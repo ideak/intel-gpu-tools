@@ -65,8 +65,8 @@ void gem_close(int fd, uint32_t handle);
 int __gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf, uint64_t length);
 void gem_write(int fd, uint32_t handle, uint64_t offset,  const void *buf, uint64_t length);
 void gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t length);
-void gem_set_domain(int fd, uint32_t handle,
-		    uint32_t read_domains, uint32_t write_domain);
+int __gem_set_domain(int fd, uint32_t handle, uint32_t read, uint32_t write);
+void gem_set_domain(int fd, uint32_t handle, uint32_t read, uint32_t write);
 int gem_wait(int fd, uint32_t handle, int64_t *timeout_ns);
 void gem_sync(int fd, uint32_t handle);
 bool gem_create__has_stolen_support(int fd);

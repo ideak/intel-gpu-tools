@@ -403,29 +403,38 @@ void gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t leng
 	igt_assert_eq(__gem_read(fd, handle, offset, buf, length), 0);
 }
 
+int __gem_set_domain(int fd, uint32_t handle, uint32_t read, uint32_t write)
+{
+	struct drm_i915_gem_set_domain set_domain;
+	int err;
+
+	memset(&set_domain, 0, sizeof(set_domain));
+	set_domain.handle = handle;
+	set_domain.read_domains = read;
+	set_domain.write_domain = write;
+
+	err = 0;
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_SET_DOMAIN, &set_domain))
+		err = -errno;
+
+	return err;
+}
+
 /**
  * gem_set_domain:
  * @fd: open i915 drm file descriptor
  * @handle: gem buffer object handle
- * @read_domains: gem domain bits for read access
- * @write_domain: gem domain bit for write access
+ * @read: gem domain bits for read access
+ * @write: gem domain bit for write access
  *
  * This wraps the SET_DOMAIN ioctl, which is used to control the coherency of
  * the gem buffer object between the cpu and gtt mappings. It is also use to
  * synchronize with outstanding rendering in general, but for that use-case
  * please have a look at gem_sync().
  */
-void gem_set_domain(int fd, uint32_t handle,
-		    uint32_t read_domains, uint32_t write_domain)
+void gem_set_domain(int fd, uint32_t handle, uint32_t read, uint32_t write)
 {
-	struct drm_i915_gem_set_domain set_domain;
-
-	memset(&set_domain, 0, sizeof(set_domain));
-	set_domain.handle = handle;
-	set_domain.read_domains = read_domains;
-	set_domain.write_domain = write_domain;
-
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_SET_DOMAIN, &set_domain);
+	igt_assert_eq(__gem_set_domain(fd, handle, read, write), 0);
 }
 
 /**
