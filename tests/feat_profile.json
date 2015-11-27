@@ -1,0 +1,7 @@
+{
+    "psr" : {
+        "include_tests" : "psr",
+        "exclude_tests" : "",
+        "target_rate" : 90
+    }
+}
