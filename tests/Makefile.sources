@@ -220,6 +220,7 @@ TESTS_progs = \
 	prime_udl \
 	drv_module_reload \
 	kms_sysfs_edid_timing \
+	perf \
 	$(NULL)
 
 # IMPORTANT: The ZZ_ tests need to be run last!

@@ -175,10 +175,10 @@ AC_ARG_ENABLE(intel, AS_HELP_STRING([--disable-intel],
 	      [Enable building of intel specific parts (default: auto)]),
 	      [INTEL=$enableval], [INTEL=auto])
 if test "x$INTEL" = xauto; then
-	PKG_CHECK_EXISTS([libdrm_intel >= 2.4.64], [INTEL=yes], [INTEL=no])
+	PKG_CHECK_EXISTS([libdrm_intel >= 2.4.74], [INTEL=yes], [INTEL=no])
 fi
 if test "x$INTEL" = xyes; then
-	PKG_CHECK_MODULES(DRM_INTEL, [libdrm_intel >= 2.4.64])
+	PKG_CHECK_MODULES(DRM_INTEL, [libdrm_intel >= 2.4.74])
 	AC_DEFINE(HAVE_LIBDRM_INTEL, 1, [Have intel support])
 else
 	DRM_INTEL_CFLAGS=-I$\(top_srcdir\)/lib/stubs/drm/
