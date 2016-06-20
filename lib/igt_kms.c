@@ -179,7 +179,8 @@ const char *igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
 	"DEGAMMA_LUT",
 	"GAMMA_LUT",
 	"MODE_ID",
-	"ACTIVE"
+	"ACTIVE",
+	"OUT_FENCE_PTR"
 };
 
 const char *igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
@@ -2385,6 +2386,14 @@ static void igt_atomic_prepare_crtc_commit(igt_pipe_t *pipe_obj, drmModeAtomicRe
 		igt_atomic_populate_crtc_req(req, pipe_obj, IGT_CRTC_ACTIVE, !!output);
 	}
 
+	pipe_obj->out_fence_fd = -1;
+	if (pipe_obj->out_fence_requested)
+	{
+		pipe_obj->out_fence_requested = false;
+		igt_atomic_populate_crtc_req(req, pipe_obj, IGT_CRTC_OUT_FENCE_PTR,
+		    (uint64_t)(uintptr_t) &pipe_obj->out_fence_fd);
+	}
+
 	/*
 	 *	TODO: Add all crtc level properties here
 	 */
@@ -2957,6 +2966,18 @@ void igt_plane_set_rotation(igt_plane_t *plane, igt_rotation_t rotation)
 	plane->rotation = rotation;
 
 	plane->rotation_changed = true;
+}
+
+/**
+ * igt_pipe_request_out_fence:
+ * @pipe: pipe which out fence will be requested for
+ *
+ * Marks this pipe for requesting an out fence at the next atomic commit
+ * will contain the fd number of the out fence created by KMS.
+ */
+void igt_pipe_request_out_fence(igt_pipe_t *pipe)
+{
+	pipe->out_fence_requested = true;
 }
 
 void

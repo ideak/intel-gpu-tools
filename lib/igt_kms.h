@@ -94,6 +94,7 @@ enum igt_atomic_crtc_properties {
        IGT_CRTC_GAMMA_LUT,
        IGT_CRTC_MODE_ID,
        IGT_CRTC_ACTIVE,
+       IGT_CRTC_OUT_FENCE_PTR,
        IGT_NUM_CRTC_PROPS
 };
 
@@ -341,6 +342,9 @@ struct igt_pipe {
 
 	uint64_t mode_blob;
 	bool mode_changed;
+
+	int32_t out_fence_fd;
+	bool out_fence_requested;
 };
 
 typedef struct {
@@ -394,7 +398,7 @@ static inline bool igt_plane_supports_rotation(igt_plane_t *plane)
 {
 	return plane->rotation_property != 0;
 }
-
+void igt_pipe_request_out_fence(igt_pipe_t *pipe);
 void igt_pipe_set_degamma_lut(igt_pipe_t *pipe, void *ptr, size_t length);
 void igt_pipe_set_ctm_matrix(igt_pipe_t *pipe, void *ptr, size_t length);
 void igt_pipe_set_gamma_lut(igt_pipe_t *pipe, void *ptr, size_t length);
