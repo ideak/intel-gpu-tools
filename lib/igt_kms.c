@@ -168,6 +168,7 @@ const char *igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	"CRTC_H",
 	"FB_ID",
 	"CRTC_ID",
+	"IN_FENCE_FD",
 	"type",
 	"rotation"
 };
@@ -1667,6 +1668,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 			plane->type = type;
 			plane->pipe = pipe;
 			plane->drm_plane = drm_plane;
+			plane->fence_fd = -1;
 
 			if (is_atomic == 0) {
 				display->is_atomic = 1;
@@ -1993,6 +1995,11 @@ igt_atomic_prepare_plane_commit(igt_plane_t *plane, igt_pipe_t *pipe,
 	    kmstest_pipe_name(pipe->pipe),
 	    plane->index,
 	    fb_id);
+
+	if (plane->fence_fd >= 0) {
+		uint64_t fence_fd = (int64_t) plane->fence_fd;
+		igt_atomic_populate_plane_req(req, plane, IGT_PLANE_IN_FENCE_FD, fence_fd);
+	}
 
 	if (plane->fb_changed) {
 		igt_atomic_populate_plane_req(req, plane, IGT_PLANE_CRTC_ID, fb_id ? crtc_id : 0);
@@ -2813,6 +2820,24 @@ void igt_plane_set_fb(igt_plane_t *plane, struct igt_fb *fb)
 
 	plane->fb_changed = true;
 	plane->size_changed = true;
+}
+
+/**
+ * igt_plane_set_fence_fd:
+ * @plane: plane
+ * @fence_fd: fence fd, disable fence_fd by setting it to -1
+ *
+ * This function sets a fence fd to enable a commit to wait for some event to
+ * occur before completing.
+ */
+void igt_plane_set_fence_fd(igt_plane_t *plane, int fence_fd)
+{
+	close(plane->fence_fd);
+
+	if (fcntl(fence_fd, F_GETFD) != -1)
+		plane->fence_fd = dup(fence_fd);
+	else
+		plane->fence_fd = -1;
 }
 
 void igt_plane_set_position(igt_plane_t *plane, int x, int y)

@@ -248,6 +248,7 @@ enum igt_atomic_plane_properties {
 
        IGT_PLANE_FB_ID,
        IGT_PLANE_CRTC_ID,
+       IGT_PLANE_IN_FENCE_FD,
        IGT_PLANE_TYPE,
        IGT_PLANE_ROTATION,
        IGT_NUM_PLANE_PROPS
@@ -306,6 +307,9 @@ typedef struct {
 	uint32_t src_h;
 
 	igt_rotation_t rotation;
+
+	/* in fence fd */
+	int fence_fd;
 	uint32_t atomic_props_plane[IGT_NUM_PLANE_PROPS];
 } igt_plane_t;
 
@@ -396,6 +400,7 @@ void igt_pipe_set_ctm_matrix(igt_pipe_t *pipe, void *ptr, size_t length);
 void igt_pipe_set_gamma_lut(igt_pipe_t *pipe, void *ptr, size_t length);
 
 void igt_plane_set_fb(igt_plane_t *plane, struct igt_fb *fb);
+void igt_plane_set_fence_fd(igt_plane_t *plane, int fence_fd);
 void igt_plane_set_position(igt_plane_t *plane, int x, int y);
 void igt_plane_set_size(igt_plane_t *plane, int w, int h);
 void igt_plane_set_rotation(igt_plane_t *plane, igt_rotation_t rotation);
