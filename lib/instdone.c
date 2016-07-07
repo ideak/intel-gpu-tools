@@ -417,18 +417,10 @@ init_gen8_instdone(void)
 	init_gen75_instdone();
 }
 
-static void
-init_gen9_instdone(void)
-{
-	init_gen8_instdone();
-}
-
 bool
 init_instdone_definitions(uint32_t devid)
 {
-	if (IS_GEN9(devid)) {
-		init_gen9_instdone();
-	} else if (IS_GEN8(devid)) {
+	if (IS_GEN8(devid) || IS_GEN9(devid) || IS_GEN10(devid)) {
 		init_gen8_instdone();
 	} else if (IS_GEN7(devid)) {
 		init_gen7_instdone();
