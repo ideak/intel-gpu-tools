@@ -49,6 +49,8 @@ static void test_bad_command(data_t *data, const char *cmd)
 	size_t written;
 
 	ctl = igt_debugfs_fopen("i915_display_crc_ctl", "r+");
+	igt_require(ctl);
+
 	written = fwrite(cmd, 1, strlen(cmd), ctl);
 	fflush(ctl);
 	igt_assert_eq(written, strlen(cmd));
@@ -56,6 +58,30 @@ static void test_bad_command(data_t *data, const char *cmd)
 	igt_assert_eq(errno, EINVAL);
 
 	fclose(ctl);
+}
+
+static void test_bad_source(data_t *data)
+{
+	FILE *f;
+	size_t written;
+	const char *source = "foo";
+
+	f = igt_debugfs_fopen("crtc-0/crc/control", "w");
+	if (!f) {
+		test_bad_command(data, "pipe A foo");
+		return;
+	}
+
+	written = fwrite(source, 1, strlen(source), f);
+	fflush(f);
+	igt_assert_eq(written, strlen(source));
+	igt_assert(!ferror(f));
+	igt_assert(!errno);
+	fclose(f);
+
+	f = igt_debugfs_fopen("crtc-0/crc/data", "w");
+	igt_assert(!f);
+	igt_assert_eq(errno, EINVAL);
 }
 
 #define N_CRCS	3
@@ -185,7 +211,7 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
 		igt_enable_connectors();
 
@@ -200,7 +226,7 @@ igt_main
 		test_bad_command(&data, "pipe D none");
 
 	igt_subtest("bad-source")
-		test_bad_command(&data, "pipe A foo");
+		test_bad_source(&data);
 
 	igt_subtest("bad-nb-words-1")
 		test_bad_command(&data, "pipe foo");

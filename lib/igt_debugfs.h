@@ -62,6 +62,7 @@ bool igt_debugfs_search(const char *filename, const char *substring);
  */
 typedef struct _igt_pipe_crc igt_pipe_crc_t;
 
+#define DRM_MAX_CRC_NR 10
 /**
  * igt_crc_t:
  * @frame: frame number of the capture CRC
@@ -73,8 +74,9 @@ typedef struct _igt_pipe_crc igt_pipe_crc_t;
  */
 typedef struct {
 	uint32_t frame;
+	bool has_valid_frame;
 	int n_words;
-	uint32_t crc[5];
+	uint32_t crc[DRM_MAX_CRC_NR];
 } igt_crc_t;
 
 /**

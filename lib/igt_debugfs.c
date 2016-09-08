@@ -25,6 +25,7 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -291,25 +292,23 @@ char *igt_crc_to_string(igt_crc_t *crc)
 {
 	char buf[128];
 
-	igt_assert_eq(crc->n_words, 5);
-
 	sprintf(buf, "%08x %08x %08x %08x %08x", crc->crc[0],
 		crc->crc[1], crc->crc[2], crc->crc[3], crc->crc[4]);
 
 	return strdup(buf);
 }
 
+#define MAX_CRC_ENTRIES 10
+#define MAX_LINE_LEN (10 + 11 * MAX_CRC_ENTRIES + 1)
+
 /* (6 fields, 8 chars each, space separated (5) + '\n') */
-#define PIPE_CRC_LINE_LEN       (6 * 8 + 5 + 1)
-/* account for \'0' */
-#define PIPE_CRC_BUFFER_LEN     (PIPE_CRC_LINE_LEN + 1)
+#define LEGACY_LINE_LEN       (6 * 8 + 5 + 1)
 
 struct _igt_pipe_crc {
 	int ctl_fd;
 	int crc_fd;
-	int line_len;
-	int buffer_len;
 	int flags;
+	bool is_legacy;
 
 	enum pipe pipe;
 	enum intel_pipe_crc_source source;
@@ -340,12 +339,25 @@ static bool igt_pipe_crc_do_start(igt_pipe_crc_t *pipe_crc)
 	/* Stop first just to make sure we don't have lingering state left. */
 	igt_pipe_crc_stop(pipe_crc);
 
-	sprintf(buf, "pipe %s %s", kmstest_pipe_name(pipe_crc->pipe),
-		pipe_crc_source_name(pipe_crc->source));
+	if (pipe_crc->is_legacy)
+		sprintf(buf, "pipe %s %s", kmstest_pipe_name(pipe_crc->pipe),
+			pipe_crc_source_name(pipe_crc->source));
+	else
+		sprintf(buf, "%s", pipe_crc_source_name(pipe_crc->source));
+
 	errno = 0;
 	igt_assert_eq(write(pipe_crc->ctl_fd, buf, strlen(buf)), strlen(buf));
 	if (errno != 0)
 		return false;
+
+	if (!pipe_crc->is_legacy) {
+		sprintf(buf, "crtc-%d/crc/data", pipe_crc->pipe);
+		errno = 0;
+		pipe_crc->crc_fd = igt_debugfs_open(buf, pipe_crc->flags);
+		if (pipe_crc->crc_fd == -1 && errno == EINVAL)
+			return false;
+		igt_assert_eq(errno, 0);
+	}
 
 	return true;
 }
@@ -360,15 +372,45 @@ static void igt_pipe_crc_pipe_off(int fd, enum pipe pipe)
 
 static void igt_pipe_crc_reset(void)
 {
+	igt_debugfs_t *debugfs = __igt_debugfs_singleton();
 	int fd;
+	struct dirent *dirent;
+	char buf[128];
+	const char *cmd = "none";
+	bool done = false;
+	DIR *dir;
+
+	dir = opendir(debugfs->dri_path);
+	if (dir) {
+		while ((dirent = readdir(dir))) {
+			if (strcmp(dirent->d_name, "crtc-") != 0)
+				continue;
+
+			sprintf(buf, "%s/%s/crc/control", debugfs->dri_path,
+				dirent->d_name);
+			fd = open(buf, O_WRONLY);
+			if (fd == -1)
+				continue;
+
+			igt_assert_eq(write(fd, cmd, strlen(cmd)), strlen(cmd));
+			done = true;
+
+			close(fd);
+		}
+		closedir(dir);
+	}
+
+	if (done)
+		return;
 
 	fd = igt_debugfs_open("i915_display_crc_ctl", O_WRONLY);
+	if (fd != -1) {
+		igt_pipe_crc_pipe_off(fd, PIPE_A);
+		igt_pipe_crc_pipe_off(fd, PIPE_B);
+		igt_pipe_crc_pipe_off(fd, PIPE_C);
 
-	igt_pipe_crc_pipe_off(fd, PIPE_A);
-	igt_pipe_crc_pipe_off(fd, PIPE_B);
-	igt_pipe_crc_pipe_off(fd, PIPE_C);
-
-	close(fd);
+		close(fd);
+	}
 }
 
 static void pipe_crc_exit_handler(int sig)
@@ -390,13 +432,16 @@ void igt_require_pipe_crc(void)
 	size_t written;
 	int ret;
 
-	ctl = igt_debugfs_fopen("i915_display_crc_ctl", "r+");
-	igt_require_f(ctl,
-		      "No display_crc_ctl found, kernel too old\n");
-	written = fwrite(cmd, 1, strlen(cmd), ctl);
-	ret = fflush(ctl);
-	igt_require_f((written == strlen(cmd) && ret == 0) || errno != ENODEV,
-		      "CRCs not supported on this platform\n");
+	ctl = igt_debugfs_fopen("crtc-0/crc/control", "r+");
+	if (!ctl) {
+		ctl = igt_debugfs_fopen("i915_display_crc_ctl", "r+");
+		igt_require_f(ctl,
+			      "No display_crc_ctl found, kernel too old\n");
+		written = fwrite(cmd, 1, strlen(cmd), ctl);
+		ret = fflush(ctl);
+		igt_require_f((written == strlen(cmd) && ret == 0) || errno != ENODEV,
+			      "CRCs not supported on this platform\n");
+	}
 
 	fclose(ctl);
 }
@@ -411,15 +456,25 @@ pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source, int flags)
 
 	pipe_crc = calloc(1, sizeof(struct _igt_pipe_crc));
 
-	pipe_crc->ctl_fd = igt_debugfs_open("i915_display_crc_ctl", O_WRONLY);
-	igt_assert(pipe_crc->ctl_fd != -1);
+	sprintf(buf, "crtc-%d/crc/control", pipe);
+	pipe_crc->ctl_fd = igt_debugfs_open(buf, O_WRONLY);
+	if (pipe_crc->ctl_fd == -1) {
+		pipe_crc->ctl_fd = igt_debugfs_open("i915_display_crc_ctl",
+						    O_WRONLY);
+		igt_assert(pipe_crc->ctl_fd != -1);
+		pipe_crc->is_legacy = true;
+	}
 
-	sprintf(buf, "i915_pipe_%s_crc", kmstest_pipe_name(pipe));
-	pipe_crc->crc_fd = igt_debugfs_open(buf, flags);
-	igt_assert(pipe_crc->crc_fd != -1);
+	if (pipe_crc->is_legacy) {
+		sprintf(buf, "i915_pipe_%s_crc", kmstest_pipe_name(pipe));
+		pipe_crc->crc_fd = igt_debugfs_open(buf, flags);
+		igt_assert(pipe_crc->crc_fd != -1);
+		igt_debug("Using legacy frame CRC ABI\n");
+	} else {
+		pipe_crc->crc_fd = -1;
+		igt_debug("Using generic frame CRC ABI\n");
+	}
 
-	pipe_crc->line_len = PIPE_CRC_LINE_LEN;
-	pipe_crc->buffer_len = PIPE_CRC_BUFFER_LEN;
 	pipe_crc->pipe = pipe;
 	pipe_crc->source = source;
 	pipe_crc->flags = flags;
@@ -479,34 +534,59 @@ void igt_pipe_crc_free(igt_pipe_crc_t *pipe_crc)
 	free(pipe_crc);
 }
 
-static bool pipe_crc_init_from_string(igt_crc_t *crc, const char *line)
+static bool pipe_crc_init_from_string(igt_pipe_crc_t *pipe_crc, igt_crc_t *crc,
+				      const char *line)
 {
-	int n;
+	int n, i;
+	const char *buf;
 
-	crc->n_words = 5;
-	n = sscanf(line, "%8u %8x %8x %8x %8x %8x", &crc->frame, &crc->crc[0],
-		   &crc->crc[1], &crc->crc[2], &crc->crc[3], &crc->crc[4]);
-	return n == 6;
+	if (pipe_crc->is_legacy) {
+		crc->has_valid_frame = true;
+		crc->n_words = 5;
+		n = sscanf(line, "%8u %8x %8x %8x %8x %8x", &crc->frame,
+			   &crc->crc[0], &crc->crc[1], &crc->crc[2],
+			   &crc->crc[3], &crc->crc[4]);
+		return n == 6;
+	}
+
+	if (strncmp(line, "XXXXXXXXXX", 10) == 0)
+		crc->has_valid_frame = false;
+	else {
+		crc->has_valid_frame = true;
+		crc->frame = strtoul(line, NULL, 16);
+	}
+
+	buf = line + 10;
+	for (i = 0; *buf != '\n'; i++, buf += 11)
+		crc->crc[i] = strtoul(buf, NULL, 16);
+
+	crc->n_words = i;
+
+	return true;
 }
 
 static int read_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out)
 {
 	ssize_t bytes_read;
-	char buf[pipe_crc->buffer_len];
+	char buf[MAX_LINE_LEN + 1];
+	size_t read_len;
+
+	if (pipe_crc->is_legacy)
+		read_len = LEGACY_LINE_LEN;
+	else
+		read_len = MAX_LINE_LEN;
 
 	igt_set_timeout(5, "CRC reading");
-	bytes_read = read(pipe_crc->crc_fd, &buf, pipe_crc->line_len);
+	bytes_read = read(pipe_crc->crc_fd, &buf, read_len);
 	igt_reset_timeout();
 
 	if (bytes_read < 0 && errno == EAGAIN) {
 		igt_assert(pipe_crc->flags & O_NONBLOCK);
 		bytes_read = 0;
-	} else {
-		igt_assert_eq(bytes_read, pipe_crc->line_len);
 	}
 	buf[bytes_read] = '\0';
 
-	if (bytes_read && !pipe_crc_init_from_string(out, buf))
+	if (bytes_read && !pipe_crc_init_from_string(pipe_crc, out, buf))
 		return -EINVAL;
 
 	return bytes_read;
@@ -530,15 +610,18 @@ void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc)
 
 	igt_assert(igt_pipe_crc_do_start(pipe_crc));
 
-	/*
-	 * For some no yet identified reason, the first CRC is bonkers. So
-	 * let's just wait for the next vblank and read out the buggy result.
-	 *
-	 * On CHV sometimes the second CRC is bonkers as well, so don't trust
-	 * that one either.
-	 */
-	read_one_crc(pipe_crc, &crc);
-	read_one_crc(pipe_crc, &crc);
+	if (pipe_crc->is_legacy) {
+		/*
+		 * For some no yet identified reason, the first CRC is
+		 * bonkers. So let's just wait for the next vblank and read
+		 * out the buggy result.
+		 *
+		 * On CHV sometimes the second CRC is bonkers as well, so
+		 * don't trust that one either.
+		 */
+		read_one_crc(pipe_crc, &crc);
+		read_one_crc(pipe_crc, &crc);
+	}
 }
 
 /**
@@ -551,8 +634,15 @@ void igt_pipe_crc_stop(igt_pipe_crc_t *pipe_crc)
 {
 	char buf[32];
 
-	sprintf(buf, "pipe %s none", kmstest_pipe_name(pipe_crc->pipe));
-	igt_assert_eq(write(pipe_crc->ctl_fd, buf, strlen(buf)), strlen(buf));
+	if (pipe_crc->is_legacy) {
+		sprintf(buf, "pipe %s none",
+			kmstest_pipe_name(pipe_crc->pipe));
+		igt_assert_eq(write(pipe_crc->ctl_fd, buf, strlen(buf)),
+			      strlen(buf));
+	} else {
+		close(pipe_crc->crc_fd);
+		pipe_crc->crc_fd = -1;
+	}
 }
 
 /**
