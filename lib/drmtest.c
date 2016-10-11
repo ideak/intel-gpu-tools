@@ -57,6 +57,7 @@
 #include "config.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
+#include "igt_dummyload.h"
 
 /**
  * SECTION:drmtest
@@ -158,6 +159,8 @@ void gem_quiescent_gpu(int fd)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
 	unsigned ring;
+
+	igt_terminate_spin_batches();
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);

@@ -75,6 +75,8 @@ lib_source_list =	 	\
 	igt_draw.h		\
 	igt_pm.c		\
 	igt_pm.h		\
+	igt_dummyload.c		\
+	igt_dummyload.h		\
 	uwildmat/uwildmat.h	\
 	uwildmat/uwildmat.c	\
 	$(NULL)

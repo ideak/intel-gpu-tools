@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015 Intel Corporation
+ * Copyright © 2016 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,32 +19,30 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
+ *
  */
 
-#ifndef IGT_H
-#define IGT_H
+#ifndef __IGT_DUMMYLOAD_H__
+#define __IGT_DUMMYLOAD_H__
 
-#include "drmtest.h"
-#include "i915_3d.h"
-#include "i915_pciids.h"
+#include <stdint.h>
+#include <time.h>
+
 #include "igt_aux.h"
-#include "igt_core.h"
-#include "igt_core.h"
-#include "igt_debugfs.h"
-#include "igt_draw.h"
-#include "igt_dummyload.h"
-#include "igt_fb.h"
-#include "igt_gt.h"
-#include "igt_kms.h"
-#include "igt_pm.h"
-#include "igt_stats.h"
-#include "instdone.h"
-#include "intel_batchbuffer.h"
-#include "intel_chipset.h"
-#include "intel_io.h"
-#include "ioctl_wrappers.h"
-#include "media_fill.h"
-#include "media_spin.h"
-#include "rendercopy.h"
 
-#endif /* IGT_H */
+typedef struct igt_spin {
+	unsigned int handle;
+	timer_t timer;
+	int signo;
+	struct igt_list link;
+	uint32_t *batch;
+} igt_spin_t;
+
+igt_spin_t *igt_spin_batch_new(int fd, int engine, unsigned int dep_handle);
+void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns);
+void igt_spin_batch_end(igt_spin_t *spin);
+void igt_spin_batch_free(int fd, igt_spin_t *spin);
+
+void igt_terminate_spin_batches(void);
+
+#endif /* __IGT_DUMMYLOAD_H__ */
