@@ -77,7 +77,7 @@ igt@gem_exec_store@basic-render
 igt@gem_exec_store@basic-vebox
 igt@gem_exec_suspend@basic
 igt@gem_exec_suspend@basic-s3
-igt@gem_exec_suspend@basic-s4
+igt@gem_exec_suspend@basic-s4-devices
 igt@gem_flink_basic@bad-flink
 igt@gem_flink_basic@bad-open
 igt@gem_flink_basic@basic
