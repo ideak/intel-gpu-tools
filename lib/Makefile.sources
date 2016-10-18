@@ -83,6 +83,8 @@ lib_source_list =	 	\
 	uwildmat/uwildmat.c	\
 	igt_kmod.c		\
 	igt_kmod.h		\
+	igt_chamelium.h		\
+	igt_chamelium.c		\
 	$(NULL)
 
 .PHONY: version.h.tmp

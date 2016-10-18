@@ -31,6 +31,9 @@ AM_CFLAGS = \
 	    $(KMOD_CFLAGS) \
 	    $(PROCPS_CFLAGS) \
 	    $(DEBUG_CFLAGS) \
+	    $(XMLRPC_CFLAGS) \
+	    $(LIBUDEV_CFLAGS) \
+	    $(PIXMAN_CFLAGS) \
 	    -DIGT_SRCDIR=\""$(abs_top_srcdir)/tests"\" \
 	    -DIGT_DATADIR=\""$(pkgdatadir)"\" \
 	    -DIGT_LOG_DOMAIN=\""$(subst _,-,$*)"\" \
@@ -47,5 +50,8 @@ libintel_tools_la_LIBADD = \
 	$(LIBUDEV_LIBS) \
 	$(LIBUNWIND_LIBS) \
 	$(TIMER_LIBS) \
+	$(XMLRPC_LIBS) \
+	$(LIBUDEV_LIBS) \
+	$(PIXMAN_LIBS) \
 	-lm
 

@@ -62,7 +62,7 @@ AM_CFLAGS = $(DRM_CFLAGS) $(CWARNFLAGS) -Wno-unused-result $(DEBUG_CFLAGS)\
 	$(LIBUNWIND_CFLAGS) $(WERROR_CFLAGS) \
 	$(NULL)
 
-LDADD = ../lib/libintel_tools.la $(GLIB_LIBS)
+LDADD = ../lib/libintel_tools.la $(GLIB_LIBS) $(XMLRPC_LIBS)
 
 AM_CFLAGS += $(CAIRO_CFLAGS) $(LIBUDEV_CFLAGS) $(GLIB_CFLAGS)
 AM_LDFLAGS = -Wl,--as-needed
@@ -118,5 +118,8 @@ vc4_wait_bo_CFLAGS = $(AM_CFLAGS) $(DRM_VC4_CFLAGS)
 vc4_wait_bo_LDADD = $(LDADD) $(DRM_VC4_LIBS)
 vc4_wait_seqno_CFLAGS = $(AM_CFLAGS) $(DRM_VC4_CFLAGS)
 vc4_wait_seqno_LDADD = $(LDADD) $(DRM_VC4_LIBS)
+
+chamelium_CFLAGS = $(AM_CFLAGS) $(XMLRPC_CFLAGS) $(LIBUDEV_CFLAGS)
+chamelium_LDADD = $(LDADD) $(XMLRPC_LIBS) $(LIBUDEV_LIBS)
 endif
 
