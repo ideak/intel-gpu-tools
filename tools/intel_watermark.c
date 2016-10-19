@@ -119,6 +119,11 @@ static const char *endis(bool enabled)
 	return enabled ? "enabled" : "disabled";
 }
 
+static char endis_ast(bool enabled)
+{
+	return enabled ? '*' : ' ';
+}
+
 static int is_gen7_plus(uint32_t d)
 {
 	return !(IS_GEN5(d) || IS_GEN6(d));
@@ -127,6 +132,145 @@ static int is_gen7_plus(uint32_t d)
 static int is_hsw_plus(uint32_t d)
 {
 	return !(IS_GEN5(d) || IS_GEN6(d) || IS_IVYBRIDGE(d));
+}
+
+
+static void skl_wm_dump(void)
+{
+	int pipe, plane, level;
+	int num_pipes = 3;
+	int num_planes = 5;
+	int num_levels = 8;
+	uint32_t base_addr = 0x70000, addr, wm_offset;
+	uint32_t wm[num_levels][num_pipes][num_planes];
+	uint32_t wm_trans[num_pipes][num_planes];
+	uint32_t buf_cfg[num_pipes][num_planes];
+	char reg_name[20];
+
+	intel_register_access_init(intel_get_pci_device(), 0, -1);
+
+	for (pipe = 0; pipe < num_pipes; pipe++) {
+		for (plane = 0; plane < num_planes; plane++) {
+			addr =  base_addr +  pipe * 0x1000 + plane * 0x100;
+
+			wm_trans[pipe][plane] = read_reg(addr + 0x00168);
+			buf_cfg[pipe][plane] = read_reg(addr + 0x0017C);
+			for (level = 0; level < num_levels; level++) {
+				wm_offset = addr + 0x00140 + level * 0x4;
+				wm[level][pipe][plane] = read_reg(wm_offset);
+			}
+		}
+	}
+
+	for (plane = 0; plane < num_planes; plane++) {
+		for (level = 0; level < num_levels; level++) {
+			for (pipe = 0; pipe < num_pipes; pipe++) {
+				if (plane == 0)
+					snprintf(reg_name, sizeof(reg_name), "%s_WM_%c_%1d","CUR",
+						 pipe_name(pipe), level);
+				else
+					snprintf(reg_name, sizeof(reg_name), "%s_WM_%1d_%c_%1d","PLANE",
+						 plane, pipe_name(pipe), level);
+
+				printf("%-19s %8x\t\t" , reg_name, wm[level][pipe][plane]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+
+	for (plane = 0; plane < num_planes; plane++) {
+		for (pipe = 0; pipe < num_pipes; pipe++) {
+			if (plane == 0)
+				snprintf(reg_name, sizeof(reg_name), "%s_WM_TRANS_%c", "CUR",
+					 pipe_name(pipe));
+			else
+				snprintf(reg_name, sizeof(reg_name), "%s_WM_TRANS_%1d_%c", "PLANE",
+					 plane, pipe_name(pipe));
+
+			printf("%-19s %8x\t\t", reg_name, wm_trans[pipe][plane]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	for (plane = 0; plane < num_planes; plane++) {
+		for (pipe = 0; pipe < num_pipes; pipe++) {
+			if (plane == 0)
+				snprintf(reg_name, sizeof(reg_name), "%s_BUF_CFG_%c", "CUR",
+					 pipe_name(pipe));
+			else
+				snprintf(reg_name, sizeof(reg_name), "%s_BUF_CFG_%1d_%c", "PLANE",
+					 plane, pipe_name(pipe));
+
+			printf("%-19s %8x\t\t", reg_name, buf_cfg[pipe][plane]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	for (pipe = 0; pipe < num_pipes; pipe++) {
+		uint32_t start, end, size;
+		uint32_t lines, blocks, enable;
+
+		printf("PIPE_%c\n", pipe_name(pipe));
+		printf("LEVEL   CURSOR   PLANE_1   PLANE_2   PLANE_3   PLANE_4\n");
+		for (level = 0; level < num_levels; level++) {
+			printf("%5d  ", level);
+			for (plane = 0; plane < num_planes; plane++) {
+				blocks = REG_DECODE1(wm[level][pipe][plane], 0, 9);
+				lines = REG_DECODE1(wm[level][pipe][plane], 14, 5);
+				enable = REG_DECODE1(wm[level][pipe][plane], 31, 1);
+
+				printf("%3d%c", blocks, endis_ast(enable));
+				if (!REG_DECODE1(wm[level][pipe][plane], 30, 1))
+					printf("(%2d)  ", lines);
+				else
+					printf("(--)  ");
+			}
+			printf("\n");
+		}
+
+		printf("TRANS: ");
+		for (plane = 0; plane < num_planes; plane++) {
+			blocks = REG_DECODE1(wm_trans[pipe][plane], 0, 9);
+			lines = REG_DECODE1(wm_trans[pipe][plane], 14, 5);
+			enable = REG_DECODE1(wm_trans[pipe][plane], 31, 1);
+
+			printf("%3d%c", blocks, endis_ast(enable));
+			if (!REG_DECODE1(wm_trans[pipe][plane], 30, 1))
+				printf("(%2d)  ", lines);
+			else
+				printf("(--)  ");
+		}
+
+		printf("\nDDB allocation:");
+
+		printf("\nstart ");
+		for (plane = 0; plane < num_planes; plane++) {
+			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 10);
+			printf("%7d   ", start);
+		}
+
+		printf("\nend   ");
+		for (plane = 0; plane < num_planes; plane++) {
+			end = REG_DECODE1(buf_cfg[pipe][plane], 16, 10);
+			printf("%7d   ", end);
+		}
+
+		printf("\nsize  ");
+		for (plane = 0; plane < num_planes; plane++) {
+			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 10);
+			end =  REG_DECODE1(buf_cfg[pipe][plane], 16, 10);
+			size = end - start + 1;
+			printf("%7d   ", (end == 0 && size == 1) ? 0 : size);
+		}
+
+		printf("\n\n\n");
+	}
+
+	printf("* plane watermark enabled\n");
+	printf("(x) line watermark if enabled\n");
 }
 
 static void ilk_wm_dump(void)
@@ -901,7 +1045,9 @@ int main(int argc, char *argv[])
 {
 	devid = intel_get_pci_device()->device_id;
 
-	if (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid)) {
+	if (IS_GEN9(devid)) {
+		skl_wm_dump();
+	} else if (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid)) {
 		display_base = 0x180000;
 		vlv_wm_dump();
 	} else if (HAS_PCH_SPLIT(devid)) {
