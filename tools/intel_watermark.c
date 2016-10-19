@@ -134,23 +134,42 @@ static int is_hsw_plus(uint32_t d)
 	return !(IS_GEN5(d) || IS_GEN6(d) || IS_IVYBRIDGE(d));
 }
 
+static int skl_num_planes(uint32_t d, int pipe)
+{
+	if (IS_GEN10(d) || IS_GEMINILAKE(d))
+		return 5;
+	else if (IS_BROXTON(d))
+		return pipe == 2 ? 4 : 5;
+	else
+		return 4;
+}
+
+static int skl_max_planes(uint32_t d)
+{
+	if (IS_GEN10(d) || IS_GEMINILAKE(d) || IS_BROXTON(d))
+		return 5;
+	else
+		return 4;
+}
 
 static void skl_wm_dump(void)
 {
 	int pipe, plane, level;
 	int num_pipes = 3;
-	int num_planes = 5;
+	int max_planes = skl_max_planes(devid);
 	int num_levels = 8;
 	uint32_t base_addr = 0x70000, addr, wm_offset;
-	uint32_t wm[num_levels][num_pipes][num_planes];
-	uint32_t wm_trans[num_pipes][num_planes];
-	uint32_t buf_cfg[num_pipes][num_planes];
+	uint32_t wm[num_levels][num_pipes][max_planes];
+	uint32_t wm_trans[num_pipes][max_planes];
+	uint32_t buf_cfg[num_pipes][max_planes];
 	uint32_t wm_linetime[num_pipes];
 	char reg_name[20];
 
 	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	for (pipe = 0; pipe < num_pipes; pipe++) {
+		int num_planes = skl_num_planes(devid, pipe);
+
 		wm_linetime[pipe] = read_reg(0x45270 + pipe * 0x4);
 
 		for (plane = 0; plane < num_planes; plane++) {
@@ -172,9 +191,11 @@ static void skl_wm_dump(void)
 	}
 	printf("\n\n");
 
-	for (plane = 0; plane < num_planes; plane++) {
+	for (plane = 0; plane < max_planes; plane++) {
 		for (level = 0; level < num_levels; level++) {
 			for (pipe = 0; pipe < num_pipes; pipe++) {
+				if (plane >= skl_num_planes(devid, pipe))
+					break;
 				if (plane == 0)
 					snprintf(reg_name, sizeof(reg_name), "CUR_WM_%c_%1d",
 						 pipe_name(pipe), level);
@@ -189,8 +210,10 @@ static void skl_wm_dump(void)
 		printf("\n");
 	}
 
-	for (plane = 0; plane < num_planes; plane++) {
+	for (plane = 0; plane < max_planes; plane++) {
 		for (pipe = 0; pipe < num_pipes; pipe++) {
+			if (plane >= skl_num_planes(devid, pipe))
+				break;
 			if (plane == 0)
 				snprintf(reg_name, sizeof(reg_name), "CUR_WM_TRANS_%c",
 					 pipe_name(pipe));
@@ -204,8 +227,10 @@ static void skl_wm_dump(void)
 	}
 	printf("\n");
 
-	for (plane = 0; plane < num_planes; plane++) {
+	for (plane = 0; plane < max_planes; plane++) {
 		for (pipe = 0; pipe < num_pipes; pipe++) {
+			if (plane >= skl_num_planes(devid, pipe))
+				break;
 			if (plane == 0)
 				snprintf(reg_name, sizeof(reg_name), "CUR_BUF_CFG_%c",
 					 pipe_name(pipe));
@@ -223,6 +248,7 @@ static void skl_wm_dump(void)
 		uint32_t start, end, size;
 		uint32_t lines, blocks, enable;
 		uint32_t linetime;
+		int num_planes = skl_num_planes(devid, pipe);
 
 		printf("PIPE_%c\n", pipe_name(pipe));
 
