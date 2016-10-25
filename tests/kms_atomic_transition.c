@@ -383,7 +383,9 @@ static void commit_display(igt_display_t *display, unsigned event_mask, bool non
 		struct drm_event_vblank *vblank = (void *)buf;
 		uint32_t crtc_id, pipe = I915_MAX_PIPES;
 
+		igt_set_timeout(3, "Timed out while reading drm_fd\n");
 		ret = read(display->drm_fd, buf, sizeof(buf));
+		igt_reset_timeout();
 		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
 			continue;
 
