@@ -157,7 +157,7 @@ const unsigned char* igt_kms_get_base_edid(void)
 #define EDID_NAME alt_edid
 #include "igt_edid_template.h"
 
-static const char *igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
+const char *igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	"SRC_X",
 	"SRC_Y",
 	"SRC_W",
@@ -172,7 +172,7 @@ static const char *igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	"rotation"
 };
 
-static const char *igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
+const char *igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
 	"background_color",
 	"CTM",
 	"DEGAMMA_LUT",
@@ -181,7 +181,7 @@ static const char *igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
 	"ACTIVE"
 };
 
-static const char *igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
+const char *igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	"scaling mode",
 	"CRTC_ID"
 };
