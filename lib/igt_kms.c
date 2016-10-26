@@ -157,23 +157,6 @@ const unsigned char* igt_kms_get_base_edid(void)
 #define EDID_NAME alt_edid
 #include "igt_edid_template.h"
 
-/**
- * igt_kms_get_alt_edid:
- *
- * Get an alternate edid block, which includes the following modes:
- *
- *  - 1400x1050 60Hz
- *  - 1920x1080 60Hz
- *  - 1280x720 60Hz
- *  - 1024x768 60Hz
- *  - 800x600 60Hz
- *  - 640x480 60Hz
- *
- * This can be extended with further features using functions such as
- * #kmstest_edid_add_3d.
- *
- * Returns: an alternate edid block
- */
 static const char *igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	"SRC_X",
 	"SRC_Y",
@@ -301,6 +284,23 @@ igt_atomic_fill_pipe_props(igt_display_t *display, igt_pipe_t *pipe,
 	drmModeFreeObjectProperties(props);
 }
 
+/**
+ * igt_kms_get_alt_edid:
+ *
+ * Get an alternate edid block, which includes the following modes:
+ *
+ *  - 1400x1050 60Hz
+ *  - 1920x1080 60Hz
+ *  - 1280x720 60Hz
+ *  - 1024x768 60Hz
+ *  - 800x600 60Hz
+ *  - 640x480 60Hz
+ *
+ * This can be extended with further features using functions such as
+ * #kmstest_edid_add_3d.
+ *
+ * Returns: an alternate edid block
+ */
 const unsigned char* igt_kms_get_alt_edid(void)
 {
 	update_edid_csum(alt_edid);
