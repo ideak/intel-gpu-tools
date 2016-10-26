@@ -105,55 +105,6 @@ static const char *plane_type_prop_names[NUM_PLANE_TYPE_PROPS] = {
 	"Cursor"
 };
 
-enum plane_properties {
-	PLANE_SRC_X = 0,
-	PLANE_SRC_Y,
-	PLANE_SRC_W,
-	PLANE_SRC_H,
-	PLANE_CRTC_X,
-	PLANE_CRTC_Y,
-	PLANE_CRTC_W,
-	PLANE_CRTC_H,
-	PLANE_FB_ID,
-	PLANE_CRTC_ID,
-	PLANE_TYPE,
-	NUM_PLANE_PROPS
-};
-
-static const char *plane_prop_names[NUM_PLANE_PROPS] = {
-	"SRC_X",
-	"SRC_Y",
-	"SRC_W",
-	"SRC_H",
-	"CRTC_X",
-	"CRTC_Y",
-	"CRTC_W",
-	"CRTC_H",
-	"FB_ID",
-	"CRTC_ID",
-	"type"
-};
-
-enum crtc_properties {
-	CRTC_MODE_ID = 0,
-	CRTC_ACTIVE,
-	NUM_CRTC_PROPS
-};
-
-static const char *crtc_prop_names[NUM_CRTC_PROPS] = {
-	"MODE_ID",
-	"ACTIVE"
-};
-
-enum connector_properties {
-	CONNECTOR_CRTC_ID = 0,
-	NUM_CONNECTOR_PROPS
-};
-
-static const char *connector_prop_names[NUM_CONNECTOR_PROPS] = {
-	"CRTC_ID"
-};
-
 struct kms_atomic_blob {
 	uint32_t id; /* 0 if not already allocated */
 	size_t len;
@@ -197,9 +148,9 @@ struct kms_atomic_state {
 
 struct kms_atomic_desc {
 	int fd;
-	uint32_t props_connector[NUM_CONNECTOR_PROPS];
-	uint32_t props_crtc[NUM_CRTC_PROPS];
-	uint32_t props_plane[NUM_PLANE_PROPS];
+	uint32_t props_connector[IGT_NUM_CONNECTOR_PROPS];
+	uint32_t props_crtc[IGT_NUM_CRTC_PROPS];
+	uint32_t props_plane[IGT_NUM_PLANE_PROPS];
 	uint64_t props_plane_type[NUM_PLANE_TYPE_PROPS];
 };
 
@@ -280,7 +231,7 @@ connector_get_current_state(struct kms_atomic_connector_state *connector)
 	for (i = 0; i < props->count_props; i++) {
 		uint32_t *prop_ids = connector->state->desc->props_connector;
 
-		if (props->props[i] == prop_ids[CONNECTOR_CRTC_ID])
+		if (props->props[i] == prop_ids[IGT_CONNECTOR_CRTC_ID])
 			connector->crtc_id = props->prop_values[i];
 	}
 	drmModeFreeObjectProperties(props);
@@ -348,16 +299,16 @@ find_connector(struct kms_atomic_state *state,
 static void plane_populate_req(struct kms_atomic_plane_state *plane,
 			       drmModeAtomicReq *req)
 {
-	plane_set_prop(req, plane, PLANE_CRTC_ID, plane->crtc_id);
-	plane_set_prop(req, plane, PLANE_FB_ID, plane->fb_id);
-	plane_set_prop(req, plane, PLANE_SRC_X, plane->src_x);
-	plane_set_prop(req, plane, PLANE_SRC_Y, plane->src_y);
-	plane_set_prop(req, plane, PLANE_SRC_W, plane->src_w);
-	plane_set_prop(req, plane, PLANE_SRC_H, plane->src_h);
-	plane_set_prop(req, plane, PLANE_CRTC_X, plane->crtc_x);
-	plane_set_prop(req, plane, PLANE_CRTC_Y, plane->crtc_y);
-	plane_set_prop(req, plane, PLANE_CRTC_W, plane->crtc_w);
-	plane_set_prop(req, plane, PLANE_CRTC_H, plane->crtc_h);
+	plane_set_prop(req, plane, IGT_PLANE_CRTC_ID, plane->crtc_id);
+	plane_set_prop(req, plane, IGT_PLANE_FB_ID, plane->fb_id);
+	plane_set_prop(req, plane, IGT_PLANE_SRC_X, plane->src_x);
+	plane_set_prop(req, plane, IGT_PLANE_SRC_Y, plane->src_y);
+	plane_set_prop(req, plane, IGT_PLANE_SRC_W, plane->src_w);
+	plane_set_prop(req, plane, IGT_PLANE_SRC_H, plane->src_h);
+	plane_set_prop(req, plane, IGT_PLANE_CRTC_X, plane->crtc_x);
+	plane_set_prop(req, plane, IGT_PLANE_CRTC_Y, plane->crtc_y);
+	plane_set_prop(req, plane, IGT_PLANE_CRTC_W, plane->crtc_w);
+	plane_set_prop(req, plane, IGT_PLANE_CRTC_H, plane->crtc_h);
 }
 
 static void plane_get_current_state(struct kms_atomic_plane_state *plane)
@@ -373,27 +324,27 @@ static void plane_get_current_state(struct kms_atomic_plane_state *plane)
 	for (i = 0; i < props->count_props; i++) {
 		uint32_t *prop_ids = desc->props_plane;
 
-		if (props->props[i] == prop_ids[PLANE_CRTC_ID])
+		if (props->props[i] == prop_ids[IGT_PLANE_CRTC_ID])
 			plane->crtc_id = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_FB_ID])
+		else if (props->props[i] == prop_ids[IGT_PLANE_FB_ID])
 			plane->fb_id = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_CRTC_X])
+		else if (props->props[i] == prop_ids[IGT_PLANE_CRTC_X])
 			plane->crtc_x = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_CRTC_Y])
+		else if (props->props[i] == prop_ids[IGT_PLANE_CRTC_Y])
 			plane->crtc_y = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_CRTC_W])
+		else if (props->props[i] == prop_ids[IGT_PLANE_CRTC_W])
 			plane->crtc_w = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_CRTC_H])
+		else if (props->props[i] == prop_ids[IGT_PLANE_CRTC_H])
 			plane->crtc_h = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_SRC_X])
+		else if (props->props[i] == prop_ids[IGT_PLANE_SRC_X])
 			plane->src_x = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_SRC_Y])
+		else if (props->props[i] == prop_ids[IGT_PLANE_SRC_Y])
 			plane->src_y = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_SRC_W])
+		else if (props->props[i] == prop_ids[IGT_PLANE_SRC_W])
 			plane->src_w = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_SRC_H])
+		else if (props->props[i] == prop_ids[IGT_PLANE_SRC_H])
 			plane->src_h = props->prop_values[i];
-		else if (props->props[i] == prop_ids[PLANE_TYPE]) {
+		else if (props->props[i] == prop_ids[IGT_PLANE_TYPE]) {
 			int j;
 
 			for (j = 0; j < ARRAY_SIZE(desc->props_plane_type); j++) {
@@ -482,8 +433,8 @@ find_plane(struct kms_atomic_state *state, enum plane_type type,
 static void crtc_populate_req(struct kms_atomic_crtc_state *crtc,
 			      drmModeAtomicReq *req)
 {
-	crtc_set_prop(req, crtc, CRTC_MODE_ID, crtc->mode.id);
-	crtc_set_prop(req, crtc, CRTC_ACTIVE, crtc->active);
+	crtc_set_prop(req, crtc, IGT_CRTC_MODE_ID, crtc->mode.id);
+	crtc_set_prop(req, crtc, IGT_CRTC_ACTIVE, crtc->active);
 }
 
 static void crtc_get_current_state(struct kms_atomic_crtc_state *crtc)
@@ -498,7 +449,7 @@ static void crtc_get_current_state(struct kms_atomic_crtc_state *crtc)
 	for (i = 0; i < props->count_props; i++) {
 		uint32_t *prop_ids = crtc->state->desc->props_crtc;
 
-		if (props->props[i] == prop_ids[CRTC_MODE_ID]) {
+		if (props->props[i] == prop_ids[IGT_CRTC_MODE_ID]) {
 			drmModePropertyBlobPtr blob;
 
 			crtc->mode.id = props->prop_values[i];
@@ -518,7 +469,7 @@ static void crtc_get_current_state(struct kms_atomic_crtc_state *crtc)
 				crtc->mode.data = blob->data;
 			crtc->mode.len = blob->length;
 		}
-		else if (props->props[i] == prop_ids[CRTC_ACTIVE]) {
+		else if (props->props[i] == prop_ids[IGT_CRTC_ACTIVE]) {
 			crtc->active = props->prop_values[i];
 		}
 	}
@@ -627,7 +578,7 @@ static void crtc_commit_legacy(struct kms_atomic_crtc_state *crtc,
 
 	for (i = 0; i < props->count_props; i++) {
 		if (props->props[i] !=
-		    crtc->state->desc->props_crtc[CRTC_MODE_ID])
+		    crtc->state->desc->props_crtc[IGT_CRTC_MODE_ID])
 			continue;
 		crtc->mode.id = props->prop_values[i];
 		break;
@@ -756,20 +707,20 @@ static void atomic_setup(struct kms_atomic_state *state)
 	igt_assert(state->connectors);
 
 	fill_obj_props(desc->fd, res->crtcs[0],
-		       DRM_MODE_OBJECT_CRTC, NUM_CRTC_PROPS,
-		       crtc_prop_names, desc->props_crtc);
+		       DRM_MODE_OBJECT_CRTC, IGT_NUM_CRTC_PROPS,
+		       igt_crtc_prop_names, desc->props_crtc);
 
 	fill_obj_props(desc->fd, res_plane->planes[0],
-		       DRM_MODE_OBJECT_PLANE, NUM_PLANE_PROPS,
-		       plane_prop_names, desc->props_plane);
+		       DRM_MODE_OBJECT_PLANE, IGT_NUM_PLANE_PROPS,
+		       igt_plane_prop_names, desc->props_plane);
 	fill_obj_prop_map(desc->fd, res_plane->planes[0],
 			  DRM_MODE_OBJECT_PLANE, "type",
 			  NUM_PLANE_TYPE_PROPS, plane_type_prop_names,
 			  desc->props_plane_type);
 
 	fill_obj_props(desc->fd, res->connectors[0],
-		       DRM_MODE_OBJECT_CONNECTOR, NUM_CONNECTOR_PROPS,
-		       connector_prop_names, desc->props_connector);
+		       DRM_MODE_OBJECT_CONNECTOR, IGT_NUM_CONNECTOR_PROPS,
+		       igt_connector_prop_names, desc->props_connector);
 
 	for (i = 0; i < state->num_crtcs; i++) {
 		struct kms_atomic_crtc_state *crtc = &state->crtcs[i];
@@ -1245,7 +1196,7 @@ static void atomic_invalid_params(struct kms_atomic_crtc_state *crtc,
 
 	/* Valid property, valid value. */
 	for (i = 0; i < ARRAY_SIZE(props_raw); i++) {
-		props_raw[i] = desc->props_crtc[CRTC_MODE_ID];
+		props_raw[i] = desc->props_crtc[IGT_CRTC_MODE_ID];
 		values_raw[i] = crtc->mode.id;
 	}
 	do_ioctl(desc->fd, DRM_IOCTL_MODE_ATOMIC, &ioc);
