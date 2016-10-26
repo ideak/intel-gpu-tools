@@ -44,6 +44,7 @@
 #include "drmtest.h"
 #include "igt.h"
 #include "igt_aux.h"
+#include "sw_sync.h"
 
 #ifndef DRM_CLIENT_CAP_ATOMIC
 #define DRM_CLIENT_CAP_ATOMIC 3
@@ -126,6 +127,7 @@ struct kms_atomic_plane_state {
 	uint32_t fb_id; /* 0 to disable */
 	uint32_t src_x, src_y, src_w, src_h; /* 16.16 fixed-point */
 	uint32_t crtc_x, crtc_y, crtc_w, crtc_h; /* normal integers */
+	int32_t fence_fd;
 };
 
 struct kms_atomic_crtc_state {
@@ -133,6 +135,7 @@ struct kms_atomic_crtc_state {
 	uint32_t obj;
 	int idx;
 	bool active;
+	int32_t *out_fence_ptr;
 	struct kms_atomic_blob mode;
 };
 
@@ -190,11 +193,13 @@ static uint32_t blob_duplicate(int fd, uint32_t id_orig)
 	crtc_populate_req(crtc, req); \
 	plane_populate_req(plane, req); \
 	do_atomic_commit((crtc)->state->desc->fd, req, flags); \
-	crtc_check_current_state(crtc, plane, relax); \
-	plane_check_current_state(plane, relax); \
+	if (!(flags & DRM_MODE_ATOMIC_TEST_ONLY)) { \
+		crtc_check_current_state(crtc, plane, relax); \
+		plane_check_current_state(plane, relax); \
+	} \
 }
 
-#define crtc_commit_atomic_err(crtc, plane, crtc_old, plane_old, req, relax, e) { \
+#define crtc_commit_atomic_err(crtc, plane, crtc_old, plane_old, req, flags, relax, e) { \
 	drmModeAtomicSetCursor(req, 0); \
 	crtc_populate_req(crtc, req); \
 	plane_populate_req(plane, req); \
@@ -299,6 +304,9 @@ find_connector(struct kms_atomic_state *state,
 static void plane_populate_req(struct kms_atomic_plane_state *plane,
 			       drmModeAtomicReq *req)
 {
+	if (plane->fence_fd)
+		plane_set_prop(req, plane, IGT_PLANE_IN_FENCE_FD, plane->fence_fd);
+
 	plane_set_prop(req, plane, IGT_PLANE_CRTC_ID, plane->crtc_id);
 	plane_set_prop(req, plane, IGT_PLANE_FB_ID, plane->fb_id);
 	plane_set_prop(req, plane, IGT_PLANE_SRC_X, plane->src_x);
@@ -433,6 +441,10 @@ find_plane(struct kms_atomic_state *state, enum plane_type type,
 static void crtc_populate_req(struct kms_atomic_crtc_state *crtc,
 			      drmModeAtomicReq *req)
 {
+	if (crtc->out_fence_ptr)
+		crtc_set_prop(req, crtc, IGT_CRTC_OUT_FENCE_PTR,
+			      (uint64_t) crtc->out_fence_ptr);
+
 	crtc_set_prop(req, crtc, IGT_CRTC_MODE_ID, crtc->mode.id);
 	crtc_set_prop(req, crtc, IGT_CRTC_ACTIVE, crtc->active);
 }
@@ -1061,6 +1073,37 @@ static void plane_invalid_params(struct kms_atomic_crtc_state *crtc,
 	drmModeAtomicFree(req);
 }
 
+static void plane_invalid_params_fence(struct kms_atomic_crtc_state *crtc,
+				struct kms_atomic_plane_state *plane_old,
+				struct kms_atomic_connector_state *conn)
+{
+	struct kms_atomic_plane_state plane = *plane_old;
+	drmModeAtomicReq *req = drmModeAtomicAlloc();
+	int timeline, fence_fd;
+
+	igt_require_sw_sync();
+
+	/* invalid fence fd */
+	plane.fence_fd = plane.state->desc->fd;
+	plane.crtc_id = plane_old->crtc_id;
+	plane_commit_atomic_err(&plane, plane_old, req,
+	                        ATOMIC_RELAX_NONE, EINVAL);
+
+	/* Valid fence_fd but invalid CRTC */
+	timeline = sw_sync_timeline_create();
+	fence_fd =  sw_sync_timeline_create_fence(timeline, 1);
+	plane.fence_fd = fence_fd;
+	plane.crtc_id = ~0U;
+	plane_commit_atomic_err(&plane, plane_old, req,
+	                        ATOMIC_RELAX_NONE, EINVAL);
+
+	plane.fence_fd = -1;
+	close(fence_fd);
+	close(timeline);
+
+	drmModeAtomicFree(req);
+}
+
 static void crtc_invalid_params(struct kms_atomic_crtc_state *crtc_old,
 				struct kms_atomic_plane_state *plane,
 				struct kms_atomic_connector_state *conn)
@@ -1072,30 +1115,32 @@ static void crtc_invalid_params(struct kms_atomic_crtc_state *crtc_old,
 
 	/* Pass a series of invalid object IDs for the mode ID. */
 	crtc.mode.id = plane->obj;
-	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
 	                       ATOMIC_RELAX_NONE, EINVAL);
 
 	crtc.mode.id = crtc.obj;
-	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
 	                       ATOMIC_RELAX_NONE, EINVAL);
 
 	crtc.mode.id = conn->obj;
-	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
 	                       ATOMIC_RELAX_NONE, EINVAL);
 
 	crtc.mode.id = plane->fb_id;
-	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
 	                       ATOMIC_RELAX_NONE, EINVAL);
 
+	/* successful TEST_ONLY with fences set */
 	crtc.mode.id = crtc_old->mode.id;
-	crtc_commit_atomic(&crtc, plane, req, ATOMIC_RELAX_NONE, 0);
+	crtc_commit_atomic(&crtc, plane, req, ATOMIC_RELAX_NONE,
+			   DRM_MODE_ATOMIC_TEST_ONLY);
 
 	/* Create a blob which is the wrong size to be a valid mode. */
 	do_or_die(drmModeCreatePropertyBlob(crtc.state->desc->fd,
 					    crtc.mode.data,
 					    sizeof(struct drm_mode_modeinfo) - 1,
 					    &crtc.mode.id));
-	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
 	                       ATOMIC_RELAX_NONE, EINVAL);
 
 
@@ -1103,12 +1148,105 @@ static void crtc_invalid_params(struct kms_atomic_crtc_state *crtc_old,
 					    crtc.mode.data,
 					    sizeof(struct drm_mode_modeinfo) + 1,
 					    &crtc.mode.id));
-	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
 	                       ATOMIC_RELAX_NONE, EINVAL);
+
 
 	/* Restore the CRTC and check the state matches the old. */
 	crtc_commit_atomic(crtc_old, plane, req, ATOMIC_RELAX_NONE, 0);
 
+	drmModeAtomicFree(req);
+}
+
+static void crtc_invalid_params_fence(struct kms_atomic_crtc_state *crtc_old,
+				struct kms_atomic_plane_state *plane,
+				struct kms_atomic_connector_state *conn)
+{
+	struct kms_atomic_crtc_state crtc = *crtc_old;
+	drmModeAtomicReq *req = drmModeAtomicAlloc();
+	int timeline, fence_fd, *out_fence;
+
+	igt_require_sw_sync();
+
+	/* invalid out_fence_ptr */
+	crtc.mode.id = crtc_old->mode.id;
+	crtc.out_fence_ptr = (int32_t *) crtc_invalid_params;
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
+	                       ATOMIC_RELAX_NONE, EFAULT);
+
+	/* invalid out_fence_ptr */
+	crtc.mode.id = crtc_old->mode.id;
+	crtc.out_fence_ptr = (int32_t *) 0x8;
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
+	                       ATOMIC_RELAX_NONE, EFAULT);
+	crtc.out_fence_ptr = (int32_t *) 0;
+
+	/* valid in fence but not allowed prop on crtc */
+	timeline = sw_sync_timeline_create();
+	fence_fd =  sw_sync_timeline_create_fence(timeline, 1);
+	plane->fence_fd = fence_fd;
+	crtc.active = false;
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
+			       ATOMIC_RELAX_NONE, EINVAL);
+
+	out_fence = malloc(sizeof(uint64_t));
+	igt_assert(out_fence);
+
+
+	/* valid out fence ptr and flip event but not allowed prop on crtc */
+	crtc.out_fence_ptr = (int32_t *) out_fence;
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
+			       ATOMIC_RELAX_NONE, EINVAL);
+
+	/* valid out fence ptr and flip event but not allowed prop on crtc */
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+			       DRM_MODE_PAGE_FLIP_EVENT,
+			       ATOMIC_RELAX_NONE, EINVAL);
+
+	/* valid page flip event but not allowed prop on crtc */
+	crtc.out_fence_ptr = (int32_t *) 0;
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+			       DRM_MODE_PAGE_FLIP_EVENT,
+			       ATOMIC_RELAX_NONE, EINVAL);
+	crtc.active = true;
+
+	/* valid out fence  ptr and flip event but invalid prop on crtc */
+	crtc.out_fence_ptr = (int32_t *) out_fence;
+	crtc.mode.id = plane->fb_id;
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req, 0,
+			       ATOMIC_RELAX_NONE, EINVAL);
+
+	/* valid out fence ptr and flip event but invalid prop on crtc */
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+			       DRM_MODE_PAGE_FLIP_EVENT,
+			       ATOMIC_RELAX_NONE, EINVAL);
+
+	/* valid page flip event but invalid prop on crtc */
+	crtc.out_fence_ptr = (int32_t *) 0;
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+			       DRM_MODE_PAGE_FLIP_EVENT,
+			       ATOMIC_RELAX_NONE, EINVAL);
+
+	/* successful TEST_ONLY with fences set */
+	plane->fence_fd = fence_fd;
+	crtc.mode.id = crtc_old->mode.id;
+	crtc_commit_atomic(&crtc, plane, req, ATOMIC_RELAX_NONE,
+			   DRM_MODE_ATOMIC_TEST_ONLY);
+	igt_assert(*out_fence == -1);
+	close(fence_fd);
+	close(timeline);
+
+	/* reset fences */
+	plane->fence_fd = -1;
+	crtc.out_fence_ptr = (int32_t *) 0;
+	crtc_commit_atomic(&crtc, plane, req, ATOMIC_RELAX_NONE, 0);
+
+	/* out fence ptr but not page flip event */
+	crtc.out_fence_ptr = (int32_t *) out_fence;
+	crtc_commit_atomic(crtc_old, plane, req, ATOMIC_RELAX_NONE, 0);
+
+	close(*out_fence);
+	free(out_fence);
 	drmModeAtomicFree(req);
 }
 
@@ -1315,6 +1453,20 @@ igt_main
 		atomic_state_free(scratch);
 	}
 
+	igt_subtest("plane_invalid_params_fence") {
+		struct kms_atomic_state *scratch = atomic_state_dup(current);
+		struct kms_atomic_crtc_state *crtc = find_crtc(scratch, true);
+		struct kms_atomic_plane_state *plane =
+			find_plane(current, PLANE_TYPE_PRIMARY, crtc);
+		struct kms_atomic_connector_state *conn =
+			find_connector(scratch, crtc);
+
+		igt_require(crtc);
+		igt_require(plane);
+		plane_invalid_params_fence(crtc, plane, conn);
+		atomic_state_free(scratch);
+	}
+
 	igt_subtest("crtc_invalid_params") {
 		struct kms_atomic_state *scratch = atomic_state_dup(current);
 		struct kms_atomic_crtc_state *crtc = find_crtc(scratch, true);
@@ -1327,6 +1479,21 @@ igt_main
 		igt_require(plane);
 		igt_require(conn);
 		crtc_invalid_params(crtc, plane, conn);
+		atomic_state_free(scratch);
+	}
+
+	igt_subtest("crtc_invalid_params_fence") {
+		struct kms_atomic_state *scratch = atomic_state_dup(current);
+		struct kms_atomic_crtc_state *crtc = find_crtc(scratch, true);
+		struct kms_atomic_plane_state *plane =
+			find_plane(scratch, NUM_PLANE_TYPE_PROPS, crtc);
+		struct kms_atomic_connector_state *conn =
+			find_connector(scratch, crtc);
+
+		igt_require(crtc);
+		igt_require(plane);
+		igt_require(conn);
+		crtc_invalid_params_fence(crtc, plane, conn);
 		atomic_state_free(scratch);
 	}
 
