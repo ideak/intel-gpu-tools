@@ -264,7 +264,7 @@ retry:
  */
 static void
 run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output,
-		    enum transition_type type, bool nonblocking)
+		enum transition_type type, bool nonblocking, bool fencing)
 {
 	struct igt_fb fb, argb_fb, sprite_fb;
 	drmModeModeInfo *mode, override_mode;
@@ -674,19 +674,19 @@ igt_main
 
 	igt_subtest("plane-all-transition")
 		for_each_pipe_with_valid_output(&display, pipe, output)
-			run_transition_test(&display, pipe, output, TRANSITION_PLANES, false);
+			run_transition_test(&display, pipe, output, TRANSITION_PLANES, false, false);
 
 	igt_subtest("plane-all-transition-nonblocking")
 		for_each_pipe_with_valid_output(&display, pipe, output)
-			run_transition_test(&display, pipe, output, TRANSITION_PLANES, true);
+			run_transition_test(&display, pipe, output, TRANSITION_PLANES, true, false);
 
 	igt_subtest("plane-all-modeset-transition")
 		for_each_pipe_with_valid_output(&display, pipe, output)
-			run_transition_test(&display, pipe, output, TRANSITION_MODESET, false);
+			run_transition_test(&display, pipe, output, TRANSITION_MODESET, false, false);
 
 	igt_subtest("plane-toggle-modeset-transition")
 		for_each_pipe_with_valid_output(&display, pipe, output)
-			run_transition_test(&display, pipe, output, TRANSITION_MODESET_DISABLE, false);
+			run_transition_test(&display, pipe, output, TRANSITION_MODESET_DISABLE, false, false);
 
 	for (i = 1; i <= I915_MAX_PIPES; i++) {
 		igt_subtest_f("%ix-modeset-transitions", i)
