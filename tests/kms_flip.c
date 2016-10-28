@@ -85,9 +85,6 @@
 #define DRM_CAP_TIMESTAMP_MONOTONIC 6
 #endif
 
-#define USEC_PER_SEC 1000000L
-#define NSEC_PER_SEC 1000000000L
-
 drmModeRes *resources;
 int drm_fd;
 static drm_intel_bufmgr *bufmgr;
@@ -191,109 +188,6 @@ static unsigned long gettime_us(void)
 	return ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 }
 
-static int calibrate_dummy_load(struct test_output *o,
-				const char *ring_name,
-				int (*emit)(struct test_output *o, int limit, int timeout))
-{
-	unsigned long start;
-	int ops = 1;
-
-	start = gettime_us();
-
-	do {
-		unsigned long diff;
-		int ret;
-
-		ret = emit(o, (ops+1)/2, 10);
-		diff = gettime_us() - start;
-
-		if (ret || diff / USEC_PER_SEC >= 1)
-			break;
-
-		ops += ops;
-	} while (ops < 100000);
-
-	igt_debug("%s dummy load calibrated: %d operations / second\n",
-		  ring_name, ops);
-
-	return ops;
-}
-
-static void blit_copy(drm_intel_bo *dst, drm_intel_bo *src,
-		      unsigned int width, unsigned int height,
-		      unsigned int dst_pitch, unsigned int src_pitch)
-{
-	BLIT_COPY_BATCH_START(0);
-	OUT_BATCH((3 << 24) | /* 32 bits */
-		  (0xcc << 16) | /* copy ROP */
-		  dst_pitch);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH(height << 16 | width);
-	OUT_RELOC_FENCED(dst, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH(src_pitch);
-	OUT_RELOC_FENCED(src, I915_GEM_DOMAIN_RENDER, 0, 0);
-	ADVANCE_BATCH();
-
-	if (batch->gen >= 6) {
-		BEGIN_BATCH(3, 0);
-		OUT_BATCH(XY_SETUP_CLIP_BLT_CMD);
-		OUT_BATCH(0);
-		OUT_BATCH(0);
-		ADVANCE_BATCH();
-	}
-}
-
-static int _emit_dummy_load__bcs(struct test_output *o, int limit, int timeout)
-{
-	int i, ret = 0;
-	drm_intel_bo *src_bo, *dst_bo, *fb_bo;
-	struct igt_fb *fb_info = &o->fb_info[o->current_fb_id];
-
-	igt_require(bufmgr);
-
-	src_bo = drm_intel_bo_alloc(bufmgr, "dummy_bo", 2048*2048*4, 4096);
-	igt_assert(src_bo);
-
-	dst_bo = drm_intel_bo_alloc(bufmgr, "dummy_bo", 2048*2048*4, 4096);
-	igt_assert(dst_bo);
-
-	fb_bo = gem_handle_to_libdrm_bo(bufmgr, drm_fd, "imported", fb_info->gem_handle);
-	igt_assert(fb_bo);
-
-	for (i = 0; i < limit; i++) {
-		blit_copy(dst_bo, src_bo,
-			  2048, 2048,
-			  2048*4, 2048*4);
-
-		igt_swap(src_bo, dst_bo);
-	}
-	blit_copy(fb_bo, src_bo,
-		  min(o->fb_width, 2048), min(o->fb_height, 2048),
-		  fb_info->stride, 2048*4);
-	intel_batchbuffer_flush(batch);
-
-	if (timeout > 0)
-		ret = drm_intel_gem_bo_wait(fb_bo, timeout * NSEC_PER_SEC);
-
-	drm_intel_bo_unreference(src_bo);
-	drm_intel_bo_unreference(dst_bo);
-	drm_intel_bo_unreference(fb_bo);
-
-	return ret;
-}
-
-static void emit_dummy_load__bcs(struct test_output *o, int seconds)
-{
-	static int ops_per_sec;
-
-	if (ops_per_sec == 0)
-		ops_per_sec = calibrate_dummy_load(o, "bcs",
-						   _emit_dummy_load__bcs);
-
-	_emit_dummy_load__bcs(o, seconds * ops_per_sec, 0);
-}
-
 static void emit_fence_stress(struct test_output *o)
 {
 	const int num_fences = gem_available_fences(drm_fd);
@@ -336,82 +230,6 @@ static void emit_fence_stress(struct test_output *o)
 		drm_intel_bo_unreference(bo[i]);
 	free(bo);
 	free(exec);
-}
-
-static int _emit_dummy_load__rcs(struct test_output *o, int limit, int timeout)
-{
-	const struct igt_fb *fb_info = &o->fb_info[o->current_fb_id];
-	igt_render_copyfunc_t copyfunc;
-	struct igt_buf sb[3], *src, *dst, *fb;
-	int i, ret = 0;
-
-	igt_require(bufmgr);
-
-	copyfunc = igt_get_render_copyfunc(devid);
-	if (copyfunc == NULL)
-		return _emit_dummy_load__bcs(o, limit, timeout);
-
-	sb[0].bo = drm_intel_bo_alloc(bufmgr, "dummy_bo", 2048*2048*4, 4096);
-	igt_assert(sb[0].bo);
-	sb[0].size = sb[0].bo->size;
-	sb[0].tiling = I915_TILING_NONE;
-	sb[0].data = NULL;
-	sb[0].num_tiles = sb[0].bo->size;
-	sb[0].stride = 4 * 2048;
-
-	sb[1].bo = drm_intel_bo_alloc(bufmgr, "dummy_bo", 2048*2048*4, 4096);
-	igt_assert(sb[1].bo);
-	sb[1].size = sb[1].bo->size;
-	sb[1].tiling = I915_TILING_NONE;
-	sb[1].data = NULL;
-	sb[1].num_tiles = sb[1].bo->size;
-	sb[1].stride = 4 * 2048;
-
-	sb[2].bo = gem_handle_to_libdrm_bo(bufmgr, drm_fd, "imported", fb_info->gem_handle);
-	igt_assert(sb[2].bo);
-	sb[2].size = sb[2].bo->size;
-	sb[2].tiling = igt_fb_mod_to_tiling(fb_info->tiling);
-	sb[2].data = NULL;
-	sb[2].num_tiles = sb[2].bo->size;
-	sb[2].stride = fb_info->stride;
-
-	src = &sb[0];
-	dst = &sb[1];
-	fb = &sb[2];
-
-	for (i = 0; i < limit; i++) {
-		copyfunc(batch, NULL,
-			 src, 0, 0,
-			 2048, 2048,
-			 dst, 0, 0);
-
-		igt_swap(src, dst);
-	}
-	copyfunc(batch, NULL,
-		 src, 0, 0,
-		 min(o->fb_width, 2048), min(o->fb_height, 2048),
-		 fb, 0, 0);
-	intel_batchbuffer_flush(batch);
-
-	if (timeout > 0)
-		ret = drm_intel_gem_bo_wait(fb->bo, timeout * NSEC_PER_SEC);
-
-	drm_intel_bo_unreference(sb[0].bo);
-	drm_intel_bo_unreference(sb[1].bo);
-	drm_intel_bo_unreference(sb[2].bo);
-
-	return ret;
-}
-
-static void emit_dummy_load__rcs(struct test_output *o, int seconds)
-{
-	static int ops_per_sec;
-
-	if (ops_per_sec == 0)
-		ops_per_sec = calibrate_dummy_load(o, "rcs",
-						   _emit_dummy_load__rcs);
-
-	_emit_dummy_load__bcs(o, seconds * ops_per_sec, 0);
 }
 
 static void dpms_off_other_outputs(struct test_output *o)
@@ -852,6 +670,8 @@ static unsigned int run_test_step(struct test_output *o)
 	struct vblank_reply vbl_reply;
 	unsigned int target_seq;
 	igt_hang_t hang;
+	igt_spin_t *spin_rcs = 0;
+	igt_spin_t *spin_bcs = 0;
 
 	target_seq = o->vblank_state.seq_step;
 	/* Absolute waits only works once we have a frame counter. */
@@ -874,10 +694,12 @@ static unsigned int run_test_step(struct test_output *o)
 		o->current_fb_id = !o->current_fb_id;
 
 	if (o->flags & TEST_WITH_DUMMY_BCS)
-		emit_dummy_load__bcs(o, 1);
+		spin_bcs = igt_spin_batch_new(drm_fd, I915_EXEC_BLT,
+					      o->fb_info[o->current_fb_id].gem_handle);
 
 	if (o->flags & TEST_WITH_DUMMY_RCS)
-		emit_dummy_load__rcs(o, 1);
+		spin_rcs = igt_spin_batch_new(drm_fd, I915_EXEC_RENDER,
+					      o->fb_info[o->current_fb_id].gem_handle);
 
 	if (o->flags & TEST_FB_RECREATE)
 		recreate_fb(o);
@@ -933,8 +755,13 @@ static unsigned int run_test_step(struct test_output *o)
 	if (o->flags & TEST_MODESET)
 		igt_assert(set_mode(o, o->fb_ids[o->current_fb_id], 0, 0) == 0);
 
-	if (o->flags & TEST_DPMS)
+	if (o->flags & TEST_DPMS) {
+		if (spin_rcs)
+			igt_spin_batch_end(spin_rcs);
+		if (spin_bcs)
+			igt_spin_batch_end(spin_bcs);
 		set_dpms(o, DRM_MODE_DPMS_ON);
+	}
 
 	if (o->flags & TEST_VBLANK_RACE) {
 		struct vblank_reply reply;
@@ -967,8 +794,13 @@ static unsigned int run_test_step(struct test_output *o)
 		igt_assert(__wait_for_vblank(TEST_VBLANK_BLOCK, o->pipe, 1, 0, &reply) == 0);
 	}
 
-	if (do_flip)
+	if (do_flip) {
 		do_or_die(do_page_flip(o, new_fb_id, !(o->flags & TEST_NOEVENT)));
+		if (spin_rcs)
+			igt_spin_batch_end(spin_rcs);
+		if (spin_bcs)
+			igt_spin_batch_end(spin_bcs);
+	}
 
 	if (o->flags & TEST_FENCE_STRESS)
 		emit_fence_stress(o);
@@ -982,7 +814,15 @@ static unsigned int run_test_step(struct test_output *o)
 				      vbl_reply.ts.tv_usec);
 			completed_events = EVENT_VBLANK;
 		}
+		if (spin_rcs)
+			igt_spin_batch_end(spin_rcs);
+		if (spin_bcs)
+			igt_spin_batch_end(spin_bcs);
 	}
+	if (spin_rcs)
+		igt_spin_batch_free(drm_fd, spin_rcs);
+	if (spin_bcs)
+		igt_spin_batch_free(drm_fd, spin_bcs);
 
 	if (do_flip && (o->flags & TEST_EBUSY))
 		igt_assert(do_page_flip(o, new_fb_id, true) == -EBUSY);
