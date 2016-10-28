@@ -27,18 +27,6 @@
 
 #include "igt.h"
 
-#include <signal.h>
-#include <time.h>
-#include <sys/syscall.h>
-
-#define gettid() syscall(__NR_gettid)
-#define sigev_notify_thread_id _sigev_un._tid
-
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
-
 static int __gem_wait(int fd, struct drm_i915_gem_wait *w)
 {
 	int err;
@@ -75,128 +63,29 @@ static void invalid_buf(int fd)
 	igt_assert_eq(__gem_wait(fd, &wait), -ENOENT);
 }
 
-static uint32_t *batch;
-
-static void sigiter(int sig, siginfo_t *info, void *arg)
-{
-	*batch = MI_BATCH_BUFFER_END;
-	__sync_synchronize();
-}
-
-#define MSEC_PER_SEC (1000)
-#define USEC_PER_SEC (1000 * MSEC_PER_SEC)
-#define NSEC_PER_SEC (1000 * USEC_PER_SEC)
-
 #define BUSY 1
 #define HANG 2
 static void basic(int fd, unsigned engine, unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj;
-	struct drm_i915_gem_relocation_entry reloc;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_wait wait;
-	unsigned engines[16];
-	unsigned nengine;
-	int i, timeout;
+	igt_spin_t *spin = igt_spin_batch_new(fd, engine, 0);
+	struct drm_i915_gem_wait wait = { spin->handle };
 
-	nengine = 0;
-	if (engine == -1) {
-		for_each_engine(fd, engine)
-			if (engine) engines[nengine++] = engine;
-	} else {
-		igt_require(gem_has_ring(fd, engine));
-		engines[nengine++] = engine;
-	}
-	igt_require(nengine);
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
-	execbuf.buffer_count = 1;
-
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, 4096);
-
-	obj.relocs_ptr = (uintptr_t)&reloc;
-	obj.relocation_count = 1;
-	memset(&reloc, 0, sizeof(reloc));
-
-	batch = gem_mmap__gtt(fd, obj.handle, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj.handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	reloc.target_handle = obj.handle; /* recurse */
-	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
-	reloc.delta = 0;
-	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc.write_domain = 0;
-
-	i = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc.delta = 1;
-		}
-	}
-
-	for (i = 0; i < nengine; i++) {
-		execbuf.flags &= ~ENGINE_MASK;
-		execbuf.flags |= engines[i];
-		gem_execbuf(fd, &execbuf);
-	}
-
-	memset(&wait, 0, sizeof(wait));
-	wait.bo_handle = obj.handle;
 	igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 
 	if (flags & BUSY) {
-		struct timespec tv;
+		struct timespec tv = {};
+		int timeout;
 
 		timeout = 120;
 		if ((flags & HANG) == 0) {
-			*batch = MI_BATCH_BUFFER_END;
-			__sync_synchronize();
+			igt_spin_batch_end(spin);
 			timeout = 1;
 		}
 
-		memset(&tv, 0, sizeof(tv));
 		while (__gem_wait(fd, &wait) == -ETIME)
 			igt_assert(igt_seconds_elapsed(&tv) < timeout);
 	} else {
-		timer_t timer;
-
-		if ((flags & HANG) == 0) {
-			struct sigevent sev;
-			struct sigaction act;
-			struct itimerspec its;
-
-			memset(&sev, 0, sizeof(sev));
-			sev.sigev_notify = SIGEV_SIGNAL | SIGEV_THREAD_ID;
-			sev.sigev_notify_thread_id = gettid();
-			sev.sigev_signo = SIGRTMIN + 1;
-			igt_assert(timer_create(CLOCK_MONOTONIC, &sev, &timer) == 0);
-
-			memset(&act, 0, sizeof(act));
-			act.sa_sigaction = sigiter;
-			act.sa_flags = SA_SIGINFO;
-			igt_assert(sigaction(SIGRTMIN + 1, &act, NULL) == 0);
-
-			memset(&its, 0, sizeof(its));
-			its.it_value.tv_nsec = 0;
-			its.it_value.tv_sec = 1;
-			igt_assert(timer_settime(timer, 0, &its, NULL) == 0);
-		}
+		igt_spin_batch_set_timeout(spin, NSEC_PER_SEC);
 
 		wait.timeout_ns = NSEC_PER_SEC / 2; /* 0.5s */
 		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
@@ -215,13 +104,9 @@ static void basic(int fd, unsigned engine, unsigned flags)
 		wait.timeout_ns = 0;
 		igt_assert_eq(__gem_wait(fd, &wait), 0);
 		igt_assert(wait.timeout_ns == 0);
-
-		if ((flags & HANG) == 0)
-			timer_delete(timer);
 	}
 
-	gem_close(fd, obj.handle);
-	munmap(batch, 4096);
+	igt_spin_batch_free(fd, spin);
 }
 
 igt_main
