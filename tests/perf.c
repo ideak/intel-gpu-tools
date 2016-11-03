@@ -288,6 +288,7 @@ static bool hsw_undefined_a_counters[45] = {
 static bool gen8_undefined_a_counters[45];
 
 static int drm_fd = -1;
+static int pm_fd = -1;
 static int stream_fd = -1;
 static uint32_t devid;
 static int card = -1;
@@ -331,20 +332,37 @@ __perf_close(int fd)
 {
 	close(fd);
 	stream_fd = -1;
+
+	if (pm_fd >= 0) {
+		close(pm_fd);
+		pm_fd = -1;
+	}
 }
 
 static int
-__perf_open(int fd, struct drm_i915_perf_open_param *param)
+__perf_open(int fd, struct drm_i915_perf_open_param *param, bool prevent_pm)
 {
 	int ret;
+	int32_t pm_value = 0;
 
 	if (stream_fd >= 0)
 		__perf_close(stream_fd);
+	if (pm_fd >= 0) {
+		close(pm_fd);
+		pm_fd = -1;
+	}
 
 	ret = igt_ioctl(fd, DRM_IOCTL_I915_PERF_OPEN, param);
 
 	igt_assert(ret >= 0);
 	errno = 0;
+
+	if (prevent_pm) {
+		pm_fd = open("/dev/cpu_dma_latency", O_RDWR);
+		igt_assert(pm_fd >= 0);
+
+		igt_assert_eq(write(pm_fd, &pm_value, sizeof(pm_value)), sizeof(pm_value));
+	}
 
 	return ret;
 }
@@ -1257,7 +1275,7 @@ test_system_wide_paranoid(void)
 
 		igt_drop_root();
 
-		stream_fd = __perf_open(drm_fd, &param);
+		stream_fd = __perf_open(drm_fd, &param, false);
 		__perf_close(stream_fd);
 	}
 
@@ -1314,7 +1332,7 @@ test_invalid_oa_metric_set_id(void)
 
 	/* Check that we aren't just seeing false positives... */
 	properties[ARRAY_SIZE(properties) - 1] = test_metric_set_id;
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 	__perf_close(stream_fd);
 
 	/* There's no valid default OA metric set ID... */
@@ -1348,7 +1366,7 @@ test_invalid_oa_format_id(void)
 
 	/* Check that we aren't just seeing false positives... */
 	properties[ARRAY_SIZE(properties) - 1] = test_oa_format;
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 	__perf_close(stream_fd);
 
 	/* There's no valid default OA format... */
@@ -1512,7 +1530,7 @@ open_and_read_2_oa_reports(int format_id,
 		.properties_ptr = to_user_pointer(properties),
 	};
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 
 	read_2_oa_reports(format_id, exponent,
 			  oa_report0, oa_report1, timer_only);
@@ -1916,7 +1934,7 @@ test_oa_exponents(void)
 				  oa_exponent_to_ns(exponent) / 1000.0,
 				  oa_exponent_to_ns(exponent) / (1000.0 * 1000.0));
 
-			stream_fd = __perf_open(drm_fd, &param);
+			stream_fd = __perf_open(drm_fd, &param, true /* prevent_pm */);
 
 			/* Right after opening the OA stream, read a
 			 * first timestamp as way to filter previously
@@ -2192,7 +2210,7 @@ test_invalid_oa_exponent(void)
 		.properties_ptr = to_user_pointer(properties),
 	};
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 
 	__perf_close(stream_fd);
 
@@ -2246,7 +2264,7 @@ test_low_oa_exponent_permissions(void)
 	igt_fork(child, 1) {
 		igt_drop_root();
 
-		stream_fd = __perf_open(drm_fd, &param);
+		stream_fd = __perf_open(drm_fd, &param, false);
 		__perf_close(stream_fd);
 	}
 
@@ -2312,7 +2330,7 @@ test_per_context_mode_unprivileged(void)
 
 		properties[1] = ctx_id;
 
-		stream_fd = __perf_open(drm_fd, &param);
+		stream_fd = __perf_open(drm_fd, &param, false);
 		__perf_close(stream_fd);
 
 		drm_intel_gem_context_destroy(context);
@@ -2401,7 +2419,7 @@ test_blocking(void)
 	int64_t start, end;
 	int n = 0;
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, true /* prevent_pm */);
 
 	times(&start_times);
 
@@ -2565,7 +2583,7 @@ test_polling(void)
 	int64_t start, end;
 	int n = 0;
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, true /* prevent_pm */);
 
 	times(&start_times);
 
@@ -2742,7 +2760,7 @@ test_buffer_fill(void)
 
 	igt_assert(fill_duration < 1000000000);
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, true /* prevent_pm */);
 
 	for (int i = 0; i < 5; i++) {
 		bool overflow_seen;
@@ -2909,7 +2927,7 @@ test_enable_disable(void)
 	load_helper_init();
 	load_helper_run(HIGH);
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, true /* prevent_pm */);
 
 	for (int i = 0; i < 5; i++) {
 		int len;
@@ -3073,7 +3091,7 @@ test_short_reads(void)
 	ret = mprotect(pages + page_size, page_size, PROT_NONE);
 	igt_assert_eq(ret, 0);
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 
 	nanosleep(&(struct timespec){ .tv_sec = 0, .tv_nsec = 5000000 }, NULL);
 
@@ -3146,7 +3164,7 @@ test_non_sampling_read_error(void)
 	int ret;
 	uint8_t buf[1024];
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 
 	ret = read(stream_fd, buf, sizeof(buf));
 	igt_assert_eq(ret, -1);
@@ -3184,7 +3202,7 @@ test_disabled_read_error(void)
 	uint32_t buf[128] = { 0 };
 	int ret;
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 
 	ret = read(stream_fd, buf, sizeof(buf));
 	igt_assert_eq(ret, -1);
@@ -3194,7 +3212,7 @@ test_disabled_read_error(void)
 
 
 	param.flags &= ~I915_PERF_FLAG_DISABLED;
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 
 	read_2_oa_reports(test_oa_format,
 			  oa_exponent,
@@ -3246,7 +3264,7 @@ test_mi_rpc(void)
 	uint32_t *report32;
 	int ret;
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 
 	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
 
@@ -3432,7 +3450,7 @@ hsw_test_single_ctx_counters(void)
 		scratch_buf_memset(dst[0].bo, width, height, 0x00ff00ff);
 
 		igt_debug("opening i915-perf stream\n");
-		stream_fd = __perf_open(drm_fd, &param);
+		stream_fd = __perf_open(drm_fd, &param, false);
 
 		bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
 
@@ -3684,7 +3702,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			scratch_buf_memset(dst[0].bo, width, height, 0x00ff00ff);
 
 			igt_debug("opening i915-perf stream\n");
-			stream_fd = __perf_open(drm_fd, &param);
+			stream_fd = __perf_open(drm_fd, &param, false);
 
 			bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
 
@@ -4031,7 +4049,7 @@ test_rc6_disable(void)
 
 	igt_skip_on(!rc6_enabled());
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 
 	n_events_start = read_debugfs_u64_record(drm_fd, "i915_drpc_info",
 						 "RC6 residency since boot");
@@ -4246,7 +4264,7 @@ test_create_destroy_userspace_config(void)
 
 	/* Try to use the new config */
 	properties[1] = config_id;
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 
 	/* Verify that destroying the config doesn't yield any error. */
 	i915_perf_remove_config(drm_fd, config_id);
@@ -4453,7 +4471,7 @@ test_i915_ref_count(void)
 	igt_debug("initial ref count with drm_fd open = %u\n", ref_count0);
 	igt_assert(ref_count0 > baseline);
 
-	stream_fd = __perf_open(drm_fd, &param);
+	stream_fd = __perf_open(drm_fd, &param, false);
 	ref_count1 = read_i915_module_ref();
 	igt_debug("ref count after opening i915 perf stream = %u\n", ref_count1);
 	igt_assert(ref_count1 > ref_count0);
