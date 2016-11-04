@@ -786,6 +786,52 @@ void igt_system_suspend_autoresume(enum igt_suspend_state state,
 	close(power_dir);
 }
 
+static int original_autoresume_delay;
+
+static void igt_restore_autoresume_delay(int sig)
+{
+	int delay_fd;
+	char delay_str[10];
+
+	igt_require((delay_fd = open("/sys/module/suspend/parameters/pm_test_delay",
+				    O_WRONLY)) >= 0);
+
+	snprintf(delay_str, sizeof(delay_str), "%d", original_autoresume_delay);
+	igt_require(write(delay_fd, delay_str, strlen(delay_str)));
+
+	close(delay_fd);
+}
+
+/**
+ * igt_set_autoresume_delay:
+ * @delay_secs: The delay in seconds before resuming the system
+ *
+ * Sets how long we wait to resume the system after suspending it, using the
+ * suspend.pm_test_delay variable. On exit, the original delay value is
+ * restored.
+ */
+void igt_set_autoresume_delay(int delay_secs)
+{
+	int delay_fd;
+	char delay_str[10];
+
+	igt_skip_on_simulation();
+
+	igt_require((delay_fd = open("/sys/module/suspend/parameters/pm_test_delay",
+				    O_RDWR)) >= 0);
+
+	if (!original_autoresume_delay) {
+		igt_require(read(delay_fd, delay_str, sizeof(delay_str)));
+		original_autoresume_delay = atoi(delay_str);
+		igt_install_exit_handler(igt_restore_autoresume_delay);
+	}
+
+	snprintf(delay_str, sizeof(delay_str), "%d", delay_secs);
+	igt_require(write(delay_fd, delay_str, strlen(delay_str)));
+
+	close(delay_fd);
+}
+
 /**
  * igt_drop_root:
  *
