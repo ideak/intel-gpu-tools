@@ -612,7 +612,7 @@ static void collect_crcs_mask(igt_pipe_crc_t **pipe_crcs, unsigned mask, igt_crc
 	}
 }
 
-static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblocking)
+static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblocking, bool fencing)
 {
 	struct igt_fb fbs[2];
 	int i, j;
@@ -659,6 +659,9 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 			igt_plane_set_size(plane, mode->hdisplay, mode->vdisplay);
 		} else
 			igt_plane_set_fb(plane, NULL);
+
+		if(fencing)
+			igt_pipe_request_out_fence(&display->pipes[i]);
 	}
 
 	/*
@@ -746,7 +749,7 @@ cleanup:
 
 }
 
-static void run_modeset_transition(igt_display_t *display, int requested_outputs, bool nonblocking)
+static void run_modeset_transition(igt_display_t *display, int requested_outputs, bool nonblocking, bool fencing)
 {
 	igt_output_t *outputs[I915_MAX_PIPES] = {};
 	int num_outputs = 0;
@@ -774,7 +777,7 @@ static void run_modeset_transition(igt_display_t *display, int requested_outputs
 		      "Should have at least %i outputs, found %i\n",
 		      requested_outputs, num_outputs);
 
-	run_modeset_tests(display, requested_outputs, nonblocking);
+	run_modeset_tests(display, requested_outputs, nonblocking, fencing);
 }
 
 igt_main
@@ -833,10 +836,16 @@ igt_main
 
 	for (i = 1; i <= I915_MAX_PIPES; i++) {
 		igt_subtest_f("%ix-modeset-transitions", i)
-			run_modeset_transition(&display, i, false);
+			run_modeset_transition(&display, i, false, false);
 
 		igt_subtest_f("%ix-modeset-transitions-nonblocking", i)
-			run_modeset_transition(&display, i, true);
+			run_modeset_transition(&display, i, true, false);
+
+		igt_subtest_f("%ix-modeset-transitions-fencing", i)
+			run_modeset_transition(&display, i, false, true);
+
+		igt_subtest_f("%ix-modeset-transitions-nonblocking-fencing", i)
+			run_modeset_transition(&display, i, true, true);
 	}
 
 	igt_fixture {

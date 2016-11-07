@@ -2475,6 +2475,12 @@ static int igt_atomic_commit(igt_display_t *display, uint32_t flags, void *user_
 
 		for_each_pipe(display, pipe) {
 			igt_pipe_t *pipe_obj = &display->pipes[pipe];
+			igt_plane_t *plane;
+
+			/* reset fence_fd to prevent it from being set for the next commit */
+			for_each_plane_on_pipe(display, pipe, plane) {
+				igt_plane_set_fence_fd(plane, -1);
+			}
 
 			if (pipe_obj->out_fence_fd == -1)
 				continue;
