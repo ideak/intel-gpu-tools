@@ -78,80 +78,11 @@ static void do_cleanup_display(igt_display_t *dpy)
 	igt_display_commit2(dpy, dpy->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 }
 
-static uint32_t *
-make_fb_busy(igt_display_t *dpy, unsigned ring, const struct igt_fb *fb)
-{
-	const int gen = intel_gen(intel_get_drm_devid(dpy->drm_fd));
-	struct drm_i915_gem_exec_object2 obj[2];
-#define SCRATCH 0
-#define BATCH 1
-	struct drm_i915_gem_relocation_entry reloc[2];
-	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t *batch;
-	int i;
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
-	execbuf.buffer_count = 2;
-	execbuf.flags = ring;
-
-	memset(obj, 0, sizeof(obj));
-	obj[SCRATCH].handle = fb->gem_handle;
-
-	obj[BATCH].handle = gem_create(dpy->drm_fd, 4096);
-	obj[BATCH].relocs_ptr = (uintptr_t)reloc;
-	obj[BATCH].relocation_count = 2;
-	memset(reloc, 0, sizeof(reloc));
-	reloc[0].target_handle = obj[BATCH].handle; /* recurse */
-	reloc[0].presumed_offset = 0;
-	reloc[0].offset = sizeof(uint32_t);
-	reloc[0].delta = 0;
-	reloc[0].read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc[0].write_domain = 0;
-
-	batch = gem_mmap__wc(dpy->drm_fd,
-			     obj[BATCH].handle, 0, 4096, PROT_WRITE);
-	gem_set_domain(dpy->drm_fd, obj[BATCH].handle,
-		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	batch[i = 0] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc[0].delta = 1;
-		}
-	}
-
-	/* dummy write to fb */
-	reloc[1].target_handle = obj[SCRATCH].handle;
-	reloc[1].presumed_offset = 0;
-	reloc[1].offset = 1024;
-	reloc[1].delta = 0;
-	reloc[1].read_domains = I915_GEM_DOMAIN_RENDER;
-	reloc[1].write_domain = I915_GEM_DOMAIN_RENDER;
-
-	gem_execbuf(dpy->drm_fd, &execbuf);
-	gem_close(dpy->drm_fd, obj[BATCH].handle);
-
-	return batch;
-}
-
-static void finish_fb_busy(uint32_t *batch, int msecs)
+static void finish_fb_busy(igt_spin_t *spin, int msecs)
 {
 	struct timespec tv = { 0, msecs * 1000 * 1000 };
 	nanosleep(&tv, NULL);
-	batch[0] = MI_BATCH_BUFFER_END;
-	__sync_synchronize();
-	munmap(batch, 4096);
+	igt_spin_batch_end(spin);
 }
 
 static void sighandler(int sig)
@@ -165,9 +96,7 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
 	struct timespec tv = { 1, 0 };
 	struct drm_event_vblank ev;
-	uint32_t *batch;
-
-	batch = make_fb_busy(dpy, ring, fb);
+	igt_spin_t *t = igt_spin_batch_new(dpy->drm_fd, ring, fb->gem_handle);
 	igt_fork(child, 1) {
 		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
 		do_or_die(drmModePageFlip(dpy->drm_fd,
@@ -179,10 +108,12 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 	}
 	igt_assert_f(nanosleep(&tv, NULL) == -1,
 		     "flip to %s blocked waiting for busy fb", name);
-	finish_fb_busy(batch, 2*TIMEOUT);
+	finish_fb_busy(t, 2*TIMEOUT);
 	igt_waitchildren();
 	igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 	igt_assert(poll(&pfd, 1, 0) == 0);
+
+	igt_spin_batch_free(dpy->drm_fd, t);
 }
 
 static void test_flip(igt_display_t *dpy, unsigned ring, int pipe)
