@@ -133,10 +133,6 @@ static void *gem_busyspin(void *arg)
 	return NULL;
 }
 
-#define MSEC_PER_SEC (1000)
-#define USEC_PER_SEC (1000 * MSEC_PER_SEC)
-#define NSEC_PER_SEC (1000 * USEC_PER_SEC)
-
 static double elapsed(const struct timespec *a, const struct timespec *b)
 {
 	return 1e9*(b->tv_sec - a->tv_sec) + (b->tv_nsec - a ->tv_nsec);

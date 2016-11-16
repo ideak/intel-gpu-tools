@@ -35,6 +35,16 @@
 extern drm_intel_bo **trash_bos;
 extern int num_trash_bos;
 
+/* signal interrupt helpers */
+
+#define MSEC_PER_SEC (1000)
+#define USEC_PER_SEC (1000*MSEC_PER_SEC)
+#define NSEC_PER_SEC (1000*USEC_PER_SEC)
+
+/* signal interrupt helpers */
+#define gettid() syscall(__NR_gettid)
+#define sigev_notify_thread_id _sigev_un._tid
+
 /* auxialiary igt helpers from igt_aux.c */
 /* generally useful helpers */
 void igt_fork_signal_helper(void);

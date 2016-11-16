@@ -75,17 +75,6 @@
  * fit into any other topic.
  */
 
-
-/* signal interrupt helpers */
-
-#define MSEC_PER_SEC (1000)
-#define USEC_PER_SEC (1000*MSEC_PER_SEC)
-#define NSEC_PER_SEC (1000*USEC_PER_SEC)
-
-/* signal interrupt helpers */
-#define gettid() syscall(__NR_gettid)
-#define sigev_notify_thread_id _sigev_un._tid
-
 static struct __igt_sigiter_global {
 	pid_t tid;
 	timer_t timer;
