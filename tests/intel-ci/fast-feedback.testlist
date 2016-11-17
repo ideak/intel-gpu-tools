@@ -67,6 +67,7 @@ igt@gem_exec_parse@basic-rejected
 igt@gem_exec_reloc@basic-cpu
 igt@gem_exec_reloc@basic-gtt
 igt@gem_exec_reloc@basic-noreloc
+igt@gem_exec_reloc@basic-softpin
 igt@gem_exec_store@basic-all
 igt@gem_exec_store@basic-blt
 igt@gem_exec_store@basic-bsd
