@@ -623,15 +623,20 @@ bool kmstest_force_connector(int drm_fd, drmModeConnector *connector,
 	uint32_t devid;
 	int len, dir, idx;
 
-	devid = intel_get_drm_devid(drm_fd);
+	if (is_i915_device(drm_fd)) {
+		devid = intel_get_drm_devid(drm_fd);
 
-	/* forcing hdmi or dp connectors on HSW and BDW doesn't currently work,
-	 * so fail early to allow the test to skip if required */
-	if ((connector->connector_type == DRM_MODE_CONNECTOR_HDMIA ||
-	     connector->connector_type == DRM_MODE_CONNECTOR_HDMIB ||
-	     connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort)
-	    && (IS_HASWELL(devid) || IS_BROADWELL(devid)))
-		return false;
+		/*
+		 * forcing hdmi or dp connectors on HSW and BDW doesn't
+		 * currently work, so fail early to allow the test to skip if
+		 * required
+		 */
+		if ((connector->connector_type == DRM_MODE_CONNECTOR_HDMIA ||
+		     connector->connector_type == DRM_MODE_CONNECTOR_HDMIB ||
+		     connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort)
+		    && (IS_HASWELL(devid) || IS_BROADWELL(devid)))
+			return false;
+	}
 
 	switch (state) {
 	case FORCE_CONNECTOR_ON:
