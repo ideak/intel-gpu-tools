@@ -173,6 +173,13 @@ drm_intel_context *drm_intel_gem_context_create(drm_intel_bufmgr *bufmgr)
 	return (drm_intel_bo *) NULL;
 }
 
+int drm_intel_gem_context_get_id(drm_intel_context *ctx,
+                                 uint32_t *ctx_id)
+{
+	igt_require_f(false, missing_support_str);
+	return 0;
+}
+
 void drm_intel_gem_context_destroy(drm_intel_context *ctx)
 {
 	igt_require_f(false, missing_support_str);
