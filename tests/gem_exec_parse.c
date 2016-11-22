@@ -258,12 +258,17 @@ static void exec_batch_chained(int fd, uint32_t cmd_bo, uint32_t *cmds,
  * from...
  */
 struct test_lri {
-	uint32_t reg, read_mask, init_val, test_val;
+	const char *name; /* register name for debug info */
+	uint32_t reg; /* address to test */
+	uint32_t read_mask; /* ignore things like HW status bits */
+	uint32_t init_val; /* initial identifiable value to set without LRI */
+	uint32_t test_val; /* value to attempt loading via LRI command */
+	bool whitelisted; /* expect to become NOOP / fail if not whitelisted */
+	int min_ver; /* required command parser version to test */
 };
 
 static void
-test_lri(int fd, uint32_t handle,
-	 struct test_lri *test, int expected_errno, uint32_t expect)
+test_lri(int fd, uint32_t handle, struct test_lri *test)
 {
 	uint32_t lri[] = {
 		MI_LOAD_REGISTER_IMM,
@@ -271,8 +276,19 @@ test_lri(int fd, uint32_t handle,
 		test->test_val,
 		MI_BATCH_BUFFER_END,
 	};
+	int bad_lri_errno = parser_version >= 8 ? 0 : -EINVAL;
+	int expected_errno = test->whitelisted ? 0 : bad_lri_errno;
+	uint32_t expect = test->whitelisted ? test->test_val : test->init_val;
+
+	igt_debug("Testing %s LRI: addr=%x, val=%x, expected errno=%d, expected val=%x\n",
+		  test->name, test->reg, test->test_val,
+		  expected_errno, expect);
 
 	intel_register_write(test->reg, test->init_val);
+
+	igt_assert_eq_u32((intel_register_read(test->reg) &
+			   test->read_mask),
+			  test->init_val);
 
 	exec_batch(fd, handle,
 		   lri, sizeof(lri),
@@ -476,57 +492,43 @@ igt_main
 	}
 
 	igt_subtest_group {
+#define REG(R, MSK, INI, V, OK, MIN_V) { #R, R, MSK, INI, V, OK, MIN_V }
+		struct test_lri lris[] = {
+			/* dummy head pointer */
+			REG(OASTATUS2,
+			    0xffffff80, 0xdeadf000, 0xbeeff000, false, 0),
+			/* NB: [1:0] MBZ */
+			REG(SO_WRITE_OFFSET_0,
+			    0xfffffffc, 0xabcdabc0, 0xbeefbee0, true, 0),
+
+			/* It's really important for us to check that
+			 * an LRI to OACONTROL doesn't result in an
+			 * EINVAL error because Mesa attempts writing
+			 * to OACONTROL to determine what extensions to
+			 * expose and will abort() for execbuffer()
+			 * errors.
+			 *
+			 * Mesa can gracefully recognise and handle the
+			 * LRI becoming a NOOP.
+			 *
+			 * The test values represent dummy context IDs
+			 * while leaving the OA unit disabled
+			 */
+			REG(OACONTROL,
+			    0xfffff000, 0xfeed0000, 0x31337000, false, 9)
+		};
+#undef REG
+
 		igt_fixture {
 			intel_register_access_init(intel_get_pci_device(), 0);
 		}
 
-		igt_subtest("registers") {
-			struct test_lri bad_lris[] = {
-				/* dummy head pointer */
-				{ OASTATUS2, 0xffffff80, 0xdeadf000, 0xbeeff000 }
-			};
-			struct test_lri v9_bad_lris[] = {
-				/* It's really important for us to check that
-				 * an LRI to OACONTROL doesn't result in an
-				 * EINVAL error because Mesa attempts writing
-				 * to OACONTROL to determine what extensions to
-				 * expose and will abort() for execbuffer()
-				 * errors.
-				 *
-				 * Mesa can gracefully recognise and handle the
-				 * LRI becoming a NOOP.
-				 *
-				 * The test values represent dummy context IDs
-				 * while leaving the OA unit disabled
-				 */
-				{ OACONTROL, 0xfffff000, 0xfeed0000, 0x31337000 }
-			};
-			struct test_lri ok_lris[] = {
-				/* NB: [1:0] MBZ */
-				{ SO_WRITE_OFFSET_0, 0xfffffffc,
-				  0xabcdabc0, 0xbeefbee0 }
-			};
-			int bad_lri_errno = parser_version >= 8 ? 0 : -EINVAL;
-
-			for (int i = 0; i < ARRAY_SIZE(ok_lris); i++) {
-				test_lri(fd, handle,
-					 ok_lris + i, 0,
-					 ok_lris[i].test_val);
-			}
-
-			for (int i = 0; i < ARRAY_SIZE(bad_lris); i++) {
-				test_lri(fd, handle,
-					 bad_lris + i, bad_lri_errno,
-					 bad_lris[i].init_val);
-			}
-
-			if (parser_version >= 9) {
-				for (int i = 0; i < ARRAY_SIZE(v9_bad_lris); i++) {
-					test_lri(fd, handle,
-						 v9_bad_lris + i,
-						 0,
-						 v9_bad_lris[i].init_val);
-				}
+		for (int i = 0; i < ARRAY_SIZE(lris); i++) {
+			igt_subtest_f("test-lri-%s", lris[i].name) {
+				igt_require_f(parser_version >= lris[i].min_ver,
+					      "minimum required parser version for test = %d\n",
+					      lris[i].min_ver);
+				test_lri(fd, handle, lris + i);
 			}
 		}
 
