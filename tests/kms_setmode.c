@@ -417,6 +417,11 @@ static double frame_time(const drmModeModeInfo *kmode)
 	return 1000.0 * kmode->htotal * kmode->vtotal / kmode->clock;
 }
 
+static double line_time(const drmModeModeInfo *kmode)
+{
+	return 1000.0 * kmode->htotal / kmode->clock;
+}
+
 static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 {
 #define CALIBRATE_TS_STEPS 120 /* ~2s has to be less than 128! */
@@ -425,6 +430,7 @@ static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 	uint32_t last_seq;
 	uint64_t last_timestamp;
 	double expected;
+	double accuracy;
 	double mean;
 	double stddev;
 	int n;
@@ -470,15 +476,21 @@ static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 
 	mean = igt_stats_get_mean(&stats);
 	stddev = igt_stats_get_std_deviation(&stats);
+	accuracy = 3.090 * stddev; /* 2-tailed 99% confidence */
 
-	igt_info("Expected frametime: %.0fus; measured %.1fus +- %.3fus accuracy %.2f%%\n",
-		 expected, mean, stddev, 100 * 6 * stddev / mean);
-	igt_assert(6 * stddev / mean < 0.005); /* 99% accuracy within 0.5% */
+	igt_info("Expected frametime: %.0fus; measured %.1fus +- %.3fus accuracy %.2f%% [%.2f scanlines]\n",
+		 expected, mean, stddev,
+		 100 * accuracy / mean, accuracy / line_time(kmode));
+
+	/* 99% accuracy within one scanline */
+	igt_assert_f(accuracy < line_time(kmode),
+		     "vblank accuracy (%.3fus, %.1f%%) worse than a scanline (%.3fus)\n",
+		     accuracy, 100 * accuracy / mean, line_time(kmode));
 
 	igt_assert_f(fabs(mean - expected) < 2*stddev,
-		      "vblank interval differs from modeline! expected %.1fus, measured %1.fus +- %.3fus, difference %.1fus (%.1f sigma)\n",
-		      expected, mean, stddev,
-		      fabs(mean - expected), fabs(mean - expected) / stddev);
+		     "vblank interval differs from modeline! expected %.1fus, measured %1.fus +- %.3fus, difference %.1fus (%.1f sigma)\n",
+		     expected, mean, stddev,
+		     fabs(mean - expected), fabs(mean - expected) / stddev);
 }
 
 static void test_crtc_config(const struct test_config *tconf,
