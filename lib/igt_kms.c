@@ -324,6 +324,24 @@ const char *kmstest_pipe_name(enum pipe pipe)
 }
 
 /**
+ * kmstest_pipe_to_index:
+ *@pipe: display pipe in string format
+ *
+ * Returns: index to corresponding pipe
+ */
+int kmstest_pipe_to_index(char pipe)
+{
+	if (pipe == 'A')
+		return 0;
+	else if (pipe == 'B')
+		return 1;
+	else if (pipe == 'C')
+		return 2;
+	else
+		return -EINVAL;
+}
+
+/**
  * kmstest_plane_name:
  * @plane: display plane
  *
@@ -1179,6 +1197,149 @@ int kmstest_get_crtc_idx(drmModeRes *res, uint32_t crtc_id)
 			return i;
 
 	igt_assert(false);
+}
+
+static inline uint32_t pipe_select(int pipe)
+{
+	if (pipe > 1)
+		return pipe << DRM_VBLANK_HIGH_CRTC_SHIFT;
+	else if (pipe > 0)
+		return DRM_VBLANK_SECONDARY;
+	else
+		return 0;
+}
+
+unsigned int kmstest_get_vblank(int fd, int pipe, unsigned int flags)
+{
+	union drm_wait_vblank vbl;
+
+	memset(&vbl, 0, sizeof(vbl));
+	vbl.request.type = DRM_VBLANK_RELATIVE | pipe_select(pipe) | flags;
+	if (drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl))
+		return 0;
+
+	return vbl.reply.sequence;
+}
+
+static void get_plane(char *str, int type, struct kmstest_plane *plane)
+{
+	int ret;
+	char buf[256];
+
+	plane->plane = type;
+	ret = sscanf(str + 12, "%d%*c %*s %[^n]s",
+		     &plane->id,
+		     buf);
+	igt_assert_eq(ret, 2);
+
+	ret = sscanf(buf + 9, "%4d%*c%4d%*c", &plane->pos_x, &plane->pos_y);
+	igt_assert_eq(ret, 2);
+
+	ret = sscanf(buf + 30, "%4d%*c%4d%*c", &plane->width, &plane->height);
+	igt_assert_eq(ret, 2);
+}
+
+static int parse_planes(FILE *fid, struct kmstest_plane *plane)
+{
+	char tmp[256];
+	int nplanes;
+	int ovl;
+
+	ovl = 0;
+	nplanes = 0;
+	while (fgets(tmp, 256, fid) != NULL) {
+		igt_assert_neq(nplanes, IGT_MAX_PLANES);
+		if (strstr(tmp, "type=PRI") != NULL) {
+			get_plane(tmp, IGT_PLANE_PRIMARY, &plane[nplanes]);
+			nplanes++;
+		} else if (strstr(tmp, "type=OVL") != NULL) {
+			get_plane(tmp, IGT_PLANE_2 + ovl, &plane[nplanes]);
+			ovl++;
+			nplanes++;
+		} else if (strstr(tmp, "type=CUR") != NULL) {
+			get_plane(tmp, IGT_PLANE_CURSOR, &plane[nplanes]);
+			nplanes++;
+			break;
+		}
+	}
+
+	return nplanes;
+}
+
+static void parse_crtc(char *info, struct kmstest_crtc *crtc)
+{
+	char buf[256];
+	int ret;
+	char pipe;
+
+	ret = sscanf(info + 4, "%d%*c %*s %c%*c %*s %s%*c",
+		     &crtc->id, &pipe, buf);
+	igt_assert_eq(ret, 3);
+
+	crtc->pipe = kmstest_pipe_to_index(pipe);
+	igt_assert(crtc->pipe >= 0);
+
+	ret = sscanf(buf + 6, "%d%*c%d%*c",
+		     &crtc->width, &crtc->height);
+	igt_assert_eq(ret, 2);
+}
+
+void kmstest_get_crtc(enum pipe pipe, struct kmstest_crtc *crtc)
+{
+	char tmp[256];
+	FILE *fid;
+	const char *mode = "r";
+	int ncrtc;
+	int line;
+
+	fid = igt_debugfs_fopen("i915_display_info", mode);
+
+	igt_skip_on(fid == NULL);
+
+	ncrtc = 0;
+	line = 0;
+	while (fgets(tmp, 256, fid) != NULL) {
+		if ((strstr(tmp, "CRTC") != NULL) && (line > 0)) {
+			if (strstr(tmp, "active=yes") != NULL) {
+				crtc->active = true;
+				parse_crtc(tmp, crtc);
+				crtc->nplanes = parse_planes(fid, crtc->plane);
+
+				if (crtc->pipe != pipe)
+					crtc = NULL;
+				else
+					ncrtc++;
+			}
+		}
+
+		line++;
+	}
+
+	fclose(fid);
+
+	igt_skip_on(ncrtc == 0);
+}
+
+void igt_assert_plane_visible(enum pipe pipe, bool visibility)
+{
+	struct kmstest_crtc crtc;
+	int i;
+	bool visible;
+
+	kmstest_get_crtc(pipe, &crtc);
+
+	visible = true;
+	for (i = IGT_PLANE_2; i < crtc.nplanes; i++) {
+		if (crtc.plane[i].pos_x > crtc.width) {
+			visible = false;
+			break;
+		} else if (crtc.plane[i].pos_y > crtc.height) {
+			visible = false;
+			break;
+		}
+	}
+
+	igt_assert_eq(visible, visibility);
 }
 
 /*

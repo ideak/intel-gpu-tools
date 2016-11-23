@@ -57,6 +57,7 @@ enum pipe {
         I915_MAX_PIPES
 };
 const char *kmstest_pipe_name(enum pipe pipe);
+int kmstest_pipe_to_index(char pipe);
 
 /* We namespace this enum to not conflict with the Android i915_drm.h */
 enum igt_plane {
@@ -132,6 +133,25 @@ struct kmstest_connector_config {
 	unsigned valid_crtc_idx_mask;
 };
 
+struct kmstest_plane {
+	int id;
+	int plane;
+	int pos_x;
+	int pos_y;
+	int width;
+	int height;
+};
+
+struct kmstest_crtc {
+	int id;
+	int pipe;
+	bool active;
+	int width;
+	int height;
+	int nplanes;
+	struct kmstest_plane plane[IGT_MAX_PLANES];
+};
+
 /**
  * kmstest_force_connector_state:
  * @FORCE_CONNECTOR_UNSPECIFIED: Unspecified
@@ -177,6 +197,9 @@ uint32_t kmstest_dumb_create(int fd, int width, int height, int bpp,
 
 void *kmstest_dumb_map_buffer(int fd, uint32_t handle, uint64_t size,
 			      unsigned prot);
+unsigned int kmstest_get_vblank(int fd, int pipe, unsigned int flags);
+void kmstest_get_crtc(enum pipe pipe, struct kmstest_crtc *crtc);
+void igt_assert_plane_visible(enum pipe pipe, bool visibility);
 
 /*
  * A small modeset API
