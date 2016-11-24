@@ -176,8 +176,8 @@ gtt_entry_size(void)
 static uint32_t
 gtt_size(void)
 {
-	/* Enough for 256MB assuming 4kB pages. */
-	const unsigned entries = 0x10000;
+	/* Enough for 64MB assuming 4kB pages. */
+	const unsigned entries = 0x4000;
 	return entries * gtt_entry_size();
 }
 
@@ -197,7 +197,7 @@ write_header(void)
 	dword_out(0); /* timestamp */
 	dword_out(0); /* comment len */
 
-	/* Set up the GTT. The max we can handle is 256M */
+	/* Set up the GTT. The max we can handle is 64M */
 	dword_out(CMD_AUB_TRACE_HEADER_BLOCK | ((gen >= 8 ? 6 : 5) - 2));
 	dword_out(AUB_TRACE_MEMTYPE_GTT_ENTRY |
 		  AUB_TRACE_TYPE_NOTYPE | AUB_TRACE_OP_DATA_WRITE);
