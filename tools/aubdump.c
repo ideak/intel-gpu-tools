@@ -185,10 +185,16 @@ static void
 write_header(void)
 {
 	char app_name[8 * 4];
+	char comment[16];
+	int comment_len, comment_dwords, dwords;
 	uint32_t entry = 0x200003;
 
+	comment_len = snprintf(comment, sizeof(comment), "PCI-ID=0x%x", device);
+	comment_dwords = ((comment_len + 3) / 4);
+
 	/* Start with a (required) version packet. */
-	dword_out(CMD_AUB_HEADER | (13 - 2));
+	dwords = 13 + comment_dwords;
+	dword_out(CMD_AUB_HEADER | (dwords - 2));
 	dword_out((4 << AUB_HEADER_MAJOR_SHIFT) |
 		  (0 << AUB_HEADER_MINOR_SHIFT));
 
@@ -199,7 +205,8 @@ write_header(void)
 
 	dword_out(0); /* timestamp */
 	dword_out(0); /* timestamp */
-	dword_out(0); /* comment len */
+	dword_out(comment_len);
+	data_out(comment, comment_dwords * 4);
 
 	/* Set up the GTT. The max we can handle is 64M */
 	dword_out(CMD_AUB_TRACE_HEADER_BLOCK | ((gen >= 8 ? 6 : 5) - 2));
