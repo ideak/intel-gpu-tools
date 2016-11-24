@@ -184,14 +184,18 @@ gtt_size(void)
 static void
 write_header(void)
 {
+	char app_name[8 * 4];
 	uint32_t entry = 0x200003;
 
 	/* Start with a (required) version packet. */
 	dword_out(CMD_AUB_HEADER | (13 - 2));
 	dword_out((4 << AUB_HEADER_MAJOR_SHIFT) |
 		  (0 << AUB_HEADER_MINOR_SHIFT));
-	for (int i = 0; i < 8; i++)
-		dword_out(0); /* app name */
+
+	/* Next comes a 32-byte application name. */
+	strncpy(app_name, program_invocation_short_name, sizeof(app_name));
+	app_name[sizeof(app_name) - 1] = 0;
+	data_out(app_name, sizeof(app_name));
 
 	dword_out(0); /* timestamp */
 	dword_out(0); /* timestamp */
