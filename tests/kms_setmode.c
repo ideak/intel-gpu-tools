@@ -83,7 +83,6 @@ struct test_config {
 struct connector_config {
 	drmModeConnector *connector;
 	int crtc_idx;
-	bool connected;
 	drmModeModeInfo default_mode;
 };
 
@@ -250,10 +249,9 @@ static void get_crtc_config_str(struct crtc_config *crtc, char *buf,
 		drmModeConnector *connector = crtc->cconfs[i].connector;
 
 		pos += snprintf(&buf[pos], buf_size - pos,
-			"%s%s-%d[%d]%s", i ? ", " : "",
+			"%s%s-%d[%d]", i ? ", " : "",
 			kmstest_connector_type_str(connector->connector_type),
-			connector->connector_type_id, connector->connector_id,
-			crtc->cconfs[i].connected ? "" : " (NC)");
+			connector->connector_type_id, connector->connector_id);
 		if (pos > buf_size)
 			return;
 	}
@@ -501,7 +499,6 @@ static void test_crtc_config(const struct test_config *tconf,
 	struct crtc_config *crtc;
 	static int test_id;
 	bool config_failed = false;
-	bool connector_connected = false;
 	int ret = 0;
 	int i;
 
@@ -548,14 +545,11 @@ static void test_crtc_config(const struct test_config *tconf,
 			igt_assert_eq(errno, EINVAL);
 			config_failed = true;
 		}
-
-		for (j = 0; j < crtc->connector_count; j++)
-			connector_connected |= crtc->cconfs[j].connected;
 	}
 
 	igt_assert(config_failed == !!(tconf->flags & TEST_INVALID));
 
-	if (ret == 0 && connector_connected && tconf->flags & TEST_TIMINGS)
+	if (ret == 0 && tconf->flags & TEST_TIMINGS)
 		check_timings(crtcs[0].crtc_idx, &crtcs[0].mode);
 
 	for (i = 0; i < crtc_count; i++) {
@@ -618,36 +612,21 @@ static int get_one_connector(drmModeRes *resources, int connector_id,
 			     struct connector_config *cconf)
 {
 	drmModeConnector *connector;
-	drmModeModeInfo mode;
 
 	connector = drmModeGetConnectorCurrent(drm_fd, connector_id);
 	igt_assert(connector);
 	cconf->connector = connector;
 
-	cconf->connected = connector->connection == DRM_MODE_CONNECTED;
-
-	/*
-	 * For DP/eDP we need a connected sink, since mode setting depends
-	 * on successful link training and retrieved DPCD parameters.
-	 */
-	switch (connector->connector_type) {
-	case DRM_MODE_CONNECTOR_DisplayPort:
-	case DRM_MODE_CONNECTOR_eDP:
-		if (!cconf->connected) {
-			drmModeFreeConnector(connector);
-			return -1;
-		}
+	if (connector->connection != DRM_MODE_CONNECTED) {
+		drmModeFreeConnector(connector);
+		return -1;
 	}
 
-	if (cconf->connected) {
-		if (!kmstest_get_connector_default_mode(drm_fd, connector,
-							&mode))
-			mode = mode_640_480;
-	} else {
-		mode = mode_640_480;
+	if (!kmstest_get_connector_default_mode(drm_fd, connector,
+						&cconf->default_mode)) {
+		drmModeFreeConnector(connector);
+		return -1;
 	}
-
-	cconf->default_mode = mode;
 
 	return 0;
 }
