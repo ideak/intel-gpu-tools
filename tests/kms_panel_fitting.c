@@ -219,7 +219,7 @@ test_panel_fitting_fastset(igt_display_t *display, const enum pipe pipe, igt_out
 {
 	igt_plane_t *primary, *sprite;
 	drmModeModeInfo mode;
-	struct igt_fb black, red;
+	struct igt_fb red, green, blue;
 
 	igt_assert(kmstest_get_connector_default_mode(display->drm_fd, output->config.connector, &mode));
 
@@ -231,13 +231,17 @@ test_panel_fitting_fastset(igt_display_t *display, const enum pipe pipe, igt_out
 
 	igt_create_color_fb(display->drm_fd, mode.hdisplay, mode.vdisplay,
 			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
-			    0.f, 0.f, 0.f, &black);
+			    0.f, 0.f, 1.f, &blue);
 
 	igt_create_color_fb(display->drm_fd, 640, 480,
 			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
 			    1.f, 0.f, 0.f, &red);
 
-	igt_plane_set_fb(primary, &black);
+	igt_create_color_fb(display->drm_fd, 800, 600,
+			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			    0.f, 1.f, 0.f, &green);
+
+	igt_plane_set_fb(primary, &blue);
 	igt_plane_set_fb(sprite, &red);
 
 	igt_display_commit2(display, COMMIT_ATOMIC);
@@ -252,9 +256,20 @@ test_panel_fitting_fastset(igt_display_t *display, const enum pipe pipe, igt_out
 	/* Don't pass ALLOW_MODESET with overridden mode, force fastset. */
 	igt_display_commit_atomic(display, 0, NULL);
 
+	/* Test with different scaled mode */
+	mode.hdisplay = 800;
+	mode.vdisplay = 600;
+	igt_output_override_mode(output, &mode);
+	igt_plane_set_fb(primary, &green);
+	igt_display_commit_atomic(display, 0, NULL);
+
+	/* Restore normal mode */
+	igt_plane_set_fb(primary, &blue);
+	igt_output_override_mode(output, NULL);
+	igt_display_commit_atomic(display, 0, NULL);
+
 	igt_plane_set_fb(primary, NULL);
 	igt_output_set_pipe(output, PIPE_NONE);
-	igt_output_override_mode(output, NULL);
 }
 
 static void test_atomic_fastset(igt_display_t *display)
