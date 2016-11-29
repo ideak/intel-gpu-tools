@@ -297,7 +297,7 @@ static void hangcheck_unterminated(void)
 {
 	int fd;
 	/* timeout needs to be greater than ~5*hangcheck */
-	int64_t timeout_ns = 100 * NSEC_PER_SEC; /* 100 seconds */
+	int64_t timeout_ns = 100ull * NSEC_PER_SEC; /* 100 seconds */
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 gem_exec;
 	uint32_t handle;
