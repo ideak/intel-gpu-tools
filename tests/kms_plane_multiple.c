@@ -210,7 +210,7 @@ prepare_planes(data_t *data, enum pipe pipe, color_t *color,
 		igt_create_color_fb(data->drm_fd,
 				    size[i], size[i],
 				    data->plane[i]->is_cursor ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
-				    tiling,
+				    data->plane[i]->is_cursor ? LOCAL_DRM_FORMAT_MOD_NONE : tiling,
 				    color->red, color->green, color->blue,
 				    &data->fb[i]);
 
@@ -349,12 +349,17 @@ test_plane_position(data_t *data, enum pipe pipe, bool atomic, int max_planes,
 {
 	igt_output_t *output;
 	int connected_outs;
+	int devid = intel_get_drm_devid(data->drm_fd);
 
 	if (atomic)
 		igt_require(data->display.is_atomic);
 
 	igt_skip_on(pipe >= data->display.n_pipes);
 	igt_skip_on(max_planes >= data->display.pipes[pipe].n_planes);
+
+	if ((tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
+	     tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED))
+		igt_require(AT_LEAST_GEN(devid, 9));
 
 	if (!opt.user_seed)
 		opt.seed = time(NULL);
