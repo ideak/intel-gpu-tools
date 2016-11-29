@@ -466,7 +466,7 @@ test_huge_bo(int fd, int huge, int tiling)
 	munmap(linear_pattern, PAGE_SIZE);
 }
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) && !defined(__clang__)
 #define MOVNT 512
 
 #pragma GCC push_options

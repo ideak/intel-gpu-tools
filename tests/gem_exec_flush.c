@@ -40,7 +40,7 @@ IGT_TEST_DESCRIPTION("Basic check of flushing after batches");
 #define BASIC 256
 #define MOVNT 512
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) && !defined(__clang__)
 #pragma GCC push_options
 #pragma GCC target("sse4.1")
 #include <smmintrin.h>

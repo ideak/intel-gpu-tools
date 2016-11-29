@@ -50,7 +50,7 @@ static double elapsed(const struct timeval *start,
 	return (1e6*(end->tv_sec - start->tv_sec) + (end->tv_usec - start->tv_usec))/loop;
 }
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) && !defined(__clang__)
 #pragma GCC push_options
 #pragma GCC target("sse4.1")
 #include <smmintrin.h>
