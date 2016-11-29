@@ -378,7 +378,7 @@ static void commit_display(igt_display_t *display, unsigned event_mask, bool non
 
 	igt_debug("Event mask: %x, waiting for %i events\n", event_mask, num_events);
 
-	igt_set_timeout(30, "Waiting for %i events timed out\n", event_mask);
+	igt_set_timeout(30, "Waiting for events timed out\n");
 
 	while (num_events) {
 		char buf[32];
