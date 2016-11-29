@@ -129,6 +129,15 @@ igt_simple_main
 	igt_fork_hang_detector(fd);
 
 	file = igt_debugfs_fopen("i915_ring_test_irq", "w");
+	fprintf(file, "0x%x", -1);
+	fclose(file);
+
+	expect_rings = -1;
+	file = igt_debugfs_fopen("i915_ring_test_irq", "r");
+	igt_ignore_warn(fscanf(file, "%x", &expect_rings));
+	fclose(file);
+
+	file = igt_debugfs_fopen("i915_ring_test_irq", "w");
 	fprintf(file, "0");
 	fclose(file);
 
@@ -146,15 +155,6 @@ igt_simple_main
 		trigger_missed_interrupt(fd, e->exec_id | e->flags);
 	}
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
-
-	file = igt_debugfs_fopen("i915_ring_test_irq", "w");
-	fprintf(file, "0x%x", -1);
-	fclose(file);
-
-	expect_rings = -1;
-	file = igt_debugfs_fopen("i915_ring_test_irq", "r");
-	igt_ignore_warn(fscanf(file, "%x", &expect_rings));
-	fclose(file);
 
 	igt_debug("Testing rings %x\n", expect_rings);
 	intel_detect_and_clear_missed_interrupts(fd);
