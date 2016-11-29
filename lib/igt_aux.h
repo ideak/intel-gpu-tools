@@ -285,7 +285,7 @@ struct igt_list {
 	struct igt_list *next;
 };
 
-#define __IGT_INIT_LIST(name) (struct igt_list){ &(name), &(name) }
+#define __IGT_INIT_LIST(name) { &(name), &(name) }
 #define IGT_LIST(name) struct igt_list name = __IGT_INIT_LIST(name);
 
 static inline void igt_list_init(struct igt_list *list)
