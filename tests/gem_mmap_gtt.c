@@ -474,7 +474,7 @@ test_huge_bo(int fd, int huge, int tiling)
 
 #include <smmintrin.h>
 __attribute__((noinline))
-static void copy_wc_page(void *dst, const void *src)
+static void copy_wc_page(void *dst, void *src)
 {
 	if (igt_x86_features() & SSE4_1) {
 		__m128i *S = (__m128i *)src;

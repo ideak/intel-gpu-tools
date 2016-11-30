@@ -395,7 +395,7 @@ static const char *efp_conn(uint8_t type)
 }
 
 static void dump_child_device(struct context *context,
-			      struct child_device_config *child)
+			      const struct child_device_config *child)
 {
 	char child_id[11];
 
@@ -403,7 +403,7 @@ static void dump_child_device(struct context *context,
 		return;
 
 	if (context->bdb->version < 152) {
-		strncpy(child_id, (char *)child->device_id, 10);
+		strncpy(child_id, (const char *)child->device_id, 10);
 		child_id[10] = 0;
 
 		printf("\tChild device info:\n");
@@ -413,8 +413,8 @@ static void dump_child_device(struct context *context,
 		printf("\t\tAIM offset: %d\n", child->addin_offset);
 		printf("\t\tDVO port: 0x%02x\n", child->dvo_port);
 	} else { /* 152+ have EFP blocks here */
-		struct efp_child_device_config *efp =
-			(struct efp_child_device_config *)child;
+		const struct efp_child_device_config *efp =
+			(const struct efp_child_device_config *)child;
 		printf("\tEFP device info:\n");
 		printf("\t\tDevice handle: 0x%04x (%s)\n", efp->handle,
 		       child_device_handle(efp->handle));
@@ -475,16 +475,16 @@ static void dump_child_device(struct context *context,
 	}
 
 	if (context->bdb->version >= 195) {
-		struct efp_child_device_config *efp =
-			(struct efp_child_device_config *)child;
+		const struct efp_child_device_config *efp =
+			(const struct efp_child_device_config *)child;
 		printf("\t\tDP USB type C support: %s\n", YESNO(efp->dp_usb_type_c));
 		printf("\t\t2X DP GPIO index: 0x%02x\n", efp->dp_usb_type_c_2x_gpio_index);
 		printf("\t\t2X DP GPIO pin number: 0x%02x\n", efp->dp_usb_type_c_2x_gpio_pin);
 	}
 
 	if (context->bdb->version >= 196) {
-		struct efp_child_device_config *efp =
-			(struct efp_child_device_config *)child;
+		const struct efp_child_device_config *efp =
+			(const struct efp_child_device_config *)child;
 		printf("\t\tIBoost level for HDMI: 0x%02x\n", efp->iboost_hdmi);
 		printf("\t\tIBoost level for DP/eDP: 0x%02x\n", efp->iboost_dp);
 	}
@@ -509,7 +509,7 @@ static void dump_general_definitions(struct context *context,
 	child_device_num = (block->size - sizeof(*defs)) /
 		defs->child_dev_size;
 	for (i = 0; i < child_device_num; i++)
-		dump_child_device(context, (void*)&defs->devices[i * defs->child_dev_size]);
+		dump_child_device(context, (const void*)&defs->devices[i * defs->child_dev_size]);
 }
 
 static void dump_child_devices(struct context *context,
@@ -1116,7 +1116,7 @@ static const uint8_t *mipi_dump_send_packet(const uint8_t *data)
 
 	flags = *data++;
 	type = *data++;
-	len = *((uint16_t *) data);
+	len = *((const uint16_t *) data);
 	data += 2;
 
 	printf("\t\tSend DCS: Port %s, VC %d, %s, Type %02x, Length %u, Data",
@@ -1162,7 +1162,7 @@ static const uint8_t *mipi_dump_i2c(const uint8_t *data)
 	flags = *data++;
 	index = *data++;
 	bus = *data++;
-	address = *((uint16_t *) data);
+	address = *((const uint16_t *) data);
 	data += 2;
 	offset = *data++;
 	len = *data++;

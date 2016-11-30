@@ -1154,14 +1154,14 @@ xprintfmt(const char *fmt, va_list ap)
 	unsigned long long num;
 
 	while (1) {
-		while ((ch = *(unsigned char *) fmt++) != '%') {
+		while ((ch = *(const unsigned char *) fmt++) != '%') {
 			if (ch == '\0') {
 				return;
 			}
 			xputch(ch);
 		}
 
-		ch = *(unsigned char *) fmt++;
+		ch = *(const unsigned char *) fmt++;
 		switch (ch) {
 		/* character */
 		case 'c':

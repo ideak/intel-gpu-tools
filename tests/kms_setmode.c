@@ -522,7 +522,6 @@ static void test_crtc_config(const struct test_config *tconf,
 
 	for (i = 0; i < crtc_count; i++) {
 		uint32_t *ids;
-		int j;
 
 		crtc = &crtcs[i];
 
