@@ -474,18 +474,48 @@ static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 
 	mean = igt_stats_get_mean(&stats);
 	stddev = igt_stats_get_std_deviation(&stats);
-	accuracy = 3.090 * stddev; /* 2-tailed 99% confidence */
+
+	/* 99.7% samples fall within `accuracy` on both sides of mean in normal
+	 * distribution if `accuracy = 3 * sigma`.
+	 * https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule
+	 *
+	 * The value of 99.7% was chosen to suit requirements of test cases
+	 * which depend on timing, giving the lowest acceptable MTBF of 5.6s
+	 * for 60Hz sampling rate.
+	 */
+	accuracy = 3. * stddev;
 
 	igt_info("Expected frametime: %.0fus; measured %.1fus +- %.3fus accuracy %.2f%% [%.2f scanlines]\n",
 		 expected, mean, stddev,
 		 100 * accuracy / mean, accuracy / line_time(kmode));
 
-	/* 99% accuracy within one scanline */
+	/* 99.7% samples within one scanline on each side of mean */
 	igt_assert_f(accuracy < line_time(kmode),
 		     "vblank accuracy (%.3fus, %.1f%%) worse than a scanline (%.3fus)\n",
 		     accuracy, 100 * accuracy / mean, line_time(kmode));
 
-	igt_assert_f(fabs(mean - expected) < 2*stddev,
+	/* At least 90% of frame times fall within the one scanline on each
+	 * side of expected mean.
+	 *
+	 * Expected scanline duration:
+	 * 	(expected - accuracy, expected + accuracy).
+	 * Assuming maximum difference allowed:
+	 * 	expected = mean + n * sigma
+	 * the scanline duration becomes:
+	 * 	(mean - accuracy + n * sigma, mean + accuracy + n * sigma)
+	 * The expected scanline captures the following number of samples
+	 * from each side of expected:
+	 * 	(erf(abs(-(accuracy/sigma) + n) / sqrt(2))
+	 * 	+ erf((accuracy/sigma) + n) / sqrt(2))) / 2
+	 * 	= samples
+	 *
+	 * Solving for samples = 0.9:
+	 * 	n = 1.718
+	 *
+	 * See:
+	 * https://en.wikipedia.org/wiki/Standard_deviation#Rules_for_normally_distributed_data
+	 */
+	igt_assert_f(fabs(mean - expected) < 1.718 * stddev,
 		     "vblank interval differs from modeline! expected %.1fus, measured %1.fus +- %.3fus, difference %.1fus (%.1f sigma)\n",
 		     expected, mean, stddev,
 		     fabs(mean - expected), fabs(mean - expected) / stddev);
