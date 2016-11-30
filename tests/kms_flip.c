@@ -1206,9 +1206,12 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 	stddev = igt_stats_get_std_deviation(&stats);
 
 	igt_info("Expected frametime: %.0fus; measured %.1fus +- %.3fus accuracy %.2f%%\n",
-		 expected, mean, stddev, 100 * 6 * stddev / mean);
-	igt_assert(6 * stddev / mean < 0.005); /* 99% accuracy within 0.5% */
-
+		 expected, mean, stddev, 100 * 3 * stddev / mean);
+	/* 99.7% samples within 0.5% of the mean */
+	igt_assert(3 * stddev / mean < 0.005);
+	/* 84% samples within 0.5% of the expected value.
+	 * See comments in check_timings() in kms_setmode.c
+	 */
 	if (fabs(mean - expected) > 2*stddev) {
 		igt_warn("vblank interval differs from modeline! expected %.1fus, measured %1.fus +- %.3fus, difference %.1fus (%.1f sigma)\n",
 				expected, mean, stddev,
