@@ -1985,7 +1985,7 @@ sampler_datatype:
 ;
 
 math_function:	INV | LOG | EXP | SQRT | POW | SIN | COS | SINCOS | INTDIV
-		| INTMOD | INTDIVMOD
+		| INTMOD | INTDIVMOD | RSQ
 ;
 
 math_signed:	%empty /* empty */ { $$ = 0; }
