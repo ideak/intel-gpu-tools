@@ -1133,6 +1133,7 @@ trinaryinstruction:
 
 		  set_instruction_opcode(&$$, $2);
 		  set_instruction_saturate(&$$, $4);
+		  set_instruction_options(&$$, $10);
 
 		  $6.width = $5;
 		  if (set_instruction_dest_three_src(&$$, &$6))
@@ -1143,7 +1144,6 @@ trinaryinstruction:
 		    YYERROR;
 		  if (set_instruction_src2_three_src(&$$, &$9))
 		    YYERROR;
-		  set_instruction_options(&$$, $10);
 }
 ;
 
