@@ -255,7 +255,8 @@ void igt_spin_batch_end(igt_spin_t *spin)
 	*spin->batch = MI_BATCH_BUFFER_END;
 	__sync_synchronize();
 
-	clear_sig_handler(spin->signo);
+	if (spin->signo)
+		clear_sig_handler(spin->signo);
 }
 
 /**
