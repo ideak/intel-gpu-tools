@@ -35,5 +35,6 @@ int igt_kmod_unload(const char *mod_name, unsigned int flags);
 int igt_i915_driver_load(const char *opts);
 int igt_i915_driver_unload(void);
 
+void igt_kselftests(const char *module_name);
 
 #endif /* IGT_KMOD_H */
