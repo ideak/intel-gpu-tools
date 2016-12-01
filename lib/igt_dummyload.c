@@ -173,9 +173,6 @@ static void clear_sig_handler(int sig)
 {
 	struct sigaction act;
 
-	if (sig <= SIGRTMIN)
-		return;
-
 	memset(&act, 0, sizeof(act));
 	act.sa_handler = SIG_DFL;
 	igt_assert(sigaction(sig, &act, NULL) == 0);
