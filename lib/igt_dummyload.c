@@ -192,7 +192,7 @@ static void sig_handler(int sig, siginfo_t *info, void *arg)
 		}
 	}
 
-	clear_sig_handler(info->si_signo);
+	clear_sig_handler(sig);
 }
 
 /**
