@@ -24,35 +24,30 @@
 #include "igt.h"
 #include "igt_gvt.h"
 #include "igt_sysfs.h"
+#include "igt_kmod.h"
 
+#include <signal.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <fcntl.h>
 
 static bool is_gvt_enabled(void)
 {
-	FILE *file;
-	int value;
 	bool enabled = false;
+	int dir, fd;
 
-	file = fopen("/sys/module/i915/parameters/enable_gvt", "r");
-	if (!file)
+	fd = __drm_open_driver(DRIVER_INTEL);
+	dir = igt_sysfs_open_parameters(fd);
+	if (dir < 0)
 		return false;
 
-	if (fscanf(file, "%d", &value) == 1)
-		enabled = value;
-	fclose(file);
+	enabled = igt_sysfs_get_boolean(dir, "enable_gvt");
 
-	errno = 0;
+	close(dir);
+	close(fd);
+
 	return enabled;
-}
 
-static void unload_i915(void)
-{
-	kick_fbcon(false);
-	/* pkill alsact */
-
-	igt_ignore_warn(system("/sbin/modprobe -s -r i915"));
 }
 
 bool igt_gvt_load_module(void)
@@ -60,8 +55,11 @@ bool igt_gvt_load_module(void)
 	if (is_gvt_enabled())
 		return true;
 
-	unload_i915();
-	igt_ignore_warn(system("/sbin/modprobe -s i915 enable_gvt=1"));
+	if (igt_i915_driver_unload())
+		return false;
+
+	if (igt_i915_driver_load("enable_gvt=1"))
+		return false;
 
 	return is_gvt_enabled();
 }
@@ -71,8 +69,9 @@ void igt_gvt_unload_module(void)
 	if (!is_gvt_enabled())
 		return;
 
-	unload_i915();
-	igt_ignore_warn(system("/sbin/modprobe -s i915 enable_gvt=0"));
+	igt_i915_driver_unload();
+
+	igt_i915_driver_load(NULL);
 
 	igt_assert(!is_gvt_enabled());
 }

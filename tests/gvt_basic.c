@@ -32,7 +32,7 @@ igt_main
 
 	igt_fixture {
 		igt_require(igt_gvt_load_module());
-		fd = drm_open_driver(DRIVER_INTEL);
+		fd = __drm_open_driver(DRIVER_INTEL);
 	}
 
 	igt_subtest_f("invalid-placeholder-test");
