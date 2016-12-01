@@ -3,7 +3,9 @@ igt@core_prop_blob@basic
 igt@drv_getparams_basic@basic-eu-total
 igt@drv_getparams_basic@basic-subslice-total
 igt@drv_hangman@error-state-basic
-igt@drv_module_reload_basic
+igt@drv_module_reload@basic-reload
+igt@drv_module_reload@basic-reload-inject
+igt@drv_module_reload@basic-reload-final
 igt@gem_basic@bad-close
 igt@gem_basic@create-close
 igt@gem_basic@create-fd-close

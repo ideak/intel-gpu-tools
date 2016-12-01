@@ -26,7 +26,6 @@ noinst_PROGRAMS = \
 	$(NULL)
 
 pkglibexec_PROGRAMS = \
-	gem_alive \
 	gem_stress \
 	$(TESTS_progs) \
 	$(TESTS_progs_M) \
