@@ -23,7 +23,14 @@ if !HAVE_LIBDRM_INTEL
 endif
 
 AM_CPPFLAGS = -I$(top_srcdir)
-AM_CFLAGS = $(CWARNFLAGS) $(DRM_CFLAGS) $(PCIACCESS_CFLAGS) $(KMOD_CFLAGS) $(LIBUNWIND_CFLAGS) $(DEBUG_CFLAGS) \
+AM_CFLAGS = \
+	    $(CWARNFLAGS) \
+	    $(DRM_CFLAGS) \
+	    $(PCIACCESS_CFLAGS) \
+	    $(LIBUNWIND_CFLAGS) \
+	    $(KMOD_CFLAGS) \
+	    $(PROCPS_CFLAGS) \
+	    $(DEBUG_CFLAGS) \
 	    -DIGT_SRCDIR=\""$(abs_top_srcdir)/tests"\" \
 	    -DIGT_DATADIR=\""$(pkgdatadir)"\" \
 	    -DIGT_LOG_DOMAIN=\""$(subst _,-,$*)"\" \
@@ -34,6 +41,7 @@ AM_CFLAGS += $(CAIRO_CFLAGS)
 libintel_tools_la_LIBADD = \
 	$(DRM_LIBS) \
 	$(PCIACCESS_LIBS) \
+	$(PROCPS_LIBS) \
 	$(KMOD_LIBS) \
 	$(CAIRO_LIBS) \
 	$(LIBUDEV_LIBS) \

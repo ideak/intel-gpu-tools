@@ -122,6 +122,7 @@ AC_SUBST(ASSEMBLER_WARN_CFLAGS)
 PKG_CHECK_MODULES(DRM, [libdrm])
 PKG_CHECK_MODULES(PCIACCESS, [pciaccess >= 0.10])
 PKG_CHECK_MODULES(KMOD, [libkmod])
+PKG_CHECK_MODULES(PROCPS, [libprocps])
 
 case "$target_cpu" in
 	x86*|i?86)

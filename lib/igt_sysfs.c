@@ -34,7 +34,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <i915_drm.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <fcntl.h>
 
+#include "igt_core.h"
 #include "igt_sysfs.h"
 
 /**
@@ -391,4 +395,106 @@ bool igt_sysfs_get_boolean(int dir, const char *attr)
 bool igt_sysfs_set_boolean(int dir, const char *attr, bool value)
 {
 	return igt_sysfs_printf(dir, attr, "%d", value) == 1;
+}
+
+/**
+ * kick_fbcon:
+ * @enable: boolean value
+ *
+ * This functions enables/disables the text console running on top of the
+ * framebuffer device.
+ */
+void kick_fbcon(bool enable)
+{
+	char buf[128];
+	const char *path = "/sys/class/vtconsole";
+	DIR *dir;
+	struct dirent *vtcon;
+
+	dir = opendir(path);
+	if (!dir)
+		return;
+
+	while ((vtcon = readdir(dir))) {
+		int fd, len;
+
+		if (strncmp(vtcon->d_name, "vtcon", 5))
+			continue;
+
+		sprintf(buf, "%s/%s/name", path, vtcon->d_name);
+		fd = open(buf, O_RDONLY);
+		if (fd < 0)
+			continue;
+
+		len = read(fd, buf, sizeof(buf) - 1);
+		close(fd);
+		if (len >= 0)
+			buf[len] = '\0';
+
+		if (strstr(buf, "frame buffer device")) {
+			sprintf(buf, "%s/%s/bind", path, vtcon->d_name);
+			fd = open(buf, O_WRONLY);
+			if (fd != -1) {
+				if (enable)
+					igt_ignore_warn(write(fd, "1\n", 2));
+				else
+					igt_ignore_warn(write(fd, "0\n", 2));
+				close(fd);
+			}
+			break;
+		}
+	}
+	closedir(dir);
+}
+
+/**
+ * kick_snd_hda_intel:
+ *
+ * This functions unbinds the snd_hda_intel driver so the module cand be
+ * unloaded.
+ *
+ */
+void kick_snd_hda_intel(void)
+{
+	DIR *dir;
+	struct dirent *snd_hda;
+	int fd; size_t len;
+
+	const char *dpath = "/sys/bus/pci/drivers/snd_hda_intel";
+	const char *path = "/sys/bus/pci/drivers/snd_hda_intel/unbind";
+	const char *devid = "0000:";
+
+	fd = open(path, O_WRONLY);
+	if (fd < 0) {
+		return;
+	}
+
+	dir = opendir(dpath);
+	if (!dir)
+		goto out;
+
+	len = strlen(devid);
+	while ((snd_hda = readdir(dir))) {
+		struct stat st;
+		char fpath[PATH_MAX];
+
+		if (*snd_hda->d_name == '.')
+			continue;
+
+		snprintf(fpath, sizeof(fpath), "%s/%s", dpath, snd_hda->d_name);
+		if (lstat(fpath, &st))
+			continue;
+
+		if (!S_ISLNK(st.st_mode))
+			continue;
+
+		if (!strncmp(devid, snd_hda->d_name, len)) {
+			igt_ignore_warn(write(fd, snd_hda->d_name,
+					strlen(snd_hda->d_name)));
+		}
+	}
+
+	closedir(dir);
+out:
+	close(fd);
 }

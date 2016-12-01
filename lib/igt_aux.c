@@ -51,6 +51,8 @@
 #include <termios.h>
 #include <assert.h>
 
+#include <proc/readproc.h>
+
 #include "drmtest.h"
 #include "i915_drm.h"
 #include "intel_chipset.h"
@@ -64,6 +66,10 @@
 #include "igt_kms.h"
 #include "igt_stats.h"
 #include "igt_sysfs.h"
+
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>   /* for dirname() */
+#endif
 
 /**
  * SECTION:igt_aux
@@ -1180,6 +1186,257 @@ void igt_set_module_param_int(const char *name, int val)
 		     "Need to increase PARAM_VALUE_MAX_SZ\n");
 
 	igt_set_module_param(name, str);
+}
+
+/**
+ * igt_terminate_process:
+ * @sig: Signal to send
+ * @comm: Name of process in the form found in /proc/pid/comm (limited to 15
+ * chars)
+ *
+ * Returns: 0 in case the process is not found running or the signal has been
+ * sent successfully or -errno otherwise.
+ *
+ * This function sends the signal @sig for a process found in process table
+ * with name @comm.
+ */
+int igt_terminate_process(int sig, const char *comm)
+{
+	PROCTAB *proc;
+	proc_t *proc_info;
+	int err = 0;
+
+	proc = openproc(PROC_FILLCOM | PROC_FILLSTAT | PROC_FILLARG);
+	igt_assert(proc != NULL);
+
+	while ((proc_info = readproc(proc, NULL))) {
+		if (!strncasecmp(proc_info->cmd, comm, sizeof(proc_info->cmd))) {
+
+			if (kill(proc_info->tid, sig) < 0)
+				err = -errno;
+
+			freeproc(proc_info);
+			break;
+		}
+		freeproc(proc_info);
+	}
+
+	closeproc(proc);
+	return err;
+}
+
+struct pinfo {
+	pid_t pid;
+	const char *comm;
+	const char *fn;
+};
+
+static void
+__igt_show_stat(struct pinfo *info)
+{
+	const char *comm, *fn;
+	const char *type = "";
+	struct stat st;
+
+	pid_t pid = info->pid;
+	igt_assert((comm = info->comm));
+	igt_assert((fn = info->fn));
+
+	if (lstat(fn, &st) == -1)
+		return;
+
+	igt_info("%20.20s ", comm);
+	igt_info("%10d ", pid);
+
+	switch (st.st_mode & S_IFMT) {
+	case S_IFBLK:
+		type = "block";
+		break;
+	case S_IFCHR:
+		type = "character";
+		break;
+	case S_IFDIR:
+		type = "directory";
+		break;
+	case S_IFIFO:
+		type = "FIFO/pipe";
+		break;
+	case S_IFLNK:
+		type = "symlink";
+		break;
+	case S_IFREG:
+		type = "file";
+		break;
+	case S_IFSOCK:
+		type = "socket";
+		break;
+	default:
+		type = "unknown?";
+		break;
+	}
+	igt_info("%20.20s ", type);
+
+	igt_info("%10ld%10ld ", (long) st.st_uid, (long) st.st_gid);
+
+	igt_info("%15lld bytes ", (long long) st.st_size);
+	igt_info("%30.30s", fn);
+	igt_info("\n");
+}
+
+
+static void
+igt_show_stat_header(void)
+{
+	igt_info("%20.20s%11.11s%21.21s%11.11s%10.10s%22.22s%31.31s\n",
+		"COMM", "PID", "Type", "UID", "GID", "Size", "Filename");
+}
+
+static void
+igt_show_stat(proc_t *info, int *state, const char *fn)
+{
+	struct pinfo p = { .pid = info->tid, .comm = info->cmd, .fn = fn };
+
+	if (!*state)
+		igt_show_stat_header();
+
+	__igt_show_stat(&p);
+	++*state;
+}
+
+static void
+__igt_lsof_fds(proc_t *proc_info, int *state, char *proc_path, const char *dir)
+{
+	struct dirent *d;
+	struct stat st;
+	char path[PATH_MAX];
+	char *fd_lnk;
+
+	/* default fds or kernel threads */
+	const char *default_fds[] = { "/dev/pts", "/dev/null" };
+
+	DIR *dp = opendir(proc_path);
+	igt_assert(dp);
+again:
+	while ((d = readdir(dp))) {
+		char *copy_fd_lnk;
+		char *dirn;
+
+		unsigned int i;
+		ssize_t read;
+
+		if (*d->d_name == '.')
+			continue;
+
+		memset(path, 0, sizeof(path));
+		snprintf(path, sizeof(path), "%s/%s", proc_path, d->d_name);
+
+		if (lstat(path, &st) == -1)
+			continue;
+
+		fd_lnk = malloc(st.st_size + 1);
+
+		igt_assert((read = readlink(path, fd_lnk, st.st_size + 1)));
+		fd_lnk[read] = '\0';
+
+		for (i = 0; i < ARRAY_SIZE(default_fds); ++i) {
+			if (!strncmp(default_fds[i],
+				     fd_lnk,
+				     strlen(default_fds[i]))) {
+				free(fd_lnk);
+				goto again;
+			}
+		}
+
+		copy_fd_lnk = strdup(fd_lnk);
+		dirn = dirname(copy_fd_lnk);
+
+		if (!strncmp(dir, dirn, strlen(dir)))
+			igt_show_stat(proc_info, state, fd_lnk);
+
+		free(copy_fd_lnk);
+		free(fd_lnk);
+	}
+}
+
+/*
+ * This functions verifies, for each process running on the machine, if the
+ * current working directory or the fds matches the one supplied in dir.
+ */
+static void
+__igt_lsof(const char *dir)
+{
+	PROCTAB *proc;
+	proc_t *proc_info;
+
+	char path[PATH_MAX];
+	char *name_lnk;
+	struct stat st;
+	int state = 0;
+
+	proc = openproc(PROC_FILLCOM | PROC_FILLSTAT | PROC_FILLARG);
+	igt_assert(proc != NULL);
+
+	while ((proc_info = readproc(proc, NULL))) {
+		ssize_t read;
+
+		/* check current working directory */
+		memset(path, 0, sizeof(path));
+		snprintf(path, sizeof(path), "/proc/%d/cwd", proc_info->tid);
+
+		if (stat(path, &st) == -1)
+			continue;
+
+		name_lnk = malloc(st.st_size + 1);
+
+		igt_assert((read = readlink(path, name_lnk, st.st_size + 1)));
+		name_lnk[read] = '\0';
+
+		if (!strncmp(dir, name_lnk, strlen(dir)))
+			igt_show_stat(proc_info, &state, name_lnk);
+
+		/* check also fd, seems that lsof(8) doesn't look here */
+		memset(path, 0, sizeof(path));
+		snprintf(path, sizeof(path), "/proc/%d/fd", proc_info->tid);
+
+		__igt_lsof_fds(proc_info, &state, path, dir);
+
+		free(name_lnk);
+		freeproc(proc_info);
+	}
+
+	closeproc(proc);
+}
+
+/**
+ * igt_lsof: Lists information about files opened by processes.
+ * @dpath: Path to look under. A valid directory is required.
+ *
+ * This function mimics (a restrictive form of) lsof(8), but also shows
+ * information about opened fds.
+ */
+void
+igt_lsof(const char *dpath)
+{
+	struct stat st;
+	size_t len = strlen(dpath);
+	char *sanitized;
+
+	if (stat(dpath, &st) == -1)
+		return;
+
+	if (!S_ISDIR(st.st_mode)) {
+		igt_warn("%s not a directory!\n", dpath);
+		return;
+	}
+
+	sanitized = strdup(dpath);
+	/* remove last '/' so matching is easier */
+	if (len > 1 && dpath[len - 1] == '/')
+		sanitized[len - 1] = '\0';
+
+	__igt_lsof(sanitized);
+
+	free(sanitized);
 }
 
 static struct igt_siglatency {

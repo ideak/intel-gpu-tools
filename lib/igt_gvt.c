@@ -23,6 +23,7 @@
 
 #include "igt.h"
 #include "igt_gvt.h"
+#include "igt_sysfs.h"
 
 #include <dirent.h>
 #include <unistd.h>
@@ -46,49 +47,9 @@ static bool is_gvt_enabled(void)
 	return enabled;
 }
 
-static void unbind_fbcon(void)
-{
-	char buf[128];
-	const char *path = "/sys/class/vtconsole";
-	DIR *dir;
-	struct dirent *vtcon;
-
-	dir = opendir(path);
-	if (!dir)
-		return;
-
-	while ((vtcon = readdir(dir))) {
-		int fd, len;
-
-		if (strncmp(vtcon->d_name, "vtcon", 5))
-			continue;
-
-		sprintf(buf, "%s/%s/name", path, vtcon->d_name);
-		fd = open(buf, O_RDONLY);
-		if (fd < 0)
-			continue;
-
-		len = read(fd, buf, sizeof(buf) - 1);
-		close(fd);
-		if (len >= 0)
-			buf[len] = '\0';
-
-		if (strstr(buf, "frame buffer device")) {
-			sprintf(buf, "%s/%s/bind", path, vtcon->d_name);
-			fd = open(buf, O_WRONLY);
-			if (fd != -1) {
-				igt_ignore_warn(write(fd, "1\n", 2));
-				close(fd);
-			}
-			break;
-		}
-	}
-	closedir(dir);
-}
-
 static void unload_i915(void)
 {
-	unbind_fbcon();
+	kick_fbcon(false);
 	/* pkill alsact */
 
 	igt_ignore_warn(system("/sbin/modprobe -s -r i915"));

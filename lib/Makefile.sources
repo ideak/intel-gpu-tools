@@ -79,6 +79,8 @@ lib_source_list =	 	\
 	igt_dummyload.h		\
 	uwildmat/uwildmat.h	\
 	uwildmat/uwildmat.c	\
+	igt_kmod.c		\
+	igt_kmod.h		\
 	$(NULL)
 
 .PHONY: version.h.tmp

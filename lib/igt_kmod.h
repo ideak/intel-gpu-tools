@@ -19,31 +19,21 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
- *
  */
 
-#ifndef __IGT_SYSFS_H__
-#define __IGT_SYSFS_H__
+#ifndef IGT_KMOD_H
+#define IGT_KMOD_H
 
-#include <stdbool.h>
+#include <libkmod.h>
 
-int igt_sysfs_open(int device, int *idx);
-int igt_sysfs_open_parameters(int device);
-bool igt_sysfs_set(int dir, const char *attr, const char *value);
-char *igt_sysfs_get(int dir, const char *attr);
+bool igt_kmod_is_loaded(const char *mod_name);
+void igt_kmod_list_loaded(void);
 
-int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
-	__attribute__((format(scanf,3,4)));
-int igt_sysfs_printf(int dir, const char *attr, const char *fmt, ...)
-	__attribute__((format(printf,3,4)));
+int igt_kmod_load(const char *mod_name, const char *opts);
+int igt_kmod_unload(const char *mod_name, unsigned int flags);
 
-uint32_t igt_sysfs_get_u32(int dir, const char *attr);
-bool igt_sysfs_set_u32(int dir, const char *attr, uint32_t value);
+int igt_i915_driver_load(const char *opts);
+int igt_i915_driver_unload(void);
 
-bool igt_sysfs_get_boolean(int dir, const char *attr);
-bool igt_sysfs_set_boolean(int dir, const char *attr, bool value);
 
-void kick_fbcon(bool enable);
-void kick_snd_hda_intel(void);
-
-#endif /* __IGT_SYSFS_H__ */
+#endif /* IGT_KMOD_H */
