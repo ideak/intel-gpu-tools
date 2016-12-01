@@ -103,8 +103,10 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 					  dpy->pipes[pipe].crtc_id, fb->fb_id,
 					  DRM_MODE_PAGE_FLIP_EVENT, fb));
 		kill(getppid(), SIGALRM);
+		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
 		igt_assert_f(poll(&pfd, 1, TIMEOUT) == 0,
-			     "flip completed whilst %s was busy\n", name);
+			     "flip completed whilst %s was busy [%d]\n",
+			     name, gem_bo_busy(dpy->drm_fd, fb->gem_handle));
 	}
 	igt_assert_f(nanosleep(&tv, NULL) == -1,
 		     "flip to %s blocked waiting for busy fb", name);
