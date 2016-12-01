@@ -757,9 +757,9 @@ static unsigned int run_test_step(struct test_output *o)
 
 	if (o->flags & TEST_DPMS) {
 		if (spin_rcs)
-			igt_spin_batch_end(spin_rcs);
+			igt_spin_batch_set_timeout(spin_rcs, NSEC_PER_SEC);
 		if (spin_bcs)
-			igt_spin_batch_end(spin_bcs);
+		        igt_spin_batch_set_timeout(spin_bcs, NSEC_PER_SEC);
 		set_dpms(o, DRM_MODE_DPMS_ON);
 	}
 
