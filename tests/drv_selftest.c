@@ -21,20 +21,12 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef IGT_KMOD_H
-#define IGT_KMOD_H
+#include "igt.h"
+#include "igt_kmod.h"
 
-#include <libkmod.h>
+IGT_TEST_DESCRIPTION("Basic unit tests for i915.ko");
 
-bool igt_kmod_is_loaded(const char *mod_name);
-void igt_kmod_list_loaded(void);
-
-int igt_kmod_load(const char *mod_name, const char *opts);
-int igt_kmod_unload(const char *mod_name, unsigned int flags);
-
-int igt_i915_driver_load(const char *opts);
-int igt_i915_driver_unload(void);
-
-void igt_kselftests(const char *module_name, const char *module_options);
-
-#endif /* IGT_KMOD_H */
+igt_main
+{
+	igt_kselftests("i915", "selftest=-1");
+}
