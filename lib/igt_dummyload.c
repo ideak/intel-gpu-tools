@@ -169,9 +169,17 @@ igt_spin_batch_new(int fd, int engine, unsigned int dep_handle)
 	return spin;
 }
 
-static void sig_handler(int sig, siginfo_t *info, void *arg)
+static void clear_sig_handler(int sig)
 {
 	struct sigaction act;
+
+	memset(&act, 0, sizeof(act));
+	act.sa_handler = SIG_DFL;
+	igt_assert(sigaction(sig, &act, NULL) == 0);
+}
+
+static void sig_handler(int sig, siginfo_t *info, void *arg)
+{
 	struct igt_spin *iter;
 
 	igt_list_for_each(iter, &spin_list, link) {
@@ -181,9 +189,7 @@ static void sig_handler(int sig, siginfo_t *info, void *arg)
 		}
 	}
 
-	memset(&act, 0, sizeof(act));
-	act.sa_handler = SIG_DFL;
-	igt_assert(sigaction(info->si_signo, &act, NULL) == 0);
+	clear_sig_handler(info->si_signo);
 }
 
 /**
@@ -248,6 +254,8 @@ void igt_spin_batch_end(igt_spin_t *spin)
 
 	*spin->batch = MI_BATCH_BUFFER_END;
 	__sync_synchronize();
+
+	clear_sig_handler(spin->signo);
 }
 
 /**
