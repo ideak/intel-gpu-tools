@@ -185,7 +185,7 @@ static void sig_handler(int sig, siginfo_t *info, void *arg)
 	igt_list_for_each(iter, &spin_list, link) {
 		if (iter->signo == info->si_signo) {
 			igt_spin_batch_end(iter);
-			break;
+			return;
 		}
 	}
 
