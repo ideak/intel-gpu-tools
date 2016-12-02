@@ -1,3 +1,57 @@
+Release 1.17 (2016-12-02)
+-------------------------
+
+Library changes:
+
+- Added an iterator that generate primes for creating input data that
+  should not fall into any patterns that may be optimised by the
+  drivers. (Chris Wilson)
+
+- Crashes in fixture blocks now print a stacktrace. (Marius Vlad)
+
+- Added support for various system suspend/resume options. (Imre Deak)
+
+- Added linked list helpers from the Wayland project. (Lyude)
+
+- Added a generic dummy workload helper for submitting GPU workloads
+  that consume exactly a specified amount of time. (Abdiel Janulgue)
+
+- Added C functions for driver loading/unloading, pkill and lsof, for
+  converting shell script tests to C code. (Marius Vlad)
+
+Tools changes:
+
+- intel_reg: Add Kabylake support. (Jani Nikula)
+
+- intel_bios_reader: Also dump PSR info. (Ville Syrjälä)
+
+- intel_guc_logger: New tool for capturing logs from the GuC
+  firmware. (Akash Goel)
+
+- intel_aubdump: Added commandline option to stream the dump to
+  another process. (Lionel Landwerlin)
+
+- intel_aubdump: Annotate the dump with the application name and the
+  used PCI ID. (Jason Ekstrand)
+
+Benchmark changes:
+
+- gem_latency: Added support for measuring fence wakeup latencies. (Chris Wilson)
+
+- prime_lookup: New microbenchmark for stressing prime_fd_to_handle
+  and prime_handle_to_fd. (Chris Wilson)
+
+Test changes:
+
+- Multiple new tests.
+
+- Added an explicit list of tests used for Intel CI. (Petri Latvala)
+
+- Converted multiple shell script tests to C. (Marius Vlad)
+
+
+And many other bug fixes and improvements.
+
 Release 1.16 (2016-09-02)
 -------------------------
 
