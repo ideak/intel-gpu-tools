@@ -13,6 +13,7 @@ intel_error_decode
 intel_firmware_decode
 intel_forcewaked
 intel_framebuffer_dump
+intel_gem_info
 intel_gpu_frequency
 intel_gpu_time
 intel_gpu_top
