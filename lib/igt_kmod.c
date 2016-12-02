@@ -343,6 +343,8 @@ static void kmsg_dump(int fd)
 
 void igt_kselftests(const char *module_name, const char *module_options)
 {
+	const char *param_prefix = "igt__";
+	const int param_len = strlen(param_prefix);
 	char options[1024];
 	struct kmod_ctx *ctx = kmod_ctx();
 	struct kmod_module *kmod;
@@ -373,14 +375,14 @@ void igt_kselftests(const char *module_name, const char *module_options)
 				continue;
 
 			val = kmod_module_info_get_value(d);
-			if (!val || strncmp(val, "igt__", 9))
+			if (!val || strncmp(val, param_prefix, param_len))
 				continue;
 
 			subtest = strdup(val);
 			colon = strchr(subtest, ':');
 			*colon = '\0';
 
-			igt_subtest_f("%s", subtest + 9) {
+			igt_subtest_f("%s", subtest + param_len) {
 				lseek(kmsg, 0, SEEK_END);
 
 				snprintf(options, sizeof(options), "%s=1 %s",
