@@ -347,6 +347,7 @@ void igt_kselftests(const char *module_name, const char *module_options)
 	struct kmod_ctx *ctx = kmod_ctx();
 	struct kmod_module *kmod;
 	struct kmod_list *d, *pre;
+	int module_subtest_count;
 	int err, kmsg = -1;
 
 	igt_require(kmod_module_new_from_name(ctx, module_name, &kmod) == 0);
@@ -360,6 +361,7 @@ void igt_kselftests(const char *module_name, const char *module_options)
 		kmsg = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
 	}
 
+	module_subtest_count = 0;
 	pre = NULL;
 	if (kmod_module_get_info(kmod, &pre)) {
 		kmod_list_foreach(d, pre) {
@@ -400,6 +402,7 @@ void igt_kselftests(const char *module_name, const char *module_options)
 					     module_name, options,
 					     strerror(-err), -err);
 			}
+			module_subtest_count++;
 		}
 		kmod_module_info_free_list(pre);
 	}
@@ -410,5 +413,7 @@ void igt_kselftests(const char *module_name, const char *module_options)
 
 		if (strcmp(module_name, "i915") == 0)
 			igt_i915_driver_load(NULL);
+
+		igt_require(module_subtest_count);
 	}
 }
