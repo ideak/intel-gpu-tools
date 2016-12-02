@@ -373,7 +373,7 @@ void igt_kselftests(const char *module_name, const char *module_options)
 				continue;
 
 			val = kmod_module_info_get_value(d);
-			if (!val || strncmp(val, "subtest__", 9))
+			if (!val || strncmp(val, "igt__", 9))
 				continue;
 
 			subtest = strdup(val);
