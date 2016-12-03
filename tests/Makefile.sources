@@ -36,6 +36,7 @@ TESTS_progs_M = \
 	gem_exec_async \
 	gem_exec_bad_domains \
 	gem_exec_basic \
+	gem_exec_capture \
 	gem_exec_create \
 	gem_exec_faulting_reloc \
 	gem_exec_fence \
