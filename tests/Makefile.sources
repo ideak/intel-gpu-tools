@@ -93,6 +93,7 @@ TESTS_progs_M = \
 	kms_atomic \
 	kms_atomic_transition \
 	kms_busy \
+	kms_ccs \
 	kms_chv_cursor_fail \
 	kms_cursor_crc \
 	kms_cursor_legacy \
