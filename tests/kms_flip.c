@@ -1187,6 +1187,7 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 		struct drm_event_vblank ev;
 		uint64_t now;
 
+		igt_assert(poll(&(struct pollfd){drm_fd, POLLIN}, 1, -1) == 1);
 		igt_assert(read(drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 		igt_assert_eq(ev.sequence, last_seq + 1);
 
