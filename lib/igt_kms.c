@@ -1686,7 +1686,7 @@ static uint32_t igt_plane_get_fb_gem_handle(igt_plane_t *plane)
 #define CHECK_RETURN(r, fail) {	\
 	if (r && !fail)		\
 		return r;	\
-	igt_assert(r == 0);	\
+	igt_assert_eq(r, 0);	\
 }
 
 
