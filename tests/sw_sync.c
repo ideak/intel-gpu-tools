@@ -457,6 +457,142 @@ static void test_sync_multi_consumer_producer(void)
 	igt_assert_f(thread_ret == 0, "A sync thread reported failure.\n");
 }
 
+static int test_mspc_wait_on_fence(int fence)
+{
+	int error, active;
+
+	do {
+		error = sync_fence_count_status(fence,
+						   SW_SYNC_FENCE_STATUS_ERROR);
+		igt_assert_f(error == 0, "Error occurred on fence\n");
+		active = sync_fence_count_status(fence,
+						    SW_SYNC_FENCE_STATUS_ACTIVE);
+	} while (active);
+
+	return 0;
+}
+
+static struct {
+	int iterations;
+	int threads;
+	int counter;
+	int cons_timeline;
+	int *prod_timeline;
+	pthread_mutex_t lock;
+} test_mpsc_data;
+
+static int mpsc_producer_thread(void *d)
+{
+	int id = (long)d;
+	int fence, i;
+	int *prod_timeline = test_mpsc_data.prod_timeline;
+	int cons_timeline = test_mpsc_data.cons_timeline;
+	int iterations = test_mpsc_data.iterations;
+
+	for (i = 0; i < iterations; i++) {
+		fence = sw_sync_fence_create(cons_timeline, i);
+
+		/* Wait for the consumer to finish. Use alternate
+		 * means of waiting on the fence
+		 */
+		if ((iterations + id) % 8 != 0) {
+			igt_assert_f(sync_wait(fence, -1) == 0,
+				     "Failure waiting on fence\n");
+		} else {
+			igt_assert_f(test_mspc_wait_on_fence(fence) == 0,
+				     "Failure waiting on fence\n");
+		}
+
+		/* Every producer increments the counter, the consumer
+		 * checks and erases it
+		 */
+		pthread_mutex_lock(&test_mpsc_data.lock);
+		test_mpsc_data.counter++;
+		pthread_mutex_unlock(&test_mpsc_data.lock);
+
+		sw_sync_timeline_inc(prod_timeline[id], 1);
+		close(fence);
+	}
+
+	return 0;
+}
+
+static int mpsc_consumer_thread(void)
+{
+	int fence, merged, tmp, it, i;
+	int *prod_timeline = test_mpsc_data.prod_timeline;
+	int cons_timeline = test_mpsc_data.cons_timeline;
+	int iterations = test_mpsc_data.iterations;
+	int n = test_mpsc_data.threads;
+
+	for (it = 1; it <= iterations; it++) {
+		fence = sw_sync_fence_create(prod_timeline[0], it);
+		for (i = 1; i < n; i++) {
+			tmp = sw_sync_fence_create(prod_timeline[i], it);
+			merged = sync_merge(tmp, fence);
+			close(tmp);
+			close(fence);
+			fence = merged;
+		}
+
+		/* Make sure we see an increment from every producer thread.
+		 * Vary the means by which we wait.
+		 */
+		if (iterations % 8 != 0) {
+			igt_assert_f(sync_wait(fence, -1) == 0,
+				    "Producers did not increment as expected\n");
+		} else {
+			igt_assert_f(test_mspc_wait_on_fence(fence) == 0,
+				     "Failure waiting on fence\n");
+		}
+
+		igt_assert_f(test_mpsc_data.counter == n * it,
+			     "Counter value mismatch\n");
+
+		/* Release the producer threads */
+		sw_sync_timeline_inc(cons_timeline, 1);
+		close(fence);
+	}
+
+	return 0;
+}
+
+/* IMPORTANT NOTE: if you see this test failing on your system, it may be
+ * due to a shortage of file descriptors. Please ensure your system has
+ * a sensible limit for this test to finish correctly.
+ */
+static void test_sync_multi_producer_single_consumer(void)
+{
+	int iterations = 1 << 12;
+	int n = 5;
+	int prod_timeline[n];
+	int cons_timeline;
+	pthread_t threads[n];
+	long i;
+
+	cons_timeline = sw_sync_timeline_create();
+	for (i = 0; i < n; i++)
+		prod_timeline[i] = sw_sync_timeline_create();
+
+	test_mpsc_data.prod_timeline = prod_timeline;
+	test_mpsc_data.cons_timeline = cons_timeline;
+	test_mpsc_data.iterations = iterations;
+	test_mpsc_data.threads = n;
+	test_mpsc_data.counter = 0;
+	pthread_mutex_init(&test_mpsc_data.lock, NULL);
+
+	for (i = 0; i < n; i++) {
+		pthread_create(&threads[i], NULL, (void * (*)(void *))
+			       mpsc_producer_thread,
+			       (void *)i);
+	}
+
+	mpsc_consumer_thread();
+
+	for (i = 0; i < n; i++)
+		pthread_join(threads[i], NULL);
+}
+
 static void test_sync_random_merge(void)
 {
 	int i, size, ret;
@@ -558,6 +694,9 @@ igt_main
 
 	igt_subtest("sync_multi_consumer_producer")
 		test_sync_multi_consumer_producer();
+
+	igt_subtest("sync_multi_producer_single_consumer")
+		test_sync_multi_producer_single_consumer();
 
 	igt_subtest("sync_random_merge")
 		test_sync_random_merge();
