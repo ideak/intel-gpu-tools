@@ -398,6 +398,9 @@ void igt_kselftests(const char *module_name,
 				if (modprobe(kmod, options))
 					err = -errno;
 				kmod_module_remove_module(kmod, 0);
+
+				if (err == -ENOTTY) /* special case */
+					err = 0;
 				if (err)
 					kmsg_dump(kmsg);
 
