@@ -172,6 +172,42 @@ static void test_sync_busy(void)
 	close(timeline);
 }
 
+static void test_sync_busy_fork(void)
+{
+	int fence, ret;
+	int timeline;
+	int skip = 0;
+
+	timeline = sw_sync_timeline_create();
+	fence = sw_sync_fence_create(timeline, 1);
+
+	switch (fork()) {
+	case 0:
+		/* Child process */
+		usleep(1*1000*1000);
+		/* Advance timeline from 0 -> 1 */
+		sw_sync_timeline_inc(timeline, 1);
+		_Exit(0);
+		break;
+	case -1:
+		/* Failed fork */
+		skip = 1;
+		break;
+	default:
+		/* Parent process */
+		ret = sync_wait(fence, 0);
+		igt_assert_f(ret == -1 && errno == ETIME, "Fence signaled (it should not have been signalled yet)\n");
+
+		ret = sync_wait(fence, 2*1000);
+		igt_assert_f(ret == 0, "Fence not signaled (timeline value 1 fence seqno 1)\n");
+		break;
+	}
+
+	close(fence);
+	close(timeline);
+	igt_require(!skip);
+}
+
 static void test_sync_merge_invalid(void)
 {
 	int in_fence;
@@ -783,6 +819,9 @@ igt_main
 
 	igt_subtest("sync_busy")
 		test_sync_busy();
+
+	igt_subtest("sync_busy_fork")
+		test_sync_busy_fork();
 
 	igt_subtest("sync_merge_invalid")
 		test_sync_merge_invalid();
