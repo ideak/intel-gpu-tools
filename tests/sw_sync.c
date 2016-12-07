@@ -43,9 +43,25 @@ static void test_alloc_timeline(void)
 	close(timeline);
 }
 
+static void test_alloc_fence(void)
+{
+	int in_fence;
+	int timeline;
+
+	timeline = sw_sync_timeline_create();
+	in_fence = sw_sync_fence_create(timeline, 0);
+
+	close(in_fence);
+	close(timeline);
+}
+
+
 igt_main
 {
 	igt_subtest("alloc_timeline")
 		test_alloc_timeline();
+
+	igt_subtest("alloc_fence")
+		test_alloc_fence();
 }
 
