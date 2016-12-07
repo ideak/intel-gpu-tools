@@ -722,6 +722,9 @@ static void test_sync_random_merge(void)
 
 igt_main
 {
+	igt_fixture
+		igt_require_sw_sync();
+
 	igt_subtest("alloc_timeline")
 		test_alloc_timeline();
 
