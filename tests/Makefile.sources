@@ -134,6 +134,7 @@ TESTS_progs_M = \
 	prime_mmap_kms \
 	prime_self_import \
 	prime_vgem \
+	sw_sync \
 	template \
 	vgem_basic \
 	vgem_slow \
