@@ -212,3 +212,17 @@ int sync_fence_count_status(int fd, int status)
 
 	return count;
 }
+
+static bool kernel_has_sw_sync(void)
+{
+	char buf[128];
+
+	igt_ignore_warn(system("/sbin/modprobe -s r sw_sync"));
+
+	return kernel_sw_sync_path(buf, sizeof(buf));
+}
+
+void igt_require_sw_sync(void)
+{
+	igt_require(kernel_has_sw_sync());
+}

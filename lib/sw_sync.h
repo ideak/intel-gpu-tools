@@ -39,6 +39,7 @@ int sync_merge(int fd1, int fd2);
 int sync_wait(int fence, int timeout);
 int sync_fence_count(int fd);
 int sync_fence_count_status(int fd, int status);
+void igt_require_sw_sync(void);
 
 #endif
 
