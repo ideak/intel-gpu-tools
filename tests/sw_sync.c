@@ -27,6 +27,8 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdint.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "igt.h"
@@ -170,6 +172,104 @@ static void test_sync_busy(void)
 
 	close(fence);
 	close(timeline);
+}
+
+static void test_sync_busy_fork_unixsocket(void)
+{
+	int fence, ret;
+	int timeline;
+	int skip = 0;
+	int sv[2];
+
+
+	timeline = sw_sync_timeline_create();
+	fence = sw_sync_fence_create(timeline, 1);
+
+	if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sv) != 0) {
+		skip = 1;
+		goto out;
+	}
+
+	switch (fork()) {
+	case 0:
+	{
+		/* Child process */
+		int socket = sv[1];
+		int socket_timeline;
+		struct msghdr msg = {0};
+		struct cmsghdr *cmsg;
+		unsigned char *data;
+		char m_buffer[256];
+		char c_buffer[256];
+		struct iovec io = { .iov_base = m_buffer, .iov_len = sizeof(m_buffer) };
+		close(sv[0]);
+
+		msg.msg_iov = &io;
+		msg.msg_iovlen = 1;
+		msg.msg_control = c_buffer;
+		msg.msg_controllen = sizeof(c_buffer);
+
+		if (recvmsg(socket, &msg, 0) < 0)
+		    _Exit(1);
+
+		cmsg = CMSG_FIRSTHDR(&msg);
+		data = CMSG_DATA(cmsg);
+		socket_timeline = *((int *) data);
+
+		/* Advance timeline from 0 -> 1 */
+		sw_sync_timeline_inc(socket_timeline, 1);
+
+		_Exit(0);
+		break;
+	}
+	case -1:
+	{
+		/* Failed fork */
+		skip = 1;
+		break;
+	}
+	default:
+	{
+		/* Parent process */
+		int socket = sv[0];
+		struct cmsghdr *cmsg;
+		struct iovec io = { .iov_base = (char *)"ABC", .iov_len = 3 };
+		struct msghdr msg = { 0 };
+		char buf[CMSG_SPACE(sizeof(timeline))];
+		memset(buf, '\0', sizeof(buf));
+		close(sv[1]);
+
+		msg.msg_iov = &io;
+		msg.msg_iovlen = 1;
+		msg.msg_control = buf;
+		msg.msg_controllen = sizeof(buf);
+
+		cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_RIGHTS;
+		cmsg->cmsg_len = CMSG_LEN(sizeof(timeline));
+
+		*((int *) CMSG_DATA(cmsg)) = timeline;
+		msg.msg_controllen = cmsg->cmsg_len;
+
+		ret = sync_wait(fence, 0);
+		igt_assert_f(ret == -1 && errno == ETIME, "Fence signaled (it should not have been signalled yet)\n");
+
+		if (sendmsg(socket, &msg, 0) < 0) {
+		    skip = 1;
+		    goto out;
+		}
+
+		ret = sync_wait(fence, 2*1000);
+		igt_assert_f(ret == 0, "Fence not signaled (timeline value 1 fence seqno 1)\n");
+		break;
+	}
+	}
+
+out:
+	close(fence);
+	close(timeline);
+	igt_require(!skip);
 }
 
 static void test_sync_busy_fork(void)
@@ -822,6 +922,9 @@ igt_main
 
 	igt_subtest("sync_busy_fork")
 		test_sync_busy_fork();
+
+	igt_subtest("sync_busy_fork_unixsocket")
+		test_sync_busy_fork_unixsocket();
 
 	igt_subtest("sync_merge_invalid")
 		test_sync_merge_invalid();
