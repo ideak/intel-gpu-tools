@@ -129,6 +129,70 @@ static void test_sync_busy(void)
 	close(timeline);
 }
 
+static void test_sync_merge(void)
+{
+	int in_fence[3];
+	int fence_merge;
+	int timeline;
+	int active, signaled;
+
+	timeline = sw_sync_timeline_create();
+	in_fence[0] = sw_sync_fence_create(timeline, 1);
+	in_fence[1] = sw_sync_fence_create(timeline, 2);
+	in_fence[2] = sw_sync_fence_create(timeline, 3);
+
+	fence_merge = sync_merge(in_fence[0], in_fence[1]);
+	fence_merge = sync_merge(in_fence[2], fence_merge);
+
+	/* confirm all fences have one active point (even d) */
+	active = sync_fence_count_status(in_fence[0],
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	igt_assert_f(active == 1, "in_fence[0] has too many active fences\n");
+	active = sync_fence_count_status(in_fence[1],
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	igt_assert_f(active == 1, "in_fence[1] has too many active fences\n");
+	active = sync_fence_count_status(in_fence[2],
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	igt_assert_f(active == 1, "in_fence[2] has too many active fences\n");
+	active = sync_fence_count_status(fence_merge,
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	igt_assert_f(active == 1, "fence_merge has too many active fences\n");
+
+	/* confirm that fence_merge is not signaled until the max of fence 0,1,2 */
+	sw_sync_timeline_inc(timeline, 1);
+	signaled = sync_fence_count_status(in_fence[0],
+					      SW_SYNC_FENCE_STATUS_SIGNALED);
+	active = sync_fence_count_status(fence_merge,
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	igt_assert_f(signaled == 1, "in_fence[0] did not signal\n");
+	igt_assert_f(active == 1, "fence_merge signaled too early\n");
+
+	sw_sync_timeline_inc(timeline, 1);
+	signaled = sync_fence_count_status(in_fence[1],
+					      SW_SYNC_FENCE_STATUS_SIGNALED);
+	active = sync_fence_count_status(fence_merge,
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	igt_assert_f(signaled == 1, "in_fence[1] did not signal\n");
+	igt_assert_f(active == 1, "fence_merge signaled too early\n");
+
+	sw_sync_timeline_inc(timeline, 1);
+	signaled = sync_fence_count_status(in_fence[2],
+					      SW_SYNC_FENCE_STATUS_SIGNALED);
+	igt_assert_f(signaled == 1, "in_fence[2] did not signal\n");
+	signaled = sync_fence_count_status(fence_merge,
+					       SW_SYNC_FENCE_STATUS_SIGNALED);
+	active = sync_fence_count_status(fence_merge,
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	igt_assert_f(active == 0 && signaled == 1,
+		     "fence_merge did not signal\n");
+
+	close(in_fence[0]);
+	close(in_fence[1]);
+	close(in_fence[2]);
+	close(fence_merge);
+	close(timeline);
+}
+
 igt_main
 {
 	igt_subtest("alloc_timeline")
@@ -145,5 +209,8 @@ igt_main
 
 	igt_subtest("sync_busy")
 		test_sync_busy();
+
+	igt_subtest("sync_merge")
+		test_sync_merge();
 }
 
