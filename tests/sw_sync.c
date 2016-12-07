@@ -55,6 +55,11 @@ static void test_alloc_fence(void)
 	close(timeline);
 }
 
+static void test_alloc_fence_invalid_timeline(void)
+{
+	igt_assert_f(__sw_sync_fence_create(-1, 0) < 0,
+	    "Did not fail to create fence on invalid timeline\n");
+}
 
 igt_main
 {
@@ -63,5 +68,8 @@ igt_main
 
 	igt_subtest("alloc_fence")
 		test_alloc_fence();
+
+	igt_subtest("alloc_fence_invalid_timeline")
+		test_alloc_fence_invalid_timeline();
 }
 
