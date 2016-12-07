@@ -102,24 +102,28 @@ static void test_sync_busy(void)
 
 	/* Make sure that fence has not been signaled yet */
 	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == -1 && errno == ETIME, "Fence signaled early (timeline value 0, fence seqno 5)\n");
+	igt_assert_f(ret == -1 && errno == ETIME,
+	    "Fence signaled early (timeline value 0, fence seqno 5)\n");
 
 	/* Advance timeline from 0 -> 1 */
 	sw_sync_timeline_inc(timeline, 1);
 
 	/* Make sure that fence has not been signaled yet */
 	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == -1 && errno == ETIME, "Fence signaled early (timeline value 1, fence seqno 5)\n");
+	igt_assert_f(ret == -1 && errno == ETIME,
+	    "Fence signaled early (timeline value 1, fence seqno 5)\n");
 
 	/* Advance timeline from 1 -> 5: signaling the fence (seqno 5)*/
 	sw_sync_timeline_inc(timeline, 4);
 	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == 0, "Fence not signaled (timeline value 5, fence seqno 5)\n");
+	igt_assert_f(ret == 0,
+	    "Fence not signaled (timeline value 5, fence seqno 5)\n");
 
 	/* Go even further, and confirm wait still succeeds */
 	sw_sync_timeline_inc(timeline, 5);
 	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == 0, "Fence not signaled (timeline value 10, fence seqno 5)\n");
+	igt_assert_f(ret == 0,
+	    "Fence not signaled (timeline value 10, fence seqno 5)\n");
 
 	seqno = 10;
 	for_each_prime_number(prime, 100) {
@@ -130,7 +134,8 @@ static void test_sync_busy(void)
 		sw_sync_timeline_inc(timeline, prime);
 
 		ret = sync_wait(fence_prime, 0);
-		igt_assert_f(ret == 0, "Fence not signaled during test of prime timeline increments\n");
+		igt_assert_f(ret == 0,
+		    "Fence not signaled during test of prime timeline increments\n");
 		close(fence_prime);
 	}
 
@@ -312,6 +317,83 @@ static void test_sync_multi_consumer(void)
 	igt_assert_f(thread_ret == 0, "A sync thread reported failure.\n");
 }
 
+#define MULTI_CONSUMER_PRODUCER_THREADS 8
+#define MULTI_CONSUMER_PRODUCER_ITERATIONS (1 << 14)
+static void * test_sync_multi_consumer_producer_thread(void *arg)
+{
+	data_t *data = arg;
+	int thread_id = data->thread_id;
+	int timeline = data->timeline;
+	int ret, i;
+
+	for (i = 0; i < MULTI_CONSUMER_PRODUCER_ITERATIONS; i++) {
+		int next_point = i * MULTI_CONSUMER_PRODUCER_THREADS + thread_id;
+		int fence = sw_sync_fence_create(timeline, next_point);
+
+		ret = sync_wait(fence, 1000);
+		if (ret == -1)
+		{
+			return (void *) 1;
+		}
+
+		if (*(data->counter) != next_point)
+		{
+			return (void *) 1;
+		}
+
+		(*data->counter)++;
+
+		/* Kick off the next thread. */
+		sw_sync_timeline_inc(timeline, 1);
+
+		close(fence);
+	}
+	return NULL;
+}
+
+static void test_sync_multi_consumer_producer(void)
+{
+	data_t data_arr[MULTI_CONSUMER_PRODUCER_THREADS];
+	pthread_t thread_arr[MULTI_CONSUMER_PRODUCER_THREADS];
+	int timeline;
+	volatile uint32_t counter = 0;
+	uintptr_t thread_ret = 0;
+	data_t data;
+	int i, ret;
+
+	timeline = sw_sync_timeline_create();
+
+	data.counter = &counter;
+	data.timeline = timeline;
+
+	/* Start consumer threads. */
+	for (i = 0; i < MULTI_CONSUMER_PRODUCER_THREADS; i++)
+	{
+		data_arr[i] = data;
+		data_arr[i].thread_id = i;
+		ret = pthread_create(&thread_arr[i], NULL,
+				     test_sync_multi_consumer_producer_thread,
+				     (void *) &(data_arr[i]));
+		igt_assert_eq(ret, 0);
+	}
+
+	/* Wait for threads to complete. */
+	for (i = 0; i < MULTI_CONSUMER_PRODUCER_THREADS; i++)
+	{
+		uintptr_t local_thread_ret;
+		pthread_join(thread_arr[i], (void **)&local_thread_ret);
+		thread_ret |= local_thread_ret;
+	}
+
+	close(timeline);
+
+	igt_assert_f(counter == MULTI_CONSUMER_PRODUCER_THREADS *
+	                        MULTI_CONSUMER_PRODUCER_ITERATIONS,
+		     "Counter has unexpected value.\n");
+
+	igt_assert_f(thread_ret == 0, "A sync thread reported failure.\n");
+}
+
 igt_main
 {
 	igt_subtest("alloc_timeline")
@@ -337,5 +419,8 @@ igt_main
 
 	igt_subtest("sync_multi_consumer")
 		test_sync_multi_consumer();
+
+	igt_subtest("sync_multi_consumer_producer")
+		test_sync_multi_consumer_producer();
 }
 
