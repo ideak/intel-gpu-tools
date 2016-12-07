@@ -394,6 +394,76 @@ static void test_sync_multi_consumer_producer(void)
 	igt_assert_f(thread_ret == 0, "A sync thread reported failure.\n");
 }
 
+static void test_sync_random_merge(void)
+{
+	int i, size, ret;
+	const int nbr_timeline = 32;
+	const int nbr_merge = 1024;
+	int fence_map[nbr_timeline];
+	int timeline_arr[nbr_timeline];
+	int fence, tmpfence, merged;
+	int timeline, timeline_offset, sync_pt;
+
+	srand(time(NULL));
+
+	for (i = 0; i < nbr_timeline; i++) {
+		timeline_arr[i] = sw_sync_timeline_create();
+		fence_map[i] = -1;
+	}
+
+	sync_pt = rand();
+	fence = sw_sync_fence_create(timeline_arr[0], sync_pt);
+
+	fence_map[0] = sync_pt;
+
+	/* Randomly create syncpoints out of a fixed set of timelines,
+	 * and merge them together.
+	 */
+	for (i = 0; i < nbr_merge; i++) {
+		/* Generate syncpoint. */
+		timeline_offset = rand() % nbr_timeline;
+		timeline = timeline_arr[timeline_offset];
+		sync_pt = rand();
+
+		/* Keep track of the latest sync_pt in each timeline. */
+		if (fence_map[timeline_offset] == -1)
+			fence_map[timeline_offset] = sync_pt;
+		else if (fence_map[timeline_offset] < sync_pt)
+			fence_map[timeline_offset] = sync_pt;
+
+		/* Merge. */
+		tmpfence = sw_sync_fence_create(timeline, sync_pt);
+		merged = sync_merge(tmpfence, fence);
+		close(tmpfence);
+		close(fence);
+		fence = merged;
+	}
+
+	size = 0;
+	for (i = 0; i < nbr_timeline; i++)
+		if (fence_map[i] != -1)
+			size++;
+
+	/* Trigger the merged fence. */
+	for (i = 0; i < nbr_timeline; i++) {
+		if (fence_map[i] != -1) {
+			ret = sync_wait(fence, 0);
+			igt_assert_f(ret == -1 && errno == ETIME,
+				    "Failure waiting on fence until timeout\n");
+			/* Increment the timeline to the last sync_pt */
+			sw_sync_timeline_inc(timeline_arr[i], fence_map[i]);
+		}
+	}
+
+	/* Check that the fence is triggered. */
+	ret = sync_wait(fence, 1);
+	igt_assert_f(ret == 0, "Failure triggering fence\n");
+
+	close(fence);
+	for (i = 0; i < nbr_timeline; i++)
+		close(timeline_arr[i]);
+}
+
 igt_main
 {
 	igt_subtest("alloc_timeline")
@@ -422,5 +492,8 @@ igt_main
 
 	igt_subtest("sync_multi_consumer_producer")
 		test_sync_multi_consumer_producer();
+
+	igt_subtest("sync_random_merge")
+		test_sync_random_merge();
 }
 
