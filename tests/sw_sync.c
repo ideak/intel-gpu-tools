@@ -231,6 +231,69 @@ static void test_sync_merge_same(void)
 	close(timeline);
 }
 
+static void test_sync_multi_timeline_wait(void)
+{
+	int timeline[3];
+	int in_fence[3];
+	int fence_merge;
+	int active, signaled, ret;
+
+	timeline[0] = sw_sync_timeline_create();
+	timeline[1] = sw_sync_timeline_create();
+	timeline[2] = sw_sync_timeline_create();
+
+	in_fence[0] = sw_sync_fence_create(timeline[0], 5);
+	in_fence[1] = sw_sync_fence_create(timeline[1], 5);
+	in_fence[2] = sw_sync_fence_create(timeline[2], 5);
+
+	fence_merge = sync_merge(in_fence[0], in_fence[1]);
+	fence_merge = sync_merge(in_fence[2], fence_merge);
+
+	/* Confirm fence isn't signaled */
+	active = sync_fence_count_status(fence_merge,
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	igt_assert_f(active == 3, "Fence signaled too early\n");
+
+	ret = sync_wait(fence_merge, 0);
+	igt_assert_f(ret == -1 && errno == ETIME, "Failure waiting on fence until timeout\n");
+
+	sw_sync_timeline_inc(timeline[0], 5);
+	active = sync_fence_count_status(fence_merge,
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	signaled = sync_fence_count_status(fence_merge,
+					      SW_SYNC_FENCE_STATUS_SIGNALED);
+	igt_assert_f(active == 2 && signaled == 1,
+		    "Fence did not signal properly\n");
+
+	sw_sync_timeline_inc(timeline[1], 5);
+	active = sync_fence_count_status(fence_merge,
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	signaled = sync_fence_count_status(fence_merge,
+					      SW_SYNC_FENCE_STATUS_SIGNALED);
+	igt_assert_f(active == 1 && signaled == 2,
+		    "Fence did not signal properly\n");
+
+	sw_sync_timeline_inc(timeline[2], 5);
+	active = sync_fence_count_status(fence_merge,
+					    SW_SYNC_FENCE_STATUS_ACTIVE);
+	signaled = sync_fence_count_status(fence_merge,
+					      SW_SYNC_FENCE_STATUS_SIGNALED);
+	igt_assert_f(active == 0 && signaled == 3,
+		     "Fence did not signal properly\n");
+
+	/* confirm you can successfully wait */
+	ret = sync_wait(fence_merge, 100);
+	igt_assert_f(ret == 0, "Failure waiting on signaled fence\n");
+
+	close(in_fence[0]);
+	close(in_fence[1]);
+	close(in_fence[2]);
+	close(fence_merge);
+	close(timeline[0]);
+	close(timeline[1]);
+	close(timeline[2]);
+}
+
 #define MULTI_CONSUMER_THREADS 8
 #define MULTI_CONSUMER_ITERATIONS (1 << 14)
 static void * test_sync_multi_consumer_thread(void *arg)
@@ -486,6 +549,9 @@ igt_main
 
 	igt_subtest("sync_merge_same")
 		test_sync_merge_same();
+
+	igt_subtest("sync_multi_timeline_wait")
+		test_sync_multi_timeline_wait();
 
 	igt_subtest("sync_multi_consumer")
 		test_sync_multi_consumer();
