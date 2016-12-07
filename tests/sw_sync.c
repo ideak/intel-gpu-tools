@@ -593,6 +593,34 @@ static void test_sync_multi_producer_single_consumer(void)
 		pthread_join(threads[i], NULL);
 }
 
+static void test_sync_expired_merge(void)
+{
+	int iterations = 1 << 20;
+	int timeline;
+	int i;
+	int fence_expired, fence_merged;
+
+	timeline = sw_sync_timeline_create();
+
+	sw_sync_timeline_inc(timeline, 100);
+	fence_expired = sw_sync_fence_create(timeline, 1);
+	igt_assert_f(sync_wait(fence_expired, 0) == 0,
+	             "Failure waiting for expired fence\n");
+
+	fence_merged = sync_merge(fence_expired, fence_expired);
+	close(fence_merged);
+
+	for (i = 0; i < iterations; i++) {
+		int fence = sync_merge(fence_expired, fence_expired);
+
+		igt_assert_f(sync_wait(fence, -1) == 0,
+				     "Failure waiting on fence\n");
+		close(fence);
+	}
+
+	close(fence_expired);
+}
+
 static void test_sync_random_merge(void)
 {
 	int i, size, ret;
@@ -697,6 +725,9 @@ igt_main
 
 	igt_subtest("sync_multi_producer_single_consumer")
 		test_sync_multi_producer_single_consumer();
+
+	igt_subtest("sync_expired_merge")
+		test_sync_expired_merge();
 
 	igt_subtest("sync_random_merge")
 		test_sync_random_merge();
