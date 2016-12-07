@@ -193,6 +193,30 @@ static void test_sync_merge(void)
 	close(timeline);
 }
 
+static void test_sync_merge_same(void)
+{
+	int in_fence[2];
+	int timeline;
+	int signaled;
+
+	timeline = sw_sync_timeline_create();
+	in_fence[0] = sw_sync_fence_create(timeline, 1);
+	in_fence[1] = sync_merge(in_fence[0], in_fence[0]);
+
+	signaled = sync_fence_count_status(in_fence[0],
+					      SW_SYNC_FENCE_STATUS_SIGNALED);
+	igt_assert_f(signaled == 0, "Fence signaled too early\n");
+
+	sw_sync_timeline_inc(timeline, 1);
+	signaled = sync_fence_count_status(in_fence[0],
+					      SW_SYNC_FENCE_STATUS_SIGNALED);
+	igt_assert_f(signaled == 1, "Fence did not signal\n");
+
+	close(in_fence[0]);
+	close(in_fence[1]);
+	close(timeline);
+}
+
 igt_main
 {
 	igt_subtest("alloc_timeline")
@@ -212,5 +236,8 @@ igt_main
 
 	igt_subtest("sync_merge")
 		test_sync_merge();
+
+	igt_subtest("sync_merge_same")
+		test_sync_merge_same();
 }
 
