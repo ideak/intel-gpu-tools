@@ -29,6 +29,7 @@
 
 #include "igt.h"
 #include "igt_aux.h"
+#include "igt_primes.h"
 
 #include "sw_sync.h"
 
@@ -81,6 +82,53 @@ static void test_alloc_merge_fence(void)
 	close(timeline[1]);
 }
 
+static void test_sync_busy(void)
+{
+	int fence, ret;
+	int timeline;
+	int seqno;
+
+	timeline = sw_sync_timeline_create();
+	fence = sw_sync_fence_create(timeline, 5);
+
+	/* Make sure that fence has not been signaled yet */
+	ret = sync_wait(fence, 0);
+	igt_assert_f(ret == -1 && errno == ETIME, "Fence signaled early (timeline value 0, fence seqno 5)\n");
+
+	/* Advance timeline from 0 -> 1 */
+	sw_sync_timeline_inc(timeline, 1);
+
+	/* Make sure that fence has not been signaled yet */
+	ret = sync_wait(fence, 0);
+	igt_assert_f(ret == -1 && errno == ETIME, "Fence signaled early (timeline value 1, fence seqno 5)\n");
+
+	/* Advance timeline from 1 -> 5: signaling the fence (seqno 5)*/
+	sw_sync_timeline_inc(timeline, 4);
+	ret = sync_wait(fence, 0);
+	igt_assert_f(ret == 0, "Fence not signaled (timeline value 5, fence seqno 5)\n");
+
+	/* Go even further, and confirm wait still succeeds */
+	sw_sync_timeline_inc(timeline, 5);
+	ret = sync_wait(fence, 0);
+	igt_assert_f(ret == 0, "Fence not signaled (timeline value 10, fence seqno 5)\n");
+
+	seqno = 10;
+	for_each_prime_number(prime, 100) {
+		int fence_prime;
+		seqno += prime;
+
+		fence_prime = sw_sync_fence_create(timeline, seqno);
+		sw_sync_timeline_inc(timeline, prime);
+
+		ret = sync_wait(fence_prime, 0);
+		igt_assert_f(ret == 0, "Fence not signaled during test of prime timeline increments\n");
+		close(fence_prime);
+	}
+
+	close(fence);
+	close(timeline);
+}
+
 igt_main
 {
 	igt_subtest("alloc_timeline")
@@ -94,5 +142,8 @@ igt_main
 
 	igt_subtest("alloc_merge_fence")
 		test_alloc_merge_fence();
+
+	igt_subtest("sync_busy")
+		test_sync_busy();
 }
 
