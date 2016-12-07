@@ -341,7 +341,9 @@ static void kmsg_dump(int fd)
 	}
 }
 
-void igt_kselftests(const char *module_name, const char *module_options)
+void igt_kselftests(const char *module_name,
+		    const char *module_options,
+		    const char *filter)
 {
 	const char *param_prefix = "igt__";
 	const int param_len = strlen(param_prefix);
@@ -376,6 +378,10 @@ void igt_kselftests(const char *module_name, const char *module_options)
 
 			val = kmod_module_info_get_value(d);
 			if (!val || strncmp(val, param_prefix, param_len))
+				continue;
+
+			if (filter &&
+			    strncmp(val + param_len, filter, strlen(filter)))
 				continue;
 
 			subtest = strdup(val);
