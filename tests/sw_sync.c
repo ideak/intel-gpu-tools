@@ -71,6 +71,20 @@ static void test_alloc_fence_invalid_timeline(void)
 	    "Did not fail to create fence on invalid timeline\n");
 }
 
+static void test_timeline_closed(void)
+{
+	int fence, ret;
+	int timeline;
+
+	timeline = sw_sync_timeline_create();
+	fence = sw_sync_fence_create(timeline, 1);
+
+	close(timeline);
+	ret = sync_wait(fence, 0);
+	igt_assert_f(ret == -1 && errno == ETIME,
+        "Failure waiting on unsignaled fence on closed timeline\n");
+}
+
 static void test_alloc_merge_fence(void)
 {
 	int in_fence[2];
@@ -701,6 +715,9 @@ igt_main
 
 	igt_subtest("alloc_fence_invalid_timeline")
 		test_alloc_fence_invalid_timeline();
+
+	igt_subtest("timeline_closed")
+		test_timeline_closed();
 
 	igt_subtest("alloc_merge_fence")
 		test_alloc_merge_fence();
