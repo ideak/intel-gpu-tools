@@ -24,6 +24,8 @@
  *    Robert Foss <robert.foss@collabora.com>
  */
 
+#include <pthread.h>
+#include <semaphore.h>
 #include <stdint.h>
 #include <unistd.h>
 
@@ -35,6 +37,13 @@
 
 
 IGT_TEST_DESCRIPTION("Test SW Sync Framework");
+
+typedef struct {
+	int timeline;
+	uint32_t thread_id;
+	volatile uint32_t * volatile counter;
+	sem_t *sem;
+} data_t;
 
 static void test_alloc_timeline(void)
 {
@@ -217,6 +226,92 @@ static void test_sync_merge_same(void)
 	close(timeline);
 }
 
+#define MULTI_CONSUMER_THREADS 8
+#define MULTI_CONSUMER_ITERATIONS (1 << 14)
+static void * test_sync_multi_consumer_thread(void *arg)
+{
+	data_t *data = arg;
+	int thread_id = data->thread_id;
+	int timeline = data->timeline;
+	int ret, i;
+
+	for (i = 0; i < MULTI_CONSUMER_ITERATIONS; i++) {
+		int next_point = i * MULTI_CONSUMER_THREADS + thread_id;
+		int fence = sw_sync_fence_create(timeline, next_point);
+
+		ret = sync_wait(fence, 1000);
+		if (ret == -1)
+		{
+			return (void *) 1;
+		}
+
+		if (*(data->counter) != next_point)
+		{
+			return (void *) 1;
+		}
+
+		sem_post(data->sem);
+		close(fence);
+	}
+	return NULL;
+}
+
+static void test_sync_multi_consumer(void)
+{
+
+	data_t data_arr[MULTI_CONSUMER_THREADS];
+	pthread_t thread_arr[MULTI_CONSUMER_THREADS];
+	sem_t sem;
+	int timeline;
+	volatile uint32_t counter = 0;
+	uintptr_t thread_ret = 0;
+	data_t data;
+	int i, ret;
+
+	sem_init(&sem, 0, 0);
+	timeline = sw_sync_timeline_create();
+
+	data.counter = &counter;
+	data.timeline = timeline;
+	data.sem = &sem;
+
+	/* Start sync threads. */
+	for (i = 0; i < MULTI_CONSUMER_THREADS; i++)
+	{
+		data_arr[i] = data;
+		data_arr[i].thread_id = i;
+		ret = pthread_create(&thread_arr[i], NULL,
+				     test_sync_multi_consumer_thread,
+				     (void *) &(data_arr[i]));
+		igt_assert_eq(ret, 0);
+	}
+
+	/* Produce 'content'. */
+	for (i = 0; i < MULTI_CONSUMER_THREADS * MULTI_CONSUMER_ITERATIONS; i++)
+	{
+		sem_wait(&sem);
+
+		counter++;
+		sw_sync_timeline_inc(timeline, 1);
+	}
+
+	/* Wait for threads to complete. */
+	for (i = 0; i < MULTI_CONSUMER_THREADS; i++)
+	{
+		uintptr_t local_thread_ret;
+		pthread_join(thread_arr[i], (void **)&local_thread_ret);
+		thread_ret |= local_thread_ret;
+	}
+
+	close(timeline);
+	sem_destroy(&sem);
+
+	igt_assert_f(counter == MULTI_CONSUMER_THREADS * MULTI_CONSUMER_ITERATIONS,
+		     "Counter has unexpected value.\n");
+
+	igt_assert_f(thread_ret == 0, "A sync thread reported failure.\n");
+}
+
 igt_main
 {
 	igt_subtest("alloc_timeline")
@@ -239,5 +334,8 @@ igt_main
 
 	igt_subtest("sync_merge_same")
 		test_sync_merge_same();
+
+	igt_subtest("sync_multi_consumer")
+		test_sync_multi_consumer();
 }
 
