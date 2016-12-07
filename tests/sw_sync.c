@@ -172,6 +172,44 @@ static void test_sync_busy(void)
 	close(timeline);
 }
 
+static void test_sync_merge_invalid(void)
+{
+	int in_fence;
+	int fence_invalid;
+	int fence_merge;
+	int timeline;
+	char tmppath[] = "/tmp/igt-XXXXXX";
+	int skip = 0;
+
+	timeline = sw_sync_timeline_create();
+	in_fence = sw_sync_fence_create(timeline, 1);
+
+	fence_invalid = -1;
+	fence_merge = sync_merge(in_fence, fence_invalid);
+	igt_assert_f(fence_merge < 0, "Verify invalid fd (-1) handling");
+
+	fence_invalid = drm_open_driver(DRIVER_ANY);
+	fence_merge = sync_merge(in_fence, fence_invalid);
+	igt_assert_f(fence_merge < 0, "Verify invalid fd (device fd) handling");
+
+	fence_invalid = mkstemp(tmppath);
+	if (fence_invalid == -1) {
+		skip = 1;
+		goto out;
+	}
+	unlink(tmppath);
+	fence_invalid = drm_open_driver(DRIVER_ANY);
+	fence_merge = sync_merge(in_fence, fence_invalid);
+	close(fence_invalid);
+	igt_assert_f(fence_merge < 0, "Verify invalid fd (file fd) handling");
+
+out:
+	close(in_fence);
+	close(fence_merge);
+	close(timeline);
+	igt_require(skip == 0);
+}
+
 static void test_sync_merge(void)
 {
 	int in_fence[3];
@@ -745,6 +783,9 @@ igt_main
 
 	igt_subtest("sync_busy")
 		test_sync_busy();
+
+	igt_subtest("sync_merge_invalid")
+		test_sync_merge_invalid();
 
 	igt_subtest("sync_merge")
 		test_sync_merge();
