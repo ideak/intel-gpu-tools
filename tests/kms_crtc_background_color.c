@@ -131,8 +131,6 @@ static void test_crtc_background(data_t *data)
 	enum pipe pipe;
 	int valid_tests = 0;
 
-	igt_require(data->display.has_universal_planes);
-
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		igt_plane_t *plane;
 

@@ -1407,7 +1407,6 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 				plane = &pipe->planes[IGT_PLANE_PRIMARY];
 				plane->is_primary = 1;
 				plane->index = IGT_PLANE_PRIMARY;
-				display->has_universal_planes = 1;
 				break;
 			case DRM_PLANE_TYPE_CURSOR:
 				/*
@@ -1420,7 +1419,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 				plane = &pipe->planes[IGT_PLANE_CURSOR];
 				plane->is_cursor = 1;
 				plane->index = IGT_PLANE_CURSOR;
-				display->has_universal_planes = 1;
+				display->has_cursor_plane = true;
 				break;
 			default:
 				plane = &pipe->planes[p];
@@ -1445,35 +1444,27 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 			plane->rotation = (igt_rotation_t)prop_value;
 		}
 
-		if (display->has_universal_planes) {
-			/*
-			 * If we have universal planes, we should have both
-			 * primary and cursor planes setup now.
-			 */
-			igt_assert(pipe->planes[IGT_PLANE_PRIMARY].drm_plane &&
-				   pipe->planes[IGT_PLANE_CURSOR].drm_plane);
+		/*
+		 * At the bare minimum, we should expect to have a primary
+		 * plane
+		 */
+		igt_assert(pipe->planes[IGT_PLANE_PRIMARY].drm_plane);
 
+		if (display->has_cursor_plane) {
 			/*
 			 * Cursor was put in the last slot.  If we have 0 or
 			 * only 1 sprite, that's the wrong slot and we need to
 			 * move it down.
 			 */
 			if (p != IGT_PLANE_CURSOR) {
-				pipe->planes[p] = pipe->planes[IGT_PLANE_CURSOR];
+				pipe->planes[p] =
+					pipe->planes[IGT_PLANE_CURSOR];
 				pipe->planes[p].index = p;
 				memset(&pipe->planes[IGT_PLANE_CURSOR], 0,
 				       sizeof *plane);
 			}
 		} else {
-			/*
-			 * No universal plane support.  Add drm_plane-less
-			 * primary and cursor planes.
-			 */
-			plane = &pipe->planes[IGT_PLANE_PRIMARY];
-			plane->pipe = pipe;
-			plane->index = IGT_PLANE_PRIMARY;
-			plane->is_primary = true;
-
+			/* Add drm_plane-less cursor */
 			plane = &pipe->planes[p];
 			plane->pipe = pipe;
 			plane->index = p;

@@ -106,10 +106,8 @@ static void commit_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 	if (!plane->is_cursor)
 		igt_plane_set_position(plane, data->pos_x, data->pos_y);
 
-	if (plane->is_primary || plane->is_cursor) {
-		igt_require(data->display.has_universal_planes);
+	if (plane->is_primary || plane->is_cursor)
 		commit = COMMIT_UNIVERSAL;
-	}
 
 	if (data->display.is_atomic)
 		commit = COMMIT_ATOMIC;
@@ -248,10 +246,11 @@ static void test_plane_rotation(data_t *data, enum igt_plane plane_type)
 	unsigned int flip_count;
 	int ret;
 
-	if (plane_type == IGT_PLANE_PRIMARY || plane_type == IGT_PLANE_CURSOR) {
-		igt_require(data->display.has_universal_planes);
+	if (plane_type == IGT_PLANE_PRIMARY || plane_type == IGT_PLANE_CURSOR)
 		commit = COMMIT_UNIVERSAL;
-	}
+
+	if (plane_type == IGT_PLANE_CURSOR)
+		igt_require(display->has_cursor_plane);
 
 	if (data->display.is_atomic)
 		commit = COMMIT_ATOMIC;
@@ -341,10 +340,11 @@ static void test_plane_rotation_ytiled_obj(data_t *data, enum igt_plane plane_ty
 	plane = igt_output_get_plane(output, plane_type);
 	igt_require(igt_plane_supports_rotation(plane));
 
-	if (plane_type == IGT_PLANE_PRIMARY || plane_type == IGT_PLANE_CURSOR) {
-		igt_require(data->display.has_universal_planes);
+	if (plane_type == IGT_PLANE_PRIMARY || plane_type == IGT_PLANE_CURSOR)
 		commit = COMMIT_UNIVERSAL;
-	}
+
+	if (plane_type == IGT_PLANE_CURSOR)
+		igt_require(display->has_cursor_plane);
 
 	if (data->display.is_atomic)
 		commit = COMMIT_ATOMIC;
@@ -408,10 +408,11 @@ static void test_plane_rotation_exhaust_fences(data_t *data, enum igt_plane plan
 	plane = igt_output_get_plane(output, plane_type);
 	igt_require(igt_plane_supports_rotation(plane));
 
-	if (plane_type == IGT_PLANE_PRIMARY || plane_type == IGT_PLANE_CURSOR) {
-		igt_require(data->display.has_universal_planes);
+	if (plane_type == IGT_PLANE_PRIMARY || plane_type == IGT_PLANE_CURSOR)
 		commit = COMMIT_UNIVERSAL;
-	}
+
+	if (plane_type == IGT_PLANE_CURSOR)
+		igt_require(display->has_cursor_plane);
 
 	if (data->display.is_atomic)
 		commit = COMMIT_ATOMIC;

@@ -183,7 +183,6 @@ static void test_plane_scaling(data_t *d)
 	int valid_tests = 0;
 	int primary_plane_scaling = 0; /* For now */
 
-	igt_require(d->display.has_universal_planes);
 	igt_require(d->num_scalers);
 
 	for_each_pipe_with_valid_output(display, pipe, output) {

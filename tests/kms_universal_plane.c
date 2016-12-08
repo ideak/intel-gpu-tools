@@ -134,7 +134,6 @@ functional_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	int num_primary = 0, num_cursor = 0;
 	int i;
 
-	igt_assert(data->display.has_universal_planes);
 	igt_skip_on(pipe >= display->n_pipes);
 
 	igt_info("Testing connector %s using pipe %s\n", igt_output_name(output),
@@ -573,8 +572,8 @@ cursor_leak_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	int r, g, b;
 	int count1, count2;
 
-	igt_assert(data->display.has_universal_planes);
 	igt_skip_on(pipe >= display->n_pipes);
+	igt_require(display->has_cursor_plane);
 
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
@@ -783,8 +782,6 @@ igt_main
 
 		igt_require_pipe_crc();
 		igt_display_init(&data.display, data.drm_fd);
-
-		igt_require(data.display.has_universal_planes);
 	}
 
 	for (int pipe = 0; pipe < I915_MAX_PIPES; pipe++)

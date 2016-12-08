@@ -311,7 +311,7 @@ struct igt_display {
 	unsigned long pipes_in_use;
 	igt_output_t *outputs;
 	igt_pipe_t pipes[I915_MAX_PIPES];
-	bool has_universal_planes;
+	bool has_cursor_plane;
 	bool is_atomic;
 };
 
