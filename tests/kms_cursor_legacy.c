@@ -1149,7 +1149,7 @@ cleanup:
 		igt_skip("Nonblocking modeset is not supported by this kernel\n");
 }
 
-static void flip_vs_cursor_crc(igt_display_t *display, bool atomic)
+static void flip_vs_cursor_crc(igt_display_t *display,bool atomic)
 {
 	struct drm_mode_cursor arg[2];
 	struct drm_event_vblank vbl;
@@ -1167,23 +1167,18 @@ static void flip_vs_cursor_crc(igt_display_t *display, bool atomic)
 	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
 	populate_cursor_args(display, pipe, arg, &cursor_fb);
 
-	arg[0].flags = arg[1].flags |= DRM_MODE_CURSOR_BO;
-	arg[1].handle = 0;
-	arg[1].width = arg[1].height = 0;
-
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
-	/* Collect reference crc with cursor disabled. */
-	igt_pipe_crc_collect_crc(pipe_crc, &crcs[1]);
-
 	set_cursor_on_pipe(display, pipe, &cursor_fb);
 	igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-	do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
+	/* Collect reference crcs, crcs[0] last. */
+	do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[1]);
+	igt_pipe_crc_collect_crc(pipe_crc, &crcs[1]);
 
-	/* Collect reference crc with cursor enabled. */
+	do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 	igt_pipe_crc_collect_crc(pipe_crc, &crcs[0]);
 
 	/* Disable cursor, and immediately queue a flip. Check if resulting crc is correct. */
@@ -1232,23 +1227,18 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
 	populate_cursor_args(display, pipe, arg, &cursor_fb);
 
-	arg[0].flags = arg[1].flags |= DRM_MODE_CURSOR_BO;
-	arg[1].handle = 0;
-	arg[1].width = arg[1].height = 0;
-
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
-	/* Collect reference crc with cursor disabled. */
-	igt_pipe_crc_collect_crc(pipe_crc, &crcs[1]);
-
 	set_cursor_on_pipe(display, pipe, &cursor_fb);
 	igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-	do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
+	/* Collect reference crcs, crc[0] last for the loop. */
+	do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[1]);
+	igt_pipe_crc_collect_crc(pipe_crc, &crcs[1]);
 
-	/* Collect reference crc with cursor enabled. */
+	do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 	igt_pipe_crc_collect_crc(pipe_crc, &crcs[0]);
 
 	/*
