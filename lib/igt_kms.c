@@ -1345,6 +1345,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 	 * hardware and cannot change of time (for now, at least).
 	 */
 	display->n_pipes = resources->count_crtcs;
+	display->pipes = calloc(sizeof(igt_pipe_t), display->n_pipes);
 
 	drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 	is_atomic = drmSetClientCap(drm_fd, DRM_CLIENT_CAP_ATOMIC, 1);
@@ -1557,6 +1558,7 @@ void igt_display_fini(igt_display_t *display)
 	for (i = 0; i < display->n_outputs; i++)
 		igt_output_fini(&display->outputs[i]);
 	free(display->outputs);
+	free(display->pipes);
 	display->outputs = NULL;
 }
 
