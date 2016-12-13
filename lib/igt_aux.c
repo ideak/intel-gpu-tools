@@ -499,7 +499,7 @@ void igt_permute_array(void *array, unsigned size,
 {
 	int i;
 
-	for (i = size - 1; i > 1; i--) {
+	for (i = size - 1; i > 0; i--) {
 		/* yes, not perfectly uniform, who cares */
 		long l = hars_petruska_f54_1_random_unsafe() % (i +1);
 		if (i != l)
