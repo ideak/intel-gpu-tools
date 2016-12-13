@@ -743,7 +743,8 @@ struct mipi_config {
 	/* 2 byte Port Description */
 	uint16_t dual_link:2;
 	uint16_t lane_cnt:2;
-	uint16_t rsvd3:12;
+	uint16_t pixel_overlap:3;
+	uint16_t rsvd3:9;
 
 	/* 2 byte DSI COntroller params */
 	/* 0 - Using DSI PHY, 1 - TE usage */

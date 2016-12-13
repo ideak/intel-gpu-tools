@@ -1046,12 +1046,16 @@ static void dump_mipi_config(struct context *context,
 		printf("RGB888\n");
 	printf("\t\t PPS GPIO Pins: %s \n", config->pwm_blc ? "Using SOC" : "Using PMIC");
 	printf("\t\t CABC Support: %s\n", config->cabc ? "supported" : "not supported");
-	//insert video mode type
 	printf("\t\t Mode: %s\n", config->cmd_mode ? "COMMAND" : "VIDEO");
+	printf("\t\t Video transfer mode: %s (0x%x)\n",
+	       config->vtm == 1 ? "non-burst with sync pulse" :
+	       config->vtm == 2 ? "non-burst with sync events" :
+	       config->vtm == 3 ? "burst" : "<unknown>",
+	       config->vtm);
 	printf("\t\t Dithering: %s\n", config->dithering ? "done in Display Controller" : "done in Panel Controller");
 
 	printf("\tPort Desc\n");
-	//insert pixel overlap count
+	printf("\t\t Pixel overlap: %d\n", config->pixel_overlap);
 	printf("\t\t Lane Count: %d\n", config->lane_cnt + 1);
 	printf("\t\t Dual Link Support: ");
 	if (config->dual_link == 0)
