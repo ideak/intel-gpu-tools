@@ -89,6 +89,22 @@ typedef struct {
 	char dri_path[128];
 } igt_debugfs_t;
 
+static bool is_mountpoint(const char *path)
+{
+	char buf[strlen(path) + 4];
+	dev_t dot_dev, dotdot_dev;
+	struct stat st;
+
+	igt_assert_lt(snprintf(buf, sizeof(buf), "%s/.", path), sizeof(buf));
+	igt_assert_eq(stat(buf, &st), 0);
+	dot_dev = st.st_dev;
+
+	igt_assert_lt(snprintf(buf, sizeof(buf), "%s/..", path), sizeof(buf));
+	igt_assert_eq(stat(buf, &st), 0);
+	dotdot_dev = st.st_dev;
+
+	return dot_dev != dotdot_dev;
+}
 
 /**
  * igt_debugfs_mount:
@@ -109,8 +125,9 @@ const char *igt_debugfs_mount(void)
 	if (stat("/sys/kernel/debug/dri", &st) == 0)
 		return "/sys/kernel/debug";
 
-	igt_assert(stat("/sys/kernel/debug", &st) == 0);
-	igt_assert(mount("debug", "/sys/kernel/debug", "debugfs", 0, 0) == 0);
+	igt_assert(is_mountpoint("/sys/kernel/debug") ||
+		   mount("debug", "/sys/kernel/debug", "debugfs", 0, 0) == 0);
+
 	return "/sys/kernel/debug";
 }
 
