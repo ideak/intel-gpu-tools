@@ -961,7 +961,7 @@ static void __attribute__((noreturn)) usage(const char *name)
 
 int main(int argc, char *argv[])
 {
-	int fd, i;
+	int i;
 	int pipe = 0, bit = 0, target_scanline = 0, target_fuzz = 1;
 	bool test_pixelcount = false;
 	uint32_t devid;
@@ -1045,9 +1045,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	devid = intel_get_drm_devid(fd);
-	close(fd);
+	devid = intel_get_pci_device()->device_id;
 
 	/*
 	 * check if the requires registers are
