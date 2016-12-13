@@ -399,10 +399,6 @@ void igt_kselftests(const char *module_name,
 			if (!val || strncmp(val, param_prefix, prefix_len))
 				continue;
 
-			if (filter &&
-			    strncmp(val + prefix_len, filter, strlen(filter)))
-				continue;
-
 			offset = strlen(val) + 1;
 			tl = malloc(sizeof(*tl) + offset);
 			if (!tl)
@@ -417,6 +413,12 @@ void igt_kselftests(const char *module_name,
 			if (sscanf(tl->name, "%u__%n",
 				   &tl->number, &offset) == 1)
 				tl->name += offset;
+
+			if (filter &&
+			    strncmp(tl->name, filter, strlen(filter))) {
+				free(tl);
+				continue;
+			}
 
 			tests_add(tl, &tests);
 		}
