@@ -289,7 +289,7 @@ struct igt_list {
 };
 
 #define __IGT_INIT_LIST(name) { &(name), &(name) }
-#define IGT_LIST(name) struct igt_list name = __IGT_INIT_LIST(name);
+#define IGT_LIST(name) struct igt_list name = __IGT_INIT_LIST(name)
 
 static inline void igt_list_init(struct igt_list *list)
 {
@@ -352,13 +352,23 @@ static inline bool igt_list_empty(const struct igt_list *list)
 
 #define igt_list_first_entry(head, pos, member) \
 	container_of((head)->next, (pos), member)
+#define igt_list_last_entry(head, pos, member) \
+	container_of((head)->prev, (pos), member)
+
 #define igt_list_next_entry(pos, member) \
 	container_of((pos)->member.next, (pos), member)
+#define igt_list_prev_entry(pos, member) \
+	container_of((pos)->member.prev, (pos), member)
 
 #define igt_list_for_each(pos, head, member)				\
-	for (pos = igt_list_first_entry(head, pos, member);	\
+	for (pos = igt_list_first_entry(head, pos, member);		\
 	     &pos->member != (head);					\
 	     pos = igt_list_next_entry(pos, member))
+
+#define igt_list_for_each_reverse(pos, head, member)			\
+	for (pos = igt_list_last_entry(head, pos, member);		\
+	     &pos->member != (head);					\
+	     pos = igt_list_prev_entry(pos, member))
 
 #define igt_list_for_each_safe(pos, tmp, head, member)			\
 	for (pos = igt_list_first_entry(head, pos, member),		\

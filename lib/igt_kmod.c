@@ -341,17 +341,36 @@ static void kmsg_dump(int fd)
 	}
 }
 
+struct test_list {
+	struct igt_list link;
+	unsigned int number;
+	char *name;
+	char param[];
+};
+
+static void tests_add(struct test_list *tl, struct igt_list *list)
+{
+	struct test_list *pos;
+
+	igt_list_for_each(pos, list, link)
+		if (pos->number > tl->number)
+			break;
+
+	igt_list_add_tail(&tl->link, &pos->link);
+}
+
 void igt_kselftests(const char *module_name,
 		    const char *module_options,
 		    const char *filter)
 {
 	const char *param_prefix = "igt__";
-	const int param_len = strlen(param_prefix);
+	const int prefix_len = strlen(param_prefix);
+	IGT_LIST(tests);
 	char options[1024];
 	struct kmod_ctx *ctx = kmod_ctx();
 	struct kmod_module *kmod;
 	struct kmod_list *d, *pre;
-	int module_subtest_count;
+	struct test_list *tl, *tn;
 	int err, kmsg = -1;
 
 	igt_require(kmod_module_new_from_name(ctx, module_name, &kmod) == 0);
@@ -365,34 +384,50 @@ void igt_kselftests(const char *module_name,
 		kmsg = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
 	}
 
-	module_subtest_count = 0;
 	pre = NULL;
 	if (kmod_module_get_info(kmod, &pre)) {
 		kmod_list_foreach(d, pre) {
 			const char *key, *val;
-			char *subtest, *colon;
+			char *colon;
+			int offset;
 
 			key = kmod_module_info_get_key(d);
 			if (strcmp(key, "parmtype"))
 				continue;
 
 			val = kmod_module_info_get_value(d);
-			if (!val || strncmp(val, param_prefix, param_len))
+			if (!val || strncmp(val, param_prefix, prefix_len))
 				continue;
 
 			if (filter &&
-			    strncmp(val + param_len, filter, strlen(filter)))
+			    strncmp(val + prefix_len, filter, strlen(filter)))
 				continue;
 
-			subtest = strdup(val);
-			colon = strchr(subtest, ':');
+			offset = strlen(val) + 1;
+			tl = malloc(sizeof(*tl) + offset);
+			if (!tl)
+				continue;
+
+			memcpy(tl->param, val, offset);
+			colon = strchr(tl->param, ':');
 			*colon = '\0';
 
-			igt_subtest_f("%s", subtest + param_len) {
+			tl->number = 0;
+			tl->name = tl->param + prefix_len;
+			if (sscanf(tl->name, "%u__%n",
+				   &tl->number, &offset) == 1)
+				tl->name += offset;
+
+			tests_add(tl, &tests);
+		}
+		kmod_module_info_free_list(pre);
+
+		igt_list_for_each_safe(tl, tn, &tests, link) {
+			igt_subtest_f("%s", tl->name) {
 				lseek(kmsg, 0, SEEK_END);
 
 				snprintf(options, sizeof(options), "%s=1 %s",
-					 subtest, module_options ?: "");
+					 tl->param, module_options ?: "");
 
 				err = 0;
 				if (modprobe(kmod, options))
@@ -410,9 +445,8 @@ void igt_kselftests(const char *module_name,
 					     module_name, options,
 					     strerror(-err), -err);
 			}
-			module_subtest_count++;
+			free(tl);
 		}
-		kmod_module_info_free_list(pre);
 	}
 
 	igt_fixture {
@@ -422,6 +456,6 @@ void igt_kselftests(const char *module_name,
 		if (strcmp(module_name, "i915") == 0)
 			igt_i915_driver_load(NULL);
 
-		igt_require(module_subtest_count);
+		igt_require(!igt_list_empty(&tests));
 	}
 }
