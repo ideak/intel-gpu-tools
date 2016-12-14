@@ -451,6 +451,7 @@ static struct kms_atomic_plane_state *
 find_plane(struct kms_atomic_state *state, enum plane_type type,
 	   struct kms_atomic_crtc_state *crtc)
 {
+	struct kms_atomic_plane_state *ret = NULL;
 	int i;
 
 	for (i = 0; i < state->num_planes; i++) {
@@ -464,10 +465,18 @@ find_plane(struct kms_atomic_state *state, enum plane_type type,
 			continue;
 
 		plane_get_current_state(plane);
-		return plane;
+
+		/* Try to find a plane that's already on this CRTC. In
+		 * particular, this ensures that for special (primary/cursor)
+		 * planes that can be on multiple CRTCs, we find the same
+		 * one that the legacy ioctls will. */
+		if (!crtc || plane->crtc_id == crtc->obj)
+			return plane;
+
+		ret = plane;
 	}
 
-	return NULL;
+	return ret;
 }
 
 static void crtc_populate_req(struct kms_atomic_crtc_state *crtc,
