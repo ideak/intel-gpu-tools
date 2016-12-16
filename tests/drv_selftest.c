@@ -29,5 +29,5 @@ IGT_TEST_DESCRIPTION("Basic unit tests for i915.ko");
 igt_main
 {
 	igt_kselftests("i915", "mock_selftests=-1", "mock");
-	igt_kselftests("i915", "late_selftests=-1", "late");
+	igt_kselftests("i915", "live_selftests=-1", "live");
 }
