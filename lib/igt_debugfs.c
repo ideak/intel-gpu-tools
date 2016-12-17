@@ -270,7 +270,7 @@ bool igt_debugfs_search(const char *filename, const char *substring)
  * be random testcase failures when different screen contents end up with the
  * same CRC by chance.
  */
-void igt_assert_crc_equal(igt_crc_t *a, igt_crc_t *b)
+void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
 {
 	int i;
 

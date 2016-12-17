@@ -113,7 +113,7 @@ enum intel_pipe_crc_source {
         INTEL_PIPE_CRC_SOURCE_MAX,
 };
 
-void igt_assert_crc_equal(igt_crc_t *a, igt_crc_t *b);
+void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
 char *igt_crc_to_string(igt_crc_t *crc);
 
 void igt_require_pipe_crc(void);
