@@ -166,26 +166,27 @@ int sync_merge(int fd1, int fd2)
 	return data.fence;
 }
 
-int sync_wait(int fd, int timeout)
+int sync_fence_wait(int fd, int timeout)
 {
 	struct pollfd fds = { fd, POLLIN };
 	int ret;
 
 	do {
-		 ret = poll(&fds, 1, timeout);
-		 if (ret > 0) {
-			  if (fds.revents & (POLLERR | POLLNVAL)) {
-				   errno = EINVAL;
-				   return -1;
-			  }
-			  return 0;
-		 } else if (ret == 0) {
-			  errno = ETIME;
-			  return -1;
-		 }
-	} while (ret == -1 && (errno == EINTR || errno == EAGAIN));
+		ret = poll(&fds, 1, timeout);
+		if (ret > 0) {
+			if (fds.revents & (POLLERR | POLLNVAL))
+				return -EINVAL;
 
-	return ret;
+			return 0;
+		} else if (ret == 0) {
+			return -ETIME;
+		} else  {
+			ret = -errno;
+			if (ret == -EINTR || ret == -EAGAIN)
+				continue;
+			return ret;
+		}
+	} while (1);
 }
 
 int sync_fence_count(int fd)

@@ -75,21 +75,20 @@ static void test_alloc_fence_invalid_timeline(void)
 
 static void test_timeline_closed(void)
 {
-	int fence, ret;
+	int fence;
 	int timeline;
 
 	timeline = sw_sync_timeline_create();
 	fence = sw_sync_fence_create(timeline, 1);
 
 	close(timeline);
-	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == -1 && errno == ETIME,
-        "Failure waiting on unsignaled fence on closed timeline\n");
+	igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
+		     "Failure waiting on unsignaled fence on closed timeline\n");
 }
 
 static void test_timeline_closed_signaled(void)
 {
-	int fence, ret;
+	int fence;
 	int timeline;
 
 	timeline = sw_sync_timeline_create();
@@ -97,8 +96,7 @@ static void test_timeline_closed_signaled(void)
 
 	sw_sync_timeline_inc(timeline, 1);
 	close(timeline);
-	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == 0,
+	igt_assert_f(sync_fence_wait(fence, 0) == 0,
 	             "Failure waiting on signaled fence for closed timeline\n");
 }
 
@@ -124,7 +122,7 @@ static void test_alloc_merge_fence(void)
 
 static void test_sync_busy(void)
 {
-	int fence, ret;
+	int fence;
 	int timeline;
 	int seqno;
 
@@ -132,29 +130,25 @@ static void test_sync_busy(void)
 	fence = sw_sync_fence_create(timeline, 5);
 
 	/* Make sure that fence has not been signaled yet */
-	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == -1 && errno == ETIME,
-	    "Fence signaled early (timeline value 0, fence seqno 5)\n");
+	igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
+		     "Fence signaled early (timeline value 0, fence seqno 5)\n");
 
 	/* Advance timeline from 0 -> 1 */
 	sw_sync_timeline_inc(timeline, 1);
 
 	/* Make sure that fence has not been signaled yet */
-	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == -1 && errno == ETIME,
-	    "Fence signaled early (timeline value 1, fence seqno 5)\n");
+	igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
+		     "Fence signaled early (timeline value 1, fence seqno 5)\n");
 
 	/* Advance timeline from 1 -> 5: signaling the fence (seqno 5)*/
 	sw_sync_timeline_inc(timeline, 4);
-	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == 0,
-	    "Fence not signaled (timeline value 5, fence seqno 5)\n");
+	igt_assert_f(sync_fence_wait(fence, 0) == 0,
+		     "Fence not signaled (timeline value 5, fence seqno 5)\n");
 
 	/* Go even further, and confirm wait still succeeds */
 	sw_sync_timeline_inc(timeline, 5);
-	ret = sync_wait(fence, 0);
-	igt_assert_f(ret == 0,
-	    "Fence not signaled (timeline value 10, fence seqno 5)\n");
+	igt_assert_f(sync_fence_wait(fence, 0) == 0,
+		     "Fence not signaled (timeline value 10, fence seqno 5)\n");
 
 	seqno = 10;
 	for_each_prime_number(prime, 100) {
@@ -164,9 +158,8 @@ static void test_sync_busy(void)
 		fence_prime = sw_sync_fence_create(timeline, seqno);
 		sw_sync_timeline_inc(timeline, prime);
 
-		ret = sync_wait(fence_prime, 0);
-		igt_assert_f(ret == 0,
-		    "Fence not signaled during test of prime timeline increments\n");
+		igt_assert_f(sync_fence_wait(fence_prime, 0) == 0,
+			     "Fence not signaled during test of prime timeline increments\n");
 		close(fence_prime);
 	}
 
@@ -176,7 +169,7 @@ static void test_sync_busy(void)
 
 static void test_sync_busy_fork_unixsocket(void)
 {
-	int fence, ret;
+	int fence;
 	int timeline;
 	int skip = 0;
 	int sv[2];
@@ -252,16 +245,16 @@ static void test_sync_busy_fork_unixsocket(void)
 		*((int *) CMSG_DATA(cmsg)) = timeline;
 		msg.msg_controllen = cmsg->cmsg_len;
 
-		ret = sync_wait(fence, 0);
-		igt_assert_f(ret == -1 && errno == ETIME, "Fence signaled (it should not have been signalled yet)\n");
+		igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
+			     "Fence signaled (it should not have been signalled yet)\n");
 
 		if (sendmsg(socket, &msg, 0) < 0) {
 		    skip = 1;
 		    goto out;
 		}
 
-		ret = sync_wait(fence, 2*1000);
-		igt_assert_f(ret == 0, "Fence not signaled (timeline value 1 fence seqno 1)\n");
+		igt_assert_f(sync_fence_wait(fence, 2*1000) == 0,
+			     "Fence not signaled (timeline value 1 fence seqno 1)\n");
 		break;
 	}
 	}
@@ -274,7 +267,7 @@ out:
 
 static void test_sync_busy_fork(void)
 {
-	int fence, ret;
+	int fence;
 	int timeline;
 	int skip = 0;
 
@@ -295,11 +288,11 @@ static void test_sync_busy_fork(void)
 		break;
 	default:
 		/* Parent process */
-		ret = sync_wait(fence, 0);
-		igt_assert_f(ret == -1 && errno == ETIME, "Fence signaled (it should not have been signalled yet)\n");
+		igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
+			     "Fence signaled (it should not have been signalled yet)\n");
 
-		ret = sync_wait(fence, 2*1000);
-		igt_assert_f(ret == 0, "Fence not signaled (timeline value 1 fence seqno 1)\n");
+		igt_assert_f(sync_fence_wait(fence, 2*1000) == 0,
+			     "Fence not signaled (timeline value 1 fence seqno 1)\n");
 		break;
 	}
 
@@ -439,7 +432,7 @@ static void test_sync_multi_timeline_wait(void)
 	int timeline[3];
 	int in_fence[3];
 	int fence_merge;
-	int active, signaled, ret;
+	int active, signaled;
 
 	timeline[0] = sw_sync_timeline_create();
 	timeline[1] = sw_sync_timeline_create();
@@ -457,8 +450,8 @@ static void test_sync_multi_timeline_wait(void)
 					    SW_SYNC_FENCE_STATUS_ACTIVE);
 	igt_assert_f(active == 3, "Fence signaled too early\n");
 
-	ret = sync_wait(fence_merge, 0);
-	igt_assert_f(ret == -1 && errno == ETIME, "Failure waiting on fence until timeout\n");
+	igt_assert_f(sync_fence_wait(fence_merge, 0) == -ETIME,
+		     "Failure waiting on fence until timeout\n");
 
 	sw_sync_timeline_inc(timeline[0], 5);
 	active = sync_fence_count_status(fence_merge,
@@ -485,8 +478,8 @@ static void test_sync_multi_timeline_wait(void)
 		     "Fence did not signal properly\n");
 
 	/* confirm you can successfully wait */
-	ret = sync_wait(fence_merge, 100);
-	igt_assert_f(ret == 0, "Failure waiting on signaled fence\n");
+	igt_assert_f(sync_fence_wait(fence_merge, 100) == 0,
+		     "Failure waiting on signaled fence\n");
 
 	close(in_fence[0]);
 	close(in_fence[1]);
@@ -504,22 +497,17 @@ static void * test_sync_multi_consumer_thread(void *arg)
 	data_t *data = arg;
 	int thread_id = data->thread_id;
 	int timeline = data->timeline;
-	int ret, i;
+	int i;
 
 	for (i = 0; i < MULTI_CONSUMER_ITERATIONS; i++) {
 		int next_point = i * MULTI_CONSUMER_THREADS + thread_id;
 		int fence = sw_sync_fence_create(timeline, next_point);
 
-		ret = sync_wait(fence, 1000);
-		if (ret == -1)
-		{
+		if (sync_fence_wait(fence, 1000) < 0)
 			return (void *) 1;
-		}
 
 		if (*(data->counter) != next_point)
-		{
 			return (void *) 1;
-		}
 
 		sem_post(data->sem);
 		close(fence);
@@ -590,22 +578,17 @@ static void * test_sync_multi_consumer_producer_thread(void *arg)
 	data_t *data = arg;
 	int thread_id = data->thread_id;
 	int timeline = data->timeline;
-	int ret, i;
+	int i;
 
 	for (i = 0; i < MULTI_CONSUMER_PRODUCER_ITERATIONS; i++) {
 		int next_point = i * MULTI_CONSUMER_PRODUCER_THREADS + thread_id;
 		int fence = sw_sync_fence_create(timeline, next_point);
 
-		ret = sync_wait(fence, 1000);
-		if (ret == -1)
-		{
+		if (sync_fence_wait(fence, 1000) < 0)
 			return (void *) 1;
-		}
 
 		if (*(data->counter) != next_point)
-		{
 			return (void *) 1;
-		}
 
 		(*data->counter)++;
 
@@ -699,7 +682,7 @@ static int mpsc_producer_thread(void *d)
 		 * means of waiting on the fence
 		 */
 		if ((iterations + id) % 8 != 0) {
-			igt_assert_f(sync_wait(fence, -1) == 0,
+			igt_assert_f(sync_fence_wait(fence, -1) == 0,
 				     "Failure waiting on fence\n");
 		} else {
 			igt_assert_f(test_mspc_wait_on_fence(fence) == 0,
@@ -742,7 +725,7 @@ static int mpsc_consumer_thread(void)
 		 * Vary the means by which we wait.
 		 */
 		if (iterations % 8 != 0) {
-			igt_assert_f(sync_wait(fence, -1) == 0,
+			igt_assert_f(sync_fence_wait(fence, -1) == 0,
 				    "Producers did not increment as expected\n");
 		} else {
 			igt_assert_f(test_mspc_wait_on_fence(fence) == 0,
@@ -807,7 +790,7 @@ static void test_sync_expired_merge(void)
 
 	sw_sync_timeline_inc(timeline, 100);
 	fence_expired = sw_sync_fence_create(timeline, 1);
-	igt_assert_f(sync_wait(fence_expired, 0) == 0,
+	igt_assert_f(sync_fence_wait(fence_expired, 0) == 0,
 	             "Failure waiting for expired fence\n");
 
 	fence_merged = sync_merge(fence_expired, fence_expired);
@@ -816,8 +799,8 @@ static void test_sync_expired_merge(void)
 	for (i = 0; i < iterations; i++) {
 		int fence = sync_merge(fence_expired, fence_expired);
 
-		igt_assert_f(sync_wait(fence, -1) == 0,
-				     "Failure waiting on fence\n");
+		igt_assert_f(sync_fence_wait(fence, -1) == 0,
+			     "Failure waiting on fence\n");
 		close(fence);
 	}
 
@@ -826,7 +809,7 @@ static void test_sync_expired_merge(void)
 
 static void test_sync_random_merge(void)
 {
-	int i, size, ret;
+	int i, size;
 	const int nbr_timeline = 32;
 	const int nbr_merge = 1024;
 	int fence_map[nbr_timeline];
@@ -877,8 +860,7 @@ static void test_sync_random_merge(void)
 	/* Trigger the merged fence. */
 	for (i = 0; i < nbr_timeline; i++) {
 		if (fence_map[i] != -1) {
-			ret = sync_wait(fence, 0);
-			igt_assert_f(ret == -1 && errno == ETIME,
+			igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
 				    "Failure waiting on fence until timeout\n");
 			/* Increment the timeline to the last sync_pt */
 			sw_sync_timeline_inc(timeline_arr[i], fence_map[i]);
@@ -886,8 +868,8 @@ static void test_sync_random_merge(void)
 	}
 
 	/* Check that the fence is triggered. */
-	ret = sync_wait(fence, 1);
-	igt_assert_f(ret == 0, "Failure triggering fence\n");
+	igt_assert_f(sync_fence_wait(fence, 1) == 0,
+		     "Failure triggering fence\n");
 
 	close(fence);
 	for (i = 0; i < nbr_timeline; i++)
