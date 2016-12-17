@@ -33,7 +33,6 @@
 #include <poll.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <linux/sync_file.h>
 #include <sys/ioctl.h>
 
 #include "igt_debugfs.h"
@@ -41,38 +40,66 @@
 #include "drmtest.h"
 #include "ioctl_wrappers.h"
 
-#ifndef SW_SYNC_IOC_INC
-struct sw_sync_create_fence_data {
+struct int_sync_create_fence_data {
 	__u32	value;
 	char	name[32];
 	__s32	fence;
 };
 
-#define LOCAL_SW_SYNC_IOC_MAGIC		    'W'
-#define LOCAL_SW_SYNC_IOC_CREATE_FENCE	_IOWR(LOCAL_SW_SYNC_IOC_MAGIC, 0,\
-						                        struct sw_sync_create_fence_data)
-#define LOCAL_SW_SYNC_IOC_INC			_IOW(LOCAL_SW_SYNC_IOC_MAGIC, 1, __u32)
-#endif
+#define INT_SYNC_IOC_MAGIC 'W'
+#define INT_SYNC_IOC_CREATE_FENCE	_IOWR(INT_SYNC_IOC_MAGIC, 0, struct int_sync_create_fence_data)
+#define INT_SYNC_IOC_INC		_IOW(INT_SYNC_IOC_MAGIC, 1, __u32)
 
+struct local_sync_merge_data {
+	char name[32];
+
+	__s32 fd2;
+	__s32 fence;
+
+	__u32 flags;
+	__u32 pad;
+};
+
+struct local_sync_fence_info {
+	char obj_name[32];
+	char driver_name[32];
+
+	__s32 status;
+	__u32 flags;
+
+	__u64 timestamp_ns;
+};
+
+struct local_sync_file_info {
+	char  name[32];
+
+	__s32 status;
+	__u32 flags;
+	__u32 num_fences;
+	__u32 pad;
+
+	__u64 sync_fence_info;
+};
+
+#define UABI_SYNC_IOC_MAGIC '>'
+#define LOCAL_SYNC_IOC_MERGE		_IOWR(UABI_SYNC_IOC_MAGIC, 3, struct local_sync_merge_data)
+#define LOCAL_SYNC_IOC_FILE_INFO	_IOWR(UABI_SYNC_IOC_MAGIC, 4, struct local_sync_file_info)
 
 static bool kernel_sw_sync_path(char *path, int length)
 {
 	snprintf(path, length, "%s", "/dev/sw_sync");
-	if (access(path, R_OK | W_OK) == 0) {
-	    return true;
-	}
+	if (access(path, R_OK | W_OK) == 0)
+		return true;
 
 	snprintf(path, length, "%s", "/sys/kernel/debug/sync/sw_sync");
-	if (access(path, R_OK | W_OK) == 0) {
-	    return true;
-	}
+	if (access(path, R_OK | W_OK) == 0)
+		return true;
 
 	snprintf(path, length, "%s/sw_sync", igt_debugfs_mount());
-	if (access(path, R_OK | W_OK) == 0) {
-	    return true;
-	}
+	if (access(path, R_OK | W_OK) == 0)
+		return true;
 
-    return false;
+	return false;
 }
 
 static bool sw_sync_fd_is_valid(int fd)
@@ -80,7 +107,7 @@ static bool sw_sync_fd_is_valid(int fd)
 	int status;
 
 	if (fd < 0)
-		return 0;
+		return false;
 
 	status = fcntl(fd, F_GETFD, 0);
 	return status >= 0;
@@ -102,10 +129,10 @@ int sw_sync_timeline_create(void)
 
 int __sw_sync_fence_create(int fd, uint32_t seqno)
 {
-	struct sw_sync_create_fence_data data = {0};
+	struct int_sync_create_fence_data data = {};
 	data.value = seqno;
 
-	if (igt_ioctl(fd, LOCAL_SW_SYNC_IOC_CREATE_FENCE, &data))
+	if (igt_ioctl(fd, INT_SYNC_IOC_CREATE_FENCE, &data))
 		return -errno;
 
 	return data.fence;
@@ -122,19 +149,17 @@ int sw_sync_fence_create(int fd, uint32_t seqno)
 
 void sw_sync_timeline_inc(int fd, uint32_t count)
 {
-	uint32_t arg = count;
-
-	do_ioctl(fd, LOCAL_SW_SYNC_IOC_INC, &arg);
+	do_ioctl(fd, INT_SYNC_IOC_INC, &count);
 }
 
 int sync_merge(int fd1, int fd2)
 {
-	struct sync_merge_data data = {};
+	struct local_sync_merge_data data = {};
 	int err;
 
 	data.fd2 = fd2;
 
-	err = ioctl(fd1, SYNC_IOC_MERGE, &data);
+	err = ioctl(fd1, LOCAL_SYNC_IOC_MERGE, &data);
 	if (err < 0)
 		return -errno;
 
@@ -143,11 +168,8 @@ int sync_merge(int fd1, int fd2)
 
 int sync_wait(int fd, int timeout)
 {
-	struct pollfd fds = {0};
+	struct pollfd fds = { fd, POLLIN };
 	int ret;
-
-	fds.fd = fd;
-	fds.events = POLLIN;
 
 	do {
 		 ret = poll(&fds, 1, timeout);
@@ -168,9 +190,9 @@ int sync_wait(int fd, int timeout)
 
 int sync_fence_count(int fd)
 {
-	struct sync_file_info info = {0};
+	struct local_sync_file_info info = {};
 
-	if (ioctl(fd, SYNC_IOC_FILE_INFO, &info))
+	if (ioctl(fd, LOCAL_SYNC_IOC_FILE_INFO, &info))
 		return -errno;
 
 	return info.num_fences;
@@ -178,12 +200,12 @@ int sync_fence_count(int fd)
 
 static int __sync_fence_count_status(int fd, int status)
 {
-	struct sync_file_info info = {0};
-	struct sync_fence_info *fence_info;
+	struct local_sync_file_info info = {};
+	struct local_sync_fence_info *fence_info;
 	int count;
 	int i;
 
-	if (ioctl(fd, SYNC_IOC_FILE_INFO, &info))
+	if (ioctl(fd, LOCAL_SYNC_IOC_FILE_INFO, &info))
 		return -errno;
 
 	fence_info = calloc(info.num_fences, sizeof(*fence_info));
@@ -191,7 +213,7 @@ static int __sync_fence_count_status(int fd, int status)
 		return -ENOMEM;
 
 	info.sync_fence_info = (uintptr_t)fence_info;
-	if (ioctl(fd, SYNC_IOC_FILE_INFO, &info)) {
+	if (ioctl(fd, LOCAL_SYNC_IOC_FILE_INFO, &info)) {
 		count = -errno;
 	} else {
 		count = 0;
