@@ -111,7 +111,7 @@ static void test_alloc_merge_fence(void)
 
 	in_fence[0] = sw_sync_fence_create(timeline[0], 1);
 	in_fence[1] = sw_sync_fence_create(timeline[1], 1);
-	fence_merge = sync_merge(in_fence[1], in_fence[0]);
+	fence_merge = sync_fence_merge(in_fence[1], in_fence[0]);
 
 	close(in_fence[0]);
 	close(in_fence[1]);
@@ -314,11 +314,11 @@ static void test_sync_merge_invalid(void)
 	in_fence = sw_sync_fence_create(timeline, 1);
 
 	fence_invalid = -1;
-	fence_merge = sync_merge(in_fence, fence_invalid);
+	fence_merge = sync_fence_merge(in_fence, fence_invalid);
 	igt_assert_f(fence_merge < 0, "Verify invalid fd (-1) handling");
 
 	fence_invalid = drm_open_driver(DRIVER_ANY);
-	fence_merge = sync_merge(in_fence, fence_invalid);
+	fence_merge = sync_fence_merge(in_fence, fence_invalid);
 	igt_assert_f(fence_merge < 0, "Verify invalid fd (device fd) handling");
 
 	fence_invalid = mkstemp(tmppath);
@@ -328,7 +328,7 @@ static void test_sync_merge_invalid(void)
 	}
 	unlink(tmppath);
 	fence_invalid = drm_open_driver(DRIVER_ANY);
-	fence_merge = sync_merge(in_fence, fence_invalid);
+	fence_merge = sync_fence_merge(in_fence, fence_invalid);
 	close(fence_invalid);
 	igt_assert_f(fence_merge < 0, "Verify invalid fd (file fd) handling");
 
@@ -351,8 +351,8 @@ static void test_sync_merge(void)
 	in_fence[1] = sw_sync_fence_create(timeline, 2);
 	in_fence[2] = sw_sync_fence_create(timeline, 3);
 
-	fence_merge = sync_merge(in_fence[0], in_fence[1]);
-	fence_merge = sync_merge(in_fence[2], fence_merge);
+	fence_merge = sync_fence_merge(in_fence[0], in_fence[1]);
+	fence_merge = sync_fence_merge(in_fence[2], fence_merge);
 
 	/* confirm all fences have one active point (even d) */
 	active = sync_fence_count_status(in_fence[0],
@@ -411,7 +411,7 @@ static void test_sync_merge_same(void)
 
 	timeline = sw_sync_timeline_create();
 	in_fence[0] = sw_sync_fence_create(timeline, 1);
-	in_fence[1] = sync_merge(in_fence[0], in_fence[0]);
+	in_fence[1] = sync_fence_merge(in_fence[0], in_fence[0]);
 
 	signaled = sync_fence_count_status(in_fence[0],
 					      SW_SYNC_FENCE_STATUS_SIGNALED);
@@ -442,8 +442,8 @@ static void test_sync_multi_timeline_wait(void)
 	in_fence[1] = sw_sync_fence_create(timeline[1], 5);
 	in_fence[2] = sw_sync_fence_create(timeline[2], 5);
 
-	fence_merge = sync_merge(in_fence[0], in_fence[1]);
-	fence_merge = sync_merge(in_fence[2], fence_merge);
+	fence_merge = sync_fence_merge(in_fence[0], in_fence[1]);
+	fence_merge = sync_fence_merge(in_fence[2], fence_merge);
 
 	/* Confirm fence isn't signaled */
 	active = sync_fence_count_status(fence_merge,
@@ -715,7 +715,7 @@ static int mpsc_consumer_thread(void)
 		fence = sw_sync_fence_create(prod_timeline[0], it);
 		for (i = 1; i < n; i++) {
 			tmp = sw_sync_fence_create(prod_timeline[i], it);
-			merged = sync_merge(tmp, fence);
+			merged = sync_fence_merge(tmp, fence);
 			close(tmp);
 			close(fence);
 			fence = merged;
@@ -793,11 +793,11 @@ static void test_sync_expired_merge(void)
 	igt_assert_f(sync_fence_wait(fence_expired, 0) == 0,
 	             "Failure waiting for expired fence\n");
 
-	fence_merged = sync_merge(fence_expired, fence_expired);
+	fence_merged = sync_fence_merge(fence_expired, fence_expired);
 	close(fence_merged);
 
 	for (i = 0; i < iterations; i++) {
-		int fence = sync_merge(fence_expired, fence_expired);
+		int fence = sync_fence_merge(fence_expired, fence_expired);
 
 		igt_assert_f(sync_fence_wait(fence, -1) == 0,
 			     "Failure waiting on fence\n");
@@ -846,7 +846,7 @@ static void test_sync_random_merge(void)
 
 		/* Merge. */
 		tmpfence = sw_sync_fence_create(timeline, sync_pt);
-		merged = sync_merge(tmpfence, fence);
+		merged = sync_fence_merge(tmpfence, fence);
 		close(tmpfence);
 		close(fence);
 		fence = merged;

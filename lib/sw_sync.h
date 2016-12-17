@@ -31,15 +31,17 @@
 #define SW_SYNC_FENCE_STATUS_ACTIVE		(0)
 #define SW_SYNC_FENCE_STATUS_SIGNALED	(1)
 
+void igt_require_sw_sync(void);
+
 int sw_sync_timeline_create(void);
 int __sw_sync_fence_create(int fd, uint32_t seqno);
 int sw_sync_fence_create(int fd, uint32_t seqno);
 void sw_sync_timeline_inc(int fd, uint32_t count);
-int sync_merge(int fd1, int fd2);
+
+int sync_fence_merge(int fd1, int fd2);
 int sync_fence_wait(int fence, int timeout);
 int sync_fence_count(int fd);
 int sync_fence_count_status(int fd, int status);
-void igt_require_sw_sync(void);
 
 #endif
 

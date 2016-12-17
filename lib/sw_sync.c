@@ -152,15 +152,11 @@ void sw_sync_timeline_inc(int fd, uint32_t count)
 	do_ioctl(fd, INT_SYNC_IOC_INC, &count);
 }
 
-int sync_merge(int fd1, int fd2)
+int sync_fence_merge(int fd1, int fd2)
 {
-	struct local_sync_merge_data data = {};
-	int err;
+	struct local_sync_merge_data data = { .fd2 = fd2};
 
-	data.fd2 = fd2;
-
-	err = ioctl(fd1, LOCAL_SYNC_IOC_MERGE, &data);
-	if (err < 0)
+	if (ioctl(fd1, LOCAL_SYNC_IOC_MERGE, &data))
 		return -errno;
 
 	return data.fence;
