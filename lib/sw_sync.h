@@ -34,9 +34,10 @@
 void igt_require_sw_sync(void);
 
 int sw_sync_timeline_create(void);
-int __sw_sync_fence_create(int fd, uint32_t seqno);
-int sw_sync_fence_create(int fd, uint32_t seqno);
 void sw_sync_timeline_inc(int fd, uint32_t count);
+
+int __sw_sync_timeline_create_fence(int fd, uint32_t seqno);
+int sw_sync_timeline_create_fence(int fd, uint32_t seqno);
 
 int sync_fence_merge(int fd1, int fd2);
 int sync_fence_wait(int fence, int timeout);

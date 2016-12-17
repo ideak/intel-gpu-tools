@@ -127,10 +127,9 @@ int sw_sync_timeline_create(void)
 	return fd;
 }
 
-int __sw_sync_fence_create(int fd, uint32_t seqno)
+int __sw_sync_timeline_create_fence(int fd, uint32_t seqno)
 {
-	struct int_sync_create_fence_data data = {};
-	data.value = seqno;
+	struct int_sync_create_fence_data data = { .value = seqno};
 
 	if (igt_ioctl(fd, INT_SYNC_IOC_CREATE_FENCE, &data))
 		return -errno;
@@ -138,9 +137,9 @@ int __sw_sync_fence_create(int fd, uint32_t seqno)
 	return data.fence;
 }
 
-int sw_sync_fence_create(int fd, uint32_t seqno)
+int sw_sync_timeline_create_fence(int fd, uint32_t seqno)
 {
-	int fence = __sw_sync_fence_create(fd, seqno);
+	int fence = __sw_sync_timeline_create_fence(fd, seqno);
 
 	igt_assert_f(sw_sync_fd_is_valid(fence), "Created invalid fence\n");
 

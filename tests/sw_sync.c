@@ -61,7 +61,7 @@ static void test_alloc_fence(void)
 	int timeline;
 
 	timeline = sw_sync_timeline_create();
-	in_fence = sw_sync_fence_create(timeline, 0);
+	in_fence = sw_sync_timeline_create_fence(timeline, 0);
 
 	close(in_fence);
 	close(timeline);
@@ -69,7 +69,7 @@ static void test_alloc_fence(void)
 
 static void test_alloc_fence_invalid_timeline(void)
 {
-	igt_assert_f(__sw_sync_fence_create(-1, 0) < 0,
+	igt_assert_f(__sw_sync_timeline_create_fence(-1, 0) < 0,
 	    "Did not fail to create fence on invalid timeline\n");
 }
 
@@ -79,7 +79,7 @@ static void test_timeline_closed(void)
 	int timeline;
 
 	timeline = sw_sync_timeline_create();
-	fence = sw_sync_fence_create(timeline, 1);
+	fence = sw_sync_timeline_create_fence(timeline, 1);
 
 	close(timeline);
 	igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
@@ -92,7 +92,7 @@ static void test_timeline_closed_signaled(void)
 	int timeline;
 
 	timeline = sw_sync_timeline_create();
-	fence = sw_sync_fence_create(timeline, 1);
+	fence = sw_sync_timeline_create_fence(timeline, 1);
 
 	sw_sync_timeline_inc(timeline, 1);
 	close(timeline);
@@ -109,8 +109,8 @@ static void test_alloc_merge_fence(void)
 	timeline[0] = sw_sync_timeline_create();
 	timeline[1] = sw_sync_timeline_create();
 
-	in_fence[0] = sw_sync_fence_create(timeline[0], 1);
-	in_fence[1] = sw_sync_fence_create(timeline[1], 1);
+	in_fence[0] = sw_sync_timeline_create_fence(timeline[0], 1);
+	in_fence[1] = sw_sync_timeline_create_fence(timeline[1], 1);
 	fence_merge = sync_fence_merge(in_fence[1], in_fence[0]);
 
 	close(in_fence[0]);
@@ -127,7 +127,7 @@ static void test_sync_busy(void)
 	int seqno;
 
 	timeline = sw_sync_timeline_create();
-	fence = sw_sync_fence_create(timeline, 5);
+	fence = sw_sync_timeline_create_fence(timeline, 5);
 
 	/* Make sure that fence has not been signaled yet */
 	igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
@@ -155,7 +155,7 @@ static void test_sync_busy(void)
 		int fence_prime;
 		seqno += prime;
 
-		fence_prime = sw_sync_fence_create(timeline, seqno);
+		fence_prime = sw_sync_timeline_create_fence(timeline, seqno);
 		sw_sync_timeline_inc(timeline, prime);
 
 		igt_assert_f(sync_fence_wait(fence_prime, 0) == 0,
@@ -176,7 +176,7 @@ static void test_sync_busy_fork_unixsocket(void)
 
 
 	timeline = sw_sync_timeline_create();
-	fence = sw_sync_fence_create(timeline, 1);
+	fence = sw_sync_timeline_create_fence(timeline, 1);
 
 	if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sv) != 0) {
 		skip = 1;
@@ -272,7 +272,7 @@ static void test_sync_busy_fork(void)
 	int skip = 0;
 
 	timeline = sw_sync_timeline_create();
-	fence = sw_sync_fence_create(timeline, 1);
+	fence = sw_sync_timeline_create_fence(timeline, 1);
 
 	switch (fork()) {
 	case 0:
@@ -311,7 +311,7 @@ static void test_sync_merge_invalid(void)
 	int skip = 0;
 
 	timeline = sw_sync_timeline_create();
-	in_fence = sw_sync_fence_create(timeline, 1);
+	in_fence = sw_sync_timeline_create_fence(timeline, 1);
 
 	fence_invalid = -1;
 	fence_merge = sync_fence_merge(in_fence, fence_invalid);
@@ -347,9 +347,9 @@ static void test_sync_merge(void)
 	int active, signaled;
 
 	timeline = sw_sync_timeline_create();
-	in_fence[0] = sw_sync_fence_create(timeline, 1);
-	in_fence[1] = sw_sync_fence_create(timeline, 2);
-	in_fence[2] = sw_sync_fence_create(timeline, 3);
+	in_fence[0] = sw_sync_timeline_create_fence(timeline, 1);
+	in_fence[1] = sw_sync_timeline_create_fence(timeline, 2);
+	in_fence[2] = sw_sync_timeline_create_fence(timeline, 3);
 
 	fence_merge = sync_fence_merge(in_fence[0], in_fence[1]);
 	fence_merge = sync_fence_merge(in_fence[2], fence_merge);
@@ -410,7 +410,7 @@ static void test_sync_merge_same(void)
 	int signaled;
 
 	timeline = sw_sync_timeline_create();
-	in_fence[0] = sw_sync_fence_create(timeline, 1);
+	in_fence[0] = sw_sync_timeline_create_fence(timeline, 1);
 	in_fence[1] = sync_fence_merge(in_fence[0], in_fence[0]);
 
 	signaled = sync_fence_count_status(in_fence[0],
@@ -438,9 +438,9 @@ static void test_sync_multi_timeline_wait(void)
 	timeline[1] = sw_sync_timeline_create();
 	timeline[2] = sw_sync_timeline_create();
 
-	in_fence[0] = sw_sync_fence_create(timeline[0], 5);
-	in_fence[1] = sw_sync_fence_create(timeline[1], 5);
-	in_fence[2] = sw_sync_fence_create(timeline[2], 5);
+	in_fence[0] = sw_sync_timeline_create_fence(timeline[0], 5);
+	in_fence[1] = sw_sync_timeline_create_fence(timeline[1], 5);
+	in_fence[2] = sw_sync_timeline_create_fence(timeline[2], 5);
 
 	fence_merge = sync_fence_merge(in_fence[0], in_fence[1]);
 	fence_merge = sync_fence_merge(in_fence[2], fence_merge);
@@ -501,7 +501,7 @@ static void * test_sync_multi_consumer_thread(void *arg)
 
 	for (i = 0; i < MULTI_CONSUMER_ITERATIONS; i++) {
 		int next_point = i * MULTI_CONSUMER_THREADS + thread_id;
-		int fence = sw_sync_fence_create(timeline, next_point);
+		int fence = sw_sync_timeline_create_fence(timeline, next_point);
 
 		if (sync_fence_wait(fence, 1000) < 0)
 			return (void *) 1;
@@ -582,7 +582,7 @@ static void * test_sync_multi_consumer_producer_thread(void *arg)
 
 	for (i = 0; i < MULTI_CONSUMER_PRODUCER_ITERATIONS; i++) {
 		int next_point = i * MULTI_CONSUMER_PRODUCER_THREADS + thread_id;
-		int fence = sw_sync_fence_create(timeline, next_point);
+		int fence = sw_sync_timeline_create_fence(timeline, next_point);
 
 		if (sync_fence_wait(fence, 1000) < 0)
 			return (void *) 1;
@@ -676,7 +676,7 @@ static int mpsc_producer_thread(void *d)
 	int iterations = test_mpsc_data.iterations;
 
 	for (i = 0; i < iterations; i++) {
-		fence = sw_sync_fence_create(cons_timeline, i);
+		fence = sw_sync_timeline_create_fence(cons_timeline, i);
 
 		/* Wait for the consumer to finish. Use alternate
 		 * means of waiting on the fence
@@ -712,9 +712,9 @@ static int mpsc_consumer_thread(void)
 	int n = test_mpsc_data.threads;
 
 	for (it = 1; it <= iterations; it++) {
-		fence = sw_sync_fence_create(prod_timeline[0], it);
+		fence = sw_sync_timeline_create_fence(prod_timeline[0], it);
 		for (i = 1; i < n; i++) {
-			tmp = sw_sync_fence_create(prod_timeline[i], it);
+			tmp = sw_sync_timeline_create_fence(prod_timeline[i], it);
 			merged = sync_fence_merge(tmp, fence);
 			close(tmp);
 			close(fence);
@@ -789,7 +789,7 @@ static void test_sync_expired_merge(void)
 	timeline = sw_sync_timeline_create();
 
 	sw_sync_timeline_inc(timeline, 100);
-	fence_expired = sw_sync_fence_create(timeline, 1);
+	fence_expired = sw_sync_timeline_create_fence(timeline, 1);
 	igt_assert_f(sync_fence_wait(fence_expired, 0) == 0,
 	             "Failure waiting for expired fence\n");
 
@@ -825,7 +825,7 @@ static void test_sync_random_merge(void)
 	}
 
 	sync_pt = rand();
-	fence = sw_sync_fence_create(timeline_arr[0], sync_pt);
+	fence = sw_sync_timeline_create_fence(timeline_arr[0], sync_pt);
 
 	fence_map[0] = sync_pt;
 
@@ -845,7 +845,7 @@ static void test_sync_random_merge(void)
 			fence_map[timeline_offset] = sync_pt;
 
 		/* Merge. */
-		tmpfence = sw_sync_fence_create(timeline, sync_pt);
+		tmpfence = sw_sync_timeline_create_fence(timeline, sync_pt);
 		merged = sync_fence_merge(tmpfence, fence);
 		close(tmpfence);
 		close(fence);
