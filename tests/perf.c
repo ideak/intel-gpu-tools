@@ -71,8 +71,6 @@ IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 #define PIPE_CONTROL_PPGTT_WRITE	(0 << 2)
 #define PIPE_CONTROL_GLOBAL_GTT_WRITE   (1 << 2)
 
-#define NSEC_PER_SEC 1000000000ull
-
 /* Temporarily copy i915-perf uapi here to avoid a dependency on libdrm's
  * i915_drm.h copy being updated with the i915-perf interface before this
  * test can land in i-g-t.
