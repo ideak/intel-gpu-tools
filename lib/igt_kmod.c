@@ -431,9 +431,7 @@ void igt_kselftests(const char *module_name,
 				snprintf(options, sizeof(options), "%s=1 %s",
 					 tl->param, module_options ?: "");
 
-				err = 0;
-				if (modprobe(kmod, options))
-					err = -errno;
+				err = modprobe(kmod, options);
 				kmod_module_remove_module(kmod, 0);
 
 				if (err == -ENOTTY) /* special case */
