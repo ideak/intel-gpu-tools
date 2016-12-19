@@ -432,7 +432,7 @@ test_system_wide_paranoid(void)
 			.flags = I915_PERF_FLAG_FD_CLOEXEC |
 				I915_PERF_FLAG_FD_NONBLOCK,
 			.num_properties = sizeof(properties) / 16,
-			.properties_ptr = (uint64_t)properties,
+			.properties_ptr = to_user_pointer(properties),
 		};
 
 		write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
@@ -458,7 +458,7 @@ test_system_wide_paranoid(void)
 			.flags = I915_PERF_FLAG_FD_CLOEXEC |
 				I915_PERF_FLAG_FD_NONBLOCK,
 			.num_properties = sizeof(properties) / 16,
-			.properties_ptr = (uint64_t)properties,
+			.properties_ptr = to_user_pointer(properties),
 		};
 		int stream_fd;
 
@@ -491,7 +491,7 @@ test_invalid_open_flags(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = ~0, /* Undefined flag bits set! */
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 
 	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
@@ -513,7 +513,7 @@ test_invalid_oa_metric_set_id(void)
 		.flags = I915_PERF_FLAG_FD_CLOEXEC |
 			I915_PERF_FLAG_FD_NONBLOCK,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd;
 
@@ -548,7 +548,7 @@ test_invalid_oa_format_id(void)
 		.flags = I915_PERF_FLAG_FD_CLOEXEC |
 			I915_PERF_FLAG_FD_NONBLOCK,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd;
 
@@ -581,7 +581,7 @@ test_missing_sample_flags(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 
 	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
@@ -735,7 +735,7 @@ open_and_read_2_oa_reports(int format_id,
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 
@@ -1047,7 +1047,7 @@ test_invalid_oa_exponent(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 
@@ -1103,7 +1103,7 @@ test_low_oa_exponent_permissions(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	uint64_t oa_period, oa_freq;
 
@@ -1168,7 +1168,7 @@ test_per_context_mode_unprivileged(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 
 	/* should be default, but just to be sure... */
@@ -1255,7 +1255,7 @@ test_blocking(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 	uint8_t buf[1024 * 1024];
@@ -1348,7 +1348,7 @@ test_polling(void)
 		.flags = I915_PERF_FLAG_FD_CLOEXEC |
 			I915_PERF_FLAG_FD_NONBLOCK,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 	uint8_t buf[1024 * 1024];
@@ -1465,7 +1465,7 @@ test_buffer_fill(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 	int buf_size = 65536 * (256 + sizeof(struct drm_i915_perf_record_header));
@@ -1540,7 +1540,7 @@ test_enable_disable(void)
 		.flags = I915_PERF_FLAG_FD_CLOEXEC |
 			 I915_PERF_FLAG_DISABLED, /* Verify we start disabled */
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 	int buf_size = 65536 * (256 + sizeof(struct drm_i915_perf_record_header));
@@ -1610,7 +1610,7 @@ test_short_reads(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	size_t record_size = 256 + sizeof(struct drm_i915_perf_record_header);
 	size_t page_size = sysconf(_SC_PAGE_SIZE);
@@ -1698,7 +1698,7 @@ test_non_sampling_read_error(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 	uint8_t buf[1024];
@@ -1732,7 +1732,7 @@ test_disabled_read_error(void)
 		.flags = I915_PERF_FLAG_FD_CLOEXEC |
 			 I915_PERF_FLAG_DISABLED, /* XXX: open disabled */
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 	uint32_t oa_report0[64];
@@ -1794,7 +1794,7 @@ test_mi_rpc(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 	drm_intel_bufmgr *bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
@@ -1924,7 +1924,7 @@ test_per_ctx_mi_rpc(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 
 	/* should be default, but just to be sure... */
@@ -2134,7 +2134,7 @@ test_rc6_disable(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
 	uint64_t n_events_start = read_debugfs_u64_record("i915_drpc_info",
@@ -2208,7 +2208,7 @@ test_i915_ref_count(void)
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
 		.num_properties = sizeof(properties) / 16,
-		.properties_ptr = (uint64_t)properties,
+		.properties_ptr = to_user_pointer(properties),
 	};
 	unsigned baseline, ref_count0, ref_count1;
 	int stream_fd;
