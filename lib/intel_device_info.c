@@ -138,33 +138,15 @@ static const struct intel_device_info intel_valleyview_info = {
 	.is_valleyview = true,
 	.codename = "valleyview"
 };
-static const struct intel_device_info intel_valleyview_m_info = {
-	.gen = BIT(6),
-	.is_mobile = true,
-	.is_valleyview = true,
-	.codename = "valleyview"
-};
 
 static const struct intel_device_info intel_haswell_info = {
 	.gen = BIT(6),
 	.is_haswell = true,
 	.codename = "haswell"
 };
-static const struct intel_device_info intel_haswell_m_info = {
-	.gen = BIT(6),
-	.is_mobile = true,
-	.is_haswell = true,
-	.codename = "haswell"
-};
 
 static const struct intel_device_info intel_broadwell_info = {
 	.gen = BIT(7),
-	.is_broadwell = true,
-	.codename = "broadwell"
-};
-static const struct intel_device_info intel_broadwell_m_info = {
-	.gen = BIT(7),
-	.is_mobile = true,
 	.is_broadwell = true,
 	.codename = "broadwell"
 };
@@ -222,14 +204,11 @@ static const struct pci_id_match intel_device_match[] = {
 	INTEL_IVB_D_IDS(&intel_ivybridge_info),
 	INTEL_IVB_M_IDS(&intel_ivybridge_m_info),
 
-	INTEL_HSW_D_IDS(&intel_haswell_info),
-	INTEL_HSW_M_IDS(&intel_haswell_m_info),
+	INTEL_HSW_IDS(&intel_haswell_info),
 
-	INTEL_VLV_D_IDS(&intel_valleyview_info),
-	INTEL_VLV_M_IDS(&intel_valleyview_m_info),
+	INTEL_VLV_IDS(&intel_valleyview_info),
 
-	INTEL_BDW_D_IDS(&intel_broadwell_info),
-	INTEL_BDW_M_IDS(&intel_broadwell_m_info),
+	INTEL_BDW_IDS(&intel_broadwell_info),
 
 	INTEL_CHV_IDS(&intel_cherryview_info),
 

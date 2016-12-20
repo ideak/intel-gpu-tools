@@ -53,8 +53,7 @@ static const struct pci_id_match match[] = {
 	INTEL_IVB_D_IDS(NULL),
 	INTEL_IVB_M_IDS(NULL),
 
-	INTEL_HSW_D_IDS(NULL),
-	INTEL_HSW_M_IDS(NULL),
+	INTEL_HSW_IDS(NULL),
 
 	{ 0, 0, 0 },
 };

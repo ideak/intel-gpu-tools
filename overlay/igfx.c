@@ -145,14 +145,11 @@ static const struct pci_id_match match[] = {
 	INTEL_IVB_D_IDS(&ivybridge_info),
 	INTEL_IVB_M_IDS(&ivybridge_info),
 
-	INTEL_HSW_D_IDS(&haswell_info),
-	INTEL_HSW_M_IDS(&haswell_info),
+	INTEL_HSW_IDS(&haswell_info),
 
-	INTEL_VLV_D_IDS(&valleyview_info),
-	INTEL_VLV_M_IDS(&valleyview_info),
+	INTEL_VLV_IDS(&valleyview_info),
 
-	INTEL_BDW_D_IDS(&broadwell_info),
-	INTEL_BDW_M_IDS(&broadwell_info),
+	INTEL_BDW_IDS(&broadwell_info),
 
 	INTEL_CHV_IDS(&cherryview_info),
 
