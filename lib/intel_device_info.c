@@ -175,6 +175,12 @@ static const struct intel_device_info intel_kabylake_info = {
 	.codename = "kabylake"
 };
 
+static const struct intel_device_info intel_geminilake_info = {
+	.gen = BIT(8),
+	.is_geminilake = true,
+	.codename = "geminilake"
+};
+
 static const struct pci_id_match intel_device_match[] = {
 	INTEL_I830_IDS(&intel_i830_info),
 	INTEL_I845G_IDS(&intel_i845_info),
@@ -217,6 +223,8 @@ static const struct pci_id_match intel_device_match[] = {
 	INTEL_BXT_IDS(&intel_broxton_info),
 
 	INTEL_KBL_IDS(&intel_kabylake_info),
+
+	INTEL_GLK_IDS(&intel_geminilake_info),
 
 	INTEL_VGA_DEVICE(PCI_MATCH_ANY, &intel_generic_info),
 };
