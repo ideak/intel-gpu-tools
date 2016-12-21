@@ -406,42 +406,40 @@ bool igt_sysfs_set_boolean(int dir, const char *attr, bool value)
  */
 void kick_fbcon(bool enable)
 {
-	char buf[128];
 	const char *path = "/sys/class/vtconsole";
 	DIR *dir;
-	struct dirent *vtcon;
+	struct dirent *de;
 
 	dir = opendir(path);
 	if (!dir)
 		return;
 
-	while ((vtcon = readdir(dir))) {
+	while ((de = readdir(dir))) {
+		char buf[128];
 		int fd, len;
 
-		if (strncmp(vtcon->d_name, "vtcon", 5))
+		if (strncmp(de->d_name, "vtcon", 5))
 			continue;
 
-		sprintf(buf, "%s/%s/name", path, vtcon->d_name);
+		sprintf(buf, "%s/%s/name", path, de->d_name);
 		fd = open(buf, O_RDONLY);
 		if (fd < 0)
 			continue;
 
+		buf[sizeof(buf) - 1] = '\0';
 		len = read(fd, buf, sizeof(buf) - 1);
 		close(fd);
 		if (len >= 0)
 			buf[len] = '\0';
 
-		if (strstr(buf, "frame buffer device")) {
-			sprintf(buf, "%s/%s/bind", path, vtcon->d_name);
-			fd = open(buf, O_WRONLY);
-			if (fd != -1) {
-				if (enable)
-					igt_ignore_warn(write(fd, "1\n", 2));
-				else
-					igt_ignore_warn(write(fd, "0\n", 2));
-				close(fd);
-			}
-			break;
+		if (!strstr(buf, "frame buffer device"))
+			continue;
+
+		sprintf(buf, "%s/%s/bind", path, de->d_name);
+		fd = open(buf, O_WRONLY);
+		if (fd != -1) {
+			igt_ignore_warn(write(fd, enable ? "1\n" : "0\n", 2));
+			close(fd);
 		}
 	}
 	closedir(dir);
