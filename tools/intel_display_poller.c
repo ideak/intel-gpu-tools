@@ -515,7 +515,7 @@ static void poll_dsl_deiir(uint32_t devid, int pipe, int bit,
 	bit = 1 << bit;
 	dsl = PIPE_REG(pipe, PIPEA_DSL);
 
-	if (IS_GEN8(devid)) {
+	if (intel_gen(devid) >= 8) {
 		iir = GEN8_DE_PIPE_IIR(pipe);
 		ier = GEN8_DE_PIPE_IER(pipe);
 		imr = GEN8_DE_PIPE_IMR(pipe);
@@ -1152,7 +1152,7 @@ int main(int argc, char *argv[])
 		default:
 			usage(argv[0]);
 		}
-	} else if (IS_GEN8(devid)) {
+	} else if (intel_gen(devid) >= 8) {
 		if (test_pixelcount)
 			usage(argv[0]);
 
