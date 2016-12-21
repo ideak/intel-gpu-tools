@@ -65,6 +65,7 @@ AC_CHECK_TYPES([sighandler_t],[],[],[AC_INCLUDES_DEFAULT
 #include <signal.h>])
 AC_CHECK_FUNCS([swapctl])
 AC_CHECK_FUNCS([asprintf])
+AX_GCC_FUNC_ATTRIBUTE([constructor])
 
 dnl Check for POSIX timers
 AC_CHECK_FUNCS(timer_create, [], [

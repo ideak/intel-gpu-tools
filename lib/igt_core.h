@@ -281,6 +281,19 @@ void igt_simple_init_parse_opts(int *argc, char **argv,
 	} \
 	static void igt_tokencat(__real_main, __LINE__)(void) \
 
+/**
+ * igt_constructor:
+ *
+ * Convenience macro to run the provided code block when igt first starts,
+ * before any tests have been run. This should be used for parts of the igt
+ * library that require initialization of objects with global context.
+ *
+ * This code block will be executed exactly once.
+ */
+#define igt_constructor \
+	__attribute__((constructor)) \
+	static void igt_tokencat(__igt_constructor_l, __LINE__)(void)
+
 __attribute__((format(printf, 1, 2)))
 void igt_skip(const char *f, ...) __attribute__((noreturn));
 __attribute__((format(printf, 5, 6)))
