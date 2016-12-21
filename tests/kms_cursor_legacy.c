@@ -274,6 +274,15 @@ enum flip_test {
 	flip_test_last = flip_test_atomic_transitions_varying_size
 };
 
+static bool cursor_slowpath(enum flip_test mode)
+{
+	/* cursor moving doesn't take slowpath, everything else does. */
+	if (mode == flip_test_legacy || mode == flip_test_atomic)
+		return false;
+
+	return true;
+}
+
 static void transition_nonblocking(igt_display_t *display, enum pipe pipe,
 				   struct igt_fb *prim_fb, struct igt_fb *argb_fb,
 				   bool hide_sprite)
@@ -599,7 +608,6 @@ static void basic_flip_cursor(igt_display_t *display,
 		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 
 		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 		break;
 
 	case FLIP_AFTER_CURSOR:
@@ -615,8 +623,12 @@ static void basic_flip_cursor(igt_display_t *display,
 			transition_nonblocking(display, pipe, &fb_info, &argb_fb, 0);
 			break;
 		}
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 	}
+
+	if (!cursor_slowpath(mode))
+		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+	else
+		igt_assert_lte(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
 
 	if (busy) {
 		struct pollfd pfd = { display->drm_fd, POLLIN };
@@ -704,8 +716,12 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 		for (int n = 0; n < target; n++)
 			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[nloops & 1]);
+
 		/* Nor should it have delayed the following cursor update */
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+		if (!cursor_slowpath(mode))
+			igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+		else
+			igt_assert_lte(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
 
 		igt_set_timeout(1, "Stuck page flip");
 		igt_ignore_warn(read(display->drm_fd, &vbl, sizeof(vbl)));
@@ -749,7 +765,7 @@ static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 	struct igt_fb fb_info, cursor_fb;
 	igt_output_t *output;
 	enum pipe pipe = find_connected_pipe(display, false);
-	struct drm_mode_cursor arg;
+	struct drm_mode_cursor arg[2];
 	bool skip_test;
 	igt_plane_t *cursor = NULL, *plane;
 
@@ -757,8 +773,8 @@ static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 	igt_require((output = set_fb_on_crtc(display, pipe, &fb_info)));
 	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
 	set_cursor_on_pipe(display, pipe, &cursor_fb);
-	populate_cursor_args(display, pipe, &arg, &cursor_fb);
-	arg.flags |= DRM_MODE_CURSOR_BO;
+	populate_cursor_args(display, pipe, arg, &cursor_fb);
+	arg[0].flags |= DRM_MODE_CURSOR_BO;
 
 	for_each_plane_on_pipe(display, pipe, plane) {
 		if (!plane->is_cursor)
@@ -802,7 +818,7 @@ static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 		igt_assert_eq(0, poll(&pfd, 1, 0));
 		igt_assert_eq(0, pfd.revents);
 
-		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg);
+		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 
 		igt_assert_eq(1, poll(&pfd, 1, 0));
 		igt_assert_eq(POLLIN, pfd.revents);
@@ -818,7 +834,7 @@ static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 		igt_assert_eq(0, pfd.revents);
 
 		/* Same for cursor on disabled crtc. */
-		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg);
+		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 
 		igt_assert_eq(1, poll(&pfd, 1, 0));
 		igt_assert_eq(POLLIN, pfd.revents);
@@ -1001,15 +1017,14 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 
 			igt_assert_eq(read(display->drm_fd, &vbl, sizeof(vbl)), sizeof(vbl));
 			if (vbl.sequence != vblank_last + 1) {
-				igt_warn("page flip %d was delayed, missed %d frames\n",
+				igt_info("page flip %d was delayed, missed %d frames\n",
 					 n, vbl.sequence - vblank_last - 1);
 			}
 			vblank_last = vbl.sequence;
 		}
 
-		if (mode != flip_test_atomic_transitions &&
-		    mode != flip_test_atomic_transitions_varying_size)
-			igt_assert_eq(vbl.sequence, vblank_start + vrefresh);
+		if (!cursor_slowpath(mode))
+			igt_assert_lte(vbl.sequence, vblank_start + 5 * vrefresh / 4);
 
 		shared[0] = 1;
 		igt_waitchildren();
@@ -1149,7 +1164,7 @@ cleanup:
 		igt_skip("Nonblocking modeset is not supported by this kernel\n");
 }
 
-static void flip_vs_cursor_crc(igt_display_t *display,bool atomic)
+static void flip_vs_cursor_crc(igt_display_t *display, bool atomic)
 {
 	struct drm_mode_cursor arg[2];
 	struct drm_event_vblank vbl;
@@ -1409,9 +1424,10 @@ igt_main
 		igt_subtest_f("%sflip-before-cursor-%s", prefix, modes[i])
 			basic_flip_cursor(&display, i, FLIP_BEFORE_CURSOR, 0);
 
-		igt_subtest_f("%sbusy-flip-before-cursor-%s", prefix, modes[i])
-			basic_flip_cursor(&display, i, FLIP_BEFORE_CURSOR,
-					  BASIC_BUSY);
+		if (!cursor_slowpath(i))
+			igt_subtest_f("%sbusy-flip-before-cursor-%s", prefix, modes[i])
+				basic_flip_cursor(&display, i, FLIP_BEFORE_CURSOR,
+						  BASIC_BUSY);
 
 		igt_subtest_f("%sflip-after-cursor-%s", prefix, modes[i])
 			basic_flip_cursor(&display, i, FLIP_AFTER_CURSOR, 0);
