@@ -67,6 +67,7 @@
 
 #include "igt_core.h"
 #include "igt_aux.h"
+#include "igt_sysfs.h"
 
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>   /* for basename() on Solaris */
@@ -512,6 +513,7 @@ static void common_exit_handler(int sig)
 {
 	if (!igt_only_list_subtests()) {
 		low_mem_killer_disable(false);
+		kick_fbcon(true);
 	}
 
 	/* When not killed by a signal check that igt_exit() has been properly
@@ -731,6 +733,7 @@ out:
 		exit(ret == -1 ? 0 : IGT_EXIT_INVALID);
 
 	if (!list_subtests) {
+		kick_fbcon(false);
 		kmsg(KERN_INFO "[IGT] %s: executing\n", command_str);
 		print_version();
 
