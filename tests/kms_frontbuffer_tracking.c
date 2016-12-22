@@ -943,8 +943,9 @@ static void get_sink_crc(sink_crc_t *crc, bool mandatory)
 			igt_skip("Sink CRC is unreliable on this machine. Try running this test again individually\n");
 		else
 			igt_info("Sink CRC is unreliable on this machine. Try running this test again individually\n");
+	} else {
+		igt_assert(rc == SINK_CRC_SIZE);
 	}
-	igt_assert(rc == SINK_CRC_SIZE);
 }
 
 static bool sink_crc_equal(sink_crc_t *a, sink_crc_t *b)
