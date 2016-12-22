@@ -166,14 +166,12 @@ struct {
 struct {
 	bool can_test;
 
-	bool supports_compressing;
 	bool supports_last_action;
 
 	struct timespec last_action;
 } fbc = {
 	.can_test = false,
 	.supports_last_action = false,
-	.supports_compressing = false,
 };
 
 struct {
@@ -896,18 +894,6 @@ static bool fbc_wait_for_compression(void)
 	return igt_wait(fbc_is_compressing(), 2000, 1);
 }
 
-static void fbc_setup_compressing(void)
-{
-	char buf[128];
-
-	igt_debugfs_read("i915_fbc_status", buf);
-
-	if (strstr(buf, "\nCompressing:"))
-		fbc.supports_compressing = true;
-	else
-		igt_info("FBC compression information not supported\n");
-}
-
 static bool fbc_not_enough_stolen(void)
 {
 	char buf[128];
@@ -1527,7 +1513,6 @@ static void setup_fbc(void)
 	fbc.can_test = true;
 
 	fbc_setup_last_action();
-	fbc_setup_compressing();
 }
 
 static void teardown_fbc(void)
@@ -1696,8 +1681,7 @@ static int adjust_assertion_flags(const struct test_mode *t, int flags)
 			igt_assert_f(false, "FBC disabled\n");		\
 		}							\
 									\
-		if (fbc.supports_compressing && 			\
-		    opt.fbc_check_compression)				\
+		if (opt.fbc_check_compression)				\
 			igt_assert(fbc_wait_for_compression());		\
 	} else if (flags_ & ASSERT_FBC_DISABLED) {			\
 		igt_assert(!fbc_wait_until_enabled());			\
