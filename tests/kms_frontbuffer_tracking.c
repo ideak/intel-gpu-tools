@@ -933,6 +933,11 @@ static void get_sink_crc(sink_crc_t *crc, bool mandatory)
 {
 	int rc, errno_;
 
+	if (!sink_crc.supported) {
+		memcpy(crc, "unsupported!", SINK_CRC_SIZE);
+		return;
+	}
+
 	lseek(sink_crc.fd, 0, SEEK_SET);
 
 	rc = read(sink_crc.fd, crc->data, SINK_CRC_SIZE);
@@ -1220,11 +1225,7 @@ static void print_crc(const char *str, struct both_crcs *crc)
 static void collect_crcs(struct both_crcs *crcs, bool mandatory_sink_crc)
 {
 	igt_pipe_crc_collect_crc(pipe_crc, &crcs->pipe);
-
-	if (sink_crc.supported)
-		get_sink_crc(&crcs->sink, mandatory_sink_crc);
-	else
-		memcpy(&crcs->sink, "unsupported!", SINK_CRC_SIZE);
+	get_sink_crc(&crcs->sink, mandatory_sink_crc);
 }
 
 static void init_blue_crc(enum pixel_format format, bool mandatory_sink_crc)
