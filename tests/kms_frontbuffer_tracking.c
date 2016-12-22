@@ -1399,7 +1399,10 @@ static void setup_modeset(void)
 
 static void teardown_modeset(void)
 {
-	destroy_fbs(FORMAT_DEFAULT);
+	enum pixel_format f;
+
+	for (f = 0; f < FORMAT_COUNT; f++)
+		destroy_fbs(f);
 }
 
 static void setup_sink_crc(void)
