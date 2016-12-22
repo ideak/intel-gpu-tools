@@ -203,9 +203,11 @@ struct both_crcs *wanted_crc;
 struct {
 	int fd;
 	bool supported;
+	bool reliable;
 } sink_crc = {
 	.fd = -1,
-	.supported = false,
+	.supported = true,
+	.reliable = true,
 };
 
 /* The goal of this structure is to easily allow us to deal with cases where we
@@ -943,11 +945,17 @@ static void get_sink_crc(sink_crc_t *crc, bool mandatory)
 	rc = read(sink_crc.fd, crc->data, SINK_CRC_SIZE);
 	errno_ = errno;
 
-	if (rc == -1 && errno_ == ETIMEDOUT) {
+	if (rc == -1 && errno_ == ENOTTY) {
+		igt_info("Sink CRC not supported: panel doesn't support it\n");
+		sink_crc.supported = false;
+	} else if (rc == -1 && errno_ == ETIMEDOUT) {
+		if (sink_crc.reliable) {
+			igt_info("Sink CRC is unreliable on this machine.\n");
+			sink_crc.reliable = false;
+		}
+
 		if (mandatory)
-			igt_skip("Sink CRC is unreliable on this machine. Try running this test again individually\n");
-		else
-			igt_info("Sink CRC is unreliable on this machine. Try running this test again individually\n");
+			igt_skip("Sink CRC is unreliable on this machine.\n");
 	} else {
 		igt_assert(rc == SINK_CRC_SIZE);
 	}
@@ -1396,9 +1404,7 @@ static void teardown_modeset(void)
 
 static void setup_sink_crc(void)
 {
-	ssize_t rc;
 	sink_crc_t crc;
-	int errno_;
 	drmModeConnectorPtr c;
 
 	c = get_connector(prim_mode_params.connector_id);
@@ -1418,17 +1424,8 @@ static void setup_sink_crc(void)
 	sink_crc.fd = igt_debugfs_open("i915_sink_crc_eDP1", O_RDONLY);
 	igt_assert_lte(0, sink_crc.fd);
 
-	rc = read(sink_crc.fd, crc.data, SINK_CRC_SIZE);
-	errno_ = errno;
-	if (rc == -1 && errno_ == ENOTTY)
-		igt_info("Sink CRC not supported: panel doesn't support it\n");
-	if (rc == -1 && errno_ == ETIMEDOUT)
-		igt_info("Sink CRC not reliable on this panel: skipping it\n");
-	else if (rc == SINK_CRC_SIZE)
-		sink_crc.supported = true;
-	else
-		igt_info("Unexpected sink CRC error, rc=:%zd errno:%d %s\n",
-			 rc, errno_, strerror(errno_));
+	/* Do a first read to try to detect if it's supported. */
+	get_sink_crc(&crc, false);
 }
 
 static void setup_crcs(void)
@@ -1677,9 +1674,9 @@ static int adjust_assertion_flags(const struct test_mode *t, int flags)
 	igt_assert_crc_equal(&crc_.pipe, &wanted_crc->pipe);		\
 	if (mandatory_sink_crc)						\
 		assert_sink_crc_equal(&crc_.sink, &wanted_crc->sink);	\
-	else								\
-		if (!sink_crc_equal(&crc_.sink, &wanted_crc->sink))	\
-			igt_info("Sink CRC differ, but not required\n"); \
+	else if (sink_crc.reliable &&					\
+		 !sink_crc_equal(&crc_.sink, &wanted_crc->sink))	\
+		igt_info("Sink CRC differ, but not required\n"); 	\
 } while (0)
 
 #define do_status_assertions(flags_) do {				\
