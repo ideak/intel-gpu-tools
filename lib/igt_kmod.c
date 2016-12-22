@@ -359,8 +359,17 @@ static void tests_add(struct test_list *tl, struct igt_list *list)
 	igt_list_add_tail(&tl->link, &pos->link);
 }
 
+static int open_parameters(const char *module_name)
+{
+	char path[256];
+
+	snprintf(path, sizeof(path), "/sys/module/%s/parameters", module_name);
+	return open(path, O_RDONLY);
+}
+
 void igt_kselftests(const char *module_name,
 		    const char *module_options,
+		    const char *result,
 		    const char *filter)
 {
 	const char *param_prefix = "igt__";
@@ -432,12 +441,17 @@ void igt_kselftests(const char *module_name,
 					 tl->param, module_options ?: "");
 
 				err = modprobe(kmod, options);
-				kmod_module_remove_module(kmod, 0);
-
+				if (err == 0 && result) {
+					int dir = open_parameters(module_name);
+					igt_sysfs_scanf(dir, result, "%d", &err);
+					close(dir);
+				}
 				if (err == -ENOTTY) /* special case */
 					err = 0;
 				if (err)
 					kmsg_dump(kmsg);
+
+				kmod_module_remove_module(kmod, 0);
 
 				errno = 0;
 				igt_assert_f(err == 0,

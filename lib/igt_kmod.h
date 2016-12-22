@@ -37,6 +37,7 @@ int igt_i915_driver_unload(void);
 
 void igt_kselftests(const char *module_name,
 		    const char *module_options,
+		    const char *result_option,
 		    const char *filter);
 
 #endif /* IGT_KMOD_H */
