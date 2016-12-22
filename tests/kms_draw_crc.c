@@ -143,7 +143,6 @@ static void get_method_crc(enum igt_draw_method method, uint32_t drm_format,
 
 	igt_pipe_crc_collect_crc(pipe_crc, crc);
 
-	kmstest_unset_all_crtcs(drm_fd, drm_res);
 	igt_remove_fb(drm_fd, &fb);
 }
 
@@ -151,8 +150,6 @@ static void draw_method_subtest(enum igt_draw_method method,
 				uint32_t format_index, uint64_t tiling)
 {
 	igt_crc_t crc;
-
-	kmstest_unset_all_crtcs(drm_fd, drm_res);
 
 	/* Use IGT_DRAW_MMAP_GTT on an untiled buffer as the parameter for
 	 * comparison. Cache the value so we don't recompute it for every single
@@ -184,7 +181,6 @@ static void get_fill_crc(uint64_t tiling, igt_crc_t *crc)
 
 	igt_pipe_crc_collect_crc(pipe_crc, crc);
 
-	kmstest_unset_all_crtcs(drm_fd, drm_res);
 	igt_remove_fb(drm_fd, &fb);
 }
 
@@ -193,8 +189,6 @@ static void fill_fb_subtest(void)
 	int rc;
 	struct igt_fb fb;
 	igt_crc_t base_crc, crc;
-
-	kmstest_unset_all_crtcs(drm_fd, drm_res);
 
 	igt_create_fb(drm_fd, ms.mode->hdisplay, ms.mode->vdisplay,
 		      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, &fb);
@@ -214,7 +208,6 @@ static void fill_fb_subtest(void)
 	get_fill_crc(LOCAL_I915_FORMAT_MOD_X_TILED, &crc);
 	igt_assert_crc_equal(&crc, &base_crc);
 
-	kmstest_unset_all_crtcs(drm_fd, drm_res);
 	igt_remove_fb(drm_fd, &fb);
 }
 
