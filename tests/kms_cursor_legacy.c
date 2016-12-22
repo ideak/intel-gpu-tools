@@ -1012,7 +1012,7 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 
 		igt_assert_eq(read(display->drm_fd, &vbl, sizeof(vbl)), sizeof(vbl));
 		vblank_start = vblank_last = vbl.sequence;
-		for (int n = 0; n < vrefresh; n++) {
+		for (int n = 0; n < vrefresh / 2; n++) {
 			flip_nonblocking(display, pipe, mode >= flip_test_atomic, &fb_info);
 
 			igt_assert_eq(read(display->drm_fd, &vbl, sizeof(vbl)), sizeof(vbl));
@@ -1024,15 +1024,16 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 		}
 
 		if (!cursor_slowpath(mode))
-			igt_assert_lte(vbl.sequence, vblank_start + 5 * vrefresh / 4);
+			igt_assert_lte(vbl.sequence, vblank_start + 5 * vrefresh / 8);
 
 		shared[0] = 1;
 		igt_waitchildren();
-		igt_assert_f(shared[0] > vrefresh*target,
-			     "completed %lu cursor updated in a period of 60 flips, "
-			     "we expect to complete approximately %lu updateds, "
+		igt_assert_f(shared[0] > vrefresh*target / 2,
+			     "completed %lu cursor updated in a period of %u flips, "
+			     "we expect to complete approximately %lu updates, "
 			     "with the threshold set at %lu\n",
-			     shared[0], 2ul*vrefresh*target, vrefresh*target);
+			     shared[0], vrefresh / 2,
+			     vrefresh*target, vrefresh*target / 2);
 	}
 
 	do_cleanup_display(display);
@@ -1375,7 +1376,7 @@ igt_main
 		two_screens_flip_vs_cursor(&display, 150, false);
 
 	igt_subtest("2x-long-cursor-vs-flip-legacy")
-		two_screens_cursor_vs_flip(&display, 150, false);
+		two_screens_cursor_vs_flip(&display, 50, false);
 
 	igt_subtest("2x-nonblocking-modeset-vs-cursor-atomic")
 		two_screens_flip_vs_cursor(&display, 8, true);
@@ -1387,7 +1388,7 @@ igt_main
 		two_screens_flip_vs_cursor(&display, 150, true);
 
 	igt_subtest("2x-long-cursor-vs-nonblocking-modeset-atomic")
-		two_screens_cursor_vs_flip(&display, 150, true);
+		two_screens_cursor_vs_flip(&display, 50, true);
 
 	igt_subtest("flip-vs-cursor-crc-legacy")
 		flip_vs_cursor_crc(&display, false);
@@ -1435,7 +1436,7 @@ igt_main
 		igt_subtest_f("flip-vs-cursor-%s", modes[i])
 			flip_vs_cursor(&display, i, 150);
 		igt_subtest_f("cursor-vs-flip-%s", modes[i])
-			cursor_vs_flip(&display, i, 150);
+			cursor_vs_flip(&display, i, 50);
 
 		igt_subtest_f("cursorA-vs-flipA-%s", modes[i])
 			flip(&display, 0, 0, 10, i);
