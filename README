@@ -136,7 +136,9 @@ everything (package names may vary):
 	gtk-doc-tools
 	libcairo2-dev
 	libdrm-dev
+	libkmod-dev
 	libpciaccess-dev
+	libprocps-dev
 	libunwind-dev
 	python-docutils
 	x11proto-dri2-dev
