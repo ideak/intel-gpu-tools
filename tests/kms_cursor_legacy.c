@@ -1104,7 +1104,6 @@ static void two_screens_cursor_vs_flip(igt_display_t *display, int nloops, bool 
 		}
 		if (get_vblank(display->drm_fd, pipe, 0) == vblank_start)
 			break;
-		target /= 2;
 	}
 
 	/*
