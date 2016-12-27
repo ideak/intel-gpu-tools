@@ -651,6 +651,35 @@ static void basic_flip_cursor(igt_display_t *display,
 		igt_remove_fb(display->drm_fd, &cursor_fb2);
 }
 
+static int
+get_cursor_updates_per_vblank(igt_display_t *display, enum pipe pipe,
+			      struct drm_mode_cursor *arg)
+{
+	int target;
+
+	for (target = 65536; target; target /= 2) {
+		unsigned vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
+
+		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+
+		for (int n = 0; n < target; n++)
+			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, arg);
+		if (get_vblank(display->drm_fd, pipe, 0) == vblank_start)
+			break;
+	}
+
+	/*
+	  * Divide by 4, to handle variations in amount of vblanks
+	  * caused by cpufreq throttling.
+	  */
+	target /= 4;
+	igt_require(target > 1);
+
+	igt_debug("Using a target of %d cursor updates per quarter-vblank\n", target);
+
+	return target;
+}
+
 static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloops)
 {
 	struct drm_mode_cursor arg[2];
@@ -673,21 +702,9 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	if (nloops) {
-		target = 4096;
-		do {
-			vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
-			igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
-			for (int n = 0; n < target; n++)
-				do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
-			target /= 2;
-			if (get_vblank(display->drm_fd, pipe, 0) == vblank_start)
-				break;
-		} while (target);
-		igt_require(target > 1);
-
-		igt_debug("Using a target of %d cursor updates per half-vblank\n", target);
-	} else
+	if (nloops)
+		target = get_cursor_updates_per_vblank(display, pipe, &arg[0]);
+	else
 		target = 1;
 
 	vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
@@ -973,20 +990,7 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	target = 4096;
-	do {
-		vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
-		for (int n = 0; n < target; n++)
-			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
-		target /= 2;
-		if (get_vblank(display->drm_fd, pipe, 0) == vblank_start)
-			break;
-	} while (target);
-	igt_require(target > 1);
-
-	igt_debug("Using a target of %ld cursor updates per half-vblank (%u)\n",
-		  target, vrefresh);
+	target = get_cursor_updates_per_vblank(display, pipe, &arg[0]);
 
 	for (int i = 0; i < nloops; i++) {
 		shared[0] = 0;
@@ -1088,8 +1092,7 @@ static void two_screens_cursor_vs_flip(igt_display_t *display, int nloops, bool 
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	target = 4096;
-	do {
+	for (target = 65536; target; target /= 2) {
 		vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
 		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 
@@ -1099,14 +1102,21 @@ static void two_screens_cursor_vs_flip(igt_display_t *display, int nloops, bool 
 		for (int n = 0; n < target; n++) {
 			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 		}
-		target /= 2;
 		if (get_vblank(display->drm_fd, pipe, 0) == vblank_start)
 			break;
-	} while (target);
-	igt_require(target > 1);
+		target /= 2;
+	}
 
-	igt_debug("Using a target of %d cursor updates per half-vblank\n",
+	/*
+	  * Divide by 4, to handle variations in amount of vblanks
+	  * caused by cpufreq throttling.
+	  */
+	target /= 4;
+
+	igt_debug("Using a target of %d cursor updates per quarter-vblank\n",
 		  target);
+
+	igt_require(target > 1);
 
 	for (int i = 0; i < nloops; i++) {
 		shared[0] = 0;
