@@ -353,6 +353,8 @@ void igt_output_override_mode(igt_output_t *output, drmModeModeInfo *mode);
 void igt_output_set_pipe(igt_output_t *output, enum pipe pipe);
 void igt_output_set_scaling_mode(igt_output_t *output, uint64_t scaling_mode);
 igt_plane_t *igt_output_get_plane(igt_output_t *output, enum igt_plane plane);
+igt_output_t *igt_output_from_connector(igt_display_t *display,
+					drmModeConnector *connector);
 bool igt_pipe_get_property(igt_pipe_t *pipe, const char *name,
 			   uint32_t *prop_id, uint64_t *value,
 			   drmModePropertyPtr *prop);

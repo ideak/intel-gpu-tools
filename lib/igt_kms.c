@@ -1686,6 +1686,32 @@ int igt_display_get_n_pipes(igt_display_t *display)
 	return display->n_pipes;
 }
 
+/**
+ * igt_output_from_connector:
+ * @display: a pointer to an #igt_display_t structure
+ * @connector: a pointer to a drmModeConnector
+ *
+ * Finds the output corresponding to the given connector
+ *
+ * Returns: A #igt_output_t structure configured to use the connector, or NULL
+ * if none was found
+ */
+igt_output_t *igt_output_from_connector(igt_display_t *display,
+					drmModeConnector *connector)
+{
+	igt_output_t *output, *found = NULL;
+
+	for_each_connected_output(display, output) {
+		if (output->config.connector->connector_id ==
+		    connector->connector_id) {
+			found = output;
+			break;
+		}
+	}
+
+	return found;
+}
+
 static void igt_pipe_fini(igt_pipe_t *pipe)
 {
 	int i;
