@@ -243,7 +243,7 @@ static void create_userptr_require(const struct create *create, unsigned count)
 			has_userptr = drmIoctl(fd,
 					 LOCAL_IOCTL_I915_GEM_USERPTR,
 					 &arg) == 0;
-			free((void *)(uintptr_t)arg.user_ptr);
+			free(from_user_pointer(arg.user_ptr));
 		}
 
 	}
@@ -275,7 +275,7 @@ userptr_create_bo(const struct buffers *b)
 					userptr.user_size, 0);
 	igt_assert(bo);
 #endif
-	bo->virtual = (void *)(uintptr_t)userptr.user_ptr;
+	bo->virtual = from_user_pointer(userptr.user_ptr);
 
 	return bo;
 }

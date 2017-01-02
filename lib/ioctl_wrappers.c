@@ -735,7 +735,7 @@ void *__gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, un
 		return NULL;
 
 	errno = 0;
-	return (void *)(uintptr_t)arg.addr_ptr;
+	return from_user_pointer(arg.addr_ptr);
 }
 
 /**
@@ -782,7 +782,7 @@ void *__gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, u
 		return NULL;
 
 	errno = 0;
-	return (void *)(uintptr_t)mmap_arg.addr_ptr;
+	return from_user_pointer(mmap_arg.addr_ptr);
 }
 
 /**

@@ -142,7 +142,7 @@ igt_main
 		arg.size = OBJECT_SIZE;
 		ret = ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg);
 		igt_assert(ret == 0);
-		addr = (uint8_t *)(uintptr_t)arg.addr_ptr;
+		addr = from_user_pointer(arg.addr_ptr);
 
 		igt_info("Testing contents of newly created object.\n");
 		memset(expected, 0, sizeof(expected));
