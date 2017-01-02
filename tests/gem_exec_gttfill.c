@@ -65,7 +65,7 @@ static void submit(int fd, int gen,
 	unsigned n;
 
 	memset(&obj, 0, sizeof(obj));
-	obj.relocs_ptr = (uintptr_t)reloc;
+	obj.relocs_ptr = to_user_pointer(reloc);
 	obj.relocation_count = 2;
 
 	memset(reloc, 0, 2*sizeof(*reloc));
@@ -97,7 +97,7 @@ static void submit(int fd, int gen,
 	batch[++n] = 0; /* upper_32_bits(value) / nop */
 	batch[++n] = MI_BATCH_BUFFER_END;
 
-	eb->buffers_ptr = (uintptr_t)&obj;
+	eb->buffers_ptr = to_user_pointer(&obj);
 	for (unsigned i = 0; i < count; i++) {
 		obj.handle = handles[i];
 		reloc[0].target_handle = obj.handle;

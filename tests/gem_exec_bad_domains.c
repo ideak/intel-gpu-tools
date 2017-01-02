@@ -111,7 +111,7 @@ static void multi_write_domain(int fd)
 
 	exec[1].handle = handle;
 	exec[1].relocation_count = 1;
-	exec[1].relocs_ptr = (uintptr_t) reloc;
+	exec[1].relocs_ptr = to_user_pointer(reloc);
 	exec[1].alignment = 0;
 	exec[1].offset = 0;
 	exec[1].flags = 0;
@@ -125,7 +125,7 @@ static void multi_write_domain(int fd)
 	reloc[0].write_domain = I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION;
 	reloc[0].presumed_offset = 0;
 
-	execbuf.buffers_ptr = (uintptr_t)exec;
+	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = 2;
 	execbuf.batch_start_offset = 0;
 	execbuf.batch_len = 8;

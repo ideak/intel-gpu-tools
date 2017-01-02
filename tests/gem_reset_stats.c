@@ -85,7 +85,7 @@ static int noop(int fd, uint32_t ctx, const struct intel_execution_engine *e)
 	gem_write(fd, exec.handle, 0, &bbe, sizeof(bbe));
 
 	memset(&eb, 0, sizeof(eb));
-	eb.buffers_ptr = (uintptr_t)&exec;
+	eb.buffers_ptr = to_user_pointer(&exec);
 	eb.buffer_count = 1;
 	eb.flags = e->exec_id | e->flags;
 	i915_execbuffer2_set_context_id(eb, ctx);
@@ -522,7 +522,7 @@ static void noop_on_each_ring(int fd, const bool reverse)
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
 	memset(&eb, 0, sizeof(eb));
-	eb.buffers_ptr = (uintptr_t)&obj;
+	eb.buffers_ptr = to_user_pointer(&obj);
 	eb.buffer_count = 1;
 
 	if (reverse) {

@@ -183,9 +183,9 @@ static void do_read_registers(int fd,
 
 	obj[1].handle = handle;
 	obj[1].relocation_count = size;
-	obj[1].relocs_ptr = (uintptr_t) reloc;
+	obj[1].relocs_ptr = to_user_pointer(reloc);
 
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.batch_len =
 		create_read_batch(reloc, batch, dst_handle, size, reg_base);
@@ -236,7 +236,7 @@ static void write_registers(int fd,
 
 	obj.handle = handle;
 
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.batch_len = create_write_batch(batch, values, size, reg_base);
 	i915_execbuffer2_set_context_id(execbuf, ctx_id);

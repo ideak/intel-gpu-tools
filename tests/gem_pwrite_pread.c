@@ -82,10 +82,10 @@ static inline void build_batch(uint32_t *batch, int len, uint32_t *batch_len)
 	struct drm_i915_gem_exec_object2 exec[] = { \
 		{ src }, \
 		{ dst }, \
-		{ gem_create(fd, 4096), 2, (uintptr_t)reloc } \
+		{ gem_create(fd, 4096), 2, to_user_pointer(reloc) } \
 	}; \
 	struct drm_i915_gem_execbuffer2 execbuf = { \
-		(uintptr_t)exec, 3, \
+		to_user_pointer(exec), 3, \
 		0, 0, \
 		0, 0, 0, 0, \
 		exec_flags, \

@@ -98,9 +98,9 @@ static void busy(data_t *data, uint32_t handle, int size, int loops)
 	drmIoctl(data->fd, DRM_IOCTL_I915_GEM_CREATE, &create);
 	gem_exec[1].handle = create.handle;
 	gem_exec[1].relocation_count = 20;
-	gem_exec[1].relocs_ptr = (uintptr_t)reloc;
+	gem_exec[1].relocs_ptr = to_user_pointer(reloc);
 
-	execbuf.buffers_ptr = (uintptr_t)gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = 2;
 	execbuf.batch_len = (b - buf) * sizeof(buf[0]);
 	execbuf.flags = 1 << 11;
@@ -110,7 +110,7 @@ static void busy(data_t *data, uint32_t handle, int size, int loops)
 	gem_pwrite.handle = gem_exec[1].handle;
 	gem_pwrite.offset = 0;
 	gem_pwrite.size = execbuf.batch_len;
-	gem_pwrite.data_ptr = (uintptr_t)buf;
+	gem_pwrite.data_ptr = to_user_pointer(buf);
 	if (drmIoctl(data->fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite) == 0) {
 		while (loops--)
 			drmIoctl(data->fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf);

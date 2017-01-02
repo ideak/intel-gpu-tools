@@ -50,7 +50,7 @@ static void store_dword(int fd, unsigned ring)
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
 	if (gen < 6)
@@ -67,7 +67,7 @@ static void store_dword(int fd, unsigned ring)
 	reloc.delta = 0;
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-	obj[1].relocs_ptr = (uintptr_t)&reloc;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
 	obj[1].relocation_count = 1;
 
 	i = 0;
@@ -109,7 +109,7 @@ static void store_all(int fd)
 	int i, j;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
@@ -155,7 +155,7 @@ static void store_all(int fd)
 		reloc[j].delta = nengine*sizeof(uint32_t);
 		reloc[j].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 		reloc[j].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-		obj[1].relocs_ptr = (uintptr_t)&reloc[j];
+		obj[1].relocs_ptr = to_user_pointer(&reloc[j]);
 
 		batch[value] = 0xdeadbeef;
 		gem_write(fd, obj[1].handle, j*sizeof(batch),
@@ -170,7 +170,7 @@ static void store_all(int fd)
 		reloc[j].delta = nengine*sizeof(uint32_t);
 		reloc[j].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 		reloc[j].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-		obj[1].relocs_ptr = (uintptr_t)&reloc[j];
+		obj[1].relocs_ptr = to_user_pointer(&reloc[j]);
 
 		batch[value] = nengine;
 		gem_write(fd, obj[1].handle, j*sizeof(batch),
@@ -183,7 +183,7 @@ static void store_all(int fd)
 	gem_sync(fd, obj[1].handle);
 
 	for (i = 0; i < nengine; i++) {
-		obj[1].relocs_ptr = (uintptr_t)&reloc[2*i];
+		obj[1].relocs_ptr = to_user_pointer(&reloc[2*i]);
 		execbuf.batch_start_offset = 2*i*sizeof(batch);
 		memcpy(permuted, engines, nengine*sizeof(engines[0]));
 		igt_permute_array(permuted, nengine, igt_exchange_int);
@@ -192,7 +192,7 @@ static void store_all(int fd)
 			execbuf.flags |= permuted[j];
 			gem_execbuf(fd, &execbuf);
 		}
-		obj[1].relocs_ptr = (uintptr_t)&reloc[2*i+1];
+		obj[1].relocs_ptr = to_user_pointer(&reloc[2*i+1]);
 		execbuf.batch_start_offset = (2*i+1)*sizeof(batch);
 		execbuf.flags &= ~ENGINE_MASK;
 		execbuf.flags |= engines[i];

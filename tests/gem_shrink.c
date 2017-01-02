@@ -87,7 +87,7 @@ static void execbuf1(int fd, uint64_t alloc)
 
 	memset(&obj, 0, sizeof(obj));
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 
 	obj.handle = gem_create(fd, alloc);
@@ -138,7 +138,7 @@ static void execbufN(int fd, uint64_t alloc)
 		int j = count - i;
 
 		obj[j].handle = gem_create(fd, 1 << 20);
-		execbuf.buffers_ptr = (uintptr_t)&obj[j];
+		execbuf.buffers_ptr = to_user_pointer(&obj[j]);
 		execbuf.buffer_count = i + 1;
 		gem_execbuf(fd, &execbuf);
 	}
@@ -166,7 +166,7 @@ static void hang(int fd, uint64_t alloc)
 		int j = count - i;
 
 		obj[j].handle = gem_create(fd, 1 << 20);
-		execbuf.buffers_ptr = (uintptr_t)&obj[j];
+		execbuf.buffers_ptr = to_user_pointer(&obj[j]);
 		execbuf.buffer_count = i + 1;
 		gem_execbuf(fd, &execbuf);
 	}
@@ -191,7 +191,7 @@ static void userptr(int fd, uint64_t alloc)
 
 	memset(&userptr, 0, sizeof(userptr));
 	userptr.user_size = alloc;
-	userptr.user_ptr = (uintptr_t)ptr;
+	userptr.user_ptr = to_user_pointer(ptr);
 	do_ioctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr);
 
 	gem_set_domain(fd, userptr.handle, I915_GEM_DOMAIN_GTT, 0);

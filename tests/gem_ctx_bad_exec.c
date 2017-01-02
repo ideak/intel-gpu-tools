@@ -34,7 +34,7 @@ static int exec(int fd, unsigned ring)
 	memset(&obj, 0, sizeof(obj));
 	memset(&execbuf, 0, sizeof(execbuf));
 
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	i915_execbuffer2_set_context_id(execbuf, 1);
 

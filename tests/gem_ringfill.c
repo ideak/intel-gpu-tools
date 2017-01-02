@@ -102,7 +102,7 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 	gem_quiescent_gpu(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.flags = ring | (1 << 11) | (1 << 12);
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
@@ -116,7 +116,7 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 	obj[0].flags |= EXEC_OBJECT_WRITE;
 	obj[1].handle = gem_create(fd, 1024*16 + 4096);
 
-	obj[1].relocs_ptr = (uintptr_t)reloc;
+	obj[1].relocs_ptr = to_user_pointer(reloc);
 	obj[1].relocation_count = 1024;
 
 	batch = gem_mmap__cpu(fd, obj[1].handle, 0, 16*1024 + 4096,

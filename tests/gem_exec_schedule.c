@@ -64,7 +64,7 @@ static void store_dword(int fd, uint32_t ctx, unsigned ring,
 	int i;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)(obj + !cork);
+	execbuf.buffers_ptr = to_user_pointer(obj + !cork);
 	execbuf.buffer_count = 2 + !!cork;
 	execbuf.flags = ring;
 	if (gen < 6)
@@ -83,7 +83,7 @@ static void store_dword(int fd, uint32_t ctx, unsigned ring,
 	reloc.delta = offset;
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 	reloc.write_domain = write_domain;
-	obj[2].relocs_ptr = (uintptr_t)&reloc;
+	obj[2].relocs_ptr = to_user_pointer(&reloc);
 	obj[2].relocation_count = 1;
 
 	i = 0;
@@ -116,7 +116,7 @@ static uint32_t *make_busy(int fd, uint32_t target, unsigned ring)
 	int i;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)(obj + !target);
+	execbuf.buffers_ptr = to_user_pointer(obj + !target);
 	execbuf.buffer_count = 1 + !!target;
 
 	memset(obj, 0, sizeof(obj));
@@ -126,7 +126,7 @@ static uint32_t *make_busy(int fd, uint32_t target, unsigned ring)
 	gem_set_domain(fd, obj[1].handle,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
-	obj[1].relocs_ptr = (uintptr_t)reloc;
+	obj[1].relocs_ptr = to_user_pointer(reloc);
 	obj[1].relocation_count = 1 + !!target;
 	memset(reloc, 0, sizeof(reloc));
 

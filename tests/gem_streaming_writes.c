@@ -101,7 +101,7 @@ static void test_streaming(int fd, int mode, int sync)
 
 	gem_write(fd, dst, 0, tmp, sizeof(tmp));
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)exec;
+	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = 2;
 	execbuf.flags = LOCAL_I915_EXEC_HANDLE_LUT;
 	if (__gem_execbuf(fd, &execbuf)) {
@@ -205,7 +205,7 @@ static void test_streaming(int fd, int mode, int sync)
 
 			b = offset / CHUNK_SIZE / 64;
 			n = offset / CHUNK_SIZE % 64;
-			exec[BATCH].relocs_ptr = (uintptr_t)(reloc + 2*n);
+			exec[BATCH].relocs_ptr = to_user_pointer((reloc + 2*n));
 			exec[BATCH].handle = batch[b].handle;
 			exec[BATCH].offset = batch[b].offset;
 			execbuf.batch_start_offset = 64*n;
@@ -272,7 +272,7 @@ static void test_batch(int fd, int mode, int reverse)
 	reloc[1].write_domain = 0;
 
 	batch_size = ALIGN(OBJECT_SIZE / CHUNK_SIZE * 128, 4096);
-	exec[BATCH].relocs_ptr = (uintptr_t)reloc;
+	exec[BATCH].relocs_ptr = to_user_pointer(reloc);
 	exec[BATCH].relocation_count = 2;
 	exec[BATCH].handle = gem_create(fd, batch_size);
 
@@ -295,7 +295,7 @@ static void test_batch(int fd, int mode, int reverse)
 
 	gem_write(fd, exec[BATCH].handle, 0, tmp, sizeof(tmp));
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)exec;
+	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = 3;
 	execbuf.flags = LOCAL_I915_EXEC_HANDLE_LUT;
 	if (gem_has_blt(fd))

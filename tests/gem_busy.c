@@ -117,11 +117,11 @@ static uint32_t busy_blt(int fd)
 	igt_assert(r - reloc <= ARRAY_SIZE(reloc));
 	munmap(map, 4096);
 
-	object[1].relocs_ptr = (uintptr_t)reloc;
+	object[1].relocs_ptr = to_user_pointer(reloc);
 	object[1].relocation_count = r - reloc;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (unsigned long)object;
+	execbuf.buffers_ptr = to_user_pointer(object);
 	execbuf.buffer_count = 2;
 	if (gen >= 6)
 		execbuf.flags = I915_EXEC_BLT;
@@ -149,7 +149,7 @@ static bool exec_noop(int fd,
 	exec[2].handle = handles[BATCH];
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)exec;
+	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = 3;
 	execbuf.flags = ring;
 	igt_debug("Queuing handle for %s on ring %d\n",
@@ -236,7 +236,7 @@ static void one(int fd, unsigned ring, uint32_t flags, unsigned test_flags)
 	int i, count, timeout;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring | flags;
 	if (gen < 6)
@@ -246,7 +246,7 @@ static void one(int fd, unsigned ring, uint32_t flags, unsigned test_flags)
 	obj[SCRATCH].handle = gem_create(fd, 4096);
 
 	obj[BATCH].handle = gem_create(fd, size);
-	obj[BATCH].relocs_ptr = (uintptr_t)store;
+	obj[BATCH].relocs_ptr = to_user_pointer(store);
 	obj[BATCH].relocation_count = ARRAY_SIZE(store);
 	memset(store, 0, sizeof(store));
 
@@ -469,13 +469,13 @@ static bool has_extended_busy_ioctl(int fd)
 	int i;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
 
-	obj.relocs_ptr = (uintptr_t)&reloc;
+	obj.relocs_ptr = to_user_pointer(&reloc);
 	obj.relocation_count = 1;
 	memset(&reloc, 0, sizeof(reloc));
 
@@ -533,14 +533,14 @@ static void basic(int fd, unsigned ring, unsigned flags)
 	bool busy;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.flags = ring;
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
 
-	obj.relocs_ptr = (uintptr_t)&reloc;
+	obj.relocs_ptr = to_user_pointer(&reloc);
 	obj.relocation_count = 1;
 	memset(&reloc, 0, sizeof(reloc));
 

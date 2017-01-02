@@ -113,7 +113,7 @@ static int has_engine(int fd, const struct intel_execution_engine *e, uint32_t c
 	gem_write(fd, exec.handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&exec;
+	execbuf.buffers_ptr = to_user_pointer(&exec);
 	execbuf.buffer_count = 1;
 	execbuf.flags = e->exec_id | e->flags;
 	execbuf.rsvd1 = ctx;
@@ -185,7 +185,7 @@ static void single(const char *name, bool all_engines)
 		if (gen >= 4 && gen < 8)
 			reloc[n].offset += sizeof(uint32_t);
 
-		obj[2*n + 1].relocs_ptr = (uintptr_t)&reloc[n];
+		obj[2*n + 1].relocs_ptr = to_user_pointer(&reloc[n]);
 		obj[2*n + 1].relocation_count = 1;
 	}
 
@@ -225,7 +225,7 @@ static void single(const char *name, bool all_engines)
 			obj[2*r + 1].handle = handle;
 
 			memset(&execbuf, 0, sizeof(execbuf));
-			execbuf.buffers_ptr = (uintptr_t)&obj[2*r];
+			execbuf.buffers_ptr = to_user_pointer(&obj[2*r]);
 			execbuf.buffer_count = 2;
 			execbuf.flags = engines[n % num_engines];
 			execbuf.rsvd1 = all[n];
@@ -319,7 +319,7 @@ static void processes(void)
 
 		memset(&obj, 0, sizeof(obj));
 		memset(&execbuf, 0, sizeof(execbuf));
-		execbuf.buffers_ptr = (uintptr_t)&obj;
+		execbuf.buffers_ptr = to_user_pointer(&obj);
 		execbuf.buffer_count = 1;
 
 		igt_permute_array(fds, num_ctx, xchg_int);
@@ -356,7 +356,7 @@ static void *thread(void *data)
 	obj.handle = t->batch;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 
 	ctx = malloc(t->num_ctx * sizeof(uint32_t));

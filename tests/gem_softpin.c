@@ -50,7 +50,7 @@ static void test_invalid(int fd)
 	struct drm_i915_gem_exec_object2 object;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&object;
+	execbuf.buffers_ptr = to_user_pointer(&object);
 	execbuf.buffer_count = 1;
 
 	memset(&object, 0, sizeof(object));
@@ -107,7 +107,7 @@ static void test_softpin(int fd)
 	last_handle = gem_create(fd, size);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&object;
+	execbuf.buffers_ptr = to_user_pointer(&object);
 	execbuf.buffer_count = 1;
 	for (loop = 0; loop < 1024; loop++) {
 		memset(&object, 0, sizeof(object));
@@ -154,7 +154,7 @@ static void test_overlap(int fd)
 
 	/* Find a hole */
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)object;
+	execbuf.buffers_ptr = to_user_pointer(object);
 	execbuf.buffer_count = 1;
 	gem_execbuf(fd, &execbuf);
 
@@ -217,7 +217,7 @@ static uint64_t busy_batch(int fd)
 	*map = MI_BATCH_BUFFER_END;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)object;
+	execbuf.buffers_ptr = to_user_pointer(object);
 	execbuf.buffer_count = 2;
 	if (gen >= 6)
 		execbuf.flags = I915_EXEC_BLT;
@@ -272,7 +272,7 @@ static void test_evict_active(int fd)
 	gem_write(fd, object.handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&object;
+	execbuf.buffers_ptr = to_user_pointer(&object);
 	execbuf.buffer_count = 1;
 
 	expected = busy_batch(fd);
@@ -297,7 +297,7 @@ static void test_evict_snoop(int fd)
 	igt_require(!gem_uses_ppgtt(fd));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)object;
+	execbuf.buffers_ptr = to_user_pointer(object);
 	execbuf.buffer_count = 1;
 
 	/* Find a hole */
@@ -356,7 +356,7 @@ static void test_evict_hang(int fd)
 	gem_write(fd, object.handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&object;
+	execbuf.buffers_ptr = to_user_pointer(&object);
 	execbuf.buffer_count = 1;
 
 	hang = igt_hang_ctx(fd, 0, 0, 0, (uint64_t *)&expected);
@@ -400,7 +400,7 @@ static void test_noreloc(int fd, enum sleep sleep)
 
 	/* Find a hole */
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)object;
+	execbuf.buffers_ptr = to_user_pointer(object);
 	execbuf.buffer_count = 1;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;

@@ -38,7 +38,7 @@ static void noop(int fd, unsigned ring)
 	gem_write(fd, exec.handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&exec;
+	execbuf.buffers_ptr = to_user_pointer(&exec);
 	execbuf.buffer_count = 1;
 	execbuf.flags = ring;
 	gem_execbuf(fd, &execbuf);
@@ -60,7 +60,7 @@ static void readonly(int fd, unsigned ring)
 	execbuf = mmap(NULL, 4096, PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
 	igt_assert(execbuf != NULL);
 
-	execbuf->buffers_ptr = (uintptr_t)&exec;
+	execbuf->buffers_ptr = to_user_pointer(&exec);
 	execbuf->buffer_count = 1;
 	execbuf->flags = ring;
 	igt_assert(mprotect(execbuf, 4096, PROT_READ) == 0);
@@ -89,7 +89,7 @@ static void gtt(int fd, unsigned ring)
 	exec->handle = gem_create(fd, 4096);
 	gem_write(fd, exec->handle, 0, &bbe, sizeof(bbe));
 
-	execbuf->buffers_ptr = (uintptr_t)exec;
+	execbuf->buffers_ptr = to_user_pointer(exec);
 	execbuf->buffer_count = 1;
 	execbuf->flags = ring;
 

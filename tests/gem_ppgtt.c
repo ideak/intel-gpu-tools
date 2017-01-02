@@ -208,7 +208,7 @@ static uint64_t exec_and_get_offset(int fd, uint32_t batch)
 	exec[0].handle = batch;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)exec;
+	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = 1;
 
 	gem_execbuf(fd, &execbuf);

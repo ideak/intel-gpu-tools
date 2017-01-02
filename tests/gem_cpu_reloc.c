@@ -90,10 +90,10 @@ static void copy(int fd, uint32_t batch, uint32_t src, uint32_t dst)
 	gem_exec[1].handle = dst;
 	gem_exec[2].handle = batch;
 	gem_exec[2].relocation_count = 2;
-	gem_exec[2].relocs_ptr = (uintptr_t)gem_reloc;
+	gem_exec[2].relocs_ptr = to_user_pointer(gem_reloc);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = 3;
 	execbuf.batch_len = 4096;
 	execbuf.flags = use_blt;
@@ -110,7 +110,7 @@ static void exec(int fd, uint32_t handle)
 	gem_exec.handle = handle;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(&gem_exec);
 	execbuf.buffer_count = 1;
 	execbuf.batch_len = 4096;
 

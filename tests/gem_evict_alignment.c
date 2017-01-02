@@ -108,9 +108,9 @@ copy(int fd, uint32_t dst, uint32_t src, uint32_t *all_bo,
 	}
 	obj[n].handle = handle;
 	obj[n].relocation_count = 2;
-	obj[n].relocs_ptr = (uintptr_t)reloc;
+	obj[n].relocs_ptr = to_user_pointer(reloc);
 
-	exec.buffers_ptr = (uintptr_t)obj;
+	exec.buffers_ptr = to_user_pointer(obj);
 	exec.buffer_count = n_bo + 1;
 	exec.batch_start_offset = 0;
 	exec.batch_len = i * 4;

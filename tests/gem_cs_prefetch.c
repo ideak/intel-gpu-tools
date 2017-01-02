@@ -118,11 +118,11 @@ static void test_ring(unsigned ring)
 	/* Fill the entire gart with batches and run them. */
 	memset(obj, 0, sizeof(obj));
 	obj[1].handle = shadow.handle;
-	obj[1].relocs_ptr = (uintptr_t)&shadow.reloc;
+	obj[1].relocs_ptr = to_user_pointer(&shadow.reloc);
 	obj[1].relocation_count = 1;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.flags = ring;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;

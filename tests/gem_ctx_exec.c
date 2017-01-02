@@ -63,7 +63,7 @@ static int exec(int fd, uint32_t handle, int ring, int ctx_id)
 	gem_exec.rsvd1 = 0;
 	gem_exec.rsvd2 = 0;
 
-	execbuf.buffers_ptr = (uintptr_t)&gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(&gem_exec);
 	execbuf.buffer_count = 1;
 	execbuf.batch_start_offset = 0;
 	execbuf.batch_len = 8;
@@ -103,7 +103,7 @@ static void big_exec(int fd, uint32_t handle, int ring)
 	gem_exec[0].handle = handle;
 
 
-	execbuf.buffers_ptr = (uintptr_t)gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = num_buffers + 1;
 	execbuf.batch_start_offset = 0;
 	execbuf.batch_len = 8;

@@ -171,14 +171,14 @@ static void faulting_reloc_and_emit(int fd, drm_intel_bo *target_bo,
 	exec[1].handle = special_bo->handle;
 	exec[1].relocation_count = 1;
 	/* A newly mmap gtt bo will fault on first access. */
-	exec[1].relocs_ptr = (uintptr_t)gtt_relocs;
+	exec[1].relocs_ptr = to_user_pointer(gtt_relocs);
 	exec[1].alignment = 0;
 	exec[1].offset = 0;
 	exec[1].flags = 0;
 	exec[1].rsvd1 = 0;
 	exec[1].rsvd2 = 0;
 
-	execbuf.buffers_ptr = (uintptr_t)exec;
+	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = 2;
 	execbuf.batch_start_offset = 0;
 	execbuf.batch_len = special_batch_len;

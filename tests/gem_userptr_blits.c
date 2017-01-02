@@ -143,9 +143,9 @@ copy(int fd, uint32_t dst, uint32_t src, unsigned int error)
 		obj[exec.buffer_count++].handle = src;
 	obj[exec.buffer_count].handle = handle;
 	obj[exec.buffer_count].relocation_count = 2;
-	obj[exec.buffer_count].relocs_ptr = (uintptr_t)reloc;
+	obj[exec.buffer_count].relocs_ptr = to_user_pointer(reloc);
 	exec.buffer_count++;
-	exec.buffers_ptr = (uintptr_t)obj;
+	exec.buffers_ptr = to_user_pointer(obj);
 	exec.flags = HAS_BLT_RING(intel_get_drm_devid(fd)) ? I915_EXEC_BLT : 0;
 
 	ret = __gem_execbuf(fd, &exec);
@@ -215,9 +215,9 @@ blit(int fd, uint32_t dst, uint32_t src, uint32_t *all_bo, int n_bo)
 		obj[n].handle = all_bo[n];
 	obj[n].handle = handle;
 	obj[n].relocation_count = 2;
-	obj[n].relocs_ptr = (uintptr_t)reloc;
+	obj[n].relocs_ptr = to_user_pointer(reloc);
 
-	exec.buffers_ptr = (uintptr_t)obj;
+	exec.buffers_ptr = to_user_pointer(obj);
 	exec.buffer_count = n_bo + 1;
 	exec.flags = HAS_BLT_RING(intel_get_drm_devid(fd)) ? I915_EXEC_BLT : 0;
 
@@ -590,7 +590,7 @@ static int test_forbidden_ops(int fd)
 	gem_pread.handle = handle;
 	gem_pread.offset = 0;
 	gem_pread.size = PAGE_SIZE;
-	gem_pread.data_ptr = (uintptr_t)ptr;
+	gem_pread.data_ptr = to_user_pointer(ptr);
 	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_PREAD, &gem_pread))
 		igt_assert_eq(errno, EINVAL);
 
@@ -598,7 +598,7 @@ static int test_forbidden_ops(int fd)
 	gem_pwrite.handle = handle;
 	gem_pwrite.offset = 0;
 	gem_pwrite.size = PAGE_SIZE;
-	gem_pwrite.data_ptr = (uintptr_t)ptr;
+	gem_pwrite.data_ptr = to_user_pointer(ptr);
 	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite))
 		igt_assert_eq(errno, EINVAL);
 
@@ -627,7 +627,7 @@ static void test_relocations(int fd)
 	*(uint32_t *)ptr = MI_BATCH_BUFFER_END;
 
 	reloc = (typeof(reloc))((char *)ptr + PAGE_SIZE);
-	obj.relocs_ptr = (uintptr_t)reloc;
+	obj.relocs_ptr = to_user_pointer(reloc);
 	obj.relocation_count = 256;
 
 	memset(reloc, 0, 256*sizeof(*reloc));
@@ -638,7 +638,7 @@ static void test_relocations(int fd)
 	}
 
 	memset(&exec, 0, sizeof(exec));
-	exec.buffers_ptr = (uintptr_t)&obj;
+	exec.buffers_ptr = to_user_pointer(&obj);
 	exec.buffer_count = 1;
 	gem_execbuf(fd, &exec);
 

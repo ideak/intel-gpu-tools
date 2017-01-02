@@ -59,13 +59,13 @@ sync_loop(int fd)
 	gem_write(fd, object[1].handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)object;
+	execbuf.buffers_ptr = to_user_pointer(object);
 	execbuf.buffer_count = 2;
 
 	/* Check if we have no-reloc support first */
 	if (__gem_execbuf(fd, &execbuf)) {
 		object[0].flags = 0;
-		object[1].relocs_ptr = (uintptr_t)reloc;
+		object[1].relocs_ptr = to_user_pointer(reloc);
 		object[1].relocation_count = 1;
 
 		/* Add a dummy relocation to mark the object as writing */

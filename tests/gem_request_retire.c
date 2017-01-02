@@ -127,9 +127,9 @@ blit(int fd, uint32_t dst, uint32_t src, uint32_t ctx_id)
 		obj[exec.buffer_count++].handle = src;
 	obj[exec.buffer_count].handle = handle;
 	obj[exec.buffer_count].relocation_count = 2 * copies;
-	obj[exec.buffer_count].relocs_ptr = (uintptr_t)reloc;
+	obj[exec.buffer_count].relocs_ptr = to_user_pointer(reloc);
 	exec.buffer_count++;
-	exec.buffers_ptr = (uintptr_t)obj;
+	exec.buffers_ptr = to_user_pointer(obj);
 
 	exec.batch_len = i * sizeof(uint32_t);
 	exec.flags = I915_EXEC_BLT;
@@ -163,9 +163,9 @@ noop(int fd, uint32_t src, uint32_t ctx_id)
 	obj[exec.buffer_count++].handle = src;
 	obj[exec.buffer_count].handle = handle;
 	obj[exec.buffer_count].relocation_count = 0;
-	obj[exec.buffer_count].relocs_ptr = (uintptr_t)0;
+	obj[exec.buffer_count].relocs_ptr = to_user_pointer(0);
 	exec.buffer_count++;
-	exec.buffers_ptr = (uintptr_t)obj;
+	exec.buffers_ptr = to_user_pointer(obj);
 
 	exec.batch_len = i * sizeof(uint32_t);
 	exec.flags = I915_EXEC_RENDER;

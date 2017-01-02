@@ -86,10 +86,10 @@ static void write_dword(int fd,
 	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 	obj[1].relocation_count = 1;
-	obj[1].relocs_ptr = (uintptr_t)&reloc;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = I915_EXEC_SECURE;
 	gem_execbuf(fd, &execbuf);
@@ -155,13 +155,13 @@ static void from_mmap(int fd, uint64_t size, enum mode mode)
 		relocs[i].write_domain = 0;
 	}
 	obj.relocation_count = max;
-	obj.relocs_ptr = (uintptr_t)relocs;
+	obj.relocs_ptr = to_user_pointer(relocs);
 
 	if (mode & RO)
 		mprotect(relocs, size, PROT_READ);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	while (relocs[0].presumed_offset == ~0ull && retry--)
 		gem_execbuf(fd, &execbuf);
@@ -213,10 +213,10 @@ static void from_gpu(int fd)
 	gem_close(fd, reloc_handle);
 
 	obj.relocation_count = 1;
-	obj.relocs_ptr = (uintptr_t)relocs;
+	obj.relocs_ptr = to_user_pointer(relocs);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	gem_execbuf(fd, &execbuf);
 	gem_read(fd, obj.handle, 1024, &value, sizeof(value));
@@ -271,7 +271,7 @@ static void active(int fd, unsigned engine)
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create(fd, 4096);
 	obj[1].handle = gem_create(fd, 64*1024);
-	obj[1].relocs_ptr = (uintptr_t)&reloc;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
 	obj[1].relocation_count = 1;
 
 	memset(&reloc, 0, sizeof(reloc));
@@ -283,7 +283,7 @@ static void active(int fd, unsigned engine)
 	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
@@ -341,7 +341,7 @@ static void basic_cpu(int fd)
 	memset(&obj, 0, sizeof(obj));
 
 	obj.handle = gem_create(fd, 4096);
-	obj.relocs_ptr = (uintptr_t)&reloc;
+	obj.relocs_ptr = to_user_pointer(&reloc);
 	obj.relocation_count = 1;
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
@@ -351,7 +351,7 @@ static void basic_cpu(int fd)
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 
 	wc = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
@@ -412,7 +412,7 @@ static void basic_gtt(int fd)
 	memset(&obj, 0, sizeof(obj));
 
 	obj.handle = gem_create(fd, 4096);
-	obj.relocs_ptr = (uintptr_t)&reloc;
+	obj.relocs_ptr = to_user_pointer(&reloc);
 	obj.relocation_count = 1;
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
@@ -422,7 +422,7 @@ static void basic_gtt(int fd)
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 
 	wc = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
@@ -477,7 +477,7 @@ static void basic_noreloc(int fd)
 	memset(&obj, 0, sizeof(obj));
 
 	obj.handle = gem_create(fd, 4096);
-	obj.relocs_ptr = (uintptr_t)&reloc;
+	obj.relocs_ptr = to_user_pointer(&reloc);
 	obj.relocation_count = 1;
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
@@ -487,7 +487,7 @@ static void basic_noreloc(int fd)
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.flags = LOCAL_I915_EXEC_NO_RELOC;
 
@@ -542,7 +542,7 @@ static void basic_softpin(int fd)
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj[1];
+	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
 	execbuf.buffer_count = 1;
 	gem_execbuf(fd, &execbuf);
 
@@ -552,7 +552,7 @@ static void basic_softpin(int fd)
 	obj[0].offset = obj[1].offset;
 	obj[0].flags = EXEC_OBJECT_PINNED;
 
-	execbuf.buffers_ptr = (uintptr_t)&obj[0];
+	execbuf.buffers_ptr = to_user_pointer(&obj[0]);
 	execbuf.buffer_count = 2;
 
 	gem_execbuf(fd, &execbuf);

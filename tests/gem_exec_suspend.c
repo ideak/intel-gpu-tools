@@ -144,7 +144,7 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 	gem_quiescent_gpu(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = 1 << 11;
 	if (gen < 6)
@@ -168,7 +168,7 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
-	obj[1].relocs_ptr = (uintptr_t)&reloc;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
 	obj[1].relocation_count = 1;
 
 	for (int i = 0; i < 1024; i++) {

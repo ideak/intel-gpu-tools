@@ -94,11 +94,11 @@ static uint64_t __exec_batch_patched(int fd, uint32_t cmd_bo, uint32_t *cmds,
 	reloc[0].delta = 0;
 	reloc[0].read_domains = I915_GEM_DOMAIN_COMMAND;
 	reloc[0].write_domain = I915_GEM_DOMAIN_COMMAND;
-	obj[1].relocs_ptr = (uintptr_t)reloc;
+	obj[1].relocs_ptr = to_user_pointer(reloc);
 	obj[1].relocation_count = 1;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.batch_len = size;
 	execbuf.flags = I915_EXEC_RENDER;
@@ -134,7 +134,7 @@ static int __exec_batch(int fd, uint32_t cmd_bo, uint32_t *cmds,
 	obj[0].handle = cmd_bo;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 1;
 	execbuf.batch_len = size;
 	execbuf.flags = ring;
@@ -169,7 +169,7 @@ static void exec_split_batch(int fd, uint32_t *cmds,
 	obj[0].handle = cmd_bo;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 1;
 	/* NB: We want batch_start_offset and batch_len to point to the block
 	 * of the actual commands (i.e. at the last dword of the first page),
@@ -227,7 +227,7 @@ static void exec_batch_chained(int fd, uint32_t cmd_bo, uint32_t *cmds,
 	reloc[0].read_domains = I915_GEM_DOMAIN_COMMAND;
 	reloc[0].write_domain = I915_GEM_DOMAIN_COMMAND;
 	obj[1].relocation_count = 1;
-	obj[1].relocs_ptr = (uintptr_t)&reloc;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
 
 	memset(&first_level_reloc, 0, sizeof(first_level_reloc));
 	first_level_reloc.offset = 4;
@@ -236,10 +236,10 @@ static void exec_batch_chained(int fd, uint32_t cmd_bo, uint32_t *cmds,
 	first_level_reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
 	first_level_reloc.write_domain = 0;
 	obj[2].relocation_count = 1;
-	obj[2].relocs_ptr = (uintptr_t)&first_level_reloc;
+	obj[2].relocs_ptr = to_user_pointer(&first_level_reloc);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 3;
 	execbuf.batch_len = sizeof(first_level_cmds);
 	execbuf.flags = I915_EXEC_RENDER;
@@ -322,7 +322,7 @@ static void test_allocations(int fd)
 	for (j = 0; j < 16384; j++) {
 		igt_progress("allocations ", j, 16384);
 		i = rand() % ARRAY_SIZE(obj);
-		execbuf.buffers_ptr = (uintptr_t)&obj[i];
+		execbuf.buffers_ptr = to_user_pointer(&obj[i]);
 		execbuf.batch_start_offset = (rand() % (1ull<<i)) << 12;
 		execbuf.batch_len = (1ull<<(12+i)) - 8 - execbuf.batch_start_offset;
 		gem_execbuf(fd, &execbuf);

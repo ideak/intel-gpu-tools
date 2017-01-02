@@ -51,7 +51,7 @@ do_read(int fd, int handle, void *buf, int offset, int size)
 
 	memset(&gem_pread, 0, sizeof(gem_pread));
 	gem_pread.handle = handle;
-	gem_pread.data_ptr = (uintptr_t)buf;
+	gem_pread.data_ptr = to_user_pointer(buf);
 	gem_pread.size = size;
 	gem_pread.offset = offset;
 
@@ -65,7 +65,7 @@ do_write(int fd, int handle, void *buf, int offset, int size)
 
 	memset(&gem_pwrite, 0, sizeof(gem_pwrite));
 	gem_pwrite.handle = handle;
-	gem_pwrite.data_ptr = (uintptr_t)buf;
+	gem_pwrite.data_ptr = to_user_pointer(buf);
 	gem_pwrite.size = size;
 	gem_pwrite.offset = offset;
 

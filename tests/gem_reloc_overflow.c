@@ -76,7 +76,7 @@ static void source_offset_tests(int devid, bool reloc_gtt)
 		obj[1].relocs_ptr = 0;
 
 		obj[0].relocation_count = 1;
-		obj[0].relocs_ptr = (uintptr_t) &single_reloc;
+		obj[0].relocs_ptr = to_user_pointer(&single_reloc);
 		execbuf.buffer_count = 2;
 
 		if (reloc_gtt) {
@@ -192,11 +192,11 @@ static void reloc_tests(const char *suffix)
 		execbuf.buffer_count = 1;
 
 		/* out-of-bounds after */
-		obj[0].relocs_ptr = (uintptr_t)reloc;
+		obj[0].relocs_ptr = to_user_pointer(reloc);
 		igt_assert_eq(__gem_execbuf(fd, &execbuf), -EFAULT);
 
 		/* out-of-bounds before */
-		obj[0].relocs_ptr = (uintptr_t)(reloc - 1);
+		obj[0].relocs_ptr = to_user_pointer((reloc - 1));
 		igt_assert_eq(__gem_execbuf(fd, &execbuf), -EFAULT);
 	}
 
@@ -245,7 +245,7 @@ static void reloc_tests(const char *suffix)
 				      (long long)intel_get_avail_ram_mb());
 		}
 
-		obj[0].relocs_ptr = (uintptr_t)reloc;
+		obj[0].relocs_ptr = to_user_pointer(reloc);
 		obj[0].relocation_count = entries;
 		execbuf.buffer_count = 1;
 		gem_execbuf(fd, &execbuf);
@@ -284,7 +284,7 @@ static void reloc_tests(const char *suffix)
 		for (i = 0; i < num; i++) {
 			struct drm_i915_gem_exec_object2 *o = &obj[i];
 
-			o->relocs_ptr = (uintptr_t)reloc;
+			o->relocs_ptr = to_user_pointer(reloc);
 			o->relocation_count = entries;
 		}
 		execbuf.buffer_count = i;
@@ -405,7 +405,7 @@ igt_main
 
 		/* Create relocation objects. */
 		memset(&execbuf, 0, sizeof(execbuf));
-		execbuf.buffers_ptr = (uintptr_t)obj;
+		execbuf.buffers_ptr = to_user_pointer(obj);
 		execbuf.buffer_count = 1;
 		execbuf.flags = I915_EXEC_HANDLE_LUT;
 		if (__gem_execbuf(fd, &execbuf))

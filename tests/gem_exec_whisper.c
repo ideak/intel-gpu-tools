@@ -136,13 +136,13 @@ static void init_hang(struct hang *h)
 	gen = intel_gen(intel_get_drm_devid(h->fd));
 
 	memset(&h->execbuf, 0, sizeof(h->execbuf));
-	h->execbuf.buffers_ptr = (uintptr_t)&h->obj;
+	h->execbuf.buffers_ptr = to_user_pointer(&h->obj);
 	h->execbuf.buffer_count = 1;
 
 	memset(&h->obj, 0, sizeof(h->obj));
 	h->obj.handle = gem_create(h->fd, 4096);
 
-	h->obj.relocs_ptr = (uintptr_t)&h->reloc;
+	h->obj.relocs_ptr = to_user_pointer(&h->reloc);
 	h->obj.relocation_count = 1;
 	memset(&h->reloc, 0, sizeof(h->reloc));
 
@@ -242,7 +242,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 
 		memset(&store, 0, sizeof(store));
 		store.handle = gem_create(fd, 4096);
-		store.relocs_ptr = (uintptr_t)&reloc;
+		store.relocs_ptr = to_user_pointer(&reloc);
 		store.relocation_count = 1;
 
 		memset(&reloc, 0, sizeof(reloc));
@@ -261,7 +261,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 			gem_write(fd, store.handle, 0, &bbe, sizeof(bbe));
 
 			memset(&execbuf, 0, sizeof(execbuf));
-			execbuf.buffers_ptr = (uintptr_t)tmp;
+			execbuf.buffers_ptr = to_user_pointer(tmp);
 			execbuf.buffer_count = 2;
 			execbuf.flags = LOCAL_I915_EXEC_HANDLE_LUT;
 			execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
@@ -304,11 +304,11 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 			batches[n].handle = gem_create(fd, 4096);
 			gem_write(fd, batches[n].handle, 0, &bbe, sizeof(bbe));
 		}
-		execbuf.buffers_ptr = (uintptr_t)batches;
+		execbuf.buffers_ptr = to_user_pointer(batches);
 		execbuf.buffer_count = 1024;
 		gem_execbuf(fd, &execbuf);
 
-		execbuf.buffers_ptr = (uintptr_t)tmp;
+		execbuf.buffers_ptr = to_user_pointer(tmp);
 		execbuf.buffer_count = 2;
 
 		old_offset = store.offset;
@@ -325,7 +325,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 			inter[n] = reloc;
 			inter[n].presumed_offset = old_offset;
 			inter[n].delta = loc;
-			batches[n].relocs_ptr = (uintptr_t)&inter[n];
+			batches[n].relocs_ptr = to_user_pointer(&inter[n]);
 			batches[n].relocation_count = 1;
 			gem_write(fd, batches[n].handle, 0, batch, sizeof(batch));
 
@@ -368,7 +368,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 				igt_assert(tmp[0].flags & EXEC_OBJECT_WRITE);
 				tmp[1] = store;
 				verify_reloc(fd, store.handle, &reloc);
-				execbuf.buffers_ptr = (uintptr_t)tmp;
+				execbuf.buffers_ptr = to_user_pointer(tmp);
 				gem_execbuf(fd, &execbuf);
 				igt_assert_eq_u64(reloc.presumed_offset, tmp[0].offset);
 				scratch = tmp[0];
@@ -378,7 +378,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 					int this_fd = fd;
 					uint32_t handle[2];
 
-					execbuf.buffers_ptr = (uintptr_t)&batches[n-1];
+					execbuf.buffers_ptr = to_user_pointer(&batches[n-1]);
 					reloc_migrations += batches[n-1].offset != inter[n].presumed_offset;
 					batches[n-1].offset = inter[n].presumed_offset;
 					old_offset = inter[n].presumed_offset;
@@ -425,7 +425,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 				}
 				execbuf.flags &= ~ENGINE_MASK;
 				execbuf.rsvd1 = 0;
-				execbuf.buffers_ptr = (uintptr_t)&tmp;
+				execbuf.buffers_ptr = to_user_pointer(&tmp);
 
 				tmp[0] = tmp[1];
 				tmp[0].relocation_count = 0;
@@ -448,7 +448,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 				tmp[0] = scratch;
 				igt_assert(tmp[0].flags & EXEC_OBJECT_WRITE);
 				igt_assert_eq_u64(reloc.presumed_offset, tmp[0].offset);
-				igt_assert(tmp[1].relocs_ptr == (uintptr_t)&reloc);
+				igt_assert(tmp[1].relocs_ptr == to_user_pointer(&reloc));
 				tmp[1].relocation_count = 1;
 				tmp[1].flags &= ~EXEC_OBJECT_WRITE;
 				verify_reloc(fd, store.handle, &reloc);

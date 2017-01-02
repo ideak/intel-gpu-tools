@@ -63,7 +63,7 @@ static void latency_on_ring(int fd, unsigned ring, const char *name)
 	reg = (volatile uint32_t *)((volatile char *)igt_global_mmio + RCS_TIMESTAMP);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC | LOCAL_I915_EXEC_HANDLE_LUT;
@@ -83,7 +83,7 @@ static void latency_on_ring(int fd, unsigned ring, const char *name)
 
 	memset(&reloc,0, sizeof(reloc));
 	obj[1].relocation_count = 1;
-	obj[1].relocs_ptr = (uintptr_t)&reloc;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
 
 	gem_set_domain(fd, obj[1].handle,
 		       I915_GEM_DOMAIN_GTT,
@@ -181,7 +181,7 @@ static void latency_from_ring(int fd, unsigned ring, const char *name)
 	int i, j;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC | LOCAL_I915_EXEC_HANDLE_LUT;
@@ -201,7 +201,7 @@ static void latency_from_ring(int fd, unsigned ring, const char *name)
 
 	memset(&reloc,0, sizeof(reloc));
 	obj[1].relocation_count = 1;
-	obj[1].relocs_ptr = (uintptr_t)&reloc;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
 
 	gem_set_domain(fd, obj[1].handle,
 		       I915_GEM_DOMAIN_GTT,

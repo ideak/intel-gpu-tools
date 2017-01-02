@@ -129,7 +129,7 @@ sync_ring(int fd, unsigned ring, int num_children, int timeout)
 		gem_write(fd, object.handle, 0, &bbe, sizeof(bbe));
 
 		memset(&execbuf, 0, sizeof(execbuf));
-		execbuf.buffers_ptr = (uintptr_t)&object;
+		execbuf.buffers_ptr = to_user_pointer(&object);
 		execbuf.buffer_count = 1;
 		execbuf.flags = engines[child % num_engines];
 		gem_execbuf(fd, &execbuf);
@@ -205,7 +205,7 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 		uint32_t *batch, *b;
 
 		memset(&execbuf, 0, sizeof(execbuf));
-		execbuf.buffers_ptr = (uintptr_t)object;
+		execbuf.buffers_ptr = to_user_pointer(object);
 		execbuf.flags = engines[child % num_engines];
 		execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 		execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
@@ -221,7 +221,7 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 		object[0].flags |= EXEC_OBJECT_WRITE;
 		object[1].handle = gem_create(fd, 20*1024);
 
-		object[1].relocs_ptr = (uintptr_t)reloc;
+		object[1].relocs_ptr = to_user_pointer(reloc);
 		object[1].relocation_count = 1024;
 
 		batch = gem_mmap__cpu(fd, object[1].handle, 0, 20*1024,
@@ -337,7 +337,7 @@ __store_many(int fd, unsigned ring, int timeout, unsigned long *cycles)
 	int done;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)object;
+	execbuf.buffers_ptr = to_user_pointer(object);
 	execbuf.flags = ring;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
@@ -351,7 +351,7 @@ __store_many(int fd, unsigned ring, int timeout, unsigned long *cycles)
 	gem_execbuf(fd, &execbuf);
 	object[0].flags |= EXEC_OBJECT_WRITE;
 
-	object[1].relocs_ptr = (uintptr_t)reloc;
+	object[1].relocs_ptr = to_user_pointer(reloc);
 	object[1].relocation_count = 1024;
 	execbuf.buffer_count = 2;
 
@@ -546,7 +546,7 @@ sync_all(int fd, int num_children, int timeout)
 		gem_write(fd, object.handle, 0, &bbe, sizeof(bbe));
 
 		memset(&execbuf, 0, sizeof(execbuf));
-		execbuf.buffers_ptr = (uintptr_t)&object;
+		execbuf.buffers_ptr = to_user_pointer(&object);
 		execbuf.buffer_count = 1;
 		gem_execbuf(fd, &execbuf);
 
@@ -611,7 +611,7 @@ store_all(int fd, int num_children, int timeout)
 		uint32_t *batch, *b;
 
 		memset(&execbuf, 0, sizeof(execbuf));
-		execbuf.buffers_ptr = (uintptr_t)object;
+		execbuf.buffers_ptr = to_user_pointer(object);
 		execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 		execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
 		if (gen < 6)
@@ -626,7 +626,7 @@ store_all(int fd, int num_children, int timeout)
 		object[0].flags |= EXEC_OBJECT_WRITE;
 		object[1].handle = gem_create(fd, 1024*16 + 4096);
 
-		object[1].relocs_ptr = (uintptr_t)reloc;
+		object[1].relocs_ptr = to_user_pointer(reloc);
 		object[1].relocation_count = 1024;
 
 		batch = gem_mmap__cpu(fd, object[1].handle, 0, 16*1024 + 4096,

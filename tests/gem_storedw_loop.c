@@ -105,7 +105,7 @@ store_dword_loop(int fd, int ring, int count, int divider)
 	}
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
 
@@ -117,7 +117,7 @@ store_dword_loop(int fd, int ring, int count, int divider)
 		gem_set_domain(fd, handle[j], coherent_domain, coherent_domain);
 		batch[j][3] = val;
 		obj[1].handle = handle[j];
-		obj[1].relocs_ptr = (uintptr_t)&reloc[j];
+		obj[1].relocs_ptr = to_user_pointer(&reloc[j]);
 		gem_execbuf(fd, &execbuf);
 
 		if (j == 0) {

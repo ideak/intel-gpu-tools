@@ -372,7 +372,7 @@ test_set_cache_level(int fd)
 	/* Bind the object to the cursor to force set-cache-level(DISPLAY) */
 	memset(&res, 0, sizeof(res));
 	res.count_crtcs = 32;
-	res.crtc_id_ptr = (uintptr_t)crtc;
+	res.crtc_id_ptr = to_user_pointer(crtc);
 	do_ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res);
 	for (n = 0; n < res.count_crtcs; n++) {
 		struct drm_mode_crtc mode;

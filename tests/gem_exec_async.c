@@ -39,7 +39,7 @@ static void store_dword(int fd, unsigned ring,
 	int i;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
 	if (gen < 6)
@@ -57,7 +57,7 @@ static void store_dword(int fd, unsigned ring,
 	reloc.delta = offset;
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-	obj[1].relocs_ptr = (uintptr_t)&reloc;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
 	obj[1].relocation_count = 1;
 
 	i = 0;
@@ -100,7 +100,7 @@ static void one(int fd, unsigned ring, uint32_t flags)
 	obj[SCRATCH].handle = gem_create(fd, 4096);
 
 	obj[BATCH].handle = gem_create(fd, 4096);
-	obj[BATCH].relocs_ptr = (uintptr_t)&reloc;
+	obj[BATCH].relocs_ptr = to_user_pointer(&reloc);
 	obj[BATCH].relocation_count = 1;
 
 	memset(&reloc, 0, sizeof(reloc));
@@ -135,7 +135,7 @@ static void one(int fd, unsigned ring, uint32_t flags)
 	i++;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring | flags;
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);

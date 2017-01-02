@@ -72,7 +72,7 @@ static void files(int core, int timeout, const int ncpus)
 
 	memset(&obj, 0, sizeof(obj));
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 
 	igt_fork(child, ncpus) {
@@ -119,7 +119,7 @@ static void active(int fd, unsigned engine, int timeout, int ncpus)
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.flags = engine;
 
@@ -260,7 +260,7 @@ static void maximum(int fd, int ncpus, unsigned mode)
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 
 	igt_fork(child, ncpus) {

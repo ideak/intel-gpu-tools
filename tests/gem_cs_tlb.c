@@ -115,7 +115,7 @@ static void run_on_ring(int fd, unsigned ring_id, const char *ring_name)
 	obj[0].batch[0] = MI_BATCH_BUFFER_END;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&execobj;
+	execbuf.buffers_ptr = to_user_pointer(&execobj);
 	execbuf.buffer_count = 1;
 	execbuf.flags = ring_id;
 

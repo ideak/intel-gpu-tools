@@ -65,14 +65,14 @@ static int exec(int fd, uint32_t handle, unsigned int flags)
 
 	gem_exec[0].handle = handle;
 	gem_exec[0].relocation_count = 1;
-	gem_exec[0].relocs_ptr = (uintptr_t) gem_reloc;
+	gem_exec[0].relocs_ptr = to_user_pointer(gem_reloc);
 	gem_exec[0].alignment = 0;
 	gem_exec[0].offset = 0;
 	gem_exec[0].flags = 0;
 	gem_exec[0].rsvd1 = 0;
 	gem_exec[0].rsvd2 = 0;
 
-	execbuf.buffers_ptr = (uintptr_t)gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = 1;
 	execbuf.batch_start_offset = 0;
 	execbuf.batch_len = 8;
@@ -119,7 +119,7 @@ static int many_exec(int fd, uint32_t batch, int num_exec, int num_reloc, unsign
 
 	gem_exec[n].handle = batch;
 	gem_exec[n].relocation_count = num_reloc;
-	gem_exec[n].relocs_ptr = (uintptr_t) gem_reloc;
+	gem_exec[n].relocs_ptr = to_user_pointer(gem_reloc);
 
 	if (flags & USE_LUT)
 		max_handle = num_exec + 1;
@@ -144,7 +144,7 @@ static int many_exec(int fd, uint32_t batch, int num_exec, int num_reloc, unsign
 		gem_reloc[n].presumed_offset = 0;
 	}
 
-	execbuf.buffers_ptr = (uintptr_t)gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = num_exec + 1;
 	execbuf.batch_start_offset = 0;
 	execbuf.batch_len = 8;

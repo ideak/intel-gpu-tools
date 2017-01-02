@@ -97,7 +97,7 @@ igt_main
 		gem_exec[0].rsvd1 = 0;
 		gem_exec[0].rsvd2 = 0;
 
-		execbuf.buffers_ptr = (uintptr_t)gem_exec;
+		execbuf.buffers_ptr = to_user_pointer(gem_exec);
 		execbuf.buffer_count = 1;
 		execbuf.batch_start_offset = 0;
 		execbuf.batch_len = 8;

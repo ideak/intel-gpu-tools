@@ -180,10 +180,10 @@ static void run_test(int fd, int num_fences, int expected_errno,
 			exec[i][n].flags = EXEC_OBJECT_NEEDS_FENCE;
 
 		exec[i][2*num_fences].handle = batch_create(fd);
-		exec[i][2*num_fences].relocs_ptr = (uintptr_t)reloc;
+		exec[i][2*num_fences].relocs_ptr = to_user_pointer(reloc);
 		exec[i][2*num_fences].relocation_count = 2*num_fences;
 
-		execbuf[i].buffers_ptr = (uintptr_t)exec[i];
+		execbuf[i].buffers_ptr = to_user_pointer(exec[i]);
 		execbuf[i].buffer_count = 2*num_fences+1;
 		execbuf[i].batch_len = 2*sizeof(uint32_t);
 	}

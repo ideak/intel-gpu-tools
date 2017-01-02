@@ -107,10 +107,10 @@ copy(int fd, uint32_t dst, uint32_t src, uint32_t *all_bo, int n_bo)
 		obj[n].handle = all_bo[n];
 	obj[n].handle = handle;
 	obj[n].relocation_count = 2;
-	obj[n].relocs_ptr = (uintptr_t)reloc;
+	obj[n].relocs_ptr = to_user_pointer(reloc);
 
 	memset(&exec, 0, sizeof(exec));
-	exec.buffers_ptr = (uintptr_t)obj;
+	exec.buffers_ptr = to_user_pointer(obj);
 	exec.buffer_count = n_bo + 1;
 	if (HAS_BLT_RING(intel_get_drm_devid(fd)))
 		exec.flags |= I915_EXEC_BLT;

@@ -209,7 +209,7 @@ static void run(int object_size)
 	else
 		exec[2].relocation_count = len > 40 ? 4 : 2;
 	/* A newly mmap gtt bo will fault on first access. */
-	exec[2].relocs_ptr = (uintptr_t)gtt_relocs;
+	exec[2].relocs_ptr = to_user_pointer(gtt_relocs);
 	exec[2].alignment = 0;
 	exec[2].offset = 0;
 	exec[2].flags = 0;
@@ -220,7 +220,7 @@ static void run(int object_size)
 	if (HAS_BLT_RING(devid))
 		ring = I915_EXEC_BLT;
 
-	execbuf.buffers_ptr = (uintptr_t)exec;
+	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = 3;
 	execbuf.batch_start_offset = 0;
 	execbuf.batch_len = len;

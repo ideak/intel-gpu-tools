@@ -110,7 +110,7 @@ static void test_execbuf(int fd)
 	exec.handle = gem_create(fd, 4096);
 	gem_write(fd, exec.handle, 0, tmp, sizeof(tmp));
 
-	execbuf.buffers_ptr = (uintptr_t)&exec;
+	execbuf.buffers_ptr = to_user_pointer(&exec);
 	execbuf.buffer_count = 1;
 
 	wedge_gpu(fd);
@@ -207,7 +207,7 @@ static void test_inflight(int fd)
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 
 	gem_execbuf(fd, &execbuf);

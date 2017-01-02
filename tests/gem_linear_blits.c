@@ -110,10 +110,10 @@ copy(int fd, uint32_t dst, uint32_t src)
 	obj[2].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[2].handle, 0, batch, i * sizeof(batch[0]));
 	obj[2].relocation_count = 2;
-	obj[2].relocs_ptr = (uintptr_t)reloc;
+	obj[2].relocs_ptr = to_user_pointer(reloc);
 
 	memset(&exec, 0, sizeof(exec));
-	exec.buffers_ptr = (uintptr_t)obj;
+	exec.buffers_ptr = to_user_pointer(obj);
 	exec.buffer_count = 3;
 	exec.batch_len = i * sizeof(batch[0]);
 	exec.flags = gem_has_blt(fd) ? I915_EXEC_BLT : 0;

@@ -146,12 +146,12 @@ static void *thread(void *data)
 	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 	reloc.delta = 4*t->id;
 	obj[1].handle = gem_create(fd, 4096);
-	obj[1].relocs_ptr = (uintptr_t)&reloc;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
 	obj[1].relocation_count = 1;
 	gem_write(fd, obj[1].handle, 0, batch, sizeof(batch));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = t->engine;
 	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;

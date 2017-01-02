@@ -119,7 +119,7 @@ dontneed_before_pwrite(void)
 	gem_pwrite.handle = gem_create(fd, OBJECT_SIZE);
 	gem_pwrite.offset = 0;
 	gem_pwrite.size = sizeof(buf);
-	gem_pwrite.data_ptr = (uintptr_t)buf;
+	gem_pwrite.data_ptr = to_user_pointer(buf);
 	gem_madvise(fd, gem_pwrite.handle, I915_MADV_DONTNEED);
 
 	igt_assert(drmIoctl(fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite));
@@ -144,7 +144,7 @@ dontneed_before_exec(void)
 	gem_write(fd, exec.handle, 0, buf, sizeof(buf));
 	gem_madvise(fd, exec.handle, I915_MADV_DONTNEED);
 
-	execbuf.buffers_ptr = (uintptr_t)&exec;
+	execbuf.buffers_ptr = to_user_pointer(&exec);
 	execbuf.buffer_count = 1;
 	execbuf.batch_len = sizeof(buf);
 	gem_execbuf(fd, &execbuf);

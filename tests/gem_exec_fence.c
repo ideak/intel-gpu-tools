@@ -50,7 +50,7 @@ static void store(int fd, unsigned ring, int fence, uint32_t target, unsigned of
 	int i;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring | LOCAL_EXEC_FENCE_IN;
 	execbuf.rsvd2 = fence;
@@ -61,7 +61,7 @@ static void store(int fd, unsigned ring, int fence, uint32_t target, unsigned of
 	obj[SCRATCH].handle = target;
 
 	obj[BATCH].handle = gem_create(fd, 4096);
-	obj[BATCH].relocs_ptr = (uintptr_t)&reloc;
+	obj[BATCH].relocs_ptr = to_user_pointer(&reloc);
 	obj[BATCH].relocation_count = 1;
 	memset(&reloc, 0, sizeof(reloc));
 
@@ -127,14 +127,14 @@ static void test_fence_busy(int fd, unsigned ring, unsigned flags)
 	gem_quiescent_gpu(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.flags = ring | LOCAL_EXEC_FENCE_OUT;
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
 
-	obj.relocs_ptr = (uintptr_t)&reloc;
+	obj.relocs_ptr = to_user_pointer(&reloc);
 	obj.relocation_count = 1;
 	memset(&reloc, 0, sizeof(reloc));
 
@@ -213,14 +213,14 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 	int fence, i;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.flags = ring | LOCAL_EXEC_FENCE_OUT;
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
 
-	obj.relocs_ptr = (uintptr_t)&reloc;
+	obj.relocs_ptr = to_user_pointer(&reloc);
 	obj.relocation_count = 1;
 	memset(&reloc, 0, sizeof(reloc));
 

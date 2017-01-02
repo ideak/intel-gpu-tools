@@ -108,7 +108,7 @@ static void many(int fd)
 	gem_write(fd, execobj[i].handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)execobj;
+	execbuf.buffers_ptr = to_user_pointer(execobj);
 	execbuf.buffer_count = count + 1;
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 
@@ -119,7 +119,7 @@ static void many(int fd)
 			uint64_t factor = alignment / max_alignment;
 			execbuf.buffer_count = 2*count / factor;
 			execbuf.buffers_ptr =
-				(uintptr_t)(execobj + count - execbuf.buffer_count + 1);
+				to_user_pointer(execobj + count - execbuf.buffer_count + 1);
 		}
 
 		igt_debug("testing %lld x alignment=%#llx [%db]\n",
@@ -153,7 +153,7 @@ static void single(int fd)
 	gem_write(fd, execobj.handle, 0, &batch, sizeof(batch));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&execobj;
+	execbuf.buffers_ptr = to_user_pointer(&execobj);
 	execbuf.buffer_count = 1;
 
 	gtt_size = gem_aperture_size(fd);

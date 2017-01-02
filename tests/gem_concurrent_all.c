@@ -263,7 +263,7 @@ userptr_create_bo(const struct buffers *b)
 	ptr = mmap(NULL, userptr.user_size,
 		   PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
 	igt_assert(ptr != (void *)-1);
-	userptr.user_ptr = (uintptr_t)ptr;
+	userptr.user_ptr = to_user_pointer(ptr);
 
 #if 0
 	do_or_die(drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr));
@@ -671,9 +671,9 @@ gpu_set_bo(struct buffers *buffers, drm_intel_bo *bo, uint32_t val)
 
 	gem_exec[1].handle = gem_create(fd, 4096);
 	gem_exec[1].relocation_count = 1;
-	gem_exec[1].relocs_ptr = (uintptr_t)reloc;
+	gem_exec[1].relocs_ptr = to_user_pointer(reloc);
 
-	execbuf.buffers_ptr = (uintptr_t)gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = 2;
 	execbuf.batch_len = (b - buf) * sizeof(buf[0]);
 	if (gen >= 6)
@@ -957,7 +957,7 @@ static igt_hang_t all_hang(void)
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(&bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 
 	for_each_engine(fd, engine) {

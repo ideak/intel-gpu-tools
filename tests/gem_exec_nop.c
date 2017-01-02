@@ -67,7 +67,7 @@ static double nop_on_ring(int fd, uint32_t handle, unsigned ring_id,
 	obj.handle = handle;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.flags = ring_id;
 	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
@@ -149,7 +149,7 @@ static void parallel(int fd, uint32_t handle, int timeout)
 	obj.handle = handle;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
@@ -217,7 +217,7 @@ static void series(int fd, uint32_t handle, int timeout)
 	obj.handle = handle;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;

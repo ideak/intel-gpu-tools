@@ -212,14 +212,14 @@ static void run(int object_size, bool dumb)
 		exec[2].relocation_count = len > 56 ? 4 : 2;
 	else
 		exec[2].relocation_count = len > 40 ? 4 : 2;
-	exec[2].relocs_ptr = (uintptr_t)reloc;
+	exec[2].relocs_ptr = to_user_pointer(reloc);
 
 	ring = 0;
 	if (HAS_BLT_RING(intel_get_drm_devid(fd)))
 		ring = I915_EXEC_BLT;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)exec;
+	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = 3;
 	execbuf.batch_len = len;
 	execbuf.flags = ring;

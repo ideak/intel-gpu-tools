@@ -104,10 +104,10 @@ static void selfcopy(int fd, uint32_t handle, int loops)
 	drmIoctl(fd, DRM_IOCTL_I915_GEM_CREATE, &create);
 	gem_exec[1].handle = create.handle;
 	gem_exec[1].relocation_count = 2;
-	gem_exec[1].relocs_ptr = (uintptr_t)reloc;
+	gem_exec[1].relocs_ptr = to_user_pointer(reloc);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = 2;
 	execbuf.batch_len = (b - buf) * sizeof(*b);
 	if (HAS_BLT_RING(devid))
@@ -117,7 +117,7 @@ static void selfcopy(int fd, uint32_t handle, int loops)
 	gem_pwrite.handle = create.handle;
 	gem_pwrite.offset = 0;
 	gem_pwrite.size = sizeof(buf);
-	gem_pwrite.data_ptr = (uintptr_t)buf;
+	gem_pwrite.data_ptr = to_user_pointer(buf);
 	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite) == 0) {
 		while (loops-- &&
 		       drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf) == 0)

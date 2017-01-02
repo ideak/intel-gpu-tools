@@ -73,7 +73,7 @@ static int has_exec_lut(int fd)
 	struct drm_i915_gem_execbuffer2 execbuf;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)(gem_exec + MAX_NUM_EXEC);
+	execbuf.buffers_ptr = to_user_pointer((gem_exec + MAX_NUM_EXEC));
 	execbuf.buffer_count = 1;
 	execbuf.flags = LOCAL_I915_EXEC_HANDLE_LUT;
 
@@ -152,11 +152,11 @@ igt_simple_main
 					reloc = mem_reloc;
 
 				gem_exec[MAX_NUM_EXEC].relocation_count = m;
-				gem_exec[MAX_NUM_EXEC].relocs_ptr = (uintptr_t)reloc;
+				gem_exec[MAX_NUM_EXEC].relocs_ptr = to_user_pointer(reloc);
 				objects = gem_exec + MAX_NUM_EXEC - n;
 
 				memset(&execbuf, 0, sizeof(execbuf));
-				execbuf.buffers_ptr = (uintptr_t)objects;
+				execbuf.buffers_ptr = to_user_pointer(objects);
 				execbuf.buffer_count = n + 1;
 				execbuf.flags = LOCAL_I915_EXEC_HANDLE_LUT;
 				if (p->flags & NO_RELOC)
@@ -182,7 +182,7 @@ igt_simple_main
 					if (p->flags & FAULT) {
 						munmap(reloc, size);
 						reloc = __gem_mmap__cpu(fd, reloc_handle, 0, size, PROT_READ | PROT_WRITE);
-						gem_exec[MAX_NUM_EXEC].relocs_ptr = (uintptr_t)reloc;
+						gem_exec[MAX_NUM_EXEC].relocs_ptr = to_user_pointer(reloc);
 					}
 					gem_execbuf(fd, &execbuf);
 				}
@@ -212,7 +212,7 @@ igt_simple_main
 					if (p->flags & FAULT) {
 						munmap(reloc, size);
 						reloc = __gem_mmap__cpu(fd, reloc_handle, 0, size, PROT_READ | PROT_WRITE);
-						gem_exec[MAX_NUM_EXEC].relocs_ptr = (uintptr_t)reloc;
+						gem_exec[MAX_NUM_EXEC].relocs_ptr = to_user_pointer(reloc);
 					}
 					gem_execbuf(fd, &execbuf);
 				}

@@ -61,14 +61,14 @@ static void exec(int fd, uint32_t handle, uint32_t offset)
 
 	gem_exec[0].handle = handle;
 	gem_exec[0].relocation_count = 1;
-	gem_exec[0].relocs_ptr = (uintptr_t) gem_reloc;
+	gem_exec[0].relocs_ptr = to_user_pointer(gem_reloc);
 	gem_exec[0].alignment = 0;
 	gem_exec[0].offset = 0;
 	gem_exec[0].flags = 0;
 	gem_exec[0].rsvd1 = 0;
 	gem_exec[0].rsvd2 = 0;
 
-	execbuf.buffers_ptr = (uintptr_t)gem_exec;
+	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = 1;
 	execbuf.batch_start_offset = 0;
 	execbuf.batch_len = 8;
@@ -149,14 +149,14 @@ static void make_busy(int fd, uint32_t handle)
 
 	obj[1].handle = handle;
 	obj[1].relocation_count = 2;
-	obj[1].relocs_ptr = (uintptr_t) reloc;
+	obj[1].relocs_ptr = to_user_pointer(reloc);
 	obj[1].alignment = 0;
 	obj[1].offset = 0;
 	obj[1].flags = 0;
 	obj[1].rsvd1 = 0;
 	obj[1].rsvd2 = 0;
 
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.batch_start_offset = 0;
 	execbuf.batch_len = gem_linear_blt(fd, batch, tmp, tmp, 1024*1024,reloc);

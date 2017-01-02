@@ -135,7 +135,7 @@ static void invalid_nonaligned_size(int fd)
 	gem_pwrite.handle = handle;
 	gem_pwrite.offset = PAGE_SIZE / 2;
 	gem_pwrite.size = PAGE_SIZE;
-	gem_pwrite.data_ptr = (uintptr_t)buf;
+	gem_pwrite.data_ptr = to_user_pointer(buf);
 	/* This should fail. Hence cannot use gem_write. */
 	igt_assert(drmIoctl(fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite));
 

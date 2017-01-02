@@ -92,12 +92,12 @@ static void single(int fd, uint32_t handle,
 		memset(&reloc, 0, sizeof(reloc));
 		reloc.offset = 1024;
 		reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-		obj.relocs_ptr = (uintptr_t)&reloc;
+		obj.relocs_ptr = to_user_pointer(&reloc);
 		obj.relocation_count = 1;
 	}
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.rsvd1 = contexts[0];
 	execbuf.flags = e->exec_id | e->flags;
