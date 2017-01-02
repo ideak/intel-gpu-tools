@@ -239,4 +239,15 @@ int __kms_addfb(int fd, uint32_t handle, uint32_t width, uint32_t height,
 		uint32_t stride, uint32_t pixel_format, uint64_t modifier,
 		uint32_t flags, uint32_t *buf_id);
 
+/**
+ * to_user_pointer:
+ *
+ * Makes sure that pointer on 32 and 64-bit systems
+ * are casted properly for being sent through an ioctl.
+ */
+inline uint64_t to_user_pointer(void *ptr)
+{
+	return (uint64_t)(uintptr_t) ptr;
+}
+
 #endif /* IOCTL_WRAPPERS_H */
