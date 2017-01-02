@@ -208,7 +208,7 @@ static int __sync_fence_count_status(int fd, int status)
 	if (!fence_info)
 		return -ENOMEM;
 
-	info.sync_fence_info = (uintptr_t)fence_info;
+	info.sync_fence_info = to_user_pointer(fence_info);
 	if (ioctl(fd, LOCAL_SYNC_IOC_FILE_INFO, &info)) {
 		count = -errno;
 	} else {

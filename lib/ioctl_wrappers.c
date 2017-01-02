@@ -338,7 +338,7 @@ static int __gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf
 	gem_pwrite.handle = handle;
 	gem_pwrite.offset = offset;
 	gem_pwrite.size = length;
-	gem_pwrite.data_ptr = (uintptr_t)buf;
+	gem_pwrite.data_ptr = to_user_pointer(buf);
 
 	err = 0;
 	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite))
@@ -371,7 +371,7 @@ static int __gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint6
 	gem_pread.handle = handle;
 	gem_pread.offset = offset;
 	gem_pread.size = length;
-	gem_pread.data_ptr = (uintptr_t)buf;
+	gem_pread.data_ptr = to_user_pointer(buf);
 
 	err = 0;
 	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_PREAD, &gem_pread))
@@ -997,7 +997,7 @@ int __gem_userptr(int fd, void *ptr, int size, int read_only, uint32_t flags, ui
 	struct local_i915_gem_userptr userptr;
 
 	memset(&userptr, 0, sizeof(userptr));
-	userptr.user_ptr = (uintptr_t)ptr;
+	userptr.user_ptr = to_user_pointer(ptr);
 	userptr.user_size = size;
 	userptr.flags = flags;
 	if (read_only)
@@ -1464,7 +1464,7 @@ bool gem_has_ring(int fd, unsigned ring)
 
 	memset(&exec, 0, sizeof(exec));
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&exec;
+	execbuf.buffers_ptr = to_user_pointer(&exec);
 	execbuf.buffer_count = 1;
 	execbuf.flags = ring;
 	return __gem_execbuf(fd, &execbuf) == -ENOENT;

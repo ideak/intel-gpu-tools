@@ -127,9 +127,9 @@ static void emit_recursive_batch(igt_spin_t *spin,
 		*++batch = 0;
 	}
 	obj[BATCH].relocation_count++;
-	obj[BATCH].relocs_ptr = (uintptr_t)relocs;
+	obj[BATCH].relocs_ptr = to_user_pointer(relocs);
 
-	execbuf.buffers_ptr = (uintptr_t)(obj + (2 - execbuf.buffer_count));
+	execbuf.buffers_ptr = to_user_pointer(obj + (2 - execbuf.buffer_count));
 
 	for (i = 0; i < nengine; i++) {
 		execbuf.flags &= ~ENGINE_MASK;

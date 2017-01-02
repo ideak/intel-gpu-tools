@@ -261,7 +261,7 @@ igt_hang_t igt_hang_ctx(int fd,
 
 	exec.handle = gem_create(fd, 4096);
 	exec.relocation_count = 1;
-	exec.relocs_ptr = (uintptr_t)&reloc;
+	exec.relocs_ptr = to_user_pointer(&reloc);
 
 	memset(b, 0xc5, sizeof(b));
 
@@ -292,7 +292,7 @@ igt_hang_t igt_hang_ctx(int fd,
 	reloc.target_handle = exec.handle;
 	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
 
-	execbuf.buffers_ptr = (uintptr_t)&exec;
+	execbuf.buffers_ptr = to_user_pointer(&exec);
 	execbuf.buffer_count = 1;
 	execbuf.flags = ring;
 	i915_execbuffer2_set_context_id(execbuf, ctx);

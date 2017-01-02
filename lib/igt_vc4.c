@@ -83,7 +83,7 @@ uint32_t igt_vc4_get_cleared_bo(int fd, size_t size, uint32_t clearval)
 		.msaa_color_write = { .hindex = ~0 },
 		.msaa_zs_write = { .hindex = ~0 },
 
-		.bo_handles = (uint64_t)(uintptr_t)&handle,
+		.bo_handles = to_user_pointer(&handle),
 		.bo_handle_count = 1,
 		.width = width,
 		.height = height,

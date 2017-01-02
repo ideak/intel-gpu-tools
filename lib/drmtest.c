@@ -167,7 +167,7 @@ void gem_quiescent_gpu(int fd)
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(&bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 
 	for (ring = 0; ring < 1<<6; ring++) {
