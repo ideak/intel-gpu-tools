@@ -231,6 +231,23 @@ int sync_fence_count_status(int fd, int status)
 	return count;
 }
 
+int sync_fence_status(int fence)
+{
+	struct local_sync_fence_info fence_info;
+	struct local_sync_file_info file_info = {
+		.sync_fence_info = to_user_pointer(&fence_info),
+		.num_fences = 1,
+	};
+
+	if (ioctl(fence, LOCAL_SYNC_IOC_FILE_INFO, &file_info))
+		return -errno;
+
+	if (file_info.num_fences != 1)
+		return -EINVAL;
+
+	return fence_info.status;
+}
+
 static bool kernel_has_sw_sync(void)
 {
 	char buf[128];

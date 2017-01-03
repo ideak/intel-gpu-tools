@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "sw_sync.h"
 
 #include <sys/ioctl.h>
 #include <sys/poll.h>
@@ -140,7 +141,7 @@ static void test_fence_busy(int fd, unsigned ring, unsigned flags)
 
 	batch = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
 	gem_set_domain(fd, obj.handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 	reloc.target_handle = obj.handle; /* recurse */
 	reloc.presumed_offset = 0;
@@ -194,6 +195,8 @@ static void test_fence_busy(int fd, unsigned ring, unsigned flags)
 	}
 
 	igt_assert(!gem_bo_busy(fd, obj.handle));
+	igt_assert_eq(sync_fence_status(fence),
+		      flags & HANG ? -EIO : SYNC_FENCE_OK);
 
 	close(fence);
 	gem_close(fd, obj.handle);

@@ -41,8 +41,11 @@ int sw_sync_timeline_create_fence(int timeline, uint32_t seqno);
 
 int sync_fence_merge(int fence1, int fence2);
 int sync_fence_wait(int fence, int timeout);
+int sync_fence_status(int fence);
 int sync_fence_count(int fence);
 int sync_fence_count_status(int fence, int status);
+
+#define SYNC_FENCE_OK 1
 
 #endif
 
