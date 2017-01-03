@@ -686,8 +686,10 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 	struct drm_event_vblank vbl;
 	struct igt_fb fb_info, cursor_fb, cursor_fb2, argb_fb;
 	unsigned vblank_start;
-	int target;
+	int target, cpu;
 	enum pipe pipe = find_connected_pipe(display, false);
+	volatile unsigned long *shared;
+	cpu_set_t mask, oldmask;
 
 	if (mode >= flip_test_atomic)
 		igt_require(display->is_atomic);
@@ -712,6 +714,37 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 	for (int n = 0; n < target; n++)
 		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 	igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+
+	/*
+	 * There are variations caused by using cpu frequency changing. To
+	 * eliminate those we force this test to run on the same cpu as an
+	 * idle thread that does a busy loop of sched_yield(); The effect is
+	 * that we don't throttle the cpu to a lower frequency, and the
+	 * variations caused by cpu speed changing are eliminated.
+	 */
+	if (target > 1) {
+		shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+		igt_assert(shared != MAP_FAILED);
+
+		cpu = sched_getcpu();
+		igt_assert(cpu >= 0);
+
+		CPU_ZERO(&mask);
+		CPU_SET(cpu, &mask);
+		sched_getaffinity(0, sizeof(oldmask), &oldmask);
+		sched_setaffinity(0, sizeof(mask), &mask);
+
+		shared[0] = 0;
+
+		igt_fork(child, 1) {
+			struct sched_param parm = { .sched_priority = 0 };
+
+			igt_assert(sched_setscheduler(0, SCHED_IDLE, &parm) == 0);
+
+			while (!shared[0])
+				sched_yield();
+		}
+	}
 
 	do {
 		/* Bind the cursor first to warm up */
@@ -745,6 +778,13 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
 		igt_reset_timeout();
 	} while (nloops--);
+
+	if (target > 1) {
+		shared[0] = 1;
+		igt_waitchildren();
+		munmap((void *)shared, 4096);
+		sched_setaffinity(0, sizeof(oldmask), &oldmask);
+	}
 
 	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info);
