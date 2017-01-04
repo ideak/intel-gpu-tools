@@ -193,6 +193,12 @@ static const struct intel_device_info intel_coffeelake_info = {
 	.codename = "coffeelake"
 };
 
+static const struct intel_device_info intel_cannonlake_info = {
+	.gen = BIT(9),
+	.is_cannonlake = true,
+	.codename = "cannonlake"
+};
+
 static const struct pci_id_match intel_device_match[] = {
 	INTEL_I810_IDS(&intel_i810_info),
 	INTEL_I815_IDS(&intel_i815_info),

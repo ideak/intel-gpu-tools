@@ -65,6 +65,7 @@ struct intel_device_info {
 	bool is_kabylake : 1;
 	bool is_geminilake : 1;
 	bool is_coffeelake : 1;
+	bool is_cannonlake : 1;
 	const char *codename;
 };
 
@@ -160,6 +161,7 @@ void intel_check_pch(void);
 #define IS_BROXTON(devid)	(intel_get_device_info(devid)->is_broxton)
 #define IS_GEMINILAKE(devid)	(intel_get_device_info(devid)->is_geminilake)
 #define IS_COFFEELAKE(devid)	(intel_get_device_info(devid)->is_coffeelake)
+#define IS_CANNONLAKE(devid)	(intel_get_device_info(devid)->is_cannonlake)
 
 #define IS_GEN(devid, x)	(intel_get_device_info(devid)->gen & (1u << ((x)-1)))
 #define AT_LEAST_GEN(devid, x)	(intel_get_device_info(devid)->gen & -(1u << ((x)-1)))
@@ -172,6 +174,7 @@ void intel_check_pch(void);
 #define IS_GEN7(devid)		IS_GEN(devid, 7)
 #define IS_GEN8(devid)		IS_GEN(devid, 8)
 #define IS_GEN9(devid)		IS_GEN(devid, 9)
+#define IS_GEN10(devid)		IS_GEN(devid, 10)
 
 #define IS_MOBILE(devid)	(intel_get_device_info(devid)->is_mobile)
 #define IS_965(devid)		AT_LEAST_GEN(devid, 4)
