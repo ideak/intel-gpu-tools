@@ -393,10 +393,8 @@ test_hang(int fd)
 static int min_tile_width(uint32_t devid, int tiling)
 {
 	if (tiling < 0) {
-		tiling = -tiling;
-
 		if (intel_gen(devid) >= 4)
-			return 4096 - min_tile_width(devid, tiling);
+			return 4096 - min_tile_width(devid, -tiling);
 		else
 			return 1024;
 
@@ -415,10 +413,8 @@ static int min_tile_width(uint32_t devid, int tiling)
 static int max_tile_width(uint32_t devid, int tiling)
 {
 	if (tiling < 0) {
-		tiling = -tiling;
-
 		if (intel_gen(devid) >= 4)
-			return 4096 + min_tile_width(devid, tiling);
+			return 4096 + min_tile_width(devid, -tiling);
 		else
 			return 2048;
 	}
@@ -555,6 +551,16 @@ static void copy_wc_page(void *dst, const void *src)
 }
 #endif
 
+static unsigned int tile_row_size(int tiling, unsigned int stride)
+{
+	if (tiling < 0)
+		tiling = -tiling;
+
+	return stride * (tiling == I915_TILING_Y ? 32 : 8);
+}
+
+#define rounddown(x, y) (x - (x%y))
+
 static void
 test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 {
@@ -583,38 +589,44 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 	intel_require_memory(2*ncpus, huge_object_size, mode);
 
 	igt_fork(child, ncpus) {
+		uint64_t valid_size = huge_object_size;
 		uint32_t bo;
 		char *a, *b;
 
 		bo = gem_create(fd, huge_object_size);
-		if (tiling_a)
+		if (tiling_a) {
 			igt_require(__gem_set_tiling(fd, bo, abs(tiling_a), min_tile_width(devid, tiling_a)) == 0);
+			valid_size = rounddown(valid_size, tile_row_size(tiling_a, min_tile_width(devid, tiling_a)));
+		}
 		a = __gem_mmap__gtt(fd, bo, huge_object_size, PROT_READ | PROT_WRITE);
 		igt_require(a);
 		gem_close(fd, bo);
 
-		for (i = 0; i < huge_object_size / PAGE_SIZE; i++) {
-			uint32_t *ptr = (uint32_t *)(a + PAGE_SIZE*i);
-			for (int j = 0; j < PAGE_SIZE/4; j++)
-				ptr[j] = i + j;
-			igt_progress("Writing a ", i, huge_object_size / PAGE_SIZE);
-		}
-
 		bo = gem_create(fd, huge_object_size);
-		if (tiling_b)
+		if (tiling_b) {
 			igt_require(__gem_set_tiling(fd, bo, abs(tiling_b), max_tile_width(devid, tiling_b)) == 0);
+			valid_size = rounddown(valid_size, tile_row_size(tiling_b, max_tile_width(devid, tiling_b)));
+		}
 		b = __gem_mmap__gtt(fd, bo, huge_object_size, PROT_READ | PROT_WRITE);
 		igt_require(b);
 		gem_close(fd, bo);
 
-		for (i = 0; i < huge_object_size / PAGE_SIZE; i++) {
+		for (i = 0; i < valid_size / PAGE_SIZE; i++) {
+			uint32_t *ptr = (uint32_t *)(a + PAGE_SIZE*i);
+			for (int j = 0; j < PAGE_SIZE/4; j++)
+				ptr[j] = i + j;
+			igt_progress("Writing a ", i, valid_size / PAGE_SIZE);
+		}
+
+
+		for (i = 0; i < valid_size / PAGE_SIZE; i++) {
 			uint32_t *ptr = (uint32_t *)(b + PAGE_SIZE*i);
 			for (int j = 0; j < PAGE_SIZE/4; j++)
 				ptr[j] = ~(i + j);
-			igt_progress("Writing b ", i, huge_object_size / PAGE_SIZE);
+			igt_progress("Writing b ", i, valid_size / PAGE_SIZE);
 		}
 
-		for (i = 0; i < huge_object_size / PAGE_SIZE; i++) {
+		for (i = 0; i < valid_size / PAGE_SIZE; i++) {
 			uint32_t *A = (uint32_t *)(a + PAGE_SIZE*i);
 			uint32_t *B = (uint32_t *)(b + PAGE_SIZE*i);
 			uint32_t A_tmp[PAGE_SIZE/sizeof(uint32_t)];
@@ -630,10 +642,10 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 			memcpy(A, A_tmp, PAGE_SIZE);
 			memcpy(B, B_tmp, PAGE_SIZE);
 
-			igt_progress("Copying a<->b ", i, huge_object_size / PAGE_SIZE);
+			igt_progress("Copying a<->b ", i, valid_size / PAGE_SIZE);
 		}
 
-		for (i = 0; i < huge_object_size / PAGE_SIZE; i++) {
+		for (i = 0; i < valid_size / PAGE_SIZE; i++) {
 			uint32_t page[PAGE_SIZE/sizeof(uint32_t)];
 			copy_wc_page(page, a + PAGE_SIZE*i);
 			for (int j = 0; j < PAGE_SIZE/sizeof(uint32_t); j++)
@@ -641,11 +653,11 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 					igt_assert_eq_u32(page[j], ~(i + j));
 				else
 					igt_assert_eq_u32(page[j], i + j);
-			igt_progress("Checking a ", i, huge_object_size / PAGE_SIZE);
+			igt_progress("Checking a ", i, valid_size / PAGE_SIZE);
 		}
 		munmap(a, huge_object_size);
 
-		for (i = 0; i < huge_object_size / PAGE_SIZE; i++) {
+		for (i = 0; i < valid_size / PAGE_SIZE; i++) {
 			uint32_t page[PAGE_SIZE/sizeof(uint32_t)];
 			copy_wc_page(page, b + PAGE_SIZE*i);
 			for (int j = 0; j < PAGE_SIZE/sizeof(uint32_t); j++)
@@ -653,7 +665,7 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 					igt_assert_eq_u32(page[j], ~(i + j));
 				else
 					igt_assert_eq_u32(page[j], i + j);
-			igt_progress("Checking b ", i, huge_object_size / PAGE_SIZE);
+			igt_progress("Checking b ", i, valid_size / PAGE_SIZE);
 		}
 		munmap(b, huge_object_size);
 	}
