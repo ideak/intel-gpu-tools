@@ -341,6 +341,55 @@ test_coherency(int fd)
 	gem_close(fd, handle);
 }
 
+static void
+test_hang(int fd)
+{
+	igt_hang_t hang;
+	uint32_t patterns[] = {
+		0, 0xaaaaaaaa, 0x55555555, 0xcccccccc,
+	};
+	uint32_t *gtt[3];
+	int last_pattern = 0;
+	int next_pattern = 1;
+	int i;
+
+	for (i = I915_TILING_NONE; i <= I915_TILING_Y; i++) {
+		uint32_t handle;
+
+		handle = gem_create(fd, OBJECT_SIZE);
+		gem_set_tiling(fd, handle, i, 2048);
+
+		gtt[i] = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_WRITE);
+		set_domain_gtt(fd, handle);
+		gem_close(fd, handle);
+	}
+
+	hang = igt_hang_ring(fd, I915_EXEC_RENDER);
+
+	do {
+		for (i = 0; i < OBJECT_SIZE / 64; i++) {
+			int x = 16*i + (i%16);
+
+			igt_assert(gtt[0][x] == patterns[last_pattern]);
+			igt_assert(gtt[1][x] == patterns[last_pattern]);
+			igt_assert(gtt[2][x] == patterns[last_pattern]);
+
+			gtt[0][x] = patterns[next_pattern];
+			gtt[1][x] = patterns[next_pattern];
+			gtt[2][x] = patterns[next_pattern];
+		}
+
+		last_pattern = next_pattern;
+		next_pattern = (next_pattern + 1) % ARRAY_SIZE(patterns);
+	} while (gem_bo_busy(fd, hang.handle));
+
+	igt_post_hang_ring(fd, hang);
+
+	munmap(gtt[0], OBJECT_SIZE);
+	munmap(gtt[1], OBJECT_SIZE);
+	munmap(gtt[2], OBJECT_SIZE);
+}
+
 static int min_tile_width(uint32_t devid, int tiling)
 {
 	if (tiling < 0) {
@@ -731,6 +780,8 @@ igt_main
 		test_write_gtt(fd);
 	igt_subtest("coherency")
 		test_coherency(fd);
+	igt_subtest("hang")
+		test_hang(fd);
 	igt_subtest("basic-read-write")
 		test_read_write(fd, READ_BEFORE_WRITE);
 	igt_subtest("basic-write-read")
