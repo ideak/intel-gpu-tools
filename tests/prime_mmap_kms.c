@@ -152,7 +152,7 @@ static void cleanup_crtc(gpu_process_t *gpu)
 	igt_remove_fb(gpu->drm_fd, &gpu->fb);
 }
 
-static bool prepare_crtc(gpu_process_t *gpu)
+static void prepare_crtc(gpu_process_t *gpu)
 {
 	igt_display_t *display = &gpu->display;
 	igt_output_t *output = gpu->output;
@@ -160,13 +160,6 @@ static bool prepare_crtc(gpu_process_t *gpu)
 
 	/* select the pipe we want to use */
 	igt_output_set_pipe(output, gpu->pipe);
-	igt_display_commit(display);
-
-	if (!output->valid) {
-		igt_output_set_pipe(output, PIPE_ANY);
-		igt_display_commit(display);
-		return false;
-	}
 
 	mode = igt_output_get_mode(output);
 
@@ -179,8 +172,6 @@ static bool prepare_crtc(gpu_process_t *gpu)
 
 	igt_plane_set_fb(gpu->primary, &gpu->fb);
 	igt_display_commit(display);
-
-	return true;
 }
 
 /*
@@ -197,32 +188,29 @@ static void run_test(gpu_process_t *gpu)
 	enum pipe pipe;
 	int prime_fd;
 
-	for_each_connected_output(display, output) {
+	for_each_pipe_with_valid_output(display, pipe, output) {
 		gpu->output = output;
-		for_each_pipe(display, pipe) {
-			gpu->pipe = pipe;
+		gpu->pipe = pipe;
 
-			if (!prepare_crtc(gpu))
-				continue;
+		prepare_crtc(gpu);
 
-			prime_fd = prime_handle_to_fd_for_mmap(gpu->drm_fd,
-							       gpu->fb.gem_handle);
-			igt_skip_on(prime_fd == -1 && errno == EINVAL);
+		prime_fd = prime_handle_to_fd_for_mmap(gpu->drm_fd,
+							gpu->fb.gem_handle);
+		igt_skip_on(prime_fd == -1 && errno == EINVAL);
 
-			/* Note that it only shares the dma-buf fd and some
-			 * other basic info */
-			igt_fork(renderer_no, 1) {
-				init_renderer(prime_fd, gpu->fb.size, gpu->fb.width,
-					      gpu->fb.height);
-			}
-			igt_waitchildren();
-
-			igt_debug_wait_for_keypress("paint");
-			cleanup_crtc(gpu);
-
-			/* once is enough */
-			return;
+		/* Note that it only shares the dma-buf fd and some
+		  * other basic info */
+		igt_fork(renderer_no, 1) {
+			init_renderer(prime_fd, gpu->fb.size, gpu->fb.width,
+				      gpu->fb.height);
 		}
+		igt_waitchildren();
+
+		igt_debug_wait_for_keypress("paint");
+		cleanup_crtc(gpu);
+
+		/* once is enough */
+		return;
 	}
 
 	igt_skip("no valid crtc/connector combinations found\n");
