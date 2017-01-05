@@ -161,7 +161,7 @@ static void test(data_t *data)
 	igt_assert_crc_equal(&crc, &data->ref_crc);
 }
 
-static bool prepare_crtc(data_t *data)
+static void prepare_crtc(data_t *data)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output = data->output;
@@ -169,13 +169,6 @@ static bool prepare_crtc(data_t *data)
 
 	/* select the pipe we want to use */
 	igt_output_set_pipe(output, data->pipe);
-	igt_display_commit(display);
-
-	if (!output->valid) {
-		igt_output_set_pipe(output, PIPE_ANY);
-		igt_display_commit(display);
-		return false;
-	}
 
 	mode = igt_output_get_mode(output);
 
@@ -197,8 +190,6 @@ static bool prepare_crtc(data_t *data)
 
 	/* get reference crc for the white fb */
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
-
-	return true;
 }
 
 static void cleanup_crtc(data_t *data)
@@ -224,20 +215,16 @@ static void run_test(data_t *data)
 	igt_output_t *output;
 	enum pipe pipe;
 
-	for_each_connected_output(display, output) {
+	for_each_pipe_with_valid_output(display, pipe, output) {
 		data->output = output;
-		for_each_pipe(display, pipe) {
-			data->pipe = pipe;
+		data->pipe = pipe;
 
-			if (!prepare_crtc(data))
-				continue;
+		prepare_crtc(data);
+		test(data);
+		cleanup_crtc(data);
 
-			test(data);
-			cleanup_crtc(data);
-
-			/* once is enough */
-			return;
-		}
+		/* once is enough */
+		return;
 	}
 
 	igt_skip("no valid crtc/connector combinations found\n");
