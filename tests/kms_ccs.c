@@ -202,7 +202,7 @@ static void display_fb(data_t *data, int compressed)
 #define TEST_UNCOMPRESSED 0
 #define TEST_COMPRESSED 1
 
-static bool test_output(data_t *data)
+static void test_output(data_t *data)
 {
 	igt_display_t *display = &data->display;
 	igt_plane_t *primary;
@@ -234,23 +234,27 @@ static bool test_output(data_t *data)
 	primary = igt_output_get_plane(data->output, IGT_PLANE_PRIMARY);
 	igt_plane_set_fb(primary, NULL);
 	igt_plane_set_rotation(primary, IGT_ROTATION_0);
+	if (!display->is_atomic)
+		igt_display_commit2(display, COMMIT_UNIVERSAL);
+
 	igt_output_set_pipe(data->output, PIPE_ANY);
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
+	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	if (data->flags & TEST_CRC)
 		igt_remove_fb(data->drm_fd, &data->fb);
-
-	return true;
 }
 
 static void test(data_t *data)
 {
 	igt_display_t *display = &data->display;
 	int valid_tests = 0;
+	enum pipe wanted_pipe = data->pipe;
 
-	for_each_connected_output(display, data->output) {
-		if (!test_output(data))
+	for_each_pipe_with_valid_output(display, data->pipe, data->output) {
+		if (wanted_pipe != PIPE_NONE && data->pipe != wanted_pipe)
 			continue;
+
+		test_output(data);
 
 		valid_tests++;
 
@@ -279,23 +283,23 @@ igt_main
 
 	igt_subtest_f("bad-pixel-format") {
 		data.flags = TEST_BAD_PIXEL_FORMAT;
-		data.pipe = PIPE_A;
+		data.pipe = PIPE_NONE;
 		test(&data);
 	}
 
 	igt_subtest_f("bad-rotation-90") {
 		data.flags = TEST_BAD_ROTATION_90;
-		data.pipe = PIPE_A;
+		data.pipe = PIPE_NONE;
 		test(&data);
 	}
 
-	for_each_pipe(&data.display, data.pipe) {
+	for (data.pipe = PIPE_A; data.pipe < I915_MAX_PIPES; data.pipe++) {
 		data.flags = TEST_CRC;
 		igt_subtest_f("pipe-%s-crc-basic", kmstest_pipe_name(data.pipe))
 			test(&data);
 	}
 
-	for_each_pipe(&data.display, data.pipe) {
+	for (data.pipe = PIPE_A; data.pipe < I915_MAX_PIPES; data.pipe++) {
 		data.flags = TEST_CRC | TEST_ROTATE_180;
 		igt_subtest_f("pipe-%s-crc-rotation-180", kmstest_pipe_name(data.pipe))
 			test(&data);
