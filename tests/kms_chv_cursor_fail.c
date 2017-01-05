@@ -226,7 +226,7 @@ static void test_edges(data_t *data, unsigned int edges)
 	}
 }
 
-static bool prepare_crtc(data_t *data)
+static void prepare_crtc(data_t *data)
 {
 	drmModeModeInfo *mode;
 	igt_display_t *display = &data->display;
@@ -235,13 +235,6 @@ static bool prepare_crtc(data_t *data)
 	/* select the pipe we want to use */
 	igt_output_set_pipe(data->output, data->pipe);
 	cursor_disable(data);
-	igt_display_commit(display);
-
-	if (!data->output->valid) {
-		igt_output_set_pipe(data->output, PIPE_ANY);
-		igt_display_commit(display);
-		return false;
-	}
 
 	mode = igt_output_get_mode(data->output);
 	igt_create_pattern_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
@@ -272,8 +265,6 @@ static bool prepare_crtc(data_t *data)
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
-
-	return true;
 }
 
 static void cleanup_crtc(data_t *data)
@@ -300,9 +291,8 @@ static void test_crtc(data_t *data, unsigned int edges)
 
 	create_cursor_fb(data, data->curw, data->curh);
 
-	for_each_connected_output(display, data->output) {
-		if (!prepare_crtc(data))
-			continue;
+	for_each_valid_output_on_pipe(display, data->pipe, data->output) {
+		prepare_crtc(data);
 
 		valid_tests++;
 
