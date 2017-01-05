@@ -166,6 +166,20 @@ enum kmstest_force_connector_state {
 	FORCE_CONNECTOR_OFF
 };
 
+/**
+ * kmstest_broadcast_rgb_mode:
+ * @BROADCAST_RGB_AUTO: Choose the color range to use automatically
+ * @BROADCAST_RGB_FULL: Force the connector to use full color range
+ * @BROADCAST_RGB_16_235: Force the connector to use a limited 16:235 color
+ * range
+ */
+enum kmstest_broadcast_rgb_mode {
+	BROADCAST_RGB_AUTO = 0,
+	BROADCAST_RGB_FULL,
+	BROADCAST_RGB_16_235
+};
+
+
 bool kmstest_force_connector(int fd, drmModeConnector *connector,
 			     enum kmstest_force_connector_state state);
 void kmstest_edid_add_3d(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
@@ -183,6 +197,8 @@ bool kmstest_probe_connector_config(int drm_fd, uint32_t connector_id,
 void kmstest_free_connector_config(struct kmstest_connector_config *config);
 
 void kmstest_set_connector_dpms(int fd, drmModeConnector *connector, int mode);
+bool kmstest_set_connector_broadcast_rgb(int fd, drmModeConnector *connector,
+					 enum kmstest_broadcast_rgb_mode mode);
 bool kmstest_get_property(int drm_fd, uint32_t object_id, uint32_t object_type,
 			  const char *name, uint32_t *prop_id, uint64_t *value,
 			  drmModePropertyPtr *prop);

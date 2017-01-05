@@ -1035,6 +1035,40 @@ void kmstest_set_connector_dpms(int fd, drmModeConnector *connector, int mode)
 }
 
 /**
+ * kmstest_set_connector_broadcast_rgb:
+ * @fd: DRM fd
+ * @connector: libdrm connector
+ * @mode: Broadcast RGB mode
+ *
+ * This function sets the Broadcast RGB prop of @connector to @mode, if there
+ * is one.
+ *
+ * Returns: true if we found and set the Broadcast RGB prop, false otherwise
+ */
+bool kmstest_set_connector_broadcast_rgb(int fd, drmModeConnector *connector,
+					 enum kmstest_broadcast_rgb_mode mode)
+{
+	uint32_t prop_id;
+	int ret;
+
+	ret = kmstest_get_property(fd, connector->connector_id,
+				   DRM_MODE_OBJECT_CONNECTOR, "Broadcast RGB",
+				   &prop_id, NULL, NULL);
+	if (!ret) {
+		igt_debug("Broadcast RGB property not found on %d\n",
+			  connector->connector_id);
+		return false;
+	}
+
+	igt_debug("Setting Broadcast RGB mode on connector %d to %d\n",
+		  connector->connector_id, mode);
+	ret = drmModeConnectorSetProperty(fd, connector->connector_id, prop_id,
+					  mode);
+
+	return ret == 0;
+}
+
+/**
  * kmstest_get_property:
  * @drm_fd: drm file descriptor
  * @object_id: object whose properties we're going to get
