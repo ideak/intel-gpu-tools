@@ -104,7 +104,7 @@ static void free_fence_objs(data_t *data)
 		drm_intel_bo_unreference(data->bos[i]);
 }
 
-static bool run_single_test(data_t *data, enum pipe pipe, igt_output_t *output)
+static void run_single_test(data_t *data, enum pipe pipe, igt_output_t *output)
 {
 	igt_display_t *display = &data->display;
 	drmModeModeInfo *mode;
@@ -113,13 +113,6 @@ static bool run_single_test(data_t *data, enum pipe pipe, igt_output_t *output)
 	int i;
 
 	igt_output_set_pipe(output, pipe);
-	igt_display_commit(display);
-
-	if (!output->valid) {
-		igt_output_set_pipe(output, PIPE_ANY);
-		igt_display_commit(display);
-		return false;
-	}
 
 	mode = igt_output_get_mode(output);
 	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
@@ -183,8 +176,6 @@ static bool run_single_test(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_remove_fb(data->drm_fd, &fb[0]);
 
 	igt_info("\n");
-
-	return true;
 }
 
 static void run_test(data_t *data)
@@ -193,11 +184,10 @@ static void run_test(data_t *data)
 	igt_output_t *output;
 	enum pipe p;
 
-	for_each_connected_output(display, output) {
-		for_each_pipe(display, p) {
-			if (run_single_test(data, p, output))
-				return; /* one time ought to be enough */
-		}
+	for_each_pipe_with_valid_output(display, p, output) {
+		run_single_test(data, p, output);
+
+		return; /* one time ought to be enough */
 	}
 
 	igt_skip("no valid crtc/connector combinations found\n");
