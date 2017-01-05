@@ -311,22 +311,11 @@ static void test_crc(data_t *data, enum test_mode mode)
 	check_crc(data, mode);
 }
 
-static bool prepare_crtc(data_t *data)
+static void prepare_crtc(data_t *data)
 {
-	igt_display_t *display = &data->display;
 	igt_output_t *output = data->output;
 
-	/* select the pipe we want to use */
 	igt_output_set_pipe(output, data->pipe);
-	igt_display_commit(display);
-
-	if (!output->valid) {
-		igt_output_set_pipe(output, PIPE_ANY);
-		igt_display_commit(display);
-		return false;
-	}
-
-	return true;
 }
 
 static void create_fbs(data_t *data, bool tiled, struct igt_fb *fbs)
@@ -468,14 +457,17 @@ static void finish_crtc(data_t *data, enum test_mode mode)
 static void reset_display(data_t *data)
 {
 	igt_display_t *display = &data->display;
+	enum pipe pipe;
 
-	for_each_connected_output(display, data->output) {
-		if (data->output->valid > 0) {
-			data->primary =  igt_output_get_plane(data->output, IGT_PLANE_PRIMARY);
-			igt_plane_set_fb(data->primary, NULL);
-		}
-		igt_output_set_pipe(data->output, PIPE_ANY);
+	for_each_pipe(display, pipe) {
+		igt_plane_t *plane = &display->pipes[pipe].planes[IGT_PLANE_PRIMARY];
+
+		if (plane->fb)
+			igt_plane_set_fb(plane, NULL);
 	}
+
+	for_each_connected_output(display, data->output)
+		igt_output_set_pipe(data->output, PIPE_ANY);
 }
 
 static void run_test(data_t *data, enum test_mode mode)
@@ -491,35 +483,32 @@ static void run_test(data_t *data, enum test_mode mode)
 
 	reset_display(data);
 
-	for_each_connected_output(display, data->output) {
-		for_each_pipe(display, data->pipe) {
-			if (!prepare_crtc(data))
-				continue;
+	for_each_pipe_with_valid_output(display, data->pipe, data->output) {
+		prepare_crtc(data);
 
-			igt_info("Beginning %s on pipe %s, connector %s\n",
-				 igt_subtest_name(),
-				 kmstest_pipe_name(data->pipe),
-				 igt_output_name(data->output));
+		igt_info("Beginning %s on pipe %s, connector %s\n",
+			  igt_subtest_name(),
+			  kmstest_pipe_name(data->pipe),
+			  igt_output_name(data->output));
 
-			if (!prepare_test(data, mode)) {
-				igt_info("%s on pipe %s, connector %s: SKIPPED\n",
-					 igt_subtest_name(),
-					 kmstest_pipe_name(data->pipe),
-					 igt_output_name(data->output));
-				continue;
-			}
-
-			valid_tests++;
-
-			test_crc(data, mode);
-
-			igt_info("%s on pipe %s, connector %s: PASSED\n",
-				 igt_subtest_name(),
-				 kmstest_pipe_name(data->pipe),
-				 igt_output_name(data->output));
-
-			finish_crtc(data, mode);
+		if (!prepare_test(data, mode)) {
+			igt_info("%s on pipe %s, connector %s: SKIPPED\n",
+				  igt_subtest_name(),
+				  kmstest_pipe_name(data->pipe),
+				  igt_output_name(data->output));
+			continue;
 		}
+
+		valid_tests++;
+
+		test_crc(data, mode);
+
+		igt_info("%s on pipe %s, connector %s: PASSED\n",
+			  igt_subtest_name(),
+			  kmstest_pipe_name(data->pipe),
+			  igt_output_name(data->output));
+
+		finish_crtc(data, mode);
 	}
 
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
