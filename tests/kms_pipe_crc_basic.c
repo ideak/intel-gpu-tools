@@ -89,7 +89,7 @@ static void test_bad_source(data_t *data)
 #define TEST_SEQUENCE (1<<0)
 #define TEST_NONBLOCK (1<<1)
 
-static int
+static void
 test_read_crc_for_output(data_t *data, int pipe, igt_output_t *output,
 			 unsigned flags)
 {
@@ -105,12 +105,6 @@ test_read_crc_for_output(data_t *data, int pipe, igt_output_t *output,
 		int n_crcs;
 
 		igt_output_set_pipe(output, pipe);
-		igt_display_commit(display);
-
-		if (!output->valid) {
-			igt_output_set_pipe(output, PIPE_ANY);
-			return 0;
-		}
 
 		igt_debug("Clearing the fb with color (%.02lf,%.02lf,%.02lf)\n",
 			  colors[c].r, colors[c].g, colors[c].b);
@@ -180,8 +174,6 @@ test_read_crc_for_output(data_t *data, int pipe, igt_output_t *output,
 
 		igt_output_set_pipe(output, PIPE_ANY);
 	}
-
-	return 1;
 }
 
 static void test_read_crc(data_t *data, int pipe, unsigned flags)
@@ -192,13 +184,14 @@ static void test_read_crc(data_t *data, int pipe, unsigned flags)
 
 	igt_skip_on(pipe >= data->display.n_pipes);
 
-	for_each_connected_output(display, output) {
+	for_each_valid_output_on_pipe(display, pipe, output) {
 
 		igt_info("%s: Testing connector %s using pipe %s\n",
 			 igt_subtest_name(), igt_output_name(output),
 			 kmstest_pipe_name(pipe));
 
-		valid_connectors += test_read_crc_for_output(data, pipe, output, flags);
+		test_read_crc_for_output(data, pipe, output, flags);
+		valid_connectors ++;
 	}
 
 	igt_require_f(valid_connectors, "No connector found for pipe %i\n", pipe);
