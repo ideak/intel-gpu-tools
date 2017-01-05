@@ -943,6 +943,7 @@ static void get_sink_crc(sink_crc_t *crc, bool mandatory)
 		if (mandatory)
 			igt_skip("Sink CRC is unreliable on this machine.\n");
 	} else {
+		igt_assert_f(rc != -1, "Unexpected error: %d\n", errno_);
 		igt_assert(rc == SINK_CRC_SIZE);
 	}
 }
@@ -1399,6 +1400,7 @@ static void setup_sink_crc(void)
 	c = get_connector(prim_mode_params.connector_id);
 	if (c->connector_type != DRM_MODE_CONNECTOR_eDP) {
 		igt_info("Sink CRC not supported: primary screen is not eDP\n");
+		sink_crc.supported = false;
 		return;
 	}
 
