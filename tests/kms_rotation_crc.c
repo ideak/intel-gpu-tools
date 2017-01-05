@@ -99,6 +99,7 @@ static void commit_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 
 	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
 	igt_plane_set_fb(primary, &data->fb_modeset);
+	primary->rotation_changed = false;
 	igt_display_commit(display);
 
 	igt_plane_set_fb(plane, &data->fb);
@@ -255,72 +256,72 @@ static void test_plane_rotation(data_t *data, enum igt_plane plane_type)
 	if (data->display.is_atomic)
 		commit = COMMIT_ATOMIC;
 
-	for_each_connected_output(display, output) {
-		for_each_pipe(display, pipe) {
-			igt_plane_t *plane;
+	for_each_pipe_with_valid_output(display, pipe, output) {
+		igt_plane_t *plane;
 
-			igt_output_set_pipe(output, pipe);
+		igt_output_set_pipe(output, pipe);
 
-			plane = igt_output_get_plane(output, plane_type);
-			igt_require(igt_plane_supports_rotation(plane));
+		plane = igt_output_get_plane(output, plane_type);
+		igt_require(igt_plane_supports_rotation(plane));
 
-			prepare_crtc(data, output, pipe, plane);
+		prepare_crtc(data, output, pipe, plane);
 
-			igt_display_commit2(display, commit);
+		igt_display_commit2(display, commit);
 
-			/* collect unrotated CRC */
-			igt_pipe_crc_collect_crc(data->pipe_crc, &crc_unrotated);
+		/* collect unrotated CRC */
+		igt_pipe_crc_collect_crc(data->pipe_crc, &crc_unrotated);
 
-			igt_plane_set_rotation(plane, data->rotation);
-			ret = igt_display_try_commit2(display, commit);
-			if (data->override_fmt || data->override_tiling) {
-				igt_assert_eq(ret, -EINVAL);
-			} else {
-				igt_assert_eq(ret, 0);
-				igt_pipe_crc_collect_crc(data->pipe_crc,
-							 &crc_output);
-				igt_assert_crc_equal(&data->ref_crc,
-						     &crc_output);
-			}
-
-			flip_count = data->flip_stress;
-			while (flip_count--) {
-				ret = drmModePageFlip(data->gfx_fd,
-						      output->config.crtc->crtc_id,
-						      data->fb_flip.fb_id,
-						      DRM_MODE_PAGE_FLIP_EVENT,
-						      NULL);
-				igt_assert(ret == 0);
-				wait_for_pageflip(data->gfx_fd);
-				ret = drmModePageFlip(data->gfx_fd,
-						      output->config.crtc->crtc_id,
-						      data->fb.fb_id,
-						      DRM_MODE_PAGE_FLIP_EVENT,
-						      NULL);
-				igt_assert(ret == 0);
-				wait_for_pageflip(data->gfx_fd);
-			}
-
-			/*
-			 * check the rotation state has been reset when the VT
-			 * mode is restored
-			 */
-			kmstest_restore_vt_mode();
-			kmstest_set_vt_graphics_mode();
-
-			commit_crtc(data, output, plane);
-
-			igt_pipe_crc_collect_crc(data->pipe_crc, &crc_output);
-			igt_assert_crc_equal(&crc_unrotated, &crc_output);
-
-			valid_tests++;
-			cleanup_crtc(data, output, plane);
+		igt_plane_set_rotation(plane, data->rotation);
+		ret = igt_display_try_commit2(display, commit);
+		if (data->override_fmt || data->override_tiling) {
+			igt_assert_eq(ret, -EINVAL);
+		} else {
+			igt_assert_eq(ret, 0);
+			igt_pipe_crc_collect_crc(data->pipe_crc,
+						  &crc_output);
+			igt_assert_crc_equal(&data->ref_crc,
+					      &crc_output);
 		}
+
+		flip_count = data->flip_stress;
+		while (flip_count--) {
+			ret = drmModePageFlip(data->gfx_fd,
+					      output->config.crtc->crtc_id,
+					      data->fb_flip.fb_id,
+					      DRM_MODE_PAGE_FLIP_EVENT,
+					      NULL);
+			igt_assert_eq(ret, 0);
+			wait_for_pageflip(data->gfx_fd);
+			ret = drmModePageFlip(data->gfx_fd,
+					      output->config.crtc->crtc_id,
+					      data->fb.fb_id,
+					      DRM_MODE_PAGE_FLIP_EVENT,
+					      NULL);
+			igt_assert_eq(ret, 0);
+			wait_for_pageflip(data->gfx_fd);
+		}
+
+		/*
+		  * check the rotation state has been reset when the VT
+		  * mode is restored
+		  */
+		kmstest_restore_vt_mode();
+		kmstest_set_vt_graphics_mode();
+
+		commit_crtc(data, output, plane);
+
+		igt_pipe_crc_collect_crc(data->pipe_crc, &crc_output);
+		igt_assert_crc_equal(&crc_unrotated, &crc_output);
+
+		valid_tests++;
+		cleanup_crtc(data, output, plane);
 	}
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 }
 
-static void test_plane_rotation_ytiled_obj(data_t *data, enum igt_plane plane_type)
+static void test_plane_rotation_ytiled_obj(data_t *data,
+					   igt_output_t *output,
+					   enum igt_plane plane_type)
 {
 	igt_display_t *display = &data->display;
 	uint64_t tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
@@ -328,14 +329,11 @@ static void test_plane_rotation_ytiled_obj(data_t *data, enum igt_plane plane_ty
 	int bpp = igt_drm_format_to_bpp(format);
 	enum igt_commit_style commit = COMMIT_LEGACY;
 	int fd = data->gfx_fd;
-	igt_output_t *output = &display->outputs[0];
 	igt_plane_t *plane;
 	drmModeModeInfo *mode;
 	unsigned int stride, size, w, h;
 	uint32_t gem_handle;
 	int ret;
-
-	igt_require(output != NULL && output->valid == true);
 
 	plane = igt_output_get_plane(output, plane_type);
 	igt_require(igt_plane_supports_rotation(plane));
@@ -360,7 +358,7 @@ static void test_plane_rotation_ytiled_obj(data_t *data, enum igt_plane plane_ty
 
 	gem_handle = gem_create(fd, size);
 	ret = __gem_set_tiling(fd, gem_handle, I915_TILING_Y, stride);
-	igt_assert(ret == 0);
+	igt_assert_eq(ret, 0);
 
 	do_or_die(__kms_addfb(fd, gem_handle, w, h, stride,
 		  format, tiling, LOCAL_DRM_MODE_FB_MODIFIERS,
@@ -381,12 +379,16 @@ static void test_plane_rotation_ytiled_obj(data_t *data, enum igt_plane plane_ty
 				 plane->rotation);
 	ret = igt_display_try_commit2(display, commit);
 
+	igt_output_set_pipe(output, PIPE_NONE);
+
 	kmstest_restore_vt_mode();
 	igt_remove_fb(fd, &data->fb);
-	igt_assert(ret == 0);
+	igt_assert_eq(ret, 0);
 }
 
-static void test_plane_rotation_exhaust_fences(data_t *data, enum igt_plane plane_type)
+static void test_plane_rotation_exhaust_fences(data_t *data,
+					       igt_output_t *output,
+					       enum igt_plane plane_type)
 {
 	igt_display_t *display = &data->display;
 	uint64_t tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
@@ -394,7 +396,6 @@ static void test_plane_rotation_exhaust_fences(data_t *data, enum igt_plane plan
 	int bpp = igt_drm_format_to_bpp(format);
 	enum igt_commit_style commit = COMMIT_LEGACY;
 	int fd = data->gfx_fd;
-	igt_output_t *output = &display->outputs[0];
 	igt_plane_t *plane;
 	drmModeModeInfo *mode;
 	data_t data2[MAX_FENCES+1] = {};
@@ -402,8 +403,6 @@ static void test_plane_rotation_exhaust_fences(data_t *data, enum igt_plane plan
 	uint32_t gem_handle;
 	uint64_t total_aperture_size, total_fbs_size;
 	int i, ret;
-
-	igt_require(output != NULL && output->valid == true);
 
 	plane = igt_output_get_plane(output, plane_type);
 	igt_require(igt_plane_supports_rotation(plane));
@@ -472,9 +471,9 @@ static void test_plane_rotation_exhaust_fences(data_t *data, enum igt_plane plan
 					 DRM_MODE_OBJECT_PLANE,
 					 plane->rotation_property,
 					 plane->rotation);
-		ret = igt_display_try_commit2(display, commit);
+		igt_display_commit2(display, commit);
 		if (ret) {
-			igt_warn("failed to commit hardware rotated fb\n");
+			igt_warn("failed to commit hardware rotated fb: %i\n", ret);
 			goto err_commit;
 		}
 	}
@@ -485,11 +484,20 @@ err_alloc:
 
 	i--;
 err_commit:
+	igt_plane_set_fb(plane, NULL);
+	igt_plane_set_rotation(plane, IGT_ROTATION_0);
+
+	if (commit < COMMIT_ATOMIC)
+		igt_display_commit2(display, commit);
+
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
 	for (; i >= 0; i--)
 		igt_remove_fb(fd, &data2[i].fb);
 
 	kmstest_restore_vt_mode();
-	igt_assert(ret == 0);
+	igt_assert_eq(ret, 0);
 }
 
 igt_main
@@ -582,14 +590,42 @@ igt_main
 	}
 
 	igt_subtest_f("primary-rotation-90-Y-tiled") {
+		enum pipe pipe;
+		igt_output_t *output;
+		int valid_tests = 0;
+
 		igt_require(gen >= 9);
 		data.rotation = IGT_ROTATION_90;
-		test_plane_rotation_ytiled_obj(&data, IGT_PLANE_PRIMARY);
+
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_output_set_pipe(output, pipe);
+
+			test_plane_rotation_ytiled_obj(&data, output, IGT_PLANE_PRIMARY);
+
+			valid_tests++;
+			break;
+		}
+
+		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 	}
 
 	igt_subtest_f("exhaust-fences") {
+		enum pipe pipe;
+		igt_output_t *output;
+		int valid_tests = 0;
+
 		igt_require(gen >= 9);
-		test_plane_rotation_exhaust_fences(&data, IGT_PLANE_PRIMARY);
+
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_output_set_pipe(output, pipe);
+
+			test_plane_rotation_exhaust_fences(&data, output, IGT_PLANE_PRIMARY);
+
+			valid_tests++;
+			break;
+		}
+
+		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 	}
 
 	igt_fixture {
