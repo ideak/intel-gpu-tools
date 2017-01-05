@@ -59,7 +59,7 @@ static double elapsed(const struct timespec *start,
 	return (1e6*(end->tv_sec - start->tv_sec) + (end->tv_nsec - start->tv_nsec)/1000)/loop;
 }
 
-static bool prepare_crtc(data_t *data, int fd, igt_output_t *output)
+static void prepare_crtc(data_t *data, int fd, igt_output_t *output)
 {
 	drmModeModeInfo *mode;
 	igt_display_t *display = &data->display;
@@ -67,13 +67,6 @@ static bool prepare_crtc(data_t *data, int fd, igt_output_t *output)
 
 	/* select the pipe we want to use */
 	igt_output_set_pipe(output, data->pipe);
-	igt_display_commit(display);
-
-	if (!output->valid) {
-		igt_output_set_pipe(output, PIPE_ANY);
-		igt_display_commit(display);
-		return false;
-	}
 
 	/* create and set the primary plane fb */
 	mode = igt_output_get_mode(output);
@@ -89,8 +82,6 @@ static bool prepare_crtc(data_t *data, int fd, igt_output_t *output)
 	igt_display_commit(display);
 
 	igt_wait_for_vblank(fd, data->pipe);
-
-	return true;
 }
 
 static void cleanup_crtc(data_t *data, int fd, igt_output_t *output)
@@ -114,30 +105,27 @@ static void run_test(data_t *data, int fd, void (*testfunc)(data_t *, int))
 	enum pipe p;
 	unsigned int valid_tests = 0;
 
-	for_each_connected_output(display, output) {
-		for_each_pipe(display, p) {
-			data->pipe = p;
+	for_each_pipe_with_valid_output(display, p, output) {
+		data->pipe = p;
 
-			if (!prepare_crtc(data, fd, output))
-				continue;
+		prepare_crtc(data, fd, output);
 
-			valid_tests++;
+		valid_tests++;
 
-			igt_info("Beginning %s on pipe %s, connector %s\n",
-				 igt_subtest_name(),
-				 kmstest_pipe_name(data->pipe),
-				 igt_output_name(output));
+		igt_info("Beginning %s on pipe %s, connector %s\n",
+			  igt_subtest_name(),
+			  kmstest_pipe_name(data->pipe),
+			  igt_output_name(output));
 
-			testfunc(data, fd);
+		testfunc(data, fd);
 
-			igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
-				 igt_subtest_name(),
-				 kmstest_pipe_name(data->pipe),
-				 igt_output_name(output));
+		igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
+			  igt_subtest_name(),
+			  kmstest_pipe_name(data->pipe),
+			  igt_output_name(output));
 
-			/* cleanup what prepare_crtc() has done */
-			cleanup_crtc(data, fd, output);
-		}
+		/* cleanup what prepare_crtc() has done */
+		cleanup_crtc(data, fd, output);
 	}
 
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
