@@ -190,7 +190,7 @@ static void make_gpu_busy(data_t *data, uint32_t flip_handle)
  * the primary plane may be full blue instead of the red it's
  * supposed to be.
  */
-static bool
+static void
 test_plane(data_t *data, igt_output_t *output, enum pipe pipe, enum igt_plane plane)
 {
 	struct igt_fb red_fb, green_fb, blue_fb;
@@ -200,13 +200,6 @@ test_plane(data_t *data, igt_output_t *output, enum pipe pipe, enum igt_plane pl
 	int ret;
 
 	igt_output_set_pipe(output, pipe);
-	igt_display_commit(&data->display);
-
-	if (!output->valid) {
-		igt_output_set_pipe(output, PIPE_ANY);
-		igt_display_commit(&data->display);
-		return false;
-	}
 
 	primary = igt_output_get_plane(output, 0);
 	sprite = igt_output_get_plane(output, plane);
@@ -316,8 +309,6 @@ test_plane(data_t *data, igt_output_t *output, enum pipe pipe, enum igt_plane pl
 	igt_display_commit(&data->display);
 
 	igt_assert_crc_equal(&ref_crc, &crc);
-
-	return true;
 }
 
 /*
@@ -341,7 +332,7 @@ test_plane(data_t *data, igt_output_t *output, enum pipe pipe, enum igt_plane pl
  * the primary plane may be full blue instead of the red it's
  * supposed to be.
  */
-static bool
+static void
 test_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 {
 	struct igt_fb red_fb, green_fb, blue_fb;
@@ -351,13 +342,6 @@ test_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 	int ret;
 
 	igt_output_set_pipe(output, pipe);
-	igt_display_commit(&data->display);
-
-	if (!output->valid) {
-		igt_output_set_pipe(output, PIPE_ANY);
-		igt_display_commit(&data->display);
-		return false;
-	}
 
 	primary = igt_output_get_plane(output, 0);
 
@@ -465,8 +449,6 @@ test_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 	igt_display_commit(&data->display);
 
 	igt_assert_crc_equal(&ref_crc, &crc);
-
-	return true;
 }
 
 static void
@@ -477,13 +459,11 @@ run_plane_test(data_t *data)
 	int valid_tests = 0;
 	enum pipe pipe;
 
-	for_each_connected_output(&data->display, output) {
-		for_each_pipe(&data->display, pipe) {
-			igt_require(data->display.pipes[pipe].n_planes > 2);
+	for_each_pipe_with_valid_output(&data->display, pipe, output) {
+		igt_require(data->display.pipes[pipe].n_planes > 2);
 
-			if (test_plane(data, output, pipe, plane))
-				valid_tests++;
-		}
+		test_plane(data, output, pipe, plane);
+		valid_tests++;
 	}
 
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
@@ -496,11 +476,9 @@ run_crtc_test(data_t *data)
 	int valid_tests = 0;
 	enum pipe pipe;
 
-	for_each_connected_output(&data->display, output) {
-		for_each_pipe(&data->display, pipe) {
-			if (test_crtc(data, output, pipe))
-				valid_tests++;
-		}
+	for_each_pipe_with_valid_output(&data->display, pipe, output) {
+		test_crtc(data, output, pipe);
+		valid_tests++;
 	}
 
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
