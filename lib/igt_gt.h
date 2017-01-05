@@ -76,7 +76,7 @@ extern const struct intel_execution_engine {
 	for (const struct intel_execution_engine *e__ = intel_execution_engines;\
 	     e__->name; \
 	     e__++) \
-		for_if (gem_has_ring(fd, flags__ = e__->exec_id | e__->flags))
+		for_if (gem_has_ring(fd__, flags__ = e__->exec_id | e__->flags))
 
 
 #endif /* IGT_GT_H */
