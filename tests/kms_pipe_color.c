@@ -288,7 +288,7 @@ static void test_pipe_degamma(data_t *data,
 
 	gamma_linear = generate_table(data->gamma_lut_size, 1.0);
 
-	for_each_connected_output(&data->display, output) {
+	for_each_valid_output_on_pipe(&data->display, primary->pipe->pipe, output) {
 		drmModeModeInfo *mode;
 		struct igt_fb fb_modeset, fb;
 		igt_crc_t crc_fullgamma, crc_fullcolors;
@@ -367,7 +367,7 @@ static void test_pipe_gamma(data_t *data,
 
 	gamma_full = generate_table_max(data->gamma_lut_size);
 
-	for_each_connected_output(&data->display, output) {
+	for_each_valid_output_on_pipe(&data->display, primary->pipe->pipe, output) {
 		drmModeModeInfo *mode;
 		struct igt_fb fb_modeset, fb;
 		igt_crc_t crc_fullgamma, crc_fullcolors;
@@ -452,7 +452,7 @@ static void test_pipe_legacy_gamma(data_t *data,
 	green_lut = malloc(sizeof(uint16_t) * legacy_lut_size);
 	blue_lut = malloc(sizeof(uint16_t) * legacy_lut_size);
 
-	for_each_connected_output(&data->display, output) {
+	for_each_valid_output_on_pipe(&data->display, primary->pipe->pipe, output) {
 		drmModeModeInfo *mode;
 		struct igt_fb fb_modeset, fb;
 		igt_crc_t crc_fullgamma, crc_fullcolors;
@@ -570,7 +570,7 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	gamma_zero = generate_table_zero(data->gamma_lut_size);
 
-	for_each_connected_output(&data->display, output) {
+	for_each_valid_output_on_pipe(&data->display, primary->pipe->pipe, output) {
 		igt_output_set_pipe(output, primary->pipe->pipe);
 
 		/* Ensure we have a clean state to start with. */
@@ -679,7 +679,7 @@ static bool test_pipe_ctm(data_t *data,
 	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	gamma_linear = generate_table(data->gamma_lut_size, 1.0);
 
-	for_each_connected_output(&data->display, output) {
+	for_each_valid_output_on_pipe(&data->display, primary->pipe->pipe, output) {
 		drmModeModeInfo *mode;
 		struct igt_fb fb_modeset, fb;
 		igt_crc_t crc_software, crc_hardware;
@@ -776,7 +776,7 @@ static void test_pipe_limited_range_ctm(data_t *data,
 	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	gamma_linear = generate_table(data->gamma_lut_size, 1.0);
 
-	for_each_connected_output(&data->display, output) {
+	for_each_valid_output_on_pipe(&data->display, primary->pipe->pipe, output) {
 		drmModeModeInfo *mode;
 		struct igt_fb fb_modeset, fb;
 		igt_crc_t crc_full, crc_limited;
@@ -850,14 +850,14 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 	};
 
 	igt_fixture {
+		int valid_tests = 0;
+
 		igt_require_pipe_crc();
 
-		if (p >= data->display.n_pipes)
-			return;
+		igt_require(p < data->display.n_pipes);
 
 		pipe = &data->display.pipes[p];
-		if (pipe->n_planes < IGT_PLANE_PRIMARY)
-			return;
+		igt_require(pipe->n_planes >= IGT_PLANE_PRIMARY);
 
 		primary = &pipe->planes[IGT_PLANE_PRIMARY];
 
@@ -875,8 +875,12 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 						  &data->gamma_lut_size,
 						  NULL));
 
-		for_each_connected_output(&data->display, output)
+		for_each_valid_output_on_pipe(&data->display, p, output) {
 			output_set_property_enum(output, "Broadcast RGB", "Full");
+
+			valid_tests++;
+		}
+		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 	}
 
 	/* We assume an 8bits depth per color for degamma/gamma LUTs
