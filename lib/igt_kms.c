@@ -1224,6 +1224,7 @@ static void igt_output_refresh(igt_output_t *output, bool final)
 {
 	igt_display_t *display = output->display;
 	unsigned long crtc_idx_mask;
+	bool valid;
 
 	crtc_idx_mask = output->pending_crtc_idx_mask;
 
@@ -1233,11 +1234,9 @@ static void igt_output_refresh(igt_output_t *output, bool final)
 
 	kmstest_free_connector_config(&output->config);
 
-	output->valid = _kmstest_connector_config(display->drm_fd,
-						  output->id,
-						  crtc_idx_mask,
-						  &output->config,
-						  output->valid < 0);
+	valid = _kmstest_connector_config(display->drm_fd, output->id,
+					  crtc_idx_mask, &output->config,
+					  !output->name);
 
 	if (!output->name && output->config.connector) {
 		drmModeConnector *c = output->config.connector;
@@ -1250,7 +1249,7 @@ static void igt_output_refresh(igt_output_t *output, bool final)
 		igt_atomic_fill_connector_props(display, output,
 			IGT_NUM_CONNECTOR_PROPS, igt_connector_prop_names);
 
-	if (!output->valid)
+	if (!valid)
 		return;
 
 	if (output->use_override_mode)
@@ -1499,7 +1498,6 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		 * We don't assign each output a pipe unless
 		 * a pipe is set with igt_output_set_pipe().
 		 */
-		output->valid = -1;
 		output->pending_crtc_idx_mask = 0;
 		output->id = resources->connectors[i];
 		output->display = display;
@@ -1536,8 +1534,7 @@ static void igt_pipe_fini(igt_pipe_t *pipe)
 
 static void igt_output_fini(igt_output_t *output)
 {
-	if (output->valid > 0)
-		kmstest_free_connector_config(&output->config);
+	kmstest_free_connector_config(&output->config);
 	free(output->name);
 }
 
@@ -2242,7 +2239,7 @@ static int do_display_commit(igt_display_t *display,
 			igt_pipe_t *pipe_obj = &display->pipes[pipe];
 			igt_output_t *output = igt_pipe_get_output(pipe_obj);
 
-			if (output && output->valid > 0)
+			if (output)
 				valid_outs++;
 
 			ret = igt_pipe_commit(pipe_obj, s, fail_on_error);
@@ -2442,7 +2439,7 @@ void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 	igt_display_t *display = output->display;
 	igt_pipe_t *old_pipe;
 
-	igt_assert(output->valid != -1);
+	igt_assert(output->name);
 
 	if (output->pending_crtc_idx_mask) {
 		old_pipe = igt_output_get_driving_pipe(output);
