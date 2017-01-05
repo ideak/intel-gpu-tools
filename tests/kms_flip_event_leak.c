@@ -40,7 +40,7 @@ IGT_TEST_DESCRIPTION(
     "itself won't fail even if the kernel leaks the event, but the resulting "
     "dmesg WARN will indicate a failure.");
 
-static bool test(data_t *data, enum pipe pipe, igt_output_t *output)
+static void test(data_t *data, enum pipe pipe, igt_output_t *output)
 {
 	igt_plane_t *primary;
 	drmModeModeInfo *mode;
@@ -49,13 +49,6 @@ static bool test(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	/* select the pipe we want to use */
 	igt_output_set_pipe(output, pipe);
-	igt_display_commit(&data->display);
-
-	if (!output->valid) {
-		igt_output_set_pipe(output, PIPE_ANY);
-		igt_display_commit(&data->display);
-		return false;
-	}
 
 	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
 	mode = igt_output_get_mode(output);
@@ -96,8 +89,6 @@ static bool test(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_display_commit(&data->display);
 
 	igt_remove_fb(data->drm_fd, &fb[0]);
-
-	return true;
 }
 
 igt_simple_main
@@ -114,11 +105,9 @@ igt_simple_main
 
 	igt_display_init(&data.display, data.drm_fd);
 
-	for_each_pipe(&data.display, pipe) {
-		for_each_connected_output(&data.display, output) {
-			if (test(&data, pipe, output))
-				valid_tests++;
-		}
+	for_each_pipe_with_valid_output(&data.display, pipe, output) {
+		test(&data, pipe, output);
+		valid_tests++;
 	}
 
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
