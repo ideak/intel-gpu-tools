@@ -597,10 +597,12 @@ static int read_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out)
 	bytes_read = read(pipe_crc->crc_fd, &buf, read_len);
 	igt_reset_timeout();
 
-	if (bytes_read < 0 && errno == EAGAIN) {
+	if (bytes_read < 0 && errno == EAGAIN)
 		igt_assert(pipe_crc->flags & O_NONBLOCK);
+
+	if (bytes_read < 0)
 		bytes_read = 0;
-	}
+
 	buf[bytes_read] = '\0';
 
 	if (bytes_read && !pipe_crc_init_from_string(pipe_crc, out, buf))
