@@ -92,7 +92,7 @@ static void cursor_enable(data_t *data)
 	igt_output_t *output = data->output;
 	igt_plane_t *cursor;
 
-	cursor = igt_output_get_plane(output, IGT_PLANE_CURSOR);
+	cursor = igt_output_get_plane_type(output, DRM_PLANE_TYPE_CURSOR);
 	igt_plane_set_fb(cursor, &data->fb);
 	igt_plane_set_size(cursor, data->curw, data->curh);
 }
@@ -102,7 +102,7 @@ static void cursor_disable(data_t *data)
 	igt_output_t *output = data->output;
 	igt_plane_t *cursor;
 
-	cursor = igt_output_get_plane(output, IGT_PLANE_CURSOR);
+	cursor = igt_output_get_plane_type(output, DRM_PLANE_TYPE_CURSOR);
 	igt_plane_set_fb(cursor, NULL);
 }
 
@@ -120,7 +120,7 @@ static void do_single_test(data_t *data, int x, int y)
 	/* Hardware test */
 	igt_paint_test_pattern(cr, data->screenw, data->screenh);
 	cursor_enable(data);
-	cursor = igt_output_get_plane(data->output, IGT_PLANE_CURSOR);
+	cursor = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_CURSOR);
 	igt_plane_set_position(cursor, x, y);
 	igt_display_commit(display);
 	igt_wait_for_vblank(data->drm_fd, data->pipe);
@@ -174,7 +174,7 @@ static void do_fail_test(data_t *data, int x, int y, int expect)
 	/* Hardware test */
 	igt_paint_test_pattern(cr, data->screenw, data->screenh);
 	cursor_enable(data);
-	cursor = igt_output_get_plane(data->output, IGT_PLANE_CURSOR);
+	cursor = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_CURSOR);
 	igt_plane_set_position(cursor, x, y);
 	ret = igt_display_try_commit2(display, COMMIT_LEGACY);
 
@@ -301,7 +301,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output,
 			    0.0, 0.0, 0.0,
 			    &data->primary_fb);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, &data->primary_fb);
 
 	igt_display_commit(display);
@@ -342,7 +342,7 @@ static void cleanup_crtc(data_t *data, igt_output_t *output)
 
 	igt_remove_fb(data->drm_fd, &data->primary_fb);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, NULL);
 
 	igt_output_set_pipe(output, PIPE_ANY);
