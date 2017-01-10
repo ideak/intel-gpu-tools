@@ -308,7 +308,7 @@ const unsigned char* igt_kms_get_alt_edid(void)
  * kmstest_pipe_name:
  * @pipe: display pipe
  *
- * Returns: String represnting @pipe, e.g. "A".
+ * Returns: String representing @pipe, e.g. "A".
  */
 const char *kmstest_pipe_name(enum pipe pipe)
 {
