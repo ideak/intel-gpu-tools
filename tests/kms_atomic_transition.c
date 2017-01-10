@@ -120,7 +120,8 @@ static void set_sprite_wh(igt_display_t *display, enum pipe pipe,
 	for_each_plane_on_pipe(display, pipe, plane) {
 		int i = plane->index;
 
-		if (plane->is_primary || plane->is_cursor)
+		if (plane->type == DRM_PLANE_TYPE_PRIMARY ||
+		    plane->type == DRM_PLANE_TYPE_CURSOR)
 			continue;
 
 		parms[i].width = w;
@@ -156,20 +157,16 @@ static void setup_parms(igt_display_t *display, enum pipe pipe,
 	for_each_plane_on_pipe(display, pipe, plane) {
 		int i = plane->index;
 
-		if (plane->is_primary)
+		if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
 			parms[i].fb = plane->fb;
-		else if (plane->is_cursor)
-			parms[i].fb = argb_fb;
-		else
-			parms[i].fb = sprite_fb;
-
-		if (plane->is_primary) {
 			parms[i].width = mode->hdisplay;
 			parms[i].height = mode->vdisplay;
-		} else if (plane->is_cursor) {
+		} else if (plane->type == DRM_PLANE_TYPE_CURSOR) {
+			parms[i].fb = argb_fb;
 			parms[i].width = cursor_width;
 			parms[i].height = cursor_height;
-		}
+		} else
+			parms[i].fb = sprite_fb;
 	}
 
 	igt_create_fb(display->drm_fd, cursor_width, cursor_height,
@@ -273,7 +270,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	drmModeModeInfo *mode, override_mode;
 	igt_plane_t *plane;
 	uint32_t iter_max = 1 << display->pipes[pipe].n_planes, i;
-	struct plane_parms parms[IGT_MAX_PLANES];
+	struct plane_parms parms[display->pipes[pipe].n_planes];
 	bool skip_test = false;
 	unsigned flags = DRM_MODE_PAGE_FLIP_EVENT;
 
@@ -421,7 +418,8 @@ static unsigned set_combinations(igt_display_t *display, unsigned mask, struct i
 		igt_output_set_pipe(output, PIPE_NONE);
 
 	for_each_pipe(display, pipe) {
-		igt_plane_t *plane = &display->pipes[pipe].planes[IGT_PLANE_PRIMARY];
+		igt_plane_t *plane = igt_pipe_get_plane_type(&display->pipes[pipe],
+			DRM_PLANE_TYPE_PRIMARY);
 		drmModeModeInfo *mode = NULL;
 
 		if (!(mask & (1 << pipe))) {
@@ -462,7 +460,7 @@ static void refresh_primaries(igt_display_t *display)
 
 	for_each_pipe(display, pipe)
 		for_each_plane_on_pipe(display, pipe, plane)
-			if (plane->is_primary && plane->fb)
+			if (plane->type == DRM_PLANE_TYPE_PRIMARY && plane->fb)
 				plane->fb_changed = true;
 }
 
@@ -506,7 +504,8 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 				    DRM_FORMAT_XRGB8888, 0, .5, .5, .5, &fbs[1]);
 
 	for_each_pipe(display, i) {
-		igt_plane_t *plane = &display->pipes[i].planes[IGT_PLANE_PRIMARY];
+		igt_pipe_t *pipe = &display->pipes[i];
+		igt_plane_t *plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 		drmModeModeInfo *mode = NULL;
 
 		if (is_i915_device(display->drm_fd))
