@@ -53,7 +53,7 @@ set_fb_on_crtc(igt_display_t *dpy, int pipe, struct igt_fb *fb)
 				      LOCAL_I915_FORMAT_MOD_X_TILED,
 				      fb);
 
-		primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, fb);
 
 		return output;
@@ -106,7 +106,7 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 						  dpy->pipes[pipe].crtc_id, fb->fb_id,
 						  DRM_MODE_PAGE_FLIP_EVENT, fb));
 		else {
-			igt_plane_set_fb(igt_output_get_plane(output, IGT_PLANE_PRIMARY), fb);
+			igt_plane_set_fb(igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY), fb);
 			igt_output_set_pipe(output, PIPE_NONE);
 			igt_display_commit_atomic(dpy,
 						  DRM_MODE_ATOMIC_NONBLOCK |
@@ -232,7 +232,7 @@ static void test_hang(igt_display_t *dpy, unsigned ring,
 
 	igt_require((output = set_fb_on_crtc(dpy, pipe, &fb[0])));
 	igt_display_commit2(dpy, COMMIT_ATOMIC);
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	igt_create_pattern_fb(dpy->drm_fd,
 			      fb[0].width, fb[0].height,
