@@ -65,7 +65,7 @@ static void cursor_disable(data_t *data)
 	igt_output_t *output = data->output;
 	igt_plane_t *cursor;
 
-	cursor = igt_output_get_plane(output, IGT_PLANE_CURSOR);
+	cursor = igt_output_get_plane_type(output, DRM_PLANE_TYPE_CURSOR);
 	igt_plane_set_fb(cursor, NULL);
 }
 
@@ -242,7 +242,7 @@ static void prepare_crtc(data_t *data)
 			      LOCAL_DRM_FORMAT_MOD_NONE,
 			      &data->primary_fb);
 
-	primary = igt_output_get_plane(data->output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, &data->primary_fb);
 
 	igt_display_commit(display);
@@ -277,7 +277,7 @@ static void cleanup_crtc(data_t *data)
 
 	igt_remove_fb(data->drm_fd, &data->primary_fb);
 
-	primary = igt_output_get_plane(data->output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, NULL);
 
 	igt_output_set_pipe(data->output, PIPE_ANY);
