@@ -372,7 +372,7 @@ static bool prepare_test(data_t *data, enum test_mode test_mode)
 	igt_output_t *output = data->output;
 	igt_pipe_crc_t *pipe_crc;
 
-	data->primary = igt_output_get_plane(data->output, IGT_PLANE_PRIMARY);
+	data->primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 
 	create_fbs(data, true, data->fb);
 
@@ -457,10 +457,11 @@ static void finish_crtc(data_t *data, enum test_mode mode)
 static void reset_display(data_t *data)
 {
 	igt_display_t *display = &data->display;
-	enum pipe pipe;
+	enum pipe pipe_id;
 
-	for_each_pipe(display, pipe) {
-		igt_plane_t *plane = &display->pipes[pipe].planes[IGT_PLANE_PRIMARY];
+	for_each_pipe(display, pipe_id) {
+        igt_pipe_t *pipe = &display->pipes[pipe_id];
+		igt_plane_t *plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 
 		if (plane->fb)
 			igt_plane_set_fb(plane, NULL);
