@@ -138,7 +138,7 @@ static void run_test(data_t *data)
 				    1.0, 0.0, 0.0,
 				    &data->fb_red);
 
-		data->primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		data->primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 		basic_sink_crc_check(data);
 		return;
