@@ -76,7 +76,7 @@ static void prepare_crtc(data_t *data, int fd, igt_output_t *output)
 			    0.0, 0.0, 0.0,
 			    &data->primary_fb);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, &data->primary_fb);
 
 	igt_display_commit(display);
@@ -91,7 +91,7 @@ static void cleanup_crtc(data_t *data, int fd, igt_output_t *output)
 
 	igt_remove_fb(fd, &data->primary_fb);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, NULL);
 
 	igt_output_set_pipe(output, PIPE_ANY);
