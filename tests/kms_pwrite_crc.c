@@ -116,7 +116,7 @@ static void prepare_crtc(data_t *data)
 			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
 			    1.0, 1.0, 1.0, &data->fb[0]);
 
-	data->primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	data->primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	igt_plane_set_fb(data->primary, &data->fb[0]);
 	igt_display_commit(display);
