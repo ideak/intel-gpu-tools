@@ -55,8 +55,10 @@ igt_simple_main
 
 	for_each_pipe(&display, p) {
 		for_each_plane_on_pipe(&display, p, plane) {
+			bool is_valid = (plane->type == DRM_PLANE_TYPE_PRIMARY ||
+			                 plane->type == DRM_PLANE_TYPE_CURSOR);
 			test_plane(plane->drm_plane->plane_id,
-				   (plane->is_cursor || plane->is_primary) ? -ENOENT : 0);
+				   is_valid ? -ENOENT : 0);
 
 			max_id = max(max_id, plane->drm_plane->plane_id);
 		}
