@@ -85,10 +85,10 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	 * there's no way (that works) to light up a pipe with only a sprite
 	 * plane enabled at the moment.
 	 */
-	if (!plane->is_primary) {
+	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
 		igt_plane_t *primary;
 
-		primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, &data->fb1);
 	}
 
@@ -128,10 +128,10 @@ static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 		data->fb_id3 = 0;
 	}
 
-	if (!plane->is_primary) {
+	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
 		igt_plane_t *primary;
 
-		primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, NULL);
 	}
 
@@ -207,7 +207,7 @@ static void test_plane_scaling(data_t *d)
 		igt_assert(d->fb_id3);
 
 		/* Set up display with plane 1 */
-		d->plane1 = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		d->plane1 = igt_output_get_plane(output, 1);
 		prepare_crtc(d, output, pipe, d->plane1, mode, COMMIT_UNIVERSAL);
 
 		if (primary_plane_scaling) {
@@ -227,7 +227,7 @@ static void test_plane_scaling(data_t *d)
 		}
 
 		/* Set up fb2->plane2 mapping. */
-		d->plane2 = igt_output_get_plane(output, IGT_PLANE_2);
+		d->plane2 = igt_output_get_plane(output, 2);
 		igt_plane_set_fb(d->plane2, &d->fb2);
 
 		/* 2nd plane windowed */
@@ -263,7 +263,7 @@ static void test_plane_scaling(data_t *d)
 		}
 
 		/* Set up fb3->plane3 mapping. */
-		d->plane3 = igt_output_get_plane(output, IGT_PLANE_3);
+		d->plane3 = igt_output_get_plane(output, 3);
 		igt_plane_set_fb(d->plane3, &d->fb3);
 
 		/* 3rd plane windowed - no scaling */
