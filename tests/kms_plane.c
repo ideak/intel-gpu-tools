@@ -150,7 +150,7 @@ enum {
 static void
 test_plane_position_with_output(data_t *data,
 				enum pipe pipe,
-				enum igt_plane plane,
+				int plane,
 				igt_output_t *output,
 				unsigned int flags)
 {
@@ -170,7 +170,7 @@ test_plane_position_with_output(data_t *data,
 	igt_output_set_pipe(output, pipe);
 
 	mode = igt_output_get_mode(output);
-	primary = igt_output_get_plane(output, 0);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	sprite = igt_output_get_plane(output, plane);
 
 	create_fb_for_mode__position(data, mode, 100, 100, 64, 64,
@@ -222,7 +222,7 @@ test_plane_position_with_output(data_t *data,
 }
 
 static void
-test_plane_position(data_t *data, enum pipe pipe, enum igt_plane plane,
+test_plane_position(data_t *data, enum pipe pipe, int plane,
 		    unsigned int flags)
 {
 	igt_output_t *output;
@@ -294,7 +294,7 @@ enum {
 static void
 test_plane_panning_with_output(data_t *data,
 			       enum pipe pipe,
-			       enum igt_plane plane,
+			       int plane,
 			       igt_output_t *output,
 			       unsigned int flags)
 {
@@ -348,8 +348,8 @@ test_plane_panning_with_output(data_t *data,
 }
 
 static void
-test_plane_panning(data_t *data, enum pipe pipe, enum igt_plane plane,
-            unsigned int flags)
+test_plane_panning(data_t *data, enum pipe pipe, int plane,
+		   unsigned int flags)
 {
 	igt_output_t *output;
 	int connected_outs = 0;
@@ -367,46 +367,56 @@ test_plane_panning(data_t *data, enum pipe pipe, enum igt_plane plane,
 }
 
 static void
-run_tests_for_pipe_plane(data_t *data, enum pipe pipe, enum igt_plane plane)
+run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 {
-	igt_subtest_f("plane-position-covered-pipe-%s-plane-%d",
-		      kmstest_pipe_name(pipe), plane)
-		test_plane_position(data, pipe, plane,
-				    TEST_POSITION_FULLY_COVERED);
+	igt_subtest_f("plane-position-covered-pipe-%s-planes",
+		      kmstest_pipe_name(pipe)) {
+		int n_planes = data->display.pipes[pipe].n_planes;
+		for (int plane = 1; plane < n_planes; plane++)
+			test_plane_position(data, pipe, plane,
+					    TEST_POSITION_FULLY_COVERED);
+	}
 
-	igt_subtest_f("plane-position-hole-pipe-%s-plane-%d",
-		      kmstest_pipe_name(pipe), plane)
-		test_plane_position(data, pipe, plane, 0);
+	igt_subtest_f("plane-position-hole-pipe-%s-planes",
+		      kmstest_pipe_name(pipe)) {
+		int n_planes = data->display.pipes[pipe].n_planes;
+		for (int plane = 1; plane < n_planes; plane++)
+			test_plane_position(data, pipe, plane, 0);
+	}
 
-	igt_subtest_f("plane-position-hole-dpms-pipe-%s-plane-%d",
-		      kmstest_pipe_name(pipe), plane)
-		test_plane_position(data, pipe, plane,
-				    TEST_DPMS);
+	igt_subtest_f("plane-position-hole-dpms-pipe-%s-planes",
+		      kmstest_pipe_name(pipe)) {
+		int n_planes = data->display.pipes[pipe].n_planes;
+		for (int plane = 1; plane < n_planes; plane++)
+			test_plane_position(data, pipe, plane,
+					    TEST_DPMS);
+	}
 
-	igt_subtest_f("plane-panning-top-left-pipe-%s-plane-%d",
-		      kmstest_pipe_name(pipe), plane)
-		test_plane_panning(data, pipe, plane, TEST_PANNING_TOP_LEFT);
+	igt_subtest_f("plane-panning-top-left-pipe-%s-planes",
+		      kmstest_pipe_name(pipe)) {
+		int n_planes = data->display.pipes[pipe].n_planes;
+		for (int plane = 1; plane < n_planes; plane++)
+			test_plane_panning(data, pipe, plane, TEST_PANNING_TOP_LEFT);
+	}
 
-	igt_subtest_f("plane-panning-bottom-right-pipe-%s-plane-%d",
-		      kmstest_pipe_name(pipe), plane)
-		test_plane_panning(data, pipe, plane,
-				   TEST_PANNING_BOTTOM_RIGHT);
+	igt_subtest_f("plane-panning-bottom-right-pipe-%s-planes",
+		      kmstest_pipe_name(pipe)) {
+		int n_planes = data->display.pipes[pipe].n_planes;
+		for (int plane = 1; plane < n_planes; plane++)
+			test_plane_panning(data, pipe, plane,
+					   TEST_PANNING_BOTTOM_RIGHT);
+	}
 
-	igt_subtest_f("plane-panning-bottom-right-suspend-pipe-%s-plane-%d",
-		      kmstest_pipe_name(pipe), plane)
-		test_plane_panning(data, pipe, plane,
-				   TEST_PANNING_BOTTOM_RIGHT |
-				   TEST_SUSPEND_RESUME);
+	igt_subtest_f("plane-panning-bottom-right-suspend-pipe-%s-planes",
+		      kmstest_pipe_name(pipe)) {
+		int n_planes = data->display.pipes[pipe].n_planes;
+		for (int plane = 1; plane < n_planes; plane++)
+			test_plane_panning(data, pipe, plane,
+					   TEST_PANNING_BOTTOM_RIGHT |
+					   TEST_SUSPEND_RESUME);
+	}
 }
 
-static void
-run_tests_for_pipe(data_t *data, enum pipe pipe)
-{
-	int plane;
-
-	for (plane = 1; plane < IGT_MAX_PLANES; plane++)
-		run_tests_for_pipe_plane(data, pipe, plane);
-}
 
 static data_t data;
 
@@ -425,7 +435,7 @@ igt_main
 	}
 
 	for (int pipe = 0; pipe < I915_MAX_PIPES; pipe++)
-		run_tests_for_pipe(&data, pipe);
+		run_tests_for_pipe_plane(&data, pipe);
 
 	igt_fixture {
 		igt_display_fini(&data.display);
