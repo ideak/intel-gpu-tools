@@ -76,10 +76,10 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	 * there's no way (that works) to light up a pipe with only a sprite
 	 * plane enabled at the moment.
 	 */
-	if (!plane->is_primary) {
+	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
 		igt_plane_t *primary;
 
-		primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, &data->fb1);
 	}
 
@@ -116,10 +116,10 @@ static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 		data->fb_id3 = 0;
 	}
 
-	if (!plane->is_primary) {
+	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
 		igt_plane_t *primary;
 
-		primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, NULL);
 	}
 
@@ -174,7 +174,7 @@ static void test_panel_fitting(data_t *d)
 		/* Set up display to enable panel fitting */
 		mode->hdisplay = 640;
 		mode->vdisplay = 480;
-		d->plane1 = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		d->plane1 = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		prepare_crtc(d, output, pipe, d->plane1, mode, COMMIT_LEGACY);
 
 		/* disable panel fitting */
@@ -189,7 +189,7 @@ static void test_panel_fitting(data_t *d)
 		prepare_crtc(d, output, pipe, d->plane1, &native_mode, COMMIT_LEGACY);
 
 		/* Set up fb2->plane2 mapping. */
-		d->plane2 = igt_output_get_plane(output, IGT_PLANE_2);
+		d->plane2 = igt_output_get_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
 		igt_plane_set_fb(d->plane2, &d->fb2);
 
 		/* enable sprite plane */
@@ -226,8 +226,8 @@ test_panel_fitting_fastset(igt_display_t *display, const enum pipe pipe, igt_out
 	igt_output_override_mode(output, &mode);
 	igt_output_set_pipe(output, pipe);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
-	sprite = igt_output_get_plane(output, IGT_PLANE_2);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	sprite = igt_output_get_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
 
 	igt_create_color_fb(display->drm_fd, mode.hdisplay, mode.vdisplay,
 			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
