@@ -168,7 +168,7 @@ static void prepare_crtc(gpu_process_t *gpu)
 			DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
 			1.0, 1.0, 1.0, &gpu->fb);
 
-	gpu->primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	gpu->primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	igt_plane_set_fb(gpu->primary, &gpu->fb);
 	igt_display_commit(display);
