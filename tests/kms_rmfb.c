@@ -83,7 +83,7 @@ test_rmfb(struct rmfb_data *data, igt_output_t *output, enum pipe pipe, bool reo
 	 * later on.
 	 */
 	for_each_plane_on_pipe(&data->display, pipe, plane) {
-		if (plane->is_cursor) {
+		if (plane->type == DRM_PLANE_TYPE_CURSOR) {
 			igt_plane_set_fb(plane, &argb_fb);
 			igt_fb_set_size(&argb_fb, plane, cursor_width, cursor_height);
 			igt_plane_set_size(plane, cursor_width, cursor_height);
