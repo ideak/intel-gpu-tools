@@ -191,7 +191,7 @@ static void make_gpu_busy(data_t *data, uint32_t flip_handle)
  * supposed to be.
  */
 static void
-test_plane(data_t *data, igt_output_t *output, enum pipe pipe, enum igt_plane plane)
+test_plane(data_t *data, igt_output_t *output, enum pipe pipe, int plane)
 {
 	struct igt_fb red_fb, green_fb, blue_fb;
 	drmModeModeInfo *mode;
@@ -201,7 +201,7 @@ test_plane(data_t *data, igt_output_t *output, enum pipe pipe, enum igt_plane pl
 
 	igt_output_set_pipe(output, pipe);
 
-	primary = igt_output_get_plane(output, 0);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	sprite = igt_output_get_plane(output, plane);
 
 	mode = igt_output_get_mode(output);
@@ -455,7 +455,7 @@ static void
 run_plane_test(data_t *data)
 {
 	igt_output_t *output;
-	enum igt_plane plane = 1; /* testing with one sprite is enough */
+	int plane = 1; /* testing with one sprite is enough */
 	int valid_tests = 0;
 	enum pipe pipe;
 
