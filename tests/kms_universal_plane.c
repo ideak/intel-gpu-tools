@@ -148,16 +148,16 @@ functional_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	 * boolean and show up in userspace as the wrong type.
 	 */
 	for (i = 0; i < display->pipes[pipe].n_planes; i++)
-		if (display->pipes[pipe].planes[i].is_primary)
+		if (display->pipes[pipe].planes[i].type == DRM_PLANE_TYPE_PRIMARY)
 			num_primary++;
-		else if (display->pipes[pipe].planes[i].is_cursor)
+		else if (display->pipes[pipe].planes[i].type == DRM_PLANE_TYPE_CURSOR)
 			num_cursor++;
 
 	igt_assert_eq(num_primary, 1);
 	igt_assert_lte(num_cursor, 1);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
-	sprite = igt_output_get_plane(output, IGT_PLANE_2);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	sprite = igt_output_get_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
 	if (!sprite) {
 		functional_test_fini(&test, output);
 		igt_skip("No sprite plane available\n");
@@ -369,7 +369,7 @@ sanity_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	sanity_test_init(&test, output, pipe);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	/* Use legacy API to set a mode with a blue FB */
 	igt_plane_set_fb(primary, &test.blue_fb);
@@ -480,7 +480,7 @@ pageflip_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	pageflip_test_init(&test, output, pipe);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	/* Use legacy API to set a mode with a blue FB */
 	igt_plane_set_fb(primary, &test.blue_fb);
@@ -602,8 +602,8 @@ cursor_leak_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 				    &cursor_fb[i]);
 	}
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
-	cursor = igt_output_get_plane(output, IGT_PLANE_CURSOR);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	cursor = igt_output_get_plane_type(output, DRM_PLANE_TYPE_CURSOR);
 	if (!primary || !cursor) {
 		cursor_leak_test_fini(data, output, &background_fb, cursor_fb);
 		igt_skip("Primary and/or cursor are unavailable\n");
@@ -706,7 +706,7 @@ gen9_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	gen9_test_init(&test, output, pipe);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	/* Start with a full-screen primary plane */
 	igt_plane_set_fb(primary, &test.biggreen_fb);
