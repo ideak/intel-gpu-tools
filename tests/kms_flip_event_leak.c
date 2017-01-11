@@ -50,7 +50,7 @@ static void test(data_t *data, enum pipe pipe, igt_output_t *output)
 	/* select the pipe we want to use */
 	igt_output_set_pipe(output, pipe);
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	mode = igt_output_get_mode(output);
 
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
