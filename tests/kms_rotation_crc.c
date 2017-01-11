@@ -97,26 +97,27 @@ static void commit_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 	 * we create an fb covering the crtc and call commit
 	 */
 
-	if (plane->is_primary || plane->is_cursor)
+	if (plane->type == DRM_PLANE_TYPE_PRIMARY ||
+	    plane->type == DRM_PLANE_TYPE_CURSOR)
 		commit = COMMIT_UNIVERSAL;
 
 	if (data->display.is_atomic)
 		commit = COMMIT_ATOMIC;
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	if (commit < COMMIT_ATOMIC) {
 		igt_plane_set_fb(primary, &data->fb_modeset);
 		primary->rotation_changed = false;
 		igt_display_commit(display);
 
-		if (plane->is_primary)
+		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
 			primary->rotation_changed = true;
 	}
 
 	igt_plane_set_fb(plane, &data->fb);
 
-	if (!plane->is_cursor)
+	if (plane->type != DRM_PLANE_TYPE_CURSOR)
 		igt_plane_set_position(plane, data->pos_x, data->pos_y);
 
 	igt_display_commit2(display, commit);
@@ -161,7 +162,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 		tiling = data->override_tiling ?
 			 data->override_tiling : LOCAL_I915_FORMAT_MOD_Y_TILED;
 		w = h = min(mode->hdisplay, mode->vdisplay);
-	} else if (plane->is_cursor) {
+	} else if (plane->type == DRM_PLANE_TYPE_CURSOR) {
 		pixel_format = data->override_fmt ?
 			       data->override_fmt : DRM_FORMAT_ARGB8888;
 		w = h = 128;
@@ -213,10 +214,10 @@ static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 		igt_remove_fb(data->gfx_fd, &data->fb_flip);
 
 	/* XXX: see the note in prepare_crtc() */
-	if (!plane->is_primary) {
+	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
 		igt_plane_t *primary;
 
-		primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, NULL);
 	}
 
@@ -247,7 +248,7 @@ static void wait_for_pageflip(int fd)
 	igt_assert(drmHandleEvent(fd, &evctx) == 0);
 }
 
-static void test_plane_rotation(data_t *data, enum igt_plane plane_type)
+static void test_plane_rotation(data_t *data, int plane_type)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
@@ -258,10 +259,10 @@ static void test_plane_rotation(data_t *data, enum igt_plane plane_type)
 	unsigned int flip_count;
 	int ret;
 
-	if (plane_type == IGT_PLANE_PRIMARY || plane_type == IGT_PLANE_CURSOR)
+	if (plane_type == DRM_PLANE_TYPE_PRIMARY || plane_type == DRM_PLANE_TYPE_CURSOR)
 		commit = COMMIT_UNIVERSAL;
 
-	if (plane_type == IGT_PLANE_CURSOR)
+	if (plane_type == DRM_PLANE_TYPE_CURSOR)
 		igt_require(display->has_cursor_plane);
 
 	if (data->display.is_atomic)
@@ -272,7 +273,7 @@ static void test_plane_rotation(data_t *data, enum igt_plane plane_type)
 
 		igt_output_set_pipe(output, pipe);
 
-		plane = igt_output_get_plane(output, plane_type);
+		plane = igt_output_get_plane_type(output, plane_type);
 		igt_require(igt_plane_supports_rotation(plane));
 
 		prepare_crtc(data, output, pipe, plane);
@@ -320,7 +321,7 @@ static void test_plane_rotation(data_t *data, enum igt_plane plane_type)
 
 static void test_plane_rotation_ytiled_obj(data_t *data,
 					   igt_output_t *output,
-					   enum igt_plane plane_type)
+					   int plane_type)
 {
 	igt_display_t *display = &data->display;
 	uint64_t tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
@@ -334,13 +335,13 @@ static void test_plane_rotation_ytiled_obj(data_t *data,
 	uint32_t gem_handle;
 	int ret;
 
-	plane = igt_output_get_plane(output, plane_type);
+	plane = igt_output_get_plane_type(output, plane_type);
 	igt_require(igt_plane_supports_rotation(plane));
 
-	if (plane_type == IGT_PLANE_PRIMARY || plane_type == IGT_PLANE_CURSOR)
+	if (plane_type == DRM_PLANE_TYPE_PRIMARY || plane_type == DRM_PLANE_TYPE_CURSOR)
 		commit = COMMIT_UNIVERSAL;
 
-	if (plane_type == IGT_PLANE_CURSOR)
+	if (plane_type == DRM_PLANE_TYPE_CURSOR)
 		igt_require(display->has_cursor_plane);
 
 	if (data->display.is_atomic)
@@ -390,7 +391,7 @@ static void test_plane_rotation_ytiled_obj(data_t *data,
 
 static void test_plane_rotation_exhaust_fences(data_t *data,
 					       igt_output_t *output,
-					       enum igt_plane plane_type)
+					       int plane_type)
 {
 	igt_display_t *display = &data->display;
 	uint64_t tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
@@ -406,13 +407,13 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 	uint64_t total_aperture_size, total_fbs_size;
 	int i, ret;
 
-	plane = igt_output_get_plane(output, plane_type);
+	plane = igt_output_get_plane_type(output, plane_type);
 	igt_require(igt_plane_supports_rotation(plane));
 
-	if (plane_type == IGT_PLANE_PRIMARY || plane_type == IGT_PLANE_CURSOR)
+	if (plane_type == DRM_PLANE_TYPE_PRIMARY || plane_type == DRM_PLANE_TYPE_CURSOR)
 		commit = COMMIT_UNIVERSAL;
 
-	if (plane_type == IGT_PLANE_CURSOR)
+	if (plane_type == DRM_PLANE_TYPE_CURSOR)
 		igt_require(display->has_cursor_plane);
 
 	if (data->display.is_atomic)
@@ -522,41 +523,41 @@ igt_main
 	}
 	igt_subtest_f("primary-rotation-180") {
 		data.rotation = IGT_ROTATION_180;
-		test_plane_rotation(&data, IGT_PLANE_PRIMARY);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
 
 	igt_subtest_f("sprite-rotation-180") {
 		data.rotation = IGT_ROTATION_180;
-		test_plane_rotation(&data, IGT_PLANE_2);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_OVERLAY);
 	}
 
 	igt_subtest_f("cursor-rotation-180") {
 		data.rotation = IGT_ROTATION_180;
-		test_plane_rotation(&data, IGT_PLANE_CURSOR);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_CURSOR);
 	}
 
 	igt_subtest_f("primary-rotation-90") {
 		igt_require(gen >= 9);
 		data.rotation = IGT_ROTATION_90;
-		test_plane_rotation(&data, IGT_PLANE_PRIMARY);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
 
 	igt_subtest_f("primary-rotation-270") {
 		igt_require(gen >= 9);
 		data.rotation = IGT_ROTATION_270;
-		test_plane_rotation(&data, IGT_PLANE_PRIMARY);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
 
 	igt_subtest_f("sprite-rotation-90") {
 		igt_require(gen >= 9);
 		data.rotation = IGT_ROTATION_90;
-		test_plane_rotation(&data, IGT_PLANE_2);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_OVERLAY);
 	}
 
 	igt_subtest_f("sprite-rotation-270") {
 		igt_require(gen >= 9);
 		data.rotation = IGT_ROTATION_270;
-		test_plane_rotation(&data, IGT_PLANE_2);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_OVERLAY);
 	}
 
 	igt_subtest_f("sprite-rotation-90-pos-100-0") {
@@ -564,7 +565,7 @@ igt_main
 		data.rotation = IGT_ROTATION_90;
 		data.pos_x = 100,
 		data.pos_y = 0;
-		test_plane_rotation(&data, IGT_PLANE_2);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_OVERLAY);
 	}
 
 	igt_subtest_f("bad-pixel-format") {
@@ -573,7 +574,7 @@ igt_main
 		data.pos_y = 0;
 		data.rotation = IGT_ROTATION_90;
 		data.override_fmt = DRM_FORMAT_RGB565;
-		test_plane_rotation(&data, IGT_PLANE_PRIMARY);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
 
 	igt_subtest_f("bad-tiling") {
@@ -581,7 +582,7 @@ igt_main
 		data.override_fmt = 0;
 		data.rotation = IGT_ROTATION_90;
 		data.override_tiling = LOCAL_DRM_FORMAT_MOD_NONE;
-		test_plane_rotation(&data, IGT_PLANE_PRIMARY);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
 
 	igt_subtest_f("primary-rotation-90-flip-stress") {
@@ -589,7 +590,7 @@ igt_main
 		data.override_tiling = 0;
 		data.flip_stress = 60;
 		data.rotation = IGT_ROTATION_90;
-		test_plane_rotation(&data, IGT_PLANE_PRIMARY);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
 
 	igt_subtest_f("primary-rotation-90-Y-tiled") {
@@ -603,7 +604,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_output_set_pipe(output, pipe);
 
-			test_plane_rotation_ytiled_obj(&data, output, IGT_PLANE_PRIMARY);
+			test_plane_rotation_ytiled_obj(&data, output, DRM_PLANE_TYPE_PRIMARY);
 
 			valid_tests++;
 			break;
@@ -622,7 +623,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_output_set_pipe(output, pipe);
 
-			test_plane_rotation_exhaust_fences(&data, output, IGT_PLANE_PRIMARY);
+			test_plane_rotation_exhaust_fences(&data, output, DRM_PLANE_TYPE_PRIMARY);
 
 			valid_tests++;
 			break;
