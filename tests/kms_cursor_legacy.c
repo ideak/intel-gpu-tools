@@ -166,7 +166,7 @@ static igt_output_t *set_fb_on_crtc(igt_display_t *display, int pipe, struct igt
 			      mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888, I915_TILING_NONE, fb_info);
 
-		primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, fb_info);
 
 		return output;
@@ -180,7 +180,7 @@ static void set_cursor_on_pipe(igt_display_t *display, enum pipe pipe, struct ig
 	igt_plane_t *plane, *cursor = NULL;
 
 	for_each_plane_on_pipe(display, pipe, plane) {
-		if (!plane->is_cursor)
+		if (plane->type != DRM_PLANE_TYPE_CURSOR)
 			continue;
 
 		cursor = plane;
@@ -250,13 +250,14 @@ static enum pipe find_connected_pipe(igt_display_t *display, bool second)
 	return pipe;
 }
 
-static void flip_nonblocking(igt_display_t *display, enum pipe pipe, bool atomic, struct igt_fb *fb)
+static void flip_nonblocking(igt_display_t *display, enum pipe pipe_id, bool atomic, struct igt_fb *fb)
 {
-	igt_plane_t *primary = &display->pipes[pipe].planes[IGT_PLANE_PRIMARY];
+	igt_pipe_t *pipe = &display->pipes[pipe_id];
+	igt_plane_t *primary = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 
 	if (!atomic) {
 		/* Schedule a nonblocking flip for the next vblank */
-		do_or_die(drmModePageFlip(display->drm_fd, display->pipes[pipe].crtc_id, fb->fb_id,
+		do_or_die(drmModePageFlip(display->drm_fd, pipe->crtc_id, fb->fb_id,
 					DRM_MODE_PAGE_FLIP_EVENT, fb));
 	} else {
 		igt_plane_set_fb(primary, fb);
@@ -298,12 +299,13 @@ static bool mode_requires_extra_vblank(enum flip_test mode)
 	return false;
 }
 
-static void transition_nonblocking(igt_display_t *display, enum pipe pipe,
+static void transition_nonblocking(igt_display_t *display, enum pipe pipe_id,
 				   struct igt_fb *prim_fb, struct igt_fb *argb_fb,
 				   bool hide_sprite)
 {
-	igt_plane_t *primary = &display->pipes[pipe].planes[IGT_PLANE_PRIMARY];
-	igt_plane_t *sprite = &display->pipes[pipe].planes[IGT_PLANE_2];
+	igt_pipe_t *pipe = &display->pipes[pipe_id];
+	igt_plane_t *primary = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_t *sprite = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_OVERLAY);
 
 	if (hide_sprite) {
 		igt_plane_set_fb(primary, prim_fb);
@@ -369,7 +371,7 @@ static void prepare_flip_test(igt_display_t *display,
 	if (mode == flip_test_atomic_transitions ||
 	    mode == flip_test_atomic_transitions_varying_size) {
 		igt_require(display->pipes[flip_pipe].n_planes > 1 &&
-			    !display->pipes[flip_pipe].planes[IGT_PLANE_2].is_cursor);
+		            display->pipes[flip_pipe].planes[1].type != DRM_PLANE_TYPE_CURSOR);
 
 		igt_create_color_pattern_fb(display->drm_fd, prim_fb->width, prim_fb->height,
 					    DRM_FORMAT_ARGB8888, 0, .1, .1, .1, argb_fb);
@@ -868,7 +870,7 @@ static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 	arg[0].flags |= DRM_MODE_CURSOR_BO;
 
 	for_each_plane_on_pipe(display, pipe, plane) {
-		if (!plane->is_cursor)
+		if (plane->type != DRM_PLANE_TYPE_CURSOR)
 			continue;
 
 		cursor = plane;
@@ -1008,7 +1010,7 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 			 * in the same commit.
 			 */
 
-			igt_plane_set_fb(igt_output_get_plane(output, IGT_PLANE_PRIMARY), &fb_info);
+			igt_plane_set_fb(igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY), &fb_info);
 			igt_output_set_pipe(output2, (nloops & 1) ? PIPE_NONE : pipe2);
 			igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK, NULL);
 		}
@@ -1308,6 +1310,8 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	unsigned vblank_start;
 	enum pipe pipe = find_connected_pipe(display, false);
 	igt_pipe_crc_t *pipe_crc;
+	igt_pipe_t *pipe_connected = &display->pipes[pipe];
+	igt_plane_t *plane_primary = igt_pipe_get_plane_type(pipe_connected, DRM_PLANE_TYPE_PRIMARY);
 	igt_crc_t crcs[3];
 
 	if (atomic)
@@ -1339,10 +1343,10 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	  * setting the correct cache level, else we get a stall in the
 	  * page flip handler.
 	  */
-	igt_plane_set_fb(&display->pipes[pipe].planes[IGT_PLANE_PRIMARY], &fb_info[1]);
+	igt_plane_set_fb(plane_primary, &fb_info[1]);
 	igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-	igt_plane_set_fb(&display->pipes[pipe].planes[IGT_PLANE_PRIMARY], &fb_info[0]);
+	igt_plane_set_fb(plane_primary, &fb_info[0]);
 	igt_display_commit2(display, COMMIT_UNIVERSAL);
 
 	/* Disable cursor, and immediately queue a flip. Check if resulting crc is correct. */
@@ -1368,7 +1372,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 
 		igt_assert_lte(vblank_start + 1, get_vblank(display->drm_fd, pipe, 0));
 
-		igt_plane_set_fb(&display->pipes[pipe].planes[IGT_PLANE_PRIMARY], &fb_info[0]);
+		igt_plane_set_fb(plane_primary, &fb_info[0]);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
 		igt_assert_crc_equal(&crcs[i], &crcs[2]);
