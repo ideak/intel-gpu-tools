@@ -38,7 +38,7 @@ static void prepare_pipe(igt_display_t *display, enum pipe pipe, igt_output_t *o
 
 	igt_output_set_pipe(output, pipe);
 
-	igt_plane_set_fb(igt_output_get_plane(output, IGT_PLANE_PRIMARY), fb);
+	igt_plane_set_fb(igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY), fb);
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 }
@@ -163,8 +163,8 @@ static void run_plane_property_tests(igt_display_t *display, enum pipe pipe, igt
 	prepare_pipe(display, pipe, output, &fb);
 
 	for_each_plane_on_pipe(display, pipe, plane) {
-		igt_info("Testing plane properties on %s.%s (output: %s)\n",
-			 kmstest_pipe_name(pipe), kmstest_plane_name(plane->index), output->name);
+		igt_info("Testing plane properties on %s.#%d-%s (output: %s)\n",
+			 kmstest_pipe_name(pipe), plane->index, kmstest_plane_type_name(plane->type), output->name);
 
 		test_properties(display->drm_fd, DRM_MODE_OBJECT_PLANE, plane->drm_plane->plane_id, atomic);
 	}
