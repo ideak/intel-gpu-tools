@@ -857,9 +857,9 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 		igt_require(p < data->display.n_pipes);
 
 		pipe = &data->display.pipes[p];
-		igt_require(pipe->n_planes >= IGT_PLANE_PRIMARY);
+		igt_require(pipe->n_planes >= 0);
 
-		primary = &pipe->planes[IGT_PLANE_PRIMARY];
+		primary = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 
 		data->pipe_crc = igt_pipe_crc_new(primary->pipe->pipe,
 						  INTEL_PIPE_CRC_SOURCE_AUTO);
