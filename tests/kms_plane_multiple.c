@@ -62,7 +62,7 @@ struct {
 	bool user_seed;
 	int seed;
 } opt = {
-	.iterations = 64,
+	.iterations = 1,
 	.user_seed = false,
 	.seed = 1,
 };
