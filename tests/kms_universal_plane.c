@@ -742,29 +742,40 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 {
 	igt_output_t *output;
 
+	igt_fixture {
+		int valid_tests = 0;
+
+		igt_skip_on(pipe >= data->display.n_pipes);
+
+		for_each_valid_output_on_pipe(&data->display, pipe, output)
+			valid_tests++;
+
+		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
+	}
+
 	igt_subtest_f("universal-plane-pipe-%s-functional",
 		      kmstest_pipe_name(pipe))
-		for_each_connected_output(&data->display, output)
+		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			functional_test_pipe(data, pipe, output);
 
 	igt_subtest_f("universal-plane-pipe-%s-sanity",
 		      kmstest_pipe_name(pipe))
-		for_each_connected_output(&data->display, output)
+		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			sanity_test_pipe(data, pipe, output);
 
 	igt_subtest_f("disable-primary-vs-flip-pipe-%s",
 		      kmstest_pipe_name(pipe))
-		for_each_connected_output(&data->display, output)
+		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			pageflip_test_pipe(data, pipe, output);
 
 	igt_subtest_f("cursor-fb-leak-pipe-%s",
 		      kmstest_pipe_name(pipe))
-		for_each_connected_output(&data->display, output)
+		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			cursor_leak_test_pipe(data, pipe, output);
 
 	igt_subtest_f("universal-plane-gen9-features-pipe-%s",
 		      kmstest_pipe_name(pipe))
-		for_each_connected_output(&data->display, output)
+		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			gen9_test_pipe(data, pipe, output);
 }
 
@@ -784,8 +795,10 @@ igt_main
 		igt_display_init(&data.display, data.drm_fd);
 	}
 
-	for (int pipe = 0; pipe < I915_MAX_PIPES; pipe++)
-		run_tests_for_pipe(&data, pipe);
+	for (int pipe = 0; pipe < I915_MAX_PIPES; pipe++) {
+		igt_subtest_group
+			run_tests_for_pipe(&data, pipe);
+	}
 
 	igt_fixture {
 		igt_display_fini(&data.display);
