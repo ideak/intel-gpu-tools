@@ -367,7 +367,7 @@ test_plane_position(data_t *data, enum pipe pipe, bool atomic, int max_planes,
 	srand(opt.seed);
 
 	connected_outs = 0;
-	for_each_connected_output(&data->display, output) {
+	for_each_valid_output_on_pipe(&data->display, pipe, output) {
 		if (atomic)
 			test_atomic_plane_position_with_output(data, pipe,
 							       output,
