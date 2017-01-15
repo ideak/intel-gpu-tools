@@ -23,7 +23,6 @@
  */
 
 #include "igt.h"
-#include "igt_sysfs.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -36,7 +35,11 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <time.h>
+
 #include "drm.h"
+
+#include "igt_sysfs.h"
+#include "igt_vgem.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
@@ -46,15 +49,50 @@
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
+#define CORK 1
+
+struct cork {
+	int device;
+	uint32_t handle;
+	uint32_t fence;
+};
+
+static void plug(int fd, struct cork *c)
+{
+	struct vgem_bo bo;
+	int dmabuf;
+
+	c->device = drm_open_driver(DRIVER_VGEM);
+
+	bo.width = bo.height = 1;
+	bo.bpp = 4;
+	vgem_create(c->device, &bo);
+	c->fence = vgem_fence_attach(c->device, &bo, VGEM_FENCE_WRITE);
+
+	dmabuf = prime_handle_to_fd(c->device, bo.handle);
+	c->handle = prime_fd_to_handle(fd, dmabuf);
+	close(dmabuf);
+}
+
+static void unplug(struct cork *c)
+{
+	vgem_fence_signal(c->device, c->fence);
+	close(c->device);
+}
+
 #define RCS_TIMESTAMP (0x2000 + 0x358)
-static void latency_on_ring(int fd, unsigned ring, const char *name)
+static void latency_on_ring(int fd,
+			    unsigned ring, const char *name,
+			    unsigned flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	const int has_64bit_reloc = gen >= 8;
-	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
+	struct cork c;
 	volatile uint32_t *reg;
+	unsigned repeats;
 	uint32_t start, end, *map, *results;
 	uint64_t offset;
 	double gpu_latency;
@@ -63,37 +101,40 @@ static void latency_on_ring(int fd, unsigned ring, const char *name)
 	reg = (volatile uint32_t *)((volatile char *)igt_global_mmio + RCS_TIMESTAMP);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC | LOCAL_I915_EXEC_HANDLE_LUT;
 
 	memset(obj, 0, sizeof(obj));
-	obj[0].handle = gem_create(fd, 4096);
-	obj[0].flags = EXEC_OBJECT_WRITE;
-	results = gem_mmap__wc(fd, obj[0].handle, 0, 4096, PROT_READ);
+	obj[1].handle = gem_create(fd, 4096);
+	obj[1].flags = EXEC_OBJECT_WRITE;
+	results = gem_mmap__wc(fd, obj[1].handle, 0, 4096, PROT_READ);
 
-	obj[1].handle = gem_create(fd, 64*1024);
-	map = gem_mmap__wc(fd, obj[1].handle, 0, 64*1024, PROT_WRITE);
-	gem_set_domain(fd, obj[1].handle,
+	obj[2].handle = gem_create(fd, 64*1024);
+	map = gem_mmap__wc(fd, obj[2].handle, 0, 64*1024, PROT_WRITE);
+	gem_set_domain(fd, obj[2].handle,
 		       I915_GEM_DOMAIN_GTT,
 		       I915_GEM_DOMAIN_GTT);
 	map[0] = MI_BATCH_BUFFER_END;
 	gem_execbuf(fd, &execbuf);
 
 	memset(&reloc,0, sizeof(reloc));
-	obj[1].relocation_count = 1;
-	obj[1].relocs_ptr = to_user_pointer(&reloc);
+	obj[2].relocation_count = 1;
+	obj[2].relocs_ptr = to_user_pointer(&reloc);
 
-	gem_set_domain(fd, obj[1].handle,
+	gem_set_domain(fd, obj[2].handle,
 		       I915_GEM_DOMAIN_GTT,
 		       I915_GEM_DOMAIN_GTT);
 
+	reloc.target_handle = flags & CORK ? 1 : 0;
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-	reloc.presumed_offset = obj[0].offset;
+	reloc.presumed_offset = obj[1].offset;
 
-	for (j = 0; j < 1024; j++) {
+	repeats = flags & CORK ? 128 : 1024;
+
+	for (j = 0; j < repeats; j++) {
 		execbuf.batch_start_offset = 64 * j;
 		reloc.offset =
 			execbuf.batch_start_offset + sizeof(uint32_t);
@@ -114,8 +155,15 @@ static void latency_on_ring(int fd, unsigned ring, const char *name)
 		map[i++] = MI_BATCH_BUFFER_END;
 	}
 
+	if (flags & CORK) {
+		plug(fd, &c);
+		obj[0].handle = c.handle;
+		execbuf.buffers_ptr = to_user_pointer(&obj[0]);
+		execbuf.buffer_count = 3;
+	}
+
 	start = *reg;
-	for (j = 0; j < 1024; j++) {
+	for (j = 0; j < repeats; j++) {
 		execbuf.batch_start_offset = 64 * j;
 		reloc.offset =
 			execbuf.batch_start_offset + sizeof(uint32_t);
@@ -124,17 +172,20 @@ static void latency_on_ring(int fd, unsigned ring, const char *name)
 		gem_execbuf(fd, &execbuf);
 	}
 	end = *reg;
-	igt_assert(reloc.presumed_offset == obj[0].offset);
+	igt_assert(reloc.presumed_offset == obj[1].offset);
 
-	gem_set_domain(fd, obj[0].handle, I915_GEM_DOMAIN_GTT, 0);
-	gpu_latency = (results[1023] - results[0]) / 1023.;
+	if (flags & CORK)
+		unplug(&c);
 
-	gem_set_domain(fd, obj[1].handle,
+	gem_set_domain(fd, obj[1].handle, I915_GEM_DOMAIN_GTT, 0);
+	gpu_latency = (results[repeats-1] - results[0]) / (double)(repeats-1);
+
+	gem_set_domain(fd, obj[2].handle,
 		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 	execbuf.batch_start_offset = 0;
-	for (j = 0; j < 1023; j++) {
-		offset = obj[1].offset;
+	for (j = 0; j < repeats - 1; j++) {
+		offset = obj[2].offset;
 		offset += 64 * (j + 1);
 
 		i = 16 * j + (has_64bit_reloc ? 4 : 3);
@@ -153,76 +204,91 @@ static void latency_on_ring(int fd, unsigned ring, const char *name)
 				map[i] |= 1;
 		}
 	}
-	offset = obj[1].offset;
+	offset = obj[2].offset;
 	gem_execbuf(fd, &execbuf);
-	igt_assert(offset == obj[1].offset);
+	igt_assert(offset == obj[2].offset);
 
-	gem_set_domain(fd, obj[0].handle, I915_GEM_DOMAIN_GTT, 0);
+	gem_set_domain(fd, obj[1].handle, I915_GEM_DOMAIN_GTT, 0);
 	igt_info("%s: dispatch latency: %.2f, execution latency: %.2f (target %.2f)\n",
 		 name,
-		 (end - start) / 1024.,
-		 gpu_latency, (results[1023] - results[0]) / 1023.);
+		 (end - start) / (double)repeats,
+		 gpu_latency, (results[repeats - 1] - results[0]) / (double)(repeats - 1));
 
 	munmap(map, 64*1024);
 	munmap(results, 4096);
-	gem_close(fd, obj[0].handle);
 	gem_close(fd, obj[1].handle);
+	gem_close(fd, obj[2].handle);
 }
 
-static void latency_from_ring(int fd, unsigned ring, const char *name)
+static void latency_from_ring(int fd,
+			      unsigned ring, const char *name,
+			      unsigned flags)
 {
 	const struct intel_execution_engine *e;
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	const int has_64bit_reloc = gen >= 8;
-	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint32_t *map, *results;
 	int i, j;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC | LOCAL_I915_EXEC_HANDLE_LUT;
 
 	memset(obj, 0, sizeof(obj));
-	obj[0].handle = gem_create(fd, 4096);
-	obj[0].flags = EXEC_OBJECT_WRITE;
-	results = gem_mmap__wc(fd, obj[0].handle, 0, 4096, PROT_READ);
+	obj[1].handle = gem_create(fd, 4096);
+	obj[1].flags = EXEC_OBJECT_WRITE;
+	results = gem_mmap__wc(fd, obj[1].handle, 0, 4096, PROT_READ);
 
-	obj[1].handle = gem_create(fd, 64*1024);
-	map = gem_mmap__wc(fd, obj[1].handle, 0, 64*1024, PROT_WRITE);
-	gem_set_domain(fd, obj[1].handle,
+	obj[2].handle = gem_create(fd, 64*1024);
+	map = gem_mmap__wc(fd, obj[2].handle, 0, 64*1024, PROT_WRITE);
+	gem_set_domain(fd, obj[2].handle,
 		       I915_GEM_DOMAIN_GTT,
 		       I915_GEM_DOMAIN_GTT);
 	map[0] = MI_BATCH_BUFFER_END;
 	gem_execbuf(fd, &execbuf);
 
 	memset(&reloc,0, sizeof(reloc));
-	obj[1].relocation_count = 1;
-	obj[1].relocs_ptr = to_user_pointer(&reloc);
+	obj[2].relocation_count = 1;
+	obj[2].relocs_ptr = to_user_pointer(&reloc);
 
-	gem_set_domain(fd, obj[1].handle,
+	gem_set_domain(fd, obj[2].handle,
 		       I915_GEM_DOMAIN_GTT,
 		       I915_GEM_DOMAIN_GTT);
 
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-	reloc.presumed_offset = obj[0].offset;
+	reloc.presumed_offset = obj[1].offset;
+	reloc.target_handle = flags & CORK ? 1 : 0;
 
 	for (e = intel_execution_engines; e->name; e++) {
+		struct cork c;
+		unsigned int repeats;
+
 		if (e->exec_id == 0)
 			continue;
 
 		if (!gem_has_ring(fd, e->exec_id | e->flags))
 			continue;
 
-		gem_set_domain(fd, obj[1].handle,
+		gem_set_domain(fd, obj[2].handle,
 			       I915_GEM_DOMAIN_GTT,
 			       I915_GEM_DOMAIN_GTT);
 
-		for (j = 0; j < 512; j++) {
+		repeats = 512;
+		if (flags & CORK) {
+			plug(fd, &c);
+			obj[0].handle = c.handle;
+			execbuf.buffers_ptr = to_user_pointer(&obj[0]);
+			execbuf.buffer_count = 3;
+			repeats = 64;
+		}
+
+		for (j = 0; j < repeats; j++) {
 			uint64_t offset;
 
 			execbuf.flags &= ~ENGINE_FLAGS;
@@ -250,17 +316,17 @@ static void latency_from_ring(int fd, unsigned ring, const char *name)
 			gem_execbuf(fd, &execbuf);
 
 			execbuf.flags &= ~ENGINE_FLAGS;
-			execbuf.flags |= ring;
+			execbuf.flags |= e->exec_id | e->flags;
 
-			execbuf.batch_start_offset = 64 * (j + 512);
+			execbuf.batch_start_offset = 64 * (j + repeats);
 			reloc.offset =
 				execbuf.batch_start_offset + sizeof(uint32_t);
-			reloc.delta = sizeof(uint32_t) * (j + 512);
+			reloc.delta = sizeof(uint32_t) * (j + repeats);
 
 			offset = reloc.presumed_offset;
 			offset += reloc.delta;
 
-			i = 16 * (j + 512);
+			i = 16 * (j + repeats);
 			/* MI_STORE_REG_MEM */
 			map[i++] = 0x24 << 23 | 1;
 			if (has_64bit_reloc)
@@ -274,18 +340,21 @@ static void latency_from_ring(int fd, unsigned ring, const char *name)
 			gem_execbuf(fd, &execbuf);
 		}
 
-		gem_set_domain(fd, obj[0].handle,
+		if (flags & CORK)
+			unplug(&c);
+
+		gem_set_domain(fd, obj[1].handle,
 			       I915_GEM_DOMAIN_GTT,
 			       I915_GEM_DOMAIN_GTT);
 
 		igt_info("%s-%s delay: %.2f\n",
-			 name, e->name, (results[1023] - results[0]) / 1024.);
+			 name, e->name, (results[2*repeats-1] - results[0]) / (double)repeats);
 	}
 
 	munmap(map, 64*1024);
 	munmap(results, 4096);
-	gem_close(fd, obj[0].handle);
 	gem_close(fd, obj[1].handle);
+	gem_close(fd, obj[2].handle);
 }
 
 static void print_welcome(int fd)
@@ -340,13 +409,28 @@ igt_main
 				gem_require_ring(device, e->exec_id | e->flags);
 				latency_on_ring(device,
 						e->exec_id | e->flags,
-						e->name);
+						e->name, 0);
 			}
+
+			igt_subtest_f("%s-dispatch-queued", e->name) {
+				gem_require_ring(device, e->exec_id | e->flags);
+				latency_on_ring(device,
+						e->exec_id | e->flags,
+						e->name, CORK);
+			}
+
 			igt_subtest_f("%s-synchronisation", e->name) {
 				gem_require_ring(device, e->exec_id | e->flags);
 				latency_from_ring(device,
 						  e->exec_id | e->flags,
-						  e->name);
+						  e->name, 0);
+			}
+
+			igt_subtest_f("%s-synchronisation-queued", e->name) {
+				gem_require_ring(device, e->exec_id | e->flags);
+				latency_from_ring(device,
+						  e->exec_id | e->flags,
+						  e->name, CORK);
 			}
 		}
 	}
