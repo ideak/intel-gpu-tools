@@ -231,7 +231,7 @@ test_plane_position(data_t *data, enum pipe pipe, enum igt_plane plane,
 	igt_skip_on(pipe >= data->display.n_pipes);
 	igt_skip_on(plane >= data->display.pipes[pipe].n_planes);
 
-	for_each_connected_output(&data->display, output) {
+	for_each_valid_output_on_pipe(&data->display, pipe, output) {
 		test_plane_position_with_output(data, pipe, plane, output,
 						flags);
 		connected_outs++;
@@ -357,7 +357,7 @@ test_plane_panning(data_t *data, enum pipe pipe, enum igt_plane plane,
 	igt_skip_on(pipe >= data->display.n_pipes);
 	igt_skip_on(plane >= data->display.pipes[pipe].n_planes);
 
-	for_each_connected_output(&data->display, output) {
+	for_each_valid_output_on_pipe(&data->display, pipe, output) {
 		test_plane_panning_with_output(data, pipe, plane, output,
 						flags);
 		connected_outs++;
