@@ -119,21 +119,22 @@ find_outputs(data_t *data, igt_output_t **output1, igt_output_t **output2)
 {
 	int count = 0;
 	igt_output_t *output;
+	enum pipe pipe;
 
 	*output1 = NULL;
 	*output2 = NULL;
 
-	for_each_connected_output(&data->display, output) {
-		if (!(*output1))
+	for_each_pipe_with_valid_output(&data->display, pipe, output) {
+		if (pipe == PIPE_B && !*output1 && output != *output2)
 			*output1 = output;
-		else if (!(*output2))
+
+		if (pipe == PIPE_C && output != *output1 && !*output2)
 			*output2 = output;
 
 		igt_output_set_pipe(output, PIPE_ANY);
-		count++;
 	}
 
-	igt_skip_on_f(count < 2, "Not enough connected outputs\n");
+	igt_skip_on_f(!*output1 || !*output2, "Not enough connected outputs\n");
 }
 
 static void
