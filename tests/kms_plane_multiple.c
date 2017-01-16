@@ -32,7 +32,7 @@
 
 IGT_TEST_DESCRIPTION("Test atomic mode setting with multiple planes ");
 
-#define MAX_CRCS          1
+#define MAX_CRCS          2
 #define SIZE_PLANE      256
 #define SIZE_CURSOR     128
 #define LOOP_FOREVER     -1
@@ -235,7 +235,7 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 	test_position_t test = { .data = data };
 	color_t blue  = { 0.0f, 0.0f, 1.0f };
 	igt_crc_t *crc = NULL;
-	unsigned int vblank_start;
+	unsigned int vblank_start, vblank_stop;
 	int i, n, ret;
 	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
 	bool loop_forever;
@@ -274,13 +274,14 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 		ret = read(data->display.drm_fd, buf, sizeof(buf));
 		igt_assert(ret >= 0);
 
-		igt_assert_eq(get_vblank(data->display.drm_fd, pipe, 0), vblank_start + 1);
+		vblank_stop = get_vblank(data->display.drm_fd, pipe, 0);
 		igt_assert_eq(e->type, DRM_EVENT_FLIP_COMPLETE);
 		igt_reset_timeout();
 
-		n = igt_pipe_crc_get_crcs(data->pipe_crc, MAX_CRCS, &crc);
+		n = igt_pipe_crc_get_crcs(data->pipe_crc, vblank_stop - vblank_start, &crc);
 
-		igt_assert_eq(n, MAX_CRCS);
+		igt_assert(vblank_stop - vblank_start <= MAX_CRCS);
+		igt_assert_eq(n, vblank_stop - vblank_start);
 
 		igt_assert_crc_equal(&test.reference_crc, crc);
 
