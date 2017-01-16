@@ -1700,6 +1700,7 @@ static void igt_output_fini(igt_output_t *output)
 {
 	kmstest_free_connector_config(&output->config);
 	free(output->name);
+	output->name = NULL;
 }
 
 /**
@@ -1719,8 +1720,9 @@ void igt_display_fini(igt_display_t *display)
 	for (i = 0; i < display->n_outputs; i++)
 		igt_output_fini(&display->outputs[i]);
 	free(display->outputs);
-	free(display->pipes);
 	display->outputs = NULL;
+	free(display->pipes);
+	display->pipes = NULL;
 }
 
 static void igt_display_refresh(igt_display_t *display)
