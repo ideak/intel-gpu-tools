@@ -294,10 +294,19 @@ static void transition_nonblocking(igt_display_t *display, enum pipe pipe,
 		igt_plane_set_fb(primary, prim_fb);
 		igt_plane_set_fb(sprite, NULL);
 	} else {
+		int ret;
+
 		igt_plane_set_fb(primary, NULL);
 		igt_plane_set_fb(sprite, argb_fb);
-	}
 
+		ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT, display);
+		if (!ret)
+			return;
+
+		igt_assert(ret == -EINVAL);
+
+		igt_plane_set_fb(sprite, prim_fb);
+	}
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT, display);
 }
 
