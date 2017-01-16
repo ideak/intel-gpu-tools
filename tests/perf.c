@@ -1294,18 +1294,50 @@ test_blocking(void)
 	struct tms end_times;
 	int64_t user_ns, kernel_ns;
 	int64_t tick_ns = 1000000000 / sysconf(_SC_CLK_TCK);
+	int64_t test_duration_ns = tick_ns * 1000;
+
+	/* Based on the 40ms OA sampling period set above: max OA samples: */
+	int max_iterations = (test_duration_ns / 40000000ull) + 1;
+
+	/* It's a bit tricky to put a lower limit here, but we expect a
+	 * relatively low latency for seeing reports, while we don't currently
+	 * give any control over this in the api.
+	 *
+	 * We assume a maximum latency of 6 millisecond to deliver a POLLIN and
+	 * read() after a new sample is written (46ms per iteration) considering
+	 * the knowledge that that the driver uses a 200Hz hrtimer (5ms period)
+	 * to check for data and giving some time to read().
+	 */
+	int min_iterations = (test_duration_ns / 46000000ull);
+
 	int64_t start;
 	int n = 0;
 
 	times(&start_times);
 
-	/* Loop for 600ms performing blocking reads while the HW is sampling at
+	igt_debug("tick length = %dns, test duration = %"PRIu64"ns, min iter. = %d, max iter. = %d\n",
+		  (int)tick_ns, test_duration_ns,
+		  min_iterations, max_iterations);
+
+	/* In the loop we perform blocking polls while the HW is sampling at
 	 * ~25Hz, with the expectation that we spend most of our time blocked
 	 * in the kernel, and shouldn't be burning cpu cycles in the kernel in
 	 * association with this process (verified by looking at stime before
 	 * and after loop).
+	 *
+	 * We're looking to assert that less than 1% of the test duration is
+	 * spent in the kernel dealing with polling and read()ing.
+	 *
+	 * The test runs for a relatively long time considering the very low
+	 * resolution of stime in ticks of typically 10 milliseconds. Since we
+	 * don't know the fractional part of tick values we read from userspace
+	 * so our minimum threshold needs to be >= one tick since any
+	 * measurement might really be +- tick_ns (assuming we effectively get
+	 * floor(real_stime)).
+	 *
+	 * We Loop for 1000 x tick_ns so one tick corresponds to 0.1%
 	 */
-	for (start = get_time(); (get_time() - start) < 600000000; /* nop */) {
+	for (start = get_time(); (get_time() - start) < test_duration_ns; /* nop */) {
 		int ret;
 
 		while ((ret = read(stream_fd, buf, sizeof(buf))) < 0 &&
@@ -1325,33 +1357,25 @@ test_blocking(void)
 	user_ns = (end_times.tms_utime - start_times.tms_utime) * tick_ns;
 	kernel_ns = (end_times.tms_stime - start_times.tms_stime) * tick_ns;
 
-	igt_debug("%d blocking reads in 500 milliseconds, with 1KHz OA sampling\n", n);
-	igt_debug("time in userspace = %"PRIu64"ns (start utime = %d, end = %d, ns ticks per sec = %d)\n",
-		  user_ns, (int)start_times.tms_utime, (int)end_times.tms_utime, (int)tick_ns);
-	igt_debug("time in kernelspace = %"PRIu64"ns (start stime = %d, end = %d, ns ticks per sec = %d)\n",
-		  kernel_ns, (int)start_times.tms_stime, (int)end_times.tms_stime, (int)tick_ns);
+	igt_debug("%d blocking reads during test with 25Hz OA sampling\n", n);
+	igt_debug("time in userspace = %"PRIu64"ns (+-%dns) (start utime = %d, end = %d)\n",
+		  user_ns, (int)tick_ns,
+		  (int)start_times.tms_utime, (int)end_times.tms_utime);
+	igt_debug("time in kernelspace = %"PRIu64"ns (+-%dns) (start stime = %d, end = %d)\n",
+		  kernel_ns, (int)tick_ns,
+		  (int)start_times.tms_stime, (int)end_times.tms_stime);
 
 	/* With completely broken blocking (but also not returning an error) we
-	 * could end up with an open loop, hopefully recognisable with > 15
-	 * (600/40)iterations.
+	 * could end up with an open loop,
 	 */
-	igt_assert(n <= 15);
+	igt_assert(n <= max_iterations);
 
-	/* It's a bit tricky to put a lower limit here, but we expect a
-	 * relatively low latency for seeing reports, while we don't currently
-	 * give any control over this in the api.
-	 *
-	 * Limited to a 5 millisecond latency and 45ms (worst case)
-	 * per-iteration that could give 13.3 iterations. Rounding gives a tiny
-	 * bit more latency slack (6ms)...
+	/* Make sure the driver is reporting new samples with a reasonably
+	 * low latency...
 	 */
-	igt_assert(n > 13);
+	igt_assert(n > min_iterations);
 
-	/* A bit tricky to put a number on this, but we don't expect the kernel
-	 * to use any significant cpu while waiting and given the in precision
-	 * of stime (multiple of CLK_TCK) we expect this to round to zero.
-	 */
-	igt_assert_eq(kernel_ns, 0);
+	igt_assert(kernel_ns <= (test_duration_ns / 100ull));
 
 	close(stream_fd);
 }
@@ -1387,18 +1411,49 @@ test_polling(void)
 	struct tms end_times;
 	int64_t user_ns, kernel_ns;
 	int64_t tick_ns = 1000000000 / sysconf(_SC_CLK_TCK);
+	int64_t test_duration_ns = tick_ns * 1000;
+
+	/* Based on the 40ms OA sampling period set above: max OA samples: */
+	int max_iterations = (test_duration_ns / 40000000ull) + 1;
+
+	/* It's a bit tricky to put a lower limit here, but we expect a
+	 * relatively low latency for seeing reports, while we don't currently
+	 * give any control over this in the api.
+	 *
+	 * We assume a maximum latency of 6 millisecond to deliver a POLLIN and
+	 * read() after a new sample is written (46ms per iteration) considering
+	 * the knowledge that that the driver uses a 200Hz hrtimer (5ms period)
+	 * to check for data and giving some time to read().
+	 */
+	int min_iterations = (test_duration_ns / 46000000ull);
 	int64_t start;
 	int n = 0;
 
 	times(&start_times);
 
-	/* Loop for 600ms performing blocking polls while the HW is sampling at
+	igt_debug("tick length = %dns, test duration = %"PRIu64"ns, min iter. = %d, max iter. = %d\n",
+		  (int)tick_ns, test_duration_ns,
+		  min_iterations, max_iterations);
+
+	/* In the loop we perform blocking polls while the HW is sampling at
 	 * ~25Hz, with the expectation that we spend most of our time blocked
 	 * in the kernel, and shouldn't be burning cpu cycles in the kernel in
 	 * association with this process (verified by looking at stime before
 	 * and after loop).
+	 *
+	 * We're looking to assert that less than 1% of the test duration is
+	 * spent in the kernel dealing with polling and read()ing.
+	 *
+	 * The test runs for a relatively long time considering the very low
+	 * resolution of stime in ticks of typically 10 milliseconds. Since we
+	 * don't know the fractional part of tick values we read from userspace
+	 * so our minimum threshold needs to be >= one tick since any
+	 * measurement might really be +- tick_ns (assuming we effectively get
+	 * floor(real_stime)).
+	 *
+	 * We Loop for 1000 x tick_ns so one tick corresponds to 0.1%
 	 */
-	for (start = get_time(); (get_time() - start) < 600000000; /* nop */) {
+	for (start = get_time(); (get_time() - start) < test_duration_ns; /* nop */) {
 		struct pollfd pollfd = { .fd = stream_fd, .events = POLLIN };
 		int ret;
 
@@ -1449,33 +1504,25 @@ test_polling(void)
 	user_ns = (end_times.tms_utime - start_times.tms_utime) * tick_ns;
 	kernel_ns = (end_times.tms_stime - start_times.tms_stime) * tick_ns;
 
-	igt_debug("%d blocking poll()s in 600 milliseconds, with 25Hz OA sampling\n", n);
-	igt_debug("time in userspace = %"PRIu64"ns (start utime = %d, end = %d, ns ticks per sec = %d)\n",
-		  user_ns, (int)start_times.tms_utime, (int)end_times.tms_utime, (int)tick_ns);
-	igt_debug("time in kernelspace = %"PRIu64"ns (start stime = %d, end = %d, ns ticks per sec = %d)\n",
-		  kernel_ns, (int)start_times.tms_stime, (int)end_times.tms_stime, (int)tick_ns);
+	igt_debug("%d blocking poll()s during test with 25Hz OA sampling\n", n);
+	igt_debug("time in userspace = %"PRIu64"ns (+-%dns) (start utime = %d, end = %d)\n",
+		  user_ns, (int)tick_ns,
+		  (int)start_times.tms_utime, (int)end_times.tms_utime);
+	igt_debug("time in kernelspace = %"PRIu64"ns (+-%dns) (start stime = %d, end = %d)\n",
+		  kernel_ns, (int)tick_ns,
+		  (int)start_times.tms_stime, (int)end_times.tms_stime);
 
 	/* With completely broken blocking while polling (but still somehow
-	 * reporting a POLLIN event) we could end up with an open loop,
-	 * hopefully recognisable with > 15 (600/40)iterations.
+	 * reporting a POLLIN event) we could end up with an open loop.
 	 */
-	igt_assert(n <= 15);
+	igt_assert(n <= max_iterations);
 
-	/* It's a bit tricky to put a lower limit here, but we expect a
-	 * relatively low latency for seeing reports, while we don't currently
-	 * give any control over this in the api.
-	 *
-	 * Limited to a 5 millisecond latency and 45ms (worst case)
-	 * per-iteration that could give 13.3 iterations. Rounding gives a tiny
-	 * bit more latency slack (6ms)...
+	/* Make sure the driver is reporting new samples with a reasonably
+	 * low latency...
 	 */
-	igt_assert(n > 13);
+	igt_assert(n > min_iterations);
 
-	/* A bit tricky to put a number on this, but we don't expect the kernel
-	 * to use any significant cpu while waiting and given the in precision
-	 * of stime (multiple of CLK_TCK) we expect this to round to zero.
-	 */
-	igt_assert_eq(kernel_ns, 0);
+	igt_assert(kernel_ns <= (test_duration_ns / 100ull));
 
 	close(stream_fd);
 }
