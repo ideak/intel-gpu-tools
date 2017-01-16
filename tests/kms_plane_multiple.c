@@ -67,28 +67,6 @@ struct {
 	.seed = 1,
 };
 
-static inline uint32_t pipe_select(int pipe)
-{
-	if (pipe > 1)
-		return pipe << DRM_VBLANK_HIGH_CRTC_SHIFT;
-	else if (pipe > 0)
-		return DRM_VBLANK_SECONDARY;
-	else
-		return 0;
-}
-
-static unsigned int get_vblank(int fd, int pipe, unsigned int flags)
-{
-	union drm_wait_vblank vbl;
-
-	memset(&vbl, 0, sizeof(vbl));
-	vbl.request.type = DRM_VBLANK_RELATIVE | pipe_select(pipe) | flags;
-	if (drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl))
-		return 0;
-
-	return vbl.reply.sequence;
-}
-
 /*
  * Common code across all tests, acting on data_t
  */
@@ -263,7 +241,8 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 	while (i < iterations || loop_forever) {
 		prepare_planes(data, pipe, &blue, tiling, max_planes, output);
 
-		vblank_start = get_vblank(data->display.drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
+		vblank_start = kmstest_get_vblank(data->display.drm_fd, pipe,
+						  DRM_VBLANK_NEXTONMISS);
 
 		igt_display_commit_atomic(&data->display,
 					  DRM_MODE_PAGE_FLIP_EVENT,
@@ -274,7 +253,7 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 		ret = read(data->display.drm_fd, buf, sizeof(buf));
 		igt_assert(ret >= 0);
 
-		vblank_stop = get_vblank(data->display.drm_fd, pipe, 0);
+		vblank_stop = kmstest_get_vblank(data->display.drm_fd, pipe, 0);
 		igt_assert_eq(e->type, DRM_EVENT_FLIP_COMPLETE);
 		igt_reset_timeout();
 
