@@ -967,7 +967,6 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 		vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
 		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[nloops & 1]);
 
-
 		flip_nonblocking(display, pipe, false, &fb_info);
 
 		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
@@ -1099,128 +1098,108 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 		igt_remove_fb(display->drm_fd, &cursor_fb2);
 }
 
-static void two_screens_cursor_vs_flip(igt_display_t *display, int nloops, bool modeset)
+static void two_screens_cursor_vs_flip(igt_display_t *display, int nloops, bool atomic)
 {
-	struct drm_mode_cursor arg[2], arg2[2];
+	struct drm_mode_cursor arg[2][2];
 	struct drm_event_vblank vbl;
-	struct igt_fb fb_info, fb2_info, cursor_fb;
-	unsigned vblank_start, vblank_last;
+	struct igt_fb fb_info[2], cursor_fb;
 	volatile unsigned long *shared;
-	int target;
-	enum pipe pipe = find_connected_pipe(display, false);
-	enum pipe pipe2 = find_connected_pipe(display, true);
-	igt_output_t *output2;
-	bool skip_test = false;
+	int target[2];
+	enum pipe pipe[2] = {
+		find_connected_pipe(display, false),
+		find_connected_pipe(display, true)
+	};
+	igt_output_t *outputs[2];
 
 	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(shared != MAP_FAILED);
 
-	if (modeset)
+	if (atomic)
 		igt_require(display->is_atomic);
 
-	igt_require(set_fb_on_crtc(display, pipe, &fb_info));
-	igt_require((output2 = set_fb_on_crtc(display, pipe2, &fb2_info)));
+	igt_require((outputs[0] = set_fb_on_crtc(display, pipe[0], &fb_info[0])));
+	igt_require((outputs[1] = set_fb_on_crtc(display, pipe[1], &fb_info[1])));
 
 	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
-	set_cursor_on_pipe(display, pipe, &cursor_fb);
-	populate_cursor_args(display, pipe, arg, &cursor_fb);
 
-	arg[0].flags = arg[1].flags = DRM_MODE_CURSOR_BO;
-	arg[1].handle = 0;
-	arg[1].width = arg[1].height = 0;
+	set_cursor_on_pipe(display, pipe[0], &cursor_fb);
+	populate_cursor_args(display, pipe[0], arg[0], &cursor_fb);
+	arg[0][1].x = arg[0][1].y = 192;
 
-	set_cursor_on_pipe(display, pipe2, &cursor_fb);
-	populate_cursor_args(display, pipe2, arg2, &cursor_fb);
-
-	arg2[0].flags = arg2[1].flags = DRM_MODE_CURSOR_BO;
-	arg2[0].handle = 0;
-	arg2[0].width = arg2[0].height = 0;
-
-	if (modeset && (skip_test = skip_on_unsupported_nonblocking_modeset(display)))
-		goto cleanup;
+	set_cursor_on_pipe(display, pipe[1], &cursor_fb);
+	populate_cursor_args(display, pipe[1], arg[1], &cursor_fb);
+	arg[1][1].x =  arg[1][1].y = 192;
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	for (target = 65536; target; target /= 2) {
-		vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
-
-		if (!modeset)
-			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg2[0]);
-
-		for (int n = 0; n < target; n++) {
-			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
-		}
-		if (get_vblank(display->drm_fd, pipe, 0) == vblank_start)
-			break;
-	}
-
-	/*
-	  * Divide by 4, to handle variations in amount of vblanks
-	  * caused by cpufreq throttling.
-	  */
-	target /= 4;
-
-	igt_debug("Using a target of %d cursor updates per quarter-vblank\n",
-		  target);
-
-	igt_require(target > 1);
+	target[0] = get_cursor_updates_per_vblank(display, pipe[0], &arg[0][0]);
+	target[1] = get_cursor_updates_per_vblank(display, pipe[1], &arg[1][0]);
 
 	for (int i = 0; i < nloops; i++) {
+		unsigned long vrefresh[2];
+		unsigned vblank_start[2], vblank_last[2];
+		int done[2] = {};
+
+		vrefresh[0] = igt_output_get_mode(outputs[0])->vrefresh;
+		vrefresh[1] = igt_output_get_mode(outputs[1])->vrefresh;
+
 		shared[0] = 0;
-		igt_fork(child, 1) {
+		shared[1] = 0;
+		igt_fork(child, 2) {
 			unsigned long count = 0;
 
-			if (!modeset)
-				do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg2[i & 1]);
-			else {
-				igt_output_set_pipe(output2, (i & 1) ? pipe2 : PIPE_NONE);
-				igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET |
-							  DRM_MODE_ATOMIC_NONBLOCK, NULL);
-			}
-
-			while (!shared[0]) {
-				do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[i & 1]);
+			while (!shared[child]) {
+				do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[child][(i >> child) & 1]);
 				count++;
 			}
-			igt_debug("child: %lu cursor updates\n", count);
-			shared[0] = count;
+			igt_debug("child %i: %lu cursor updates\n", child, count);
+			shared[child] = count;
 		}
 
-		flip_nonblocking(display, pipe, modeset, &fb_info);
+		flip_nonblocking(display, pipe[0], atomic, &fb_info[0]);
+		flip_nonblocking(display, pipe[1], atomic, &fb_info[1]);
 
-		igt_assert_eq(read(display->drm_fd, &vbl, sizeof(vbl)), sizeof(vbl));
-		vblank_start = vblank_last = vbl.sequence;
-		for (int n = 0; n < 60; n++) {
-			flip_nonblocking(display, pipe, modeset, &fb_info);
+		for (int n = 0; n < vrefresh[0] / 2 + vrefresh[1] / 2; n++) {
+			int child;
 
 			igt_assert_eq(read(display->drm_fd, &vbl, sizeof(vbl)), sizeof(vbl));
-			if (vbl.sequence != vblank_last + 1) {
-				igt_warn("page flip %d was delayed, missed %d frames\n",
-					 n, vbl.sequence - vblank_last - 1);
-			}
-			vblank_last = vbl.sequence;
-		}
-		igt_assert_eq(vbl.sequence, vblank_start + 60);
+			child = vbl.user_data == (unsigned long)&fb_info[1];
 
-		shared[0] = 1;
+			if (!done[child]++)
+				vblank_start[child] = vbl.sequence;
+			else if (vbl.sequence != vblank_last[child] + 1)
+				igt_info("page flip %d was delayed, missed %d frames\n",
+					 done[child], vbl.sequence - vblank_last[child] - 1);
+
+			vblank_last[child] = vbl.sequence;
+
+			if (done[child] < vrefresh[child] / 2) {
+				flip_nonblocking(display, pipe[child], atomic, &fb_info[child]);
+			} else {
+				igt_assert_lte(vbl.sequence, vblank_start[child] + 5 * vrefresh[child] / 8);
+
+				shared[child] = 1;
+			}
+		}
+
+		igt_assert_eq(done[0], vrefresh[0] / 2);
+		igt_assert_eq(done[1], vrefresh[1] / 2);
+
 		igt_waitchildren();
-		igt_assert_f(shared[0] > 60*target,
-			     "completed %lu cursor updated in a period of 60 flips, "
-			     "we expect to complete approximately %lu updateds, "
-			     "with the threshold set at %lu\n",
-			     shared[0], 2*60ul*target, 60ul*target);
+		for (int child = 0; child < 2; child++)
+			igt_assert_f(shared[child] > vrefresh[child]*target[child] / 2,
+				    "completed %lu cursor updated in a period of %lu flips, "
+				    "we expect to complete approximately %lu updates, "
+				    "with the threshold set at %lu\n",
+				    shared[child], vrefresh[child] / 2,
+				    vrefresh[child]*target[child], vrefresh[child]*target[child] / 2);
 	}
 
-cleanup:
 	do_cleanup_display(display);
-	igt_remove_fb(display->drm_fd, &fb_info);
-	igt_remove_fb(display->drm_fd, &fb2_info);
+	igt_remove_fb(display->drm_fd, &fb_info[0]);
+	igt_remove_fb(display->drm_fd, &fb_info[1]);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
 	munmap((void *)shared, 4096);
-
-	if (skip_test)
-		igt_skip("Nonblocking modeset is not supported by this kernel\n");
 }
 
 static void flip_vs_cursor_crc(igt_display_t *display, bool atomic)
@@ -1428,7 +1407,7 @@ igt_main
 		two_screens_flip_vs_cursor(&display, 8, false);
 
 	igt_subtest("2x-cursor-vs-flip-legacy")
-		two_screens_cursor_vs_flip(&display, 4, false);
+		two_screens_cursor_vs_flip(&display, 8, false);
 
 	igt_subtest("2x-long-flip-vs-cursor-legacy")
 		two_screens_flip_vs_cursor(&display, 150, false);
@@ -1439,13 +1418,13 @@ igt_main
 	igt_subtest("2x-nonblocking-modeset-vs-cursor-atomic")
 		two_screens_flip_vs_cursor(&display, 8, true);
 
-	igt_subtest("2x-cursor-vs-nonblocking-modeset-atomic")
-		two_screens_cursor_vs_flip(&display, 4, true);
+	igt_subtest("2x-cursor-vs-flip-atomic")
+		two_screens_cursor_vs_flip(&display, 8, true);
 
 	igt_subtest("2x-long-nonblocking-modeset-vs-cursor-atomic")
 		two_screens_flip_vs_cursor(&display, 150, true);
 
-	igt_subtest("2x-long-cursor-vs-nonblocking-modeset-atomic")
+	igt_subtest("2x-long-cursor-vs-flip-atomic")
 		two_screens_cursor_vs_flip(&display, 50, true);
 
 	igt_subtest("flip-vs-cursor-crc-legacy")
