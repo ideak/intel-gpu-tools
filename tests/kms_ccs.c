@@ -182,7 +182,7 @@ static void display_fb(data_t *data, int compressed)
 		render_ccs(data, f.handles[0], f.offsets[1], size[1],
 			   f.width/16, f.height/8, f.pitches[1]);
 
-	primary = igt_output_get_plane(data->output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, fb);
 
 	if (data->flags & TEST_ROTATE_180)
@@ -231,7 +231,7 @@ static void test_output(data_t *data)
 		display_fb(data, TEST_COMPRESSED);
 	}
 
-	primary = igt_output_get_plane(data->output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, NULL);
 	igt_plane_set_rotation(primary, IGT_ROTATION_0);
 	if (!display->is_atomic)
