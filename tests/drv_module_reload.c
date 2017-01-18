@@ -311,6 +311,9 @@ igt_main
 		gem_exec_store();
 	}
 
+	igt_subtest("basic-no-display")
+		igt_assert_eq(reload("disable_display=1"), 0);
+
 	igt_subtest("basic-reload-inject") {
 		for (i = 0; i < 4; i++) {
 			memset(buf, 0, sizeof(buf));
