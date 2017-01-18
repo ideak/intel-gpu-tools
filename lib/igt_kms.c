@@ -1107,6 +1107,7 @@ void kmstest_edid_add_3d(const unsigned char *edid, size_t length,
 	*new_length = length + 128;
 
 	new_edid = calloc(*new_length, sizeof(char));
+	igt_assert_f(new_edid, "Failed to allocate %zu bytes for edid\n", sizeof(new_length));
 	memcpy(new_edid, edid, length);
 	*new_edid_ptr = new_edid;
 
@@ -1506,6 +1507,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 	 */
 	display->n_pipes = resources->count_crtcs;
 	display->pipes = calloc(sizeof(igt_pipe_t), display->n_pipes);
+	igt_assert_f(display->pipes, "Failed to allocate memory for %d pipes\n", display->n_pipes);
 
 	drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 	is_atomic = drmSetClientCap(drm_fd, DRM_CLIENT_CAP_ATOMIC, 1);
@@ -1650,7 +1652,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 	 */
 	display->n_outputs = resources->count_connectors;
 	display->outputs = calloc(display->n_outputs, sizeof(igt_output_t));
-	igt_assert(display->outputs);
+	igt_assert_f(display->outputs, "Failed to allocate memory for %d outputs\n", display->n_outputs);
 
 	for (i = 0; i < display->n_outputs; i++) {
 		igt_output_t *output = &display->outputs[i];
