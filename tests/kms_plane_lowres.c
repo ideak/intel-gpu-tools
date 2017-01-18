@@ -181,11 +181,11 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 	igt_output_set_pipe(output, pipe);
 
 	kmstest_get_crtc(pipe, &crtc);
-	igt_skip_on(crtc.nplanes > data->display.pipes[pipe].n_planes);
-	igt_skip_on(crtc.nplanes == 0);
+	igt_skip_on(crtc.n_planes > data->display.pipes[pipe].n_planes);
+	igt_skip_on(crtc.n_planes == 0);
 
-	for (i = 0; i < crtc.nplanes; i++)
-		data->plane[i] = igt_output_get_plane(output, crtc.plane[i].index);
+	for (i = 0; i < crtc.n_planes; i++)
+		data->plane[i] = igt_output_get_plane(output, crtc.planes[i].index);
 
 	mode = igt_output_get_mode(output);
 
@@ -198,7 +198,7 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 	igt_plane_set_fb(data->plane[0], &data->fb[0]);
 
 	/* yellow sprite plane in lower left corner */
-	for (i = IGT_PLANE_2; i < crtc.nplanes; i++) {
+	for (i = IGT_PLANE_2; i < crtc.n_planes; i++) {
 		if (data->plane[i]->is_cursor)
 			size = 64;
 		else

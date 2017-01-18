@@ -1348,11 +1348,13 @@ void kmstest_get_crtc(enum pipe pipe, struct kmstest_crtc *crtc)
 				crtc->active = true;
 				parse_crtc(tmp, crtc);
 
-				crtc->nplanes = parse_planes(fid, NULL);
-				crtc->plane = calloc(crtc->nplanes, sizeof(*crtc->plane));
+				crtc->n_planes = parse_planes(fid, NULL);
+				crtc->planes = calloc(crtc->n_planes, sizeof(*crtc->planes));
+				igt_assert_f(crtc->planes, "Failed to allocate memory for %d planes\n", crtc->n_planes);
+
 				fseek(fid, 0, SEEK_END);
 				fseek(fid, 0, SEEK_SET);
-				parse_planes(fid, crtc->plane);
+				parse_planes(fid, crtc->planes);
 
 				if (crtc->pipe != pipe)
 					crtc = NULL;
@@ -1378,14 +1380,14 @@ void igt_assert_plane_visible(enum pipe pipe, bool visibility)
 	kmstest_get_crtc(pipe, &crtc);
 
 	visible = true;
-	for (i = 0; i < crtc.nplanes; i++) {
-		if (crtc.plane[i].type == DRM_PLANE_TYPE_PRIMARY)
+	for (i = 0; i < crtc.n_planes; i++) {
+		if (crtc.planes[i].type == DRM_PLANE_TYPE_PRIMARY)
 			continue;
 
-		if (crtc.plane[i].pos_x > crtc.width) {
+		if (crtc.planes[i].pos_x > crtc.width) {
 			visible = false;
 			break;
-		} else if (crtc.plane[i].pos_y > crtc.height) {
+		} else if (crtc.planes[i].pos_y > crtc.height) {
 			visible = false;
 			break;
 		}

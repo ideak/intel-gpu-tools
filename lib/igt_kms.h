@@ -149,8 +149,8 @@ struct kmstest_crtc {
 	bool active;
 	int width;
 	int height;
-	int nplanes;
-	struct kmstest_plane *plane;
+	int n_planes;
+	struct kmstest_plane *planes;
 };
 
 /**
