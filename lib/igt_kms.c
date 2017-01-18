@@ -1282,21 +1282,21 @@ static int parse_planes(FILE *fid, struct kmstest_plane *plane)
 {
 	char tmp[256];
 	int nplanes;
-	int ovl;
 
-	ovl = 0;
 	nplanes = 0;
 	while (fgets(tmp, 256, fid) != NULL) {
 		igt_assert_neq(nplanes, IGT_MAX_PLANES);
 		if (strstr(tmp, "type=PRI") != NULL) {
-			get_plane(tmp, IGT_PLANE_PRIMARY, &plane[nplanes]);
+			get_plane(tmp, DRM_PLANE_TYPE_PRIMARY, &plane[nplanes]);
+			plane[nplanes].index = nplanes;
 			nplanes++;
 		} else if (strstr(tmp, "type=OVL") != NULL) {
-			get_plane(tmp, IGT_PLANE_2 + ovl, &plane[nplanes]);
-			ovl++;
+			get_plane(tmp, DRM_PLANE_TYPE_OVERLAY, &plane[nplanes]);
+			plane[nplanes].index = nplanes;
 			nplanes++;
 		} else if (strstr(tmp, "type=CUR") != NULL) {
-			get_plane(tmp, IGT_PLANE_CURSOR, &plane[nplanes]);
+			get_plane(tmp, DRM_PLANE_TYPE_CURSOR, &plane[nplanes]);
+			plane[nplanes].index = nplanes;
 			nplanes++;
 			break;
 		}

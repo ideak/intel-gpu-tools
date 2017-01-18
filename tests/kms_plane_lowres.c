@@ -185,7 +185,7 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 	igt_skip_on(crtc.nplanes == 0);
 
 	for (i = 0; i < crtc.nplanes; i++)
-		data->plane[i] = igt_output_get_plane(output, crtc.plane[i].plane);
+		data->plane[i] = igt_output_get_plane(output, crtc.plane[i].index);
 
 	mode = igt_output_get_mode(output);
 

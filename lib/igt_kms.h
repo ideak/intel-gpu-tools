@@ -136,6 +136,7 @@ struct kmstest_connector_config {
 struct kmstest_plane {
 	int id;
 	int plane;
+	int index;
 	int pos_x;
 	int pos_y;
 	int width;
