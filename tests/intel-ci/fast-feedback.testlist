@@ -3,9 +3,6 @@ igt@core_prop_blob@basic
 igt@drv_getparams_basic@basic-eu-total
 igt@drv_getparams_basic@basic-subslice-total
 igt@drv_hangman@error-state-basic
-igt@drv_module_reload@basic-reload
-igt@drv_module_reload@basic-reload-inject
-igt@drv_module_reload@basic-reload-final
 igt@gem_basic@bad-close
 igt@gem_basic@create-close
 igt@gem_basic@create-fd-close
@@ -244,3 +241,6 @@ igt@vgem_basic@mmap
 igt@vgem_basic@second-client
 igt@vgem_basic@sysfs
 igt@vgem_basic@unload
+igt@drv_module_reload@basic-reload
+igt@drv_module_reload@basic-reload-inject
+igt@drv_module_reload@basic-reload-final
