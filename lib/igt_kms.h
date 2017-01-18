@@ -61,21 +61,22 @@ int kmstest_pipe_to_index(char pipe);
 
 /* We namespace this enum to not conflict with the Android i915_drm.h */
 enum igt_plane {
-	IGT_PLANE_1 = 0,
-	IGT_PLANE_PRIMARY = IGT_PLANE_1,
-	IGT_PLANE_2,
-	IGT_PLANE_3,
-	IGT_PLANE_4,
-	IGT_PLANE_5,
-	IGT_PLANE_6,
-	IGT_PLANE_7,
-	IGT_PLANE_8,
-	IGT_PLANE_9,
-	IGT_PLANE_CURSOR, /* IGT_PLANE_CURSOR is always the last plane. */
-	IGT_MAX_PLANES,
+        IGT_PLANE_1 = 0,
+        IGT_PLANE_PRIMARY = IGT_PLANE_1,
+        IGT_PLANE_2,
+        IGT_PLANE_3,
+        IGT_PLANE_4,
+        IGT_PLANE_5,
+        IGT_PLANE_6,
+        IGT_PLANE_7,
+        IGT_PLANE_8,
+        IGT_PLANE_9,
+        IGT_PLANE_CURSOR, /* IGT_PLANE_CURSOR is always the last plane. */
+        IGT_MAX_PLANES,
 };
 
 const char *kmstest_plane_name(enum igt_plane plane);
+const char *kmstest_plane_type_name(int plane_type);
 
 enum port {
         PORT_A = 0,
@@ -272,6 +273,7 @@ typedef struct {
 	igt_pipe_t *pipe;
 	int index;
 	/* capabilities */
+	int type;
 	unsigned int is_primary       : 1;
 	unsigned int is_cursor        : 1;
 	/* state tracking */
@@ -308,8 +310,11 @@ struct igt_pipe {
 	igt_display_t *display;
 	enum pipe pipe;
 	bool enabled;
+
 	int n_planes;
-	igt_plane_t planes[IGT_MAX_PLANES];
+	int plane_cursor;
+	int plane_primary;
+	igt_plane_t *planes;
 
 	uint32_t atomic_props_crtc[IGT_NUM_CRTC_PROPS];
 
@@ -369,9 +374,11 @@ drmModeModeInfo *igt_output_get_mode(igt_output_t *output);
 void igt_output_override_mode(igt_output_t *output, drmModeModeInfo *mode);
 void igt_output_set_pipe(igt_output_t *output, enum pipe pipe);
 void igt_output_set_scaling_mode(igt_output_t *output, uint64_t scaling_mode);
-igt_plane_t *igt_output_get_plane(igt_output_t *output, enum igt_plane plane);
+igt_plane_t *igt_output_get_plane(igt_output_t *output, int plane_idx);
+igt_plane_t *igt_output_get_plane_type(igt_output_t *output, int plane_type);
 igt_output_t *igt_output_from_connector(igt_display_t *display,
-					drmModeConnector *connector);
+    drmModeConnector *connector);
+igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type);
 bool igt_pipe_get_property(igt_pipe_t *pipe, const char *name,
 			   uint32_t *prop_id, uint64_t *value,
 			   drmModePropertyPtr *prop);

@@ -349,7 +349,7 @@ int kmstest_pipe_to_index(char pipe)
  * kmstest_plane_name:
  * @plane: display plane
  *
- * Returns: String represnting @pipe, e.g. "plane1".
+ * Returns: String representing @plane, e.g. "plane1".
  */
 const char *kmstest_plane_name(enum igt_plane plane)
 {
@@ -369,6 +369,25 @@ const char *kmstest_plane_name(enum igt_plane plane)
 	igt_assert(plane < ARRAY_SIZE(names) && names[plane]);
 
 	return names[plane];
+}
+
+/**
+ * kmstest_plane_type_name:
+ * @plane: display plane
+ *
+ * Returns: String representing @plane, e.g. "overlay".
+ */
+const char *kmstest_plane_type_name(int plane_type)
+{
+	static const char *names[] = {
+		[DRM_PLANE_TYPE_OVERLAY] = "overlay",
+		[DRM_PLANE_TYPE_PRIMARY] = "primary",
+		[DRM_PLANE_TYPE_CURSOR] = "cursor",
+	};
+
+	igt_assert(plane_type < ARRAY_SIZE(names) && names[plane_type]);
+
+	return names[plane_type];
 }
 
 static const char *mode_stereo_name(const drmModeModeInfo *mode)
@@ -1570,14 +1589,17 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 	for (i = 0; i < display->n_pipes; i++) {
 		igt_pipe_t *pipe = &display->pipes[i];
 		igt_plane_t *plane;
-		int p = IGT_PLANE_2;
+		int p = 1;
 		int j, type;
-		uint8_t n_planes = 0;
+		uint8_t last_plane = 0, n_planes = 0;
 		uint64_t prop_value;
 
 		pipe->crtc_id = resources->crtcs[i];
 		pipe->display = display;
 		pipe->pipe = i;
+		pipe->plane_cursor = -1;
+		pipe->plane_primary = -1;
+		pipe->planes = NULL;
 
 		get_crtc_property(display->drm_fd, pipe->crtc_id,
 				    "background_color",
@@ -1603,6 +1625,27 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 
 		igt_atomic_fill_pipe_props(display, pipe, IGT_NUM_CRTC_PROPS, igt_crtc_prop_names);
 
+		/* count number of valid planes */
+		for (j = 0; j < plane_resources->count_planes; j++) {
+			drmModePlane *drm_plane;
+
+			drm_plane = drmModeGetPlane(display->drm_fd,
+						    plane_resources->planes[j]);
+			igt_assert(drm_plane);
+
+			if (!(drm_plane->possible_crtcs & (1 << i))) {
+				drmModeFreePlane(drm_plane);
+				continue;
+			}
+
+			n_planes++;
+		}
+
+		igt_assert_lte(0, n_planes);
+		pipe->planes = calloc(sizeof(igt_plane_t), n_planes);
+		igt_assert_f(pipe->planes, "Failed to allocate memory for %d planes\n", n_planes);
+		last_plane = n_planes - 1;
+
 		/* add the planes that can be used with that pipe */
 		for (j = 0; j < plane_resources->count_planes; j++) {
 			drmModePlane *drm_plane;
@@ -1620,22 +1663,27 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 						  plane_resources->planes[j]);
 			switch (type) {
 			case DRM_PLANE_TYPE_PRIMARY:
-				plane = &pipe->planes[IGT_PLANE_PRIMARY];
+				if (pipe->plane_primary == -1) {
+					plane = &pipe->planes[0];
+					plane->index = 0;
+					pipe->plane_primary = 0;
+				} else {
+					plane = &pipe->planes[p];
+					plane->index = p++;
+				}
 				plane->is_primary = 1;
-				plane->index = IGT_PLANE_PRIMARY;
 				break;
 			case DRM_PLANE_TYPE_CURSOR:
-				/*
-				 * Cursor should be the highest index in our
-				 * internal list, but we don't know what that
-				 * is yet.  Just stick it in the last slot
-				 * for now and we'll move it later, if
-				 * necessary.
-				 */
-				plane = &pipe->planes[IGT_PLANE_CURSOR];
-				plane->is_cursor = 1;
-				plane->index = IGT_PLANE_CURSOR;
+				if (pipe->plane_cursor == -1) {
+					plane = &pipe->planes[last_plane];
+					plane->index = last_plane;
+					pipe->plane_cursor = last_plane;
+				} else {
+					plane = &pipe->planes[p];
+					plane->index = p++;
+				}
 				display->has_cursor_plane = true;
+				plane->is_cursor = 1;
 				break;
 			default:
 				plane = &pipe->planes[p];
@@ -1643,7 +1691,8 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 				break;
 			}
 
-			n_planes++;
+			igt_assert_f(plane->index < n_planes, "n_planes < plane->index failed\n");
+			plane->type = type;
 			plane->pipe = pipe;
 			plane->drm_plane = drm_plane;
 
@@ -1664,7 +1713,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		 * At the bare minimum, we should expect to have a primary
 		 * plane
 		 */
-		igt_assert(pipe->planes[IGT_PLANE_PRIMARY].drm_plane);
+		igt_assert(pipe->planes[pipe->plane_primary].drm_plane);
 
 		if (display->has_cursor_plane) {
 			/*
@@ -1672,11 +1721,11 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 			 * only 1 sprite, that's the wrong slot and we need to
 			 * move it down.
 			 */
-			if (p != IGT_PLANE_CURSOR) {
+			if (p != last_plane) {
 				pipe->planes[p] =
-					pipe->planes[IGT_PLANE_CURSOR];
+					pipe->planes[last_plane];
 				pipe->planes[p].index = p;
-				memset(&pipe->planes[IGT_PLANE_CURSOR], 0,
+				memset(&pipe->planes[last_plane], 0,
 				       sizeof *plane);
 			}
 		} else {
@@ -1684,16 +1733,13 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 			plane = &pipe->planes[p];
 			plane->pipe = pipe;
 			plane->index = p;
-			plane->is_cursor = true;
+			plane->type = DRM_PLANE_TYPE_CURSOR;
 		}
 
 		pipe->n_planes = n_planes;
 
 		for_each_plane_on_pipe(display, i, plane)
 			plane->fb_changed = true;
-
-		/* make sure we don't overflow the plane array */
-		igt_assert_lte(pipe->n_planes, IGT_MAX_PLANES);
 
 		pipe->mode_changed = true;
 	}
@@ -1773,6 +1819,9 @@ static void igt_pipe_fini(igt_pipe_t *pipe)
 			plane->drm_plane = NULL;
 		}
 	}
+
+	free(pipe->planes);
+	pipe->planes = NULL;
 }
 
 static void igt_output_fini(igt_output_t *output)
@@ -1861,20 +1910,41 @@ static igt_pipe_t *igt_output_get_driving_pipe(igt_output_t *output)
 	return &display->pipes[pipe];
 }
 
-static igt_plane_t *igt_pipe_get_plane(igt_pipe_t *pipe, enum igt_plane plane)
+static igt_plane_t *igt_pipe_get_plane(igt_pipe_t *pipe, int plane_idx)
 {
-	int idx;
+	igt_assert_f(plane_idx >= 0 && plane_idx < pipe->n_planes,
+		"Valid pipe->planes plane_idx not found, plane_idx=%d n_planes=%d",
+		plane_idx, pipe->n_planes);
 
-	/* Cursor plane is always the highest index */
-	if (plane == IGT_PLANE_CURSOR)
-		idx = pipe->n_planes - 1;
-	else {
-		igt_assert_f(plane >= 0 && plane < (pipe->n_planes),
-			     "plane=%d\n", plane);
-		idx = plane;
+	return &pipe->planes[plane_idx];
+}
+
+
+igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type)
+{
+	int i, plane_idx = -1;
+
+	switch(plane_type) {
+	case DRM_PLANE_TYPE_CURSOR:
+		plane_idx = pipe->plane_cursor;
+		break;
+	case DRM_PLANE_TYPE_PRIMARY:
+		plane_idx = pipe->plane_primary;
+		break;
+	case DRM_PLANE_TYPE_OVERLAY:
+		for(i = 0; i < pipe->n_planes; i++)
+			if (pipe->planes[i].type == DRM_PLANE_TYPE_OVERLAY)
+			    plane_idx = i;
+		break;
+	default:
+		break;
 	}
 
-	return &pipe->planes[idx];
+	igt_assert_f(plane_idx >= 0 && plane_idx < pipe->n_planes,
+		"Valid pipe->planes idx not found. plane_idx=%d plane_type=%d n_planes=%d\n",
+		plane_idx, plane_type, pipe->n_planes);
+
+	return &pipe->planes[plane_idx];
 }
 
 static igt_output_t *igt_pipe_get_output(igt_pipe_t *pipe)
@@ -2219,9 +2289,9 @@ static int igt_plane_commit(igt_plane_t *plane,
 			    enum igt_commit_style s,
 			    bool fail_on_error)
 {
-	if (plane->is_cursor && s == COMMIT_LEGACY) {
+	if (plane->type == DRM_PLANE_TYPE_CURSOR && s == COMMIT_LEGACY) {
 		return igt_cursor_commit_legacy(plane, pipe, fail_on_error);
-	} else if (plane->is_primary && s == COMMIT_LEGACY) {
+	} else if (plane->type == DRM_PLANE_TYPE_PRIMARY && s == COMMIT_LEGACY) {
 		return igt_primary_plane_commit_legacy(plane, pipe,
 						       fail_on_error);
 	} else {
@@ -2438,7 +2508,9 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 			plane->position_changed = false;
 			plane->size_changed = false;
 
-			if (s != COMMIT_LEGACY || !(plane->is_primary || plane->is_cursor))
+			if (s != COMMIT_LEGACY ||
+			    !(plane->type == DRM_PLANE_TYPE_PRIMARY ||
+			      plane->type == DRM_PLANE_TYPE_CURSOR))
 				plane->rotation_changed = false;
 		}
 	}
@@ -2717,14 +2789,24 @@ void igt_output_set_scaling_mode(igt_output_t *output, uint64_t scaling_mode)
 	igt_require(output->config.atomic_props_connector[IGT_CONNECTOR_SCALING_MODE]);
 }
 
-igt_plane_t *igt_output_get_plane(igt_output_t *output, enum igt_plane plane)
+igt_plane_t *igt_output_get_plane(igt_output_t *output, int plane_idx)
 {
 	igt_pipe_t *pipe;
 
 	pipe = igt_output_get_driving_pipe(output);
 	igt_assert(pipe);
 
-	return igt_pipe_get_plane(pipe, plane);
+	return igt_pipe_get_plane(pipe, plane_idx);
+}
+
+igt_plane_t *igt_output_get_plane_type(igt_output_t *output, int plane_type)
+{
+	igt_pipe_t *pipe;
+
+	pipe = igt_output_get_driving_pipe(output);
+	igt_assert(pipe);
+
+	return igt_pipe_get_plane_type(pipe, plane_type);
 }
 
 void igt_plane_set_fb(igt_plane_t *plane, struct igt_fb *fb)
