@@ -41,6 +41,7 @@
 #define BOMB 0x10
 #define SUSPEND 0x20
 #define HIBERNATE 0x40
+#define NEWFD 0x80
 
 static void check_bo(int fd, uint32_t handle)
 {
@@ -81,37 +82,33 @@ static void fill_ring(int fd,
 	}
 }
 
-static void run_test(int fd, unsigned ring, unsigned flags)
+static int setup_execbuf(int fd,
+			 struct drm_i915_gem_execbuffer2 *execbuf,
+			 struct drm_i915_gem_exec_object2 *obj,
+			 struct drm_i915_gem_relocation_entry *reloc,
+			 unsigned int ring)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct drm_i915_gem_exec_object2 obj[2];
-	struct drm_i915_gem_relocation_entry reloc[1024];
-	struct drm_i915_gem_execbuffer2 execbuf;
-	igt_hang_t hang;
 	uint32_t *batch, *b;
+	int ret;
 	int i;
 
-	gem_require_ring(fd, ring);
-	igt_skip_on_f(gen == 6 && (ring & ~(3<<13)) == I915_EXEC_BSD,
-		      "MI_STORE_DATA broken on gen6 bsd\n");
+	memset(execbuf, 0, sizeof(*execbuf));
+	memset(obj, 0, 2*sizeof(*obj));
+	memset(reloc, 0, 1024*sizeof(*reloc));
 
-	if (flags & (SUSPEND | HIBERNATE))
-		run_test(fd, ring, 0);
-
-	gem_quiescent_gpu(fd);
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.flags = ring | (1 << 11) | (1 << 12);
+	execbuf->buffers_ptr = to_user_pointer(obj);
+	execbuf->flags = ring | (1 << 11) | (1 << 12);
 	if (gen < 6)
-		execbuf.flags |= I915_EXEC_SECURE;
+		execbuf->flags |= I915_EXEC_SECURE;
 
-	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[0].handle, 0, &bbe, sizeof(bbe));
-	execbuf.buffer_count = 1;
-	igt_require(__gem_execbuf(fd, &execbuf) == 0);
+	execbuf->buffer_count = 1;
+	ret = __gem_execbuf(fd, execbuf);
+	if (ret)
+		return ret;
 
 	obj[0].flags |= EXEC_OBJECT_WRITE;
 	obj[1].handle = gem_create(fd, 1024*16 + 4096);
@@ -124,7 +121,6 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 	gem_set_domain(fd, obj[1].handle,
 		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
-	memset(reloc, 0, sizeof(reloc));
 	b = batch;
 	for (i = 0; i < 1024; i++) {
 		uint64_t offset;
@@ -152,9 +148,31 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 	}
 	*b++ = MI_BATCH_BUFFER_END;
 	munmap(batch, 16*1024+4096);
-	execbuf.buffer_count = 2;
-	gem_execbuf(fd, &execbuf);
+
+	execbuf->buffer_count = 2;
+	gem_execbuf(fd, execbuf);
+
 	check_bo(fd, obj[0].handle);
+	return 0;
+}
+
+static void run_test(int fd, unsigned ring, unsigned flags)
+{
+	const int gen = intel_gen(intel_get_drm_devid(fd));
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_relocation_entry reloc[1024];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	igt_hang_t hang;
+
+	gem_require_ring(fd, ring);
+	igt_skip_on_f(gen == 6 && (ring & ~(3<<13)) == I915_EXEC_BSD,
+		      "MI_STORE_DATA broken on gen6 bsd\n");
+
+	if (flags & (SUSPEND | HIBERNATE))
+		run_test(fd, ring, 0);
+
+	gem_quiescent_gpu(fd);
+	igt_require(setup_execbuf(fd, &execbuf, obj, reloc, ring) == 0);
 
 	memset(&hang, 0, sizeof(hang));
 	if (flags & HANG)
@@ -171,8 +189,13 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 			nchild = 1;
 
 		igt_debug("Forking %d children\n", nchild);
-		igt_fork(child, nchild)
+		igt_fork(child, nchild) {
+			if (flags & NEWFD) {
+				fd = drm_open_driver(DRIVER_INTEL);
+				setup_execbuf(fd, &execbuf, obj, reloc, ring);
+			}
 			fill_ring(fd, &execbuf, flags);
+		}
 
 		if (flags & SUSPEND)
 			igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
@@ -181,6 +204,9 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 		if (flags & HIBERNATE)
 			igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
 						      SUSPEND_TEST_NONE);
+
+		if (flags & NEWFD)
+			fill_ring(fd, &execbuf, flags);
 
 		igt_waitchildren();
 	} else
@@ -212,7 +238,8 @@ igt_main
 		{ "-hang", HANG, true },
 		{ "-child", CHILD },
 		{ "-forked", FORKED, true },
-		{ "-bomb", BOMB | INTERRUPTIBLE },
+		{ "-fd", FORKED | NEWFD, true },
+		{ "-bomb", BOMB | NEWFD | INTERRUPTIBLE },
 		{ "-S3", BOMB | SUSPEND },
 		{ "-S4", BOMB | HIBERNATE },
 		{ NULL }
