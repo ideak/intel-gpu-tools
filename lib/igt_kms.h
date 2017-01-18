@@ -180,6 +180,7 @@ bool kmstest_get_connector_config(int drm_fd, uint32_t connector_id,
 bool kmstest_probe_connector_config(int drm_fd, uint32_t connector_id,
 				    unsigned long crtc_idx_mask,
 				    struct kmstest_connector_config *config);
+int kmstest_pipe_to_index(char pipe);
 void kmstest_free_connector_config(struct kmstest_connector_config *config);
 
 void kmstest_set_connector_dpms(int fd, drmModeConnector *connector, int mode);
