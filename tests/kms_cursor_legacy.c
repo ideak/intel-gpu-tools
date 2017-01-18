@@ -919,7 +919,7 @@ cleanup:
 		igt_skip("Nonblocking modeset is not supported by this kernel\n");
 }
 
-static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool modeset)
+static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool modeset, bool atomic)
 {
 	struct drm_mode_cursor arg[2], arg2[2];
 	struct drm_event_vblank vbl;
@@ -927,29 +927,27 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 	unsigned vblank_start;
 	enum pipe pipe = find_connected_pipe(display, false);
 	enum pipe pipe2 = find_connected_pipe(display, true);
-	igt_output_t *output2;
+	igt_output_t *output, *output2;
 	bool skip_test = false;
 
-	if (modeset)
+	igt_fail_on(modeset && !atomic);
+
+	if (atomic)
 		igt_require(display->is_atomic);
 
-	igt_require(set_fb_on_crtc(display, pipe, &fb_info));
+	igt_require((output = set_fb_on_crtc(display, pipe, &fb_info)));
 	igt_require((output2 = set_fb_on_crtc(display, pipe2, &fb2_info)));
 
 	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
 	set_cursor_on_pipe(display, pipe, &cursor_fb);
 	populate_cursor_args(display, pipe, arg, &cursor_fb);
 
-	arg[0].flags = arg[1].flags = DRM_MODE_CURSOR_BO;
-	arg[1].handle = 0;
-	arg[1].width = arg[1].height = 0;
+	arg[1].x = arg[1].y = 192;
 
 	set_cursor_on_pipe(display, pipe2, &cursor_fb);
 	populate_cursor_args(display, pipe2, arg2, &cursor_fb);
 
-	arg2[0].flags = arg2[1].flags = DRM_MODE_CURSOR_BO;
-	arg2[0].handle = 0;
-	arg2[0].width = arg2[0].height = 0;
+	arg2[1].x = arg2[1].y = 192;
 
 	if (modeset && (skip_test = skip_on_unsupported_nonblocking_modeset(display)))
 		goto cleanup;
@@ -967,7 +965,28 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 		vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
 		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[nloops & 1]);
 
-		flip_nonblocking(display, pipe, false, &fb_info);
+		if (!modeset)
+			flip_nonblocking(display, pipe, false, &fb_info);
+		else {
+			/*
+			 * There are 2 design issues that prevent us from doing
+			 * the test we would like here:
+			 *
+			 * - drm_event_vblank doesn't set crtc_id, so if we
+			 *   use events we don't know which pipe fired the event,
+			 *   no way to distinguish.
+			 * - Doing a modeset may add unrelated pipes, and fail with
+			 *   -EBUSY if a page flip is queued on one of those.
+			 *
+			 * Work around it by not setting an event, but doing a synchronous
+			 * commit to wait for completion, and queue the page flip and modeset
+			 * in the same commit.
+			 */
+
+			igt_plane_set_fb(igt_output_get_plane(output, IGT_PLANE_PRIMARY), &fb_info);
+			igt_output_set_pipe(output2, (nloops & 1) ? PIPE_NONE : pipe2);
+			igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK, NULL);
+		}
 
 		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 
@@ -976,24 +995,20 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg2[nloops & 1]);
 			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[nloops & 1]);
 			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg2[nloops & 1]);
+
+			igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+
+			igt_set_timeout(1, "Stuck page flip");
+			igt_ignore_warn(read(display->drm_fd, &vbl, sizeof(vbl)));
+			igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
+			igt_reset_timeout();
 		} else {
-			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[nloops & 1]);
-
-			igt_output_set_pipe(output2, (nloops & 1) ? PIPE_NONE : pipe2);
-			igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK, NULL);
-
-			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[nloops & 1]);
+			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg2[nloops & 1]);
 		}
 
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
-
-		igt_set_timeout(1, "Stuck page flip");
-		igt_ignore_warn(read(display->drm_fd, &vbl, sizeof(vbl)));
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
-		igt_reset_timeout();
-
 		if (modeset) {
-			/* wait for pending modeset to complete, to prevent -EBUSY */
+			/* wait for pending modeset and page flip to complete, to prevent -EBUSY */
+			display->pipes[pipe].mode_changed = true;
 			display->pipes[pipe2].mode_changed = true;
 			igt_display_commit2(display, COMMIT_ATOMIC);
 		}
@@ -1404,25 +1419,31 @@ igt_main
 		nonblocking_modeset_vs_cursor(&display, 16);
 
 	igt_subtest("2x-flip-vs-cursor-legacy")
-		two_screens_flip_vs_cursor(&display, 8, false);
+		two_screens_flip_vs_cursor(&display, 8, false, false);
+
+	igt_subtest("2x-flip-vs-cursor-atomic")
+		two_screens_flip_vs_cursor(&display, 4, false, true);
 
 	igt_subtest("2x-cursor-vs-flip-legacy")
 		two_screens_cursor_vs_flip(&display, 8, false);
 
 	igt_subtest("2x-long-flip-vs-cursor-legacy")
-		two_screens_flip_vs_cursor(&display, 150, false);
+		two_screens_flip_vs_cursor(&display, 150, false, false);
+
+	igt_subtest("2x-long-flip-vs-cursor-atomic")
+		two_screens_flip_vs_cursor(&display, 150, false, true);
 
 	igt_subtest("2x-long-cursor-vs-flip-legacy")
 		two_screens_cursor_vs_flip(&display, 50, false);
 
 	igt_subtest("2x-nonblocking-modeset-vs-cursor-atomic")
-		two_screens_flip_vs_cursor(&display, 8, true);
+		two_screens_flip_vs_cursor(&display, 8, true, true);
 
 	igt_subtest("2x-cursor-vs-flip-atomic")
 		two_screens_cursor_vs_flip(&display, 8, true);
 
 	igt_subtest("2x-long-nonblocking-modeset-vs-cursor-atomic")
-		two_screens_flip_vs_cursor(&display, 150, true);
+		two_screens_flip_vs_cursor(&display, 150, true, true);
 
 	igt_subtest("2x-long-cursor-vs-flip-atomic")
 		two_screens_cursor_vs_flip(&display, 50, true);
