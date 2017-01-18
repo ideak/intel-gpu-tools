@@ -100,8 +100,6 @@ static int setup_execbuf(int fd,
 
 	execbuf->buffers_ptr = to_user_pointer(obj);
 	execbuf->flags = ring | (1 << 11) | (1 << 12);
-	if (gen < 6)
-		execbuf->flags |= I915_EXEC_SECURE;
 
 	obj[0].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[0].handle, 0, &bbe, sizeof(bbe));
@@ -248,7 +246,7 @@ igt_main
 	int fd;
 
 	igt_fixture
-		fd = drm_open_driver_master(DRIVER_INTEL);
+		fd = drm_open_driver(DRIVER_INTEL);
 
 	for (m = modes; m->suffix; m++) {
 		for (e = intel_execution_engines; e->name; e++) {
