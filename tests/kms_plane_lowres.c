@@ -40,8 +40,8 @@ typedef struct {
 	int drm_fd;
 	igt_display_t display;
 	igt_pipe_crc_t *pipe_crc;
-	igt_plane_t *plane[IGT_MAX_PLANES];
-	struct igt_fb fb[IGT_MAX_PLANES];
+	igt_plane_t **plane;
+	struct igt_fb *fb;
 } data_t;
 
 static drmModeModeInfo
@@ -113,6 +113,12 @@ static void
 test_init(data_t *data, enum pipe pipe)
 {
 	data->pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	data->plane = calloc(data->display.pipes[pipe].n_planes, sizeof(data->plane));\
+	igt_assert_f(data->plane, "Failed to allocate memory for %d planes\n",
+	             data->display.pipes[pipe].n_planes);
+	data->fb = calloc(data->display.pipes[pipe].n_planes, sizeof(struct igt_fb));
+	igt_assert_f(data->fb, "Failed to allocate memory for %d FBs\n",
+	             data->display.pipes[pipe].n_planes);
 }
 
 static void
@@ -128,6 +134,11 @@ test_fini(data_t *data, igt_output_t *output)
 	igt_output_set_pipe(output, PIPE_ANY);
 
 	igt_pipe_crc_free(data->pipe_crc);
+
+	free(data->plane);
+	data->plane = NULL;
+	free(data->fb);
+	data->fb = NULL;
 }
 
 static int
@@ -178,6 +189,8 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 	int size;
 	int i, x, y;
 
+	crtc.planes = calloc(sizeof(struct kmstest_plane), data->display.pipes[pipe].n_planes);
+	igt_assert_f(crtc.planes, "Failed to allocate memory for %d planes\n", data->display.pipes[pipe].n_planes);
 	igt_output_set_pipe(output, pipe);
 
 	kmstest_get_crtc(pipe, &crtc);
@@ -198,8 +211,10 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 	igt_plane_set_fb(data->plane[0], &data->fb[0]);
 
 	/* yellow sprite plane in lower left corner */
-	for (i = IGT_PLANE_2; i < crtc.n_planes; i++) {
-		if (data->plane[i]->is_cursor)
+	for (i = 0; i < crtc.n_planes; i++) {
+		if (data->plane[i]->type == DRM_PLANE_TYPE_PRIMARY)
+			continue;
+		if (data->plane[i]->type == DRM_PLANE_TYPE_CURSOR)
 			size = 64;
 		else
 			size = SIZE;
@@ -209,8 +224,8 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 
 		igt_create_color_fb(data->drm_fd,
 				    size, size,
-				    data->plane[i]->is_cursor ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
-				    data->plane[i]->is_cursor ? LOCAL_DRM_FORMAT_MOD_NONE : modifier,
+				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
+				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? LOCAL_DRM_FORMAT_MOD_NONE : modifier,
 				    1.0, 1.0, 0.0,
 				    &data->fb[i]);
 
