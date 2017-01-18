@@ -1265,7 +1265,7 @@ static void get_plane(char *str, int type, struct kmstest_plane *plane)
 	int ret;
 	char buf[256];
 
-	plane->plane = type;
+	plane->type = type;
 	ret = sscanf(str + 12, "%d%*c %*s %[^n]s",
 		     &plane->id,
 		     buf);
@@ -1278,31 +1278,36 @@ static void get_plane(char *str, int type, struct kmstest_plane *plane)
 	igt_assert_eq(ret, 2);
 }
 
-static int parse_planes(FILE *fid, struct kmstest_plane *plane)
+static int parse_planes(FILE *fid, struct kmstest_plane *planes)
 {
 	char tmp[256];
-	int nplanes;
+	int n_planes;
 
-	nplanes = 0;
+	n_planes = 0;
 	while (fgets(tmp, 256, fid) != NULL) {
-		igt_assert_neq(nplanes, IGT_MAX_PLANES);
 		if (strstr(tmp, "type=PRI") != NULL) {
-			get_plane(tmp, DRM_PLANE_TYPE_PRIMARY, &plane[nplanes]);
-			plane[nplanes].index = nplanes;
-			nplanes++;
+			if (planes) {
+				get_plane(tmp, DRM_PLANE_TYPE_PRIMARY, &planes[n_planes]);
+				planes[n_planes].index = n_planes;
+			}
+			n_planes++;
 		} else if (strstr(tmp, "type=OVL") != NULL) {
-			get_plane(tmp, DRM_PLANE_TYPE_OVERLAY, &plane[nplanes]);
-			plane[nplanes].index = nplanes;
-			nplanes++;
+			if (planes) {
+				get_plane(tmp, DRM_PLANE_TYPE_OVERLAY, &planes[n_planes]);
+				planes[n_planes].index = n_planes;
+			}
+			n_planes++;
 		} else if (strstr(tmp, "type=CUR") != NULL) {
-			get_plane(tmp, DRM_PLANE_TYPE_CURSOR, &plane[nplanes]);
-			plane[nplanes].index = nplanes;
-			nplanes++;
+			if (planes) {
+				get_plane(tmp, DRM_PLANE_TYPE_CURSOR, &planes[n_planes]);
+				planes[n_planes].index = n_planes;
+			}
+			n_planes++;
 			break;
 		}
 	}
 
-	return nplanes;
+	return n_planes;
 }
 
 static void parse_crtc(char *info, struct kmstest_crtc *crtc)
@@ -1342,7 +1347,12 @@ void kmstest_get_crtc(enum pipe pipe, struct kmstest_crtc *crtc)
 			if (strstr(tmp, "active=yes") != NULL) {
 				crtc->active = true;
 				parse_crtc(tmp, crtc);
-				crtc->nplanes = parse_planes(fid, crtc->plane);
+
+				crtc->nplanes = parse_planes(fid, NULL);
+				crtc->plane = calloc(crtc->nplanes, sizeof(*crtc->plane));
+				fseek(fid, 0, SEEK_END);
+				fseek(fid, 0, SEEK_SET);
+				parse_planes(fid, crtc->plane);
 
 				if (crtc->pipe != pipe)
 					crtc = NULL;
@@ -1368,7 +1378,10 @@ void igt_assert_plane_visible(enum pipe pipe, bool visibility)
 	kmstest_get_crtc(pipe, &crtc);
 
 	visible = true;
-	for (i = IGT_PLANE_2; i < crtc.nplanes; i++) {
+	for (i = 0; i < crtc.nplanes; i++) {
+		if (crtc.plane[i].type == DRM_PLANE_TYPE_PRIMARY)
+			continue;
+
 		if (crtc.plane[i].pos_x > crtc.width) {
 			visible = false;
 			break;

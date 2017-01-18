@@ -135,8 +135,8 @@ struct kmstest_connector_config {
 
 struct kmstest_plane {
 	int id;
-	int plane;
 	int index;
+	int type;
 	int pos_x;
 	int pos_y;
 	int width;
@@ -150,7 +150,7 @@ struct kmstest_crtc {
 	int width;
 	int height;
 	int nplanes;
-	struct kmstest_plane plane[IGT_MAX_PLANES];
+	struct kmstest_plane *plane;
 };
 
 /**
