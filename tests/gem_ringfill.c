@@ -130,7 +130,7 @@ static int setup_execbuf(int fd,
 		reloc[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 		offset = obj[0].offset + reloc[i].delta;
-		*b++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		*b++ = MI_STORE_DWORD_IMM;
 		if (gen >= 8) {
 			*b++ = offset;
 			*b++ = offset >> 32;
@@ -139,6 +139,7 @@ static int setup_execbuf(int fd,
 			*b++ = offset;
 			reloc[i].offset += sizeof(*batch);
 		} else {
+			b[-1] |= 1 << 22;
 			b[-1] -= 1;
 			*b++ = offset;
 		}
