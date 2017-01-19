@@ -90,7 +90,11 @@ static void emit_recursive_batch(igt_spin_t *spin,
 	memset(relocs, 0, sizeof(relocs));
 
 	obj[BATCH].handle = gem_create(fd, BATCH_SIZE);
-	batch = gem_mmap__gtt(fd, obj[BATCH].handle, BATCH_SIZE, PROT_WRITE);
+	batch = __gem_mmap__wc(fd, obj[BATCH].handle,
+			       0, BATCH_SIZE, PROT_WRITE);
+	if (!batch)
+		batch = __gem_mmap__gtt(fd, obj[BATCH].handle,
+				       	BATCH_SIZE, PROT_WRITE);
 	gem_set_domain(fd, obj[BATCH].handle,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	execbuf.buffer_count++;
