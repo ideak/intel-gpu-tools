@@ -267,6 +267,72 @@ static void series(int fd, uint32_t handle, int timeout)
 		     1e6*time, 1e6*min, 1e6*max, 1e6*sum*2);
 }
 
+static void sequential(int fd, uint32_t handle, int timeout)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct timespec start, now, sync;
+	unsigned engines[16];
+	unsigned nengine;
+	unsigned engine;
+	unsigned long count;
+	double time, sum;
+
+	nengine = 0;
+	sum = 0;
+	for_each_engine(fd, engine) {
+		if (ignore_engine(fd, engine))
+			continue;
+
+		time = nop_on_ring(fd, handle, engine, 1, &count) / count;
+		sum += time;
+		igt_debug("%s: %.3fus\n", e__->name, 1e6*time);
+
+		engines[nengine++] = engine;
+	}
+	igt_require(nengine);
+	igt_info("Total (individual) execution latency %.3fus per cycle\n",
+		 1e6*sum);
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = gem_create(fd, 4096);
+	obj[0].flags = EXEC_OBJECT_WRITE;
+	obj[1].handle = handle;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	igt_require(__gem_execbuf(fd, &execbuf) == 0);
+
+	intel_detect_and_clear_missed_interrupts(fd);
+
+	count = 0;
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	do {
+		for (int loop = 0; loop < 1024; loop++) {
+			for (int n = 0; n < nengine; n++) {
+				execbuf.flags &= ~ENGINE_FLAGS;
+				execbuf.flags |= engines[n];
+				gem_execbuf(fd, &execbuf);
+			}
+		}
+		count += 1024;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+	} while (elapsed(&start, &now) < timeout); /* Hang detection ~120s */
+	gem_sync(fd, handle);
+	clock_gettime(CLOCK_MONOTONIC, &sync);
+	igt_debug("sync time: %.3fus\n", elapsed(&now, &sync)*1e6);
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+
+	time = elapsed(&start, &now) / count;
+	igt_info("Sequential (%d engines): %'lu cycles, average %.3fus per cycle [expected %.3fus]\n",
+		 nengine, count, 1e6*time, 1e6*sum);
+
+	gem_close(fd, obj[0].handle);
+}
+
 static void print_welcome(int fd)
 {
 	bool active;
@@ -320,6 +386,9 @@ igt_main
 	igt_subtest("basic-parallel")
 		parallel(device, handle, 5);
 
+	igt_subtest("basic-sequential")
+		sequential(device, handle, 5);
+
 	for (e = intel_execution_engines; e->name; e++)
 		igt_subtest_f("%s", e->name)
 			single(device, handle, e->exec_id | e->flags, e->name);
@@ -329,6 +398,9 @@ igt_main
 
 	igt_subtest("parallel")
 		parallel(device, handle, 150);
+
+	igt_subtest("sequential")
+		sequential(device, handle, 150);
 
 	igt_fixture {
 		igt_stop_hang_detector();
