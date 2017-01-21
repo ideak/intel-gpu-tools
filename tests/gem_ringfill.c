@@ -101,6 +101,9 @@ static int setup_execbuf(int fd,
 	execbuf->buffers_ptr = to_user_pointer(obj);
 	execbuf->flags = ring | (1 << 11) | (1 << 12);
 
+	if (gen > 3 && gen < 6)
+		execbuf->flags |= I915_EXEC_SECURE;
+
 	obj[0].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[0].handle, 0, &bbe, sizeof(bbe));
 	execbuf->buffer_count = 1;
@@ -135,6 +138,8 @@ static int setup_execbuf(int fd,
 			*b++ = offset;
 			*b++ = offset >> 32;
 		} else if (gen >= 4) {
+			if (gen < 6)
+				b[-1] |= 1 << 22;
 			*b++ = 0;
 			*b++ = offset;
 			reloc[i].offset += sizeof(*batch);
@@ -244,18 +249,29 @@ igt_main
 		{ NULL }
 	}, *m;
 	const struct intel_execution_engine *e;
+	bool master = false;
 	int fd;
 
-	igt_fixture
+	igt_fixture {
+		int gen;
+
 		fd = drm_open_driver(DRIVER_INTEL);
+		gen = intel_gen(intel_get_drm_devid(fd));
+		if (gen > 3 && gen < 6) { /* ctg and ilk need secure batches */
+			igt_require(drmSetMaster(fd) == 0);
+			master = true;
+		}
+	}
 
 	for (m = modes; m->suffix; m++) {
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("%s%s%s",
 				      m->basic && !e->exec_id ? "basic-" : "",
 				      e->name,
-				      m->suffix)
+				      m->suffix) {
+				igt_skip_on(m->flags & NEWFD && master);
 				run_test(fd, e->exec_id | e->flags, m->flags);
+			}
 		}
 	}
 
