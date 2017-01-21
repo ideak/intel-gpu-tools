@@ -460,137 +460,36 @@ static bool has_semaphores(int fd)
 
 static bool has_extended_busy_ioctl(int fd)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj;
-	struct drm_i915_gem_relocation_entry reloc;
-	struct drm_i915_gem_execbuffer2 execbuf;
+	igt_spin_t *spin = igt_spin_batch_new(fd, I915_EXEC_RENDER, 0);
 	uint32_t read, write;
-	uint32_t *batch;
-	int i;
 
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&obj);
-	execbuf.buffer_count = 1;
-
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, 4096);
-
-	obj.relocs_ptr = to_user_pointer(&reloc);
-	obj.relocation_count = 1;
-	memset(&reloc, 0, sizeof(reloc));
-
-	batch = gem_mmap__gtt(fd, obj.handle, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj.handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	reloc.target_handle = obj.handle; /* recurse */
-	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
-	reloc.delta = 0;
-	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc.write_domain = 0;
-
-	i = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc.delta = 1;
-		}
-	}
-	i++;
-
-	gem_execbuf(fd, &execbuf);
-	__gem_busy(fd, obj.handle, &read, &write);
-
-	*batch = MI_BATCH_BUFFER_END;
-	__sync_synchronize();
-	munmap(batch, 4096);
-
-	gem_close(fd, obj.handle);
+	__gem_busy(fd, spin->handle, &read, &write);
+	igt_spin_batch_free(fd, spin);
 
 	return read != 0;
 }
 
 static void basic(int fd, unsigned ring, unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj;
-	struct drm_i915_gem_relocation_entry reloc;
-	struct drm_i915_gem_execbuffer2 execbuf;
+	igt_spin_t *spin = igt_spin_batch_new(fd, ring, 0);
 	struct timespec tv;
-	uint32_t *batch;
-	int i, timeout;
+	int timeout;
 	bool busy;
 
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&obj);
-	execbuf.buffer_count = 1;
-	execbuf.flags = ring;
-
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, 4096);
-
-	obj.relocs_ptr = to_user_pointer(&reloc);
-	obj.relocation_count = 1;
-	memset(&reloc, 0, sizeof(reloc));
-
-	batch = gem_mmap__gtt(fd, obj.handle, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj.handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	reloc.target_handle = obj.handle; /* recurse */
-	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
-	reloc.delta = 0;
-	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc.write_domain = 0;
-
-	i = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc.delta = 1;
-		}
-	}
-	i++;
-
-	gem_execbuf(fd, &execbuf);
-	busy = gem_bo_busy(fd, obj.handle);
+	busy = gem_bo_busy(fd, spin->handle);
 
 	timeout = 120;
 	if ((flags & HANG) == 0) {
-		*batch = MI_BATCH_BUFFER_END;
-		__sync_synchronize();
+		igt_spin_batch_end(spin);
 		timeout = 1;
 	}
-	munmap(batch, 4096);
 
 	igt_assert(busy);
 	memset(&tv, 0, sizeof(tv));
-	while (gem_bo_busy(fd, obj.handle))
+	while (gem_bo_busy(fd, spin->handle))
 		igt_assert(igt_seconds_elapsed(&tv) < timeout);
 
-	gem_close(fd, obj.handle);
+	igt_spin_batch_free(fd, spin);
 }
 
 igt_main
