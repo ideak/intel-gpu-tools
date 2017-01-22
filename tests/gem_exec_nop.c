@@ -26,7 +26,9 @@
  */
 
 #include "igt.h"
+#include "igt_rand.h"
 #include "igt_sysfs.h"
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -48,6 +50,10 @@
 #define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+
+#define FORKED 1
+#define CHAINED 2
+#define CONTEXT 4
 
 static double elapsed(const struct timespec *start, const struct timespec *end)
 {
@@ -267,28 +273,53 @@ static void series(int fd, uint32_t handle, int timeout)
 		     1e6*time, 1e6*min, 1e6*max, 1e6*sum*2);
 }
 
-static void sequential(int fd, uint32_t handle, int timeout)
+static void xchg(void *array, unsigned i, unsigned j)
 {
+	unsigned *u = array;
+	unsigned tmp = u[i];
+	u[i] = u[j];
+	u[j] = tmp;
+}
+
+static int __gem_context_create(int fd, uint32_t *ctx_id)
+{
+	struct drm_i915_gem_context_create arg;
+	int ret = 0;
+
+	memset(&arg, 0, sizeof(arg));
+	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg))
+		ret = -errno;
+
+	*ctx_id = arg.ctx_id;
+	return ret;
+}
+static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
+{
+	const int ncpus = flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
-	struct timespec start, now, sync;
 	unsigned engines[16];
 	unsigned nengine;
-	unsigned engine;
-	unsigned long count;
+	double *results;
 	double time, sum;
+	unsigned n;
+
+	results = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(results != MAP_FAILED);
 
 	nengine = 0;
 	sum = 0;
-	for_each_engine(fd, engine) {
-		if (ignore_engine(fd, engine))
+	for_each_engine(fd, n) {
+		unsigned long count;
+
+		if (ignore_engine(fd, n))
 			continue;
 
-		time = nop_on_ring(fd, handle, engine, 1, &count) / count;
+		time = nop_on_ring(fd, handle, n, 1, &count) / count;
 		sum += time;
 		igt_debug("%s: %.3fus\n", e__->name, 1e6*time);
 
-		engines[nengine++] = engine;
+		engines[nengine++] = n;
 	}
 	igt_require(nengine);
 	igt_info("Total (individual) execution latency %.3fus per cycle\n",
@@ -306,31 +337,79 @@ static void sequential(int fd, uint32_t handle, int timeout)
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 
+	if (flags & CONTEXT) {
+		uint32_t id;
+
+		igt_require(__gem_context_create(fd, &id) == 0);
+		execbuf.rsvd1 = id;
+	}
+
+	for (n = 0; n < nengine; n++) {
+		execbuf.flags &= ~ENGINE_FLAGS;
+		execbuf.flags |= engines[n];
+		igt_require(__gem_execbuf(fd, &execbuf) == 0);
+	}
+
 	intel_detect_and_clear_missed_interrupts(fd);
 
-	count = 0;
-	clock_gettime(CLOCK_MONOTONIC, &start);
-	do {
-		for (int loop = 0; loop < 1024; loop++) {
-			for (int n = 0; n < nengine; n++) {
-				execbuf.flags &= ~ENGINE_FLAGS;
-				execbuf.flags |= engines[n];
-				gem_execbuf(fd, &execbuf);
+	igt_fork(child, ncpus) {
+		struct timespec start, now;
+		unsigned long count;
+
+		obj[0].handle = gem_create(fd, 4096);
+		gem_execbuf(fd, &execbuf);
+
+		if (flags & CONTEXT)
+			execbuf.rsvd1 = gem_context_create(fd);
+
+		hars_petruska_f54_1_random_perturb(child);
+
+		count = 0;
+		clock_gettime(CLOCK_MONOTONIC, &start);
+		do {
+			igt_permute_array(engines, nengine, xchg);
+			if (flags & CHAINED) {
+				for (n = 0; n < nengine; n++) {
+					execbuf.flags &= ~ENGINE_FLAGS;
+					execbuf.flags |= engines[n];
+					for (int loop = 0; loop < 1024; loop++)
+						gem_execbuf(fd, &execbuf);
+				}
+			} else {
+				for (int loop = 0; loop < 1024; loop++) {
+					for (n = 0; n < nengine; n++) {
+						execbuf.flags &= ~ENGINE_FLAGS;
+						execbuf.flags |= engines[n];
+						gem_execbuf(fd, &execbuf);
+					}
+				}
 			}
-		}
-		count += 1024;
-		clock_gettime(CLOCK_MONOTONIC, &now);
-	} while (elapsed(&start, &now) < timeout); /* Hang detection ~120s */
-	gem_sync(fd, handle);
-	clock_gettime(CLOCK_MONOTONIC, &sync);
-	igt_debug("sync time: %.3fus\n", elapsed(&now, &sync)*1e6);
+			count += 1024;
+			clock_gettime(CLOCK_MONOTONIC, &now);
+		} while (elapsed(&start, &now) < timeout); /* Hang detection ~120s */
+		results[child] = elapsed(&start, &now) / count;
+
+		if (flags & CONTEXT)
+			gem_context_destroy(fd, execbuf.rsvd1);
+
+		gem_close(fd, obj[0].handle);
+	}
+	igt_waitchildren();
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 
-	time = elapsed(&start, &now) / count;
-	igt_info("Sequential (%d engines): %'lu cycles, average %.3fus per cycle [expected %.3fus]\n",
-		 nengine, count, 1e6*time, 1e6*sum);
+	results[ncpus] = 0;
+	for (n = 0; n < ncpus; n++)
+		results[ncpus] += results[n];
+	results[ncpus] /= ncpus;
+
+	igt_info("Sequential (%d engines, %d processes): average %.3fus per cycle [expected %.3fus]\n",
+		 nengine, ncpus, 1e6*results[ncpus], 1e6*sum*ncpus);
+
+	if (flags & CONTEXT)
+		gem_context_destroy(fd, execbuf.rsvd1);
 
 	gem_close(fd, obj[0].handle);
+	munmap(results, 4096);
 }
 
 static void print_welcome(int fd)
@@ -387,7 +466,7 @@ igt_main
 		parallel(device, handle, 5);
 
 	igt_subtest("basic-sequential")
-		sequential(device, handle, 5);
+		sequential(device, handle, 0, 5);
 
 	for (e = intel_execution_engines; e->name; e++)
 		igt_subtest_f("%s", e->name)
@@ -400,7 +479,16 @@ igt_main
 		parallel(device, handle, 150);
 
 	igt_subtest("sequential")
-		sequential(device, handle, 150);
+		sequential(device, handle, 0, 150);
+
+	igt_subtest("forked-sequential")
+		sequential(device, handle, FORKED, 150);
+
+	igt_subtest("chained-sequential")
+		sequential(device, handle, FORKED | CHAINED, 150);
+
+	igt_subtest("context-sequential")
+		sequential(device, handle, FORKED | CONTEXT, 150);
 
 	igt_fixture {
 		igt_stop_hang_detector();
