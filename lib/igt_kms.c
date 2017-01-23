@@ -346,32 +346,6 @@ int kmstest_pipe_to_index(char pipe)
 }
 
 /**
- * kmstest_plane_name:
- * @plane: display plane
- *
- * Returns: String representing @plane, e.g. "plane1".
- */
-const char *kmstest_plane_name(enum igt_plane plane)
-{
-	static const char *names[] = {
-		[IGT_PLANE_1] = "plane1",
-		[IGT_PLANE_2] = "plane2",
-		[IGT_PLANE_3] = "plane3",
-		[IGT_PLANE_4] = "plane4",
-		[IGT_PLANE_5] = "plane5",
-		[IGT_PLANE_6] = "plane6",
-		[IGT_PLANE_7] = "plane7",
-		[IGT_PLANE_8] = "plane8",
-		[IGT_PLANE_9] = "plane9",
-		[IGT_PLANE_CURSOR] = "cursor",
-	};
-
-	igt_assert(plane < ARRAY_SIZE(names) && names[plane]);
-
-	return names[plane];
-}
-
-/**
  * kmstest_plane_type_name:
  * @plane: display plane
  *
@@ -1671,7 +1645,6 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 					plane = &pipe->planes[p];
 					plane->index = p++;
 				}
-				plane->is_primary = 1;
 				break;
 			case DRM_PLANE_TYPE_CURSOR:
 				if (pipe->plane_cursor == -1) {
@@ -1683,7 +1656,6 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 					plane->index = p++;
 				}
 				display->has_cursor_plane = true;
-				plane->is_cursor = 1;
 				break;
 			default:
 				plane = &pipe->planes[p];

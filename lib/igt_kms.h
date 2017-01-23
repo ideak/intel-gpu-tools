@@ -58,24 +58,6 @@ enum pipe {
 };
 const char *kmstest_pipe_name(enum pipe pipe);
 int kmstest_pipe_to_index(char pipe);
-
-/* We namespace this enum to not conflict with the Android i915_drm.h */
-enum igt_plane {
-        IGT_PLANE_1 = 0,
-        IGT_PLANE_PRIMARY = IGT_PLANE_1,
-        IGT_PLANE_2,
-        IGT_PLANE_3,
-        IGT_PLANE_4,
-        IGT_PLANE_5,
-        IGT_PLANE_6,
-        IGT_PLANE_7,
-        IGT_PLANE_8,
-        IGT_PLANE_9,
-        IGT_PLANE_CURSOR, /* IGT_PLANE_CURSOR is always the last plane. */
-        IGT_MAX_PLANES,
-};
-
-const char *kmstest_plane_name(enum igt_plane plane);
 const char *kmstest_plane_type_name(int plane_type);
 
 enum port {
@@ -274,8 +256,6 @@ typedef struct {
 	int index;
 	/* capabilities */
 	int type;
-	unsigned int is_primary       : 1;
-	unsigned int is_cursor        : 1;
 	/* state tracking */
 	unsigned int fb_changed       : 1;
 	unsigned int position_changed : 1;
