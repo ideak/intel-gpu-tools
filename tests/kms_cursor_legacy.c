@@ -283,6 +283,21 @@ static bool cursor_slowpath(enum flip_test mode)
 	return true;
 }
 
+/*
+ * On platforms with two-stage watermark programming
+ * changing sprite visibility may require a extra vblank wait.
+ *
+ * Handle this here.
+ */
+static bool mode_requires_extra_vblank(enum flip_test mode)
+{
+	if (mode == flip_test_atomic_transitions ||
+	    mode == flip_test_atomic_transitions_varying_size)
+		return true;
+
+	return false;
+}
+
 static void transition_nonblocking(igt_display_t *display, enum pipe pipe,
 				   struct igt_fb *prim_fb, struct igt_fb *argb_fb,
 				   bool hide_sprite)
@@ -647,7 +662,12 @@ static void basic_flip_cursor(igt_display_t *display,
 
 	igt_set_timeout(1, "Stuck page flip");
 	igt_ignore_warn(read(display->drm_fd, &vbl, sizeof(vbl)));
-	igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
+
+	if (!mode_requires_extra_vblank(mode))
+		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
+	else
+		igt_assert_lte(get_vblank(display->drm_fd, pipe, 0), vblank_start + 2);
+
 	igt_reset_timeout();
 
 	do_cleanup_display(display);
@@ -784,7 +804,12 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 
 		igt_set_timeout(1, "Stuck page flip");
 		igt_ignore_warn(read(display->drm_fd, &vbl, sizeof(vbl)));
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
+
+		if (!mode_requires_extra_vblank(mode))
+			igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
+		else
+			igt_assert_lte(get_vblank(display->drm_fd, pipe, 0), vblank_start + 2);
+
 		igt_reset_timeout();
 	} while (nloops--);
 
