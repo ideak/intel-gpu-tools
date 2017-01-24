@@ -1658,18 +1658,28 @@ static void dump_headers(struct context *context)
 	if (context->hexdump)
 		hex_dump(vbt, vbt->header_size);
 
-	printf("\tVBT signature:\t\"%.*s\"\n",
+	printf("\tVBT signature:\t\t\"%.*s\"\n",
 	       (int)sizeof(vbt->signature), vbt->signature);
-	printf("\tVBT version:\t%d.%d\n", vbt->version / 100, vbt->version % 100);
+	printf("\tVBT version:\t\t0x%04x (%d.%d)\n", vbt->version,
+	       vbt->version / 100, vbt->version % 100);
+	printf("\tVBT header size:\t0x%04x (%u)\n",
+	       vbt->header_size, vbt->header_size);
+	printf("\tVBT size:\t\t0x%04x (%u)\n", vbt->vbt_size, vbt->vbt_size);
+	printf("\tVBT checksum:\t\t0x%02x\n", vbt->vbt_checksum);
+	printf("\tBDB offset:\t\t0x%08x (%u)\n", vbt->bdb_offset, vbt->bdb_offset);
+
 	printf("\n");
 
 	printf("BDB header:\n");
 	if (context->hexdump)
 		hex_dump(bdb, bdb->header_size);
 
-	printf("\tBDB signature:\t\"%.*s\"\n",
+	printf("\tBDB signature:\t\t\"%.*s\"\n",
 	       (int)sizeof(bdb->signature), bdb->signature);
-	printf("\tBDB version:\t%d\n", bdb->version);
+	printf("\tBDB version:\t\t%d\n", bdb->version);
+	printf("\tBDB header size:\t0x%04x (%u)\n",
+	       bdb->header_size, bdb->header_size);
+	printf("\tBDB size:\t\t0x%04x (%u)\n", bdb->bdb_size, bdb->bdb_size);
 	printf("\n");
 
 	printf("BDB blocks present:");
