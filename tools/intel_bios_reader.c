@@ -1634,7 +1634,8 @@ static bool dump_section(struct context *context, int section_id)
 	if (dumper && dumper->name)
 		printf("BDB block %d - %s:\n", block->id, dumper->name);
 	else
-		printf("BDB block %d:\n", block->id);
+		printf("BDB block %d - Unknown, no decoding available:\n",
+		       block->id);
 
 	if (context->hexdump)
 		hex_dump_block(block);
