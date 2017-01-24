@@ -1648,13 +1648,19 @@ static void dump_headers(struct context *context)
 	const struct bdb_header *bdb = context->bdb;
 	int i, j = 0;
 
-	printf("VBT signature:\t\"%.*s\"\n",
-	       (int)sizeof(vbt->signature), vbt->signature);
-	printf("VBT version:\t%d.%d\n", vbt->version / 100, vbt->version % 100);
+	printf("VBT header:\n");
 
-	printf("BDB signature:\t\"%.*s\"\n",
+	printf("\tVBT signature:\t\"%.*s\"\n",
+	       (int)sizeof(vbt->signature), vbt->signature);
+	printf("\tVBT version:\t%d.%d\n", vbt->version / 100, vbt->version % 100);
+	printf("\n");
+
+	printf("BDB header:\n");
+
+	printf("\tBDB signature:\t\"%.*s\"\n",
 	       (int)sizeof(bdb->signature), bdb->signature);
-	printf("BDB version:\t%d\n", bdb->version);
+	printf("\tBDB version:\t%d\n", bdb->version);
+	printf("\n");
 
 	printf("BDB blocks present:");
 	for (i = 0; i < 256; i++) {
