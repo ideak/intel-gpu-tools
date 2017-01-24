@@ -1588,17 +1588,17 @@ struct dumper dumpers[] = {
 	},
 };
 
-static void hex_dump(const struct bdb_block *block)
+static void hex_dump(const void *data, uint32_t size)
 {
 	int i;
-	const uint8_t *p = block->data;
+	const uint8_t *p = data;
 
-	for (i = 0; i < block->size; i++) {
+	for (i = 0; i < size; i++) {
 		if (i % 16 == 0)
 			printf("\t%04x: ", i);
 		printf("%02x", p[i]);
 		if (i % 16 == 15) {
-			if (i + 1 < block->size)
+			if (i + 1 < size)
 				printf("\n");
 		} else if (i % 8 == 7) {
 			printf("  ");
@@ -1607,6 +1607,11 @@ static void hex_dump(const struct bdb_block *block)
 		}
 	}
 	printf("\n\n");
+}
+
+static void hex_dump_block(const struct bdb_block *block)
+{
+	hex_dump(block->data, block->size);
 }
 
 static bool dump_section(struct context *context, int section_id)
@@ -1632,7 +1637,7 @@ static bool dump_section(struct context *context, int section_id)
 		printf("BDB block %d:\n", block->id);
 
 	if (context->hexdump)
-		hex_dump(block);
+		hex_dump_block(block);
 	if (dumper && dumper->dump)
 		dumper->dump(context, block);
 	printf("\n");
