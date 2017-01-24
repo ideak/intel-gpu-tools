@@ -2624,8 +2624,7 @@ void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 		display->pipes[pipe].mode_changed = true;
 	}
 
-	if (pipe != output->config.pipe)
-		output->config.pipe_changed = true;
+	output->config.pipe_changed = true;
 
 	igt_output_refresh(output, false);
 }
