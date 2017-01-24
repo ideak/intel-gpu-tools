@@ -7,6 +7,11 @@ bin_PROGRAMS += $(LIBDRM_INTEL_BIN)
 intel_error_decode_LDFLAGS = -lz
 endif
 
+if HAVE_UDEV
+bin_PROGRAMS += intel_dp_compliance
+intel_dp_compliance_LDADD = $(top_builddir)/lib/libintel_tools.la $(GLIB_LIBS)
+endif
+
 SUBDIRS = null_state_gen registers
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/lib
@@ -15,7 +20,6 @@ AM_CFLAGS = $(DEBUG_CFLAGS) $(DRM_CFLAGS) $(PCIACCESS_CFLAGS) $(CWARNFLAGS) \
 	    $(WERROR_CFLAGS)
 LDADD = $(top_builddir)/lib/libintel_tools.la
 AM_LDFLAGS = -Wl,--as-needed
-
 
 # aubdumper
 

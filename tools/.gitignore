@@ -8,6 +8,7 @@ intel_bios_dumper
 intel_bios_reader
 intel_display_crc
 intel_display_poller
+intel_dp_compliance
 intel_dump_decode
 intel_error_decode
 intel_firmware_decode

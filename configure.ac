@@ -164,6 +164,7 @@ PKG_CHECK_MODULES(XRANDR, xrandr >= 1.3, AC_DEFINE(HAVE_XRANDR, 1, [Have libXran
 # for testdisplay
 PKG_CHECK_MODULES(CAIRO, [cairo >= 1.12.0])
 PKG_CHECK_MODULES(LIBUDEV, [libudev], [udev=yes], [udev=no])
+AM_CONDITIONAL(HAVE_UDEV, [test "x$udev" = xyes])
 if test x"$udev" = xyes; then
 	AC_DEFINE(HAVE_UDEV,1,[Enable udev-based monitor hotplug detection])
 fi
