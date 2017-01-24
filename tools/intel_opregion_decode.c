@@ -327,7 +327,7 @@ static void decode_vbt(const void *buffer)
 	printf("\tproduct string:\t%s\n", s);
 	free(s);
 
-	printf("\t(use intel_bios_reader to decode the VBT)\n");
+	printf("\t(use intel_vbt_decode to decode the VBT)\n");
 
 	printf("\n");
 }

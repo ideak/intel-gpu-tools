@@ -10,7 +10,6 @@ tools_prog_lists =		\
 	intel_reg		\
 	intel_backlight		\
 	intel_bios_dumper	\
-	intel_bios_reader	\
 	intel_display_crc	\
 	intel_display_poller	\
 	intel_forcewaked	\
@@ -28,6 +27,7 @@ tools_prog_lists =		\
 	intel_reg_checker	\
 	intel_residency		\
 	intel_stepping		\
+	intel_vbt_decode	\
 	intel_watermark		\
 	intel_gem_info		\
 	$(NULL)
@@ -47,8 +47,8 @@ intel_reg_SOURCES =		\
 	intel_reg_spec.c	\
 	intel_reg_spec.h
 
-intel_bios_reader_SOURCES =	\
-	intel_bios_reader.c	\
+intel_vbt_decode_SOURCES =	\
+	intel_vbt_decode.c	\
 	intel_bios.h
 
 intel_l3_parity_SOURCES =	\

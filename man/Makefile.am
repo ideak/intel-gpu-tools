@@ -3,7 +3,6 @@ appman_RST = 				\
 	intel_aubdump.rst		\
 	intel_audio_dump.rst		\
 	intel_bios_dumper.rst		\
-	intel_bios_reader.rst		\
 	intel_error_decode.rst		\
 	intel_gpu_frequency.rst		\
 	intel_gpu_top.rst		\
@@ -16,7 +15,8 @@ appman_RST = 				\
 	intel_upload_blit_large.rst	\
 	intel_upload_blit_large_gtt.rst \
 	intel_upload_blit_large_map.rst \
-	intel_upload_blit_small.rst
+	intel_upload_blit_small.rst	\
+	intel_vbt_decode.rst
 
 if HAVE_RST2MAN
 appman_DATA = $(appman_RST:rst=$(APP_MAN_SUFFIX))

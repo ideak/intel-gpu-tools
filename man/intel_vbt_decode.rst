@@ -1,6 +1,6 @@
-=================
-intel_bios_reader
-=================
+================
+intel_vbt_decode
+================
 
 -----------------------------
 Intel Video BIOS Table parser
@@ -16,12 +16,12 @@ Intel Video BIOS Table parser
 SYNOPSIS
 ========
 
-**intel_bios_reader** [*OPTIONS*]
+**intel_vbt_decode** [*OPTIONS*]
 
 DESCRIPTION
 ===========
 
-**intel_bios_reader** is a tool to parse the Intel Video BIOS Tables (VBT) and
+**intel_vbt_decode** is a tool to parse the Intel Video BIOS Tables (VBT) and
 present the information in a human readable format.
 
 The preferred ways of getting the binary VBT to parse are:

@@ -33,4 +33,4 @@ Report bugs to https://bugs.freedesktop.org.
 SEE ALSO
 ========
 
-**intel_bios_reader(1)**
+**intel_vbt_decode(1)**

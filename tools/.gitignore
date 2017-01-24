@@ -5,7 +5,7 @@ intel_aubdump
 intel_audio_dump
 intel_backlight
 intel_bios_dumper
-intel_bios_reader
+intel_vbt_decode
 intel_display_crc
 intel_display_poller
 intel_dp_compliance
