@@ -1654,6 +1654,8 @@ static void dump_headers(struct context *context)
 	int i, j = 0;
 
 	printf("VBT header:\n");
+	if (context->hexdump)
+		hex_dump(vbt, vbt->header_size);
 
 	printf("\tVBT signature:\t\"%.*s\"\n",
 	       (int)sizeof(vbt->signature), vbt->signature);
@@ -1661,6 +1663,8 @@ static void dump_headers(struct context *context)
 	printf("\n");
 
 	printf("BDB header:\n");
+	if (context->hexdump)
+		hex_dump(bdb, bdb->header_size);
 
 	printf("\tBDB signature:\t\"%.*s\"\n",
 	       (int)sizeof(bdb->signature), bdb->signature);
