@@ -80,7 +80,7 @@ static void do_cleanup_display(igt_display_t *dpy)
 
 static void finish_fb_busy(igt_spin_t *spin, int msecs)
 {
-	struct timespec tv = { 0, msecs * 1000 * 1000 };
+	struct timespec tv = { msecs / 1000, (msecs % 1000) * 1000000ULL };
 	nanosleep(&tv, NULL);
 	igt_spin_batch_end(spin);
 }
@@ -90,42 +90,64 @@ static void sighandler(int sig)
 }
 
 static void flip_to_fb(igt_display_t *dpy, int pipe,
+		       igt_output_t *output,
 		       struct igt_fb *fb, unsigned ring,
-		       const char *name)
+		       const char *name, bool modeset)
 {
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
 	struct timespec tv = { 1, 0 };
 	struct drm_event_vblank ev;
+
 	igt_spin_t *t = igt_spin_batch_new(dpy->drm_fd, ring, fb->gem_handle);
 	igt_fork(child, 1) {
 		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
-		do_or_die(drmModePageFlip(dpy->drm_fd,
-					  dpy->pipes[pipe].crtc_id, fb->fb_id,
-					  DRM_MODE_PAGE_FLIP_EVENT, fb));
+		if (!modeset)
+			do_or_die(drmModePageFlip(dpy->drm_fd,
+						  dpy->pipes[pipe].crtc_id, fb->fb_id,
+						  DRM_MODE_PAGE_FLIP_EVENT, fb));
+		else {
+			igt_plane_set_fb(igt_output_get_plane(output, IGT_PLANE_PRIMARY), fb);
+			igt_output_set_pipe(output, PIPE_NONE);
+			igt_display_commit_atomic(dpy,
+						  DRM_MODE_ATOMIC_NONBLOCK |
+						  DRM_MODE_PAGE_FLIP_EVENT |
+						  DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+		}
+
 		kill(getppid(), SIGALRM);
 		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
-		igt_assert_f(poll(&pfd, 1, TIMEOUT) == 0,
+		igt_assert_f(poll(&pfd, 1, modeset ? 5000 : TIMEOUT) == 0,
 			     "flip completed whilst %s was busy [%d]\n",
 			     name, gem_bo_busy(dpy->drm_fd, fb->gem_handle));
 	}
 	igt_assert_f(nanosleep(&tv, NULL) == -1,
 		     "flip to %s blocked waiting for busy fb", name);
-	finish_fb_busy(t, 2*TIMEOUT);
 	igt_waitchildren();
+	finish_fb_busy(t, modeset ? 5000 : 2 * TIMEOUT);
 	igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 	igt_assert(poll(&pfd, 1, 0) == 0);
+
+	if (modeset) {
+		dpy->pipes[pipe].mode_blob = 0;
+		igt_output_set_pipe(output, pipe);
+		igt_display_commit2(dpy, COMMIT_ATOMIC);
+	}
 
 	igt_spin_batch_free(dpy->drm_fd, t);
 }
 
-static void test_flip(igt_display_t *dpy, unsigned ring, int pipe)
+static void test_flip(igt_display_t *dpy, unsigned ring, int pipe, bool modeset)
 {
 	struct igt_fb fb[2];
 	int warmup[] = { 0, 1, 0, -1 };
+	igt_output_t *output;
+
+	if (modeset)
+		igt_require(dpy->is_atomic);
 
 	signal(SIGALRM, sighandler);
 
-	igt_require(set_fb_on_crtc(dpy, pipe, &fb[0]));
+	igt_require((output = set_fb_on_crtc(dpy, pipe, &fb[0])));
 	igt_display_commit2(dpy, COMMIT_LEGACY);
 
 	igt_create_pattern_fb(dpy->drm_fd,
@@ -149,16 +171,98 @@ static void test_flip(igt_display_t *dpy, unsigned ring, int pipe)
 	}
 
 	/* Make the frontbuffer busy and try to flip to itself */
-	flip_to_fb(dpy, pipe, &fb[0], ring, "fb[0]");
+	flip_to_fb(dpy, pipe, output, &fb[0], ring, "fb[0]", modeset);
 
 	/* Repeat for flip to second buffer */
-	flip_to_fb(dpy, pipe, &fb[1], ring, "fb[1]");
+	flip_to_fb(dpy, pipe, output, &fb[1], ring, "fb[1]", modeset);
 
 	do_cleanup_display(dpy);
 	igt_remove_fb(dpy->drm_fd, &fb[1]);
 	igt_remove_fb(dpy->drm_fd, &fb[0]);
 
 	signal(SIGALRM, SIG_DFL);
+}
+
+static void test_atomic_commit_hang(igt_display_t *dpy, igt_plane_t *primary,
+				    struct igt_fb *busy_fb, unsigned ring,
+				    bool completes_early)
+{
+	igt_spin_t *t = igt_spin_batch_new(dpy->drm_fd, ring, busy_fb->gem_handle);
+	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
+	unsigned flags = 0;
+	struct drm_event_vblank ev;
+
+	flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
+	flags |= DRM_MODE_ATOMIC_NONBLOCK;
+	flags |= DRM_MODE_PAGE_FLIP_EVENT;
+
+	igt_display_commit_atomic(dpy, flags, NULL);
+
+	igt_fork(child, 1) {
+		/*
+		 * bit of a hack, just set atomic commit to NULL fb to make sure
+		 * that we don't wait for the new update to complete.
+		 */
+		igt_plane_set_fb(primary, NULL);
+		igt_display_commit_atomic(dpy, 0, NULL);
+
+		if (completes_early)
+			igt_assert(gem_bo_busy(dpy->drm_fd, busy_fb->gem_handle));
+		else
+			igt_fail_on(gem_bo_busy(dpy->drm_fd, busy_fb->gem_handle));
+
+		igt_assert_f(poll(&pfd, 1, 1) > 0,
+			    "nonblocking update completed whilst fb[%d] was still busy [%d]\n",
+			    busy_fb->fb_id, gem_bo_busy(dpy->drm_fd, busy_fb->gem_handle));
+	}
+
+	igt_waitchildren();
+
+	igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
+
+	igt_spin_batch_end(t);
+}
+
+static void test_hang(igt_display_t *dpy, unsigned ring,
+		      enum pipe pipe, bool modeset, bool hang_newfb)
+{
+	struct igt_fb fb[2];
+	igt_output_t *output;
+	igt_plane_t *primary;
+
+	igt_require((output = set_fb_on_crtc(dpy, pipe, &fb[0])));
+	igt_display_commit2(dpy, COMMIT_ATOMIC);
+	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+
+	igt_create_pattern_fb(dpy->drm_fd,
+			      fb[0].width, fb[0].height,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_X_TILED,
+			      &fb[1]);
+
+	if (modeset) {
+		/* Test modeset disable with hang */
+		igt_output_set_pipe(output, PIPE_NONE);
+		igt_plane_set_fb(primary, &fb[1]);
+		test_atomic_commit_hang(dpy, primary, &fb[hang_newfb], ring, hang_newfb);
+
+		/* Test modeset enable with hang */
+		igt_plane_set_fb(primary, &fb[0]);
+		igt_output_set_pipe(output, pipe);
+		test_atomic_commit_hang(dpy, primary, &fb[!hang_newfb], ring, hang_newfb);
+	} else {
+		/*
+		 * Test what happens with a single hanging pageflip.
+		 * This always completes early, because we have some
+		 * timeouts taking care of it.
+		 */
+		igt_plane_set_fb(primary, &fb[1]);
+		test_atomic_commit_hang(dpy, primary, &fb[hang_newfb], ring, true);
+	}
+
+	do_cleanup_display(dpy);
+	igt_remove_fb(dpy->drm_fd, &fb[1]);
+	igt_remove_fb(dpy->drm_fd, &fb[0]);
 }
 
 igt_main
@@ -194,7 +298,83 @@ igt_main
 				igt_require(gem_has_ring(display.drm_fd,
 							e->exec_id | e->flags));
 
-				test_flip(&display, e->exec_id | e->flags, n);
+				test_flip(&display, e->exec_id | e->flags, n, false);
+			}
+			igt_subtest_f("%smodeset-%s-%s",
+				      e->exec_id == 0 ? "basic-" : "",
+				      e->name, kmstest_pipe_name(n)) {
+				igt_require(gem_has_ring(display.drm_fd,
+							e->exec_id | e->flags));
+
+				test_flip(&display, e->exec_id | e->flags, n, true);
+			}
+
+			igt_subtest_group {
+				igt_hang_t hang;
+
+				igt_fixture {
+					igt_require(display.is_atomic);
+
+					hang = igt_allow_hang(display.drm_fd, 0, 0);
+				}
+
+				igt_subtest_f("extended-pageflip-hang-oldfb-%s-%s",
+					      e->name, kmstest_pipe_name(n)) {
+					igt_require(gem_has_ring(display.drm_fd,
+								e->exec_id | e->flags));
+
+					test_hang(&display, e->exec_id | e->flags, n, false, false);
+				}
+
+				igt_subtest_f("extended-pageflip-hang-newfb-%s-%s",
+					      e->name, kmstest_pipe_name(n)) {
+					igt_require(gem_has_ring(display.drm_fd,
+								e->exec_id | e->flags));
+
+					test_hang(&display, e->exec_id | e->flags, n, false, true);
+				}
+
+				igt_subtest_f("extended-modeset-hang-oldfb-%s-%s",
+					      e->name, kmstest_pipe_name(n)) {
+					igt_require(gem_has_ring(display.drm_fd,
+								e->exec_id | e->flags));
+
+					test_hang(&display, e->exec_id | e->flags, n, true, false);
+				}
+
+				igt_subtest_f("extended-modeset-hang-newfb-%s-%s",
+					      e->name, kmstest_pipe_name(n)) {
+					igt_require(gem_has_ring(display.drm_fd,
+								e->exec_id | e->flags));
+
+					test_hang(&display, e->exec_id | e->flags, n, true, true);
+				}
+
+				igt_subtest_f("extended-modeset-hang-oldfb-with-reset-%s-%s",
+					      e->name, kmstest_pipe_name(n)) {
+					igt_require(gem_has_ring(display.drm_fd,
+								e->exec_id | e->flags));
+					igt_set_module_param_int("force_reset_modeset_test", 1);
+
+					test_hang(&display, e->exec_id | e->flags, n, true, false);
+
+					igt_set_module_param_int("force_reset_modeset_test", 0);
+				}
+
+				igt_subtest_f("extended-modeset-hang-newfb-with-reset-%s-%s",
+					      e->name, kmstest_pipe_name(n)) {
+					igt_require(gem_has_ring(display.drm_fd,
+								e->exec_id | e->flags));
+					igt_set_module_param_int("force_reset_modeset_test", 1);
+
+					test_hang(&display, e->exec_id | e->flags, n, true, true);
+
+					igt_set_module_param_int("force_reset_modeset_test", 0);
+				}
+
+				igt_fixture {
+					igt_disallow_hang(display.drm_fd, hang);
+				}
 			}
 		}
 	}
