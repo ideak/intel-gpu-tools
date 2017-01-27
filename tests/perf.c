@@ -82,15 +82,20 @@ IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 #define DRM_IOCTL_I915_PERF_OPEN	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_OPEN, struct drm_i915_perf_open_param)
 
 enum drm_i915_oa_format {
-       I915_OA_FORMAT_A13 = 1,
-       I915_OA_FORMAT_A29,
-       I915_OA_FORMAT_A13_B8_C8,
-       I915_OA_FORMAT_B4_C8,
-       I915_OA_FORMAT_A45_B8_C8,
-       I915_OA_FORMAT_B4_C8_A16,
-       I915_OA_FORMAT_C4_B8,
+	I915_OA_FORMAT_A13 = 1,     /* HSW only */
+	I915_OA_FORMAT_A29,         /* HSW only */
+	I915_OA_FORMAT_A13_B8_C8,   /* HSW only */
+	I915_OA_FORMAT_B4_C8,       /* HSW only */
+	I915_OA_FORMAT_A45_B8_C8,   /* HSW only */
+	I915_OA_FORMAT_B4_C8_A16,   /* HSW only */
+	I915_OA_FORMAT_C4_B8,       /* HSW+ */
 
-       I915_OA_FORMAT_MAX /* non-ABI */
+	/* Gen8+ */
+	I915_OA_FORMAT_A12,
+	I915_OA_FORMAT_A12_B8_C8,
+	I915_OA_FORMAT_A32u40_A4u32_B8_C8,
+
+	I915_OA_FORMAT_MAX /* non-ABI */
 };
 
 enum drm_i915_perf_property_id {
@@ -202,6 +207,7 @@ static uint64_t gt_min_freq_mhz = 0;
 static uint64_t gt_max_freq_mhz = 0;
 
 static uint64_t timestamp_frequency = 12500000;
+static enum drm_i915_oa_format test_oa_format;
 
 static igt_render_copyfunc_t render_copy = NULL;
 
@@ -348,7 +354,7 @@ read_debugfs_u64_record(int fd, const char *file, const char *key)
 }
 
 static bool
-lookup_test_metric_set_id(void)
+init_sys_info(void)
 {
 	const char *test_set_name = NULL;
 	const char *test_set_uuid = NULL;
@@ -357,26 +363,32 @@ lookup_test_metric_set_id(void)
 	igt_assert_neq(card, -1);
 	igt_assert_neq(devid, 0);
 
+	timestamp_frequency = 12500000;
+
 	if (IS_HASWELL(devid)) {
 		/* We don't have a TestOa metric set for Haswell so use
 		 * RenderBasic
 		 */
 		test_set_name = "RenderBasic";
 		test_set_uuid = "403d8832-1a27-4aa6-a64e-f5389ce7b212";
-	} else if (IS_BROADWELL(devid)) {
+		test_oa_format = I915_OA_FORMAT_A45_B8_C8;
+	} else {
 		test_set_name = "TestOa";
-		test_set_uuid = "d6de6f55-e526-4f79-a6a6-d7315c09044e";
-	} else if (IS_CHERRYVIEW(devid)) {
-		test_set_name = "TestOa";
-		test_set_uuid = "4a534b07-cba3-414d-8d60-874830e883aa";
-	} else if (IS_SKYLAKE(devid)) {
-		test_set_name = "TestOa";
-		test_set_uuid = "544a0c1f-5863-4682-bc59-778b7eab8303";
-	} else if (IS_BROXTON(devid)) {
-		test_set_name = "TestOa";
-		test_set_uuid = "5ee72f5c-092f-421e-8b70-225f7c3e9612";
-	} else
-		return false;
+		test_oa_format = I915_OA_FORMAT_A32u40_A4u32_B8_C8;
+
+		if (IS_BROADWELL(devid)) {
+			test_set_uuid = "d6de6f55-e526-4f79-a6a6-d7315c09044e";
+		} else if (IS_CHERRYVIEW(devid)) {
+			test_set_uuid = "4a534b07-cba3-414d-8d60-874830e883aa";
+		} else if (IS_SKYLAKE(devid)) {
+			test_set_uuid = "544a0c1f-5863-4682-bc59-778b7eab8303";
+			timestamp_frequency = 12000000;
+		} else if (IS_BROXTON(devid)) {
+			test_set_uuid = "5ee72f5c-092f-421e-8b70-225f7c3e9612";
+			timestamp_frequency = 19200000;
+		} else
+			return false;
+	}
 
 	igt_debug("%s metric set UUID = %s\n",
 		  test_set_name,
@@ -456,7 +468,7 @@ test_system_wide_paranoid(void)
 
 			/* OA unit configuration */
 			DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-			DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+			DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 			DRM_I915_PERF_PROP_OA_EXPONENT, 13, /* 1 millisecond */
 		};
 		struct drm_i915_perf_open_param param = {
@@ -482,7 +494,7 @@ test_system_wide_paranoid(void)
 
 			/* OA unit configuration */
 			DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-			DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+			DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 			DRM_I915_PERF_PROP_OA_EXPONENT, 13, /* 1 millisecond */
 		};
 		struct drm_i915_perf_open_param param = {
@@ -516,7 +528,7 @@ test_invalid_open_flags(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, 13, /* 1 millisecond */
 	};
 	struct drm_i915_perf_open_param param = {
@@ -536,7 +548,7 @@ test_invalid_oa_metric_set_id(void)
 		DRM_I915_PERF_PROP_SAMPLE_OA, true,
 
 		/* OA unit configuration */
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, 13, /* 1 millisecond */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, UINT64_MAX,
 	};
@@ -589,7 +601,7 @@ test_invalid_oa_format_id(void)
 	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
 
 	/* Check that we aren't just seeing false positives... */
-	properties[ARRAY_SIZE(properties) - 1] = I915_OA_FORMAT_A45_B8_C8;
+	properties[ARRAY_SIZE(properties) - 1] = test_oa_format;
 	stream_fd = __perf_open(drm_fd, &param);
 	close(stream_fd);
 
@@ -607,7 +619,7 @@ test_missing_sample_flags(void)
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
 		DRM_I915_PERF_PROP_OA_EXPONENT, 13, /* 1 millisecond */
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 	};
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC,
@@ -981,7 +993,7 @@ test_oa_exponents(int gt_freq_mhz)
 			igt_debug("ITER %d: testing OA exponent %d with sysfs GT freq = %dmhz\n",
 				  j, i, gt_freq_mhz_0);
 
-			open_and_read_2_oa_reports(I915_OA_FORMAT_A45_B8_C8,
+			open_and_read_2_oa_reports(test_oa_format,
 						   i, /* exponent */
 						   oa_report0,
 						   oa_report1,
@@ -1014,7 +1026,7 @@ test_oa_exponents(int gt_freq_mhz)
 			 * open_and_read_2_oa_reports(), the C2 counter is
 			 * configured as the gpu clock counter...
 			 */
-			c_off = oa_formats[I915_OA_FORMAT_A45_B8_C8].c_off;
+			c_off = oa_formats[test_oa_format].c_off;
 			igt_assert(c_off);
 			c0 = (uint32_t *)(((uint8_t *)oa_report0) + c_off);
 			c1 = (uint32_t *)(((uint8_t *)oa_report1) + c_off);
@@ -1071,7 +1083,7 @@ test_invalid_oa_exponent(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, 31, /* maximum exponent expected
 						       to be accepted */
 	};
@@ -1128,7 +1140,7 @@ test_low_oa_exponent_permissions(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, bad_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
@@ -1193,7 +1205,7 @@ test_per_context_mode_unprivileged(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, 13, /* 1 millisecond */
 	};
 	struct drm_i915_perf_open_param param = {
@@ -1280,7 +1292,7 @@ test_blocking(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
@@ -1396,7 +1408,7 @@ test_polling(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
@@ -1537,7 +1549,7 @@ test_buffer_fill(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
@@ -1611,7 +1623,7 @@ test_enable_disable(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
@@ -1682,7 +1694,7 @@ test_short_reads(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
@@ -1769,7 +1781,7 @@ test_non_sampling_read_error(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 
 		/* XXX: no sampling exponent */
 	};
@@ -1803,7 +1815,7 @@ test_disabled_read_error(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
@@ -1830,7 +1842,7 @@ test_disabled_read_error(void)
 	stream_fd = __perf_open(drm_fd, &param);
 
 	read_2_oa_reports(stream_fd,
-			  I915_OA_FORMAT_A45_B8_C8,
+			  test_oa_format,
 			  oa_exponent,
 			  oa_report0,
 			  oa_report1,
@@ -1845,7 +1857,7 @@ test_disabled_read_error(void)
 	do_ioctl(stream_fd, I915_PERF_IOCTL_ENABLE, 0);
 
 	read_2_oa_reports(stream_fd,
-			  I915_OA_FORMAT_A45_B8_C8,
+			  test_oa_format,
 			  oa_exponent,
 			  oa_report0,
 			  oa_report1,
@@ -1865,7 +1877,7 @@ test_mi_rpc(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 
 		/* Note: no OA exponent specified in this case */
 	};
@@ -1995,7 +2007,7 @@ test_per_ctx_mi_rpc(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 
 		/* Note: no OA exponent specified in this case */
 	};
@@ -2143,7 +2155,7 @@ test_per_ctx_mi_rpc(void)
 		igt_assert_neq(report1_32[1], 0); /* timestamp */
 
 		print_reports(report0_32, report1_32,
-			      lookup_format(I915_OA_FORMAT_A45_B8_C8));
+			      lookup_format(test_oa_format));
 
 		/* A40 == N samples written to all render targets */
 		n_samples_written = report1_32[43] - report0_32[43];
@@ -2206,7 +2218,7 @@ test_rc6_disable(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
 		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
@@ -2280,7 +2292,7 @@ test_i915_ref_count(void)
 
 		/* OA unit configuration */
 		DRM_I915_PERF_PROP_OA_METRICS_SET, 0 /* updated below */,
-		DRM_I915_PERF_PROP_OA_FORMAT, I915_OA_FORMAT_A45_B8_C8,
+		DRM_I915_PERF_PROP_OA_FORMAT, 0, /* update below */
 		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
@@ -2305,9 +2317,12 @@ test_i915_ref_count(void)
 	devid = intel_get_drm_devid(drm_fd);
 	card = drm_get_card();
 
-	igt_require(IS_HASWELL(devid));
-	igt_require(lookup_test_metric_set_id());
+	/* Note: these global variables are only initialized after calling
+	 * init_sys_info()...
+	 */
+	igt_require(init_sys_info());
 	properties[3] = test_metric_set_id;
+	properties[5] = test_oa_format;
 
 	ref_count0 = read_i915_module_ref();
 	igt_debug("initial ref count with drm_fd open = %u\n", ref_count0);
@@ -2326,7 +2341,7 @@ test_i915_ref_count(void)
 	igt_assert(ref_count0 > baseline);
 
 	read_2_oa_reports(stream_fd,
-			  I915_OA_FORMAT_A45_B8_C8,
+			  test_oa_format,
 			  oa_exponent,
 			  oa_report0,
 			  oa_report1,
@@ -2376,8 +2391,7 @@ igt_main
 		devid = intel_get_drm_devid(drm_fd);
 		card = drm_get_card();
 
-		igt_require(IS_HASWELL(devid));
-		igt_require(lookup_test_metric_set_id());
+		igt_require(init_sys_info());
 
 		gt_frequency_range_save();
 
