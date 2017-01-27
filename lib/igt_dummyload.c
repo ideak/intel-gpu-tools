@@ -123,12 +123,13 @@ static void emit_recursive_batch(igt_spin_t *spin,
 		*batch++ = MI_BATCH_BUFFER_START | 1 << 8;
 		*batch++ = 0;
 	} else {
-		*batch = MI_BATCH_BUFFER_START | 2 << 6;
+		*batch++ = MI_BATCH_BUFFER_START | 2 << 6;
+		*batch = 0;
 		if (gen < 4) {
 			*batch |= 1;
 			relocs[obj[BATCH].relocation_count].delta = 1;
 		}
-		*++batch = 0;
+		batch++;
 	}
 	obj[BATCH].relocation_count++;
 	obj[BATCH].relocs_ptr = to_user_pointer(relocs);
