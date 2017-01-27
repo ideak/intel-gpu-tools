@@ -42,6 +42,11 @@ igt@gem_exec_basic@readonly-default
 igt@gem_exec_basic@readonly-render
 igt@gem_exec_basic@readonly-vebox
 igt@gem_exec_create@basic
+igt@gem_exec_fence@basic-busy-default
+igt@gem_exec_fence@basic-wait-default
+igt@gem_exec_fence@basic-await-default
+igt@gem_exec_fence@await-hang-default
+igt@gem_exec_fence@nb-await-default
 igt@gem_exec_flush@basic-batch-kernel-default-cmd
 igt@gem_exec_flush@basic-batch-kernel-default-uc
 igt@gem_exec_flush@basic-batch-kernel-default-wb
