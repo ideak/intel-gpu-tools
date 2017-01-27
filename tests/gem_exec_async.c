@@ -24,7 +24,7 @@
 #include "igt.h"
 
 #define LOCAL_OBJECT_ASYNC (1 << 6)
-#define LOCAL_PARAM_HAS_EXEC_ASYNC 42
+#define LOCAL_PARAM_HAS_EXEC_ASYNC 43
 
 IGT_TEST_DESCRIPTION("Check that we can issue concurrent writes across the engines.");
 

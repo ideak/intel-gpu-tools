@@ -29,7 +29,7 @@
 
 IGT_TEST_DESCRIPTION("Check that execbuf waits for explicit fences");
 
-#define LOCAL_PARAM_HAS_EXEC_FENCE 43
+#define LOCAL_PARAM_HAS_EXEC_FENCE 44
 #define LOCAL_EXEC_FENCE_IN (1 << 16)
 #define LOCAL_EXEC_FENCE_OUT (1 << 17)
 #define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
