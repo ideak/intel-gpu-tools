@@ -142,8 +142,13 @@ TESTS_progs_M = \
 	template \
 	vgem_basic \
 	vgem_slow \
+	$(NULL)
+
+if HAVE_CHAMELIUM
+TESTS_progs_M += \
 	chamelium \
 	$(NULL)
+endif
 
 TESTS_progs_XM = \
     gem_concurrent_all \
