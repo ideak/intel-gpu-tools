@@ -486,8 +486,16 @@ static void basic(int fd, unsigned ring, unsigned flags)
 
 	igt_assert(busy);
 	memset(&tv, 0, sizeof(tv));
-	while (gem_bo_busy(fd, spin->handle))
-		igt_assert(igt_seconds_elapsed(&tv) < timeout);
+	while (gem_bo_busy(fd, spin->handle)) {
+		if (igt_seconds_elapsed(&tv) > timeout) {
+			igt_debugfs_dump(fd, "i915_engine_info");
+			igt_debugfs_dump(fd, "i915_hangcheck_info");
+			igt_assert_f(igt_seconds_elapsed(&tv) < timeout,
+				     "%s batch did not complete within %ds\n",
+				     flags & HANG ? "Hanging" : "Normal",
+				     timeout);
+		}
+	}
 
 	igt_spin_batch_free(fd, spin);
 }
