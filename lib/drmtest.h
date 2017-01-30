@@ -42,7 +42,14 @@
 #define DRIVER_VC4	(1 << 1)
 #define DRIVER_VGEM	(1 << 2)
 #define DRIVER_VIRTIO	(1 << 3)
+/*
+ * Exclude DRVER_VGEM from DRIVER_ANY since if you run on a system
+ * with vgem as well as a supported driver, you can end up with a
+ * near-100% skip rate if you don't explicitly specify the device,
+ * depending on device-load ordering.
+ */
 #define DRIVER_ANY 	~(DRIVER_VGEM)
+
 
 #ifdef ANDROID
 #if (!(defined HAVE_MMAP64)) && (!(defined __x86_64__))
