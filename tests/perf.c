@@ -250,6 +250,8 @@ static enum drm_i915_oa_format test_oa_format;
 static bool *undefined_a_counters;
 
 static igt_render_copyfunc_t render_copy = NULL;
+static uint32_t (*read_report_ticks)(uint32_t *report,
+				     enum drm_i915_oa_format format);
 
 static int
 __perf_open(int fd, struct drm_i915_perf_open_param *param)
@@ -393,6 +395,28 @@ read_debugfs_u64_record(int fd, const char *file, const char *key)
 	return val;
 }
 
+/* XXX: For Haswell this utility is only applicable to the render basic
+ * metric set.
+ *
+ * C2 corresponds to a clock counter for the Haswell render basic metric set
+ * but it's not included in all of the formats.
+ */
+static uint32_t
+hsw_read_report_ticks(uint32_t *report, enum drm_i915_oa_format format)
+{
+	uint32_t *c = (uint32_t *)(((uint8_t *)report) + oa_formats[format].c_off);
+
+	igt_assert_neq(oa_formats[format].n_c, 0);
+
+	return c[2];
+}
+
+static uint32_t
+gen8_read_report_ticks(uint32_t *report, enum drm_i915_oa_format format)
+{
+	return report[3];
+}
+
 static bool
 init_sys_info(void)
 {
@@ -413,10 +437,12 @@ init_sys_info(void)
 		test_set_uuid = "403d8832-1a27-4aa6-a64e-f5389ce7b212";
 		test_oa_format = I915_OA_FORMAT_A45_B8_C8;
 		undefined_a_counters = hsw_undefined_a_counters;
+		read_report_ticks = hsw_read_report_ticks;
 	} else {
 		test_set_name = "TestOa";
 		test_oa_format = I915_OA_FORMAT_A32u40_A4u32_B8_C8;
 		undefined_a_counters = gen8_undefined_a_counters;
+		read_report_ticks = gen8_read_report_ticks;
 
 		if (IS_BROADWELL(devid)) {
 			test_set_uuid = "d6de6f55-e526-4f79-a6a6-d7315c09044e";
@@ -945,30 +971,28 @@ test_oa_formats(void)
 		time_delta = timebase_scale(oa_report1[1] - oa_report0[1]);
 		igt_assert_neq(time_delta, 0);
 
-		/* C2 corresponds to a clock counter for the Haswell render
-		 * basic metric set but it's not included in all of the
-		 * formats.
+		/* As a special case we have to consider that on Haswell we
+		 * can't explicitly derive a clock delta for all OA report
+		 * formats...
 		 */
-		if (oa_formats[i].n_c) {
+		if (IS_HASWELL(devid) && oa_formats[i].n_c == 0) {
+			/* Assume running at max freq for sake of
+			 * below sanity check on counters... */
+			clock_delta = (gt_max_freq_mhz *
+				       (uint64_t)time_delta) / 1000;
+		} else {
+			uint32_t ticks0 = read_report_ticks(oa_report0, i);
+			uint32_t ticks1 = read_report_ticks(oa_report1, i);
 			uint64_t freq;
 
-			/* The first report might have a clock count of zero
-			 * but we wouldn't expect that in the second report...
-			 */
-			igt_assert_neq(c1[2], 0);
+			clock_delta = ticks1 - ticks0;
 
-			clock_delta = c1[2] - c0[2];
 			igt_assert_neq(clock_delta, 0);
 
 			freq = ((uint64_t)clock_delta * 1000) / time_delta;
 			igt_debug("freq = %"PRIu64"\n", freq);
 
 			igt_assert(freq <= gt_max_freq_mhz);
-		} else {
-			/* Assume running at max freq for sake of
-			 * below sanity check on counters... */
-			clock_delta = (gt_max_freq_mhz *
-				       (uint64_t)time_delta) / 1000;
 		}
 
 		igt_debug("clock delta = %"PRIu32"\n", clock_delta);
@@ -1035,7 +1059,6 @@ test_oa_exponents(int gt_freq_mhz)
 		uint32_t timestamp_delta;
 		uint32_t oa_report0[64];
 		uint32_t oa_report1[64];
-		uint32_t *c0, *c1;
 		uint32_t time_delta;
 		uint32_t clock_delta;
 		uint32_t freq;
@@ -1051,7 +1074,7 @@ test_oa_exponents(int gt_freq_mhz)
 
 		for (int j = 0; n_tested < 10 && j < 100; j++) {
 			int gt_freq_mhz_0, gt_freq_mhz_1;
-			int c_off;
+			uint32_t ticks0, ticks1;
 
 			gt_freq_mhz_0 = sysfs_read("gt_act_freq_mhz");
 
@@ -1087,15 +1110,9 @@ test_oa_exponents(int gt_freq_mhz)
 
 			igt_assert_eq(timestamp_delta, expected_timestamp_delta);
 
-			/* NB: for the render basic metric set opened above by
-			 * open_and_read_2_oa_reports(), the C2 counter is
-			 * configured as the gpu clock counter...
-			 */
-			c_off = oa_formats[test_oa_format].c_off;
-			igt_assert(c_off);
-			c0 = (uint32_t *)(((uint8_t *)oa_report0) + c_off);
-			c1 = (uint32_t *)(((uint8_t *)oa_report1) + c_off);
-			clock_delta = c1[2] - c0[2];
+			ticks0 = read_report_ticks(oa_report0, test_oa_format);
+			ticks1 = read_report_ticks(oa_report1, test_oa_format);
+			clock_delta = ticks1 - ticks0;
 
 			time_delta = timebase_scale(timestamp_delta);
 
