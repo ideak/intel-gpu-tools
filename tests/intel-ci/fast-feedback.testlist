@@ -125,7 +125,6 @@ igt@gem_tiled_pread_basic
 igt@gem_wait@basic-busy-all
 igt@gem_wait@basic-wait-all
 igt@gem_workarounds@basic-read
-igt@gvt_basic@invalid-placeholder-test
 igt@kms_addfb_basic@addfb25-bad-modifier
 igt@kms_addfb_basic@addfb25-framebuffer-vs-set-tiling
 igt@kms_addfb_basic@addfb25-modifier-no-flag
@@ -245,3 +244,4 @@ igt@drv_module_reload@basic-reload
 igt@drv_module_reload@basic-no-display
 igt@drv_module_reload@basic-reload-inject
 igt@drv_module_reload@basic-reload-final
+igt@gvt_basic@invalid-placeholder-test
