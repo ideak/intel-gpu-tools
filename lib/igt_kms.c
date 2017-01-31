@@ -53,6 +53,7 @@
 #include "intel_chipset.h"
 #include "igt_debugfs.h"
 #include "igt_sysfs.h"
+#include "sw_sync.h"
 
 /**
  * SECTION:igt_kms
@@ -2470,6 +2471,22 @@ static int igt_atomic_commit(igt_display_t *display, uint32_t flags, void *user_
 	}
 
 	ret = drmModeAtomicCommit(display->drm_fd, req, flags, user_data);
+	if (!ret) {
+
+		for_each_pipe(display, pipe) {
+			igt_pipe_t *pipe_obj = &display->pipes[pipe];
+
+			if (pipe_obj->out_fence_fd == -1)
+				continue;
+
+			igt_assert(pipe_obj->out_fence_fd >= 0);
+			ret = sync_fence_wait(pipe_obj->out_fence_fd, 1000);
+			igt_assert(ret == 0);
+			close(pipe_obj->out_fence_fd);
+			pipe_obj->out_fence_fd = -1;
+		}
+	}
+
 	drmModeAtomicFree(req);
 	return ret;
 
