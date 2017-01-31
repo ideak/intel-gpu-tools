@@ -139,43 +139,79 @@ enum drm_i915_perf_record_type {
 static struct {
 	const char *name;
 	size_t size;
-	int a_off; /* bytes */
+	int a40_high_off; /* bytes */
+	int a40_low_off;
+	int n_a40;
+	int a_off;
 	int n_a;
 	int first_a;
 	int b_off;
 	int n_b;
 	int c_off;
 	int n_c;
+	int min_gen;
+	int max_gen;
 } oa_formats[I915_OA_FORMAT_MAX] = {
-	[I915_OA_FORMAT_A13] = {
+	[I915_OA_FORMAT_A13] = { /* HSW only */
 		"A13", .size = 64,
-		.a_off = 12, .n_a = 13 },
-	[I915_OA_FORMAT_A29] = {
+		.a_off = 12, .n_a = 13,
+		.max_gen = 7 },
+	[I915_OA_FORMAT_A29] = { /* HSW only */
 		"A29", .size = 128,
-		.a_off = 12, .n_a = 29 },
-	[I915_OA_FORMAT_A13_B8_C8] = {
+		.a_off = 12, .n_a = 29,
+		.max_gen = 7 },
+	[I915_OA_FORMAT_A13_B8_C8] = { /* HSW only */
 		"A13_B8_C8", .size = 128,
 		.a_off = 12, .n_a = 13,
 		.b_off = 64, .n_b = 8,
-		.c_off = 96, .n_c = 8 },
-	[I915_OA_FORMAT_A45_B8_C8] = {
+		.c_off = 96, .n_c = 8,
+		.max_gen = 7 },
+	[I915_OA_FORMAT_A45_B8_C8] = { /* HSW only */
 		"A45_B8_C8", .size = 256,
 		.a_off = 12,  .n_a = 45,
 		.b_off = 192, .n_b = 8,
-		.c_off = 224, .n_c = 8 },
-	[I915_OA_FORMAT_B4_C8] = {
+		.c_off = 224, .n_c = 8,
+		.max_gen = 7 },
+	[I915_OA_FORMAT_B4_C8] = { /* HSW only */
 		"B4_C8", .size = 64,
 		.b_off = 16, .n_b = 4,
-		.c_off = 32, .n_c = 8 },
-	[I915_OA_FORMAT_B4_C8_A16] = {
+		.c_off = 32, .n_c = 8,
+		.max_gen = 7 },
+	[I915_OA_FORMAT_B4_C8_A16] = { /* HSW only */
 		"B4_C8_A16", .size = 128,
 		.b_off = 16, .n_b = 4,
 		.c_off = 32, .n_c = 8,
-		.a_off = 60, .n_a = 16, .first_a = 29 },
-	[I915_OA_FORMAT_C4_B8] = {
+		.a_off = 60, .n_a = 16, .first_a = 29,
+		.max_gen = 7 },
+	[I915_OA_FORMAT_C4_B8] = { /* HSW+ (header differs from HSW-Gen8+) */
 		"C4_B8", .size = 64,
 		.c_off = 16, .n_c = 4,
 		.b_off = 28, .n_b = 8 },
+
+	/* Gen8+ */
+
+	[I915_OA_FORMAT_A12] = {
+		"A12", .size = 64,
+		.a_off = 12, .n_a = 12, .first_a = 7,
+		.min_gen = 8 },
+	[I915_OA_FORMAT_A12_B8_C8] = {
+		"A12_B8_C8", .size = 128,
+		.a_off = 12, .n_a = 12,
+		.b_off = 64, .n_b = 8,
+		.c_off = 96, .n_c = 8, .first_a = 7,
+		.min_gen = 8 },
+	[I915_OA_FORMAT_A32u40_A4u32_B8_C8] = {
+		"A32u40_A4u32_B8_C8", .size = 256,
+		.a40_high_off = 160, .a40_low_off = 16, .n_a40 = 32,
+		.a_off = 144, .n_a = 4, .first_a = 32,
+		.b_off = 192, .n_b = 8,
+		.c_off = 224, .n_c = 8,
+		.min_gen = 8 },
+	[I915_OA_FORMAT_C4_B8] = {
+		"C4_B8", .size = 64,
+		.c_off = 16, .n_c = 4,
+		.b_off = 32, .n_b = 8,
+		.min_gen = 8 },
 };
 
 static bool hsw_undefined_a_counters[45] = {
@@ -869,6 +905,20 @@ test_oa_formats(void)
 
 		if (!oa_formats[i].name) /* sparse, indexed by ID */
 			continue;
+
+		if (oa_formats[i].min_gen &&
+		    intel_gen(devid) < oa_formats[i].min_gen) {
+			igt_debug("skipping unsupported OA format %s\n",
+				  oa_formats[i].name);
+			continue;
+		}
+
+		if (oa_formats[i].max_gen &&
+		    intel_gen(devid) > oa_formats[i].max_gen) {
+			igt_debug("skipping unsupported OA format %s\n",
+				  oa_formats[i].name);
+			continue;
+		}
 
 		igt_debug("Checking OA format %s\n", oa_formats[i].name);
 
