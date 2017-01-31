@@ -97,21 +97,27 @@ static void commit_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 	 * we create an fb covering the crtc and call commit
 	 */
 
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
-	igt_plane_set_fb(primary, &data->fb_modeset);
-	primary->rotation_changed = false;
-	igt_display_commit(display);
-
-	igt_plane_set_fb(plane, &data->fb);
-
-	if (!plane->is_cursor)
-		igt_plane_set_position(plane, data->pos_x, data->pos_y);
-
 	if (plane->is_primary || plane->is_cursor)
 		commit = COMMIT_UNIVERSAL;
 
 	if (data->display.is_atomic)
 		commit = COMMIT_ATOMIC;
+
+	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+
+	if (commit < COMMIT_ATOMIC) {
+		igt_plane_set_fb(primary, &data->fb_modeset);
+		primary->rotation_changed = false;
+		igt_display_commit(display);
+
+		if (plane->is_primary)
+			primary->rotation_changed = true;
+	}
+
+	igt_plane_set_fb(plane, &data->fb);
+
+	if (!plane->is_cursor)
+		igt_plane_set_position(plane, data->pos_x, data->pos_y);
 
 	igt_display_commit2(display, commit);
 }
@@ -128,6 +134,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 				data->override_fmt : DRM_FORMAT_XRGB8888;
 
 	igt_output_set_pipe(output, pipe);
+	igt_plane_set_rotation(plane, IGT_ROTATION_0);
 
 	/* create the pipe_crc object for this pipe */
 	igt_pipe_crc_free(data->pipe_crc);
@@ -153,7 +160,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	    data->rotation == IGT_ROTATION_270) {
 		tiling = data->override_tiling ?
 			 data->override_tiling : LOCAL_I915_FORMAT_MOD_Y_TILED;
-		w = h =  mode->vdisplay;
+		w = h = min(mode->hdisplay, mode->vdisplay);
 	} else if (plane->is_cursor) {
 		pixel_format = data->override_fmt ?
 			       data->override_fmt : DRM_FORMAT_ARGB8888;
@@ -214,6 +221,10 @@ static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 	}
 
 	igt_plane_set_fb(plane, NULL);
+	igt_plane_set_rotation(plane, IGT_ROTATION_0);
+
+	igt_display_commit2(display, COMMIT_UNIVERSAL);
+
 	igt_output_set_pipe(output, PIPE_ANY);
 
 	igt_display_commit(display);
@@ -301,18 +312,6 @@ static void test_plane_rotation(data_t *data, enum igt_plane plane_type)
 			wait_for_pageflip(data->gfx_fd);
 		}
 
-		/*
-		  * check the rotation state has been reset when the VT
-		  * mode is restored
-		  */
-		kmstest_restore_vt_mode();
-		kmstest_set_vt_graphics_mode();
-
-		commit_crtc(data, output, plane);
-
-		igt_pipe_crc_collect_crc(data->pipe_crc, &crc_output);
-		igt_assert_crc_equal(&crc_unrotated, &crc_output);
-
 		valid_tests++;
 		cleanup_crtc(data, output, plane);
 	}
@@ -372,11 +371,14 @@ static void test_plane_rotation_ytiled_obj(data_t *data,
 
 	igt_plane_set_rotation(plane, data->rotation);
 	igt_plane_set_fb(plane, &data->fb);
+	igt_plane_set_size(plane, h, w);
 
-	drmModeObjectSetProperty(fd, plane->drm_plane->plane_id,
-				 DRM_MODE_OBJECT_PLANE,
-				 plane->rotation_property,
-				 plane->rotation);
+	if (commit < COMMIT_ATOMIC)
+		drmModeObjectSetProperty(fd, plane->drm_plane->plane_id,
+					DRM_MODE_OBJECT_PLANE,
+					plane->rotation_property,
+					plane->rotation);
+
 	ret = igt_display_try_commit2(display, commit);
 
 	igt_output_set_pipe(output, PIPE_NONE);
@@ -466,6 +468,7 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 		}
 
 		igt_plane_set_rotation(plane, IGT_ROTATION_90);
+		igt_plane_set_size(plane, h, w);
 
 		drmModeObjectSetProperty(fd, plane->drm_plane->plane_id,
 					 DRM_MODE_OBJECT_PLANE,
