@@ -863,17 +863,15 @@ print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 	} else
 		igt_debug("CLOCK = N/A\n");
 
-	for (int j = oa_formats[fmt].first_a;
-	     j < oa_formats[fmt].n_a;
-	     j++)
-	{
+	for (int j = 0; j < oa_formats[fmt].n_a; j++) {
+		int a_id = oa_formats[fmt].first_a + j;
 		uint32_t delta = a1[j] - a0[j];
 
-		if (hsw_undefined_a_counters[j])
+		if (hsw_undefined_a_counters[a_id])
 			continue;
 
 		igt_debug("A%d: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
-			  j, a0[j], a1[j], delta);
+			  a_id, a0[j], a1[j], delta);
 	}
 
 	for (int j = 0; j < oa_formats[fmt].n_b; j++) {
@@ -976,16 +974,14 @@ test_oa_formats(void)
 		 */
 		max_delta = clock_delta * 40;
 
-		for (int j = oa_formats[i].first_a;
-		     j < oa_formats[i].n_a;
-		     j++)
-		{
+		for (int j = 0; j < oa_formats[i].n_a; j++) {
+			int a_id = oa_formats[i].first_a + j;
 			uint32_t delta = a1[j] - a0[j];
 
-			if (hsw_undefined_a_counters[j])
+			if (hsw_undefined_a_counters[a_id])
 				continue;
 
-			igt_debug("A%d: delta = %"PRIu32"\n", j, delta);
+			igt_debug("A%d: delta = %"PRIu32"\n", a_id, delta);
 			igt_assert(delta <= max_delta);
 		}
 
