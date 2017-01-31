@@ -232,6 +232,9 @@ static bool hsw_undefined_a_counters[45] = {
 	[44] = true,
 };
 
+/* No A counters currently reserved/undefined for gen8+ so far */
+static bool gen8_undefined_a_counters[45];
+
 static int drm_fd = -1;
 static uint32_t devid;
 static int card = -1;
@@ -244,6 +247,7 @@ static uint64_t gt_max_freq_mhz = 0;
 
 static uint64_t timestamp_frequency = 12500000;
 static enum drm_i915_oa_format test_oa_format;
+static bool *undefined_a_counters;
 
 static igt_render_copyfunc_t render_copy = NULL;
 
@@ -408,9 +412,11 @@ init_sys_info(void)
 		test_set_name = "RenderBasic";
 		test_set_uuid = "403d8832-1a27-4aa6-a64e-f5389ce7b212";
 		test_oa_format = I915_OA_FORMAT_A45_B8_C8;
+		undefined_a_counters = hsw_undefined_a_counters;
 	} else {
 		test_set_name = "TestOa";
 		test_oa_format = I915_OA_FORMAT_A32u40_A4u32_B8_C8;
+		undefined_a_counters = gen8_undefined_a_counters;
 
 		if (IS_BROADWELL(devid)) {
 			test_set_uuid = "d6de6f55-e526-4f79-a6a6-d7315c09044e";
@@ -867,7 +873,7 @@ print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 		int a_id = oa_formats[fmt].first_a + j;
 		uint32_t delta = a1[j] - a0[j];
 
-		if (hsw_undefined_a_counters[a_id])
+		if (undefined_a_counters[a_id])
 			continue;
 
 		igt_debug("A%d: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
@@ -978,7 +984,7 @@ test_oa_formats(void)
 			int a_id = oa_formats[i].first_a + j;
 			uint32_t delta = a1[j] - a0[j];
 
-			if (hsw_undefined_a_counters[a_id])
+			if (undefined_a_counters[a_id])
 				continue;
 
 			igt_debug("A%d: delta = %"PRIu32"\n", a_id, delta);
