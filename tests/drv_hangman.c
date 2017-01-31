@@ -32,136 +32,52 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "igt_sysfs.h"
 #include "igt_debugfs.h"
 
 #ifndef I915_PARAM_CMD_PARSER_VERSION
 #define I915_PARAM_CMD_PARSER_VERSION       28
 #endif
 
-static char read_buffer[1024];
-
-static int _read_sysfs(void *dst, int maxlen,
-		      const char* path,
-		      const char *fname)
-{
-	int fd;
-	char full[PATH_MAX];
-	int r, e;
-
-	igt_assert(snprintf(full, PATH_MAX, "%s/%s", path, fname) < PATH_MAX);
-
-	fd = open(full, O_RDONLY);
-	if (fd == -1)
-		return -errno;
-
-	r = read(fd, dst, maxlen);
-	e = errno;
-	close(fd);
-
-	if (r < 0)
-		return -e;
-
-	return r;
-}
-
-static int read_sysfs(void *dst, int maxlen, const char *fname)
-{
-	char path[PATH_MAX];
-
-	igt_assert(snprintf(path, PATH_MAX, "/sys/class/drm/card%d",
-			    drm_get_card()) < PATH_MAX);
-
-	return _read_sysfs(dst, maxlen, path, fname);
-}
+static int device = -1;
+static int sysfs = -1;
 
 static void test_sysfs_error_exists(void)
 {
-	igt_assert_lt(0, read_sysfs(read_buffer, sizeof(read_buffer), "error"));
+	char *error;
+
+	error = igt_sysfs_get(sysfs, "error");
+	igt_assert(error);
+	free(error);
 }
 
-static void test_debugfs_error_state_exists(void)
+static void assert_entry(const char *s, bool expect)
 {
-	int fd;
+	char *error;
 
-	igt_assert_lte(0,
-		       (fd = igt_debugfs_open("i915_error_state", O_RDONLY)));
+	error = igt_sysfs_get(sysfs, "error");
+	igt_assert(error);
 
-	close (fd);
-}
+	igt_assert_f(strcasecmp(error, s) != expect,
+		     "contents of error: '%s' (expected %s '%s')\n",
+		     error, expect ? "": "not", s);
 
-static void read_dfs(const char *fname, char *d, int maxlen)
-{
-	int fd;
-	int l;
-
-	igt_assert_lte(0, (fd = igt_debugfs_open(fname, O_RDONLY)));
-
-	igt_assert_lt(0, (l = read(fd, d, maxlen - 1)));
-	igt_assert_lt(l, maxlen);
-	d[l] = 0;
-	close(fd);
-
-	igt_debug("dfs entry %s read '%s'\n", fname, d);
-}
-
-static int compare_dfs_entry(const char *fname, const char *s)
-{
-	const int l = min(strlen(s), sizeof(read_buffer));
-
-	read_dfs(fname, read_buffer, l + 1);
-	return strncmp(read_buffer, s, l);
-}
-
-static void assert_dfs_entry(const char *fname, const char *s)
-{
-	igt_fail_on_f(compare_dfs_entry(fname, s) != 0,
-		      "contents of %s: '%s' (expected '%s')\n",
-		      fname, read_buffer, s);
-}
-
-static void assert_dfs_entry_not(const char *fname, const char *s)
-{
-	igt_fail_on_f(compare_dfs_entry(fname, s) == 0,
-		      "contents of %s: '%s' (expected not '%s'\n",
-		      fname, read_buffer, s);
+	free(error);
 }
 
 static void assert_error_state_clear(void)
 {
-	assert_dfs_entry("i915_error_state", "no error state collected");
+	assert_entry("no error state collected", true);
 }
 
 static void assert_error_state_collected(void)
 {
-	assert_dfs_entry_not("i915_error_state", "no error state collected");
-}
-
-const uint32_t *batch;
-
-static uint64_t submit_hang(int fd, unsigned ring_id)
-{
-	uint64_t offset;
-	igt_hang_t hang;
-
-	hang = igt_hang_ctx(fd, 0, ring_id, HANG_ALLOW_CAPTURE, &offset);
-
-	batch = gem_mmap__cpu(fd, hang.handle, 0, 4096, PROT_READ);
-	gem_set_domain(fd, hang.handle, I915_GEM_DOMAIN_CPU, 0);
-
-	igt_post_hang_ring(fd, hang);
-
-	return offset;
+	assert_entry("no error state collected", false);
 }
 
 static void clear_error_state(void)
 {
-	int fd;
-	const char *b = "1";
-
-	igt_assert_lte(0,
-		       (fd = igt_debugfs_open("i915_error_state", O_WRONLY)));
-	igt_assert(write(fd, b, 1) == 1);
-	close(fd);
+	igt_sysfs_set(sysfs, "error", "");
 }
 
 static void test_error_state_basic(void)
@@ -177,9 +93,7 @@ static void test_error_state_basic(void)
 	close(fd);
 
 	/* Wait for the error capture and gpu reset to complete */
-	fd = drm_open_driver(DRIVER_INTEL);
-	gem_quiescent_gpu(fd);
-	close(fd);
+	gem_quiescent_gpu(device);
 
 	assert_error_state_collected();
 
@@ -187,17 +101,37 @@ static void test_error_state_basic(void)
 	assert_error_state_clear();
 }
 
-static void check_error_state(const int gen,
-			      const bool uses_cmd_parser,
-			      const char *expected_ring_name,
-			      uint64_t expected_offset)
+static FILE *open_error(void)
 {
-	FILE *file;
+	int fd;
+
+	fd = openat(sysfs, "error", O_RDONLY);
+	if (fd < 0)
+		return NULL;
+
+	return fdopen(fd, "r");
+}
+
+static bool uses_cmd_parser(void)
+{
+	int parser_version = 0;
+	drm_i915_getparam_t gp;
+
+	gp.param = I915_PARAM_CMD_PARSER_VERSION;
+	gp.value = &parser_version;
+	drmIoctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	return parser_version > 0;
+}
+
+static void check_error_state(const char *expected_ring_name,
+			      uint64_t expected_offset,
+			      const uint32_t *batch)
+{
+	bool cmd_parser = uses_cmd_parser();
+	FILE *file = open_error();
 	char *line = NULL;
 	size_t line_size = 0;
-
-	file = igt_debugfs_fopen("i915_error_state", "r");
-	igt_require(file);
 
 	while (getline(&line, &line_size, file) > 0) {
 		char *dashes;
@@ -209,9 +143,9 @@ static void check_error_state(const int gen,
 			continue;
 
 		matched = sscanf(dashes, "--- gtt_offset = 0x%08x %08x\n",
-				    &gtt_offset_upper, &gtt_offset_lower);
+				 &gtt_offset_upper, &gtt_offset_lower);
 		if (matched) {
-			char expected_line[64];
+			char expected_line[128];
 			uint64_t gtt_offset;
 			int i;
 
@@ -224,7 +158,7 @@ static void check_error_state(const int gen,
 				gtt_offset <<= 32;
 				gtt_offset |= gtt_offset_lower;
 			}
-			if (!uses_cmd_parser)
+			if (!cmd_parser)
 				igt_assert_eq_u64(gtt_offset, expected_offset);
 
 			for (i = 0; i < 1024; i++) {
@@ -245,47 +179,24 @@ static void check_error_state(const int gen,
 	fclose(file);
 }
 
-static bool uses_cmd_parser(int fd, int gen)
-{
-	int parser_version = 0;
-	drm_i915_getparam_t gp;
-	int rc;
-
-	gp.param = I915_PARAM_CMD_PARSER_VERSION;
-	gp.value = &parser_version;
-	rc = drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
-	if (rc || parser_version == 0)
-		return false;
-
-	if (!gem_uses_ppgtt(fd))
-		return false;
-
-	if (gen != 7)
-		return false;
-
-	return true;
-}
-
 static void test_error_state_capture(unsigned ring_id,
 				     const char *ring_name)
 {
-	int fd, gen;
+	uint32_t *batch;
+	igt_hang_t hang;
 	uint64_t offset;
-	bool cmd_parser;
 
-	fd = drm_open_driver(DRIVER_INTEL);
-
+	igt_require(gem_has_ring(device, ring_id));
 	clear_error_state();
 
-	gen = intel_gen(intel_get_drm_devid(fd));
-	cmd_parser = uses_cmd_parser(fd, gen);
+	hang = igt_hang_ctx(device, 0, ring_id, HANG_ALLOW_CAPTURE, &offset);
+	batch = gem_mmap__cpu(device, hang.handle, 0, 4096, PROT_READ);
+	gem_set_domain(device, hang.handle, I915_GEM_DOMAIN_CPU, 0);
+	igt_post_hang_ring(device, hang);
 
-	offset = submit_hang(fd, ring_id);
-	close(fd);
-
-	check_error_state(gen, cmd_parser, ring_name, offset);
+	check_error_state(ring_name, offset, batch);
+	munmap(batch, 4096);
 }
-
 
 /* This test covers the case where we end up in an uninitialised area of the
  * ppgtt and keep executing through it. This is particularly relevant if 48b
@@ -295,18 +206,16 @@ static void test_error_state_capture(unsigned ring_id,
  */
 static void hangcheck_unterminated(void)
 {
-	int fd;
 	/* timeout needs to be greater than ~5*hangcheck */
 	int64_t timeout_ns = 100ull * NSEC_PER_SEC; /* 100 seconds */
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 gem_exec;
 	uint32_t handle;
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	igt_require(gem_uses_full_ppgtt(fd));
-	igt_require_hang_ring(fd, 0);
+	igt_require(gem_uses_full_ppgtt(device));
+	igt_require_hang_ring(device, 0);
 
-	handle = gem_create(fd, 4096);
+	handle = gem_create(device, 4096);
 
 	memset(&gem_exec, 0, sizeof(gem_exec));
 	gem_exec.handle = handle;
@@ -315,14 +224,12 @@ static void hangcheck_unterminated(void)
 	execbuf.buffers_ptr = (uintptr_t)&gem_exec;
 	execbuf.buffer_count = 1;
 
-	gem_execbuf(fd, &execbuf);
-	if (gem_wait(fd, handle, &timeout_ns) != 0) {
+	gem_execbuf(device, &execbuf);
+	if (gem_wait(device, handle, &timeout_ns) != 0) {
 		/* need to manually trigger an hang to clean before failing */
 		igt_force_gpu_reset();
 		igt_assert_f(0, "unterminated batch did not trigger an hang!");
 	}
-
-	close(fd);
 }
 
 igt_main
@@ -331,8 +238,13 @@ igt_main
 
 	igt_skip_on_simulation();
 
-	igt_subtest("error-state-debugfs-entry")
-		test_debugfs_error_state_exists();
+	igt_fixture {
+		int idx;
+
+		device = drm_open_driver(DRIVER_INTEL);
+		sysfs = igt_sysfs_open(device, &idx);
+		igt_assert(sysfs != -1);
+	}
 
 	igt_subtest("error-state-sysfs-entry")
 		test_sysfs_error_exists();
