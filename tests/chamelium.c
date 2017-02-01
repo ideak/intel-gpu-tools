@@ -514,6 +514,7 @@ test_hpd_without_ddc(data_t *data, struct chamelium_port *port)
 	struct udev_monitor *mon = igt_watch_hotplug();
 
 	reset_state(data, port);
+	igt_flush_hotplugs(mon);
 
 	/* Disable the DDC on the connector and make sure we still get a
 	 * hotplug
