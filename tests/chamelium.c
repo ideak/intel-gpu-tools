@@ -310,7 +310,7 @@ enable_output(data_t *data,
 	      struct igt_fb *fb)
 {
 	igt_display_t *display = output->display;
-	igt_plane_t *primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	igt_plane_t *primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	drmModeConnector *connector = chamelium_port_get_connector(
 	    data->chamelium, port, false);
 
@@ -341,7 +341,7 @@ disable_output(data_t *data,
 	       igt_output_t *output)
 {
 	igt_display_t *display = output->display;
-	igt_plane_t *primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	igt_plane_t *primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
 	/* Disable the display */
@@ -364,7 +364,7 @@ test_display_crc_single(data_t *data, struct chamelium_port *port)
 
 	output = prepare_output(data, &display, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
 	for (i = 0; i < connector->count_modes; i++) {
@@ -418,7 +418,7 @@ test_display_crc_multiple(data_t *data, struct chamelium_port *port)
 
 	output = prepare_output(data, &display, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
 	for (i = 0; i < connector->count_modes; i++) {
@@ -477,7 +477,7 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 
 	output = prepare_output(data, &display, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
-	primary = igt_output_get_plane(output, IGT_PLANE_PRIMARY);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
 	for (i = 0; i < connector->count_modes; i++) {
