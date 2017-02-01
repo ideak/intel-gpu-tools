@@ -171,7 +171,7 @@ create_fb_for_mode_position(data_t *data, igt_output_t *output, drmModeModeInfo 
 			mode->hdisplay, mode->vdisplay,
 			color->red, color->green, color->blue);
 
-	for (int i = 0; i <= max_planes; i++) {
+	for (int i = 0; i < max_planes; i++) {
 		if (data->plane[i]->type == DRM_PLANE_TYPE_PRIMARY)
 			continue;
 		igt_paint_color(cr, rect_x[i], rect_y[i],
@@ -211,7 +211,7 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 	/* planes with random positions */
 	x[primary->index] = 0;
 	y[primary->index] = 0;
-	for (i = 1; i <= max_planes; i++) {
+	for (i = 0; i < max_planes; i++) {
 		igt_plane_t *plane = igt_output_get_plane(output, i);
 
 		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
@@ -247,7 +247,7 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 static void
 test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 				       igt_output_t *output, int n_planes,
-					   int max_planes, uint64_t tiling)
+				       uint64_t tiling)
 {
 	char buf[256];
 	struct drm_event *e = (void *)buf;
@@ -270,7 +270,7 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 	}
 
 	igt_info("Testing connector %s using pipe %s with %d planes %s with seed %d\n",
-		 igt_output_name(output), kmstest_pipe_name(pipe), max_planes,
+		 igt_output_name(output), kmstest_pipe_name(pipe), n_planes,
 		 info, opt.seed);
 
 	test_init(data, pipe, n_planes);
@@ -280,7 +280,7 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	i = 0;
 	while (i < iterations || loop_forever) {
-		prepare_planes(data, pipe, &blue, tiling, max_planes, output);
+		prepare_planes(data, pipe, &blue, tiling, n_planes, output);
 
 		vblank_start = kmstest_get_vblank(data->display.drm_fd, pipe,
 						  DRM_VBLANK_NEXTONMISS);
@@ -316,7 +316,7 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 static void
 test_legacy_plane_position_with_output(data_t *data, enum pipe pipe,
 				       igt_output_t *output, int n_planes,
-					   int max_planes, uint64_t tiling)
+				       uint64_t tiling)
 {
 	test_position_t test = { .data = data };
 	color_t blue  = { 0.0f, 0.0f, 1.0f };
@@ -336,7 +336,7 @@ test_legacy_plane_position_with_output(data_t *data, enum pipe pipe,
 	}
 
 	igt_info("Testing connector %s using pipe %s with %d planes %s with seed %d\n",
-		 igt_output_name(output), kmstest_pipe_name(pipe), max_planes,
+		 igt_output_name(output), kmstest_pipe_name(pipe), n_planes,
 		 info, opt.seed);
 
 	test_init(data, pipe, n_planes);
@@ -346,7 +346,7 @@ test_legacy_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	i = 0;
 	while (i < iterations || loop_forever) {
-		prepare_planes(data, pipe, &blue, tiling, max_planes, output);
+		prepare_planes(data, pipe, &blue, tiling, n_planes, output);
 
 		igt_display_commit2(&data->display, COMMIT_LEGACY);
 
@@ -366,7 +366,7 @@ test_legacy_plane_position_with_output(data_t *data, enum pipe pipe,
 
 static void
 test_plane_position(data_t *data, enum pipe pipe, bool atomic, int n_planes,
-		    int max_planes, uint64_t tiling)
+		    uint64_t tiling)
 {
 	igt_output_t *output;
 	int connected_outs;
@@ -376,7 +376,6 @@ test_plane_position(data_t *data, enum pipe pipe, bool atomic, int n_planes,
 		igt_require(data->display.is_atomic);
 
 	igt_skip_on(pipe >= data->display.n_pipes);
-	igt_skip_on(max_planes >= data->display.pipes[pipe].n_planes);
 
 	if ((tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
 	     tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED))
@@ -392,14 +391,12 @@ test_plane_position(data_t *data, enum pipe pipe, bool atomic, int n_planes,
 		if (atomic)
 			test_atomic_plane_position_with_output(data, pipe,
 							       output,
-								   n_planes,
-							       max_planes,
+							       n_planes,
 							       tiling);
 		else
 			test_legacy_plane_position_with_output(data, pipe,
 							       output,
-								   n_planes,
-							       max_planes,
+							       n_planes,
 							       tiling);
 
 		connected_outs++;
@@ -412,68 +409,54 @@ test_plane_position(data_t *data, enum pipe pipe, bool atomic, int n_planes,
 static void
 run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 {
-	igt_subtest_f("legacy-pipe-%s-tiling-none-planes",
+	int n_planes = data->display.pipes[pipe].n_planes;
+
+	igt_subtest_f("legacy-pipe-%s-tiling-none",
 		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int planes = 0; planes < n_planes; planes++)
-			test_plane_position(data, pipe, false,  n_planes,
-				planes, LOCAL_DRM_FORMAT_MOD_NONE);
+		test_plane_position(data, pipe, false, n_planes,
+				    LOCAL_DRM_FORMAT_MOD_NONE);
 	}
 
-	igt_subtest_f("atomic-pipe-%s-tiling-none-planes",
+	igt_subtest_f("atomic-pipe-%s-tiling-none",
 		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int planes = 0; planes < n_planes; planes++)
-			test_plane_position(data, pipe, true, n_planes,
-				planes,	LOCAL_I915_FORMAT_MOD_X_TILED);
+		test_plane_position(data, pipe, true, n_planes,
+				    LOCAL_I915_FORMAT_MOD_X_TILED);
 	}
 
-	igt_subtest_f("legacy-pipe-%s-tiling-x-planes",
+	igt_subtest_f("legacy-pipe-%s-tiling-x",
 		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int planes = 0; planes < n_planes; planes++)
-			test_plane_position(data, pipe, false, n_planes,
-				planes, LOCAL_I915_FORMAT_MOD_X_TILED);
+		test_plane_position(data, pipe, false, n_planes,
+				    LOCAL_I915_FORMAT_MOD_X_TILED);
 	}
 
-	igt_subtest_f("atomic-pipe-%s-tiling-x-planes",
+	igt_subtest_f("atomic-pipe-%s-tiling-x",
 		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int planes = 0; planes < n_planes; planes++)
-			test_plane_position(data, pipe, true, n_planes,
-				planes, LOCAL_I915_FORMAT_MOD_X_TILED);
+		test_plane_position(data, pipe, true, n_planes,
+				    LOCAL_I915_FORMAT_MOD_X_TILED);
 	}
 
-	igt_subtest_f("legacy-pipe-%s-tiling-y-planes",
+	igt_subtest_f("legacy-pipe-%s-tiling-y",
 		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int planes = 0; planes < n_planes; planes++)
-			test_plane_position(data, pipe, false, n_planes,
-				planes, LOCAL_I915_FORMAT_MOD_Y_TILED);
+		test_plane_position(data, pipe, false, n_planes,
+				    LOCAL_I915_FORMAT_MOD_Y_TILED);
 	}
 
-	igt_subtest_f("atomic-pipe-%s-tiling-y-planes",
+	igt_subtest_f("atomic-pipe-%s-tiling-y",
 		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int planes = 0; planes < n_planes; planes++)
-			test_plane_position(data, pipe, true, n_planes,
-				planes, LOCAL_I915_FORMAT_MOD_Y_TILED);
+		test_plane_position(data, pipe, true, n_planes,
+				    LOCAL_I915_FORMAT_MOD_Y_TILED);
 	}
 
-	igt_subtest_f("legacy-pipe-%s-tiling-yf-planes",
+	igt_subtest_f("legacy-pipe-%s-tiling-yf",
 		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int planes = 0; planes < n_planes; planes++)
-			test_plane_position(data, pipe, false, n_planes,
-				planes, LOCAL_I915_FORMAT_MOD_Yf_TILED);
+		test_plane_position(data, pipe, false, n_planes,
+				    LOCAL_I915_FORMAT_MOD_Yf_TILED);
 	}
 
-	igt_subtest_f("atomic-pipe-%s-tiling-yf-planes",
+	igt_subtest_f("atomic-pipe-%s-tiling-yf",
 		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int planes = 0; planes < n_planes; planes++)
-			test_plane_position(data, pipe, true, n_planes,
-				planes, LOCAL_I915_FORMAT_MOD_Yf_TILED);
+		test_plane_position(data, pipe, true, n_planes,
+				    LOCAL_I915_FORMAT_MOD_Yf_TILED);
 	}
 }
 
