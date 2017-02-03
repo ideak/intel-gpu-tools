@@ -512,7 +512,6 @@ static void commit_display(igt_display_t *display, unsigned event_mask, bool non
 		char buf[32];
 		struct drm_event *e = (void *)buf;
 		struct drm_event_vblank *vblank = (void *)buf;
-		uint32_t crtc_id, pipe = I915_MAX_PIPES;
 
 		igt_set_timeout(3, "Timed out while reading drm_fd\n");
 		ret = read(display->drm_fd, buf, sizeof(buf));
@@ -523,17 +522,7 @@ static void commit_display(igt_display_t *display, unsigned event_mask, bool non
 		igt_assert(ret >= 0);
 		igt_assert_eq(e->type, DRM_EVENT_FLIP_COMPLETE);
 
-		crtc_id = vblank->reserved;
-		if (crtc_id) {
-			for_each_pipe(display, pipe)
-				if (display->pipes[pipe].crtc_id == crtc_id)
-					break;
-
-			igt_assert_lt(pipe, display->n_pipes);
-
-			igt_debug("Retrieved vblank seq: %u on %u/%u\n", vblank->sequence, vblank->reserved, pipe);
-		} else
-			igt_debug("Retrieved vblank seq: %u on unk/unk\n", vblank->sequence);
+		igt_debug("Retrieved vblank seq: %u on unk/unk\n", vblank->sequence);
 
 		num_events--;
 	}
