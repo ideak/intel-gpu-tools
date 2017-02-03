@@ -91,7 +91,7 @@ igt_kmod_is_loaded(const char *mod_name)
 		struct kmod_module *kmod = kmod_module_get_module(mod);
 		const char *kmod_name = kmod_module_get_name(kmod);
 
-		if (!strncmp(kmod_name, mod_name, strlen(kmod_name))) {
+		if (!strcmp(kmod_name, mod_name)) {
 			kmod_module_unref(kmod);
 			ret = true;
 			break;
