@@ -73,7 +73,7 @@ static void gem_require_context(int fd)
 
 static bool can_mi_store_dword(int gen, unsigned engine)
 {
-	return !(gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD);
+	return gen > 2 && !(gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD);
 }
 
 static bool ignore_engine(int gen, unsigned engine)

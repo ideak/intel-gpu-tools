@@ -443,7 +443,7 @@ static void crtc_populate_req(struct kms_atomic_crtc_state *crtc,
 {
 	if (crtc->out_fence_ptr)
 		crtc_set_prop(req, crtc, IGT_CRTC_OUT_FENCE_PTR,
-			      (uint64_t) crtc->out_fence_ptr);
+			      to_user_pointer(crtc->out_fence_ptr));
 
 	crtc_set_prop(req, crtc, IGT_CRTC_MODE_ID, crtc->mode.id);
 	crtc_set_prop(req, crtc, IGT_CRTC_ACTIVE, crtc->active);

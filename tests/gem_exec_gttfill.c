@@ -209,6 +209,11 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
+static bool can_store_dword_imm(int fd)
+{
+	return intel_gen(intel_gen(intel_get_drm_devid(fd))) > 2;
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -218,6 +223,7 @@ igt_main
 
 	igt_fixture {
 		device = drm_open_driver(DRIVER_INTEL);
+		igt_require(can_store_dword_imm(device));
 		igt_fork_hang_detector(device);
 	}
 

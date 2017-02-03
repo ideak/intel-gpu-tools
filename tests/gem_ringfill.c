@@ -230,6 +230,11 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 		run_test(fd, ring, 0);
 }
 
+static bool can_store_dword_imm(int fd)
+{
+	return intel_gen(intel_gen(intel_get_drm_devid(fd))) > 2;
+}
+
 igt_main
 {
 	const struct {
@@ -256,6 +261,7 @@ igt_main
 		int gen;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require(can_store_dword_imm(fd));
 		gen = intel_gen(intel_get_drm_devid(fd));
 		if (gen > 3 && gen < 6) { /* ctg and ilk need secure batches */
 			igt_require(drmSetMaster(fd) == 0);

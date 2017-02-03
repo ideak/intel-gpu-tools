@@ -117,7 +117,6 @@ set_normal_mode_on_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 static void
 find_outputs(data_t *data, igt_output_t **output1, igt_output_t **output2)
 {
-	int count = 0;
 	igt_output_t *output;
 	enum pipe pipe;
 

@@ -541,6 +541,11 @@ static const char *yesno(bool x)
 	return x ? "yes" : "no";
 }
 
+static bool can_store_dword_imm(int gen)
+{
+	return gen > 2;
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -580,6 +585,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		gem_require_mmap_wc(fd);
 		gen = intel_gen(intel_get_drm_devid(fd));
+		igt_require(can_store_dword_imm(gen));
 		igt_info("Has LLC? %s\n", yesno(gem_has_llc(fd)));
 
 		if (cpu) {

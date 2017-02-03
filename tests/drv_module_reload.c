@@ -42,6 +42,11 @@
 
 #define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
+static bool can_store_dword_imm(int fd)
+{
+	return intel_gen(intel_gen(intel_get_drm_devid(fd))) > 2;
+}
+
 static void store_dword(int fd, unsigned ring)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
@@ -50,6 +55,9 @@ static void store_dword(int fd, unsigned ring)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint32_t batch[16];
 	int i;
+
+	if (!can_store_dword_imm(fd))
+		return;
 
 	if (!gem_has_ring(fd, ring))
 		return;
@@ -116,6 +124,9 @@ static void store_all(int fd)
 	unsigned engine, nengine;
 	int value;
 	int i, j;
+
+	if (!can_store_dword_imm(fd))
+		return;
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = (uintptr_t)obj;

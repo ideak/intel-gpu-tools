@@ -77,7 +77,7 @@ out:
 
 static bool can_mi_store_dword(int gen, unsigned engine)
 {
-	return !(gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD);
+	return gen > 2 && !(gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD);
 }
 
 static void
@@ -719,6 +719,11 @@ out:
 	close(dir);
 }
 
+static bool can_store_dword_imm(int fd)
+{
+	return intel_gen(intel_gen(intel_get_drm_devid(fd))) > 2;
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -729,6 +734,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require(can_store_dword_imm(fd));
 		print_welcome(fd);
 
 		igt_fork_hang_detector(fd);
