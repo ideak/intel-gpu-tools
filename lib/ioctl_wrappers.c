@@ -1433,6 +1433,35 @@ bool gem_has_softpin(int fd)
 	return has_softpin;
 }
 
+#define LOCAL_PARAM_HAS_EXEC_FENCE 44
+/**
+ * gem_has_exec_fence:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether in/out fence support in execbuffer is
+ * available.
+ *
+ * Returns: Whether fence support is available
+ */
+bool gem_has_exec_fence(int fd)
+{
+	static int has_exec_fence = -1;
+
+	if (has_exec_fence < 0) {
+		struct drm_i915_getparam gp;
+
+		memset(&gp, 0, sizeof(gp));
+		gp.param = LOCAL_PARAM_HAS_EXEC_FENCE;
+		gp.value = &has_exec_fence;
+
+		has_exec_fence = 0;
+		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
+		errno = 0;
+	}
+
+	return has_exec_fence;
+}
+
 /**
  * gem_require_caching:
  * @fd: open i915 drm file descriptor

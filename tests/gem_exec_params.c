@@ -45,6 +45,8 @@
 #define LOCAL_I915_EXEC_BSD_RING1 (1<<13)
 #define LOCAL_I915_EXEC_BSD_RING2 (2<<13)
 #define LOCAL_I915_EXEC_RESOURCE_STREAMER (1<<15)
+#define LOCAL_I915_EXEC_FENCE_IN (1 << 16)
+#define LOCAL_I915_EXEC_FENCE_OUT (1 << 17)
 
 static bool has_ring(int fd, unsigned ring_exec_flags)
 {
@@ -239,13 +241,15 @@ igt_main
 				    &execbuf) == 0);
 	}
 
-	/* HANDLE_LUT and NO_RELOC are already exercised by gem_exec_lut_handle */
+	/* HANDLE_LUT and NO_RELOC are already exercised by gem_exec_lut_handle,
+	 * EXEC_FENCE_IN and EXEC_FENCE_OUT correct usage is tested by
+	 * gem_exec_fence, invalid usage of EXEC_FENCE_IN is tested below. */
 
 	igt_subtest("invalid-flag") {
 		/* NOTE: This test intentionally exercise the next available
 		 * flag. Don't "fix" this testcase without adding the required
 		 * tests for the new flag first. */
-		execbuf.flags = I915_EXEC_RENDER | (LOCAL_I915_EXEC_RESOURCE_STREAMER << 1);
+		execbuf.flags = I915_EXEC_RENDER | (LOCAL_I915_EXEC_FENCE_OUT << 1);
 		RUN_FAIL(EINVAL);
 	}
 
@@ -283,6 +287,23 @@ igt_main
 		RUN_FAIL(EINVAL);
 	}
 
+	igt_subtest("invalid-fence-in") {
+		igt_require(gem_has_exec_fence(fd));
+		execbuf.flags = LOCAL_I915_EXEC_FENCE_IN;
+		execbuf.rsvd2 = -1;
+		RUN_FAIL(EINVAL);
+		execbuf.rsvd2 = fd;
+		RUN_FAIL(EINVAL);
+	}
+
+	igt_subtest("rsvd2-dirt") {
+		igt_require(!gem_has_exec_fence(fd));
+		execbuf.flags = 0;
+		execbuf.rsvd2 = 1;
+		RUN_FAIL(EINVAL);
+		execbuf.rsvd2 = 0;
+	}
+
 #define DIRT(name) \
 	igt_subtest(#name "-dirt") { \
 		execbuf.flags = 0; \
@@ -291,7 +312,6 @@ igt_main
 		execbuf.name = 0; \
 	}
 
-	DIRT(rsvd2);
 	DIRT(cliprects_ptr);
 	DIRT(DR1);
 	DIRT(DR4);

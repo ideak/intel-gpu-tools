@@ -309,20 +309,6 @@ static void test_fence_flip(int i915)
 	igt_skip_on_f(1, "no fence-in for atomic flips\n");
 }
 
-static bool gem_has_exec_fence(int fd)
-{
-	struct drm_i915_getparam gp;
-	int val = -1;
-
-	memset(&gp, 0, sizeof(gp));
-	gp.param = LOCAL_PARAM_HAS_EXEC_FENCE;
-	gp.value = &val;
-
-	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
-
-	return val > 0;
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
