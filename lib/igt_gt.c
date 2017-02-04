@@ -145,6 +145,8 @@ static void context_set_ban(int fd, unsigned ctx, unsigned ban)
 {
 	struct local_i915_gem_context_param param;
 
+	memset(&param, 0, sizeof(param));
+	param.context = ctx;
 	param.value = ban;
 	param.size = 0;
 	param.param = LOCAL_CONTEXT_PARAM_BANNABLE;
