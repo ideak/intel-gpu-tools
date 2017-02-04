@@ -331,6 +331,7 @@ static bool has_64b_reloc(int fd)
 
 #define NORELOC 1
 #define ACTIVE 2
+#define HANG 4
 static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 {
 	struct drm_i915_gem_relocation_entry reloc;
@@ -381,7 +382,8 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 
 	if (flags & ACTIVE) {
 		spin = igt_spin_batch_new(fd, I915_EXEC_DEFAULT, obj.handle);
-		igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
+		if (!(flags & HANG))
+			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
 		igt_assert(gem_bo_busy(fd, obj.handle));
 	}
 
@@ -441,7 +443,8 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 
 	if (flags & ACTIVE) {
 		spin = igt_spin_batch_new(fd, I915_EXEC_DEFAULT, obj.handle);
-		igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
+		if (!(flags & HANG))
+			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
 		igt_assert(gem_bo_busy(fd, obj.handle));
 	}
 
@@ -530,10 +533,12 @@ igt_main
 	const struct flags {
 		const char *name;
 		unsigned flags;
+		bool basic;
 	} flags[] = {
-		{ "", 0 },
-		{ "-noreloc", NORELOC },
-		{ "-active", ACTIVE },
+		{ "", 0 , true},
+		{ "-noreloc", NORELOC, true },
+		{ "-active", ACTIVE, true },
+		{ "-hang", ACTIVE | HANG },
 		{ },
 	}, *f;
 	uint64_t size;
@@ -543,10 +548,21 @@ igt_main
 		fd = drm_open_driver_master(DRIVER_INTEL);
 
 	for (f = flags; f->name; f++) {
+		igt_hang_t hang;
+
+		if (f->flags & HANG)
+			hang = igt_allow_hang(fd, 0, 0);
+
 		for (m = modes; m->name; m++) {
-			igt_subtest_f("basic-%s%s", m->name, f->name)
+			igt_subtest_f("%s%s%s",
+				      f->basic ? "basic-" : "",
+				      m->name,
+				      f->name)
 				basic_reloc(fd, m->before, m->after, f->flags);
 		}
+
+		if (f->flags & HANG)
+			igt_disallow_hang(fd, hang);
 	}
 
 	igt_subtest("basic-softpin")
