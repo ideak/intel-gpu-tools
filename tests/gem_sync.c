@@ -719,11 +719,6 @@ out:
 	close(dir);
 }
 
-static bool can_store_dword_imm(int fd)
-{
-	return intel_gen(intel_gen(intel_get_drm_devid(fd))) > 2;
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -734,7 +729,6 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
-		igt_require(can_store_dword_imm(fd));
 		print_welcome(fd);
 
 		igt_fork_hang_detector(fd);
