@@ -210,7 +210,7 @@ static void store_all(int fd)
 
 static bool can_store_dword_imm(int fd)
 {
-	return intel_gen(intel_gen(intel_get_drm_devid(fd))) > 2;
+	return intel_gen(intel_get_drm_devid(fd)) > 2;
 }
 
 igt_main
