@@ -1111,6 +1111,8 @@ test_oa_formats(void)
 static void
 test_oa_exponents(int gt_freq_mhz)
 {
+	uint32_t freq_margin;
+
 	/* This test tries to use the sysfs interface for pinning the GT
 	 * frequency so we have another point of reference for comparing with
 	 * the clock frequency as derived from OA reports.
@@ -1129,11 +1131,17 @@ test_oa_exponents(int gt_freq_mhz)
 	igt_debug("Testing OA timer exponents with requested GT frequency = %dmhz\n",
 		  gt_freq_mhz);
 
+	/* allow a +- 10% error margin when checking that the frequency
+	 * calculated from the OA reports matches the frequency according to
+	 * sysfs.
+	 */
+	freq_margin = gt_freq_mhz * 0.1;
+
 	/* It's asking a lot to sample with a 160 nanosecond period and the
 	 * test can fail due to buffer overflows if it wasn't possible to
 	 * keep up, so we don't start from an exponent of zero...
 	 */
-	for (int i = 2; i < 20; i++) {
+	for (int i = 5; i < 20; i++) {
 		uint32_t expected_timestamp_delta;
 		uint32_t timestamp_delta;
 		uint32_t oa_report0[64];
@@ -1157,8 +1165,10 @@ test_oa_exponents(int gt_freq_mhz)
 
 			gt_freq_mhz_0 = sysfs_read("gt_act_freq_mhz");
 
-			igt_debug("ITER %d: testing OA exponent %d with sysfs GT freq = %dmhz\n",
-				  j, i, gt_freq_mhz_0);
+			igt_debug("ITER %d: testing OA exponent %d (period = %"PRIu64"ns) with sysfs GT freq = %dmhz +- %u\n",
+				  j, i,
+				  oa_exponent_to_ns(i),
+				  gt_freq_mhz_0, freq_margin);
 
 			open_and_read_2_oa_reports(test_oa_format,
 						   i, /* exponent */
@@ -1199,7 +1209,8 @@ test_oa_exponents(int gt_freq_mhz)
 			igt_debug("ITER %d: time delta = %"PRIu32"(ns) clock delta = %"PRIu32" freq = %"PRIu32"(mhz)\n",
 				  j, time_delta, clock_delta, freq);
 
-			if (freq == gt_freq_mhz_1)
+                        if (freq < (gt_freq_mhz_1 + freq_margin) &&
+                            freq > (gt_freq_mhz_1 - freq_margin))
 				n_freq_matches++;
 
 			n_tested++;
