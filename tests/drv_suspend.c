@@ -111,7 +111,7 @@ test_debugfs_reader(bool hibernate)
 		static char tmp[1024];
 
 		snprintf(tmp, sizeof(tmp) - 1,
-			 "while true; do find %s/%i/ -type f | xargs cat > /dev/null 2>&1; done",
+			 "while true; do find %s/%i/ -type f ! -path \"*/crc/*\" | xargs cat > /dev/null 2>&1; done",
 			 dfs_base, drm_get_card());
 		igt_assert(execl("/bin/sh", "sh", "-c", tmp, (char *) NULL) != -1);
 	}
