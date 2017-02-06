@@ -550,19 +550,25 @@ igt_main
 	for (f = flags; f->name; f++) {
 		igt_hang_t hang;
 
-		if (f->flags & HANG)
-			hang = igt_allow_hang(fd, 0, 0);
+		igt_subtest_group {
+			igt_fixture {
+				if (f->flags & HANG)
+					hang = igt_allow_hang(fd, 0, 0);
+			}
 
-		for (m = modes; m->name; m++) {
-			igt_subtest_f("%s%s%s",
-				      f->basic ? "basic-" : "",
-				      m->name,
-				      f->name)
-				basic_reloc(fd, m->before, m->after, f->flags);
+			for (m = modes; m->name; m++) {
+				igt_subtest_f("%s%s%s",
+					      f->basic ? "basic-" : "",
+					      m->name,
+					      f->name)
+					basic_reloc(fd, m->before, m->after, f->flags);
+			}
+
+			igt_fixture {
+				if (f->flags & HANG)
+					igt_disallow_hang(fd, hang);
+			}
 		}
-
-		if (f->flags & HANG)
-			igt_disallow_hang(fd, hang);
 	}
 
 	igt_subtest("basic-softpin")
