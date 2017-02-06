@@ -417,6 +417,34 @@ gen8_read_report_ticks(uint32_t *report, enum drm_i915_oa_format format)
 	return report[3];
 }
 
+static uint64_t
+timebase_scale(uint32_t u32_delta)
+{
+	return ((uint64_t)u32_delta * NSEC_PER_SEC) / timestamp_frequency;
+}
+
+/* Return the largest OA exponent that will still result in a sampling
+ * frequency higher than the given frequency.
+ */
+static int
+max_oa_exponent_for_higher_freq(uint64_t freq)
+{
+	/* NB: timebase_scale() takes a uint32_t and an exponent of 30
+	 * would already represent a period of ~3 minutes so there's
+	 * really no need to consider higher exponents.
+	 */
+	for (int i = 0; i < 30; i++) {
+		uint64_t oa_period = timebase_scale(2 << i);
+		uint32_t oa_freq = NSEC_PER_SEC / oa_period;
+
+		if (oa_freq <= freq)
+			return max(0, i - 1);
+	}
+
+	igt_assert(!"reached");
+	return -1;
+}
+
 static bool
 init_sys_info(void)
 {
@@ -529,12 +557,6 @@ gt_frequency_range_restore(void)
 
 	gt_min_freq_mhz = gt_min_freq_mhz_saved;
 	gt_max_freq_mhz = gt_max_freq_mhz_saved;
-}
-
-static uint64_t
-timebase_scale(uint32_t u32_delta)
-{
-	return ((uint64_t)u32_delta * NSEC_PER_SEC) / timestamp_frequency;
 }
 
 /* CAP_SYS_ADMIN is required to open system wide metrics, unless the system
@@ -1182,28 +1204,6 @@ test_invalid_oa_exponent(void)
 		properties[7] = i;
 		do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
 	}
-}
-
-/* Return the largest OA exponent that will still result in a sampling
- * frequency higher than the given frequency.
- */
-static int
-max_oa_exponent_for_higher_freq(uint64_t freq)
-{
-	/* NB: timebase_scale() takes a uint32_t and an exponent of 30
-	 * would already represent a period of ~3 minutes so there's
-	 * really no need to consider higher exponents.
-	 */
-	for (int i = 0; i < 30; i++) {
-		uint64_t oa_period = timebase_scale(2 << i);
-		uint32_t oa_freq = NSEC_PER_SEC / oa_period;
-
-		if (oa_freq <= freq)
-			return max(0, i - 1);
-	}
-
-	igt_assert(!"reached");
-	return -1;
 }
 
 /* The lowest periodic sampling exponent equates to a period of 160 nanoseconds
