@@ -446,6 +446,26 @@ max_oa_exponent_for_higher_freq(uint64_t freq)
 	return -1;
 }
 
+static uint64_t
+gen8_read_40bit_a_counter(uint32_t *report, enum drm_i915_oa_format fmt, int a_id)
+{
+	uint8_t *a40_high = (((uint8_t *)report) + oa_formats[fmt].a40_high_off);
+	uint32_t *a40_low = (uint32_t *)(((uint8_t *)report) +
+					 oa_formats[fmt].a40_low_off);
+	uint64_t high = (uint64_t)(a40_high[a_id]) << 32;
+
+	return a40_low[a_id] | high;
+}
+
+static uint64_t
+gen8_40bit_a_delta(uint64_t value0, uint64_t value1)
+{
+	if (value0 > value1)
+		return (1ULL << 40) + value1 - value0;
+	else
+		return value1 - value0;
+}
+
 static bool
 init_sys_info(void)
 {
@@ -895,30 +915,37 @@ open_and_read_2_oa_reports(int format_id,
 static void
 print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 {
-	uint32_t *a0, *b0, *c0;
-	uint32_t *a1, *b1, *c1;
-
-	/* Not ideal naming here with a0 or a1
-	 * differentiating report0 or 1 not A counter 0 or 1....
-	 */
-	a0 = (uint32_t *)(((uint8_t *)oa_report0) + oa_formats[fmt].a_off);
-	b0 = (uint32_t *)(((uint8_t *)oa_report0) + oa_formats[fmt].b_off);
-	c0 = (uint32_t *)(((uint8_t *)oa_report0) + oa_formats[fmt].c_off);
-
-	a1 = (uint32_t *)(((uint8_t *)oa_report1) + oa_formats[fmt].a_off);
-	b1 = (uint32_t *)(((uint8_t *)oa_report1) + oa_formats[fmt].b_off);
-	c1 = (uint32_t *)(((uint8_t *)oa_report1) + oa_formats[fmt].c_off);
-
 	igt_debug("TIMESTAMP: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
 		  oa_report0[1], oa_report1[1], oa_report1[1] - oa_report0[1]);
 
-	if (oa_formats[fmt].n_c) {
-		igt_debug("CLOCK: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
-			  c0[2], c1[2], c1[2] - c0[2]);
-	} else
+	if (IS_HASWELL(devid) && oa_formats[fmt].n_c == 0) {
 		igt_debug("CLOCK = N/A\n");
+	} else {
+		uint32_t clock0 = read_report_ticks(oa_report0, fmt);
+		uint32_t clock1 = read_report_ticks(oa_report1, fmt);
+
+		igt_debug("CLOCK: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
+			  clock0, clock1, clock1 - clock0);
+	}
+
+	/* Gen8+ has some 40bit A counters... */
+	for (int j = 0; j < oa_formats[fmt].n_a40; j++) {
+		uint64_t value0 = gen8_read_40bit_a_counter(oa_report0, fmt, j);
+		uint64_t value1 = gen8_read_40bit_a_counter(oa_report1, fmt, j);
+		uint64_t delta = gen8_40bit_a_delta(value0, value1);
+
+		if (undefined_a_counters[j])
+			continue;
+
+		igt_debug("A%d: 1st = %"PRIu64", 2nd = %"PRIu64", delta = %"PRIu64"\n",
+			  j, value0, value1, delta);
+	}
 
 	for (int j = 0; j < oa_formats[fmt].n_a; j++) {
+		uint32_t *a0 = (uint32_t *)(((uint8_t *)oa_report0) +
+					    oa_formats[fmt].a_off);
+		uint32_t *a1 = (uint32_t *)(((uint8_t *)oa_report1) +
+					    oa_formats[fmt].a_off);
 		int a_id = oa_formats[fmt].first_a + j;
 		uint32_t delta = a1[j] - a0[j];
 
@@ -930,13 +957,23 @@ print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 	}
 
 	for (int j = 0; j < oa_formats[fmt].n_b; j++) {
+		uint32_t *b0 = (uint32_t *)(((uint8_t *)oa_report0) +
+					    oa_formats[fmt].b_off);
+		uint32_t *b1 = (uint32_t *)(((uint8_t *)oa_report1) +
+					    oa_formats[fmt].b_off);
 		uint32_t delta = b1[j] - b0[j];
+
 		igt_debug("B%d: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
 			  j, b0[j], b1[j], delta);
 	}
 
 	for (int j = 0; j < oa_formats[fmt].n_c; j++) {
+		uint32_t *c0 = (uint32_t *)(((uint8_t *)oa_report0) +
+					    oa_formats[fmt].c_off);
+		uint32_t *c1 = (uint32_t *)(((uint8_t *)oa_report1) +
+					    oa_formats[fmt].c_off);
 		uint32_t delta = c1[j] - c0[j];
+
 		igt_debug("C%d: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
 			  j, c0[j], c1[j], delta);
 	}
