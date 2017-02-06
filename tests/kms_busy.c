@@ -78,13 +78,6 @@ static void do_cleanup_display(igt_display_t *dpy)
 	igt_display_commit2(dpy, dpy->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 }
 
-static void finish_fb_busy(igt_spin_t *spin, int msecs)
-{
-	struct timespec tv = { msecs / 1000, (msecs % 1000) * 1000000ULL };
-	nanosleep(&tv, NULL);
-	igt_spin_batch_end(spin);
-}
-
 static void sighandler(int sig)
 {
 }
@@ -99,6 +92,19 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 	struct drm_event_vblank ev;
 
 	igt_spin_t *t = igt_spin_batch_new(dpy->drm_fd, ring, fb->gem_handle);
+
+	if (modeset) {
+		/*
+		 * We want to check that a modeset actually waits for the
+		 * spin batch to complete, but we keep a bigger timeout for
+		 * disable than required for flipping.
+		 *
+		 * As a result, the GPU reset code may kick in, which we neuter
+		 * here to be sure there's no premature completion.
+		 */
+		igt_set_module_param_int("enable_hangcheck", 0);
+	}
+
 	igt_fork(child, 1) {
 		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
 		if (!modeset)
@@ -116,18 +122,29 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 
 		kill(getppid(), SIGALRM);
 		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
-		igt_assert_f(poll(&pfd, 1, modeset ? 5000 : TIMEOUT) == 0,
+		igt_assert_f(poll(&pfd, 1, modeset ? 8500 : TIMEOUT) == 0,
 			     "flip completed whilst %s was busy [%d]\n",
 			     name, gem_bo_busy(dpy->drm_fd, fb->gem_handle));
 	}
+
 	igt_assert_f(nanosleep(&tv, NULL) == -1,
 		     "flip to %s blocked waiting for busy fb", name);
+
 	igt_waitchildren();
-	finish_fb_busy(t, modeset ? 5000 : 2 * TIMEOUT);
+
+	if (!modeset) {
+		tv.tv_sec = 0;
+		tv.tv_nsec = (2 * TIMEOUT) * 1000000ULL;
+		nanosleep(&tv, NULL);
+	}
+
+	igt_spin_batch_end(t);
+
 	igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 	igt_assert(poll(&pfd, 1, 0) == 0);
 
 	if (modeset) {
+		igt_set_module_param_int("enable_hangcheck", 1);
 		dpy->pipes[pipe].mode_blob = 0;
 		igt_output_set_pipe(output, pipe);
 		igt_display_commit2(dpy, COMMIT_ATOMIC);
