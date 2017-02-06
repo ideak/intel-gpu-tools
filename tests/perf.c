@@ -43,6 +43,7 @@
 IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 
 #define GEN6_MI_REPORT_PERF_COUNT ((0x28 << 23) | (3 - 2))
+#define GEN8_MI_REPORT_PERF_COUNT ((0x28 << 23) | (4 - 2))
 
 #define GFX_OP_PIPE_CONTROL     ((3 << 29) | (3 << 27) | (2 << 24))
 #define PIPE_CONTROL_CS_STALL	   (1 << 20)
@@ -1949,6 +1950,32 @@ test_disabled_read_error(void)
 }
 
 static void
+emit_report_perf_count(struct intel_batchbuffer *batch,
+		       drm_intel_bo *dst_bo,
+		       int dst_offset,
+		       uint32_t report_id)
+{
+	if (IS_HASWELL(devid)) {
+		BEGIN_BATCH(3, 1);
+		OUT_BATCH(GEN6_MI_REPORT_PERF_COUNT);
+		OUT_RELOC(dst_bo, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
+			  dst_offset);
+		OUT_BATCH(report_id);
+		ADVANCE_BATCH();
+	} else {
+		/* XXX: NB: n dwords arg is actually magic since it internally
+		 * automatically accounts for larger addresses on gen >= 8...
+		 */
+		BEGIN_BATCH(3, 1);
+		OUT_BATCH(GEN8_MI_REPORT_PERF_COUNT);
+		OUT_RELOC(dst_bo, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
+			  dst_offset);
+		OUT_BATCH(report_id);
+		ADVANCE_BATCH();
+	}
+}
+
+static void
 test_mi_rpc(void)
 {
 	uint64_t properties[] = {
@@ -1991,12 +2018,10 @@ test_mi_rpc(void)
 	memset(bo->virtual, 0x80, 4096);
 	drm_intel_bo_unmap(bo);
 
-	BEGIN_BATCH(3, 1);
-	OUT_BATCH(GEN6_MI_REPORT_PERF_COUNT);
-	OUT_RELOC(bo, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-		  0); /* offset in bytes */
-	OUT_BATCH(0xdeadbeef); /* report ID */
-	ADVANCE_BATCH();
+	emit_report_perf_count(batch,
+			       bo, /* dst */
+			       0, /* dst offset in bytes */
+			       0xdeadbeef); /* report ID */
 
 	intel_batchbuffer_flush_with_context(batch, context);
 
@@ -2063,12 +2088,7 @@ emit_stall_timestamp_and_rpc(struct intel_batchbuffer *batch,
 	OUT_BATCH(0); /* imm upper */
 	ADVANCE_BATCH();
 
-	BEGIN_BATCH(3, 1);
-	OUT_BATCH(GEN6_MI_REPORT_PERF_COUNT);
-	OUT_RELOC(dst, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-		  report_dst_offset);
-	OUT_BATCH(report_id);
-	ADVANCE_BATCH();
+	emit_report_perf_count(batch, dst, report_dst_offset, report_id);
 }
 
 /* Tests the INTEL_performance_query use case where an unprivileged process
