@@ -828,12 +828,16 @@ extern enum igt_log_level igt_log_level;
  * Should be used everywhere where a test checks results to decide about
  * printing warnings. This is useful to streamline the test logic since it
  * allows for a more flat code control flow, similar to igt_assert()
+ *
+ * This macro also returns the value of @condition.
  */
-#define igt_warn_on(condition) do {\
-		if (condition) \
-			igt_warn("Warning on condition %s in fucntion %s, file %s:%i\n", \
+#define igt_warn_on(condition) ({ \
+		typeof(condition) ret__ = (condition); \
+		if (ret__) \
+			igt_warn("Warning on condition %s in function %s, file %s:%i\n", \
 				 #condition, __func__, __FILE__, __LINE__); \
-	} while (0)
+		ret__; \
+	})
 
 /**
  * igt_warn_on_f:
@@ -850,15 +854,18 @@ extern enum igt_log_level igt_log_level;
  *
  * In addition to the plain igt_warn_on_f() helper this allows to print
  * additional information (again as warnings) to help debugging test failures.
+ *
+ * It also returns the value of @condition.
  */
-#define igt_warn_on_f(condition, f...) do {\
-		if (condition) {\
-			igt_warn("Warning on condition %s in fucntion %s, file %s:%i\n", \
+#define igt_warn_on_f(condition, f...) ({ \
+		typeof(condition) ret__ = (condition); \
+		if (ret__) {\
+			igt_warn("Warning on condition %s in function %s, file %s:%i\n", \
 				 #condition, __func__, __FILE__, __LINE__); \
 			igt_warn(f); \
 		} \
-	} while (0)
-
+		ret__; \
+	})
 
 void igt_set_timeout(unsigned int seconds,
 		     const char *op);
