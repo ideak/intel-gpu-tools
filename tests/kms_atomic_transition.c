@@ -476,7 +476,8 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	}
 
 cleanup:
-	unprepare_fencing(display, pipe);
+	if (fencing)
+		unprepare_fencing(display, pipe);
 
 	igt_output_set_pipe(output, PIPE_NONE);
 
