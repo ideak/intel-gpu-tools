@@ -341,22 +341,66 @@ static void kmsg_dump(int fd)
 	}
 }
 
-struct test_list {
-	struct igt_list link;
-	unsigned int number;
-	char *name;
-	char param[];
-};
-
-static void tests_add(struct test_list *tl, struct igt_list *list)
+static void tests_add(struct igt_kselftest_list *tl, struct igt_list *list)
 {
-	struct test_list *pos;
+	struct igt_kselftest_list *pos;
 
 	igt_list_for_each(pos, list, link)
 		if (pos->number > tl->number)
 			break;
 
 	igt_list_add_tail(&tl->link, &pos->link);
+}
+
+void igt_kselftest_get_tests(struct kmod_module *kmod,
+			     const char *filter,
+			     struct igt_list *tests)
+{
+	const char *param_prefix = "igt__";
+	const int prefix_len = strlen(param_prefix);
+	struct kmod_list *d, *pre;
+	struct igt_kselftest_list *tl;
+
+	pre = NULL;
+	if (!kmod_module_get_info(kmod, &pre))
+		return;
+
+	kmod_list_foreach(d, pre) {
+		const char *key, *val;
+		char *colon;
+		int offset;
+
+		key = kmod_module_info_get_key(d);
+		if (strcmp(key, "parmtype"))
+			continue;
+
+		val = kmod_module_info_get_value(d);
+		if (!val || strncmp(val, param_prefix, prefix_len))
+			continue;
+
+		offset = strlen(val) + 1;
+		tl = malloc(sizeof(*tl) + offset);
+		if (!tl)
+			continue;
+
+		memcpy(tl->param, val, offset);
+		colon = strchr(tl->param, ':');
+		*colon = '\0';
+
+		tl->number = 0;
+		tl->name = tl->param + prefix_len;
+		if (sscanf(tl->name, "%u__%n",
+			   &tl->number, &offset) == 1)
+			tl->name += offset;
+
+		if (filter && strncmp(tl->name, filter, strlen(filter))) {
+			free(tl);
+			continue;
+		}
+
+		tests_add(tl, tests);
+	}
+	kmod_module_info_free_list(pre);
 }
 
 static int open_parameters(const char *module_name)
@@ -367,109 +411,112 @@ static int open_parameters(const char *module_name)
 	return open(path, O_RDONLY);
 }
 
+int igt_kselftest_init(struct igt_kselftest *tst,
+		       const char *module_name)
+{
+	int err;
+
+	memset(tst, 0, sizeof(*tst));
+
+	tst->module_name = strdup(module_name);
+	igt_assert(tst->module_name);
+
+	tst->kmsg = -1;
+
+	err = kmod_module_new_from_name(kmod_ctx(), module_name, &tst->kmod);
+	if (err)
+		return err;
+
+	return 0;
+}
+
+int igt_kselftest_begin(struct igt_kselftest *tst)
+{
+	int err;
+
+	if (strcmp(tst->module_name, "i915") == 0)
+		igt_i915_driver_unload();
+
+	err = kmod_module_remove_module(tst->kmod, KMOD_REMOVE_FORCE);
+	igt_require(err == 0 || err == -ENOENT);
+
+	tst->kmsg = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
+
+	return 0;
+}
+
+int igt_kselftest_execute(struct igt_kselftest *tst,
+			  struct igt_kselftest_list *tl,
+			  const char *options,
+			  const char *result)
+{
+	char buf[1024];
+	int err;
+
+	lseek(tst->kmsg, 0, SEEK_END);
+
+	snprintf(buf, sizeof(buf), "%s=1 %s", tl->param, options ?: "");
+
+	err = modprobe(tst->kmod, buf);
+	if (err == 0 && result) {
+		int dir = open_parameters(tst->module_name);
+		igt_sysfs_scanf(dir, result, "%d", &err);
+		close(dir);
+	}
+	if (err == -ENOTTY) /* special case */
+		err = 0;
+	if (err)
+		kmsg_dump(tst->kmsg);
+
+	kmod_module_remove_module(tst->kmod, 0);
+
+	errno = 0;
+	igt_assert_f(err == 0,
+		     "kselftest \"%s %s\" failed: %s [%d]\n",
+		     tst->module_name, buf, strerror(-err), -err);
+
+	return err;
+}
+
+void igt_kselftest_end(struct igt_kselftest *tst)
+{
+	kmod_module_remove_module(tst->kmod, KMOD_REMOVE_FORCE);
+	close(tst->kmsg);
+
+	if (strcmp(tst->module_name, "i915") == 0)
+		igt_i915_driver_load(NULL);
+}
+
+void igt_kselftest_fini(struct igt_kselftest *tst)
+{
+	free(tst->module_name);
+	kmod_module_unref(tst->kmod);
+}
+
 void igt_kselftests(const char *module_name,
-		    const char *module_options,
+		    const char *options,
 		    const char *result,
 		    const char *filter)
 {
-	const char *param_prefix = "igt__";
-	const int prefix_len = strlen(param_prefix);
+	struct igt_kselftest tst;
 	IGT_LIST(tests);
-	char options[1024];
-	struct kmod_ctx *ctx = kmod_ctx();
-	struct kmod_module *kmod;
-	struct kmod_list *d, *pre;
-	struct test_list *tl, *tn;
-	int err, kmsg = -1;
+	struct igt_kselftest_list *tl, *tn;
 
-	igt_require(kmod_module_new_from_name(ctx, module_name, &kmod) == 0);
-	igt_fixture {
-		if (strcmp(module_name, "i915") == 0)
-			igt_i915_driver_unload();
+	igt_require(igt_kselftest_init(&tst, module_name) == 0);
+	igt_fixture
+		igt_require(igt_kselftest_begin(&tst) == 0);
 
-		err = kmod_module_remove_module(kmod, KMOD_REMOVE_FORCE);
-		igt_require(err == 0 || err == -ENOENT);
-
-		kmsg = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
-	}
-
-	pre = NULL;
-	if (kmod_module_get_info(kmod, &pre)) {
-		kmod_list_foreach(d, pre) {
-			const char *key, *val;
-			char *colon;
-			int offset;
-
-			key = kmod_module_info_get_key(d);
-			if (strcmp(key, "parmtype"))
-				continue;
-
-			val = kmod_module_info_get_value(d);
-			if (!val || strncmp(val, param_prefix, prefix_len))
-				continue;
-
-			offset = strlen(val) + 1;
-			tl = malloc(sizeof(*tl) + offset);
-			if (!tl)
-				continue;
-
-			memcpy(tl->param, val, offset);
-			colon = strchr(tl->param, ':');
-			*colon = '\0';
-
-			tl->number = 0;
-			tl->name = tl->param + prefix_len;
-			if (sscanf(tl->name, "%u__%n",
-				   &tl->number, &offset) == 1)
-				tl->name += offset;
-
-			if (filter &&
-			    strncmp(tl->name, filter, strlen(filter))) {
-				free(tl);
-				continue;
-			}
-
-			tests_add(tl, &tests);
-		}
-		kmod_module_info_free_list(pre);
-
-		igt_list_for_each_safe(tl, tn, &tests, link) {
-			igt_subtest_f("%s", tl->name) {
-				lseek(kmsg, 0, SEEK_END);
-
-				snprintf(options, sizeof(options), "%s=1 %s",
-					 tl->param, module_options ?: "");
-
-				err = modprobe(kmod, options);
-				if (err == 0 && result) {
-					int dir = open_parameters(module_name);
-					igt_sysfs_scanf(dir, result, "%d", &err);
-					close(dir);
-				}
-				if (err == -ENOTTY) /* special case */
-					err = 0;
-				if (err)
-					kmsg_dump(kmsg);
-
-				kmod_module_remove_module(kmod, 0);
-
-				errno = 0;
-				igt_assert_f(err == 0,
-					     "kselftest \"%s %s\" failed: %s [%d]\n",
-					     module_name, options,
-					     strerror(-err), -err);
-			}
-			free(tl);
-		}
+	igt_kselftest_get_tests(tst.kmod, filter, &tests);
+	igt_list_for_each_safe(tl, tn, &tests, link) {
+		igt_subtest_f("%s", tl->name)
+			igt_kselftest_execute(&tst, tl, options, result);
+		free(tl);
 	}
 
 	igt_fixture {
-		close(kmsg);
-		kmod_module_remove_module(kmod, KMOD_REMOVE_FORCE);
-
-		if (strcmp(module_name, "i915") == 0)
-			igt_i915_driver_load(NULL);
-
+		igt_kselftest_end(&tst);
 		igt_require(!igt_list_empty(&tests));
 	}
+
+	igt_kselftest_fini(&tst);
 }

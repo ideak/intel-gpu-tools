@@ -40,4 +40,32 @@ void igt_kselftests(const char *module_name,
 		    const char *result_option,
 		    const char *filter);
 
+struct igt_kselftest {
+	struct kmod_module *kmod;
+	char *module_name;
+	int kmsg;
+};
+
+struct igt_kselftest_list {
+	struct igt_list link;
+	unsigned int number;
+	char *name;
+	char param[];
+};
+
+int igt_kselftest_init(struct igt_kselftest *tst,
+		       const char *module_name);
+int igt_kselftest_begin(struct igt_kselftest *tst);
+
+void igt_kselftest_get_tests(struct kmod_module *kmod,
+			     const char *filter,
+			     struct igt_list *tests);
+int igt_kselftest_execute(struct igt_kselftest *tst,
+			  struct igt_kselftest_list *tl,
+			  const char *module_options,
+			  const char *result);
+
+void igt_kselftest_end(struct igt_kselftest *tst);
+void igt_kselftest_fini(struct igt_kselftest *tst);
+
 #endif /* IGT_KMOD_H */
