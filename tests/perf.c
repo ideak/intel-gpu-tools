@@ -2177,9 +2177,15 @@ emit_stall_timestamp_and_rpc(struct intel_batchbuffer *batch,
  * should be able to configure the OA unit for per-context metrics (for a
  * context associated with that process' drm file descriptor) and the counters
  * should only relate to that specific context.
+ *
+ * Unfortunately only Haswell limits the progression of OA counters for a
+ * single context and so this unit test is Haswell specific. For Gen8+ although
+ * reports read via i915 perf can be filtered for a single context the counters
+ * themselves always progress as global/system-wide counters affected by all
+ * contexts.
  */
 static void
-test_per_ctx_mi_rpc(void)
+hsw_test_single_ctx_counters(void)
 {
 	uint64_t properties[] = {
 		DRM_I915_PERF_PROP_CTX_HANDLE, UINT64_MAX, /* updated below */
@@ -2638,8 +2644,16 @@ igt_main
 	igt_subtest("mi-rpc")
 		test_mi_rpc();
 
-	igt_subtest("mi-rpc-per-ctx")
-		test_per_ctx_mi_rpc();
+	igt_subtest("unprivileged-singled-ctx-counters") {
+		/* For Gen8+ the OA unit can no longer be made to clock gate
+		 * for a specific context. Additionally the partial-replacement
+		 * functionality to HW filter timer reports for a specific
+		 * context (SKL+) can't stop multiple applications viewing
+		 * system-wide data via MI_REPORT_PERF_COUNT commands.
+		 */
+		igt_require(IS_HASWELL(devid));
+		hsw_test_single_ctx_counters();
+	}
 
 	igt_subtest("rc6-disable")
 		test_rc6_disable();
