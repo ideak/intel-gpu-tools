@@ -3024,10 +3024,13 @@ static void badstride_subtest(const struct test_mode *t)
 	set_mode_for_params(params);
 	do_assertions(0);
 
-	/* We can't use the page flip IOCTL to flip to a buffer with a different
-	 * stride. */
+	/*
+	 * We previously couldn't use the page flip IOCTL to flip to a buffer
+	 * with a different stride. With the atomic page flip helper we can,
+	 * so allow page flip to fail and succeed.
+	 */
 	rc = drmModePageFlip(drm.fd, params->crtc_id, wide_fb.fb_id, 0, NULL);
-	igt_assert(rc == -EINVAL);
+	igt_assert(rc == -EINVAL || rc == 0);
 	do_assertions(0);
 
 	igt_remove_fb(drm.fd, &wide_fb);
@@ -3089,9 +3092,12 @@ static void stridechange_subtest(const struct test_mode *t)
 	set_prim_plane_for_params(params);
 	do_assertions(0);
 
-	/* We just can't page flip with a new stride. */
+	/*
+	 * Try to set a new stride. with the page flip api. This is allowed
+	 * with the atomic page flip helper, but not with the legacy page flip.
+	 */
 	rc = drmModePageFlip(drm.fd, params->crtc_id, new_fb.fb_id, 0, NULL);
-	igt_assert(rc == -EINVAL);
+	igt_assert(rc == -EINVAL || rc == 0);
 	do_assertions(0);
 
 	igt_remove_fb(drm.fd, &new_fb);
