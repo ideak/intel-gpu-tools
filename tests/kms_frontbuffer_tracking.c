@@ -902,6 +902,14 @@ static bool fbc_not_enough_stolen(void)
 	return strstr(buf, "FBC disabled: not enough stolen memory\n");
 }
 
+static bool fbc_stride_not_supported(void)
+{
+	char buf[128];
+
+	igt_debugfs_read("i915_fbc_status", buf);
+	return strstr(buf, "FBC disabled: framebuffer stride not supported\n");
+}
+
 static bool fbc_wait_until_enabled(void)
 {
 	return igt_wait(fbc_is_enabled(), 2000, 1);
@@ -1678,6 +1686,7 @@ static int adjust_assertion_flags(const struct test_mode *t, int flags)
 									\
 	if (flags_ & ASSERT_FBC_ENABLED) {				\
 		igt_require(!fbc_not_enough_stolen());			\
+		igt_require(!fbc_stride_not_supported());		\
 		if (!fbc_wait_until_enabled()) {			\
 			fbc_print_status();				\
 			igt_assert_f(false, "FBC disabled\n");		\
