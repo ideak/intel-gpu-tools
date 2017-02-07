@@ -239,6 +239,7 @@ static bool gen8_undefined_a_counters[45];
 static int drm_fd = -1;
 static uint32_t devid;
 static int card = -1;
+static int n_eus;
 
 static uint64_t test_metric_set_id = UINT64_MAX;
 static uint64_t gt_min_freq_mhz_saved = 0;
@@ -506,7 +507,20 @@ init_sys_info(void)
 		test_oa_format = I915_OA_FORMAT_A45_B8_C8;
 		undefined_a_counters = hsw_undefined_a_counters;
 		read_report_ticks = hsw_read_report_ticks;
+
+		if (intel_gt(devid) == 0)
+			n_eus = 10;
+		else if (intel_gt(devid) == 1)
+			n_eus = 20;
+		else if (intel_gt(devid) == 2)
+			n_eus = 40;
+		else {
+			igt_assert(!"reached");
+			return false;
+		}
 	} else {
+		drm_i915_getparam_t gp;
+
 		test_set_name = "TestOa";
 		test_oa_format = I915_OA_FORMAT_A32u40_A4u32_B8_C8;
 		undefined_a_counters = gen8_undefined_a_counters;
@@ -537,6 +551,10 @@ init_sys_info(void)
 			timestamp_frequency = 19200000;
 		} else
 			return false;
+
+		gp.param = I915_PARAM_EU_TOTAL;
+		gp.value = &n_eus;
+		do_ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp);
 	}
 
 	igt_debug("%s metric set UUID = %s\n",
@@ -1077,11 +1095,11 @@ test_oa_formats(void)
 		igt_debug("clock delta = %"PRIu32"\n", clock_delta);
 
 		/* The maximum rate for any HSW counter =
-		 *   clock_delta * 40 EUs
+		 *   clock_delta * N EUs
 		 *
 		 * Sanity check that no counters exceed this delta.
 		 */
-		max_delta = clock_delta * 40;
+		max_delta = clock_delta * n_eus;
 
 		for (int j = 0; j < oa_formats[i].n_a; j++) {
 			int a_id = oa_formats[i].first_a + j;
