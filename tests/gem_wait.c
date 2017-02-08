@@ -26,6 +26,7 @@
  */
 
 #include "igt.h"
+#include "igt_vgem.h"
 
 static int __gem_wait(int fd, struct drm_i915_gem_wait *w)
 {
@@ -65,9 +66,50 @@ static void invalid_buf(int fd)
 
 #define BUSY 1
 #define HANG 2
+#define AWAIT 4
+
+struct cork {
+	int device;
+	uint32_t handle;
+	uint32_t fence;
+};
+
+static struct cork plug(int fd, unsigned flags)
+{
+	struct cork c;
+	struct vgem_bo bo;
+	int dmabuf;
+
+	if ((flags & AWAIT) == 0)
+		return (struct cork){0};
+
+	c.device = drm_open_driver(DRIVER_VGEM);
+
+	bo.width = bo.height = 1;
+	bo.bpp = 4;
+	vgem_create(c.device, &bo);
+	c.fence = vgem_fence_attach(c.device, &bo, VGEM_FENCE_WRITE);
+
+	dmabuf = prime_handle_to_fd(c.device, bo.handle);
+	c.handle = prime_fd_to_handle(fd, dmabuf);
+	close(dmabuf);
+
+	return c;
+}
+
+static void unplug(struct cork *c)
+{
+	if (!c->device)
+		return;
+
+	vgem_fence_signal(c->device, c->fence);
+	close(c->device);
+}
+
 static void basic(int fd, unsigned engine, unsigned flags)
 {
-	igt_spin_t *spin = igt_spin_batch_new(fd, engine, 0);
+	struct cork cork = plug(fd, flags);
+	igt_spin_t *spin = igt_spin_batch_new(fd, engine, cork.handle);
 	struct drm_i915_gem_wait wait = { spin->handle };
 
 	igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
@@ -90,6 +132,8 @@ static void basic(int fd, unsigned engine, unsigned flags)
 		wait.timeout_ns = NSEC_PER_SEC / 2; /* 0.5s */
 		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 		igt_assert_eq_s64(wait.timeout_ns, 0);
+
+		unplug(&cork);
 
 		if ((flags & HANG) == 0) {
 			wait.timeout_ns = NSEC_PER_SEC; /* 1.0s */
@@ -140,6 +184,10 @@ igt_main
 			gem_quiescent_gpu(fd);
 			basic(fd, -1, 0);
 		}
+		igt_subtest("basic-await-all") {
+			gem_quiescent_gpu(fd);
+			basic(fd, -1, AWAIT);
+		}
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_group {
@@ -150,6 +198,10 @@ igt_main
 				igt_subtest_f("wait-%s", e->name) {
 					gem_quiescent_gpu(fd);
 					basic(fd, e->exec_id | e->flags, 0);
+				}
+				igt_subtest_f("await-%s", e->name) {
+					gem_quiescent_gpu(fd);
+					basic(fd, e->exec_id | e->flags, AWAIT);
 				}
 			}
 		}
