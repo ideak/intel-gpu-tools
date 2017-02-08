@@ -3087,6 +3087,10 @@ void igt_enable_connectors(void)
 
 		/* Do a probe. This may be the first action after booting */
 		c = drmModeGetConnector(drm_fd, res->connectors[i]);
+		if (!c) {
+			igt_warn("Could not read connector %u: %m\n", res->connectors[i]);
+			continue;
+		}
 
 		/* don't attempt to force connectors that are already connected
 		 */
