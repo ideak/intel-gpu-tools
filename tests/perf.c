@@ -261,6 +261,8 @@ static uint64_t oa_exp_1_millisec;
 static igt_render_copyfunc_t render_copy = NULL;
 static uint32_t (*read_report_ticks)(uint32_t *report,
 				     enum drm_i915_oa_format format);
+static void (*sanity_check_reports)(uint32_t *oa_report0, uint32_t *oa_report1,
+				    enum drm_i915_oa_format format);
 
 static int
 __perf_open(int fd, struct drm_i915_perf_open_param *param)
@@ -472,6 +474,90 @@ oa_exponent_to_ns(int exponent)
        return 1000000000ULL * (2ULL << exponent) / timestamp_frequency;
 }
 
+static void
+hsw_sanity_check_render_basic_reports(uint32_t *oa_report0, uint32_t *oa_report1,
+				      enum drm_i915_oa_format fmt)
+{
+	uint32_t time_delta = timebase_scale(oa_report1[1] - oa_report0[1]);
+	uint32_t clock_delta;
+	uint32_t max_delta;
+
+	igt_assert_neq(time_delta, 0);
+
+	/* As a special case we have to consider that on Haswell we
+	 * can't explicitly derive a clock delta for all OA report
+	 * formats...
+	 */
+	if (oa_formats[fmt].n_c == 0) {
+		/* Assume running at max freq for sake of
+		 * below sanity check on counters... */
+		clock_delta = (gt_max_freq_mhz *
+			       (uint64_t)time_delta) / 1000;
+	} else {
+		uint32_t ticks0 = read_report_ticks(oa_report0, fmt);
+		uint32_t ticks1 = read_report_ticks(oa_report1, fmt);
+		uint64_t freq;
+
+		clock_delta = ticks1 - ticks0;
+
+		igt_assert_neq(clock_delta, 0);
+
+		freq = ((uint64_t)clock_delta * 1000) / time_delta;
+		igt_debug("freq = %"PRIu64"\n", freq);
+
+		igt_assert(freq <= gt_max_freq_mhz);
+	}
+
+	igt_debug("clock delta = %"PRIu32"\n", clock_delta);
+
+	/* The maximum rate for any HSW counter =
+	 *   clock_delta * N EUs
+	 *
+	 * Sanity check that no counters exceed this delta.
+	 */
+	max_delta = clock_delta * n_eus;
+
+	/* 40bit A counters were only introduced for Gen8+ */
+	igt_assert_eq(oa_formats[fmt].n_a40, 0);
+
+	for (int j = 0; j < oa_formats[fmt].n_a; j++) {
+		uint32_t *a0 = (uint32_t *)(((uint8_t *)oa_report0) +
+					    oa_formats[fmt].a_off);
+		uint32_t *a1 = (uint32_t *)(((uint8_t *)oa_report1) +
+					    oa_formats[fmt].a_off);
+		int a_id = oa_formats[fmt].first_a + j;
+		uint32_t delta = a1[j] - a0[j];
+
+		if (undefined_a_counters[a_id])
+			continue;
+
+		igt_debug("A%d: delta = %"PRIu32"\n", a_id, delta);
+		igt_assert(delta <= max_delta);
+	}
+
+	for (int j = 0; j < oa_formats[fmt].n_b; j++) {
+		uint32_t *b0 = (uint32_t *)(((uint8_t *)oa_report0) +
+					    oa_formats[fmt].b_off);
+		uint32_t *b1 = (uint32_t *)(((uint8_t *)oa_report1) +
+					    oa_formats[fmt].b_off);
+		uint32_t delta = b1[j] - b0[j];
+
+		igt_debug("B%d: delta = %"PRIu32"\n", j, delta);
+		igt_assert(delta <= max_delta);
+	}
+
+	for (int j = 0; j < oa_formats[fmt].n_c; j++) {
+		uint32_t *c0 = (uint32_t *)(((uint8_t *)oa_report0) +
+					    oa_formats[fmt].c_off);
+		uint32_t *c1 = (uint32_t *)(((uint8_t *)oa_report1) +
+					    oa_formats[fmt].c_off);
+		uint32_t delta = c1[j] - c0[j];
+
+		igt_debug("C%d: delta = %"PRIu32"\n", j, delta);
+		igt_assert(delta <= max_delta);
+	}
+}
+
 static uint64_t
 gen8_read_40bit_a_counter(uint32_t *report, enum drm_i915_oa_format fmt, int a_id)
 {
@@ -490,6 +576,119 @@ gen8_40bit_a_delta(uint64_t value0, uint64_t value1)
 		return (1ULL << 40) + value1 - value0;
 	else
 		return value1 - value0;
+}
+
+/* The TestOa metric set is designed so */
+static void
+gen8_sanity_check_test_oa_reports(uint32_t *oa_report0, uint32_t *oa_report1,
+				  enum drm_i915_oa_format fmt)
+{
+	uint32_t time_delta = timebase_scale(oa_report1[1] - oa_report0[1]);
+	uint32_t ticks0 = read_report_ticks(oa_report0, fmt);
+	uint32_t ticks1 = read_report_ticks(oa_report1, fmt);
+	uint32_t clock_delta = ticks1 - ticks0;
+	uint32_t max_delta;
+	uint64_t freq;
+	uint32_t *rpt0_b = (uint32_t *)(((uint8_t *)oa_report0) +
+					oa_formats[fmt].b_off);
+	uint32_t *rpt1_b = (uint32_t *)(((uint8_t *)oa_report1) +
+					oa_formats[fmt].b_off);
+	uint32_t b;
+	uint32_t ref;
+
+
+	igt_assert_neq(time_delta, 0);
+	igt_assert_neq(clock_delta, 0);
+
+	freq = ((uint64_t)clock_delta * 1000) / time_delta;
+	igt_debug("freq = %"PRIu64"\n", freq);
+
+	igt_assert(freq <= gt_max_freq_mhz);
+
+	igt_debug("clock delta = %"PRIu32"\n", clock_delta);
+
+	max_delta = clock_delta * n_eus;
+
+	/* Gen8+ has some 40bit A counters... */
+	for (int j = 0; j < oa_formats[fmt].n_a40; j++) {
+		uint64_t value0 = gen8_read_40bit_a_counter(oa_report0, fmt, j);
+		uint64_t value1 = gen8_read_40bit_a_counter(oa_report1, fmt, j);
+		uint64_t delta = gen8_40bit_a_delta(value0, value1);
+
+		if (undefined_a_counters[j])
+			continue;
+
+		igt_debug("A%d: delta = %"PRIu64"\n", j, delta);
+		igt_assert(delta <= max_delta);
+	}
+
+	for (int j = 0; j < oa_formats[fmt].n_a; j++) {
+		uint32_t *a0 = (uint32_t *)(((uint8_t *)oa_report0) +
+					    oa_formats[fmt].a_off);
+		uint32_t *a1 = (uint32_t *)(((uint8_t *)oa_report1) +
+					    oa_formats[fmt].a_off);
+		int a_id = oa_formats[fmt].first_a + j;
+		uint32_t delta = a1[j] - a0[j];
+
+		if (undefined_a_counters[a_id])
+			continue;
+
+		igt_debug("A%d: delta = %"PRIu32"\n", a_id, delta);
+		igt_assert(delta <= max_delta);
+	}
+
+	/* The TestOa metric set defines all B counters to be a
+	 * multiple of the gpu clock
+	 */
+	if (oa_formats[fmt].n_b) {
+		b = rpt1_b[0] - rpt0_b[0];
+		igt_debug("B0: delta = %"PRIu32"\n", b);
+		igt_assert_eq(b, 0);
+
+		b = rpt1_b[1] - rpt0_b[1];
+		igt_debug("B1: delta = %"PRIu32"\n", b);
+		igt_assert_eq(b, clock_delta);
+
+		b = rpt1_b[2] - rpt0_b[2];
+		igt_debug("B2: delta = %"PRIu32"\n", b);
+		igt_assert_eq(b, clock_delta);
+
+		b = rpt1_b[3] - rpt0_b[3];
+		ref = clock_delta / 2;
+		igt_debug("B3: delta = %"PRIu32"\n", b);
+		igt_assert(b >= ref - 1 && b <= ref + 1);
+
+		b = rpt1_b[4] - rpt0_b[4];
+		ref = clock_delta / 3;
+		igt_debug("B4: delta = %"PRIu32"\n", b);
+		igt_assert(b >= ref - 1 && b <= ref + 1);
+
+		b = rpt1_b[5] - rpt0_b[5];
+		ref = clock_delta / 3;
+		igt_debug("B5: delta = %"PRIu32"\n", b);
+		igt_assert(b >= ref - 1 && b <= ref + 1);
+
+		b = rpt1_b[6] - rpt0_b[6];
+		ref = clock_delta / 6;
+		igt_debug("B6: delta = %"PRIu32"\n", b);
+		igt_assert(b >= ref - 1 && b <= ref + 1);
+
+		b = rpt1_b[7] - rpt0_b[7];
+		ref = clock_delta * 2 / 3;
+		igt_debug("B7: delta = %"PRIu32"\n", b);
+		igt_assert(b >= ref - 1 && b <= ref + 1);
+	}
+
+	for (int j = 0; j < oa_formats[fmt].n_c; j++) {
+		uint32_t *c0 = (uint32_t *)(((uint8_t *)oa_report0) +
+					    oa_formats[fmt].c_off);
+		uint32_t *c1 = (uint32_t *)(((uint8_t *)oa_report1) +
+					    oa_formats[fmt].c_off);
+		uint32_t delta = c1[j] - c0[j];
+
+		igt_debug("C%d: delta = %"PRIu32"\n", j, delta);
+		igt_assert(delta <= max_delta);
+	}
 }
 
 static bool
@@ -513,6 +712,7 @@ init_sys_info(void)
 		test_oa_format = I915_OA_FORMAT_A45_B8_C8;
 		undefined_a_counters = hsw_undefined_a_counters;
 		read_report_ticks = hsw_read_report_ticks;
+		sanity_check_reports = hsw_sanity_check_render_basic_reports;
 
 		if (intel_gt(devid) == 0)
 			n_eus = 10;
@@ -531,6 +731,7 @@ init_sys_info(void)
 		test_oa_format = I915_OA_FORMAT_A32u40_A4u32_B8_C8;
 		undefined_a_counters = gen8_undefined_a_counters;
 		read_report_ticks = gen8_read_report_ticks;
+		sanity_check_reports = gen8_sanity_check_test_oa_reports;
 
 		if (IS_BROADWELL(devid)) {
 			test_set_uuid = "d6de6f55-e526-4f79-a6a6-d7315c09044e";
@@ -1030,11 +1231,6 @@ test_oa_formats(void)
 	for (int i = 0; i < ARRAY_SIZE(oa_formats); i++) {
 		uint32_t oa_report0[64];
 		uint32_t oa_report1[64];
-		uint32_t *a0, *b0, *c0;
-		uint32_t *a1, *b1, *c1;
-		uint32_t time_delta;
-		uint32_t clock_delta;
-		uint32_t max_delta;
 
 		if (!oa_formats[i].name) /* sparse, indexed by ID */
 			continue;
@@ -1062,73 +1258,7 @@ test_oa_formats(void)
 					   false); /* timer reports only */
 
 		print_reports(oa_report0, oa_report1, i);
-
-		a0 = (uint32_t *)(((uint8_t *)oa_report0) + oa_formats[i].a_off);
-		b0 = (uint32_t *)(((uint8_t *)oa_report0) + oa_formats[i].b_off);
-		c0 = (uint32_t *)(((uint8_t *)oa_report0) + oa_formats[i].c_off);
-
-		a1 = (uint32_t *)(((uint8_t *)oa_report1) + oa_formats[i].a_off);
-		b1 = (uint32_t *)(((uint8_t *)oa_report1) + oa_formats[i].b_off);
-		c1 = (uint32_t *)(((uint8_t *)oa_report1) + oa_formats[i].c_off);
-
-		time_delta = timebase_scale(oa_report1[1] - oa_report0[1]);
-		igt_assert_neq(time_delta, 0);
-
-		/* As a special case we have to consider that on Haswell we
-		 * can't explicitly derive a clock delta for all OA report
-		 * formats...
-		 */
-		if (IS_HASWELL(devid) && oa_formats[i].n_c == 0) {
-			/* Assume running at max freq for sake of
-			 * below sanity check on counters... */
-			clock_delta = (gt_max_freq_mhz *
-				       (uint64_t)time_delta) / 1000;
-		} else {
-			uint32_t ticks0 = read_report_ticks(oa_report0, i);
-			uint32_t ticks1 = read_report_ticks(oa_report1, i);
-			uint64_t freq;
-
-			clock_delta = ticks1 - ticks0;
-
-			igt_assert_neq(clock_delta, 0);
-
-			freq = ((uint64_t)clock_delta * 1000) / time_delta;
-			igt_debug("freq = %"PRIu64"\n", freq);
-
-			igt_assert(freq <= gt_max_freq_mhz);
-		}
-
-		igt_debug("clock delta = %"PRIu32"\n", clock_delta);
-
-		/* The maximum rate for any HSW counter =
-		 *   clock_delta * N EUs
-		 *
-		 * Sanity check that no counters exceed this delta.
-		 */
-		max_delta = clock_delta * n_eus;
-
-		for (int j = 0; j < oa_formats[i].n_a; j++) {
-			int a_id = oa_formats[i].first_a + j;
-			uint32_t delta = a1[j] - a0[j];
-
-			if (undefined_a_counters[a_id])
-				continue;
-
-			igt_debug("A%d: delta = %"PRIu32"\n", a_id, delta);
-			igt_assert(delta <= max_delta);
-		}
-
-		for (int j = 0; j < oa_formats[i].n_b; j++) {
-			uint32_t delta = b1[j] - b0[j];
-			igt_debug("B%d: delta = %"PRIu32"\n", j, delta);
-			igt_assert(delta <= max_delta);
-		}
-
-		for (int j = 0; j < oa_formats[i].n_c; j++) {
-			uint32_t delta = c1[j] - c0[j];
-			igt_debug("C%d: delta = %"PRIu32"\n", j, delta);
-			igt_assert(delta <= max_delta);
-		}
+		sanity_check_reports(oa_report0, oa_report1, i);
 	}
 }
 
