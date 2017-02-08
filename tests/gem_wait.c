@@ -120,15 +120,13 @@ static void basic(int fd, unsigned engine, unsigned flags)
 
 		timeout = 120;
 		if ((flags & HANG) == 0) {
-			igt_spin_batch_end(spin);
+			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/2);
 			timeout = 1;
 		}
 
 		while (__gem_wait(fd, &wait) == -ETIME)
 			igt_assert(igt_seconds_elapsed(&tv) < timeout);
 	} else {
-		igt_spin_batch_set_timeout(spin, NSEC_PER_SEC);
-
 		wait.timeout_ns = NSEC_PER_SEC / 2; /* 0.5s */
 		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 		igt_assert_eq_s64(wait.timeout_ns, 0);
@@ -136,6 +134,7 @@ static void basic(int fd, unsigned engine, unsigned flags)
 		unplug(&cork);
 
 		if ((flags & HANG) == 0) {
+			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/2);
 			wait.timeout_ns = NSEC_PER_SEC; /* 1.0s */
 			igt_assert_eq(__gem_wait(fd, &wait), 0);
 			igt_assert(wait.timeout_ns > 0);
