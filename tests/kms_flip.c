@@ -1018,9 +1018,10 @@ fb_is_bound(struct test_output *o, int fb)
 	int n;
 
 	for (n = 0; n < o->count; n++) {
-		struct drm_mode_crtc mode;
+		struct drm_mode_crtc mode = {
+			.crtc_id = o->_crtc[n]
+		};
 
-		mode.crtc_id = o->_crtc[n];
 		if (drmIoctl(drm_fd, DRM_IOCTL_MODE_GETCRTC, &mode))
 			return 0;
 
@@ -1186,8 +1187,22 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 	for (n = 0; n < CALIBRATE_TS_STEPS; n++) {
 		struct drm_event_vblank ev;
 		uint64_t now;
+		int poll_ret;
 
-		igt_assert(poll(&(struct pollfd){drm_fd, POLLIN}, 1, -1) == 1);
+		while (1) {
+			/*
+			 * In case of the interruptible tests, this poll may
+			 * be interrupted with -EINTR, handle this by restarting
+			 * until we poll timeout or success.
+			 */
+			poll_ret = poll(&(struct pollfd){drm_fd, POLLIN}, 1, -1);
+
+			if (poll_ret == 1)
+				break;
+
+			igt_assert_neq(poll_ret, 0);
+			igt_assert_eq(errno, EINTR);
+		}
 		igt_assert(read(drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 		igt_assert_eq(ev.sequence, last_seq + 1);
 
