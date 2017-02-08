@@ -45,6 +45,12 @@ IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 #define GEN6_MI_REPORT_PERF_COUNT ((0x28 << 23) | (3 - 2))
 #define GEN8_MI_REPORT_PERF_COUNT ((0x28 << 23) | (4 - 2))
 
+#define OAREPORT_REASON_MASK           0x3f
+#define OAREPORT_REASON_SHIFT          19
+#define OAREPORT_REASON_TIMER          (1<<0)
+#define OAREPORT_REASON_CTX_SWITCH     (1<<3)
+#define OAREPORT_REASON_CLK_RATIO      (1<<5)
+
 #define GFX_OP_PIPE_CONTROL     ((3 << 29) | (3 << 27) | (2 << 24))
 #define PIPE_CONTROL_CS_STALL	   (1 << 20)
 #define PIPE_CONTROL_GLOBAL_SNAPSHOT_COUNT_RESET	(1 << 19)
@@ -1478,6 +1484,7 @@ test_blocking(void)
 	int64_t test_duration_ns = tick_ns * 1000;
 
 	int max_iterations = (test_duration_ns / oa_period) + 1;
+	int n_extra_iterations = 0;
 
 	/* It's a bit tricky to put a lower limit here, but we expect a
 	 * relatively low latency for seeing reports, while we don't currently
@@ -1518,6 +1525,9 @@ test_blocking(void)
 	 * We Loop for 1000 x tick_ns so one tick corresponds to 0.1%
 	 */
 	for (start = get_time(); (get_time() - start) < test_duration_ns; /* nop */) {
+		struct drm_i915_perf_record_header *header;
+		bool timer_report_read = false;
+		bool non_timer_report_read = false;
 		int ret;
 
 		while ((ret = read(stream_fd, buf, sizeof(buf))) < 0 &&
@@ -1525,6 +1535,36 @@ test_blocking(void)
 			;
 
 		igt_assert(ret > 0);
+
+		/* For Haswell reports don't contain a well defined reason
+		 * field we so assume all reports to be 'periodic'. For gen8+
+		 * we want to to consider that the HW automatically writes some
+		 * non periodic reports (e.g. on context switch) which might
+		 * lead to more successful read()s than expected due to
+		 * periodic sampling and we don't want these extra reads to
+		 * cause the test to fail...
+		 */
+		if (intel_gen(devid) >= 8) {
+			for (int offset = 0; offset < ret; offset += header->size) {
+				header = (void *)(buf + offset);
+
+				if (header->type == DRM_I915_PERF_RECORD_SAMPLE) {
+					uint32_t *report = (void *)(header + 1);
+
+					uint32_t reason = ((report[0] >>
+							    OAREPORT_REASON_SHIFT) &
+							   OAREPORT_REASON_MASK);
+
+					if (reason & OAREPORT_REASON_TIMER)
+						timer_report_read = true;
+					else
+						non_timer_report_read = true;
+				}
+			}
+		}
+
+		if (non_timer_report_read && !timer_report_read)
+			n_extra_iterations++;
 
 		n++;
 	}
@@ -1537,7 +1577,10 @@ test_blocking(void)
 	user_ns = (end_times.tms_utime - start_times.tms_utime) * tick_ns;
 	kernel_ns = (end_times.tms_stime - start_times.tms_stime) * tick_ns;
 
-	igt_debug("%d blocking reads during test with ~25Hz OA sampling\n", n);
+	igt_debug("%d blocking reads during test with ~25Hz OA sampling (expect no more than %d)\n",
+		  n, max_iterations);
+	igt_debug("%d extra iterations seen, not related to periodic sampling (e.g. context switches)\n",
+		  n_extra_iterations);
 	igt_debug("time in userspace = %"PRIu64"ns (+-%dns) (start utime = %d, end = %d)\n",
 		  user_ns, (int)tick_ns,
 		  (int)start_times.tms_utime, (int)end_times.tms_utime);
@@ -1548,12 +1591,12 @@ test_blocking(void)
 	/* With completely broken blocking (but also not returning an error) we
 	 * could end up with an open loop,
 	 */
-	igt_assert(n <= max_iterations);
+	igt_assert(n <= (max_iterations + n_extra_iterations));
 
 	/* Make sure the driver is reporting new samples with a reasonably
 	 * low latency...
 	 */
-	igt_assert(n > min_iterations);
+	igt_assert(n > (min_iterations + n_extra_iterations));
 
 	igt_assert(kernel_ns <= (test_duration_ns / 100ull));
 
@@ -1595,6 +1638,7 @@ test_polling(void)
 	int64_t test_duration_ns = tick_ns * 1000;
 
 	int max_iterations = (test_duration_ns / oa_period) + 1;
+	int n_extra_iterations = 0;
 
 	/* It's a bit tricky to put a lower limit here, but we expect a
 	 * relatively low latency for seeing reports, while we don't currently
@@ -1635,6 +1679,9 @@ test_polling(void)
 	 */
 	for (start = get_time(); (get_time() - start) < test_duration_ns; /* nop */) {
 		struct pollfd pollfd = { .fd = stream_fd, .events = POLLIN };
+		struct drm_i915_perf_record_header *header;
+		bool timer_report_read = false;
+		bool non_timer_report_read = false;
 		int ret;
 
 		while ((ret = poll(&pollfd, 1, -1)) < 0 &&
@@ -1663,6 +1710,36 @@ test_polling(void)
 			igt_debug("Unexpected error when reading after poll = %d\n", errno);
 		igt_assert_neq(ret, -1);
 
+		/* For Haswell reports don't contain a well defined reason
+		 * field we so assume all reports to be 'periodic'. For gen8+
+		 * we want to to consider that the HW automatically writes some
+		 * non periodic reports (e.g. on context switch) which might
+		 * lead to more successful read()s than expected due to
+		 * periodic sampling and we don't want these extra reads to
+		 * cause the test to fail...
+		 */
+		if (intel_gen(devid) >= 8) {
+			for (int offset = 0; offset < ret; offset += header->size) {
+				header = (void *)(buf + offset);
+
+				if (header->type == DRM_I915_PERF_RECORD_SAMPLE) {
+					uint32_t *report = (void *)(header + 1);
+
+					uint32_t reason = ((report[0] >>
+							    OAREPORT_REASON_SHIFT) &
+							   OAREPORT_REASON_MASK);
+
+					if (reason & OAREPORT_REASON_TIMER)
+						timer_report_read = true;
+					else
+						non_timer_report_read = true;
+				}
+			}
+		}
+
+		if (non_timer_report_read && !timer_report_read)
+			n_extra_iterations++;
+
 		/* At this point, after consuming pending reports (and hoping
 		 * the scheduler hasn't stopped us for too long we now
 		 * expect EAGAIN on read.
@@ -1684,7 +1761,10 @@ test_polling(void)
 	user_ns = (end_times.tms_utime - start_times.tms_utime) * tick_ns;
 	kernel_ns = (end_times.tms_stime - start_times.tms_stime) * tick_ns;
 
-	igt_debug("%d blocking poll()s during test with ~25Hz OA sampling\n", n);
+	igt_debug("%d blocking reads during test with ~25Hz OA sampling (expect no more than %d)\n",
+		  n, max_iterations);
+	igt_debug("%d extra iterations seen, not related to periodic sampling (e.g. context switches)\n",
+		  n_extra_iterations);
 	igt_debug("time in userspace = %"PRIu64"ns (+-%dns) (start utime = %d, end = %d)\n",
 		  user_ns, (int)tick_ns,
 		  (int)start_times.tms_utime, (int)end_times.tms_utime);
@@ -1695,12 +1775,12 @@ test_polling(void)
 	/* With completely broken blocking while polling (but still somehow
 	 * reporting a POLLIN event) we could end up with an open loop.
 	 */
-	igt_assert(n <= max_iterations);
+	igt_assert(n <= (max_iterations + n_extra_iterations));
 
 	/* Make sure the driver is reporting new samples with a reasonably
 	 * low latency...
 	 */
-	igt_assert(n > min_iterations);
+	igt_assert(n > (min_iterations + n_extra_iterations));
 
 	igt_assert(kernel_ns <= (test_duration_ns / 100ull));
 
