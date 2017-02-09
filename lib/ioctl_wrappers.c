@@ -56,6 +56,15 @@
 #include "igt_debugfs.h"
 #include "config.h"
 
+#ifdef HAVE_VALGRIND
+#include <valgrind/valgrind.h>
+#include <valgrind/memcheck.h>
+
+#define VG(x) x
+#else
+#define VG(x)
+#endif
+
 #include "ioctl_wrappers.h"
 
 /**
@@ -636,6 +645,8 @@ void *__gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot)
 	else
 		errno = 0;
 
+	VG(VALGRIND_MAKE_MEM_DEFINED(ptr, size));
+
 	return ptr;
 }
 
@@ -655,6 +666,16 @@ void *gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot)
 	void *ptr = __gem_mmap__gtt(fd, handle, size, prot);
 	igt_assert(ptr);
 	return ptr;
+}
+
+int gem_munmap(void *ptr, uint64_t size)
+{
+	int ret = munmap(ptr, size);
+
+	if (ret == 0)
+		VG(VALGRIND_MAKE_MEM_NOACCESS(ptr, size));
+
+	return ret;
 }
 
 struct local_i915_gem_mmap_v2 {
@@ -734,6 +755,8 @@ void *__gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, un
 	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_MMAP_v2, &arg))
 		return NULL;
 
+	VG(VALGRIND_MAKE_MEM_DEFINED(from_user_pointer(arg.addr_ptr), arg.size));
+
 	errno = 0;
 	return from_user_pointer(arg.addr_ptr);
 }
@@ -780,6 +803,8 @@ void *__gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, u
 	mmap_arg.size = size;
 	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &mmap_arg))
 		return NULL;
+
+	VG(VALGRIND_MAKE_MEM_DEFINED(from_user_pointer(mmap_arg.addr_ptr), mmap_arg.size));
 
 	errno = 0;
 	return from_user_pointer(mmap_arg.addr_ptr);

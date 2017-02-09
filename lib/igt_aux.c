@@ -402,7 +402,7 @@ void igt_fork_hang_detector(int fd)
 
 	igt_assert(fstat(fd, &st) == 0);
 
-	signal(SIGRTMAX, sig_abort);
+	signal(SIGRTMAX - 1, sig_abort);
 	igt_fork_helper(&hang_detector)
 		hang_detector_process(getppid(), st.st_rdev);
 }

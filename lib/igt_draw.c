@@ -269,7 +269,7 @@ static void draw_rect_mmap_cpu(int fd, struct buf_data *buf, struct rect *rect,
 
 	gem_sw_finish(fd, buf->handle);
 
-	igt_assert(munmap(ptr, buf->size) == 0);
+	igt_assert(gem_munmap(ptr, buf->size) == 0);
 }
 
 static void draw_rect_mmap_gtt(int fd, struct buf_data *buf, struct rect *rect,
@@ -284,7 +284,7 @@ static void draw_rect_mmap_gtt(int fd, struct buf_data *buf, struct rect *rect,
 
 	draw_rect_ptr_linear(ptr, buf->stride, rect, color, buf->bpp);
 
-	igt_assert(munmap(ptr, buf->size) == 0);
+	igt_assert(gem_munmap(ptr, buf->size) == 0);
 }
 
 static void draw_rect_mmap_wc(int fd, struct buf_data *buf, struct rect *rect,
@@ -317,7 +317,7 @@ static void draw_rect_mmap_wc(int fd, struct buf_data *buf, struct rect *rect,
 		break;
 	}
 
-	igt_assert(munmap(ptr, buf->size) == 0);
+	igt_assert(gem_munmap(ptr, buf->size) == 0);
 }
 
 static void draw_rect_pwrite_untiled(int fd, struct buf_data *buf,

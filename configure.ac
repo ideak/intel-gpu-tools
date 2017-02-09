@@ -124,6 +124,11 @@ PKG_CHECK_MODULES(DRM, [libdrm])
 PKG_CHECK_MODULES(PCIACCESS, [pciaccess >= 0.10])
 PKG_CHECK_MODULES(KMOD, [libkmod])
 PKG_CHECK_MODULES(PROCPS, [libprocps])
+PKG_CHECK_MODULES(VALGRIND, [valgrind], [have_valgrind=yes], [have_valgrind=no])
+
+if test x$have_valgrind = xyes; then
+	AC_DEFINE(HAVE_VALGRIND, 1, [Enable valgrind annotation support.])
+fi
 
 case "$target_cpu" in
 	x86*|i?86)

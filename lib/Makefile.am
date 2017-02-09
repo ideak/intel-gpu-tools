@@ -34,6 +34,7 @@ AM_CFLAGS = \
 	    $(XMLRPC_CFLAGS) \
 	    $(LIBUDEV_CFLAGS) \
 	    $(PIXMAN_CFLAGS) \
+	    $(VALGRIND_CFLAGS) \
 	    -DIGT_SRCDIR=\""$(abs_top_srcdir)/tests"\" \
 	    -DIGT_DATADIR=\""$(pkgdatadir)"\" \
 	    -DIGT_LOG_DOMAIN=\""$(subst _,-,$*)"\" \

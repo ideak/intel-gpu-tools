@@ -237,7 +237,7 @@ static int create_bo_for_fb(int fd, int width, int height, uint32_t format,
 			/* Ensure the framebuffer is preallocated */
 			ptr = gem_mmap__gtt(fd, bo, size, PROT_READ);
 			igt_assert(*ptr == 0);
-			munmap(ptr, size);
+			gem_munmap(ptr, size);
 
 			if (size_ret)
 				*size_ret = size;
@@ -988,7 +988,7 @@ static void destroy_cairo_surface__blit(void *arg)
 	struct igt_fb *fb = blit->fb;
 	unsigned int obj_tiling = igt_fb_mod_to_tiling(fb->tiling);
 
-	munmap(blit->linear.map, blit->linear.size);
+	gem_munmap(blit->linear.map, blit->linear.size);
 	fb->cairo_surface = NULL;
 
 	gem_set_domain(blit->fd, blit->linear.handle,
@@ -1095,7 +1095,7 @@ static void destroy_cairo_surface__gtt(void *arg)
 {
 	struct igt_fb *fb = arg;
 
-	munmap(cairo_image_surface_get_data(fb->cairo_surface), fb->size);
+	gem_munmap(cairo_image_surface_get_data(fb->cairo_surface), fb->size);
 	fb->cairo_surface = NULL;
 
 	if (fb->is_dumb)

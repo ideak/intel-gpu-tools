@@ -220,7 +220,8 @@ void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns)
 
 	igt_assert(!spin->timer);
 
-	if (spin_signo == SIGRTMAX)
+	/* SIGRTMAX is used by valgrind, SIGRTMAX - 1 by igt_fork_hang_detector */
+	if (spin_signo >= SIGRTMAX - 2)
 		spin_signo = SIGRTMIN;
 	spin->signo = ++spin_signo;
 
@@ -283,7 +284,7 @@ void igt_spin_batch_free(int fd, igt_spin_t *spin)
 		timer_delete(spin->timer);
 
 	igt_spin_batch_end(spin);
-	munmap(spin->batch, BATCH_SIZE);
+	gem_munmap(spin->batch, BATCH_SIZE);
 
 	gem_close(fd, spin->handle);
 	free(spin);
