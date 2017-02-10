@@ -111,6 +111,14 @@ static void x11_overlay_destroy(void *data)
 	free(priv);
 }
 
+static int x_error_count;
+
+static int check_error_handler(Display *display, XErrorEvent *event)
+{
+	x_error_count++;
+	return False; /* ignored */
+}
+
 cairo_surface_t *
 x11_overlay_create(struct config *config, int *width, int *height)
 {
@@ -132,6 +140,8 @@ x11_overlay_create(struct config *config, int *width, int *height)
 	dpy = XOpenDisplay(NULL);
 	if (dpy == NULL)
 		return NULL;
+
+	XSetErrorHandler(check_error_handler);
 
 	scr = ScreenOfDisplay(dpy, DefaultScreen(dpy));
 
@@ -162,6 +172,9 @@ x11_overlay_create(struct config *config, int *width, int *height)
 	}
 	XvFreeAdaptorInfo(info);
 	if (port == -1)
+		goto err_fd;
+
+	if (x_error_count)
 		goto err_fd;
 
 	XSetErrorHandler(noop);
