@@ -67,6 +67,7 @@ static void invalid_buf(int fd)
 #define BUSY 1
 #define HANG 2
 #define AWAIT 4
+#define WRITE 8
 
 struct cork {
 	int device;
@@ -80,7 +81,7 @@ static struct cork plug(int fd, unsigned flags)
 	struct vgem_bo bo;
 	int dmabuf;
 
-	if ((flags & AWAIT) == 0)
+	if ((flags & (WRITE | AWAIT)) == 0)
 		return (struct cork){0};
 
 	c.device = drm_open_driver(DRIVER_VGEM);
@@ -110,7 +111,9 @@ static void basic(int fd, unsigned engine, unsigned flags)
 {
 	struct cork cork = plug(fd, flags);
 	igt_spin_t *spin = igt_spin_batch_new(fd, engine, cork.handle);
-	struct drm_i915_gem_wait wait = { spin->handle };
+	struct drm_i915_gem_wait wait = {
+	       	flags & WRITE ? cork.handle : spin->handle
+       	};
 
 	igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 
@@ -124,6 +127,9 @@ static void basic(int fd, unsigned engine, unsigned flags)
 			timeout = 1;
 		}
 
+		unplug(&cork);
+		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
+
 		while (__gem_wait(fd, &wait) == -ETIME)
 			igt_assert(igt_seconds_elapsed(&tv) < timeout);
 	} else {
@@ -132,6 +138,8 @@ static void basic(int fd, unsigned engine, unsigned flags)
 		igt_assert_eq_s64(wait.timeout_ns, 0);
 
 		unplug(&cork);
+		wait.timeout_ns = 0;
+		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 
 		if ((flags & HANG) == 0) {
 			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/2);
@@ -187,6 +195,14 @@ igt_main
 			gem_quiescent_gpu(fd);
 			basic(fd, -1, AWAIT);
 		}
+		igt_subtest("basic-busy-write-all") {
+			gem_quiescent_gpu(fd);
+			basic(fd, -1, BUSY | WRITE);
+		}
+		igt_subtest("basic-wait-write-all") {
+			gem_quiescent_gpu(fd);
+			basic(fd, -1, WRITE);
+		}
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_group {
@@ -201,6 +217,14 @@ igt_main
 				igt_subtest_f("await-%s", e->name) {
 					gem_quiescent_gpu(fd);
 					basic(fd, e->exec_id | e->flags, AWAIT);
+				}
+				igt_subtest_f("write-busy-%s", e->name) {
+					gem_quiescent_gpu(fd);
+					basic(fd, e->exec_id | e->flags, BUSY | WRITE);
+				}
+				igt_subtest_f("write-wait-%s", e->name) {
+					gem_quiescent_gpu(fd);
+					basic(fd, e->exec_id | e->flags, WRITE);
 				}
 			}
 		}
@@ -228,6 +252,15 @@ igt_main
 			basic(fd, -1, HANG);
 		}
 
+		igt_subtest("hang-busy-write-all") {
+			gem_quiescent_gpu(fd);
+			basic(fd, -1, BUSY | WRITE | HANG);
+		}
+		igt_subtest("hang-wait-write-all") {
+			gem_quiescent_gpu(fd);
+			basic(fd, -1, WRITE | HANG);
+		}
+
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("hang-busy-%s", e->name) {
 				gem_quiescent_gpu(fd);
@@ -236,6 +269,14 @@ igt_main
 			igt_subtest_f("hang-wait-%s", e->name) {
 				gem_quiescent_gpu(fd);
 				basic(fd, e->exec_id | e->flags, HANG);
+			}
+			igt_subtest_f("hang-busy-write-%s", e->name) {
+				gem_quiescent_gpu(fd);
+				basic(fd, e->exec_id | e->flags, HANG | WRITE | BUSY);
+			}
+			igt_subtest_f("hang-wait-write-%s", e->name) {
+				gem_quiescent_gpu(fd);
+				basic(fd, e->exec_id | e->flags, HANG | WRITE);
 			}
 		}
 
