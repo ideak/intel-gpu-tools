@@ -48,7 +48,9 @@ IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 #define OAREPORT_REASON_MASK           0x3f
 #define OAREPORT_REASON_SHIFT          19
 #define OAREPORT_REASON_TIMER          (1<<0)
+#define OAREPORT_REASON_INTERNAL       (3<<1)
 #define OAREPORT_REASON_CTX_SWITCH     (1<<3)
+#define OAREPORT_REASON_GO             (1<<4)
 #define OAREPORT_REASON_CLK_RATIO      (1<<5)
 
 #define GFX_OP_PIPE_CONTROL     ((3 << 29) | (3 << 27) | (2 << 24))
@@ -574,6 +576,22 @@ oa_exponent_to_ns(int exponent)
        return 1000000000ULL * (2ULL << exponent) / timestamp_frequency;
 }
 
+static bool
+oa_report_ctx_is_valid(uint32_t *report)
+{
+	if (IS_HASWELL(devid)) {
+		return false; /* TODO */
+	} else if (IS_GEN8(devid)) {
+		return report[0] & (1ul << 25);
+	} else if (IS_GEN9(devid)) {
+		return report[0] & (1ul << 16);
+	}
+
+	/* Need to update this function for newer Gen. */
+	igt_assert(!"reached");
+}
+
+
 static void
 hsw_sanity_check_render_basic_reports(uint32_t *oa_report0, uint32_t *oa_report1,
 				      enum drm_i915_oa_format fmt)
@@ -676,6 +694,100 @@ gen8_40bit_a_delta(uint64_t value0, uint64_t value1)
 		return (1ULL << 40) + value1 - value0;
 	else
 		return value1 - value0;
+}
+
+static void
+accumulate_uint32(size_t offset,
+		  uint32_t *report0,
+                  uint32_t *report1,
+                  uint64_t *delta)
+{
+	uint32_t value0 = *(uint32_t *)(((uint8_t *)report0) + offset);
+	uint32_t value1 = *(uint32_t *)(((uint8_t *)report1) + offset);
+
+	*delta += (uint32_t)(value1 - value0);
+}
+
+static void
+accumulate_uint40(int a_index,
+                  uint32_t *report0,
+                  uint32_t *report1,
+		  enum drm_i915_oa_format format,
+                  uint64_t *delta)
+{
+	uint64_t value0 = gen8_read_40bit_a_counter(report0, format, a_index),
+		 value1 = gen8_read_40bit_a_counter(report1, format, a_index);
+
+	*delta += gen8_40bit_a_delta(value0, value1);
+}
+
+static void
+accumulate_reports(struct accumulator *accumulator,
+		   uint32_t *start,
+		   uint32_t *end)
+{
+	enum drm_i915_oa_format format = accumulator->format;
+	uint64_t *deltas = accumulator->deltas;
+	int idx = 0;
+
+	if (intel_gen(devid) >= 8) {
+		/* timestamp */
+		accumulate_uint32(4, start, end, deltas + idx++);
+
+		/* clock cycles */
+		accumulate_uint32(12, start, end, deltas + idx++);
+	} else {
+		/* timestamp */
+		accumulate_uint32(4, start, end, deltas + idx++);
+	}
+
+	for (int i = 0; i < oa_formats[format].n_a40; i++)
+		accumulate_uint40(i, start, end, format, deltas + idx++);
+
+	for (int i = 0; i < oa_formats[format].n_a; i++) {
+		accumulate_uint32(oa_formats[format].a_off + 4 * i,
+				  start, end, deltas + idx++);
+	}
+
+	for (int i = 0; i < oa_formats[format].n_b; i++) {
+		accumulate_uint32(oa_formats[format].b_off + 4 * i,
+				  start, end, deltas + idx++);
+	}
+
+	for (int i = 0; i < oa_formats[format].n_c; i++) {
+		accumulate_uint32(oa_formats[format].c_off + 4 * i,
+				  start, end, deltas + idx++);
+	}
+}
+
+static void
+accumulator_print(struct accumulator *accumulator, const char *title)
+{
+	enum drm_i915_oa_format format = accumulator->format;
+	uint64_t *deltas = accumulator->deltas;
+	int idx = 0;
+
+	igt_debug("%s:\n", title);
+	if (intel_gen(devid) >= 8) {
+		igt_debug("\ttime delta = %lu\n", deltas[idx++]);
+		igt_debug("\tclock cycle delta = %lu\n", deltas[idx++]);
+
+		for (int i = 0; i < oa_formats[format].n_a40; i++)
+			igt_debug("\tA%u = %lu\n", i, deltas[idx++]);
+	} else {
+		igt_debug("\ttime delta = %lu\n", deltas[idx++]);
+	}
+
+	for (int i = 0; i < oa_formats[format].n_a; i++) {
+		int a_id = oa_formats[format].first_a + i;
+		igt_debug("\tA%u = %lu\n", a_id, deltas[idx++]);
+	}
+
+	for (int i = 0; i < oa_formats[format].n_a; i++)
+		igt_debug("\tB%u = %lu\n", i, deltas[idx++]);
+
+	for (int i = 0; i < oa_formats[format].n_c; i++)
+		igt_debug("\tC%u = %lu\n", i, deltas[idx++]);
 }
 
 /* The TestOa metric set is designed so */
@@ -943,6 +1055,62 @@ gt_frequency_range_restore(void)
 	gt_min_freq_mhz = gt_min_freq_mhz_saved;
 	gt_max_freq_mhz = gt_max_freq_mhz_saved;
 }
+
+static int
+i915_read_reports_until_timestamp(enum drm_i915_oa_format oa_format,
+				  uint8_t *buf,
+				  uint32_t max_size,
+				  uint32_t start_timestamp,
+				  uint32_t end_timestamp)
+{
+	size_t format_size = oa_formats[oa_format].size;
+	uint32_t last_seen_timestamp = start_timestamp;
+	int total_len = 0;
+
+	while (last_seen_timestamp < end_timestamp) {
+		int offset, len;
+
+		/* Running out of space. */
+		if ((max_size - total_len) < format_size) {
+			igt_warn("run out of space before reaching "
+				 "end timestamp (%u/%u)\n",
+				 last_seen_timestamp, end_timestamp);
+			return -1;
+		}
+
+		while ((len = read(stream_fd, &buf[total_len],
+				   max_size - total_len)) < 0 &&
+		       errno == EINTR)
+			;
+
+		/* Intentionally return an error. */
+		if (len <= 0) {
+			if (errno == EAGAIN)
+				return total_len;
+			else {
+				igt_warn("error read OA stream : %i\n", errno);
+				return -1;
+			}
+		}
+
+		offset = total_len;
+		total_len += len;
+
+		while (offset < total_len) {
+			const struct drm_i915_perf_record_header *header =
+				(const struct drm_i915_perf_record_header *) &buf[offset];
+			uint32_t *report = (uint32_t *) (header + 1);
+
+			if (header->type == DRM_I915_PERF_RECORD_SAMPLE)
+				last_seen_timestamp = report[1];
+
+			offset += header->size;
+		}
+	}
+
+	return total_len;
+}
+
 
 /* CAP_SYS_ADMIN is required to open system wide metrics, unless the system
  * control parameter dev.i915.perf_stream_paranoid == 0 */
@@ -1361,6 +1529,70 @@ print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 			  j, c0[j], c1[j], delta);
 	}
 }
+
+/* Debug function, only useful when reports don't make sense. */
+#if 0
+static void
+print_report(uint32_t *report, int fmt)
+{
+	igt_debug("TIMESTAMP: %"PRIu32"\n", report[1]);
+
+	if (IS_HASWELL(devid) && oa_formats[fmt].n_c == 0) {
+		igt_debug("CLOCK = N/A\n");
+	} else {
+		uint32_t clock = read_report_ticks(report, fmt);
+
+		igt_debug("CLOCK: %"PRIu32"\n", clock);
+	}
+
+	if (intel_gen(devid) >= 8) {
+		uint32_t slice_freq, unslice_freq;
+		const char *reason = gen8_read_report_reason(report);
+
+		gen8_read_report_clock_ratios(report, &slice_freq, &unslice_freq);
+
+		igt_debug("SLICE CLK: %umhz\n", slice_freq);
+		igt_debug("UNSLICE CLK: %umhz\n", unslice_freq);
+		igt_debug("REASON: \"%s\"\n", reason);
+		igt_debug("CTX ID: %"PRIu32"/%"PRIx32"\n", report[2], report[2]);
+	}
+
+	/* Gen8+ has some 40bit A counters... */
+	for (int j = 0; j < oa_formats[fmt].n_a40; j++) {
+		uint64_t value = gen8_read_40bit_a_counter(report, fmt, j);
+
+		if (undefined_a_counters[j])
+			continue;
+
+		igt_debug("A%d: %"PRIu64"\n", j, value);
+	}
+
+	for (int j = 0; j < oa_formats[fmt].n_a; j++) {
+		uint32_t *a = (uint32_t *)(((uint8_t *)report) +
+					   oa_formats[fmt].a_off);
+		int a_id = oa_formats[fmt].first_a + j;
+
+		if (undefined_a_counters[a_id])
+			continue;
+
+		igt_debug("A%d: %"PRIu32"\n", a_id, a[j]);
+	}
+
+	for (int j = 0; j < oa_formats[fmt].n_b; j++) {
+		uint32_t *b = (uint32_t *)(((uint8_t *)report) +
+					   oa_formats[fmt].b_off);
+
+		igt_debug("B%d: %"PRIu32"\n", j, b[j]);
+	}
+
+	for (int j = 0; j < oa_formats[fmt].n_c; j++) {
+		uint32_t *c = (uint32_t *)(((uint8_t *)report) +
+					   oa_formats[fmt].c_off);
+
+		igt_debug("C%d: %"PRIu32"\n", j, c[j]);
+	}
+}
+#endif
 
 static void
 test_oa_formats(void)
@@ -2486,14 +2718,8 @@ test_mi_rpc(void)
 }
 
 static void
-scratch_buf_init(drm_intel_bufmgr *bufmgr,
-		 struct igt_buf *buf,
-		 int width, int height,
-		 uint32_t color)
+scratch_buf_memset(drm_intel_bo *bo, int width, int height, uint32_t color)
 {
-	size_t stride = width * 4;
-	size_t size = stride * height;
-	drm_intel_bo *bo = drm_intel_bo_alloc(bufmgr, "", size, 4096);
 	int ret;
 
 	ret = drm_intel_bo_map(bo, true /* writable */);
@@ -2503,6 +2729,19 @@ scratch_buf_init(drm_intel_bufmgr *bufmgr,
 		((uint32_t *)bo->virtual)[i] = color;
 
 	drm_intel_bo_unmap(bo);
+}
+
+static void
+scratch_buf_init(drm_intel_bufmgr *bufmgr,
+		 struct igt_buf *buf,
+		 int width, int height,
+		 uint32_t color)
+{
+	size_t stride = width * 4;
+	size_t size = stride * height;
+	drm_intel_bo *bo = drm_intel_bo_alloc(bufmgr, "", size, 4096);
+
+	scratch_buf_memset(bo, width, height, color);
 
 	buf->bo = bo;
 	buf->stride = stride;
@@ -2521,14 +2760,25 @@ emit_stall_timestamp_and_rpc(struct intel_batchbuffer *batch,
 				   PIPE_CONTROL_RENDER_TARGET_FLUSH |
 				   PIPE_CONTROL_WRITE_TIMESTAMP);
 
-	BEGIN_BATCH(5, 1);
-	OUT_BATCH(GFX_OP_PIPE_CONTROL | (5 - 2));
-	OUT_BATCH(pipe_ctl_flags);
-	OUT_RELOC(dst, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-		  timestamp_offset);
-	OUT_BATCH(0); /* imm lower */
-	OUT_BATCH(0); /* imm upper */
-	ADVANCE_BATCH();
+	if (intel_gen(devid) >= 8) {
+		BEGIN_BATCH(5, 1);
+		OUT_BATCH(GFX_OP_PIPE_CONTROL | (6 - 2));
+		OUT_BATCH(pipe_ctl_flags);
+		OUT_RELOC(dst, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
+			  timestamp_offset);
+		OUT_BATCH(0); /* imm lower */
+		OUT_BATCH(0); /* imm upper */
+		ADVANCE_BATCH();
+	} else {
+		BEGIN_BATCH(5, 1);
+		OUT_BATCH(GFX_OP_PIPE_CONTROL | (5 - 2));
+		OUT_BATCH(pipe_ctl_flags);
+		OUT_RELOC(dst, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
+			  timestamp_offset);
+		OUT_BATCH(0); /* imm lower */
+		OUT_BATCH(0); /* imm upper */
+		ADVANCE_BATCH();
+	}
 
 	emit_report_perf_count(batch, dst, report_dst_offset, report_id);
 }
@@ -2574,7 +2824,7 @@ hsw_test_single_ctx_counters(void)
 		drm_intel_bufmgr *bufmgr;
 		drm_intel_context *context0, *context1;
 		struct intel_batchbuffer *batch;
-		struct igt_buf src, dst;
+		struct igt_buf src[3], dst[3];
 		drm_intel_bo *bo;
 		uint32_t *report0_32, *report1_32;
 		uint64_t timestamp0_64, timestamp1_64;
@@ -2592,8 +2842,10 @@ hsw_test_single_ctx_counters(void)
 		bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
 		drm_intel_bufmgr_gem_enable_reuse(bufmgr);
 
-		scratch_buf_init(bufmgr, &src, width, height, 0xff0000ff);
-		scratch_buf_init(bufmgr, &dst, width, height, 0x00ff00ff);
+		for (int i = 0; i < ARRAY_SIZE(src); i++) {
+			scratch_buf_init(bufmgr, &src[i], width, height, 0xff0000ff);
+			scratch_buf_init(bufmgr, &dst[i], width, height, 0x00ff00ff);
+		}
 
 		batch = intel_batchbuffer_alloc(bufmgr, devid);
 
@@ -2627,13 +2879,18 @@ hsw_test_single_ctx_counters(void)
 		 */
 		render_copy(batch,
 			    context0,
-			    &src, 0, 0, width, height,
-			    &dst, 0, 0);
+			    &src[0], 0, 0, width, height,
+			    &dst[0], 0, 0);
 
 		ret = drm_intel_gem_context_get_id(context0, &ctx_id);
 		igt_assert_eq(ret, 0);
 		igt_assert_neq(ctx_id, 0xffffffff);
 		properties[1] = ctx_id;
+
+		intel_batchbuffer_flush_with_context(batch, context0);
+
+		scratch_buf_memset(src[0].bo, width, height, 0xff0000ff);
+		scratch_buf_memset(dst[0].bo, width, height, 0x00ff00ff);
 
 		igt_debug("opening i915-perf stream\n");
 		stream_fd = __perf_open(drm_fd, &param);
@@ -2661,8 +2918,8 @@ hsw_test_single_ctx_counters(void)
 
 		render_copy(batch,
 			    context0,
-			    &src, 0, 0, width, height,
-			    &dst, 0, 0);
+			    &src[0], 0, 0, width, height,
+			    &dst[0], 0, 0);
 
 		/* Another redundant flush to clarify batch bo is free to reuse */
 		intel_batchbuffer_flush_with_context(batch, context0);
@@ -2673,13 +2930,13 @@ hsw_test_single_ctx_counters(void)
 		 */
 		render_copy(batch,
 			    context1,
-			    &src, 0, 0, width, height,
-			    &dst, 0, 0);
+			    &src[1], 0, 0, width, height,
+			    &dst[1], 0, 0);
 
 		render_copy(batch,
 			    context1,
-			    &src, 0, 0, width, height,
-			    &dst, 0, 0);
+			    &src[2], 0, 0, width, height,
+			    &dst[2], 0, 0);
 
 		/* And another */
 		intel_batchbuffer_flush_with_context(batch, context1);
@@ -2708,6 +2965,7 @@ hsw_test_single_ctx_counters(void)
 
 		/* A40 == N samples written to all render targets */
 		n_samples_written = report1_32[43] - report0_32[43];
+
 		igt_debug("n samples written = %d\n", n_samples_written);
 		igt_assert_eq(n_samples_written, width * height);
 
@@ -2742,8 +3000,10 @@ hsw_test_single_ctx_counters(void)
 			(delta_oa32_ns - delta_ts64_ns);
 		igt_assert(delta_delta <= 320);
 
-		drm_intel_bo_unreference(src.bo);
-		drm_intel_bo_unreference(dst.bo);
+		for (int i = 0; i < ARRAY_SIZE(src); i++) {
+			drm_intel_bo_unreference(src[i].bo);
+			drm_intel_bo_unreference(dst[i].bo);
+		}
 
 		drm_intel_bo_unmap(bo);
 		drm_intel_bo_unreference(bo);
@@ -2755,6 +3015,449 @@ hsw_test_single_ctx_counters(void)
 	}
 
 	igt_waitchildren();
+}
+
+/* Tests the INTEL_performance_query use case where an unprivileged process
+ * should be able to configure the OA unit for per-context metrics (for a
+ * context associated with that process' drm file descriptor) and the counters
+ * should only relate to that specific context.
+ *
+ * For Gen8+ although reports read via i915 perf can be filtered for a single
+ * context the counters themselves always progress as global/system-wide
+ * counters affected by all contexts. To support the INTEL_performance_query
+ * use case on Gen8+ it's necessary to combine OABUFFER and
+ * MI_REPORT_PERF_COUNT reports so that counter normalisation can take into
+ * account context-switch reports and factor out any counter progression not
+ * associated with the current context.
+ */
+static void
+gen8_test_single_ctx_render_target_writes_a_counter(void)
+{
+	int oa_exponent = max_oa_exponent_for_period_lte(1000000);
+	uint64_t properties[] = {
+		DRM_I915_PERF_PROP_CTX_HANDLE, UINT64_MAX, /* updated below */
+
+		/* Note: we have to specify at least one sample property even
+		 * though we aren't interested in samples in this case
+		 */
+		DRM_I915_PERF_PROP_SAMPLE_OA, true,
+
+		/* OA unit configuration */
+		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
+		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
+
+		/* Note: no OA exponent specified in this case */
+	};
+	struct drm_i915_perf_open_param param = {
+		.flags = I915_PERF_FLAG_FD_CLOEXEC,
+		.num_properties = ARRAY_SIZE(properties) / 2,
+		.properties_ptr = to_user_pointer(properties),
+	};
+	size_t format_size = oa_formats[test_oa_format].size;
+	size_t sample_size = (sizeof(struct drm_i915_perf_record_header) +
+			      format_size);
+	int max_reports = (16 * 1024 * 1024) / format_size;
+	int buf_size = sample_size * max_reports * 1.5;
+	int child_ret;
+	uint8_t *buf = malloc(buf_size);
+	ssize_t len;
+	struct igt_helper_process child = {};
+
+	/* should be default, but just to be sure... */
+	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
+
+	do {
+
+		igt_fork_helper(&child) {
+			struct drm_i915_perf_record_header *header;
+			drm_intel_bufmgr *bufmgr;
+			drm_intel_context *context0, *context1;
+			struct intel_batchbuffer *batch;
+			struct igt_buf src[3], dst[3];
+			drm_intel_bo *bo;
+			uint32_t *report0_32, *report1_32;
+			uint32_t *prev, *lprev = NULL;
+			uint64_t timestamp0_64, timestamp1_64;
+			uint32_t delta_ts64, delta_oa32;
+			uint64_t delta_ts64_ns, delta_oa32_ns;
+			uint32_t delta_delta;
+			int width = 800;
+			int height = 600;
+			uint32_t ctx_id = 0xffffffff; /* invalid handle */
+			uint32_t ctx1_id = 0xffffffff;  /* invalid handle */
+			uint32_t current_ctx_id = 0xffffffff;
+			uint32_t n_invalid_ctx = 0;
+			int ret;
+			struct accumulator accumulator = {
+				.format = test_oa_format
+			};
+
+			bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
+			drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+
+			for (int i = 0; i < ARRAY_SIZE(src); i++) {
+				scratch_buf_init(bufmgr, &src[i], width, height, 0xff0000ff);
+				scratch_buf_init(bufmgr, &dst[i], width, height, 0x00ff00ff);
+			}
+
+			batch = intel_batchbuffer_alloc(bufmgr, devid);
+
+			context0 = drm_intel_gem_context_create(bufmgr);
+			igt_assert(context0);
+
+			context1 = drm_intel_gem_context_create(bufmgr);
+			igt_assert(context1);
+
+			igt_debug("submitting warm up render_copy\n");
+
+			/* Submit some early, unmeasured, work to the context we want
+			 * to measure to try and catch issues with i915-perf
+			 * initializing the HW context ID for filtering.
+			 *
+			 * We do this because i915-perf single context filtering had
+			 * previously only relied on a hook into context pinning to
+			 * initialize the HW context ID, instead of also trying to
+			 * determine the HW ID while opening the stream, in case it
+			 * has already been pinned.
+			 *
+			 * This wasn't noticed by the previous unit test because we
+			 * were opening the stream while the context hadn't been
+			 * touched or pinned yet and so it worked out correctly to wait
+			 * for the pinning hook.
+			 *
+			 * Now a buggy version of i915-perf will fail to measure
+			 * anything for context0 once this initial render_copy() ends
+			 * up pinning the context since there won't ever be a pinning
+			 * hook callback.
+			 */
+			render_copy(batch,
+				    context0,
+				    &src[0], 0, 0, width, height,
+				    &dst[0], 0, 0);
+
+			ret = drm_intel_gem_context_get_id(context0, &ctx_id);
+			igt_assert_eq(ret, 0);
+			igt_assert_neq(ctx_id, 0xffffffff);
+			properties[1] = ctx_id;
+
+			scratch_buf_memset(src[0].bo, width, height, 0xff0000ff);
+			scratch_buf_memset(dst[0].bo, width, height, 0x00ff00ff);
+
+			igt_debug("opening i915-perf stream\n");
+			stream_fd = __perf_open(drm_fd, &param);
+
+			bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
+
+			ret = drm_intel_bo_map(bo, true /* write enable */);
+			igt_assert_eq(ret, 0);
+
+			memset(bo->virtual, 0x80, 4096);
+			drm_intel_bo_unmap(bo);
+
+			emit_stall_timestamp_and_rpc(batch,
+						     bo,
+						     512 /* timestamp offset */,
+						     0, /* report dst offset */
+						     0xdeadbeef); /* report id */
+
+			/* Explicitly flush here (even though the render_copy() call
+			 * will itself flush before/after the copy) to clarify that
+			 * that the PIPE_CONTROL + MI_RPC commands will be in a
+			 * separate batch from the copy.
+			 */
+			intel_batchbuffer_flush_with_context(batch, context0);
+
+			render_copy(batch,
+				    context0,
+				    &src[0], 0, 0, width, height,
+				    &dst[0], 0, 0);
+
+			/* Another redundant flush to clarify batch bo is free to reuse */
+			intel_batchbuffer_flush_with_context(batch, context0);
+
+			/* submit two copies on the other context to avoid a false
+			 * positive in case the driver somehow ended up filtering for
+			 * context1
+			 */
+			render_copy(batch,
+				    context1,
+				    &src[1], 0, 0, width, height,
+				    &dst[1], 0, 0);
+
+			ret = drm_intel_gem_context_get_id(context1, &ctx1_id);
+			igt_assert_eq(ret, 0);
+			igt_assert_neq(ctx1_id, 0xffffffff);
+
+			render_copy(batch,
+				    context1,
+				    &src[2], 0, 0, width, height,
+				    &dst[2], 0, 0);
+
+			/* And another */
+			intel_batchbuffer_flush_with_context(batch, context1);
+
+			emit_stall_timestamp_and_rpc(batch,
+						     bo,
+						     520 /* timestamp offset */,
+						     256, /* report dst offset */
+						     0xbeefbeef); /* report id */
+
+			intel_batchbuffer_flush_with_context(batch, context1);
+
+			ret = drm_intel_bo_map(bo, false /* write enable */);
+			igt_assert_eq(ret, 0);
+
+			report0_32 = bo->virtual;
+			igt_assert_eq(report0_32[0], 0xdeadbeef); /* report ID */
+			igt_assert_neq(report0_32[1], 0); /* timestamp */
+			prev = report0_32;
+			ctx_id = prev[2];
+			igt_debug("MI_RPC(start) CTX ID: %u\n", ctx_id);
+
+			report1_32 = report0_32 + 64; /* 64 uint32_t = 256bytes offset */
+			igt_assert_eq(report1_32[0], 0xbeefbeef); /* report ID */
+			igt_assert_neq(report1_32[1], 0); /* timestamp */
+			ctx1_id = report1_32[2];
+
+			memset(accumulator.deltas, 0, sizeof(accumulator.deltas));
+			accumulate_reports(&accumulator, report0_32, report1_32);
+			igt_debug("total: A0 = %lu, A21 = %lu, A26 = %lu\n",
+				  accumulator.deltas[2 + 0], /* skip timestamp + clock cycles */
+				  accumulator.deltas[2 + 21],
+				  accumulator.deltas[2 + 26]);
+
+			igt_debug("oa_timestamp32 0 = %u\n", report0_32[1]);
+			igt_debug("oa_timestamp32 1 = %u\n", report1_32[1]);
+			igt_debug("ctx_id 0 = %u\n", report0_32[2]);
+			igt_debug("ctx_id 1 = %u\n", report1_32[2]);
+
+			timestamp0_64 = *(uint64_t *)(((uint8_t *)bo->virtual) + 512);
+			timestamp1_64 = *(uint64_t *)(((uint8_t *)bo->virtual) + 520);
+
+			igt_debug("ts_timestamp64 0 = %"PRIu64"\n", timestamp0_64);
+			igt_debug("ts_timestamp64 1 = %"PRIu64"\n", timestamp1_64);
+
+			delta_ts64 = timestamp1_64 - timestamp0_64;
+			delta_oa32 = report1_32[1] - report0_32[1];
+
+			/* sanity check that we can pass the delta to timebase_scale */
+			igt_assert(delta_ts64 < UINT32_MAX);
+			delta_oa32_ns = timebase_scale(delta_oa32);
+			delta_ts64_ns = timebase_scale(delta_ts64);
+
+			igt_debug("oa32 delta = %u, = %uns\n",
+				  delta_oa32, (unsigned)delta_oa32_ns);
+			igt_debug("ts64 delta = %u, = %uns\n",
+				  delta_ts64, (unsigned)delta_ts64_ns);
+
+			/* The delta as calculated via the PIPE_CONTROL timestamp or
+			 * the OA report timestamps should be almost identical but
+			 * allow a 500 nanoseconds margin.
+			 */
+			delta_delta = delta_ts64_ns > delta_oa32_ns ?
+				(delta_ts64_ns - delta_oa32_ns) :
+				(delta_oa32_ns - delta_ts64_ns);
+			if (delta_delta > 500) {
+				igt_debug("skipping\n");
+				exit(EAGAIN);
+			}
+
+			len = i915_read_reports_until_timestamp(test_oa_format,
+								buf, buf_size,
+								report0_32[1],
+								report1_32[1]);
+
+			igt_assert(len > 0);
+			igt_debug("read %d bytes\n", (int)len);
+
+			memset(accumulator.deltas, 0, sizeof(accumulator.deltas));
+
+			for (size_t offset = 0; offset < len; offset += header->size) {
+				uint32_t *report;
+				uint32_t reason;
+				const char *skip_reason = NULL, *report_reason = NULL;
+				struct accumulator laccumulator = {
+					.format = test_oa_format
+				};
+
+
+				header = (void *)(buf + offset);
+
+				igt_assert_eq(header->pad, 0); /* Reserved */
+
+				/* Currently the only test that should ever expect to
+				 * see a _BUFFER_LOST error is the buffer_fill test,
+				 * otherwise something bad has probably happened...
+				 */
+				igt_assert_neq(header->type, DRM_I915_PERF_RECORD_OA_BUFFER_LOST);
+
+				/* At high sampling frequencies the OA HW might not be
+				 * able to cope with all write requests and will notify
+				 * us that a report was lost.
+				 *
+				 * XXX: we should maybe restart the test in this case?
+				 */
+				if (header->type == DRM_I915_PERF_RECORD_OA_REPORT_LOST) {
+					igt_debug("OA trigger collision / report lost\n");
+					exit(EAGAIN);
+				}
+
+				/* Currently the only other record type expected is a
+				 * _SAMPLE. Notably this test will need updating if
+				 * i915-perf is extended in the future with additional
+				 * record types.
+				 */
+				igt_assert_eq(header->type, DRM_I915_PERF_RECORD_SAMPLE);
+
+				igt_assert_eq(header->size, sample_size);
+
+				report = (void *)(header + 1);
+
+				/* Don't expect zero for timestamps */
+				igt_assert_neq(report[1], 0);
+
+				igt_debug("report %p:\n", report);
+
+				/* Discard reports not contained in between the
+				 * timestamps we're looking at. */
+				{
+					uint32_t time_delta = report[1] - report0_32[1];
+
+					if (timebase_scale(time_delta) > 1000000000) {
+						skip_reason = "prior first mi-rpc";
+					}
+				}
+
+				{
+					uint32_t time_delta = report[1] - report1_32[1];
+
+					if (timebase_scale(time_delta) <= 1000000000) {
+						igt_debug("    comes after last MI_RPC (%u)\n",
+							  report1_32[1]);
+						report = report1_32;
+					}
+				}
+
+				/* Print out deltas for a few significant
+				 * counters for each report. */
+				if (lprev) {
+					memset(laccumulator.deltas, 0, sizeof(laccumulator.deltas));
+					accumulate_reports(&laccumulator, lprev, report);
+					igt_debug("    deltas: A0=%lu A21=%lu, A26=%lu\n",
+						  laccumulator.deltas[2 + 0], /* skip timestamp + clock cycles */
+						  laccumulator.deltas[2 + 21],
+						  laccumulator.deltas[2 + 26]);
+				}
+				lprev = report;
+
+				/* Print out reason for the report. */
+				reason = ((report[0] >> OAREPORT_REASON_SHIFT) &
+					  OAREPORT_REASON_MASK);
+
+				if (reason & OAREPORT_REASON_CTX_SWITCH) {
+					report_reason = "ctx-load";
+				} else if (reason & OAREPORT_REASON_TIMER) {
+					report_reason = "timer";
+				} else if (reason & OAREPORT_REASON_INTERNAL ||
+					   reason & OAREPORT_REASON_GO ||
+					   reason & OAREPORT_REASON_CLK_RATIO) {
+					report_reason = "internal/go/clk-ratio";
+				} else {
+					report_reason = "end-mi-rpc";
+				}
+				igt_debug("    ctx_id=%u/%x reason=%s oa_timestamp32=%u\n",
+					  report[2], report[2], report_reason, report[1]);
+
+				/* Should we skip this report?
+				 *
+				 *   Only if the current context id of
+				 *   the stream is not the one we want
+				 *   to measure.
+				 */
+				if (current_ctx_id != ctx_id) {
+					skip_reason = "not our context";
+				}
+
+				if (n_invalid_ctx > 1) {
+					skip_reason = "too many invalid context events";
+				}
+
+				if (!skip_reason) {
+					accumulate_reports(&accumulator, prev, report);
+					igt_debug(" -> Accumulated deltas A0=%lu A21=%lu, A26=%lu\n",
+						  accumulator.deltas[2 + 0], /* skip timestamp + clock cycles */
+						  accumulator.deltas[2 + 21],
+						  accumulator.deltas[2 + 26]);
+				} else {
+					igt_debug(" -> Skipping: %s\n", skip_reason);
+				}
+
+
+				/* Finally update current-ctx_id, only possible
+				 * with a valid context id. */
+				if (oa_report_ctx_is_valid(report)) {
+					current_ctx_id = report[2];
+					n_invalid_ctx = 0;
+				} else {
+					n_invalid_ctx++;
+				}
+
+				prev = report;
+
+				if (report == report1_32) {
+					igt_debug("Breaking on end of report\n");
+					print_reports(report0_32, report1_32,
+						      lookup_format(test_oa_format));
+					break;
+				}
+			}
+
+			igt_debug("n samples written = %ld/%lu (%ix%i)\n",
+				  accumulator.deltas[2 + 21],/* skip timestamp + clock cycles */
+				  accumulator.deltas[2 + 26],
+				  width, height);
+			accumulator_print(&accumulator, "filtered");
+
+			ret = drm_intel_bo_map(src[0].bo, false /* write enable */);
+			igt_assert_eq(ret, 0);
+			ret = drm_intel_bo_map(dst[0].bo, false /* write enable */);
+			igt_assert_eq(ret, 0);
+
+			ret = memcmp(src[0].bo->virtual, dst[0].bo->virtual, 4 * width * height);
+			if (ret != 0) {
+				accumulator_print(&accumulator, "total");
+				/* This needs to be investigated... From time
+				 * to time, the work we kick off doesn't seem
+				 * to happen. WTH?? */
+				exit(EAGAIN);
+			}
+
+			drm_intel_bo_unmap(src[0].bo);
+			drm_intel_bo_unmap(dst[0].bo);
+
+			igt_assert_eq(accumulator.deltas[2 + 26], width * height);
+
+			for (int i = 0; i < ARRAY_SIZE(src); i++) {
+				drm_intel_bo_unreference(src[i].bo);
+				drm_intel_bo_unreference(dst[i].bo);
+			}
+
+			drm_intel_bo_unmap(bo);
+			drm_intel_bo_unreference(bo);
+			intel_batchbuffer_free(batch);
+			drm_intel_gem_context_destroy(context0);
+			drm_intel_gem_context_destroy(context1);
+			drm_intel_bufmgr_destroy(bufmgr);
+			__perf_close(stream_fd);
+		}
+
+		child_ret = igt_wait_helper(&child);
+
+		igt_assert(WEXITSTATUS(child_ret) == EAGAIN ||
+			   WEXITSTATUS(child_ret) == 0);
+
+	} while (WEXITSTATUS(child_ret) == EAGAIN);
 }
 
 static void
@@ -3298,8 +4001,10 @@ igt_main
 		test_oa_exponents(550);
 	}
 
-	igt_subtest("per-context-mode-unprivileged")
+	igt_subtest("per-context-mode-unprivileged") {
+		igt_require(IS_HASWELL(devid));
 		test_per_context_mode_unprivileged();
+	}
 
 	igt_subtest("buffer-fill")
 		test_buffer_fill();
@@ -3324,15 +4029,20 @@ igt_main
 	igt_subtest("mi-rpc")
 		test_mi_rpc();
 
-	igt_subtest("unprivileged-singled-ctx-counters") {
+	igt_subtest("unprivileged-single-ctx-counters") {
+		igt_require(IS_HASWELL(devid));
+		hsw_test_single_ctx_counters();
+	}
+
+	igt_subtest("gen8-unprivileged-single-ctx-counters") {
 		/* For Gen8+ the OA unit can no longer be made to clock gate
 		 * for a specific context. Additionally the partial-replacement
 		 * functionality to HW filter timer reports for a specific
 		 * context (SKL+) can't stop multiple applications viewing
 		 * system-wide data via MI_REPORT_PERF_COUNT commands.
 		 */
-		igt_require(IS_HASWELL(devid));
-		hsw_test_single_ctx_counters();
+		igt_require(intel_gen(devid) >= 8);
+		gen8_test_single_ctx_render_target_writes_a_counter();
 	}
 
 	igt_subtest("rc6-disable")
