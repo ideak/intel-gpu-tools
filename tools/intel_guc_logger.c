@@ -302,7 +302,7 @@ static int parse_options(int opt, int opt_index, void *data)
 	switch(opt) {
 	case 'v':
 		verbosity_level = atoi(optarg);
-		igt_assert_f(verbosity_level < 0 || verbosity_level > 3, "invalid input for -v option\n");
+		igt_assert_f(verbosity_level >= 0 && verbosity_level <= 3, "invalid input for -v option\n");
 		igt_debug("verbosity level to be used is %d\n", verbosity_level);
 		break;
 	case 'o':
