@@ -1331,6 +1331,7 @@ void kmstest_get_crtc(enum pipe pipe, struct kmstest_crtc *crtc)
 	const char *mode = "r";
 	int ncrtc;
 	int line;
+	long int n;
 
 	fid = igt_debugfs_fopen("i915_display_info", mode);
 
@@ -1344,18 +1345,20 @@ void kmstest_get_crtc(enum pipe pipe, struct kmstest_crtc *crtc)
 				crtc->active = true;
 				parse_crtc(tmp, crtc);
 
+				n = ftell(fid);
 				crtc->n_planes = parse_planes(fid, NULL);
 				crtc->planes = calloc(crtc->n_planes, sizeof(*crtc->planes));
 				igt_assert_f(crtc->planes, "Failed to allocate memory for %d planes\n", crtc->n_planes);
 
-				fseek(fid, 0, SEEK_END);
-				fseek(fid, 0, SEEK_SET);
+				fseek(fid, n, SEEK_SET);
 				parse_planes(fid, crtc->planes);
 
-				if (crtc->pipe != pipe)
-					crtc = NULL;
-				else
+				if (crtc->pipe != pipe) {
+					free(crtc->planes);
+				} else {
 					ncrtc++;
+					break;
+				}
 			}
 		}
 
