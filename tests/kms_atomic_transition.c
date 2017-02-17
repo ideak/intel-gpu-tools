@@ -607,7 +607,7 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 	struct igt_fb fbs[2];
 	int i, j;
 	unsigned iter_max = 1 << display->n_pipes;
-	igt_pipe_crc_t *pipe_crcs[I915_MAX_PIPES];
+	igt_pipe_crc_t *pipe_crcs[I915_MAX_PIPES] = { 0 };
 	igt_output_t *output;
 	unsigned width = 0, height = 0;
 	bool skip_test = false;
