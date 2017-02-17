@@ -334,29 +334,19 @@ static bool has_64b_reloc(int fd)
 #define HANG 4
 static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 {
+#define OBJSZ 8192
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint64_t address_mask = has_64b_reloc(fd) ? ~(uint64_t)0 : ~(uint32_t)0;
-	uint32_t bbe = MI_BATCH_BUFFER_END;
-	igt_spin_t *spin = NULL;
-	uint32_t trash = 0;
-	uint64_t offset;
-	char *wc;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned int reloc_offset;
 
 	memset(&obj, 0, sizeof(obj));
-
-	obj.handle = gem_create(fd, 4096);
+	obj.handle = gem_create(fd, OBJSZ);
 	obj.relocs_ptr = to_user_pointer(&reloc);
 	obj.relocation_count = 1;
-	obj.offset = -1;
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
-
-	memset(&reloc, 0, sizeof(reloc));
-	reloc.offset = 4000;
-	reloc.target_handle = obj.handle;
-	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-	reloc.presumed_offset = -1;
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj);
@@ -364,119 +354,141 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 	if (flags & NORELOC)
 		execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 
-	if (before) {
-		if (before == I915_GEM_DOMAIN_CPU)
-			wc = gem_mmap__cpu(fd, obj.handle, 0, 4096, PROT_WRITE);
-		else if (before == I915_GEM_DOMAIN_GTT)
-			wc = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
-		else
-			igt_assert(0);
-		gem_set_domain(fd, obj.handle, before, before);
-		offset = -1;
-		memcpy(wc + 4000, &offset, sizeof(offset));
-		munmap(wc, 4096);
-	} else {
-		offset = -1;
-		gem_write(fd, obj.handle, 4000, &offset, sizeof(offset));
-	}
+	for (reloc_offset = 4096 - 8; reloc_offset <= 4096 + 8; reloc_offset += 4) {
+		igt_spin_t *spin = NULL;
+		uint32_t trash = 0;
+		uint64_t offset;
 
-	if (flags & ACTIVE) {
-		spin = igt_spin_batch_new(fd, I915_EXEC_DEFAULT, obj.handle);
-		if (!(flags & HANG))
-			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
-		igt_assert(gem_bo_busy(fd, obj.handle));
-	}
-
-	gem_execbuf(fd, &execbuf);
-
-	if (after) {
-		if (after == I915_GEM_DOMAIN_CPU)
-			wc = gem_mmap__cpu(fd, obj.handle, 0, 4096, PROT_READ);
-		else if (after == I915_GEM_DOMAIN_GTT)
-			wc = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_READ);
-		else
-			igt_assert(0);
-		gem_set_domain(fd, obj.handle, after, 0);
-		offset = ~reloc.presumed_offset & address_mask;
-		memcpy(&offset, wc + 4000, has_64b_reloc(fd) ? 8 : 4);
-		munmap(wc, 4096);
-	} else {
-		offset = ~reloc.presumed_offset & address_mask;
-		gem_read(fd, obj.handle, 4000, &offset, has_64b_reloc(fd) ? 8 : 4);
-	}
-
-	if (reloc.presumed_offset == -1)
-		igt_warn("reloc.presumed_offset == -1\n");
-	else
-		igt_assert_eq_u64(reloc.presumed_offset, offset);
-	igt_assert_eq_u64(obj.offset, offset);
-
-	igt_spin_batch_free(fd, spin);
-
-	/* Simulate relocation */
-	if (flags & NORELOC) {
-		obj.offset += 4096;
-		reloc.presumed_offset += 4096;
-	} else {
-		trash = obj.handle;
-		obj.handle = gem_create(fd, 4096);
 		obj.offset = -1;
-		gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+		memset(&reloc, 0, sizeof(reloc));
+		reloc.offset = reloc_offset;
 		reloc.target_handle = obj.handle;
-	}
+		reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		reloc.presumed_offset = -1;
 
-	if (before) {
-		if (before == I915_GEM_DOMAIN_CPU)
-			wc = gem_mmap__cpu(fd, obj.handle, 0, 4096, PROT_WRITE);
-		else if (before == I915_GEM_DOMAIN_GTT)
-			wc = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
+		if (before) {
+			char *wc;
+
+			if (before == I915_GEM_DOMAIN_CPU)
+				wc = gem_mmap__cpu(fd, obj.handle, 0, OBJSZ, PROT_WRITE);
+			else if (before == I915_GEM_DOMAIN_GTT)
+				wc = gem_mmap__wc(fd, obj.handle, 0, OBJSZ, PROT_WRITE);
+			else
+				igt_assert(0);
+			gem_set_domain(fd, obj.handle, before, before);
+			offset = -1;
+			memcpy(wc + reloc_offset, &offset, sizeof(offset));
+			munmap(wc, OBJSZ);
+		} else {
+			offset = -1;
+			gem_write(fd, obj.handle, reloc_offset, &offset, sizeof(offset));
+		}
+
+		if (flags & ACTIVE) {
+			spin = igt_spin_batch_new(fd, I915_EXEC_DEFAULT, obj.handle);
+			if (!(flags & HANG))
+				igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
+			igt_assert(gem_bo_busy(fd, obj.handle));
+		}
+
+		gem_execbuf(fd, &execbuf);
+
+		if (after) {
+			char *wc;
+
+			if (after == I915_GEM_DOMAIN_CPU)
+				wc = gem_mmap__cpu(fd, obj.handle, 0, OBJSZ, PROT_READ);
+			else if (after == I915_GEM_DOMAIN_GTT)
+				wc = gem_mmap__wc(fd, obj.handle, 0, OBJSZ, PROT_READ);
+			else
+				igt_assert(0);
+			gem_set_domain(fd, obj.handle, after, 0);
+			offset = ~reloc.presumed_offset & address_mask;
+			memcpy(&offset, wc + reloc_offset, has_64b_reloc(fd) ? 8 : 4);
+			munmap(wc, OBJSZ);
+		} else {
+			offset = ~reloc.presumed_offset & address_mask;
+			gem_read(fd, obj.handle, reloc_offset, &offset, has_64b_reloc(fd) ? 8 : 4);
+		}
+
+		if (reloc.presumed_offset == -1)
+			igt_warn("reloc.presumed_offset == -1\n");
 		else
-			igt_assert(0);
-		gem_set_domain(fd, obj.handle, before, before);
-		offset = -1;
-		memcpy(wc + 4000, &offset, sizeof(offset));
-		munmap(wc, 4096);
-	} else {
-		offset = -1;
-		gem_write(fd, obj.handle, 4000, &offset, sizeof(offset));
-	}
+			igt_assert_eq_u64(reloc.presumed_offset, offset);
+		igt_assert_eq_u64(obj.offset, offset);
 
-	if (flags & ACTIVE) {
-		spin = igt_spin_batch_new(fd, I915_EXEC_DEFAULT, obj.handle);
-		if (!(flags & HANG))
-			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
-		igt_assert(gem_bo_busy(fd, obj.handle));
-	}
+		igt_spin_batch_free(fd, spin);
 
-	gem_execbuf(fd, &execbuf);
+		/* Simulate relocation */
+		if (flags & NORELOC) {
+			obj.offset += OBJSZ;
+			reloc.presumed_offset += OBJSZ;
+		} else {
+			trash = obj.handle;
+			obj.handle = gem_create(fd, OBJSZ);
+			obj.offset = -1;
+			gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+			reloc.target_handle = obj.handle;
+		}
 
-	if (after) {
-		if (after == I915_GEM_DOMAIN_CPU)
-			wc = gem_mmap__cpu(fd, obj.handle, 0, 4096, PROT_READ);
-		else if (after == I915_GEM_DOMAIN_GTT)
-			wc = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_READ);
+		if (before) {
+			char *wc;
+
+			if (before == I915_GEM_DOMAIN_CPU)
+				wc = gem_mmap__cpu(fd, obj.handle, 0, OBJSZ, PROT_WRITE);
+			else if (before == I915_GEM_DOMAIN_GTT)
+				wc = gem_mmap__wc(fd, obj.handle, 0, OBJSZ, PROT_WRITE);
+			else
+				igt_assert(0);
+			gem_set_domain(fd, obj.handle, before, before);
+			offset = -1;
+			memcpy(wc + reloc_offset, &offset, sizeof(offset));
+			munmap(wc, OBJSZ);
+		} else {
+			offset = -1;
+			gem_write(fd, obj.handle, reloc_offset, &offset, sizeof(offset));
+		}
+
+		if (flags & ACTIVE) {
+			spin = igt_spin_batch_new(fd, I915_EXEC_DEFAULT, obj.handle);
+			if (!(flags & HANG))
+				igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
+			igt_assert(gem_bo_busy(fd, obj.handle));
+		}
+
+		gem_execbuf(fd, &execbuf);
+
+		if (after) {
+			char *wc;
+
+			if (after == I915_GEM_DOMAIN_CPU)
+				wc = gem_mmap__cpu(fd, obj.handle, 0, OBJSZ, PROT_READ);
+			else if (after == I915_GEM_DOMAIN_GTT)
+				wc = gem_mmap__wc(fd, obj.handle, 0, OBJSZ, PROT_READ);
+			else
+				igt_assert(0);
+			gem_set_domain(fd, obj.handle, after, 0);
+			offset = ~reloc.presumed_offset & address_mask;
+			memcpy(&offset, wc + reloc_offset, has_64b_reloc(fd) ? 8 : 4);
+			munmap(wc, OBJSZ);
+		} else {
+			offset = ~reloc.presumed_offset & address_mask;
+			gem_read(fd, obj.handle, reloc_offset, &offset, has_64b_reloc(fd) ? 8 : 4);
+		}
+
+		if (reloc.presumed_offset == -1)
+			igt_warn("reloc.presumed_offset == -1\n");
 		else
-			igt_assert(0);
-		gem_set_domain(fd, obj.handle, after, 0);
-		offset = ~reloc.presumed_offset & address_mask;
-		memcpy(&offset, wc + 4000, has_64b_reloc(fd) ? 8 : 4);
-		munmap(wc, 4096);
-	} else {
-		offset = ~reloc.presumed_offset & address_mask;
-		gem_read(fd, obj.handle, 4000, &offset, has_64b_reloc(fd) ? 8 : 4);
+			igt_assert_eq_u64(reloc.presumed_offset, offset);
+		igt_assert_eq_u64(obj.offset, offset);
+
+		igt_spin_batch_free(fd, spin);
+		if (trash)
+			gem_close(fd, trash);
 	}
-
-	if (reloc.presumed_offset == -1)
-		igt_warn("reloc.presumed_offset == -1\n");
-	else
-		igt_assert_eq_u64(reloc.presumed_offset, offset);
-	igt_assert_eq_u64(obj.offset, offset);
-
-	igt_spin_batch_free(fd, spin);
 
 	gem_close(fd, obj.handle);
-	if (trash)
-		gem_close(fd, trash);
 }
 
 static void basic_softpin(int fd)
