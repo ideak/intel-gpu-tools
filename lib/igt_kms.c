@@ -1613,12 +1613,10 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 						    plane_resources->planes[j]);
 			igt_assert(drm_plane);
 
-			if (!(drm_plane->possible_crtcs & (1 << i))) {
-				drmModeFreePlane(drm_plane);
-				continue;
-			}
+			if (drm_plane->possible_crtcs & (1 << i))
+				n_planes++;
 
-			n_planes++;
+			drmModeFreePlane(drm_plane);
 		}
 
 		igt_assert_lte(0, n_planes);
