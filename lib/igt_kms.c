@@ -1639,32 +1639,19 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 
 			type = get_drm_plane_type(display->drm_fd,
 						  plane_resources->planes[j]);
-			switch (type) {
-			case DRM_PLANE_TYPE_PRIMARY:
-				if (pipe->plane_primary == -1) {
-					plane = &pipe->planes[0];
-					plane->index = 0;
-					pipe->plane_primary = 0;
-				} else {
-					plane = &pipe->planes[p];
-					plane->index = p++;
-				}
-				break;
-			case DRM_PLANE_TYPE_CURSOR:
-				if (pipe->plane_cursor == -1) {
-					plane = &pipe->planes[last_plane];
-					plane->index = last_plane;
-					pipe->plane_cursor = last_plane;
-				} else {
-					plane = &pipe->planes[p];
-					plane->index = p++;
-				}
+
+			if (type == DRM_PLANE_TYPE_PRIMARY && pipe->plane_primary == -1) {
+				plane = &pipe->planes[0];
+				plane->index = 0;
+				pipe->plane_primary = 0;
+			} else if (type == DRM_PLANE_TYPE_CURSOR && pipe->plane_cursor == -1) {
+				plane = &pipe->planes[last_plane];
+				plane->index = last_plane;
+				pipe->plane_cursor = last_plane;
 				display->has_cursor_plane = true;
-				break;
-			default:
+			} else {
 				plane = &pipe->planes[p];
 				plane->index = p++;
-				break;
 			}
 
 			igt_assert_f(plane->index < n_planes, "n_planes < plane->index failed\n");
