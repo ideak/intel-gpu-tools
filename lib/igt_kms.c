@@ -1679,20 +1679,11 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		 */
 		igt_assert_eq(pipe->plane_primary, 0);
 
-		if (display->has_cursor_plane) {
-			/*
-			 * Cursor was put in the last slot.  If we have 0 or
-			 * only 1 sprite, that's the wrong slot and we need to
-			 * move it down.
-			 */
-			if (p != last_plane) {
-				pipe->planes[p] =
-					pipe->planes[last_plane];
-				pipe->planes[p].index = p;
-				memset(&pipe->planes[last_plane], 0,
-				       sizeof *plane);
-			}
-		}
+		/*
+		 * There should be no gaps. If there is, something happened
+		 * which we can't handle (e.g. all planes are cursors).
+		 */
+		igt_assert_eq(p, last_plane);
 
 		pipe->n_planes = n_planes;
 
