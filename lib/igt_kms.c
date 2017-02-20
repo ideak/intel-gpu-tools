@@ -1692,12 +1692,6 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 				memset(&pipe->planes[last_plane], 0,
 				       sizeof *plane);
 			}
-		} else {
-			/* Add drm_plane-less cursor */
-			plane = &pipe->planes[p];
-			plane->pipe = pipe;
-			plane->index = p;
-			plane->type = DRM_PLANE_TYPE_CURSOR;
 		}
 
 		pipe->n_planes = n_planes;
