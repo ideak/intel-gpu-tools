@@ -1675,9 +1675,9 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 
 		/*
 		 * At the bare minimum, we should expect to have a primary
-		 * plane
+		 * plane, and it must be in slot 0.
 		 */
-		igt_assert(pipe->planes[pipe->plane_primary].drm_plane);
+		igt_assert_eq(pipe->plane_primary, 0);
 
 		if (display->has_cursor_plane) {
 			/*
