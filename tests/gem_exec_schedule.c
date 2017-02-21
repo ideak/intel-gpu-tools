@@ -27,7 +27,7 @@
 #include "igt_vgem.h"
 
 #define LOCAL_PARAM_HAS_SCHEDULER 41
-#define LOCAL_CONTEXT_PARAM_PRIORITY 5
+#define LOCAL_CONTEXT_PARAM_PRIORITY 6
 
 #define LO 0
 #define HI 1
@@ -39,7 +39,7 @@
 
 IGT_TEST_DESCRIPTION("Check that we can control the order of execution");
 
-static void ctx_set_priority(int fd, uint32_t ctx, int prio)
+static int __ctx_set_priority(int fd, uint32_t ctx, int prio)
 {
 	struct local_i915_gem_context_param param;
 
@@ -49,7 +49,17 @@ static void ctx_set_priority(int fd, uint32_t ctx, int prio)
 	param.param = LOCAL_CONTEXT_PARAM_PRIORITY;
 	param.value = prio;
 
-	gem_context_set_param(fd, &param);
+	return __gem_context_set_param(fd, &param);
+}
+
+static void ctx_set_priority(int fd, uint32_t ctx, int prio)
+{
+	igt_assert_eq(__ctx_set_priority(fd, ctx, prio), 0);
+}
+
+static void ctx_has_priority(int fd)
+{
+	igt_require(__ctx_set_priority(fd, 0, MAX_PRIO) == 0);
 }
 
 static void store_dword(int fd, uint32_t ctx, unsigned ring,
@@ -467,7 +477,7 @@ igt_main
 	igt_subtest_group {
 		igt_fixture {
 			igt_require(has_scheduler(fd));
-			ctx_set_priority(fd, 0, MAX_PRIO);
+			ctx_has_priority(fd);
 		}
 
 		for (e = intel_execution_engines; e->name; e++) {
