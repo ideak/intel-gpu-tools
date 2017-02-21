@@ -3031,7 +3031,7 @@ static void badstride_subtest(const struct test_mode *t)
 	 */
 	rc = drmModePageFlip(drm.fd, params->crtc_id, wide_fb.fb_id, 0, NULL);
 	igt_assert(rc == -EINVAL || rc == 0);
-	do_assertions(0);
+	do_assertions(rc == 0 ? ASSERT_FBC_DISABLED : 0);
 
 	igt_remove_fb(drm.fd, &wide_fb);
 }
