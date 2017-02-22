@@ -158,6 +158,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver_render(DRIVER_INTEL);
+		igt_require_gem(fd);
 
 		handle = gem_create(fd, 4096);
 

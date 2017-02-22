@@ -308,6 +308,7 @@ igt_main
 		unsigned engine;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 
 		memset(&create, 0, sizeof(create));
 		igt_require(__gem_context_create(fd, &create) == 0);

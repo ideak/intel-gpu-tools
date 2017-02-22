@@ -215,6 +215,7 @@ igt_main
 		int fd;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 
 		devid = intel_get_drm_devid(fd);
 		has_64bit_relocations = intel_gen(devid) >= 8;

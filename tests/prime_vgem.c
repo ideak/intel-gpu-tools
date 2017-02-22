@@ -740,6 +740,7 @@ igt_main
 		igt_require(has_prime_export(vgem));
 
 		i915 = drm_open_driver_master(DRIVER_INTEL);
+		igt_require_gem(i915);
 		igt_require(has_prime_import(i915));
 		gem_require_mmap_wc(i915);
 		gen = intel_gen(intel_get_drm_devid(i915));

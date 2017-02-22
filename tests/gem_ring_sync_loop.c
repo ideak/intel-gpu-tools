@@ -95,6 +95,7 @@ igt_simple_main
 	int fd;
 
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(fd);
 	intel_detect_and_clear_missed_interrupts(fd);
 
 	sync_loop(fd);

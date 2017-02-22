@@ -394,6 +394,7 @@ igt_main
 	igt_fixture {
 		intel_register_access_init(intel_get_pci_device(), false);
 		device = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(device);
 		print_welcome(device);
 	}
 

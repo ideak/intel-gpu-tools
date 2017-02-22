@@ -182,6 +182,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 
 		size = 1024 * 1024;
 		count = 3*gem_aperture_size(fd) / size / 4;

@@ -371,6 +371,7 @@ igt_main
 		size_t reloc_size;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 		devid = intel_get_drm_devid(fd);
 
 		/* Create giant reloc buffer area. */

@@ -424,6 +424,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 
 		parser_version = command_parser_version(fd);
 		igt_require(parser_version != -1);

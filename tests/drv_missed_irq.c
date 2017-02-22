@@ -125,6 +125,7 @@ igt_simple_main
 	bind_to_cpu(0);
 
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(fd);
 	gem_require_mmap_wc(fd);
 	igt_fork_hang_detector(fd);
 

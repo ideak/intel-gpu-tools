@@ -242,6 +242,7 @@ igt_main
 		int idx;
 
 		device = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(device);
 		sysfs = igt_sysfs_open(device, &idx);
 		igt_assert(sysfs != -1);
 	}

@@ -199,8 +199,10 @@ igt_main
 {
 	int fd = -1;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+	}
 
 	igt_subtest("single") /* basic! */
 		single(fd);

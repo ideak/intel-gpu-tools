@@ -556,8 +556,10 @@ igt_main
 	uint64_t size;
 	int fd = -1;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
+		igt_require_gem(fd);
+	}
 
 	for (f = flags; f->name; f++) {
 		igt_hang_t hang;

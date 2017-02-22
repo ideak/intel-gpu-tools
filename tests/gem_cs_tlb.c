@@ -145,8 +145,10 @@ igt_main
 
 	igt_skip_on_simulation();
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+	}
 
 	for (e = intel_execution_engines; e->name; e++)
 		igt_subtest_f("%s%s", e->exec_id ? "" : "basic-", e->name)

@@ -152,6 +152,7 @@ igt_main
 
 	igt_fixture {
 		device = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(device);
 
 		igt_fork_hang_detector(device);
 	}

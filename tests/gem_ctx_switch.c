@@ -151,6 +151,8 @@ igt_main
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+
 		light = gem_create(fd, 4096);
 		gem_write(fd, light, 0, &bbe, sizeof(bbe));
 

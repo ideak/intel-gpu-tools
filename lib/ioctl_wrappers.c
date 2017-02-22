@@ -1480,6 +1480,17 @@ void gem_require_caching(int fd)
 	errno = 0;
 }
 
+void igt_require_gem(int fd)
+{
+	int err;
+
+	err = 0;
+	if (ioctl(fd, DRM_IOCTL_I915_GEM_THROTTLE))
+		err = -errno;
+
+	igt_require_f(err == 0, "Unresponsive i915/GEM device\n");
+}
+
 bool gem_has_ring(int fd, unsigned ring)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;

@@ -231,8 +231,10 @@ igt_main
 
 	igt_skip_on_simulation();
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
+		igt_require_gem(fd);
+	}
 
 	igt_subtest_group {
 		const struct mode {

@@ -451,6 +451,7 @@ igt_main
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 
 		device = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(device);
 		print_welcome(device);
 
 		handle = gem_create(device, 4096);

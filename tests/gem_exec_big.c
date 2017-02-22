@@ -204,6 +204,8 @@ igt_simple_main
 	int fd;
 
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(fd);
+
 	use_64bit_relocs = intel_gen(intel_get_drm_devid(fd)) >= 8;
 
 	max = 3 * gem_aperture_size(fd) / 4;

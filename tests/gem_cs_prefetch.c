@@ -94,6 +94,7 @@ static void can_test_ring(unsigned ring)
 
 	/* Dance to avoid dying with master open */
 	close(master);
+	igt_require_gem(fd);
 	gem_require_ring(fd, ring);
 	gem_require_store_dword(fd, ring);
 	close(fd);

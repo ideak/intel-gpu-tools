@@ -374,8 +374,10 @@ igt_main
 {
 	int fd, sync;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+	}
 
 	for (sync = 2; sync--; ) {
 		igt_subtest_f("cpu%s", sync ? "-sync":"")

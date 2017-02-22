@@ -151,6 +151,7 @@ igt_main
 		allow_unlimited_files();
 
 		no.fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(no.fd);
 
 		igt_fork_hang_detector(no.fd);
 

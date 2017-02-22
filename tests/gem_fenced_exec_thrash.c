@@ -221,6 +221,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 		num_fences = gem_available_fences(fd);
 		igt_assert(num_fences > 4);
 		devid = intel_get_drm_devid(fd);

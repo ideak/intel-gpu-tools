@@ -583,6 +583,7 @@ igt_main
 	igt_fixture {
 		igt_require(igt_setup_clflush());
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
 		gen = intel_gen(intel_get_drm_devid(fd));
 		igt_require(can_store_dword_imm(gen));

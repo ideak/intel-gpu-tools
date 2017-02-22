@@ -1833,6 +1833,7 @@ igt_main
 		allow_unlimited_files();
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 		intel_detect_and_clear_missed_interrupts(fd);
 		devid = intel_get_drm_devid(fd);
 		gen = intel_gen(devid);

@@ -172,6 +172,7 @@ static void run(int object_size)
 	int ring;
 
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(fd);
 	devid = intel_get_drm_devid(fd);
 	handle = gem_create(fd, 4096);
 	src = gem_create(fd, object_size);

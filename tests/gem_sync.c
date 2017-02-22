@@ -729,6 +729,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 		print_welcome(fd);
 
 		igt_fork_hang_detector(fd);

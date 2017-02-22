@@ -457,6 +457,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
+		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
 		igt_fork_hang_detector(fd);
 	}

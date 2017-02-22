@@ -261,6 +261,7 @@ igt_main
 		int gen;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 		igt_require(can_store_dword_imm(fd));
 		gen = intel_gen(intel_get_drm_devid(fd));
 		if (gen > 3 && gen < 6) { /* ctg and ilk need secure batches */

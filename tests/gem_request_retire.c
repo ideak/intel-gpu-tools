@@ -226,6 +226,7 @@ int main(int argc, char **argv)
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 		igt_assert(fd >= 0);
 	}
 

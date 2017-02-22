@@ -318,6 +318,7 @@ igt_main
 
 	igt_fixture {
 		i915 = drm_open_driver_master(DRIVER_INTEL);
+		igt_require_gem(i915);
 		igt_require(gem_has_exec_fence(i915));
 		gem_require_mmap_wc(i915);
 
