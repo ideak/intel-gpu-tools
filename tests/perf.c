@@ -381,7 +381,20 @@ init_sys_info(void)
 		} else if (IS_CHERRYVIEW(devid)) {
 			test_set_uuid = "4a534b07-cba3-414d-8d60-874830e883aa";
 		} else if (IS_SKYLAKE(devid)) {
-			test_set_uuid = "544a0c1f-5863-4682-bc59-778b7eab8303";
+			switch (intel_gt(devid)) {
+			case 1:
+				test_set_uuid = "1651949f-0ac0-4cb1-a06f-dafd74a407d1";
+				break;
+			case 2:
+				test_set_uuid = "2b985803-d3c9-4629-8a4f-634bfecba0e8";
+				break;
+			case 3:
+				test_set_uuid = "882fa433-1f4a-4a67-a962-c741888fe5f5";
+				break;
+			default:
+				igt_debug("unsupport Skylake GT size\n");
+				return false;
+			}
 			timestamp_frequency = 12000000;
 		} else if (IS_BROXTON(devid)) {
 			test_set_uuid = "5ee72f5c-092f-421e-8b70-225f7c3e9612";
