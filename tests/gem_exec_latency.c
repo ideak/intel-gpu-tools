@@ -164,12 +164,15 @@ static void latency_on_ring(int fd,
 
 	start = *reg;
 	for (j = 0; j < repeats; j++) {
+		uint64_t presumed_offset = reloc.presumed_offset;
+
 		execbuf.batch_start_offset = 64 * j;
 		reloc.offset =
 			execbuf.batch_start_offset + sizeof(uint32_t);
 		reloc.delta = sizeof(uint32_t) * j;
 
 		gem_execbuf(fd, &execbuf);
+		igt_assert(reloc.presumed_offset == presumed_offset);
 	}
 	end = *reg;
 	igt_assert(reloc.presumed_offset == obj[1].offset);
