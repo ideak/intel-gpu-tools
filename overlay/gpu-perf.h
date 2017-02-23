@@ -28,7 +28,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define MAX_RINGS 4
+#define MAX_RINGS 16
 
 struct gpu_perf {
 	const char *error;
@@ -50,7 +50,7 @@ struct gpu_perf {
 		char name[256];
 		pid_t pid;
 		bool active;
-		int nr_requests[4];
+		int nr_requests[MAX_RINGS];
 		void *user_data;
 
 		uint64_t wait_time;

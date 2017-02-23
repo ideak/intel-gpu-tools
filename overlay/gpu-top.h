@@ -25,7 +25,7 @@
 #ifndef GPU_TOP_H
 #define GPU_TOP_H
 
-#define MAX_RINGS 4
+#define MAX_RINGS 16
 
 #include <stdint.h>
 
