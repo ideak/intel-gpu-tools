@@ -154,6 +154,7 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port)
 	int i;
 
 	reset_state(data, port);
+	igt_hpd_storm_set_threshold(0);
 
 	for (i = 0; i < 15; i++) {
 		igt_flush_hotplugs(mon);
@@ -171,12 +172,10 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port)
 		igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
 		igt_assert_eq(reprobe_connector(data, port),
 			      DRM_MODE_DISCONNECTED);
-
-		/* Sleep so we don't accidentally cause an hpd storm */
-		usleep(500 * 1000);
 	}
 
 	igt_cleanup_hotplug(mon);
+	igt_hpd_storm_reset();
 }
 
 static void
