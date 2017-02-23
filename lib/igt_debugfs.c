@@ -463,6 +463,117 @@ void igt_require_pipe_crc(void)
 	fclose(ctl);
 }
 
+/**
+ * igt_hpd_storm_set_threshold:
+ * @threshold: How many hotplugs per second required to trigger an HPD storm,
+ * or 0 to disable storm detection.
+ *
+ * Convienence helper to configure the HPD storm detection threshold for i915
+ * through debugfs. Useful for hotplugging tests where HPD storm detection
+ * might get in the way and slow things down.
+ *
+ * If the system does not support HPD storm detection, this function does
+ * nothing.
+ *
+ * See: https://01.org/linuxgraphics/gfx-docs/drm/gpu/i915.html#hotplug
+ */
+void igt_hpd_storm_set_threshold(unsigned int threshold)
+{
+	int fd = igt_debugfs_open("i915_hpd_storm_ctl", O_WRONLY);
+	char buf[16];
+
+	if (fd < 0)
+		return;
+
+	igt_debug("Setting HPD storm threshold to %d\n", threshold);
+	snprintf(buf, sizeof(buf), "%d", threshold);
+	igt_assert_eq(write(fd, buf, strlen(buf)), strlen(buf));
+
+	close(fd);
+	igt_install_exit_handler((igt_exit_handler_t)igt_hpd_storm_reset);
+}
+
+/**
+ * igt_hpd_storm_reset:
+ *
+ * Convienence helper to reset HPD storm detection to it's default settings.
+ * If hotplug detection was disabled on any ports due to an HPD storm, it will
+ * be immediately re-enabled. Always called on exit if the HPD storm detection
+ * threshold was modified during any tests.
+ *
+ * If the system does not support HPD storm detection, this function does
+ * nothing.
+ *
+ * See: https://01.org/linuxgraphics/gfx-docs/drm/gpu/i915.html#hotplug
+ */
+void igt_hpd_storm_reset(void)
+{
+	int fd = igt_debugfs_open("i915_hpd_storm_ctl", O_WRONLY);
+	const char *buf = "reset";
+
+	if (fd < 0)
+		return;
+
+	igt_debug("Resetting HPD storm threshold\n");
+	igt_assert_eq(write(fd, buf, strlen(buf)), strlen(buf));
+
+	close(fd);
+}
+
+/**
+ * igt_hpd_storm_detected:
+ *
+ * Checks whether or not i915 has detected an HPD interrupt storm on any of the
+ * system's ports.
+ *
+ * This function always returns false on systems that do not support HPD storm
+ * detection.
+ *
+ * See: https://01.org/linuxgraphics/gfx-docs/drm/gpu/i915.html#hotplug
+ *
+ * Returns: Whether or not an HPD storm has been detected.
+ */
+bool igt_hpd_storm_detected(void)
+{
+	int fd = igt_debugfs_open("i915_hpd_storm_ctl", O_RDONLY);
+	char *start_loc;
+	char buf[32] = {0}, detected_str[4];
+	bool ret;
+
+	if (fd < 0)
+		return false;
+
+	igt_assert_lt(0, read(fd, buf, sizeof(buf)));
+	igt_assert(start_loc = strstr(buf, "Detected: "));
+	igt_assert_eq(sscanf(start_loc, "Detected: %s\n", detected_str), 1);
+
+	if (strcmp(detected_str, "yes") == 0)
+		ret = true;
+	else if (strcmp(detected_str, "no") == 0)
+		ret = false;
+	else
+		igt_fail_on_f(true, "Unknown hpd storm detection status '%s'\n",
+			      detected_str);
+
+	close(fd);
+	return ret;
+}
+
+/**
+ * igt_require_hpd_storm_ctl:
+ *
+ * Skips the current test if the system does not have HPD storm detection.
+ *
+ * See: https://01.org/linuxgraphics/gfx-docs/drm/gpu/i915.html#hotplug
+ */
+void igt_require_hpd_storm_ctl(void)
+{
+	int fd = igt_debugfs_open("i915_hpd_storm_ctl", O_RDONLY);
+
+	igt_require_f(fd > 0, "No i915_hpd_storm_ctl found in debugfs\n");
+	close(fd);
+}
+
 static igt_pipe_crc_t *
 pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source, int flags)
 {

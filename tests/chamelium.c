@@ -44,6 +44,9 @@ typedef struct {
 #define HOTPLUG_TIMEOUT 20 /* seconds */
 #define SUSPEND_RESUME_DELAY 20 /* seconds */
 
+#define HPD_STORM_PULSE_INTERVAL_DP 100 /* ms */
+#define HPD_STORM_PULSE_INTERVAL_HDMI 200 /* ms */
+
 /* Pre-calculated CRCs for the pattern fb, for all the modes in the default
  * chamelium edid
  */
@@ -528,6 +531,48 @@ test_hpd_without_ddc(data_t *data, struct chamelium_port *port)
 	igt_cleanup_hotplug(mon);
 }
 
+static void
+test_hpd_storm_detect(data_t *data, struct chamelium_port *port, int width)
+{
+	struct udev_monitor *mon;
+	int count = 0;
+
+	igt_require_hpd_storm_ctl();
+	reset_state(data, port);
+
+	igt_hpd_storm_set_threshold(1);
+	chamelium_fire_hpd_pulses(data->chamelium, port, width, 10);
+	igt_assert(igt_hpd_storm_detected());
+
+	mon = igt_watch_hotplug();
+	chamelium_fire_hpd_pulses(data->chamelium, port, width, 10);
+
+	/*
+	 * Polling should have been enabled by the HPD storm at this point,
+	 * so we should only get at most 1 hotplug event
+	 */
+	igt_until_timeout(5)
+		count += igt_hotplug_detected(mon, 1);
+	igt_assert_lt(count, 2);
+
+	igt_cleanup_hotplug(mon);
+	igt_hpd_storm_reset();
+}
+
+static void
+test_hpd_storm_disable(data_t *data, struct chamelium_port *port, int width)
+{
+	igt_require_hpd_storm_ctl();
+	reset_state(data, port);
+
+	igt_hpd_storm_set_threshold(0);
+	chamelium_fire_hpd_pulses(data->chamelium, port,
+				  width, 10);
+	igt_assert(!igt_hpd_storm_detected());
+
+	igt_hpd_storm_reset();
+}
+
 #define for_each_port(p, port)            \
 	for (p = 0, port = data.ports[p]; \
 	     p < data.port_count;         \
@@ -593,6 +638,14 @@ igt_main
 						SUSPEND_STATE_DISK,
 						SUSPEND_TEST_DEVICES);
 
+		connector_subtest("dp-hpd-storm", DisplayPort)
+			test_hpd_storm_detect(&data, port,
+					      HPD_STORM_PULSE_INTERVAL_DP);
+
+		connector_subtest("dp-hpd-storm-disable", DisplayPort)
+			test_hpd_storm_disable(&data, port,
+					       HPD_STORM_PULSE_INTERVAL_DP);
+
 		connector_subtest("dp-edid-change-during-suspend", DisplayPort)
 			test_suspend_resume_edid_change(&data, port,
 							SUSPEND_STATE_MEM,
@@ -640,6 +693,14 @@ igt_main
 			test_suspend_resume_hpd(&data, port,
 						SUSPEND_STATE_DISK,
 						SUSPEND_TEST_DEVICES);
+
+		connector_subtest("hdmi-hpd-storm", HDMIA)
+			test_hpd_storm_detect(&data, port,
+					      HPD_STORM_PULSE_INTERVAL_HDMI);
+
+		connector_subtest("hdmi-hpd-storm-disable", HDMIA)
+			test_hpd_storm_disable(&data, port,
+					       HPD_STORM_PULSE_INTERVAL_HDMI);
 
 		connector_subtest("hdmi-edid-change-during-suspend", HDMIA)
 			test_suspend_resume_edid_change(&data, port,
