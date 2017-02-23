@@ -58,7 +58,7 @@ static void assert_entry(const char *s, bool expect)
 	error = igt_sysfs_get(sysfs, "error");
 	igt_assert(error);
 
-	igt_assert_f(strcasecmp(error, s) != expect,
+	igt_assert_f(!!strcasecmp(error, s) != expect,
 		     "contents of error: '%s' (expected %s '%s')\n",
 		     error, expect ? "": "not", s);
 
