@@ -29,6 +29,10 @@
 
 int igt_sysfs_open(int device, int *idx);
 int igt_sysfs_open_parameters(int device);
+
+int igt_sysfs_read(int dir, const char *attr, void *data, int len);
+int igt_sysfs_write(int dir, const char *attr, const void *data, int len);
+
 bool igt_sysfs_set(int dir, const char *attr, const char *value);
 char *igt_sysfs_get(int dir, const char *attr);
 

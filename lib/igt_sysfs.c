@@ -172,6 +172,59 @@ int igt_sysfs_open_parameters(int device)
 
 	return params;
 }
+
+/**
+ * igt_sysfs_write:
+ * @dir: directory for the device from igt_sysfs_open()
+ * @attr: name of the sysfs node to open
+ * @data: the block to write from
+ * @len: the length to write
+ *
+ * This writes @len bytes from @data to the sysfs file.
+ *
+ * Returns:
+ * The number of bytes written, or -1 on error.
+ */
+int igt_sysfs_write(int dir, const char *attr, const void *data, int len)
+{
+	int fd;
+
+	fd = openat(dir, attr, O_WRONLY);
+	if (fd < 0)
+		return false;
+
+	len = writeN(fd, data, len);
+	close(fd);
+
+	return len;
+}
+
+/**
+ * igt_sysfs_read:
+ * @dir: directory for the device from igt_sysfs_open()
+ * @attr: name of the sysfs node to open
+ * @data: the block to read into
+ * @len: the maximum length to read
+ *
+ * This reads @len bytes from the sysfs file to @data
+ *
+ * Returns:
+ * The length read, -1 on failure.
+ */
+int igt_sysfs_read(int dir, const char *attr, void *data, int len)
+{
+	int fd;
+
+	fd = openat(dir, attr, O_WRONLY);
+	if (fd < 0)
+		return false;
+
+	len = readN(fd, data, len);
+	close(fd);
+
+	return len;
+}
+
 /**
  * igt_sysfs_set:
  * @dir: directory for the device from igt_sysfs_open()
@@ -185,17 +238,8 @@ int igt_sysfs_open_parameters(int device)
  */
 bool igt_sysfs_set(int dir, const char *attr, const char *value)
 {
-	int fd, len, ret;
-
-	fd = openat(dir, attr, O_WRONLY);
-	if (fd < 0)
-		return false;
-
-	len = strlen(value);
-	ret = writeN(fd, value, len);
-	close(fd);
-
-	return len == ret;
+	int len = strlen(value);
+	return igt_sysfs_write(dir, attr, value, len) == len;
 }
 
 /**
