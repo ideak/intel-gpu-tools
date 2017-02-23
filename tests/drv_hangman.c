@@ -77,7 +77,7 @@ static void assert_error_state_collected(void)
 
 static void clear_error_state(void)
 {
-	igt_sysfs_set(sysfs, "error", "");
+	igt_sysfs_write(sysfs, "error", "", 1);
 }
 
 static void test_error_state_basic(void)
