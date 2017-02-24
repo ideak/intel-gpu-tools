@@ -45,7 +45,6 @@
 #include <sys/resource.h>
 #include "drm.h"
 
-#define I915_EXEC_FENCE_OUT (1 << 17)
 #define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
 
 #define CONTEXT		0x1
