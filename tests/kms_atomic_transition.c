@@ -51,7 +51,7 @@ run_primary_test(igt_display_t *display, enum pipe pipe, igt_output_t *output)
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
 	igt_fb_t fb;
-	int i;
+	int i, ret;
 	unsigned flags = DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET;
 
 	igt_output_set_pipe(output, pipe);
