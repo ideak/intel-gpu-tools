@@ -46,6 +46,49 @@ struct plane_parms {
 #define hweight32 __builtin_popcount
 
 static void
+run_primary_test(igt_display_t *display, enum pipe pipe, igt_output_t *output)
+{
+	drmModeModeInfo *mode;
+	igt_plane_t *primary;
+	igt_fb_t fb;
+	int i;
+	unsigned flags = DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET;
+
+	igt_output_set_pipe(output, pipe);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+
+	mode = igt_output_get_mode(output);
+
+	igt_plane_set_fb(primary, NULL);
+	ret = igt_display_try_commit_atomic(display, flags, NULL);
+	igt_skip_on_f(ret == -EINVAL, "Primary plane cannot be disabled separately from output\n");
+
+	igt_create_fb(display->drm_fd, mode->hdisplay, mode->vdisplay,
+		      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+
+	igt_plane_set_fb(primary, &fb);
+
+	for (i = 0; i < 4; i++) {
+		igt_display_commit2(display, COMMIT_ATOMIC);
+
+		if (!(i & 1))
+			igt_wait_for_vblank(display->drm_fd, pipe);
+
+		igt_plane_set_fb(primary, (i & 1) ? &fb : NULL);
+		igt_display_commit2(display, COMMIT_ATOMIC);
+
+		if (i & 1)
+			igt_wait_for_vblank(display->drm_fd, pipe);
+
+		igt_plane_set_fb(primary, (i & 1) ? NULL : &fb);
+	}
+
+	igt_plane_set_fb(primary, NULL);
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_remove_fb(display->drm_fd, &fb);
+}
+
+static void
 wm_setup_plane(igt_display_t *display, enum pipe pipe,
 	       uint32_t mask, struct plane_parms *parms)
 {
@@ -795,6 +838,10 @@ igt_main
 
 		igt_require_f(valid_outputs, "no valid crtc/connector combinations found\n");
 	}
+
+	igt_subtest("plane-primary-toggle-with-vblank-wait")
+		for_each_pipe_with_valid_output(&display, pipe, output)
+			run_primary_test(&display, pipe, output);
 
 	igt_subtest("plane-all-transition")
 		for_each_pipe_with_valid_output(&display, pipe, output)
