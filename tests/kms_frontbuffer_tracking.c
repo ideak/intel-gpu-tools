@@ -377,7 +377,7 @@ static void print_mode_info(const char *screen, struct modeset_params *params)
 		 screen,
 		 kmstest_connector_type_str(c->connector_type),
 		 params->mode->name,
-		 params->crtc_id);
+		 kmstest_get_crtc_idx(drm.res, params->crtc_id));
 }
 
 static void init_mode_params(struct modeset_params *params, uint32_t crtc_id,
