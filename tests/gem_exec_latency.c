@@ -34,6 +34,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <sys/signal.h>
 #include <time.h>
 
 #include "drm.h"
@@ -50,6 +51,8 @@
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
 #define CORK 1
+
+static unsigned int ring_size;
 
 struct cork {
 	int device;
@@ -80,6 +83,54 @@ static void unplug(struct cork *c)
 	close(c->device);
 }
 
+static void alarm_handler(int sig)
+{
+}
+
+static void set_timeout(int seconds)
+{
+	struct sigaction sa = { .sa_handler = alarm_handler };
+
+	sigaction(SIGALRM, seconds ? &sa : NULL, NULL);
+	alarm(seconds);
+}
+
+static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	return ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf);
+}
+
+static unsigned int measure_ring_size(int fd)
+{
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned int count;
+	struct cork c;
+
+	memset(obj, 0, sizeof(obj));
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	plug(fd, &c);
+	obj[0].handle = c.handle;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+
+	count = 0;
+	set_timeout(1);
+	while (__execbuf(fd, &execbuf) == 0)
+		count++;
+	set_timeout(0);
+
+	unplug(&c);
+	gem_close(fd, obj[1].handle);
+
+	return count;
+}
+
 #define RCS_TIMESTAMP (0x2000 + 0x358)
 static void latency_on_ring(int fd,
 			    unsigned ring, const char *name,
@@ -92,7 +143,7 @@ static void latency_on_ring(int fd,
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct cork c;
 	volatile uint32_t *reg;
-	unsigned repeats;
+	unsigned repeats = ring_size;
 	uint32_t start, end, *map, *results;
 	uint64_t offset;
 	double gpu_latency;
@@ -131,8 +182,6 @@ static void latency_on_ring(int fd,
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 	reloc.presumed_offset = obj[1].offset;
-
-	repeats = flags & CORK ? 128 : 1024;
 
 	for (j = 0; j < repeats; j++) {
 		execbuf.batch_start_offset = 64 * j;
@@ -233,6 +282,7 @@ static void latency_from_ring(int fd,
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
+	const unsigned int repeats = ring_size / 2;
 	uint32_t *map, *results;
 	int i, j;
 
@@ -270,7 +320,6 @@ static void latency_from_ring(int fd,
 
 	for (e = intel_execution_engines; e->name; e++) {
 		struct cork c;
-		unsigned int repeats;
 
 		if (e->exec_id == 0)
 			continue;
@@ -282,13 +331,11 @@ static void latency_from_ring(int fd,
 			       I915_GEM_DOMAIN_GTT,
 			       I915_GEM_DOMAIN_GTT);
 
-		repeats = 512;
 		if (flags & CORK) {
 			plug(fd, &c);
 			obj[0].handle = c.handle;
 			execbuf.buffers_ptr = to_user_pointer(&obj[0]);
 			execbuf.buffer_count = 3;
-			repeats = 64;
 		}
 
 		for (j = 0; j < repeats; j++) {
@@ -399,6 +446,13 @@ igt_main
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
 		print_welcome(device);
+
+		ring_size = measure_ring_size(device);
+		igt_info("Ring size: %d batches\n", ring_size);
+		igt_require(ring_size > 8);
+		ring_size -= 8; /* leave some spare */
+		if (ring_size > 1024)
+			ring_size = 1024;
 	}
 
 	igt_subtest_group {
