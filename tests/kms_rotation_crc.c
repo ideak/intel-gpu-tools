@@ -139,7 +139,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 
 	/* create the pipe_crc object for this pipe */
 	igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	mode = igt_output_get_mode(output);
 
@@ -517,7 +517,7 @@ igt_main
 
 		kmstest_set_vt_graphics_mode();
 
-		igt_require_pipe_crc();
+		igt_require_pipe_crc(data.gfx_fd);
 
 		igt_display_init(&data.display, data.gfx_fd);
 	}

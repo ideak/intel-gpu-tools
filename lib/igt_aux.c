@@ -350,10 +350,10 @@ void igt_stop_signal_helper(void)
 }
 
 static struct igt_helper_process shrink_helper;
-static void __attribute__((noreturn)) shrink_helper_process(pid_t pid)
+static void __attribute__((noreturn)) shrink_helper_process(int fd, pid_t pid)
 {
 	while (1) {
-		igt_drop_caches_set(DROP_SHRINK_ALL);
+		igt_drop_caches_set(fd, DROP_SHRINK_ALL);
 		usleep(1000 * 1000 / 50);
 		if (kill(pid, 0)) /* Parent has died, so must we. */
 			exit(0);
@@ -370,12 +370,12 @@ static void __attribute__((noreturn)) shrink_helper_process(pid_t pid)
  *
  * This should only be used from an igt_fixture.
  */
-void igt_fork_shrink_helper(void)
+void igt_fork_shrink_helper(int drm_fd)
 {
 	assert(!igt_only_list_subtests());
-	igt_require(igt_drop_caches_has(DROP_SHRINK_ALL));
+	igt_require(igt_drop_caches_has(drm_fd, DROP_SHRINK_ALL));
 	igt_fork_helper(&shrink_helper)
-		shrink_helper_process(getppid());
+		shrink_helper_process(drm_fd, getppid());
 }
 
 /**

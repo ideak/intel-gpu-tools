@@ -211,7 +211,7 @@ static bool fbc_enabled(data_t *data)
 {
 	char str[128] = {};
 
-	igt_debugfs_read("i915_fbc_status", str);
+	igt_debugfs_read(data->drm_fd, "i915_fbc_status", str);
 	return strstr(str, "FBC enabled") != NULL;
 }
 
@@ -378,7 +378,7 @@ static bool prepare_test(data_t *data, enum test_mode test_mode)
 
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = NULL;
-	pipe_crc = igt_pipe_crc_new(data->pipe,
+	pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
 				    INTEL_PIPE_CRC_SOURCE_AUTO);
 	data->pipe_crc = pipe_crc;
 
@@ -530,9 +530,9 @@ igt_main
 
 		data.devid = intel_get_drm_devid(data.drm_fd);
 
-		igt_require_pipe_crc();
+		igt_require_pipe_crc(data.drm_fd);
 
-		igt_debugfs_read("i915_fbc_status", buf);
+		igt_debugfs_read(data.drm_fd, "i915_fbc_status", buf);
 		igt_require_f(!strstr(buf, "unsupported on this chipset"),
 			      "FBC not supported\n");
 

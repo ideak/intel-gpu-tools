@@ -35,6 +35,19 @@
 
 IGT_TEST_DESCRIPTION("Tests slice/subslice/EU power gating functionality.\n");
 
+struct {
+	int init;
+	int drm_fd;
+	int devid;
+	int gen;
+	int has_ppgtt;
+	drm_intel_bufmgr *bufmgr;
+	struct intel_batchbuffer *batch;
+	igt_media_spinfunc_t spinfunc;
+	struct igt_buf buf;
+	uint32_t spins_per_msec;
+} gem;
+
 static double
 to_dt(const struct timespec *start, const struct timespec *end)
 {
@@ -174,7 +187,7 @@ dbg_get_status(struct status *stat)
 static void
 dbg_init(void)
 {
-	dbg.status_fd = igt_debugfs_open("i915_sseu_status", O_RDONLY);
+	dbg.status_fd = igt_debugfs_open(gem.drm_fd, "i915_sseu_status", O_RDONLY);
 	igt_skip_on_f(dbg.status_fd == -1,
 		      "debugfs entry 'i915_sseu_status' not found\n");
 	dbg.init = 1;
@@ -189,19 +202,6 @@ dbg_deinit(void)
 		close(dbg.status_fd);
 	}
 }
-
-struct {
-	int init;
-	int drm_fd;
-	int devid;
-	int gen;
-	int has_ppgtt;
-	drm_intel_bufmgr *bufmgr;
-	struct intel_batchbuffer *batch;
-	igt_media_spinfunc_t spinfunc;
-	struct igt_buf buf;
-	uint32_t spins_per_msec;
-} gem;
 
 static void
 gem_check_spin(uint32_t spins)

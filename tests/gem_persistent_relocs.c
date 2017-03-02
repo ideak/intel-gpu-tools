@@ -288,7 +288,7 @@ static void do_forked_test(int fd, unsigned flags)
 		igt_fork_helper(&thrasher) {
 			while (1) {
 				usleep(1000);
-				igt_drop_caches_set(val);
+				igt_drop_caches_set(fd, val);
 			}
 		}
 	}

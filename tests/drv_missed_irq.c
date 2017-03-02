@@ -29,6 +29,8 @@
 
 IGT_TEST_DESCRIPTION("Inject missed interrupts and make sure they are caught");
 
+static int drm_fd;
+
 static void trigger_missed_interrupt(int fd, unsigned ring)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
@@ -116,16 +118,16 @@ static uint32_t engine_mask(void)
 	uint32_t mask;
 	FILE *file;
 
-	file = igt_debugfs_fopen("i915_ring_test_irq", "w");
+	file = igt_debugfs_fopen(drm_fd, "i915_ring_test_irq", "w");
 	fprintf(file, "0x%x", -1);
 	fclose(file);
 
 	mask = -1;
-	file = igt_debugfs_fopen("i915_ring_test_irq", "r");
+	file = igt_debugfs_fopen(drm_fd, "i915_ring_test_irq", "r");
 	igt_ignore_warn(fscanf(file, "%x", &mask));
 	fclose(file);
 
-	file = igt_debugfs_fopen("i915_ring_test_irq", "w");
+	file = igt_debugfs_fopen(drm_fd, "i915_ring_test_irq", "w");
 	fprintf(file, "0");
 	fclose(file);
 
@@ -136,7 +138,7 @@ static void enable_missed_irq(void)
 {
 	FILE *file;
 
-	file = igt_debugfs_fopen("i915_ring_test_irq", "w");
+	file = igt_debugfs_fopen(drm_fd, "i915_ring_test_irq", "w");
 	fprintf(file, "0x%x", -1);
 	fclose(file);
 }
@@ -146,11 +148,11 @@ static uint32_t disable_missed_irq(void)
 	FILE *file;
 	uint32_t mask = 0;
 
-	file = igt_debugfs_fopen("i915_ring_test_irq", "r");
+	file = igt_debugfs_fopen(drm_fd, "i915_ring_test_irq", "r");
 	igt_ignore_warn(fscanf(file, "%x", &mask));
 	fclose(file);
 
-	file = igt_debugfs_fopen("i915_ring_test_irq", "w");
+	file = igt_debugfs_fopen(drm_fd, "i915_ring_test_irq", "w");
 	fprintf(file, "0");
 	fclose(file);
 
@@ -163,20 +165,19 @@ igt_simple_main
 	unsigned expect_rings;
 	unsigned missed_rings;
 	unsigned check_rings;
-	int fd;
 
 	igt_skip_on_simulation();
 	bind_to_cpu(0);
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	igt_require_gem(fd);
-	gem_require_mmap_wc(fd);
-	igt_fork_hang_detector(fd);
+	drm_fd = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(drm_fd);
+	gem_require_mmap_wc(drm_fd);
+	igt_fork_hang_detector(drm_fd);
 
 	expect_rings = engine_mask();
 
 	igt_debug("Clearing rings %x\n", expect_rings);
-	intel_detect_and_clear_missed_interrupts(fd);
+	intel_detect_and_clear_missed_interrupts(drm_fd);
 	for (e = intel_execution_engines; e->name; e++) {
 		if (expect_rings == -1 && e->exec_id)
 			continue;
@@ -186,9 +187,9 @@ igt_simple_main
 
 		igt_debug("Clearing ring %s [%x]\n",
 			  e->name, e->exec_id | e->flags);
-		trigger_missed_interrupt(fd, e->exec_id | e->flags);
+		trigger_missed_interrupt(drm_fd, e->exec_id | e->flags);
 	}
-	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(drm_fd), 0);
 
 	igt_debug("Testing rings %x\n", expect_rings);
 	enable_missed_irq();
@@ -201,9 +202,9 @@ igt_simple_main
 
 		igt_debug("Executing on ring %s [%x]\n",
 			  e->name, e->exec_id | e->flags);
-		trigger_missed_interrupt(fd, e->exec_id | e->flags);
+		trigger_missed_interrupt(drm_fd, e->exec_id | e->flags);
 	}
-	missed_rings = intel_detect_and_clear_missed_interrupts(fd);
+	missed_rings = intel_detect_and_clear_missed_interrupts(drm_fd);
 
 	check_rings = disable_missed_irq();
 	igt_assert_eq_u32(check_rings, expect_rings);
@@ -214,5 +215,5 @@ igt_simple_main
 		igt_assert_eq_u32(missed_rings, expect_rings);
 
 	igt_stop_hang_detector();
-	close(fd);
+	close(drm_fd);
 }

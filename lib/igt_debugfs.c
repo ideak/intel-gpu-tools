@@ -131,39 +131,34 @@ const char *igt_debugfs_mount(void)
 	return "/sys/kernel/debug";
 }
 
-static bool __igt_debugfs_init(igt_debugfs_t *debugfs)
+static char *
+igt_get_debugfs_path(int fd)
 {
 	struct stat st;
-	int n;
+	const char *debugfs_root;
+	char *debugfs_dri_path;
+	int len;
 
-	strcpy(debugfs->root, igt_debugfs_mount());
-	for (n = 0; n < 16; n++) {
-		int len = sprintf(debugfs->dri_path, "%s/dri/%d", debugfs->root, n);
-		sprintf(debugfs->dri_path + len, "/i915_error_state");
-		if (stat(debugfs->dri_path, &st) == 0) {
-			debugfs->dri_path[len] = '\0';
-			return true;
-		}
-	}
-
-	debugfs->dri_path[0] = '\0';
-	return false;
-}
-
-static igt_debugfs_t *__igt_debugfs_singleton(void)
-{
-	static igt_debugfs_t singleton;
-	static bool init_done = false;
-
-	if (init_done)
-		return &singleton;
-
-	if (__igt_debugfs_init(&singleton)) {
-		init_done = true;
-		return &singleton;
-	} else {
+	if (fstat(fd, &st)) {
+		igt_debug("Couldn't stat FD for DRM device: %s\n", strerror(errno));
 		return NULL;
 	}
+
+	if (!S_ISCHR(st.st_mode)) {
+		igt_debug("FD for DRM device not a char device!\n");
+		return NULL;
+	}
+
+	debugfs_root = igt_debugfs_mount();
+	debugfs_dri_path = calloc(1, strlen(debugfs_root) + 100);
+	len = sprintf(debugfs_dri_path, "%s/dri/%d", debugfs_root, minor(st.st_rdev));
+	sprintf(debugfs_dri_path + len, "/name");
+	if (stat(debugfs_dri_path, &st) == 0) {
+		debugfs_dri_path[len] = '\0';
+		return debugfs_dri_path;
+	}
+
+	return NULL;
 }
 
 /**
@@ -177,15 +172,19 @@ static igt_debugfs_t *__igt_debugfs_singleton(void)
  * Returns:
  * The Unix file descriptor for the debugfs file or -1 if that didn't work out.
  */
-int igt_debugfs_open(const char *filename, int mode)
+int igt_debugfs_open(int fd, const char *filename, int mode)
 {
 	char buf[1024];
-	igt_debugfs_t *debugfs = __igt_debugfs_singleton();
+	char *debugfs_dri_path;
 
-	if (!debugfs)
+	debugfs_dri_path = igt_get_debugfs_path(fd);
+	if (!debugfs_dri_path)
 		return -1;
 
-	sprintf(buf, "%s/%s", debugfs->dri_path, filename);
+	sprintf(buf, "%s/%s", debugfs_dri_path, filename);
+
+	free(debugfs_dri_path);
+
 	return open(buf, mode);
 }
 
@@ -200,17 +199,21 @@ int igt_debugfs_open(const char *filename, int mode)
  * Returns:
  * The libc FILE pointer for the debugfs file or NULL if that didn't work out.
  */
-FILE *igt_debugfs_fopen(const char *filename,
+FILE *igt_debugfs_fopen(int fd,
+			const char *filename,
 			const char *mode)
 {
 	char buf[1024];
+	char *debugfs_dri_path;
 
-	igt_debugfs_t *debugfs = __igt_debugfs_singleton();
-
-	if (!debugfs)
+	debugfs_dri_path = igt_get_debugfs_path(fd);
+	if (!debugfs_dri_path)
 		return NULL;
 
-	sprintf(buf, "%s/%s", debugfs->dri_path, filename);
+	sprintf(buf, "%s/%s", debugfs_dri_path, filename);
+
+	free(debugfs_dri_path);
+
 	return fopen(buf, mode);
 }
 
@@ -224,12 +227,12 @@ FILE *igt_debugfs_fopen(const char *filename,
  * provided buffer, then closes the file. Users should make sure that the buffer
  * provided is big enough to fit the whole file, plus one byte.
  */
-void __igt_debugfs_read(const char *filename, char *buf, int buf_size)
+void __igt_debugfs_read(int fd, const char *filename, char *buf, int buf_size)
 {
 	FILE *file;
 	size_t n_read;
 
-	file = igt_debugfs_fopen(filename, "r");
+	file = igt_debugfs_fopen(fd, filename, "r");
 	igt_assert(file);
 
 	n_read = fread(buf, 1, buf_size - 1, file);
@@ -250,14 +253,14 @@ void __igt_debugfs_read(const char *filename, char *buf, int buf_size)
  *
  * Returns: True if the @substring is found to occur in @filename
  */
-bool igt_debugfs_search(const char *filename, const char *substring)
+bool igt_debugfs_search(int fd, const char *filename, const char *substring)
 {
 	FILE *file;
 	size_t n = 0;
 	char *line = NULL;
 	bool matched = false;
 
-	file = igt_debugfs_fopen(filename, "r");
+	file = igt_debugfs_fopen(fd, filename, "r");
 	igt_assert(file);
 
 	while (getline(&line, &n, file) >= 0) {
@@ -322,6 +325,7 @@ char *igt_crc_to_string(igt_crc_t *crc)
 #define LEGACY_LINE_LEN       (6 * 8 + 5 + 1)
 
 struct _igt_pipe_crc {
+	int fd;
 	int ctl_fd;
 	int crc_fd;
 	int flags;
@@ -370,7 +374,7 @@ static bool igt_pipe_crc_do_start(igt_pipe_crc_t *pipe_crc)
 	if (!pipe_crc->is_legacy) {
 		sprintf(buf, "crtc-%d/crc/data", pipe_crc->pipe);
 		errno = 0;
-		pipe_crc->crc_fd = igt_debugfs_open(buf, pipe_crc->flags);
+		pipe_crc->crc_fd = igt_debugfs_open(pipe_crc->fd, buf, pipe_crc->flags);
 		if (pipe_crc->crc_fd == -1 && errno == EINVAL)
 			return false;
 		igt_assert_eq(errno, 0);
@@ -387,23 +391,27 @@ static void igt_pipe_crc_pipe_off(int fd, enum pipe pipe)
 	igt_assert_eq(write(fd, buf, strlen(buf)), strlen(buf));
 }
 
-static void igt_pipe_crc_reset(void)
+static void igt_pipe_crc_reset(int drm_fd)
 {
-	igt_debugfs_t *debugfs = __igt_debugfs_singleton();
 	int fd;
 	struct dirent *dirent;
 	char buf[128];
 	const char *cmd = "none";
 	bool done = false;
 	DIR *dir;
+	char *debugfs_dri_path;
 
-	dir = opendir(debugfs->dri_path);
+	debugfs_dri_path = igt_get_debugfs_path(drm_fd);
+	if (!debugfs_dri_path)
+		return;
+
+	dir = opendir(debugfs_dri_path);
 	if (dir) {
 		while ((dirent = readdir(dir))) {
 			if (strcmp(dirent->d_name, "crtc-") != 0)
 				continue;
 
-			sprintf(buf, "%s/%s/crc/control", debugfs->dri_path,
+			sprintf(buf, "%s/%s/crc/control", debugfs_dri_path,
 				dirent->d_name);
 			fd = open(buf, O_WRONLY);
 			if (fd == -1)
@@ -416,11 +424,12 @@ static void igt_pipe_crc_reset(void)
 		}
 		closedir(dir);
 	}
+	free(debugfs_dri_path);
 
 	if (done)
 		return;
 
-	fd = igt_debugfs_open("i915_display_crc_ctl", O_WRONLY);
+	fd = igt_debugfs_open(drm_fd, "i915_display_crc_ctl", O_WRONLY);
 	if (fd != -1) {
 		igt_pipe_crc_pipe_off(fd, PIPE_A);
 		igt_pipe_crc_pipe_off(fd, PIPE_B);
@@ -432,7 +441,32 @@ static void igt_pipe_crc_reset(void)
 
 static void pipe_crc_exit_handler(int sig)
 {
-	igt_pipe_crc_reset();
+	struct dirent *dirent;
+	char buf[128];
+	DIR *dir;
+	int fd;
+
+	dir = opendir("/dev/dri");
+	if (!dir)
+		return;
+
+	/*
+	 * Try to reset CRC capture for all DRM devices, this is only needed
+	 * for the legacy CRC ABI and can be completely removed once the
+	 * legacy codepaths are removed.
+	 */
+	while ((dirent = readdir(dir))) {
+		if (strncmp(dirent->d_name, "card", 4) != 0)
+			continue;
+
+		sprintf(buf, "/dev/dri/%s", dirent->d_name);
+		fd = open(buf, O_WRONLY);
+
+		igt_pipe_crc_reset(fd);
+
+		close(fd);
+	}
+	closedir(dir);
 }
 
 /**
@@ -442,16 +476,16 @@ static void pipe_crc_exit_handler(int sig)
  * kernel. Uses igt_skip to automatically skip the test/subtest if this isn't
  * the case.
  */
-void igt_require_pipe_crc(void)
+void igt_require_pipe_crc(int fd)
 {
 	const char *cmd = "pipe A none";
 	FILE *ctl;
 	size_t written;
 	int ret;
 
-	ctl = igt_debugfs_fopen("crtc-0/crc/control", "r+");
+	ctl = igt_debugfs_fopen(fd, "crtc-0/crc/control", "r+");
 	if (!ctl) {
-		ctl = igt_debugfs_fopen("i915_display_crc_ctl", "r+");
+		ctl = igt_debugfs_fopen(fd, "i915_display_crc_ctl", "r+");
 		igt_require_f(ctl,
 			      "No display_crc_ctl found, kernel too old\n");
 		written = fwrite(cmd, 1, strlen(cmd), ctl);
@@ -461,6 +495,16 @@ void igt_require_pipe_crc(void)
 	}
 
 	fclose(ctl);
+}
+
+static void igt_hpd_storm_exit_handler(int sig)
+{
+	int fd = drm_open_driver_master(DRIVER_INTEL);
+
+	/* Here we assume that only one i915 device will be ever present */
+	igt_hpd_storm_reset(fd);
+
+	close(fd);
 }
 
 /**
@@ -477,9 +521,9 @@ void igt_require_pipe_crc(void)
  *
  * See: https://01.org/linuxgraphics/gfx-docs/drm/gpu/i915.html#hotplug
  */
-void igt_hpd_storm_set_threshold(unsigned int threshold)
+void igt_hpd_storm_set_threshold(int drm_fd, unsigned int threshold)
 {
-	int fd = igt_debugfs_open("i915_hpd_storm_ctl", O_WRONLY);
+	int fd = igt_debugfs_open(drm_fd, "i915_hpd_storm_ctl", O_WRONLY);
 	char buf[16];
 
 	if (fd < 0)
@@ -490,7 +534,7 @@ void igt_hpd_storm_set_threshold(unsigned int threshold)
 	igt_assert_eq(write(fd, buf, strlen(buf)), strlen(buf));
 
 	close(fd);
-	igt_install_exit_handler((igt_exit_handler_t)igt_hpd_storm_reset);
+	igt_install_exit_handler(igt_hpd_storm_exit_handler);
 }
 
 /**
@@ -506,9 +550,9 @@ void igt_hpd_storm_set_threshold(unsigned int threshold)
  *
  * See: https://01.org/linuxgraphics/gfx-docs/drm/gpu/i915.html#hotplug
  */
-void igt_hpd_storm_reset(void)
+void igt_hpd_storm_reset(int drm_fd)
 {
-	int fd = igt_debugfs_open("i915_hpd_storm_ctl", O_WRONLY);
+	int fd = igt_debugfs_open(drm_fd, "i915_hpd_storm_ctl", O_WRONLY);
 	const char *buf = "reset";
 
 	if (fd < 0)
@@ -533,9 +577,9 @@ void igt_hpd_storm_reset(void)
  *
  * Returns: Whether or not an HPD storm has been detected.
  */
-bool igt_hpd_storm_detected(void)
+bool igt_hpd_storm_detected(int drm_fd)
 {
-	int fd = igt_debugfs_open("i915_hpd_storm_ctl", O_RDONLY);
+	int fd = igt_debugfs_open(drm_fd, "i915_hpd_storm_ctl", O_RDONLY);
 	char *start_loc;
 	char buf[32] = {0}, detected_str[4];
 	bool ret;
@@ -566,16 +610,16 @@ bool igt_hpd_storm_detected(void)
  *
  * See: https://01.org/linuxgraphics/gfx-docs/drm/gpu/i915.html#hotplug
  */
-void igt_require_hpd_storm_ctl(void)
+void igt_require_hpd_storm_ctl(int drm_fd)
 {
-	int fd = igt_debugfs_open("i915_hpd_storm_ctl", O_RDONLY);
+	int fd = igt_debugfs_open(drm_fd, "i915_hpd_storm_ctl", O_RDONLY);
 
 	igt_require_f(fd > 0, "No i915_hpd_storm_ctl found in debugfs\n");
 	close(fd);
 }
 
 static igt_pipe_crc_t *
-pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source, int flags)
+pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source, int flags)
 {
 	igt_pipe_crc_t *pipe_crc;
 	char buf[128];
@@ -585,9 +629,9 @@ pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source, int flags)
 	pipe_crc = calloc(1, sizeof(struct _igt_pipe_crc));
 
 	sprintf(buf, "crtc-%d/crc/control", pipe);
-	pipe_crc->ctl_fd = igt_debugfs_open(buf, O_WRONLY);
+	pipe_crc->ctl_fd = igt_debugfs_open(fd, buf, O_WRONLY);
 	if (pipe_crc->ctl_fd == -1) {
-		pipe_crc->ctl_fd = igt_debugfs_open("i915_display_crc_ctl",
+		pipe_crc->ctl_fd = igt_debugfs_open(fd, "i915_display_crc_ctl",
 						    O_WRONLY);
 		igt_assert(pipe_crc->ctl_fd != -1);
 		pipe_crc->is_legacy = true;
@@ -595,7 +639,7 @@ pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source, int flags)
 
 	if (pipe_crc->is_legacy) {
 		sprintf(buf, "i915_pipe_%s_crc", kmstest_pipe_name(pipe));
-		pipe_crc->crc_fd = igt_debugfs_open(buf, flags);
+		pipe_crc->crc_fd = igt_debugfs_open(fd, buf, flags);
 		igt_assert(pipe_crc->crc_fd != -1);
 		igt_debug("Using legacy frame CRC ABI\n");
 	} else {
@@ -603,6 +647,7 @@ pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source, int flags)
 		igt_debug("Using generic frame CRC ABI\n");
 	}
 
+	pipe_crc->fd = fd;
 	pipe_crc->pipe = pipe;
 	pipe_crc->source = source;
 	pipe_crc->flags = flags;
@@ -623,9 +668,9 @@ pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source, int flags)
  * least INTEL_PIPE_CRC_SOURCE_AUTO everywhere.
  */
 igt_pipe_crc_t *
-igt_pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source)
+igt_pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source)
 {
-	return pipe_crc_new(pipe, source, O_RDONLY);
+	return pipe_crc_new(fd, pipe, source, O_RDONLY);
 }
 
 /**
@@ -641,9 +686,9 @@ igt_pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source)
  * least INTEL_PIPE_CRC_SOURCE_AUTO everywhere.
  */
 igt_pipe_crc_t *
-igt_pipe_crc_new_nonblock(enum pipe pipe, enum intel_pipe_crc_source source)
+igt_pipe_crc_new_nonblock(int fd, enum pipe pipe, enum intel_pipe_crc_source source)
 {
-	return pipe_crc_new(pipe, source, O_RDONLY | O_NONBLOCK);
+	return pipe_crc_new(fd, pipe, source, O_RDONLY | O_NONBLOCK);
 }
 
 /**
@@ -879,13 +924,13 @@ void igt_pipe_crc_collect_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out_crc)
  * This queries the debugfs to see if it supports the full set of desired
  * operations.
  */
-bool igt_drop_caches_has(uint64_t val)
+bool igt_drop_caches_has(int drm_fd, uint64_t val)
 {
 	FILE *file;
 	uint64_t mask;
 
 	mask = 0;
-	file = igt_debugfs_fopen("i915_gem_drop_caches", "r");
+	file = igt_debugfs_fopen(drm_fd, "i915_gem_drop_caches", "r");
 	if (file) {
 		igt_ignore_warn(fscanf(file, "0x%" PRIx64, &mask));
 		fclose(file);
@@ -901,7 +946,7 @@ bool igt_drop_caches_has(uint64_t val)
  * This calls the debugfs interface the drm/i915 GEM driver exposes to drop or
  * evict certain classes of gem buffer objects.
  */
-void igt_drop_caches_set(uint64_t val)
+void igt_drop_caches_set(int drm_fd, uint64_t val)
 {
 	int fd;
 	char data[19];
@@ -909,7 +954,7 @@ void igt_drop_caches_set(uint64_t val)
 
 	sprintf(data, "0x%" PRIx64, val);
 
-	fd = igt_debugfs_open("i915_gem_drop_caches", O_WRONLY);
+	fd = igt_debugfs_open(drm_fd, "i915_gem_drop_caches", O_WRONLY);
 
 	igt_assert(fd >= 0);
 	do {
@@ -975,14 +1020,14 @@ void igt_enable_prefault(void)
 	igt_prefault_control(true);
 }
 
-static int get_object_count(void)
+static int get_object_count(int fd)
 {
 	FILE *file;
 	int ret, scanned;
 
-	igt_drop_caches_set(DROP_RETIRE | DROP_ACTIVE | DROP_FREED);
+	igt_drop_caches_set(fd, DROP_RETIRE | DROP_ACTIVE | DROP_FREED);
 
-	file = igt_debugfs_fopen("i915_gem_objects", "r");
+	file = igt_debugfs_fopen(fd, "i915_gem_objects", "r");
 
 	scanned = fscanf(file, "%i objects", &ret);
 	igt_assert_eq(scanned, 1);
@@ -1002,7 +1047,7 @@ int igt_get_stable_obj_count(int driver)
 {
 	int obj_count;
 	gem_quiescent_gpu(driver);
-	obj_count = get_object_count();
+	obj_count = get_object_count(driver);
 	/* The test relies on the system being in the same state before and
 	 * after the test so any difference in the object count is a result of
 	 * leaks during the test. gem_quiescent_gpu() mostly achieves this but
@@ -1016,7 +1061,7 @@ int igt_get_stable_obj_count(int driver)
 		while (loop_count < 4) {
 			usleep(200000);
 			gem_quiescent_gpu(driver);
-			obj_count = get_object_count();
+			obj_count = get_object_count(driver);
 			if (obj_count == prev_obj_count) {
 				loop_count++;
 			} else {

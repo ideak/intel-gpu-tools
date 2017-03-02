@@ -67,7 +67,7 @@ functional_test_init(functional_test_t *test, igt_output_t *output, enum pipe pi
 	data_t *data = test->data;
 	drmModeModeInfo *mode;
 
-	test->pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	test->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	igt_output_set_pipe(output, pipe);
 
@@ -545,13 +545,13 @@ cursor_leak_test_fini(data_t *data,
 }
 
 static int
-i915_gem_fb_count(void)
+i915_gem_fb_count(data_t *data)
 {
 	char buf[1024];
 	FILE *fp;
 	int count = 0;
 
-	fp = igt_debugfs_fopen("i915_gem_framebuffer", "r");
+	fp = igt_debugfs_fopen(data->drm_fd, "i915_gem_framebuffer", "r");
 	igt_require(fp);
 	while (fgets(buf, sizeof(buf), fp) != NULL)
 		count++;
@@ -579,7 +579,7 @@ cursor_leak_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	mode = igt_output_get_mode(output);
 
 	/* Count GEM framebuffers before creating our cursor FB's */
-	count1 = i915_gem_fb_count();
+	count1 = i915_gem_fb_count(data);
 
 	/* Black background FB */
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
@@ -637,7 +637,7 @@ cursor_leak_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	cursor_leak_test_fini(data, output, &background_fb, cursor_fb);
 
 	/* We should be back to the same framebuffer count as when we started */
-	count2 = i915_gem_fb_count();
+	count2 = i915_gem_fb_count(data);
 
 	igt_assert_eq(count1, count2);
 }
@@ -791,7 +791,7 @@ igt_main
 
 		kmstest_set_vt_graphics_mode();
 
-		igt_require_pipe_crc();
+		igt_require_pipe_crc(data.drm_fd);
 		igt_display_init(&data.display, data.drm_fd);
 	}
 

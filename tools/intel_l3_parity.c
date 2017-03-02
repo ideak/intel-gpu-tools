@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
 	if (intel_gen(devid) < 7 || IS_VALLEYVIEW(devid))
 		exit(77);
 
-	assert(intel_register_access_init(intel_get_pci_device(), 0) == 0);
+	assert(intel_register_access_init(intel_get_pci_device(), 0, device) == 0);
 
 	dir = igt_sysfs_open(device, NULL);
 

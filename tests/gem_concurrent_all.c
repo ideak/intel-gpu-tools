@@ -1905,7 +1905,7 @@ igt_main
 					count = num_buffers(gem_mappable_aperture_size(),
 							    s, c, CHECK_RAM);
 
-					igt_fork_shrink_helper();
+					igt_fork_shrink_helper(fd);
 				}
 				run_modes(name, c, modes, s, count);
 

@@ -229,13 +229,13 @@ static void clear_test_active(void)
 
 static void setup_debugfs_files(void)
 {
-	test_type_fp = igt_debugfs_fopen(INTEL_DP_TEST_TYPE_FILE, "r");
+	test_type_fp = igt_debugfs_fopen(drm_fd, INTEL_DP_TEST_TYPE_FILE, "r");
 	igt_require(test_type_fp);
 
-	test_data_fp = igt_debugfs_fopen(INTEL_DP_TEST_DATA_FILE, "r");
+	test_data_fp = igt_debugfs_fopen(drm_fd, INTEL_DP_TEST_DATA_FILE, "r");
 	igt_require(test_data_fp);
 
-	test_active_fp = igt_debugfs_fopen(INTEL_DP_TEST_ACTIVE_FILE, "w+");
+	test_active_fp = igt_debugfs_fopen(drm_fd, INTEL_DP_TEST_ACTIVE_FILE, "w+");
 	igt_require(test_active_fp);
 
 	/* Reset the active flag for safety */

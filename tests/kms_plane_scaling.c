@@ -64,7 +64,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 
 	/* create the pipe_crc object for this pipe */
 	igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	/* before allocating, free if any older fb */
 	if (data->fb_id1) {
@@ -318,7 +318,7 @@ igt_simple_main
 
 
 	data.drm_fd = drm_open_driver(DRIVER_INTEL);
-	igt_require_pipe_crc();
+	igt_require_pipe_crc(data.drm_fd);
 	igt_display_init(&data.display, data.drm_fd);
 	data.devid = intel_get_drm_devid(data.drm_fd);
 
