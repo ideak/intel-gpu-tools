@@ -39,8 +39,6 @@
 #include "intel_reg.h"
 #include "intel_chipset.h"
 
-#define LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE 0x4
-
 /**
  * SECTION:igt_gt
  * @short_description: GT support library
