@@ -192,8 +192,6 @@ igt_simple_main
 
 	igt_debug("Testing rings %x\n", expect_rings);
 	enable_missed_irq();
-
-	intel_detect_and_clear_missed_interrupts(fd);
 	for (e = intel_execution_engines; e->name; e++) {
 		if (expect_rings == -1 && e->exec_id)
 			continue;
