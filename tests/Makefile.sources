@@ -214,6 +214,7 @@ TESTS_progs = \
 	gem_unfence_active_buffers \
 	gem_unref_active_buffers \
 	gem_wait \
+	gem_spin_batch \
 	gem_workarounds \
 	gen3_mixed_blits \
 	gen3_render_linear_blits \
