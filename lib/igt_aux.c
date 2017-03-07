@@ -367,9 +367,13 @@ hang_detector_process(pid_t pid, dev_t rdev)
 	pfd.events = POLLIN;
 
 	while (poll(&pfd, 1, -1) > 0) {
-		struct udev_device *dev = udev_monitor_receive_device(mon);
+		struct udev_device *dev;
 		dev_t devnum;
 
+		if (kill(pid, 0)) /* Parent has died, so must we. */
+			break;
+
+		dev = udev_monitor_receive_device(mon);
 		if (dev == NULL)
 			continue;
 
@@ -383,8 +387,6 @@ hang_detector_process(pid_t pid, dev_t rdev)
 		}
 
 		udev_device_unref(dev);
-		if (kill(pid, 0)) /* Parent has died, so must we. */
-			break;
 	}
 
 	exit(0);
