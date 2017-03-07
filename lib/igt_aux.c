@@ -359,6 +359,7 @@ hang_detector_process(pid_t pid, dev_t rdev)
 	struct udev_monitor *mon =
 		udev_monitor_new_from_netlink(udev_new(), "kernel");
 	struct pollfd pfd;
+	int ret;
 
 	udev_monitor_filter_add_match_subsystem_devtype(mon, "drm", NULL);
 	udev_monitor_enable_receiving(mon);
@@ -366,14 +367,19 @@ hang_detector_process(pid_t pid, dev_t rdev)
 	pfd.fd = udev_monitor_get_fd(mon);
 	pfd.events = POLLIN;
 
-	while (poll(&pfd, 1, -1) > 0) {
+	while ((ret = poll(&pfd, 1, 2000)) >= 0) {
 		struct udev_device *dev;
 		dev_t devnum;
 
-		if (kill(pid, 0)) /* Parent has died, so must we. */
+		if (kill(pid, 0)) { /* Parent has died, so must we. */
+			igt_warn("Parent died without killing its children (%s)\n",
+				 __func__);
 			break;
+		}
 
-		dev = udev_monitor_receive_device(mon);
+		dev = NULL;
+		if (ret > 0)
+			dev = udev_monitor_receive_device(mon);
 		if (dev == NULL)
 			continue;
 
