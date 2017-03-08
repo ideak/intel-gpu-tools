@@ -372,28 +372,6 @@ static const char *efp_port(uint8_t type)
 	return "unknown";
 }
 
-static const struct {
-	unsigned short type;
-	const char *name;
-} efp_conn_info[] = {
-	{ DEVICE_INFO_NONE, "N/A" },
-	{ DEVICE_INFO_HDMI_CERT, "HDMI certified" },
-	{ DEVICE_INFO_DP, "DisplayPort" },
-	{ DEVICE_INFO_DVI, "DVI" },
-};
-static const int num_efp_conn_info = sizeof(efp_conn_info) / sizeof(efp_conn_info[0]);
-
-static const char *efp_conn(uint8_t type)
-{
-	int i;
-
-	for (i = 0; i < num_efp_conn_info; i++)
-		if (efp_conn_info[i].type == type)
-			return efp_conn_info[i].name;
-
-	return "unknown";
-}
-
 static void dump_child_device(struct context *context,
 			      const struct child_device_config *child)
 {
