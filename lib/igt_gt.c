@@ -362,7 +362,8 @@ void igt_post_hang_ring(int fd, igt_hang_t arg)
  */
 void igt_force_gpu_reset(void)
 {
-	int fd, ret;
+	FILE *file;
+	int fd, ret, wedged;
 
 	igt_debug("Triggering GPU reset\n");
 
@@ -373,6 +374,15 @@ void igt_force_gpu_reset(void)
 	close(fd);
 
 	igt_assert_eq(ret, 3);
+
+	file = igt_debugfs_fopen("i915_wedged", "r");
+	igt_assert(file);
+
+	wedged = 1;
+	fscanf(file, "%d", &wedged);
+	fclose(file);
+
+	igt_assert(!wedged);
 }
 
 /* GPU abusers */

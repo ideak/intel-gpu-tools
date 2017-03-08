@@ -228,6 +228,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 		igt_require_hang_ring(fd, I915_EXEC_DEFAULT);
 	}
 
