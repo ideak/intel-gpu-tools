@@ -477,22 +477,64 @@ static int test_invalid_null_pointer(int fd)
 
 static int test_invalid_gtt_mapping(int fd)
 {
-	uint32_t handle, handle2;
-	void *ptr;
+	struct drm_i915_gem_mmap_gtt arg;
+	uint32_t handle;
+	char *gtt, *map;
+
+	/* Anonymous mapping to find a hole */
+	map = mmap(NULL, sizeof(linear) + 2 * PAGE_SIZE,
+		   PROT_READ | PROT_WRITE,
+		   MAP_PRIVATE | MAP_ANONYMOUS,
+		   -1, 0);
+	igt_assert(map != MAP_FAILED);
+
+	gem_userptr(fd, map, sizeof(linear) + 2 * PAGE_SIZE, 0, userptr_flags, &handle);
+	copy(fd, handle, handle, 0);
+	gem_close(fd, handle);
+
+	gem_userptr(fd, map, PAGE_SIZE, 0, userptr_flags, &handle);
+	copy(fd, handle, handle, 0);
+	gem_close(fd, handle);
+
+	gem_userptr(fd, map + sizeof(linear) + PAGE_SIZE, PAGE_SIZE, 0, userptr_flags, &handle);
+	copy(fd, handle, handle, 0);
+	gem_close(fd, handle);
 
 	/* GTT mapping */
-	handle = create_bo(fd, 0);
-	ptr = gem_mmap__gtt(fd, handle, sizeof(linear),
-			    PROT_READ | PROT_WRITE);
-	gem_close(fd, handle);
-	igt_assert(((unsigned long)ptr & (PAGE_SIZE - 1)) == 0);
+	memset(&arg, 0, sizeof(arg));
+	arg.handle = create_bo(fd, 0);
+	do_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &arg);
+	gtt = mmap(map + PAGE_SIZE, sizeof(linear),
+		   PROT_READ | PROT_WRITE,
+		   MAP_SHARED | MAP_FIXED,
+		   fd, arg.offset);
+	igt_assert(gtt == map + PAGE_SIZE);
+	gem_close(fd, arg.handle);
+	igt_assert(((unsigned long)gtt & (PAGE_SIZE - 1)) == 0);
 	igt_assert((sizeof(linear) & (PAGE_SIZE - 1)) == 0);
 
-	gem_userptr(fd, ptr, sizeof(linear), 0, userptr_flags, &handle2);
-	copy(fd, handle2, handle2, ~0); /* QQQ Precise errno? */
-	gem_close(fd, handle2);
+	gem_userptr(fd, gtt, sizeof(linear), 0, userptr_flags, &handle);
+	copy(fd, handle, handle, EFAULT);
+	gem_close(fd, handle);
 
-	munmap(ptr, sizeof(linear));
+	gem_userptr(fd, gtt, PAGE_SIZE, 0, userptr_flags, &handle);
+	copy(fd, handle, handle, EFAULT);
+	gem_close(fd, handle);
+
+	gem_userptr(fd, gtt + sizeof(linear) - PAGE_SIZE, PAGE_SIZE, 0, userptr_flags, &handle);
+	copy(fd, handle, handle, EFAULT);
+	gem_close(fd, handle);
+
+	/* boundaries */
+	gem_userptr(fd, map, 2*PAGE_SIZE, 0, userptr_flags, &handle);
+	copy(fd, handle, handle, EFAULT);
+	gem_close(fd, handle);
+
+	gem_userptr(fd, map + sizeof(linear), 2*PAGE_SIZE, 0, userptr_flags, &handle);
+	copy(fd, handle, handle, EFAULT);
+	gem_close(fd, handle);
+
+	munmap(map, sizeof(linear) + 2*PAGE_SIZE);
 
 	return 0;
 }
