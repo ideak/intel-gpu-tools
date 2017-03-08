@@ -292,6 +292,7 @@ igt_main
 	igt_fixture {
 		int fd = drm_open_driver_master(DRIVER_INTEL);
 
+		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
 
 		kmstest_set_vt_graphics_mode();
