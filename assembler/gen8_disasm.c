@@ -138,11 +138,6 @@ static const char *const m_dep_ctrl[4] = {
    "NoDDClr,NoDDChk",
 };
 
-static const char *const m_mask_ctrl[4] = {
-   "",
-   "nomask",
-};
-
 static const char *const m_access_mode[2] = { "align1", "align16" };
 
 static const char *const m_reg_type[8] = {
