@@ -1898,6 +1898,21 @@ igt_main
 				run_modes(name, c, modes, s, count);
 			}
 
+			snprintf(name, sizeof(name), "%s%s-%s",
+				 c->name, s->name, "shrink");
+			igt_subtest_group {
+				igt_fixture {
+					count = num_buffers(gem_mappable_aperture_size(),
+							    s, c, CHECK_RAM);
+
+					igt_fork_shrink_helper();
+				}
+				run_modes(name, c, modes, s, count);
+
+				igt_fixture
+					igt_stop_shrink_helper();
+			}
+
 			/* Use the entire mappable aperture, force swapping */
 			snprintf(name, sizeof(name), "%s%s-%s",
 				 c->name, s->name, "swap");

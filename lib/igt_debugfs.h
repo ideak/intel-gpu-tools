@@ -170,16 +170,25 @@ void igt_require_hpd_storm_ctl(void);
  */
 #define DROP_FREED 0x10
 /**
+ * DROP_SHRINK_ALL:
+ *
+ * Force all unpinned buffers to be evicted from their GTT and returned to the
+ * system.
+ */
+#define DROP_SHRINK_ALL 0x20
+/**
  * DROP_ALL:
  *
  * All of the above DROP_ flags combined.
  */
 #define DROP_ALL (DROP_UNBOUND | \
 		  DROP_BOUND | \
+		  DROP_SHRINK_ALL | \
 		  DROP_RETIRE | \
 		  DROP_ACTIVE | \
 		  DROP_FREED)
 
+bool igt_drop_caches_has(uint64_t val);
 void igt_drop_caches_set(uint64_t val);
 
 /*

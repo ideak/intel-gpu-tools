@@ -349,6 +349,45 @@ void igt_stop_signal_helper(void)
 	sig_stat = 0;
 }
 
+static struct igt_helper_process shrink_helper;
+static void __attribute__((noreturn)) shrink_helper_process(pid_t pid)
+{
+	while (1) {
+		igt_drop_caches_set(DROP_SHRINK_ALL);
+		usleep(1000 * 1000 / 50);
+		if (kill(pid, 0)) /* Parent has died, so must we. */
+			exit(0);
+	}
+}
+
+/**
+ * igt_fork_shrink_helper:
+ *
+ * Fork a child process using #igt_fork_helper to force all available objects
+ * to be paged out (via i915_gem_shrink()).
+ *
+ * This is useful to exercise swapping paths, without requiring us to hit swap.
+ *
+ * This should only be used from an igt_fixture.
+ */
+void igt_fork_shrink_helper(void)
+{
+	assert(!igt_only_list_subtests());
+	igt_require(igt_drop_caches_has(DROP_SHRINK_ALL));
+	igt_fork_helper(&shrink_helper)
+		shrink_helper_process(getppid());
+}
+
+/**
+ * igt_stop_shrink_helper:
+ *
+ * Stops the child process spawned with igt_fork_shrink_helper().
+ */
+void igt_stop_shrink_helper(void)
+{
+	igt_stop_helper(&shrink_helper);
+}
+
 #if HAVE_UDEV
 #include <libudev.h>
 

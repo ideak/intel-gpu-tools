@@ -210,10 +210,20 @@ igt_main
 	/* the rest of the tests are too long for simulation */
 	igt_skip_on_simulation();
 
-	igt_subtest("apperture-thrash") {
+	igt_subtest("aperture-thrash") {
 		count = 3 * gem_aperture_size(fd) / SIZE / 2;
 		intel_require_memory(count, SIZE, CHECK_RAM);
 		run_test(fd, count);
+	}
+
+	igt_subtest("aperture-shrink") {
+		igt_fork_shrink_helper();
+
+		count = 3 * gem_aperture_size(fd) / SIZE / 2;
+		intel_require_memory(count, SIZE, CHECK_RAM);
+		run_test(fd, count);
+
+		igt_stop_shrink_helper();
 	}
 
 	igt_subtest("swap-thrash") {

@@ -873,6 +873,28 @@ void igt_pipe_crc_collect_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out_crc)
  */
 
 /**
+ * igt_drop_caches_has:
+ * @val: bitmask for DROP_* values
+ *
+ * This queries the debugfs to see if it supports the full set of desired
+ * operations.
+ */
+bool igt_drop_caches_has(uint64_t val)
+{
+	FILE *file;
+	uint64_t mask;
+
+	mask = 0;
+	file = igt_debugfs_fopen("i915_gem_drop_caches", "r");
+	if (file) {
+		fscanf(file, "0x%" PRIx64, &mask);
+		fclose(file);
+	}
+
+	return (val & mask) == val;
+}
+
+/**
  * igt_drop_caches_set:
  * @val: bitmask for DROP_* values
  *
