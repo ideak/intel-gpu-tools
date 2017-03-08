@@ -96,7 +96,6 @@ unsigned int plane_fb_id;
 unsigned int plane_crtc_id;
 unsigned int plane_id;
 int plane_width, plane_height;
-static const uint32_t SPRITE_COLOR_KEY = 0x00aaaaaa;
 
 /*
  * Mode setting with the kernel interfaces is a bit of a chore.
