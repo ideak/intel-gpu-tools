@@ -831,6 +831,25 @@ static uint32_t plane_get_igt_format(struct kms_atomic_plane_state *plane)
 	return ret;
 }
 
+static void
+set_dpms(int fd, int mode)
+{
+	int i;
+	drmModeConnector *connector;
+	uint32_t id;
+	drmModeRes *resources = drmModeGetResources(fd);
+
+	for (i = 0; i < resources->count_connectors; i++) {
+		id = resources->connectors[i];
+
+		connector = drmModeGetConnectorCurrent(fd, id);
+
+		kmstest_set_connector_dpms(fd, connector, mode);
+
+		drmModeFreeConnector(connector);
+	}
+}
+
 static void plane_overlay(struct kms_atomic_crtc_state *crtc,
 			  struct kms_atomic_plane_state *plane_old)
 {
@@ -926,6 +945,57 @@ static void plane_primary(struct kms_atomic_crtc_state *crtc,
 
 	/* Finally, restore to the original state. */
 	crtc_commit_atomic(crtc, plane_old, req, ATOMIC_RELAX_NONE, flags);
+
+	drmModeAtomicFree(req);
+}
+
+/* test to ensure that DRM_MODE_ATOMIC_TEST_ONLY really only touches the
+ * free-standing state objects and nothing else.
+ */
+static void test_only(struct kms_atomic_crtc_state *crtc,
+		      struct kms_atomic_plane_state *plane_old)
+{
+	struct drm_mode_modeinfo *mode = crtc->mode.data;
+	struct kms_atomic_plane_state plane = *plane_old;
+	uint32_t format = plane_get_igt_format(&plane);
+	drmModeAtomicReq *req = drmModeAtomicAlloc();
+	struct igt_fb fb;
+	int ret;
+
+	igt_require(format != 0);
+
+	plane.src_x = 0;
+	plane.src_y = 0;
+	plane.src_w = mode->hdisplay << 16;
+	plane.src_h = mode->vdisplay << 16;
+	plane.crtc_x = 0;
+	plane.crtc_y = 0;
+	plane.crtc_w = mode->hdisplay;
+	plane.crtc_h = mode->vdisplay;
+	plane.crtc_id = crtc->obj;
+	plane.fb_id = igt_create_pattern_fb(plane.state->desc->fd,
+					    plane.crtc_w, plane.crtc_h,
+					    format, I915_TILING_NONE, &fb);
+
+	drmModeAtomicSetCursor(req, 0);
+	crtc_populate_req(crtc, req);
+	plane_populate_req(&plane, req);
+	ret = drmModeAtomicCommit(crtc->state->desc->fd, req,
+				  DRM_MODE_ATOMIC_TEST_ONLY, NULL);
+
+	igt_assert_eq(ret, 0);
+
+	/* go through dpms off/on cycle */
+	set_dpms(crtc->state->desc->fd, DRM_MODE_DPMS_OFF);
+	set_dpms(crtc->state->desc->fd, DRM_MODE_DPMS_ON);
+
+	/* check the state */
+	crtc_check_current_state(crtc, plane_old, ATOMIC_RELAX_NONE);
+	plane_check_current_state(plane_old, ATOMIC_RELAX_NONE);
+
+	/* Re-enable the plane through the legacy CRTC/primary-plane API, and
+	 * verify through atomic. */
+	crtc_commit_legacy(crtc, plane_old, CRTC_RELAX_MODE);
 
 	drmModeAtomicFree(req);
 }
@@ -1424,6 +1494,18 @@ igt_main
 		igt_require(crtc);
 		igt_require(plane);
 		plane_primary(crtc, plane);
+		atomic_state_free(scratch);
+	}
+
+	igt_subtest("test_only") {
+		struct kms_atomic_state *scratch = atomic_state_dup(current);
+		struct kms_atomic_crtc_state *crtc = find_crtc(scratch, true);
+		struct kms_atomic_plane_state *plane =
+			find_plane(scratch, PLANE_TYPE_PRIMARY, crtc);
+
+		igt_require(crtc);
+		igt_require(plane);
+		test_only(crtc, plane);
 		atomic_state_free(scratch);
 	}
 
