@@ -338,7 +338,7 @@ void gem_close(int fd, uint32_t handle)
 	do_ioctl(fd, DRM_IOCTL_GEM_CLOSE, &close_bo);
 }
 
-static int __gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf, uint64_t length)
+int __gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf, uint64_t length)
 {
 	struct drm_i915_gem_pwrite gem_pwrite;
 	int err;

@@ -62,6 +62,7 @@ uint32_t gem_get_caching(int fd, uint32_t handle);
 uint32_t gem_flink(int fd, uint32_t handle);
 uint32_t gem_open(int fd, uint32_t name);
 void gem_close(int fd, uint32_t handle);
+int __gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf, uint64_t length);
 void gem_write(int fd, uint32_t handle, uint64_t offset,  const void *buf, uint64_t length);
 void gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t length);
 void gem_set_domain(int fd, uint32_t handle,

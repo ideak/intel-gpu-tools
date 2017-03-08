@@ -113,19 +113,14 @@ static void
 dontneed_before_pwrite(void)
 {
 	int fd = drm_open_driver(DRIVER_INTEL);
-	uint32_t buf[] = { MI_BATCH_BUFFER_END, 0 };
-	struct drm_i915_gem_pwrite gem_pwrite;
+	uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
 
-	gem_pwrite.handle = gem_create(fd, OBJECT_SIZE);
-	gem_pwrite.offset = 0;
-	gem_pwrite.size = sizeof(buf);
-	gem_pwrite.data_ptr = to_user_pointer(buf);
-	gem_madvise(fd, gem_pwrite.handle, I915_MADV_DONTNEED);
+	handle = gem_create(fd, OBJECT_SIZE);
+	gem_madvise(fd, handle, I915_MADV_DONTNEED);
 
-	igt_assert(drmIoctl(fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite));
-	igt_assert(errno == EFAULT);
+	igt_assert_eq(__gem_write(fd, handle, 0, &bbe, sizeof(bbe)), -EFAULT);
 
-	gem_close(fd, gem_pwrite.handle);
 	close(fd);
 }
 
@@ -147,9 +142,8 @@ dontneed_before_exec(void)
 	execbuf.buffers_ptr = to_user_pointer(&exec);
 	execbuf.buffer_count = 1;
 	execbuf.batch_len = sizeof(buf);
-	gem_execbuf(fd, &execbuf);
+	igt_assert_eq(__gem_execbuf(fd, &execbuf), -EFAULT);
 
-	gem_close(fd, exec.handle);
 	close(fd);
 }
 
