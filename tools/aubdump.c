@@ -633,7 +633,8 @@ ioctl(int fd, unsigned long request, ...)
 			return libc_ioctl(fd, request, argp);
 		}
 
-		case DRM_IOCTL_I915_GEM_EXECBUFFER2: {
+		case DRM_IOCTL_I915_GEM_EXECBUFFER2:
+		case DRM_IOCTL_I915_GEM_EXECBUFFER2_WR: {
 			dump_execbuffer2(fd, argp);
 			if (device_override)
 				return 0;
