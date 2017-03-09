@@ -133,8 +133,8 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 			      uint64_t surface_size,
 			      uint64_t surface_count)
 {
+	unsigned int *can_mlock;
 	uint64_t sz, pin;
-	void *locked;
 
 	intel_require_memory(surface_count, surface_size, CHECK_RAM);
 
@@ -148,17 +148,22 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 		  (long long)pin/(1024*1024),
 		  (long long)(pin + sz)/(1024*1024));
 
-	locked = malloc(pin + sz);
-	if (locked != NULL && mlock(locked, pin + sz)) {
-		free(locked);
-		locked = NULL;
-	} else {
-		munlock(locked, pin + sz);
-		free(locked);
-	}
-	igt_require(locked);
+	can_mlock = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(can_mlock != MAP_FAILED);
 
 	igt_fork(child, 1) {
+		void *locked;
+
+		locked = malloc(pin + sz);
+		if (locked != NULL && !mlock(locked, pin + sz))
+			*can_mlock = 1;
+	}
+	igt_waitchildren();
+	igt_require(*can_mlock);
+	munmap(can_mlock, 4096);
+
+	igt_fork(child, 1) {
+		void *locked;
 		uint32_t *bo;
 		uint64_t n;
 		int ret;
