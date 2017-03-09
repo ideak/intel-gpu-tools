@@ -389,7 +389,7 @@ hang_detector_process(pid_t pid, dev_t rdev)
 
 			str = udev_device_get_property_value(dev, "ERROR");
 			if (str && atoi(str) == 1)
-				kill(pid, SIGRTMAX);
+				kill(pid, SIGIO);
 		}
 
 		udev_device_unref(dev);
@@ -410,7 +410,7 @@ void igt_fork_hang_detector(int fd)
 
 	igt_assert(fstat(fd, &st) == 0);
 
-	signal(SIGRTMAX - 1, sig_abort);
+	signal(SIGIO, sig_abort);
 	igt_fork_helper(&hang_detector)
 		hang_detector_process(getppid(), st.st_rdev);
 }
