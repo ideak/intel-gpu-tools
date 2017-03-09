@@ -5,7 +5,6 @@ intel_aubdump
 intel_audio_dump
 intel_backlight
 intel_bios_dumper
-intel_vbt_decode
 intel_display_crc
 intel_display_poller
 intel_dp_compliance
@@ -20,6 +19,7 @@ intel_gpu_time
 intel_gpu_top
 intel_gtt
 intel_guc_logger
+intel_gvtg_test
 intel_infoframes
 intel_l3_parity
 intel_lid
@@ -30,6 +30,7 @@ intel_reg
 intel_reg_checker
 intel_residency
 intel_stepping
+intel_vbt_decode
 intel_watermark
 skl_compute_wrpll
 skl_ddb_allocation

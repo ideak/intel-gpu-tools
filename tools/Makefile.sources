@@ -30,6 +30,7 @@ tools_prog_lists =		\
 	intel_vbt_decode	\
 	intel_watermark		\
 	intel_gem_info		\
+	intel_gvtg_test     \
 	$(NULL)
 
 dist_bin_SCRIPTS = intel_gpu_abrt
