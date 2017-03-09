@@ -312,9 +312,12 @@ static void test_allocations(int fd)
 
 	memset(obj, 0, sizeof(obj));
 	for (i = 0; i < ARRAY_SIZE(obj); i++) {
-		obj[i].handle = gem_create(fd, 1ull<<(12 + i));
-		gem_write(fd, obj[i].handle, (1ull<<(12+i)) - 8 - sizeof(bbe),
-			  &bbe, sizeof(bbe));
+		uint64_t size = 1ull << (12 + i);
+
+		obj[i].handle = gem_create(fd, size);
+		for (uint64_t page = 4096; page <= size; page += 4096)
+			gem_write(fd, obj[i].handle,
+				  page - sizeof(bbe), &bbe, sizeof(bbe));
 	}
 
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -324,7 +327,8 @@ static void test_allocations(int fd)
 		i = rand() % ARRAY_SIZE(obj);
 		execbuf.buffers_ptr = to_user_pointer(&obj[i]);
 		execbuf.batch_start_offset = (rand() % (1ull<<i)) << 12;
-		execbuf.batch_len = (1ull<<(12+i)) - 8 - execbuf.batch_start_offset;
+		execbuf.batch_start_offset += 64 * (rand() % 64);
+		execbuf.batch_len = (1ull<<(12+i)) - execbuf.batch_start_offset;
 		gem_execbuf(fd, &execbuf);
 	}
 
@@ -435,6 +439,7 @@ igt_main
 
 		/* ATM cmd parser only exists on gen7. */
 		igt_require(intel_gen(intel_get_drm_devid(fd)) == 7);
+		igt_fork_hang_detector(fd);
 	}
 
 	igt_subtest("basic-allowed") {
@@ -661,6 +666,7 @@ igt_main
 		hsw_load_register_reg();
 
 	igt_fixture {
+		igt_stop_hang_detector();
 		gem_close(fd, handle);
 
 		close(fd);
