@@ -33,6 +33,10 @@
 
 #include "igt.h"
 #include "igt_gt.h"
+#include "igt_vgem.h"
+
+#include <signal.h>
+#include <sys/ioctl.h>
 
 #define INTERRUPTIBLE 0x1
 #define HANG 0x2
@@ -42,6 +46,8 @@
 #define SUSPEND 0x20
 #define HIBERNATE 0x40
 #define NEWFD 0x80
+
+static unsigned int ring_size;
 
 static void check_bo(int fd, uint32_t handle)
 {
@@ -58,7 +64,7 @@ static void check_bo(int fd, uint32_t handle)
 
 static void fill_ring(int fd,
 		      struct drm_i915_gem_execbuffer2 *execbuf,
-		      unsigned flags)
+		      unsigned flags, unsigned timeout)
 {
 	/* The ring we've been using is 128k, and each rendering op
 	 * will use at least 8 dwords:
@@ -76,9 +82,11 @@ static void fill_ring(int fd,
 	 * doing this, we aren't likely to with this test.
 	 */
 	igt_debug("Executing execbuf %d times\n", 128*1024/(8*4));
-	igt_while_interruptible(flags & INTERRUPTIBLE) {
-		for (int i = 0; i < 128*1024 / (8 * 4); i++)
-			gem_execbuf(fd, execbuf);
+	igt_until_timeout(timeout) {
+		igt_while_interruptible(flags & INTERRUPTIBLE) {
+			for (typeof(ring_size) i = 0; i < ring_size; i++)
+				gem_execbuf(fd, execbuf);
+		}
 	}
 }
 
@@ -160,7 +168,7 @@ static int setup_execbuf(int fd,
 	return 0;
 }
 
-static void run_test(int fd, unsigned ring, unsigned flags)
+static void run_test(int fd, unsigned ring, unsigned flags, unsigned timeout)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -173,7 +181,7 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 		      "MI_STORE_DATA broken on gen6 bsd\n");
 
 	if (flags & (SUSPEND | HIBERNATE))
-		run_test(fd, ring, 0);
+		run_test(fd, ring, 0, 0);
 
 	gem_quiescent_gpu(fd);
 	igt_require(setup_execbuf(fd, &execbuf, obj, reloc, ring) == 0);
@@ -198,7 +206,7 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 				fd = drm_open_driver(DRIVER_INTEL);
 				setup_execbuf(fd, &execbuf, obj, reloc, ring);
 			}
-			fill_ring(fd, &execbuf, flags);
+			fill_ring(fd, &execbuf, flags, timeout);
 		}
 
 		if (flags & SUSPEND)
@@ -210,11 +218,11 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 						      SUSPEND_TEST_NONE);
 
 		if (flags & NEWFD)
-			fill_ring(fd, &execbuf, flags);
+			fill_ring(fd, &execbuf, flags, timeout);
 
 		igt_waitchildren();
 	} else
-		fill_ring(fd, &execbuf, flags);
+		fill_ring(fd, &execbuf, flags, timeout);
 
 	if (flags & HANG)
 		igt_post_hang_ring(fd, hang);
@@ -227,7 +235,7 @@ static void run_test(int fd, unsigned ring, unsigned flags)
 	gem_quiescent_gpu(fd);
 
 	if (flags & (SUSPEND | HIBERNATE))
-		run_test(fd, ring, 0);
+		run_test(fd, ring, 0, 0);
 }
 
 static bool can_store_dword_imm(int fd)
@@ -235,27 +243,115 @@ static bool can_store_dword_imm(int fd)
 	return intel_gen(intel_get_drm_devid(fd)) > 2;
 }
 
+struct cork {
+	int device;
+	uint32_t handle;
+	uint32_t fence;
+};
+
+static void plug(int fd, struct cork *c)
+{
+	struct vgem_bo bo;
+	int dmabuf;
+
+	c->device = drm_open_driver(DRIVER_VGEM);
+
+	bo.width = bo.height = 1;
+	bo.bpp = 4;
+	vgem_create(c->device, &bo);
+	c->fence = vgem_fence_attach(c->device, &bo, VGEM_FENCE_WRITE);
+
+	dmabuf = prime_handle_to_fd(c->device, bo.handle);
+	c->handle = prime_fd_to_handle(fd, dmabuf);
+	close(dmabuf);
+}
+
+static void unplug(struct cork *c)
+{
+	vgem_fence_signal(c->device, c->fence);
+	close(c->device);
+}
+
+static void alarm_handler(int sig)
+{
+}
+
+static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	return ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf);
+}
+
+static unsigned int measure_ring_size(int fd)
+{
+	struct sigaction sa = { .sa_handler = alarm_handler };
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned int count, last;
+	struct itimerval itv;
+	struct cork c;
+
+	memset(obj, 0, sizeof(obj));
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	plug(fd, &c);
+	obj[0].handle = c.handle;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+
+	sigaction(SIGALRM, &sa, NULL);
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 100;
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 1000;
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	last = count = 0;
+	do {
+		if (__execbuf(fd, &execbuf) == 0) {
+			count++;
+			continue;
+		}
+
+		if (last == count)
+			break;
+
+		last = count;
+	} while (1);
+
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	unplug(&c);
+	gem_close(fd, obj[1].handle);
+
+	return count;
+}
+
 igt_main
 {
 	const struct {
 		const char *suffix;
 		unsigned flags;
+		unsigned timeout;
 		bool basic;
 	} modes[] = {
-		{ "", 0, true},
-		{ "-interruptible", INTERRUPTIBLE, true },
-		{ "-hang", HANG, true },
-		{ "-child", CHILD },
-		{ "-forked", FORKED, true },
-		{ "-fd", FORKED | NEWFD, true },
-		{ "-bomb", BOMB | NEWFD | INTERRUPTIBLE },
-		{ "-S3", BOMB | SUSPEND },
-		{ "-S4", BOMB | HIBERNATE },
+		{ "", 0, 0, true},
+		{ "-interruptible", INTERRUPTIBLE, 1, true },
+		{ "-hang", HANG, 10, true },
+		{ "-child", CHILD, 0 },
+		{ "-forked", FORKED, 0, true },
+		{ "-fd", FORKED | NEWFD, 0, true },
+		{ "-bomb", BOMB | NEWFD | INTERRUPTIBLE, 150 },
+		{ "-S3", BOMB | SUSPEND, 30 },
+		{ "-S4", BOMB | HIBERNATE, 30 },
 		{ NULL }
 	}, *m;
-	const struct intel_execution_engine *e;
 	bool master = false;
-	int fd;
+	int fd = -1;
 
 	igt_fixture {
 		int gen;
@@ -268,16 +364,23 @@ igt_main
 			igt_require(drmSetMaster(fd) == 0);
 			master = true;
 		}
+
+		ring_size = measure_ring_size(fd);
+		igt_info("Ring size: %d batches\n", ring_size);
+		igt_require(ring_size);
 	}
 
 	for (m = modes; m->suffix; m++) {
+		const struct intel_execution_engine *e;
+
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("%s%s%s",
 				      m->basic && !e->exec_id ? "basic-" : "",
 				      e->name,
 				      m->suffix) {
 				igt_skip_on(m->flags & NEWFD && master);
-				run_test(fd, e->exec_id | e->flags, m->flags);
+				run_test(fd, e->exec_id | e->flags,
+					 m->flags, m->timeout);
 			}
 		}
 	}
