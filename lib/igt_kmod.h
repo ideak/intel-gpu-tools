@@ -35,10 +35,16 @@ int igt_kmod_unload(const char *mod_name, unsigned int flags);
 int igt_i915_driver_load(const char *opts);
 int igt_i915_driver_unload(void);
 
+struct igt_kselftest_mockentry {
+	const char *name;
+	bool do_mock;
+};
+
 void igt_kselftests(const char *module_name,
 		    const char *module_options,
 		    const char *result_option,
-		    const char *filter);
+		    const char *filter,
+		    struct igt_kselftest_mockentry* mocklist);
 
 struct igt_kselftest {
 	struct kmod_module *kmod;

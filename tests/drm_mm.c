@@ -28,5 +28,20 @@ IGT_TEST_DESCRIPTION("Basic sanity check of DRM's range manager (struct drm_mm)"
 
 igt_main
 {
-	igt_kselftests("test-drm_mm", NULL, NULL, NULL);
+	/*
+	 * Set of subtest names that are always exposed by IGT,
+	 * regardless of the running kernel's capabilities. Selftests
+	 * that the kernel has but are not on these lists are also
+	 * exposed. This is a known intentional violation of the
+	 * general rule that subtest enumeration must not change
+	 * depending on the runtime environment.
+	 */
+	struct igt_kselftest_mockentry drm_mm_testlist[] = {
+#define selftest(n, x) { .name = #n, .do_mock = true },
+#include "drm_mm_selftests.h"
+#undef selftest
+		{ NULL, false }
+	};
+
+	igt_kselftests("test-drm_mm", NULL, NULL, NULL, drm_mm_testlist);
 }

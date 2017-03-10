@@ -493,30 +493,54 @@ void igt_kselftest_fini(struct igt_kselftest *tst)
 	kmod_module_unref(tst->kmod);
 }
 
+static void mocklist_mark_entry(struct igt_kselftest_mockentry *mocklist,
+				const char *name)
+{
+	struct igt_kselftest_mockentry *me;
+
+	for (me = mocklist; me->name != NULL; ++me) {
+		if (!strcmp(me->name, name)) {
+			me->do_mock = false;
+			return;
+		}
+	}
+}
+
 void igt_kselftests(const char *module_name,
 		    const char *options,
 		    const char *result,
-		    const char *filter)
+		    const char *filter,
+		    struct igt_kselftest_mockentry *mocklist)
 {
 	struct igt_kselftest tst;
 	IGT_LIST(tests);
 	struct igt_kselftest_list *tl, *tn;
+	struct igt_kselftest_mockentry *me;
 
-	igt_require(igt_kselftest_init(&tst, module_name) == 0);
-	igt_fixture
-		igt_require(igt_kselftest_begin(&tst) == 0);
+	if (igt_kselftest_init(&tst, module_name) == 0) {
+		igt_fixture
+			igt_require(igt_kselftest_begin(&tst) == 0);
 
-	igt_kselftest_get_tests(tst.kmod, filter, &tests);
-	igt_list_for_each_safe(tl, tn, &tests, link) {
-		igt_subtest_f("%s", tl->name)
-			igt_kselftest_execute(&tst, tl, options, result);
-		free(tl);
+		igt_kselftest_get_tests(tst.kmod, filter, &tests);
+		igt_list_for_each_safe(tl, tn, &tests, link) {
+			igt_subtest_f("%s", tl->name)
+				igt_kselftest_execute(&tst, tl, options, result);
+			mocklist_mark_entry(mocklist, tl->name);
+			free(tl);
+		}
+
+		igt_fixture {
+			igt_kselftest_end(&tst);
+			igt_require(!igt_list_empty(&tests));
+		}
+
+		igt_kselftest_fini(&tst);
 	}
 
-	igt_fixture {
-		igt_kselftest_end(&tst);
-		igt_require(!igt_list_empty(&tests));
+	/* Expose subtests for anything the above didn't already generate. */
+	for (me = mocklist; me->name != NULL; ++me) {
+		if (me->do_mock)
+			igt_subtest(me->name)
+				igt_skip("Kernel selftest not present");
 	}
-
-	igt_kselftest_fini(&tst);
 }
