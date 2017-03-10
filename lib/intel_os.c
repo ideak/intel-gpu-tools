@@ -51,6 +51,7 @@
 #include "intel_io.h"
 #include "drmtest.h"
 #include "igt_aux.h"
+#include "igt_debugfs.h"
 
 /**
  * intel_get_total_ram_mb:
@@ -294,6 +295,8 @@ void intel_require_memory(uint64_t count, uint64_t size, unsigned mode)
 void intel_purge_vm_caches(void)
 {
 	int fd;
+
+	igt_drop_caches_set(DROP_SHRINK_ALL);
 
 	fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
 	if (fd >= 0) {
