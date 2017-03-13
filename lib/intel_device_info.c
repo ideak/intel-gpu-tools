@@ -9,10 +9,16 @@ static const struct intel_device_info intel_generic_info = {
 	.gen = 0,
 };
 
-static const struct intel_device_info intel_i81x_info = {
+static const struct intel_device_info intel_i810_info = {
 	.gen = BIT(0),
 	.is_whitney = true,
 	.codename = "solano" /* 815 == "whitney" ? or vice versa? */
+};
+
+static const struct intel_device_info intel_i815_info = {
+	.gen = BIT(0),
+	.is_whitney = true,
+	.codename = "whitney"
 };
 
 static const struct intel_device_info intel_i830_info = {
@@ -182,6 +188,9 @@ static const struct intel_device_info intel_geminilake_info = {
 };
 
 static const struct pci_id_match intel_device_match[] = {
+	INTEL_I810_IDS(&intel_i810_info),
+	INTEL_I815_IDS(&intel_i815_info),
+
 	INTEL_I830_IDS(&intel_i830_info),
 	INTEL_I845G_IDS(&intel_i845_info),
 	INTEL_I85X_IDS(&intel_i855_info),
