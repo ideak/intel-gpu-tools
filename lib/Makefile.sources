@@ -83,9 +83,6 @@ lib_source_list =	 	\
 	uwildmat/uwildmat.c	\
 	igt_kmod.c		\
 	igt_kmod.h		\
-	drm_mm_selftests.h      \
-	i915_live_selftests.h   \
-	i915_mock_selftests.h   \
 	$(NULL)
 
 if HAVE_CHAMELIUM
