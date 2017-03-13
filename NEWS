@@ -1,3 +1,40 @@
+Release 1.18 (2017-03-13)
+-------------------------
+
+Library changes:
+
+- Various changes to library functions so that they don't assume Intel
+  hardware. (Lyude)
+
+- Added helper functions for managing synchronization primitives.
+  (Robert Foss)
+
+- Added support for the new generic CRC capture kernel ABI. (Tomeu
+  Vizoso)
+
+- Added Geminilake platform support. (Ander Conselvan de Oliveira)
+
+- Added helpers for sysfs hotplug events. (Lyude)
+
+- Added support for hotplug testing with the Chamelium device (Lyude)
+
+Tools changes:
+
+- intel_dp_compliance: New tool for running automated DisplayPort
+  compliance tests. (Manasi Navare)
+
+- Renamed intel_bios_reader to intel_vbt_decode. (Jani Nikula)
+
+- intel_gvtg_test: New tool for setting up GVT-g guests based on
+  KVMGT. (Terrence Xu)
+
+Test changes:
+
+- Multiple new tests.
+
+
+And many other bug fixes and improvements.
+
 Release 1.17 (2016-12-02)
 -------------------------
 
