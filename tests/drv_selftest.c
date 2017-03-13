@@ -28,27 +28,6 @@ IGT_TEST_DESCRIPTION("Basic unit tests for i915.ko");
 
 igt_main
 {
-	/*
-	 * Set of subtest names that are always exposed by IGT,
-	 * regardless of the running kernel's capabilities. Selftests
-	 * that the kernel has but are not on these lists are also
-	 * exposed. This is a known intentional violation of the
-	 * general rule that subtest enumeration must not change
-	 * depending on the runtime environment.
-	 */
-	struct igt_kselftest_mockentry i915_mock_testlist[] = {
-#define selftest(n, x) { .name = "mock_" #n, .do_mock = true },
-#include "i915_mock_selftests.h"
-#undef selftest
-		{ NULL, false }
-	};
-	struct igt_kselftest_mockentry i915_live_testlist[] = {
-#define selftest(n, x) { .name = "live_" #n, .do_mock = true },
-#include "i915_live_selftests.h"
-#undef selftest
-		{ NULL, false }
-	};
-
-	igt_kselftests("i915", "mock_selftests=-1", NULL, "mock", i915_mock_testlist);
-	igt_kselftests("i915", "live_selftests=-1", "live_selftests", "live", i915_live_testlist);
+	igt_kselftests("i915", "mock_selftests=-1", NULL, "mock");
+	igt_kselftests("i915", "live_selftests=-1", "live_selftests", "live");
 }
