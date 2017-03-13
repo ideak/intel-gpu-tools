@@ -57,6 +57,8 @@ function print_help {
 	echo "  -s              create html summary"
 	echo "  -t <regex>      only include tests that match the regular expression"
 	echo "                  (can be used more than once)"
+	echo "  -T <filename>   run tests listed in testlist"
+	echo "                  (overrides -t and -x)"
 	echo "  -v              enable verbose mode"
 	echo "  -x <regex>      exclude tests that match the regular expression"
 	echo "                  (can be used more than once)"
@@ -81,7 +83,7 @@ function list_tests {
 	done
 }
 
-while getopts ":dhlr:st:vx:Rn" opt; do
+while getopts ":dhlr:st:T:vx:Rn" opt; do
 	case $opt in
 		d) download_piglit; exit ;;
 		h) print_help; exit ;;
@@ -89,6 +91,7 @@ while getopts ":dhlr:st:vx:Rn" opt; do
 		r) RESULTS="$OPTARG" ;;
 		s) SUMMARY="html" ;;
 		t) FILTER="$FILTER -t $OPTARG" ;;
+		T) FILTER="$FILTER --test-list $OPTARG" ;;
 		v) VERBOSE="-v" ;;
 		x) EXCLUDE="$EXCLUDE -x $OPTARG" ;;
 		R) RESUME="true" ;;
