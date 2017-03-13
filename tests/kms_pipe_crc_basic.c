@@ -249,10 +249,14 @@ igt_main
 		}
 
 		igt_subtest_f("hang-read-crc-pipe-%c", 'A'+i) {
-			igt_hang_t hang =
-				igt_hang_ring(data.drm_fd, I915_EXEC_RENDER);
+			igt_hang_t hang;
+
+			test_read_crc(&data, i, 0);
+
+			hang = igt_hang_ring(data.drm_fd, I915_EXEC_RENDER);
 			test_read_crc(&data, i, 0);
 			igt_post_hang_ring(data.drm_fd, hang);
+
 			test_read_crc(&data, i, 0);
 		}
 	}
