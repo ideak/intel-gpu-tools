@@ -3020,8 +3020,7 @@ void igt_crtc_set_background(igt_pipe_t *pipe, uint64_t background)
 	pipe->background_changed = true;
 }
 
-
-void igt_wait_for_vblank(int drm_fd, enum pipe pipe)
+void igt_wait_for_vblank_count(int drm_fd, enum pipe pipe, int count)
 {
 	drmVBlank wait_vbl;
 	uint32_t pipe_id_flag;
@@ -3031,9 +3030,14 @@ void igt_wait_for_vblank(int drm_fd, enum pipe pipe)
 
 	wait_vbl.request.type = DRM_VBLANK_RELATIVE;
 	wait_vbl.request.type |= pipe_id_flag;
-	wait_vbl.request.sequence = 1;
+	wait_vbl.request.sequence = count;
 
 	igt_assert(drmWaitVBlank(drm_fd, &wait_vbl) == 0);
+}
+
+void igt_wait_for_vblank(int drm_fd, enum pipe pipe)
+{
+	igt_wait_for_vblank_count(drm_fd, pipe, 1);
 }
 
 /**

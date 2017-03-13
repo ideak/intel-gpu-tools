@@ -415,6 +415,7 @@ void igt_fb_set_size(struct igt_fb *fb, igt_plane_t *plane,
 	uint32_t w, uint32_t h);
 
 void igt_wait_for_vblank(int drm_fd, enum pipe pipe);
+void igt_wait_for_vblank_count(int drm_fd, enum pipe pipe, int count);
 
 static inline bool igt_output_is_connected(igt_output_t *output)
 {
