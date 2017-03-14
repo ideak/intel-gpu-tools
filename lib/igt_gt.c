@@ -379,7 +379,7 @@ void igt_force_gpu_reset(void)
 	igt_assert(file);
 
 	wedged = 1;
-	fscanf(file, "%d", &wedged);
+	igt_ignore_warn(fscanf(file, "%d", &wedged));
 	fclose(file);
 
 	igt_assert(!wedged);

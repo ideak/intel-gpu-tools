@@ -887,7 +887,7 @@ bool igt_drop_caches_has(uint64_t val)
 	mask = 0;
 	file = igt_debugfs_fopen("i915_gem_drop_caches", "r");
 	if (file) {
-		fscanf(file, "0x%" PRIx64, &mask);
+		igt_ignore_warn(fscanf(file, "0x%" PRIx64, &mask));
 		fclose(file);
 	}
 
