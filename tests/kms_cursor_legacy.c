@@ -613,12 +613,12 @@ static void basic_flip_cursor(igt_display_t *display,
 	/* Bind the cursor first to warm up */
 	do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 
-	/* Start with a synchronous query to align with the vblank */
-	vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
-
 	busy = NULL;
 	if (flags & BASIC_BUSY)
 		busy = make_fb_busy(display->drm_fd, &fb_info);
+
+	/* Start with a synchronous query to align with the vblank */
+	vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
 
 	switch (order) {
 	case FLIP_BEFORE_CURSOR:
