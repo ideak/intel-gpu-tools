@@ -75,7 +75,8 @@ static bool ignore_connector_property(const char *name, bool atomic)
 		return true;
 
 	/* FIXME: Remove when all intel connectors are converted to atomic. */
-	if (!atomic && !strcmp(name, "CRTC_ID"))
+	if (!atomic && (!strcmp(name, "CRTC_ID") ||
+			!strcmp(name, "link-status")))
 		return true;
 
 	if (atomic && !strcmp(name, "DPMS"))
