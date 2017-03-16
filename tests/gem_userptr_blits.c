@@ -83,8 +83,7 @@ static void gem_userptr_sync(int fd, uint32_t handle)
 	gem_set_domain(fd, handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 }
 
-static void
-copy(int fd, uint32_t dst, uint32_t src, unsigned int error)
+static int copy(int fd, uint32_t dst, uint32_t src)
 {
 	uint32_t batch[12];
 	struct drm_i915_gem_relocation_entry reloc[2];
@@ -151,10 +150,7 @@ copy(int fd, uint32_t dst, uint32_t src, unsigned int error)
 	ret = __gem_execbuf(fd, &exec);
 	gem_close(fd, handle);
 
-	if (error == ~0)
-		igt_assert_neq(ret, 0);
-	else
-		igt_assert_eq(ret, -error);
+	return ret;
 }
 
 static int
@@ -469,7 +465,7 @@ static int test_invalid_null_pointer(int fd)
 	/* NULL pointer. */
 	gem_userptr(fd, NULL, PAGE_SIZE, 0, userptr_flags, &handle);
 
-	copy(fd, handle, handle, ~0); /* QQQ Precise errno? */
+	igt_assert_neq(copy(fd, handle, handle), 0); /* QQQ Precise errno? */
 	gem_close(fd, handle);
 
 	return 0;
@@ -489,15 +485,15 @@ static int test_invalid_gtt_mapping(int fd)
 	igt_assert(map != MAP_FAILED);
 
 	gem_userptr(fd, map, sizeof(linear) + 2 * PAGE_SIZE, 0, userptr_flags, &handle);
-	copy(fd, handle, handle, 0);
+	igt_assert_eq(copy(fd, handle, handle), 0);
 	gem_close(fd, handle);
 
 	gem_userptr(fd, map, PAGE_SIZE, 0, userptr_flags, &handle);
-	copy(fd, handle, handle, 0);
+	igt_assert_eq(copy(fd, handle, handle), 0);
 	gem_close(fd, handle);
 
 	gem_userptr(fd, map + sizeof(linear) + PAGE_SIZE, PAGE_SIZE, 0, userptr_flags, &handle);
-	copy(fd, handle, handle, 0);
+	igt_assert_eq(copy(fd, handle, handle), 0);
 	gem_close(fd, handle);
 
 	/* GTT mapping */
@@ -514,24 +510,24 @@ static int test_invalid_gtt_mapping(int fd)
 	igt_assert((sizeof(linear) & (PAGE_SIZE - 1)) == 0);
 
 	gem_userptr(fd, gtt, sizeof(linear), 0, userptr_flags, &handle);
-	copy(fd, handle, handle, EFAULT);
+	igt_assert_eq(copy(fd, handle, handle), -EFAULT);
 	gem_close(fd, handle);
 
 	gem_userptr(fd, gtt, PAGE_SIZE, 0, userptr_flags, &handle);
-	copy(fd, handle, handle, EFAULT);
+	igt_assert_eq(copy(fd, handle, handle), -EFAULT);
 	gem_close(fd, handle);
 
 	gem_userptr(fd, gtt + sizeof(linear) - PAGE_SIZE, PAGE_SIZE, 0, userptr_flags, &handle);
-	copy(fd, handle, handle, EFAULT);
+	igt_assert_eq(copy(fd, handle, handle), -EFAULT);
 	gem_close(fd, handle);
 
 	/* boundaries */
 	gem_userptr(fd, map, 2*PAGE_SIZE, 0, userptr_flags, &handle);
-	copy(fd, handle, handle, EFAULT);
+	igt_assert_eq(copy(fd, handle, handle), -EFAULT);
 	gem_close(fd, handle);
 
 	gem_userptr(fd, map + sizeof(linear), 2*PAGE_SIZE, 0, userptr_flags, &handle);
-	copy(fd, handle, handle, EFAULT);
+	igt_assert_eq(copy(fd, handle, handle), -EFAULT);
 	gem_close(fd, handle);
 
 	munmap(map, sizeof(linear) + 2*PAGE_SIZE);
@@ -558,7 +554,7 @@ static void test_process_exit(int fd, int flags)
 		}
 
 		if (flags & PE_BUSY)
-			copy(fd, handle, handle, 0);
+			igt_assert_eq(copy(fd, handle, handle), 0);
 	}
 	igt_waitchildren();
 }
@@ -588,9 +584,8 @@ static void test_forked_access(int fd)
 	memset(ptr1, 0x1, sizeof(linear));
 	memset(ptr2, 0x2, sizeof(linear));
 
-	igt_fork(child, 1) {
-		copy(fd, handle1, handle2, 0);
-	}
+	igt_fork(child, 1)
+		igt_assert_eq(copy(fd, handle1, handle2), 0);
 	igt_waitchildren();
 
 	gem_userptr_sync(fd, handle1);
@@ -641,27 +636,36 @@ static int test_map_fixed_invalidate(int fd, uint32_t flags)
 	     fixed + 2*PAGE_SIZE <= end;
 	     fixed += PAGE_SIZE) {
 		struct drm_i915_gem_mmap_gtt mmap_gtt;
-		char *map;
+		uint32_t *map;
 
-		ptr = mmap(ptr, ptr_size, PROT_READ | PROT_WRITE,
+		map = mmap(ptr, ptr_size, PROT_READ | PROT_WRITE,
 			   MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED,
 			   -1, 0);
+		igt_assert(map != MAP_FAILED);
+		igt_assert(map == ptr);
 
 		memset(&mmap_gtt, 0, sizeof(mmap_gtt));
 		mmap_gtt.handle = gem_create(fd, 2*PAGE_SIZE);
 		do_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &mmap_gtt);
 
+		if (flags & MAP_FIXED_INVALIDATE_GET_PAGES)
+			igt_assert_eq(__gem_set_domain(fd, handle[0],
+						       I915_GEM_DOMAIN_GTT,
+						       I915_GEM_DOMAIN_GTT),
+				      0);
+
 		if (flags & MAP_FIXED_INVALIDATE_BUSY)
-			copy(fd, handle[0], handle[num_handles-1], 0);
+			igt_assert_eq(copy(fd, handle[0], handle[num_handles-1]), 0);
 
 		map = mmap(fixed, 2*PAGE_SIZE,
 			   PROT_READ | PROT_WRITE,
 			   MAP_SHARED | MAP_FIXED,
 			   fd, mmap_gtt.offset);
-		igt_assert(map == fixed);
+		igt_assert(map != MAP_FAILED);
+		igt_assert(map == (uint32_t *)fixed);
 
 		gem_set_tiling(fd, mmap_gtt.handle, I915_TILING_NONE, 0);
-		*(uint32_t*)map = 0xdead;
+		*map = 0xdead;
 
 		if (flags & MAP_FIXED_INVALIDATE_GET_PAGES)
 			igt_assert_eq(__gem_set_domain(fd, handle[0],
@@ -772,7 +776,7 @@ static void *umap(int fd, uint32_t handle)
 				    PROT_READ | PROT_WRITE);
 	} else {
 		uint32_t tmp = gem_create(fd, sizeof(linear));
-		copy(fd, tmp, handle, 0);
+		igt_assert_eq(copy(fd, tmp, handle), 0);
 		ptr = gem_mmap__cpu(fd, tmp, 0, sizeof(linear), PROT_READ);
 		gem_close(fd, tmp);
 	}
@@ -1011,7 +1015,7 @@ static int test_coherency(int fd, int count)
 		int src = i % count;
 		int dst = (i + 1) % count;
 
-		copy(fd, gpu[dst], cpu[src], 0);
+		igt_assert_eq(copy(fd, gpu[dst], cpu[src]), 0);
 		gpu_val[dst] = cpu_val[src];
 	}
 	for (i = 0; i < count; i++)
@@ -1022,7 +1026,7 @@ static int test_coherency(int fd, int count)
 		int src = (i + 1) % count;
 		int dst = i % count;
 
-		copy(fd, cpu[dst], gpu[src], 0);
+		igt_assert_eq(copy(fd, cpu[dst], gpu[src]), 0);
 		cpu_val[dst] = gpu_val[src];
 	}
 	for (i = 0; i < count; i++) {
@@ -1036,10 +1040,10 @@ static int test_coherency(int fd, int count)
 		int dst = random() % count;
 
 		if (random() & 1) {
-			copy(fd, gpu[dst], cpu[src], 0);
+			igt_assert_eq(copy(fd, gpu[dst], cpu[src]), 0);
 			gpu_val[dst] = cpu_val[src];
 		} else {
-			copy(fd, cpu[dst], gpu[src], 0);
+			igt_assert_eq(copy(fd, cpu[dst], gpu[src]), 0);
 			cpu_val[dst] = gpu_val[src];
 		}
 	}
@@ -1210,13 +1214,13 @@ static void test_unmap(int fd, int expected)
 	bo[num_obj] = create_bo(fd, 0);
 
 	for (i = 0; i < num_obj; i++)
-		copy(fd, bo[num_obj], bo[i], 0);
+		igt_assert_eq(copy(fd, bo[num_obj], bo[i]), 0);
 
 	ret = munmap(ptr, map_size);
 	igt_assert_eq(ret, 0);
 
 	for (i = 0; i < num_obj; i++)
-		copy(fd, bo[num_obj], bo[i], expected);
+		igt_assert_eq(copy(fd, bo[num_obj], bo[i]), -expected);
 
 	for (i = 0; i < (num_obj + 1); i++)
 		gem_close(fd, bo[i]);
@@ -1244,7 +1248,7 @@ static void test_unmap_after_close(int fd)
 	bo[num_obj] = create_bo(fd, 0);
 
 	for (i = 0; i < num_obj; i++)
-		copy(fd, bo[num_obj], bo[i], 0);
+		igt_assert_eq(copy(fd, bo[num_obj], bo[i]), 0);
 
 	for (i = 0; i < (num_obj + 1); i++)
 		gem_close(fd, bo[i]);
