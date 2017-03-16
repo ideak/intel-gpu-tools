@@ -165,8 +165,6 @@ int __gem_set_tiling(int fd, uint32_t handle, uint32_t tiling, uint32_t stride)
 	struct drm_i915_gem_set_tiling st;
 	int ret;
 
-	igt_require_intel(fd);
-
 	/* The kernel doesn't know about these tiling modes, expects NONE */
 	if (tiling == I915_TILING_Yf || tiling == I915_TILING_Ys)
 		tiling = I915_TILING_NONE;
@@ -1517,6 +1515,8 @@ void gem_require_caching(int fd)
 void igt_require_gem(int fd)
 {
 	int err;
+
+	igt_require_intel(fd);
 
 	err = 0;
 	if (ioctl(fd, DRM_IOCTL_I915_GEM_THROTTLE))
