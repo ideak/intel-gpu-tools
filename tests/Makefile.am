@@ -52,7 +52,7 @@ dist_pkgdata_DATA = \
 
 all-local: .gitignore
 .gitignore: Makefile.sources
-	@echo "$(pkglibexec_PROGRAMS) $(HANG) test-list.txt test-list-full.txt .gitignore" | sed 's/\s\+/\n/g' | sort > $@
+	@echo "$(pkglibexec_PROGRAMS) $(HANG) test-list.txt test-list-full.txt /.gitignore" | sed 's/\s\+/\n/g' | sort > $@
 
 pkgdata_DATA = test-list.txt test-list-full.txt
 
