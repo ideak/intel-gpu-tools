@@ -92,9 +92,6 @@ static void test_error_state_basic(void)
 	igt_ignore_warn(write(fd, "1\n", 2));
 	close(fd);
 
-	/* Wait for the error capture and gpu reset to complete */
-	gem_quiescent_gpu(device);
-
 	assert_error_state_collected();
 
 	clear_error_state();
