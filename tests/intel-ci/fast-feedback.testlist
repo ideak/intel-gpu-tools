@@ -1,3 +1,5 @@
+# Keep alphabetically sorted by default
+
 igt@core_auth@basic-auth
 igt@core_prop_blob@basic
 igt@drv_getparams_basic@basic-eu-total
@@ -270,6 +272,11 @@ igt@vgem_basic@dmabuf-mmap
 igt@vgem_basic@mmap
 igt@vgem_basic@second-client
 igt@vgem_basic@sysfs
+
+# All tests that do module unloading and reloading are executed last.
+# They will sometimes reveal issues of earlier tests leaving the
+# driver in a broken state that is not otherwise noticed in that test.
+
 igt@vgem_basic@unload
 igt@drv_module_reload@basic-reload
 igt@drv_module_reload@basic-no-display
