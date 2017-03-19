@@ -34,6 +34,7 @@
 #include <inttypes.h>
 #include <errno.h>
 #include <time.h>
+#include <sys/poll.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -49,7 +50,10 @@ typedef struct {
 	struct igt_fb primary_fb;
 	igt_output_t *output;
 	enum pipe pipe;
-	uint8_t mode_busy:1;
+	unsigned int flags;
+#define IDLE 1
+#define BUSY 2
+#define FORKED 4
 } data_t;
 
 static double elapsed(const struct timespec *start,
@@ -98,8 +102,21 @@ static void cleanup_crtc(data_t *data, int fd, igt_output_t *output)
 	igt_display_commit(display);
 }
 
-static void run_test(data_t *data, int fd, void (*testfunc)(data_t *, int))
+static int wait_vblank(int fd, union drm_wait_vblank *vbl)
 {
+	int err;
+
+	err = 0;
+	if (igt_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, vbl))
+		err = -errno;
+
+	return err;
+}
+
+static void run_test(data_t *data, int fd, void (*testfunc)(data_t *, int, int))
+{
+	int nchildren =
+		data->flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1;
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
 	enum pipe p;
@@ -107,92 +124,101 @@ static void run_test(data_t *data, int fd, void (*testfunc)(data_t *, int))
 
 	for_each_pipe_with_valid_output(display, p, output) {
 		data->pipe = p;
-
 		prepare_crtc(data, fd, output);
 
-		valid_tests++;
+		igt_info("Beginning %s on pipe %s, connector %s (%d threads)\n",
+			 igt_subtest_name(),
+			 kmstest_pipe_name(data->pipe),
+			 igt_output_name(output),
+			 nchildren);
 
-		igt_info("Beginning %s on pipe %s, connector %s\n",
-			  igt_subtest_name(),
-			  kmstest_pipe_name(data->pipe),
-			  igt_output_name(output));
+		if (data->flags & BUSY) {
+			union drm_wait_vblank vbl;
 
-		testfunc(data, fd);
+			memset(&vbl, 0, sizeof(vbl));
+			vbl.request.type =
+				DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT;
+			vbl.request.type |= kmstest_get_vbl_flag(data->pipe);
+			vbl.request.sequence = 120 + 12;
+			igt_assert_eq(wait_vblank(fd, &vbl), 0);
+		}
+
+		igt_fork(child, nchildren)
+			testfunc(data, fd, nchildren);
+		igt_waitchildren();
+
+		if (data->flags & BUSY) {
+			struct drm_event_vblank buf;
+			igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
+		}
+
+		igt_assert(poll(&(struct pollfd){fd, POLLIN}, 1, 0) == 0);
 
 		igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
-			  igt_subtest_name(),
-			  kmstest_pipe_name(data->pipe),
-			  igt_output_name(output));
+			 igt_subtest_name(),
+			 kmstest_pipe_name(data->pipe),
+			 igt_output_name(output));
 
 		/* cleanup what prepare_crtc() has done */
 		cleanup_crtc(data, fd, output);
+		valid_tests++;
 	}
 
-	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
+	igt_require_f(valid_tests,
+		      "no valid crtc/connector combinations found\n");
 }
 
-static void accuracy(data_t *data, int fd)
+static void accuracy(data_t *data, int fd, int nchildren)
 {
+	const uint32_t pipe_id_flag = kmstest_get_vbl_flag(data->pipe);
 	union drm_wait_vblank vbl;
 	unsigned long target;
-	uint32_t pipe_id_flag;
+	int total = 120 / nchildren;
 	int n;
 
 	memset(&vbl, 0, sizeof(vbl));
-	pipe_id_flag = kmstest_get_vbl_flag(data->pipe);
-
 	vbl.request.type = DRM_VBLANK_RELATIVE;
 	vbl.request.type |= pipe_id_flag;
 	vbl.request.sequence = 1;
-	do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
+	igt_assert_eq(wait_vblank(fd, &vbl), 0);
 
-	target = vbl.reply.sequence + 60;
-	for (n = 0; n < 60; n++) {
+	target = vbl.reply.sequence + total;
+	for (n = 0; n < total; n++) {
 		vbl.request.type = DRM_VBLANK_RELATIVE;
 		vbl.request.type |= pipe_id_flag;
 		vbl.request.sequence = 1;
-		do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
+		igt_assert_eq(wait_vblank(fd, &vbl), 0);
 
 		vbl.request.type = DRM_VBLANK_ABSOLUTE | DRM_VBLANK_EVENT;
 		vbl.request.type |= pipe_id_flag;
 		vbl.request.sequence = target;
-		do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
+		igt_assert_eq(wait_vblank(fd, &vbl), 0);
 	}
 	vbl.request.type = DRM_VBLANK_RELATIVE;
 	vbl.request.type |= pipe_id_flag;
 	vbl.request.sequence = 0;
-	do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
+	igt_assert_eq(wait_vblank(fd, &vbl), 0);
 	igt_assert_eq(vbl.reply.sequence, target);
 
-	for (n = 0; n < 60; n++) {
+	for (n = 0; n < total; n++) {
 		struct drm_event_vblank ev;
 		igt_assert_eq(read(fd, &ev, sizeof(ev)), sizeof(ev));
 		igt_assert_eq(ev.sequence, target);
 	}
 }
 
-static void vblank_query(data_t *data, int fd)
+static void vblank_query(data_t *data, int fd, int nchildren)
 {
+	const uint32_t pipe_id_flag = kmstest_get_vbl_flag(data->pipe);
 	union drm_wait_vblank vbl;
 	struct timespec start, end;
 	unsigned long sq, count = 0;
-	struct drm_event_vblank buf;
-	uint32_t pipe_id_flag;
 
 	memset(&vbl, 0, sizeof(vbl));
-	pipe_id_flag = kmstest_get_vbl_flag(data->pipe);
-
-	if (data->mode_busy) {
-		vbl.request.type = DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT;
-		vbl.request.type |= pipe_id_flag;
-		vbl.request.sequence = 72;
-		do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
-	}
-
 	vbl.request.type = DRM_VBLANK_RELATIVE;
 	vbl.request.type |= pipe_id_flag;
 	vbl.request.sequence = 0;
-	do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
+	igt_assert_eq(wait_vblank(fd, &vbl), 0);
 
 	sq = vbl.reply.sequence;
 
@@ -201,40 +227,27 @@ static void vblank_query(data_t *data, int fd)
 		vbl.request.type = DRM_VBLANK_RELATIVE;
 		vbl.request.type |= pipe_id_flag;
 		vbl.request.sequence = 0;
-		do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
+		igt_assert_eq(wait_vblank(fd, &vbl), 0);
 		count++;
-	} while ((vbl.reply.sequence - sq) <= 60);
+	} while ((vbl.reply.sequence - sq) <= 120);
 	clock_gettime(CLOCK_MONOTONIC, &end);
 
 	igt_info("Time to query current counter (%s):		%7.3fµs\n",
-		 data->mode_busy ? "busy" : "idle", elapsed(&start, &end, count));
-
-	if (data->mode_busy)
-		igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
+		 data->flags & BUSY ? "busy" : "idle", elapsed(&start, &end, count));
 }
 
-static void vblank_wait(data_t *data, int fd)
+static void vblank_wait(data_t *data, int fd, int nchildren)
 {
+	const uint32_t pipe_id_flag = kmstest_get_vbl_flag(data->pipe);
 	union drm_wait_vblank vbl;
 	struct timespec start, end;
 	unsigned long sq, count = 0;
-	struct drm_event_vblank buf;
-	uint32_t pipe_id_flag;
 
 	memset(&vbl, 0, sizeof(vbl));
-	pipe_id_flag = kmstest_get_vbl_flag(data->pipe);
-
-	if (data->mode_busy) {
-		vbl.request.type = DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT;
-		vbl.request.type |= pipe_id_flag;
-		vbl.request.sequence = 72;
-		do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
-	}
-
 	vbl.request.type = DRM_VBLANK_RELATIVE;
 	vbl.request.type |= pipe_id_flag;
 	vbl.request.sequence = 0;
-	do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
+	igt_assert_eq(wait_vblank(fd, &vbl), 0);
 
 	sq = vbl.reply.sequence;
 
@@ -243,24 +256,41 @@ static void vblank_wait(data_t *data, int fd)
 		vbl.request.type = DRM_VBLANK_RELATIVE;
 		vbl.request.type |= pipe_id_flag;
 		vbl.request.sequence = 1;
-		do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
+		igt_assert_eq(wait_vblank(fd, &vbl), 0);
 		count++;
-	} while ((vbl.reply.sequence - sq) <= 60);
+	} while ((vbl.reply.sequence - sq) <= 120);
 	clock_gettime(CLOCK_MONOTONIC, &end);
 
 	igt_info("Time to wait for %ld/%d vblanks (%s):		%7.3fµs\n",
 		 count, (int)(vbl.reply.sequence - sq),
-		 data->mode_busy ? "busy" : "idle",
+		 data->flags & BUSY ? "busy" : "idle",
 		 elapsed(&start, &end, count));
-
-	if (data->mode_busy)
-		igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
 }
 
 igt_main
 {
 	int fd;
 	data_t data;
+	const struct {
+		const char *name;
+		void (*func)(data_t *, int, int);
+		unsigned int valid;
+	} funcs[] = {
+		{ "accuracy", accuracy, IDLE },
+		{ "query", vblank_query, IDLE | FORKED | BUSY },
+		{ "wait", vblank_wait, IDLE | FORKED | BUSY },
+		{ }
+	}, *f;
+	const struct {
+		const char *name;
+		unsigned int flags;
+	} modes[] = {
+		{ "idle", IDLE },
+		{ "forked", IDLE | FORKED },
+		{ "busy", BUSY },
+		{ "forked-busy", BUSY | FORKED },
+		{ }
+	}, *m;
 
 	igt_skip_on_simulation();
 
@@ -270,28 +300,15 @@ igt_main
 		igt_display_init(&data.display, fd);
 	}
 
-	igt_subtest("accuracy") {
-		data.mode_busy = 0;
-		run_test(&data, fd, accuracy);
-	}
+	for (f = funcs; f->name; f++) {
+		for (m = modes; m->name; m++) {
+			if (m->flags & ~f->valid)
+				continue;
 
-	igt_subtest("query-idle") {
-		data.mode_busy = 0;
-		run_test(&data, fd, vblank_query);
-	}
-
-	igt_subtest("query-busy") {
-		data.mode_busy = 1;
-		run_test(&data, fd, vblank_query);
-	}
-
-	igt_subtest("wait-idle") {
-		data.mode_busy = 0;
-		run_test(&data, fd, vblank_wait);
-	}
-
-	igt_subtest("wait-busy") {
-		data.mode_busy = 1;
-		run_test(&data, fd, vblank_wait);
+			igt_subtest_f("%s-%s", f->name, m->name) {
+				data.flags = m->flags;
+				run_test(&data, fd, f->func);
+			}
+		}
 	}
 }
