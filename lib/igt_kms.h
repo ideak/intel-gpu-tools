@@ -364,7 +364,6 @@ struct igt_display {
 	int log_shift;
 	int n_pipes;
 	int n_outputs;
-	unsigned long pipes_in_use;
 	igt_output_t *outputs;
 	igt_pipe_t *pipes;
 	bool has_cursor_plane;

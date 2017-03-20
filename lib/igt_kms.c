@@ -1434,16 +1434,12 @@ static void igt_display_log_shift(igt_display_t *display, int shift)
 	igt_assert(display->log_shift >= 0);
 }
 
-static void igt_output_refresh(igt_output_t *output, bool final)
+static void igt_output_refresh(igt_output_t *output)
 {
 	igt_display_t *display = output->display;
 	unsigned long crtc_idx_mask;
 
 	crtc_idx_mask = output->pending_crtc_idx_mask;
-
-	/* we mask out the pipes already in use */
-	if (final)
-		crtc_idx_mask &= ~display->pipes_in_use;
 
 	kmstest_free_connector_config(&output->config);
 
@@ -1470,9 +1466,6 @@ static void igt_output_refresh(igt_output_t *output, bool final)
 
 	LOG(display, "%s: Selecting pipe %s\n", output->name,
 	    kmstest_pipe_name(output->config.pipe));
-
-	if (final)
-		display->pipes_in_use |= 1 << output->config.pipe;
 }
 
 static bool
@@ -1714,7 +1707,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		output->id = resources->connectors[i];
 		output->display = display;
 
-		igt_output_refresh(output, false);
+		igt_output_refresh(output);
 
 		output->config.pipe_changed = true;
 	}
@@ -1804,35 +1797,35 @@ void igt_display_fini(igt_display_t *display)
 
 static void igt_display_refresh(igt_display_t *display)
 {
-	int i, j;
+	igt_output_t *output;
+	int i;
 
-	display->pipes_in_use = 0;
+	unsigned long pipes_in_use = 0;
 
        /* Check that two outputs aren't trying to use the same pipe */
-        for (i = 0; i < display->n_outputs; i++) {
-                igt_output_t *a = &display->outputs[i];
-
-                if (!a->pending_crtc_idx_mask)
-                        continue;
-
-                for (j = 0; j < display->n_outputs; j++) {
-                        igt_output_t *b = &display->outputs[j];
-
-                        if (i == j)
-                                continue;
-
-                        igt_assert_f(a->pending_crtc_idx_mask !=
-                                     b->pending_crtc_idx_mask,
-                                     "%s and %s are both trying to use pipe %s\n",
-                                     igt_output_name(a), igt_output_name(b),
-                                     kmstest_pipe_name(ffs(a->pending_crtc_idx_mask) - 1));
-                }
-        }
-
 	for (i = 0; i < display->n_outputs; i++) {
-		igt_output_t *output = &display->outputs[i];
+		output = &display->outputs[i];
 
-		igt_output_refresh(output, true);
+		if (pipes_in_use & output->pending_crtc_idx_mask)
+			goto report_dup;
+
+		pipes_in_use |= output->pending_crtc_idx_mask;
+
+		if (output->force_reprobe)
+			igt_output_refresh(output);
+	}
+
+	return;
+
+report_dup:
+	for (; i > 0; i--) {
+		igt_output_t *b = &display->outputs[i - 1];
+
+		igt_assert_f(output->pending_crtc_idx_mask !=
+			     b->pending_crtc_idx_mask,
+			     "%s and %s are both trying to use pipe %s\n",
+			     igt_output_name(output), igt_output_name(b),
+			     kmstest_pipe_name(ffs(b->pending_crtc_idx_mask) - 1));
 	}
 }
 
@@ -2761,7 +2754,7 @@ void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 
 	output->config.pipe_changed = true;
 
-	igt_output_refresh(output, false);
+	igt_output_refresh(output);
 }
 
 void igt_output_set_scaling_mode(igt_output_t *output, uint64_t scaling_mode)
