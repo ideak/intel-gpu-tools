@@ -81,7 +81,12 @@ for test in $TESTLIST; do
 	fi
 
 	if [ $RET -eq 0 -a -z "$LIST" ]; then
-		fail $test
+		# Subtest enumeration of kernel selftest launchers depends
+		# on the running kernel. If selftests are not enabled,
+		# they will output nothing and exit with 0.
+		if [ "$testname" != "drv_selftest" -a "$testname" != "drm_mm" ]; then
+			fail $test
+		fi
 	fi
 
 	# check invalid subtest handling
