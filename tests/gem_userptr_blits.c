@@ -61,6 +61,8 @@
 #define PAGE_SIZE 4096
 #endif
 
+#define LOCAL_EXEC_OBJECT_SUPPORTS_48B (1 << 3)
+
 static uint32_t userptr_flags = LOCAL_I915_USERPTR_UNSYNCHRONIZED;
 
 #define WIDTH 512
@@ -137,12 +139,21 @@ static int copy(int fd, uint32_t dst, uint32_t src)
 
 	memset(&exec, 0, sizeof(exec));
 	memset(obj, 0, sizeof(obj));
-	obj[exec.buffer_count++].handle = dst;
-	if (src != dst)
-		obj[exec.buffer_count++].handle = src;
+
+	obj[exec.buffer_count].handle = dst;
+	obj[exec.buffer_count].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+	exec.buffer_count++;
+
+	if (src != dst) {
+		obj[exec.buffer_count].handle = src;
+		obj[exec.buffer_count].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+		exec.buffer_count++;
+	}
+
 	obj[exec.buffer_count].handle = handle;
 	obj[exec.buffer_count].relocation_count = 2;
 	obj[exec.buffer_count].relocs_ptr = to_user_pointer(reloc);
+	obj[exec.buffer_count].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
 	exec.buffer_count++;
 	exec.buffers_ptr = to_user_pointer(obj);
 	exec.flags = HAS_BLT_RING(intel_get_drm_devid(fd)) ? I915_EXEC_BLT : 0;
@@ -207,9 +218,12 @@ blit(int fd, uint32_t dst, uint32_t src, uint32_t *all_bo, int n_bo)
 
 	memset(&exec, 0, sizeof(exec));
 	obj = calloc(n_bo + 1, sizeof(*obj));
-	for (n = 0; n < n_bo; n++)
+	for (n = 0; n < n_bo; n++) {
 		obj[n].handle = all_bo[n];
+		obj[n].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+	}
 	obj[n].handle = handle;
+	obj[n].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
 	obj[n].relocation_count = 2;
 	obj[n].relocs_ptr = to_user_pointer(reloc);
 
