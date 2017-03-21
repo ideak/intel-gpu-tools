@@ -25,19 +25,28 @@
 # Check that command line handling works consistently across all tests
 #
 
-if [ -z "$top_builddir" ]; then
-	top_builddir="$(dirname $0)"
+# top_builddir is not set during distcheck. Distcheck executes this
+# script in the directory where the built binaries are so just use '.'
+# as the directory if top_builddir is not set.
+
+tests_dir="$top_builddir"
+if [ -z "$tests_dir" ]; then
+	tests_dir="."
 fi
 
-# allow to run this script from top directory
-TESTLIST=`cat $top_builddir/test-list.txt`
+# Manually running this script is possible in the source root or the
+# tests directory.
+
+TESTLISTFILE="$tests_dir/test-list.txt"
+if [ ! -r "$TESTLISTFILE" ]; then
+	tests_dir="tests"
+	TESTLISTFILE="$tests_dir/test-list.txt"
+fi
+
+TESTLIST=`cat $TESTLISTFILE`
 if [ $? -ne 0 ]; then
-	# distcheck requires this hack
-	TESTLIST=$(cat test-list.txt)
-	if [ $? -ne 0 ]; then
-		echo "Error: Could not read test lists"
-		exit 99
-	fi
+	echo "Error: Could not read test lists"
+	exit 99
 fi
 
 fail () {
@@ -50,12 +59,16 @@ for test in $TESTLIST; do
 		continue
 	fi
 
-	# top_builddir is empty for distcheck
-	test=$top_builddir/$test
-
-	# distcheck requires this hack
-	if [ ! -x "$test" ]; then
-		continue
+	testname="$test"
+	if [ -x "$tests_dir/$test" ]; then
+		test="$tests_dir/$test"
+	else
+		# Possibly a script, not found in builddir but in srcdir
+		if [ -x "$srcdir/$test" ]; then
+			test="$srcdir/$test"
+		else
+			fail "Cannot execute $test"
+		fi
 	fi
 
 	echo "$test:"
