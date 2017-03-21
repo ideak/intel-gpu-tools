@@ -657,9 +657,9 @@ static void setup_pc8(void)
 	if (!supports_pc8_plus_residencies())
 		return;
 
-	pc8_status_fd = igt_debugfs_open("i915_pc8_status", O_RDONLY);
+	pc8_status_fd = igt_debugfs_open(drm_fd, "i915_pc8_status", O_RDONLY);
 	if (pc8_status_fd == -1)
-		pc8_status_fd = igt_debugfs_open("i915_runtime_pm_status",
+		pc8_status_fd = igt_debugfs_open(drm_fd, "i915_runtime_pm_status",
 						 O_RDONLY);
 	igt_assert_f(pc8_status_fd >= 0,
 		     "Can't open /sys/kernel/debug/dri/0/i915_runtime_pm_status");
@@ -919,7 +919,7 @@ static void debugfs_forcewake_user_subtest(void)
 
 	disable_all_screens_and_wait(&ms_data);
 
-	fd = igt_open_forcewake_handle();
+	fd = igt_open_forcewake_handle(drm_fd);
 	igt_require(fd >= 0);
 
 	if (has_runtime_pm) {

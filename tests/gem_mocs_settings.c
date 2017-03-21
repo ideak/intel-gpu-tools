@@ -383,7 +383,7 @@ static void default_context_tests(unsigned mode)
 
 	switch (mode) {
 	case NONE:	break;
-	case RESET:	igt_force_gpu_reset();	break;
+	case RESET:	igt_force_gpu_reset(fd);	break;
 	case SUSPEND:	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 						      SUSPEND_TEST_NONE); break;
 	case HIBERNATE:	igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
@@ -424,7 +424,7 @@ static void default_dirty_tests(unsigned mode)
 
 	switch (mode) {
 	case NONE:	break;
-	case RESET:	igt_force_gpu_reset();	break;
+	case RESET:	igt_force_gpu_reset(fd);	break;
 	case SUSPEND:	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 						      SUSPEND_TEST_NONE); break;
 	case HIBERNATE:	igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
@@ -449,7 +449,7 @@ static void context_save_restore_test(unsigned mode)
 
 	switch (mode) {
 	case NONE:	break;
-	case RESET:	igt_force_gpu_reset();	break;
+	case RESET:	igt_force_gpu_reset(fd);	break;
 	case SUSPEND:	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 						      SUSPEND_TEST_NONE); break;
 	case HIBERNATE:	igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
@@ -494,7 +494,7 @@ static void context_dirty_test(unsigned mode)
 
 	switch (mode) {
 	case NONE:	break;
-	case RESET:	igt_force_gpu_reset();	break;
+	case RESET:	igt_force_gpu_reset(fd);	break;
 	case SUSPEND:	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 						      SUSPEND_TEST_NONE); break;
 	case HIBERNATE:	igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
@@ -514,10 +514,14 @@ static void context_dirty_test(unsigned mode)
 static void run_tests(unsigned mode)
 {
 	struct pci_device *pci_dev;
+	int fd;
 
 	pci_dev = intel_get_pci_device();
 	igt_require(pci_dev);
-	intel_register_access_init(pci_dev, 0);
+
+	fd = drm_open_driver_master(DRIVER_INTEL);
+	intel_register_access_init(pci_dev, 0, fd);
+	close(fd);
 
 	default_context_tests(mode);
 	default_dirty_tests(mode);

@@ -72,7 +72,7 @@ struct {
  */
 static void test_init(data_t *data, enum pipe pipe, int n_planes)
 {
-	data->pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	data->plane = calloc(n_planes, sizeof(data->plane));
 	igt_assert_f(data->plane != NULL, "Failed to allocate memory for planes\n");
@@ -508,7 +508,7 @@ int main(int argc, char *argv[])
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		kmstest_set_vt_graphics_mode();
-		igt_require_pipe_crc();
+		igt_require_pipe_crc(data.drm_fd);
 		igt_display_init(&data.display, data.drm_fd);
 		igt_require(data.display.n_pipes > 0);
 	}

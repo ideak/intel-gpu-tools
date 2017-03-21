@@ -195,7 +195,7 @@ static bool psr_possible(data_t *data)
 {
 	char buf[512];
 
-	igt_debugfs_read("i915_edp_psr_status", buf);
+	igt_debugfs_read(data->drm_fd, "i915_edp_psr_status", buf);
 
 	return running_with_psr_disabled ||
 		strstr(buf, "Sink_Support: yes\n");
@@ -205,7 +205,7 @@ static bool psr_active(data_t *data)
 {
 	char buf[512];
 
-	igt_debugfs_read("i915_edp_psr_status", buf);
+	igt_debugfs_read(data->drm_fd, "i915_edp_psr_status", buf);
 
 	return running_with_psr_disabled ||
 		strstr(buf, "HW Enabled & Active bit: yes\n");
@@ -229,7 +229,7 @@ static void get_sink_crc(data_t *data, char *crc) {
 	if (igt_interactive_debug)
 		return;
 
-	file = igt_debugfs_fopen("i915_sink_crc_eDP1", "r");
+	file = igt_debugfs_fopen(data->drm_fd, "i915_sink_crc_eDP1", "r");
 	igt_require(file);
 
 	ret = fscanf(file, "%s\n", crc);

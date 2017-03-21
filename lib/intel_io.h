@@ -36,7 +36,7 @@ extern void *igt_global_mmio;
 void intel_mmio_use_pci_bar(struct pci_device *pci_dev);
 void intel_mmio_use_dump_file(char *file);
 
-int intel_register_access_init(struct pci_device *pci_dev, int safe);
+int intel_register_access_init(struct pci_device *pci_dev, int safe, int fd);
 void intel_register_access_fini(void);
 uint32_t intel_register_read(uint32_t reg);
 void intel_register_write(uint32_t reg, uint32_t val);

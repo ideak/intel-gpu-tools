@@ -852,7 +852,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 	igt_fixture {
 		int valid_tests = 0;
 
-		igt_require_pipe_crc();
+		igt_require_pipe_crc(data->drm_fd);
 
 		igt_require(p < data->display.n_pipes);
 
@@ -861,7 +861,8 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 
 		primary = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 
-		data->pipe_crc = igt_pipe_crc_new(primary->pipe->pipe,
+		data->pipe_crc = igt_pipe_crc_new(data->drm_fd,
+						  primary->pipe->pipe,
 						  INTEL_PIPE_CRC_SOURCE_AUTO);
 
 		igt_require(igt_pipe_get_property(&data->display.pipes[p],

@@ -41,14 +41,14 @@ typedef struct {
 
 static igt_pipe_crc_t *_pipe_crc;
 
-static igt_pipe_crc_t *pipe_crc_new(int pipe)
+static igt_pipe_crc_t *pipe_crc_new(data_t *data, int pipe)
 {
 	if (_pipe_crc) {
 		igt_pipe_crc_free(_pipe_crc);
 		_pipe_crc = NULL;
 	}
 
-	_pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	_pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 	igt_assert(_pipe_crc);
 
 	return _pipe_crc;
@@ -89,7 +89,7 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 	igt_crc_t reference_crc, crc;
 	int fb_id, ret, width;
 
-	pipe_crc = pipe_crc_new(pipe);
+	pipe_crc = pipe_crc_new(data, pipe);
 	igt_output_set_pipe(output, pipe);
 
 	mode = igt_output_get_mode(output);
@@ -168,7 +168,7 @@ igt_main
 
 		kmstest_set_vt_graphics_mode();
 
-		igt_require_pipe_crc();
+		igt_require_pipe_crc(data.drm_fd);
 		igt_display_init(&data.display, data.drm_fd);
 	}
 

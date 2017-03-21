@@ -360,14 +360,14 @@ void igt_post_hang_ring(int fd, igt_hang_t arg)
  * stuck, either because the test manually disabled gpu resets or because the
  * test hit an hangcheck bug
  */
-void igt_force_gpu_reset(void)
+void igt_force_gpu_reset(int drm_fd)
 {
 	FILE *file;
 	int fd, ret, wedged;
 
 	igt_debug("Triggering GPU reset\n");
 
-	fd = igt_debugfs_open("i915_wedged", O_RDWR);
+	fd = igt_debugfs_open(drm_fd, "i915_wedged", O_RDWR);
 	igt_require(fd >= 0);
 
 	ret = write(fd, "-1\n", 3);
@@ -375,7 +375,7 @@ void igt_force_gpu_reset(void)
 
 	igt_assert_eq(ret, 3);
 
-	file = igt_debugfs_fopen("i915_wedged", "r");
+	file = igt_debugfs_fopen(drm_fd, "i915_wedged", "r");
 	igt_assert(file);
 
 	wedged = 1;
@@ -451,11 +451,11 @@ void igt_stop_hang_helper(void)
  * Returns:
  * The file descriptor of the forcewake handle or -1 if that didn't work out.
  */
-int igt_open_forcewake_handle(void)
+int igt_open_forcewake_handle(int fd)
 {
 	if (getenv("IGT_NO_FORCEWAKE"))
 		return -1;
-	return igt_debugfs_open("i915_forcewake_user", O_WRONLY);
+	return igt_debugfs_open(fd, "i915_forcewake_user", O_WRONLY);
 }
 
 #if defined(__x86_64__) || defined(__i386__)
@@ -543,13 +543,13 @@ unsigned intel_detect_and_clear_missed_interrupts(int fd)
 
 	gem_quiescent_gpu(fd);
 
-	file = igt_debugfs_fopen("i915_ring_missed_irq", "r");
+	file = igt_debugfs_fopen(fd, "i915_ring_missed_irq", "r");
 	if (file) {
 		igt_assert(fscanf(file, "%x", &missed) == 1);
 		fclose(file);
 	}
 	if (missed) {
-		file = igt_debugfs_fopen("i915_ring_missed_irq", "w");
+		file = igt_debugfs_fopen(fd, "i915_ring_missed_irq", "w");
 		if (file) {
 			fwrite("0\n", 1, 2, file);
 			fclose(file);

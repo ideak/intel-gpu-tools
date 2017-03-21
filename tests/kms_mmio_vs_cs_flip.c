@@ -235,7 +235,7 @@ test_plane(data_t *data, igt_output_t *output, enum pipe pipe, int plane)
 
 	if (data->pipe_crc)
 		igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	/* set red fb and grab reference crc */
 	igt_plane_set_fb(primary, &red_fb);
@@ -374,7 +374,7 @@ test_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 
 	if (data->pipe_crc)
 		igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	/* set red fb and grab reference crc */
 	igt_plane_set_fb(primary, &red_fb);
@@ -497,7 +497,7 @@ igt_main
 
 		data.devid = intel_get_drm_devid(data.drm_fd);
 
-		igt_require_pipe_crc();
+		igt_require_pipe_crc(data.drm_fd);
 		igt_display_init(&data.display, data.drm_fd);
 
 		data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);

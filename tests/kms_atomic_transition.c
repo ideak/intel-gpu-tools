@@ -675,7 +675,7 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 		drmModeModeInfo *mode = NULL;
 
 		if (is_i915_device(display->drm_fd))
-			pipe_crcs[i] = igt_pipe_crc_new(i, INTEL_PIPE_CRC_SOURCE_AUTO);
+			pipe_crcs[i] = igt_pipe_crc_new(display->drm_fd, i, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 		for_each_valid_output_on_pipe(display, i, output) {
 			if (output->pending_crtc_idx_mask)

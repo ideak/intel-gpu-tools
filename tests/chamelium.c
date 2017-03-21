@@ -154,7 +154,7 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port)
 	int i;
 
 	reset_state(data, port);
-	igt_hpd_storm_set_threshold(0);
+	igt_hpd_storm_set_threshold(data->drm_fd, 0);
 
 	for (i = 0; i < 15; i++) {
 		igt_flush_hotplugs(mon);
@@ -175,7 +175,7 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port)
 	}
 
 	igt_cleanup_hotplug(mon);
-	igt_hpd_storm_reset();
+	igt_hpd_storm_reset(data->drm_fd);
 }
 
 static void
@@ -536,12 +536,12 @@ test_hpd_storm_detect(data_t *data, struct chamelium_port *port, int width)
 	struct udev_monitor *mon;
 	int count = 0;
 
-	igt_require_hpd_storm_ctl();
+	igt_require_hpd_storm_ctl(data->drm_fd);
 	reset_state(data, port);
 
-	igt_hpd_storm_set_threshold(1);
+	igt_hpd_storm_set_threshold(data->drm_fd, 1);
 	chamelium_fire_hpd_pulses(data->chamelium, port, width, 10);
-	igt_assert(igt_hpd_storm_detected());
+	igt_assert(igt_hpd_storm_detected(data->drm_fd));
 
 	mon = igt_watch_hotplug();
 	chamelium_fire_hpd_pulses(data->chamelium, port, width, 10);
@@ -555,21 +555,21 @@ test_hpd_storm_detect(data_t *data, struct chamelium_port *port, int width)
 	igt_assert_lt(count, 2);
 
 	igt_cleanup_hotplug(mon);
-	igt_hpd_storm_reset();
+	igt_hpd_storm_reset(data->drm_fd);
 }
 
 static void
 test_hpd_storm_disable(data_t *data, struct chamelium_port *port, int width)
 {
-	igt_require_hpd_storm_ctl();
+	igt_require_hpd_storm_ctl(data->drm_fd);
 	reset_state(data, port);
 
-	igt_hpd_storm_set_threshold(0);
+	igt_hpd_storm_set_threshold(data->drm_fd, 0);
 	chamelium_fire_hpd_pulses(data->chamelium, port,
 				  width, 10);
-	igt_assert(!igt_hpd_storm_detected());
+	igt_assert(!igt_hpd_storm_detected(data->drm_fd));
 
-	igt_hpd_storm_reset();
+	igt_hpd_storm_reset(data->drm_fd);
 }
 
 #define for_each_port(p, port)            \

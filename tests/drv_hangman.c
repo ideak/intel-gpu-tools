@@ -88,7 +88,7 @@ static void test_error_state_basic(void)
 	assert_error_state_clear();
 
 	/* Manually trigger a hang by request a reset */
-	fd = igt_debugfs_open("i915_wedged", O_WRONLY);
+	fd = igt_debugfs_open(device, "i915_wedged", O_WRONLY);
 	igt_ignore_warn(write(fd, "1\n", 2));
 	close(fd);
 
@@ -224,7 +224,7 @@ static void hangcheck_unterminated(void)
 	gem_execbuf(device, &execbuf);
 	if (gem_wait(device, handle, &timeout_ns) != 0) {
 		/* need to manually trigger an hang to clean before failing */
-		igt_force_gpu_reset();
+		igt_force_gpu_reset(device);
 		igt_assert_f(0, "unterminated batch did not trigger an hang!");
 	}
 }

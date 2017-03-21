@@ -246,7 +246,7 @@ igt_main
 		igt_skip_on((check_for_dma_buf_mmap(gpu.drm_fd) != 0));
 		kmstest_set_vt_graphics_mode();
 
-		igt_require_pipe_crc();
+		igt_require_pipe_crc(gpu.drm_fd);
 
 		igt_display_init(&gpu.display, gpu.drm_fd);
 	}

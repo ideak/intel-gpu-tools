@@ -217,7 +217,7 @@ igt_main
 	}
 
 	igt_subtest("aperture-shrink") {
-		igt_fork_shrink_helper();
+		igt_fork_shrink_helper(fd);
 
 		count = 3 * gem_aperture_size(fd) / SIZE / 2;
 		intel_require_memory(count, SIZE, CHECK_RAM);

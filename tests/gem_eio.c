@@ -61,7 +61,7 @@ static bool i915_reset_control(bool enable)
 
 static void trigger_reset(int fd)
 {
-	igt_force_gpu_reset();
+	igt_force_gpu_reset(fd);
 
 	/* And just check the gpu is indeed running again */
 	igt_debug("Checking that the GPU recovered\n");

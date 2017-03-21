@@ -48,7 +48,7 @@ static void test_bad_command(data_t *data, const char *cmd)
 	FILE *ctl;
 	size_t written;
 
-	ctl = igt_debugfs_fopen("i915_display_crc_ctl", "r+");
+	ctl = igt_debugfs_fopen(data->drm_fd, "i915_display_crc_ctl", "r+");
 	igt_require(ctl);
 
 	written = fwrite(cmd, 1, strlen(cmd), ctl);
@@ -66,7 +66,7 @@ static void test_bad_source(data_t *data)
 	size_t written;
 	const char *source = "foo";
 
-	f = igt_debugfs_fopen("crtc-0/crc/control", "w");
+	f = igt_debugfs_fopen(data->drm_fd, "crtc-0/crc/control", "w");
 	if (!f) {
 		test_bad_command(data, "pipe A foo");
 		return;
@@ -78,7 +78,7 @@ static void test_bad_source(data_t *data)
 	igt_assert(!ferror(f));
 	fclose(f);
 
-	f = igt_debugfs_fopen("crtc-0/crc/data", "w");
+	f = igt_debugfs_fopen(data->drm_fd, "crtc-0/crc/data", "w");
 	igt_assert(!f);
 	igt_assert_eq(errno, EINVAL);
 }
@@ -126,7 +126,7 @@ test_read_crc_for_output(data_t *data, int pipe, igt_output_t *output,
 		if (flags & TEST_NONBLOCK) {
 			igt_pipe_crc_t *pipe_crc;
 
-			pipe_crc = igt_pipe_crc_new_nonblock(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+			pipe_crc = igt_pipe_crc_new_nonblock(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 			igt_wait_for_vblank(data->drm_fd, pipe);
 			igt_pipe_crc_start(pipe_crc);
 
@@ -140,7 +140,7 @@ test_read_crc_for_output(data_t *data, int pipe, igt_output_t *output,
 		} else {
 			igt_pipe_crc_t *pipe_crc;
 
-			pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+			pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 			igt_pipe_crc_start(pipe_crc);
 
 			n_crcs = igt_pipe_crc_get_crcs(pipe_crc, N_CRCS, &crcs);
@@ -212,7 +212,7 @@ igt_main
 
 		kmstest_set_vt_graphics_mode();
 
-		igt_require_pipe_crc();
+		igt_require_pipe_crc(data.drm_fd);
 
 		igt_display_init(&data.display, data.drm_fd);
 	}
