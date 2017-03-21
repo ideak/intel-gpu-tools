@@ -387,6 +387,9 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 			count += 1024;
 			clock_gettime(CLOCK_MONOTONIC, &now);
 		} while (elapsed(&start, &now) < timeout); /* Hang detection ~120s */
+
+		gem_sync(fd, obj[0].handle);
+		clock_gettime(CLOCK_MONOTONIC, &now);
 		results[child] = elapsed(&start, &now) / count;
 
 		if (flags & CONTEXT)
