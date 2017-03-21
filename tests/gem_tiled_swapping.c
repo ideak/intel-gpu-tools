@@ -155,9 +155,9 @@ static void thread_fini(struct thread *t)
 	free(t->idx_arr);
 }
 
-static void check_memory_layout(int fd)
+static void check_memory_layout(void)
 {
-	igt_skip_on_f(igt_debugfs_search(fd, "i915_swizzle_info", "L-shaped"),
+	igt_skip_on_f(igt_debugfs_search("i915_swizzle_info", "L-shaped"),
 		      "L-shaped memory configuration detected\n");
 
 	igt_debug("normal memory configuration detected, continuing\n");
@@ -173,10 +173,11 @@ igt_main
 
 		current_tiling_mode = I915_TILING_X;
 
+		intel_purge_vm_caches();
+
 		fd = drm_open_driver(DRIVER_INTEL);
 
-		intel_purge_vm_caches(fd);
-		check_memory_layout(fd);
+		check_memory_layout();
 
 		/* lock RAM, leaving only 512MB available */
 		lock_size = max(0, intel_get_total_ram_mb() - AVAIL_RAM);

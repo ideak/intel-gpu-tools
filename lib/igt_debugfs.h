@@ -33,11 +33,11 @@ enum pipe;
 
 const char *igt_debugfs_mount(void);
 
-int igt_debugfs_open(int fd, const char *filename, int mode);
-FILE *igt_debugfs_fopen(int fd, const char *filename,
+int igt_debugfs_open(const char *filename, int mode);
+FILE *igt_debugfs_fopen(const char *filename,
 			const char *mode);
-void __igt_debugfs_read(int fd, const char *filename, char *buf, int buf_size);
-bool igt_debugfs_search(int fd, const char *filename, const char *substring);
+void __igt_debugfs_read(const char *filename, char *buf, int buf_size);
+bool igt_debugfs_search(const char *filename, const char *substring);
 
 /**
  * igt_debugfs_read:
@@ -47,8 +47,8 @@ bool igt_debugfs_search(int fd, const char *filename, const char *substring);
  * This is just a convenience wrapper for __igt_debugfs_read. See its
  * documentation.
  */
-#define igt_debugfs_read(fd, filename, buf) \
-		__igt_debugfs_read(fd, (filename), (buf), sizeof(buf))
+#define igt_debugfs_read(filename, buf) \
+		__igt_debugfs_read((filename), (buf), sizeof(buf))
 
 /*
  * Pipe CRC
@@ -116,11 +116,11 @@ enum intel_pipe_crc_source {
 void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
 char *igt_crc_to_string(igt_crc_t *crc);
 
-void igt_require_pipe_crc(int fd);
+void igt_require_pipe_crc(void);
 igt_pipe_crc_t *
-igt_pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source);
+igt_pipe_crc_new(enum pipe pipe, enum intel_pipe_crc_source source);
 igt_pipe_crc_t *
-igt_pipe_crc_new_nonblock(int fd, enum pipe pipe, enum intel_pipe_crc_source source);
+igt_pipe_crc_new_nonblock(enum pipe pipe, enum intel_pipe_crc_source source);
 void igt_pipe_crc_free(igt_pipe_crc_t *pipe_crc);
 void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc);
 void igt_pipe_crc_stop(igt_pipe_crc_t *pipe_crc);
@@ -129,10 +129,10 @@ int igt_pipe_crc_get_crcs(igt_pipe_crc_t *pipe_crc, int n_crcs,
 			  igt_crc_t **out_crcs);
 void igt_pipe_crc_collect_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out_crc);
 
-void igt_hpd_storm_set_threshold(int fd, unsigned int threshold);
-void igt_hpd_storm_reset(int fd);
-bool igt_hpd_storm_detected(int fd);
-void igt_require_hpd_storm_ctl(int fd);
+void igt_hpd_storm_set_threshold(unsigned int threshold);
+void igt_hpd_storm_reset(void);
+bool igt_hpd_storm_detected(void);
+void igt_require_hpd_storm_ctl(void);
 
 /*
  * Drop caches
@@ -188,8 +188,8 @@ void igt_require_hpd_storm_ctl(int fd);
 		  DROP_ACTIVE | \
 		  DROP_FREED)
 
-bool igt_drop_caches_has(int fd, uint64_t val);
-void igt_drop_caches_set(int fd, uint64_t val);
+bool igt_drop_caches_has(uint64_t val);
+void igt_drop_caches_set(uint64_t val);
 
 /*
  * Prefault control

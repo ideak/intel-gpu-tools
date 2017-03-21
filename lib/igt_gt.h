@@ -51,12 +51,12 @@ igt_hang_t igt_hang_ctx(int fd,
 igt_hang_t igt_hang_ring(int fd, int ring);
 void igt_post_hang_ring(int fd, igt_hang_t arg);
 
-void igt_force_gpu_reset(int fd);
+void igt_force_gpu_reset(void);
 
 void igt_fork_hang_helper(void);
 void igt_stop_hang_helper(void);
 
-int igt_open_forcewake_handle(int fd);
+int igt_open_forcewake_handle(void);
 
 int igt_setup_clflush(void);
 void igt_clflush_range(void *addr, int size);

@@ -747,7 +747,7 @@ void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
 
 	igt_assert_neq(asprintf(&path, "%s-%d/edid_override", kmstest_connector_type_str(connector->connector_type), connector->connector_type_id),
 		       -1);
-	debugfs_fd = igt_debugfs_open(drm_fd, path, O_WRONLY | O_TRUNC);
+	debugfs_fd = igt_debugfs_open(path, O_WRONLY | O_TRUNC);
 	free(path);
 
 	igt_assert(debugfs_fd != -1);
@@ -1324,7 +1324,7 @@ static void parse_crtc(char *info, struct kmstest_crtc *crtc)
 	igt_assert_eq(ret, 2);
 }
 
-void kmstest_get_crtc(int fd, enum pipe pipe, struct kmstest_crtc *crtc)
+void kmstest_get_crtc(enum pipe pipe, struct kmstest_crtc *crtc)
 {
 	char tmp[256];
 	FILE *fid;
@@ -1333,7 +1333,7 @@ void kmstest_get_crtc(int fd, enum pipe pipe, struct kmstest_crtc *crtc)
 	int line;
 	long int n;
 
-	fid = igt_debugfs_fopen(fd, "i915_display_info", mode);
+	fid = igt_debugfs_fopen("i915_display_info", mode);
 
 	igt_skip_on(fid == NULL);
 
@@ -1370,13 +1370,13 @@ void kmstest_get_crtc(int fd, enum pipe pipe, struct kmstest_crtc *crtc)
 	igt_skip_on(ncrtc == 0);
 }
 
-void igt_assert_plane_visible(int fd, enum pipe pipe, bool visibility)
+void igt_assert_plane_visible(enum pipe pipe, bool visibility)
 {
 	struct kmstest_crtc crtc;
 	int i;
 	bool visible;
 
-	kmstest_get_crtc(fd, pipe, &crtc);
+	kmstest_get_crtc(pipe, &crtc);
 
 	visible = true;
 	for (i = 0; i < crtc.n_planes; i++) {

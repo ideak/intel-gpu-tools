@@ -165,7 +165,7 @@ release_forcewake_lock(int fd)
  * @pci_dev can be obtained from intel_get_pci_device().
  */
 int
-intel_register_access_init(struct pci_device *pci_dev, int safe, int fd)
+intel_register_access_init(struct pci_device *pci_dev, int safe)
 {
 	int ret;
 
@@ -187,7 +187,7 @@ intel_register_access_init(struct pci_device *pci_dev, int safe, int fd)
 	/* Find where the forcewake lock is. Forcewake doesn't exist
 	 * gen < 6, but the debugfs should do the right things for us.
 	 */
-	ret = igt_open_forcewake_handle(fd);
+	ret = igt_open_forcewake_handle();
 	if (ret == -1)
 		mmio_data.key = FAKEKEY;
 	else

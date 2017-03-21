@@ -965,7 +965,6 @@ int main(int argc, char *argv[])
 	int pipe = 0, bit = 0, target_scanline = 0, target_fuzz = 1;
 	bool test_pixelcount = false;
 	uint32_t devid;
-	int drm_fd;
 	uint32_t min[2*128] = {};
 	uint32_t max[2*128] = {};
 	uint32_t a, b;
@@ -1187,10 +1186,7 @@ int main(int argc, char *argv[])
 		break;
 	}
 
-	/* Just to make sure we open the right debugfs files */
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
-
-	intel_register_access_init(intel_get_pci_device(), 0, drm_fd);
+	intel_register_access_init(intel_get_pci_device(), 0);
 
 	printf("%s?\n", test_name(test, pipe, bit, test_pixelcount));
 
@@ -1266,8 +1262,6 @@ int main(int argc, char *argv[])
 	}
 
 	intel_register_access_fini();
-
-	close(drm_fd);
 
 	if (quit)
 		return 0;

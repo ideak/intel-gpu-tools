@@ -33,7 +33,6 @@
 #include "intel_io.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
-#include "drmtest.h"
 
 int gen;
 
@@ -266,7 +265,7 @@ static void print_usage(void)
 
 int main (int argc, char *argv[])
 {
-	int opt, drm_fd;
+	int opt;
 	int ret = 0;
 	char intel_pipe = '\0';
 	int x = 0, y = 0;
@@ -279,11 +278,8 @@ int main (int argc, char *argv[])
 	       "with overscan compensation properties: it is just a temporary "
 	       "solution that may or may not work. Use it at your own risk.\n");
 
-	/* Just to make sure we open the right debugfs files */
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
-
 	pci_dev = intel_get_pci_device();
-	intel_register_access_init(pci_dev, 0, drm_fd);
+	intel_register_access_init(pci_dev, 0);
 	devid = pci_dev->device_id;
 
 	if (!HAS_PCH_SPLIT(devid)) {
@@ -346,6 +342,5 @@ int main (int argc, char *argv[])
 
 out:
 	intel_register_access_fini();
-	close(drm_fd);
 	return ret;
 }

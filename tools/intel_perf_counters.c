@@ -483,7 +483,7 @@ main(int argc, char **argv)
 
 	if (oacontrol) {
 		/* Forcewake */
-		intel_register_access_init(intel_get_pci_device(), 0, fd);
+		intel_register_access_init(intel_get_pci_device(), 0);
 
 		/* Enable performance counters */
 		intel_register_write(OACONTROL,

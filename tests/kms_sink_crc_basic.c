@@ -46,11 +46,11 @@ typedef struct {
 	igt_plane_t *primary;
 } data_t;
 
-static void get_crc(data_t *data, char *crc) {
+static void get_crc(char *crc) {
 	int ret;
 	FILE *file;
 
-	file = igt_debugfs_fopen(data->drm_fd, "i915_sink_crc_eDP1", "r");
+	file = igt_debugfs_fopen("i915_sink_crc_eDP1", "r");
 	igt_require(file);
 
 	ret = fscanf(file, "%s\n", crc);
@@ -95,7 +95,7 @@ static void basic_sink_crc_check(data_t *data)
 	igt_display_commit(&data->display);
 
 	/* It should be Green */
-	get_crc(data, crc);
+	get_crc(crc);
 	assert_color(crc, GREEN);
 
 	/* Go Red */
@@ -103,7 +103,7 @@ static void basic_sink_crc_check(data_t *data)
 	igt_display_commit(&data->display);
 
 	/* It should be Red */
-	get_crc(data, crc);
+	get_crc(crc);
 	assert_color(crc, RED);
 }
 

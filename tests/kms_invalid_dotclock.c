@@ -104,13 +104,13 @@ static void test(data_t *data)
 	igt_require_f(valid_connectors, "No suitable connectors found\n");
 }
 
-static int i915_max_dotclock(data_t *data)
+static int i915_max_dotclock(void)
 {
 	char buf[4096];
 	char *s;
 	int max_dotclock = 0;
 
-	igt_debugfs_read(data->drm_fd, "i915_frequency_info", buf);
+	igt_debugfs_read("i915_frequency_info", buf);
 	s = strstr(buf, "Max pixel clock frequency:");
 	igt_assert(s);
 	igt_assert_eq(sscanf(s, "Max pixel clock frequency: %d kHz", &max_dotclock), 1);
@@ -137,7 +137,7 @@ igt_simple_main
 	data.res = drmModeGetResources(data.drm_fd);
 	kmstest_unset_all_crtcs(data.drm_fd, data.res);
 
-	data.max_dotclock = i915_max_dotclock(&data);
+	data.max_dotclock = i915_max_dotclock();
 	igt_info("Max dotclock: %d kHz\n", data.max_dotclock);
 
 	test(&data);

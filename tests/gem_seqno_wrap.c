@@ -47,7 +47,6 @@
 IGT_TEST_DESCRIPTION("Runs blitcopy -> rendercopy with multiple buffers over"
 		     " wrap boundary.");
 
-static int drm_fd;
 static int devid;
 static int card_index = 0;
 static uint32_t last_seqno = 0;
@@ -175,25 +174,26 @@ static void run_sync_test(int num_buffers, bool verify)
 	int max;
 	drm_intel_bo **src, **dst1, **dst2;
 	int width = 128, height = 128;
+	int fd;
 	int i;
 	unsigned int *p_dst1, *p_dst2;
 	struct igt_buf *s_src, *s_dst;
 
-	drm_fd = drm_open_driver(DRIVER_INTEL);
+	fd = drm_open_driver(DRIVER_INTEL);
 
-	gem_quiescent_gpu(drm_fd);
+	gem_quiescent_gpu(fd);
 
-	devid = intel_get_drm_devid(drm_fd);
+	devid = intel_get_drm_devid(fd);
 
-	max = gem_aperture_size (drm_fd) / (1024 * 1024) / 2;
+	max = gem_aperture_size (fd) / (1024 * 1024) / 2;
 	if (num_buffers > max)
 		num_buffers = max;
 
-	bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
+	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
 	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-	batch_blt = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(drm_fd));
+	batch_blt = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(fd));
 	igt_assert(batch_blt);
-	batch_3d = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(drm_fd));
+	batch_3d = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(fd));
 	igt_assert(batch_3d);
 
 	src = malloc(num_buffers * sizeof(*src));
@@ -265,9 +265,9 @@ static void run_sync_test(int num_buffers, bool verify)
 	free(dst1);
 	free(src);
 
-	gem_quiescent_gpu(drm_fd);
+	gem_quiescent_gpu(fd);
 
-	close(drm_fd);
+	close(fd);
 }
 
 static int __read_seqno(uint32_t *seqno)
@@ -278,7 +278,7 @@ static int __read_seqno(uint32_t *seqno)
 	char *p;
 	unsigned long int tmp;
 
-	fh = igt_debugfs_open(drm_fd, "i915_next_seqno", O_RDONLY);
+	fh = igt_debugfs_open("i915_next_seqno", O_RDONLY);
 
 	r = read(fh, buf, sizeof(buf) - 1);
 	close(fh);
@@ -332,7 +332,7 @@ static void write_seqno(uint32_t seqno)
 	if (options.dontwrap)
 		return;
 
-	fd = igt_debugfs_open(drm_fd, "i915_next_seqno", O_RDWR);
+	fd = igt_debugfs_open("i915_next_seqno", O_RDWR);
 	len = snprintf(buf, sizeof(buf), "0x%x", seqno);
 	igt_assert(write(fd, buf, len) == len);
 	close(fd);

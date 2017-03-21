@@ -185,7 +185,7 @@ static void prepare_crtc(data_t *data)
 	if (data->pipe_crc)
 		igt_pipe_crc_free(data->pipe_crc);
 
-	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
+	data->pipe_crc = igt_pipe_crc_new(data->pipe,
 					  INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	/* get reference crc for the white fb */
@@ -277,7 +277,7 @@ int main(int argc, char **argv)
 
 		kmstest_set_vt_graphics_mode();
 
-		igt_require_pipe_crc(data.drm_fd);
+		igt_require_pipe_crc();
 
 		igt_display_init(&data.display, data.drm_fd);
 

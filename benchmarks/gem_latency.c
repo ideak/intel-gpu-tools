@@ -470,7 +470,7 @@ static int run(int seconds,
 	if (gen < 6)
 		return IGT_EXIT_SKIP; /* Needs BCS timestamp */
 
-	intel_register_access_init(intel_get_pci_device(), false, fd);
+	intel_register_access_init(intel_get_pci_device(), false);
 
 	if (gen == 6)
 		timestamp_reg = REG(RCS_TIMESTAMP);

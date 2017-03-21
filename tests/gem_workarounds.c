@@ -133,9 +133,9 @@ igt_main
 		pci_dev = intel_get_pci_device();
 		igt_require(pci_dev);
 
-		intel_register_access_init(pci_dev, 0, fd);
+		intel_register_access_init(pci_dev, 0);
 
-		file = igt_debugfs_fopen(fd, "i915_wa_registers", "r");
+		file = igt_debugfs_fopen("i915_wa_registers", "r");
 		igt_assert(getline(&line, &line_size, file) > 0);
 		igt_debug("i915_wa_registers: %s", line);
 		sscanf(line, "Workarounds applied: %d", &num_wa_regs);

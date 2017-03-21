@@ -297,7 +297,7 @@ sysfs_write(const char *file, uint64_t val)
 }
 
 static char *
-read_debugfs_record(int fd, const char *file, const char *key)
+read_debugfs_record(const char *file, const char *key)
 {
 	FILE *fp;
 	char *line = NULL;
@@ -306,7 +306,7 @@ read_debugfs_record(int fd, const char *file, const char *key)
 	int key_len = strlen(key);
 	char *value = NULL;
 
-	fp = igt_debugfs_fopen(fd, file, "r");
+	fp = igt_debugfs_fopen(file, "r");
 	igt_require(fp);
 
 	while ((len = getline(&line, &line_buf_size, fp)) > 0) {
@@ -332,9 +332,9 @@ done:
 }
 
 static uint64_t
-read_debugfs_u64_record(int fd, const char *file, const char *key)
+read_debugfs_u64_record(const char *file, const char *key)
 {
-	char *str_val = read_debugfs_record(fd, file, key);
+	char *str_val = read_debugfs_record(file, key);
 	uint64_t val;
 
 	igt_require(str_val);
@@ -2137,25 +2137,25 @@ test_rc6_disable(void)
 		.properties_ptr = to_user_pointer(properties),
 	};
 	int stream_fd = __perf_open(drm_fd, &param);
-	uint64_t n_events_start = read_debugfs_u64_record(drm_fd, "i915_drpc_info",
+	uint64_t n_events_start = read_debugfs_u64_record("i915_drpc_info",
 							  "RC6 residency since boot");
 	uint64_t n_events_end;
 
 	nanosleep(&(struct timespec){ .tv_sec = 0, .tv_nsec = 500000000 }, NULL);
 
-	n_events_end = read_debugfs_u64_record(drm_fd, "i915_drpc_info",
+	n_events_end = read_debugfs_u64_record("i915_drpc_info",
 					       "RC6 residency since boot");
 
 	igt_assert_eq(n_events_end - n_events_start, 0);
 
 	close(stream_fd);
 
-	n_events_start = read_debugfs_u64_record(drm_fd, "i915_drpc_info",
+	n_events_start = read_debugfs_u64_record("i915_drpc_info",
 						 "RC6 residency since boot");
 
 	nanosleep(&(struct timespec){ .tv_sec = 0, .tv_nsec = 500000000 }, NULL);
 
-	n_events_end = read_debugfs_u64_record(drm_fd, "i915_drpc_info",
+	n_events_end = read_debugfs_u64_record("i915_drpc_info",
 					       "RC6 residency since boot");
 
 	igt_assert_neq(n_events_end - n_events_start, 0);

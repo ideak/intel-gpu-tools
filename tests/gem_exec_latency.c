@@ -442,9 +442,9 @@ igt_main
 	int device = -1;
 
 	igt_fixture {
+		intel_register_access_init(intel_get_pci_device(), false);
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
-		intel_register_access_init(intel_get_pci_device(), false, device);
 		print_welcome(device);
 
 		ring_size = measure_ring_size(device);

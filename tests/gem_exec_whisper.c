@@ -41,12 +41,12 @@
 
 #define VERIFY 0
 
-static void write_seqno(int fd, unsigned offset)
+static void write_seqno(unsigned offset)
 {
 	uint32_t seqno = UINT32_MAX - offset;
 	FILE *file;
 
-	file = igt_debugfs_fopen(fd, "i915_next_seqno", "w");
+	file = igt_debugfs_fopen("i915_next_seqno", "w");
 	igt_assert(file);
 
 	igt_assert(fprintf(file, "0x%x", seqno) > 0);
@@ -337,7 +337,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 				uint64_t offset;
 
 				if (!(flags & FORKED))
-					write_seqno(fd, pass);
+					write_seqno(pass);
 
 				if (flags & HANG)
 					submit_hang(&hang, engines, nengine);

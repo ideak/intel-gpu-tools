@@ -209,7 +209,7 @@ igt_main
 
 		igt_require(supports_lpsp(devid));
 
-		intel_register_access_init(intel_get_pci_device(), 0, drm_fd);
+		intel_register_access_init(intel_get_pci_device(), 0);
 
 		kmstest_set_vt_graphics_mode();
 	}

@@ -1081,7 +1081,6 @@ printf("Options:\n"
 int main(int argc, char *argv[])
 {
 	int opt;
-	int drm_fd;
 	int ret = 0;
 	Transcoder transcoder = TRANSC_INVALID;
 	DipType dip = DIP_INVALID;
@@ -1108,11 +1107,8 @@ int main(int argc, char *argv[])
 	printf("WARNING: This is just a debugging tool! Don't expect it to work"
 	       " perfectly: the Kernel might undo our changes.\n");
 
-	/* Just to make sure we open the right debugfs files */
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
-
 	pci_dev = intel_get_pci_device();
-	intel_register_access_init(pci_dev, 0, drm_fd);
+	intel_register_access_init(pci_dev, 0);
 	intel_check_pch();
 
 	if (IS_GEN4(pci_dev->device_id))
@@ -1261,6 +1257,5 @@ int main(int argc, char *argv[])
 
 out:
 	intel_register_access_fini();
-	close(drm_fd);
 	return ret;
 }

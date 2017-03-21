@@ -97,11 +97,8 @@ intel_get_avail_ram_mb(void)
 
 #ifdef HAVE_STRUCT_SYSINFO_TOTALRAM /* Linux */
 	struct sysinfo sysinf;
-	int fd;
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	intel_purge_vm_caches(fd);
-	close(fd);
+	intel_purge_vm_caches();
 
 	igt_assert(sysinfo(&sysinf) == 0);
 	retval = sysinf.freeram;
@@ -295,11 +292,11 @@ void intel_require_memory(uint64_t count, uint64_t size, unsigned mode)
 	igt_skip_on_simulation();
 }
 
-void intel_purge_vm_caches(int drm_fd)
+void intel_purge_vm_caches(void)
 {
 	int fd;
 
-	igt_drop_caches_set(drm_fd, DROP_SHRINK_ALL);
+	igt_drop_caches_set(DROP_SHRINK_ALL);
 
 	fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
 	if (fd >= 0) {

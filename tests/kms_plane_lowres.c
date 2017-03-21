@@ -112,7 +112,7 @@ get_lowres_mode(int drmfd, drmModeModeInfo *mode_default)
 static void
 test_init(data_t *data, enum pipe pipe)
 {
-	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	data->pipe_crc = igt_pipe_crc_new(pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 	data->plane = calloc(data->display.pipes[pipe].n_planes, sizeof(data->plane));\
 	igt_assert_f(data->plane, "Failed to allocate memory for %d planes\n",
 	             data->display.pipes[pipe].n_planes);
@@ -189,9 +189,11 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 	int size;
 	int i, x, y;
 
+	crtc.planes = calloc(sizeof(struct kmstest_plane), data->display.pipes[pipe].n_planes);
+	igt_assert_f(crtc.planes, "Failed to allocate memory for %d planes\n", data->display.pipes[pipe].n_planes);
 	igt_output_set_pipe(output, pipe);
 
-	kmstest_get_crtc(data->drm_fd, pipe, &crtc);
+	kmstest_get_crtc(pipe, &crtc);
 	igt_skip_on(crtc.n_planes > data->display.pipes[pipe].n_planes);
 	igt_skip_on(crtc.n_planes == 0);
 
@@ -261,7 +263,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 	n = igt_pipe_crc_get_crcs(data->pipe_crc, 1, &crc_hires1);
 	igt_assert_eq(1, n);
 
-	igt_assert_plane_visible(data->drm_fd, pipe, true);
+	igt_assert_plane_visible(pipe, true);
 
 	/* switch to lower resolution */
 	igt_output_override_mode(output, &mode_lowres);
@@ -273,7 +275,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	display_commit_mode(data, pipe, flags, crc_lowres);
 
-	igt_assert_plane_visible(data->drm_fd, pipe, false);
+	igt_assert_plane_visible(pipe, false);
 
 	/* switch back to higher resolution */
 	igt_output_override_mode(output, NULL);
@@ -285,7 +287,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	display_commit_mode(data, pipe, flags, crc_hires2);
 
-	igt_assert_plane_visible(data->drm_fd, pipe, true);
+	igt_assert_plane_visible(pipe, true);
 
 	igt_pipe_crc_stop(data->pipe_crc);
 
@@ -346,7 +348,7 @@ igt_main
 
 		kmstest_set_vt_graphics_mode();
 
-		igt_require_pipe_crc(data.drm_fd);
+		igt_require_pipe_crc();
 		igt_display_init(&data.display, data.drm_fd);
 	}
 

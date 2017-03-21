@@ -161,11 +161,11 @@ test_sysfs_reader(bool hibernate)
 }
 
 static void
-test_forcewake(int fd, bool hibernate)
+test_forcewake(bool hibernate)
 {
 	int fw_fd;
 
-	fw_fd = igt_open_forcewake_handle(fd);
+	fw_fd = igt_open_forcewake_handle();
 	igt_assert_lte(0, fw_fd);
 
 	if (hibernate)
@@ -200,7 +200,7 @@ igt_main
 		test_sysfs_reader(false);
 
 	igt_subtest("forcewake")
-		test_forcewake(fd, false);
+		test_forcewake(false);
 
 	igt_subtest("fence-restore-tiled2untiled-hibernate")
 		test_fence_restore(fd, true, true);
@@ -215,7 +215,7 @@ igt_main
 		test_sysfs_reader(true);
 
 	igt_subtest("forcewake-hibernate")
-		test_forcewake(fd, true);
+		test_forcewake(true);
 
 	igt_fixture
 		close(fd);

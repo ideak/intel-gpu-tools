@@ -232,7 +232,7 @@ static void setup_environment(void)
 	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
 
 	find_modeset_params();
-	pipe_crc = igt_pipe_crc_new(drm_fd, kmstest_get_crtc_idx(drm_res, ms.crtc_id),
+	pipe_crc = igt_pipe_crc_new(kmstest_get_crtc_idx(drm_res, ms.crtc_id),
 				    INTEL_PIPE_CRC_SOURCE_AUTO);
 }
 

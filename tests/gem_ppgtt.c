@@ -236,7 +236,7 @@ static void flink_and_close(void)
 	gem_sync(fd2, flinked_bo);
 	gem_close(fd2, flinked_bo);
 
-	igt_drop_caches_set(fd, DROP_RETIRE);
+	igt_drop_caches_set(DROP_RETIRE);
 
 	/* the flinked bo VMA should have been cleared now, so a new bo of the
 	 * same size should get the same offset
@@ -269,12 +269,12 @@ static void flink_and_exit(void)
 	flinked_bo = gem_open(fd2, name);
 
 	/* Verify VMA is not there yet. */
-	igt_assert(!igt_debugfs_search(fd, "i915_gem_gtt", match));
+	igt_assert(!igt_debugfs_search("i915_gem_gtt", match));
 
 	exec_and_get_offset(fd2, flinked_bo);
 
 	/* Verify VMA has been created. */
-	igt_assert(igt_debugfs_search(fd, "i915_gem_gtt", match));
+	igt_assert(igt_debugfs_search("i915_gem_gtt", match));
 
 	/* Close the context. */
 	close(fd2);
@@ -286,8 +286,8 @@ static void flink_and_exit(void)
 	exec_and_get_offset(fd3, gem_create(fd3, 4096));
 	close(fd3);
 
-	igt_drop_caches_set(fd, DROP_ACTIVE | DROP_RETIRE);
-	igt_assert(!igt_debugfs_search(fd, "i915_gem_gtt", match));
+	igt_drop_caches_set(DROP_ACTIVE | DROP_RETIRE);
+	igt_assert(!igt_debugfs_search("i915_gem_gtt", match));
 
 	close(fd);
 }

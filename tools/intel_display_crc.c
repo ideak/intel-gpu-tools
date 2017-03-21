@@ -67,7 +67,7 @@ static void print_crcs(display_crc_t *ctx)
 	char *crc_str;
 	int i;
 
-	pipe_crc = igt_pipe_crc_new(ctx->fd, ctx->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	pipe_crc = igt_pipe_crc_new(ctx->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	for (i = 0; i < ctx->n_crcs; i++) {
 		igt_pipe_crc_collect_crc(pipe_crc, &crc);

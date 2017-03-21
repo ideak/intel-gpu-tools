@@ -212,7 +212,7 @@ static void test_output(data_t *data)
 	igt_output_set_pipe(data->output, data->pipe);
 
 	if (data->flags & TEST_CRC) {
-		pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+		pipe_crc = igt_pipe_crc_new(data->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 		display_fb(data, TEST_COMPRESSED);
 		igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
@@ -276,7 +276,7 @@ igt_main
 
 		igt_require(intel_gen(intel_get_drm_devid(data.drm_fd)) >= 9);
 		kmstest_set_vt_graphics_mode();
-		igt_require_pipe_crc(data.drm_fd);
+		igt_require_pipe_crc();
 
 		igt_display_init(&data.display, data.drm_fd);
 	}
