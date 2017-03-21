@@ -24,13 +24,13 @@
 
 #include "igt.h"
 
-#define MAX_ERROR 3 /* % */
+#define MAX_ERROR 5 /* % */
 
 #define assert_within_epsilon(x, ref, tolerance) \
 	igt_assert_f(100 * x <= (100 + tolerance) * ref && \
 		     100 * x >= (100 - tolerance) * ref, \
-		     "'%s' != '%s' (%ld not within %d%% tolerance of %ld)\n", \
-		     #x, #ref, (int64_t)x, tolerance, (int64_t)ref)
+		     "'%s' != '%s' (%lld not within %d%% tolerance of %lld)\n",\
+		     #x, #ref, (long long)x, tolerance, (long long)ref)
 
 static void basic(int fd, unsigned int engine, unsigned int timeout_sec)
 {
@@ -38,20 +38,26 @@ static void basic(int fd, unsigned int engine, unsigned int timeout_sec)
 	unsigned long loops = 0;
 	igt_spin_t *spin;
 	struct timespec tv = { };
+	struct timespec itv = { };
 	uint64_t elapsed;
 
 	spin = igt_spin_batch_new(fd, engine, 0);
 	while ((elapsed = igt_nsec_elapsed(&tv)) >> 30 < timeout_sec) {
 		igt_spin_t *next = igt_spin_batch_new(fd, engine, 0);
 
-		igt_spin_batch_set_timeout(spin, timeout_100ms);
+		igt_spin_batch_set_timeout(spin,
+					   timeout_100ms - igt_nsec_elapsed(&itv));
 		gem_sync(fd, spin->handle);
-		loops++;
+		memset(&itv, 0, sizeof(itv));
 
 		igt_spin_batch_free(fd, spin);
 		spin = next;
+		loops++;
 	}
 	igt_spin_batch_free(fd, spin);
+
+	igt_info("Completed %ld loops in %lld ns, target %ld\n",
+		 loops, (long long)elapsed, (long)(elapsed / timeout_100ms));
 
 	assert_within_epsilon(timeout_100ms * loops, elapsed, MAX_ERROR);
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
