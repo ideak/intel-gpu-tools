@@ -419,7 +419,8 @@ int igt_kselftest_init(struct igt_kselftest *tst,
 	memset(tst, 0, sizeof(*tst));
 
 	tst->module_name = strdup(module_name);
-	igt_assert(tst->module_name);
+	if (!tst->module_name)
+		return 1;
 
 	tst->kmsg = -1;
 
@@ -502,7 +503,9 @@ void igt_kselftests(const char *module_name,
 	IGT_LIST(tests);
 	struct igt_kselftest_list *tl, *tn;
 
-	igt_require(igt_kselftest_init(&tst, module_name) == 0);
+	if (igt_kselftest_init(&tst, module_name) != 0)
+		return;
+
 	igt_fixture
 		igt_require(igt_kselftest_begin(&tst) == 0);
 
