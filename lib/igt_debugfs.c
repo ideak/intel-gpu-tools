@@ -366,20 +366,25 @@ static bool igt_pipe_crc_do_start(igt_pipe_crc_t *pipe_crc)
 	else
 		sprintf(buf, "%s", pipe_crc_source_name(pipe_crc->source));
 
-	errno = 0;
 	igt_assert_eq(write(pipe_crc->ctl_fd, buf, strlen(buf)), strlen(buf));
-	if (errno != 0)
-		return false;
 
 	if (!pipe_crc->is_legacy) {
+		int err;
+
 		sprintf(buf, "crtc-%d/crc/data", pipe_crc->pipe);
-		errno = 0;
+		err = 0;
+
 		pipe_crc->crc_fd = igt_debugfs_open(pipe_crc->fd, buf, pipe_crc->flags);
-		if (pipe_crc->crc_fd == -1 && errno == EINVAL)
+		if (pipe_crc->crc_fd < 0)
+			err = -errno;
+
+		if (err == -EINVAL)
 			return false;
-		igt_assert_eq(errno, 0);
+
+		igt_assert_eq(err, 0);
 	}
 
+	errno = 0;
 	return true;
 }
 
