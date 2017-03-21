@@ -76,7 +76,6 @@ static void test_bad_source(data_t *data)
 	fflush(f);
 	igt_assert_eq(written, strlen(source));
 	igt_assert(!ferror(f));
-	igt_assert(!errno);
 	fclose(f);
 
 	f = igt_debugfs_fopen(data->drm_fd, "crtc-0/crc/data", "w");
