@@ -110,7 +110,10 @@ static void from_mmap(int fd, uint64_t size, enum mode mode)
 	uint64_t max, i;
 	int retry = 2;
 
-	intel_require_memory(1, size, CHECK_RAM);
+	/* Worst case is that the kernel has to copy the entire incoming
+	 * reloc[], so double the memory requirements.
+	 */
+	intel_require_memory(2, size, CHECK_RAM);
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
