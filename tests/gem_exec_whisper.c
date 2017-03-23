@@ -231,6 +231,11 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	}
 	igt_require(nengine);
 
+	if (flags & CONTEXTS) {
+		igt_require(__gem_context_create(fd, &contexts[0]) == 0);
+		gem_context_destroy(fd, contexts[0]);
+	}
+
 	if (flags & HANG)
 		init_hang(&hang);
 
@@ -289,8 +294,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		batch[++i] = MI_BATCH_BUFFER_END;
 
 		if (flags & CONTEXTS) {
-			igt_require(__gem_context_create(fd, &contexts[0]) == 0);
-			for (n = 1; n < 64; n++)
+			for (n = 0; n < 64; n++)
 				contexts[n] = gem_context_create(fd);
 		}
 		if (flags & FDS) {
