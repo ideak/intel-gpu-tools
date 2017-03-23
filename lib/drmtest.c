@@ -51,8 +51,9 @@
 #include "i915_drm.h"
 #include "intel_chipset.h"
 #include "intel_io.h"
-#include "igt_gt.h"
 #include "igt_debugfs.h"
+#include "igt_gt.h"
+#include "igt_kmod.h"
 #include "version.h"
 #include "config.h"
 #include "intel_reg.h"
@@ -228,9 +229,7 @@ int drm_get_card(void)
 
 static int modprobe(const char *driver)
 {
-	char buf[128];
-	snprintf(buf, sizeof(buf), "/sbin/modprobe -s %s", driver);
-	return system(buf);
+	return igt_kmod_load(driver, "");
 }
 
 /**

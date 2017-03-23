@@ -26,6 +26,8 @@
 
 #include <libkmod.h>
 
+#include "igt_aux.h"
+
 bool igt_kmod_is_loaded(const char *mod_name);
 void igt_kmod_list_loaded(void);
 
