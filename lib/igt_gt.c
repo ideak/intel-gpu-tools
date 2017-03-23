@@ -556,6 +556,7 @@ unsigned intel_detect_and_clear_missed_interrupts(int fd)
 		}
 	}
 
+	errno = 0;
 	return missed;
 }
 
