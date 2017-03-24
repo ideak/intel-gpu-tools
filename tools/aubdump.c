@@ -123,7 +123,6 @@ get_bo(uint32_t handle)
 
 	fail_if(handle >= MAX_BO_COUNT, "bo handle too large\n");
 	bo = &bos[handle];
-	fail_if(bo->size == 0, "invalid bo handle (%d) in execbuf\n", handle);
 
 	return bo;
 }
@@ -434,7 +433,7 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 			offset = align_u32(offset + bo->size + 4095, 4096);
 		}
 
-		if (bo->map == NULL)
+		if (bo->map == NULL && bo->size > 0)
 			bo->map = gem_mmap(fd, obj->handle, 0, bo->size);
 		fail_if(bo->map == MAP_FAILED, "intel_aubdump: bo mmap failed\n");
 	}
@@ -575,7 +574,7 @@ maybe_init(void)
 	}
 	fclose(config);
 
-	bos = malloc(MAX_BO_COUNT * sizeof(bos[0]));
+	bos = calloc(MAX_BO_COUNT, sizeof(bos[0]));
 	fail_if(bos == NULL, "intel_aubdump: out of memory\n");
 }
 
