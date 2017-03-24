@@ -23,6 +23,7 @@
  */
 
 #include "igt.h"
+#include "igt_sysfs.h"
 #include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -47,16 +48,13 @@ typedef struct {
 } data_t;
 
 static void get_crc(data_t *data, char *crc) {
-	int ret;
-	FILE *file;
+	int dir;
 
-	file = igt_debugfs_fopen(data->drm_fd, "i915_sink_crc_eDP1", "r");
-	igt_require(file);
+	dir = igt_debugfs_dir(data->drm_fd);
+	igt_require_f(igt_sysfs_scanf(dir, "i915_sink_crc_eDP1", "%s\n", crc),
+		      "Sink CRC is unreliable on this machine. Try manual debug with --interactive-debug=no-crc\n");
+	close(dir);
 
-	ret = fscanf(file, "%s\n", crc);
-	igt_require(ret > 0);
-
-	fclose(file);
 
 	/* Black screen is always invalid */
 	igt_assert(strcmp(crc, CRC_BLACK) != 0);

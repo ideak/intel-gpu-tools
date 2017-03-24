@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
 
 
 typedef struct {
@@ -549,13 +550,16 @@ i915_gem_fb_count(data_t *data)
 {
 	char buf[1024];
 	FILE *fp;
+	int fd;
 	int count = 0;
 
-	fp = igt_debugfs_fopen(data->drm_fd, "i915_gem_framebuffer", "r");
+	fd = igt_debugfs_open(data->drm_fd, "i915_gem_framebuffer", O_RDONLY);
+	fp = fdopen(fd, "r");
 	igt_require(fp);
 	while (fgets(buf, sizeof(buf), fp) != NULL)
 		count++;
 	fclose(fp);
+	close(fd);
 
 	return count;
 }

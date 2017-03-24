@@ -23,6 +23,7 @@
  */
 
 #include "igt.h"
+#include "igt_sysfs.h"
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -223,19 +224,15 @@ static bool wait_psr_entry(data_t *data)
 }
 
 static void get_sink_crc(data_t *data, char *crc) {
-	int ret;
-	FILE *file;
+	int dir;
 
 	if (igt_interactive_debug)
 		return;
 
-	file = igt_debugfs_fopen(data->drm_fd, "i915_sink_crc_eDP1", "r");
-	igt_require(file);
-
-	ret = fscanf(file, "%s\n", crc);
-	igt_require_f(ret > 0, "Sink CRC is unreliable on this machine. Try manual debug with --interactive-debug=no-crc\n");
-
-	fclose(file);
+	dir = igt_debugfs_dir(data->drm_fd);
+	igt_require_f(igt_sysfs_scanf(dir, "i915_sink_crc_eDP1", "%s\n", crc),
+		      "Sink CRC is unreliable on this machine. Try manual debug with --interactive-debug=no-crc\n");
+	close(dir);
 
 	igt_debug("%s\n", crc);
 	igt_debug_wait_for_keypress("crc");

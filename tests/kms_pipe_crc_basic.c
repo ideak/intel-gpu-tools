@@ -23,6 +23,7 @@
  */
 
 #include "igt.h"
+#include "igt_sysfs.h"
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -45,42 +46,18 @@ static struct {
 
 static void test_bad_command(data_t *data, const char *cmd)
 {
-	FILE *ctl;
-	size_t written;
+	int dir = igt_debugfs_dir(data->drm_fd);
 
-	ctl = igt_debugfs_fopen(data->drm_fd, "i915_display_crc_ctl", "r+");
-	igt_require(ctl);
-
-	written = fwrite(cmd, 1, strlen(cmd), ctl);
-	fflush(ctl);
-	igt_assert_eq(written, strlen(cmd));
-	igt_assert(ferror(ctl));
-	igt_assert_eq(errno, EINVAL);
-
-	fclose(ctl);
+	igt_require(igt_sysfs_set(dir, "i915_display_crc_ctl", cmd));
+	close(dir);
 }
 
 static void test_bad_source(data_t *data)
 {
-	FILE *f;
-	size_t written;
-	const char *source = "foo";
+	int dir = igt_debugfs_dir(data->drm_fd);
 
-	f = igt_debugfs_fopen(data->drm_fd, "crtc-0/crc/control", "w");
-	if (!f) {
-		test_bad_command(data, "pipe A foo");
-		return;
-	}
-
-	written = fwrite(source, 1, strlen(source), f);
-	fflush(f);
-	igt_assert_eq(written, strlen(source));
-	igt_assert(!ferror(f));
-	fclose(f);
-
-	f = igt_debugfs_fopen(data->drm_fd, "crtc-0/crc/data", "w");
-	igt_assert(!f);
-	igt_assert_eq(errno, EINVAL);
+	igt_require(igt_sysfs_set(dir, "crtc-0/crc/control", "foo"));
+	close(dir);
 }
 
 #define N_CRCS	3

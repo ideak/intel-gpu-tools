@@ -28,6 +28,8 @@
 #define _GNU_SOURCE
 #include "igt.h"
 
+#include <fcntl.h>
+
 enum operation {
 	GPU_RESET,
 	SUSPEND_RESUME,
@@ -122,20 +124,21 @@ static void check_workarounds(enum operation op)
 igt_main
 {
 	igt_fixture {
-		int fd = drm_open_driver_master(DRIVER_INTEL);
-		const int gen = intel_gen(intel_get_drm_devid(fd));
+		int device = drm_open_driver_master(DRIVER_INTEL);
+		const int gen = intel_gen(intel_get_drm_devid(device));
 		struct pci_device *pci_dev;
 		FILE *file;
 		char *line = NULL;
 		size_t line_size;
-		int i;
+		int i, fd;
 
 		pci_dev = intel_get_pci_device();
 		igt_require(pci_dev);
 
-		intel_register_access_init(pci_dev, 0, fd);
+		intel_register_access_init(pci_dev, 0, device);
 
-		file = igt_debugfs_fopen(fd, "i915_wa_registers", "r");
+		fd = igt_debugfs_open(device, "i915_wa_registers", O_RDONLY);
+		file = fdopen(fd, "r");
 		igt_assert(getline(&line, &line_size, file) > 0);
 		igt_debug("i915_wa_registers: %s", line);
 		sscanf(line, "Workarounds applied: %d", &num_wa_regs);
@@ -164,6 +167,8 @@ igt_main
 
 		free(line);
 		fclose(file);
+		close(fd);
+		close(device);
 	}
 
 	igt_subtest("basic-read")

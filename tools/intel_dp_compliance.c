@@ -227,16 +227,26 @@ static void clear_test_active(void)
 	fflush(test_active_fp);
 }
 
+static FILE *fopenat(int dir, const char *name, const char *mode)
+{
+	int fd = openat(dir, name, O_RDWR);
+	return fdopen(fd, mode);
+}
+
 static void setup_debugfs_files(void)
 {
-	test_type_fp = igt_debugfs_fopen(drm_fd, INTEL_DP_TEST_TYPE_FILE, "r");
+	int dir = igt_debugfs_dir(drm_fd);
+
+	test_type_fp = fopenat(dir, INTEL_DP_TEST_TYPE_FILE, "r");
 	igt_require(test_type_fp);
 
-	test_data_fp = igt_debugfs_fopen(drm_fd, INTEL_DP_TEST_DATA_FILE, "r");
+	test_data_fp = fopenat(dir, INTEL_DP_TEST_DATA_FILE, "r");
 	igt_require(test_data_fp);
 
-	test_active_fp = igt_debugfs_fopen(drm_fd, INTEL_DP_TEST_ACTIVE_FILE, "w+");
+	test_active_fp = fopenat(dir, INTEL_DP_TEST_ACTIVE_FILE, "w+");
 	igt_require(test_active_fp);
+
+	close(dir);
 
 	/* Reset the active flag for safety */
 	clear_test_active();

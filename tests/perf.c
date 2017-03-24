@@ -193,7 +193,7 @@ static bool hsw_undefined_a_counters[45] = {
 
 static int drm_fd = -1;
 static uint32_t devid;
-static int device = -1;
+static int card = -1;
 
 static uint64_t hsw_render_basic_id = UINT64_MAX;
 static uint64_t gt_min_freq_mhz_saved = 0;
@@ -281,7 +281,7 @@ sysfs_read(const char *file)
 {
 	char buf[512];
 
-	snprintf(buf, sizeof(buf), "/sys/class/drm/card%d/%s", device, file);
+	snprintf(buf, sizeof(buf), "/sys/class/drm/card%d/%s", card, file);
 
 	return read_u64_file(buf);
 }
@@ -291,22 +291,24 @@ sysfs_write(const char *file, uint64_t val)
 {
 	char buf[512];
 
-	snprintf(buf, sizeof(buf), "/sys/class/drm/card%d/%s", device, file);
+	snprintf(buf, sizeof(buf), "/sys/class/drm/card%d/%s", card, file);
 
 	write_u64_file(buf, val);
 }
 
 static char *
-read_debugfs_record(int fd, const char *file, const char *key)
+read_debugfs_record(int device, const char *file, const char *key)
 {
 	FILE *fp;
+	int fd;
 	char *line = NULL;
 	size_t line_buf_size = 0;
 	int len = 0;
 	int key_len = strlen(key);
 	char *value = NULL;
 
-	fp = igt_debugfs_fopen(fd, file, "r");
+	fd = igt_debugfs_open(device, file, O_RDONLY);
+	fp = fdopen(fd, "r");
 	igt_require(fp);
 
 	while ((len = getline(&line, &line_buf_size, fp)) > 0) {
@@ -326,8 +328,8 @@ read_debugfs_record(int fd, const char *file, const char *key)
 	igt_assert(!"reached");
 done:
 	free(line);
-	if (fp)
-		fclose(fp);
+	fclose(fp);
+	close(fd);
 	return value;
 }
 
@@ -350,11 +352,11 @@ lookup_hsw_render_basic_id(void)
 {
 	char buf[256];
 
-	igt_assert_neq(device, -1);
+	igt_assert_neq(card, -1);
 
 	snprintf(buf, sizeof(buf),
 		 "/sys/class/drm/card%d/metrics/403d8832-1a27-4aa6-a64e-f5389ce7b212/id",
-		 device);
+		 card);
 
 	return try_read_u64_file(buf, &hsw_render_basic_id);
 }
@@ -2225,7 +2227,7 @@ test_i915_ref_count(void)
 
 	drm_fd = __drm_open_driver(DRIVER_INTEL);
 	devid = intel_get_drm_devid(drm_fd);
-	device = drm_get_card();
+	card = drm_get_card();
 
 	igt_require(IS_HASWELL(devid));
 	igt_require(lookup_hsw_render_basic_id());
@@ -2296,7 +2298,7 @@ igt_main
 		igt_assert_eq(drm_fd, -1);
 		drm_fd = drm_open_driver_render(DRIVER_INTEL);
 		devid = intel_get_drm_devid(drm_fd);
-		device = drm_get_card();
+		card = drm_get_card();
 
 		igt_require(IS_HASWELL(devid));
 		igt_require(lookup_hsw_render_basic_id());

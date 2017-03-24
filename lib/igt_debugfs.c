@@ -222,34 +222,6 @@ int igt_debugfs_open(int device, const char *filename, int mode)
 }
 
 /**
- * igt_debugfs_fopen:
- * @filename: name of the debugfs node to open
- * @mode: mode string as used by fopen()
- *
- * This opens a debugfs file as a libc FILE. The filename should be
- * relative to the drm device's root, i.e. without "drm/<minor>".
- *
- * Returns:
- * The libc FILE pointer for the debugfs file or NULL if that didn't work out.
- */
-FILE *igt_debugfs_fopen(int device,
-			const char *filename,
-			const char *mode)
-{
-	FILE *file;
-	int fd;
-
-	fd = igt_debugfs_open(device, filename, O_RDWR);
-	if (fd < 0)
-		return NULL;
-
-	file = fdopen(fd, mode);
-	close(fd);
-
-	return file;
-}
-
-/**
  * __igt_debugfs_read:
  * @filename: file name
  * @buf: buffer where the contents will be stored, allocated by the caller
@@ -281,14 +253,16 @@ void __igt_debugfs_read(int fd, const char *filename, char *buf, int buf_size)
  *
  * Returns: True if the @substring is found to occur in @filename
  */
-bool igt_debugfs_search(int fd, const char *filename, const char *substring)
+bool igt_debugfs_search(int device, const char *filename, const char *substring)
 {
 	FILE *file;
 	size_t n = 0;
 	char *line = NULL;
 	bool matched = false;
+	int fd;
 
-	file = igt_debugfs_fopen(fd, filename, "r");
+	fd = igt_debugfs_open(device, filename, O_RDONLY);
+	file = fdopen(fd, "r");
 	igt_assert(file);
 
 	while (getline(&line, &n, file) >= 0) {
@@ -299,6 +273,7 @@ bool igt_debugfs_search(int fd, const char *filename, const char *substring)
 
 	free(line);
 	fclose(file);
+	close(fd);
 
 	return matched;
 }

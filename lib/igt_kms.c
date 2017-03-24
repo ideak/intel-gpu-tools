@@ -1324,34 +1324,34 @@ static void parse_crtc(char *info, struct kmstest_crtc *crtc)
 	igt_assert_eq(ret, 2);
 }
 
-void kmstest_get_crtc(int fd, enum pipe pipe, struct kmstest_crtc *crtc)
+void kmstest_get_crtc(int device, enum pipe pipe, struct kmstest_crtc *crtc)
 {
 	char tmp[256];
-	FILE *fid;
-	const char *mode = "r";
+	FILE *file;
 	int ncrtc;
 	int line;
 	long int n;
+	int fd;
 
-	fid = igt_debugfs_fopen(fd, "i915_display_info", mode);
-
-	igt_skip_on(fid == NULL);
+	fd = igt_debugfs_open(device, "i915_display_info", O_RDONLY);
+	file = fdopen(fd, "r");
+	igt_skip_on(file == NULL);
 
 	ncrtc = 0;
 	line = 0;
-	while (fgets(tmp, 256, fid) != NULL) {
+	while (fgets(tmp, 256, file) != NULL) {
 		if ((strstr(tmp, "CRTC") != NULL) && (line > 0)) {
 			if (strstr(tmp, "active=yes") != NULL) {
 				crtc->active = true;
 				parse_crtc(tmp, crtc);
 
-				n = ftell(fid);
-				crtc->n_planes = parse_planes(fid, NULL);
+				n = ftell(file);
+				crtc->n_planes = parse_planes(file, NULL);
 				crtc->planes = calloc(crtc->n_planes, sizeof(*crtc->planes));
 				igt_assert_f(crtc->planes, "Failed to allocate memory for %d planes\n", crtc->n_planes);
 
-				fseek(fid, n, SEEK_SET);
-				parse_planes(fid, crtc->planes);
+				fseek(file, n, SEEK_SET);
+				parse_planes(file, crtc->planes);
 
 				if (crtc->pipe != pipe) {
 					free(crtc->planes);
@@ -1365,7 +1365,8 @@ void kmstest_get_crtc(int fd, enum pipe pipe, struct kmstest_crtc *crtc)
 		line++;
 	}
 
-	fclose(fid);
+	fclose(file);
+	close(fd);
 
 	igt_skip_on(ncrtc == 0);
 }
