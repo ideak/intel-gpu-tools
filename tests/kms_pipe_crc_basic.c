@@ -28,10 +28,12 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
 
 
 typedef struct {
 	int drm_fd;
+	int debugfs;
 	igt_display_t display;
 	struct igt_fb fb;
 } data_t;
@@ -46,18 +48,15 @@ static struct {
 
 static void test_bad_command(data_t *data, const char *cmd)
 {
-	int dir = igt_debugfs_dir(data->drm_fd);
-
-	igt_require(igt_sysfs_set(dir, "i915_display_crc_ctl", cmd));
-	close(dir);
+	igt_assert(!igt_sysfs_set(data->debugfs, "i915_display_crc_ctl", cmd));
+	igt_skip_on(errno == ENOENT);
+	igt_assert(errno == EINVAL);
 }
 
 static void test_bad_source(data_t *data)
 {
-	int dir = igt_debugfs_dir(data->drm_fd);
-
-	igt_require(igt_sysfs_set(dir, "crtc-0/crc/control", "foo"));
-	close(dir);
+	igt_assert(igt_sysfs_set(data->debugfs, "crtc-0/crc/control", "foo"));
+	igt_assert(openat(data->debugfs, "crtc-0/crc/data", O_WRONLY) == -1);
 }
 
 #define N_CRCS	3
@@ -192,6 +191,7 @@ igt_main
 		igt_require_pipe_crc(data.drm_fd);
 
 		igt_display_init(&data.display, data.drm_fd);
+		data.debugfs = igt_debugfs_dir(data.drm_fd);
 	}
 
 	igt_subtest("bad-pipe")
