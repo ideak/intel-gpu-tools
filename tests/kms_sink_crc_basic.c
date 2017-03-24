@@ -33,8 +33,6 @@
 #include "drm_fourcc.h"
 
 
-#define CRC_BLACK "000000000000"
-
 enum color {
 	RED,
 	GREEN,
@@ -47,26 +45,18 @@ typedef struct {
 	igt_plane_t *primary;
 } data_t;
 
-static void get_crc(data_t *data, char *crc) {
-	int dir;
+static void assert_color(int dir, enum color color)
+{
+	unsigned int r, g, b, x;
 
-	dir = igt_debugfs_dir(data->drm_fd);
-	igt_require_f(igt_sysfs_scanf(dir, "i915_sink_crc_eDP1", "%s\n", crc),
+	igt_require_f(igt_sysfs_scanf(dir,
+				      "i915_sink_crc_eDP1",
+				      "%4x%4x%4x%4x\n",
+				      &r, &g, &b, &x) == 4,
 		      "Sink CRC is unreliable on this machine. Try manual debug with --interactive-debug=no-crc\n");
-	close(dir);
-
 
 	/* Black screen is always invalid */
-	igt_assert(strcmp(crc, CRC_BLACK) != 0);
-}
-
-static void assert_color(const char *crc, enum color color)
-{
-	unsigned int r, g, b;
-	int ret;
-
-	ret = sscanf(crc, "%4x%4x%4x", &r, &g, &b);
-	igt_assert_eq(ret, 3);
+	igt_assert_neq(r | g | b | x, 0);
 
 	switch (color) {
 	case RED:
@@ -86,23 +76,25 @@ static void assert_color(const char *crc, enum color color)
 
 static void basic_sink_crc_check(data_t *data)
 {
-	char crc[13];
+	int dir;
+
+	dir = igt_debugfs_dir(data->drm_fd);
 
 	/* Go Green */
 	igt_plane_set_fb(data->primary, &data->fb_green);
 	igt_display_commit(&data->display);
 
 	/* It should be Green */
-	get_crc(data, crc);
-	assert_color(crc, GREEN);
+	assert_color(dir, GREEN);
 
 	/* Go Red */
 	igt_plane_set_fb(data->primary, &data->fb_red);
 	igt_display_commit(&data->display);
 
 	/* It should be Red */
-	get_crc(data, crc);
-	assert_color(crc, RED);
+	assert_color(dir, RED);
+
+	close(dir);
 }
 
 static void run_test(data_t *data)
