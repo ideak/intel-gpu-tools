@@ -131,7 +131,17 @@ const char *igt_debugfs_mount(void)
 	return "/sys/kernel/debug";
 }
 
-static int __igt_debugfs_dir(int device)
+/**
+ * igt_debugfs_dir:
+ * @device: fd of the device
+ *
+ * This opens the debugfs directory corresponding to device for use
+ * with igt_sysfs_get() and related functions.
+ *
+ * Returns:
+ * The directory fd, or -1 on failure.
+ */
+int igt_debugfs_dir(int device)
 {
 	struct stat st;
 	const char *debugfs_root;
@@ -204,7 +214,7 @@ int igt_debugfs_open(int device, const char *filename, int mode)
 {
 	int dir;
 
-	dir = __igt_debugfs_dir(device);
+	dir = igt_debugfs_dir(device);
 	if (dir < 0)
 		return dir;
 
@@ -226,13 +236,17 @@ FILE *igt_debugfs_fopen(int device,
 			const char *filename,
 			const char *mode)
 {
+	FILE *file;
 	int fd;
 
 	fd = igt_debugfs_open(device, filename, O_RDWR);
 	if (fd < 0)
 		return NULL;
 
-	return fdopen(fd, mode);
+	file = fdopen(fd, mode);
+	close(fd);
+
+	return file;
 }
 
 /**
@@ -250,7 +264,7 @@ void __igt_debugfs_read(int fd, const char *filename, char *buf, int buf_size)
 	int dir;
 	int len;
 
-	dir = __igt_debugfs_dir(fd);
+	dir = igt_debugfs_dir(fd);
 	len = igt_sysfs_read(dir, filename, buf, buf_size - 1);
 	if (len < 0)
 		len = 0;
@@ -278,7 +292,7 @@ bool igt_debugfs_search(int fd, const char *filename, const char *substring)
 	igt_assert(file);
 
 	while (getline(&line, &n, file) >= 0) {
-		matched = (strstr(line, substring) != NULL);
+		matched = strstr(line, substring) != NULL;
 		if (matched)
 			break;
 	}
@@ -419,7 +433,7 @@ static void igt_pipe_crc_reset(int drm_fd)
 	int fdir;
 	int fd;
 
-	fdir = __igt_debugfs_dir(drm_fd);
+	fdir = igt_debugfs_dir(drm_fd);
 	if (fdir < 0)
 		return;
 
@@ -949,7 +963,7 @@ bool igt_drop_caches_has(int drm_fd, uint64_t val)
 	int dir;
 
 	mask = 0;
-	dir = __igt_debugfs_dir(drm_fd);
+	dir = igt_debugfs_dir(drm_fd);
 	igt_sysfs_scanf(dir, "i915_gem_drop_caches", "0x%" PRIx64, &mask);
 	close(dir);
 
@@ -1043,7 +1057,7 @@ static int get_object_count(int fd)
 
 	igt_drop_caches_set(fd, DROP_RETIRE | DROP_ACTIVE | DROP_FREED);
 
-	dir = __igt_debugfs_dir(fd);
+	dir = igt_debugfs_dir(fd);
 	scanned = igt_sysfs_scanf(dir, "i915_gem_objects",
 				  "%i objects", &ret);
 	igt_assert_eq(scanned, 1);
@@ -1092,33 +1106,6 @@ int igt_get_stable_obj_count(int driver)
 	}
 #endif
 	return obj_count;
-}
-
-
-/* Non-i915 specific debugfs API */
-
-/**
- * igt_debugfs_dir:
- * @device: fd of the device (or -1 to default to Intel)
- *
- * This opens the debugfs directory corresponding to device for use
- * with igt_sysfs_get() and related functions.
- *
- * Returns:
- * The directory fd, or -1 on failure.
- */
-int igt_debugfs_dir(int device)
-{
-	struct stat st;
-	char path[256];
-
-	if (fstat(device, &st) || !S_ISCHR(st.st_mode))
-		return -1;
-
-	sprintf(path, "%s/dri/%d",
-		igt_debugfs_mount(), (int)(st.st_rdev & 0xff));
-	igt_debug("Opening debugfs dir %s\n", path);
-	return open(path, O_RDONLY);
 }
 
 void igt_debugfs_dump(int device, const char *filename)

@@ -29,6 +29,7 @@
 
 #include "igt.h"
 #include "igt_gt.h"
+#include "igt_debugfs.h"
 #include "igt_sysfs.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
@@ -41,16 +42,11 @@
 
 #define VERIFY 0
 
-static void write_seqno(int fd, unsigned offset)
+static void write_seqno(int dir, unsigned offset)
 {
 	uint32_t seqno = UINT32_MAX - offset;
-	FILE *file;
 
-	file = igt_debugfs_fopen(fd, "i915_next_seqno", "w");
-	igt_assert(file);
-
-	igt_assert(fprintf(file, "0x%x", seqno) > 0);
-	fclose(file);
+	igt_sysfs_printf(dir, "i915_next_seqno", "0x%x", seqno);
 
 	igt_debug("next seqno set to: 0x%x\n", seqno);
 }
@@ -217,6 +213,9 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	unsigned int reloc_interruptions = 0;
 	unsigned int eb_migrations = 0;
 	uint64_t old_offset;
+	int debugfs;
+
+	debugfs = igt_debugfs_dir(fd);
 
 	nengine = 0;
 	if (engine == -1) {
@@ -341,7 +340,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 				uint64_t offset;
 
 				if (!(flags & FORKED))
-					write_seqno(fd, pass);
+					write_seqno(debugfs, pass);
 
 				if (flags & HANG)
 					submit_hang(&hang, engines, nengine);
@@ -489,6 +488,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		fini_hang(&hang);
 	else
 		igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+
+	close(debugfs);
 }
 
 static void print_welcome(int fd)

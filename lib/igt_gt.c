@@ -362,25 +362,16 @@ void igt_post_hang_ring(int fd, igt_hang_t arg)
  */
 void igt_force_gpu_reset(int drm_fd)
 {
-	FILE *file;
-	int fd, ret, wedged;
+	int dir, wedged;
 
 	igt_debug("Triggering GPU reset\n");
 
-	fd = igt_debugfs_open(drm_fd, "i915_wedged", O_RDWR);
-	igt_require(fd >= 0);
+	dir = igt_debugfs_dir(drm_fd);
 
-	ret = write(fd, "-1\n", 3);
-	close(fd);
+	igt_sysfs_set(dir, "i915_wedged", "-1");
+	igt_sysfs_scanf(dir, "i915_wedged", "%d", &wedged);
 
-	igt_assert_eq(ret, 3);
-
-	file = igt_debugfs_fopen(drm_fd, "i915_wedged", "r");
-	igt_assert(file);
-
-	wedged = 1;
-	igt_ignore_warn(fscanf(file, "%d", &wedged));
-	fclose(file);
+	close(dir);
 
 	igt_assert(!wedged);
 }
@@ -538,23 +529,19 @@ void igt_clflush_range(void *addr, int size)
  */
 unsigned intel_detect_and_clear_missed_interrupts(int fd)
 {
-	unsigned missed = 0;
-	FILE *file;
+	unsigned missed;
+	int dir;
 
 	gem_quiescent_gpu(fd);
 
-	file = igt_debugfs_fopen(fd, "i915_ring_missed_irq", "r");
-	if (file) {
-		igt_assert(fscanf(file, "%x", &missed) == 1);
-		fclose(file);
-	}
-	if (missed) {
-		file = igt_debugfs_fopen(fd, "i915_ring_missed_irq", "w");
-		if (file) {
-			fwrite("0\n", 1, 2, file);
-			fclose(file);
-		}
-	}
+	dir = igt_debugfs_dir(fd);
+
+	missed = 0;
+	igt_assert(igt_sysfs_scanf(dir, "i915_ring_missed_irq", "%x", &missed) == 1);
+	if (missed)
+		igt_sysfs_set(dir, "i915_ring_missed_irq", "0");
+
+	close(dir);
 
 	errno = 0;
 	return missed;
