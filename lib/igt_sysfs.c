@@ -63,6 +63,8 @@ static int readN(int fd, char *buf, int len)
 			return total ?: ret;
 
 		total += ret;
+		if (total == len)
+			return total;
 	} while (1);
 }
 
@@ -78,6 +80,8 @@ static int writeN(int fd, const char *buf, int len)
 			return total ?: ret;
 
 		total += ret;
+		if (total == len)
+			return total;
 	} while (1);
 }
 
