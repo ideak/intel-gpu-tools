@@ -47,16 +47,16 @@ typedef struct {
 
 static void assert_color(int dir, enum color color)
 {
-	unsigned int r, g, b, x;
+	unsigned int r, g, b;
 
 	igt_require_f(igt_sysfs_scanf(dir,
 				      "i915_sink_crc_eDP1",
-				      "%4x%4x%4x%4x\n",
-				      &r, &g, &b, &x) == 4,
+				      "%4x%4x%4x",
+				      &r, &g, &b) == 3,
 		      "Sink CRC is unreliable on this machine. Try manual debug with --interactive-debug=no-crc\n");
 
 	/* Black screen is always invalid */
-	igt_assert_neq(r | g | b | x, 0);
+	igt_assert_neq(r | g | b, 0);
 
 	switch (color) {
 	case RED:
