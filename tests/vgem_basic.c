@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "igt_kmod.h"
 #include "igt_vgem.h"
 #include "igt_debugfs.h"
 #include "igt_sysfs.h"
@@ -290,7 +291,7 @@ static void test_debugfs_read(int fd)
 
 static int module_unload(void)
 {
-	return system("/sbin/modprobe -s -r vgem");
+	return igt_kmod_unload("vgem", 0);
 }
 
 static void test_unload(void)

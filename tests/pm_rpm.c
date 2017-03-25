@@ -26,6 +26,7 @@
  */
 
 #include "igt.h"
+#include "igt_kmod.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -110,6 +111,11 @@ struct modeset_params non_lpsp_mode_params;
 struct modeset_params *default_mode_params;
 
 static int8_t *pm_data = NULL;
+
+static int modprobe(const char *driver)
+{
+	return igt_kmod_load(driver, "");
+}
 
 /* If the read fails, then the machine doesn't support PC8+ residencies. */
 static bool supports_pc8_plus_residencies(void)
@@ -647,7 +653,7 @@ static void setup_pc8(void)
 		return;
 
 	/* Make sure our Kernel supports MSR and the module is loaded. */
-	igt_require(system("modprobe -s msr") == 0);
+	igt_require(modprobe("msr") == 0);
 
 	msr_fd = open("/dev/cpu/0/msr", O_RDONLY);
 	igt_assert_f(msr_fd >= 0,
@@ -793,7 +799,7 @@ static void i2c_subtest_check_environment(void)
 	struct dirent *dirent;
 
 	/* Make sure the /dev/i2c-* files exist. */
-	igt_require(system("modprobe -s i2c-dev") == 0);
+	igt_require(modprobe("i2c-dev") == 0);
 
 	dev_dir = opendir("/dev");
 	igt_assert(dev_dir);

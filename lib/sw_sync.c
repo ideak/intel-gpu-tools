@@ -36,6 +36,7 @@
 #include <sys/ioctl.h>
 
 #include "igt_debugfs.h"
+#include "igt_kmod.h"
 #include "sw_sync.h"
 #include "drmtest.h"
 #include "ioctl_wrappers.h"
@@ -248,11 +249,16 @@ int sync_fence_status(int fence)
 	return fence_info.status;
 }
 
+static void modprobe(const char *driver)
+{
+	igt_kmod_load(driver, "");
+}
+
 static bool kernel_has_sw_sync(void)
 {
 	char buf[128];
 
-	igt_ignore_warn(system("/sbin/modprobe -s r sw_sync"));
+	modprobe("sw_sync");
 
 	return kernel_sw_sync_path(buf, sizeof(buf));
 }
