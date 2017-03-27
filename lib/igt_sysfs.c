@@ -219,7 +219,7 @@ int igt_sysfs_read(int dir, const char *attr, void *data, int len)
 {
 	int fd;
 
-	fd = openat(dir, attr, O_WRONLY);
+	fd = openat(dir, attr, O_RDONLY);
 	if (fd < 0)
 		return false;
 
