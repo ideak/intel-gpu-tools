@@ -25,6 +25,7 @@
  */
 
 #include "igt.h"
+#include "igt_sysfs.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -154,6 +155,7 @@ struct rect {
 #define MAX_ENCODERS 32
 struct {
 	int fd;
+	int debugfs;
 	drmModeResPtr res;
 	drmModeConnectorPtr connectors[MAX_CONNECTORS];
 	drmModeEncoderPtr encoders[MAX_ENCODERS];
@@ -777,11 +779,20 @@ static bool set_mode_for_params(struct modeset_params *params)
 	return (rc == 0);
 }
 
+static void __debugfs_read(const char *param, char *buf, int len)
+{
+	len = igt_sysfs_read(drm.debugfs, param, buf, len - 1);
+	igt_assert(len > 0);
+	buf[len] = '\0';
+}
+
+#define debugfs_read(p, arr) __debugfs_read(p, arr, sizeof(arr))
+
 static bool fbc_is_enabled(void)
 {
 	char buf[128];
 
-	igt_debugfs_read(drm.fd, "i915_fbc_status", buf);
+	debugfs_read("i915_fbc_status", buf);
 	return strstr(buf, "FBC enabled\n");
 }
 
@@ -789,7 +800,7 @@ static void fbc_print_status(void)
 {
 	char buf[128];
 
-	igt_debugfs_read(drm.fd, "i915_fbc_status", buf);
+	debugfs_read("i915_fbc_status", buf);
 	igt_info("FBC status:\n%s\n", buf);
 }
 
@@ -797,7 +808,7 @@ static bool psr_is_enabled(void)
 {
 	char buf[256];
 
-	igt_debugfs_read(drm.fd, "i915_edp_psr_status", buf);
+	debugfs_read("i915_edp_psr_status", buf);
 	return strstr(buf, "\nActive: yes\n") &&
 	       strstr(buf, "\nHW Enabled & Active bit: yes\n");
 }
@@ -806,7 +817,7 @@ static void psr_print_status(void)
 {
 	char buf[256];
 
-	igt_debugfs_read(drm.fd, "i915_edp_psr_status", buf);
+	debugfs_read("i915_edp_psr_status", buf);
 	igt_info("PSR status:\n%s\n", buf);
 }
 
@@ -817,7 +828,7 @@ static struct timespec fbc_get_last_action(void)
 	char *action;
 	ssize_t n_read;
 
-	igt_debugfs_read(drm.fd, "i915_fbc_status", buf);
+	debugfs_read("i915_fbc_status", buf);
 
 	action = strstr(buf, "\nLast action:");
 	igt_assert(action);
@@ -866,7 +877,7 @@ static void fbc_setup_last_action(void)
 	char buf[128];
 	char *action;
 
-	igt_debugfs_read(drm.fd, "i915_fbc_status", buf);
+	debugfs_read("i915_fbc_status", buf);
 
 	action = strstr(buf, "\nLast action:");
 	if (!action) {
@@ -885,7 +896,7 @@ static bool fbc_is_compressing(void)
 {
 	char buf[128];
 
-	igt_debugfs_read(drm.fd, "i915_fbc_status", buf);
+	debugfs_read("i915_fbc_status", buf);
 	return strstr(buf, "\nCompressing: yes\n") != NULL;
 }
 
@@ -898,7 +909,7 @@ static bool fbc_not_enough_stolen(void)
 {
 	char buf[128];
 
-	igt_debugfs_read(drm.fd, "i915_fbc_status", buf);
+	debugfs_read("i915_fbc_status", buf);
 	return strstr(buf, "FBC disabled: not enough stolen memory\n");
 }
 
@@ -906,7 +917,7 @@ static bool fbc_stride_not_supported(void)
 {
 	char buf[128];
 
-	igt_debugfs_read(drm.fd, "i915_fbc_status", buf);
+	debugfs_read("i915_fbc_status", buf);
 	return strstr(buf, "FBC disabled: framebuffer stride not supported\n");
 }
 
@@ -1335,6 +1346,7 @@ static void setup_drm(void)
 	int i, rc;
 
 	drm.fd = drm_open_driver_master(DRIVER_INTEL);
+	drm.debugfs = igt_debugfs_dir(drm.fd);
 
 	drm.res = drmModeGetResources(drm.fd);
 	igt_assert(drm.res->count_connectors <= MAX_CONNECTORS);
@@ -1420,7 +1432,7 @@ static void setup_sink_crc(void)
 	fill_fb_region(&prim_mode_params.fb, COLOR_PRIM_BG);
 	set_mode_for_params(&prim_mode_params);
 
-	sink_crc.fd = igt_debugfs_open(drm.fd, "i915_sink_crc_eDP1", O_RDONLY);
+	sink_crc.fd = openat(drm.debugfs, "i915_sink_crc_eDP1", O_RDONLY);
 	igt_assert_lte(0, sink_crc.fd);
 
 	/* Do a first read to try to detect if it's supported. */
@@ -1497,7 +1509,7 @@ static bool fbc_supported_on_chipset(void)
 {
 	char buf[128];
 
-	igt_debugfs_read(drm.fd, "i915_fbc_status", buf);
+	debugfs_read("i915_fbc_status", buf);
 	return !strstr(buf, "FBC unsupported on this chipset\n");
 }
 
@@ -1533,7 +1545,7 @@ static bool psr_sink_has_support(void)
 {
 	char buf[256];
 
-	igt_debugfs_read(drm.fd, "i915_edp_psr_status", buf);
+	debugfs_read("i915_edp_psr_status", buf);
 	return strstr(buf, "Sink_Support: yes\n");
 }
 
