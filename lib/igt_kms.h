@@ -184,6 +184,8 @@ enum kmstest_broadcast_rgb_mode {
 bool kmstest_force_connector(int fd, drmModeConnector *connector,
 			     enum kmstest_force_connector_state state);
 void kmstest_edid_add_3d(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
+void kmstest_edid_add_4k(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
+void kmstest_edid_add_audio(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
 void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
 			const unsigned char *edid, size_t length);
 

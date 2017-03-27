@@ -83,7 +83,7 @@
 static char *forced_connectors[MAX_CONNECTORS + 1];
 static int forced_connectors_device[MAX_CONNECTORS + 1];
 
-static void update_edid_csum(unsigned char *edid)
+static void update_edid_csum(unsigned char *edid, int cea_pos)
 {
 	int i, sum = 0;
 	struct tm *tm;
@@ -96,9 +96,9 @@ static void update_edid_csum(unsigned char *edid)
 
 	/* calculate checksum */
 	for (i = 0; i < 127; i++) {
-		sum = sum + edid[i];
+		sum = sum + edid[cea_pos + i];
 	}
-	edid[127] = 256 - sum;
+	edid[cea_pos + 127] = 256 - sum;
 }
 
 #define VFREQ 60
@@ -136,7 +136,7 @@ static void update_edid_csum(unsigned char *edid)
  */
 const unsigned char* igt_kms_get_base_edid(void)
 {
-	update_edid_csum(base_edid);
+	update_edid_csum(base_edid, 0);
 
 	return base_edid;
 }
@@ -306,7 +306,7 @@ igt_atomic_fill_pipe_props(igt_display_t *display, igt_pipe_t *pipe,
  */
 const unsigned char* igt_kms_get_alt_edid(void)
 {
-	update_edid_csum(alt_edid);
+	update_edid_csum(alt_edid, 0);
 
 	return alt_edid;
 }
@@ -1116,6 +1116,59 @@ kmstest_get_property(int drm_fd, uint32_t object_id, uint32_t object_type,
 	return found;
 }
 
+struct edid_block {
+    int pos;
+    unsigned char *data;
+};
+
+#define DTD_SUPPORTS_AUDIO 1<<6
+
+static struct edid_block
+init_cea_block(const unsigned char *edid, size_t length,
+	       unsigned char *new_edid_ptr[], size_t *new_length,
+	       char extra_extensions_length,
+	       uint32_t dtd_support)
+{
+	struct edid_block new_edid;
+	int n_extensions;
+	int pos;
+	static const char cea_header_len = 4, video_block_len = 6;
+
+	igt_assert(new_edid_ptr != NULL && new_length != NULL);
+
+	*new_length = length + 128;
+
+	new_edid.data = calloc(*new_length, sizeof(char));
+	igt_assert_f(new_edid.data, "Failed to allocate %zu bytes for edid\n", sizeof(new_length));
+	memcpy(new_edid.data, edid, length);
+	*new_edid_ptr = new_edid.data;
+
+	n_extensions = new_edid.data[126];
+	n_extensions++;
+	new_edid.data[126] = n_extensions;
+
+	update_edid_csum(new_edid.data, 0);
+
+	/* add a cea-861 extension block */
+	pos = length;
+	new_edid.data[pos++] = 0x2;
+	new_edid.data[pos++] = 0x3;
+	new_edid.data[pos++] = cea_header_len + video_block_len +
+		extra_extensions_length;
+	new_edid.data[pos++] = dtd_support;
+
+	/* video block (id | length) */
+	new_edid.data[pos++] = 2 << 5 | (video_block_len - 1);
+	new_edid.data[pos++] = 32 | 0x80; /* 1080p @ 24Hz | (native)*/
+	new_edid.data[pos++] = 5;         /* 1080i @ 60Hz */
+	new_edid.data[pos++] = 20;        /* 1080i @ 50Hz */
+	new_edid.data[pos++] = 4;         /* 720p @ 60Hz*/
+	new_edid.data[pos++] = 19;        /* 720p @ 50Hz*/
+	new_edid.pos = pos;
+
+	return new_edid;
+}
+
 /**
  * kmstest_edid_add_3d:
  * @edid: an existing valid edid block
@@ -1129,72 +1182,135 @@ kmstest_get_property(int drm_fd, uint32_t object_id, uint32_t object_type,
 void kmstest_edid_add_3d(const unsigned char *edid, size_t length,
 			 unsigned char *new_edid_ptr[], size_t *new_length)
 {
-	unsigned char *new_edid;
-	int n_extensions;
-	char sum = 0;
-	int pos;
-	int i;
-	char cea_header_len = 4, video_block_len = 6, vsdb_block_len = 11;
-
-	igt_assert(new_edid_ptr != NULL && new_length != NULL);
-
-	*new_length = length + 128;
-
-	new_edid = calloc(*new_length, sizeof(char));
-	igt_assert_f(new_edid, "Failed to allocate %zu bytes for edid\n", sizeof(new_length));
-	memcpy(new_edid, edid, length);
-	*new_edid_ptr = new_edid;
-
-	n_extensions = new_edid[126];
-	n_extensions++;
-	new_edid[126] = n_extensions;
-
-	/* recompute checksum */
-	for (i = 0; i < 127; i++) {
-		sum = sum + new_edid[i];
-	}
-	new_edid[127] = 256 - sum;
-
-	/* add a cea-861 extension block */
-	pos = length;
-	new_edid[pos++] = 0x2;
-	new_edid[pos++] = 0x3;
-	new_edid[pos++] = cea_header_len + video_block_len + vsdb_block_len;
-	new_edid[pos++] = 0x0;
-
-	/* video block (id | length) */
-	new_edid[pos++] = 2 << 5 | (video_block_len - 1);
-	new_edid[pos++] = 32 | 0x80; /* 1080p @ 24Hz | (native)*/
-	new_edid[pos++] = 5;         /* 1080i @ 60Hz */
-	new_edid[pos++] = 20;        /* 1080i @ 50Hz */
-	new_edid[pos++] = 4;         /* 720p @ 60Hz*/
-	new_edid[pos++] = 19;        /* 720p @ 50Hz*/
+	char vsdb_block_len = 11;
+	struct edid_block new_edid = init_cea_block(edid, length, new_edid_ptr,
+						    new_length, vsdb_block_len,
+						    0);
+	int pos = new_edid.pos;
 
 	/* vsdb block ( id | length ) */
-	new_edid[pos++] = 3 << 5 | (vsdb_block_len - 1);
+	new_edid.data[pos++] = 3 << 5 | (vsdb_block_len - 1);
 	/* registration id */
-	new_edid[pos++] = 0x3;
-	new_edid[pos++] = 0xc;
-	new_edid[pos++] = 0x0;
+	new_edid.data[pos++] = 0x3;
+	new_edid.data[pos++] = 0xc;
+	new_edid.data[pos++] = 0x0;
 	/* source physical address */
-	new_edid[pos++] = 0x10;
-	new_edid[pos++] = 0x00;
+	new_edid.data[pos++] = 0x10;
+	new_edid.data[pos++] = 0x00;
 	/* Supports_AI ... etc */
-	new_edid[pos++] = 0x00;
+	new_edid.data[pos++] = 0x00;
 	/* Max TMDS Clock */
-	new_edid[pos++] = 0x00;
+	new_edid.data[pos++] = 0x00;
 	/* Latency present, HDMI Video Present */
-	new_edid[pos++] = 0x20;
+	new_edid.data[pos++] = 0x20;
 	/* HDMI Video */
-	new_edid[pos++] = 0x80;
-	new_edid[pos++] = 0x00;
+	new_edid.data[pos++] = 0x80;
+	new_edid.data[pos++] = 0x00;
 
-	/* checksum */
-	sum = 0;
-	for (i = 0; i < 127; i++) {
-		sum = sum + new_edid[length + i];
-	}
-	new_edid[length + 127] = 256 - sum;
+	update_edid_csum(new_edid.data, length);
+}
+
+/**
+ * kmstest_edid_add_4k:
+ * @edid: an existing valid edid block
+ * @length: length of @edid
+ * @new_edid_ptr: pointer to where the new edid will be placed
+ * @new_length: pointer to the size of the new edid
+ *
+ * Makes a copy of an existing edid block and adds an extension indicating
+ * a HDMI 4K mode in vsdb.
+ */
+void kmstest_edid_add_4k(const unsigned char *edid, size_t length,
+			 unsigned char *new_edid_ptr[], size_t *new_length)
+{
+	char vsdb_block_len = 12;
+	struct edid_block new_edid = init_cea_block(edid, length, new_edid_ptr,
+						    new_length, vsdb_block_len,
+						    0);
+	int pos = new_edid.pos;
+
+	/* vsdb block ( id | length ) */
+	new_edid.data[pos++] = 3 << 5 | (vsdb_block_len - 1);
+	/* registration id */
+	new_edid.data[pos++] = 0x3;
+	new_edid.data[pos++] = 0xc;
+	new_edid.data[pos++] = 0x0;
+	/* source physical address */
+	new_edid.data[pos++] = 0x10;
+	new_edid.data[pos++] = 0x00;
+	/* Supports_AI ... etc */
+	new_edid.data[pos++] = 0x00;
+	/* Max TMDS Clock */
+	new_edid.data[pos++] = 0x00;
+	/* Latency present, HDMI Video Present */
+	new_edid.data[pos++] = 0x20;
+	/* HDMI Video */
+	new_edid.data[pos++] = 0x00; /* 3D present */
+
+	/* HDMI MODE LEN -- how many entries */
+	new_edid.data[pos++] = 0x20;
+	/* 2160p, specified as short descriptor */
+	new_edid.data[pos++] = 0x01;
+
+	update_edid_csum(new_edid.data, length);
+}
+
+/**
+ * kmstest_edid_add_audio:
+ * @edid: an existing valid edid block
+ * @length: length of @edid
+ * @new_edid_ptr: pointer to where the new edid will be placed
+ * @new_length: pointer to the size of the new edid
+ *
+ * Makes a copy of an existing edid block and adds an extension indicating
+ * basic audio support and speaker data block.
+ *
+ */
+void kmstest_edid_add_audio(const unsigned char *edid, size_t length,
+			    unsigned char *new_edid_ptr[], size_t *new_length)
+{
+	char vsdb_block_len = 10, audio_block_len = 4, spkr_block_len = 4;
+	struct edid_block new_edid = init_cea_block(edid, length, new_edid_ptr,
+						    new_length,
+						    vsdb_block_len +
+						    audio_block_len +
+						    spkr_block_len,
+						    DTD_SUPPORTS_AUDIO);
+	int pos = new_edid.pos;
+
+	/* audio block, short audio block descriptors  */
+	new_edid.data[pos++] = (1 << 5) | (audio_block_len - 1);
+	new_edid.data[pos++] = 0x09; /* Audio Format, PCM */
+	new_edid.data[pos++] = 0x07; /* Frequency, 32, 44.1, 48kHz  */
+	new_edid.data[pos++] = 0x07; /* Bit Rate 16, 20, 24 bit */
+
+
+	/* vsdb block ( id | length ) -- need vsdb as well
+	 * otherwise the kernel will fallback to lower clock modes */
+	new_edid.data[pos++] = 3 << 5 | (vsdb_block_len - 1);
+	/* registration id */
+	new_edid.data[pos++] = 0x3;
+	new_edid.data[pos++] = 0xc;
+	new_edid.data[pos++] = 0x0;
+	/* source physical address */
+	new_edid.data[pos++] = 0x10;
+	new_edid.data[pos++] = 0x00;
+	/* Supports_AI ... etc */
+	new_edid.data[pos++] = 0x00;
+	/* Max TMDS Clock */
+	new_edid.data[pos++] = 0x00;
+	/* Latency present, HDMI Video Present */
+	new_edid.data[pos++] = 0x20;
+	/* HDMI Video */
+	new_edid.data[pos++] = 0x00; /* 3D present */
+
+	/* speaker data block */
+	new_edid.data[pos++] = (4 << 5) | (spkr_block_len - 1);
+	new_edid.data[pos++] = (1 << 5);
+	new_edid.data[pos++] = 0x00;
+	new_edid.data[pos++] = 0x00;
+
+	update_edid_csum(new_edid.data, length);
 }
 
 /**
