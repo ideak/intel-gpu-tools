@@ -27,6 +27,7 @@
 
 #define _GNU_SOURCE
 #include "igt.h"
+#include "igt_sysfs.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +42,8 @@
 #define RC6P_ENABLED	2
 #define RC6PP_ENABLED	4
 
+static int sysfs;
+
 struct residencies {
 	int rc6;
 	int media_rc6;
@@ -49,50 +52,23 @@ struct residencies {
 	int duration;
 };
 
-static unsigned int readit(const char *path)
-{
-	unsigned int ret;
-	int scanned;
-
-	FILE *file;
-	file = fopen(path, "r");
-	igt_assert(file);
-	scanned = fscanf(file, "%u", &ret);
-	igt_assert_eq(scanned, 1);
-
-	fclose(file);
-
-	return ret;
-}
-
 static unsigned long get_rc6_enabled_mask(void)
 {
 	unsigned long rc6_mask;
-	char *path;
-	int ret;
 
-	ret = asprintf(&path, "/sys/class/drm/card%d/power/rc6_enable",
-		       drm_get_card());
-	igt_assert_neq(ret, -1);
-	rc6_mask = readit(path);
-	free(path);
-
+	rc6_mask = 0;
+	igt_sysfs_scanf(sysfs, "power/rc6_enable", "%lu", &rc6_mask);
 	return rc6_mask;
 }
 
-static int read_rc6_residency(const char *name_of_rc6_residency)
+static unsigned long read_rc6_residency(const char *name)
 {
-	unsigned int residency;
-	const int device = drm_get_card();
-	char *path ;
-	int  ret;
+	unsigned long residency;
+	char path[128];
 
-	ret = asprintf(&path, "/sys/class/drm/card%d/power/%s_residency_ms",
-		       device, name_of_rc6_residency);
-	igt_assert_neq(ret, -1);
-	residency = readit(path);
-	free(path);
-
+	residency = 0;
+	sprintf(path, "power/%s_residency_ms", name);
+	igt_assert(igt_sysfs_scanf(sysfs, path, "%lu", &residency) == 1);
 	return residency;
 }
 
@@ -192,7 +168,6 @@ static void measure_residencies(int devid, unsigned int rc6_mask,
 igt_main
 {
 	unsigned int rc6_mask;
-	int fd;
 	int devid = 0;
 	struct residencies res;
 
@@ -200,11 +175,16 @@ igt_main
 
 	/* Use drm_open_driver to verify device existence */
 	igt_fixture {
+		int fd;
+
 		fd = drm_open_driver(DRIVER_INTEL);
 		devid = intel_get_drm_devid(fd);
+		sysfs = igt_sysfs_open(fd, NULL);
 		close(fd);
 
 		rc6_mask = get_rc6_enabled_mask();
+		igt_require(rc6_mask);
+
 		measure_residencies(devid, rc6_mask, &res);
 	}
 
