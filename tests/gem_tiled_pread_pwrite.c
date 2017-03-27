@@ -45,6 +45,7 @@
  */
 
 #include "igt.h"
+#include "igt_x86.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -99,19 +100,60 @@ create_bo(int fd)
 	return handle;
 }
 
+#if defined(__x86_64__) && !defined(__clang__)
+#define MOVNT 512
+
+#pragma GCC push_options
+#pragma GCC target("sse4.1")
+
+#include <smmintrin.h>
+__attribute__((noinline))
+static void copy_wc_page(void *dst, void *src)
+{
+	if (igt_x86_features() & SSE4_1) {
+		__m128i *S = (__m128i *)src;
+		__m128i *D = (__m128i *)dst;
+
+		for (int i = 0; i < PAGE_SIZE/64; i++) {
+			__m128i tmp[4];
+
+			tmp[0] = _mm_stream_load_si128(S++);
+			tmp[1] = _mm_stream_load_si128(S++);
+			tmp[2] = _mm_stream_load_si128(S++);
+			tmp[3] = _mm_stream_load_si128(S++);
+
+			_mm_store_si128(D++, tmp[0]);
+			_mm_store_si128(D++, tmp[1]);
+			_mm_store_si128(D++, tmp[2]);
+			_mm_store_si128(D++, tmp[3]);
+		}
+	} else
+		memcpy(dst, src, PAGE_SIZE);
+}
+
+#pragma GCC pop_options
+
+#else
+static void copy_wc_page(void *dst, const void *src)
+{
+	memcpy(dst, src, PAGE_SIZE);
+}
+#endif
+
 igt_simple_main
 {
-	int fd;
-	uint32_t *data;
-	int i, j;
 	uint32_t tiling, swizzle;
-	uint32_t handle, handle_target;
 	int count;
+	int fd;
 	
 	fd = drm_open_driver(DRIVER_INTEL);
 	count = SLOW_QUICK(intel_get_total_ram_mb() * 9 / 10, 8) ;
 
-	for (i = 0; i < count/2; i++) {
+	for (int i = 0; i < count/2; i++) {
+		uint32_t handle, handle_target;
+		char *data;
+		int n;
+
 		current_tiling_mode = I915_TILING_X;
 
 		handle = create_bo_and_fill(fd);
@@ -123,11 +165,18 @@ igt_simple_main
 		gem_write(fd, handle_target, 0, linear, sizeof(linear));
 
 		/* Check the target bo's contents. */
-		data = gem_mmap__gtt(fd, handle_target, sizeof(linear), PROT_READ | PROT_WRITE);
-		for (j = 0; j < WIDTH*HEIGHT; j++)
-			igt_assert_f(data[j] == j,
-				     "mismatch at %i: %i\n",
-				     j, data[j]);
+		data = gem_mmap__gtt(fd, handle_target, sizeof(linear), PROT_READ);
+		n = 0;
+		for (int pfn = 0; pfn < sizeof(linear)/PAGE_SIZE; pfn++) {
+			uint32_t page[PAGE_SIZE/sizeof(uint32_t)];
+			copy_wc_page(page, data + PAGE_SIZE*pfn);
+			for (int j = 0; j < PAGE_SIZE/sizeof(uint32_t); j++) {
+				igt_assert_f(page[j] == n,
+					     "mismatch at %i: %i\n",
+					     n, page[j]);
+				n++;
+			}
+		}
 		munmap(data, sizeof(linear));
 
 		/* Leak both bos so that we use all of system mem! */
