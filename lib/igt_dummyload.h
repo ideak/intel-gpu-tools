@@ -33,7 +33,6 @@
 typedef struct igt_spin {
 	unsigned int handle;
 	timer_t timer;
-	int signo;
 	struct igt_list link;
 	uint32_t *batch;
 } igt_spin_t;

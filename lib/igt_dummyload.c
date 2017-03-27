@@ -174,27 +174,11 @@ igt_spin_batch_new(int fd, int engine, unsigned int dep_handle)
 	return spin;
 }
 
-static void clear_sig_handler(int sig)
+static void notify(union sigval arg)
 {
-	struct sigaction act;
+	igt_spin_t *spin = arg.sival_ptr;
 
-	memset(&act, 0, sizeof(act));
-	act.sa_handler = SIG_DFL;
-	igt_assert(sigaction(sig, &act, NULL) == 0);
-}
-
-static void sig_handler(int sig, siginfo_t *info, void *arg)
-{
-	struct igt_spin *iter;
-
-	igt_list_for_each(iter, &spin_list, link) {
-		if (iter->signo == info->si_signo) {
-			igt_spin_batch_end(iter);
-			return;
-		}
-	}
-
-	clear_sig_handler(sig);
+	igt_spin_batch_end(spin);
 }
 
 /**
@@ -208,10 +192,8 @@ static void sig_handler(int sig, siginfo_t *info, void *arg)
  */
 void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns)
 {
-	static int spin_signo = 48; /* Midpoint of SIGRTMIN, SIGRTMAX */
 	timer_t timer;
 	struct sigevent sev;
-	struct sigaction act, oldact;
 	struct itimerspec its;
 
 	igt_assert(ns > 0);
@@ -220,24 +202,12 @@ void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns)
 
 	igt_assert(!spin->timer);
 
-	/* SIGRTMAX is used by valgrind, SIGRTMAX - 1 by igt_fork_hang_detector */
-	if (spin_signo >= SIGRTMAX - 2)
-		spin_signo = SIGRTMIN;
-	spin->signo = ++spin_signo;
-
 	memset(&sev, 0, sizeof(sev));
-	sev.sigev_notify = SIGEV_SIGNAL | SIGEV_THREAD_ID;
-	sev.sigev_notify_thread_id = gettid();
-	sev.sigev_signo = spin->signo;
+	sev.sigev_notify = SIGEV_THREAD;
+	sev.sigev_value.sival_ptr = spin;
+	sev.sigev_notify_function = notify;
 	igt_assert(timer_create(CLOCK_MONOTONIC, &sev, &timer) == 0);
 	igt_assert(timer);
-
-	memset(&oldact, 0, sizeof(oldact));
-	memset(&act, 0, sizeof(act));
-	act.sa_sigaction = sig_handler;
-	act.sa_flags = SA_SIGINFO;
-	igt_assert(sigaction(spin->signo, &act, &oldact) == 0);
-	igt_assert(oldact.sa_sigaction == NULL);
 
 	memset(&its, 0, sizeof(its));
 	its.it_value.tv_sec = ns / NSEC_PER_SEC;
@@ -260,9 +230,6 @@ void igt_spin_batch_end(igt_spin_t *spin)
 
 	*spin->batch = MI_BATCH_BUFFER_END;
 	__sync_synchronize();
-
-	if (spin->signo)
-		clear_sig_handler(spin->signo);
 }
 
 /**
