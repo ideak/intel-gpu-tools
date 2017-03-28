@@ -37,6 +37,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <time.h>
+#include <assert.h>
 
 #include "drm.h"
 #include "ioctl_wrappers.h"
@@ -110,6 +111,7 @@ static double replay(const char *filename)
 		uint32_t magic;
 		uint32_t version;
 	} *tv;
+	const uint32_t bbe = 0xa << 23;
 	struct drm_i915_gem_exec_object2 *exec_objects = NULL;
 	uint32_t *bo, *ctx;
 	int num_bo, num_ctx;
@@ -122,25 +124,19 @@ static double replay(const char *filename)
 	if (fd < 0)
 		return -1;
 
-	if (fstat(fd, &st) < 0)
+	if (fstat(fd, &st) < 0) {
+		close(fd);
 		return -1;
+	}
 
-	ctx = calloc(1024, sizeof(*ctx));
-	num_ctx = 1024;
-
-	bo = calloc(4096, sizeof(*bo));
-	num_bo = 4096;
-
-	ptr = mmap(0, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+	ptr = mmap(0, st.st_size, PROT_WRITE, MAP_PRIVATE, fd, 0);
 	close(fd);
 
 	if (ptr == MAP_FAILED)
 		return -1;
 
 	madvise(ptr, st.st_size, MADV_SEQUENTIAL);
-
 	end = ptr + st.st_size;
-	fd = drm_open_driver(DRIVER_INTEL);
 
 	tv = (struct trace_version *)ptr;
 	if (tv->magic != 0xdeadbeef) {
@@ -154,11 +150,20 @@ static double replay(const char *filename)
 	}
 	ptr = (void *)(tv + 1);
 
+	ctx = calloc(1024, sizeof(*ctx));
+	num_ctx = 1024;
+
+	bo = calloc(4096, sizeof(*bo));
+	num_bo = 4096;
+
+	fd = drm_open_driver(DRIVER_INTEL);
+	bo[0] = gem_create(fd, 256*1024);
+	gem_write(fd, bo[0], 256*1024 - sizeof(bbe), &bbe, sizeof(bbe));
+
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
 	do switch (*ptr++) {
 	case ADD_BO:
 		{
-			const uint32_t bbe = 0xa << 23;
 			struct trace_add_bo *t = (void *)ptr;
 			ptr = (void *)(t + 1);
 
@@ -170,8 +175,6 @@ static double replay(const char *filename)
 			}
 
 			bo[t->handle] = gem_create(fd, t->size);
-			gem_write(fd, bo[t->handle], t->size - sizeof(bbe),
-				  &bbe, sizeof(bbe));
 			break;
 		}
 	case DEL_BO:
@@ -179,6 +182,7 @@ static double replay(const char *filename)
 			struct trace_del_bo *t = (void *)ptr;
 			ptr = (void *)(t + 1);
 
+			assert(t->handle && t->handle < num_bo && bo[t->handle]);
 			gem_close(fd, bo[t->handle]);
 			bo[t->handle] = 0;
 			break;
@@ -203,10 +207,9 @@ static double replay(const char *filename)
 			struct trace_del_ctx *t = (void *)ptr;
 			ptr = (void *)(t + 1);
 
-			if (t->handle < num_ctx && ctx[t->handle]) {
-				gem_context_destroy(fd, ctx[t->handle]);
-				ctx[t->handle] = 0;
-			}
+			assert(t->handle < num_ctx && ctx[t->handle]);
+			gem_context_destroy(fd, ctx[t->handle]);
+			ctx[t->handle] = 0;
 			break;
 		}
 	case EXEC:
@@ -218,10 +221,10 @@ static double replay(const char *filename)
 			eb.flags = t->flags;
 			eb.rsvd1 = ctx[t->context];
 
-			if (eb.buffer_count > max_objects) {
+			if (eb.buffer_count >= max_objects) {
 				free(exec_objects);
 
-				max_objects = ALIGN(eb.buffer_count, 4096);
+				max_objects = ALIGN(eb.buffer_count + 1, 4096);
 
 				exec_objects = malloc(max_objects*sizeof(*exec_objects));
 				eb.buffers_ptr = (uintptr_t)exec_objects;
@@ -240,8 +243,20 @@ static double replay(const char *filename)
 
 				exec_objects[i].relocation_count = to->relocation_count;
 				exec_objects[i].relocs_ptr = (uintptr_t)ptr;
+
+				if (!(eb.flags & I915_EXEC_HANDLE_LUT)) {
+					struct drm_i915_gem_relocation_entry *relocs =
+						(struct drm_i915_gem_relocation_entry *)ptr;
+					for (uint32_t j = 0; j < to->relocation_count; j++)
+						relocs[j].target_handle = bo[relocs[j].target_handle];
+				}
+
 				ptr += sizeof(struct drm_i915_gem_relocation_entry) * to->relocation_count;
 			}
+
+			((struct drm_i915_gem_exec_object2 *)
+			 memset(&exec_objects[eb.buffer_count++], 0,
+				sizeof(*exec_objects)))->handle = bo[0];
 
 			gem_execbuf(fd, &eb);
 			break;
@@ -252,7 +267,8 @@ static double replay(const char *filename)
 			struct trace_wait *t = (void *)ptr;
 			ptr = (void *)(t + 1);
 
-			gem_wait(fd, t->handle, NULL);
+			assert(t->handle && t->handle < num_bo && bo[t->handle]);
+			gem_wait(fd, bo[t->handle], NULL);
 			break;
 		}
 
