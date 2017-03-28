@@ -38,12 +38,15 @@
 #include <sys/mman.h>
 #include <dlfcn.h>
 #include <i915_drm.h>
+#include <pthread.h>
 
 #include "intel_aub.h"
 #include "intel_chipset.h"
 
 static int (*libc_close)(int fd);
 static int (*libc_ioctl)(int fd, unsigned long request, void *argp);
+
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct trace {
 	int fd;
@@ -146,6 +149,7 @@ trace_exec(struct trace *trace,
 	fail_if(execbuffer2->flags & (I915_EXEC_FENCE_IN | I915_EXEC_FENCE_OUT),
 		"fences not supported yet\n");
 
+	flockfile(trace->file);
 	{
 		struct trace_exec t = {
 			EXEC,
@@ -177,6 +181,7 @@ trace_exec(struct trace *trace,
 	}
 
 	fflush(trace->file);
+	funlockfile(trace->file);
 #undef to_ptr
 }
 
@@ -220,6 +225,7 @@ close(int fd)
 {
 	struct trace *t, **p;
 
+	pthread_mutex_lock(&mutex);
 	for (p = &traces; (t = *p); p = &t->next) {
 		if (t->fd == fd) {
 			*p = t->next;
@@ -228,6 +234,7 @@ close(int fd)
 			break;
 		}
 	}
+	pthread_mutex_unlock(&mutex);
 
 	return libc_close(fd);
 }
@@ -276,6 +283,7 @@ ioctl(int fd, unsigned long request, ...)
 	if (_IOC_TYPE(request) != DRM_IOCTL_BASE)
 		goto untraced;
 
+	pthread_mutex_lock(&mutex);
 	for (p = &traces; (t = *p); p = &t->next) {
 		if (fd == t->fd) {
 			if (traces != t) {
@@ -289,18 +297,23 @@ ioctl(int fd, unsigned long request, ...)
 	if (!t) {
 		char filename[80];
 
-		if (!is_i915(fd))
+		if (!is_i915(fd)) {
+			pthread_mutex_unlock(&mutex);
 			goto untraced;
+		}
 
 		t = malloc(sizeof(*t));
-		if (!t)
+		if (!t) {
+			pthread_mutex_unlock(&mutex);
 			return -ENOMEM;
+		}
 
 		sprintf(filename, "/tmp/trace-%d.%d", getpid(), fd);
 		t->file = fopen(filename, "w+");
 		t->fd = fd;
 
 		if (!fwrite(&version, sizeof(version), 1, t->file)) {
+			pthread_mutex_unlock(&mutex);
 			fclose(t->file);
 			free(t);
 			return -ENOMEM;
@@ -309,6 +322,7 @@ ioctl(int fd, unsigned long request, ...)
 		t->next = traces;
 		traces = t;
 	}
+	pthread_mutex_unlock(&mutex);
 
 	switch (request) {
 	case DRM_IOCTL_I915_GEM_EXECBUFFER2:
