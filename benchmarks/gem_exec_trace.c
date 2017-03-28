@@ -50,6 +50,7 @@ enum {
 	ADD_CTX,
 	DEL_CTX,
 	EXEC,
+	WAIT,
 };
 
 struct trace_add_bo {
@@ -84,6 +85,10 @@ struct trace_exec_object {
 	uint64_t rsvd1;
 	uint64_t rsvd2;
 }__attribute__((packed));
+
+struct trace_wait {
+	uint32_t handle;
+} __attribute__((packed));
 
 static double elapsed(const struct timespec *start, const struct timespec *end)
 {
@@ -239,6 +244,15 @@ static double replay(const char *filename)
 			}
 
 			gem_execbuf(fd, &eb);
+			break;
+		}
+
+	case WAIT:
+		{
+			struct trace_wait *t = (void *)ptr;
+			ptr = (void *)(t + 1);
+
+			gem_wait(fd, t->handle, NULL);
 			break;
 		}
 

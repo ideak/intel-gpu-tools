@@ -59,6 +59,7 @@ enum {
 	ADD_CTX,
 	DEL_CTX,
 	EXEC,
+	WAIT,
 };
 
 static struct trace_verion {
@@ -113,6 +114,11 @@ struct trace_exec_relocation {
 	uint32_t read_domains;
 	uint32_t write_domain;
 }__attribute__((packed));
+
+struct trace_wait {
+	uint8_t cmd;
+	uint32_t handle;
+} __attribute__((packed));
 
 static void __attribute__ ((format(__printf__, 2, 3)))
 fail_if(int cond, const char *format, ...)
@@ -172,6 +178,13 @@ trace_exec(struct trace *trace,
 
 	fflush(trace->file);
 #undef to_ptr
+}
+
+static void
+trace_wait(struct trace *trace, uint32_t handle)
+{
+	struct trace_wait t = { WAIT, handle };
+	fwrite(&t, sizeof(t), 1, trace->file);
 }
 
 static void
@@ -312,6 +325,18 @@ ioctl(int fd, unsigned long request, ...)
 	case DRM_IOCTL_I915_GEM_CONTEXT_DESTROY: {
 		struct drm_i915_gem_context_destroy *close = argp;
 		trace_del_context(t, close->ctx_id);
+		break;
+	}
+
+	case DRM_IOCTL_I915_GEM_WAIT: {
+		struct drm_i915_gem_wait *w = argp;
+		trace_wait(t, w->bo_handle);
+		break;
+	}
+
+	case DRM_IOCTL_I915_GEM_SET_DOMAIN: {
+		struct drm_i915_gem_set_domain *w = argp;
+		trace_wait(t, w->handle);
 		break;
 	}
 	}
