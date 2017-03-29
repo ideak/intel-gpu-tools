@@ -91,6 +91,15 @@ struct trace_wait {
 	uint32_t handle;
 } __attribute__((packed));
 
+static uint32_t hars_petruska_f54_1_random(void)
+{
+	static uint32_t state = 0x12345678;
+
+#define rol(x,k) ((x << k) | (x >> (32-k)))
+	return state = (state ^ rol (state, 5) ^ rol (state, 24)) + 0x37798849;
+#undef rol
+}
+
 static double elapsed(const struct timespec *start, const struct timespec *end)
 {
 	return 1e3*(end->tv_sec - start->tv_sec) + 1e-6*(end->tv_nsec - start->tv_nsec);
@@ -103,7 +112,7 @@ static uint32_t __gem_context_create(int fd)
 	return arg.ctx_id;
 }
 
-static double replay(const char *filename, long nop)
+static double replay(const char *filename, long nop, long range)
 {
 	struct timespec t_start, t_end;
 	struct drm_i915_gem_execbuffer2 eb = {};
@@ -158,8 +167,11 @@ static double replay(const char *filename, long nop)
 
 	fd = drm_open_driver(DRIVER_INTEL);
 	if (nop > 0) {
-		bo[0] = gem_create(fd, nop);
-		gem_write(fd, bo[0], nop - sizeof(bbe), &bbe, sizeof(bbe));
+		bo[0] = gem_create(fd, nop + range);
+		gem_write(fd, bo[0], nop + range - sizeof(bbe),
+			  &bbe, sizeof(bbe));
+		range *= 2;
+		range -= 64;
 	} else {
 		bo[0] = gem_create(fd, 4096);
 		gem_write(fd, bo[0], 0, &bbe, sizeof(bbe));
@@ -263,6 +275,12 @@ static double replay(const char *filename, long nop)
 			 memset(&exec_objects[eb.buffer_count++], 0,
 				sizeof(*exec_objects)))->handle = bo[0];
 
+			if (nop > 0) {
+				eb.batch_start_offset = hars_petruska_f54_1_random();
+				eb.batch_start_offset =
+					((uint64_t)eb.batch_start_offset * range) >> 32;
+				eb.batch_start_offset = ALIGN(eb.batch_start_offset, 64);
+			}
 			gem_execbuf(fd, &eb);
 			break;
 		}
@@ -320,17 +338,43 @@ static long calibrate_nop(int usecs)
 	return size;
 }
 
+static int measure_nop(long nop)
+{
+	const uint32_t bbe = 0xa << 23;
+	int fd = drm_open_driver(DRIVER_INTEL);
+	struct drm_i915_gem_exec_object2 obj = {};
+	struct drm_i915_gem_execbuffer2 eb = { .buffer_count = 1, .buffers_ptr = (uintptr_t)&obj};
+	struct timespec t_start, t_end;
+
+	obj.handle = gem_create(fd, nop);
+	gem_write(fd, obj.handle, nop - sizeof(bbe), &bbe, sizeof(bbe));
+	gem_execbuf(fd, &eb);
+	gem_sync(fd, obj.handle);
+
+	clock_gettime(CLOCK_MONOTONIC, &t_start);
+	for (int loop = 0; loop < 9; loop++)
+		gem_execbuf(fd, &eb);
+	gem_sync(fd, obj.handle);
+	clock_gettime(CLOCK_MONOTONIC, &t_end);
+
+	gem_close(fd, obj.handle);
+
+	close(fd);
+	return 1e3*elapsed(&t_start, &t_end) / 9;
+}
+
 int main(int argc, char **argv)
 {
 	int delay = 1000;
 	double *results;
 	long nop = 0;
+	long range = 0;
 	int i, c;
 
 	results = mmap(NULL, ALIGN(argc*sizeof(double), 4096),
 		       PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 
-	while ((c = getopt(argc, argv, "d:n:")) != -1) {
+	while ((c = getopt(argc, argv, "d:n:r:")) != -1) {
 		switch (c) {
 		case 'd':
 			delay = atoi(optarg);
@@ -340,17 +384,29 @@ int main(int argc, char **argv)
 			if (nop > 0)
 				nop = ALIGN(nop, 4096);
 			break;
+		case 'r':
+			range = strtol(optarg, NULL, 0);
+			if (range > 0)
+				range = ALIGN(range, 4096);
+			break;
 		default:
 			break;
 		}
 	}
+
 	if (!nop)
 		nop = calibrate_nop(delay);
-	if (nop > 0)
-		printf("Using %lu nop batch for %dus delay\n", nop, delay);
+	if (!range)
+		range = nop / 2;
+	if (nop > 0) {
+		delay = measure_nop(nop);
+		printf("Using %lu nop batch for ~%dus delay, range %lu [%dus]\n",
+		       nop, delay,
+		       range, (int)(delay * range / nop));
+	}
 
 	igt_fork(child, argc-optind)
-		results[child] = replay(argv[child + optind], nop);
+		results[child] = replay(argv[child + optind], nop, range);
 	igt_waitchildren();
 
 	for (i = 0; i < argc - optind; i++) {
