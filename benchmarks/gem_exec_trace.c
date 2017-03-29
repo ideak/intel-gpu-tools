@@ -103,7 +103,7 @@ static uint32_t __gem_context_create(int fd)
 	return arg.ctx_id;
 }
 
-static double replay(const char *filename)
+static double replay(const char *filename, long nop)
 {
 	struct timespec t_start, t_end;
 	struct drm_i915_gem_execbuffer2 eb = {};
@@ -157,8 +157,13 @@ static double replay(const char *filename)
 	num_bo = 4096;
 
 	fd = drm_open_driver(DRIVER_INTEL);
-	bo[0] = gem_create(fd, 256*1024);
-	gem_write(fd, bo[0], 256*1024 - sizeof(bbe), &bbe, sizeof(bbe));
+	if (nop > 0) {
+		bo[0] = gem_create(fd, nop);
+		gem_write(fd, bo[0], nop - sizeof(bbe), &bbe, sizeof(bbe));
+	} else {
+		bo[0] = gem_create(fd, 4096);
+		gem_write(fd, bo[0], 0, &bbe, sizeof(bbe));
+	}
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
 	do switch (*ptr++) {
@@ -281,24 +286,79 @@ static double replay(const char *filename)
 	return elapsed(&t_start, &t_end);
 }
 
+static long calibrate_nop(int usecs)
+{
+	const uint32_t bbe = 0xa << 23;
+	int fd = drm_open_driver(DRIVER_INTEL);
+	struct drm_i915_gem_exec_object2 obj = {};
+	struct drm_i915_gem_execbuffer2 eb = { .buffer_count = 1, .buffers_ptr = (uintptr_t)&obj};
+	unsigned long size, last_size;
+
+	size = 256*1024;
+	do {
+		struct timespec t_start, t_end;
+
+		obj.handle = gem_create(fd, size);
+		gem_write(fd, obj.handle, size - sizeof(bbe), &bbe, sizeof(bbe));
+		gem_execbuf(fd, &eb);
+		gem_sync(fd, obj.handle);
+
+		clock_gettime(CLOCK_MONOTONIC, &t_start);
+		for (int loop = 0; loop < 9; loop++)
+			gem_execbuf(fd, &eb);
+		gem_sync(fd, obj.handle);
+		clock_gettime(CLOCK_MONOTONIC, &t_end);
+
+		gem_close(fd, obj.handle);
+
+		last_size = size;
+		size = 9e-3*usecs / elapsed(&t_start, &t_end) * size;
+		size = ALIGN(size, 4096);
+	} while (size != last_size);
+
+	close(fd);
+	return size;
+}
+
 int main(int argc, char **argv)
 {
+	int delay = 1000;
 	double *results;
-	int i;
+	long nop = 0;
+	int i, c;
 
 	results = mmap(NULL, ALIGN(argc*sizeof(double), 4096),
 		       PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 
-	igt_fork(child, argc-1)
-		results[child] = replay(argv[child + 1]);
+	while ((c = getopt(argc, argv, "d:n:")) != -1) {
+		switch (c) {
+		case 'd':
+			delay = atoi(optarg);
+			break;
+		case 'n':
+			nop = strtol(optarg, NULL, 0);
+			if (nop > 0)
+				nop = ALIGN(nop, 4096);
+			break;
+		default:
+			break;
+		}
+	}
+	if (!nop)
+		nop = calibrate_nop(delay);
+	if (nop > 0)
+		printf("Using %lu nop batch for %dus delay\n", nop, delay);
+
+	igt_fork(child, argc-optind)
+		results[child] = replay(argv[child + optind], nop);
 	igt_waitchildren();
 
-	for (i = 0; i < argc - 1; i++) {
+	for (i = 0; i < argc - optind; i++) {
 		double t = results[i];
 		if (t < 0)
-			printf("%s: failed\n", argv[i+1]);
+			printf("%s: failed\n", argv[optind + i]);
 		else
-			printf("%s: %.3f\n", argv[i+1], t);
+			printf("%s: %.3f\n", argv[optind + i], t);
 	}
 
 	return 0;
