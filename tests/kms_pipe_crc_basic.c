@@ -228,15 +228,15 @@ igt_main
 		}
 
 		igt_subtest_f("hang-read-crc-pipe-%c", 'A'+i) {
-			igt_hang_t hang;
+			igt_hang_t hang = igt_allow_hang(data.drm_fd, 0, 0);
 
 			test_read_crc(&data, i, 0);
 
-			hang = igt_hang_ring(data.drm_fd, I915_EXEC_RENDER);
-			test_read_crc(&data, i, 0);
-			igt_post_hang_ring(data.drm_fd, hang);
+			igt_force_gpu_reset(data.drm_fd);
 
 			test_read_crc(&data, i, 0);
+
+			igt_disallow_hang(data.drm_fd, hang);
 		}
 	}
 
