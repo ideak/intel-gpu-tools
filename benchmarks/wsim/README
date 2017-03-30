@@ -1,0 +1,56 @@
+Workload descriptor format
+==========================
+
+ctx.engine.duration_us.dependency.wait,...
+<uint>.<str>.<uint>[-<uint>].<int <= 0>.<0|1>,...
+d|p|s.<uiny>,...
+
+For duration a range can be given from which a random value will be picked
+before every submit. Since this and seqno management requires CPU access to
+objects, care needs to be taken in order to ensure the submit queue is deep
+enough these operations do not affect the execution speed unless that is
+desired.
+
+Additional workload steps are also supported:
+
+ 'd' - Adds a delay (in microseconds).
+ 'p' - Adds a delay relative to the start of previous loop so that the each loop
+       starts execution with a given period.
+ 's' - Synchronises the pipeline to a batch relative to the step.
+ 't' - Throttle every n batches
+ 'q' - Throttle to n max queue depth
+
+Engine ids: RCS, BCS, VCS, VCS1, VCS2, VECS
+
+Example (leading spaces must not be present in the actual file):
+----------------------------------------------------------------
+
+  1.VCS1.3000.0.1
+  1.RCS.500-1000.-1.0
+  1.RCS.3700.0.0
+  1.RCS.1000.-2.0
+  1.VCS2.2300.-2.0
+  1.RCS.4700.-1.0
+  1.VCS2.600.-1.1
+  p.16000
+
+The above workload described in human language works like this:
+
+  1.   A batch is sent to the VCS1 engine which will be executing for 3ms on the
+       GPU and userspace will wait until it is finished before proceeding.
+  2-4. Now three batches are sent to RCS with durations of 0.5-1.5ms (random
+       duration range), 3.7ms and 1ms respectively. The first batch has a data
+       dependency on the preceding VCS1 batch, and the last of the group depends
+       on the first from the group.
+  5.   Now a 2.3ms batch is sent to VCS2, with a data dependency on the 3.7ms
+       RCS batch.
+  6.   This is followed by a 4.7ms RCS batch with a data dependency on the 2.3ms
+       VCS2 batch.
+  7.   Then a 0.6ms VCS2 batch is sent depending on the previous RCS one. In the
+       same step the tool is told to wait for the batch completes before
+       proceeding.
+  8.   Finally the tool is told to wait long enough to ensure the next iteration
+       starts 16ms after the previous one has started.
+
+When workload descriptors are provided on the command line, commas must be used
+instead of new lines.

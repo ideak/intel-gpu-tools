@@ -14,6 +14,7 @@ benchmarks_prog_list =			\
 	gem_prw				\
 	gem_set_domain			\
 	gem_syslatency			\
+	gem_wsim			\
 	kms_vblank			\
 	prime_lookup			\
 	vgem_mmap			\

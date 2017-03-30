@@ -1558,6 +1558,32 @@ bool __igt_fork(void)
 }
 
 /**
+ * igt_child_done:
+ *
+ * Lets the IGT core know that one of the children has exited.
+ */
+void igt_child_done(pid_t pid)
+{
+	int i = 0;
+	int found = -1;
+
+	igt_assert(num_test_children > 1);
+
+	for (i = 0; i < num_test_children; i++) {
+		if (pid == test_children[i]) {
+			found = i;
+			break;
+		}
+	}
+
+	igt_assert(found >= 0);
+
+	num_test_children--;
+	for (i = found; i < num_test_children; i++)
+		test_children[i] = test_children[i + 1];
+}
+
+/**
  * igt_waitchildren:
  *
  * Wait for all children forked with igt_fork.
