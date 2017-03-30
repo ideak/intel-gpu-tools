@@ -13,3 +13,4 @@ igt_simulation
 igt_stats
 igt_subtest_group
 igt_timeout
+igt_hdmi_inject

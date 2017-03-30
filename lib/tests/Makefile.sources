@@ -13,6 +13,7 @@ check_prog_list = \
 	igt_subtest_group \
 	igt_assert \
 	igt_exit_handler \
+	igt_hdmi_inject \
 	$(NULL)
 
 TESTS = \
