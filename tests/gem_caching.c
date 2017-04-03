@@ -116,6 +116,7 @@ igt_main
 
 		fd = drm_open_driver(DRIVER_INTEL);
 
+		igt_require_gem(fd);
 		gem_require_caching(fd);
 
 		devid = intel_get_drm_devid(fd);

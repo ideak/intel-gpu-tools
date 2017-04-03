@@ -192,6 +192,8 @@ static void run(int object_size, bool dumb)
 	int ring;
 
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(fd);
+
 	if (dumb)
 		handle = kmstest_dumb_create(fd, 32, 32, 32, NULL, NULL);
 	else
