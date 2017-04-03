@@ -104,7 +104,7 @@ igt_simple_main
 	int i, j;
 
 	data.drm_fd = drm_open_driver_render(DRIVER_INTEL);
-	igt_require_em(data.drm_fd);
+	igt_require_gem(data.drm_fd);
 
 	data.devid = intel_get_drm_devid(data.drm_fd);
 
