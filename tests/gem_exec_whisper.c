@@ -113,6 +113,7 @@ static bool ignore_engine(int gen, unsigned engine)
 #define CHAIN 0x8
 #define FORKED 0x10
 #define HANG 0x20
+#define SYNC 0x40
 
 struct hang {
 	struct drm_i915_gem_exec_object2 obj;
@@ -177,13 +178,15 @@ static void init_hang(struct hang *h)
 	munmap(batch, 4096);
 }
 
-static void submit_hang(struct hang *h, unsigned *engines, int nengine)
+static void submit_hang(struct hang *h, unsigned *engines, int nengine, unsigned flags)
 {
 	while (nengine--) {
 		h->execbuf.flags &= ~ENGINE_MASK;
 		h->execbuf.flags |= *engines++;
 		gem_execbuf(h->fd, &h->execbuf);
 	}
+	if (flags & SYNC)
+		gem_sync(h->fd, h->obj.handle);
 }
 
 static void fini_hang(struct hang *h)
@@ -343,7 +346,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 					write_seqno(debugfs, pass);
 
 				if (flags & HANG)
-					submit_hang(&hang, engines, nengine);
+					submit_hang(&hang, engines, nengine, flags);
 
 				if (flags & CHAIN) {
 					execbuf.flags &= ~ENGINE_MASK;
@@ -374,6 +377,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 				execbuf.buffers_ptr = to_user_pointer(tmp);
 				gem_execbuf(fd, &execbuf);
 				igt_assert_eq_u64(reloc.presumed_offset, tmp[0].offset);
+				if (flags & SYNC)
+					gem_sync(fd, tmp[0].handle);
 				scratch = tmp[0];
 
 				gem_write(fd, batches[1023].handle, loc, &pass, sizeof(pass));
@@ -413,6 +418,9 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 						inter[n].presumed_offset = batches[n-1].offset;
 					}
 					igt_assert_eq_u64(inter[n].presumed_offset, batches[n-1].offset);
+
+					if (flags & SYNC)
+						gem_sync(this_fd, batches[n-1].handle);
 					relocations += inter[n].presumed_offset != old_offset;
 
 					batches[n-1].relocation_count = 1;
@@ -459,6 +467,9 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 				eb_migrations += tmp[0].offset != scratch.offset;
 				eb_migrations += tmp[1].offset != store.offset;
 				igt_assert_eq_u64(reloc.presumed_offset, tmp[0].offset);
+				if (flags & SYNC)
+					gem_sync(fd, tmp[0].handle);
+
 				store = tmp[1];
 				scratch = tmp[0];
 			}
@@ -535,17 +546,21 @@ igt_main
 		{ "normal", 0 },
 		{ "interruptible", INTERRUPTIBLE },
 		{ "forked", FORKED },
+		{ "sync", SYNC },
 		{ "chain", CHAIN },
 		{ "chain-forked", CHAIN | FORKED },
 		{ "chain-interruptible", CHAIN | INTERRUPTIBLE },
+		{ "chain-sync", CHAIN | SYNC },
 		{ "contexts", CONTEXTS },
 		{ "contexts-interruptible", CONTEXTS | INTERRUPTIBLE},
 		{ "contexts-forked", CONTEXTS | FORKED},
 		{ "contexts-chain", CONTEXTS | CHAIN },
+		{ "contexts-sync", CONTEXTS | SYNC },
 		{ "fds", FDS },
 		{ "fds-interruptible", FDS | INTERRUPTIBLE},
 		{ "fds-forked", FDS | FORKED},
 		{ "fds-chain", FDS | CHAIN},
+		{ "fds-sync", FDS | SYNC},
 		{ NULL }
 	};
 	int fd;
