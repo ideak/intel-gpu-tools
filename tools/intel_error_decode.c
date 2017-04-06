@@ -558,7 +558,7 @@ read_data_file(FILE *file)
 	char *line = NULL;
 	size_t line_size;
 	uint32_t offset, value, ring_length = 0;
-	uint64_t gtt_offset = 0, new_gtt_offset;
+	uint64_t gtt_offset = 0;
 	uint32_t head_offset = -1;
 	const char *buffer_name = "batch buffer";
 	char *ring_name = NULL;
@@ -581,97 +581,64 @@ read_data_file(FILE *file)
 
 		dashes = strstr(line, "---");
 		if (dashes) {
-			uint32_t lo, hi;
-			char *new_ring_name = malloc(dashes - line);
+			const struct {
+				const char *match;
+				const char *name;
+			} buffers[] = {
+				{ "ringbuffer", "ring" },
+				{ "gtt_offset", "batch" },
+				{ "hw context", "HW context" },
+				{ "hw status", "HW status" },
+				{ "wa context", "WA context" },
+				{ "wa batchbuffer", "WA batch" },
+				{ "user", "user" },
+				{ },
+			}, *b;
+			char *new_ring_name;
+
+			new_ring_name = malloc(dashes - line);
 			strncpy(new_ring_name, line, dashes - line);
 			new_ring_name[dashes - line - 1] = '\0';
 
-			matched = sscanf(dashes, "--- gtt_offset = 0x%08x %08x\n",
-					 &hi, &lo);
-			if (matched > 0) {
-				new_gtt_offset = hi;
-				if (matched == 2) {
-					new_gtt_offset <<= 32;
-					new_gtt_offset |= lo;
+			decode(decode_ctx,
+			       buffer_name, ring_name,
+			       gtt_offset, head_offset,
+			       data, &count);
+			gtt_offset = 0;
+			head_offset = -1;
+
+			free(ring_name);
+			ring_name = new_ring_name;
+
+			dashes += 4;
+			for (b = buffers; b->match; b++) {
+				uint32_t lo, hi;
+
+				if (strncasecmp(dashes, b->match,
+						strlen(b->match)))
+					continue;
+
+				dashes = strchr(dashes, '=');
+				if (!dashes)
+					break;
+
+				matched = sscanf(dashes, "= 0x%08x %08x\n",
+						 &hi, &lo);
+				if (matched > 0) {
+					gtt_offset = hi;
+					if (matched == 2) {
+						gtt_offset <<= 32;
+						gtt_offset |= lo;
+					}
 				}
 
-				decode(decode_ctx,
-				       buffer_name, ring_name,
-				       gtt_offset, head_offset,
-				       data, &count);
-				gtt_offset = new_gtt_offset;
-				head_offset = -1;
-				free(ring_name);
-				ring_name = new_ring_name;
-				buffer_name = "batch buffer";
-				continue;
-			}
-
-			matched = sscanf(dashes, "--- ringbuffer = 0x%08x %08x\n",
-					 &hi, &lo);
-			if (matched > 0) {
-				new_gtt_offset = hi;
-				if (matched == 2) {
-					new_gtt_offset <<= 32;
-					new_gtt_offset |= lo;
-				}
-
-				decode(decode_ctx,
-				       buffer_name, ring_name,
-				       gtt_offset, head_offset,
-				       data, &count);
-				gtt_offset = new_gtt_offset;
-				if (head_idx < num_rings)
+				buffer_name = b->name;
+				if (b == buffers)
 					head_offset = head[head_idx++];
-				else
-					head_offset = -1;
-				free(ring_name);
-				ring_name = new_ring_name;
-				buffer_name = "ring buffer";
-				continue;
+				break;
 			}
 
-			matched = sscanf(dashes, "--- HW Context = 0x%08x %08x\n",
-					 &hi, &lo);
-			if (matched > 0) {
-				new_gtt_offset = hi;
-				if (matched == 2) {
-					new_gtt_offset <<= 32;
-					new_gtt_offset |= lo;
-				}
-
-				decode(decode_ctx,
-				       buffer_name, ring_name,
-				       gtt_offset, head_offset,
-				       data, &count);
-				gtt_offset = new_gtt_offset;
-				head_offset = -1;
-				free(ring_name);
-				ring_name = new_ring_name;
-				buffer_name = "HW Context";
-				continue;
-			}
-
-			matched = sscanf(dashes, "--- user = 0x%08x %08x\n",
-					 &hi, &lo);
-			if (matched > 0) {
-				new_gtt_offset = hi;
-				if (matched == 2) {
-					new_gtt_offset <<= 32;
-					new_gtt_offset |= lo;
-				}
-
-				decode(decode_ctx,
-				       buffer_name, ring_name,
-				       gtt_offset, head_offset,
-				       data, &count);
-				gtt_offset = new_gtt_offset;
-				head_offset = -1;
-				free(ring_name);
-				ring_name = new_ring_name;
-				buffer_name = "user";
-				continue;
-			}
+			continue;
 		}
 
 		matched = sscanf(line, "%08x : %08x", &offset, &value);
