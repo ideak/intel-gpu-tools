@@ -554,7 +554,7 @@ read_data_file(FILE *file)
 	int head_idx = 0;
 	int num_rings = 0;
 	long long unsigned fence;
-	int data_size = 0, count = 0, line_number = 0, matched;
+	int data_size = 0, count = 0, matched;
 	char *line = NULL;
 	size_t line_size;
 	uint32_t offset, value, ring_length = 0;
@@ -565,7 +565,19 @@ read_data_file(FILE *file)
 
 	while (getline(&line, &line_size, file) > 0) {
 		char *dashes;
-		line_number++;
+
+		if (line[0] == ':' || line[0] == '~') {
+			count = ascii85_decode(line+1, &data, line[0] == ':');
+			if (count == 0) {
+				fprintf(stderr, "ASCII85 decode failed.\n");
+				exit(1);
+			}
+			decode(decode_ctx,
+			       buffer_name, ring_name,
+			       gtt_offset, head_offset,
+			       data, &count);
+			continue;
+		}
 
 		dashes = strstr(line, "---");
 		if (dashes) {
@@ -639,19 +651,6 @@ read_data_file(FILE *file)
 				buffer_name = "HW Context";
 				continue;
 			}
-		}
-
-		if (line[0] == ':' || line[0] == '~') {
-			count = ascii85_decode(line+1, &data, line[0] == ':');
-			if (count == 0) {
-				fprintf(stderr, "ASCII85 decode failed.\n");
-				exit(1);
-			}
-			decode(decode_ctx,
-			       buffer_name, ring_name,
-			       gtt_offset, head_offset,
-			       data, &count);
-			continue;
 		}
 
 		matched = sscanf(line, "%08x : %08x", &offset, &value);
