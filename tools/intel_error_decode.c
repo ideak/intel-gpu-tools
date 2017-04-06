@@ -651,6 +651,27 @@ read_data_file(FILE *file)
 				buffer_name = "HW Context";
 				continue;
 			}
+
+			matched = sscanf(dashes, "--- user = 0x%08x %08x\n",
+					 &hi, &lo);
+			if (matched > 0) {
+				new_gtt_offset = hi;
+				if (matched == 2) {
+					new_gtt_offset <<= 32;
+					new_gtt_offset |= lo;
+				}
+
+				decode(decode_ctx,
+				       buffer_name, ring_name,
+				       gtt_offset, head_offset,
+				       data, &count);
+				gtt_offset = new_gtt_offset;
+				head_offset = -1;
+				free(ring_name);
+				ring_name = new_ring_name;
+				buffer_name = "user";
+				continue;
+			}
 		}
 
 		matched = sscanf(line, "%08x : %08x", &offset, &value);
