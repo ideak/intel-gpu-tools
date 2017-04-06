@@ -772,6 +772,30 @@ read_data_file(FILE *file)
 	free(ring_name);
 }
 
+static void setup_pager(void)
+{
+	int fds[2];
+
+	if (pipe(fds) == -1)
+		return;
+
+	switch (fork()) {
+	case -1:
+		break;
+	case 0:
+		close(fds[1]);
+		dup2(fds[0], 0);
+		execlp("less", "less", "-FRSi", NULL);
+		break;
+
+	default:
+		close(fds[0]);
+		dup2(fds[1], 1);
+		close(fds[1]);
+		break;
+	}
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -796,6 +820,9 @@ main(int argc, char *argv[])
 				argv[0]);
 		return 1;
 	}
+
+	if (isatty(1))
+		setup_pager();
 
 	if (argc == 1) {
 		if (isatty(0)) {
