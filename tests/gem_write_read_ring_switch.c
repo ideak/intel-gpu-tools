@@ -153,6 +153,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 
 		/* Test requires MI_FLUSH_DW and MI_COND_BATCH_BUFFER_END */
 		igt_require(intel_gen(intel_get_drm_devid(fd)) >= 6);

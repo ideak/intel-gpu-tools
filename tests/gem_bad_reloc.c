@@ -188,8 +188,10 @@ igt_main
 	const struct intel_execution_engine *e;
 	int fd = -1;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+	}
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("negative-reloc-%s", e->name)

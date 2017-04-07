@@ -199,6 +199,7 @@ igt_main
 		int devid;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 
 		devid = intel_get_drm_devid(fd);
 		igt_require(intel_gen(devid) >= 6);

@@ -72,6 +72,7 @@ static void gpu_blit(struct igt_fb *dst_fb, struct igt_fb *src_fb)
 	uint32_t devid;
 
 	igt_require_intel(drm_fd);
+	igt_require_gem(drm_fd);
 
 	bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
 	devid = intel_get_drm_devid(drm_fd);

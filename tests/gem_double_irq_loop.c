@@ -96,6 +96,7 @@ igt_simple_main
 	igt_skip_on_simulation();
 
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(fd);
 	devid = intel_get_drm_devid(fd);
 	igt_require_f(HAS_BLT_RING(devid),
 		      "not (yet) implemented for pre-snb\n");

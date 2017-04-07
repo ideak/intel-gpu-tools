@@ -297,6 +297,12 @@ int main(int argc, char **argv)
 {
 	igt_subtest_init(argc, argv);
 
+	igt_fixture {
+		int fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+		close(fd);
+	}
+
 	igt_subtest("blt-vs-render-ctx0") {
 		drm_intel_bo *bcs[1], *rcs[N_CHILD];
 
