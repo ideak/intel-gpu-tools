@@ -333,6 +333,7 @@ char *igt_crc_to_string(igt_crc_t *crc)
 
 struct _igt_pipe_crc {
 	int fd;
+	int dir;
 	int ctl_fd;
 	int crc_fd;
 	int flags;
@@ -381,7 +382,7 @@ static bool igt_pipe_crc_do_start(igt_pipe_crc_t *pipe_crc)
 		sprintf(buf, "crtc-%d/crc/data", pipe_crc->pipe);
 		err = 0;
 
-		pipe_crc->crc_fd = igt_debugfs_open(pipe_crc->fd, buf, pipe_crc->flags);
+		pipe_crc->crc_fd = openat(pipe_crc->dir, buf, pipe_crc->flags);
 		if (pipe_crc->crc_fd < 0)
 			err = -errno;
 
@@ -635,23 +636,27 @@ pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source, int flag
 {
 	igt_pipe_crc_t *pipe_crc;
 	char buf[128];
+	int debugfs;
+
+	debugfs = igt_debugfs_dir(fd);
+	igt_assert(debugfs != -1);
 
 	igt_install_exit_handler(pipe_crc_exit_handler);
 
 	pipe_crc = calloc(1, sizeof(struct _igt_pipe_crc));
 
 	sprintf(buf, "crtc-%d/crc/control", pipe);
-	pipe_crc->ctl_fd = igt_debugfs_open(fd, buf, O_WRONLY);
+	pipe_crc->ctl_fd = openat(debugfs, buf, O_WRONLY);
 	if (pipe_crc->ctl_fd == -1) {
-		pipe_crc->ctl_fd = igt_debugfs_open(fd, "i915_display_crc_ctl",
-						    O_WRONLY);
+		pipe_crc->ctl_fd = openat(debugfs,
+					  "i915_display_crc_ctl", O_WRONLY);
 		igt_assert(pipe_crc->ctl_fd != -1);
 		pipe_crc->is_legacy = true;
 	}
 
 	if (pipe_crc->is_legacy) {
 		sprintf(buf, "i915_pipe_%s_crc", kmstest_pipe_name(pipe));
-		pipe_crc->crc_fd = igt_debugfs_open(fd, buf, flags);
+		pipe_crc->crc_fd = openat(debugfs, buf, flags);
 		igt_assert(pipe_crc->crc_fd != -1);
 		igt_debug("Using legacy frame CRC ABI\n");
 	} else {
@@ -660,6 +665,7 @@ pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source, int flag
 	}
 
 	pipe_crc->fd = fd;
+	pipe_crc->dir = debugfs;
 	pipe_crc->pipe = pipe;
 	pipe_crc->source = source;
 	pipe_crc->flags = flags;
@@ -716,6 +722,7 @@ void igt_pipe_crc_free(igt_pipe_crc_t *pipe_crc)
 
 	close(pipe_crc->ctl_fd);
 	close(pipe_crc->crc_fd);
+	close(pipe_crc->dir);
 	free(pipe_crc);
 }
 
@@ -822,8 +829,7 @@ void igt_pipe_crc_stop(igt_pipe_crc_t *pipe_crc)
 	char buf[32];
 
 	if (pipe_crc->is_legacy) {
-		sprintf(buf, "pipe %s none",
-			kmstest_pipe_name(pipe_crc->pipe));
+		sprintf(buf, "pipe %s none", kmstest_pipe_name(pipe_crc->pipe));
 		igt_assert_eq(write(pipe_crc->ctl_fd, buf, strlen(buf)),
 			      strlen(buf));
 	} else {
