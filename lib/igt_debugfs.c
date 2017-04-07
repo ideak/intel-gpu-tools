@@ -212,13 +212,17 @@ int igt_debugfs_dir(int device)
  */
 int igt_debugfs_open(int device, const char *filename, int mode)
 {
-	int dir;
+	int dir, ret;
 
 	dir = igt_debugfs_dir(device);
 	if (dir < 0)
 		return dir;
 
-	return openat(dir, filename, mode);
+	ret = openat(dir, filename, mode);
+
+	close(dir);
+
+	return ret;
 }
 
 /**
