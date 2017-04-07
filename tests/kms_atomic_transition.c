@@ -146,7 +146,7 @@ static void ev_page_flip(int fd, unsigned seq, unsigned tv_sec, unsigned tv_usec
 }
 
 static drmEventContext drm_events = {
-	.version = DRM_EVENT_CONTEXT_VERSION,
+	.version = 2,
 	.page_flip_handler = ev_page_flip
 };
 

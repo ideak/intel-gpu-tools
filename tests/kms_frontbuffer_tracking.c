@@ -2278,7 +2278,7 @@ static void wait_flip_event(void)
 	drmEventContext evctx;
 	struct pollfd pfd;
 
-	evctx.version = DRM_EVENT_CONTEXT_VERSION;
+	evctx.version = 2;
 	evctx.vblank_handler = NULL;
 	evctx.page_flip_handler = flip_handler;
 

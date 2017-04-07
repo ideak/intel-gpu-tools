@@ -1072,7 +1072,7 @@ static unsigned int wait_for_events(struct test_output *o)
 	igt_assert(event_mask);
 
 	memset(&evctx, 0, sizeof evctx);
-	evctx.version = DRM_EVENT_CONTEXT_VERSION;
+	evctx.version = 2;
 	evctx.vblank_handler = vblank_handler;
 	evctx.page_flip_handler = page_flip_handler;
 

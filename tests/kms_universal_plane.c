@@ -470,7 +470,7 @@ pageflip_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	pageflip_test_t test = { .data = data };
 	igt_plane_t *primary;
 	struct timeval timeout = { .tv_sec = 0, .tv_usec = 500 };
-	drmEventContext evctx = { .version = DRM_EVENT_CONTEXT_VERSION };
+	drmEventContext evctx = { .version = 2 };
 
 	fd_set fds;
 	int ret = 0;

@@ -109,7 +109,7 @@ static void wait_for_flip(data_t *data, uint32_t flip_handle)
 		.tv_usec = 0,
 	};
 	drmEventContext evctx = {
-		.version = DRM_EVENT_CONTEXT_VERSION,
+		.version = 2,
 		.page_flip_handler = page_flip_handler,
 	};
 	fd_set fds;
