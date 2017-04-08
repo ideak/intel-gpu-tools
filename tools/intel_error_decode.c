@@ -440,8 +440,8 @@ static void decode(struct drm_intel_decode *ctx,
 		   const char *ring_name,
 		   uint64_t gtt_offset,
 		   uint32_t head_offset,
-		   uint32_t *data,
-		   int *count)
+		   uint32_t *data, int *count,
+		   int decode)
 {
 	if (!*count)
 		return;
@@ -455,8 +455,15 @@ static void decode(struct drm_intel_decode *ctx,
 		       (unsigned)((head_offset + gtt_offset) & 0xffffffff));
 	printf("\n");
 
-	drm_intel_decode_set_batch_pointer(ctx, data, gtt_offset, *count);
-	drm_intel_decode(ctx);
+	if (decode) {
+		drm_intel_decode_set_batch_pointer(ctx, data, gtt_offset,
+						   *count);
+		drm_intel_decode(ctx);
+	} else {
+		for (int i = 0; i + 4 < *count; i += 4)
+			printf("[%04x] %08x %08x %08x %08x\n",
+			       4*i, data[i], data[i+1], data[i+2], data[i+3]);
+	}
 	*count = 0;
 }
 
@@ -562,6 +569,7 @@ read_data_file(FILE *file)
 	uint32_t head_offset = -1;
 	const char *buffer_name = "batch buffer";
 	char *ring_name = NULL;
+	int do_decode = 1;
 
 	while (getline(&line, &line_size, file) > 0) {
 		char *dashes;
@@ -575,7 +583,7 @@ read_data_file(FILE *file)
 			decode(decode_ctx,
 			       buffer_name, ring_name,
 			       gtt_offset, head_offset,
-			       data, &count);
+			       data, &count, do_decode);
 			continue;
 		}
 
@@ -584,14 +592,16 @@ read_data_file(FILE *file)
 			const struct {
 				const char *match;
 				const char *name;
+				int do_decode;
 			} buffers[] = {
-				{ "ringbuffer", "ring" },
-				{ "gtt_offset", "batch" },
-				{ "hw context", "HW context" },
-				{ "hw status", "HW status" },
-				{ "wa context", "WA context" },
-				{ "wa batchbuffer", "WA batch" },
-				{ "user", "user" },
+				{ "ringbuffer", "ring", 1 },
+				{ "gtt_offset", "batch", 1 },
+				{ "hw context", "HW context", 1 },
+				{ "hw status", "HW status", 0 },
+				{ "wa context", "WA context", 1 },
+				{ "wa batchbuffer", "WA batch", 1 },
+				{ "user", "user", 0 },
+				{ "semaphores", "semaphores", 0 },
 				{ },
 			}, *b;
 			char *new_ring_name;
@@ -603,7 +613,7 @@ read_data_file(FILE *file)
 			decode(decode_ctx,
 			       buffer_name, ring_name,
 			       gtt_offset, head_offset,
-			       data, &count);
+			       data, &count, do_decode);
 			gtt_offset = 0;
 			head_offset = -1;
 
@@ -632,6 +642,7 @@ read_data_file(FILE *file)
 					}
 				}
 
+				do_decode = b->do_decode;
 				buffer_name = b->name;
 				if (b == buffers)
 					head_offset = head[head_idx++];
@@ -649,7 +660,7 @@ read_data_file(FILE *file)
 			decode(decode_ctx,
 			       buffer_name, ring_name,
 			       gtt_offset, head_offset,
-			       data, &count);
+			       data, &count, do_decode);
 
 			printf("%s", line);
 
@@ -732,7 +743,7 @@ read_data_file(FILE *file)
 	decode(decode_ctx,
 	       buffer_name, ring_name,
 	       gtt_offset, head_offset,
-	       data, &count);
+	       data, &count, do_decode);
 
 	free(data);
 	free(line);
