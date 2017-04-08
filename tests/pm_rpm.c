@@ -27,6 +27,7 @@
 
 #include "igt.h"
 #include "igt_kmod.h"
+#include "igt_sysfs.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -78,6 +79,7 @@ enum plane_type {
 #define USE_DPMS	8
 
 int drm_fd, msr_fd, pc8_status_fd;
+int debugfs;
 bool has_runtime_pm, has_pc8;
 struct mode_set_data ms_data;
 
@@ -663,10 +665,10 @@ static void setup_pc8(void)
 	if (!supports_pc8_plus_residencies())
 		return;
 
-	pc8_status_fd = igt_debugfs_open(drm_fd, "i915_pc8_status", O_RDONLY);
+	pc8_status_fd = openat(debugfs, "i915_pc8_status", O_RDONLY);
 	if (pc8_status_fd == -1)
-		pc8_status_fd = igt_debugfs_open(drm_fd, "i915_runtime_pm_status",
-						 O_RDONLY);
+		pc8_status_fd = openat(debugfs,
+				       "i915_runtime_pm_status", O_RDONLY);
 	igt_assert_f(pc8_status_fd >= 0,
 		     "Can't open /sys/kernel/debug/dri/0/i915_runtime_pm_status");
 
@@ -676,6 +678,8 @@ static void setup_pc8(void)
 static void setup_environment(void)
 {
 	drm_fd = drm_open_driver_master(DRIVER_INTEL);
+	debugfs = igt_debugfs_dir(drm_fd);
+	igt_require(debugfs != -1);
 
 	init_mode_set_data(&ms_data);
 
@@ -700,6 +704,7 @@ static void teardown_environment(void)
 {
 	restore_environment();
 	fini_mode_set_data(&ms_data);
+	close(debugfs);
 	drmClose(drm_fd);
 	close(msr_fd);
 	if (has_pc8)
@@ -825,62 +830,54 @@ static void i2c_subtest(void)
 	enable_one_screen(&ms_data);
 }
 
-static void read_full_file(const char *name)
+static void read_full_file(int fd, const char *name)
 {
-	int rc, fd;
+	int rc;
 	char buf[128];
 
 	igt_assert_f(wait_for_suspended(), "File: %s\n", name);
-
-	fd = open(name, O_RDONLY);
-	if (fd < 0)
-		return;
 
 	do {
 		rc = read(fd, buf, ARRAY_SIZE(buf));
 	} while (rc == ARRAY_SIZE(buf));
 
-	rc = close(fd);
-	igt_assert_eq(rc, 0);
-
 	igt_assert_f(wait_for_suspended(), "File: %s\n", name);
 }
 
-static void read_files_from_dir(const char *name, int level)
+static void read_files_from_dir(int path, int level)
 {
 	DIR *dir;
 	struct dirent *dirent;
-	char *full_name;
 	int rc;
 
-	dir = opendir(name);
+	dir = fdopendir(path);
 	igt_assert(dir);
-
-	full_name = malloc(PATH_MAX);
 
 	igt_assert_lt(level, 128);
 
 	while ((dirent = readdir(dir))) {
 		struct stat stat_buf;
+		int de;
 
 		if (strcmp(dirent->d_name, ".") == 0)
 			continue;
 		if (strcmp(dirent->d_name, "..") == 0)
 			continue;
 
-		snprintf(full_name, PATH_MAX, "%s/%s", name, dirent->d_name);
+		de = openat(path, dirent->d_name, O_RDONLY);
 
-		rc = lstat(full_name, &stat_buf);
+		rc = fstat(de, &stat_buf);
 		igt_assert_eq(rc, 0);
 
 		if (S_ISDIR(stat_buf.st_mode))
-			read_files_from_dir(full_name, level + 1);
+			read_files_from_dir(de, level + 1);
 
 		if (S_ISREG(stat_buf.st_mode))
-			read_full_file(full_name);
+			read_full_file(de, dirent->d_name);
+
+		close(de);
 	}
 
-	free(full_name);
 	closedir(dir);
 }
 
@@ -889,31 +886,21 @@ static void read_files_from_dir(const char *name, int level)
  * errors, so a "pass" here should be confirmed by a check on dmesg. */
 static void debugfs_read_subtest(void)
 {
-	const char *path = "/sys/kernel/debug/dri/0";
-	DIR *dir;
-
-	dir = opendir(path);
-	igt_require_f(dir, "Can't open the debugfs directory\n");
-	closedir(dir);
-
 	disable_all_screens_and_wait(&ms_data);
 
-	read_files_from_dir(path, 0);
+	read_files_from_dir(debugfs, 0);
 }
 
 /* Read the comment on debugfs_read_subtest(). */
 static void sysfs_read_subtest(void)
 {
-	const char *path = "/sys/devices/pci0000:00/0000:00:02.0";
-	DIR *dir;
-
-	dir = opendir(path);
-	igt_require_f(dir, "Can't open the sysfs directory\n");
-	closedir(dir);
+	int dir = igt_sysfs_open(drm_fd, NULL);
+	igt_require_f(dir != -1, "Can't open the sysfs directory\n");
 
 	disable_all_screens_and_wait(&ms_data);
 
-	read_files_from_dir(path, 0);
+	read_files_from_dir(dir, 0);
+	close(dir);
 }
 
 /* Make sure we don't suspend when we have the i915_forcewake_user file open. */
