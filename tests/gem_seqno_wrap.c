@@ -30,7 +30,6 @@
  * boundary.
  */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -42,12 +41,15 @@
 #include <signal.h>
 #include <errno.h>
 
+#include "igt.h"
+#include "igt_sysfs.h"
 #include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Runs blitcopy -> rendercopy with multiple buffers over"
 		     " wrap boundary.");
 
 static int drm_fd;
+static int debugfs;
 static int devid;
 static int card_index = 0;
 static uint32_t last_seqno = 0;
@@ -169,6 +171,13 @@ static void exchange_uint(void *array, unsigned i, unsigned j)
 	igt_swap(i_arr[i], i_arr[j]);
 }
 
+static bool has_seqno_wrap(void)
+{
+	int ret = igt_sysfs_printf(debugfs, "i915_next_seqno", "0x1");
+	errno = 0;
+	return ret == 1;
+}
+
 static void run_sync_test(int num_buffers, bool verify)
 {
 	drm_intel_bufmgr *bufmgr;
@@ -178,12 +187,6 @@ static void run_sync_test(int num_buffers, bool verify)
 	int i;
 	unsigned int *p_dst1, *p_dst2;
 	struct igt_buf *s_src, *s_dst;
-
-	drm_fd = drm_open_driver(DRIVER_INTEL);
-
-	gem_quiescent_gpu(drm_fd);
-
-	devid = intel_get_drm_devid(drm_fd);
 
 	max = gem_aperture_size (drm_fd) / (1024 * 1024) / 2;
 	if (num_buffers > max)
@@ -266,43 +269,14 @@ static void run_sync_test(int num_buffers, bool verify)
 	free(src);
 
 	gem_quiescent_gpu(drm_fd);
-
-	close(drm_fd);
 }
 
 static int __read_seqno(uint32_t *seqno)
 {
-	int fh;
-	char buf[32];
-	int r;
-	char *p;
-	unsigned long int tmp;
+	if (igt_sysfs_scanf(debugfs, "i915_next_seqno", "%x", seqno) != 1)
+		return -1;
 
-	fh = igt_debugfs_open(drm_fd, "i915_next_seqno", O_RDONLY);
-
-	r = read(fh, buf, sizeof(buf) - 1);
-	close(fh);
-	if (r < 0) {
-		igt_warn("read");
-		return -errno;
-	}
-
-	buf[r] = 0;
-
-	p = strstr(buf, "0x");
-	if (!p)
-		p = buf;
-
-	errno = 0;
-	tmp = strtoul(p, NULL, 0);
-	if (tmp == ULONG_MAX && errno) {
-		igt_warn("strtoul");
-		return -errno;
-	}
-
-	*seqno = tmp;
 	igt_debug("next_seqno: 0x%x\n", *seqno);
-
 	return 0;
 }
 
@@ -326,17 +300,11 @@ static int read_seqno(void)
 static void write_seqno(uint32_t seqno)
 {
 	uint32_t rb = -1;
-	char buf[32];
-	int len, fd;
 
 	if (options.dontwrap)
 		return;
 
-	fd = igt_debugfs_open(drm_fd, "i915_next_seqno", O_RDWR);
-	len = snprintf(buf, sizeof(buf), "0x%x", seqno);
-	igt_assert(write(fd, buf, len) == len);
-	close(fd);
-
+	igt_sysfs_printf(debugfs, "i915_next_seqno", "0x%x", seqno);
 	igt_debug("next_seqno set to: 0x%x\n", seqno);
 	last_seqno = seqno;
 
@@ -483,6 +451,13 @@ int main(int argc, char **argv)
 	igt_simple_init_parse_opts(&argc, argv, "n:bvt:dp:ri:", long_options,
 				   help, parse_options, NULL);
 
+	drm_fd = drm_open_driver(DRIVER_INTEL);
+	debugfs = igt_debugfs_dir(drm_fd);
+	igt_require(has_seqno_wrap());
+
+	gem_quiescent_gpu(drm_fd);
+
+	devid = intel_get_drm_devid(drm_fd);
 	card_index = drm_get_card();
 
 	srandom(time(NULL));
