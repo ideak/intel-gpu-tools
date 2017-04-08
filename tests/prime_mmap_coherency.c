@@ -57,9 +57,6 @@ static void test_read_flush(bool expect_stale_cache)
 	uint32_t *ptr_gtt;
 	int dma_buf_fd, i;
 
-	if (expect_stale_cache)
-		igt_require(!gem_has_llc(fd));
-
 	bo_1 = drm_intel_bo_alloc(bufmgr, "BO 1", width * height * 4, 4096);
 
 	/* STEP #1: put the BO 1 in GTT domain. We use the blitter to copy and fill
@@ -72,20 +69,21 @@ static void test_read_flush(bool expect_stale_cache)
 
 	/* STEP #2: read BO 1 using the dma-buf CPU mmap. This dirties the CPU caches. */
 	dma_buf_fd = prime_handle_to_fd_for_mmap(fd, bo_1->handle);
-	igt_skip_on(errno == EINVAL);
 
-	ptr_cpu = mmap(NULL, width * height, PROT_READ | PROT_WRITE,
+	/* STEP #3: write 0x11 into BO 1. */
+	bo_2 = drm_intel_bo_alloc(bufmgr, "BO 2", width * height * 4, 4096);
+	ptr_gtt = gem_mmap__gtt(fd, bo_2->handle, width * height, PROT_READ | PROT_WRITE);
+	gem_set_domain(fd, bo_2->handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	memset(ptr_gtt, 0xc5, width * height);
+	munmap(ptr_gtt, width * height);
+
+	ptr_cpu = mmap(NULL, width * height, PROT_READ,
 		       MAP_SHARED, dma_buf_fd, 0);
 	igt_assert(ptr_cpu != MAP_FAILED);
 
 	for (i = 0; i < (width * height) / 4; i++)
 		igt_assert_eq(ptr_cpu[i], 0);
-
-	/* STEP #3: write 0x11 into BO 1. */
-	bo_2 = drm_intel_bo_alloc(bufmgr, "BO 2", width * height * 4, 4096);
-	ptr_gtt = gem_mmap__gtt(fd, bo_2->handle, width * height, PROT_READ | PROT_WRITE);
-	memset(ptr_gtt, 0x11, width * height);
-	munmap(ptr_gtt, width * height);
 
 	intel_copy_bo(batch, bo_1, bo_2, width * height);
 	gem_sync(fd, bo_1->handle);
@@ -100,7 +98,7 @@ static void test_read_flush(bool expect_stale_cache)
 		prime_sync_start(dma_buf_fd, false);
 
 	for (i = 0; i < (width * height) / 4; i++)
-		if (ptr_cpu[i] != 0x11111111) {
+		if (ptr_cpu[i] != 0xc5c5c5c5) {
 			igt_warn_on_f(!expect_stale_cache,
 				    "Found 0x%08x at offset 0x%08x\n", ptr_cpu[i], i);
 			stale++;
@@ -124,9 +122,6 @@ static void test_write_flush(bool expect_stale_cache)
 	uint32_t *ptr_cpu;
 	uint32_t *ptr2_cpu;
 	int dma_buf_fd, dma_buf2_fd, i;
-
-	if (expect_stale_cache)
-		igt_require(!gem_has_llc(fd));
 
 	bo_1 = drm_intel_bo_alloc(bufmgr, "BO 1", width * height * 4, 4096);
 
@@ -285,7 +280,6 @@ static void test_ioctl_errors(void)
 int main(int argc, char **argv)
 {
 	int i;
-	bool expect_stale_cache;
 	igt_subtest_init(argc, argv);
 
 	igt_fixture {
@@ -302,39 +296,37 @@ int main(int argc, char **argv)
 	igt_info("%d rounds for each test\n", ROUNDS);
 	igt_subtest("read") {
 		stale = 0;
-		expect_stale_cache = false;
 		igt_info("exercising read flush\n");
 		for (i = 0; i < ROUNDS; i++)
-			test_read_flush(expect_stale_cache);
+			test_read_flush(false);
 		igt_fail_on_f(stale, "num of stale cache lines %d\n", stale);
 	}
 
 	/* Only for !llc platforms */
 	igt_subtest("read-and-fail") {
+		igt_require(!gem_has_llc(fd));
 		stale = 0;
-		expect_stale_cache = true;
 		igt_info("exercising read flush and expect to fail on !llc\n");
 		for (i = 0; i < ROUNDS; i++)
-			test_read_flush(expect_stale_cache);
+			test_read_flush(true);
 		igt_fail_on_f(!stale, "couldn't find any stale cache lines\n");
 	}
 
 	igt_subtest("write") {
 		stale = 0;
-		expect_stale_cache = false;
 		igt_info("exercising write flush\n");
 		for (i = 0; i < ROUNDS; i++)
-			test_write_flush(expect_stale_cache);
+			test_write_flush(false);
 		igt_fail_on_f(stale, "num of stale cache lines %d\n", stale);
 	}
 
 	/* Only for !llc platforms */
 	igt_subtest("write-and-fail") {
+		igt_require(!gem_has_llc(fd));
 		stale = 0;
-		expect_stale_cache = true;
 		igt_info("exercising write flush and expect to fail on !llc\n");
 		for (i = 0; i < ROUNDS; i++)
-			test_write_flush(expect_stale_cache);
+			test_write_flush(true);
 		igt_fail_on_f(!stale, "couldn't find any stale cache lines\n");
 	}
 
