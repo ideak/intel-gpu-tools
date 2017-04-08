@@ -602,6 +602,7 @@ read_data_file(FILE *file)
 				{ "wa batchbuffer", "WA batch", 1 },
 				{ "user", "user", 0 },
 				{ "semaphores", "semaphores", 0 },
+				{ "guc log buffer", "GuC log", 0 },
 				{ },
 			}, *b;
 			char *new_ring_name;
