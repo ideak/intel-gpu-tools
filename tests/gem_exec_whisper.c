@@ -233,6 +233,9 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	}
 	igt_require(nengine);
 
+	if (flags & FDS)
+		igt_require(gen >= 6);
+
 	if (flags & CONTEXTS) {
 		igt_require(__gem_context_create(fd, &contexts[0]) == 0);
 		gem_context_destroy(fd, contexts[0]);
@@ -300,7 +303,6 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 				contexts[n] = gem_context_create(fd);
 		}
 		if (flags & FDS) {
-			igt_require(gen >= 6);
 			for (n = 0; n < 64; n++)
 				fds[n] = drm_open_driver(DRIVER_INTEL);
 		}
