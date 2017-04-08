@@ -196,6 +196,9 @@ static void all(int fd, unsigned engine, unsigned flags)
 	if (flags & CONTEXTS)
 		gem_require_context(fd);
 
+	if (flags & FDS)
+		igt_require(gen > 5);
+
 	nengine = 0;
 	if (engine == -1) {
 		for_each_engine(fd, engine) {
