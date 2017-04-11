@@ -122,6 +122,7 @@ TESTS_progs_M = \
 	kms_plane \
 	kms_plane_multiple \
 	kms_plane_lowres \
+	kms_concurrent \
 	kms_properties \
 	kms_psr_sink_crc \
 	kms_render \
