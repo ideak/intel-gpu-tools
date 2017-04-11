@@ -321,8 +321,6 @@ igt_main
 		igt_require_gem(i915);
 		igt_require(gem_has_exec_fence(i915));
 		gem_require_mmap_wc(i915);
-
-		igt_allow_hang(i915, 0, 0);
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
@@ -331,28 +329,42 @@ igt_main
 				igt_require(gem_has_ring(i915, e->exec_id | e->flags));
 			}
 
-			igt_subtest_f("%sbusy-%s",
-				      e->exec_id == 0 ? "basic-" : "",
-				      e->name)
-				test_fence_busy(i915, e->exec_id | e->flags, 0);
-			igt_subtest_f("%swait-%s",
-				      e->exec_id == 0 ? "basic-" : "",
-				      e->name)
-				test_fence_busy(i915, e->exec_id | e->flags, WAIT);
-			igt_subtest_f("%sawait-%s",
-				      e->exec_id == 0 ? "basic-" : "",
-				      e->name)
-				test_fence_await(i915, e->exec_id | e->flags, 0);
-			igt_subtest_f("nb-await-%s", e->name)
-				test_fence_await(i915, e->exec_id | e->flags, NONBLOCK);
-			igt_subtest_f("busy-hang-%s", e->name)
-				test_fence_busy(i915, e->exec_id | e->flags, HANG);
-			igt_subtest_f("wait-hang-%s", e->name)
-				test_fence_busy(i915, e->exec_id | e->flags, HANG | WAIT);
-			igt_subtest_f("await-hang-%s", e->name)
-				test_fence_await(i915, e->exec_id | e->flags, HANG);
-			igt_subtest_f("nb-await-hang-%s", e->name)
-				test_fence_await(i915, e->exec_id | e->flags, NONBLOCK | HANG);
+			igt_subtest_group {
+				igt_subtest_f("%sbusy-%s",
+						e->exec_id == 0 ? "basic-" : "",
+						e->name)
+					test_fence_busy(i915, e->exec_id | e->flags, 0);
+				igt_subtest_f("%swait-%s",
+						e->exec_id == 0 ? "basic-" : "",
+						e->name)
+					test_fence_busy(i915, e->exec_id | e->flags, WAIT);
+				igt_subtest_f("%sawait-%s",
+						e->exec_id == 0 ? "basic-" : "",
+						e->name)
+					test_fence_await(i915, e->exec_id | e->flags, 0);
+				igt_subtest_f("nb-await-%s", e->name)
+					test_fence_await(i915, e->exec_id | e->flags, NONBLOCK);
+			}
+
+			igt_subtest_group {
+				igt_hang_t hang;
+
+				igt_fixture {
+					hang = igt_allow_hang(i915, 0, 0);
+				}
+
+				igt_subtest_f("busy-hang-%s", e->name)
+					test_fence_busy(i915, e->exec_id | e->flags, HANG);
+				igt_subtest_f("wait-hang-%s", e->name)
+					test_fence_busy(i915, e->exec_id | e->flags, HANG | WAIT);
+				igt_subtest_f("await-hang-%s", e->name)
+					test_fence_await(i915, e->exec_id | e->flags, HANG);
+				igt_subtest_f("nb-await-hang-%s", e->name)
+					test_fence_await(i915, e->exec_id | e->flags, NONBLOCK | HANG);
+				igt_fixture {
+					igt_disallow_hang(i915, hang);
+				}
+			}
 		}
 	}
 
