@@ -549,11 +549,11 @@ unsigned intel_detect_and_clear_missed_interrupts(int fd)
 
 const struct intel_execution_engine intel_execution_engines[] = {
 	{ "default", NULL, 0, 0 },
-	{ "render", "rcs", I915_EXEC_RENDER, 0 },
-	{ "bsd", "vcs", I915_EXEC_BSD, 0 },
-	{ "bsd1", "vcs", I915_EXEC_BSD, 1<<13 /*I915_EXEC_BSD_RING1*/ },
-	{ "bsd2", "vcs2", I915_EXEC_BSD, 2<<13 /*I915_EXEC_BSD_RING2*/ },
-	{ "blt", "bcs", I915_EXEC_BLT, 0 },
-	{ "vebox", "vecs", I915_EXEC_VEBOX, 0 },
+	{ "render", "rcs0", I915_EXEC_RENDER, 0 },
+	{ "bsd", "vcs0", I915_EXEC_BSD, 0 },
+	{ "bsd1", "vcs0", I915_EXEC_BSD, 1<<13 /*I915_EXEC_BSD_RING1*/ },
+	{ "bsd2", "vcs1", I915_EXEC_BSD, 2<<13 /*I915_EXEC_BSD_RING2*/ },
+	{ "blt", "bcs0", I915_EXEC_BLT, 0 },
+	{ "vebox", "vecs0", I915_EXEC_VEBOX, 0 },
 	{ NULL, 0, 0 }
 };
