@@ -843,8 +843,23 @@ init_sys_info(void)
 		} else if (IS_BROXTON(devid)) {
 			test_set_uuid = "5ee72f5c-092f-421e-8b70-225f7c3e9612";
 			timestamp_frequency = 19200000;
-		} else
+		} else if (IS_KABYLAKE(devid)) {
+			switch (intel_gt(devid)) {
+			case 1:
+				test_set_uuid = "baa3c7e4-52b6-4b85-801e-465a94b746dd";
+				break;
+			case 2:
+				test_set_uuid = "f1792f32-6db2-4b50-b4b2-557128f1688d";
+				break;
+			default:
+				igt_debug("unsupported Kabylake GT size\n");
+				return false;
+			}
+			timestamp_frequency = 12000000;
+		} else {
+			igt_debug("unsupported GT\n");
 			return false;
+		}
 
 		gp.param = I915_PARAM_EU_TOTAL;
 		gp.value = &n_eus;
