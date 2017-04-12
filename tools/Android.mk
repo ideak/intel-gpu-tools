@@ -59,6 +59,8 @@ bin_PROGRAMS := $(tools_prog_lists)
 
 skip_tools_list := \
     intel_framebuffer_dump \
+    intel_guc_logger \
+    intel_l3_parity \
     intel_reg_dumper \
     intel_vga_read \
     intel_vga_write
