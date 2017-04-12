@@ -229,6 +229,7 @@ TESTS_progs = \
 	prime_udl \
 	prime_vgem \
 	sw_sync \
+	syncobj_basic \
 	template \
 	tools_test \
 	vgem_basic \
