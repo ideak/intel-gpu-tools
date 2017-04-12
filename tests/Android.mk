@@ -59,6 +59,7 @@ else
     pm_lpsp \
 	drm_read \
 	gem_exec_blt \
+	perf \
 	prime_mmap_kms
 
 # All kms tests depend on cairo
