@@ -23,6 +23,7 @@ define add_tool
     LOCAL_CFLAGS += -Wno-error=return-type
     # Excessive complaining for established cases. Rely on the Linux version warnings.
     LOCAL_CFLAGS += -Wno-sign-compare
+    LOCAL_LDFLAGS += -lkmod
     ifeq ($($(1)_LDFLAGS),)
     else
         LOCAL_LDFLAGS += $($(1)_LDFLAGS)
@@ -38,6 +39,7 @@ define add_tool
     LOCAL_STATIC_LIBRARIES := libintel_gpu_tools
 
     LOCAL_SHARED_LIBRARIES := libpciaccess  \
+                              libkmod       \
                               libdrm        \
                               libdrm_intel
 

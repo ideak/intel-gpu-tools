@@ -18,6 +18,7 @@ define add_benchmark
     LOCAL_CFLAGS += -Wno-error=return-type
     # Excessive complaining for established cases. Rely on the Linux version warnings.
     LOCAL_CFLAGS += -Wno-sign-compare
+    LOCAL_LDFLAGS += -lkmod
 
     LOCAL_MODULE := $1_benchmark
     LOCAL_MODULE_TAGS := optional
@@ -26,6 +27,7 @@ define add_benchmark
     LOCAL_STATIC_LIBRARIES := libintel_gpu_tools
 
     LOCAL_SHARED_LIBRARIES := libpciaccess  \
+                              libkmod       \
                               libdrm        \
                               libdrm_intel
 

@@ -24,7 +24,11 @@
 #ifndef IGT_KMOD_H
 #define IGT_KMOD_H
 
+#ifdef ANDROID
+#include <libkmod/libkmod.h>
+#else
 #include <libkmod.h>
+#endif
 
 #include "igt_aux.h"
 

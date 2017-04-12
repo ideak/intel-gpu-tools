@@ -29,6 +29,7 @@ LOCAL_CFLAGS += -std=gnu99 -UNDEBUG
 LOCAL_MODULE:= libintel_gpu_tools
 
 LOCAL_SHARED_LIBRARIES := libpciaccess  \
+			  libkmod       \
 			  libdrm        \
 			  libdrm_intel
 

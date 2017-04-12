@@ -19,7 +19,7 @@ define add_test
 
     LOCAL_MODULE_TAGS := optional
     # ask linker to define a specific symbol; we use this to identify IGT tests
-    LOCAL_LDFLAGS := -Wl,--defsym=$2=0
+    LOCAL_LDFLAGS := -Wl,--defsym=$2=0 -lkmod
     LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/intel/validation/core/igt
 
     include $(BUILD_EXECUTABLE)
@@ -45,7 +45,7 @@ IGT_LOCAL_C_INCLUDES += ${ANDROID_BUILD_TOP}/external/PRIVATE/drm/include/drm
 
 # set local libraries
 IGT_LOCAL_STATIC_LIBRARIES := libintel_gpu_tools
-IGT_LOCAL_SHARED_LIBRARIES := libpciaccess libdrm libdrm_intel
+IGT_LOCAL_SHARED_LIBRARIES := libpciaccess libkmod libdrm libdrm_intel
 
 # handle cairo requirements if it is enabled
 ifeq ("${ANDROID_HAS_CAIRO}", "1")
