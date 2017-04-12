@@ -358,6 +358,63 @@ static void test_object_invalid_properties(igt_display_t *display,
 		test_invalid_properties(display->drm_fd, id, type, output->id, DRM_MODE_OBJECT_CONNECTOR, atomic);
 }
 
+static void get_prop_sanity(igt_display_t *display)
+{
+	int i, fd;
+	uint64_t *values;
+	struct drm_mode_property_enum *enums;
+
+	fd = display->drm_fd;
+
+	/*
+	 * There's no way to enumerate all properties, we just have to
+	 * brute-force the first few kms ids. 1000 should be enough.
+	 */
+	for (i = 0; i < 1000; i++) {
+		struct drm_mode_get_property prop;
+
+		memset(&prop, 0, sizeof(prop));
+		prop.prop_id = i;
+
+		if (drmIoctl(fd, DRM_IOCTL_MODE_GETPROPERTY, &prop))
+			continue;
+
+		if (prop.count_values) {
+			values = calloc(prop.count_values, sizeof(uint64_t));
+			igt_assert(values);
+			memset(values, 0x5c, sizeof(uint64_t)*prop.count_values);
+			prop.values_ptr = to_user_pointer(values);
+		}
+
+		/* despite what libdrm makes you believe, we never supply
+		 * additional information for BLOB properties, only for enums
+		 * and bitmasks */
+		igt_assert_eq(!!prop.count_enum_blobs,
+			      !!(prop.flags & (DRM_MODE_PROP_ENUM | DRM_MODE_PROP_BITMASK)));
+		if (prop.flags & (DRM_MODE_PROP_ENUM | DRM_MODE_PROP_BITMASK))
+			igt_assert(prop.count_enum_blobs == prop.count_values);
+
+		if (prop.count_enum_blobs) {
+			enums = calloc(prop.count_enum_blobs, sizeof(*enums));
+			memset(enums, 0x5c, sizeof(*enums)*prop.count_enum_blobs);
+			igt_assert(enums);
+			prop.enum_blob_ptr = to_user_pointer(enums);
+		}
+
+		do_ioctl(fd, DRM_IOCTL_MODE_GETPROPERTY, &prop);
+
+		for (int j = 0; j < prop.count_values; j++) {
+			igt_assert(values[j] != 0x5c5c5c5c5c5c5c5cULL);
+
+			if (!(prop.flags & (DRM_MODE_PROP_ENUM | DRM_MODE_PROP_BITMASK)))
+				continue;
+			igt_assert(enums[j].value != 0x5c5c5c5c5c5c5c5cULL);
+			igt_assert(enums[j].value == values[j]);
+			igt_assert(enums[j].name[0] != '\0');
+		}
+	}
+}
+
 static void invalid_properties(igt_display_t *display, bool atomic)
 {
 	igt_output_t *output;
@@ -413,6 +470,9 @@ igt_main
 
 	igt_subtest("invalid-properties-atomic")
 		invalid_properties(&display, true);
+
+	igt_subtest("get_properties-sanity")
+		get_prop_sanity(&display);
 
 	igt_fixture {
 		igt_display_fini(&display);
