@@ -22,6 +22,13 @@ if !HAVE_LIBDRM_INTEL
         stubs/drm/intel_bufmgr.h
 endif
 
+if HAVE_CHAMELIUM
+lib_source_list +=	 	\
+	igt_chamelium.h		\
+	igt_chamelium.c		\
+	$(NULL)
+endif
+
 AM_CPPFLAGS = -I$(top_srcdir)
 AM_CFLAGS = \
 	    $(CWARNFLAGS) \

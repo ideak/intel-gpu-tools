@@ -12,6 +12,12 @@ if HAVE_LIBDRM_VC4
     TESTS_progs_M += $(VC4_TESTS_M)
 endif
 
+if HAVE_CHAMELIUM
+TESTS_progs_M += \
+	chamelium \
+	$(NULL)
+endif
+
 if BUILD_TESTS
 test-list.txt: Makefile.sources
 	@echo TESTLIST > $@

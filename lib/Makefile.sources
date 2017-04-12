@@ -85,13 +85,6 @@ lib_source_list =	 	\
 	igt_kmod.h		\
 	$(NULL)
 
-if HAVE_CHAMELIUM
-lib_source_list +=	 	\
-	igt_chamelium.h		\
-	igt_chamelium.c		\
-	$(NULL)
-endif
-
 .PHONY: version.h.tmp
 
 # leaving a space here to work around automake's conditionals

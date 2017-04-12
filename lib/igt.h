@@ -38,7 +38,9 @@
 #include "igt_kms.h"
 #include "igt_pm.h"
 #include "igt_stats.h"
+#ifdef HAVE_CHAMELIUM
 #include "igt_chamelium.h"
+#endif
 #include "instdone.h"
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"

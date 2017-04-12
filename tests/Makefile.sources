@@ -154,12 +154,6 @@ TESTS_progs_M = \
 	meta_test \
 	$(NULL)
 
-if HAVE_CHAMELIUM
-TESTS_progs_M += \
-	chamelium \
-	$(NULL)
-endif
-
 TESTS_progs_XM = \
     gem_concurrent_all \
     $(NULL)
