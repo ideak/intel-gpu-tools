@@ -388,7 +388,7 @@ void igt_stop_shrink_helper(void)
 	igt_stop_helper(&shrink_helper);
 }
 
-#if HAVE_UDEV
+#ifdef HAVE_UDEV
 #include <libudev.h>
 
 static struct igt_helper_process hang_detector;

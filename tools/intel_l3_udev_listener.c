@@ -25,7 +25,7 @@
 #include "config.h"
 #endif
 
-#if HAVE_UDEV
+#ifdef HAVE_UDEV
 #include <libudev.h>
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE

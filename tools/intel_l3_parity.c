@@ -42,7 +42,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#if HAVE_UDEV
+#ifdef HAVE_UDEV
 #include <libudev.h>
 #include <syslog.h>
 #endif

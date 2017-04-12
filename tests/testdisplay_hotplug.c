@@ -34,7 +34,7 @@
 #endif
 
 
-#if HAVE_UDEV
+#ifdef HAVE_UDEV
 #include <libudev.h>
 static struct udev_monitor *uevent_monitor;
 static struct udev *udev;
