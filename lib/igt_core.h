@@ -919,4 +919,14 @@ FILE *__igt_fopen_data(const char* igt_srcdir, const char* igt_datadir,
 #define igt_fopen_data(filename) \
 	__igt_fopen_data(IGT_SRCDIR, IGT_DATADIR, filename)
 
+int igt_system(const char *command);
+int igt_system_quiet(const char *command);
+#define igt_system_cmd(status, format...) \
+	do { \
+		char *buf = 0; \
+		igt_assert(asprintf(&buf, format) != -1); \
+	        status = igt_system(buf); \
+		free(buf); \
+	} while (0)
+
 #endif /* IGT_CORE_H */

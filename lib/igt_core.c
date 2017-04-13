@@ -2099,3 +2099,160 @@ FILE *__igt_fopen_data(const char* igt_srcdir, const char* igt_datadir,
 
 	return fp;
 }
+
+struct output_pipe {
+	int output_fd;
+	int save_fd;
+	int read_fd;
+	int write_fd;
+	bool redirected;
+	enum igt_log_level log_level;
+};
+
+static bool redirect_output(struct output_pipe *p, int output_fd,
+			    enum igt_log_level level)
+{
+	int fds[2];
+
+	if (pipe(fds) == -1)
+		goto err;
+
+	/* save output */
+	if ((p->save_fd = dup(output_fd)) == -1)
+		goto err;
+
+	/* Redirect output to our buffer */
+	if (dup2(fds[1], output_fd) == -1)
+		goto err;
+
+	p->output_fd = output_fd;
+	p->read_fd = fds[0];
+	p->write_fd = fds[1];
+	p->redirected = true;
+	p->log_level = level;
+
+	return true;
+err:
+	close(fds[0]);
+	close(fds[1]);
+	close(p->save_fd);
+
+	return false;
+}
+
+static void unredirect_output(struct output_pipe *p)
+{
+	if (!p->redirected)
+		return;
+
+	/* read_fd is closed separately. We still need to read its
+	 * buffered contents after un-redirecting the stream.
+	 */
+	close(p->write_fd);
+	dup2(p->save_fd, p->output_fd);
+	close(p->save_fd);
+	p->redirected = false;
+}
+
+/**
+ * igt_system:
+ *
+ * An improved replacement of the system() call.
+ *
+ * Executes the shell command specified in @command with the added feature of
+ * concurrently capturing its stdout and stderr to igt_log and igt_warn
+ * respectively.
+ *
+ * Returns: The exit status of the executed process. -1 for failure.
+ */
+int igt_system(const char *command)
+{
+#define OUT 0
+#define ERR 1
+	struct output_pipe op[2];
+	int i, status;
+	struct igt_helper_process process = {};
+	char buf[PIPE_BUF];
+
+	if (!redirect_output(&op[OUT], STDOUT_FILENO, IGT_LOG_INFO))
+		goto err;
+	if (!redirect_output(&op[ERR], STDERR_FILENO, IGT_LOG_WARN))
+		goto err;
+
+	igt_fork_helper(&process) {
+		igt_assert(execl("/bin/sh", "sh", "-c", command,
+				 (char *) NULL) != -1);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(op); i++) {
+		struct output_pipe *current = &op[i];
+
+		/* Unredirect so igt_log() works */
+		unredirect_output(current);
+		memset(buf, 0, sizeof(buf));
+		while (read(current->read_fd, buf, sizeof(buf)) > 0) {
+			igt_log(IGT_LOG_DOMAIN, current->log_level,
+				"[cmd] %s", buf);
+			memset(buf, 0, sizeof(buf));
+		}
+		close(current->read_fd);
+	}
+	status = igt_wait_helper(&process);
+
+	return WEXITSTATUS(status);
+err:
+	/* Failed to redirect one or both streams. Roll back changes. */
+	for (i = 0; i < ARRAY_SIZE(op); i++) {
+		if (!op[i].redirected)
+			continue;
+		close(op[i].read_fd);
+		unredirect_output(&op[i]);
+	}
+
+	return -1;
+}
+
+/**
+ * igt_system_quiet:
+ * Similar to igt_system(), except redirect output to /dev/null
+ *
+ * Returns: The exit status of the executed process. -1 for failure.
+ */
+int igt_system_quiet(const char *command)
+{
+	int stderr_fd_copy, stdout_fd_copy, status, nullfd;
+
+	/* redirect */
+	if ((nullfd = open("/dev/null", O_WRONLY)) == -1)
+		goto err;
+	if ((stdout_fd_copy = dup(STDOUT_FILENO)) == -1)
+		goto err;
+	if ((stderr_fd_copy = dup(STDERR_FILENO)) == -1)
+		goto err;
+
+	if (dup2(nullfd, STDOUT_FILENO) == -1)
+		goto err;
+	if (dup2(nullfd, STDERR_FILENO) == -1)
+		goto err;
+
+	if ((status = system(command)) == -1)
+		goto err;
+
+	/* restore */
+	if (dup2(stdout_fd_copy, STDOUT_FILENO) == -1)
+		goto err;
+	if (dup2(stderr_fd_copy, STDERR_FILENO) == -1)
+		goto err;
+
+	close(stdout_fd_copy);
+	close(stderr_fd_copy);
+	close(nullfd);
+
+	return WEXITSTATUS(status);
+err:
+	close(stderr_fd_copy);
+	close(stdout_fd_copy);
+	close(nullfd);
+
+	return -1;
+}
