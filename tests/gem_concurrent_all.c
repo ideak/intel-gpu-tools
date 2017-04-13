@@ -917,8 +917,8 @@ static void wc_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src)
 	const int size = b->page_size;
 	void *d, *s;
 
-	gem_set_domain(fd, src->handle, I915_GEM_DOMAIN_GTT, 0);
-	gem_set_domain(fd, dst->handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	gem_set_domain(fd, src->handle, I915_GEM_DOMAIN_WC, 0);
+	gem_set_domain(fd, dst->handle, I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
 	s = gem_mmap__wc(fd, src->handle, 0, size, PROT_READ);
 	d = gem_mmap__wc(fd, dst->handle, 0, size, PROT_WRITE);
