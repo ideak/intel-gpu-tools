@@ -434,7 +434,6 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 		} else {
 			trash = obj.handle;
 			obj.handle = gem_create(fd, OBJSZ);
-			obj.offset = -1;
 			gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 			reloc.target_handle = obj.handle;
 		}
@@ -451,12 +450,10 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 			else
 				igt_assert(0);
 			gem_set_domain(fd, obj.handle, before, before);
-			offset = -1;
-			memcpy(wc + reloc_offset, &offset, sizeof(offset));
+			memcpy(wc + reloc_offset, &reloc.presumed_offset, sizeof(reloc.presumed_offset));
 			munmap(wc, OBJSZ);
 		} else {
-			offset = -1;
-			gem_write(fd, obj.handle, reloc_offset, &offset, sizeof(offset));
+			gem_write(fd, obj.handle, reloc_offset, &reloc.presumed_offset, sizeof(reloc.presumed_offset));
 		}
 
 		if (flags & ACTIVE) {
