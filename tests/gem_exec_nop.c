@@ -112,6 +112,73 @@ static void single(int fd, uint32_t handle,
 		 ring_name, count, time*1e6 / count);
 }
 
+static double
+stable_nop_on_ring(int fd, uint32_t handle, unsigned int engine,
+		   int timeout, int reps)
+{
+	igt_stats_t s;
+	double n;
+
+	igt_assert(reps >= 5);
+
+	igt_stats_init_with_size(&s, reps);
+	s.is_float = true;
+
+	while (reps--) {
+		unsigned long count;
+		double time;
+
+		time = nop_on_ring(fd, handle, engine, timeout, &count);
+		igt_stats_push_float(&s, time / count);
+	}
+
+	n = igt_stats_get_median(&s);
+	igt_stats_fini(&s);
+
+	return n;
+}
+
+#define assert_within_epsilon(x, ref, tolerance) \
+        igt_assert_f((x) <= (1.0 + tolerance) * ref && \
+                     (x) >= (1.0 - tolerance) * ref, \
+                     "'%s' != '%s' (%f not within %f%% tolerance of %f)\n",\
+                     #x, #ref, x, tolerance * 100.0, ref)
+
+static void headless(int fd, uint32_t handle)
+{
+	unsigned int nr_connected = 0;
+	drmModeConnector *connector;
+	drmModeRes *res;
+	double n_display, n_headless;
+
+	res = drmModeGetResources(fd);
+	igt_assert(res);
+
+	/* require at least one connected connector for the test */
+	for (int i = 0; i < res->count_connectors; i++) {
+		connector = drmModeGetConnectorCurrent(fd, res->connectors[i]);
+		if (connector->connection == DRM_MODE_CONNECTED)
+			nr_connected++;
+		drmModeFreeConnector(connector);
+	}
+	igt_require(nr_connected > 0);
+
+	/* set graphics mode to prevent blanking */
+	kmstest_set_vt_graphics_mode();
+
+	/* benchmark nops */
+	n_display = stable_nop_on_ring(fd, handle, I915_EXEC_DEFAULT, 1, 5);
+
+	/* force all connectors off */
+	kmstest_unset_all_crtcs(fd, res);
+
+	/* benchmark nops again */
+	n_headless = stable_nop_on_ring(fd, handle, I915_EXEC_DEFAULT, 1, 5);
+
+	/* check that the two execution speeds are roughly the same */
+	assert_within_epsilon(n_headless, n_display, 0.1f);
+}
+
 static bool ignore_engine(int fd, unsigned engine)
 {
 	if (engine == 0)
@@ -493,6 +560,9 @@ igt_main
 
 	igt_subtest("context-sequential")
 		sequential(device, handle, FORKED | CONTEXT, 150);
+
+	igt_subtest("headless")
+		headless(device, handle);
 
 	igt_fixture {
 		igt_stop_hang_detector();
