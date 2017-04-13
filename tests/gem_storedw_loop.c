@@ -55,13 +55,13 @@ mmap_coherent(int fd, uint32_t handle, int size)
 	if (gem_has_llc(fd)) {
 		coherent_domain = I915_GEM_DOMAIN_CPU;
 		return gem_mmap__cpu(fd, handle, 0, size, PROT_WRITE);
-	}
-
-	coherent_domain = I915_GEM_DOMAIN_GTT;
-	if (gem_mmap__has_wc(fd))
+	} else if (gem_mmap__has_wc(fd)) {
+		coherent_domain = I915_GEM_DOMAIN_WC;
 		return gem_mmap__wc(fd, handle, 0, size, PROT_WRITE);
-	else
+	} else {
+		coherent_domain = I915_GEM_DOMAIN_GTT;
 		return gem_mmap__gtt(fd, handle, size, PROT_WRITE);
+	}
 }
 
 static void
