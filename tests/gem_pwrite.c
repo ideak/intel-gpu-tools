@@ -173,7 +173,7 @@ static void test_big_gtt(int fd, int scale, unsigned flags)
 			int suboffset = (offset >> 12) % (4096 / sizeof(offset) - 1) * sizeof(offset);
 
 			gem_write(fd, handle, offset + suboffset, &offset, sizeof(offset));
-			gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, 0);
+			gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, 0);
 			igt_assert_eq_u64(ptr[(offset + suboffset)/sizeof(offset)], offset);
 		}
 	}
@@ -183,7 +183,7 @@ static void test_big_gtt(int fd, int scale, unsigned flags)
 		for (offset = size >> 12; offset--; ) {
 			int suboffset = (4096 - (offset % (4096 - sizeof(offset)))) & -sizeof(offset);
 			gem_write(fd, handle, (offset<<12) + suboffset, &offset, sizeof(offset));
-			gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, 0);
+			gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, 0);
 			igt_assert_eq_u64(ptr[((offset<<12) + suboffset)/sizeof(offset)], offset);
 		}
 	}
@@ -196,7 +196,7 @@ static void test_big_gtt(int fd, int scale, unsigned flags)
 
 			tmp = (tmp << 12) + suboffset;
 			gem_write(fd, handle, tmp, &offset, sizeof(offset));
-			gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, 0);
+			gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, 0);
 			igt_assert_eq_u64(ptr[tmp/sizeof(offset)], offset);
 		}
 	}
