@@ -329,6 +329,30 @@ static void _igt_log_buffer_dump(void)
 	pthread_mutex_unlock(&log_buffer_mutex);
 }
 
+/**
+ * igt_log_buffer_inspect:
+ *
+ * Provides a way to replay the internal igt log buffer for inspection.
+ * @check: A user-specified handler that gets invoked for each line of
+ *         the log buffer. The handler should return true to stop
+ *         inspecting the rest of the buffer.
+ * @data: passed as a user argument to the inspection function.
+ */
+void igt_log_buffer_inspect(igt_buffer_log_handler_t check, void *data)
+{
+	uint8_t i;
+	pthread_mutex_lock(&log_buffer_mutex);
+
+	i = log_buffer.start;
+	do {
+		if (check(log_buffer.entries[i], data))
+			break;
+		i++;
+	} while (i != log_buffer.start && i != log_buffer.end);
+
+	pthread_mutex_unlock(&log_buffer_mutex);
+}
+
 __attribute__((format(printf, 1, 2)))
 static void kmsg(const char *format, ...)
 #define KERN_EMER	"<0>"

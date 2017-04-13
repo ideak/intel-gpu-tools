@@ -818,6 +818,9 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
  */
 #define igt_critical(f...) igt_log(IGT_LOG_DOMAIN, IGT_LOG_CRITICAL, f)
 
+typedef bool (*igt_buffer_log_handler_t)(const char *line, void *data);
+void igt_log_buffer_inspect(igt_buffer_log_handler_t check, void *data);
+
 extern enum igt_log_level igt_log_level;
 
 /**
