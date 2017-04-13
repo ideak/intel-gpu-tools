@@ -54,7 +54,7 @@ static int OBJECT_SIZE = 16*1024*1024;
 
 static void set_domain(int fd, uint32_t handle)
 {
-	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 }
 
 static void *
@@ -230,7 +230,7 @@ test_coherency(int fd)
 
 	wc = gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
 	cpu = gem_mmap__cpu(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
-	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
 	for (i = 0; i < OBJECT_SIZE / 64; i++) {
 		int x = 16*i + (i%16);
