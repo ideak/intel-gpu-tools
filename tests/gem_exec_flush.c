@@ -134,8 +134,8 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 			igt_assert(flags & COHERENT);
 			map = gem_mmap__wc(fd, obj[0].handle, 0, 4096, PROT_WRITE);
 			gem_set_domain(fd, obj[0].handle,
-				       I915_GEM_DOMAIN_GTT,
-				       I915_GEM_DOMAIN_GTT);
+				       I915_GEM_DOMAIN_WC,
+				       I915_GEM_DOMAIN_WC);
 		} else {
 			snoop = flags & COHERENT;
 			gem_set_caching(fd, obj[0].handle, snoop);
@@ -149,8 +149,8 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 			map[i] = 0xabcdabcd;
 
 		gem_set_domain(fd, obj[0].handle,
-			       I915_GEM_DOMAIN_GTT,
-			       I915_GEM_DOMAIN_GTT);
+			       I915_GEM_DOMAIN_WC,
+			       I915_GEM_DOMAIN_WC);
 
 		/* Prepara a mappable binding to prevent pread mighrating */
 		if (!snoop) {
@@ -177,7 +177,7 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 		ptr = gem_mmap__wc(fd, obj[1].handle, 0, 64*1024,
 				   PROT_WRITE | PROT_READ);
 		gem_set_domain(fd, obj[1].handle,
-			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+			       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
 		memset(reloc0, 0, sizeof(reloc0));
 		for (i = 0; i < 1024; i++) {
@@ -211,7 +211,7 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 		ptr = gem_mmap__wc(fd, obj[2].handle, 0, 64*1024,
 				   PROT_WRITE | PROT_READ);
 		gem_set_domain(fd, obj[2].handle,
-			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+			       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
 		memset(reloc1, 0, sizeof(reloc1));
 		for (i = 0; i < 1024; i++) {
@@ -263,7 +263,7 @@ overwrite:
 			gem_execbuf(fd, &execbuf);
 
 			if (flags & SET_DOMAIN) {
-				unsigned domain = flags & WC ? I915_GEM_DOMAIN_GTT : I915_GEM_DOMAIN_CPU;
+				unsigned domain = flags & WC ? I915_GEM_DOMAIN_WC : I915_GEM_DOMAIN_CPU;
 				igt_while_interruptible(flags & INTERRUPTIBLE)
 					gem_set_domain(fd, obj[0].handle,
 						       domain, (flags & WRITE) ? domain : 0);
@@ -450,6 +450,10 @@ static void batch(int fd, unsigned ring, int nchild, int timeout,
 					break;
 
 				case BATCH_WC:
+					gem_set_domain(fd, obj[1].handle,
+						       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
+					break;
+
 				case BATCH_GTT:
 					gem_set_domain(fd, obj[1].handle,
 						       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
