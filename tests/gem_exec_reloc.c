@@ -145,7 +145,7 @@ static void from_mmap(int fd, uint64_t size, enum mode mode)
 		reloc_handle = gem_create(fd, size);
 		relocs = gem_mmap__wc(fd, reloc_handle, 0, size, PROT_WRITE);
 		gem_set_domain(fd, reloc_handle,
-			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+			       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 		gem_close(fd, reloc_handle);
 		break;
 	}
@@ -376,6 +376,8 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 			if (before == I915_GEM_DOMAIN_CPU)
 				wc = gem_mmap__cpu(fd, obj.handle, 0, OBJSZ, PROT_WRITE);
 			else if (before == I915_GEM_DOMAIN_GTT)
+				wc = gem_mmap__gtt(fd, obj.handle, OBJSZ, PROT_WRITE);
+			else if (before == I915_GEM_DOMAIN_WC)
 				wc = gem_mmap__wc(fd, obj.handle, 0, OBJSZ, PROT_WRITE);
 			else
 				igt_assert(0);
@@ -403,6 +405,8 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 			if (after == I915_GEM_DOMAIN_CPU)
 				wc = gem_mmap__cpu(fd, obj.handle, 0, OBJSZ, PROT_READ);
 			else if (after == I915_GEM_DOMAIN_GTT)
+				wc = gem_mmap__gtt(fd, obj.handle, OBJSZ, PROT_READ);
+			else if (after == I915_GEM_DOMAIN_WC)
 				wc = gem_mmap__wc(fd, obj.handle, 0, OBJSZ, PROT_READ);
 			else
 				igt_assert(0);
@@ -441,6 +445,8 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 			if (before == I915_GEM_DOMAIN_CPU)
 				wc = gem_mmap__cpu(fd, obj.handle, 0, OBJSZ, PROT_WRITE);
 			else if (before == I915_GEM_DOMAIN_GTT)
+				wc = gem_mmap__gtt(fd, obj.handle, OBJSZ, PROT_WRITE);
+			else if (before == I915_GEM_DOMAIN_WC)
 				wc = gem_mmap__wc(fd, obj.handle, 0, OBJSZ, PROT_WRITE);
 			else
 				igt_assert(0);
@@ -468,6 +474,8 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 			if (after == I915_GEM_DOMAIN_CPU)
 				wc = gem_mmap__cpu(fd, obj.handle, 0, OBJSZ, PROT_READ);
 			else if (after == I915_GEM_DOMAIN_GTT)
+				wc = gem_mmap__gtt(fd, obj.handle, OBJSZ, PROT_READ);
+			else if (after == I915_GEM_DOMAIN_WC)
 				wc = gem_mmap__wc(fd, obj.handle, 0, OBJSZ, PROT_READ);
 			else
 				igt_assert(0);
@@ -536,12 +544,19 @@ igt_main
 	} modes[] = {
 		{ "cpu", I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU },
 		{ "gtt", I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT },
+		{ "wc", I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC },
 		{ "cpu-gtt", I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_GTT },
 		{ "gtt-cpu", I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_CPU },
+		{ "cpu-wc", I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_WC },
+		{ "wc-cpu", I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_CPU },
+		{ "gtt-wc", I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_WC },
+		{ "wc-gtt", I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_GTT },
 		{ "cpu-read", I915_GEM_DOMAIN_CPU, 0 },
 		{ "gtt-read", I915_GEM_DOMAIN_GTT, 0 },
+		{ "wc-read", I915_GEM_DOMAIN_WC, 0 },
 		{ "write-cpu", 0, I915_GEM_DOMAIN_CPU },
 		{ "write-gtt", 0, I915_GEM_DOMAIN_GTT },
+		{ "write-wc", 0, I915_GEM_DOMAIN_WC },
 		{ "write-read", 0, 0 },
 		{ },
 	}, *m;
@@ -577,8 +592,11 @@ igt_main
 				igt_subtest_f("%s%s%s",
 					      f->basic ? "basic-" : "",
 					      m->name,
-					      f->name)
+					      f->name) {
+					if ((m->before | m->after) & I915_GEM_DOMAIN_WC)
+						igt_require(gem_mmap__has_wc(fd));
 					basic_reloc(fd, m->before, m->after, f->flags);
+				}
 			}
 
 			igt_fixture {
@@ -598,8 +616,10 @@ igt_main
 			from_mmap(fd, size, MEM | RO);
 		igt_subtest_f("cpu-%u", find_last_set(size) - 1)
 			from_mmap(fd, size, CPU);
-		igt_subtest_f("wc-%u", find_last_set(size) - 1)
+		igt_subtest_f("wc-%u", find_last_set(size) - 1) {
+			igt_require(gem_mmap__has_wc(fd));
 			from_mmap(fd, size, WC);
+		}
 		igt_subtest_f("gtt-%u", find_last_set(size) - 1)
 			from_mmap(fd, size, GTT);
 	}

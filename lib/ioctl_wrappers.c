@@ -702,17 +702,23 @@ bool gem_mmap__has_wc(int fd)
 
 	if (has_wc == -1) {
 		struct drm_i915_getparam gp;
-		int val = -1;
+		int mmap_version = -1;
+		int gtt_version = -1;
 
 		has_wc = 0;
 
 		memset(&gp, 0, sizeof(gp));
-		gp.param = 30; /* MMAP_VERSION */
-		gp.value = &val;
-
-		/* Do we have the new mmap_ioctl? */
+		gp.param = 40; /* MMAP_GTT_VERSION */
+		gp.value = &gtt_version;
 		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
-		if (val >= 1) {
+
+		memset(&gp, 0, sizeof(gp));
+		gp.param = 30; /* MMAP_VERSION */
+		gp.value = &mmap_version;
+		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+		/* Do we have the new mmap_ioctl with DOMAIN_WC? */
+		if (mmap_version >= 1 && gtt_version >= 2) {
 			struct local_i915_gem_mmap_v2 arg;
 
 			/* Does this device support wc-mmaps ? */
