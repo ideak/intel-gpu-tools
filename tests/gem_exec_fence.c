@@ -330,6 +330,10 @@ igt_main
 			}
 
 			igt_subtest_group {
+				igt_fixture {
+					igt_fork_hang_detector(i915);
+				}
+
 				igt_subtest_f("%sbusy-%s",
 						e->exec_id == 0 ? "basic-" : "",
 						e->name)
@@ -344,6 +348,10 @@ igt_main
 					test_fence_await(i915, e->exec_id | e->flags, 0);
 				igt_subtest_f("nb-await-%s", e->name)
 					test_fence_await(i915, e->exec_id | e->flags, NONBLOCK);
+
+				igt_fixture {
+					igt_stop_hang_detector();
+				}
 			}
 
 			igt_subtest_group {
