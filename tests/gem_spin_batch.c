@@ -32,7 +32,7 @@
 		     "'%s' != '%s' (%lld not within %d%% tolerance of %lld)\n",\
 		     #x, #ref, (long long)x, tolerance, (long long)ref)
 
-static void basic(int fd, unsigned int engine, unsigned int timeout_sec)
+static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 {
 	const uint64_t timeout_100ms = 100000000LL;
 	unsigned long loops = 0;
@@ -63,6 +63,28 @@ static void basic(int fd, unsigned int engine, unsigned int timeout_sec)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
+static void spin_exit_handler(int sig)
+{
+	igt_terminate_spin_batches();
+}
+
+static void spin_on_all_engines(int fd, unsigned int timeout_sec)
+{
+	unsigned engine;
+
+	for_each_engine(fd, engine) {
+		if (engine == 0)
+			continue;
+
+		igt_fork(child, 1) {
+			igt_install_exit_handler(spin_exit_handler);
+			spin(fd, engine, timeout_sec);
+		}
+	}
+
+	igt_waitchildren();
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -82,8 +104,11 @@ igt_main
 			continue;
 
 		igt_subtest_f("basic-%s", e->name)
-			basic(fd, e->exec_id, 3);
+			spin(fd, e->exec_id, 3);
 	}
+
+	igt_subtest("spin-each")
+		spin_on_all_engines(fd, 3);
 
 	igt_fixture {
 		igt_stop_hang_detector();
