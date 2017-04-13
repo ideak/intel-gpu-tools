@@ -82,7 +82,7 @@ mmap_coherent(int fd, uint32_t handle, int size)
 		domain = I915_GEM_DOMAIN_CPU;
 		ptr = gem_mmap__cpu(fd, handle, 0, size, PROT_WRITE);
 	} else {
-		domain = I915_GEM_DOMAIN_GTT;
+		domain = I915_GEM_DOMAIN_WC;
 		ptr = gem_mmap__wc(fd, handle, 0, size, PROT_WRITE);
 	}
 
