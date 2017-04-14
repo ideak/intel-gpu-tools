@@ -17,8 +17,8 @@ LOCAL_GENERATED_SOURCES :=       \
 	$(IGT_LIB_PATH)/version.h  \
 	$(GPU_TOOLS_PATH)/config.h
 
-LOCAL_C_INCLUDES +=              \
-	$(LOCAL_PATH)/..
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/.. \
+                    $(LOCAL_PATH)/stubs/drm/
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 

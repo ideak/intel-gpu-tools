@@ -40,8 +40,8 @@ IGT_LOCAL_CFLAGS += -Wno-error=return-type
 IGT_LOCAL_CFLAGS += -Wno-sign-compare
 
 # set local includes
-IGT_LOCAL_C_INCLUDES = $(LOCAL_PATH)/../lib
-IGT_LOCAL_C_INCLUDES += ${ANDROID_BUILD_TOP}/external/PRIVATE/drm/include/drm
+IGT_LOCAL_C_INCLUDES = $(LOCAL_PATH)/../lib \
+                       $(LOCAL_PATH)/../lib/stubs/drm/
 
 # set local libraries
 IGT_LOCAL_STATIC_LIBRARIES := libintel_gpu_tools

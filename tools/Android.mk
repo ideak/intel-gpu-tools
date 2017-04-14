@@ -30,7 +30,7 @@ define add_tool
     endif
 
     LOCAL_C_INCLUDES = $(LOCAL_PATH)/../lib
-    LOCAL_C_INCLUDES += ${ANDROID_BUILD_TOP}/external/PRIVATE/drm/include/drm
+    LOCAL_C_INCLUDES += $(LOCAL_PATH)/../lib/stubs/drm/
     LOCAL_C_INCLUDES += ${ANDROID_BUILD_TOP}/external/zlib
 
     LOCAL_MODULE := $1_tool

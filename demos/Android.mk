@@ -16,7 +16,8 @@ LOCAL_CFLAGS += -std=gnu99
 # Excessive complaining for established cases. Rely on the Linux version warnings.
 LOCAL_CFLAGS += -Wno-sign-compare
 
-LOCAL_C_INCLUDES = $(LOCAL_PATH)/../lib
+LOCAL_C_INCLUDES = $(LOCAL_PATH)/../lib \
+                   $(LOCAL_PATH)/../lib/stubs/drm/
 
 LOCAL_MODULE := intel_sprite_on
 
