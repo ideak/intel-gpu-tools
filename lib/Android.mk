@@ -45,7 +45,7 @@ skip_lib_list := \
     -DANDROID_HAS_CAIRO=0
 endif
 
-LOCAL_SRC_FILES := $(filter-out $(skip_lib_list),$(lib_source_list))
+LOCAL_SRC_FILES := $(filter-out %.h $(skip_lib_list),$(lib_source_list))
 
 include $(BUILD_STATIC_LIBRARY)
 

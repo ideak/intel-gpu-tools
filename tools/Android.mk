@@ -12,7 +12,7 @@ define add_tool
     ifeq ($($(1)_SOURCES),)
         LOCAL_SRC_FILES := $1.c
     else
-        LOCAL_SRC_FILES := $($(1)_SOURCES)
+        LOCAL_SRC_FILES := $(filter-out %.h,$($(1)_SOURCES))
     endif
 
     LOCAL_CFLAGS += -DHAVE_TERMIOS_H
