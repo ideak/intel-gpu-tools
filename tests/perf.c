@@ -450,6 +450,29 @@ gen8_read_report_reason(const uint32_t *report)
 		return "unknown";
 }
 
+static bool
+oa_report_is_periodic(uint32_t oa_exponent, const uint32_t *report)
+{
+	if (IS_HASWELL(devid)) {
+		/* For Haswell we don't have a documented report reason field
+		 * (though empirically report[0] bit 10 does seem to correlate
+		 * with a timer trigger reason) so we instead infer which
+		 * reports are timer triggered by checking if the least
+		 * significant bits are zero and the exponent bit is set.
+		 */
+		uint32_t oa_exponent_mask = (1 << (oa_exponent + 1)) - 1;
+
+		if ((report[1] & oa_exponent_mask) != (1 << oa_exponent))
+			return true;
+	} else {
+		if ((report[0] >> OAREPORT_REASON_SHIFT) &
+		    OAREPORT_REASON_TIMER)
+			return true;
+	}
+
+	return false;
+}
+
 static uint64_t
 timebase_scale(uint32_t u32_delta)
 {
@@ -1115,22 +1138,8 @@ read_2_oa_reports(int stream_fd,
 			igt_assert_neq(report[1], 0);
 
 			if (timer_only) {
-				/* For Haswell we don't have a documented
-				 * report reason field (though empirically
-				 * report[0] bit 10 does seem to correlate with
-				 * a timer trigger reason) so we instead infer
-				 * which reports are timer triggered by
-				 * checking if the least significant bits are
-				 * zero and the exponent bit is set.
-				 */
-				if ((report[1] & exponent_mask) != (1 << exponent)) {
-					igt_debug("skipping non timer report reason=%x\n",
-						  report[0]);
-
-					/* Also assert our hypothesis about the
-					 * reason bit...
-					 */
-					igt_assert_eq(report[0] & (1 << 10), 0);
+				if (!oa_report_is_periodic(exponent, report)) {
+					igt_debug("skipping non timer report\n");
 					continue;
 				}
 			}
@@ -1740,11 +1749,8 @@ test_blocking(void)
 				if (header->type == DRM_I915_PERF_RECORD_SAMPLE) {
 					uint32_t *report = (void *)(header + 1);
 
-					uint32_t reason = ((report[0] >>
-							    OAREPORT_REASON_SHIFT) &
-							   OAREPORT_REASON_MASK);
-
-					if (reason & OAREPORT_REASON_TIMER)
+					if (oa_report_is_periodic(oa_exponent,
+								  report))
 						timer_report_read = true;
 					else
 						non_timer_report_read = true;
@@ -1914,11 +1920,8 @@ test_polling(void)
 				if (header->type == DRM_I915_PERF_RECORD_SAMPLE) {
 					uint32_t *report = (void *)(header + 1);
 
-					uint32_t reason = ((report[0] >>
-							    OAREPORT_REASON_SHIFT) &
-							   OAREPORT_REASON_MASK);
-
-					if (reason & OAREPORT_REASON_TIMER)
+					if (oa_report_is_periodic(oa_exponent,
+								  report))
 						timer_report_read = true;
 					else
 						non_timer_report_read = true;
