@@ -32,8 +32,8 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libdrm/drm.h>
-#include <libdrm/i915_drm.h>
+#include <drm.h>
+#include <i915_drm.h>
 #include <xf86drm.h>
 #include <intel_bufmgr.h>
 #include <errno.h>
