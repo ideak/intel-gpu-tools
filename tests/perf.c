@@ -1215,6 +1215,9 @@ print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 		const char *reason0 = gen8_read_report_reason(oa_report0);
 		const char *reason1 = gen8_read_report_reason(oa_report1);
 
+		igt_debug("CTX ID: 1st = %"PRIu32", 2nd = %"PRIu32"\n",
+			  oa_report0[2], oa_report1[2]);
+
 		gen8_read_report_clock_ratios(oa_report0,
 					      &slice_freq0, &unslice_freq0);
 		gen8_read_report_clock_ratios(oa_report1,
