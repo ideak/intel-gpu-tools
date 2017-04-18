@@ -29,9 +29,8 @@ define add_tool
         LOCAL_LDFLAGS += $($(1)_LDFLAGS)
     endif
 
-    LOCAL_C_INCLUDES = $(LOCAL_PATH)/../lib
-    LOCAL_C_INCLUDES += $(LOCAL_PATH)/../lib/stubs/drm/
-    LOCAL_C_INCLUDES += ${ANDROID_BUILD_TOP}/external/zlib
+    LOCAL_C_INCLUDES = $(LOCAL_PATH)/../lib \
+                       $(LOCAL_PATH)/../lib/stubs/drm/
 
     LOCAL_MODULE := $1_tool
     LOCAL_MODULE_TAGS := optional
@@ -41,7 +40,8 @@ define add_tool
     LOCAL_SHARED_LIBRARIES := libpciaccess  \
                               libkmod       \
                               libdrm        \
-                              libdrm_intel
+                              libdrm_intel \
+                              libz
 
     # Tools dir on host
     LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/$(LOCAL_TOOLS_DIR)
