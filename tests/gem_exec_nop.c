@@ -139,6 +139,7 @@ stable_nop_on_ring(int fd, uint32_t handle, unsigned int engine,
 	return n;
 }
 
+#if !defined(ANDROID) || ANDROID_HAS_CAIRO
 #define assert_within_epsilon(x, ref, tolerance) \
         igt_assert_f((x) <= (1.0 + tolerance) * ref && \
                      (x) >= (1.0 - tolerance) * ref, \
@@ -183,6 +184,7 @@ static void headless(int fd, uint32_t handle)
 	/* check that the two execution speeds are roughly the same */
 	assert_within_epsilon(n_headless, n_display, 0.1f);
 }
+#endif
 
 static bool ignore_engine(int fd, unsigned engine)
 {
@@ -665,8 +667,10 @@ igt_main
 	igt_subtest("context-sequential")
 		sequential(device, handle, FORKED | CONTEXT, 150);
 
+#if !defined(ANDROID) || ANDROID_HAS_CAIRO
 	igt_subtest("headless")
 		headless(device, handle);
+#endif
 
 	igt_fixture {
 		igt_stop_hang_detector();
