@@ -168,12 +168,16 @@ static void headless(int fd, uint32_t handle)
 
 	/* benchmark nops */
 	n_display = stable_nop_on_ring(fd, handle, I915_EXEC_DEFAULT, 1, 5);
+	igt_info("With one display connected: %.2fus\n",
+		 n_display * 1e6);
 
 	/* force all connectors off */
 	kmstest_unset_all_crtcs(fd, res);
 
 	/* benchmark nops again */
 	n_headless = stable_nop_on_ring(fd, handle, I915_EXEC_DEFAULT, 1, 5);
+	igt_info("Without a display connected (headless): %.2fus\n",
+		 n_headless * 1e6);
 
 	/* check that the two execution speeds are roughly the same */
 	assert_within_epsilon(n_headless, n_display, 0.1f);
