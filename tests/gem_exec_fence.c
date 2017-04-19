@@ -22,10 +22,12 @@
  */
 
 #include "igt.h"
+#include "igt_vgem.h"
 #include "sw_sync.h"
 
 #include <sys/ioctl.h>
 #include <sys/poll.h>
+#include <sys/signal.h>
 
 IGT_TEST_DESCRIPTION("Check that execbuf waits for explicit fences");
 
@@ -33,6 +35,18 @@ IGT_TEST_DESCRIPTION("Check that execbuf waits for explicit fences");
 #define LOCAL_EXEC_FENCE_IN (1 << 16)
 #define LOCAL_EXEC_FENCE_OUT (1 << 17)
 #define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
+
+#ifndef SYNC_IOC_MERGE
+struct sync_merge_data {
+	char    name[32];
+	int32_t fd2;
+	int32_t fence;
+	uint32_t        flags;
+	uint32_t        pad;
+};
+#define SYNC_IOC_MAGIC '>'
+#define SYNC_IOC_MERGE _IOWR(SYNC_IOC_MAGIC, 3, struct sync_merge_data)
+#endif
 
 static bool can_mi_store_dword(int gen, unsigned engine)
 {
@@ -304,6 +318,188 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 	gem_close(fd, scratch);
 }
 
+struct cork {
+	int device;
+	uint32_t handle;
+	uint32_t fence;
+};
+
+static void plug(int fd, struct cork *c)
+{
+	struct vgem_bo bo;
+	int dmabuf;
+
+	c->device = drm_open_driver(DRIVER_VGEM);
+
+	bo.width = bo.height = 1;
+	bo.bpp = 4;
+	vgem_create(c->device, &bo);
+	c->fence = vgem_fence_attach(c->device, &bo, VGEM_FENCE_WRITE);
+
+	dmabuf = prime_handle_to_fd(c->device, bo.handle);
+	c->handle = prime_fd_to_handle(fd, dmabuf);
+	close(dmabuf);
+}
+
+static void unplug(struct cork *c)
+{
+	vgem_fence_signal(c->device, c->fence);
+	close(c->device);
+}
+
+static void alarm_handler(int sig)
+{
+}
+
+static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	return ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf);
+}
+
+static unsigned int measure_ring_size(int fd)
+{
+	struct sigaction sa = { .sa_handler = alarm_handler };
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned int count, last;
+	struct itimerval itv;
+	struct cork c;
+
+	memset(obj, 0, sizeof(obj));
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	plug(fd, &c);
+	obj[0].handle = c.handle;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+
+	sigaction(SIGALRM, &sa, NULL);
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 100;
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 1000;
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	last = count = 0;
+	do {
+		if (__execbuf(fd, &execbuf) == 0) {
+			count++;
+			continue;
+		}
+
+		if (last == count)
+			break;
+
+		last = count;
+	} while (1);
+
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	unplug(&c);
+	gem_close(fd, obj[1].handle);
+
+	return count;
+}
+
+#define EXPIRED 0x1
+static void test_long_history(int fd, long ring_size, unsigned flags)
+{
+	const uint32_t sz = 1 << 20;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	unsigned int engines[16], engine;
+	unsigned int nengine, n, s;
+	int all_fences;
+	struct cork c;
+
+	nengine = 0;
+	for_each_engine(fd, engine) {
+		if (engine == 0)
+			continue;
+
+		if (engine == I915_EXEC_BSD)
+			continue;
+
+		engines[nengine++] = engine;
+	}
+	igt_require(nengine);
+
+	gem_quiescent_gpu(fd);
+
+	memset(obj, 0, sizeof(obj));
+	obj[1].handle = gem_create(fd, sz);
+	gem_write(fd, obj[1].handle, sz - sizeof(bbe), &bbe, sizeof(bbe));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
+	execbuf.buffer_count = 1;
+	execbuf.flags = LOCAL_EXEC_FENCE_OUT;
+
+	gem_execbuf_wr(fd, &execbuf);
+	all_fences = execbuf.rsvd2 >> 32;
+
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+
+	plug(fd, &c);
+	obj[0].handle = c.handle;
+
+	igt_until_timeout(5) {
+		execbuf.rsvd1 = gem_context_create(fd);
+
+		for (n = 0; n < nengine; n++) {
+			struct sync_merge_data merge;
+
+			execbuf.flags = engines[n] | LOCAL_EXEC_FENCE_OUT;
+			if (__gem_execbuf_wr(fd, &execbuf))
+				continue;
+
+			memset(&merge, 0, sizeof(merge));
+			merge.fd2 = execbuf.rsvd2 >> 32;
+			strcpy(merge.name, "igt");
+
+			do_ioctl(all_fences, SYNC_IOC_MERGE, &merge);
+
+			close(all_fences);
+			close(merge.fd2);
+
+			all_fences = merge.fence;
+		}
+
+		gem_context_destroy(fd, execbuf.rsvd1);
+	}
+	unplug(&c);
+
+	igt_info("History depth = %d\n", sync_fence_count(all_fences));
+
+	if (flags & EXPIRED)
+		gem_sync(fd, obj[1].handle);
+
+	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
+	execbuf.buffer_count = 1;
+	execbuf.rsvd2 = all_fences;
+	execbuf.rsvd1 = 0;
+
+	for (s = 0; s < ring_size; s++) {
+		for (n = 0; n < nengine; n++) {
+			execbuf.flags = engines[n] | LOCAL_EXEC_FENCE_IN;
+			if (__gem_execbuf_wr(fd, &execbuf))
+				continue;
+		}
+	}
+
+	close(all_fences);
+
+	gem_sync(fd, obj[1].handle);
+	gem_close(fd, obj[1].handle);
+}
+
 static void test_fence_flip(int i915)
 {
 	igt_skip_on_f(1, "no fence-in for atomic flips\n");
@@ -374,6 +570,24 @@ igt_main
 				}
 			}
 		}
+	}
+
+	igt_subtest("long-history") {
+		long ring_size = measure_ring_size(i915) - 1;
+
+		igt_info("Ring size: %ld batches\n", ring_size);
+		igt_require(ring_size);
+
+		test_long_history(i915, ring_size, 0);
+	}
+
+	igt_subtest("expired-history") {
+		long ring_size = measure_ring_size(i915) - 1;
+
+		igt_info("Ring size: %ld batches\n", ring_size);
+		igt_require(ring_size);
+
+		test_long_history(i915, ring_size, EXPIRED);
 	}
 
 	igt_subtest("flip") {
