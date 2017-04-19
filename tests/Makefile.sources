@@ -143,6 +143,7 @@ TESTS_progs_M = \
 	template \
 	vgem_basic \
 	vgem_slow \
+	meta_test \
 	$(NULL)
 
 if HAVE_CHAMELIUM
