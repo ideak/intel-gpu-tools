@@ -47,6 +47,9 @@
 
 #define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
 
+#define LOCAL_I915_EXEC_FENCE_IN              (1<<16)
+#define LOCAL_I915_EXEC_FENCE_OUT             (1<<17)
+
 #define CONTEXT		0x1
 #define REALTIME	0x2
 #define CMDPARSER	0x4
@@ -287,7 +290,7 @@ static void setup_latency(struct producer *p, int gen, unsigned flags)
 		eb->batch_len = sizeof(*map) * ((i + 1) & ~1);
 	eb->flags = I915_EXEC_BLT | LOCAL_EXEC_NO_RELOC;
 	if (flags & FENCE_OUT)
-		eb->flags |= I915_EXEC_FENCE_OUT;
+		eb->flags |= LOCAL_I915_EXEC_FENCE_OUT;
 	eb->rsvd1 = p->ctx;
 }
 
@@ -325,7 +328,7 @@ static void fence_wait(int fence)
 
 static void measure_latency(struct producer *p, struct igt_mean *mean)
 {
-	if (!(p->latency_dispatch.execbuf.flags & I915_EXEC_FENCE_OUT))
+	if (!(p->latency_dispatch.execbuf.flags & LOCAL_I915_EXEC_FENCE_OUT))
 		gem_sync(fd, p->latency_dispatch.exec[0].handle);
 	else
 		fence_wait(p->latency_dispatch.execbuf.rsvd2 >> 32);
@@ -361,7 +364,7 @@ static void *producer(void *arg)
 		/* Finally, execute a batch that just reads the current
 		 * TIMESTAMP so we can measure the latency.
 		 */
-		if (p->latency_dispatch.execbuf.flags & I915_EXEC_FENCE_OUT)
+		if (p->latency_dispatch.execbuf.flags & LOCAL_I915_EXEC_FENCE_OUT)
 			gem_execbuf_wr(fd, &p->latency_dispatch.execbuf);
 		else
 			gem_execbuf(fd, &p->latency_dispatch.execbuf);
@@ -387,7 +390,7 @@ static void *producer(void *arg)
 
 		p->complete++;
 
-		if (p->latency_dispatch.execbuf.flags & I915_EXEC_FENCE_OUT)
+		if (p->latency_dispatch.execbuf.flags & LOCAL_I915_EXEC_FENCE_OUT)
 			close(p->latency_dispatch.execbuf.rsvd2 >> 32);
 	}
 
