@@ -107,9 +107,18 @@ static void active(int fd, unsigned engine, int timeout, int ncpus)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
+	unsigned int nengine, engines[16];
 	unsigned *shared;
 
-	gem_require_ring(fd, engine);
+	if (engine == -1) {
+		igt_require(all_nengine);
+		nengine = all_nengine;
+		memcpy(engines, all_engines, sizeof(engines[0])*nengine);
+	} else {
+		gem_require_ring(fd, engine);
+		nengine = 1;
+		engines[0] = engine;
+	}
 
 	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(shared != MAP_FAILED);
@@ -121,7 +130,6 @@ static void active(int fd, unsigned engine, int timeout, int ncpus)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
-	execbuf.flags = engine;
 
 	if (ncpus < 0) {
 		igt_fork(child, ppgtt_nengine) {
@@ -154,7 +162,10 @@ static void active(int fd, unsigned engine, int timeout, int ncpus)
 		do {
 			do {
 				execbuf.rsvd1 = gem_context_create(fd);
-				gem_execbuf(fd, &execbuf);
+				for (unsigned n = 0; n < nengine; n++) {
+					execbuf.flags = engines[n];
+					gem_execbuf(fd, &execbuf);
+				}
 				gem_context_destroy(fd, execbuf.rsvd1);
 			} while (++count & 1023);
 			clock_gettime(CLOCK_MONOTONIC, &end);
@@ -359,6 +370,11 @@ igt_main
 		files(fd, 150, 1);
 	igt_subtest("forked-files")
 		files(fd, 150, ncpus);
+
+	igt_subtest("active-all")
+		active(fd, -1, 120, 1);
+	igt_subtest("forked-active-all")
+		active(fd, -1, 120, ncpus);
 
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {
