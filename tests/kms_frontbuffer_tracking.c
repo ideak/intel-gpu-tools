@@ -3629,8 +3629,10 @@ int main(int argc, char *argv[])
 	t.feature = FEATURE_DEFAULT;
 	t.format = FORMAT_DEFAULT;
 	t.flip = FLIP_PAGEFLIP;
-	igt_subtest("basic")
+	igt_subtest("basic") {
+		igt_require_gem(drm.fd);
 		basic_subtest(&t);
+	}
 
 	igt_fixture
 		teardown_environment();
