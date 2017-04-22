@@ -122,6 +122,11 @@ static bool is_virtio_device(int fd)
 	return __is_device(fd, "virt");
 }
 
+static bool is_amd_device(int fd)
+{
+	return __is_device(fd, "amdg");
+}
+
 static bool has_known_intel_chipset(int fd)
 {
 	struct drm_i915_getparam gp;
@@ -269,6 +274,9 @@ int __drm_open_driver(int chipset)
 
 		if (chipset & DRIVER_VIRTIO &&
 		    is_virtio_device(fd))
+			return fd;
+
+		if (chipset & DRIVER_AMDGPU && is_amd_device(fd))
 			return fd;
 
 		/* Only VGEM-specific tests should be run on VGEM */

@@ -11,6 +11,10 @@ VC4_TESTS_M = \
 	vc4_wait_seqno \
 	$(NULL)
 
+AMDGPU_TESTS_M = \
+	amdgpu/amd_basic \
+	$(NULL)
+
 TESTS_progs_M = \
 	core_get_client_auth \
 	drm_mm \

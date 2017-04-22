@@ -42,6 +42,7 @@
 #define DRIVER_VC4	(1 << 1)
 #define DRIVER_VGEM	(1 << 2)
 #define DRIVER_VIRTIO	(1 << 3)
+#define DRIVER_AMDGPU	(1 << 4)
 /*
  * Exclude DRVER_VGEM from DRIVER_ANY since if you run on a system
  * with vgem as well as a supported driver, you can end up with a

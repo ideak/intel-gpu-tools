@@ -203,6 +203,18 @@ AC_SUBST([DRM_LIBS])
 
 AM_CONDITIONAL(HAVE_LIBDRM_INTEL, [test "x$INTEL" = xyes])
 
+AC_ARG_ENABLE(amdgpu, AS_HELP_STRING([--disable-amdgpu],
+	      [Enable building of amdgpu tests (default: auto)]),
+	      [AMDGPU=$enableval], [AMDGPU=auto])
+if test "x$AMDGPU" = xauto; then
+	PKG_CHECK_EXISTS([libdrm_amdgpu], [AMDGPU=yes], [AMDGPU=no])
+fi
+if test "x$AMDGPU" = xyes; then
+	PKG_CHECK_MODULES(DRM_AMDGPU, [libdrm_amdgpu])
+	AC_DEFINE(HAVE_LIBDRM_AMDGPU, 1, [Have amdgpu support])
+fi
+AM_CONDITIONAL(HAVE_LIBDRM_AMDGPU, [test "x$AMDGPU" = xyes])
+
 # for dma-buf tests
 AC_ARG_ENABLE(nouveau, AS_HELP_STRING([--disable-nouveau],
 	      [Enable use of nouveau API for prime tests (default: auto)]),

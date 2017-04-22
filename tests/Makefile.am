@@ -1,5 +1,9 @@
 include Makefile.sources
 
+if HAVE_LIBDRM_AMDGPU
+    TESTS_progs_M += $(AMDGPU_TESTS_M)
+endif
+
 if HAVE_LIBDRM_NOUVEAU
     TESTS_progs_M += $(NOUVEAU_TESTS_M)
 endif
@@ -121,5 +125,8 @@ vc4_wait_seqno_LDADD = $(LDADD) $(DRM_VC4_LIBS)
 
 chamelium_CFLAGS = $(AM_CFLAGS) $(XMLRPC_CFLAGS) $(LIBUDEV_CFLAGS)
 chamelium_LDADD = $(LDADD) $(XMLRPC_LIBS) $(LIBUDEV_LIBS)
-endif
 
+amdgpu_amd_basic_CFLAGS = $(AM_CFLAGS) $(DRM_AMDGPU_CFLAGS)
+amdgpu_amd_basic_LDADD = $(LDADD) $(DRM_AMDGPU_LIBS)
+
+endif
