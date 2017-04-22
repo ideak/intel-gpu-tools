@@ -9,6 +9,7 @@ endif
 
 if HAVE_UDEV
 bin_PROGRAMS += intel_dp_compliance
+intel_dp_compliance_CFLAGS = $(AM_CFLAGS) $(GLIB_CLFAGS)
 intel_dp_compliance_LDADD = $(top_builddir)/lib/libintel_tools.la $(GLIB_LIBS)
 endif
 
