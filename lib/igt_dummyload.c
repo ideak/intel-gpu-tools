@@ -163,6 +163,8 @@ igt_spin_batch_new(int fd, int engine, unsigned int dep_handle)
 {
 	igt_spin_t *spin;
 
+	igt_require_gem(fd);
+
 	spin = calloc(1, sizeof(struct igt_spin));
 	igt_assert(spin);
 
