@@ -13,6 +13,7 @@ VC4_TESTS_M = \
 
 AMDGPU_TESTS_M = \
 	amdgpu/amd_basic \
+	amdgpu/amd_cs_nop \
 	$(NULL)
 
 TESTS_progs_M = \
