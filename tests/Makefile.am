@@ -130,5 +130,7 @@ amdgpu_amd_basic_CFLAGS = $(AM_CFLAGS) $(DRM_AMDGPU_CFLAGS)
 amdgpu_amd_basic_LDADD = $(LDADD) $(DRM_AMDGPU_LIBS)
 amdgpu_amd_cs_nop_CFLAGS = $(AM_CFLAGS) $(DRM_AMDGPU_CFLAGS)
 amdgpu_amd_cs_nop_LDADD = $(LDADD) $(DRM_AMDGPU_LIBS)
+amdgpu_amd_prime_CFLAGS = $(AM_CFLAGS) $(DRM_AMDGPU_CFLAGS)
+amdgpu_amd_prime_LDADD = $(LDADD) $(DRM_AMDGPU_LIBS)
 
 endif
