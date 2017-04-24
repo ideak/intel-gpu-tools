@@ -434,6 +434,70 @@ static void deep(int fd, unsigned ring)
 	munmap(ptr, 4096);
 
 	free(ctx);
+#undef XS
+}
+
+static void wide(int fd, unsigned ring)
+{
+#define XS 128
+#define NCTX 4096
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj;
+	struct drm_i915_gem_execbuffer2 execbuf;
+
+	struct cork cork;
+	uint32_t result;
+	uint32_t *busy;
+	uint32_t *ptr;
+	uint32_t *ctx;
+
+	ctx = malloc(sizeof(*ctx)*NCTX);
+	for (int n = 0; n < NCTX; n++)
+		ctx[n] = gem_context_create(fd);
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = gem_create(fd, 4096);
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+
+	result = gem_create(fd, 4*NCTX);
+
+	busy = make_busy(fd, result, ring);
+	plug(fd, &cork);
+
+	/* Lots of in-order requests, plugged and submitted simultaneously */
+	for (int n = 0; n < NCTX; n++) {
+		store_dword(fd, ctx[n], ring, result, 4*n, ctx[n], cork.handle, I915_GEM_DOMAIN_INSTRUCTION);
+
+		execbuf.rsvd1 = ctx[n];
+		execbuf.flags = ring;
+		for (int m = 0; m < XS; m++)
+			gem_execbuf(fd, &execbuf);
+	}
+
+	igt_assert(gem_bo_busy(fd, result));
+	unplug(&cork); /* only now submit our batches */
+	igt_debugfs_dump(fd, "i915_engine_info");
+	finish_busy(busy);
+
+	for (int n = 0; n < NCTX; n++)
+		gem_context_destroy(fd, ctx[n]);
+
+	ptr = gem_mmap__gtt(fd, result, 4*NCTX, PROT_READ);
+	gem_set_domain(fd, result, /* no write hazard lies! */
+			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	for (int n = 0; n < NCTX; n++)
+		igt_assert_eq_u32(ptr[n], ctx[n]);
+	munmap(ptr, 4096);
+
+	gem_close(fd, obj.handle);
+	gem_close(fd, result);
+	free(ctx);
+#undef CTX
+#undef XS
 }
 
 static bool has_scheduler(int fd)
@@ -508,6 +572,9 @@ igt_main
 
 				igt_subtest_f("deep-%s", e->name)
 					deep(fd, e->exec_id | e->flags);
+
+				igt_subtest_f("wide-%s", e->name)
+					wide(fd, e->exec_id | e->flags);
 			}
 		}
 	}
