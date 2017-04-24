@@ -114,6 +114,7 @@ static void amdgpu_cs_sync(amdgpu_context_handle context,
 }
 
 #define SYNC 0x1
+#define FORK 0x2
 static void nop_cs(amdgpu_device_handle device,
 		   amdgpu_context_handle context,
 		   const char *name,
@@ -122,13 +123,10 @@ static void nop_cs(amdgpu_device_handle device,
 		   unsigned int timeout,
 		   unsigned int flags)
 {
+	const int ncpus = flags & FORK ? sysconf(_SC_NPROCESSORS_ONLN) : 1;
 	amdgpu_bo_handle ib_result_handle;
 	void *ib_result_cpu;
 	uint64_t ib_result_mc_address;
-	struct amdgpu_cs_request ibs_request;
-	struct amdgpu_cs_ib_info ib_info;
-	struct timespec tv = {};
-	uint64_t submit_ns, sync_ns;
 	uint32_t *ptr;
 	int i, r;
 	amdgpu_bo_list_handle bo_list;
@@ -147,33 +145,41 @@ static void nop_cs(amdgpu_device_handle device,
 	r = amdgpu_bo_list_create(device, 1, &ib_result_handle, NULL, &bo_list);
 	igt_assert_eq(r, 0);
 
-	memset(&ib_info, 0, sizeof(struct amdgpu_cs_ib_info));
-	ib_info.ib_mc_address = ib_result_mc_address;
-	ib_info.size = 16;
+	igt_fork(child, ncpus) {
+		struct amdgpu_cs_request ibs_request;
+		struct amdgpu_cs_ib_info ib_info;
+		struct timespec tv = {};
+		uint64_t submit_ns, sync_ns;
 
-	memset(&ibs_request, 0, sizeof(struct amdgpu_cs_request));
-	ibs_request.ip_type = ip_type;
-	ibs_request.ring = ring;
-	ibs_request.number_of_ibs = 1;
-	ibs_request.ibs = &ib_info;
-	ibs_request.resources = bo_list;
+		memset(&ib_info, 0, sizeof(struct amdgpu_cs_ib_info));
+		ib_info.ib_mc_address = ib_result_mc_address;
+		ib_info.size = 16;
 
-	igt_nsec_elapsed(&tv);
-	igt_until_timeout(timeout) {
-		r = amdgpu_cs_submit(context, 0, &ibs_request, 1);
-		igt_assert_eq(r, 0);
-		if (flags & SYNC)
-			amdgpu_cs_sync(context, ip_type, ring,
-				       ibs_request.seq_no);
+		memset(&ibs_request, 0, sizeof(struct amdgpu_cs_request));
+		ibs_request.ip_type = ip_type;
+		ibs_request.ring = ring;
+		ibs_request.number_of_ibs = 1;
+		ibs_request.ibs = &ib_info;
+		ibs_request.resources = bo_list;
+
+		igt_nsec_elapsed(&tv);
+		igt_until_timeout(timeout) {
+			r = amdgpu_cs_submit(context, 0, &ibs_request, 1);
+			igt_assert_eq(r, 0);
+			if (flags & SYNC)
+				amdgpu_cs_sync(context, ip_type, ring,
+					       ibs_request.seq_no);
+		}
+		submit_ns = igt_nsec_elapsed(&tv);
+
+		amdgpu_cs_sync(context, ip_type, ring, ibs_request.seq_no);
+		sync_ns = igt_nsec_elapsed(&tv);
+
+		igt_info("%s.%d: submit %.2fus, sync %.2fus\n", name, child,
+			 1e-3 * submit_ns / ibs_request.seq_no,
+			 1e-3 * sync_ns / ibs_request.seq_no);
 	}
-	submit_ns = igt_nsec_elapsed(&tv);
-
-	amdgpu_cs_sync(context, ip_type, ring, ibs_request.seq_no);
-	sync_ns = igt_nsec_elapsed(&tv);
-
-	igt_info("%s: submit %.2fus, sync %.2fus\n", name,
-		 1e-3 * submit_ns / ibs_request.seq_no,
-		 1e-3 * sync_ns / ibs_request.seq_no);
+	igt_waitchildren();
 
 	r = amdgpu_bo_list_destroy(bo_list);
 	igt_assert_eq(r, 0);
@@ -192,6 +198,8 @@ igt_main
 	} phase[] = {
 		{ "nop", 0 },
 		{ "sync", SYNC },
+		{ "fork", FORK },
+		{ "sync-fork", SYNC | FORK },
 		{ },
 	}, *p;
 	const struct engine {
