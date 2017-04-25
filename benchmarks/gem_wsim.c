@@ -50,6 +50,8 @@
 #include "igt_aux.h"
 #include "igt_rand.h"
 
+#include "ewma.h"
+
 enum intel_engine_id {
 	RCS,
 	BCS,
@@ -103,6 +105,8 @@ struct w_step
 	unsigned int mapped_len;
 };
 
+DECLARE_EWMA(uint64_t, rt, 4, 2)
+
 struct workload
 {
 	unsigned int nr_steps;
@@ -127,6 +131,13 @@ struct workload
 
 	struct igt_list requests[NUM_ENGINES];
 	unsigned int nrequest[NUM_ENGINES];
+
+	union {
+		struct rtavg {
+			struct ewma_rt avg[NUM_ENGINES];
+			uint32_t last[NUM_ENGINES];
+		} rt;
+	};
 };
 
 static const unsigned int nop_calibration_us = 1000;
@@ -788,12 +799,31 @@ static const struct workload_balancer qd_balancer = {
 };
 
 static enum intel_engine_id
+__rt_select_engine(struct workload *wrk, unsigned long *qd, bool random)
+{
+	unsigned int n;
+
+	qd[VCS1] >>= 10;
+	qd[VCS2] >>= 10;
+
+	if (qd[VCS1] < qd[VCS2])
+		n = 0;
+	else if (qd[VCS2] < qd[VCS1])
+		n = 1;
+	else if (random)
+		n = hars_petruska_f54_1_random(&wrk->prng) & 1;
+	else
+		n = wrk->vcs_rr;
+	wrk->vcs_rr = n ^ 1;
+
+	return get_vcs_engine(n);
+}
+
+static enum intel_engine_id
 __rt_balance(const struct workload_balancer *balancer,
 	     struct workload *wrk, struct w_step *w, bool random)
 {
-	enum intel_engine_id engine;
-	long qd[NUM_ENGINES];
-	unsigned int n;
+	unsigned long qd[NUM_ENGINES];
 
 	igt_assert(w->engine == VCS);
 
@@ -827,22 +857,7 @@ __rt_balance(const struct workload_balancer *balancer,
 	       qd[VCS2]);
 #endif
 
-	qd[VCS1] >>= 10;
-	qd[VCS2] >>= 10;
-
-	if (qd[VCS1] < qd[VCS2])
-		n = 0;
-	else if (qd[VCS2] < qd[VCS1])
-		n = 1;
-	else if (random)
-		n = hars_petruska_f54_1_random(&wrk->prng) & 1;
-	else
-		n = wrk->vcs_rr;
-
-	engine = get_vcs_engine(n);
-	wrk->vcs_rr = n ^ 1;
-
-	return engine;
+	return __rt_select_engine(wrk, qd, random);
 }
 
 static enum intel_engine_id
@@ -868,6 +883,68 @@ rtr_balance(const struct workload_balancer *balancer,
 static const struct workload_balancer rtr_balancer = {
 	.get_qd = get_qd_depth,
 	.balance = rtr_balance,
+};
+
+static enum intel_engine_id
+rtavg_balance(const struct workload_balancer *balancer,
+	   struct workload *wrk, struct w_step *w)
+{
+	unsigned long qd[NUM_ENGINES];
+
+	igt_assert(w->engine == VCS);
+
+	/* Estimate the average "speed" of the most recent batches
+	 *    (finish time - submit time)
+	 * and use that as an approximate for the total remaining time for
+	 * all batches on that engine plus the time we expect to execute in.
+	 * We try to keep the total remaining balanced between the engines.
+	 */
+	if (wrk->status_page[VCS_SEQNO_IDX(VCS1)] != wrk->rt.last[VCS1]) {
+		igt_assert((long)(wrk->status_page[2] - wrk->status_page[1]) > 0);
+		ewma_rt_add(&wrk->rt.avg[VCS1],
+			    wrk->status_page[2] - wrk->status_page[1]);
+		wrk->rt.last[VCS1] = wrk->status_page[VCS_SEQNO_IDX(VCS1)];
+	}
+
+	qd[VCS1] = balancer->get_qd(balancer, wrk, VCS1);
+	wrk->qd_sum[VCS1] += qd[VCS1];
+	qd[VCS1] = (qd[VCS1] + 1) * ewma_rt_read(&wrk->rt.avg[VCS1]);
+
+#ifdef DEBUG
+	printf("qd[0] = %d (%d - %d) x %ld (%d) = %ld\n",
+	       wrk->seqno[VCS1] - wrk->status_page[0],
+	       wrk->seqno[VCS1], wrk->status_page[0],
+	       ewma_rt_read(&wrk->rt.avg[VCS1]),
+	       wrk->status_page[2] -  wrk->status_page[1],
+	       qd[VCS1]);
+#endif
+
+	if (wrk->status_page[VCS_SEQNO_IDX(VCS2)] != wrk->rt.last[VCS2]) {
+		igt_assert((long)(wrk->status_page[2+16] - wrk->status_page[1+16]) > 0);
+		ewma_rt_add(&wrk->rt.avg[VCS2],
+			    wrk->status_page[2+16] - wrk->status_page[1+16]);
+		wrk->rt.last[VCS2] = wrk->status_page[VCS_SEQNO_IDX(VCS2)];
+	}
+
+	qd[VCS2] = balancer->get_qd(balancer, wrk, VCS2);
+	wrk->qd_sum[VCS2] += qd[VCS2];
+	qd[VCS2] = (qd[VCS2] + 1) * ewma_rt_read(&wrk->rt.avg[VCS2]);
+
+#ifdef DEBUG
+	printf("qd[1] = %d (%d - %d) x %ld (%d) = %ld\n",
+	       wrk->seqno[VCS2] - wrk->status_page[16],
+	       wrk->seqno[VCS2], wrk->status_page[16],
+	       ewma_rt_read(&wrk->rt.avg[VCS2]),
+	       wrk->status_page[18] - wrk->status_page[17],
+	       qd[VCS2]);
+#endif
+
+	return __rt_select_engine(wrk, qd, false);
+}
+
+static const struct workload_balancer rtavg_balancer = {
+	.get_qd = get_qd_depth,
+	.balance = rtavg_balance,
 };
 
 static void
@@ -1277,7 +1354,7 @@ add_workload_arg(char **w_args, unsigned int nr_args, char *w_arg)
 
 static int parse_balancing_mode(char *str)
 {
-	const char *modes[] = { "rr", "qd", "rt", "rtr" };
+	const char *modes[] = { "rr", "qd", "rt", "rtr" , "rtavg" };
 	int mode = -1;
 	unsigned int i;
 
@@ -1394,25 +1471,41 @@ int main(int argc, char **argv)
 			}
 			switch (i) {
 			case 0:
+				if (!quiet)
+					printf("Using rr balancer\n");
 				balancer = &rr_balancer;
 				flags |= BALANCE;
 				break;
 			case 1:
+				if (!quiet)
+					printf("Using qd balancer\n");
 				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
 					   8);
 				balancer = &qd_balancer;
 				flags |= SEQNO | BALANCE;
 				break;
 			case 2:
+				if (!quiet)
+					printf("Using rt balancer\n");
 				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
 					   8);
 				balancer = &rt_balancer;
 				flags |= SEQNO | BALANCE | RT;
 				break;
 			case 3:
+				if (!quiet)
+					printf("Using rtr balancer\n");
 				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
 					   8);
 				balancer = &rtr_balancer;
+				flags |= SEQNO | BALANCE | RT;
+				break;
+			case 4:
+				if (!quiet)
+					printf("Using rtavg balancer\n");
+				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
+					   8);
+				balancer = &rtavg_balancer;
 				flags |= SEQNO | BALANCE | RT;
 				break;
 			default:
