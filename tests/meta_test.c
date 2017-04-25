@@ -97,9 +97,9 @@ static void test_result(bool result)
 static void test_dmesg(bool pass)
 {
 	if (pass)
-		kmsg(KERN_DEBUG "drm: IGT inserted string.");
+		kmsg(KERN_DEBUG "[drm: IGT inserted string.");
 	else
-		kmsg(KERN_WARNING "drm: IGT inserted string.");
+		kmsg(KERN_WARNING "[drm: IGT inserted string.");
 }
 
 static void test_user_crash(void)
