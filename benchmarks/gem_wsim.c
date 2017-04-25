@@ -809,7 +809,7 @@ update_bb_rt(struct w_step *w, enum intel_engine_id engine)
 
 	*w->rt0_value = *REG(RCS_TIMESTAMP);
 	*w->rt0_address = w->reloc[1].presumed_offset + w->reloc[1].delta;
-	*w->rt1_address = w->reloc[1].presumed_offset + w->reloc[1].delta;
+	*w->rt1_address = w->reloc[2].presumed_offset + w->reloc[2].delta;
 
 	/* If not using NO_RELOC, force the relocations */
 	if (!(w->eb.flags & I915_EXEC_NO_RELOC)) {
