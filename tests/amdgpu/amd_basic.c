@@ -552,9 +552,9 @@ static void amdgpu_semaphore_test(void)
 	amdgpu_bo_handle ib_result_handle[2];
 	void *ib_result_cpu[2];
 	uint64_t ib_result_mc_address[2];
-	struct amdgpu_cs_request ibs_request[2] = {0};
-	struct amdgpu_cs_ib_info ib_info[2] = {0};
-	struct amdgpu_cs_fence fence_status = {0};
+	struct amdgpu_cs_request ibs_request[2] = {};
+	struct amdgpu_cs_ib_info ib_info[2] = {};
+	struct amdgpu_cs_fence fence_status = {};
 	uint32_t *ptr;
 	uint32_t expired;
 	amdgpu_bo_list_handle bo_list[2];
@@ -1207,9 +1207,9 @@ static void amdgpu_command_submission_multi_fence_wait_all(bool wait_all)
 	amdgpu_bo_handle ib_result_handle, ib_result_ce_handle;
 	void *ib_result_cpu, *ib_result_ce_cpu;
 	uint64_t ib_result_mc_address, ib_result_ce_mc_address;
-	struct amdgpu_cs_request ibs_request[2] = {0};
+	struct amdgpu_cs_request ibs_request[2] = {};
 	struct amdgpu_cs_ib_info ib_info[2];
-	struct amdgpu_cs_fence fence_status[2] = {0};
+	struct amdgpu_cs_fence fence_status[2] = {};
 	uint32_t *ptr;
 	uint32_t expired;
 	amdgpu_bo_list_handle bo_list;
