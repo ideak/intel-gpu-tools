@@ -1516,6 +1516,7 @@ static bool fbc_supported_on_chipset(void)
 static void setup_fbc(void)
 {
 	drmModeConnectorPtr c = get_connector(prim_mode_params.connector_id);
+	int devid = intel_get_drm_devid(drm.fd);
 
 	if (!fbc_supported_on_chipset()) {
 		igt_info("Can't test FBC: not supported on this chipset\n");
@@ -1532,6 +1533,11 @@ static void setup_fbc(void)
 			 "pipe A\n");
 		return;
 	}
+
+	/* Early Generations are not able to report compression status. */
+	if (!AT_LEAST_GEN(devid, 7))
+		opt.fbc_check_compression = false;
+
 	fbc.can_test = true;
 
 	fbc_setup_last_action();
