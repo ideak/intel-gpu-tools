@@ -187,6 +187,7 @@ dbg_get_status(struct status *stat)
 static void
 dbg_init(void)
 {
+	igt_assert(gem.init);
 	dbg.status_fd = igt_debugfs_open(gem.drm_fd, "i915_sseu_status", O_RDONLY);
 	igt_skip_on_f(dbg.status_fd == -1,
 		      "debugfs entry 'i915_sseu_status' not found\n");
@@ -354,8 +355,8 @@ full_enable(void)
 static void
 exit_handler(int sig)
 {
-	gem_deinit();
 	dbg_deinit();
+	gem_deinit();
 }
 
 igt_main
@@ -363,8 +364,8 @@ igt_main
 	igt_fixture {
 		igt_install_exit_handler(exit_handler);
 
-		dbg_init();
 		gem_init();
+		dbg_init();
 	}
 
 	igt_subtest("full-enable")
