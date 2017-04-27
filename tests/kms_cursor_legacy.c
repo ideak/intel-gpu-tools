@@ -1512,10 +1512,13 @@ igt_main
 		igt_subtest_f("%sflip-before-cursor-%s", prefix, modes[i])
 			basic_flip_cursor(&display, i, FLIP_BEFORE_CURSOR, 0);
 
-		if (!cursor_slowpath(i))
-			igt_subtest_f("%sbusy-flip-before-cursor-%s", prefix, modes[i])
+		if (!cursor_slowpath(i)) {
+			igt_subtest_f("%sbusy-flip-before-cursor-%s", prefix, modes[i]) {
+				igt_require_gem(display.drm_fd);
 				basic_flip_cursor(&display, i, FLIP_BEFORE_CURSOR,
 						  BASIC_BUSY);
+			}
+		}
 
 		igt_subtest_f("%sflip-after-cursor-%s", prefix, modes[i])
 			basic_flip_cursor(&display, i, FLIP_AFTER_CURSOR, 0);
