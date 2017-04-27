@@ -132,6 +132,8 @@ igt_main
 		size_t line_size;
 		int i, fd;
 
+		igt_require_gem(device);
+
 		pci_dev = intel_get_pci_device();
 		igt_require(pci_dev);
 
