@@ -31,6 +31,7 @@
 #include "igt_core.h"
 #include "igt_fb.h"
 #include "ioctl_wrappers.h"
+#include "i830_reg.h"
 
 /**
  * SECTION:igt_draw
@@ -210,6 +211,35 @@ static void set_pixel(void *_ptr, int index, uint32_t color, int bpp)
 	} else {
 		igt_assert_f(false, "bpp: %d\n", bpp);
 	}
+}
+
+static void switch_blt_tiling(struct intel_batchbuffer *batch, uint32_t tiling,
+			      bool on)
+{
+	uint32_t bcs_swctrl;
+
+	/* Default is X-tile */
+	if (tiling != I915_TILING_Y)
+		return;
+
+	bcs_swctrl = (0x3 << 16) | (on ? 0x3 : 0x0);
+
+	/* To change the tile register, insert an MI_FLUSH_DW followed by an
+	 * MI_LOAD_REGISTER_IMM
+	 */
+	BEGIN_BATCH(4, 0);
+	OUT_BATCH(MI_FLUSH_DW | 2);
+	OUT_BATCH(0x0);
+	OUT_BATCH(0x0);
+	OUT_BATCH(0x0);
+	ADVANCE_BATCH();
+
+	BEGIN_BATCH(4, 0);
+	OUT_BATCH(MI_LOAD_REGISTER_IMM);
+	OUT_BATCH(0x22200); /* BCS_SWCTRL */
+	OUT_BATCH(bcs_swctrl);
+	OUT_BATCH(MI_NOOP);
+	ADVANCE_BATCH();
 }
 
 static void draw_rect_ptr_linear(void *ptr, uint32_t stride,
@@ -445,6 +475,8 @@ static void draw_rect_blt(int fd, struct cmd_data *cmd_data,
 	blt_cmd_tiling = (tiling) ? XY_COLOR_BLT_TILED : 0;
 	pitch = (tiling) ? buf->stride / 4 : buf->stride;
 
+	switch_blt_tiling(batch, tiling, true);
+
 	BEGIN_BATCH(6, 1);
 	OUT_BATCH(XY_COLOR_BLT_CMD_NOLEN | XY_COLOR_BLT_WRITE_ALPHA |
 		  XY_COLOR_BLT_WRITE_RGB | blt_cmd_tiling | blt_cmd_len);
@@ -454,6 +486,8 @@ static void draw_rect_blt(int fd, struct cmd_data *cmd_data,
 	OUT_RELOC_FENCED(dst, 0, I915_GEM_DOMAIN_RENDER, 0);
 	OUT_BATCH(color);
 	ADVANCE_BATCH();
+
+	switch_blt_tiling(batch, tiling, false);
 
 	intel_batchbuffer_flush(batch);
 	intel_batchbuffer_free(batch);
