@@ -252,6 +252,7 @@ struct {
 	int only_pipes;
 	int shared_fb_x_offset;
 	int shared_fb_y_offset;
+	uint64_t tiling;
 } opt = {
 	.check_status = true,
 	.check_crc = true,
@@ -264,6 +265,7 @@ struct {
 	.only_pipes = PIPE_COUNT,
 	.shared_fb_x_offset = 500,
 	.shared_fb_y_offset = 500,
+	.tiling = LOCAL_I915_FORMAT_MOD_X_TILED,
 };
 
 struct modeset_params {
@@ -578,7 +580,7 @@ static void create_fb(enum pixel_format pformat, int width, int height,
 	if (plane == PLANE_CUR)
 		tiling_for_size = LOCAL_DRM_FORMAT_MOD_NONE;
 	else
-		tiling_for_size = LOCAL_I915_FORMAT_MOD_X_TILED;
+		tiling_for_size = opt.tiling;
 
 	igt_calc_fb_size(drm.fd, width, height, bpp, tiling_for_size, &size,
 			 &stride);
@@ -710,8 +712,7 @@ static void create_shared_fb(enum pixel_format format)
 
 	big_h = prim_h + scnd_h + offs_h + opt.shared_fb_y_offset;
 
-	create_fb(format, big_w, big_h, LOCAL_I915_FORMAT_MOD_X_TILED,
-		  PLANE_PRI, &s->big);
+	create_fb(format, big_w, big_h, opt.tiling, PLANE_PRI, &s->big);
 }
 
 static void destroy_fbs(enum pixel_format format)
@@ -743,17 +744,17 @@ static void create_fbs(enum pixel_format format)
 	s->initialized = true;
 
 	create_fb(format, prim_mode_params.mode->hdisplay,
-		  prim_mode_params.mode->vdisplay,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, PLANE_PRI, &s->prim_pri);
+		  prim_mode_params.mode->vdisplay, opt.tiling, PLANE_PRI,
+		  &s->prim_pri);
 	create_fb(format, prim_mode_params.cursor.w,
 		  prim_mode_params.cursor.h, LOCAL_DRM_FORMAT_MOD_NONE,
 		  PLANE_CUR, &s->prim_cur);
 	create_fb(format, prim_mode_params.sprite.w,
-		  prim_mode_params.sprite.h, LOCAL_I915_FORMAT_MOD_X_TILED,
-		  PLANE_SPR, &s->prim_spr);
+		  prim_mode_params.sprite.h, opt.tiling, PLANE_SPR,
+		  &s->prim_spr);
 
-	create_fb(format, offscreen_fb.w, offscreen_fb.h,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, PLANE_PRI, &s->offscreen);
+	create_fb(format, offscreen_fb.w, offscreen_fb.h, opt.tiling, PLANE_PRI,
+		  &s->offscreen);
 
 	create_shared_fb(format);
 
@@ -761,12 +762,12 @@ static void create_fbs(enum pixel_format format)
 		return;
 
 	create_fb(format, scnd_mode_params.mode->hdisplay,
-		  scnd_mode_params.mode->vdisplay,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, PLANE_PRI, &s->scnd_pri);
+		  scnd_mode_params.mode->vdisplay, opt.tiling, PLANE_PRI,
+		  &s->scnd_pri);
 	create_fb(format, scnd_mode_params.cursor.w, scnd_mode_params.cursor.h,
 		  LOCAL_DRM_FORMAT_MOD_NONE, PLANE_CUR, &s->scnd_cur);
 	create_fb(format, scnd_mode_params.sprite.w, scnd_mode_params.sprite.h,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, PLANE_SPR, &s->scnd_spr);
+		  opt.tiling, PLANE_SPR, &s->scnd_spr);
 }
 
 static bool set_mode_for_params(struct modeset_params *params)
@@ -1251,8 +1252,8 @@ static void init_blue_crc(enum pixel_format format, bool mandatory_sink_crc)
 		return;
 
 	create_fb(format, prim_mode_params.mode->hdisplay,
-		  prim_mode_params.mode->vdisplay,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, PLANE_PRI, &blue);
+		  prim_mode_params.mode->vdisplay, opt.tiling, PLANE_PRI,
+		  &blue);
 
 	fill_fb(&blue, COLOR_PRIM_BG);
 
@@ -1286,8 +1287,8 @@ static void init_crcs(enum pixel_format format,
 
 	for (r = 0; r < pattern->n_rects; r++)
 		create_fb(format, prim_mode_params.mode->hdisplay,
-			  prim_mode_params.mode->vdisplay,
-			  LOCAL_I915_FORMAT_MOD_X_TILED, PLANE_PRI, &tmp_fbs[r]);
+			  prim_mode_params.mode->vdisplay, opt.tiling,
+			  PLANE_PRI, &tmp_fbs[r]);
 
 	for (r = 0; r < pattern->n_rects; r++)
 		fill_fb(&tmp_fbs[r], COLOR_PRIM_BG);
@@ -2393,7 +2394,7 @@ static void flip_subtest(const struct test_mode *t)
 	prepare_subtest(t, pattern);
 
 	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, t->plane, &fb2);
+		  opt.tiling, t->plane, &fb2);
 	fill_fb(&fb2, bg_color);
 	orig_fb = params->fb.fb;
 
@@ -2439,7 +2440,7 @@ static void fliptrack_subtest(const struct test_mode *t, enum flip_type type)
 	prepare_subtest(t, pattern);
 
 	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, t->plane, &fb2);
+		  opt.tiling, t->plane, &fb2);
 	fill_fb(&fb2, COLOR_PRIM_BG);
 	orig_fb = params->fb.fb;
 
@@ -2650,8 +2651,8 @@ static void fullscreen_plane_subtest(const struct test_mode *t)
 	prepare_subtest(t, pattern);
 
 	rect = pattern->get_rect(&params->fb, 0);
-	create_fb(t->format, rect.w, rect.h, LOCAL_I915_FORMAT_MOD_X_TILED,
-		  t->plane, &fullscreen_fb);
+	create_fb(t->format, rect.w, rect.h, opt.tiling, t->plane,
+		  &fullscreen_fb);
 	/* Call pick_color() again since PRI and SPR may not support the same
 	 * pixel formats. */
 	rect.color = pick_color(&fullscreen_fb, COLOR_GREEN);
@@ -2729,8 +2730,7 @@ static void scaledprimary_subtest(const struct test_mode *t)
 	old_fb = params->fb.fb;
 
 	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
-		  LOCAL_I915_FORMAT_MOD_X_TILED,
-		  t->plane, &new_fb);
+		  opt.tiling, t->plane, &new_fb);
 	fill_fb(&new_fb, COLOR_BLUE);
 
 	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, &new_fb, t->method,
@@ -2839,7 +2839,7 @@ static void modesetfrombusy_subtest(const struct test_mode *t)
 	prepare_subtest(t, NULL);
 
 	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, t->plane, &fb2);
+		  opt.tiling, t->plane, &fb2);
 	fill_fb(&fb2, COLOR_PRIM_BG);
 
 	start_busy_thread(params->fb.fb);
@@ -2943,8 +2943,8 @@ static void farfromfence_subtest(const struct test_mode *t)
 	prepare_subtest(t, pattern);
 	target = pick_target(t, params);
 
-	create_fb(t->format, params->mode->hdisplay, max_height,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, t->plane, &tall_fb);
+	create_fb(t->format, params->mode->hdisplay, max_height, opt.tiling,
+		  t->plane, &tall_fb);
 
 	fill_fb(&tall_fb, COLOR_PRIM_BG);
 
@@ -3019,7 +3019,7 @@ static void badstride_subtest(const struct test_mode *t)
 	old_fb = params->fb.fb;
 
 	create_fb(t->format, params->fb.fb->width + 4096, params->fb.fb->height,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, t->plane, &wide_fb);
+		  opt.tiling, t->plane, &wide_fb);
 	igt_assert(wide_fb.stride > 16384);
 
 	fill_fb(&wide_fb, COLOR_PRIM_BG);
@@ -3086,7 +3086,7 @@ static void stridechange_subtest(const struct test_mode *t)
 	old_fb = params->fb.fb;
 
 	create_fb(t->format, params->fb.fb->width + 512, params->fb.fb->height,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, t->plane, &new_fb);
+		  opt.tiling, t->plane, &new_fb);
 	fill_fb(&new_fb, COLOR_PRIM_BG);
 
 	igt_assert(old_fb->stride != new_fb.stride);
@@ -3205,7 +3205,7 @@ static void basic_subtest(const struct test_mode *t)
 	prepare_subtest(t, pattern);
 
 	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
-		  LOCAL_I915_FORMAT_MOD_X_TILED, t->plane, &fb2);
+		  opt.tiling, t->plane, &fb2);
 	fb1 = params->fb.fb;
 
 	for (r = 0, method = 0; method < IGT_DRAW_METHOD_COUNT; method++, r++) {
@@ -3274,6 +3274,14 @@ static int opt_handler(int option, int option_index, void *data)
 		igt_assert_eq(opt.only_pipes, PIPE_COUNT);
 		opt.only_pipes = PIPE_DUAL;
 		break;
+	case 'l':
+		if (!strcmp(optarg, "x"))
+			opt.tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
+		else if (!strcmp(optarg, "y"))
+			opt.tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
+		else
+			igt_assert_f(false, "Bad tiling value: %s\n", optarg);
+		break;
 	default:
 		igt_assert(false);
 	}
@@ -3293,7 +3301,9 @@ const char *help_str =
 "  --shared-fb-x offset        Use 'offset' as the X offset for the shared FB\n"
 "  --shared-fb-y offset        Use 'offset' as the Y offset for the shared FB\n"
 "  --1p-only                   Only run subtests that use 1 pipe\n"
-"  --2p-only                   Only run subtests that use 2 pipes\n";
+"  --2p-only                   Only run subtests that use 2 pipes\n"
+"  --tiling tiling             Use 'tiling' as the tiling mode, which can be\n"
+"                              either 'x' (default) or 'y'\n";
 
 static const char *pipes_str(int pipes)
 {
@@ -3432,6 +3442,7 @@ int main(int argc, char *argv[])
 		{ "shared-fb-y",              1, 0, 'y'},
 		{ "1p-only",                  0, 0, '1'},
 		{ "2p-only",                  0, 0, '2'},
+		{ "tiling",                   1, 0, 'l'},
 		{ 0, 0, 0, 0 }
 	};
 
