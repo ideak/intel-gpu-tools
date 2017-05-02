@@ -3460,6 +3460,17 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 	} while (WEXITSTATUS(child_ret) == EAGAIN);
 }
 
+static bool
+rc6_enabled(void)
+{
+	char *rc6_status = read_debugfs_record(drm_fd, "i915_drpc_info",
+					       "RC6 Enabled");
+	bool enabled = strcmp(rc6_status, "yes") == 0;
+
+	free(rc6_status);
+	return enabled;
+}
+
 static void
 test_rc6_disable(void)
 {
@@ -3478,6 +3489,8 @@ test_rc6_disable(void)
 		.properties_ptr = to_user_pointer(properties),
 	};
 	uint64_t n_events_start, n_events_end;
+
+	igt_skip_on(!rc6_enabled());
 
 	stream_fd = __perf_open(drm_fd, &param);
 
