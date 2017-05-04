@@ -1,3 +1,4 @@
+# Please keep sorted alphabetically
 gem_blt
 gem_busy
 gem_create
@@ -12,6 +13,7 @@ gem_prw
 gem_set_domain
 gem_syslatency
 gem_userptr_benchmark
+gem_wsim
 intel_upload_blit_large
 intel_upload_blit_large_gtt
 intel_upload_blit_large_map
@@ -19,4 +21,3 @@ intel_upload_blit_small
 kms_vblank
 prime_lookup
 vgem_mmap
-# Please keep sorted alphabetically
