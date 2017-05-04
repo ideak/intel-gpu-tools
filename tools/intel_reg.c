@@ -880,7 +880,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Just to make sure we open the right debugfs files */
-	config.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+	config.drm_fd = __drm_open_driver(DRIVER_INTEL);
 
 	if (read_reg_spec(&config) < 0) {
 		return EXIT_FAILURE;
@@ -900,7 +900,6 @@ int main(int argc, char *argv[])
 
 	ret = command->function(&config, argc, argv);
 
-	close(config.drm_fd);
 	free(config.mmiofile);
 
 	return ret;
