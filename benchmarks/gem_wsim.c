@@ -514,7 +514,7 @@ static void
 alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 {
 	enum intel_engine_id engine = w->engine;
-	unsigned int bb_i, j = 0;
+	unsigned int j = 0;
 
 	w->obj[j].handle = gem_create(fd, 4096);
 	w->obj[j].flags = EXEC_OBJECT_WRITE;
@@ -525,11 +525,6 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		j++;
 	}
 
-	bb_i = j++;
-	w->bb_sz = get_bb_sz(w->duration.max);
-	w->bb_handle = w->obj[bb_i].handle = gem_create(fd, w->bb_sz);
-	terminate_bb(w, flags);
-
 	igt_assert(w->dependency <= 0);
 	if (w->dependency) {
 		int dep_idx = w->idx + w->dependency;
@@ -537,24 +532,26 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		igt_assert(dep_idx >= 0 && dep_idx < wrk->nr_steps);
 		igt_assert(wrk->steps[dep_idx].type == BATCH);
 
-		w->obj[j].handle = w->obj[bb_i].handle;
-		bb_i = j;
-		w->obj[j - 1].handle = wrk->steps[dep_idx].obj[0].handle;
+		w->obj[j].handle = wrk->steps[dep_idx].obj[0].handle;
 		j++;
 	}
 
+	w->bb_sz = get_bb_sz(w->duration.max);
+	w->bb_handle = w->obj[j].handle = gem_create(fd, w->bb_sz);
+	terminate_bb(w, flags);
+
 	if (flags & SEQNO) {
-		w->obj[bb_i].relocs_ptr = to_user_pointer(&w->reloc);
+		w->obj[j].relocs_ptr = to_user_pointer(&w->reloc);
 		if (flags & RT)
-			w->obj[bb_i].relocation_count = 3;
+			w->obj[j].relocation_count = 3;
 		else
-			w->obj[bb_i].relocation_count = 1;
-		for (int i = 0; i < w->obj[bb_i].relocation_count; i++)
+			w->obj[j].relocation_count = 1;
+		for (int i = 0; i < w->obj[j].relocation_count; i++)
 			w->reloc[i].target_handle = 1;
 	}
 
 	w->eb.buffers_ptr = to_user_pointer(w->obj);
-	w->eb.buffer_count = j;
+	w->eb.buffer_count = j + 1;
 	w->eb.rsvd1 = wrk->ctx_id[w->context];
 
 	if (flags & SWAPVCS && engine == VCS1)
@@ -566,7 +563,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 	printf("%u: %u:%x|%x|%x|%x %10lu flags=%llx bb=%x[%u] ctx[%u]=%u\n",
 		w->idx, w->eb.buffer_count, w->obj[0].handle,
 		w->obj[1].handle, w->obj[2].handle, w->obj[3].handle,
-		w->bb_sz, w->eb.flags, w->bb_handle, bb_i,
+		w->bb_sz, w->eb.flags, w->bb_handle, j,
 		w->context, wrk->ctx_id[w->context]);
 #endif
 }
