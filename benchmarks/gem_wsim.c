@@ -121,25 +121,17 @@ struct workload
 	unsigned long nr_bb[NUM_ENGINES];
 };
 
-static const unsigned int eb_engine_map[NUM_ENGINES] = {
-	[RCS] = I915_EXEC_RENDER,
-	[BCS] = I915_EXEC_BLT,
-	[VCS] = I915_EXEC_BSD,
-	[VCS1] = I915_EXEC_BSD | I915_EXEC_BSD_RING1,
-	[VCS2] = I915_EXEC_BSD | I915_EXEC_BSD_RING2,
-	[VECS] = I915_EXEC_VEBOX
-};
-
 static const unsigned int nop_calibration_us = 1000;
 static unsigned long nop_calibration;
 
 static bool quiet;
 static int fd;
 
-#define SWAPVCS	(1<<0)
-#define SEQNO	(1<<1)
-#define BALANCE	(1<<2)
-#define RT	(1<<3)
+#define SWAPVCS		(1<<0)
+#define SEQNO		(1<<1)
+#define BALANCE		(1<<2)
+#define RT		(1<<3)
+#define VCS2REMAP	(1<<4)
 
 #define VCS_SEQNO_IDX(engine) (((engine) - VCS1) * 16)
 #define VCS_SEQNO_OFFSET(engine) (VCS_SEQNO_IDX(engine) * sizeof(uint32_t))
@@ -190,7 +182,7 @@ static int parse_dependencies(struct w_step *w, char *_desc)
 	return 0;
 }
 
-static struct workload *parse_workload(char *_desc)
+static struct workload *parse_workload(char *_desc, unsigned int flags)
 {
 	struct workload *wrk;
 	unsigned int nr_steps = 0;
@@ -198,6 +190,7 @@ static struct workload *parse_workload(char *_desc)
 	char *_token, *token, *tctx = NULL, *tstart = desc;
 	char *field, *fctx = NULL, *fstart;
 	struct w_step step, *steps = NULL;
+	bool bcs_used = false;
 	unsigned int valid;
 	int tmp;
 
@@ -317,6 +310,8 @@ static struct workload *parse_workload(char *_desc)
 			for (i = 0; i < ARRAY_SIZE(ring_str_map); i++) {
 				if (!strcasecmp(field, ring_str_map[i])) {
 					step.engine = i;
+					if (step.engine == BCS)
+						bcs_used = true;
 					valid++;
 					break;
 				}
@@ -421,6 +416,9 @@ add_step:
 	wrk->steps = steps;
 
 	free(desc);
+
+	if (bcs_used && !quiet)
+		printf("BCS usage in workload with VCS2 remapping enabled!\n");
 
 	return wrk;
 }
@@ -527,11 +525,24 @@ terminate_bb(struct w_step *w, unsigned int flags)
 	w->mapped_len = mmap_len;
 }
 
+static const unsigned int eb_engine_map[NUM_ENGINES] = {
+	[RCS] = I915_EXEC_RENDER,
+	[BCS] = I915_EXEC_BLT,
+	[VCS] = I915_EXEC_BSD,
+	[VCS1] = I915_EXEC_BSD | I915_EXEC_BSD_RING1,
+	[VCS2] = I915_EXEC_BSD | I915_EXEC_BSD_RING2,
+	[VECS] = I915_EXEC_VEBOX
+};
+
 static void
 eb_update_flags(struct w_step *w, enum intel_engine_id engine,
 		unsigned int flags)
 {
+	if (engine == VCS2 && (flags & VCS2REMAP))
+		engine = BCS;
+
 	w->eb.flags = eb_engine_map[engine];
+
 	w->eb.flags |= I915_EXEC_HANDLE_LUT;
 	w->eb.flags |= I915_EXEC_NO_RELOC;
 }
@@ -1089,6 +1100,7 @@ static void print_help(void)
 "	-c <n>		Fork N clients emitting the workload simultaneously.\n"
 "	-x		Swap VCS1 and VCS2 engines in every other client.\n"
 "	-b <n>		Load balancing to use. (0: rr, 1: qd, 2: rt)\n"
+"	-2		Remap VCS2 to BCS\n"
 	);
 }
 
@@ -1153,7 +1165,7 @@ int main(int argc, char **argv)
 	fd = drm_open_driver(DRIVER_INTEL);
 	intel_register_access_init(intel_get_pci_device(), false, fd);
 
-	while ((c = getopt(argc, argv, "qc:n:r:xw:W:t:b:h")) != -1) {
+	while ((c = getopt(argc, argv, "q2c:n:r:xw:W:t:b:h")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -1184,6 +1196,9 @@ int main(int argc, char **argv)
 			break;
 		case 'x':
 			flags |= SWAPVCS;
+			break;
+		case '2':
+			flags |= VCS2REMAP;
 			break;
 		case 'b':
 			switch (strtol(optarg, NULL, 0)) {
@@ -1257,7 +1272,7 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
-		wrk[i] = parse_workload(w_args[i]);
+		wrk[i] = parse_workload(w_args[i], flags);
 		if (!wrk[i]) {
 			if (!quiet)
 				fprintf(stderr,
