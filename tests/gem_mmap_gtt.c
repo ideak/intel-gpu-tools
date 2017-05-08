@@ -342,6 +342,25 @@ test_coherency(int fd)
 }
 
 static void
+test_clflush(int fd)
+{
+	uint32_t handle;
+	uint32_t *gtt;
+
+	igt_require(igt_setup_clflush());
+
+	handle = gem_create(fd, OBJECT_SIZE);
+
+	gtt = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	set_domain_gtt(fd, handle);
+
+	igt_clflush_range(gtt, OBJECT_SIZE);
+
+	munmap(gtt, OBJECT_SIZE);
+	gem_close(fd, handle);
+}
+
+static void
 test_hang(int fd)
 {
 	igt_hang_t hang;
@@ -792,6 +811,8 @@ igt_main
 		test_write_gtt(fd);
 	igt_subtest("coherency")
 		test_coherency(fd);
+	igt_subtest("clflush")
+		test_clflush(fd);
 	igt_subtest("hang")
 		test_hang(fd);
 	igt_subtest("basic-read-write")
