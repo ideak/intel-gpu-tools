@@ -766,8 +766,8 @@ static const struct workload_balancer qd_balancer = {
 };
 
 static enum intel_engine_id
-rt_balance(const struct workload_balancer *balancer,
-	   struct workload *wrk, struct w_step *w)
+__rt_balance(const struct workload_balancer *balancer,
+	     struct workload *wrk, struct w_step *w, bool random)
 {
 	enum intel_engine_id engine;
 	long qd[NUM_ENGINES];
@@ -809,6 +809,8 @@ rt_balance(const struct workload_balancer *balancer,
 		n = 0;
 	else if (qd[VCS2] < qd[VCS1])
 		n = 1;
+	else if (random)
+		n = hars_petruska_f54_1_random_unsafe() & 1;
 	else
 		n = wrk->vcs_rr;
 
@@ -818,9 +820,30 @@ rt_balance(const struct workload_balancer *balancer,
 	return engine;
 }
 
+static enum intel_engine_id
+rt_balance(const struct workload_balancer *balancer,
+	   struct workload *wrk, struct w_step *w)
+{
+
+	return __rt_balance(balancer, wrk, w, false);
+}
+
 static const struct workload_balancer rt_balancer = {
 	.get_qd = get_qd_depth,
 	.balance = rt_balance,
+};
+
+static enum intel_engine_id
+rtr_balance(const struct workload_balancer *balancer,
+	   struct workload *wrk, struct w_step *w)
+{
+
+	return __rt_balance(balancer, wrk, w, true);
+}
+
+static const struct workload_balancer rtr_balancer = {
+	.get_qd = get_qd_depth,
+	.balance = rtr_balance,
 };
 
 static void
@@ -1099,7 +1122,7 @@ static void print_help(void)
 "	-r <n>		How many times to emit the workload.\n"
 "	-c <n>		Fork N clients emitting the workload simultaneously.\n"
 "	-x		Swap VCS1 and VCS2 engines in every other client.\n"
-"	-b <n>		Load balancing to use. (0: rr, 1: qd, 2: rt)\n"
+"	-b <n>		Load balancing to use. (0: rr, 1: qd, 2: rt, 3: rtr)\n"
 "	-2		Remap VCS2 to BCS\n"
 	);
 }
@@ -1216,6 +1239,12 @@ int main(int argc, char **argv)
 				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
 					   8);
 				balancer = &rt_balancer;
+				flags |= SEQNO | BALANCE | RT;
+				break;
+			case 3:
+				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
+					   8);
+				balancer = &rtr_balancer;
 				flags |= SEQNO | BALANCE | RT;
 				break;
 			default:
