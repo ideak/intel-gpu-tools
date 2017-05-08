@@ -1007,7 +1007,7 @@ run_workload(unsigned int id, struct workload *wrk,
 		}
 	}
 
-	if (run)
+	if (run && wrk->steps[wrk->nr_steps - 1].type == BATCH)
 		gem_sync(fd, wrk->steps[wrk->nr_steps - 1].obj[0].handle);
 
 	clock_gettime(CLOCK_MONOTONIC, &t_end);
