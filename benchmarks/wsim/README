@@ -2,8 +2,8 @@ Workload descriptor format
 ==========================
 
 ctx.engine.duration_us.dependency.wait,...
-<uint>.<str>.<uint>[-<uint>].<int <= 0>.<0|1>,...
-d|p|s.<uiny>,...
+<uint>.<str>.<uint>[-<uint>].<int <= 0>[/<int <= 0>][...].<0|1>,...
+d|p|s|t|q.<uiny>,...
 
 For duration a range can be given from which a random value will be picked
 before every submit. Since this and seqno management requires CPU access to
@@ -54,3 +54,5 @@ The above workload described in human language works like this:
 
 When workload descriptors are provided on the command line, commas must be used
 instead of new lines.
+
+Multiple dependencies can be given separated by forward slashes.

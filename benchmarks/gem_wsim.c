@@ -79,14 +79,15 @@ struct w_step
 	unsigned int context;
 	unsigned int engine;
 	struct duration duration;
-	int dependency;
+	int nr_deps;
+	int *dep;
 	int wait;
 
 	/* Implementation details */
 	unsigned int idx;
 
 	struct drm_i915_gem_execbuffer2 eb;
-	struct drm_i915_gem_exec_object2 obj[4];
+	struct drm_i915_gem_exec_object2 *obj;
 	struct drm_i915_gem_relocation_entry reloc[3];
 	unsigned long bb_sz;
 	uint32_t bb_handle;
@@ -146,17 +147,6 @@ static int fd;
 #define RCS_TIMESTAMP (0x2000 + 0x358)
 #define REG(x) (volatile uint32_t *)((volatile char *)igt_global_mmio + x)
 
-/*
- * Workload descriptor:
- *
- * ctx.engine.duration.dependency.wait,...
- * <uint>.<str>.<uint>.<int <= 0>.<0|1>,...
- *
- * Engine ids: RCS, BCS, VCS, VCS1, VCS2, VECS
- *
- * "1.VCS1.3000.0.1,1.RCS.1000.-1.0,1.RCS.3700.0.0,1.RCS.1000.-2.0,1.VCS2.2300.-2.0,1.RCS.4700.-1.0,1.VCS2.600.-1.1"
- */
-
 static const char *ring_str_map[NUM_ENGINES] = {
 	[RCS] = "RCS",
 	[BCS] = "BCS",
@@ -165,6 +155,40 @@ static const char *ring_str_map[NUM_ENGINES] = {
 	[VCS2] = "VCS2",
 	[VECS] = "VECS",
 };
+
+static int parse_dependencies(struct w_step *w, char *_desc)
+{
+	char *desc = strdup(_desc);
+	char *token, *tctx = NULL, *tstart = desc;
+	int dep;
+
+	igt_assert(desc);
+
+	w->nr_deps = 0;
+	w->dep = NULL;
+
+	while ((token = strtok_r(tstart, "/", &tctx)) != NULL) {
+		tstart = NULL;
+
+		dep = atoi(token);
+		if (dep > 0) {
+			if (w->dep)
+				free(w-dep);
+			return -1;
+		}
+
+		if (dep < 0) {
+			w->nr_deps++;
+			w->dep = realloc(w->dep, sizeof(*w->dep) * w->nr_deps);
+			igt_assert(w->dep);
+			w->dep[w->nr_deps - 1] = dep;
+		}
+	}
+
+	free(desc);
+
+	return 0;
+}
 
 static struct workload *parse_workload(char *_desc)
 {
@@ -177,9 +201,12 @@ static struct workload *parse_workload(char *_desc)
 	unsigned int valid;
 	int tmp;
 
+	igt_assert(desc);
+
 	while ((_token = strtok_r(tstart, ",", &tctx)) != NULL) {
 		tstart = NULL;
 		token = strdup(_token);
+		igt_assert(token);
 		fstart = token;
 		valid = 0;
 		memset(&step, 0, sizeof(step));
@@ -340,15 +367,14 @@ static struct workload *parse_workload(char *_desc)
 		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
 			fstart = NULL;
 
-			tmp = atoi(field);
-			if (tmp > 0) {
+			tmp = parse_dependencies(&step, field);
+			if (tmp < 0) {
 				if (!quiet)
 					fprintf(stderr,
 						"Invalid forward dependency at step %u!\n",
 						nr_steps);
 				return NULL;
 			}
-			step.dependency = tmp;
 
 			valid++;
 		}
@@ -515,25 +541,35 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 {
 	enum intel_engine_id engine = w->engine;
 	unsigned int j = 0;
+	unsigned int nr_obj = 3 + w->nr_deps;
+	unsigned int i;
+
+	w->obj = calloc(nr_obj, sizeof(*w->obj));
+	igt_assert(w->obj);
 
 	w->obj[j].handle = gem_create(fd, 4096);
 	w->obj[j].flags = EXEC_OBJECT_WRITE;
 	j++;
+	igt_assert(j < nr_obj);
 
 	if (flags & SEQNO) {
 		w->obj[j].handle = wrk->status_page_handle;
 		j++;
+		igt_assert(j < nr_obj);
 	}
 
-	igt_assert(w->dependency <= 0);
-	if (w->dependency) {
-		int dep_idx = w->idx + w->dependency;
+	for (i = 0; i < w->nr_deps; i++) {
+		igt_assert(w->dep[i] <= 0);
+		if (w->dep[i]) {
+			int dep_idx = w->idx + w->dep[i];
 
-		igt_assert(dep_idx >= 0 && dep_idx < wrk->nr_steps);
-		igt_assert(wrk->steps[dep_idx].type == BATCH);
+			igt_assert(dep_idx >= 0 && dep_idx < wrk->nr_steps);
+			igt_assert(wrk->steps[dep_idx].type == BATCH);
 
-		w->obj[j].handle = wrk->steps[dep_idx].obj[0].handle;
-		j++;
+			w->obj[j].handle = wrk->steps[dep_idx].obj[0].handle;
+			j++;
+			igt_assert(j < nr_obj);
+		}
 	}
 
 	w->bb_sz = get_bb_sz(w->duration.max);
@@ -546,7 +582,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 			w->obj[j].relocation_count = 3;
 		else
 			w->obj[j].relocation_count = 1;
-		for (int i = 0; i < w->obj[j].relocation_count; i++)
+		for (i = 0; i < w->obj[j].relocation_count; i++)
 			w->reloc[i].target_handle = 1;
 	}
 
@@ -560,11 +596,12 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		engine = VCS1;
 	eb_update_flags(w, engine, flags);
 #ifdef DEBUG
-	printf("%u: %u:%x|%x|%x|%x %10lu flags=%llx bb=%x[%u] ctx[%u]=%u\n",
-		w->idx, w->eb.buffer_count, w->obj[0].handle,
-		w->obj[1].handle, w->obj[2].handle, w->obj[3].handle,
-		w->bb_sz, w->eb.flags, w->bb_handle, j,
-		w->context, wrk->ctx_id[w->context]);
+	printf("%u: %u:|", w->idx, w->eb.buffer_count);
+	for (i = 0; i <= j; i++)
+		printf("%x|", w->obj[i].handle);
+	printf(" %10lu flags=%llx bb=%x[%u] ctx[%u]=%u\n",
+		w->bb_sz, w->eb.flags, w->bb_handle, j, w->context,
+		wrk->ctx_id[w->context]);
 #endif
 }
 
