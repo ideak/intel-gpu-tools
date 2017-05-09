@@ -827,6 +827,9 @@ __rt_balance(const struct workload_balancer *balancer,
 	       qd[VCS2]);
 #endif
 
+	qd[VCS1] >>= 10;
+	qd[VCS2] >>= 10;
+
 	if (qd[VCS1] < qd[VCS2])
 		n = 0;
 	else if (qd[VCS2] < qd[VCS1])
@@ -1288,6 +1291,40 @@ static int parse_balancing_mode(char *str)
 	return mode;
 }
 
+static void init_clocks(void)
+{
+	struct timespec t_start, t_end;
+	uint32_t rcs_start, rcs_end;
+	double overhead, t;
+
+	intel_register_access_init(intel_get_pci_device(), false, fd);
+
+	if (quiet)
+		return;
+
+	clock_gettime(CLOCK_MONOTONIC, &t_start);
+	for (int i = 0; i < 100; i++)
+		rcs_start = *REG(RCS_TIMESTAMP);
+	clock_gettime(CLOCK_MONOTONIC, &t_end);
+	overhead = 2 * elapsed(&t_start, &t_end) / 100;
+
+	clock_gettime(CLOCK_MONOTONIC, &t_start);
+	for (int i = 0; i < 100; i++)
+		clock_gettime(CLOCK_MONOTONIC, &t_end);
+	clock_gettime(CLOCK_MONOTONIC, &t_end);
+	overhead += elapsed(&t_start, &t_end) / 100;
+
+	clock_gettime(CLOCK_MONOTONIC, &t_start);
+	rcs_start = *REG(RCS_TIMESTAMP);
+	usleep(100);
+	rcs_end = *REG(RCS_TIMESTAMP);
+	clock_gettime(CLOCK_MONOTONIC, &t_end);
+
+	t = elapsed(&t_start, &t_end) - overhead;
+	printf("%d cycles in %.1fus, i.e. 1024 cycles takes %1.fus\n",
+	       rcs_end - rcs_start, 1e6*t, 1024e6 * t / (rcs_end - rcs_start));
+}
+
 int main(int argc, char **argv)
 {
 	unsigned int repeat = 1;
@@ -1305,7 +1342,7 @@ int main(int argc, char **argv)
 	int i, c;
 
 	fd = drm_open_driver(DRIVER_INTEL);
-	intel_register_access_init(intel_get_pci_device(), false, fd);
+	init_clocks();
 
 	while ((c = getopt(argc, argv, "q2RSc:n:r:xw:W:t:b:h")) != -1) {
 		switch (c) {
