@@ -1158,12 +1158,6 @@ run_workload(unsigned int id, struct workload *wrk,
 				w->eb.batch_start_offset = offset;
 			}
 
-			/* If workload want qd throttling when qd is not
-			 * available approximate with normal throttling. */
-			if (qd_throttle > 0 && throttle < 0 &&
-			    !(balancer && balancer->get_qd))
-				throttle = qd_throttle;
-
 			if (throttle > 0)
 				w_sync_to(wrk, w, i - throttle);
 
@@ -1185,7 +1179,7 @@ run_workload(unsigned int id, struct workload *wrk,
 			if (w->wait)
 				gem_sync(fd, w->obj[0].handle);
 
-			if (qd_throttle > 0 && balancer) {
+			if (qd_throttle > 0) {
 				while (wrk->nrequest[engine] > qd_throttle) {
 					struct w_step *s;
 
