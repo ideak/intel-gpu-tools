@@ -93,7 +93,7 @@ struct w_step
 
 	struct drm_i915_gem_execbuffer2 eb;
 	struct drm_i915_gem_exec_object2 *obj;
-	struct drm_i915_gem_relocation_entry reloc[3];
+	struct drm_i915_gem_relocation_entry reloc[4];
 	unsigned long bb_sz;
 	uint32_t bb_handle;
 	uint32_t *mapped_batch;
@@ -102,6 +102,8 @@ struct w_step
 	uint32_t *rt0_value;
 	uint32_t *rt0_address;
 	uint32_t *rt1_address;
+	uint32_t *latch_value;
+	uint32_t *latch_address;
 	unsigned int mapped_len;
 };
 
@@ -503,7 +505,7 @@ terminate_bb(struct w_step *w, unsigned int flags)
 	if (flags & SEQNO)
 		batch_start -= 4 * sizeof(uint32_t);
 	if (flags & RT)
-		batch_start -= 8 * sizeof(uint32_t);
+		batch_start -= 12 * sizeof(uint32_t);
 
 	mmap_start = rounddown(batch_start, PAGE_SIZE);
 	mmap_len = w->bb_sz - mmap_start;
@@ -544,6 +546,16 @@ terminate_bb(struct w_step *w, unsigned int flags)
 		*cs++ = RCS_TIMESTAMP;
 		w->rt1_address = cs;
 		*cs++ = 0;
+		*cs++ = 0;
+
+		w->reloc[3].offset = batch_start + sizeof(uint32_t);
+		batch_start += 4 * sizeof(uint32_t);
+
+		*cs++ = MI_STORE_DWORD_IMM;
+		w->latch_address = cs;
+		*cs++ = 0;
+		*cs++ = 0;
+		w->latch_value = cs;
 		*cs++ = 0;
 	}
 
@@ -618,7 +630,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 	if (flags & SEQNO) {
 		w->obj[j].relocs_ptr = to_user_pointer(&w->reloc);
 		if (flags & RT)
-			w->obj[j].relocation_count = 3;
+			w->obj[j].relocation_count = 4;
 		else
 			w->obj[j].relocation_count = 1;
 		for (i = 0; i < w->obj[j].relocation_count; i++)
@@ -832,19 +844,15 @@ static void get_rt_depth(struct workload *wrk,
 			 struct rt_depth *rt)
 {
 	const unsigned int idx = VCS_SEQNO_IDX(engine);
-	uint32_t old;
+	uint32_t latch;
 
-	old = READ_ONCE(wrk->status_page[idx]);
 	do {
+		latch = READ_ONCE(wrk->status_page[idx + 3]);
+
 		rt->submitted = wrk->status_page[idx + 1];
 		rt->completed = wrk->status_page[idx + 2];
 		rt->seqno = READ_ONCE(wrk->status_page[idx]);
-
-		if (old == rt->seqno)
-			return;
-
-		old = rt->seqno;
-	} while (1);
+	} while (latch != rt->seqno);
 }
 
 static enum intel_engine_id
@@ -998,7 +1006,7 @@ update_bb_seqno(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
 }
 
 static void
-update_bb_rt(struct w_step *w, enum intel_engine_id engine)
+update_bb_rt(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
 {
 	igt_assert(engine == VCS1 || engine == VCS2);
 
@@ -1007,6 +1015,10 @@ update_bb_rt(struct w_step *w, enum intel_engine_id engine)
 
 	w->reloc[1].delta = VCS_SEQNO_OFFSET(engine) + sizeof(uint32_t);
 	w->reloc[2].delta = VCS_SEQNO_OFFSET(engine) + 2 * sizeof(uint32_t);
+	w->reloc[3].delta = VCS_SEQNO_OFFSET(engine) + 3 * sizeof(uint32_t);
+
+	*w->latch_value = seqno;
+	*w->latch_address = w->reloc[3].presumed_offset + w->reloc[3].delta;
 
 	*w->rt0_value = *REG(RCS_TIMESTAMP);
 	*w->rt0_address = w->reloc[1].presumed_offset + w->reloc[1].delta;
@@ -1040,7 +1052,7 @@ static void w_sync_to(struct workload *wrk, struct w_step *w, int target)
 static void init_status_page(struct workload *wrk)
 {
 	struct drm_i915_gem_exec_object2 obj[2] = {};
-	struct drm_i915_gem_relocation_entry reloc[3] = {};
+	struct drm_i915_gem_relocation_entry reloc[4] = {};
 	struct drm_i915_gem_execbuffer2 eb = {
 		.buffer_count = 2, .buffers_ptr = to_user_pointer(obj)
 	};
@@ -1060,6 +1072,7 @@ static void init_status_page(struct workload *wrk)
 	reloc[0].offset = sizeof(uint32_t);
 	reloc[1].offset = 5 * sizeof(uint32_t);
 	reloc[2].offset = 10 * sizeof(uint32_t);
+	reloc[3].offset = 13 * sizeof(uint32_t);
 
 	for (int engine = VCS1; engine <= VCS2; engine++) {
 		uint32_t *cs, *base;
@@ -1068,6 +1081,7 @@ static void init_status_page(struct workload *wrk)
 		reloc[0].delta = VCS_SEQNO_OFFSET(engine);
 		reloc[1].delta = VCS_SEQNO_OFFSET(engine) + sizeof(uint32_t);
 		reloc[2].delta = VCS_SEQNO_OFFSET(engine) + 2 * sizeof(uint32_t);
+		reloc[3].delta = VCS_SEQNO_OFFSET(engine) + 3 * sizeof(uint32_t);
 
 		obj[1].handle = gem_create(fd, 4096);
 
@@ -1091,6 +1105,12 @@ static void init_status_page(struct workload *wrk)
 		*cs++ = RCS_TIMESTAMP;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
+
+		addr = reloc[3].presumed_offset + reloc[3].delta;
+		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = addr;
+		*cs++ = addr >> 32;
+		*cs++ = wrk->seqno[engine];
 
 		*cs++ = MI_BATCH_BUFFER_END;
 		munmap(base, 4096);
@@ -1178,7 +1198,8 @@ run_workload(unsigned int id, struct workload *wrk,
 					update_bb_seqno(w, engine,
 							++wrk->seqno[engine]);
 				if (flags & RT)
-					update_bb_rt(w, engine);
+					update_bb_rt(w, engine,
+						     wrk->seqno[engine]);
 			}
 
 			if (w->duration.min != w->duration.max) {
