@@ -819,11 +819,35 @@ __rt_select_engine(struct workload *wrk, unsigned long *qd, bool random)
 	return get_vcs_engine(n);
 }
 
+struct rt_depth {
+	uint32_t seqno;
+	uint32_t submitted;
+	uint32_t completed;
+};
+
+#define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
+
+static void get_rt_depth(struct workload *wrk,
+			 unsigned int engine,
+			 struct rt_depth *rt)
+{
+	int idx = VCS_SEQNO_IDX(engine);
+	uint32_t old;
+
+	old = READ_ONCE(wrk->status_page[idx]);
+	do {
+		rt->submitted = wrk->status_page[idx + 1];
+		rt->completed = wrk->status_page[idx + 2];
+		rt->seqno = READ_ONCE(wrk->status_page[VCS_SEQNO_IDX(engine)]);
+	} while (rt->seqno != old);
+}
+
 static enum intel_engine_id
 __rt_balance(const struct workload_balancer *balancer,
 	     struct workload *wrk, struct w_step *w, bool random)
 {
 	unsigned long qd[NUM_ENGINES];
+	struct rt_depth results;
 
 	igt_assert(w->engine == VCS);
 
@@ -833,9 +857,10 @@ __rt_balance(const struct workload_balancer *balancer,
 	 * all batches on that engine, plus the time we expect this batch to
 	 * take. We try to keep the total balanced between the engines.
 	 */
-	qd[VCS1] = balancer->get_qd(balancer, wrk, VCS1);
+	get_rt_depth(wrk, VCS1, &results);
+	qd[VCS1] = wrk->seqno[VCS1] - results.seqno;
 	wrk->qd_sum[VCS1] += qd[VCS1];
-	qd[VCS1] = (qd[VCS1] + 1) * (wrk->status_page[2] - wrk->status_page[1]);
+	qd[VCS1] = (qd[VCS1] + 1) * (results.completed - results.submitted);
 #ifdef DEBUG
 	printf("qd[0] = %d (%d - %d) x %d (%d - %d) = %ld\n",
 	       wrk->seqno[VCS1] - wrk->status_page[0],
@@ -845,9 +870,10 @@ __rt_balance(const struct workload_balancer *balancer,
 	       qd[VCS1]);
 #endif
 
-	qd[VCS2] = balancer->get_qd(balancer, wrk, VCS2);
+	get_rt_depth(wrk, VCS2, &results);
+	qd[VCS2] = wrk->seqno[VCS2] - results.seqno;
 	wrk->qd_sum[VCS2] += qd[VCS2];
-	qd[VCS2] = (qd[VCS2] + 1) * (wrk->status_page[2 + 16] - wrk->status_page[1 + 16]);
+	qd[VCS2] = (qd[VCS2] + 1) * (results.completed - results.submitted);
 #ifdef DEBUG
 	printf("qd[1] = %d (%d - %d) x %d (%d - %d) = %ld\n",
 	       wrk->seqno[VCS2] - wrk->status_page[16],
@@ -890,6 +916,7 @@ rtavg_balance(const struct workload_balancer *balancer,
 	   struct workload *wrk, struct w_step *w)
 {
 	unsigned long qd[NUM_ENGINES];
+	struct rt_depth results;
 
 	igt_assert(w->engine == VCS);
 
@@ -899,14 +926,14 @@ rtavg_balance(const struct workload_balancer *balancer,
 	 * all batches on that engine plus the time we expect to execute in.
 	 * We try to keep the total remaining balanced between the engines.
 	 */
-	if (wrk->status_page[VCS_SEQNO_IDX(VCS1)] != wrk->rt.last[VCS1]) {
-		igt_assert((long)(wrk->status_page[2] - wrk->status_page[1]) > 0);
+	get_rt_depth(wrk, VCS1, &results);
+	if (results.seqno != wrk->rt.last[VCS1]) {
+		igt_assert((long)(results.completed - results.submitted) > 0);
 		ewma_rt_add(&wrk->rt.avg[VCS1],
-			    wrk->status_page[2] - wrk->status_page[1]);
-		wrk->rt.last[VCS1] = wrk->status_page[VCS_SEQNO_IDX(VCS1)];
+			    results.completed - results.submitted);
+		wrk->rt.last[VCS1] = results.seqno;
 	}
-
-	qd[VCS1] = balancer->get_qd(balancer, wrk, VCS1);
+	qd[VCS1] = wrk->seqno[VCS1] - results.seqno;
 	wrk->qd_sum[VCS1] += qd[VCS1];
 	qd[VCS1] = (qd[VCS1] + 1) * ewma_rt_read(&wrk->rt.avg[VCS1]);
 
@@ -919,14 +946,14 @@ rtavg_balance(const struct workload_balancer *balancer,
 	       qd[VCS1]);
 #endif
 
-	if (wrk->status_page[VCS_SEQNO_IDX(VCS2)] != wrk->rt.last[VCS2]) {
-		igt_assert((long)(wrk->status_page[2+16] - wrk->status_page[1+16]) > 0);
+	get_rt_depth(wrk, VCS2, &results);
+	if (results.seqno != wrk->rt.last[VCS2]) {
+		igt_assert((long)(results.completed - results.submitted) > 0);
 		ewma_rt_add(&wrk->rt.avg[VCS2],
-			    wrk->status_page[2+16] - wrk->status_page[1+16]);
-		wrk->rt.last[VCS2] = wrk->status_page[VCS_SEQNO_IDX(VCS2)];
+			    results.completed - results.submitted);
+		wrk->rt.last[VCS2] = results.seqno;
 	}
-
-	qd[VCS2] = balancer->get_qd(balancer, wrk, VCS2);
+	qd[VCS2] = wrk->seqno[VCS2] - results.seqno;
 	wrk->qd_sum[VCS2] += qd[VCS2];
 	qd[VCS2] = (qd[VCS2] + 1) * ewma_rt_read(&wrk->rt.avg[VCS2]);
 
