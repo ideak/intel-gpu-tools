@@ -150,7 +150,8 @@ static const char *ring_str_map[NUM_ENGINES] = {
 	[VECS] = "VECS",
 };
 
-static int parse_dependencies(struct w_step *w, char *_desc)
+static int
+parse_dependencies(unsigned int nr_steps, struct w_step *w, char *_desc)
 {
 	char *desc = strdup(_desc);
 	char *token, *tctx = NULL, *tstart = desc;
@@ -165,7 +166,7 @@ static int parse_dependencies(struct w_step *w, char *_desc)
 		tstart = NULL;
 
 		dep = atoi(token);
-		if (dep > 0) {
+		if (dep > 0 || ((int)nr_steps + dep) < 0) {
 			if (w->dep)
 				free(w-dep);
 			return -1;
@@ -245,7 +246,8 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
-					if (tmp >= 0) {
+					if (tmp >= 0 ||
+					    ((int)nr_steps + tmp) < 0) {
 						if (!quiet)
 							fprintf(stderr,
 								"Invalid sync target at step %u!\n",
@@ -335,7 +337,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 			fstart = NULL;
 
 			tmpl = strtol(field, &sep, 10);
-			if (tmpl == LONG_MIN || tmpl == LONG_MAX) {
+			if (tmpl == 0 || tmpl == LONG_MIN || tmpl == LONG_MAX) {
 				if (!quiet)
 					fprintf(stderr,
 						"Invalid duration at step %u!\n",
@@ -346,7 +348,8 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 
 			if (sep && *sep == '-') {
 				tmpl = strtol(sep + 1, NULL, 10);
-				if (tmpl == LONG_MIN || tmpl == LONG_MAX) {
+				if (tmpl == 0 ||
+				    tmpl == LONG_MIN || tmpl == LONG_MAX) {
 					if (!quiet)
 						fprintf(stderr,
 							"Invalid duration range at step %u!\n",
@@ -364,11 +367,11 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
 			fstart = NULL;
 
-			tmp = parse_dependencies(&step, field);
+			tmp = parse_dependencies(nr_steps, &step, field);
 			if (tmp < 0) {
 				if (!quiet)
 					fprintf(stderr,
-						"Invalid forward dependency at step %u!\n",
+						"Invalid dependency at step %u!\n",
 						nr_steps);
 				return NULL;
 			}
@@ -379,15 +382,15 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
 			fstart = NULL;
 
-			tmp = atoi(field);
-			if (tmp != 0 && tmp != 1) {
+			if (strlen(field) != 1 ||
+			    (field[0] != '0' && field[0] != '1')) {
 				if (!quiet)
 					fprintf(stderr,
 						"Invalid wait boolean at step %u!\n",
 						nr_steps);
 				return NULL;
 			}
-			step.wait = tmp;
+			step.wait = field[0] - '0';
 
 			valid++;
 		}
