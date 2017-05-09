@@ -1128,6 +1128,8 @@ static void print_help(void)
 "	-c <n>		Fork N clients emitting the workload simultaneously.\n"
 "	-x		Swap VCS1 and VCS2 engines in every other client.\n"
 "	-b <n>		Load balancing to use. (0: rr, 1: qd, 2: rt, 3: rtr)\n"
+"			Balancers can be specified either as names or as their\n"
+"			id numbers as listed above.\n"
 "	-2		Remap VCS2 to BCS.\n"
 "	-R		Round-robin initial VCS assignment per client.\n"
 "	-S		Synchronize the sequence of random batch durations\n"
@@ -1178,6 +1180,22 @@ add_workload_arg(char **w_args, unsigned int nr_args, char *w_arg)
 	return w_args;
 }
 
+static int parse_balancing_mode(char *str)
+{
+	const char *modes[] = { "rr", "qd", "rt", "rtr" };
+	int mode = -1;
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(modes); i++) {
+		if (!strcasecmp(str, modes[i])) {
+			mode = i;
+			break;
+		}
+	}
+
+	return mode;
+}
+
 int main(int argc, char **argv)
 {
 	unsigned int repeat = 1;
@@ -1190,6 +1208,7 @@ int main(int argc, char **argv)
 	char **w_args = NULL;
 	unsigned int tolerance_pct = 1;
 	const struct workload_balancer *balancer = NULL;
+	char *endptr = NULL;
 	double t;
 	int i, c;
 
@@ -1238,7 +1257,13 @@ int main(int argc, char **argv)
 			flags |= SYNCEDCLIENTS;
 			break;
 		case 'b':
-			switch (strtol(optarg, NULL, 0)) {
+			i = parse_balancing_mode(optarg);
+			if (i < 0) {
+				i = strtol(optarg, &endptr, 0);
+				if (endptr && *endptr)
+					i = -1;
+			}
+			switch (i) {
 			case 0:
 				balancer = &rr_balancer;
 				flags |= BALANCE;
