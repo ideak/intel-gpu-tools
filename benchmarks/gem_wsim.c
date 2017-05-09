@@ -800,12 +800,12 @@ __rt_balance(const struct workload_balancer *balancer,
 	/* Estimate the "speed" of the most recent batch
 	 *    (finish time - submit time)
 	 * and use that as an approximate for the total remaining time for
-	 * all batches on that engine. We try to keep the total remaining
-	 * balanced between the engines.
+	 * all batches on that engine, plus the time we expect this batch to
+	 * take. We try to keep the total balanced between the engines.
 	 */
 	qd[VCS1] = balancer->get_qd(balancer, wrk, VCS1);
 	wrk->qd_sum[VCS1] += qd[VCS1];
-	qd[VCS1] *= wrk->status_page[2] - wrk->status_page[1];
+	qd[VCS1] = (qd[VCS1] + 1) * (wrk->status_page[2] - wrk->status_page[1]);
 #ifdef DEBUG
 	printf("qd[0] = %d (%d - %d) x %d (%d - %d) = %ld\n",
 	       wrk->seqno[VCS1] - wrk->status_page[0],
@@ -817,7 +817,7 @@ __rt_balance(const struct workload_balancer *balancer,
 
 	qd[VCS2] = balancer->get_qd(balancer, wrk, VCS2);
 	wrk->qd_sum[VCS2] += qd[VCS2];
-	qd[VCS2] *= wrk->status_page[2 + 16] - wrk->status_page[1 + 16];
+	qd[VCS2] = (qd[VCS2] + 1) * (wrk->status_page[2 + 16] - wrk->status_page[1 + 16]);
 #ifdef DEBUG
 	printf("qd[1] = %d (%d - %d) x %d (%d - %d) = %ld\n",
 	       wrk->seqno[VCS2] - wrk->status_page[16],
