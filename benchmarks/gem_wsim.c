@@ -1056,6 +1056,7 @@ static void init_status_page(struct workload *wrk)
 	struct drm_i915_gem_execbuffer2 eb = {
 		.buffer_count = 2, .buffers_ptr = to_user_pointer(obj)
 	};
+	uint32_t *base;
 
 	/* Want to make sure that the balancer has a reasonable view of
 	 * the background busyness of each engine. To do that we occasionally
@@ -1066,6 +1067,15 @@ static void init_status_page(struct workload *wrk)
 		return;
 
 	obj[0].handle = wrk->status_page_handle;
+
+	/* As the expected offset is untracked, do a quick nop to query it */
+	obj[1].handle = gem_create(fd, 4096);
+	base = gem_mmap__wc(fd, obj[1].handle, 0, 4096, PROT_WRITE);
+	gem_set_domain(fd, obj[1].handle,
+		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
+	*base = MI_BATCH_BUFFER_END;
+	gem_execbuf(fd, &eb);
+
 	obj[1].relocs_ptr = to_user_pointer(reloc);
 	obj[1].relocation_count = ARRAY_SIZE(reloc);
 
@@ -1075,37 +1085,36 @@ static void init_status_page(struct workload *wrk)
 	reloc[3].offset = 13 * sizeof(uint32_t);
 
 	for (int engine = VCS1; engine <= VCS2; engine++) {
-		uint32_t *cs, *base;
+		uint32_t *cs = base + engine * 128 / sizeof(*cs);
 		uint64_t addr;
 
 		reloc[0].delta = VCS_SEQNO_OFFSET(engine);
-		reloc[1].delta = VCS_SEQNO_OFFSET(engine) + sizeof(uint32_t);
-		reloc[2].delta = VCS_SEQNO_OFFSET(engine) + 2 * sizeof(uint32_t);
-		reloc[3].delta = VCS_SEQNO_OFFSET(engine) + 3 * sizeof(uint32_t);
-
-		obj[1].handle = gem_create(fd, 4096);
-
-		base = gem_mmap__cpu(fd, obj[1].handle, 0, 4096, PROT_WRITE);
-		cs = base;
-
+		reloc[0].presumed_offset = obj[0].offset;
 		addr = reloc[0].presumed_offset + reloc[0].delta;
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
 		*cs++ = ++wrk->seqno[engine];
 
+		reloc[1].delta = VCS_SEQNO_OFFSET(engine) + sizeof(uint32_t);
+		reloc[1].presumed_offset = obj[0].offset;
 		addr = reloc[1].presumed_offset + reloc[1].delta;
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
 		*cs++ = *REG(RCS_TIMESTAMP);
 
+		reloc[2].delta = VCS_SEQNO_OFFSET(engine) + 2*sizeof(uint32_t);
+		reloc[2].presumed_offset = obj[0].offset;
 		addr = reloc[2].presumed_offset + reloc[2].delta;
 		*cs++ = 0x24 << 23 | 2; /* MI_STORE_REG_MEM */
 		*cs++ = RCS_TIMESTAMP;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
 
+		reloc[3].delta = VCS_SEQNO_OFFSET(engine) + 3*sizeof(uint32_t);
+
+		reloc[3].presumed_offset = obj[0].offset;
 		addr = reloc[3].presumed_offset + reloc[3].delta;
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
@@ -1113,15 +1122,18 @@ static void init_status_page(struct workload *wrk)
 		*cs++ = wrk->seqno[engine];
 
 		*cs++ = MI_BATCH_BUFFER_END;
-		munmap(base, 4096);
 
 		eb.flags = eb_engine_map[engine];
 		eb.flags |= I915_EXEC_HANDLE_LUT;
 		eb.flags |= I915_EXEC_NO_RELOC;
 
+		eb.batch_start_offset = 128 * engine;
+
 		gem_execbuf(fd, &eb);
-		gem_close(fd, obj[1].handle);
 	}
+
+	munmap(base, 4096);
+	gem_close(fd, obj[1].handle);
 }
 
 static void
