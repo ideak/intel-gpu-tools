@@ -635,14 +635,18 @@ static void basic_flip_cursor(igt_display_t *display,
 				transition_nonblocking(display, pipe, &fb_info, &argb_fb, 0);
 				break;
 			}
-			igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+
+			delta = get_vblank(display->drm_fd, pipe, 0) - vblank_start;
+			miss = delta != 0;
 
 			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 			break;
 
 		case FLIP_AFTER_CURSOR:
 			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
-			igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+
+			delta = get_vblank(display->drm_fd, pipe, 0) - vblank_start;
+			miss = delta != 0;
 
 			switch (mode) {
 			default:
@@ -663,7 +667,9 @@ static void basic_flip_cursor(igt_display_t *display,
 			finish_fb_busy(busy);
 		}
 
-		if (!cursor_slowpath(mode))
+		if (miss)
+			{ /* compare nothing, already failed */ }
+		else if (!cursor_slowpath(mode))
 			miss = delta != 0;
 		else
 			miss = delta != 0 && delta != 1;
