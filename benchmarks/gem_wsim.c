@@ -133,6 +133,7 @@ static int fd;
 #define RT		(1<<3)
 #define VCS2REMAP	(1<<4)
 #define INITVCSRR	(1<<5)
+#define SYNCEDCLIENTS	(1<<6)
 
 #define VCS_SEQNO_IDX(engine) (((engine) - VCS1) * 16)
 #define VCS_SEQNO_OFFSET(engine) (VCS_SEQNO_IDX(engine) * sizeof(uint32_t))
@@ -925,7 +926,7 @@ run_workload(unsigned int id, struct workload *wrk,
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
 
-	hars_petruska_f54_1_random_seed(0);
+	hars_petruska_f54_1_random_seed((flags & SYNCEDCLIENTS) ? 0 : id);
 
 	for (j = 0; run && (background || j < repeat); j++) {
 		clock_gettime(CLOCK_MONOTONIC, &wrk->repeat_start);
@@ -1129,6 +1130,8 @@ static void print_help(void)
 "	-b <n>		Load balancing to use. (0: rr, 1: qd, 2: rt, 3: rtr)\n"
 "	-2		Remap VCS2 to BCS.\n"
 "	-R		Round-robin initial VCS assignment per client.\n"
+"	-S		Synchronize the sequence of random batch durations\n"
+"			between clients.\n"
 	);
 }
 
@@ -1193,7 +1196,7 @@ int main(int argc, char **argv)
 	fd = drm_open_driver(DRIVER_INTEL);
 	intel_register_access_init(intel_get_pci_device(), false, fd);
 
-	while ((c = getopt(argc, argv, "q2Rc:n:r:xw:W:t:b:h")) != -1) {
+	while ((c = getopt(argc, argv, "q2RSc:n:r:xw:W:t:b:h")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -1230,6 +1233,9 @@ int main(int argc, char **argv)
 			break;
 		case 'R':
 			flags |= INITVCSRR;
+			break;
+		case 'S':
+			flags |= SYNCEDCLIENTS;
 			break;
 		case 'b':
 			switch (strtol(optarg, NULL, 0)) {
