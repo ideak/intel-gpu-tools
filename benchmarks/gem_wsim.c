@@ -669,12 +669,11 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 		wrk->vcs_rr = id & 1;
 
 	if (flags & SEQNO) {
-		const unsigned int status_sz = sizeof(uint32_t);
-		uint32_t handle = gem_create(fd, status_sz);
+		uint32_t handle = gem_create(fd, 4096);
 
 		gem_set_caching(fd, handle, I915_CACHING_CACHED);
 		wrk->status_page_handle = handle;
-		wrk->status_page = gem_mmap__cpu(fd, handle, 0, status_sz,
+		wrk->status_page = gem_mmap__cpu(fd, handle, 0, 4096,
 						 PROT_READ);
 	}
 
