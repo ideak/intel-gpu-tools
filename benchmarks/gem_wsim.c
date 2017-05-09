@@ -143,7 +143,7 @@ struct workload
 static const unsigned int nop_calibration_us = 1000;
 static unsigned long nop_calibration;
 
-static bool quiet;
+static int verbose = 1;
 static int fd;
 
 #define SWAPVCS		(1<<0)
@@ -234,7 +234,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 				    NULL) {
 					tmp = atoi(field);
 					if (tmp <= 0) {
-						if (!quiet)
+						if (verbose)
 							fprintf(stderr,
 								"Invalid delay at step %u!\n",
 								nr_steps);
@@ -250,7 +250,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 				    NULL) {
 					tmp = atoi(field);
 					if (tmp <= 0) {
-						if (!quiet)
+						if (verbose)
 							fprintf(stderr,
 								"Invalid period at step %u!\n",
 								nr_steps);
@@ -267,7 +267,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 					tmp = atoi(field);
 					if (tmp >= 0 ||
 					    ((int)nr_steps + tmp) < 0) {
-						if (!quiet)
+						if (verbose)
 							fprintf(stderr,
 								"Invalid sync target at step %u!\n",
 								nr_steps);
@@ -283,7 +283,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 				    NULL) {
 					tmp = atoi(field);
 					if (tmp < 0) {
-						if (!quiet)
+						if (verbose)
 							fprintf(stderr,
 								"Invalid throttle at step %u!\n",
 								nr_steps);
@@ -299,7 +299,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 				    NULL) {
 					tmp = atoi(field);
 					if (tmp < 0) {
-						if (!quiet)
+						if (verbose)
 							fprintf(stderr,
 								"Invalid qd throttle at step %u!\n",
 								nr_steps);
@@ -314,7 +314,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 
 			tmp = atoi(field);
 			if (tmp < 0) {
-				if (!quiet)
+				if (verbose)
 					fprintf(stderr,
 						"Invalid ctx id at step %u!\n",
 						nr_steps);
@@ -341,7 +341,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 			}
 
 			if (old_valid == valid) {
-				if (!quiet)
+				if (verbose)
 					fprintf(stderr,
 						"Invalid engine id at step %u!\n",
 						nr_steps);
@@ -357,7 +357,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 
 			tmpl = strtol(field, &sep, 10);
 			if (tmpl == 0 || tmpl == LONG_MIN || tmpl == LONG_MAX) {
-				if (!quiet)
+				if (verbose)
 					fprintf(stderr,
 						"Invalid duration at step %u!\n",
 						nr_steps);
@@ -369,7 +369,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 				tmpl = strtol(sep + 1, NULL, 10);
 				if (tmpl == 0 ||
 				    tmpl == LONG_MIN || tmpl == LONG_MAX) {
-					if (!quiet)
+					if (verbose)
 						fprintf(stderr,
 							"Invalid duration range at step %u!\n",
 							nr_steps);
@@ -388,7 +388,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 
 			tmp = parse_dependencies(nr_steps, &step, field);
 			if (tmp < 0) {
-				if (!quiet)
+				if (verbose)
 					fprintf(stderr,
 						"Invalid dependency at step %u!\n",
 						nr_steps);
@@ -403,7 +403,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 
 			if (strlen(field) != 1 ||
 			    (field[0] != '0' && field[0] != '1')) {
-				if (!quiet)
+				if (verbose)
 					fprintf(stderr,
 						"Invalid wait boolean at step %u!\n",
 						nr_steps);
@@ -415,7 +415,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 		}
 
 		if (valid != 5) {
-			if (!quiet)
+			if (verbose)
 				fprintf(stderr, "Invalid record at step %u!\n",
 					nr_steps);
 			return NULL;
@@ -441,7 +441,7 @@ add_step:
 
 	free(desc);
 
-	if (bcs_used && !quiet)
+	if (bcs_used && verbose)
 		printf("BCS usage in workload with VCS2 remapping enabled!\n");
 
 	return wrk;
@@ -1084,7 +1084,6 @@ run_workload(unsigned int id, struct workload *wrk,
 	bool run = true;
 	int throttle = -1;
 	int qd_throttle = -1;
-	double t;
 	int i, j;
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
@@ -1109,7 +1108,7 @@ run_workload(unsigned int id, struct workload *wrk,
 				do_sleep = w->wait -
 					   elapsed_us(&wrk->repeat_start, &now);
 				if (do_sleep < 0) {
-					if (!quiet) {
+					if (verbose > 1) {
 						printf("%u: Dropped period @ %u/%u (%dus late)!\n",
 						       id, j, i, do_sleep);
 						continue;
@@ -1212,20 +1211,23 @@ run_workload(unsigned int id, struct workload *wrk,
 
 	clock_gettime(CLOCK_MONOTONIC, &t_end);
 
-	t = elapsed(&t_start, &t_end);
-	if (!quiet && !balancer)
-		printf("%c%u: %.3fs elapsed (%.3f workloads/s)\n",
-		       background ? ' ' : '*', id, t, repeat / t);
-	else if (!quiet && !balancer->get_qd)
-		printf("%c%u: %.3fs elapsed (%.3f workloads/s). %lu (%lu + %lu) total VCS batches.\n",
-		       background ? ' ' : '*', id, t, repeat / t,
-		       wrk->nr_bb[VCS], wrk->nr_bb[VCS1], wrk->nr_bb[VCS2]);
-	else if (!quiet && balancer)
-		printf("%c%u: %.3fs elapsed (%.3f workloads/s). %lu (%lu + %lu) total VCS batches. Average queue depths %.3f, %.3f.\n",
-		       background ? ' ' : '*', id, t, repeat / t,
-		       wrk->nr_bb[VCS], wrk->nr_bb[VCS1], wrk->nr_bb[VCS2],
-		       (double)wrk->qd_sum[VCS1] / wrk->nr_bb[VCS],
-		       (double)wrk->qd_sum[VCS2] / wrk->nr_bb[VCS]);
+	if (verbose > 1) {
+		double t = elapsed(&t_start, &t_end);
+
+		if (!balancer)
+			printf("%c%u: %.3fs elapsed (%.3f workloads/s)\n",
+			       background ? ' ' : '*', id, t, repeat / t);
+		else if (!balancer->get_qd)
+			printf("%c%u: %.3fs elapsed (%.3f workloads/s). %lu (%lu + %lu) total VCS batches.\n",
+			       background ? ' ' : '*', id, t, repeat / t,
+			       wrk->nr_bb[VCS], wrk->nr_bb[VCS1], wrk->nr_bb[VCS2]);
+		else
+			printf("%c%u: %.3fs elapsed (%.3f workloads/s). %lu (%lu + %lu) total VCS batches. Average queue depths %.3f, %.3f.\n",
+			       background ? ' ' : '*', id, t, repeat / t,
+			       wrk->nr_bb[VCS], wrk->nr_bb[VCS1], wrk->nr_bb[VCS2],
+			       (double)wrk->qd_sum[VCS1] / wrk->nr_bb[VCS],
+			       (double)wrk->qd_sum[VCS2] / wrk->nr_bb[VCS]);
+	}
 }
 
 static void fini_workload(struct workload *wrk)
@@ -1376,7 +1378,7 @@ static void init_clocks(void)
 
 	intel_register_access_init(intel_get_pci_device(), false, fd);
 
-	if (quiet)
+	if (verbose <= 1)
 		return;
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
@@ -1421,11 +1423,11 @@ int main(int argc, char **argv)
 	fd = drm_open_driver(DRIVER_INTEL);
 	init_clocks();
 
-	while ((c = getopt(argc, argv, "q2RSc:n:r:xw:W:t:b:h")) != -1) {
+	while ((c = getopt(argc, argv, "q2RSc:n:r:xw:W:t:b:vh")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
-				if (!quiet)
+				if (verbose)
 					fprintf(stderr,
 						"Only one master workload can be given!\n");
 				return 1;
@@ -1448,7 +1450,10 @@ int main(int argc, char **argv)
 			repeat = strtol(optarg, NULL, 0);
 			break;
 		case 'q':
-			quiet = true;
+			verbose = 0;
+			break;
+		case 'v':
+			verbose++;
 			break;
 		case 'x':
 			flags |= SWAPVCS;
@@ -1471,13 +1476,13 @@ int main(int argc, char **argv)
 			}
 			switch (i) {
 			case 0:
-				if (!quiet)
+				if (verbose > 1)
 					printf("Using rr balancer\n");
 				balancer = &rr_balancer;
 				flags |= BALANCE;
 				break;
 			case 1:
-				if (!quiet)
+				if (verbose > 1)
 					printf("Using qd balancer\n");
 				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
 					   8);
@@ -1485,7 +1490,7 @@ int main(int argc, char **argv)
 				flags |= SEQNO | BALANCE;
 				break;
 			case 2:
-				if (!quiet)
+				if (verbose > 1)
 					printf("Using rt balancer\n");
 				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
 					   8);
@@ -1493,7 +1498,7 @@ int main(int argc, char **argv)
 				flags |= SEQNO | BALANCE | RT;
 				break;
 			case 3:
-				if (!quiet)
+				if (verbose > 1)
 					printf("Using rtr balancer\n");
 				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
 					   8);
@@ -1501,7 +1506,7 @@ int main(int argc, char **argv)
 				flags |= SEQNO | BALANCE | RT;
 				break;
 			case 4:
-				if (!quiet)
+				if (verbose > 1)
 					printf("Using rtavg balancer\n");
 				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
 					   8);
@@ -1509,7 +1514,7 @@ int main(int argc, char **argv)
 				flags |= SEQNO | BALANCE | RT;
 				break;
 			default:
-				if (!quiet)
+				if (verbose)
 					fprintf(stderr,
 						"Unknown balancing mode '%s'!\n",
 						optarg);
@@ -1525,11 +1530,11 @@ int main(int argc, char **argv)
 	}
 
 	if (!nop_calibration) {
-		if (!quiet)
+		if (verbose > 1)
 			printf("Calibrating nop delay with %u%% tolerance...\n",
 				tolerance_pct);
 		nop_calibration = calibrate_nop(tolerance_pct);
-		if (!quiet)
+		if (verbose)
 			printf("Nop calibration for %uus delay is %lu.\n",
 			       nop_calibration_us, nop_calibration);
 
@@ -1537,13 +1542,13 @@ int main(int argc, char **argv)
 	}
 
 	if (!nr_w_args) {
-		if (!quiet)
+		if (verbose)
 			fprintf(stderr, "No workload descriptor(s)!\n");
 		return 1;
 	}
 
 	if (nr_w_args > 1 && clients > 1) {
-		if (!quiet)
+		if (verbose)
 			fprintf(stderr,
 				"Cloned clients cannot be combined with multiple workloads!\n");
 		return 1;
@@ -1555,7 +1560,7 @@ int main(int argc, char **argv)
 	for (i = 0; i < nr_w_args; i++) {
 		w_args[i] = load_workload_descriptor(w_args[i]);
 		if (!w_args[i]) {
-			if (!quiet)
+			if (verbose)
 				fprintf(stderr,
 					"Failed to load workload descriptor %u!\n",
 					i);
@@ -1564,14 +1569,14 @@ int main(int argc, char **argv)
 
 		wrk[i] = parse_workload(w_args[i], flags);
 		if (!wrk[i]) {
-			if (!quiet)
+			if (verbose)
 				fprintf(stderr,
 					"Failed to parse workload %u!\n", i);
 			return 1;
 		}
 	}
 
-	if (!quiet) {
+	if (verbose > 1) {
 		printf("Using %lu nop calibration for %uus delay.\n",
 		       nop_calibration, nop_calibration_us);
 		if (nr_w_args > 1)
@@ -1644,7 +1649,7 @@ int main(int argc, char **argv)
 	clock_gettime(CLOCK_MONOTONIC, &t_end);
 
 	t = elapsed(&t_start, &t_end);
-	if (!quiet)
+	if (verbose)
 		printf("%.3fs elapsed (%.3f workloads/s)\n",
 		       t, clients * repeat / t);
 
