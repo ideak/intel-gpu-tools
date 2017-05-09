@@ -831,15 +831,20 @@ static void get_rt_depth(struct workload *wrk,
 			 unsigned int engine,
 			 struct rt_depth *rt)
 {
-	int idx = VCS_SEQNO_IDX(engine);
+	const unsigned int idx = VCS_SEQNO_IDX(engine);
 	uint32_t old;
 
 	old = READ_ONCE(wrk->status_page[idx]);
 	do {
 		rt->submitted = wrk->status_page[idx + 1];
 		rt->completed = wrk->status_page[idx + 2];
-		rt->seqno = READ_ONCE(wrk->status_page[VCS_SEQNO_IDX(engine)]);
-	} while (rt->seqno != old);
+		rt->seqno = READ_ONCE(wrk->status_page[idx]);
+
+		if (old == rt->seqno)
+			return;
+
+		old = rt->seqno;
+	} while (1);
 }
 
 static enum intel_engine_id
