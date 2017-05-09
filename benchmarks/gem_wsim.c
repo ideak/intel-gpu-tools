@@ -105,6 +105,8 @@ struct workload
 	unsigned int nr_steps;
 	struct w_step *steps;
 
+	uint32_t prng;
+
 	struct timespec repeat_start;
 
 	int pipe[2];
@@ -628,6 +630,8 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	struct w_step *w;
 	int i;
 
+	wrk->prng = rand();
+
 	if (flags & INITVCSRR)
 		wrk->vcs_rr = id & 1;
 
@@ -818,7 +822,7 @@ __rt_balance(const struct workload_balancer *balancer,
 	else if (qd[VCS2] < qd[VCS1])
 		n = 1;
 	else if (random)
-		n = hars_petruska_f54_1_random_unsafe() & 1;
+		n = hars_petruska_f54_1_random(&wrk->prng) & 1;
 	else
 		n = wrk->vcs_rr;
 
@@ -845,7 +849,6 @@ static enum intel_engine_id
 rtr_balance(const struct workload_balancer *balancer,
 	   struct workload *wrk, struct w_step *w)
 {
-
 	return __rt_balance(balancer, wrk, w, true);
 }
 
