@@ -90,6 +90,7 @@ struct w_step
 	/* Implementation details */
 	unsigned int idx;
 	struct igt_list rq_link;
+	unsigned int request;
 
 	struct drm_i915_gem_execbuffer2 eb;
 	struct drm_i915_gem_exec_object2 *obj;
@@ -427,6 +428,7 @@ static struct workload *parse_workload(char *_desc, unsigned int flags)
 
 add_step:
 		step.idx = nr_steps++;
+		step.request = -1;
 		steps = realloc(steps, sizeof(step) * nr_steps);
 		igt_assert(steps);
 
@@ -1292,6 +1294,11 @@ run_workload(unsigned int id, struct workload *wrk,
 				w_sync_to(wrk, w, i - throttle);
 
 			gem_execbuf(fd, &w->eb);
+			if (w->request != -1) {
+				igt_list_del(&w->rq_link);
+				wrk->nrequest[w->request]--;
+			}
+			w->request = engine;
 			igt_list_add_tail(&w->rq_link, &wrk->requests[engine]);
 			wrk->nrequest[engine]++;
 
@@ -1318,6 +1325,7 @@ run_workload(unsigned int id, struct workload *wrk,
 
 					gem_sync(fd, s->obj[0].handle);
 
+					s->request = -1;
 					igt_list_del(&s->rq_link);
 					wrk->nrequest[engine]--;
 				}
