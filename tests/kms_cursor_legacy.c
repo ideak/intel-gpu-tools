@@ -590,6 +590,7 @@ static void basic_flip_cursor(igt_display_t *display,
 	unsigned vblank_start;
 	enum pipe pipe = find_connected_pipe(display, false);
 	uint32_t *busy;
+	int i, miss1 = 0, miss2 = 0, delta;
 
 	if (mode >= flip_test_atomic)
 		igt_require(display->is_atomic);
@@ -610,67 +611,83 @@ static void basic_flip_cursor(igt_display_t *display,
 	do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 	igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 
-	/* Bind the cursor first to warm up */
-	do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
+	for (i = 0; i < 25; i++) {
+		bool miss;
 
-	busy = NULL;
-	if (flags & BASIC_BUSY)
-		busy = make_fb_busy(display->drm_fd, &fb_info);
-
-	/* Start with a synchronous query to align with the vblank */
-	vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
-
-	switch (order) {
-	case FLIP_BEFORE_CURSOR:
-		switch (mode) {
-		default:
-			flip_nonblocking(display, pipe, mode >= flip_test_atomic, &fb_info);
-			break;
-		case flip_test_atomic_transitions:
-		case flip_test_atomic_transitions_varying_size:
-			transition_nonblocking(display, pipe, &fb_info, &argb_fb, 0);
-			break;
-		}
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
-
+		/* Bind the cursor first to warm up */
 		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
-		break;
 
-	case FLIP_AFTER_CURSOR:
-		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+		busy = NULL;
+		if (flags & BASIC_BUSY)
+			busy = make_fb_busy(display->drm_fd, &fb_info);
 
-		switch (mode) {
-		default:
-			flip_nonblocking(display, pipe, mode >= flip_test_atomic, &fb_info);
+		/* Start with a synchronous query to align with the vblank */
+		vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
+
+		switch (order) {
+		case FLIP_BEFORE_CURSOR:
+			switch (mode) {
+			default:
+				flip_nonblocking(display, pipe, mode >= flip_test_atomic, &fb_info);
+				break;
+			case flip_test_atomic_transitions:
+			case flip_test_atomic_transitions_varying_size:
+				transition_nonblocking(display, pipe, &fb_info, &argb_fb, 0);
+				break;
+			}
+			igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+
+			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 			break;
-		case flip_test_atomic_transitions:
-		case flip_test_atomic_transitions_varying_size:
-			transition_nonblocking(display, pipe, &fb_info, &argb_fb, 0);
-			break;
+
+		case FLIP_AFTER_CURSOR:
+			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
+			igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
+
+			switch (mode) {
+			default:
+				flip_nonblocking(display, pipe, mode >= flip_test_atomic, &fb_info);
+				break;
+			case flip_test_atomic_transitions:
+			case flip_test_atomic_transitions_varying_size:
+				transition_nonblocking(display, pipe, &fb_info, &argb_fb, 0);
+				break;
+			}
 		}
+
+		delta = get_vblank(display->drm_fd, pipe, 0) - vblank_start;
+
+		if (busy) {
+			struct pollfd pfd = { display->drm_fd, POLLIN };
+			igt_assert(poll(&pfd, 1, 0) == 0);
+			finish_fb_busy(busy);
+		}
+
+		if (!cursor_slowpath(mode))
+			miss = delta != 0;
+		else
+			miss = delta != 0 && delta != 1;
+
+		miss1 += miss;
+
+		igt_set_timeout(1, "Stuck page flip");
+		igt_ignore_warn(read(display->drm_fd, &vbl, sizeof(vbl)));
+		igt_reset_timeout();
+
+		if (miss1)
+			continue;
+
+		delta = get_vblank(display->drm_fd, pipe, 0) - vblank_start;
+
+		if (!mode_requires_extra_vblank(mode))
+			miss2 += delta != 1;
+		else
+			miss2 += delta != 1 && delta != 2;
 	}
 
-	if (!cursor_slowpath(mode))
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
-	else
-		igt_assert_lte(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
-
-	if (busy) {
-		struct pollfd pfd = { display->drm_fd, POLLIN };
-		igt_assert(poll(&pfd, 1, 0) == 0);
-		finish_fb_busy(busy);
-	}
-
-	igt_set_timeout(1, "Stuck page flip");
-	igt_ignore_warn(read(display->drm_fd, &vbl, sizeof(vbl)));
-
-	if (!mode_requires_extra_vblank(mode))
-		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
-	else
-		igt_assert_lte(get_vblank(display->drm_fd, pipe, 0), vblank_start + 2);
-
-	igt_reset_timeout();
+	igt_fail_on_f(miss1 > 2 || miss1 + miss2 > 5, "Failed to evade %i vblanks and missed %i page flips\n", miss1, miss2);
+	if (miss1 || miss2)
+		igt_info("Failed to evade %i vblanks and missed %i page flips\n", miss1, miss2);
 
 	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info);
