@@ -45,7 +45,9 @@
 #include "drm.h"
 #include "ioctl_wrappers.h"
 #include "drmtest.h"
+
 #include "intel_io.h"
+#include "igt_aux.h"
 #include "igt_rand.h"
 
 enum intel_engine_id {
@@ -85,6 +87,7 @@ struct w_step
 
 	/* Implementation details */
 	unsigned int idx;
+	struct igt_list rq_link;
 
 	struct drm_i915_gem_execbuffer2 eb;
 	struct drm_i915_gem_exec_object2 *obj;
@@ -121,6 +124,9 @@ struct workload
 
 	unsigned long qd_sum[NUM_ENGINES];
 	unsigned long nr_bb[NUM_ENGINES];
+
+	struct igt_list requests[NUM_ENGINES];
+	unsigned int nrequest[NUM_ENGINES];
 };
 
 static const unsigned int nop_calibration_us = 1000;
@@ -434,6 +440,7 @@ static struct workload *
 clone_workload(struct workload *_wrk)
 {
 	struct workload *wrk;
+	int i;
 
 	wrk = malloc(sizeof(*wrk));
 	igt_assert(wrk);
@@ -444,6 +451,9 @@ clone_workload(struct workload *_wrk)
 	igt_assert(wrk->steps);
 
 	memcpy(wrk->steps, _wrk->steps, sizeof(struct w_step) * wrk->nr_steps);
+
+	for (i = 0; i < NUM_ENGINES; i++)
+		igt_list_init(&wrk->requests[i]);
 
 	return wrk;
 }
@@ -1010,20 +1020,9 @@ run_workload(unsigned int id, struct workload *wrk,
 			if (throttle > 0)
 				w_sync_to(wrk, w, i - throttle);
 
-			if (qd_throttle > 0 && balancer && balancer->get_qd) {
-				unsigned int target;
-
-				for (target = wrk->nr_steps - 1; target > 0;
-				     target--) {
-					if (balancer->get_qd(balancer, wrk,
-							     engine) <
-					    qd_throttle)
-						break;
-					w_sync_to(wrk, w, i - target);
-				}
-			}
-
 			gem_execbuf(fd, &w->eb);
+			igt_list_add_tail(&w->rq_link, &wrk->requests[engine]);
+			wrk->nrequest[engine]++;
 
 			if (pipe_fd >= 0) {
 				struct pollfd fds;
@@ -1038,11 +1037,30 @@ run_workload(unsigned int id, struct workload *wrk,
 
 			if (w->wait)
 				gem_sync(fd, w->obj[0].handle);
+
+			if (qd_throttle > 0 && balancer) {
+				while (wrk->nrequest[engine] > qd_throttle) {
+					struct w_step *s;
+
+					s = igt_list_first_entry(&wrk->requests[engine],
+								 s, rq_link);
+
+					gem_sync(fd, s->obj[0].handle);
+
+					igt_list_del(&s->rq_link);
+					wrk->nrequest[engine]--;
+				}
+			}
 		}
 	}
 
-	if (run && wrk->steps[wrk->nr_steps - 1].type == BATCH)
-		gem_sync(fd, wrk->steps[wrk->nr_steps - 1].obj[0].handle);
+	for (i = 0; i < NUM_ENGINES; i++) {
+		if (!wrk->nrequest[i])
+			continue;
+
+		w = igt_list_last_entry(&wrk->requests[i], w, rq_link);
+		gem_sync(fd, w->obj[0].handle);
+	}
 
 	clock_gettime(CLOCK_MONOTONIC, &t_end);
 
