@@ -739,6 +739,12 @@ static enum intel_engine_id get_vcs_engine(unsigned int n)
 }
 
 struct workload_balancer {
+	unsigned int id;
+	const char *name;
+	const char *desc;
+	unsigned int flags;
+	unsigned int min_gen;
+
 	unsigned int (*get_qd)(const struct workload_balancer *balancer,
 			       struct workload *wrk,
 			       enum intel_engine_id engine);
@@ -758,9 +764,12 @@ rr_balance(const struct workload_balancer *balancer,
 	return engine;
 }
 
-static const struct workload_balancer rr_balancer = {
-	.balance = rr_balance,
-};
+static enum intel_engine_id
+rand_balance(const struct workload_balancer *balancer,
+	     struct workload *wrk, struct w_step *w)
+{
+	return get_vcs_engine(hars_petruska_f54_1_random(&wrk->prng) & 1);
+}
 
 static unsigned int
 get_qd_depth(const struct workload_balancer *balancer,
@@ -771,8 +780,8 @@ get_qd_depth(const struct workload_balancer *balancer,
 }
 
 static enum intel_engine_id
-qd_balance(const struct workload_balancer *balancer,
-	   struct workload *wrk, struct w_step *w)
+__qd_balance(const struct workload_balancer *balancer,
+	     struct workload *wrk, struct w_step *w, bool random)
 {
 	enum intel_engine_id engine;
 	long qd[NUM_ENGINES];
@@ -790,6 +799,8 @@ qd_balance(const struct workload_balancer *balancer,
 		n = 0;
 	else if (qd[VCS2] < qd[VCS1])
 		n = 1;
+	else if (random)
+		n = hars_petruska_f54_1_random(&wrk->prng) & 1;
 	else
 		n = wrk->vcs_rr;
 
@@ -805,10 +816,19 @@ qd_balance(const struct workload_balancer *balancer,
 	return engine;
 }
 
-static const struct workload_balancer qd_balancer = {
-	.get_qd = get_qd_depth,
-	.balance = qd_balance,
-};
+static enum intel_engine_id
+qd_balance(const struct workload_balancer *balancer,
+	     struct workload *wrk, struct w_step *w)
+{
+	return __qd_balance(balancer, wrk, w, false);
+}
+
+static enum intel_engine_id
+qdr_balance(const struct workload_balancer *balancer,
+	     struct workload *wrk, struct w_step *w)
+{
+	return __qd_balance(balancer, wrk, w, true);
+}
 
 static enum intel_engine_id
 __rt_select_engine(struct workload *wrk, unsigned long *qd, bool random)
@@ -907,22 +927,12 @@ rt_balance(const struct workload_balancer *balancer,
 	return __rt_balance(balancer, wrk, w, false);
 }
 
-static const struct workload_balancer rt_balancer = {
-	.get_qd = get_qd_depth,
-	.balance = rt_balance,
-};
-
 static enum intel_engine_id
 rtr_balance(const struct workload_balancer *balancer,
 	   struct workload *wrk, struct w_step *w)
 {
 	return __rt_balance(balancer, wrk, w, true);
 }
-
-static const struct workload_balancer rtr_balancer = {
-	.get_qd = get_qd_depth,
-	.balance = rtr_balance,
-};
 
 static enum intel_engine_id
 rtavg_balance(const struct workload_balancer *balancer,
@@ -982,9 +992,64 @@ rtavg_balance(const struct workload_balancer *balancer,
 	return __rt_select_engine(wrk, qd, false);
 }
 
-static const struct workload_balancer rtavg_balancer = {
-	.get_qd = get_qd_depth,
-	.balance = rtavg_balance,
+static const struct workload_balancer all_balancers[] = {
+	{
+		.id = 0,
+		.name = "rr",
+		.desc = "Simple round-robin.",
+		.balance = rr_balance,
+	},
+	{
+		.id = 6,
+		.name = "rand",
+		.desc = "Random selection.",
+		.balance = rand_balance,
+	},
+	{
+		.id = 1,
+		.name = "qd",
+		.desc = "Queue depth estimation with round-robin on equal depth.",
+		.flags = SEQNO,
+		.min_gen = 8,
+		.get_qd = get_qd_depth,
+		.balance = qd_balance,
+	},
+	{
+		.id = 5,
+		.name = "qdr",
+		.desc = "Queue depth estimation with random selection on equal depth.",
+		.flags = SEQNO,
+		.min_gen = 8,
+		.get_qd = get_qd_depth,
+		.balance = qdr_balance,
+	},
+	{
+		.id = 2,
+		.name = "rt",
+		.desc = "Queue depth plus last runtime estimation.",
+		.flags = SEQNO | RT,
+		.min_gen = 8,
+		.get_qd = get_qd_depth,
+		.balance = rt_balance,
+	},
+	{
+		.id = 3,
+		.name = "rtr",
+		.desc = "Like rt but with random engine selection on equal depth.",
+		.flags = SEQNO | RT,
+		.min_gen = 8,
+		.get_qd = get_qd_depth,
+		.balance = rtr_balance,
+	},
+	{
+		.id = 4,
+		.name = "rtavg",
+		.desc = "Improved version rt tracking average execution speed per engine.",
+		.flags = SEQNO | RT,
+		.min_gen = 8,
+		.get_qd = get_qd_depth,
+		.balance = rtavg_balance,
+	},
 };
 
 static void
@@ -1335,6 +1400,8 @@ static unsigned long calibrate_nop(unsigned int tolerance_pct)
 
 static void print_help(void)
 {
+	unsigned int i;
+
 	puts(
 "Usage: gem_wsim [OPTIONS]\n"
 "\n"
@@ -1359,21 +1426,23 @@ static void print_help(void)
 "  -c <n>          Fork N clients emitting the workload simultaneously.\n"
 "  -x              Swap VCS1 and VCS2 engines in every other client.\n"
 "  -b <n>          Load balancing to use.\n"
-"                  Available load balancers are:\n"
-"                     0/   rr: Simple round-robin.\n"
-"                     1/   qd: Queue depth estimation. Round-robin on equal\n"
-"                              queue depth.\n"
-"                     2/   rt: Like qd but with added last run-time estimation.\n"
-"                     3/  rtr: Like rt but with random selection on equal queue\n"
-"                              depth.\n"
-"                     4/rtavg: Improved version of rt tracking average latency\n"
-"                              per engine.\n"
+"                  Available load balancers are:"
+	);
+
+	for (i = 0; i < ARRAY_SIZE(all_balancers); i++) {
+		igt_assert(all_balancers[i].desc);
+		printf(
+"                     %s (%u): %s\n",
+		       all_balancers[i].name, all_balancers[i].id,
+		       all_balancers[i].desc);
+	}
+	puts(
 "                  Balancers can be specified either as names or as their id\n"
 "                  number as listed above.\n"
 "  -2              Remap VCS2 to BCS.\n"
 "  -R              Round-robin initial VCS assignment per client.\n"
 "  -S              Synchronize the sequence of random batch durations between\n"
-"                  clients.\n"
+"                  clients."
 	);
 }
 
@@ -1420,20 +1489,28 @@ add_workload_arg(char **w_args, unsigned int nr_args, char *w_arg)
 	return w_args;
 }
 
-static int parse_balancing_mode(char *str)
+static int find_balancer_by_name(char *name)
 {
-	const char *modes[] = { "rr", "qd", "rt", "rtr" , "rtavg" };
-	int mode = -1;
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(modes); i++) {
-		if (!strcasecmp(str, modes[i])) {
-			mode = i;
-			break;
-		}
+	for (i = 0; i < ARRAY_SIZE(all_balancers); i++) {
+		if (!strcasecmp(name, all_balancers[i].name))
+			return all_balancers[i].id;
 	}
 
-	return mode;
+	return -1;
+}
+
+static const struct workload_balancer *find_balancer_by_id(unsigned int id)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(all_balancers); i++) {
+		if (id == all_balancers[i].id)
+			return &all_balancers[i];
+	}
+
+	return NULL;
 }
 
 static void init_clocks(void)
@@ -1534,52 +1611,22 @@ int main(int argc, char **argv)
 			flags |= SYNCEDCLIENTS;
 			break;
 		case 'b':
-			i = parse_balancing_mode(optarg);
+			i = find_balancer_by_name(optarg);
 			if (i < 0) {
 				i = strtol(optarg, &endptr, 0);
 				if (endptr && *endptr)
 					i = -1;
 			}
-			switch (i) {
-			case 0:
-				if (verbose > 1)
-					printf("Using rr balancer\n");
-				balancer = &rr_balancer;
-				flags |= BALANCE;
-				break;
-			case 1:
-				if (verbose > 1)
-					printf("Using qd balancer\n");
-				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
-					   8);
-				balancer = &qd_balancer;
-				flags |= SEQNO | BALANCE;
-				break;
-			case 2:
-				if (verbose > 1)
-					printf("Using rt balancer\n");
-				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
-					   8);
-				balancer = &rt_balancer;
-				flags |= SEQNO | BALANCE | RT;
-				break;
-			case 3:
-				if (verbose > 1)
-					printf("Using rtr balancer\n");
-				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
-					   8);
-				balancer = &rtr_balancer;
-				flags |= SEQNO | BALANCE | RT;
-				break;
-			case 4:
-				if (verbose > 1)
-					printf("Using rtavg balancer\n");
-				igt_assert(intel_gen(intel_get_drm_devid(fd)) >=
-					   8);
-				balancer = &rtavg_balancer;
-				flags |= SEQNO | BALANCE | RT;
-				break;
-			default:
+
+			if (i >= 0) {
+				balancer = find_balancer_by_id(i);
+				if (balancer) {
+					igt_assert(intel_gen(intel_get_drm_devid(fd)) >= balancer->min_gen);
+					flags |= BALANCE | balancer->flags;
+				}
+			}
+
+			if (!balancer) {
 				if (verbose)
 					fprintf(stderr,
 						"Unknown balancing mode '%s'!\n",
@@ -1652,6 +1699,8 @@ int main(int argc, char **argv)
 		printf("%u client%s.\n", clients, clients > 1 ? "s" : "");
 		if (flags & SWAPVCS)
 			printf("Swapping VCS rings between clients.\n");
+		if (balancer)
+			printf("Using %s balancer.\n", balancer->name);
 	}
 
 	if (master_workload >= 0 && clients == 1)
