@@ -277,7 +277,8 @@ static int wait_begin(struct gpu_perf *gp, const void *event)
 
 	wait->comm = comm;
 	wait->comm->active = true;
-	wait->seqno = sample->raw[GLOBAL_SEQNO];
+	wait->context = sample->raw[ENGINE];
+	wait->seqno = sample->raw[CTX_SEQNO];
 	wait->time = sample->time;
 	wait->next = gp->wait[sample->raw[CTX]];
 	gp->wait[sample->raw[CTX]] = wait;
@@ -291,7 +292,8 @@ static int wait_end(struct gpu_perf *gp, const void *event)
 	struct gpu_perf_time *wait, **prev;
 
 	for (prev = &gp->wait[sample->raw[ENGINE]]; (wait = *prev) != NULL; prev = &wait->next) {
-		if (wait->seqno != sample->raw[GLOBAL_SEQNO])
+		if (wait->context != sample->raw[CTX] ||
+		    wait->seqno != sample->raw[CTX_SEQNO])
 			continue;
 
 		wait->comm->wait_time += sample->time - wait->time;
