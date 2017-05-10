@@ -499,6 +499,112 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 	gem_close(fd, obj.handle);
 }
 
+static inline uint64_t sign_extend(uint64_t x, int index)
+{
+	int shift = 63 - index;
+	return (int64_t)(x << shift) >> shift;
+}
+
+static uint64_t gen8_canonical_address(uint64_t address)
+{
+	return sign_extend(address, 47);
+}
+
+static void basic_range(int fd, unsigned flags)
+{
+	struct drm_i915_gem_relocation_entry reloc[128];
+	struct drm_i915_gem_exec_object2 obj[128];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	uint64_t address_mask = has_64b_reloc(fd) ? ~(uint64_t)0 : ~(uint32_t)0;
+	uint64_t gtt_size = gem_aperture_size(fd);
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	igt_spin_t *spin = NULL;
+	int count, n;
+
+	igt_require(gem_has_softpin(fd));
+
+	for (count = 12; gtt_size >> (count + 1); count++)
+		;
+
+	count -= 12;
+
+	memset(obj, 0, sizeof(obj));
+	memset(reloc, 0, sizeof(reloc));
+
+	n = 0;
+	for (int i = 0; i <= count; i++) {
+		obj[n].handle = gem_create(fd, 4096);
+		obj[n].offset = (1ull << (i + 12)) - 4096;
+		obj[n].offset = gen8_canonical_address(obj[i].offset);
+		obj[n].flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
+		igt_debug("obj[%d] handle=%d, address=%llx\n",
+			  n, obj[n].handle, (long long)obj[n].offset);
+
+		reloc[n].offset = 8 * (n + 1);
+		reloc[n].target_handle = obj[n].handle;
+		reloc[n].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		reloc[n].presumed_offset = -1;
+		n++;
+	}
+	for (int i = 1; i < count; i++) {
+		obj[n].handle = gem_create(fd, 4096);
+		obj[n].offset = 1ull << (i + 12);
+		obj[n].offset = gen8_canonical_address(obj[n].offset);
+		obj[n].flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
+		igt_debug("obj[%d] handle=%d, address=%llx\n",
+			  n, obj[n].handle, (long long)obj[n].offset);
+
+		reloc[n].offset = 8 * (n + 1);
+		reloc[n].target_handle = obj[n].handle;
+		reloc[n].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		reloc[n].presumed_offset = -1;
+		n++;
+	}
+	obj[n].handle = gem_create(fd, 4096);
+	obj[n].relocs_ptr = to_user_pointer(reloc);
+	obj[n].relocation_count = n;
+	gem_write(fd, obj[n].handle, 0, &bbe, sizeof(bbe));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = n + 1;
+
+	if (flags & ACTIVE) {
+		spin = igt_spin_batch_new(fd, 0, obj[n].handle);
+		if (!(flags & HANG))
+			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
+		igt_assert(gem_bo_busy(fd, obj[n].handle));
+	}
+
+	gem_execbuf(fd, &execbuf);
+	igt_spin_batch_free(fd, spin);
+
+	for (int i = 0; i < n; i++) {
+		uint64_t offset;
+
+		offset = ~reloc[i].presumed_offset & address_mask;
+		gem_read(fd, obj[n].handle, reloc[i].offset,
+			 &offset, has_64b_reloc(fd) ? 8 : 4);
+
+		igt_debug("obj[%d] handle=%d, offset=%llx, found=%llx, presumed=%llx\n",
+			  i, obj[i].handle,
+			  (long long)obj[i].offset,
+			  (long long)offset,
+			  (long long)reloc[i].presumed_offset);
+
+		igt_assert_eq_u64(obj[i].offset, offset);
+		if (reloc[i].presumed_offset == -1)
+			igt_warn("reloc.presumed_offset == -1\n");
+		else
+			igt_assert_eq_u64(reloc[i].presumed_offset, offset);
+	}
+
+	for (int i = 0; i <= n; i++)
+		gem_close(fd, obj[i].handle);
+}
+
 static void basic_softpin(int fd)
 {
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -594,6 +700,12 @@ igt_main
 						igt_require(gem_mmap__has_wc(fd));
 					basic_reloc(fd, m->before, m->after, f->flags);
 				}
+			}
+
+			if (!(f->flags & NORELOC)) {
+				igt_subtest_f("%srange%s",
+					      f->basic ? "basic-" : "", f->name)
+					basic_range(fd, f->flags);
 			}
 
 			igt_fixture {
