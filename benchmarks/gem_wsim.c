@@ -1141,7 +1141,8 @@ run_workload(unsigned int id, struct workload *wrk,
 	     bool background, int pipe_fd,
 	     const struct workload_balancer *balancer,
 	     unsigned int repeat,
-	     unsigned int flags)
+	     unsigned int flags,
+	     bool print_stats)
 {
 	struct timespec t_start, t_end;
 	struct w_step *w;
@@ -1270,22 +1271,19 @@ run_workload(unsigned int id, struct workload *wrk,
 
 	clock_gettime(CLOCK_MONOTONIC, &t_end);
 
-	if (verbose > 1) {
+	if (print_stats) {
 		double t = elapsed(&t_start, &t_end);
 
-		if (!balancer)
-			printf("%c%u: %.3fs elapsed (%.3f workloads/s)\n",
-			       background ? ' ' : '*', id, t, repeat / t);
-		else if (!balancer->get_qd)
-			printf("%c%u: %.3fs elapsed (%.3f workloads/s). %lu (%lu + %lu) total VCS batches.\n",
-			       background ? ' ' : '*', id, t, repeat / t,
+		printf("%c%u: %.3fs elapsed (%.3f workloads/s).",
+		       background ? ' ' : '*', id, t, repeat / t);
+		if (balancer)
+			printf(" %lu (%lu + %lu) total VCS batches.",
 			       wrk->nr_bb[VCS], wrk->nr_bb[VCS1], wrk->nr_bb[VCS2]);
-		else
-			printf("%c%u: %.3fs elapsed (%.3f workloads/s). %lu (%lu + %lu) total VCS batches. Average queue depths %.3f, %.3f.\n",
-			       background ? ' ' : '*', id, t, repeat / t,
-			       wrk->nr_bb[VCS], wrk->nr_bb[VCS1], wrk->nr_bb[VCS2],
+		if (balancer && balancer->get_qd)
+			printf(" Average queue depths %.3f, %.3f.",
 			       (double)wrk->qd_sum[VCS1] / wrk->nr_bb[VCS],
 			       (double)wrk->qd_sum[VCS2] / wrk->nr_bb[VCS]);
+		putchar('\n');
 	}
 }
 
@@ -1341,32 +1339,41 @@ static void print_help(void)
 "Usage: gem_wsim [OPTIONS]\n"
 "\n"
 "Runs a simulated workload on the GPU.\n"
-"When ran without arguments performs a GPU calibration result of which needs\n"
-"to be provided when running the simulation in subsequent invocations.\n"
+"When ran without arguments performs a GPU calibration result of which needs to\n"
+"be provided when running the simulation in subsequent invocations.\n"
 "\n"
 "Options:\n"
-"	-h		This text.\n"
-"	-q		Be quiet - do not output anything to stdout.\n"
-"	-n <n>		Nop calibration value.\n"
-"	-t <n>		Nop calibration tolerance percentage.\n"
-"			Use when there is a difficulty obtaining calibration\n"
-"			with the default settings.\n"
-"	-w <desc|path>	Filename or a workload descriptor.\n"
-"			Can be given multiple times.\n"
-"	-W <desc|path>	Filename or a master workload descriptor.\n"
-"			Only one master workload can be optinally specified\n"
-"			in which case all other workloads become background\n"
-"			ones and run as long as the master.\n"
-"	-r <n>		How many times to emit the workload.\n"
-"	-c <n>		Fork N clients emitting the workload simultaneously.\n"
-"	-x		Swap VCS1 and VCS2 engines in every other client.\n"
-"	-b <n>		Load balancing to use. (0: rr, 1: qd, 2: rt, 3: rtr)\n"
-"			Balancers can be specified either as names or as their\n"
-"			id numbers as listed above.\n"
-"	-2		Remap VCS2 to BCS.\n"
-"	-R		Round-robin initial VCS assignment per client.\n"
-"	-S		Synchronize the sequence of random batch durations\n"
-"			between clients.\n"
+"  -h              This text.\n"
+"  -q              Be quiet - do not output anything to stdout.\n"
+"  -n <n>          Nop calibration value.\n"
+"  -t <n>          Nop calibration tolerance percentage.\n"
+"                  Use when there is a difficulty obtaining calibration with the\n"
+"                  default settings.\n"
+"  -w <desc|path>  Filename or a workload descriptor.\n"
+"                  Can be given multiple times.\n"
+"  -W <desc|path>  Filename or a master workload descriptor.\n"
+"                  Only one master workload can be optinally specified in which\n"
+"                  case all other workloads become background ones and run as\n"
+"                  long as the master.\n"
+"  -r <n>          How many times to emit the workload.\n"
+"  -c <n>          Fork N clients emitting the workload simultaneously.\n"
+"  -x              Swap VCS1 and VCS2 engines in every other client.\n"
+"  -b <n>          Load balancing to use.\n"
+"                  Available load balancers are:\n"
+"                     0/   rr: Simple round-robin.\n"
+"                     1/   qd: Queue depth estimation. Round-robin on equal\n"
+"                              queue depth.\n"
+"                     2/   rt: Like qd but with added last run-time estimation.\n"
+"                     3/  rtr: Like rt but with random selection on equal queue\n"
+"                              depth.\n"
+"                     4/rtavg: Improved version of rt tracking average latency\n"
+"                              per engine.\n"
+"                  Balancers can be specified either as names or as their id\n"
+"                  number as listed above.\n"
+"  -2              Remap VCS2 to BCS.\n"
+"  -R              Round-robin initial VCS assignment per client.\n"
+"  -S              Synchronize the sequence of random batch durations between\n"
+"                  clients.\n"
 	);
 }
 
@@ -1482,7 +1489,7 @@ int main(int argc, char **argv)
 	fd = drm_open_driver(DRIVER_INTEL);
 	init_clocks();
 
-	while ((c = getopt(argc, argv, "q2RSc:n:r:xw:W:t:b:vh")) != -1) {
+	while ((c = getopt(argc, argv, "hqv2RSxc:n:r:w:W:t:b:")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -1618,6 +1625,7 @@ int main(int argc, char **argv)
 
 	for (i = 0; i < nr_w_args; i++) {
 		w_args[i] = load_workload_descriptor(w_args[i]);
+
 		if (!w_args[i]) {
 			if (verbose)
 				fprintf(stderr,
@@ -1635,11 +1643,12 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (nr_w_args > 1)
+		clients = nr_w_args;
+
 	if (verbose > 1) {
 		printf("Using %lu nop calibration for %uus delay.\n",
 		       nop_calibration, nop_calibration_us);
-		if (nr_w_args > 1)
-			clients = nr_w_args;
 		printf("%u client%s.\n", clients, clients > 1 ? "s" : "");
 		if (flags & SWAPVCS)
 			printf("Swapping VCS rings between clients.\n");
@@ -1685,7 +1694,9 @@ int main(int argc, char **argv)
 		}
 
 		run_workload(child, w[child], background, pipe_fd, balancer,
-			     repeat, flags);
+			     repeat, flags,
+			     verbose > 1 ||
+			     (verbose > 0 && master_workload == child));
 	}
 
 	if (master_workload >= 0) {
