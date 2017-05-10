@@ -20,6 +20,12 @@ benchmarks_prog_list =			\
 	vgem_mmap			\
 	$(NULL)
 
+gem_wsim_SOURCES =                      \
+	gem_wsim.c                      \
+	ewma.h                          \
+	ilog2.h                         \
+	$(NULL)
+
 LIBDRM_INTEL_BENCHMARKS =		\
 	intel_upload_blit_large		\
 	intel_upload_blit_large_gtt	\
