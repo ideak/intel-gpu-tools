@@ -530,13 +530,19 @@ static void basic_range(int fd, unsigned flags)
 
 	memset(obj, 0, sizeof(obj));
 	memset(reloc, 0, sizeof(reloc));
+	memset(&execbuf, 0, sizeof(execbuf));
 
 	n = 0;
 	for (int i = 0; i <= count; i++) {
 		obj[n].handle = gem_create(fd, 4096);
 		obj[n].offset = (1ull << (i + 12)) - 4096;
-		obj[n].offset = gen8_canonical_address(obj[i].offset);
+		obj[n].offset = gen8_canonical_address(obj[n].offset);
 		obj[n].flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+		gem_write(fd, obj[n].handle, 0, &bbe, sizeof(bbe));
+		execbuf.buffers_ptr = to_user_pointer(&obj[n]);
+		execbuf.buffer_count = 1;
+		if (__gem_execbuf(fd, &execbuf))
+			continue;
 
 		igt_debug("obj[%d] handle=%d, address=%llx\n",
 			  n, obj[n].handle, (long long)obj[n].offset);
@@ -552,6 +558,11 @@ static void basic_range(int fd, unsigned flags)
 		obj[n].offset = 1ull << (i + 12);
 		obj[n].offset = gen8_canonical_address(obj[n].offset);
 		obj[n].flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+		gem_write(fd, obj[n].handle, 0, &bbe, sizeof(bbe));
+		execbuf.buffers_ptr = to_user_pointer(&obj[n]);
+		execbuf.buffer_count = 1;
+		if (__gem_execbuf(fd, &execbuf))
+			continue;
 
 		igt_debug("obj[%d] handle=%d, address=%llx\n",
 			  n, obj[n].handle, (long long)obj[n].offset);
@@ -562,12 +573,13 @@ static void basic_range(int fd, unsigned flags)
 		reloc[n].presumed_offset = -1;
 		n++;
 	}
+	igt_require(n);
+
 	obj[n].handle = gem_create(fd, 4096);
 	obj[n].relocs_ptr = to_user_pointer(reloc);
 	obj[n].relocation_count = n;
 	gem_write(fd, obj[n].handle, 0, &bbe, sizeof(bbe));
 
-	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = n + 1;
 
