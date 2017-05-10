@@ -787,12 +787,29 @@ get_qd_depth(const struct workload_balancer *balancer,
 }
 
 static enum intel_engine_id
+__qd_select_engine(struct workload *wrk, const unsigned long *qd, bool random)
+{
+	unsigned int n;
+
+	if (qd[VCS1] < qd[VCS2])
+		n = 0;
+	else if (qd[VCS1] > qd[VCS2])
+		n = 1;
+	else if (random)
+		n = hars_petruska_f54_1_random(&wrk->prng) & 1;
+	else
+		n = wrk->vcs_rr;
+	wrk->vcs_rr = n ^ 1;
+
+	return get_vcs_engine(n);
+}
+
+static enum intel_engine_id
 __qd_balance(const struct workload_balancer *balancer,
 	     struct workload *wrk, struct w_step *w, bool random)
 {
 	enum intel_engine_id engine;
-	long qd[NUM_ENGINES];
-	unsigned int n;
+	unsigned long qd[NUM_ENGINES];
 
 	igt_assert(w->engine == VCS);
 
@@ -802,17 +819,7 @@ __qd_balance(const struct workload_balancer *balancer,
 	qd[VCS2] = balancer->get_qd(balancer, wrk, VCS2);
 	wrk->qd_sum[VCS2] += qd[VCS2];
 
-	if (qd[VCS1] < qd[VCS2])
-		n = 0;
-	else if (qd[VCS2] < qd[VCS1])
-		n = 1;
-	else if (random)
-		n = hars_petruska_f54_1_random(&wrk->prng) & 1;
-	else
-		n = wrk->vcs_rr;
-
-	engine = get_vcs_engine(n);
-	wrk->vcs_rr = n ^ 1;
+	engine = __qd_select_engine(wrk, qd, random);
 
 #ifdef DEBUG
 	printf("qd_balance: 1:%ld 2:%ld rr:%u = %u\t(%lu - %u) (%lu - %u)\n",
@@ -838,24 +845,32 @@ qdr_balance(const struct workload_balancer *balancer,
 }
 
 static enum intel_engine_id
+qdavg_balance(const struct workload_balancer *balancer,
+	     struct workload *wrk, struct w_step *w)
+{
+	unsigned long qd[NUM_ENGINES];
+	unsigned int engine;
+
+	igt_assert(w->engine == VCS);
+
+	for (engine = VCS1; engine <= VCS2; engine++) {
+		qd[engine] = balancer->get_qd(balancer, wrk, engine);
+		wrk->qd_sum[engine] += qd[engine];
+
+		ewma_rt_add(&wrk->rt.avg[engine], qd[engine]);
+		qd[engine] = ewma_rt_read(&wrk->rt.avg[engine]);
+	}
+
+	return __qd_select_engine(wrk, qd, false);
+}
+
+static enum intel_engine_id
 __rt_select_engine(struct workload *wrk, unsigned long *qd, bool random)
 {
-	unsigned int n;
-
 	qd[VCS1] >>= 10;
 	qd[VCS2] >>= 10;
 
-	if (qd[VCS1] < qd[VCS2])
-		n = 0;
-	else if (qd[VCS2] < qd[VCS1])
-		n = 1;
-	else if (random)
-		n = hars_petruska_f54_1_random(&wrk->prng) & 1;
-	else
-		n = wrk->vcs_rr;
-	wrk->vcs_rr = n ^ 1;
-
-	return get_vcs_engine(n);
+	return __qd_select_engine(wrk, qd, random);
 }
 
 struct rt_depth {
@@ -1029,6 +1044,15 @@ static const struct workload_balancer all_balancers[] = {
 		.min_gen = 8,
 		.get_qd = get_qd_depth,
 		.balance = qdr_balance,
+	},
+	{
+		.id = 7,
+		.name = "qdavg",
+		.desc = "Like qd, but using an average queue depth estimator.",
+		.flags = SEQNO,
+		.min_gen = 8,
+		.get_qd = get_qd_depth,
+		.balance = qdavg_balance,
 	},
 	{
 		.id = 2,
