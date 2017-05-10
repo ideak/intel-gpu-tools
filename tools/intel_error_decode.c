@@ -460,7 +460,7 @@ static void decode(struct drm_intel_decode *ctx,
 						   *count);
 		drm_intel_decode(ctx);
 	} else {
-		for (int i = 0; i + 4 < *count; i += 4)
+		for (int i = 0; i + 4 <= *count; i += 4)
 			printf("[%04x] %08x %08x %08x %08x\n",
 			       4*i, data[i], data[i+1], data[i+2], data[i+3]);
 	}
