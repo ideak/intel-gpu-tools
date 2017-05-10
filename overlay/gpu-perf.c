@@ -61,6 +61,14 @@ struct sample_event {
 	uint32_t raw[0];
 };
 
+enum {
+	DEVICE = 0,
+	CTX,
+	ENGINE,
+	CTX_SEQNO,
+	GLOBAL_SEQNO
+};
+
 static uint64_t tracepoint_id(const char *sys, const char *name)
 {
 	char buf[1024];
@@ -218,7 +226,7 @@ static int request_add(struct gpu_perf *gp, const void *event)
 	if (comm == NULL)
 		return 0;
 
-	comm->nr_requests[sample->raw[1]]++;
+	comm->nr_requests[sample->raw[ENGINE]]++;
 	return 1;
 }
 
@@ -234,7 +242,7 @@ static int ctx_switch(struct gpu_perf *gp, const void *event)
 {
 	const struct sample_event *sample = event;
 
-	gp->ctx_switch[sample->raw[1]]++;
+	gp->ctx_switch[sample->raw[ENGINE]]++;
 	return 1;
 }
 
@@ -265,12 +273,14 @@ static int wait_begin(struct gpu_perf *gp, const void *event)
 	if (wait == NULL)
 		return 0;
 
+	/* XXX argument order CTX == ENGINE! */
+
 	wait->comm = comm;
 	wait->comm->active = true;
-	wait->seqno = sample->raw[2];
+	wait->seqno = sample->raw[GLOBAL_SEQNO];
 	wait->time = sample->time;
-	wait->next = gp->wait[sample->raw[1]];
-	gp->wait[sample->raw[1]] = wait;
+	wait->next = gp->wait[sample->raw[CTX]];
+	gp->wait[sample->raw[CTX]] = wait;
 
 	return 0;
 }
@@ -280,8 +290,8 @@ static int wait_end(struct gpu_perf *gp, const void *event)
 	const struct sample_event *sample = event;
 	struct gpu_perf_time *wait, **prev;
 
-	for (prev = &gp->wait[sample->raw[1]]; (wait = *prev) != NULL; prev = &wait->next) {
-		if (wait->seqno != sample->raw[2])
+	for (prev = &gp->wait[sample->raw[ENGINE]]; (wait = *prev) != NULL; prev = &wait->next) {
+		if (wait->seqno != sample->raw[GLOBAL_SEQNO])
 			continue;
 
 		wait->comm->wait_time += sample->time - wait->time;

@@ -313,8 +313,9 @@ static void show_gpu_perf(struct overlay_context *ctx, struct overlay_gpu_perf *
 	struct gpu_perf_comm *comm, **prev;
 	const char *ring_name[] = {
 		"R",
-		"V",
 		"B",
+		"V0",
+		"V1",
 	};
 	double range[2];
 	char buf[1024];
@@ -432,7 +433,7 @@ static void show_gpu_perf(struct overlay_context *ctx, struct overlay_gpu_perf *
 			goto skip_comm;
 
 		len = sprintf(buf, "%s:", comm->name);
-		for (n = 0; n < 3; n++) {
+		for (n = 0; n < sizeof(ring_name)/sizeof(ring_name[0]); n++) {
 			if (comm->nr_requests[n] == 0)
 				continue;
 			len += sprintf(buf + len, "%s %d%s", need_comma ? "," : "", comm->nr_requests[n], ring_name[n]);

@@ -69,8 +69,9 @@ static int perf_init(struct gpu_top *gt)
 {
 	const char *names[] = {
 		"RCS",
-		"VCS",
 		"BCS",
+		"VCS0",
+		"VCS1",
 		NULL,
 	};
 	int n;
