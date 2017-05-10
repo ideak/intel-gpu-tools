@@ -1217,9 +1217,9 @@ run_workload(unsigned int id, struct workload *wrk,
 
 	hars_petruska_f54_1_random_seed((flags & SYNCEDCLIENTS) ? 0 : id);
 
+	init_status_page(wrk);
 	for (j = 0; run && (background || j < repeat); j++) {
 		clock_gettime(CLOCK_MONOTONIC, &wrk->repeat_start);
-		init_status_page(wrk);
 
 		for (i = 0, w = wrk->steps; run && (i < wrk->nr_steps);
 		     i++, w++) {
@@ -1309,8 +1309,10 @@ run_workload(unsigned int id, struct workload *wrk,
 				}
 			}
 
-			if (w->wait)
+			if (w->wait) {
 				gem_sync(fd, w->obj[0].handle);
+				init_status_page(wrk);
+			}
 
 			if (qd_throttle > 0) {
 				while (wrk->nrequest[engine] > qd_throttle) {
