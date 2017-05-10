@@ -1571,14 +1571,9 @@ static void igt_output_refresh(igt_output_t *output)
 			       -1);
 	}
 
-	if (output->config.connector) {
+	if (output->config.connector)
 		igt_atomic_fill_connector_props(display, output,
 			IGT_NUM_CONNECTOR_PROPS, igt_connector_prop_names);
-
-		kmstest_set_connector_broadcast_rgb(display->drm_fd,
-						    output->config.connector,
-						    BROADCAST_RGB_FULL);
-	}
 
 	if (output->use_override_mode)
 		output->config.default_mode = output->override_mode;
