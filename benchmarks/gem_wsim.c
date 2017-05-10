@@ -157,6 +157,7 @@ static int fd;
 #define VCS2REMAP	(1<<4)
 #define INITVCSRR	(1<<5)
 #define SYNCEDCLIENTS	(1<<6)
+#define HEARTBEAT	(1<<7)
 
 #define VCS_SEQNO_IDX(engine) (((engine) - VCS1) * 16)
 #define VCS_SEQNO_OFFSET(engine) (VCS_SEQNO_IDX(engine) * sizeof(uint32_t))
@@ -1329,7 +1330,8 @@ run_workload(unsigned int id, struct workload *wrk,
 
 			if (w->wait) {
 				gem_sync(fd, w->obj[0].handle);
-				init_status_page(wrk, 0);
+				if (flags & HEARTBEAT)
+					init_status_page(wrk, 0);
 			}
 
 			if (qd_throttle > 0) {
@@ -1589,7 +1591,7 @@ int main(int argc, char **argv)
 	fd = drm_open_driver(DRIVER_INTEL);
 	init_clocks();
 
-	while ((c = getopt(argc, argv, "hqv2RSxc:n:r:w:W:t:b:")) != -1) {
+	while ((c = getopt(argc, argv, "hqv2RSHxc:n:r:w:W:t:b:")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -1632,6 +1634,9 @@ int main(int argc, char **argv)
 			break;
 		case 'S':
 			flags |= SYNCEDCLIENTS;
+			break;
+		case 'H':
+			flags |= HEARTBEAT;
 			break;
 		case 'b':
 			i = find_balancer_by_name(optarg);
