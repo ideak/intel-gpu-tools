@@ -125,8 +125,9 @@ struct workload
 	uint32_t *ctx_id;
 
 	uint32_t seqno[NUM_ENGINES];
-	uint32_t status_page_handle;
+	struct drm_i915_gem_exec_object2 status_object[2];
 	uint32_t *status_page;
+	uint32_t *status_cs;
 	unsigned int vcs_rr;
 
 	unsigned long qd_sum[NUM_ENGINES];
@@ -606,8 +607,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 	igt_assert(j < nr_obj);
 
 	if (flags & SEQNO) {
-		w->obj[j].handle = wrk->status_page_handle;
-		j++;
+		w->obj[j++] = wrk->status_object[0];
 		igt_assert(j < nr_obj);
 	}
 
@@ -674,9 +674,14 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 		uint32_t handle = gem_create(fd, 4096);
 
 		gem_set_caching(fd, handle, I915_CACHING_CACHED);
-		wrk->status_page_handle = handle;
+		wrk->status_object[0].handle = handle;
 		wrk->status_page = gem_mmap__cpu(fd, handle, 0, 4096,
 						 PROT_READ);
+
+		handle = gem_create(fd, 4096);
+		wrk->status_object[1].handle = handle;
+		wrk->status_cs = gem_mmap__wc(fd, handle,
+					      0, 4096, PROT_WRITE);
 	}
 
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
@@ -1117,33 +1122,26 @@ static void w_sync_to(struct workload *wrk, struct w_step *w, int target)
 
 static void init_status_page(struct workload *wrk)
 {
-	struct drm_i915_gem_exec_object2 obj[2] = {};
 	struct drm_i915_gem_relocation_entry reloc[4] = {};
 	struct drm_i915_gem_execbuffer2 eb = {
-		.buffer_count = 2, .buffers_ptr = to_user_pointer(obj)
+		.buffer_count = ARRAY_SIZE(wrk->status_object),
+		.buffers_ptr = to_user_pointer(wrk->status_object)
 	};
-	uint32_t *base;
+	uint32_t *base = wrk->status_cs;
 
 	/* Want to make sure that the balancer has a reasonable view of
 	 * the background busyness of each engine. To do that we occasionally
 	 * send a dummy batch down the pipeline.
 	 */
 
-	if (!wrk->status_page_handle)
+	if (!wrk->status_cs)
 		return;
 
-	obj[0].handle = wrk->status_page_handle;
-
-	/* As the expected offset is untracked, do a quick nop to query it */
-	obj[1].handle = gem_create(fd, 4096);
-	base = gem_mmap__wc(fd, obj[1].handle, 0, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj[1].handle,
+	gem_set_domain(fd, wrk->status_object[1].handle,
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
-	*base = MI_BATCH_BUFFER_END;
-	gem_execbuf(fd, &eb);
 
-	obj[1].relocs_ptr = to_user_pointer(reloc);
-	obj[1].relocation_count = ARRAY_SIZE(reloc);
+	wrk->status_object[1].relocs_ptr = to_user_pointer(reloc);
+	wrk->status_object[1].relocation_count = ARRAY_SIZE(reloc);
 
 	reloc[0].offset = sizeof(uint32_t);
 	reloc[1].offset = 5 * sizeof(uint32_t);
@@ -1151,28 +1149,29 @@ static void init_status_page(struct workload *wrk)
 	reloc[3].offset = 13 * sizeof(uint32_t);
 
 	for (int engine = VCS1; engine <= VCS2; engine++) {
+		uint64_t presumed_offset = wrk->status_object[0].offset;
 		uint32_t *cs = base + engine * 128 / sizeof(*cs);
 		uint64_t addr;
 
 		reloc[0].delta = VCS_SEQNO_OFFSET(engine);
-		reloc[0].presumed_offset = obj[0].offset;
-		addr = reloc[0].presumed_offset + reloc[0].delta;
+		reloc[0].presumed_offset = presumed_offset;
+		addr = presumed_offset + reloc[0].delta;
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
 		*cs++ = ++wrk->seqno[engine];
 
 		reloc[1].delta = VCS_SEQNO_OFFSET(engine) + sizeof(uint32_t);
-		reloc[1].presumed_offset = obj[0].offset;
-		addr = reloc[1].presumed_offset + reloc[1].delta;
+		reloc[1].presumed_offset = presumed_offset;
+		addr = presumed_offset + reloc[1].delta;
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
 		*cs++ = *REG(RCS_TIMESTAMP);
 
 		reloc[2].delta = VCS_SEQNO_OFFSET(engine) + 2*sizeof(uint32_t);
-		reloc[2].presumed_offset = obj[0].offset;
-		addr = reloc[2].presumed_offset + reloc[2].delta;
+		reloc[2].presumed_offset = presumed_offset;
+		addr = presumed_offset + reloc[2].delta;
 		*cs++ = 0x24 << 23 | 2; /* MI_STORE_REG_MEM */
 		*cs++ = RCS_TIMESTAMP;
 		*cs++ = addr;
@@ -1180,8 +1179,8 @@ static void init_status_page(struct workload *wrk)
 
 		reloc[3].delta = VCS_SEQNO_OFFSET(engine) + 3*sizeof(uint32_t);
 
-		reloc[3].presumed_offset = obj[0].offset;
-		addr = reloc[3].presumed_offset + reloc[3].delta;
+		reloc[3].presumed_offset = presumed_offset;
+		addr = presumed_offset + reloc[3].delta;
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
@@ -1197,9 +1196,6 @@ static void init_status_page(struct workload *wrk)
 
 		gem_execbuf(fd, &eb);
 	}
-
-	munmap(base, 4096);
-	gem_close(fd, obj[1].handle);
 }
 
 static void
