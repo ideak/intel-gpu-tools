@@ -1,6 +1,8 @@
 benchmarksdir=$(libexecdir)/intel-gpu-tools/benchmarks
 
 benchmarks_prog_list =			\
+	ewma.h				\
+	ilog2.h				\
 	gem_blt				\
 	gem_busy			\
 	gem_create			\
