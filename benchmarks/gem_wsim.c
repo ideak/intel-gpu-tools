@@ -1120,7 +1120,9 @@ static void w_sync_to(struct workload *wrk, struct w_step *w, int target)
 	gem_sync(fd, wrk->steps[target].obj[0].handle);
 }
 
-static void init_status_page(struct workload *wrk)
+#define INIT_CLOCKS 0x1
+#define INIT_ALL (INIT_CLOCKS)
+static void init_status_page(struct workload *wrk, unsigned int flags)
 {
 	struct drm_i915_gem_relocation_entry reloc[4] = {};
 	struct drm_i915_gem_execbuffer2 eb = {
@@ -1141,50 +1143,66 @@ static void init_status_page(struct workload *wrk)
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
 	wrk->status_object[1].relocs_ptr = to_user_pointer(reloc);
-	wrk->status_object[1].relocation_count = ARRAY_SIZE(reloc);
-
-	reloc[0].offset = sizeof(uint32_t);
-	reloc[1].offset = 5 * sizeof(uint32_t);
-	reloc[2].offset = 10 * sizeof(uint32_t);
-	reloc[3].offset = 13 * sizeof(uint32_t);
+	wrk->status_object[1].relocation_count = 2;
+	if (flags & INIT_CLOCKS)
+		wrk->status_object[1].relocation_count += 2;
 
 	for (int engine = VCS1; engine <= VCS2; engine++) {
+		struct drm_i915_gem_relocation_entry *r = reloc;
 		uint64_t presumed_offset = wrk->status_object[0].offset;
-		uint32_t *cs = base + engine * 128 / sizeof(*cs);
+		uint32_t offset = engine * 128;
+		uint32_t *cs = base + offset / sizeof(*cs);
 		uint64_t addr;
 
-		reloc[0].delta = VCS_SEQNO_OFFSET(engine);
-		reloc[0].presumed_offset = presumed_offset;
-		addr = presumed_offset + reloc[0].delta;
+		r->offset = offset + sizeof(uint32_t);
+		r->delta = VCS_SEQNO_OFFSET(engine);
+		r->presumed_offset = presumed_offset;
+		addr = presumed_offset + r->delta;
+		r++;
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
 		*cs++ = ++wrk->seqno[engine];
+		offset += 4 * sizeof(uint32_t);
 
-		reloc[1].delta = VCS_SEQNO_OFFSET(engine) + sizeof(uint32_t);
-		reloc[1].presumed_offset = presumed_offset;
-		addr = presumed_offset + reloc[1].delta;
-		*cs++ = MI_STORE_DWORD_IMM;
-		*cs++ = addr;
-		*cs++ = addr >> 32;
-		*cs++ = *REG(RCS_TIMESTAMP);
+		/* When we are busy, we can just reuse the last set of timings.
+		 * If we have been idle for a while, we want to resample the
+		 * latency on each engine (to measure external load).
+		 */
+		if (flags & INIT_CLOCKS) {
+			r->offset = offset + sizeof(uint32_t);
+			r->delta = VCS_SEQNO_OFFSET(engine) + sizeof(uint32_t);
+			r->presumed_offset = presumed_offset;
+			addr = presumed_offset + r->delta;
+			r++;
+			*cs++ = MI_STORE_DWORD_IMM;
+			*cs++ = addr;
+			*cs++ = addr >> 32;
+			*cs++ = *REG(RCS_TIMESTAMP);
+			offset += 4 * sizeof(uint32_t);
 
-		reloc[2].delta = VCS_SEQNO_OFFSET(engine) + 2*sizeof(uint32_t);
-		reloc[2].presumed_offset = presumed_offset;
-		addr = presumed_offset + reloc[2].delta;
-		*cs++ = 0x24 << 23 | 2; /* MI_STORE_REG_MEM */
-		*cs++ = RCS_TIMESTAMP;
-		*cs++ = addr;
-		*cs++ = addr >> 32;
+			r->offset = offset + 2 * sizeof(uint32_t);
+			r->delta = VCS_SEQNO_OFFSET(engine) + 2*sizeof(uint32_t);
+			r->presumed_offset = presumed_offset;
+			addr = presumed_offset + r->delta;
+			r++;
+			*cs++ = 0x24 << 23 | 2; /* MI_STORE_REG_MEM */
+			*cs++ = RCS_TIMESTAMP;
+			*cs++ = addr;
+			*cs++ = addr >> 32;
+			offset += 4 * sizeof(uint32_t);
+		}
 
-		reloc[3].delta = VCS_SEQNO_OFFSET(engine) + 3*sizeof(uint32_t);
-
-		reloc[3].presumed_offset = presumed_offset;
-		addr = presumed_offset + reloc[3].delta;
+		r->offset = offset + sizeof(uint32_t);
+		r->delta = VCS_SEQNO_OFFSET(engine) + 3*sizeof(uint32_t);
+		r->presumed_offset = presumed_offset;
+		addr = presumed_offset + r->delta;
+		r++;
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
 		*cs++ = wrk->seqno[engine];
+		offset += 4 * sizeof(uint32_t);
 
 		*cs++ = MI_BATCH_BUFFER_END;
 
@@ -1217,7 +1235,7 @@ run_workload(unsigned int id, struct workload *wrk,
 
 	hars_petruska_f54_1_random_seed((flags & SYNCEDCLIENTS) ? 0 : id);
 
-	init_status_page(wrk);
+	init_status_page(wrk, INIT_ALL);
 	for (j = 0; run && (background || j < repeat); j++) {
 		clock_gettime(CLOCK_MONOTONIC, &wrk->repeat_start);
 
@@ -1311,7 +1329,7 @@ run_workload(unsigned int id, struct workload *wrk,
 
 			if (w->wait) {
 				gem_sync(fd, w->obj[0].handle);
-				init_status_page(wrk);
+				init_status_page(wrk, 0);
 			}
 
 			if (qd_throttle > 0) {
