@@ -902,7 +902,7 @@ __rt_balance(const struct workload_balancer *balancer,
 	     struct workload *wrk, struct w_step *w, bool random)
 {
 	unsigned long qd[NUM_ENGINES];
-	struct rt_depth results;
+	unsigned int engine;
 
 	igt_assert(w->engine == VCS);
 
@@ -912,31 +912,22 @@ __rt_balance(const struct workload_balancer *balancer,
 	 * all batches on that engine, plus the time we expect this batch to
 	 * take. We try to keep the total balanced between the engines.
 	 */
-	get_rt_depth(wrk, VCS1, &results);
-	qd[VCS1] = wrk->seqno[VCS1] - results.seqno;
-	wrk->qd_sum[VCS1] += qd[VCS1];
-	qd[VCS1] = (qd[VCS1] + 1) * (results.completed - results.submitted);
-#ifdef DEBUG
-	printf("qd[0] = %d (%d - %d) x %d (%d - %d) = %ld\n",
-	       wrk->seqno[VCS1] - wrk->status_page[0],
-	       wrk->seqno[VCS1], wrk->status_page[0],
-	       wrk->status_page[2] - wrk->status_page[1],
-	       wrk->status_page[2], wrk->status_page[1],
-	       qd[VCS1]);
-#endif
+	for (engine = VCS1; engine <= VCS2; engine++) {
+		struct rt_depth rt;
 
-	get_rt_depth(wrk, VCS2, &results);
-	qd[VCS2] = wrk->seqno[VCS2] - results.seqno;
-	wrk->qd_sum[VCS2] += qd[VCS2];
-	qd[VCS2] = (qd[VCS2] + 1) * (results.completed - results.submitted);
+		get_rt_depth(wrk, engine, &rt);
+		qd[engine] = wrk->seqno[engine] - rt.seqno;
+		wrk->qd_sum[engine] += qd[engine];
+		qd[engine] = (qd[engine] + 1) * (rt.completed - rt.submitted);
 #ifdef DEBUG
-	printf("qd[1] = %d (%d - %d) x %d (%d - %d) = %ld\n",
-	       wrk->seqno[VCS2] - wrk->status_page[16],
-	       wrk->seqno[VCS2], wrk->status_page[16],
-	       wrk->status_page[18] - wrk->status_page[17],
-	       wrk->status_page[18], wrk->status_page[17],
-	       qd[VCS2]);
+		printf("qd[0] = %d (%d - %d) x %d (%d - %d) = %ld\n",
+		       wrk->seqno[engine] - rt.seqno,
+		       wrk->seqno[engine], rt.seqno,
+		       rt.completed - rt.submitted,
+		       rt.completed, rt.submitted,
+		       qd[engine]);
 #endif
+	}
 
 	return __rt_select_engine(wrk, qd, random);
 }
@@ -961,7 +952,7 @@ rtavg_balance(const struct workload_balancer *balancer,
 	   struct workload *wrk, struct w_step *w)
 {
 	unsigned long qd[NUM_ENGINES];
-	struct rt_depth results;
+	unsigned int engine;
 
 	igt_assert(w->engine == VCS);
 
@@ -971,45 +962,31 @@ rtavg_balance(const struct workload_balancer *balancer,
 	 * all batches on that engine plus the time we expect to execute in.
 	 * We try to keep the total remaining balanced between the engines.
 	 */
-	get_rt_depth(wrk, VCS1, &results);
-	if (results.seqno != wrk->rt.last[VCS1]) {
-		igt_assert((long)(results.completed - results.submitted) > 0);
-		ewma_rt_add(&wrk->rt.avg[VCS1],
-			    results.completed - results.submitted);
-		wrk->rt.last[VCS1] = results.seqno;
-	}
-	qd[VCS1] = wrk->seqno[VCS1] - results.seqno;
-	wrk->qd_sum[VCS1] += qd[VCS1];
-	qd[VCS1] = (qd[VCS1] + 1) * ewma_rt_read(&wrk->rt.avg[VCS1]);
+	for (engine = VCS1; engine <= VCS2; engine++) {
+		struct rt_depth rt;
+
+		get_rt_depth(wrk, engine, &rt);
+		if (rt.seqno != wrk->rt.last[engine]) {
+			igt_assert((long)(rt.completed - rt.submitted) > 0);
+			ewma_rt_add(&wrk->rt.avg[engine],
+				    rt.completed - rt.submitted);
+			wrk->rt.last[engine] = rt.seqno;
+		}
+		qd[engine] = wrk->seqno[engine] - rt.seqno;
+		wrk->qd_sum[engine] += qd[engine];
+		qd[engine] =
+			(qd[engine] + 1) * ewma_rt_read(&wrk->rt.avg[engine]);
 
 #ifdef DEBUG
-	printf("qd[0] = %d (%d - %d) x %ld (%d) = %ld\n",
-	       wrk->seqno[VCS1] - wrk->status_page[0],
-	       wrk->seqno[VCS1], wrk->status_page[0],
-	       ewma_rt_read(&wrk->rt.avg[VCS1]),
-	       wrk->status_page[2] -  wrk->status_page[1],
-	       qd[VCS1]);
+		printf("qd[%d] = %d (%d - %d) x %ld (%d) = %ld\n",
+		       engine,
+		       wrk->seqno[engine] - rt.seqno,
+		       wrk->seqno[engine], rt.seqno,
+		       ewma_rt_read(&wrk->rt.avg[engine]),
+		       rt.completed - rt.submitted,
+		       qd[engine]);
 #endif
-
-	get_rt_depth(wrk, VCS2, &results);
-	if (results.seqno != wrk->rt.last[VCS2]) {
-		igt_assert((long)(results.completed - results.submitted) > 0);
-		ewma_rt_add(&wrk->rt.avg[VCS2],
-			    results.completed - results.submitted);
-		wrk->rt.last[VCS2] = results.seqno;
 	}
-	qd[VCS2] = wrk->seqno[VCS2] - results.seqno;
-	wrk->qd_sum[VCS2] += qd[VCS2];
-	qd[VCS2] = (qd[VCS2] + 1) * ewma_rt_read(&wrk->rt.avg[VCS2]);
-
-#ifdef DEBUG
-	printf("qd[1] = %d (%d - %d) x %ld (%d) = %ld\n",
-	       wrk->seqno[VCS2] - wrk->status_page[16],
-	       wrk->seqno[VCS2], wrk->status_page[16],
-	       ewma_rt_read(&wrk->rt.avg[VCS2]),
-	       wrk->status_page[18] - wrk->status_page[17],
-	       qd[VCS2]);
-#endif
 
 	return __rt_select_engine(wrk, qd, false);
 }
