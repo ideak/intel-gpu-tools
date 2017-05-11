@@ -888,8 +888,8 @@ static void get_rt_depth(struct workload *wrk,
 	do {
 		latch = READ_ONCE(wrk->status_page[idx + 3]);
 
-		rt->submitted = wrk->status_page[idx + 1];
-		rt->completed = wrk->status_page[idx + 2];
+		rt->submitted = READ_ONCE(wrk->status_page[idx + 1]);
+		rt->completed = READ_ONCE(wrk->status_page[idx + 2]);
 		rt->seqno = READ_ONCE(wrk->status_page[idx]);
 	} while (latch != rt->seqno);
 }
@@ -1094,6 +1094,7 @@ update_bb_rt(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
 	if (!(w->eb.flags & I915_EXEC_NO_RELOC)) {
 		w->reloc[1].presumed_offset = -1;
 		w->reloc[2].presumed_offset = -1;
+		w->reloc[3].presumed_offset = -1;
 	}
 }
 
