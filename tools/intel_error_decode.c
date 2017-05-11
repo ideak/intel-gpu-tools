@@ -482,7 +482,7 @@ static int zlib_inflate(uint32_t **ptr, int len)
 
 	out = malloc(128*4096); /* approximate obj size */
 	zstream.next_out = out;
-	zstream.avail_out = 40*len;
+	zstream.avail_out = 128*4096;
 
 	do {
 		switch (inflate(&zstream, Z_SYNC_FLUSH)) {
@@ -576,10 +576,9 @@ read_data_file(FILE *file)
 
 		if (line[0] == ':' || line[0] == '~') {
 			count = ascii85_decode(line+1, &data, line[0] == ':');
-			if (count == 0) {
-				fprintf(stderr, "ASCII85 decode failed.\n");
-				exit(1);
-			}
+			if (count == 0)
+				fprintf(stderr, "ASCII85 decode failed (%s - %s).\n",
+					ring_name, buffer_name);
 			decode(decode_ctx,
 			       buffer_name, ring_name,
 			       gtt_offset, head_offset,
