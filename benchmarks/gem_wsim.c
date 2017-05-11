@@ -159,7 +159,7 @@ static int fd;
 #define SYNCEDCLIENTS	(1<<6)
 #define HEARTBEAT	(1<<7)
 
-#define VCS_SEQNO_IDX(engine) (((engine) - VCS1) * 16)
+#define VCS_SEQNO_IDX(engine) ((engine) * 16)
 #define VCS_SEQNO_OFFSET(engine) (VCS_SEQNO_IDX(engine) * sizeof(uint32_t))
 
 #define RCS_TIMESTAMP (0x2000 + 0x358)
@@ -715,9 +715,6 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 		if (w->type != BATCH)
 			continue;
 
-		if (engine != VCS && engine != VCS1 && engine != VCS2)
-			_flags &= ~(SEQNO | RT);
-
 		if (engine == VCS)
 			_flags &= ~SWAPVCS;
 
@@ -1063,8 +1060,6 @@ static const struct workload_balancer all_balancers[] = {
 static void
 update_bb_seqno(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
 {
-	igt_assert(engine == VCS1 || engine == VCS2);
-
 	gem_set_domain(fd, w->bb_handle,
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
@@ -1081,8 +1076,6 @@ update_bb_seqno(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
 static void
 update_bb_rt(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
 {
-	igt_assert(engine == VCS1 || engine == VCS2);
-
 	gem_set_domain(fd, w->bb_handle,
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
@@ -1149,7 +1142,7 @@ static void init_status_page(struct workload *wrk, unsigned int flags)
 	if (flags & INIT_CLOCKS)
 		wrk->status_object[1].relocation_count += 2;
 
-	for (int engine = VCS1; engine <= VCS2; engine++) {
+	for (int engine = 0; engine < NUM_ENGINES; engine++) {
 		struct drm_i915_gem_relocation_entry *r = reloc;
 		uint64_t presumed_offset = wrk->status_object[0].offset;
 		uint32_t offset = engine * 128;
@@ -1282,20 +1275,17 @@ run_workload(unsigned int id, struct workload *wrk,
 			}
 
 			wrk->nr_bb[engine]++;
-
 			if (engine == VCS && balancer) {
 				engine = balancer->balance(balancer, wrk, w);
 				wrk->nr_bb[engine]++;
-
-				eb_update_flags(w, engine, flags);
-
-				if (flags & SEQNO)
-					update_bb_seqno(w, engine,
-							++wrk->seqno[engine]);
-				if (flags & RT)
-					update_bb_rt(w, engine,
-						     wrk->seqno[engine]);
 			}
+			eb_update_flags(w, engine, flags);
+
+			wrk->seqno[engine]++;
+			if (flags & SEQNO)
+				update_bb_seqno(w, engine, wrk->seqno[engine]);
+			if (flags & RT)
+				update_bb_rt(w, engine, wrk->seqno[engine]);
 
 			if (w->duration.min != w->duration.max) {
 				unsigned int d = get_duration(&w->duration);
