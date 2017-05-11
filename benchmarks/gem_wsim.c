@@ -1579,7 +1579,15 @@ int main(int argc, char **argv)
 	double t;
 	int i, c;
 
-	fd = drm_open_driver(DRIVER_INTEL);
+	/*
+	 * Open the device via the low-level API so we can do the GPU quiesce
+	 * manually as close as possible in time to the start of the workload.
+	 * This minimizes the gap in engine utilization tracking when observed
+	 * via external tools like trace.pl.
+	 */
+	fd = __drm_open_driver(DRIVER_INTEL);
+	igt_require(fd);
+
 	init_clocks();
 
 	while ((c = getopt(argc, argv, "hqv2RSHxc:n:r:w:W:t:b:")) != -1) {
@@ -1744,6 +1752,8 @@ int main(int argc, char **argv)
 
 		prepare_workload(i, w[i], flags_);
 	}
+
+	gem_quiescent_gpu(fd);
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
 
