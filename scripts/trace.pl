@@ -169,7 +169,7 @@ sub arg_trace
 		shift @_;
 
 		unshift @_, join(',', @events);
-		unshift @_, ('perf', 'record', '-a', '-c', '1', '-e');
+		unshift @_, ('perf', 'record', '-a', '-c', '1', '-q', '-e');
 
 		exec @_;
 	}
