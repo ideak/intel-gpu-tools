@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/poll.h>
 #include <sys/time.h>
 #include <time.h>
 #include "drm.h"
@@ -364,6 +365,7 @@ static int __gem_context_create(int fd, uint32_t *ctx_id)
 	*ctx_id = arg.ctx_id;
 	return ret;
 }
+
 static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 {
 	const int ncpus = flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1;
@@ -486,6 +488,113 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 	munmap(results, 4096);
 }
 
+#define LOCAL_EXEC_FENCE_OUT (1 << 17)
+#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
+
+static int __gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err = 0;
+	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
+		err = -errno;
+	errno = 0;
+	return err;
+}
+
+static void gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	igt_assert_eq(__gem_execbuf_wr(fd, execbuf), 0);
+}
+
+static bool fence_enable_signaling(int fence)
+{
+	return poll(&(struct pollfd){fence, POLLIN}, 1, 0) == 0;
+}
+
+static bool fence_wait(int fence)
+{
+	return poll(&(struct pollfd){fence, POLLIN}, 1, -1) == 1;
+}
+
+static void signal(int fd, uint32_t handle,
+		   unsigned ring_id, const char *ring_name,
+		   int timeout)
+{
+#define NFENCES 512
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj;
+	struct timespec start, now;
+	unsigned engines[16];
+	unsigned nengine;
+	int *fences, n;
+	unsigned long count, signal;
+
+	igt_require(gem_has_exec_fence(fd));
+
+	nengine = 0;
+	if (ring_id == -1) {
+		for_each_engine(fd, n) {
+			if (ignore_engine(fd, n))
+				continue;
+
+			engines[nengine++] = n;
+		}
+	} else {
+		engines[nengine++] = ring_id;
+	}
+	igt_require(nengine);
+
+	fences = malloc(sizeof(*fences) * NFENCES);
+	igt_assert(fences);
+	memset(fences, -1, sizeof(*fences) * NFENCES);
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = handle;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags = LOCAL_EXEC_FENCE_OUT;
+
+	n = 0;
+	count = 0;
+	signal = 0;
+
+	intel_detect_and_clear_missed_interrupts(fd);
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	do {
+		for (int loop = 0; loop < 1024; loop++) {
+			for (int e = 0; e < nengine; e++) {
+				if (fences[n] != -1) {
+					igt_assert(fence_wait(fences[n]));
+					close(fences[n]);
+				}
+
+				execbuf.flags &= ~ENGINE_FLAGS;
+				execbuf.flags |= engines[e];
+				gem_execbuf_wr(fd, &execbuf);
+
+				/* Enable signaling by doing a poll() */
+				fences[n] = execbuf.rsvd2 >> 32;
+				signal += fence_enable_signaling(fences[n]);
+
+				n = (n + 1) % NFENCES;
+			}
+		}
+
+		count += 1024 * nengine;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+	} while (elapsed(&start, &now) < timeout);
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+
+	for (n = 0; n < NFENCES; n++)
+		if (fences[n] != -1)
+			close(fences[n]);
+	free(fences);
+
+	igt_info("Signal %s: %'lu cycles (%'lu signals): %.3fus\n",
+		 ring_name, count, signal, elapsed(&start, &now) * 1e6 / count);
+}
+
 static void print_welcome(int fd)
 {
 	bool active;
@@ -543,9 +652,15 @@ igt_main
 	igt_subtest("basic-sequential")
 		sequential(device, handle, 0, 5);
 
-	for (e = intel_execution_engines; e->name; e++)
+	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%s", e->name)
 			single(device, handle, e->exec_id | e->flags, e->name);
+		igt_subtest_f("signal-%s", e->name)
+			signal(device, handle, e->exec_id | e->flags, e->name, 5);
+	}
+
+	igt_subtest("signal-all")
+		signal(device, handle, -1, "all", 150);
 
 	igt_subtest("series")
 		series(device, handle, 150);
