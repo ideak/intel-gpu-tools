@@ -539,6 +539,7 @@ static void signal(int fd, uint32_t handle,
 			engines[nengine++] = n;
 		}
 	} else {
+		gem_require_ring(fd, ring_id);
 		engines[nengine++] = ring_id;
 	}
 	igt_require(nengine);
