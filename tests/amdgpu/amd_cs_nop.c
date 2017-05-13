@@ -150,6 +150,7 @@ static void nop_cs(amdgpu_device_handle device,
 		struct amdgpu_cs_ib_info ib_info;
 		struct timespec tv = {};
 		uint64_t submit_ns, sync_ns;
+		unsigned long count;
 
 		memset(&ib_info, 0, sizeof(struct amdgpu_cs_ib_info));
 		ib_info.ib_mc_address = ib_result_mc_address;
@@ -162,6 +163,7 @@ static void nop_cs(amdgpu_device_handle device,
 		ibs_request.ibs = &ib_info;
 		ibs_request.resources = bo_list;
 
+		count = 0;
 		igt_nsec_elapsed(&tv);
 		igt_until_timeout(timeout) {
 			r = amdgpu_cs_submit(context, 0, &ibs_request, 1);
@@ -169,15 +171,16 @@ static void nop_cs(amdgpu_device_handle device,
 			if (flags & SYNC)
 				amdgpu_cs_sync(context, ip_type, ring,
 					       ibs_request.seq_no);
+			count++;
 		}
 		submit_ns = igt_nsec_elapsed(&tv);
 
 		amdgpu_cs_sync(context, ip_type, ring, ibs_request.seq_no);
 		sync_ns = igt_nsec_elapsed(&tv);
 
-		igt_info("%s.%d: submit %.2fus, sync %.2fus\n", name, child,
-			 1e-3 * submit_ns / ibs_request.seq_no,
-			 1e-3 * sync_ns / ibs_request.seq_no);
+		igt_info("%s.%d: %'lu cycles, submit %.2fus, sync %.2fus\n",
+			 name, child, count,
+			 1e-3 * submit_ns / count, 1e-3 * sync_ns / count);
 	}
 	igt_waitchildren();
 
