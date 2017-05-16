@@ -497,8 +497,10 @@ clone_workload(struct workload *_wrk)
 #define PAGE_SIZE (4096)
 #endif
 
-static unsigned int get_duration(struct duration *dur)
+static unsigned int get_duration(struct w_step *w)
 {
+	struct duration *dur = &w->duration;
+
 	if (dur->min == dur->max)
 		return dur->min;
 	else
@@ -1306,14 +1308,9 @@ run_workload(unsigned int id, struct workload *wrk,
 			if (flags & RT)
 				update_bb_rt(w, engine, wrk->seqno[engine]);
 
-			if (w->duration.min != w->duration.max) {
-				unsigned int d = get_duration(&w->duration);
-				unsigned long offset;
-
-				offset = ALIGN(w->bb_sz - get_bb_sz(d),
-					       2 * sizeof(uint32_t));
-				w->eb.batch_start_offset = offset;
-			}
+			w->eb.batch_start_offset =
+				ALIGN(w->bb_sz - get_bb_sz(get_duration(w)),
+				      2 * sizeof(uint32_t));
 
 			if (throttle > 0)
 				w_sync_to(wrk, w, i - throttle);
