@@ -92,7 +92,14 @@ struct w_step
 	struct deps data_deps;
 	struct deps fence_deps;
 	int emit_fence;
-	int wait;
+	union {
+		int sync;
+		int delay;
+		int period;
+		int target;
+		int throttle;
+		int fence_signal;
+	};
 
 	/* Implementation details */
 	unsigned int idx;
@@ -268,7 +275,7 @@ parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 					}
 
 					step.type = DELAY;
-					step.wait = tmp;
+					step.delay = tmp;
 					goto add_step;
 				}
 			} else if (!strcasecmp(field, "p")) {
@@ -284,7 +291,7 @@ parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 					}
 
 					step.type = PERIOD;
-					step.wait = tmp;
+					step.period = tmp;
 					goto add_step;
 				}
 			} else if (!strcasecmp(field, "s")) {
@@ -301,7 +308,7 @@ parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 					}
 
 					step.type = SYNC;
-					step.wait = tmp;
+					step.target = tmp;
 					goto add_step;
 				}
 			} else if (!strcasecmp(field, "t")) {
@@ -317,7 +324,7 @@ parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 					}
 
 					step.type = THROTTLE;
-					step.wait = tmp;
+					step.throttle = tmp;
 					goto add_step;
 				}
 			} else if (!strcasecmp(field, "q")) {
@@ -333,7 +340,7 @@ parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 					}
 
 					step.type = QD_THROTTLE;
-					step.wait = tmp;
+					step.throttle = tmp;
 					goto add_step;
 				}
 			}
@@ -435,7 +442,7 @@ parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 						nr_steps);
 				return NULL;
 			}
-			step.wait = field[0] - '0';
+			step.sync = field[0] - '0';
 
 			valid++;
 		}
@@ -1354,12 +1361,12 @@ run_workload(unsigned int id, struct workload *wrk,
 			int do_sleep = 0;
 
 			if (w->type == DELAY) {
-				do_sleep = w->wait;
+				do_sleep = w->delay;
 			} else if (w->type == PERIOD) {
 				struct timespec now;
 
 				clock_gettime(CLOCK_MONOTONIC, &now);
-				do_sleep = w->wait -
+				do_sleep = w->period -
 					   elapsed_us(&wrk->repeat_start, &now);
 				if (do_sleep < 0) {
 					if (verbose > 1)
@@ -1368,17 +1375,17 @@ run_workload(unsigned int id, struct workload *wrk,
 					continue;
 				}
 			} else if (w->type == SYNC) {
-				unsigned int s_idx = i + w->wait;
+				unsigned int s_idx = i + w->target;
 
 				igt_assert(i > 0 && i < wrk->nr_steps);
 				igt_assert(wrk->steps[s_idx].type == BATCH);
 				gem_sync(fd, wrk->steps[s_idx].obj[0].handle);
 				continue;
 			} else if (w->type == THROTTLE) {
-				throttle = w->wait;
+				throttle = w->throttle;
 				continue;
 			} else if (w->type == QD_THROTTLE) {
-				qd_throttle = w->wait;
+				qd_throttle = w->throttle;
 				continue;
 			}
 
@@ -1419,7 +1426,7 @@ run_workload(unsigned int id, struct workload *wrk,
 				}
 			}
 
-			if (w->wait) {
+			if (w->sync) {
 				gem_sync(fd, w->obj[0].handle);
 				if (flags & HEARTBEAT)
 					init_status_page(wrk, 0);
