@@ -49,6 +49,7 @@
 #include "intel_io.h"
 #include "igt_aux.h"
 #include "igt_rand.h"
+#include "sw_sync.h"
 
 #include "ewma.h"
 
@@ -73,7 +74,9 @@ enum w_type
 	DELAY,
 	PERIOD,
 	THROTTLE,
-	QD_THROTTLE
+	QD_THROTTLE,
+	SW_FENCE,
+	SW_FENCE_SIGNAL
 };
 
 struct deps
@@ -137,6 +140,9 @@ struct workload
 
 	unsigned int nr_ctxs;
 	uint32_t *ctx_id;
+
+	int sync_timeline;
+	uint32_t sync_seqno;
 
 	uint32_t seqno[NUM_ENGINES];
 	struct drm_i915_gem_exec_object2 status_object[2];
@@ -343,6 +349,25 @@ parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 					step.throttle = tmp;
 					goto add_step;
 				}
+			} else if (!strcasecmp(field, "a")) {
+				if ((field = strtok_r(fstart, ".", &fctx)) !=
+				    NULL) {
+					tmp = atoi(field);
+					if (tmp >= 0) {
+						if (verbose)
+							fprintf(stderr,
+								"Invalid sw fence signal at step %u!\n",
+								nr_steps);
+						return NULL;
+					}
+
+					step.type = SW_FENCE_SIGNAL;
+					step.target = tmp;
+					goto add_step;
+				}
+			} else if (!strcasecmp(field, "f")) {
+				step.type = SW_FENCE;
+				goto add_step;
 			}
 
 			tmp = atoi(field);
@@ -496,9 +521,31 @@ add_step:
 	for (i = 0; i < nr_steps; i++) {
 		for (j = 0; j < steps[i].fence_deps.nr; j++) {
 			tmp = steps[i].idx + steps[i].fence_deps.list[j];
-			igt_assert(tmp >= 0 && tmp < i);
-			igt_assert(steps[tmp].type == BATCH);
+			if (tmp < 0 || tmp >= i ||
+			    (steps[tmp].type != BATCH &&
+			     steps[tmp].type != SW_FENCE)) {
+				if (verbose)
+					fprintf(stderr,
+						"Invalid dependency target %u!\n",
+						i);
+				return NULL;
+			}
 			steps[tmp].emit_fence = -1;
+		}
+	}
+
+	/* Validate SW_FENCE_SIGNAL targets. */
+	for (i = 0; i < nr_steps; i++) {
+		if (steps[i].type == SW_FENCE_SIGNAL) {
+			tmp = steps[i].idx + steps[i].target;
+			if (tmp < 0 || tmp >= i ||
+			    steps[tmp].type != SW_FENCE) {
+				if (verbose)
+					fprintf(stderr,
+						"Invalid sw fence target %u!\n",
+						i);
+				return NULL;
+			}
 		}
 	}
 
@@ -523,6 +570,15 @@ clone_workload(struct workload *_wrk)
 	igt_assert(wrk->steps);
 
 	memcpy(wrk->steps, _wrk->steps, sizeof(struct w_step) * wrk->nr_steps);
+
+	/* Check if we need a sw sync timeline. */
+	for (i = 0; i < wrk->nr_steps; i++) {
+		if (wrk->steps[i].type == SW_FENCE) {
+			wrk->sync_timeline = sw_sync_timeline_create();
+			igt_assert(wrk->sync_timeline >= 0);
+			break;
+		}
+	}
 
 	for (i = 0; i < NUM_ENGINES; i++)
 		igt_list_init(&wrk->requests[i]);
@@ -678,7 +734,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		if (w->data_deps.list[i]) {
 			int dep_idx = w->idx + w->data_deps.list[i];
 
-			igt_assert(dep_idx >= 0 && dep_idx < wrk->nr_steps);
+			igt_assert(dep_idx >= 0 && dep_idx < w->idx);
 			igt_assert(wrk->steps[dep_idx].type == BATCH);
 
 			w->obj[j].handle = wrk->steps[dep_idx].obj[0].handle;
@@ -1353,6 +1409,8 @@ run_workload(unsigned int id, struct workload *wrk,
 
 	init_status_page(wrk, INIT_ALL);
 	for (j = 0; run && (background || j < repeat); j++) {
+		unsigned int cur_seqno = wrk->sync_seqno;
+
 		clock_gettime(CLOCK_MONOTONIC, &wrk->repeat_start);
 
 		for (i = 0, w = wrk->steps; run && (i < wrk->nr_steps);
@@ -1377,7 +1435,7 @@ run_workload(unsigned int id, struct workload *wrk,
 			} else if (w->type == SYNC) {
 				unsigned int s_idx = i + w->target;
 
-				igt_assert(i > 0 && i < wrk->nr_steps);
+				igt_assert(s_idx >= 0 && s_idx < i);
 				igt_assert(wrk->steps[s_idx].type == BATCH);
 				gem_sync(fd, wrk->steps[s_idx].obj[0].handle);
 				continue;
@@ -1386,6 +1444,23 @@ run_workload(unsigned int id, struct workload *wrk,
 				continue;
 			} else if (w->type == QD_THROTTLE) {
 				qd_throttle = w->throttle;
+				continue;
+			} else if (w->type == SW_FENCE) {
+				igt_assert(w->emit_fence < 0);
+				w->emit_fence =
+					sw_sync_timeline_create_fence(wrk->sync_timeline,
+								      cur_seqno + w->idx);
+				igt_assert(w->emit_fence > 0);
+				continue;
+			} else if (w->type == SW_FENCE_SIGNAL) {
+				int tgt = w->idx + w->target;
+				int inc;
+
+				igt_assert(tgt >= 0 && tgt < i);
+				igt_assert(wrk->steps[tgt].type == SW_FENCE);
+				cur_seqno += wrk->steps[tgt].idx;
+				inc = cur_seqno - wrk->sync_seqno;
+				sw_sync_timeline_inc(wrk->sync_timeline, inc);
 				continue;
 			}
 
@@ -1446,6 +1521,14 @@ run_workload(unsigned int id, struct workload *wrk,
 					wrk->nrequest[engine]--;
 				}
 			}
+		}
+
+		if (wrk->sync_timeline) {
+			int inc;
+
+			inc = wrk->nr_steps - (cur_seqno - wrk->sync_seqno);
+			sw_sync_timeline_inc(wrk->sync_timeline, inc);
+			wrk->sync_seqno += wrk->nr_steps;
 		}
 
 		/* Cleanup all fences instantiated in this iteration. */

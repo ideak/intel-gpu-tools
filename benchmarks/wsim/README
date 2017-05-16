@@ -3,7 +3,8 @@ Workload descriptor format
 
 ctx.engine.duration_us.dependency.wait,...
 <uint>.<str>.<uint>[-<uint>].<int <= 0>[/<int <= 0>][...].<0|1>,...
-d|p|s|t|q.<uiny>,...
+d|p|s|t|q|a.<int>,...
+f
 
 For duration a range can be given from which a random value will be picked
 before every submit. Since this and seqno management requires CPU access to
@@ -17,8 +18,10 @@ Additional workload steps are also supported:
  'p' - Adds a delay relative to the start of previous loop so that the each loop
        starts execution with a given period.
  's' - Synchronises the pipeline to a batch relative to the step.
- 't' - Throttle every n batches
- 'q' - Throttle to n max queue depth
+ 't' - Throttle every n batches.
+ 'q' - Throttle to n max queue depth.
+ 'f' - Create a sync fence.
+ 'a' - Advance the previously created sync fence.
 
 Engine ids: RCS, BCS, VCS, VCS1, VCS2, VECS
 
@@ -77,8 +80,33 @@ as a dependency in the current step.
 
 Example:
 
-  1.VCS1.3000.0.1
+  1.VCS1.3000.0.0
   1.RCS.500-1000.-1/f-1.0
 
 In this case the second step will have both a data dependency and a sync fence
 dependency on the previous step.
+
+Example:
+
+  1.RCS.500-1000.0.0
+  1.VCS1.3000.f-1.0
+  1.VCS2.3000.f-2.0
+
+VCS1 and VCS2 batches will have a sync fence dependency on the RCS batch.
+
+Example:
+
+  1.RCS.500-1000.0.0
+  f
+  2.VCS1.3000.f-1.0
+  2.VCS2.3000.f-2.0
+  1.RCS.500-1000.0.1
+  a.-4
+  s.-4
+  s.-4
+
+VCS1 and VCS2 batches have an input sync fence dependecy on the standalone fence
+created at the second step. They are submitted ahead of time while still not
+runnable. When the second RCS batch completes the standalone fence is signaled
+which allows the two VCS batches to be executed. Finally we wait until the both
+VCS batches have completed before starting the (optional) next iteration.
