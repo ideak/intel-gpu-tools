@@ -501,9 +501,9 @@ static bool fence_wait(int fence)
 	return poll(&(struct pollfd){fence, POLLIN}, 1, -1) == 1;
 }
 
-static void signal(int fd, uint32_t handle,
-		   unsigned ring_id, const char *ring_name,
-		   int timeout)
+static void fence_signal(int fd, uint32_t handle,
+			 unsigned ring_id, const char *ring_name,
+			 int timeout)
 {
 #define NFENCES 512
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -643,11 +643,11 @@ igt_main
 		igt_subtest_f("%s", e->name)
 			single(device, handle, e->exec_id | e->flags, e->name);
 		igt_subtest_f("signal-%s", e->name)
-			signal(device, handle, e->exec_id | e->flags, e->name, 5);
+			fence_signal(device, handle, e->exec_id | e->flags, e->name, 5);
 	}
 
 	igt_subtest("signal-all")
-		signal(device, handle, -1, "all", 150);
+		fence_signal(device, handle, -1, "all", 150);
 
 	igt_subtest("series")
 		series(device, handle, 150);
