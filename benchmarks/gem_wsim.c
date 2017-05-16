@@ -209,7 +209,8 @@ parse_dependencies(unsigned int nr_steps, struct w_step *w, char *_desc)
 	return 0;
 }
 
-static struct workload *parse_workload(char *_desc, unsigned int flags)
+static struct workload *
+parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 {
 	struct workload *wrk;
 	unsigned int nr_steps = 0;
@@ -437,6 +438,22 @@ add_step:
 		memcpy(&steps[nr_steps - 1], &step, sizeof(step));
 
 		free(token);
+	}
+
+	if (app_w) {
+		unsigned int i;
+
+		steps = realloc(steps, sizeof(step) *
+				(nr_steps + app_w->nr_steps));
+		igt_assert(steps);
+
+		memcpy(&steps[nr_steps], app_w->steps,
+		       sizeof(step) * app_w->nr_steps);
+
+		for (i = 0; i < app_w->nr_steps; i++)
+			steps[nr_steps + i].idx += nr_steps;
+
+		nr_steps += app_w->nr_steps;
 	}
 
 	wrk = malloc(sizeof(*wrk));
@@ -1249,11 +1266,10 @@ run_workload(unsigned int id, struct workload *wrk,
 				do_sleep = w->wait -
 					   elapsed_us(&wrk->repeat_start, &now);
 				if (do_sleep < 0) {
-					if (verbose > 1) {
+					if (verbose > 1)
 						printf("%u: Dropped period @ %u/%u (%dus late)!\n",
 						       id, j, i, do_sleep);
-						continue;
-					}
+					continue;
 				}
 			} else if (w->type == SYNC) {
 				unsigned int s_idx = i + w->wait;
@@ -1270,10 +1286,12 @@ run_workload(unsigned int id, struct workload *wrk,
 				continue;
 			}
 
-			if (do_sleep) {
+			if (do_sleep || w->type == PERIOD) {
 				usleep(do_sleep);
 				continue;
 			}
+
+			igt_assert(w->type == BATCH);
 
 			wrk->nr_bb[engine]++;
 			if (engine == VCS && balancer) {
@@ -1439,6 +1457,7 @@ static void print_help(void)
 "                  Only one master workload can be optinally specified in which\n"
 "                  case all other workloads become background ones and run as\n"
 "                  long as the master.\n"
+"  -a <desc|path>  Append a workload to all other workloads.\n"
 "  -r <n>          How many times to emit the workload.\n"
 "  -c <n>          Fork N clients emitting the workload simultaneously.\n"
 "  -x              Swap VCS1 and VCS2 engines in every other client.\n"
@@ -1571,8 +1590,10 @@ int main(int argc, char **argv)
 	unsigned int flags = 0;
 	struct timespec t_start, t_end;
 	struct workload **w, **wrk = NULL;
+	struct workload *app_w = NULL;
 	unsigned int nr_w_args = 0;
 	int master_workload = -1;
+	char *append_workload_arg = NULL;
 	char **w_args = NULL;
 	unsigned int tolerance_pct = 1;
 	const struct workload_balancer *balancer = NULL;
@@ -1591,7 +1612,7 @@ int main(int argc, char **argv)
 
 	init_clocks();
 
-	while ((c = getopt(argc, argv, "hqv2RSHxc:n:r:w:W:t:b:")) != -1) {
+	while ((c = getopt(argc, argv, "hqv2RSHxc:n:r:w:W:a:t:b:")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -1604,6 +1625,15 @@ int main(int argc, char **argv)
 			/* Fall through */
 		case 'w':
 			w_args = add_workload_arg(w_args, ++nr_w_args, optarg);
+			break;
+		case 'a':
+			if (append_workload_arg) {
+				if (verbose)
+					fprintf(stderr,
+						"Only one append workload can be given!\n");
+				return 1;
+			}
+			append_workload_arg = optarg;
 			break;
 		case 'c':
 			clients = strtol(optarg, NULL, 0);
@@ -1695,6 +1725,27 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (append_workload_arg) {
+		append_workload_arg = load_workload_descriptor(append_workload_arg);
+		if (!append_workload_arg) {
+			if (verbose)
+				fprintf(stderr,
+					"Failed to load append workload descriptor!\n");
+			return 1;
+		}
+	}
+
+	if (append_workload_arg) {
+		app_w = parse_workload(append_workload_arg, flags, NULL);
+		if (!app_w) {
+			if (verbose)
+				fprintf(stderr,
+					"Failed to parse append workload %u!\n",
+					i);
+			return 1;
+		}
+	}
+
 	wrk = calloc(nr_w_args, sizeof(*wrk));
 	igt_assert(wrk);
 
@@ -1709,7 +1760,7 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
-		wrk[i] = parse_workload(w_args[i], flags);
+		wrk[i] = parse_workload(w_args[i], flags, app_w);
 		if (!wrk[i]) {
 			if (verbose)
 				fprintf(stderr,
