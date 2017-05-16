@@ -76,6 +76,12 @@ enum w_type
 	QD_THROTTLE
 };
 
+struct deps
+{
+	int nr;
+	int *list;
+};
+
 struct w_step
 {
 	/* Workload step metadata */
@@ -83,8 +89,9 @@ struct w_step
 	unsigned int context;
 	unsigned int engine;
 	struct duration duration;
-	int nr_deps;
-	int *dep;
+	struct deps data_deps;
+	struct deps fence_deps;
+	int emit_fence;
 	int wait;
 
 	/* Implementation details */
@@ -179,28 +186,41 @@ parse_dependencies(unsigned int nr_steps, struct w_step *w, char *_desc)
 {
 	char *desc = strdup(_desc);
 	char *token, *tctx = NULL, *tstart = desc;
-	int dep;
 
 	igt_assert(desc);
-
-	w->nr_deps = 0;
-	w->dep = NULL;
+	igt_assert(!w->data_deps.nr && w->data_deps.nr == w->fence_deps.nr);
+	igt_assert(!w->data_deps.list &&
+		   w->data_deps.list == w->fence_deps.list);
 
 	while ((token = strtok_r(tstart, "/", &tctx)) != NULL) {
+		char *str = token;
+		struct deps *deps;
+		int dep;
+
 		tstart = NULL;
 
-		dep = atoi(token);
+		if (strlen(token) > 1 && token[0] == 'f') {
+			deps = &w->fence_deps;
+			str++;
+		} else {
+			deps = &w->data_deps;
+		}
+
+		dep = atoi(str);
 		if (dep > 0 || ((int)nr_steps + dep) < 0) {
-			if (w->dep)
-				free(w-dep);
+			if (deps->list)
+				free(deps->list);
 			return -1;
 		}
 
 		if (dep < 0) {
-			w->nr_deps++;
-			w->dep = realloc(w->dep, sizeof(*w->dep) * w->nr_deps);
-			igt_assert(w->dep);
-			w->dep[w->nr_deps - 1] = dep;
+			deps->nr++;
+			/* Multiple fences not yet supported. */
+			igt_assert(deps->nr == 1 || deps != &w->fence_deps);
+			deps->list = realloc(deps->list,
+					     sizeof(*deps->list) * deps->nr);
+			igt_assert(deps->list);
+			deps->list[deps->nr - 1] = dep;
 		}
 	}
 
@@ -220,7 +240,7 @@ parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 	struct w_step step, *steps = NULL;
 	bool bcs_used = false;
 	unsigned int valid;
-	int tmp;
+	int i, j, tmp;
 
 	igt_assert(desc);
 
@@ -332,7 +352,7 @@ parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
 		}
 
 		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
-			unsigned int i, old_valid = valid;
+			unsigned int old_valid = valid;
 
 			fstart = NULL;
 
@@ -441,8 +461,6 @@ add_step:
 	}
 
 	if (app_w) {
-		unsigned int i;
-
 		steps = realloc(steps, sizeof(step) *
 				(nr_steps + app_w->nr_steps));
 		igt_assert(steps);
@@ -463,6 +481,19 @@ add_step:
 	wrk->steps = steps;
 
 	free(desc);
+
+	/*
+	 * Tag all steps which need to emit a sync fence if another step is
+	 * referencing them as a sync fence dependency.
+	 */
+	for (i = 0; i < nr_steps; i++) {
+		for (j = 0; j < steps[i].fence_deps.nr; j++) {
+			tmp = steps[i].idx + steps[i].fence_deps.list[j];
+			igt_assert(tmp >= 0 && tmp < i);
+			igt_assert(steps[tmp].type == BATCH);
+			steps[tmp].emit_fence = -1;
+		}
+	}
 
 	if (bcs_used && verbose)
 		printf("BCS usage in workload with VCS2 remapping enabled!\n");
@@ -608,6 +639,10 @@ eb_update_flags(struct w_step *w, enum intel_engine_id engine,
 
 	w->eb.flags |= I915_EXEC_HANDLE_LUT;
 	w->eb.flags |= I915_EXEC_NO_RELOC;
+
+	igt_assert(w->emit_fence <= 0);
+	if (w->emit_fence)
+		w->eb.flags |= I915_EXEC_FENCE_OUT;
 }
 
 static void
@@ -615,7 +650,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 {
 	enum intel_engine_id engine = w->engine;
 	unsigned int j = 0;
-	unsigned int nr_obj = 3 + w->nr_deps;
+	unsigned int nr_obj = 3 + w->data_deps.nr;
 	unsigned int i;
 
 	w->obj = calloc(nr_obj, sizeof(*w->obj));
@@ -631,10 +666,10 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		igt_assert(j < nr_obj);
 	}
 
-	for (i = 0; i < w->nr_deps; i++) {
-		igt_assert(w->dep[i] <= 0);
-		if (w->dep[i]) {
-			int dep_idx = w->idx + w->dep[i];
+	for (i = 0; i < w->data_deps.nr; i++) {
+		igt_assert(w->data_deps.list[i] <= 0);
+		if (w->data_deps.list[i]) {
+			int dep_idx = w->idx + w->data_deps.list[i];
 
 			igt_assert(dep_idx >= 0 && dep_idx < wrk->nr_steps);
 			igt_assert(wrk->steps[dep_idx].type == BATCH);
@@ -1231,6 +1266,65 @@ static void init_status_page(struct workload *wrk, unsigned int flags)
 	}
 }
 
+#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
+
+static int __gem_execbuf_wr(int gemfd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err = 0;
+	if (igt_ioctl(gemfd, LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
+		err = -errno;
+	errno = 0;
+	return err;
+}
+
+static void gem_execbuf_wr(int gemfd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	igt_assert_eq(__gem_execbuf_wr(gemfd, execbuf), 0);
+}
+
+static void
+do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
+      unsigned int flags)
+{
+	unsigned int i;
+
+	eb_update_flags(w, engine, flags);
+
+	wrk->seqno[engine]++;
+
+	if (flags & SEQNO)
+		update_bb_seqno(w, engine, wrk->seqno[engine]);
+	if (flags & RT)
+		update_bb_rt(w, engine, wrk->seqno[engine]);
+
+	w->eb.batch_start_offset =
+		ALIGN(w->bb_sz - get_bb_sz(get_duration(w)),
+			2 * sizeof(uint32_t));
+
+	for (i = 0; i < w->fence_deps.nr; i++) {
+		int tgt = w->idx + w->fence_deps.list[i];
+
+		/* TODO: fence merging needed to support multiple inputs */
+		igt_assert(i == 0);
+		igt_assert(tgt >= 0 && tgt < w->idx);
+		igt_assert(wrk->steps[tgt].emit_fence > 0);
+
+		w->eb.flags |= I915_EXEC_FENCE_IN;
+		w->eb.rsvd2 = wrk->steps[tgt].emit_fence;
+	}
+
+	if ((w->eb.flags & I915_EXEC_FENCE_IN) ||
+	    (w->eb.flags & I915_EXEC_FENCE_OUT))
+		gem_execbuf_wr(fd, &w->eb);
+	else
+		gem_execbuf(fd, &w->eb);
+
+	if (w->eb.flags & I915_EXEC_FENCE_OUT) {
+		w->emit_fence = w->eb.rsvd2 >> 32;
+		igt_assert(w->emit_fence > 0);
+	}
+}
+
 static void
 run_workload(unsigned int id, struct workload *wrk,
 	     bool background, int pipe_fd,
@@ -1300,22 +1394,12 @@ run_workload(unsigned int id, struct workload *wrk,
 				engine = balancer->balance(balancer, wrk, w);
 				wrk->nr_bb[engine]++;
 			}
-			eb_update_flags(w, engine, flags);
-
-			wrk->seqno[engine]++;
-			if (flags & SEQNO)
-				update_bb_seqno(w, engine, wrk->seqno[engine]);
-			if (flags & RT)
-				update_bb_rt(w, engine, wrk->seqno[engine]);
-
-			w->eb.batch_start_offset =
-				ALIGN(w->bb_sz - get_bb_sz(get_duration(w)),
-				      2 * sizeof(uint32_t));
 
 			if (throttle > 0)
 				w_sync_to(wrk, w, i - throttle);
 
-			gem_execbuf(fd, &w->eb);
+			do_eb(wrk, w, engine, flags);
+
 			if (w->request != -1) {
 				igt_list_del(&w->rq_link);
 				wrk->nrequest[w->request]--;
@@ -1354,6 +1438,15 @@ run_workload(unsigned int id, struct workload *wrk,
 					igt_list_del(&s->rq_link);
 					wrk->nrequest[engine]--;
 				}
+			}
+		}
+
+		/* Cleanup all fences instantiated in this iteration. */
+		for (i = 0, w = wrk->steps; run && (i < wrk->nr_steps);
+		     i++, w++) {
+			if (w->emit_fence > 0) {
+				close(w->emit_fence);
+				w->emit_fence = -1;
 			}
 		}
 	}

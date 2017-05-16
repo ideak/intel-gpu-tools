@@ -56,3 +56,29 @@ When workload descriptors are provided on the command line, commas must be used
 instead of new lines.
 
 Multiple dependencies can be given separated by forward slashes.
+
+Example:
+
+  1.VCS1.3000.0.1
+  1.RCS.3700.0.0
+  1.VCS2.2300.-1/-2.0
+
+I this case the last step has a data dependency on both first and second steps.
+
+Sync (fd) fences
+----------------
+
+Sync fences are also supported as dependencies.
+
+To use them put a "f<N>" token in the step dependecy list. N is this case the
+same relative step offset to the dependee batch, but instead of the data
+dependency an output fence will be emitted at the dependee step, and passed in
+as a dependency in the current step.
+
+Example:
+
+  1.VCS1.3000.0.1
+  1.RCS.500-1000.-1/f-1.0
+
+In this case the second step will have both a data dependency and a sync fence
+dependency on the previous step.
