@@ -53,7 +53,7 @@ static void store_dword(int fd, unsigned ring)
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
-	if (gen < 6)
+	if (gen > 3 && gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
 	memset(obj, 0, sizeof(obj));
@@ -213,13 +213,40 @@ static bool can_store_dword_imm(int fd)
 	return intel_gen(intel_get_drm_devid(fd)) > 2;
 }
 
+static int print_welcome(int fd)
+{
+	uint16_t devid = intel_get_drm_devid(fd);
+	const struct intel_device_info *info = intel_get_device_info(devid);
+	int err;
+
+	igt_info("Running on %s (pci-id %04x, gen %d)\n",
+		 info->codename, devid, ffs(info->gen));
+	igt_info("Can use MI_STORE_DWORD(virtual)? %s\n",
+		 can_store_dword_imm(fd) ? "yes" : "no");
+
+	err = 0;
+	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_THROTTLE, 0))
+		err = -errno;
+	igt_info("GPU operation? %s [errno=%d]\n",
+		 err == 0 ? "yes" : "no", err);
+
+	return ffs(info->gen);
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
 	int fd;
 
 	igt_fixture {
-		fd = drm_open_driver_master(DRIVER_INTEL);
+		int gen;
+
+		fd = drm_open_driver(DRIVER_INTEL);
+
+		gen = print_welcome(fd);
+		if (gen > 3 && gen < 6) /* ctg and ilk need secure batches */
+			igt_require(drmSetMaster(fd) == 0);
+
 		igt_require_gem(fd);
 		igt_require(can_store_dword_imm(fd));
 
