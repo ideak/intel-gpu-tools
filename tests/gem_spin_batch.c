@@ -43,7 +43,7 @@ static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 
 	spin = igt_spin_batch_new(fd, engine, 0);
 	while ((elapsed = igt_nsec_elapsed(&tv)) >> 30 < timeout_sec) {
-		igt_spin_t *next = igt_spin_batch_new(fd, engine, 0);
+		igt_spin_t *next = __igt_spin_batch_new(fd, engine, 0);
 
 		igt_spin_batch_set_timeout(spin,
 					   timeout_100ms - igt_nsec_elapsed(&itv));

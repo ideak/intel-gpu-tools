@@ -61,7 +61,7 @@ fill_reloc(struct drm_i915_gem_relocation_entry *reloc,
 }
 
 static void emit_recursive_batch(igt_spin_t *spin,
-				 int fd, int engine, unsigned int dep_handle)
+				 int fd, int engine, unsigned int dep)
 {
 #define SCRATCH 0
 #define BATCH 1
@@ -99,11 +99,11 @@ static void emit_recursive_batch(igt_spin_t *spin,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	execbuf.buffer_count++;
 
-	if (dep_handle > 0) {
+	if (dep) {
 		/* dummy write to dependency */
-		obj[SCRATCH].handle = dep_handle;
+		obj[SCRATCH].handle = dep;
 		fill_reloc(&relocs[obj[BATCH].relocation_count++],
-			   dep_handle, 256,
+			   dep, 256,
 			   I915_GEM_DOMAIN_RENDER,
 			   I915_GEM_DOMAIN_RENDER);
 		execbuf.buffer_count++;
@@ -143,12 +143,28 @@ static void emit_recursive_batch(igt_spin_t *spin,
 	}
 }
 
+igt_spin_t *
+__igt_spin_batch_new(int fd, int engine, unsigned int dep)
+{
+	igt_spin_t *spin;
+
+	spin = calloc(1, sizeof(struct igt_spin));
+	igt_assert(spin);
+
+	emit_recursive_batch(spin, fd, engine, dep);
+	igt_assert(gem_bo_busy(fd, spin->handle));
+
+	igt_list_add(&spin->link, &spin_list);
+
+	return spin;
+}
+
 /**
  * igt_spin_batch_new:
  * @fd: open i915 drm file descriptor
  * @engine: Ring to execute batch OR'd with execbuf flags. If value is less
  *          than 0, execute on all available rings.
- * @dep_handle: handle to a buffer object dependency. If greater than 0, add a
+ * @dep: handle to a buffer object dependency. If greater than 0, add a
  *              relocation entry to this buffer within the batch.
  *
  * Start a recursive batch on a ring. Immediately returns a #igt_spin_t that
@@ -159,21 +175,11 @@ static void emit_recursive_batch(igt_spin_t *spin,
  * Structure with helper internal state for igt_spin_batch_free().
  */
 igt_spin_t *
-igt_spin_batch_new(int fd, int engine, unsigned int dep_handle)
+igt_spin_batch_new(int fd, int engine, unsigned int dep)
 {
-	igt_spin_t *spin;
-
 	igt_require_gem(fd);
 
-	spin = calloc(1, sizeof(struct igt_spin));
-	igt_assert(spin);
-
-	emit_recursive_batch(spin, fd, engine, dep_handle);
-	igt_assert(gem_bo_busy(fd, spin->handle));
-
-	igt_list_add(&spin->link, &spin_list);
-
-	return spin;
+	return __igt_spin_batch_new(fd, engine, dep);
 }
 
 static void notify(union sigval arg)
