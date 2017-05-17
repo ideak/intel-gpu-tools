@@ -412,7 +412,7 @@ sub dump_scoreboard
 
 	@sorted = sort { $b <=> $a } values %{$h};
 	$max = $sorted[0];
-	$range = $max - $sorted[-1];
+	$range = 1 - $sorted[-1] / $max;
 	$str = "$n rank (range=$range):";
 	say "\n$str";
 	say '=' x length($str);
