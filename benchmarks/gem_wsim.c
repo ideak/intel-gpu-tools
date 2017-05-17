@@ -1992,13 +1992,14 @@ int main(int argc, char **argv)
 		int pipe_fd = -1;
 		bool background = false;
 
-		if (master_workload >= 0) {
-			close(w[child]->pipe[0]);
-			if (child != master_workload) {
+		for (i = 0; i < clients; i++) {
+			close(w[i]->pipe[0]);
+			if (master_workload >= 0 && child != master_workload &&
+			    child == i) {
 				pipe_fd = w[child]->pipe[1];
 				background = true;
 			} else {
-				close(w[child]->pipe[1]);
+				close(w[i]->pipe[1]);
 			}
 		}
 
