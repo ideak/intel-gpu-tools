@@ -152,12 +152,13 @@ sub run_workload
 sub trace_workload
 {
 	my ($wrk, $b, $r, $c) = @_;
-	my @args = ( "-n $nop", "-w $wrk_root/$wrk", $balancer, "-r $r", "-c $c");
+	my @args = ( "-n $nop", "-w $wrk_root/$wrk", "-r $r", "-c $c");
 	my $min_batches = 16 + $r * $c / 2;
 	my @skip_engine;
 	my %engines;
 	my $cmd;
 
+	unshift @args, $b unless $b eq '<none>';
 	unshift @args, '-q';
 	unshift @args, "$tracepl --trace $wsim";
 	$cmd = join ' ', @args;
@@ -182,7 +183,7 @@ sub trace_workload
 	$cmd = "perf script | $tracepl --html -x ctxsave -s --squash-ctx-id ";
 	$cmd .= join ' ', map("-i $_", @skip_engine);
 	$wrk =~ s/ /_/g;
-	$b =~ s/ /_/g;
+	$b =~ s/[ <>]/_/g;
 	$cmd .= " > ${wrk}_${b}_-r${r}_-c${c}.html";
 	show_cmd($cmd);
 	system($cmd);
@@ -448,7 +449,7 @@ say "\nBalancer is '$balancer'.";
 say "Idleness tolerance is $idle_tolerance_pct%.";
 
 foreach my $wrk (@workloads) {
-	my @args = ( "-n $nop", "-w $wrk_root/$wrk", $balancer);
+	my @args = ( "-n $nop", "-w $wrk_root/$wrk");
 	my ($r, $error, $c, $wps, $swps);
 	my $saturated = 0;
 	my $result = 'Pass';
@@ -456,6 +457,8 @@ foreach my $wrk (@workloads) {
 	my $engines;
 
 	next unless can_balance_workload($wrk);
+
+	push @args, $balancer unless $balancer eq '<none>';
 
 	if (scalar(keys %results)) {
 		$r = $results{$wrk}->{$balancer} / $best_bal{$wrk} * 100.0;
