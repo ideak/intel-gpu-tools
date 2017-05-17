@@ -383,7 +383,7 @@ foreach my $wrk (@workloads) {
 				if ($realtime_target > 0 || $wps_target > 0) {
 					$mwps{$bid} = $w * $c;
 				} else {
-					$mwps{$bid} = $w * $w / $s + $s;
+					$mwps{$bid} = $w + $s;
 				}
 
 				say "$c clients ($w wps, $s wps single client, score=$mwps{$bid}).";
