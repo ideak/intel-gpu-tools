@@ -482,11 +482,20 @@ foreach my $wrk (@workloads) {
 			     if $engines->{$key} < $idle_tolerance_pct;
 	}
 
-	if ($saturated == 0 or
-	    ($saturated == 1 and
-	     ($engines->{'2'} < $idle_tolerance_pct or
-	      $engines->{'3'} < $idle_tolerance_pct))) {
-		$result = $saturated == 0 ? 'FAIL' : 'WARN';
+	if ($saturated == 0) {
+		# Not a single saturated engine
+		$result = 'FAIL';
+	} elsif (not exists $engines->{'2'} or not exists $engines->{'3'}) {
+		# VCS1 and VCS2 not present in a balancing workload
+		$result = 'FAIL';
+	} elsif ($saturated == 1 and
+		 ($engines->{'2'} < $idle_tolerance_pct or
+		  $engines->{'3'} < $idle_tolerance_pct)) {
+		# Only one VCS saturated
+		$result = 'WARN';
+	}
+
+	if ($result ne 'Pass') {
 		$problem{'c'} = $c;
 		$problem{'r'} = $r;
 		$problem{'stats'} = $engines;
