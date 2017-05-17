@@ -1376,8 +1376,7 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
 		w->eb.rsvd2 = wrk->steps[tgt].emit_fence;
 	}
 
-	if ((w->eb.flags & I915_EXEC_FENCE_IN) ||
-	    (w->eb.flags & I915_EXEC_FENCE_OUT))
+	if (w->eb.flags & I915_EXEC_FENCE_OUT)
 		gem_execbuf_wr(fd, &w->eb);
 	else
 		gem_execbuf(fd, &w->eb);
