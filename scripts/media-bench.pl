@@ -344,6 +344,7 @@ foreach my $wrk (@workloads) {
 	my ($r, $error, $should_b, $best);
 	my (%wps, %cwps, %mwps);
 	my @sorted;
+	my $range;
 	my @args;
 
 	$should_b = can_balance_workload($wrk);
@@ -398,9 +399,9 @@ foreach my $wrk (@workloads) {
 	@sorted = sort { $mwps{$b} <=> $mwps{$a} } keys %mwps;
 	$best = $sorted[0];
 	@sorted = sort { $b <=> $a } values %mwps;
-	$best_bal{$wrk} = $sorted[0] if not exists $best_bal{$wrk} or
-					$sorted[0] > $best_bal{$wrk};
-	say "  Best balancer is '$best' ($sorted[0]).";
+	$range = 1 - $sorted[-1] / $sorted[0];
+	$best_bal{$wrk} = $sorted[0];
+	say "  Best balancer is '$best' (range=$range).";
 
 
 	$results{$wrk} = \%mwps;
