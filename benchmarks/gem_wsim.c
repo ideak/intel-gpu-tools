@@ -1400,14 +1400,15 @@ run_workload(unsigned int id, struct workload *wrk,
 	bool run = true;
 	int throttle = -1;
 	int qd_throttle = -1;
-	int i, j;
+	int count;
+	int i;
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
 
 	hars_petruska_f54_1_random_seed((flags & SYNCEDCLIENTS) ? 0 : id);
 
 	init_status_page(wrk, INIT_ALL);
-	for (j = 0; run && (background || j < repeat); j++) {
+	for (count = 0; run && (background || count < repeat); count++) {
 		unsigned int cur_seqno = wrk->sync_seqno;
 
 		clock_gettime(CLOCK_MONOTONIC, &wrk->repeat_start);
@@ -1428,7 +1429,7 @@ run_workload(unsigned int id, struct workload *wrk,
 				if (do_sleep < 0) {
 					if (verbose > 1)
 						printf("%u: Dropped period @ %u/%u (%dus late)!\n",
-						       id, j, i, do_sleep);
+						       id, count, i, do_sleep);
 					continue;
 				}
 			} else if (w->type == SYNC) {
@@ -1553,8 +1554,8 @@ run_workload(unsigned int id, struct workload *wrk,
 	if (print_stats) {
 		double t = elapsed(&t_start, &t_end);
 
-		printf("%c%u: %.3fs elapsed (%.3f workloads/s).",
-		       background ? ' ' : '*', id, t, repeat / t);
+		printf("%c%u: %.3fs elapsed (%d cycles, %.3f workloads/s).",
+		       background ? ' ' : '*', id, t, count, count / t);
 		if (balancer)
 			printf(" %lu (%lu + %lu) total VCS batches.",
 			       wrk->nr_bb[VCS], wrk->nr_bb[VCS1], wrk->nr_bb[VCS2]);
