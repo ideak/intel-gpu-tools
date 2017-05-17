@@ -85,6 +85,12 @@ struct deps
 	int *list;
 };
 
+struct w_arg {
+	char *filename;
+	char *desc;
+	int prio;
+};
+
 struct w_step
 {
 	/* Workload step metadata */
@@ -131,6 +137,7 @@ struct workload
 {
 	unsigned int nr_steps;
 	struct w_step *steps;
+	int prio;
 
 	uint32_t prng;
 
@@ -243,11 +250,11 @@ parse_dependencies(unsigned int nr_steps, struct w_step *w, char *_desc)
 }
 
 static struct workload *
-parse_workload(char *_desc, unsigned int flags, struct workload *app_w)
+parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 {
 	struct workload *wrk;
 	unsigned int nr_steps = 0;
-	char *desc = strdup(_desc);
+	char *desc = strdup(arg->desc);
 	char *_token, *token, *tctx = NULL, *tstart = desc;
 	char *field, *fctx = NULL, *fstart;
 	struct w_step step, *steps = NULL;
@@ -511,6 +518,7 @@ add_step:
 
 	wrk->nr_steps = nr_steps;
 	wrk->steps = steps;
+	wrk->prio = arg->prio;
 
 	free(desc);
 
@@ -565,6 +573,7 @@ clone_workload(struct workload *_wrk)
 	igt_assert(wrk);
 	memset(wrk, 0, sizeof(*wrk));
 
+	wrk->prio = _wrk->prio;
 	wrk->nr_steps = _wrk->nr_steps;
 	wrk->steps = calloc(wrk->nr_steps, sizeof(struct w_step));
 	igt_assert(wrk->steps);
@@ -822,6 +831,15 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			igt_assert(arg.ctx_id);
 
 			wrk->ctx_id[w->context] = arg.ctx_id;
+
+			if (wrk->prio) {
+				struct local_i915_gem_context_param param = {
+					.context = arg.ctx_id,
+					.param = 0x6,
+					.value = wrk->prio,
+				};
+				gem_context_set_param(fd, &param);
+			}
 		}
 	}
 
@@ -1695,12 +1713,12 @@ static char *load_workload_descriptor(char *filename)
 	return buf;
 }
 
-static char **
-add_workload_arg(char **w_args, unsigned int nr_args, char *w_arg)
+static struct w_arg *
+add_workload_arg(struct w_arg *w_args, unsigned int nr_args, char *w_arg, int prio)
 {
-	w_args = realloc(w_args, sizeof(char *) * nr_args);
+	w_args = realloc(w_args, sizeof(*w_args) * nr_args);
 	igt_assert(w_args);
-	w_args[nr_args - 1] = w_arg;
+	w_args[nr_args - 1] = (struct w_arg) { w_arg, NULL, prio };
 
 	return w_args;
 }
@@ -1774,10 +1792,11 @@ int main(int argc, char **argv)
 	unsigned int nr_w_args = 0;
 	int master_workload = -1;
 	char *append_workload_arg = NULL;
-	char **w_args = NULL;
+	struct w_arg *w_args = NULL;
 	unsigned int tolerance_pct = 1;
 	const struct workload_balancer *balancer = NULL;
 	char *endptr = NULL;
+	int prio = 0;
 	double t;
 	int i, c;
 
@@ -1792,7 +1811,7 @@ int main(int argc, char **argv)
 
 	init_clocks();
 
-	while ((c = getopt(argc, argv, "hqv2RSHxc:n:r:w:W:a:t:b:")) != -1) {
+	while ((c = getopt(argc, argv, "hqv2RSHxc:n:r:w:W:a:t:b:p:")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -1804,7 +1823,10 @@ int main(int argc, char **argv)
 			master_workload = nr_w_args;
 			/* Fall through */
 		case 'w':
-			w_args = add_workload_arg(w_args, ++nr_w_args, optarg);
+			w_args = add_workload_arg(w_args, ++nr_w_args, optarg, prio);
+			break;
+		case 'p':
+			prio = atoi(optarg);
 			break;
 		case 'a':
 			if (append_workload_arg) {
@@ -1916,12 +1938,12 @@ int main(int argc, char **argv)
 	}
 
 	if (append_workload_arg) {
-		app_w = parse_workload(append_workload_arg, flags, NULL);
+		struct w_arg arg = { NULL, append_workload_arg, 0 };
+		app_w = parse_workload(&arg, flags, NULL);
 		if (!app_w) {
 			if (verbose)
 				fprintf(stderr,
-					"Failed to parse append workload %u!\n",
-					i);
+					"Failed to parse append workload!\n");
 			return 1;
 		}
 	}
@@ -1930,9 +1952,9 @@ int main(int argc, char **argv)
 	igt_assert(wrk);
 
 	for (i = 0; i < nr_w_args; i++) {
-		w_args[i] = load_workload_descriptor(w_args[i]);
+		w_args[i].desc = load_workload_descriptor(w_args[i].filename);
 
-		if (!w_args[i]) {
+		if (!w_args[i].desc) {
 			if (verbose)
 				fprintf(stderr,
 					"Failed to load workload descriptor %u!\n",
@@ -1940,7 +1962,7 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
-		wrk[i] = parse_workload(w_args[i], flags, app_w);
+		wrk[i] = parse_workload(&w_args[i], flags, app_w);
 		if (!wrk[i]) {
 			if (verbose)
 				fprintf(stderr,
