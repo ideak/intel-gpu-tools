@@ -156,7 +156,7 @@ sub trace_workload
 	my $min_batches = 16 + $r * $c / 2;
 	my @skip_engine;
 	my %engines;
-	my $cmd;
+	my ($cmd, $file);
 
 	unshift @args, $b unless $b eq '<none>';
 	unshift @args, '-q';
@@ -180,11 +180,17 @@ sub trace_workload
 	}
 	close CMD;
 
-	$cmd = "perf script | $tracepl --html -x ctxsave -s --squash-ctx-id ";
-	$cmd .= join ' ', map("-i $_", @skip_engine);
 	$wrk =~ s/ /_/g;
 	$b =~ s/[ <>]/_/g;
-	$cmd .= " > ${wrk}_${b}_-r${r}_-c${c}.html";
+	$file = "${wrk}_${b}_-r${r}_-c${c}";
+
+	$cmd = "perf script > ${file}.trace";
+	show_cmd($cmd);
+	system($cmd);
+
+	$cmd = "perf script | $tracepl --html -x ctxsave -s --squash-ctx-id ";
+	$cmd .= join ' ', map("-i $_", @skip_engine);
+	$cmd .= " > ${file}.html";
 	show_cmd($cmd);
 	system($cmd);
 
