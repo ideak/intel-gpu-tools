@@ -316,10 +316,10 @@ static void one(int fd, unsigned ring, uint32_t flags, unsigned test_flags)
 			if (e->exec_id == 0 || e->exec_id == ring)
 				continue;
 
-			if (e->exec_id == I915_EXEC_BSD && gen == 6)
+			if (!gem_has_ring(fd, e->exec_id | e->flags))
 				continue;
 
-			if (!gem_has_ring(fd, e->exec_id | e->flags))
+			if (!gem_can_store_dword(fd, e->exec_id | e->flags))
 				continue;
 
 			igt_debug("Testing %s in parallel\n", e->name);
@@ -500,11 +500,6 @@ static void basic(int fd, unsigned ring, unsigned flags)
 	igt_spin_batch_free(fd, spin);
 }
 
-static bool can_store_dword_imm(int fd)
-{
-	return intel_gen(intel_get_drm_devid(fd)) > 2;
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -515,7 +510,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
-		igt_require(can_store_dword_imm(fd));
+		igt_require(gem_can_store_dword(fd, 0));
 	}
 
 	igt_subtest_group {
@@ -536,12 +531,9 @@ igt_main
 		}
 
 		igt_subtest_group {
-			int gen = 0;
-
 			igt_fixture {
 				igt_require(has_extended_busy_ioctl(fd));
 				gem_require_mmap_wc(fd);
-				gen = intel_gen(intel_get_drm_devid(fd));
 			}
 
 			for (e = intel_execution_engines; e->name; e++) {
@@ -551,9 +543,7 @@ igt_main
 
 				igt_subtest_f("extended-%s", e->name) {
 					gem_require_ring(fd, e->exec_id | e->flags);
-					igt_skip_on_f(gen == 6 &&
-						      e->exec_id == I915_EXEC_BSD,
-						      "MI_STORE_DATA broken on gen6 bsd\n");
+					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 					gem_quiescent_gpu(fd);
 					one(fd, e->exec_id, e->flags, 0);
 					gem_quiescent_gpu(fd);
@@ -567,9 +557,8 @@ igt_main
 
 				igt_subtest_f("extended-parallel-%s", e->name) {
 					gem_require_ring(fd, e->exec_id | e->flags);
-					igt_skip_on_f(gen == 6 &&
-						      e->exec_id == I915_EXEC_BSD,
-						      "MI_STORE_DATA broken on gen6 bsd\n");
+					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
+
 					gem_quiescent_gpu(fd);
 					one(fd, e->exec_id, e->flags, PARALLEL);
 					gem_quiescent_gpu(fd);
@@ -619,12 +608,9 @@ igt_main
 		}
 
 		igt_subtest_group {
-			int gen = 0;
-
 			igt_fixture {
 				igt_require(has_extended_busy_ioctl(fd));
 				gem_require_mmap_wc(fd);
-				gen = intel_gen(intel_get_drm_devid(fd));
 			}
 
 			for (e = intel_execution_engines; e->name; e++) {
@@ -634,9 +620,8 @@ igt_main
 
 				igt_subtest_f("extended-hang-%s", e->name) {
 					gem_require_ring(fd, e->exec_id | e->flags);
-					igt_skip_on_f(gen == 6 &&
-						      e->exec_id == I915_EXEC_BSD,
-						      "MI_STORE_DATA broken on gen6 bsd\n");
+					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
+
 					gem_quiescent_gpu(fd);
 					one(fd, e->exec_id, e->flags, HANG);
 					gem_quiescent_gpu(fd);

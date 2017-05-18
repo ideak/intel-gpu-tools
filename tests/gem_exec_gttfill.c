@@ -28,14 +28,6 @@ IGT_TEST_DESCRIPTION("Fill the GTT with batches.");
 
 #define BATCH_SIZE (4096<<10)
 
-static void gem_require_store_dword(int fd, unsigned ring)
-{
-	int gen = intel_gen(intel_get_drm_devid(fd));
-	ring &= ~(3 << 13);
-	igt_skip_on_f(gen == 6 && ring == I915_EXEC_BSD,
-		      "MI_STORE_DATA broken on gen6 bsd\n");
-}
-
 static bool ignore_engine(int fd, unsigned engine)
 {
 	if (engine == 0)
@@ -138,14 +130,14 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 			if (ignore_engine(fd, engine))
 				continue;
 
-			if (gen == 6 && e__->exec_id == I915_EXEC_BSD)
+			if (!gem_can_store_dword(fd, engine))
 				continue;
 
 			engines[nengine++] = engine;
 		}
 	} else {
 		gem_require_ring(fd, ring);
-		gem_require_store_dword(fd, ring);
+		igt_require(gem_can_store_dword(fd, ring));
 
 		engines[nengine++] = ring;
 	}
@@ -209,11 +201,6 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
-static bool can_store_dword_imm(int fd)
-{
-	return intel_gen(intel_get_drm_devid(fd)) > 2;
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -224,7 +211,7 @@ igt_main
 	igt_fixture {
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
-		igt_require(can_store_dword_imm(device));
+		igt_require(gem_can_store_dword(device, 0));
 		igt_fork_hang_detector(device);
 	}
 

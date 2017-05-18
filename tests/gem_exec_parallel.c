@@ -71,17 +71,12 @@ static void gem_require_context(int fd)
 	igt_require(__gem_context_create(fd));
 }
 
-static bool can_mi_store_dword(int gen, unsigned engine)
-{
-	return gen > 2 && !(gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD);
-}
-
-static bool ignore_engine(int gen, unsigned engine)
+static bool ignore_engine(int fd, unsigned engine)
 {
 	if (engine == 0)
 		return true;
 
-	if (!can_mi_store_dword(gen, engine))
+	if (!gem_can_store_dword(fd, engine))
 		return true;
 
 	return false;
@@ -202,12 +197,12 @@ static void all(int fd, unsigned engine, unsigned flags)
 	nengine = 0;
 	if (engine == -1) {
 		for_each_engine(fd, engine) {
-			if (!ignore_engine(gen, engine))
+			if (!ignore_engine(fd, engine))
 				engines[nengine++] = engine;
 		}
 	} else {
 		igt_require(gem_has_ring(fd, engine));
-		igt_require(can_mi_store_dword(gen, engine));
+		igt_require(gem_can_store_dword(fd, engine));
 		engines[nengine++] = engine;
 	}
 	igt_require(nengine);

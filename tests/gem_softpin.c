@@ -483,6 +483,7 @@ igt_main
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
 		igt_require(gem_has_softpin(fd));
+		igt_require(gem_can_store_dword(fd, 0));
 	}
 
 	igt_subtest("invalid")

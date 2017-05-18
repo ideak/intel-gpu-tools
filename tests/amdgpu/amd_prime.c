@@ -183,9 +183,6 @@ static void i915_to_amd(int i915, int amd, amdgpu_device_handle device)
 		if (engine == 0)
 			continue;
 
-		if (engine == I915_EXEC_BSD)
-			continue;
-
 		engines[nengine++] = engine;
 	}
 	igt_require(nengine);

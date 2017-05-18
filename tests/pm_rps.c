@@ -690,6 +690,8 @@ igt_main
 
 		/* Use drm_open_driver to verify device existence */
 		drm_fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(drm_fd);
+		igt_require(gem_can_store_dword(drm_fd, 0));
 
 		do {
 			int val = -1;

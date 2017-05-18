@@ -534,9 +534,7 @@ igt_main
 
 			igt_subtest_f("fifo-%s", e->name) {
 				gem_require_ring(fd, e->exec_id | e->flags);
-				igt_skip_on_f(intel_gen(intel_get_drm_devid(fd)) == 6 &&
-					      e->exec_id == I915_EXEC_BSD,
-					      "MI_STORE_DATA broken on gen6 bsd\n");
+				igt_require(gem_can_store_dword(fd, e->exec_id) | e->flags);
 				fifo(fd, e->exec_id | e->flags);
 			}
 		}
@@ -556,9 +554,7 @@ igt_main
 			igt_subtest_group {
 				igt_fixture {
 					gem_require_ring(fd, e->exec_id | e->flags);
-					igt_skip_on_f(intel_gen(intel_get_drm_devid(fd)) == 6 &&
-						      e->exec_id == I915_EXEC_BSD,
-						      "MI_STORE_DATA broken on gen6 bsd\n");
+					igt_require(gem_can_store_dword(fd, e->exec_id) | e->flags);
 				}
 
 				igt_subtest_f("in-order-%s", e->name)

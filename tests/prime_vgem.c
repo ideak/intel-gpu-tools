@@ -731,7 +731,6 @@ igt_main
 	const struct intel_execution_engine *e;
 	int i915 = -1;
 	int vgem = -1;
-	int gen = 0;
 
 	igt_skip_on_simulation();
 
@@ -743,7 +742,6 @@ igt_main
 		igt_require_gem(i915);
 		igt_require(has_prime_import(i915));
 		gem_require_mmap_wc(i915);
-		gen = intel_gen(intel_get_drm_devid(i915));
 	}
 
 	igt_subtest("basic-read")
@@ -760,9 +758,8 @@ igt_main
 			      e->exec_id == 0 ? "basic-" : "",
 			      e->name) {
 			gem_require_ring(i915, e->exec_id | e->flags);
-			igt_skip_on_f(gen == 6 &&
-				      e->exec_id == I915_EXEC_BSD,
-				      "MI_STORE_DATA broken on gen6 bsd\n");
+			igt_require(gem_can_store_dword(i915, e->exec_id) | e->flags);
+
 			gem_quiescent_gpu(i915);
 			test_sync(i915, vgem, e->exec_id, e->flags);
 		}
@@ -773,9 +770,8 @@ igt_main
 			      e->exec_id == 0 ? "basic-" : "",
 			      e->name) {
 			gem_require_ring(i915, e->exec_id | e->flags);
-			igt_skip_on_f(gen == 6 &&
-				      e->exec_id == I915_EXEC_BSD,
-				      "MI_STORE_DATA broken on gen6 bsd\n");
+			igt_require(gem_can_store_dword(i915, e->exec_id) | e->flags);
+
 			gem_quiescent_gpu(i915);
 			test_busy(i915, vgem, e->exec_id, e->flags);
 		}
@@ -786,9 +782,8 @@ igt_main
 			      e->exec_id == 0 ? "basic-" : "",
 			      e->name) {
 			gem_require_ring(i915, e->exec_id | e->flags);
-			igt_skip_on_f(gen == 6 &&
-				      e->exec_id == I915_EXEC_BSD,
-				      "MI_STORE_DATA broken on gen6 bsd\n");
+			igt_require(gem_can_store_dword(i915, e->exec_id) | e->flags);
+
 			gem_quiescent_gpu(i915);
 			test_wait(i915, vgem, e->exec_id, e->flags);
 		}
@@ -810,9 +805,8 @@ igt_main
 					e->exec_id == 0 ? "basic-" : "",
 					e->name) {
 				gem_require_ring(i915, e->exec_id | e->flags);
-				igt_skip_on_f(gen == 6 &&
-						e->exec_id == I915_EXEC_BSD,
-						"MI_STORE_DATA broken on gen6 bsd\n");
+				igt_require(gem_can_store_dword(i915, e->exec_id) | e->flags);
+
 				gem_quiescent_gpu(i915);
 				test_fence_wait(i915, vgem, e->exec_id, e->flags);
 			}

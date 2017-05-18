@@ -163,8 +163,7 @@ static void
 check_test_requirements(int fd, int ringid)
 {
 	gem_require_ring(fd, ringid);
-	igt_skip_on_f(intel_gen(devid) == 6 && ringid == I915_EXEC_BSD,
-		      "MI_STORE_DATA broken on gen6 bsd\n");
+	igt_require(gem_can_store_dword(fd, ringid));
 }
 
 igt_main

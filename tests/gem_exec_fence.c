@@ -48,11 +48,6 @@ struct sync_merge_data {
 #define SYNC_IOC_MERGE _IOWR(SYNC_IOC_MAGIC, 3, struct sync_merge_data)
 #endif
 
-static bool can_mi_store_dword(int gen, unsigned engine)
-{
-	return !(gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD);
-}
-
 static void store(int fd, unsigned ring, int fence, uint32_t target, unsigned offset_value)
 {
 	const int SCRATCH = 0;
@@ -283,7 +278,7 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 
 	i = 0;
 	for_each_engine(fd, engine) {
-		if (!can_mi_store_dword(gen, engine))
+		if (!gem_can_store_dword(fd, engine))
 			continue;
 
 		if (flags & NONBLOCK) {
@@ -523,6 +518,7 @@ igt_main
 		igt_subtest_group {
 			igt_fixture {
 				igt_require(gem_has_ring(i915, e->exec_id | e->flags));
+				igt_require(gem_can_store_dword(i915, e->exec_id | e->flags));
 			}
 
 			igt_subtest_group {

@@ -147,10 +147,10 @@ static void one(int fd, unsigned ring, uint32_t flags)
 		if (e->exec_id == 0 || e->exec_id == ring)
 			continue;
 
-		if (e->exec_id == I915_EXEC_BSD && gen == 6)
+		if (!gem_has_ring(fd, e->exec_id | e->flags))
 			continue;
 
-		if (!gem_has_ring(fd, e->exec_id | e->flags))
+		if (!gem_can_store_dword(fd, e->exec_id | e->flags))
 			continue;
 
 		store_dword(fd, e->exec_id | e->flags,
@@ -199,6 +199,7 @@ igt_main
 		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
 		igt_require(has_async_execbuf(fd));
+		igt_require(gem_can_store_dword(fd, 0));
 		igt_fork_hang_detector(fd);
 	}
 
@@ -207,8 +208,10 @@ igt_main
 		if (e->exec_id == 0)
 			continue;
 
-		igt_subtest_f("concurrent-writes-%s", e->name)
+		igt_subtest_f("concurrent-writes-%s", e->name) {
+			igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 			one(fd, e->exec_id, e->flags);
+		}
 	}
 
 	igt_fixture {

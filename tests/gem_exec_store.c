@@ -45,8 +45,7 @@ static void store_dword(int fd, unsigned ring)
 	int i;
 
 	gem_require_ring(fd, ring);
-	igt_skip_on_f(gen == 6 && (ring & ~(3<<13)) == I915_EXEC_BSD,
-		      "MI_STORE_DATA broken on gen6 bsd\n");
+	igt_require(gem_can_store_dword(fd, ring));
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -140,7 +139,7 @@ static void store_all(int fd)
 	nengine = 0;
 	intel_detect_and_clear_missed_interrupts(fd);
 	for_each_engine(fd, engine) {
-		if (gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD)
+		if (!gem_can_store_dword(fd, engine))
 			continue;
 
 		igt_assert(2*(nengine+1)*sizeof(batch) <= 4096);
@@ -208,11 +207,6 @@ static void store_all(int fd)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
-static bool can_store_dword_imm(int fd)
-{
-	return intel_gen(intel_get_drm_devid(fd)) > 2;
-}
-
 static int print_welcome(int fd)
 {
 	uint16_t devid = intel_get_drm_devid(fd);
@@ -222,7 +216,7 @@ static int print_welcome(int fd)
 	igt_info("Running on %s (pci-id %04x, gen %d)\n",
 		 info->codename, devid, ffs(info->gen));
 	igt_info("Can use MI_STORE_DWORD(virtual)? %s\n",
-		 can_store_dword_imm(fd) ? "yes" : "no");
+		 gem_can_store_dword(fd, 0) ? "yes" : "no");
 
 	err = 0;
 	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_THROTTLE, 0))
@@ -248,7 +242,7 @@ igt_main
 			igt_require(drmSetMaster(fd) == 0);
 
 		igt_require_gem(fd);
-		igt_require(can_store_dword_imm(fd));
+		igt_require(gem_can_store_dword(fd, 0));
 
 		igt_fork_hang_detector(fd);
 	}

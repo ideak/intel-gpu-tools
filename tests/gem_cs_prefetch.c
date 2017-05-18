@@ -46,14 +46,6 @@ struct shadow {
 	struct drm_i915_gem_relocation_entry reloc;
 };
 
-static void gem_require_store_dword(int fd, unsigned ring)
-{
-	int gen = intel_gen(intel_get_drm_devid(fd));
-	ring &= ~(3 << 13);
-	igt_skip_on_f(gen == 6 && ring == I915_EXEC_BSD,
-		      "MI_STORE_DATA broken on gen6 bsd\n");
-}
-
 static void setup(int fd, int gen, struct shadow *shadow)
 {
 	uint32_t buf[16];
@@ -96,7 +88,7 @@ static void can_test_ring(unsigned ring)
 	close(master);
 	igt_require_gem(fd);
 	gem_require_ring(fd, ring);
-	gem_require_store_dword(fd, ring);
+	igt_require(gem_can_store_dword(fd, ring));
 	close(fd);
 }
 

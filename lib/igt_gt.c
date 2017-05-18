@@ -557,3 +557,21 @@ const struct intel_execution_engine intel_execution_engines[] = {
 	{ "vebox", "vecs0", I915_EXEC_VEBOX, 0 },
 	{ NULL, 0, 0 }
 };
+
+bool gem_can_store_dword(int fd, unsigned int engine)
+{
+	uint16_t devid = intel_get_drm_devid(fd);
+	const struct intel_device_info *info = intel_get_device_info(devid);
+	const int gen = ffs(info->gen);
+
+	if (gen <= 2) /* requires physical addresses */
+		return false;
+
+	if (gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD)
+		return false; /* kills the machine! */
+
+	if (info->is_broadwater)
+		return false; /* Not sure yet... */
+
+	return true;
+}

@@ -190,6 +190,8 @@ static void from_gpu(int fd)
 	uint32_t reloc_handle;
 	uint64_t value;
 
+	igt_require(gem_can_store_dword(fd, 0));
+
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
@@ -231,11 +233,6 @@ static void from_gpu(int fd)
 	munmap(relocs, 4096);
 }
 
-static bool ignore_engine(int gen, unsigned engine)
-{
-	return gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD;
-}
-
 static void check_bo(int fd, uint32_t handle)
 {
 	uint32_t *map;
@@ -262,12 +259,12 @@ static void active(int fd, unsigned engine)
 	nengine = 0;
 	if (engine == -1) {
 		for_each_engine(fd, engine) {
-			if (!ignore_engine(gen, engine))
+			if (gem_can_store_dword(fd, engine))
 				engines[nengine++] = engine;
 		}
 	} else {
 		igt_require(gem_has_ring(fd, engine));
-		igt_require(!ignore_engine(gen, engine));
+		igt_require(gem_can_store_dword(fd, engine));
 		engines[nengine++] = engine;
 	}
 	igt_require(nengine);

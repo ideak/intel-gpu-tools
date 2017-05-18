@@ -91,17 +91,12 @@ static int __gem_context_create(int fd, uint32_t *ctx_id)
 	return ret;
 }
 
-static bool can_mi_store_dword(int gen, unsigned engine)
-{
-	return gen > 2 && !(gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD);
-}
-
-static bool ignore_engine(int gen, unsigned engine)
+static bool ignore_engine(int fd, unsigned engine)
 {
 	if (engine == 0)
 		return true;
 
-	if (!can_mi_store_dword(gen, engine))
+	if (!gem_can_store_dword(fd, engine))
 		return true;
 
 	return false;
@@ -223,12 +218,12 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	nengine = 0;
 	if (engine == -1) {
 		for_each_engine(fd, engine) {
-			if (!ignore_engine(gen, engine))
+			if (!ignore_engine(fd, engine))
 				engines[nengine++] = engine;
 		}
 	} else {
 		igt_require(gem_has_ring(fd, engine));
-		igt_require(can_mi_store_dword(gen, engine));
+		igt_require(gem_can_store_dword(fd, engine));
 		engines[nengine++] = engine;
 	}
 	igt_require(nengine);
@@ -534,11 +529,6 @@ out:
 	close(dir);
 }
 
-static bool can_store_dword_imm(int fd)
-{
-	return intel_gen(intel_get_drm_devid(fd)) > 2;
-}
-
 igt_main
 {
 	const struct mode {
@@ -570,7 +560,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
-		igt_require(can_store_dword_imm(fd));
+		igt_require(gem_can_store_dword(fd, 0));
 		print_welcome(fd);
 
 		igt_fork_hang_detector(fd);

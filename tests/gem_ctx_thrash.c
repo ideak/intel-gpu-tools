@@ -136,6 +136,9 @@ static void single(const char *name, bool all_engines)
 #define MAX_LOOP 16
 
 	fd = drm_open_driver_master(DRIVER_INTEL);
+	igt_require_gem(fd);
+	igt_require(gem_can_store_dword(fd, 0));
+
 	gen = intel_gen(intel_get_drm_devid(fd));
 
 	num_engines = 0;

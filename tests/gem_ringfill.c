@@ -170,15 +170,13 @@ static int setup_execbuf(int fd,
 
 static void run_test(int fd, unsigned ring, unsigned flags, unsigned timeout)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_relocation_entry reloc[1024];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	igt_hang_t hang;
 
 	gem_require_ring(fd, ring);
-	igt_skip_on_f(gen == 6 && (ring & ~(3<<13)) == I915_EXEC_BSD,
-		      "MI_STORE_DATA broken on gen6 bsd\n");
+	igt_require(gem_can_store_dword(fd, ring));
 
 	if (flags & (SUSPEND | HIBERNATE))
 		run_test(fd, ring, 0, 0);
@@ -236,11 +234,6 @@ static void run_test(int fd, unsigned ring, unsigned flags, unsigned timeout)
 
 	if (flags & (SUSPEND | HIBERNATE))
 		run_test(fd, ring, 0, 0);
-}
-
-static bool can_store_dword_imm(int fd)
-{
-	return intel_gen(intel_get_drm_devid(fd)) > 2;
 }
 
 struct cork {
@@ -358,7 +351,7 @@ igt_main
 
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
-		igt_require(can_store_dword_imm(fd));
+		igt_require(gem_can_store_dword(fd, 0));
 		gen = intel_gen(intel_get_drm_devid(fd));
 		if (gen > 3 && gen < 6) { /* ctg and ilk need secure batches */
 			igt_require(drmSetMaster(fd) == 0);

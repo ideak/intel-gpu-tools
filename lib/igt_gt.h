@@ -78,5 +78,6 @@ extern const struct intel_execution_engine {
 	     e__++) \
 		for_if (gem_has_ring(fd__, flags__ = e__->exec_id | e__->flags))
 
+bool gem_can_store_dword(int fd, unsigned int engine);
 
 #endif /* IGT_GT_H */

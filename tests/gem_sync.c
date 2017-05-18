@@ -75,11 +75,6 @@ out:
 	return ts.tv_sec + 1e-9*ts.tv_nsec;
 }
 
-static bool can_mi_store_dword(int gen, unsigned engine)
-{
-	return gen > 2 && !(gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD);
-}
-
 static void
 sync_ring(int fd, unsigned ring, int num_children, int timeout)
 {
@@ -171,7 +166,7 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 			if (!gem_has_ring(fd, e->exec_id | e->flags))
 				continue;
 
-			if (!can_mi_store_dword(gen, e->exec_id))
+			if (!gem_can_store_dword(fd, e->exec_id | e->flags))
 				continue;
 
 			if (e->exec_id == I915_EXEC_BSD) {
@@ -189,7 +184,7 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 		num_children *= num_engines;
 	} else {
 		gem_require_ring(fd, ring);
-		igt_require(can_mi_store_dword(gen, ring));
+		igt_require(gem_can_store_dword(fd, ring));
 		names[num_engines] = NULL;
 		engines[num_engines++] = ring;
 	}
@@ -454,7 +449,6 @@ __store_many(int fd, unsigned ring, int timeout, unsigned long *cycles)
 static void
 store_many(int fd, unsigned ring, int timeout)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
 	unsigned long *shared;
 	const char *names[16];
 	int n = 0;
@@ -474,7 +468,7 @@ store_many(int fd, unsigned ring, int timeout)
 			if (!gem_has_ring(fd, e->exec_id | e->flags))
 				continue;
 
-			if (!can_mi_store_dword(gen, e->exec_id))
+			if (!gem_can_store_dword(fd, e->exec_id | e->flags))
 				continue;
 
 			if (e->exec_id == I915_EXEC_BSD) {
@@ -494,7 +488,7 @@ store_many(int fd, unsigned ring, int timeout)
 		igt_waitchildren();
 	} else {
 		gem_require_ring(fd, ring);
-		igt_require(can_mi_store_dword(gen, ring));
+		igt_require(gem_can_store_dword(fd, ring));
 		__store_many(fd, ring, timeout, &shared[n]);
 		names[n++] = NULL;
 	}
@@ -585,7 +579,7 @@ store_all(int fd, int num_children, int timeout)
 		if (!gem_has_ring(fd, e->exec_id | e->flags))
 			continue;
 
-		if (!can_mi_store_dword(gen, e->exec_id))
+		if (!gem_can_store_dword(fd, e->exec_id))
 			continue;
 
 		if (e->exec_id == I915_EXEC_BSD) {

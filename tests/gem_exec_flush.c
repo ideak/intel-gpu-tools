@@ -545,11 +545,6 @@ static const char *yesno(bool x)
 	return x ? "yes" : "no";
 }
 
-static bool can_store_dword_imm(int gen)
-{
-	return gen > 2;
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -579,7 +574,6 @@ igt_main
 		{ NULL }
 	};
 	unsigned cpu = x86_64_features();
-	int gen = -1;
 	int fd = -1;
 
 	igt_skip_on_simulation();
@@ -589,8 +583,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
-		gen = intel_gen(intel_get_drm_devid(fd));
-		igt_require(can_store_dword_imm(gen));
+		igt_require(gem_can_store_dword(fd, 0));
 		igt_info("Has LLC? %s\n", yesno(gem_has_llc(fd)));
 
 		if (cpu) {
@@ -609,8 +602,7 @@ igt_main
 
 		igt_fixture {
 			gem_require_ring(fd, ring);
-			igt_skip_on_f(gen == 6 && e->exec_id == I915_EXEC_BSD,
-				      "MI_STORE_DATA broken on gen6 bsd\n");
+			igt_require(gem_can_store_dword(fd, ring));
 		}
 
 		for (const struct batch *b = batches; b->name; b++) {
