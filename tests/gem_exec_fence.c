@@ -224,6 +224,8 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 	unsigned engine;
 	int fence, i;
 
+	igt_require(gem_can_store_dword(fd, 0));
+
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
