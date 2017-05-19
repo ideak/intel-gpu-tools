@@ -887,6 +887,17 @@ static enum intel_engine_id get_vcs_engine(unsigned int n)
 	return vcs_engines[n];
 }
 
+static uint32_t new_seqno(struct workload *wrk, enum intel_engine_id engine)
+{
+	return ++wrk->seqno[engine];
+}
+
+static uint32_t
+current_seqno(struct workload *wrk, enum intel_engine_id engine)
+{
+	return wrk->seqno[engine];
+}
+
 struct workload_balancer {
 	unsigned int id;
 	const char *name;
@@ -924,7 +935,7 @@ static unsigned int
 get_qd_depth(const struct workload_balancer *balancer,
 	     struct workload *wrk, enum intel_engine_id engine)
 {
-	return wrk->seqno[engine] -
+	return current_seqno(wrk, engine) -
 	       wrk->status_page[VCS_SEQNO_IDX(engine)];
 }
 
@@ -966,8 +977,8 @@ __qd_balance(const struct workload_balancer *balancer,
 #ifdef DEBUG
 	printf("qd_balance: 1:%ld 2:%ld rr:%u = %u\t(%lu - %u) (%lu - %u)\n",
 	       qd[VCS1], qd[VCS2], wrk->vcs_rr, engine,
-	       wrk->seqno[VCS1], wrk->status_page[VCS_SEQNO_IDX(VCS1)],
-	       wrk->seqno[VCS2], wrk->status_page[VCS_SEQNO_IDX(VCS2)]);
+	       current_seqno(wrk, VCS1), wrk->status_page[VCS_SEQNO_IDX(VCS1)],
+	       current_seqno(wrk, VCS2), wrk->status_page[VCS_SEQNO_IDX(VCS2)]);
 #endif
 	return engine;
 }
@@ -1058,13 +1069,13 @@ __rt_balance(const struct workload_balancer *balancer,
 		struct rt_depth rt;
 
 		get_rt_depth(wrk, engine, &rt);
-		qd[engine] = wrk->seqno[engine] - rt.seqno;
+		qd[engine] = current_seqno(wrk, engine) - rt.seqno;
 		wrk->qd_sum[engine] += qd[engine];
 		qd[engine] = (qd[engine] + 1) * (rt.completed - rt.submitted);
 #ifdef DEBUG
-		printf("qd[0] = %d (%d - %d) x %d (%d - %d) = %ld\n",
-		       wrk->seqno[engine] - rt.seqno,
-		       wrk->seqno[engine], rt.seqno,
+		printf("rt[0] = %d (%d - %d) x %d (%d - %d) = %ld\n",
+		       current_seqno(wrk, engine) - rt.seqno,
+		       current_seqno(wrk, engine), rt.seqno,
 		       rt.completed - rt.submitted,
 		       rt.completed, rt.submitted,
 		       qd[engine]);
@@ -1114,16 +1125,16 @@ rtavg_balance(const struct workload_balancer *balancer,
 				    rt.completed - rt.submitted);
 			wrk->rt.last[engine] = rt.seqno;
 		}
-		qd[engine] = wrk->seqno[engine] - rt.seqno;
+		qd[engine] = current_seqno(wrk, engine) - rt.seqno;
 		wrk->qd_sum[engine] += qd[engine];
 		qd[engine] =
 			(qd[engine] + 1) * ewma_rt_read(&wrk->rt.avg[engine]);
 
 #ifdef DEBUG
-		printf("qd[%d] = %d (%d - %d) x %ld (%d) = %ld\n",
+		printf("rtavg[%d] = %d (%d - %d) x %ld (%d) = %ld\n",
 		       engine,
-		       wrk->seqno[engine] - rt.seqno,
-		       wrk->seqno[engine], rt.seqno,
+		       current_seqno(wrk, engine) - rt.seqno,
+		       current_seqno(wrk, engine), rt.seqno,
 		       ewma_rt_read(&wrk->rt.avg[engine]),
 		       rt.completed - rt.submitted,
 		       qd[engine]);
@@ -1303,7 +1314,7 @@ static void init_status_page(struct workload *wrk, unsigned int flags)
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
-		*cs++ = ++wrk->seqno[engine];
+		*cs++ = new_seqno(wrk, engine);
 		offset += 4 * sizeof(uint32_t);
 
 		/* When we are busy, we can just reuse the last set of timings.
@@ -1342,7 +1353,7 @@ static void init_status_page(struct workload *wrk, unsigned int flags)
 		*cs++ = MI_STORE_DWORD_IMM;
 		*cs++ = addr;
 		*cs++ = addr >> 32;
-		*cs++ = wrk->seqno[engine];
+		*cs++ = current_seqno(wrk, engine);
 		offset += 4 * sizeof(uint32_t);
 
 		*cs++ = MI_BATCH_BUFFER_END;
@@ -1377,16 +1388,15 @@ static void
 do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
       unsigned int flags)
 {
+	uint32_t seqno = new_seqno(wrk, engine);
 	unsigned int i;
 
 	eb_update_flags(w, engine, flags);
 
-	wrk->seqno[engine]++;
-
 	if (flags & SEQNO)
-		update_bb_seqno(w, engine, wrk->seqno[engine]);
+		update_bb_seqno(w, engine, seqno);
 	if (flags & RT)
-		update_bb_rt(w, engine, wrk->seqno[engine]);
+		update_bb_rt(w, engine, seqno);
 
 	w->eb.batch_start_offset =
 		ALIGN(w->bb_sz - get_bb_sz(get_duration(w)),
