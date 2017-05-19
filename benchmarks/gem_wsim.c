@@ -39,6 +39,7 @@
 #include <time.h>
 #include <assert.h>
 #include <limits.h>
+#include <pthread.h>
 
 
 #include "intel_chipset.h"
@@ -135,15 +136,23 @@ DECLARE_EWMA(uint64_t, rt, 4, 2)
 
 struct workload
 {
+	unsigned int id;
+
 	unsigned int nr_steps;
 	struct w_step *steps;
 	int prio;
 
+	pthread_t thread;
+	bool run;
+	bool background;
+	const struct workload_balancer *balancer;
+	unsigned int repeat;
+	unsigned int flags;
+	bool print_stats;
+
 	uint32_t prng;
 
 	struct timespec repeat_start;
-
-	int pipe[2];
 
 	unsigned int nr_ctxs;
 	uint32_t *ctx_id;
@@ -792,6 +801,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	struct w_step *w;
 	int i;
 
+	wrk->id = id;
 	wrk->prng = rand();
 
 	if (flags & INITVCSRR)
@@ -1405,17 +1415,11 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
 	}
 }
 
-static void
-run_workload(unsigned int id, struct workload *wrk,
-	     bool background, int pipe_fd,
-	     const struct workload_balancer *balancer,
-	     unsigned int repeat,
-	     unsigned int flags,
-	     bool print_stats)
+static void *run_workload(void *data)
 {
+	struct workload *wrk = (struct workload *)data;
 	struct timespec t_start, t_end;
 	struct w_step *w;
-	bool run = true;
 	int throttle = -1;
 	int qd_throttle = -1;
 	int count;
@@ -1423,15 +1427,17 @@ run_workload(unsigned int id, struct workload *wrk,
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
 
-	hars_petruska_f54_1_random_seed((flags & SYNCEDCLIENTS) ? 0 : id);
+	hars_petruska_f54_1_random_seed((wrk->flags & SYNCEDCLIENTS) ?
+					0 : wrk->id);
 
 	init_status_page(wrk, INIT_ALL);
-	for (count = 0; run && (background || count < repeat); count++) {
+	for (count = 0; wrk->run && (wrk->background || count < wrk->repeat);
+	     count++) {
 		unsigned int cur_seqno = wrk->sync_seqno;
 
 		clock_gettime(CLOCK_MONOTONIC, &wrk->repeat_start);
 
-		for (i = 0, w = wrk->steps; run && (i < wrk->nr_steps);
+		for (i = 0, w = wrk->steps; wrk->run && (i < wrk->nr_steps);
 		     i++, w++) {
 			enum intel_engine_id engine = w->engine;
 			int do_sleep = 0;
@@ -1447,7 +1453,7 @@ run_workload(unsigned int id, struct workload *wrk,
 				if (do_sleep < 0) {
 					if (verbose > 1)
 						printf("%u: Dropped period @ %u/%u (%dus late)!\n",
-						       id, count, i, do_sleep);
+						       wrk->id, count, i, do_sleep);
 					continue;
 				}
 			} else if (w->type == SYNC) {
@@ -1490,15 +1496,16 @@ run_workload(unsigned int id, struct workload *wrk,
 			igt_assert(w->type == BATCH);
 
 			wrk->nr_bb[engine]++;
-			if (engine == VCS && balancer) {
-				engine = balancer->balance(balancer, wrk, w);
+			if (engine == VCS && wrk->balancer) {
+				engine = wrk->balancer->balance(wrk->balancer,
+								wrk, w);
 				wrk->nr_bb[engine]++;
 			}
 
 			if (throttle > 0)
 				w_sync_to(wrk, w, i - throttle);
 
-			do_eb(wrk, w, engine, flags);
+			do_eb(wrk, w, engine, wrk->flags);
 
 			if (w->request != -1) {
 				igt_list_del(&w->rq_link);
@@ -1508,20 +1515,12 @@ run_workload(unsigned int id, struct workload *wrk,
 			igt_list_add_tail(&w->rq_link, &wrk->requests[engine]);
 			wrk->nrequest[engine]++;
 
-			if (pipe_fd >= 0) {
-				struct pollfd fds;
-
-				fds.fd = pipe_fd;
-				fds.events = POLLHUP;
-				if (poll(&fds, 1, 0)) {
-					run = false;
-					break;
-				}
-			}
+			if (!wrk->run)
+				break;
 
 			if (w->sync) {
 				gem_sync(fd, w->obj[0].handle);
-				if (flags & HEARTBEAT)
+				if (wrk->flags & HEARTBEAT)
 					init_status_page(wrk, 0);
 			}
 
@@ -1550,7 +1549,7 @@ run_workload(unsigned int id, struct workload *wrk,
 		}
 
 		/* Cleanup all fences instantiated in this iteration. */
-		for (i = 0, w = wrk->steps; run && (i < wrk->nr_steps);
+		for (i = 0, w = wrk->steps; wrk->run && (i < wrk->nr_steps);
 		     i++, w++) {
 			if (w->emit_fence > 0) {
 				close(w->emit_fence);
@@ -1569,20 +1568,23 @@ run_workload(unsigned int id, struct workload *wrk,
 
 	clock_gettime(CLOCK_MONOTONIC, &t_end);
 
-	if (print_stats) {
+	if (wrk->print_stats) {
 		double t = elapsed(&t_start, &t_end);
 
 		printf("%c%u: %.3fs elapsed (%d cycles, %.3f workloads/s).",
-		       background ? ' ' : '*', id, t, count, count / t);
-		if (balancer)
+		       wrk->background ? ' ' : '*', wrk->id,
+		       t, count, count / t);
+		if (wrk->balancer)
 			printf(" %lu (%lu + %lu) total VCS batches.",
 			       wrk->nr_bb[VCS], wrk->nr_bb[VCS1], wrk->nr_bb[VCS2]);
-		if (balancer && balancer->get_qd)
+		if (wrk->balancer && wrk->balancer->get_qd)
 			printf(" Average queue depths %.3f, %.3f.",
 			       (double)wrk->qd_sum[VCS1] / wrk->nr_bb[VCS],
 			       (double)wrk->qd_sum[VCS2] / wrk->nr_bb[VCS]);
 		putchar('\n');
 	}
+
+	return NULL;
 }
 
 static void fini_workload(struct workload *wrk)
@@ -1997,59 +1999,46 @@ int main(int argc, char **argv)
 
 		w[i] = clone_workload(wrk[nr_w_args > 1 ? i : 0]);
 
-		if (master_workload >= 0) {
-			int ret = pipe(w[i]->pipe);
-
-			igt_assert(ret == 0);
-		}
-
 		if (flags & SWAPVCS && i & 1)
 			flags_ &= ~SWAPVCS;
 
 		prepare_workload(i, w[i], flags_);
+
+		w[i]->flags = flags;
+		w[i]->repeat = repeat;
+		w[i]->balancer = balancer;
+		w[i]->run = true;
+		w[i]->background = master_workload >= 0 && i != master_workload;
+		w[i]->print_stats = verbose > 1 ||
+				    (verbose > 0 && master_workload == i);
 	}
 
 	gem_quiescent_gpu(fd);
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
 
-	igt_fork(child, clients) {
-		int pipe_fd = -1;
-		bool background = false;
+	for (i = 0; i < clients; i++) {
+		int ret;
 
-		for (i = 0; i < clients; i++) {
-			close(w[i]->pipe[0]);
-			if (master_workload >= 0 && child != master_workload &&
-			    child == i) {
-				pipe_fd = w[child]->pipe[1];
-				background = true;
-			} else {
-				close(w[i]->pipe[1]);
-			}
-		}
-
-		run_workload(child, w[child], background, pipe_fd, balancer,
-			     repeat, flags,
-			     verbose > 1 ||
-			     (verbose > 0 && master_workload == child));
+		ret = pthread_create(&w[i]->thread, NULL, run_workload, w[i]);
+		igt_assert_eq(ret, 0);
 	}
 
 	if (master_workload >= 0) {
-		int status = -1;
-		pid_t pid;
+		int ret = pthread_join(w[master_workload]->thread, NULL);
+
+		igt_assert(ret == 0);
 
 		for (i = 0; i < clients; i++)
-			close(w[i]->pipe[1]);
-
-		pid = wait(&status);
-		if (pid >= 0)
-			igt_child_done(pid);
-
-		for (i = 0; i < clients; i++)
-			close(w[i]->pipe[0]);
+			w[i]->run = false;
 	}
 
-	igt_waitchildren();
+	for (i = 0; i < clients; i++) {
+		if (master_workload != i) {
+			int ret = pthread_join(w[i]->thread, NULL);
+			igt_assert(ret == 0);
+		}
+	}
 
 	clock_gettime(CLOCK_MONOTONIC, &t_end);
 

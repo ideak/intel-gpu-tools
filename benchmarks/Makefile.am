@@ -19,5 +19,6 @@ gem_latency_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_latency_LDADD = $(LDADD) -lpthread
 gem_syslatency_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_syslatency_LDADD = $(LDADD) -lpthread -lrt
+gem_wsim_LDADD = $(LDADD) -lpthread
 
 EXTRA_DIST=README
