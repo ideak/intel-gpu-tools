@@ -195,8 +195,8 @@ static int fd;
 #define SYNCEDCLIENTS	(1<<6)
 #define HEARTBEAT	(1<<7)
 
-#define VCS_SEQNO_IDX(engine) ((engine) * 16)
-#define VCS_SEQNO_OFFSET(engine) (VCS_SEQNO_IDX(engine) * sizeof(uint32_t))
+#define SEQNO_IDX(engine) ((engine) * 16)
+#define SEQNO_OFFSET(engine) (SEQNO_IDX(engine) * sizeof(uint32_t))
 
 #define RCS_TIMESTAMP (0x2000 + 0x358)
 #define REG(x) (volatile uint32_t *)((volatile char *)igt_global_mmio + x)
@@ -726,6 +726,12 @@ eb_update_flags(struct w_step *w, enum intel_engine_id engine,
 		w->eb.flags |= I915_EXEC_FENCE_OUT;
 }
 
+static struct drm_i915_gem_exec_object2 *
+get_status_objects(struct workload *wrk)
+{
+	return wrk->status_object;
+}
+
 static void
 alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 {
@@ -743,7 +749,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 	igt_assert(j < nr_obj);
 
 	if (flags & SEQNO) {
-		w->obj[j++] = wrk->status_object[0];
+		w->obj[j++] = get_status_objects(wrk)[0];
 		igt_assert(j < nr_obj);
 	}
 
@@ -898,6 +904,20 @@ current_seqno(struct workload *wrk, enum intel_engine_id engine)
 	return wrk->seqno[engine];
 }
 
+#define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
+
+static uint32_t
+read_status_page(struct workload *wrk, unsigned int idx)
+{
+	return READ_ONCE(wrk->status_page[idx]);
+}
+
+static uint32_t
+current_gpu_seqno(struct workload *wrk, enum intel_engine_id engine)
+{
+       return read_status_page(wrk, SEQNO_IDX(engine));
+}
+
 struct workload_balancer {
 	unsigned int id;
 	const char *name;
@@ -935,8 +955,7 @@ static unsigned int
 get_qd_depth(const struct workload_balancer *balancer,
 	     struct workload *wrk, enum intel_engine_id engine)
 {
-	return current_seqno(wrk, engine) -
-	       wrk->status_page[VCS_SEQNO_IDX(engine)];
+	return current_seqno(wrk, engine) - current_gpu_seqno(wrk, engine);
 }
 
 static enum intel_engine_id
@@ -977,8 +996,8 @@ __qd_balance(const struct workload_balancer *balancer,
 #ifdef DEBUG
 	printf("qd_balance: 1:%ld 2:%ld rr:%u = %u\t(%lu - %u) (%lu - %u)\n",
 	       qd[VCS1], qd[VCS2], wrk->vcs_rr, engine,
-	       current_seqno(wrk, VCS1), wrk->status_page[VCS_SEQNO_IDX(VCS1)],
-	       current_seqno(wrk, VCS2), wrk->status_page[VCS_SEQNO_IDX(VCS2)]);
+	       current_seqno(wrk, VCS1), current_gpu_seqno(wrk, VCS1),
+	       current_seqno(wrk, VCS2), current_gpu_seqno(wrk, VCS2));
 #endif
 	return engine;
 }
@@ -1032,21 +1051,18 @@ struct rt_depth {
 	uint32_t completed;
 };
 
-#define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
-
 static void get_rt_depth(struct workload *wrk,
 			 unsigned int engine,
 			 struct rt_depth *rt)
 {
-	const unsigned int idx = VCS_SEQNO_IDX(engine);
+	const unsigned int idx = SEQNO_IDX(engine);
 	uint32_t latch;
 
 	do {
-		latch = READ_ONCE(wrk->status_page[idx + 3]);
-
-		rt->submitted = READ_ONCE(wrk->status_page[idx + 1]);
-		rt->completed = READ_ONCE(wrk->status_page[idx + 2]);
-		rt->seqno = READ_ONCE(wrk->status_page[idx]);
+		latch = read_status_page(wrk, idx + 3);
+		rt->submitted = read_status_page(wrk, idx + 1);
+		rt->completed = read_status_page(wrk, idx + 2);
+		rt->seqno = read_status_page(wrk, idx);
 	} while (latch != rt->seqno);
 }
 
@@ -1219,7 +1235,7 @@ update_bb_seqno(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
 	gem_set_domain(fd, w->bb_handle,
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
-	w->reloc[0].delta = VCS_SEQNO_OFFSET(engine);
+	w->reloc[0].delta = SEQNO_OFFSET(engine);
 
 	*w->seqno_value = seqno;
 	*w->seqno_address = w->reloc[0].presumed_offset + w->reloc[0].delta;
@@ -1235,9 +1251,9 @@ update_bb_rt(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
 	gem_set_domain(fd, w->bb_handle,
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
-	w->reloc[1].delta = VCS_SEQNO_OFFSET(engine) + sizeof(uint32_t);
-	w->reloc[2].delta = VCS_SEQNO_OFFSET(engine) + 2 * sizeof(uint32_t);
-	w->reloc[3].delta = VCS_SEQNO_OFFSET(engine) + 3 * sizeof(uint32_t);
+	w->reloc[1].delta = SEQNO_OFFSET(engine) + sizeof(uint32_t);
+	w->reloc[2].delta = SEQNO_OFFSET(engine) + 2 * sizeof(uint32_t);
+	w->reloc[3].delta = SEQNO_OFFSET(engine) + 3 * sizeof(uint32_t);
 
 	*w->latch_value = seqno;
 	*w->latch_address = w->reloc[3].presumed_offset + w->reloc[3].delta;
@@ -1272,42 +1288,49 @@ static void w_sync_to(struct workload *wrk, struct w_step *w, int target)
 	gem_sync(fd, wrk->steps[target].obj[0].handle);
 }
 
+static uint32_t *get_status_cs(struct workload *wrk)
+{
+	return wrk->status_cs;
+}
+
 #define INIT_CLOCKS 0x1
 #define INIT_ALL (INIT_CLOCKS)
 static void init_status_page(struct workload *wrk, unsigned int flags)
 {
 	struct drm_i915_gem_relocation_entry reloc[4] = {};
+	struct drm_i915_gem_exec_object2 *status_object =
+						get_status_objects(wrk);
 	struct drm_i915_gem_execbuffer2 eb = {
 		.buffer_count = ARRAY_SIZE(wrk->status_object),
-		.buffers_ptr = to_user_pointer(wrk->status_object)
+		.buffers_ptr = to_user_pointer(status_object)
 	};
-	uint32_t *base = wrk->status_cs;
+	uint32_t *base = get_status_cs(wrk);
 
 	/* Want to make sure that the balancer has a reasonable view of
 	 * the background busyness of each engine. To do that we occasionally
 	 * send a dummy batch down the pipeline.
 	 */
 
-	if (!wrk->status_cs)
+	if (!base)
 		return;
 
-	gem_set_domain(fd, wrk->status_object[1].handle,
+	gem_set_domain(fd, status_object[1].handle,
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
-	wrk->status_object[1].relocs_ptr = to_user_pointer(reloc);
-	wrk->status_object[1].relocation_count = 2;
+	status_object[1].relocs_ptr = to_user_pointer(reloc);
+	status_object[1].relocation_count = 2;
 	if (flags & INIT_CLOCKS)
-		wrk->status_object[1].relocation_count += 2;
+		status_object[1].relocation_count += 2;
 
 	for (int engine = 0; engine < NUM_ENGINES; engine++) {
 		struct drm_i915_gem_relocation_entry *r = reloc;
-		uint64_t presumed_offset = wrk->status_object[0].offset;
+		uint64_t presumed_offset = status_object[0].offset;
 		uint32_t offset = engine * 128;
 		uint32_t *cs = base + offset / sizeof(*cs);
 		uint64_t addr;
 
 		r->offset = offset + sizeof(uint32_t);
-		r->delta = VCS_SEQNO_OFFSET(engine);
+		r->delta = SEQNO_OFFSET(engine);
 		r->presumed_offset = presumed_offset;
 		addr = presumed_offset + r->delta;
 		r++;
@@ -1323,7 +1346,7 @@ static void init_status_page(struct workload *wrk, unsigned int flags)
 		 */
 		if (flags & INIT_CLOCKS) {
 			r->offset = offset + sizeof(uint32_t);
-			r->delta = VCS_SEQNO_OFFSET(engine) + sizeof(uint32_t);
+			r->delta = SEQNO_OFFSET(engine) + sizeof(uint32_t);
 			r->presumed_offset = presumed_offset;
 			addr = presumed_offset + r->delta;
 			r++;
@@ -1334,7 +1357,7 @@ static void init_status_page(struct workload *wrk, unsigned int flags)
 			offset += 4 * sizeof(uint32_t);
 
 			r->offset = offset + 2 * sizeof(uint32_t);
-			r->delta = VCS_SEQNO_OFFSET(engine) + 2*sizeof(uint32_t);
+			r->delta = SEQNO_OFFSET(engine) + 2*sizeof(uint32_t);
 			r->presumed_offset = presumed_offset;
 			addr = presumed_offset + r->delta;
 			r++;
@@ -1346,7 +1369,7 @@ static void init_status_page(struct workload *wrk, unsigned int flags)
 		}
 
 		r->offset = offset + sizeof(uint32_t);
-		r->delta = VCS_SEQNO_OFFSET(engine) + 3*sizeof(uint32_t);
+		r->delta = SEQNO_OFFSET(engine) + 3*sizeof(uint32_t);
 		r->presumed_offset = presumed_offset;
 		addr = presumed_offset + r->delta;
 		r++;
