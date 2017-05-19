@@ -1649,6 +1649,8 @@ static void print_help(void)
 "  -t <n>          Nop calibration tolerance percentage.\n"
 "                  Use when there is a difficulty obtaining calibration with the\n"
 "                  default settings.\n"
+"  -p <n>          Context priority to use for the following workload on the\n"
+"                  command line.\n"
 "  -w <desc|path>  Filename or a workload descriptor.\n"
 "                  Can be given multiple times.\n"
 "  -W <desc|path>  Filename or a master workload descriptor.\n"
