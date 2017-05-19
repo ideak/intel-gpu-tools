@@ -519,13 +519,13 @@ static void loaded_check(void)
 		read_freqs(freqs);
 		dump(freqs);
 		checkit(freqs);
-		if (freqs[CUR] == freqs[MAX])
+		if (freqs[CUR] >= freqs[MAX])
 			break;
 		usleep(1000 * LOADED_WAIT_TIMESTEP_MSEC);
 		wait += LOADED_WAIT_TIMESTEP_MSEC;
 	} while (wait < LOADED_WAIT_TIMEOUT_MSEC);
 
-	igt_assert_eq(freqs[CUR], freqs[MAX]);
+	igt_assert_lte(freqs[MAX], freqs[CUR]);
 	igt_debug("Required %d msec to reach cur=max\n", wait);
 }
 
