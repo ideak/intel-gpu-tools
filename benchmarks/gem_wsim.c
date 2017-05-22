@@ -172,6 +172,10 @@ struct workload
 	struct igt_list requests[NUM_ENGINES];
 	unsigned int nrequest[NUM_ENGINES];
 
+	struct workload *global_wrk;
+	const struct workload_balancer *global_balancer;
+	pthread_mutex_t mutex;
+
 	union {
 		struct rtavg {
 			struct ewma_rt avg[NUM_ENGINES];
@@ -194,6 +198,7 @@ static int fd;
 #define INITVCSRR	(1<<5)
 #define SYNCEDCLIENTS	(1<<6)
 #define HEARTBEAT	(1<<7)
+#define GLOBAL_BALANCE	(1<<8)
 
 #define SEQNO_IDX(engine) ((engine) * 16)
 #define SEQNO_OFFSET(engine) (SEQNO_IDX(engine) * sizeof(uint32_t))
@@ -729,7 +734,10 @@ eb_update_flags(struct w_step *w, enum intel_engine_id engine,
 static struct drm_i915_gem_exec_object2 *
 get_status_objects(struct workload *wrk)
 {
-	return wrk->status_object;
+	if (wrk->flags & GLOBAL_BALANCE)
+		return wrk->global_wrk->status_object;
+	else
+		return wrk->status_object;
 }
 
 static void
@@ -809,22 +817,31 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 
 	wrk->id = id;
 	wrk->prng = rand();
+	wrk->run = true;
 
 	if (flags & INITVCSRR)
 		wrk->vcs_rr = id & 1;
 
+	if (flags & GLOBAL_BALANCE) {
+		int ret = pthread_mutex_init(&wrk->mutex, NULL);
+		igt_assert(ret == 0);
+	}
+
 	if (flags & SEQNO) {
-		uint32_t handle = gem_create(fd, 4096);
+		if (!(flags & GLOBAL_BALANCE) || id == 0) {
+			uint32_t handle;
 
-		gem_set_caching(fd, handle, I915_CACHING_CACHED);
-		wrk->status_object[0].handle = handle;
-		wrk->status_page = gem_mmap__cpu(fd, handle, 0, 4096,
-						 PROT_READ);
+			handle = gem_create(fd, 4096);
+			gem_set_caching(fd, handle, I915_CACHING_CACHED);
+			wrk->status_object[0].handle = handle;
+			wrk->status_page = gem_mmap__cpu(fd, handle, 0, 4096,
+							 PROT_READ);
 
-		handle = gem_create(fd, 4096);
-		wrk->status_object[1].handle = handle;
-		wrk->status_cs = gem_mmap__wc(fd, handle,
-					      0, 4096, PROT_WRITE);
+			handle = gem_create(fd, 4096);
+			wrk->status_object[1].handle = handle;
+			wrk->status_cs = gem_mmap__wc(fd, handle,
+						      0, 4096, PROT_WRITE);
+		}
 	}
 
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
@@ -895,13 +912,34 @@ static enum intel_engine_id get_vcs_engine(unsigned int n)
 
 static uint32_t new_seqno(struct workload *wrk, enum intel_engine_id engine)
 {
-	return ++wrk->seqno[engine];
+	uint32_t seqno;
+	int ret;
+
+	if (wrk->flags & GLOBAL_BALANCE) {
+		igt_assert(wrk->global_wrk);
+		wrk = wrk->global_wrk;
+
+		ret = pthread_mutex_lock(&wrk->mutex);
+		igt_assert(ret == 0);
+	}
+
+	seqno = ++wrk->seqno[engine];
+
+	if (wrk->flags & GLOBAL_BALANCE) {
+		ret = pthread_mutex_unlock(&wrk->mutex);
+		igt_assert(ret == 0);
+	}
+
+	return seqno;
 }
 
 static uint32_t
 current_seqno(struct workload *wrk, enum intel_engine_id engine)
 {
-	return wrk->seqno[engine];
+	if (wrk->flags & GLOBAL_BALANCE)
+		return wrk->global_wrk->seqno[engine];
+	else
+		return wrk->seqno[engine];
 }
 
 #define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
@@ -909,7 +947,10 @@ current_seqno(struct workload *wrk, enum intel_engine_id engine)
 static uint32_t
 read_status_page(struct workload *wrk, unsigned int idx)
 {
-	return READ_ONCE(wrk->status_page[idx]);
+	if (wrk->flags & GLOBAL_BALANCE)
+		return READ_ONCE(wrk->global_wrk->status_page[idx]);
+	else
+		return READ_ONCE(wrk->status_page[idx]);
 }
 
 static uint32_t
@@ -994,8 +1035,8 @@ __qd_balance(const struct workload_balancer *balancer,
 	engine = __qd_select_engine(wrk, qd, random);
 
 #ifdef DEBUG
-	printf("qd_balance: 1:%ld 2:%ld rr:%u = %u\t(%lu - %u) (%lu - %u)\n",
-	       qd[VCS1], qd[VCS2], wrk->vcs_rr, engine,
+	printf("qd_balance[%u]: 1:%ld 2:%ld rr:%u = %u\t(%u - %u) (%u - %u)\n",
+	       wrk->id, qd[VCS1], qd[VCS2], wrk->vcs_rr, engine,
 	       current_seqno(wrk, VCS1), current_gpu_seqno(wrk, VCS1),
 	       current_seqno(wrk, VCS2), current_gpu_seqno(wrk, VCS2));
 #endif
@@ -1033,7 +1074,14 @@ qdavg_balance(const struct workload_balancer *balancer,
 		qd[engine] = ewma_rt_read(&wrk->rt.avg[engine]);
 	}
 
-	return __qd_select_engine(wrk, qd, false);
+	engine = __qd_select_engine(wrk, qd, false);
+#ifdef DEBUG
+	printf("qdavg_balance[%u]: 1:%ld 2:%ld rr:%u = %u\t(%u - %u) (%u - %u)\n",
+	       wrk->id, qd[VCS1], qd[VCS2], wrk->vcs_rr, engine,
+	       current_seqno(wrk, VCS1), current_gpu_seqno(wrk, VCS1),
+	       current_seqno(wrk, VCS2), current_gpu_seqno(wrk, VCS2));
+#endif
+	return engine;
 }
 
 static enum intel_engine_id
@@ -1228,6 +1276,48 @@ static const struct workload_balancer all_balancers[] = {
 		.balance = rtavg_balance,
 	},
 };
+
+static unsigned int
+global_get_qd(const struct workload_balancer *balancer,
+	      struct workload *wrk, enum intel_engine_id engine)
+{
+	igt_assert(wrk->global_wrk);
+	igt_assert(wrk->global_balancer);
+
+	return wrk->global_balancer->get_qd(wrk->global_balancer,
+					    wrk->global_wrk, engine);
+}
+
+static enum intel_engine_id
+global_balance(const struct workload_balancer *balancer,
+	       struct workload *wrk, struct w_step *w)
+{
+	enum intel_engine_id engine;
+	int ret;
+
+	igt_assert(wrk->global_wrk);
+	igt_assert(wrk->global_balancer);
+
+	wrk = wrk->global_wrk;
+
+	ret = pthread_mutex_lock(&wrk->mutex);
+	igt_assert(ret == 0);
+
+	engine = wrk->global_balancer->balance(wrk->global_balancer, wrk, w);
+
+	ret = pthread_mutex_unlock(&wrk->mutex);
+	igt_assert(ret == 0);
+
+	return engine;
+}
+
+static const struct workload_balancer global_balancer = {
+		.id = ~0,
+		.name = "global",
+		.desc = "Global balancer",
+		.get_qd = global_get_qd,
+		.balance = global_balance,
+	};
 
 static void
 update_bb_seqno(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
@@ -1713,7 +1803,9 @@ static void print_help(void)
 "  -2              Remap VCS2 to BCS.\n"
 "  -R              Round-robin initial VCS assignment per client.\n"
 "  -S              Synchronize the sequence of random batch durations between\n"
-"                  clients."
+"                  clients.\n"
+"  -G              Global load balancing - a single load balancer will be shared\n"
+"                  between all clients and there will be a single seqno domain."
 	);
 }
 
@@ -1848,7 +1940,7 @@ int main(int argc, char **argv)
 
 	init_clocks();
 
-	while ((c = getopt(argc, argv, "hqv2RSHxc:n:r:w:W:a:t:b:p:")) != -1) {
+	while ((c = getopt(argc, argv, "hqv2RSHxGc:n:r:w:W:a:t:b:p:")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -1907,6 +1999,9 @@ int main(int argc, char **argv)
 		case 'H':
 			flags |= HEARTBEAT;
 			break;
+		case 'G':
+			flags |= GLOBAL_BALANCE;
+			break;
 		case 'b':
 			i = find_balancer_by_name(optarg);
 			if (i < 0) {
@@ -1964,6 +2059,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if ((flags & GLOBAL_BALANCE) && !balancer) {
+		if (verbose)
+			fprintf(stderr,
+				"Balancer not specified in global balancing mode!\n");
+		return 1;
+	}
+
 	if (append_workload_arg) {
 		append_workload_arg = load_workload_descriptor(append_workload_arg);
 		if (!append_workload_arg) {
@@ -2017,7 +2119,10 @@ int main(int argc, char **argv)
 		printf("%u client%s.\n", clients, clients > 1 ? "s" : "");
 		if (flags & SWAPVCS)
 			printf("Swapping VCS rings between clients.\n");
-		if (balancer)
+		if (flags & GLOBAL_BALANCE)
+			printf("Using %s balancer in global mode.\n",
+			       balancer->name);
+		else if (balancer)
 			printf("Using %s balancer.\n", balancer->name);
 	}
 
@@ -2035,15 +2140,21 @@ int main(int argc, char **argv)
 		if (flags & SWAPVCS && i & 1)
 			flags_ &= ~SWAPVCS;
 
-		prepare_workload(i, w[i], flags_);
+		if (flags & GLOBAL_BALANCE) {
+			w[i]->balancer = &global_balancer;
+			w[i]->global_wrk = w[0];
+			w[i]->global_balancer = balancer;
+		} else {
+			w[i]->balancer = balancer;
+		}
 
 		w[i]->flags = flags;
 		w[i]->repeat = repeat;
-		w[i]->balancer = balancer;
-		w[i]->run = true;
 		w[i]->background = master_workload >= 0 && i != master_workload;
 		w[i]->print_stats = verbose > 1 ||
 				    (verbose > 0 && master_workload == i);
+
+		prepare_workload(i, w[i], flags_);
 	}
 
 	gem_quiescent_gpu(fd);
