@@ -165,9 +165,12 @@ static void store_cachelines(int fd, unsigned ring, unsigned int flags)
 
 		igt_assert_eq_u32(result, n | ~n << 16);
 	}
+	free(reloc);
 
 	for (unsigned n = 0; n < execbuf.buffer_count; n++)
 		gem_close(fd, obj[n].handle);
+	free(obj);
+
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
