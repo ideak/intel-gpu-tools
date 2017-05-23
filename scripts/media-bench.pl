@@ -38,6 +38,7 @@ my $idle_tolerance_pct = 2.0;
 my $show_cmds = 0;
 my $realtime_target = 0;
 my $wps_target = 0;
+my $w_direct;
 my $balancer;
 my $nop;
 my %opts;
@@ -152,15 +153,19 @@ sub run_workload
 sub trace_workload
 {
 	my ($wrk, $b, $r, $c) = @_;
-	my @args = ( "-n $nop", "-w $wrk_root/$wrk", "-r $r", "-c $c");
+	my @args = ( "-n $nop", "-r $r", "-c $c");
 	my $min_batches = 16 + $r * $c / 2;
 	my @skip_engine;
 	my %engines;
 	my ($cmd, $file);
+	my $warg = defined $w_direct ? $wrk : "-w $wrk_root/$wrk";
 
-	unshift @args, "$b -R" unless $b eq '<none>';
+	push @args, "$b -R" unless $b eq '<none>';
+	push @args, $warg;
+
 	unshift @args, '-q';
 	unshift @args, "$tracepl --trace $wsim";
+
 	$cmd = join ' ', @args;
 	show_cmd($cmd);
 	system($cmd);
@@ -200,6 +205,7 @@ sub trace_workload
 sub calibrate_workload
 {
 	my ($wrk) = @_;
+	my $warg = defined $w_direct ? $wrk : "-w $wrk_root/$wrk";
 	my $tol = $tolerance;
 	my $loops = 0;
 	my $error;
@@ -207,7 +213,7 @@ sub calibrate_workload
 
 	$r = 23;
 	for (;;) {
-		my @args = ( "-n $nop", "-w $wrk_root/$wrk", "-r $r");
+		my @args = ( "-n $nop", "-r $r", $warg);
 		my ($time, $wps);
 
 		($time, $wps) = run_workload(@args);
@@ -230,15 +236,25 @@ sub calibrate_workload
 
 sub find_saturation_point
 {
-	my ($rr, @args) = @_;
+	my ($wrk, $rr, @args) = @_;
 	my ($last_wps, $c, $swps);
 	my $target = $realtime_target > 0 ? $realtime_target : $wps_target;
 	my $r = $rr;
+	my ($warg, $wcnt);
+
+	if (defined $w_direct) {
+		$warg = $wrk;
+		$wcnt = () = $wrk =~ /-[wW]/gi;
+
+	} else {
+		$warg = "-w $wrk_root/$wrk";
+		$wcnt = 1;
+	}
 
 	for ($c = 1; ; $c = $c + 1) {
 		my ($time, $wps);
 
-		($time, $wps) = run_workload((@args, ("-r $r", "-c $c")));
+		($time, $wps) = run_workload((@args, ($warg, "-r $r", "-c $c")));
 
 		if ($c > 1) {
 			my $delta;
@@ -253,6 +269,7 @@ sub find_saturation_point
 			$r = int($rr * ($client_target_s / $time));
 		} elsif ($c == 1) {
 			$swps = $wps;
+			return ($c, $wps, $swps) if $wcnt > 1;
 		}
 
 		$last_wps = $wps;
@@ -261,7 +278,7 @@ sub find_saturation_point
 	return ($c - 1, $last_wps, $swps);
 }
 
-getopts('hxn:b:W:B:r:t:i:R:T:', \%opts);
+getopts('hxn:b:W:B:r:t:i:R:T:w:', \%opts);
 
 if (defined $opts{'h'}) {
 	print <<ENDHELP;
@@ -280,6 +297,7 @@ Supported options:
   -i pct      Engine idleness tolerance.
   -R wps      Run workloads in the real-time mode at wps rate.
   -T wps      Calibrate up to wps/client target instead of GPU saturation.
+  -w str      Pass-through to gem_wsim -w.
 ENDHELP
 	exit 0;
 }
@@ -297,7 +315,9 @@ $tolerance = $opts{'t'} / 100.0 if defined $opts{'t'};
 $idle_tolerance_pct = $opts{'i'} if defined $opts{'i'};
 $realtime_target = $opts{'R'} if defined $opts{'R'};
 $wps_target = $opts{'T'} if defined $opts{'T'};
+$w_direct = $opts{'w'} if defined $opts{'w'};
 
+@workloads =  ($w_direct ) if defined $w_direct;
 say "Workloads:";
 print map { "  $_\n" } @workloads;
 print "Balancers: ";
@@ -349,13 +369,14 @@ sub add_points
 }
 
 foreach my $wrk (@workloads) {
-	my @args = ( "-n $nop", "-w $wrk_root/$wrk");
+	my @args = ( "-n $nop");
 	my ($r, $error, $should_b, $best);
 	my (%wps, %cwps, %mwps);
 	my @sorted;
 	my $range;
 
-	$should_b = can_balance_workload($wrk);
+	$should_b = 1;
+	$should_b = can_balance_workload($wrk) unless defined $w_direct;
 
 	print "\nEvaluating '$wrk'...";
 
@@ -382,7 +403,8 @@ foreach my $wrk (@workloads) {
 					print "    No balancing: ";
 				}
 
-				($c, $w, $s) = find_saturation_point($r, (@args,
+				($c, $w, $s) = find_saturation_point($wrk, $r,
+								     (@args,
 								      @xargs));
 
 				$wps{$bid} = $w;
@@ -463,14 +485,14 @@ say "\nBalancer is '$balancer'.";
 say "Idleness tolerance is $idle_tolerance_pct%.";
 
 foreach my $wrk (@workloads) {
-	my @args = ( "-n $nop", "-w $wrk_root/$wrk");
+	my @args = ( "-n $nop" );
 	my ($r, $error, $c, $wps, $swps);
 	my $saturated = 0;
 	my $result = 'Pass';
 	my %problem;
 	my $engines;
 
-	next unless can_balance_workload($wrk);
+	next if not defined $w_direct and not can_balance_workload($wrk);
 
 	push @args, $balancer unless $balancer eq '<none>';
 
@@ -484,7 +506,7 @@ foreach my $wrk (@workloads) {
 	($r, $error) = calibrate_workload($wrk);
 	say "      ${client_target_s}s is $r workloads. (error=$error)";
 
-	($c, $wps, $swps) = find_saturation_point($r, @args);
+	($c, $wps, $swps) = find_saturation_point($wrk, $r, @args);
 	say "      Saturation at $c clients ($wps workloads/s).";
 	push @args, "-c $c";
 
