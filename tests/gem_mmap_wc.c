@@ -127,8 +127,6 @@ test_copy(int fd)
 {
 	void *src, *dst;
 
-	gem_require_mmap_wc(fd);
-
 	/* copy from a fresh src to fresh dst to force pagefault on both */
 	src = create_pointer(fd);
 	dst = create_pointer(fd);
@@ -177,8 +175,6 @@ test_read_write2(int fd, enum test_read_write order)
 	void *r, *w;
 	volatile uint32_t val = 0;
 
-	gem_require_mmap_wc(fd);
-
 	handle = gem_create(fd, OBJECT_SIZE);
 	set_domain(fd, handle);
 
@@ -204,8 +200,6 @@ test_write(int fd)
 {
 	void *src;
 	uint32_t dst;
-
-	gem_require_mmap_wc(fd);
 
 	/* copy from a fresh src to fresh dst to force pagefault on both */
 	src = create_pointer(fd);
@@ -251,8 +245,6 @@ test_write_gtt(int fd)
 	char *dst_gtt;
 	void *src;
 
-	gem_require_mmap_wc(fd);
-
 	dst = gem_create(fd, OBJECT_SIZE);
 	set_domain(fd, dst);
 
@@ -274,8 +266,6 @@ test_read(int fd)
 {
 	void *dst;
 	uint32_t src;
-
-	gem_require_mmap_wc(fd);
 
 	/* copy from a fresh src to fresh dst to force pagefault on both */
 	dst = create_pointer(fd);
@@ -308,8 +298,6 @@ test_write_cpu_read_wc(int fd, int force_domain)
 	uint32_t handle;
 	uint32_t *src, *dst;
 
-	gem_require_mmap_wc(fd);
-
 	handle = gem_create(fd, OBJECT_SIZE);
 
 	dst = gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ);
@@ -331,8 +319,6 @@ test_write_gtt_read_wc(int fd)
 {
 	uint32_t handle;
 	uint32_t *src, *dst;
-
-	gem_require_mmap_wc(fd);
 
 	handle = gem_create(fd, OBJECT_SIZE);
 	set_domain(fd, handle);
@@ -424,8 +410,6 @@ test_fault_concurrent(int fd)
 	struct thread_fault_concurrent thread[64];
 	int n;
 
-	gem_require_mmap_wc(fd);
-
 	for (n = 0; n < 32; n++) {
 		ptr[n] = create_pointer(fd);
 	}
@@ -460,8 +444,10 @@ igt_main
 	if (igt_run_in_simulation())
 		OBJECT_SIZE = 1 * 1024 * 1024;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		gem_require_mmap_wc(fd);
+	}
 
 	igt_subtest("invalid-flags")
 		test_invalid_flags(fd);
