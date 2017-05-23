@@ -158,7 +158,7 @@ sub trace_workload
 	my %engines;
 	my ($cmd, $file);
 
-	unshift @args, $b unless $b eq '<none>';
+	unshift @args, "$b -R" unless $b eq '<none>';
 	unshift @args, '-q';
 	unshift @args, "$tracepl --trace $wsim";
 	$cmd = join ' ', @args;
@@ -218,8 +218,8 @@ sub calibrate_workload
 
 		$r = int($wps * $client_target_s);
 		$loops = $loops + 1;
-		if ($loops >= 4) {
-			$tol = $tol * (1.0 + ($tol));
+		if ($loops >= 3) {
+			$tol = $tol * (1.5 + ($tol));
 			$loops = 0;
 		}
 		last if $tol > 0.2;
@@ -230,19 +230,27 @@ sub calibrate_workload
 
 sub find_saturation_point
 {
-	my (@args) = @_;
+	my ($rr, @args) = @_;
 	my ($last_wps, $c, $swps);
+	my $target = $realtime_target > 0 ? $realtime_target : $wps_target;
+	my $r = $rr;
 
 	for ($c = 1; ; $c = $c + 1) {
 		my ($time, $wps);
 
-		($time, $wps) = run_workload((@args, ("-c $c")));
+		($time, $wps) = run_workload((@args, ("-r $r", "-c $c")));
 
 		if ($c > 1) {
-			my $error = abs($wps - $last_wps) / $last_wps;
-			last if $wps_target <= 0 and
-				($wps < $last_wps or $error <= $tolerance);
-			last if $wps_target > 0 and $wps / $c < $wps_target;
+			my $delta;
+
+			if ($target <= 0) {
+				$delta = ($wps - $last_wps) / $last_wps;
+				$delta = -$tolerance if $delta < 0;
+			} else {
+				$delta = ($wps / $c - $target) / $target;
+			}
+			last if $delta < 0 and abs($delta) >= $tolerance;
+			$r = int($rr * ($client_target_s / $time));
 		} elsif ($c == 1) {
 			$swps = $wps;
 		}
@@ -341,11 +349,11 @@ sub add_points
 }
 
 foreach my $wrk (@workloads) {
+	my @args = ( "-n $nop", "-w $wrk_root/$wrk");
 	my ($r, $error, $should_b, $best);
 	my (%wps, %cwps, %mwps);
 	my @sorted;
 	my $range;
-	my @args;
 
 	$should_b = can_balance_workload($wrk);
 
@@ -353,21 +361,20 @@ foreach my $wrk (@workloads) {
 
 	($r, $error) = calibrate_workload($wrk);
 	say " ${client_target_s}s is $r workloads. (error=$error)";
-	@args = ( "-n $nop", "-w $wrk_root/$wrk", "-r $r");
 
 	say "  Finding saturation points for '$wrk'...";
 
 	BAL: foreach my $bal (@balancers) {
-		RBAL: foreach my $R ('', '-R') {
+		RBAL: foreach my $R ('', '-G') {
 			foreach my $H ('', '-H') {
 				my @xargs;
 				my ($w, $c, $s);
 				my $bid;
 
 				if ($bal ne '') {
-					push @xargs, "-b $bal";
-					push @xargs, '-R' if $R ne '';
-					push @xargs, '-H' if $H ne '';
+					push @xargs, "-b $bal -R";
+					push @xargs, $R if $R ne '';
+					push @xargs, $H if $H ne '';
 					$bid = join ' ', @xargs;
 					print "    $bal balancer ('$bid'): ";
 				} else {
@@ -375,7 +382,7 @@ foreach my $wrk (@workloads) {
 					print "    No balancing: ";
 				}
 
-				($c, $w, $s) = find_saturation_point((@args,
+				($c, $w, $s) = find_saturation_point($r, (@args,
 								      @xargs));
 
 				$wps{$bid} = $w;
@@ -476,9 +483,8 @@ foreach my $wrk (@workloads) {
 
 	($r, $error) = calibrate_workload($wrk);
 	say "      ${client_target_s}s is $r workloads. (error=$error)";
-	push @args, "-r $r";
 
-	($c, $wps, $swps) = find_saturation_point(@args);
+	($c, $wps, $swps) = find_saturation_point($r, @args);
 	say "      Saturation at $c clients ($wps workloads/s).";
 	push @args, "-c $c";
 
