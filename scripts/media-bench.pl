@@ -181,6 +181,8 @@ sub trace_workload
 			} else {
 				push @skip_engine, $1;
 			}
+		} elsif (/GPU: (\d+\.?\d+)% idle/) {
+			$engines{'gpu'} = $1;
 		}
 	}
 	close CMD;
@@ -225,7 +227,7 @@ sub calibrate_workload
 		$r = int($wps * $client_target_s);
 		$loops = $loops + 1;
 		if ($loops >= 3) {
-			$tol = $tol * (1.5 + ($tol));
+			$tol = $tol * (1.2 + ($tol));
 			$loops = 0;
 		}
 		last if $tol > 0.2;
@@ -513,6 +515,7 @@ foreach my $wrk (@workloads) {
 	$engines = trace_workload($wrk, $balancer, $r, $c);
 
 	foreach my $key (keys %{$engines}) {
+		next if $key eq 'gpu';
 		$saturated = $saturated + 1
 			     if $engines->{$key} < $idle_tolerance_pct;
 	}
@@ -529,6 +532,8 @@ foreach my $wrk (@workloads) {
 		# Only one VCS saturated
 		$result = 'WARN';
 	}
+
+	$result = 'WARN' if $engines->{'gpu'} > $idle_tolerance_pct;
 
 	if ($result ne 'Pass') {
 		$problem{'c'} = $c;
