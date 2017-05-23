@@ -50,6 +50,7 @@
 #include "intel_io.h"
 #include "igt_aux.h"
 #include "igt_rand.h"
+#include "igt_perf.h"
 #include "sw_sync.h"
 
 #include "ewma.h"
@@ -188,6 +189,16 @@ struct workload
 			uint32_t last[NUM_ENGINES];
 		} rt;
 	};
+
+	struct busy_balancer {
+		int fd;
+		bool first;
+		unsigned int num_engines;
+		unsigned int engine_map[5];
+		uint64_t t_prev;
+		uint64_t prev[5];
+		double busy[5];
+	} busy_balancer;
 };
 
 static const unsigned int nop_calibration_us = 1000;
@@ -993,6 +1004,8 @@ struct workload_balancer {
 	unsigned int flags;
 	unsigned int min_gen;
 
+	int (*init)(const struct workload_balancer *balancer,
+		    struct workload *wrk);
 	unsigned int (*get_qd)(const struct workload_balancer *balancer,
 			       struct workload *wrk,
 			       enum intel_engine_id engine);
@@ -1242,6 +1255,108 @@ context_balance(const struct workload_balancer *balancer,
 	return get_vcs_engine(wrk->ctx_list[w->context].static_vcs);
 }
 
+static unsigned int
+get_engine_busy(const struct workload_balancer *balancer,
+		struct workload *wrk, enum intel_engine_id engine)
+{
+	struct busy_balancer *bb = &wrk->busy_balancer;
+
+	if (engine == VCS2 && (wrk->flags & VCS2REMAP))
+		engine = BCS;
+
+	return bb->busy[bb->engine_map[engine]];
+}
+
+static void
+get_pmu_stats(const struct workload_balancer *b, struct workload *wrk)
+{
+	struct busy_balancer *bb = &wrk->busy_balancer;
+	uint64_t val[7];
+	unsigned int i;
+
+	igt_assert_eq(read(bb->fd, val, sizeof(val)),
+		      (2 + bb->num_engines) * sizeof(uint64_t));
+
+	if (!bb->first) {
+		for (i = 0; i < bb->num_engines; i++) {
+			double d;
+
+			d = (val[2 + i] - bb->prev[i]) * 100;
+			d /= val[1] - bb->t_prev;
+			bb->busy[i] = d;
+		}
+	}
+
+	for (i = 0; i < bb->num_engines; i++)
+		bb->prev[i] = val[2 + i];
+
+	bb->t_prev = val[1];
+	bb->first = false;
+}
+
+static enum intel_engine_id
+busy_avg_balance(const struct workload_balancer *balancer,
+		 struct workload *wrk, struct w_step *w)
+{
+	get_pmu_stats(balancer, wrk);
+
+	return qdavg_balance(balancer, wrk, w);
+}
+
+static enum intel_engine_id
+busy_balance(const struct workload_balancer *balancer,
+	     struct workload *wrk, struct w_step *w)
+{
+	get_pmu_stats(balancer, wrk);
+
+	return qd_balance(balancer, wrk, w);
+}
+
+static int
+busy_init(const struct workload_balancer *balancer, struct workload *wrk)
+{
+	struct busy_balancer *bb = &wrk->busy_balancer;
+	struct engine_desc {
+		unsigned class, inst;
+		enum intel_engine_id id;
+	} *d, engines[] = {
+		{ I915_ENGINE_CLASS_RENDER, 0, RCS },
+		{ I915_ENGINE_CLASS_COPY, 0, BCS },
+		{ I915_ENGINE_CLASS_VIDEO, 0, VCS1 },
+		{ I915_ENGINE_CLASS_VIDEO, 1, VCS2 },
+		{ I915_ENGINE_CLASS_VIDEO_ENHANCE, 0, VECS },
+		{ 0, 0, VCS }
+	};
+
+	bb->num_engines = 0;
+	bb->first = true;
+	bb->fd = -1;
+
+	for (d = &engines[0]; d->id != VCS; d++) {
+		int pfd;
+
+		pfd = perf_i915_open_group(I915_PMU_ENGINE_BUSY(d->class,
+							        d->inst),
+					   bb->fd);
+		if (pfd < 0) {
+			if (d->id != VCS2)
+				return -(10 + bb->num_engines);
+			else
+				continue;
+		}
+
+		if (bb->num_engines == 0)
+			bb->fd = pfd;
+
+		bb->engine_map[d->id] = bb->num_engines++;
+	}
+
+	if (bb->num_engines < 5 && !(wrk->flags & VCS2REMAP))
+		return -1;
+
+	return 0;
+}
+
 static const struct workload_balancer all_balancers[] = {
 	{
 		.id = 0,
@@ -1314,6 +1429,22 @@ static const struct workload_balancer all_balancers[] = {
 		.name = "context",
 		.desc = "Static round-robin VCS assignment at context creation.",
 		.balance = context_balance,
+	},
+	{
+		.id = 9,
+		.name = "busy",
+		.desc = "Engine busyness based balancing.",
+		.init = busy_init,
+		.get_qd = get_engine_busy,
+		.balance = busy_balance,
+	},
+	{
+		.id = 10,
+		.name = "busy-avg",
+		.desc = "Average engine busyness based balancing.",
+		.init = busy_init,
+		.get_qd = get_engine_busy,
+		.balance = busy_avg_balance,
 	},
 };
 
@@ -2226,6 +2357,17 @@ int main(int argc, char **argv)
 				    (verbose > 0 && master_workload == i);
 
 		prepare_workload(i, w[i], flags_);
+
+		if (balancer && balancer->init) {
+			int ret = balancer->init(balancer, w[i]);
+			if (ret) {
+				if (verbose)
+					fprintf(stderr,
+						"Failed to initialize balancing! (%u=%d)\n",
+						i, ret);
+				return 1;
+			}
+		}
 	}
 
 	gem_quiescent_gpu(fd);
