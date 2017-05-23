@@ -39,6 +39,7 @@ my $html = 0;
 my $trace = 0;
 my $avg_delay_stats = 0;
 my $squash_context_id = 0;
+my $gpu_timeline = 0;
 
 my @args;
 
@@ -108,6 +109,7 @@ Usage:
       --avg-delay-stats			Print average delay stats.
       --squash-ctx-id			Squash context id by substracting engine
 					id from ctx id.
+      --gpu-timeline			Draw overall GPU busy timeline.
 ENDHELP
 
 		exit 0;
@@ -147,6 +149,18 @@ sub arg_squash_ctx_id
 	if ($_[0] eq '--squash-ctx-id') {
 		shift @_;
 		$squash_context_id = 1;
+	}
+
+	return @_;
+}
+
+sub arg_gpu_timeline
+{
+	return unless scalar(@_);
+
+	if ($_[0] eq '--gpu-timeline') {
+		shift @_;
+		$gpu_timeline = 1;
 	}
 
 	return @_;
@@ -273,6 +287,7 @@ while (@args) {
 	@args = arg_html(@args);
 	@args = arg_avg_delay_stats(@args);
 	@args = arg_squash_ctx_id(@args);
+	@args = arg_gpu_timeline(@args);
 	@args = arg_trace(@args);
 	@args = arg_max_items(@args);
 	@args = arg_zoom_width(@args);
@@ -749,6 +764,7 @@ foreach my $gid (sort keys %rings) {
 }
 
 # Calculate overall GPU idle time
+my @gpu_intervals;
 my (@s_, @e_);
 
 # Extract all GPU busy intervals and sort them.
@@ -782,6 +798,13 @@ for my $i (0..$#s_) {
 	die if $e_[$i] < $s_[$i];
 
 	$total = $total + ($e_[$i] - $s_[$i]);
+}
+
+# Generate data for the GPU timeline if requested
+if ($gpu_timeline) {
+	for my $i (0..$#s_) {
+		push @gpu_intervals, [ $s_[$i], $e_[$i] ];
+	}
 }
 
 $flat_busy{'gpu-busy'} = $total / ($last_ts - $first_ts) * 100.0;
@@ -886,10 +909,14 @@ sub stdio_stats
 }
 
 print "\t{id: 0, content: 'Freq'},\n" if $html;
+print "\t{id: 1, content: 'GPU'},\n" if $gpu_timeline;
+
+my $engine_start_id = $gpu_timeline ? 2 : 1;
+
 foreach my $group (sort keys %rings) {
 	my $name;
 	my $ring = $ringmap{$rings{$group}};
-	my $id = 1 + $rings{$group};
+	my $id = $engine_start_id + $rings{$group};
 	my $elapsed = $last_ts - $first_ts;
 	my %stats;
 
@@ -927,7 +954,7 @@ foreach my $key (sort {$db{$a}->{'queue'} <=> $db{$b}->{'queue'}} keys %db) {
 	my ($queue, $start, $notify, $end) = ($db{$key}->{'queue'}, $db{$key}->{'start'}, $db{$key}->{'notify'}, $db{$key}->{'end'});
 	my $submit = $queue + $db{$key}->{'submit-delay'};
 	my ($content, $style);
-	my $group = 1 + $rings{$db{$key}->{'ring'}};
+	my $group = $engine_start_id + $rings{$db{$key}->{'ring'}};
 	my $type = ' type: \'range\',';
 	my $startend;
 	my $skey;
@@ -1000,6 +1027,21 @@ foreach my $item (@freqs) {
 	$startend = 'start: \'' . ts($start) . '\', end: \'' . ts($end) . '\'';
 	print "\t{id: $i, type: 'range', group: 0, content: '$freq', $startend},\n";
 	$i++;
+}
+
+if ($gpu_timeline) {
+	foreach my $item (@gpu_intervals) {
+		my ($start, $end) = @$item;
+		my $startend;
+
+		next if $start > $last_ts;
+
+		$start = $first_ts if $start < $first_ts;
+		$end = $last_ts if $end > $last_ts;
+		$startend = 'start: \'' . ts($start) . '\', end: \'' . ts($end) . '\'';
+		print "\t{id: $i, type: 'range', group: 1, $startend},\n";
+		$i++;
+	}
 }
 
 my $end_ts = ts($first_ts + $width_us);
