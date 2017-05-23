@@ -444,7 +444,8 @@ igt_main
 	igt_fixture {
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
-		intel_register_access_init(intel_get_pci_device(), false, device);
+		gem_require_mmap_wc(device);
+
 		print_welcome(device);
 
 		ring_size = measure_ring_size(device);
@@ -453,6 +454,8 @@ igt_main
 		ring_size -= 8; /* leave some spare */
 		if (ring_size > 1024)
 			ring_size = 1024;
+
+		intel_register_access_init(intel_get_pci_device(), false, device);
 	}
 
 	igt_subtest_group {
