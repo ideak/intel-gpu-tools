@@ -94,6 +94,83 @@ static void store_dword(int fd, unsigned ring)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
+#define PAGES 1
+static void store_cachelines(int fd, unsigned ring, unsigned int flags)
+{
+	const int gen = intel_gen(intel_get_drm_devid(fd));
+	struct drm_i915_gem_exec_object2 *obj;
+	struct drm_i915_gem_relocation_entry *reloc;
+	struct drm_i915_gem_execbuffer2 execbuf;
+#define NCACHELINES (4096/64)
+	uint32_t *batch;
+	int i;
+
+	reloc = calloc(NCACHELINES, sizeof(*reloc));
+	igt_assert(reloc);
+
+	gem_require_ring(fd, ring);
+	igt_require(gem_can_store_dword(fd, ring));
+
+	intel_detect_and_clear_missed_interrupts(fd);
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffer_count = flags & PAGES ? NCACHELINES + 1 : 2;
+	execbuf.flags = ring;
+	if (gen > 3 && gen < 6)
+		execbuf.flags |= I915_EXEC_SECURE;
+
+	obj = calloc(execbuf.buffer_count, sizeof(*obj));
+	igt_assert(obj);
+	for (i = 0; i < execbuf.buffer_count; i++)
+		obj[i].handle = gem_create(fd, 4096);
+	obj[i-1].relocs_ptr = to_user_pointer(reloc);
+	obj[i-1].relocation_count = NCACHELINES;
+	execbuf.buffers_ptr = to_user_pointer(obj);
+
+	batch = gem_mmap__cpu(fd, obj[i-1].handle, 0, 4096, PROT_WRITE);
+
+	i = 0;
+	for (unsigned n = 0; n < NCACHELINES; n++) {
+		reloc[n].target_handle = obj[n % (execbuf.buffer_count-1)].handle;
+		reloc[n].presumed_offset = -1;
+		reloc[n].offset = (i + 1)*sizeof(uint32_t);
+		reloc[n].delta = 4 * (n * 16 + n % 16);
+		reloc[n].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		reloc[n].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
+
+		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		if (gen >= 8) {
+			batch[++i] = 0;
+			batch[++i] = 0;
+		} else if (gen >= 4) {
+			batch[++i] = 0;
+			batch[++i] = 0;
+			reloc[n].offset += sizeof(uint32_t);
+		} else {
+			batch[i]--;
+			batch[++i] = 0;
+		}
+		batch[++i] = n | ~n << 16;
+		i++;
+	}
+	batch[i++] = MI_BATCH_BUFFER_END;
+	igt_assert(i < 4096 / sizeof(*batch));
+	munmap(batch, 4096);
+	gem_execbuf(fd, &execbuf);
+
+	for (unsigned n = 0; n < NCACHELINES; n++) {
+		uint32_t result;
+
+		gem_read(fd, reloc[n].target_handle, reloc[n].delta,
+			 &result, sizeof(result));
+
+		igt_assert_eq_u32(result, n | ~n << 16);
+	}
+
+	for (unsigned n = 0; n < execbuf.buffer_count; n++)
+		gem_close(fd, obj[n].handle);
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+}
+
 static void store_all(int fd)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
@@ -247,9 +324,16 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	for (e = intel_execution_engines; e->name; e++)
+	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("basic-%s", e->name)
 			store_dword(fd, e->exec_id | e->flags);
+
+		igt_subtest_f("cachelines-%s", e->name)
+			store_cachelines(fd, e->exec_id | e->flags, 0);
+
+		igt_subtest_f("pages-%s", e->name)
+			store_cachelines(fd, e->exec_id | e->flags, PAGES);
+	}
 
 	igt_subtest("basic-all")
 		store_all(fd);
