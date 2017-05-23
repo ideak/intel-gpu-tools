@@ -726,7 +726,11 @@ foreach my $gid (sort keys %rings) {
 			# Current entry overlaps with the previous one. We need
 			# to merge end of the previous interval from the list
 			# with the start of the current one.
-			splice @e_, $i - 1, 1;
+			if ($e_[$i] >= $e_[$i - 1]) {
+				splice @e_, $i - 1, 1;
+			} else {
+				splice @e_, $i, 1;
+			}
 			splice @s_, $i, 1;
 			# Continue with the same element when list got squashed.
 			redo;
@@ -744,10 +748,53 @@ foreach my $gid (sort keys %rings) {
 	$flat_busy{$ring} = $total;
 }
 
+# Calculate overall GPU idle time
+my (@s_, @e_);
+
+# Extract all GPU busy intervals and sort them.
+foreach my $key (sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db) {
+	push @s_, $db{$key}->{'start'};
+	push @e_, $db{$key}->{'end'};
+	die if $db{$key}->{'start'} > $db{$key}->{'end'};
+}
+
+die unless $#s_ == $#e_;
+
+# Flatten the intervals (copy & paste of the flattening loop above)
+for my $i (1..$#s_) {
+	last if $i >= @s_;
+	die if $e_[$i] < $s_[$i];
+	die if $s_[$i] < $s_[$i - 1];
+	if ($s_[$i] <= $e_[$i - 1]) {
+		if ($e_[$i] >= $e_[$i - 1]) {
+			splice @e_, $i - 1, 1;
+		} else {
+			splice @e_, $i, 1;
+		}
+		splice @s_, $i, 1;
+		redo;
+	}
+}
+
+# Add up all busy times.
+my $total = 0;
+for my $i (0..$#s_) {
+	die if $e_[$i] < $s_[$i];
+
+	$total = $total + ($e_[$i] - $s_[$i]);
+}
+
+$flat_busy{'gpu-busy'} = $total / ($last_ts - $first_ts) * 100.0;
+$flat_busy{'gpu-idle'} = (1.0 - $total / ($last_ts - $first_ts)) * 100.0;
+
+# Add up all request waits per engine
 my %reqw;
 foreach my $key (keys %reqwait) {
 	$reqw{$reqwait{$key}->{'ring'}} += $reqwait{$key}->{'end'} - $reqwait{$key}->{'start'};
 }
+
+say sprintf('GPU: %.2f%% idle, %.2f%% busy',
+	     $flat_busy{'gpu-idle'}, $flat_busy{'gpu-busy'}) unless $html;
 
 print <<ENDHTML if $html;
 <!DOCTYPE HTML>
@@ -779,7 +826,11 @@ Boxes are in format 'ctx-id/seqno'.
 <p>
 Use Ctrl+scroll-action to zoom-in/out and scroll-action or dragging to move around the timeline.
 </p>
-
+<p>
+<b>GPU idle: $flat_busy{'gpu-idle'}%</b>
+<br>
+<b>GPU busy: $flat_busy{'gpu-busy'}%</b>
+</p>
 <div id="visualization"></div>
 
 <script type="text/javascript">
@@ -800,14 +851,14 @@ sub html_stats
 
 	$name = 'Ring' . $group;
 	$name .= '<br><small><br>';
-	$name .= sprintf('%2.2f', $stats->{'idle'}) . '% idle<br><br>';
-	$name .= sprintf('%2.2f', $stats->{'busy'}) . '% busy<br>';
-	$name .= sprintf('%2.2f', $stats->{'runnable'}) . '% runnable<br>';
-	$name .= sprintf('%2.2f', $stats->{'queued'}) . '% queued<br><br>';
-	$name .= sprintf('%2.2f', $stats->{'wait'}) . '% wait<br><br>';
+	$name .= sprintf('%.2f', $stats->{'idle'}) . '% idle<br><br>';
+	$name .= sprintf('%.2f', $stats->{'busy'}) . '% busy<br>';
+	$name .= sprintf('%.2f', $stats->{'runnable'}) . '% runnable<br>';
+	$name .= sprintf('%.2f', $stats->{'queued'}) . '% queued<br><br>';
+	$name .= sprintf('%.2f', $stats->{'wait'}) . '% wait<br><br>';
 	$name .= $stats->{'count'} . ' batches<br>';
-	$name .= sprintf('%2.2f', $stats->{'avg'}) . 'us avg batch<br>';
-	$name .= sprintf('%2.2f', $stats->{'total-avg'}) . 'us avg engine batch<br>';
+	$name .= sprintf('%.2f', $stats->{'avg'}) . 'us avg batch<br>';
+	$name .= sprintf('%.2f', $stats->{'total-avg'}) . 'us avg engine batch<br>';
 	$name .= '</small>';
 
 	print "\t{id: $id, content: '$name'},\n";
@@ -820,17 +871,16 @@ sub stdio_stats
 
 	$str = 'Ring' . $group . ': ';
 	$str .= $stats->{'count'} . ' batches, ';
-	$str .= sprintf('%2.2f (%2.2f) avg batch us, ', $stats->{'avg'}, $stats->{'total-avg'});
-	$str .= sprintf('%2.2f', $stats->{'idle'}) . '% idle, ';
-	$str .= sprintf('%2.2f', $stats->{'busy'}) . '% busy, ';
-	$str .= sprintf('%2.2f', $stats->{'runnable'}) . '% runnable, ';
-	$str .= sprintf('%2.2f', $stats->{'queued'}) . '% queued, ';
-	$str .= sprintf('%2.2f', $stats->{'wait'}) . '% wait';
+	$str .= sprintf('%.2f (%.2f) avg batch us, ', $stats->{'avg'}, $stats->{'total-avg'});
+	$str .= sprintf('%.2f', $stats->{'idle'}) . '% idle, ';
+	$str .= sprintf('%.2f', $stats->{'busy'}) . '% busy, ';
+	$str .= sprintf('%.2f', $stats->{'runnable'}) . '% runnable, ';
+	$str .= sprintf('%.2f', $stats->{'queued'}) . '% queued, ';
+	$str .= sprintf('%.2f', $stats->{'wait'}) . '% wait';
 	if ($avg_delay_stats) {
 		$str .= ', submit/execute/save-avg=(';
-		$str .= sprintf('%2.2f/%2.2f/%2.2f', $stats->{'submit'}, $stats->{'execute'}, $stats->{'save'});
+		$str .= sprintf('%.2f/%.2f/%.2f)', $stats->{'submit'}, $stats->{'execute'}, $stats->{'save'});
 	}
-	$str .= ')';
 
 	say $str;
 }
