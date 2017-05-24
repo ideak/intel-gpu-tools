@@ -29,6 +29,8 @@
 
 #include "igt.h"
 #include "igt_gt.h"
+#include "igt_debugfs.h"
+#include "igt_sysfs.h"
 
 #ifndef MADV_FREE
 #define MADV_FREE 8
@@ -291,6 +293,44 @@ static void run_test(int nchildren, uint64_t alloc,
 	igt_waitchildren();
 }
 
+static void reclaim(unsigned engine, int timeout)
+{
+	const uint64_t timeout_100ms = 100000000LL;
+	int fd = drm_open_driver(DRIVER_INTEL);
+	int debugfs = igt_debugfs_dir(fd);
+	igt_spin_t *spin;
+	volatile uint32_t *shared;
+
+	shared = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(shared != MAP_FAILED);
+
+	igt_fork(child, sysconf(_SC_NPROCESSORS_ONLN)) {
+		do {
+			igt_sysfs_printf(debugfs, "i915_drop_caches",
+					"%d", DROP_BOUND | DROP_UNBOUND);
+		} while (!*shared);
+	}
+
+	spin = igt_spin_batch_new(fd, engine, 0);
+	igt_until_timeout(timeout) {
+		igt_spin_t *next = __igt_spin_batch_new(fd, engine, 0);
+
+		igt_spin_batch_set_timeout(spin, timeout_100ms);
+		gem_sync(fd, spin->handle);
+
+		igt_spin_batch_free(fd, spin);
+		spin = next;
+	}
+	igt_spin_batch_free(fd, spin);
+
+	*shared = 1;
+	igt_waitchildren();
+
+	munmap((void *)shared, 4096);
+	close(debugfs);
+	close(fd);
+}
+
 igt_main
 {
 	const struct test {
@@ -340,6 +380,9 @@ igt_main
 		intel_require_memory(num_processes, alloc_size,
 				     CHECK_SWAP | CHECK_RAM);
 	}
+
+	igt_subtest("reclaim")
+		reclaim(I915_EXEC_DEFAULT, 2);
 
 	for(const struct test *t = tests; t->name; t++) {
 		for(const struct mode *m = modes; m->suffix; m++) {
