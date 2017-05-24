@@ -213,7 +213,7 @@ sub calibrate_workload
 	my $error;
 	my $r;
 
-	$r = 23;
+	$r = $realtime_target > 0 ? $realtime_target * $client_target_s : 23;
 	for (;;) {
 		my @args = ( "-n $nop", "-r $r", $warg);
 		my ($time, $wps);
@@ -243,6 +243,8 @@ sub find_saturation_point
 	my $target = $realtime_target > 0 ? $realtime_target : $wps_target;
 	my $r = $rr;
 	my ($warg, $wcnt);
+	my $maxc;
+	my $max = 0;
 
 	if (defined $w_direct) {
 		$warg = $wrk;
@@ -262,12 +264,21 @@ sub find_saturation_point
 			my $delta;
 
 			if ($target <= 0) {
+				if ($wps > $max) {
+					$max = $wps;
+					$maxc = $c;
+				}
 				$delta = ($wps - $last_wps) / $last_wps;
-				$delta = -$tolerance if $delta < 0;
+				if ($delta > 0) {
+					last if $delta < $tolerance;
+				} else {
+					$delta = ($wps - $max) / $max;
+					last if abs($delta) >= $tolerance;
+				}
 			} else {
 				$delta = ($wps / $c - $target) / $target;
+				last if $delta < 0 and abs($delta) >= $tolerance;
 			}
-			last if $delta < 0 and abs($delta) >= $tolerance;
 			$r = int($rr * ($client_target_s / $time));
 		} elsif ($c == 1) {
 			$swps = $wps;
@@ -277,7 +288,11 @@ sub find_saturation_point
 		$last_wps = $wps;
 	}
 
-	return ($c - 1, $last_wps, $swps);
+	if ($target <= 0) {
+		return ($maxc, $max, $swps);
+	} else {
+		return ($c - 1, $last_wps, $swps);
+	}
 }
 
 getopts('hxn:b:W:B:r:t:i:R:T:w:', \%opts);
@@ -299,7 +314,7 @@ Supported options:
   -i pct      Engine idleness tolerance.
   -R wps      Run workloads in the real-time mode at wps rate.
   -T wps      Calibrate up to wps/client target instead of GPU saturation.
-  -w str      Pass-through to gem_wsim -w.
+  -w str      Pass-through to gem_wsim. Overrides normal workload selection.
 ENDHELP
 	exit 0;
 }
