@@ -45,8 +45,6 @@
 #include <sys/resource.h>
 #include "drm.h"
 
-#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
-
 #define LOCAL_I915_EXEC_FENCE_IN              (1<<16)
 #define LOCAL_I915_EXEC_FENCE_OUT             (1<<17)
 
@@ -102,20 +100,6 @@ inline static uint32_t read_timestamp(void)
 	return *timestamp_reg;
 }
 #endif
-
-static int __gem_execbuf_wr(int _fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	int err = 0;
-	if (igt_ioctl(_fd, LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
-		err = -errno;
-	errno = 0;
-	return err;
-}
-
-static void gem_execbuf_wr(int _fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	igt_assert_eq(__gem_execbuf_wr(_fd, execbuf), 0);
-}
 
 struct consumer {
 	pthread_t thread;

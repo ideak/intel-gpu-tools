@@ -1481,22 +1481,6 @@ static void init_status_page(struct workload *wrk, unsigned int flags)
 	}
 }
 
-#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
-
-static int __gem_execbuf_wr(int gemfd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	int err = 0;
-	if (igt_ioctl(gemfd, LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
-		err = -errno;
-	errno = 0;
-	return err;
-}
-
-static void gem_execbuf_wr(int gemfd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	igt_assert_eq(__gem_execbuf_wr(gemfd, execbuf), 0);
-}
-
 static void
 do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
       unsigned int flags)

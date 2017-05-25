@@ -31,10 +31,8 @@
 
 IGT_TEST_DESCRIPTION("Check that execbuf waits for explicit fences");
 
-#define LOCAL_PARAM_HAS_EXEC_FENCE 44
 #define LOCAL_EXEC_FENCE_IN (1 << 16)
 #define LOCAL_EXEC_FENCE_OUT (1 << 17)
-#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
 
 #ifndef SYNC_IOC_MERGE
 struct sync_merge_data {
@@ -99,20 +97,6 @@ static void store(int fd, unsigned ring, int fence, uint32_t target, unsigned of
 	gem_write(fd, obj[BATCH].handle, 0, batch, sizeof(batch));
 	gem_execbuf(fd, &execbuf);
 	gem_close(fd, obj[BATCH].handle);
-}
-
-static int __gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	int err = 0;
-	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
-		err = -errno;
-	errno = 0;
-	return err;
-}
-
-static void gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	igt_assert_eq(__gem_execbuf_wr(fd, execbuf), 0);
 }
 
 static bool fence_busy(int fence)

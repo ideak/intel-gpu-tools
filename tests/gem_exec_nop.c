@@ -489,22 +489,6 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 }
 
 #define LOCAL_EXEC_FENCE_OUT (1 << 17)
-#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
-
-static int __gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	int err = 0;
-	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
-		err = -errno;
-	errno = 0;
-	return err;
-}
-
-static void gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	igt_assert_eq(__gem_execbuf_wr(fd, execbuf), 0);
-}
-
 static bool fence_enable_signaling(int fence)
 {
 	return poll(&(struct pollfd){fence, POLLIN}, 1, 0) == 0;

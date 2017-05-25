@@ -45,8 +45,6 @@
 #include "intel_chipset.h"
 #include "igt_stats.h"
 
-#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
-
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
 
@@ -71,20 +69,6 @@ static bool gem_busy(int fd, uint32_t handle)
 	do_ioctl(fd, DRM_IOCTL_I915_GEM_BUSY, &busy);
 
 	return busy.busy != 0;
-}
-
-static int __gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	int err = 0;
-	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
-		err = -errno;
-	errno = 0;
-	return err;
-}
-
-static void gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	igt_assert_eq(__gem_execbuf_wr(fd, execbuf), 0);
 }
 
 static bool gem_wait__busy(int fd, uint32_t handle)

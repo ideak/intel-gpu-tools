@@ -624,6 +624,39 @@ void gem_execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 	igt_assert_eq(__gem_execbuf(fd, execbuf), 0);
 }
 
+#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR \
+    DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
+
+/**
+ * __gem_execbuf_wr:
+ * @fd: open i915 drm file descriptor
+ * @execbuf: execbuffer data structure
+ *
+ * This wraps the EXECBUFFER2_WR ioctl, which submits a batchbuffer for the gpu to
+ * run. This is allowed to fail, with -errno returned.
+ */
+int __gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err = 0;
+	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
+		err = -errno;
+	errno = 0;
+	return err;
+}
+
+/**
+ * gem_execbuf_wr:
+ * @fd: open i915 drm file descriptor
+ * @execbuf: execbuffer data structure
+ *
+ * This wraps the EXECBUFFER2_WR ioctl, which submits a batchbuffer for the gpu to
+ * run.
+ */
+void gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	igt_assert_eq(__gem_execbuf_wr(fd, execbuf), 0);
+}
+
 /**
  * __gem_mmap__gtt:
  * @fd: open i915 drm file descriptor
