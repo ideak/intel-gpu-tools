@@ -40,7 +40,7 @@ AM_INIT_AUTOMAKE([1.12 foreign subdir-objects dist-bzip2])
 AM_PATH_PYTHON([3],, [:])
 
 AC_PROG_CC
-AM_PROG_LEX
+AC_PROG_LEX
 AC_PROG_YACC
 
 # check for gtk-doc
