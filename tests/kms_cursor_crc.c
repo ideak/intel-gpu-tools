@@ -416,7 +416,13 @@ static bool has_nonsquare_cursors(uint32_t devid)
 	 * Test non-square cursors a bit on the platforms
 	 * that support such things.
 	 */
-	return devid == PCI_CHIP_845_G || devid == PCI_CHIP_I865_G;
+	if (devid == PCI_CHIP_845_G || devid == PCI_CHIP_I865_G)
+		return true;
+
+	if (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid))
+		return false;
+
+	return intel_gen(devid) >= 7;
 }
 
 static void test_cursor_size(data_t *data)
