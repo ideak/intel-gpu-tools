@@ -81,7 +81,7 @@ static const uint32_t spin_kernel[][4] = {
 
 void
 gen8_media_spinfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst, uint32_t spins)
+		    const struct igt_buf *dst, uint32_t spins)
 {
 	uint32_t curbe_buffer, interface_descriptor;
 	uint32_t batch_end;
@@ -121,7 +121,7 @@ gen8_media_spinfunc(struct intel_batchbuffer *batch,
 
 void
 gen9_media_spinfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst, uint32_t spins)
+		    const struct igt_buf *dst, uint32_t spins)
 {
 	uint32_t curbe_buffer, interface_descriptor;
 	uint32_t batch_end;

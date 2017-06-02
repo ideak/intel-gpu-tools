@@ -105,7 +105,7 @@ static const uint32_t gen9_gpgpu_kernel[][4] = {
 
 void
 gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst,
+		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
 		    unsigned int width, unsigned int height,
 		    uint8_t color)
@@ -154,7 +154,7 @@ gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 
 void
 gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst,
+		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
 		    unsigned int width, unsigned int height,
 		    uint8_t color)
@@ -202,7 +202,7 @@ gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 
 static void
 __gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-		      struct igt_buf *dst,
+		      const struct igt_buf *dst,
 		      unsigned int x, unsigned int y,
 		      unsigned int width, unsigned int height,
 		      uint8_t color, const uint32_t kernel[][4],
@@ -251,7 +251,7 @@ __gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 }
 
 void gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-			 struct igt_buf *dst,
+			 const struct igt_buf *dst,
 			 unsigned int x, unsigned int y,
 			 unsigned int width, unsigned int height,
 			 uint8_t color)

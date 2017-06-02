@@ -91,7 +91,7 @@ static const uint32_t gen8_media_kernel[][4] = {
 
 void
 gen7_media_fillfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst,
+		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
 		    unsigned int width, unsigned int height,
 		    uint8_t color)
@@ -135,7 +135,7 @@ gen7_media_fillfunc(struct intel_batchbuffer *batch,
 
 void
 gen8_media_fillfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst,
+		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
 		    unsigned int width, unsigned int height,
 		    uint8_t color)
@@ -179,7 +179,7 @@ gen8_media_fillfunc(struct intel_batchbuffer *batch,
 
 static void
 __gen9_media_fillfunc(struct intel_batchbuffer *batch,
-		      struct igt_buf *dst,
+		      const struct igt_buf *dst,
 		      unsigned int x, unsigned int y,
 		      unsigned int width, unsigned int height,
 		      uint8_t color, const uint32_t kernel[][4],
@@ -235,7 +235,7 @@ __gen9_media_fillfunc(struct intel_batchbuffer *batch,
 
 void
 gen9_media_fillfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst,
+		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
 		    unsigned int width, unsigned int height,
 		    uint8_t color)

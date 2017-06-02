@@ -28,9 +28,9 @@
 #define MEDIA_SPIN_H
 
 void gen8_media_spinfunc(struct intel_batchbuffer *batch,
-			 struct igt_buf *dst, uint32_t spins);
+			 const struct igt_buf *dst, uint32_t spins);
 
 void gen9_media_spinfunc(struct intel_batchbuffer *batch,
-			 struct igt_buf *dst, uint32_t spins);
+			 const struct igt_buf *dst, uint32_t spins);
 
 #endif /* MEDIA_SPIN_H */

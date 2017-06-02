@@ -30,21 +30,21 @@
 
 void
 gen8_media_fillfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst,
+		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
 		    unsigned int width, unsigned int height,
 		    uint8_t color);
 
 void
 gen7_media_fillfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst,
+		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
 		    unsigned int width, unsigned int height,
 		    uint8_t color);
 
 void
 gen9_media_fillfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst,
+		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
 		    unsigned int width, unsigned int height,
 		    uint8_t color);

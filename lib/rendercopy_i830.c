@@ -133,7 +133,7 @@ static void gen2_emit_invariant(struct intel_batchbuffer *batch)
 }
 
 static void gen2_emit_target(struct intel_batchbuffer *batch,
-			     struct igt_buf *dst)
+			     const struct igt_buf *dst)
 {
 	uint32_t tiling;
 
@@ -161,7 +161,7 @@ static void gen2_emit_target(struct intel_batchbuffer *batch,
 }
 
 static void gen2_emit_texture(struct intel_batchbuffer *batch,
-			      struct igt_buf *src,
+			      const struct igt_buf *src,
 			      int unit)
 {
 	uint32_t tiling;
@@ -209,9 +209,9 @@ static void gen2_emit_copy_pipeline(struct intel_batchbuffer *batch)
 
 void gen2_render_copyfunc(struct intel_batchbuffer *batch,
 			  drm_intel_context *context,
-			  struct igt_buf *src, unsigned src_x, unsigned src_y,
+			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
 			  unsigned width, unsigned height,
-			  struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
+			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
 {
 	gen2_emit_invariant(batch);
 	gen2_emit_copy_pipeline(batch);

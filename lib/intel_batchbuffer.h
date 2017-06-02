@@ -232,15 +232,15 @@ struct igt_buf {
     unsigned num_tiles;
 };
 
-unsigned igt_buf_width(struct igt_buf *buf);
-unsigned igt_buf_height(struct igt_buf *buf);
+unsigned igt_buf_width(const struct igt_buf *buf);
+unsigned igt_buf_height(const struct igt_buf *buf);
 
 void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
-			   struct igt_buf *src, unsigned src_delta,
+			   const struct igt_buf *src, unsigned src_delta,
 			   unsigned src_x, unsigned src_y,
 			   unsigned width, unsigned height,
 			   int bpp,
-			   struct igt_buf *dst, unsigned dst_delta,
+			   const struct igt_buf *dst, unsigned dst_delta,
 			   unsigned dst_x, unsigned dst_y);
 
 void igt_blitter_fast_copy__raw(int fd,
@@ -287,9 +287,9 @@ void igt_blitter_fast_copy__raw(int fd,
  */
 typedef void (*igt_render_copyfunc_t)(struct intel_batchbuffer *batch,
 				      drm_intel_context *context,
-				      struct igt_buf *src, unsigned src_x, unsigned src_y,
+				      const struct igt_buf *src, unsigned src_x, unsigned src_y,
 				      unsigned width, unsigned height,
-				      struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
+				      const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
 
 igt_render_copyfunc_t igt_get_render_copyfunc(int devid);
 
@@ -311,7 +311,7 @@ igt_render_copyfunc_t igt_get_render_copyfunc(int devid);
  * the specified blit fill operation using the media/gpgpu engine.
  */
 typedef void (*igt_fillfunc_t)(struct intel_batchbuffer *batch,
-			       struct igt_buf *dst,
+			       const struct igt_buf *dst,
 			       unsigned x, unsigned y,
 			       unsigned width, unsigned height,
 			       uint8_t color);
@@ -337,7 +337,7 @@ igt_fillfunc_t igt_get_gpgpu_fillfunc(int devid);
  * to keep the render engine busy for a set time for various tests.
  */
 typedef void (*igt_media_spinfunc_t)(struct intel_batchbuffer *batch,
-				     struct igt_buf *dst, uint32_t spins);
+				     const struct igt_buf *dst, uint32_t spins);
 
 igt_media_spinfunc_t igt_get_media_spinfunc(int devid);
 

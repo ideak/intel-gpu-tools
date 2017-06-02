@@ -54,7 +54,7 @@ gen7_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
 
 uint32_t
 gen7_fill_surface_state(struct intel_batchbuffer *batch,
-			struct igt_buf *buf,
+			const struct igt_buf *buf,
 			uint32_t format,
 			int is_dst)
 {
@@ -103,7 +103,7 @@ gen7_fill_surface_state(struct intel_batchbuffer *batch,
 
 uint32_t
 gen7_fill_binding_table(struct intel_batchbuffer *batch,
-			struct igt_buf *dst)
+			const struct igt_buf *dst)
 {
 	uint32_t *binding_table, offset;
 
@@ -133,7 +133,8 @@ gen7_fill_kernel(struct intel_batchbuffer *batch,
 
 uint32_t
 gen7_fill_interface_descriptor(struct intel_batchbuffer *batch,
-			       struct igt_buf *dst, const uint32_t kernel[][4],
+			       const struct igt_buf *dst,
+			       const uint32_t kernel[][4],
 			       size_t size)
 {
 	struct gen7_interface_descriptor_data *idd;
@@ -335,7 +336,7 @@ gen8_spin_curbe_buffer_data(struct intel_batchbuffer *batch,
 
 uint32_t
 gen8_fill_surface_state(struct intel_batchbuffer *batch,
-			struct igt_buf *buf,
+			const struct igt_buf *buf,
 			uint32_t format,
 			int is_dst)
 {
@@ -385,7 +386,8 @@ gen8_fill_surface_state(struct intel_batchbuffer *batch,
 
 uint32_t
 gen8_fill_interface_descriptor(struct intel_batchbuffer *batch,
-			       struct igt_buf *dst, const uint32_t kernel[][4],
+			       const struct igt_buf *dst,
+			       const uint32_t kernel[][4],
 			       size_t size)
 {
 	struct gen8_interface_descriptor_data *idd;

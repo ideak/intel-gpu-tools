@@ -509,7 +509,7 @@ intel_copy_bo(struct intel_batchbuffer *batch,
  * Returns:
  * The width of the buffer.
  */
-unsigned igt_buf_width(struct igt_buf *buf)
+unsigned igt_buf_width(const struct igt_buf *buf)
 {
 	return buf->stride/sizeof(uint32_t);
 }
@@ -523,7 +523,7 @@ unsigned igt_buf_width(struct igt_buf *buf)
  * Returns:
  * The height of the buffer.
  */
-unsigned igt_buf_height(struct igt_buf *buf)
+unsigned igt_buf_height(const struct igt_buf *buf)
 {
 	return buf->size/buf->stride;
 }
@@ -775,11 +775,11 @@ void igt_blitter_fast_copy__raw(int fd,
  * The source and destination surfaces cannot overlap.
  */
 void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
-			   struct igt_buf *src, unsigned src_delta,
+			   const struct igt_buf *src, unsigned src_delta,
 			   unsigned src_x, unsigned src_y,
 			   unsigned width, unsigned height,
 			   int bpp,
-			   struct igt_buf *dst, unsigned dst_delta,
+			   const struct igt_buf *dst, unsigned dst_delta,
 			   unsigned dst_x, unsigned dst_y)
 {
 	uint32_t src_pitch, dst_pitch;

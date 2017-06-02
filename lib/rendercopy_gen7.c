@@ -58,7 +58,7 @@ gen7_tiling_bits(uint32_t tiling)
 
 static uint32_t
 gen7_bind_buf(struct intel_batchbuffer *batch,
-	      struct igt_buf *buf,
+	      const struct igt_buf *buf,
 	      uint32_t format,
 	      int is_dst)
 {
@@ -179,8 +179,8 @@ static void gen7_emit_vertex_buffer(struct intel_batchbuffer *batch,
 
 static uint32_t
 gen7_bind_surfaces(struct intel_batchbuffer *batch,
-		   struct igt_buf *src,
-		   struct igt_buf *dst)
+		   const struct igt_buf *src,
+		   const struct igt_buf *dst)
 {
 	uint32_t *binding_table;
 
@@ -196,8 +196,8 @@ gen7_bind_surfaces(struct intel_batchbuffer *batch,
 
 static void
 gen7_emit_binding_table(struct intel_batchbuffer *batch,
-			struct igt_buf *src,
-			struct igt_buf *dst,
+			const struct igt_buf *src,
+			const struct igt_buf *dst,
 			uint32_t bind_surf_off)
 {
 	OUT_BATCH(GEN7_3DSTATE_BINDING_TABLE_POINTERS_PS | (2 - 2));
@@ -205,7 +205,7 @@ gen7_emit_binding_table(struct intel_batchbuffer *batch,
 }
 
 static void
-gen7_emit_drawing_rectangle(struct intel_batchbuffer *batch, struct igt_buf *dst)
+gen7_emit_drawing_rectangle(struct intel_batchbuffer *batch, const struct igt_buf *dst)
 {
 	OUT_BATCH(GEN6_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
 	OUT_BATCH(0);
@@ -492,9 +492,9 @@ gen7_emit_null_depth_buffer(struct intel_batchbuffer *batch)
 #define BATCH_STATE_SPLIT 2048
 void gen7_render_copyfunc(struct intel_batchbuffer *batch,
 			  drm_intel_context *context,
-			  struct igt_buf *src, unsigned src_x, unsigned src_y,
+			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
 			  unsigned width, unsigned height,
-			  struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
+			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
 {
 	uint32_t ps_binding_table, ps_sampler_off, ps_kernel_off;
 	uint32_t blend_state, cc_viewport;

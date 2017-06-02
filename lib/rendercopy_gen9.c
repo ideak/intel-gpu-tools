@@ -143,7 +143,7 @@ gen6_render_flush(struct intel_batchbuffer *batch,
 
 /* Mostly copy+paste from gen6, except height, width, pitch moved */
 static uint32_t
-gen8_bind_buf(struct intel_batchbuffer *batch, struct igt_buf *buf,
+gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	      uint32_t format, int is_dst) {
 	struct gen8_surface_state *ss;
 	uint32_t write_domain, read_domain, offset;
@@ -193,8 +193,8 @@ gen8_bind_buf(struct intel_batchbuffer *batch, struct igt_buf *buf,
 
 static uint32_t
 gen8_bind_surfaces(struct intel_batchbuffer *batch,
-		   struct igt_buf *src,
-		   struct igt_buf *dst)
+		   const struct igt_buf *src,
+		   const struct igt_buf *dst)
 {
 	uint32_t *binding_table, offset;
 
@@ -261,7 +261,7 @@ gen8_fill_ps(struct intel_batchbuffer *batch,
  */
 static uint32_t
 gen7_fill_vertex_buffer_data(struct intel_batchbuffer *batch,
-			     struct igt_buf *src,
+			     const struct igt_buf *src,
 			     uint32_t src_x, uint32_t src_y,
 			     uint32_t dst_x, uint32_t dst_y,
 			     uint32_t width, uint32_t height)
@@ -827,7 +827,7 @@ gen7_emit_clear(struct intel_batchbuffer *batch) {
 }
 
 static void
-gen6_emit_drawing_rectangle(struct intel_batchbuffer *batch, struct igt_buf *dst)
+gen6_emit_drawing_rectangle(struct intel_batchbuffer *batch, const struct igt_buf *dst)
 {
 	OUT_BATCH(GEN6_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
 	OUT_BATCH(0);
@@ -894,9 +894,9 @@ static void gen8_emit_primitive(struct intel_batchbuffer *batch, uint32_t offset
 
 void gen9_render_copyfunc(struct intel_batchbuffer *batch,
 			  drm_intel_context *context,
-			  struct igt_buf *src, unsigned src_x, unsigned src_y,
+			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
 			  unsigned width, unsigned height,
-			  struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
+			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
 {
 	uint32_t ps_sampler_state, ps_kernel_off, ps_binding_table;
 	uint32_t scissor_state;
