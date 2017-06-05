@@ -31,15 +31,13 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/time.h>
-
+#include <math.h>
 #include "intel_bufmgr.h"
 
 #define MAX_CONNECTORS  10
-#define MAX_CRTCS       3
+#define MAX_CRTCS       6
 
 /* max combinations with repetitions */
-#define MAX_COMBINATION_COUNT   \
-	(MAX_CONNECTORS * MAX_CONNECTORS * MAX_CONNECTORS)
 #define MAX_COMBINATION_ELEMS   MAX_CRTCS
 
 static int drm_fd;
@@ -702,7 +700,8 @@ struct combination {
 
 struct combination_set {
 	int count;
-	struct combination items[MAX_COMBINATION_COUNT];
+	int capacity;
+	struct combination *items;
 };
 
 /*
@@ -716,7 +715,7 @@ static void iterate_combinations(int n, int k, bool allow_repetitions,
 	int v;
 
 	if (!k) {
-		igt_assert(set->count < ARRAY_SIZE(set->items));
+		igt_assert(set->count < set->capacity);
 		set->items[set->count++] = *comb;
 		return;
 	}
@@ -750,6 +749,16 @@ static void test_combinations(const struct test_config *tconf,
 
 	if (connector_count > 2 && (tconf->flags & TEST_STEALING))
 		return;
+
+	igt_assert(tconf->resources);
+
+	connector_combs.capacity = pow(tconf->resources->count_connectors,
+				       tconf->resources->count_crtcs + 1);
+	crtc_combs.capacity = pow(tconf->resources->count_crtcs,
+				  tconf->resources->count_crtcs + 1);
+
+	connector_combs.items = malloc(connector_combs.capacity * sizeof(struct combination));
+	crtc_combs.items = malloc(crtc_combs.capacity * sizeof(struct combination));
 
 	get_combinations(tconf->resources->count_connectors, connector_count,
 			 false, &connector_combs);
@@ -787,6 +796,9 @@ static void test_combinations(const struct test_config *tconf,
 free_cconfs:
 		free(cconfs);
 	}
+
+	free(connector_combs.items);
+	free(crtc_combs.items);
 }
 
 static void run_test(const struct test_config *tconf)
