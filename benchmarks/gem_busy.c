@@ -59,31 +59,16 @@
 #define WAIT 0x8
 #define SYNC 0x10
 
-static bool gem_busy(int fd, uint32_t handle)
+static void gem_busy(int fd, uint32_t handle)
 {
-	struct drm_i915_gem_busy busy;
-
-	memset(&busy, 0, sizeof(busy));
-	busy.handle = handle;
-
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_BUSY, &busy);
-
-	return busy.busy != 0;
+	struct drm_i915_gem_busy busy = { .handle = handle };
+	ioctl(fd, DRM_IOCTL_I915_GEM_BUSY, &busy);
 }
 
-static bool gem_wait__busy(int fd, uint32_t handle)
+static void gem_wait__busy(int fd, uint32_t handle)
 {
-	struct drm_i915_gem_wait wait;
-	int ret;
-
-	memset(&wait, 0, sizeof(wait));
-	wait.bo_handle = handle;
-
-	ret = 0;
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_WAIT, &wait))
-		ret = -errno;
-
-	return ret == -ETIME;
+	struct drm_i915_gem_wait wait = { .bo_handle = handle };
+	ioctl(fd, DRM_IOCTL_I915_GEM_WAIT, &wait);
 }
 
 static double elapsed(const struct timespec *start,
