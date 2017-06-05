@@ -444,7 +444,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			fstart = NULL;
 
 			tmpl = strtol(field, &sep, 10);
-			if (tmpl == 0 || tmpl == LONG_MIN || tmpl == LONG_MAX) {
+			if (tmpl <= 0 || tmpl == LONG_MIN || tmpl == LONG_MAX) {
 				if (verbose)
 					fprintf(stderr,
 						"Invalid duration at step %u!\n",
@@ -455,7 +455,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 
 			if (sep && *sep == '-') {
 				tmpl = strtol(sep + 1, NULL, 10);
-				if (tmpl == 0 ||
+				if (tmpl <= 0 || tmpl <= step.duration.min ||
 				    tmpl == LONG_MIN || tmpl == LONG_MAX) {
 					if (verbose)
 						fprintf(stderr,
