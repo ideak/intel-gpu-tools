@@ -1794,11 +1794,11 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		 */
 		igt_assert_eq(pipe->plane_primary, 0);
 
-		/*
-		 * There should be no gaps. If there is, something happened
-		 * which we can't handle (e.g. all planes are cursors).
-		 */
-		igt_assert_eq(p, last_plane);
+		/* Check that we filled every slot exactly once */
+		if (display->has_cursor_plane)
+			igt_assert_eq(p, last_plane);
+		else
+			igt_assert_eq(p, n_planes);
 
 		pipe->n_planes = n_planes;
 
