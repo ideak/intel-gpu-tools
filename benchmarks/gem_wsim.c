@@ -1789,6 +1789,8 @@ static void print_help(void)
 "                  number as listed above.\n"
 "  -2              Remap VCS2 to BCS.\n"
 "  -R              Round-robin initial VCS assignment per client.\n"
+"  -H              Send heartbeat on synchronisation points with seqno based\n"
+"                  balancers. Gives better engine busyness view in some cases.\n"
 "  -S              Synchronize the sequence of random batch durations between\n"
 "                  clients.\n"
 "  -G              Global load balancing - a single load balancer will be shared\n"
@@ -2019,6 +2021,12 @@ int main(int argc, char **argv)
 		default:
 			return 1;
 		}
+	}
+
+	if ((flags & HEARTBEAT) && !(flags & SEQNO)) {
+		if (verbose)
+			fprintf(stderr, "Heartbeat needs a seqno based balancer!\n");
+		return 1;
 	}
 
 	if (!nop_calibration) {
