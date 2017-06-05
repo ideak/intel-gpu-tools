@@ -43,8 +43,10 @@ my $balancer;
 my $nop;
 my %opts;
 
-my @balancers = ( 'rr', 'rand', 'qd', 'qdr', 'qdavg', 'rt', 'rtr', 'rtavg' );
-my %bal_skip_H = ( 'rr' => 1, 'rand' => 1 );
+my @balancers = ( 'rr', 'rand', 'qd', 'qdr', 'qdavg', 'rt', 'rtr', 'rtavg',
+		  'context' );
+my %bal_skip_H = ( 'rr' => 1, 'rand' => 1, 'context' => 1 );
+my %bal_skip_R = ( 'context' => 1 );
 
 my @workloads = (
 	'media_load_balance_17i7.wsim',
@@ -403,15 +405,16 @@ foreach my $wrk (@workloads) {
 	say "  Finding saturation points for '$wrk'...";
 
 	BAL: foreach my $bal (@balancers) {
-		RBAL: foreach my $R ('', '-G') {
+		GBAL: foreach my $G ('', '-G') {
 			foreach my $H ('', '-H') {
 				my @xargs;
 				my ($w, $c, $s);
 				my $bid;
 
 				if ($bal ne '') {
-					push @xargs, "-b $bal -R";
-					push @xargs, $R if $R ne '';
+					push @xargs, "-b $bal";
+					push @xargs, '-R' unless exists $bal_skip_R{$bal};
+					push @xargs, $G if $G ne '';
 					push @xargs, $H if $H ne '';
 					$bid = join ' ', @xargs;
 					print "    $bal balancer ('$bid'): ";
@@ -437,7 +440,7 @@ foreach my $wrk (@workloads) {
 
 				last BAL unless $should_b;
 				next BAL if $bal eq '';
-				next RBAL if exists $bal_skip_H{$bal};
+				next GBAL if exists $bal_skip_H{$bal};
 			}
 		}
 	}
