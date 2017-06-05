@@ -84,11 +84,6 @@
  * General debugfs helpers
  */
 
-typedef struct {
-	char root[128];
-	char dri_path[128];
-} igt_debugfs_t;
-
 static bool is_mountpoint(const char *path)
 {
 	char buf[strlen(path) + 4];
