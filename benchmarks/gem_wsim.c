@@ -158,7 +158,10 @@ struct workload
 	struct timespec repeat_start;
 
 	unsigned int nr_ctxs;
-	uint32_t *ctx_id;
+	struct {
+		uint32_t id;
+		unsigned int static_vcs;
+	} *ctx_list;
 
 	int sync_timeline;
 	uint32_t sync_seqno;
@@ -189,6 +192,8 @@ struct workload
 
 static const unsigned int nop_calibration_us = 1000;
 static unsigned long nop_calibration;
+
+static unsigned int context_vcs_rr;
 
 static int verbose = 1;
 static int fd;
@@ -794,7 +799,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 
 	w->eb.buffers_ptr = to_user_pointer(w->obj);
 	w->eb.buffer_count = j + 1;
-	w->eb.rsvd1 = wrk->ctx_id[w->context];
+	w->eb.rsvd1 = wrk->ctx_list[w->context].id;
 
 	if (flags & SWAPVCS && engine == VCS1)
 		engine = VCS2;
@@ -807,13 +812,14 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		printf("%x|", w->obj[i].handle);
 	printf(" %10lu flags=%llx bb=%x[%u] ctx[%u]=%u\n",
 		w->bb_sz, w->eb.flags, w->bb_handle, j, w->context,
-		wrk->ctx_id[w->context]);
+		wrk->ctx_list[w->context].id);
 #endif
 }
 
 static void
 prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 {
+	unsigned int ctx_vcs = 0;
 	int max_ctx = -1;
 	struct w_step *w;
 	int i;
@@ -852,21 +858,30 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			int delta = w->context + 1 - wrk->nr_ctxs;
 
 			wrk->nr_ctxs += delta;
-			wrk->ctx_id = realloc(wrk->ctx_id,
-					      wrk->nr_ctxs * sizeof(uint32_t));
-			memset(&wrk->ctx_id[wrk->nr_ctxs - delta], 0,
-			       delta * sizeof(uint32_t));
+			wrk->ctx_list = realloc(wrk->ctx_list,
+						wrk->nr_ctxs *
+						sizeof(*wrk->ctx_list));
+			memset(&wrk->ctx_list[wrk->nr_ctxs - delta], 0,
+			       delta * sizeof(*wrk->ctx_list));
 
 			max_ctx = w->context;
 		}
 
-		if (!wrk->ctx_id[w->context]) {
+		if (!wrk->ctx_list[w->context].id) {
 			struct drm_i915_gem_context_create arg = {};
 
 			drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg);
 			igt_assert(arg.ctx_id);
 
-			wrk->ctx_id[w->context] = arg.ctx_id;
+			wrk->ctx_list[w->context].id = arg.ctx_id;
+
+			if (flags & GLOBAL_BALANCE) {
+				wrk->ctx_list[w->context].static_vcs = context_vcs_rr;
+				context_vcs_rr ^= 1;
+			} else {
+				wrk->ctx_list[w->context].static_vcs = ctx_vcs;
+				ctx_vcs ^= 1;
+			}
 
 			if (wrk->prio) {
 				struct local_i915_gem_context_param param = {
@@ -1211,6 +1226,13 @@ rtavg_balance(const struct workload_balancer *balancer,
 	return __rt_select_engine(wrk, qd, false);
 }
 
+static enum intel_engine_id
+context_balance(const struct workload_balancer *balancer,
+		struct workload *wrk, struct w_step *w)
+{
+	return get_vcs_engine(wrk->ctx_list[w->context].static_vcs);
+}
+
 static const struct workload_balancer all_balancers[] = {
 	{
 		.id = 0,
@@ -1277,6 +1299,12 @@ static const struct workload_balancer all_balancers[] = {
 		.min_gen = 8,
 		.get_qd = get_qd_depth,
 		.balance = rtavg_balance,
+	},
+	{
+		.id = 8,
+		.name = "context",
+		.desc = "Static round-robin VCS assignment at context creation.",
+		.balance = context_balance,
 	},
 };
 
