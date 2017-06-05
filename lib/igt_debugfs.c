@@ -312,10 +312,11 @@ void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
  */
 char *igt_crc_to_string(igt_crc_t *crc)
 {
-	char buf[128];
+	int i;
+	char buf[128] = { 0 };
 
-	sprintf(buf, "%08x %08x %08x %08x %08x", crc->crc[0],
-		crc->crc[1], crc->crc[2], crc->crc[3], crc->crc[4]);
+	for (i = 0; i < crc->n_words; i++)
+		sprintf(buf + strlen(buf), "%08x ", crc->crc[i]);
 
 	return strdup(buf);
 }
