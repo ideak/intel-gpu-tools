@@ -29,6 +29,10 @@
 
 int igt_sysfs_open(int device, int *idx);
 int igt_sysfs_open_parameters(int device);
+bool igt_sysfs_set_parameter(int device,
+			     const char *parameter,
+			     const char *fmt, ...)
+	__attribute__((format(printf,3,4)));
 
 int igt_sysfs_read(int dir, const char *attr, void *data, int len);
 int igt_sysfs_write(int dir, const char *attr, const void *data, int len);
@@ -38,6 +42,8 @@ char *igt_sysfs_get(int dir, const char *attr);
 
 int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
 	__attribute__((format(scanf,3,4)));
+int igt_sysfs_vprintf(int dir, const char *attr, const char *fmt, va_list ap)
+	__attribute__((format(printf,3,0)));
 int igt_sysfs_printf(int dir, const char *attr, const char *fmt, ...)
 	__attribute__((format(printf,3,4)));
 

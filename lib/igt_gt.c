@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  */
 
+#include <limits.h>
 #include <string.h>
 #include <strings.h>
 #include <signal.h>
@@ -161,6 +162,9 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 {
 	struct local_i915_gem_context_param param;
 	unsigned ban;
+
+	igt_assert(igt_sysfs_set_parameter
+		   (fd, "reset", "%d", INT_MAX /* any reset method */));
 
 	if (!igt_check_boolean_env_var("IGT_HANG", true))
 		igt_skip("hang injection disabled by user");

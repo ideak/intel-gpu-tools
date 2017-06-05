@@ -139,6 +139,35 @@ int igt_sysfs_open(int device, int *idx)
 }
 
 /**
+ * igt_sysfs_set_parameters:
+ * @device: fd of the device (or -1 to default to Intel)
+ * @parameter: the name of the parameter to set
+ * @fmt: printf-esque format string
+ *
+ * Returns true on success
+ */
+bool igt_sysfs_set_parameter(int device,
+			     const char *parameter,
+			     const char *fmt, ...)
+{
+	va_list ap;
+	int dir;
+	int ret;
+
+	dir = igt_sysfs_open_parameters(device);
+	if (dir < 0)
+		return false;
+
+	va_start(ap, fmt);
+	ret = igt_sysfs_vprintf(dir, parameter, fmt, ap);
+	va_end(ap);
+
+	close(dir);
+
+	return ret > 0;
+}
+
+/**
  * igt_sysfs_open_parameters:
  * @device: fd of the device (or -1 to default to Intel)
  *
@@ -336,19 +365,7 @@ int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
 	return ret;
 }
 
-/**
- * igt_sysfs_printf:
- * @dir: directory for the device from igt_sysfs_open()
- * @attr: name of the sysfs node to open
- * @fmt: printf format string
- * @...: Additional paramaters to store the scaned input values
- *
- * printf() wrapper for sysfs.
- * 
- * Returns:
- * Number of characters written, negative value on error.
- */
-int igt_sysfs_printf(int dir, const char *attr, const char *fmt, ...)
+int igt_sysfs_vprintf(int dir, const char *attr, const char *fmt, va_list ap)
 {
 	FILE *file;
 	int fd;
@@ -360,15 +377,34 @@ int igt_sysfs_printf(int dir, const char *attr, const char *fmt, ...)
 
 	file = fdopen(fd, "w");
 	if (file) {
-		va_list ap;
-
-		va_start(ap, fmt);
 		ret = vfprintf(file, fmt, ap);
-		va_end(ap);
-
 		fclose(file);
 	}
 	close(fd);
+
+	return ret;
+}
+
+/**
+ * igt_sysfs_printf:
+ * @dir: directory for the device from igt_sysfs_open()
+ * @attr: name of the sysfs node to open
+ * @fmt: printf format string
+ * @...: Additional paramaters to store the scaned input values
+ *
+ * printf() wrapper for sysfs.
+ *
+ * Returns:
+ * Number of characters written, negative value on error.
+ */
+int igt_sysfs_printf(int dir, const char *attr, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = igt_sysfs_vprintf(dir, attr, fmt, ap);
+	va_end(ap);
 
 	return ret;
 }

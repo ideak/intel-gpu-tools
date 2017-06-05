@@ -58,6 +58,7 @@
 #include "igt_debugfs.h"
 #include "igt_gt.h"
 #include "igt_rand.h"
+#include "igt_sysfs.h"
 #include "config.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
@@ -450,6 +451,15 @@ void igt_fork_hang_detector(int fd)
 	struct stat st;
 
 	igt_assert(fstat(fd, &st) == 0);
+
+	/*
+	 * Disable per-engine reset to force an error uevent. We don't
+	 * expect to get any hangs whilst the detector is enabled (if we do
+	 * they are a test failure!) and so the loss of per-engine reset
+	 * functionality is not an issue.
+	 */
+	igt_assert(igt_sysfs_set_parameter
+		   (fd, "reset", "%d", 1 /* only global reset */));
 
 	signal(SIGIO, sig_abort);
 	igt_fork_helper(&hang_detector)
