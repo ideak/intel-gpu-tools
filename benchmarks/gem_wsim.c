@@ -207,6 +207,7 @@ static int fd;
 #define SYNCEDCLIENTS	(1<<6)
 #define HEARTBEAT	(1<<7)
 #define GLOBAL_BALANCE	(1<<8)
+#define DEPSYNC		(1<<9)
 
 #define SEQNO_IDX(engine) ((engine) * 16)
 #define SEQNO_OFFSET(engine) (SEQNO_IDX(engine) * sizeof(uint32_t))
@@ -1553,11 +1554,38 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
 	}
 }
 
+static bool sync_deps(struct workload *wrk, struct w_step *w)
+{
+	bool synced = false;
+	unsigned int i;
+
+	for (i = 0; i < w->data_deps.nr; i++) {
+		int dep_idx;
+
+		igt_assert(w->data_deps.list[i] <= 0);
+
+		if (!w->data_deps.list[i])
+			continue;
+
+		dep_idx = w->idx + w->data_deps.list[i];
+
+		igt_assert(dep_idx >= 0 && dep_idx < w->idx);
+		igt_assert(wrk->steps[dep_idx].type == BATCH);
+
+		gem_sync(fd, wrk->steps[dep_idx].obj[0].handle);
+
+		synced = true;
+	}
+
+	return synced;
+}
+
 static void *run_workload(void *data)
 {
 	struct workload *wrk = (struct workload *)data;
 	struct timespec t_start, t_end;
 	struct w_step *w;
+	bool last_sync = false;
 	int throttle = -1;
 	int qd_throttle = -1;
 	int count;
@@ -1633,6 +1661,14 @@ static void *run_workload(void *data)
 
 			igt_assert(w->type == BATCH);
 
+			if ((wrk->flags & DEPSYNC) && engine == VCS)
+				last_sync = sync_deps(wrk, w);
+
+			if (last_sync && (wrk->flags & HEARTBEAT))
+				init_status_page(wrk, 0);
+
+			last_sync = false;
+
 			wrk->nr_bb[engine]++;
 			if (engine == VCS && wrk->balancer) {
 				engine = wrk->balancer->balance(wrk->balancer,
@@ -1658,8 +1694,7 @@ static void *run_workload(void *data)
 
 			if (w->sync) {
 				gem_sync(fd, w->obj[0].handle);
-				if (wrk->flags & HEARTBEAT)
-					init_status_page(wrk, 0);
+				last_sync = true;
 			}
 
 			if (qd_throttle > 0) {
@@ -1670,6 +1705,7 @@ static void *run_workload(void *data)
 								 s, rq_link);
 
 					gem_sync(fd, s->obj[0].handle);
+					last_sync = true;
 
 					s->request = -1;
 					igt_list_del(&s->rq_link);
@@ -1822,7 +1858,8 @@ static void print_help(void)
 "  -S              Synchronize the sequence of random batch durations between\n"
 "                  clients.\n"
 "  -G              Global load balancing - a single load balancer will be shared\n"
-"                  between all clients and there will be a single seqno domain."
+"                  between all clients and there will be a single seqno domain.\n"
+"  -d              Sync between data dependencies in userspace."
 	);
 }
 
@@ -1957,7 +1994,7 @@ int main(int argc, char **argv)
 
 	init_clocks();
 
-	while ((c = getopt(argc, argv, "hqv2RSHxGc:n:r:w:W:a:t:b:p:")) != -1) {
+	while ((c = getopt(argc, argv, "hqv2RSHxGdc:n:r:w:W:a:t:b:p:")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -2018,6 +2055,9 @@ int main(int argc, char **argv)
 			break;
 		case 'G':
 			flags |= GLOBAL_BALANCE;
+			break;
+		case 'd':
+			flags |= DEPSYNC;
 			break;
 		case 'b':
 			i = find_balancer_by_name(optarg);
