@@ -405,7 +405,7 @@ foreach my $wrk (@workloads) {
 	say "  Finding saturation points for '$wrk'...";
 
 	BAL: foreach my $bal (@balancers) {
-		GBAL: foreach my $G ('', '-G') {
+		GBAL: foreach my $G ('', '-G', '-d', '-G -d') {
 			foreach my $H ('', '-H') {
 				my @xargs;
 				my ($w, $c, $s);
