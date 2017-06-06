@@ -92,6 +92,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	uint64_t tiling = data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE;
 	uint32_t pixel_format = data->override_fmt ?: DRM_FORMAT_XRGB8888;
 	igt_display_t *display = &data->display;
+	igt_plane_t *primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	igt_output_set_pipe(output, pipe);
 	igt_plane_set_rotation(plane, IGT_ROTATION_0);
@@ -112,11 +113,14 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	 * setplane without a modeset. So, to be able to call
 	 * igt_display_commit and ultimately setcrtc to do the first modeset,
 	 * we create an fb covering the crtc and call commit
+	 *
+	 * It's also a good idea to set a primary fb on the primary plane
+	 * regardless, to force a underrun when watermarks are allocated
+	 * incorrectly for other planes.
 	 */
-	if (commit < COMMIT_ATOMIC) {
-		igt_plane_t *primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_fb(primary, &data->fb_modeset);
 
-		igt_plane_set_fb(primary, &data->fb_modeset);
+	if (commit < COMMIT_ATOMIC) {
 		primary->rotation_changed = false;
 		igt_display_commit(display);
 
@@ -137,13 +141,10 @@ static void remove_fbs(data_t *data)
 	igt_remove_fb(data->gfx_fd, &data->fb);
 	igt_remove_fb(data->gfx_fd, &data->fb_reference);
 
-	if (data->fb_modeset.fb_id)
-		igt_remove_fb(data->gfx_fd, &data->fb_modeset);
-
 	if (data->fb_flip.fb_id)
 		igt_remove_fb(data->gfx_fd, &data->fb_flip);
 
-	data->fb_modeset.fb_id = data->fb_flip.fb_id = data->fb.fb_id = 0;
+	data->fb_flip.fb_id = data->fb.fb_id = 0;
 }
 
 enum rectangle_type {
@@ -252,6 +253,8 @@ static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 	data->pipe_crc = NULL;
 
 	remove_fbs(data);
+
+	igt_remove_fb(data->gfx_fd, &data->fb_modeset);
 
 	/* XXX: see the note in prepare_crtc() */
 	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
