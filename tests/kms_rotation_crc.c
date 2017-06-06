@@ -45,7 +45,7 @@ typedef struct {
 } data_t;
 
 static void
-paint_squares(data_t *data, drmModeModeInfo *mode, igt_rotation_t rotation,
+paint_squares(data_t *data, igt_rotation_t rotation,
 	      struct igt_fb *fb, float o)
 {
 	cairo_t *cr;
@@ -136,19 +136,29 @@ static void remove_fbs(data_t *data)
 
 	igt_remove_fb(data->gfx_fd, &data->fb);
 	igt_remove_fb(data->gfx_fd, &data->fb_reference);
-	igt_remove_fb(data->gfx_fd, &data->fb_modeset);
+
+	if (data->fb_modeset.fb_id)
+		igt_remove_fb(data->gfx_fd, &data->fb_modeset);
 
 	if (data->fb_flip.fb_id)
 		igt_remove_fb(data->gfx_fd, &data->fb_flip);
-	data->fb.fb_id = 0;
+
+	data->fb_modeset.fb_id = data->fb_flip.fb_id = data->fb.fb_id = 0;
 }
 
+enum rectangle_type {
+	square,
+	portrait,
+	landscape,
+	num_rectangle_types /* must be last */
+};
+
 static void prepare_fbs(data_t *data, igt_output_t *output,
-			igt_plane_t *plane)
+			igt_plane_t *plane, enum rectangle_type rect)
 {
 	drmModeModeInfo *mode;
 	igt_display_t *display = &data->display;
-	unsigned int w, h, ref_w, ref_h;
+	unsigned int w, h, ref_w, ref_h, min_w, min_h;
 	uint64_t tiling = data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE;
 	uint32_t pixel_format = data->override_fmt ?: DRM_FORMAT_XRGB8888;
 
@@ -162,8 +172,35 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	igt_plane_set_rotation(plane, IGT_ROTATION_0);
 
 	mode = igt_output_get_mode(output);
-	ref_w = w = mode->hdisplay;
-	ref_h = h = mode->vdisplay;
+	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
+		w = mode->hdisplay;
+		h = mode->vdisplay;
+
+		min_w = 256;
+		min_h = 256;
+	} else {
+		pixel_format = data->override_fmt ?: DRM_FORMAT_ARGB8888;
+
+		w = h = 256;
+		min_w = min_h = 64;
+	}
+
+	switch (rect) {
+	case square:
+		w = h = min(h, w);
+		break;
+	case portrait:
+		w = min_w;
+		break;
+	case landscape:
+		h = min_h;
+		break;
+	case num_rectangle_types:
+		igt_assert(0);
+	}
+
+	ref_w = w;
+	ref_h = h;
 
 	/*
 	 * For 90/270, we will use create smaller fb so that the rotated
@@ -173,30 +210,25 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	    data->rotation == IGT_ROTATION_270) {
 		tiling = data->override_tiling ?: LOCAL_I915_FORMAT_MOD_Y_TILED;
 
-		w = h = min(mode->hdisplay, mode->vdisplay);
-
-		ref_w = h;
-		ref_h = w;
-	} else if (plane->type == DRM_PLANE_TYPE_CURSOR) {
-		pixel_format = data->override_fmt ?: DRM_FORMAT_ARGB8888;
-		ref_w = ref_h = w = h = 128;
+		igt_swap(w, h);
 	}
 
 	igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling, &data->fb);
-	igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format,
-		      data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE, &data->fb_reference);
 
 	if (data->flip_stress) {
 		igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling, &data->fb_flip);
-		paint_squares(data, mode, IGT_ROTATION_0, &data->fb_flip, 0.92);
+		paint_squares(data, IGT_ROTATION_0, &data->fb_flip, 0.92);
 	}
 
 	/* Step 1: create a reference CRC for a software-rotated fb */
-	paint_squares(data, mode, data->rotation, &data->fb_reference, 1.0);
+	igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format,
+		      data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE, &data->fb_reference);
+	paint_squares(data, data->rotation, &data->fb_reference, 1.0);
 
 	igt_plane_set_fb(plane, &data->fb_reference);
 	if (plane->type != DRM_PLANE_TYPE_CURSOR)
 		igt_plane_set_position(plane, data->pos_x, data->pos_y);
+	igt_plane_set_rotation(plane, IGT_ROTATION_0);
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
 
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
@@ -205,7 +237,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	 * Step 2: prepare the plane with an non-rotated fb let the hw
 	 * rotate it.
 	 */
-	paint_squares(data, mode, IGT_ROTATION_0, &data->fb, 1.0);
+	paint_squares(data, IGT_ROTATION_0, &data->fb, 1.0);
 	igt_plane_set_fb(plane, &data->fb);
 
 	if (plane->type != DRM_PLANE_TYPE_CURSOR)
@@ -278,6 +310,7 @@ static void test_plane_rotation(data_t *data, int plane_type)
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		igt_plane_t *plane;
+		int i;
 
 		igt_output_set_pipe(output, pipe);
 
@@ -286,41 +319,52 @@ static void test_plane_rotation(data_t *data, int plane_type)
 
 		prepare_crtc(data, output, pipe, plane, commit);
 
-		prepare_fbs(data, output, plane);
+		for (i = 0; i < num_rectangle_types; i++) {
+			/* Unsupported on i915 */
+			if (plane_type == DRM_PLANE_TYPE_CURSOR &&
+			    i != square)
+				continue;
 
-		igt_display_commit2(display, commit);
+			igt_debug("Testing case %i on pipe %s\n", i, kmstest_pipe_name(pipe));
+			prepare_fbs(data, output, plane, i);
 
-		/* collect unrotated CRC */
-		igt_pipe_crc_collect_crc(data->pipe_crc, &crc_unrotated);
+			igt_display_commit2(display, commit);
 
-		igt_plane_set_rotation(plane, data->rotation);
-		ret = igt_display_try_commit2(display, commit);
-		if (data->override_fmt || data->override_tiling) {
-			igt_assert_eq(ret, -EINVAL);
-		} else {
-			igt_assert_eq(ret, 0);
-			igt_pipe_crc_collect_crc(data->pipe_crc,
-						  &crc_output);
-			igt_assert_crc_equal(&data->ref_crc,
-					      &crc_output);
-		}
+			/* collect unrotated CRC */
+			igt_pipe_crc_collect_crc(data->pipe_crc, &crc_unrotated);
 
-		flip_count = data->flip_stress;
-		while (flip_count--) {
-			ret = drmModePageFlip(data->gfx_fd,
-					      output->config.crtc->crtc_id,
-					      data->fb_flip.fb_id,
-					      DRM_MODE_PAGE_FLIP_EVENT,
-					      NULL);
-			igt_assert_eq(ret, 0);
-			wait_for_pageflip(data->gfx_fd);
-			ret = drmModePageFlip(data->gfx_fd,
-					      output->config.crtc->crtc_id,
-					      data->fb.fb_id,
-					      DRM_MODE_PAGE_FLIP_EVENT,
-					      NULL);
-			igt_assert_eq(ret, 0);
-			wait_for_pageflip(data->gfx_fd);
+			igt_plane_set_rotation(plane, data->rotation);
+			if (data->rotation == IGT_ROTATION_90 || data->rotation == IGT_ROTATION_270)
+				igt_plane_set_size(plane, data->fb.height, data->fb.width);
+
+			ret = igt_display_try_commit2(display, commit);
+			if (data->override_fmt || data->override_tiling) {
+				igt_assert_eq(ret, -EINVAL);
+			} else {
+				igt_assert_eq(ret, 0);
+				igt_pipe_crc_collect_crc(data->pipe_crc,
+							  &crc_output);
+				igt_assert_crc_equal(&data->ref_crc,
+						      &crc_output);
+			}
+
+			flip_count = data->flip_stress;
+			while (flip_count--) {
+				ret = drmModePageFlip(data->gfx_fd,
+						      output->config.crtc->crtc_id,
+						      data->fb_flip.fb_id,
+						      DRM_MODE_PAGE_FLIP_EVENT,
+						      NULL);
+				igt_assert_eq(ret, 0);
+				wait_for_pageflip(data->gfx_fd);
+				ret = drmModePageFlip(data->gfx_fd,
+						      output->config.crtc->crtc_id,
+						      data->fb.fb_id,
+						      DRM_MODE_PAGE_FLIP_EVENT,
+						      NULL);
+				igt_assert_eq(ret, 0);
+				wait_for_pageflip(data->gfx_fd);
+			}
 		}
 
 		valid_tests++;
