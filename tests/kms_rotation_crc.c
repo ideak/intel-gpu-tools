@@ -31,6 +31,7 @@ typedef struct {
 	int gfx_fd;
 	igt_display_t display;
 	struct igt_fb fb;
+	struct igt_fb fb_reference;
 	struct igt_fb fb_modeset;
 	struct igt_fb fb_flip;
 	igt_crc_t ref_crc;
@@ -38,7 +39,6 @@ typedef struct {
 	igt_rotation_t rotation;
 	int pos_x;
 	int pos_y;
-	unsigned int w, h;
 	uint32_t override_fmt;
 	uint64_t override_tiling;
 	unsigned int flip_stress;
@@ -49,8 +49,8 @@ paint_squares(data_t *data, drmModeModeInfo *mode, igt_rotation_t rotation,
 	      struct igt_fb *fb, float o)
 {
 	cairo_t *cr;
-	unsigned int w = data->w;
-	unsigned int h = data->h;
+	unsigned int w = fb->width;
+	unsigned int h = fb->height;
 
 	cr = igt_get_cairo_ctx(data->gfx_fd, fb);
 
@@ -84,55 +84,14 @@ paint_squares(data_t *data, drmModeModeInfo *mode, igt_rotation_t rotation,
 	cairo_destroy(cr);
 }
 
-static void commit_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
-{
-	igt_display_t *display = &data->display;
-	enum igt_commit_style commit = COMMIT_LEGACY;
-	igt_plane_t *primary;
-
-	/*
-	 * With igt_display_commit2 and COMMIT_UNIVERSAL, we call just the
-	 * setplane without a modeset. So, to be able to call
-	 * igt_display_commit and ultimately setcrtc to do the first modeset,
-	 * we create an fb covering the crtc and call commit
-	 */
-
-	if (plane->type == DRM_PLANE_TYPE_PRIMARY ||
-	    plane->type == DRM_PLANE_TYPE_CURSOR)
-		commit = COMMIT_UNIVERSAL;
-
-	if (data->display.is_atomic)
-		commit = COMMIT_ATOMIC;
-
-	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-
-	if (commit < COMMIT_ATOMIC) {
-		igt_plane_set_fb(primary, &data->fb_modeset);
-		primary->rotation_changed = false;
-		igt_display_commit(display);
-
-		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
-			primary->rotation_changed = true;
-	}
-
-	igt_plane_set_fb(plane, &data->fb);
-
-	if (plane->type != DRM_PLANE_TYPE_CURSOR)
-		igt_plane_set_position(plane, data->pos_x, data->pos_y);
-
-	igt_display_commit2(display, commit);
-}
-
 static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
-			 igt_plane_t *plane)
+			 igt_plane_t *plane, enum igt_commit_style commit)
 {
 	drmModeModeInfo *mode;
-	int fb_id, fb_modeset_id;
 	unsigned int w, h;
-	uint64_t tiling = data->override_tiling ?
-			  data->override_tiling : LOCAL_DRM_FORMAT_MOD_NONE;
-	uint32_t pixel_format = data->override_fmt ?
-				data->override_fmt : DRM_FORMAT_XRGB8888;
+	uint64_t tiling = data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE;
+	uint32_t pixel_format = data->override_fmt ?: DRM_FORMAT_XRGB8888;
+	igt_display_t *display = &data->display;
 
 	igt_output_set_pipe(output, pipe);
 	igt_plane_set_rotation(plane, IGT_ROTATION_0);
@@ -146,12 +105,65 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	w = mode->hdisplay;
 	h = mode->vdisplay;
 
-	fb_modeset_id = igt_create_fb(data->gfx_fd,
-				      w, h,
-				      pixel_format,
-				      tiling,
-				      &data->fb_modeset);
-	igt_assert(fb_modeset_id);
+	igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling, &data->fb_modeset);
+
+	/*
+	 * With igt_display_commit2 and COMMIT_UNIVERSAL, we call just the
+	 * setplane without a modeset. So, to be able to call
+	 * igt_display_commit and ultimately setcrtc to do the first modeset,
+	 * we create an fb covering the crtc and call commit
+	 */
+	if (commit < COMMIT_ATOMIC) {
+		igt_plane_t *primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+
+		igt_plane_set_fb(primary, &data->fb_modeset);
+		primary->rotation_changed = false;
+		igt_display_commit(display);
+
+		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
+			primary->rotation_changed = true;
+	}
+
+	igt_plane_set_fb(plane, NULL);
+
+	igt_display_commit2(display, commit);
+}
+
+static void remove_fbs(data_t *data)
+{
+	if (!data->fb.fb_id)
+		return;
+
+	igt_remove_fb(data->gfx_fd, &data->fb);
+	igt_remove_fb(data->gfx_fd, &data->fb_reference);
+	igt_remove_fb(data->gfx_fd, &data->fb_modeset);
+
+	if (data->fb_flip.fb_id)
+		igt_remove_fb(data->gfx_fd, &data->fb_flip);
+	data->fb.fb_id = 0;
+}
+
+static void prepare_fbs(data_t *data, igt_output_t *output,
+			igt_plane_t *plane)
+{
+	drmModeModeInfo *mode;
+	igt_display_t *display = &data->display;
+	unsigned int w, h, ref_w, ref_h;
+	uint64_t tiling = data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE;
+	uint32_t pixel_format = data->override_fmt ?: DRM_FORMAT_XRGB8888;
+
+	if (data->fb.fb_id) {
+		igt_plane_set_fb(plane, NULL);
+		igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
+
+		remove_fbs(data);
+	}
+
+	igt_plane_set_rotation(plane, IGT_ROTATION_0);
+
+	mode = igt_output_get_mode(output);
+	ref_w = w = mode->hdisplay;
+	ref_h = h = mode->vdisplay;
 
 	/*
 	 * For 90/270, we will use create smaller fb so that the rotated
@@ -159,38 +171,34 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	 */
 	if (data->rotation == IGT_ROTATION_90 ||
 	    data->rotation == IGT_ROTATION_270) {
-		tiling = data->override_tiling ?
-			 data->override_tiling : LOCAL_I915_FORMAT_MOD_Y_TILED;
+		tiling = data->override_tiling ?: LOCAL_I915_FORMAT_MOD_Y_TILED;
+
 		w = h = min(mode->hdisplay, mode->vdisplay);
+
+		ref_w = h;
+		ref_h = w;
 	} else if (plane->type == DRM_PLANE_TYPE_CURSOR) {
-		pixel_format = data->override_fmt ?
-			       data->override_fmt : DRM_FORMAT_ARGB8888;
-		w = h = 128;
+		pixel_format = data->override_fmt ?: DRM_FORMAT_ARGB8888;
+		ref_w = ref_h = w = h = 128;
 	}
 
-	data->w = w;
-	data->h = h;
-
-	fb_id = igt_create_fb(data->gfx_fd,
-			      w, h,
-			      pixel_format,
-			      tiling,
-			      &data->fb);
-	igt_assert(fb_id);
+	igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling, &data->fb);
+	igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format,
+		      data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE, &data->fb_reference);
 
 	if (data->flip_stress) {
-		fb_id = igt_create_fb(data->gfx_fd,
-				      w, h,
-				      pixel_format,
-				      tiling,
-				      &data->fb_flip);
-		igt_assert(fb_id);
+		igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling, &data->fb_flip);
 		paint_squares(data, mode, IGT_ROTATION_0, &data->fb_flip, 0.92);
 	}
 
 	/* Step 1: create a reference CRC for a software-rotated fb */
-	paint_squares(data, mode, data->rotation, &data->fb, 1.0);
-	commit_crtc(data, output, plane);
+	paint_squares(data, mode, data->rotation, &data->fb_reference, 1.0);
+
+	igt_plane_set_fb(plane, &data->fb_reference);
+	if (plane->type != DRM_PLANE_TYPE_CURSOR)
+		igt_plane_set_position(plane, data->pos_x, data->pos_y);
+	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
+
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
 
 	/*
@@ -199,6 +207,9 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	 */
 	paint_squares(data, mode, IGT_ROTATION_0, &data->fb, 1.0);
 	igt_plane_set_fb(plane, &data->fb);
+
+	if (plane->type != DRM_PLANE_TYPE_CURSOR)
+		igt_plane_set_position(plane, data->pos_x, data->pos_y);
 }
 
 static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
@@ -208,10 +219,7 @@ static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = NULL;
 
-	igt_remove_fb(data->gfx_fd, &data->fb);
-	igt_remove_fb(data->gfx_fd, &data->fb_modeset);
-	if (data->fb_flip.fb_id)
-		igt_remove_fb(data->gfx_fd, &data->fb_flip);
+	remove_fbs(data);
 
 	/* XXX: see the note in prepare_crtc() */
 	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
@@ -276,7 +284,9 @@ static void test_plane_rotation(data_t *data, int plane_type)
 		plane = igt_output_get_plane_type(output, plane_type);
 		igt_require(igt_plane_supports_rotation(plane));
 
-		prepare_crtc(data, output, pipe, plane);
+		prepare_crtc(data, output, pipe, plane, commit);
+
+		prepare_fbs(data, output, plane);
 
 		igt_display_commit2(display, commit);
 
