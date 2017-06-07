@@ -128,3 +128,24 @@ igt_vc4_mmap_bo(int fd, uint32_t handle, uint32_t size, unsigned prot)
 	else
 		return ptr;
 }
+
+void igt_vc4_set_tiling(int fd, uint32_t handle, uint64_t modifier)
+{
+	struct drm_vc4_set_tiling set = {
+		.handle = handle,
+		.modifier = modifier,
+	};
+
+	do_ioctl(fd, DRM_IOCTL_VC4_SET_TILING, &set);
+}
+
+uint64_t igt_vc4_get_tiling(int fd, uint32_t handle)
+{
+	struct drm_vc4_get_tiling get = {
+		.handle = handle,
+	};
+
+	do_ioctl(fd, DRM_IOCTL_VC4_GET_TILING, &get);
+
+	return get.modifier;
+}

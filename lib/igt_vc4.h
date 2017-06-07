@@ -28,4 +28,7 @@ uint32_t igt_vc4_get_cleared_bo(int fd, size_t size, uint32_t clearval);
 int igt_vc4_create_bo(int fd, size_t size);
 void *igt_vc4_mmap_bo(int fd, uint32_t handle, uint32_t size, unsigned prot);
 
+void igt_vc4_set_tiling(int fd, uint32_t handle, uint64_t modifier);
+uint64_t igt_vc4_get_tiling(int fd, uint32_t handle);
+
 #endif /* IGT_VC4_H */

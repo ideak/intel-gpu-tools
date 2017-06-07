@@ -216,6 +216,7 @@ test_progs = [
 	'vc4_create_bo',
 	'vc4_dmabuf_poll',
 	'vc4_lookup_fail',
+	'vc4_tiling',
 	'vc4_wait_bo',
 	'vc4_wait_seqno',
 	'vgem_basic',
