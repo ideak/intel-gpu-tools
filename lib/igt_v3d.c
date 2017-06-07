@@ -40,10 +40,6 @@
 #include "intel_chipset.h"
 #include "v3d_drm.h"
 
-#if NEW_CONTEXT_PARAM_NO_ERROR_CAPTURE_API
-#define LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE 0x4
-#endif
-
 /**
  * SECTION:igt_v3d
  * @short_description: V3D support library

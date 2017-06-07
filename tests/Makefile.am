@@ -14,6 +14,8 @@ if BUILD_VC4
     TESTS_progs += $(VC4_TESTS)
 endif
 
+TESTS_progs += $(V3D_TESTS)
+
 if HAVE_CHAMELIUM
 TESTS_progs += \
 	kms_chamelium \
