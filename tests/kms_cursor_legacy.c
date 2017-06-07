@@ -618,8 +618,22 @@ static void basic_flip_cursor(igt_display_t *display,
 		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 
 		busy = NULL;
-		if (flags & BASIC_BUSY)
+		if (flags & BASIC_BUSY) {
 			busy = make_fb_busy(display->drm_fd, &fb_info);
+
+			/*
+			 * Prevent going into C3 or higher state
+			 * or we may miss vblank interrupts on SNB.
+			 */
+			igt_fork(child, 1) {
+				struct sched_param parm = { .sched_priority = 0 };
+
+				igt_assert(sched_setscheduler(0, SCHED_IDLE, &parm) == 0);
+
+				while (*busy != MI_BATCH_BUFFER_END)
+					sched_yield();
+			}
+		}
 
 		/* Start with a synchronous query to align with the vblank */
 		vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
@@ -684,6 +698,8 @@ static void basic_flip_cursor(igt_display_t *display,
 			continue;
 
 		delta = get_vblank(display->drm_fd, pipe, 0) - vblank_start;
+
+		igt_waitchildren();
 
 		if (!mode_requires_extra_vblank(mode))
 			miss2 += delta != 1;
