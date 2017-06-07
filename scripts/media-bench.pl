@@ -35,6 +35,7 @@ my $tracepl = "$igt_root/scripts/trace.pl";
 my $tolerance = 0.01;
 my $client_target_s = 10;
 my $idle_tolerance_pct = 2.0;
+my $verbose = 0;
 my $show_cmds = 0;
 my $realtime_target = 0;
 my $wps_target = 0;
@@ -240,7 +241,7 @@ sub calibrate_workload
 
 sub find_saturation_point
 {
-	my ($wrk, $rr, @args) = @_;
+	my ($wrk, $rr, $verbose, @args) = @_;
 	my ($last_wps, $c, $swps);
 	my $target = $realtime_target > 0 ? $realtime_target : $wps_target;
 	my $r = $rr;
@@ -261,6 +262,8 @@ sub find_saturation_point
 		my ($time, $wps);
 
 		($time, $wps) = run_workload((@args, ($warg, "-r $r", "-c $c")));
+
+		say "        $c clients is $wps wps." if $verbose;
 
 		if ($c > 1) {
 			my $delta;
@@ -297,13 +300,14 @@ sub find_saturation_point
 	}
 }
 
-getopts('hxn:b:W:B:r:t:i:R:T:w:', \%opts);
+getopts('hvxn:b:W:B:r:t:i:R:T:w:', \%opts);
 
 if (defined $opts{'h'}) {
 	print <<ENDHELP;
 Supported options:
 
   -h          Help text.
+  -v          Be verbose.
   -x          Show external commands.
   -n num      Nop calibration.
   -b str      Balancer to pre-select.
@@ -321,7 +325,8 @@ ENDHELP
 	exit 0;
 }
 
-$show_cmds = $opts{'x'} if defined $opts{'x'};
+$verbose = 1 if defined $opts{'v'};
+$show_cmds = 1 if defined $opts{'x'};
 $balancer = $opts{'b'} if defined $opts{'b'};
 if (defined $opts{'B'}) {
 	@balancers = split /,/, $opts{'B'};
@@ -424,6 +429,7 @@ foreach my $wrk (@workloads) {
 				}
 
 				($c, $w, $s) = find_saturation_point($wrk, $r,
+								     0,
 								     (@args,
 								      @xargs));
 
@@ -526,7 +532,7 @@ foreach my $wrk (@workloads) {
 	($r, $error) = calibrate_workload($wrk);
 	say "      ${client_target_s}s is $r workloads. (error=$error)";
 
-	($c, $wps, $swps) = find_saturation_point($wrk, $r, @args);
+	($c, $wps, $swps) = find_saturation_point($wrk, $r, $verbose, @args);
 	say "      Saturation at $c clients ($wps workloads/s).";
 	push @args, "-c $c";
 
