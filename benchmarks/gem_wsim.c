@@ -724,13 +724,21 @@ static const unsigned int eb_engine_map[NUM_ENGINES] = {
 };
 
 static void
-eb_update_flags(struct w_step *w, enum intel_engine_id engine,
-		unsigned int flags)
+eb_set_engine(struct drm_i915_gem_execbuffer2 *eb,
+	      enum intel_engine_id engine,
+	      unsigned int flags)
 {
 	if (engine == VCS2 && (flags & VCS2REMAP))
 		engine = BCS;
 
-	w->eb.flags = eb_engine_map[engine];
+	eb->flags = eb_engine_map[engine];
+}
+
+static void
+eb_update_flags(struct w_step *w, enum intel_engine_id engine,
+		unsigned int flags)
+{
+	eb_set_engine(&w->eb, engine, flags);
 
 	w->eb.flags |= I915_EXEC_HANDLE_LUT;
 	w->eb.flags |= I915_EXEC_NO_RELOC;
@@ -1503,7 +1511,7 @@ static void init_status_page(struct workload *wrk, unsigned int flags)
 
 		*cs++ = MI_BATCH_BUFFER_END;
 
-		eb.flags = eb_engine_map[engine];
+		eb_set_engine(&eb, engine, wrk->flags);
 		eb.flags |= I915_EXEC_HANDLE_LUT;
 		eb.flags |= I915_EXEC_NO_RELOC;
 
