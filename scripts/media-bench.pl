@@ -36,6 +36,7 @@ my $tolerance = 0.01;
 my $client_target_s = 10;
 my $idle_tolerance_pct = 2.0;
 my $verbose = 0;
+my $gt2 = 0;
 my $show_cmds = 0;
 my $realtime_target = 0;
 my $wps_target = 0;
@@ -135,6 +136,7 @@ sub run_workload
 	my ($time, $wps, $cmd);
 
 	@args = add_wps_arg(@args);
+	push @args, '-2' if $gt2;
 
 	unshift @args, "$wsim";
 	$cmd = join ' ', @args;
@@ -164,6 +166,7 @@ sub trace_workload
 	my $warg = defined $w_direct ? $wrk : "-w $wrk_root/$wrk";
 
 	push @args, "$b -R" unless $b eq '<none>';
+	push @args, '-2' if $gt2;
 	push @args, $warg;
 
 	unshift @args, '-q';
@@ -300,7 +303,7 @@ sub find_saturation_point
 	}
 }
 
-getopts('hvxn:b:W:B:r:t:i:R:T:w:', \%opts);
+getopts('hv2xn:b:W:B:r:t:i:R:T:w:', \%opts);
 
 if (defined $opts{'h'}) {
 	print <<ENDHELP;
@@ -309,6 +312,7 @@ Supported options:
   -h          Help text.
   -v          Be verbose.
   -x          Show external commands.
+  -2          Run gem_wsim in GT2 mode.
   -n num      Nop calibration.
   -b str      Balancer to pre-select.
               Skips balancer auto-selection.
@@ -326,6 +330,7 @@ ENDHELP
 }
 
 $verbose = 1 if defined $opts{'v'};
+$gt2 = 1 if defined $opts{'2'};
 $show_cmds = 1 if defined $opts{'x'};
 $balancer = $opts{'b'} if defined $opts{'b'};
 if (defined $opts{'B'}) {
@@ -515,6 +520,7 @@ foreach my $wrk (@workloads) {
 	my ($r, $error, $c, $wps, $swps);
 	my $saturated = 0;
 	my $result = 'Pass';
+	my $vcs2 = $gt2 ? '1' : '3';
 	my %problem;
 	my $engines;
 
@@ -547,12 +553,12 @@ foreach my $wrk (@workloads) {
 	if ($saturated == 0) {
 		# Not a single saturated engine
 		$result = 'FAIL';
-	} elsif (not exists $engines->{'2'} or not exists $engines->{'3'}) {
+	} elsif (not exists $engines->{'2'} or not exists $engines->{$vcs2}) {
 		# VCS1 and VCS2 not present in a balancing workload
 		$result = 'FAIL';
 	} elsif ($saturated == 1 and
 		 ($engines->{'2'} < $idle_tolerance_pct or
-		  $engines->{'3'} < $idle_tolerance_pct)) {
+		  $engines->{$vcs2} < $idle_tolerance_pct)) {
 		# Only one VCS saturated
 		$result = 'WARN';
 	}
