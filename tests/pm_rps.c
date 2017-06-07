@@ -560,58 +560,21 @@ static void reset_gpu(void)
 	close(fd);
 }
 
-static uint32_t *make_busy(int fd, uint32_t handle)
+static void boost_freq(int fd, int *boost_freqs)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj;
-	struct drm_i915_gem_relocation_entry reloc;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t *batch;
-	int i;
+	int64_t timeout = 1;
+	int ring = -1;
+	igt_spin_t *load;
 
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
-	execbuf.buffer_count = 1;
+	load = igt_spin_batch_new(fd, ring, 0);
 
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = handle;
+	/* Waiting will grant us a boost to maximum */
+	gem_wait(fd, load->handle, &timeout);
 
-	obj.relocs_ptr = (uintptr_t)&reloc;
-	obj.relocation_count = 1;
-	memset(&reloc, 0, sizeof(reloc));
+	read_freqs(boost_freqs);
+	dump(boost_freqs);
 
-	batch = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj.handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	reloc.target_handle = obj.handle; /* recurse */
-	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
-	reloc.delta = 0;
-	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc.write_domain = 0;
-
-	i = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc.delta = 1;
-		}
-	}
-	i++;
-
-	gem_execbuf(fd, &execbuf);
-	return batch;
+	igt_spin_batch_free(fd, load);
 }
 
 static void waitboost(bool reset)
@@ -619,14 +582,8 @@ static void waitboost(bool reset)
 	int pre_freqs[NUMFREQ];
 	int boost_freqs[NUMFREQ];
 	int post_freqs[NUMFREQ];
-	uint32_t *batch, handle;
-	int64_t timeout = 1;
 
 	int fd = drm_open_driver(DRIVER_INTEL);
-
-	/* When we wait upon the GPU, we want to temporarily boost it
-	 * to maximum.
-	 */
 
 	load_helper_run(LOW);
 
@@ -640,15 +597,10 @@ static void waitboost(bool reset)
 		sleep(1);
 	}
 
-	igt_debug("Wait for gpu...\n");
-	handle = gem_create(fd, 4096);
-	batch = make_busy(fd, handle);
-	gem_wait(fd, handle, &timeout);
-	read_freqs(boost_freqs);
-	dump(boost_freqs);
-	*batch = MI_BATCH_BUFFER_END;
-	munmap(batch, 4096);
-	gem_close(fd, handle);
+	/* When we wait upon the GPU, we want to temporarily boost it
+	 * to maximum.
+	 */
+	boost_freq(fd, boost_freqs);
 
 	igt_debug("Apply low load again...\n");
 	sleep(1);
