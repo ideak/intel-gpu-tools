@@ -183,6 +183,9 @@ PKG_CHECK_MODULES(GLIB, glib-2.0)
 PKG_CHECK_MODULES(XMLRPC, xmlrpc_client, [xmlrpc=yes], [xmlrpc=no])
 PKG_CHECK_MODULES(PIXMAN, pixman-1, [pixman=yes], [pixman=no])
 AM_CONDITIONAL(HAVE_CHAMELIUM, [test "x$xmlrpc$pixman" = xyesyes])
+if test x"$xmlrpc$pixman" = xyesyes; then
+	AC_DEFINE(HAVE_CHAMELIUM, 1, [Enable Chamelium support])
+fi
 
 # -----------------------------------------------------------------------------
 #			Configuration options
