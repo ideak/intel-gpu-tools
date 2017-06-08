@@ -1,19 +1,19 @@
 include Makefile.sources
 
 if HAVE_LIBDRM_AMDGPU
-    TESTS_progs_M += $(AMDGPU_TESTS_M)
+    TESTS_progs += $(AMDGPU_TESTS)
 endif
 
 if HAVE_LIBDRM_NOUVEAU
-    TESTS_progs_M += $(NOUVEAU_TESTS_M)
+    TESTS_progs += $(NOUVEAU_TESTS)
 endif
 
 if HAVE_LIBDRM_VC4
-    TESTS_progs_M += $(VC4_TESTS_M)
+    TESTS_progs += $(VC4_TESTS)
 endif
 
 if HAVE_CHAMELIUM
-TESTS_progs_M += \
+TESTS_progs += \
 	chamelium \
 	$(NULL)
 endif
@@ -21,12 +21,12 @@ endif
 if BUILD_TESTS
 test-list.txt: Makefile.sources
 	@echo TESTLIST > $@
-	@echo ${single_kernel_tests} ${multi_kernel_tests} >> $@
+	@echo ${kernel_tests} >> $@
 	@echo END TESTLIST >> $@
 
 test-list-full.txt: Makefile.sources
 	@echo TESTLIST > $@
-	@echo ${single_kernel_tests} ${multi_kernel_tests} ${extra_multi_kernel_tests} >> $@
+	@echo ${kernel_tests} ${extra_kernel_tests} >> $@
 	@echo END TESTLIST >> $@
 
 
@@ -38,13 +38,11 @@ noinst_PROGRAMS = \
 pkglibexec_PROGRAMS = \
 	gem_stress \
 	$(TESTS_progs) \
-	$(TESTS_progs_M) \
-	$(TESTS_progs_XM) \
+	$(TESTS_progs_X) \
 	$(NULL)
 
 dist_pkglibexec_SCRIPTS = \
 	$(TESTS_scripts) \
-	$(TESTS_scripts_M) \
 	$(scripts) \
 	$(NULL)
 
