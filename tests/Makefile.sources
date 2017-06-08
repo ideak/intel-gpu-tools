@@ -293,14 +293,6 @@ kernel_tests_full = \
 	$(extra_multi_kernel_tests) \
 	$(NULL)
 
-# Test that exercise specific asserts in the test framework library and are
-# hence expected to fail.
-XFAIL_TESTS = \
-	igt_no_exit \
-	igt_no_exit_list_only \
-	igt_no_subtest \
-	$(NULL)
-
 # IMPORTANT: These tests here are all disabled because the result in sometime
 # unrecoverable gpu hangs. Don't put real testcases here.
 HANG = \
