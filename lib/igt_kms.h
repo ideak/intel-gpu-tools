@@ -46,7 +46,8 @@
  * @PIPE_A: First crtc.
  * @PIPE_B: Second crtc.
  * @PIPE_C: Third crtc.
- * @I915_MAX_PIPES: Max number of pipes allowed.
+ * ... and so on.
+ * @IGT_MAX_PIPES: Max number of pipes allowed.
  */
 enum pipe {
         PIPE_NONE = -1,
@@ -57,7 +58,7 @@ enum pipe {
         PIPE_D,
         PIPE_E,
         PIPE_F,
-        I915_MAX_PIPES
+        IGT_MAX_PIPES
 };
 const char *kmstest_pipe_name(enum pipe pipe);
 int kmstest_pipe_to_index(char pipe);

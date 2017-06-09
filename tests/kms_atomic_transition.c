@@ -634,7 +634,7 @@ static void collect_crcs_mask(igt_pipe_crc_t **pipe_crcs, unsigned mask, igt_crc
 {
 	int i;
 
-	for (i = 0; i < I915_MAX_PIPES; i++) {
+	for (i = 0; i < IGT_MAX_PIPES; i++) {
 		if (!((1 << i) & mask))
 			continue;
 
@@ -650,7 +650,7 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 	struct igt_fb fbs[2];
 	int i, j;
 	unsigned iter_max = 1 << display->n_pipes;
-	igt_pipe_crc_t *pipe_crcs[I915_MAX_PIPES] = { 0 };
+	igt_pipe_crc_t *pipe_crcs[IGT_MAX_PIPES] = { 0 };
 	igt_output_t *output;
 	unsigned width = 0, height = 0;
 	bool skip_test = false;
@@ -707,7 +707,7 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	for (i = 0; i < iter_max; i++) {
-		igt_crc_t crcs[5][I915_MAX_PIPES];
+		igt_crc_t crcs[5][IGT_MAX_PIPES];
 		unsigned event_mask;
 
 		if (hweight32(i) > howmany)
@@ -754,7 +754,7 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 			if (!is_i915_device(display->drm_fd))
 				continue;
 
-			for (int k = 0; k < I915_MAX_PIPES; k++) {
+			for (int k = 0; k < IGT_MAX_PIPES; k++) {
 				if (i & (1 << k)) {
 					igt_assert_crc_equal(&crcs[0][k], &crcs[3][k]);
 					igt_assert_crc_equal(&crcs[0][k], &crcs[4][k]);
@@ -784,7 +784,7 @@ cleanup:
 
 static void run_modeset_transition(igt_display_t *display, int requested_outputs, bool nonblocking, bool fencing)
 {
-	igt_output_t *outputs[I915_MAX_PIPES] = {};
+	igt_output_t *outputs[IGT_MAX_PIPES] = {};
 	int num_outputs = 0;
 	enum pipe pipe;
 
@@ -871,7 +871,7 @@ igt_main
 		for_each_pipe_with_valid_output(&display, pipe, output)
 			run_transition_test(&display, pipe, output, TRANSITION_MODESET_DISABLE, false, false);
 
-	for (i = 1; i <= I915_MAX_PIPES; i++) {
+	for (i = 1; i <= IGT_MAX_PIPES; i++) {
 		igt_subtest_f("%ix-modeset-transitions", i)
 			run_modeset_transition(&display, i, false, false);
 

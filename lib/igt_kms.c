@@ -324,7 +324,7 @@ const char *kmstest_pipe_name(enum pipe pipe)
 	if (pipe == PIPE_NONE)
 		return "None";
 
-	if (pipe >= I915_MAX_PIPES)
+	if (pipe >= IGT_MAX_PIPES)
 		return "invalid";
 
 	return str[pipe];

@@ -415,7 +415,7 @@ int main(int argc, char *argv[])
 		igt_require(data.display.is_atomic);
 	}
 
-	for (int pipe = 0; pipe < I915_MAX_PIPES; pipe++) {
+	for (int pipe = 0; pipe < IGT_MAX_PIPES; pipe++) {
 		igt_subtest_group
 			run_tests_for_pipe(&data, pipe);
 	}

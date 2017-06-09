@@ -284,7 +284,7 @@ static void test_hang(igt_display_t *dpy, unsigned ring,
 
 igt_main
 {
-	igt_display_t display = { .drm_fd = -1, .n_pipes = I915_MAX_PIPES };
+	igt_display_t display = { .drm_fd = -1, .n_pipes = IGT_MAX_PIPES };
 	const struct intel_execution_engine *e;
 
 	igt_skip_on_simulation();
@@ -302,7 +302,7 @@ igt_main
 
 	/* XXX Extend to cover atomic rendering tests to all planes + legacy */
 
-	for (int n = 0; n < I915_MAX_PIPES; n++) {
+	for (int n = 0; n < IGT_MAX_PIPES; n++) {
 		errno = 0;
 
 		igt_fixture {

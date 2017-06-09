@@ -54,7 +54,7 @@ static void stress(igt_display_t *display,
 	uint64_t *results;
 	bool torture;
 	int n;
-	unsigned crtc_id[I915_MAX_PIPES], num_crtcs;
+	unsigned crtc_id[IGT_MAX_PIPES], num_crtcs;
 
 	torture = false;
 	if (num_children < 0) {
@@ -1425,7 +1425,7 @@ igt_main
 	}
 
 	igt_subtest_group {
-		for (int n = 0; n < I915_MAX_PIPES; n++) {
+		for (int n = 0; n < IGT_MAX_PIPES; n++) {
 			errno = 0;
 
 			igt_fixture {
