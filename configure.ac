@@ -360,6 +360,7 @@ AC_CONFIG_FILES([
 		 man/Makefile
 		 scripts/Makefile
 		 tests/Makefile
+		 tests/intel-ci/Makefile
 		 tools/Makefile
 		 tools/null_state_gen/Makefile
 		 tools/registers/Makefile

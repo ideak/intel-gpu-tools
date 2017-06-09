@@ -1,5 +1,7 @@
 include Makefile.sources
 
+SUBDIRS = intel-ci
+
 if HAVE_LIBDRM_AMDGPU
     TESTS_progs += $(AMDGPU_TESTS)
 endif
