@@ -400,7 +400,7 @@ sub sanitize_ctx
 sub ts
 {
 	my ($us) = @_;
-	my ($h, $m, $s);
+	my ($d, $h, $m, $s);
 
 	$s = int($us / 1000000);
 	$us = $us % 1000000;
@@ -411,7 +411,11 @@ sub ts
 	$h = int($m / 60);
 	$m = $m % 60;
 
-	return sprintf('2017-01-01 %02u:%02u:%02u.%06u', int($h), int($m), int($s), int($us));
+	$d = 1 + int($h / 24);
+	$h = $h % 24;
+
+	return sprintf('2017-01-%02u %02u:%02u:%02u.%06u',
+		       int($d), int($h), int($m), int($s), int($us));
 }
 
 # Main input loop - parse lines and build the internal representation of the
