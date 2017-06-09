@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "igt_sysfs.h"
 #include "igt_vgem.h"
 #include "sw_sync.h"
 
@@ -387,7 +388,7 @@ static unsigned int measure_ring_size(int fd)
 	return count;
 }
 
-#define EXPIRED 0x1
+#define EXPIRED 0x10000
 static void test_long_history(int fd, long ring_size, unsigned flags)
 {
 	const uint32_t sz = 1 << 20;
@@ -396,8 +397,13 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	unsigned int engines[16], engine;
 	unsigned int nengine, n, s;
+	unsigned long limit;
 	int all_fences;
 	struct cork c;
+
+	limit = -1;
+	if (!gem_uses_full_ppgtt(fd))
+		limit = ring_size / 3;
 
 	nengine = 0;
 	for_each_engine(fd, engine) {
@@ -454,6 +460,8 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 		}
 
 		gem_context_destroy(fd, execbuf.rsvd1);
+		if (!--limit)
+			break;
 	}
 	unplug(&c);
 
@@ -486,9 +494,44 @@ static void test_fence_flip(int i915)
 	igt_skip_on_f(1, "no fence-in for atomic flips\n");
 }
 
+#define HAVE_EXECLISTS 0x1
+static unsigned int print_welcome(int fd)
+{
+	unsigned int result = 0;
+	bool active;
+	int dir;
+
+	dir = igt_sysfs_open_parameters(fd);
+	if (dir < 0)
+		return 0;
+
+	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
+	if (active) {
+		igt_info("Using GuC submission\n");
+		result |= HAVE_EXECLISTS;
+		goto out;
+	}
+
+	active = igt_sysfs_get_boolean(dir, "enable_execlists");
+	if (active) {
+		igt_info("Using Execlists submission\n");
+		result |= HAVE_EXECLISTS;
+		goto out;
+	}
+
+	active = igt_sysfs_get_boolean(dir, "semaphores");
+	igt_info("Using Legacy submission%s\n",
+		 active ? ", with semaphores" : "");
+
+out:
+	close(dir);
+	return result;
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
+	unsigned int caps = 0;
 	int i915 = -1;
 
 	igt_skip_on_simulation();
@@ -498,6 +541,8 @@ igt_main
 		igt_require_gem(i915);
 		igt_require(gem_has_exec_fence(i915));
 		gem_require_mmap_wc(i915);
+
+		caps = print_welcome(i915);
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
@@ -560,7 +605,7 @@ igt_main
 		igt_info("Ring size: %ld batches\n", ring_size);
 		igt_require(ring_size);
 
-		test_long_history(i915, ring_size, 0);
+		test_long_history(i915, ring_size, caps);
 	}
 
 	igt_subtest("expired-history") {
@@ -569,7 +614,7 @@ igt_main
 		igt_info("Ring size: %ld batches\n", ring_size);
 		igt_require(ring_size);
 
-		test_long_history(i915, ring_size, EXPIRED);
+		test_long_history(i915, ring_size, caps | EXPIRED);
 	}
 
 	igt_subtest("flip") {
