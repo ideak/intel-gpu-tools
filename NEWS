@@ -1,3 +1,46 @@
+Release 1.19 (2017-06-09)
+-------------------------
+
+Library changes:
+
+- Changed debugfs handlers to open files for the DRM device in use,
+  for setups with more than one DRM device. (Tomeu Vizoso)
+
+- Added support for 4K and audio HDMI EDID injection. (Abdiel
+  Janulgue, Marius Vlad)
+
+- Added support for AMDGPU devices. (Chris Wilson)
+
+Tools changes:
+
+- intel_error_decode now automatically opens a pager. (Chris Wilson)
+
+- intel_error_decode now dumps the GuC firmware logs if available.
+  (Chris Wilson)
+
+Benchmark changes:
+
+- gem_wsim: New benchmark that simulates command submission
+  workloads. (Tvrtko Ursulin)
+
+Scripts changes:
+
+- trace.pl: New tool to parse i915 tracepoints for performance
+  analysis. (Tvrtko Ursulin)
+
+- media-bench.pl: New tool to programmatically analyze simulated media
+  workloads using gem_wsim to find the optimal load balancing
+  strategy. (Tvrtko Ursulin)
+
+Test changes:
+
+- Imported amdgpu tests from libdrm. (Chris Wilson)
+
+- Multiple other new tests.
+
+
+And many other bug fixes and improvements.
+
 Release 1.18 (2017-03-13)
 -------------------------
 
