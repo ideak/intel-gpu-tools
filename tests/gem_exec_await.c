@@ -164,7 +164,7 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 
 	intel_detect_and_clear_missed_interrupts(fd);
 
-	time = 9;
+	time = 0;
 	count = 0;
 	igt_until_timeout(timeout) {
 		struct timespec start, now;
@@ -246,24 +246,28 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 	free(exec);
 }
 
-static void print_welcome(int fd)
+#define HAVE_EXECLISTS 0x1
+static unsigned int print_welcome(int fd)
 {
+	unsigned int result = 0;
 	bool active;
 	int dir;
 
 	dir = igt_sysfs_open_parameters(fd);
 	if (dir < 0)
-		return;
+		return 0;
 
 	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
 	if (active) {
 		igt_info("Using GuC submission\n");
+		result |= HAVE_EXECLISTS;
 		goto out;
 	}
 
 	active = igt_sysfs_get_boolean(dir, "enable_execlists");
 	if (active) {
 		igt_info("Using Execlists submission\n");
+		result |= HAVE_EXECLISTS;
 		goto out;
 	}
 
@@ -273,6 +277,7 @@ static void print_welcome(int fd)
 
 out:
 	close(dir);
+	return result;
 }
 
 struct cork {
@@ -369,11 +374,15 @@ igt_main
 	int device = -1;
 
 	igt_fixture {
+		unsigned int caps;
+
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
-		print_welcome(device);
+		caps = print_welcome(device);
 
 		ring_size = measure_ring_size(device) - 10;
+		if (!(caps & HAVE_EXECLISTS))
+			ring_size /= 2;
 		igt_info("Ring size: %d batches\n", ring_size);
 		igt_require(ring_size > 0);
 
