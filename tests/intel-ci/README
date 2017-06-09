@@ -24,6 +24,9 @@ fast-feedback.testlist
 Fast-feedback is the testlist that is run for Patchwork and Trybot
 testing. It is also run on various drm-intel-* branches.
 
+The results of CI runs on drm-tip can be found in
+https://intel-gfx-ci.01.org/CI/
+
 Time limit: Full run must complete in 15 minutes on all tested
 platforms.
 
