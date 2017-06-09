@@ -40,6 +40,7 @@ my $gt2 = 0;
 my $show_cmds = 0;
 my $realtime_target = 0;
 my $wps_target = 0;
+my $wps_target_param = 0;
 my $w_direct;
 my $balancer;
 my $nop;
@@ -294,7 +295,8 @@ sub find_saturation_point
 			$r = int($rr * ($client_target_s / $time));
 		} elsif ($c == 1) {
 			$swps = $wps;
-			return ($c, $wps, $swps) if $wcnt > 1;
+			return ($c, $wps, $swps) if $wcnt > 1 or
+						    ($wps_target_param < 0 and $wps_target == 0);
 		}
 
 		$last_wps = $wps;
@@ -328,6 +330,8 @@ Supported options:
   -i pct      Engine idleness tolerance.
   -R wps      Run workloads in the real-time mode at wps rate.
   -T wps      Calibrate up to wps/client target instead of GPU saturation.
+              Negative values set the target based on the single client
+	      performance where target = single-client-wps / -N.
   -w str      Pass-through to gem_wsim. Overrides normal workload selection.
 ENDHELP
 	exit 0;
@@ -348,6 +352,7 @@ $tolerance = $opts{'t'} / 100.0 if defined $opts{'t'};
 $idle_tolerance_pct = $opts{'i'} if defined $opts{'i'};
 $realtime_target = $opts{'R'} if defined $opts{'R'};
 $wps_target = $opts{'T'} if defined $opts{'T'};
+$wps_target_param = $wps_target;
 $w_direct = $opts{'w'} if defined $opts{'w'};
 
 @workloads =  ($w_direct ) if defined $w_direct;
@@ -437,15 +442,27 @@ foreach my $wrk (@workloads) {
 					print "    No balancing: ";
 				}
 
+				$wps_target = 0 if $wps_target_param < 0;
+
 				($c, $w, $s) = find_saturation_point($wrk, $r,
 								     0,
 								     (@args,
 								      @xargs));
 
+				if ($wps_target_param < 0) {
+					$wps_target = $s / -$wps_target_param;
+
+					($c, $w, $s) =
+						find_saturation_point($wrk, $r,
+								      0,
+								      (@args,
+								       @xargs));
+				}
+
 				$wps{$bid} = $w;
 				$cwps{$bid} = $s;
 
-				if ($realtime_target > 0 || $wps_target > 0) {
+				if ($realtime_target > 0 || $wps_target_param > 0) {
 					$mwps{$bid} = $w * $c;
 				} else {
 					$mwps{$bid} = $w + $s;
