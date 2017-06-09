@@ -319,12 +319,12 @@ const unsigned char* igt_kms_get_alt_edid(void)
  */
 const char *kmstest_pipe_name(enum pipe pipe)
 {
-	const char *str[] = { "A", "B", "C" };
+	const char *str[] = { "A", "B", "C", "D", "E", "F"};
 
 	if (pipe == PIPE_NONE)
 		return "None";
 
-	if (pipe > 2)
+	if (pipe >= I915_MAX_PIPES)
 		return "invalid";
 
 	return str[pipe];
@@ -344,6 +344,12 @@ int kmstest_pipe_to_index(char pipe)
 		return 1;
 	else if (pipe == 'C')
 		return 2;
+	else if (pipe == 'D')
+		return 3;
+	else if (pipe == 'E')
+		return 4;
+	else if (pipe == 'F')
+		return 5;
 	else
 		return -EINVAL;
 }

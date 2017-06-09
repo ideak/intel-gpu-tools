@@ -54,6 +54,9 @@ enum pipe {
         PIPE_A = 0,
         PIPE_B,
         PIPE_C,
+        PIPE_D,
+        PIPE_E,
+        PIPE_F,
         I915_MAX_PIPES
 };
 const char *kmstest_pipe_name(enum pipe pipe);

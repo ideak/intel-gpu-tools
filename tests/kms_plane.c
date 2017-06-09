@@ -354,9 +354,6 @@ test_plane_panning(data_t *data, enum pipe pipe, int plane,
 	igt_output_t *output;
 	int connected_outs = 0;
 
-	igt_skip_on(pipe >= data->display.n_pipes);
-	igt_skip_on(plane >= data->display.pipes[pipe].n_planes);
-
 	for_each_valid_output_on_pipe(&data->display, pipe, output) {
 		test_plane_panning_with_output(data, pipe, plane, output,
 						flags);
@@ -369,6 +366,11 @@ test_plane_panning(data_t *data, enum pipe pipe, int plane,
 static void
 run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 {
+	igt_fixture {
+		igt_skip_on(pipe >= data->display.n_pipes);
+		igt_require(data->display.pipes[pipe].n_planes > 0);
+	}
+
 	igt_subtest_f("plane-position-covered-pipe-%s-planes",
 		      kmstest_pipe_name(pipe)) {
 		int n_planes = data->display.pipes[pipe].n_planes;

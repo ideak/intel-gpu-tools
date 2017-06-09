@@ -1180,7 +1180,8 @@ igt_main
 	}
 
 	for (int pipe = 0; pipe < I915_MAX_PIPES; pipe++)
-		run_tests_for_pipe(&data, pipe);
+		igt_subtest_group
+			run_tests_for_pipe(&data, pipe);
 
 	igt_subtest_f("invalid-lut-sizes")
 		invalid_lut_sizes(&data);

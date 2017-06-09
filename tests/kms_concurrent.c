@@ -351,8 +351,8 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 	igt_fixture {
 		int valid_tests = 0;
 
-		igt_require(data->display.pipes[pipe].n_planes > 0);
 		igt_skip_on(pipe >= data->display.n_pipes);
+		igt_require(data->display.pipes[pipe].n_planes > 0);
 
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			valid_tests++;

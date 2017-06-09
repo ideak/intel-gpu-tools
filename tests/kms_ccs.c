@@ -250,6 +250,8 @@ static void test(data_t *data)
 	int valid_tests = 0;
 	enum pipe wanted_pipe = data->pipe;
 
+	igt_skip_on(wanted_pipe >= display->n_pipes);
+
 	for_each_pipe_with_valid_output(display, data->pipe, data->output) {
 		if (wanted_pipe != PIPE_NONE && data->pipe != wanted_pipe)
 			continue;
