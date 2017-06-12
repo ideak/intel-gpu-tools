@@ -148,6 +148,7 @@ static void remove_fbs(data_t *data)
 }
 
 enum rectangle_type {
+	rectangle,
 	square,
 	portrait,
 	landscape,
@@ -187,6 +188,8 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	}
 
 	switch (rect) {
+	case rectangle:
+		break;
 	case square:
 		w = h = min(h, w);
 		break;
@@ -326,6 +329,11 @@ static void test_plane_rotation(data_t *data, int plane_type)
 			/* Unsupported on i915 */
 			if (plane_type == DRM_PLANE_TYPE_CURSOR &&
 			    i != square)
+				continue;
+
+			/* Only support partial covering primary plane on gen9+ */
+			if (plane_type == DRM_PLANE_TYPE_PRIMARY &&
+			    i != rectangle && intel_gen(intel_get_drm_devid(data->gfx_fd)) < 9)
 				continue;
 
 			igt_debug("Testing case %i on pipe %s\n", i, kmstest_pipe_name(pipe));
