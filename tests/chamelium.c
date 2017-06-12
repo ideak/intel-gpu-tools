@@ -747,4 +747,8 @@ igt_main
 		connector_subtest("vga-hpd-without-ddc", VGA)
 			test_hpd_without_ddc(&data, port);
 	}
+
+	igt_fixture {
+		close(data.drm_fd);
+	}
 }
