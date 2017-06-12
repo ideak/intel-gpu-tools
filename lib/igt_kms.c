@@ -1845,6 +1845,30 @@ int igt_display_get_n_pipes(igt_display_t *display)
 	return display->n_pipes;
 }
 
+void igt_display_require_output(igt_display_t *display)
+{
+	enum pipe pipe;
+	igt_output_t *output;
+
+	for_each_pipe_with_valid_output(display, pipe, output)
+		return;
+
+	igt_skip("No valid crtc/connector combinations found.\n");
+}
+
+void igt_display_require_output_on_pipe(igt_display_t *display, enum pipe pipe)
+{
+	igt_output_t *output;
+
+	igt_skip_on_f(igt_display_get_n_pipes(display) < pipe,
+		      "Pipe %s does not exist.\n", kmstest_pipe_name(pipe));
+
+	for_each_valid_output_on_pipe(display, pipe, output)
+		return;
+
+	igt_skip("No valid connector found on pipe %s\n", kmstest_pipe_name(pipe));
+}
+
 /**
  * igt_output_from_connector:
  * @display: a pointer to an #igt_display_t structure
