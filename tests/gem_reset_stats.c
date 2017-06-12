@@ -239,7 +239,7 @@ static void test_rs(const struct intel_execution_engine *e,
 		if (i == hang_index)
 			assert_reset_status(i, fd[i], 0, RS_BATCH_ACTIVE);
 		if (i > hang_index)
-			assert_reset_status(i, fd[i], 0, RS_BATCH_PENDING);
+			assert_reset_status(i, fd[i], 0, RS_NO_ERROR);
 	}
 
 	igt_assert(igt_seconds_elapsed(&ts_injected) <= 30);
@@ -312,10 +312,10 @@ static void test_rs_ctx(const struct intel_execution_engine *e,
 						    RS_BATCH_ACTIVE);
 			if (i == hang_index && j > hang_context)
 				assert_reset_status(i, fd[i], ctx[i][j],
-						    RS_BATCH_PENDING);
+						    RS_NO_ERROR);
 			if (i > hang_index)
 				assert_reset_status(i, fd[i], ctx[i][j],
-						    RS_BATCH_PENDING);
+						    RS_NO_ERROR);
 		}
 	}
 
@@ -330,7 +330,7 @@ static void test_ban(const struct intel_execution_engine *e)
 	struct local_drm_i915_reset_stats rs_bad, rs_good;
 	int fd_bad, fd_good;
 	int ban, retry = 10;
-	int active_count = 0, pending_count = 0;
+	int active_count = 0;
 
 	fd_bad = drm_open_driver(DRIVER_INTEL);
 	fd_good = drm_open_driver(DRIVER_INTEL);
@@ -350,9 +350,6 @@ static void test_ban(const struct intel_execution_engine *e)
 	noop(fd_good, 0, e);
 	noop(fd_good, 0, e);
 
-	/* The second hang will count as pending and be discarded */
-	active_count--;
-	pending_count += 1; /* inject hang does 1 real exec + 1 dummy */
 	while (retry--) {
 		inject_hang(fd_bad, 0, e, BAN);
 		active_count++;
@@ -373,12 +370,10 @@ static void test_ban(const struct intel_execution_engine *e)
 	assert_reset_status(fd_bad, fd_bad, 0, RS_BATCH_ACTIVE);
 	igt_assert_eq(gem_reset_stats(fd_bad, 0, &rs_bad), 0);
 	igt_assert_eq(rs_bad.batch_active, active_count);
-	igt_assert_eq(rs_bad.batch_pending, pending_count);
 
-	assert_reset_status(fd_good, fd_good, 0, RS_BATCH_PENDING);
+	assert_reset_status(fd_good, fd_good, 0, RS_NO_ERROR);
 	igt_assert_eq(gem_reset_stats(fd_good, 0, &rs_good), 0);
 	igt_assert_eq(rs_good.batch_active, 0);
-	igt_assert_eq(rs_good.batch_pending, 2);
 
 	close(fd_bad);
 	close(fd_good);
@@ -389,7 +384,7 @@ static void test_ban_ctx(const struct intel_execution_engine *e)
 	struct local_drm_i915_reset_stats rs_bad, rs_good;
 	int fd, ban, retry = 10;
 	uint32_t ctx_good, ctx_bad;
-	int active_count = 0, pending_count = 0;
+	int active_count = 0;
 
 	fd = drm_open_driver(DRIVER_INTEL);
 
@@ -414,9 +409,6 @@ static void test_ban_ctx(const struct intel_execution_engine *e)
 	noop(fd, ctx_good, e);
 	noop(fd, ctx_good, e);
 
-	/* This second hang will count as pending and be discarded */
-	active_count--;
-	pending_count++;
 	while (retry--) {
 		inject_hang(fd, ctx_bad, e, BAN);
 		active_count++;
@@ -437,12 +429,10 @@ static void test_ban_ctx(const struct intel_execution_engine *e)
 	assert_reset_status(fd, fd, ctx_bad, RS_BATCH_ACTIVE);
 	igt_assert_eq(gem_reset_stats(fd, ctx_bad, &rs_bad), 0);
 	igt_assert_eq(rs_bad.batch_active, active_count);
-	igt_assert_eq(rs_bad.batch_pending, pending_count);
 
-	assert_reset_status(fd, fd, ctx_good, RS_BATCH_PENDING);
+	assert_reset_status(fd, fd, ctx_good, RS_NO_ERROR);
 	igt_assert_eq(gem_reset_stats(fd, ctx_good, &rs_good), 0);
 	igt_assert_eq(rs_good.batch_active, 0);
-	igt_assert_eq(rs_good.batch_pending, 2);
 
 	close(fd);
 }
