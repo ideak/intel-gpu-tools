@@ -159,7 +159,7 @@ static void remove_vgpu(void)
 static void gen_mac_addr(void)
 {
     srand(getpid());
-    sprintf(mac_addr, "52:54:00:%2X:%02X:%02X", RANDOM(256), RANDOM(256),
+    sprintf(mac_addr, "52:54:00:%02X:%02X:%02X", RANDOM(256), RANDOM(256),
 RANDOM(256));
 }
 
