@@ -2670,8 +2670,6 @@ static int do_display_commit(igt_display_t *display,
 
 	if (s == COMMIT_ATOMIC) {
 		ret = igt_atomic_commit(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-
-		CHECK_RETURN(ret, fail_on_error);
 	} else {
 		int valid_outs = 0;
 
@@ -2683,10 +2681,9 @@ static int do_display_commit(igt_display_t *display,
 				valid_outs++;
 
 			ret = igt_pipe_commit(pipe_obj, s, fail_on_error);
-			CHECK_RETURN(ret, fail_on_error);
+			if (ret)
+				break;
 		}
-
-		CHECK_RETURN(ret, fail_on_error);
 
 		if (valid_outs == 0) {
 			LOG_UNINDENT(display);
@@ -2695,10 +2692,9 @@ static int do_display_commit(igt_display_t *display,
 		}
 	}
 
-	LOG_UNINDENT(display);
 
-	if (ret)
-		return ret;
+	LOG_UNINDENT(display);
+	CHECK_RETURN(ret, fail_on_error);
 
 	display_commit_changed(display, s);
 
