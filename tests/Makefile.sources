@@ -26,6 +26,7 @@ TESTS_progs = \
 	core_getversion \
 	core_prop_blob \
 	core_setmaster_vs_auth \
+	debugfs_test \
 	drm_import_export \
 	drm_mm \
 	drm_read \
@@ -238,8 +239,6 @@ TESTS_progs_X = \
     $(NULL)
 
 TESTS_scripts = \
-	debugfs_emon_crash \
-	drv_debugfs_reader \
 	sysfs_l3_parity \
 	test_rte_check \
 	tools_test \
@@ -276,7 +275,6 @@ HANG = \
 scripts = \
 	check_drm_clients \
 	ddx_intel_after_fbdev \
-	debugfs_wedged \
 	drm_lib.sh \
 	drm_getopt.sh \
 	$(NULL)
