@@ -145,7 +145,6 @@ static int do_writeval(FILE *filp, int val, int lerrno, bool readback_check)
 static void checkit(const int *freqs)
 {
 	igt_assert_lte(freqs[MIN], freqs[MAX]);
-	igt_assert_lte(freqs[CUR], freqs[MAX]);
 	igt_assert_lte(freqs[RPn], freqs[CUR]);
 	igt_assert_lte(freqs[RPn], freqs[MIN]);
 	igt_assert_lte(freqs[MAX], freqs[RP0]);
