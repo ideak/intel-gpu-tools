@@ -106,6 +106,34 @@ static void cursor_disable(data_t *data)
 	igt_plane_set_fb(cursor, NULL);
 }
 
+static bool chv_cursor_broken(data_t *data, int x)
+{
+	/*
+	 * CHV gets a FIFO underrun on pipe C when cursor x coordinate
+	 * is negative and the cursor visible.
+	 *
+	 * i915 is fixed to return -EINVAL on cursor updates with those
+	 * negative coordinates, so require cursor update to fail with
+	 * -EINVAL in that case.
+	 *
+	 * See also kms_chv_cursor_fail.c
+	 */
+	if (x >= 0)
+		return false;
+
+	return IS_CHERRYVIEW(data->devid) && data->pipe == PIPE_C;
+}
+
+static bool cursor_visible(data_t *data, int x, int y)
+{
+	if (x + data->curw <= 0 || y + data->curh <= 0)
+		return false;
+
+	if (x >= data->screenw || y >= data->screenh)
+		return false;
+
+	return true;
+}
 
 static void do_single_test(data_t *data, int x, int y)
 {
@@ -114,6 +142,7 @@ static void do_single_test(data_t *data, int x, int y)
 	igt_crc_t crc, ref_crc;
 	igt_plane_t *cursor;
 	cairo_t *cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
+	int ret = 0;
 
 	igt_print_activity();
 
@@ -122,7 +151,17 @@ static void do_single_test(data_t *data, int x, int y)
 	cursor_enable(data);
 	cursor = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_CURSOR);
 	igt_plane_set_position(cursor, x, y);
+
+	if (chv_cursor_broken(data, x) && cursor_visible(data, x, y)) {
+		ret = igt_display_try_commit2(display, COMMIT_LEGACY);
+		igt_assert_eq(ret, -EINVAL);
+		igt_plane_set_position(cursor, 0, y);
+
+		return;
+	}
+
 	igt_display_commit(display);
+
 	igt_wait_for_vblank(data->drm_fd, data->pipe);
 	igt_pipe_crc_collect_crc(pipe_crc, &crc);
 
