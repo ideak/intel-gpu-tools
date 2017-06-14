@@ -322,6 +322,8 @@ enable_output(data_t *data,
 	igt_plane_set_fb(primary, fb);
 	igt_output_override_mode(output, mode);
 
+	igt_output_set_pipe(output, output->config.pipe);
+
 	/* Clear any color correction values that might be enabled */
 	igt_pipe_set_degamma_lut(primary->pipe, NULL, 0);
 	igt_pipe_set_gamma_lut(primary->pipe, NULL, 0);
