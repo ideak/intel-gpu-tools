@@ -1229,9 +1229,9 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 	 * See comments in check_timings() in kms_setmode.c
 	 */
 	if (fabs(mean - expected) > 2*stddev) {
-		igt_warn("vblank interval differs from modeline! expected %.1fus, measured %1.fus +- %.3fus, difference %.1fus (%.1f sigma)\n",
-				expected, mean, stddev,
-				fabs(mean - expected), fabs(mean - expected) / stddev);
+		igt_info("vblank interval differs from modeline! expected %.1fus, measured %1.fus +- %.3fus, difference %.1fus (%.1f sigma)\n",
+			 expected, mean, stddev,
+			 fabs(mean - expected), fabs(mean - expected) / stddev);
 	}
 
 	o->vblank_interval = mean;
