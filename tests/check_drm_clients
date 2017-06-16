@@ -1,6 +1,0 @@
-#!/bin/bash
-
-SOURCE_DIR="$( dirname "${BASH_SOURCE[0]}" )"
-. $SOURCE_DIR/drm_lib.sh
-
-exit $IGT_EXIT_SUCCESS

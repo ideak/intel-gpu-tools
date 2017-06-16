@@ -230,6 +230,7 @@ TESTS_progs = \
 	prime_vgem \
 	sw_sync \
 	template \
+	tools_test \
 	vgem_basic \
 	vgem_slow \
 	$(NULL)
@@ -237,12 +238,6 @@ TESTS_progs = \
 TESTS_progs_X = \
     gem_concurrent_all \
     $(NULL)
-
-TESTS_scripts = \
-	sysfs_l3_parity \
-	test_rte_check \
-	tools_test \
-	$(NULL)
 
 kernel_tests = \
 	$(TESTS_progs) \
@@ -273,7 +268,6 @@ HANG = \
 	$(NULL)
 
 scripts = \
-	check_drm_clients \
 	ddx_intel_after_fbdev \
 	drm_lib.sh \
 	drm_getopt.sh \
