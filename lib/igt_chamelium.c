@@ -967,7 +967,7 @@ static pixman_image_t *convert_frame_format(pixman_image_t *src,
 	int w = pixman_image_get_width(src), h = pixman_image_get_height(src);
 
 	converted = pixman_image_create_bits(format, w, h, NULL,
-					     PIXMAN_FORMAT_BPP(format) * w);
+					     PIXMAN_FORMAT_BPP(format) / 8 * w);
 	pixman_image_composite(PIXMAN_OP_ADD, src, NULL, converted,
 			       0, 0, 0, 0, 0, 0, w, h);
 
