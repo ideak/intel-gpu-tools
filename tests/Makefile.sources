@@ -269,8 +269,6 @@ HANG = \
 
 scripts = \
 	ddx_intel_after_fbdev \
-	drm_lib.sh \
-	drm_getopt.sh \
 	$(NULL)
 
 IMAGES = pass.png 1080p-left.png 1080p-right.png

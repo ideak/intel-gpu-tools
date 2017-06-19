@@ -92,7 +92,8 @@ igt@pm_rpm@modeset-non-lpsp-stress
 igt@pm_rpm@modeset-non-lpsp-stress-no-wait
 igt@pm_rpm@modeset-pc8-residency-stress
 igt@pm_rpm@modeset-stress-extra-wait
-igt@debugfs_emon_crash
+igt@debugfs_test@emon_crash
+igt@debugfs_test@read_all_entries
 igt@drm_import_export@flink
 igt@drm_import_export@import-close-race-flink
 igt@drm_import_export@import-close-race-prime
@@ -101,7 +102,6 @@ igt@drm_vma_limiter
 igt@drm_vma_limiter_cached
 igt@drm_vma_limiter_cpu
 igt@drm_vma_limiter_gtt
-igt@drv_debugfs_reader
 igt@drv_missed_irq
 igt@drv_suspend@debugfs-reader
 igt@drv_suspend@fence-restore-tiled2untiled
@@ -1143,9 +1143,8 @@ igt@sw_sync@sync_multi_timeline_wait
 igt@sw_sync@sync_random_merge
 igt@sw_sync@timeline_closed
 igt@sw_sync@timeline_closed_signaled
-igt@sysfs_l3_parity
-igt@test_rte_check
-igt@tools_test
+igt@tools_test@sysfs_l3_parity
+igt@tools_test@tools_test
 igt@vgem_slow@nohang
 # Placed last, used to cause issues to subsequent tests
 igt@gem_bad_length
