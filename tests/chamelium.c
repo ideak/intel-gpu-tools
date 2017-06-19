@@ -143,8 +143,18 @@ wait_for_connector(data_t *data, struct chamelium_port *port,
 static void
 reset_state(data_t *data, struct chamelium_port *port)
 {
+	int p;
+
 	chamelium_reset(data->chamelium);
-	wait_for_connector(data, port, DRM_MODE_DISCONNECTED);
+
+	if (port) {
+		wait_for_connector(data, port, DRM_MODE_DISCONNECTED);
+	} else {
+		for (p = 0; p < data->port_count; p++) {
+			port = data->ports[p];
+			wait_for_connector(data, port, DRM_MODE_DISCONNECTED);
+		}
+	}
 }
 
 static void
@@ -206,6 +216,56 @@ test_edid_read(data_t *data, struct chamelium_port *port,
 }
 
 static void
+try_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
+		       enum igt_suspend_state state, enum igt_suspend_test test,
+		       struct udev_monitor *mon, bool connected)
+{
+	int p;
+
+	igt_set_autoresume_delay(SUSPEND_RESUME_DELAY);
+	igt_flush_hotplugs(mon);
+
+	if (port) {
+		chamelium_async_hpd_pulse_start(data->chamelium, port,
+						connected,
+						SUSPEND_RESUME_DELAY / 2);
+	} else {
+		for (p = 0; p < data->port_count; p++) {
+			port = data->ports[p];
+			if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
+				continue;
+
+			chamelium_async_hpd_pulse_start(data->chamelium, port,
+							connected,
+							SUSPEND_RESUME_DELAY / 2);
+		}
+
+		port = NULL;
+	}
+
+	igt_system_suspend_autoresume(state, test);
+	chamelium_async_hpd_pulse_finish(data->chamelium);
+
+	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
+	if (port) {
+		igt_assert_eq(reprobe_connector(data, port), connected ?
+			      DRM_MODE_DISCONNECTED : DRM_MODE_CONNECTED);
+	} else {
+		for (p = 0; p < data->port_count; p++) {
+			port = data->ports[p];
+			if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
+				continue;
+
+			igt_assert_eq(reprobe_connector(data, port), connected ?
+				      DRM_MODE_DISCONNECTED :
+				      DRM_MODE_CONNECTED);
+		}
+
+		port = NULL;
+	}
+}
+
+static void
 test_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 			enum igt_suspend_state state,
 			enum igt_suspend_test test)
@@ -214,28 +274,38 @@ test_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 
 	reset_state(data, port);
 
-	igt_set_autoresume_delay(SUSPEND_RESUME_DELAY);
-	igt_flush_hotplugs(mon);
-
 	/* Make sure we notice new connectors after resuming */
-	chamelium_async_hpd_pulse_start(data->chamelium, port, false,
-					SUSPEND_RESUME_DELAY / 2);
-	igt_system_suspend_autoresume(state, test);
-	chamelium_async_hpd_pulse_finish(data->chamelium);
-
-	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
-	igt_assert_eq(reprobe_connector(data, port), DRM_MODE_CONNECTED);
-
-	igt_flush_hotplugs(mon);
+	try_suspend_resume_hpd(data, port, state, test, mon, false);
 
 	/* Now make sure we notice disconnected connectors after resuming */
-	chamelium_async_hpd_pulse_start(data->chamelium, port, true,
-					SUSPEND_RESUME_DELAY / 2);
-	igt_system_suspend_autoresume(state, test);
-	chamelium_async_hpd_pulse_finish(data->chamelium);
+	try_suspend_resume_hpd(data, port, state, test, mon, true);
 
-	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
-	igt_assert_eq(reprobe_connector(data, port), DRM_MODE_DISCONNECTED);
+	igt_cleanup_hotplug(mon);
+}
+
+static void
+test_suspend_resume_hpd_common(data_t *data, enum igt_suspend_state state,
+			       enum igt_suspend_test test)
+{
+	struct udev_monitor *mon = igt_watch_hotplug();
+	struct chamelium_port *port;
+	int p;
+
+	for (p = 0; p < data->port_count; p++) {
+		port = data->ports[p];
+		if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
+			continue;
+
+		igt_debug("Testing port %s\n", chamelium_port_get_name(port));
+	}
+
+	reset_state(data, NULL);
+
+	/* Make sure we notice new connectors after resuming */
+	try_suspend_resume_hpd(data, NULL, state, test, mon, false);
+
+	/* Now make sure we notice disconnected connectors after resuming */
+	try_suspend_resume_hpd(data, NULL, state, test, mon, true);
 
 	igt_cleanup_hotplug(mon);
 }
@@ -748,6 +818,18 @@ igt_main
 
 		connector_subtest("vga-hpd-without-ddc", VGA)
 			test_hpd_without_ddc(&data, port);
+	}
+
+	igt_subtest_group {
+		igt_subtest("common-hpd-after-suspend")
+			test_suspend_resume_hpd_common(&data,
+						       SUSPEND_STATE_MEM,
+						       SUSPEND_TEST_NONE);
+
+		igt_subtest("common-hpd-after-hibernate")
+			test_suspend_resume_hpd_common(&data,
+						       SUSPEND_STATE_DISK,
+						       SUSPEND_TEST_DEVICES);
 	}
 
 	igt_fixture {
