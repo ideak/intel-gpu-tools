@@ -172,7 +172,8 @@ static void test_read_crc(data_t *data, int pipe, unsigned flags)
 		valid_connectors ++;
 	}
 
-	igt_require_f(valid_connectors, "No connector found for pipe %i\n", pipe);
+	igt_require_f(valid_connectors, "No connector found for pipe %s\n",
+		      kmstest_pipe_name(pipe));
 }
 
 data_t data = {0, };
