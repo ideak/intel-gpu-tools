@@ -128,6 +128,12 @@ igt_main
 	igt_subtest("pass-result")
 		test_result(true);
 
+	igt_subtest("warn") {
+		igt_warn("This is a test that should fail with a warning\n");
+
+		test_result(true);
+	}
+
 	igt_subtest("fail-result")
 		test_result(false);
 
