@@ -417,10 +417,20 @@ init_gen8_instdone(void)
 	init_gen75_instdone();
 }
 
+static void
+init_gen11_instdone(void)
+{
+	gen6_instdone1_bit(1 << 24, "TSG1");
+	gen6_instdone1_bit(1 << 11, "TDG1");
+	init_gen8_instdone();
+}
+
 bool
 init_instdone_definitions(uint32_t devid)
 {
-	if (IS_GEN8(devid) || IS_GEN9(devid) || IS_GEN10(devid)) {
+	if (IS_GEN11(devid)) {
+		init_gen11_instdone();
+	} else if (IS_GEN8(devid) || IS_GEN9(devid) || IS_GEN10(devid)) {
 		init_gen8_instdone();
 	} else if (IS_GEN7(devid)) {
 		init_gen7_instdone();
