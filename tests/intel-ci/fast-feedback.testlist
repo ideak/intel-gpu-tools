@@ -263,6 +263,7 @@ igt@prime_vgem@basic-read
 igt@prime_vgem@basic-sync-default
 igt@prime_vgem@basic-wait-default
 igt@prime_vgem@basic-write
+igt@vgem_basic@setversion
 igt@vgem_basic@create
 igt@vgem_basic@debugfs
 igt@vgem_basic@dmabuf-export

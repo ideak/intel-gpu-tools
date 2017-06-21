@@ -34,6 +34,34 @@
 
 IGT_TEST_DESCRIPTION("Basic sanity check of Virtual GEM module (vGEM).");
 
+static int __gem_setversion(int fd, drm_set_version_t *sv)
+{
+	int err;
+
+	err = 0;
+	if (igt_ioctl(fd, DRM_IOCTL_SET_VERSION, sv))
+		err = -errno;
+	errno = 0;
+
+	return err;
+}
+
+static void test_setversion(int fd)
+{
+	drm_set_version_t sv;
+
+	memset(&sv, 0, sizeof(sv));
+	sv.drm_di_major = 1; /* must be equal to DRM_IF_MAJOR */
+	sv.drm_di_minor = 4; /* must be less than DRM_IF_MINOR */
+	sv.drm_dd_major = -1; /* don't care */
+	sv.drm_dd_minor = -1; /* don't care */
+	igt_assert_eq(__gem_setversion(fd, &sv), 0);
+
+	igt_info("vgem DRM interface v%d.%d, device v%d.%d\n",
+		 sv.drm_di_major, sv.drm_di_minor,
+		 sv.drm_dd_major, sv.drm_dd_minor);
+}
+
 static void test_client(int fd)
 {
 	close(drm_open_driver(DRIVER_VGEM));
@@ -380,6 +408,9 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_VGEM);
 	}
+
+	igt_subtest_f("setversion")
+		test_setversion(fd);
 
 	igt_subtest_f("second-client")
 		test_client(fd);
