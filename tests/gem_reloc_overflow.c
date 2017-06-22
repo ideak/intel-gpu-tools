@@ -339,6 +339,8 @@ static void reloc_tests(const char *suffix)
 static void buffer_count_tests(void)
 {
 	igt_subtest("buffercount-overflow") {
+		igt_skip_on(SIZE_MAX / sizeof(*obj) >= UINT_MAX);
+
 		for (int i = 0; i < num; i++) {
 			obj[i].relocation_count = 0;
 			obj[i].relocs_ptr = 0;
