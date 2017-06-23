@@ -977,10 +977,8 @@ int __gem_context_get_param(int fd, struct local_i915_gem_context_param *p)
  * @fd: open i915 drm file descriptor
  * @p: i915 hw context parameter
  *
- * This is a wraps the CONTEXT_GET_PARAM ioctl, which is used to free a hardware
- * context. Not that similarly to gem_set_caching() this wrapper calls
- * igt_require() internally to correctly skip on kernels and platforms where hw
- * context parameter support is not available.
+ * This is a wraps the CONTEXT_GET_PARAM ioctl, which is used to get a context
+ * parameter.
  */
 void gem_context_get_param(int fd, struct local_i915_gem_context_param *p)
 {
@@ -1003,10 +1001,8 @@ int __gem_context_set_param(int fd, struct local_i915_gem_context_param *p)
  * @fd: open i915 drm file descriptor
  * @p: i915 hw context parameter
  *
- * This is a wraps the CONTEXT_SET_PARAM ioctl, which is used to free a hardware
- * context. Not that similarly to gem_set_caching() this wrapper calls
- * igt_require() internally to correctly skip on kernels and platforms where hw
- * context parameter support is not available.
+ * This is a wraps the CONTEXT_SET_PARAM ioctl, which is used to set a context
+ * parameter.
  */
 void gem_context_set_param(int fd, struct local_i915_gem_context_param *p)
 {
