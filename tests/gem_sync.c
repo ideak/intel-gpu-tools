@@ -757,6 +757,11 @@ igt_main
 		sync_all(fd, 1, 5);
 	igt_subtest("basic-store-all")
 		store_all(fd, 1, 5);
+
+	igt_subtest("all")
+		sync_all(fd, 1, 150);
+	igt_subtest("store-all")
+		store_all(fd, 1, 150);
 	igt_subtest("forked-all")
 		sync_all(fd, ncpus, 150);
 	igt_subtest("forked-store-all")
