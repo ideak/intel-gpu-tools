@@ -757,16 +757,16 @@ igt_main
 				}
 
 				igt_subtest_f("%sbusy-%s",
-						e->exec_id == 0 ? "basic-" : "",
-						e->name)
+					      igt_is_basic(e) ? "basic-" : "",
+					      e->name)
 					test_fence_busy(i915, e->exec_id | e->flags, 0);
 				igt_subtest_f("%swait-%s",
-						e->exec_id == 0 ? "basic-" : "",
-						e->name)
+					      igt_is_basic(e) ? "basic-" : "",
+					      e->name)
 					test_fence_busy(i915, e->exec_id | e->flags, WAIT);
 				igt_subtest_f("%sawait-%s",
-						e->exec_id == 0 ? "basic-" : "",
-						e->name)
+					      igt_is_basic(e) ? "basic-" : "",
+					      e->name)
 					test_fence_await(i915, e->exec_id | e->flags, 0);
 				igt_subtest_f("nb-await-%s", e->name)
 					test_fence_await(i915, e->exec_id | e->flags, NONBLOCK);

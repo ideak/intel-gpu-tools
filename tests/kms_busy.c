@@ -335,7 +335,7 @@ igt_main
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("%sflip-%s-%s",
-				      e->exec_id == 0 ? "basic-" : "",
+				      igt_is_basic(e) ? "basic-" : "",
 				      e->name, kmstest_pipe_name(n)) {
 				igt_require(gem_has_ring(display.drm_fd,
 							e->exec_id | e->flags));
@@ -343,7 +343,7 @@ igt_main
 				test_flip(&display, e->exec_id | e->flags, n, false);
 			}
 			igt_subtest_f("%smodeset-%s-%s",
-				      e->exec_id == 0 ? "basic-" : "",
+				      igt_is_basic(e) ? "basic-" : "",
 				      e->name, kmstest_pipe_name(n)) {
 				igt_require(gem_has_ring(display.drm_fd,
 							e->exec_id | e->flags));

@@ -151,7 +151,7 @@ igt_main
 	}
 
 	for (e = intel_execution_engines; e->name; e++)
-		igt_subtest_f("%s%s", e->exec_id ? "" : "basic-", e->name)
+		igt_subtest_f("%s%s", !igt_is_basic(e) ? "" : "basic-", e->name)
 			run_on_ring(fd, e->exec_id | e->flags, e->name);
 
 	igt_fixture

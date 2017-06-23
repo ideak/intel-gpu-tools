@@ -80,4 +80,9 @@ extern const struct intel_execution_engine {
 
 bool gem_can_store_dword(int fd, unsigned int engine);
 
+static inline bool igt_is_basic(const struct intel_execution_engine *e)
+{
+	return e->exec_id == 1;
+}
+
 #endif /* IGT_GT_H */
