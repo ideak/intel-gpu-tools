@@ -163,7 +163,7 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port)
 	struct udev_monitor *mon = igt_watch_hotplug();
 	int i;
 
-	reset_state(data, port);
+	reset_state(data, NULL);
 	igt_hpd_storm_set_threshold(data->drm_fd, 0);
 
 	for (i = 0; i < 15; i++) {
