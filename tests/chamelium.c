@@ -134,7 +134,7 @@ wait_for_connector(data_t *data, struct chamelium_port *port,
 			return;
 		}
 
-		sleep(1);
+		usleep(50000);
 	}
 
 	igt_assert(finished);
