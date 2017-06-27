@@ -232,9 +232,6 @@ try_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 	} else {
 		for (p = 0; p < data->port_count; p++) {
 			port = data->ports[p];
-			if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
-				continue;
-
 			chamelium_schedule_hpd_toggle(data->chamelium, port,
 						      SUSPEND_RESUME_DELAY * 1000 / 2,
 						      !connected);
@@ -252,9 +249,6 @@ try_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 	} else {
 		for (p = 0; p < data->port_count; p++) {
 			port = data->ports[p];
-			if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
-				continue;
-
 			igt_assert_eq(reprobe_connector(data, port), connected ?
 				      DRM_MODE_DISCONNECTED :
 				      DRM_MODE_CONNECTED);
@@ -292,9 +286,6 @@ test_suspend_resume_hpd_common(data_t *data, enum igt_suspend_state state,
 
 	for (p = 0; p < data->port_count; p++) {
 		port = data->ports[p];
-		if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
-			continue;
-
 		igt_debug("Testing port %s\n", chamelium_port_get_name(port));
 	}
 
@@ -810,10 +801,15 @@ igt_main
 				       igt_kms_get_alt_edid());
 		}
 
-		/* FIXME: Right now there isn't a way to do any sort of delayed
-		 * psuedo-hotplug with VGA, so testing detection after a
-		 * suspend/resume cycle isn't possible yet
-		 */
+		connector_subtest("vga-hpd-after-suspend", VGA)
+			test_suspend_resume_hpd(&data, port,
+						SUSPEND_STATE_MEM,
+						SUSPEND_TEST_NONE);
+
+		connector_subtest("vga-hpd-after-hibernate", VGA)
+			test_suspend_resume_hpd(&data, port,
+						SUSPEND_STATE_DISK,
+						SUSPEND_TEST_DEVICES);
 
 		connector_subtest("vga-hpd-without-ddc", VGA)
 			test_hpd_without_ddc(&data, port);
