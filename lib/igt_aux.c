@@ -680,6 +680,8 @@ void igt_cleanup_aperture_trashers(void)
 	free(trash_bos);
 }
 
+static int autoresume_delay;
+
 static const char *suspend_state_name[] = {
 	[SUSPEND_STATE_FREEZE] = "freeze",
 	[SUSPEND_STATE_STANDBY] = "standby",
@@ -746,7 +748,10 @@ static void suspend_via_rtcwake(enum igt_suspend_state state)
 
 	igt_assert(state < SUSPEND_STATE_NUM);
 
-	delay = state == SUSPEND_STATE_DISK ? 30 : 15;
+	if (autoresume_delay)
+		delay = autoresume_delay;
+	else
+		delay = state == SUSPEND_STATE_DISK ? 30 : 15;
 
 	/*
 	 * Skip if rtcwake would fail for a reason not related to the kernel's
@@ -889,6 +894,8 @@ void igt_set_autoresume_delay(int delay_secs)
 	igt_require(write(delay_fd, delay_str, strlen(delay_str)));
 
 	close(delay_fd);
+
+	autoresume_delay = delay_secs;
 }
 
 /**
