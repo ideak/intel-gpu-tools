@@ -226,25 +226,24 @@ try_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 	igt_flush_hotplugs(mon);
 
 	if (port) {
-		chamelium_async_hpd_pulse_start(data->chamelium, port,
-						connected,
-						SUSPEND_RESUME_DELAY / 2);
+		chamelium_schedule_hpd_toggle(data->chamelium, port,
+					      SUSPEND_RESUME_DELAY * 1000 / 2,
+					      !connected);
 	} else {
 		for (p = 0; p < data->port_count; p++) {
 			port = data->ports[p];
 			if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
 				continue;
 
-			chamelium_async_hpd_pulse_start(data->chamelium, port,
-							connected,
-							SUSPEND_RESUME_DELAY / 2);
+			chamelium_schedule_hpd_toggle(data->chamelium, port,
+						      SUSPEND_RESUME_DELAY * 1000 / 2,
+						      !connected);
 		}
 
 		port = NULL;
 	}
 
 	igt_system_suspend_autoresume(state, test);
-	chamelium_async_hpd_pulse_finish(data->chamelium);
 
 	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
 	if (port) {

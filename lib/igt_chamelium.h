@@ -61,10 +61,9 @@ void chamelium_fire_mixed_hpd_pulses(struct chamelium *chamelium,
 void chamelium_fire_hpd_pulses(struct chamelium *chamelium,
 			       struct chamelium_port *port,
 			       int width_msec, int count);
-void chamelium_async_hpd_pulse_start(struct chamelium *chamelium,
-				     struct chamelium_port *port,
-				     bool high, int delay_secs);
-void chamelium_async_hpd_pulse_finish(struct chamelium *chamelium);
+void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
+				   struct chamelium_port *port, int delay_ms,
+				   bool rising_edge);
 int chamelium_new_edid(struct chamelium *chamelium, const unsigned char *edid);
 void chamelium_port_set_edid(struct chamelium *chamelium,
 			     struct chamelium_port *port, int edid_id);

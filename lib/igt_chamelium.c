@@ -447,76 +447,26 @@ void chamelium_fire_mixed_hpd_pulses(struct chamelium *chamelium,
 	xmlrpc_DECREF(pulse_widths);
 }
 
-static void async_rpc_handler(const char *server_url, const char *method_name,
-			      xmlrpc_value *param_array, void *user_data,
-			      xmlrpc_env *fault, xmlrpc_value *result)
-{
-	/* We don't care about the responses */
-}
-
 /**
- * chamelium_async_hpd_pulse_start:
+ * chamelium_schedule_hpd_toggle:
  * @chamelium: The Chamelium instance to use
  * @port: The port to fire the HPD pulses on
- * @high: Whether to fire a high pulse (e.g. simulate a connect), or a low
- * pulse (e.g. simulate a disconnect)
- * @delay_secs: How long to wait before sending the HPD pulse.
+ * @delay_ms: Delay in milli-second before the toggle takes place
+ * @rising_edge: Whether the toggle should be a rising edge or a falling edge
  *
- * Instructs the chamelium to send an hpd pulse after @delay_secs seconds have
- * passed, without waiting for the chamelium to finish. This is useful for
- * testing things such as hpd after a suspend/resume cycle, since we can't tell
- * the chamelium to send a hotplug at the same time that our system is
- * suspended.
- *
- * It is required that the user eventually call
- * #chamelium_async_hpd_pulse_finish, to clean up the leftover XML-RPC
- * responses from the chamelium.
+ * Instructs the chamelium to schedule an hpd toggle (either a rising edge or
+ * a falling edge, depending on @rising_edg) after @delay_ms have passed.
+ * This is useful for testing things such as hpd after a suspend/resume cycle.
  */
-void chamelium_async_hpd_pulse_start(struct chamelium *chamelium,
-				     struct chamelium_port *port,
-				     bool high, int delay_secs)
+void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
+				   struct chamelium_port *port, int delay_ms,
+				   bool rising_edge)
 {
-	xmlrpc_value *pulse_widths = xmlrpc_array_new(&chamelium->env), *width;
+	igt_debug("Scheduling HPD toggle on %s in %d ms\n", port->name,
+		  delay_ms);
 
-	/* TODO: Actually implement something in the chameleon server to allow
-	 * for delayed actions such as hotplugs. This would work a bit better
-	 * and allow us to test suspend/resume on ports without hpd like VGA
-	 */
-
-	igt_debug("Sending HPD pulse (%s) on %s with %d second delay\n",
-		  high ? "high->low" : "low->high", port->name, delay_secs);
-
-	/* If we're starting at high, make the first pulse width 0 so we keep
-	 * the port connected */
-	if (high) {
-		width = xmlrpc_int_new(&chamelium->env, 0);
-		xmlrpc_array_append_item(&chamelium->env, pulse_widths, width);
-		xmlrpc_DECREF(width);
-	}
-
-	width = xmlrpc_int_new(&chamelium->env, delay_secs * 1000);
-	xmlrpc_array_append_item(&chamelium->env, pulse_widths, width);
-	xmlrpc_DECREF(width);
-
-	xmlrpc_client_start_rpcf(&chamelium->env, chamelium->client,
-				 chamelium->url,
-				 "FireMixedHpdPulses", async_rpc_handler, NULL,
-				 "(iA)", port->id, pulse_widths);
-	xmlrpc_DECREF(pulse_widths);
-}
-
-/**
- * chamelium_async_hpd_pulse_finish:
- * @chamelium: The Chamelium instance to use
- *
- * Waits for any asynchronous RPC started by #chamelium_async_hpd_pulse_start
- * to complete, and then cleans up any leftover responses from the chamelium.
- * If all of the RPC calls have already completed, this function returns
- * immediately.
- */
-void chamelium_async_hpd_pulse_finish(struct chamelium *chamelium)
-{
-	xmlrpc_client_event_loop_finish(chamelium->client);
+	xmlrpc_DECREF(chamelium_rpc(chamelium, NULL, "ScheduleHpdToggle",
+				    "(iii)", port->id, delay_ms, rising_edge));
 }
 
 /**
