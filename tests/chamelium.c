@@ -47,6 +47,9 @@ typedef struct {
 #define HPD_STORM_PULSE_INTERVAL_DP 100 /* ms */
 #define HPD_STORM_PULSE_INTERVAL_HDMI 200 /* ms */
 
+#define HPD_TOGGLE_COUNT_VGA 5
+#define HPD_TOGGLE_COUNT_DP_HDMI 15
+
 /* Pre-calculated CRCs for the pattern fb, for all the modes in the default
  * chamelium edid
  */
@@ -158,7 +161,7 @@ reset_state(data_t *data, struct chamelium_port *port)
 }
 
 static void
-test_basic_hotplug(data_t *data, struct chamelium_port *port)
+test_basic_hotplug(data_t *data, struct chamelium_port *port, int toggle_count)
 {
 	struct udev_monitor *mon = igt_watch_hotplug();
 	int i;
@@ -166,7 +169,7 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port)
 	reset_state(data, NULL);
 	igt_hpd_storm_set_threshold(data->drm_fd, 0);
 
-	for (i = 0; i < 15; i++) {
+	for (i = 0; i < toggle_count; i++) {
 		igt_flush_hotplugs(mon);
 
 		/* Check if we get a sysfs hotplug event */
@@ -680,7 +683,8 @@ igt_main
 		}
 
 		connector_subtest("dp-hpd", DisplayPort)
-			test_basic_hotplug(&data, port);
+			test_basic_hotplug(&data, port,
+					   HPD_TOGGLE_COUNT_DP_HDMI);
 
 		connector_subtest("dp-edid-read", DisplayPort) {
 			test_edid_read(&data, port, edid_id,
@@ -736,7 +740,8 @@ igt_main
 		}
 
 		connector_subtest("hdmi-hpd", HDMIA)
-			test_basic_hotplug(&data, port);
+			test_basic_hotplug(&data, port,
+					   HPD_TOGGLE_COUNT_DP_HDMI);
 
 		connector_subtest("hdmi-edid-read", HDMIA) {
 			test_edid_read(&data, port, edid_id,
@@ -792,7 +797,7 @@ igt_main
 		}
 
 		connector_subtest("vga-hpd", VGA)
-			test_basic_hotplug(&data, port);
+			test_basic_hotplug(&data, port, HPD_TOGGLE_COUNT_VGA);
 
 		connector_subtest("vga-edid-read", VGA) {
 			test_edid_read(&data, port, edid_id,
