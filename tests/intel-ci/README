@@ -41,3 +41,10 @@ generic.testlist
 ======================
 
 Generic is the testlist for GPU-agnostic tests.
+
+=================================
+fast-feedback-simulation.testlist
+=================================
+
+fast-feedback-simulation is a version of fast-feedback.testlist for
+simulation environments.
