@@ -881,7 +881,7 @@ void *gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, uns
  * @handle: gem buffer object handle
  * @state: desired madvise state
  *
- * This is a wraps the MADVISE ioctl, which is used in libdrm to implement
+ * This wraps the MADVISE ioctl, which is used in libdrm to implement
  * opportunistic buffer object caching. Objects in the cache are set to DONTNEED
  * (internally in the kernel tracked as purgeable objects). When such a cached
  * object is in need again it must be set back to WILLNEED before first use.
@@ -906,12 +906,11 @@ int gem_madvise(int fd, uint32_t handle, int state)
  * gem_context_create:
  * @fd: open i915 drm file descriptor
  *
- * This is a wraps the CONTEXT_CREATE ioctl, which is used to allocate a new
- * hardware context. Not that similarly to gem_set_caching() this wrapper calls
- * igt_require() internally to correctly skip on kernels and platforms where hw
- * context support is not available.
+ * This wraps the CONTEXT_CREATE ioctl, which is used to allocate a new
+ * context. Note that similarly to gem_set_caching() this wrapper skips on
+ * kernels and platforms where context support is not available.
  *
- * Returns: The id of the allocated hw context.
+ * Returns: The id of the allocated context.
  */
 uint32_t gem_context_create(int fd)
 {
@@ -946,10 +945,9 @@ int __gem_context_destroy(int fd, uint32_t ctx_id)
 /**
  * gem_context_destroy:
  * @fd: open i915 drm file descriptor
- * @ctx_id: i915 hw context id
+ * @ctx_id: i915 context id
  *
- * This is a wraps the CONTEXT_DESTROY ioctl, which is used to free a hardware
- * context.
+ * This wraps the CONTEXT_DESTROY ioctl, which is used to free a context.
  */
 void gem_context_destroy(int fd, uint32_t ctx_id)
 {
@@ -975,9 +973,9 @@ int __gem_context_get_param(int fd, struct local_i915_gem_context_param *p)
 /**
  * gem_context_get_param:
  * @fd: open i915 drm file descriptor
- * @p: i915 hw context parameter
+ * @p: i915 context parameter
  *
- * This is a wraps the CONTEXT_GET_PARAM ioctl, which is used to get a context
+ * This wraps the CONTEXT_GET_PARAM ioctl, which is used to get a context
  * parameter.
  */
 void gem_context_get_param(int fd, struct local_i915_gem_context_param *p)
@@ -999,9 +997,9 @@ int __gem_context_set_param(int fd, struct local_i915_gem_context_param *p)
 /**
  * gem_context_set_param:
  * @fd: open i915 drm file descriptor
- * @p: i915 hw context parameter
+ * @p: i915 context parameter
  *
- * This is a wraps the CONTEXT_SET_PARAM ioctl, which is used to set a context
+ * This wraps the CONTEXT_SET_PARAM ioctl, which is used to set a context
  * parameter.
  */
 void gem_context_set_param(int fd, struct local_i915_gem_context_param *p)
@@ -1012,9 +1010,9 @@ void gem_context_set_param(int fd, struct local_i915_gem_context_param *p)
 /**
  * gem_context_require_param:
  * @fd: open i915 drm file descriptor
- * @param: i915 hw context parameter
+ * @param: i915 context parameter
  *
- * Feature test macro to query whether hw context parameter support for @param
+ * Feature test macro to query whether context parameter support for @param
  * is available. Automatically skips through igt_require() if not.
  */
 void gem_context_require_param(int fd, uint64_t param)
@@ -1098,7 +1096,7 @@ void gem_userptr(int fd, void *ptr, int size, int read_only, uint32_t flags, uin
  * @fd: open i915 drm file descriptor
  * @handle: gem buffer object handle
  *
- * This is a wraps the SW_FINISH ioctl, which is used to flush out frontbuffer
+ * This wraps the SW_FINISH ioctl, which is used to flush out frontbuffer
  * rendering done through the direct cpu memory mappings. Shipping userspace
  * does _not_ call this after frontbuffer rendering through gtt memory mappings.
  */
@@ -1117,7 +1115,7 @@ void gem_sw_finish(int fd, uint32_t handle)
  * @fd: open i915 drm file descriptor
  * @handle: gem buffer object handle
  *
- * This is a wraps the BUSY ioctl, which tells whether a buffer object is still
+ * This wraps the BUSY ioctl, which tells whether a buffer object is still
  * actively used by the gpu in a execbuffer.
  *
  * Returns: The busy state of the buffer object.
