@@ -1193,6 +1193,57 @@ bool gem_uses_full_ppgtt(int fd)
 }
 
 /**
+ * gem_gpu_reset_type:
+ * @fd: open i915 drm file descriptor
+ *
+ * Query whether reset-engine (2), global-reset (1) or reset-disable (0)
+ * is available.
+ *
+ * Returns: GPU reset type available
+ */
+int gem_gpu_reset_type(int fd)
+{
+	struct drm_i915_getparam gp;
+	int gpu_reset_type = -1;
+
+	memset(&gp, 0, sizeof(gp));
+	gp.param = I915_PARAM_HAS_GPU_RESET;
+	gp.value = &gpu_reset_type;
+	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	return gpu_reset_type;
+}
+
+/**
+ * gem_gpu_reset_enabled:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to check whether the kernel internally uses hangchecks
+ * and can reset the GPU upon hang detection. Note that this is also true when
+ * reset-engine (the lightweight, single engine reset) is available.
+ *
+ * Returns: Whether the driver will detect hangs and perform a reset.
+ */
+bool gem_gpu_reset_enabled(int fd)
+{
+	return gem_gpu_reset_type(fd) > 0;
+}
+
+/**
+ * gem_engine_reset_enabled:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to check whether the kernel internally uses hangchecks
+ * and can reset individual engines upon hang detection.
+ *
+ * Returns: Whether the driver will detect hangs and perform an engine reset.
+ */
+bool gem_engine_reset_enabled(int fd)
+{
+	return gem_gpu_reset_type(fd) > 1;
+}
+
+/**
  * gem_available_fences:
  * @fd: open i915 drm file descriptor
  *
