@@ -203,7 +203,7 @@ static uint32_t blob_duplicate(int fd, uint32_t id_orig)
 	drmModeAtomicSetCursor(req, 0); \
 	crtc_populate_req(crtc, req); \
 	plane_populate_req(plane, req); \
-	do_atomic_commit_err((crtc)->state->desc->fd, req, 0, e); \
+	do_atomic_commit_err((crtc)->state->desc->fd, req, flags, e); \
 	crtc_check_current_state(crtc_old, plane_old, relax); \
 	plane_check_current_state(plane_old, relax); \
 }
@@ -1205,6 +1205,15 @@ static void crtc_invalid_params(struct kms_atomic_crtc_state *crtc_old,
 	crtc_commit_atomic(&crtc, plane, req, ATOMIC_RELAX_NONE,
 			   DRM_MODE_ATOMIC_TEST_ONLY);
 
+	/*
+	 * TEST_ONLY cannot be combined with DRM_MODE_PAGE_FLIP_EVENT,
+	 * but DRM_MODE_PAGE_FLIP_EVENT will always generate EINVAL
+	 * without valid crtc, so test it here.
+	 */
+	crtc_commit_atomic_err(&crtc, plane, crtc_old, plane, req,
+			       DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_PAGE_FLIP_EVENT,
+			       ATOMIC_RELAX_NONE, EINVAL);
+
 	/* Create a blob which is the wrong size to be a valid mode. */
 	do_or_die(drmModeCreatePropertyBlob(crtc.state->desc->fd,
 					    crtc.mode.data,
@@ -1356,12 +1365,12 @@ static void atomic_invalid_params(struct kms_atomic_crtc_state *crtc,
 	/* Valid pointers, but still should copy nothing. */
 	do_ioctl(desc->fd, DRM_IOCTL_MODE_ATOMIC, &ioc);
 
-	/* Nonsense flags. */
-	ioc.flags = 0xdeadbeef;
+	/* Valid noop, but with event set should fail. */
+	ioc.flags = DRM_MODE_PAGE_FLIP_EVENT;
 	do_ioctl_err(desc->fd, DRM_IOCTL_MODE_ATOMIC, &ioc, EINVAL);
 
-	/* Specifically forbidden combination. */
-	ioc.flags = DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_PAGE_FLIP_EVENT;
+	/* Nonsense flags. */
+	ioc.flags = 0xdeadbeef;
 	do_ioctl_err(desc->fd, DRM_IOCTL_MODE_ATOMIC, &ioc, EINVAL);
 
 	ioc.flags = 0;
