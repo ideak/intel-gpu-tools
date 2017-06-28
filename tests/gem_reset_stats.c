@@ -27,6 +27,8 @@
 
 #define _GNU_SOURCE
 #include "igt.h"
+#include "igt_sysfs.h"
+#include <limits.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -777,15 +779,24 @@ igt_main
 		int fd;
 
 		bool has_reset_stats;
+		bool using_full_reset;
 		fd = drm_open_driver(DRIVER_INTEL);
 		devid = intel_get_drm_devid(fd);
 
 		has_reset_stats = gem_has_reset_stats(fd);
 
+		igt_assert(igt_sysfs_set_parameter
+			   (fd, "reset", "%d", 1 /* only global reset */));
+
+		using_full_reset = !gem_engine_reset_enabled(fd) &&
+				   gem_gpu_reset_enabled(fd);
+
 		close(fd);
 
 		igt_require_f(has_reset_stats,
 			      "No reset stats ioctl support. Too old kernel?\n");
+		igt_require_f(using_full_reset,
+			      "Full GPU reset is not enabled. Is enable_hangcheck set?\n");
 	}
 
 	igt_subtest("params")
@@ -830,5 +841,14 @@ igt_main
 
 		igt_subtest_f("defer-hangcheck-%s", e->name)
 			RUN_TEST(defer_hangcheck(e));
+	}
+
+	igt_fixture {
+		int fd;
+
+		fd = drm_open_driver(DRIVER_INTEL);
+		igt_assert(igt_sysfs_set_parameter
+			   (fd, "reset", "%d", INT_MAX /* any reset method */));
+		close(fd);
 	}
 }
