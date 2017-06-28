@@ -201,8 +201,7 @@ static void test_flip(igt_display_t *dpy, unsigned ring, int pipe, bool modeset)
 }
 
 static void test_atomic_commit_hang(igt_display_t *dpy, igt_plane_t *primary,
-				    struct igt_fb *busy_fb, unsigned ring,
-				    bool completes_early)
+				    struct igt_fb *busy_fb, unsigned ring)
 {
 	igt_spin_t *t = igt_spin_batch_new(dpy->drm_fd, ring, busy_fb->gem_handle);
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
@@ -222,11 +221,6 @@ static void test_atomic_commit_hang(igt_display_t *dpy, igt_plane_t *primary,
 		 */
 		igt_plane_set_fb(primary, NULL);
 		igt_display_commit_atomic(dpy, 0, NULL);
-
-		if (completes_early)
-			igt_assert(gem_bo_busy(dpy->drm_fd, busy_fb->gem_handle));
-		else
-			igt_fail_on(gem_bo_busy(dpy->drm_fd, busy_fb->gem_handle));
 
 		igt_assert_f(poll(&pfd, 1, 1) > 0,
 			    "nonblocking update completed whilst fb[%d] was still busy [%d]\n",
@@ -261,12 +255,12 @@ static void test_hang(igt_display_t *dpy, unsigned ring,
 		/* Test modeset disable with hang */
 		igt_output_set_pipe(output, PIPE_NONE);
 		igt_plane_set_fb(primary, &fb[1]);
-		test_atomic_commit_hang(dpy, primary, &fb[hang_newfb], ring, hang_newfb);
+		test_atomic_commit_hang(dpy, primary, &fb[hang_newfb], ring);
 
 		/* Test modeset enable with hang */
 		igt_plane_set_fb(primary, &fb[0]);
 		igt_output_set_pipe(output, pipe);
-		test_atomic_commit_hang(dpy, primary, &fb[!hang_newfb], ring, hang_newfb);
+		test_atomic_commit_hang(dpy, primary, &fb[!hang_newfb], ring);
 	} else {
 		/*
 		 * Test what happens with a single hanging pageflip.
@@ -274,7 +268,7 @@ static void test_hang(igt_display_t *dpy, unsigned ring,
 		 * timeouts taking care of it.
 		 */
 		igt_plane_set_fb(primary, &fb[1]);
-		test_atomic_commit_hang(dpy, primary, &fb[hang_newfb], ring, true);
+		test_atomic_commit_hang(dpy, primary, &fb[hang_newfb], ring);
 	}
 
 	do_cleanup_display(dpy);
