@@ -241,6 +241,8 @@ static const struct pci_id_match intel_device_match[] = {
 
 	INTEL_GLK_IDS(&intel_geminilake_info),
 
+	INTEL_CFL_IDS(&intel_coffeelake_info),
+
 	INTEL_VGA_DEVICE(PCI_MATCH_ANY, &intel_generic_info),
 };
 
