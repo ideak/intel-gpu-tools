@@ -96,7 +96,7 @@ static void source_offset_tests(int devid, bool reloc_gtt)
 		single_reloc.target_handle = target_handle();
 		single_reloc.read_domains = I915_GEM_DOMAIN_RENDER;
 		single_reloc.write_domain = I915_GEM_DOMAIN_RENDER;
-		single_reloc.presumed_offset = 0;
+		single_reloc.presumed_offset = -1;
 		gem_execbuf(fd, &execbuf);
 
 		single_reloc.delta = 1024;
@@ -110,7 +110,7 @@ static void source_offset_tests(int devid, bool reloc_gtt)
 		single_reloc.target_handle = target_handle();
 		single_reloc.read_domains = I915_GEM_DOMAIN_RENDER;
 		single_reloc.write_domain = I915_GEM_DOMAIN_RENDER;
-		single_reloc.presumed_offset = 0;
+		single_reloc.presumed_offset = -1;
 		gem_execbuf(fd, &execbuf);
 	}
 
@@ -121,7 +121,7 @@ static void source_offset_tests(int devid, bool reloc_gtt)
 		single_reloc.target_handle = target_handle();
 		single_reloc.read_domains = I915_GEM_DOMAIN_RENDER;
 		single_reloc.write_domain = I915_GEM_DOMAIN_RENDER;
-		single_reloc.presumed_offset = 0;
+		single_reloc.presumed_offset = -1;
 		igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
 	}
 
@@ -133,7 +133,7 @@ static void source_offset_tests(int devid, bool reloc_gtt)
 		single_reloc.target_handle = target_handle();
 		single_reloc.read_domains = I915_GEM_DOMAIN_RENDER;
 		single_reloc.write_domain = I915_GEM_DOMAIN_RENDER;
-		single_reloc.presumed_offset = 0;
+		single_reloc.presumed_offset = -1;
 		gem_execbuf(fd, &execbuf);
 	}
 
@@ -143,7 +143,7 @@ static void source_offset_tests(int devid, bool reloc_gtt)
 		single_reloc.target_handle = target_handle();
 		single_reloc.read_domains = I915_GEM_DOMAIN_RENDER;
 		single_reloc.write_domain = I915_GEM_DOMAIN_RENDER;
-		single_reloc.presumed_offset = 0;
+		single_reloc.presumed_offset = -1;
 		igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
 	}
 
@@ -153,7 +153,7 @@ static void source_offset_tests(int devid, bool reloc_gtt)
 		single_reloc.target_handle = target_handle();
 		single_reloc.read_domains = I915_GEM_DOMAIN_RENDER;
 		single_reloc.write_domain = I915_GEM_DOMAIN_RENDER;
-		single_reloc.presumed_offset = 0;
+		single_reloc.presumed_offset = -1;
 		igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
 	}
 
@@ -163,7 +163,7 @@ static void source_offset_tests(int devid, bool reloc_gtt)
 		single_reloc.target_handle = target_handle();
 		single_reloc.read_domains = I915_GEM_DOMAIN_RENDER;
 		single_reloc.write_domain = I915_GEM_DOMAIN_RENDER;
-		single_reloc.presumed_offset = 0;
+		single_reloc.presumed_offset = -1;
 		igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
 	}
 }
