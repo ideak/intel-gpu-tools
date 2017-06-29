@@ -120,7 +120,7 @@ static void single(int fd, uint32_t handle,
 			igt_while_interruptible(flags & INTERRUPTIBLE) {
 				for (int loop = 0; loop < 64; loop++) {
 					execbuf.rsvd1 = contexts[loop % 64];
-					reloc.presumed_offset = 0;
+					reloc.presumed_offset = -1;
 					gem_execbuf(fd, &execbuf);
 				}
 				count += 64;
