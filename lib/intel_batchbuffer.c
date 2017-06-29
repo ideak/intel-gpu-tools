@@ -741,7 +741,7 @@ igt_render_copyfunc_t igt_get_render_copyfunc(int devid)
 		copy = gen7_render_copyfunc;
 	else if (IS_GEN8(devid))
 		copy = gen8_render_copyfunc;
-	else if (IS_GEN9(devid))
+	else if (IS_GEN9(devid) || IS_GEN10(devid))
 		copy = gen9_render_copyfunc;
 
 	return copy;
@@ -789,7 +789,7 @@ igt_fillfunc_t igt_get_gpgpu_fillfunc(int devid)
 		fill = gen7_gpgpu_fillfunc;
 	else if (IS_BROADWELL(devid))
 		fill = gen8_gpgpu_fillfunc;
-	else if (IS_GEN9(devid))
+	else if (IS_GEN9(devid) || IS_GEN10(devid))
 		fill = gen9_gpgpu_fillfunc;
 
 	return fill;
