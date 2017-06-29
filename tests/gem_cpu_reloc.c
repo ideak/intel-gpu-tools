@@ -74,7 +74,7 @@ static void copy(int fd, uint32_t batch, uint32_t src, uint32_t dst)
 	gem_reloc[0].target_handle = dst;
 	gem_reloc[0].read_domains = I915_GEM_DOMAIN_RENDER;
 	gem_reloc[0].write_domain = I915_GEM_DOMAIN_RENDER;
-	gem_reloc[0].presumed_offset = 0;
+	gem_reloc[0].presumed_offset = -1;
 
 	gem_reloc[1].offset = 7 * sizeof(uint32_t);
 	if (intel_gen(intel_get_drm_devid(fd)) >= 8)
@@ -83,7 +83,7 @@ static void copy(int fd, uint32_t batch, uint32_t src, uint32_t dst)
 	gem_reloc[1].target_handle = src;
 	gem_reloc[1].read_domains = I915_GEM_DOMAIN_RENDER;
 	gem_reloc[1].write_domain = 0;
-	gem_reloc[1].presumed_offset = 0;
+	gem_reloc[1].presumed_offset = -1;
 
 	memset(gem_exec, 0, sizeof(gem_exec));
 	gem_exec[0].handle = src;
