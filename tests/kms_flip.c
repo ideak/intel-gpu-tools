@@ -834,7 +834,10 @@ static unsigned int run_test_step(struct test_output *o)
 	if (o->flags & TEST_PAN) {
 		int count = do_flip ?
 			o->flip_state.count : o->vblank_state.count;
-		int x_ofs = min(count * 10, o->fb_width - o->kmode[0].hdisplay);
+		int width = o->fb_width - o->kmode[0].hdisplay;
+		int x_ofs = count * 10 % (2 * width);
+		if (x_ofs >= width)
+			x_ofs = 2 * width - x_ofs;
 
 		/* Make sure DSPSURF changes value */
 		if (o->flags & TEST_HANG)
