@@ -44,6 +44,8 @@ static void read_and_discard_sysfs_entries(int path_fd, bool is_crc)
 			continue;
 		if (dirent->d_type == DT_DIR) {
 			int sub_fd = -1;
+			if (strstr(dirent->d_name, "crtc-"))
+				continue;
 			igt_assert((sub_fd =
 				    openat(path_fd, dirent->d_name, O_RDONLY |
 					   O_DIRECTORY)) > 0);
