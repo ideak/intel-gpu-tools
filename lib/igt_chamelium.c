@@ -1233,8 +1233,6 @@ struct chamelium *chamelium_init(int drm_fd)
 	if (!chamelium_read_config(chamelium, drm_fd))
 		goto error;
 
-	chamelium_reset(chamelium);
-
 	cleanup_instance = chamelium;
 	igt_install_exit_handler(chamelium_exit_handler);
 

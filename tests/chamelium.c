@@ -429,6 +429,8 @@ test_display_crc_single(data_t *data, struct chamelium_port *port)
 	drmModeConnector *connector;
 	int fb_id, i;
 
+	reset_state(data, port);
+
 	output = prepare_output(data, &display, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
@@ -482,6 +484,8 @@ test_display_crc_multiple(data_t *data, struct chamelium_port *port)
 	drmModeModeInfo *mode;
 	drmModeConnector *connector;
 	int fb_id, i, j, captured_frame_count;
+
+	reset_state(data, port);
 
 	output = prepare_output(data, &display, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
@@ -541,6 +545,8 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 	drmModeModeInfo *mode;
 	drmModeConnector *connector;
 	int fb_id, i, j;
+
+	reset_state(data, port);
 
 	output = prepare_output(data, &display, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
