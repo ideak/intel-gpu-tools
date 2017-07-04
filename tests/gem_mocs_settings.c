@@ -32,13 +32,27 @@
 #include "igt_sysfs.h"
 
 #define MAX_NUMBER_MOCS_REGISTERS	(64)
-
 enum {
 	NONE,
 	RESET,
+	RC6,
 	SUSPEND,
-	HIBERNATE
+	HIBERNATE,
+	MAX_MOCS_TEST_MODES
 };
+
+static const char * const test_modes[] = {
+	[NONE] = "settings",
+	[RESET] = "reset",
+	[RC6] = "rc6",
+	[SUSPEND] = "suspend",
+	[HIBERNATE] = "hibernate"
+};
+
+#define MOCS_NON_DEFAULT_CTX	(1<<0)
+#define MOCS_DIRTY_VALUES	(1<<1)
+#define ALL_MOCS_FLAGS		(MOCS_NON_DEFAULT_CTX | \
+				 MOCS_DIRTY_VALUES)
 
 #define GEN9_LNCFCMOCS0		(0xB020)	/* L3 Cache Control base */
 #define GEN9_GFX_MOCS_0		(0xc800)	/* Graphics MOCS base register*/
@@ -117,19 +131,18 @@ static bool get_mocs_settings(int fd, struct mocs_table *table, bool dirty)
 	return result;
 }
 
+#define LOCAL_I915_EXEC_BSD1 (I915_EXEC_BSD | (1<<13))
+#define LOCAL_I915_EXEC_BSD2 (I915_EXEC_BSD | (2<<13))
+
 static uint32_t get_engine_base(uint32_t engine)
 {
-	/* Note we cannot test BSD1 or BSD2 due to limitations of current ANI */
 	switch (engine) {
-	case I915_EXEC_BSD:	return GEN9_MFX0_MOCS_0;
-/*
-	case I915_EXEC_BSD1:	return GEN9_MFX0_MOCS_0;
-	case I915_EXEC_BSD2:	return GEN9_MFX1_MOCS_0;
-*/
-	case I915_EXEC_RENDER:	return GEN9_GFX_MOCS_0;
-	case I915_EXEC_BLT:	return GEN9_BLT_MOCS_0;
-	case I915_EXEC_VEBOX:	return GEN9_VEBOX_MOCS_0;
-	default:		return 0;
+	case LOCAL_I915_EXEC_BSD1:	return GEN9_MFX0_MOCS_0;
+	case LOCAL_I915_EXEC_BSD2:	return GEN9_MFX1_MOCS_0;
+	case I915_EXEC_RENDER:		return GEN9_GFX_MOCS_0;
+	case I915_EXEC_BLT:		return GEN9_BLT_MOCS_0;
+	case I915_EXEC_VEBOX:		return GEN9_VEBOX_MOCS_0;
+	default:			return 0;
 	}
 }
 
@@ -252,7 +265,7 @@ static void check_control_registers(int fd,
 				    uint32_t ctx_id,
 				    bool dirty)
 {
-	const uint32_t reg_base  = get_engine_base(engine);
+	const uint32_t reg_base = get_engine_base(engine);
 	uint32_t dst_handle = gem_create(fd, 4096);
 	uint32_t *read_regs;
 	struct mocs_table table;
@@ -299,6 +312,7 @@ static void check_l3cc_registers(int fd,
 	read_regs = gem_mmap__cpu(fd, dst_handle, 0, 4096, PROT_READ);
 
 	gem_set_domain(fd, dst_handle, I915_GEM_DOMAIN_CPU, 0);
+
 	for (index = 0; index < table.size / 2; index++) {
 		igt_assert_eq_u32(read_regs[index] & 0xffff,
 				  table.table[index * 2].l3cc_value);
@@ -314,284 +328,135 @@ static void check_l3cc_registers(int fd,
 	gem_close(fd, dst_handle);
 }
 
-static void test_context_mocs_values(int fd, unsigned engine)
-{
-	int local_fd;
-	uint32_t ctx_id = 0;
 
-	local_fd = fd;
-	if (local_fd == -1)
-		local_fd = drm_open_driver_master(DRIVER_INTEL);
-
-	check_control_registers(local_fd, engine, ctx_id, false);
-	check_l3cc_registers(local_fd, engine, ctx_id, false);
-
-	if (engine == I915_EXEC_RENDER) {
-		ctx_id = gem_context_create(local_fd);
-
-		check_control_registers(local_fd, engine, ctx_id, false);
-		check_l3cc_registers(local_fd, engine, ctx_id, false);
-
-		gem_context_destroy(local_fd, ctx_id);
-	}
-
-	if (local_fd != fd)
-		close(local_fd);
-}
-
-static bool local_has_ring(int fd, unsigned engine)
-{
-	bool has_ring;
-	int local_fd;
-
-	if (get_engine_base(engine) == 0)
-		return false;
-
-	if (fd == -1)
-		local_fd = drm_open_driver_master(DRIVER_INTEL);
-	else
-		local_fd = fd;
-
-	has_ring = gem_has_ring(local_fd, engine);
-	if (local_fd != fd)
-		close(local_fd);
-
-	return has_ring;
-}
-
-static void test_mocs_values(int fd)
-{
-	const struct intel_execution_engine *e;
-
-	for (e = intel_execution_engines; e->name; e++) {
-		unsigned engine = e->exec_id | e->flags;
-
-		if (!local_has_ring(fd, engine))
-			continue;
-
-		igt_debug("Testing %s\n", e->name);
-		test_context_mocs_values(fd, engine);
-	}
-}
-
-static void default_context_tests(unsigned mode)
-{
-	int fd = drm_open_driver_master(DRIVER_INTEL);
-
-	igt_debug("Testing Non/Default Context Engines\n");
-	test_mocs_values(fd);
-
-	switch (mode) {
-	case NONE:	break;
-	case RESET:	igt_force_gpu_reset(fd);	break;
-	case SUSPEND:	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-						      SUSPEND_TEST_NONE); break;
-	case HIBERNATE:	igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
-						      SUSPEND_TEST_NONE); break;
-	}
-
-	test_mocs_values(fd);
-	close(fd);
-
-	igt_debug("Testing Pristine Defaults\n");
-	test_mocs_values(-1);
-}
-
-static void default_dirty_tests(unsigned mode)
-{
-	const struct intel_execution_engine *e;
-	int fd = drm_open_driver_master(DRIVER_INTEL);
-
-	igt_debug("Testing Dirty Default Context Engines\n");
-	test_mocs_values(fd);
-
-	for (e = intel_execution_engines; e->name; e++) {
-		unsigned engine = e->exec_id | e->flags;
-
-		if (!local_has_ring(fd, engine))
-			continue;
-
-		write_registers(fd, 0,
-				GEN9_GFX_MOCS_0,
-				write_values, ARRAY_SIZE(write_values),
-				engine);
-
-		write_registers(fd, 0,
-				GEN9_LNCFCMOCS0,
-				write_values, ARRAY_SIZE(write_values),
-				engine);
-	}
-
-	switch (mode) {
-	case NONE:	break;
-	case RESET:	igt_force_gpu_reset(fd);	break;
-	case SUSPEND:	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-						      SUSPEND_TEST_NONE); break;
-	case HIBERNATE:	igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
-						      SUSPEND_TEST_NONE); break;
-	}
-
-	close(fd);
-
-	igt_debug("Testing Pristine after Dirty Defaults\n");
-	test_mocs_values(-1);
-}
-
-static void context_save_restore_test(unsigned mode)
-{
-	int fd = drm_open_driver_master(DRIVER_INTEL);
-	uint32_t ctx_id = gem_context_create(fd);
-
-	igt_debug("Testing Save Restore\n");
-
-	check_control_registers(fd, I915_EXEC_RENDER, ctx_id, false);
-	check_l3cc_registers(fd, I915_EXEC_RENDER, ctx_id, false);
-
-	switch (mode) {
-	case NONE:	break;
-	case RESET:	igt_force_gpu_reset(fd);	break;
-	case SUSPEND:	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-						      SUSPEND_TEST_NONE); break;
-	case HIBERNATE:	igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
-						      SUSPEND_TEST_NONE); break;
-	}
-
-	check_control_registers(fd, I915_EXEC_RENDER, ctx_id, false);
-	check_l3cc_registers(fd, I915_EXEC_RENDER, ctx_id, false);
-
-	close(fd);
-}
-
-static void context_dirty_test(unsigned mode)
-{
-	int fd = drm_open_driver_master(DRIVER_INTEL);
-	uint32_t ctx_id = gem_context_create(fd);
-
-	igt_debug("Testing Dirty Context\n");
-	test_mocs_values(fd);
-
-	check_control_registers(fd, I915_EXEC_RENDER, ctx_id, false);
-	check_l3cc_registers(fd, I915_EXEC_RENDER, ctx_id, false);
-
-	/* XXX !RCS as well */
-
-	write_registers(fd,
-			ctx_id,
-			GEN9_GFX_MOCS_0,
-			write_values,
-			ARRAY_SIZE(write_values),
-			I915_EXEC_RENDER);
-
-	write_registers(fd,
-			ctx_id,
-			GEN9_LNCFCMOCS0,
-			write_values,
-			ARRAY_SIZE(write_values),
-			I915_EXEC_RENDER);
-
-	check_control_registers(fd, I915_EXEC_RENDER, ctx_id, true);
-	check_l3cc_registers(fd, I915_EXEC_RENDER, ctx_id, true);
-
-	switch (mode) {
-	case NONE:	break;
-	case RESET:	igt_force_gpu_reset(fd);	break;
-	case SUSPEND:	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-						      SUSPEND_TEST_NONE); break;
-	case HIBERNATE:	igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
-						      SUSPEND_TEST_NONE); break;
-	}
-
-	check_control_registers(fd, I915_EXEC_RENDER, ctx_id, true);
-	check_l3cc_registers(fd, I915_EXEC_RENDER, ctx_id, true);
-
-	close(fd);
-
-	/* Check that unmodified contexts are pristine */
-	igt_debug("Testing Prestine Context (after dirty)\n");
-	test_mocs_values(-1);
-}
-
-static void run_tests(unsigned mode)
-{
-	struct pci_device *pci_dev;
-	int fd;
-
-	pci_dev = intel_get_pci_device();
-	igt_require(pci_dev);
-
-	fd = drm_open_driver_master(DRIVER_INTEL);
-	intel_register_access_init(pci_dev, 0, fd);
-	close(fd);
-
-	default_context_tests(mode);
-	default_dirty_tests(mode);
-	context_save_restore_test(mode);
-	context_dirty_test(mode);
-
-	intel_register_access_fini();
-}
-
-static int rc6_residency(int dir)
+static uint32_t rc6_residency(int dir)
 {
 	return igt_sysfs_get_u32(dir, "power/rc6_residency_ms");
 }
 
-static void context_rc6_test(void)
+static void rc6_wait(int fd)
 {
-	int fd = drm_open_driver(DRIVER_INTEL);
-	uint32_t ctx_id = gem_context_create(fd);
-	int residency;
-	int timeout;
 	int sysfs;
-
-	igt_debug("RC6 Context Test\n");
-	check_control_registers(fd, I915_EXEC_RENDER, ctx_id, false);
-	check_l3cc_registers(fd, I915_EXEC_RENDER, ctx_id, false);
+	uint32_t residency;
 
 	sysfs = igt_sysfs_open(fd, NULL);
+	igt_assert_lte(0, sysfs);
 
-	timeout = 3000 / 2;
 	residency = rc6_residency(sysfs);
-	while (rc6_residency(sysfs) == residency && --timeout)
-		usleep(2000);
-	igt_require(timeout);
+	igt_require(igt_wait(rc6_residency(sysfs) != residency, 10000, 2));
 
 	close(sysfs);
-
-	check_control_registers(fd, I915_EXEC_RENDER, ctx_id, false);
-	check_l3cc_registers(fd, I915_EXEC_RENDER, ctx_id, false);
-	close(fd);
 }
 
-
-static void test_requirements(void)
+static void check_mocs_values(int fd, unsigned engine, uint32_t ctx_id, bool dirty)
 {
-	int fd = drm_open_driver_master(DRIVER_INTEL);
-	struct mocs_table table;
+	check_control_registers(fd, engine, ctx_id, dirty);
 
-	gem_require_mocs_registers(fd);
-	igt_require(get_mocs_settings(fd, &table, false));
-	close(fd);
+	if (engine == I915_EXEC_RENDER)
+		check_l3cc_registers(fd, engine, ctx_id, dirty);
+}
+
+static void write_dirty_mocs(int fd, unsigned engine, uint32_t ctx_id)
+{
+	write_registers(fd, ctx_id, get_engine_base(engine),
+			write_values, ARRAY_SIZE(write_values),
+			engine);
+
+	if (engine == I915_EXEC_RENDER)
+		write_registers(fd, ctx_id, GEN9_LNCFCMOCS0,
+				write_values, ARRAY_SIZE(write_values),
+				engine);
+}
+
+static void run_test(int fd, unsigned engine, unsigned flags, unsigned mode)
+{
+	uint32_t ctx_id = 0;
+	uint32_t ctx_clean_id;
+	uint32_t ctx_dirty_id;
+
+	/* Skip if we don't know where the registers are for this engine */
+	igt_require(get_engine_base(engine));
+
+	if (flags & MOCS_NON_DEFAULT_CTX)
+		ctx_id = gem_context_create(fd);
+
+	if (flags & MOCS_DIRTY_VALUES) {
+		ctx_dirty_id = gem_context_create(fd);
+		write_dirty_mocs(fd, engine, ctx_dirty_id);
+		check_mocs_values(fd, engine, ctx_dirty_id, true);
+	}
+
+	check_mocs_values(fd, engine, ctx_id, false);
+
+	switch (mode) {
+	case NONE:	break;
+	case RESET:	igt_force_gpu_reset(fd);	break;
+	case SUSPEND:	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
+						      SUSPEND_TEST_NONE); break;
+	case HIBERNATE:	igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
+						      SUSPEND_TEST_NONE); break;
+	case RC6:	rc6_wait(fd);			break;
+	}
+
+	check_mocs_values(fd, engine, ctx_id, false);
+
+	if (flags & MOCS_DIRTY_VALUES) {
+		ctx_clean_id = gem_context_create(fd);
+		check_mocs_values(fd, engine, ctx_dirty_id, true);
+		check_mocs_values(fd, engine, ctx_clean_id, false);
+		gem_context_destroy(fd, ctx_dirty_id);
+		gem_context_destroy(fd, ctx_clean_id);
+	}
+
+	if (ctx_id)
+		gem_context_destroy(fd, ctx_id);
 }
 
 igt_main
 {
+	const struct intel_execution_engine *e;
+	struct mocs_table table;
+	int fd = -1;
+
 	igt_fixture {
-		test_requirements();
+		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+		gem_require_mocs_registers(fd);
+		igt_require(get_mocs_settings(fd, &table, false));
 	}
 
-	igt_subtest("mocs-settings")
-		run_tests(NONE);
+	for (e = intel_execution_engines; e->name; e++) {
+		/* We don't know which engine will be assigned to us if we're
+		 * using plain I915_EXEC_BSD, I915_EXEC_DEFAULT is just
+		 * duplicating render
+		 */
+		if ((e->exec_id == I915_EXEC_BSD && !e->flags) ||
+		    e->exec_id == I915_EXEC_DEFAULT)
+			continue;
 
-	igt_subtest("mocs-rc6")
-		context_rc6_test();
+		for (unsigned mode = NONE; mode < MAX_MOCS_TEST_MODES; mode++) {
+			for (unsigned flags = 0; flags < ALL_MOCS_FLAGS + 1; flags++) {
+				/* Trying to test non-render engines for dirtying MOCS
+				 * values from one context having effect on different
+				 * context is bound to fail - only render engine is
+				 * doing context save/restore of MOCS registers.
+				 * Let's also limit testing values on non-default
+				 * contexts to render-only.
+				 */
+				if (flags && e->exec_id != I915_EXEC_RENDER)
+					continue;
 
-	igt_subtest("mocs-reset")
-		run_tests(RESET);
+				igt_subtest_f("mocs-%s%s%s-%s",
+					      test_modes[mode],
+					      flags & MOCS_NON_DEFAULT_CTX ? "-ctx": "",
+					      flags & MOCS_DIRTY_VALUES ? "-dirty" : "",
+					      e->name) {
+					run_test(fd, e->exec_id | e->flags, flags, mode);
+				}
+			}
+		}
+	}
 
-	igt_subtest("mocs-suspend")
-		run_tests(SUSPEND);
-
-	igt_subtest("mocs-hibernate")
-		run_tests(HIBERNATE);
+	igt_fixture
+		close(fd);
 }
