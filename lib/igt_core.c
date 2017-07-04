@@ -57,6 +57,7 @@
 #include <limits.h>
 #include <locale.h>
 #include <uwildmat/uwildmat.h>
+#include <glib.h>
 
 #include "drmtest.h"
 #include "intel_chipset.h"
@@ -225,6 +226,23 @@
  * - 'basic*,advanced*' match any subtest starting basic or advanced
  * - '*,!basic*' match any subtest not starting basic
  * - 'basic*,!basic-render*' match any subtest starting basic but not starting basic-render
+ *
+ * # Configuration
+ *
+ * Some of IGT's behavior can be configured through a configuration file.
+ * By default, this file is expected to exist in ~/.igtrc . The directory for
+ * this can be overriden by setting the environment variable %IGT_CONFIG_PATH.
+ * An example configuration follows:
+ *
+ * |[<!-- language="plain" -->
+ *	# The following section is used for configuring the Device Under Test.
+ *	# It is not mandatory and allows overriding default values.
+ *	[DUT]
+ *	SuspendResumeDelay=10
+ * ]|
+ *
+ * Some specific configuration options may be used by specific parts of IGT,
+ * such as those related to Chamelium support.
  */
 
 static unsigned int exit_handler_count;
@@ -270,6 +288,8 @@ static struct {
 	uint8_t start, end;
 } log_buffer;
 static pthread_mutex_t log_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+GKeyFile *igt_key_file;
 
 const char *igt_test_name(void)
 {
@@ -593,6 +613,25 @@ static void oom_adjust_for_doom(void)
 
 }
 
+static int config_parse(void)
+{
+	GError *error = NULL;
+	int rc;
+
+	if (!igt_key_file)
+		return 0;
+
+	rc = g_key_file_get_integer(igt_key_file, "DUT", "SuspendResumeDelay",
+				    &error);
+	if (error && error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+		return -2;
+
+	if (rc != 0)
+		igt_set_autoresume_delay(rc);
+
+	return 0;
+}
+
 static int common_init(int *argc, char **argv,
 		       const char *extra_short_opts,
 		       const struct option *extra_long_opts,
@@ -616,6 +655,9 @@ static int common_init(int *argc, char **argv,
 	int extra_opt_count;
 	int all_opt_count;
 	int ret = 0;
+	char *key_file_loc = NULL;
+	char *key_file_env = NULL;
+	GError *error = NULL;
 	const char *env;
 
 	if (!isatty(STDOUT_FILENO) || getenv("IGT_PLAIN_OUTPUT"))
@@ -737,7 +779,31 @@ static int common_init(int *argc, char **argv,
 		}
 	}
 
+	key_file_env = getenv("IGT_CONFIG_PATH");
+	if (key_file_env) {
+		key_file_loc = key_file_env;
+	} else {
+		key_file_loc = malloc(100);
+		snprintf(key_file_loc, 100, "%s/.igtrc", g_get_home_dir());
+	}
+
+	igt_key_file = g_key_file_new();
+	ret = g_key_file_load_from_file(igt_key_file, key_file_loc,
+					G_KEY_FILE_NONE, &error);
+	if (error && error->code == G_KEY_FILE_ERROR) {
+		g_key_file_free(igt_key_file);
+		igt_key_file = NULL;
+		ret = -2;
+
+		goto out;
+	}
+
+	ret = config_parse();
+
 out:
+	if (!key_file_env && key_file_loc)
+		free(key_file_loc);
+
 	free(short_opts);
 	free(combined_opts);
 
@@ -1344,6 +1410,9 @@ void __igt_fail_assert(const char *domain, const char *file, const int line,
 void igt_exit(void)
 {
 	igt_exit_called = true;
+
+	if (igt_key_file)
+		g_key_file_free(igt_key_file);
 
 	if (run_single_subtest && !run_single_subtest_found) {
 		igt_warn("Unknown subtest: %s\n", run_single_subtest);

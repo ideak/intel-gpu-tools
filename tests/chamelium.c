@@ -42,7 +42,6 @@ typedef struct {
 } data_t;
 
 #define HOTPLUG_TIMEOUT 20 /* seconds */
-#define SUSPEND_RESUME_DELAY 20 /* seconds */
 
 #define HPD_STORM_PULSE_INTERVAL_DP 100 /* ms */
 #define HPD_STORM_PULSE_INTERVAL_HDMI 200 /* ms */
@@ -223,21 +222,21 @@ try_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 		       enum igt_suspend_state state, enum igt_suspend_test test,
 		       struct udev_monitor *mon, bool connected)
 {
+	int delay;
 	int p;
 
-	igt_set_autoresume_delay(SUSPEND_RESUME_DELAY);
 	igt_flush_hotplugs(mon);
 
+	delay = igt_get_autoresume_delay(state) * 1000 / 2;
+
 	if (port) {
-		chamelium_schedule_hpd_toggle(data->chamelium, port,
-					      SUSPEND_RESUME_DELAY * 1000 / 2,
+		chamelium_schedule_hpd_toggle(data->chamelium, port, delay,
 					      !connected);
 	} else {
 		for (p = 0; p < data->port_count; p++) {
 			port = data->ports[p];
 			chamelium_schedule_hpd_toggle(data->chamelium, port,
-						      SUSPEND_RESUME_DELAY * 1000 / 2,
-						      !connected);
+						      delay, !connected);
 		}
 
 		port = NULL;

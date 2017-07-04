@@ -51,8 +51,8 @@
  * [on the ChromeOS project page](https://www.chromium.org/chromium-os/testing/chamelium).
  *
  * In order to run tests using the Chamelium, a valid configuration file must be
- * present.  The configuration file is a normal Glib keyfile (similar to Windows
- * INI) structured like so:
+ * present. It must contain Chamelium-specific keys as shown with the following
+ * example:
  *
  * |[<!-- language="plain" -->
  *	[Chamelium]
@@ -72,8 +72,6 @@
  *	ChameliumPortID=3
  * ]|
  *
- * By default, this file is expected to exist in ~/.igtrc . The directory for
- * this can be overriden by setting the environment variable %IGT_CONFIG_PATH.
  */
 
 struct chamelium_edid {
@@ -1034,7 +1032,7 @@ static unsigned int chamelium_get_port_type(struct chamelium *chamelium,
 }
 
 static bool chamelium_read_port_mappings(struct chamelium *chamelium,
-					 int drm_fd, GKeyFile *key_file)
+					 int drm_fd)
 {
 	drmModeRes *res;
 	drmModeConnector *connector;
@@ -1045,7 +1043,7 @@ static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 	int port_i, i, j;
 	bool ret = true;
 
-	group_list = g_key_file_get_groups(key_file, NULL);
+	group_list = g_key_file_get_groups(igt_key_file, NULL);
 
 	/* Count how many connector mappings are specified in the config */
 	for (i = 0; group_list[i] != NULL; i++) {
@@ -1068,7 +1066,7 @@ static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 
 		port = &chamelium->ports[port_i++];
 		port->name = strdup(map_name);
-		port->id = g_key_file_get_integer(key_file, group,
+		port->id = g_key_file_get_integer(igt_key_file, group,
 						  "ChameliumPortID",
 						  &error);
 		if (!port->id) {
@@ -1125,47 +1123,22 @@ out:
 
 static bool chamelium_read_config(struct chamelium *chamelium, int drm_fd)
 {
-	GKeyFile *key_file = g_key_file_new();
 	GError *error = NULL;
-	char *key_file_loc, *key_file_env;
-	int rc;
-	bool ret = true;
 
-	key_file_env = getenv("IGT_CONFIG_PATH");
-	if (key_file_env) {
-		key_file_loc = key_file_env;
-	} else {
-		key_file_loc = malloc(100);
-		snprintf(key_file_loc, 100, "%s/.igtrc", g_get_home_dir());
+	if (!igt_key_file) {
+		igt_warn("No configuration file available for chamelium\n");
+		return false;
 	}
 
-	rc = g_key_file_load_from_file(key_file, key_file_loc,
-				       G_KEY_FILE_NONE, &error);
-	if (!rc) {
-		igt_warn("Failed to read chamelium configuration file: %s\n",
-			 error->message);
-		ret = false;
-		goto out;
-	}
-
-	chamelium->url = g_key_file_get_string(key_file, "Chamelium", "URL",
+	chamelium->url = g_key_file_get_string(igt_key_file, "Chamelium", "URL",
 					       &error);
 	if (!chamelium->url) {
 		igt_warn("Couldn't read chamelium URL from config file: %s\n",
 			 error->message);
-		ret = false;
-		goto out;
+		return false;
 	}
 
-	ret = chamelium_read_port_mappings(chamelium, drm_fd, key_file);
-
-out:
-	g_key_file_free(key_file);
-
-	if (!key_file_env)
-		free(key_file_loc);
-
-	return ret;
+	return chamelium_read_port_mappings(chamelium, drm_fd);
 }
 
 /**

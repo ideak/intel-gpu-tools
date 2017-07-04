@@ -41,6 +41,7 @@ AM_CFLAGS = \
 	    $(XMLRPC_CFLAGS) \
 	    $(LIBUDEV_CFLAGS) \
 	    $(PIXMAN_CFLAGS) \
+	    $(GLIB_CFLAGS) \
 	    $(VALGRIND_CFLAGS) \
 	    -DIGT_SRCDIR=\""$(abs_top_srcdir)/tests"\" \
 	    -DIGT_DATADIR=\""$(pkgdatadir)"\" \
@@ -61,5 +62,6 @@ libintel_tools_la_LIBADD = \
 	$(XMLRPC_LIBS) \
 	$(LIBUDEV_LIBS) \
 	$(PIXMAN_LIBS) \
+	$(GLIB_LIBS) \
 	-lm
 

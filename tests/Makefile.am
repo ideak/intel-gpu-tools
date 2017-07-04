@@ -72,9 +72,9 @@ AM_CFLAGS = $(DRM_CFLAGS) $(CWARNFLAGS) -Wno-unused-result $(DEBUG_CFLAGS)\
 	$(LIBUNWIND_CFLAGS) $(WERROR_CFLAGS) \
 	$(NULL)
 
-LDADD = ../lib/libintel_tools.la $(GLIB_LIBS) $(XMLRPC_LIBS)
+LDADD = ../lib/libintel_tools.la $(XMLRPC_LIBS)
 
-AM_CFLAGS += $(CAIRO_CFLAGS) $(LIBUDEV_CFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS += $(CAIRO_CFLAGS) $(LIBUDEV_CFLAGS)
 AM_LDFLAGS = -Wl,--as-needed
 
 drm_import_export_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)

@@ -748,10 +748,7 @@ static void suspend_via_rtcwake(enum igt_suspend_state state)
 
 	igt_assert(state < SUSPEND_STATE_NUM);
 
-	if (autoresume_delay)
-		delay = autoresume_delay;
-	else
-		delay = state == SUSPEND_STATE_DISK ? 30 : 15;
+	delay = igt_get_autoresume_delay(state);
 
 	/*
 	 * Skip if rtcwake would fail for a reason not related to the kernel's
@@ -896,6 +893,28 @@ void igt_set_autoresume_delay(int delay_secs)
 	close(delay_fd);
 
 	autoresume_delay = delay_secs;
+}
+
+/**
+ * igt_get_autoresume_delay:
+ * @state: an #igt_suspend_state, the target suspend state
+ *
+ * Retrieves how long we wait to resume the system after suspending it.
+ * This can either be set through igt_set_autoresume_delay or be a default
+ * value that depends on the suspend state.
+ *
+ * Returns: The autoresume delay, in seconds.
+ */
+int igt_get_autoresume_delay(enum igt_suspend_state state)
+{
+	int delay;
+
+	if (autoresume_delay)
+		delay = autoresume_delay;
+	else
+		delay = state == SUSPEND_STATE_DISK ? 30 : 15;
+
+	return delay;
 }
 
 /**

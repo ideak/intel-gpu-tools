@@ -9,8 +9,8 @@ endif
 
 if HAVE_UDEV
 bin_PROGRAMS += intel_dp_compliance
-intel_dp_compliance_CFLAGS = $(AM_CFLAGS) $(GLIB_CFLAGS)
-intel_dp_compliance_LDADD = $(top_builddir)/lib/libintel_tools.la $(GLIB_LIBS)
+intel_dp_compliance_CFLAGS = $(AM_CFLAGS)
+intel_dp_compliance_LDADD = $(top_builddir)/lib/libintel_tools.la
 endif
 
 SUBDIRS = null_state_gen registers
