@@ -29,7 +29,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-static void read_and_discard_sysfs_entries(int path_fd)
+static void read_and_discard_sysfs_entries(int path_fd, bool is_crc)
 {
 	struct dirent *dirent;
 	DIR *dir;
@@ -47,10 +47,19 @@ static void read_and_discard_sysfs_entries(int path_fd)
 			igt_assert((sub_fd =
 				    openat(path_fd, dirent->d_name, O_RDONLY |
 					   O_DIRECTORY)) > 0);
-			read_and_discard_sysfs_entries(sub_fd);
+			read_and_discard_sysfs_entries(sub_fd, !strcmp(dirent->d_name, "crc"));
 			close(sub_fd);
 		} else {
 			char *buf = igt_sysfs_get(path_fd, dirent->d_name);
+
+			/*
+			 * /crtc-XX/crc/data may fail with -EIO if the CRTC
+			 * is not active.
+			 */
+			if (!buf && is_crc && errno == EIO &&
+			    !strcmp(dirent->d_name, "data"))
+				continue;
+
 			igt_assert(buf);
 			free(buf);
 		}
@@ -70,7 +79,7 @@ igt_main
 	}
 
 	igt_subtest("read_all_entries") {
-		read_and_discard_sysfs_entries(debugfs);
+		read_and_discard_sysfs_entries(debugfs, false);
 	}
 
 	igt_subtest("emon_crash") {
