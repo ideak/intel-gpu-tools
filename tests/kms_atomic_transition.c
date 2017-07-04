@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <poll.h>
 
 #ifndef DRM_CAP_CURSOR_WIDTH
 #define DRM_CAP_CURSOR_WIDTH 0x8
@@ -152,6 +153,7 @@ static drmEventContext drm_events = {
 
 enum transition_type {
 	TRANSITION_PLANES,
+	TRANSITION_AFTER_FREE,
 	TRANSITION_MODESET,
 	TRANSITION_MODESET_DISABLE,
 };
@@ -478,6 +480,31 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 
 		if (!ret)
 			igt_skip("Cannot run tests without proper size sprite planes\n");
+	}
+
+	igt_display_commit2(display, COMMIT_ATOMIC);
+
+	if (type == TRANSITION_AFTER_FREE) {
+		struct pollfd pfd = { display->drm_fd, POLLIN };
+
+		wm_setup_plane(display, pipe, 0, parms);
+
+		atomic_commit(display, pipe, flags, (void *)(unsigned long)0, fencing);
+
+		for_each_plane_on_pipe(display, pipe, plane)
+			plane->fb_changed = true;
+
+		igt_display_commit2(display, COMMIT_ATOMIC);
+
+		/*
+		 * Previous atomic commit should have completed
+		 * before this plane-only atomic commit.
+		 */
+		igt_assert_eq(poll(&pfd, 1, 0), 1);
+
+		drmHandleEvent(display->drm_fd, &drm_events);
+
+		goto cleanup;
 	}
 
 	for (i = 0; i < iter_max; i++) {
@@ -853,6 +880,10 @@ igt_main
 	igt_subtest("plane-all-transition-nonblocking-fencing")
 		for_each_pipe_with_valid_output(&display, pipe, output)
 			run_transition_test(&display, pipe, output, TRANSITION_PLANES, true, true);
+
+	igt_subtest("plane-use-after-nonblocking-unbind")
+		for_each_pipe_with_valid_output(&display, pipe, output)
+			run_transition_test(&display, pipe, output, TRANSITION_AFTER_FREE, true, false);
 
 	igt_subtest("plane-all-modeset-transition")
 		for_each_pipe_with_valid_output(&display, pipe, output)
