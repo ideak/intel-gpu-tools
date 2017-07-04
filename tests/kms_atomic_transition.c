@@ -823,8 +823,6 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_fixture {
-		int valid_outputs = 0;
-
 		display.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
 		kmstest_set_vt_graphics_mode();
@@ -833,10 +831,7 @@ igt_main
 
 		igt_require(display.is_atomic);
 
-		for_each_pipe_with_valid_output(&display, pipe, output)
-			valid_outputs++;
-
-		igt_require_f(valid_outputs, "no valid crtc/connector combinations found\n");
+		igt_display_require_output(&display);
 	}
 
 	igt_subtest("plane-primary-toggle-with-vblank-wait")
