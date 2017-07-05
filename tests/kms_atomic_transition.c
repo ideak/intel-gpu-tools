@@ -717,11 +717,11 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 			igt_plane_set_fb(plane, &fbs[1]);
 			igt_fb_set_size(&fbs[1], plane, mode->hdisplay, mode->vdisplay);
 			igt_plane_set_size(plane, mode->hdisplay, mode->vdisplay);
+
+			if (fencing)
+				igt_pipe_request_out_fence(&display->pipes[i]);
 		} else
 			igt_plane_set_fb(plane, NULL);
-
-		if(fencing)
-			igt_pipe_request_out_fence(&display->pipes[i]);
 	}
 
 	/*
