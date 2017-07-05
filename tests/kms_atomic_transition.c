@@ -367,14 +367,6 @@ static void configure_fencing(igt_display_t *display, enum pipe pipe)
 	}
 }
 
-static void clear_fencing(igt_display_t *display, enum pipe pipe)
-{
-	igt_plane_t *plane;
-
-	for_each_plane_on_pipe(display, pipe, plane)
-		igt_plane_set_fence_fd(plane, -1);
-}
-
 static void atomic_commit(igt_display_t *display, enum pipe pipe, unsigned int flags, void *data, bool fencing)
 {
 	if (fencing) {
@@ -383,9 +375,6 @@ static void atomic_commit(igt_display_t *display, enum pipe pipe, unsigned int f
 	}
 
 	igt_display_commit_atomic(display, flags, data);
-
-	if (fencing)
-		clear_fencing(display, pipe);
 }
 
 /*
