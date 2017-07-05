@@ -2505,7 +2505,6 @@ static void igt_atomic_prepare_crtc_commit(igt_pipe_t *pipe_obj, drmModeAtomicRe
 	pipe_obj->out_fence_fd = -1;
 	if (pipe_obj->out_fence_requested)
 	{
-		pipe_obj->out_fence_requested = false;
 		igt_atomic_populate_crtc_req(req, pipe_obj, IGT_CRTC_OUT_FENCE_PTR,
 		    (uint64_t)(uintptr_t) &pipe_obj->out_fence_fd);
 	}
@@ -2586,27 +2585,6 @@ static int igt_atomic_commit(igt_display_t *display, uint32_t flags, void *user_
 	}
 
 	ret = drmModeAtomicCommit(display->drm_fd, req, flags, user_data);
-	if (!ret) {
-
-		for_each_pipe(display, pipe) {
-			igt_pipe_t *pipe_obj = &display->pipes[pipe];
-			igt_plane_t *plane;
-
-			/* reset fence_fd to prevent it from being set for the next commit */
-			for_each_plane_on_pipe(display, pipe, plane) {
-				igt_plane_set_fence_fd(plane, -1);
-			}
-
-			if (pipe_obj->out_fence_fd == -1)
-				continue;
-
-			igt_assert(pipe_obj->out_fence_fd >= 0);
-			ret = sync_fence_wait(pipe_obj->out_fence_fd, 1000);
-			igt_assert(ret == 0);
-			close(pipe_obj->out_fence_fd);
-			pipe_obj->out_fence_fd = -1;
-		}
-	}
 
 	drmModeAtomicFree(req);
 	return ret;
@@ -2629,6 +2607,18 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 		if (s != COMMIT_UNIVERSAL)
 			pipe_obj->mode_changed = false;
 
+		if (s == COMMIT_ATOMIC) {
+			pipe_obj->out_fence_requested = false;
+
+			if (pipe_obj->out_fence_fd == -1)
+				continue;
+
+			igt_assert(pipe_obj->out_fence_fd >= 0);
+			igt_assert_eq(sync_fence_wait(pipe_obj->out_fence_fd, 1000), 0);
+			close(pipe_obj->out_fence_fd);
+			pipe_obj->out_fence_fd = -1;
+		}
+
 		for_each_plane_on_pipe(display, pipe, plane) {
 			plane->fb_changed = false;
 			plane->position_changed = false;
@@ -2638,6 +2628,10 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 			    !(plane->type == DRM_PLANE_TYPE_PRIMARY ||
 			      plane->type == DRM_PLANE_TYPE_CURSOR))
 				plane->rotation_changed = false;
+
+			if (s == COMMIT_ATOMIC)
+				/* reset fence_fd to prevent it from being set for the next commit */
+				igt_plane_set_fence_fd(plane, -1);
 		}
 	}
 
