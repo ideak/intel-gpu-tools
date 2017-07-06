@@ -521,7 +521,7 @@ igt_main
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_group {
 				igt_subtest_f("%sbusy-%s",
-					      igt_is_basic(e) ? "basic-" : "",
+					      e->exec_id == 0 ? "basic-" : "",
 					      e->name) {
 					igt_require(gem_has_ring(fd, e->exec_id | e->flags));
 					gem_quiescent_gpu(fd);
@@ -599,7 +599,7 @@ igt_main
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("%shang-%s",
-				      igt_is_basic(e) ? "basic-" : "",
+				      e->exec_id == 0 ? "basic-" : "",
 				      e->name) {
 				igt_require(gem_has_ring(fd, e->exec_id | e->flags));
 				gem_quiescent_gpu(fd);

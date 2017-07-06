@@ -76,6 +76,7 @@ igt@gem_ringfill@blt-bomb
 igt@gem_ringfill@bsd-bomb
 igt@gem_ringfill@bsd1-bomb
 igt@gem_ringfill@bsd2-bomb
+igt@gem_ringfill@default-bomb
 igt@gem_ringfill@render-bomb
 igt@gem_ringfill@vebox-bomb
 igt@gem_userptr_blits@stress-mm
@@ -1152,10 +1153,12 @@ igt@gem_bad_reloc@negative-reloc-bltcopy
 igt@gem_bad_reloc@negative-reloc-bsd
 igt@gem_bad_reloc@negative-reloc-bsd1
 igt@gem_bad_reloc@negative-reloc-bsd2
+igt@gem_bad_reloc@negative-reloc-default
 igt@gem_bad_reloc@negative-reloc-lut-blt
 igt@gem_bad_reloc@negative-reloc-lut-bsd
 igt@gem_bad_reloc@negative-reloc-lut-bsd1
 igt@gem_bad_reloc@negative-reloc-lut-bsd2
+igt@gem_bad_reloc@negative-reloc-lut-default
 igt@gem_bad_reloc@negative-reloc-lut-render
 igt@gem_bad_reloc@negative-reloc-lut-vebox
 igt@gem_bad_reloc@negative-reloc-render
@@ -1199,6 +1202,7 @@ igt@gem_cs_prefetch@blt
 igt@gem_cs_prefetch@bsd
 igt@gem_cs_prefetch@bsd1
 igt@gem_cs_prefetch@bsd2
+igt@gem_cs_prefetch@default
 igt@gem_cs_prefetch@render
 igt@gem_cs_prefetch@vebox
 igt@gem_cs_tlb@blt
@@ -1215,6 +1219,7 @@ igt@gem_ctx_bad_exec@blt
 igt@gem_ctx_bad_exec@bsd
 igt@gem_ctx_bad_exec@bsd1
 igt@gem_ctx_bad_exec@bsd2
+igt@gem_ctx_bad_exec@default
 igt@gem_ctx_bad_exec@render
 igt@gem_ctx_bad_exec@vebox
 igt@gem_ctx_exec@lrc-lite-restore
@@ -1238,6 +1243,7 @@ igt@gem_ctx_switch@bsd1
 igt@gem_ctx_switch@bsd1-interruptible
 igt@gem_ctx_switch@bsd2
 igt@gem_ctx_switch@bsd2-interruptible
+igt@gem_ctx_switch@default-interruptible
 igt@gem_ctx_switch@render
 igt@gem_ctx_switch@render-interruptible
 igt@gem_ctx_switch@vebox
@@ -1315,6 +1321,7 @@ igt@gem_exec_nop@blt
 igt@gem_exec_nop@bsd
 igt@gem_exec_nop@bsd1
 igt@gem_exec_nop@bsd2
+igt@gem_exec_nop@default
 igt@gem_exec_nop@parallel
 igt@gem_exec_nop@render
 igt@gem_exec_nop@series
@@ -1332,6 +1339,9 @@ igt@gem_exec_parallel@bsd2
 igt@gem_exec_parallel@bsd2-contexts
 igt@gem_exec_parallel@bsd2-fds
 igt@gem_exec_parallel@contexts
+igt@gem_exec_parallel@default
+igt@gem_exec_parallel@default-contexts
+igt@gem_exec_parallel@default-fds
 igt@gem_exec_parallel@fds
 igt@gem_exec_parallel@render
 igt@gem_exec_parallel@render-contexts
@@ -1381,6 +1391,7 @@ igt@gem_exec_reloc@active-blt
 igt@gem_exec_reloc@active-bsd
 igt@gem_exec_reloc@active-bsd1
 igt@gem_exec_reloc@active-bsd2
+igt@gem_exec_reloc@active-default
 igt@gem_exec_reloc@active-render
 igt@gem_exec_reloc@active-vebox
 igt@gem_exec_schedule@deep-blt
@@ -1419,6 +1430,7 @@ igt@gem_exec_whisper@bsd1-normal
 igt@gem_exec_whisper@bsd2-normal
 igt@gem_exec_whisper@chain
 igt@gem_exec_whisper@contexts
+igt@gem_exec_whisper@default-normal
 igt@gem_exec_whisper@fds
 igt@gem_exec_whisper@forked
 igt@gem_exec_whisper@interruptible
@@ -1695,6 +1707,8 @@ igt@gem_ringfill@bsd2
 igt@gem_ringfill@bsd2-child
 igt@gem_ringfill@bsd2-interruptible
 igt@gem_ringfill@bsd2-s3
+igt@gem_ringfill@default-child
+igt@gem_ringfill@default-s3
 igt@gem_ringfill@render
 igt@gem_ringfill@render-child
 igt@gem_ringfill@render-interruptible
@@ -1739,22 +1753,26 @@ igt@gem_storedw_loop@long-blt
 igt@gem_storedw_loop@long-bsd
 igt@gem_storedw_loop@long-bsd1
 igt@gem_storedw_loop@long-bsd2
+igt@gem_storedw_loop@long-default
 igt@gem_storedw_loop@long-render
 igt@gem_storedw_loop@long-vebox
 igt@gem_storedw_loop@short-blt
 igt@gem_storedw_loop@short-bsd
 igt@gem_storedw_loop@short-bsd1
 igt@gem_storedw_loop@short-bsd2
+igt@gem_storedw_loop@short-default
 igt@gem_storedw_loop@short-render
 igt@gem_storedw_loop@short-vebox
 igt@gem_sync@blt
 igt@gem_sync@bsd
 igt@gem_sync@bsd1
 igt@gem_sync@bsd2
+igt@gem_sync@default
 igt@gem_sync@many-blt
 igt@gem_sync@many-bsd
 igt@gem_sync@many-bsd1
 igt@gem_sync@many-bsd2
+igt@gem_sync@many-default
 igt@gem_sync@many-render
 igt@gem_sync@many-vebox
 igt@gem_sync@render
@@ -1762,6 +1780,7 @@ igt@gem_sync@store-blt
 igt@gem_sync@store-bsd
 igt@gem_sync@store-bsd1
 igt@gem_sync@store-bsd2
+igt@gem_sync@store-default
 igt@gem_sync@store-render
 igt@gem_sync@store-vebox
 igt@gem_sync@vebox
@@ -1814,6 +1833,7 @@ igt@gem_wait@busy-blt
 igt@gem_wait@busy-bsd
 igt@gem_wait@busy-bsd1
 igt@gem_wait@busy-bsd2
+igt@gem_wait@busy-default
 igt@gem_wait@busy-render
 igt@gem_wait@busy-vebox
 igt@gem_wait@invalid-buf
@@ -1822,6 +1842,7 @@ igt@gem_wait@wait-blt
 igt@gem_wait@wait-bsd
 igt@gem_wait@wait-bsd1
 igt@gem_wait@wait-bsd2
+igt@gem_wait@wait-default
 igt@gem_wait@wait-render
 igt@gem_wait@wait-vebox
 igt@gem_workarounds@reset

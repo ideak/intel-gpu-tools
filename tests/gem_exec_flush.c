@@ -607,17 +607,17 @@ igt_main
 
 		for (const struct batch *b = batches; b->name; b++) {
 			igt_subtest_f("%sbatch-%s-%s-uc",
-				      b == batches && igt_is_basic(e) ? "basic-" : "",
+				      b == batches && e->exec_id == 0 ? "basic-" : "",
 				      b->name,
 				      e->name)
 				batch(fd, ring, ncpus, timeout, b->mode, 0);
 			igt_subtest_f("%sbatch-%s-%s-wb",
-				      b == batches && igt_is_basic(e) ? "basic-" : "",
+				      b == batches && e->exec_id == 0 ? "basic-" : "",
 				      b->name,
 				      e->name)
 				batch(fd, ring, ncpus, timeout, b->mode, COHERENT);
 			igt_subtest_f("%sbatch-%s-%s-cmd",
-				      b == batches && igt_is_basic(e) ? "basic-" : "",
+				      b == batches && e->exec_id == 0 ? "basic-" : "",
 				      b->name,
 				      e->name)
 				batch(fd, ring, ncpus, timeout, b->mode,
@@ -626,7 +626,7 @@ igt_main
 
 		for (const struct mode *m = modes; m->name; m++) {
 			igt_subtest_f("%suc-%s-%s",
-				      (m->flags & BASIC && igt_is_basic(e)) ? "basic-" : "",
+				      (m->flags & BASIC && e->exec_id == 0) ? "basic-" : "",
 				      m->name,
 				      e->name)
 				run(fd, ring, ncpus, timeout,
@@ -639,7 +639,7 @@ igt_main
 				    UNCACHED | m->flags | INTERRUPTIBLE);
 
 			igt_subtest_f("%swb-%s-%s",
-				      igt_is_basic(e) ? "basic-" : "",
+				      e->exec_id == 0 ? "basic-" : "",
 				      m->name,
 				      e->name)
 				run(fd, ring, ncpus, timeout,

@@ -163,9 +163,9 @@ igt_main
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("%s%s", igt_is_basic(e) ? "basic-" : "", e->name)
+		igt_subtest_f("%s%s", e->exec_id == 0 ? "basic-" : "", e->name)
 			single(fd, light, e, 0, 1, 5);
-		igt_subtest_f("%s%s-heavy", igt_is_basic(e) ? "basic-" : "", e->name)
+		igt_subtest_f("%s%s-heavy", e->exec_id == 0 ? "basic-" : "", e->name)
 			single(fd, heavy, e, 0, 1, 5);
 		igt_subtest_f("%s-interruptible", e->name)
 			single(fd, light, e, INTERRUPTIBLE, 1, 150);

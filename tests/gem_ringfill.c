@@ -368,7 +368,7 @@ igt_main
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("%s%s%s",
-				      m->basic && igt_is_basic(e) ? "basic-" : "",
+				      m->basic && !e->exec_id ? "basic-" : "",
 				      e->name,
 				      m->suffix) {
 				igt_skip_on(m->flags & NEWFD && master);

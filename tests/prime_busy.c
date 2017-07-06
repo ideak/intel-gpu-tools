@@ -186,7 +186,7 @@ static void run_busy(int fd,
 	}
 
 	igt_subtest_f("%s%s-%s",
-		      igt_is_basic(e) && !(flags & HANG) ? "basic-" : "",
+		      !e->exec_id && !(flags & HANG) ? "basic-" : "",
 		      name, e->name)
 		busy(fd, e->exec_id | e->flags, flags);
 
@@ -211,7 +211,7 @@ static void run_poll(int fd,
 	}
 
 	igt_subtest_f("%swait-%s-%s",
-		      igt_is_basic(e) && !(flags & HANG) ? "basic-" : "",
+		      !e->exec_id && !(flags & HANG) ? "basic-" : "",
 		      name, e->name)
 		busy(fd, e->exec_id | e->flags, flags | POLL);
 

@@ -755,7 +755,7 @@ igt_main
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%ssync-%s",
-			      igt_is_basic(e) ? "basic-" : "",
+			      e->exec_id == 0 ? "basic-" : "",
 			      e->name) {
 			gem_require_ring(i915, e->exec_id | e->flags);
 			igt_require(gem_can_store_dword(i915, e->exec_id) | e->flags);
@@ -767,7 +767,7 @@ igt_main
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%sbusy-%s",
-			      igt_is_basic(e) ? "basic-" : "",
+			      e->exec_id == 0 ? "basic-" : "",
 			      e->name) {
 			gem_require_ring(i915, e->exec_id | e->flags);
 			igt_require(gem_can_store_dword(i915, e->exec_id) | e->flags);
@@ -779,7 +779,7 @@ igt_main
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%swait-%s",
-			      igt_is_basic(e) ? "basic-" : "",
+			      e->exec_id == 0 ? "basic-" : "",
 			      e->name) {
 			gem_require_ring(i915, e->exec_id | e->flags);
 			igt_require(gem_can_store_dword(i915, e->exec_id) | e->flags);
@@ -802,8 +802,8 @@ igt_main
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("%sfence-wait-%s",
-				      igt_is_basic(e) ? "basic-" : "",
-				      e->name) {
+					e->exec_id == 0 ? "basic-" : "",
+					e->name) {
 				gem_require_ring(i915, e->exec_id | e->flags);
 				igt_require(gem_can_store_dword(i915, e->exec_id) | e->flags);
 
