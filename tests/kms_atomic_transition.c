@@ -377,6 +377,31 @@ static void atomic_commit(igt_display_t *display, enum pipe pipe, unsigned int f
 	igt_display_commit_atomic(display, flags, data);
 }
 
+static int fd_completed(int fd)
+{
+	struct pollfd pfd = { fd, POLLIN };
+	int ret;
+
+	ret = poll(&pfd, 1, 0);
+	igt_assert(ret >= 0);
+	return ret;
+}
+
+static void wait_for_transition(igt_display_t *display, enum pipe pipe, bool nonblocking, bool fencing)
+{
+	if (fencing) {
+		int fence_fd = display->pipes[pipe].out_fence_fd;
+
+		igt_assert_neq(fd_completed(fence_fd), nonblocking);
+
+		igt_assert(sync_fence_wait(fence_fd, 30000) == 0);
+	} else {
+		igt_assert_neq(fd_completed(display->drm_fd), nonblocking);
+
+		drmHandleEvent(display->drm_fd, &drm_events);
+	}
+}
+
 /*
  * 1. Set primary plane to a known fb.
  * 2. Make sure getcrtc returns the correct fb id.
@@ -393,14 +418,17 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	struct igt_fb fb, argb_fb, sprite_fb;
 	drmModeModeInfo *mode, override_mode;
 	igt_plane_t *plane;
-	uint32_t iter_max = 1 << display->pipes[pipe].n_planes, i;
-	struct plane_parms parms[display->pipes[pipe].n_planes];
+	igt_pipe_t *pipe_obj = &display->pipes[pipe];
+	uint32_t iter_max = 1 << pipe_obj->n_planes, i;
+	struct plane_parms parms[pipe_obj->n_planes];
 	bool skip_test = false;
-	unsigned flags = DRM_MODE_PAGE_FLIP_EVENT;
+	unsigned flags = 0;
 	int ret;
 
 	if (fencing)
 		prepare_fencing(display, pipe);
+	else
+		flags |= DRM_MODE_PAGE_FLIP_EVENT;
 
 	if (nonblocking)
 		flags |= DRM_MODE_ATOMIC_NONBLOCK;
@@ -444,10 +472,10 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 		wm_setup_plane(display, pipe, iter_max - 1, parms);
 
 		if (fencing)
-			igt_pipe_request_out_fence(&display->pipes[pipe]);
+			igt_pipe_request_out_fence(pipe_obj);
 
 		ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-		if (ret != -EINVAL || display->pipes[pipe].n_planes < 3)
+		if (ret != -EINVAL || pipe_obj->n_planes < 3)
 			break;
 
 		ret = 0;
@@ -474,25 +502,28 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	if (type == TRANSITION_AFTER_FREE) {
-		struct pollfd pfd = { display->drm_fd, POLLIN };
+		int fence_fd = -1;
 
 		wm_setup_plane(display, pipe, 0, parms);
 
 		atomic_commit(display, pipe, flags, (void *)(unsigned long)0, fencing);
+		if (fencing) {
+			fence_fd = pipe_obj->out_fence_fd;
+			pipe_obj->out_fence_fd = -1;
+		}
 
 		for_each_plane_on_pipe(display, pipe, plane)
 			plane->fb_changed = true;
 
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
-		/*
-		 * Previous atomic commit should have completed
-		 * before this plane-only atomic commit.
-		 */
-		igt_assert_eq(poll(&pfd, 1, 0), 1);
-
-		drmHandleEvent(display->drm_fd, &drm_events);
-
+		if (fence_fd != -1) {
+			igt_assert(fd_completed(fence_fd));
+			close(fence_fd);
+		} else {
+			igt_assert(fd_completed(display->drm_fd));
+			wait_for_transition(display, pipe, false, fencing);
+		}
 		goto cleanup;
 	}
 
@@ -502,7 +533,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 		wm_setup_plane(display, pipe, i, parms);
 
 		atomic_commit(display, pipe, flags, (void *)(unsigned long)i, fencing);
-		drmHandleEvent(display->drm_fd, &drm_events);
+		wait_for_transition(display, pipe, nonblocking, fencing);
 
 		if (type == TRANSITION_MODESET_DISABLE) {
 			igt_output_set_pipe(output, PIPE_NONE);
@@ -510,7 +541,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 			wm_setup_plane(display, pipe, 0, parms);
 
 			atomic_commit(display, pipe, flags, (void *) 0UL, fencing);
-			drmHandleEvent(display->drm_fd, &drm_events);
+			wait_for_transition(display, pipe, nonblocking, fencing);
 		} else {
 			uint32_t j;
 
@@ -522,14 +553,14 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 					igt_output_override_mode(output, &override_mode);
 
 				atomic_commit(display, pipe, flags, (void *)(unsigned long) j, fencing);
-				drmHandleEvent(display->drm_fd, &drm_events);
+				wait_for_transition(display, pipe, nonblocking, fencing);
 
 				wm_setup_plane(display, pipe, i, parms);
 				if (type == TRANSITION_MODESET)
 					igt_output_override_mode(output, NULL);
 
 				atomic_commit(display, pipe, flags, (void *)(unsigned long) i, fencing);
-				drmHandleEvent(display->drm_fd, &drm_events);
+				wait_for_transition(display, pipe, nonblocking, fencing);
 			}
 		}
 	}
@@ -873,6 +904,10 @@ igt_main
 	igt_subtest("plane-use-after-nonblocking-unbind")
 		for_each_pipe_with_valid_output(&display, pipe, output)
 			run_transition_test(&display, pipe, output, TRANSITION_AFTER_FREE, true, false);
+
+	igt_subtest("plane-use-after-nonblocking-unbind-fencing")
+		for_each_pipe_with_valid_output(&display, pipe, output)
+			run_transition_test(&display, pipe, output, TRANSITION_AFTER_FREE, true, true);
 
 	igt_subtest("plane-all-modeset-transition")
 		for_each_pipe_with_valid_output(&display, pipe, output)

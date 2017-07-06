@@ -1698,6 +1698,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		pipe->plane_cursor = -1;
 		pipe->plane_primary = -1;
 		pipe->planes = NULL;
+		pipe->out_fence_fd = -1;
 
 		get_crtc_property(display->drm_fd, pipe->crtc_id,
 				    "background_color",
@@ -1913,6 +1914,9 @@ static void igt_pipe_fini(igt_pipe_t *pipe)
 
 	free(pipe->planes);
 	pipe->planes = NULL;
+
+	if (pipe->out_fence_fd != -1)
+		close(pipe->out_fence_fd);
 }
 
 static void igt_output_fini(igt_output_t *output)
@@ -2502,7 +2506,11 @@ static void igt_atomic_prepare_crtc_commit(igt_pipe_t *pipe_obj, drmModeAtomicRe
 		igt_atomic_populate_crtc_req(req, pipe_obj, IGT_CRTC_ACTIVE, !!output);
 	}
 
-	pipe_obj->out_fence_fd = -1;
+	if (pipe_obj->out_fence_fd != -1) {
+		close(pipe_obj->out_fence_fd);
+		pipe_obj->out_fence_fd = -1;
+	}
+
 	if (pipe_obj->out_fence_requested)
 	{
 		igt_atomic_populate_crtc_req(req, pipe_obj, IGT_CRTC_OUT_FENCE_PTR,
@@ -2607,16 +2615,9 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 		if (s != COMMIT_UNIVERSAL)
 			pipe_obj->mode_changed = false;
 
-		if (s == COMMIT_ATOMIC) {
+		if (s == COMMIT_ATOMIC && pipe_obj->out_fence_requested) {
 			pipe_obj->out_fence_requested = false;
-
-			if (pipe_obj->out_fence_fd == -1)
-				continue;
-
 			igt_assert(pipe_obj->out_fence_fd >= 0);
-			igt_assert_eq(sync_fence_wait(pipe_obj->out_fence_fd, 1000), 0);
-			close(pipe_obj->out_fence_fd);
-			pipe_obj->out_fence_fd = -1;
 		}
 
 		for_each_plane_on_pipe(display, pipe, plane) {
