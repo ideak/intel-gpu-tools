@@ -61,6 +61,7 @@ static void test_many_magics(int master)
 		/* open slave and make sure it's NOT a master */
 		slave = open(path, O_RDWR | O_CLOEXEC);
 		if (slave < 0) {
+			igt_info("Reopening device failed after %d opens\n", i);
 			igt_assert(errno == EMFILE);
 			break;
 		}
