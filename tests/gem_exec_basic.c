@@ -111,15 +111,6 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	igt_subtest("basic-default")
-		noop(fd, I915_EXEC_DEFAULT);
-
-	igt_subtest("readonly-default")
-		readonly(fd, I915_EXEC_DEFAULT);
-
-	igt_subtest("gtt-default")
-		gtt(fd, I915_EXEC_DEFAULT);
-
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("basic-%s", e->name)
 			noop(fd, e->exec_id | e->flags);
