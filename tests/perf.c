@@ -143,6 +143,39 @@ enum drm_i915_perf_record_type {
 };
 #endif /* !DRM_I915_PERF_OPEN */
 
+#ifndef DRM_IOCTL_I915_PERF_ADD_CONFIG
+
+#define DRM_I915_PERF_ADD_CONFIG	0x37
+#define DRM_I915_PERF_REMOVE_CONFIG	0x38
+
+#define DRM_IOCTL_I915_PERF_ADD_CONFIG	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_ADD_CONFIG, struct drm_i915_perf_oa_config)
+#define DRM_IOCTL_I915_PERF_REMOVE_CONFIG	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_REMOVE_CONFIG, __u64)
+
+/**
+ * Structure to upload perf dynamic configuration into the kernel.
+ */
+struct drm_i915_perf_oa_config {
+	/** String formatted like "%08x-%04x-%04x-%04x-%012x" */
+	char uuid[36];
+
+	__u32 n_mux_regs;
+	__u32 n_boolean_regs;
+	__u32 n_flex_regs;
+
+	__u64 mux_regs_ptr;
+	__u64 boolean_regs_ptr;
+	__u64 flex_regs_ptr;
+};
+
+#endif /* !DRM_IOCTL_I915_PERF_ADD_CONFIG */
+
+struct accumulator {
+#define MAX_RAW_OA_COUNTERS 62
+	enum drm_i915_oa_format format;
+
+	uint64_t deltas[MAX_RAW_OA_COUNTERS];
+};
+
 static struct {
 	const char *name;
 	size_t size;
@@ -2730,6 +2763,320 @@ test_rc6_disable(void)
 	igt_assert_neq(n_events_end - n_events_start, 0);
 }
 
+static int __i915_perf_add_config(int fd, struct drm_i915_perf_oa_config *config)
+{
+	int ret = igt_ioctl(fd, DRM_IOCTL_I915_PERF_ADD_CONFIG, config);
+	if (ret < 0)
+		ret = -errno;
+	return ret;
+}
+
+static int i915_perf_add_config(int fd, struct drm_i915_perf_oa_config *config)
+{
+	int config_id = __i915_perf_add_config(fd, config);
+
+	igt_debug("config_id=%i\n", config_id);
+	igt_assert(config_id > 0);
+
+	return config_id;
+}
+
+static void i915_perf_remove_config(int fd, uint64_t config_id)
+{
+	igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_I915_PERF_REMOVE_CONFIG,
+				&config_id), 0);
+}
+
+static void
+test_invalid_create_userspace_config(void)
+{
+	struct drm_i915_perf_oa_config config;
+	const char *uuid = "01234567-0123-0123-0123-0123456789ab";
+	const char *invalid_uuid = "blablabla-wrong";
+	uint32_t mux_regs[] = { 0x9888 /* NOA_WRITE */, 0x0 };
+	uint32_t invalid_mux_regs[] = { 0x12345678 /* invalid register */, 0x0 };
+
+	memset(&config, 0, sizeof(config));
+
+	/* invalid uuid */
+	strncpy(config.uuid, invalid_uuid, sizeof(config.uuid));
+	config.n_mux_regs = 1;
+	config.mux_regs_ptr = to_user_pointer(mux_regs);
+	config.n_boolean_regs = 0;
+	config.n_flex_regs = 0;
+
+	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EINVAL);
+
+	/* invalid mux_regs */
+	strncpy(config.uuid, uuid, sizeof(config.uuid));
+	config.n_mux_regs = 1;
+	config.mux_regs_ptr = to_user_pointer(invalid_mux_regs);
+	config.n_boolean_regs = 0;
+	config.n_flex_regs = 0;
+
+	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EINVAL);
+
+	/* empty config */
+	strncpy(config.uuid, uuid, sizeof(config.uuid));
+	config.n_mux_regs = 0;
+	config.mux_regs_ptr = to_user_pointer(mux_regs);
+	config.n_boolean_regs = 0;
+	config.n_flex_regs = 0;
+
+	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EINVAL);
+
+	/* empty config with null pointers */
+	strncpy(config.uuid, uuid, sizeof(config.uuid));
+	config.n_mux_regs = 1;
+	config.mux_regs_ptr = to_user_pointer(NULL);
+	config.n_boolean_regs = 2;
+	config.boolean_regs_ptr = to_user_pointer(NULL);
+	config.n_flex_regs = 3;
+	config.flex_regs_ptr = to_user_pointer(NULL);
+
+	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EINVAL);
+
+	/* invalid pointers */
+	strncpy(config.uuid, uuid, sizeof(config.uuid));
+	config.n_mux_regs = 42;
+	config.mux_regs_ptr = to_user_pointer((void *) 0xDEADBEEF);
+	config.n_boolean_regs = 0;
+	config.n_flex_regs = 0;
+
+	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EFAULT);
+}
+
+static void
+test_invalid_remove_userspace_config(void)
+{
+	struct drm_i915_perf_oa_config config;
+	const char *uuid = "01234567-0123-0123-0123-0123456789ab";
+	uint32_t mux_regs[] = { 0x9888 /* NOA_WRITE */, 0x0 };
+	uint64_t config_id, wrong_config_id = 999999999;
+	char path[512];
+
+	snprintf(path, sizeof(path), "/sys/class/drm/card%d/metrics/%s/id", card, uuid);
+
+	/* Destroy previous configuration if present */
+	if (try_read_u64_file(path, &config_id))
+		i915_perf_remove_config(drm_fd, config_id);
+
+	memset(&config, 0, sizeof(config));
+
+	memcpy(config.uuid, uuid, sizeof(config.uuid));
+
+	config.n_mux_regs = 1;
+	config.mux_regs_ptr = to_user_pointer(mux_regs);
+	config.n_boolean_regs = 0;
+	config.n_flex_regs = 0;
+
+	config_id = i915_perf_add_config(drm_fd, &config);
+
+	/* Removing configs without permissions should fail. */
+	igt_fork(child, 1) {
+		igt_drop_root();
+
+		do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_REMOVE_CONFIG, &config_id, EACCES);
+	}
+	igt_waitchildren();
+
+	/* Removing invalid config ID should fail. */
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_REMOVE_CONFIG, &wrong_config_id, ENOENT);
+
+	i915_perf_remove_config(drm_fd, config_id);
+}
+
+static void
+test_create_destroy_userspace_config(void)
+{
+	struct drm_i915_perf_oa_config config;
+	const char *uuid = "01234567-0123-0123-0123-0123456789ab";
+	uint32_t mux_regs[] = { 0x9888 /* NOA_WRITE */, 0x0 };
+	uint32_t flex_regs[100];
+	int i, stream_fd;
+	uint64_t config_id;
+	uint64_t properties[] = {
+		DRM_I915_PERF_PROP_OA_METRICS_SET, 0, /* Filled later */
+
+		/* OA unit configuration */
+		DRM_I915_PERF_PROP_SAMPLE_OA, true,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
+		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exp_1_millisec,
+		DRM_I915_PERF_PROP_OA_METRICS_SET
+	};
+	struct drm_i915_perf_open_param param = {
+		.flags = I915_PERF_FLAG_FD_CLOEXEC |
+		I915_PERF_FLAG_FD_NONBLOCK |
+		I915_PERF_FLAG_DISABLED,
+		.num_properties = ARRAY_SIZE(properties) / 2,
+		.properties_ptr = to_user_pointer(properties),
+	};
+	char path[512];
+
+	snprintf(path, sizeof(path), "/sys/class/drm/card%d/metrics/%s/id", card, uuid);
+
+	/* Destroy previous configuration if present */
+	if (try_read_u64_file(path, &config_id))
+		i915_perf_remove_config(drm_fd, config_id);
+
+	memset(&config, 0, sizeof(config));
+	strncpy(config.uuid, uuid, sizeof(config.uuid));
+
+	config.n_mux_regs = 1;
+	config.mux_regs_ptr = to_user_pointer(mux_regs);
+	for (i = 0; i < ARRAY_SIZE(flex_regs) / 2; i++) {
+		flex_regs[i * 2] = 0xe458; /* EU_PERF_CNTL0 */
+		flex_regs[i * 2 + 1] = 0x0;
+	}
+	config.flex_regs_ptr = to_user_pointer(flex_regs);
+	config.n_flex_regs = ARRAY_SIZE(flex_regs) / 2;
+	config.n_boolean_regs = 0;
+
+	/* Creating configs without permissions shouldn't work. */
+	igt_fork(child, 1) {
+		igt_drop_root();
+
+		igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EACCES);
+	}
+	igt_waitchildren();
+
+	/* Create a new config */
+	config_id = i915_perf_add_config(drm_fd, &config);
+
+	/* Verify that adding the another config with the same uuid fails. */
+	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EADDRINUSE);
+
+	/* Try to use the new config */
+	properties[1] = config_id;
+	stream_fd = __perf_open(drm_fd, &param);
+
+	/* Verify that destroying the config doesn't yield any error. */
+	i915_perf_remove_config(drm_fd, config_id);
+
+	/* Read the config to verify shouldn't raise any issue. */
+	config_id = i915_perf_add_config(drm_fd, &config);
+
+	close(stream_fd);
+
+	i915_perf_remove_config(drm_fd, config_id);
+}
+
+/* Registers required by userspace. This list should be maintained by
+ * the OA configs developers and agreed upon with kernel developers as
+ * some of the registers have bits used by the kernel (for workarounds
+ * for instance) and other bits that need to be set by the OA configs.
+ */
+static void
+test_whitelisted_registers_userspace_config(void)
+{
+	struct drm_i915_perf_oa_config config;
+	const char *uuid = "01234567-0123-0123-0123-0123456789ab";
+	uint32_t mux_regs[200];
+	uint32_t b_counters_regs[200];
+	uint32_t flex_regs[200];
+	uint32_t i;
+	uint64_t config_id;
+	char path[512];
+	int ret;
+	const uint32_t flex[] = {
+		0xe458,
+		0xe558,
+		0xe658,
+		0xe758,
+		0xe45c,
+		0xe55c,
+		0xe65c
+	};
+
+	snprintf(path, sizeof(path), "/sys/class/drm/card%d/metrics/%s/id", card, uuid);
+
+	if (try_read_u64_file(path, &config_id))
+		i915_perf_remove_config(drm_fd, config_id);
+
+	memset(&config, 0, sizeof(config));
+	memcpy(config.uuid, uuid, sizeof(config.uuid));
+
+	/* OASTARTTRIG[1-8] */
+	for (i = 0x2710; i <= 0x272c; i += 4) {
+		b_counters_regs[config.n_boolean_regs * 2] = i;
+		b_counters_regs[config.n_boolean_regs * 2 + 1] = 0;
+		config.n_boolean_regs++;
+	}
+	/* OAREPORTTRIG[1-8] */
+	for (i = 0x2740; i <= 0x275c; i += 4) {
+		b_counters_regs[config.n_boolean_regs * 2] = i;
+		b_counters_regs[config.n_boolean_regs * 2 + 1] = 0;
+		config.n_boolean_regs++;
+	}
+	config.boolean_regs_ptr = (uintptr_t) b_counters_regs;
+
+	/* Flex EU registers */
+	for (i = 0; i < ARRAY_SIZE(flex); i++) {
+		flex_regs[config.n_flex_regs * 2] = flex[i];
+		flex_regs[config.n_flex_regs * 2 + 1] = 0;
+		config.n_flex_regs++;
+	}
+	config.flex_regs_ptr = (uintptr_t) flex_regs;
+
+	/* Mux registers (too many of them, just checking bounds) */
+	i = 0;
+
+	/* NOA_WRITE */
+	mux_regs[i++] = 0x9800;
+	mux_regs[i++] = 0;
+
+	if (IS_HASWELL(devid)) {
+		/* Haswell specific. undocumented... */
+		mux_regs[i++] = 0x9ec0;
+		mux_regs[i++] = 0;
+
+		mux_regs[i++] = 0x25100;
+		mux_regs[i++] = 0;
+		mux_regs[i++] = 0x2ff90;
+		mux_regs[i++] = 0;
+	}
+
+	if (intel_gen(devid) >= 8) {
+		/* NOA_CONFIG */
+		mux_regs[i++] = 0xD04;
+		mux_regs[i++] = 0;
+		mux_regs[i++] = 0xD2C;
+		mux_regs[i++] = 0;
+		/* WAIT_FOR_RC6_EXIT */
+		mux_regs[i++] = 0x20CC;
+		mux_regs[i++] = 0;
+	}
+
+	/* HALF_SLICE_CHICKEN2 (shared with kernel workaround) */
+	mux_regs[i++] = 0xE180;
+	mux_regs[i++] = 0;
+
+	if (IS_CHERRYVIEW(devid)) {
+		/* Cherryview specific. undocumented... */
+		mux_regs[i++] = 0x182300;
+		mux_regs[i++] = 0;
+		mux_regs[i++] = 0x1823A4;
+		mux_regs[i++] = 0;
+	}
+
+	/* PERFCNT[12] */
+	mux_regs[i++] = 0x91B8;
+	mux_regs[i++] = 0;
+	/* PERFMATRIX */
+	mux_regs[i++] = 0x91C8;
+	mux_regs[i++] = 0;
+
+	config.mux_regs_ptr = (uintptr_t) mux_regs;
+	config.n_mux_regs = i / 2;
+
+	/* Create a new config */
+	ret = igt_ioctl(drm_fd, DRM_IOCTL_I915_PERF_ADD_CONFIG, &config);
+	igt_assert(ret > 0); /* Config 0 should be used by the kernel */
+	config_id = ret;
+
+	i915_perf_remove_config(drm_fd, config_id);
+}
+
 static unsigned
 read_i915_module_ref(void)
 {
@@ -2947,6 +3294,18 @@ igt_main
 
 	igt_subtest("rc6-disable")
 		test_rc6_disable();
+
+	igt_subtest("invalid-create-userspace-config")
+		test_invalid_create_userspace_config();
+
+	igt_subtest("invalid-remove-userspace-config")
+		test_invalid_remove_userspace_config();
+
+	igt_subtest("create-destroy-userspace-config")
+		test_create_destroy_userspace_config();
+
+	igt_subtest("whitelisted-registers-userspace-config")
+		test_whitelisted_registers_userspace_config();
 
 	igt_fixture {
 		/* leave sysctl options in their default state... */
