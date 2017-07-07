@@ -47,6 +47,7 @@
 #define LOCAL_I915_EXEC_RESOURCE_STREAMER (1<<15)
 #define LOCAL_I915_EXEC_FENCE_IN (1 << 16)
 #define LOCAL_I915_EXEC_FENCE_OUT (1 << 17)
+#define LOCAL_I915_EXEC_BATCH_FIRST (1 << 18)
 
 static bool has_ring(int fd, unsigned ring_exec_flags)
 {
@@ -250,7 +251,7 @@ igt_main
 		/* NOTE: This test intentionally exercise the next available
 		 * flag. Don't "fix" this testcase without adding the required
 		 * tests for the new flag first. */
-		execbuf.flags = I915_EXEC_RENDER | (LOCAL_I915_EXEC_FENCE_OUT << 1);
+		execbuf.flags = I915_EXEC_RENDER | (LOCAL_I915_EXEC_BATCH_FIRST << 1);
 		RUN_FAIL(EINVAL);
 	}
 
