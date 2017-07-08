@@ -73,6 +73,112 @@ static bool has_ring(int fd, unsigned ring_exec_flags)
 	return false;
 }
 
+static bool has_exec_batch_first(int fd)
+{
+	int val = -1;
+	struct drm_i915_getparam gp = {
+		.param = 48,
+		.value = &val,
+	};
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+	return val > 0;
+}
+
+static void test_batch_first(int fd)
+{
+	const int gen = intel_gen(intel_get_drm_devid(fd));
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj[3];
+	struct drm_i915_gem_relocation_entry reloc[2];
+	uint32_t *map, value;
+	int i;
+
+	igt_require(gem_can_store_dword(fd, 0));
+	igt_require(has_exec_batch_first(fd));
+
+	memset(obj, 0, sizeof(obj));
+	memset(reloc, 0, sizeof(reloc));
+
+	obj[0].handle = gem_create(fd, 4096);
+	obj[1].handle = gem_create(fd, 4096);
+	obj[2].handle = gem_create(fd, 4096);
+
+	reloc[0].target_handle = obj[1].handle;
+	reloc[0].offset = sizeof(uint32_t);
+	reloc[0].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+	reloc[0].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
+	obj[0].relocs_ptr = to_user_pointer(&reloc[0]);
+	obj[0].relocation_count = 1;
+
+	i = 0;
+	map = gem_mmap__cpu(fd, obj[0].handle, 0, 4096, PROT_WRITE);
+	gem_set_domain(fd, obj[0].handle,
+			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	map[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	if (gen >= 8) {
+		map[++i] = 0;
+		map[++i] = 0;
+	} else if (gen >= 4) {
+		map[++i] = 0;
+		map[++i] = 0;
+		reloc[0].offset += sizeof(uint32_t);
+	} else {
+		map[i]--;
+		map[++i] = 0;
+	}
+	map[++i] = 1;
+	map[++i] = MI_BATCH_BUFFER_END;
+	munmap(map, 4096);
+
+	reloc[1].target_handle = obj[1].handle;
+	reloc[1].offset = sizeof(uint32_t);
+	reloc[1].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+	reloc[1].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
+	obj[2].relocs_ptr = to_user_pointer(&reloc[1]);
+	obj[2].relocation_count = 1;
+
+	i = 0;
+	map = gem_mmap__cpu(fd, obj[2].handle, 0, 4096, PROT_WRITE);
+	gem_set_domain(fd, obj[2].handle,
+			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	map[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	if (gen >= 8) {
+		map[++i] = 0;
+		map[++i] = 0;
+	} else if (gen >= 4) {
+		map[++i] = 0;
+		map[++i] = 0;
+		reloc[1].offset += sizeof(uint32_t);
+	} else {
+		map[i]--;
+		map[++i] = 0;
+	}
+	map[++i] = 2;
+	map[++i] = MI_BATCH_BUFFER_END;
+	munmap(map, 4096);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = ARRAY_SIZE(obj);
+	if (gen > 3 && gen < 6)
+		execbuf.flags |= I915_EXEC_SECURE;
+
+	/* Normal mode */
+	gem_execbuf(fd, &execbuf);
+	gem_read(fd, obj[1].handle, 0, &value, sizeof(value));
+	igt_assert_eq_u32(value, 2);
+
+	/* Batch first mode */
+	execbuf.flags |= LOCAL_I915_EXEC_BATCH_FIRST;
+	gem_execbuf(fd, &execbuf);
+	gem_read(fd, obj[1].handle, 0, &value, sizeof(value));
+	igt_assert_eq_u32(value, 1);
+
+	gem_close(fd, obj[2].handle);
+	gem_close(fd, obj[1].handle);
+	gem_close(fd, obj[0].handle);
+}
+
 struct drm_i915_gem_execbuffer2 execbuf;
 struct drm_i915_gem_exec_object2 gem_exec[1];
 uint32_t batch[2] = {MI_BATCH_BUFFER_END};
@@ -305,6 +411,9 @@ igt_main
 		RUN_FAIL(EINVAL);
 		execbuf.rsvd2 = 0;
 	}
+
+	igt_subtest("batch-first")
+		test_batch_first(fd);
 
 #define DIRT(name) \
 	igt_subtest(#name "-dirt") { \
