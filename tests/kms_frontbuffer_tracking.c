@@ -2140,7 +2140,8 @@ static void multidraw_subtest(const struct test_mode *t)
 				assertions = used_method != IGT_DRAW_MMAP_GTT ?
 					     ASSERT_LAST_ACTION_CHANGED :
 					     ASSERT_NO_ACTION_CHANGE;
-				if (op_disables_psr(t, used_method))
+				if (op_disables_psr(t, used_method) &&
+				    !wc_used)
 					assertions |= ASSERT_PSR_DISABLED;
 
 				do_assertions(assertions);
