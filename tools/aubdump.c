@@ -578,6 +578,9 @@ maybe_init(void)
 	fail_if(bos == NULL, "intel_aubdump: out of memory\n");
 }
 
+#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR \
+    DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
+
 int
 ioctl(int fd, unsigned long request, ...)
 {
@@ -633,7 +636,7 @@ ioctl(int fd, unsigned long request, ...)
 		}
 
 		case DRM_IOCTL_I915_GEM_EXECBUFFER2:
-		case DRM_IOCTL_I915_GEM_EXECBUFFER2_WR: {
+		case LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR: {
 			dump_execbuffer2(fd, argp);
 			if (device_override)
 				return 0;

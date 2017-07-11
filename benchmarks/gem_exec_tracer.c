@@ -138,6 +138,9 @@ fail_if(int cond, const char *format, ...)
 	abort();
 }
 
+#define LOCAL_I915_EXEC_FENCE_IN              (1<<16)
+#define LOCAL_I915_EXEC_FENCE_OUT             (1<<17)
+
 static void
 trace_exec(struct trace *trace,
 	   const struct drm_i915_gem_execbuffer2 *execbuffer2)
@@ -146,7 +149,7 @@ trace_exec(struct trace *trace,
 	const struct drm_i915_gem_exec_object2 *exec_objects =
 		to_ptr(typeof(*exec_objects), execbuffer2->buffers_ptr);
 
-	fail_if(execbuffer2->flags & (I915_EXEC_FENCE_IN | I915_EXEC_FENCE_OUT),
+	fail_if(execbuffer2->flags & (LOCAL_I915_EXEC_FENCE_IN | LOCAL_I915_EXEC_FENCE_OUT),
 		"fences not supported yet\n");
 
 	flockfile(trace->file);
@@ -268,6 +271,9 @@ static int is_i915(int fd)
 	return strcmp(name, "i915") == 0;
 }
 
+#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR \
+    DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
+
 int
 ioctl(int fd, unsigned long request, ...)
 {
@@ -326,7 +332,7 @@ ioctl(int fd, unsigned long request, ...)
 
 	switch (request) {
 	case DRM_IOCTL_I915_GEM_EXECBUFFER2:
-	case DRM_IOCTL_I915_GEM_EXECBUFFER2_WR:
+	case LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR:
 		trace_exec(t, argp);
 		break;
 
