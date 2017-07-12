@@ -50,8 +50,11 @@ static void read_and_discard_sysfs_entries(int path_fd, bool is_crc)
 			read_and_discard_sysfs_entries(sub_fd, !strcmp(dirent->d_name, "crc"));
 			close(sub_fd);
 		} else {
-			char *buf = igt_sysfs_get(path_fd, dirent->d_name);
+			char *buf;
 
+			igt_set_timeout(5, "reading sysfs entry");
+			buf = igt_sysfs_get(path_fd, dirent->d_name);
+			igt_reset_timeout();
 			/*
 			 * /crtc-XX/crc/data may fail with -EIO if the CRTC
 			 * is not active.
