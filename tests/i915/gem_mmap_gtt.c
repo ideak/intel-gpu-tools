@@ -34,8 +34,11 @@
 #include <inttypes.h>
 #include <pthread.h>
 #include <errno.h>
-#include <sys/stat.h>
+#include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/ptrace.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include "drm.h"
 
 #include "igt.h"
@@ -499,6 +502,78 @@ test_write_gtt(int fd)
 
 	gem_close(fd, dst);
 	munmap(src, OBJECT_SIZE);
+}
+
+static void *memchr_inv(const void *s, int c, size_t n)
+{
+	const uint8_t *us = s;
+	const uint8_t uc = c;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+	while (n--) {
+		if (*us != uc)
+			return (void *) us;
+		us++;
+	}
+#pragma GCC diagnostic pop
+
+	return NULL;
+}
+
+static void
+test_ptrace(int fd)
+{
+	unsigned long AA, CC;
+	unsigned long *gtt, *cpy;
+	uint32_t bo;
+	pid_t pid;
+
+	memset(&AA, 0xaa, sizeof(AA));
+	memset(&CC, 0x55, sizeof(CC));
+
+	cpy = malloc(OBJECT_SIZE);
+	memset(cpy, AA, OBJECT_SIZE);
+
+	bo = gem_create(fd, OBJECT_SIZE);
+	gtt = mmap_bo(fd, bo, OBJECT_SIZE);
+	memset(gtt, CC, OBJECT_SIZE);
+	gem_close(fd, bo);
+
+	igt_assert(!memchr_inv(gtt, CC, OBJECT_SIZE));
+	igt_assert(!memchr_inv(cpy, AA, OBJECT_SIZE));
+
+	igt_fork(child, 1) {
+		ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+		raise(SIGSTOP);
+	}
+
+	/* Wait for the child to ready themselves [SIGSTOP] */
+	pid = wait(NULL);
+
+	ptrace(PTRACE_ATTACH, pid, NULL, NULL);
+	for (int i = 0; i < OBJECT_SIZE / sizeof(long); i++) {
+		long ret;
+
+		ret = ptrace(PTRACE_PEEKDATA, pid, gtt + i);
+		igt_assert_eq_u64(ret, CC);
+		cpy[i] = ret;
+
+		ret = ptrace(PTRACE_POKEDATA, pid, gtt + i, AA);
+		igt_assert_eq(ret, 0l);
+	}
+	ptrace(PTRACE_DETACH, pid, NULL, NULL);
+
+	/* Wakeup the child for it to exit */
+	kill(SIGCONT, pid);
+	igt_waitchildren();
+
+	/* The contents of the two buffers should now be swapped */
+	igt_assert(!memchr_inv(gtt, AA, OBJECT_SIZE));
+	igt_assert(!memchr_inv(cpy, CC, OBJECT_SIZE));
+
+	munmap(gtt, OBJECT_SIZE);
+	free(cpy);
 }
 
 static bool is_coherent(int i915)
@@ -1084,6 +1159,8 @@ igt_main
 		test_write(fd);
 	igt_subtest("basic-write-gtt")
 		test_write_gtt(fd);
+	igt_subtest("ptrace")
+		test_ptrace(fd);
 	igt_subtest("coherency")
 		test_coherency(fd);
 	igt_subtest("clflush")
