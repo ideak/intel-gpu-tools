@@ -23,9 +23,12 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdatomic.h>
-#include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/ptrace.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include "drm.h"
 
 #include "igt.h"
@@ -263,6 +266,89 @@ static void pf_nonblock(int i915)
 	}
 
 	igt_spin_free(i915, spin);
+}
+
+static void *memchr_inv(const void *s, int c, size_t n)
+{
+	const uint8_t *us = s;
+	const uint8_t uc = c;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+	while (n--) {
+		if (*us != uc)
+			return (void *) us;
+		us++;
+	}
+#pragma GCC diagnostic pop
+
+	return NULL;
+}
+
+static void test_ptrace(int i915)
+{
+	const unsigned int SZ = 3 * 4096;
+	unsigned long *ptr, *cpy;
+	unsigned long AA, CC;
+	uint32_t bo;
+
+	memset(&AA, 0xaa, sizeof(AA));
+	memset(&CC, 0x55, sizeof(CC));
+
+	cpy = malloc(SZ);
+	bo = gem_create(i915, SZ);
+
+	for_each_mmap_offset_type(i915, t) {
+		ptr = __mmap_offset(i915, bo, 0, SZ,
+				    PROT_READ | PROT_WRITE,
+				    t->type);
+		if (!ptr)
+			continue;
+
+		igt_dynamic_f("%s", t->name) {
+			pid_t pid;
+
+			memset(cpy, AA, SZ);
+			memset(ptr, CC, SZ);
+
+			igt_assert(!memchr_inv(ptr, CC, SZ));
+			igt_assert(!memchr_inv(cpy, AA, SZ));
+
+			igt_fork(child, 1) {
+				ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+				raise(SIGSTOP);
+			}
+
+			/* Wait for the child to ready themselves [SIGSTOP] */
+			pid = wait(NULL);
+
+			ptrace(PTRACE_ATTACH, pid, NULL, NULL);
+			for (int i = 0; i < SZ / sizeof(long); i++) {
+				long ret;
+
+				ret = ptrace(PTRACE_PEEKDATA, pid, ptr + i);
+				igt_assert_eq_u64(ret, CC);
+				cpy[i] = ret;
+
+				ret = ptrace(PTRACE_POKEDATA, pid, ptr + i, AA);
+				igt_assert_eq(ret, 0l);
+			}
+			ptrace(PTRACE_DETACH, pid, NULL, NULL);
+
+			/* Wakeup the child for it to exit */
+			kill(SIGCONT, pid);
+			igt_waitchildren();
+
+			/* The two buffers should now be swapped */
+			igt_assert(!memchr_inv(ptr, AA, SZ));
+			igt_assert(!memchr_inv(cpy, CC, SZ));
+		}
+
+		munmap(ptr, SZ);
+	}
+
+	gem_close(i915, bo);
+	free(cpy);
 }
 
 static void close_race(int i915, int timeout)
@@ -529,6 +615,9 @@ igt_main
 		isolation(i915);
 	igt_subtest_f("pf-nonblock")
 		pf_nonblock(i915);
+
+	igt_subtest_with_dynamic("ptrace")
+		test_ptrace(i915);
 
 	igt_describe("Check race between close and mmap offset between threads");
 	igt_subtest_f("close-race")
