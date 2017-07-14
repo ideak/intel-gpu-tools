@@ -285,7 +285,10 @@ hda_dynamic_debug(bool enable)
 	const char snd_hda_core_off[] = "module snd_hda_intel =_";
 
 	fp = fopen("/sys/kernel/debug/dynamic_debug/control", "w");
-	igt_assert(fp != NULL);
+	if (!fp) {
+		igt_debug("hda dynamic debug not available\n");
+		return;
+	}
 
 	if (enable) {
 		fwrite(snd_hda_intel_on, 1, sizeof(snd_hda_intel_on), fp);
