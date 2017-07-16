@@ -53,6 +53,8 @@
 
 #define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
+#define MI_ARB_CHK (0x5 << 23)
+
 static const int BATCH_SIZE = 4096;
 static IGT_LIST(spin_list);
 
@@ -68,7 +70,8 @@ fill_reloc(struct drm_i915_gem_relocation_entry *reloc,
 }
 
 static void emit_recursive_batch(igt_spin_t *spin,
-				 int fd, int engine, unsigned int dep)
+				 int fd, uint32_t ctx, unsigned engine,
+				 uint32_t dep)
 {
 #define SCRATCH 0
 #define BATCH 1
@@ -119,6 +122,9 @@ static void emit_recursive_batch(igt_spin_t *spin,
 	spin->batch = batch;
 	spin->handle = obj[BATCH].handle;
 
+	/* Allow ourselves to be preempted */
+	*batch++ = MI_ARB_CHK;
+
 	/* Pad with a few nops so that we do not completely hog the system.
 	 *
 	 * Part of the attraction of using a recursive batch is that it is
@@ -156,6 +162,7 @@ static void emit_recursive_batch(igt_spin_t *spin,
 	obj[BATCH].relocs_ptr = to_user_pointer(relocs);
 
 	execbuf.buffers_ptr = to_user_pointer(obj + (2 - execbuf.buffer_count));
+	execbuf.rsvd1 = ctx;
 
 	for (i = 0; i < nengine; i++) {
 		execbuf.flags &= ~ENGINE_MASK;
@@ -165,14 +172,14 @@ static void emit_recursive_batch(igt_spin_t *spin,
 }
 
 igt_spin_t *
-__igt_spin_batch_new(int fd, int engine, unsigned int dep)
+__igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
 {
 	igt_spin_t *spin;
 
 	spin = calloc(1, sizeof(struct igt_spin));
 	igt_assert(spin);
 
-	emit_recursive_batch(spin, fd, engine, dep);
+	emit_recursive_batch(spin, fd, ctx, engine, dep);
 	igt_assert(gem_bo_busy(fd, spin->handle));
 
 	igt_list_add(&spin->link, &spin_list);
@@ -196,11 +203,11 @@ __igt_spin_batch_new(int fd, int engine, unsigned int dep)
  * Structure with helper internal state for igt_spin_batch_free().
  */
 igt_spin_t *
-igt_spin_batch_new(int fd, int engine, unsigned int dep)
+igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
 {
 	igt_require_gem(fd);
 
-	return __igt_spin_batch_new(fd, engine, dep);
+	return __igt_spin_batch_new(fd, ctx, engine, dep);
 }
 
 static void notify(union sigval arg)

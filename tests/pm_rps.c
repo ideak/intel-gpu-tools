@@ -579,7 +579,7 @@ static void boost_freq(int fd, int *boost_freqs)
 	engine = I915_EXEC_RENDER;
 	if (intel_gen(lh.devid) >= 6)
 		engine = I915_EXEC_BLT;
-	load = igt_spin_batch_new(fd, engine, 0);
+	load = igt_spin_batch_new(fd, 0, engine, 0);
 	/* Waiting will grant us a boost to maximum */
 	gem_wait(fd, load->handle, &timeout);
 

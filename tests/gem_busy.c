@@ -460,7 +460,7 @@ static bool has_semaphores(int fd)
 
 static bool has_extended_busy_ioctl(int fd)
 {
-	igt_spin_t *spin = igt_spin_batch_new(fd, I915_EXEC_RENDER, 0);
+	igt_spin_t *spin = igt_spin_batch_new(fd, 0, I915_EXEC_RENDER, 0);
 	uint32_t read, write;
 
 	__gem_busy(fd, spin->handle, &read, &write);
@@ -471,7 +471,7 @@ static bool has_extended_busy_ioctl(int fd)
 
 static void basic(int fd, unsigned ring, unsigned flags)
 {
-	igt_spin_t *spin = igt_spin_batch_new(fd, ring, 0);
+	igt_spin_t *spin = igt_spin_batch_new(fd, 0, ring, 0);
 	struct timespec tv;
 	int timeout;
 	bool busy;

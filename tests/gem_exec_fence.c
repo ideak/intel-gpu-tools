@@ -438,7 +438,7 @@ static void test_parallel(int fd, unsigned int master)
 	/* Fill the queue with many requests so that the next one has to
 	 * wait before it can be executed by the hardware.
 	 */
-	spin = igt_spin_batch_new(fd, master, c.handle);
+	spin = igt_spin_batch_new(fd, 0, master, c.handle);
 	resubmit(fd, spin->handle, master, 16);
 
 	/* Now queue the master request and its secondaries */
@@ -954,7 +954,7 @@ static void test_syncobj_unused_fence(int fd)
 	struct local_gem_exec_fence fence = {
 		.handle = syncobj_create(fd),
 	};
-	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0);
+	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0, 0);
 
 	/* sanity check our syncobj_to_sync_file interface */
 	igt_assert_eq(__syncobj_to_sync_file(fd, 0), -ENOENT);
@@ -1018,7 +1018,7 @@ static void test_syncobj_signal(int fd)
 	struct local_gem_exec_fence fence = {
 		.handle = syncobj_create(fd),
 	};
-	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0);
+	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0, 0);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj);
@@ -1062,7 +1062,7 @@ static void test_syncobj_wait(int fd)
 
 	gem_quiescent_gpu(fd);
 
-	spin = igt_spin_batch_new(fd, 0, 0);
+	spin = igt_spin_batch_new(fd, 0, 0, 0);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj);
@@ -1132,7 +1132,7 @@ static void test_syncobj_import(int fd)
 		.handle = syncobj_create(fd),
 	};
 	int export[2];
-	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0);
+	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0, 0);
 
 	for (int n = 0; n < ARRAY_SIZE(export); n++)
 		export[n] = syncobj_export(fd, fence.handle);

@@ -110,7 +110,7 @@ static void unplug(struct cork *c)
 static void basic(int fd, unsigned engine, unsigned flags)
 {
 	struct cork cork = plug(fd, flags);
-	igt_spin_t *spin = igt_spin_batch_new(fd, engine, cork.handle);
+	igt_spin_t *spin = igt_spin_batch_new(fd, 0, engine, cork.handle);
 	struct drm_i915_gem_wait wait = {
 	       	flags & WRITE ? cork.handle : spin->handle
        	};

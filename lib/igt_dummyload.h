@@ -37,8 +37,14 @@ typedef struct igt_spin {
 	uint32_t *batch;
 } igt_spin_t;
 
-igt_spin_t *__igt_spin_batch_new(int fd, int engine, unsigned int dep);
-igt_spin_t *igt_spin_batch_new(int fd, int engine, unsigned int dep);
+igt_spin_t *__igt_spin_batch_new(int fd,
+				 uint32_t ctx,
+				 unsigned engine,
+				 uint32_t  dep);
+igt_spin_t *igt_spin_batch_new(int fd,
+			       uint32_t ctx,
+			       unsigned engine,
+			       uint32_t  dep);
 void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns);
 void igt_spin_batch_end(igt_spin_t *spin);
 void igt_spin_batch_free(int fd, igt_spin_t *spin);

@@ -373,6 +373,157 @@ static void promotion(int fd, unsigned ring)
 	munmap(ptr, 4096);
 }
 
+#define NEW_CTX 0x1
+static void preempt(int fd, unsigned ring, unsigned flags)
+{
+	uint32_t result = gem_create(fd, 4096);
+	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	igt_spin_t *spin[16];
+	uint32_t ctx[2];
+
+	ctx[LO] = gem_context_create(fd);
+	ctx_set_priority(fd, ctx[LO], -MAX_PRIO);
+
+	ctx[HI] = gem_context_create(fd);
+	ctx_set_priority(fd, ctx[HI], MAX_PRIO);
+
+	for (int n = 0; n < 16; n++) {
+		if (flags & NEW_CTX) {
+			gem_context_destroy(fd, ctx[LO]);
+			ctx[LO] = gem_context_create(fd);
+			ctx_set_priority(fd, ctx[LO], -MAX_PRIO);
+		}
+		spin[n] = __igt_spin_batch_new(fd, ctx[LO], ring, 0);
+		igt_debug("spin[%d].handle=%d\n", n, spin[n]->handle);
+
+		store_dword(fd, ctx[HI], ring, result, 0, n + 1, 0, I915_GEM_DOMAIN_RENDER);
+
+		gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
+		igt_assert_eq_u32(ptr[0], n + 1);
+		igt_assert(gem_bo_busy(fd, spin[0]->handle));
+	}
+
+	for (int n = 0; n < 16; n++)
+		igt_spin_batch_free(fd, spin[n]);
+
+	gem_context_destroy(fd, ctx[LO]);
+	gem_context_destroy(fd, ctx[HI]);
+
+	munmap(ptr, 4096);
+	gem_close(fd, result);
+}
+
+static void preempt_other(int fd, unsigned ring)
+{
+	uint32_t result = gem_create(fd, 4096);
+	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	igt_spin_t *spin[16];
+	unsigned int other;
+	unsigned int n, i;
+	uint32_t ctx[3];
+
+	/* On each engine, insert
+	 * [NOISE] spinner,
+	 * [LOW] write
+	 *
+	 * Then on our target engine do a [HIGH] write which should then
+	 * prompt its dependent LOW writes in front of the spinner on
+	 * each engine. The purpose of this test is to check that preemption
+	 * can cross engines.
+	 */
+
+	ctx[LO] = gem_context_create(fd);
+	ctx_set_priority(fd, ctx[LO], -MAX_PRIO);
+
+	ctx[NOISE] = gem_context_create(fd);
+
+	ctx[HI] = gem_context_create(fd);
+	ctx_set_priority(fd, ctx[HI], MAX_PRIO);
+
+	n = 0;
+	for_each_engine(fd, other) {
+		spin[n] = __igt_spin_batch_new(fd, ctx[NOISE], other, 0);
+		store_dword(fd, ctx[LO], other,
+			    result, (n + 1)*sizeof(uint32_t), n + 1,
+			    0, I915_GEM_DOMAIN_RENDER);
+		n++;
+	}
+	store_dword(fd, ctx[HI], ring,
+		    result, (n + 1)*sizeof(uint32_t), n + 1,
+		    0, I915_GEM_DOMAIN_RENDER);
+
+	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
+
+	for (i = 0; i < n; i++) {
+		igt_assert(gem_bo_busy(fd, spin[i]->handle));
+		igt_spin_batch_free(fd, spin[i]);
+	}
+
+	n++;
+	for (i = 0; i <= n; i++)
+		igt_assert_eq_u32(ptr[i], i);
+
+	gem_context_destroy(fd, ctx[LO]);
+	gem_context_destroy(fd, ctx[NOISE]);
+	gem_context_destroy(fd, ctx[HI]);
+
+	munmap(ptr, 4096);
+	gem_close(fd, result);
+}
+
+static void preempt_self(int fd, unsigned ring)
+{
+	uint32_t result = gem_create(fd, 4096);
+	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	igt_spin_t *spin[16];
+	unsigned int other;
+	unsigned int n, i;
+	uint32_t ctx[3];
+
+	/* On each engine, insert
+	 * [NOISE] spinner,
+	 * [self/LOW] write
+	 *
+	 * Then on our target engine do a [self/HIGH] write which should then
+	 * preempt its own lower priority task on any engine.
+	 */
+
+	ctx[NOISE] = gem_context_create(fd);
+
+	ctx[HI] = gem_context_create(fd);
+
+	n = 0;
+	ctx_set_priority(fd, ctx[HI], -MAX_PRIO);
+	for_each_engine(fd, other) {
+		spin[n] = __igt_spin_batch_new(fd, ctx[NOISE], other, 0);
+		store_dword(fd, ctx[HI], other,
+			    result, (n + 1)*sizeof(uint32_t), n + 1,
+			    0, I915_GEM_DOMAIN_RENDER);
+		n++;
+	}
+	ctx_set_priority(fd, ctx[HI], MAX_PRIO);
+	store_dword(fd, ctx[HI], ring,
+		    result, (n + 1)*sizeof(uint32_t), n + 1,
+		    0, I915_GEM_DOMAIN_RENDER);
+
+	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
+
+	for (i = 0; i < n; i++) {
+		igt_assert(gem_bo_busy(fd, spin[i]->handle));
+		igt_spin_batch_free(fd, spin[i]);
+	}
+
+	n++;
+	for (i = 0; i <= n; i++)
+		igt_assert_eq_u32(ptr[i], i);
+
+	gem_context_destroy(fd, ctx[NOISE]);
+	gem_context_destroy(fd, ctx[HI]);
+
+	munmap(ptr, 4096);
+	gem_close(fd, result);
+}
+
 static void deep(int fd, unsigned ring)
 {
 #define XS 8
@@ -725,6 +876,18 @@ igt_main
 
 				igt_subtest_f("promotion-%s", e->name)
 					promotion(fd, e->exec_id | e->flags);
+
+				igt_subtest_f("preempt-%s", e->name)
+					preempt(fd, e->exec_id | e->flags, 0);
+
+				igt_subtest_f("preempt-contexts-%s", e->name)
+					preempt(fd, e->exec_id | e->flags, NEW_CTX);
+
+				igt_subtest_f("preempt-other-%s", e->name)
+					preempt_other(fd, e->exec_id | e->flags);
+
+				igt_subtest_f("preempt-self-%s", e->name)
+					preempt_self(fd, e->exec_id | e->flags);
 
 				igt_subtest_f("deep-%s", e->name)
 					deep(fd, e->exec_id | e->flags);

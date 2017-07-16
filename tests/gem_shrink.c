@@ -311,9 +311,9 @@ static void reclaim(unsigned engine, int timeout)
 		} while (!*shared);
 	}
 
-	spin = igt_spin_batch_new(fd, engine, 0);
+	spin = igt_spin_batch_new(fd, 0, engine, 0);
 	igt_until_timeout(timeout) {
-		igt_spin_t *next = __igt_spin_batch_new(fd, engine, 0);
+		igt_spin_t *next = __igt_spin_batch_new(fd, 0, engine, 0);
 
 		igt_spin_batch_set_timeout(spin, timeout_100ms);
 		gem_sync(fd, spin->handle);
