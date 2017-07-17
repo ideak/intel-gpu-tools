@@ -304,21 +304,23 @@ void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
  * igt_crc_to_string:
  * @crc: pipe CRC value to print
  *
- * This formats @crc into a string buffer which is owned by igt_crc_to_string().
- * The next call will override the buffer again, which makes this multithreading
- * unsafe.
+ * This function allocates a string and formats @crc into it.
+ * The caller is responsible for freeing the string.
  *
  * This should only ever be used for diagnostic debug output.
  */
 char *igt_crc_to_string(igt_crc_t *crc)
 {
 	int i;
-	char buf[128] = { 0 };
+	char *buf = calloc(128, sizeof(char));
+
+	if (!buf)
+		return NULL;
 
 	for (i = 0; i < crc->n_words; i++)
 		sprintf(buf + strlen(buf), "%08x ", crc->crc[i]);
 
-	return strdup(buf);
+	return buf;
 }
 
 #define MAX_CRC_ENTRIES 10
