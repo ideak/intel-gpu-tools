@@ -180,10 +180,15 @@ fi
 PKG_CHECK_MODULES(GLIB, glib-2.0)
 
 # for chamelium
-PKG_CHECK_MODULES(XMLRPC, xmlrpc_client, [xmlrpc=yes], [xmlrpc=no])
-PKG_CHECK_MODULES(PIXMAN, pixman-1, [pixman=yes], [pixman=no])
-AM_CONDITIONAL(HAVE_CHAMELIUM, [test "x$xmlrpc$pixman" = xyesyes])
-if test x"$xmlrpc$pixman" = xyesyes; then
+AC_ARG_ENABLE(chamelium, AS_HELP_STRING([--disable-chamelium],
+	      [Enable building of chamelium libraries and tests (default: yes)]),
+	      [enable_chamelium=yes], [enable_chamelium=no])
+AM_CONDITIONAL(HAVE_CHAMELIUM, [test "x$enable_chamelium" = xyes])
+if test "x$enable_chamelium" = xyes; then
+	PKG_CHECK_MODULES(XMLRPC, xmlrpc xmlrpc_util xmlrpc_client, [],
+			  [AC_MSG_ERROR([Failed to find xmlrpc, required by chamelium. Use --disable-chamelium to disable chamelium support.])])
+	PKG_CHECK_MODULES(PIXMAN, pixman-1, [],
+			  [AC_MSG_ERROR([Failed to find pixman, required by chamelium. Use --disable-chamelium to disable chamelium support.])])
 	AC_DEFINE(HAVE_CHAMELIUM, 1, [Enable Chamelium support])
 fi
 
