@@ -74,8 +74,19 @@ static struct format_desc_struct {
 #define for_each_format(f)	\
 	for (f = format_desc; f - format_desc < ARRAY_SIZE(format_desc); f++)
 
-static void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
-				 unsigned *width_ret, unsigned *height_ret)
+/**
+ * igt_get_fb_tile_size:
+ * @fd: the DRM file descriptor
+ * @tiling: tiling layout of the framebuffer (as framebuffer modifier)
+ * @fb_bpp: bits per pixel of the framebuffer
+ * @width_ret: width of the tile in bytes
+ * @height_ret: height of the tile in lines
+ *
+ * This function returns width and height of a tile based on the given tiling
+ * format.
+ */
+void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
+			  unsigned *width_ret, unsigned *height_ret)
 {
 	switch (tiling) {
 	case LOCAL_DRM_FORMAT_MOD_NONE:

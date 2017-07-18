@@ -95,6 +95,8 @@ enum igt_text_align {
 	align_hcenter	= 0x08,
 };
 
+void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
+			  unsigned *width_ret, unsigned *height_ret);
 void igt_calc_fb_size(int fd, int width, int height, int bpp, uint64_t tiling,
 		      unsigned *size_ret, unsigned *stride_ret);
 unsigned int
