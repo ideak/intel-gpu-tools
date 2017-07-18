@@ -318,12 +318,10 @@ static void prepare_crtc(data_t *data)
 	igt_output_set_pipe(output, data->pipe);
 }
 
-static void create_fbs(data_t *data, bool tiled, struct igt_fb *fbs)
+static void create_fbs(data_t *data, uint64_t tiling, struct igt_fb *fbs)
 {
 	int rc;
 	drmModeModeInfo *mode = igt_output_get_mode(data->output);
-	uint64_t tiling = tiled ? LOCAL_I915_FORMAT_MOD_X_TILED :
-				  LOCAL_DRM_FORMAT_MOD_NONE;
 
 	rc = igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 				 DRM_FORMAT_XRGB8888, tiling,
@@ -344,8 +342,8 @@ static void get_ref_crcs(data_t *data)
 	struct igt_fb fbs[4];
 	int i;
 
-	create_fbs(data, false, &fbs[0]);
-	create_fbs(data, false, &fbs[2]);
+	create_fbs(data, LOCAL_DRM_FORMAT_MOD_NONE, &fbs[0]);
+	create_fbs(data, LOCAL_DRM_FORMAT_MOD_NONE, &fbs[2]);
 
 	fill_mmap_gtt(data, fbs[2].gem_handle, 0xff);
 	fill_mmap_gtt(data, fbs[3].gem_handle, 0xff);
@@ -366,7 +364,7 @@ static void get_ref_crcs(data_t *data)
 		igt_remove_fb(data->drm_fd, &fbs[i]);
 }
 
-static bool prepare_test(data_t *data, enum test_mode test_mode)
+static bool prepare_test(data_t *data, enum test_mode test_mode, uint64_t tiling)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output = data->output;
@@ -374,7 +372,7 @@ static bool prepare_test(data_t *data, enum test_mode test_mode)
 
 	data->primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 
-	create_fbs(data, true, data->fb);
+	create_fbs(data, tiling, data->fb);
 
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = NULL;
@@ -474,7 +472,10 @@ static void reset_display(data_t *data)
 static void run_test(data_t *data, enum test_mode mode)
 {
 	igt_display_t *display = &data->display;
-	int valid_tests = 0;
+	int valid_tests = 0, i;
+	uint64_t tiling_methods[] = {
+		LOCAL_I915_FORMAT_MOD_X_TILED, LOCAL_I915_FORMAT_MOD_Y_TILED,
+	};
 
 	if (mode == TEST_CONTEXT || mode == TEST_PAGE_FLIP_AND_CONTEXT) {
 		drm_intel_context *ctx = drm_intel_gem_context_create(data->bufmgr);
@@ -484,32 +485,53 @@ static void run_test(data_t *data, enum test_mode mode)
 
 	reset_display(data);
 
-	for_each_pipe_with_valid_output(display, data->pipe, data->output) {
-		prepare_crtc(data);
+	for (i = 0; i < ARRAY_SIZE(tiling_methods); i++) {
+		uint64_t tiling = tiling_methods[i];
 
-		igt_info("Beginning %s on pipe %s, connector %s\n",
-			  igt_subtest_name(),
-			  kmstest_pipe_name(data->pipe),
-			  igt_output_name(data->output));
-
-		if (!prepare_test(data, mode)) {
-			igt_info("%s on pipe %s, connector %s: SKIPPED\n",
-				  igt_subtest_name(),
-				  kmstest_pipe_name(data->pipe),
-				  igt_output_name(data->output));
+		if (intel_gen(data->devid) < 9 &&
+		    tiling == LOCAL_I915_FORMAT_MOD_Y_TILED) {
+			igt_info("%s y-tiled: SKIPPED\n", igt_subtest_name());
 			continue;
 		}
 
-		valid_tests++;
+		for_each_pipe_with_valid_output(display,
+						data->pipe, data->output) {
+			const char *tiling_name =
+				tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ?
+					"y" : "x";
 
-		test_crc(data, mode);
+			prepare_crtc(data);
 
-		igt_info("%s on pipe %s, connector %s: PASSED\n",
-			  igt_subtest_name(),
-			  kmstest_pipe_name(data->pipe),
-			  igt_output_name(data->output));
+			igt_info("Beginning %s on pipe %s, connector "
+				 "%s, %s-tiled\n",
+				 igt_subtest_name(),
+				 kmstest_pipe_name(data->pipe),
+				 igt_output_name(data->output),
+				 tiling_name);
 
-		finish_crtc(data, mode);
+			if (!prepare_test(data, mode, tiling)) {
+				igt_info("%s on pipe %s, connector "
+					 "%s, %s-tiled: SKIPPED\n",
+					 igt_subtest_name(),
+					 kmstest_pipe_name(data->pipe),
+					 igt_output_name(data->output),
+					 tiling_name);
+				continue;
+			}
+
+			valid_tests++;
+
+			test_crc(data, mode);
+
+			igt_info("%s on pipe %s, connector %s,"
+				 "%s-tiled: PASSED\n",
+				 igt_subtest_name(),
+				 kmstest_pipe_name(data->pipe),
+				 igt_output_name(data->output),
+				 tiling_name);
+
+			finish_crtc(data, mode);
+		}
 	}
 
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
