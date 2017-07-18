@@ -132,6 +132,7 @@ int igt_create_bo_with_dimensions(int fd, int width, int height, uint32_t format
 				  bool *is_dumb);
 
 uint64_t igt_fb_mod_to_tiling(uint64_t modifier);
+uint64_t igt_fb_tiling_to_mod(uint64_t tiling);
 
 /* cairo-based painting */
 cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb);

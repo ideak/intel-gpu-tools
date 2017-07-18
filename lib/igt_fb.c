@@ -217,6 +217,32 @@ uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 	}
 }
 
+/**
+ * igt_fb_tiling_to_mod:
+ * @tiling: DRM framebuffer tiling
+ *
+ * This function converts a DRM framebuffer tiling to its corresponding
+ * modifier constant.
+ *
+ * Returns:
+ * A modifier constant
+ */
+uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
+{
+	switch (tiling) {
+	case I915_TILING_NONE:
+		return LOCAL_DRM_FORMAT_MOD_NONE;
+	case I915_TILING_X:
+		return LOCAL_I915_FORMAT_MOD_X_TILED;
+	case I915_TILING_Y:
+		return LOCAL_I915_FORMAT_MOD_Y_TILED;
+	case I915_TILING_Yf:
+		return LOCAL_I915_FORMAT_MOD_Yf_TILED;
+	default:
+		igt_assert(0);
+	}
+}
+
 /* helpers to create nice-looking framebuffers */
 static int create_bo_for_fb(int fd, int width, int height, uint32_t format,
 			    uint64_t tiling, unsigned size, unsigned stride,
