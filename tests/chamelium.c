@@ -340,12 +340,16 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 
 	reset_state(data, port);
 
+	/* Catch the event and flush all remaining ones. */
+	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
+	igt_flush_hotplugs(mon);
+
 	/* First plug in the port */
 	chamelium_port_set_edid(data->chamelium, port, edid_id);
 	chamelium_plug(data->chamelium, port);
-	wait_for_connector(data, port, DRM_MODE_CONNECTED);
+	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
 
-	igt_flush_hotplugs(mon);
+	wait_for_connector(data, port, DRM_MODE_CONNECTED);
 
 	/*
 	 * Change the edid before we suspend. On resume, the machine should
@@ -354,6 +358,8 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 	chamelium_port_set_edid(data->chamelium, port, alt_edid_id);
 
 	get_connectors_link_status_failed(data, link_status_failed[0]);
+
+	igt_flush_hotplugs(mon);
 
 	igt_system_suspend_autoresume(state, test);
 
