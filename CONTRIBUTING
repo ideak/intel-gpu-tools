@@ -26,10 +26,11 @@ A short list of contribution guidelines:
   convenience macros provided by the igt library. The semantic patch lib/igt.cocci
   can help with the more automatic conversions.
 
-- There is no formal review requirement and regular contributors with commit
-  access can push patches right after submitting them to the mailing lists. But
-  invasive changes, new helper libraries and contributions from newcomers should
-  go through a proper review to ensure overall consistency in the codebase.
+- Patches need to be reviewed on the mailing list. Exceptions only apply for
+  testcases and tooling for drivers with just a single contributor (e.g. vc4).
+  In this case patches must still be submitted to the mailing list first.
+  Testcase should preferrably be cross-reviewed by the same people who write and
+  review the kernel feature itself.
 
 - When patches from new contributors (without commit access) are stuck, for
   anything related to the regular releases, issues with packaging and
