@@ -135,69 +135,116 @@ static int swizzle_addr(int addr, int swizzle)
 	return addr;
 }
 
-/* It's all in "pixel coordinates", so make sure you multiply/divide by the bpp
- * if you need to. */
-static int linear_x_y_to_tiled_pos(int x, int y, uint32_t stride, int swizzle,
-				   int bpp)
+static int tile(int x, int y, uint32_t x_tile_size, uint32_t y_tile_size,
+		uint32_t line_size, bool xmajor)
 {
-	int x_tile_size, y_tile_size;
-	int x_tile_n, y_tile_n, x_tile_off, y_tile_off;
-	int line_size, tile_size;
-	int tile_n, tile_off;
-	int tiled_pos, tiles_per_line;
-	int pixel_size = bpp / 8;
+	int tile_size, tiles_per_line, x_tile_n, y_tile_n, tile_off, pos;
+	int tile_n, x_tile_off, y_tile_off;
 
-	line_size = stride;
-	x_tile_size = 512;
-	y_tile_size = 8;
-	tile_size = x_tile_size * y_tile_size;
 	tiles_per_line = line_size / x_tile_size;
+	tile_size = x_tile_size * y_tile_size;
 
+	x_tile_n = x / x_tile_size;
 	y_tile_n = y / y_tile_size;
+	tile_n = y_tile_n * tiles_per_line + x_tile_n;
+
+	x_tile_off = x % x_tile_size;
 	y_tile_off = y % y_tile_size;
 
-	x_tile_n = (x * pixel_size) / x_tile_size;
-	x_tile_off = (x * pixel_size) % x_tile_size;
+	if (xmajor)
+		tile_off = y_tile_off * x_tile_size + x_tile_off;
+	else
+		tile_off = x_tile_off * y_tile_size + y_tile_off;
 
-	tile_n = y_tile_n * tiles_per_line + x_tile_n;
-	tile_off = y_tile_off * x_tile_size + x_tile_off;
-	tiled_pos = tile_n * tile_size + tile_off;
+	pos = tile_n * tile_size + tile_off;
 
-	tiled_pos = swizzle_addr(tiled_pos, swizzle);
-
-	return tiled_pos / pixel_size;
+	return pos;
 }
 
-/* It's all in "pixel coordinates", so make sure you multiply/divide by the bpp
- * if you need to. */
-static void tiled_pos_to_x_y_linear(int tiled_pos, uint32_t stride,
-				    int swizzle, int bpp, int *x, int *y)
+static void untile(int tiled_pos, int x_tile_size, int y_tile_size,
+		   uint32_t line_size, bool xmajor, int *x, int *y)
 {
-	int tile_n, tile_off, tiles_per_line, line_size;
+	int tile_n, tile_off, tiles_per_line;
 	int x_tile_off, y_tile_off;
 	int x_tile_n, y_tile_n;
-	int x_tile_size, y_tile_size, tile_size;
-	int pixel_size = bpp / 8;
+	int tile_size;
 
-	tiled_pos = swizzle_addr(tiled_pos, swizzle);
-
-	line_size = stride;
-	x_tile_size = 512;
-	y_tile_size = 8;
 	tile_size = x_tile_size * y_tile_size;
 	tiles_per_line = line_size / x_tile_size;
 
 	tile_n = tiled_pos / tile_size;
 	tile_off = tiled_pos % tile_size;
 
-	y_tile_off = tile_off / x_tile_size;
-	x_tile_off = tile_off % x_tile_size;
+	if (xmajor) {
+		y_tile_off = tile_off / x_tile_size;
+		x_tile_off = tile_off % x_tile_size;
+	} else {
+		y_tile_off = tile_off % y_tile_size;
+		x_tile_off = tile_off / y_tile_size;
+	}
 
 	x_tile_n = tile_n % tiles_per_line;
 	y_tile_n = tile_n / tiles_per_line;
 
-	*x = (x_tile_n * x_tile_size + x_tile_off) / pixel_size;
+	*x = (x_tile_n * x_tile_size + x_tile_off);
 	*y = y_tile_n * y_tile_size + y_tile_off;
+}
+
+static int linear_x_y_to_xtiled_pos(int x, int y, uint32_t stride, int swizzle,
+				    int bpp)
+{
+	int pos;
+	int pixel_size = bpp / 8;
+
+	x *= pixel_size;
+	pos = tile(x, y, 512, 8, stride, true);
+	pos = swizzle_addr(pos, swizzle);
+	return pos / pixel_size;
+}
+
+static int linear_x_y_to_ytiled_pos(int x, int y, uint32_t stride, int swizzle,
+				    int bpp)
+{
+	int ow_tile_n, pos;
+	int ow_size = 16;
+	int pixel_size = bpp / 8;
+
+	/* We have an Y tiling of OWords, so use the tile() function to get the
+	 * OW number, then adjust to the fact that the OW may have more than one
+	 * pixel. */
+	x *= pixel_size;
+	ow_tile_n = tile(x / ow_size, y, 128 / ow_size, 32,
+			 stride / ow_size, false);
+	pos = ow_tile_n * ow_size + (x % ow_size);
+	pos = swizzle_addr(pos, swizzle);
+	return pos / pixel_size;
+}
+
+static void xtiled_pos_to_x_y_linear(int tiled_pos, uint32_t stride,
+				     int swizzle, int bpp, int *x, int *y)
+{
+	int pixel_size = bpp / 8;
+
+	tiled_pos = swizzle_addr(tiled_pos, swizzle);
+
+	untile(tiled_pos, 512, 8, stride, true, x, y);
+	*x /= pixel_size;
+}
+
+static void ytiled_pos_to_x_y_linear(int tiled_pos, uint32_t stride,
+				     int swizzle, int bpp, int *x, int *y)
+{
+	int ow_tile_n;
+	int ow_size = 16;
+	int pixel_size = bpp / 8;
+
+	tiled_pos = swizzle_addr(tiled_pos, swizzle);
+
+	ow_tile_n = tiled_pos / ow_size;
+	untile(ow_tile_n, 128 / ow_size, 32, stride / ow_size, false, x, y);
+	*x *= ow_size;
+	*x += tiled_pos % ow_size;
+	*x /= pixel_size;
 }
 
 static void set_pixel(void *_ptr, int index, uint32_t color, int bpp)
@@ -254,15 +301,26 @@ static void draw_rect_ptr_linear(void *ptr, uint32_t stride,
 	}
 }
 
-static void draw_rect_ptr_tiled(void *ptr, uint32_t stride, int swizzle,
-				struct rect *rect, uint32_t color, int bpp)
+static void draw_rect_ptr_tiled(void *ptr, uint32_t stride, uint32_t tiling,
+				int swizzle, struct rect *rect, uint32_t color,
+				int bpp)
 {
 	int x, y, pos;
 
 	for (y = rect->y; y < rect->y + rect->h; y++) {
 		for (x = rect->x; x < rect->x + rect->w; x++) {
-			pos = linear_x_y_to_tiled_pos(x, y, stride, swizzle,
-						      bpp);
+			switch (tiling) {
+			case I915_TILING_X:
+				pos = linear_x_y_to_xtiled_pos(x, y, stride,
+							       swizzle, bpp);
+				break;
+			case I915_TILING_Y:
+				pos = linear_x_y_to_ytiled_pos(x, y, stride,
+							       swizzle, bpp);
+				break;
+			default:
+				igt_assert(false);
+			}
 			set_pixel(ptr, pos, color, bpp);
 		}
 	}
@@ -289,8 +347,9 @@ static void draw_rect_mmap_cpu(int fd, struct buf_data *buf, struct rect *rect,
 		draw_rect_ptr_linear(ptr, buf->stride, rect, color, buf->bpp);
 		break;
 	case I915_TILING_X:
-		draw_rect_ptr_tiled(ptr, buf->stride, swizzle, rect, color,
-				    buf->bpp);
+	case I915_TILING_Y:
+		draw_rect_ptr_tiled(ptr, buf->stride, tiling, swizzle, rect,
+				    color, buf->bpp);
 		break;
 	default:
 		igt_assert(false);
@@ -339,8 +398,9 @@ static void draw_rect_mmap_wc(int fd, struct buf_data *buf, struct rect *rect,
 		draw_rect_ptr_linear(ptr, buf->stride, rect, color, buf->bpp);
 		break;
 	case I915_TILING_X:
-		draw_rect_ptr_tiled(ptr, buf->stride, swizzle, rect, color,
-				    buf->bpp);
+	case I915_TILING_Y:
+		draw_rect_ptr_tiled(ptr, buf->stride, tiling, swizzle, rect,
+				    color, buf->bpp);
 		break;
 	default:
 		igt_assert(false);
@@ -367,8 +427,8 @@ static void draw_rect_pwrite_untiled(int fd, struct buf_data *buf,
 }
 
 static void draw_rect_pwrite_tiled(int fd, struct buf_data *buf,
-				   struct rect *rect, uint32_t color,
-				   uint32_t swizzle)
+				   uint32_t tiling, struct rect *rect,
+				   uint32_t color, uint32_t swizzle)
 {
 	int i;
 	int tiled_pos, x, y, pixel_size;
@@ -391,8 +451,18 @@ static void draw_rect_pwrite_tiled(int fd, struct buf_data *buf,
 		set_pixel(tmp, i, color, buf->bpp);
 
 	for (tiled_pos = 0; tiled_pos < buf->size; tiled_pos += pixel_size) {
-		tiled_pos_to_x_y_linear(tiled_pos, buf->stride, swizzle,
-					buf->bpp, &x, &y);
+		switch (tiling) {
+		case I915_TILING_X:
+			xtiled_pos_to_x_y_linear(tiled_pos, buf->stride,
+						 swizzle, buf->bpp, &x, &y);
+			break;
+		case I915_TILING_Y:
+			ytiled_pos_to_x_y_linear(tiled_pos, buf->stride,
+						 swizzle, buf->bpp, &x, &y);
+			break;
+		default:
+			igt_assert(false);
+		}
 
 		if (x >= rect->x && x < rect->x + rect->w &&
 		    y >= rect->y && y < rect->y + rect->h) {
@@ -429,7 +499,8 @@ static void draw_rect_pwrite(int fd, struct buf_data *buf,
 		draw_rect_pwrite_untiled(fd, buf, rect, color);
 		break;
 	case I915_TILING_X:
-		draw_rect_pwrite_tiled(fd, buf, rect, color, swizzle);
+	case I915_TILING_Y:
+		draw_rect_pwrite_tiled(fd, buf, tiling, rect, color, swizzle);
 		break;
 	default:
 		igt_assert(false);
