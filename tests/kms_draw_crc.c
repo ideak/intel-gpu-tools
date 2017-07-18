@@ -47,6 +47,13 @@ static const uint32_t formats[N_FORMATS] = {
 	DRM_FORMAT_XRGB2101010,
 };
 
+#define N_TILING_METHODS 3
+static const uint64_t tilings[N_TILING_METHODS] = {
+	LOCAL_DRM_FORMAT_MOD_NONE,
+	LOCAL_I915_FORMAT_MOD_X_TILED,
+	LOCAL_I915_FORMAT_MOD_Y_TILED,
+};
+
 struct base_crc {
 	bool set;
 	igt_crc_t crc;
@@ -151,6 +158,9 @@ static void draw_method_subtest(enum igt_draw_method method,
 {
 	igt_crc_t crc;
 
+	if (tiling == LOCAL_I915_FORMAT_MOD_Y_TILED)
+		igt_require(intel_gen(intel_get_drm_devid(drm_fd)) >= 9);
+
 	/* Use IGT_DRAW_MMAP_GTT on an untiled buffer as the parameter for
 	 * comparison. Cache the value so we don't recompute it for every single
 	 * subtest. */
@@ -207,6 +217,11 @@ static void fill_fb_subtest(void)
 
 	get_fill_crc(LOCAL_I915_FORMAT_MOD_X_TILED, &crc);
 	igt_assert_crc_equal(&crc, &base_crc);
+
+	if (intel_gen(intel_get_drm_devid(drm_fd)) >= 9) {
+		get_fill_crc(LOCAL_I915_FORMAT_MOD_Y_TILED, &crc);
+		igt_assert_crc_equal(&crc, &base_crc);
+	}
 
 	igt_remove_fb(drm_fd, &fb);
 }
@@ -265,28 +280,38 @@ static const char *format_str(int format_index)
 	}
 }
 
+static const char *tiling_str(int tiling_index)
+{
+	switch (tilings[tiling_index]) {
+	case LOCAL_DRM_FORMAT_MOD_NONE:
+		return "untiled";
+	case LOCAL_I915_FORMAT_MOD_X_TILED:
+		return "xtiled";
+	case LOCAL_I915_FORMAT_MOD_Y_TILED:
+		return "ytiled";
+	default:
+		igt_assert(false);
+	}
+}
+
 igt_main
 {
 	enum igt_draw_method method;
-	int format_index;
+	int format_idx, tiling_idx;
 
 	igt_fixture
 		setup_environment();
 
-	for (format_index = 0; format_index < N_FORMATS; format_index++) {
-		for (method = 0; method < IGT_DRAW_METHOD_COUNT; method++) {
-			igt_subtest_f("draw-method-%s-%s-untiled",
-				      format_str(format_index),
-				      igt_draw_get_method_name(method))
-				draw_method_subtest(method, format_index,
-						    LOCAL_DRM_FORMAT_MOD_NONE);
-			igt_subtest_f("draw-method-%s-%s-tiled",
-				      format_str(format_index),
-				      igt_draw_get_method_name(method))
-				draw_method_subtest(method, format_index,
-						LOCAL_I915_FORMAT_MOD_X_TILED);
-		}
-	}
+	for (format_idx = 0; format_idx < N_FORMATS; format_idx++) {
+	for (method = 0; method < IGT_DRAW_METHOD_COUNT; method++) {
+	for (tiling_idx = 0; tiling_idx < N_TILING_METHODS; tiling_idx++) {
+		igt_subtest_f("draw-method-%s-%s-%s",
+			      format_str(format_idx),
+			      igt_draw_get_method_name(method),
+			      tiling_str(tiling_idx))
+			draw_method_subtest(method, format_idx,
+					    tilings[tiling_idx]);
+	} } }
 
 	igt_subtest("fill-fb")
 		fill_fb_subtest();
