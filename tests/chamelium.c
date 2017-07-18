@@ -87,6 +87,31 @@ get_precalculated_crc(struct chamelium_port *port, int w, int h)
 }
 
 static void
+get_connectors_link_status_failed(data_t *data, bool *link_status_failed)
+{
+	drmModeConnector *connector;
+	uint64_t link_status;
+	drmModePropertyPtr prop;
+	int p;
+
+	for (p = 0; p < data->port_count; p++) {
+		connector = chamelium_port_get_connector(data->chamelium,
+							 data->ports[p], false);
+
+		igt_assert(kmstest_get_property(data->drm_fd,
+						connector->connector_id,
+						DRM_MODE_OBJECT_CONNECTOR,
+						"link-status", NULL,
+						&link_status, &prop));
+
+		link_status_failed[p] = link_status == DRM_MODE_LINK_STATUS_BAD;
+
+		drmModeFreeProperty(prop);
+		drmModeFreeConnector(connector);
+	}
+}
+
+static void
 require_connector_present(data_t *data, unsigned int type)
 {
 	int i;
@@ -310,6 +335,8 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 				int alt_edid_id)
 {
 	struct udev_monitor *mon = igt_watch_hotplug();
+	bool link_status_failed[2][data->port_count];
+	int p;
 
 	reset_state(data, port);
 
@@ -326,8 +353,16 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 	 */
 	chamelium_port_set_edid(data->chamelium, port, alt_edid_id);
 
+	get_connectors_link_status_failed(data, link_status_failed[0]);
+
 	igt_system_suspend_autoresume(state, test);
+
 	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
+
+	get_connectors_link_status_failed(data, link_status_failed[1]);
+
+	for (p = 0; p < data->port_count; p++)
+		igt_skip_on(!link_status_failed[0][p] && link_status_failed[1][p]);
 }
 
 static igt_output_t *
