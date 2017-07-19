@@ -431,7 +431,7 @@ test_display_crc_single(data_t *data, struct chamelium_port *port)
 	struct igt_fb fb;
 	drmModeModeInfo *mode;
 	drmModeConnector *connector;
-	int fb_id, i;
+	int fb_id, i, captured_frame_count;
 
 	reset_state(data, port);
 
@@ -456,10 +456,14 @@ test_display_crc_single(data_t *data, struct chamelium_port *port)
 
 		igt_debug("Testing single CRC fetch\n");
 
-		crc = chamelium_get_crc_for_area(data->chamelium, port,
-						 0, 0, 0, 0);
+		chamelium_capture(data->chamelium, port, 0, 0, 0, 0, 1);
+		crc = chamelium_read_captured_crcs(data->chamelium,
+						   &captured_frame_count);
 
 		expected_crc = chamelium_calculate_fb_crc_async_finish(fb_crc);
+
+		chamelium_assert_crc_eq_or_dump(data->chamelium, expected_crc,
+						crc, &fb, 0);
 
 		igt_assert_crc_equal(crc, expected_crc);
 		free(expected_crc);
@@ -522,7 +526,9 @@ test_display_crc_multiple(data_t *data, struct chamelium_port *port)
 		expected_crc = chamelium_calculate_fb_crc_async_finish(fb_crc);
 
 		for (j = 0; j < captured_frame_count; j++)
-			igt_assert_crc_equal(&crc[j], expected_crc);
+			chamelium_assert_crc_eq_or_dump(data->chamelium,
+							expected_crc, &crc[j],
+							&fb, j);
 
 		free(expected_crc);
 		free(crc);

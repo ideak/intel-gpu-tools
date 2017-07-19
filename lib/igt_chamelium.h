@@ -105,6 +105,10 @@ int chamelium_get_frame_limit(struct chamelium *chamelium,
 void chamelium_assert_frame_eq(const struct chamelium *chamelium,
 			       const struct chamelium_frame_dump *dump,
 			       struct igt_fb *fb);
+void chamelium_assert_crc_eq_or_dump(struct chamelium *chamelium,
+				     igt_crc_t *reference_crc,
+				     igt_crc_t *capture_crc, struct igt_fb *fb,
+				     int index);
 void chamelium_destroy_frame_dump(struct chamelium_frame_dump *dump);
 
 #endif /* IGT_CHAMELIUM_H */

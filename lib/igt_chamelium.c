@@ -929,6 +929,32 @@ static pixman_image_t *convert_frame_format(pixman_image_t *src,
 	return converted;
 }
 
+static cairo_surface_t *convert_frame_dump_argb32(const struct chamelium_frame_dump *dump)
+{
+	cairo_surface_t *dump_surface;
+	pixman_image_t *image_bgr;
+	pixman_image_t *image_argb;
+	int w = dump->width, h = dump->height;
+	uint32_t *bits_bgr = (uint32_t *) dump->bgr;
+	unsigned char *bits_argb;
+
+	image_bgr = pixman_image_create_bits(
+	    PIXMAN_b8g8r8, w, h, bits_bgr,
+	    PIXMAN_FORMAT_BPP(PIXMAN_b8g8r8) / 8 * w);
+	image_argb = convert_frame_format(image_bgr, PIXMAN_x8r8g8b8);
+	pixman_image_unref(image_bgr);
+
+	bits_argb = (unsigned char *) pixman_image_get_data(image_argb);
+
+	dump_surface = cairo_image_surface_create_for_data(
+	    bits_argb, CAIRO_FORMAT_ARGB32, w, h,
+	    PIXMAN_FORMAT_BPP(PIXMAN_x8r8g8b8) / 8 * w);
+
+	pixman_image_unref(image_argb);
+
+	return dump_surface;
+}
+
 /**
  * chamelium_assert_frame_eq:
  * @chamelium: The chamelium instance the frame dump belongs to
@@ -970,6 +996,61 @@ void chamelium_assert_frame_eq(const struct chamelium *chamelium,
 
 	igt_fail_on_f(!eq,
 		      "Chamelium frame dump didn't match reference image\n");
+}
+
+/**
+ * chamelium_assert_crc_eq_or_dump:
+ * @chamelium: The chamelium instance the frame dump belongs to
+ * @reference_crc: The CRC for the reference frame
+ * @capture_crc: The CRC for the captured frame
+ * @fb: pointer to an #igt_fb structure
+ *
+ * Asserts that the CRC provided for both the reference and the captured frame
+ * are identical. If they are not, this grabs the captured frame and saves it
+ * along with the reference to a png file.
+ */
+void chamelium_assert_crc_eq_or_dump(struct chamelium *chamelium,
+				     igt_crc_t *reference_crc,
+				     igt_crc_t *capture_crc, struct igt_fb *fb,
+				     int index)
+{
+	struct chamelium_frame_dump *frame;
+	cairo_surface_t *reference;
+	cairo_surface_t *capture;
+	char *reference_suffix;
+	char *capture_suffix;
+	bool eq;
+
+	eq = igt_check_crc_equal(reference_crc, capture_crc);
+	if (!eq && igt_frame_dump_is_enabled()) {
+		/* Grab the reference frame from framebuffer */
+		reference = igt_get_cairo_surface(chamelium->drm_fd, fb);
+
+		/* Grab the captured frame from chamelium */
+		frame = chamelium_read_captured_frame(chamelium, index);
+		igt_assert(frame);
+
+		capture = convert_frame_dump_argb32(frame);
+
+		reference_suffix = igt_crc_to_string_extended(reference_crc,
+							      '-', 2);
+		capture_suffix = igt_crc_to_string_extended(capture_crc, '-',
+							    2);
+
+		/* Write reference and capture frames to png */
+		igt_write_compared_frames_to_png(reference, capture,
+						 reference_suffix,
+						 capture_suffix);
+
+		free(reference_suffix);
+		free(capture_suffix);
+
+		chamelium_destroy_frame_dump(frame);
+
+		cairo_surface_destroy(capture);
+	}
+
+	igt_assert(eq);
 }
 
 /**
