@@ -130,6 +130,76 @@ wait_for_connector(data_t *data, struct chamelium_port *port,
 	igt_assert(finished);
 }
 
+static int chamelium_vga_modes[][2] = {
+	{ 1600, 1200 },
+	{ 1920, 1200 },
+	{ 1920, 1080 },
+	{ 1680, 1050 },
+	{ 1280, 1024 },
+	{ 1280, 960 },
+	{ 1440, 900 },
+	{ 1280, 800 },
+	{ 1024, 768 },
+	{ 1360, 768 },
+	{ 1280, 720 },
+	{ 800, 600 },
+	{ 640, 480 },
+	{ -1, -1 },
+};
+
+static bool
+prune_vga_mode(data_t *data, drmModeModeInfo *mode)
+{
+	int i = 0;
+
+	while (chamelium_vga_modes[i][0] != -1) {
+		if (mode->hdisplay == chamelium_vga_modes[i][0] &&
+		    mode->vdisplay == chamelium_vga_modes[i][1])
+			return false;
+
+		i++;
+	}
+
+	return true;
+}
+
+static bool
+check_analog_bridge(data_t *data, struct chamelium_port *port)
+{
+	drmModePropertyBlobPtr edid_blob = NULL;
+	drmModeConnector *connector = chamelium_port_get_connector(
+	    data->chamelium, port, false);
+	uint64_t edid_blob_id;
+	unsigned char *edid;
+	char edid_vendor[3];
+
+	if (chamelium_port_get_type(port) != DRM_MODE_CONNECTOR_VGA)
+		return false;
+
+	igt_assert(kmstest_get_property(data->drm_fd, connector->connector_id,
+					DRM_MODE_OBJECT_CONNECTOR, "EDID", NULL,
+					&edid_blob_id, NULL));
+	igt_assert(edid_blob = drmModeGetPropertyBlob(data->drm_fd,
+						      edid_blob_id));
+
+	edid = (unsigned char *) edid_blob->data;
+
+	edid_vendor[0] = ((edid[8] & 0x7c) >> 2) + '@';
+	edid_vendor[1] = (((edid[8] & 0x03) << 3) |
+			  ((edid[9] & 0xe0) >> 5)) + '@';
+	edid_vendor[2] = (edid[9] & 0x1f) + '@';
+
+	/* Analog bridges provide their own EDID */
+	if (edid_vendor[0] != 'I' || edid_vendor[1] != 'G' ||
+	    edid_vendor[0] != 'T')
+		return true;
+
+	drmModeFreePropertyBlob(edid_blob);
+	drmModeFreeConnector(connector);
+
+	return false;
+}
+
 static void
 reset_state(data_t *data, struct chamelium_port *port)
 {
@@ -192,6 +262,8 @@ test_edid_read(data_t *data, struct chamelium_port *port,
 	chamelium_port_set_edid(data->chamelium, port, edid_id);
 	chamelium_plug(data->chamelium, port);
 	wait_for_connector(data, port, DRM_MODE_CONNECTED);
+
+	igt_skip_on(check_analog_bridge(data, port));
 
 	igt_assert(kmstest_get_property(data->drm_fd, connector->connector_id,
 					DRM_MODE_OBJECT_CONNECTOR, "EDID", NULL,
@@ -547,14 +619,20 @@ test_analog_frame_dump(data_t *data, struct chamelium_port *port)
 	drmModeModeInfo *mode;
 	drmModeConnector *connector;
 	int fb_id, i;
+	bool bridge;
 
 	output = prepare_output(data, &display, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
+	bridge = check_analog_bridge(data, port);
+
 	for (i = 0; i < connector->count_modes; i++) {
 		mode = &connector->modes[i];
+
+		if (bridge && prune_vga_mode(data, mode))
+			continue;
 
 		fb_id = igt_create_color_pattern_fb(data->drm_fd,
 						    mode->hdisplay, mode->vdisplay,
