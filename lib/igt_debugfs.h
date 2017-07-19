@@ -114,6 +114,7 @@ enum intel_pipe_crc_source {
 };
 
 void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
+bool igt_check_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
 char *igt_crc_to_string(igt_crc_t *crc);
 
 void igt_require_pipe_crc(int fd);

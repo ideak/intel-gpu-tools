@@ -281,6 +281,26 @@ bool igt_debugfs_search(int device, const char *filename, const char *substring)
  * Pipe CRC
  */
 
+static bool igt_find_crc_mismatch(const igt_crc_t *a, const igt_crc_t *b,
+				  int *index)
+{
+	int i;
+
+	if (a->n_words != b->n_words)
+		return true;
+
+	for (i = 0; i < a->n_words; i++) {
+		if (a->crc[i] != b->crc[i]) {
+			if (index)
+				*index = i;
+
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /**
  * igt_assert_crc_equal:
  * @a: first pipe CRC value
@@ -294,10 +314,37 @@ bool igt_debugfs_search(int device, const char *filename, const char *substring)
  */
 void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
 {
-	int i;
+	int index;
+	bool mismatch;
 
-	for (i = 0; i < a->n_words; i++)
-		igt_assert_eq_u32(a->crc[i], b->crc[i]);
+	mismatch = igt_find_crc_mismatch(a, b, &index);
+	if (mismatch)
+		igt_debug("CRC mismatch at index %d: 0x%x != 0x%x\n", index,
+			  a->crc[index], b->crc[index]);
+
+	igt_assert(!mismatch);
+}
+
+/**
+ * igt_check_crc_equal:
+ * @a: first pipe CRC value
+ * @b: second pipe CRC value
+ *
+ * Compares two CRC values and return whether they match.
+ *
+ * Returns: A boolean indicating whether the CRC values match
+ */
+bool igt_check_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
+{
+	int index;
+	bool mismatch;
+
+	mismatch = igt_find_crc_mismatch(a, b, &index);
+	if (mismatch)
+		igt_debug("CRC mismatch at index %d: 0x%x != 0x%x\n", index,
+			  a->crc[index], b->crc[index]);
+
+	return !mismatch;
 }
 
 /**
