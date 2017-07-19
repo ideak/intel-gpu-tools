@@ -182,7 +182,7 @@ PKG_CHECK_MODULES(GLIB, glib-2.0)
 # for chamelium
 AC_ARG_ENABLE(chamelium, AS_HELP_STRING([--disable-chamelium],
 	      [Enable building of chamelium libraries and tests (default: yes)]),
-	      [enable_chamelium=yes], [enable_chamelium=no])
+	      [enable_chamelium=no], [enable_chamelium=yes])
 AM_CONDITIONAL(HAVE_CHAMELIUM, [test "x$enable_chamelium" = xyes])
 if test "x$enable_chamelium" = xyes; then
 	PKG_CHECK_MODULES(XMLRPC, xmlrpc xmlrpc_util xmlrpc_client, [],
