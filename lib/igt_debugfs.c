@@ -348,6 +348,34 @@ bool igt_check_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
 }
 
 /**
+ * igt_crc_to_string_extended:
+ * @crc: pipe CRC value to print
+ * @delimiter: The delimiter to use between crc words
+ * @crc_size: the number of bytes to print per crc word (either 4 or 2)
+ *
+ * This function allocates a string and formats @crc into it, depending on
+ * @delimiter and @crc_size.
+ * The caller is responsible for freeing the string.
+ *
+ * This should only ever be used for diagnostic debug output.
+ */
+char *igt_crc_to_string_extended(igt_crc_t *crc, char delimiter, int crc_size)
+{
+	int i;
+	char *buf = calloc(128, sizeof(char));
+	const char *format[2] = { "%08x%c", "%04x%c" };
+
+	if (!buf)
+		return NULL;
+
+	for (i = 0; i < crc->n_words; i++)
+		sprintf(buf + strlen(buf), format[crc_size == 2], crc->crc[i],
+			i == (crc->n_words - 1) ? '\0' : delimiter);
+
+	return buf;
+}
+
+/**
  * igt_crc_to_string:
  * @crc: pipe CRC value to print
  *
@@ -358,16 +386,7 @@ bool igt_check_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
  */
 char *igt_crc_to_string(igt_crc_t *crc)
 {
-	int i;
-	char *buf = calloc(128, sizeof(char));
-
-	if (!buf)
-		return NULL;
-
-	for (i = 0; i < crc->n_words; i++)
-		sprintf(buf + strlen(buf), "%08x ", crc->crc[i]);
-
-	return buf;
+	return igt_crc_to_string_extended(crc, ' ', 4);
 }
 
 #define MAX_CRC_ENTRIES 10
