@@ -420,65 +420,7 @@ disable_output(data_t *data,
 }
 
 static void
-test_display_crc_single(data_t *data, struct chamelium_port *port)
-{
-	igt_display_t display;
-	igt_output_t *output;
-	igt_plane_t *primary;
-	igt_crc_t *crc;
-	igt_crc_t *expected_crc;
-	struct chamelium_fb_crc_async_data *fb_crc;
-	struct igt_fb fb;
-	drmModeModeInfo *mode;
-	drmModeConnector *connector;
-	int fb_id, i, captured_frame_count;
-
-	reset_state(data, port);
-
-	output = prepare_output(data, &display, port);
-	connector = chamelium_port_get_connector(data->chamelium, port, false);
-	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-	igt_assert(primary);
-
-	for (i = 0; i < connector->count_modes; i++) {
-		mode = &connector->modes[i];
-		fb_id = igt_create_color_pattern_fb(data->drm_fd,
-						    mode->hdisplay,
-						    mode->vdisplay,
-						    DRM_FORMAT_XRGB8888,
-						    LOCAL_DRM_FORMAT_MOD_NONE,
-						    0, 0, 0, &fb);
-		igt_assert(fb_id > 0);
-
-		fb_crc = chamelium_calculate_fb_crc_async_start(data->drm_fd,
-								&fb);
-		enable_output(data, port, output, mode, &fb);
-
-		igt_debug("Testing single CRC fetch\n");
-
-		chamelium_capture(data->chamelium, port, 0, 0, 0, 0, 1);
-		crc = chamelium_read_captured_crcs(data->chamelium,
-						   &captured_frame_count);
-
-		expected_crc = chamelium_calculate_fb_crc_async_finish(fb_crc);
-
-		chamelium_assert_crc_eq_or_dump(data->chamelium, expected_crc,
-						crc, &fb, 0);
-
-		igt_assert_crc_equal(crc, expected_crc);
-		free(expected_crc);
-		free(crc);
-
-		disable_output(data, port, output);
-		igt_remove_fb(data->drm_fd, &fb);
-	}
-
-	drmModeFreeConnector(connector);
-	igt_display_fini(&display);
-}
-
-static void
-test_display_crc_multiple(data_t *data, struct chamelium_port *port)
+test_display_crc(data_t *data, struct chamelium_port *port, int count)
 {
 	igt_display_t display;
 	igt_output_t *output;
@@ -517,9 +459,11 @@ test_display_crc_multiple(data_t *data, struct chamelium_port *port)
 		 * there's always the potential the driver isn't able to keep
 		 * the display running properly for very long
 		 */
-		chamelium_capture(data->chamelium, port, 0, 0, 0, 0, 3);
+		chamelium_capture(data->chamelium, port, 0, 0, 0, 0, count);
 		crc = chamelium_read_captured_crcs(data->chamelium,
 						   &captured_frame_count);
+
+		igt_assert(captured_frame_count == count);
 
 		igt_debug("Captured %d frames\n", captured_frame_count);
 
@@ -737,10 +681,10 @@ igt_main
 							edid_id, alt_edid_id);
 
 		connector_subtest("dp-crc-single", DisplayPort)
-			test_display_crc_single(&data, port);
+			test_display_crc(&data, port, 1);
 
 		connector_subtest("dp-crc-multiple", DisplayPort)
-			test_display_crc_multiple(&data, port);
+			test_display_crc(&data, port, 3);
 
 		connector_subtest("dp-frame-dump", DisplayPort)
 			test_display_frame_dump(&data, port);
@@ -794,10 +738,10 @@ igt_main
 							edid_id, alt_edid_id);
 
 		connector_subtest("hdmi-crc-single", HDMIA)
-			test_display_crc_single(&data, port);
+			test_display_crc(&data, port, 1);
 
 		connector_subtest("hdmi-crc-multiple", HDMIA)
-			test_display_crc_multiple(&data, port);
+			test_display_crc(&data, port, 3);
 
 		connector_subtest("hdmi-frame-dump", HDMIA)
 			test_display_frame_dump(&data, port);
