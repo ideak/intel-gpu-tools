@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015 Intel Corporation
+ * Copyright © 2017 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,36 +19,25 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
+ *
+ * Authors:
+ *  Paul Kocialkowski <paul.kocialkowski@linux.intel.com>
  */
 
-#ifndef IGT_H
-#define IGT_H
+#ifndef IGT_FRAME_H
+#define IGT_FRAME_H
 
-#include "drmtest.h"
-#include "i915_3d.h"
-#include "i915_pciids.h"
-#include "igt_aux.h"
-#include "igt_core.h"
-#include "igt_core.h"
-#include "igt_debugfs.h"
-#include "igt_draw.h"
-#include "igt_dummyload.h"
-#include "igt_fb.h"
-#include "igt_frame.h"
-#include "igt_gt.h"
-#include "igt_kms.h"
-#include "igt_pm.h"
-#include "igt_stats.h"
-#ifdef HAVE_CHAMELIUM
-#include "igt_chamelium.h"
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
-#include "instdone.h"
-#include "intel_batchbuffer.h"
-#include "intel_chipset.h"
-#include "intel_io.h"
-#include "ioctl_wrappers.h"
-#include "media_fill.h"
-#include "media_spin.h"
-#include "rendercopy.h"
 
-#endif /* IGT_H */
+#include "igt.h"
+#include <stdbool.h>
+
+bool igt_frame_dump_is_enabled(void);
+void igt_write_compared_frames_to_png(cairo_surface_t *reference,
+				      cairo_surface_t *capture,
+				      const char *reference_suffix,
+				      const char *capture_suffix);
+
+#endif

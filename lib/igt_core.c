@@ -235,6 +235,10 @@
  * An example configuration follows:
  *
  * |[<!-- language="plain" -->
+ *	# The common configuration secton follows.
+ *	[Common]
+ *	FrameDumpPath=/tmp # The path to dump frames that fail comparison checks
+ *
  *	# The following section is used for configuring the Device Under Test.
  *	# It is not mandatory and allows overriding default values.
  *	[DUT]
@@ -290,6 +294,7 @@ static struct {
 static pthread_mutex_t log_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 GKeyFile *igt_key_file;
+char *frame_dump_path;
 
 const char *igt_test_name(void)
 {
@@ -620,6 +625,13 @@ static int config_parse(void)
 
 	if (!igt_key_file)
 		return 0;
+
+	frame_dump_path = getenv("IGT_FRAME_DUMP_PATH");
+
+	if (!frame_dump_path)
+		frame_dump_path = g_key_file_get_string(igt_key_file, "Common",
+							"FrameDumpPath",
+							&error);
 
 	rc = g_key_file_get_integer(igt_key_file, "DUT", "SuspendResumeDelay",
 				    &error);

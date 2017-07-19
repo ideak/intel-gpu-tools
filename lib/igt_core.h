@@ -50,7 +50,7 @@
 extern const char* __igt_test_description __attribute__((weak));
 extern bool __igt_plain_output;
 extern GKeyFile *igt_key_file;
-
+extern char *frame_dump_path;
 
 /**
  * IGT_TEST_DESCRIPTION:
