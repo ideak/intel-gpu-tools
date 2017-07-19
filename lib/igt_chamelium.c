@@ -936,17 +936,13 @@ void chamelium_assert_frame_eq(const struct chamelium *chamelium,
 			       const struct chamelium_frame_dump *dump,
 			       struct igt_fb *fb)
 {
-	cairo_t *cr;
 	cairo_surface_t *fb_surface;
 	pixman_image_t *reference_src, *reference_bgr;
 	int w = dump->width, h = dump->height;
 	bool eq;
 
 	/* Get the cairo surface for the framebuffer */
-	cr = igt_get_cairo_ctx(chamelium->drm_fd, fb);
-	fb_surface = cairo_get_target(cr);
-	cairo_surface_reference(fb_surface);
-	cairo_destroy(cr);
+	fb_surface = igt_get_cairo_surface(chamelium->drm_fd, fb);
 
 	/*
 	 * Convert the reference image into the same format as the chamelium
@@ -964,7 +960,6 @@ void chamelium_assert_frame_eq(const struct chamelium *chamelium,
 		    dump->size) == 0;
 
 	pixman_image_unref(reference_bgr);
-	cairo_surface_destroy(fb_surface);
 
 	igt_fail_on_f(!eq,
 		      "Chamelium frame dump didn't match reference image\n");

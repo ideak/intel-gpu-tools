@@ -1124,7 +1124,18 @@ static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
 				    fb, destroy_cairo_surface__gtt);
 }
 
-static cairo_surface_t *get_cairo_surface(int fd, struct igt_fb *fb)
+/**
+ * igt_get_cairo_surface:
+ * @fd: open drm file descriptor
+ * @fb: pointer to an #igt_fb structure
+ *
+ * This function stores the contents of the supplied framebuffer into a cairo
+ * surface and returns it.
+ *
+ * Returns:
+ * A pointer to a cairo surface with the contents of the framebuffer.
+ */
+cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 {
 	if (fb->cairo_surface == NULL) {
 		if (fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
@@ -1160,7 +1171,7 @@ cairo_t *igt_get_cairo_ctx(int fd, struct igt_fb *fb)
 	cairo_surface_t *surface;
 	cairo_t *cr;
 
-	surface = get_cairo_surface(fd, fb);
+	surface = igt_get_cairo_surface(fd, fb);
 	cr = cairo_create(surface);
 	cairo_surface_destroy(surface);
 	igt_assert(cairo_status(cr) == CAIRO_STATUS_SUCCESS);
@@ -1170,27 +1181,6 @@ cairo_t *igt_get_cairo_ctx(int fd, struct igt_fb *fb)
 	igt_assert(cairo_status(cr) == CAIRO_STATUS_SUCCESS);
 
 	return cr;
-}
-
-/**
- * igt_write_fb_to_png:
- * @fd: open i915 drm file descriptor
- * @fb: pointer to an #igt_fb structure
- * @filename: target name for the png image
- *
- * This function stores the contents of the supplied framebuffer into a png
- * image stored at @filename.
- */
-void igt_write_fb_to_png(int fd, struct igt_fb *fb, const char *filename)
-{
-	cairo_surface_t *surface;
-	cairo_status_t status;
-
-	surface = get_cairo_surface(fd, fb);
-	status = cairo_surface_write_to_png(surface, filename);
-	cairo_surface_destroy(surface);
-
-	igt_assert(status == CAIRO_STATUS_SUCCESS);
 }
 
 /**
