@@ -94,6 +94,13 @@ struct chamelium_frame_dump {
 	struct chamelium_port *port;
 };
 
+struct chamelium_fb_crc_async_data {
+	cairo_surface_t *fb_surface;
+
+	pthread_t thread_id;
+	igt_crc_t *ret;
+};
+
 struct chamelium {
 	xmlrpc_env env;
 	xmlrpc_client *client;
@@ -994,6 +1001,142 @@ int chamelium_get_frame_limit(struct chamelium *chamelium,
 
 	xmlrpc_read_int(&chamelium->env, res, &ret);
 	xmlrpc_DECREF(res);
+
+	return ret;
+}
+
+static uint32_t chamelium_xrgb_hash16(const unsigned char *buffer, int width,
+				      int height, int k, int m)
+{
+	unsigned char r, g, b;
+	uint64_t sum = 0;
+	uint64_t count = 0;
+	uint64_t value;
+	uint32_t hash;
+	int index;
+	int i;
+
+	for (i=0; i < width * height; i++) {
+		if ((i % m) != k)
+			continue;
+
+		index = i * 4;
+
+		r = buffer[index + 2];
+		g = buffer[index + 1];
+		b = buffer[index + 0];
+
+		value = r | (g << 8) | (b << 16);
+		sum += ++count * value;
+	}
+
+	hash = ((sum >> 0) ^ (sum >> 16) ^ (sum >> 32) ^ (sum >> 48)) & 0xffff;
+
+	return hash;
+}
+
+static void chamelium_do_calculate_fb_crc(cairo_surface_t *fb_surface,
+					  igt_crc_t *out)
+{
+	unsigned char *buffer;
+	int n = 4;
+	int w, h;
+	int i, j;
+
+	buffer = cairo_image_surface_get_data(fb_surface);
+	w = cairo_image_surface_get_width(fb_surface);
+	h = cairo_image_surface_get_height(fb_surface);
+
+	for (i = 0; i < n; i++) {
+		j = n - i - 1;
+		out->crc[i] = chamelium_xrgb_hash16(buffer, w, h, j, n);
+	}
+
+	out->n_words = n;
+}
+
+/**
+ * chamelium_calculate_fb_crc:
+ * @fd: The drm file descriptor
+ * @fb: The framebuffer to calculate the CRC for
+ *
+ * Calculates the CRC for the provided framebuffer, using the Chamelium's CRC
+ * algorithm. This calculates the CRC in a synchronous fashion.
+ *
+ * Returns: The calculated CRC
+ */
+igt_crc_t *chamelium_calculate_fb_crc(int fd, struct igt_fb *fb)
+{
+	igt_crc_t *ret = calloc(1, sizeof(igt_crc_t));
+	cairo_surface_t *fb_surface;
+
+	/* Get the cairo surface for the framebuffer */
+	fb_surface = igt_get_cairo_surface(fd, fb);
+
+	chamelium_do_calculate_fb_crc(fb_surface, ret);
+
+	return ret;
+}
+
+static void *chamelium_calculate_fb_crc_async_work(void *data)
+{
+	struct chamelium_fb_crc_async_data *fb_crc;
+
+	fb_crc = (struct chamelium_fb_crc_async_data *) data;
+
+	chamelium_do_calculate_fb_crc(fb_crc->fb_surface, fb_crc->ret);
+
+	return NULL;
+}
+
+/**
+ * chamelium_calculate_fb_crc_launch:
+ * @fd: The drm file descriptor
+ * @fb: The framebuffer to calculate the CRC for
+ *
+ * Launches the CRC calculation for the provided framebuffer, using the
+ * Chamelium's CRC algorithm. This calculates the CRC in an asynchronous
+ * fashion.
+ *
+ * The returned structure should be passed to a subsequent call to
+ * chamelium_calculate_fb_crc_result. It should not be freed.
+ *
+ * Returns: An intermediate structure for the CRC calculation work.
+ */
+struct chamelium_fb_crc_async_data *chamelium_calculate_fb_crc_async_start(int fd,
+									   struct igt_fb *fb)
+{
+	struct chamelium_fb_crc_async_data *fb_crc;
+
+	fb_crc = calloc(1, sizeof(struct chamelium_fb_crc_async_data));
+	fb_crc->ret = calloc(1, sizeof(igt_crc_t));
+
+	/* Get the cairo surface for the framebuffer */
+	fb_crc->fb_surface = igt_get_cairo_surface(fd, fb);
+
+	pthread_create(&fb_crc->thread_id, NULL,
+		       chamelium_calculate_fb_crc_async_work, fb_crc);
+
+	return fb_crc;
+}
+
+/**
+ * chamelium_calculate_fb_crc_result:
+ * @fb_crc: An intermediate structure with thread-related information
+ *
+ * Blocks until the asynchronous CRC calculation is finished, and then returns
+ * its result.
+ *
+ * Returns: The calculated CRC
+ */
+igt_crc_t *chamelium_calculate_fb_crc_async_finish(struct chamelium_fb_crc_async_data *fb_crc)
+{
+	igt_crc_t *ret;
+
+	pthread_join(fb_crc->thread_id, NULL);
+
+	ret = fb_crc->ret;
+	free(fb_crc);
 
 	return ret;
 }

@@ -49,43 +49,6 @@ typedef struct {
 #define HPD_TOGGLE_COUNT_VGA 5
 #define HPD_TOGGLE_COUNT_DP_HDMI 15
 
-/* Pre-calculated CRCs for the pattern fb, for all the modes in the default
- * chamelium edid
- */
-struct crc_entry {
-	int width;
-	int height;
-	igt_crc_t crc;
-};
-
-#define CRC_ENTRY(w_, h_, ...) \
-	{ w_, h_, { .n_words = 4, .crc = { __VA_ARGS__ } } }
-
-static const struct crc_entry pattern_fb_crcs[] = {
-	CRC_ENTRY(1920, 1080, 0xf859, 0xa751, 0x8c81, 0x45a1),
-	CRC_ENTRY(1280,  720, 0xcec2, 0x4246, 0x6cfd, 0xeb43),
-	CRC_ENTRY(1024,  768, 0x85e5, 0xf0cd, 0xafe3, 0x7f18),
-	CRC_ENTRY( 800,  600, 0x6b39, 0x32b6, 0x831a, 0xb03e),
-	CRC_ENTRY( 640,  480, 0xa121, 0x2473, 0xb150, 0x8c47),
-};
-#undef CRC_ENTRY
-
-static const igt_crc_t *
-get_precalculated_crc(struct chamelium_port *port, int w, int h)
-{
-	int i;
-	const struct crc_entry *entry;
-
-	for (i = 0; i < ARRAY_SIZE(pattern_fb_crcs); i++) {
-		entry = &pattern_fb_crcs[i];
-
-		if (entry->width == w && entry->height == h)
-			return &entry->crc;
-	}
-
-	return NULL;
-}
-
 static void
 get_connectors_link_status_failed(data_t *data, bool *link_status_failed)
 {
@@ -463,7 +426,8 @@ test_display_crc_single(data_t *data, struct chamelium_port *port)
 	igt_output_t *output;
 	igt_plane_t *primary;
 	igt_crc_t *crc;
-	const igt_crc_t *expected_crc;
+	igt_crc_t *expected_crc;
+	struct chamelium_fb_crc_async_data *fb_crc;
 	struct igt_fb fb;
 	drmModeModeInfo *mode;
 	drmModeConnector *connector;
@@ -486,24 +450,21 @@ test_display_crc_single(data_t *data, struct chamelium_port *port)
 						    0, 0, 0, &fb);
 		igt_assert(fb_id > 0);
 
+		fb_crc = chamelium_calculate_fb_crc_async_start(data->drm_fd,
+								&fb);
 		enable_output(data, port, output, mode, &fb);
 
-		expected_crc = get_precalculated_crc(port,
-						     mode->hdisplay,
-						     mode->vdisplay);
-		if (!expected_crc) {
-			igt_warn("No precalculated CRC found for %dx%d, skipping CRC check\n",
-				 mode->hdisplay, mode->vdisplay);
-			goto next;
-		}
-
 		igt_debug("Testing single CRC fetch\n");
+
 		crc = chamelium_get_crc_for_area(data->chamelium, port,
 						 0, 0, 0, 0);
+
+		expected_crc = chamelium_calculate_fb_crc_async_finish(fb_crc);
+
 		igt_assert_crc_equal(crc, expected_crc);
+		free(expected_crc);
 		free(crc);
 
-next:
 		disable_output(data, port, output);
 		igt_remove_fb(data->drm_fd, &fb);
 	}
@@ -519,7 +480,8 @@ test_display_crc_multiple(data_t *data, struct chamelium_port *port)
 	igt_output_t *output;
 	igt_plane_t *primary;
 	igt_crc_t *crc;
-	const igt_crc_t *expected_crc;
+	igt_crc_t *expected_crc;
+	struct chamelium_fb_crc_async_data *fb_crc;
 	struct igt_fb fb;
 	drmModeModeInfo *mode;
 	drmModeConnector *connector;
@@ -542,15 +504,10 @@ test_display_crc_multiple(data_t *data, struct chamelium_port *port)
 						    0, 0, 0, &fb);
 		igt_assert(fb_id > 0);
 
-		enable_output(data, port, output, mode, &fb);
+		fb_crc = chamelium_calculate_fb_crc_async_start(data->drm_fd,
+								&fb);
 
-		expected_crc = get_precalculated_crc(port, mode->hdisplay,
-						     mode->vdisplay);
-		if (!expected_crc) {
-			igt_warn("No precalculated CRC found for %dx%d, skipping CRC check\n",
-				 mode->hdisplay, mode->vdisplay);
-			goto next;
-		}
+		enable_output(data, port, output, mode, &fb);
 
 		/* We want to keep the display running for a little bit, since
 		 * there's always the potential the driver isn't able to keep
@@ -561,11 +518,15 @@ test_display_crc_multiple(data_t *data, struct chamelium_port *port)
 						   &captured_frame_count);
 
 		igt_debug("Captured %d frames\n", captured_frame_count);
+
+		expected_crc = chamelium_calculate_fb_crc_async_finish(fb_crc);
+
 		for (j = 0; j < captured_frame_count; j++)
 			igt_assert_crc_equal(&crc[j], expected_crc);
+
+		free(expected_crc);
 		free(crc);
 
-next:
 		disable_output(data, port, output);
 		igt_remove_fb(data->drm_fd, &fb);
 	}

@@ -36,6 +36,7 @@
 struct chamelium;
 struct chamelium_port;
 struct chamelium_frame_dump;
+struct chamelium_fb_crc_async_data;
 
 struct chamelium *chamelium_init(int drm_fd);
 void chamelium_deinit(struct chamelium *chamelium);
@@ -92,6 +93,10 @@ struct chamelium_frame_dump *chamelium_port_dump_pixels(struct chamelium *chamel
 							struct chamelium_port *port,
 							int x, int y,
 							int w, int h);
+igt_crc_t *chamelium_calculate_fb_crc(int fd, struct igt_fb *fb);
+struct chamelium_fb_crc_async_data *chamelium_calculate_fb_crc_async_start(int fd,
+									   struct igt_fb *fb);
+igt_crc_t *chamelium_calculate_fb_crc_async_finish(struct chamelium_fb_crc_async_data *fb_crc);
 int chamelium_get_captured_frame_count(struct chamelium *chamelium);
 int chamelium_get_frame_limit(struct chamelium *chamelium,
 			      struct chamelium_port *port,
