@@ -177,7 +177,10 @@ AM_CONDITIONAL(HAVE_UDEV, [test "x$udev" = xyes])
 if test x"$udev" = xyes; then
 	AC_DEFINE(HAVE_UDEV,1,[Enable udev-based monitor hotplug detection])
 fi
-PKG_CHECK_MODULES(GLIB, glib-2.0)
+PKG_CHECK_MODULES(GLIB, [glib-2.0], [glib=yes], [glib=no])
+if test x"$glib" = xyes; then
+	AC_DEFINE(HAVE_GLIB,1,[Enable glib support])
+fi
 
 # for chamelium
 AC_ARG_ENABLE(chamelium, AS_HELP_STRING([--disable-chamelium],
@@ -189,6 +192,9 @@ if test "x$enable_chamelium" = xyes; then
 			  [AC_MSG_ERROR([Failed to find xmlrpc, required by chamelium. Use --disable-chamelium to disable chamelium support.])])
 	PKG_CHECK_MODULES(PIXMAN, pixman-1, [],
 			  [AC_MSG_ERROR([Failed to find pixman, required by chamelium. Use --disable-chamelium to disable chamelium support.])])
+	if test x"$glib" != xyes; then
+		AC_MSG_ERROR([Failed to find glib, required by chamelium. Use --disable-chamelium to disable chamelium support.])
+	fi
 	AC_DEFINE(HAVE_CHAMELIUM, 1, [Enable Chamelium support])
 fi
 
