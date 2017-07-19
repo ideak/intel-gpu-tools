@@ -293,7 +293,10 @@ static struct {
 } log_buffer;
 static pthread_mutex_t log_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+#ifdef HAVE_GLIB
 GKeyFile *igt_key_file;
+#endif
+
 char *frame_dump_path;
 
 const char *igt_test_name(void)
@@ -618,6 +621,7 @@ static void oom_adjust_for_doom(void)
 
 }
 
+#ifdef HAVE_GLIB
 static int config_parse(void)
 {
 	GError *error = NULL;
@@ -643,6 +647,7 @@ static int config_parse(void)
 
 	return 0;
 }
+#endif
 
 static int common_init(int *argc, char **argv,
 		       const char *extra_short_opts,
@@ -799,6 +804,7 @@ static int common_init(int *argc, char **argv,
 		snprintf(key_file_loc, 100, "%s/.igtrc", g_get_home_dir());
 	}
 
+#ifdef HAVE_GLIB
 	igt_key_file = g_key_file_new();
 	ret = g_key_file_load_from_file(igt_key_file, key_file_loc,
 					G_KEY_FILE_NONE, &error);
@@ -811,6 +817,7 @@ static int common_init(int *argc, char **argv,
 	}
 
 	ret = config_parse();
+#endif
 
 out:
 	if (!key_file_env && key_file_loc)
@@ -1423,8 +1430,10 @@ void igt_exit(void)
 {
 	igt_exit_called = true;
 
+#ifdef HAVE_GLIB
 	if (igt_key_file)
 		g_key_file_free(igt_key_file);
+#endif
 
 	if (run_single_subtest && !run_single_subtest_found) {
 		igt_warn("Unknown subtest: %s\n", run_single_subtest);
