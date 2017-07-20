@@ -40,6 +40,13 @@
 #include "igt_x86.h"
 #include <stdio.h>
 
+/**
+ * SECTION:igt_x86
+ * @short_description: x86 helper library
+ * @title: x86
+ * @include: igt_x86.h
+ */
+
 #define BASIC_CPUID 0x0
 #define EXTENDED_CPUID 0x80000000
 

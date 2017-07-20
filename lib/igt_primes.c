@@ -28,6 +28,13 @@
 #include <string.h>
 #include <math.h>
 
+/**
+ * SECTION:igt_primes
+ * @short_description: Prime numbers helper library
+ * @title: Primes
+ * @include: igt_primes.h
+ */
+
 #define BITS_PER_CHAR 8
 #define BITS_PER_LONG (sizeof(long)*BITS_PER_CHAR)
 

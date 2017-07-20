@@ -134,7 +134,11 @@ IGNORE_HFILES=gen6_render.h gen7_media.h gen7_render.h gen8_media.h \
 # e.g. HTML_IMAGES=$(top_srcdir)/gtk/stock-icons/stock_about_24.png
 HTML_IMAGES=
 
-test_program_files = xml/igt_test_programs_core_description.xml \
+test_program_files = xml/igt_test_programs_amdgpu_description.xml \
+		     xml/igt_test_programs_amdgpu_programs.xml \
+		     xml/igt_test_programs_chamelium_description.xml \
+		     xml/igt_test_programs_chamelium_programs.xml \
+		     xml/igt_test_programs_core_description.xml \
 		     xml/igt_test_programs_core_programs.xml \
 		     xml/igt_test_programs_debugfs_description.xml \
 		     xml/igt_test_programs_debugfs_programs.xml \
@@ -146,14 +150,28 @@ test_program_files = xml/igt_test_programs_core_description.xml \
 		     xml/igt_test_programs_gem_programs.xml \
 		     xml/igt_test_programs_gen3_description.xml \
 		     xml/igt_test_programs_gen3_programs.xml \
+		     xml/igt_test_programs_gen7_description.xml \
+		     xml/igt_test_programs_gen7_programs.xml \
+		     xml/igt_test_programs_gvt_description.xml \
+		     xml/igt_test_programs_gvt_programs.xml \
 		     xml/igt_test_programs_kms_description.xml \
 		     xml/igt_test_programs_kms_programs.xml \
+		     xml/igt_test_programs_meta_description.xml \
+		     xml/igt_test_programs_meta_programs.xml \
+		     xml/igt_test_programs_perf_description.xml \
+		     xml/igt_test_programs_perf_programs.xml \
 		     xml/igt_test_programs_pm_description.xml \
 		     xml/igt_test_programs_pm_programs.xml \
 		     xml/igt_test_programs_prime_description.xml \
 		     xml/igt_test_programs_prime_programs.xml \
-		     xml/igt_test_programs_sysfs_description.xml \
-		     xml/igt_test_programs_sysfs_programs.xml \
+		     xml/igt_test_programs_sw_sync_description.xml \
+		     xml/igt_test_programs_sw_sync_programs.xml \
+		     xml/igt_test_programs_testdisplay_description.xml \
+		     xml/igt_test_programs_testdisplay_programs.xml \
+		     xml/igt_test_programs_tools_description.xml \
+		     xml/igt_test_programs_tools_programs.xml \
+		     xml/igt_test_programs_vgem_description.xml \
+		     xml/igt_test_programs_vgem_programs.xml \
 		     $(NULL)
 
 # Extra SGML files that are included by $(DOC_MAIN_SGML_FILE).

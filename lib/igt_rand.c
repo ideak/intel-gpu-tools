@@ -1,5 +1,12 @@
 #include "igt_rand.h"
 
+/**
+ * SECTION:igt_rand
+ * @short_description: Random numbers helper library
+ * @title: Random
+ * @include: igt_rand.h
+ */
+
 static uint32_t global = 0x12345678;
 
 uint32_t hars_petruska_f54_1_random_seed(uint32_t new_state)

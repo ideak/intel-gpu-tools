@@ -31,6 +31,13 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+/**
+ * SECTION:igt_gvt
+ * @short_description: Graphics virtualization technology library
+ * @title: GVT
+ * @include: igt_gvt.h
+ */
+
 static bool is_gvt_enabled(void)
 {
 	bool enabled = false;

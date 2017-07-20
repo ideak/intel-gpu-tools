@@ -41,6 +41,13 @@
 #include "drmtest.h"
 #include "ioctl_wrappers.h"
 
+/**
+ * SECTION:sw_sync
+ * @short_description: Software sync (fencing) support library
+ * @title: SW Sync
+ * @include: sw_sync.h
+ */
+
 struct int_sync_create_fence_data {
 	__u32	value;
 	char	name[32];

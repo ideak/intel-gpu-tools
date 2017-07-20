@@ -100,19 +100,46 @@
     </refsect1>
   </refentry>
 
+  <refentry id="igt-amdgpu-tests">
+    <refnamediv>
+      <refname>AMDGPU Tests</refname>
+      <refpurpose>Tests for amdgpu driver behaviour</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_amdgpu_programs.xml"/>
+    <xi:include href="igt_test_programs_amdgpu_description.xml"/>
+  </refentry>
+
+  <refentry id="igt-chamelium-tests">
+    <refnamediv>
+      <refname>Chamelium Tests</refname>
+      <refpurpose>Tests using the Chamelium platform</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_chamelium_programs.xml"/>
+    <xi:include href="igt_test_programs_chamelium_description.xml"/>
+  </refentry>
+
   <refentry id="igt-core-tests">
     <refnamediv>
       <refname>Core Tests</refname>
-      <refpurpose>Tests for core drm ioctls and behaviour.</refpurpose>
+      <refpurpose>Tests for core drm ioctls and behaviour</refpurpose>
     </refnamediv>
     <xi:include href="igt_test_programs_core_programs.xml"/>
     <xi:include href="igt_test_programs_core_description.xml"/>
   </refentry>
 
+  <refentry id="igt-debugfs-tests">
+    <refnamediv>
+      <refname>Debugfs Tests</refname>
+      <refpurpose>Tests for debugfs behaviour</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_debugfs_programs.xml"/>
+    <xi:include href="igt_test_programs_debugfs_description.xml"/>
+  </refentry>
+
   <refentry id="igt-drm-tests">
     <refnamediv>
       <refname>DRM Tests</refname>
-      <refpurpose>Tests for libdrm behaviour.</refpurpose>
+      <refpurpose>Tests for libdrm behaviour</refpurpose>
     </refnamediv>
     <xi:include href="igt_test_programs_drm_programs.xml"/>
     <xi:include href="igt_test_programs_drm_description.xml"/>
@@ -121,7 +148,7 @@
   <refentry id="igt-drv-tests">
     <refnamediv>
       <refname>DRV Tests</refname>
-      <refpurpose>Tests for overall driver behaviour.</refpurpose>
+      <refpurpose>Tests for overall driver behaviour</refpurpose>
     </refnamediv>
     <xi:include href="igt_test_programs_drv_programs.xml"/>
     <xi:include href="igt_test_programs_drv_description.xml"/>
@@ -130,19 +157,64 @@
   <refentry id="igt-gem-tests">
     <refnamediv>
       <refname>GEM Tests</refname>
-      <refpurpose>Tests for core drm ioctls and behaviour.</refpurpose>
+      <refpurpose>Tests for the graphics execution manager</refpurpose>
     </refnamediv>
     <xi:include href="igt_test_programs_gem_programs.xml"/>
     <xi:include href="igt_test_programs_gem_description.xml"/>
   </refentry>
 
+  <refentry id="igt-gen3-tests">
+    <refnamediv>
+      <refname>Gen 3 Tests</refname>
+      <refpurpose>Tests specific to gen 3</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_gen3_programs.xml"/>
+    <xi:include href="igt_test_programs_gen3_description.xml"/>
+  </refentry>
+
+  <refentry id="igt-gen7-tests">
+    <refnamediv>
+      <refname>Gen 7 Tests</refname>
+      <refpurpose>Tests specific to gen 7</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_gen7_programs.xml"/>
+    <xi:include href="igt_test_programs_gen7_description.xml"/>
+  </refentry>
+
+  <refentry id="igt-gvt-tests">
+    <refnamediv>
+      <refname>GVT Tests</refname>
+      <refpurpose>Tests for graphics virtualization technology</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_gvt_programs.xml"/>
+    <xi:include href="igt_test_programs_gvt_description.xml"/>
+  </refentry>
+
   <refentry id="igt-kms-tests">
     <refnamediv>
       <refname>KMS Tests</refname>
-      <refpurpose>Mode setting tests</refpurpose>
+      <refpurpose>Tests for kernel mode setting</refpurpose>
     </refnamediv>
     <xi:include href="igt_test_programs_kms_programs.xml"/>
     <xi:include href="igt_test_programs_kms_description.xml"/>
+  </refentry>
+
+  <refentry id="igt-meta-tests">
+    <refnamediv>
+      <refname>Meta Tests</refname>
+      <refpurpose>Tests for the CI system itself</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_meta_programs.xml"/>
+    <xi:include href="igt_test_programs_meta_description.xml"/>
+  </refentry>
+
+  <refentry id="igt-perf-tests">
+    <refnamediv>
+      <refname>Perf Tests</refname>
+      <refpurpose>Tests for the performance metrics</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_perf_programs.xml"/>
+    <xi:include href="igt_test_programs_perf_description.xml"/>
   </refentry>
 
   <refentry id="igt-pm-tests">
@@ -157,37 +229,46 @@
   <refentry id="igt-prime-tests">
     <refnamediv>
       <refname>Prime Tests</refname>
-      <refpurpose>Buffer sharing tests</refpurpose>
+      <refpurpose>Tests for buffer sharding</refpurpose>
     </refnamediv>
     <xi:include href="igt_test_programs_prime_programs.xml"/>
     <xi:include href="igt_test_programs_prime_description.xml"/>
   </refentry>
 
-  <refentry id="igt-gen3-tests">
+  <refentry id="igt-sw-sync-tests">
     <refnamediv>
-      <refname>Gen 3 Tests</refname>
-      <refpurpose>Gen 3 specific tests</refpurpose>
+      <refname>SW Sync Tests</refname>
+      <refpurpose>Tests for software sync (fencing)</refpurpose>
     </refnamediv>
-    <xi:include href="igt_test_programs_gen3_programs.xml"/>
-    <xi:include href="igt_test_programs_gen3_description.xml"/>
+    <xi:include href="igt_test_programs_sw_sync_programs.xml"/>
+    <xi:include href="igt_test_programs_sw_sync_description.xml"/>
   </refentry>
 
-  <refentry id="igt-sysfs-tests">
+  <refentry id="igt-testdisplay-tests">
     <refnamediv>
-      <refname>Sysfs Tests</refname>
-      <refpurpose>Sysfs tests</refpurpose>
+      <refname>Display Tests</refname>
+      <refpurpose>Tests for display validation</refpurpose>
     </refnamediv>
-    <xi:include href="igt_test_programs_sysfs_programs.xml"/>
-    <xi:include href="igt_test_programs_sysfs_description.xml"/>
+    <xi:include href="igt_test_programs_testdisplay_programs.xml"/>
+    <xi:include href="igt_test_programs_testdisplay_description.xml"/>
   </refentry>
 
-  <refentry id="igt-debugfs-tests">
+  <refentry id="igt-tools-tests">
     <refnamediv>
-      <refname>Debugfs Tests</refname>
-      <refpurpose>Debugfs tests</refpurpose>
+      <refname>Tools Tests</refname>
+      <refpurpose>Tests for IGT tools behaviour</refpurpose>
     </refnamediv>
-    <xi:include href="igt_test_programs_debugfs_programs.xml"/>
-    <xi:include href="igt_test_programs_debugfs_description.xml"/>
+    <xi:include href="igt_test_programs_tools_programs.xml"/>
+    <xi:include href="igt_test_programs_tools_description.xml"/>
+  </refentry>
+
+  <refentry id="igt-vgem-tests">
+    <refnamediv>
+      <refname>vGEM Tests</refname>
+      <refpurpose>Tests for the vitual graphics execution manager</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_vgem_programs.xml"/>
+    <xi:include href="igt_test_programs_vgem_description.xml"/>
   </refentry>
 
   <glossary>

@@ -16,25 +16,31 @@
   <chapter>
     <title>API Reference</title>
     <xi:include href="xml/drmtest.xml"/>
-    <xi:include href="xml/igt_core.xml"/>
-    <xi:include href="xml/igt_stats.xml"/>
-    <xi:include href="xml/igt_debugfs.xml"/>
-    <xi:include href="xml/igt_sysfs.xml"/>
-    <xi:include href="xml/igt_draw.xml"/>
-    <xi:include href="xml/igt_kms.xml"/>
-    <xi:include href="xml/igt_kmod.xml"/>
-    <xi:include href="xml/igt_fb.xml"/>
     <xi:include href="xml/igt_aux.xml"/>
+    <xi:include href="xml/igt_chamelium.xml"/>
+    <xi:include href="xml/igt_core.xml"/>
+    <xi:include href="xml/igt_debugfs.xml"/>
+    <xi:include href="xml/igt_draw.xml"/>
+    <xi:include href="xml/igt_dummyload.xml"/>
+    <xi:include href="xml/igt_fb.xml"/>
+    <xi:include href="xml/igt_frame.xml"/>
     <xi:include href="xml/igt_gt.xml"/>
+    <xi:include href="xml/igt_gvt.xml"/>
+    <xi:include href="xml/igt_kmod.xml"/>
+    <xi:include href="xml/igt_kms.xml"/>
     <xi:include href="xml/igt_pm.xml"/>
-    <xi:include href="xml/ioctl_wrappers.xml"/>
+    <xi:include href="xml/igt_primes.xml"/>
+    <xi:include href="xml/igt_rand.xml"/>
+    <xi:include href="xml/igt_stats.xml"/>
+    <xi:include href="xml/igt_sysfs.xml"/>
+    <xi:include href="xml/igt_vc4.xml"/>
+    <xi:include href="xml/igt_vgem.xml"/>
+    <xi:include href="xml/igt_x86.xml"/>
     <xi:include href="xml/intel_batchbuffer.xml"/>
     <xi:include href="xml/intel_chipset.xml"/>
     <xi:include href="xml/intel_io.xml"/>
-    <xi:include href="xml/igt_vc4.xml"/>
-    <xi:include href="xml/igt_vgem.xml"/>
-    <xi:include href="xml/igt_dummyload.xml"/>
-    <xi:include href="xml/igt_chamelium.xml"/>
+    <xi:include href="xml/ioctl_wrappers.xml"/>
+    <xi:include href="xml/sw_sync.xml"/>
   </chapter>
   <xi:include href="xml/igt_test_programs.xml"/>
 
