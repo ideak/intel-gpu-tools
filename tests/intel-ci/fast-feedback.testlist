@@ -2,6 +2,7 @@
 
 igt@core_auth@basic-auth
 igt@core_prop_blob@basic
+igt@debugfs_test@read_all_entries
 igt@drv_getparams_basic@basic-eu-total
 igt@drv_getparams_basic@basic-subslice-total
 igt@drv_hangman@error-state-basic
