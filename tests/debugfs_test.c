@@ -29,7 +29,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-static void read_and_discard_sysfs_entries(int path_fd, bool is_crc)
+static void read_and_discard_sysfs_entries(int path_fd)
 {
 	struct dirent *dirent;
 	DIR *dir;
@@ -47,24 +47,31 @@ static void read_and_discard_sysfs_entries(int path_fd, bool is_crc)
 			igt_assert((sub_fd =
 				    openat(path_fd, dirent->d_name, O_RDONLY |
 					   O_DIRECTORY)) > 0);
-			read_and_discard_sysfs_entries(sub_fd, !strcmp(dirent->d_name, "crc"));
+			read_and_discard_sysfs_entries(sub_fd);
 			close(sub_fd);
 		} else {
-			char *buf;
+			char buf[512];
+			int sub_fd;
+			ssize_t ret;
 
 			igt_set_timeout(5, "reading sysfs entry");
-			buf = igt_sysfs_get(path_fd, dirent->d_name);
-			igt_reset_timeout();
-			/*
-			 * /crtc-XX/crc/data may fail with -EIO if the CRTC
-			 * is not active.
-			 */
-			if (!buf && is_crc && errno == EIO &&
-			    !strcmp(dirent->d_name, "data"))
-				continue;
+			igt_debug("Reading file \"%s\"\n", dirent->d_name);
 
-			igt_assert(buf);
-			free(buf);
+			sub_fd = openat(path_fd, dirent->d_name, O_RDONLY);
+			if (sub_fd == -1) {
+				igt_debug("Could not open file \"%s\" with error: %m\n", dirent->d_name);
+				continue;
+			}
+
+			do {
+				ret = read(sub_fd, buf, sizeof(buf));
+			} while (ret == sizeof(buf));
+
+			if (ret == -1)
+				igt_debug("Could not read file \"%s\" with error: %m\n", dirent->d_name);
+
+			igt_reset_timeout();
+			close(sub_fd);
 		}
 	}
 	closedir(dir);
@@ -82,7 +89,7 @@ igt_main
 	}
 
 	igt_subtest("read_all_entries") {
-		read_and_discard_sysfs_entries(debugfs, false);
+		read_and_discard_sysfs_entries(debugfs);
 	}
 
 	igt_subtest("emon_crash") {
@@ -95,6 +102,9 @@ igt_main
 		for (i = 0; i < 1000; i++) {
 			char *buf = igt_sysfs_get(debugfs,
 						  "i915_emon_status");
+
+			igt_skip_on_f(!buf && !i, "i915_emon_status could not be read\n");
+
 			igt_assert(buf);
 			free(buf);
 		}
