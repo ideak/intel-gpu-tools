@@ -181,6 +181,8 @@ PKG_CHECK_MODULES(GLIB, [glib-2.0], [glib=yes], [glib=no])
 if test x"$glib" = xyes; then
 	AC_DEFINE(HAVE_GLIB,1,[Enable glib support])
 fi
+PKG_CHECK_MODULES(GSL, [gsl], [gsl=yes], [gsl=no])
+AM_CONDITIONAL(HAVE_GSL, [test "x$gsl" = xyes])
 
 # for chamelium
 AC_ARG_ENABLE(chamelium, AS_HELP_STRING([--disable-chamelium],

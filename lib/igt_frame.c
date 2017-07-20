@@ -29,6 +29,8 @@
 #include <fcntl.h>
 #include <pixman.h>
 #include <cairo.h>
+#include <gsl/gsl_statistics_double.h>
+#include <gsl/gsl_fit.h>
 
 #include "igt.h"
 
@@ -134,4 +136,133 @@ void igt_write_compared_frames_to_png(cairo_surface_t *reference,
 	igt_write_frame_to_png(capture, fd, "capture", capture_suffix);
 
 	close(fd);
+}
+
+/**
+ * igt_check_analog_frame_match:
+ * @reference: The reference cairo surface
+ * @capture: The captured cairo surface
+ *
+ * Checks that the analog image contained in the chamelium frame dump matches
+ * the given framebuffer.
+ *
+ * In order to determine whether the frame matches the reference, the following
+ * reasoning is implemented:
+ * 1. The absolute error for each color value of the reference is collected.
+ * 2. The average absolute error is calculated for each color value of the
+ *    reference and must not go above 60 (23.5 % of the total range).
+ * 3. A linear fit for the average absolute error from the pixel value is
+ *    calculated, as a DAC-ADC chain is expected to have a linear error curve.
+ * 4. The linear fit is correlated with the actual average absolute error for
+ *    the frame and the correlation coefficient is checked to be > 0.985,
+ *    indicating a match with the expected error trend.
+ *
+ * Most errors (e.g. due to scaling, rotation, color space, etc) can be
+ * reliably detected this way, with a minimized number of false-positives.
+ * However, the brightest values (250 and up) are ignored as the error trend
+ * is often not linear there in practice due to clamping.
+ *
+ * Returns: a boolean indicating whether the frames match
+ */
+
+bool igt_check_analog_frame_match(cairo_surface_t *reference,
+				  cairo_surface_t *capture)
+{
+	pixman_image_t *reference_src, *capture_src;
+	int w, h;
+	int error_count[3][256][2] = { 0 };
+	double error_average[4][250];
+	double error_trend[250];
+	double c0, c1, cov00, cov01, cov11, sumsq;
+	double correlation;
+	unsigned char *reference_pixels, *capture_pixels;
+	unsigned char *p;
+	unsigned char *q;
+	bool match = true;
+	int diff;
+	int x, y;
+	int i, j;
+
+	w = cairo_image_surface_get_width(reference);
+	h = cairo_image_surface_get_height(reference);
+
+	reference_src = pixman_image_create_bits(
+	    PIXMAN_x8r8g8b8, w, h,
+	    (void*)cairo_image_surface_get_data(reference),
+	    cairo_image_surface_get_stride(reference));
+	reference_pixels = (unsigned char *) pixman_image_get_data(reference_src);
+
+	capture_src = pixman_image_create_bits(
+	    PIXMAN_x8r8g8b8, w, h,
+	    (void*)cairo_image_surface_get_data(capture),
+	    cairo_image_surface_get_stride(capture));
+	capture_pixels = (unsigned char *) pixman_image_get_data(capture_src);
+
+	/* Collect the absolute error for each color value */
+	for (x = 0; x < w; x++) {
+		for (y = 0; y < h; y++) {
+			p = &capture_pixels[(x + y * w) * 4];
+			q = &reference_pixels[(x + y * w) * 4];
+
+			for (i = 0; i < 3; i++) {
+				diff = (int) p[i] - q[i];
+				if (diff < 0)
+					diff = -diff;
+
+				error_count[i][q[i]][0] += diff;
+				error_count[i][q[i]][1]++;
+			}
+		}
+	}
+
+	/* Calculate the average absolute error for each color value */
+	for (i = 0; i < 250; i++) {
+		error_average[0][i] = i;
+
+		for (j = 1; j < 4; j++) {
+			error_average[j][i] = (double) error_count[j-1][i][0] /
+					      error_count[j-1][i][1];
+
+			if (error_average[j][i] > 60) {
+				igt_warn("Error average too high (%f)\n",
+					 error_average[j][i]);
+
+				match = false;
+				goto complete;
+			}
+		}
+	}
+
+	/*
+	 * Calculate error trend from linear fit.
+	 * A DAC-ADC chain is expected to have a linear absolute error on
+	 * most of its range
+	 */
+	for (i = 1; i < 4; i++) {
+		gsl_fit_linear((const double *) &error_average[0], 1,
+			       (const double *) &error_average[i], 1, 250,
+			       &c0, &c1, &cov00, &cov01, &cov11, &sumsq);
+
+		for (j = 0; j < 250; j++)
+			error_trend[j] = c0 + j * c1;
+
+		correlation = gsl_stats_correlation((const double *) &error_trend,
+						    1,
+						    (const double *) &error_average[i],
+						    1, 250);
+
+		if (correlation < 0.985) {
+			igt_warn("Error with reference not correlated (%f)\n",
+				 correlation);
+
+			match = false;
+			goto complete;
+		}
+	}
+
+complete:
+	pixman_image_unref(reference_src);
+	pixman_image_unref(capture_src);
+
+	return match;
 }

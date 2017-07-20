@@ -29,12 +29,20 @@ lib_source_list +=	 	\
 	$(NULL)
 endif
 
+if HAVE_GSL
+lib_source_list +=		\
+	igt_frame.c		\
+	igt_frame.h		\
+	$(NULL)
+endif
+
 AM_CPPFLAGS = -I$(top_srcdir)
 AM_CFLAGS = \
 	    $(CWARNFLAGS) \
 	    $(DRM_CFLAGS) \
 	    $(PCIACCESS_CFLAGS) \
 	    $(LIBUNWIND_CFLAGS) \
+	    $(GSL_CFLAGS) \
 	    $(KMOD_CFLAGS) \
 	    $(PROCPS_CFLAGS) \
 	    $(DEBUG_CFLAGS) \
@@ -54,6 +62,7 @@ libintel_tools_la_LIBADD = \
 	$(DRM_LIBS) \
 	$(PCIACCESS_LIBS) \
 	$(PROCPS_LIBS) \
+	$(GSL_LIBS) \
 	$(KMOD_LIBS) \
 	$(CAIRO_LIBS) \
 	$(LIBUDEV_LIBS) \
