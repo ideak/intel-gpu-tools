@@ -652,8 +652,6 @@ static void common_init_config(void)
 
 	g_clear_error(&error);
 
-	frame_dump_path = getenv("IGT_FRAME_DUMP_PATH");
-
 	if (!frame_dump_path)
 		frame_dump_path = g_key_file_get_string(igt_key_file, "Common",
 							"FrameDumpPath",
@@ -675,6 +673,31 @@ out:
 		free(key_file_loc);
 }
 #endif
+
+static void common_init_env(void)
+{
+	const char *env;
+
+	if (!isatty(STDOUT_FILENO) || getenv("IGT_PLAIN_OUTPUT"))
+		__igt_plain_output = true;
+
+	if (!__igt_plain_output)
+		setlocale(LC_ALL, "");
+
+	env = getenv("IGT_LOG_LEVEL");
+	if (env) {
+		if (strcmp(env, "debug") == 0)
+			igt_log_level = IGT_LOG_DEBUG;
+		else if (strcmp(env, "info") == 0)
+			igt_log_level = IGT_LOG_INFO;
+		else if (strcmp(env, "warn") == 0)
+			igt_log_level = IGT_LOG_WARN;
+		else if (strcmp(env, "none") == 0)
+			igt_log_level = IGT_LOG_NONE;
+	}
+
+	frame_dump_path = getenv("IGT_FRAME_DUMP_PATH");
+}
 
 static int common_init(int *argc, char **argv,
 		       const char *extra_short_opts,
@@ -699,25 +722,8 @@ static int common_init(int *argc, char **argv,
 	int extra_opt_count;
 	int all_opt_count;
 	int ret = 0;
-	const char *env;
 
-	if (!isatty(STDOUT_FILENO) || getenv("IGT_PLAIN_OUTPUT"))
-		__igt_plain_output = true;
-
-	if (!__igt_plain_output)
-		setlocale(LC_ALL, "");
-
-	env = getenv("IGT_LOG_LEVEL");
-	if (env) {
-		if (strcmp(env, "debug") == 0)
-			igt_log_level = IGT_LOG_DEBUG;
-		else if (strcmp(env, "info") == 0)
-			igt_log_level = IGT_LOG_INFO;
-		else if (strcmp(env, "warn") == 0)
-			igt_log_level = IGT_LOG_WARN;
-		else if (strcmp(env, "none") == 0)
-			igt_log_level = IGT_LOG_NONE;
-	}
+	common_init_env();
 
 	command_str = argv[0];
 	if (strrchr(command_str, '/'))
