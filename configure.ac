@@ -197,6 +197,10 @@ if test "x$enable_chamelium" = xyes; then
 	if test x"$glib" != xyes; then
 		AC_MSG_ERROR([Failed to find glib, required by chamelium. Use --disable-chamelium to disable chamelium support.])
 	fi
+	if test x"$gsl" != xyes; then
+		AC_MSG_ERROR([Failed to find gsl, required by chamelium. Use --disable-chamelium to disable chamelium support.])
+	fi
+
 	AC_DEFINE(HAVE_CHAMELIUM, 1, [Enable Chamelium support])
 fi
 

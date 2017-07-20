@@ -399,6 +399,10 @@ enable_output(data_t *data,
 					    BROADCAST_RGB_FULL);
 
 	igt_display_commit(display);
+
+	if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
+		usleep(250000);
+
 	chamelium_port_wait_video_input_stable(data->chamelium, port,
 					       HOTPLUG_TIMEOUT);
 
@@ -523,6 +527,56 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 			chamelium_assert_frame_eq(data->chamelium, frame, &fb);
 			chamelium_destroy_frame_dump(frame);
 		}
+
+		disable_output(data, port, output);
+		igt_remove_fb(data->drm_fd, &fb);
+	}
+
+	drmModeFreeConnector(connector);
+	igt_display_fini(&display);
+}
+
+static void
+test_analog_frame_dump(data_t *data, struct chamelium_port *port)
+{
+	igt_display_t display;
+	igt_output_t *output;
+	igt_plane_t *primary;
+	struct igt_fb fb;
+	struct chamelium_frame_dump *frame;
+	drmModeModeInfo *mode;
+	drmModeConnector *connector;
+	int fb_id, i;
+
+	output = prepare_output(data, &display, port);
+	connector = chamelium_port_get_connector(data->chamelium, port, false);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_assert(primary);
+
+	for (i = 0; i < connector->count_modes; i++) {
+		mode = &connector->modes[i];
+
+		fb_id = igt_create_color_pattern_fb(data->drm_fd,
+						    mode->hdisplay, mode->vdisplay,
+						    DRM_FORMAT_XRGB8888,
+						    LOCAL_DRM_FORMAT_MOD_NONE,
+						    0, 0, 0, &fb);
+		igt_assert(fb_id > 0);
+
+		enable_output(data, port, output, mode, &fb);
+
+		igt_debug("Reading frame dumps from Chamelium...\n");
+
+		frame = chamelium_port_dump_pixels(data->chamelium, port, 0, 0,
+						   0, 0);
+
+		chamelium_crop_analog_frame(frame, mode->hdisplay,
+					    mode->vdisplay);
+
+		chamelium_assert_analog_frame_match_or_dump(data->chamelium,
+							    port, frame, &fb);
+
+		chamelium_destroy_frame_dump(frame);
 
 		disable_output(data, port, output);
 		igt_remove_fb(data->drm_fd, &fb);
@@ -775,6 +829,9 @@ igt_main
 
 		connector_subtest("vga-hpd-without-ddc", VGA)
 			test_hpd_without_ddc(&data, port);
+
+		connector_subtest("vga-frame-dump", VGA)
+			test_analog_frame_dump(&data, port);
 	}
 
 	igt_subtest_group {

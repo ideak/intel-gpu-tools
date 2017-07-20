@@ -937,6 +937,8 @@ static cairo_surface_t *convert_frame_dump_argb32(const struct chamelium_frame_d
 	int w = dump->width, h = dump->height;
 	uint32_t *bits_bgr = (uint32_t *) dump->bgr;
 	unsigned char *bits_argb;
+	unsigned char *bits_target;
+	int size;
 
 	image_bgr = pixman_image_create_bits(
 	    PIXMAN_b8g8r8, w, h, bits_bgr,
@@ -946,9 +948,13 @@ static cairo_surface_t *convert_frame_dump_argb32(const struct chamelium_frame_d
 
 	bits_argb = (unsigned char *) pixman_image_get_data(image_argb);
 
-	dump_surface = cairo_image_surface_create_for_data(
-	    bits_argb, CAIRO_FORMAT_ARGB32, w, h,
-	    PIXMAN_FORMAT_BPP(PIXMAN_x8r8g8b8) / 8 * w);
+	dump_surface = cairo_image_surface_create(
+	    CAIRO_FORMAT_ARGB32, w, h);
+
+	bits_target = cairo_image_surface_get_data(dump_surface);
+	size = cairo_image_surface_get_stride(dump_surface) * h;
+	memcpy(bits_target, bits_argb, size);
+	cairo_surface_mark_dirty(dump_surface);
 
 	pixman_image_unref(image_argb);
 
@@ -1051,6 +1057,154 @@ void chamelium_assert_crc_eq_or_dump(struct chamelium *chamelium,
 	}
 
 	igt_assert(eq);
+}
+
+/**
+ * chamelium_assert_analog_frame_match_or_dump:
+ * @chamelium: The chamelium instance the frame dump belongs to
+ * @frame: The chamelium frame dump to match
+ * @fb: pointer to an #igt_fb structure
+ *
+ * Asserts that the provided captured frame matches the reference frame from
+ * the framebuffer. If they do not, this saves the reference and captured frames
+ * to a png file.
+ */
+void chamelium_assert_analog_frame_match_or_dump(struct chamelium *chamelium,
+						 struct chamelium_port *port,
+						 const struct chamelium_frame_dump *frame,
+						 struct igt_fb *fb)
+{
+	cairo_surface_t *reference;
+	cairo_surface_t *capture;
+	igt_crc_t *reference_crc;
+	igt_crc_t *capture_crc;
+	char *reference_suffix;
+	char *capture_suffix;
+	bool match;
+
+	/* Grab the reference frame from framebuffer */
+	reference = igt_get_cairo_surface(chamelium->drm_fd, fb);
+
+	/* Grab the captured frame from chamelium */
+	capture = convert_frame_dump_argb32(frame);
+
+	match = igt_check_analog_frame_match(reference, capture);
+	if (!match && igt_frame_dump_is_enabled()) {
+		reference_crc = chamelium_calculate_fb_crc(chamelium->drm_fd,
+							   fb);
+		capture_crc = chamelium_get_crc_for_area(chamelium, port, 0, 0,
+							 0, 0);
+
+		reference_suffix = igt_crc_to_string_extended(reference_crc,
+							      '-', 2);
+		capture_suffix = igt_crc_to_string_extended(capture_crc, '-',
+							    2);
+
+		/* Write reference and capture frames to png */
+		igt_write_compared_frames_to_png(reference, capture,
+						 reference_suffix,
+						 capture_suffix);
+
+		free(reference_suffix);
+		free(capture_suffix);
+	}
+
+	cairo_surface_destroy(capture);
+
+	igt_assert(match);
+}
+
+
+/**
+ * chamelium_analog_frame_crop:
+ * @chamelium: The Chamelium instance to use
+ * @dump: The chamelium frame dump to crop
+ * @width: The cropped frame width
+ * @height: The cropped frame height
+ *
+ * Detects the corners of a chamelium frame and crops it to the requested
+ * width/height. This is useful for VGA frame dumps that also contain the
+ * pixels dumped during the blanking intervals.
+ *
+ * The detection is done on a brightness-threshold-basis, that is adapted
+ * to the reference frame used by i-g-t. It may not be as relevant for other
+ * frames.
+ */
+void chamelium_crop_analog_frame(struct chamelium_frame_dump *dump, int width,
+				 int height)
+{
+	unsigned char *bgr;
+	unsigned char *p;
+	unsigned char *q;
+	int top, left;
+	int x, y, xx, yy;
+	int score;
+
+	if (dump->width == width && dump->height == height)
+		return;
+
+	/* Start with the most bottom-right position. */
+	top = dump->height - height;
+	left = dump->width - width;
+
+	igt_assert(top >= 0 && left >= 0);
+
+	igt_debug("Cropping analog frame from %dx%d to %dx%d\n", dump->width,
+		  dump->height, width, height);
+
+	/* Detect the top-left corner of the frame. */
+	for (x = 0; x < dump->width; x++) {
+		for (y = 0; y < dump->height; y++) {
+			p = &dump->bgr[(x + y * dump->width) * 3];
+
+			/* Detect significantly bright pixels. */
+			if (p[0] < 50 && p[1] < 50 && p[2] < 50)
+				continue;
+
+			/*
+			 * Make sure close-by pixels are also significantly
+			 * bright.
+			 */
+			score = 0;
+			for (xx = x; xx < x + 10; xx++) {
+				for (yy = y; yy < y + 10; yy++) {
+					p = &dump->bgr[(xx + yy * dump->width) * 3];
+
+					if (p[0] > 50 && p[1] > 50 && p[2] > 50)
+						score++;
+				}
+			}
+
+			/* Not enough pixels are significantly bright. */
+			if (score < 25)
+				continue;
+
+			if (x < left)
+				left = x;
+
+			if (y < top)
+				top = y;
+
+			if (left == x || top == y)
+				continue;
+		}
+	}
+
+	igt_debug("Detected analog frame edges at %dx%d\n", left, top);
+
+	/* Crop the frame given the detected top-left corner. */
+	bgr = malloc(width * height * 3);
+
+	for (y = 0; y < height; y++) {
+		p = &dump->bgr[(left + (top + y) * dump->width) * 3];
+		q = &bgr[(y * width) * 3];
+		memcpy(q, p, width * 3);
+	}
+
+	free(dump->bgr);
+	dump->width = width;
+	dump->height = height;
+	dump->bgr = bgr;
 }
 
 /**
@@ -1480,7 +1634,7 @@ igt_constructor {
 	/* Frame dumps can be large, so we need to be able to handle very large
 	 * responses
 	 *
-	 * Limit here is 10MB
+	 * Limit here is 15MB
 	 */
-	xmlrpc_limit_set(XMLRPC_XML_SIZE_LIMIT_ID, 10485760);
+	xmlrpc_limit_set(XMLRPC_XML_SIZE_LIMIT_ID, 15728640);
 }
