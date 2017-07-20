@@ -133,6 +133,80 @@ static void single(int fd, uint32_t handle,
 		gem_context_destroy(fd, contexts[n]);
 }
 
+static void all(int fd, uint32_t handle, unsigned flags, int timeout)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj[2];
+	unsigned int engine[16], e;
+	const char *name[16];
+	uint32_t contexts[65];
+	unsigned int nengine;
+	int n;
+
+	nengine = 0;
+	for_each_physical_engine(fd, e) {
+		engine[nengine] = e;
+		name[nengine] = e__->name;
+		nengine++;
+	}
+	igt_require(nengine);
+
+	for (n = 0; n < ARRAY_SIZE(contexts); n++)
+		contexts[n] = gem_context_create(fd);
+
+	memset(obj, 0, sizeof(obj));
+	obj[1].handle = handle;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj + 1);
+	execbuf.buffer_count = 1;
+	execbuf.rsvd1 = contexts[0];
+	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	igt_require(__gem_execbuf(fd, &execbuf) == 0);
+	gem_sync(fd, handle);
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+
+	for (int pot = 2; pot <= 64; pot *= 2) {
+		for (int nctx = pot - 1; nctx <= pot + 1; nctx++) {
+			igt_fork(child, nengine) {
+				struct timespec start, now;
+				unsigned int count = 0;
+
+				obj[0].handle = gem_create(fd, 4096);
+				execbuf.flags |= engine[child];
+				for (int loop = 0; loop < ARRAY_SIZE(contexts); loop++) {
+					execbuf.rsvd1 = contexts[loop];
+					gem_execbuf(fd, &execbuf);
+				}
+				gem_sync(fd, obj[0].handle);
+
+				clock_gettime(CLOCK_MONOTONIC, &start);
+				do {
+					for (int loop = 0; loop < 1024; loop++) {
+						execbuf.rsvd1 = contexts[loop % nctx];
+						gem_execbuf(fd, &execbuf);
+					}
+					count += 1024;
+					clock_gettime(CLOCK_MONOTONIC, &now);
+				} while (elapsed(&start, &now) < timeout);
+				gem_sync(fd, obj[0].handle);
+				clock_gettime(CLOCK_MONOTONIC, &now);
+				gem_close(fd, obj[0].handle);
+
+				igt_info("[%d:%d] %s: %'u cycles: %.3fus%s\n",
+					 nctx, child, name[child], count, elapsed(&start, &now)*1e6 / count,
+					 flags & INTERRUPTIBLE ? " (interruptible)" : "");
+			}
+			igt_waitchildren();
+		}
+	}
+
+	for (n = 0; n < ARRAY_SIZE(contexts); n++)
+		gem_context_destroy(fd, contexts[n]);
+}
+
 igt_main
 {
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
@@ -174,6 +248,11 @@ igt_main
 		igt_subtest_f("forked-%s-interruptible", e->name)
 			single(fd, light, e, INTERRUPTIBLE, ncpus, 150);
 	}
+
+	igt_subtest("basic-all-light")
+		all(fd, light, 0, 5);
+	igt_subtest("basic-all-heavy")
+		all(fd, heavy, 0, 5);
 
 	igt_fixture {
 		igt_stop_hang_detector();
