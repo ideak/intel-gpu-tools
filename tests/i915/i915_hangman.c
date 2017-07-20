@@ -257,6 +257,7 @@ static void hangcheck_unterminated(void)
 igt_main
 {
 	const struct intel_execution_engine *e;
+	igt_hang_t hang = {};
 
 	igt_skip_on_simulation();
 
@@ -265,6 +266,8 @@ igt_main
 
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
+
+		hang = igt_allow_hang(device, 0, HANG_ALLOW_CAPTURE);
 
 		sysfs = igt_sysfs_open(device, &idx);
 		igt_assert(sysfs != -1);
@@ -288,4 +291,8 @@ igt_main
 
 	igt_subtest("hangcheck-unterminated")
 		hangcheck_unterminated();
+
+	igt_fixture {
+		igt_disallow_hang(device, hang);
+	}
 }
