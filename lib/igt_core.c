@@ -637,10 +637,16 @@ static int config_parse(void)
 							"FrameDumpPath",
 							&error);
 
+	g_clear_error(&error);
+
 	rc = g_key_file_get_integer(igt_key_file, "DUT", "SuspendResumeDelay",
 				    &error);
-	if (error && error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+	if (error && error->code == G_KEY_FILE_ERROR_INVALID_VALUE) {
+		g_error_free(error);
 		return -2;
+	}
+
+	g_clear_error(&error);
 
 	if (rc != 0)
 		igt_set_autoresume_delay(rc);
@@ -809,12 +815,15 @@ static int common_init(int *argc, char **argv,
 	ret = g_key_file_load_from_file(igt_key_file, key_file_loc,
 					G_KEY_FILE_NONE, &error);
 	if (error && error->code == G_KEY_FILE_ERROR) {
+		g_error_free(error);
 		g_key_file_free(igt_key_file);
 		igt_key_file = NULL;
 		ret = -2;
 
 		goto out;
 	}
+
+	g_clear_error(&error);
 
 	ret = config_parse();
 #endif
