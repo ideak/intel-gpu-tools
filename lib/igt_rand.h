@@ -38,4 +38,10 @@ static inline void hars_petruska_f54_1_random_perturb(uint32_t xor)
 	hars_petruska_f54_1_random_seed(hars_petruska_f54_1_random_unsafe());
 }
 
+/* Returns: pseudo-random number in interval [0, ep_ro) */
+static inline uint32_t hars_petruska_f54_1_random_unsafe_max(uint32_t ep_ro)
+{
+	return ((uint64_t)hars_petruska_f54_1_random_unsafe() * ep_ro) >> 32;
+}
+
 #endif /* IGT_RAND_H */

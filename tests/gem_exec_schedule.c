@@ -26,6 +26,7 @@
 
 #include "igt.h"
 #include "igt_vgem.h"
+#include "igt_rand.h"
 
 #define LOCAL_PARAM_HAS_SCHEDULER 41
 #define LOCAL_CONTEXT_PARAM_PRIORITY 6
@@ -550,11 +551,113 @@ static void wide(int fd, unsigned ring)
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	for (int n = 0; n < NCTX; n++)
 		igt_assert_eq_u32(ptr[n], ctx[n]);
-	munmap(ptr, 4096);
+	munmap(ptr, 4*NCTX);
 
 	gem_close(fd, result);
 	free(ctx);
-#undef CTX
+#undef NCTX
+}
+
+static void reorder_wide(int fd, unsigned ring)
+{
+	const int gen = intel_gen(intel_get_drm_devid(fd));
+	struct drm_i915_gem_relocation_entry reloc;
+	struct drm_i915_gem_exec_object2 obj[3];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct cork cork;
+	uint32_t result, target;
+	uint32_t *busy;
+	uint32_t *r, *t;
+
+	result = gem_create(fd, 4096);
+	target = gem_create(fd, 4096);
+
+	busy = make_busy(fd, result, ring);
+	plug(fd, &cork);
+
+	t = gem_mmap__cpu(fd, target, 0, 4096, PROT_WRITE);
+	gem_set_domain(fd, target, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = cork.handle;
+	obj[1].handle = result;
+	obj[2].relocs_ptr = to_user_pointer(&reloc);
+	obj[2].relocation_count = 1;
+
+	memset(&reloc, 0, sizeof(reloc));
+	reloc.target_handle = result;
+	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+	reloc.write_domain = 0; /* lies */
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 3;
+	execbuf.flags = ring;
+	if (gen < 6)
+		execbuf.flags |= I915_EXEC_SECURE;
+
+	for (int n = -MAX_PRIO, x = 1; n <= MAX_PRIO; n++, x++) {
+		uint32_t *batch;
+
+		execbuf.rsvd1 = gem_context_create(fd);
+		ctx_set_priority(fd, execbuf.rsvd1, n);
+
+		obj[2].handle = gem_create(fd, 128 * 64);
+		batch = gem_mmap__gtt(fd, obj[2].handle, 128 * 64, PROT_WRITE);
+		gem_set_domain(fd, obj[2].handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
+		for (int m = 0; m < 128; m++) {
+			uint64_t addr;
+			int idx = hars_petruska_f54_1_random_unsafe_max( 1024);
+			int i;
+
+			execbuf.batch_start_offset = m * 64;
+			reloc.offset = execbuf.batch_start_offset + sizeof(uint32_t);
+			reloc.delta = idx * sizeof(uint32_t);
+			addr = reloc.presumed_offset + reloc.delta;
+
+			i = execbuf.batch_start_offset / sizeof(uint32_t);
+			batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+			if (gen >= 8) {
+				batch[++i] = addr;
+				batch[++i] = addr >> 32;
+			} else if (gen >= 4) {
+				batch[++i] = 0;
+				batch[++i] = addr;
+				reloc.offset += sizeof(uint32_t);
+			} else {
+				batch[i]--;
+				batch[++i] = addr;
+			}
+			batch[++i] = x;
+			batch[++i] = MI_BATCH_BUFFER_END;
+
+			if (!t[idx])
+				t[idx] =  x;
+
+			gem_execbuf(fd, &execbuf);
+		}
+
+		munmap(batch, 128 * 64);
+		gem_close(fd, obj[2].handle);
+		gem_context_destroy(fd, execbuf.rsvd1);
+	}
+
+	igt_assert(gem_bo_busy(fd, result));
+	unplug(&cork); /* only now submit our batches */
+	igt_debugfs_dump(fd, "i915_engine_info");
+	finish_busy(busy);
+
+	r = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	gem_set_domain(fd, result, /* no write hazard lies! */
+			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	for (int n = 0; n < 1024; n++)
+		igt_assert_eq_u32(r[n], t[n]);
+	munmap(r, 4096);
+	munmap(t, 4096);
+
+	gem_close(fd, result);
+	gem_close(fd, target);
 }
 
 static bool has_scheduler(int fd)
@@ -628,6 +731,9 @@ igt_main
 
 				igt_subtest_f("wide-%s", e->name)
 					wide(fd, e->exec_id | e->flags);
+
+				igt_subtest_f("reorder-wide-%s", e->name)
+					reorder_wide(fd, e->exec_id | e->flags);
 			}
 		}
 	}
