@@ -622,13 +622,35 @@ static void oom_adjust_for_doom(void)
 }
 
 #ifdef HAVE_GLIB
-static int config_parse(void)
+static void common_init_config(void)
 {
+	char *key_file_env = NULL;
+	char *key_file_loc = NULL;
 	GError *error = NULL;
-	int rc;
+	int ret;
 
-	if (!igt_key_file)
-		return 0;
+	/* Determine igt config path */
+	key_file_env = getenv("IGT_CONFIG_PATH");
+	if (key_file_env) {
+		key_file_loc = key_file_env;
+	} else {
+		key_file_loc = malloc(100);
+		snprintf(key_file_loc, 100, "%s/.igtrc", g_get_home_dir());
+	}
+
+	/* Load igt config file */
+	igt_key_file = g_key_file_new();
+	ret = g_key_file_load_from_file(igt_key_file, key_file_loc,
+					G_KEY_FILE_NONE, &error);
+	if (error && error->code == G_KEY_FILE_ERROR) {
+		g_error_free(error);
+		g_key_file_free(igt_key_file);
+		igt_key_file = NULL;
+
+		goto out;
+	}
+
+	g_clear_error(&error);
 
 	frame_dump_path = getenv("IGT_FRAME_DUMP_PATH");
 
@@ -639,19 +661,18 @@ static int config_parse(void)
 
 	g_clear_error(&error);
 
-	rc = g_key_file_get_integer(igt_key_file, "DUT", "SuspendResumeDelay",
-				    &error);
-	if (error && error->code == G_KEY_FILE_ERROR_INVALID_VALUE) {
-		g_error_free(error);
-		return -2;
-	}
+	ret = g_key_file_get_integer(igt_key_file, "DUT", "SuspendResumeDelay",
+				     &error);
+	assert(!error || error->code != G_KEY_FILE_ERROR_INVALID_VALUE);
 
 	g_clear_error(&error);
 
-	if (rc != 0)
-		igt_set_autoresume_delay(rc);
+	if (ret != 0)
+		igt_set_autoresume_delay(ret);
 
-	return 0;
+out:
+	if (!key_file_env && key_file_loc)
+		free(key_file_loc);
 }
 #endif
 
@@ -678,9 +699,6 @@ static int common_init(int *argc, char **argv,
 	int extra_opt_count;
 	int all_opt_count;
 	int ret = 0;
-	char *key_file_loc = NULL;
-	char *key_file_env = NULL;
-	GError *error = NULL;
 	const char *env;
 
 	if (!isatty(STDOUT_FILENO) || getenv("IGT_PLAIN_OUTPUT"))
@@ -802,36 +820,11 @@ static int common_init(int *argc, char **argv,
 		}
 	}
 
-	key_file_env = getenv("IGT_CONFIG_PATH");
-	if (key_file_env) {
-		key_file_loc = key_file_env;
-	} else {
-		key_file_loc = malloc(100);
-		snprintf(key_file_loc, 100, "%s/.igtrc", g_get_home_dir());
-	}
-
 #ifdef HAVE_GLIB
-	igt_key_file = g_key_file_new();
-	ret = g_key_file_load_from_file(igt_key_file, key_file_loc,
-					G_KEY_FILE_NONE, &error);
-	if (error && error->code == G_KEY_FILE_ERROR) {
-		g_error_free(error);
-		g_key_file_free(igt_key_file);
-		igt_key_file = NULL;
-		ret = -2;
-
-		goto out;
-	}
-
-	g_clear_error(&error);
-
-	ret = config_parse();
+	common_init_config();
 #endif
 
 out:
-	if (!key_file_env && key_file_loc)
-		free(key_file_loc);
-
 	free(short_opts);
 	free(combined_opts);
 
