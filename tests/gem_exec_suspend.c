@@ -29,6 +29,7 @@
 
 #include "igt.h"
 #include "igt_gt.h"
+#include "igt_dummyload.h"
 
 #define NOSLEEP 0
 #define SUSPEND_DEVICES 1
@@ -44,6 +45,7 @@
 
 #define UNCACHED (0<<8)
 #define CACHED (1<<8)
+#define HANG (2<<8)
 
 static void run_test(int fd, unsigned ring, unsigned flags);
 
@@ -105,6 +107,7 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	unsigned engines[16];
 	unsigned nengine;
+	igt_spin_t *spin = NULL;
 
 	nengine = 0;
 	if (engine == -1) {
@@ -197,6 +200,9 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 		gem_close(fd, obj[1].handle);
 	}
 
+	if (flags & HANG)
+		spin = igt_spin_batch_new(fd, 0, engine, 0);
+
 	switch (mode(flags)) {
 	case NOSLEEP:
 		break;
@@ -222,6 +228,8 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 		break;
 	}
 
+	igt_spin_batch_free(fd, spin);
+
 	check_bo(fd, obj[0].handle);
 	gem_close(fd, obj[0].handle);
 
@@ -244,6 +252,7 @@ igt_main
 		{ NULL, 0 }
 	}, *m;
 	const struct intel_execution_engine *e;
+	igt_hang_t hang;
 	int fd;
 
 	igt_fixture {
@@ -278,6 +287,16 @@ igt_main
 
 	igt_fixture {
 		igt_stop_hang_detector();
+		hang = igt_allow_hang(fd, 0, 0);
+	}
+
+	igt_subtest("hang-S3")
+		run_test(fd, 0, SUSPEND | HANG);
+	igt_subtest("hang-S4")
+		run_test(fd, 0, HIBERNATE | HANG);
+
+	igt_fixture {
+		igt_disallow_hang(fd, hang);
 		close(fd);
 	}
 }
