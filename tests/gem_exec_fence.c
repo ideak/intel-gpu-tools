@@ -208,6 +208,113 @@ static void test_fence_busy(int fd, unsigned ring, unsigned flags)
 	gem_quiescent_gpu(fd);
 }
 
+static void test_fence_busy_all(int fd, unsigned flags)
+{
+	const int gen = intel_gen(intel_get_drm_devid(fd));
+	struct drm_i915_gem_exec_object2 obj;
+	struct drm_i915_gem_relocation_entry reloc;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct timespec tv;
+	uint32_t *batch;
+	unsigned int engine;
+	int all, i, timeout;
+
+	gem_quiescent_gpu(fd);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = gem_create(fd, 4096);
+
+	obj.relocs_ptr = to_user_pointer(&reloc);
+	obj.relocation_count = 1;
+	memset(&reloc, 0, sizeof(reloc));
+
+	batch = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
+	gem_set_domain(fd, obj.handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
+	reloc.target_handle = obj.handle; /* recurse */
+	reloc.presumed_offset = 0;
+	reloc.offset = sizeof(uint32_t);
+	reloc.delta = 0;
+	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
+	reloc.write_domain = 0;
+
+	i = 0;
+	batch[i] = MI_BATCH_BUFFER_START;
+	if (gen >= 8) {
+		batch[i] |= 1 << 8 | 1;
+		batch[++i] = 0;
+		batch[++i] = 0;
+	} else if (gen >= 6) {
+		batch[i] |= 1 << 8;
+		batch[++i] = 0;
+	} else {
+		batch[i] |= 2 << 6;
+		batch[++i] = 0;
+		if (gen < 4) {
+			batch[i] |= 1;
+			reloc.delta = 1;
+		}
+	}
+	i++;
+
+	all = -1;
+	for_each_engine(fd, engine) {
+		int fence, new;
+
+		execbuf.flags = engine | LOCAL_EXEC_FENCE_OUT;
+		execbuf.rsvd2 = -1;
+		gem_execbuf_wr(fd, &execbuf);
+		fence = execbuf.rsvd2 >> 32;
+		igt_assert(fence != -1);
+
+		if (all < 0) {
+			all = fence;
+			break;
+		}
+
+		new = sync_fence_merge(all, fence);
+		igt_assert_lte(0, new);
+		close(all);
+		close(fence);
+
+		all = new;
+	}
+
+	igt_assert(gem_bo_busy(fd, obj.handle));
+	igt_assert(fence_busy(all));
+
+	timeout = 120;
+	if ((flags & HANG) == 0) {
+		*batch = MI_BATCH_BUFFER_END;
+		__sync_synchronize();
+		timeout = 1;
+	}
+	munmap(batch, 4096);
+
+	if (flags & WAIT) {
+		struct pollfd pfd = { .fd = all, .events = POLLIN };
+		igt_assert(poll(&pfd, 1, timeout*1000) == 1);
+	} else {
+		memset(&tv, 0, sizeof(tv));
+		while (fence_busy(all))
+			igt_assert(igt_seconds_elapsed(&tv) < timeout);
+	}
+
+	igt_assert(!gem_bo_busy(fd, obj.handle));
+	igt_assert_eq(sync_fence_status(all),
+		      flags & HANG ? -EIO : SYNC_FENCE_OK);
+
+	close(all);
+	gem_close(fd, obj.handle);
+
+	gem_quiescent_gpu(fd);
+}
+
 static void test_fence_await(int fd, unsigned ring, unsigned flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
@@ -1463,6 +1570,26 @@ igt_main
 		gem_require_mmap_wc(i915);
 
 		gem_submission_print_method(i915);
+	}
+
+	igt_subtest_group {
+		igt_fixture {
+			igt_fork_hang_detector(i915);
+		}
+
+		igt_subtest("basic-busy-all")
+			test_fence_busy_all(i915, 0);
+		igt_subtest("basic-wait-all")
+			test_fence_busy_all(i915, WAIT);
+
+		igt_fixture {
+			igt_stop_hang_detector();
+		}
+
+		igt_subtest("busy-hang-all")
+			test_fence_busy_all(i915, HANG);
+		igt_subtest("wait-hang-all")
+			test_fence_busy_all(i915, WAIT | HANG);
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
