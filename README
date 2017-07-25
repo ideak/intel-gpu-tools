@@ -131,7 +131,7 @@ Requirements
 ------------
 
 This is a non-exhaustive list of package dependencies required for building
-everything (package names may vary):
+the default configuration (package names may vary):
 
 	gtk-doc-tools
 	libcairo2-dev
@@ -143,6 +143,15 @@ everything (package names may vary):
 	python-docutils
 	x11proto-dri2-dev
 	xutils-dev
+
+The following dependencies are required for building chamelium support
+(package names may vary):
+
+	libxmlrpc-core-c3-dev
+	libpixman-1-dev
+	libudev-dev
+	libglib2.0-dev
+	libgsl-dev
 
 Releases for maintainers
 ------------------------
