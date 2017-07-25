@@ -288,10 +288,15 @@ static unsigned int measure_ring_size(int fd)
 	obj[1].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj + 1);
+	execbuf.buffer_count = 1;
+	gem_execbuf(fd, &execbuf);
+	gem_sync(fd, obj[1].handle);
+
 	plug(fd, &c);
 	obj[0].handle = c.handle;
 
-	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 
@@ -302,7 +307,8 @@ static unsigned int measure_ring_size(int fd)
 	itv.it_value.tv_usec = 1000;
 	setitimer(ITIMER_REAL, &itv, NULL);
 
-	last = count = 0;
+	last = -1;
+	count = 0;
 	do {
 		if (__execbuf(fd, &execbuf) == 0) {
 			count++;
