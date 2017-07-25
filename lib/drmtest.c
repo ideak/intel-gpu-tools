@@ -341,6 +341,26 @@ static void quiescent_gpu_at_exit_render(int sig)
 	at_exit_drm_render_fd = -1;
 }
 
+static const char *chipset_to_str(int chipset)
+{
+	switch (chipset) {
+	case DRIVER_INTEL:
+		return "intel";
+	case DRIVER_VC4:
+		return "vc4";
+	case DRIVER_VGEM:
+		return "vgem";
+	case DRIVER_VIRTIO:
+		return "virtio";
+	case DRIVER_AMDGPU:
+		return "amdgpu";
+	case DRIVER_ANY:
+		return "any";
+	default:
+		return "otehr";
+	}
+}
+
 /**
  * drm_open_driver:
  * @chipset: OR'd flags for each chipset to search, eg. #DRIVER_INTEL
@@ -356,7 +376,8 @@ int drm_open_driver(int chipset)
 	int fd;
 
 	fd = __drm_open_driver(chipset);
-	igt_skip_on_f(fd<0, "No known gpu found\n");
+	igt_skip_on_f(fd<0, "No known gpu found for chipset flags 0x%u (%s)\n",
+		      chipset, chipset_to_str(chipset));
 
 	/* For i915, at least, we ensure that the driver is idle before
 	 * starting a test and we install an exit handler to wait until
