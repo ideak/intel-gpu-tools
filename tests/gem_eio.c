@@ -53,7 +53,7 @@ static bool i915_reset_control(bool enable)
 	fd = open(path, O_RDWR);
 	igt_require(fd >= 0);
 
-	ret = write(fd, &"NY"[enable], 1) == 1;
+	ret = write(fd, &"01"[enable], 1) == 1;
 	close(fd);
 
 	return ret;
