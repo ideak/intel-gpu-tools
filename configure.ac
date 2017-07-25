@@ -194,6 +194,9 @@ if test "x$enable_chamelium" = xyes; then
 			  [AC_MSG_ERROR([Failed to find xmlrpc, required by chamelium. Use --disable-chamelium to disable chamelium support.])])
 	PKG_CHECK_MODULES(PIXMAN, pixman-1, [],
 			  [AC_MSG_ERROR([Failed to find pixman, required by chamelium. Use --disable-chamelium to disable chamelium support.])])
+	if test x"$udev" != xyes; then
+		AC_MSG_ERROR([Failed to find udev, required by chamelium. Use --disable-chamelium to disable chamelium support.])
+	fi
 	if test x"$glib" != xyes; then
 		AC_MSG_ERROR([Failed to find glib, required by chamelium. Use --disable-chamelium to disable chamelium support.])
 	fi
