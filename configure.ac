@@ -185,23 +185,24 @@ PKG_CHECK_MODULES(GSL, [gsl], [gsl=yes], [gsl=no])
 AM_CONDITIONAL(HAVE_GSL, [test "x$gsl" = xyes])
 
 # for chamelium
-AC_ARG_ENABLE(chamelium, AS_HELP_STRING([--disable-chamelium],
-	      [Enable building of chamelium libraries and tests (default: yes)]),
-	      [enable_chamelium=no], [enable_chamelium=yes])
+AC_ARG_ENABLE(chamelium, AS_HELP_STRING([--enable-chamelium],
+	      [Enable building of chamelium libraries and tests (default: no)]),
+	      [if test x$enableval = xyes; then enable_chamelium=yes; fi],
+	      [enable_chamelium=no])
 AM_CONDITIONAL(HAVE_CHAMELIUM, [test "x$enable_chamelium" = xyes])
 if test "x$enable_chamelium" = xyes; then
 	PKG_CHECK_MODULES(XMLRPC, xmlrpc xmlrpc_util xmlrpc_client, [],
-			  [AC_MSG_ERROR([Failed to find xmlrpc, required by chamelium. Use --disable-chamelium to disable chamelium support.])])
+			  [AC_MSG_ERROR([Failed to find xmlrpc, required by chamelium.])])
 	PKG_CHECK_MODULES(PIXMAN, pixman-1, [],
-			  [AC_MSG_ERROR([Failed to find pixman, required by chamelium. Use --disable-chamelium to disable chamelium support.])])
+			  [AC_MSG_ERROR([Failed to find pixman, required by chamelium.])])
 	if test x"$udev" != xyes; then
-		AC_MSG_ERROR([Failed to find udev, required by chamelium. Use --disable-chamelium to disable chamelium support.])
+		AC_MSG_ERROR([Failed to find udev, required by chamelium.])
 	fi
 	if test x"$glib" != xyes; then
-		AC_MSG_ERROR([Failed to find glib, required by chamelium. Use --disable-chamelium to disable chamelium support.])
+		AC_MSG_ERROR([Failed to find glib, required by chamelium.])
 	fi
 	if test x"$gsl" != xyes; then
-		AC_MSG_ERROR([Failed to find gsl, required by chamelium. Use --disable-chamelium to disable chamelium support.])
+		AC_MSG_ERROR([Failed to find gsl, required by chamelium.])
 	fi
 
 	AC_DEFINE(HAVE_CHAMELIUM, 1, [Enable Chamelium support])
@@ -404,6 +405,7 @@ echo "Intel GPU tools"
 echo ""
 echo " • Tests:"
 echo "       Build tests        : ${BUILD_TESTS}"
+echo "       Chamelium tests    : ${enable_chamelium}"
 echo "       Compile prime tests: ${NOUVEAU}"
 echo "       Print stack traces : ${with_libunwind}"
 echo "       Debug flags        : ${DEBUG_CFLAGS}"
