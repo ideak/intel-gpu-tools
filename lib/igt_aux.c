@@ -744,7 +744,7 @@ static void set_suspend_test(int power_dir, enum igt_suspend_test test)
 static void suspend_via_rtcwake(enum igt_suspend_state state)
 {
 	char cmd[128];
-	int delay;
+	int delay, ret;
 
 	igt_assert(state < SUSPEND_STATE_NUM);
 
@@ -756,14 +756,19 @@ static void suspend_via_rtcwake(enum igt_suspend_state state)
 	 */
 	snprintf(cmd, sizeof(cmd), "rtcwake -n -s %d -m %s " SQUELCH,
 		 delay, suspend_state_name[state]);
-	igt_require(system(cmd) == 0);
+	ret = system(cmd);
+	igt_require_f(ret == 0, "rtcwake test failed with %i\n"
+		     "This failure could mean that something is wrong with "
+		     "the rtcwake tool or how your distro is set up.\n",
+		      ret);
 
 	snprintf(cmd, sizeof(cmd), "rtcwake -s %d -m %s ",
 		 delay, suspend_state_name[state]);
-	igt_assert_f(system(cmd) == 0,
-		     "This failure means that something is wrong with "
-		     "the rtcwake tool or how your distro is set up. "
-		     "This is not a i915.ko or i-g-t bug.\n");
+	ret = system(cmd);
+	igt_assert_f(ret == 0,
+		     "rtcwake failed with %i\n"
+		     "Check dmesg for further details.\n",
+		     ret);
 }
 
 static void suspend_via_sysfs(int power_dir, enum igt_suspend_state state)
