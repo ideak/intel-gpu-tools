@@ -1103,38 +1103,50 @@ invalid_lut_sizes(data_t *data)
 	struct _drm_color_lut *degamma_lut = malloc(data->degamma_lut_size * sizeof(struct _drm_color_lut) * 2);
 	struct _drm_color_lut *gamma_lut = malloc(data->gamma_lut_size * sizeof(struct _drm_color_lut) * 2);
 
-	igt_assert_eq(pipe_set_property_blob(pipe, "DEGAMMA_LUT",
-					     degamma_lut, 1), -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, "DEGAMMA_LUT",
-					     degamma_lut, degamma_lut_size + 1),
-		      -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, "DEGAMMA_LUT",
-					     degamma_lut, degamma_lut_size - 1),
-		      -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, "DEGAMMA_LUT",
-					     degamma_lut, degamma_lut_size + sizeof(struct _drm_color_lut)),
-		      -EINVAL);
-	igt_assert_eq(pipe_set_property_blob_id(pipe, "DEGAMMA_LUT", pipe->crtc_id),
-		      -EINVAL);
-	igt_assert_eq(pipe_set_property_blob_id(pipe, "DEGAMMA_LUT", 4096 * 4096),
-		      -EINVAL);
+	if (kmstest_get_property(pipe->display->drm_fd,
+				 pipe->crtc_id,
+				 DRM_MODE_OBJECT_CRTC,
+				 "DEGAMMA_LUT",
+				 NULL, NULL, NULL)) {
+		igt_assert_eq(pipe_set_property_blob(pipe, "DEGAMMA_LUT",
+						     degamma_lut, 1), -EINVAL);
+		igt_assert_eq(pipe_set_property_blob(pipe, "DEGAMMA_LUT",
+						     degamma_lut, degamma_lut_size + 1),
+			      -EINVAL);
+		igt_assert_eq(pipe_set_property_blob(pipe, "DEGAMMA_LUT",
+						     degamma_lut, degamma_lut_size - 1),
+			      -EINVAL);
+		igt_assert_eq(pipe_set_property_blob(pipe, "DEGAMMA_LUT",
+						     degamma_lut, degamma_lut_size + sizeof(struct _drm_color_lut)),
+			      -EINVAL);
+		igt_assert_eq(pipe_set_property_blob_id(pipe, "DEGAMMA_LUT", pipe->crtc_id),
+			      -EINVAL);
+		igt_assert_eq(pipe_set_property_blob_id(pipe, "DEGAMMA_LUT", 4096 * 4096),
+			      -EINVAL);
+	}
 
-	igt_assert_eq(pipe_set_property_blob(pipe, "GAMMA_LUT",
-					     gamma_lut, 1),
-		      -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, "GAMMA_LUT",
-					     gamma_lut, gamma_lut_size + 1),
-		      -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, "GAMMA_LUT",
-					     gamma_lut, gamma_lut_size - 1),
-		      -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, "GAMMA_LUT",
-					     gamma_lut, gamma_lut_size + sizeof(struct _drm_color_lut)),
-		      -EINVAL);
-	igt_assert_eq(pipe_set_property_blob_id(pipe, "GAMMA_LUT", pipe->crtc_id),
-		      -EINVAL);
-	igt_assert_eq(pipe_set_property_blob_id(pipe, "GAMMA_LUT", 4096 * 4096),
-		      -EINVAL);
+	if (kmstest_get_property(pipe->display->drm_fd,
+				 pipe->crtc_id,
+				 DRM_MODE_OBJECT_CRTC,
+				 "GAMMA_LUT",
+				 NULL, NULL, NULL)) {
+		igt_assert_eq(pipe_set_property_blob(pipe, "GAMMA_LUT",
+						     gamma_lut, 1),
+			      -EINVAL);
+		igt_assert_eq(pipe_set_property_blob(pipe, "GAMMA_LUT",
+						     gamma_lut, gamma_lut_size + 1),
+			      -EINVAL);
+		igt_assert_eq(pipe_set_property_blob(pipe, "GAMMA_LUT",
+						     gamma_lut, gamma_lut_size - 1),
+			      -EINVAL);
+		igt_assert_eq(pipe_set_property_blob(pipe, "GAMMA_LUT",
+						     gamma_lut, gamma_lut_size + sizeof(struct _drm_color_lut)),
+			      -EINVAL);
+		igt_assert_eq(pipe_set_property_blob_id(pipe, "GAMMA_LUT", pipe->crtc_id),
+			      -EINVAL);
+		igt_assert_eq(pipe_set_property_blob_id(pipe, "GAMMA_LUT", 4096 * 4096),
+			      -EINVAL);
+	}
 
 	free(degamma_lut);
 	free(gamma_lut);
@@ -1144,7 +1156,16 @@ static void
 invalid_ctm_matrix_sizes(data_t *data)
 {
 	igt_pipe_t *pipe = &data->display.pipes[0];
-	void *ptr = malloc(sizeof(struct _drm_color_ctm) * 4);
+	void *ptr;
+
+	if (!kmstest_get_property(pipe->display->drm_fd,
+				  pipe->crtc_id,
+				  DRM_MODE_OBJECT_CRTC,
+				  "CTM",
+				  NULL, NULL, NULL))
+		return;
+
+	ptr = malloc(sizeof(struct _drm_color_ctm) * 4);
 
 	igt_assert_eq(pipe_set_property_blob(pipe, "CTM", ptr, 1),
 		      -EINVAL);
