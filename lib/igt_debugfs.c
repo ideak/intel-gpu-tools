@@ -351,7 +351,7 @@ bool igt_check_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
  * igt_crc_to_string_extended:
  * @crc: pipe CRC value to print
  * @delimiter: The delimiter to use between crc words
- * @crc_size: the number of bytes to print per crc word (either 4 or 2)
+ * @crc_size: the number of bytes to print per crc word (between 1 and 4)
  *
  * This function allocates a string and formats @crc into it, depending on
  * @delimiter and @crc_size.
@@ -362,16 +362,19 @@ bool igt_check_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
 char *igt_crc_to_string_extended(igt_crc_t *crc, char delimiter, int crc_size)
 {
 	int i;
-	char *buf = calloc(128, sizeof(char));
-	const char *format[2] = { "%08x%c", "%04x%c" };
+	int len = 0;
+	int field_width = 2 * crc_size; /* Two chars per byte. */
+	char *buf = malloc((field_width+1) * crc->n_words * sizeof(char));
 
 	if (!buf)
 		return NULL;
 
 	for (i = 0; i < crc->n_words; i++)
-		sprintf(buf + strlen(buf), format[crc_size == 2], crc->crc[i],
-			i == (crc->n_words - 1) ? '\0' : delimiter);
+		len += sprintf(buf + len, "%0*x%c", field_width,
+			       crc->crc[i], delimiter);
 
+	/* Eat the last delimiter */
+	buf[len - 1] = '\0';
 	return buf;
 }
 
