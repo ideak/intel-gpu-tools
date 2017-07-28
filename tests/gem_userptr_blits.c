@@ -681,11 +681,16 @@ static int test_map_fixed_invalidate(int fd, uint32_t flags)
 		gem_set_tiling(fd, mmap_gtt.handle, I915_TILING_NONE, 0);
 		*map = 0xdead;
 
-		if (flags & MAP_FIXED_INVALIDATE_GET_PAGES)
+		if (flags & MAP_FIXED_INVALIDATE_GET_PAGES) {
 			igt_assert_eq(__gem_set_domain(fd, handle[0],
 						       I915_GEM_DOMAIN_GTT,
 						       I915_GEM_DOMAIN_GTT),
 				      -EFAULT);
+
+			/* Errors are permanent, so we have to recreate */
+			gem_close(fd, handle[0]);
+			handle[0] = create_userptr(fd, 0, ptr + PAGE_SIZE/sizeof(*ptr));
+		}
 
 		gem_set_tiling(fd, mmap_gtt.handle, I915_TILING_Y, 512 * 4);
 		*(uint32_t*)map = 0xbeef;
