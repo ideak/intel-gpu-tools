@@ -22,6 +22,7 @@
  */
 
 #include <sys/poll.h>
+#include <sys/ioctl.h>
 
 #include "igt.h"
 #include "igt_vgem.h"
@@ -437,31 +438,88 @@ static void deep(int fd, unsigned ring)
 #undef XS
 }
 
+static void alarm_handler(int sig)
+{
+}
+
+static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	return ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf);
+}
+
+static unsigned int measure_ring_size(int fd, unsigned int ring)
+{
+	struct sigaction sa = { .sa_handler = alarm_handler };
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned int count, last;
+	struct itimerval itv;
+	struct cork c;
+
+	memset(obj, 0, sizeof(obj));
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj + 1);
+	execbuf.buffer_count = 1;
+	execbuf.flags = ring;
+	gem_execbuf(fd, &execbuf);
+	gem_sync(fd, obj[1].handle);
+
+	plug(fd, &c);
+	obj[0].handle = c.handle;
+
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+
+	sigaction(SIGALRM, &sa, NULL);
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 100;
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 1000;
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	last = -1;
+	count = 0;
+	do {
+		if (__execbuf(fd, &execbuf) == 0) {
+			count++;
+			continue;
+		}
+
+		if (last == count)
+			break;
+
+		last = count;
+	} while (1);
+
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	unplug(&c);
+	gem_close(fd, obj[1].handle);
+
+	return count;
+}
+
 static void wide(int fd, unsigned ring)
 {
-#define XS 128
 #define NCTX 4096
-	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct drm_i915_gem_exec_object2 obj;
-	struct drm_i915_gem_execbuffer2 execbuf;
+	struct timespec tv = {};
+	unsigned int ring_size = measure_ring_size(fd, ring);
 
 	struct cork cork;
 	uint32_t result;
 	uint32_t *busy;
 	uint32_t *ptr;
 	uint32_t *ctx;
+	unsigned int count;
 
 	ctx = malloc(sizeof(*ctx)*NCTX);
 	for (int n = 0; n < NCTX; n++)
 		ctx[n] = gem_context_create(fd);
-
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, 4096);
-	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&obj);
-	execbuf.buffer_count = 1;
 
 	result = gem_create(fd, 4*NCTX);
 
@@ -469,14 +527,15 @@ static void wide(int fd, unsigned ring)
 	plug(fd, &cork);
 
 	/* Lots of in-order requests, plugged and submitted simultaneously */
-	for (int n = 0; n < NCTX; n++) {
-		store_dword(fd, ctx[n], ring, result, 4*n, ctx[n], cork.handle, I915_GEM_DOMAIN_INSTRUCTION);
-
-		execbuf.rsvd1 = ctx[n];
-		execbuf.flags = ring;
-		for (int m = 0; m < XS; m++)
-			gem_execbuf(fd, &execbuf);
+	for (count = 0;
+	     igt_seconds_elapsed(&tv) < 5 && count < ring_size;
+	     count++) {
+		for (int n = 0; n < NCTX; n++) {
+			store_dword(fd, ctx[n], ring, result, 4*n, ctx[n], cork.handle, I915_GEM_DOMAIN_INSTRUCTION);
+		}
 	}
+	igt_info("Submitted %d requests over %d contexts in %.1fms\n",
+		 count, NCTX, igt_nsec_elapsed(&tv) * 1e-6);
 
 	igt_assert(gem_bo_busy(fd, result));
 	unplug(&cork); /* only now submit our batches */
@@ -493,11 +552,9 @@ static void wide(int fd, unsigned ring)
 		igt_assert_eq_u32(ptr[n], ctx[n]);
 	munmap(ptr, 4096);
 
-	gem_close(fd, obj.handle);
 	gem_close(fd, result);
 	free(ctx);
 #undef CTX
-#undef XS
 }
 
 static bool has_scheduler(int fd)
