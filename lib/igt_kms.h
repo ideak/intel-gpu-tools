@@ -324,7 +324,6 @@ typedef struct {
 struct igt_pipe {
 	igt_display_t *display;
 	enum pipe pipe;
-	bool enabled;
 
 	int n_planes;
 	int plane_cursor;

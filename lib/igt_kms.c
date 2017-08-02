@@ -2374,8 +2374,6 @@ static int igt_primary_plane_commit_legacy(igt_plane_t *primary,
 
 	CHECK_RETURN(ret, fail_on_error);
 
-	primary->pipe->enabled = (fb_id != 0);
-
 	return 0;
 }
 
@@ -2413,10 +2411,8 @@ static int igt_pipe_commit(igt_pipe_t *pipe,
 			   enum igt_commit_style s,
 			   bool fail_on_error)
 {
-	igt_display_t *display = pipe->display;
 	int i;
 	int ret;
-	bool need_wait_for_vblank = false;
 
 	if (pipe->background_changed) {
 		igt_crtc_set_property(pipe, pipe->background_property,
@@ -2435,19 +2431,8 @@ static int igt_pipe_commit(igt_pipe_t *pipe,
 	for (i = 0; i < pipe->n_planes; i++) {
 		igt_plane_t *plane = &pipe->planes[i];
 
-		if (plane->fb_changed || plane->position_changed || plane->size_changed)
-			need_wait_for_vblank = true;
-
 		ret = igt_plane_commit(plane, pipe, s, fail_on_error);
 		CHECK_RETURN(ret, fail_on_error);
-	}
-
-	/*
-	 * If the crtc is enabled, wait until the next vblank before returning
-	 * if we made changes to any of the planes.
-	 */
-	if (need_wait_for_vblank && pipe->enabled) {
-		igt_wait_for_vblank(display->drm_fd, pipe->pipe);
 	}
 
 	return 0;
