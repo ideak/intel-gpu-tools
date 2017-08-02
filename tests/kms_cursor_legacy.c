@@ -47,7 +47,7 @@
 IGT_TEST_DESCRIPTION("Stress legacy cursor ioctl");
 
 static void stress(igt_display_t *display,
-		   int pipe, int num_children, unsigned mode,
+		   enum pipe pipe, int num_children, unsigned mode,
 		   int timeout)
 {
 	struct drm_mode_cursor arg;
@@ -148,7 +148,7 @@ static void stress(igt_display_t *display,
 	munmap(results, 4096);
 }
 
-static igt_output_t *set_fb_on_crtc(igt_display_t *display, int pipe, struct igt_fb *fb_info)
+static igt_output_t *set_fb_on_crtc(igt_display_t *display, enum pipe pipe, struct igt_fb *fb_info)
 {
 	igt_output_t *output;
 
@@ -464,7 +464,7 @@ static void flip(igt_display_t *display,
 		igt_remove_fb(display->drm_fd, &cursor_fb2);
 }
 
-static inline uint32_t pipe_select(int pipe)
+static inline uint32_t pipe_select(enum pipe pipe)
 {
 	if (pipe > 1)
 		return pipe << DRM_VBLANK_HIGH_CRTC_SHIFT;
@@ -474,7 +474,7 @@ static inline uint32_t pipe_select(int pipe)
 		return 0;
 }
 
-static unsigned get_vblank(int fd, int pipe, unsigned flags)
+static unsigned get_vblank(int fd, enum pipe pipe, unsigned flags)
 {
 	union drm_wait_vblank vbl;
 
