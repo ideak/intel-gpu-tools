@@ -186,7 +186,8 @@ const char *igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
 
 const char *igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	"scaling mode",
-	"CRTC_ID"
+	"CRTC_ID",
+	"DPMS"
 };
 
 /*

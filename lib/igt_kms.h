@@ -114,6 +114,7 @@ extern const char *igt_crtc_prop_names[];
 enum igt_atomic_connector_properties {
        IGT_CONNECTOR_SCALING_MODE = 0,
        IGT_CONNECTOR_CRTC_ID,
+       IGT_CONNECTOR_DPMS,
        IGT_NUM_CONNECTOR_PROPS
 };
 
