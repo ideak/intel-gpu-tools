@@ -51,11 +51,6 @@ typedef struct {
 	struct igt_fb *fb;
 } data_t;
 
-typedef struct {
-	data_t *data;
-	igt_crc_t reference_crc;
-} test_position_t;
-
 /* Command line parameters. */
 struct {
 	int iterations;
@@ -106,7 +101,7 @@ static void test_fini(data_t *data, igt_output_t *output, int n_planes)
 
 static void
 test_grab_crc(data_t *data, igt_output_t *output, enum pipe pipe, bool atomic,
-	      color_t *color, uint64_t tiling, igt_crc_t *crc /* out */)
+	      color_t *color, uint64_t tiling, igt_crc_t **crc /* out */)
 {
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
@@ -132,7 +127,7 @@ test_grab_crc(data_t *data, igt_output_t *output, enum pipe pipe, bool atomic,
 	igt_skip_on(ret != 0);
 
 	igt_pipe_crc_start(data->pipe_crc);
-	n = igt_pipe_crc_get_crcs(data->pipe_crc, 1, &crc);
+	n = igt_pipe_crc_get_crcs(data->pipe_crc, 1, crc);
 	igt_assert_eq(n, 1);
 }
 
@@ -251,8 +246,8 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 {
 	char buf[256];
 	struct drm_event *e = (void *)buf;
-	test_position_t test = { .data = data };
 	color_t blue  = { 0.0f, 0.0f, 1.0f };
+	igt_crc_t *ref = NULL;
 	igt_crc_t *crc = NULL;
 	unsigned int vblank_start, vblank_stop;
 	int i, n, ret;
@@ -275,8 +270,7 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	test_init(data, pipe, n_planes);
 
-	test_grab_crc(data, output, pipe, true, &blue, tiling,
-		      &test.reference_crc);
+	test_grab_crc(data, output, pipe, true, &blue, tiling, &ref);
 
 	i = 0;
 	while (i < iterations || loop_forever) {
@@ -303,7 +297,7 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 		igt_assert(vblank_stop - vblank_start <= MAX_CRCS);
 		igt_assert_eq(n, vblank_stop - vblank_start);
 
-		igt_assert_crc_equal(&test.reference_crc, crc);
+		igt_assert_crc_equal(ref, crc);
 
 		i++;
 	}
@@ -318,9 +312,9 @@ test_legacy_plane_position_with_output(data_t *data, enum pipe pipe,
 				       igt_output_t *output, int n_planes,
 				       uint64_t tiling)
 {
-	test_position_t test = { .data = data };
 	color_t blue  = { 0.0f, 0.0f, 1.0f };
-	igt_crc_t *crc;
+	igt_crc_t *ref = NULL;
+	igt_crc_t *crc = NULL;
 	int i, n;
 	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
 	bool loop_forever;
@@ -341,8 +335,7 @@ test_legacy_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	test_init(data, pipe, n_planes);
 
-	test_grab_crc(data, output, pipe, false, &blue, tiling,
-		      &test.reference_crc);
+	test_grab_crc(data, output, pipe, false, &blue, tiling, &ref);
 
 	i = 0;
 	while (i < iterations || loop_forever) {
@@ -354,7 +347,7 @@ test_legacy_plane_position_with_output(data_t *data, enum pipe pipe,
 
 		igt_assert_eq(n, MAX_CRCS);
 
-		igt_assert_crc_equal(&test.reference_crc, crc);
+		igt_assert_crc_equal(ref, crc);
 
 		i++;
 	}
