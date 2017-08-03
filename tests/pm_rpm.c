@@ -1852,14 +1852,14 @@ static void fences_subtest(bool dpms)
 	igt_assert(munmap(buf_ptr, params.fb.size) == 0);
 }
 
-int rounds = 40;
+int rounds = 10;
 bool stay = false;
 
 static int opt_handler(int opt, int opt_index, void *data)
 {
 	switch (opt) {
-	case 'q':
-		rounds = 10;
+	case 'l':
+		rounds = 50;
 		break;
 	case 's':
 		stay = true;
@@ -1874,10 +1874,10 @@ static int opt_handler(int opt, int opt_index, void *data)
 int main(int argc, char *argv[])
 {
 	const char *help_str =
-	       "  --quick\t\tMake the stress-tests not stressful, for quick regression testing.\n"
+	       "  --stress\t\tMake the stress-tests more stressful.\n"
 	       "  --stay\t\tDisable all screen and try to go into runtime pm. Useful for debugging.";
 	static struct option long_options[] = {
-		{"quick", 0, 0, 'q'},
+		{"stress", 0, 0, 'l'},
 		{"stay", 0, 0, 's'},
 		{ 0, 0, 0, 0 }
 	};
