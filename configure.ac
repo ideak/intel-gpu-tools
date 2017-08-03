@@ -191,8 +191,19 @@ AC_ARG_ENABLE(chamelium, AS_HELP_STRING([--enable-chamelium],
 	      [enable_chamelium=no])
 AM_CONDITIONAL(HAVE_CHAMELIUM, [test "x$enable_chamelium" = xyes])
 if test "x$enable_chamelium" = xyes; then
-	PKG_CHECK_MODULES(XMLRPC, xmlrpc xmlrpc_util xmlrpc_client, [],
-			  [AC_MSG_ERROR([Failed to find xmlrpc, required by chamelium.])])
+	PKG_CHECK_MODULES(XMLRPC, xmlrpc xmlrpc_util xmlrpc_client,
+		          [xmlrpc=yes], [xmlrpc=no])
+	if test x"$xmlrpc" != xyes; then
+		AC_CHECK_PROG([XMLRPC_C_CONFIG], [xmlrpc-c-config], [yes], [no])
+		if test x"$XMLRPC_C_CONFIG" = xyes; then
+			XMLRPC_CFLAGS=$(xmlrpc-c-config client --cflags)
+			XMLRPC_LIBS=$(xmlrpc-c-config client --libs)
+			AC_SUBST(XMLRPC_CFLAGS)
+			AC_SUBST(XMLRPC_LIBS)
+		else
+			AC_MSG_ERROR([Failed to find xmlrpc, required by chamelium.])
+		fi
+	fi
 	PKG_CHECK_MODULES(PIXMAN, pixman-1, [],
 			  [AC_MSG_ERROR([Failed to find pixman, required by chamelium.])])
 	if test x"$udev" != xyes; then
