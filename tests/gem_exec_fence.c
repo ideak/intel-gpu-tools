@@ -34,7 +34,7 @@ IGT_TEST_DESCRIPTION("Check that execbuf waits for explicit fences");
 
 #define LOCAL_EXEC_FENCE_IN (1 << 16)
 #define LOCAL_EXEC_FENCE_OUT (1 << 17)
-#define LOCAL_EXEC_FENCE_SUBMIT (1 << 19)
+#define LOCAL_EXEC_FENCE_SUBMIT (1 << 20)
 
 #define LOCAL_EXEC_FENCE_ARRAY (1 << 19)
 struct local_gem_exec_fence {
@@ -732,7 +732,7 @@ static bool has_submit_fence(int fd)
 	int value = 0;
 
 	memset(&gp, 0, sizeof(gp));
-	gp.param = 49; /* I915_PARAM_HAS_EXEC_SUBMIT_FENCE */
+	gp.param = 50; /* I915_PARAM_HAS_EXEC_SUBMIT_FENCE */
 	gp.value = &value;
 
 	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
@@ -769,6 +769,7 @@ static void test_invalid_fence_array(int fd)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
 	struct local_gem_exec_fence fence;
+	void *ptr;
 
 	/* create an otherwise valid execbuf */
 	memset(&obj, 0, sizeof(obj));
@@ -779,10 +780,10 @@ static void test_invalid_fence_array(int fd)
 	execbuf.buffer_count = 1;
 	gem_execbuf(fd, &execbuf);
 
-	/* Now add a few invalid fence-array pointers */
 	execbuf.flags |= LOCAL_EXEC_FENCE_ARRAY;
-	//igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
+	gem_execbuf(fd, &execbuf);
 
+	/* Now add a few invalid fence-array pointers */
 	if (sizeof(execbuf.num_cliprects) == sizeof(size_t)) {
 		execbuf.num_cliprects = -1;
 		igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
@@ -795,6 +796,19 @@ static void test_invalid_fence_array(int fd)
 	memset(&fence, 0, sizeof(fence));
 	execbuf.cliprects_ptr = to_user_pointer(&fence);
 	igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOENT);
+
+	ptr = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(ptr != MAP_FAILED);
+	execbuf.cliprects_ptr = to_user_pointer(ptr);
+	igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOENT);
+
+	do_or_die(mprotect(ptr, 4096, PROT_READ));
+	igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOENT);
+
+	do_or_die(mprotect(ptr, 4096, PROT_NONE));
+	igt_assert_eq(__gem_execbuf(fd, &execbuf), -EFAULT);
+
+	munmap(ptr, 4096);
 }
 
 static uint32_t __syncobj_create(int fd)
@@ -805,7 +819,7 @@ static uint32_t __syncobj_create(int fd)
 #define LOCAL_IOCTL_SYNCOBJ_CREATE        DRM_IOWR(0xBF, struct local_syncobj_create)
 
 	memset(&arg, 0, sizeof(arg));
-	ioctl(fd, LOCAL_IOCTL_SYNCOBJ_CREATE, &arg);
+	igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_CREATE, &arg);
 
 	return arg.handle;
 }
@@ -829,7 +843,7 @@ static int __syncobj_destroy(int fd, uint32_t handle)
 
 	memset(&arg, 0, sizeof(arg));
 	arg.handle = handle;
-	if (ioctl(fd, LOCAL_IOCTL_SYNCOBJ_DESTROY, &arg))
+	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_DESTROY, &arg))
 		err = -errno;
 
 	errno = 0;
@@ -854,7 +868,7 @@ static int __syncobj_to_sync_file(int fd, uint32_t handle)
 	memset(&arg, 0, sizeof(arg));
 	arg.handle = handle;
 	arg.flags = 1 << 0; /* EXPORT_SYNC_FILE */
-	if (ioctl(fd, LOCAL_IOCTL_SYNCOBJ_HANDLE_TO_FD, &arg))
+	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_HANDLE_TO_FD, &arg))
 		arg.fd = -errno;
 
 	errno = 0;
@@ -868,6 +882,33 @@ static int syncobj_to_sync_file(int fd, uint32_t handle)
 	igt_assert_lte(0, (ret = __syncobj_to_sync_file(fd, handle)));
 
 	return ret;
+}
+
+static int __syncobj_from_sync_file(int fd, uint32_t handle, int sf)
+{
+	struct local_syncobj_handle {
+		uint32_t handle;
+		uint32_t flags;
+		int32_t fd;
+		uint32_t pad;
+	} arg;
+#define LOCAL_IOCTL_SYNCOBJ_FD_TO_HANDLE  DRM_IOWR(0xC2, struct local_syncobj_handle)
+	int err = 0;
+
+	memset(&arg, 0, sizeof(arg));
+	arg.handle = handle;
+	arg.fd = sf;
+	arg.flags = 1 << 0; /* IMPORT_SYNC_FILE */
+	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_FD_TO_HANDLE, &arg))
+		err = -errno;
+
+	errno = 0;
+	return err;
+}
+
+static void syncobj_from_sync_file(int fd, uint32_t handle, int sf)
+{
+	igt_assert_eq(__syncobj_from_sync_file(fd, handle, sf), 0);
 }
 
 static int __syncobj_export(int fd, uint32_t handle, int *syncobj)
@@ -884,7 +925,7 @@ static int __syncobj_export(int fd, uint32_t handle, int *syncobj)
 	arg.handle = handle;
 
 	err = 0;
-	if (ioctl(fd, LOCAL_IOCTL_SYNCOBJ_HANDLE_TO_FD, &arg))
+	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_HANDLE_TO_FD, &arg))
 		err = -errno;
 
 	errno = 0;
@@ -916,7 +957,7 @@ static int __syncobj_import(int fd, int syncobj, uint32_t *handle)
 	arg.fd = syncobj;
 
 	err = 0;
-	if (ioctl(fd, LOCAL_IOCTL_SYNCOBJ_FD_TO_HANDLE, &arg))
+	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_FD_TO_HANDLE, &arg))
 		err = -errno;
 
 	errno = 0;
@@ -1020,6 +1061,8 @@ static void test_syncobj_signal(int fd)
 	};
 	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0, 0);
 
+	/* Check that the syncobj is signaled only when our request/fence is */
+
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
@@ -1059,6 +1102,10 @@ static void test_syncobj_wait(int fd)
 	unsigned engine;
 	unsigned handle[16];
 	int n;
+
+	/* Check that we can use the syncobj to asynchronous wait prior to
+	 * execution.
+	 */
 
 	gem_quiescent_gpu(fd);
 
@@ -1123,7 +1170,7 @@ static void test_syncobj_wait(int fd)
 	}
 }
 
-static void test_syncobj_import(int fd)
+static void test_syncobj_export(int fd)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj;
@@ -1134,6 +1181,11 @@ static void test_syncobj_import(int fd)
 	int export[2];
 	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0, 0);
 
+	/* Check that if we export the syncobj prior to use it picks up
+	 * the later fence. This allows a syncobj to establish a channel
+	 * between clients that may be updated to a later fence by either
+	 * end.
+	 */
 	for (int n = 0; n < ARRAY_SIZE(export); n++)
 		export[n] = syncobj_export(fd, fence.handle);
 
@@ -1166,15 +1218,241 @@ static void test_syncobj_import(int fd)
 	igt_assert(!gem_bo_busy(fd, obj.handle));
 	igt_assert(!syncobj_busy(fd, fence.handle));
 
+	gem_close(fd, obj.handle);
+	syncobj_destroy(fd, fence.handle);
+
 	for (int n = 0; n < ARRAY_SIZE(export); n++) {
 		uint32_t import = syncobj_import(fd, export[n]);
 		igt_assert(!syncobj_busy(fd, import));
-		close(export[n]);
 		syncobj_destroy(fd, import);
+		close(export[n]);
 	}
+}
+
+static void test_syncobj_repeat(int fd)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	const unsigned nfences = 4096;
+	struct drm_i915_gem_exec_object2 obj;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct local_gem_exec_fence *fence;
+	int export;
+	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0, 0);
+
+	/* Check that we can wait on the same fence multiple times */
+	fence = calloc(nfences, sizeof(*fence));
+	fence->handle = syncobj_create(fd);
+	export = syncobj_export(fd, fence->handle);
+	for (int i = 1; i < nfences; i++)
+		fence[i].handle = syncobj_import(fd, export);
+	close(export);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags = LOCAL_EXEC_FENCE_ARRAY;
+	execbuf.cliprects_ptr = to_user_pointer(fence);
+	execbuf.num_cliprects = nfences;
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = gem_create(fd, 4096);
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+	for (int i = 0; i < nfences; i++)
+		fence[i].flags = LOCAL_EXEC_FENCE_SIGNAL;
+
+	gem_execbuf(fd, &execbuf);
+
+	for (int i = 0; i < nfences; i++) {
+		igt_assert(syncobj_busy(fd, fence[i].handle));
+		fence[i].flags |= LOCAL_EXEC_FENCE_WAIT;
+	}
+	igt_assert(gem_bo_busy(fd, obj.handle));
+
+	gem_execbuf(fd, &execbuf);
+
+	for (int i = 0; i < nfences; i++)
+		igt_assert(syncobj_busy(fd, fence[i].handle));
+	igt_assert(gem_bo_busy(fd, obj.handle));
+
+	igt_spin_batch_free(fd, spin);
+
+	gem_sync(fd, obj.handle);
+	gem_close(fd, obj.handle);
+
+	for (int i = 0; i < nfences; i++) {
+		igt_assert(!syncobj_busy(fd, fence[i].handle));
+		syncobj_destroy(fd, fence[i].handle);
+	}
+	free(fence);
+}
+
+static void test_syncobj_import(int fd)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	igt_spin_t *spin = igt_spin_batch_new(fd, 0, 0, 0);
+	uint32_t sync = syncobj_create(fd);
+	int fence;
+
+	/* Check that we can create a syncobj from an explicit fence (which
+	 * uses sync_file) and that it acts just like a regular fence.
+	 */
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags = LOCAL_EXEC_FENCE_OUT;
+	execbuf.rsvd2 = -1;
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = gem_create(fd, 4096);
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+	gem_execbuf_wr(fd, &execbuf);
+
+	fence = execbuf.rsvd2 >> 32;
+	igt_assert(fence_busy(fence));
+	syncobj_from_sync_file(fd, sync, fence);
+	close(fence);
+
+	igt_assert(gem_bo_busy(fd, obj.handle));
+	igt_assert(syncobj_busy(fd, sync));
+
+	igt_spin_batch_free(fd, spin);
+
+	gem_sync(fd, obj.handle);
+	igt_assert(!gem_bo_busy(fd, obj.handle));
+	igt_assert(!syncobj_busy(fd, sync));
 
 	gem_close(fd, obj.handle);
-	syncobj_destroy(fd, fence.handle);
+	syncobj_destroy(fd, sync);
+}
+
+static void test_syncobj_channel(int fd)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	unsigned int *control;
+	int syncobj[3];
+
+	/* Create a pair of channels (like a pipe) between two clients
+	 * and try to create races on the syncobj.
+	 */
+
+	control = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(control != MAP_FAILED);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags = LOCAL_EXEC_FENCE_OUT;
+	execbuf.rsvd2 = -1;
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = gem_create(fd, 4096);
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+	for (int i = 0; i < ARRAY_SIZE(syncobj); i++) {
+		struct local_gem_exec_fence fence;
+
+		execbuf.flags = LOCAL_EXEC_FENCE_ARRAY;
+		execbuf.cliprects_ptr = to_user_pointer(&fence);
+		execbuf.num_cliprects = 1;
+
+		/* Create a primed fence */
+		fence.handle = syncobj_create(fd);
+		fence.flags = LOCAL_EXEC_FENCE_SIGNAL;
+
+		gem_execbuf(fd, &execbuf);
+
+		syncobj[i] = fence.handle;
+	}
+
+	/* Two processes in ping-pong unison (pipe), one out of sync */
+	igt_fork(child, 1) {
+		struct local_gem_exec_fence fence[3];
+		unsigned long count;
+
+		execbuf.flags = LOCAL_EXEC_FENCE_ARRAY;
+		execbuf.cliprects_ptr = to_user_pointer(fence);
+		execbuf.num_cliprects = 3;
+
+		fence[0].handle = syncobj[0];
+		fence[0].flags = LOCAL_EXEC_FENCE_SIGNAL;
+
+		fence[1].handle = syncobj[1];
+		fence[1].flags = LOCAL_EXEC_FENCE_WAIT;
+
+		fence[2].handle = syncobj[2];
+		fence[2].flags = LOCAL_EXEC_FENCE_WAIT;
+
+		count = 0;
+		while (!*(volatile unsigned *)control) {
+			gem_execbuf(fd, &execbuf);
+			count++;
+		}
+
+		control[1] = count;
+	}
+	igt_fork(child, 1) {
+		struct local_gem_exec_fence fence[3];
+		unsigned long count;
+
+		execbuf.flags = LOCAL_EXEC_FENCE_ARRAY;
+		execbuf.cliprects_ptr = to_user_pointer(fence);
+		execbuf.num_cliprects = 3;
+
+		fence[0].handle = syncobj[0];
+		fence[0].flags = LOCAL_EXEC_FENCE_WAIT;
+
+		fence[1].handle = syncobj[1];
+		fence[1].flags = LOCAL_EXEC_FENCE_SIGNAL;
+
+		fence[2].handle = syncobj[2];
+		fence[2].flags = LOCAL_EXEC_FENCE_WAIT;
+
+		count = 0;
+		while (!*(volatile unsigned *)control) {
+			gem_execbuf(fd, &execbuf);
+			count++;
+		}
+		control[2] = count;
+	}
+	igt_fork(child, 1) {
+		struct local_gem_exec_fence fence;
+		unsigned long count;
+
+		execbuf.flags = LOCAL_EXEC_FENCE_ARRAY;
+		execbuf.cliprects_ptr = to_user_pointer(&fence);
+		execbuf.num_cliprects = 1;
+
+		fence.handle = syncobj[2];
+		fence.flags = LOCAL_EXEC_FENCE_SIGNAL;
+
+		count = 0;
+		while (!*(volatile unsigned *)control) {
+			gem_execbuf(fd, &execbuf);
+			count++;
+		}
+		control[3] = count;
+	}
+
+	sleep(1);
+	*control = 1;
+	igt_waitchildren();
+
+	igt_info("Pipe=[%u, %u], gooseberry=%u\n",
+		 control[1], control[2], control[3]);
+	munmap(control, 4096);
+
+	gem_sync(fd, obj.handle);
+	gem_close(fd, obj.handle);
+
+	for (int i = 0; i < ARRAY_SIZE(syncobj); i++)
+		syncobj_destroy(fd, syncobj[i]);
 }
 
 igt_main
@@ -1282,33 +1560,40 @@ igt_main
 
 	igt_subtest_group { /* syncobj */
 		igt_fixture {
-			igt_require(has_syncobj(i915));
 			igt_require(exec_has_fence_array(i915));
+			igt_assert(has_syncobj(i915));
 			igt_fork_hang_detector(i915);
 		}
 
-		igt_subtest("invalid-fence-array") {
+		igt_subtest("invalid-fence-array")
 			test_invalid_fence_array(i915);
-		}
 
-		igt_subtest("syncobj-unused-fence") {
+		igt_subtest("syncobj-unused-fence")
 			test_syncobj_unused_fence(i915);
-		}
 
-		igt_subtest("syncobj-invalid-wait") {
+		igt_subtest("syncobj-invalid-wait")
 			test_syncobj_invalid_wait(i915);
-		}
 
-		igt_subtest("syncobj-signal") {
+		igt_subtest("syncobj-signal")
 			test_syncobj_signal(i915);
-		}
 
-		igt_subtest("syncobj-wait") {
+		igt_subtest("syncobj-wait")
 			test_syncobj_wait(i915);
-		}
 
-		igt_subtest("syncobj-import") {
+		igt_subtest("syncobj-export")
+			test_syncobj_export(i915);
+
+		igt_subtest("syncobj-repeat")
+			test_syncobj_repeat(i915);
+
+		igt_subtest("syncobj-import")
 			test_syncobj_import(i915);
+
+		igt_subtest("syncobj-channel")
+			test_syncobj_channel(i915);
+
+		igt_fixture {
+			igt_stop_hang_detector();
 		}
 	}
 
