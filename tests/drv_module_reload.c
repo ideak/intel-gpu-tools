@@ -329,14 +329,12 @@ igt_main
 		}
 	}
 
-	igt_subtest("basic-reload-final") {
+	igt_fixture {
 		if ((err = reload(NULL)))
 			igt_fail(err);
 
 		gem_sanitycheck();
 		gem_exec_store();
-	}
-
-	igt_fixture
 		hda_dynamic_debug(false);
+	}
 }
