@@ -196,9 +196,9 @@ igt@kms_addfb_basic@unused-handle
 igt@kms_addfb_basic@unused-modifier
 igt@kms_addfb_basic@unused-offsets
 igt@kms_addfb_basic@unused-pitches
-igt@kms_busy@basic-flip-default-a
-igt@kms_busy@basic-flip-default-b
-igt@kms_busy@basic-flip-default-c
+igt@kms_busy@basic-flip-a
+igt@kms_busy@basic-flip-b
+igt@kms_busy@basic-flip-c
 igt@kms_cursor_legacy@basic-busy-flip-before-cursor-atomic
 igt@kms_cursor_legacy@basic-busy-flip-before-cursor-legacy
 igt@kms_cursor_legacy@basic-flip-after-cursor-atomic
