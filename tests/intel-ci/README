@@ -41,9 +41,3 @@ generic.testlist
 ======================
 
 Generic is the testlist for GPU-agnostic tests.
-
-======================
-extended.testlist
-======================
-
-Test list for wider coverage testing.
