@@ -57,50 +57,22 @@ static void cleanup_pipe(igt_display_t *display, enum pipe pipe, igt_output_t *o
 	igt_remove_fb(display->drm_fd, fb);
 }
 
-static bool ignore_crtc_property(const char *name, bool atomic)
+static bool ignore_property(uint32_t obj_type, uint32_t prop_flags,
+			    const char *name, bool atomic)
 {
-	if (!strcmp(name, "GAMMA_LUT_SIZE"))
-		return true;
-	if (!strcmp(name, "DEGAMMA_LUT_SIZE"))
+	if (prop_flags & DRM_MODE_PROP_IMMUTABLE)
 		return true;
 
-	return false;
-}
-
-static bool ignore_connector_property(const char *name, bool atomic)
-{
-	if (!strcmp(name, "EDID") ||
-	    !strcmp(name, "PATH") ||
-	    !strcmp(name, "TILE"))
-		return true;
-
-	if (atomic && !strcmp(name, "DPMS"))
-		return true;
-
-	return false;
-}
-
-static bool ignore_plane_property(const char *name, bool atomic)
-{
-	if (!strcmp(name, "type"))
-		return true;
-
-	return false;
-}
-
-static bool ignore_property(uint32_t type, const char *name, bool atomic)
-{
-	switch (type) {
-	case DRM_MODE_OBJECT_CRTC:
-		return ignore_crtc_property(name, atomic);
+	switch (obj_type) {
 	case DRM_MODE_OBJECT_CONNECTOR:
-		return ignore_connector_property(name, atomic);
-	case DRM_MODE_OBJECT_PLANE:
-		return ignore_plane_property(name, atomic);
+		if (atomic && !strcmp(name, "DPMS"))
+			return true;
+		break;
 	default:
-		igt_assert(0);
-		return false;
+		break;
 	}
+
+	return false;
 }
 
 static void test_properties(int fd, uint32_t type, uint32_t id, bool atomic)
@@ -122,7 +94,7 @@ static void test_properties(int fd, uint32_t type, uint32_t id, bool atomic)
 
 		igt_assert(prop);
 
-		if (ignore_property(type, prop->name, atomic)) {
+		if (ignore_property(type, prop->flags, prop->name, atomic)) {
 			igt_debug("Ignoring property \"%s\"\n", prop->name);
 
 			continue;
