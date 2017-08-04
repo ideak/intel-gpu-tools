@@ -146,7 +146,7 @@ enum drm_i915_perf_record_type {
 /* There is no ifdef we can use for those formats :( */
 enum {
 	local_I915_OA_FORMAT_A12 = I915_OA_FORMAT_C4_B8 + 1,
-	local_I915_OA_FORMAT_A12_B8_C8 = I915_OA_FORMAT_A12 + 2,
+	local_I915_OA_FORMAT_A12_B8_C8 = I915_OA_FORMAT_C4_B8 + 2,
 	local_I915_OA_FORMAT_A32u40_A4u32_B8_C8 = I915_OA_FORMAT_C4_B8 + 3,
 };
 
