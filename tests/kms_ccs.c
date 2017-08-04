@@ -187,7 +187,7 @@ static void display_fb(data_t *data, int compressed)
 		f.pitches[1] = ALIGN(width * 1, 128);
 		f.modifier[1] = modifier;
 		f.offsets[1] = size[0];
-		size[1] = f.pitches[1] * ALIGN(f.height, 32);
+		size[1] = f.pitches[1] * ALIGN(height, 32);
 
 		f.handles[0] = gem_create(data->drm_fd, size[0] + size[1]);
 		f.handles[1] = f.handles[0];
