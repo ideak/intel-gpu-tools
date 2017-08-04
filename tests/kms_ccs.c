@@ -48,12 +48,17 @@ typedef struct {
 #define COMPRESSED_GREEN	0x000ff00f
 #define COMPRESSED_BLUE		0x00000fff
 
+#define CCS_UNCOMPRESSED	0x0
+#define CCS_COMPRESSED		0x55
+
 #define RED			0x00ff0000
 
-static void render_fb(data_t *data, bool compressed)
+static void render_fb(data_t *data, bool compressed,
+		      int height, unsigned int stride)
 {
 	struct igt_fb *fb = &data->fb;
 	uint32_t *ptr;
+	unsigned int half_height, half_size;
 	int i;
 
 	igt_assert(fb->fb_id);
@@ -62,43 +67,63 @@ static void render_fb(data_t *data, bool compressed)
 			    0, fb->size,
 			    PROT_READ | PROT_WRITE);
 
-	for (i = 0; i < fb->size / 4; i++) {
-		/* Fill upper half as compressed */
-		if (compressed && i < fb->size / 4 / 2)
-			ptr[i] = COMPRESSED_RED;
-		else
+	if (compressed) {
+		/* In the compressed case, we want the top half of the
+		 * surface to be uncompressed and the bottom half to be
+		 * compressed.
+		 *
+		 * We need to cut the surface on a CCS cache-line boundary,
+		 * otherwise, we're going to be in trouble when we try to
+		 * generate CCS data for the surface.  A cache line in the
+		 * CCS is 16x16 cache-line-pairs in the main surface.  16
+		 * cache lines is 64 rows high.
+		 */
+		half_height = ALIGN(height, 128) / 2;
+		half_size = half_height * stride;
+		for (i = 0; i < fb->size / 4; i++) {
+			if (i < half_size / 4)
+				ptr[i] = RED;
+			else
+				ptr[i] = COMPRESSED_RED;
+		}
+	} else {
+		for (i = 0; i < fb->size / 4; i++)
 			ptr[i] = RED;
 	}
 
 	munmap(ptr, fb->size);
 }
 
-static uint8_t *ccs_ptr(uint8_t *ptr,
-			unsigned int x, unsigned int y,
-			unsigned int stride)
+static unsigned int
+y_tile_y_pos(unsigned int offset, unsigned int stride)
 {
-	return ptr +
-		((y & ~0x3f) * stride) +
-		((x & ~0x7) * 64) +
-		((y & 0x3f) * 8) +
-		(x & 7);
+	unsigned int y_tiles, y;
+	y_tiles = (offset / 4096) / (stride / 128);
+	y = y_tiles * 32 + ((offset & 0x1f0) >> 4);
+	return y;
 }
 
 static void render_ccs(data_t *data, uint32_t gem_handle,
 		       uint32_t offset, uint32_t size,
-		       int w, int h, unsigned int stride)
+		       int height, unsigned int ccs_stride)
 {
+	unsigned int half_height, ccs_half_height;
 	uint8_t *ptr;
-	int x, y;
+	int i;
+
+	half_height = ALIGN(height, 128) / 2;
+	ccs_half_height = half_height / 16;
 
 	ptr = gem_mmap__cpu(data->drm_fd, gem_handle,
 			    offset, size,
 			    PROT_READ | PROT_WRITE);
 
-	/* Mark upper half as compressed */
-	for (x = 0 ; x < w; x++)
-		for (y = 0 ; y <= h / 2; y++)
-			*ccs_ptr(ptr, x, y, stride) = 0x55;
+	for (i = 0; i < size; i++) {
+		if (y_tile_y_pos(i, ccs_stride) < ccs_half_height)
+			ptr[i] = CCS_UNCOMPRESSED;
+		else
+			ptr[i] = CCS_COMPRESSED;
+	}
 
 	munmap(ptr, size);
 }
@@ -143,12 +168,26 @@ static void display_fb(data_t *data, int compressed)
 	size[0] = f.pitches[0] * ALIGN(height, 32);
 
 	if (compressed) {
-		width = ALIGN(f.width, 16) / 16;
-		height = ALIGN(f.height, 8) / 8;
-		f.pitches[1] = ALIGN(width * 1, 64);
+		/* From the Sky Lake PRM, Vol 12, "Color Control Surface":
+		 *
+		 *    "The compression state of the cache-line pair is
+		 *    specified by 2 bits in the CCS.  Each CCS cache-line
+		 *    represents an area on the main surface of 16x16 sets
+		 *    of 128 byte Y-tiled cache-line-pairs. CCS is always Y
+		 *    tiled."
+		 *
+		 * A "cache-line-pair" for a Y-tiled surface is two
+		 * horizontally adjacent cache lines.  When operating in
+		 * bytes and rows, this gives us a scale-down factor of
+		 * 32x16.  Since the main surface has a 32-bit format, we
+		 * need to multiply width by 4 to get bytes.
+		 */
+		width = ALIGN(f.width * 4, 32) / 32;
+		height = ALIGN(f.height, 16) / 16;
+		f.pitches[1] = ALIGN(width * 1, 128);
 		f.modifier[1] = modifier;
 		f.offsets[1] = size[0];
-		size[1] = f.pitches[1] * ALIGN(height, 64);
+		size[1] = f.pitches[1] * ALIGN(f.height, 32);
 
 		f.handles[0] = gem_create(data->drm_fd, size[0] + size[1]);
 		f.handles[1] = f.handles[0];
@@ -176,11 +215,11 @@ static void display_fb(data_t *data, int compressed)
 	fb->cairo_surface = NULL;
 	fb->domain = 0;
 
-	render_fb(data, compressed);
+	render_fb(data, compressed, f.height, f.pitches[0]);
 
 	if (compressed)
 		render_ccs(data, f.handles[0], f.offsets[1], size[1],
-			   f.width/16, f.height/8, f.pitches[1]);
+			   f.height, f.pitches[1]);
 
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, fb);
