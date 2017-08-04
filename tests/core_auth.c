@@ -39,6 +39,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/poll.h>
+#include <sys/resource.h>
 #include "drm.h"
 
 IGT_TEST_DESCRIPTION("Call drmGetMagic() and drmAuthMagic() and see if it behaves.");
@@ -54,6 +55,12 @@ static void test_many_magics(int master)
 	unsigned int i, j, ns, allocated = 0;
 	char path[512];
 	int *fds = NULL, slave;
+
+	struct rlimit fd_limit;
+
+	do_or_die(getrlimit(RLIMIT_NOFILE, &fd_limit));
+	fd_limit.rlim_cur = 1024;
+	do_or_die(setrlimit(RLIMIT_NOFILE, &fd_limit));
 
 	sprintf(path, "/proc/self/fd/%d", master);
 
@@ -157,6 +164,7 @@ igt_main
 	igt_subtest("basic-auth")
 		test_basic_auth(master);
 
+	/* this must be last, we adjust the rlimit */
 	igt_subtest("many-magics")
 		test_many_magics(master);
 }
