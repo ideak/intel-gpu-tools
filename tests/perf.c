@@ -143,6 +143,15 @@ enum drm_i915_perf_record_type {
 };
 #endif /* !DRM_I915_PERF_OPEN */
 
+/* There is no ifdef we can use for those formats :( */
+enum {
+	local_I915_OA_FORMAT_A12 = I915_OA_FORMAT_C4_B8 + 1,
+	local_I915_OA_FORMAT_A12_B8_C8 = I915_OA_FORMAT_A12 + 2,
+	local_I915_OA_FORMAT_A32u40_A4u32_B8_C8 = I915_OA_FORMAT_C4_B8 + 3,
+};
+
+#define local_I915_OA_FORMAT_MAX (local_I915_OA_FORMAT_A32u40_A4u32_B8_C8 + 1)
+
 #ifndef DRM_IOCTL_I915_PERF_ADD_CONFIG
 
 #define DRM_I915_PERF_ADD_CONFIG	0x37
@@ -191,7 +200,7 @@ static struct {
 	int n_c;
 	int min_gen;
 	int max_gen;
-} oa_formats[I915_OA_FORMAT_MAX] = {
+} oa_formats[local_I915_OA_FORMAT_MAX] = {
 	[I915_OA_FORMAT_A13] = { /* HSW only */
 		"A13", .size = 64,
 		.a_off = 12, .n_a = 13,
@@ -230,17 +239,17 @@ static struct {
 
 	/* Gen8+ */
 
-	[I915_OA_FORMAT_A12] = {
+	[local_I915_OA_FORMAT_A12] = {
 		"A12", .size = 64,
 		.a_off = 12, .n_a = 12, .first_a = 7,
 		.min_gen = 8 },
-	[I915_OA_FORMAT_A12_B8_C8] = {
+	[local_I915_OA_FORMAT_A12_B8_C8] = {
 		"A12_B8_C8", .size = 128,
 		.a_off = 12, .n_a = 12,
 		.b_off = 64, .n_b = 8,
 		.c_off = 96, .n_c = 8, .first_a = 7,
 		.min_gen = 8 },
-	[I915_OA_FORMAT_A32u40_A4u32_B8_C8] = {
+	[local_I915_OA_FORMAT_A32u40_A4u32_B8_C8] = {
 		"A32u40_A4u32_B8_C8", .size = 256,
 		.a40_high_off = 160, .a40_low_off = 16, .n_a40 = 32,
 		.a_off = 144, .n_a = 4, .first_a = 32,
@@ -311,7 +320,7 @@ __perf_open(int fd, struct drm_i915_perf_open_param *param)
 static int
 lookup_format(int i915_perf_fmt_id)
 {
-	igt_assert(i915_perf_fmt_id < I915_OA_FORMAT_MAX);
+	igt_assert(i915_perf_fmt_id < local_I915_OA_FORMAT_MAX);
 	igt_assert(oa_formats[i915_perf_fmt_id].name);
 
 	return i915_perf_fmt_id;
@@ -806,7 +815,7 @@ init_sys_info(void)
 		drm_i915_getparam_t gp;
 
 		test_set_name = "TestOa";
-		test_oa_format = I915_OA_FORMAT_A32u40_A4u32_B8_C8;
+		test_oa_format = local_I915_OA_FORMAT_A32u40_A4u32_B8_C8;
 		undefined_a_counters = gen8_undefined_a_counters;
 		read_report_ticks = gen8_read_report_ticks;
 		sanity_check_reports = gen8_sanity_check_test_oa_reports;
