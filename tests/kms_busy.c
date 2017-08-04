@@ -342,7 +342,7 @@ igt_main
 			test_flip(&display, e->exec_id | e->flags, n, false);
 		}
 		igt_subtest_f("basic-modeset-%s",
-			      e->name, kmstest_pipe_name(n)) {
+			      kmstest_pipe_name(n)) {
 			igt_require(gem_has_ring(display.drm_fd,
 						e->exec_id | e->flags));
 
