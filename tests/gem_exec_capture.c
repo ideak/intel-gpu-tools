@@ -64,9 +64,9 @@ static void capture(int fd, int dir, unsigned ring)
 #define CAPTURE 1
 #define NOCAPTURE 2
 #define BATCH 3
-	struct drm_i915_gem_relocation_entry reloc;
+	struct drm_i915_gem_relocation_entry reloc[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t *batch;
+	uint32_t *batch, *seqno;
 	int i;
 
 	memset(obj, 0, sizeof(obj));
@@ -76,25 +76,50 @@ static void capture(int fd, int dir, unsigned ring)
 	obj[NOCAPTURE].handle = gem_create(fd, 4096);
 
 	obj[BATCH].handle = gem_create(fd, 4096);
-	obj[BATCH].relocs_ptr = (uintptr_t)&reloc;
-	obj[BATCH].relocation_count = 1;
+	obj[BATCH].relocs_ptr = (uintptr_t)reloc;
+	obj[BATCH].relocation_count = ARRAY_SIZE(reloc);
 
-	memset(&reloc, 0, sizeof(reloc));
-	reloc.target_handle = obj[BATCH].handle; /* recurse */
-	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
-	reloc.delta = 0;
-	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc.write_domain = 0;
+	memset(reloc, 0, sizeof(reloc));
+	reloc[0].target_handle = obj[BATCH].handle; /* recurse */
+	reloc[0].presumed_offset = 0;
+	reloc[0].offset = 5*sizeof(uint32_t);
+	reloc[0].delta = 0;
+	reloc[0].read_domains = I915_GEM_DOMAIN_COMMAND;
+	reloc[0].write_domain = 0;
+
+	reloc[1].target_handle = obj[SCRATCH].handle; /* breadcrumb */
+	reloc[1].presumed_offset = 0;
+	reloc[1].offset = sizeof(uint32_t);
+	reloc[1].delta = 0;
+	reloc[1].read_domains = I915_GEM_DOMAIN_RENDER;
+	reloc[1].write_domain = I915_GEM_DOMAIN_RENDER;
+
+	seqno = gem_mmap__wc(fd, obj[SCRATCH].handle, 0, 4096, PROT_READ);
+	gem_set_domain(fd, obj[SCRATCH].handle,
+			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 	batch = gem_mmap__cpu(fd, obj[BATCH].handle, 0, 4096, PROT_WRITE);
 	gem_set_domain(fd, obj[BATCH].handle,
 			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 	i = 0;
-	batch[i++] = 0xdeadbeef; /* crashme */
-	batch[i++] = -1;
-	batch[i] = MI_BATCH_BUFFER_START; /* not crashed? try again! */
+	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	if (gen >= 8) {
+		batch[++i] = 0;
+		batch[++i] = 0;
+	} else if (gen >= 4) {
+		batch[++i] = 0;
+		batch[++i] = 0;
+		reloc[1].offset += sizeof(uint32_t);
+	} else {
+		batch[i]--;
+		batch[++i] = 0;
+	}
+	batch[++i] = 0xc0ffee;
+	if (gen < 3)
+		batch[++i] = MI_NOOP;
+
+	batch[++i] = MI_BATCH_BUFFER_START; /* not crashed? try again! */
 	if (gen >= 8) {
 		batch[i] |= 1 << 8 | 1;
 		batch[++i] = 0;
@@ -107,7 +132,7 @@ static void capture(int fd, int dir, unsigned ring)
 		batch[++i] = 0;
 		if (gen < 4) {
 			batch[i] |= 1;
-			reloc.delta = 1;
+			reloc[0].delta = 1;
 		}
 	}
 	munmap(batch, 4096);
@@ -118,9 +143,16 @@ static void capture(int fd, int dir, unsigned ring)
 	execbuf.flags = ring;
 	gem_execbuf(fd, &execbuf);
 
+	/* Wait for the request to start */
+	while (*(volatile uint32_t *)seqno != 0xc0ffee)
+		igt_assert(gem_bo_busy(fd, obj[SCRATCH].handle));
+	munmap(seqno, 4096);
+
 	/* Check that only the buffer we marked is reported in the error */
 	igt_force_gpu_reset(fd);
 	check_error_state(dir, &obj[CAPTURE]);
+
+	gem_sync(fd, obj[BATCH].handle);
 
 	gem_close(fd, obj[BATCH].handle);
 	gem_close(fd, obj[NOCAPTURE].handle);
@@ -167,6 +199,7 @@ igt_main
 
 		igt_subtest_f("capture-%s", e->name) {
 			gem_require_ring(fd, e->exec_id | e->flags);
+			igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 			capture(fd, dir, e->exec_id | e->flags);
 		}
 	}
