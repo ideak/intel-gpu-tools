@@ -513,7 +513,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Just to make sure we open the right debugfs files */
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
+	drm_fd = drm_open_driver(DRIVER_INTEL);
 
 	/* Grab access to the registers */
 	intel_register_access_init(pci_dev, 0, drm_fd);
