@@ -2933,12 +2933,17 @@ test_create_destroy_userspace_config(void)
 
 	config.n_mux_regs = 1;
 	config.mux_regs_ptr = to_user_pointer(mux_regs);
-	for (i = 0; i < ARRAY_SIZE(flex_regs) / 2; i++) {
-		flex_regs[i * 2] = 0xe458; /* EU_PERF_CNTL0 */
-		flex_regs[i * 2 + 1] = 0x0;
+
+	/* Flex EU counters are only available on gen8+ */
+	if (intel_gen(devid) >= 8) {
+		for (i = 0; i < ARRAY_SIZE(flex_regs) / 2; i++) {
+			flex_regs[i * 2] = 0xe458; /* EU_PERF_CNTL0 */
+			flex_regs[i * 2 + 1] = 0x0;
+		}
+		config.flex_regs_ptr = to_user_pointer(flex_regs);
+		config.n_flex_regs = ARRAY_SIZE(flex_regs) / 2;
 	}
-	config.flex_regs_ptr = to_user_pointer(flex_regs);
-	config.n_flex_regs = ARRAY_SIZE(flex_regs) / 2;
+
 	config.n_boolean_regs = 0;
 
 	/* Creating configs without permissions shouldn't work. */
@@ -3019,13 +3024,15 @@ test_whitelisted_registers_userspace_config(void)
 	}
 	config.boolean_regs_ptr = (uintptr_t) b_counters_regs;
 
-	/* Flex EU registers */
-	for (i = 0; i < ARRAY_SIZE(flex); i++) {
-		flex_regs[config.n_flex_regs * 2] = flex[i];
-		flex_regs[config.n_flex_regs * 2 + 1] = 0;
-		config.n_flex_regs++;
+	if (intel_gen(devid) >= 8) {
+		/* Flex EU registers, only from Gen8+. */
+		for (i = 0; i < ARRAY_SIZE(flex); i++) {
+			flex_regs[config.n_flex_regs * 2] = flex[i];
+			flex_regs[config.n_flex_regs * 2 + 1] = 0;
+			config.n_flex_regs++;
+		}
+		config.flex_regs_ptr = (uintptr_t) flex_regs;
 	}
-	config.flex_regs_ptr = (uintptr_t) flex_regs;
 
 	/* Mux registers (too many of them, just checking bounds) */
 	i = 0;
