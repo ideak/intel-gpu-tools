@@ -57,18 +57,15 @@ typedef struct {
 
 #define RED			0x00ff0000
 
-static void render_fb(data_t *data, enum test_fb_flags fb_flags,
+static void render_fb(data_t *data, uint32_t gem_handle, unsigned int size,
+		      enum test_fb_flags fb_flags,
 		      int height, unsigned int stride)
 {
-	struct igt_fb *fb = &data->fb;
 	uint32_t *ptr;
 	unsigned int half_height, half_size;
 	int i;
 
-	igt_assert(fb->fb_id);
-
-	ptr = gem_mmap__cpu(data->drm_fd, fb->gem_handle,
-			    0, fb->size,
+	ptr = gem_mmap__cpu(data->drm_fd, gem_handle, 0, size,
 			    PROT_READ | PROT_WRITE);
 
 	if (fb_flags & FB_COMPRESSED) {
@@ -84,18 +81,18 @@ static void render_fb(data_t *data, enum test_fb_flags fb_flags,
 		 */
 		half_height = ALIGN(height, 128) / 2;
 		half_size = half_height * stride;
-		for (i = 0; i < fb->size / 4; i++) {
+		for (i = 0; i < size / 4; i++) {
 			if (i < half_size / 4)
 				ptr[i] = RED;
 			else
 				ptr[i] = COMPRESSED_RED;
 		}
 	} else {
-		for (i = 0; i < fb->size / 4; i++)
+		for (i = 0; i < size / 4; i++)
 			ptr[i] = RED;
 	}
 
-	munmap(ptr, fb->size);
+	munmap(ptr, size);
 }
 
 static unsigned int
@@ -118,8 +115,7 @@ static void render_ccs(data_t *data, uint32_t gem_handle,
 	half_height = ALIGN(height, 128) / 2;
 	ccs_half_height = half_height / 16;
 
-	ptr = gem_mmap__cpu(data->drm_fd, gem_handle,
-			    offset, size,
+	ptr = gem_mmap__cpu(data->drm_fd, gem_handle, offset, size,
 			    PROT_READ | PROT_WRITE);
 
 	for (i = 0; i < size; i++) {
@@ -132,23 +128,14 @@ static void render_ccs(data_t *data, uint32_t gem_handle,
 	munmap(ptr, size);
 }
 
-static void display_fb(data_t *data, enum test_fb_flags fb_flags)
+static void generate_fb(data_t *data, struct igt_fb *fb,
+			int width, int height,
+			enum test_fb_flags fb_flags)
 {
 	struct local_drm_mode_fb_cmd2 f = {};
-	struct igt_fb *fb = &data->fb;
-	igt_display_t *display = &data->display;
-	igt_plane_t *primary;
-	drmModeModeInfo *mode;
-	unsigned int width, height;
 	unsigned int size[2];
 	uint64_t modifier;
-	enum igt_commit_style commit = COMMIT_UNIVERSAL;
 	int ret;
-
-	if (data->display.is_atomic)
-		commit = COMMIT_ATOMIC;
-
-	mode = igt_output_get_mode(data->output);
 
 	if (fb_flags & FB_COMPRESSED)
 		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED_CCS;
@@ -156,8 +143,8 @@ static void display_fb(data_t *data, enum test_fb_flags fb_flags)
 		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED;
 
 	f.flags = LOCAL_DRM_MODE_FB_MODIFIERS;
-	f.width = ALIGN(mode->hdisplay, 16);
-	f.height = ALIGN(mode->vdisplay, 8);
+	f.width = ALIGN(width, 16);
+	f.height = ALIGN(height, 8);
 
 	if (data->flags & TEST_BAD_PIXEL_FORMAT)
 		f.pixel_format = DRM_FORMAT_RGB565;
@@ -195,8 +182,12 @@ static void display_fb(data_t *data, enum test_fb_flags fb_flags)
 
 		f.handles[0] = gem_create(data->drm_fd, size[0] + size[1]);
 		f.handles[1] = f.handles[0];
+		render_ccs(data, f.handles[1], f.offsets[1], size[1],
+			   height, f.pitches[1]);
 	} else
 		f.handles[0] = gem_create(data->drm_fd, size[0]);
+
+	render_fb(data, f.handles[0], size[0], fb_flags, height, f.pitches[0]);
 
 	ret = drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f);
 	if (data->flags & TEST_BAD_PIXEL_FORMAT) {
@@ -218,15 +209,30 @@ static void display_fb(data_t *data, enum test_fb_flags fb_flags)
 	fb->size = size[0];
 	fb->cairo_surface = NULL;
 	fb->domain = 0;
+}
 
-	render_fb(data, fb_flags, f.height, f.pitches[0]);
+static void try_config(data_t *data, enum test_fb_flags fb_flags)
+{
+	igt_display_t *display = &data->display;
+	igt_plane_t *primary;
+	drmModeModeInfo *drm_mode = igt_output_get_mode(data->output);
+	enum igt_commit_style commit;
+	int ret;
 
-	if (fb_flags & FB_COMPRESSED)
-		render_ccs(data, f.handles[0], f.offsets[1], size[1],
-			   f.height, f.pitches[1]);
+	if (data->display.is_atomic)
+		commit = COMMIT_ATOMIC;
+	else
+		commit = COMMIT_UNIVERSAL;
+
+	generate_fb(data, &data->fb, drm_mode->hdisplay, drm_mode->vdisplay,
+		    fb_flags);
+	if (data->flags & TEST_BAD_PIXEL_FORMAT)
+		return;
 
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
-	igt_plane_set_fb(primary, fb);
+	igt_plane_set_position(primary, 0, 0);
+	igt_plane_set_size(primary, drm_mode->hdisplay, drm_mode->vdisplay);
+	igt_plane_set_fb(primary, &data->fb);
 
 	if (data->flags & TEST_ROTATE_180)
 		igt_plane_set_rotation(primary, IGT_ROTATION_180);
@@ -253,13 +259,12 @@ static void test_output(data_t *data)
 	igt_output_set_pipe(data->output, data->pipe);
 
 	if (data->flags & TEST_CRC) {
-
 		pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
-		display_fb(data, fb_flags | FB_COMPRESSED);
+		try_config(data, fb_flags | FB_COMPRESSED);
 		igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
 
-		display_fb(data, fb_flags);
+		try_config(data, fb_flags);
 		igt_pipe_crc_collect_crc(pipe_crc, &crc);
 
 		igt_assert_crc_equal(&crc, &ref_crc);
@@ -270,7 +275,7 @@ static void test_output(data_t *data)
 
 	if (data->flags & TEST_BAD_PIXEL_FORMAT ||
 	    data->flags & TEST_BAD_ROTATION_90) {
-		display_fb(data, fb_flags | FB_COMPRESSED);
+		try_config(data, fb_flags | FB_COMPRESSED);
 	}
 
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
