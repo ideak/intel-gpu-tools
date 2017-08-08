@@ -35,6 +35,10 @@ enum test_flags {
 	TEST_BAD_ROTATION_90		= 1 << 4,
 };
 
+enum test_fb_flags {
+	FB_COMPRESSED			= 1 << 0,
+};
+
 typedef struct {
 	int drm_fd;
 	igt_display_t display;
@@ -53,7 +57,7 @@ typedef struct {
 
 #define RED			0x00ff0000
 
-static void render_fb(data_t *data, bool compressed,
+static void render_fb(data_t *data, enum test_fb_flags fb_flags,
 		      int height, unsigned int stride)
 {
 	struct igt_fb *fb = &data->fb;
@@ -67,7 +71,7 @@ static void render_fb(data_t *data, bool compressed,
 			    0, fb->size,
 			    PROT_READ | PROT_WRITE);
 
-	if (compressed) {
+	if (fb_flags & FB_COMPRESSED) {
 		/* In the compressed case, we want the top half of the
 		 * surface to be uncompressed and the bottom half to be
 		 * compressed.
@@ -128,7 +132,7 @@ static void render_ccs(data_t *data, uint32_t gem_handle,
 	munmap(ptr, size);
 }
 
-static void display_fb(data_t *data, int compressed)
+static void display_fb(data_t *data, enum test_fb_flags fb_flags)
 {
 	struct local_drm_mode_fb_cmd2 f = {};
 	struct igt_fb *fb = &data->fb;
@@ -146,7 +150,7 @@ static void display_fb(data_t *data, int compressed)
 
 	mode = igt_output_get_mode(data->output);
 
-	if (compressed)
+	if (fb_flags & FB_COMPRESSED)
 		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED_CCS;
 	else
 		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED;
@@ -167,7 +171,7 @@ static void display_fb(data_t *data, int compressed)
 	f.offsets[0] = 0;
 	size[0] = f.pitches[0] * ALIGN(height, 32);
 
-	if (compressed) {
+	if (fb_flags & FB_COMPRESSED) {
 		/* From the Sky Lake PRM, Vol 12, "Color Control Surface":
 		 *
 		 *    "The compression state of the cache-line pair is
@@ -215,9 +219,9 @@ static void display_fb(data_t *data, int compressed)
 	fb->cairo_surface = NULL;
 	fb->domain = 0;
 
-	render_fb(data, compressed, f.height, f.pitches[0]);
+	render_fb(data, fb_flags, f.height, f.pitches[0]);
 
-	if (compressed)
+	if (fb_flags & FB_COMPRESSED)
 		render_ccs(data, f.handles[0], f.offsets[1], size[1],
 			   f.height, f.pitches[1]);
 
@@ -238,25 +242,24 @@ static void display_fb(data_t *data, int compressed)
 	igt_debug_wait_for_keypress("ccs");
 }
 
-#define TEST_UNCOMPRESSED 0
-#define TEST_COMPRESSED 1
-
 static void test_output(data_t *data)
 {
 	igt_display_t *display = &data->display;
 	igt_plane_t *primary;
 	igt_crc_t crc, ref_crc;
 	igt_pipe_crc_t *pipe_crc;
+	enum test_fb_flags fb_flags = 0;
 
 	igt_output_set_pipe(data->output, data->pipe);
 
 	if (data->flags & TEST_CRC) {
+
 		pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
-		display_fb(data, TEST_COMPRESSED);
+		display_fb(data, fb_flags | FB_COMPRESSED);
 		igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
 
-		display_fb(data, TEST_UNCOMPRESSED);
+		display_fb(data, fb_flags);
 		igt_pipe_crc_collect_crc(pipe_crc, &crc);
 
 		igt_assert_crc_equal(&crc, &ref_crc);
@@ -267,7 +270,7 @@ static void test_output(data_t *data)
 
 	if (data->flags & TEST_BAD_PIXEL_FORMAT ||
 	    data->flags & TEST_BAD_ROTATION_90) {
-		display_fb(data, TEST_COMPRESSED);
+		display_fb(data, fb_flags | FB_COMPRESSED);
 	}
 
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
