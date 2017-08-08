@@ -143,16 +143,14 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED;
 
 	f.flags = LOCAL_DRM_MODE_FB_MODIFIERS;
-	f.width = ALIGN(width, 16);
-	f.height = ALIGN(height, 8);
+	f.width = width;
+	f.height = height;
 
 	if (data->flags & TEST_BAD_PIXEL_FORMAT)
 		f.pixel_format = DRM_FORMAT_RGB565;
 	else
 		f.pixel_format = DRM_FORMAT_XRGB8888;
 
-	width = f.width;
-	height = f.height;
 	f.pitches[0] = ALIGN(width * 4, 128);
 	f.modifier[0] = modifier;
 	f.offsets[0] = 0;
@@ -173,12 +171,12 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		 * 32x16.  Since the main surface has a 32-bit format, we
 		 * need to multiply width by 4 to get bytes.
 		 */
-		width = ALIGN(f.width * 4, 32) / 32;
-		height = ALIGN(f.height, 16) / 16;
-		f.pitches[1] = ALIGN(width * 1, 128);
+		int ccs_width = ALIGN(width * 4, 32) / 32;
+		int ccs_height = ALIGN(height, 16) / 16;
+		f.pitches[1] = ALIGN(ccs_width * 1, 128);
 		f.modifier[1] = modifier;
 		f.offsets[1] = size[0];
-		size[1] = f.pitches[1] * ALIGN(height, 32);
+		size[1] = f.pitches[1] * ALIGN(ccs_height, 32);
 
 		f.handles[0] = gem_create(data->drm_fd, size[0] + size[1]);
 		f.handles[1] = f.handles[0];
