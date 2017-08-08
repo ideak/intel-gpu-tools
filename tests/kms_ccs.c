@@ -37,19 +37,24 @@ enum test_flags {
 
 enum test_fb_flags {
 	FB_COMPRESSED			= 1 << 0,
+	FB_HAS_PLANE			= 1 << 1,
 };
 
 typedef struct {
 	int drm_fd;
 	igt_display_t display;
 	struct igt_fb fb;
+	struct igt_fb fb_sprite;
 	igt_output_t *output;
 	enum pipe pipe;
 	enum test_flags flags;
+	igt_plane_t *plane;
 } data_t;
 
 #define RED			0x00ff0000
 #define COMPRESSED_RED		0x0ff0000f
+#define GREEN			0x0000ff00
+#define COMPRESSED_GREEN	0x000ff00f
 
 #define CCS_UNCOMPRESSED	0x0
 #define CCS_COMPRESSED		0x55
@@ -177,8 +182,10 @@ static void render_fb(data_t *data, uint32_t gem_handle, unsigned int size,
 {
 	uint32_t *ptr;
 	unsigned int half_height, half_size;
-	uint32_t uncompressed_color = RED;
-	uint32_t compressed_color = COMPRESSED_RED;
+	uint32_t uncompressed_color = data->plane ? GREEN : RED;
+	uint32_t compressed_color =
+		data->plane ? COMPRESSED_GREEN : COMPRESSED_RED;
+	uint32_t bad_color = RED;
 	int i;
 
 	ptr = gem_mmap__cpu(data->drm_fd, gem_handle, 0, size,
@@ -204,8 +211,20 @@ static void render_fb(data_t *data, uint32_t gem_handle, unsigned int size,
 				ptr[i] = compressed_color;
 		}
 	} else {
-		for (i = 0; i < size / 4; i++)
-			ptr[i] = uncompressed_color;
+		/* When we're displaying the primary plane underneath a
+		 * sprite plane, cut out a 128 x 128 area (less than the sprite)
+		 * plane size which we paint red, so we know easily if it's
+		 * bad.
+		 */
+		for (i = 0; i < size / 4; i++) {
+			if ((fb_flags & FB_HAS_PLANE) &&
+			    (i / (stride / 4)) < 128 &&
+			    (i % (stride / 4)) < 128) {
+				ptr[i] = bad_color;
+			} else {
+				ptr[i] = uncompressed_color;
+			}
+		}
 	}
 
 	munmap(ptr, size);
@@ -253,10 +272,17 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	uint64_t modifier;
 	int ret;
 
+	/* Use either compressed or Y-tiled to test. However, given the lack of
+	 * available bandwidth, we use linear for the primary plane when
+	 * testing sprites, since we cannot fit two CCS planes into the
+	 * available FIFO configurations.
+	 */
 	if (fb_flags & FB_COMPRESSED)
 		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED_CCS;
-	else
+	else if (!(fb_flags & FB_HAS_PLANE))
 		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED;
+	else
+		modifier = 0;
 
 	f.flags = LOCAL_DRM_MODE_FB_MODIFIERS;
 	f.width = width;
@@ -342,14 +368,29 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags)
 					    DRM_PLANE_TYPE_PRIMARY);
 	plane_require_ccs(data, primary, DRM_FORMAT_XRGB8888);
 
-	generate_fb(data, &data->fb, drm_mode->hdisplay, drm_mode->vdisplay,
-		    fb_flags);
+	if (data->plane && fb_flags & FB_COMPRESSED) {
+		plane_require_ccs(data, data->plane, DRM_FORMAT_XRGB8888);
+		generate_fb(data, &data->fb, drm_mode->hdisplay,
+			    drm_mode->vdisplay,
+			    (fb_flags & ~FB_COMPRESSED) | FB_HAS_PLANE);
+		generate_fb(data, &data->fb_sprite, 256, 256, fb_flags);
+	} else {
+		generate_fb(data, &data->fb, drm_mode->hdisplay,
+			    drm_mode->vdisplay, fb_flags);
+	}
+
 	if (data->flags & TEST_BAD_PIXEL_FORMAT)
 		return;
 
 	igt_plane_set_position(primary, 0, 0);
 	igt_plane_set_size(primary, drm_mode->hdisplay, drm_mode->vdisplay);
 	igt_plane_set_fb(primary, &data->fb);
+
+	if (data->plane && fb_flags & FB_COMPRESSED) {
+		igt_plane_set_position(data->plane, 0, 0);
+		igt_plane_set_size(data->plane, 256, 256);
+		igt_plane_set_fb(data->plane, &data->fb_sprite);
+	}
 
 	if (data->flags & TEST_ROTATE_180)
 		igt_plane_set_rotation(primary, IGT_ROTATION_180);
@@ -363,6 +404,13 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags)
 		igt_assert_eq(ret, 0);
 
 	igt_debug_wait_for_keypress("ccs");
+
+	if (data->plane && fb_flags & FB_COMPRESSED) {
+		igt_plane_set_position(data->plane, 0, 0);
+		igt_plane_set_size(data->plane, 0, 0);
+		igt_plane_set_fb(data->plane, NULL);
+		igt_remove_fb(display->drm_fd, &data->fb_sprite);
+	}
 }
 
 static void test_output(data_t *data)
@@ -431,6 +479,7 @@ igt_main
 
 	for_each_pipe(&data.display, data.pipe) {
 		const char *pipe_name = kmstest_pipe_name(data.pipe);
+		int sprite_idx = 0;
 
 		data.flags = TEST_BAD_PIXEL_FORMAT;
 		igt_subtest_f("pipe-%s-bad-pixel-format", pipe_name)
@@ -447,6 +496,18 @@ igt_main
 		data.flags = TEST_CRC | TEST_ROTATE_180;
 		igt_subtest_f("pipe-%s-crc-primary-rotation-180", pipe_name)
 			test_output(&data);
+
+		data.flags = TEST_CRC;
+		for_each_plane_on_pipe(&data.display, data.pipe, data.plane) {
+			if (data.plane->type == DRM_PLANE_TYPE_PRIMARY)
+				continue;
+			sprite_idx++;
+			igt_subtest_f("pipe-%s-crc-sprite-%d-basic", pipe_name,
+				      sprite_idx)
+				test_output(&data);
+		}
+
+		data.plane = NULL;
 	}
 
 	igt_fixture
