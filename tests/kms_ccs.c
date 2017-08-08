@@ -342,13 +342,13 @@ igt_main
 
 	for (data.pipe = PIPE_A; data.pipe < IGT_MAX_PIPES; data.pipe++) {
 		data.flags = TEST_CRC;
-		igt_subtest_f("pipe-%s-crc-basic", kmstest_pipe_name(data.pipe))
+		igt_subtest_f("pipe-%s-crc-primary-basic",
+			      kmstest_pipe_name(data.pipe))
 			test(&data);
-	}
 
-	for (data.pipe = PIPE_A; data.pipe < IGT_MAX_PIPES; data.pipe++) {
-		data.flags = TEST_CRC | TEST_ROTATE_180;
-		igt_subtest_f("pipe-%s-crc-rotation-180", kmstest_pipe_name(data.pipe))
+		data.flags |= TEST_ROTATE_180;
+		igt_subtest_f("pipe-%s-crc-primary-rotation-180",
+			      kmstest_pipe_name(data.pipe))
 			test(&data);
 	}
 
