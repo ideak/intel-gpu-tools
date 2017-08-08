@@ -373,6 +373,13 @@ static void test_output(data_t *data)
 	igt_pipe_crc_t *pipe_crc;
 	enum test_fb_flags fb_flags = 0;
 
+	igt_display_require_output_on_pipe(display, data->pipe);
+
+	/* Sets data->output with a valid output. */
+	for_each_valid_output_on_pipe(display, data->pipe, data->output) {
+		break;
+	}
+
 	igt_output_set_pipe(data->output, data->pipe);
 
 	if (data->flags & TEST_CRC) {
@@ -408,31 +415,6 @@ static void test_output(data_t *data)
 		igt_remove_fb(data->drm_fd, &data->fb);
 }
 
-static void test(data_t *data)
-{
-	igt_display_t *display = &data->display;
-	int valid_tests = 0;
-	enum pipe wanted_pipe = data->pipe;
-
-	igt_skip_on(wanted_pipe >= display->n_pipes);
-
-	for_each_pipe_with_valid_output(display, data->pipe, data->output) {
-		if (wanted_pipe != PIPE_NONE && data->pipe != wanted_pipe)
-			continue;
-
-		test_output(data);
-
-		valid_tests++;
-
-		igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
-			 igt_subtest_name(),
-			 kmstest_pipe_name(data->pipe),
-			 igt_output_name(data->output));
-	}
-
-	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
-}
-
 static data_t data;
 
 igt_main
@@ -447,28 +429,24 @@ igt_main
 		igt_display_init(&data.display, data.drm_fd);
 	}
 
-	igt_subtest_f("bad-pixel-format") {
+	for_each_pipe(&data.display, data.pipe) {
+		const char *pipe_name = kmstest_pipe_name(data.pipe);
+
 		data.flags = TEST_BAD_PIXEL_FORMAT;
-		data.pipe = PIPE_NONE;
-		test(&data);
-	}
+		igt_subtest_f("pipe-%s-bad-pixel-format", pipe_name)
+			test_output(&data);
 
-	igt_subtest_f("bad-rotation-90") {
 		data.flags = TEST_BAD_ROTATION_90;
-		data.pipe = PIPE_NONE;
-		test(&data);
-	}
+		igt_subtest_f("pipe-%s-bad-rotation-90", pipe_name)
+			test_output(&data);
 
-	for (data.pipe = PIPE_A; data.pipe < IGT_MAX_PIPES; data.pipe++) {
 		data.flags = TEST_CRC;
-		igt_subtest_f("pipe-%s-crc-primary-basic",
-			      kmstest_pipe_name(data.pipe))
-			test(&data);
+		igt_subtest_f("pipe-%s-crc-primary-basic", pipe_name)
+			test_output(&data);
 
-		data.flags |= TEST_ROTATE_180;
-		igt_subtest_f("pipe-%s-crc-primary-rotation-180",
-			      kmstest_pipe_name(data.pipe))
-			test(&data);
+		data.flags = TEST_CRC | TEST_ROTATE_180;
+		igt_subtest_f("pipe-%s-crc-primary-rotation-180", pipe_name)
+			test_output(&data);
 	}
 
 	igt_fixture
