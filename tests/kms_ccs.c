@@ -48,14 +48,12 @@ typedef struct {
 	enum test_flags flags;
 } data_t;
 
+#define RED			0x00ff0000
 #define COMPRESSED_RED		0x0ff0000f
-#define COMPRESSED_GREEN	0x000ff00f
-#define COMPRESSED_BLUE		0x00000fff
 
 #define CCS_UNCOMPRESSED	0x0
 #define CCS_COMPRESSED		0x55
 
-#define RED			0x00ff0000
 
 static void render_fb(data_t *data, uint32_t gem_handle, unsigned int size,
 		      enum test_fb_flags fb_flags,
@@ -63,6 +61,8 @@ static void render_fb(data_t *data, uint32_t gem_handle, unsigned int size,
 {
 	uint32_t *ptr;
 	unsigned int half_height, half_size;
+	uint32_t uncompressed_color = RED;
+	uint32_t compressed_color = COMPRESSED_RED;
 	int i;
 
 	ptr = gem_mmap__cpu(data->drm_fd, gem_handle, 0, size,
@@ -83,13 +83,13 @@ static void render_fb(data_t *data, uint32_t gem_handle, unsigned int size,
 		half_size = half_height * stride;
 		for (i = 0; i < size / 4; i++) {
 			if (i < half_size / 4)
-				ptr[i] = RED;
+				ptr[i] = uncompressed_color;
 			else
-				ptr[i] = COMPRESSED_RED;
+				ptr[i] = compressed_color;
 		}
 	} else {
 		for (i = 0; i < size / 4; i++)
-			ptr[i] = RED;
+			ptr[i] = uncompressed_color;
 	}
 
 	munmap(ptr, size);
