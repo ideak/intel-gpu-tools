@@ -54,6 +54,122 @@ typedef struct {
 #define CCS_UNCOMPRESSED	0x0
 #define CCS_COMPRESSED		0x55
 
+struct local_drm_format_modifier {
+       /* Bitmask of formats in get_plane format list this info applies to. The
+	* offset allows a sliding window of which 64 formats (bits).
+	*
+	* Some examples:
+	* In today's world with < 65 formats, and formats 0, and 2 are
+	* supported
+	* 0x0000000000000005
+	*		  ^-offset = 0, formats = 5
+	*
+	* If the number formats grew to 128, and formats 98-102 are
+	* supported with the modifier:
+	*
+	* 0x0000003c00000000 0000000000000000
+	*		  ^
+	*		  |__offset = 64, formats = 0x3c00000000
+	*
+	*/
+       uint64_t formats;
+       uint32_t offset;
+       uint32_t pad;
+
+       /* This modifier can be used with the format for this plane. */
+       uint64_t modifier;
+};
+
+struct local_drm_format_modifier_blob {
+#define LOCAL_FORMAT_BLOB_CURRENT 1
+	/* Version of this blob format */
+	uint32_t version;
+
+	/* Flags */
+	uint32_t flags;
+
+	/* Number of fourcc formats supported */
+	uint32_t count_formats;
+
+	/* Where in this blob the formats exist (in bytes) */
+	uint32_t formats_offset;
+
+	/* Number of drm_format_modifiers */
+	uint32_t count_modifiers;
+
+	/* Where in this blob the modifiers exist (in bytes) */
+	uint32_t modifiers_offset;
+
+	/* u32 formats[] */
+	/* struct drm_format_modifier modifiers[] */
+};
+
+static inline uint32_t *
+formats_ptr(struct local_drm_format_modifier_blob *blob)
+{
+	return (uint32_t *)(((char *)blob) + blob->formats_offset);
+}
+
+static inline struct local_drm_format_modifier *
+modifiers_ptr(struct local_drm_format_modifier_blob *blob)
+{
+	return (struct local_drm_format_modifier *)(((char *)blob) + blob->modifiers_offset);
+}
+
+static void plane_require_ccs(data_t *data, igt_plane_t *plane, uint32_t format)
+{
+	drmModePropertyBlobPtr blob;
+	struct local_drm_format_modifier_blob *blob_data;
+	struct local_drm_format_modifier *modifiers, *last_mod;
+	uint32_t *formats, *last_fmt;
+	uint64_t blob_id;
+	bool ret;
+	int fmt_idx = -1;
+
+	ret = kmstest_get_property(data->drm_fd, plane->drm_plane->plane_id,
+				   DRM_MODE_OBJECT_PLANE, "IN_FORMATS",
+				   NULL, &blob_id, NULL);
+	igt_skip_on_f(ret == false, "IN_FORMATS not supported by kernel\n");
+	igt_skip_on_f(blob_id == 0, "IN_FORMATS not supported by plane\n");
+	blob = drmModeGetPropertyBlob(data->drm_fd, blob_id);
+	igt_assert(blob);
+	igt_assert_lte(sizeof(struct local_drm_format_modifier_blob),
+		       blob->length);
+
+	blob_data = (struct local_drm_format_modifier_blob *) blob->data;
+	formats = formats_ptr(blob_data);
+	last_fmt = &formats[blob_data->count_formats];
+	igt_assert_lte(((char *) last_fmt - (char *) blob_data), blob->length);
+	for (int i = 0; i < blob_data->count_formats; i++) {
+		if (formats[i] == format) {
+			fmt_idx = i;
+			break;
+		}
+	}
+
+	igt_skip_on_f(fmt_idx == -1,
+		      "Format 0x%x not supported by plane\n", format);
+
+	modifiers = modifiers_ptr(blob_data);
+	last_mod = &modifiers[blob_data->count_modifiers];
+	igt_assert_lte(((char *) last_mod - (char *) blob_data), blob->length);
+	for (int i = 0; i < blob_data->count_modifiers; i++) {
+		if (modifiers[i].modifier != LOCAL_I915_FORMAT_MOD_Y_TILED_CCS)
+			continue;
+
+		if (modifiers[i].offset > fmt_idx ||
+		    fmt_idx > modifiers[i].offset + 63)
+			continue;
+
+		if (modifiers[i].formats &
+		    (1UL << (fmt_idx - modifiers[i].offset)))
+			return;
+
+		igt_skip("i915 CCS modifier not supported for format\n");
+	}
+
+	igt_skip("i915 CCS modifier not supported by kernel for plane\n");
+}
 
 static void render_fb(data_t *data, uint32_t gem_handle, unsigned int size,
 		      enum test_fb_flags fb_flags,
@@ -222,12 +338,15 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags)
 	else
 		commit = COMMIT_UNIVERSAL;
 
+	primary = igt_output_get_plane_type(data->output,
+					    DRM_PLANE_TYPE_PRIMARY);
+	plane_require_ccs(data, primary, DRM_FORMAT_XRGB8888);
+
 	generate_fb(data, &data->fb, drm_mode->hdisplay, drm_mode->vdisplay,
 		    fb_flags);
 	if (data->flags & TEST_BAD_PIXEL_FORMAT)
 		return;
 
-	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_position(primary, 0, 0);
 	igt_plane_set_size(primary, drm_mode->hdisplay, drm_mode->vdisplay);
 	igt_plane_set_fb(primary, &data->fb);
