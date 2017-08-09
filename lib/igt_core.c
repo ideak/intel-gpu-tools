@@ -63,6 +63,7 @@
 #include "intel_chipset.h"
 #include "intel_io.h"
 #include "igt_debugfs.h"
+#include "igt_dummyload.h"
 #include "version.h"
 #include "config.h"
 
@@ -994,6 +995,8 @@ static void exit_subtest(const char *result)
 		 (!__igt_plain_output) ? "\x1b[0m" : "");
 	fflush(stdout);
 
+	igt_terminate_spin_batches();
+
 	in_subtest = NULL;
 	siglongjmp(igt_subtest_jmpbuf, 1);
 }
@@ -1816,6 +1819,8 @@ static void restore_all_sig_handler(void)
 static void call_exit_handlers(int sig)
 {
 	int i;
+
+	igt_terminate_spin_batches();
 
 	if (!exit_handler_count) {
 		return;
