@@ -1108,11 +1108,10 @@ void kmstest_set_connector_dpms(int fd, drmModeConnector *connector, int mode)
 	bool found_it = false;
 
 	for (i = 0; i < connector->count_props; i++) {
-		struct drm_mode_get_property prop;
+		struct drm_mode_get_property prop = {
+			.prop_id = connector->props[i],
+		};
 
-		prop.prop_id = connector->props[i];
-		prop.count_values = 0;
-		prop.count_enum_blobs = 0;
 		if (drmIoctl(fd, DRM_IOCTL_MODE_GETPROPERTY, &prop))
 			continue;
 
