@@ -57,6 +57,7 @@
 
 static const int BATCH_SIZE = 4096;
 static IGT_LIST(spin_list);
+static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void
 fill_reloc(struct drm_i915_gem_relocation_entry *reloc,
@@ -182,7 +183,9 @@ __igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
 	emit_recursive_batch(spin, fd, ctx, engine, dep);
 	igt_assert(gem_bo_busy(fd, spin->handle));
 
+	pthread_mutex_lock(&list_lock);
 	igt_list_add(&spin->link, &spin_list);
+	pthread_mutex_unlock(&list_lock);
 
 	return spin;
 }
@@ -281,7 +284,9 @@ void igt_spin_batch_free(int fd, igt_spin_t *spin)
 	if (!spin)
 		return;
 
+	pthread_mutex_lock(&list_lock);
 	igt_list_del(&spin->link);
+	pthread_mutex_unlock(&list_lock);
 
 	if (spin->timer)
 		timer_delete(spin->timer);
@@ -297,6 +302,8 @@ void igt_terminate_spin_batches(void)
 {
 	struct igt_spin *iter;
 
+	pthread_mutex_lock(&list_lock);
 	igt_list_for_each(iter, &spin_list, link)
 		igt_spin_batch_end(iter);
+	pthread_mutex_unlock(&list_lock);
 }
