@@ -755,13 +755,8 @@ static unsigned int run_test_step(struct test_output *o)
 	if (o->flags & TEST_MODESET)
 		igt_assert(set_mode(o, o->fb_ids[o->current_fb_id], 0, 0) == 0);
 
-	if (o->flags & TEST_DPMS) {
-		if (spin_rcs)
-			igt_spin_batch_set_timeout(spin_rcs, NSEC_PER_SEC);
-		if (spin_bcs)
-		        igt_spin_batch_set_timeout(spin_bcs, NSEC_PER_SEC);
+	if (o->flags & TEST_DPMS)
 		set_dpms(o, DRM_MODE_DPMS_ON);
-	}
 
 	if (o->flags & TEST_VBLANK_RACE) {
 		struct vblank_reply reply;
@@ -1592,14 +1587,10 @@ int main(int argc, char **argv)
 			"plain-flip-fb-recreate" },
 		{ 30, TEST_FLIP | TEST_RMFB | TEST_MODESET , "flip-vs-rmfb" },
 		{ 20, TEST_FLIP | TEST_DPMS | TEST_EINVAL | TEST_BASIC, "flip-vs-dpms" },
-		{ 60, TEST_FLIP | TEST_DPMS | TEST_WITH_DUMMY_BCS, "blt-flip-vs-dpms" },
-		{ 60, TEST_FLIP | TEST_DPMS | TEST_WITH_DUMMY_RCS, "render-flip-vs-dpms" },
 		{ 30,  TEST_FLIP | TEST_PAN, "flip-vs-panning" },
 		{ 60, TEST_FLIP | TEST_PAN | TEST_WITH_DUMMY_BCS, "blt-flip-vs-panning" },
 		{ 60, TEST_FLIP | TEST_PAN | TEST_WITH_DUMMY_RCS, "render-flip-vs-panning" },
 		{ 20, TEST_FLIP | TEST_MODESET | TEST_EINVAL | TEST_BASIC, "flip-vs-modeset" },
-		{ 60, TEST_FLIP | TEST_MODESET | TEST_WITH_DUMMY_BCS, "blt-flip-vs-modeset" },
-		{ 60, TEST_FLIP | TEST_MODESET | TEST_WITH_DUMMY_RCS, "render-flip-vs-modeset" },
 		{ 30,  TEST_FLIP | TEST_VBLANK_EXPIRED_SEQ,
 					"flip-vs-expired-vblank" },
 
