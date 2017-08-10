@@ -156,6 +156,8 @@ static void test(data_t *data)
 	if (ioctl_sync)
 		prime_sync_end(dma_buf_fd, true);
 
+	do_or_die(drmModeDirtyFB(data->drm_fd, fb->fb_id, NULL, 0));
+
 	/* check that the crc is as expected, which requires that caches got flushed */
 	igt_pipe_crc_collect_crc(data->pipe_crc, &crc);
 	igt_assert_crc_equal(&crc, &data->ref_crc);
