@@ -58,6 +58,15 @@
 #define DMABUF 0x4
 #define WAIT 0x8
 #define SYNC 0x10
+#define SYNCOBJ 0x20
+
+#define LOCAL_I915_EXEC_FENCE_ARRAY (1 << 19)
+struct local_gem_exec_fence {
+	uint32_t handle;
+	uint32_t flags;
+#define LOCAL_EXEC_FENCE_WAIT (1 << 0)
+#define LOCAL_EXEC_FENCE_SIGNAL (1 << 1)
+};
 
 static void gem_busy(int fd, uint32_t handle)
 {
@@ -109,11 +118,54 @@ static int sync_merge(int fd1, int fd2)
 	return data.fence;
 }
 
+static uint32_t __syncobj_create(int fd)
+{
+	struct local_syncobj_create {
+		uint32_t handle, flags;
+	} arg;
+#define LOCAL_IOCTL_SYNCOBJ_CREATE        DRM_IOWR(0xBF, struct local_syncobj_create)
+
+	memset(&arg, 0, sizeof(arg));
+	ioctl(fd, LOCAL_IOCTL_SYNCOBJ_CREATE, &arg);
+
+	return arg.handle;
+}
+
+static uint32_t syncobj_create(int fd)
+{
+	uint32_t ret;
+
+	igt_assert_neq((ret = __syncobj_create(fd)), 0);
+
+	return ret;
+}
+
+#define LOCAL_SYNCOBJ_WAIT_FLAGS_WAIT_ALL (1 << 0)
+#define LOCAL_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT (1 << 1)
+struct local_syncobj_wait {
+       __u64 handles;
+       /* absolute timeout */
+       __s64 timeout_nsec;
+       __u32 count_handles;
+       __u32 flags;
+       __u32 first_signaled; /* only valid when not waiting all */
+       __u32 pad;
+};
+#define LOCAL_IOCTL_SYNCOBJ_WAIT	DRM_IOWR(0xC3, struct local_syncobj_wait)
+static int __syncobj_wait(int fd, struct local_syncobj_wait *args)
+{
+	int err = 0;
+	if (drmIoctl(fd, LOCAL_IOCTL_SYNCOBJ_WAIT, args))
+		err = -errno;
+	return err;
+}
+
 static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_relocation_entry reloc[2];
+	struct local_gem_exec_fence syncobj;
 	unsigned engines[16];
 	unsigned nengine;
 	uint32_t *batch;
@@ -140,7 +192,7 @@ static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 	batch[0] = MI_BATCH_BUFFER_END;
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
@@ -148,6 +200,15 @@ static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 		execbuf.flags = 0;
 		if (__gem_execbuf(fd, &execbuf))
 			return 77;
+	}
+
+	if (flags & SYNCOBJ) {
+		syncobj.handle = syncobj_create(fd);
+		syncobj.flags = LOCAL_EXEC_FENCE_SIGNAL;
+
+		execbuf.cliprects_ptr = to_user_pointer(&syncobj);
+		execbuf.num_cliprects = 1;
+		execbuf.flags |= LOCAL_I915_EXEC_FENCE_ARRAY;
 	}
 
 	if (ring == -1) {
@@ -163,7 +224,7 @@ static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 		engines[0] = ring;
 	}
 
-	obj[1].relocs_ptr = (uintptr_t)reloc;
+	obj[1].relocs_ptr = to_user_pointer(reloc);
 	obj[1].relocation_count = 2;
 
 	if (flags & DMABUF)
@@ -235,6 +296,14 @@ static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 					struct pollfd pfd = { .fd = dmabuf, .events = POLLOUT };
 					for (int inner = 0; inner < 1024; inner++)
 						poll(&pfd, 1, 0);
+				} else if (flags & SYNCOBJ) {
+					struct local_syncobj_wait arg = {
+						.handles = to_user_pointer(&syncobj.handle),
+						.count_handles = 1,
+					};
+
+					for (int inner = 0; inner < 1024; inner++)
+						__syncobj_wait(fd, &arg);
 				} else if (flags & SYNC) {
 					struct pollfd pfd = { .fd = fence, .events = POLLOUT };
 					for (int inner = 0; inner < 1024; inner++)
@@ -275,7 +344,7 @@ int main(int argc, char **argv)
 	int ncpus = 1;
 	int c;
 
-	while ((c = getopt (argc, argv, "e:r:dfswWI")) != -1) {
+	while ((c = getopt (argc, argv, "e:r:dfsSwWI")) != -1) {
 		switch (c) {
 		case 'e':
 			if (strcmp(optarg, "rcs") == 0)
@@ -312,6 +381,10 @@ int main(int argc, char **argv)
 
 		case 's':
 			flags |= SYNC;
+			break;
+
+		case 'S':
+			flags |= SYNCOBJ;
 			break;
 
 		case 'W':
