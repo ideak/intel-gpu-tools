@@ -14,3 +14,5 @@ igt_stats
 igt_subtest_group
 igt_timeout
 igt_hdmi_inject
+igt_can_fail
+igt_can_fail_simple

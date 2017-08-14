@@ -14,6 +14,8 @@ check_prog_list = \
 	igt_assert \
 	igt_exit_handler \
 	igt_hdmi_inject \
+	igt_can_fail \
+	igt_can_fail_simple \
 	$(NULL)
 
 TESTS = \

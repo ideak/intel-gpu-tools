@@ -306,6 +306,8 @@ void __igt_skip_check(const char *file, const int line,
 	__igt_skip_check(__FILE__, __LINE__, __func__, E, F)
 void igt_success(void);
 
+bool igt_can_fail(void);
+
 void igt_fail(int exitcode) __attribute__((noreturn));
 __attribute__((format(printf, 6, 7)))
 void __igt_fail_assert(const char *domain, const char *file,

@@ -1170,7 +1170,7 @@ void igt_fail(int exitcode)
 		else
 			exit_subtest("FAIL");
 	} else {
-		assert(!test_with_subtests || in_fixture);
+		assert(igt_can_fail());
 
 		if (in_fixture) {
 			skip_subtests_henceforth = FAIL;
@@ -1179,6 +1179,22 @@ void igt_fail(int exitcode)
 
 		igt_exit();
 	}
+}
+
+/**
+ * igt_can_fail:
+ *
+ * Returns true if called from either an #igt_fixture, #igt_subtest or a
+ * testcase without subtests, i.e. #igt_simple_main. Returns false otherwise. In
+ * other words, it checks whether it's legal to call igt_fail(), igt_skip_on()
+ * and all the convenience macros build around those.
+ *
+ * This is useful to make sure that library code is called from the right
+ * places.
+ */
+bool igt_can_fail(void)
+{
+	return !test_with_subtests || in_fixture || in_subtest;
 }
 
 static bool run_under_gdb(void)
@@ -2015,7 +2031,7 @@ void igt_skip_on_simulation(void)
 	if (igt_only_list_subtests())
 		return;
 
-	if (!in_fixture && !in_subtest) {
+	if (!igt_can_fail()) {
 		igt_fixture
 			igt_require(!igt_run_in_simulation());
 	} else
