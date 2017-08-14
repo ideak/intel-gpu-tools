@@ -311,6 +311,7 @@ igt_main
 	igt_display_t display = { .drm_fd = -1, .n_pipes = IGT_MAX_PIPES };
 	/* we only test on render */
 	const struct intel_execution_engine *e = &intel_execution_engines[1];
+	enum pipe n;
 
 	igt_skip_on_simulation();
 
@@ -327,7 +328,7 @@ igt_main
 
 	/* XXX Extend to cover atomic rendering tests to all planes + legacy */
 
-	for (int n = 0; n < IGT_MAX_PIPES; n++) {
+	for_each_pipe_static(n) {
 		errno = 0;
 
 		igt_fixture {

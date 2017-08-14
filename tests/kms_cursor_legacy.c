@@ -1425,7 +1425,8 @@ igt_main
 	}
 
 	igt_subtest_group {
-		for (int n = 0; n < IGT_MAX_PIPES; n++) {
+		enum pipe n;
+		for_each_pipe_static(n) {
 			errno = 0;
 
 			igt_fixture {

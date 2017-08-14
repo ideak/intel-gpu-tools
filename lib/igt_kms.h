@@ -463,10 +463,26 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 
 /**
  * for_each_pipe:
+ * @pipe: The pipe to iterate.
+ *
+ * This for loop iterates over all pipes supported by IGT libraries.
+ *
+ * This should be used to enumerate per-pipe subtests since it has no runtime
+ * depencies.
+ */
+#define for_each_pipe_static(pipe) \
+	for (pipe = 0; pipe < IGT_MAX_PIPES; pipe++)
+
+/**
+ * for_each_pipe:
  * @display: a pointer to an #igt_display_t structure
  * @pipe: The pipe to iterate.
  *
  * This for loop iterates over all pipes.
+ *
+ * Note that this cannot be used to enumerate per-pipe subtest names since it
+ * depends upon runtime probing of the actual kms driver that is being tested.
+ * Used #for_each_pipe_static instead.
  */
 #define for_each_pipe(display, pipe)					\
 	for (pipe = 0; pipe < igt_display_get_n_pipes(display); pipe++)

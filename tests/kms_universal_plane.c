@@ -787,6 +787,8 @@ static data_t data;
 
 igt_main
 {
+	enum pipe pipe;
+
 	igt_skip_on_simulation();
 
 	igt_fixture {
@@ -799,7 +801,7 @@ igt_main
 		igt_display_init(&data.display, data.drm_fd);
 	}
 
-	for (int pipe = 0; pipe < IGT_MAX_PIPES; pipe++) {
+	for_each_pipe_static(pipe) {
 		igt_subtest_group
 			run_tests_for_pipe(&data, pipe);
 	}

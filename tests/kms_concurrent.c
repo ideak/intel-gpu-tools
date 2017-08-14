@@ -401,6 +401,7 @@ int main(int argc, char *argv[])
 		{ "seed",    required_argument, NULL, 's'},
 		{ 0, 0, 0, 0 }
 	};
+	enum pipe pipe;
 
 	igt_subtest_init_parse_opts(&argc, argv, "", long_options, help_str,
 				    opt_handler, NULL);
@@ -415,7 +416,7 @@ int main(int argc, char *argv[])
 		igt_require(data.display.is_atomic);
 	}
 
-	for (int pipe = 0; pipe < IGT_MAX_PIPES; pipe++) {
+	for_each_pipe_static(pipe) {
 		igt_subtest_group
 			run_tests_for_pipe(&data, pipe);
 	}
