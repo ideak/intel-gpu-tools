@@ -693,13 +693,19 @@ static unsigned int run_test_step(struct test_output *o)
 	if (!(o->flags & TEST_SINGLE_BUFFER))
 		o->current_fb_id = !o->current_fb_id;
 
-	if (o->flags & TEST_WITH_DUMMY_BCS)
+	if (o->flags & TEST_WITH_DUMMY_BCS) {
 		spin_bcs = igt_spin_batch_new(drm_fd, I915_EXEC_BLT,
 					      o->fb_info[o->current_fb_id].gem_handle);
+		igt_spin_batch_set_timeout(spin_bcs,
+					   NSEC_PER_SEC);
+	}
 
-	if (o->flags & TEST_WITH_DUMMY_RCS)
+	if (o->flags & TEST_WITH_DUMMY_RCS) {
 		spin_rcs = igt_spin_batch_new(drm_fd, I915_EXEC_RENDER,
 					      o->fb_info[o->current_fb_id].gem_handle);
+		igt_spin_batch_set_timeout(spin_rcs,
+					   NSEC_PER_SEC);
+	}
 
 	if (o->flags & TEST_FB_RECREATE)
 		recreate_fb(o);
@@ -789,13 +795,8 @@ static unsigned int run_test_step(struct test_output *o)
 		igt_assert(__wait_for_vblank(TEST_VBLANK_BLOCK, o->pipe, 1, 0, &reply) == 0);
 	}
 
-	if (do_flip) {
+	if (do_flip)
 		do_or_die(do_page_flip(o, new_fb_id, !(o->flags & TEST_NOEVENT)));
-		if (spin_rcs)
-			igt_spin_batch_end(spin_rcs);
-		if (spin_bcs)
-			igt_spin_batch_end(spin_bcs);
-	}
 
 	if (o->flags & TEST_FENCE_STRESS)
 		emit_fence_stress(o);
@@ -809,10 +810,6 @@ static unsigned int run_test_step(struct test_output *o)
 				      vbl_reply.ts.tv_usec);
 			completed_events = EVENT_VBLANK;
 		}
-		if (spin_rcs)
-			igt_spin_batch_end(spin_rcs);
-		if (spin_bcs)
-			igt_spin_batch_end(spin_bcs);
 	}
 	if (spin_rcs)
 		igt_spin_batch_free(drm_fd, spin_rcs);
