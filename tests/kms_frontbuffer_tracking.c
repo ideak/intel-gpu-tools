@@ -1677,88 +1677,95 @@ static int adjust_assertion_flags(const struct test_mode *t, int flags)
 	return flags;
 }
 
-#define do_crc_assertions(flags, mandatory_sink_crc) do {		\
-	int flags__ = (flags);						\
-	struct both_crcs crc_;						\
-									\
-	if (!opt.check_crc || (flags__ & DONT_ASSERT_CRC))		\
-		break;							\
-									\
-	collect_crcs(&crc_, mandatory_sink_crc);			\
-	print_crc("Calculated CRC:", &crc_);				\
-									\
-	igt_assert(wanted_crc);						\
-	igt_assert_crc_equal(&crc_.pipe, &wanted_crc->pipe);		\
-	if (mandatory_sink_crc)						\
-		assert_sink_crc_equal(&crc_.sink, &wanted_crc->sink);	\
-	else if (sink_crc.reliable &&					\
-		 !sink_crc_equal(&crc_.sink, &wanted_crc->sink))	\
-		igt_info("Sink CRC differ, but not required\n"); 	\
-} while (0)
+static void do_crc_assertions(int flags, bool mandatory_sink_crc)
+{
+	struct both_crcs crc;
 
-#define do_status_assertions(flags_) do {				\
-	if (!opt.check_status) {					\
-		/* Make sure we settle before continuing. */		\
-		sleep(1);						\
-		break;							\
-	}								\
-									\
-	if (flags_ & ASSERT_FBC_ENABLED) {				\
-		igt_require(!fbc_not_enough_stolen());			\
-		igt_require(!fbc_stride_not_supported());		\
-		if (!fbc_wait_until_enabled()) {			\
-			fbc_print_status();				\
-			igt_assert_f(false, "FBC disabled\n");		\
-		}							\
-									\
-		if (opt.fbc_check_compression)				\
-			igt_assert(fbc_wait_for_compression());		\
-	} else if (flags_ & ASSERT_FBC_DISABLED) {			\
-		igt_assert(!fbc_wait_until_enabled());			\
-	}								\
-									\
-	if (flags_ & ASSERT_PSR_ENABLED) {				\
-		if (!psr_wait_until_enabled()) {			\
-			psr_print_status();				\
-			igt_assert_f(false, "PSR disabled\n");		\
-		}							\
-	} else if (flags_ & ASSERT_PSR_DISABLED) {			\
-		igt_assert(!psr_wait_until_enabled());			\
-	}								\
-} while (0)
+	if (!opt.check_crc || (flags & DONT_ASSERT_CRC))
+		return;
 
-#define do_assertions(flags) do {					\
-	int flags_ = adjust_assertion_flags(t, (flags));		\
-	bool mandatory_sink_crc = t->feature & FEATURE_PSR;		\
-									\
-	wait_user(2, "Paused before assertions.");			\
-									\
-	/* Check the CRC to make sure the drawing operations work	\
-	 * immediately, independently of the features being enabled. */	\
-	do_crc_assertions(flags_, mandatory_sink_crc);			\
-									\
-	/* Now we can flush things to make the test faster. */		\
-	do_flush(t);							\
-									\
-	do_status_assertions(flags_);					\
-									\
-	/* Check CRC again to make sure the compressed screen is ok,	\
-	 * except if we're not drawing on the primary screen. On this	\
-	 * case, the first check should be enough and a new CRC check	\
-	 * would only delay the test suite while adding no value to the	\
-	 * test suite. */						\
-	if (t->screen == SCREEN_PRIM)					\
-		do_crc_assertions(flags_, mandatory_sink_crc);		\
-									\
-	if (fbc.supports_last_action && opt.fbc_check_last_action) {	\
-		if (flags_ & ASSERT_LAST_ACTION_CHANGED)		\
-			igt_assert(fbc_last_action_changed());		\
-		else if (flags_ & ASSERT_NO_ACTION_CHANGE)		\
-			igt_assert(!fbc_last_action_changed());		\
-	}								\
-									\
-	wait_user(1, "Paused after assertions.");			\
-} while (0)
+	collect_crcs(&crc, mandatory_sink_crc);
+	print_crc("Calculated CRC:", &crc);
+
+	igt_assert(wanted_crc);
+	igt_assert_crc_equal(&crc.pipe, &wanted_crc->pipe);
+	if (mandatory_sink_crc)
+		assert_sink_crc_equal(&crc.sink, &wanted_crc->sink);
+	else if (sink_crc.reliable &&
+		 !sink_crc_equal(&crc.sink, &wanted_crc->sink))
+		igt_info("Sink CRC differ, but not required\n");
+}
+
+static void do_status_assertions(int flags)
+{
+	if (!opt.check_status) {
+		/* Make sure we settle before continuing. */
+		sleep(1);
+		return;
+	}
+
+	if (flags & ASSERT_FBC_ENABLED) {
+		igt_require(!fbc_not_enough_stolen());
+		igt_require(!fbc_stride_not_supported());
+		if (!fbc_wait_until_enabled()) {
+			fbc_print_status();
+			igt_assert_f(false, "FBC disabled\n");
+		}
+
+		if (opt.fbc_check_compression)
+			igt_assert(fbc_wait_for_compression());
+	} else if (flags & ASSERT_FBC_DISABLED) {
+		igt_assert(!fbc_wait_until_enabled());
+	}
+
+	if (flags & ASSERT_PSR_ENABLED) {
+		if (!psr_wait_until_enabled()) {
+			psr_print_status();
+			igt_assert_f(false, "PSR disabled\n");
+		}
+	} else if (flags & ASSERT_PSR_DISABLED) {
+		igt_assert(!psr_wait_until_enabled());
+	}
+}
+
+static void __do_assertions(const struct test_mode *t, int flags,
+			    int line)
+{
+	flags = adjust_assertion_flags(t, flags);
+	bool mandatory_sink_crc = t->feature & FEATURE_PSR;
+
+	igt_debug("checking asserts in line %i\n", line);
+
+	wait_user(2, "Paused before assertions.");
+
+	/* Check the CRC to make sure the drawing operations work
+	 * immediately, independently of the features being enabled. */
+	do_crc_assertions(flags, mandatory_sink_crc);
+
+	/* Now we can flush things to make the test faster. */
+	do_flush(t);
+
+	do_status_assertions(flags);
+
+	/* Check CRC again to make sure the compressed screen is ok,
+	 * except if we're not drawing on the primary screen. On this
+	 * case, the first check should be enough and a new CRC check
+	 * would only delay the test suite while adding no value to the
+	 * test suite. */
+	if (t->screen == SCREEN_PRIM)
+		do_crc_assertions(flags, mandatory_sink_crc);
+
+	if (fbc.supports_last_action && opt.fbc_check_last_action) {
+		if (flags & ASSERT_LAST_ACTION_CHANGED)
+			igt_assert(fbc_last_action_changed());
+		else if (flags & ASSERT_NO_ACTION_CHANGE)
+			igt_assert(!fbc_last_action_changed());
+	}
+
+	wait_user(1, "Paused after assertions.");
+}
+
+#define do_assertions(__flags) __do_assertions(t, (__flags), __LINE__)
 
 static void enable_prim_screen_and_wait(const struct test_mode *t)
 {
