@@ -97,10 +97,7 @@ for test in $TESTLIST; do
 		# Subtest enumeration of kernel selftest launchers depends
 		# on the running kernel. If selftests are not enabled,
 		# they will output nothing and exit with 0.
-		# XXX: kms_ccs is added temporarily to workaround "make check" fail
-		if [ "$testname" != "drv_selftest" \
-			-a "$testname" != "drm_mm" \
-			-a "$testname" != "kms_ccs" ]; then
+		if [ "$testname" != "drv_selftest" -a "$testname" != "drm_mm" ]; then
 			fail $test
 		fi
 	fi
