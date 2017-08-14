@@ -467,6 +467,8 @@ static data_t data;
 
 igt_main
 {
+	enum pipe pipe;
+
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 
@@ -477,8 +479,8 @@ igt_main
 		igt_display_init(&data.display, data.drm_fd);
 	}
 
-	for_each_pipe(&data.display, data.pipe) {
-		const char *pipe_name = kmstest_pipe_name(data.pipe);
+	for_each_pipe_static(pipe) {
+		const char *pipe_name = kmstest_pipe_name(pipe);
 		int sprite_idx = 0;
 
 		data.flags = TEST_BAD_PIXEL_FORMAT;
@@ -498,13 +500,13 @@ igt_main
 			test_output(&data);
 
 		data.flags = TEST_CRC;
-		for_each_plane_on_pipe(&data.display, data.pipe, data.plane) {
-			if (data.plane->type == DRM_PLANE_TYPE_PRIMARY)
-				continue;
-			sprite_idx++;
-			igt_subtest_f("pipe-%s-crc-sprite-%d-basic", pipe_name,
-				      sprite_idx)
-				test_output(&data);
+		igt_subtest_f("pipe-%s-crc-sprite-planes-basic", pipe_name) {
+			for_each_plane_on_pipe(&data.display, data.pipe, data.plane) {
+				if (data.plane->type == DRM_PLANE_TYPE_PRIMARY)
+					continue;
+				sprite_idx++;
+					test_output(&data);
+			}
 		}
 
 		data.plane = NULL;
