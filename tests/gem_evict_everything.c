@@ -172,6 +172,8 @@ static void test_major_evictions(int fd, uint64_t size, uint64_t count)
 	major_evictions(fd, &fault_ops, size, count);
 }
 
+#define MAX_32b ((1ull << 32) - 4096)
+
 igt_main
 {
 	uint64_t size, count;
@@ -185,7 +187,12 @@ igt_main
 		igt_require_gem(fd);
 
 		size = 1024 * 1024;
-		count = 3*gem_aperture_size(fd) / size / 4;
+		count = gem_aperture_size(fd);
+		if (count >> 32)
+			count = MAX_32b;
+		count = 3 * count / size / 4;
+
+		igt_fork_hang_detector(fd);
 	}
 
 	for (unsigned flags = 0; flags < ALL_FORKING_EVICTIONS + 1; flags++) {
@@ -210,14 +217,20 @@ igt_main
 		test_minor_evictions(fd, size, count);
 
 	igt_subtest("major-normal") {
-		size = 3*gem_aperture_size(fd) / 4;
+		size = gem_aperture_size(fd);
+		if (size >> 32)
+			size = MAX_32b;
+		size = 3 * size / 4;
 		count = 4;
 		test_major_evictions(fd, size, count);
 	}
 
 	igt_fixture {
 		size = 1024 * 1024;
-		count = 3*gem_aperture_size(fd) / size / 4;
+		count = gem_aperture_size(fd);
+		if (count >> 32)
+			count = MAX_32b;
+		count = 3 * count / size / 4;
 	}
 
 	igt_fork_signal_helper();
@@ -232,16 +245,23 @@ igt_main
 		test_minor_evictions(fd, size, count);
 
 	igt_subtest("major-interruptible") {
-		size = 3*gem_aperture_size(fd) / 4;
+		size = gem_aperture_size(fd);
+		if (size >> 32)
+			size = MAX_32b;
+		size = 3 * size / 4;
 		count = 4;
 		test_major_evictions(fd, size, count);
 	}
 
 	igt_fixture {
+		igt_stop_hang_detector();
 		igt_fork_hang_helper();
 
 		size = 1024 * 1024;
-		count = 3*gem_aperture_size(fd) / size / 4;
+		count = gem_aperture_size(fd);
+		if (count >> 32)
+			count = MAX_32b;
+		count = 3 * count / size / 4;
 	}
 
 	igt_subtest("mlocked-hang")
@@ -254,7 +274,10 @@ igt_main
 		test_minor_evictions(fd, size, count);
 
 	igt_subtest("major-hang") {
-		size = 3*gem_aperture_size(fd) / 4;
+		size = gem_aperture_size(fd);
+		if (size >> 32)
+			size = MAX_32b;
+		size = 3 * size / 4;
 		count = 4;
 		test_major_evictions(fd, size, count);
 	}
