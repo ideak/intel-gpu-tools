@@ -103,7 +103,7 @@ static void emit_recursive_batch(igt_spin_t *spin,
 		/* dummy write to dependency */
 		obj[SCRATCH].handle = dep;
 		fill_reloc(&relocs[obj[BATCH].relocation_count++],
-			   dep, 256,
+			   dep, 1020,
 			   I915_GEM_DOMAIN_RENDER,
 			   I915_GEM_DOMAIN_RENDER);
 		execbuf.buffer_count++;
@@ -112,9 +112,23 @@ static void emit_recursive_batch(igt_spin_t *spin,
 	spin->batch = batch;
 	spin->handle = obj[BATCH].handle;
 
+	/* Pad with a few nops so that we do not completely hog the system.
+	 *
+	 * Part of the attraction of using a recursive batch is that it is
+	 * hard on the system (executing the "function" call is apparently
+	 * quite expensive). However, the GPU may hog the entire system for
+	 * a few minutes, preventing even NMI. Quite why this is so is unclear,
+	 * but presumably it relates to the PM_INTRMSK workaround on gen6/gen7.
+	 * If we give the system a break by having the GPU execute a few nops
+	 * between function calls, that appears enough to keep SNB out of
+	 * trouble. See https://bugs.freedesktop.org/show_bug.cgi?id=102262
+	 */
+	batch += 1000;
+
 	/* recurse */
 	fill_reloc(&relocs[obj[BATCH].relocation_count],
-		   obj[BATCH].handle, 1, I915_GEM_DOMAIN_COMMAND, 0);
+		   obj[BATCH].handle, (batch - spin->batch) + 1,
+		   I915_GEM_DOMAIN_COMMAND, 0);
 	if (gen >= 8) {
 		*batch++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
 		*batch++ = 0;
