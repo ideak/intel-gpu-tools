@@ -273,7 +273,6 @@ struct child_device_config {
 struct efp_child_device_config {
 	uint16_t handle;
 	uint16_t device_type;
-	uint16_t device_class;
 	uint8_t i2c_speed;
 	uint8_t dp_onboard_redriver; /* 158 */
 	uint8_t dp_ondock_redriver; /* 158 */
@@ -289,6 +288,7 @@ struct efp_child_device_config {
 	uint8_t skip1:4;
 	uint8_t slave_port; /*  202 */
 	uint8_t skip2;
+	uint16_t addin_offset;
 	uint8_t port;
 	uint8_t i2c_pin; /* for add-in card */
 	uint8_t slave_addr; /* for add-in card */
