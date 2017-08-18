@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
+#include <ftw.h>
 #include <inttypes.h>
 #include <pthread.h>
 #include <sched.h>
@@ -51,6 +52,7 @@ static volatile int done;
 struct gem_busyspin {
 	pthread_t thread;
 	unsigned long count;
+	bool leak;
 };
 
 struct sys_wait {
@@ -93,6 +95,7 @@ static void *gem_busyspin(void *arg)
 	struct gem_busyspin *bs = arg;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
+	const unsigned sz = bs->leak ? 16 << 20 : 4 << 10;
 	unsigned engines[16];
 	unsigned nengine;
 	unsigned engine;
@@ -105,7 +108,7 @@ static void *gem_busyspin(void *arg)
 		if (!ignore_engine(fd, engine)) engines[nengine++] = engine;
 
 	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, 4096);
+	obj.handle = gem_create(fd, sz);
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -125,6 +128,11 @@ static void *gem_busyspin(void *arg)
 			gem_execbuf(fd, &execbuf);
 		}
 		bs->count += nengine;
+		if (bs->leak) {
+			gem_madvise(fd, obj.handle, I915_MADV_DONTNEED);
+			obj.handle = gem_create(fd, sz);
+			gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+		}
 	}
 
 	close(fd);
@@ -180,6 +188,34 @@ static void *sys_wait(void *arg)
 	return NULL;
 }
 
+#define PAGE_SIZE 4096
+static void *sys_thp_alloc(void *arg)
+{
+	struct sys_wait *w = arg;
+	struct timespec now;
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	while (!done) {
+		const size_t sz = 2 << 20;
+		const struct timespec start = now;
+		void *ptr;
+
+		ptr = mmap(NULL, sz,
+			   PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS,
+			   -1, 0);
+		assert(ptr != MAP_FAILED);
+		madvise(ptr, sz, MADV_HUGEPAGE);
+		for (size_t page = 0; page < sz; page += PAGE_SIZE)
+			*(volatile uint32_t *)(ptr + page) = 0;
+		munmap(ptr, sz);
+
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		igt_mean_add(&w->mean, elapsed(&start, &now));
+	}
+
+	return NULL;
+}
+
 static void bind_cpu(pthread_attr_t *attr, int cpu)
 {
 #ifdef __USE_GNU
@@ -229,20 +265,51 @@ static double min_measurement_error(void)
 	return elapsed(&start, &end) / n;
 }
 
+static int print_entry(const char *filepath, const struct stat *info,
+		       const int typeflag, struct FTW *pathinfo)
+{
+	int fd;
+
+	fd = open(filepath, O_RDONLY);
+	if (fd != -1)  {
+		void *ptr;
+
+		ptr = mmap(NULL, info->st_size,
+			   PROT_READ, MAP_SHARED | MAP_POPULATE,
+			   fd, 0);
+		if (ptr != MAP_FAILED)
+			munmap(ptr, info->st_size);
+
+		close(fd);
+	}
+
+	return 0;
+}
+
+static void *background_fs(void *path)
+{
+	while (1)
+		nftw(path, print_entry, 20, FTW_PHYS | FTW_MOUNT);
+	return NULL;
+}
+
 int main(int argc, char **argv)
 {
 	struct gem_busyspin *busy;
 	struct sys_wait *wait;
+	void *sys_fn = sys_wait;
 	pthread_attr_t attr;
+	pthread_t bg_fs = 0;
 	int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	igt_stats_t cycles, mean, max;
 	double min;
 	int time = 10;
 	int field = -1;
 	int enable_gem_sysbusy = 1;
+	bool leak = false;
 	int n, c;
 
-	while ((c = getopt(argc, argv, "t:f:n")) != -1) {
+	while ((c = getopt(argc, argv, "t:f:bmn")) != -1) {
 		switch (c) {
 		case 'n': /* dry run, measure baseline system latency */
 			enable_gem_sysbusy = 0;
@@ -256,6 +323,15 @@ int main(int argc, char **argv)
 		case 'f':
 			/* Select an output field */
 			field = atoi(optarg);
+			break;
+		case 'b':
+			pthread_create(&bg_fs, NULL,
+				       background_fs, (void *)"/");
+			sleep(5);
+			break;
+		case 'm':
+			sys_fn = sys_thp_alloc;
+			leak = true;
 			break;
 		default:
 			break;
@@ -271,6 +347,7 @@ int main(int argc, char **argv)
 	if (enable_gem_sysbusy) {
 		for (n = 0; n < ncpus; n++) {
 			bind_cpu(&attr, n);
+			busy[n].leak = leak;
 			pthread_create(&busy[n].thread, &attr,
 				       gem_busyspin, &busy[n]);
 		}
@@ -282,7 +359,7 @@ int main(int argc, char **argv)
 	for (n = 0; n < ncpus; n++) {
 		igt_mean_init(&wait[n].mean);
 		bind_cpu(&attr, n);
-		pthread_create(&wait[n].thread, &attr, sys_wait, &wait[n]);
+		pthread_create(&wait[n].thread, &attr, sys_fn, &wait[n]);
 	}
 
 	sleep(time);
@@ -302,6 +379,10 @@ int main(int argc, char **argv)
 		pthread_join(wait[n].thread, NULL);
 		igt_stats_push_float(&mean, wait[n].mean.mean);
 		igt_stats_push_float(&max, wait[n].mean.max);
+	}
+	if (bg_fs) {
+		pthread_cancel(bg_fs);
+		pthread_join(bg_fs, NULL);
 	}
 
 	switch (field) {
