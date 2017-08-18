@@ -1598,13 +1598,23 @@ void gem_require_caching(int fd)
 
 void igt_require_gem(int fd)
 {
+	char path[256];
 	int err;
 
 	igt_require_intel(fd);
 
+	/* We only want to use the throttle-ioctl for its -EIO reporting
+	 * of a wedged device, not for actually waiting on outstanding
+	 * requests! So create a new drm_file for the device that is clean.
+	 */
+	snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
+	fd = open(path, O_RDWR);
+	igt_assert_lte(0, fd);
+
 	err = 0;
 	if (ioctl(fd, DRM_IOCTL_I915_GEM_THROTTLE))
 		err = -errno;
+	close(fd);
 
 	igt_require_f(err == 0, "Unresponsive i915/GEM device\n");
 }
