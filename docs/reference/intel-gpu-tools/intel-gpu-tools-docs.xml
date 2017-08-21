@@ -16,6 +16,7 @@
   <chapter>
     <title>API Reference</title>
     <xi:include href="xml/drmtest.xml"/>
+    <xi:include href="xml/igt_audio.xml"/>
     <xi:include href="xml/igt_aux.xml"/>
     <xi:include href="xml/igt_chamelium.xml"/>
     <xi:include href="xml/igt_core.xml"/>

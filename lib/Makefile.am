@@ -33,6 +33,8 @@ if HAVE_GSL
 lib_source_list +=		\
 	igt_frame.c		\
 	igt_frame.h		\
+	igt_audio.c		\
+	igt_audio.h		\
 	$(NULL)
 endif
 
