@@ -153,6 +153,12 @@ The following dependencies are required for building chamelium support
 	libglib2.0-dev
 	libgsl-dev
 
+The following dependencies are requires for building audio support
+(package names may vary):
+
+	libasound2-dev
+	libgsl-dev
+
 Releases for maintainers
 ------------------------
 

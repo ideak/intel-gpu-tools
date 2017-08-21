@@ -20,6 +20,15 @@ TESTS_progs += \
 	$(NULL)
 endif
 
+if HAVE_ALSA
+if HAVE_GSL
+TESTS_progs += \
+	audio \
+	$(NULL)
+endif
+endif
+
+
 if BUILD_TESTS
 test-list.txt: Makefile.sources
 	@echo TESTLIST > $@
@@ -133,6 +142,9 @@ vc4_wait_seqno_LDADD = $(LDADD) $(DRM_VC4_LIBS)
 
 chamelium_CFLAGS = $(AM_CFLAGS) $(XMLRPC_CFLAGS) $(LIBUDEV_CFLAGS)
 chamelium_LDADD = $(LDADD) $(XMLRPC_LIBS) $(LIBUDEV_LIBS)
+
+audio_CFLAGS = $(AM_CFLAGS) $(ALSA_CFLAGS)
+audio_LDADD = $(LDADD) $(ALSA_LIBS)
 
 amdgpu_amd_basic_CFLAGS = $(AM_CFLAGS) $(DRM_AMDGPU_CFLAGS)
 amdgpu_amd_basic_LDADD = $(LDADD) $(DRM_AMDGPU_LIBS)

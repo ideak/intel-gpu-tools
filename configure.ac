@@ -222,6 +222,23 @@ fi
 PKG_CHECK_MODULES(ALSA, [alsa], [alsa=yes], [alsa=no])
 AM_CONDITIONAL(HAVE_ALSA, [test "x$alsa" = xyes])
 
+# for audio
+AC_ARG_ENABLE(audio, AS_HELP_STRING([--enable-audio],
+	      [Enable building of audio tests (default: no)]),
+	      [if test x$enableval = xyes; then enable_audio=yes; fi],
+	      [enable_audio=no])
+AM_CONDITIONAL(HAVE_AUDIO, [test "x$enable_audio" = xyes])
+if test "x$enable_audio" = xyes; then
+	if test x"$alsa" != xyes; then
+		AC_MSG_ERROR([Failed to find ALSA, required by audio.])
+	fi
+	if test x"$gsl" != xyes; then
+		AC_MSG_ERROR([Failed to find gsl, required by audio.])
+	fi
+
+	AC_DEFINE(HAVE_AUDIO, 1, [Enable Audio support])
+fi
+
 # -----------------------------------------------------------------------------
 #			Configuration options
 # -----------------------------------------------------------------------------
@@ -420,6 +437,7 @@ echo ""
 echo " • Tests:"
 echo "       Build tests        : ${BUILD_TESTS}"
 echo "       Chamelium tests    : ${enable_chamelium}"
+echo "       Audio tests        : ${enable_audio}"
 echo "       Compile prime tests: ${NOUVEAU}"
 echo "       Print stack traces : ${with_libunwind}"
 echo "       Debug flags        : ${DEBUG_CFLAGS}"
