@@ -219,6 +219,9 @@ if test "x$enable_chamelium" = xyes; then
 	AC_DEFINE(HAVE_CHAMELIUM, 1, [Enable Chamelium support])
 fi
 
+PKG_CHECK_MODULES(ALSA, [alsa], [alsa=yes], [alsa=no])
+AM_CONDITIONAL(HAVE_ALSA, [test "x$alsa" = xyes])
+
 # -----------------------------------------------------------------------------
 #			Configuration options
 # -----------------------------------------------------------------------------

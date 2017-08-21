@@ -38,6 +38,13 @@ lib_source_list +=		\
 	$(NULL)
 endif
 
+if HAVE_ALSA
+lib_source_list +=		\
+	igt_alsa.c		\
+	igt_alsa.h		\
+	$(NULL)
+endif
+
 AM_CPPFLAGS = -I$(top_srcdir)
 AM_CFLAGS = \
 	    $(CWARNFLAGS) \

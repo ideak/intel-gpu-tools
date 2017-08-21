@@ -35,6 +35,7 @@
 #include "igt_dummyload.h"
 #include "igt_fb.h"
 #include "igt_frame.h"
+#include "igt_alsa.h"
 #include "igt_audio.h"
 #include "igt_gt.h"
 #include "igt_kms.h"
