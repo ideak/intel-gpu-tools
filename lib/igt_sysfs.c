@@ -86,26 +86,26 @@ static int writeN(int fd, const char *buf, int len)
 }
 
 /**
- * igt_sysfs_open:
+ * igt_sysfs_path:
  * @device: fd of the device (or -1 to default to Intel)
+ * @path: buffer to fill with the sysfs path to the device
+ * @pathlen: length of @path buffer
  * @idx: optional pointer to store the card index of the opened device
  *
- * This opens the sysfs directory corresponding to device for use
- * with igt_sysfs_set() and igt_sysfs_get().
+ * This finds the sysfs directory corresponding to @device.
  *
  * Returns:
- * The directory fd, or -1 on failure.
+ * The directory path, or NULL on failure.
  */
-int igt_sysfs_open(int device, int *idx)
+char *igt_sysfs_path(int device, char *path, int pathlen, int *idx)
 {
-	char path[80];
 	struct stat st;
 
 	if (device != -1 && (fstat(device, &st) || !S_ISCHR(st.st_mode)))
-		return -1;
+		return NULL;
 
 	for (int n = 0; n < 16; n++) {
-		int len = sprintf(path, "/sys/class/drm/card%d", n);
+		int len = snprintf(path, pathlen, "/sys/class/drm/card%d", n);
 		if (device != -1) {
 			FILE *file;
 			int ret, maj, min;
@@ -132,10 +132,31 @@ int igt_sysfs_open(int device, int *idx)
 		path[len] = '\0';
 		if (idx)
 			*idx = n;
-		return open(path, O_RDONLY);
+		return path;
 	}
 
-	return -1;
+	return NULL;
+}
+
+/**
+ * igt_sysfs_open:
+ * @device: fd of the device (or -1 to default to Intel)
+ * @idx: optional pointer to store the card index of the opened device
+ *
+ * This opens the sysfs directory corresponding to device for use
+ * with igt_sysfs_set() and igt_sysfs_get().
+ *
+ * Returns:
+ * The directory fd, or -1 on failure.
+ */
+int igt_sysfs_open(int device, int *idx)
+{
+	char path[80];
+
+	if (!igt_sysfs_path(device, path, sizeof(path), idx))
+		return -1;
+
+	return open(path, O_RDONLY);
 }
 
 /**

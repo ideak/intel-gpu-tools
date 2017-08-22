@@ -32,6 +32,7 @@
 enum pipe;
 
 const char *igt_debugfs_mount(void);
+char *igt_debugfs_path(int device, char *path, int pathlen);
 
 int igt_debugfs_dir(int device);
 

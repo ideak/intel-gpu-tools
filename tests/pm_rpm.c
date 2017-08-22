@@ -25,13 +25,13 @@
  *
  */
 
-#include "igt.h"
-#include "igt_kmod.h"
-#include "igt_sysfs.h"
+#include "config.h"
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <ftw.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -45,6 +45,10 @@
 
 #include <drm.h>
 
+#include "igt.h"
+#include "igt_kmod.h"
+#include "igt_sysfs.h"
+#include "igt_debugfs.h"
 
 #define MSR_PC8_RES	0x630
 #define MSR_PC9_RES	0x631
@@ -830,55 +834,40 @@ static void i2c_subtest(void)
 	enable_one_screen(&ms_data);
 }
 
-static void read_full_file(int fd, const char *name)
+static int read_entry(const char *filepath,
+		      const struct stat *info,
+		      const int typeflag,
+		      struct FTW *pathinfo)
 {
-	int rc;
-	char buf[128];
-
-	igt_assert_f(wait_for_suspended(), "File: %s\n", name);
-
-	do {
-		rc = read(fd, buf, ARRAY_SIZE(buf));
-	} while (rc == ARRAY_SIZE(buf));
-
-	igt_assert_f(wait_for_suspended(), "File: %s\n", name);
-}
-
-static void read_files_from_dir(int path, int level)
-{
-	DIR *dir;
-	struct dirent *dirent;
+	char buf[4096];
+	int fd;
 	int rc;
 
-	dir = fdopendir(path);
-	igt_assert(dir);
+	igt_assert_f(wait_for_suspended(), "Before opening: %s (%s)\n",
+		     filepath + pathinfo->base, filepath);
 
-	igt_assert_lt(level, 128);
-
-	while ((dirent = readdir(dir))) {
-		struct stat stat_buf;
-		int de;
-
-		if (strcmp(dirent->d_name, ".") == 0)
-			continue;
-		if (strcmp(dirent->d_name, "..") == 0)
-			continue;
-
-		de = openat(path, dirent->d_name, O_RDONLY);
-
-		rc = fstat(de, &stat_buf);
-		igt_assert_eq(rc, 0);
-
-		if (S_ISDIR(stat_buf.st_mode))
-			read_files_from_dir(de, level + 1);
-
-		if (S_ISREG(stat_buf.st_mode))
-			read_full_file(de, dirent->d_name);
-
-		close(de);
+	fd = open(filepath, O_RDONLY | O_NONBLOCK);
+	if (fd < 0) {
+		igt_debug("Failed to open '%s': %m\n", filepath);
+		return 0;
 	}
 
-	closedir(dir);
+	do {
+		rc = read(fd, buf, sizeof(buf));
+	} while (rc == sizeof(buf));
+
+	close(fd);
+
+	igt_assert_f(wait_for_suspended(), "After closing: %s (%s)\n",
+		     filepath + pathinfo->base, filepath);
+
+	return 0;
+}
+
+static void walk_fs(char *path)
+{
+	disable_all_screens_and_wait(&ms_data);
+	nftw(path, read_entry, 20, FTW_PHYS | FTW_MOUNT);
 }
 
 /* This test will probably pass, with a small chance of hanging the machine in
@@ -886,21 +875,21 @@ static void read_files_from_dir(int path, int level)
  * errors, so a "pass" here should be confirmed by a check on dmesg. */
 static void debugfs_read_subtest(void)
 {
-	disable_all_screens_and_wait(&ms_data);
+	char path[256];
 
-	read_files_from_dir(debugfs, 0);
+	igt_require_f(igt_debugfs_path(drm_fd, path, sizeof(path)),
+		      "Can't find the debugfs directory\n");
+	walk_fs(path);
 }
 
 /* Read the comment on debugfs_read_subtest(). */
 static void sysfs_read_subtest(void)
 {
-	int dir = igt_sysfs_open(drm_fd, NULL);
-	igt_require_f(dir != -1, "Can't open the sysfs directory\n");
+	char path[80];
 
-	disable_all_screens_and_wait(&ms_data);
-
-	read_files_from_dir(dir, 0);
-	close(dir);
+	igt_require_f(igt_sysfs_path(drm_fd, path, sizeof(path), NULL),
+		      "Can't find the sysfs directory\n");
+	walk_fs(path);
 }
 
 /* Make sure we don't suspend when we have the i915_forcewake_user file open. */

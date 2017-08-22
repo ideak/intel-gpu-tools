@@ -127,6 +127,73 @@ const char *igt_debugfs_mount(void)
 }
 
 /**
+ * igt_debugfs_path:
+ * @device: fd of the device
+ * @path: buffer to store path
+ * @pathlen: len of @path buffer.
+ *
+ * This finds the debugfs directory corresponding to @device.
+ *
+ * Returns:
+ * The directory path, or NULL on failure.
+ */
+char *igt_debugfs_path(int device, char *path, int pathlen)
+{
+	struct stat st;
+	const char *debugfs_root;
+	int idx;
+
+	if (fstat(device, &st)) {
+		igt_debug("Couldn't stat FD for DRM device: %s\n", strerror(errno));
+		return NULL;
+	}
+
+	if (!S_ISCHR(st.st_mode)) {
+		igt_debug("FD for DRM device not a char device!\n");
+		return NULL;
+	}
+
+	debugfs_root = igt_debugfs_mount();
+
+	idx = minor(st.st_rdev);
+	snprintf(path, pathlen, "%s/dri/%d/name", debugfs_root, idx);
+	if (stat(path, &st))
+		return NULL;
+
+	if (idx >= 64) {
+		int file, name_len, cmp_len;
+		char name[100], cmp[100];
+
+		file = open(path, O_RDONLY);
+		if (file < 0)
+			return NULL;
+
+		name_len = read(file, name, sizeof(name));
+		close(file);
+
+		for (idx = 0; idx < 16; idx++) {
+			snprintf(path, pathlen, "%s/dri/%d/name",
+				 debugfs_root, idx);
+			file = open(path, O_RDONLY);
+			if (file < 0)
+				return NULL;
+
+			cmp_len = read(file, cmp, sizeof(cmp));
+			close(file);
+
+			if (cmp_len == name_len && !memcmp(cmp, name, name_len))
+				break;
+		}
+
+		if (idx == 16)
+			return NULL;
+	}
+
+	snprintf(path, pathlen, "%s/dri/%d", debugfs_root, idx);
+	return path;
+}
+
+/**
  * igt_debugfs_dir:
  * @device: fd of the device
  *
@@ -138,58 +205,11 @@ const char *igt_debugfs_mount(void)
  */
 int igt_debugfs_dir(int device)
 {
-	struct stat st;
-	const char *debugfs_root;
 	char path[200];
-	int idx;
 
-	if (fstat(device, &st)) {
-		igt_debug("Couldn't stat FD for DRM device: %s\n", strerror(errno));
-		return -1;
-	}
-
-	if (!S_ISCHR(st.st_mode)) {
-		igt_debug("FD for DRM device not a char device!\n");
-		return -1;
-	}
-
-	debugfs_root = igt_debugfs_mount();
-
-	idx = minor(st.st_rdev);
-	snprintf(path, sizeof(path), "%s/dri/%d/name", debugfs_root, idx);
-	if (stat(path, &st))
+	if (!igt_debugfs_path(device, path, sizeof(path)))
 		return -1;
 
-	if (idx >= 64) {
-		int file, name_len, cmp_len;
-		char name[100], cmp[100];
-
-		file = open(path, O_RDONLY);
-		if (file < 0)
-			return -1;
-
-		name_len = read(file, name, sizeof(name));
-		close(file);
-
-		for (idx = 0; idx < 16; idx++) {
-			snprintf(path, sizeof(path), "%s/dri/%d/name",
-				 debugfs_root, idx);
-			file = open(path, O_RDONLY);
-			if (file < 0)
-				return -1;
-
-			cmp_len = read(file, cmp, sizeof(cmp));
-			close(file);
-
-			if (cmp_len == name_len && !memcmp(cmp, name, name_len))
-				break;
-		}
-
-		if (idx == 16)
-			return -1;
-	}
-
-	snprintf(path, sizeof(path), "%s/dri/%d", debugfs_root, idx);
 	igt_debug("Opening debugfs directory '%s'\n", path);
 	return open(path, O_RDONLY);
 }
