@@ -45,6 +45,7 @@ TESTS_progs = \
 	gem_basic \
 	gem_busy \
 	gem_caching \
+	gem_close \
 	gem_close_race \
 	gem_concurrent_blit \
 	gem_cpu_reloc \
