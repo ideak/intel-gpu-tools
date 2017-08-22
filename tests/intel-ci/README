@@ -36,12 +36,6 @@ test per feature.
 The string "basic" in a test name means the test probably belongs in
 this list.
 
-======================
-generic.testlist
-======================
-
-Generic is the testlist for GPU-agnostic tests.
-
 =================================
 fast-feedback-simulation.testlist
 =================================
