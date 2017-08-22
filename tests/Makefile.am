@@ -20,12 +20,10 @@ TESTS_progs += \
 	$(NULL)
 endif
 
-if HAVE_ALSA
-if HAVE_GSL
+if HAVE_AUDIO
 TESTS_progs += \
 	audio \
 	$(NULL)
-endif
 endif
 
 
