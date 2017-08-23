@@ -588,9 +588,9 @@ static void print_version(void)
 
 	uname(&uts);
 
-	fprintf(stdout, "IGT-Version: %s-%s (%s) (%s: %s %s)\n", PACKAGE_VERSION,
-		IGT_GIT_SHA1, TARGET_CPU_PLATFORM,
-		uts.sysname, uts.release, uts.machine);
+	igt_info("IGT-Version: %s-%s (%s) (%s: %s %s)\n", PACKAGE_VERSION,
+		 IGT_GIT_SHA1, TARGET_CPU_PLATFORM,
+		 uts.sysname, uts.release, uts.machine);
 }
 
 static void print_usage(const char *help_str, bool output_on_stderr)
@@ -1028,10 +1028,10 @@ static void exit_subtest(const char *result)
 	struct timespec now;
 
 	gettime(&now);
-	printf("%sSubtest %s: %s (%.3fs)%s\n",
-	       (!__igt_plain_output) ? "\x1b[1m" : "",
-	       in_subtest, result, time_elapsed(&subtest_time, &now),
-	       (!__igt_plain_output) ? "\x1b[0m" : "");
+	igt_info("%sSubtest %s: %s (%.3fs)%s\n",
+		 (!__igt_plain_output) ? "\x1b[1m" : "",
+		 in_subtest, result, time_elapsed(&subtest_time, &now),
+		 (!__igt_plain_output) ? "\x1b[0m" : "");
 	fflush(stdout);
 
 	in_subtest = NULL;
@@ -1216,7 +1216,7 @@ static void print_backtrace(void)
 	unw_context_t uc;
 	int stack_num = 0;
 
-	printf("Stack trace:\n");
+	igt_info("Stack trace:\n");
 
 	unw_getcontext(&uc);
 	unw_init_local(&cursor, &uc);
@@ -1227,8 +1227,8 @@ static void print_backtrace(void)
 		if (unw_get_proc_name(&cursor, name, 255, &off) < 0)
 			strcpy(name, "<unknown>");
 
-		printf("  #%d [%s+0x%x]\n", stack_num++, name,
-		       (unsigned int) off);
+		igt_info("  #%d [%s+0x%x]\n", stack_num++, name,
+			 (unsigned int) off);
 	}
 }
 
