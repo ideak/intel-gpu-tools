@@ -28,7 +28,6 @@
 
 #include "config.h"
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -40,6 +39,12 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 #include "drm.h"
+
+#include "igt.h"
+#include "igt_x86.h"
+
+#define PAGE_SIZE 4096
+#define CACHELINE 64
 
 #define OBJECT_SIZE (128*1024) /* restricted to 1MiB alignment on i915 fences */
 
@@ -102,15 +107,84 @@ bo_copy (void *_arg)
 	return NULL;
 }
 
+#if defined(__x86_64__) && !defined(__clang__)
+
+#pragma GCC push_options
+#pragma GCC target("sse4.1")
+
+#include <smmintrin.h>
+
+#define MOVNT 512
+
+__attribute__((noinline))
+static void copy_wc_page(void *dst, void *src)
+{
+	if (igt_x86_features() & SSE4_1) {
+		__m128i *S = (__m128i *)src;
+		__m128i *D = (__m128i *)dst;
+
+		for (int i = 0; i < PAGE_SIZE/CACHELINE; i++) {
+			__m128i tmp[4];
+
+			tmp[0] = _mm_stream_load_si128(S++);
+			tmp[1] = _mm_stream_load_si128(S++);
+			tmp[2] = _mm_stream_load_si128(S++);
+			tmp[3] = _mm_stream_load_si128(S++);
+
+			_mm_store_si128(D++, tmp[0]);
+			_mm_store_si128(D++, tmp[1]);
+			_mm_store_si128(D++, tmp[2]);
+			_mm_store_si128(D++, tmp[3]);
+		}
+	} else
+		memcpy(dst, src, PAGE_SIZE);
+}
+
+static void copy_wc_cacheline(void *dst, void *src)
+{
+	if (igt_x86_features() & SSE4_1) {
+		__m128i *S = (__m128i *)src;
+		__m128i *D = (__m128i *)dst;
+		__m128i tmp[4];
+
+		tmp[0] = _mm_stream_load_si128(S++);
+		tmp[1] = _mm_stream_load_si128(S++);
+		tmp[2] = _mm_stream_load_si128(S++);
+		tmp[3] = _mm_stream_load_si128(S++);
+
+		_mm_store_si128(D++, tmp[0]);
+		_mm_store_si128(D++, tmp[1]);
+		_mm_store_si128(D++, tmp[2]);
+		_mm_store_si128(D++, tmp[3]);
+	} else
+		memcpy(dst, src, CACHELINE);
+}
+
+#pragma GCC pop_options
+
+#else
+
+static void copy_wc_page(void *dst, const void *src)
+{
+	memcpy(dst, src, PAGE_SIZE);
+}
+
+static void copy_wc_cacheline(void *dst, const void *src)
+{
+	memcpy(dst, src, CACHELINE);
+}
+
+#endif
+
 static void
 _bo_write_verify(struct test *t)
 {
 	int fd = t->fd;
 	int i, k;
 	uint32_t **s;
-	uint32_t v;
 	unsigned int dwords = OBJECT_SIZE >> 2;
 	const char *tile_str[] = { "none", "x", "y" };
+	uint32_t tmp[PAGE_SIZE/sizeof(uint32_t)];
 
 	igt_assert(t->tiling >= 0 && t->tiling <= I915_TILING_Y);
 	igt_assert_lt(0, t->num_surfaces);
@@ -122,21 +196,39 @@ _bo_write_verify(struct test *t)
 		s[k] = bo_create(fd, t->tiling);
 
 	for (k = 0; k < t->num_surfaces; k++) {
-		volatile uint32_t *a = s[k];
+		uint32_t *a = s[k];
 
-		for (i = 0; i < dwords; i++) {
-			a[i] = i;
-			v = a[i];
-			igt_assert_f(v == i,
-				     "tiling %s: write failed at %d (%x)\n",
-				     tile_str[t->tiling], i, v);
+		a[0] = 0xdeadbeef;
+		igt_assert_f(a[0] == 0xdeadbeef,
+			     "tiling %s: write failed at start (%x)\n",
+			     tile_str[t->tiling], a[0]);
+
+		a[dwords - 1] = 0xc0ffee;
+		igt_assert_f(a[dwords - 1] == 0xc0ffee,
+			     "tiling %s: write failed at end (%x)\n",
+			     tile_str[t->tiling], a[dwords - 1]);
+
+		for (i = 0; i < dwords; i += CACHELINE/sizeof(uint32_t)) {
+			for (int j = 0; j < CACHELINE/sizeof(uint32_t); j++)
+				a[i + j] = ~(i + j);
+
+			copy_wc_cacheline(tmp, a + i);
+			for (int j = 0; j < CACHELINE/sizeof(uint32_t); j++)
+				igt_assert_f(tmp[j] == ~(i+ j),
+					     "tiling %s: write failed at %d (%x)\n",
+					     tile_str[t->tiling], i + j, tmp[j]);
+
+			for (int j = 0; j < CACHELINE/sizeof(uint32_t); j++)
+				a[i + j] = i + j;
 		}
 
-		for (i = 0; i < dwords; i++) {
-			v = a[i];
-			igt_assert_f(v == i,
-				     "tiling %s: verify failed at %d (%x)\n",
-				     tile_str[t->tiling], i, v);
+		for (i = 0; i < dwords; i += PAGE_SIZE/sizeof(uint32_t)) {
+			copy_wc_page(tmp, a + i);
+			for (int j = 0; j < PAGE_SIZE/sizeof(uint32_t); j++) {
+				igt_assert_f(tmp[j] == i + j,
+					     "tiling %s: verify failed at %d (%x)\n",
+					     tile_str[t->tiling], i + j, tmp[j]);
+			}
 		}
 	}
 
