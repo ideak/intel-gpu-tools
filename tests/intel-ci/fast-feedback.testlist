@@ -1,5 +1,14 @@
 # Keep alphabetically sorted by default
 
+igt@chamelium@dp-hpd-fast
+igt@chamelium@dp-edid-read
+igt@chamelium@dp-crc-fast
+igt@chamelium@hdmi-hpd-fast
+igt@chamelium@hdmi-edid-read
+igt@chamelium@hdmi-crc-fast
+igt@chamelium@vga-hpd-fast
+igt@chamelium@vga-edid-read
+igt@chamelium@common-hpd-after-suspend
 igt@core_auth@basic-auth
 igt@core_prop_blob@basic
 igt@debugfs_test@read_all_entries
