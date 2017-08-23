@@ -262,44 +262,6 @@ aub_write_trace_block(uint32_t type, void *virtual, uint32_t size, uint64_t gtt_
 }
 
 static void
-aub_dump_ringbuffer(uint64_t batch_offset, uint64_t offset, int ring_flag)
-{
-	uint32_t ringbuffer[4096];
-	int ring = AUB_TRACE_TYPE_RING_PRB0; /* The default ring */
-	int ring_count = 0;
-
-	if (ring_flag == I915_EXEC_BSD)
-		ring = AUB_TRACE_TYPE_RING_PRB1;
-	else if (ring_flag == I915_EXEC_BLT)
-		ring = AUB_TRACE_TYPE_RING_PRB2;
-
-	/* Make a ring buffer to execute our batchbuffer. */
-	memset(ringbuffer, 0, sizeof(ringbuffer));
-	if (gen >= 8) {
-		ringbuffer[ring_count++] = AUB_MI_BATCH_BUFFER_START | (3 - 2);
-		ringbuffer[ring_count++] = batch_offset;
-		ringbuffer[ring_count++] = batch_offset >> 32;
-	} else {
-		ringbuffer[ring_count++] = AUB_MI_BATCH_BUFFER_START;
-		ringbuffer[ring_count++] = batch_offset;
-	}
-
-	/* Write out the ring.  This appears to trigger execution of
-	 * the ring in the simulator.
-	 */
-	dword_out(CMD_AUB_TRACE_HEADER_BLOCK |
-		  ((gen >= 8 ? 6 : 5) - 2));
-	dword_out(AUB_TRACE_MEMTYPE_GTT | ring | AUB_TRACE_OP_COMMAND_WRITE);
-	dword_out(0); /* general/surface subtype */
-	dword_out(offset);
-	dword_out(ring_count * 4);
-	if (gen >= 8)
-		dword_out(offset >> 32);
-
-	data_out(ringbuffer, ring_count * 4);
-}
-
-static void
 write_reloc(void *p, uint64_t v)
 {
 	if (gen >= 8) {
@@ -323,6 +285,42 @@ write_reloc(void *p, uint64_t v)
 	} else {
 		*(uint32_t *)p = v;
 	}
+}
+
+static void
+aub_dump_ringbuffer(uint64_t batch_offset, uint64_t offset, int ring_flag)
+{
+	uint32_t ringbuffer[4096];
+	unsigned aub_mi_bbs_len;
+	int ring = AUB_TRACE_TYPE_RING_PRB0; /* The default ring */
+	int ring_count = 0;
+
+	if (ring_flag == I915_EXEC_BSD)
+		ring = AUB_TRACE_TYPE_RING_PRB1;
+	else if (ring_flag == I915_EXEC_BLT)
+		ring = AUB_TRACE_TYPE_RING_PRB2;
+
+	/* Make a ring buffer to execute our batchbuffer. */
+	memset(ringbuffer, 0, sizeof(ringbuffer));
+
+	aub_mi_bbs_len = gen >= 8 ? 3 : 2;
+	ringbuffer[ring_count] = AUB_MI_BATCH_BUFFER_START | (aub_mi_bbs_len - 2);
+	write_reloc(&ringbuffer[ring_count + 1], batch_offset);
+	ring_count += aub_mi_bbs_len;
+
+	/* Write out the ring.  This appears to trigger execution of
+	 * the ring in the simulator.
+	 */
+	dword_out(CMD_AUB_TRACE_HEADER_BLOCK |
+		  ((gen >= 8 ? 6 : 5) - 2));
+	dword_out(AUB_TRACE_MEMTYPE_GTT | ring | AUB_TRACE_OP_COMMAND_WRITE);
+	dword_out(0); /* general/surface subtype */
+	dword_out(offset);
+	dword_out(ring_count * 4);
+	if (gen >= 8)
+		dword_out(offset >> 32);
+
+	data_out(ringbuffer, ring_count * 4);
 }
 
 static void *
