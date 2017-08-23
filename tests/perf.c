@@ -2372,7 +2372,8 @@ test_blocking(void)
 		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
 	};
 	struct drm_i915_perf_open_param param = {
-		.flags = I915_PERF_FLAG_FD_CLOEXEC,
+		.flags = I915_PERF_FLAG_FD_CLOEXEC |
+			I915_PERF_FLAG_DISABLED,
 		.num_properties = sizeof(properties) / 16,
 		.properties_ptr = to_user_pointer(properties),
 	};
@@ -2397,16 +2398,17 @@ test_blocking(void)
 	 */
 	int min_iterations = (test_duration_ns / (oa_period + 6000000ull));
 
-	int64_t start;
+	int64_t start, end;
 	int n = 0;
 
 	stream_fd = __perf_open(drm_fd, &param);
 
 	times(&start_times);
 
-	igt_debug("tick length = %dns, test duration = %"PRIu64"ns, min iter. = %d, max iter. = %d\n",
+	igt_debug("tick length = %dns, test duration = %"PRIu64"ns, min iter. = %d,"
+		  " estimated max iter. = %d, oa_period = %"PRIu64"ns\n",
 		  (int)tick_ns, test_duration_ns,
-		  min_iterations, max_iterations);
+		  min_iterations, max_iterations, oa_period);
 
 	/* In the loop we perform blocking polls while the HW is sampling at
 	 * ~25Hz, with the expectation that we spend most of our time blocked
@@ -2425,8 +2427,13 @@ test_blocking(void)
 	 * floor(real_stime)).
 	 *
 	 * We Loop for 1000 x tick_ns so one tick corresponds to 0.1%
+	 *
+	 * Also enable the stream just before poll/read to minimize
+	 * the error delta.
 	 */
-	for (start = get_time(); (get_time() - start) < test_duration_ns; /* nop */) {
+	start = get_time();
+	do_ioctl(stream_fd, I915_PERF_IOCTL_ENABLE, 0);
+	for (/* nop */; ((end = get_time()) - start) < test_duration_ns; /* nop */) {
 		struct drm_i915_perf_record_header *header;
 		bool timer_report_read = false;
 		bool non_timer_report_read = false;
@@ -2467,6 +2474,12 @@ test_blocking(void)
 
 		n++;
 	}
+
+	/* Updated the maximum of iterations based on the time spent
+	 * in the loop.
+	 */
+	max_iterations = (end - start) / oa_period + 1;
+	igt_debug("adjusted max iter. = %d\n", max_iterations);
 
 	times(&end_times);
 
@@ -2524,6 +2537,7 @@ test_polling(void)
 	};
 	struct drm_i915_perf_open_param param = {
 		.flags = I915_PERF_FLAG_FD_CLOEXEC |
+			I915_PERF_FLAG_DISABLED |
 			I915_PERF_FLAG_FD_NONBLOCK,
 		.num_properties = sizeof(properties) / 16,
 		.properties_ptr = to_user_pointer(properties),
@@ -2548,7 +2562,7 @@ test_polling(void)
 	 * to check for data and giving some time to read().
 	 */
 	int min_iterations = (test_duration_ns / (oa_period + 6000000ull));
-	int64_t start;
+	int64_t start, end;
 	int n = 0;
 
 	stream_fd = __perf_open(drm_fd, &param);
@@ -2576,8 +2590,13 @@ test_polling(void)
 	 * floor(real_stime)).
 	 *
 	 * We Loop for 1000 x tick_ns so one tick corresponds to 0.1%
+	 *
+	 * Also enable the stream just before poll/read to minimize
+	 * the error delta.
 	 */
-	for (start = get_time(); (get_time() - start) < test_duration_ns; /* nop */) {
+	start = get_time();
+	do_ioctl(stream_fd, I915_PERF_IOCTL_ENABLE, 0);
+	for (/* nop */; ((end = get_time()) - start) < test_duration_ns; /* nop */) {
 		struct pollfd pollfd = { .fd = stream_fd, .events = POLLIN };
 		struct drm_i915_perf_record_header *header;
 		bool timer_report_read = false;
@@ -2625,8 +2644,7 @@ test_polling(void)
 				if (header->type == DRM_I915_PERF_RECORD_SAMPLE) {
 					uint32_t *report = (void *)(header + 1);
 
-					if (oa_report_is_periodic(oa_exponent,
-								  report))
+					if (oa_report_is_periodic(oa_exponent, report))
 						timer_report_read = true;
 					else
 						non_timer_report_read = true;
@@ -2649,6 +2667,12 @@ test_polling(void)
 
 		n++;
 	}
+
+	/* Updated the maximum of iterations based on the time spent
+	 * in the loop.
+	 */
+	max_iterations = (end - start) / oa_period + 1;
+	igt_debug("adjusted max iter. = %d\n", max_iterations);
 
 	times(&end_times);
 
