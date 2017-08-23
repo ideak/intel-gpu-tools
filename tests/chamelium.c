@@ -48,6 +48,7 @@ typedef struct {
 
 #define HPD_TOGGLE_COUNT_VGA 5
 #define HPD_TOGGLE_COUNT_DP_HDMI 15
+#define HPD_TOGGLE_COUNT_FAST 3
 
 static void
 get_connectors_link_status_failed(data_t *data, bool *link_status_failed)
@@ -775,6 +776,10 @@ igt_main
 			test_basic_hotplug(&data, port,
 					   HPD_TOGGLE_COUNT_DP_HDMI);
 
+		connector_subtest("dp-hpd-fast", DisplayPort)
+			test_basic_hotplug(&data, port,
+					   HPD_TOGGLE_COUNT_FAST);
+
 		connector_subtest("dp-edid-read", DisplayPort) {
 			test_edid_read(&data, port, edid_id,
 				       igt_kms_get_base_edid());
@@ -832,6 +837,10 @@ igt_main
 			test_basic_hotplug(&data, port,
 					   HPD_TOGGLE_COUNT_DP_HDMI);
 
+		connector_subtest("hdmi-hpd-fast", HDMIA)
+			test_basic_hotplug(&data, port,
+					   HPD_TOGGLE_COUNT_FAST);
+
 		connector_subtest("hdmi-edid-read", HDMIA) {
 			test_edid_read(&data, port, edid_id,
 				       igt_kms_get_base_edid());
@@ -887,6 +896,9 @@ igt_main
 
 		connector_subtest("vga-hpd", VGA)
 			test_basic_hotplug(&data, port, HPD_TOGGLE_COUNT_VGA);
+
+		connector_subtest("vga-hpd-fast", VGA)
+			test_basic_hotplug(&data, port, HPD_TOGGLE_COUNT_FAST);
 
 		connector_subtest("vga-edid-read", VGA) {
 			test_edid_read(&data, port, edid_id,
