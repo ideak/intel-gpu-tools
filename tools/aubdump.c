@@ -426,6 +426,12 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 		obj = &exec_objects[i];
 		bo = get_bo(obj->handle);
 
+		/* If bo->size == 0, this means they passed us an invalid
+		 * buffer.  The kernel will reject it and so should we.
+		 */
+		if (bo->size == 0)
+			return;
+
 		if (obj->flags & EXEC_OBJECT_PINNED) {
 			bo->offset = obj->offset;
 		} else {
@@ -475,6 +481,7 @@ add_new_bo(int handle, uint64_t size, void *map)
 	struct bo *bo = &bos[handle];
 
 	fail_if(handle >= MAX_BO_COUNT, "intel_aubdump: bo handle out of range\n");
+	fail_if(size == 0, "intel_aubdump: bo size is invalid\n");
 
 	bo->size = size;
 	bo->map = map;
@@ -487,6 +494,7 @@ remove_bo(int handle)
 
 	if (bo->map && !IS_USERPTR(bo->map))
 		munmap(bo->map, bo->size);
+	bo->size = 0;
 	bo->map = NULL;
 }
 
