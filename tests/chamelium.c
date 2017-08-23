@@ -497,7 +497,8 @@ disable_output(data_t *data,
 }
 
 static void
-test_display_crc(data_t *data, struct chamelium_port *port, int count)
+test_display_crc(data_t *data, struct chamelium_port *port, int count,
+		 bool fast)
 {
 	igt_display_t display;
 	igt_output_t *output;
@@ -509,6 +510,7 @@ test_display_crc(data_t *data, struct chamelium_port *port, int count)
 	drmModeModeInfo *mode;
 	drmModeConnector *connector;
 	int fb_id, i, j, captured_frame_count;
+	int count_modes;
 
 	reset_state(data, port);
 
@@ -517,7 +519,9 @@ test_display_crc(data_t *data, struct chamelium_port *port, int count)
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
-	for (i = 0; i < connector->count_modes; i++) {
+	count_modes = fast ? 1 : connector->count_modes;
+
+	for (i = 0; i < count_modes; i++) {
 		mode = &connector->modes[i];
 		fb_id = igt_create_color_pattern_fb(data->drm_fd,
 						    mode->hdisplay,
@@ -818,10 +822,13 @@ igt_main
 							edid_id, alt_edid_id);
 
 		connector_subtest("dp-crc-single", DisplayPort)
-			test_display_crc(&data, port, 1);
+			test_display_crc(&data, port, 1, false);
+
+		connector_subtest("dp-crc-fast", DisplayPort)
+			test_display_crc(&data, port, 1, true);
 
 		connector_subtest("dp-crc-multiple", DisplayPort)
-			test_display_crc(&data, port, 3);
+			test_display_crc(&data, port, 3, false);
 
 		connector_subtest("dp-frame-dump", DisplayPort)
 			test_display_frame_dump(&data, port);
@@ -879,10 +886,13 @@ igt_main
 							edid_id, alt_edid_id);
 
 		connector_subtest("hdmi-crc-single", HDMIA)
-			test_display_crc(&data, port, 1);
+			test_display_crc(&data, port, 1, false);
+
+		connector_subtest("hdmi-crc-fast", HDMIA)
+			test_display_crc(&data, port, 1, true);
 
 		connector_subtest("hdmi-crc-multiple", HDMIA)
-			test_display_crc(&data, port, 3);
+			test_display_crc(&data, port, 3, false);
 
 		connector_subtest("hdmi-frame-dump", HDMIA)
 			test_display_frame_dump(&data, port);
