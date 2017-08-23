@@ -420,6 +420,9 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 			       filename, device, gen);
 	}
 
+	if (verbose)
+		printf("Dumping execbuffer2:\n");
+
 	for (uint32_t i = 0; i < execbuffer2->buffer_count; i++) {
 		obj = &exec_objects[i];
 		bo = get_bo(obj->handle);
@@ -427,8 +430,14 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 		/* If bo->size == 0, this means they passed us an invalid
 		 * buffer.  The kernel will reject it and so should we.
 		 */
-		if (bo->size == 0)
+		if (bo->size == 0) {
+			if (verbose)
+				printf("BO #%d is invalid!\n", obj->handle);
 			return;
+		}
+
+		if (verbose)
+			printf("BO #%d (%dB) @ 0x%x\n", obj->handle, bo->size, offset);
 
 		if (obj->flags & EXEC_OBJECT_PINNED) {
 			bo->offset = obj->offset;
