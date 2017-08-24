@@ -21,12 +21,16 @@
  * IN THE SOFTWARE.
  */
 
+#include "config.h"
+
 #include <sys/poll.h>
 #include <sys/ioctl.h>
+#include <sched.h>
 
 #include "igt.h"
 #include "igt_vgem.h"
 #include "igt_rand.h"
+#include "igt_sysfs.h"
 
 #define LOCAL_PARAM_HAS_SCHEDULER 41
 #define LOCAL_CONTEXT_PARAM_PRIORITY 6
@@ -596,7 +600,10 @@ static void alarm_handler(int sig)
 
 static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 {
-	return ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf);
+	int err = 0;
+	if (ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf))
+		err = -errno;
+	return err;
 }
 
 static unsigned int measure_ring_size(int fd, unsigned int ring)
@@ -811,6 +818,133 @@ static void reorder_wide(int fd, unsigned ring)
 	gem_close(fd, target);
 }
 
+static void bind_to_cpu(int cpu)
+{
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	struct sched_param rt = {.sched_priority = 99 };
+	cpu_set_t allowed;
+
+	igt_assert(sched_setscheduler(getpid(), SCHED_RR | SCHED_RESET_ON_FORK, &rt) == 0);
+
+	CPU_ZERO(&allowed);
+	CPU_SET(cpu % ncpus, &allowed);
+	igt_assert(sched_setaffinity(getpid(), sizeof(cpu_set_t), &allowed) == 0);
+}
+
+static void test_pi_ringfull(int fd, unsigned int engine)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct sigaction sa = { .sa_handler = alarm_handler };
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj[2];
+	unsigned int last, count;
+	struct itimerval itv;
+	struct cork c;
+	bool *result;
+
+	result = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(result != MAP_FAILED);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	memset(&obj, 0, sizeof(obj));
+
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
+	execbuf.buffer_count = 1;
+	execbuf.flags = engine;
+	execbuf.rsvd1 = gem_context_create(fd);
+	ctx_set_priority(fd, execbuf.rsvd1, -MAX_PRIO);
+
+	gem_execbuf(fd, &execbuf);
+	gem_sync(fd, obj[1].handle);
+
+	/* Fill the low-priority ring */
+	plug(fd, &c);
+	obj[0].handle = c.handle;
+
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+
+	sigaction(SIGALRM, &sa, NULL);
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 100;
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 1000;
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	last = -1;
+	count = 0;
+	do {
+		if (__execbuf(fd, &execbuf) == 0) {
+			count++;
+			continue;
+		}
+
+		if (last == count)
+			break;
+
+		last = count;
+	} while (1);
+	igt_debug("Filled low-priority ring with %d batches\n", count);
+
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
+	execbuf.buffer_count = 1;
+
+	/* both parent + child on the same cpu, only parent is RT */
+	bind_to_cpu(0);
+
+	igt_fork(child, 1) {
+		result[0] = true;
+
+		igt_debug("Creating HP context\n");
+		execbuf.rsvd1 = gem_context_create(fd);
+		ctx_set_priority(fd, execbuf.rsvd1, MAX_PRIO);
+
+		kill(getppid(), SIGALRM);
+		sched_yield();
+		result[1] = true;
+
+		itv.it_value.tv_sec = 0;
+		itv.it_value.tv_usec = 10000;
+		setitimer(ITIMER_REAL, &itv, NULL);
+
+		/* Since we are the high priority task, we expect to be
+		 * able to add ourselves to *our* ring without interruption.
+		 */
+		igt_debug("HP child executing\n");
+		result[2] = __execbuf(fd, &execbuf) == 0;
+		gem_context_destroy(fd, execbuf.rsvd1);
+	}
+
+	/* Relinquish CPU just to allow child to create a context */
+	sleep(1);
+	igt_assert_f(result[0], "HP context (child) not created");
+	igt_assert_f(!result[1], "Child released too early!\n");
+
+	/* Parent sleeps waiting for ringspace, releasing child */
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 50000;
+	setitimer(ITIMER_REAL, &itv, NULL);
+	igt_debug("LP parent executing\n");
+	igt_assert_eq(__execbuf(fd, &execbuf), -EINTR);
+	igt_assert_f(result[1], "Child was not released!\n");
+	igt_assert_f(result[2],
+		     "High priority child unable to submit within 10ms\n");
+
+	unplug(&c);
+	igt_waitchildren();
+
+	gem_context_destroy(fd, execbuf.rsvd1);
+	gem_close(fd, obj[1].handle);
+	gem_close(fd, obj[0].handle);
+	munmap(result, 4096);
+}
+
 static bool has_scheduler(int fd)
 {
 	drm_i915_getparam_t gp;
@@ -823,15 +957,52 @@ static bool has_scheduler(int fd)
 	return has > 0;
 }
 
+#define HAVE_EXECLISTS 0x1
+#define HAVE_GUC 0x2
+static unsigned print_welcome(int fd)
+{
+	unsigned flags = 0;
+	bool active;
+	int dir;
+
+	dir = igt_sysfs_open_parameters(fd);
+	if (dir < 0)
+		return 0;
+
+	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
+	if (active) {
+		igt_info("Using GuC submission\n");
+		flags |= HAVE_GUC | HAVE_EXECLISTS;
+		goto out;
+	}
+
+	active = igt_sysfs_get_boolean(dir, "enable_execlists");
+	if (active) {
+		igt_info("Using Execlists submission\n");
+		flags |= HAVE_EXECLISTS;
+		goto out;
+	}
+
+	active = igt_sysfs_get_boolean(dir, "semaphores");
+	igt_info("Using Legacy submission%s\n",
+		 active ? ", with semaphores" : "");
+
+out:
+	close(dir);
+	return flags;
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
+	unsigned int caps = 0;
 	int fd = -1;
 
 	igt_skip_on_simulation();
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
+		caps = print_welcome(fd);
 		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
 		igt_fork_hang_detector(fd);
@@ -897,6 +1068,27 @@ igt_main
 
 				igt_subtest_f("reorder-wide-%s", e->name)
 					reorder_wide(fd, e->exec_id | e->flags);
+			}
+		}
+	}
+
+	igt_subtest_group {
+		igt_fixture {
+			igt_require(has_scheduler(fd));
+			ctx_has_priority(fd);
+
+			/* need separate rings */
+			igt_require(caps & HAVE_EXECLISTS);
+		}
+
+		for (e = intel_execution_engines; e->name; e++) {
+			igt_subtest_group {
+				igt_fixture {
+					gem_require_ring(fd, e->exec_id | e->flags);
+				}
+
+				igt_subtest_f("pi-ringfull-%s", e->name)
+					test_pi_ringfull(fd, e->exec_id | e->flags);
 			}
 		}
 	}
