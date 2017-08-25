@@ -155,34 +155,6 @@ struct bdb_child_devices {
 	struct child_device_config children[DEVICE_CHILD_SIZE];
 } __attribute__ ((packed));
 
-struct lvds_dvo_timing {
-	uint16_t clock;		/**< In 10khz */
-	uint8_t hactive_lo;
-	uint8_t hblank_lo;
-	uint8_t hblank_hi:4;
-	uint8_t hactive_hi:4;
-	uint8_t vactive_lo;
-	uint8_t vblank_lo;
-	uint8_t vblank_hi:4;
-	uint8_t vactive_hi:4;
-	uint8_t hsync_off_lo;
-	uint8_t hsync_pulse_width;
-	uint8_t vsync_pulse_width:4;
-	uint8_t vsync_off:4;
-	uint8_t rsvd0:6;
-	uint8_t hsync_off_hi:2;
-	uint8_t h_image;
-	uint8_t v_image;
-	uint8_t max_hv;
-	uint8_t h_border;
-	uint8_t v_border;
-	uint8_t rsvd1:3;
-	uint8_t digital:2;
-	uint8_t vsync_positive:1;
-	uint8_t hsync_positive:1;
-	uint8_t rsvd2:1;
-} __attribute__((packed));
-
 struct blc_struct {
 	uint8_t inverter_type:2;
 	uint8_t inverter_polarity:1;	/* 1 means inverted (0 = max brightness) */

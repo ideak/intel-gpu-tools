@@ -950,7 +950,8 @@ print_detail_timing_data(const struct lvds_dvo_timing *dvo_timing)
 	display = (dvo_timing->hactive_hi << 8) | dvo_timing->hactive_lo;
 	sync_start = display +
 		((dvo_timing->hsync_off_hi << 8) | dvo_timing->hsync_off_lo);
-	sync_end = sync_start + dvo_timing->hsync_pulse_width;
+	sync_end = sync_start + ((dvo_timing->hsync_pulse_width_hi << 8) |
+				 dvo_timing->hsync_pulse_width_lo);
 	total = display +
 		((dvo_timing->hblank_hi << 8) | dvo_timing->hblank_lo);
 	printf("\thdisplay: %d\n", display);
@@ -959,8 +960,10 @@ print_detail_timing_data(const struct lvds_dvo_timing *dvo_timing)
 	printf("\thtotal: %d\n", total);
 
 	display = (dvo_timing->vactive_hi << 8) | dvo_timing->vactive_lo;
-	sync_start = display + dvo_timing->vsync_off;
-	sync_end = sync_start + dvo_timing->vsync_pulse_width;
+	sync_start = display + ((dvo_timing->vsync_off_hi << 8) |
+				dvo_timing->vsync_off_lo);
+	sync_end = sync_start + ((dvo_timing->vsync_pulse_width_hi << 8) |
+				 dvo_timing->vsync_pulse_width_lo);
 	total = display +
 		((dvo_timing->vblank_hi << 8) | dvo_timing->vblank_lo);
 	printf("\tvdisplay: %d\n", display);

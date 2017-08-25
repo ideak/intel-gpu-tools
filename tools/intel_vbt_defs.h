@@ -379,6 +379,37 @@ struct lvds_fp_timing {
 	u16 terminator;
 } __packed;
 
+struct lvds_dvo_timing {
+	u16 clock;		/**< In 10khz */
+	u8 hactive_lo;
+	u8 hblank_lo;
+	u8 hblank_hi:4;
+	u8 hactive_hi:4;
+	u8 vactive_lo;
+	u8 vblank_lo;
+	u8 vblank_hi:4;
+	u8 vactive_hi:4;
+	u8 hsync_off_lo;
+	u8 hsync_pulse_width_lo;
+	u8 vsync_pulse_width_lo:4;
+	u8 vsync_off_lo:4;
+	u8 vsync_pulse_width_hi:2;
+	u8 vsync_off_hi:2;
+	u8 hsync_pulse_width_hi:2;
+	u8 hsync_off_hi:2;
+	u8 himage_lo;
+	u8 vimage_lo;
+	u8 vimage_hi:4;
+	u8 himage_hi:4;
+	u8 h_border;
+	u8 v_border;
+	u8 rsvd1:3;
+	u8 digital:2;
+	u8 vsync_positive:1;
+	u8 hsync_positive:1;
+	u8 non_interlaced:1;
+} __packed;
+
 struct lvds_pnp_id {
 	u16 mfg_name;
 	u16 product_code;
