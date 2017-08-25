@@ -348,25 +348,6 @@ struct lvds_fp_timing {
 } __attribute__ ((packed));
 
 struct lvds_dvo_timing {
-	uint16_t dclk;		/**< In 10khz */
-	uint8_t hactive;
-	uint8_t hblank;
-	uint8_t high_h;		/**< 7:4 = hactive 11:8, 3:0 = hblank 11:8 */
-	uint8_t vactive;
-	uint8_t vblank;
-	uint8_t high_v;		/**< 7:4 = vactive 11:8, 3:0 = vblank 11:8 */
-	uint8_t hsync_off;
-	uint8_t hsync_pulse_width;
-	uint8_t vsync_off;
-	uint8_t high_hsync_off;	/**< 7:6 = hsync off 9:8 */
-	uint8_t h_image;
-	uint8_t v_image;
-	uint8_t max_hv;
-	uint8_t h_border;
-	uint8_t v_border;
-	uint8_t flags;
-} __attribute__ ((packed));
-struct lvds_dvo_timing2 {
 	uint16_t clock;		/**< In 10khz */
 	uint8_t hactive_lo;
 	uint8_t hblank_lo;

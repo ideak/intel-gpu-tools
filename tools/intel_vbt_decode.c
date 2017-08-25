@@ -935,7 +935,7 @@ static void dump_psr(struct context *context,
 }
 
 static void
-print_detail_timing_data(const struct lvds_dvo_timing2 *dvo_timing)
+print_detail_timing_data(const struct lvds_dvo_timing *dvo_timing)
 {
 	int display, sync_start, sync_end, total;
 
@@ -966,10 +966,10 @@ print_detail_timing_data(const struct lvds_dvo_timing2 *dvo_timing)
 static void dump_sdvo_panel_dtds(struct context *context,
 				 const struct bdb_block *block)
 {
-	const struct lvds_dvo_timing2 *dvo_timing = block->data;
+	const struct lvds_dvo_timing *dvo_timing = block->data;
 	int n, count;
 
-	count = block->size / sizeof(struct lvds_dvo_timing2);
+	count = block->size / sizeof(struct lvds_dvo_timing);
 	for (n = 0; n < count; n++) {
 		printf("%d:\n", n);
 		print_detail_timing_data(dvo_timing++);
