@@ -671,7 +671,25 @@ struct bdb_driver_features {
 #define EDP_VSWING_0_8V		2
 #define EDP_VSWING_1_2V		3
 
+struct psr_table {
+	/* Feature bits */
+	u8 full_link:1;
+	u8 require_aux_to_wakeup:1;
+	u8 feature_bits_rsvd:6;
 
+	/* Wait times */
+	u8 idle_frames:4;
+	u8 lines_to_wait:3;
+	u8 wait_times_rsvd:1;
+
+	/* TP wake up time in multiple of 100 */
+	u16 tp1_wakeup_time;
+	u16 tp2_tp3_wakeup_time;
+} __packed;
+
+struct bdb_psr {
+	struct psr_table psr_table[16];
+} __packed;
 
 /*
  * Driver<->VBIOS interaction occurs through scratch bits in

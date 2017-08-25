@@ -891,7 +891,7 @@ static void dump_edp(struct context *context,
 static void dump_psr(struct context *context,
 		     const struct bdb_block *block)
 {
-	const struct bdb_psr *psr = block->data;
+	const struct bdb_psr *psr_block = block->data;
 	int i;
 
 	/* The same block ID was used for something else before? */
@@ -899,41 +899,43 @@ static void dump_psr(struct context *context,
 		return;
 
 	for (i = 0; i < 16; i++) {
+		const struct psr_table *psr = &psr_block->psr_table[i];
+
 		if (i != context->panel_type && !context->dump_all_panel_types)
 			continue;
 
 		printf("\tPanel %d%s\n", i, context->panel_type == i ? " *" : "");
 
-		printf("\t\tFull link: %s\n", YESNO(psr->psr[i].full_link));
-		printf("\t\tRequire AUX to wakeup: %s\n", YESNO(psr->psr[i].require_aux_to_wakeup));
+		printf("\t\tFull link: %s\n", YESNO(psr->full_link));
+		printf("\t\tRequire AUX to wakeup: %s\n", YESNO(psr->require_aux_to_wakeup));
 
-		switch (psr->psr[i].lines_to_wait) {
+		switch (psr->lines_to_wait) {
 		case 0:
 		case 1:
 			printf("\t\tLines to wait before link standby: %d\n",
-			       psr->psr[i].lines_to_wait);
+			       psr->lines_to_wait);
 			break;
 		case 2:
 		case 3:
 			printf("\t\tLines to wait before link standby: %d\n",
-			       1 << psr->psr[i].lines_to_wait);
+			       1 << psr->lines_to_wait);
 			break;
 		default:
 			printf("\t\tLines to wait before link standby: (unknown) (0x%x)\n",
-			       psr->psr[i].lines_to_wait);
+			       psr->lines_to_wait);
 			break;
 		}
 
 		printf("\t\tIdle frames to for PSR enable: %d\n",
-		       psr->psr[i].idle_frames);
+		       psr->idle_frames);
 
 		printf("\t\tTP1 wakeup time: %d usec (0x%x)\n",
-		       psr->psr[i].tp1_wakeup_time * 100,
-		       psr->psr[i].tp1_wakeup_time);
+		       psr->tp1_wakeup_time * 100,
+		       psr->tp1_wakeup_time);
 
 		printf("\t\tTP2/TP3 wakeup time: %d usec (0x%x)\n",
-		       psr->psr[i].tp2_tp3_wakeup_time * 100,
-		       psr->psr[i].tp2_tp3_wakeup_time);
+		       psr->tp2_tp3_wakeup_time * 100,
+		       psr->tp2_tp3_wakeup_time);
 	}
 }
 
