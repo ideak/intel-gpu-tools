@@ -417,8 +417,6 @@ prepare_output(data_t *data,
 	drmModeConnector *connector =
 		chamelium_port_get_connector(data->chamelium, port, false);
 
-	chamelium_reset(data->chamelium);
-
 	igt_assert(res = drmModeGetResources(data->drm_fd));
 	kmstest_unset_all_crtcs(data->drm_fd, res);
 
@@ -625,6 +623,8 @@ test_analog_frame_dump(data_t *data, struct chamelium_port *port)
 	drmModeConnector *connector;
 	int fb_id, i;
 	bool bridge;
+
+	reset_state(data, port);
 
 	output = prepare_output(data, &display, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
