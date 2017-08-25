@@ -155,7 +155,7 @@ igt_kmod_load(const char *mod_name, const char *opts)
 	}
 out:
 	kmod_module_unref(kmod);
-	return -err ? err < 0 : err;
+	return err < 0 ? err : 0;
 }
 
 
@@ -192,7 +192,7 @@ igt_kmod_unload(const char *mod_name, unsigned int flags)
 
 out:
 	kmod_module_unref(kmod);
-	return -err ? err < 0 : err;
+	return err < 0 ? err : 0;
 }
 
 /**
