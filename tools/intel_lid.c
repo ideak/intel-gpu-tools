@@ -39,8 +39,9 @@
 
 #include "intel_io.h"
 #include "intel_reg.h"
-#include "intel_bios.h"
 #include "intel_chipset.h"
+
+#define SWF14_LID_STATUS_CLOSED	(1<<29) /* 0 here means open */
 
 enum lid_status {
 	LID_UNKNOWN = -1,
@@ -125,7 +126,7 @@ int main(int argc, char **argv)
 
 		printf("Intel LVDS Lid status:\n");
 		printf("\tSWF14(0x%x) : %s\n", swf14,
-		       swf14 & SWF14_LID_SWITCH_EN ? "close" : "open");
+		       swf14 & SWF14_LID_STATUS_CLOSED ? "close" : "open");
 
 		acpi_lid = i830_lvds_acpi_lid_state();
 		switch (acpi_lid) {
