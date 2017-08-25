@@ -328,6 +328,10 @@ static void test_unload(void)
 	int vgem, dmabuf;
 	uint32_t *ptr;
 
+	/* Load and unload vgem just to make sure it exists */
+	vgem = __drm_open_driver(DRIVER_VGEM);
+	igt_require(vgem != -1);
+	close(vgem);
 	igt_require(module_unload() == 0);
 
 	vgem = __drm_open_driver(DRIVER_VGEM);
