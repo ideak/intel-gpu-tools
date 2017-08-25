@@ -290,6 +290,102 @@ struct bdb_general_features {
 
 #define LEGACY_CHILD_DEVICE_CONFIG_SIZE		33
 
+/*
+ * The child device config, aka the display device data structure, provides a
+ * description of a port and its configuration on the platform.
+ *
+ * The child device config size has been increased, and fields have been added
+ * and their meaning has changed over time. Care must be taken when accessing
+ * basically any of the fields to ensure the correct interpretation for the BDB
+ * version in question.
+ *
+ * When we copy the child device configs to dev_priv->vbt.child_dev, we reserve
+ * space for the full structure below, and initialize the tail not actually
+ * present in VBT to zeros. Accessing those fields is fine, as long as the
+ * default zero is taken into account, again according to the BDB version.
+ *
+ * BDB versions 155 and below are considered legacy, and version 155 seems to be
+ * a baseline for some of the VBT documentation. When adding new fields, please
+ * include the BDB version when the field was added, if it's above that.
+ */
+struct child_device_config {
+	u16 handle;
+	u16 device_type; /* See DEVICE_TYPE_* above */
+
+	union {
+		u8  device_id[10]; /* ascii string */
+		struct {
+			u8 i2c_speed;
+			u8 dp_onboard_redriver;			/* 158 */
+			u8 dp_ondock_redriver;			/* 158 */
+			u8 hdmi_level_shifter_value:4;		/* 169 */
+			u8 hdmi_max_data_rate:4;		/* 204 */
+			u16 dtd_buf_ptr;			/* 161 */
+			u8 edidless_efp:1;			/* 161 */
+			u8 compression_enable:1;		/* 198 */
+			u8 compression_method:1;		/* 198 */
+			u8 ganged_edp:1;			/* 202 */
+			u8 reserved0:4;
+			u8 compression_structure_index:4;	/* 198 */
+			u8 reserved1:4;
+			u8 slave_port;				/* 202 */
+			u8 reserved2;
+		} __packed;
+	} __packed;
+
+	u16 addin_offset;
+	u8 dvo_port; /* See DEVICE_PORT_* and DVO_PORT_* above */
+	u8 i2c_pin;
+	u8 slave_addr;
+	u8 ddc_pin;
+	u16 edid_ptr;
+	u8 dvo_cfg; /* See DEVICE_CFG_* above */
+
+	union {
+		struct {
+			u8 dvo2_port;
+			u8 i2c2_pin;
+			u8 slave2_addr;
+			u8 ddc2_pin;
+		} __packed;
+		struct {
+			u8 efp_routed:1;			/* 158 */
+			u8 lane_reversal:1;			/* 184 */
+			u8 lspcon:1;				/* 192 */
+			u8 iboost:1;				/* 196 */
+			u8 hpd_invert:1;			/* 196 */
+			u8 flag_reserved:3;
+			u8 hdmi_support:1;			/* 158 */
+			u8 dp_support:1;			/* 158 */
+			u8 tmds_support:1;			/* 158 */
+			u8 support_reserved:5;
+			u8 aux_channel;
+			u8 dongle_detect;
+		} __packed;
+	} __packed;
+
+	u8 pipe_cap:2;
+	u8 sdvo_stall:1;					/* 158 */
+	u8 hpd_status:2;
+	u8 integrated_encoder:1;
+	u8 capabilities_reserved:2;
+	u8 dvo_wiring; /* See DEVICE_WIRE_* above */
+
+	union {
+		u8 dvo2_wiring;
+		u8 mipi_bridge_type;				/* 171 */
+	} __packed;
+
+	u16 extended_type;
+	u8 dvo_function;
+	u8 dp_usb_type_c:1;					/* 195 */
+	u8 flags2_reserved:7;					/* 195 */
+	u8 dp_gpio_index;					/* 195 */
+	u16 dp_gpio_pin_num;					/* 195 */
+	u8 dp_iboost_level:4;					/* 196 */
+	u8 hdmi_iboost_level:4;					/* 196 */
+} __packed;
+
 struct bdb_general_definitions {
 	/* DDC GPIO */
 	u8 crt_ddc_gmbus_pin;

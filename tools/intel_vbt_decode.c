@@ -383,6 +383,7 @@ static const char *efp_port(uint8_t type)
 static void dump_child_device(struct context *context,
 			      const struct child_device_config *child)
 {
+	const struct child_device_config *efp = child;
 	char child_id[11];
 
 	if (!child->device_type)
@@ -399,8 +400,6 @@ static void dump_child_device(struct context *context,
 		printf("\t\tAIM offset: %d\n", child->addin_offset);
 		printf("\t\tDVO port: 0x%02x\n", child->dvo_port);
 	} else { /* 152+ have EFP blocks here */
-		const struct efp_child_device_config *efp =
-			(const struct efp_child_device_config *)child;
 		printf("\tEFP device info:\n");
 		printf("\t\tDevice handle: 0x%04x (%s)\n", efp->handle,
 		       child_device_handle(efp->handle));
@@ -420,21 +419,21 @@ static void dump_child_device(struct context *context,
 		printf("\t\tCompression structure index: 0x%02x)\n", efp->compression_structure_index);
 		printf("\t\tSlave DDI port: 0x%02x (%s)\n", efp->slave_port, efp_port(efp->slave_port));
 		printf("\t\tAIM offset: %d\n", child->addin_offset);
-		printf("\t\tPort: 0x%02x (%s)\n", efp->port, efp_port(efp->port));
+		printf("\t\tPort: 0x%02x (%s)\n", efp->dvo_port, efp_port(efp->dvo_port));
 		printf("\t\tAIM I2C pin: 0x%02x\n", efp->i2c_pin);
 		printf("\t\tAIM Slave address: 0x%02x\n", efp->slave_addr);
 		printf("\t\tDDC pin: 0x%02x\n", efp->ddc_pin);
 		printf("\t\tEDID buffer ptr: 0x%02x\n", efp->edid_ptr);
-		printf("\t\tDVO config: 0x%02x\n", efp->dvo_config);
+		printf("\t\tDVO config: 0x%02x\n", efp->dvo_cfg);
 		printf("\t\tHPD sense invert: %s\n", YESNO(efp->hpd_invert));
-		printf("\t\tIboost enable: %s\n", YESNO(efp->iboost_enable));
-		printf("\t\tOnboard LSPCON: %s\n", YESNO(efp->onboard_lspcon));
+		printf("\t\tIboost enable: %s\n", YESNO(efp->iboost));
+		printf("\t\tOnboard LSPCON: %s\n", YESNO(efp->lspcon));
 		printf("\t\tLane reversal: %s\n", YESNO(efp->lane_reversal));
-		printf("\t\tEFP routed through dock: %s\n", YESNO(efp->efp_docked_port));
-		printf("\t\tHDMI compatible? %s\n", YESNO(efp->hdmi_compat));
-		printf("\t\tDP compatible? %s\n", YESNO(efp->dp_compat));
-		printf("\t\tTMDS compatible? %s\n", YESNO(efp->tmds_compat));
-		printf("\t\tAux channel: 0x%02x\n", efp->aux_chan);
+		printf("\t\tEFP routed through dock: %s\n", YESNO(efp->efp_routed));
+		printf("\t\tHDMI compatible? %s\n", YESNO(efp->hdmi_support));
+		printf("\t\tDP compatible? %s\n", YESNO(efp->dp_support));
+		printf("\t\tTMDS compatible? %s\n", YESNO(efp->tmds_support));
+		printf("\t\tAux channel: 0x%02x\n", efp->aux_channel);
 		printf("\t\tDongle detect: 0x%02x\n", efp->dongle_detect);
 		printf("\t\tIntegrated encoder instead of SDVO: %s\n", YESNO(efp->integrated_encoder));
 		printf("\t\tHotplu connect status: 0x%02x\n", efp->hpd_status);
@@ -456,23 +455,19 @@ static void dump_child_device(struct context *context,
 			printf("(unknown value %d)\n", efp->mipi_bridge_type);
 			break;
 		}
-		printf("\t\tDevice class extendsion: 0x%02x\n", efp->device_class_ext);
+		printf("\t\tDevice class extendsion: 0x%02x\n", efp->extended_type);
 		printf("\t\tDVO function: 0x%02x\n", efp->dvo_function);
 	}
 
 	if (context->bdb->version >= 195) {
-		const struct efp_child_device_config *efp =
-			(const struct efp_child_device_config *)child;
 		printf("\t\tDP USB type C support: %s\n", YESNO(efp->dp_usb_type_c));
-		printf("\t\t2X DP GPIO index: 0x%02x\n", efp->dp_usb_type_c_2x_gpio_index);
-		printf("\t\t2X DP GPIO pin number: 0x%02x\n", efp->dp_usb_type_c_2x_gpio_pin);
+		printf("\t\t2X DP GPIO index: 0x%02x\n", efp->dp_gpio_index);
+		printf("\t\t2X DP GPIO pin number: 0x%02x\n", efp->dp_gpio_pin_num);
 	}
 
 	if (context->bdb->version >= 196) {
-		const struct efp_child_device_config *efp =
-			(const struct efp_child_device_config *)child;
-		printf("\t\tIBoost level for HDMI: 0x%02x\n", efp->iboost_hdmi);
-		printf("\t\tIBoost level for DP/eDP: 0x%02x\n", efp->iboost_dp);
+		printf("\t\tIBoost level for HDMI: 0x%02x\n", efp->hdmi_iboost_level);
+		printf("\t\tIBoost level for DP/eDP: 0x%02x\n", efp->dp_iboost_level);
 	}
 }
 
@@ -498,11 +493,11 @@ static void dump_general_definitions(struct context *context,
 		dump_child_device(context, (const void*)&defs->devices[i * defs->child_dev_size]);
 }
 
-static void dump_child_devices(struct context *context,
-			       const struct bdb_block *block)
+static void dump_legacy_child_devices(struct context *context,
+				      const struct bdb_block *block)
 {
 	const struct bdb_child_devices *child_devs = block->data;
-	const struct child_device_config *child;
+	const struct legacy_child_device_config *child;
 	int i;
 
 	for (i = 0; i < DEVICE_CHILD_SIZE; i++) {
@@ -1517,8 +1512,8 @@ struct dumper dumpers[] = {
 	},
 	{
 		.id = BDB_CHILD_DEVICE_TABLE,
-		.name = "Child devices block",
-		.dump = dump_child_devices,
+		.name = "Legacy child devices block",
+		.dump = dump_legacy_child_devices,
 	},
 	{
 		.id = BDB_LVDS_OPTIONS,
