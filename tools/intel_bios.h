@@ -30,108 +30,6 @@
 
 #include <stdint.h>
 
-
-struct vbt_header {
-	char signature[20];		/**< Always starts with 'VBT$' */
-	uint16_t version;		/**< decimal */
-	uint16_t header_size;		/**< in bytes */
-	uint16_t vbt_size;		/**< in bytes */
-	uint8_t vbt_checksum;
-	uint8_t reserved0;
-	uint32_t bdb_offset;		/**< from beginning of VBT */
-	uint32_t aim_offset[4];		/**< from beginning of VBT */
-} __attribute__ ((packed));
-
-struct bdb_header {
-	char signature[16];		/**< Always 'BIOS_DATA_BLOCK' */
-	uint16_t version;		/**< decimal */
-	uint16_t header_size;		/**< in bytes */
-	uint16_t bdb_size;		/**< in bytes */
-} __attribute__ ((packed));
-
-/*
- * There are several types of BIOS data blocks (BDBs), each block has
- * an ID and size in the first 3 bytes (ID in first, size in next 2).
- * Known types are listed below.
- */
-#define BDB_GENERAL_FEATURES	  1
-#define BDB_GENERAL_DEFINITIONS	  2
-#define BDB_OLD_TOGGLE_LIST	  3
-#define BDB_MODE_SUPPORT_LIST	  4
-#define BDB_GENERIC_MODE_TABLE	  5
-#define BDB_EXT_MMIO_REGS	  6
-#define BDB_SWF_IO		  7
-#define BDB_SWF_MMIO		  8
-#define BDB_DOT_CLOCK_TABLE	  9
-#define BDB_PSR			  9
-#define BDB_MODE_REMOVAL_TABLE	 10
-#define BDB_CHILD_DEVICE_TABLE	 11
-#define BDB_DRIVER_FEATURES	 12
-#define BDB_DRIVER_PERSISTENCE	 13
-#define BDB_EXT_TABLE_PTRS	 14
-#define BDB_DOT_CLOCK_OVERRIDE	 15
-#define BDB_DISPLAY_SELECT	 16
-/* 17 rsvd */
-#define BDB_DRIVER_ROTATION	 18
-#define BDB_DISPLAY_REMOVE	 19
-#define BDB_OEM_CUSTOM		 20
-#define BDB_EFP_LIST		 21	/* workarounds for VGA hsync/vsync */
-#define BDB_SDVO_LVDS_OPTIONS	 22
-#define BDB_SDVO_PANEL_DTDS	 23
-#define BDB_SDVO_LVDS_PNP_IDS	 24
-#define BDB_SDVO_LVDS_POWER_SEQ	 25
-#define BDB_TV_OPTIONS		 26
-#define BDB_EDP			 27
-#define BDB_LVDS_OPTIONS	 40
-#define BDB_LVDS_LFP_DATA_PTRS	 41
-#define BDB_LVDS_LFP_DATA	 42
-#define BDB_LVDS_BACKLIGHT	 43
-#define BDB_LVDS_POWER		 44
-#define BDB_MIPI_CONFIG		 52
-#define BDB_MIPI_SEQUENCE	 53
-#define BDB_SKIP		254	/* VBIOS private block, ignore */
-
-struct bdb_general_features {
-	/* bits 1 */
-	unsigned char panel_fitting:2;
-	unsigned char flexaim:1;
-	unsigned char msg_enable:1;
-	unsigned char clear_screen:3;
-	unsigned char color_flip:1;
-
-	/* bits 2 */
-	unsigned char download_ext_vbt:1;
-	unsigned char enable_ssc:1;
-	unsigned char ssc_freq:1;
-	unsigned char enable_lfp_on_override:1;
-	unsigned char disable_ssc_ddt:1;
-	unsigned char underscan_vga_timings:1;
-	unsigned char dynamic_cdclk:1; /* 183 */
-	unsigned char vbios_hotplug_support:1;
-
-	/* bits 3 */
-	unsigned char disable_smooth_vision:1;
-	unsigned char single_dvi:1;
-	unsigned char rotate_180:1; /* 181 */
-	unsigned char fdi_rx_polarity:1;
-	unsigned char vbios_extended_mode:1; /* 160 */
-	unsigned char copy_ilfp_dtd_to_sdvo_lvds_dtd:1; /* 160 */
-	unsigned char panel_best_fit_timing:1; /* 160 */
-	unsigned char ignore_strap_state:1; /* 160 */
-
-	/* bits 4 */
-	unsigned char legacy_monitor_detect;
-
-	/* bits 5 */
-	unsigned char int_crt_support:1;
-	unsigned char int_tv_support:1;
-	unsigned char int_efp_support:1;
-	unsigned char dp_ssc_enable:1;
-	unsigned char dp_ssc_freq:1;
-	unsigned char dp_ssc_dongle_supported:1;
-	unsigned char rsvd11:2;	/* finish byte */
-} __attribute__ ((packed));
-
 #define DEVICE_HANDLE_CRT	0x01
 #define DEVICE_HANDLE_EFP1	0x04
 #define DEVICE_HANDLE_EFP2	0x40
@@ -158,43 +56,8 @@ struct bdb_general_features {
 #define DEVICE_TYPE_DIGITAL_OUTPUT	1
 #define DEVICE_TYPE_ANALOG_OUTPUT	0
 
-/* Pre 915 */
-#define DEVICE_TYPE_NONE	0x00
-#define DEVICE_TYPE_CRT		0x01
-#define DEVICE_TYPE_TV		0x09
-#define DEVICE_TYPE_EFP		0x12
-#define DEVICE_TYPE_LFP		0x22
-/* On 915+ */
-#define DEVICE_TYPE_CRT_DPMS		0x6001
-#define DEVICE_TYPE_CRT_DPMS_HOTPLUG	0x4001
-#define DEVICE_TYPE_TV_COMPOSITE	0x0209
-#define DEVICE_TYPE_TV_MACROVISION	0x0289
-#define DEVICE_TYPE_TV_RF_COMPOSITE	0x020c
-#define DEVICE_TYPE_TV_SVIDEO_COMPOSITE	0x0609
-#define DEVICE_TYPE_TV_SCART		0x0209
-#define DEVICE_TYPE_TV_CODEC_HOTPLUG_PWR 0x6009
-#define DEVICE_TYPE_EFP_HOTPLUG_PWR	0x6012
-#define DEVICE_TYPE_EFP_DVI_HOTPLUG_PWR	0x6052
-#define DEVICE_TYPE_EFP_DVI_I		0x6053
-#define DEVICE_TYPE_EFP_DVI_D_DUAL	0x6152
-#define DEVICE_TYPE_EFP_DVI_D_HDCP	0x60d2
-#define DEVICE_TYPE_OPENLDI_HOTPLUG_PWR	0x6062
-#define DEVICE_TYPE_OPENLDI_DUALPIX	0x6162
-#define DEVICE_TYPE_LFP_PANELLINK	0x5012
-#define DEVICE_TYPE_LFP_CMOS_PWR	0x5042
-#define DEVICE_TYPE_LFP_LVDS_PWR	0x5062
-#define DEVICE_TYPE_LFP_LVDS_DUAL	0x5162
-#define DEVICE_TYPE_LFP_LVDS_DUAL_HDCP	0x51e2
-#define DEVICE_TYPE_INT_HDMI		0xf0D2
-
-#define DEVICE_TYPE_INT_LFP		0x1022
-#define DEVICE_TYPE_INT_TV		0x1009
-#define DEVICE_TYPE_DP			0x68C6
-#define DEVICE_TYPE_DP_HDMI_DVI		0x60d6
 #define DEVICE_TYPE_DP_DVI		0x68d6
-#define DEVICE_TYPE_HDMI_DVI		0x60d2
 #define DEVICE_TYPE_DVI			0x68d2
-#define DEVICE_TYPE_eDP			0x78C6
 #define DEVICE_TYPE_MIPI		0x7cc2
 
 #define DEVICE_PORT_DVOA	0x00	/* none on 845+ */
@@ -285,66 +148,11 @@ struct efp_child_device_config {
 	uint8_t iboost_hdmi:4; /* 196 */
 } __attribute__ ((packed));
 
-struct bdb_general_definitions {
-	unsigned char crt_ddc_gmbus_pin;	/* see GPIO_PIN_* above */
-
-	/* DPMS bits */
-	unsigned char dpms_acpi:1;
-	unsigned char skip_boot_crt_detect:1;
-	unsigned char dpms_aim:1;
-	unsigned char rsvd1:5;	/* finish byte */
-
-	/* boot device bits */
-	unsigned char boot_display[2];
-	unsigned char child_dev_size;
-
-	/*
-	 * Device info:
-	 * If TV is present, it'll be at devices[0]
-	 * LVDS will be next, either devices[0] or [1], if present
-	 * Max total will be 6, but could be as few as 4 if both
-	 * TV and LVDS are missing, so be careful when interpreting
-	 * [4] and [5].
-	 */
-	uint8_t devices[0];
-	/* may be another device block here on some platforms */
-} __attribute__ ((packed));
-
 #define DEVICE_CHILD_SIZE 7
 
 struct bdb_child_devices {
 	uint8_t child_structure_size;
 	struct child_device_config children[DEVICE_CHILD_SIZE];
-} __attribute__ ((packed));
-
-struct bdb_lvds_options {
-	uint8_t panel_type;
-	uint8_t rsvd1;
-	/* LVDS capabilities, stored in a dword */
-	uint8_t pfit_mode:2;
-	uint8_t pfit_text_mode_enhanced:1;
-	uint8_t pfit_gfx_mode_enhanced:1;
-	uint8_t pfit_ratio_auto:1;
-	uint8_t pixel_dither:1;
-	uint8_t lvds_edid:1;
-	uint8_t rsvd2:1;
-	uint8_t rsvd4;
-} __attribute__ ((packed));
-
-struct lvds_fp_timing {
-	uint16_t x_res;
-	uint16_t y_res;
-	uint32_t lvds_reg;
-	uint32_t lvds_reg_val;
-	uint32_t pp_on_reg;
-	uint32_t pp_on_reg_val;
-	uint32_t pp_off_reg;
-	uint32_t pp_off_reg_val;
-	uint32_t pp_cycle_reg;
-	uint32_t pp_cycle_reg_val;
-	uint32_t pfit_reg;
-	uint32_t pfit_reg_val;
-	uint16_t terminator;
 } __attribute__ ((packed));
 
 struct lvds_dvo_timing {
@@ -375,39 +183,6 @@ struct lvds_dvo_timing {
 	uint8_t rsvd2:1;
 } __attribute__((packed));
 
-struct lvds_pnp_id {
-	uint16_t mfg_name;
-	uint16_t product_code;
-	uint32_t serial;
-	uint8_t mfg_week;
-	uint8_t mfg_year;
-} __attribute__ ((packed));;
-
-/* LFP pointer table contains entries to the struct below */
-struct bdb_lvds_lfp_data_ptr {
-	uint16_t fp_timing_offset;	/* offsets are from start of bdb */
-	uint8_t fp_table_size;
-	uint16_t dvo_timing_offset;
-	uint8_t dvo_table_size;
-	uint16_t panel_pnp_id_offset;
-	uint8_t pnp_table_size;
-} __attribute__ ((packed));
-
-struct bdb_lvds_lfp_data_ptrs {
-	uint8_t lvds_entries;
-	struct bdb_lvds_lfp_data_ptr ptr[16];
-} __attribute__ ((packed));
-
-struct bdb_lvds_lfp_data_entry {
-	struct lvds_fp_timing fp_timing;
-	struct lvds_dvo_timing dvo_timing;
-	struct lvds_pnp_id pnp_id;
-} __attribute__ ((packed));
-
-struct bdb_lvds_lfp_data {
-	struct bdb_lvds_lfp_data_entry data[16];
-} __attribute__ ((packed));
-
 struct blc_struct {
 	uint8_t inverter_type:2;
 	uint8_t inverter_polarity:1;	/* 1 means inverted (0 = max brightness) */
@@ -428,75 +203,6 @@ struct bdb_lvds_backlight {
 #define BDB_DRIVER_INT_LVDS	1
 #define BDB_DRIVER_SDVO_LVDS	2
 #define BDB_DRIVER_EDP		3
-
-struct bdb_driver_feature {
-	uint8_t boot_dev_algorithm:1;
-	uint8_t block_display_switch:1;
-	uint8_t allow_display_switch:1;
-	uint8_t hotplug_dvo:1;
-	uint8_t dual_view_zoom:1;
-	uint8_t int15h_hook:1;
-	uint8_t sprite_in_clone:1;
-	uint8_t primary_lfp_id:1;
-
-	uint16_t boot_mode_x;
-	uint16_t boot_mode_y;
-	uint8_t boot_mode_bpp;
-	uint8_t boot_mode_refresh;
-
-	uint16_t enable_lfp_primary:1;
-	uint16_t selective_mode_pruning:1;
-	uint16_t dual_frequency:1;
-	uint16_t render_clock_freq:1;	/* 0: high freq; 1: low freq */
-	uint16_t nt_clone_support:1;
-	uint16_t power_scheme_ui:1;	/* 0: CUI; 1: 3rd party */
-	uint16_t sprite_display_assign:1;	/* 0: secondary; 1: primary */
-	uint16_t cui_aspect_scaling:1;
-	uint16_t preserve_aspect_ratio:1;
-	uint16_t sdvo_device_power_down:1;
-	uint16_t crt_hotplug:1;
-	uint16_t lvds_config:2;
-	uint16_t reserved:3;
-
-	uint8_t static_display:1;
-	uint8_t reserved2:7;
-	uint16_t legacy_crt_max_x;
-	uint16_t legacy_crt_max_y;
-	uint8_t legacy_crt_max_refresh;
-} __attribute__ ((packed));
-
-struct bdb_sdvo_lvds_options {
-	uint8_t panel_backlight;
-	uint8_t h40_set_panel_type;
-	uint8_t panel_type;
-	uint8_t ssc_clk_freq;
-	uint16_t als_low_trip;
-	uint16_t als_high_trip;
-	uint8_t sclalarcoeff_tab_row_num;
-	uint8_t sclalarcoeff_tab_row_size;
-	uint8_t coefficient[8];
-	uint8_t panel_misc_bits_1;
-	uint8_t panel_misc_bits_2;
-	uint8_t panel_misc_bits_3;
-	uint8_t panel_misc_bits_4;
-} __attribute__ ((packed));
-
-#define EDP_18BPP	0
-#define EDP_24BPP	1
-#define EDP_30BPP	2
-#define EDP_RATE_1_62  0
-#define EDP_RATE_2_7   1
-#define EDP_LANE_1     0
-#define EDP_LANE_2     1
-#define EDP_LANE_4     3
-#define EDP_PREEMPHASIS_NONE   0
-#define EDP_PREEMPHASIS_3_5dB  1
-#define EDP_PREEMPHASIS_6dB    2
-#define EDP_PREEMPHASIS_9_5dB  3
-#define EDP_VSWING_0_4V                0
-#define EDP_VSWING_0_6V                1
-#define EDP_VSWING_0_8V                2
-#define EDP_VSWING_1_2V                3
 
 struct edp_power_seq {
 	uint16_t t3;
@@ -677,17 +383,6 @@ struct mipi_pps_data {
 	uint16_t bl_disable_delay;
 	uint16_t panel_off_delay;
 	uint16_t panel_power_cycle_delay;
-} __attribute__ ((packed));
-
-struct bdb_mipi_config {
-	struct mipi_config config[MAX_MIPI_CONFIGURATIONS];
-	struct mipi_pps_data pps[MAX_MIPI_CONFIGURATIONS];
-} __attribute__ ((packed));
-
-/* variable number of these - max 6 */
-struct bdb_mipi_sequence {
-	uint8_t version;
-	uint8_t data[0];
 } __attribute__ ((packed));
 
 /* MIPI Sequence Block definitions */

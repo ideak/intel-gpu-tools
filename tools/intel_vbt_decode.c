@@ -36,10 +36,18 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "intel_bios.h"
 #include "intel_io.h"
 #include "intel_chipset.h"
 #include "drmtest.h"
+
+/* kernel types for intel_vbt_defs.h */
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+#define __packed __attribute__ ((packed))
+
+#define _INTEL_BIOS_PRIVATE
+#include "intel_vbt_defs.h"
 
 /* no bother to include "edid.h" */
 #define _H_ACTIVE(x) (x[2] + ((x[4] & 0xF0) << 4))
@@ -175,7 +183,7 @@ static void dump_general_features(struct context *context,
 	printf("\tUnderscan support for VGA timings: %s\n",
 	       YESNO(features->underscan_vga_timings));
 	if (context->bdb->version >= 183)
-		printf("\tDynamic CD clock: %s\n", YESNO(features->dynamic_cdclk));
+		printf("\tDynamic CD clock: %s\n", YESNO(features->display_clock_mode));
 	printf("\tHotplug support in VBIOS: %s\n",
 	       YESNO(features->vbios_hotplug_support));
 
@@ -184,7 +192,7 @@ static void dump_general_features(struct context *context,
 	printf("\tSingle DVI for CRT/DVI: %s\n", YESNO(features->single_dvi));
 	if (context->bdb->version >= 181)
 		printf("\tEnable 180 degree rotation: %s\n", YESNO(features->rotate_180));
-	printf("\tInverted FDI Rx polarity: %s\n", YESNO(features->fdi_rx_polarity));
+	printf("\tInverted FDI Rx polarity: %s\n", YESNO(features->fdi_rx_polarity_inverted));
 	if (context->bdb->version >= 160) {
 		printf("\tExtended VBIOS mode: %s\n", YESNO(features->vbios_extended_mode));
 		printf("\tCopy iLFP DTD to SDVO LVDS DTD: %s\n", YESNO(features->copy_ilfp_dtd_to_sdvo_lvds_dtd));
@@ -269,9 +277,9 @@ static const struct {
 	{ DEVICE_TYPE_INT_LFP, "LFP" },
 	{ DEVICE_TYPE_INT_TV, "TV" },
 	{ DEVICE_TYPE_DP, "DisplayPort" },
-	{ DEVICE_TYPE_DP_HDMI_DVI, "DisplayPort/HDMI/DVI" },
+	{ DEVICE_TYPE_DP_DUAL_MODE, "DisplayPort/HDMI/DVI" },
 	{ DEVICE_TYPE_DP_DVI, "DisplayPort/DVI" },
-	{ DEVICE_TYPE_HDMI_DVI, "HDMI/DVI" },
+	{ DEVICE_TYPE_HDMI, "HDMI/DVI" },
 	{ DEVICE_TYPE_DVI, "DVI" },
 	{ DEVICE_TYPE_eDP, "eDP" },
 	{ DEVICE_TYPE_MIPI, "MIPI" },
@@ -627,7 +635,7 @@ static void dump_lvds_data(struct context *context,
 static void dump_driver_feature(struct context *context,
 				const struct bdb_block *block)
 {
-	const struct bdb_driver_feature *feature = block->data;
+	const struct bdb_driver_features *feature = block->data;
 
 	printf("\tBoot Device Algorithm: %s\n", feature->boot_dev_algorithm ?
 	       "driver default" : "os default");
