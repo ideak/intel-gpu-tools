@@ -44,6 +44,7 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
+typedef uint64_t u64;
 #define __packed __attribute__ ((packed))
 
 #define _INTEL_BIOS_PRIVATE
@@ -797,17 +798,17 @@ static void dump_edp(struct context *context,
 		}
 
 		if (context->bdb->version >= 162) {
-			bool val = (edp->s3d_feature >> i) & 1;
+			bool val = (edp->edp_s3d_feature >> i) & 1;
 			printf("\t\tStereo 3D feature: %s\n", YESNO(val));
 		}
 
 		if (context->bdb->version >= 165) {
-			bool val = (edp->t3_optimization >> i) & 1;
+			bool val = (edp->edp_t3_optimization >> i) & 1;
 			printf("\t\tT3 optimization: %s\n", YESNO(val));
 		}
 
 		if (context->bdb->version >= 173) {
-			int val = (edp->vswing_preemph_table_selection >> (i * 4)) & 0xf;
+			int val = (edp->edp_vswing_preemph >> (i * 4)) & 0xf;
 
 			printf("\t\tVswing/preemphasis table selection: ");
 			switch (val) {

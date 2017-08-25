@@ -671,6 +671,41 @@ struct bdb_driver_features {
 #define EDP_VSWING_0_8V		2
 #define EDP_VSWING_1_2V		3
 
+
+struct edp_fast_link_params {
+	u8 rate:4;
+	u8 lanes:4;
+	u8 preemphasis:4;
+	u8 vswing:4;
+} __packed;
+
+struct edp_pwm_delays {
+	u16 pwm_on_to_backlight_enable;
+	u16 backlight_disable_to_pwm_off;
+} __packed;
+
+struct edp_full_link_params {
+	u8 preemphasis:4;
+	u8 vswing:4;
+} __packed;
+
+struct bdb_edp {
+	struct edp_power_seq power_seqs[16];
+	u32 color_depth;
+	struct edp_fast_link_params fast_link_params[16];
+	u32 sdrrs_msa_timing_delay;
+
+	/* ith bit indicates enabled/disabled for (i+1)th panel */
+	u16 edp_s3d_feature;					/* 162 */
+	u16 edp_t3_optimization;				/* 165 */
+	u64 edp_vswing_preemph;					/* 173 */
+	u16 fast_link_training;					/* 182 */
+	u16 dpcd_600h_write_required;				/* 185 */
+	struct edp_pwm_delays pwm_delays[16];			/* 186 */
+	u16 full_link_params_provided;				/* 199 */
+	struct edp_full_link_params full_link_params[16];	/* 199 */
+} __packed;
+
 struct psr_table {
 	/* Feature bits */
 	u8 full_link:1;
