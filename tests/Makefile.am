@@ -51,6 +51,16 @@ pkglibexec_PROGRAMS = \
 	$(TESTS_progs_X) \
 	$(NULL)
 
+# Piglit expects test-list*.txt to be in the same directory as the
+# tests. pkglibexec_DATA is an invalid combo to autotools, so work
+# around that by defining a new directory variable that is the same as
+# libexec directory and install the .txt files there.
+wrap_libexecdir = $(pkglibexecdir)
+wrap_libexec_DATA = \
+	test-list.txt \
+	test-list-full.txt \
+	$(NULL)
+
 dist_pkglibexec_SCRIPTS = \
 	$(TESTS_scripts) \
 	$(scripts) \
@@ -63,8 +73,6 @@ dist_pkgdata_DATA = \
 all-local: .gitignore
 .gitignore: Makefile.sources
 	@echo "$(pkglibexec_PROGRAMS) $(HANG) test-list.txt test-list-full.txt /.gitignore" | sed 's/\s\+/\n/g' | sort > $@
-
-pkgdata_DATA = test-list.txt test-list-full.txt
 
 EXTRA_PROGRAMS = $(HANG)
 EXTRA_DIST = $(common_files) $(check_SCRIPTS)
