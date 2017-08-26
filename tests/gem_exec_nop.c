@@ -711,8 +711,11 @@ igt_main
 	}
 
 #if !defined(ANDROID) || ANDROID_HAS_CAIRO
-	igt_subtest("headless")
+	igt_subtest("headless") {
+		/* Requires master for changing display modes */
+		igt_require(drmSetMaster(device) == 0);
 		headless(device, handle);
+	}
 #endif
 
 	igt_fixture {
