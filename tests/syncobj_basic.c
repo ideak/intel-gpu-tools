@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "igt_syncobj.h"
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include "drm.h"
@@ -48,14 +49,11 @@ static void
 test_bad_handle_to_fd(int fd)
 {
 	struct drm_syncobj_handle handle;
-	int ret;
 
 	handle.handle = 0xdeadbeef;
 	handle.flags = 0;
 
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD, &handle);
-
-	igt_assert(ret == -1 && errno == EINVAL);
+	igt_assert_eq(__syncobj_handle_to_fd(fd, &handle), -EINVAL);
 }
 
 /* fd to handle a bad fd */
@@ -63,14 +61,11 @@ static void
 test_bad_fd_to_handle(int fd)
 {
 	struct drm_syncobj_handle handle;
-	int ret;
 
 	handle.fd = -1;
 	handle.flags = 0;
 
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, &handle);
-
-	igt_assert(ret == -1 && errno == EINVAL);
+	igt_assert_eq(__syncobj_fd_to_handle(fd, &handle), -EINVAL);
 }
 
 /* fd to handle an fd but not a sync file one */
@@ -78,58 +73,47 @@ static void
 test_illegal_fd_to_handle(int fd)
 {
 	struct drm_syncobj_handle handle;
-	int ret;
 
 	handle.fd = fd;
 	handle.flags = 0;
 
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, &handle);
-
-	igt_assert(ret == -1 && errno == EINVAL);
+	igt_assert_eq(__syncobj_fd_to_handle(fd, &handle), -EINVAL);
 }
 
 static void
 test_bad_flags_fd_to_handle(int fd)
 {
 	struct drm_syncobj_handle handle = { 0 };
-	int ret;
 
 	handle.flags = 0xdeadbeef;
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, &handle);
-	igt_assert(ret == -1 && errno == EINVAL);
+	igt_assert_eq(__syncobj_fd_to_handle(fd, &handle), -EINVAL);
 }
 
 static void
 test_bad_flags_handle_to_fd(int fd)
 {
 	struct drm_syncobj_handle handle = { 0 };
-	int ret;
 
 	handle.flags = 0xdeadbeef;
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD, &handle);
-	igt_assert(ret == -1 && errno == EINVAL);
+	igt_assert_eq(__syncobj_handle_to_fd(fd, &handle), -EINVAL);
 }
 
 static void
 test_bad_pad_handle_to_fd(int fd)
 {
 	struct drm_syncobj_handle handle = { 0 };
-	int ret;
 
 	handle.pad = 0xdeadbeef;
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD, &handle);
-	igt_assert(ret == -1 && errno == EINVAL);
+	igt_assert_eq(__syncobj_handle_to_fd(fd, &handle), -EINVAL);
 }
 
 static void
 test_bad_pad_fd_to_handle(int fd)
 {
 	struct drm_syncobj_handle handle = { 0 };
-	int ret;
 
 	handle.pad = 0xdeadbeef;
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, &handle);
-	igt_assert(ret == -1 && errno == EINVAL);
+	igt_assert_eq(__syncobj_fd_to_handle(fd, &handle), -EINVAL);
 }
 
 
@@ -138,24 +122,17 @@ test_bad_pad_fd_to_handle(int fd)
 static void
 test_bad_destroy_pad(int fd)
 {
-	struct drm_syncobj_create create = { 0 };
 	struct drm_syncobj_destroy destroy;
 	int ret;
 
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_CREATE, &create);
-
-	destroy.handle = create.handle;
+	destroy.handle = syncobj_create(fd, 0);
 	destroy.pad = 0xdeadbeef;
 
 	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_DESTROY, &destroy);
 
 	igt_assert(ret == -1 && errno == EINVAL);
 
-	destroy.handle = create.handle;
-	destroy.pad = 0;
-
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_DESTROY, &destroy);
-	igt_assert(ret == 0);
+	syncobj_destroy(fd, destroy.handle);
 }
 
 static void
@@ -176,34 +153,18 @@ test_bad_create_flags(int fd)
 static void
 test_valid_cycle(int fd)
 {
-	int ret;
-	struct drm_syncobj_create create = { 0 };
-	struct drm_syncobj_handle handle = { 0 };
-	struct drm_syncobj_destroy destroy = { 0 };
-	uint32_t first_handle;
+	uint32_t first_handle, second_handle;
+	int syncobj_fd;
 
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_CREATE, &create);
-	igt_assert(ret == 0);
+	first_handle = syncobj_create(fd, 0);
+	syncobj_fd = syncobj_handle_to_fd(fd, first_handle, 0);
+	second_handle = syncobj_fd_to_handle(fd, syncobj_fd, 0);
+	close(syncobj_fd);
 
-	first_handle = create.handle;
+	igt_assert(first_handle != second_handle);
 
-	handle.handle = create.handle;
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD, &handle);
-	igt_assert(ret == 0);
-	handle.handle = 0;
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, &handle);
-	close(handle.fd);
-	igt_assert(ret == 0);
-
-	igt_assert(handle.handle != first_handle);
-
-	destroy.handle = handle.handle;
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_DESTROY, &destroy);
-	igt_assert(ret == 0);
-
-	destroy.handle = first_handle;
-	ret = ioctl(fd, DRM_IOCTL_SYNCOBJ_DESTROY, &destroy);
-	igt_assert(ret == 0);
+	syncobj_destroy(fd, first_handle);
+	syncobj_destroy(fd, second_handle);
 }
 
 static bool has_syncobj(int fd)
