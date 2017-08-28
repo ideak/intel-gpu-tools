@@ -34,6 +34,7 @@
     <xi:include href="xml/igt_primes.xml"/>
     <xi:include href="xml/igt_rand.xml"/>
     <xi:include href="xml/igt_stats.xml"/>
+    <xi:include href="xml/igt_syncobj.xml"/>
     <xi:include href="xml/igt_sysfs.xml"/>
     <xi:include href="xml/igt_vc4.xml"/>
     <xi:include href="xml/igt_vgem.xml"/>
