@@ -235,12 +235,12 @@
  * An example configuration follows:
  *
  * |[<!-- language="plain" -->
- *	# The common configuration secton follows.
+ *	&num; The common configuration section follows.
  *	[Common]
  *	FrameDumpPath=/tmp # The path to dump frames that fail comparison checks
  *
- *	# The following section is used for configuring the Device Under Test.
- *	# It is not mandatory and allows overriding default values.
+ *	&num; The following section is used for configuring the Device Under Test.
+ *	&num; It is not mandatory and allows overriding default values.
  *	[DUT]
  *	SuspendResumeDelay=10
  * ]|
