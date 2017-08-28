@@ -146,6 +146,16 @@ test_bad_create_flags(int fd)
 	igt_assert(ret == -1 && errno == EINVAL);
 }
 
+static void
+test_create_signaled(int fd)
+{
+	uint32_t syncobj = syncobj_create(fd, LOCAL_SYNCOBJ_CREATE_SIGNALED);
+
+	igt_assert_eq(syncobj_wait_err(fd, &syncobj, 1, 0, 0), 0);
+
+	syncobj_destroy(fd, syncobj);
+}
+
 /*
  * currently don't do handle deduplication
  * test we get a different handle back.
@@ -214,6 +224,9 @@ igt_main
 
 	igt_subtest("bad-destroy-pad")
 		test_bad_destroy_pad(fd);
+
+	igt_subtest("create-signaled")
+		test_create_signaled(fd);
 
 	igt_subtest("test-valid-cycle")
 		test_valid_cycle(fd);

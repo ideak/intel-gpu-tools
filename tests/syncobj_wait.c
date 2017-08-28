@@ -27,6 +27,8 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/ioctl.h>
+#include <pthread.h>
+#include <signal.h>
 #include "drm.h"
 
 IGT_TEST_DESCRIPTION("Tests for the drm sync object wait API");
