@@ -299,34 +299,37 @@ static const char *child_device_type(unsigned short type)
 	return "unknown";
 }
 
-static const char * const child_device_type_bits[] = {
-	[DEVICE_TYPE_CLASS_EXTENSION] = "Class extension",
-	[DEVICE_TYPE_POWER_MANAGEMENT] = "Power management",
-	[DEVICE_TYPE_HOTPLUG_SIGNALING] = "Hotplug signaling",
-	[DEVICE_TYPE_INTERNAL_CONNECTOR] = "Internal connector",
-	[DEVICE_TYPE_NOT_HDMI_OUTPUT] = "HDMI output", /* decoded as inverse */
-	[DEVICE_TYPE_MIPI_OUTPUT] = "MIPI output",
-	[DEVICE_TYPE_COMPOSITE_OUTPUT] = "Composite output",
-	[DEVICE_TYPE_DIAL_CHANNEL] = "Dual channel",
-	[DEVICE_TYPE_CONTENT_PROTECTION] = "Content protection",
-	[DEVICE_TYPE_HIGH_SPEED_LINK] = "High speel link",
-	[DEVICE_TYPE_LVDS_SIGNALING] = "LVDS signaling",
-	[DEVICE_TYPE_TMDS_DVI_SIGNALING] = "TMDS/DVI signaling",
-	[DEVICE_TYPE_VIDEO_SIGNALING] = "Video signaling",
-	[DEVICE_TYPE_DISPLAYPORT_OUTPUT] = "DisplayPort output",
-	[DEVICE_TYPE_DIGITAL_OUTPUT] = "Digital output",
-	[DEVICE_TYPE_ANALOG_OUTPUT] = "Analog output",
+static const struct {
+	unsigned short mask;
+	const char *name;
+} child_device_type_bits[] = {
+	{ DEVICE_TYPE_CLASS_EXTENSION, "Class extension" },
+	{ DEVICE_TYPE_POWER_MANAGEMENT, "Power management" },
+	{ DEVICE_TYPE_HOTPLUG_SIGNALING, "Hotplug signaling" },
+	{ DEVICE_TYPE_INTERNAL_CONNECTOR, "Internal connector" },
+	{ DEVICE_TYPE_NOT_HDMI_OUTPUT, "HDMI output" }, /* decoded as inverse */
+	{ DEVICE_TYPE_MIPI_OUTPUT, "MIPI output" },
+	{ DEVICE_TYPE_COMPOSITE_OUTPUT, "Composite output" },
+	{ DEVICE_TYPE_DUAL_CHANNEL, "Dual channel" },
+	{ 1 << 7, "Content protection" },
+	{ DEVICE_TYPE_HIGH_SPEED_LINK, "High speel link" },
+	{ DEVICE_TYPE_LVDS_SINGALING, "LVDS signaling" },
+	{ DEVICE_TYPE_TMDS_DVI_SIGNALING, "TMDS/DVI signaling" },
+	{ DEVICE_TYPE_VIDEO_SIGNALING, "Video signaling" },
+	{ DEVICE_TYPE_DISPLAYPORT_OUTPUT, "DisplayPort output" },
+	{ DEVICE_TYPE_DIGITAL_OUTPUT, "Digital output" },
+	{ DEVICE_TYPE_ANALOG_OUTPUT, "Analog output" },
 };
 
 static void dump_child_device_type_bits(uint16_t type)
 {
-	int bit;
+	int i;
 
-	type ^= 1 << DEVICE_TYPE_NOT_HDMI_OUTPUT;
+	type ^= DEVICE_TYPE_NOT_HDMI_OUTPUT;
 
-	for (bit = 15; bit >= 0; bit--) {
-		if (type & (1 << bit))
-			printf("\t\t\t%s\n", child_device_type_bits[bit]);
+	for (i = 0; i < ARRAY_SIZE(child_device_type_bits); i++) {
+		if (child_device_type_bits[i].mask & type)
+			printf("\t\t\t%s\n", child_device_type_bits[i].name);
 	}
 }
 
