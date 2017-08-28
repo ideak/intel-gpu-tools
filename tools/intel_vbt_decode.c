@@ -225,25 +225,21 @@ static void dump_general_features(struct context *context,
 static void dump_backlight_info(struct context *context,
 				const struct bdb_block *block)
 {
-	const struct bdb_lvds_backlight *backlight = block->data;
-	const struct blc_struct *blc;
+	const struct bdb_lfp_backlight_data *backlight = block->data;
+	const struct bdb_lfp_backlight_data_entry *blc;
 
-	if (sizeof(struct blc_struct) != backlight->blcstruct_size) {
+	if (sizeof(*blc) != backlight->entry_size) {
 		printf("\tBacklight struct sizes don't match (expected %zu, got %u), skipping\n",
-		     sizeof(struct blc_struct), backlight->blcstruct_size);
+		     sizeof(*blc), backlight->entry_size);
 		return;
 	}
 
-	blc = &backlight->panels[context->panel_type];
+	blc = &backlight->data[context->panel_type];
 
-	printf("\tInverter type: %d\n", blc->inverter_type);
-	printf("\t     polarity: %d\n", blc->inverter_polarity);
-	printf("\t    GPIO pins: %d\n", blc->gpio_pins);
-	printf("\t  GMBUS speed: %d\n", blc->gmbus_speed);
-	printf("\t     PWM freq: %d\n", blc->pwm_freq);
+	printf("\tInverter type: %d\n", blc->type);
+	printf("\t     polarity: %d\n", blc->active_low_pwm);
+	printf("\t     PWM freq: %d\n", blc->pwm_freq_hz);
 	printf("\tMinimum brightness: %d\n", blc->min_brightness);
-	printf("\tI2C slave addr: 0x%02x\n", blc->i2c_slave_addr);
-	printf("\tI2C command: 0x%02x\n", blc->i2c_cmd);
 }
 
 static const struct {

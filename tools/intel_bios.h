@@ -83,22 +83,6 @@ struct bdb_child_devices {
 	struct legacy_child_device_config children[DEVICE_CHILD_SIZE];
 } __attribute__ ((packed));
 
-struct blc_struct {
-	uint8_t inverter_type:2;
-	uint8_t inverter_polarity:1;	/* 1 means inverted (0 = max brightness) */
-	uint8_t gpio_pins:3;
-	uint8_t gmbus_speed:2;
-	uint16_t pwm_freq;	/* in Hz */
-	uint8_t min_brightness;	/* (0-255) */
-	uint8_t i2c_slave_addr;
-	uint8_t i2c_cmd;
-} __attribute__ ((packed));
-
-struct bdb_lvds_backlight {
-	uint8_t blcstruct_size;
-	struct blc_struct panels[16];
-} __attribute__ ((packed));
-
 #define BDB_DRIVER_NO_LVDS	0
 #define BDB_DRIVER_INT_LVDS	1
 #define BDB_DRIVER_SDVO_LVDS	2
