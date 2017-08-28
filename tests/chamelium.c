@@ -474,9 +474,6 @@ enable_output(data_t *data,
 	if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
 		usleep(250000);
 
-	chamelium_port_wait_video_input_stable(data->chamelium, port,
-					       HOTPLUG_TIMEOUT);
-
 	drmModeFreeConnector(connector);
 }
 
