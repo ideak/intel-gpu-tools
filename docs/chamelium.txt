@@ -54,6 +54,12 @@ CI system with a shared testlist) to remove the Chamelium configuration from the
 hosts that shouldn't connect to the Chamelium so that they can be skipped, which
 is faster than a network timeout.
 
+It should also be noted that each Chamelium platform should only be used for
+testing a single target device at a time. This is because the reset call issued
+by the IGT tests is common to all connectors and thus one machine running a test
+on a given connector may reset the Chamelium while another machine is running
+a test on another connector.
+
 An example fully-featured configuration follows:
 [Common]
 FrameDumpPath=/root/
