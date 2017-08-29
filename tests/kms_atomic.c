@@ -1596,6 +1596,7 @@ igt_main
 		struct kms_atomic_connector_state *conn =
 			find_connector(scratch, crtc);
 
+		igt_require(crtc);
 		igt_require(plane);
 		igt_require(conn);
 		atomic_invalid_params(crtc, plane, conn);
