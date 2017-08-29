@@ -167,8 +167,27 @@ static void test_integrity(const char *device_name)
 	free(data.alsa);
 }
 
+static void test_suspend_resume_integrity(const char *device_name,
+					  enum igt_suspend_state state,
+					  enum igt_suspend_test test)
+{
+	test_integrity(device_name);
+
+	igt_system_suspend_autoresume(state, test);
+
+	test_integrity(device_name);
+}
+
 igt_main
 {
 	igt_subtest("hdmi-integrity")
 		test_integrity("HDMI");
+
+	igt_subtest("hdmi-integrity-after-suspend")
+		test_suspend_resume_integrity("HDMI", SUSPEND_STATE_MEM,
+					      SUSPEND_TEST_NONE);
+
+	igt_subtest("hdmi-integrity-after-hibernate")
+		test_suspend_resume_integrity("HDMI", SUSPEND_STATE_DISK,
+					      SUSPEND_TEST_DEVICES);
 }
