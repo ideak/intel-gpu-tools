@@ -579,7 +579,7 @@ void igt_require_pipe_crc(int fd)
 
 static void igt_hpd_storm_exit_handler(int sig)
 {
-	int fd = drm_open_driver_master(DRIVER_INTEL);
+	int fd = drm_open_driver(DRIVER_INTEL);
 
 	/* Here we assume that only one i915 device will be ever present */
 	igt_hpd_storm_reset(fd);
