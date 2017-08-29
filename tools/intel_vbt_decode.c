@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "igt_aux.h"
 #include "intel_io.h"
 #include "intel_chipset.h"
 #include "drmtest.h"
@@ -475,6 +476,7 @@ static void dump_general_definitions(struct context *context,
 				     const struct bdb_block *block)
 {
 	const struct bdb_general_definitions *defs = block->data;
+	struct child_device_config *child;
 	int i;
 	int child_device_num;
 
@@ -489,8 +491,22 @@ static void dump_general_definitions(struct context *context,
 	printf("\tChild device size: %d\n", defs->child_dev_size);
 	child_device_num = (block->size - sizeof(*defs)) /
 		defs->child_dev_size;
-	for (i = 0; i < child_device_num; i++)
-		dump_child_device(context, (const void*)&defs->devices[i * defs->child_dev_size]);
+
+	/*
+	 * Use a temp buffer so dump_child_device() doesn't have to worry about
+	 * accessing the struct beyond child_dev_size. The tail, if any, remains
+	 * initialized to zero.
+	 */
+	child = calloc(1, sizeof(*child));
+
+	for (i = 0; i < child_device_num; i++) {
+		memcpy(child, &defs->devices[i * defs->child_dev_size],
+		       min(sizeof(*child), defs->child_dev_size));
+
+		dump_child_device(context, child);
+	}
+
+	free(child);
 }
 
 static void dump_legacy_child_devices(struct context *context,
