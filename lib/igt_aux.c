@@ -883,19 +883,21 @@ void igt_set_autoresume_delay(int delay_secs)
 
 	igt_skip_on_simulation();
 
-	igt_require((delay_fd = open("/sys/module/suspend/parameters/pm_test_delay",
-				    O_RDWR)) >= 0);
+	delay_fd = open("/sys/module/suspend/parameters/pm_test_delay", O_RDWR);
 
-	if (!original_autoresume_delay) {
-		igt_require(read(delay_fd, delay_str, sizeof(delay_str)));
-		original_autoresume_delay = atoi(delay_str);
-		igt_install_exit_handler(igt_restore_autoresume_delay);
+	if (delay_fd >= 0) {
+		if (!original_autoresume_delay) {
+			igt_require(read(delay_fd, delay_str,
+					 sizeof(delay_str)));
+			original_autoresume_delay = atoi(delay_str);
+			igt_install_exit_handler(igt_restore_autoresume_delay);
+		}
+
+		snprintf(delay_str, sizeof(delay_str), "%d", delay_secs);
+		igt_require(write(delay_fd, delay_str, strlen(delay_str)));
+
+		close(delay_fd);
 	}
-
-	snprintf(delay_str, sizeof(delay_str), "%d", delay_secs);
-	igt_require(write(delay_fd, delay_str, strlen(delay_str)));
-
-	close(delay_fd);
 
 	autoresume_delay = delay_secs;
 }
