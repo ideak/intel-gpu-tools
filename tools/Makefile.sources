@@ -50,6 +50,7 @@ intel_reg_SOURCES =		\
 
 intel_vbt_decode_SOURCES =	\
 	intel_vbt_decode.c	\
+	intel_vbt_defs.h \
 	intel_bios.h
 
 intel_l3_parity_SOURCES =	\
