@@ -48,8 +48,14 @@ IGT_TEST_DESCRIPTION("Check for flink/open vs. gem close races.");
 volatile int pls_die = 0;
 int fd;
 
+struct flink_name {
+	pthread_t thread;
+	unsigned long count;
+};
+
 static void *thread_fn_flink_name(void *p)
 {
+	struct flink_name *t = p;
 	struct drm_gem_open open_struct;
 	int ret;
 
@@ -64,6 +70,7 @@ static void *thread_fn_flink_name(void *p)
 			igt_assert(name == 1);
 
 			gem_close(fd, open_struct.handle);
+			t->count++;
 		} else
 			igt_assert(errno == ENOENT);
 	}
@@ -71,42 +78,50 @@ static void *thread_fn_flink_name(void *p)
 	return (void *)0;
 }
 
-static void test_flink_name(void)
+static void test_flink_name(int timeout)
 {
-	pthread_t *threads;
+	struct flink_name *threads;
 	int r, i, num_threads;
+	unsigned long count;
+	char buf[256];
 	void *status;
+	int len;
 
 	num_threads = sysconf(_SC_NPROCESSORS_ONLN) - 1;
 	if (!num_threads)
 		num_threads = 1;
 
-	threads = calloc(num_threads, sizeof(pthread_t));
+	threads = calloc(num_threads, sizeof(*threads));
 
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	for (i = 0; i < num_threads; i++) {
-		r = pthread_create(&threads[i], NULL,
-				   thread_fn_flink_name, NULL);
+		r = pthread_create(&threads[i].thread, NULL,
+				   thread_fn_flink_name, &threads[i]);
 		igt_assert_eq(r, 0);
 	}
 
-	for (i = 0; i < 1000000; i++) {
+	count = 0;
+	igt_until_timeout(timeout) {
 		uint32_t handle;
 
 		handle = gem_create(fd, 4096);
-
 		gem_flink(fd, handle);
-
 		gem_close(fd, handle);
+
+		count++;
 	}
 
 	pls_die = 1;
 
+	len = snprintf(buf, sizeof(buf), "Completed %lu cycles with [", count);
 	for (i = 0;  i < num_threads; i++) {
-		pthread_join(threads[i], &status);
+		pthread_join(threads[i].thread, &status);
 		igt_assert(status == 0);
+		len += snprintf(buf + len, sizeof(buf) - len, "%lu, ", threads[i].count);
 	}
+	snprintf(buf + len - 2, sizeof(buf) - len + 2, "] races");
+	igt_info("%s\n", buf);
 
 	close(fd);
 }
@@ -185,7 +200,7 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_subtest("flink_name")
-		test_flink_name();
+		test_flink_name(5);
 
 	igt_subtest("flink_close")
 		test_flink_close();
