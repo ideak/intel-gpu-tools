@@ -50,6 +50,7 @@ enum {
 	RP0,
 	RP1,
 	RPn,
+	BOOST,
 	NUMFREQ
 };
 
@@ -60,7 +61,7 @@ struct junk {
 	const char *mode;
 	FILE *filp;
 } stuff[] = {
-	{ "cur", "r", NULL }, { "min", "rb+", NULL }, { "max", "rb+", NULL }, { "RP0", "r", NULL }, { "RP1", "r", NULL }, { "RPn", "r", NULL }, { NULL, NULL, NULL }
+	{ "cur", "r", NULL }, { "min", "rb+", NULL }, { "max", "rb+", NULL }, { "RP0", "r", NULL }, { "RP1", "r", NULL }, { "RPn", "r", NULL }, { "boost", "rb+", NULL }, { NULL, NULL, NULL }
 };
 
 static int readval(FILE *filp)
@@ -167,7 +168,7 @@ static void dump(const int *freqs)
 }
 
 enum load {
-	LOW,
+	LOW = 0,
 	HIGH
 };
 
@@ -185,9 +186,10 @@ static struct load_helper {
 
 static void load_helper_signal_handler(int sig)
 {
-	if (sig == SIGUSR2)
-		lh.load = lh.load == LOW ? HIGH : LOW;
-	else
+	if (sig == SIGUSR2) {
+		lh.load = !lh.load;
+		igt_debug("Switching background load to %s\n", lh.load ? "high" : "low");
+	} else
 		lh.exit = true;
 }
 
@@ -238,6 +240,7 @@ static void load_helper_run(enum load load)
 		return;
 	}
 
+	lh.exit = false;
 	lh.load = load;
 
 	igt_fork_helper(&lh.igt_proc) {
@@ -262,6 +265,8 @@ static void load_helper_run(enum load load)
 		execbuf.buffer_count = 1;
 		if (intel_gen(lh.devid) >= 6)
 			execbuf.flags = I915_EXEC_BLT;
+
+		igt_debug("Applying %s load...\n", lh.load ? "high" : "low");
 
 		while (!lh.exit) {
 			memset(&object, 0, sizeof(object));
@@ -296,6 +301,12 @@ static void load_helper_run(enum load load)
 		gem_close(drm_fd, fences[0]);
 		gem_close(drm_fd, fences[1]);
 		gem_close(drm_fd, fences[2]);
+
+		/* Idle/boost logic is tied with request retirement.
+		 * Speed up detection of idle state and ensure deboost
+		 * after removing load.
+		 */
+		igt_drop_caches_set(drm_fd, DROP_RETIRE);
 	}
 }
 
@@ -553,37 +564,42 @@ static void stabilize_check(int *out)
 	igt_debug("Waited %d msec to stabilize cur\n", wait);
 }
 
-static void reset_gpu(void)
-{
-	int fd = drm_open_driver(DRIVER_INTEL);
-	igt_post_hang_ring(fd, igt_hang_ring(fd, I915_EXEC_DEFAULT));
-	close(fd);
-}
-
 static void boost_freq(int fd, int *boost_freqs)
 {
 	int64_t timeout = 1;
-	int ring = -1;
 	igt_spin_t *load;
+	unsigned int engine;
+	int fmid = (origfreqs[RPn] + origfreqs[RP0]) / 2;
 
-	load = igt_spin_batch_new(fd, ring, 0);
+	fmid = get_hw_rounded_freq(fmid);
+	/* Set max freq to less then boost freq */
+	writeval(stuff[MAX].filp, fmid);
 
+	/* Put boost on the same engine as low load */
+	engine = I915_EXEC_RENDER;
+	if (intel_gen(lh.devid) >= 6)
+		engine = I915_EXEC_BLT;
+	load = igt_spin_batch_new(fd, engine, 0);
 	/* Waiting will grant us a boost to maximum */
 	gem_wait(fd, load->handle, &timeout);
 
 	read_freqs(boost_freqs);
 	dump(boost_freqs);
 
+	/* Avoid downlocking till boost request is pending */
+	igt_spin_batch_end(load);
+	gem_sync(fd, load->handle);
 	igt_spin_batch_free(fd, load);
+
+	/* Set max freq to original softmax */
+	writeval(stuff[MAX].filp, origfreqs[MAX]);
 }
 
-static void waitboost(bool reset)
+static void waitboost(int fd, bool reset)
 {
 	int pre_freqs[NUMFREQ];
 	int boost_freqs[NUMFREQ];
 	int post_freqs[NUMFREQ];
-
-	int fd = drm_open_driver(DRIVER_INTEL);
 
 	load_helper_run(LOW);
 
@@ -593,7 +609,7 @@ static void waitboost(bool reset)
 
 	if (reset) {
 		igt_debug("Reset gpu...\n");
-		reset_gpu();
+		igt_force_gpu_reset(fd);
 		sleep(1);
 	}
 
@@ -611,10 +627,9 @@ static void waitboost(bool reset)
 	idle_check();
 
 	igt_assert_lt(pre_freqs[CUR], pre_freqs[MAX]);
-	igt_assert_eq(boost_freqs[CUR], boost_freqs[MAX]);
+	igt_assert_eq(boost_freqs[CUR], boost_freqs[BOOST]);
 	igt_assert_lt(post_freqs[CUR], post_freqs[MAX]);
 
-	close(fd);
 }
 
 static void pm_rps_exit_handler(int sig)
@@ -657,7 +672,7 @@ igt_main
 			val = readval(junk->filp);
 			igt_assert(val >= 0);
 			junk++;
-		} while(junk->name != NULL);
+		} while (junk->name != NULL);
 
 		read_freqs(origfreqs);
 
@@ -679,9 +694,11 @@ igt_main
 	}
 
 	igt_subtest("waitboost")
-		waitboost(false);
+		waitboost(drm_fd, false);
 
-	igt_subtest("reset")
-		waitboost(true);
-
+	igt_subtest("reset") {
+		igt_hang_t hang = igt_allow_hang(drm_fd, 0, 0);
+		waitboost(drm_fd, true);
+		igt_disallow_hang(drm_fd, hang);
+	}
 }
