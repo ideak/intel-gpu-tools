@@ -202,6 +202,7 @@ static const struct module {
 } modules[] = {
 	{ DRIVER_AMDGPU, "amdgpu" },
 	{ DRIVER_INTEL, "i915", modprobe_i915 },
+	{ DRIVER_V3D, "v3d" },
 	{ DRIVER_VC4, "vc4" },
 	{ DRIVER_VGEM, "vgem" },
 	{ DRIVER_VIRTIO, "virtio-gpu" },
@@ -340,6 +341,8 @@ static const char *chipset_to_str(int chipset)
 	switch (chipset) {
 	case DRIVER_INTEL:
 		return "intel";
+	case DRIVER_V3D:
+		return "v3d";
 	case DRIVER_VC4:
 		return "vc4";
 	case DRIVER_VGEM:
