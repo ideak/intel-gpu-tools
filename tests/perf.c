@@ -1145,6 +1145,16 @@ init_sys_info(void)
 		} else if (IS_GEMINILAKE(devid)) {
 			test_set_uuid = "dd3fd789-e783-4204-8cd0-b671bbccb0cf";
 			timestamp_frequency = 19200000;
+		} else if (IS_COFFEELAKE(devid)) {
+			switch (intel_gt(devid)) {
+			case 1:
+				test_set_uuid = "74fb4902-d3d3-4237-9e90-cbdc68d0a446";
+				break;
+			default:
+				igt_debug("unsupported Cannonlake GT size\n");
+				return false;
+			}
+			timestamp_frequency = 12000000;
 		} else {
 			igt_debug("unsupported GT\n");
 			return false;
