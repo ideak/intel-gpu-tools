@@ -146,6 +146,9 @@ gem_ctx_isolation_SOURCES = i915/gem_ctx_isolation.c
 TESTS_progs += gem_ctx_param
 gem_ctx_param_SOURCES = i915/gem_ctx_param.c
 
+TESTS_progs += gem_ctx_sseu
+gem_ctx_sseu_SOURCES = i915/gem_ctx_sseu.c
+
 TESTS_progs += gem_ctx_switch
 gem_ctx_switch_SOURCES = i915/gem_ctx_switch.c
 

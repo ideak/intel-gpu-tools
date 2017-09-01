@@ -290,6 +290,14 @@ foreach prog : gem_progs + gen3_progs
 	test_list += prog
 endforeach
 
+test_executables += executable('gem_ctx_sseu',
+	   join_paths('i915', 'gem_ctx_sseu.c'),
+	   dependencies : test_deps + [ lib_igt_perf ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'gem_ctx_sseu'
+
 test_executables += executable('gem_eio',
 	   join_paths('i915', 'gem_eio.c'),
 	   dependencies : test_deps + [ realtime ],
