@@ -491,7 +491,7 @@ static void igt_pipe_crc_reset(int drm_fd)
 	}
 
 	while ((dirent = readdir(dir))) {
-		char buf[128];
+		char buf[PATH_MAX];
 
 		if (strcmp(dirent->d_name, "crtc-") != 0)
 			continue;
@@ -525,7 +525,7 @@ static void igt_pipe_crc_reset(int drm_fd)
 static void pipe_crc_exit_handler(int sig)
 {
 	struct dirent *dirent;
-	char buf[128];
+	char buf[PATH_MAX];
 	DIR *dir;
 	int fd;
 

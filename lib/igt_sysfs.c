@@ -192,7 +192,7 @@ int igt_sysfs_open_parameters(int device)
 	if (params < 0) { /* builtin? */
 		drm_version_t version;
 		char name[32] = "";
-		char path[128];
+		char path[PATH_MAX];
 
 		memset(&version, 0, sizeof(version));
 		version.name_len = sizeof(name);
@@ -499,7 +499,7 @@ void kick_fbcon(bool enable)
 		return;
 
 	while ((de = readdir(dir))) {
-		char buf[128];
+		char buf[PATH_MAX];
 		int fd, len;
 
 		if (strncmp(de->d_name, "vtcon", 5))

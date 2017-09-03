@@ -594,14 +594,14 @@ static int count_i2c_valid_edids(void)
 	DIR *dir;
 
 	struct dirent *dirent;
-	char full_name[32];
+	char full_name[PATH_MAX];
 
 	dir = opendir("/dev/");
 	igt_assert(dir);
 
 	while ((dirent = readdir(dir))) {
 		if (strncmp(dirent->d_name, "i2c-", 4) == 0) {
-			snprintf(full_name, 32, "/dev/%s", dirent->d_name);
+			sprintf(full_name, "/dev/%s", dirent->d_name);
 			fd = open(full_name, O_RDWR);
 			igt_assert_neq(fd, -1);
 			if (i2c_edid_is_valid(fd))

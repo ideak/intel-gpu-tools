@@ -170,7 +170,7 @@ eld_is_valid(void)
 			continue;
 
 		while ((snd_hda = readdir(dir))) {
-			char fpath[128];
+			char fpath[PATH_MAX];
 
 			if (*snd_hda->d_name == '.' ||
 			    strstr(snd_hda->d_name, "eld") == 0)
