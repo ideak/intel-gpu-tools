@@ -901,7 +901,7 @@ static void poll_dsl_field(int pipe, uint32_t *min, uint32_t *max, const int cou
 
 static const char *test_name(enum test test, int pipe, int bit, bool test_pixel_count)
 {
-	static char str[32];
+	static char str[64];
 	const char *type = test_pixel_count ? "pixel" : "dsl";
 
 	switch (test) {
