@@ -110,7 +110,7 @@ struct ilk_wm {
 	((((lo) >> (shift_lo)) & MASK(size_lo)) | \
 	 ((((hi) >> (shift_hi)) & MASK(size_hi)) << (size_lo)))
 
-static const char pipe_name(int pipe)
+static char pipe_name(int pipe)
 {
 	return 'A' + pipe;
 }
