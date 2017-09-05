@@ -248,7 +248,7 @@ if libdrm_amdgpu.found()
 	test_deps += libdrm_amdgpu
 endif
 
-if alsa.found()
+if alsa.found() and gsl.found()
 	test_progs += [
 		'audio',
 	]
