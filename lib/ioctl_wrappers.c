@@ -26,9 +26,7 @@
  *
  */
 
-#ifndef ANDROID
-#define _GNU_SOURCE
-#else
+#ifdef HAVE_LIBGEN_H
 #include <libgen.h>
 #endif
 #include <stdio.h>

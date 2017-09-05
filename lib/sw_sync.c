@@ -24,9 +24,7 @@
  *    Robert Foss <robert.foss@collabora.com>
  */
 
-#ifndef ANDROID
-#define _GNU_SOURCE
-#else
+#ifdef HAVE_LIBGEN_H
 #include <libgen.h>
 #endif
 #include <fcntl.h>
