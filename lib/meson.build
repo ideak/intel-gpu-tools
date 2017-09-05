@@ -117,8 +117,8 @@ if valgrind.found()
 	lib_deps += valgrind
 endif
 
-if gsl.found()
-	lib_deps += gsl
+if gsl.found() and pixman.found()
+	lib_deps += [ gsl, pixman ]
 	lib_headers += [ 'igt_frame.h', 'igt_audio.h' ]
 	lib_sources += [ 'igt_frame.c', 'igt_audio.c' ]
 endif
