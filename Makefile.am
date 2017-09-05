@@ -36,7 +36,7 @@ if BUILD_SHADER_DEBUGGER
 SUBDIRS += debugger
 endif
 
-SUBDIRS += overlay demos benchmarks
+SUBDIRS += overlay benchmarks
 endif
 
 SUBDIRS += docs

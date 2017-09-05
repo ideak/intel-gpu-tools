@@ -1,7 +1,0 @@
-demos_prog_list =		\
-	$(NULL)
-
-LIBDRM_INTEL_BIN =		\
-	intel_sprite_on		\
-	$(NULL)
-
