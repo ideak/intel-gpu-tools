@@ -60,7 +60,7 @@
 
 #define VG(x) x
 #else
-#define VG(x)
+#define VG(x) do {} while (0)
 #endif
 
 #include "ioctl_wrappers.h"
