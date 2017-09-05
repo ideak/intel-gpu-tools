@@ -4,7 +4,8 @@ project('IGT gpu tests', 'c',
           'warning_level=2',
           'c_std=gnu99',
         ],
-	license : 'MIT')
+	license : 'MIT',
+	meson_version : '>0.40.0')
 
 cc = meson.get_compiler('c')
 
