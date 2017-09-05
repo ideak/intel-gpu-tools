@@ -144,19 +144,33 @@ vcs_tag(input : 'version.h.in', output : 'version.h',
 	fallback : 'NO-GIT',
 	command : [ 'git', 'log', '-n1', '--pretty=format:g%h' ] )
 
-# FIXME we don't regenerate when the script changes
-prepend_log_domain = generator(find_program('prepend_log_domain.sh'),
-		arguments : [ '@INPUT@', '@OUTPUT@' ],
-		output : '@PLAINNAME@' + '.pre.c')
+lib_intermediates = []
+foreach f: lib_sources
+    # No / in the target name
+    if f.contains('uwildmat')
+        name = 'uwildmat'
+    else
+        name = f
+    endif
 
-processed_src_dep = prepend_log_domain.process(lib_sources)
+    lib = static_library('igt-' + name,
+        f,
+	include_directories: inc,
+	dependencies : lib_deps,
+	c_args : [
+	    '-DIGT_DATADIR="@0@"'.format(pkgdatadir),
+	    '-DIGT_SRCDIR="@0@"'.format(srcdir),
+	    '-DIGT_LOG_DOMAIN="@0@"'.format(f.split('.')[0]),
+	])
+
+    lib_intermediates += lib
+endforeach
 
 lib_igt_build = shared_library('igt',
-			 processed_src_dep,
-			 include_directories : inc,
-			 dependencies : lib_deps,
-			 c_args : [ '-DIGT_DATADIR="@0@"'.format(pkgdatadir),
-				'-DIGT_SRCDIR="@0@"'.format(srcdir), ])
+    ['dummy.c'],
+    link_whole: lib_intermediates,
+    dependencies: lib_deps,
+)
 
 lib_igt = declare_dependency(link_with : lib_igt_build,
 			    include_directories : inc)
