@@ -76,6 +76,7 @@ AM_CFLAGS = $(DRM_CFLAGS) $(CWARNFLAGS) -Wno-unused-result $(DEBUG_CFLAGS)\
 	-include "$(srcdir)/../lib/check-ndebug.h" \
 	-DIGT_SRCDIR=\""$(abs_srcdir)"\" \
 	-DIGT_DATADIR=\""$(pkgdatadir)"\" \
+	-D_GNU_SOURCE \
 	$(LIBUNWIND_CFLAGS) $(WERROR_CFLAGS) \
 	$(NULL)
 

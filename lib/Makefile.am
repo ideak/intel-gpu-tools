@@ -62,6 +62,7 @@ AM_CFLAGS = \
 	    $(VALGRIND_CFLAGS) \
 	    -DIGT_SRCDIR=\""$(abs_top_srcdir)/tests"\" \
 	    -DIGT_DATADIR=\""$(pkgdatadir)"\" \
+	    -D_GNU_SOURCE \
 	    -DIGT_LOG_DOMAIN=\""$(subst _,-,$*)"\" \
 	    -pthread
 

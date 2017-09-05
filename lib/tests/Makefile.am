@@ -12,6 +12,7 @@ AM_CFLAGS = $(DRM_CFLAGS) $(CWARNFLAGS) $(DEBUG_CFLAGS) \
 	-I$(srcdir)/.. \
 	-include "$(srcdir)/../../lib/check-ndebug.h" \
 	-DIGT_DATADIR=\""$(abs_srcdir)"\" \
+	-D_GNU_SOURCE
 	$(NULL)
 
 LDADD = ../libintel_tools.la $(PCIACCESS_LIBS) $(DRM_LIBS) $(LIBUNWIND_LIBS) $(TIMER_LIBS)
