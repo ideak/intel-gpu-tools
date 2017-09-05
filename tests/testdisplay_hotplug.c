@@ -29,9 +29,7 @@
 #include <sys/stat.h>
 
 #include "testdisplay.h"
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 
 #ifdef HAVE_UDEV

@@ -27,9 +27,7 @@
 #ifndef IGT_FRAME_H
 #define IGT_FRAME_H
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include "igt.h"
 #include <stdbool.h>

@@ -33,9 +33,7 @@
  * The goal is to simply ensure the basics work.
  */
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include "igt.h"
 #include <stdlib.h>

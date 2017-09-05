@@ -22,9 +22,7 @@
  *
  */
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include <X11/Xlib.h>
 #ifdef HAVE_XRANDR

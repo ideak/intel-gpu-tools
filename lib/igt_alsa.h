@@ -27,9 +27,7 @@
 #ifndef IGT_ALSA_H
 #define IGT_ALSA_H
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include "igt.h"
 #include <stdbool.h>

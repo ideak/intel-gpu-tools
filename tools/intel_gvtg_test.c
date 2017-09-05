@@ -28,9 +28,7 @@
  * TODO:
  * Enable more GVT-g related test cases.
  */
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include "igt.h"
 #include <errno.h>

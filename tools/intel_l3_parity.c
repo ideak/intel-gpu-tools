@@ -39,9 +39,7 @@
 #include "intel_io.h"
 #include "igt_sysfs.h"
 #include "drmtest.h"
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 #ifdef HAVE_UDEV
 #include <libudev.h>
 #include <syslog.h>

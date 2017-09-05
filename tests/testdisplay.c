@@ -45,9 +45,7 @@
  *  - DP commands (e.g. poweroff)
  * - verify outputs against VBT/physical connectors
  */
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include "igt.h"
 #include <cairo.h>

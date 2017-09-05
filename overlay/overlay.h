@@ -25,9 +25,7 @@
 #ifndef OVERLAY_H
 #define OVERLAY_H
 
-#ifdef HAVE_CONFIG_H
 #include"config.h"
-#endif
 
 #include <cairo.h>
 
