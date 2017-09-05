@@ -95,7 +95,7 @@
 
 #include <string.h>
 #include <stdint.h>
-#include "uwildmat.h"
+#include "uwildmat/uwildmat.h"
 
 #define ABORT -1
 
