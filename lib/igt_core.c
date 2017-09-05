@@ -295,7 +295,7 @@ static pthread_mutex_t log_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 GKeyFile *igt_key_file;
 #endif
 
-char *frame_dump_path;
+char *igt_frame_dump_path;
 
 const char *igt_test_name(void)
 {
@@ -650,10 +650,10 @@ static void common_init_config(void)
 
 	g_clear_error(&error);
 
-	if (!frame_dump_path)
-		frame_dump_path = g_key_file_get_string(igt_key_file, "Common",
-							"FrameDumpPath",
-							&error);
+	if (!igt_frame_dump_path)
+		igt_frame_dump_path =
+			g_key_file_get_string(igt_key_file, "Common",
+					      "FrameDumpPath", &error);
 
 	g_clear_error(&error);
 
@@ -694,7 +694,7 @@ static void common_init_env(void)
 			igt_log_level = IGT_LOG_NONE;
 	}
 
-	frame_dump_path = getenv("IGT_FRAME_DUMP_PATH");
+	igt_frame_dump_path = getenv("IGT_FRAME_DUMP_PATH");
 }
 
 static int common_init(int *argc, char **argv,

@@ -53,7 +53,7 @@
  */
 bool igt_frame_dump_is_enabled(void)
 {
-	return frame_dump_path != NULL;
+	return igt_frame_dump_path != NULL;
 }
 
 static void igt_write_frame_to_png(cairo_surface_t *surface, int fd,
@@ -70,11 +70,11 @@ static void igt_write_frame_to_png(cairo_surface_t *surface, int fd,
 
 	if (suffix)
 		snprintf(path, PATH_MAX, "%s/frame-%s-%s-%s-%s.png",
-			 frame_dump_path, test_name, subtest_name, qualifier,
+			 igt_frame_dump_path, test_name, subtest_name, qualifier,
 			 suffix);
 	else
 		snprintf(path, PATH_MAX, "%s/frame-%s-%s-%s.png",
-			 frame_dump_path, test_name, subtest_name, qualifier);
+			 igt_frame_dump_path, test_name, subtest_name, qualifier);
 
 	igt_debug("Dumping %s frame to %s...\n", qualifier, path);
 
@@ -122,10 +122,10 @@ void igt_write_compared_frames_to_png(cairo_surface_t *reference,
 
 	if (id)
 		snprintf(path, PATH_MAX, "%s/frame-%s-%s-%s.txt",
-			 frame_dump_path, test_name, subtest_name, id);
+			 igt_frame_dump_path, test_name, subtest_name, id);
 	else
 		snprintf(path, PATH_MAX, "%s/frame-%s-%s.txt",
-			 frame_dump_path, test_name, subtest_name);
+			 igt_frame_dump_path, test_name, subtest_name);
 
 	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	igt_assert(fd >= 0);
