@@ -120,3 +120,4 @@ if libdrm_intel.found()
 	subdir('assembler')
 	subdir('overlay')
 endif
+subdir('man')
