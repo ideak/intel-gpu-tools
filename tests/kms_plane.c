@@ -207,8 +207,9 @@ test_plane_position_with_output(data_t *data,
 
 	if (flags & TEST_POSITION_FULLY_COVERED)
 		igt_assert_crc_equal(&test.reference_crc, &crc);
-	else
+	else {
 		;/* FIXME: missing reference CRCs */
+	}
 
 	igt_assert_crc_equal(&crc, &crc2);
 
