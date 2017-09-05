@@ -25,8 +25,6 @@
  *
  */
 
-#define _GNU_SOURCE
-
 #include "igt.h"
 #include <stdlib.h>
 #include <sys/ioctl.h>

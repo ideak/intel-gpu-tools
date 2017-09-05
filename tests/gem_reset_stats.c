@@ -25,7 +25,6 @@
  *
  */
 
-#define _GNU_SOURCE
 #include "igt.h"
 #include "igt_sysfs.h"
 #include <limits.h>

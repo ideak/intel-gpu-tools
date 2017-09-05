@@ -24,7 +24,6 @@
  *    Daniel Vetter <daniel.vetter@ffwll.ch>
  */
 
-#define _GNU_SOURCE
 #include "igt.h"
 #include <sys/ioctl.h>
 #include <stdlib.h>

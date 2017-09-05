@@ -46,7 +46,6 @@
  * intel_gpu_frequency -d
  */
 
-#define _GNU_SOURCE
 #include <assert.h>
 #include <getopt.h>
 #include <stdio.h>

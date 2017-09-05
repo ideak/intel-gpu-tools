@@ -1,5 +1,4 @@
 
-#define _GNU_SOURCE  /* For using O_DIRECT */
 #include <inttypes.h>
 #include <stdio.h>
 #include <fcntl.h>

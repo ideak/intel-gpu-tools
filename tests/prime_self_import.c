@@ -31,7 +31,6 @@
  * ... but with different fds, i.e. the wayland usecase.
  */
 
-#define _GNU_SOURCE
 #include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>

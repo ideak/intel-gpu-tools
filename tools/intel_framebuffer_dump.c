@@ -26,7 +26,6 @@
  * Read back all the KMS framebuffers attached to the CRTC and record as PNG.
  */
 
-#define _GNU_SOURCE
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/mman.h>

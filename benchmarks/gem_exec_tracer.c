@@ -21,8 +21,6 @@
  * IN THE SOFTWARE.
  */
 
-#define _GNU_SOURCE /* for RTLD_NEXT */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

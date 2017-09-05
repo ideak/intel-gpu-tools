@@ -38,7 +38,6 @@
  * decode, but never crash in the process.
  */
 
-#define _GNU_SOURCE
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

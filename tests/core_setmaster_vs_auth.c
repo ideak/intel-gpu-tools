@@ -33,7 +33,6 @@
  * trying to authenticate a client against the wrong master.
  */
 
-#define _GNU_SOURCE
 #include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
