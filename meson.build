@@ -8,16 +8,22 @@ project('IGT gpu tests', 'c',
 
 cc = meson.get_compiler('c')
 
-add_global_arguments('-Wno-unused-parameter', language: 'c')
-add_global_arguments('-Wno-sign-compare', language: 'c')
-add_global_arguments('-Wno-missing-field-initializers', language: 'c')
-add_global_arguments('-Wno-clobbered', language: 'c')
-
+cc_args = [
+	'-Wno-unused-parameter',
+	'-Wno-sign-compare',
+	'-Wno-missing-field-initializers',
+	'-Wno-clobbered',
 # Macros asserting on the range of their arguments triggers this.
-add_global_arguments('-Wno-type-limits', language: 'c')
-
+	'-Wno-type-limits',
 # igt_assert(0) in switch statements triggers a bunch of this.
-add_global_arguments('-Wimplicit-fallthrough=0', language: 'c')
+	'-Wimplicit-fallthrough=0',
+]
+
+foreach cc_arg : cc_args
+  if cc.has_argument(cc_arg)
+    add_global_arguments(cc_arg, language : 'c')
+  endif
+endforeach
 
 inc = include_directories('lib', '.')
 
