@@ -854,6 +854,7 @@ out:
 		kmsg(KERN_INFO "[IGT] %s: executing\n", command_str);
 		print_version();
 
+		sync();
 		oom_adjust_for_doom();
 		low_mem_killer_disable(true);
 	}
