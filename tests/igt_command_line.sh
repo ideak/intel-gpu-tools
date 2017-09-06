@@ -37,26 +37,19 @@ fi
 # Manually running this script is possible in the source root or the
 # tests directory.
 
-TESTLISTFILE="$tests_dir/test-list.txt"
-if [ ! -r "$TESTLISTFILE" ]; then
-	tests_dir="tests"
-	TESTLISTFILE="$tests_dir/test-list.txt"
-fi
-
-TESTLIST=`cat $TESTLISTFILE`
-if [ $? -ne 0 ]; then
-	echo "Error: Could not read test lists"
-	exit 99
-fi
-
 fail () {
 	echo "FAIL: $1"
 	exit 1
 }
 
-for test in $TESTLIST; do
+check_test ()
+{
+	local test
+
+	test=$1
+
 	if [ "$test" = "TESTLIST" -o "$test" = "END" ]; then
-		continue
+		return
 	fi
 
 	testname="$test"
@@ -105,4 +98,25 @@ for test in $TESTLIST; do
 	# check invalid subtest handling
 	echo "  Checking invalid subtest handling..."
 	./$test --run-subtest invalid-subtest > /dev/null 2>&1 && fail $test
+}
+
+TESTLISTFILE="$tests_dir/test-list.txt"
+if [ ! -r "$TESTLISTFILE" ]; then
+	tests_dir="tests"
+	TESTLISTFILE="$tests_dir/test-list.txt"
+fi
+
+TESTLIST=`cat $TESTLISTFILE`
+if [ $? -ne 0 ]; then
+	echo "Error: Could not read test lists"
+	exit 99
+fi
+
+if [[ "$1" != "" ]] ; then
+	check_test $1
+	exit 0
+fi
+
+for test in $TESTLIST; do
+	check_test $test
 done
