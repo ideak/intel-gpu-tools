@@ -22,11 +22,18 @@
  *
  */
 
-#include "igt.h"
-#include "igt_dummyload.h"
 #include <time.h>
 #include <signal.h>
-#include <sys/syscall.h>
+#include <pthread.h>
+
+#include <i915_drm.h>
+
+#include "igt_core.h"
+#include "igt_dummyload.h"
+#include "igt_gt.h"
+#include "intel_chipset.h"
+#include "intel_reg.h"
+#include "ioctl_wrappers.h"
 
 /**
  * SECTION:igt_dummyload

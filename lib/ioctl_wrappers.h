@@ -32,6 +32,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/mman.h>
 #include <intel_bufmgr.h>
 #include <i915_drm.h>
 
