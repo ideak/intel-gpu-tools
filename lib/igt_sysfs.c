@@ -537,13 +537,14 @@ void kick_fbcon(bool enable)
 		if (len >= 0)
 			buf[len] = '\0';
 
-		if (!strstr(buf, "frame buffer device"))
+		if (!strstr(buf, enable ? "dummy device" :
+			    "frame buffer device"))
 			continue;
 
 		sprintf(buf, "%s/%s/bind", path, de->d_name);
 		fd = open(buf, O_WRONLY);
 		if (fd != -1) {
-			igt_ignore_warn(write(fd, enable ? "1\n" : "0\n", 2));
+			igt_ignore_warn(write(fd, "0\n", 2));
 			close(fd);
 		}
 	}
