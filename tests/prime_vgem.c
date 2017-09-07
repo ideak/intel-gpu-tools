@@ -203,7 +203,7 @@ static void test_gtt(int vgem, int i915)
 {
 	struct vgem_bo scratch;
 	uint32_t handle;
-	uint32_t *ptr, *gtt;
+	uint32_t *ptr;
 	int dmabuf, i;
 
 	scratch.width = 1024;
@@ -232,18 +232,46 @@ static void test_gtt(int vgem, int i915)
 		igt_assert_eq(ptr[1024*i], ~i);
 	munmap(ptr, scratch.size);
 
+	gem_close(i915, handle);
+	gem_close(vgem, scratch.handle);
+}
+
+static void test_gtt_interleaved(int vgem, int i915)
+{
+	struct vgem_bo scratch;
+	uint32_t handle;
+	uint32_t *ptr, *gtt;
+	int dmabuf, i;
+
+	scratch.width = 1024;
+	scratch.height = 1024;
+	scratch.bpp = 32;
+	vgem_create(vgem, &scratch);
+
+	dmabuf = prime_handle_to_fd(vgem, scratch.handle);
+	handle = prime_fd_to_handle(i915, dmabuf);
+	close(dmabuf);
+
+	/* This assumes that GTT is perfectedly coherent. On certain machines,
+	 * it is possible for a direct acces to bypass the GTT indirection.
+	 *
+	 * This test may fail. It tells us how far userspace can trust
+	 * concurrent dmabuf/i915 access. In the future, we may have a kernel
+	 * param to indicate whether or not this interleaving is possible.
+	 * However, the mmaps may be passed around to third parties that do
+	 * not know about the shortcommings...
+	 */
 	ptr = vgem_mmap(vgem, &scratch, PROT_WRITE);
 	gtt = gem_mmap__gtt(i915, handle, scratch.size, PROT_WRITE);
-#if defined(__x86_64__)
 	for (i = 0; i < 1024; i++) {
 		gtt[1024*i] = i;
-		__builtin_ia32_sfence();
+		/* The read from WC should act as a flush for the GTT wcb */
 		igt_assert_eq(ptr[1024*i], i);
+
 		ptr[1024*i] = ~i;
-		__builtin_ia32_sfence();
+		/* The read from GTT should act as a flush for the WC wcb */
 		igt_assert_eq(gtt[1024*i], ~i);
 	}
-#endif
 	munmap(gtt, scratch.size);
 	munmap(ptr, scratch.size);
 
@@ -752,6 +780,9 @@ igt_main
 
 	igt_subtest("basic-gtt")
 		test_gtt(vgem, i915);
+
+	igt_subtest("coherency-gtt")
+		test_gtt_interleaved(vgem, i915);
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%ssync-%s",
