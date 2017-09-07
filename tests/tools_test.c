@@ -27,23 +27,26 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+struct line_check {
+	bool found;
+	const char *substr;
+};
+
 /**
- * Parse the r-value of a [cmd] string.
+ * Our igt_log_buffer_inspect handler. Checks the output of the
+ * intel_l3_parity tool and returns line_check::found to true if
+ * a specific substring is found.
  */
-static bool check_cmd_return_value(const char *s, void *data)
+static bool check_cmd_return_value(const char *line, void *data)
 {
-	int *val = data;
-	char *cmd, *found;
-	const char *delim = "[cmd]";
-	const int delim_len = strlen(delim);
+	struct line_check *check = data;
 
-	if (!(cmd = strstr(s, delim)))
+	if (!strstr(line, check->substr)) {
+		check->found = false;
 		return false;
+	}
 
-	found = cmd + delim_len + 1;
-	igt_assert(delim_len + strlen(found) < strlen(cmd));
-
-	*val = atoi(found);
+	check->found = true;
 	return true;
 }
 
@@ -57,37 +60,41 @@ igt_main
 		igt_system_cmd(exec_return,
 			       "../tools/intel_l3_parity -r 0 -b 0 "
 			       "-s 0 -e");
-		igt_assert(exec_return == IGT_EXIT_SUCCESS);
+		igt_skip_on_f(exec_return == IGT_EXIT_SKIP,
+			      "intel_l3_parity not supported\n");
+		igt_assert_eq(exec_return, IGT_EXIT_SUCCESS);
 
-		igt_system_cmd(exec_return,
-			       "../tools/intel_l3_parity -l | "
-			       "grep -c 'Row 0, Bank 0, Subbank 0 "
-			       "is disabled'");
+		igt_system_cmd(exec_return, "../tools/intel_l3_parity -l");
 		if (exec_return == IGT_EXIT_SUCCESS) {
-			int val = -1;
+			struct line_check line;
+			line.substr = "Row 0, Bank 0, Subbank 0 is disabled";
 			igt_log_buffer_inspect(check_cmd_return_value,
-					       &val);
-			igt_assert(val == 1);
-		} else {
-			igt_fail(IGT_EXIT_FAILURE);
+					       &line);
+			igt_assert_eq(line.found, true);
 		}
 
 		igt_system_cmd(exec_return,
 			       "../tools/intel_l3_parity -r 0 -b 0 "
 			       "-s 0 -e");
-		igt_assert(exec_return == IGT_EXIT_SUCCESS);
+		igt_skip_on_f(exec_return == IGT_EXIT_SKIP,
+			      "intel_l3_parity not supported\n");
+		igt_assert_eq(exec_return, IGT_EXIT_SUCCESS);
 
-		/* Check that we can clear remaps */
+		/* Check that we can clear remaps:
+		 * In the original shell script, the output of intel_l3_parity -l
+		 * was piped thru wc -l to check if the tool would at least
+		 * return a line. Just watch for one of the expected output
+		 * string as an alternative.
+		 * ("is disabled" unique only to intel_l3_parity.c:dumpit())
+		 */
 		igt_system_cmd(exec_return,
-			       "../tools/intel_l3_parity -l | "
-			       "wc -l");
+			       "../tools/intel_l3_parity -l");
 		if (exec_return == IGT_EXIT_SUCCESS) {
-			int val = -1;
+			struct line_check line;
+			line.substr = "is disabled";
 			igt_log_buffer_inspect(check_cmd_return_value,
-					       &val);
-			igt_assert(val == 1);
-		} else {
-			igt_fail(IGT_EXIT_FAILURE);
+					       &line);
+			igt_assert_eq(line.found, true);
 		}
 	}
 
