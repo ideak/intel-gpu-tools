@@ -2035,9 +2035,9 @@ igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type)
 		break;
 	}
 
-	igt_assert_f(plane_idx >= 0 && plane_idx < pipe->n_planes,
-		"Valid pipe->planes idx not found. plane_idx=%d plane_type=%d n_planes=%d\n",
-		plane_idx, plane_type, pipe->n_planes);
+	igt_require_f(plane_idx >= 0 && plane_idx < pipe->n_planes,
+		      "Valid pipe->planes idx not found. plane_idx=%d plane_type=%d n_planes=%d\n",
+		      plane_idx, plane_type, pipe->n_planes);
 
 	return &pipe->planes[plane_idx];
 }
