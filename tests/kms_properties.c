@@ -389,6 +389,9 @@ static void invalid_properties(igt_display_t *display, bool atomic)
 	enum pipe pipe;
 	int i;
 
+	if (atomic)
+		igt_skip_on(!display->is_atomic);
+
 	for_each_pipe(display, pipe)
 		test_object_invalid_properties(display, display->pipes[pipe].crtc_id, DRM_MODE_OBJECT_CRTC, atomic);
 
