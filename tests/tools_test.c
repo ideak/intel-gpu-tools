@@ -47,36 +47,6 @@ static bool check_cmd_return_value(const char *s, void *data)
 	return true;
 }
 
-static bool kmsg_check(const char *str)
-{
-	int fd;
-	FILE *file = NULL;
-
-	fd = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
-	if (fd != -1)
-		file = fdopen(fd, "r");
-	if (file) {
-		size_t len = 0;
-		char *line = NULL;
-		char *ret = NULL;
-
-		while (getline(&line, &len, file) != -1) {
-			if ((ret = strstr(line, str)) != NULL) {
-				break;
-			}
-		}
-		free(line);
-		fclose(file);
-		close(fd);
-		if (ret)
-			return true;
-	} else {
-		close(fd);
-		igt_warn("Unable to retrieve kernel log (from /dev/kmsg)\n");
-	}
-	return false;
-}
-
 igt_main
 {
 	igt_skip_on_simulation();
@@ -134,10 +104,5 @@ igt_main
 			   != -1);
 		igt_assert(igt_system_quiet(cmd) == IGT_EXIT_SUCCESS);
 		free(cmd);
-	}
-
-	igt_subtest("check_dmesg") {
-		igt_assert(!kmsg_check("*ERROR*"));
-		igt_assert(!kmsg_check("------[ cut here ]----"));
 	}
 }
