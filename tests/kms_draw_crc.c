@@ -161,6 +161,8 @@ static void draw_method_subtest(enum igt_draw_method method,
 	if (tiling == LOCAL_I915_FORMAT_MOD_Y_TILED)
 		igt_require(intel_gen(intel_get_drm_devid(drm_fd)) >= 9);
 
+	igt_skip_on(method == IGT_DRAW_MMAP_WC && !gem_mmap__has_wc(drm_fd));
+
 	/* Use IGT_DRAW_MMAP_GTT on an untiled buffer as the parameter for
 	 * comparison. Cache the value so we don't recompute it for every single
 	 * subtest. */
