@@ -310,7 +310,7 @@ static void decode_asle(const void *buffer)
 
 	printf("\tfdsp:\t0x%08x\n", asle->fdsp);
 	printf("\tstat:\t0x%08x\n", asle->stat);
-	printf("\trvda:\t0x%016lx\n", asle->rvda);
+	printf("\trvda:\t0x%016"PRIx64"\n", asle->rvda);
 	printf("\trvds:\t0x%08x\n", asle->rvds);
 
 	printf("\n");

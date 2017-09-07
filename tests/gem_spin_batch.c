@@ -48,7 +48,7 @@ static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 		igt_spin_batch_set_timeout(spin,
 					   timeout_100ms - igt_nsec_elapsed(&itv));
 		gem_sync(fd, spin->handle);
-		igt_debug("loop %d: interval=%fms (target 100ms), elapsed %fms\n",
+		igt_debug("loop %lu: interval=%fms (target 100ms), elapsed %fms\n",
 			  loops,
 			  igt_nsec_elapsed(&itv) * 1e-6,
 			  igt_nsec_elapsed(&tv) * 1e-6);
