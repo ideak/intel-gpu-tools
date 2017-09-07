@@ -85,7 +85,7 @@ static void emit_recursive_batch(igt_spin_t *spin,
 	int i;
 
 	nengine = 0;
-	if (engine < 0) {
+	if (engine == -1) {
 		for_each_engine(fd, engine)
 			if (engine)
 				engines[nengine++] = engine;
