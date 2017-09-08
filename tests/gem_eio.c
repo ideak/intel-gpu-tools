@@ -220,14 +220,27 @@ static void test_inflight(int fd)
 	trigger_reset(fd);
 }
 
+static int fd = -1;
+
+static void
+exit_handler(int sig)
+{
+	i915_reset_control(true);
+	igt_force_gpu_reset(fd);
+}
+
 igt_main
 {
-	int fd = -1;
 
 	igt_skip_on_simulation();
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+
+		igt_require(i915_reset_control(true));
+		igt_force_gpu_reset(fd);
+		igt_install_exit_handler(exit_handler);
+
 		igt_require_gem(fd);
 		igt_require_hang_ring(fd, I915_EXEC_DEFAULT);
 	}
@@ -243,7 +256,4 @@ igt_main
 
 	igt_subtest("in-flight")
 		test_inflight(fd);
-
-	igt_fixture
-		close(fd);
 }
