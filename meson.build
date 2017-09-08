@@ -28,7 +28,7 @@ endforeach
 
 inc = include_directories('lib', '.')
 
-config_h = configuration_data()
+config = configuration_data()
 
 libdrm = dependency('libdrm', version : '>=2.4.82')
 libdrm_intel = dependency('libdrm_intel', required : false)
@@ -40,24 +40,24 @@ pciaccess = dependency('pciaccess', version : '>=0.10')
 libkmod = dependency('libkmod')
 libprocps = dependency('libprocps', required : false)
 if libprocps.found()
-	config_h.set('HAVE_PROCPS', 1)
+	config.set('HAVE_PROCPS', 1)
 endif
 
 valgrind = dependency('valgrind', required : false)
 if valgrind.found()
-	config_h.set('HAVE_VALGRIND', 1)
+	config.set('HAVE_VALGRIND', 1)
 endif
 
 cairo = dependency('cairo', version : '>1.12.0', required : false)
 
 libudev = dependency('libudev', required : false)
 if libudev.found()
-	config_h.set('HAVE_UDEV', 1)
+	config.set('HAVE_UDEV', 1)
 endif
 
 glib = dependency('glib-2.0', required : false)
 if glib.found()
-	config_h.set('HAVE_GLIB', 1)
+	config.set('HAVE_GLIB', 1)
 endif
 
 libunwind = dependency('libunwind')
@@ -83,35 +83,37 @@ dlsym = cc.find_library('dl')
 zlib = cc.find_library('z')
 
 if cc.has_header('linux/kd.h')
-	config_h.set('HAVE_LINUX_KD_H', 1)
+	config.set('HAVE_LINUX_KD_H', 1)
 endif
 if cc.has_header('sys/kd.h')
-	config_h.set('HAVE_SYS_KD_H', 1)
+	config.set('HAVE_SYS_KD_H', 1)
 endif
 if cc.has_header('libgen.h')
-	config_h.set('HAVE_LIBGEN_H', 1)
+	config.set('HAVE_LIBGEN_H', 1)
 endif
 if cc.has_header('sys/io.h')
-	config_h.set('HAVE_SYS_IO_H', 1)
+	config.set('HAVE_SYS_IO_H', 1)
 endif
 if cc.has_header('cpuid.h')
 	# FIXME: Do we need the example link test from configure.ac?
-	config_h.set('HAVE_CPUID_H', 1)
+	config.set('HAVE_CPUID_H', 1)
 endif
 
 if cc.has_member('struct sysinfo', 'totalram',
 		prefix : '#include <sys/sysinfo.h>')
-	config_h.set('HAVE_STRUCT_SYSINFO_TOTALRAM', 1)
+	config.set('HAVE_STRUCT_SYSINFO_TOTALRAM', 1)
 endif
 
 add_project_arguments('-D_GNU_SOURCE', language : 'c')
 add_project_arguments('-include', 'config.h', language : 'c')
 
-config_h.set_quoted('PACKAGE_VERSION', meson.project_version())
-config_h.set_quoted('PACKAGE', meson.project_name())
-config_h.set_quoted('TARGET_CPU_PLATFORM', host_machine.cpu_family())
+config.set('PACKAGE_NAME', meson.project_name())
+config.set_quoted('PACKAGE_VERSION', meson.project_version())
+config.set_quoted('PACKAGE', meson.project_name())
+config.set('PACKAGE_STRING', meson.project_name() + ' ' + meson.project_version())
+config.set_quoted('TARGET_CPU_PLATFORM', host_machine.cpu_family())
 
-configure_file(output: 'config.h', install: false, configuration: config_h)
+configure_file(output: 'config.h', install: false, configuration: config)
 
 subdir('lib')
 subdir('tests')

@@ -18,15 +18,9 @@ manpages = [
 	'intel_vbt_decode',
 ]
 
-man_config = configuration_data()
-
-man_config.set('PACKAGE_NAME', meson.project_name())
-man_config.set('PACKAGE_VERSION', meson.project_version())
-man_config.set('PACKAGE_STRING', meson.project_name() + ' ' + meson.project_version())
-
 defs_rst = configure_file(input : 'defs.rst.in',
 		output : 'defs.rst',
-		configuration : man_config)
+		configuration : config)
 
 rst2man = find_program('rst2man', required : false)
 rst2man_script = find_program('rst2man.sh')
