@@ -60,15 +60,15 @@ static double elapsed(const struct timespec *start,
 	return (end->tv_sec - start->tv_sec) + 1e-9*(end->tv_nsec - start->tv_nsec);
 }
 
-static uint32_t batch(int fd, int size)
+static uint32_t batch(int fd, uint64_t size)
 {
-	const uint32_t buf[] = {MI_BATCH_BUFFER_END};
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	uint32_t handle = gem_create(fd, size);
-	gem_write(fd, handle, 0, buf, sizeof(buf));
+	gem_write(fd, handle, 0, &bbe, sizeof(bbe));
 	return handle;
 }
 
-static int loop(int size, unsigned ring, int reps, int ncpus, unsigned flags)
+static int loop(uint64_t size, unsigned ring, int reps, int ncpus, unsigned flags)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
@@ -82,7 +82,7 @@ static int loop(int size, unsigned ring, int reps, int ncpus, unsigned flags)
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	memset(&obj, 0, sizeof(obj));
-	obj.handle = batch(fd, size);
+	obj.handle = batch(fd, 4096);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = (uintptr_t)&obj;
@@ -94,7 +94,7 @@ static int loop(int size, unsigned ring, int reps, int ncpus, unsigned flags)
 		if (__gem_execbuf(fd, &execbuf))
 			return 77;
 	}
-	gem_close(fd, obj.handle);
+	/* let the small object leak; ideally blocking the low address */
 
 	nengine = 0;
 	if (ring == -1) {
@@ -107,6 +107,9 @@ static int loop(int size, unsigned ring, int reps, int ncpus, unsigned flags)
 	} else
 		engines[nengine++] = ring;
 
+	if (size > 1ul << 31)
+		obj.flags |= 1 << 3;
+
 	while (reps--) {
 		memset(shared, 0, 4096);
 
@@ -115,6 +118,7 @@ static int loop(int size, unsigned ring, int reps, int ncpus, unsigned flags)
 			unsigned count = 0;
 
 			obj.handle = batch(fd, size);
+			obj.offset = -1;
 
 			clock_gettime(CLOCK_MONOTONIC, &start);
 			do {
@@ -152,7 +156,7 @@ int main(int argc, char **argv)
 {
 	unsigned ring = I915_EXEC_RENDER;
 	unsigned flags = 0;
-	int size = 4096;
+	uint64_t size = 4096;
 	int reps = 1;
 	int ncpus = 1;
 	int c;
@@ -185,7 +189,7 @@ int main(int argc, char **argv)
 			break;
 
 		case 's':
-			size = atoi(optarg);
+			size = strtoull(optarg, NULL, 0);
 			if (size < 4096)
 				size = 4096;
 			break;
