@@ -39,7 +39,7 @@
 
 #include <drm.h>
 
-#include "igt_vgem.h"
+#include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Test that specific ioctls report a wedged GPU (EIO).");
 
@@ -158,66 +158,49 @@ static void test_wait(int fd)
 	trigger_reset(fd);
 }
 
-struct cork {
-	int device;
-	uint32_t handle;
-	uint32_t fence;
-};
-
-static void plug(int fd, struct cork *c)
-{
-	struct vgem_bo bo;
-	int dmabuf;
-
-	c->device = __drm_open_driver(DRIVER_VGEM);
-	igt_require(c->device != -1);
-
-	bo.width = bo.height = 1;
-	bo.bpp = 4;
-	vgem_create(c->device, &bo);
-	c->fence = vgem_fence_attach(c->device, &bo, VGEM_FENCE_WRITE);
-
-	dmabuf = prime_handle_to_fd(c->device, bo.handle);
-	c->handle = prime_fd_to_handle(fd, dmabuf);
-	close(dmabuf);
-}
-
-static void unplug(struct cork *c)
-{
-	vgem_fence_signal(c->device, c->fence);
-	close(c->device);
-}
-
-static void test_inflight(int fd)
+static void test_inflight_external(int fd)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_exec_object2 obj;
 	uint32_t bbe = MI_BATCH_BUFFER_END;
 	igt_hang_t hang;
-	struct cork cork;
+	int timeline, fence;
+
+	igt_require_sw_sync();
+	igt_require(gem_has_exec_fence(fd));
+
+	timeline = sw_sync_timeline_create();
+	fence = sw_sync_timeline_create_fence(timeline, 1);
 
 	igt_require(i915_reset_control(false));
 	hang = igt_hang_ring(fd, I915_EXEC_DEFAULT);
 
-	plug(fd, &cork);
-
-	memset(obj, 0, sizeof(obj));
-	obj[0].handle = cork.handle;
-	obj[1].handle = gem_create(fd, 4096);
-	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = gem_create(fd, 4096);
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.buffer_count = 2;
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags = I915_EXEC_FENCE_IN | I915_EXEC_FENCE_OUT;
+	execbuf.rsvd2 = (uint32_t)fence;
 
-	gem_execbuf(fd, &execbuf);
+	gem_execbuf_wr(fd, &execbuf);
+	close(fence);
 
-	igt_post_hang_ring(fd, hang);
-	unplug(&cork); /* only now submit our batches */
-	igt_assert_eq(__gem_wait(fd, obj[1].handle, -1), 0);
+	fence = execbuf.rsvd2 >> 32;
+	igt_assert(fence != -1);
 
-	igt_require(i915_reset_control(true));
+	igt_post_hang_ring(fd, hang); /* wedged, with an unready batch */
+	sw_sync_timeline_inc(timeline, 1); /* only now submit our batches */
+
+	igt_assert_eq(__gem_wait(fd, obj.handle, -1), 0);
+	igt_assert_eq(sync_fence_status(fence), -EIO);
+	close(fence);
+
+	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
+	close(timeline);
 }
 
 static int fd = -1;
@@ -254,6 +237,6 @@ igt_main
 	igt_subtest("wait")
 		test_wait(fd);
 
-	igt_subtest("in-flight")
-		test_inflight(fd);
+	igt_subtest("in-flight-external")
+		test_inflight_external(fd);
 }
