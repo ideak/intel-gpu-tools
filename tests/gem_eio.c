@@ -27,7 +27,6 @@
  *
  */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -39,6 +38,8 @@
 
 #include <drm.h>
 
+#include "igt.h"
+#include "igt_sysfs.h"
 #include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Test that specific ioctls report a wedged GPU (EIO).");
@@ -203,6 +204,90 @@ static void test_inflight_external(int fd)
 	close(timeline);
 }
 
+static void test_inflight_internal(int fd)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj[2];
+	uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned engine, nfence = 0;
+	int fences[16];
+	igt_hang_t hang;
+
+	igt_require(gem_has_exec_fence(fd));
+
+	igt_require(i915_reset_control(false));
+	hang = igt_hang_ring(fd, I915_EXEC_DEFAULT);
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = hang.handle;
+	obj[0].flags = EXEC_OBJECT_WRITE;
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+	for_each_engine(fd, engine) {
+		execbuf.flags = engine | I915_EXEC_FENCE_OUT;
+
+		gem_execbuf_wr(fd, &execbuf);
+
+		fences[nfence] = execbuf.rsvd2 >> 32;
+		igt_assert(fences[nfence] != -1);
+		nfence++;
+	}
+
+	igt_post_hang_ring(fd, hang); /* wedged, with an unready batch */
+
+	igt_assert_eq(__gem_wait(fd, obj[1].handle, -1), 0);
+	while (nfence--) {
+		igt_assert_eq(sync_fence_status(fences[nfence]), -EIO);
+		close(fences[nfence]);
+	}
+
+	igt_assert(i915_reset_control(true));
+	trigger_reset(fd);
+}
+
+#define HAVE_EXECLISTS 0x1
+#define HAVE_GUC 0x2
+#define HAVE_SEMAPHORES 0x4
+
+static unsigned print_welcome(int fd)
+{
+	unsigned flags = 0;
+	bool active;
+	int dir;
+
+	dir = igt_sysfs_open_parameters(fd);
+	if (dir < 0)
+		return 0;
+
+	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
+	if (active) {
+		igt_info("Using GuC submission\n");
+		flags |= HAVE_GUC | HAVE_EXECLISTS;
+		goto out;
+	}
+
+	active = igt_sysfs_get_boolean(dir, "enable_execlists");
+	if (active) {
+		igt_info("Using Execlists submission\n");
+		flags |= HAVE_EXECLISTS;
+		goto out;
+	}
+
+	active = igt_sysfs_get_boolean(dir, "semaphores");
+	if (active)
+		flags |= HAVE_SEMAPHORES;
+	igt_info("Using Legacy submission%s\n",
+		 active ? ", with semaphores" : "");
+
+out:
+	close(dir);
+	return flags;
+}
+
 static int fd = -1;
 
 static void
@@ -214,6 +299,7 @@ exit_handler(int sig)
 
 igt_main
 {
+	unsigned int caps = 0;
 
 	igt_skip_on_simulation();
 
@@ -224,6 +310,7 @@ igt_main
 		igt_force_gpu_reset(fd);
 		igt_install_exit_handler(exit_handler);
 
+		caps = print_welcome(fd);
 		igt_require_gem(fd);
 		igt_require_hang_ring(fd, I915_EXEC_DEFAULT);
 	}
@@ -239,4 +326,9 @@ igt_main
 
 	igt_subtest("in-flight-external")
 		test_inflight_external(fd);
+
+	igt_subtest("in-flight-internal") {
+		igt_skip_on(caps & HAVE_SEMAPHORES);
+		test_inflight_internal(fd);
+	}
 }
