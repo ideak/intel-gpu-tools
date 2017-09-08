@@ -5,9 +5,14 @@ shift
 
 echo TESTLIST > $OUTPUT
 
+if [[ $# -gt 0 ]] ; then
+	echo -n $1 >> $OUTPUT
+	shift
+fi
+
 while [[ $# -gt 0 ]] ; do
-	echo $1 >> $OUTPUT
+	echo -n " $1" >> $OUTPUT
 	shift
 done
 
-echo END TESTLIST >> $OUTPUT
+echo -e "\nEND TESTLIST" >> $OUTPUT

@@ -218,6 +218,17 @@ test_progs = [
 ]
 
 test_deps = [ igt_deps ]
+
+if libdrm_amdgpu.found()
+	# FIXME meson/ninja really doesn't like build targets with paths in them
+	test_progs += [
+		'amdgpu/amd_basic',
+		'amdgpu/amd_cs_nop',
+		'amdgpu/amd_prime',
+	]
+	test_deps += libdrm_amdgpu
+endif
+
 if libdrm_nouveau.found()
 	test_progs += [
 		'prime_nv_api',
@@ -238,14 +249,11 @@ if libdrm_vc4.found()
 	test_deps += libdrm_vc4
 endif
 
-if libdrm_amdgpu.found()
-	# FIXME meson/ninja really doesn't like build targets with paths in them
+if chamelium.found()
 	test_progs += [
-		'amdgpu/amd_basic',
-		'amdgpu/amd_cs_nop',
-		'amdgpu/amd_prime',
+		'chamelium',
 	]
-	test_deps += libdrm_amdgpu
+	test_deps += chamelium
 endif
 
 if alsa.found() and gsl.found()

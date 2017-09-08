@@ -26,6 +26,7 @@ TESTS_progs += \
 	$(NULL)
 endif
 
+TESTS_progs += testdisplay
 
 if BUILD_TESTS
 test-list.txt: Makefile.sources
