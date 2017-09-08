@@ -21,10 +21,14 @@
  * IN THE SOFTWARE.
  */
 
-#include "igt.h"
-#include "igt_vgem.h"
-
 #include <sys/mman.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+#include <errno.h>
+
+#include "igt_vgem.h"
+#include "igt_core.h"
+#include "ioctl_wrappers.h"
 
 /**
  * SECTION:igt_vgem

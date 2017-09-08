@@ -32,7 +32,8 @@
 #include <gsl/gsl_statistics_double.h>
 #include <gsl/gsl_fit.h>
 
-#include "igt.h"
+#include "igt_frame.h"
+#include "igt_core.h"
 
 /**
  * SECTION:igt_frame

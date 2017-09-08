@@ -28,8 +28,12 @@
 
 #include "config.h"
 
-#include "igt.h"
 #include <stdbool.h>
+#include <xf86drmMode.h>
+
+#include "igt_debugfs.h"
+
+struct igt_fb;
 
 struct chamelium;
 struct chamelium_port;

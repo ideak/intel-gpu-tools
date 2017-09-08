@@ -21,15 +21,15 @@
  * IN THE SOFTWARE.
  */
 
-#include "igt.h"
-#include "igt_gvt.h"
-#include "igt_sysfs.h"
-#include "igt_kmod.h"
-
 #include <signal.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <fcntl.h>
+
+#include "igt_gvt.h"
+#include "igt_sysfs.h"
+#include "igt_kmod.h"
+#include "drmtest.h"
 
 /**
  * SECTION:igt_gvt

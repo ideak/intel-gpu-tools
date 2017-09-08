@@ -28,7 +28,8 @@
 
 #include <alsa/asoundlib.h>
 
-#include "igt.h"
+#include "igt_alsa.h"
+#include "igt_core.h"
 
 #define HANDLES_MAX	8
 

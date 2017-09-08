@@ -21,12 +21,12 @@
  * IN THE SOFTWARE.
  */
 
-#include "igt.h"
+#include <signal.h>
+#include <errno.h>
+
 #include "igt_core.h"
 #include "igt_sysfs.h"
 #include "igt_kmod.h"
-
-#include <signal.h>
 
 /**
  * SECTION:igt_kmod

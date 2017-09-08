@@ -26,6 +26,7 @@
 #define __IGT_SYSFS_H__
 
 #include <stdbool.h>
+#include <stdarg.h>
 
 char *igt_sysfs_path(int device, char *path, int pathlen, int *idx);
 int igt_sysfs_open(int device, int *idx);

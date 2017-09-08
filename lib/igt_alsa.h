@@ -29,7 +29,6 @@
 
 #include "config.h"
 
-#include "igt.h"
 #include <stdbool.h>
 
 struct alsa;

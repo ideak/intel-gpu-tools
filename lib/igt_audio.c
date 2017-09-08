@@ -29,7 +29,8 @@
 #include <math.h>
 #include <gsl/gsl_fft_real.h>
 
-#include "igt.h"
+#include "igt_audio.h"
+#include "igt_core.h"
 
 #define FREQS_MAX	8
 

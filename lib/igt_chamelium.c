@@ -35,7 +35,11 @@
 #include <pixman.h>
 #include <cairo.h>
 
-#include "igt.h"
+#include "igt_chamelium.h"
+#include "igt_core.h"
+#include "igt_aux.h"
+#include "igt_kms.h"
+#include "igt_frame.h"
 
 /**
  * SECTION:igt_chamelium

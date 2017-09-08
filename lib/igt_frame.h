@@ -29,7 +29,6 @@
 
 #include "config.h"
 
-#include "igt.h"
 #include <stdbool.h>
 
 bool igt_frame_dump_is_enabled(void);

@@ -25,6 +25,7 @@
 #define IGT_VGEM_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 struct vgem_bo {
 	uint32_t handle;
