@@ -52,8 +52,9 @@ gpu_overlay_src += both_x11_src
 gpu_overlay_src += 'kms/kms-overlay.c'
 
 if xrandr.found() and cairo.found()
-	executable('intel_gpu_overlay', gpu_overlay_src,
+	executable('intel-gpu-overlay', gpu_overlay_src,
 			include_directories : inc,
 			c_args : gpu_overlay_cflags,
-			dependencies : gpu_overlay_deps)
+			dependencies : gpu_overlay_deps,
+			install : true)
 endif
