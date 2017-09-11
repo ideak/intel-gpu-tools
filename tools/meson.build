@@ -57,6 +57,11 @@ endforeach
 
 pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), 'intel-gpu-tools')
 
+intel_dp_compliance_src = [ 'intel_dp_compliance.c', 'intel_dp_compliance_hotplug.c' ]
+executable('intel_dp_compliance', sources : intel_dp_compliance_src,
+	   dependencies : tool_deps,
+	   install : true)
+
 intel_l3_parity_src = [ 'intel_l3_parity.c', 'intel_l3_udev_listener.c' ]
 executable('intel_l3_parity', sources : intel_l3_parity_src,
 	   dependencies : tool_deps,
