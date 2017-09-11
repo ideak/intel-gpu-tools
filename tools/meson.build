@@ -80,6 +80,9 @@ install_subdir('registers', install_dir : pkgdatadir,
 		 'Makefile', 'Makefile.in', 'Makefile.am',
 	       ])
 
-shared_library('intel_aubdump', 'aubdump.c', dependencies : [ igt_deps, dlsym ])
+shared_library('intel_aubdump', 'aubdump.c',
+	       dependencies : [ igt_deps, dlsym ],
+	       name_prefix : '',
+	       install : true)
 
 subdir('null_state_gen')
