@@ -82,8 +82,10 @@ static void test_timeline_closed(void)
 	fence = sw_sync_timeline_create_fence(timeline, 1);
 
 	close(timeline);
-	igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
+	igt_assert_f(sync_fence_wait(fence, 0) == 0,
 		     "Failure waiting on unsignaled fence on closed timeline\n");
+	igt_assert_f(sync_fence_status(fence) == -ENOENT,
+		     "Failure in marking up an unsignaled fence on closed timeline\n");
 }
 
 static void test_timeline_closed_signaled(void)
