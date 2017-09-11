@@ -51,7 +51,8 @@ endif
 
 foreach prog : tools_progs
 	executable(prog, prog + '.c',
-			dependencies : tool_deps)
+		   dependencies : tool_deps,
+		   install : true)
 endforeach
 
 shared_library('intel_aubdump', 'aubdump.c', dependencies : [ igt_deps, dlsym ])
