@@ -301,3 +301,10 @@ foreach prog : hang_progs
 			dependencies : igt_deps,
 			install : false)
 endforeach
+
+image_files = [
+  '1080p-left.png',
+  '1080p-right.png',
+  'pass.png',
+]
+install_data(sources : image_files, install_dir : pkgdatadir)
