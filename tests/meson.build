@@ -255,13 +255,19 @@ if alsa.found() and gsl.found()
 	test_deps += alsa
 endif
 
+libexecdir = join_paths(get_option('prefix'), get_option('libexecdir'), 'intel-gpu-tools')
+
 foreach prog : test_progs
 	executable(prog, prog + '.c',
-			dependencies : test_deps)
+		   dependencies : test_deps,
+		   install_dir : libexecdir,
+		   install : true)
 endforeach
 
 executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
-		dependencies : test_deps)
+	   dependencies : test_deps,
+	   install_dir : libexecdir,
+	   install : true)
 test_progs += 'testdisplay'
 
 run_command('generate_testlist.sh', test_progs)
