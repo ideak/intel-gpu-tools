@@ -159,6 +159,54 @@ static void test_wait(int fd)
 	trigger_reset(fd);
 }
 
+static void test_inflight(int fd)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj[2];
+	uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned int engine;
+	int fence[64]; /* conservative estimate of ring size */
+
+	igt_require(gem_has_exec_fence(fd));
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].flags = EXEC_OBJECT_WRITE;
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	for_each_engine(fd, engine) {
+		igt_hang_t hang;
+
+		igt_debug("Starting %s on engine '%s'\n", __func__, e__->name);
+		igt_require(i915_reset_control(false));
+
+		hang = igt_hang_ring(fd, engine);
+		obj[0].handle = hang.handle;
+
+		memset(&execbuf, 0, sizeof(execbuf));
+		execbuf.buffers_ptr = to_user_pointer(obj);
+		execbuf.buffer_count = 2;
+		execbuf.flags = engine | I915_EXEC_FENCE_OUT;
+
+		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
+			gem_execbuf_wr(fd, &execbuf);
+			fence[n] = execbuf.rsvd2 >> 32;
+			igt_assert(fence[n] != -1);
+		}
+
+		igt_post_hang_ring(fd, hang);
+
+		igt_assert_eq(__gem_wait(fd, obj[1].handle, -1), 0);
+		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
+			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
+			close(fence[n]);
+		}
+
+		igt_assert(i915_reset_control(true));
+		trigger_reset(fd);
+	}
+}
+
 static void test_inflight_external(int fd)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -323,6 +371,9 @@ igt_main
 
 	igt_subtest("wait")
 		test_wait(fd);
+
+	igt_subtest("in-flight")
+		test_inflight(fd);
 
 	igt_subtest("in-flight-external")
 		test_inflight_external(fd);
