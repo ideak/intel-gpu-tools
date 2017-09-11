@@ -270,7 +270,14 @@ executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   install : true)
 test_progs += 'testdisplay'
 
-run_command('generate_testlist.sh', test_progs)
+pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), 'intel-gpu-tools')
+
+gen_testlist = find_program('generate_testlist.sh')
+custom_target('testlist',
+	      output : 'test-list.txt',
+	      command : [ gen_testlist, '@OUTPUT@', test_progs ],
+	      install : true,
+	      install_dir : pkgdatadir)
 
 test_script = find_program('igt_command_line.sh')
 foreach prog : test_progs
