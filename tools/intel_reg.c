@@ -713,7 +713,7 @@ static int read_reg_spec(struct config *config)
 		path = getenv("INTEL_REG_SPEC");
 
 	if (!path)
-		path = PKGDATADIR"/registers";
+		path = IGT_DATADIR"/registers";
 
 	r = stat(path, &st);
 	if (r) {

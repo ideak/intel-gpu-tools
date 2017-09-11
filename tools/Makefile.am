@@ -17,7 +17,7 @@ SUBDIRS = null_state_gen registers
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/lib
 AM_CFLAGS = $(DEBUG_CFLAGS) $(DRM_CFLAGS) $(PCIACCESS_CFLAGS) $(CWARNFLAGS) \
-	    $(CAIRO_CFLAGS) $(LIBUNWIND_CFLAGS) -DPKGDATADIR=\"$(pkgdatadir)\" \
+	    $(CAIRO_CFLAGS) $(LIBUNWIND_CFLAGS) -DIGT_DATADIR=\"$(pkgdatadir)\" \
 	    $(WERROR_CFLAGS) -D_GNU_SOURCE
 LDADD = $(top_builddir)/lib/libintel_tools.la
 AM_LDFLAGS = -Wl,--as-needed
