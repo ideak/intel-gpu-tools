@@ -65,6 +65,11 @@ executable('intel_reg', sources : intel_reg_src,
 	     '-DIGT_DATADIR="@0@"'.format(pkgdatadir),
 	   ])
 
+install_subdir('registers', install_dir : pkgdatadir,
+	       exclude_files : [
+		 'Makefile', 'Makefile.in', 'Makefile.am',
+	       ])
+
 shared_library('intel_aubdump', 'aubdump.c', dependencies : [ igt_deps, dlsym ])
 
 subdir('null_state_gen')
