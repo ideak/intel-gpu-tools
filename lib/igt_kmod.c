@@ -56,14 +56,50 @@ static void squelch(void *data, int priority,
 static struct kmod_ctx *kmod_ctx(void)
 {
 	static struct kmod_ctx *ctx;
+	const char **config_paths = NULL;
+	char *config_paths_str;
+	char *dirname;
 
-	if (!ctx) {
-		ctx = kmod_new(NULL, NULL);
-		igt_assert(ctx != NULL);
+	if (ctx)
+		goto out;
 
-		kmod_set_log_fn(ctx, squelch, NULL);
+	dirname = getenv("IGT_KMOD_DIRNAME");
+	if (dirname)
+		igt_debug("kmod dirname = %s\n", dirname);
+
+	config_paths_str = getenv("IGT_KMOD_CONFIG_PATHS");
+	if (config_paths_str)
+		igt_debug("kmod config paths = %s\n", config_paths_str);
+
+	if (config_paths_str) {
+		unsigned count = !!strlen(config_paths_str);
+		unsigned i;
+		char* p;
+
+		p = config_paths_str;
+		while ((p = strchr(p, ':'))) p++, count++;
+
+
+		config_paths = malloc(sizeof(*config_paths) * (count + 1));
+		igt_assert(config_paths != NULL);
+
+		p = config_paths_str;
+		for (i = 0; i < count; ++i) {
+			config_paths[i] = p;
+
+			if ((p = strchr(p, ':')))
+				*p++ = '\0';
+		}
+		config_paths[i] = NULL;
 	}
 
+	ctx = kmod_new(dirname, config_paths);
+	igt_assert(ctx != NULL);
+
+	free(config_paths);
+
+	kmod_set_log_fn(ctx, squelch, NULL);
+out:
 	return ctx;
 }
 
