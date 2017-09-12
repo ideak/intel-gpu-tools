@@ -192,6 +192,8 @@ static void run_test(int count)
 	free(bo);
 }
 
+#define MAX_32b ((1ull << 32) - 4096)
+
 int fd;
 
 int main(int argc, char **argv)
@@ -212,9 +214,12 @@ int main(int argc, char **argv)
 		run_test(2);
 
 	igt_subtest("normal") {
-		int count;
+		uint64_t count;
 
-		count = 3 * gem_aperture_size(fd) / (1024*1024) / 2;
+		count = gem_aperture_size(fd);
+		if (count >> 32)
+			count = MAX_32b;
+		count = 3 * count / (1024*1024) / 2;
 		count += (count & 1) == 0;
 		intel_require_memory(count, 1024*1024, CHECK_RAM);
 
@@ -222,9 +227,12 @@ int main(int argc, char **argv)
 	}
 
 	igt_subtest("interruptible") {
-		int count;
+		uint64_t count;
 
-		count = 3 * gem_aperture_size(fd) / (1024*1024) / 2;
+		count = gem_aperture_size(fd);
+		if (count >> 32)
+			count = MAX_32b;
+		count = 3 * count / (1024*1024) / 2;
 		count += (count & 1) == 0;
 		intel_require_memory(count, 1024*1024, CHECK_RAM);
 

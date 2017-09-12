@@ -160,9 +160,11 @@ static void run_test (int fd, int count)
 	drm_intel_bufmgr_destroy(bufmgr);
 }
 
+#define MAX_32b ((1ull << 32) - 4096)
+
 igt_main
 {
-	int fd, count;
+	int fd;
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
@@ -177,7 +179,12 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_subtest("normal") {
-		count = 3 * gem_aperture_size(fd) / (bo_size) / 2;
+		uint64_t count;
+
+		count = gem_aperture_size(fd);
+		if (count >> 32)
+			count = MAX_32b;
+		count = 3 * count / bo_size / 2;
 		intel_require_memory(count, bo_size, CHECK_RAM);
 		run_test(fd, count);
 	}
