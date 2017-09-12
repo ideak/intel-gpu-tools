@@ -394,7 +394,7 @@ void igt_stop_shrink_helper(void)
 
 static struct igt_helper_process hang_detector;
 static void __attribute__((noreturn))
-hang_detector_process(pid_t pid, dev_t rdev)
+hang_detector_process(int fd, pid_t pid, dev_t rdev)
 {
 	struct udev_monitor *mon =
 		udev_monitor_new_from_netlink(udev_new(), "kernel");
@@ -428,8 +428,10 @@ hang_detector_process(pid_t pid, dev_t rdev)
 			const char *str;
 
 			str = udev_device_get_property_value(dev, "ERROR");
-			if (str && atoi(str) == 1)
+			if (str && atoi(str) == 1) {
+				igt_debugfs_dump(fd, "i915_error_state");
 				kill(pid, SIGIO);
+			}
 		}
 
 		udev_device_unref(dev);
@@ -461,7 +463,7 @@ void igt_fork_hang_detector(int fd)
 
 	signal(SIGIO, sig_abort);
 	igt_fork_helper(&hang_detector)
-		hang_detector_process(getppid(), st.st_rdev);
+		hang_detector_process(fd, getppid(), st.st_rdev);
 }
 
 void igt_stop_hang_detector(void)
