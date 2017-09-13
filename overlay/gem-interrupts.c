@@ -136,8 +136,12 @@ int gem_interrupts_update(struct gem_interrupts *irqs)
 		else
 			val = ret;
 	} else {
-		if (read(irqs->fd, &val, sizeof(val)) < 0)
+		uint64_t data[2];
+
+		if (read(irqs->fd, data, sizeof(data)) < 0)
 			return irqs->error = errno;
+
+		val = data[0];
 	}
 
 	update = irqs->last_count == 0;
