@@ -10,7 +10,6 @@ gpu_overlay_src = [
 	'gpu-freq.c',
 	'igfx.c',
 	'overlay.c',
-	'perf.c',
 	'power.c',
 	'rc6.c',
 ]
@@ -56,5 +55,6 @@ if xrandr.found() and cairo.found()
 			include_directories : inc,
 			c_args : gpu_overlay_cflags,
 			dependencies : gpu_overlay_deps,
+			link_with : lib_igt_perf,
 			install : true)
 endif

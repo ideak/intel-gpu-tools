@@ -34,7 +34,8 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include "perf.h"
+#include "igt_perf.h"
+
 #include "gpu-perf.h"
 #include "debugfs.h"
 

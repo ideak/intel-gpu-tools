@@ -179,4 +179,8 @@ lib_igt = declare_dependency(link_with : lib_igt_build,
 
 igt_deps = [ lib_igt ] + lib_deps
 
+lib_igt_perf = static_library('igt_perf',
+	['igt_perf.c']
+)
+
 subdir('tests')

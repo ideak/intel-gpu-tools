@@ -31,7 +31,8 @@
 #include <errno.h>
 #include <assert.h>
 
-#include "perf.h"
+#include "igt_perf.h"
+
 #include "igfx.h"
 #include "gpu-top.h"
 

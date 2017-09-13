@@ -31,7 +31,8 @@
 #include <time.h>
 #include <errno.h>
 
-#include "perf.h"
+#include "igt_perf.h"
+
 #include "power.h"
 #include "debugfs.h"
 

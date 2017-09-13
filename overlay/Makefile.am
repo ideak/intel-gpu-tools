@@ -4,8 +4,8 @@ endif
 
 AM_CPPFLAGS = -I.
 AM_CFLAGS = $(DRM_CFLAGS) $(PCIACCESS_CFLAGS) $(CWARNFLAGS) \
-	$(CAIRO_CFLAGS) $(OVERLAY_CFLAGS) $(WERROR_CFLAGS)
-LDADD = $(DRM_LIBS) $(PCIACCESS_LIBS) $(CAIRO_LIBS) $(OVERLAY_LIBS)
+	$(CAIRO_CFLAGS) $(OVERLAY_CFLAGS) $(WERROR_CFLAGS) -I$(srcdir)/../lib
+LDADD = $(DRM_LIBS) $(PCIACCESS_LIBS) $(CAIRO_LIBS) $(OVERLAY_LIBS) $(top_builddir)/lib/libigt_perf.la
 
 intel_gpu_overlay_SOURCES = \
 	chart.h \
@@ -29,8 +29,6 @@ intel_gpu_overlay_SOURCES = \
 	igfx.c \
 	overlay.h \
 	overlay.c \
-	perf.h \
-	perf.c \
 	power.h \
 	power.c \
 	rc6.h \

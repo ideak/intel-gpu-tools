@@ -31,9 +31,10 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "igt_perf.h"
+
 #include "gem-interrupts.h"
 #include "debugfs.h"
-#include "perf.h"
 
 static int perf_open(void)
 {

@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#include "perf.h"
+#include "igt_perf.h"
 
 uint64_t i915_type_id(void)
 {

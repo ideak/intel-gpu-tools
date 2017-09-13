@@ -31,8 +31,9 @@
 #include <time.h>
 #include <errno.h>
 
+#include "igt_perf.h"
+
 #include "rc6.h"
-#include "perf.h"
 
 static int perf_i915_open(int config, int group)
 {

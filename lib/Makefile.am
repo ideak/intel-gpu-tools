@@ -7,7 +7,11 @@ include Makefile.sources
 
 libintel_tools_la_SOURCES = $(lib_source_list)
 
-noinst_LTLIBRARIES = libintel_tools.la
+libigt_perf_la_SOURCES = \
+	igt_perf.c	 \
+	igt_perf.h
+
+noinst_LTLIBRARIES = libintel_tools.la libigt_perf.la
 noinst_HEADERS = check-ndebug.h
 
 if BUILD_VC4

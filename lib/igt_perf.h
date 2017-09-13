@@ -1,6 +1,8 @@
 #ifndef I915_PERF_H
 #define I915_PERF_H
 
+#include <stdint.h>
+
 #include <linux/perf_event.h>
 
 #define I915_SAMPLE_BUSY	0

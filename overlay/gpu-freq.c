@@ -28,9 +28,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "igt_perf.h"
+
 #include "gpu-freq.h"
 #include "debugfs.h"
-#include "perf.h"
 
 static int perf_i915_open(int config, int group)
 {
