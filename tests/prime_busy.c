@@ -52,6 +52,8 @@ static void busy(int fd, unsigned ring, unsigned flags)
 	uint32_t *batch, *bbe;
 	int i, count, timeout;
 
+	gem_quiescent_gpu(fd);
+
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = (uintptr_t)obj;
 	execbuf.buffer_count = 2;
@@ -172,53 +174,39 @@ static void busy(int fd, unsigned ring, unsigned flags)
 	close(pfd[SCRATCH].fd);
 }
 
-static void run_busy(int fd,
-		     const struct intel_execution_engine *e,
-		     const char *name, unsigned flags)
+static void test_engine_mode(int fd,
+			     const struct intel_execution_engine *e,
+			     const char *name, unsigned int flags)
 {
-	igt_fixture {
-		gem_require_ring(fd, e->exec_id | e->flags);
-		igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
-		gem_quiescent_gpu(fd);
+	igt_hang_t hang = {};
 
-		if ((flags & HANG) == 0)
-			igt_fork_hang_detector(fd);
-	}
+	igt_subtest_group {
+		igt_fixture {
+			gem_require_ring(fd, e->exec_id | e->flags);
+			igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 
-	igt_subtest_f("%s%s-%s",
-		      !e->exec_id && !(flags & HANG) ? "basic-" : "",
-		      name, e->name)
-		busy(fd, e->exec_id | e->flags, flags);
+			if ((flags & HANG) == 0)
+				igt_fork_hang_detector(fd);
+			else
+				hang = igt_allow_hang(fd, 0, 0);
+		}
 
-	igt_fixture {
-		if ((flags & HANG) == 0)
-			igt_stop_hang_detector();
-		gem_quiescent_gpu(fd);
-	}
-}
+		igt_subtest_f("%s%s-%s",
+			      !e->exec_id && !(flags & HANG) ? "basic-" : "",
+			      name, e->name)
+			busy(fd, e->exec_id | e->flags, flags);
 
-static void run_poll(int fd,
-		     const struct intel_execution_engine *e,
-		     const char *name, unsigned flags)
-{
-	igt_fixture {
-		gem_require_ring(fd, e->exec_id | e->flags);
-		igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
+		igt_subtest_f("%swait-%s-%s",
+			      !e->exec_id && !(flags & HANG) ? "basic-" : "",
+			      name, e->name)
+			busy(fd, e->exec_id | e->flags, flags | POLL);
 
-		gem_quiescent_gpu(fd);
-		if ((flags & HANG) == 0)
-			igt_fork_hang_detector(fd);
-	}
-
-	igt_subtest_f("%swait-%s-%s",
-		      !e->exec_id && !(flags & HANG) ? "basic-" : "",
-		      name, e->name)
-		busy(fd, e->exec_id | e->flags, flags | POLL);
-
-	igt_fixture {
-		if ((flags & HANG) == 0)
-			igt_stop_hang_detector();
-		gem_quiescent_gpu(fd);
+		igt_fixture {
+			if ((flags & HANG) == 0)
+				igt_stop_hang_detector();
+			else
+				igt_disallow_hang(fd, hang);
+		}
 	}
 }
 
@@ -250,10 +238,7 @@ igt_main
 
 		for (e = intel_execution_engines; e->name; e++) {
 			for (const struct mode *m = modes; m->name; m++)
-				igt_subtest_group {
-					run_busy(fd, e, m->name, m->flags);
-					run_poll(fd, e, m->name, m->flags);
-				}
+				test_engine_mode(fd, e, m->name, m->flags);
 		}
 	}
 
