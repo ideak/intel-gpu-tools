@@ -43,49 +43,57 @@
 #define   RING_WAIT		(1<<11)
 #define   RING_WAIT_SEMAPHORE	(1<<10)
 
-#define __I915_PERF_RING(n) (4*n)
-#define I915_PERF_RING_BUSY(n) (__I915_PERF_RING(n) + 0)
-#define I915_PERF_RING_WAIT(n) (__I915_PERF_RING(n) + 1)
-#define I915_PERF_RING_SEMA(n) (__I915_PERF_RING(n) + 2)
-
 static int perf_init(struct gpu_top *gt)
 {
-	const char *names[] = {
-		"RCS",
-		"BCS",
-		"VCS0",
-		"VCS1",
-		NULL,
+	struct engine_desc {
+		unsigned class, inst;
+		const char *name;
+	} *d, engines[] = {
+		{ I915_ENGINE_CLASS_RENDER, 0, "rcs0" },
+		{ I915_ENGINE_CLASS_COPY, 0, "bcs0" },
+		{ I915_ENGINE_CLASS_VIDEO, 0, "vcs0" },
+		{ I915_ENGINE_CLASS_VIDEO, 1, "vcs1" },
+		{ I915_ENGINE_CLASS_VIDEO_ENHANCE, 0, "vecs0" },
+		{ 0, 0, NULL }
 	};
-	int n;
 
-	gt->fd = perf_i915_open_group(I915_PERF_RING_BUSY(0), -1);
+	d = &engines[0];
+
+	gt->fd = perf_i915_open_group(I915_PMU_ENGINE_BUSY(d->class, d->inst),
+				      -1);
 	if (gt->fd < 0)
 		return -1;
 
-	if (perf_i915_open_group(I915_PERF_RING_WAIT(0), gt->fd) >= 0)
+	if (perf_i915_open_group(I915_PMU_ENGINE_WAIT(d->class, d->inst),
+				 gt->fd) >= 0)
 		gt->have_wait = 1;
 
-	if (perf_i915_open_group(I915_PERF_RING_SEMA(0), gt->fd) >= 0)
+	if (perf_i915_open_group(I915_PMU_ENGINE_SEMA(d->class, d->inst),
+				 gt->fd) >= 0)
 		gt->have_sema = 1;
 
-	gt->ring[0].name = names[0];
+	gt->ring[0].name = d->name;
 	gt->num_rings = 1;
 
-	for (n = 1; names[n]; n++) {
-		if (perf_i915_open_group(I915_PERF_RING_BUSY(n), gt->fd) >= 0) {
-			if (gt->have_wait &&
-			    perf_i915_open_group(I915_PERF_RING_WAIT(n),
-						 gt->fd) < 0)
-				return -1;
+	for (d++; d->name; d++) {
+		if (perf_i915_open_group(I915_PMU_ENGINE_BUSY(d->class,
+							      d->inst),
+					gt->fd) < 0)
+			continue;
 
-			if (gt->have_sema &&
-			    perf_i915_open_group(I915_PERF_RING_SEMA(n),
-						 gt->fd) < 0)
-				return -1;
+		if (gt->have_wait &&
+		    perf_i915_open_group(I915_PMU_ENGINE_WAIT(d->class,
+							      d->inst),
+					 gt->fd) < 0)
+			return -1;
 
-			gt->ring[gt->num_rings++].name = names[n];
-		}
+		if (gt->have_sema &&
+		    perf_i915_open_group(I915_PMU_ENGINE_SEMA(d->class,
+							      d->inst),
+				   gt->fd) < 0)
+			return -1;
+
+		gt->ring[gt->num_rings++].name = d->name;
 	}
 
 	return 0;

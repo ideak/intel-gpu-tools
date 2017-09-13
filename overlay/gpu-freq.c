@@ -37,8 +37,8 @@ static int perf_open(void)
 {
 	int fd;
 
-	fd = perf_i915_open_group(I915_PERF_ACTUAL_FREQUENCY, -1);
-	if (perf_i915_open_group(I915_PERF_REQUESTED_FREQUENCY, fd) < 0) {
+	fd = perf_i915_open_group(I915_PMU_ACTUAL_FREQUENCY, -1);
+	if (perf_i915_open_group(I915_PMU_REQUESTED_FREQUENCY, fd) < 0) {
 		close(fd);
 		fd = -1;
 	}
@@ -176,8 +176,8 @@ int gpu_freq_update(struct gpu_freq *gf)
 			return EAGAIN;
 		}
 
-		gf->current = (s->act - d->act) / d_time;
-		gf->request = (s->req - d->req) / d_time;
+		gf->current = (s->act - d->act) * 1e9 / d_time;
+		gf->request = (s->req - d->req) * 1e9 / d_time;
 	}
 
 	return 0;

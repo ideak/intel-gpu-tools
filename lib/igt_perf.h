@@ -1,3 +1,27 @@
+/*
+ * Copyright © 2017 Intel Corporation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
+
 #ifndef I915_PERF_H
 #define I915_PERF_H
 
@@ -5,41 +29,52 @@
 
 #include <linux/perf_event.h>
 
-#define I915_SAMPLE_BUSY	0
-#define I915_SAMPLE_WAIT	1
-#define I915_SAMPLE_SEMA	2
+enum drm_i915_gem_engine_class {
+	I915_ENGINE_CLASS_RENDER 	= 0,
+	I915_ENGINE_CLASS_COPY		= 1,
+	I915_ENGINE_CLASS_VIDEO		= 2,
+	I915_ENGINE_CLASS_VIDEO_ENHANCE	= 3,
 
-#define I915_SAMPLE_RCS		0
-#define I915_SAMPLE_VCS		1
-#define I915_SAMPLE_BCS		2
-#define I915_SAMPLE_VECS	3
+	I915_ENGINE_CLASS_INVALID	= -1
+};
 
-#define __I915_PERF_COUNT(ring, id) ((ring) << 4 | (id))
+enum drm_i915_pmu_engine_sample {
+	I915_SAMPLE_BUSY = 0,
+	I915_SAMPLE_WAIT = 1,
+	I915_SAMPLE_SEMA = 2,
+	I915_ENGINE_SAMPLE_MAX /* non-ABI */
+};
 
-#define I915_PERF_COUNT_RCS_BUSY __I915_PERF_COUNT(I915_SAMPLE_RCS, I915_SAMPLE_BUSY)
-#define I915_PERF_COUNT_RCS_WAIT __I915_PERF_COUNT(I915_SAMPLE_RCS, I915_SAMPLE_WAIT)
-#define I915_PERF_COUNT_RCS_SEMA __I915_PERF_COUNT(I915_SAMPLE_RCS, I915_SAMPLE_SEMA)
+#define I915_PMU_SAMPLE_BITS (4)
+#define I915_PMU_SAMPLE_MASK (0xf)
+#define I915_PMU_SAMPLE_INSTANCE_BITS (8)
+#define I915_PMU_CLASS_SHIFT \
+	(I915_PMU_SAMPLE_BITS + I915_PMU_SAMPLE_INSTANCE_BITS)
 
-#define I915_PERF_COUNT_VCS_BUSY __I915_PERF_COUNT(I915_SAMPLE_VCS, I915_SAMPLE_BUSY)
-#define I915_PERF_COUNT_VCS_WAIT __I915_PERF_COUNT(I915_SAMPLE_VCS, I915_SAMPLE_WAIT)
-#define I915_PERF_COUNT_VCS_SEMA __I915_PERF_COUNT(I915_SAMPLE_VCS, I915_SAMPLE_SEMA)
+#define __I915_PMU_ENGINE(class, instance, sample) \
+	((class) << I915_PMU_CLASS_SHIFT | \
+	(instance) << I915_PMU_SAMPLE_BITS | \
+	(sample))
 
-#define I915_PERF_COUNT_BCS_BUSY __I915_PERF_COUNT(I915_SAMPLE_BCS, I915_SAMPLE_BUSY)
-#define I915_PERF_COUNT_BCS_WAIT __I915_PERF_COUNT(I915_SAMPLE_BCS, I915_SAMPLE_WAIT)
-#define I915_PERF_COUNT_BCS_SEMA __I915_PERF_COUNT(I915_SAMPLE_BCS, I915_SAMPLE_SEMA)
+#define I915_PMU_ENGINE_BUSY(class, instance) \
+	__I915_PMU_ENGINE(class, instance, I915_SAMPLE_BUSY)
 
-#define I915_PERF_COUNT_VECS_BUSY __I915_PERF_COUNT(I915_SAMPLE_VECS, I915_SAMPLE_BUSY)
-#define I915_PERF_COUNT_VECS_WAIT __I915_PERF_COUNT(I915_SAMPLE_VECS, I915_SAMPLE_WAIT)
-#define I915_PERF_COUNT_VECS_SEMA __I915_PERF_COUNT(I915_SAMPLE_VECS, I915_SAMPLE_SEMA)
+#define I915_PMU_ENGINE_WAIT(class, instance) \
+	__I915_PMU_ENGINE(class, instance, I915_SAMPLE_WAIT)
 
-#define I915_PERF_ACTUAL_FREQUENCY 32
-#define I915_PERF_REQUESTED_FREQUENCY 33
-#define I915_PERF_ENERGY 34
-#define I915_PERF_INTERRUPTS 35
+#define I915_PMU_ENGINE_SEMA(class, instance) \
+	__I915_PMU_ENGINE(class, instance, I915_SAMPLE_SEMA)
 
-#define I915_PERF_RC6_RESIDENCY		40
-#define I915_PERF_RC6p_RESIDENCY	41
-#define I915_PERF_RC6pp_RESIDENCY	42
+#define __I915_PMU_OTHER(x) (__I915_PMU_ENGINE(0xff, 0xff, 0xf) + 1 + (x))
+
+#define I915_PMU_ACTUAL_FREQUENCY	__I915_PMU_OTHER(0)
+#define I915_PMU_REQUESTED_FREQUENCY	__I915_PMU_OTHER(1)
+#define I915_PMU_INTERRUPTS		__I915_PMU_OTHER(2)
+#define I915_PMU_RC6_RESIDENCY		__I915_PMU_OTHER(3)
+#define I915_PMU_RC6p_RESIDENCY		__I915_PMU_OTHER(4)
+#define I915_PMU_RC6pp_RESIDENCY	__I915_PMU_OTHER(5)
+
+#define I915_PMU_LAST I915_PMU_RC6pp_RESIDENCY
 
 static inline int
 perf_event_open(struct perf_event_attr *attr,

@@ -43,15 +43,15 @@ static int perf_open(unsigned *flags)
 {
 	int fd;
 
-	fd = perf_i915_open_group(I915_PERF_RC6_RESIDENCY, -1);
+	fd = perf_i915_open_group(I915_PMU_RC6_RESIDENCY, -1);
 	if (fd < 0)
 		return -1;
 
 	*flags |= RC6;
-	if (perf_i915_open_group(I915_PERF_RC6p_RESIDENCY, fd) >= 0)
+	if (perf_i915_open_group(I915_PMU_RC6p_RESIDENCY, fd) >= 0)
 		*flags |= RC6p;
 
-	if (perf_i915_open_group(I915_PERF_RC6pp_RESIDENCY, fd) >= 0)
+	if (perf_i915_open_group(I915_PMU_RC6pp_RESIDENCY, fd) >= 0)
 		*flags |= RC6pp;
 
 	return fd;
@@ -132,11 +132,11 @@ int rc6_update(struct rc6 *rc6)
 
 		len = 2;
 		if (rc6->flags & RC6)
-			s->rc6_residency = data[len++];
+			s->rc6_residency = data[len++] / 1e6;
 		if (rc6->flags & RC6p)
-			s->rc6p_residency = data[len++];
+			s->rc6p_residency = data[len++] / 1e6;
 		if (rc6->flags & RC6pp)
-			s->rc6pp_residency = data[len++];
+			s->rc6pp_residency = data[len++] / 1e6;
 	}
 
 	if (rc6->count == 1)
@@ -149,14 +149,14 @@ int rc6_update(struct rc6 *rc6)
 	}
 
 	d_rc6 = s->rc6_residency - d->rc6_residency;
-	rc6->rc6 = (100 * d_rc6 + d_time/2) / d_time;
+	rc6->rc6 = 100 * d_rc6 / d_time;
 
 	d_rc6p = s->rc6p_residency - d->rc6p_residency;
-	rc6->rc6p = (100 * d_rc6p + d_time/2) / d_time;
+	rc6->rc6p = 100 * d_rc6p / d_time;
 
 	d_rc6pp = s->rc6pp_residency - d->rc6pp_residency;
-	rc6->rc6pp = (100 * d_rc6pp + d_time/2) / d_time;
+	rc6->rc6pp = 100 * d_rc6pp / d_time;
 
-	rc6->rc6_combined = (100 * (d_rc6 + d_rc6p + d_rc6pp) + d_time/2) / d_time;
+	rc6->rc6_combined = 100 * (d_rc6 + d_rc6p + d_rc6pp) / d_time;
 	return 0;
 }

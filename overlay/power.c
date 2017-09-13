@@ -45,9 +45,7 @@ int power_init(struct power *power)
 
 	memset(power, 0, sizeof(*power));
 
-	power->fd = perf_i915_open(I915_PERF_ENERGY);
-	if (power->fd != -1)
-		return 0;
+	power->fd = -1;
 
 	sprintf(buf, "%s/i915_energy_uJ", debugfs_dri_path);
 	fd = open(buf, 0);
