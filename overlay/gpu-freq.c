@@ -33,30 +33,12 @@
 #include "gpu-freq.h"
 #include "debugfs.h"
 
-static int perf_i915_open(int config, int group)
-{
-	struct perf_event_attr attr;
-
-	memset(&attr, 0, sizeof (attr));
-
-	attr.type = i915_type_id();
-	if (attr.type == 0)
-		return -ENOENT;
-	attr.config = config;
-
-	attr.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED;
-	if (group == -1)
-		attr.read_format |= PERF_FORMAT_GROUP;
-
-	return perf_event_open(&attr, -1, 0, group, 0);
-}
-
 static int perf_open(void)
 {
 	int fd;
 
-	fd = perf_i915_open(I915_PERF_ACTUAL_FREQUENCY, -1);
-	if (perf_i915_open(I915_PERF_REQUESTED_FREQUENCY, fd) < 0) {
+	fd = perf_i915_open_group(I915_PERF_ACTUAL_FREQUENCY, -1);
+	if (perf_i915_open_group(I915_PERF_REQUESTED_FREQUENCY, fd) < 0) {
 		close(fd);
 		fd = -1;
 	}

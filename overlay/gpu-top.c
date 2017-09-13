@@ -48,24 +48,6 @@
 #define I915_PERF_RING_WAIT(n) (__I915_PERF_RING(n) + 1)
 #define I915_PERF_RING_SEMA(n) (__I915_PERF_RING(n) + 2)
 
-static int perf_i915_open(int config, int group)
-{
-	struct perf_event_attr attr;
-
-	memset(&attr, 0, sizeof (attr));
-
-	attr.type = i915_type_id();
-	if (attr.type == 0)
-		return -ENOENT;
-	attr.config = config;
-
-	attr.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED;
-	if (group == -1)
-		attr.read_format |= PERF_FORMAT_GROUP;
-
-	return perf_event_open(&attr, -1, 0, group, 0);
-}
-
 static int perf_init(struct gpu_top *gt)
 {
 	const char *names[] = {
@@ -77,27 +59,29 @@ static int perf_init(struct gpu_top *gt)
 	};
 	int n;
 
-	gt->fd = perf_i915_open(I915_PERF_RING_BUSY(0), -1);
+	gt->fd = perf_i915_open_group(I915_PERF_RING_BUSY(0), -1);
 	if (gt->fd < 0)
 		return -1;
 
-	if (perf_i915_open(I915_PERF_RING_WAIT(0), gt->fd) >= 0)
+	if (perf_i915_open_group(I915_PERF_RING_WAIT(0), gt->fd) >= 0)
 		gt->have_wait = 1;
 
-	if (perf_i915_open(I915_PERF_RING_SEMA(0), gt->fd) >= 0)
+	if (perf_i915_open_group(I915_PERF_RING_SEMA(0), gt->fd) >= 0)
 		gt->have_sema = 1;
 
 	gt->ring[0].name = names[0];
 	gt->num_rings = 1;
 
 	for (n = 1; names[n]; n++) {
-		if (perf_i915_open(I915_PERF_RING_BUSY(n), gt->fd) >= 0) {
+		if (perf_i915_open_group(I915_PERF_RING_BUSY(n), gt->fd) >= 0) {
 			if (gt->have_wait &&
-			    perf_i915_open(I915_PERF_RING_WAIT(n), gt->fd) < 0)
+			    perf_i915_open_group(I915_PERF_RING_WAIT(n),
+						 gt->fd) < 0)
 				return -1;
 
 			if (gt->have_sema &&
-			    perf_i915_open(I915_PERF_RING_SEMA(n), gt->fd) < 0)
+			    perf_i915_open_group(I915_PERF_RING_SEMA(n),
+						 gt->fd) < 0)
 				return -1;
 
 			gt->ring[gt->num_rings++].name = names[n];

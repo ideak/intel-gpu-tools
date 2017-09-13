@@ -36,20 +36,6 @@
 #include "gem-interrupts.h"
 #include "debugfs.h"
 
-static int perf_open(void)
-{
-	struct perf_event_attr attr;
-
-	memset(&attr, 0, sizeof (attr));
-
-	attr.type = i915_type_id();
-	if (attr.type == 0)
-		return -ENOENT;
-	attr.config = I915_PERF_INTERRUPTS;
-
-	return perf_event_open(&attr, -1, 0, -1, 0);
-}
-
 static long long debugfs_read(void)
 {
 	char buf[8192], *b;
@@ -127,7 +113,7 @@ int gem_interrupts_init(struct gem_interrupts *irqs)
 {
 	memset(irqs, 0, sizeof(*irqs));
 
-	irqs->fd = perf_open();
+	irqs->fd = perf_i915_open(I915_PERF_INTERRUPTS);
 	if (irqs->fd < 0 && interrupts_read() < 0)
 		irqs->error = ENODEV;
 

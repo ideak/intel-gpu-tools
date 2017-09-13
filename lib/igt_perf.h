@@ -62,5 +62,7 @@ perf_event_open(struct perf_event_attr *attr,
 }
 
 uint64_t i915_type_id(void);
+int perf_i915_open(int config);
+int perf_i915_open_group(int config, int group);
 
 #endif /* I915_PERF_H */

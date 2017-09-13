@@ -35,24 +35,6 @@
 
 #include "rc6.h"
 
-static int perf_i915_open(int config, int group)
-{
-	struct perf_event_attr attr;
-
-	memset(&attr, 0, sizeof (attr));
-
-	attr.type = i915_type_id();
-	if (attr.type == 0)
-		return -ENOENT;
-	attr.config = config;
-
-	attr.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED;
-	if (group == -1)
-		attr.read_format |= PERF_FORMAT_GROUP;
-
-	return perf_event_open(&attr, -1, 0, group, 0);
-}
-
 #define RC6	(1<<0)
 #define RC6p	(1<<1)
 #define RC6pp	(1<<2)
@@ -61,15 +43,15 @@ static int perf_open(unsigned *flags)
 {
 	int fd;
 
-	fd = perf_i915_open(I915_PERF_RC6_RESIDENCY, -1);
+	fd = perf_i915_open_group(I915_PERF_RC6_RESIDENCY, -1);
 	if (fd < 0)
 		return -1;
 
 	*flags |= RC6;
-	if (perf_i915_open(I915_PERF_RC6p_RESIDENCY, fd) >= 0)
+	if (perf_i915_open_group(I915_PERF_RC6p_RESIDENCY, fd) >= 0)
 		*flags |= RC6p;
 
-	if (perf_i915_open(I915_PERF_RC6pp_RESIDENCY, fd) >= 0)
+	if (perf_i915_open_group(I915_PERF_RC6pp_RESIDENCY, fd) >= 0)
 		*flags |= RC6pp;
 
 	return fd;

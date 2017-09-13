@@ -38,21 +38,6 @@
 
 /* XXX Is this exposed through RAPL? */
 
-static int perf_open(void)
-{
-	struct perf_event_attr attr;
-
-	memset(&attr, 0, sizeof (attr));
-
-	attr.type = i915_type_id();
-	if (attr.type == 0)
-		return -1;
-	attr.config = I915_PERF_ENERGY;
-
-	attr.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED;
-	return perf_event_open(&attr, -1, 0, -1, 0);
-}
-
 int power_init(struct power *power)
 {
 	char buf[4096];
@@ -60,7 +45,7 @@ int power_init(struct power *power)
 
 	memset(power, 0, sizeof(*power));
 
-	power->fd = perf_open();
+	power->fd = perf_i915_open(I915_PERF_ENERGY);
 	if (power->fd != -1)
 		return 0;
 
