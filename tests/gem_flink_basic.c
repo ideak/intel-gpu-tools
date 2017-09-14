@@ -36,6 +36,8 @@
 #include <sys/ioctl.h>
 #include "drm.h"
 
+IGT_TEST_DESCRIPTION("Tests for flink - a way to export a gem object by name");
+
 static void
 test_flink(int fd)
 {
@@ -44,7 +46,7 @@ test_flink(int fd)
 	struct drm_gem_open open_struct;
 	int ret;
 
-	igt_info("Testing flink and open.\n");
+	igt_debug("Testing flink and open.\n");
 
 	memset(&create, 0, sizeof(create));
 	create.size = 16 * 1024;
@@ -69,7 +71,7 @@ test_double_flink(int fd)
 	struct drm_gem_flink flink2;
 	int ret;
 
-	igt_info("Testing repeated flink.\n");
+	igt_debug("Testing repeated flink.\n");
 
 	memset(&create, 0, sizeof(create));
 	create.size = 16 * 1024;
@@ -83,6 +85,8 @@ test_double_flink(int fd)
 	flink2.handle = create.handle;
 	ret = ioctl(fd, DRM_IOCTL_GEM_FLINK, &flink2);
 	igt_assert_eq(ret, 0);
+
+	/* flinks for same gem object share the same name */
 	igt_assert(flink2.name == flink.name);
 }
 
@@ -92,7 +96,7 @@ test_bad_flink(int fd)
 	struct drm_gem_flink flink;
 	int ret;
 
-	igt_info("Testing error return on bad flink ioctl.\n");
+	igt_debug("Testing error return on bad flink ioctl.\n");
 
 	flink.handle = 0x10101010;
 	ret = ioctl(fd, DRM_IOCTL_GEM_FLINK, &flink);
@@ -105,7 +109,7 @@ test_bad_open(int fd)
 	struct drm_gem_open open_struct;
 	int ret;
 
-	igt_info("Testing error return on bad open ioctl.\n");
+	igt_debug("Testing error return on bad open ioctl.\n");
 
 	open_struct.name = 0x10101010;
 	ret = ioctl(fd, DRM_IOCTL_GEM_OPEN, &open_struct);
@@ -121,7 +125,7 @@ test_flink_lifetime(int fd)
 	struct drm_gem_open open_struct;
 	int ret, fd2;
 
-	igt_info("Testing flink lifetime.\n");
+	igt_debug("Testing flink lifetime.\n");
 
 	fd2 = drm_open_driver(DRIVER_INTEL);
 
@@ -134,6 +138,7 @@ test_flink_lifetime(int fd)
 	ret = ioctl(fd2, DRM_IOCTL_GEM_FLINK, &flink);
 	igt_assert_eq(ret, 0);
 
+	/* Open a second reference to the gem object with different fd */
 	open_struct.name = flink.name;
 	ret = ioctl(fd, DRM_IOCTL_GEM_OPEN, &open_struct);
 	igt_assert_eq(ret, 0);
@@ -142,6 +147,7 @@ test_flink_lifetime(int fd)
 	close(fd2);
 	fd2 = drm_open_driver(DRIVER_INTEL);
 
+	/* Flink name remains valid due to the second reference */
 	open_struct.name = flink.name;
 	ret = ioctl(fd2, DRM_IOCTL_GEM_OPEN, &open_struct);
 	igt_assert_eq(ret, 0);
@@ -163,6 +169,8 @@ igt_main
 		test_bad_flink(fd);
 	igt_subtest("bad-open")
 		test_bad_open(fd);
+
+	/* Flink lifetime is limited to that of the gem object it points to */
 	igt_subtest("flink-lifetime")
 		test_flink_lifetime(fd);
 }
