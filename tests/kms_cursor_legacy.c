@@ -490,92 +490,6 @@ enum basic_flip_cursor {
 	FLIP_AFTER_CURSOR
 };
 
-static uint32_t *make_busy(int fd, uint32_t target)
-{
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj[2];
-	struct drm_i915_gem_relocation_entry reloc[2];
-	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t *batch;
-	int i;
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
-	execbuf.buffer_count = 2;
-
-	memset(obj, 0, sizeof(obj));
-	obj[0].handle = target;
-	obj[1].handle = gem_create(fd, 4096);
-	batch = gem_mmap__wc(fd, obj[1].handle, 0, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj[1].handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-
-	obj[1].relocs_ptr = (uintptr_t)reloc;
-	obj[1].relocation_count = 2;
-	memset(reloc, 0, sizeof(reloc));
-
-	reloc[0].target_handle = obj[1].handle; /* recurse */
-	reloc[0].presumed_offset = 0;
-	reloc[0].offset = sizeof(uint32_t);
-	reloc[0].delta = 0;
-	reloc[0].read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc[0].write_domain = 0;
-
-	reloc[1].target_handle = target;
-	reloc[1].presumed_offset = 0;
-	reloc[1].offset = 1024;
-	reloc[1].delta = 0;
-	reloc[1].read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc[1].write_domain = I915_GEM_DOMAIN_COMMAND;
-
-	i = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc[0].delta = 1;
-		}
-	}
-	i++;
-
-	gem_execbuf(fd, &execbuf);
-	gem_close(fd, obj[1].handle);
-
-	return batch;
-}
-
-static void cancel_busy(uint32_t *busy)
-{
-	*busy = MI_BATCH_BUFFER_END;
-	munmap(busy, 4096);
-}
-
-static uint32_t *
-make_fb_busy(int fd, const struct igt_fb *fb)
-{
-	uint32_t *busy;
-
-	busy = make_busy(fd, fb->gem_handle);
-	igt_assert(gem_bo_busy(fd, fb->gem_handle));
-
-	return busy;
-}
-
-static void finish_fb_busy(uint32_t *busy)
-{
-	cancel_busy(busy);
-}
-
 #define BASIC_BUSY 0x1
 
 static void basic_flip_cursor(igt_display_t *display,
@@ -588,7 +502,7 @@ static void basic_flip_cursor(igt_display_t *display,
 	struct igt_fb fb_info, cursor_fb, cursor_fb2, argb_fb;
 	unsigned vblank_start;
 	enum pipe pipe = find_connected_pipe(display, false);
-	uint32_t *busy;
+	igt_spin_t *spin;
 	int i, miss1 = 0, miss2 = 0, delta;
 
 	if (mode >= flip_test_atomic)
@@ -616,9 +530,9 @@ static void basic_flip_cursor(igt_display_t *display,
 		/* Bind the cursor first to warm up */
 		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[0]);
 
-		busy = NULL;
+		spin = NULL;
 		if (flags & BASIC_BUSY)
-			busy = make_fb_busy(display->drm_fd, &fb_info);
+			spin = igt_spin_batch_new(display->drm_fd, 0, 0, fb_info.gem_handle);
 
 		/* Start with a synchronous query to align with the vblank */
 		vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
@@ -660,10 +574,10 @@ static void basic_flip_cursor(igt_display_t *display,
 
 		delta = get_vblank(display->drm_fd, pipe, 0) - vblank_start;
 
-		if (busy) {
+		if (spin) {
 			struct pollfd pfd = { display->drm_fd, POLLIN };
 			igt_assert(poll(&pfd, 1, 0) == 0);
-			finish_fb_busy(busy);
+			igt_spin_batch_free(display->drm_fd, spin);
 		}
 
 		if (miss)
@@ -1379,12 +1293,13 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 
 	/* Disable cursor, and immediately queue a flip. Check if resulting crc is correct. */
 	for (int i = 1; i >= 0; i--) {
-		uint32_t *busy;
+		igt_spin_t *spin;
 		igt_crc_t *received_crcs = NULL;
 		int ncrcs;
 		static const int max_crcs = 8;
 
-		busy = make_fb_busy(display->drm_fd, &fb_info[1]);
+		spin = igt_spin_batch_new(display->drm_fd, 0, 0,
+					  fb_info[1].gem_handle);
 
 		vblank_start = get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
 
@@ -1395,7 +1310,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 
 		ncrcs = igt_pipe_crc_get_crcs(pipe_crc, max_crcs, &received_crcs);
 
-		finish_fb_busy(busy);
+		igt_spin_batch_free(display->drm_fd, spin);
 
 		igt_set_timeout(1, "Stuck page flip");
 		igt_ignore_warn(read(display->drm_fd, &vbl, sizeof(vbl)));
