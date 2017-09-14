@@ -89,4 +89,11 @@ shared_library('intel_aubdump', 'aubdump.c',
 	       name_prefix : '',
 	       install : true)
 
+conf_data = configuration_data()
+conf_data.set('prefix', get_option('prefix'))
+conf_data.set('exec_prefix', '${prefix}')
+conf_data.set('libdir', join_paths('${prefix}', get_option('libdir')))
+configure_file(input : 'intel_aubdump.in', output : 'intel_aubdump',
+               configuration : conf_data, install_dir : get_option('bindir'))
+
 subdir('null_state_gen')
