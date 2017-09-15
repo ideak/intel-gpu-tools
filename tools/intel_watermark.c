@@ -166,10 +166,10 @@ static void skl_wm_dump(void)
 		for (level = 0; level < num_levels; level++) {
 			for (pipe = 0; pipe < num_pipes; pipe++) {
 				if (plane == 0)
-					snprintf(reg_name, sizeof(reg_name), "%s_WM_%c_%1d","CUR",
+					snprintf(reg_name, sizeof(reg_name), "CUR_WM_%c_%1d",
 						 pipe_name(pipe), level);
 				else
-					snprintf(reg_name, sizeof(reg_name), "%s_WM_%1d_%c_%1d","PLANE",
+					snprintf(reg_name, sizeof(reg_name), "PLANE_WM_%1d_%c_%1d",
 						 plane, pipe_name(pipe), level);
 
 				printf("%-19s %8x\t\t" , reg_name, wm[level][pipe][plane]);
@@ -182,10 +182,10 @@ static void skl_wm_dump(void)
 	for (plane = 0; plane < num_planes; plane++) {
 		for (pipe = 0; pipe < num_pipes; pipe++) {
 			if (plane == 0)
-				snprintf(reg_name, sizeof(reg_name), "%s_WM_TRANS_%c", "CUR",
+				snprintf(reg_name, sizeof(reg_name), "CUR_WM_TRANS_%c",
 					 pipe_name(pipe));
 			else
-				snprintf(reg_name, sizeof(reg_name), "%s_WM_TRANS_%1d_%c", "PLANE",
+				snprintf(reg_name, sizeof(reg_name), "PLANE_WM_TRANS_%1d_%c",
 					 plane, pipe_name(pipe));
 
 			printf("%-19s %8x\t\t", reg_name, wm_trans[pipe][plane]);
@@ -197,10 +197,10 @@ static void skl_wm_dump(void)
 	for (plane = 0; plane < num_planes; plane++) {
 		for (pipe = 0; pipe < num_pipes; pipe++) {
 			if (plane == 0)
-				snprintf(reg_name, sizeof(reg_name), "%s_BUF_CFG_%c", "CUR",
+				snprintf(reg_name, sizeof(reg_name), "CUR_BUF_CFG_%c",
 					 pipe_name(pipe));
 			else
-				snprintf(reg_name, sizeof(reg_name), "%s_BUF_CFG_%1d_%c", "PLANE",
+				snprintf(reg_name, sizeof(reg_name), "PLANE_BUF_CFG_%1d_%c",
 					 plane, pipe_name(pipe));
 
 			printf("%-19s %8x\t\t", reg_name, buf_cfg[pipe][plane]);
