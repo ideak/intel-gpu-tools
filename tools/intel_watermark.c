@@ -145,11 +145,14 @@ static void skl_wm_dump(void)
 	uint32_t wm[num_levels][num_pipes][num_planes];
 	uint32_t wm_trans[num_pipes][num_planes];
 	uint32_t buf_cfg[num_pipes][num_planes];
+	uint32_t wm_linetime[num_pipes];
 	char reg_name[20];
 
 	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	for (pipe = 0; pipe < num_pipes; pipe++) {
+		wm_linetime[pipe] = read_reg(0x45270 + pipe * 0x4);
+
 		for (plane = 0; plane < num_planes; plane++) {
 			addr =  base_addr +  pipe * 0x1000 + plane * 0x100;
 
@@ -161,6 +164,13 @@ static void skl_wm_dump(void)
 			}
 		}
 	}
+
+	for (pipe = 0; pipe < num_pipes; pipe++) {
+		snprintf(reg_name, sizeof(reg_name), "WM_LINETIME_%c",
+			 pipe_name(pipe));
+		printf("%-18s 0x%08x\t", reg_name, wm_linetime[pipe]);
+	}
+	printf("\n\n");
 
 	for (plane = 0; plane < num_planes; plane++) {
 		for (level = 0; level < num_levels; level++) {
@@ -212,8 +222,13 @@ static void skl_wm_dump(void)
 	for (pipe = 0; pipe < num_pipes; pipe++) {
 		uint32_t start, end, size;
 		uint32_t lines, blocks, enable;
+		uint32_t linetime;
 
 		printf("PIPE_%c\n", pipe_name(pipe));
+
+		linetime = REG_DECODE1(wm_linetime[pipe], 0, 9);
+		printf("LINETIME: %d (%.3f usec)\n", linetime, linetime* 0.125f);
+
 		printf("LEVEL   CURSOR   PLANE_1   PLANE_2   PLANE_3   PLANE_4\n");
 		for (level = 0; level < num_levels; level++) {
 			printf("%5d  ", level);
