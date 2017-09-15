@@ -172,7 +172,7 @@ static void skl_wm_dump(void)
 					snprintf(reg_name, sizeof(reg_name), "PLANE_WM_%1d_%c_%1d",
 						 plane, pipe_name(pipe), level);
 
-				printf("%-19s %8x\t\t" , reg_name, wm[level][pipe][plane]);
+				printf("%-18s 0x%08x\t" , reg_name, wm[level][pipe][plane]);
 			}
 			printf("\n");
 		}
@@ -188,7 +188,7 @@ static void skl_wm_dump(void)
 				snprintf(reg_name, sizeof(reg_name), "PLANE_WM_TRANS_%1d_%c",
 					 plane, pipe_name(pipe));
 
-			printf("%-19s %8x\t\t", reg_name, wm_trans[pipe][plane]);
+			printf("%-18s 0x%08x\t", reg_name, wm_trans[pipe][plane]);
 		}
 		printf("\n");
 	}
@@ -203,7 +203,7 @@ static void skl_wm_dump(void)
 				snprintf(reg_name, sizeof(reg_name), "PLANE_BUF_CFG_%1d_%c",
 					 plane, pipe_name(pipe));
 
-			printf("%-19s %8x\t\t", reg_name, buf_cfg[pipe][plane]);
+			printf("%-18s 0x%08x\t", reg_name, buf_cfg[pipe][plane]);
 		}
 		printf("\n");
 	}
