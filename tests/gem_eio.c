@@ -207,6 +207,75 @@ static void test_inflight(int fd)
 	}
 }
 
+static uint32_t __gem_context_create(int fd)
+{
+	struct drm_i915_gem_context_create create;
+
+	memset(&create, 0, sizeof(create));
+	if (ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &create))
+		return 0;
+
+	return create.ctx_id;
+}
+
+static void test_inflight_contexts(int fd)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj[2];
+	uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned int engine;
+	uint32_t ctx[64];
+	int fence[64];
+
+	igt_require(gem_has_exec_fence(fd));
+
+	ctx[0] = __gem_context_create(fd);
+	igt_require(ctx[0]);
+	for (unsigned int n = 1; n < ARRAY_SIZE(ctx); n++)
+		ctx[n] = gem_context_create(fd);
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].flags = EXEC_OBJECT_WRITE;
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	for_each_engine(fd, engine) {
+		igt_hang_t hang;
+
+		igt_debug("Starting %s on engine '%s'\n", __func__, e__->name);
+		igt_require(i915_reset_control(false));
+
+		hang = igt_hang_ring(fd, engine);
+		obj[0].handle = hang.handle;
+
+		memset(&execbuf, 0, sizeof(execbuf));
+		execbuf.buffers_ptr = to_user_pointer(obj);
+		execbuf.buffer_count = 2;
+		execbuf.flags = engine | I915_EXEC_FENCE_OUT;
+
+		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
+			execbuf.rsvd1 = ctx[n];
+			gem_execbuf_wr(fd, &execbuf);
+			fence[n] = execbuf.rsvd2 >> 32;
+			igt_assert(fence[n] != -1);
+		}
+
+		igt_post_hang_ring(fd, hang);
+
+		igt_assert_eq(__gem_wait(fd, obj[1].handle, -1), 0);
+		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
+			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
+			close(fence[n]);
+		}
+
+		igt_assert(i915_reset_control(true));
+		trigger_reset(fd);
+	}
+
+	for (unsigned int n = 0; n < ARRAY_SIZE(ctx); n++)
+		gem_context_destroy(fd, ctx[n]);
+}
+
 static void test_inflight_external(int fd)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -374,6 +443,9 @@ igt_main
 
 	igt_subtest("in-flight")
 		test_inflight(fd);
+
+	igt_subtest("in-flight-contexts")
+		test_inflight_contexts(fd);
 
 	igt_subtest("in-flight-external")
 		test_inflight_external(fd);
