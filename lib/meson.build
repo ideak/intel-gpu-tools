@@ -140,9 +140,9 @@ install_headers(lib_headers)
 pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), 'intel-gpu-tools')
 srcdir = join_paths(meson.source_root(), 'tests')
 
-vcs_tag(input : 'version.h.in', output : 'version.h',
-	fallback : 'NO-GIT',
-	command : [ 'git', 'log', '-n1', '--pretty=format:g%h' ] )
+lib_version = vcs_tag(input : 'version.h.in', output : 'version.h',
+		      fallback : 'NO-GIT',
+		      command : [ 'git', 'log', '-n1', '--pretty=format:g%h' ] )
 
 lib_intermediates = []
 foreach f: lib_sources
@@ -154,7 +154,7 @@ foreach f: lib_sources
     endif
 
     lib = static_library('igt-' + name,
-        f,
+	[ f, lib_version ],
 	include_directories: inc,
 	dependencies : lib_deps,
 	c_args : [
