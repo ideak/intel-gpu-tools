@@ -239,8 +239,10 @@ static void ilk_wm_dump(void)
 	}
 	if (is_hsw_plus(devid)) {
 		for (i = 0; i < num_pipes; i++) {
-			printf("WM_LINETIME_%c: line time=%d, ips line time=%d\n",
-			       pipe_name(i), wm.linetime[i].linetime, wm.linetime[i].ips);
+			printf("WM_LINETIME_%c: line time=%d (%.3f usec), ips line time=%d (%.3f usec)\n",
+			       pipe_name(i),
+			       wm.linetime[i].linetime, wm.linetime[i].linetime * 0.125f,
+			       wm.linetime[i].ips, wm.linetime[i].ips * 0.125f);
 		}
 	}
 	if (is_gen7_plus(devid)) {
