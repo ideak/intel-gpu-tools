@@ -11,8 +11,8 @@ lib_brw_src = [
 	'ralloc.c',
 ]
 
-lib_brw = shared_library('brw', lib_brw_src,
-		dependencies : igt_deps)
+lib_brw = static_library('brw', lib_brw_src,
+			 dependencies : igt_deps)
 
 flex = find_program('flex')
 bison = find_program('bison')
@@ -29,9 +29,22 @@ pgen = generator(bison,
 
 pfiles = pgen.process('gram.y')
 
-executable('intel-gen4asm', 'main.c', lfiles, pfiles, link_with : lib_brw)
+executable('intel-gen4asm', 'main.c', lfiles, pfiles,
+	   link_with : lib_brw, install : true)
 
-executable('intel-gen4disasm', 'disasm-main.c', link_with : lib_brw)
+executable('intel-gen4disasm', 'disasm-main.c',
+	   link_with : lib_brw, install : true)
+
+pkgconfigdir = join_paths(get_option('libdir'), 'pgkconfig')
+
+conf_data = configuration_data()
+conf_data.set('prefix', get_option('prefix'))
+conf_data.set('exec_prefix', '${prefix}')
+conf_data.set('libdir', join_paths('${prefix}', get_option('libdir')))
+conf_data.set('includedir', join_paths('${prefix}', get_option('includedir')))
+conf_data.set('VERSION', meson.project_version())
+configure_file(input : 'intel-gen4asm.pc.in', output : 'intel-gen4asm.pc',
+	       configuration : conf_data, install_dir : pkgconfigdir)
 
 gen4asm_testcases = [
 	'test/mov',
