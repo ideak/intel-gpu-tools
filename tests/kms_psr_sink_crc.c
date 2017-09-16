@@ -284,6 +284,15 @@ static void assert_or_manual(bool condition, const char *expected)
 	igt_assert(igt_interactive_debug || condition);
 }
 
+static bool drrs_disabled(data_t *data)
+{
+	char buf[512];
+
+	igt_debugfs_read(data->drm_fd, "i915_drrs_status", buf);
+
+	return strstr(buf, "DRRS Support: No\n");
+}
+
 static void run_test(data_t *data)
 {
 	uint32_t handle = data->fb_white.gem_handle;
@@ -522,6 +531,11 @@ int main(int argc, char *argv[])
 	igt_subtest("psr_basic") {
 		setup_test_plane(&data);
 		igt_assert(wait_psr_entry(&data));
+	}
+
+	igt_subtest("psr_drrs") {
+		setup_test_plane(&data);
+		igt_assert(drrs_disabled(&data));
 	}
 
 	for (op = PAGE_FLIP; op <= RENDER; op++) {
