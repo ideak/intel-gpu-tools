@@ -29,14 +29,7 @@
 
 #include <linux/perf_event.h>
 
-enum drm_i915_gem_engine_class {
-	I915_ENGINE_CLASS_RENDER 	= 0,
-	I915_ENGINE_CLASS_COPY		= 1,
-	I915_ENGINE_CLASS_VIDEO		= 2,
-	I915_ENGINE_CLASS_VIDEO_ENHANCE	= 3,
-
-	I915_ENGINE_CLASS_INVALID	= -1
-};
+#include "igt_gt.h"
 
 enum drm_i915_pmu_engine_sample {
 	I915_SAMPLE_BUSY = 0,

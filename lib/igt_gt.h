@@ -25,6 +25,7 @@
 #define IGT_GT_H
 
 #include "igt_debugfs.h"
+#include "igt_core.h"
 
 void igt_require_hang_ring(int fd, int ring);
 
@@ -79,5 +80,42 @@ extern const struct intel_execution_engine {
 		for_if (gem_has_ring(fd__, flags__ = e__->exec_id | e__->flags))
 
 bool gem_can_store_dword(int fd, unsigned int engine);
+
+extern const struct intel_execution_engine2 {
+	const char *name;
+	int class;
+	int instance;
+} intel_execution_engines2[];
+
+#define for_each_engine_class_instance(fd__, e__) \
+	for ((e__) = intel_execution_engines2;\
+	     (e__)->name; \
+	     (e__)++)
+
+enum drm_i915_gem_engine_class {
+	I915_ENGINE_CLASS_RENDER 	= 0,
+	I915_ENGINE_CLASS_COPY		= 1,
+	I915_ENGINE_CLASS_VIDEO		= 2,
+	I915_ENGINE_CLASS_VIDEO_ENHANCE	= 3,
+
+	I915_ENGINE_CLASS_INVALID	= -1
+};
+
+unsigned int
+gem_class_instance_to_eb_flags(int gem_fd,
+			       enum drm_i915_gem_engine_class class,
+			       unsigned int instance);
+
+bool gem_has_engine(int gem_fd,
+		    enum drm_i915_gem_engine_class class,
+		    unsigned int instance);
+
+static inline
+void gem_require_engine(int gem_fd,
+			enum drm_i915_gem_engine_class class,
+			unsigned int instance)
+{
+	igt_require(gem_has_engine(gem_fd, class, instance));
+}
 
 #endif /* IGT_GT_H */

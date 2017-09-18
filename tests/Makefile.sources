@@ -217,6 +217,7 @@ TESTS_progs = \
 	kms_vblank \
 	meta_test \
 	perf \
+	perf_pmu \
 	pm_backlight \
 	pm_lpsp \
 	pm_rc6_residency \

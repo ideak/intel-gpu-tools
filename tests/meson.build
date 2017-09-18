@@ -195,6 +195,7 @@ test_progs = [
 	'kms_vblank',
 	'meta_test',
 	'perf',
+	'perf_pmu',
 	'pm_backlight',
 	'pm_lpsp',
 	'pm_rc6_residency',
@@ -262,9 +263,14 @@ endif
 libexecdir = join_paths(get_option('prefix'), get_option('libexecdir'), 'intel-gpu-tools')
 
 foreach prog : test_progs
+	link = []
+	if prog == 'perf_pmu'
+		link += lib_igt_perf
+	endif
 	executable(prog, prog + '.c',
 		   dependencies : test_deps,
 		   install_dir : libexecdir,
+		   link_with : link,
 		   install : true)
 endforeach
 

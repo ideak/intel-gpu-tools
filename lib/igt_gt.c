@@ -608,3 +608,53 @@ bool gem_can_store_dword(int fd, unsigned int engine)
 
 	return true;
 }
+
+const struct intel_execution_engine2 intel_execution_engines2[] = {
+	{ "rcs0", I915_ENGINE_CLASS_RENDER, 0 },
+	{ "bcs0", I915_ENGINE_CLASS_COPY, 0 },
+	{ "vcs0", I915_ENGINE_CLASS_VIDEO, 0 },
+	{ "vcs1", I915_ENGINE_CLASS_VIDEO, 1 },
+	{ "vecs0", I915_ENGINE_CLASS_VIDEO_ENHANCE, 0 },
+};
+
+unsigned int
+gem_class_instance_to_eb_flags(int gem_fd,
+			       enum drm_i915_gem_engine_class class,
+			       unsigned int instance)
+{
+	if (class != I915_ENGINE_CLASS_VIDEO)
+		igt_assert(instance == 0);
+	else
+		igt_assert(instance >= 0 && instance <= 1);
+
+	switch (class) {
+	case I915_ENGINE_CLASS_RENDER:
+		return I915_EXEC_RENDER;
+	case I915_ENGINE_CLASS_COPY:
+		return I915_EXEC_BLT;
+	case I915_ENGINE_CLASS_VIDEO:
+		if (instance == 0) {
+			if (gem_has_bsd2(gem_fd))
+				return I915_EXEC_BSD | I915_EXEC_BSD_RING1;
+			else
+				return I915_EXEC_BSD;
+
+		} else {
+			return I915_EXEC_BSD | I915_EXEC_BSD_RING2;
+		}
+	case I915_ENGINE_CLASS_VIDEO_ENHANCE:
+		return I915_EXEC_VEBOX;
+	case I915_ENGINE_CLASS_INVALID:
+	default:
+		igt_assert(0);
+	};
+}
+
+bool gem_has_engine(int gem_fd,
+		    enum drm_i915_gem_engine_class class,
+		    unsigned int instance)
+{
+	return gem_has_ring(gem_fd,
+			    gem_class_instance_to_eb_flags(gem_fd, class,
+							   instance));
+}
