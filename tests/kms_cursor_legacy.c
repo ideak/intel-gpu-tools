@@ -1334,7 +1334,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	igt_pipe_crc_t *pipe_crc;
 	igt_pipe_t *pipe_connected = &display->pipes[pipe];
 	igt_plane_t *plane_primary = igt_pipe_get_plane_type(pipe_connected, DRM_PLANE_TYPE_PRIMARY);
-	igt_crc_t crcs[3];
+	igt_crc_t crcs[2];
 
 	if (atomic)
 		igt_require(display->is_atomic);
@@ -1348,7 +1348,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	pipe_crc = igt_pipe_crc_new(display->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	pipe_crc = igt_pipe_crc_new_nonblock(display->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	set_cursor_on_pipe(display, pipe, &cursor_fb);
 	igt_display_commit2(display, COMMIT_UNIVERSAL);
@@ -1371,9 +1371,18 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	igt_plane_set_fb(plane_primary, &fb_info[0]);
 	igt_display_commit2(display, COMMIT_UNIVERSAL);
 
+	/*
+	 * We must enable CRC collecting here since this may force
+	 * a modeset, and this loop is timing sensitive.
+	 */
+	igt_pipe_crc_start(pipe_crc);
+
 	/* Disable cursor, and immediately queue a flip. Check if resulting crc is correct. */
 	for (int i = 1; i >= 0; i--) {
 		uint32_t *busy;
+		igt_crc_t *received_crcs = NULL;
+		int ncrcs;
+		static const int max_crcs = 8;
 
 		busy = make_fb_busy(display->drm_fd, &fb_info[1]);
 
@@ -1384,7 +1393,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 
 		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 
-		igt_pipe_crc_collect_crc(pipe_crc, &crcs[2]);
+		ncrcs = igt_pipe_crc_get_crcs(pipe_crc, max_crcs, &received_crcs);
 
 		finish_fb_busy(busy);
 
@@ -1397,13 +1406,28 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 		igt_plane_set_fb(plane_primary, &fb_info[0]);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-		igt_assert_crc_equal(&crcs[i], &crcs[2]);
+		/*
+		 * We collect the crc nonblockingly, and should have at least 1
+		 * but not so many crcs that we overflow. Last CRC is the only
+		 * one we care about here. Other CRCs may have been from before
+		 * the cursor update and can contain garbage.
+		 */
+		igt_assert(ncrcs > 0 && ncrcs < max_crcs);
+
+		igt_assert_crc_equal(&crcs[i], &received_crcs[ncrcs - 1]);
+		free(received_crcs);
 	}
 
 	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info[1]);
 	igt_remove_fb(display->drm_fd, &fb_info[0]);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
+
+	/*
+	 * igt_pipe_crc_stop() may force a modeset for workarounds, call
+	 * it after do_cleanup_display since we disable the display anyway.
+	 */
+	igt_pipe_crc_stop(pipe_crc);
 	igt_pipe_crc_free(pipe_crc);
 }
 
