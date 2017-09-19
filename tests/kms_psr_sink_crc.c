@@ -34,6 +34,7 @@
 bool running_with_psr_disabled;
 
 #define CRC_BLACK "000000000000"
+#define CRC_LEN 12
 
 enum operations {
 	PAGE_FLIP,
@@ -243,7 +244,7 @@ static void get_sink_crc(data_t *data, char *crc) {
 	usleep(300000);
 
 	/* Black screen is always invalid */
-	igt_assert(strcmp(crc, CRC_BLACK) != 0);
+	igt_assert(strncmp(crc, CRC_BLACK, CRC_LEN) != 0);
 }
 
 static bool is_green(char *crc)
@@ -298,8 +299,8 @@ static void run_test(data_t *data)
 	uint32_t handle = data->fb_white.gem_handle;
 	igt_plane_t *test_plane;
 	void *ptr;
-	char ref_crc[12];
-	char crc[12];
+	char ref_crc[CRC_LEN];
+	char crc[CRC_LEN];
 	const char *expected = "";
 
 	/* Confirm that screen became Green */
@@ -356,9 +357,9 @@ static void run_test(data_t *data)
 		memset(ptr, 0xff, data->mod_size);
 		get_sink_crc(data, crc);
 		if (data->test_plane == DRM_PLANE_TYPE_PRIMARY)
-			assert_or_manual(strcmp(ref_crc, crc) == 0, "screen WHITE");
+			assert_or_manual(strncmp(ref_crc, crc, CRC_LEN) == 0, "screen WHITE");
 		else
-			assert_or_manual(strcmp(ref_crc, crc) == 0,
+			assert_or_manual(strncmp(ref_crc, crc, CRC_LEN) == 0,
 			       "GREEN background with WHITE box");
 
 		igt_info("Waiting 10s...\n");
@@ -401,7 +402,7 @@ static void run_test(data_t *data)
 		break;
 	}
 	get_sink_crc(data, crc);
-	assert_or_manual(strcmp(ref_crc, crc) != 0, expected);
+	assert_or_manual(strncmp(ref_crc, crc, CRC_LEN) != 0, expected);
 }
 
 static void test_cleanup(data_t *data) {
