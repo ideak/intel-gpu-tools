@@ -2008,9 +2008,9 @@ static igt_pipe_t *igt_output_get_driving_pipe(igt_output_t *output)
 
 static igt_plane_t *igt_pipe_get_plane(igt_pipe_t *pipe, int plane_idx)
 {
-	igt_assert_f(plane_idx >= 0 && plane_idx < pipe->n_planes,
-		"Valid pipe->planes plane_idx not found, plane_idx=%d n_planes=%d",
-		plane_idx, pipe->n_planes);
+	igt_require_f(plane_idx >= 0 && plane_idx < pipe->n_planes,
+		      "Valid pipe->planes plane_idx not found, plane_idx=%d n_planes=%d",
+		      plane_idx, pipe->n_planes);
 
 	return &pipe->planes[plane_idx];
 }
