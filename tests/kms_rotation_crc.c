@@ -332,6 +332,9 @@ static void test_plane_rotation(data_t *data, int plane_type)
 	enum igt_commit_style commit = COMMIT_LEGACY;
 	int ret;
 
+	if (data->flips && plane_type != DRM_PLANE_TYPE_PRIMARY)
+		igt_require(data->display.is_atomic);
+
 	if (plane_type == DRM_PLANE_TYPE_PRIMARY || plane_type == DRM_PLANE_TYPE_CURSOR)
 		commit = COMMIT_UNIVERSAL;
 
@@ -390,12 +393,20 @@ static void test_plane_rotation(data_t *data, int plane_type)
 			 * check CRC against that one as well.
 			 */
 			if (data->flips) {
-				ret = drmModePageFlip(data->gfx_fd,
-						      output->config.crtc->crtc_id,
-						      data->fb_flip.fb_id,
-						      DRM_MODE_PAGE_FLIP_EVENT,
-						      NULL);
-				igt_assert_eq(ret, 0);
+				igt_plane_set_fb(plane, &data->fb_flip);
+				if (data->rotation == IGT_ROTATION_90 || data->rotation == IGT_ROTATION_270)
+					igt_plane_set_size(plane, data->fb.height, data->fb.width);
+
+				if (plane_type != DRM_PLANE_TYPE_PRIMARY) {
+					igt_display_commit_atomic(display, DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, NULL);
+				} else {
+					ret = drmModePageFlip(data->gfx_fd,
+							output->config.crtc->crtc_id,
+							data->fb_flip.fb_id,
+							DRM_MODE_PAGE_FLIP_EVENT,
+							NULL);
+					igt_assert_eq(ret, 0);
+				}
 				wait_for_pageflip(data->gfx_fd);
 				igt_pipe_crc_collect_crc(data->pipe_crc,
 							 &crc_output);
