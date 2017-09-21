@@ -153,15 +153,32 @@ static void get_method_crc(enum igt_draw_method method, uint32_t drm_format,
 	igt_remove_fb(drm_fd, &fb);
 }
 
+static bool format_is_supported(uint32_t format, uint64_t modifier)
+{
+	uint32_t gem_handle, fb_id;
+	unsigned int stride;
+	int ret;
+
+	gem_handle = igt_create_bo_with_dimensions(drm_fd, 64, 64,
+						   format, modifier,
+						   0, NULL, &stride, NULL);
+	ret =  __kms_addfb(drm_fd, gem_handle, 64, 64,
+			   stride, format, modifier,
+			   LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id);
+	drmModeRmFB(drm_fd, fb_id);
+	gem_close(drm_fd, gem_handle);
+
+	return ret == 0;
+}
+
 static void draw_method_subtest(enum igt_draw_method method,
 				uint32_t format_index, uint64_t tiling)
 {
 	igt_crc_t crc;
 
-	if (tiling == LOCAL_I915_FORMAT_MOD_Y_TILED)
-		igt_require(intel_gen(intel_get_drm_devid(drm_fd)) >= 9);
-
 	igt_skip_on(method == IGT_DRAW_MMAP_WC && !gem_mmap__has_wc(drm_fd));
+
+	igt_require(format_is_supported(formats[format_index], tiling));
 
 	/* Use IGT_DRAW_MMAP_GTT on an untiled buffer as the parameter for
 	 * comparison. Cache the value so we don't recompute it for every single
