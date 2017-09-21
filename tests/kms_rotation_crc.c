@@ -122,11 +122,11 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_plane_set_fb(primary, &data->fb_modeset);
 
 	if (commit < COMMIT_ATOMIC) {
-		primary->rotation_changed = false;
+		igt_plane_clear_prop_changed(primary, IGT_PLANE_ROTATION);
 		igt_display_commit(display);
 
 		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
-			primary->rotation_changed = true;
+			igt_plane_set_prop_changed(primary, IGT_PLANE_ROTATION);
 	}
 
 	igt_plane_set_fb(plane, NULL);

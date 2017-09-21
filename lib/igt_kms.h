@@ -252,6 +252,9 @@ enum igt_atomic_plane_properties {
        IGT_PLANE_CRTC_W,
        IGT_PLANE_CRTC_H,
 
+/* Append new properties after IGT_PLANE_COORD_CHANGED_MASK */
+#define IGT_PLANE_COORD_CHANGED_MASK 0xff
+
        IGT_PLANE_FB_ID,
        IGT_PLANE_CRTC_ID,
        IGT_PLANE_IN_FENCE_FD,
@@ -286,37 +289,19 @@ typedef struct {
 	int index;
 	/* capabilities */
 	int type;
-	/* state tracking */
-	unsigned int fb_changed       : 1;
-	unsigned int position_changed : 1;
-	unsigned int rotation_changed : 1;
-	unsigned int size_changed     : 1;
+
 	/*
 	 * drm_plane can be NULL for primary and cursor planes (when not
 	 * using the atomic modeset API)
 	 */
 	drmModePlane *drm_plane;
-	struct igt_fb *fb;
 
-	uint32_t rotation_property;
+	/* gem handle for fb */
+	uint32_t gem_handle;
 
-	/* position within pipe_src_w x pipe_src_h */
-	int crtc_x, crtc_y;
-	/* size within pipe_src_w x pipe_src_h */
-	int crtc_w, crtc_h;
-
-	/* position within the framebuffer */
-	uint32_t src_x;
-	uint32_t src_y;
-	/* size within the framebuffer*/
-	uint32_t src_w;
-	uint32_t src_h;
-
-	igt_rotation_t rotation;
-
-	/* in fence fd */
-	int fence_fd;
-	uint32_t atomic_props_plane[IGT_NUM_PLANE_PROPS];
+	uint64_t changed;
+	uint32_t props[IGT_NUM_PLANE_PROPS];
+	uint64_t values[IGT_NUM_PLANE_PROPS];
 } igt_plane_t;
 
 struct igt_pipe {
@@ -407,7 +392,7 @@ bool igt_pipe_get_property(igt_pipe_t *pipe, const char *name,
 
 static inline bool igt_plane_supports_rotation(igt_plane_t *plane)
 {
-	return plane->rotation_property != 0;
+	return plane->props[IGT_PLANE_ROTATION] != 0;
 }
 void igt_pipe_request_out_fence(igt_pipe_t *pipe);
 void igt_pipe_set_degamma_lut(igt_pipe_t *pipe, void *ptr, size_t length);
@@ -527,16 +512,20 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 
 #define IGT_FIXED(i,f)	((i) << 16 | (f))
 
-/**
- * igt_atomic_populate_plane_req:
- * @req: A pointer to drmModeAtomicReq
- * @plane: A pointer igt_plane_t
- * @prop: one of igt_atomic_plane_properties
- * @value: the value to add
- */
-#define igt_atomic_populate_plane_req(req, plane, prop, value) \
-	igt_assert_lt(0, drmModeAtomicAddProperty(req, plane->drm_plane->plane_id,\
-						  plane->atomic_props_plane[prop], value))
+#define igt_plane_is_prop_changed(plane, prop) \
+	(!!((plane)->changed & (1 << (prop))))
+
+#define igt_plane_set_prop_changed(plane, prop) \
+	(plane)->changed |= 1 << (prop)
+
+#define igt_plane_clear_prop_changed(plane, prop) \
+	(plane)->changed &= ~(1 << (prop))
+
+#define igt_plane_set_prop_value(plane, prop, value) \
+	do { \
+		plane->values[prop] = value; \
+		igt_plane_set_prop_changed(plane, prop); \
+	} while (0)
 
 /**
  * igt_atomic_populate_crtc_req:

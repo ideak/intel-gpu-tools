@@ -163,12 +163,12 @@ static void run_plane_test(igt_display_t *display, enum pipe pipe, igt_output_t 
 					/* connector: 1 prop */
 					output->props[IGT_CONNECTOR_CRTC_ID],
 					/* plane: remainder props */
-					plane->atomic_props_plane[IGT_PLANE_CRTC_ID],
-					plane->atomic_props_plane[IGT_PLANE_FB_ID],
-					plane->atomic_props_plane[IGT_PLANE_SRC_W],
-					plane->atomic_props_plane[IGT_PLANE_SRC_H],
-					plane->atomic_props_plane[IGT_PLANE_CRTC_W],
-					plane->atomic_props_plane[IGT_PLANE_CRTC_H]
+					plane->props[IGT_PLANE_CRTC_ID],
+					plane->props[IGT_PLANE_FB_ID],
+					plane->props[IGT_PLANE_SRC_W],
+					plane->props[IGT_PLANE_SRC_H],
+					plane->props[IGT_PLANE_CRTC_W],
+					plane->props[IGT_PLANE_CRTC_H]
 				};
 				uint64_t prop_vals[] = {
 					/* crtc */
