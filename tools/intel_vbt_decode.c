@@ -384,6 +384,20 @@ static const char *dvo_port(uint8_t type)
 		return "unknown";
 }
 
+static const char *mipi_bridge_type(uint8_t type)
+{
+	switch (type) {
+	case 1:
+		return "ASUS";
+	case 2:
+		return "Toshiba";
+	case 3:
+		return "Renesas";
+	default:
+		return "unknown";
+	}
+}
+
 static void dump_child_device(struct context *context,
 			      const struct child_device_config *child)
 {
@@ -440,21 +454,8 @@ static void dump_child_device(struct context *context,
 		printf("\t\tSDVO stall signal available: %s\n", YESNO(efp->sdvo_stall));
 		printf("\t\tPipe capabilities: 0x%02x\n", efp->pipe_cap);
 		printf("\t\tDVO wiring: 0x%02x\n", efp->dvo_wiring);
-		printf("\t\tMIPI bridge type:");
-		switch (efp->mipi_bridge_type) {
-		case 1:
-			printf("ASUS\n");
-			break;
-		case 2:
-			printf("Toshiba\n");
-			break;
-		case 3:
-			printf("Renesas\n");
-			break;
-		default:
-			printf("(unknown value %d)\n", efp->mipi_bridge_type);
-			break;
-		}
+		printf("\t\tMIPI bridge type: %02x (%s)\n", efp->mipi_bridge_type,
+		       mipi_bridge_type(efp->mipi_bridge_type));
 		printf("\t\tDevice class extendsion: 0x%02x\n", efp->extended_type);
 		printf("\t\tDVO function: 0x%02x\n", efp->dvo_function);
 	}
