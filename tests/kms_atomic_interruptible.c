@@ -161,7 +161,7 @@ static void run_plane_test(igt_display_t *display, enum pipe pipe, igt_output_t 
 					plane->pipe->atomic_props_crtc[IGT_CRTC_MODE_ID],
 					plane->pipe->atomic_props_crtc[IGT_CRTC_ACTIVE],
 					/* connector: 1 prop */
-					output->config.atomic_props_connector[IGT_CONNECTOR_CRTC_ID],
+					output->props[IGT_CONNECTOR_CRTC_ID],
 					/* plane: remainder props */
 					plane->atomic_props_plane[IGT_PLANE_CRTC_ID],
 					plane->atomic_props_plane[IGT_PLANE_FB_ID],
@@ -206,7 +206,7 @@ static void run_plane_test(igt_display_t *display, enum pipe pipe, igt_output_t 
 			case test_legacy_dpms: {
 				struct drm_mode_connector_set_property prop = {
 					.value = DRM_MODE_DPMS_OFF,
-					.prop_id = output->config.atomic_props_connector[IGT_CONNECTOR_DPMS],
+					.prop_id = output->props[IGT_CONNECTOR_DPMS],
 					.connector_id = output->id,
 				};
 

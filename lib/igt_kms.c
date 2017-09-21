@@ -248,7 +248,7 @@ igt_atomic_fill_connector_props(igt_display_t *display, igt_output_t *output,
 			if (strcmp(prop->name, conn_prop_names[j]) != 0)
 				continue;
 
-			output->config.atomic_props_connector[j] = props->props[i];
+			output->props[j] = props->props[i];
 			break;
 		}
 
@@ -1834,7 +1834,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 
 		igt_output_refresh(output);
 
-		output->config.pipe_changed = true;
+		igt_output_set_prop_changed(output, IGT_CONNECTOR_CRTC_ID);
 	}
 
 	drmModeFreePlaneResources(plane_resources);
@@ -2514,23 +2514,24 @@ static void igt_atomic_prepare_crtc_commit(igt_pipe_t *pipe_obj, drmModeAtomicRe
 static void igt_atomic_prepare_connector_commit(igt_output_t *output, drmModeAtomicReq *req)
 {
 
-	struct kmstest_connector_config *config = &output->config;
+	int i;
 
-	if (config->connector_scaling_mode_changed)
-		igt_atomic_populate_connector_req(req, output, IGT_CONNECTOR_SCALING_MODE, config->connector_scaling_mode);
+	for (i = 0; i < IGT_NUM_CONNECTOR_PROPS; i++) {
+		if (!igt_output_is_prop_changed(output, i))
+			continue;
 
-	if (config->pipe_changed) {
-		uint32_t crtc_id = 0;
+		/* it's an error to try an unsupported feature */
+		igt_assert(output->props[i]);
 
-		if (output->config.pipe != PIPE_NONE)
-			crtc_id = output->config.crtc->crtc_id;
+		igt_debug("%s: Setting property \"%s\" to 0x%"PRIx64"/%"PRIi64"\n",
+			  igt_output_name(output), igt_connector_prop_names[i],
+			  output->values[i], output->values[i]);
 
-		igt_atomic_populate_connector_req(req, output, IGT_CONNECTOR_CRTC_ID, crtc_id);
+		igt_assert_lt(0, drmModeAtomicAddProperty(req,
+					  output->config.connector->connector_id,
+					  output->props[i],
+					  output->values[i]));
 	}
-	/*
-	 *	TODO: Add all other connector level properties here
-	 */
-
 }
 
 /*
@@ -2625,11 +2626,10 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 	for (i = 0; i < display->n_outputs; i++) {
 		igt_output_t *output = &display->outputs[i];
 
-		if (s != COMMIT_UNIVERSAL)
-			output->config.pipe_changed = false;
-
 		if (s == COMMIT_ATOMIC)
-			output->config.connector_scaling_mode_changed = false;
+			output->changed = 0;
+		else if (s != COMMIT_UNIVERSAL)
+			igt_output_clear_prop_changed(output, IGT_CONNECTOR_CRTC_ID);
 	}
 }
 
@@ -2873,18 +2873,16 @@ void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 	if (pipe != PIPE_NONE)
 		display->pipes[pipe].mode_changed = true;
 
-	output->config.pipe_changed = true;
+	igt_output_set_prop_value(output, IGT_CONNECTOR_CRTC_ID, pipe == PIPE_NONE ? 0 : display->pipes[pipe].crtc_id);
 
 	igt_output_refresh(output);
 }
 
 void igt_output_set_scaling_mode(igt_output_t *output, uint64_t scaling_mode)
 {
-	output->config.connector_scaling_mode_changed = true;
+	igt_output_set_prop_value(output, IGT_CONNECTOR_SCALING_MODE, scaling_mode);
 
-	output->config.connector_scaling_mode = scaling_mode;
-
-	igt_require(output->config.atomic_props_connector[IGT_CONNECTOR_SCALING_MODE]);
+	igt_require(output->props[IGT_CONNECTOR_SCALING_MODE]);
 }
 
 igt_plane_t *igt_output_get_plane(igt_output_t *output, int plane_idx)

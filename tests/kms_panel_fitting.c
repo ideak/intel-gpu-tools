@@ -275,7 +275,7 @@ static void test_atomic_fastset(igt_display_t *display)
 	igt_require(intel_gen(intel_get_drm_devid(display->drm_fd)) >= 5);
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
-		if (!output->config.atomic_props_connector[IGT_CONNECTOR_SCALING_MODE])
+		if (!output->props[IGT_CONNECTOR_SCALING_MODE])
 			continue;
 
 		test_panel_fitting_fastset(display, pipe, output);

@@ -131,10 +131,7 @@ struct kmstest_connector_config {
 	drmModeConnector *connector;
 	drmModeEncoder *encoder;
 	drmModeModeInfo default_mode;
-	uint64_t connector_scaling_mode;
-	bool connector_scaling_mode_changed;
-	bool pipe_changed;
-	uint32_t atomic_props_connector[IGT_NUM_CONNECTOR_PROPS];
+
 	int pipe;
 	unsigned valid_crtc_idx_mask;
 };
@@ -364,6 +361,12 @@ typedef struct {
 	enum pipe pending_pipe;
 	bool use_override_mode;
 	drmModeModeInfo override_mode;
+
+	/* bitmask of changed properties */
+	uint64_t changed;
+
+	uint32_t props[IGT_NUM_CONNECTOR_PROPS];
+	uint64_t values[IGT_NUM_CONNECTOR_PROPS];
 } igt_output_t;
 
 struct igt_display {
@@ -545,16 +548,20 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 #define igt_atomic_populate_crtc_req(req, pipe, prop, value) \
 	igt_assert_lt(0, drmModeAtomicAddProperty(req, pipe->crtc_id,\
 						  pipe->atomic_props_crtc[prop], value))
-/**
- * igt_atomic_populate_connector_req:
- * @req: A pointer to drmModeAtomicReq
- * @output: A pointer igt_output_t
- * @prop: one of igt_atomic_connector_properties
- * @value: the value to add
- */
-#define igt_atomic_populate_connector_req(req, output, prop, value) \
-	igt_assert_lt(0, drmModeAtomicAddProperty(req, output->config.connector->connector_id,\
-						  output->config.atomic_props_connector[prop], value))
+
+#define igt_output_is_prop_changed(output, prop) \
+	(!!((output)->changed & (1 << (prop))))
+#define igt_output_set_prop_changed(output, prop) \
+	(output)->changed |= 1 << (prop)
+
+#define igt_output_clear_prop_changed(output, prop) \
+	(output)->changed &= ~(1 << (prop))
+
+#define igt_output_set_prop_value(output, prop, value) \
+	do { \
+		(output)->values[prop] = (value); \
+		igt_output_set_prop_changed(output, prop); \
+	} while (0)
 
 /*
  * igt_pipe_refresh:
