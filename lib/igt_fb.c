@@ -583,6 +583,18 @@ stdio_read_func(void *closure, unsigned char* data, unsigned int size)
 	return CAIRO_STATUS_SUCCESS;
 }
 
+cairo_surface_t *igt_cairo_image_surface_create_from_png(const char *filename)
+{
+	cairo_surface_t *image;
+	FILE *f;
+
+	f = igt_fopen_data(filename);
+	image = cairo_image_surface_create_from_png_stream(&stdio_read_func, f);
+	fclose(f);
+
+	return image;
+}
+
 /**
  * igt_paint_image:
  * @cr: cairo drawing context
@@ -601,11 +613,8 @@ void igt_paint_image(cairo_t *cr, const char *filename,
 	cairo_surface_t *image;
 	int img_width, img_height;
 	double scale_x, scale_y;
-	FILE* f;
 
-	f = igt_fopen_data(filename);
-
-	image = cairo_image_surface_create_from_png_stream(&stdio_read_func, f);
+	image = igt_cairo_image_surface_create_from_png(filename);
 	igt_assert(cairo_surface_status(image) == CAIRO_STATUS_SUCCESS);
 
 	img_width = cairo_image_surface_get_width(image);
@@ -624,8 +633,6 @@ void igt_paint_image(cairo_t *cr, const char *filename,
 	cairo_surface_destroy(image);
 
 	cairo_restore(cr);
-
-	fclose(f);
 }
 
 /**
@@ -877,7 +884,7 @@ unsigned int igt_create_image_fb(int fd, int width, int height,
 	uint32_t fb_id;
 	cairo_t *cr;
 
-	image = cairo_image_surface_create_from_png(filename);
+	image = igt_cairo_image_surface_create_from_png(filename);
 	igt_assert(cairo_surface_status(image) == CAIRO_STATUS_SUCCESS);
 	if (width == 0)
 		width = cairo_image_surface_get_width(image);

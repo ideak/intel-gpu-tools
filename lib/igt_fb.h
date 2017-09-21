@@ -136,6 +136,7 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling);
 
 /* cairo-based painting */
 cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb);
+cairo_surface_t *igt_cairo_image_surface_create_from_png(const char *filename);
 cairo_t *igt_get_cairo_ctx(int fd, struct igt_fb *fb);
 void igt_paint_color(cairo_t *cr, int x, int y, int w, int h,
 			 double r, double g, double b);
