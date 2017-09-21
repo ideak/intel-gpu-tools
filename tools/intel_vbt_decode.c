@@ -356,29 +356,32 @@ static const char *child_device_handle(unsigned char handle)
 	return "unknown";
 }
 
-static const struct {
-	unsigned short type;
-	const char *name;
-} efp_ports[] = {
-	{ DEVICE_PORT_NONE, "N/A" },
-	{ DEVICE_PORT_HDMIB, "HDMI-B" },
-	{ DEVICE_PORT_HDMIC, "HDMI-C" },
-	{ DEVICE_PORT_HDMID, "HDMI-D" },
-	{ DEVICE_PORT_DPB, "DP-B" },
-	{ DEVICE_PORT_DPC, "DP-C" },
-	{ DEVICE_PORT_DPD, "DP-D" },
+static const char *dvo_port_names[] = {
+	[DVO_PORT_HDMIA] = "HDMI-A",
+	[DVO_PORT_HDMIB] = "HDMI-B",
+	[DVO_PORT_HDMIC] = "HDMI-C",
+	[DVO_PORT_HDMID] = "HDMI-D",
+	[DVO_PORT_LVDS] = "LVDS",
+	[DVO_PORT_TV] = "TV",
+	[DVO_PORT_CRT] = "CRT",
+	[DVO_PORT_DPB] = "DP-B",
+	[DVO_PORT_DPC] = "DP-C",
+	[DVO_PORT_DPD] = "DP-D",
+	[DVO_PORT_DPA] = "DP-A",
+	[DVO_PORT_DPE] = "DP-E",
+	[DVO_PORT_HDMIE] = "HDMI-E",
+	[DVO_PORT_MIPIA] = "MIPI-A",
+	[DVO_PORT_MIPIB] = "MIPI-B",
+	[DVO_PORT_MIPIC] = "MIPI-C",
+	[DVO_PORT_MIPID] = "MIPI-D",
 };
-static const int num_efp_ports = sizeof(efp_ports) / sizeof(efp_ports[0]);
 
-static const char *efp_port(uint8_t type)
+static const char *dvo_port(uint8_t type)
 {
-	int i;
-
-	for (i = 0; i < num_efp_ports; i++)
-		if (efp_ports[i].type == type)
-			return efp_ports[i].name;
-
-	return "unknown";
+	if (type < ARRAY_SIZE(dvo_port_names) && dvo_port_names[type])
+		return dvo_port_names[type];
+	else
+		return "unknown";
 }
 
 static void dump_child_device(struct context *context,
@@ -418,9 +421,9 @@ static void dump_child_device(struct context *context,
 		printf("\t\tCompression enable: %s\n", YESNO(efp->compression_enable));
 		printf("\t\tEdidless EFP: %s\n", YESNO(efp->edidless_efp));
 		printf("\t\tCompression structure index: 0x%02x)\n", efp->compression_structure_index);
-		printf("\t\tSlave DDI port: 0x%02x (%s)\n", efp->slave_port, efp_port(efp->slave_port));
+		printf("\t\tSlave DDI port: 0x%02x (%s)\n", efp->slave_port, dvo_port(efp->slave_port));
 		printf("\t\tAIM offset: %d\n", child->addin_offset);
-		printf("\t\tPort: 0x%02x (%s)\n", efp->dvo_port, efp_port(efp->dvo_port));
+		printf("\t\tPort: 0x%02x (%s)\n", efp->dvo_port, dvo_port(efp->dvo_port));
 		printf("\t\tAIM I2C pin: 0x%02x\n", efp->i2c_pin);
 		printf("\t\tAIM Slave address: 0x%02x\n", efp->slave_addr);
 		printf("\t\tDDC pin: 0x%02x\n", efp->ddc_pin);

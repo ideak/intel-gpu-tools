@@ -42,18 +42,6 @@
 #define DEVICE_TYPE_DVI			0x68d2
 #define DEVICE_TYPE_MIPI		0x7cc2
 
-#define DEVICE_PORT_DVOA	0x00	/* none on 845+ */
-#define DEVICE_PORT_DVOB	0x01
-#define DEVICE_PORT_DVOC	0x02
-
-#define DEVICE_PORT_NONE	0
-#define DEVICE_PORT_HDMIB	1
-#define DEVICE_PORT_HDMIC	2
-#define DEVICE_PORT_HDMID	3
-#define DEVICE_PORT_DPB		7
-#define DEVICE_PORT_DPC		8
-#define DEVICE_PORT_DPD		9
-
 struct legacy_child_device_config {
 	uint16_t handle;
 	uint16_t device_type;	/* See DEVICE_TYPE_* above */
