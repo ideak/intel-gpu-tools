@@ -388,19 +388,15 @@ static void dump_child_device(struct context *context,
 			      const struct child_device_config *child)
 {
 	const struct child_device_config *efp = child;
-	char child_id[11];
 
 	if (!child->device_type)
 		return;
 
 	if (context->bdb->version < 152) {
-		strncpy(child_id, (const char *)child->device_id, 10);
-		child_id[10] = 0;
-
 		printf("\tChild device info:\n");
 		printf("\t\tDevice type: %04x (%s)\n", child->device_type,
 		       child_device_type(child->device_type));
-		printf("\t\tSignature: %s\n", child_id);
+		printf("\t\tSignature: %.*s\n", (int)sizeof(child->device_id), child->device_id);
 		printf("\t\tAIM offset: %d\n", child->addin_offset);
 		printf("\t\tDVO port: 0x%02x\n", child->dvo_port);
 	} else { /* 152+ have EFP blocks here */
