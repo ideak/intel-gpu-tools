@@ -99,6 +99,10 @@ struct drm_i915_gem_userptr {
 #define IS_USERPTR(p) ((uintptr_t) (p) & USERPTR_FLAG)
 #define GET_PTR(p) ( (void *) ((uintptr_t) p & ~(uintptr_t) 1) )
 
+#ifndef I915_EXEC_BATCH_FIRST
+#define I915_EXEC_BATCH_FIRST (1 << 18)
+#endif
+
 static void __attribute__ ((format(__printf__, 2, 3)))
 fail_if(int cond, const char *format, ...)
 {
@@ -449,7 +453,9 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 		fail_if(bo->map == MAP_FAILED, "intel_aubdump: bo mmap failed\n");
 	}
 
-	batch_bo = get_bo(exec_objects[execbuffer2->buffer_count - 1].handle);
+	int batch_index = (execbuffer2->flags & I915_EXEC_BATCH_FIRST) ? 0 :
+			  execbuffer2->buffer_count - 1;
+	batch_bo = get_bo(exec_objects[batch_index].handle);
 	for (uint32_t i = 0; i < execbuffer2->buffer_count; i++) {
 		obj = &exec_objects[i];
 		bo = get_bo(obj->handle);
