@@ -159,7 +159,7 @@ static void test_panel_fitting(data_t *d)
 		native_mode = *mode;
 
 		/* allocate fb2 with image size */
-		image = cairo_image_surface_create_from_png(FILE_NAME);
+		image = igt_cairo_image_surface_create_from_png(FILE_NAME);
 		igt_assert(cairo_surface_status(image) == CAIRO_STATUS_SUCCESS);
 		d->image_w = cairo_image_surface_get_width(image);
 		d->image_h = cairo_image_surface_get_height(image);
