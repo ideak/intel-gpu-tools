@@ -158,8 +158,8 @@ static void run_plane_test(igt_display_t *display, enum pipe pipe, igt_output_t 
 				uint32_t count_props[3] = { 2, 1, 6 };
 				uint32_t props[] = {
 					/* crtc: 2 props */
-					plane->pipe->atomic_props_crtc[IGT_CRTC_MODE_ID],
-					plane->pipe->atomic_props_crtc[IGT_CRTC_ACTIVE],
+					plane->pipe->props[IGT_CRTC_MODE_ID],
+					plane->pipe->props[IGT_CRTC_ACTIVE],
 					/* connector: 1 prop */
 					output->props[IGT_CONNECTOR_CRTC_ID],
 					/* plane: remainder props */
@@ -254,6 +254,10 @@ static void run_plane_test(igt_display_t *display, enum pipe pipe, igt_output_t 
 	}
 
 	igt_waitchildren();
+
+	/* The mode is unset by the forked helper, force a refresh here */
+	if (test_type == test_legacy_modeset || test_type == test_atomic_modeset)
+		igt_pipe_refresh(display, pipe, true);
 
 	igt_plane_set_fb(plane, NULL);
 	igt_plane_set_fb(primary, NULL);

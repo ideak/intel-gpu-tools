@@ -313,27 +313,13 @@ struct igt_pipe {
 	int plane_primary;
 	igt_plane_t *planes;
 
-	uint32_t atomic_props_crtc[IGT_NUM_CRTC_PROPS];
-
-	uint64_t background; /* Background color MSB BGR 16bpc LSB */
-	uint32_t background_changed : 1;
-	uint32_t background_property;
-
-	uint64_t degamma_blob;
-	uint32_t degamma_property;
-	uint64_t ctm_blob;
-	uint32_t ctm_property;
-	uint64_t gamma_blob;
-	uint32_t gamma_property;
-	uint32_t color_mgmt_changed : 1;
+	uint64_t changed;
+	uint32_t props[IGT_NUM_CRTC_PROPS];
+	uint64_t values[IGT_NUM_CRTC_PROPS];
 
 	uint32_t crtc_id;
 
-	uint64_t mode_blob;
-	bool mode_changed;
-
 	int32_t out_fence_fd;
-	bool out_fence_requested;
 };
 
 typedef struct {
@@ -527,17 +513,6 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 		igt_plane_set_prop_changed(plane, prop); \
 	} while (0)
 
-/**
- * igt_atomic_populate_crtc_req:
- * @req: A pointer to drmModeAtomicReq
- * @pipe: A pointer igt_pipe_t
- * @prop: one of igt_atomic_crtc_properties
- * @value: the value to add
- */
-#define igt_atomic_populate_crtc_req(req, pipe, prop, value) \
-	igt_assert_lt(0, drmModeAtomicAddProperty(req, pipe->crtc_id,\
-						  pipe->atomic_props_crtc[prop], value))
-
 #define igt_output_is_prop_changed(output, prop) \
 	(!!((output)->changed & (1 << (prop))))
 #define igt_output_set_prop_changed(output, prop) \
@@ -552,26 +527,34 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 		igt_output_set_prop_changed(output, prop); \
 	} while (0)
 
-/*
- * igt_pipe_refresh:
- * @display: a pointer to an #igt_display_t structure
- * @pipe: Pipe to refresh
- * @force: Should be set to true if mode_blob is no longer considered
- * to be valid, for example after doing an atomic commit during fork or closing display fd.
- *
- * Requests the pipe to be part of the state on next update.
- * This is useful when state may have been out of sync after
- * a fork, or we just want to be sure the pipe is included
- * in the next commit.
- */
-static inline void
-igt_pipe_refresh(igt_display_t *display, enum pipe pipe, bool force)
-{
-	if (force)
-		display->pipes[pipe].mode_blob = 0;
+#define igt_pipe_obj_is_prop_changed(pipe_obj, prop) \
+	(!!((pipe_obj)->changed & (1 << (prop))))
 
-	display->pipes[pipe].mode_changed = true;
-}
+#define igt_pipe_is_prop_changed(display, pipe, prop) \
+	igt_pipe_obj_is_prop_changed(&(display)->pipes[(pipe)], prop)
+
+#define igt_pipe_obj_set_prop_changed(pipe_obj, prop) \
+	(pipe_obj)->changed |= 1 << (prop)
+
+#define igt_pipe_set_prop_changed(display, pipe, prop) \
+	igt_pipe_obj_set_prop_changed(&(display)->pipes[(pipe)], prop)
+
+#define igt_pipe_obj_clear_prop_changed(pipe_obj, prop) \
+	(pipe_obj)->changed &= ~(1 << (prop))
+
+#define igt_pipe_clear_prop_changed(display, pipe, prop) \
+	igt_pipe_obj_clear_prop_changed(&(display)->pipes[(pipe)], prop)
+
+#define igt_pipe_obj_set_prop_value(pipe_obj, prop, value) \
+	do { \
+		(pipe_obj)->values[prop] = (value); \
+		igt_pipe_obj_set_prop_changed(pipe_obj, prop); \
+	} while (0)
+
+#define igt_pipe_set_prop_value(display, pipe, prop, value) \
+	igt_pipe_obj_set_prop_value(&(display)->pipes[(pipe)], prop, value)
+
+void igt_pipe_refresh(igt_display_t *display, enum pipe pipe, bool force);
 
 void igt_enable_connectors(void);
 void igt_reset_connectors(void);
