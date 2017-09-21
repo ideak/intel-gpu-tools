@@ -28,26 +28,31 @@
 #include <fcntl.h>
 
 struct line_check {
-	bool found;
+	int found;
 	const char *substr;
 };
 
 /**
  * Our igt_log_buffer_inspect handler. Checks the output of the
- * intel_l3_parity tool and returns line_check::found to true if
- * a specific substring is found.
+ * intel_l3_parity tool and increments line_check::found if a specific
+ * substring is found.
  */
-static bool check_cmd_return_value(const char *line, void *data)
+static bool check_cmd_output(const char *line, void *data)
 {
 	struct line_check *check = data;
 
-	if (!strstr(line, check->substr)) {
-		check->found = false;
-		return false;
+	if (strstr(line, check->substr)) {
+		check->found++;
 	}
 
-	check->found = true;
-	return true;
+	return false;
+}
+
+static void assert_cmd_success(int exec_return)
+{
+	igt_skip_on_f(exec_return == IGT_EXIT_SKIP,
+		      "intel_l3_parity not supported\n");
+	igt_assert_eq(exec_return, IGT_EXIT_SUCCESS);
 }
 
 igt_main
@@ -56,46 +61,54 @@ igt_main
 
 	igt_subtest("sysfs_l3_parity") {
 		int exec_return;
+		struct line_check line;
 
-		igt_system_cmd(exec_return,
-			       "../tools/intel_l3_parity -r 0 -b 0 "
-			       "-s 0 -e");
-		igt_skip_on_f(exec_return == IGT_EXIT_SKIP,
-			      "intel_l3_parity not supported\n");
-		igt_assert_eq(exec_return, IGT_EXIT_SUCCESS);
-
-		igt_system_cmd(exec_return, "../tools/intel_l3_parity -l");
-		if (exec_return == IGT_EXIT_SUCCESS) {
-			struct line_check line;
-			line.substr = "Row 0, Bank 0, Subbank 0 is disabled";
-			igt_log_buffer_inspect(check_cmd_return_value,
-					       &line);
-			igt_assert_eq(line.found, true);
-		}
-
-		igt_system_cmd(exec_return,
-			       "../tools/intel_l3_parity -r 0 -b 0 "
-			       "-s 0 -e");
-		igt_skip_on_f(exec_return == IGT_EXIT_SKIP,
-			      "intel_l3_parity not supported\n");
-		igt_assert_eq(exec_return, IGT_EXIT_SUCCESS);
-
-		/* Check that we can clear remaps:
-		 * In the original shell script, the output of intel_l3_parity -l
-		 * was piped thru wc -l to check if the tool would at least
-		 * return a line. Just watch for one of the expected output
-		 * string as an alternative.
-		 * ("is disabled" unique only to intel_l3_parity.c:dumpit())
+		/* Sanity check that l3 parity tool is usable: Enable
+		 * row,bank,subbank 0,0,0.
+		 *
+		 * TODO: Better way to find intel_l3_parity. This path
+		 * is relative to piglit's path, when run through
+		 * piglit.
 		 */
 		igt_system_cmd(exec_return,
-			       "../tools/intel_l3_parity -l");
-		if (exec_return == IGT_EXIT_SUCCESS) {
-			struct line_check line;
-			line.substr = "is disabled";
-			igt_log_buffer_inspect(check_cmd_return_value,
-					       &line);
-			igt_assert_eq(line.found, true);
-		}
+			       "../tools/intel_l3_parity -r 0 -b 0 "
+			       "-s 0 -e");
+		assert_cmd_success(exec_return);
+
+		/* Disable row,bank,subbank 0,0,0. */
+		igt_system_cmd(exec_return, "../tools/intel_l3_parity -r 0 -b 0 "
+			       "-s 0 -d");
+		assert_cmd_success(exec_return);
+
+		/* Check that disabling was successful */
+		igt_system_cmd(exec_return, "../tools/intel_l3_parity -l");
+		assert_cmd_success(exec_return);
+		line.substr = "Row 0, Bank 0, Subbank 0 is disabled";
+		line.found = 0;
+		igt_log_buffer_inspect(check_cmd_output,
+				       &line);
+		igt_assert_eq(line.found, 1);
+
+		/* Re-enable row,bank,subbank 0,0,0 */
+		igt_system_cmd(exec_return,
+			       "../tools/intel_l3_parity -r 0 -b 0 "
+			       "-s 0 -e");
+		assert_cmd_success(exec_return);
+
+		/* Check that re-enabling was successful:
+		 * intel_l3_parity -l should now not print that Row 0,
+		 * Bank 0, Subbank 0 is disabled.
+		 *
+		 * The previously printed line is already in the log
+		 * buffer so we check for count 1.
+		 */
+		igt_system_cmd(exec_return, "../tools/intel_l3_parity -l");
+		assert_cmd_success(exec_return);
+		line.substr = "Row 0, Bank 0, Subbank 0 is disabled";
+		line.found = 0;
+		igt_log_buffer_inspect(check_cmd_output,
+				       &line);
+		igt_assert_eq(line.found, 1);
 	}
 
 	igt_subtest("tools_test") {
