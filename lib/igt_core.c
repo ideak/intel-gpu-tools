@@ -2237,58 +2237,23 @@ FILE *__igt_fopen_data(const char* igt_srcdir, const char* igt_datadir,
 	return fp;
 }
 
-struct output_pipe {
-	int output_fd;
-	int save_fd;
-	int read_fd;
-	int write_fd;
-	bool redirected;
-	enum igt_log_level log_level;
-};
-
-static bool redirect_output(struct output_pipe *p, int output_fd,
-			    enum igt_log_level level)
+static void log_output(int *fd, enum igt_log_level level)
 {
-	int fds[2];
+	ssize_t len;
+	char buf[PIPE_BUF];
 
-	if (pipe(fds) == -1)
-		goto err;
-
-	/* save output */
-	if ((p->save_fd = dup(output_fd)) == -1)
-		goto err;
-
-	/* Redirect output to our buffer */
-	if (dup2(fds[1], output_fd) == -1)
-		goto err;
-
-	p->output_fd = output_fd;
-	p->read_fd = fds[0];
-	p->write_fd = fds[1];
-	p->redirected = true;
-	p->log_level = level;
-
-	return true;
-err:
-	close(fds[0]);
-	close(fds[1]);
-	close(p->save_fd);
-
-	return false;
-}
-
-static void unredirect_output(struct output_pipe *p)
-{
-	if (!p->redirected)
+	if (*fd < 0)
 		return;
 
-	/* read_fd is closed separately. We still need to read its
-	 * buffered contents after un-redirecting the stream.
-	 */
-	close(p->write_fd);
-	dup2(p->save_fd, p->output_fd);
-	close(p->save_fd);
-	p->redirected = false;
+	memset(buf, 0, sizeof(buf));
+	len = read(*fd, buf, sizeof(buf));
+	if (len <= 0) {
+		close(*fd);
+		*fd = -1;
+		return;
+	}
+
+	igt_log(IGT_LOG_DOMAIN, level, "[cmd] %s", buf);
 }
 
 /**
@@ -2304,48 +2269,48 @@ static void unredirect_output(struct output_pipe *p)
  */
 int igt_system(const char *command)
 {
-#define OUT 0
-#define ERR 1
-	struct output_pipe op[2];
-	int i, status;
+	int outpipe[2] = { -1, -1 };
+	int errpipe[2] = { -1, -1 };
+	int status;
 	struct igt_helper_process process = {};
-	char buf[PIPE_BUF];
 
-	if (!redirect_output(&op[OUT], STDOUT_FILENO, IGT_LOG_INFO))
+	if (pipe(outpipe) < 0)
 		goto err;
-	if (!redirect_output(&op[ERR], STDERR_FILENO, IGT_LOG_WARN))
+	if (pipe(errpipe) < 0)
 		goto err;
 
 	igt_fork_helper(&process) {
-		igt_assert(execl("/bin/sh", "sh", "-c", command,
-				 (char *) NULL) != -1);
+		close(outpipe[0]);
+		close(errpipe[0]);
+
+		if (dup2(outpipe[1], STDOUT_FILENO) < 0)
+			goto child_err;
+		if (dup2(errpipe[1], STDERR_FILENO) < 0)
+			goto child_err;
+
+		execl("/bin/sh", "sh", "-c", command,
+		      (char *) NULL);
+
+	child_err:
+		exit(EXIT_FAILURE);
 	}
 
-	for (i = 0; i < ARRAY_SIZE(op); i++) {
-		struct output_pipe *current = &op[i];
+	close(outpipe[1]);
+	close(errpipe[1]);
 
-		/* Unredirect so igt_log() works */
-		unredirect_output(current);
-		memset(buf, 0, sizeof(buf));
-		while (read(current->read_fd, buf, sizeof(buf)) > 0) {
-			igt_log(IGT_LOG_DOMAIN, current->log_level,
-				"[cmd] %s", buf);
-			memset(buf, 0, sizeof(buf));
-		}
-		close(current->read_fd);
+	while (outpipe[0] >= 0 || errpipe[0] >= 0) {
+		log_output(&outpipe[0], IGT_LOG_INFO);
+		log_output(&errpipe[0], IGT_LOG_WARN);
 	}
+
 	status = igt_wait_helper(&process);
 
 	return WEXITSTATUS(status);
 err:
-	/* Failed to redirect one or both streams. Roll back changes. */
-	for (i = 0; i < ARRAY_SIZE(op); i++) {
-		if (!op[i].redirected)
-			continue;
-		close(op[i].read_fd);
-		unredirect_output(&op[i]);
-	}
-
+	close(outpipe[0]);
+	close(outpipe[1]);
+	close(errpipe[0]);
+	close(errpipe[1]);
 	return -1;
 }
 
