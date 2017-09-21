@@ -146,7 +146,10 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 
 	if (modeset) {
 		igt_set_module_param_int("enable_hangcheck", 1);
-		dpy->pipes[pipe].mode_blob = 0;
+
+		/* Clear old mode blob. */
+		igt_pipe_refresh(dpy, pipe, true);
+
 		igt_output_set_pipe(output, pipe);
 		igt_display_commit2(dpy, COMMIT_ATOMIC);
 	}

@@ -476,12 +476,6 @@ static void test_plane_rotation_ytiled_obj(data_t *data,
 	igt_plane_set_fb(plane, &data->fb);
 	igt_plane_set_size(plane, h, w);
 
-	if (commit < COMMIT_ATOMIC)
-		drmModeObjectSetProperty(fd, plane->drm_plane->plane_id,
-					DRM_MODE_OBJECT_PLANE,
-					plane->rotation_property,
-					plane->rotation);
-
 	ret = igt_display_try_commit2(display, commit);
 
 	igt_output_set_pipe(output, PIPE_NONE);
@@ -573,10 +567,6 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 		igt_plane_set_rotation(plane, IGT_ROTATION_90);
 		igt_plane_set_size(plane, h, w);
 
-		drmModeObjectSetProperty(fd, plane->drm_plane->plane_id,
-					 DRM_MODE_OBJECT_PLANE,
-					 plane->rotation_property,
-					 plane->rotation);
 		igt_display_commit2(display, commit);
 		if (ret) {
 			igt_warn("failed to commit hardware rotated fb: %i\n", ret);

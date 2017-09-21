@@ -93,19 +93,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	}
 
 	igt_plane_set_fb(plane, &data->fb1);
-	if (s == COMMIT_LEGACY) {
-		int ret;
-		ret = drmModeSetCrtc(data->drm_fd,
-				plane->pipe->crtc_id,
-				data->fb_id1,
-				plane->src_x, plane->src_y,
-				&output->id,
-				1,
-				mode);
-		igt_assert_eq(ret, 0);
-	} else {
-		igt_display_commit2(display, s);
-	}
+	igt_display_commit2(display, s);
 }
 
 static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)

@@ -46,6 +46,11 @@ struct plane_parms {
 
 #define hweight32 __builtin_popcount
 
+/* globals for fence support */
+int *timeline;
+pthread_t *thread;
+int *seqno;
+
 static void
 run_primary_test(igt_display_t *display, enum pipe pipe, igt_output_t *output)
 {
@@ -89,9 +94,34 @@ run_primary_test(igt_display_t *display, enum pipe pipe, igt_output_t *output)
 	igt_remove_fb(display->drm_fd, &fb);
 }
 
+static void *fence_inc_thread(void *arg)
+{
+	int t = *((int *) arg);
+
+	pthread_detach(pthread_self());
+
+	usleep(5000);
+	sw_sync_timeline_inc(t, 1);
+	return NULL;
+}
+
+static void configure_fencing(igt_plane_t *plane)
+{
+	int i, fd, ret;
+
+	i = plane->index;
+
+	seqno[i]++;
+	fd = sw_sync_timeline_create_fence(timeline[i], seqno[i]);
+	igt_plane_set_fence_fd(plane, fd);
+	close(fd);
+	ret = pthread_create(&thread[i], NULL, fence_inc_thread, &timeline[i]);
+	igt_assert_eq(ret, 0);
+}
+
 static void
 wm_setup_plane(igt_display_t *display, enum pipe pipe,
-	       uint32_t mask, struct plane_parms *parms)
+	       uint32_t mask, struct plane_parms *parms, bool fencing)
 {
 	igt_plane_t *plane;
 
@@ -107,6 +137,9 @@ wm_setup_plane(igt_display_t *display, enum pipe pipe,
 			igt_plane_set_fb(plane, NULL);
 			continue;
 		}
+
+		if (fencing)
+			configure_fencing(plane);
 
 		igt_plane_set_fb(plane, parms[i].fb);
 		igt_fb_set_size(parms[i].fb, plane, parms[i].width, parms[i].height);
@@ -136,7 +169,7 @@ static bool skip_on_unsupported_nonblocking_modeset(igt_display_t *display)
 
 	/* Force the next state to update all crtc's, to synchronize with the nonblocking modeset. */
 	for_each_pipe(display, pipe)
-		display->pipes[pipe].mode_changed = true;
+		igt_pipe_refresh(display, pipe, false);
 
 	return false;
 }
@@ -183,6 +216,7 @@ static void set_sprite_wh(igt_display_t *display, enum pipe pipe,
 
 static void setup_parms(igt_display_t *display, enum pipe pipe,
 			const drmModeModeInfo *mode,
+			struct igt_fb *primary_fb,
 			struct igt_fb *argb_fb,
 			struct igt_fb *sprite_fb,
 			struct plane_parms *parms)
@@ -205,7 +239,7 @@ static void setup_parms(igt_display_t *display, enum pipe pipe,
 		int i = plane->index;
 
 		if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
-			parms[i].fb = plane->fb;
+			parms[i].fb = primary_fb;
 			parms[i].width = mode->hdisplay;
 			parms[i].height = mode->vdisplay;
 		} else if (plane->type == DRM_PLANE_TYPE_CURSOR) {
@@ -242,7 +276,7 @@ retry:
 		set_sprite_wh(display, pipe, parms, sprite_fb,
 			      alpha, sprite_width, sprite_height);
 
-		wm_setup_plane(display, pipe, (1 << n_planes) - 1, parms);
+		wm_setup_plane(display, pipe, (1 << n_planes) - 1, parms, false);
 		ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
 		if (ret == -EINVAL) {
@@ -300,10 +334,6 @@ retry:
 		 sprite_width, sprite_height, alpha);
 }
 
-int *timeline;
-pthread_t *thread;
-int *seqno;
-
 static void prepare_fencing(igt_display_t *display, enum pipe pipe)
 {
 	igt_plane_t *plane;
@@ -335,44 +365,10 @@ static void unprepare_fencing(igt_display_t *display, enum pipe pipe)
 	free(seqno);
 }
 
-static void *fence_inc_thread(void *arg)
-{
-	int t = *((int *) arg);
-
-	pthread_detach(pthread_self());
-
-	usleep(5000);
-	sw_sync_timeline_inc(t, 1);
-	return NULL;
-}
-
-static void configure_fencing(igt_display_t *display, enum pipe pipe)
-{
-	igt_plane_t *plane;
-	int i, fd, ret;
-
-	for_each_plane_on_pipe(display, pipe, plane) {
-
-		if (!plane->fb)
-			continue;
-
-		i = plane->index;
-
-		seqno[i]++;
-		fd = sw_sync_timeline_create_fence(timeline[i], seqno[i]);
-		igt_plane_set_fence_fd(plane, fd);
-		close(fd);
-		ret = pthread_create(&thread[i], NULL, fence_inc_thread, &timeline[i]);
-		igt_assert_eq(ret, 0);
-	}
-}
-
 static void atomic_commit(igt_display_t *display, enum pipe pipe, unsigned int flags, void *data, bool fencing)
 {
-	if (fencing) {
-		configure_fencing(display, pipe);
+	if (fencing)
 		igt_pipe_request_out_fence(&display->pipes[pipe]);
-	}
 
 	igt_display_commit_atomic(display, flags, data);
 }
@@ -445,7 +441,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 
 	igt_output_set_pipe(output, pipe);
 
-	wm_setup_plane(display, pipe, 0, NULL);
+	wm_setup_plane(display, pipe, 0, NULL, false);
 
 	if (flags & DRM_MODE_ATOMIC_ALLOW_MODESET) {
 		skip_test = nonblocking && skip_on_unsupported_nonblocking_modeset(display);
@@ -461,7 +457,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
-	setup_parms(display, pipe, mode, &argb_fb, &sprite_fb, parms);
+	setup_parms(display, pipe, mode, &fb, &argb_fb, &sprite_fb, parms);
 
 	/*
 	 * In some configurations the tests may not run to completion with all
@@ -469,7 +465,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	 * planes to fix this
 	 */
 	while (1) {
-		wm_setup_plane(display, pipe, iter_max - 1, parms);
+		wm_setup_plane(display, pipe, iter_max - 1, parms, false);
 
 		if (fencing)
 			igt_pipe_request_out_fence(pipe_obj);
@@ -504,7 +500,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	if (type == TRANSITION_AFTER_FREE) {
 		int fence_fd = -1;
 
-		wm_setup_plane(display, pipe, 0, parms);
+		wm_setup_plane(display, pipe, 0, parms, fencing);
 
 		atomic_commit(display, pipe, flags, (void *)(unsigned long)0, fencing);
 		if (fencing) {
@@ -512,8 +508,9 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 			pipe_obj->out_fence_fd = -1;
 		}
 
+		/* force planes to be part of commit */
 		for_each_plane_on_pipe(display, pipe, plane)
-			plane->fb_changed = true;
+			igt_plane_set_position(plane, 0, 0);
 
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
@@ -530,7 +527,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	for (i = 0; i < iter_max; i++) {
 		igt_output_set_pipe(output, pipe);
 
-		wm_setup_plane(display, pipe, i, parms);
+		wm_setup_plane(display, pipe, i, parms, fencing);
 
 		atomic_commit(display, pipe, flags, (void *)(unsigned long)i, fencing);
 		wait_for_transition(display, pipe, nonblocking, fencing);
@@ -538,7 +535,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 		if (type == TRANSITION_MODESET_DISABLE) {
 			igt_output_set_pipe(output, PIPE_NONE);
 
-			wm_setup_plane(display, pipe, 0, parms);
+			wm_setup_plane(display, pipe, 0, parms, fencing);
 
 			atomic_commit(display, pipe, flags, (void *) 0UL, fencing);
 			wait_for_transition(display, pipe, nonblocking, fencing);
@@ -547,7 +544,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 
 			/* i -> i+1 will be done when i increases, can be skipped here */
 			for (j = iter_max - 1; j > i + 1; j--) {
-				wm_setup_plane(display, pipe, j, parms);
+				wm_setup_plane(display, pipe, j, parms, fencing);
 
 				if (type == TRANSITION_MODESET)
 					igt_output_override_mode(output, &override_mode);
@@ -555,7 +552,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 				atomic_commit(display, pipe, flags, (void *)(unsigned long) j, fencing);
 				wait_for_transition(display, pipe, nonblocking, fencing);
 
-				wm_setup_plane(display, pipe, i, parms);
+				wm_setup_plane(display, pipe, i, parms, fencing);
 				if (type == TRANSITION_MODESET)
 					igt_output_override_mode(output, NULL);
 
@@ -666,15 +663,19 @@ static unsigned set_combinations(igt_display_t *display, unsigned mask, struct i
 	return event_mask;
 }
 
-static void refresh_primaries(igt_display_t *display)
+static void refresh_primaries(igt_display_t *display, int mask)
 {
 	enum pipe pipe;
 	igt_plane_t *plane;
 
-	for_each_pipe(display, pipe)
+	for_each_pipe(display, pipe) {
+		if (!((1 << pipe) & mask))
+			continue;
+
 		for_each_plane_on_pipe(display, pipe, plane)
-			if (plane->type == DRM_PLANE_TYPE_PRIMARY && plane->fb)
-				plane->fb_changed = true;
+			if (plane->type == DRM_PLANE_TYPE_PRIMARY)
+				igt_plane_set_position(plane, 0, 0);
+	}
 }
 
 static void collect_crcs_mask(igt_pipe_crc_t **pipe_crcs, unsigned mask, igt_crc_t *crcs)
@@ -783,7 +784,7 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 
 			collect_crcs_mask(pipe_crcs, j, crcs[1]);
 
-			refresh_primaries(display);
+			refresh_primaries(display, j);
 			commit_display(display, j, nonblocking);
 			collect_crcs_mask(pipe_crcs, j, crcs[2]);
 
@@ -794,7 +795,7 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 			commit_display(display, event_mask, nonblocking);
 			collect_crcs_mask(pipe_crcs, i, crcs[3]);
 
-			refresh_primaries(display);
+			refresh_primaries(display, i);
 			commit_display(display, i, nonblocking);
 			collect_crcs_mask(pipe_crcs, i, crcs[4]);
 

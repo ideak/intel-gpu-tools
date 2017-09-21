@@ -556,6 +556,27 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 	igt_assert_lt(0, drmModeAtomicAddProperty(req, output->config.connector->connector_id,\
 						  output->config.atomic_props_connector[prop], value))
 
+/*
+ * igt_pipe_refresh:
+ * @display: a pointer to an #igt_display_t structure
+ * @pipe: Pipe to refresh
+ * @force: Should be set to true if mode_blob is no longer considered
+ * to be valid, for example after doing an atomic commit during fork or closing display fd.
+ *
+ * Requests the pipe to be part of the state on next update.
+ * This is useful when state may have been out of sync after
+ * a fork, or we just want to be sure the pipe is included
+ * in the next commit.
+ */
+static inline void
+igt_pipe_refresh(igt_display_t *display, enum pipe pipe, bool force)
+{
+	if (force)
+		display->pipes[pipe].mode_blob = 0;
+
+	display->pipes[pipe].mode_changed = true;
+}
+
 void igt_enable_connectors(void);
 void igt_reset_connectors(void);
 

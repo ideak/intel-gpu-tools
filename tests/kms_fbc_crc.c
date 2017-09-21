@@ -461,8 +461,7 @@ static void reset_display(data_t *data)
         igt_pipe_t *pipe = &display->pipes[pipe_id];
 		igt_plane_t *plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 
-		if (plane->fb)
-			igt_plane_set_fb(plane, NULL);
+		igt_plane_set_fb(plane, NULL);
 	}
 
 	for_each_connected_output(display, data->output)

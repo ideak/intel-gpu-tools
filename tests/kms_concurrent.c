@@ -91,7 +91,7 @@ static void test_fini(data_t *data, enum pipe pipe, int n_planes,
 {
 	int i;
 
-	data->display.pipes[pipe].mode_blob = 0;
+	igt_pipe_refresh(&data->display, pipe, true);
 
 	for (i = 0; i < n_planes; i++) {
 		igt_plane_t *plane = data->plane[i];
@@ -292,7 +292,7 @@ test_resolution_with_output(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	i = 0;
 	while (i < iterations || loop_forever) {
-		data->display.pipes[pipe].mode_blob = 0;
+		igt_pipe_refresh(&data->display, pipe, true);
 
 		mode_hi = igt_output_get_mode(output);
 		mode_lo = get_lowres_mode(data, mode_hi, output);

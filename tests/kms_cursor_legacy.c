@@ -784,7 +784,7 @@ static bool skip_on_unsupported_nonblocking_modeset(igt_display_t *display)
 
 	/* Force the next state to update all crtc's, to synchronize with the nonblocking modeset. */
 	for_each_pipe(display, pipe)
-		display->pipes[pipe].mode_changed = true;
+		igt_pipe_refresh(display, pipe, false);
 
 	return false;
 }
@@ -971,8 +971,8 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 
 		if (modeset) {
 			/* wait for pending modeset and page flip to complete, to prevent -EBUSY */
-			display->pipes[pipe].mode_changed = true;
-			display->pipes[pipe2].mode_changed = true;
+			igt_pipe_refresh(display, pipe, false);
+			igt_pipe_refresh(display, pipe2, false);
 			igt_display_commit2(display, COMMIT_ATOMIC);
 		}
 	}
