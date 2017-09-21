@@ -1205,10 +1205,10 @@ igt_main
 		igt_subtest_group
 			run_tests_for_pipe(&data, pipe);
 
-	igt_subtest_f("invalid-lut-sizes")
+	igt_subtest_f("pipe-invalid-lut-sizes")
 		invalid_lut_sizes(&data);
 
-	igt_subtest_f("invalid-ctm-matrix-sizes")
+	igt_subtest_f("pipe-invalid-ctm-matrix-sizes")
 		invalid_ctm_matrix_sizes(&data);
 
 	igt_fixture {
