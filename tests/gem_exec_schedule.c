@@ -123,96 +123,6 @@ static void store_dword(int fd, uint32_t ctx, unsigned ring,
 	gem_close(fd, obj[2].handle);
 }
 
-static uint32_t *make_busy(int fd, uint32_t target, unsigned ring)
-{
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj[2];
-	struct drm_i915_gem_relocation_entry reloc[2];
-	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t *batch;
-	int i;
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj + !target);
-	execbuf.buffer_count = 1 + !!target;
-
-	memset(obj, 0, sizeof(obj));
-	obj[0].handle = target;
-	obj[1].handle = gem_create(fd, 4096);
-	batch = gem_mmap__wc(fd, obj[1].handle, 0, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj[1].handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	obj[1].relocs_ptr = to_user_pointer(reloc);
-	obj[1].relocation_count = 1 + !!target;
-	memset(reloc, 0, sizeof(reloc));
-
-	reloc[0].target_handle = obj[1].handle; /* recurse */
-	reloc[0].presumed_offset = 0;
-	reloc[0].offset = sizeof(uint32_t);
-	reloc[0].delta = 0;
-	reloc[0].read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc[0].write_domain = 0;
-
-	reloc[1].target_handle = target;
-	reloc[1].presumed_offset = 0;
-	reloc[1].offset = 1024;
-	reloc[1].delta = 0;
-	reloc[1].read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc[1].write_domain = 0;
-
-	i = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc[0].delta = 1;
-		}
-	}
-	i++;
-
-	if (ring != -1) {
-		execbuf.flags = ring;
-		for (int n = 0; n < BUSY_QLEN; n++)
-			gem_execbuf(fd, &execbuf);
-	} else {
-		for_each_engine(fd, ring) {
-			if (ring == 0)
-				continue;
-
-			execbuf.flags = ring;
-			for (int n = 0; n < BUSY_QLEN; n++)
-				gem_execbuf(fd, &execbuf);
-			igt_assert(execbuf.flags == ring);
-		}
-	}
-
-	if (target) {
-		execbuf.flags = 0;
-		reloc[1].write_domain = I915_GEM_DOMAIN_COMMAND;
-		gem_execbuf(fd, &execbuf);
-	}
-
-	gem_close(fd, obj[1].handle);
-
-	return batch;
-}
-
-static void finish_busy(uint32_t *busy)
-{
-	*busy = MI_BATCH_BUFFER_END;
-	munmap(busy, 4096);
-}
-
 struct cork {
 	int device;
 	uint32_t handle;
@@ -242,25 +152,50 @@ static void unplug(struct cork *c)
 	close(c->device);
 }
 
+static void unplug_show_queue(int fd, struct cork *c, unsigned int engine)
+{
+	igt_spin_t *spin;
+	uint32_t ctx;
+
+	ctx = gem_context_create(fd);
+	ctx_set_priority(fd, ctx, MAX_PRIO);
+
+	spin = igt_spin_batch_new(fd, ctx, engine, 0);
+	for (int n = 0; n < BUSY_QLEN; n++) {
+		struct drm_i915_gem_exec_object2 obj = {
+			.handle = spin->handle,
+		};
+		struct drm_i915_gem_execbuffer2 execbuf = {
+			.buffers_ptr = to_user_pointer(&obj),
+			.buffer_count = 1,
+			.flags = engine,
+		};
+		gem_execbuf(fd, &execbuf);
+	}
+
+	unplug(c); /* batches will now be queued on the engine */
+
+	igt_debugfs_dump(fd, "i915_engine_info");
+	igt_spin_batch_free(fd, spin);
+
+	gem_context_destroy(fd, ctx);
+}
+
 static void fifo(int fd, unsigned ring)
 {
 	struct cork cork;
-	uint32_t *busy;
 	uint32_t scratch;
 	uint32_t *ptr;
 
 	scratch = gem_create(fd, 4096);
 
-	busy = make_busy(fd, scratch, ring);
 	plug(fd, &cork);
 
 	/* Same priority, same timeline, final result will be the second eb */
 	store_dword(fd, 0, ring, scratch, 0, 1, cork.handle, 0);
 	store_dword(fd, 0, ring, scratch, 0, 2, cork.handle, 0);
 
-	unplug(&cork); /* only now submit our batches */
-	igt_debugfs_dump(fd, "i915_engine_info");
-	finish_busy(busy);
+	unplug_show_queue(fd, &cork, ring);
 
 	ptr = gem_mmap__gtt(fd, scratch, 4096, PROT_READ);
 	gem_set_domain(fd, scratch, /* no write hazard lies! */
@@ -276,7 +211,6 @@ static void reorder(int fd, unsigned ring, unsigned flags)
 {
 	struct cork cork;
 	uint32_t scratch;
-	uint32_t *busy;
 	uint32_t *ptr;
 	uint32_t ctx[2];
 
@@ -287,8 +221,6 @@ static void reorder(int fd, unsigned ring, unsigned flags)
 	ctx_set_priority(fd, ctx[HI], flags & EQUAL ? MIN_PRIO : 0);
 
 	scratch = gem_create(fd, 4096);
-
-	busy = make_busy(fd, scratch, ring);
 	plug(fd, &cork);
 
 	/* We expect the high priority context to be executed first, and
@@ -297,9 +229,7 @@ static void reorder(int fd, unsigned ring, unsigned flags)
 	store_dword(fd, ctx[LO], ring, scratch, 0, ctx[LO], cork.handle, 0);
 	store_dword(fd, ctx[HI], ring, scratch, 0, ctx[HI], cork.handle, 0);
 
-	unplug(&cork); /* only now submit our batches */
-	igt_debugfs_dump(fd, "i915_engine_info");
-	finish_busy(busy);
+	unplug_show_queue(fd, &cork, ring);
 
 	gem_context_destroy(fd, ctx[LO]);
 	gem_context_destroy(fd, ctx[HI]);
@@ -320,7 +250,6 @@ static void promotion(int fd, unsigned ring)
 {
 	struct cork cork;
 	uint32_t result, dep;
-	uint32_t *busy;
 	uint32_t *ptr;
 	uint32_t ctx[3];
 
@@ -336,7 +265,6 @@ static void promotion(int fd, unsigned ring)
 	result = gem_create(fd, 4096);
 	dep = gem_create(fd, 4096);
 
-	busy = make_busy(fd, result, ring);
 	plug(fd, &cork);
 
 	/* Expect that HI promotes LO, so the order will be LO, HI, NOISE.
@@ -353,9 +281,7 @@ static void promotion(int fd, unsigned ring)
 
 	store_dword(fd, ctx[HI], ring, result, 0, ctx[HI], 0, 0);
 
-	unplug(&cork); /* only now submit our batches */
-	igt_debugfs_dump(fd, "i915_engine_info");
-	finish_busy(busy);
+	unplug_show_queue(fd, &cork, ring);
 
 	gem_context_destroy(fd, ctx[NOISE]);
 	gem_context_destroy(fd, ctx[LO]);
@@ -532,64 +458,62 @@ static void preempt_self(int fd, unsigned ring)
 static void deep(int fd, unsigned ring)
 {
 #define XS 8
+	const unsigned int nctx = MAX_PRIO + 1;
+	const unsigned size = ALIGN(4*nctx, 4096);
 	struct cork cork;
 	uint32_t result, dep[XS];
-	uint32_t *busy;
 	uint32_t *ptr;
 	uint32_t *ctx;
 
-	ctx = malloc(sizeof(*ctx)*(MAX_PRIO + 1));
-	for (int n = 0; n <= MAX_PRIO; n++) {
+	ctx = malloc(sizeof(*ctx) * nctx);
+	for (int n = 0; n < nctx; n++) {
 		ctx[n] = gem_context_create(fd);
-		ctx_set_priority(fd, ctx[n], n);
+		ctx_set_priority(fd, ctx[n], MAX_PRIO - nctx + n);
 	}
 
-	result = gem_create(fd, 4096);
+	result = gem_create(fd, size);
 	for (int m = 0; m < XS; m ++)
-		dep[m] = gem_create(fd, 4096);
+		dep[m] = gem_create(fd, size);
 
-	busy = make_busy(fd, result, ring);
 	plug(fd, &cork);
 
 	/* Create a deep dependency chain, with a few branches */
-	for (int n = 0; n <= MAX_PRIO; n++)
+	for (int n = 0; n < nctx; n++)
 		for (int m = 0; m < XS; m++)
 			store_dword(fd, ctx[n], ring, dep[m], 4*n, ctx[n], cork.handle, I915_GEM_DOMAIN_INSTRUCTION);
 
-	for (int n = 0; n <= MAX_PRIO; n++) {
+	for (int n = 0; n < nctx; n++) {
 		for (int m = 0; m < XS; m++) {
 			store_dword(fd, ctx[n], ring, result, 4*n, ctx[n], dep[m], 0);
 			store_dword(fd, ctx[n], ring, result, 4*m, ctx[n], 0, I915_GEM_DOMAIN_INSTRUCTION);
 		}
 	}
 
-	igt_assert(gem_bo_busy(fd, result));
-	unplug(&cork); /* only now submit our batches */
-	igt_debugfs_dump(fd, "i915_engine_info");
-	finish_busy(busy);
+	unplug_show_queue(fd, &cork, ring);
 
-	for (int n = 0; n <= MAX_PRIO; n++)
+	for (int n = 0; n < nctx; n++)
 		gem_context_destroy(fd, ctx[n]);
 
 	for (int m = 0; m < XS; m++) {
-		ptr = gem_mmap__gtt(fd, dep[m], 4096, PROT_READ);
+		ptr = gem_mmap__gtt(fd, dep[m], size, PROT_READ);
 		gem_set_domain(fd, dep[m], /* no write hazard lies! */
 				I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 		gem_close(fd, dep[m]);
 
-		for (int n = 0; n <= MAX_PRIO; n++)
+		for (int n = 0; n < nctx; n++)
 			igt_assert_eq_u32(ptr[n], ctx[n]);
-		munmap(ptr, 4096);
+		munmap(ptr, size);
 	}
 
-	ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	ptr = gem_mmap__gtt(fd, result, size, PROT_READ);
 	gem_set_domain(fd, result, /* no write hazard lies! */
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	gem_close(fd, result);
 
+	/* No reordering due to PI on all contexts because of the common dep */
 	for (int m = 0; m < XS; m++)
-		igt_assert_eq_u32(ptr[m], ctx[MAX_PRIO]);
-	munmap(ptr, 4096);
+		igt_assert_eq_u32(ptr[m], ctx[nctx - 1]);
+	munmap(ptr, size);
 
 	free(ctx);
 #undef XS
@@ -633,6 +557,7 @@ static unsigned int measure_ring_size(int fd, unsigned int ring)
 
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
+	execbuf.rsvd1 = gem_context_create(fd);
 
 	sigaction(SIGALRM, &sa, NULL);
 	itv.it_interval.tv_sec = 0;
@@ -660,6 +585,7 @@ static unsigned int measure_ring_size(int fd, unsigned int ring)
 
 	unplug(&c);
 	gem_close(fd, obj[1].handle);
+	gem_context_destroy(fd, execbuf.rsvd1);
 
 	return count;
 }
@@ -672,7 +598,6 @@ static void wide(int fd, unsigned ring)
 
 	struct cork cork;
 	uint32_t result;
-	uint32_t *busy;
 	uint32_t *ptr;
 	uint32_t *ctx;
 	unsigned int count;
@@ -683,7 +608,6 @@ static void wide(int fd, unsigned ring)
 
 	result = gem_create(fd, 4*NCTX);
 
-	busy = make_busy(fd, result, ring);
 	plug(fd, &cork);
 
 	/* Lots of in-order requests, plugged and submitted simultaneously */
@@ -697,10 +621,7 @@ static void wide(int fd, unsigned ring)
 	igt_info("Submitted %d requests over %d contexts in %.1fms\n",
 		 count, NCTX, igt_nsec_elapsed(&tv) * 1e-6);
 
-	igt_assert(gem_bo_busy(fd, result));
-	unplug(&cork); /* only now submit our batches */
-	igt_debugfs_dump(fd, "i915_engine_info");
-	finish_busy(busy);
+	unplug_show_queue(fd, &cork, ring);
 
 	for (int n = 0; n < NCTX; n++)
 		gem_context_destroy(fd, ctx[n]);
@@ -723,18 +644,18 @@ static void reorder_wide(int fd, unsigned ring)
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_execbuffer2 execbuf;
+	struct timespec tv = {};
+	unsigned int ring_size = measure_ring_size(fd, ring);
 	struct cork cork;
 	uint32_t result, target;
-	uint32_t *busy;
-	uint32_t *r, *t;
+	uint32_t *found, *expected;
 
 	result = gem_create(fd, 4096);
 	target = gem_create(fd, 4096);
 
-	busy = make_busy(fd, result, ring);
 	plug(fd, &cork);
 
-	t = gem_mmap__cpu(fd, target, 0, 4096, PROT_WRITE);
+	expected = gem_mmap__cpu(fd, target, 0, 4096, PROT_WRITE);
 	gem_set_domain(fd, target, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 	memset(obj, 0, sizeof(obj));
@@ -755,19 +676,22 @@ static void reorder_wide(int fd, unsigned ring)
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
-	for (int n = MIN_PRIO, x = 1; n <= MAX_PRIO; n++, x++) {
+	for (int n = MIN_PRIO, x = 1;
+	     igt_seconds_elapsed(&tv) < 5 && n <= MAX_PRIO;
+	     n++, x++) {
+		unsigned int sz = ALIGN(ring_size * 64, 4096);
 		uint32_t *batch;
 
 		execbuf.rsvd1 = gem_context_create(fd);
 		ctx_set_priority(fd, execbuf.rsvd1, n);
 
-		obj[2].handle = gem_create(fd, 128 * 64);
-		batch = gem_mmap__gtt(fd, obj[2].handle, 128 * 64, PROT_WRITE);
+		obj[2].handle = gem_create(fd, sz);
+		batch = gem_mmap__gtt(fd, obj[2].handle, sz, PROT_WRITE);
 		gem_set_domain(fd, obj[2].handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
-		for (int m = 0; m < 128; m++) {
+		for (int m = 0; m < ring_size; m++) {
 			uint64_t addr;
-			int idx = hars_petruska_f54_1_random_unsafe_max( 1024);
+			int idx = hars_petruska_f54_1_random_unsafe_max(1024);
 			int i;
 
 			execbuf.batch_start_offset = m * 64;
@@ -791,29 +715,26 @@ static void reorder_wide(int fd, unsigned ring)
 			batch[++i] = x;
 			batch[++i] = MI_BATCH_BUFFER_END;
 
-			if (!t[idx])
-				t[idx] =  x;
+			if (!expected[idx])
+				expected[idx] =  x;
 
 			gem_execbuf(fd, &execbuf);
 		}
 
-		munmap(batch, 128 * 64);
+		munmap(batch, sz);
 		gem_close(fd, obj[2].handle);
 		gem_context_destroy(fd, execbuf.rsvd1);
 	}
 
-	igt_assert(gem_bo_busy(fd, result));
-	unplug(&cork); /* only now submit our batches */
-	igt_debugfs_dump(fd, "i915_engine_info");
-	finish_busy(busy);
+	unplug_show_queue(fd, &cork, ring);
 
-	r = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	found = gem_mmap__gtt(fd, result, 4096, PROT_READ);
 	gem_set_domain(fd, result, /* no write hazard lies! */
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	for (int n = 0; n < 1024; n++)
-		igt_assert_eq_u32(r[n], t[n]);
-	munmap(r, 4096);
-	munmap(t, 4096);
+		igt_assert_eq_u32(found[n], expected[n]);
+	munmap(found, 4096);
+	munmap(expected, 4096);
 
 	gem_close(fd, result);
 	gem_close(fd, target);
