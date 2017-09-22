@@ -290,7 +290,7 @@ static bool drrs_disabled(data_t *data)
 
 	igt_debugfs_read(data->drm_fd, "i915_drrs_status", buf);
 
-	return strstr(buf, "DRRS Support: No\n");
+	return !strstr(buf, "DRRS Supported: Yes\n");
 }
 
 static void run_test(data_t *data)
