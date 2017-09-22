@@ -40,6 +40,7 @@
 #define NOISE 2
 
 #define MAX_PRIO 1023
+#define MIN_PRIO -1023
 
 #define BUSY_QLEN 8
 
@@ -280,10 +281,10 @@ static void reorder(int fd, unsigned ring, unsigned flags)
 	uint32_t ctx[2];
 
 	ctx[LO] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[LO], -MAX_PRIO);
+	ctx_set_priority(fd, ctx[LO], MIN_PRIO);
 
 	ctx[HI] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[HI], flags & EQUAL ? -MAX_PRIO : 0);
+	ctx_set_priority(fd, ctx[HI], flags & EQUAL ? MIN_PRIO : 0);
 
 	scratch = gem_create(fd, 4096);
 
@@ -324,13 +325,13 @@ static void promotion(int fd, unsigned ring)
 	uint32_t ctx[3];
 
 	ctx[LO] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[LO], -MAX_PRIO);
+	ctx_set_priority(fd, ctx[LO], MIN_PRIO);
 
 	ctx[HI] = gem_context_create(fd);
 	ctx_set_priority(fd, ctx[HI], 0);
 
 	ctx[NOISE] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[NOISE], -MAX_PRIO/2);
+	ctx_set_priority(fd, ctx[NOISE], MIN_PRIO/2);
 
 	result = gem_create(fd, 4096);
 	dep = gem_create(fd, 4096);
@@ -386,7 +387,7 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 	uint32_t ctx[2];
 
 	ctx[LO] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[LO], -MAX_PRIO);
+	ctx_set_priority(fd, ctx[LO], MIN_PRIO);
 
 	ctx[HI] = gem_context_create(fd);
 	ctx_set_priority(fd, ctx[HI], MAX_PRIO);
@@ -395,7 +396,7 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 		if (flags & NEW_CTX) {
 			gem_context_destroy(fd, ctx[LO]);
 			ctx[LO] = gem_context_create(fd);
-			ctx_set_priority(fd, ctx[LO], -MAX_PRIO);
+			ctx_set_priority(fd, ctx[LO], MIN_PRIO);
 		}
 		spin[n] = __igt_spin_batch_new(fd, ctx[LO], ring, 0);
 		igt_debug("spin[%d].handle=%d\n", n, spin[n]->handle);
@@ -437,7 +438,7 @@ static void preempt_other(int fd, unsigned ring)
 	 */
 
 	ctx[LO] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[LO], -MAX_PRIO);
+	ctx_set_priority(fd, ctx[LO], MIN_PRIO);
 
 	ctx[NOISE] = gem_context_create(fd);
 
@@ -497,7 +498,7 @@ static void preempt_self(int fd, unsigned ring)
 	ctx[HI] = gem_context_create(fd);
 
 	n = 0;
-	ctx_set_priority(fd, ctx[HI], -MAX_PRIO);
+	ctx_set_priority(fd, ctx[HI], MIN_PRIO);
 	for_each_engine(fd, other) {
 		spin[n] = __igt_spin_batch_new(fd, ctx[NOISE], other, 0);
 		store_dword(fd, ctx[HI], other,
@@ -754,7 +755,7 @@ static void reorder_wide(int fd, unsigned ring)
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
-	for (int n = -MAX_PRIO, x = 1; n <= MAX_PRIO; n++, x++) {
+	for (int n = MIN_PRIO, x = 1; n <= MAX_PRIO; n++, x++) {
 		uint32_t *batch;
 
 		execbuf.rsvd1 = gem_context_create(fd);
@@ -855,7 +856,7 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	execbuf.buffer_count = 1;
 	execbuf.flags = engine;
 	execbuf.rsvd1 = gem_context_create(fd);
-	ctx_set_priority(fd, execbuf.rsvd1, -MAX_PRIO);
+	ctx_set_priority(fd, execbuf.rsvd1, MIN_PRIO);
 
 	gem_execbuf(fd, &execbuf);
 	gem_sync(fd, obj[1].handle);
