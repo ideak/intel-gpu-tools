@@ -142,6 +142,14 @@ struct w_step
 
 DECLARE_EWMA(uint64_t, rt, 4, 2)
 
+struct ctx {
+	uint32_t id;
+	int priority;
+	bool targets_instance;
+	bool wants_balance;
+	unsigned int static_vcs;
+};
+
 struct workload
 {
 	unsigned int id;
@@ -163,11 +171,7 @@ struct workload
 	struct timespec repeat_start;
 
 	unsigned int nr_ctxs;
-	struct {
-		uint32_t id;
-		int priority;
-		unsigned int static_vcs;
-	} *ctx_list;
+	struct ctx *ctx_list;
 
 	int sync_timeline;
 	uint32_t sync_seqno;
@@ -224,6 +228,7 @@ static int fd;
 #define HEARTBEAT	(1<<7)
 #define GLOBAL_BALANCE	(1<<8)
 #define DEPSYNC		(1<<9)
+#define I915		(1<<10)
 
 #define SEQNO_IDX(engine) ((engine) * 16)
 #define SEQNO_OFFSET(engine) (SEQNO_IDX(engine) * sizeof(uint32_t))
@@ -841,7 +846,10 @@ eb_set_engine(struct drm_i915_gem_execbuffer2 *eb,
 	if (engine == VCS2 && (flags & VCS2REMAP))
 		engine = BCS;
 
-	eb->flags = eb_engine_map[engine];
+	if ((flags & I915) && engine == VCS)
+		eb->flags = 0;
+	else
+		eb->flags = eb_engine_map[engine];
 }
 
 static void
@@ -865,6 +873,23 @@ get_status_objects(struct workload *wrk)
 		return wrk->global_wrk->status_object;
 	else
 		return wrk->status_object;
+}
+
+static struct ctx *
+__get_ctx(struct workload *wrk, struct w_step *w)
+{
+	return &wrk->ctx_list[w->context * 2];
+}
+
+static uint32_t
+get_ctxid(struct workload *wrk, struct w_step *w)
+{
+	struct ctx *ctx = __get_ctx(wrk, w);
+
+	if (ctx->targets_instance && ctx->wants_balance && w->engine == VCS)
+		return wrk->ctx_list[w->context * 2 + 1].id;
+	else
+		return wrk->ctx_list[w->context * 2].id;
 }
 
 static void
@@ -919,7 +944,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 
 	w->eb.buffers_ptr = to_user_pointer(w->obj);
 	w->eb.buffer_count = j + 1;
-	w->eb.rsvd1 = wrk->ctx_list[w->context].id;
+	w->eb.rsvd1 = get_ctxid(wrk, w);
 
 	if (flags & SWAPVCS && engine == VCS1)
 		engine = VCS2;
@@ -932,8 +957,39 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		printf("%x|", w->obj[i].handle);
 	printf(" %10lu flags=%llx bb=%x[%u] ctx[%u]=%u\n",
 		w->bb_sz, w->eb.flags, w->bb_handle, j, w->context,
-		wrk->ctx_list[w->context].id);
+		get_ctxid(wrk, w));
 #endif
+}
+
+static void __ctx_set_prio(uint32_t ctx_id, unsigned int prio)
+{
+	struct drm_i915_gem_context_param param = {
+		.ctx_id = ctx_id,
+		.param = I915_CONTEXT_PARAM_PRIORITY,
+		.value = prio,
+	};
+
+	if (prio)
+		gem_context_set_param(fd, &param);
+}
+
+static int __vm_destroy(int i915, uint32_t vm_id)
+{
+	struct drm_i915_gem_vm_control ctl = { .vm_id = vm_id };
+	int err = 0;
+
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_VM_DESTROY, &ctl)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
+}
+
+static void vm_destroy(int i915, uint32_t vm_id)
+{
+	igt_assert_eq(__vm_destroy(i915, vm_id), 0);
 }
 
 static void
@@ -942,7 +998,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	unsigned int ctx_vcs;
 	int max_ctx = -1;
 	struct w_step *w;
-	int i;
+	int i, j;
 
 	wrk->id = id;
 	wrk->prng = rand();
@@ -975,45 +1031,187 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 		}
 	}
 
+	/*
+	 * Pre-scan workload steps to allocate context list storage.
+	 */
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
-		if ((int)w->context > max_ctx) {
-			int delta = w->context + 1 - wrk->nr_ctxs;
+		int ctx = w->context * 2 + 1; /* Odd slots are special. */
+		int delta;
 
-			wrk->nr_ctxs += delta;
-			wrk->ctx_list = realloc(wrk->ctx_list,
-						wrk->nr_ctxs *
-						sizeof(*wrk->ctx_list));
-			memset(&wrk->ctx_list[wrk->nr_ctxs - delta], 0,
-			       delta * sizeof(*wrk->ctx_list));
+		if (ctx <= max_ctx)
+			continue;
 
-			max_ctx = w->context;
+		delta = ctx + 1 - wrk->nr_ctxs;
+
+		wrk->nr_ctxs += delta;
+		wrk->ctx_list = realloc(wrk->ctx_list,
+					wrk->nr_ctxs * sizeof(*wrk->ctx_list));
+		memset(&wrk->ctx_list[wrk->nr_ctxs - delta], 0,
+			delta * sizeof(*wrk->ctx_list));
+
+		max_ctx = ctx;
+	}
+
+	/*
+	 * Identify if contexts target specific engine instances and if they
+	 * want to be balanced.
+	 */
+	for (j = 0; j < wrk->nr_ctxs; j += 2) {
+		bool targets = false;
+		bool balance = false;
+
+		for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+			if (w->type != BATCH)
+				continue;
+
+			if (w->context != (j / 2))
+				continue;
+
+			if (w->engine == VCS)
+				balance = true;
+			else
+				targets = true;
 		}
 
-		if (!wrk->ctx_list[w->context].id) {
-			struct drm_i915_gem_context_create arg = {};
+		if (flags & I915) {
+			wrk->ctx_list[j].targets_instance = targets;
+			wrk->ctx_list[j].wants_balance = balance;
+		}
+	}
 
-			drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg);
-			igt_assert(arg.ctx_id);
+	/*
+	 * Create and configure contexts.
+	 */
+	for (i = 0; i < wrk->nr_ctxs; i += 2) {
+		struct ctx *ctx = &wrk->ctx_list[i];
+		uint32_t ctx_id, share_vm = 0;
 
-			wrk->ctx_list[w->context].id = arg.ctx_id;
+		if (ctx->id)
+			continue;
 
-			if (flags & GLOBAL_BALANCE) {
-				wrk->ctx_list[w->context].static_vcs = context_vcs_rr;
-				context_vcs_rr ^= 1;
-			} else {
-				wrk->ctx_list[w->context].static_vcs = ctx_vcs;
-				ctx_vcs ^= 1;
-			}
+		if (flags & I915) {
+			struct drm_i915_gem_context_create_ext_setparam ext = {
+				.base.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
+				.param.param = I915_CONTEXT_PARAM_VM,
+			};
+			struct drm_i915_gem_context_create_ext args = { };
 
-			if (wrk->prio) {
+			/* Find existing context to share ppgtt with. */
+			for (j = 0; j < wrk->nr_ctxs; j++) {
 				struct drm_i915_gem_context_param param = {
-					.ctx_id = arg.ctx_id,
-					.param = I915_CONTEXT_PARAM_PRIORITY,
-					.value = wrk->prio,
+					.param = I915_CONTEXT_PARAM_VM,
 				};
-				gem_context_set_param(fd, &param);
+
+				if (!wrk->ctx_list[j].id)
+					continue;
+
+				param.ctx_id = wrk->ctx_list[j].id;
+
+				gem_context_get_param(fd, &param);
+				igt_assert(param.value);
+
+				share_vm = param.value;
+
+				ext.param.value = share_vm;
+				args.flags =
+				    I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS;
+				args.extensions = to_user_pointer(&ext);
+				break;
 			}
+
+			if (!ctx->targets_instance)
+				args.flags |=
+				     I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE;
+
+			drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT,
+				 &args);
+
+			ctx_id = args.ctx_id;
+		} else {
+			struct drm_i915_gem_context_create args = {};
+
+			drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &args);
+			ctx_id = args.ctx_id;
 		}
+
+		igt_assert(ctx_id);
+		ctx->id = ctx_id;
+
+		if (flags & GLOBAL_BALANCE) {
+			ctx->static_vcs = context_vcs_rr;
+			context_vcs_rr ^= 1;
+		} else {
+			ctx->static_vcs = ctx_vcs;
+			ctx_vcs ^= 1;
+		}
+
+		__ctx_set_prio(ctx_id, wrk->prio);
+
+		/*
+		 * Do we need a separate context to satisfy this workloads which
+		 * both want to target specific engines and be balanced by i915?
+		 */
+		if ((flags & I915) && ctx->wants_balance &&
+		    ctx->targets_instance) {
+			struct drm_i915_gem_context_create_ext_setparam ext = {
+				.base.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
+				.param.param = I915_CONTEXT_PARAM_VM,
+				.param.value = share_vm,
+			};
+			struct drm_i915_gem_context_create_ext args = {
+				.extensions = to_user_pointer(&ext),
+				.flags =
+				    I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS |
+				    I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE,
+			};
+
+			igt_assert(share_vm);
+
+			drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT,
+				 &args);
+
+			igt_assert(args.ctx_id);
+			ctx_id = args.ctx_id;
+			wrk->ctx_list[i + 1].id = args.ctx_id;
+
+			__ctx_set_prio(ctx_id, wrk->prio);
+		}
+
+		if (ctx->wants_balance) {
+			I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(load_balance, 2) = {
+				.base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE,
+				.num_siblings = 2,
+				.engines = {
+					{ .engine_class = I915_ENGINE_CLASS_VIDEO,
+					  .engine_instance = 0 },
+					{ .engine_class = I915_ENGINE_CLASS_VIDEO,
+					  .engine_instance = 1 },
+				},
+			};
+			I915_DEFINE_CONTEXT_PARAM_ENGINES(set_engines, 3) = {
+				.extensions = to_user_pointer(&load_balance),
+				.engines = {
+					{ .engine_class = I915_ENGINE_CLASS_INVALID,
+					  .engine_instance = I915_ENGINE_CLASS_INVALID_NONE },
+					{ .engine_class = I915_ENGINE_CLASS_VIDEO,
+					  .engine_instance = 0 },
+					{ .engine_class = I915_ENGINE_CLASS_VIDEO,
+					  .engine_instance = 1 },
+				},
+			};
+
+			struct drm_i915_gem_context_param param = {
+				.ctx_id = ctx_id,
+				.param = I915_CONTEXT_PARAM_ENGINES,
+				.size = sizeof(set_engines),
+				.value = to_user_pointer(&set_engines),
+			};
+
+			gem_context_set_param(fd, &param);
+		}
+
+		if (share_vm)
+			vm_destroy(fd, share_vm);
 	}
 
 	/* Record default preemption. */
@@ -1029,7 +1227,6 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	 */
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
 		struct w_step *w2;
-		int j;
 
 		if (w->type != PREEMPTION)
 			continue;
@@ -1387,7 +1584,7 @@ static enum intel_engine_id
 context_balance(const struct workload_balancer *balancer,
 		struct workload *wrk, struct w_step *w)
 {
-	return get_vcs_engine(wrk->ctx_list[w->context].static_vcs);
+	return get_vcs_engine(__get_ctx(wrk, w)->static_vcs);
 }
 
 static unsigned int
@@ -1580,6 +1777,12 @@ static const struct workload_balancer all_balancers[] = {
 		.init = busy_init,
 		.get_qd = get_engine_busy,
 		.balance = busy_avg_balance,
+	},
+	{
+		.id = 11,
+		.name = "i915",
+		.desc = "i915 balancing.",
+		.flags = I915,
 	},
 };
 
@@ -1959,7 +2162,8 @@ static void *run_workload(void *data)
 			last_sync = false;
 
 			wrk->nr_bb[engine]++;
-			if (engine == VCS && wrk->balancer) {
+			if (engine == VCS && wrk->balancer &&
+			    wrk->balancer->balance) {
 				engine = wrk->balancer->balance(wrk->balancer,
 								wrk, w);
 				wrk->nr_bb[engine]++;
@@ -2386,6 +2590,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if ((flags & VCS2REMAP) && (flags & I915)) {
+		if (verbose)
+			fprintf(stderr, "VCS remapping not supported with i915 balancing!\n");
+		return 1;
+	}
+
 	if (!nop_calibration) {
 		if (verbose > 1)
 			printf("Calibrating nop delay with %u%% tolerance...\n",
@@ -2471,11 +2681,17 @@ int main(int argc, char **argv)
 		printf("%u client%s.\n", clients, clients > 1 ? "s" : "");
 		if (flags & SWAPVCS)
 			printf("Swapping VCS rings between clients.\n");
-		if (flags & GLOBAL_BALANCE)
-			printf("Using %s balancer in global mode.\n",
-			       balancer->name);
-		else if (balancer)
+		if (flags & GLOBAL_BALANCE) {
+			if (flags & I915) {
+				printf("Ignoring global balancing with i915!\n");
+				flags &= ~GLOBAL_BALANCE;
+			} else {
+				printf("Using %s balancer in global mode.\n",
+				       balancer->name);
+			}
+		} else if (balancer) {
 			printf("Using %s balancer.\n", balancer->name);
+		}
 	}
 
 	if (master_workload >= 0 && clients == 1)
@@ -2492,7 +2708,7 @@ int main(int argc, char **argv)
 		if (flags & SWAPVCS && i & 1)
 			flags_ &= ~SWAPVCS;
 
-		if (flags & GLOBAL_BALANCE) {
+		if ((flags & GLOBAL_BALANCE) && !(flags & I915)) {
 			w[i]->balancer = &global_balancer;
 			w[i]->global_wrk = w[0];
 			w[i]->global_balancer = balancer;

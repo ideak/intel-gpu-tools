@@ -49,10 +49,11 @@ my $nop;
 my %opts;
 
 my @balancers = ( 'rr', 'rand', 'qd', 'qdr', 'qdavg', 'rt', 'rtr', 'rtavg',
-		  'context', 'busy', 'busy-avg' );
+		  'context', 'busy', 'busy-avg', 'i915' );
 my %bal_skip_H = ( 'rr' => 1, 'rand' => 1, 'context' => 1, , 'busy' => 1,
-		   'busy-avg' => 1 );
-my %bal_skip_R = ();
+		   'busy-avg' => 1, 'i915' => 1 );
+my %bal_skip_R = ( 'i915' => 1 );
+my %bal_skip_G = ( 'i915' => 1 );
 
 my @workloads = (
 	'media_load_balance_17i7.wsim',
@@ -498,6 +499,8 @@ foreach my $wrk (@saturation_workloads) {
 				my $bid;
 
 				if ($bal ne '') {
+					next GBAL if $G =~ '-G' and exists $bal_skip_G{$bal};
+
 					push @xargs, "-b $bal";
 					push @xargs, '-R' unless exists $bal_skip_R{$bal};
 					push @xargs, $G if $G ne '';
