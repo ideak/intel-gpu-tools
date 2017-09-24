@@ -30,6 +30,7 @@
 #include "igt.h"
 #include "igt_gt.h"
 #include "igt_debugfs.h"
+#include "igt_rand.h"
 #include "igt_sysfs.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
@@ -109,6 +110,7 @@ static bool ignore_engine(int fd, unsigned engine)
 #define FORKED 0x10
 #define HANG 0x20
 #define SYNC 0x40
+#define PRIORITY 0x80
 
 struct hang {
 	struct drm_i915_gem_exec_object2 obj;
@@ -189,6 +191,40 @@ static void fini_hang(struct hang *h)
 	close(h->fd);
 }
 
+#define LOCAL_PARAM_HAS_SCHEDULER 41
+#define LOCAL_CONTEXT_PARAM_PRIORITY 6
+
+static bool __has_scheduler(int fd)
+{
+	drm_i915_getparam_t gp;
+	int has = -1;
+
+	gp.param = LOCAL_PARAM_HAS_SCHEDULER;
+	gp.value = &has;
+	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	return has > 0;
+}
+
+static int __ctx_set_priority(int fd, uint32_t ctx, int prio)
+{
+	struct local_i915_gem_context_param param;
+
+	memset(&param, 0, sizeof(param));
+	param.context = ctx;
+	param.size = 0;
+	param.param = LOCAL_CONTEXT_PARAM_PRIORITY;
+	param.value = prio;
+
+	return __gem_context_set_param(fd, &param);
+}
+
+static void ctx_set_priority(int fd, uint32_t ctx)
+{
+	int prio = hars_petruska_f54_1_random_unsafe_max(1024) - 512;
+	igt_assert_eq(__ctx_set_priority(fd, ctx, prio), 0);
+};
+
 static void whisper(int fd, unsigned engine, unsigned flags)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -212,6 +248,16 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	unsigned int eb_migrations = 0;
 	uint64_t old_offset;
 	int debugfs;
+
+	if (flags & PRIORITY) {
+		int __fd = drm_open_driver(DRIVER_INTEL);
+		bool has_scheduler = __has_scheduler(__fd);
+		bool ctx_has_priority =
+			__ctx_set_priority(__fd, 0, 1) == 0;
+		close(__fd);
+
+		igt_require(has_scheduler && ctx_has_priority);
+	}
 
 	debugfs = igt_debugfs_dir(fd);
 
@@ -401,14 +447,20 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 						batches[n].handle =
 							gem_open(this_fd,
 									gem_flink(fd, handle[1]));
+						if (flags & PRIORITY)
+							ctx_set_priority(this_fd, 0);
 					}
 
 					if (!(flags & CHAIN)) {
 						execbuf.flags &= ~ENGINE_MASK;
 						execbuf.flags |= engines[rand() % nengine];
 					}
-					if (flags & CONTEXTS)
+					if (flags & CONTEXTS) {
 						execbuf.rsvd1 = contexts[rand() % 64];
+						if (flags & PRIORITY)
+							ctx_set_priority(this_fd, execbuf.rsvd1);
+					}
+
 					gem_execbuf(this_fd, &execbuf);
 					if (inter[n].presumed_offset == -1) {
 						reloc_interruptions++;
@@ -546,11 +598,13 @@ igt_main
 		{ "contexts", CONTEXTS },
 		{ "contexts-interruptible", CONTEXTS | INTERRUPTIBLE},
 		{ "contexts-forked", CONTEXTS | FORKED},
+		{ "contexts-priority", CONTEXTS | FORKED | PRIORITY },
 		{ "contexts-chain", CONTEXTS | CHAIN },
 		{ "contexts-sync", CONTEXTS | SYNC },
 		{ "fds", FDS },
 		{ "fds-interruptible", FDS | INTERRUPTIBLE},
 		{ "fds-forked", FDS | FORKED},
+		{ "fds-priority", FDS | FORKED | PRIORITY },
 		{ "fds-chain", FDS | CHAIN},
 		{ "fds-sync", FDS | SYNC},
 		{ NULL }
