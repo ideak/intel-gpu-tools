@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Copyright © 2014 Intel Corporation
 #
@@ -112,7 +112,7 @@ if [ $? -ne 0 ]; then
 	exit 99
 fi
 
-if [[ "$1" != "" ]] ; then
+if [ -n "$1" ] ; then
 	check_test $1
 	exit 0
 fi
