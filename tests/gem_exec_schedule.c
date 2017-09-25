@@ -152,33 +152,36 @@ static void unplug(struct cork *c)
 	close(c->device);
 }
 
+static uint32_t create_highest_priority(int fd)
+{
+	uint32_t ctx = gem_context_create(fd);
+
+	/*
+	 * If there is no priority support, all contexts will have equal
+	 * priority (and therefore the max user priority), so no context
+	 * can overtake us, and we effectively can form a plug.
+	 */
+	__ctx_set_priority(fd, ctx, MAX_PRIO);
+
+	return ctx;
+}
+
 static void unplug_show_queue(int fd, struct cork *c, unsigned int engine)
 {
-	igt_spin_t *spin;
-	uint32_t ctx;
+	igt_spin_t *spin[BUSY_QLEN];
 
-	ctx = gem_context_create(fd);
-	ctx_set_priority(fd, ctx, MAX_PRIO);
-
-	spin = igt_spin_batch_new(fd, ctx, engine, 0);
-	for (int n = 0; n < BUSY_QLEN; n++) {
-		struct drm_i915_gem_exec_object2 obj = {
-			.handle = spin->handle,
-		};
-		struct drm_i915_gem_execbuffer2 execbuf = {
-			.buffers_ptr = to_user_pointer(&obj),
-			.buffer_count = 1,
-			.flags = engine,
-		};
-		gem_execbuf(fd, &execbuf);
+	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
+		uint32_t ctx = create_highest_priority(fd);
+		spin[n] = __igt_spin_batch_new(fd, ctx, engine, 0);
+		gem_context_destroy(fd, ctx);
 	}
 
 	unplug(c); /* batches will now be queued on the engine */
-
 	igt_debugfs_dump(fd, "i915_engine_info");
-	igt_spin_batch_free(fd, spin);
 
-	gem_context_destroy(fd, ctx);
+	for (int n = 0; n < ARRAY_SIZE(spin); n++)
+		igt_spin_batch_free(fd, spin[n]);
+
 }
 
 static void fifo(int fd, unsigned ring)
