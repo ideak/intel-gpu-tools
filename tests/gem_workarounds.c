@@ -29,6 +29,9 @@
 
 #include <fcntl.h>
 
+#define PAGE_SIZE 4096
+#define PAGE_ALIGN(x) ALIGN(x, PAGE_SIZE)
+
 static int gen;
 
 enum operation {
@@ -61,20 +64,6 @@ static struct write_only_list {
 static struct intel_wa_reg *wa_regs;
 static int num_wa_regs;
 
-static void wait_gpu(void)
-{
-	int fd = drm_open_driver(DRIVER_INTEL);
-	gem_quiescent_gpu(fd);
-	close(fd);
-}
-
-static void test_hang_gpu(void)
-{
-	int fd = drm_open_driver(DRIVER_INTEL);
-	igt_post_hang_ring(fd, igt_hang_ring(fd, I915_EXEC_DEFAULT));
-	close(fd);
-}
-
 static void test_suspend_resume(void)
 {
 	igt_info("Suspending the device ...\n");
@@ -96,49 +85,95 @@ static bool write_only(const uint32_t addr)
 	return false;
 }
 
-static int workaround_fail_count(void)
-{
-	int i, fail_count = 0;
+#define MI_STORE_REGISTER_MEM (0x24 << 23)
 
-	/* There is a small delay after coming ot of rc6 to the correct
-	   render context values will get loaded by hardware (bdw,chv).
-	   This here ensures that we have the correct context loaded before
-	   we start to read values */
-	wait_gpu();
+static int workaround_fail_count(int fd)
+{
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_relocation_entry *reloc;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	uint32_t result_sz, batch_sz;
+	uint32_t *base, *out;
+	int fail_count = 0;
+
+	reloc = calloc(num_wa_regs, sizeof(*reloc));
+	igt_assert(reloc);
+
+	result_sz = 4 * num_wa_regs;
+	result_sz = PAGE_ALIGN(result_sz);
+
+	batch_sz = 16 * num_wa_regs + 4;
+	batch_sz = PAGE_ALIGN(batch_sz);
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = gem_create(fd, result_sz);
+	gem_set_caching(fd, obj[0].handle, I915_CACHING_CACHED);
+	obj[1].handle = gem_create(fd, batch_sz);
+	obj[1].relocs_ptr = to_user_pointer(reloc);
+	obj[1].relocation_count = num_wa_regs;
+
+	out = base = gem_mmap__cpu(fd, obj[1].handle, 0, batch_sz, PROT_WRITE);
+	for (int i = 0; i < num_wa_regs; i++) {
+		*out++ = MI_STORE_REGISTER_MEM | ((gen >= 8 ? 4 : 2) - 2);
+		*out++ = wa_regs[i].addr;
+		reloc[i].target_handle = obj[0].handle;
+		reloc[i].offset = (out - base) * sizeof(*out);
+		reloc[i].delta = i * sizeof(uint32_t);
+		reloc[i].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		reloc[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
+		*out++ = reloc[i].delta;
+		if (gen >= 8)
+			*out++ = 0;
+	}
+	*out++ = MI_BATCH_BUFFER_END;
+	munmap(base, batch_sz);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+	gem_execbuf(fd, &execbuf);
+
+	gem_set_domain(fd, obj[0].handle, I915_GEM_DOMAIN_CPU, 0);
 
 	igt_debug("Address\tval\t\tmask\t\tread\t\tresult\n");
 
-	for (i = 0; i < num_wa_regs; ++i) {
-		const uint32_t val = intel_register_read(wa_regs[i].addr);
-		const bool ok = (wa_regs[i].value & wa_regs[i].mask) ==
-			(val & wa_regs[i].mask);
+	out = gem_mmap__cpu(fd, obj[0].handle, 0, result_sz, PROT_READ);
+	for (int i = 0; i < num_wa_regs; i++) {
+		const bool ok =
+			(wa_regs[i].value & wa_regs[i].mask) ==
+			(out[i] & wa_regs[i].mask);
+		char buf[80];
 
-		igt_debug("0x%05X\t0x%08X\t0x%08X\t0x%08X\t%s\n",
-			  wa_regs[i].addr, wa_regs[i].value, wa_regs[i].mask,
-			  val, ok ? "OK" : "FAIL");
+		snprintf(buf, sizeof(buf),
+			 "0x%05X\t0x%08X\t0x%08X\t0x%08X",
+			 wa_regs[i].addr, wa_regs[i].value, wa_regs[i].mask,
+			 out[i]);
 
-		if (write_only(wa_regs[i].addr))
-			continue;
-
-		if (!ok) {
-			igt_warn("0x%05X\t0x%08X\t0x%08X\t0x%08X\t%s\n",
-				 wa_regs[i].addr, wa_regs[i].value,
-				 wa_regs[i].mask,
-				 val, ok ? "OK" : "FAIL");
+		if (ok) {
+			igt_debug("%s\tOK\n", buf);
+		} else if (write_only(wa_regs[i].addr)) {
+			igt_debug("%s\tIGNORED (w/o)\n", buf);
+		} else {
+			igt_warn("%s\tFAIL\n", buf);
 			fail_count++;
 		}
 	}
+	munmap(out, result_sz);
+
+	gem_close(fd, obj[1].handle);
+	gem_close(fd, obj[0].handle);
+	free(reloc);
 
 	return fail_count;
 }
 
-static void check_workarounds(enum operation op)
+static void check_workarounds(int fd, enum operation op)
 {
-	igt_assert_eq(workaround_fail_count(), 0);
+	igt_assert_eq(workaround_fail_count(fd), 0);
 
 	switch (op) {
 	case GPU_RESET:
-		test_hang_gpu();
+		igt_force_gpu_reset(fd);
 		break;
 
 	case SUSPEND_RESUME:
@@ -152,40 +187,30 @@ static void check_workarounds(enum operation op)
 		igt_assert(0);
 	}
 
-	igt_assert_eq(workaround_fail_count(), 0);
+	igt_assert_eq(workaround_fail_count(fd), 0);
 }
 
 igt_main
 {
+	int device = -1;
+
 	igt_fixture {
-		int device = drm_open_driver_master(DRIVER_INTEL);
-		struct pci_device *pci_dev;
 		FILE *file;
 		char *line = NULL;
 		size_t line_size;
 		int i, fd;
 
+		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
 
 		gen = intel_gen(intel_get_drm_devid(device));
-
-		pci_dev = intel_get_pci_device();
-		igt_require(pci_dev);
-
-		intel_register_access_init(pci_dev, 0, device);
 
 		fd = igt_debugfs_open(device, "i915_wa_registers", O_RDONLY);
 		file = fdopen(fd, "r");
 		igt_assert(getline(&line, &line_size, file) > 0);
 		igt_debug("i915_wa_registers: %s", line);
 		sscanf(line, "Workarounds applied: %d", &num_wa_regs);
-
-		/* For newer gens, the lri wa list has always something.
-		 * If it doesn't, go and add one. */
-		if (gen >= 8)
-			igt_assert_lt(0, num_wa_regs);
-		else
-			igt_assert_lte(0, num_wa_regs);
+		igt_require(num_wa_regs > 0);
 
 		wa_regs = malloc(num_wa_regs * sizeof(*wa_regs));
 		igt_assert(wa_regs);
@@ -205,21 +230,14 @@ igt_main
 		free(line);
 		fclose(file);
 		close(fd);
-		close(device);
 	}
 
 	igt_subtest("basic-read")
-		check_workarounds(SIMPLE_READ);
+		check_workarounds(device, SIMPLE_READ);
 
 	igt_subtest("reset")
-		check_workarounds(GPU_RESET);
+		check_workarounds(device, GPU_RESET);
 
 	igt_subtest("suspend-resume")
-		check_workarounds(SUSPEND_RESUME);
-
-	igt_fixture {
-		free(wa_regs);
-		intel_register_access_fini();
-	}
-
+		check_workarounds(device, SUSPEND_RESUME);
 }
