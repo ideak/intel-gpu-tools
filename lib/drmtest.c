@@ -161,35 +161,10 @@ static bool has_known_intel_chipset(int fd)
  */
 void gem_quiescent_gpu(int fd)
 {
-	uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 obj;
-	unsigned ring;
-
 	igt_terminate_spin_batches();
 
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, 4096);
-	gem_write(fd, obj.handle, 0, &bbe, sizeof(&bbe));
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&obj);
-	execbuf.buffer_count = 1;
-
-	for (ring = 0; ring < 1<<6; ring++) {
-		execbuf.flags = ring;
-		__gem_execbuf(fd, &execbuf);
-	}
-
-	if (gem_has_bsd2(fd)) {
-		execbuf.flags = I915_EXEC_BSD | (2 << 13);
-		__gem_execbuf(fd, &execbuf);
-	}
-
-	gem_sync(fd, obj.handle);
-	gem_close(fd, obj.handle);
-
-	igt_drop_caches_set(fd, DROP_RETIRE | DROP_IDLE | DROP_FREED);
+	igt_drop_caches_set(fd,
+			    DROP_ACTIVE | DROP_RETIRE | DROP_IDLE | DROP_FREED);
 }
 
 /**
