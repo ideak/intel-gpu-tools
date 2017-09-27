@@ -2332,7 +2332,7 @@ static int igt_primary_plane_commit_legacy(igt_plane_t *primary,
 	igt_assert(!primary->rotation_changed);
 
 	if (!primary->fb_changed && !primary->position_changed &&
-	    !primary->size_changed)
+	    !primary->size_changed && !primary->pipe->mode_changed)
 		return 0;
 
 	crtc_id = pipe->crtc_id;
