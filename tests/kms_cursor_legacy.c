@@ -155,7 +155,7 @@ static igt_output_t *set_fb_on_crtc(igt_display_t *display, enum pipe pipe, stru
 		drmModeModeInfoPtr mode;
 		igt_plane_t *primary;
 
-		if (output->pending_crtc_idx_mask)
+		if (output->pending_pipe != PIPE_NONE)
 			continue;
 
 		igt_output_set_pipe(output, pipe);

@@ -1561,9 +1561,10 @@ static void igt_display_log_shift(igt_display_t *display, int shift)
 static void igt_output_refresh(igt_output_t *output)
 {
 	igt_display_t *display = output->display;
-	unsigned long crtc_idx_mask;
+	unsigned long crtc_idx_mask = 0;
 
-	crtc_idx_mask = output->pending_crtc_idx_mask;
+	if (output->pending_pipe != PIPE_NONE)
+		crtc_idx_mask = 1 << output->pending_pipe;
 
 	kmstest_free_connector_config(&output->config);
 
@@ -1587,11 +1588,8 @@ static void igt_output_refresh(igt_output_t *output)
 						    BROADCAST_RGB_FULL);
 	}
 
-	if (output->config.pipe == PIPE_NONE)
-		return;
-
 	LOG(display, "%s: Selecting pipe %s\n", output->name,
-	    kmstest_pipe_name(output->config.pipe));
+	    kmstest_pipe_name(output->pending_pipe));
 }
 
 static bool
@@ -1830,7 +1828,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		 * a pipe is set with igt_output_set_pipe().
 		 */
 		output->force_reprobe = true;
-		output->pending_crtc_idx_mask = 0;
+		output->pending_pipe = PIPE_NONE;
 		output->id = resources->connectors[i];
 		output->display = display;
 
@@ -1960,10 +1958,12 @@ static void igt_display_refresh(igt_display_t *display)
 	for (i = 0; i < display->n_outputs; i++) {
 		output = &display->outputs[i];
 
-		if (pipes_in_use & output->pending_crtc_idx_mask)
-			goto report_dup;
+		if (output->pending_pipe != PIPE_NONE) {
+			if (pipes_in_use & (1 << output->pending_pipe))
+				goto report_dup;
 
-		pipes_in_use |= output->pending_crtc_idx_mask;
+			pipes_in_use |= 1 << output->pending_pipe;
+		}
 
 		if (output->force_reprobe)
 			igt_output_refresh(output);
@@ -1975,11 +1975,11 @@ report_dup:
 	for (; i > 0; i--) {
 		igt_output_t *b = &display->outputs[i - 1];
 
-		igt_assert_f(output->pending_crtc_idx_mask !=
-			     b->pending_crtc_idx_mask,
+		igt_assert_f(output->pending_pipe !=
+			     b->pending_pipe,
 			     "%s and %s are both trying to use pipe %s\n",
 			     igt_output_name(output), igt_output_name(b),
-			     kmstest_pipe_name(ffs(b->pending_crtc_idx_mask) - 1));
+			     kmstest_pipe_name(output->pending_pipe));
 	}
 }
 
@@ -1988,7 +1988,7 @@ static igt_pipe_t *igt_output_get_driving_pipe(igt_output_t *output)
 	igt_display_t *display = output->display;
 	enum pipe pipe;
 
-	if (!output->pending_crtc_idx_mask) {
+	if (output->pending_pipe == PIPE_NONE) {
 		/*
 		 * The user hasn't specified a pipe to use, return none.
 		 */
@@ -1998,7 +1998,7 @@ static igt_pipe_t *igt_output_get_driving_pipe(igt_output_t *output)
 		 * Otherwise, return the pending pipe (ie the pipe that should
 		 * drive this output after the commit()
 		 */
-		pipe = ffs(output->pending_crtc_idx_mask) - 1;
+		pipe = output->pending_pipe;
 	}
 
 	igt_assert(pipe >= 0 && pipe < display->n_pipes);
@@ -2051,7 +2051,7 @@ static igt_output_t *igt_pipe_get_output(igt_pipe_t *pipe)
 	for (i = 0; i < display->n_outputs; i++) {
 		igt_output_t *output = &display->outputs[i];
 
-		if (output->pending_crtc_idx_mask == (1 << pipe->pipe))
+		if (output->pending_pipe == pipe->pipe)
 			return output;
 	}
 
@@ -2860,22 +2860,18 @@ void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 
 	igt_assert(output->name);
 
-	if (output->pending_crtc_idx_mask) {
+	if (output->pending_pipe != PIPE_NONE) {
 		old_pipe = igt_output_get_driving_pipe(output);
 
 		old_pipe->mode_changed = true;
 	}
 
-	if (pipe == PIPE_NONE) {
-		LOG(display, "%s: set_pipe(any)\n", igt_output_name(output));
-		output->pending_crtc_idx_mask = 0;
-	} else {
-		LOG(display, "%s: set_pipe(%s)\n", igt_output_name(output),
-		    kmstest_pipe_name(pipe));
-		output->pending_crtc_idx_mask = 1 << pipe;
+	LOG(display, "%s: set_pipe(%s)\n", igt_output_name(output),
+	    kmstest_pipe_name(pipe));
+	output->pending_pipe = pipe;
 
+	if (pipe != PIPE_NONE)
 		display->pipes[pipe].mode_changed = true;
-	}
 
 	output->config.pipe_changed = true;
 

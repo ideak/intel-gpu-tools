@@ -644,7 +644,7 @@ static unsigned set_combinations(igt_display_t *display, unsigned mask, struct i
 		event_mask |= 1 << pipe;
 
 		for_each_valid_output_on_pipe(display, pipe, output) {
-			if (output->pending_crtc_idx_mask)
+			if (output->pending_pipe != PIPE_NONE)
 				continue;
 
 			mode = igt_output_get_mode(output);
@@ -726,7 +726,7 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 			pipe_crcs[i] = igt_pipe_crc_new(display->drm_fd, i, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 		for_each_valid_output_on_pipe(display, i, output) {
-			if (output->pending_crtc_idx_mask)
+			if (output->pending_pipe != PIPE_NONE)
 				continue;
 
 			igt_output_set_pipe(output, i);

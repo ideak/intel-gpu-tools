@@ -361,7 +361,7 @@ typedef struct {
 	struct kmstest_connector_config config;
 	char *name;
 	bool force_reprobe;
-	unsigned long pending_crtc_idx_mask;
+	enum pipe pending_pipe;
 	bool use_override_mode;
 	drmModeModeInfo override_mode;
 } igt_output_t;
