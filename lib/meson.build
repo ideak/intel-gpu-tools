@@ -55,7 +55,6 @@ lib_sources = [
 	'igt_rand.c',
 	'igt_stats.c',
 	'igt_sysfs.c',
-	'igt_x86.c',
 	'igt_vgem.c',
 	'instdone.c',
 	'intel_batchbuffer.c',
@@ -88,6 +87,10 @@ lib_sources = [
 	'uwildmat/uwildmat.c',
 	'igt_kmod.c',
 ]
+
+if ['x86', 'x86_64'].contains(host_machine.cpu_family())
+    lib_sources += 'igt_x86.c'
+endif
 
 lib_deps = [
 	cairo,
