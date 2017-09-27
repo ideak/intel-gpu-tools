@@ -121,6 +121,8 @@ subdir('benchmarks')
 subdir('tools')
 if libdrm_intel.found()
 	subdir('assembler')
-	subdir('overlay')
+	if ['x86', 'x86_64'].contains(host_machine.cpu_family())
+		subdir('overlay')
+	endif
 endif
 subdir('man')
