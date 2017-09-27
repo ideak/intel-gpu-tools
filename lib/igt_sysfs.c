@@ -24,6 +24,7 @@
 
 #include <inttypes.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/mount.h>
 #include <errno.h>
 #include <stdarg.h>
