@@ -526,25 +526,30 @@ static void dump_general_definitions(struct context *context,
 static void dump_legacy_child_devices(struct context *context,
 				      const struct bdb_block *block)
 {
-	const struct bdb_child_devices *child_devs = block->data;
-	const struct legacy_child_device_config *child;
+	const struct bdb_legacy_child_devices *defs = block->data;
+	struct child_device_config *child;
 	int i;
+	int child_device_num;
 
-	for (i = 0; i < DEVICE_CHILD_SIZE; i++) {
-		child = &child_devs->children[i];
-		/* Skip nonexistent children */
-		if (!child->device_type)
-			continue;
-		printf("\tChild device %d\n", i);
-		printf("\t\tType: 0x%04x (%s)\n", child->device_type,
-		       child_device_type(child->device_type));
-		printf("\t\tDVO port: 0x%02x\n", child->dvo_port);
-		printf("\t\tI2C pin: 0x%02x\n", child->i2c_pin);
-		printf("\t\tSlave addr: 0x%02x\n", child->slave_addr);
-		printf("\t\tDDC pin: 0x%02x\n", child->ddc_pin);
-		printf("\t\tDVO config: 0x%02x\n", child->dvo_cfg);
-		printf("\t\tDVO wiring: 0x%02x\n", child->dvo_wiring);
+	printf("\tChild device size: %d\n", defs->child_dev_size);
+	child_device_num = (block->size - sizeof(*defs)) /
+		defs->child_dev_size;
+
+	/*
+	 * Use a temp buffer so dump_child_device() doesn't have to worry about
+	 * accessing the struct beyond child_dev_size. The tail, if any, remains
+	 * initialized to zero.
+	 */
+	child = calloc(1, sizeof(*child));
+
+	for (i = 0; i < child_device_num; i++) {
+		memcpy(child, &defs->devices[i * defs->child_dev_size],
+		       min(sizeof(*child), defs->child_dev_size));
+
+		dump_child_device(context, child);
 	}
+
+	free(child);
 }
 
 static void dump_lvds_options(struct context *context,

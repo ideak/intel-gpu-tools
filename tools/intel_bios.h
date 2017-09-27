@@ -42,33 +42,9 @@
 #define DEVICE_TYPE_DVI			0x68d2
 #define DEVICE_TYPE_MIPI		0x7cc2
 
-struct legacy_child_device_config {
-	uint16_t handle;
-	uint16_t device_type;	/* See DEVICE_TYPE_* above */
-	uint8_t device_id[10];
-	uint16_t addin_offset;
-	uint8_t dvo_port;	/* See DEVICE_PORT_* above */
-	uint8_t i2c_pin;
-	uint8_t slave_addr;
-	uint8_t ddc_pin;
-	uint16_t edid_ptr;
-	uint8_t dvo_cfg;	/* See DEVICE_CFG_* above */
-	uint8_t dvo2_port;
-	uint8_t i2c2_pin;
-	uint8_t slave2_addr;
-	uint8_t ddc2_pin;
-	uint8_t capabilities;
-	uint8_t dvo_wiring;	/* See DEVICE_WIRE_* above */
-	uint8_t dvo2_wiring;
-	uint16_t extended_type;
-	uint8_t dvo_function;
-} __attribute__ ((packed));
-
-#define DEVICE_CHILD_SIZE 7
-
-struct bdb_child_devices {
-	uint8_t child_structure_size;
-	struct legacy_child_device_config children[DEVICE_CHILD_SIZE];
+struct bdb_legacy_child_devices {
+	uint8_t child_dev_size;
+	uint8_t devices[0]; /* presumably 7 * 33 */
 } __attribute__ ((packed));
 
 #define BDB_DRIVER_NO_LVDS	0
