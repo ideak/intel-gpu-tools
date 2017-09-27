@@ -122,7 +122,8 @@ static uint64_t max_open_files(void)
 	if (getrlimit(RLIMIT_NOFILE, &rlim))
 		rlim.rlim_cur = 64 << 10;
 
-	igt_info("Process limit for file descriptors is %lu\n", rlim.rlim_cur);
+	igt_info("Process limit for file descriptors is %lu\n",
+		 (long)rlim.rlim_cur);
 	return rlim.rlim_cur;
 }
 

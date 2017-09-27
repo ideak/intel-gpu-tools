@@ -143,7 +143,7 @@ static bool allow_files(unsigned min)
 		return false;
 
 	igt_info("Current file limit is %ld, estimated we need %d\n",
-		 rlim.rlim_cur, min);
+		 (long)rlim.rlim_cur, min);
 
 	if (rlim.rlim_cur > min)
 		return true;
