@@ -87,7 +87,7 @@ static bool write_only(const uint32_t addr)
 
 #define MI_STORE_REGISTER_MEM (0x24 << 23)
 
-static int workaround_fail_count(int fd)
+static int workaround_fail_count(int fd, uint32_t ctx)
 {
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_relocation_entry *reloc;
@@ -131,6 +131,7 @@ static int workaround_fail_count(int fd)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
+	execbuf.rsvd1 = ctx;
 	gem_execbuf(fd, &execbuf);
 
 	gem_set_domain(fd, obj[0].handle, I915_GEM_DOMAIN_CPU, 0);
@@ -167,9 +168,15 @@ static int workaround_fail_count(int fd)
 	return fail_count;
 }
 
-static void check_workarounds(int fd, enum operation op)
+#define CONTEXT 0x1
+static void check_workarounds(int fd, enum operation op, unsigned int flags)
 {
-	igt_assert_eq(workaround_fail_count(fd), 0);
+	uint32_t ctx = 0;
+
+	if (flags & CONTEXT)
+		ctx = gem_context_create(fd);
+
+	igt_assert_eq(workaround_fail_count(fd, ctx), 0);
 
 	switch (op) {
 	case GPU_RESET:
@@ -181,13 +188,16 @@ static void check_workarounds(int fd, enum operation op)
 		break;
 
 	case SIMPLE_READ:
-		return;
+		break;
 
 	default:
 		igt_assert(0);
 	}
 
-	igt_assert_eq(workaround_fail_count(fd), 0);
+	igt_assert_eq(workaround_fail_count(fd, ctx), 0);
+
+	if (flags & CONTEXT)
+		gem_context_destroy(fd, ctx);
 }
 
 igt_main
@@ -233,11 +243,20 @@ igt_main
 	}
 
 	igt_subtest("basic-read")
-		check_workarounds(device, SIMPLE_READ);
+		check_workarounds(device, SIMPLE_READ, 0);
+
+	igt_subtest("basic-read-context")
+		check_workarounds(device, SIMPLE_READ, CONTEXT);
 
 	igt_subtest("reset")
-		check_workarounds(device, GPU_RESET);
+		check_workarounds(device, GPU_RESET, 0);
+
+	igt_subtest("reset-context")
+		check_workarounds(device, GPU_RESET, CONTEXT);
 
 	igt_subtest("suspend-resume")
-		check_workarounds(device, SUSPEND_RESUME);
+		check_workarounds(device, SUSPEND_RESUME, 0);
+
+	igt_subtest("suspend-resume-context")
+		check_workarounds(device, SUSPEND_RESUME, CONTEXT);
 }
