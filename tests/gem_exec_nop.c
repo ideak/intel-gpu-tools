@@ -44,6 +44,8 @@
 #include <time.h>
 #include "drm.h"
 
+#define BIT(x) (1ul << (x))
+
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
 
@@ -51,6 +53,14 @@
 #define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+
+#define LOCAL_PARAM_HAS_SCHEDULER 41
+#define   HAS_SCHEDULER		BIT(0)
+#define   HAS_PRIORITY		BIT(1)
+#define   HAS_PREEMPTION	BIT(2)
+#define LOCAL_CONTEXT_PARAM_PRIORITY 6
+#define   MAX_PRIO 1023
+#define   MIN_PRIO -1023
 
 #define FORKED 1
 #define CHAINED 2
@@ -581,6 +591,79 @@ static void fence_signal(int fd, uint32_t handle,
 	igt_info("Signal %s: %'lu cycles (%'lu signals): %.3fus\n",
 		 ring_name, count, signal, elapsed(&start, &now) * 1e6 / count);
 }
+static int __ctx_set_priority(int fd, uint32_t ctx, int prio)
+{
+	struct local_i915_gem_context_param param;
+
+	memset(&param, 0, sizeof(param));
+	param.context = ctx;
+	param.size = 0;
+	param.param = LOCAL_CONTEXT_PARAM_PRIORITY;
+	param.value = prio;
+
+	return __gem_context_set_param(fd, &param);
+}
+
+static void ctx_set_priority(int fd, uint32_t ctx, int prio)
+{
+	igt_assert_eq(__ctx_set_priority(fd, ctx, prio), 0);
+}
+
+static void preempt(int fd, uint32_t handle,
+		   unsigned ring_id, const char *ring_name)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj;
+	struct timespec start, now;
+	unsigned long count;
+	uint32_t ctx[2];
+
+	gem_require_ring(fd, ring_id);
+
+	ctx[0] = gem_context_create(fd);
+	ctx_set_priority(fd, ctx[0], MIN_PRIO);
+
+	ctx[1] = gem_context_create(fd);
+	ctx_set_priority(fd, ctx[1], MAX_PRIO);
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = handle;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags = ring_id;
+	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	if (__gem_execbuf(fd, &execbuf)) {
+		execbuf.flags = ring_id;
+		gem_execbuf(fd, &execbuf);
+	}
+	execbuf.rsvd1 = ctx[1];
+	intel_detect_and_clear_missed_interrupts(fd);
+
+	count = 0;
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	do {
+		igt_spin_t *spin =
+			__igt_spin_batch_new(fd, ctx[0], ring_id, 0);
+
+		for (int loop = 0; loop < 1024; loop++)
+			gem_execbuf(fd, &execbuf);
+
+		igt_spin_batch_free(fd, spin);
+
+		count += 1024;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+	} while (elapsed(&start, &now) < 20);
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+
+	gem_context_destroy(fd, ctx[1]);
+	gem_context_destroy(fd, ctx[0]);
+
+	igt_info("%s: %'lu cycles: %.3fus\n",
+		 ring_name, count, elapsed(&start, &now)*1e6 / count);
+}
 
 static void print_welcome(int fd)
 {
@@ -611,9 +694,31 @@ out:
 	close(dir);
 }
 
+static unsigned int has_scheduler(int fd)
+{
+	drm_i915_getparam_t gp;
+	unsigned int caps = 0;
+
+	gp.param = LOCAL_PARAM_HAS_SCHEDULER;
+	gp.value = (int *)&caps;
+	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	if (!caps)
+		return 0;
+
+	igt_info("Has kernel scheduler\n");
+	if (caps & HAS_PRIORITY)
+		igt_info(" - With priority sorting\n");
+	if (caps & HAS_PREEMPTION)
+		igt_info(" - With preemption enabled\n");
+
+	return caps;
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
+	unsigned int sched_caps = 0;
 	uint32_t handle = 0;
 	int device = -1;
 
@@ -623,6 +728,7 @@ igt_main
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
 		print_welcome(device);
+		sched_caps = has_scheduler(device);
 
 		handle = gem_create(device, 4096);
 		gem_write(device, handle, 0, &bbe, sizeof(bbe));
@@ -666,6 +772,18 @@ igt_main
 
 	igt_subtest("context-sequential")
 		sequential(device, handle, FORKED | CONTEXT, 150);
+
+	igt_subtest_group {
+		igt_fixture {
+			igt_require(sched_caps & HAS_PRIORITY);
+			igt_require(sched_caps & HAS_PREEMPTION);
+		}
+
+		for (e = intel_execution_engines; e->name; e++) {
+			igt_subtest_f("preempt-%s", e->name)
+				preempt(device, handle, e->exec_id | e->flags, e->name);
+		}
+	}
 
 #if !defined(ANDROID) || ANDROID_HAS_CAIRO
 	igt_subtest("headless")
