@@ -2413,6 +2413,36 @@ static int igt_pipe_commit(igt_pipe_t *pipe,
 	return 0;
 }
 
+static int igt_output_commit(igt_output_t *output,
+			     enum igt_commit_style s,
+			     bool fail_on_error)
+{
+	int i, ret;
+
+	for (i = 0; i < IGT_NUM_CONNECTOR_PROPS; i++) {
+		if (!igt_output_is_prop_changed(output, i))
+			continue;
+
+		/* CRTC_ID is set by calling drmModeSetCrtc in the legacy path. */
+		if (i == IGT_CONNECTOR_CRTC_ID)
+			continue;
+
+		igt_assert(output->props[i]);
+
+		if (s == COMMIT_LEGACY)
+			ret = drmModeConnectorSetProperty(output->display->drm_fd, output->id,
+							  output->props[i], output->values[i]);
+		else
+			ret = drmModeObjectSetProperty(output->display->drm_fd, output->id,
+						       DRM_MODE_OBJECT_CONNECTOR,
+						       output->props[i], output->values[i]);
+
+		CHECK_RETURN(ret, fail_on_error);
+	}
+
+	return 0;
+}
+
 static void
 igt_pipe_replace_blob(igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop, void *ptr, size_t length)
 {
@@ -2590,10 +2620,11 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 	for (i = 0; i < display->n_outputs; i++) {
 		igt_output_t *output = &display->outputs[i];
 
-		if (s == COMMIT_ATOMIC)
+		if (s != COMMIT_UNIVERSAL)
 			output->changed = 0;
-		else if (s != COMMIT_UNIVERSAL)
-			igt_output_clear_prop_changed(output, IGT_CONNECTOR_CRTC_ID);
+		else
+			/* no modeset in universal commit, no change to crtc. */
+			output->changed &= 1 << IGT_CONNECTOR_CRTC_ID;
 	}
 }
 
@@ -2610,7 +2641,7 @@ static int do_display_commit(igt_display_t *display,
 			     enum igt_commit_style s,
 			     bool fail_on_error)
 {
-	int ret;
+	int i, ret = 0;
 	enum pipe pipe;
 	LOG_INDENT(display, "commit");
 
@@ -2619,27 +2650,17 @@ static int do_display_commit(igt_display_t *display,
 	if (s == COMMIT_ATOMIC) {
 		ret = igt_atomic_commit(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 	} else {
-		int valid_outs = 0;
-
 		for_each_pipe(display, pipe) {
 			igt_pipe_t *pipe_obj = &display->pipes[pipe];
-			igt_output_t *output = igt_pipe_get_output(pipe_obj);
-
-			if (output)
-				valid_outs++;
 
 			ret = igt_pipe_commit(pipe_obj, s, fail_on_error);
 			if (ret)
 				break;
 		}
 
-		if (valid_outs == 0) {
-			LOG_UNINDENT(display);
-
-			return -1;
-		}
+		for (i = 0; !ret && i < display->n_outputs; i++)
+			ret = igt_output_commit(&display->outputs[i], s, fail_on_error);
 	}
-
 
 	LOG_UNINDENT(display);
 	CHECK_RETURN(ret, fail_on_error);
