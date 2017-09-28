@@ -29,6 +29,8 @@
 
 #include <fcntl.h>
 
+static int gen;
+
 enum operation {
 	GPU_RESET,
 	SUSPEND_RESUME,
@@ -39,6 +41,21 @@ struct intel_wa_reg {
 	uint32_t addr;
 	uint32_t value;
 	uint32_t mask;
+};
+
+static struct write_only_list {
+	unsigned int gen;
+	uint32_t addr;
+} wo_list[] = {
+	{ 10, 0xE5F0 } /* WaForceContextSaveRestoreNonCoherent:cnl */
+
+	/*
+	 * FIXME: If you are contemplating adding stuff here
+	 * consider this as a temporary solution. You need to
+	 * manually check from context image that your workaround
+	 * is having an effect. Consider creating a context image
+	 * validator to act as a superior solution.
+	 */
 };
 
 static struct intel_wa_reg *wa_regs;
@@ -64,6 +81,21 @@ static void test_suspend_resume(void)
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 }
 
+static bool write_only(const uint32_t addr)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(wo_list); i++) {
+		if (gen == wo_list[i].gen &&
+		    addr == wo_list[i].addr) {
+			igt_info("Skipping check for 0x%x due to write only\n", addr);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static int workaround_fail_count(void)
 {
 	int i, fail_count = 0;
@@ -84,6 +116,9 @@ static int workaround_fail_count(void)
 		igt_debug("0x%05X\t0x%08X\t0x%08X\t0x%08X\t%s\n",
 			  wa_regs[i].addr, wa_regs[i].value, wa_regs[i].mask,
 			  val, ok ? "OK" : "FAIL");
+
+		if (write_only(wa_regs[i].addr))
+			continue;
 
 		if (!ok) {
 			igt_warn("0x%05X\t0x%08X\t0x%08X\t0x%08X\t%s\n",
@@ -124,7 +159,6 @@ igt_main
 {
 	igt_fixture {
 		int device = drm_open_driver_master(DRIVER_INTEL);
-		const int gen = intel_gen(intel_get_drm_devid(device));
 		struct pci_device *pci_dev;
 		FILE *file;
 		char *line = NULL;
@@ -132,6 +166,8 @@ igt_main
 		int i, fd;
 
 		igt_require_gem(device);
+
+		gen = intel_gen(intel_get_drm_devid(device));
 
 		pci_dev = intel_get_pci_device();
 		igt_require(pci_dev);
