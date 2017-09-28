@@ -466,10 +466,12 @@ static void preempt_self(int fd, unsigned ring)
 static void deep(int fd, unsigned ring)
 {
 #define XS 8
-	const unsigned int nctx = MAX_PRIO + 1;
+	const unsigned int nctx = MAX_PRIO - MIN_PRIO;
 	const unsigned size = ALIGN(4*nctx, 4096);
+	struct timespec tv = {};
 	struct cork cork;
 	uint32_t result, dep[XS];
+	uint32_t expected = 0;
 	uint32_t *ptr;
 	uint32_t *ctx;
 
@@ -483,21 +485,48 @@ static void deep(int fd, unsigned ring)
 	for (int m = 0; m < XS; m ++)
 		dep[m] = gem_create(fd, size);
 
+	/* Bind all surfaces and contexts before starting the timeout. */
+	{
+		struct drm_i915_gem_exec_object2 obj[XS + 2];
+		struct drm_i915_gem_execbuffer2 execbuf;
+		const uint32_t bbe = MI_BATCH_BUFFER_END;
+
+		memset(obj, 0, sizeof(obj));
+		for (int n = 0; n < XS; n++)
+			obj[n].handle = dep[n];
+		obj[XS].handle = result;
+		obj[XS+1].handle = gem_create(fd, 4096);
+		gem_write(fd, obj[XS+1].handle, 0, &bbe, sizeof(bbe));
+
+		memset(&execbuf, 0, sizeof(execbuf));
+		execbuf.buffers_ptr = to_user_pointer(obj);
+		execbuf.buffer_count = XS + 2;
+		execbuf.flags = ring;
+		for (int n = 0; n < nctx; n++) {
+			execbuf.rsvd1 = ctx[n];
+			gem_execbuf(fd, &execbuf);
+		}
+		gem_close(fd, obj[XS+1].handle);
+		gem_sync(fd, result);
+	}
+
 	plug(fd, &cork);
 
 	/* Create a deep dependency chain, with a few branches */
-	for (int n = 0; n < nctx; n++)
+	for (int n = 0; n < nctx && igt_seconds_elapsed(&tv) < 8; n++)
 		for (int m = 0; m < XS; m++)
 			store_dword(fd, ctx[n], ring, dep[m], 4*n, ctx[n], cork.handle, I915_GEM_DOMAIN_INSTRUCTION);
 
-	for (int n = 0; n < nctx; n++) {
+	for (int n = 0; n < nctx && igt_seconds_elapsed(&tv) < 6; n++) {
 		for (int m = 0; m < XS; m++) {
 			store_dword(fd, ctx[n], ring, result, 4*n, ctx[n], dep[m], 0);
 			store_dword(fd, ctx[n], ring, result, 4*m, ctx[n], 0, I915_GEM_DOMAIN_INSTRUCTION);
 		}
+		expected = ctx[n];
 	}
 
 	unplug_show_queue(fd, &cork, ring);
+	igt_require(expected); /* too slow */
 
 	for (int n = 0; n < nctx; n++)
 		gem_context_destroy(fd, ctx[n]);
@@ -520,7 +549,7 @@ static void deep(int fd, unsigned ring)
 
 	/* No reordering due to PI on all contexts because of the common dep */
 	for (int m = 0; m < XS; m++)
-		igt_assert_eq_u32(ptr[m], ctx[nctx - 1]);
+		igt_assert_eq_u32(ptr[m], expected);
 	munmap(ptr, size);
 
 	free(ctx);
