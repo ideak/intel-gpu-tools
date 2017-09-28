@@ -27,11 +27,21 @@
 #include "igt.h"
 #include "igt_sysfs.h"
 
+#define BIT(x) (1ul << (x))
+
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
 
 #define LOCAL_I915_EXEC_BSD_SHIFT      (13)
 #define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
+
+#define LOCAL_PARAM_HAS_SCHEDULER 41
+#define   HAS_SCHEDULER		BIT(0)
+#define   HAS_PRIORITY		BIT(1)
+#define   HAS_PREEMPTION	BIT(2)
+#define LOCAL_CONTEXT_PARAM_PRIORITY 6
+#define   MAX_PRIO 1023
+#define   MIN_PRIO -1023
 
 #define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
@@ -684,6 +694,116 @@ store_all(int fd, int num_children, int timeout)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
+static int __ctx_set_priority(int fd, uint32_t ctx, int prio)
+{
+	struct local_i915_gem_context_param param;
+
+	memset(&param, 0, sizeof(param));
+	param.context = ctx;
+	param.size = 0;
+	param.param = LOCAL_CONTEXT_PARAM_PRIORITY;
+	param.value = prio;
+
+	return __gem_context_set_param(fd, &param);
+}
+
+static void ctx_set_priority(int fd, uint32_t ctx, int prio)
+{
+	igt_assert_eq(__ctx_set_priority(fd, ctx, prio), 0);
+}
+
+static void
+preempt(int fd, unsigned ring, int num_children, int timeout)
+{
+	unsigned engines[16];
+	const char *names[16];
+	int num_engines = 0;
+	uint32_t ctx[2];
+
+	if (ring == ~0u) {
+		const struct intel_execution_engine *e;
+
+		for (e = intel_execution_engines; e->name; e++) {
+			if (e->exec_id == 0)
+				continue;
+
+			if (!gem_has_ring(fd, e->exec_id | e->flags))
+				continue;
+
+			if (e->exec_id == I915_EXEC_BSD) {
+				int is_bsd2 = e->flags != 0;
+				if (gem_has_bsd2(fd) != is_bsd2)
+					continue;
+			}
+
+			names[num_engines] = e->name;
+			engines[num_engines++] = e->exec_id | e->flags;
+			if (num_engines == ARRAY_SIZE(engines))
+				break;
+		}
+
+		num_children *= num_engines;
+	} else {
+		gem_require_ring(fd, ring);
+		names[num_engines] = NULL;
+		engines[num_engines++] = ring;
+	}
+
+	ctx[0] = gem_context_create(fd);
+	ctx_set_priority(fd, ctx[0], MIN_PRIO);
+
+	ctx[1] = gem_context_create(fd);
+	ctx_set_priority(fd, ctx[1], MAX_PRIO);
+
+	intel_detect_and_clear_missed_interrupts(fd);
+	igt_fork(child, num_children) {
+		const uint32_t bbe = MI_BATCH_BUFFER_END;
+		struct drm_i915_gem_exec_object2 object;
+		struct drm_i915_gem_execbuffer2 execbuf;
+		double start, elapsed;
+		unsigned long cycles;
+
+		memset(&object, 0, sizeof(object));
+		object.handle = gem_create(fd, 4096);
+		gem_write(fd, object.handle, 0, &bbe, sizeof(bbe));
+
+		memset(&execbuf, 0, sizeof(execbuf));
+		execbuf.buffers_ptr = to_user_pointer(&object);
+		execbuf.buffer_count = 1;
+		execbuf.flags = engines[child % num_engines];
+		execbuf.rsvd1 = ctx[1];
+		gem_execbuf(fd, &execbuf);
+
+		start = gettime();
+		cycles = 0;
+		do {
+			igt_spin_t *spin =
+				__igt_spin_batch_new(fd,
+						     ctx[0],
+						     execbuf.flags,
+						     0);
+
+			do {
+				gem_execbuf(fd, &execbuf);
+				gem_sync(fd, object.handle);
+			} while (++cycles & 1023);
+
+			igt_spin_batch_free(fd, spin);
+		} while ((elapsed = gettime() - start) < timeout);
+		igt_info("%s%sompleted %ld cycles: %.3f us\n",
+			 names[child % num_engines] ?: "",
+			 names[child % num_engines] ? " c" : "C",
+			 cycles, elapsed*1e6/cycles);
+
+		gem_close(fd, object.handle);
+	}
+	igt_waitchildren_timeout(timeout+10, NULL);
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+
+	gem_context_destroy(fd, ctx[1]);
+	gem_context_destroy(fd, ctx[0]);
+}
+
 static void print_welcome(int fd)
 {
 	bool active;
@@ -713,10 +833,32 @@ out:
 	close(dir);
 }
 
+static unsigned int has_scheduler(int fd)
+{
+	drm_i915_getparam_t gp;
+	unsigned int caps = 0;
+
+	gp.param = LOCAL_PARAM_HAS_SCHEDULER;
+	gp.value = (int *)&caps;
+	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	if (!caps)
+		return 0;
+
+	igt_info("Has kernel scheduler\n");
+	if (caps & HAS_PRIORITY)
+		igt_info(" - With priority sorting\n");
+	if (caps & HAS_PREEMPTION)
+		igt_info(" - With preemption enabled\n");
+
+	return caps;
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	unsigned int sched_caps = 0;
 	int fd = -1;
 
 	igt_skip_on_simulation();
@@ -725,6 +867,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 		print_welcome(fd);
+		sched_caps = has_scheduler(fd);
 
 		igt_fork_hang_detector(fd);
 	}
@@ -766,6 +909,21 @@ igt_main
 		sync_all(fd, ncpus, 150);
 	igt_subtest("forked-store-all")
 		store_all(fd, ncpus, 150);
+
+	igt_subtest_group {
+		igt_fixture {
+			igt_require(sched_caps & HAS_PRIORITY);
+			igt_require(sched_caps & HAS_PREEMPTION);
+		}
+
+		igt_subtest("preempt-all")
+			preempt(fd, -1, 1, 20);
+
+		for (e = intel_execution_engines; e->name; e++) {
+			igt_subtest_f("preempt-%s", e->name)
+				preempt(fd, e->exec_id | e->flags, ncpus, 150);
+		}
+	}
 
 	igt_fixture {
 		igt_stop_hang_detector();
