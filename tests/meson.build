@@ -152,6 +152,7 @@ test_progs = [
 	'kms_3d',
 	'kms_addfb_basic',
 	'kms_atomic',
+	'kms_atomic_interruptible',
 	'kms_atomic_transition',
 	'kms_busy',
 	'kms_ccs',
