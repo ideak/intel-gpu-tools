@@ -6,8 +6,8 @@ cat > Makefile <<EOF
 default: all
 
 build/build.ninja:
-	mkdir build
-	meson
+	mkdir -p build
+	meson build
 
 all: build/build.ninja
 	ninja -C build
