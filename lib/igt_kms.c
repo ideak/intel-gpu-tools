@@ -2097,7 +2097,22 @@ igt_atomic_prepare_plane_commit(igt_plane_t *plane, igt_pipe_t *pipe,
 	}
 }
 
-
+/*
+ * Properties that can be changed through legacy SetProperty:
+ * - Obviously not the XYWH SRC/CRTC coordinates.
+ * - Not CRTC_ID or FENCE_ID, done through SetPlane.
+ * - Can't set IN_FENCE_FD, that would be silly.
+ *
+ * Theoretically the above can all be set through the legacy path
+ * with the atomic cap set, but that's not how our legacy plane
+ * commit behaves, so blacklist it by default.
+ */
+#define LEGACY_PLANE_COMMIT_MASK \
+	(((1ULL << IGT_NUM_PLANE_PROPS) - 1) & \
+	 ~(IGT_PLANE_COORD_CHANGED_MASK | \
+	   (1ULL << IGT_PLANE_FB_ID) | \
+	   (1ULL << IGT_PLANE_CRTC_ID) | \
+	   (1ULL << IGT_PLANE_IN_FENCE_FD)))
 
 /*
  * Commit position and fb changes to a DRM plane via the SetPlane ioctl; if the
@@ -2111,7 +2126,7 @@ static int igt_drm_plane_commit(igt_plane_t *plane,
 {
 	igt_display_t *display = pipe->display;
 	uint32_t fb_id, crtc_id;
-	int ret;
+	int ret, i;
 	uint32_t src_x;
 	uint32_t src_y;
 	uint32_t src_w;
@@ -2120,6 +2135,7 @@ static int igt_drm_plane_commit(igt_plane_t *plane,
 	int32_t crtc_y;
 	uint32_t crtc_w;
 	uint32_t crtc_h;
+	uint64_t changed_mask;
 	bool setplane =
 		igt_plane_is_prop_changed(plane, IGT_PLANE_FB_ID) ||
 		plane->changed & IGT_PLANE_COORD_CHANGED_MASK;
@@ -2184,10 +2200,21 @@ static int igt_drm_plane_commit(igt_plane_t *plane,
 		CHECK_RETURN(ret, fail_on_error);
 	}
 
-	if (igt_plane_is_prop_changed(plane, IGT_PLANE_ROTATION)) {
+	changed_mask = plane->changed & LEGACY_PLANE_COMMIT_MASK;
+
+	for (i = 0; i < IGT_NUM_PLANE_PROPS; i++) {
+		if (!(changed_mask & (1 << i)))
+			continue;
+
+		LOG(display, "SetProp plane %s.%d \"%s\" to 0x%"PRIx64"/%"PRIi64"\n",
+			kmstest_pipe_name(pipe->pipe), plane->index, igt_plane_prop_names[i],
+			plane->values[i], plane->values[i]);
+
+		igt_assert(plane->props[i]);
+
 		ret = igt_plane_set_property(plane,
-					     plane->props[IGT_PLANE_ROTATION],
-					     plane->values[IGT_PLANE_ROTATION]);
+					     plane->props[i],
+					     plane->values[i]);
 
 		CHECK_RETURN(ret, fail_on_error);
 	}
@@ -2555,7 +2582,7 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 				if (s != COMMIT_LEGACY ||
 				    !(plane->type == DRM_PLANE_TYPE_PRIMARY ||
 				      plane->type == DRM_PLANE_TYPE_CURSOR))
-					igt_plane_clear_prop_changed(plane, IGT_PLANE_ROTATION);
+					plane->changed &= ~LEGACY_PLANE_COMMIT_MASK;
 			}
 		}
 	}
