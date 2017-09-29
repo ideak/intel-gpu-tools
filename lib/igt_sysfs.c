@@ -463,7 +463,7 @@ uint32_t igt_sysfs_get_u32(int dir, const char *attr)
  */
 bool igt_sysfs_set_u32(int dir, const char *attr, uint32_t value)
 {
-	return igt_sysfs_printf(dir, attr, "%u", value) == 1;
+	return igt_sysfs_printf(dir, attr, "%u", value) > 0;
 }
 
 /**
