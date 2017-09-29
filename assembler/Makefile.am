@@ -153,6 +153,7 @@ CLEANFILES = $(BUILT_SOURCES) \
 EXTRA_DIST = \
 	README \
 	TODO \
+	meson.build \
 	intel-gen4asm.pc.in \
 	$(test_EXTRA_DIST) \
 	$(NULL)

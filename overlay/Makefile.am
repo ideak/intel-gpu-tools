@@ -67,4 +67,7 @@ intel_gpu_overlay_SOURCES += $(both_x11_sources)
 
 intel_gpu_overlay_LDADD = $(LDADD) -lrt
 
-EXTRA_DIST=README
+EXTRA_DIST= \
+	README \
+	meson.build \
+	$(NULL)

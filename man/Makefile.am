@@ -22,7 +22,13 @@ if HAVE_RST2MAN
 appman_DATA = $(appman_RST:rst=$(APP_MAN_SUFFIX))
 endif
 
-EXTRA_DIST = $(appman_RST)
+EXTRA_DIST = \
+	$(appman_RST) \
+	defs.rst.in \
+	meson.build \
+	rst2man.sh \
+	$(NULL)
+
 CLEANFILES = $(appman_DATA) defs.rst
 
 SUFFIXES = .$(APP_MAN_SUFFIX)

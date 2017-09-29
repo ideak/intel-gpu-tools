@@ -75,7 +75,12 @@ all-local: .gitignore
 	@echo "$(pkglibexec_PROGRAMS) $(HANG) test-list.txt test-list-full.txt /.gitignore" | sed 's/\s\+/\n/g' | sort > $@
 
 EXTRA_PROGRAMS = $(HANG)
-EXTRA_DIST = $(common_files) $(check_SCRIPTS)
+EXTRA_DIST = \
+	$(common_files) \
+	$(check_SCRIPTS) \
+	generate_testlist.sh \
+	meson.build \
+	$(NULL)
 
 CLEANFILES = $(EXTRA_PROGRAMS) test-list.txt test-list-full.txt .gitignore
 

@@ -33,3 +33,6 @@ intel_aubdump_la_LIBADD = $(top_builddir)/lib/libintel_tools.la -ldl
 bin_SCRIPTS = intel_aubdump
 CLEANFILES = $(bin_SCRIPTS)
 
+EXTRA_DIST = \
+	meson.build \
+	$(NULL)

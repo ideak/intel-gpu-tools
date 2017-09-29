@@ -28,3 +28,7 @@ states: intel_null_state_gen
 		echo "" >>$(h); \
 		./intel_null_state_gen $$gen >>$(h); \
 	done
+
+EXTRA_DIST = \
+	meson.build \
+	$(NULL)
