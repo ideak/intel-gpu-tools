@@ -402,6 +402,7 @@ AC_SUBST(REGISTER_FILES)
 AC_CONFIG_FILES([
 		 Makefile
 		 benchmarks/Makefile
+		 benchmarks/ezbench.d/Makefile
 		 benchmarks/wsim/Makefile
 		 docs/Makefile
 		 docs/reference/Makefile

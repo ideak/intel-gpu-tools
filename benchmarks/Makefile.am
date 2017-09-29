@@ -1,6 +1,6 @@
 include Makefile.sources
 
-SUBDIRS = wsim
+SUBDIRS = wsim ezbench.d
 
 benchmarks_PROGRAMS = $(benchmarks_prog_list)
 
