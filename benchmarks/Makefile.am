@@ -1,5 +1,7 @@
 include Makefile.sources
 
+SUBDIRS = wsim
+
 benchmarks_PROGRAMS = $(benchmarks_prog_list)
 
 if HAVE_LIBDRM_INTEL
