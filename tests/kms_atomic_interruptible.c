@@ -21,6 +21,8 @@
  * IN THE SOFTWARE.
  */
 
+#include <signal.h>
+
 #include "igt.h"
 #include "drmtest.h"
 #include "sw_sync.h"
