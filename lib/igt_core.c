@@ -55,7 +55,9 @@
 #include <limits.h>
 #include <locale.h>
 #include <uwildmat/uwildmat.h>
+#ifdef HAVE_GLIB
 #include <glib.h>
+#endif
 
 #include "drmtest.h"
 #include "intel_chipset.h"
@@ -67,6 +69,7 @@
 #include "igt_core.h"
 #include "igt_aux.h"
 #include "igt_sysfs.h"
+#include "igt_rc.h"
 
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>   /* for basename() on Solaris */

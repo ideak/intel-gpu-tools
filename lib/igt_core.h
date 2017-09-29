@@ -40,7 +40,6 @@
 #include <stdarg.h>
 #include <getopt.h>
 #include <unistd.h>
-#include <glib.h>
 
 #ifndef IGT_LOG_DOMAIN
 #define IGT_LOG_DOMAIN (NULL)
@@ -49,7 +48,6 @@
 
 extern const char* __igt_test_description __attribute__((weak));
 extern bool __igt_plain_output;
-extern GKeyFile *igt_key_file;
 extern char *igt_frame_dump_path;
 
 /**

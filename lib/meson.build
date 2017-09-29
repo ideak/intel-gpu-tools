@@ -13,6 +13,7 @@ lib_headers = [
 	'igt_gvt.h',
 	'igt_primes.h',
 	'igt_rand.h',
+	'igt_rc.h',
 	'igt_stats.h',
 	'igt_sysfs.h',
 	'igt_x86.h',

@@ -40,6 +40,7 @@
 #include "igt_aux.h"
 #include "igt_kms.h"
 #include "igt_frame.h"
+#include "igt_rc.h"
 
 /**
  * SECTION:igt_chamelium
