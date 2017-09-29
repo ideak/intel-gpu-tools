@@ -138,6 +138,7 @@ sync_ring(int fd, unsigned ring, int num_children, int timeout)
 		execbuf.buffer_count = 1;
 		execbuf.flags = engines[child % num_engines];
 		gem_execbuf(fd, &execbuf);
+		gem_sync(fd, object.handle);
 
 		start = gettime();
 		cycles = 0;
@@ -553,6 +554,7 @@ sync_all(int fd, int num_children, int timeout)
 		execbuf.buffers_ptr = to_user_pointer(&object);
 		execbuf.buffer_count = 1;
 		gem_execbuf(fd, &execbuf);
+		gem_sync(fd, object.handle);
 
 		start = gettime();
 		cycles = 0;
@@ -773,6 +775,7 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 		execbuf.flags = engines[child % num_engines];
 		execbuf.rsvd1 = ctx[1];
 		gem_execbuf(fd, &execbuf);
+		gem_sync(fd, object.handle);
 
 		start = gettime();
 		cycles = 0;
