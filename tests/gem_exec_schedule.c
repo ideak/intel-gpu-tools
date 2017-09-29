@@ -26,6 +26,7 @@
 #include <sys/poll.h>
 #include <sys/ioctl.h>
 #include <sched.h>
+#include <signal.h>
 
 #include "igt.h"
 #include "igt_vgem.h"
