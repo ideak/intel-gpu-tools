@@ -168,11 +168,25 @@ static int workaround_fail_count(int fd, uint32_t ctx)
 	return fail_count;
 }
 
+static int reopen(int fd)
+{
+	char path[256];
+
+	snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
+	fd = open(path, O_RDWR);
+	igt_assert_lte(0, fd);
+
+	return fd;
+}
+
 #define CONTEXT 0x1
+#define FD 0x2
 static void check_workarounds(int fd, enum operation op, unsigned int flags)
 {
 	uint32_t ctx = 0;
 
+	if (flags & FD)
+		fd = reopen(fd);
 	if (flags & CONTEXT)
 		ctx = gem_context_create(fd);
 
@@ -198,6 +212,8 @@ static void check_workarounds(int fd, enum operation op, unsigned int flags)
 
 	if (flags & CONTEXT)
 		gem_context_destroy(fd, ctx);
+	if (flags & FD)
+		close(fd);
 }
 
 igt_main
@@ -248,15 +264,24 @@ igt_main
 	igt_subtest("basic-read-context")
 		check_workarounds(device, SIMPLE_READ, CONTEXT);
 
+	igt_subtest("basic-read-fd")
+		check_workarounds(device, SIMPLE_READ, FD);
+
 	igt_subtest("reset")
 		check_workarounds(device, GPU_RESET, 0);
 
 	igt_subtest("reset-context")
 		check_workarounds(device, GPU_RESET, CONTEXT);
 
+	igt_subtest("reset-fd")
+		check_workarounds(device, GPU_RESET, FD);
+
 	igt_subtest("suspend-resume")
 		check_workarounds(device, SUSPEND_RESUME, 0);
 
 	igt_subtest("suspend-resume-context")
 		check_workarounds(device, SUSPEND_RESUME, CONTEXT);
+
+	igt_subtest("suspend-resume-fd")
+		check_workarounds(device, SUSPEND_RESUME, FD);
 }
