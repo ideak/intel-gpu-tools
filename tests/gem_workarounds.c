@@ -37,6 +37,7 @@ static int gen;
 enum operation {
 	GPU_RESET,
 	SUSPEND_RESUME,
+	HIBERNATE_RESUME,
 	SIMPLE_READ,
 };
 
@@ -63,12 +64,6 @@ static struct write_only_list {
 
 static struct intel_wa_reg *wa_regs;
 static int num_wa_regs;
-
-static void test_suspend_resume(void)
-{
-	igt_info("Suspending the device ...\n");
-	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
-}
 
 static bool write_only(const uint32_t addr)
 {
@@ -198,7 +193,13 @@ static void check_workarounds(int fd, enum operation op, unsigned int flags)
 		break;
 
 	case SUSPEND_RESUME:
-		test_suspend_resume();
+		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
+					      SUSPEND_TEST_NONE);
+		break;
+
+	case HIBERNATE_RESUME:
+		igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
+					      SUSPEND_TEST_NONE);
 		break;
 
 	case SIMPLE_READ:
@@ -226,6 +227,7 @@ igt_main
 		{ "basic-read", SIMPLE_READ },
 		{ "reset", GPU_RESET },
 		{ "suspend-resume", SUSPEND_RESUME },
+		{ "hibernate-resume", HIBERNATE_RESUME },
 		{ }
 	}, *op;
 	const struct {
