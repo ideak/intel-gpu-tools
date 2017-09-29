@@ -18,6 +18,7 @@ endif
 
 if !HAVE_LIBDRM_INTEL
     libintel_tools_la_SOURCES += 	\
+        stubs/drm/intel_aub.h		\
         stubs/drm/intel_bufmgr.c	\
         stubs/drm/intel_bufmgr.h
 endif
