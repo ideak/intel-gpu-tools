@@ -219,6 +219,24 @@ static void check_workarounds(int fd, enum operation op, unsigned int flags)
 igt_main
 {
 	int device = -1;
+	const struct {
+		const char *name;
+		enum operation op;
+	} ops[] =   {
+		{ "basic-read", SIMPLE_READ },
+		{ "reset", GPU_RESET },
+		{ "suspend-resume", SUSPEND_RESUME },
+		{ }
+	}, *op;
+	const struct {
+		const char *name;
+		unsigned int flags;
+	} modes[] =   {
+		{ "", 0 },
+		{ "-context", CONTEXT },
+		{ "-fd", FD },
+		{ }
+	}, *m;
 
 	igt_fixture {
 		FILE *file;
@@ -258,30 +276,10 @@ igt_main
 		close(fd);
 	}
 
-	igt_subtest("basic-read")
-		check_workarounds(device, SIMPLE_READ, 0);
-
-	igt_subtest("basic-read-context")
-		check_workarounds(device, SIMPLE_READ, CONTEXT);
-
-	igt_subtest("basic-read-fd")
-		check_workarounds(device, SIMPLE_READ, FD);
-
-	igt_subtest("reset")
-		check_workarounds(device, GPU_RESET, 0);
-
-	igt_subtest("reset-context")
-		check_workarounds(device, GPU_RESET, CONTEXT);
-
-	igt_subtest("reset-fd")
-		check_workarounds(device, GPU_RESET, FD);
-
-	igt_subtest("suspend-resume")
-		check_workarounds(device, SUSPEND_RESUME, 0);
-
-	igt_subtest("suspend-resume-context")
-		check_workarounds(device, SUSPEND_RESUME, CONTEXT);
-
-	igt_subtest("suspend-resume-fd")
-		check_workarounds(device, SUSPEND_RESUME, FD);
+	for (op = ops; op->name; op++) {
+		for (m = modes; m->name; m++) {
+			igt_subtest_f("%s%s", op->name, m->name)
+				check_workarounds(device, op->op, m->flags);
+		}
+	}
 }
