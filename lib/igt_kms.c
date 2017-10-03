@@ -187,7 +187,8 @@ const char *igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
 const char *igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	"scaling mode",
 	"CRTC_ID",
-	"DPMS"
+	"DPMS",
+	"Broadcast RGB"
 };
 
 /*
@@ -1038,40 +1039,6 @@ void kmstest_set_connector_dpms(int fd, drmModeConnector *connector, int mode)
 }
 
 /**
- * kmstest_set_connector_broadcast_rgb:
- * @fd: DRM fd
- * @connector: libdrm connector
- * @mode: Broadcast RGB mode
- *
- * This function sets the Broadcast RGB prop of @connector to @mode, if there
- * is one.
- *
- * Returns: true if we found and set the Broadcast RGB prop, false otherwise
- */
-bool kmstest_set_connector_broadcast_rgb(int fd, drmModeConnector *connector,
-					 enum kmstest_broadcast_rgb_mode mode)
-{
-	uint32_t prop_id;
-	int ret;
-
-	ret = kmstest_get_property(fd, connector->connector_id,
-				   DRM_MODE_OBJECT_CONNECTOR, "Broadcast RGB",
-				   &prop_id, NULL, NULL);
-	if (!ret) {
-		igt_debug("Broadcast RGB property not found on %d\n",
-			  connector->connector_id);
-		return false;
-	}
-
-	igt_debug("Setting Broadcast RGB mode on connector %d to %d\n",
-		  connector->connector_id, mode);
-	ret = drmModeConnectorSetProperty(fd, connector->connector_id, prop_id,
-					  mode);
-
-	return ret == 0;
-}
-
-/**
  * kmstest_get_property:
  * @drm_fd: drm file descriptor
  * @object_id: object whose properties we're going to get
@@ -1583,9 +1550,10 @@ static void igt_output_refresh(igt_output_t *output)
 		igt_atomic_fill_connector_props(display, output,
 			IGT_NUM_CONNECTOR_PROPS, igt_connector_prop_names);
 
-		kmstest_set_connector_broadcast_rgb(display->drm_fd,
-						    output->config.connector,
-						    BROADCAST_RGB_FULL);
+		if (output->props[IGT_CONNECTOR_BROADCAST_RGB])
+			igt_output_set_prop_value(output,
+						  IGT_CONNECTOR_BROADCAST_RGB,
+						  BROADCAST_RGB_FULL);
 	}
 
 	LOG(display, "%s: Selecting pipe %s\n", output->name,

@@ -466,9 +466,6 @@ enable_output(data_t *data,
 	igt_pipe_obj_replace_prop_blob(primary->pipe, IGT_CRTC_GAMMA_LUT, NULL, 0);
 	igt_pipe_obj_replace_prop_blob(primary->pipe, IGT_CRTC_CTM, NULL, 0);
 
-	kmstest_set_connector_broadcast_rgb(display->drm_fd, connector,
-					    BROADCAST_RGB_FULL);
-
 	igt_display_commit(display);
 
 	if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
