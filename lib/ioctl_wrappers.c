@@ -551,7 +551,7 @@ uint32_t gem_create_stolen(int fd, uint64_t size)
 	return create.handle;
 }
 
-int __gem_create(int fd, int size, uint32_t *handle)
+int __gem_create(int fd, uint64_t size, uint32_t *handle)
 {
 	struct drm_i915_gem_create create = {
 		.size = size,

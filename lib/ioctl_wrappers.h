@@ -73,7 +73,7 @@ void gem_sync(int fd, uint32_t handle);
 bool gem_create__has_stolen_support(int fd);
 uint32_t __gem_create_stolen(int fd, uint64_t size);
 uint32_t gem_create_stolen(int fd, uint64_t size);
-int __gem_create(int fd, int size, uint32_t *handle);
+int __gem_create(int fd, uint64_t size, uint32_t *handle);
 uint32_t gem_create(int fd, uint64_t size);
 void gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf);
 int __gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf);
