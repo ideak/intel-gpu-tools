@@ -95,10 +95,9 @@ static void invalid_flag_test(int fd)
 
 static void invalid_size_test(int fd)
 {
-	int handle;
+	uint32_t handle;
 
-	handle = __gem_create(fd, 0);
-	igt_assert(!handle);
+	igt_assert_eq(__gem_create(fd, 0, &handle), -EINVAL);
 }
 
 /*

@@ -551,22 +551,20 @@ uint32_t gem_create_stolen(int fd, uint64_t size)
 	return create.handle;
 }
 
-
-uint32_t __gem_create(int fd, int size)
+int __gem_create(int fd, int size, uint32_t *handle)
 {
-	struct drm_i915_gem_create create;
-	int ret;
+	struct drm_i915_gem_create create = {
+		.size = size,
+	};
+	int err = 0;
 
-	memset(&create, 0, sizeof(create));
-	create.handle = 0;
-	create.size = size;
-	ret = igt_ioctl(fd, DRM_IOCTL_I915_GEM_CREATE, &create);
-
-	if (ret < 0)
-		return 0;
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CREATE, &create) == 0)
+		*handle = create.handle;
+	else
+		err = -errno;
 
 	errno = 0;
-	return create.handle;
+	return err;
 }
 
 /**
@@ -581,15 +579,11 @@ uint32_t __gem_create(int fd, int size)
  */
 uint32_t gem_create(int fd, uint64_t size)
 {
-	struct drm_i915_gem_create create;
+	uint32_t handle;
 
-	memset(&create, 0, sizeof(create));
-	create.handle = 0;
-	create.size = size;
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_CREATE, &create);
-	igt_assert(create.handle);
+	igt_assert_eq(__gem_create(fd, size, &handle), 0);
 
-	return create.handle;
+	return handle;
 }
 
 /**

@@ -78,8 +78,7 @@ igt_simple_main
 			if (tmp_fd >= 0 && i < FD_ARR_SZ)
 				fd_arr[i] = tmp_fd;
 
-			handle = __gem_create(fd, 4096);
-			if (handle)
+			if (__gem_create(fd, 4096, &handle) == 0)
 				gem_close(fd, handle);
 
 
