@@ -2336,7 +2336,7 @@ static int igt_primary_plane_commit_legacy(igt_plane_t *primary,
 		return 0;
 
 	crtc_id = pipe->crtc_id;
-	fb_id = igt_plane_get_fb_id(primary);
+	fb_id = output ? igt_plane_get_fb_id(primary) : 0;
 	if (fb_id)
 		mode = igt_output_get_mode(output);
 	else
