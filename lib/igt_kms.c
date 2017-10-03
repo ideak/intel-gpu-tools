@@ -2443,8 +2443,88 @@ static int igt_output_commit(igt_output_t *output,
 	return 0;
 }
 
-static void
-igt_pipe_replace_blob(igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop, void *ptr, size_t length)
+/**
+ * igt_plane_replace_prop_blob:
+ * @plane: plane to set property on.
+ * @prop: property for which the blob will be replaced.
+ * @ptr: Pointer to contents for the property.
+ * @length: Length of contents.
+ *
+ * This function will destroy the old property blob for the given property,
+ * and will create a new property blob with the values passed to this function.
+ *
+ * The new property blob will be committed when you call igt_display_commit(),
+ * igt_display_commit2() or igt_display_commit_atomic().
+ */
+void
+igt_plane_replace_prop_blob(igt_plane_t *plane, enum igt_atomic_plane_properties prop, const void *ptr, size_t length)
+{
+	igt_display_t *display = plane->pipe->display;
+	uint64_t *blob = &plane->values[prop];
+	uint32_t blob_id = 0;
+
+	if (*blob != 0)
+		igt_assert(drmModeDestroyPropertyBlob(display->drm_fd,
+						      *blob) == 0);
+
+	if (length > 0)
+		igt_assert(drmModeCreatePropertyBlob(display->drm_fd,
+						     ptr, length, &blob_id) == 0);
+
+	*blob = blob_id;
+	igt_plane_set_prop_changed(plane, prop);
+}
+
+/**
+ * igt_output_replace_prop_blob:
+ * @output: output to set property on.
+ * @prop: property for which the blob will be replaced.
+ * @ptr: Pointer to contents for the property.
+ * @length: Length of contents.
+ *
+ * This function will destroy the old property blob for the given property,
+ * and will create a new property blob with the values passed to this function.
+ *
+ * The new property blob will be committed when you call igt_display_commit(),
+ * igt_display_commit2() or igt_display_commit_atomic().
+ */
+void
+igt_output_replace_prop_blob(igt_output_t *output, enum igt_atomic_connector_properties prop, const void *ptr, size_t length)
+{
+	igt_display_t *display = output->display;
+	uint64_t *blob = &output->values[prop];
+	uint32_t blob_id = 0;
+
+	if (*blob != 0)
+		igt_assert(drmModeDestroyPropertyBlob(display->drm_fd,
+						      *blob) == 0);
+
+	if (length > 0)
+		igt_assert(drmModeCreatePropertyBlob(display->drm_fd,
+						     ptr, length, &blob_id) == 0);
+
+	*blob = blob_id;
+	igt_output_set_prop_changed(output, prop);
+}
+
+/**
+ * igt_pipe_obj_replace_prop_blob:
+ * @pipe: pipe to set property on.
+ * @prop: property for which the blob will be replaced.
+ * @ptr: Pointer to contents for the property.
+ * @length: Length of contents.
+ *
+ * This function will destroy the old property blob for the given property,
+ * and will create a new property blob with the values passed to this function.
+ *
+ * The new property blob will be committed when you call igt_display_commit(),
+ * igt_display_commit2() or igt_display_commit_atomic().
+ *
+ * Please use igt_output_override_mode() if you want to set #IGT_CRTC_MODE_ID,
+ * it works better with legacy commit.
+ */
+void
+igt_pipe_obj_replace_prop_blob(igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop, const void *ptr, size_t length)
 {
 	igt_display_t *display = pipe->display;
 	uint64_t *blob = &pipe->values[prop];
@@ -2836,7 +2916,7 @@ void igt_output_override_mode(igt_output_t *output, drmModeModeInfo *mode)
 
 	if (pipe) {
 		if (output->display->is_atomic)
-			igt_pipe_replace_blob(pipe, IGT_CRTC_MODE_ID, igt_output_get_mode(output), sizeof(*mode));
+			igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_MODE_ID, igt_output_get_mode(output), sizeof(*mode));
 		else
 			igt_pipe_obj_set_prop_changed(pipe, IGT_CRTC_MODE_ID);
 	}
@@ -2865,7 +2945,7 @@ void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 		old_output = igt_pipe_get_output(old_pipe);
 		if (!old_output) {
 			if (display->is_atomic)
-				igt_pipe_replace_blob(old_pipe, IGT_CRTC_MODE_ID, NULL, 0);
+				igt_pipe_obj_replace_prop_blob(old_pipe, IGT_CRTC_MODE_ID, NULL, 0);
 			else
 				igt_pipe_obj_set_prop_changed(old_pipe, IGT_CRTC_MODE_ID);
 
@@ -2879,7 +2959,7 @@ void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 
 	if (pipe_obj) {
 		if (display->is_atomic)
-			igt_pipe_replace_blob(pipe_obj, IGT_CRTC_MODE_ID, igt_output_get_mode(output), sizeof(drmModeModeInfo));
+			igt_pipe_obj_replace_prop_blob(pipe_obj, IGT_CRTC_MODE_ID, igt_output_get_mode(output), sizeof(drmModeModeInfo));
 		else
 			igt_pipe_obj_set_prop_changed(pipe_obj, IGT_CRTC_MODE_ID);
 
@@ -2908,16 +2988,9 @@ void igt_pipe_refresh(igt_display_t *display, enum pipe pipe, bool force)
 
 		pipe_obj->values[IGT_CRTC_MODE_ID] = 0;
 		if (output)
-			igt_pipe_replace_blob(pipe_obj, IGT_CRTC_MODE_ID, igt_output_get_mode(output), sizeof(drmModeModeInfo));
+			igt_pipe_obj_replace_prop_blob(pipe_obj, IGT_CRTC_MODE_ID, igt_output_get_mode(output), sizeof(drmModeModeInfo));
 	} else
 		igt_pipe_obj_set_prop_changed(pipe_obj, IGT_CRTC_MODE_ID);
-}
-
-void igt_output_set_scaling_mode(igt_output_t *output, uint64_t scaling_mode)
-{
-	igt_output_set_prop_value(output, IGT_CONNECTOR_SCALING_MODE, scaling_mode);
-
-	igt_require(output->props[IGT_CONNECTOR_SCALING_MODE]);
 }
 
 igt_plane_t *igt_output_get_plane(igt_output_t *output, int plane_idx)
@@ -3117,24 +3190,6 @@ void igt_plane_set_rotation(igt_plane_t *plane, igt_rotation_t rotation)
 void igt_pipe_request_out_fence(igt_pipe_t *pipe)
 {
 	igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_OUT_FENCE_PTR, (ptrdiff_t)&pipe->out_fence_fd);
-}
-
-void
-igt_pipe_set_degamma_lut(igt_pipe_t *pipe, void *ptr, size_t length)
-{
-	igt_pipe_replace_blob(pipe, IGT_CRTC_DEGAMMA_LUT, ptr, length);
-}
-
-void
-igt_pipe_set_ctm_matrix(igt_pipe_t *pipe, void *ptr, size_t length)
-{
-	igt_pipe_replace_blob(pipe, IGT_CRTC_CTM, ptr, length);
-}
-
-void
-igt_pipe_set_gamma_lut(igt_pipe_t *pipe, void *ptr, size_t length)
-{
-	igt_pipe_replace_blob(pipe, IGT_CRTC_GAMMA_LUT, ptr, length);
 }
 
 /**

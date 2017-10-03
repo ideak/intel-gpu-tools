@@ -366,7 +366,6 @@ const char *igt_output_name(igt_output_t *output);
 drmModeModeInfo *igt_output_get_mode(igt_output_t *output);
 void igt_output_override_mode(igt_output_t *output, drmModeModeInfo *mode);
 void igt_output_set_pipe(igt_output_t *output, enum pipe pipe);
-void igt_output_set_scaling_mode(igt_output_t *output, uint64_t scaling_mode);
 igt_plane_t *igt_output_get_plane(igt_output_t *output, int plane_idx);
 igt_plane_t *igt_output_get_plane_type(igt_output_t *output, int plane_type);
 igt_output_t *igt_output_from_connector(igt_display_t *display,
@@ -381,9 +380,6 @@ static inline bool igt_plane_supports_rotation(igt_plane_t *plane)
 	return plane->props[IGT_PLANE_ROTATION] != 0;
 }
 void igt_pipe_request_out_fence(igt_pipe_t *pipe);
-void igt_pipe_set_degamma_lut(igt_pipe_t *pipe, void *ptr, size_t length);
-void igt_pipe_set_ctm_matrix(igt_pipe_t *pipe, void *ptr, size_t length);
-void igt_pipe_set_gamma_lut(igt_pipe_t *pipe, void *ptr, size_t length);
 
 void igt_plane_set_fb(igt_plane_t *plane, struct igt_fb *fb);
 void igt_plane_set_fence_fd(igt_plane_t *plane, int fence_fd);
@@ -513,6 +509,10 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 		igt_plane_set_prop_changed(plane, prop); \
 	} while (0)
 
+extern void igt_plane_replace_prop_blob(igt_plane_t *plane,
+					enum igt_atomic_plane_properties prop,
+					const void *ptr, size_t length);
+
 #define igt_output_is_prop_changed(output, prop) \
 	(!!((output)->changed & (1 << (prop))))
 #define igt_output_set_prop_changed(output, prop) \
@@ -526,6 +526,10 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 		(output)->values[prop] = (value); \
 		igt_output_set_prop_changed(output, prop); \
 	} while (0)
+
+extern void igt_output_replace_prop_blob(igt_output_t *output,
+					 enum igt_atomic_connector_properties prop,
+					 const void *ptr, size_t length);
 
 #define igt_pipe_obj_is_prop_changed(pipe_obj, prop) \
 	(!!((pipe_obj)->changed & (1 << (prop))))
@@ -553,6 +557,13 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 
 #define igt_pipe_set_prop_value(display, pipe, prop, value) \
 	igt_pipe_obj_set_prop_value(&(display)->pipes[(pipe)], prop, value)
+
+extern void igt_pipe_obj_replace_prop_blob(igt_pipe_t *pipe_obj,
+					   enum igt_atomic_crtc_properties prop,
+					   const void *ptr, size_t length);
+
+#define igt_pipe_replace_prop_blob(display, pipe, prop, ptr, length) \
+	igt_pipe_obj_replace_prop_blob(&(display)->pipes[(pipe)], prop, ptr, length)
 
 void igt_pipe_refresh(igt_display_t *display, enum pipe pipe, bool force);
 

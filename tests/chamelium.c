@@ -462,9 +462,9 @@ enable_output(data_t *data,
 	igt_output_set_pipe(output, output->config.pipe);
 
 	/* Clear any color correction values that might be enabled */
-	igt_pipe_set_degamma_lut(primary->pipe, NULL, 0);
-	igt_pipe_set_gamma_lut(primary->pipe, NULL, 0);
-	igt_pipe_set_ctm_matrix(primary->pipe, NULL, 0);
+	igt_pipe_obj_replace_prop_blob(primary->pipe, IGT_CRTC_DEGAMMA_LUT, NULL, 0);
+	igt_pipe_obj_replace_prop_blob(primary->pipe, IGT_CRTC_GAMMA_LUT, NULL, 0);
+	igt_pipe_obj_replace_prop_blob(primary->pipe, IGT_CRTC_CTM, NULL, 0);
 
 	kmstest_set_connector_broadcast_rgb(display->drm_fd, connector,
 					    BROADCAST_RGB_FULL);

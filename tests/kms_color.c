@@ -189,7 +189,7 @@ static void set_degamma(data_t *data,
 						   data->degamma_lut_size,
 						   data->color_depth, 0);
 
-	igt_pipe_set_degamma_lut(pipe, lut, size);
+	igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_DEGAMMA_LUT, lut, size);
 
 	free(lut);
 }
@@ -204,7 +204,7 @@ static void set_gamma(data_t *data,
 						   data->gamma_lut_size,
 						   data->color_depth, 0);
 
-	igt_pipe_set_gamma_lut(pipe, lut, size);
+		igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_GAMMA_LUT, lut, size);
 
 	free(lut);
 }
@@ -224,12 +224,12 @@ static void set_ctm(igt_pipe_t *pipe, const double *coefficients)
 				(int64_t) (coefficients[i] * ((int64_t) 1L << 32));
 	}
 
-	igt_pipe_set_ctm_matrix(pipe, &ctm, sizeof(ctm));
+	igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_CTM, &ctm, sizeof(ctm));
 }
 
-#define disable_degamma(pipe) igt_pipe_set_degamma_lut(pipe, NULL, 0)
-#define disable_gamma(pipe) igt_pipe_set_gamma_lut(pipe, NULL, 0)
-#define disable_ctm(pipe) igt_pipe_set_ctm_matrix(pipe, NULL, 0)
+#define disable_degamma(pipe) igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_DEGAMMA_LUT, NULL, 0)
+#define disable_gamma(pipe) igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_GAMMA_LUT, NULL, 0)
+#define disable_ctm(pipe) igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_CTM, NULL, 0)
 
 static void output_set_property_enum(igt_output_t *output,
 				     const char *property,
