@@ -342,7 +342,8 @@ static void test_pipe_degamma(data_t *data,
 		 */
 		igt_assert_crc_equal(&crc_fullgamma, &crc_fullcolors);
 
-		igt_output_set_pipe(output, PIPE_ANY);
+		igt_plane_set_fb(primary, NULL);
+		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
 	free(degamma_linear);
@@ -420,7 +421,8 @@ static void test_pipe_gamma(data_t *data,
 		 */
 		igt_assert_crc_equal(&crc_fullgamma, &crc_fullcolors);
 
-		igt_output_set_pipe(output, PIPE_ANY);
+		igt_plane_set_fb(primary, NULL);
+		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
 	free(gamma_full);
@@ -519,7 +521,8 @@ static void test_pipe_legacy_gamma(data_t *data,
 						  legacy_lut_size, red_lut, green_lut, blue_lut), 0);
 		igt_display_commit(&data->display);
 
-		igt_output_set_pipe(output, PIPE_ANY);
+		igt_plane_set_fb(primary, NULL);
+		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
 	free(red_lut);
@@ -645,7 +648,8 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 				   lut[i].blue == 0xffff);
 		drmModeFreePropertyBlob(blob);
 
-		igt_output_set_pipe(output, PIPE_ANY);
+		igt_plane_set_fb(primary, NULL);
+		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
 	free(degamma_linear);
@@ -731,7 +735,8 @@ static bool test_pipe_ctm(data_t *data,
 		 */
 		ret &= crc_equal(&crc_software, &crc_hardware);
 
-		igt_output_set_pipe(output, PIPE_ANY);
+		igt_plane_set_fb(primary, NULL);
+		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
 	free(degamma_linear);
@@ -827,7 +832,8 @@ static void test_pipe_limited_range_ctm(data_t *data,
 		 */
 		igt_assert_crc_equal(&crc_full, &crc_limited);
 
-		igt_output_set_pipe(output, PIPE_ANY);
+		igt_plane_set_fb(primary, NULL);
+		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
 	free(gamma_linear);
