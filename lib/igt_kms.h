@@ -503,6 +503,8 @@ igt_plane_has_prop(igt_plane_t *plane, enum igt_atomic_plane_properties prop)
 	return plane->props[prop];
 }
 
+uint64_t igt_plane_get_prop(igt_plane_t *plane, enum igt_atomic_plane_properties prop);
+
 #define igt_plane_is_prop_changed(plane, prop) \
 	(!!((plane)->changed & (1 << (prop))))
 
@@ -536,6 +538,8 @@ igt_output_has_prop(igt_output_t *output, enum igt_atomic_connector_properties p
 	return output->props[prop];
 }
 
+uint64_t igt_output_get_prop(igt_output_t *output, enum igt_atomic_connector_properties prop);
+
 #define igt_output_is_prop_changed(output, prop) \
 	(!!((output)->changed & (1 << (prop))))
 #define igt_output_set_prop_changed(output, prop) \
@@ -566,6 +570,26 @@ static inline bool
 igt_pipe_obj_has_prop(igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop)
 {
 	return pipe->props[prop];
+}
+
+uint64_t igt_pipe_obj_get_prop(igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop);
+
+/**
+ * igt_pipe_get_prop - Return current value on a pipe for a given property.
+ *
+ * @display: Pointer to display.
+ * @pipe: Target pipe.
+ * @prop: Property to return.
+ *
+ * Returns: The value the property is set to, if this
+ * is a blob, the blob id is returned. This can be passed
+ * to drmModeGetPropertyBlob() to get the contents of the blob.
+ */
+static inline uint64_t
+igt_pipe_get_prop(igt_display_t *display, enum pipe pipe,
+		  enum igt_atomic_crtc_properties prop)
+{
+	return igt_pipe_obj_get_prop(&display->pipes[pipe], prop);
 }
 
 /**

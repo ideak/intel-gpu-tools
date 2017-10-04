@@ -2407,6 +2407,51 @@ static int igt_output_commit(igt_output_t *output,
 	return 0;
 }
 
+static uint64_t igt_mode_object_get_prop(igt_display_t *display,
+					 uint32_t object_type,
+					 uint32_t object_id,
+					 uint32_t prop)
+{
+	drmModeObjectPropertiesPtr proplist;
+	bool found = false;
+	int i;
+	uint64_t ret;
+
+	proplist = drmModeObjectGetProperties(display->drm_fd, object_id, object_type);
+	for (i = 0; i < proplist->count_props; i++) {
+		if (proplist->props[i] != prop)
+			continue;
+
+		found = true;
+		break;
+	}
+
+	igt_assert(found);
+
+	ret = proplist->prop_values[i];
+
+	drmModeFreeObjectProperties(proplist);
+	return ret;
+}
+
+/**
+ * igt_plane_get_prop - Return current value on a plane for a given property.
+ *
+ * @plane: Target plane.
+ * @prop: Property to check.
+ *
+ * Returns: The value the property is set to, if this
+ * is a blob, the blob id is returned. This can be passed
+ * to drmModeGetPropertyBlob() to get the contents of the blob.
+ */
+uint64_t igt_plane_get_prop(igt_plane_t *plane, enum igt_atomic_plane_properties prop)
+{
+	igt_assert(igt_plane_has_prop(plane, prop));
+
+	return igt_mode_object_get_prop(plane->pipe->display, DRM_MODE_OBJECT_PLANE,
+					plane->drm_plane->plane_id, plane->props[prop]);
+}
+
 /**
  * igt_plane_replace_prop_blob:
  * @plane: plane to set property on.
@@ -2440,6 +2485,24 @@ igt_plane_replace_prop_blob(igt_plane_t *plane, enum igt_atomic_plane_properties
 }
 
 /**
+ * igt_output_get_prop - Return current value on an output for a given property.
+ *
+ * @output: Target output.
+ * @prop: Property to return.
+ *
+ * Returns: The value the property is set to, if this
+ * is a blob, the blob id is returned. This can be passed
+ * to drmModeGetPropertyBlob() to get the contents of the blob.
+ */
+uint64_t igt_output_get_prop(igt_output_t *output, enum igt_atomic_connector_properties prop)
+{
+	igt_assert(igt_output_has_prop(output, prop));
+
+	return igt_mode_object_get_prop(output->display, DRM_MODE_OBJECT_CONNECTOR,
+					output->id, output->props[prop]);
+}
+
+/**
  * igt_output_replace_prop_blob:
  * @output: output to set property on.
  * @prop: property for which the blob will be replaced.
@@ -2469,6 +2532,24 @@ igt_output_replace_prop_blob(igt_output_t *output, enum igt_atomic_connector_pro
 
 	*blob = blob_id;
 	igt_output_set_prop_changed(output, prop);
+}
+
+/**
+ * igt_pipe_obj_get_prop - Return current value on a pipe for a given property.
+ *
+ * @pipe: Target pipe.
+ * @prop: Property to return.
+ *
+ * Returns: The value the property is set to, if this
+ * is a blob, the blob id is returned. This can be passed
+ * to drmModeGetPropertyBlob() to get the contents of the blob.
+ */
+uint64_t igt_pipe_obj_get_prop(igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop)
+{
+	igt_assert(igt_pipe_obj_has_prop(pipe, prop));
+
+	return igt_mode_object_get_prop(pipe->display, DRM_MODE_OBJECT_CRTC,
+					pipe->crtc_id, pipe->props[prop]);
 }
 
 /**
