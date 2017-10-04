@@ -1,3 +1,46 @@
+Release 1.20 (2017-10-03)
+-------------------------
+
+Library changes:
+
+- Added helpers for launching external processes and capturing their
+  outputs. (Abdiel Janulgue)
+
+- Increased max pipe count to 6 to support AMD GPUs. (Leo (Sunpeng) Li)
+
+- Various improvements for Chamelium support. (Paul Kocialkowski)
+
+- Added Coffeelake platform support. (Rodrigo Vivi, Anusha Srivatsa)
+
+- Added Cannonlake platform support. (Rodrigo Vivi)
+
+- Added support for audio testing. (Paul Kocialkowski)
+
+- Added preliminary meson build system support. (Daniel Vetter, et al)
+  -- Autotools remains the supported build system for now.
+
+Tools changes:
+
+- Refactored video bios data to use definitions copied from the
+  kernel. (Jani Nikula)
+
+Documentation changes:
+
+- Added user and developer documentation about Chamelium support to
+  aid deploying the platform. (Paul Kocialkowski)
+
+- Added documentation about the required hardware setup for audio
+  testing. (Paul Kocialkowski)
+
+Tests changes:
+
+- Converted remaining shell-script tests to C code (Abdiel Janulgue)
+
+- Multiple new tests.
+
+
+And many other bug fixes and improvements.
+
 Release 1.19 (2017-06-09)
 -------------------------
 

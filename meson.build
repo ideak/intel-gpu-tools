@@ -1,5 +1,5 @@
 project('IGT gpu tests', 'c',
-	version : '1.19',
+	version : '1.20',
         default_options: [
           'warning_level=2',
           'c_std=gnu99',
