@@ -351,7 +351,7 @@ static void test_plane_rotation(data_t *data, int plane_type)
 		igt_output_set_pipe(output, pipe);
 
 		plane = igt_output_get_plane_type(output, plane_type);
-		igt_require(igt_plane_supports_rotation(plane));
+		igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
 
 		prepare_crtc(data, output, pipe, plane, commit);
 
@@ -438,7 +438,7 @@ static void test_plane_rotation_ytiled_obj(data_t *data,
 	int ret;
 
 	plane = igt_output_get_plane_type(output, plane_type);
-	igt_require(igt_plane_supports_rotation(plane));
+	igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
 
 	if (plane_type == DRM_PLANE_TYPE_PRIMARY || plane_type == DRM_PLANE_TYPE_CURSOR)
 		commit = COMMIT_UNIVERSAL;
@@ -504,7 +504,7 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 	int i, ret;
 
 	plane = igt_output_get_plane_type(output, plane_type);
-	igt_require(igt_plane_supports_rotation(plane));
+	igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
 
 	if (plane_type == DRM_PLANE_TYPE_PRIMARY || plane_type == DRM_PLANE_TYPE_CURSOR)
 		commit = COMMIT_UNIVERSAL;

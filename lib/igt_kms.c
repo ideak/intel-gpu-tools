@@ -2110,10 +2110,6 @@ static int igt_drm_plane_commit(igt_plane_t *plane,
 
 	igt_assert(plane->drm_plane);
 
-	/* it's an error to try an unsupported feature */
-	igt_assert(igt_plane_supports_rotation(plane) ||
-		   !igt_plane_is_prop_changed(plane, IGT_PLANE_ROTATION));
-
 	fb_id = igt_plane_get_fb_id(plane);
 	crtc_id = pipe->crtc_id;
 

@@ -137,7 +137,7 @@ static void test_crtc_background(data_t *data)
 		igt_output_set_pipe(output, pipe);
 
 		plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-		igt_require(plane->pipe->props[IGT_CRTC_BACKGROUND]);
+		igt_require(igt_pipe_has_prop(display, pipe, IGT_CRTC_BACKGROUND));
 
 		prepare_crtc(data, output, pipe, plane, 1, PURPLE, BLACK64);
 
