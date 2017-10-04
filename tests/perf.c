@@ -188,7 +188,7 @@ struct accumulator {
 	uint64_t deltas[MAX_RAW_OA_COUNTERS];
 };
 
-static struct {
+struct oa_format {
 	const char *name;
 	size_t size;
 	int a40_high_off; /* bytes */
@@ -201,69 +201,59 @@ static struct {
 	int n_b;
 	int c_off;
 	int n_c;
-	int min_gen;
-	int max_gen;
-} oa_formats[local_I915_OA_FORMAT_MAX] = {
+};
+
+static struct oa_format hsw_oa_formats[local_I915_OA_FORMAT_MAX] = {
 	[I915_OA_FORMAT_A13] = { /* HSW only */
 		"A13", .size = 64,
-		.a_off = 12, .n_a = 13,
-		.max_gen = 7 },
+		.a_off = 12, .n_a = 13, },
 	[I915_OA_FORMAT_A29] = { /* HSW only */
 		"A29", .size = 128,
-		.a_off = 12, .n_a = 29,
-		.max_gen = 7 },
+		.a_off = 12, .n_a = 29, },
 	[I915_OA_FORMAT_A13_B8_C8] = { /* HSW only */
 		"A13_B8_C8", .size = 128,
 		.a_off = 12, .n_a = 13,
 		.b_off = 64, .n_b = 8,
-		.c_off = 96, .n_c = 8,
-		.max_gen = 7 },
+		.c_off = 96, .n_c = 8, },
 	[I915_OA_FORMAT_A45_B8_C8] = { /* HSW only */
 		"A45_B8_C8", .size = 256,
 		.a_off = 12,  .n_a = 45,
 		.b_off = 192, .n_b = 8,
-		.c_off = 224, .n_c = 8,
-		.max_gen = 7 },
+		.c_off = 224, .n_c = 8, },
 	[I915_OA_FORMAT_B4_C8] = { /* HSW only */
 		"B4_C8", .size = 64,
 		.b_off = 16, .n_b = 4,
-		.c_off = 32, .n_c = 8,
-		.max_gen = 7 },
+		.c_off = 32, .n_c = 8, },
 	[I915_OA_FORMAT_B4_C8_A16] = { /* HSW only */
 		"B4_C8_A16", .size = 128,
 		.b_off = 16, .n_b = 4,
 		.c_off = 32, .n_c = 8,
-		.a_off = 60, .n_a = 16, .first_a = 29,
-		.max_gen = 7 },
+		.a_off = 60, .n_a = 16, .first_a = 29, },
 	[I915_OA_FORMAT_C4_B8] = { /* HSW+ (header differs from HSW-Gen8+) */
 		"C4_B8", .size = 64,
 		.c_off = 16, .n_c = 4,
 		.b_off = 28, .n_b = 8 },
+};
 
-	/* Gen8+ */
-
+static struct oa_format gen8_oa_formats[local_I915_OA_FORMAT_MAX] = {
 	[local_I915_OA_FORMAT_A12] = {
 		"A12", .size = 64,
-		.a_off = 12, .n_a = 12, .first_a = 7,
-		.min_gen = 8 },
+		.a_off = 12, .n_a = 12, .first_a = 7, },
 	[local_I915_OA_FORMAT_A12_B8_C8] = {
 		"A12_B8_C8", .size = 128,
 		.a_off = 12, .n_a = 12,
 		.b_off = 64, .n_b = 8,
-		.c_off = 96, .n_c = 8, .first_a = 7,
-		.min_gen = 8 },
+		.c_off = 96, .n_c = 8, .first_a = 7, },
 	[local_I915_OA_FORMAT_A32u40_A4u32_B8_C8] = {
 		"A32u40_A4u32_B8_C8", .size = 256,
 		.a40_high_off = 160, .a40_low_off = 16, .n_a40 = 32,
 		.a_off = 144, .n_a = 4, .first_a = 32,
 		.b_off = 192, .n_b = 8,
-		.c_off = 224, .n_c = 8,
-		.min_gen = 8 },
+		.c_off = 224, .n_c = 8, },
 	[I915_OA_FORMAT_C4_B8] = {
 		"C4_B8", .size = 64,
 		.c_off = 16, .n_c = 4,
-		.b_off = 32, .n_b = 8,
-		.min_gen = 8 },
+		.b_off = 32, .n_b = 8, },
 };
 
 static bool hsw_undefined_a_counters[45] = {
@@ -307,6 +297,14 @@ static uint32_t (*read_report_ticks)(uint32_t *report,
 				     enum drm_i915_oa_format format);
 static void (*sanity_check_reports)(uint32_t *oa_report0, uint32_t *oa_report1,
 				    enum drm_i915_oa_format format);
+
+static struct oa_format
+get_oa_format(enum drm_i915_oa_format format)
+{
+	if (IS_HASWELL(devid))
+		return hsw_oa_formats[format];
+	return gen8_oa_formats[format];
+}
 
 static bool
 timestamp_delta_within(uint32_t delta,
@@ -371,7 +369,7 @@ static int
 lookup_format(int i915_perf_fmt_id)
 {
 	igt_assert(i915_perf_fmt_id < local_I915_OA_FORMAT_MAX);
-	igt_assert(oa_formats[i915_perf_fmt_id].name);
+	igt_assert(get_oa_format(i915_perf_fmt_id).name);
 
 	return i915_perf_fmt_id;
 }
@@ -497,9 +495,9 @@ read_debugfs_u64_record(int fd, const char *file, const char *key)
 static uint32_t
 hsw_read_report_ticks(uint32_t *report, enum drm_i915_oa_format format)
 {
-	uint32_t *c = (uint32_t *)(((uint8_t *)report) + oa_formats[format].c_off);
+	uint32_t *c = (uint32_t *)(((uint8_t *)report) + get_oa_format(format).c_off);
 
-	igt_assert_neq(oa_formats[format].n_c, 0);
+	igt_assert_neq(get_oa_format(format).n_c, 0);
 
 	return c[2];
 }
@@ -760,6 +758,7 @@ hsw_sanity_check_render_basic_reports(uint32_t *oa_report0, uint32_t *oa_report1
 	uint32_t time_delta = timebase_scale(oa_report1[1] - oa_report0[1]);
 	uint32_t clock_delta;
 	uint32_t max_delta;
+	struct oa_format format = get_oa_format(fmt);
 
 	igt_assert_neq(time_delta, 0);
 
@@ -767,7 +766,7 @@ hsw_sanity_check_render_basic_reports(uint32_t *oa_report0, uint32_t *oa_report1
 	 * can't explicitly derive a clock delta for all OA report
 	 * formats...
 	 */
-	if (oa_formats[fmt].n_c == 0) {
+	if (format.n_c == 0) {
 		/* Assume running at max freq for sake of
 		 * below sanity check on counters... */
 		clock_delta = (gt_max_freq_mhz *
@@ -797,14 +796,14 @@ hsw_sanity_check_render_basic_reports(uint32_t *oa_report0, uint32_t *oa_report1
 	max_delta = clock_delta * n_eus;
 
 	/* 40bit A counters were only introduced for Gen8+ */
-	igt_assert_eq(oa_formats[fmt].n_a40, 0);
+	igt_assert_eq(format.n_a40, 0);
 
-	for (int j = 0; j < oa_formats[fmt].n_a; j++) {
+	for (int j = 0; j < format.n_a; j++) {
 		uint32_t *a0 = (uint32_t *)(((uint8_t *)oa_report0) +
-					    oa_formats[fmt].a_off);
+					    format.a_off);
 		uint32_t *a1 = (uint32_t *)(((uint8_t *)oa_report1) +
-					    oa_formats[fmt].a_off);
-		int a_id = oa_formats[fmt].first_a + j;
+					    format.a_off);
+		int a_id = format.first_a + j;
 		uint32_t delta = a1[j] - a0[j];
 
 		if (undefined_a_counters[a_id])
@@ -814,22 +813,22 @@ hsw_sanity_check_render_basic_reports(uint32_t *oa_report0, uint32_t *oa_report1
 		igt_assert(delta <= max_delta);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_b; j++) {
+	for (int j = 0; j < format.n_b; j++) {
 		uint32_t *b0 = (uint32_t *)(((uint8_t *)oa_report0) +
-					    oa_formats[fmt].b_off);
+					    format.b_off);
 		uint32_t *b1 = (uint32_t *)(((uint8_t *)oa_report1) +
-					    oa_formats[fmt].b_off);
+					    format.b_off);
 		uint32_t delta = b1[j] - b0[j];
 
 		igt_debug("B%d: delta = %"PRIu32"\n", j, delta);
 		igt_assert(delta <= max_delta);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_c; j++) {
+	for (int j = 0; j < format.n_c; j++) {
 		uint32_t *c0 = (uint32_t *)(((uint8_t *)oa_report0) +
-					    oa_formats[fmt].c_off);
+					    format.c_off);
 		uint32_t *c1 = (uint32_t *)(((uint8_t *)oa_report1) +
-					    oa_formats[fmt].c_off);
+					    format.c_off);
 		uint32_t delta = c1[j] - c0[j];
 
 		igt_debug("C%d: delta = %"PRIu32"\n", j, delta);
@@ -840,9 +839,10 @@ hsw_sanity_check_render_basic_reports(uint32_t *oa_report0, uint32_t *oa_report1
 static uint64_t
 gen8_read_40bit_a_counter(uint32_t *report, enum drm_i915_oa_format fmt, int a_id)
 {
-	uint8_t *a40_high = (((uint8_t *)report) + oa_formats[fmt].a40_high_off);
+	struct oa_format format = get_oa_format(fmt);
+	uint8_t *a40_high = (((uint8_t *)report) + format.a40_high_off);
 	uint32_t *a40_low = (uint32_t *)(((uint8_t *)report) +
-					 oa_formats[fmt].a40_low_off);
+					 format.a40_low_off);
 	uint64_t high = (uint64_t)(a40_high[a_id]) << 32;
 
 	return a40_low[a_id] | high;
@@ -887,7 +887,7 @@ accumulate_reports(struct accumulator *accumulator,
 		   uint32_t *start,
 		   uint32_t *end)
 {
-	enum drm_i915_oa_format format = accumulator->format;
+	struct oa_format format = get_oa_format(accumulator->format);
 	uint64_t *deltas = accumulator->deltas;
 	int idx = 0;
 
@@ -902,21 +902,23 @@ accumulate_reports(struct accumulator *accumulator,
 		accumulate_uint32(4, start, end, deltas + idx++);
 	}
 
-	for (int i = 0; i < oa_formats[format].n_a40; i++)
-		accumulate_uint40(i, start, end, format, deltas + idx++);
+	for (int i = 0; i < format.n_a40; i++) {
+		accumulate_uint40(i, start, end, accumulator->format,
+				  deltas + idx++);
+	}
 
-	for (int i = 0; i < oa_formats[format].n_a; i++) {
-		accumulate_uint32(oa_formats[format].a_off + 4 * i,
+	for (int i = 0; i < format.n_a; i++) {
+		accumulate_uint32(format.a_off + 4 * i,
 				  start, end, deltas + idx++);
 	}
 
-	for (int i = 0; i < oa_formats[format].n_b; i++) {
-		accumulate_uint32(oa_formats[format].b_off + 4 * i,
+	for (int i = 0; i < format.n_b; i++) {
+		accumulate_uint32(format.b_off + 4 * i,
 				  start, end, deltas + idx++);
 	}
 
-	for (int i = 0; i < oa_formats[format].n_c; i++) {
-		accumulate_uint32(oa_formats[format].c_off + 4 * i,
+	for (int i = 0; i < format.n_c; i++) {
+		accumulate_uint32(format.c_off + 4 * i,
 				  start, end, deltas + idx++);
 	}
 }
@@ -924,7 +926,7 @@ accumulate_reports(struct accumulator *accumulator,
 static void
 accumulator_print(struct accumulator *accumulator, const char *title)
 {
-	enum drm_i915_oa_format format = accumulator->format;
+	struct oa_format format = get_oa_format(accumulator->format);
 	uint64_t *deltas = accumulator->deltas;
 	int idx = 0;
 
@@ -933,21 +935,21 @@ accumulator_print(struct accumulator *accumulator, const char *title)
 		igt_debug("\ttime delta = %lu\n", deltas[idx++]);
 		igt_debug("\tclock cycle delta = %lu\n", deltas[idx++]);
 
-		for (int i = 0; i < oa_formats[format].n_a40; i++)
+		for (int i = 0; i < format.n_a40; i++)
 			igt_debug("\tA%u = %lu\n", i, deltas[idx++]);
 	} else {
 		igt_debug("\ttime delta = %lu\n", deltas[idx++]);
 	}
 
-	for (int i = 0; i < oa_formats[format].n_a; i++) {
-		int a_id = oa_formats[format].first_a + i;
+	for (int i = 0; i < format.n_a; i++) {
+		int a_id = format.first_a + i;
 		igt_debug("\tA%u = %lu\n", a_id, deltas[idx++]);
 	}
 
-	for (int i = 0; i < oa_formats[format].n_a; i++)
+	for (int i = 0; i < format.n_a; i++)
 		igt_debug("\tB%u = %lu\n", i, deltas[idx++]);
 
-	for (int i = 0; i < oa_formats[format].n_c; i++)
+	for (int i = 0; i < format.n_c; i++)
 		igt_debug("\tC%u = %lu\n", i, deltas[idx++]);
 }
 
@@ -956,6 +958,7 @@ static void
 gen8_sanity_check_test_oa_reports(uint32_t *oa_report0, uint32_t *oa_report1,
 				  enum drm_i915_oa_format fmt)
 {
+	struct oa_format format = get_oa_format(fmt);
 	uint32_t time_delta = timebase_scale(oa_report1[1] - oa_report0[1]);
 	uint32_t ticks0 = read_report_ticks(oa_report0, fmt);
 	uint32_t ticks1 = read_report_ticks(oa_report1, fmt);
@@ -963,9 +966,9 @@ gen8_sanity_check_test_oa_reports(uint32_t *oa_report0, uint32_t *oa_report1,
 	uint32_t max_delta;
 	uint64_t freq;
 	uint32_t *rpt0_b = (uint32_t *)(((uint8_t *)oa_report0) +
-					oa_formats[fmt].b_off);
+					format.b_off);
 	uint32_t *rpt1_b = (uint32_t *)(((uint8_t *)oa_report1) +
-					oa_formats[fmt].b_off);
+					format.b_off);
 	uint32_t b;
 	uint32_t ref;
 
@@ -983,7 +986,7 @@ gen8_sanity_check_test_oa_reports(uint32_t *oa_report0, uint32_t *oa_report1,
 	max_delta = clock_delta * n_eus;
 
 	/* Gen8+ has some 40bit A counters... */
-	for (int j = 0; j < oa_formats[fmt].n_a40; j++) {
+	for (int j = 0; j < format.n_a40; j++) {
 		uint64_t value0 = gen8_read_40bit_a_counter(oa_report0, fmt, j);
 		uint64_t value1 = gen8_read_40bit_a_counter(oa_report1, fmt, j);
 		uint64_t delta = gen8_40bit_a_delta(value0, value1);
@@ -995,12 +998,12 @@ gen8_sanity_check_test_oa_reports(uint32_t *oa_report0, uint32_t *oa_report1,
 		igt_assert(delta <= max_delta);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_a; j++) {
+	for (int j = 0; j < format.n_a; j++) {
 		uint32_t *a0 = (uint32_t *)(((uint8_t *)oa_report0) +
-					    oa_formats[fmt].a_off);
+					    format.a_off);
 		uint32_t *a1 = (uint32_t *)(((uint8_t *)oa_report1) +
-					    oa_formats[fmt].a_off);
-		int a_id = oa_formats[fmt].first_a + j;
+					    format.a_off);
+		int a_id = format.first_a + j;
 		uint32_t delta = a1[j] - a0[j];
 
 		if (undefined_a_counters[a_id])
@@ -1013,7 +1016,7 @@ gen8_sanity_check_test_oa_reports(uint32_t *oa_report0, uint32_t *oa_report1,
 	/* The TestOa metric set defines all B counters to be a
 	 * multiple of the gpu clock
 	 */
-	if (oa_formats[fmt].n_b) {
+	if (format.n_b) {
 		b = rpt1_b[0] - rpt0_b[0];
 		igt_debug("B0: delta = %"PRIu32"\n", b);
 		igt_assert_eq(b, 0);
@@ -1052,11 +1055,11 @@ gen8_sanity_check_test_oa_reports(uint32_t *oa_report0, uint32_t *oa_report1,
 		igt_assert(b >= ref - 1 && b <= ref + 1);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_c; j++) {
+	for (int j = 0; j < format.n_c; j++) {
 		uint32_t *c0 = (uint32_t *)(((uint8_t *)oa_report0) +
-					    oa_formats[fmt].c_off);
+					    format.c_off);
 		uint32_t *c1 = (uint32_t *)(((uint8_t *)oa_report1) +
-					    oa_formats[fmt].c_off);
+					    format.c_off);
 		uint32_t delta = c1[j] - c0[j];
 
 		igt_debug("C%d: delta = %"PRIu32"\n", j, delta);
@@ -1186,7 +1189,7 @@ i915_read_reports_until_timestamp(enum drm_i915_oa_format oa_format,
 				  uint32_t start_timestamp,
 				  uint32_t end_timestamp)
 {
-	size_t format_size = oa_formats[oa_format].size;
+	size_t format_size = get_oa_format(oa_format).size;
 	uint32_t last_seen_timestamp = start_timestamp;
 	int total_len = 0;
 
@@ -1411,7 +1414,7 @@ read_2_oa_reports(int format_id,
 		  uint32_t *oa_report1,
 		  bool timer_only)
 {
-	size_t format_size = oa_formats[format_id].size;
+	size_t format_size = get_oa_format(format_id).size;
 	size_t sample_size = (sizeof(struct drm_i915_perf_record_header) +
 			      format_size);
 	const struct drm_i915_perf_record_header *header;
@@ -1551,10 +1554,12 @@ open_and_read_2_oa_reports(int format_id,
 static void
 print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 {
+	struct oa_format format = get_oa_format(fmt);
+
 	igt_debug("TIMESTAMP: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
 		  oa_report0[1], oa_report1[1], oa_report1[1] - oa_report0[1]);
 
-	if (IS_HASWELL(devid) && oa_formats[fmt].n_c == 0) {
+	if (IS_HASWELL(devid) && format.n_c == 0) {
 		igt_debug("CLOCK = N/A\n");
 	} else {
 		uint32_t clock0 = read_report_ticks(oa_report0, fmt);
@@ -1588,7 +1593,7 @@ print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 	}
 
 	/* Gen8+ has some 40bit A counters... */
-	for (int j = 0; j < oa_formats[fmt].n_a40; j++) {
+	for (int j = 0; j < format.n_a40; j++) {
 		uint64_t value0 = gen8_read_40bit_a_counter(oa_report0, fmt, j);
 		uint64_t value1 = gen8_read_40bit_a_counter(oa_report1, fmt, j);
 		uint64_t delta = gen8_40bit_a_delta(value0, value1);
@@ -1600,12 +1605,12 @@ print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 			  j, value0, value1, delta);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_a; j++) {
+	for (int j = 0; j < format.n_a; j++) {
 		uint32_t *a0 = (uint32_t *)(((uint8_t *)oa_report0) +
-					    oa_formats[fmt].a_off);
+					    format.a_off);
 		uint32_t *a1 = (uint32_t *)(((uint8_t *)oa_report1) +
-					    oa_formats[fmt].a_off);
-		int a_id = oa_formats[fmt].first_a + j;
+					    format.a_off);
+		int a_id = format.first_a + j;
 		uint32_t delta = a1[j] - a0[j];
 
 		if (undefined_a_counters[a_id])
@@ -1615,22 +1620,22 @@ print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 			  a_id, a0[j], a1[j], delta);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_b; j++) {
+	for (int j = 0; j < format.n_b; j++) {
 		uint32_t *b0 = (uint32_t *)(((uint8_t *)oa_report0) +
-					    oa_formats[fmt].b_off);
+					    format.b_off);
 		uint32_t *b1 = (uint32_t *)(((uint8_t *)oa_report1) +
-					    oa_formats[fmt].b_off);
+					    format.b_off);
 		uint32_t delta = b1[j] - b0[j];
 
 		igt_debug("B%d: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
 			  j, b0[j], b1[j], delta);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_c; j++) {
+	for (int j = 0; j < format.n_c; j++) {
 		uint32_t *c0 = (uint32_t *)(((uint8_t *)oa_report0) +
-					    oa_formats[fmt].c_off);
+					    format.c_off);
 		uint32_t *c1 = (uint32_t *)(((uint8_t *)oa_report1) +
-					    oa_formats[fmt].c_off);
+					    format.c_off);
 		uint32_t delta = c1[j] - c0[j];
 
 		igt_debug("C%d: 1st = %"PRIu32", 2nd = %"PRIu32", delta = %"PRIu32"\n",
@@ -1643,9 +1648,11 @@ print_reports(uint32_t *oa_report0, uint32_t *oa_report1, int fmt)
 static void
 print_report(uint32_t *report, int fmt)
 {
+	struct oa_format format = get_oa_format(fmt);
+
 	igt_debug("TIMESTAMP: %"PRIu32"\n", report[1]);
 
-	if (IS_HASWELL(devid) && oa_formats[fmt].n_c == 0) {
+	if (IS_HASWELL(devid) && format.n_c == 0) {
 		igt_debug("CLOCK = N/A\n");
 	} else {
 		uint32_t clock = read_report_ticks(report, fmt);
@@ -1666,7 +1673,7 @@ print_report(uint32_t *report, int fmt)
 	}
 
 	/* Gen8+ has some 40bit A counters... */
-	for (int j = 0; j < oa_formats[fmt].n_a40; j++) {
+	for (int j = 0; j < format.n_a40; j++) {
 		uint64_t value = gen8_read_40bit_a_counter(report, fmt, j);
 
 		if (undefined_a_counters[j])
@@ -1675,10 +1682,10 @@ print_report(uint32_t *report, int fmt)
 		igt_debug("A%d: %"PRIu64"\n", j, value);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_a; j++) {
+	for (int j = 0; j < format.n_a; j++) {
 		uint32_t *a = (uint32_t *)(((uint8_t *)report) +
-					   oa_formats[fmt].a_off);
-		int a_id = oa_formats[fmt].first_a + j;
+					   format.a_off);
+		int a_id = format.first_a + j;
 
 		if (undefined_a_counters[a_id])
 			continue;
@@ -1686,16 +1693,16 @@ print_report(uint32_t *report, int fmt)
 		igt_debug("A%d: %"PRIu32"\n", a_id, a[j]);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_b; j++) {
+	for (int j = 0; j < format.n_b; j++) {
 		uint32_t *b = (uint32_t *)(((uint8_t *)report) +
-					   oa_formats[fmt].b_off);
+					   format.b_off);
 
 		igt_debug("B%d: %"PRIu32"\n", j, b[j]);
 	}
 
-	for (int j = 0; j < oa_formats[fmt].n_c; j++) {
+	for (int j = 0; j < format.n_c; j++) {
 		uint32_t *c = (uint32_t *)(((uint8_t *)report) +
-					   oa_formats[fmt].c_off);
+					   format.c_off);
 
 		igt_debug("C%d: %"PRIu32"\n", j, c[j]);
 	}
@@ -1705,28 +1712,15 @@ print_report(uint32_t *report, int fmt)
 static void
 test_oa_formats(void)
 {
-	for (int i = 0; i < ARRAY_SIZE(oa_formats); i++) {
+	for (int i = 0; i < I915_OA_FORMAT_MAX; i++) {
+		struct oa_format format = get_oa_format(i);
 		uint32_t oa_report0[64];
 		uint32_t oa_report1[64];
 
-		if (!oa_formats[i].name) /* sparse, indexed by ID */
+		if (!format.name) /* sparse, indexed by ID */
 			continue;
 
-		if (oa_formats[i].min_gen &&
-		    intel_gen(devid) < oa_formats[i].min_gen) {
-			igt_debug("skipping unsupported OA format %s\n",
-				  oa_formats[i].name);
-			continue;
-		}
-
-		if (oa_formats[i].max_gen &&
-		    intel_gen(devid) > oa_formats[i].max_gen) {
-			igt_debug("skipping unsupported OA format %s\n",
-				  oa_formats[i].name);
-			continue;
-		}
-
-		igt_debug("Checking OA format %s\n", oa_formats[i].name);
+		igt_debug("Checking OA format %s\n", format.name);
 
 		open_and_read_2_oa_reports(i,
 					   oa_exp_1_millisec,
@@ -2761,7 +2755,7 @@ test_buffer_fill(void)
 	uint8_t *buf = malloc(buf_size);
 	int len;
 	size_t oa_buf_size = 16 * 1024 * 1024;
-	size_t report_size = oa_formats[test_oa_format].size;
+	size_t report_size = get_oa_format(test_oa_format).size;
 	int n_full_oa_reports = oa_buf_size / report_size;
 	uint64_t fill_duration = n_full_oa_reports * oa_period;
 
@@ -2930,7 +2924,7 @@ test_enable_disable(void)
 	int buf_size = 65536 * (256 + sizeof(struct drm_i915_perf_record_header));
 	uint8_t *buf = malloc(buf_size);
 	size_t oa_buf_size = 16 * 1024 * 1024;
-	size_t report_size = oa_formats[test_oa_format].size;
+	size_t report_size = get_oa_format(test_oa_format).size;
 	int n_full_oa_reports = oa_buf_size / report_size;
 	uint64_t fill_duration = n_full_oa_reports * oa_period;
 
@@ -3621,7 +3615,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 		.num_properties = ARRAY_SIZE(properties) / 2,
 		.properties_ptr = to_user_pointer(properties),
 	};
-	size_t format_size = oa_formats[test_oa_format].size;
+	size_t format_size = get_oa_format(test_oa_format).size;
 	size_t sample_size = (sizeof(struct drm_i915_perf_record_header) +
 			      format_size);
 	int max_reports = (16 * 1024 * 1024) / format_size;
