@@ -215,6 +215,80 @@ static void fifo(int fd, unsigned ring)
 	munmap(ptr, 4096);
 }
 
+static bool ignore_engine(int fd, unsigned engine)
+{
+	if (engine == 0)
+		return true;
+
+	if (gem_has_bsd2(fd) && engine == I915_EXEC_BSD)
+		return true;
+
+	return false;
+}
+
+static void smoketest(int fd, unsigned ring, unsigned timeout)
+{
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	unsigned engines[16];
+	unsigned nengine;
+	unsigned engine;
+	uint32_t scratch;
+	uint32_t *ptr;
+
+	nengine = 0;
+	for_each_engine(fd, engine) {
+		if (ignore_engine(fd, engine))
+			continue;
+
+		engines[nengine++] = engine;
+	}
+	igt_require(nengine);
+
+	scratch = gem_create(fd, 4096);
+	igt_fork(child, ncpus) {
+		unsigned long count = 0;
+		uint32_t ctx;
+
+		hars_petruska_f54_1_random_perturb(child);
+
+		ctx = gem_context_create(fd);
+		igt_until_timeout(timeout) {
+			int prio;
+
+			prio = hars_petruska_f54_1_random_unsafe_max(MAX_PRIO - MIN_PRIO) + MIN_PRIO;
+			ctx_set_priority(fd, ctx, prio);
+
+			engine = engines[hars_petruska_f54_1_random_unsafe_max(nengine)];
+			store_dword(fd, ctx, engine, scratch,
+				    8*child + 0, ~child,
+				    0, 0);
+			for (unsigned int step = 0; step < 8; step++)
+				store_dword(fd, ctx, engine, scratch,
+					    8*child + 4, count++,
+					    0, 0);
+		}
+		gem_context_destroy(fd, ctx);
+	}
+	igt_waitchildren();
+
+	ptr = gem_mmap__gtt(fd, scratch, 4096, PROT_READ);
+	gem_set_domain(fd, scratch, /* no write hazard lies! */
+			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	gem_close(fd, scratch);
+
+	for (unsigned n = 0; n < ncpus; n++) {
+		igt_assert_eq_u32(ptr[2*n], ~n);
+		/*
+		 * Note this count is approximate due to unconstrained
+		 * ordering of the dword writes between engines.
+		 *
+		 * Take the result with a pinch of salt.
+		 */
+		igt_info("Child[%d] completed %u cycles\n",  n, ptr[2*n+1]);
+	}
+	munmap(ptr, 4096);
+}
+
 static void reorder(int fd, unsigned ring, unsigned flags)
 #define EQUAL 1
 {
@@ -999,6 +1073,9 @@ igt_main
 			ctx_has_priority(fd);
 		}
 
+		igt_subtest("smoketest-all")
+			smoketest(fd, -1, 30);
+
 		for (e = intel_execution_engines; e->name; e++) {
 			/* default exec-id is purely symbolic */
 			if (e->exec_id == 0)
@@ -1045,6 +1122,9 @@ igt_main
 
 				igt_subtest_f("reorder-wide-%s", e->name)
 					reorder_wide(fd, e->exec_id | e->flags);
+
+				igt_subtest_f("smoketest-%s", e->name)
+					smoketest(fd, e->exec_id | e->flags, 5);
 			}
 		}
 	}
