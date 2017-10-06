@@ -57,7 +57,7 @@ static void check_error_state(int dir, struct drm_i915_gem_exec_object2 *obj)
 	igt_assert(found);
 }
 
-static void capture(int fd, int dir, unsigned ring)
+static void __capture(int fd, int dir, unsigned ring, uint32_t target)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[4];
@@ -72,7 +72,7 @@ static void capture(int fd, int dir, unsigned ring)
 
 	memset(obj, 0, sizeof(obj));
 	obj[SCRATCH].handle = gem_create(fd, 4096);
-	obj[CAPTURE].handle = gem_create(fd, 4096);
+	obj[CAPTURE].handle = target;
 	obj[CAPTURE].flags = LOCAL_OBJECT_CAPTURE;
 	obj[NOCAPTURE].handle = gem_create(fd, 4096);
 
@@ -159,8 +159,30 @@ static void capture(int fd, int dir, unsigned ring)
 
 	gem_close(fd, obj[BATCH].handle);
 	gem_close(fd, obj[NOCAPTURE].handle);
-	gem_close(fd, obj[CAPTURE].handle);
 	gem_close(fd, obj[SCRATCH].handle);
+}
+
+static void capture(int fd, int dir, unsigned ring)
+{
+	uint32_t handle;
+
+	handle = gem_create(fd, 4096);
+	__capture(fd, dir, ring, handle);
+	gem_close(fd, handle);
+}
+
+static void userptr(int fd, int dir)
+{
+	uint32_t handle;
+	void *ptr;
+
+	igt_assert(posix_memalign(&ptr, 4096, 4096) == 0);
+	igt_require(__gem_userptr(fd, ptr, 4096, 0, 0, &handle) == 0);
+
+	__capture(fd, dir, 0, handle);
+
+	gem_close(fd, handle);
+	free(ptr);
 }
 
 static bool has_capture(int fd)
@@ -212,6 +234,13 @@ igt_main
 			igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 			capture(fd, dir, e->exec_id | e->flags);
 		}
+	}
+
+	/* And check we can read from different types of objects */
+
+	igt_subtest_f("userptr") {
+		igt_require(gem_can_store_dword(fd, 0));
+		userptr(fd, dir);
 	}
 
 	igt_fixture {
