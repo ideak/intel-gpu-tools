@@ -434,7 +434,7 @@ static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 
 	memset(&wait, 0, sizeof(wait));
 	wait.request.type = kmstest_get_vbl_flag(crtc_idx);
-	wait.request.type |= DRM_VBLANK_ABSOLUTE | DRM_VBLANK_NEXTONMISS;
+	wait.request.type |= DRM_VBLANK_RELATIVE | DRM_VBLANK_NEXTONMISS;
 	do_or_die(drmWaitVBlank(drm_fd, &wait));
 
 	last_seq = wait.reply.sequence;
