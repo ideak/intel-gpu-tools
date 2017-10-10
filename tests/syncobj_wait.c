@@ -713,7 +713,7 @@ test_wait_interrupted(int fd, uint32_t test_flags)
 {
 	struct local_syncobj_wait wait = { 0 };
 	uint32_t syncobj = syncobj_create(fd, 0);
-	int ret, timeline;
+	int timeline;
 
 	wait.handles = to_user_pointer(&syncobj);
 	wait.count_handles = 1;
@@ -721,20 +721,16 @@ test_wait_interrupted(int fd, uint32_t test_flags)
 
 	if (test_flags & WAIT_FOR_SUBMIT) {
 		wait.timeout_nsec = short_timeout();
-		igt_while_interruptible(true) {
-			ret = igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_WAIT, &wait);
-			igt_assert(ret == -1 && errno == ETIME);
-		}
+		igt_while_interruptible(true)
+			igt_assert_eq(__syncobj_wait(fd, &wait), -ETIME);
 	}
 
 	timeline = syncobj_attach_sw_sync(fd, syncobj);
 	close(timeline);
 
 	wait.timeout_nsec = short_timeout();
-	igt_while_interruptible(true) {
-		ret = igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_WAIT, &wait);
-		igt_assert(ret == -1 && errno == ETIME);
-	}
+	igt_while_interruptible(true)
+		igt_assert_eq(__syncobj_wait(fd, &wait), -ETIME);
 
 	syncobj_destroy(fd, syncobj);
 }
