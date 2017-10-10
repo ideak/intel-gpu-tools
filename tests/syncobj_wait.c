@@ -726,13 +726,13 @@ test_wait_interrupted(int fd, uint32_t test_flags)
 	}
 
 	timeline = syncobj_attach_sw_sync(fd, syncobj);
-	close(timeline);
 
 	wait.timeout_nsec = short_timeout();
 	igt_while_interruptible(true)
 		igt_assert_eq(__syncobj_wait(fd, &wait), -ETIME);
 
 	syncobj_destroy(fd, syncobj);
+	close(timeline);
 }
 
 static bool
