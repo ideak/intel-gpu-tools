@@ -59,6 +59,7 @@ static int gen = 0;
 static int verbose = 0;
 static bool device_override;
 static uint32_t device;
+static int addr_bits = 0;
 
 #define MAX_BO_COUNT 64 * 1024
 
@@ -172,7 +173,7 @@ data_out(const void *data, size_t size)
 static uint32_t
 gtt_entry_size(void)
 {
-	return gen >= 8 ? 8 : 4;
+	return addr_bits > 32 ? 8 : 4;
 }
 
 static uint32_t
@@ -211,17 +212,17 @@ write_header(void)
 	data_out(comment, comment_dwords * 4);
 
 	/* Set up the GTT. The max we can handle is 64M */
-	dword_out(CMD_AUB_TRACE_HEADER_BLOCK | ((gen >= 8 ? 6 : 5) - 2));
+	dword_out(CMD_AUB_TRACE_HEADER_BLOCK | ((addr_bits > 32 ? 6 : 5) - 2));
 	dword_out(AUB_TRACE_MEMTYPE_GTT_ENTRY |
 		  AUB_TRACE_TYPE_NOTYPE | AUB_TRACE_OP_DATA_WRITE);
 	dword_out(0); /* subtype */
 	dword_out(0); /* offset */
 	dword_out(gtt_size()); /* size */
-	if (gen >= 8)
+	if (addr_bits > 32)
 		dword_out(0);
 	for (uint32_t i = 0; i * gtt_entry_size() < gtt_size(); i++) {
 		dword_out(entry + 0x1000 * i);
-		if (gen >= 8)
+		if (addr_bits > 32)
 			dword_out(0);
 	}
 }
@@ -245,13 +246,13 @@ aub_write_trace_block(uint32_t type, void *virtual, uint32_t size, uint64_t gtt_
 			block_size = 8 * 4096;
 
 		dword_out(CMD_AUB_TRACE_HEADER_BLOCK |
-			  ((gen >= 8 ? 6 : 5) - 2));
+			  ((addr_bits > 32 ? 6 : 5) - 2));
 		dword_out(AUB_TRACE_MEMTYPE_GTT |
 			  type | AUB_TRACE_OP_DATA_WRITE);
 		dword_out(subtype);
 		dword_out(gtt_offset + offset);
 		dword_out(align_u32(block_size, 4));
-		if (gen >= 8)
+		if (addr_bits > 32)
 			dword_out((gtt_offset + offset) >> 32);
 
 		if (virtual)
@@ -267,7 +268,7 @@ aub_write_trace_block(uint32_t type, void *virtual, uint32_t size, uint64_t gtt_
 static void
 write_reloc(void *p, uint64_t v)
 {
-	if (gen >= 8) {
+	if (addr_bits > 32) {
 		/* From the Broadwell PRM Vol. 2a,
 		 * MI_LOAD_REGISTER_MEM::MemoryAddress:
 		 *
@@ -306,7 +307,7 @@ aub_dump_ringbuffer(uint64_t batch_offset, uint64_t offset, int ring_flag)
 	/* Make a ring buffer to execute our batchbuffer. */
 	memset(ringbuffer, 0, sizeof(ringbuffer));
 
-	aub_mi_bbs_len = gen >= 8 ? 3 : 2;
+	aub_mi_bbs_len = addr_bits > 32 ? 3 : 2;
 	ringbuffer[ring_count] = AUB_MI_BATCH_BUFFER_START | (aub_mi_bbs_len - 2);
 	write_reloc(&ringbuffer[ring_count + 1], batch_offset);
 	ring_count += aub_mi_bbs_len;
@@ -315,12 +316,12 @@ aub_dump_ringbuffer(uint64_t batch_offset, uint64_t offset, int ring_flag)
 	 * the ring in the simulator.
 	 */
 	dword_out(CMD_AUB_TRACE_HEADER_BLOCK |
-		  ((gen >= 8 ? 6 : 5) - 2));
+		  ((addr_bits > 32 ? 6 : 5) - 2));
 	dword_out(AUB_TRACE_MEMTYPE_GTT | ring | AUB_TRACE_OP_COMMAND_WRITE);
 	dword_out(0); /* general/surface subtype */
 	dword_out(offset);
 	dword_out(ring_count * 4);
-	if (gen >= 8)
+	if (addr_bits > 32)
 		dword_out(offset >> 32);
 
 	data_out(ringbuffer, ring_count * 4);
@@ -422,6 +423,11 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 			       "output file %s, chipset id 0x%04x, gen %d]\n",
 			       filename, device, gen);
 	}
+
+	/* If we don't know the device gen, then it probably is a
+	 * newer device which uses 48-bit addresses.
+	 */
+	addr_bits = (gen >= 8 || gen == 0) ? 48 : 32;
 
 	if (verbose)
 		printf("Dumping execbuffer2:\n");
