@@ -78,15 +78,65 @@ static void read_and_discard_sysfs_entries(int path_fd)
 igt_main
 {
 	int fd = -1, debugfs;
+	igt_display_t display;
+	struct igt_fb fb[IGT_MAX_PIPES];
+	enum pipe pipe;
+
 	igt_skip_on_simulation();
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
 		debugfs = igt_debugfs_dir(fd);
+
+		kmstest_set_vt_graphics_mode();
+		igt_display_init(&display, fd);
 	}
 
 	igt_subtest("read_all_entries") {
+		/* try to light all pipes */
+		for_each_pipe(&display, pipe) {
+			igt_output_t *output;
+
+			for_each_valid_output_on_pipe(&display, pipe, output) {
+				igt_plane_t *primary;
+				drmModeModeInfo *mode;
+
+				if (output->pending_pipe != PIPE_NONE)
+					continue;
+
+				igt_output_set_pipe(output, pipe);
+				primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+				mode = igt_output_get_mode(output);
+				igt_create_pattern_fb(display.drm_fd,
+						      mode->hdisplay, mode->vdisplay,
+						      DRM_FORMAT_XRGB8888,
+						      LOCAL_DRM_FORMAT_MOD_NONE, &fb[pipe]);
+
+				/* Set a valid fb as some debugfs like to inspect it on a active pipe */
+				igt_plane_set_fb(primary, &fb[pipe]);
+				break;
+			}
+		}
+
+		igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+		read_and_discard_sysfs_entries(debugfs);
+	}
+
+	igt_subtest("read_all_entries_display_off") {
+		igt_output_t *output;
+		igt_plane_t *plane;
+
+		for_each_connected_output(&display, output)
+			igt_output_set_pipe(output, PIPE_NONE);
+
+		for_each_pipe(&display, pipe)
+			for_each_plane_on_pipe(&display, pipe, plane)
+				igt_plane_set_fb(plane, NULL);
+
+		igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
 		read_and_discard_sysfs_entries(debugfs);
 	}
 
@@ -112,6 +162,7 @@ igt_main
 	}
 
 	igt_fixture {
+		igt_display_fini(&display);
 		close(debugfs);
 		close(fd);
 	}
