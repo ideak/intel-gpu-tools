@@ -155,13 +155,56 @@ igt_main
 {
 	struct context context = {0};
 	int old;
+	igt_display_t display;
+	struct igt_fb fb;
 
 	igt_skip_on_simulation();
 
 	igt_fixture {
+		enum pipe pipe;
+		igt_output_t *output;
+		bool found = false;
+		char full_name[32] = {};
+		char *name;
+		drmModeModeInfo *mode;
+		igt_plane_t *primary;
+
 		/* Get the max value and skip the whole test if sysfs interface not available */
 		igt_skip_on(backlight_read(&old, "brightness"));
 		igt_assert(backlight_read(&context.max, "max_brightness") > -1);
+
+		/*
+		 * Backlight tests requires the output to be enabled,
+		 * try to enable all.
+		 */
+		kmstest_set_vt_graphics_mode();
+		igt_display_init(&display, drm_open_driver(DRIVER_INTEL));
+
+		/* should be ../../cardX-$output */
+		igt_assert_lt(12, readlink(BACKLIGHT_PATH "/device", full_name, sizeof(full_name) - 1));
+		name = basename(full_name);
+
+		for_each_pipe_with_valid_output(&display, pipe, output) {
+			if (strcmp(name + 6, output->name))
+				continue;
+
+			found = true;
+			break;
+		}
+
+		igt_assert_f(found, "Could not map \"%s\" to output (%s?)\n", name, name + 6);
+
+		igt_output_set_pipe(output, pipe);
+		mode = igt_output_get_mode(output);
+
+		igt_create_pattern_fb(display.drm_fd,
+				      mode->hdisplay, mode->vdisplay,
+				      DRM_FORMAT_XRGB8888,
+				      LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+		igt_plane_set_fb(primary, &fb);
+
+		igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 	}
 
 	igt_subtest("basic-brightness")
@@ -174,5 +217,9 @@ igt_main
 	igt_fixture {
 		/* Restore old brightness */
 		backlight_write(old, "brightness");
+
+		igt_display_fini(&display);
+		igt_remove_fb(display.drm_fd, &fb);
+		close(display.drm_fd);
 	}
 }
