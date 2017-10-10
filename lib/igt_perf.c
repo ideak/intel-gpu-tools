@@ -27,11 +27,12 @@ uint64_t i915_type_id(void)
 	return strtoull(buf, NULL, 0);
 }
 
-static int _perf_open(uint64_t config, int group, uint64_t format)
+static int
+_perf_open(uint64_t type, uint64_t config, int group, uint64_t format)
 {
 	struct perf_event_attr attr = { };
 
-	attr.type = i915_type_id();
+	attr.type = type;
 	if (attr.type == 0)
 		return -ENOENT;
 
@@ -46,11 +47,18 @@ static int _perf_open(uint64_t config, int group, uint64_t format)
 
 int perf_i915_open(uint64_t config)
 {
-	return _perf_open(config, -1, PERF_FORMAT_TOTAL_TIME_ENABLED);
+	return _perf_open(i915_type_id(), config, -1,
+			  PERF_FORMAT_TOTAL_TIME_ENABLED);
 }
 
 int perf_i915_open_group(uint64_t config, int group)
 {
-	return _perf_open(config, group,
+	return _perf_open(i915_type_id(), config, group,
 			  PERF_FORMAT_TOTAL_TIME_ENABLED | PERF_FORMAT_GROUP);
+}
+
+int igt_perf_open(uint64_t type, uint64_t config)
+{
+	return _perf_open(type, config, -1,
+			  PERF_FORMAT_TOTAL_TIME_ENABLED);
 }

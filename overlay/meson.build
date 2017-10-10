@@ -21,7 +21,7 @@ dri2proto = dependency('dri2proto', version : '>= 2.6', required : false)
 cairo_xlib = dependency('cairo-xlib', required : false)
 xrandr = dependency('xrandr', version : '>=1.3', required : false)
 
-gpu_overlay_deps = [ realtime, cairo, pciaccess, libdrm, libdrm_intel ]
+gpu_overlay_deps = [ realtime, math, cairo, pciaccess, libdrm, libdrm_intel ]
 
 both_x11_src = ''
 

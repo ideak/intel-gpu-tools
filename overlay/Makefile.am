@@ -63,7 +63,7 @@ intel_gpu_overlay_SOURCES += \
 
 intel_gpu_overlay_SOURCES += $(both_x11_sources)
 
-intel_gpu_overlay_LDADD = $(LDADD) -lrt
+intel_gpu_overlay_LDADD = $(LDADD) -lrt -lm
 
 EXTRA_DIST= \
 	README \

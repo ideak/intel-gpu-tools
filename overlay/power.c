@@ -30,60 +30,107 @@
 #include <fcntl.h>
 #include <time.h>
 #include <errno.h>
+#include <ctype.h>
+#include <math.h>
 
 #include "igt_perf.h"
 
 #include "power.h"
 #include "debugfs.h"
 
-/* XXX Is this exposed through RAPL? */
-
-int power_init(struct power *power)
+static int
+filename_to_buf(const char *filename, char *buf, unsigned int bufsize)
 {
-	char buf[4096];
-	int fd, len;
+	int fd;
+	ssize_t ret;
 
-	memset(power, 0, sizeof(*power));
-
-	power->fd = -1;
-
-	sprintf(buf, "%s/i915_energy_uJ", debugfs_dri_path);
-	fd = open(buf, 0);
+	fd = open(filename, O_RDONLY);
 	if (fd < 0)
-		return power->error = errno;
+		return -1;
 
-	len = read(fd, buf, sizeof(buf));
+	ret = read(fd, buf, bufsize - 1);
 	close(fd);
+	if (ret < 1)
+		return -1;
 
-	if (len < 0)
-		return power->error = errno;
-
-	buf[len] = '\0';
-	if (strtoull(buf, 0, 0) == 0)
-		return power->error = EINVAL;
+	buf[ret] = '\0';
 
 	return 0;
 }
 
-static uint64_t file_to_u64(const char *name)
+static uint64_t filename_to_u64(const char *filename, int base)
 {
-	char buf[4096];
-	int fd, len;
+	char buf[64], *b;
 
-	sprintf(buf, "%s/%s", debugfs_dri_path, name);
-	fd = open(buf, 0);
-	if (fd < 0)
+	if (filename_to_buf(filename, buf, sizeof(buf)))
 		return 0;
 
-	len = read(fd, buf, sizeof(buf)-1);
-	close(fd);
+	/*
+	 * Handle both single integer and key=value formats by skipping
+	 * leading non-digits.
+	 */
+	b = buf;
+	while (*b && !isdigit(*b))
+		b++;
 
-	if (len < 0)
+	return strtoull(b, NULL, base);
+}
+
+static uint64_t debugfs_file_to_u64(const char *name)
+{
+	char buf[1024];
+
+	snprintf(buf, sizeof(buf), "%s/%s", debugfs_dri_path, name);
+
+	return filename_to_u64(buf, 0);
+}
+
+static uint64_t rapl_type_id(void)
+{
+	return filename_to_u64("/sys/devices/power/type", 10);
+}
+
+static uint64_t rapl_gpu_power(void)
+{
+	return filename_to_u64("/sys/devices/power/events/energy-gpu", 0);
+}
+
+static double filename_to_double(const char *filename)
+{
+	char buf[64];
+
+	if (filename_to_buf(filename, buf, sizeof(buf)))
 		return 0;
 
-	buf[len] = '\0';
+	return strtod(buf, NULL);
+}
 
-	return strtoull(buf, 0, 0);
+static double rapl_gpu_power_scale(void)
+{
+	return filename_to_double("/sys/devices/power/events/energy-gpu.scale");
+}
+
+int power_init(struct power *power)
+{
+	uint64_t val;
+
+	memset(power, 0, sizeof(*power));
+
+	power->fd = igt_perf_open(rapl_type_id(), rapl_gpu_power());
+	if (power->fd >= 0) {
+		power->rapl_scale = rapl_gpu_power_scale();
+
+		if (power->rapl_scale != NAN) {
+			power->rapl_scale *= 1e3; /* from nano to micro */
+			return 0;
+		}
+	}
+
+	val = debugfs_file_to_u64("i915_energy_uJ");
+	if (val == 0)
+		return power->error = EINVAL;
+
+	return 0;
 }
 
 static uint64_t clock_ms_to_u64(void)
@@ -93,30 +140,30 @@ static uint64_t clock_ms_to_u64(void)
 	if (clock_gettime(CLOCK_MONOTONIC, &tv) < 0)
 		return 0;
 
-	return (uint64_t)tv.tv_sec * 1000 + tv.tv_nsec / 1000000;
+	return (uint64_t)tv.tv_sec * 1e3 + tv.tv_nsec / 1e6;
 }
 
 int power_update(struct power *power)
 {
-	struct power_stat *s = &power->stat[power->count++&1];
-	struct power_stat *d = &power->stat[power->count&1];
+	struct power_stat *s = &power->stat[power->count++ & 1];
+	struct power_stat *d = &power->stat[power->count & 1];
 	uint64_t d_time;
 
 	if (power->error)
 		return power->error;
 
-	if (power->fd != -1) {
+	if (power->fd >= 0) {
 		uint64_t data[2];
 		int len;
 
 		len = read(power->fd, data, sizeof(data));
-		if (len < 0)
+		if (len != sizeof(data))
 			return power->error = errno;
 
-		s->energy = data[0];
-		s->timestamp = data[1] / (1000*1000);
+		s->energy = llround((double)data[0] * power->rapl_scale);
+		s->timestamp = data[1] / 1e6;
 	} else {
-		s->energy = file_to_u64("i915_energy_uJ");
+		s->energy = debugfs_file_to_u64("i915_energy_uJ") / 1e3;
 		s->timestamp = clock_ms_to_u64();
 	}
 
@@ -124,7 +171,9 @@ int power_update(struct power *power)
 		return EAGAIN;
 
 	d_time = s->timestamp - d->timestamp;
-	power->power_mW = (s->energy - d->energy) / d_time;
+	power->power_mW = round((double)(s->energy - d->energy) *
+				(1e3f / d_time));
 	power->new_sample = 1;
+
 	return 0;
 }

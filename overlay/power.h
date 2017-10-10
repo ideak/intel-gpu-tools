@@ -39,6 +39,8 @@ struct power {
 	int new_sample;
 
 	uint64_t power_mW;
+
+	double rapl_scale;
 };
 
 int power_init(struct power *power);
