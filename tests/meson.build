@@ -20,7 +20,6 @@ test_progs = [
 	'drv_module_reload',
 	'drv_selftest',
 	'drv_suspend',
-	'gem_bad_length',
 	'gem_bad_reloc',
 	'gem_basic',
 	'gem_busy',
