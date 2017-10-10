@@ -525,7 +525,7 @@ test_wait_snapshot(int fd, uint32_t test_flags)
 {
 	struct wait_thread_data wait = { 0 };
 	uint32_t syncobjs[2];
-	int timelines[2] = { -1, -1 };
+	int timelines[3] = { -1, -1, -1 };
 	pthread_t thread;
 
 	syncobjs[0] = syncobj_create(fd, 0);
@@ -570,8 +570,7 @@ test_wait_snapshot(int fd, uint32_t test_flags)
 	 * the kernel picks up on the new fence (it shouldn't), we'll get a
 	 * timeout.
 	 */
-	close(timelines[0]);
-	timelines[0] = syncobj_attach_sw_sync(fd, syncobjs[0]);
+	timelines[2] = syncobj_attach_sw_sync(fd, syncobjs[0]);
 
 	sleep_nsec(SHORT_TIME_NSEC / 5);
 
@@ -589,6 +588,7 @@ test_wait_snapshot(int fd, uint32_t test_flags)
 
 	close(timelines[0]);
 	close(timelines[1]);
+	close(timelines[2]);
 	syncobj_destroy(fd, syncobjs[0]);
 	syncobj_destroy(fd, syncobjs[1]);
 }
