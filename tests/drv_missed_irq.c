@@ -26,90 +26,41 @@
 
 #include "igt.h"
 #include "igt_debugfs.h"
+#include "igt_dummyload.h"
 #include "igt_sysfs.h"
 
 IGT_TEST_DESCRIPTION("Inject missed interrupts and make sure they are caught");
 
 static void trigger_missed_interrupt(int fd, unsigned ring)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj;
-	struct drm_i915_gem_relocation_entry reloc;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t *batch;
-	int i;
-
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, 4096);
-	obj.relocs_ptr = (uintptr_t)&reloc;
-	obj.relocation_count = 1;
-
-	memset(&reloc, 0, sizeof(reloc));
-	reloc.target_handle = obj.handle; /* recurse */
-	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
-	reloc.delta = 0;
-	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc.write_domain = 0;
-
-	batch = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj.handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	i = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc.delta = 1;
-		}
-	}
-	batch[1000] = 1;
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
-	execbuf.buffer_count = 1;
-	execbuf.flags = ring;
-
-	execbuf.flags = ring;
-	if (__gem_execbuf(fd, &execbuf))
-		goto out;
+	igt_spin_t *spin = __igt_spin_batch_new(fd, 0, ring, 0);
 
 	igt_fork(child, 1) {
 		/* We are now a low priority child on the *same* CPU as the
 		 * parent. We will have to wait for our parent to sleep
 		 * (gem_sync -> i915_wait_request) before we run.
 		 */
-		igt_assert(*((volatile uint32_t *)batch + 1000) == 0);
-		igt_assert(gem_bo_busy(fd, obj.handle));
-
-		*batch = MI_BATCH_BUFFER_END;
-		__sync_synchronize();
+		igt_assert(gem_bo_busy(fd, spin->handle));
+		igt_spin_batch_end(spin);
 	}
 
-	batch[1000] = 0;
-	gem_sync(fd, obj.handle);
+	gem_sync(fd, spin->handle);
 	igt_waitchildren();
 
-out:
-	gem_close(fd, obj.handle);
-	munmap(batch, 4096);
+	igt_spin_batch_free(fd, spin);
 }
 
 static void bind_to_cpu(int cpu)
 {
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	struct sched_param rt = {.sched_priority = 99 };
+	cpu_set_t allowed;
 
 	igt_assert(sched_setscheduler(getpid(), SCHED_RR | SCHED_RESET_ON_FORK, &rt) == 0);
+
+	CPU_ZERO(&allowed);
+	CPU_SET(cpu % ncpus, &allowed);
+	igt_assert(sched_setaffinity(getpid(), sizeof(cpu_set_t), &allowed) == 0);
 }
 
 static void enable_missed_irq(int dir)
@@ -162,6 +113,9 @@ igt_simple_main
 		if (expect_rings != -1 && e->exec_id == 0)
 			continue;
 
+		if (!gem_has_ring(device, e->exec_id | e->flags))
+			continue;
+
 		igt_debug("Clearing ring %s [%x]\n",
 			  e->name, e->exec_id | e->flags);
 		trigger_missed_interrupt(device, e->exec_id | e->flags);
@@ -175,6 +129,9 @@ igt_simple_main
 			continue;
 
 		if (expect_rings != -1 && e->exec_id == 0)
+			continue;
+
+		if (!gem_has_ring(device, e->exec_id | e->flags))
 			continue;
 
 		igt_debug("Executing on ring %s [%x]\n",
