@@ -2009,16 +2009,6 @@ static igt_output_t *igt_pipe_get_output(igt_pipe_t *pipe)
 	return NULL;
 }
 
-bool igt_pipe_get_property(igt_pipe_t *pipe, const char *name,
-			   uint32_t *prop_id, uint64_t *value,
-			   drmModePropertyPtr *prop)
-{
-	return get_crtc_property(pipe->display->drm_fd,
-				 pipe->crtc_id,
-				 name,
-				 prop_id, value, prop);
-}
-
 static uint32_t igt_plane_get_fb_id(igt_plane_t *plane)
 {
 	return plane->values[IGT_PLANE_FB_ID];
