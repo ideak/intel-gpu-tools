@@ -3227,27 +3227,6 @@ void igt_pipe_request_out_fence(igt_pipe_t *pipe)
 	igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_OUT_FENCE_PTR, (ptrdiff_t)&pipe->out_fence_fd);
 }
 
-/**
- * igt_crtc_set_background:
- * @pipe: pipe pointer to which background color to be set
- * @background: background color value in BGR 16bpc
- *
- * Sets background color for requested pipe. Color value provided here
- * will be actually submitted at output commit time via "background_color"
- * property.
- * For example to get red as background, set background = 0x00000000FFFF.
- */
-void igt_crtc_set_background(igt_pipe_t *pipe, uint64_t background)
-{
-	igt_display_t *display = pipe->display;
-
-	LOG(display, "%s.%d: crtc_set_background(%"PRIx64")\n",
-	    kmstest_pipe_name(pipe->pipe),
-	    pipe->pipe, background);
-
-	igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_BACKGROUND, background);
-}
-
 void igt_wait_for_vblank_count(int drm_fd, enum pipe pipe, int count)
 {
 	drmVBlank wait_vbl;

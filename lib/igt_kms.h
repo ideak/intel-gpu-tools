@@ -378,7 +378,6 @@ void igt_plane_set_fence_fd(igt_plane_t *plane, int fence_fd);
 void igt_plane_set_position(igt_plane_t *plane, int x, int y);
 void igt_plane_set_size(igt_plane_t *plane, int w, int h);
 void igt_plane_set_rotation(igt_plane_t *plane, igt_rotation_t rotation);
-void igt_crtc_set_background(igt_pipe_t *pipe, uint64_t background);
 void igt_fb_set_position(struct igt_fb *fb, igt_plane_t *plane,
 	uint32_t x, uint32_t y);
 void igt_fb_set_size(struct igt_fb *fb, igt_plane_t *plane,

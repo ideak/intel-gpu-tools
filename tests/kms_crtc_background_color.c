@@ -97,7 +97,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_assert(fb_id);
 
 	/* To make FB pixel win with background color, set alpha as full opaque */
-	igt_crtc_set_background(plane->pipe, pipe_background_color);
+	igt_pipe_set_prop_value(display, pipe, IGT_CRTC_BACKGROUND, pipe_background_color);
 	if (opaque_buffer)
 		alpha = 1.0;    /* alpha 1 is fully opque */
 	else
@@ -117,7 +117,7 @@ static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 
 	igt_remove_fb(data->gfx_fd, &data->fb);
 
-	igt_crtc_set_background(plane->pipe, BLACK64);
+	igt_pipe_obj_set_prop_value(plane->pipe, IGT_CRTC_BACKGROUND, BLACK64);
 	igt_plane_set_fb(plane, NULL);
 	igt_output_set_pipe(output, PIPE_ANY);
 
@@ -144,26 +144,26 @@ static void test_crtc_background(data_t *data)
 		/* Now set background without using a plane, i.e.,
 		 * Disable the plane to let hw background color win blend. */
 		igt_plane_set_fb(plane, NULL);
-		igt_crtc_set_background(plane->pipe, PURPLE64);
+		igt_pipe_set_prop_value(display, pipe, IGT_CRTC_BACKGROUND, PURPLE64);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
 		/* Try few other background colors */
-		igt_crtc_set_background(plane->pipe, CYAN64);
+		igt_pipe_set_prop_value(display, pipe, IGT_CRTC_BACKGROUND, CYAN64);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-		igt_crtc_set_background(plane->pipe, YELLOW64);
+		igt_pipe_set_prop_value(display, pipe, IGT_CRTC_BACKGROUND, YELLOW64);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-		igt_crtc_set_background(plane->pipe, RED64);
+		igt_pipe_set_prop_value(display, pipe, IGT_CRTC_BACKGROUND, RED64);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-		igt_crtc_set_background(plane->pipe, GREEN64);
+		igt_pipe_set_prop_value(display, pipe, IGT_CRTC_BACKGROUND, GREEN64);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-		igt_crtc_set_background(plane->pipe, BLUE64);
+		igt_pipe_set_prop_value(display, pipe, IGT_CRTC_BACKGROUND, BLUE64);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-		igt_crtc_set_background(plane->pipe, WHITE64);
+		igt_pipe_set_prop_value(display, pipe, IGT_CRTC_BACKGROUND, WHITE64);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
 		valid_tests++;
