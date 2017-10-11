@@ -34,10 +34,7 @@
 IGT_TEST_DESCRIPTION("Test dma-buf mmap on !llc platforms mostly and provoke"
 		" coherency bugs so we know for sure where we need the sync ioctls.");
 
-#define ROUNDS 20
-
 int fd;
-int stale = 0;
 static drm_intel_bufmgr *bufmgr;
 struct intel_batchbuffer *batch;
 static int width = 1024, height = 1024;
@@ -49,13 +46,14 @@ static int width = 1024, height = 1024;
  *   3. write '1's, in GTT domain.
  *   4. read again through the mapped dma-buf.
  */
-static void test_read_flush(bool expect_stale_cache)
+static int test_read_flush(void)
 {
 	drm_intel_bo *bo_1;
 	drm_intel_bo *bo_2;
 	uint32_t *ptr_cpu;
 	uint32_t *ptr_gtt;
 	int dma_buf_fd, i;
+	int stale = 0;
 
 	bo_1 = drm_intel_bo_alloc(bufmgr, "BO 1", width * height * 4, 4096);
 
@@ -94,18 +92,16 @@ static void test_read_flush(bool expect_stale_cache)
 	 * stale cachelines from step #2 survive (mostly, a few will be evicted)
 	 * until we try to read them again in step #4. This behavior could be fixed
 	 * by flush CPU read right before accessing the CPU pointer */
-	if (!expect_stale_cache)
-		prime_sync_start(dma_buf_fd, false);
+	prime_sync_start(dma_buf_fd, false);
 
 	for (i = 0; i < (width * height) / 4; i++)
-		if (ptr_cpu[i] != 0xc5c5c5c5) {
-			igt_warn_on_f(!expect_stale_cache,
-				    "Found 0x%08x at offset 0x%08x\n", ptr_cpu[i], i);
+		if (ptr_cpu[i] != 0xc5c5c5c5)
 			stale++;
-		}
 
 	drm_intel_bo_unreference(bo_1);
 	munmap(ptr_cpu, width * height);
+
+	return stale;
 }
 
 /*
@@ -115,13 +111,14 @@ static void test_read_flush(bool expect_stale_cache)
  *   3. copy BO 1 to new BO 2, in GTT domain.
  *   4. read via dma-buf mmap BO 2.
  */
-static void test_write_flush(bool expect_stale_cache)
+static int test_write_flush(void)
 {
 	drm_intel_bo *bo_1;
 	drm_intel_bo *bo_2;
 	uint32_t *ptr_cpu;
 	uint32_t *ptr2_cpu;
 	int dma_buf_fd, dma_buf2_fd, i;
+	int stale = 0;
 
 	bo_1 = drm_intel_bo_alloc(bufmgr, "BO 1", width * height * 4, 4096);
 
@@ -143,8 +140,7 @@ static void test_write_flush(bool expect_stale_cache)
 
 	/* This is the main point of this test: !llc hw requires a cache write
 	 * flush right here (explained in step #4). */
-	if (!expect_stale_cache)
-		prime_sync_start(dma_buf_fd, true);
+	prime_sync_start(dma_buf_fd, true);
 
 	memset(ptr_cpu, 0x11, width * height);
 
@@ -164,15 +160,14 @@ static void test_write_flush(bool expect_stale_cache)
 	igt_assert(ptr2_cpu != MAP_FAILED);
 
 	for (i = 0; i < (width * height) / 4; i++)
-		if (ptr2_cpu[i] != 0x11111111) {
-			igt_warn_on_f(!expect_stale_cache,
-				      "Found 0x%08x at offset 0x%08x\n", ptr2_cpu[i], i);
+		if (ptr2_cpu[i] != 0x11111111)
 			stale++;
-		}
 
 	drm_intel_bo_unreference(bo_1);
 	drm_intel_bo_unreference(bo_2);
 	munmap(ptr_cpu, width * height);
+
+	return stale;
 }
 
 static void blit_and_cmp(void)
@@ -279,7 +274,6 @@ static void test_ioctl_errors(void)
 
 int main(int argc, char **argv)
 {
-	int i;
 	igt_subtest_init(argc, argv);
 
 	igt_fixture {
@@ -293,41 +287,20 @@ int main(int argc, char **argv)
 	/* Cache coherency and the eviction are pretty much unpredictable, so
 	 * reproducing boils down to trial and error to hit different scenarios.
 	 * TODO: We may want to improve tests a bit by picking random subranges. */
-	igt_info("%d rounds for each test\n", ROUNDS);
 	igt_subtest("read") {
-		stale = 0;
-		igt_info("exercising read flush\n");
-		for (i = 0; i < ROUNDS; i++)
-			test_read_flush(false);
-		igt_fail_on_f(stale, "num of stale cache lines %d\n", stale);
-	}
-
-	/* Only for !llc platforms */
-	igt_subtest("read-and-fail") {
-		igt_require(!gem_has_llc(fd));
-		stale = 0;
-		igt_info("exercising read flush and expect to fail on !llc\n");
-		for (i = 0; i < ROUNDS; i++)
-			test_read_flush(true);
-		igt_fail_on_f(!stale, "couldn't find any stale cache lines\n");
+		igt_until_timeout(5) {
+			int stale = test_read_flush();
+			igt_fail_on_f(stale,
+				      "num of stale cache lines %d\n", stale);
+		}
 	}
 
 	igt_subtest("write") {
-		stale = 0;
-		igt_info("exercising write flush\n");
-		for (i = 0; i < ROUNDS; i++)
-			test_write_flush(false);
-		igt_fail_on_f(stale, "num of stale cache lines %d\n", stale);
-	}
-
-	/* Only for !llc platforms */
-	igt_subtest("write-and-fail") {
-		igt_require(!gem_has_llc(fd));
-		stale = 0;
-		igt_info("exercising write flush and expect to fail on !llc\n");
-		for (i = 0; i < ROUNDS; i++)
-			test_write_flush(true);
-		igt_fail_on_f(!stale, "couldn't find any stale cache lines\n");
+		igt_until_timeout(5) {
+			int stale = test_write_flush();
+			igt_fail_on_f(stale,
+				      "num of stale cache lines %d\n", stale);
+		}
 	}
 
 	igt_subtest("ioctl-errors") {
