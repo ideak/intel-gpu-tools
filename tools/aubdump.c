@@ -407,6 +407,7 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 	uint32_t offset = gtt_size();
 	struct drm_i915_gem_exec_object2 *obj;
 	struct bo *bo, *batch_bo;
+	int batch_index;
 	void *data;
 
 	/* We can't do this at open time as we're not yet authenticated. */
@@ -460,7 +461,7 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 		fail_if(bo->map == MAP_FAILED, "intel_aubdump: bo mmap failed\n");
 	}
 
-	int batch_index = (execbuffer2->flags & I915_EXEC_BATCH_FIRST) ? 0 :
+	batch_index = (execbuffer2->flags & I915_EXEC_BATCH_FIRST) ? 0 :
 			  execbuffer2->buffer_count - 1;
 	batch_bo = get_bo(exec_objects[batch_index].handle);
 	for (uint32_t i = 0; i < execbuffer2->buffer_count; i++) {
