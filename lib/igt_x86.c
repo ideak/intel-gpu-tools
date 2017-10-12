@@ -93,6 +93,7 @@
 
 #define has_YMM 0x1
 
+#if defined(__x86_64__) || defined(__i386__)
 unsigned igt_x86_features(void)
 {
 	unsigned max = __get_cpuid_max(BASIC_CPUID, 0);
@@ -172,3 +173,4 @@ char *igt_x86_features_to_string(unsigned features, char *line)
 
 	return ret;
 }
+#endif

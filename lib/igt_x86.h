@@ -40,7 +40,7 @@
 #define AVX	0x80
 #define AVX2	0x100
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__i386__)
 unsigned igt_x86_features(void);
 char *igt_x86_features_to_string(unsigned features, char *line);
 #else
