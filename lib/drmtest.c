@@ -355,7 +355,7 @@ static const char *chipset_to_str(int chipset)
 	case DRIVER_ANY:
 		return "any";
 	default:
-		return "otehr";
+		return "other";
 	}
 }
 
