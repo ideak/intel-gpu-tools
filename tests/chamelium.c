@@ -416,6 +416,8 @@ prepare_output(data_t *data,
 	drmModeRes *res;
 	drmModeConnector *connector =
 		chamelium_port_get_connector(data->chamelium, port, false);
+	enum pipe pipe;
+	bool found = false;
 
 	igt_assert(res = drmModeGetResources(data->drm_fd));
 	kmstest_unset_all_crtcs(data->drm_fd, res);
@@ -433,7 +435,18 @@ prepare_output(data_t *data,
 
 	igt_assert(kmstest_probe_connector_config(
 		data->drm_fd, connector->connector_id, ~0, &output->config));
-	igt_output_set_pipe(output, output->config.pipe);
+
+	for_each_pipe(display, pipe) {
+		if (!igt_pipe_connector_valid(pipe, output))
+			continue;
+
+		found = true;
+		break;
+	}
+
+	igt_assert_f(found, "No pipe found for output %s\n", igt_output_name(output));
+
+	igt_output_set_pipe(output, pipe);
 
 	drmModeFreeConnector(connector);
 	drmModeFreeResources(res);
@@ -458,8 +471,6 @@ enable_output(data_t *data,
 	igt_plane_set_size(primary, mode->hdisplay, mode->vdisplay);
 	igt_plane_set_fb(primary, fb);
 	igt_output_override_mode(output, mode);
-
-	igt_output_set_pipe(output, output->config.pipe);
 
 	/* Clear any color correction values that might be enabled */
 	igt_pipe_obj_replace_prop_blob(primary->pipe, IGT_CRTC_DEGAMMA_LUT, NULL, 0);
