@@ -932,25 +932,25 @@ accumulator_print(struct accumulator *accumulator, const char *title)
 
 	igt_debug("%s:\n", title);
 	if (intel_gen(devid) >= 8) {
-		igt_debug("\ttime delta = %lu\n", deltas[idx++]);
-		igt_debug("\tclock cycle delta = %lu\n", deltas[idx++]);
+		igt_debug("\ttime delta = %"PRIu64"\n", deltas[idx++]);
+		igt_debug("\tclock cycle delta = %"PRIu64"\n", deltas[idx++]);
 
 		for (int i = 0; i < format.n_a40; i++)
-			igt_debug("\tA%u = %lu\n", i, deltas[idx++]);
+			igt_debug("\tA%u = %"PRIu64"\n", i, deltas[idx++]);
 	} else {
-		igt_debug("\ttime delta = %lu\n", deltas[idx++]);
+		igt_debug("\ttime delta = %"PRIu64"\n", deltas[idx++]);
 	}
 
 	for (int i = 0; i < format.n_a; i++) {
 		int a_id = format.first_a + i;
-		igt_debug("\tA%u = %lu\n", a_id, deltas[idx++]);
+		igt_debug("\tA%u = %"PRIu64"\n", a_id, deltas[idx++]);
 	}
 
 	for (int i = 0; i < format.n_a; i++)
-		igt_debug("\tB%u = %lu\n", i, deltas[idx++]);
+		igt_debug("\tB%u = %"PRIu64"\n", i, deltas[idx++]);
 
 	for (int i = 0; i < format.n_c; i++)
-		igt_debug("\tC%u = %lu\n", i, deltas[idx++]);
+		igt_debug("\tC%u = %"PRIu64"\n", i, deltas[idx++]);
 }
 
 /* The TestOa metric set is designed so */
@@ -2126,7 +2126,7 @@ test_oa_exponents(void)
 						}
 
 						igt_debug(" > report ts=%u"
-							  " ts_delta_last=%8u ts_delta_last_periodic=%8u is_timer=%i ctx_id=%8x gpu_ticks=%u period=%.2f A0=%lu A%i=%lu\n",
+							  " ts_delta_last=%8u ts_delta_last_periodic=%8u is_timer=%i ctx_id=%8x gpu_ticks=%u period=%.2f A0=%"PRIu64" A%i=%"PRIu64"\n",
 							  rpt[1],
 							  (last != NULL) ? (rpt[1] - last[1]) : 0,
 							  (last_periodic != NULL) ? (rpt[1] - last_periodic[1]) : 0,
@@ -2796,7 +2796,7 @@ test_buffer_fill(void)
 
 		do_ioctl(stream_fd, I915_PERF_IOCTL_DISABLE, 0);
 
-		igt_debug("fill_duration = %luns, oa_exponent = %u\n",
+		igt_debug("fill_duration = %"PRIu64"ns, oa_exponent = %u\n",
 			  fill_duration, oa_exponent);
 
 		do_ioctl(stream_fd, I915_PERF_IOCTL_ENABLE, 0);
@@ -2813,7 +2813,7 @@ test_buffer_fill(void)
 		 */
 		while (((last_timestamp - first_timestamp) * oa_period) < (fill_duration / 2)) {
 
-			igt_debug("dts=%u elapsed=%lu duration=%lu\n",
+			igt_debug("dts=%u elapsed=%"PRIu64" duration=%"PRIu64"\n",
 				  last_timestamp - first_timestamp,
 				  (last_timestamp - first_timestamp) * oa_period,
 				  fill_duration / 2);
@@ -2881,7 +2881,7 @@ test_buffer_fill(void)
 
 		do_ioctl(stream_fd, I915_PERF_IOCTL_DISABLE, 0);
 
-		igt_debug("%f < %lu < %f\n",
+		igt_debug("%f < %zu < %f\n",
 			  report_size * n_full_oa_reports * 0.45,
 			  n_periodic_reports * report_size,
 			  report_size * n_full_oa_reports * 0.55);
@@ -3032,7 +3032,7 @@ test_enable_disable(void)
 
 		do_ioctl(stream_fd, I915_PERF_IOCTL_DISABLE, 0);
 
-		igt_debug("%f < %lu < %f\n",
+		igt_debug("%f < %zu < %f\n",
 			  report_size * n_full_oa_reports * 0.45,
 			  n_periodic_reports * report_size,
 			  report_size * n_full_oa_reports * 0.55);
@@ -3783,7 +3783,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 
 			memset(accumulator.deltas, 0, sizeof(accumulator.deltas));
 			accumulate_reports(&accumulator, report0_32, report1_32);
-			igt_debug("total: A0 = %lu, A21 = %lu, A26 = %lu\n",
+			igt_debug("total: A0 = %"PRIu64", A21 = %"PRIu64", A26 = %"PRIu64"\n",
 				  accumulator.deltas[2 + 0], /* skip timestamp + clock cycles */
 				  accumulator.deltas[2 + 21],
 				  accumulator.deltas[2 + 26]);
@@ -3905,7 +3905,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 				if (lprev) {
 					memset(laccumulator.deltas, 0, sizeof(laccumulator.deltas));
 					accumulate_reports(&laccumulator, lprev, report);
-					igt_debug("    deltas: A0=%lu A21=%lu, A26=%lu\n",
+					igt_debug("    deltas: A0=%"PRIu64" A21=%"PRIu64", A26=%"PRIu64"\n",
 						  laccumulator.deltas[2 + 0], /* skip timestamp + clock cycles */
 						  laccumulator.deltas[2 + 21],
 						  laccumulator.deltas[2 + 26]);
@@ -3946,7 +3946,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 
 				if (!skip_reason) {
 					accumulate_reports(&accumulator, prev, report);
-					igt_debug(" -> Accumulated deltas A0=%lu A21=%lu, A26=%lu\n",
+					igt_debug(" -> Accumulated deltas A0=%"PRIu64" A21=%"PRIu64", A26=%"PRIu64"\n",
 						  accumulator.deltas[2 + 0], /* skip timestamp + clock cycles */
 						  accumulator.deltas[2 + 21],
 						  accumulator.deltas[2 + 26]);
@@ -3974,7 +3974,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 				}
 			}
 
-			igt_debug("n samples written = %ld/%lu (%ix%i)\n",
+			igt_debug("n samples written = %"PRIu64"/%"PRIu64" (%ix%i)\n",
 				  accumulator.deltas[2 + 21],/* skip timestamp + clock cycles */
 				  accumulator.deltas[2 + 26],
 				  width, height);
