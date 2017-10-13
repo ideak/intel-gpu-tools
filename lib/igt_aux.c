@@ -794,7 +794,7 @@ static void suspend_via_rtcwake(enum igt_suspend_state state)
 	 */
 	snprintf(cmd, sizeof(cmd), "rtcwake -n -s %d -m %s " SQUELCH,
 		 delay, suspend_state_name[state]);
-	ret = system(cmd);
+	ret = igt_system(cmd);
 	igt_require_f(ret == 0, "rtcwake test failed with %i\n"
 		     "This failure could mean that something is wrong with "
 		     "the rtcwake tool or how your distro is set up.\n",
@@ -802,7 +802,7 @@ static void suspend_via_rtcwake(enum igt_suspend_state state)
 
 	snprintf(cmd, sizeof(cmd), "rtcwake -s %d -m %s ",
 		 delay, suspend_state_name[state]);
-	ret = system(cmd);
+	ret = igt_system(cmd);
 	igt_assert_f(ret == 0,
 		     "rtcwake failed with %i\n"
 		     "Check dmesg for further details.\n",
