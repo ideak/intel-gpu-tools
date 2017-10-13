@@ -209,11 +209,50 @@ void igt_disallow_hang(int fd, igt_hang_t arg)
 }
 
 /**
+ * has_ctx_exec:
+ * @fd: open i915 drm file descriptor
+ * @ring: execbuf ring flag
+ * @ctx: Context to be checked
+ *
+ * This helper function checks if non default context submission is allowed
+ * on a ring.
+ *
+ * Returns:
+ * True if allowed
+ *
+ */
+static bool has_ctx_exec(int fd, unsigned ring, uint32_t ctx)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 exec;
+
+	/* silly ABI, the kernel thinks everyone who has BSD also has BSD2 */
+	if ((ring & ~(3<<13)) == I915_EXEC_BSD) {
+		if (ring & (3 << 13) && !gem_has_bsd2(fd))
+			return false;
+	}
+
+	memset(&exec, 0, sizeof(exec));
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&exec);
+	execbuf.buffer_count = 1;
+	execbuf.flags = ring;
+	execbuf.rsvd1 = ctx;
+	/*
+	 * If context submission is not allowed, this will return EINVAL
+	 * Otherwise, this will return ENOENT on account of no gem obj
+	 * being submitted
+	 */
+	return __gem_execbuf(fd, &execbuf) == -ENOENT;
+}
+
+/**
  * igt_hang_ring_ctx:
  * @fd: open i915 drm file descriptor
  * @ctx: the contxt specifier
  * @ring: execbuf ring flag
  * @flags: set of flags to control execution
+ * @offset: The resultant gtt offset of the exec obj
  *
  * This helper function injects a hanging batch associated with @ctx into @ring.
  * It returns a #igt_hang_t structure which must be passed to
@@ -239,8 +278,8 @@ igt_hang_t igt_hang_ctx(int fd,
 
 	igt_require_hang_ring(fd, ring);
 
-	/* One day the kernel ABI will be fixed! */
-	igt_require(ctx == 0 || ring == I915_EXEC_RENDER);
+	/* check if non-default ctx submission is allowed */
+	igt_require(ctx == 0 || has_ctx_exec(fd, ring, ctx));
 
 	param.context = ctx;
 	param.size = 0;
