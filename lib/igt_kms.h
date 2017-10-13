@@ -221,7 +221,6 @@ uint32_t kmstest_dumb_create(int fd, int width, int height, int bpp,
 void *kmstest_dumb_map_buffer(int fd, uint32_t handle, uint64_t size,
 			      unsigned prot);
 unsigned int kmstest_get_vblank(int fd, int pipe, unsigned int flags);
-void kmstest_get_crtc(int fd, enum pipe pipe, struct kmstest_crtc *crtc);
 void igt_assert_plane_visible(int fd, enum pipe pipe, bool visibility);
 
 /*

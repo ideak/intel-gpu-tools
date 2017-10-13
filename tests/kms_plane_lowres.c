@@ -39,8 +39,6 @@ IGT_TEST_DESCRIPTION("Test atomic mode setting with a plane by switching between
 typedef struct {
 	int drm_fd;
 	igt_display_t display;
-	igt_pipe_crc_t *pipe_crc;
-	igt_plane_t **plane;
 	struct igt_fb *fb;
 } data_t;
 
@@ -110,63 +108,47 @@ get_lowres_mode(int drmfd, drmModeModeInfo *mode_default)
 }
 
 static void
-test_init(data_t *data, enum pipe pipe)
+test_fini(data_t *data, igt_output_t *output, enum pipe pipe)
 {
-	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
-	data->plane = calloc(data->display.pipes[pipe].n_planes, sizeof(data->plane));\
-	igt_assert_f(data->plane, "Failed to allocate memory for %d planes\n",
-	             data->display.pipes[pipe].n_planes);
-	data->fb = calloc(data->display.pipes[pipe].n_planes, sizeof(struct igt_fb));
-	igt_assert_f(data->fb, "Failed to allocate memory for %d FBs\n",
-	             data->display.pipes[pipe].n_planes);
-}
+	igt_plane_t *plane;
 
-static void
-test_fini(data_t *data, igt_output_t *output)
-{
 	/* restore original mode */
 	igt_output_override_mode(output, NULL);
 
-	for (int i = 0; i < 2; i++)
-		igt_plane_set_fb(data->plane[i], NULL);
+	for_each_plane_on_pipe(&data->display, pipe, plane)
+		igt_plane_set_fb(plane, NULL);
 
 	/* reset the constraint on the pipe */
 	igt_output_set_pipe(output, PIPE_ANY);
 
-	igt_pipe_crc_free(data->pipe_crc);
-
-	free(data->plane);
-	data->plane = NULL;
 	free(data->fb);
 	data->fb = NULL;
 }
 
 static int
-display_commit_mode(data_t *data, enum pipe pipe, int flags, igt_crc_t *crc)
+display_commit_mode(igt_display_t *display, igt_pipe_crc_t *pipe_crc,
+		    enum pipe pipe, int flags, igt_crc_t *crc)
 {
 	char buf[256];
 	struct drm_event *e = (void *)buf;
 	unsigned int vblank_start, vblank_stop;
 	int n, ret;
 
-	vblank_start = kmstest_get_vblank(data->display.drm_fd, pipe,
+	vblank_start = kmstest_get_vblank(display->drm_fd, pipe,
 					  DRM_VBLANK_NEXTONMISS);
 
-	ret = igt_display_try_commit_atomic(&data->display,
-					    flags,
-					    NULL);
+	ret = igt_display_try_commit_atomic(display, flags, NULL);
 	igt_skip_on(ret != 0);
 
 	igt_set_timeout(1, "Stuck on page flip");
-	ret = read(data->display.drm_fd, buf, sizeof(buf));
+	ret = read(display->drm_fd, buf, sizeof(buf));
 	igt_assert(ret >= 0);
 
-	vblank_stop = kmstest_get_vblank(data->display.drm_fd, pipe, 0);
+	vblank_stop = kmstest_get_vblank(display->drm_fd, pipe, 0);
 	igt_assert_eq(e->type, DRM_EVENT_FLIP_COMPLETE);
 	igt_reset_timeout();
 
-	n = igt_pipe_crc_get_crcs(data->pipe_crc, vblank_stop - vblank_start,
-				  &crc);
+	n = igt_pipe_crc_get_crcs(pipe_crc, vblank_stop - vblank_start, &crc);
 	igt_assert_eq(n, vblank_stop - vblank_start);
 
 	return n;
@@ -184,21 +166,18 @@ static drmModeModeInfo *
 test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 	   igt_output_t *output)
 {
-	struct kmstest_crtc crtc;
 	drmModeModeInfo *mode;
 	int size;
-	int i, x, y;
+	int i = 1, x, y;
+	igt_plane_t *plane;
 
 	igt_output_set_pipe(output, pipe);
 
-	kmstest_get_crtc(data->drm_fd, pipe, &crtc);
-	igt_skip_on(crtc.n_planes > data->display.pipes[pipe].n_planes);
-	igt_skip_on(crtc.n_planes == 0);
-
-	for (i = 0; i < crtc.n_planes; i++)
-		data->plane[i] = igt_output_get_plane(output, crtc.planes[i].index);
-
 	mode = igt_output_get_mode(output);
+
+	data->fb = calloc(data->display.pipes[pipe].n_planes, sizeof(struct igt_fb));
+	igt_assert_f(data->fb, "Failed to allocate memory for %d FBs\n",
+	             data->display.pipes[pipe].n_planes);
 
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
@@ -206,13 +185,14 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 			    0.0, 0.0, 1.0,
 			    &data->fb[0]);
 
-	igt_plane_set_fb(data->plane[0], &data->fb[0]);
-
 	/* yellow sprite plane in lower left corner */
-	for (i = 0; i < crtc.n_planes; i++) {
-		if (data->plane[i]->type == DRM_PLANE_TYPE_PRIMARY)
+	for_each_plane_on_pipe(&data->display, pipe, plane) {
+		if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
+			igt_plane_set_fb(plane, &data->fb[0]);
 			continue;
-		if (data->plane[i]->type == DRM_PLANE_TYPE_CURSOR)
+		}
+
+		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			size = 64;
 		else
 			size = SIZE;
@@ -222,13 +202,13 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
 
 		igt_create_color_fb(data->drm_fd,
 				    size, size,
-				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
-				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? LOCAL_DRM_FORMAT_MOD_NONE : modifier,
+				    plane->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
+				    plane->type == DRM_PLANE_TYPE_CURSOR ? LOCAL_DRM_FORMAT_MOD_NONE : modifier,
 				    1.0, 1.0, 0.0,
 				    &data->fb[i]);
 
-		igt_plane_set_position(data->plane[i], x, y);
-		igt_plane_set_fb(data->plane[i], &data->fb[i]);
+		igt_plane_set_position(plane, x, y);
+		igt_plane_set_fb(plane, &data->fb[i++]);
 	}
 
 	return mode;
@@ -244,21 +224,22 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 	drmModeModeInfo *mode1, *mode2, *mode3;
 	int ret, n;
 	int flags = DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_ALLOW_MODESET;
+	igt_pipe_crc_t *pipe_crc;
 
 	igt_info("Testing connector %s using pipe %s\n",
 		 igt_output_name(output), kmstest_pipe_name(pipe));
-
-	test_init(data, pipe);
 
 	mode1 = test_setup(data, pipe, modifier, flags, output);
 
 	mode_lowres = get_lowres_mode(data->drm_fd, mode1);
 
-	igt_pipe_crc_start(data->pipe_crc);
 	ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
 	igt_skip_on(ret != 0);
 
-	n = igt_pipe_crc_get_crcs(data->pipe_crc, 1, &crc_hires1);
+	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	igt_pipe_crc_start(pipe_crc);
+
+	n = igt_pipe_crc_get_crcs(pipe_crc, 1, &crc_hires1);
 	igt_assert_eq(1, n);
 
 	igt_assert_plane_visible(data->drm_fd, pipe, true);
@@ -271,7 +252,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	check_mode(&mode_lowres, mode2);
 
-	display_commit_mode(data, pipe, flags, crc_lowres);
+	display_commit_mode(&data->display, pipe_crc, pipe, flags, crc_lowres);
 
 	igt_assert_plane_visible(data->drm_fd, pipe, false);
 
@@ -283,41 +264,39 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	check_mode(mode1, mode3);
 
-	display_commit_mode(data, pipe, flags, crc_hires2);
+	display_commit_mode(&data->display, pipe_crc, pipe, flags, crc_hires2);
 
 	igt_assert_plane_visible(data->drm_fd, pipe, true);
 
-	igt_pipe_crc_stop(data->pipe_crc);
+	igt_pipe_crc_stop(pipe_crc);
+	igt_pipe_crc_free(pipe_crc);
 
-	test_fini(data, output);
+	test_fini(data, output, pipe);
 }
 
 static void
 test_plane_position(data_t *data, enum pipe pipe, uint64_t modifier)
 {
 	igt_output_t *output;
-	int connected_outs;
 	const int gen = intel_gen(intel_get_drm_devid(data->drm_fd));
-
-	igt_require(data->display.is_atomic);
-	igt_skip_on(pipe >= data->display.n_pipes);
 
 	if (modifier == LOCAL_I915_FORMAT_MOD_Y_TILED ||
 	    modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED)
 		igt_skip_on(gen < 9);
 
-	connected_outs = 0;
-	for_each_valid_output_on_pipe(&data->display, pipe, output) {
+	for_each_valid_output_on_pipe(&data->display, pipe, output)
 		test_plane_position_with_output(data, pipe, output, modifier);
-		connected_outs++;
-	}
-
-	igt_skip_on(connected_outs == 0);
 }
 
 static void
 run_tests_for_pipe(data_t *data, enum pipe pipe)
 {
+	igt_fixture {
+		igt_skip_on(pipe >= data->display.n_pipes);
+
+		igt_display_require_output_on_pipe(&data->display, pipe);
+	}
+
 	igt_subtest_f("pipe-%s-tiling-none",
 		      kmstest_pipe_name(pipe))
 		test_plane_position(data, pipe, LOCAL_DRM_FORMAT_MOD_NONE);
@@ -350,10 +329,12 @@ igt_main
 
 		igt_require_pipe_crc(data.drm_fd);
 		igt_display_init(&data.display, data.drm_fd);
+		igt_require(data.display.is_atomic);
 	}
 
 	for_each_pipe_static(pipe)
-		run_tests_for_pipe(&data, pipe);
+		igt_subtest_group
+			run_tests_for_pipe(&data, pipe);
 
 	igt_fixture {
 		igt_display_fini(&data.display);

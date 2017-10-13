@@ -1416,7 +1416,7 @@ static void parse_crtc(char *info, struct kmstest_crtc *crtc)
 	igt_assert_eq(ret, 2);
 }
 
-void kmstest_get_crtc(int device, enum pipe pipe, struct kmstest_crtc *crtc)
+static void kmstest_get_crtc(int device, enum pipe pipe, struct kmstest_crtc *crtc)
 {
 	char tmp[256];
 	FILE *file;
@@ -1460,7 +1460,7 @@ void kmstest_get_crtc(int device, enum pipe pipe, struct kmstest_crtc *crtc)
 	fclose(file);
 	close(fd);
 
-	igt_skip_on(ncrtc == 0);
+	igt_assert(ncrtc == 1);
 }
 
 void igt_assert_plane_visible(int fd, enum pipe pipe, bool visibility)
@@ -1485,6 +1485,7 @@ void igt_assert_plane_visible(int fd, enum pipe pipe, bool visibility)
 		}
 	}
 
+	free(crtc.planes);
 	igt_assert_eq(visible, visibility);
 }
 
