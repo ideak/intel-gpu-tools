@@ -57,18 +57,9 @@ static void assert_empty(int fd)
 	do_or_die(poll(&pfd, 1, 0));
 }
 
-static void generate_event(int fd)
+static void generate_event(int fd, enum pipe pipe)
 {
-	union drm_wait_vblank vbl;
-
-	/* We require that pipe 0 is running */
-
-	vbl.request.type =
-		DRM_VBLANK_RELATIVE |
-		DRM_VBLANK_EVENT;
-	vbl.request.sequence = 0;
-
-	do_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
+	igt_assert(kmstest_get_vblank(fd, pipe, DRM_VBLANK_EVENT));
 }
 
 static void wait_for_event(int fd)
@@ -120,7 +111,7 @@ static void test_invalid_buffer(int in)
 	teardown(fd);
 }
 
-static void test_fault_buffer(int in)
+static void test_fault_buffer(int in, enum pipe pipe)
 {
 	int fd = setup(in, 0);
 	struct drm_mode_map_dumb arg;
@@ -134,7 +125,7 @@ static void test_fault_buffer(int in)
 	buf = mmap(0, 4096, PROT_WRITE, MAP_SHARED, fd, arg.offset);
 	igt_assert(buf != MAP_FAILED);
 
-	generate_event(fd);
+	generate_event(fd, pipe);
 
 	alarm(1);
 
@@ -156,13 +147,13 @@ static void test_empty(int in, int nonblock, int expected)
 	teardown(fd);
 }
 
-static void test_short_buffer(int in, int nonblock)
+static void test_short_buffer(int in, int nonblock, enum pipe pipe)
 {
 	char buffer[1024]; /* events are typically 32 bytes */
 	int fd = setup(in, nonblock);
 
-	generate_event(fd);
-	generate_event(fd);
+	generate_event(fd, pipe);
+	generate_event(fd, pipe);
 
 	wait_for_event(fd);
 
@@ -175,31 +166,46 @@ static void test_short_buffer(int in, int nonblock)
 	teardown(fd);
 }
 
-static bool crtc0_active(int fd)
-{
-	union drm_wait_vblank vbl = {};
-
-	vbl.request.type = DRM_VBLANK_RELATIVE;
-	return drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl) == 0;
-}
-
 igt_main
 {
 	int fd;
+	igt_display_t display;
+	struct igt_fb fb;
+	enum pipe pipe;
 
 	signal(SIGALRM, sighandler);
 	siginterrupt(SIGALRM, 1);
 
 	igt_fixture {
+		igt_output_t *output;
+
 		fd = drm_open_driver_master(DRIVER_ANY);
-		igt_require(crtc0_active(fd));
+		kmstest_set_vt_graphics_mode();
+
+		igt_display_init(&display, fd);
+		igt_display_require_output(&display);
+
+		for_each_pipe_with_valid_output(&display, pipe, output) {
+			drmModeModeInfo *mode = igt_output_get_mode(output);
+
+			igt_create_pattern_fb(fd, mode->hdisplay, mode->vdisplay,
+					      DRM_FORMAT_XRGB8888,
+					      LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+
+			igt_output_set_pipe(output, pipe);
+			igt_plane_set_fb(igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY), &fb);
+			break;
+		}
+
+		igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+		igt_require(kmstest_get_vblank(fd, pipe, 0));
 	}
 
 	igt_subtest("invalid-buffer")
 		test_invalid_buffer(fd);
 
 	igt_subtest("fault-buffer")
-		test_fault_buffer(fd);
+		test_fault_buffer(fd, pipe);
 
 	igt_subtest("empty-block")
 		test_empty(fd, 0, EINTR);
@@ -208,8 +214,8 @@ igt_main
 		test_empty(fd, 1, EAGAIN);
 
 	igt_subtest("short-buffer-block")
-		test_short_buffer(fd, 0);
+		test_short_buffer(fd, 0, pipe);
 
 	igt_subtest("short-buffer-nonblock")
-		test_short_buffer(fd, 1);
+		test_short_buffer(fd, 1, pipe);
 }
