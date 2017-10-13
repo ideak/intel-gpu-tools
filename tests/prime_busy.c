@@ -186,9 +186,14 @@ static void test_engine_mode(int fd,
 			igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 
 			if ((flags & HANG) == 0)
+			{
 				igt_fork_hang_detector(fd);
+			}
 			else
+			{
+				igt_skip_on_simulation();
 				hang = igt_allow_hang(fd, 0, 0);
+			}
 		}
 
 		igt_subtest_f("%s%s-%s",
@@ -214,8 +219,6 @@ igt_main
 {
 	const struct intel_execution_engine *e;
 	int fd = -1;
-
-	igt_skip_on_simulation();
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);

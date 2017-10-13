@@ -226,8 +226,6 @@ int main(int argc, char **argv)
 		{ -1 },
 	}, *c;
 
-	igt_skip_on_simulation();
-
 	igt_subtest_init(argc, argv);
 
 	if (argc > 1 && atoi(argv[1]))

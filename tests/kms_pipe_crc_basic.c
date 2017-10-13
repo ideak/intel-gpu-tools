@@ -180,8 +180,6 @@ data_t data = {0, };
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
@@ -206,6 +204,8 @@ igt_main
 
 	igt_subtest("bad-nb-words-3")
 		test_bad_command(&data, "pipe A none option");
+
+	igt_skip_on_simulation();
 
 	for (int i = 0; i < 3; i++) {
 		igt_subtest_f("read-crc-pipe-%c", 'A'+i)

@@ -760,8 +760,6 @@ igt_main
 	int i915 = -1;
 	int vgem = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		vgem = drm_open_driver(DRIVER_VGEM);
 		igt_require(has_prime_export(vgem));

@@ -165,6 +165,9 @@ igt_main
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%s%s", e->exec_id == 0 ? "basic-" : "", e->name)
 			single(fd, light, e, 0, 1, 5);
+
+		igt_skip_on_simulation();
+
 		igt_subtest_f("%s%s-heavy", e->exec_id == 0 ? "basic-" : "", e->name)
 			single(fd, heavy, e, 0, 1, 5);
 		igt_subtest_f("%s-interruptible", e->name)

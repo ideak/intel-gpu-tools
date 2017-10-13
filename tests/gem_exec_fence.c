@@ -1426,8 +1426,6 @@ igt_main
 	const struct intel_execution_engine *e;
 	int i915 = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		i915 = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(i915);
@@ -1480,6 +1478,8 @@ igt_main
 
 			igt_subtest_group {
 				igt_hang_t hang;
+
+				igt_skip_on_simulation();
 
 				igt_fixture {
 					hang = igt_allow_hang(i915, 0, 0);

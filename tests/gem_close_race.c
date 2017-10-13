@@ -209,8 +209,6 @@ static void threads(int timeout)
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		int fd;
 

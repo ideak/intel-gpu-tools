@@ -154,8 +154,6 @@ int fd;
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		fd = drm_open_driver_render(DRIVER_INTEL);
 		igt_require_gem(fd);
@@ -188,6 +186,8 @@ igt_main
 
 	igt_subtest("reset-pin-leak") {
 		int i;
+
+		igt_skip_on_simulation();
 
 		/*
 		 * Use an explicit context to isolate the test from

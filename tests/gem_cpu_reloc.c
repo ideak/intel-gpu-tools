@@ -254,7 +254,6 @@ igt_main
 		run_test (fd, 10);
 	}
 
-	igt_skip_on_simulation();
 
 	igt_subtest("full") {
 		aper_size = gem_mappable_aperture_size();

@@ -378,6 +378,8 @@ igt_main
 				      e->name,
 				      m->suffix) {
 				igt_skip_on(m->flags & NEWFD && master);
+				if (m->flags & (HANG|SUSPEND|HIBERNATE))
+					igt_skip_on_simulation();
 				run_test(fd, e->exec_id | e->flags,
 					 m->flags, m->timeout);
 			}

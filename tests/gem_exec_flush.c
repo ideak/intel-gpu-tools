@@ -576,8 +576,6 @@ igt_main
 	unsigned cpu = x86_64_features();
 	int fd = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		igt_require(igt_setup_clflush());
 		fd = drm_open_driver(DRIVER_INTEL);

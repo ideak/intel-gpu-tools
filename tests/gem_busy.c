@@ -505,8 +505,6 @@ igt_main
 	const struct intel_execution_engine *e;
 	int fd = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
@@ -601,6 +599,7 @@ igt_main
 			igt_subtest_f("%shang-%s",
 				      e->exec_id == 0 ? "basic-" : "",
 				      e->name) {
+				igt_skip_on_simulation();
 				igt_require(gem_has_ring(fd, e->exec_id | e->flags));
 				gem_quiescent_gpu(fd);
 				basic(fd, e->exec_id | e->flags, HANG);
@@ -619,6 +618,7 @@ igt_main
 					continue;
 
 				igt_subtest_f("extended-hang-%s", e->name) {
+					igt_skip_on_simulation();
 					gem_require_ring(fd, e->exec_id | e->flags);
 					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 
