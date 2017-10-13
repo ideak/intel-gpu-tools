@@ -35,10 +35,3 @@ test per feature.
 
 The string "basic" in a test name means the test probably belongs in
 this list.
-
-=================================
-fast-feedback-simulation.testlist
-=================================
-
-fast-feedback-simulation is a version of fast-feedback.testlist for
-simulation environments.
