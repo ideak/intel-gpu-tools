@@ -2282,6 +2282,13 @@ int igt_system(const char *command)
 	if (pipe(errpipe) < 0)
 		goto err;
 
+	/*
+	 * The clone() system call called from a largish executable has
+	 * difficulty to make progress if interrupted too frequently, so
+	 * suspend the signal helper for the time of the syscall.
+	 */
+	igt_suspend_signal_helper();
+
 	igt_fork_helper(&process) {
 		close(outpipe[0]);
 		close(errpipe[0]);
@@ -2297,6 +2304,8 @@ int igt_system(const char *command)
 	child_err:
 		exit(EXIT_FAILURE);
 	}
+
+	igt_resume_signal_helper();
 
 	close(outpipe[1]);
 	close(errpipe[1]);
@@ -2340,8 +2349,13 @@ int igt_system_quiet(const char *command)
 	if (dup2(nullfd, STDERR_FILENO) == -1)
 		goto err;
 
+	/* See igt_system() for the reason for suspending the signal helper. */
+	igt_suspend_signal_helper();
+
 	if ((status = system(command)) == -1)
 		goto err;
+
+	igt_resume_signal_helper();
 
 	/* restore */
 	if (dup2(stdout_fd_copy, STDOUT_FILENO) == -1)
@@ -2355,6 +2369,8 @@ int igt_system_quiet(const char *command)
 
 	return WEXITSTATUS(status);
 err:
+	igt_resume_signal_helper();
+
 	close(stderr_fd_copy);
 	close(stdout_fd_copy);
 	close(nullfd);

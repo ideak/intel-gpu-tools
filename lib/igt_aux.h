@@ -55,6 +55,8 @@ extern int num_trash_bos;
 /* generally useful helpers */
 void igt_fork_signal_helper(void);
 void igt_stop_signal_helper(void);
+void igt_suspend_signal_helper(void);
+void igt_resume_signal_helper(void);
 
 void igt_fork_shrink_helper(int fd);
 void igt_stop_shrink_helper(void);

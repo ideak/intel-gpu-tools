@@ -350,6 +350,44 @@ void igt_stop_signal_helper(void)
 	sig_stat = 0;
 }
 
+/**
+ * igt_suspend_signal_helper:
+ *
+ * Suspends the child process spawned with igt_fork_signal_helper(). This
+ * should be called before a critical section of code that has difficulty to
+ * make progress if interrupted frequently, like the clone() syscall called
+ * from a largish executable. igt_resume_signal_helper() must be called after
+ * the critical section to restart interruptions for the test.
+ */
+void igt_suspend_signal_helper(void)
+{
+	int status;
+
+	if (!signal_helper.running)
+		return;
+
+	kill(signal_helper.pid, SIGSTOP);
+	while (waitpid(signal_helper.pid, &status, WUNTRACED) == -1 &&
+	       errno == EINTR)
+		;
+}
+
+/**
+ * igt_resume_signal_helper:
+ *
+ * Resumes the child process spawned with igt_fork_signal_helper().
+ *
+ * This should be paired with igt_suspend_signal_helper() and called after the
+ * problematic code sensitive to signals.
+ */
+void igt_resume_signal_helper(void)
+{
+	if (!signal_helper.running)
+		return;
+
+	kill(signal_helper.pid, SIGCONT);
+}
+
 static struct igt_helper_process shrink_helper;
 static void __attribute__((noreturn)) shrink_helper_process(int fd, pid_t pid)
 {
