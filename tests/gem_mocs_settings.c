@@ -374,6 +374,8 @@ static void run_test(int fd, unsigned engine, unsigned flags, unsigned mode)
 	uint32_t ctx_clean_id;
 	uint32_t ctx_dirty_id;
 
+	gem_require_ring(fd, engine);
+
 	/* Skip if we don't know where the registers are for this engine */
 	igt_require(get_engine_base(engine));
 
