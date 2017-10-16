@@ -2654,10 +2654,12 @@ static int igt_atomic_commit(igt_display_t *display, uint32_t flags, void *user_
 		/*
 		 * Add CRTC Properties to the property set
 		 */
-		igt_atomic_prepare_crtc_commit(pipe_obj, req);
+		if (pipe_obj->changed)
+			igt_atomic_prepare_crtc_commit(pipe_obj, req);
 
 		for_each_plane_on_pipe(display, pipe, plane) {
-			igt_atomic_prepare_plane_commit(plane, pipe_obj, req);
+			if (plane->changed)
+				igt_atomic_prepare_plane_commit(plane, pipe_obj, req);
 		}
 
 	}
@@ -2665,7 +2667,7 @@ static int igt_atomic_commit(igt_display_t *display, uint32_t flags, void *user_
 	for (i = 0; i < display->n_outputs; i++) {
 		output = &display->outputs[i];
 
-		if (!output->config.connector)
+		if (!output->config.connector || !output->changed)
 			continue;
 
 		LOG(display, "%s: preparing atomic, pipe: %s\n",
