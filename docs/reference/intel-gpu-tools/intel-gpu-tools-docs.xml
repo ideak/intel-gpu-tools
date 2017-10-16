@@ -48,6 +48,7 @@
   </chapter>
   <chapter>
     <title>igt/i915 API Reference</title>
+    <xi:include href="xml/gem_context.xml"/>
     <xi:include href="xml/gem_scheduler.xml"/>
   </chapter>
   <xi:include href="xml/igt_test_programs.xml"/>

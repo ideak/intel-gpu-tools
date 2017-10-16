@@ -36,6 +36,7 @@
 #include <intel_bufmgr.h>
 #include <i915_drm.h>
 
+#include "i915/gem_context.h"
 #include "i915/gem_scheduler.h"
 
 /**
@@ -120,27 +121,6 @@ int gem_munmap(void *ptr, uint64_t size);
 #define gem_require_mmap_wc(fd) igt_require(gem_mmap__has_wc(fd))
 
 int gem_madvise(int fd, uint32_t handle, int state);
-
-uint32_t gem_context_create(int fd);
-void gem_context_destroy(int fd, uint32_t ctx_id);
-int __gem_context_destroy(int fd, uint32_t ctx_id);
-struct local_i915_gem_context_param {
-	uint32_t context;
-	uint32_t size;
-	uint64_t param;
-#define LOCAL_CONTEXT_PARAM_BAN_PERIOD	0x1
-#define LOCAL_CONTEXT_PARAM_NO_ZEROMAP	0x2
-#define LOCAL_CONTEXT_PARAM_GTT_SIZE	0x3
-#define LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE	0x4
-#define LOCAL_CONTEXT_PARAM_BANNABLE	0x5
-	uint64_t value;
-};
-void gem_context_require_bannable(int fd);
-void gem_context_require_param(int fd, uint64_t param);
-void gem_context_get_param(int fd, struct local_i915_gem_context_param *p);
-void gem_context_set_param(int fd, struct local_i915_gem_context_param *p);
-int __gem_context_set_param(int fd, struct local_i915_gem_context_param *p);
-int __gem_context_get_param(int fd, struct local_i915_gem_context_param *p);
 
 #define LOCAL_I915_GEM_USERPTR       0x33
 #define LOCAL_IOCTL_I915_GEM_USERPTR DRM_IOWR (DRM_COMMAND_BASE + LOCAL_I915_GEM_USERPTR, struct local_i915_gem_userptr)

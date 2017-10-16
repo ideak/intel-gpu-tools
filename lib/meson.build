@@ -2,6 +2,7 @@ lib_headers = [
 	'debug.h',
 	'drmtest.h',
 	'i830_reg.h',
+	'i915/gem_context.h',
 	'i915/gem_scheduler.h',
 	'i915_3d.h',
 	'i915_reg.h',
@@ -49,6 +50,7 @@ lib_headers = [
 
 lib_sources = [
 	'drmtest.c',
+	'i915/gem_context.c',
 	'i915/gem_scheduler.c',
 	'igt_debugfs.c',
 	'igt_aux.c',
