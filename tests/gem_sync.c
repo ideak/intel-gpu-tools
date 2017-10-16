@@ -33,9 +33,8 @@
 #define LOCAL_I915_EXEC_BSD_SHIFT      (13)
 #define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
 
-#define LOCAL_CONTEXT_PARAM_PRIORITY 6
-#define   MAX_PRIO 1023
-#define   MIN_PRIO -1023
+#define MAX_PRIO LOCAL_I915_CONTEXT_MAX_USER_PRIORITY
+#define MIN_PRIO LOCAL_I915_CONTEXT_MIN_USER_PRIORITY
 
 #define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
@@ -690,24 +689,6 @@ store_all(int fd, int num_children, int timeout)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
-static int __ctx_set_priority(int fd, uint32_t ctx, int prio)
-{
-	struct local_i915_gem_context_param param;
-
-	memset(&param, 0, sizeof(param));
-	param.context = ctx;
-	param.size = 0;
-	param.param = LOCAL_CONTEXT_PARAM_PRIORITY;
-	param.value = prio;
-
-	return __gem_context_set_param(fd, &param);
-}
-
-static void ctx_set_priority(int fd, uint32_t ctx, int prio)
-{
-	igt_assert_eq(__ctx_set_priority(fd, ctx, prio), 0);
-}
-
 static void
 preempt(int fd, unsigned ring, int num_children, int timeout)
 {
@@ -746,10 +727,10 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 	}
 
 	ctx[0] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[0], MIN_PRIO);
+	gem_context_set_priority(fd, ctx[0], MIN_PRIO);
 
 	ctx[1] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[1], MAX_PRIO);
+	gem_context_set_priority(fd, ctx[1], MAX_PRIO);
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	igt_fork(child, num_children) {

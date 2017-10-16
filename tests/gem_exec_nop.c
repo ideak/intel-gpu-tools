@@ -52,9 +52,8 @@
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
-#define LOCAL_CONTEXT_PARAM_PRIORITY 6
-#define   MAX_PRIO 1023
-#define   MIN_PRIO -1023
+#define MAX_PRIO LOCAL_I915_CONTEXT_MAX_USER_PRIORITY
+#define MIN_PRIO LOCAL_I915_CONTEXT_MIN_USER_PRIORITY
 
 #define FORKED 1
 #define CHAINED 2
@@ -585,23 +584,6 @@ static void fence_signal(int fd, uint32_t handle,
 	igt_info("Signal %s: %'lu cycles (%'lu signals): %.3fus\n",
 		 ring_name, count, signal, elapsed(&start, &now) * 1e6 / count);
 }
-static int __ctx_set_priority(int fd, uint32_t ctx, int prio)
-{
-	struct local_i915_gem_context_param param;
-
-	memset(&param, 0, sizeof(param));
-	param.context = ctx;
-	param.size = 0;
-	param.param = LOCAL_CONTEXT_PARAM_PRIORITY;
-	param.value = prio;
-
-	return __gem_context_set_param(fd, &param);
-}
-
-static void ctx_set_priority(int fd, uint32_t ctx, int prio)
-{
-	igt_assert_eq(__ctx_set_priority(fd, ctx, prio), 0);
-}
 
 static void preempt(int fd, uint32_t handle,
 		   unsigned ring_id, const char *ring_name)
@@ -615,10 +597,10 @@ static void preempt(int fd, uint32_t handle,
 	gem_require_ring(fd, ring_id);
 
 	ctx[0] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[0], MIN_PRIO);
+	gem_context_set_priority(fd, ctx[0], MIN_PRIO);
 
 	ctx[1] = gem_context_create(fd);
-	ctx_set_priority(fd, ctx[1], MAX_PRIO);
+	gem_context_set_priority(fd, ctx[1], MAX_PRIO);
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = handle;

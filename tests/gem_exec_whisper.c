@@ -191,25 +191,10 @@ static void fini_hang(struct hang *h)
 	close(h->fd);
 }
 
-#define LOCAL_CONTEXT_PARAM_PRIORITY 6
-
-static int __ctx_set_priority(int fd, uint32_t ctx, int prio)
-{
-	struct local_i915_gem_context_param param;
-
-	memset(&param, 0, sizeof(param));
-	param.context = ctx;
-	param.size = 0;
-	param.param = LOCAL_CONTEXT_PARAM_PRIORITY;
-	param.value = prio;
-
-	return __gem_context_set_param(fd, &param);
-}
-
-static void ctx_set_priority(int fd, uint32_t ctx)
+static void ctx_set_random_priority(int fd, uint32_t ctx)
 {
 	int prio = hars_petruska_f54_1_random_unsafe_max(1024) - 512;
-	igt_assert_eq(__ctx_set_priority(fd, ctx, prio), 0);
+	gem_context_set_priority(fd, ctx, prio);
 };
 
 static void whisper(int fd, unsigned engine, unsigned flags)
@@ -430,7 +415,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 							gem_open(this_fd,
 									gem_flink(fd, handle[1]));
 						if (flags & PRIORITY)
-							ctx_set_priority(this_fd, 0);
+							ctx_set_random_priority(this_fd, 0);
 					}
 
 					if (!(flags & CHAIN)) {
@@ -440,7 +425,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 					if (flags & CONTEXTS) {
 						execbuf.rsvd1 = contexts[rand() % 64];
 						if (flags & PRIORITY)
-							ctx_set_priority(this_fd, execbuf.rsvd1);
+							ctx_set_random_priority(this_fd, execbuf.rsvd1);
 					}
 
 					gem_execbuf(this_fd, &execbuf);

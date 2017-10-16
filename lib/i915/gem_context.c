@@ -197,3 +197,43 @@ void gem_context_require_bannable(int fd)
 
 	igt_require(has_ban_period || has_bannable);
 }
+
+#define LOCAL_I915_CONTEXT_PARAM_PRIORITY 0x6
+
+/**
+ * __gem_context_set_priority:
+ * @fd: open i915 drm file descriptor
+ * @ctx_id: i915 context id
+ * @prio: desired context priority
+ *
+ * This function modifies priority property of the context.
+ * It is used by the scheduler to decide on the ordering of requests submitted
+ * to the hardware.
+ *
+ * Returns: An integer equal to zero for success and negative for failure
+ */
+int __gem_context_set_priority(int fd, uint32_t ctx_id, int prio)
+{
+	struct local_i915_gem_context_param p;
+
+	memset(&p, 0, sizeof(p));
+	p.context = ctx_id;
+	p.size = 0;
+	p.param = LOCAL_I915_CONTEXT_PARAM_PRIORITY;
+	p.value = prio;
+
+	return __gem_context_set_param(fd, &p);
+}
+
+/**
+ * gem_context_set_priority:
+ * @fd: open i915 drm file descriptor
+ * @ctx_id: i915 context id
+ * @prio: desired context priority
+ *
+ * Like __gem_context_set_priority(), except we assert on failure.
+ */
+void gem_context_set_priority(int fd, uint32_t ctx_id, int prio)
+{
+	igt_assert(__gem_context_set_priority(fd, ctx_id, prio) == 0);
+}
