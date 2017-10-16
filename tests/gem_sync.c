@@ -27,18 +27,12 @@
 #include "igt.h"
 #include "igt_sysfs.h"
 
-#define BIT(x) (1ul << (x))
-
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
 
 #define LOCAL_I915_EXEC_BSD_SHIFT      (13)
 #define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
 
-#define LOCAL_PARAM_HAS_SCHEDULER 41
-#define   HAS_SCHEDULER		BIT(0)
-#define   HAS_PRIORITY		BIT(1)
-#define   HAS_PREEMPTION	BIT(2)
 #define LOCAL_CONTEXT_PARAM_PRIORITY 6
 #define   MAX_PRIO 1023
 #define   MIN_PRIO -1023
@@ -807,32 +801,10 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 	gem_context_destroy(fd, ctx[0]);
 }
 
-static unsigned int has_scheduler(int fd)
-{
-	drm_i915_getparam_t gp;
-	unsigned int caps = 0;
-
-	gp.param = LOCAL_PARAM_HAS_SCHEDULER;
-	gp.value = (int *)&caps;
-	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
-
-	if (!caps)
-		return 0;
-
-	igt_info("Has kernel scheduler\n");
-	if (caps & HAS_PRIORITY)
-		igt_info(" - With priority sorting\n");
-	if (caps & HAS_PREEMPTION)
-		igt_info(" - With preemption enabled\n");
-
-	return caps;
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
-	unsigned int sched_caps = 0;
 	int fd = -1;
 
 	igt_skip_on_simulation();
@@ -841,7 +813,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 		gem_show_submission_method(fd);
-		sched_caps = has_scheduler(fd);
+		gem_scheduler_print_capability(fd);
 
 		igt_fork_hang_detector(fd);
 	}
@@ -886,8 +858,8 @@ igt_main
 
 	igt_subtest_group {
 		igt_fixture {
-			igt_require(sched_caps & HAS_PRIORITY);
-			igt_require(sched_caps & HAS_PREEMPTION);
+			igt_require(gem_scheduler_has_ctx_priority(fd));
+			igt_require(gem_scheduler_has_preemption(fd));
 		}
 
 		igt_subtest("preempt-all")

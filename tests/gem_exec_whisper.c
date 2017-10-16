@@ -191,20 +191,7 @@ static void fini_hang(struct hang *h)
 	close(h->fd);
 }
 
-#define LOCAL_PARAM_HAS_SCHEDULER 41
 #define LOCAL_CONTEXT_PARAM_PRIORITY 6
-
-static bool __has_scheduler(int fd)
-{
-	drm_i915_getparam_t gp;
-	int has = -1;
-
-	gp.param = LOCAL_PARAM_HAS_SCHEDULER;
-	gp.value = &has;
-	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
-
-	return has > 0;
-}
 
 static int __ctx_set_priority(int fd, uint32_t ctx, int prio)
 {
@@ -250,13 +237,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	int debugfs;
 
 	if (flags & PRIORITY) {
-		int __fd = drm_open_driver(DRIVER_INTEL);
-		bool has_scheduler = __has_scheduler(__fd);
-		bool ctx_has_priority =
-			__ctx_set_priority(__fd, 0, 1) == 0;
-		close(__fd);
-
-		igt_require(has_scheduler && ctx_has_priority);
+		igt_require(gem_scheduler_enabled(fd));
+		igt_require(gem_scheduler_has_ctx_priority(fd));
 	}
 
 	debugfs = igt_debugfs_dir(fd);

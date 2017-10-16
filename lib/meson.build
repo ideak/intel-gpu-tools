@@ -2,6 +2,7 @@ lib_headers = [
 	'debug.h',
 	'drmtest.h',
 	'i830_reg.h',
+	'i915/gem_scheduler.h',
 	'i915_3d.h',
 	'i915_reg.h',
 	'i915_pciids.h',
@@ -48,6 +49,7 @@ lib_headers = [
 
 lib_sources = [
 	'drmtest.c',
+	'i915/gem_scheduler.c',
 	'igt_debugfs.c',
 	'igt_aux.c',
 	'igt_gt.c',
@@ -152,13 +154,7 @@ lib_version = vcs_tag(input : 'version.h.in', output : 'version.h',
 
 lib_intermediates = []
 foreach f: lib_sources
-    # No / in the target name
-    if f.contains('uwildmat')
-        name = 'uwildmat'
-    else
-        name = f
-    endif
-
+    name = f.underscorify(f)
     lib = static_library('igt-' + name,
 	[ f, lib_version ],
 	include_directories: inc,

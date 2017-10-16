@@ -44,8 +44,6 @@
 #include <time.h>
 #include "drm.h"
 
-#define BIT(x) (1ul << (x))
-
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
 
@@ -54,10 +52,6 @@
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
-#define LOCAL_PARAM_HAS_SCHEDULER 41
-#define   HAS_SCHEDULER		BIT(0)
-#define   HAS_PRIORITY		BIT(1)
-#define   HAS_PREEMPTION	BIT(2)
 #define LOCAL_CONTEXT_PARAM_PRIORITY 6
 #define   MAX_PRIO 1023
 #define   MIN_PRIO -1023
@@ -665,31 +659,9 @@ static void preempt(int fd, uint32_t handle,
 		 ring_name, count, elapsed(&start, &now)*1e6 / count);
 }
 
-static unsigned int has_scheduler(int fd)
-{
-	drm_i915_getparam_t gp;
-	unsigned int caps = 0;
-
-	gp.param = LOCAL_PARAM_HAS_SCHEDULER;
-	gp.value = (int *)&caps;
-	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
-
-	if (!caps)
-		return 0;
-
-	igt_info("Has kernel scheduler\n");
-	if (caps & HAS_PRIORITY)
-		igt_info(" - With priority sorting\n");
-	if (caps & HAS_PREEMPTION)
-		igt_info(" - With preemption enabled\n");
-
-	return caps;
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
-	unsigned int sched_caps = 0;
 	uint32_t handle = 0;
 	int device = -1;
 
@@ -699,7 +671,7 @@ igt_main
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
 		gem_show_submission_method(device);
-		sched_caps = has_scheduler(device);
+		gem_scheduler_print_capability(device);
 
 		handle = gem_create(device, 4096);
 		gem_write(device, handle, 0, &bbe, sizeof(bbe));
@@ -746,8 +718,8 @@ igt_main
 
 	igt_subtest_group {
 		igt_fixture {
-			igt_require(sched_caps & HAS_PRIORITY);
-			igt_require(sched_caps & HAS_PREEMPTION);
+			igt_require(gem_scheduler_has_ctx_priority(device));
+			igt_require(gem_scheduler_has_preemption(device));
 		}
 
 		for (e = intel_execution_engines; e->name; e++) {

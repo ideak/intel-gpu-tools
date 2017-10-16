@@ -33,12 +33,6 @@
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 
-#define BIT(x) (1ul << (x))
-
-#define LOCAL_PARAM_HAS_SCHEDULER 41
-#define   HAS_SCHEDULER		BIT(0)
-#define   HAS_PRIORITY		BIT(1)
-#define   HAS_PREEMPTION	BIT(2)
 #define LOCAL_CONTEXT_PARAM_PRIORITY 6
 
 #define LO 0
@@ -68,11 +62,6 @@ static int __ctx_set_priority(int fd, uint32_t ctx, int prio)
 static void ctx_set_priority(int fd, uint32_t ctx, int prio)
 {
 	igt_assert_eq(__ctx_set_priority(fd, ctx, prio), 0);
-}
-
-static void ctx_has_priority(int fd)
-{
-	igt_require(__ctx_set_priority(fd, 0, MAX_PRIO) == 0);
 }
 
 static void store_dword(int fd, uint32_t ctx, unsigned ring,
@@ -979,31 +968,9 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	munmap(result, 4096);
 }
 
-static unsigned int has_scheduler(int fd)
-{
-	drm_i915_getparam_t gp;
-	unsigned int caps = 0;
-
-	gp.param = LOCAL_PARAM_HAS_SCHEDULER;
-	gp.value = (int *)&caps;
-	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
-
-	if (!caps)
-		return 0;
-
-	igt_info("Has kernel scheduler\n");
-	if (caps & HAS_PRIORITY)
-		igt_info(" - With priority sorting\n");
-	if (caps & HAS_PREEMPTION)
-		igt_info(" - With preemption enabled\n");
-
-	return caps;
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
-	unsigned int sched_caps = 0;
 	int fd = -1;
 
 	igt_skip_on_simulation();
@@ -1011,7 +978,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		gem_show_submission_method(fd);
-		sched_caps = has_scheduler(fd);
+		gem_scheduler_print_capability(fd);
 		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
 		igt_fork_hang_detector(fd);
@@ -1033,8 +1000,8 @@ igt_main
 
 	igt_subtest_group {
 		igt_fixture {
-			igt_require(sched_caps & HAS_SCHEDULER);
-			ctx_has_priority(fd);
+			igt_require(gem_scheduler_enabled(fd));
+			igt_require(gem_scheduler_has_ctx_priority(fd));
 		}
 
 		igt_subtest("smoketest-all")
@@ -1062,7 +1029,7 @@ igt_main
 
 				igt_subtest_group {
 					igt_fixture {
-						igt_require(sched_caps & HAS_PREEMPTION);
+						igt_require(gem_scheduler_has_preemption(fd));
 					}
 
 					igt_subtest_f("preempt-%s", e->name)
@@ -1095,8 +1062,8 @@ igt_main
 
 	igt_subtest_group {
 		igt_fixture {
-			igt_require(sched_caps & HAS_SCHEDULER);
-			ctx_has_priority(fd);
+			igt_require(gem_scheduler_enabled(fd));
+			igt_require(gem_scheduler_has_ctx_priority(fd));
 
 			/* need separate rings */
 			igt_require(gem_has_execlists(fd));
@@ -1106,7 +1073,7 @@ igt_main
 			igt_subtest_group {
 				igt_fixture {
 					gem_require_ring(fd, e->exec_id | e->flags);
-					igt_require(sched_caps & HAS_PREEMPTION);
+					igt_require(gem_scheduler_has_preemption(fd));
 				}
 
 				igt_subtest_f("pi-ringfull-%s", e->name)

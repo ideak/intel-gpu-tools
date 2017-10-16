@@ -36,6 +36,8 @@
 #include <intel_bufmgr.h>
 #include <i915_drm.h>
 
+#include "i915/gem_scheduler.h"
+
 /**
  * igt_ioctl:
  * @fd: file descriptor
