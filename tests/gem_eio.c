@@ -411,45 +411,6 @@ static void test_inflight_internal(int fd)
 	trigger_reset(fd);
 }
 
-#define HAVE_EXECLISTS 0x1
-#define HAVE_GUC 0x2
-#define HAVE_SEMAPHORES 0x4
-
-static unsigned print_welcome(int fd)
-{
-	unsigned flags = 0;
-	bool active;
-	int dir;
-
-	dir = igt_sysfs_open_parameters(fd);
-	if (dir < 0)
-		return 0;
-
-	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
-	if (active) {
-		igt_info("Using GuC submission\n");
-		flags |= HAVE_GUC | HAVE_EXECLISTS;
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "enable_execlists");
-	if (active) {
-		igt_info("Using Execlists submission\n");
-		flags |= HAVE_EXECLISTS;
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "semaphores");
-	if (active)
-		flags |= HAVE_SEMAPHORES;
-	igt_info("Using Legacy submission%s\n",
-		 active ? ", with semaphores" : "");
-
-out:
-	close(dir);
-	return flags;
-}
-
 static int fd = -1;
 
 static void
@@ -461,8 +422,6 @@ exit_handler(int sig)
 
 igt_main
 {
-	unsigned int caps = 0;
-
 	igt_skip_on_simulation();
 
 	igt_fixture {
@@ -472,7 +431,7 @@ igt_main
 		igt_force_gpu_reset(fd);
 		igt_install_exit_handler(exit_handler);
 
-		caps = print_welcome(fd);
+		gem_show_submission_method(fd);
 		igt_require_gem(fd);
 		igt_require_hang_ring(fd, I915_EXEC_DEFAULT);
 	}
@@ -496,7 +455,7 @@ igt_main
 		test_inflight_external(fd);
 
 	igt_subtest("in-flight-internal") {
-		igt_skip_on(caps & HAVE_SEMAPHORES);
+		igt_skip_on(gem_has_semaphores(fd));
 		test_inflight_internal(fd);
 	}
 

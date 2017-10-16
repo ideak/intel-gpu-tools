@@ -49,21 +49,6 @@ igt_render_copyfunc_t rendercopy;
 struct intel_batchbuffer *batch;
 int width, height;
 
-static int semaphores_enabled(int fd)
-{
-	bool enabled = false;
-	int dir;
-
-	dir = igt_sysfs_open_parameters(fd);
-	if (dir < 0)
-		return false;
-
-	enabled = igt_sysfs_get_boolean(dir, "semaphores");
-	close(dir);
-
-	return enabled;
-}
-
 static drm_intel_bo *rcs_copy_bo(drm_intel_bo *dst, drm_intel_bo *src)
 {
 	struct igt_buf d = {
@@ -212,7 +197,7 @@ igt_main
 
 		batch =  intel_batchbuffer_alloc(bufmgr, devid);
 
-		igt_info("Semaphores: %d\n", semaphores_enabled(fd));
+		gem_show_submission_method(fd);
 	}
 
 	for (i = 0; sizes[i] != 0; i++) {

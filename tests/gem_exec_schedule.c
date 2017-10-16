@@ -1000,45 +1000,9 @@ static unsigned int has_scheduler(int fd)
 	return caps;
 }
 
-#define HAVE_EXECLISTS 0x1
-#define HAVE_GUC 0x2
-static unsigned print_welcome(int fd)
-{
-	unsigned flags = 0;
-	bool active;
-	int dir;
-
-	dir = igt_sysfs_open_parameters(fd);
-	if (dir < 0)
-		return 0;
-
-	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
-	if (active) {
-		igt_info("Using GuC submission\n");
-		flags |= HAVE_GUC | HAVE_EXECLISTS;
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "enable_execlists");
-	if (active) {
-		igt_info("Using Execlists submission\n");
-		flags |= HAVE_EXECLISTS;
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "semaphores");
-	igt_info("Using Legacy submission%s\n",
-		 active ? ", with semaphores" : "");
-
-out:
-	close(dir);
-	return flags;
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
-	unsigned int exec_caps = 0;
 	unsigned int sched_caps = 0;
 	int fd = -1;
 
@@ -1046,7 +1010,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
-		exec_caps = print_welcome(fd);
+		gem_show_submission_method(fd);
 		sched_caps = has_scheduler(fd);
 		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
@@ -1135,7 +1099,7 @@ igt_main
 			ctx_has_priority(fd);
 
 			/* need separate rings */
-			igt_require(exec_caps & HAVE_EXECLISTS);
+			igt_require(gem_has_execlists(fd));
 		}
 
 		for (e = intel_execution_engines; e->name; e++) {

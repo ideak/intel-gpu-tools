@@ -42,21 +42,6 @@ static void xchg_int(void *array, unsigned i, unsigned j)
 	igt_swap(A[i], A[j]);
 }
 
-static bool has_execlists(int fd)
-{
-	bool enabled = false;
-	int dir;
-
-	dir = igt_sysfs_open_parameters(fd);
-	if (dir < 0)
-		return false;
-
-	enabled = igt_sysfs_get_boolean(dir, "enable_execlists");
-	close(dir);
-
-	return enabled;
-}
-
 static unsigned context_size(int fd)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
@@ -86,7 +71,7 @@ static unsigned get_num_contexts(int fd, int num_engines)
 	ggtt_size = gem_global_aperture_size(fd);
 
 	size = context_size(fd);
-	if (has_execlists(fd)) {
+	if (gem_has_execlists(fd)) {
 		size += 4 << 12; /* ringbuffer as well */
 		if (num_engines) /* one per engine with execlists */
 			size *= num_engines;
@@ -95,7 +80,7 @@ static unsigned get_num_contexts(int fd, int num_engines)
 	count = 3 * (ggtt_size / size) / 2;
 	igt_info("Creating %lld contexts (assuming of size %lld%s)\n",
 		 (long long)count, (long long)size,
-		 has_execlists(fd) ? " with execlists" : "");
+		 gem_has_execlists(fd) ? " with execlists" : "");
 
 	intel_require_memory(count, size, CHECK_RAM | CHECK_SWAP);
 	return count;

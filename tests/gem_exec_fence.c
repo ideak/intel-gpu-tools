@@ -692,40 +692,6 @@ static void test_fence_flip(int i915)
 	igt_skip_on_f(1, "no fence-in for atomic flips\n");
 }
 
-#define HAVE_EXECLISTS 0x1
-static unsigned int print_welcome(int fd)
-{
-	unsigned int result = 0;
-	bool active;
-	int dir;
-
-	dir = igt_sysfs_open_parameters(fd);
-	if (dir < 0)
-		return 0;
-
-	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
-	if (active) {
-		igt_info("Using GuC submission\n");
-		result |= HAVE_EXECLISTS;
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "enable_execlists");
-	if (active) {
-		igt_info("Using Execlists submission\n");
-		result |= HAVE_EXECLISTS;
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "semaphores");
-	igt_info("Using Legacy submission%s\n",
-		 active ? ", with semaphores" : "");
-
-out:
-	close(dir);
-	return result;
-}
-
 static bool has_submit_fence(int fd)
 {
 	struct drm_i915_getparam gp;
@@ -1458,7 +1424,6 @@ static void test_syncobj_channel(int fd)
 igt_main
 {
 	const struct intel_execution_engine *e;
-	unsigned int caps = 0;
 	int i915 = -1;
 
 	igt_skip_on_simulation();
@@ -1469,7 +1434,7 @@ igt_main
 		igt_require(gem_has_exec_fence(i915));
 		gem_require_mmap_wc(i915);
 
-		caps = print_welcome(i915);
+		gem_show_submission_method(i915);
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
@@ -1541,7 +1506,7 @@ igt_main
 		igt_info("Ring size: %ld batches\n", ring_size);
 		igt_require(ring_size);
 
-		test_long_history(i915, ring_size, caps);
+		test_long_history(i915, ring_size, 0);
 	}
 
 	igt_subtest("expired-history") {
@@ -1550,7 +1515,7 @@ igt_main
 		igt_info("Ring size: %ld batches\n", ring_size);
 		igt_require(ring_size);
 
-		test_long_history(i915, ring_size, caps | EXPIRED);
+		test_long_history(i915, ring_size, EXPIRED);
 	}
 
 	igt_subtest("flip") {

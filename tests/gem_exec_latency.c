@@ -407,35 +407,6 @@ static void latency_from_ring(int fd,
 	gem_close(fd, obj[2].handle);
 }
 
-static void print_welcome(int fd)
-{
-	bool active;
-	int dir;
-
-	dir = igt_sysfs_open_parameters(fd);
-	if (dir < 0)
-		return;
-
-	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
-	if (active) {
-		igt_info("Using GuC submission\n");
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "enable_execlists");
-	if (active) {
-		igt_info("Using Execlists submission\n");
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "semaphores");
-	igt_info("Using Legacy submission%s\n",
-		 active ? ", with semaphores" : "");
-
-out:
-	close(dir);
-}
-
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -446,7 +417,7 @@ igt_main
 		igt_require_gem(device);
 		gem_require_mmap_wc(device);
 
-		print_welcome(device);
+		gem_show_submission_method(device);
 
 		ring_size = measure_ring_size(device);
 		igt_info("Ring size: %d batches\n", ring_size);

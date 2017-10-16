@@ -246,40 +246,6 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 	free(exec);
 }
 
-#define HAVE_EXECLISTS 0x1
-static unsigned int print_welcome(int fd)
-{
-	unsigned int result = 0;
-	bool active;
-	int dir;
-
-	dir = igt_sysfs_open_parameters(fd);
-	if (dir < 0)
-		return 0;
-
-	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
-	if (active) {
-		igt_info("Using GuC submission\n");
-		result |= HAVE_EXECLISTS;
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "enable_execlists");
-	if (active) {
-		igt_info("Using Execlists submission\n");
-		result |= HAVE_EXECLISTS;
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "semaphores");
-	igt_info("Using Legacy submission%s\n",
-		 active ? ", with semaphores" : "");
-
-out:
-	close(dir);
-	return result;
-}
-
 struct cork {
 	int device;
 	uint32_t handle;
@@ -374,14 +340,13 @@ igt_main
 	int device = -1;
 
 	igt_fixture {
-		unsigned int caps;
 
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
-		caps = print_welcome(device);
+		gem_show_submission_method(device);
 
 		ring_size = measure_ring_size(device) - 10;
-		if (!(caps & HAVE_EXECLISTS))
+		if (!gem_has_execlists(device))
 			ring_size /= 2;
 		igt_info("Ring size: %d batches\n", ring_size);
 		igt_require(ring_size > 0);

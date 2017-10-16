@@ -665,35 +665,6 @@ static void preempt(int fd, uint32_t handle,
 		 ring_name, count, elapsed(&start, &now)*1e6 / count);
 }
 
-static void print_welcome(int fd)
-{
-	bool active;
-	int dir;
-
-	dir = igt_sysfs_open_parameters(fd);
-	if (dir < 0)
-		return;
-
-	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
-	if (active) {
-		igt_info("Using GuC submission\n");
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "enable_execlists");
-	if (active) {
-		igt_info("Using Execlists submission\n");
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "semaphores");
-	igt_info("Using Legacy submission%s\n",
-		 active ? ", with semaphores" : "");
-
-out:
-	close(dir);
-}
-
 static unsigned int has_scheduler(int fd)
 {
 	drm_i915_getparam_t gp;
@@ -727,7 +698,7 @@ igt_main
 
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
-		print_welcome(device);
+		gem_show_submission_method(device);
 		sched_caps = has_scheduler(device);
 
 		handle = gem_create(device, 4096);

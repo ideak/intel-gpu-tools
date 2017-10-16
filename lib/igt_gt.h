@@ -80,4 +80,11 @@ extern const struct intel_execution_engine {
 
 bool gem_can_store_dword(int fd, unsigned int engine);
 
+#define GEM_SUBMISSION_SEMAPHORES	(1 << 0)
+#define GEM_SUBMISSION_EXECLISTS	(1 << 1)
+#define GEM_SUBMISSION_GUC		(1 << 2)
+unsigned gem_submission_method(int fd);
+bool gem_has_semaphores(int fd);
+bool gem_has_execlists(int fd);
+
 #endif /* IGT_GT_H */

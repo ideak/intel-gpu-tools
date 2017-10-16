@@ -552,35 +552,6 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	close(debugfs);
 }
 
-static void print_welcome(int fd)
-{
-	bool active;
-	int dir;
-
-	dir = igt_sysfs_open_parameters(fd);
-	if (dir < 0)
-		return;
-
-	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
-	if (active) {
-		igt_info("Using GuC submission\n");
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "enable_execlists");
-	if (active) {
-		igt_info("Using Execlists submission\n");
-		goto out;
-	}
-
-	active = igt_sysfs_get_boolean(dir, "semaphores");
-	igt_info("Using Legacy submission%s\n",
-		 active ? ", with semaphores" : "");
-
-out:
-	close(dir);
-}
-
 igt_main
 {
 	const struct mode {
@@ -615,7 +586,7 @@ igt_main
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
 		igt_require(gem_can_store_dword(fd, 0));
-		print_welcome(fd);
+		gem_show_submission_method(fd);
 
 		igt_fork_hang_detector(fd);
 	}

@@ -280,6 +280,8 @@ void igt_unlock_mem(void);
 	ret_;								\
 })
 
+void gem_show_submission_method(int fd);
+
 struct igt_mean;
 void igt_start_siglatency(int sig); /* 0 => SIGRTMIN (default) */
 double igt_stop_siglatency(struct igt_mean *result);
