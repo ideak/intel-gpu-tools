@@ -162,7 +162,6 @@ test_progs = [
 	'kms_cursor_crc',
 	'kms_cursor_legacy',
 	'kms_draw_crc',
-	'kms_fbc_crc',
 	'kms_fbcon_fbt',
 	'kms_fence_pin_leak',
 	'kms_flip',
