@@ -53,11 +53,11 @@ struct residencies {
 
 static unsigned long get_rc6_enabled_mask(void)
 {
-	unsigned long rc6_mask;
+	unsigned long enabled;
 
-	rc6_mask = 0;
-	igt_sysfs_scanf(sysfs, "power/rc6_enable", "%lu", &rc6_mask);
-	return rc6_mask;
+	enabled = 0;
+	igt_sysfs_scanf(sysfs, "power/rc6_enable", "%lu", &enabled);
+	return enabled;
 }
 
 static unsigned long read_rc6_residency(const char *name)
@@ -85,23 +85,6 @@ static void residency_accuracy(unsigned int diff,
 		     "Sysfs RC6 residency counter is inaccurate.\n");
 }
 
-static void read_residencies(int devid, unsigned int rc6_mask,
-			     struct residencies *res)
-{
-	if (rc6_mask & RC6_ENABLED)
-		res->rc6 = read_rc6_residency("rc6");
-
-	if ((rc6_mask & RC6_ENABLED) &&
-	    (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid)))
-		res->media_rc6 = read_rc6_residency("media_rc6");
-
-	if (rc6_mask & RC6P_ENABLED)
-		res->rc6p = read_rc6_residency("rc6p");
-
-	if (rc6_mask & RC6PP_ENABLED)
-		res->rc6pp = read_rc6_residency("rc6pp");
-}
-
 static unsigned long gettime_ms(void)
 {
 	struct timespec ts;
@@ -111,37 +94,58 @@ static unsigned long gettime_ms(void)
 	return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
-static void measure_residencies(int devid, unsigned int rc6_mask,
+static void read_residencies(int devid, unsigned int mask,
+			     struct residencies *res)
+{
+	res->duration = gettime_ms();
+
+	if (mask & RC6_ENABLED)
+		res->rc6 = read_rc6_residency("rc6");
+
+	if ((mask & RC6_ENABLED) &&
+	    (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid)))
+		res->media_rc6 = read_rc6_residency("media_rc6");
+
+	if (mask & RC6P_ENABLED)
+		res->rc6p = read_rc6_residency("rc6p");
+
+	if (mask & RC6PP_ENABLED)
+		res->rc6pp = read_rc6_residency("rc6pp");
+
+	res->duration += (gettime_ms() - res->duration) / 2;
+}
+
+static void measure_residencies(int devid, unsigned int mask,
 				struct residencies *res)
 {
 	struct residencies start = { };
 	struct residencies end = { };
 	int retry;
-	unsigned long t;
 
-	if (!rc6_mask)
+	if (!mask)
 		return;
-
-	/*
-	 * For some reason my ivb isn't idle even after syncing up with the gpu.
-	 * Let's add a sleep just to make it happy.
-	 */
-	sleep(8);
 
 	/*
 	 * Retry in case of counter wrap-around. We simply re-run the
 	 * measurement, since the valid counter range is different on
 	 * different platforms and so fixing it up would be non-trivial.
 	 */
+	read_residencies(devid, mask, &end);
+	igt_debug("time=%d: rc6=(%d, %d), rc6p=%d, rc6pp=%d\n",
+		 end.duration, end.rc6, end.media_rc6, end.rc6p, end.rc6pp);
 	for (retry = 0; retry < 2; retry++) {
-		t = gettime_ms();
-		read_residencies(devid, rc6_mask, &start);
+		start = end;
 		sleep(SLEEP_DURATION);
-		read_residencies(devid, rc6_mask, &end);
-		t = gettime_ms() - t;
+		read_residencies(devid, mask, &end);
 
-		if (end.rc6 >= start.rc6 && end.media_rc6 >= start.media_rc6 &&
-		    end.rc6p >= start.rc6p && end.rc6pp >= start.rc6pp)
+		igt_debug("time=%d: rc6=(%d, %d), rc6p=%d, rc6pp=%d\n",
+			 end.duration,
+			 end.rc6, end.media_rc6, end.rc6p, end.rc6pp);
+
+		if (end.rc6 >= start.rc6 &&
+		    end.media_rc6 >= start.media_rc6 &&
+		    end.rc6p >= start.rc6p &&
+		    end.rc6pp >= start.rc6pp)
 			break;
 	}
 	igt_assert_f(retry < 2, "residency values are not consistent\n");
@@ -150,7 +154,7 @@ static void measure_residencies(int devid, unsigned int rc6_mask,
 	res->rc6p = end.rc6p - start.rc6p;
 	res->rc6pp = end.rc6pp - start.rc6pp;
 	res->media_rc6 = end.media_rc6 - start.media_rc6;
-	res->duration = t;
+	res->duration = end.duration - start.duration;
 
 	/*
 	 * For the purposes of this test case we want a given residency value
@@ -164,11 +168,23 @@ static void measure_residencies(int devid, unsigned int rc6_mask,
 	res->rc6 += res->rc6p;
 }
 
+static unsigned long rc6_enable_us(void)
+{
+	/*
+	 * To know how long we need to wait for the device to enter rc6 once
+	 * idle, we need to look at GEN6_RC_EVALUATION_INTERVAL. Currently,
+	 * this is set to 125000 (12500 * 1280ns or 0.16s) on all platforms.
+	 * We must complete at least one EI with activity below the
+	 * per-platform threshold for RC6 to kick. Therefore, we must wait
+	 * at least 2 EI cycles, before we can expect rc6 to start ticking.
+	 */
+	return 2 * 160 * 1000;
+}
+
 igt_main
 {
-	unsigned int rc6_mask;
-	int devid = 0;
-	struct residencies res;
+	unsigned int rc6_enabled = 0;
+	unsigned int devid = 0;
 
 	igt_skip_on_simulation();
 
@@ -179,33 +195,33 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		devid = intel_get_drm_devid(fd);
 		sysfs = igt_sysfs_open(fd, NULL);
+
+		/* Make sure rc6 counters are running */
+		igt_drop_caches_set(fd, DROP_IDLE);
+		usleep(rc6_enable_us());
+
 		close(fd);
 
-		rc6_mask = get_rc6_enabled_mask();
-		igt_require(rc6_mask);
-
-		measure_residencies(devid, rc6_mask, &res);
+		rc6_enabled = get_rc6_enabled_mask();
+		igt_require(rc6_enabled);
 	}
 
 	igt_subtest("rc6-accuracy") {
-		igt_skip_on(!(rc6_mask & RC6_ENABLED));
+		struct residencies res;
 
+		igt_require(rc6_enabled & RC6_ENABLED);
+
+		measure_residencies(devid, rc6_enabled, &res);
 		residency_accuracy(res.rc6, res.duration, "rc6");
 	}
+
 	igt_subtest("media-rc6-accuracy") {
-		igt_skip_on(!((rc6_mask & RC6_ENABLED) &&
-			      (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid))));
+		struct residencies res;
 
+		igt_require((rc6_enabled & RC6_ENABLED) &&
+			    (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid)));
+
+		measure_residencies(devid, rc6_enabled, &res);
 		residency_accuracy(res.media_rc6, res.duration, "media_rc6");
-	}
-	igt_subtest("rc6p-accuracy") {
-		igt_skip_on(!(rc6_mask & RC6P_ENABLED));
-
-		residency_accuracy(res.rc6p, res.duration, "rc6p");
-	}
-	igt_subtest("rc6pp-accuracy") {
-		igt_skip_on(!(rc6_mask & RC6PP_ENABLED));
-
-		residency_accuracy(res.rc6pp, res.duration, "rc6pp");
 	}
 }
