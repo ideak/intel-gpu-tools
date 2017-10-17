@@ -134,7 +134,8 @@ wm_setup_plane(igt_display_t *display, enum pipe pipe,
 		int i = plane->index;
 
 		if (!((1 << plane->index) & mask)) {
-			igt_plane_set_fb(plane, NULL);
+			if (plane->values[IGT_PLANE_FB_ID])
+				igt_plane_set_fb(plane, NULL);
 			continue;
 		}
 
@@ -388,11 +389,13 @@ static void wait_for_transition(igt_display_t *display, enum pipe pipe, bool non
 	if (fencing) {
 		int fence_fd = display->pipes[pipe].out_fence_fd;
 
-		igt_assert_neq(fd_completed(fence_fd), nonblocking);
+		if (!nonblocking)
+			igt_assert(fd_completed(fence_fd));
 
 		igt_assert(sync_fence_wait(fence_fd, 30000) == 0);
 	} else {
-		igt_assert_neq(fd_completed(display->drm_fd), nonblocking);
+		if (!nonblocking)
+			igt_assert(fd_completed(display->drm_fd));
 
 		drmHandleEvent(display->drm_fd, &drm_events);
 	}
