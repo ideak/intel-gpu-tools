@@ -79,9 +79,9 @@ static void residency_accuracy(unsigned int diff,
 
 	ratio = (double)diff / duration;
 
-	igt_info("Residency in %s or deeper state: %u ms (sleep duration %u ms) (ratio to expected duration: %.02f)\n",
-		 name_of_rc6_residency, diff, duration, ratio);
-	igt_assert_f(ratio > 0.9 && ratio <= 1,
+	igt_info("Residency in %s or deeper state: %u ms (sleep duration %u ms) (%.1f%% of expected duration)\n",
+		 name_of_rc6_residency, diff, duration, 100*ratio);
+	igt_assert_f(ratio > 0.9 && ratio < 1.05,
 		     "Sysfs RC6 residency counter is inaccurate.\n");
 }
 
