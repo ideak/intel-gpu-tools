@@ -69,9 +69,22 @@ xmlrpc = dependency('xmlrpc', required : false)
 xmlrpc_util = dependency('xmlrpc_util', required : false)
 xmlrpc_client = dependency('xmlrpc_client', required : false)
 
+if not xmlrpc.found()
+	libs_cmd = run_command('xmlrpc-c-config', 'client', '--libs')
+	cflags_cmd = run_command('xmlrpc-c-config', 'client', '--cflags')
+
+	if libs_cmd.returncode() == 0 and cflags_cmd.returncode() == 0
+		xmlrpc = declare_dependency(compile_args: cflags_cmd.stdout().strip().split(),
+					   link_args : libs_cmd.stdout().strip().split())
+		xmlrpc_util = declare_dependency()
+		xmlrpc_client = declare_dependency()
+	endif
+endif
+
 if pixman.found() and xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found()
 	chamelium = declare_dependency(dependencies : [ pixman, xmlrpc,
 	  xmlrpc_util, xmlrpc_client])
+	config.set('HAVE_CHAMELIUM', 1)
 else
 	chamelium = dependency('', required: false)
 endif
