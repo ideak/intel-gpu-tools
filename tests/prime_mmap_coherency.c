@@ -62,7 +62,6 @@ static int test_read_flush(void)
 	 * the GTT domain. */
 	bo_2 = drm_intel_bo_alloc(bufmgr, "BO 2", width * height * 4, 4096);
 	intel_copy_bo(batch, bo_1, bo_2, width * height);
-	gem_sync(fd, bo_1->handle);
 	drm_intel_bo_unreference(bo_2);
 
 	/* STEP #2: read BO 1 using the dma-buf CPU mmap. This dirties the CPU caches. */
@@ -86,7 +85,6 @@ static int test_read_flush(void)
 	prime_sync_end(dma_buf_fd, false);
 
 	intel_copy_bo(batch, bo_1, bo_2, width * height);
-	gem_sync(fd, bo_1->handle);
 	drm_intel_bo_unreference(bo_2);
 
 	/* STEP #4: read again using the CPU mmap. Doing #1 before #3 makes sure we
@@ -129,7 +127,6 @@ static int test_write_flush(void)
 	 * the GTT domain. */
 	bo_2 = drm_intel_bo_alloc(bufmgr, "BO 2", width * height * 4, 4096);
 	intel_copy_bo(batch, bo_1, bo_2, width * height);
-	gem_sync(fd, bo_1->handle);
 	drm_intel_bo_unreference(bo_2);
 
 	/* STEP #2: Write '1's into BO 1 using the dma-buf CPU mmap. */
@@ -149,7 +146,6 @@ static int test_write_flush(void)
 	/* STEP #3: Copy BO 1 into BO 2, using blitter. */
 	bo_2 = drm_intel_bo_alloc(bufmgr, "BO 2", width * height * 4, 4096);
 	intel_copy_bo(batch, bo_2, bo_1, width * height);
-	gem_sync(fd, bo_2->handle);
 
 	/* STEP #4: compare BO 2 against written BO 1. In !llc hardware, there
 	 * should be some cache lines that didn't get flushed out and are still 0,
