@@ -1128,7 +1128,8 @@ static int get_object_count(int fd)
 {
 	int dir, ret, scanned;
 
-	igt_drop_caches_set(fd, DROP_RETIRE | DROP_ACTIVE | DROP_FREED);
+	igt_drop_caches_set(fd,
+			    DROP_RETIRE | DROP_ACTIVE | DROP_IDLE | DROP_FREED);
 
 	dir = igt_debugfs_dir(fd);
 	scanned = igt_sysfs_scanf(dir, "i915_gem_objects",
