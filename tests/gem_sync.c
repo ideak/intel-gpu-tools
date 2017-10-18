@@ -793,7 +793,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
-		gem_show_submission_method(fd);
+		gem_submission_print_method(fd);
 		gem_scheduler_print_capability(fd);
 
 		igt_fork_hang_detector(fd);

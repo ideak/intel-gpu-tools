@@ -431,7 +431,7 @@ igt_main
 		igt_force_gpu_reset(fd);
 		igt_install_exit_handler(exit_handler);
 
-		gem_show_submission_method(fd);
+		gem_submission_print_method(fd);
 		igt_require_gem(fd);
 		igt_require_hang_ring(fd, I915_EXEC_DEFAULT);
 	}

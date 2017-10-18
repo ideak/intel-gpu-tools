@@ -33,6 +33,8 @@
 #include <stddef.h>
 #include <sys/time.h>
 
+#include <i915/gem_submission.h>
+
 extern drm_intel_bo **trash_bos;
 extern int num_trash_bos;
 
@@ -279,8 +281,6 @@ void igt_unlock_mem(void);
 									\
 	ret_;								\
 })
-
-void gem_show_submission_method(int fd);
 
 struct igt_mean;
 void igt_start_siglatency(int sig); /* 0 => SIGRTMIN (default) */

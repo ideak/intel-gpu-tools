@@ -1432,7 +1432,7 @@ igt_main
 		igt_require(gem_has_exec_fence(i915));
 		gem_require_mmap_wc(i915);
 
-		gem_show_submission_method(i915);
+		gem_submission_print_method(i915);
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {

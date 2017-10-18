@@ -343,7 +343,7 @@ igt_main
 
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
-		gem_show_submission_method(device);
+		gem_submission_print_method(device);
 
 		ring_size = measure_ring_size(device) - 10;
 		if (!gem_has_execlists(device))

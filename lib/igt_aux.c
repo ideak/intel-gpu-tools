@@ -1493,24 +1493,6 @@ igt_show_stat(proc_t *info, int *state, const char *fn)
 	++*state;
 }
 
-void gem_show_submission_method(int fd)
-{
-	const unsigned flags = gem_submission_method(fd);
-
-	if (flags & GEM_SUBMISSION_GUC) {
-		igt_info("Using GuC submission\n");
-		return;
-	}
-
-	if (flags & GEM_SUBMISSION_EXECLISTS) {
-		igt_info("Using Execlists submission\n");
-		return;
-	}
-
-	igt_info("Using Legacy submission%s\n",
-		 flags & GEM_SUBMISSION_SEMAPHORES ? ", with semaphores" : "");
-}
-
 static void
 __igt_lsof_fds(proc_t *proc_info, int *state, char *proc_path, const char *dir)
 {

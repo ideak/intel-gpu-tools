@@ -197,7 +197,7 @@ igt_main
 
 		batch =  intel_batchbuffer_alloc(bufmgr, devid);
 
-		gem_show_submission_method(fd);
+		gem_submission_print_method(fd);
 	}
 
 	for (i = 0; sizes[i] != 0; i++) {

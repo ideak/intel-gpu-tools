@@ -417,7 +417,7 @@ igt_main
 		igt_require_gem(device);
 		gem_require_mmap_wc(device);
 
-		gem_show_submission_method(device);
+		gem_submission_print_method(device);
 
 		ring_size = measure_ring_size(device);
 		igt_info("Ring size: %d batches\n", ring_size);

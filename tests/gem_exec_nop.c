@@ -652,7 +652,7 @@ igt_main
 
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
-		gem_show_submission_method(device);
+		gem_submission_print_method(device);
 		gem_scheduler_print_capability(device);
 
 		handle = gem_create(device, 4096);

@@ -553,7 +553,7 @@ igt_main
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
 		igt_require(gem_can_store_dword(fd, 0));
-		gem_show_submission_method(fd);
+		gem_submission_print_method(fd);
 
 		igt_fork_hang_detector(fd);
 	}
