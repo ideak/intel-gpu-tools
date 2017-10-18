@@ -297,7 +297,7 @@ void intel_purge_vm_caches(int drm_fd)
 {
 	int fd;
 
-	igt_drop_caches_set(drm_fd, DROP_SHRINK_ALL);
+	igt_drop_caches_set(drm_fd, DROP_SHRINK_ALL | DROP_IDLE | DROP_FREED);
 
 	fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
 	if (fd >= 0) {
