@@ -583,11 +583,6 @@ static void boost_freq(int fd, int *boost_freqs)
 	int64_t timeout = 1;
 	igt_spin_t *load;
 	unsigned int engine;
-	int fmid = (origfreqs[RPn] + origfreqs[RP0]) / 2;
-
-	fmid = get_hw_rounded_freq(fmid);
-	/* Set max freq to less then boost freq */
-	writeval(sysfs_files[MAX].filp, fmid);
 
 	/* Put boost on the same engine as low load */
 	engine = I915_EXEC_RENDER;
@@ -604,9 +599,6 @@ static void boost_freq(int fd, int *boost_freqs)
 	igt_spin_batch_end(load);
 	gem_sync(fd, load->handle);
 	igt_spin_batch_free(fd, load);
-
-	/* Set max freq to original softmax */
-	writeval(sysfs_files[MAX].filp, origfreqs[MAX]);
 }
 
 static void waitboost(int fd, bool reset)
@@ -614,6 +606,8 @@ static void waitboost(int fd, bool reset)
 	int pre_freqs[NUMFREQ];
 	int boost_freqs[NUMFREQ];
 	int post_freqs[NUMFREQ];
+	int fmid = (origfreqs[RPn] + origfreqs[RP0]) / 2;
+	fmid = get_hw_rounded_freq(fmid);
 
 	load_helper_run(LOW);
 
@@ -627,10 +621,16 @@ static void waitboost(int fd, bool reset)
 		sleep(1);
 	}
 
+	/* Set max freq to less than boost freq */
+	writeval(sysfs_files[MAX].filp, fmid);
+
 	/* When we wait upon the GPU, we want to temporarily boost it
 	 * to maximum.
 	 */
 	boost_freq(fd, boost_freqs);
+
+	/* Set max freq to original softmax */
+	writeval(sysfs_files[MAX].filp, origfreqs[MAX]);
 
 	igt_debug("Apply low load again...\n");
 	sleep(1);
@@ -643,7 +643,6 @@ static void waitboost(int fd, bool reset)
 	igt_assert_lt(pre_freqs[CUR], pre_freqs[MAX]);
 	igt_assert_eq(boost_freqs[CUR], boost_freqs[BOOST]);
 	igt_assert_lt(post_freqs[CUR], post_freqs[MAX]);
-
 }
 
 static void pm_rps_exit_handler(int sig)
