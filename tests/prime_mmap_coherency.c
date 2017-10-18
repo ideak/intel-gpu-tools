@@ -80,8 +80,10 @@ static int test_read_flush(void)
 		       MAP_SHARED, dma_buf_fd, 0);
 	igt_assert(ptr_cpu != MAP_FAILED);
 
+	prime_sync_start(dma_buf_fd, false);
 	for (i = 0; i < (width * height) / 4; i++)
 		igt_assert_eq(ptr_cpu[i], 0);
+	prime_sync_end(dma_buf_fd, false);
 
 	intel_copy_bo(batch, bo_1, bo_2, width * height);
 	gem_sync(fd, bo_1->handle);
@@ -93,10 +95,10 @@ static int test_read_flush(void)
 	 * until we try to read them again in step #4. This behavior could be fixed
 	 * by flush CPU read right before accessing the CPU pointer */
 	prime_sync_start(dma_buf_fd, false);
-
 	for (i = 0; i < (width * height) / 4; i++)
 		if (ptr_cpu[i] != 0xc5c5c5c5)
 			stale++;
+	prime_sync_end(dma_buf_fd, false);
 
 	drm_intel_bo_unreference(bo_1);
 	munmap(ptr_cpu, width * height);
@@ -141,8 +143,8 @@ static int test_write_flush(void)
 	/* This is the main point of this test: !llc hw requires a cache write
 	 * flush right here (explained in step #4). */
 	prime_sync_start(dma_buf_fd, true);
-
 	memset(ptr_cpu, 0x11, width * height);
+	prime_sync_end(dma_buf_fd, true);
 
 	/* STEP #3: Copy BO 1 into BO 2, using blitter. */
 	bo_2 = drm_intel_bo_alloc(bufmgr, "BO 2", width * height * 4, 4096);
@@ -159,9 +161,13 @@ static int test_write_flush(void)
 		        MAP_SHARED, dma_buf2_fd, 0);
 	igt_assert(ptr2_cpu != MAP_FAILED);
 
+	prime_sync_start(dma_buf2_fd, false);
+
 	for (i = 0; i < (width * height) / 4; i++)
 		if (ptr2_cpu[i] != 0x11111111)
 			stale++;
+
+	prime_sync_end(dma_buf2_fd, false);
 
 	drm_intel_bo_unreference(bo_1);
 	drm_intel_bo_unreference(bo_2);
