@@ -180,6 +180,12 @@ void igt_require_hpd_storm_ctl(int fd);
  */
 #define DROP_SHRINK_ALL 0x20
 /**
+ * DROP_IDLE:
+ *
+ * Flush the driver's idle_worker, releasing internal caches and wakerefs.
+ */
+#define DROP_IDLE 0x40
+/**
  * DROP_ALL:
  *
  * All of the above DROP_ flags combined.
@@ -189,7 +195,8 @@ void igt_require_hpd_storm_ctl(int fd);
 		  DROP_SHRINK_ALL | \
 		  DROP_RETIRE | \
 		  DROP_ACTIVE | \
-		  DROP_FREED)
+		  DROP_FREED | \
+		  DROP_IDLE)
 
 bool igt_drop_caches_has(int fd, uint64_t val);
 void igt_drop_caches_set(int fd, uint64_t val);
