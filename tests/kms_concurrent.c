@@ -91,8 +91,6 @@ static void test_fini(data_t *data, enum pipe pipe, int n_planes,
 {
 	int i;
 
-	igt_pipe_refresh(&data->display, pipe, true);
-
 	for (i = 0; i < n_planes; i++) {
 		igt_plane_t *plane = data->plane[i];
 
@@ -228,6 +226,8 @@ test_plane_position_with_output(data_t *data, enum pipe pipe, igt_output_t *outp
 	bool loop_forever = opt.iterations == LOOP_FOREVER ? true : false;
 	int max_planes = data->display.pipes[pipe].n_planes;
 
+	igt_pipe_refresh(&data->display, pipe, true);
+
 	i = 0;
 	while (i < iterations || loop_forever) {
 		prepare_planes(data, pipe, max_planes, output);
@@ -237,27 +237,28 @@ test_plane_position_with_output(data_t *data, enum pipe pipe, igt_output_t *outp
 	}
 }
 
+static drmModeModeInfo std_1024_mode = {
+	.clock = 65000,
+	.hdisplay = 1024,
+	.hsync_start = 1048,
+	.hsync_end = 1184,
+	.htotal = 1344,
+	.hskew = 0,
+	.vdisplay = 768,
+	.vsync_start = 771,
+	.vsync_end = 777,
+	.vtotal = 806,
+	.vscan = 0,
+	.vrefresh = 60,
+	.flags = 0xA,
+	.type = 0x40,
+	.name = "Custom 1024x768",
+};
+
 static drmModeModeInfo *
 get_lowres_mode(data_t *data, drmModeModeInfo *mode_default,
 		igt_output_t *output)
 {
-	drmModeModeInfo std_1024_mode = {
-		.clock = 65000,
-		.hdisplay = 1024,
-		.hsync_start = 1048,
-		.hsync_end = 1184,
-		.htotal = 1344,
-		.hskew = 0,
-		.vdisplay = 768,
-		.vsync_start = 771,
-		.vsync_end = 777,
-		.vtotal = 806,
-		.vscan = 0,
-		.vrefresh = 60,
-		.flags = 0xA,
-		.type = 0x40,
-		.name = "Custom 1024x768",
-	};
 	drmModeModeInfo *mode = &std_1024_mode;
 	drmModeConnector *connector = output->config.connector;
 	int limit = mode_default->vdisplay - SIZE_PLANE;
@@ -292,19 +293,15 @@ test_resolution_with_output(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	i = 0;
 	while (i < iterations || loop_forever) {
-		igt_pipe_refresh(&data->display, pipe, true);
-
 		mode_hi = igt_output_get_mode(output);
 		mode_lo = get_lowres_mode(data, mode_hi, output);
 
 		/* switch to lower resolution */
 		igt_output_override_mode(output, mode_lo);
-		igt_output_set_pipe(output, pipe);
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 		/* switch back to higher resolution */
 		igt_output_override_mode(output, NULL);
-		igt_output_set_pipe(output, pipe);
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 		i++;
