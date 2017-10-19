@@ -45,8 +45,7 @@
 #include "igt_stats.h"
 
 #define TEST_DPMS		(1 << 0)
-#define TEST_WITH_DUMMY_BCS	(1 << 1)
-#define TEST_WITH_DUMMY_RCS	(1 << 2)
+
 #define TEST_PAN		(1 << 3)
 #define TEST_MODESET		(1 << 4)
 #define TEST_CHECK_TS		(1 << 5)
@@ -668,8 +667,6 @@ static unsigned int run_test_step(struct test_output *o)
 	struct vblank_reply vbl_reply;
 	unsigned int target_seq;
 	igt_hang_t hang;
-	igt_spin_t *spin_rcs = 0;
-	igt_spin_t *spin_bcs = 0;
 
 	target_seq = o->vblank_state.seq_step;
 	/* Absolute waits only works once we have a frame counter. */
@@ -690,20 +687,6 @@ static unsigned int run_test_step(struct test_output *o)
 
 	if (!(o->flags & TEST_SINGLE_BUFFER))
 		o->current_fb_id = !o->current_fb_id;
-
-	if (o->flags & TEST_WITH_DUMMY_BCS) {
-		spin_bcs = __igt_spin_batch_new(drm_fd, 0, I915_EXEC_BLT,
-						o->fb_info[o->current_fb_id].gem_handle);
-		igt_spin_batch_set_timeout(spin_bcs,
-					   NSEC_PER_SEC);
-	}
-
-	if (o->flags & TEST_WITH_DUMMY_RCS) {
-		spin_rcs = __igt_spin_batch_new(drm_fd, 0, I915_EXEC_RENDER,
-						o->fb_info[o->current_fb_id].gem_handle);
-		igt_spin_batch_set_timeout(spin_rcs,
-					   NSEC_PER_SEC);
-	}
 
 	if (o->flags & TEST_FB_RECREATE)
 		recreate_fb(o);
@@ -809,10 +792,6 @@ static unsigned int run_test_step(struct test_output *o)
 			completed_events = EVENT_VBLANK;
 		}
 	}
-	if (spin_rcs)
-		igt_spin_batch_free(drm_fd, spin_rcs);
-	if (spin_bcs)
-		igt_spin_batch_free(drm_fd, spin_bcs);
 
 	if (do_flip && (o->flags & TEST_EBUSY))
 		igt_assert(do_page_flip(o, new_fb_id, true) == -EBUSY);
@@ -1065,10 +1044,6 @@ static unsigned int wait_for_events(struct test_output *o)
 	evctx.vblank_handler = vblank_handler;
 	evctx.page_flip_handler = page_flip_handler;
 
-	/* make timeout lax with the dummy load */
-	if (o->flags & (TEST_WITH_DUMMY_BCS | TEST_WITH_DUMMY_RCS))
-		timeout.tv_sec *= 60;
-
 	FD_ZERO(&fds);
 	FD_SET(drm_fd, &fds);
 	do {
@@ -1098,9 +1073,6 @@ static unsigned event_loop(struct test_output *o, unsigned duration_ms)
 	unsigned long start, end;
 	igt_hang_t hang;
 	int count = 0;
-
-	if (o->flags & (TEST_WITH_DUMMY_BCS | TEST_WITH_DUMMY_RCS))
-		igt_require_gem(drm_fd);
 
 	memset(&hang, 0, sizeof(hang));
 	if (o->flags & TEST_HANG_ONCE)
@@ -1571,15 +1543,7 @@ int main(int argc, char **argv)
 		{ 30,  TEST_VBLANK | TEST_VBLANK_BLOCK | TEST_VBLANK_ABSOLUTE,
 					"blocking-absolute-wf_vblank" },
 		{ 60,  TEST_VBLANK | TEST_DPMS | TEST_EINVAL, "wf_vblank-vs-dpms" },
-		{ 60,  TEST_VBLANK | TEST_DPMS | TEST_WITH_DUMMY_BCS,
-					"blt-wf_vblank-vs-dpms" },
-		{ 60,  TEST_VBLANK | TEST_DPMS | TEST_WITH_DUMMY_RCS,
-					"rcs-wf_vblank-vs-dpms" },
 		{ 60,  TEST_VBLANK | TEST_MODESET | TEST_EINVAL, "wf_vblank-vs-modeset" },
-		{ 60,  TEST_VBLANK | TEST_MODESET | TEST_WITH_DUMMY_BCS,
-					"blt-wf_vblank-vs-modeset" },
-		{ 60,  TEST_VBLANK | TEST_MODESET | TEST_WITH_DUMMY_RCS,
-					"rcs-wf_vblank-vs-modeset" },
 		{ 10, TEST_FLIP | TEST_BASIC, "plain-flip" },
 		{ 30, TEST_FLIP | TEST_EBUSY , "busy-flip" },
 		{ 30, TEST_FLIP | TEST_FENCE_STRESS , "flip-vs-fences" },
@@ -1589,8 +1553,6 @@ int main(int argc, char **argv)
 		{ 30, TEST_FLIP | TEST_RMFB | TEST_MODESET , "flip-vs-rmfb" },
 		{ 20, TEST_FLIP | TEST_DPMS | TEST_EINVAL | TEST_BASIC, "flip-vs-dpms" },
 		{ 30,  TEST_FLIP | TEST_PAN, "flip-vs-panning" },
-		{ 60, TEST_FLIP | TEST_PAN | TEST_WITH_DUMMY_BCS, "blt-flip-vs-panning" },
-		{ 60, TEST_FLIP | TEST_PAN | TEST_WITH_DUMMY_RCS, "render-flip-vs-panning" },
 		{ 20, TEST_FLIP | TEST_MODESET | TEST_EINVAL | TEST_BASIC, "flip-vs-modeset" },
 		{ 30,  TEST_FLIP | TEST_VBLANK_EXPIRED_SEQ,
 					"flip-vs-expired-vblank" },
