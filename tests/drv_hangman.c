@@ -184,6 +184,7 @@ static void test_error_state_capture(unsigned ring_id,
 	uint64_t offset;
 
 	igt_require(gem_has_ring(device, ring_id));
+
 	clear_error_state();
 
 	hang = igt_hang_ctx(device, 0, ring_id, HANG_ALLOW_CAPTURE, &offset);
@@ -252,6 +253,20 @@ igt_main
 
 	for (e = intel_execution_engines; e->name; e++) {
 		if (e->exec_id == 0)
+			continue;
+
+		/*
+		 * If the device has 2 BSD rings then due to obtuse aliasing
+		 * in the API, we can not determine which ring I915_EXEC_BSD
+		 * will map to, and so must skip the test; as the matching name
+		 * may be either bsd or bsd2 depending on the kernel/test
+		 * ordering.
+		 *
+		 * Here we are not checking that executing on every ABI engine
+		 * results in a detectable hang, but that a hang generated
+		 * from a specific HW engine gives an indentifiable result.
+		 */
+		if (e->exec_id == I915_EXEC_BSD && e->flags == 0)
 			continue;
 
 		igt_subtest_f("error-state-capture-%s", e->name)
