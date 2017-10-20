@@ -1724,6 +1724,7 @@ enum opt {
 	OPT_HEXDUMP,
 	OPT_BLOCK,
 	OPT_USAGE,
+	OPT_HEADER,
 };
 
 static void usage(const char *toolname)
@@ -1735,6 +1736,7 @@ static void usage(const char *toolname)
 			" [--all-panels]"
 			" [--hexdump]"
 			" [--block=<block_no>]"
+			" [--header]"
 			" [--help]\n");
 }
 
@@ -1755,6 +1757,7 @@ int main(int argc, char **argv)
 	};
 	char *endp;
 	int block_number = -1;
+	bool header_only = false;
 
 	static struct option options[] = {
 		{ "file",	required_argument,	NULL,	OPT_FILE },
@@ -1763,6 +1766,7 @@ int main(int argc, char **argv)
 		{ "all-panels",	no_argument,		NULL,	OPT_ALL_PANELS },
 		{ "hexdump",	no_argument,		NULL,	OPT_HEXDUMP },
 		{ "block",	required_argument,	NULL,	OPT_BLOCK },
+		{ "header",	no_argument,		NULL,	OPT_HEADER },
 		{ "help",	no_argument,		NULL,	OPT_USAGE },
 		{ 0 }
 	};
@@ -1802,6 +1806,9 @@ int main(int argc, char **argv)
 					optarg);
 				return EXIT_FAILURE;
 			}
+			break;
+		case OPT_HEADER:
+			header_only = true;
 			break;
 		case OPT_END:
 			break;
@@ -1906,7 +1913,9 @@ int main(int argc, char **argv)
 		context.panel_type = 0;
 	}
 
-	if (block_number != -1) {
+	if (header_only) {
+		dump_headers(&context);
+	} else if (block_number != -1) {
 		/* dump specific section only */
 		if (!dump_section(&context, block_number)) {
 			fprintf(stderr, "Block %d not found\n", block_number);
