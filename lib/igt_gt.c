@@ -194,17 +194,18 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 
 void igt_disallow_hang(int fd, igt_hang_t arg)
 {
-	struct local_i915_gem_context_param param;
 
 	context_set_ban(fd, arg.ctx, arg.ban);
 
 	if ((arg.flags & HANG_ALLOW_CAPTURE) == 0) {
-		param.context = arg.ctx;
-		param.size = 0;
-		param.param = LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE;
-		param.value = 0;
-		if (__gem_context_set_param(fd, &param))
-			eat_error_state(fd);
+		struct local_i915_gem_context_param param = {
+			.context = arg.ctx,
+			.param = LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE,
+			.value = 0,
+		};
+		__gem_context_set_param(fd, &param);
+
+		eat_error_state(fd);
 	}
 }
 
@@ -360,8 +361,6 @@ igt_hang_t igt_hang_ring(int fd, int ring)
  */
 void igt_post_hang_ring(int fd, igt_hang_t arg)
 {
-	struct local_i915_gem_context_param param;
-
 	if (arg.handle == 0)
 		return;
 
@@ -372,12 +371,14 @@ void igt_post_hang_ring(int fd, igt_hang_t arg)
 	context_set_ban(fd, arg.ctx, arg.ban);
 
 	if ((arg.flags & HANG_ALLOW_CAPTURE) == 0) {
-		param.context = arg.ctx;
-		param.size = 0;
-		param.param = LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE;
-		param.value = 0;
-		if (__gem_context_set_param(fd, &param))
-			eat_error_state(fd);
+		struct local_i915_gem_context_param param = {
+			.context = arg.ctx,
+			.param = LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE,
+			.value = 0,
+		};
+		__gem_context_set_param(fd, &param);
+
+		eat_error_state(fd);
 	}
 }
 
