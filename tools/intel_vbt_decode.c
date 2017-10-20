@@ -25,6 +25,7 @@
  *
  */
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -1662,6 +1663,33 @@ static bool dump_section(struct context *context, int section_id)
 	return true;
 }
 
+/* print a description of the VBT of the form <bdb-version>-<vbt-signature> */
+static void print_description(struct context *context)
+{
+	const struct vbt_header *vbt = context->vbt;
+	const struct bdb_header *bdb = context->bdb;
+	char *desc = strndup((char *)vbt->signature, sizeof(vbt->signature));
+	char *p;
+
+	for (p = desc + strlen(desc) - 1; p >= desc && isspace(*p); p--)
+		*p = '\0';
+
+	for (p = desc; *p; p++) {
+		if (!isalnum(*p))
+			*p = '-';
+		else
+			*p = tolower(*p);
+	}
+
+	p = desc;
+	if (strncmp(p, "-vbt-", 5) == 0)
+		p += 5;
+
+	printf("%d-%s\n", bdb->version, p);
+
+	free (desc);
+}
+
 static void dump_headers(struct context *context)
 {
 	const struct vbt_header *vbt = context->vbt;
@@ -1725,6 +1753,7 @@ enum opt {
 	OPT_BLOCK,
 	OPT_USAGE,
 	OPT_HEADER,
+	OPT_DESCRIBE,
 };
 
 static void usage(const char *toolname)
@@ -1737,6 +1766,7 @@ static void usage(const char *toolname)
 			" [--hexdump]"
 			" [--block=<block_no>]"
 			" [--header]"
+			" [--describe]"
 			" [--help]\n");
 }
 
@@ -1757,7 +1787,7 @@ int main(int argc, char **argv)
 	};
 	char *endp;
 	int block_number = -1;
-	bool header_only = false;
+	bool header_only = false, describe = false;
 
 	static struct option options[] = {
 		{ "file",	required_argument,	NULL,	OPT_FILE },
@@ -1767,6 +1797,7 @@ int main(int argc, char **argv)
 		{ "hexdump",	no_argument,		NULL,	OPT_HEXDUMP },
 		{ "block",	required_argument,	NULL,	OPT_BLOCK },
 		{ "header",	no_argument,		NULL,	OPT_HEADER },
+		{ "describe",	no_argument,		NULL,	OPT_DESCRIBE },
 		{ "help",	no_argument,		NULL,	OPT_USAGE },
 		{ 0 }
 	};
@@ -1809,6 +1840,9 @@ int main(int argc, char **argv)
 			break;
 		case OPT_HEADER:
 			header_only = true;
+			break;
+		case OPT_DESCRIBE:
+			describe = true;
 			break;
 		case OPT_END:
 			break;
@@ -1913,7 +1947,9 @@ int main(int argc, char **argv)
 		context.panel_type = 0;
 	}
 
-	if (header_only) {
+	if (describe) {
+		print_description(&context);
+	} else if (header_only) {
 		dump_headers(&context);
 	} else if (block_number != -1) {
 		/* dump specific section only */
