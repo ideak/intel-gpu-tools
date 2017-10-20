@@ -33,11 +33,6 @@
 #include <fcntl.h>
 #include <limits.h>
 
-
-
-#define FD_ARR_SZ 100
-int fd_arr[FD_ARR_SZ];
-
 static bool allow_unlimited_files(void)
 {
 	struct rlimit rlim;
@@ -60,31 +55,23 @@ static bool allow_unlimited_files(void)
 
 igt_simple_main
 {
-	int fd, i;
+	int fd;
 
 	igt_require(allow_unlimited_files());
 
 	fd = drm_open_driver(DRIVER_INTEL);
 
-	igt_assert(open("/dev/null", O_RDONLY) >= 0);
-
 	igt_fork(n, 1) {
 		igt_drop_root();
 
-		for (i = 0; ; i++) {
-			int tmp_fd = open("/dev/null", O_RDONLY);
+		for (int i = 0; ; i++) {
+			int leak = dup(fd);
 			uint32_t handle;
-
-			if (tmp_fd >= 0 && i < FD_ARR_SZ)
-				fd_arr[i] = tmp_fd;
 
 			if (__gem_create(fd, 4096, &handle) == 0)
 				gem_close(fd, handle);
 
-
-			if (tmp_fd < 0) {
-				/* Ensure we actually hit the failure path ... */
-				igt_assert(handle == 0);
+			if (leak < 0) {
 				igt_info("fd exhaustion after %i rounds.\n", i);
 				break;
 			}
