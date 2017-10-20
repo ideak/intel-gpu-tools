@@ -513,6 +513,8 @@ static void dump_general_definitions(struct context *context,
 	const struct bdb_general_definitions *defs = block->data;
 	int child_dev_num;
 
+	child_dev_num = (block->size - sizeof(*defs)) / defs->child_dev_size;
+
 	printf("\tCRT DDC GMBUS addr: 0x%02x\n", defs->crt_ddc_gmbus_pin);
 	printf("\tUse ACPI DPMS CRT power states: %s\n",
 	       YESNO(defs->dpms_acpi));
@@ -522,8 +524,8 @@ static void dump_general_definitions(struct context *context,
 	printf("\tBoot display type: 0x%02x%02x\n", defs->boot_display[1],
 	       defs->boot_display[0]);
 	printf("\tChild device size: %d\n", defs->child_dev_size);
+	printf("\tChild device count: %d\n", child_dev_num);
 
-	child_dev_num = (block->size - sizeof(*defs)) / defs->child_dev_size;
 	dump_child_devices(context, defs->devices,
 			   child_dev_num, defs->child_dev_size);
 }
@@ -534,9 +536,11 @@ static void dump_legacy_child_devices(struct context *context,
 	const struct bdb_legacy_child_devices *defs = block->data;
 	int child_dev_num;
 
-	printf("\tChild device size: %d\n", defs->child_dev_size);
-
 	child_dev_num = (block->size - sizeof(*defs)) / defs->child_dev_size;
+
+	printf("\tChild device size: %d\n", defs->child_dev_size);
+	printf("\tChild device count: %d\n", child_dev_num);
+
 	dump_child_devices(context, defs->devices,
 			   child_dev_num, defs->child_dev_size);
 }
