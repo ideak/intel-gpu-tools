@@ -31,5 +31,6 @@ unsigned gem_submission_method(int fd);
 void gem_submission_print_method(int fd);
 bool gem_has_semaphores(int fd);
 bool gem_has_execlists(int fd);
+bool gem_has_guc_submission(int fd);
 
 #endif /* GEM_SUBMISSION_H */

@@ -126,3 +126,15 @@ bool gem_has_execlists(int fd)
 {
 	return gem_submission_method(fd) & GEM_SUBMISSION_EXECLISTS;
 }
+
+/**
+ * gem_has_guc_submission:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether the driver is using the GuC as a
+ * hardware submission method.
+ */
+bool gem_has_guc_submission(int fd)
+{
+	return gem_submission_method(fd) & GEM_SUBMISSION_GUC;
+}
