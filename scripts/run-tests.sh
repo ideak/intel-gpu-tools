@@ -40,8 +40,6 @@ if [ ! -f "$IGT_TEST_ROOT/test-list.txt" ]; then
 	exit 1
 fi
 
-TEST_LIST=`cat "$IGT_TEST_ROOT/test-list.txt" | sed -e '/TESTLIST/d' -e 's/ /\n/g'`
-
 function download_piglit {
 	git clone git://anongit.freedesktop.org/piglit "$ROOT/piglit"
 }
@@ -70,24 +68,11 @@ function print_help {
 	echo "Useful patterns for test filtering are described in the API documentation."
 }
 
-function list_tests {
-	for test in $TEST_LIST; do
-		SUBTESTS=`"$IGT_TEST_ROOT/$test" --list-subtests`
-		if [ -z "$SUBTESTS" ]; then
-			echo "$test"
-		else
-			for subtest in $SUBTESTS; do
-				echo "$test/$subtest"
-			done
-		fi
-	done
-}
-
 while getopts ":dhlr:st:T:vx:Rn" opt; do
 	case $opt in
 		d) download_piglit; exit ;;
 		h) print_help; exit ;;
-		l) list_tests; exit ;;
+		l) LIST_TESTS="true" ;;
 		r) RESULTS="$OPTARG" ;;
 		s) SUMMARY="html" ;;
 		t) FILTER="$FILTER -t $OPTARG" ;;
@@ -123,6 +108,11 @@ if [ ! -x "$PIGLIT" ]; then
 	echo "Could not find Piglit."
 	echo "Please install Piglit or use -d to download Piglit locally."
 	exit 1
+fi
+
+if [ "x$LIST_TESTS" != "x" ]; then
+	IGT_TEST_ROOT="$IGT_TEST_ROOT" IGT_CONFIG_PATH="$IGT_CONFIG_PATH" "$PIGLIT" print-cmd --format "{name}" igt
+	exit
 fi
 
 if [ "x$RESUME" != "x" ]; then
