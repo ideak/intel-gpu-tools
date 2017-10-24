@@ -69,9 +69,10 @@ xmlrpc = dependency('xmlrpc', required : false)
 xmlrpc_util = dependency('xmlrpc_util', required : false)
 xmlrpc_client = dependency('xmlrpc_client', required : false)
 
-if not xmlrpc.found()
-	libs_cmd = run_command('xmlrpc-c-config', 'client', '--libs')
-	cflags_cmd = run_command('xmlrpc-c-config', 'client', '--cflags')
+xmlrpc_cmd = find_program('xmlrpc-c-config', required : false)
+if not xmlrpc.found() and xmlrpc_cmd.found()
+	libs_cmd = run_command(xmlrpc_cmd, 'client', '--libs')
+	cflags_cmd = run_command(xmlrpc_cmd, 'client', '--cflags')
 
 	if libs_cmd.returncode() == 0 and cflags_cmd.returncode() == 0
 		xmlrpc = declare_dependency(compile_args: cflags_cmd.stdout().strip().split(),
