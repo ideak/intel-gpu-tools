@@ -97,6 +97,7 @@ igt_simple_main
 
 	device = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(device);
+	igt_skip_on(gem_has_guc_submission(device)); /* irq forced for guc */
 	gem_require_mmap_wc(device);
 	igt_fork_hang_detector(device);
 
