@@ -855,7 +855,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 	data->color_depth = 8;
 	delta = 1.0 / (1 << data->color_depth);
 
-	igt_subtest_f("ctm-red-to-blue-pipe%d", p) {
+	igt_subtest_f("pipe-%s-ctm-red-to-blue", kmstest_pipe_name(p)) {
 		color_t blue_green_blue[] = {
 			{ 0.0, 0.0, 1.0 },
 			{ 0.0, 1.0, 0.0 },
@@ -868,7 +868,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 					 blue_green_blue, ctm));
 	}
 
-	igt_subtest_f("ctm-green-to-red-pipe%d", p) {
+	igt_subtest_f("pipe-%s-ctm-green-to-red", kmstest_pipe_name(p)) {
 		color_t red_red_blue[] = {
 			{ 1.0, 0.0, 0.0 },
 			{ 1.0, 0.0, 0.0 },
@@ -881,7 +881,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 					 red_red_blue, ctm));
 	}
 
-	igt_subtest_f("ctm-blue-to-red-pipe%d", p) {
+	igt_subtest_f("pipe-%s-ctm-blue-to-red", kmstest_pipe_name(p)) {
 		color_t red_green_red[] = {
 			{ 1.0, 0.0, 0.0 },
 			{ 0.0, 1.0, 0.0 },
@@ -898,7 +898,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 	 * the it depends on the hardware we're dealing with, we can
 	 * either get clamped or rounded values and we also need to
 	 * account for odd number of items in the LUTs. */
-	igt_subtest_f("ctm-0-25-pipe%d", p) {
+	igt_subtest_f("pipe-%s-ctm-0-25", kmstest_pipe_name(p)) {
 		color_t expected_colors[] = {
 			{ 0.0, }, { 0.0, }, { 0.0, }
 		};
@@ -919,7 +919,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 		igt_assert(success);
 	}
 
-	igt_subtest_f("ctm-0-5-pipe%d", p) {
+	igt_subtest_f("pipe-%s-ctm-0-5", kmstest_pipe_name(p)) {
 		color_t expected_colors[] = {
 			{ 0.0, }, { 0.0, }, { 0.0, }
 		};
@@ -940,7 +940,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 		igt_assert(success);
 	}
 
-	igt_subtest_f("ctm-0-75-pipe%d", p) {
+	igt_subtest_f("pipe-%s-ctm-0-75", kmstest_pipe_name(p)) {
 		color_t expected_colors[] = {
 			{ 0.0, }, { 0.0, }, { 0.0, }
 		};
@@ -961,7 +961,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 		igt_assert(success);
 	}
 
-	igt_subtest_f("ctm-max-pipe%d", p) {
+	igt_subtest_f("pipe-%s-ctm-max", kmstest_pipe_name(p)) {
 		color_t full_rgb[] = {
 			{ 1.0, 0.0, 0.0 },
 			{ 0.0, 1.0, 0.0 },
@@ -979,7 +979,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 					 full_rgb, ctm));
 	}
 
-	igt_subtest_f("ctm-negative-pipe%d", p) {
+	igt_subtest_f("pipe-%s-ctm-negative", kmstest_pipe_name(p)) {
 		color_t all_black[] = {
 			{ 0.0, 0.0, 0.0 },
 			{ 0.0, 0.0, 0.0 },
@@ -993,20 +993,20 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 	}
 
 #if 0
-	igt_subtest_f("ctm-limited-range-pipe%d", p)
+	igt_subtest_f("pipe-%s-ctm-limited-range", kmstest_pipe_name(p))
 		test_pipe_limited_range_ctm(data, primary);
 #endif
 
-	igt_subtest_f("degamma-pipe%d", p)
+	igt_subtest_f("pipe-%s-degamma", kmstest_pipe_name(p))
 		test_pipe_degamma(data, primary);
 
-	igt_subtest_f("gamma-pipe%d", p)
+	igt_subtest_f("pipe-%s-gamma", kmstest_pipe_name(p))
 		test_pipe_gamma(data, primary);
 
-	igt_subtest_f("legacy-gamma-pipe%d", p)
+	igt_subtest_f("pipe-%s-legacy-gamma", kmstest_pipe_name(p))
 		test_pipe_legacy_gamma(data, primary);
 
-	igt_subtest_f("legacy-gamma-reset-pipe%d", p)
+	igt_subtest_f("pipe-%s-legacy-gamma-reset", kmstest_pipe_name(p))
 		test_pipe_legacy_gamma_reset(data, primary);
 
 	igt_fixture {
