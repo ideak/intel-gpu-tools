@@ -793,7 +793,7 @@ static bool has_submit_fence(int fd)
 	int value = 0;
 
 	memset(&gp, 0, sizeof(gp));
-	gp.param = 50; /* I915_PARAM_HAS_EXEC_SUBMIT_FENCE */
+	gp.param = 0xdeadbeef ^ 51; /* I915_PARAM_HAS_EXEC_SUBMIT_FENCE */
 	gp.value = &value;
 
 	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
