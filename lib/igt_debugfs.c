@@ -416,16 +416,12 @@ char *igt_crc_to_string(igt_crc_t *crc)
 #define MAX_CRC_ENTRIES 10
 #define MAX_LINE_LEN (10 + 11 * MAX_CRC_ENTRIES + 1)
 
-/* (6 fields, 8 chars each, space separated (5) + '\n') */
-#define LEGACY_LINE_LEN       (6 * 8 + 5 + 1)
-
 struct _igt_pipe_crc {
 	int fd;
 	int dir;
 	int ctl_fd;
 	int crc_fd;
 	int flags;
-	bool is_legacy;
 
 	enum pipe pipe;
 	enum intel_pipe_crc_source source;
@@ -449,130 +445,6 @@ static const char *pipe_crc_source_name(enum intel_pipe_crc_source source)
         return pipe_crc_sources[source];
 }
 
-static bool igt_pipe_crc_do_start(igt_pipe_crc_t *pipe_crc)
-{
-	char buf[64];
-
-	/* Stop first just to make sure we don't have lingering state left. */
-	igt_pipe_crc_stop(pipe_crc);
-
-	if (pipe_crc->is_legacy)
-		sprintf(buf, "pipe %s %s", kmstest_pipe_name(pipe_crc->pipe),
-			pipe_crc_source_name(pipe_crc->source));
-	else
-		sprintf(buf, "%s", pipe_crc_source_name(pipe_crc->source));
-
-	igt_assert_eq(write(pipe_crc->ctl_fd, buf, strlen(buf)), strlen(buf));
-
-	if (!pipe_crc->is_legacy) {
-		int err;
-
-		sprintf(buf, "crtc-%d/crc/data", pipe_crc->pipe);
-		err = 0;
-
-		pipe_crc->crc_fd = openat(pipe_crc->dir, buf, pipe_crc->flags);
-		if (pipe_crc->crc_fd < 0)
-			err = -errno;
-
-		if (err == -EINVAL)
-			return false;
-
-		igt_assert_eq(err, 0);
-	}
-
-	errno = 0;
-	return true;
-}
-
-static void igt_pipe_crc_pipe_off(int fd, enum pipe pipe)
-{
-	char buf[32];
-
-	sprintf(buf, "pipe %s none", kmstest_pipe_name(pipe));
-	igt_assert_eq(write(fd, buf, strlen(buf)), strlen(buf));
-}
-
-static void igt_pipe_crc_reset(int drm_fd)
-{
-	struct dirent *dirent;
-	const char *cmd = "none";
-	bool done = false;
-	DIR *dir;
-	int fdir;
-	int fd;
-
-	fdir = igt_debugfs_dir(drm_fd);
-	if (fdir < 0)
-		return;
-
-	dir = fdopendir(fdir);
-	if (!dir) {
-		close(fdir);
-		return;
-	}
-
-	while ((dirent = readdir(dir))) {
-		char buf[PATH_MAX];
-
-		if (strcmp(dirent->d_name, "crtc-") != 0)
-			continue;
-
-		sprintf(buf, "%s/crc/control", dirent->d_name);
-		fd = openat(fdir, buf, O_WRONLY);
-		if (fd < 0)
-			continue;
-
-		igt_assert_eq(write(fd, cmd, strlen(cmd)), strlen(cmd));
-		close(fd);
-
-		done = true;
-	}
-	closedir(dir);
-
-	if (!done) {
-		fd = openat(fdir, "i915_display_crtc_ctl", O_WRONLY);
-		if (fd != -1) {
-			igt_pipe_crc_pipe_off(fd, PIPE_A);
-			igt_pipe_crc_pipe_off(fd, PIPE_B);
-			igt_pipe_crc_pipe_off(fd, PIPE_C);
-
-			close(fd);
-		}
-	}
-
-	close(fdir);
-}
-
-static void pipe_crc_exit_handler(int sig)
-{
-	struct dirent *dirent;
-	char buf[PATH_MAX];
-	DIR *dir;
-	int fd;
-
-	dir = opendir("/dev/dri");
-	if (!dir)
-		return;
-
-	/*
-	 * Try to reset CRC capture for all DRM devices, this is only needed
-	 * for the legacy CRC ABI and can be completely removed once the
-	 * legacy codepaths are removed.
-	 */
-	while ((dirent = readdir(dir))) {
-		if (strncmp(dirent->d_name, "card", 4) != 0)
-			continue;
-
-		sprintf(buf, "/dev/dri/%s", dirent->d_name);
-		fd = open(buf, O_WRONLY);
-
-		igt_pipe_crc_reset(fd);
-
-		close(fd);
-	}
-	closedir(dir);
-}
-
 /**
  * igt_require_pipe_crc:
  *
@@ -582,26 +454,15 @@ static void pipe_crc_exit_handler(int sig)
  */
 void igt_require_pipe_crc(int fd)
 {
-	const char *cmd = "pipe A none";
-	int ctl, written;
-	int dir, ret;
+	int dir;
 	struct stat stat;
 
 	dir = igt_debugfs_dir(fd);
 	igt_require_f(dir >= 0, "Could not open debugfs directory\n");
-	ret = fstatat(dir, "crtc-0/crc/control", &stat, 0);
+	igt_require_f(fstatat(dir, "crtc-0/crc/control", &stat, 0) == 0,
+		      "CRCs not supported on this platform\n");
+
 	close(dir);
-
-	if (ret < 0) {
-		ctl = igt_debugfs_open(fd, "i915_display_crc_ctl", O_WRONLY);
-		igt_require_f(ctl,
-			      "No display_crc_ctl found, kernel too old\n");
-
-		written = write(ctl, cmd, strlen(cmd));
-		igt_require_f(written < 0,
-			      "CRCs not supported on this platform\n");
-		close(ctl);
-	}
 }
 
 static void igt_hpd_storm_exit_handler(int sig)
@@ -735,29 +596,13 @@ pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source, int flag
 	debugfs = igt_debugfs_dir(fd);
 	igt_assert(debugfs != -1);
 
-	igt_install_exit_handler(pipe_crc_exit_handler);
-
 	pipe_crc = calloc(1, sizeof(struct _igt_pipe_crc));
 
 	sprintf(buf, "crtc-%d/crc/control", pipe);
 	pipe_crc->ctl_fd = openat(debugfs, buf, O_WRONLY);
-	if (pipe_crc->ctl_fd == -1) {
-		pipe_crc->ctl_fd = openat(debugfs,
-					  "i915_display_crc_ctl", O_WRONLY);
-		igt_assert(pipe_crc->ctl_fd != -1);
-		pipe_crc->is_legacy = true;
-	}
+	igt_assert(pipe_crc->ctl_fd != -1);
 
-	if (pipe_crc->is_legacy) {
-		sprintf(buf, "i915_pipe_%s_crc", kmstest_pipe_name(pipe));
-		pipe_crc->crc_fd = openat(debugfs, buf, flags);
-		igt_assert(pipe_crc->crc_fd != -1);
-		igt_debug("Using legacy frame CRC ABI\n");
-	} else {
-		pipe_crc->crc_fd = -1;
-		igt_debug("Using generic frame CRC ABI\n");
-	}
-
+	pipe_crc->crc_fd = -1;
 	pipe_crc->fd = fd;
 	pipe_crc->dir = debugfs;
 	pipe_crc->pipe = pipe;
@@ -823,17 +668,8 @@ void igt_pipe_crc_free(igt_pipe_crc_t *pipe_crc)
 static bool pipe_crc_init_from_string(igt_pipe_crc_t *pipe_crc, igt_crc_t *crc,
 				      const char *line)
 {
-	int n, i;
+	int i;
 	const char *buf;
-
-	if (pipe_crc->is_legacy) {
-		crc->has_valid_frame = true;
-		crc->n_words = 5;
-		n = sscanf(line, "%8u %8x %8x %8x %8x %8x", &crc->frame,
-			   &crc->crc[0], &crc->crc[1], &crc->crc[2],
-			   &crc->crc[3], &crc->crc[4]);
-		return n == 6;
-	}
 
 	if (strncmp(line, "XXXXXXXXXX", 10) == 0)
 		crc->has_valid_frame = false;
@@ -855,15 +691,9 @@ static int read_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out)
 {
 	ssize_t bytes_read;
 	char buf[MAX_LINE_LEN + 1];
-	size_t read_len;
-
-	if (pipe_crc->is_legacy)
-		read_len = LEGACY_LINE_LEN;
-	else
-		read_len = MAX_LINE_LEN;
 
 	igt_set_timeout(5, "CRC reading");
-	bytes_read = read(pipe_crc->crc_fd, &buf, read_len);
+	bytes_read = read(pipe_crc->crc_fd, &buf, MAX_LINE_LEN);
 	igt_reset_timeout();
 
 	if (bytes_read < 0 && errno == EAGAIN)
@@ -894,22 +724,19 @@ static void read_one_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out)
  */
 void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc)
 {
-	igt_crc_t crc;
+	const char *src = pipe_crc_source_name(pipe_crc->source);
+	char buf[32];
 
-	igt_assert(igt_pipe_crc_do_start(pipe_crc));
+	/* Stop first just to make sure we don't have lingering state left. */
+	igt_pipe_crc_stop(pipe_crc);
 
-	if (pipe_crc->is_legacy) {
-		/*
-		 * For some no yet identified reason, the first CRC is
-		 * bonkers. So let's just wait for the next vblank and read
-		 * out the buggy result.
-		 *
-		 * On CHV sometimes the second CRC is bonkers as well, so
-		 * don't trust that one either.
-		 */
-		read_one_crc(pipe_crc, &crc);
-		read_one_crc(pipe_crc, &crc);
-	}
+	igt_assert_eq(write(pipe_crc->ctl_fd, src, strlen(src)), strlen(src));
+
+	sprintf(buf, "crtc-%d/crc/data", pipe_crc->pipe);
+
+	pipe_crc->crc_fd = openat(pipe_crc->dir, buf, pipe_crc->flags);
+	igt_assert(pipe_crc->crc_fd != -1);
+	errno = 0;
 }
 
 /**
@@ -920,16 +747,8 @@ void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc)
  */
 void igt_pipe_crc_stop(igt_pipe_crc_t *pipe_crc)
 {
-	char buf[32];
-
-	if (pipe_crc->is_legacy) {
-		sprintf(buf, "pipe %s none", kmstest_pipe_name(pipe_crc->pipe));
-		igt_assert_eq(write(pipe_crc->ctl_fd, buf, strlen(buf)),
-			      strlen(buf));
-	} else {
-		close(pipe_crc->crc_fd);
-		pipe_crc->crc_fd = -1;
-	}
+	close(pipe_crc->crc_fd);
+	pipe_crc->crc_fd = -1;
 }
 
 /**
