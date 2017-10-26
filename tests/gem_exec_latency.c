@@ -50,7 +50,8 @@
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
-#define CORK 1
+#define CORK 0x1
+#define PREEMPT 0x2
 
 static unsigned int ring_size;
 
@@ -284,13 +285,23 @@ static void latency_from_ring(int fd,
 	struct drm_i915_gem_execbuffer2 execbuf;
 	const unsigned int repeats = ring_size / 2;
 	uint32_t *map, *results;
+	uint32_t ctx[2] = {};
 	int i, j;
+
+	if (flags & PREEMPT) {
+		ctx[0] = gem_context_create(fd);
+		gem_context_set_priority(fd, ctx[0], -1023);
+
+		ctx[1] = gem_context_create(fd);
+		gem_context_set_priority(fd, ctx[1], 1023);
+	}
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC | LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.rsvd1 = ctx[1];
 
 	memset(obj, 0, sizeof(obj));
 	obj[1].handle = gem_create(fd, 4096);
@@ -319,6 +330,7 @@ static void latency_from_ring(int fd,
 	reloc.target_handle = flags & CORK ? 1 : 0;
 
 	for (e = intel_execution_engines; e->name; e++) {
+		igt_spin_t *spin = NULL;
 		struct cork c;
 
 		if (e->exec_id == 0)
@@ -330,6 +342,9 @@ static void latency_from_ring(int fd,
 		gem_set_domain(fd, obj[2].handle,
 			       I915_GEM_DOMAIN_GTT,
 			       I915_GEM_DOMAIN_GTT);
+
+		if (flags & PREEMPT)
+			spin = igt_spin_batch_new(fd, ctx[0], ring, 0);
 
 		if (flags & CORK) {
 			plug(fd, &c);
@@ -349,6 +364,7 @@ static void latency_from_ring(int fd,
 				execbuf.batch_start_offset + sizeof(uint32_t);
 			reloc.delta = sizeof(uint32_t) * j;
 
+			reloc.presumed_offset = obj[1].offset;
 			offset = reloc.presumed_offset;
 			offset += reloc.delta;
 
@@ -373,6 +389,7 @@ static void latency_from_ring(int fd,
 				execbuf.batch_start_offset + sizeof(uint32_t);
 			reloc.delta = sizeof(uint32_t) * (j + repeats);
 
+			reloc.presumed_offset = obj[1].offset;
 			offset = reloc.presumed_offset;
 			offset += reloc.delta;
 
@@ -392,10 +409,10 @@ static void latency_from_ring(int fd,
 
 		if (flags & CORK)
 			unplug(&c);
-
 		gem_set_domain(fd, obj[1].handle,
 			       I915_GEM_DOMAIN_GTT,
 			       I915_GEM_DOMAIN_GTT);
+		igt_spin_batch_free(fd, spin);
 
 		igt_info("%s-%s delay: %.2f\n",
 			 name, e->name, (results[2*repeats-1] - results[0]) / (double)repeats);
@@ -405,6 +422,11 @@ static void latency_from_ring(int fd,
 	munmap(results, 4096);
 	gem_close(fd, obj[1].handle);
 	gem_close(fd, obj[2].handle);
+
+	if (flags & PREEMPT) {
+		gem_context_destroy(fd, ctx[1]);
+		gem_context_destroy(fd, ctx[0]);
+	}
 }
 
 igt_main
@@ -437,36 +459,44 @@ igt_main
 			if (e->exec_id == 0)
 				continue;
 
-			igt_subtest_f("%s-dispatch", e->name) {
-				gem_require_ring(device, e->exec_id | e->flags);
-				latency_on_ring(device,
-						e->exec_id | e->flags,
-						e->name, 0);
-			}
+			igt_subtest_group {
+				igt_fixture {
+					gem_require_ring(device, e->exec_id | e->flags);
+				}
 
-			igt_subtest_f("%s-dispatch-queued", e->name) {
-				gem_require_ring(device, e->exec_id | e->flags);
-				latency_on_ring(device,
-						e->exec_id | e->flags,
-						e->name, CORK);
-			}
+				igt_subtest_f("%s-dispatch", e->name)
+					latency_on_ring(device,
+							e->exec_id | e->flags,
+							e->name, 0);
 
-			igt_subtest_f("%s-synchronisation", e->name) {
-				gem_require_ring(device, e->exec_id | e->flags);
-				latency_from_ring(device,
-						  e->exec_id | e->flags,
-						  e->name, 0);
-			}
+				igt_subtest_f("%s-dispatch-queued", e->name)
+					latency_on_ring(device,
+							e->exec_id | e->flags,
+							e->name, CORK);
 
-			igt_subtest_f("%s-synchronisation-queued", e->name) {
-				gem_require_ring(device, e->exec_id | e->flags);
-				latency_from_ring(device,
-						  e->exec_id | e->flags,
-						  e->name, CORK);
+				igt_subtest_f("%s-synchronisation", e->name)
+					latency_from_ring(device,
+							  e->exec_id | e->flags,
+							  e->name, 0);
+
+				igt_subtest_f("%s-synchronisation-queued", e->name)
+					latency_from_ring(device,
+							  e->exec_id | e->flags,
+							  e->name, CORK);
+
+				igt_subtest_group {
+					igt_fixture {
+						igt_require(gem_scheduler_has_preemption(device));
+					}
+
+					igt_subtest_f("%s-preemption", e->name)
+						latency_from_ring(device,
+								  e->exec_id | e->flags,
+								  e->name, PREEMPT);
+				}
 			}
 		}
 	}
-
 
 	igt_fixture {
 		close(device);
