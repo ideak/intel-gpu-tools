@@ -22,6 +22,9 @@
  */
 
 #include <stdbool.h>
+#include <sys/ioctl.h>
+
+#include <i915_drm.h>
 
 #include "igt_core.h"
 #include "igt_sysfs.h"
@@ -40,6 +43,18 @@
  * For legacy ringbuffer submission, there's also a variation where we're using
  * semaphores for synchronization between engines.
  */
+
+static bool has_semaphores(int fd, int dir)
+{
+	int val = 0;
+	struct drm_i915_getparam gp = {
+		gp.param = I915_PARAM_HAS_SEMAPHORES,
+		gp.value = &val,
+	};
+	if (ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp) < 0)
+		val = igt_sysfs_get_boolean(dir, "semaphores");
+	return val;
+}
 
 /**
  * gem_submission_method:
@@ -69,7 +84,7 @@ unsigned gem_submission_method(int fd)
 		goto out;
 	}
 
-	active = igt_sysfs_get_boolean(dir, "semaphores");
+	active = has_semaphores(fd, dir);
 	if (active) {
 		flags |= GEM_SUBMISSION_SEMAPHORES;
 	}
