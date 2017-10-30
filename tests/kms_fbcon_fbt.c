@@ -95,6 +95,14 @@ static bool connector_can_fbc(drmModeConnectorPtr connector)
 	return true;
 }
 
+static void fbc_print_status(int fd)
+{
+	static char buf[128];
+
+	igt_debugfs_read(fd, "i915_fbc_status", buf);
+	igt_debug("FBC status: %s\n", buf);
+}
+
 static bool fbc_is_enabled(int fd)
 {
 	char buf[128];
@@ -105,7 +113,9 @@ static bool fbc_is_enabled(int fd)
 
 static bool fbc_wait_until_enabled(int fd)
 {
-	return igt_wait(fbc_is_enabled(fd), 5000, 1);
+	bool r = igt_wait(fbc_is_enabled(fd), 5000, 1);
+	fbc_print_status(fd);
+	return r;
 }
 
 typedef bool (*connector_possible_fn)(drmModeConnectorPtr connector);
@@ -160,6 +170,14 @@ static bool connector_can_psr(drmModeConnectorPtr connector)
 	return (connector->connector_type == DRM_MODE_CONNECTOR_eDP);
 }
 
+static void psr_print_status(int fd)
+{
+	static char buf[256];
+
+	igt_debugfs_read(fd, "i915_edp_psr_status", buf);
+	igt_debug("PSR status: %s\n", buf);
+}
+
 static bool psr_is_enabled(int fd)
 {
 	char buf[256];
@@ -170,7 +188,9 @@ static bool psr_is_enabled(int fd)
 
 static bool psr_wait_until_enabled(int fd)
 {
-	return igt_wait(psr_is_enabled(fd), 5000, 1);
+	bool r = igt_wait(psr_is_enabled(fd), 5000, 1);
+	psr_print_status(fd);
+	return r;
 }
 
 struct feature {
