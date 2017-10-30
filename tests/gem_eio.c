@@ -238,7 +238,7 @@ static void test_inflight_suspend(int fd)
 	}
 
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-				      SUSPEND_TEST_DEVICES);
+				      SUSPEND_TEST_NONE);
 
 	igt_post_hang_ring(fd, hang);
 
