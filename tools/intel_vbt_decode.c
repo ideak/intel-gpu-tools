@@ -399,6 +399,26 @@ static const char *mipi_bridge_type(uint8_t type)
 	}
 }
 
+static void dump_hmdi_max_data_rate(uint8_t hdmi_max_data_rate)
+{
+	static const uint16_t max_data_rate[] = {
+		[HDMI_MAX_DATA_RATE_PLATFORM] = 0,
+		[HDMI_MAX_DATA_RATE_297] = 297,
+		[HDMI_MAX_DATA_RATE_165] = 165,
+	};
+
+	if (hdmi_max_data_rate >= ARRAY_SIZE(max_data_rate))
+		printf("\t\tHDMI max data rate: <unknown> (0x%02x)\n",
+		       hdmi_max_data_rate);
+	else if (hdmi_max_data_rate == HDMI_MAX_DATA_RATE_PLATFORM)
+		printf("\t\tHDMI max data rate: <platform max> (0x%02x)\n",
+		       hdmi_max_data_rate);
+	else
+		printf("\t\tHDMI max data rate: %d MHz (0x%02x)\n",
+		       max_data_rate[hdmi_max_data_rate],
+		       hdmi_max_data_rate);
+}
+
 static void dump_child_device(struct context *context,
 			      const struct child_device_config *child)
 {
@@ -419,7 +439,7 @@ static void dump_child_device(struct context *context,
 		printf("\t\tDP onboard redriver: 0x%02x\n", child->dp_onboard_redriver);
 		printf("\t\tDP ondock redriver: 0x%02x\n", child->dp_ondock_redriver);
 		printf("\t\tHDMI level shifter value: 0x%02x\n", child->hdmi_level_shifter_value);
-		printf("\t\tHDMI max data rate: 0x%02x\n", child->hdmi_max_data_rate);
+		dump_hmdi_max_data_rate(child->hdmi_max_data_rate);
 		printf("\t\tOffset to DTD buffer for edidless CHILD: 0x%02x\n", child->dtd_buf_ptr);
 		printf("\t\tEdidless EFP: %s\n", YESNO(child->edidless_efp));
 		printf("\t\tCompression enable: %s\n", YESNO(child->compression_enable));
