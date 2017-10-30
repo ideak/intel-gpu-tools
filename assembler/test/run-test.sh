@@ -5,7 +5,7 @@ BUILDDIR=${top_builddir-`pwd`}
 
 test="TEST"
 
-if [[ "$1" != "" ]] ; then
+if [ -n "$1" ] ; then
 	test="$1"
 fi
 
