@@ -54,6 +54,7 @@ typedef struct {
 #define IDLE 1
 #define BUSY 2
 #define FORKED 4
+#define NOHANG 8
 } data_t;
 
 static double elapsed(const struct timespec *start,
@@ -120,12 +121,16 @@ static void run_test(data_t *data, void (*testfunc)(data_t *, int, int))
 	igt_display_t *display = &data->display;
 	igt_output_t *output = data->output;
 	int fd = display->drm_fd;
+	igt_hang_t hang;
 
 	prepare_crtc(data, fd, output);
 
 	igt_info("Beginning %s on pipe %s, connector %s (%d threads)\n",
 		 igt_subtest_name(), kmstest_pipe_name(data->pipe),
 		 igt_output_name(output), nchildren);
+
+	if (!(data->flags & NOHANG))
+		hang = igt_hang_ring(fd, I915_EXEC_DEFAULT);
 
 	if (data->flags & BUSY) {
 		union drm_wait_vblank vbl;
@@ -148,6 +153,9 @@ static void run_test(data_t *data, void (*testfunc)(data_t *, int, int))
 	}
 
 	igt_assert(poll(&(struct pollfd){fd, POLLIN}, 1, 0) == 0);
+
+	if (!(data->flags & NOHANG))
+		igt_post_hang_ring(fd, hang);
 
 	igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
 		 igt_subtest_name(), kmstest_pipe_name(data->pipe), igt_output_name(output));
@@ -315,7 +323,11 @@ static void run_subtests_for_pipe(data_t *data)
 		void (*func)(data_t *, int, int);
 		unsigned int valid;
 	} funcs[] = {
-		{ "accuracy", accuracy, IDLE },
+		/*
+		 * GPU reset recovery may disable irqs or reset display, so
+		 * accuracy tests will fail in the hang case, disable this test.
+		 */
+		{ "accuracy", accuracy, IDLE | NOHANG },
 		{ "query", vblank_query, IDLE | FORKED | BUSY },
 		{ "wait", vblank_wait, IDLE | FORKED | BUSY },
 		{ }
@@ -337,10 +349,23 @@ static void run_subtests_for_pipe(data_t *data)
 
 	for (f = funcs; f->name; f++) {
 		for (m = modes; m->name; m++) {
-			if (m->flags & ~f->valid)
+			if (m->flags & ~(f->valid | NOHANG))
 				continue;
 
 			igt_subtest_f("pipe-%s-%s-%s",
+				      kmstest_pipe_name(data->pipe),
+				      f->name, m->name) {
+				for_each_valid_output_on_pipe(&data->display, data->pipe, data->output) {
+					data->flags = m->flags | NOHANG;
+					run_test(data, f->func);
+				}
+			}
+
+			/* Skip the -hang version if NOHANG flag is set */
+			if (f->valid & NOHANG || m->flags & NOHANG)
+				continue;
+
+			igt_subtest_f("pipe-%s-%s-%s-hang",
 				      kmstest_pipe_name(data->pipe),
 				      f->name, m->name) {
 				for_each_valid_output_on_pipe(&data->display, data->pipe, data->output) {

@@ -72,7 +72,7 @@
 #define TEST_SUSPEND		(1 << 26)
 #define TEST_TS_CONT		(1 << 27)
 #define TEST_BO_TOOBIG		(1 << 28)
-#define TEST_HANG_ONCE		(1 << 29)
+
 #define TEST_BASIC		(1 << 30)
 
 #define EVENT_FLIP		(1 << 0)
@@ -1071,12 +1071,7 @@ static unsigned int wait_for_events(struct test_output *o)
 static unsigned event_loop(struct test_output *o, unsigned duration_ms)
 {
 	unsigned long start, end;
-	igt_hang_t hang;
 	int count = 0;
-
-	memset(&hang, 0, sizeof(hang));
-	if (o->flags & TEST_HANG_ONCE)
-		hang = hang_gpu(drm_fd);
 
 	start = gettime_us();
 
@@ -1096,8 +1091,6 @@ static unsigned event_loop(struct test_output *o, unsigned duration_ms)
 	}
 
 	end = gettime_us();
-
-	unhang_gpu(drm_fd, hang);
 
 	/* Flush any remaining events */
 	if (o->pending_events)
@@ -1565,7 +1558,6 @@ int main(int argc, char **argv)
 			TEST_CHECK_TS, "flip-vs-blocking-wf-vblank" },
 		{ 30, TEST_FLIP | TEST_MODESET | TEST_HANG | TEST_NOEVENT, "flip-vs-modeset-vs-hang" },
 		{ 30, TEST_FLIP | TEST_PAN | TEST_HANG, "flip-vs-panning-vs-hang" },
-		{ 30, TEST_VBLANK | TEST_HANG_ONCE, "vblank-vs-hang" },
 		{ 1, TEST_FLIP | TEST_EINVAL | TEST_FB_BAD_TILING, "flip-vs-bad-tiling" },
 
 		{ 1, TEST_DPMS_OFF | TEST_MODESET | TEST_FLIP,
