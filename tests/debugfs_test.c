@@ -27,10 +27,18 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-static void read_and_discard_sysfs_entries(int path_fd)
+static void read_and_discard_sysfs_entries(int path_fd, int indent)
 {
 	struct dirent *dirent;
 	DIR *dir;
+	char tabs[8];
+	int i;
+
+	igt_assert(indent < sizeof(tabs) - 1);
+
+	for (i = 0; i < indent; i++)
+		tabs[i] = '\t';
+	tabs[i] = '\0';
 
 	dir = fdopendir(path_fd);
 	if (!dir)
@@ -45,7 +53,8 @@ static void read_and_discard_sysfs_entries(int path_fd)
 			igt_assert((sub_fd =
 				    openat(path_fd, dirent->d_name, O_RDONLY |
 					   O_DIRECTORY)) > 0);
-			read_and_discard_sysfs_entries(sub_fd);
+			igt_debug("%sEntering subdir %s\n", tabs, dirent->d_name);
+			read_and_discard_sysfs_entries(sub_fd, indent + 1);
 			close(sub_fd);
 		} else {
 			char buf[512];
@@ -53,11 +62,12 @@ static void read_and_discard_sysfs_entries(int path_fd)
 			ssize_t ret;
 
 			igt_set_timeout(5, "reading sysfs entry");
-			igt_debug("Reading file \"%s\"\n", dirent->d_name);
+			igt_debug("%sReading file \"%s\"\n", tabs, dirent->d_name);
 
 			sub_fd = openat(path_fd, dirent->d_name, O_RDONLY);
 			if (sub_fd == -1) {
-				igt_debug("Could not open file \"%s\" with error: %m\n", dirent->d_name);
+				igt_debug("%sCould not open file \"%s\" with error: %m\n",
+					  tabs, dirent->d_name);
 				continue;
 			}
 
@@ -66,7 +76,8 @@ static void read_and_discard_sysfs_entries(int path_fd)
 			} while (ret == sizeof(buf));
 
 			if (ret == -1)
-				igt_debug("Could not read file \"%s\" with error: %m\n", dirent->d_name);
+				igt_debug("%sCould not read file \"%s\" with error: %m\n",
+					  tabs, dirent->d_name);
 
 			igt_reset_timeout();
 			close(sub_fd);
@@ -121,7 +132,7 @@ igt_main
 
 		igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-		read_and_discard_sysfs_entries(debugfs);
+		read_and_discard_sysfs_entries(debugfs, 0);
 	}
 
 	igt_subtest("read_all_entries_display_off") {
@@ -137,7 +148,7 @@ igt_main
 
 		igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-		read_and_discard_sysfs_entries(debugfs);
+		read_and_discard_sysfs_entries(debugfs, 0);
 	}
 
 	igt_subtest("emon_crash") {
