@@ -584,9 +584,15 @@ void igt_require_pipe_crc(int fd)
 {
 	const char *cmd = "pipe A none";
 	int ctl, written;
+	int dir, ret;
+	struct stat stat;
 
-	ctl = igt_debugfs_open(fd, "crtc-0/crc/control", O_RDONLY);
-	if (ctl < 0) {
+	dir = igt_debugfs_dir(fd);
+	igt_require_f(dir >= 0, "Could not open debugfs directory\n");
+	ret = fstatat(dir, "crtc-0/crc/control", &stat, 0);
+	close(dir);
+
+	if (ret < 0) {
 		ctl = igt_debugfs_open(fd, "i915_display_crc_ctl", O_WRONLY);
 		igt_require_f(ctl,
 			      "No display_crc_ctl found, kernel too old\n");
@@ -594,8 +600,8 @@ void igt_require_pipe_crc(int fd)
 		written = write(ctl, cmd, strlen(cmd));
 		igt_require_f(written < 0,
 			      "CRCs not supported on this platform\n");
+		close(ctl);
 	}
-	close(ctl);
 }
 
 static void igt_hpd_storm_exit_handler(int sig)
