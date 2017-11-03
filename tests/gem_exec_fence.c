@@ -1017,6 +1017,34 @@ static void test_syncobj_invalid_wait(int fd)
 	syncobj_destroy(fd, fence.handle);
 }
 
+static void test_syncobj_invalid_flags(int fd)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct local_gem_exec_fence fence = {
+		.handle = syncobj_create(fd),
+	};
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags = LOCAL_EXEC_FENCE_ARRAY;
+	execbuf.cliprects_ptr = to_user_pointer(&fence);
+	execbuf.num_cliprects = 1;
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = gem_create(fd, 4096);
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+	/* set all flags to hit an invalid one */
+	fence.flags = ~0;
+	igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
+
+	gem_close(fd, obj.handle);
+	syncobj_destroy(fd, fence.handle);
+}
+
 static void test_syncobj_signal(int fd)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -1538,6 +1566,9 @@ igt_main
 
 		igt_subtest("syncobj-invalid-wait")
 			test_syncobj_invalid_wait(i915);
+
+		igt_subtest("syncobj-invalid-flags")
+			test_syncobj_invalid_flags(i915);
 
 		igt_subtest("syncobj-signal")
 			test_syncobj_signal(i915);
