@@ -144,7 +144,10 @@ static void create_guest(void)
 
 static void destroy_all_guest(void)
 {
-    system("pkill qemu");
+	int ret = system("pkill qemu");
+
+	igt_assert(ret >= 0 && WIFEXITED(ret));
+	igt_assert(WEXITSTATUS(ret) == 0 || WEXITSTATUS(ret) == 1);
 }
 
 static void remove_vgpu(void)
