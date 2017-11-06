@@ -195,7 +195,7 @@ static void test_plane_scaling(data_t *d)
 		igt_assert(d->fb_id3);
 
 		/* Set up display with plane 1 */
-		d->plane1 = igt_output_get_plane(output, 1);
+		d->plane1 = igt_output_get_plane(output, 0);
 		prepare_crtc(d, output, pipe, d->plane1, mode, COMMIT_UNIVERSAL);
 
 		if (primary_plane_scaling) {
@@ -215,7 +215,7 @@ static void test_plane_scaling(data_t *d)
 		}
 
 		/* Set up fb2->plane2 mapping. */
-		d->plane2 = igt_output_get_plane(output, 2);
+		d->plane2 = igt_output_get_plane(output, 1);
 		igt_plane_set_fb(d->plane2, &d->fb2);
 
 		/* 2nd plane windowed */
@@ -251,7 +251,7 @@ static void test_plane_scaling(data_t *d)
 		}
 
 		/* Set up fb3->plane3 mapping. */
-		d->plane3 = igt_output_get_plane(output, 3);
+		d->plane3 = igt_output_get_plane(output, 2);
 		igt_plane_set_fb(d->plane3, &d->fb3);
 
 		/* 3rd plane windowed - no scaling */
