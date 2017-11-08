@@ -206,7 +206,7 @@ static void *sys_thp_alloc(void *arg)
 		assert(ptr != MAP_FAILED);
 		madvise(ptr, sz, MADV_HUGEPAGE);
 		for (size_t page = 0; page < sz; page += PAGE_SIZE)
-			*(volatile uint32_t *)(ptr + page) = 0;
+			*(volatile uint32_t *)((unsigned char *)ptr + page) = 0;
 		munmap(ptr, sz);
 
 		clock_gettime(CLOCK_MONOTONIC, &now);
