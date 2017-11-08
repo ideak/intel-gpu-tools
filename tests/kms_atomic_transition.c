@@ -189,6 +189,7 @@ enum transition_type {
 	TRANSITION_PLANES,
 	TRANSITION_AFTER_FREE,
 	TRANSITION_MODESET,
+	TRANSITION_MODESET_FAST,
 	TRANSITION_MODESET_DISABLE,
 };
 
@@ -528,6 +529,13 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	}
 
 	for (i = 0; i < iter_max; i++) {
+		int n_enable_planes = hweight32(i);
+
+		if (type == TRANSITION_MODESET_FAST &&
+		    n_enable_planes > 1 &&
+		    n_enable_planes < pipe_obj->n_planes)
+			continue;
+
 		igt_output_set_pipe(output, pipe);
 
 		wm_setup_plane(display, pipe, i, parms, fencing);
@@ -547,16 +555,23 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 
 			/* i -> i+1 will be done when i increases, can be skipped here */
 			for (j = iter_max - 1; j > i + 1; j--) {
+				n_enable_planes = hweight32(j);
+
+				if (type == TRANSITION_MODESET_FAST &&
+				    n_enable_planes > 1 &&
+				    n_enable_planes < pipe_obj->n_planes)
+					continue;
+
 				wm_setup_plane(display, pipe, j, parms, fencing);
 
-				if (type == TRANSITION_MODESET)
+				if (type >= TRANSITION_MODESET)
 					igt_output_override_mode(output, &override_mode);
 
 				atomic_commit(display, pipe, flags, (void *)(unsigned long) j, fencing);
 				wait_for_transition(display, pipe, nonblocking, fencing);
 
 				wm_setup_plane(display, pipe, i, parms, fencing);
-				if (type == TRANSITION_MODESET)
+				if (type >= TRANSITION_MODESET)
 					igt_output_override_mode(output, NULL);
 
 				atomic_commit(display, pipe, flags, (void *)(unsigned long) i, fencing);
@@ -864,6 +879,19 @@ static void run_modeset_transition(igt_display_t *display, int requested_outputs
 	run_modeset_tests(display, requested_outputs, nonblocking, fencing);
 }
 
+static bool output_is_internal_panel(igt_output_t *output)
+{
+	switch (output->config.connector->connector_type) {
+	case DRM_MODE_CONNECTOR_LVDS:
+	case DRM_MODE_CONNECTOR_eDP:
+	case DRM_MODE_CONNECTOR_DSI:
+	case DRM_MODE_CONNECTOR_DPI:
+		return true;
+	default:
+		return false;
+	}
+}
+
 igt_main
 {
 	igt_display_t display;
@@ -913,13 +941,48 @@ igt_main
 		for_each_pipe_with_valid_output(&display, pipe, output)
 			run_transition_test(&display, pipe, output, TRANSITION_AFTER_FREE, true, true);
 
+	/*
+	 * Test modeset cases on internal panels separately with a reduced
+	 * number of combinations, to avoid long runtimes due to modesets on
+	 * panels with long power cycle delays.
+	 */
 	igt_subtest("plane-all-modeset-transition")
-		for_each_pipe_with_valid_output(&display, pipe, output)
+		for_each_pipe_with_valid_output(&display, pipe, output) {
+			if (output_is_internal_panel(output))
+				continue;
 			run_transition_test(&display, pipe, output, TRANSITION_MODESET, false, false);
+		}
 
 	igt_subtest("plane-all-modeset-transition-fencing")
-		for_each_pipe_with_valid_output(&display, pipe, output)
+		for_each_pipe_with_valid_output(&display, pipe, output) {
+			if (output_is_internal_panel(output))
+				continue;
 			run_transition_test(&display, pipe, output, TRANSITION_MODESET, false, true);
+		}
+
+	igt_subtest("plane-all-modeset-transition-internal-panels") {
+		int tested = 0;
+
+		for_each_pipe_with_valid_output(&display, pipe, output) {
+			if (!output_is_internal_panel(output))
+				continue;
+			run_transition_test(&display, pipe, output, TRANSITION_MODESET_FAST, false, false);
+			tested++;
+		}
+		igt_skip_on_f(!tested, "No output with internal panel found\n");
+	}
+
+	igt_subtest("plane-all-modeset-transition-fencing-internal-panels") {
+		int tested = 0;
+
+		for_each_pipe_with_valid_output(&display, pipe, output) {
+			if (!output_is_internal_panel(output))
+				continue;
+			run_transition_test(&display, pipe, output, TRANSITION_MODESET_FAST, false, true);
+			tested++;
+		}
+		igt_skip_on_f(!tested, "No output with internal panel found\n");
+	}
 
 	igt_subtest("plane-toggle-modeset-transition")
 		for_each_pipe_with_valid_output(&display, pipe, output)
