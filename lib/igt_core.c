@@ -1262,7 +1262,7 @@ static const char hex[] = "0123456789abcdef";
 static void
 xputch(int c)
 {
-	write(STDERR_FILENO, (const void *) &c, 1);
+	igt_ignore_warn(write(STDERR_FILENO, (const void *) &c, 1));
 }
 
 static int
@@ -1407,13 +1407,23 @@ xprintf(const char *fmt, ...)
 	va_end(ap);
 }
 
+static void __write_stderr(const char *str, size_t len)
+{
+	igt_ignore_warn(write(STDERR_FILENO, str, len));
+}
+
+static void write_stderr(const char *str)
+{
+	__write_stderr(str, strlen(str));
+}
+
 static void print_backtrace_sig_safe(void)
 {
 	unw_cursor_t cursor;
 	unw_context_t uc;
 	int stack_num = 0;
 
-	write(STDERR_FILENO, "Stack trace: \n", 15);
+	write_stderr("Stack trace: \n");
 
 	unw_getcontext(&uc);
 	unw_init_local(&cursor, &uc);
@@ -1922,11 +1932,10 @@ static void fatal_sig_handler(int sig)
 			continue;
 
 		if (handled_signals[i].name_len) {
-			igt_assert_eq(write(STDERR_FILENO, "Received signal ", 16),
-                                      16);
-			igt_assert_eq(write(STDERR_FILENO, handled_signals[i].name, handled_signals[i].name_len),
-                                      handled_signals[i].name_len);
-			igt_assert_eq(write(STDERR_FILENO, ".\n", 2), 2);
+			write_stderr("Received signal ");
+			__write_stderr(handled_signals[i].name,
+				       handled_signals[i].name_len);
+			write_stderr(".\n");
 		}
 
 		if (crash_signal(sig)) {
