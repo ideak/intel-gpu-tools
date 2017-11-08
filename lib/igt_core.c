@@ -561,6 +561,28 @@ static void low_mem_killer_disable(bool disable)
 	chmod(adj_fname, buf.st_mode);
 }
 
+/*
+ * If the test takes out the machine, in addition to the usual dmesg
+ * spam, the kernel may also emit a "death rattle" -- extra debug
+ * information that is overkill for normal successful tests, but
+ * vital for post-mortem analysis.
+ */
+static void ftrace_dump_on_oops(bool enable)
+{
+	int fd;
+
+	fd = open("/proc/sys/kernel/ftrace_dump_on_oops", O_WRONLY);
+	if (fd < 0)
+		return;
+
+	/*
+	 * If we fail, we do not get the death rattle we wish, but we
+	 * still want to run the tests anyway.
+	 */
+	igt_ignore_warn(write(fd, enable ? "1\n" : "0\n", 2));
+	close(fd);
+}
+
 bool igt_exit_called;
 static void common_exit_handler(int sig)
 {
@@ -858,6 +880,7 @@ out:
 		sync();
 		oom_adjust_for_doom();
 		low_mem_killer_disable(true);
+		ftrace_dump_on_oops(true);
 	}
 
 	/* install exit handler, to ensure we clean up */
