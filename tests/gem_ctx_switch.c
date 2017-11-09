@@ -101,6 +101,13 @@ static void single(int fd, uint32_t handle,
 		struct timespec start, now;
 		unsigned int count = 0;
 
+		/* Warmup to bind all objects into each ctx before we begin */
+		for (int i = 0; i < ARRAY_SIZE(contexts); i++) {
+			execbuf.rsvd1 = contexts[i];
+			gem_execbuf(fd, &execbuf);
+		}
+		gem_sync(fd, handle);
+
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		do {
 			igt_while_interruptible(flags & INTERRUPTIBLE) {
