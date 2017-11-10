@@ -197,21 +197,9 @@ void gem_set_tiling(int fd, uint32_t handle, uint32_t tiling, uint32_t stride)
 	igt_assert(__gem_set_tiling(fd, handle, tiling, stride) == 0);
 }
 
-struct local_drm_i915_gem_caching {
-	uint32_t handle;
-	uint32_t caching;
-};
-
-#define LOCAL_DRM_I915_GEM_SET_CACHEING    0x2f
-#define LOCAL_DRM_I915_GEM_GET_CACHEING    0x30
-#define LOCAL_DRM_IOCTL_I915_GEM_SET_CACHEING \
-	DRM_IOW(DRM_COMMAND_BASE + LOCAL_DRM_I915_GEM_SET_CACHEING, struct local_drm_i915_gem_caching)
-#define LOCAL_DRM_IOCTL_I915_GEM_GET_CACHEING \
-	DRM_IOWR(DRM_COMMAND_BASE + LOCAL_DRM_I915_GEM_GET_CACHEING, struct local_drm_i915_gem_caching)
-
 static int __gem_set_caching(int fd, uint32_t handle, uint32_t caching)
 {
-	struct local_drm_i915_gem_caching arg;
+	struct drm_i915_gem_caching arg;
 	int err;
 
 	memset(&arg, 0, sizeof(arg));
@@ -219,7 +207,7 @@ static int __gem_set_caching(int fd, uint32_t handle, uint32_t caching)
 	arg.caching = caching;
 
 	err = 0;
-	if (igt_ioctl(fd, LOCAL_DRM_IOCTL_I915_GEM_SET_CACHEING, &arg)) {
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_SET_CACHING, &arg)) {
 		err = -errno;
 		igt_assert(errno == ENOTTY || errno == EINVAL);
 	}
@@ -254,12 +242,12 @@ void gem_set_caching(int fd, uint32_t handle, uint32_t caching)
  */
 uint32_t gem_get_caching(int fd, uint32_t handle)
 {
-	struct local_drm_i915_gem_caching arg;
+	struct drm_i915_gem_caching arg;
 	int ret;
 
 	memset(&arg, 0, sizeof(arg));
 	arg.handle = handle;
-	ret = ioctl(fd, LOCAL_DRM_IOCTL_I915_GEM_GET_CACHEING, &arg);
+	ret = ioctl(fd, DRM_IOCTL_I915_GEM_GET_CACHING, &arg);
 	igt_assert(ret == 0);
 	errno = 0;
 
@@ -616,9 +604,6 @@ void gem_execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 	igt_assert_eq(__gem_execbuf(fd, execbuf), 0);
 }
 
-#define LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR \
-    DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_EXECBUFFER2, struct drm_i915_gem_execbuffer2)
-
 /**
  * __gem_execbuf_wr:
  * @fd: open i915 drm file descriptor
@@ -630,7 +615,7 @@ void gem_execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 int __gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 {
 	int err = 0;
-	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
 		err = -errno;
 	errno = 0;
 	return err;
@@ -710,17 +695,6 @@ int gem_munmap(void *ptr, uint64_t size)
 	return ret;
 }
 
-struct local_i915_gem_mmap_v2 {
-	uint32_t handle;
-	uint32_t pad;
-	uint64_t offset;
-	uint64_t size;
-	uint64_t addr_ptr;
-	uint64_t flags;
-#define I915_MMAP_WC 0x1
-};
-#define LOCAL_IOCTL_I915_GEM_MMAP_v2 DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_MMAP, struct local_i915_gem_mmap_v2)
-
 bool gem_mmap__has_wc(int fd)
 {
 	static int has_wc = -1;
@@ -744,7 +718,7 @@ bool gem_mmap__has_wc(int fd)
 
 		/* Do we have the new mmap_ioctl with DOMAIN_WC? */
 		if (mmap_version >= 1 && gtt_version >= 2) {
-			struct local_i915_gem_mmap_v2 arg;
+			struct drm_i915_gem_mmap arg;
 
 			/* Does this device support wc-mmaps ? */
 			memset(&arg, 0, sizeof(arg));
@@ -752,7 +726,7 @@ bool gem_mmap__has_wc(int fd)
 			arg.offset = 0;
 			arg.size = 4096;
 			arg.flags = I915_MMAP_WC;
-			has_wc = igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_MMAP_v2, &arg) == 0;
+			has_wc = igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg) == 0;
 			gem_close(fd, arg.handle);
 		}
 		errno = 0;
@@ -778,7 +752,7 @@ bool gem_mmap__has_wc(int fd)
  */
 void *__gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot)
 {
-	struct local_i915_gem_mmap_v2 arg;
+	struct drm_i915_gem_mmap arg;
 
 	if (!gem_mmap__has_wc(fd)) {
 		errno = ENOSYS;
@@ -790,7 +764,7 @@ void *__gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, un
 	arg.offset = offset;
 	arg.size = size;
 	arg.flags = I915_MMAP_WC;
-	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_MMAP_v2, &arg))
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg))
 		return NULL;
 
 	VG(VALGRIND_MAKE_MEM_DEFINED(from_user_pointer(arg.addr_ptr), arg.size));
@@ -896,16 +870,16 @@ int gem_madvise(int fd, uint32_t handle, int state)
 
 int __gem_userptr(int fd, void *ptr, int size, int read_only, uint32_t flags, uint32_t *handle)
 {
-	struct local_i915_gem_userptr userptr;
+	struct drm_i915_gem_userptr userptr;
 
 	memset(&userptr, 0, sizeof(userptr));
 	userptr.user_ptr = to_user_pointer(ptr);
 	userptr.user_size = size;
 	userptr.flags = flags;
 	if (read_only)
-		userptr.flags |= LOCAL_I915_USERPTR_READ_ONLY;
+		userptr.flags |= I915_USERPTR_READ_ONLY;
 
-	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr))
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr))
 		return -errno;
 
 	*handle = userptr.handle;
@@ -1179,7 +1153,6 @@ bool gem_has_blt(int fd)
 	return has_blt;
 }
 
-#define LOCAL_I915_PARAM_HAS_VEBOX 22
 /**
  * gem_has_vebox:
  * @fd: open i915 drm file descriptor
@@ -1195,11 +1168,11 @@ bool gem_has_vebox(int fd)
 {
 	static int has_vebox = -1;
 	if (has_vebox < 0)
-		has_vebox =  has_param(fd, LOCAL_I915_PARAM_HAS_VEBOX);
+		has_vebox =  has_param(fd, I915_PARAM_HAS_VEBOX);
 	return has_vebox;
 }
 
-#define LOCAL_I915_PARAM_HAS_BSD2 31
+#define I915_PARAM_HAS_BSD2 31
 /**
  * gem_has_bsd2:
  * @fd: open i915 drm file descriptor
@@ -1214,7 +1187,7 @@ bool gem_has_bsd2(int fd)
 {
 	static int has_bsd2 = -1;
 	if (has_bsd2 < 0)
-		has_bsd2 = has_param(fd, LOCAL_I915_PARAM_HAS_BSD2);
+		has_bsd2 = has_param(fd, I915_PARAM_HAS_BSD2);
 	return has_bsd2;
 }
 
@@ -1296,7 +1269,7 @@ uint64_t gem_aperture_size(int fd)
 	static uint64_t aperture_size = 0;
 
 	if (aperture_size == 0) {
-		struct local_i915_gem_context_param p;
+		struct drm_i915_gem_context_param p;
 
 		memset(&p, 0, sizeof(p));
 		p.param = 0x3;
@@ -1357,7 +1330,6 @@ uint64_t gem_global_aperture_size(int fd)
 	return aperture.aper_size;
 }
 
-#define LOCAL_I915_PARAM_HAS_EXEC_SOFTPIN 37
 /**
  * gem_has_softpin:
  * @fd: open i915 drm file descriptor
@@ -1375,7 +1347,7 @@ bool gem_has_softpin(int fd)
 		struct drm_i915_getparam gp;
 
 		memset(&gp, 0, sizeof(gp));
-		gp.param = LOCAL_I915_PARAM_HAS_EXEC_SOFTPIN;
+		gp.param = I915_PARAM_HAS_EXEC_SOFTPIN;
 		gp.value = &has_softpin;
 
 		has_softpin = 0;
@@ -1386,7 +1358,6 @@ bool gem_has_softpin(int fd)
 	return has_softpin;
 }
 
-#define LOCAL_PARAM_HAS_EXEC_FENCE 44
 /**
  * gem_has_exec_fence:
  * @fd: open i915 drm file descriptor
@@ -1404,7 +1375,7 @@ bool gem_has_exec_fence(int fd)
 		struct drm_i915_getparam gp;
 
 		memset(&gp, 0, sizeof(gp));
-		gp.param = LOCAL_PARAM_HAS_EXEC_FENCE;
+		gp.param = I915_PARAM_HAS_EXEC_FENCE;
 		gp.value = &has_exec_fence;
 
 		has_exec_fence = 0;
@@ -1676,7 +1647,7 @@ int __kms_addfb(int fd, uint32_t handle, uint32_t width, uint32_t height,
 		uint32_t stride, uint32_t pixel_format, uint64_t modifier,
 		uint32_t flags, uint32_t *buf_id)
 {
-	struct local_drm_mode_fb_cmd2 f;
+	struct drm_mode_fb_cmd2 f;
 	int ret;
 
 	igt_require_fb_modifiers(fd);

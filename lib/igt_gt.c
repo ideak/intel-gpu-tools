@@ -126,15 +126,15 @@ void igt_require_hang_ring(int fd, int ring)
 
 static unsigned context_get_ban(int fd, unsigned ctx)
 {
-	struct local_i915_gem_context_param param;
+	struct drm_i915_gem_context_param param;
 
-	param.param = LOCAL_CONTEXT_PARAM_BANNABLE;
+	param.param = I915_CONTEXT_PARAM_BANNABLE;
 	param.value = 0;
 	param.size = 0;
 
 	if (__gem_context_get_param(fd, &param) == -EINVAL) {
 		igt_assert(param.value == 0);
-		param.param = LOCAL_CONTEXT_PARAM_BAN_PERIOD;
+		param.param = I915_CONTEXT_PARAM_BAN_PERIOD;
 		gem_context_get_param(fd, &param);
 	}
 
@@ -143,24 +143,24 @@ static unsigned context_get_ban(int fd, unsigned ctx)
 
 static void context_set_ban(int fd, unsigned ctx, unsigned ban)
 {
-	struct local_i915_gem_context_param param;
+	struct drm_i915_gem_context_param param;
 
 	memset(&param, 0, sizeof(param));
-	param.context = ctx;
+	param.ctx_id = ctx;
 	param.value = ban;
 	param.size = 0;
-	param.param = LOCAL_CONTEXT_PARAM_BANNABLE;
+	param.param = I915_CONTEXT_PARAM_BANNABLE;
 
 	if(__gem_context_set_param(fd, &param) == -EINVAL) {
 		igt_assert(param.value == ban);
-		param.param = LOCAL_CONTEXT_PARAM_BAN_PERIOD;
+		param.param = I915_CONTEXT_PARAM_BAN_PERIOD;
 		gem_context_set_param(fd, &param);
 	}
 }
 
 igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 {
-	struct local_i915_gem_context_param param;
+	struct drm_i915_gem_context_param param;
 	unsigned ban;
 
 	igt_assert(igt_sysfs_set_parameter
@@ -172,11 +172,11 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 	if (!igt_check_boolean_env_var("IGT_HANG_WITHOUT_RESET", false))
 		igt_require(has_gpu_reset(fd));
 
-	param.context = ctx;
+	param.ctx_id = ctx;
 	param.size = 0;
 
 	if ((flags & HANG_ALLOW_CAPTURE) == 0) {
-		param.param = LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE;
+		param.param = I915_CONTEXT_PARAM_NO_ERROR_CAPTURE;
 		param.value = 1;
 		/* Older kernels may not have NO_ERROR_CAPTURE, in which case
 		 * we just eat the error state in post-hang (and hope we eat
@@ -198,9 +198,9 @@ void igt_disallow_hang(int fd, igt_hang_t arg)
 	context_set_ban(fd, arg.ctx, arg.ban);
 
 	if ((arg.flags & HANG_ALLOW_CAPTURE) == 0) {
-		struct local_i915_gem_context_param param = {
-			.context = arg.ctx,
-			.param = LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE,
+		struct drm_i915_gem_context_param param = {
+			.ctx_id = arg.ctx,
+			.param = I915_CONTEXT_PARAM_NO_ERROR_CAPTURE,
 			.value = 0,
 		};
 		__gem_context_set_param(fd, &param);
@@ -272,7 +272,7 @@ igt_hang_t igt_hang_ctx(int fd,
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 exec;
-	struct local_i915_gem_context_param param;
+	struct drm_i915_gem_context_param param;
 	uint32_t b[16];
 	unsigned ban;
 	unsigned len;
@@ -282,11 +282,11 @@ igt_hang_t igt_hang_ctx(int fd,
 	/* check if non-default ctx submission is allowed */
 	igt_require(ctx == 0 || has_ctx_exec(fd, ring, ctx));
 
-	param.context = ctx;
+	param.ctx_id = ctx;
 	param.size = 0;
 
 	if ((flags & HANG_ALLOW_CAPTURE) == 0) {
-		param.param = LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE;
+		param.param = I915_CONTEXT_PARAM_NO_ERROR_CAPTURE;
 		param.value = 1;
 		/* Older kernels may not have NO_ERROR_CAPTURE, in which case
 		 * we just eat the error state in post-hang (and hope we eat
@@ -371,9 +371,9 @@ void igt_post_hang_ring(int fd, igt_hang_t arg)
 	context_set_ban(fd, arg.ctx, arg.ban);
 
 	if ((arg.flags & HANG_ALLOW_CAPTURE) == 0) {
-		struct local_i915_gem_context_param param = {
-			.context = arg.ctx,
-			.param = LOCAL_CONTEXT_PARAM_NO_ERROR_CAPTURE,
+		struct drm_i915_gem_context_param param = {
+			.ctx_id = arg.ctx,
+			.param = I915_CONTEXT_PARAM_NO_ERROR_CAPTURE,
 			.value = 0,
 		};
 		__gem_context_set_param(fd, &param);

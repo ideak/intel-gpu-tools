@@ -893,9 +893,9 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			}
 
 			if (wrk->prio) {
-				struct local_i915_gem_context_param param = {
-					.context = arg.ctx_id,
-					.param = 0x6,
+				struct drm_i915_gem_context_param param = {
+					.ctx_id = arg.ctx_id,
+					.param = I915_CONTEXT_PARAM_PRIORITY,
 					.value = wrk->prio,
 				};
 				gem_context_set_param(fd, &param);

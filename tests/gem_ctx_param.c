@@ -30,7 +30,7 @@ IGT_TEST_DESCRIPTION("Basic test for context set/get param input validation.");
 
 igt_main
 {
-	struct local_i915_gem_context_param arg;
+	struct drm_i915_gem_context_param arg;
 	int fd;
 	uint32_t ctx;
 
@@ -41,46 +41,46 @@ igt_main
 		ctx = gem_context_create(fd);
 	}
 
-	arg.param = LOCAL_CONTEXT_PARAM_BAN_PERIOD;
+	arg.param = I915_CONTEXT_PARAM_BAN_PERIOD;
 
 	/* XXX start to enforce ban period returning -EINVAL when
 	 * transition has been done */
 	if (__gem_context_get_param(fd, &arg) == -EINVAL)
-		arg.param = LOCAL_CONTEXT_PARAM_BANNABLE;
+		arg.param = I915_CONTEXT_PARAM_BANNABLE;
 
 	igt_subtest("basic") {
-		arg.context = ctx;
+		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
 		gem_context_set_param(fd, &arg);
 	}
 
 	igt_subtest("basic-default") {
-		arg.context = 0;
+		arg.ctx_id = 0;
 		gem_context_get_param(fd, &arg);
 		gem_context_set_param(fd, &arg);
 	}
 
 	igt_subtest("invalid-ctx-get") {
-		arg.context = 2;
+		arg.ctx_id = 2;
 		igt_assert_eq(__gem_context_get_param(fd, &arg), -ENOENT);
 	}
 
 	igt_subtest("invalid-ctx-set") {
-		arg.context = ctx;
+		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
-		arg.context = 2;
+		arg.ctx_id = 2;
 		igt_assert_eq(__gem_context_set_param(fd, &arg), -ENOENT);
 	}
 
 	igt_subtest("invalid-size-get") {
-		arg.context = ctx;
+		arg.ctx_id = ctx;
 		arg.size = 8;
 		gem_context_get_param(fd, &arg);
 		igt_assert(arg.size == 0);
 	}
 
 	igt_subtest("invalid-size-set") {
-		arg.context = ctx;
+		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
 		arg.size = 8;
 		igt_assert_eq(__gem_context_set_param(fd, &arg), -EINVAL);
@@ -91,7 +91,7 @@ igt_main
 		igt_fork(child, 1) {
 			igt_drop_root();
 
-			arg.context = ctx;
+			arg.ctx_id = ctx;
 			gem_context_get_param(fd, &arg);
 			arg.value--;
 			igt_assert_eq(__gem_context_set_param(fd, &arg), -EPERM);
@@ -101,19 +101,19 @@ igt_main
 	}
 
 	igt_subtest("root-set") {
-		arg.context = ctx;
+		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
 		arg.value--;
 		gem_context_set_param(fd, &arg);
 	}
 
-	arg.param = LOCAL_CONTEXT_PARAM_NO_ZEROMAP;
+	arg.param = I915_CONTEXT_PARAM_NO_ZEROMAP;
 
 	igt_subtest("non-root-set-no-zeromap") {
 		igt_fork(child, 1) {
 			igt_drop_root();
 
-			arg.context = ctx;
+			arg.ctx_id = ctx;
 			gem_context_get_param(fd, &arg);
 			arg.value--;
 			gem_context_set_param(fd, &arg);
@@ -123,14 +123,14 @@ igt_main
 	}
 
 	igt_subtest("root-set-no-zeromap-enabled") {
-		arg.context = ctx;
+		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
 		arg.value = 1;
 		gem_context_set_param(fd, &arg);
 	}
 
 	igt_subtest("root-set-no-zeromap-disabled") {
-		arg.context = ctx;
+		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
 		arg.value = 0;
 		gem_context_set_param(fd, &arg);
@@ -140,15 +140,15 @@ igt_main
 	 * to catch ABI extensions. Don't "fix" this testcase without adding all
 	 * the tests for the new param first.
 	 */
-	arg.param = LOCAL_CONTEXT_PARAM_BANNABLE + 1;
+	arg.param = I915_CONTEXT_PARAM_BANNABLE + 1;
 
 	igt_subtest("invalid-param-get") {
-		arg.context = ctx;
+		arg.ctx_id = ctx;
 		igt_assert_eq(__gem_context_get_param(fd, &arg), -EINVAL);
 	}
 
 	igt_subtest("invalid-param-set") {
-		arg.context = ctx;
+		arg.ctx_id = ctx;
 		igt_assert_eq(__gem_context_set_param(fd, &arg), -EINVAL);
 	}
 

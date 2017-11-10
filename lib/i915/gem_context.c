@@ -100,11 +100,9 @@ void gem_context_destroy(int fd, uint32_t ctx_id)
 	do_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_DESTROY, &destroy);
 }
 
-int __gem_context_get_param(int fd, struct local_i915_gem_context_param *p)
+int __gem_context_get_param(int fd, struct drm_i915_gem_context_param *p)
 {
-#define LOCAL_I915_GEM_CONTEXT_GETPARAM       0x34
-#define LOCAL_IOCTL_I915_GEM_CONTEXT_GETPARAM DRM_IOWR (DRM_COMMAND_BASE + LOCAL_I915_GEM_CONTEXT_GETPARAM, struct local_i915_gem_context_param)
-	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_CONTEXT_GETPARAM, p))
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_GETPARAM, p))
 		return -errno;
 
 	errno = 0;
@@ -119,17 +117,15 @@ int __gem_context_get_param(int fd, struct local_i915_gem_context_param *p)
  * This wraps the CONTEXT_GET_PARAM ioctl, which is used to get a context
  * parameter.
  */
-void gem_context_get_param(int fd, struct local_i915_gem_context_param *p)
+void gem_context_get_param(int fd, struct drm_i915_gem_context_param *p)
 {
 	igt_assert(__gem_context_get_param(fd, p) == 0);
 }
 
 
-int __gem_context_set_param(int fd, struct local_i915_gem_context_param *p)
+int __gem_context_set_param(int fd, struct drm_i915_gem_context_param *p)
 {
-#define LOCAL_I915_GEM_CONTEXT_SETPARAM       0x35
-#define LOCAL_IOCTL_I915_GEM_CONTEXT_SETPARAM DRM_IOWR (DRM_COMMAND_BASE + LOCAL_I915_GEM_CONTEXT_SETPARAM, struct local_i915_gem_context_param)
-	if (igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_CONTEXT_SETPARAM, p))
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_SETPARAM, p))
 		return -errno;
 
 	errno = 0;
@@ -143,7 +139,7 @@ int __gem_context_set_param(int fd, struct local_i915_gem_context_param *p)
  * This wraps the CONTEXT_SET_PARAM ioctl, which is used to set a context
  * parameter.
  */
-void gem_context_set_param(int fd, struct local_i915_gem_context_param *p)
+void gem_context_set_param(int fd, struct drm_i915_gem_context_param *p)
 {
 	igt_assert(__gem_context_set_param(fd, p) == 0);
 }
@@ -158,14 +154,14 @@ void gem_context_set_param(int fd, struct local_i915_gem_context_param *p)
  */
 void gem_context_require_param(int fd, uint64_t param)
 {
-	struct local_i915_gem_context_param p;
+	struct drm_i915_gem_context_param p;
 
-	p.context = 0;
+	p.ctx_id = 0;
 	p.param = param;
 	p.value = 0;
 	p.size = 0;
 
-	igt_require(igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_CONTEXT_GETPARAM, &p) == 0);
+	igt_require(igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_GETPARAM, &p) == 0);
 }
 
 void gem_context_require_bannable(int fd)
@@ -174,31 +170,31 @@ void gem_context_require_bannable(int fd)
 	static int has_bannable = -1;
 
 	if (has_bannable < 0) {
-		struct local_i915_gem_context_param p;
+		struct drm_i915_gem_context_param p;
 
-		p.context = 0;
-		p.param = LOCAL_CONTEXT_PARAM_BANNABLE;
+		p.ctx_id = 0;
+		p.param = I915_CONTEXT_PARAM_BANNABLE;
 		p.value = 0;
 		p.size = 0;
 
-		has_bannable = igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_CONTEXT_GETPARAM, &p) == 0;
+		has_bannable = igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_GETPARAM, &p) == 0;
 	}
 
 	if (has_ban_period < 0) {
-		struct local_i915_gem_context_param p;
+		struct drm_i915_gem_context_param p;
 
-		p.context = 0;
-		p.param = LOCAL_CONTEXT_PARAM_BAN_PERIOD;
+		p.ctx_id = 0;
+		p.param = I915_CONTEXT_PARAM_BAN_PERIOD;
 		p.value = 0;
 		p.size = 0;
 
-		has_ban_period = igt_ioctl(fd, LOCAL_IOCTL_I915_GEM_CONTEXT_GETPARAM, &p) == 0;
+		has_ban_period = igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_GETPARAM, &p) == 0;
 	}
 
 	igt_require(has_ban_period || has_bannable);
 }
 
-#define LOCAL_I915_CONTEXT_PARAM_PRIORITY 0x6
+#define DRM_I915_CONTEXT_PARAM_PRIORITY 0x6
 
 /**
  * __gem_context_set_priority:
@@ -214,12 +210,12 @@ void gem_context_require_bannable(int fd)
  */
 int __gem_context_set_priority(int fd, uint32_t ctx_id, int prio)
 {
-	struct local_i915_gem_context_param p;
+	struct drm_i915_gem_context_param p;
 
 	memset(&p, 0, sizeof(p));
-	p.context = ctx_id;
+	p.ctx_id = ctx_id;
 	p.size = 0;
-	p.param = LOCAL_I915_CONTEXT_PARAM_PRIORITY;
+	p.param = DRM_I915_CONTEXT_PARAM_PRIORITY;
 	p.value = prio;
 
 	return __gem_context_set_param(fd, &p);
