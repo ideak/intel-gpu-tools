@@ -47,6 +47,7 @@ lib_headers = [
 	'igt_dummyload.h',
 	'uwildmat/uwildmat.h',
 	'igt_kmod.h',
+	'igt_vc4.h',
 ]
 
 lib_sources = [
@@ -95,6 +96,7 @@ lib_sources = [
 	'igt_dummyload.c',
 	'uwildmat/uwildmat.c',
 	'igt_kmod.c',
+	'igt_vc4.c',
 ]
 
 lib_deps = [
@@ -118,10 +120,6 @@ else
 	lib_sources += 'stubs/drm/intel_bufmgr.c'
 endif
 
-if libdrm_vc4.found()
-	lib_headers += 'igt_vc4.h'
-	lib_sources += 'igt_vc4.c'
-endif
 if valgrind.found()
 	lib_deps += valgrind
 endif

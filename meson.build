@@ -32,7 +32,6 @@ config = configuration_data()
 
 libdrm = dependency('libdrm', version : '>=2.4.82')
 libdrm_intel = dependency('libdrm_intel', required : false)
-libdrm_vc4 = dependency('libdrm_vc4', required : false)
 libdrm_nouveau = dependency('libdrm_nouveau', required : false)
 libdrm_amdgpu = dependency('libdrm_amdgpu', required : false)
 

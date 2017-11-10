@@ -10,7 +10,7 @@ libintel_tools_la_SOURCES = $(lib_source_list)
 noinst_LTLIBRARIES = libintel_tools.la
 noinst_HEADERS = check-ndebug.h
 
-if HAVE_LIBDRM_VC4
+if BUILD_VC4
     libintel_tools_la_SOURCES += 	\
         igt_vc4.c			\
         igt_vc4.h

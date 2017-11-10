@@ -10,7 +10,7 @@ if HAVE_LIBDRM_NOUVEAU
     TESTS_progs += $(NOUVEAU_TESTS)
 endif
 
-if HAVE_LIBDRM_VC4
+if BUILD_VC4
     TESTS_progs += $(VC4_TESTS)
 endif
 
@@ -143,16 +143,6 @@ prime_nv_api_CFLAGS = $(AM_CFLAGS) $(DRM_NOUVEAU_CFLAGS)
 prime_nv_api_LDADD = $(LDADD) $(DRM_NOUVEAU_LIBS)
 prime_nv_pcopy_CFLAGS = $(AM_CFLAGS) $(DRM_NOUVEAU_CFLAGS)
 prime_nv_pcopy_LDADD = $(LDADD) $(DRM_NOUVEAU_LIBS)
-vc4_create_bo_CFLAGS = $(AM_CFLAGS) $(DRM_VC4_CFLAGS)
-vc4_create_bo_LDADD = $(LDADD) $(DRM_VC4_LIBS)
-vc4_lookup_fail_CFLAGS = $(AM_CFLAGS) $(DRM_VC4_CFLAGS)
-vc4_lookup_fail_LDADD = $(LDADD) $(DRM_VC4_LIBS)
-vc4_dmabuf_poll_CFLAGS = $(AM_CFLAGS) $(DRM_VC4_CFLAGS)
-vc4_dmabuf_poll_LDADD = $(LDADD) $(DRM_VC4_LIBS)
-vc4_wait_bo_CFLAGS = $(AM_CFLAGS) $(DRM_VC4_CFLAGS)
-vc4_wait_bo_LDADD = $(LDADD) $(DRM_VC4_LIBS)
-vc4_wait_seqno_CFLAGS = $(AM_CFLAGS) $(DRM_VC4_CFLAGS)
-vc4_wait_seqno_LDADD = $(LDADD) $(DRM_VC4_LIBS)
 
 kms_chamelium_CFLAGS = $(AM_CFLAGS) $(XMLRPC_CFLAGS) $(LIBUDEV_CFLAGS)
 kms_chamelium_LDADD = $(LDADD) $(XMLRPC_LIBS) $(LIBUDEV_LIBS)

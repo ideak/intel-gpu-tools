@@ -213,6 +213,11 @@ test_progs = [
 	'syncobj_wait',
 	'template',
 	'tools_test',
+	'vc4_create_bo',
+	'vc4_dmabuf_poll',
+	'vc4_lookup_fail',
+	'vc4_wait_bo',
+	'vc4_wait_seqno',
 	'vgem_basic',
 	'vgem_slow',
 ]
@@ -236,17 +241,6 @@ if libdrm_nouveau.found()
 		'prime_nv_test',
 	]
 	test_deps += libdrm_nouveau
-endif
-
-if libdrm_vc4.found()
-	test_progs += [
-		'vc4_create_bo',
-		'vc4_dmabuf_poll',
-		'vc4_lookup_fail',
-		'vc4_wait_bo',
-		'vc4_wait_seqno',
-	]
-	test_deps += libdrm_vc4
 endif
 
 if chamelium.found()
