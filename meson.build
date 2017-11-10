@@ -26,7 +26,7 @@ foreach cc_arg : cc_args
   endif
 endforeach
 
-inc = include_directories('lib', '.')
+inc = include_directories('include/drm-uapi', 'lib', '.')
 
 config = configuration_data()
 

@@ -46,7 +46,10 @@ lib_source_list +=		\
 	$(NULL)
 endif
 
-AM_CPPFLAGS = -I$(top_srcdir)
+AM_CPPFLAGS = \
+	-I$(top_srcdir)/include/drm-uapi \
+	-I$(top_srcdir)
+
 AM_CFLAGS = \
 	    $(CWARNFLAGS) \
 	    $(DRM_CFLAGS) \

@@ -84,14 +84,15 @@ EXTRA_DIST = \
 
 CLEANFILES = $(EXTRA_PROGRAMS) test-list.txt test-list-full.txt .gitignore
 
-AM_CFLAGS = $(DRM_CFLAGS) $(CWARNFLAGS) -Wno-unused-result $(DEBUG_CFLAGS)\
+AM_CFLAGS = $(CWARNFLAGS) -Wno-unused-result $(DEBUG_CFLAGS)\
+	-I$(top_srcdir)/include/drm-uapi \
 	-I$(srcdir)/.. \
 	-I$(srcdir)/../lib \
 	-include "$(srcdir)/../lib/check-ndebug.h" \
 	-DIGT_SRCDIR=\""$(abs_srcdir)"\" \
 	-DIGT_DATADIR=\""$(pkgdatadir)"\" \
 	-D_GNU_SOURCE \
-	$(LIBUNWIND_CFLAGS) $(WERROR_CFLAGS) \
+	$(DRM_CFLAGS) $(LIBUNWIND_CFLAGS) $(WERROR_CFLAGS) \
 	$(NULL)
 
 LDADD = ../lib/libintel_tools.la $(XMLRPC_LIBS)
