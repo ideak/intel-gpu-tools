@@ -126,6 +126,14 @@ docs/
 	intel-gpu-tools-sections.txt. Entirely new sections will also need to be
 	added to intel-gpu-tools-docs.xml in the appropriate place.
 
+include/drm-uapi
+	Imported DRM uapi headers from airlied's drm-next branch.
+	These should be updated all together by executing "make
+	headers_install" from that branch of the kernel and then
+	copying the resulting ./usr/include/drm/*.h in and committing
+	with a note of which commit on airlied's branch was used to
+	generate them.
+
 
 Requirements
 ------------
