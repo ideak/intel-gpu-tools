@@ -1663,7 +1663,7 @@ void igt_require_fb_modifiers(int fd)
 		uint64_t cap_modifiers;
 		int ret;
 
-		ret = drmGetCap(fd, LOCAL_DRM_CAP_ADDFB2_MODIFIERS, &cap_modifiers);
+		ret = drmGetCap(fd, DRM_CAP_ADDFB2_MODIFIERS, &cap_modifiers);
 		igt_assert(ret == 0 || errno == EINVAL);
 		has_modifiers = ret == 0 && cap_modifiers == 1;
 		cap_modifiers_tested = true;
@@ -1691,7 +1691,7 @@ int __kms_addfb(int fd, uint32_t handle, uint32_t width, uint32_t height,
 	f.pitches[0] = stride;
 	f.modifier[0] = modifier;
 
-	ret = igt_ioctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f);
+	ret = igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &f);
 
 	*buf_id = f.fb_id;
 
