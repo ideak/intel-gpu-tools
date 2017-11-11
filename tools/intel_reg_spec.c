@@ -64,8 +64,48 @@ static const struct port_desc port_descs[] = {
 		.stride = 1,
 	},
 	{
+		.name = "mmio-ar",
+		.port = PORT_MMIO_VGA_AR,
+		.stride = 1,
+	},
+	{
+		.name = "mmio-sr",
+		.port = PORT_MMIO_VGA_SR,
+		.stride = 1,
+	},
+	{
+		.name = "mmio-gr",
+		.port = PORT_MMIO_VGA_GR,
+		.stride = 1,
+	},
+	{
+		.name = "mmio-cr",
+		.port = PORT_MMIO_VGA_CR,
+		.stride = 1,
+	},
+	{
 		.name = "portio",
 		.port = PORT_PORTIO,
+		.stride = 1,
+	},
+	{
+		.name = "portio-ar",
+		.port = PORT_PORTIO_VGA_AR,
+		.stride = 1,
+	},
+	{
+		.name = "portio-sr",
+		.port = PORT_PORTIO_VGA_SR,
+		.stride = 1,
+	},
+	{
+		.name = "portio-gr",
+		.port = PORT_PORTIO_VGA_GR,
+		.stride = 1,
+	},
+	{
+		.name = "portio-cr",
+		.port = PORT_PORTIO_VGA_CR,
 		.stride = 1,
 	},
 	{

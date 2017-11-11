@@ -46,9 +46,19 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 /* I/O register offsets
  */
-#define SRX 0x3C4		/* p208 */
-#define GRX 0x3CE		/* p213 */
-#define ARX 0x3C0		/* p224 */
+#define CRX_MDA		0x3B4
+#define CRD_MDA		0x3B5
+#define ST01_MDA	0x3BA
+#define ARX		0x3C0
+#define ARD_W		0x3C0
+#define ARD_R		0x3C1
+#define SRX		0x3C4
+#define SRD		0x3C5
+#define GRX		0x3CE
+#define GRD		0x3CF
+#define CRX_CGA		0x3D4
+#define CRD_CGA		0x3D5
+#define ST01_CGA	0x3DA
 
 /* VGA Color Palette Registers */
 #define DACMASK  0x3C6		/* p232 */

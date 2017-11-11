@@ -375,6 +375,122 @@ static uint32_t mcbar_offset(uint32_t devid)
 	return intel_gen(devid) >= 6 ? 0x140000 : 0x10000;
 }
 
+static uint8_t vga_read(uint16_t reg, bool mmio)
+{
+	uint8_t val;
+
+	if (mmio) {
+		val = INREG(reg);
+	} else {
+		iopl(3);
+		val = inb(reg);
+		iopl(0);
+	}
+
+	return val;
+}
+
+static void vga_write(uint16_t reg, uint8_t val, bool mmio)
+{
+	if (mmio) {
+		OUTREG(reg, val);
+	} else {
+		iopl(3);
+		outb(val, reg);
+		iopl(0);
+	}
+}
+
+static bool vga_is_cga_mode(bool mmio)
+{
+	return vga_read(MSR_R, mmio) & IO_ADDR_SELECT;
+}
+
+static uint16_t vga_st01(bool mmio)
+{
+	if (vga_is_cga_mode(mmio))
+		return ST01_CGA;
+	else
+		return ST01_MDA;
+}
+
+static void vga_ar_reset_flip_flop(bool mmio)
+{
+	vga_read(vga_st01(mmio), mmio);
+}
+
+static uint16_t vga_crx(bool mmio)
+{
+	if (vga_is_cga_mode(mmio))
+		return CRX_CGA;
+	else
+		return CRX_MDA;
+}
+
+static uint16_t vga_crd(bool mmio)
+{
+	if (vga_is_cga_mode(mmio))
+		return CRD_CGA;
+	else
+		return CRD_MDA;
+}
+
+static uint8_t vga_idx_read(uint16_t index_reg, uint16_t data_reg,
+			    uint8_t index, bool mmio)
+{
+	vga_write(index_reg, index, mmio);
+	return vga_read(data_reg, mmio);
+}
+
+static void vga_idx_write(uint16_t index_reg, uint16_t data_reg,
+			  uint8_t index, uint8_t value, bool mmio)
+{
+	vga_write(index_reg, index, mmio);
+	vga_write(data_reg, value, mmio);
+}
+
+static uint8_t vga_ar_read(uint8_t index, bool mmio)
+{
+	vga_ar_reset_flip_flop(mmio);
+	return vga_idx_read(ARX, ARD_R, index, mmio);
+}
+
+static void vga_ar_write(uint8_t index, uint8_t value, bool mmio)
+{
+	vga_ar_reset_flip_flop(mmio);
+	vga_idx_write(ARX, ARD_W, index, value, mmio);
+}
+
+static uint8_t vga_sr_read(uint8_t index, bool mmio)
+{
+	return vga_idx_read(SRX, SRD, index, mmio);
+}
+
+static void vga_sr_write(uint8_t index, uint8_t value, bool mmio)
+{
+	vga_idx_write(SRX, SRD, index, value, mmio);
+}
+
+static uint8_t vga_gr_read(uint8_t index, bool mmio)
+{
+	return vga_idx_read(GRX, GRD, index, mmio);
+}
+
+static void vga_gr_write(uint8_t index, uint8_t value, bool mmio)
+{
+	vga_idx_write(GRX, GRD, index, value, mmio);
+}
+
+static uint8_t vga_cr_read(uint8_t index, bool mmio)
+{
+	return vga_idx_read(vga_crx(mmio), vga_crd(mmio), index, mmio);
+}
+
+static void vga_cr_write(uint8_t index, uint8_t value, bool mmio)
+{
+	vga_idx_write(vga_crx(mmio), vga_crd(mmio), index, value, mmio);
+}
+
 static int read_register(struct config *config, struct reg *reg, uint32_t *valp)
 {
 	uint32_t val = 0;
@@ -395,10 +511,34 @@ static int read_register(struct config *config, struct reg *reg, uint32_t *valp)
 	case PORT_MMIO_8:
 		val = INREG8(reg->mmio_offset + reg->addr);
 		break;
+	case PORT_MMIO_VGA_AR:
+		val = vga_ar_read(reg->addr, true);
+		break;
+	case PORT_MMIO_VGA_SR:
+		val = vga_sr_read(reg->addr, true);
+		break;
+	case PORT_MMIO_VGA_GR:
+		val = vga_gr_read(reg->addr, true);
+		break;
+	case PORT_MMIO_VGA_CR:
+		val = vga_cr_read(reg->addr, true);
+		break;
 	case PORT_PORTIO:
 		iopl(3);
 		val = inb(reg->addr);
 		iopl(0);
+		break;
+	case PORT_PORTIO_VGA_AR:
+		val = vga_ar_read(reg->addr, false);
+		break;
+	case PORT_PORTIO_VGA_SR:
+		val = vga_sr_read(reg->addr, false);
+		break;
+	case PORT_PORTIO_VGA_GR:
+		val = vga_gr_read(reg->addr, false);
+		break;
+	case PORT_PORTIO_VGA_CR:
+		val = vga_cr_read(reg->addr, false);
 		break;
 	case PORT_BUNIT:
 	case PORT_PUNIT:
@@ -469,6 +609,38 @@ static int write_register(struct config *config, struct reg *reg, uint32_t val)
 		}
 		OUTREG8(reg->mmio_offset + reg->addr, val);
 		break;
+	case PORT_MMIO_VGA_AR:
+		if (val > 0xff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		vga_ar_write(reg->addr, val, true);
+		break;
+	case PORT_MMIO_VGA_SR:
+		if (val > 0xff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		vga_sr_write(reg->addr, val, true);
+		break;
+	case PORT_MMIO_VGA_GR:
+		if (val > 0xff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		vga_gr_write(reg->addr, val, true);
+		break;
+	case PORT_MMIO_VGA_CR:
+		if (val > 0xff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		vga_cr_write(reg->addr, val, true);
+		break;
 	case PORT_PORTIO:
 		if (val > 0xff) {
 			fprintf(stderr, "value 0x%08x out of range for port %s\n",
@@ -478,6 +650,38 @@ static int write_register(struct config *config, struct reg *reg, uint32_t val)
 		iopl(3);
 		outb(val, reg->addr);
 		iopl(0);
+		break;
+	case PORT_PORTIO_VGA_AR:
+		if (val > 0xff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		vga_ar_write(reg->addr, val, false);
+		break;
+	case PORT_PORTIO_VGA_SR:
+		if (val > 0xff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		vga_sr_write(reg->addr, val, false);
+		break;
+	case PORT_PORTIO_VGA_GR:
+		if (val > 0xff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		vga_gr_write(reg->addr, val, false);
+		break;
+	case PORT_PORTIO_VGA_CR:
+		if (val > 0xff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		vga_cr_write(reg->addr, val, false);
 		break;
 	case PORT_BUNIT:
 	case PORT_PUNIT:
