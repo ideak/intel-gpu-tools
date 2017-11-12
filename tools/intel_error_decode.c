@@ -51,6 +51,7 @@
 #include <assert.h>
 #include <intel_bufmgr.h>
 #include <zlib.h>
+#include <ctype.h>
 
 #include "intel_chipset.h"
 #include "intel_io.h"
@@ -434,6 +435,16 @@ print_fault_data(unsigned devid, uint32_t data1, uint32_t data0)
 
 #define MAX_RINGS 10 /* I really hope this never... */
 
+static bool maybe_ascii(const void *data, int check)
+{
+	const char *c = data;
+	while (check--) {
+		if (!isprint(*c++))
+			return false;
+	}
+	return true;
+}
+
 static void decode(struct drm_intel_decode *ctx,
 		   const char *buffer_name,
 		   const char *ring_name,
@@ -458,6 +469,8 @@ static void decode(struct drm_intel_decode *ctx,
 		drm_intel_decode_set_batch_pointer(ctx, data, gtt_offset,
 						   *count);
 		drm_intel_decode(ctx);
+	} else if (maybe_ascii(data, 16)) {
+		printf("%*s\n", 4 * *count, (char *)data);
 	} else {
 		for (int i = 0; i + 4 <= *count; i += 4)
 			printf("[%04x] %08x %08x %08x %08x\n",
