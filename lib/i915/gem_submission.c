@@ -28,6 +28,7 @@
 
 #include "igt_core.h"
 #include "igt_sysfs.h"
+#include "intel_chipset.h"
 
 #include "i915/gem_submission.h"
 
@@ -64,30 +65,30 @@ static bool has_semaphores(int fd, int dir)
  */
 unsigned gem_submission_method(int fd)
 {
+	const int gen = intel_gen(intel_get_drm_devid(fd));
 	unsigned flags = 0;
-	bool active;
+	int result;
+
 	int dir;
 
 	dir = igt_sysfs_open_parameters(fd);
 	if (dir < 0)
 		return 0;
 
-	active = igt_sysfs_get_boolean(dir, "enable_guc_submission");
-	if (active) {
+	if (igt_sysfs_get_boolean(dir, "enable_guc_submission")) {
 		flags |= GEM_SUBMISSION_GUC | GEM_SUBMISSION_EXECLISTS;
 		goto out;
 	}
 
-	active = igt_sysfs_get_boolean(dir, "enable_execlists");
-	if (active) {
+	if (igt_sysfs_scanf(dir, "enable_execlists", "%d", &result) != 1)
+		result = gen >= 8;
+	if (result) {
 		flags |= GEM_SUBMISSION_EXECLISTS;
 		goto out;
 	}
 
-	active = has_semaphores(fd, dir);
-	if (active) {
+	if (has_semaphores(fd, dir))
 		flags |= GEM_SUBMISSION_SEMAPHORES;
-	}
 
 out:
 	close(dir);
