@@ -519,9 +519,6 @@ void igt_kselftest_end(struct igt_kselftest *tst)
 {
 	kmod_module_remove_module(tst->kmod, KMOD_REMOVE_FORCE);
 	close(tst->kmsg);
-
-	if (strcmp(tst->module_name, "i915") == 0)
-		igt_i915_driver_load(NULL);
 }
 
 void igt_kselftest_fini(struct igt_kselftest *tst)
