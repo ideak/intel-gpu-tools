@@ -44,6 +44,7 @@
 #include <sys/syscall.h>
 #include <sys/utsname.h>
 #include <termios.h>
+#include <pthread.h>
 
 #include "drmtest.h"
 #include "i915_drm.h"
@@ -235,25 +236,19 @@ static int modprobe(const char *driver)
 	return igt_kmod_load(driver, "");
 }
 
-/**
- * __drm_open_driver:
- * @chipset: OR'd flags for each chipset to search, eg. #DRIVER_INTEL
- *
- * Open the first DRM device we can find, searching up to 16 device nodes
- *
- * Returns:
- * An open DRM fd or -1 on error
- */
-int __drm_open_driver(int chipset)
+static void modprobe_i915(const char *name)
 {
-	if (chipset & DRIVER_VGEM)
-		modprobe("vgem");
+	/* When loading i915, we also want to load snd-hda et al */
+	igt_i915_driver_load(NULL);
+}
 
+static int __open_device(const char *base, int offset, unsigned int chipset)
+{
 	for (int i = 0; i < 16; i++) {
 		char name[80];
 		int fd;
 
-		sprintf(name, "/dev/dri/card%u", i);
+		sprintf(name, "%s%u", base, i + offset);
 		fd = open(name, O_RDWR);
 		if (fd == -1)
 			continue;
@@ -262,16 +257,13 @@ int __drm_open_driver(int chipset)
 		    has_known_intel_chipset(fd))
 			return fd;
 
-		if (chipset & DRIVER_VC4 &&
-		    is_vc4_device(fd))
+		if (chipset & DRIVER_VC4 && is_vc4_device(fd))
 			return fd;
 
-		if (chipset & DRIVER_VGEM &&
-		    is_vgem_device(fd))
+		if (chipset & DRIVER_VGEM && is_vgem_device(fd))
 			return fd;
 
-		if (chipset & DRIVER_VIRTIO &&
-		    is_virtio_device(fd))
+		if (chipset & DRIVER_VIRTIO && is_virtio_device(fd))
 			return fd;
 
 		if (chipset & DRIVER_AMDGPU && is_amd_device(fd))
@@ -287,33 +279,58 @@ int __drm_open_driver(int chipset)
 	return -1;
 }
 
+static int __open_driver(const char *base, int offset, unsigned int chipset)
+{
+	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+	static const struct module {
+		unsigned int bit;
+		const char *module;
+		void (*modprobe)(const char *name);
+	} modules[] = {
+		{ DRIVER_AMDGPU, "amdgpu" },
+		{ DRIVER_INTEL, "i915", modprobe_i915 },
+		{ DRIVER_VC4, "vc4" },
+		{ DRIVER_VGEM, "vgem" },
+		{ DRIVER_VIRTIO, "virtio-gpu" },
+		{}
+	};
+	int fd;
+
+	fd = __open_device(base, offset, chipset);
+	if (fd != -1)
+		return fd;
+
+	pthread_mutex_lock(&mutex);
+	for (const struct module *m = modules; m->module; m++) {
+		if (chipset & m->bit) {
+			if (m->modprobe)
+				m->modprobe(m->module);
+			else
+				modprobe(m->module);
+		}
+	}
+	pthread_mutex_unlock(&mutex);
+
+	return __open_device(base, offset, chipset);
+}
+
+/**
+ * __drm_open_driver:
+ * @chipset: OR'd flags for each chipset to search, eg. #DRIVER_INTEL
+ *
+ * Open the first DRM device we can find, searching up to 16 device nodes
+ *
+ * Returns:
+ * An open DRM fd or -1 on error
+ */
+int __drm_open_driver(int chipset)
+{
+	return __open_driver("/dev/dri/card", 0, chipset);
+}
+
 static int __drm_open_driver_render(int chipset)
 {
-	char *name;
-	int i, fd;
-
-	for (i = 128; i < (128 + 16); i++) {
-		int ret;
-
-		ret = asprintf(&name, "/dev/dri/renderD%u", i);
-		igt_assert(ret != -1);
-
-		fd = open(name, O_RDWR);
-		free(name);
-
-		if (fd == -1)
-			continue;
-
-		if (!is_i915_device(fd) || !has_known_intel_chipset(fd)) {
-			close(fd);
-			fd = -1;
-			continue;
-		}
-
-		return fd;
-	}
-
-	return fd;
+	return __open_driver("/dev/dri/renderD", 128, chipset);
 }
 
 static int at_exit_drm_fd = -1;
