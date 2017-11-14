@@ -803,10 +803,24 @@ static void suspend_via_rtcwake(enum igt_suspend_state state)
 	snprintf(cmd, sizeof(cmd), "rtcwake -s %d -m %s ",
 		 delay, suspend_state_name[state]);
 	ret = igt_system(cmd);
-	igt_assert_f(ret == 0,
-		     "rtcwake failed with %i\n"
-		     "Check dmesg for further details.\n",
-		     ret);
+	if (ret) {
+		const char *path = "suspend_stats";
+		char *info;
+		int dir;
+
+		igt_warn("rtcwake failed with %i\n"
+			 "Check dmesg for further details.\n",
+			 ret);
+
+		dir = open(igt_debugfs_mount(), O_RDONLY);
+		info = igt_sysfs_get(dir, path);
+		close(dir);
+		if (info) {
+			igt_debug("%s:\n%s\n", path, info);
+			free(info);
+		}
+	}
+	igt_assert_eq(ret, 0);
 }
 
 static void suspend_via_sysfs(int power_dir, enum igt_suspend_state state)
