@@ -1549,27 +1549,12 @@ static void igt_output_refresh(igt_output_t *output)
 			       -1);
 	}
 
-	if (output->config.connector) {
+	if (output->config.connector)
 		igt_atomic_fill_connector_props(display, output,
 			IGT_NUM_CONNECTOR_PROPS, igt_connector_prop_names);
 
-		if (output->props[IGT_CONNECTOR_BROADCAST_RGB])
-			igt_output_set_prop_value(output,
-						  IGT_CONNECTOR_BROADCAST_RGB,
-						  BROADCAST_RGB_FULL);
-	}
-
 	LOG(display, "%s: Selecting pipe %s\n", output->name,
 	    kmstest_pipe_name(output->pending_pipe));
-}
-
-static bool
-get_plane_property(int drm_fd, uint32_t plane_id, const char *name,
-		   uint32_t *prop_id /* out */, uint64_t *value /* out */,
-		   drmModePropertyPtr *prop /* out */)
-{
-	return kmstest_get_property(drm_fd, plane_id, DRM_MODE_OBJECT_PLANE,
-				    name, prop_id, value, prop);
 }
 
 static int
@@ -1582,15 +1567,6 @@ igt_plane_set_property(igt_plane_t *plane, uint32_t prop_id, uint64_t value)
 				 DRM_MODE_OBJECT_PLANE, prop_id, value);
 }
 
-static bool
-get_crtc_property(int drm_fd, uint32_t crtc_id, const char *name,
-		   uint32_t *prop_id /* out */, uint64_t *value /* out */,
-		   drmModePropertyPtr *prop /* out */)
-{
-	return kmstest_get_property(drm_fd, crtc_id, DRM_MODE_OBJECT_CRTC,
-				    name, prop_id, value, prop);
-}
-
 /*
  * Walk a plane's property list to determine its type.  If we don't
  * find a type property, then the kernel doesn't support universal
@@ -1601,12 +1577,110 @@ static int get_drm_plane_type(int drm_fd, uint32_t plane_id)
 	uint64_t value;
 	bool has_prop;
 
-	has_prop = get_plane_property(drm_fd, plane_id, "type",
-				      NULL /* prop_id */, &value, NULL);
+	has_prop = kmstest_get_property(drm_fd, plane_id, DRM_MODE_OBJECT_PLANE,
+					"type", NULL, &value, NULL);
 	if (has_prop)
 		return (int)value;
 
 	return DRM_PLANE_TYPE_OVERLAY;
+}
+
+static void igt_plane_reset(igt_plane_t *plane)
+{
+	/* Reset src coordinates. */
+	igt_plane_set_prop_value(plane, IGT_PLANE_SRC_X, 0);
+	igt_plane_set_prop_value(plane, IGT_PLANE_SRC_Y, 0);
+	igt_plane_set_prop_value(plane, IGT_PLANE_SRC_W, 0);
+	igt_plane_set_prop_value(plane, IGT_PLANE_SRC_H, 0);
+
+	/* Reset crtc coordinates. */
+	igt_plane_set_prop_value(plane, IGT_PLANE_CRTC_X, 0);
+	igt_plane_set_prop_value(plane, IGT_PLANE_CRTC_Y, 0);
+	igt_plane_set_prop_value(plane, IGT_PLANE_CRTC_W, 0);
+	igt_plane_set_prop_value(plane, IGT_PLANE_CRTC_H, 0);
+
+	/* Reset binding to fb and crtc. */
+	igt_plane_set_prop_value(plane, IGT_PLANE_FB_ID, 0);
+	igt_plane_set_prop_value(plane, IGT_PLANE_CRTC_ID, 0);
+
+	/* Use default rotation */
+	if (igt_plane_has_prop(plane, IGT_PLANE_ROTATION)) {
+		plane->values[IGT_PLANE_ROTATION] =
+			igt_plane_get_prop(plane, IGT_PLANE_ROTATION);
+		igt_plane_clear_prop_changed(plane, IGT_PLANE_ROTATION);
+	}
+
+	igt_plane_clear_prop_changed(plane, IGT_PLANE_IN_FENCE_FD);
+	plane->values[IGT_PLANE_IN_FENCE_FD] = ~0ULL;
+}
+
+static void igt_pipe_reset(igt_pipe_t *pipe)
+{
+	igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_MODE_ID, 0);
+	igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_ACTIVE, 0);
+	igt_pipe_obj_clear_prop_changed(pipe, IGT_CRTC_OUT_FENCE_PTR);
+
+	pipe->out_fence_fd = -1;
+}
+
+static void igt_output_reset(igt_output_t *output)
+{
+	output->pending_pipe = PIPE_NONE;
+	output->use_override_mode = false;
+	memset(&output->override_mode, 0, sizeof(output->override_mode));
+
+	igt_output_set_prop_value(output, IGT_CONNECTOR_CRTC_ID, 0);
+
+	if (igt_output_has_prop(output, IGT_CONNECTOR_BROADCAST_RGB))
+		igt_output_set_prop_value(output, IGT_CONNECTOR_BROADCAST_RGB,
+					  BROADCAST_RGB_FULL);
+}
+
+/**
+ * igt_display_reset:
+ * @display: a pointer to an #igt_display_t structure
+ *
+ * Reset basic pipes, connectors and planes on @display back to default values.
+ * In particular, the following properties will be reset:
+ *
+ * For outputs:
+ * - %IGT_CONNECTOR_CRTC_ID
+ * - %IGT_CONNECTOR_BROADCAST_RGB (if applicable)
+ * - igt_output_override_mode() to default.
+ *
+ * For pipes:
+ * - %IGT_CRTC_MODE_ID (leaked)
+ * - %IGT_CRTC_ACTIVE
+ * - %IGT_CRTC_OUT_FENCE_PTR
+ *
+ * For planes:
+ * - %IGT_PLANE_SRC_*
+ * - %IGT_PLANE_CRTC_*
+ * - %IGT_PLANE_FB_ID
+ * - %IGT_PLANE_CRTC_ID
+ * - %IGT_PLANE_ROTATION
+ * - %IGT_PLANE_IN_FENCE_FD
+ */
+void igt_display_reset(igt_display_t *display)
+{
+	enum pipe pipe;
+	int i;
+
+	for_each_pipe(display, pipe) {
+		igt_pipe_t *pipe_obj = &display->pipes[pipe];
+		igt_plane_t *plane;
+
+		for_each_plane_on_pipe(display, pipe, plane)
+			igt_plane_reset(plane);
+
+		igt_pipe_reset(pipe_obj);
+	}
+
+	for (i = 0; i < display->n_outputs; i++) {
+		igt_output_t *output = &display->outputs[i];
+
+		igt_output_reset(output);
+	}
 }
 
 /**
@@ -1648,7 +1722,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 	plane_resources = drmModeGetPlaneResources(display->drm_fd);
 	igt_assert(plane_resources);
 
-	for (i = 0; i < display->n_pipes; i++) {
+	for_each_pipe(display, i) {
 		igt_pipe_t *pipe = &display->pipes[i];
 		igt_plane_t *plane;
 		int p = 1;
@@ -1661,18 +1735,8 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		pipe->plane_cursor = -1;
 		pipe->plane_primary = -1;
 		pipe->planes = NULL;
-		pipe->out_fence_fd = -1;
 
 		igt_fill_pipe_props(display, pipe, IGT_NUM_CRTC_PROPS, igt_crtc_prop_names);
-
-		/* Force modeset disable on first commit */
-		igt_pipe_obj_set_prop_changed(pipe, IGT_CRTC_MODE_ID);
-		igt_pipe_obj_set_prop_changed(pipe, IGT_CRTC_ACTIVE);
-
-		get_crtc_property(display->drm_fd, pipe->crtc_id,
-				    "background_color", NULL,
-				    &pipe->values[IGT_CRTC_BACKGROUND],
-				    NULL);
 
 		/* count number of valid planes */
 		for (j = 0; j < plane_resources->count_planes; j++) {
@@ -1730,24 +1794,6 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 			plane->values[IGT_PLANE_IN_FENCE_FD] = ~0ULL;
 
 			igt_fill_plane_props(display, plane, IGT_NUM_PLANE_PROPS, igt_plane_prop_names);
-
-			get_plane_property(display->drm_fd, drm_plane->plane_id,
-					   "rotation",
-					   &plane->props[IGT_PLANE_ROTATION],
-					   &plane->values[IGT_PLANE_ROTATION],
-					   NULL);
-
-			/* Clear any residual framebuffer info on first commit. */
-			igt_plane_set_prop_changed(plane, IGT_PLANE_FB_ID);
-			igt_plane_set_prop_changed(plane, IGT_PLANE_CRTC_ID);
-
-			/*
-			 * CRTC_X/Y are not changed in igt_plane_set_fb, so
-			 * force them to be sanitized in case they contain
-			 * garbage.
-			 */
-			igt_plane_set_prop_changed(plane, IGT_PLANE_CRTC_X);
-			igt_plane_set_prop_changed(plane, IGT_PLANE_CRTC_Y);
 		}
 
 		/*
@@ -1782,17 +1828,17 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		 * a pipe is set with igt_output_set_pipe().
 		 */
 		output->force_reprobe = true;
-		output->pending_pipe = PIPE_NONE;
 		output->id = resources->connectors[i];
 		output->display = display;
 
 		igt_output_refresh(output);
-
-		igt_output_set_prop_changed(output, IGT_CONNECTOR_CRTC_ID);
 	}
 
 	drmModeFreePlaneResources(plane_resources);
 	drmModeFreeResources(resources);
+
+	/* Set reasonable default values for every object in the display. */
+	igt_display_reset(display);
 
 	LOG_UNINDENT(display);
 }

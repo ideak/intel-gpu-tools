@@ -353,6 +353,7 @@ struct igt_display {
 
 void igt_display_init(igt_display_t *display, int drm_fd);
 void igt_display_fini(igt_display_t *display);
+void igt_display_reset(igt_display_t *display);
 int  igt_display_commit2(igt_display_t *display, enum igt_commit_style s);
 int  igt_display_commit(igt_display_t *display);
 int  igt_display_try_commit_atomic(igt_display_t *display, uint32_t flags, void *user_data);
