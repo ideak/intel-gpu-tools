@@ -1955,7 +1955,7 @@ void igt_display_require_output_on_pipe(igt_display_t *display, enum pipe pipe)
 {
 	igt_output_t *output;
 
-	igt_skip_on_f(igt_display_get_n_pipes(display) < pipe,
+	igt_skip_on_f(pipe >= igt_display_get_n_pipes(display),
 		      "Pipe %s does not exist.\n", kmstest_pipe_name(pipe));
 
 	for_each_valid_output_on_pipe(display, pipe, output)
