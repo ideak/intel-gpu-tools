@@ -35,14 +35,19 @@ enum test_flags {
 	TEST_BAD_ROTATION_90		= 1 << 4,
 	TEST_NO_AUX_BUFFER		= 1 << 5,
 	TEST_BAD_CCS_HANDLE		= 1 << 6,
+	TEST_BAD_AUX_STRIDE		= 1 << 7,
 };
 
 #define TEST_FAIL_ON_ADDFB2 \
-	(TEST_BAD_PIXEL_FORMAT | TEST_NO_AUX_BUFFER | TEST_BAD_CCS_HANDLE)
+	(TEST_BAD_PIXEL_FORMAT | TEST_NO_AUX_BUFFER | TEST_BAD_CCS_HANDLE | \
+	 TEST_BAD_AUX_STRIDE)
 
 enum test_fb_flags {
 	FB_COMPRESSED			= 1 << 0,
 	FB_HAS_PLANE			= 1 << 1,
+	FB_MISALIGN_AUX_STRIDE		= 1 << 2,
+	FB_SMALL_AUX_STRIDE		= 1 << 3,
+	FB_ZERO_AUX_STRIDE		= 1 << 4,
 };
 
 typedef struct {
@@ -324,6 +329,17 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		int ccs_pitches = ALIGN(ccs_width * 1, 128);
 		int ccs_offsets = size[0];
 
+		if (fb_flags & FB_MISALIGN_AUX_STRIDE) {
+			igt_skip_on_f(width <= 1024,
+				      "FB already has the smallest possible stride\n");
+			ccs_pitches -= 64;
+		}
+		else if (fb_flags & FB_SMALL_AUX_STRIDE) {
+			igt_skip_on_f(width <= 1024,
+				      "FB already has the smallest possible stride\n");
+			ccs_pitches = ALIGN(ccs_width/2, 128);
+		}
+
 		size[1] = ccs_pitches * ALIGN(ccs_height, 32);
 
 		f.handles[0] = gem_create(data->drm_fd, size[0] + size[1]);
@@ -336,11 +352,11 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		if (!(data->flags & TEST_NO_AUX_BUFFER)) {
 			f.modifier[1] = modifier;
 			f.handles[1] = ccs_handle;
-			f.pitches[1] = ccs_pitches;
 			f.offsets[1] = ccs_offsets;
+			f.pitches[1] = (fb_flags & FB_ZERO_AUX_STRIDE)? 0:ccs_pitches;
 
 			render_ccs(data, f.handles[1], f.offsets[1], size[1],
-				   height, f.pitches[1]);
+				   height, ccs_pitches);
 		}
 	} else {
 		f.handles[0] = gem_create(data->drm_fd, size[0]);
@@ -471,6 +487,12 @@ static void test_output(data_t *data)
 		try_config(data, fb_flags | FB_COMPRESSED);
 	}
 
+	if (data->flags & TEST_BAD_AUX_STRIDE) {
+		try_config(data, fb_flags | FB_COMPRESSED | FB_MISALIGN_AUX_STRIDE);
+		try_config(data, fb_flags | FB_COMPRESSED | FB_SMALL_AUX_STRIDE);
+		try_config(data, fb_flags | FB_COMPRESSED | FB_ZERO_AUX_STRIDE);
+	}
+
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, NULL);
 	igt_plane_set_rotation(primary, IGT_ROTATION_0);
@@ -543,6 +565,10 @@ igt_main
 
 		data.flags = TEST_BAD_CCS_HANDLE;
 		igt_subtest_f("pipe-%s-ccs-on-another-bo", pipe_name)
+			test_output(&data);
+
+		data.flags = TEST_BAD_AUX_STRIDE;
+		igt_subtest_f("pipe-%s-bad-aux-stride", pipe_name)
 			test_output(&data);
 	}
 
