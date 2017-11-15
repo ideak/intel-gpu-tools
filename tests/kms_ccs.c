@@ -33,7 +33,11 @@ enum test_flags {
 	TEST_ROTATE_180			= 1 << 2,
 	TEST_BAD_PIXEL_FORMAT		= 1 << 3,
 	TEST_BAD_ROTATION_90		= 1 << 4,
+	TEST_NO_AUX_BUFFER		= 1 << 5,
 };
+
+#define TEST_FAIL_ON_ADDFB2 \
+	(TEST_BAD_PIXEL_FORMAT | TEST_NO_AUX_BUFFER)
 
 enum test_fb_flags {
 	FB_COMPRESSED			= 1 << 0,
@@ -315,22 +319,30 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		 */
 		int ccs_width = ALIGN(width * 4, 32) / 32;
 		int ccs_height = ALIGN(height, 16) / 16;
-		f.pitches[1] = ALIGN(ccs_width * 1, 128);
-		f.modifier[1] = modifier;
-		f.offsets[1] = size[0];
-		size[1] = f.pitches[1] * ALIGN(ccs_height, 32);
+		int ccs_pitches = ALIGN(ccs_width * 1, 128);
+		int ccs_offsets = size[0];
+
+		size[1] = ccs_pitches * ALIGN(ccs_height, 32);
 
 		f.handles[0] = gem_create(data->drm_fd, size[0] + size[1]);
-		f.handles[1] = f.handles[0];
-		render_ccs(data, f.handles[1], f.offsets[1], size[1],
-			   height, f.pitches[1]);
-	} else
+
+		if (!(data->flags & TEST_NO_AUX_BUFFER)) {
+			f.modifier[1] = modifier;
+			f.handles[1] = f.handles[0];
+			f.pitches[1] = ccs_pitches;
+			f.offsets[1] = ccs_offsets;
+
+			render_ccs(data, f.handles[1], f.offsets[1], size[1],
+				   height, f.pitches[1]);
+		}
+	} else {
 		f.handles[0] = gem_create(data->drm_fd, size[0]);
+	}
 
 	render_fb(data, f.handles[0], size[0], fb_flags, height, f.pitches[0]);
 
 	ret = drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f);
-	if (data->flags & TEST_BAD_PIXEL_FORMAT) {
+	if (data->flags & TEST_FAIL_ON_ADDFB2) {
 		igt_assert_eq(ret, -1);
 		igt_assert_eq(errno, EINVAL);
 		return;
@@ -379,7 +391,7 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags)
 			    drm_mode->vdisplay, fb_flags);
 	}
 
-	if (data->flags & TEST_BAD_PIXEL_FORMAT)
+	if (data->flags & TEST_FAIL_ON_ADDFB2)
 		return;
 
 	igt_plane_set_position(primary, 0, 0);
@@ -446,7 +458,8 @@ static void test_output(data_t *data)
 	}
 
 	if (data->flags & TEST_BAD_PIXEL_FORMAT ||
-	    data->flags & TEST_BAD_ROTATION_90) {
+	    data->flags & TEST_BAD_ROTATION_90 ||
+	    data->flags & TEST_NO_AUX_BUFFER) {
 		try_config(data, fb_flags | FB_COMPRESSED);
 	}
 
@@ -515,6 +528,11 @@ igt_main
 		}
 
 		data.plane = NULL;
+
+		data.flags = TEST_NO_AUX_BUFFER;
+		igt_subtest_f("pipe-%s-missing-ccs-buffer", pipe_name)
+			test_output(&data);
+
 	}
 
 	igt_fixture
