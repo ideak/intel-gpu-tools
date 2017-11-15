@@ -34,10 +34,11 @@ enum test_flags {
 	TEST_BAD_PIXEL_FORMAT		= 1 << 3,
 	TEST_BAD_ROTATION_90		= 1 << 4,
 	TEST_NO_AUX_BUFFER		= 1 << 5,
+	TEST_BAD_CCS_HANDLE		= 1 << 6,
 };
 
 #define TEST_FAIL_ON_ADDFB2 \
-	(TEST_BAD_PIXEL_FORMAT | TEST_NO_AUX_BUFFER)
+	(TEST_BAD_PIXEL_FORMAT | TEST_NO_AUX_BUFFER | TEST_BAD_CCS_HANDLE)
 
 enum test_fb_flags {
 	FB_COMPRESSED			= 1 << 0,
@@ -275,6 +276,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	unsigned int size[2];
 	uint64_t modifier;
 	int ret;
+	uint32_t ccs_handle;
 
 	/* Use either compressed or Y-tiled to test. However, given the lack of
 	 * available bandwidth, we use linear for the primary plane when
@@ -325,10 +327,15 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		size[1] = ccs_pitches * ALIGN(ccs_height, 32);
 
 		f.handles[0] = gem_create(data->drm_fd, size[0] + size[1]);
+		if (data->flags & TEST_BAD_CCS_HANDLE) {
+			/* Put the CCS buffer on a different BO. */
+			ccs_handle = gem_create(data->drm_fd, size[0] + size[1]);
+		} else
+			ccs_handle = f.handles[0];
 
 		if (!(data->flags & TEST_NO_AUX_BUFFER)) {
 			f.modifier[1] = modifier;
-			f.handles[1] = f.handles[0];
+			f.handles[1] = ccs_handle;
 			f.pitches[1] = ccs_pitches;
 			f.offsets[1] = ccs_offsets;
 
@@ -459,7 +466,8 @@ static void test_output(data_t *data)
 
 	if (data->flags & TEST_BAD_PIXEL_FORMAT ||
 	    data->flags & TEST_BAD_ROTATION_90 ||
-	    data->flags & TEST_NO_AUX_BUFFER) {
+	    data->flags & TEST_NO_AUX_BUFFER ||
+	    data->flags & TEST_BAD_CCS_HANDLE) {
 		try_config(data, fb_flags | FB_COMPRESSED);
 	}
 
@@ -533,6 +541,9 @@ igt_main
 		igt_subtest_f("pipe-%s-missing-ccs-buffer", pipe_name)
 			test_output(&data);
 
+		data.flags = TEST_BAD_CCS_HANDLE;
+		igt_subtest_f("pipe-%s-ccs-on-another-bo", pipe_name)
+			test_output(&data);
 	}
 
 	igt_fixture
