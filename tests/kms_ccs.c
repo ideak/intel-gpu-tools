@@ -503,6 +503,9 @@ igt_main
 
 		data.flags = TEST_CRC;
 		igt_subtest_f("pipe-%s-crc-sprite-planes-basic", pipe_name) {
+
+			igt_display_require_output_on_pipe(&data.display, data.pipe);
+
 			for_each_plane_on_pipe(&data.display, data.pipe, data.plane) {
 				if (data.plane->type == DRM_PLANE_TYPE_PRIMARY)
 					continue;
