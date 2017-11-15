@@ -483,6 +483,8 @@ igt_main
 		const char *pipe_name = kmstest_pipe_name(pipe);
 		int sprite_idx = 0;
 
+		data.pipe = pipe;
+
 		data.flags = TEST_BAD_PIXEL_FORMAT;
 		igt_subtest_f("pipe-%s-bad-pixel-format", pipe_name)
 			test_output(&data);
