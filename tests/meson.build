@@ -251,7 +251,7 @@ endif
 
 if chamelium.found()
 	test_progs += [
-		'chamelium',
+		'kms_chamelium',
 	]
 	test_deps += chamelium
 endif

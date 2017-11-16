@@ -16,7 +16,7 @@ endif
 
 if HAVE_CHAMELIUM
 TESTS_progs += \
-	chamelium \
+	kms_chamelium \
 	$(NULL)
 endif
 
@@ -153,8 +153,8 @@ vc4_wait_bo_LDADD = $(LDADD) $(DRM_VC4_LIBS)
 vc4_wait_seqno_CFLAGS = $(AM_CFLAGS) $(DRM_VC4_CFLAGS)
 vc4_wait_seqno_LDADD = $(LDADD) $(DRM_VC4_LIBS)
 
-chamelium_CFLAGS = $(AM_CFLAGS) $(XMLRPC_CFLAGS) $(LIBUDEV_CFLAGS)
-chamelium_LDADD = $(LDADD) $(XMLRPC_LIBS) $(LIBUDEV_LIBS)
+kms_chamelium_CFLAGS = $(AM_CFLAGS) $(XMLRPC_CFLAGS) $(LIBUDEV_CFLAGS)
+kms_chamelium_LDADD = $(LDADD) $(XMLRPC_LIBS) $(LIBUDEV_LIBS)
 
 audio_CFLAGS = $(AM_CFLAGS) $(ALSA_CFLAGS)
 audio_LDADD = $(LDADD) $(ALSA_LIBS)

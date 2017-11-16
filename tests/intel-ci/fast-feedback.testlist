@@ -1,14 +1,5 @@
 # Keep alphabetically sorted by default
 
-igt@chamelium@dp-hpd-fast
-igt@chamelium@dp-edid-read
-igt@chamelium@dp-crc-fast
-igt@chamelium@hdmi-hpd-fast
-igt@chamelium@hdmi-edid-read
-igt@chamelium@hdmi-crc-fast
-igt@chamelium@vga-hpd-fast
-igt@chamelium@vga-edid-read
-igt@chamelium@common-hpd-after-suspend
 igt@core_auth@basic-auth
 igt@core_prop_blob@basic
 igt@debugfs_test@read_all_entries
@@ -208,6 +199,15 @@ igt@kms_addfb_basic@unused-pitches
 igt@kms_busy@basic-flip-a
 igt@kms_busy@basic-flip-b
 igt@kms_busy@basic-flip-c
+igt@kms_chamelium@dp-hpd-fast
+igt@kms_chamelium@dp-edid-read
+igt@kms_chamelium@dp-crc-fast
+igt@kms_chamelium@hdmi-hpd-fast
+igt@kms_chamelium@hdmi-edid-read
+igt@kms_chamelium@hdmi-crc-fast
+igt@kms_chamelium@vga-hpd-fast
+igt@kms_chamelium@vga-edid-read
+igt@kms_chamelium@common-hpd-after-suspend
 igt@kms_cursor_legacy@basic-busy-flip-before-cursor-atomic
 igt@kms_cursor_legacy@basic-busy-flip-before-cursor-legacy
 igt@kms_cursor_legacy@basic-flip-after-cursor-atomic
