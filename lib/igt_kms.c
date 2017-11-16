@@ -1886,9 +1886,13 @@ igt_output_t *igt_output_from_connector(igt_display_t *display,
 					drmModeConnector *connector)
 {
 	igt_output_t *output, *found = NULL;
+	int i;
 
-	for_each_connected_output(display, output) {
-		if (output->config.connector->connector_id ==
+	for (i = 0; i < display->n_outputs; i++) {
+		output = &display->outputs[i];
+
+		if (output->config.connector &&
+		    output->config.connector->connector_id ==
 		    connector->connector_id) {
 			found = output;
 			break;
