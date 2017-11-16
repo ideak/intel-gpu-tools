@@ -33,6 +33,7 @@
 typedef struct {
 	struct chamelium *chamelium;
 	struct chamelium_port **ports;
+	igt_display_t display;
 	int port_count;
 
 	int drm_fd;
@@ -409,9 +410,9 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 
 static igt_output_t *
 prepare_output(data_t *data,
-	       igt_display_t *display,
 	       struct chamelium_port *port)
 {
+	igt_display_t *display = &data->display;
 	igt_output_t *output;
 	drmModeRes *res;
 	drmModeConnector *connector =
@@ -420,7 +421,6 @@ prepare_output(data_t *data,
 	bool found = false;
 
 	igt_assert(res = drmModeGetResources(data->drm_fd));
-	kmstest_unset_all_crtcs(data->drm_fd, res);
 
 	/* The chamelium's default EDID has a lot of resolutions, way more then
 	 * we need to test
@@ -430,11 +430,9 @@ prepare_output(data_t *data,
 	chamelium_plug(data->chamelium, port);
 	wait_for_connector(data, port, DRM_MODE_CONNECTED);
 
-	igt_display_init(display, data->drm_fd);
-	output = igt_output_from_connector(display, connector);
+	igt_display_reset(display);
 
-	igt_assert(kmstest_probe_connector_config(
-		data->drm_fd, connector->connector_id, ~0, &output->config));
+	output = igt_output_from_connector(display, connector);
 
 	for_each_pipe(display, pipe) {
 		if (!igt_pipe_connector_valid(pipe, output))
@@ -477,7 +475,7 @@ enable_output(data_t *data,
 	igt_pipe_obj_replace_prop_blob(primary->pipe, IGT_CRTC_GAMMA_LUT, NULL, 0);
 	igt_pipe_obj_replace_prop_blob(primary->pipe, IGT_CRTC_CTM, NULL, 0);
 
-	igt_display_commit(display);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	if (chamelium_port_get_type(port) == DRM_MODE_CONNECTOR_VGA)
 		usleep(250000);
@@ -486,24 +484,9 @@ enable_output(data_t *data,
 }
 
 static void
-disable_output(data_t *data,
-	       struct chamelium_port *port,
-	       igt_output_t *output)
-{
-	igt_display_t *display = output->display;
-	igt_plane_t *primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-	igt_assert(primary);
-
-	/* Disable the display */
-	igt_plane_set_fb(primary, NULL);
-	igt_display_commit(display);
-}
-
-static void
 test_display_crc(data_t *data, struct chamelium_port *port, int count,
 		 bool fast)
 {
-	igt_display_t display;
 	igt_output_t *output;
 	igt_plane_t *primary;
 	igt_crc_t *crc;
@@ -517,7 +500,7 @@ test_display_crc(data_t *data, struct chamelium_port *port, int count,
 
 	reset_state(data, port);
 
-	output = prepare_output(data, &display, port);
+	output = prepare_output(data, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -561,18 +544,15 @@ test_display_crc(data_t *data, struct chamelium_port *port, int count,
 		free(expected_crc);
 		free(crc);
 
-		disable_output(data, port, output);
 		igt_remove_fb(data->drm_fd, &fb);
 	}
 
 	drmModeFreeConnector(connector);
-	igt_display_fini(&display);
 }
 
 static void
 test_display_frame_dump(data_t *data, struct chamelium_port *port)
 {
-	igt_display_t display;
 	igt_output_t *output;
 	igt_plane_t *primary;
 	struct igt_fb fb;
@@ -583,7 +563,7 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 
 	reset_state(data, port);
 
-	output = prepare_output(data, &display, port);
+	output = prepare_output(data, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -608,18 +588,15 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 			chamelium_destroy_frame_dump(frame);
 		}
 
-		disable_output(data, port, output);
 		igt_remove_fb(data->drm_fd, &fb);
 	}
 
 	drmModeFreeConnector(connector);
-	igt_display_fini(&display);
 }
 
 static void
 test_analog_frame_dump(data_t *data, struct chamelium_port *port)
 {
-	igt_display_t display;
 	igt_output_t *output;
 	igt_plane_t *primary;
 	struct igt_fb fb;
@@ -631,7 +608,7 @@ test_analog_frame_dump(data_t *data, struct chamelium_port *port)
 
 	reset_state(data, port);
 
-	output = prepare_output(data, &display, port);
+	output = prepare_output(data, port);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -666,12 +643,10 @@ test_analog_frame_dump(data_t *data, struct chamelium_port *port)
 
 		chamelium_destroy_frame_dump(frame);
 
-		disable_output(data, port, output);
 		igt_remove_fb(data->drm_fd, &fb);
 	}
 
 	drmModeFreeConnector(connector);
-	igt_display_fini(&display);
 }
 
 static void
@@ -773,6 +748,9 @@ igt_main
 
 		/* So fbcon doesn't try to reprobe things itself */
 		kmstest_set_vt_graphics_mode();
+
+		igt_display_init(&data.display, data.drm_fd);
+		igt_require(data.display.is_atomic);
 	}
 
 	igt_subtest_group {
@@ -952,6 +930,7 @@ igt_main
 	}
 
 	igt_fixture {
+		igt_display_fini(&data.display);
 		close(data.drm_fd);
 	}
 }
