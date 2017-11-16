@@ -349,6 +349,7 @@ struct igt_display {
 	igt_pipe_t *pipes;
 	bool has_cursor_plane;
 	bool is_atomic;
+	bool first_commit;
 };
 
 void igt_display_init(igt_display_t *display, int drm_fd);

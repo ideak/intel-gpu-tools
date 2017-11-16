@@ -1604,11 +1604,8 @@ static void igt_plane_reset(igt_plane_t *plane)
 	igt_plane_set_prop_value(plane, IGT_PLANE_CRTC_ID, 0);
 
 	/* Use default rotation */
-	if (igt_plane_has_prop(plane, IGT_PLANE_ROTATION)) {
-		plane->values[IGT_PLANE_ROTATION] =
-			igt_plane_get_prop(plane, IGT_PLANE_ROTATION);
-		igt_plane_clear_prop_changed(plane, IGT_PLANE_ROTATION);
-	}
+	if (igt_plane_has_prop(plane, IGT_PLANE_ROTATION))
+		igt_plane_set_prop_value(plane, IGT_PLANE_ROTATION, IGT_ROTATION_0);
 
 	igt_plane_clear_prop_changed(plane, IGT_PLANE_IN_FENCE_FD);
 	plane->values[IGT_PLANE_IN_FENCE_FD] = ~0ULL;
@@ -1665,6 +1662,12 @@ void igt_display_reset(igt_display_t *display)
 {
 	enum pipe pipe;
 	int i;
+
+	/*
+	 * Allow resetting rotation on all planes, which is normally
+	 * prohibited on the primary and cursor plane for legacy commits.
+	 */
+	display->first_commit = true;
 
 	for_each_pipe(display, pipe) {
 		igt_pipe_t *pipe_obj = &display->pipes[pipe];
@@ -2298,7 +2301,8 @@ static int igt_primary_plane_commit_legacy(igt_plane_t *primary,
 	igt_assert((primary->values[IGT_PLANE_CRTC_X] == 0 && primary->values[IGT_PLANE_CRTC_Y] == 0));
 
 	/* nor rotated */
-	igt_assert(!igt_plane_is_prop_changed(primary, IGT_PLANE_ROTATION));
+	if (!pipe->display->first_commit)
+		igt_assert(!igt_plane_is_prop_changed(primary, IGT_PLANE_ROTATION));
 
 	if (!igt_plane_is_prop_changed(primary, IGT_PLANE_FB_ID) &&
 	    !(primary->changed & IGT_PLANE_COORD_CHANGED_MASK) &&
@@ -2351,6 +2355,48 @@ static int igt_primary_plane_commit_legacy(igt_plane_t *primary,
 	return 0;
 }
 
+static int igt_plane_fixup_rotation(igt_plane_t *plane,
+				    igt_pipe_t *pipe)
+{
+	int ret;
+
+	if (!igt_plane_has_prop(plane, IGT_PLANE_ROTATION))
+		return 0;
+
+	LOG(pipe->display, "Fixing up initial rotation pipe %s, plane %d\n",
+	    kmstest_pipe_name(pipe->pipe), plane->index);
+
+	/* First try the easy case, can we change rotation without problems? */
+	ret = igt_plane_set_property(plane, plane->props[IGT_PLANE_ROTATION],
+				     plane->values[IGT_PLANE_ROTATION]);
+	if (!ret)
+		return 0;
+
+	/* Disable the plane, while we tinker with rotation */
+	ret = drmModeSetPlane(pipe->display->drm_fd,
+			      plane->drm_plane->plane_id,
+			      pipe->crtc_id, 0, /* fb_id */
+			      0, /* flags */
+			      0, 0, 0, 0, /* crtc_x, crtc_y, crtc_w, crtc_h */
+			      IGT_FIXED(0,0), IGT_FIXED(0,0), /* src_x, src_y */
+			      IGT_FIXED(0,0), IGT_FIXED(0,0)); /* src_w, src_h */
+
+	if (ret && plane->type != DRM_PLANE_TYPE_PRIMARY)
+		return ret;
+
+	/* For primary plane, fall back to disabling the crtc. */
+	if (ret) {
+		ret = drmModeSetCrtc(pipe->display->drm_fd,
+				     pipe->crtc_id, 0, 0, 0, NULL, 0, NULL);
+
+		if (ret)
+			return ret;
+	}
+
+	/* and finally, set rotation property. */
+	return igt_plane_set_property(plane, plane->props[IGT_PLANE_ROTATION],
+				      plane->values[IGT_PLANE_ROTATION]);
+}
 
 /*
  * Commit position and fb changes to a plane.  The value of @s will determine
@@ -2361,6 +2407,14 @@ static int igt_plane_commit(igt_plane_t *plane,
 			    enum igt_commit_style s,
 			    bool fail_on_error)
 {
+	if (pipe->display->first_commit || (s == COMMIT_UNIVERSAL &&
+	     igt_plane_is_prop_changed(plane, IGT_PLANE_ROTATION))) {
+		int ret;
+
+		ret = igt_plane_fixup_rotation(plane, pipe);
+		CHECK_RETURN(ret, fail_on_error);
+	}
+
 	if (plane->type == DRM_PLANE_TYPE_CURSOR && s == COMMIT_LEGACY) {
 		return igt_cursor_commit_legacy(plane, pipe, fail_on_error);
 	} else if (plane->type == DRM_PLANE_TYPE_PRIMARY && s == COMMIT_LEGACY) {
@@ -2783,6 +2837,9 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 				    !(plane->type == DRM_PLANE_TYPE_PRIMARY ||
 				      plane->type == DRM_PLANE_TYPE_CURSOR))
 					plane->changed &= ~LEGACY_PLANE_COMMIT_MASK;
+
+				if (display->first_commit)
+					igt_plane_clear_prop_changed(plane, IGT_PLANE_ROTATION);
 			}
 		}
 	}
@@ -2796,6 +2853,8 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 			/* no modeset in universal commit, no change to crtc. */
 			output->changed &= 1 << IGT_CONNECTOR_CRTC_ID;
 	}
+
+	display->first_commit = false;
 }
 
 /*
