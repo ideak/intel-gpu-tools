@@ -106,11 +106,11 @@ static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 		return 77;
 
 	all_nengine = 0;
-	for (ring = 1; ring < 16; ring++) {
+	for (unsigned r = 1; r < 16; r++) {
 		execbuf.flags &= ~ENGINE_FLAGS;
-		execbuf.flags |= ring;
+		execbuf.flags |= r;
 		if (__gem_execbuf(fd, &execbuf) == 0)
-			all_engines[all_nengine++] = ring;
+			all_engines[all_nengine++] = r;
 	}
 
 	if (ring == -1) {
