@@ -46,7 +46,7 @@ int verbosity_level = 3; /* by default capture logs at max verbosity */
 uint32_t produced, consumed;
 uint64_t total_bytes_written;
 int num_buffers = NUM_SUBBUFS;
-int relay_fd, drm_fd, outfile_fd = -1;
+int relay_fd, outfile_fd = -1;
 uint32_t test_duration, max_filesize;
 pthread_cond_t underflow_cond, overflow_cond;
 bool stop_logging, discard_oldlogs, capturing_stopped;
@@ -58,7 +58,7 @@ static void guc_log_control(bool enable_logging)
 	uint64_t val;
 	int ret;
 
-	control_fd = igt_debugfs_open(drm_fd, CONTROL_FILE_NAME, O_WRONLY);
+	control_fd = igt_debugfs_open(-1, CONTROL_FILE_NAME, O_WRONLY);
 	igt_assert_f(control_fd >= 0, "couldn't open the guc log control file\n");
 
 	val = enable_logging ? ((verbosity_level << 4) | 0x1) : 0;
@@ -227,7 +227,7 @@ static void init_flusher_thread(void)
 
 static void open_relay_file(void)
 {
-	relay_fd = igt_debugfs_open(drm_fd, RELAY_FILE_NAME, O_RDONLY);
+	relay_fd = igt_debugfs_open(-1, RELAY_FILE_NAME, O_RDONLY);
 	igt_assert_f(relay_fd >= 0, "couldn't open the guc log file\n");
 
 	/* Purge the old/boot-time logs from the relay buffer.
@@ -373,9 +373,6 @@ int main(int argc, char **argv)
 
 	process_command_line(argc, argv);
 
-	/* Just to make sure we open the right debugfs files */
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
-
 	init_main_thread();
 
 	/* Use a separate thread for flushing the logs to a file on disk.
@@ -436,6 +433,5 @@ int main(int argc, char **argv)
 	free(read_buffer);
 	close(relay_fd);
 	close(outfile_fd);
-	close(drm_fd);
 	igt_exit();
 }

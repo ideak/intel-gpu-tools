@@ -150,18 +150,21 @@ char *igt_debugfs_path(int device, char *path, int pathlen)
 	const char *debugfs_root;
 	int idx;
 
-	if (fstat(device, &st)) {
-		igt_debug("Couldn't stat FD for DRM device: %s\n", strerror(errno));
-		return NULL;
-	}
-
-	if (!S_ISCHR(st.st_mode)) {
-		igt_debug("FD for DRM device not a char device!\n");
-		return NULL;
-	}
-
 	debugfs_root = igt_debugfs_mount();
 	igt_assert(debugfs_root);
+
+	memset(&st, 0, sizeof(st));
+	if (device != -1) { /* if no fd, we presume we want dri/0 */
+		if (fstat(device, &st)) {
+			igt_debug("Couldn't stat FD for DRM device: %m\n");
+			return NULL;
+		}
+
+		if (!S_ISCHR(st.st_mode)) {
+			igt_debug("FD for DRM device not a char device!\n");
+			return NULL;
+		}
+	}
 
 	idx = minor(st.st_rdev);
 	snprintf(path, pathlen, "%s/dri/%d/name", debugfs_root, idx);

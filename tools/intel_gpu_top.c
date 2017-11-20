@@ -409,7 +409,6 @@ usage(const char *appname)
 int main(int argc, char **argv)
 {
 	uint32_t devid;
-	int drm_fd;
 	struct pci_device *pci_dev;
 	struct ring render_ring = {
 		.name = "render",
@@ -510,11 +509,8 @@ int main(int argc, char **argv)
 		top_bits_sorted[i] = &top_bits[i];
 	}
 
-	/* Just to make sure we open the right debugfs files */
-	drm_fd = drm_open_driver(DRIVER_INTEL);
-
 	/* Grab access to the registers */
-	intel_register_access_init(pci_dev, 0, drm_fd);
+	intel_register_access_init(pci_dev, 0, -1);
 
 	ring_init(&render_ring);
 	if (IS_GEN4(devid) || IS_GEN5(devid))
@@ -717,6 +713,5 @@ int main(int argc, char **argv)
 	fclose(output);
 
 	intel_register_access_fini();
-	close(drm_fd);
 	return 0;
 }
