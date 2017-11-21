@@ -152,6 +152,19 @@ static int skl_max_planes(uint32_t d)
 		return 4;
 }
 
+static const char *skl_plane_name(int pipe, int plane)
+{
+	static char name[32];
+
+	if (plane == 0)
+		snprintf(name, sizeof(name), "CURSOR");
+	else
+		snprintf(name, sizeof(name), "PLANE_%1d%c",
+			 plane, pipe_name(pipe));
+
+	return name;
+}
+
 static const char *skl_wm_linetime_reg_name(int pipe)
 {
 	static char reg_name[32];
@@ -293,7 +306,11 @@ static void skl_wm_dump(void)
 		linetime = REG_DECODE1(wm_linetime[pipe], 0, 9);
 		printf("LINETIME: %d (%.3f usec)\n", linetime, linetime* 0.125f);
 
-		printf("LEVEL   CURSOR   PLANE_1   PLANE_2   PLANE_3   PLANE_4\n");
+		printf("LEVEL");
+		for (plane = 0; plane < num_planes; plane++)
+			printf("%10s", skl_plane_name(pipe, plane));
+		printf("\n");
+
 		for (level = 0; level < num_levels; level++) {
 			printf("%5d  ", level);
 			for (plane = 0; plane < num_planes; plane++) {
