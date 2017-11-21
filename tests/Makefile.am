@@ -29,12 +29,12 @@ endif
 TESTS_progs += testdisplay
 
 if BUILD_TESTS
-test-list.txt: Makefile.sources
+test-list.txt: Makefile
 	@echo TESTLIST > $@
 	@echo ${kernel_tests} >> $@
 	@echo END TESTLIST >> $@
 
-test-list-full.txt: Makefile.sources
+test-list-full.txt: Makefile
 	@echo TESTLIST > $@
 	@echo ${kernel_tests} ${extra_kernel_tests} >> $@
 	@echo END TESTLIST >> $@
