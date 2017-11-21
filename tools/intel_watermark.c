@@ -163,7 +163,7 @@ static void skl_wm_dump(void)
 	uint32_t wm_trans[num_pipes][max_planes];
 	uint32_t buf_cfg[num_pipes][max_planes];
 	uint32_t wm_linetime[num_pipes];
-	char reg_name[20];
+	char reg_name[32];
 
 	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
