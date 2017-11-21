@@ -152,9 +152,9 @@ test_plane_position_with_output(data_t *data,
 				enum pipe pipe,
 				int plane,
 				igt_output_t *output,
+				igt_crc_t *reference_crc,
 				unsigned int flags)
 {
-	test_position_t test = { .data = data };
 	igt_plane_t *primary, *sprite;
 	struct igt_fb primary_fb, sprite_fb;
 	drmModeModeInfo *mode;
@@ -162,10 +162,6 @@ test_plane_position_with_output(data_t *data,
 
 	igt_info("Testing connector %s using pipe %s plane %d\n",
 		 igt_output_name(output), kmstest_pipe_name(pipe), plane);
-
-	test_init(data, pipe);
-
-	test_grab_crc(data, output, pipe, &green, &test.reference_crc);
 
 	igt_output_set_pipe(output, pipe);
 
@@ -206,7 +202,7 @@ test_plane_position_with_output(data_t *data,
 	igt_pipe_crc_collect_crc(data->pipe_crc, &crc2);
 
 	if (flags & TEST_POSITION_FULLY_COVERED)
-		igt_assert_crc_equal(&test.reference_crc, &crc);
+		igt_assert_crc_equal(reference_crc, &crc);
 	else {
 		;/* FIXME: missing reference CRCs */
 	}
@@ -218,23 +214,29 @@ test_plane_position_with_output(data_t *data,
 
 	/* reset the constraint on the pipe */
 	igt_output_set_pipe(output, PIPE_ANY);
-
-	test_fini(data);
 }
 
 static void
-test_plane_position(data_t *data, enum pipe pipe, int plane,
-		    unsigned int flags)
+test_plane_position(data_t *data, enum pipe pipe, unsigned int flags)
 {
 	igt_output_t *output;
 	int connected_outs = 0;
 
-	igt_skip_on(pipe >= data->display.n_pipes);
-	igt_skip_on(plane >= data->display.pipes[pipe].n_planes);
-
 	for_each_valid_output_on_pipe(&data->display, pipe, output) {
-		test_plane_position_with_output(data, pipe, plane, output,
-						flags);
+		int n_planes = data->display.pipes[pipe].n_planes;
+		igt_crc_t reference_crc;
+
+		test_init(data, pipe);
+
+		test_grab_crc(data, output, pipe, &green, &reference_crc);
+
+		for (int plane = 1; plane < n_planes; plane++)
+			test_plane_position_with_output(data, pipe, plane,
+							output, &reference_crc,
+							flags);
+
+		test_fini(data);
+
 		connected_outs++;
 	}
 
@@ -373,27 +375,16 @@ run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 	}
 
 	igt_subtest_f("plane-position-covered-pipe-%s-planes",
-		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int plane = 1; plane < n_planes; plane++)
-			test_plane_position(data, pipe, plane,
-					    TEST_POSITION_FULLY_COVERED);
-	}
+		      kmstest_pipe_name(pipe))
+		test_plane_position(data, pipe, TEST_POSITION_FULLY_COVERED);
 
 	igt_subtest_f("plane-position-hole-pipe-%s-planes",
-		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int plane = 1; plane < n_planes; plane++)
-			test_plane_position(data, pipe, plane, 0);
-	}
+		      kmstest_pipe_name(pipe))
+		test_plane_position(data, pipe, 0);
 
 	igt_subtest_f("plane-position-hole-dpms-pipe-%s-planes",
-		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int plane = 1; plane < n_planes; plane++)
-			test_plane_position(data, pipe, plane,
-					    TEST_DPMS);
-	}
+		      kmstest_pipe_name(pipe))
+		test_plane_position(data, pipe, TEST_DPMS);
 
 	igt_subtest_f("plane-panning-top-left-pipe-%s-planes",
 		      kmstest_pipe_name(pipe)) {
