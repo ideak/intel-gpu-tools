@@ -248,7 +248,7 @@ static void skl_wm_dump(void)
 	}
 
 	for (pipe = 0; pipe < num_pipes; pipe++) {
-		printf("%-18s 0x%08x\t",
+		printf("%18s 0x%08x\t",
 		       skl_wm_linetime_reg_name(pipe),
 		       wm_linetime[pipe]);
 	}
@@ -260,7 +260,7 @@ static void skl_wm_dump(void)
 				if (plane >= skl_num_planes(devid, pipe))
 					break;
 
-				printf("%-18s 0x%08x\t" ,
+				printf("%18s 0x%08x\t" ,
 				       skl_wm_reg_name(pipe, plane, level),
 				       wm[level][pipe][plane]);
 			}
@@ -274,7 +274,7 @@ static void skl_wm_dump(void)
 			if (plane >= skl_num_planes(devid, pipe))
 				break;
 
-			printf("%-18s 0x%08x\t",
+			printf("%18s 0x%08x\t",
 			       skl_wm_trans_reg_name(pipe, plane),
 			       wm_trans[pipe][plane]);
 		}
@@ -287,7 +287,7 @@ static void skl_wm_dump(void)
 			if (plane >= skl_num_planes(devid, pipe))
 				break;
 
-			printf("%-18s 0x%08x\t",
+			printf("%18s 0x%08x\t",
 			       skl_buf_cfg_reg_name(pipe, plane),
 			       buf_cfg[pipe][plane]);
 		}
