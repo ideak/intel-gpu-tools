@@ -255,11 +255,6 @@ test_plane_position(data_t *data, enum pipe pipe, unsigned int flags)
  *   - The TEST_PANNING_BOTTOM_RIGHT test makes sure that with panning at
  *     (vdisplay, hdisplay) we do get the same CRC than the full blue fb.
  */
-typedef struct {
-	data_t *data;
-	igt_crc_t red_crc, blue_crc;
-} test_panning_t;
-
 static void
 create_fb_for_mode__panning(data_t *data, drmModeModeInfo *mode,
 			    struct igt_fb *fb /* out */)
@@ -299,9 +294,9 @@ test_plane_panning_with_output(data_t *data,
 			       enum pipe pipe,
 			       int plane,
 			       igt_output_t *output,
+			       igt_crc_t *red_crc, igt_crc_t *blue_crc,
 			       unsigned int flags)
 {
-	test_panning_t test = { .data = data };
 	igt_plane_t *primary;
 	struct igt_fb primary_fb;
 	drmModeModeInfo *mode;
@@ -309,11 +304,6 @@ test_plane_panning_with_output(data_t *data,
 
 	igt_info("Testing connector %s using pipe %s plane %d\n",
 		 igt_output_name(output), kmstest_pipe_name(pipe), plane);
-
-	test_init(data, pipe);
-
-	test_grab_crc(data, output, pipe, &red, &test.red_crc);
-	test_grab_crc(data, output, pipe, &blue, &test.blue_crc);
 
 	igt_output_set_pipe(output, pipe);
 
@@ -337,29 +327,41 @@ test_plane_panning_with_output(data_t *data,
 	igt_pipe_crc_collect_crc(data->pipe_crc, &crc);
 
 	if (flags & TEST_PANNING_TOP_LEFT)
-		igt_assert_crc_equal(&test.red_crc, &crc);
+		igt_assert_crc_equal(red_crc, &crc);
 	else
-		igt_assert_crc_equal(&test.blue_crc, &crc);
+		igt_assert_crc_equal(blue_crc, &crc);
 
 	igt_plane_set_fb(primary, NULL);
 
 	/* reset states to neutral values, assumed by other tests */
 	igt_output_set_pipe(output, PIPE_ANY);
 	igt_fb_set_position(&primary_fb, primary, 0, 0);
-
-	test_fini(data);
 }
 
 static void
-test_plane_panning(data_t *data, enum pipe pipe, int plane,
-		   unsigned int flags)
+test_plane_panning(data_t *data, enum pipe pipe, unsigned int flags)
 {
 	igt_output_t *output;
 	int connected_outs = 0;
 
 	for_each_valid_output_on_pipe(&data->display, pipe, output) {
-		test_plane_panning_with_output(data, pipe, plane, output,
-						flags);
+		int n_planes = data->display.pipes[pipe].n_planes;
+		igt_crc_t red_crc;
+		igt_crc_t blue_crc;
+
+		test_init(data, pipe);
+
+		test_grab_crc(data, output, pipe, &red, &red_crc);
+		test_grab_crc(data, output, pipe, &blue, &blue_crc);
+
+		for (int plane = 1; plane < n_planes; plane++)
+			test_plane_panning_with_output(data, pipe, plane,
+						       output,
+						       &red_crc, &blue_crc,
+						       flags);
+
+		test_fini(data);
+
 		connected_outs++;
 	}
 
@@ -387,28 +389,17 @@ run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 		test_plane_position(data, pipe, TEST_DPMS);
 
 	igt_subtest_f("plane-panning-top-left-pipe-%s-planes",
-		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int plane = 1; plane < n_planes; plane++)
-			test_plane_panning(data, pipe, plane, TEST_PANNING_TOP_LEFT);
-	}
+		      kmstest_pipe_name(pipe))
+		test_plane_panning(data, pipe, TEST_PANNING_TOP_LEFT);
 
 	igt_subtest_f("plane-panning-bottom-right-pipe-%s-planes",
-		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int plane = 1; plane < n_planes; plane++)
-			test_plane_panning(data, pipe, plane,
-					   TEST_PANNING_BOTTOM_RIGHT);
-	}
+		      kmstest_pipe_name(pipe))
+		test_plane_panning(data, pipe, TEST_PANNING_BOTTOM_RIGHT);
 
 	igt_subtest_f("plane-panning-bottom-right-suspend-pipe-%s-planes",
-		      kmstest_pipe_name(pipe)) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		for (int plane = 1; plane < n_planes; plane++)
-			test_plane_panning(data, pipe, plane,
-					   TEST_PANNING_BOTTOM_RIGHT |
-					   TEST_SUSPEND_RESUME);
-	}
+		      kmstest_pipe_name(pipe))
+		test_plane_panning(data, pipe, TEST_PANNING_BOTTOM_RIGHT |
+					       TEST_SUSPEND_RESUME);
 }
 
 
