@@ -740,7 +740,7 @@ static void init_gem_objects(struct overlay_context *ctx,
 static void show_gem_objects(struct overlay_context *ctx, struct overlay_gem_objects *go)
 {
 	struct gem_objects_comm *comm;
-	char buf[160];
+	char buf[310];
 	cairo_pattern_t *linear;
 	int x, y, y1, y2;
 
