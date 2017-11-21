@@ -312,54 +312,54 @@ static void skl_wm_dump(void)
 		printf("\n");
 
 		for (level = 0; level < num_levels; level++) {
-			printf("%5d  ", level);
+			printf("%5d", level);
 			for (plane = 0; plane < num_planes; plane++) {
 				blocks = REG_DECODE1(wm[level][pipe][plane], 0, 9);
 				lines = REG_DECODE1(wm[level][pipe][plane], 14, 5);
 				enable = REG_DECODE1(wm[level][pipe][plane], 31, 1);
 
-				printf("%3d%c", blocks, endis_ast(enable));
+				printf("%5d%c", blocks, endis_ast(enable));
 				if (!REG_DECODE1(wm[level][pipe][plane], 30, 1))
-					printf("(%2d)  ", lines);
+					printf("(%2d)", lines);
 				else
-					printf("(--)  ");
+					printf("(--)");
 			}
 			printf("\n");
 		}
 
-		printf("TRANS: ");
+		printf("TRANS");
 		for (plane = 0; plane < num_planes; plane++) {
 			blocks = REG_DECODE1(wm_trans[pipe][plane], 0, 9);
 			lines = REG_DECODE1(wm_trans[pipe][plane], 14, 5);
 			enable = REG_DECODE1(wm_trans[pipe][plane], 31, 1);
 
-			printf("%3d%c", blocks, endis_ast(enable));
+			printf("%5d%c", blocks, endis_ast(enable));
 			if (!REG_DECODE1(wm_trans[pipe][plane], 30, 1))
-				printf("(%2d)  ", lines);
+				printf("(%2d)", lines);
 			else
-				printf("(--)  ");
+				printf("(--)");
 		}
 
 		printf("\nDDB allocation:");
 
-		printf("\nstart ");
+		printf("\nstart");
 		for (plane = 0; plane < num_planes; plane++) {
 			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 10);
-			printf("%7d   ", start);
+			printf("%10d", start);
 		}
 
-		printf("\nend   ");
+		printf("\n  end");
 		for (plane = 0; plane < num_planes; plane++) {
 			end = REG_DECODE1(buf_cfg[pipe][plane], 16, 10);
-			printf("%7d   ", end);
+			printf("%10d", end);
 		}
 
-		printf("\nsize  ");
+		printf("\n size");
 		for (plane = 0; plane < num_planes; plane++) {
 			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 10);
 			end =  REG_DECODE1(buf_cfg[pipe][plane], 16, 10);
 			size = end - start + 1;
-			printf("%7d   ", (end == 0 && size == 1) ? 0 : size);
+			printf("%10d", (end == 0 && size == 1) ? 0 : size);
 		}
 
 		printf("\n\n\n");
