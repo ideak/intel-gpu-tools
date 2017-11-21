@@ -152,6 +152,57 @@ static int skl_max_planes(uint32_t d)
 		return 4;
 }
 
+static const char *skl_wm_linetime_reg_name(int pipe)
+{
+	static char reg_name[32];
+
+	snprintf(reg_name, sizeof(reg_name), "WM_LINETIME_%c",
+		 pipe_name(pipe));
+
+	return reg_name;
+}
+
+static const char *skl_wm_reg_name(int pipe, int plane, int level)
+{
+	static char reg_name[32];
+
+	if (plane == 0)
+		snprintf(reg_name, sizeof(reg_name), "CUR_WM_%c_%1d",
+			 pipe_name(pipe), level);
+	else
+		snprintf(reg_name, sizeof(reg_name), "PLANE_WM_%1d_%c_%1d",
+			 plane, pipe_name(pipe), level);
+
+	return reg_name;
+}
+
+static const char *skl_wm_trans_reg_name(int pipe, int plane)
+{
+	static char reg_name[32];
+
+	if (plane == 0)
+		snprintf(reg_name, sizeof(reg_name), "CUR_WM_TRANS_%c",
+			 pipe_name(pipe));
+	else
+		snprintf(reg_name, sizeof(reg_name), "PLANE_WM_TRANS_%1d_%c",
+			 plane, pipe_name(pipe));
+	return reg_name;
+}
+
+static const char *skl_buf_cfg_reg_name(int pipe, int plane)
+{
+	static char reg_name[32];
+
+	if (plane == 0)
+		snprintf(reg_name, sizeof(reg_name), "CUR_BUF_CFG_%c",
+			 pipe_name(pipe));
+	else
+		snprintf(reg_name, sizeof(reg_name), "PLANE_BUF_CFG_%1d_%c",
+			 plane, pipe_name(pipe));
+
+	return reg_name;
+}
+
 static void skl_wm_dump(void)
 {
 	int pipe, plane, level;
@@ -163,7 +214,6 @@ static void skl_wm_dump(void)
 	uint32_t wm_trans[num_pipes][max_planes];
 	uint32_t buf_cfg[num_pipes][max_planes];
 	uint32_t wm_linetime[num_pipes];
-	char reg_name[32];
 
 	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
@@ -185,9 +235,9 @@ static void skl_wm_dump(void)
 	}
 
 	for (pipe = 0; pipe < num_pipes; pipe++) {
-		snprintf(reg_name, sizeof(reg_name), "WM_LINETIME_%c",
-			 pipe_name(pipe));
-		printf("%-18s 0x%08x\t", reg_name, wm_linetime[pipe]);
+		printf("%-18s 0x%08x\t",
+		       skl_wm_linetime_reg_name(pipe),
+		       wm_linetime[pipe]);
 	}
 	printf("\n\n");
 
@@ -196,14 +246,10 @@ static void skl_wm_dump(void)
 			for (pipe = 0; pipe < num_pipes; pipe++) {
 				if (plane >= skl_num_planes(devid, pipe))
 					break;
-				if (plane == 0)
-					snprintf(reg_name, sizeof(reg_name), "CUR_WM_%c_%1d",
-						 pipe_name(pipe), level);
-				else
-					snprintf(reg_name, sizeof(reg_name), "PLANE_WM_%1d_%c_%1d",
-						 plane, pipe_name(pipe), level);
 
-				printf("%-18s 0x%08x\t" , reg_name, wm[level][pipe][plane]);
+				printf("%-18s 0x%08x\t" ,
+				       skl_wm_reg_name(pipe, plane, level),
+				       wm[level][pipe][plane]);
 			}
 			printf("\n");
 		}
@@ -214,14 +260,10 @@ static void skl_wm_dump(void)
 		for (pipe = 0; pipe < num_pipes; pipe++) {
 			if (plane >= skl_num_planes(devid, pipe))
 				break;
-			if (plane == 0)
-				snprintf(reg_name, sizeof(reg_name), "CUR_WM_TRANS_%c",
-					 pipe_name(pipe));
-			else
-				snprintf(reg_name, sizeof(reg_name), "PLANE_WM_TRANS_%1d_%c",
-					 plane, pipe_name(pipe));
 
-			printf("%-18s 0x%08x\t", reg_name, wm_trans[pipe][plane]);
+			printf("%-18s 0x%08x\t",
+			       skl_wm_trans_reg_name(pipe, plane),
+			       wm_trans[pipe][plane]);
 		}
 		printf("\n");
 	}
@@ -231,14 +273,10 @@ static void skl_wm_dump(void)
 		for (pipe = 0; pipe < num_pipes; pipe++) {
 			if (plane >= skl_num_planes(devid, pipe))
 				break;
-			if (plane == 0)
-				snprintf(reg_name, sizeof(reg_name), "CUR_BUF_CFG_%c",
-					 pipe_name(pipe));
-			else
-				snprintf(reg_name, sizeof(reg_name), "PLANE_BUF_CFG_%1d_%c",
-					 plane, pipe_name(pipe));
 
-			printf("%-18s 0x%08x\t", reg_name, buf_cfg[pipe][plane]);
+			printf("%-18s 0x%08x\t",
+			       skl_buf_cfg_reg_name(pipe, plane),
+			       buf_cfg[pipe][plane]);
 		}
 		printf("\n");
 	}
