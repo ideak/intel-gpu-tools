@@ -111,22 +111,17 @@ static void pmu_read_multi(int fd, unsigned int num, uint64_t *val)
  */
 static unsigned int measured_usleep(unsigned int usec)
 {
-	uint64_t slept = 0;
+	struct timespec ts = { };
+	unsigned int slept;
 
-	while (usec > 0) {
-		struct timespec start = { };
-		uint64_t this_sleep;
+	slept = igt_nsec_elapsed(&ts);
+	igt_assert(slept == 0);
+	do {
+		usleep(usec - slept);
+		slept = igt_nsec_elapsed(&ts) / 1000;
+	} while (slept < usec);
 
-		igt_nsec_elapsed(&start);
-		usleep(usec);
-		this_sleep = igt_nsec_elapsed(&start);
-		slept += this_sleep;
-		if (this_sleep > usec * 1000)
-			break;
-		usec -= this_sleep;
-	}
-
-	return slept;
+	return igt_nsec_elapsed(&ts);
 }
 
 static unsigned int e2ring(int gem_fd, const struct intel_execution_engine2 *e)
