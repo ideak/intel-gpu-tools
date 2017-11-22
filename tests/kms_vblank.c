@@ -120,7 +120,6 @@ static void run_test(data_t *data, int fd, void (*testfunc)(data_t *, int, int))
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
 	enum pipe p;
-	unsigned int valid_tests = 0;
 
 	for_each_pipe_with_valid_output(display, p, output) {
 		data->pipe = p;
@@ -161,11 +160,60 @@ static void run_test(data_t *data, int fd, void (*testfunc)(data_t *, int, int))
 
 		/* cleanup what prepare_crtc() has done */
 		cleanup_crtc(data, fd, output);
-		valid_tests++;
 	}
+}
 
-	igt_require_f(valid_tests,
-		      "no valid crtc/connector combinations found\n");
+static void crtc_id_subtest(data_t *data, int fd)
+{
+	igt_display_t *display = &data->display;
+	igt_output_t *output;
+	enum pipe p;
+
+	for_each_pipe_with_valid_output(display, p, output) {
+		struct drm_event_vblank buf;
+		const uint32_t pipe_id_flag = kmstest_get_vbl_flag(p);
+		unsigned crtc_id, expected_crtc_id;
+		uint64_t val;
+		union drm_wait_vblank vbl;
+
+		crtc_id = display->pipes[p].crtc_id;
+		if (drmGetCap(display->drm_fd, DRM_CAP_CRTC_IN_VBLANK_EVENT, &val) == 0)
+			expected_crtc_id = crtc_id;
+		else
+			expected_crtc_id = 0;
+
+		data->pipe = p;
+		prepare_crtc(data, fd, output);
+
+		memset(&vbl, 0, sizeof(vbl));
+		vbl.request.type = DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT;
+		vbl.request.type |= pipe_id_flag;
+		vbl.request.sequence = 1;
+		igt_assert_eq(wait_vblank(fd, &vbl), 0);
+
+		igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
+		igt_assert_eq(buf.crtc_id, expected_crtc_id);
+
+		do_or_die(drmModePageFlip(fd, crtc_id,
+					  data->primary_fb.fb_id,
+					  DRM_MODE_PAGE_FLIP_EVENT, NULL));
+
+		igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
+		igt_assert_eq(buf.crtc_id, expected_crtc_id);
+
+		if (display->is_atomic) {
+			igt_plane_t *primary = igt_output_get_plane(output, 0);
+
+			igt_plane_set_fb(primary, &data->primary_fb);
+			igt_display_commit_atomic(display, DRM_MODE_PAGE_FLIP_EVENT, NULL);
+
+			igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
+			igt_assert_eq(buf.crtc_id, expected_crtc_id);
+		}
+
+		cleanup_crtc(data, fd, output);
+		return;
+	}
 }
 
 static void accuracy(data_t *data, int fd, int nchildren)
@@ -298,7 +346,11 @@ igt_main
 		fd = drm_open_driver(DRIVER_ANY);
 		kmstest_set_vt_graphics_mode();
 		igt_display_init(&data.display, fd);
+		igt_display_require_output(&data.display);
 	}
+
+	igt_subtest("crtc-id")
+		crtc_id_subtest(&data, fd);
 
 	for (f = funcs; f->name; f++) {
 		for (m = modes; m->name; m++) {
