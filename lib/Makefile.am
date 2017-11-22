@@ -17,7 +17,8 @@ noinst_HEADERS = check-ndebug.h
 if BUILD_VC4
     libintel_tools_la_SOURCES += 	\
         igt_vc4.c			\
-        igt_vc4.h
+        igt_vc4.h			\
+        vc4_packet.h
 endif
 
 if !HAVE_LIBDRM_INTEL

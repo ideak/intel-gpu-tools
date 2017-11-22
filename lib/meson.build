@@ -48,6 +48,7 @@ lib_headers = [
 	'uwildmat/uwildmat.h',
 	'igt_kmod.h',
 	'igt_vc4.h',
+	'vc4_packet.h',
 ]
 
 lib_sources = [
