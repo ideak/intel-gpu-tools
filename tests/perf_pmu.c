@@ -99,10 +99,10 @@ static void pmu_read_multi(int fd, unsigned int num, uint64_t *val)
 }
 
 #define assert_within_epsilon(x, ref, tolerance) \
-	igt_assert_f((double)(x) <= (1.0 + tolerance) * (double)ref && \
-		     (double)(x) >= (1.0 - tolerance) * (double)ref, \
+	igt_assert_f((double)(x) <= (1.0 + (tolerance)) * (double)(ref) && \
+		     (double)(x) >= (1.0 - (tolerance)) * (double)(ref), \
 		     "'%s' != '%s' (%f not within %f%% tolerance of %f)\n",\
-		     #x, #ref, (double)x, tolerance * 100.0, (double)ref)
+		     #x, #ref, (double)(x), (tolerance) * 100.0, (double)ref)
 
 /*
  * Helper for cases where we assert on time spent sleeping (directly or
