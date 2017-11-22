@@ -498,75 +498,81 @@ event_wait(int gem_fd, const struct intel_execution_engine2 *e)
 {
 	struct drm_i915_gem_exec_object2 obj = { };
 	struct drm_i915_gem_execbuffer2 eb = { };
-	data_t data;
-	igt_display_t *display = &data.display;
 	const uint32_t DERRMR = 0x44050;
+	const uint32_t FORCEWAKE_MT = 0xa188;
 	unsigned int valid_tests = 0;
-	uint32_t batch[8], *b;
+	uint32_t batch[16], *b;
+	uint16_t devid;
 	igt_output_t *output;
-	uint32_t bb_handle;
-	uint32_t reg;
+	data_t data;
 	enum pipe p;
 	int fd;
 
-	igt_require(intel_gen(intel_get_drm_devid(gem_fd)) >= 6);
-	igt_require(intel_register_access_init(intel_get_pci_device(),
-					       false, gem_fd) == 0);
+	devid = intel_get_drm_devid(gem_fd);
+	igt_require(intel_gen(devid) >= 7);
+	igt_skip_on(IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid));
+
+	kmstest_set_vt_graphics_mode();
+	igt_display_init(&data.display, gem_fd);
 
 	/**
 	 * We will use the display to render event forwarind so need to
 	 * program the DERRMR register and restore it at exit.
+	 * Note we assume that the default/desired value for DERRMR will always
+	 * be ~0u (all routing disable). To be fancy, we could do a SRM of the
+	 * reg beforehand and then LRM at the end.
 	 *
 	 * We will emit a MI_WAIT_FOR_EVENT listening for vblank events,
 	 * have a background helper to indirectly enable vblank irqs, and
 	 * listen to the recorded time spent in engine wait state as reported
 	 * by the PMU.
 	 */
-	reg = intel_register_read(DERRMR);
-
-	kmstest_set_vt_graphics_mode();
-	igt_display_init(&data.display, gem_fd);
-
-	bb_handle = gem_create(gem_fd, 4096);
+	obj.handle = gem_create(gem_fd, 4096);
 
 	b = batch;
 	*b++ = MI_LOAD_REGISTER_IMM;
-	*b++ = DERRMR;
-	*b++ = reg & ~((1 << 3) | (1 << 11) | (1 << 21));
-	*b++ = MI_WAIT_FOR_EVENT | MI_WAIT_FOR_PIPE_A_VBLANK;
+	*b++ = FORCEWAKE_MT;
+	*b++ = 2 << 16 | 2;
 	*b++ = MI_LOAD_REGISTER_IMM;
 	*b++ = DERRMR;
-	*b++ = reg;
+	*b++ = ~0u;
+	*b++ = MI_WAIT_FOR_EVENT;
+	*b++ = MI_LOAD_REGISTER_IMM;
+	*b++ = DERRMR;
+	*b++ = ~0u;
+	*b++ = MI_LOAD_REGISTER_IMM;
+	*b++ = FORCEWAKE_MT;
+	*b++ = 2 << 16;
 	*b++ = MI_BATCH_BUFFER_END;
-
-	obj.handle = bb_handle;
 
 	eb.buffer_count = 1;
 	eb.buffers_ptr = to_user_pointer(&obj);
 	eb.flags = e2ring(gem_fd, e) | I915_EXEC_SECURE;
 
-	for_each_pipe_with_valid_output(display, p, output) {
+	for_each_pipe_with_valid_output(&data.display, p, output) {
 		struct igt_helper_process waiter = { };
 		const unsigned int frames = 3;
-		unsigned int frame;
 		uint64_t val[2];
 
-		batch[3] = MI_WAIT_FOR_EVENT;
+		batch[6] = MI_WAIT_FOR_EVENT;
 		switch (p) {
 		case PIPE_A:
-			batch[3] |= MI_WAIT_FOR_PIPE_A_VBLANK;
+			batch[6] |= MI_WAIT_FOR_PIPE_A_VBLANK;
+			batch[5] = ~(1 << 3);
 			break;
 		case PIPE_B:
-			batch[3] |= MI_WAIT_FOR_PIPE_B_VBLANK;
+			batch[6] |= MI_WAIT_FOR_PIPE_B_VBLANK;
+			batch[5] = ~(1 << 11);
 			break;
 		case PIPE_C:
-			batch[3] |= MI_WAIT_FOR_PIPE_C_VBLANK;
+			batch[6] |= MI_WAIT_FOR_PIPE_C_VBLANK;
+			batch[5] = ~(1 << 21);
 			break;
 		default:
 			continue;
 		}
 
-		gem_write(gem_fd, bb_handle, 0, batch, sizeof(batch));
+		gem_write(gem_fd, obj.handle, 0, batch, sizeof(batch));
 
 		data.pipe = p;
 		prepare_crtc(&data, gem_fd, output);
@@ -589,9 +595,9 @@ event_wait(int gem_fd, const struct intel_execution_engine2 *e)
 			}
 		}
 
-		for (frame = 0; frame < frames; frame++) {
+		for (unsigned int frame = 0; frame < frames; frame++) {
 			gem_execbuf(gem_fd, &eb);
-			gem_sync(gem_fd, bb_handle);
+			gem_sync(gem_fd, obj.handle);
 		}
 
 		igt_stop_helper(&waiter);
@@ -606,9 +612,7 @@ event_wait(int gem_fd, const struct intel_execution_engine2 *e)
 		igt_assert(val[1] - val[0] > 0);
 	}
 
-	gem_close(gem_fd, bb_handle);
-
-	intel_register_access_fini();
+	gem_close(gem_fd, obj.handle);
 
 	igt_require_f(valid_tests,
 		      "no valid crtc/connector combinations found\n");
