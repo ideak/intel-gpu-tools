@@ -44,7 +44,7 @@
 IGT_TEST_DESCRIPTION("Test the i915 pmu perf interface");
 
 const double tolerance = 0.05f;
-const unsigned long batch_duration_ns = 100e6;
+const unsigned long batch_duration_ns = 500e6;
 
 static int open_pmu(uint64_t config)
 {
