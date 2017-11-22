@@ -674,6 +674,7 @@ do { \
 	attr.config = I915_PMU_ENGINE_BUSY(I915_ENGINE_CLASS_RENDER, 0); \
 	attr.type = i915_type_id(); \
 	igt_assert(attr.type != 0); \
+	errno = 0; \
 } while(0)
 
 	ATTR_INIT();
