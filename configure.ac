@@ -413,6 +413,8 @@ AC_CONFIG_FILES([
 		 tools/Makefile
 		 tools/null_state_gen/Makefile
 		 tools/registers/Makefile
+		 include/Makefile
+		 include/drm-uapi/Makefile
 		 debugger/Makefile
 		 debugger/system_routine/Makefile
 		 assembler/Makefile

@@ -13,7 +13,8 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/include/drm-uapi \
 	-I$(top_srcdir)/lib
 
-AM_CFLAGS = $(DRM_CFLAGS) $(CWARNFLAGS) $(CAIRO_CFLAGS) $(LIBUNWIND_CFLAGS) \
+AM_CFLAGS = -I$(top_srcdir)/include/drm-uapi \
+	    $(DRM_CFLAGS) $(CWARNFLAGS) $(CAIRO_CFLAGS) $(LIBUNWIND_CFLAGS) \
 	    $(WERROR_CFLAGS) -D_GNU_SOURCE
 LDADD = $(top_builddir)/lib/libintel_tools.la
 
