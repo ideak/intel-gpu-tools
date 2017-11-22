@@ -928,6 +928,8 @@ test_frequency(int gem_fd)
 	min_freq = igt_sysfs_get_u32(sysfs, "gt_RPn_freq_mhz");
 	max_freq = igt_sysfs_get_u32(sysfs, "gt_RP0_freq_mhz");
 	boost_freq = igt_sysfs_get_u32(sysfs, "gt_boost_freq_mhz");
+	igt_info("Frequency: min=%u, max=%u, boost=%u MHz\n",
+		 min_freq, max_freq, boost_freq);
 	igt_require(min_freq > 0 && max_freq > 0 && boost_freq > 0);
 	igt_require(max_freq > min_freq);
 	igt_require(boost_freq > min_freq);
@@ -938,6 +940,8 @@ test_frequency(int gem_fd)
 	/*
 	 * Set GPU to min frequency and read PMU counters.
 	 */
+	igt_require(igt_sysfs_set_u32(sysfs, "gt_min_freq_mhz", min_freq));
+	igt_require(igt_sysfs_get_u32(sysfs, "gt_min_freq_mhz") == min_freq);
 	igt_require(igt_sysfs_set_u32(sysfs, "gt_max_freq_mhz", min_freq));
 	igt_require(igt_sysfs_get_u32(sysfs, "gt_max_freq_mhz") == min_freq);
 	igt_require(igt_sysfs_set_u32(sysfs, "gt_boost_freq_mhz", min_freq));
