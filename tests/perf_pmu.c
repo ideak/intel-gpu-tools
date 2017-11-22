@@ -661,7 +661,6 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 static void invalid_init(void)
 {
 	struct perf_event_attr attr;
-	int pid, cpu;
 
 #define ATTR_INIT() \
 do { \
@@ -674,21 +673,15 @@ do { \
 
 	ATTR_INIT();
 	attr.sample_period = 100;
-	pid = -1;
-	cpu = 0;
-	igt_assert_eq(perf_event_open(&attr, pid, cpu, -1, 0), -1);
+	igt_assert_eq(perf_event_open(&attr, -1, 0, -1, 0), -1);
 	igt_assert_eq(errno, EINVAL);
 
 	ATTR_INIT();
-	pid = 0;
-	cpu = 0;
-	igt_assert_eq(perf_event_open(&attr, pid, cpu, -1, 0), -1);
+	igt_assert_eq(perf_event_open(&attr, 0, 0, -1, 0), -1);
 	igt_assert_eq(errno, EINVAL);
 
 	ATTR_INIT();
-	pid = -1;
-	cpu = 1;
-	igt_assert_eq(perf_event_open(&attr, pid, cpu, -1, 0), -1);
+	igt_assert_eq(perf_event_open(&attr, -1, 1, -1, 0), -1);
 	igt_assert_eq(errno, ENODEV);
 }
 
