@@ -51,7 +51,7 @@ static int open_pmu(uint64_t config)
 	int fd;
 
 	fd = perf_i915_open(config);
-	igt_require(fd >= 0 || (fd < 0 && errno != ENODEV));
+	igt_skip_on(fd < 0 && errno == ENODEV);
 	igt_assert(fd >= 0);
 
 	return fd;
@@ -62,7 +62,7 @@ static int open_group(uint64_t config, int group)
 	int fd;
 
 	fd = perf_i915_open_group(config, group);
-	igt_require(fd >= 0 || (fd < 0 && errno != ENODEV));
+	igt_skip_on(fd < 0 && errno == ENODEV);
 	igt_assert(fd >= 0);
 
 	return fd;
