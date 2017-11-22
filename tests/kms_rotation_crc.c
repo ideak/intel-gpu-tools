@@ -32,6 +32,7 @@ typedef struct {
 	igt_display_t display;
 	struct igt_fb fb;
 	struct igt_fb fb_reference;
+	struct igt_fb fb_unrotated;
 	struct igt_fb fb_modeset;
 	struct igt_fb fb_flip;
 	igt_crc_t ref_crc;
@@ -43,7 +44,58 @@ typedef struct {
 	uint32_t override_fmt;
 	uint64_t override_tiling;
 	bool flips;
+	int devid;
 } data_t;
+
+typedef struct {
+	float r;
+	float g;
+	float b;
+} rgb_color_t;
+
+static void set_color(rgb_color_t *color, float r, float g, float b)
+{
+	color->r = r;
+	color->g = g;
+	color->b = b;
+}
+
+static void rotate_colors(rgb_color_t *tl, rgb_color_t *tr, rgb_color_t *br,
+			  rgb_color_t *bl, igt_rotation_t rotation)
+{
+	rgb_color_t bl_tmp, br_tmp, tl_tmp, tr_tmp;
+
+	if (rotation & IGT_REFLECT_X) {
+		igt_swap(*tl, *tr);
+		igt_swap(*bl, *br);
+	}
+
+	if (rotation & IGT_ROTATION_90) {
+		bl_tmp = *bl;
+		br_tmp = *br;
+		tl_tmp = *tl;
+		tr_tmp = *tr;
+		*tl = tr_tmp;
+		*bl = tl_tmp;
+		*tr = br_tmp;
+		*br = bl_tmp;
+	} else if (rotation & IGT_ROTATION_180) {
+		igt_swap(*tl, *br);
+		igt_swap(*tr, *bl);
+	} else if (rotation & IGT_ROTATION_270) {
+		bl_tmp = *bl;
+		br_tmp = *br;
+		tl_tmp = *tl;
+		tr_tmp = *tr;
+		*tl = bl_tmp;
+		*bl = br_tmp;
+		*tr = tl_tmp;
+		*br = tr_tmp;
+	}
+}
+
+#define RGB_COLOR(color) \
+	color.r, color.g, color.b
 
 static void
 paint_squares(data_t *data, igt_rotation_t rotation,
@@ -52,35 +104,21 @@ paint_squares(data_t *data, igt_rotation_t rotation,
 	cairo_t *cr;
 	unsigned int w = fb->width;
 	unsigned int h = fb->height;
+	rgb_color_t tl, tr, bl, br;
 
 	cr = igt_get_cairo_ctx(data->gfx_fd, fb);
 
-	if (rotation == IGT_ROTATION_180) {
-		cairo_translate(cr, w, h);
-		cairo_rotate(cr, M_PI);
-	}
+	set_color(&tl, o, 0.0f, 0.0f);
+	set_color(&tr, 0.0f, o, 0.0f);
+	set_color(&br, o, o, o);
+	set_color(&bl, 0.0f, 0.0f, o);
 
-	if (rotation == IGT_ROTATION_90) {
-		/* Paint 4 squares with width == height in Green, White,
-		Blue, Red Clockwise order to look like 270 degree rotated*/
-		igt_paint_color(cr, 0, 0, w / 2, h / 2, 0.0, o, 0.0);
-		igt_paint_color(cr, w / 2, 0, w / 2, h / 2, o, o, o);
-		igt_paint_color(cr, 0, h / 2, w / 2, h / 2, o, 0.0, 0.0);
-		igt_paint_color(cr, w / 2, h / 2, w / 2, h / 2, 0.0, 0.0, o);
-	} else if (rotation == IGT_ROTATION_270) {
-		/* Paint 4 squares with width == height in Blue, Red,
-		Green, White Clockwise order to look like 90 degree rotated*/
-		igt_paint_color(cr, 0, 0, w / 2, h / 2, 0.0, 0.0, o);
-		igt_paint_color(cr, w / 2, 0, w / 2, h / 2, o, 0.0, 0.0);
-		igt_paint_color(cr, 0, h / 2, w / 2, h / 2, o, o, o);
-		igt_paint_color(cr, w / 2, h / 2, w / 2, h / 2, 0.0, o, 0.0);
-	} else {
-		/* Paint with 4 squares of Red, Green, White, Blue Clockwise */
-		igt_paint_color(cr, 0, 0, w / 2, h / 2, o, 0.0, 0.0);
-		igt_paint_color(cr, w / 2, 0, w / 2, h / 2, 0.0, o, 0.0);
-		igt_paint_color(cr, 0, h / 2, w / 2, h / 2, 0.0, 0.0, o);
-		igt_paint_color(cr, w / 2, h / 2, w / 2, h / 2, o, o, o);
-	}
+	rotate_colors(&tl, &tr, &br, &bl, rotation);
+
+	igt_paint_color(cr, 0, 0, w / 2, h / 2, RGB_COLOR(tl));
+	igt_paint_color(cr, w / 2, 0, w / 2, h / 2, RGB_COLOR(tr));
+	igt_paint_color(cr, 0, h / 2, w / 2, h / 2, RGB_COLOR(bl));
+	igt_paint_color(cr, w / 2, h / 2, w / 2, h / 2, RGB_COLOR(br));
 
 	cairo_destroy(cr);
 }
@@ -141,6 +179,7 @@ static void remove_fbs(data_t *data)
 
 	igt_remove_fb(data->gfx_fd, &data->fb);
 	igt_remove_fb(data->gfx_fd, &data->fb_reference);
+	igt_remove_fb(data->gfx_fd, &data->fb_unrotated);
 
 	if (data->fb_flip.fb_id)
 		igt_remove_fb(data->gfx_fd, &data->fb_flip);
@@ -212,16 +251,11 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	 * For 90/270, we will use create smaller fb so that the rotated
 	 * frame can fit in
 	 */
-	if (data->rotation == IGT_ROTATION_90 ||
-	    data->rotation == IGT_ROTATION_270) {
+	if (data->rotation & (IGT_ROTATION_90 | IGT_ROTATION_270)) {
 		tiling = data->override_tiling ?: LOCAL_I915_FORMAT_MOD_Y_TILED;
 
 		igt_swap(w, h);
 	}
-
-	igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling, &data->fb);
-
-	igt_plane_set_rotation(plane, IGT_ROTATION_0);
 
 	/*
 	 * Create a reference software rotated flip framebuffer.
@@ -255,8 +289,20 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
 
 	/*
+	 * Prepare the non-rotated reference fb.
+	 */
+	igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format, tiling, &data->fb_unrotated);
+	paint_squares(data, IGT_ROTATION_0, &data->fb_unrotated, 1.0);
+	igt_plane_set_fb(plane, &data->fb_unrotated);
+	igt_plane_set_rotation(plane, IGT_ROTATION_0);
+	if (plane->type != DRM_PLANE_TYPE_CURSOR)
+		igt_plane_set_position(plane, data->pos_x, data->pos_y);
+	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
+
+	/*
 	 * Prepare the plane with an non-rotated fb let the hw rotate it.
 	 */
+	igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling, &data->fb);
 	paint_squares(data, IGT_ROTATION_0, &data->fb, 1.0);
 	igt_plane_set_fb(plane, &data->fb);
 
@@ -322,7 +368,7 @@ static void wait_for_pageflip(int fd)
 	igt_assert(drmHandleEvent(fd, &evctx) == 0);
 }
 
-static void test_plane_rotation(data_t *data, int plane_type)
+static void __test_plane_rotation(data_t *data, int plane_type, bool test_bad_format)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
@@ -348,6 +394,9 @@ static void test_plane_rotation(data_t *data, int plane_type)
 		igt_plane_t *plane;
 		int i;
 
+		if (IS_CHERRYVIEW(data->devid) && pipe != PIPE_B)
+			continue;
+
 		igt_output_set_pipe(output, pipe);
 
 		plane = igt_output_get_plane_type(output, plane_type);
@@ -369,14 +418,12 @@ static void test_plane_rotation(data_t *data, int plane_type)
 			igt_debug("Testing case %i on pipe %s\n", i, kmstest_pipe_name(pipe));
 			prepare_fbs(data, output, plane, i);
 
-			igt_display_commit2(display, commit);
-
 			igt_plane_set_rotation(plane, data->rotation);
-			if (data->rotation == IGT_ROTATION_90 || data->rotation == IGT_ROTATION_270)
+			if (data->rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
 				igt_plane_set_size(plane, data->fb.height, data->fb.width);
 
 			ret = igt_display_try_commit2(display, commit);
-			if (data->override_fmt || data->override_tiling) {
+			if (test_bad_format && (data->override_fmt || data->override_tiling)) {
 				igt_assert_eq(ret, -EINVAL);
 				continue;
 			}
@@ -419,6 +466,16 @@ static void test_plane_rotation(data_t *data, int plane_type)
 		cleanup_crtc(data, output, plane);
 	}
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
+}
+
+static inline void test_bad_plane_rotation(data_t *data, int plane_type)
+{
+	__test_plane_rotation(data, plane_type, true);
+}
+
+static inline void test_plane_rotation(data_t *data, int plane_type)
+{
+	__test_plane_rotation(data, plane_type, false);
 }
 
 static void test_plane_rotation_ytiled_obj(data_t *data,
@@ -613,12 +670,28 @@ static const char *plane_test_str(unsigned plane)
 static const char *rot_test_str(igt_rotation_t rot)
 {
 	switch (rot) {
+	case IGT_ROTATION_0:
+		return "0";
 	case IGT_ROTATION_90:
 		return "90";
 	case IGT_ROTATION_180:
 		return "180";
 	case IGT_ROTATION_270:
 		return "270";
+	default:
+		igt_assert(0);
+	}
+}
+
+static const char *tiling_test_str(uint64_t tiling)
+{
+	switch (tiling) {
+	case LOCAL_I915_FORMAT_MOD_X_TILED:
+		return "x-tiled";
+	case LOCAL_I915_FORMAT_MOD_Y_TILED:
+		return "y-tiled";
+	case LOCAL_I915_FORMAT_MOD_Yf_TILED:
+		return "yf-tiled";
 	default:
 		igt_assert(0);
 	}
@@ -637,7 +710,7 @@ igt_main
 	struct rot_subtest {
 		unsigned plane;
 		igt_rotation_t rot;
-		unsigned flips;
+		bool flips;
 	} *subtest, subtests[] = {
 		{ DRM_PLANE_TYPE_PRIMARY, IGT_ROTATION_90, 0 },
 		{ DRM_PLANE_TYPE_PRIMARY, IGT_ROTATION_180, 0 },
@@ -654,6 +727,35 @@ igt_main
 		{ DRM_PLANE_TYPE_CURSOR, IGT_ROTATION_180, 0 },
 		{ 0, 0, 0}
 	};
+
+	struct reflect_x {
+		uint64_t tiling;
+		igt_rotation_t rot;
+		bool flips;
+	} *reflect_x, reflect_x_subtests[] = {
+		{ LOCAL_I915_FORMAT_MOD_X_TILED, IGT_ROTATION_0, 0 },
+		{ LOCAL_I915_FORMAT_MOD_X_TILED, IGT_ROTATION_180, 0 },
+		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_0, 0 },
+		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_90, 0 },
+		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_180, 0 },
+		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_270, 0 },
+		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_0, 0 },
+		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_90, 0 },
+		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_180, 0 },
+		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_270, 0 },
+		{ LOCAL_I915_FORMAT_MOD_X_TILED, IGT_ROTATION_0, 1 },
+		{ LOCAL_I915_FORMAT_MOD_X_TILED, IGT_ROTATION_180, 1 },
+		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_0, 1 },
+		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_90, 1 },
+		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_180, 1 },
+		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_270, 1 },
+		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_0, 1 },
+		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_90, 1 },
+		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_180, 1 },
+		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_270, 1 },
+		{ 0, 0, 0 }
+	};
+
 	data_t data = {};
 	int gen = 0;
 
@@ -661,7 +763,8 @@ igt_main
 
 	igt_fixture {
 		data.gfx_fd = drm_open_driver_master(DRIVER_INTEL);
-		gen = intel_gen(intel_get_drm_devid(data.gfx_fd));
+		data.devid = intel_get_drm_devid(data.gfx_fd);
+		gen = intel_gen(data.devid);
 
 		kmstest_set_vt_graphics_mode();
 
@@ -698,7 +801,7 @@ igt_main
 		data.pos_y = 0;
 		data.rotation = IGT_ROTATION_90;
 		data.override_fmt = DRM_FORMAT_RGB565;
-		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
+		test_bad_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
 
 	igt_subtest_f("bad-tiling") {
@@ -706,7 +809,7 @@ igt_main
 		data.override_fmt = 0;
 		data.rotation = IGT_ROTATION_90;
 		data.override_tiling = LOCAL_DRM_FORMAT_MOD_NONE;
-		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
+		test_bad_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
 
 	igt_subtest_f("primary-rotation-90-Y-tiled") {
@@ -727,6 +830,21 @@ igt_main
 		}
 
 		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
+	}
+
+	for (reflect_x = reflect_x_subtests; reflect_x->tiling; reflect_x++) {
+		igt_subtest_f("primary-%s-reflect-x-%s%s",
+			      tiling_test_str(reflect_x->tiling),
+			      rot_test_str(reflect_x->rot),
+			      flip_test_str(reflect_x->flips)) {
+			igt_require(gen >= 10 ||
+				    (IS_CHERRYVIEW(data.devid) && reflect_x->rot == IGT_ROTATION_0
+				     && reflect_x->tiling == LOCAL_I915_FORMAT_MOD_X_TILED));
+			data.rotation = (IGT_REFLECT_X | reflect_x->rot);
+			data.override_tiling = reflect_x->tiling;
+			data.flips = reflect_x->flips;
+			test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
+		}
 	}
 
 	igt_subtest_f("exhaust-fences") {

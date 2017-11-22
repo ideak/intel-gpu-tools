@@ -3392,7 +3392,7 @@ void igt_fb_set_size(struct igt_fb *fb, igt_plane_t *plane,
 
 static const char *rotation_name(igt_rotation_t rotation)
 {
-	switch (rotation) {
+	switch (rotation & IGT_ROTATION_MASK) {
 	case IGT_ROTATION_0:
 		return "0°";
 	case IGT_ROTATION_90:

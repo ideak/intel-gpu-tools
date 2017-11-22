@@ -281,7 +281,12 @@ typedef enum {
 	IGT_ROTATION_90  = 1 << 1,
 	IGT_ROTATION_180 = 1 << 2,
 	IGT_ROTATION_270 = 1 << 3,
+	IGT_REFLECT_X    = 1 << 4,
+	IGT_REFLECT_Y    = 1 << 5,
 } igt_rotation_t;
+
+#define IGT_ROTATION_MASK \
+	(IGT_ROTATION_0 | IGT_ROTATION_90 | IGT_ROTATION_180 | IGT_ROTATION_270)
 
 typedef struct {
 	/*< private >*/
