@@ -996,7 +996,7 @@ test_rc6(int gem_fd)
 	fd = open_pmu(I915_PMU_RC6_RESIDENCY);
 
 	gem_quiescent_gpu(gem_fd);
-	usleep(1e6);
+	usleep(100e3); /* wait for the rc6 cycle counter to kick in */
 
 	/* Go idle and check full RC6. */
 	prev = pmu_read_single(fd);
@@ -1008,6 +1008,7 @@ test_rc6(int gem_fd)
 	/* Wake up device and check no RC6. */
 	fw = igt_open_forcewake_handle(gem_fd);
 	igt_assert(fw >= 0);
+	usleep(1e3); /* wait for the rc6 cycle counter to stop ticking */
 
 	prev = pmu_read_single(fd);
 	usleep(duration_ns / 1000);
@@ -1040,7 +1041,7 @@ test_rc6p(int gem_fd)
 	igt_require(num_pmu == 3);
 
 	gem_quiescent_gpu(gem_fd);
-	usleep(1e6);
+	usleep(100e3); /* wait for the rc6 cycle counter to kick in */
 
 	/* Go idle and check full RC6. */
 	pmu_read_multi(fd, num_pmu, prev);
@@ -1053,6 +1054,7 @@ test_rc6p(int gem_fd)
 	/* Wake up device and check no RC6. */
 	fw = igt_open_forcewake_handle(gem_fd);
 	igt_assert(fw >= 0);
+	usleep(1e3); /* wait for the rc6 cycle counter to stop ticking */
 
 	pmu_read_multi(fd, num_pmu, prev);
 	usleep(duration_ns / 1000);
