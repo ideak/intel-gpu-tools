@@ -880,10 +880,10 @@ test_interrupts(int gem_fd)
 	unsigned int i;
 	int fd;
 
+	fd = open_pmu(I915_PMU_INTERRUPTS);
+
 	cal = calibrate_nop(gem_fd, calibration_us);
 	sz = batch_len_us * cal / calibration_us;
-
-	fd = open_pmu(I915_PMU_INTERRUPTS);
 
 	gem_quiescent_gpu(gem_fd);
 
