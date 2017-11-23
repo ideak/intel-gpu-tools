@@ -40,6 +40,7 @@
 #include "igt_core.h"
 #include "igt_perf.h"
 #include "igt_sysfs.h"
+#include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Test the i915 pmu perf interface");
 
@@ -787,18 +788,18 @@ static void cpu_hotplug(int gem_fd)
 	assert_within_epsilon(val, ref, tolerance);
 }
 
-static unsigned long calibrate_nop(int fd, const unsigned int calibration_us)
+static unsigned long calibrate_nop(int fd, const uint64_t calibration_us)
 {
-	const unsigned int cal_min_us = calibration_us * 3;
+	const uint64_t cal_min_us = calibration_us * 3;
 	const unsigned int tolerance_pct = 10;
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	const unsigned int loops = 17;
 	struct drm_i915_gem_exec_object2 obj = {};
-	struct drm_i915_gem_execbuffer2 eb =
-		{ .buffer_count = 1, .buffers_ptr = (uintptr_t)&obj};
+	struct drm_i915_gem_execbuffer2 eb = {
+		.buffer_count = 1, .buffers_ptr = to_user_pointer(&obj),
+	};
 	struct timespec t_begin = { };
-	long size, last_size;
-	unsigned long ns;
+	uint64_t size, last_size, ns;
 
 	igt_nsec_elapsed(&t_begin);
 
@@ -828,81 +829,75 @@ static unsigned long calibrate_nop(int fd, const unsigned int calibration_us)
 	} while (igt_nsec_elapsed(&t_begin) / 1000 < cal_min_us ||
 		 abs(size - last_size) > (size * tolerance_pct / 100));
 
-	return size / sizeof(uint32_t);
-}
-
-static void exec_nop(int gem_fd, unsigned long sz)
-{
-	struct drm_i915_gem_exec_object2 obj = {};
-	struct drm_i915_gem_execbuffer2 eb =
-		{ .buffer_count = 1, .buffers_ptr = (uintptr_t)&obj};
-	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct pollfd pfd;
-	int fence;
-
-	sz = ALIGN(sz, sizeof(uint32_t));
-
-	obj.handle = gem_create(gem_fd, sz);
-	gem_write(gem_fd, obj.handle, sz - sizeof(bbe), &bbe, sizeof(bbe));
-
-	eb.flags = I915_EXEC_RENDER | I915_EXEC_FENCE_OUT;
-
-	gem_execbuf_wr(gem_fd, &eb);
-	fence = eb.rsvd2 >> 32;
-
-	/*
-	 * Poll on the output fence to ensure user interrupts will be
-	 * generated and listened to.
-	 */
-	pfd.fd = fence;
-	pfd.events = POLLIN;
-	igt_assert_eq(poll(&pfd, 1, -1), 1);
-
-	close(fence);
-	gem_close(gem_fd, obj.handle);
+	return size;
 }
 
 static void
 test_interrupts(int gem_fd)
 {
-	const unsigned int calibration_us = 250000;
-	const unsigned int batch_len_us = 100000;
-	const unsigned int batch_count = 3e6 / batch_len_us;
-	uint64_t idle, busy, prev;
-	unsigned long cal, sz;
-	unsigned int i;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	const unsigned int test_duration_ms = 1000;
+	struct drm_i915_gem_exec_object2 obj = { };
+	struct drm_i915_gem_execbuffer2 eb = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = I915_EXEC_FENCE_OUT,
+	};
+	unsigned long sz;
+	igt_spin_t *spin;
+	const int target = 30;
+	struct pollfd pfd;
+	uint64_t idle, busy;
 	int fd;
 
-	fd = open_pmu(I915_PMU_INTERRUPTS);
-
-	cal = calibrate_nop(gem_fd, calibration_us);
-	sz = batch_len_us * cal / calibration_us;
-
+	sz = calibrate_nop(gem_fd, test_duration_ms * 1000 / target);
 	gem_quiescent_gpu(gem_fd);
 
-	/* Wait for idle state. */
-	prev = pmu_read_single(fd);
-	idle = prev + 1;
-	while (idle != prev) {
-		usleep(1e6);
-		prev = idle;
-		idle = pmu_read_single(fd);
+	fd = open_pmu(I915_PMU_INTERRUPTS);
+	spin = igt_spin_batch_new(gem_fd, 0, 0, 0);
+
+	obj.handle = gem_create(gem_fd, sz);
+	gem_write(gem_fd, obj.handle, sz - sizeof(bbe), &bbe, sizeof(bbe));
+
+	pfd.events = POLLIN;
+	pfd.fd = -1;
+	for (int i = 0; i < target; i++) {
+		int new;
+
+		/* Merge all the fences together so we can wait on them all */
+		gem_execbuf_wr(gem_fd, &eb);
+		new = eb.rsvd2 >> 32;
+		if (pfd.fd == -1) {
+			pfd.fd = new;
+		} else {
+			int old = pfd.fd;
+			pfd.fd = sync_fence_merge(old, new);
+			close(old);
+			close(new);
+		}
 	}
 
-	igt_assert_eq(idle - prev, 0);
+	/* Wait for idle state. */
+	idle = pmu_read_single(fd);
+	do {
+		busy = idle;
+		usleep(1e3);
+		idle = pmu_read_single(fd);
+	} while (idle != busy);
 
-	/*
-	 * Send some no-op batches waiting on output fences to
-	 * ensure interrupts.
-	 */
-	for (i = 0; i < batch_count; i++)
-		exec_nop(gem_fd, sz);
+	/* Install the fences and enable signaling */
+	igt_assert_eq(poll(&pfd, 1, 10), 0);
+
+	/* Unplug the calibrated queue and wait for all the fences */
+	igt_spin_batch_free(gem_fd, spin);
+	igt_assert_eq(poll(&pfd, 1, 2 * test_duration_ms), 1);
+	close(pfd.fd);
 
 	/* Check at least as many interrupts has been generated. */
 	busy = pmu_read_single(fd) - idle;
 	close(fd);
 
-	igt_assert(busy >= batch_count);
+	igt_assert_lte(target, busy);
 }
 
 static void
