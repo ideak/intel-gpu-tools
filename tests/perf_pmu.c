@@ -416,7 +416,7 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e)
 
 	gem_execbuf(gem_fd, &eb);
 
-	slept = measured_usleep(100e3);
+	slept = measured_usleep(batch_duration_ns / 1000);
 
 	*obj_ptr = 1;
 
