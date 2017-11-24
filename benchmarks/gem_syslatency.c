@@ -219,7 +219,6 @@ static void *sys_thp_alloc(void *arg)
 static void bind_cpu(pthread_attr_t *attr, int cpu)
 {
 #ifdef __USE_GNU
-#ifndef ANDROID
 	cpu_set_t mask;
 
 	if (cpu == -1)
@@ -229,7 +228,6 @@ static void bind_cpu(pthread_attr_t *attr, int cpu)
 	CPU_SET(cpu, &mask);
 
 	pthread_attr_setaffinity_np(attr, sizeof(mask), &mask);
-#endif
 #endif
 }
 

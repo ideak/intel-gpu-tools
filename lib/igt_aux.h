@@ -45,12 +45,7 @@ extern int num_trash_bos;
 #define NSEC_PER_SEC (1000*USEC_PER_SEC)
 
 /* signal interrupt helpers */
-#ifdef ANDROID
-#include <unistd.h> /* on Android bionic has this implemented */
-#else
 #define gettid() syscall(__NR_gettid)
-#endif
-
 #define sigev_notify_thread_id _sigev_un._tid
 
 /* auxialiary igt helpers from igt_aux.c */

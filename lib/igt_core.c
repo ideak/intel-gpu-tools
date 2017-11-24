@@ -496,72 +496,6 @@ void __igt_fixture_end(void)
 }
 
 /*
- * Some of the IGT tests put quite a lot of pressure on memory and when
- * running on Android they are sometimes killed by the Android low memory killer.
- * This seems to be due to some incompatibility between the kswapd free memory
- * targets and the way the lowmemorykiller assesses free memory.
- * The low memory killer really isn't usefull in this context and has no
- * interaction with the gpu driver that we are testing, so the following
- * function is used to disable it by modifying one of its module parameters.
- * We still have the normal linux oom killer to protect the kernel.
- * Apparently it is also possible for the lowmemorykiller to get included
- * in some linux distributions; so rather than check for Android we directly
- * check for the existence of the module parameter we want to adjust.
- *
- * In future, if we can get the lowmemorykiller to play nicely then we can
- * remove this hack.
- */
-static void low_mem_killer_disable(bool disable)
-{
-	static const char* adj_fname="/sys/module/lowmemorykiller/parameters/adj";
-	static const char no_lowmem_killer[] = "9999";
-	int fd;
-	struct stat buf;
-	/* The following must persist across invocations */
-	static char prev_adj_scores[256];
-	static int adj_scores_len = 0;
-	static bool is_disabled = false;
-
-	/* capture the permissions bits for the lowmemkiller adj pseudo-file.
-	 * Bail out if the stat fails; it probably means that there is no
-	 * lowmemorykiller, but in any case we're doomed. */
-	if (stat(adj_fname, &buf)) {
-		igt_assert(errno == ENOENT);
-		return;
-	}
-
-	/* make sure the file can be read/written - by default it is write-only */
-	chmod(adj_fname, S_IRUSR | S_IWUSR);
-
-	if (disable && !is_disabled) {
-		/* read the current oom adj parameters for lowmemorykiller */
-		fd = open(adj_fname, O_RDWR);
-		igt_assert(fd != -1);
-		adj_scores_len = read(fd, (void*)prev_adj_scores, 255);
-		igt_assert(adj_scores_len > 0);
-
-		/* writing 9999 to this module parameter effectively diables the
-		 * low memory killer. This is not a real file, so we dont need to
-		 * seek to the start or truncate it */
-		igt_assert_eq(write(fd, no_lowmem_killer, sizeof(no_lowmem_killer)),
-			      sizeof(no_lowmem_killer));
-		close(fd);
-		is_disabled = true;
-	} else if (is_disabled) {
-		/* just re-enstate the original settings */
-		fd = open(adj_fname, O_WRONLY);
-		igt_assert(fd != -1);
-		igt_assert_eq(write(fd, prev_adj_scores, adj_scores_len),
-			      adj_scores_len);
-		close(fd);
-		is_disabled = false;
-	}
-
-	/* re-enstate the file permissions */
-	chmod(adj_fname, buf.st_mode);
-}
-
-/*
  * If the test takes out the machine, in addition to the usual dmesg
  * spam, the kernel may also emit a "death rattle" -- extra debug
  * information that is overkill for normal successful tests, but
@@ -587,7 +521,6 @@ bool igt_exit_called;
 static void common_exit_handler(int sig)
 {
 	if (!igt_only_list_subtests()) {
-		low_mem_killer_disable(false);
 		kick_fbcon(true);
 	}
 
@@ -879,7 +812,6 @@ out:
 
 		sync();
 		oom_adjust_for_doom();
-		low_mem_killer_disable(true);
 		ftrace_dump_on_oops(true);
 	}
 

@@ -28,14 +28,7 @@
 #ifndef __IGT_FB_H__
 #define __IGT_FB_H__
 
-/* cairo is assumed available on linux. On Android we check for ANDROID_HAS_CAIRO */
-#if (!defined(ANDROID)) || (defined(ANDROID) && ANDROID_HAS_CAIRO)
 #include <cairo.h>
-#else
-typedef struct _cairo_surface cairo_surface_t;
-typedef struct _cairo cairo_t;
-#endif
-
 #include <stddef.h>
 #include <stdbool.h>
 #include <drm_fourcc.h>
