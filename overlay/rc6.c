@@ -35,34 +35,12 @@
 
 #include "rc6.h"
 
-#define RC6	(1<<0)
-#define RC6p	(1<<1)
-#define RC6pp	(1<<2)
-
-static int perf_open(unsigned *flags)
-{
-	int fd;
-
-	fd = perf_i915_open_group(I915_PMU_RC6_RESIDENCY, -1);
-	if (fd < 0)
-		return -1;
-
-	*flags |= RC6;
-	if (perf_i915_open_group(I915_PMU_RC6p_RESIDENCY, fd) >= 0)
-		*flags |= RC6p;
-
-	if (perf_i915_open_group(I915_PMU_RC6pp_RESIDENCY, fd) >= 0)
-		*flags |= RC6pp;
-
-	return fd;
-}
-
 int rc6_init(struct rc6 *rc6)
 {
 	memset(rc6, 0, sizeof(*rc6));
 
-	rc6->fd = perf_open(&rc6->flags);
-	if (rc6->fd == -1) {
+	rc6->fd = perf_i915_open(I915_PMU_RC6_RESIDENCY);
+	if (rc6->fd < 0) {
 		struct stat st;
 		if (stat("/sys/class/drm/card0/power", &st) < 0)
 			return rc6->error = errno;
@@ -110,7 +88,7 @@ int rc6_update(struct rc6 *rc6)
 	if (rc6->error)
 		return rc6->error;
 
-	if (rc6->fd == -1) {
+	if (rc6->fd < 0) {
 		struct stat st;
 
 		if (stat("/sys/class/drm/card0/power/rc6_residency_ms", &st) < 0)
@@ -121,22 +99,13 @@ int rc6_update(struct rc6 *rc6)
 		s->rc6pp_residency = file_to_u64("/sys/class/drm/card0/power/rc6pp_residency_ms");
 		s->timestamp = clock_ms_to_u64();
 	} else {
-		uint64_t data[5];
-		int len;
+		uint64_t data[2];
 
-		len = read(rc6->fd, data, sizeof(data));
-		if (len < 0)
+		if (read(rc6->fd, data, sizeof(data)) < sizeof(data))
 			return rc6->error = errno;
 
-		s->timestamp = data[1] / (1000*1000);
-
-		len = 2;
-		if (rc6->flags & RC6)
-			s->rc6_residency = data[len++] / 1e6;
-		if (rc6->flags & RC6p)
-			s->rc6p_residency = data[len++] / 1e6;
-		if (rc6->flags & RC6pp)
-			s->rc6pp_residency = data[len++] / 1e6;
+		s->timestamp = data[1] / 1e6;
+		s->rc6_residency = data[0] / 1e6;
 	}
 
 	if (rc6->count == 1)

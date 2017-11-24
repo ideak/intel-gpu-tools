@@ -1019,53 +1019,6 @@ test_rc6(int gem_fd)
 	assert_within_epsilon(busy - prev, 0.0, tolerance);
 }
 
-static void
-test_rc6p(int gem_fd)
-{
-	int64_t duration_ns = 2e9;
-	unsigned int num_pmu = 1;
-	uint64_t idle[3], busy[3], prev[3];
-	unsigned int slept, i;
-	int fd, ret, fw;
-
-	fd = open_group(I915_PMU_RC6_RESIDENCY, -1);
-	ret = perf_i915_open_group(I915_PMU_RC6p_RESIDENCY, fd);
-	if (ret > 0) {
-		num_pmu++;
-		ret = perf_i915_open_group(I915_PMU_RC6pp_RESIDENCY, fd);
-		if (ret > 0)
-			num_pmu++;
-	}
-
-	igt_require(num_pmu == 3);
-
-	gem_quiescent_gpu(gem_fd);
-	usleep(100e3); /* wait for the rc6 cycle counter to kick in */
-
-	/* Go idle and check full RC6. */
-	pmu_read_multi(fd, num_pmu, prev);
-	slept = measured_usleep(duration_ns / 1000);
-	pmu_read_multi(fd, num_pmu, idle);
-
-	for (i = 0; i < num_pmu; i++)
-		assert_within_epsilon(idle[i] - prev[i], slept, tolerance);
-
-	/* Wake up device and check no RC6. */
-	fw = igt_open_forcewake_handle(gem_fd);
-	igt_assert(fw >= 0);
-	usleep(1e3); /* wait for the rc6 cycle counter to stop ticking */
-
-	pmu_read_multi(fd, num_pmu, prev);
-	usleep(duration_ns / 1000);
-	pmu_read_multi(fd, num_pmu, busy);
-
-	close(fw);
-	close(fd);
-
-	for (i = 0; i < num_pmu; i++)
-		assert_within_epsilon(busy[i] - prev[i], 0.0, tolerance);
-}
-
 igt_main
 {
 	const unsigned int num_other_metrics =
@@ -1204,12 +1157,6 @@ igt_main
 	 */
 	igt_subtest("rc6")
 		test_rc6(fd);
-
-	/**
-	 * Test RC6p residency reporting.
-	 */
-	igt_subtest("rc6p")
-		test_rc6p(fd);
 
 	/**
 	 * Check render nodes are counted.
