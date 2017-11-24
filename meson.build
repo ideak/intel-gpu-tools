@@ -37,10 +37,7 @@ libdrm_amdgpu = dependency('libdrm_amdgpu', required : false)
 
 pciaccess = dependency('pciaccess', version : '>=0.10')
 libkmod = dependency('libkmod')
-libprocps = dependency('libprocps', required : false)
-if libprocps.found()
-	config.set('HAVE_PROCPS', 1)
-endif
+libprocps = dependency('libprocps', required : true)
 
 valgrind = dependency('valgrind', required : false)
 if valgrind.found()

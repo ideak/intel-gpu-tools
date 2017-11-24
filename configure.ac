@@ -123,11 +123,7 @@ AC_SUBST(ASSEMBLER_WARN_CFLAGS)
 PKG_CHECK_MODULES(DRM, [libdrm >= 2.4.82])
 PKG_CHECK_MODULES(PCIACCESS, [pciaccess >= 0.10])
 PKG_CHECK_MODULES(KMOD, [libkmod])
-PKG_CHECK_MODULES(PROCPS, [libprocps], [procps=yes], [procps=no])
-AM_CONDITIONAL(HAVE_PROCPS, [test "x$procps" = xyes])
-if test x"$procps" = xyes; then
-	AC_DEFINE(HAVE_PROCPS,1,[Enable process managment without shelling out])
-fi
+PKG_CHECK_MODULES(PROCPS, [libprocps])
 PKG_CHECK_MODULES(VALGRIND, [valgrind], [have_valgrind=yes], [have_valgrind=no])
 
 if test x$have_valgrind = xyes; then

@@ -48,7 +48,9 @@
 #include <sys/utsname.h>
 #include <termios.h>
 #include <assert.h>
-#include <linux/limits.h>
+
+#include <proc/readproc.h>
+
 #include "drmtest.h"
 #include "i915_drm.h"
 #include "intel_chipset.h"
@@ -66,10 +68,6 @@
 
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>   /* for dirname() */
-#endif
-
-#ifdef HAVE_PROCPS
-#include <proc/readproc.h>
 #endif
 
 /**
@@ -1296,7 +1294,6 @@ void igt_set_module_param_int(const char *name, int val)
  * This function sends the signal @sig for a process found in process table
  * with name @comm.
  */
-#ifdef HAVE_PROCPS
 int igt_terminate_process(int sig, const char *comm)
 {
 	PROCTAB *proc;
@@ -1321,19 +1318,7 @@ int igt_terminate_process(int sig, const char *comm)
 	closeproc(proc);
 	return err;
 }
-#else
-#warning "No procps, using naive implementation of igt_terminate_process"
 
-int igt_terminate_process(int sig, const char *comm)
-{
-	char pkill_cmd[NAME_MAX];
-
-	snprintf(pkill_cmd, sizeof(pkill_cmd), "pkill -x -%d %s", sig, comm);
-	return system(pkill_cmd);
-}
-#endif
-
-#ifdef HAVE_PROCPS
 struct pinfo {
 	pid_t pid;
 	const char *comm;
@@ -1515,7 +1500,6 @@ __igt_lsof(const char *dir)
 
 	closeproc(proc);
 }
-#endif
 
 /**
  * igt_lsof: Lists information about files opened by processes.
@@ -1524,7 +1508,6 @@ __igt_lsof(const char *dir)
  * This function mimics (a restrictive form of) lsof(8), but also shows
  * information about opened fds.
  */
-#ifdef HAVE_PROCPS
 void
 igt_lsof(const char *dpath)
 {
@@ -1549,18 +1532,6 @@ igt_lsof(const char *dpath)
 
 	free(sanitized);
 }
-#else
-#warning "No procps, using naive implementation of igt_lsof"
-
-void
-igt_lsof(const char *dpath)
-{
-	char lsof_cmd[NAME_MAX];
-
-	snprintf(lsof_cmd, sizeof(lsof_cmd), "lsof +d %s", dpath);
-	system(lsof_cmd);
-}
-#endif
 
 static struct igt_siglatency {
 	timer_t timer;
