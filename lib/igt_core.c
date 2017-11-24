@@ -1231,6 +1231,16 @@ static bool run_under_gdb(void)
 		strncmp(basename(buf), "gdb", 3) == 0);
 }
 
+static void __write_stderr(const char *str, size_t len)
+{
+	igt_ignore_warn(write(STDERR_FILENO, str, len));
+}
+
+static void write_stderr(const char *str)
+{
+	__write_stderr(str, strlen(str));
+}
+
 #ifdef HAVE_LIBUNWIND
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
@@ -1405,16 +1415,6 @@ xprintf(const char *fmt, ...)
 	va_start(ap, fmt);
 	xprintfmt(fmt, ap);
 	va_end(ap);
-}
-
-static void __write_stderr(const char *str, size_t len)
-{
-	igt_ignore_warn(write(STDERR_FILENO, str, len));
-}
-
-static void write_stderr(const char *str)
-{
-	__write_stderr(str, strlen(str));
 }
 
 static void print_backtrace_sig_safe(void)
