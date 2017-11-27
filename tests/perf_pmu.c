@@ -638,9 +638,9 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 	fd[1] = open_pmu(config);
 
 	spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
-	igt_spin_batch_set_timeout(spin, batch_duration_ns);
+	igt_spin_batch_set_timeout(spin, 2 * batch_duration_ns);
 
-	slept = measured_usleep(batch_duration_ns / 3000);
+	slept = measured_usleep(batch_duration_ns / 1000);
 	val[1] = pmu_read_single(fd[1]);
 	close(fd[1]);
 
@@ -651,7 +651,7 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
 
-	assert_within_epsilon(val[0], batch_duration_ns, tolerance);
+	assert_within_epsilon(val[0], 2 * batch_duration_ns, tolerance);
 	assert_within_epsilon(val[1], slept, tolerance);
 }
 
