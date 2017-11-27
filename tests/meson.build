@@ -33,7 +33,6 @@ test_progs = [
 	'gem_cs_tlb',
 	'gem_ctx_bad_destroy',
 	'gem_ctx_bad_exec',
-	'gem_ctx_basic',
 	'gem_ctx_create',
 	'gem_ctx_exec',
 	'gem_ctx_param',
