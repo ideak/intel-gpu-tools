@@ -661,7 +661,8 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
  *  - sampling period is not supported
  *  - pid > 0 is not supported since we can't count per-process (we count
  *    per whole system)
- *  - cpu != 0 is not supported since i915 PMU exposes cpumask for CPU0
+ *  - cpu != 0 is not supported since i915 PMU only allows running on one cpu
+ *    and that is normally CPU0.
  */
 static void invalid_init(void)
 {
@@ -687,7 +688,7 @@ do { \
 
 	ATTR_INIT();
 	igt_assert_eq(perf_event_open(&attr, -1, 1, -1, 0), -1);
-	igt_assert_eq(errno, ENODEV);
+	igt_assert_eq(errno, EINVAL);
 }
 
 static void init_other(unsigned int i, bool valid)
