@@ -77,7 +77,6 @@ test_progs = [
 	'gem_gtt_cpu_tlb',
 	'gem_gtt_hog',
 	'gem_gtt_speed',
-	'gem_hangcheck_forcewake',
 	'gem_largeobject',
 	'gem_linear_blits',
 	'gem_lut_handle',
