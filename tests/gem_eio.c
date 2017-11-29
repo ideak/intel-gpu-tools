@@ -82,6 +82,15 @@ static void wedge_gpu(int fd)
 	igt_assert(i915_reset_control(true));
 }
 
+static void wedgeme(int drm_fd)
+{
+	int dir = igt_debugfs_dir(drm_fd);
+
+	igt_sysfs_set(dir, "i915_wedged", "-1");
+
+	close(dir);
+}
+
 static int __gem_throttle(int fd)
 {
 	int err = 0;
@@ -156,6 +165,18 @@ static void test_wait(int fd)
 	igt_post_hang_ring(fd, hang);
 	igt_require(i915_reset_control(true));
 
+	trigger_reset(fd);
+}
+
+static void test_suspend(int fd, int state)
+{
+	/* Check we can suspend when the driver is already wedged */
+	igt_require(i915_reset_control(false));
+	wedgeme(fd);
+
+	igt_system_suspend_autoresume(state, SUSPEND_TEST_DEVICES);
+
+	igt_require(i915_reset_control(true));
 	trigger_reset(fd);
 }
 
@@ -444,6 +465,12 @@ igt_main
 
 	igt_subtest("wait")
 		test_wait(fd);
+
+	igt_subtest("suspend")
+		test_suspend(fd, SUSPEND_STATE_MEM);
+
+	igt_subtest("hibernate")
+		test_suspend(fd, SUSPEND_STATE_DISK);
 
 	igt_subtest("in-flight")
 		test_inflight(fd);
