@@ -110,7 +110,6 @@ test_progs = [
 	'gem_ring_sync_copy',
 	'gem_ring_sync_loop',
 	'gem_ringfill',
-	'gem_seqno_wrap',
 	'gem_set_tiling_vs_blt',
 	'gem_set_tiling_vs_gtt',
 	'gem_set_tiling_vs_pwrite',
