@@ -89,7 +89,6 @@ test_progs = [
 	'gem_mocs_settings',
 	'gem_partial_pwrite_pread',
 	'gem_persistent_relocs',
-	'gem_pin',
 	'gem_pipe_control_store_loop',
 	'gem_ppgtt',
 	'gem_pread',
