@@ -258,8 +258,8 @@ static void test_inflight_suspend(int fd)
 		igt_assert(fence[n] != -1);
 	}
 
-	igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-				      SUSPEND_TEST_NONE);
+	igt_set_autoresume_delay(30);
+	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 
 	igt_post_hang_ring(fd, hang);
 
