@@ -253,12 +253,17 @@ static void
 gem_init(void)
 {
 	gem.drm_fd = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(gem.drm_fd);
 	gem.init = 1;
 
 	gem.devid = intel_get_drm_devid(gem.drm_fd);
 	gem.gen = intel_gen(gem.devid);
 	igt_require_f(gem.gen >= 8,
 		      "SSEU power gating only relevant for Gen8+");
+
+	gem.spinfunc = igt_get_media_spinfunc(gem.devid);
+	igt_require(gem.spinfunc);
+
 	gem.has_ppgtt = gem_uses_ppgtt(gem.drm_fd);
 
 	gem.bufmgr = drm_intel_bufmgr_gem_init(gem.drm_fd, 4096);
@@ -270,9 +275,6 @@ gem_init(void)
 	gem.batch = intel_batchbuffer_alloc(gem.bufmgr, gem.devid);
 	igt_assert(gem.batch);
 	gem.init = 3;
-
-	gem.spinfunc = igt_get_media_spinfunc(gem.devid);
-	igt_assert(gem.spinfunc);
 
 	gem.buf.stride = sizeof(uint32_t);
 	gem.buf.tiling = I915_TILING_NONE;
