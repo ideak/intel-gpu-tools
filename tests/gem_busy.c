@@ -21,10 +21,16 @@
  * IN THE SOFTWARE.
  */
 
+#include <sched.h>
+#include <signal.h>
+#include <sys/ioctl.h>
+
 #include "igt.h"
 #include "igt_rand.h"
+#include "igt_vgem.h"
 
 #define LOCAL_EXEC_NO_RELOC (1<<11)
+#define PAGE_ALIGN(x) ALIGN(x, 4096)
 
 /* Exercise the busy-ioctl, ensuring the ABI is never broken */
 IGT_TEST_DESCRIPTION("Basic check of busy-ioctl ABI.");
@@ -57,80 +63,6 @@ static void __gem_busy(int fd,
 
 	*write = busy.busy & 0xffff;
 	*read = busy.busy >> 16;
-}
-
-static uint32_t busy_blt(int fd)
-{
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	const int has_64bit_reloc = gen >= 8;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 object[2];
-	struct drm_i915_gem_relocation_entry reloc[200], *r;
-	uint32_t *map;
-	int factor = 100;
-	int i = 0;
-
-	memset(object, 0, sizeof(object));
-	object[0].handle = gem_create(fd, 1024*1024);
-	object[1].handle = gem_create(fd, 4096);
-
-	r = memset(reloc, 0, sizeof(reloc));
-	map = gem_mmap__cpu(fd, object[1].handle, 0, 4096, PROT_WRITE);
-	gem_set_domain(fd, object[1].handle,
-		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
-
-#define COPY_BLT_CMD		(2<<29|0x53<<22|0x6)
-#define BLT_WRITE_ALPHA		(1<<21)
-#define BLT_WRITE_RGB		(1<<20)
-	while (factor--) {
-		/* XY_SRC_COPY */
-		map[i++] = COPY_BLT_CMD | BLT_WRITE_ALPHA | BLT_WRITE_RGB;
-		if (has_64bit_reloc)
-			map[i-1] += 2;
-		map[i++] = 0xcc << 16 | 1 << 25 | 1 << 24 | (4*1024);
-		map[i++] = 0;
-		map[i++] = 256 << 16 | 1024;
-
-		r->offset = i * sizeof(uint32_t);
-		r->target_handle = object[0].handle;
-		r->read_domains = I915_GEM_DOMAIN_RENDER;
-		r->write_domain = I915_GEM_DOMAIN_RENDER;
-		r++;
-		map[i++] = 0;
-		if (has_64bit_reloc)
-			map[i++] = 0;
-
-		map[i++] = 0;
-		map[i++] = 4096;
-
-		r->offset = i * sizeof(uint32_t);
-		r->target_handle = object[0].handle;
-		r->read_domains = I915_GEM_DOMAIN_RENDER;
-		r->write_domain = 0;
-		r++;
-		map[i++] = 0;
-		if (has_64bit_reloc)
-			map[i++] = 0;
-	}
-	map[i++] = MI_BATCH_BUFFER_END;
-	igt_assert(i <= 4096/sizeof(uint32_t));
-	igt_assert(r - reloc <= ARRAY_SIZE(reloc));
-	munmap(map, 4096);
-
-	object[1].relocs_ptr = to_user_pointer(reloc);
-	object[1].relocation_count = r - reloc;
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(object);
-	execbuf.buffer_count = 2;
-	if (gen >= 6)
-		execbuf.flags = I915_EXEC_BLT;
-	gem_execbuf(fd, &execbuf);
-	igt_assert(gem_bo_busy(fd, object[0].handle));
-
-	igt_debug("Created busy handle %d\n", object[0].handle);
-	gem_close(fd, object[1].handle);
-	return object[0].handle;
 }
 
 static bool exec_noop(int fd,
@@ -167,6 +99,7 @@ static bool still_busy(int fd, uint32_t handle)
 static void semaphore(int fd, unsigned ring, uint32_t flags)
 {
 	uint32_t bbe = MI_BATCH_BUFFER_END;
+	igt_spin_t *spin;
 	uint32_t handle[3];
 	uint32_t read, write;
 	uint32_t active;
@@ -179,7 +112,8 @@ static void semaphore(int fd, unsigned ring, uint32_t flags)
 	gem_write(fd, handle[BATCH], 0, &bbe, sizeof(bbe));
 
 	/* Create a long running batch which we can use to hog the GPU */
-	handle[BUSY] = busy_blt(fd);
+	handle[BUSY] = gem_create(fd, 4096);
+	spin = igt_spin_batch_new(fd, 0, ring, handle[BUSY]);
 
 	/* Queue a batch after the busy, it should block and remain "busy" */
 	igt_assert(exec_noop(fd, handle, ring | flags, false));
@@ -208,6 +142,7 @@ static void semaphore(int fd, unsigned ring, uint32_t flags)
 
 	/* Check that our long batch was long enough */
 	igt_assert(still_busy(fd, handle[BUSY]));
+	igt_spin_batch_free(fd, spin);
 
 	/* And make sure it becomes idle again */
 	gem_sync(fd, handle[TEST]);
@@ -364,47 +299,146 @@ static void xchg_u32(void *array, unsigned i, unsigned j)
 	u32[j] = tmp;
 }
 
+struct cork {
+	int device;
+	uint32_t handle;
+	uint32_t fence;
+};
+
+static void plug(int fd, struct cork *c)
+{
+	struct vgem_bo bo;
+	int dmabuf;
+
+	c->device = drm_open_driver(DRIVER_VGEM);
+
+	bo.width = bo.height = 1;
+	bo.bpp = 4;
+	vgem_create(c->device, &bo);
+	c->fence = vgem_fence_attach(c->device, &bo, VGEM_FENCE_WRITE);
+
+	dmabuf = prime_handle_to_fd(c->device, bo.handle);
+	c->handle = prime_fd_to_handle(fd, dmabuf);
+	close(dmabuf);
+}
+
+static void unplug(struct cork *c)
+{
+	vgem_fence_signal(c->device, c->fence);
+	close(c->device);
+}
+
+static void alarm_handler(int sig)
+{
+}
+
+static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	return ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf);
+}
+
+static unsigned int measure_ring_size(int fd)
+{
+	struct sigaction sa = { .sa_handler = alarm_handler };
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned int count, last;
+	struct itimerval itv;
+	struct cork c;
+
+	memset(obj, 0, sizeof(obj));
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj + 1);
+	execbuf.buffer_count = 1;
+	gem_execbuf(fd, &execbuf);
+	gem_sync(fd, obj[1].handle);
+
+	plug(fd, &c);
+	obj[0].handle = c.handle;
+
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+
+	sigaction(SIGALRM, &sa, NULL);
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 100;
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 1000;
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	last = -1;
+	count = 0;
+	do {
+		if (__execbuf(fd, &execbuf) == 0) {
+			count++;
+			continue;
+		}
+
+		if (last == count)
+			break;
+
+		last = count;
+	} while (1);
+
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	unplug(&c);
+	gem_close(fd, obj[1].handle);
+	gem_quiescent_gpu(fd);
+
+	return count;
+}
+
 static void close_race(int fd)
 {
-#define N_HANDLES 4096
-	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
-	uint32_t *handles;
+	const unsigned int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	const unsigned int nhandles = measure_ring_size(fd) / 2;
+	unsigned int engines[16], nengine;
 	unsigned long *control;
-	unsigned long count = 0;
+	uint32_t *handles;
 	int i;
 
-	intel_require_memory(N_HANDLES, 4096, CHECK_RAM);
+	igt_require(ncpus > 1);
+	intel_require_memory(nhandles, 4096, CHECK_RAM);
 
-	/* One thread spawning work and randomly closing fd.
+	/*
+	 * One thread spawning work and randomly closing handles.
 	 * One background thread per cpu checking busyness.
 	 */
+
+	nengine = 0;
+	for_each_engine(fd, i)
+		engines[nengine++] = i;
+	igt_require(nengine);
 
 	control = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(control != MAP_FAILED);
 
-	handles = mmap(NULL, N_HANDLES*sizeof(*handles),
+	handles = mmap(NULL, PAGE_ALIGN(nhandles*sizeof(*handles)),
 		   PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(handles != MAP_FAILED);
 
-	for (i = 0; i < N_HANDLES; i++) {
-		handles[i] = gem_create(fd, 4096);
-	}
-
-	igt_fork(child, ncpus) {
+	igt_fork(child, ncpus - 1) {
 		struct drm_i915_gem_busy busy;
-		uint32_t indirection[N_HANDLES];
+		uint32_t indirection[nhandles];
+		unsigned long count = 0;
 
-		for (i = 0; i < N_HANDLES; i++)
+		for (i = 0; i < nhandles; i++)
 			indirection[i] = i;
 
 		hars_petruska_f54_1_random_perturb(child);
 
 		memset(&busy, 0, sizeof(busy));
 		do {
-			igt_permute_array(indirection, N_HANDLES, xchg_u32);
+			igt_permute_array(indirection, nhandles, xchg_u32);
 			__sync_synchronize();
-			for (i = 0; i < N_HANDLES; i++) {
-				busy.handle = indirection[handles[i]];
+			for (i = 0; i < nhandles; i++) {
+				busy.handle = handles[indirection[i]];
 				/* Check that the busy computation doesn't
 				 * explode in the face of random gem_close().
 				 */
@@ -414,30 +448,47 @@ static void close_race(int fd)
 		} while(*(volatile long *)control == 0);
 
 		igt_debug("child[%d]: count = %lu\n", child, count);
-		control[child] = count;
+		control[child + 1] = count;
 	}
 
-	igt_until_timeout(20) {
-		int j = rand() % N_HANDLES;
+	igt_fork(child, 1) {
+		struct sched_param rt = {.sched_priority = 99 };
+		igt_spin_t *spin[nhandles];
+		unsigned long count = 0;
 
-		gem_close(fd, handles[j]);
+		igt_assert(sched_setscheduler(getpid(), SCHED_RR, &rt) == 0);
+
+		for (i = 0; i < nhandles; i++) {
+			spin[i] = igt_spin_batch_new(fd, 0,
+						     engines[rand() % nengine], 0);
+			handles[i] = spin[i]->handle;
+		}
+
+		igt_until_timeout(20) {
+			for (i = 0; i < nhandles; i++) {
+				igt_spin_batch_free(fd, spin[i]);
+				spin[i] = igt_spin_batch_new(fd, 0,
+							     engines[rand() % nengine],
+							     0);
+				handles[i] = spin[i]->handle;
+				__sync_synchronize();
+			}
+			count += nhandles;
+		}
+		control[0] = count;
 		__sync_synchronize();
-		handles[j] = busy_blt(fd);
 
-		count++;
+		for (i = 0; i < nhandles; i++)
+			igt_spin_batch_free(fd, spin[i]);
 	}
-	control[0] = 1;
 	igt_waitchildren();
 
-	for (i = 0; i < ncpus; i++)
-		control[ncpus + 1] += control[i + 1];
+	for (i = 0; i < ncpus - 1; i++)
+		control[ncpus] += control[i + 1];
 	igt_info("Total execs %lu, busy-ioctls %lu\n",
-		 count, control[ncpus + 1] * N_HANDLES);
+		 control[0], control[ncpus] * nhandles);
 
-	for (i = 0; i < N_HANDLES; i++)
-		gem_close(fd, handles[i]);
-
-	munmap(handles, N_HANDLES * sizeof(*handles));
+	munmap(handles, PAGE_ALIGN(nhandles * sizeof(*handles)));
 	munmap(control, 4096);
 
 	gem_quiescent_gpu(fd);
