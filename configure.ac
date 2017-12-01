@@ -124,6 +124,7 @@ PKG_CHECK_MODULES(DRM, [libdrm >= 2.4.82])
 PKG_CHECK_MODULES(PCIACCESS, [pciaccess >= 0.10])
 PKG_CHECK_MODULES(KMOD, [libkmod])
 PKG_CHECK_MODULES(PROCPS, [libprocps])
+PKG_CHECK_MODULES(LIBUNWIND, [libunwind])
 PKG_CHECK_MODULES(VALGRIND, [valgrind], [have_valgrind=yes], [have_valgrind=no])
 
 if test x$have_valgrind = xyes; then
@@ -330,15 +331,6 @@ AM_CONDITIONAL(BUILD_SHADER_DEBUGGER, [test "x$BUILD_SHADER_DEBUGGER" != xno])
 AS_IF([test "x$BUILD_SHADER_DEBUGGER" != xno],
       [enable_debugger=yes], [enable_debugger=no])
 
-AC_ARG_WITH(libunwind,
-	    AS_HELP_STRING([--without-libunwind],
-			   [Build tests without libunwind support]),
-	    [], [with_libunwind=yes])
-if test "x$with_libunwind" = xyes; then
-	PKG_CHECK_MODULES(LIBUNWIND, libunwind, AC_DEFINE(HAVE_LIBUNWIND, 1, [libunwind support]),
-			  AC_MSG_ERROR([libunwind not found. Use --without-libunwind to disable libunwind support.]))
-fi
-
 # enable debug symbols
 AC_ARG_ENABLE(debug,
 	      AS_HELP_STRING([--disable-debug],
@@ -434,7 +426,6 @@ echo "       Build tests        : ${BUILD_TESTS}"
 echo "       Chamelium tests    : ${enable_chamelium}"
 echo "       Audio tests        : ${enable_audio}"
 echo "       Compile prime tests: ${NOUVEAU}"
-echo "       Print stack traces : ${with_libunwind}"
 echo "       Debug flags        : ${DEBUG_CFLAGS}"
 echo ""
 echo " • Tools:"

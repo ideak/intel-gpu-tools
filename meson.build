@@ -38,6 +38,7 @@ libdrm_amdgpu = dependency('libdrm_amdgpu', required : false)
 pciaccess = dependency('pciaccess', version : '>=0.10')
 libkmod = dependency('libkmod')
 libprocps = dependency('libprocps', required : true)
+libunwind = dependency('libunwind', required : true)
 
 valgrind = dependency('valgrind', required : false)
 if valgrind.found()
@@ -56,7 +57,6 @@ if glib.found()
 	config.set('HAVE_GLIB', 1)
 endif
 
-libunwind = dependency('libunwind')
 gsl = dependency('gsl', required : false)
 alsa = dependency('alsa', required : false)
 

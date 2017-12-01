@@ -71,6 +71,9 @@
 #include "igt_sysfs.h"
 #include "igt_rc.h"
 
+#define UNW_LOCAL_ONLY
+#include <libunwind.h>
+
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>   /* for basename() on Solaris */
 #endif
@@ -1173,10 +1176,6 @@ static void write_stderr(const char *str)
 	__write_stderr(str, strlen(str));
 }
 
-#ifdef HAVE_LIBUNWIND
-#define UNW_LOCAL_ONLY
-#include <libunwind.h>
-
 static void print_backtrace(void)
 {
 	unw_cursor_t cursor;
@@ -1371,7 +1370,6 @@ static void print_backtrace_sig_safe(void)
 
 	}
 }
-#endif
 
 void __igt_fail_assert(const char *domain, const char *file, const int line,
 		       const char *func, const char *assertion,
@@ -1394,9 +1392,7 @@ void __igt_fail_assert(const char *domain, const char *file, const int line,
 		va_end(args);
 	}
 
-#ifdef HAVE_LIBUNWIND
 	print_backtrace();
-#endif
 
 	if (run_under_gdb())
 		abort();
@@ -1876,9 +1872,8 @@ static void fatal_sig_handler(int sig)
 				igt_exitcode = 128 + sig;
 
 			failed_one = true;
-#ifdef HAVE_LIBUNWIND
 			print_backtrace_sig_safe();
-#endif
+
 			if (in_subtest)
 				exit_subtest("CRASH");
 		}
