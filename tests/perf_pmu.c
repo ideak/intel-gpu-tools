@@ -355,13 +355,13 @@ no_sema(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 static void
 sema_wait(int gem_fd, const struct intel_execution_engine2 *e)
 {
-	struct drm_i915_gem_relocation_entry reloc = { };
-	struct drm_i915_gem_execbuffer2 eb = { };
-	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_relocation_entry reloc[2] = {};
+	struct drm_i915_gem_exec_object2 obj[2] = {};
+	struct drm_i915_gem_execbuffer2 eb = {};
 	uint32_t bb_handle, obj_handle;
 	unsigned long slept;
 	uint32_t *obj_ptr;
-	uint32_t batch[6];
+	uint32_t batch[16];
 	uint64_t val[2];
 	int fd;
 
@@ -378,28 +378,35 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e)
 
 	obj_ptr = gem_mmap__wc(gem_fd, obj_handle, 0, 4096, PROT_WRITE);
 
-	batch[0] = MI_SEMAPHORE_WAIT |
+	batch[0] = MI_STORE_DWORD_IMM;
+	batch[1] = sizeof(*obj_ptr);
+	batch[2] = 0;
+	batch[3] = 1;
+	batch[4] = MI_SEMAPHORE_WAIT |
 		   MI_SEMAPHORE_POLL |
 		   MI_SEMAPHORE_SAD_GTE_SDD;
-	batch[1] = 1;
-	batch[2] = 0x0;
-	batch[3] = 0x0;
-	batch[4] = MI_NOOP;
-	batch[5] = MI_BATCH_BUFFER_END;
+	batch[5] = 1;
+	batch[6] = 0x0;
+	batch[7] = 0x0;
+	batch[8] = MI_BATCH_BUFFER_END;
 
 	gem_write(gem_fd, bb_handle, 0, batch, sizeof(batch));
 
-	reloc.target_handle = obj_handle;
-	reloc.offset = 2 * sizeof(uint32_t);
-	reloc.read_domains = I915_GEM_DOMAIN_RENDER;
+	reloc[0].target_handle = obj_handle;
+	reloc[0].offset = 1 * sizeof(uint32_t);
+	reloc[0].read_domains = I915_GEM_DOMAIN_RENDER;
+	reloc[0].write_domain = I915_GEM_DOMAIN_RENDER;
+	reloc[0].delta = sizeof(*obj_ptr);
 
-	memset(obj, 0, sizeof(obj));
+	reloc[1].target_handle = obj_handle;
+	reloc[1].offset = 6 * sizeof(uint32_t);
+	reloc[1].read_domains = I915_GEM_DOMAIN_RENDER;
 
 	obj[0].handle = obj_handle;
 
 	obj[1].handle = bb_handle;
-	obj[1].relocation_count = 1;
-	obj[1].relocs_ptr = to_user_pointer(&reloc);
+	obj[1].relocation_count = 2;
+	obj[1].relocs_ptr = to_user_pointer(reloc);
 
 	eb.buffer_count = 2;
 	eb.buffers_ptr = to_user_pointer(obj);
@@ -413,17 +420,20 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e)
 
 	fd = open_pmu(I915_PMU_ENGINE_SEMA(e->class, e->instance));
 
-	val[0] = pmu_read_single(fd);
-
 	gem_execbuf(gem_fd, &eb);
+	do { /* wait for the batch to start executing */
+		usleep(5e3);
+	} while (!obj_ptr[1]);
+	usleep(5e3); /* wait for the register sampling */
 
+	val[0] = pmu_read_single(fd);
 	slept = measured_usleep(batch_duration_ns / 1000);
-
-	*obj_ptr = 1;
-
-	gem_sync(gem_fd, bb_handle);
-
 	val[1] = pmu_read_single(fd);
+	igt_debug("slept %.3fms, sampled %.3fms\n",
+		  slept*1e-6, (val[1] - val[0])*1e-6);
+
+	obj_ptr[0] = 1;
+	gem_sync(gem_fd, bb_handle);
 
 	munmap(obj_ptr, 4096);
 	gem_close(gem_fd, obj_handle);
