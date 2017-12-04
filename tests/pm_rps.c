@@ -26,7 +26,6 @@
  *
  */
 
-#include "igt.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +36,8 @@
 #include <time.h>
 #include <sys/wait.h>
 
-#include "intel_bufmgr.h"
+#include "igt.h"
+#include "igt_dummyload.h"
 
 IGT_TEST_DESCRIPTION("Render P-States tests - verify GPU frequency changes");
 
@@ -181,15 +181,9 @@ enum load {
 };
 
 static struct load_helper {
-	int devid;
-	int has_ppgtt;
-	drm_intel_bufmgr *bufmgr;
-	struct intel_batchbuffer *batch;
-	drm_intel_bo *target_buffer;
 	enum load load;
 	bool exit;
 	struct igt_helper_process igt_proc;
-	drm_intel_bo *src, *dst;
 } lh;
 
 static void load_helper_signal_handler(int sig)
@@ -199,29 +193,6 @@ static void load_helper_signal_handler(int sig)
 		igt_debug("Switching background load to %s\n", lh.load ? "high" : "low");
 	} else
 		lh.exit = true;
-}
-
-static void emit_store_dword_imm(uint32_t val)
-{
-	int cmd;
-	struct intel_batchbuffer *batch = lh.batch;
-
-	cmd = MI_STORE_DWORD_IMM;
-	if (!lh.has_ppgtt)
-		cmd |= MI_MEM_VIRTUAL;
-
-	BEGIN_BATCH(4, 0); /* just ignore the reloc we emit and count dwords */
-	OUT_BATCH(cmd);
-	if (batch->gen >= 8) {
-		OUT_RELOC(lh.target_buffer, I915_GEM_DOMAIN_INSTRUCTION,
-			  I915_GEM_DOMAIN_INSTRUCTION, 0);
-	} else {
-		OUT_BATCH(0); /* reserved */
-		OUT_RELOC(lh.target_buffer, I915_GEM_DOMAIN_INSTRUCTION,
-			  I915_GEM_DOMAIN_INSTRUCTION, 0);
-	}
-	OUT_BATCH(val);
-	ADVANCE_BATCH();
 }
 
 #define LOAD_HELPER_PAUSE_USEC 500
@@ -252,69 +223,51 @@ static void load_helper_run(enum load load)
 	lh.load = load;
 
 	igt_fork_helper(&lh.igt_proc) {
-		const uint32_t bbe = MI_BATCH_BUFFER_END;
-		struct drm_i915_gem_exec_object2 object;
-		struct drm_i915_gem_execbuffer2 execbuf;
-		uint32_t fences[3];
-		uint32_t val = 0;
+		igt_spin_t *spin[2] = {};
+		uint32_t handle;
 
 		signal(SIGUSR1, load_helper_signal_handler);
 		signal(SIGUSR2, load_helper_signal_handler);
 
-		fences[0] = gem_create(drm_fd, 4096);
-		gem_write(drm_fd, fences[0], 0,  &bbe, sizeof(bbe));
-		fences[1] = gem_create(drm_fd, 4096);
-		gem_write(drm_fd, fences[1], 0,  &bbe, sizeof(bbe));
-		fences[2] = gem_create(drm_fd, 4096);
-		gem_write(drm_fd, fences[2], 0,  &bbe, sizeof(bbe));
-
-		memset(&execbuf, 0, sizeof(execbuf));
-		execbuf.buffers_ptr = (uintptr_t)&object;
-		execbuf.buffer_count = 1;
-		if (intel_gen(lh.devid) >= 6)
-			execbuf.flags = I915_EXEC_BLT;
-
 		igt_debug("Applying %s load...\n", lh.load ? "high" : "low");
 
 		while (!lh.exit) {
-			memset(&object, 0, sizeof(object));
-			object.handle = fences[val%3];
-
-			while (gem_bo_busy(drm_fd, object.handle))
+			if (spin[0]) {
+				handle = spin[0]->handle;
+				igt_spin_batch_end(spin[0]);
+				while (gem_bo_busy(drm_fd, handle))
+					usleep(100);
+				igt_spin_batch_free(drm_fd, spin[0]);
 				usleep(100);
+			}
+			spin[0] = spin[1];
+			spin[lh.load == HIGH] =
+				igt_spin_batch_new(drm_fd, 0, 0, 0);
+		}
 
-			if (lh.load == HIGH)
-				intel_copy_bo(lh.batch, lh.dst, lh.src,
-					      LOAD_HELPER_BO_SIZE);
-
-			emit_store_dword_imm(val);
-			intel_batchbuffer_flush_on_ring(lh.batch,
-                                                        I915_EXEC_BLT);
-			val++;
-
-			gem_execbuf(drm_fd, &execbuf);
-
-			/* Lower the load by pausing after every submitted
-			 * write. */
-			if (lh.load == LOW)
-				usleep(LOAD_HELPER_PAUSE_USEC);
+		if (spin[0]) {
+			handle = spin[0]->handle;
+			igt_spin_batch_end(spin[0]);
+		}
+		if (spin[1]) {
+			handle = spin[1]->handle;
+			igt_spin_batch_end(spin[1]);
 		}
 
 		/* Wait for completion without boosting */
 		usleep(1000);
-		while (gem_bo_busy(drm_fd, lh.target_buffer->handle))
+		while (gem_bo_busy(drm_fd, handle))
 			usleep(1000);
 
-		igt_debug("load helper sent %u dword writes\n", val);
-		gem_close(drm_fd, fences[0]);
-		gem_close(drm_fd, fences[1]);
-		gem_close(drm_fd, fences[2]);
-
-		/* Idle/boost logic is tied with request retirement.
+		/*
+		 * Idle/boost logic is tied with request retirement.
 		 * Speed up detection of idle state and ensure deboost
 		 * after removing load.
 		 */
 		igt_drop_caches_set(drm_fd, DROP_RETIRE);
+
+		igt_spin_batch_free(drm_fd, spin[1]);
+		igt_spin_batch_free(drm_fd, spin[0]);
 	}
 }
 
@@ -322,54 +275,6 @@ static void load_helper_stop(void)
 {
 	kill(lh.igt_proc.pid, SIGUSR1);
 	igt_assert(igt_wait_helper(&lh.igt_proc) == 0);
-}
-
-static void load_helper_init(void)
-{
-	lh.devid = intel_get_drm_devid(drm_fd);
-	lh.has_ppgtt = gem_uses_ppgtt(drm_fd);
-
-	/* MI_STORE_DATA can only use GTT address on gen4+/g33 and needs
-	 * snoopable mem on pre-gen6. Hence load-helper only works on gen6+, but
-	 * that's also all we care about for the rps testcase*/
-	igt_assert(intel_gen(lh.devid) >= 6);
-	lh.bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-	igt_assert(lh.bufmgr);
-
-	drm_intel_bufmgr_gem_enable_reuse(lh.bufmgr);
-
-	lh.batch = intel_batchbuffer_alloc(lh.bufmgr, lh.devid);
-	igt_assert(lh.batch);
-
-	lh.target_buffer = drm_intel_bo_alloc(lh.bufmgr, "target bo",
-					      4096, 4096);
-	igt_assert(lh.target_buffer);
-
-	lh.dst = drm_intel_bo_alloc(lh.bufmgr, "dst bo",
-				    LOAD_HELPER_BO_SIZE, 4096);
-	igt_assert(lh.dst);
-	lh.src = drm_intel_bo_alloc(lh.bufmgr, "src bo",
-				    LOAD_HELPER_BO_SIZE, 4096);
-	igt_assert(lh.src);
-}
-
-static void load_helper_deinit(void)
-{
-	if (lh.igt_proc.running)
-		load_helper_stop();
-
-	if (lh.target_buffer)
-		drm_intel_bo_unreference(lh.target_buffer);
-	if (lh.src)
-		drm_intel_bo_unreference(lh.src);
-	if (lh.dst)
-		drm_intel_bo_unreference(lh.dst);
-
-	if (lh.batch)
-		intel_batchbuffer_free(lh.batch);
-
-	if (lh.bufmgr)
-		drm_intel_bufmgr_destroy(lh.bufmgr);
 }
 
 static void do_load_gpu(void)
@@ -582,13 +487,8 @@ static void boost_freq(int fd, int *boost_freqs)
 {
 	int64_t timeout = 1;
 	igt_spin_t *load;
-	unsigned int engine;
 
-	/* Put boost on the same engine as low load */
-	engine = I915_EXEC_RENDER;
-	if (intel_gen(lh.devid) >= 6)
-		engine = I915_EXEC_BLT;
-	load = igt_spin_batch_new(fd, 0, engine, 0);
+	load = igt_spin_batch_new(fd, 0, 0, 0);
 	/* Waiting will grant us a boost to maximum */
 	gem_wait(fd, load->handle, &timeout);
 
@@ -655,7 +555,9 @@ static void pm_rps_exit_handler(int sig)
 		writeval(sysfs_files[MAX].filp, origfreqs[MAX]);
 	}
 
-	load_helper_deinit();
+	if (lh.igt_proc.running)
+		load_helper_stop();
+
 	close(drm_fd);
 }
 
@@ -691,8 +593,6 @@ igt_main
 		read_freqs(origfreqs);
 
 		igt_install_exit_handler(pm_rps_exit_handler);
-
-		load_helper_init();
 	}
 
 	igt_subtest("basic-api")
