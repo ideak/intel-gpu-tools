@@ -356,19 +356,24 @@ static void promotion(int fd, unsigned ring)
 	munmap(ptr, 4096);
 }
 
-#define NEW_CTX 0x1
+#define NEW_CTX (0x1 << 0)
+#define HANG_LP (0x1 << 1)
 static void preempt(int fd, unsigned ring, unsigned flags)
 {
 	uint32_t result = gem_create(fd, 4096);
 	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
 	igt_spin_t *spin[16];
 	uint32_t ctx[2];
+	igt_hang_t hang;
 
 	ctx[LO] = gem_context_create(fd);
 	gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
 
 	ctx[HI] = gem_context_create(fd);
 	gem_context_set_priority(fd, ctx[HI], MAX_PRIO);
+
+	if (flags & HANG_LP)
+		hang = igt_hang_ctx(fd, ctx[LO], ring, 0, NULL);
 
 	for (int n = 0; n < 16; n++) {
 		if (flags & NEW_CTX) {
@@ -388,6 +393,9 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 
 	for (int n = 0; n < 16; n++)
 		igt_spin_batch_free(fd, spin[n]);
+
+	if (flags & HANG_LP)
+		igt_post_hang_ring(fd, hang);
 
 	gem_context_destroy(fd, ctx[LO]);
 	gem_context_destroy(fd, ctx[HI]);
@@ -1023,6 +1031,24 @@ igt_main
 
 					igt_subtest_f("preempt-self-%s", e->name)
 						preempt_self(fd, e->exec_id | e->flags);
+
+					igt_subtest_group {
+						igt_hang_t hang;
+
+						igt_fixture {
+							igt_stop_hang_detector();
+							hang = igt_allow_hang(fd, 0, 0);
+						}
+
+						igt_subtest_f("preempt-hang-%s", e->name) {
+							preempt(fd, e->exec_id | e->flags, NEW_CTX | HANG_LP);
+						}
+
+						igt_fixture {
+							igt_disallow_hang(fd, hang);
+							igt_fork_hang_detector(fd);
+						}
+					}
 				}
 
 				igt_subtest_f("deep-%s", e->name)
