@@ -122,9 +122,6 @@ static void measure_residencies(int devid, unsigned int mask,
 	struct residencies end = { };
 	int retry;
 
-	if (!mask)
-		return;
-
 	/*
 	 * Retry in case of counter wrap-around. We simply re-run the
 	 * measurement, since the valid counter range is different on
@@ -168,17 +165,18 @@ static void measure_residencies(int devid, unsigned int mask,
 	res->rc6 += res->rc6p;
 }
 
-static unsigned long rc6_enable_us(void)
+static bool wait_for_rc6(void)
 {
-	/*
-	 * To know how long we need to wait for the device to enter rc6 once
-	 * idle, we need to look at GEN6_RC_EVALUATION_INTERVAL. Currently,
-	 * this is set to 125000 (12500 * 1280ns or 0.16s) on all platforms.
-	 * We must complete at least one EI with activity below the
-	 * per-platform threshold for RC6 to kick. Therefore, we must wait
-	 * at least 2 EI cycles, before we can expect rc6 to start ticking.
-	 */
-	return 2 * 160 * 1000;
+	struct timespec tv = {};
+	unsigned long start, now;
+
+	start = read_rc6_residency("rc6");
+	do {
+		usleep(50);
+		now = read_rc6_residency("rc6");
+	} while (now == start && !igt_seconds_elapsed(&tv));
+
+	return now != start;
 }
 
 igt_main
@@ -198,18 +196,16 @@ igt_main
 
 		/* Make sure rc6 counters are running */
 		igt_drop_caches_set(fd, DROP_IDLE);
-		usleep(rc6_enable_us());
+		igt_require(wait_for_rc6());
 
 		close(fd);
 
 		rc6_enabled = get_rc6_enabled_mask();
-		igt_require(rc6_enabled);
+		igt_require(rc6_enabled & RC6_ENABLED);
 	}
 
 	igt_subtest("rc6-accuracy") {
 		struct residencies res;
-
-		igt_require(rc6_enabled & RC6_ENABLED);
 
 		measure_residencies(devid, rc6_enabled, &res);
 		residency_accuracy(res.rc6, res.duration, "rc6");
@@ -218,8 +214,7 @@ igt_main
 	igt_subtest("media-rc6-accuracy") {
 		struct residencies res;
 
-		igt_require((rc6_enabled & RC6_ENABLED) &&
-			    (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid)));
+		igt_require(IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid));
 
 		measure_residencies(devid, rc6_enabled, &res);
 		residency_accuracy(res.media_rc6, res.duration, "media_rc6");
