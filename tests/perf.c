@@ -81,106 +81,6 @@ IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 #define PIPE_CONTROL_PPGTT_WRITE	(0 << 2)
 #define PIPE_CONTROL_GLOBAL_GTT_WRITE   (1 << 2)
 
-/* Temporarily copy i915-perf uapi here to avoid a dependency on libdrm's
- * i915_drm.h copy being updated with the i915-perf interface before this
- * test can land in i-g-t.
- *
- * TODO: remove this once the interface lands in libdrm
- */
-#ifndef DRM_I915_PERF_OPEN
-#define DRM_I915_PERF_OPEN		0x36
-#define DRM_IOCTL_I915_PERF_OPEN	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_OPEN, struct drm_i915_perf_open_param)
-
-enum drm_i915_oa_format {
-	I915_OA_FORMAT_A13 = 1,     /* HSW only */
-	I915_OA_FORMAT_A29,         /* HSW only */
-	I915_OA_FORMAT_A13_B8_C8,   /* HSW only */
-	I915_OA_FORMAT_B4_C8,       /* HSW only */
-	I915_OA_FORMAT_A45_B8_C8,   /* HSW only */
-	I915_OA_FORMAT_B4_C8_A16,   /* HSW only */
-	I915_OA_FORMAT_C4_B8,       /* HSW+ */
-
-	/* Gen8+ */
-	I915_OA_FORMAT_A12,
-	I915_OA_FORMAT_A12_B8_C8,
-	I915_OA_FORMAT_A32u40_A4u32_B8_C8,
-
-	I915_OA_FORMAT_MAX /* non-ABI */
-};
-
-enum drm_i915_perf_property_id {
-       DRM_I915_PERF_PROP_CTX_HANDLE = 1,
-       DRM_I915_PERF_PROP_SAMPLE_OA,
-       DRM_I915_PERF_PROP_OA_METRICS_SET,
-       DRM_I915_PERF_PROP_OA_FORMAT,
-       DRM_I915_PERF_PROP_OA_EXPONENT,
-
-       DRM_I915_PERF_PROP_MAX /* non-ABI */
-};
-
-struct drm_i915_perf_open_param {
-       __u32 flags;
-#define I915_PERF_FLAG_FD_CLOEXEC	(1<<0)
-#define I915_PERF_FLAG_FD_NONBLOCK	(1<<1)
-#define I915_PERF_FLAG_DISABLED		(1<<2)
-
-       __u32 num_properties;
-       __u64 properties_ptr;
-};
-
-#define I915_PERF_IOCTL_ENABLE _IO('i', 0x0)
-#define I915_PERF_IOCTL_DISABLE	_IO('i', 0x1)
-
-struct drm_i915_perf_record_header {
-       __u32 type;
-       __u16 pad;
-       __u16 size;
-};
-
-enum drm_i915_perf_record_type {
-       DRM_I915_PERF_RECORD_SAMPLE = 1,
-       DRM_I915_PERF_RECORD_OA_REPORT_LOST = 2,
-       DRM_I915_PERF_RECORD_OA_BUFFER_LOST = 3,
-
-       DRM_I915_PERF_RECORD_MAX /* non-ABI */
-};
-#endif /* !DRM_I915_PERF_OPEN */
-
-/* There is no ifdef we can use for those formats :( */
-enum {
-	local_I915_OA_FORMAT_A12 = I915_OA_FORMAT_C4_B8 + 1,
-	local_I915_OA_FORMAT_A12_B8_C8 = I915_OA_FORMAT_C4_B8 + 2,
-	local_I915_OA_FORMAT_A32u40_A4u32_B8_C8 = I915_OA_FORMAT_C4_B8 + 3,
-};
-
-#define local_I915_OA_FORMAT_MAX (local_I915_OA_FORMAT_A32u40_A4u32_B8_C8 + 1)
-
-#ifndef DRM_IOCTL_I915_PERF_ADD_CONFIG
-
-#define DRM_I915_PERF_ADD_CONFIG	0x37
-#define DRM_I915_PERF_REMOVE_CONFIG	0x38
-
-#define DRM_IOCTL_I915_PERF_ADD_CONFIG	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_ADD_CONFIG, struct drm_i915_perf_oa_config)
-#define DRM_IOCTL_I915_PERF_REMOVE_CONFIG	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_REMOVE_CONFIG, __u64)
-
-/**
- * Structure to upload perf dynamic configuration into the kernel.
- */
-struct drm_i915_perf_oa_config {
-	/** String formatted like "%08x-%04x-%04x-%04x-%012x" */
-	char uuid[36];
-
-	__u32 n_mux_regs;
-	__u32 n_boolean_regs;
-	__u32 n_flex_regs;
-
-	__u64 mux_regs_ptr;
-	__u64 boolean_regs_ptr;
-	__u64 flex_regs_ptr;
-};
-
-#endif /* !DRM_IOCTL_I915_PERF_ADD_CONFIG */
-
 struct accumulator {
 #define MAX_RAW_OA_COUNTERS 62
 	enum drm_i915_oa_format format;
@@ -203,7 +103,7 @@ struct oa_format {
 	int n_c;
 };
 
-static struct oa_format hsw_oa_formats[local_I915_OA_FORMAT_MAX] = {
+static struct oa_format hsw_oa_formats[I915_OA_FORMAT_MAX] = {
 	[I915_OA_FORMAT_A13] = { /* HSW only */
 		"A13", .size = 64,
 		.a_off = 12, .n_a = 13, },
@@ -235,16 +135,16 @@ static struct oa_format hsw_oa_formats[local_I915_OA_FORMAT_MAX] = {
 		.b_off = 28, .n_b = 8 },
 };
 
-static struct oa_format gen8_oa_formats[local_I915_OA_FORMAT_MAX] = {
-	[local_I915_OA_FORMAT_A12] = {
+static struct oa_format gen8_oa_formats[I915_OA_FORMAT_MAX] = {
+	[I915_OA_FORMAT_A12] = {
 		"A12", .size = 64,
 		.a_off = 12, .n_a = 12, .first_a = 7, },
-	[local_I915_OA_FORMAT_A12_B8_C8] = {
+	[I915_OA_FORMAT_A12_B8_C8] = {
 		"A12_B8_C8", .size = 128,
 		.a_off = 12, .n_a = 12,
 		.b_off = 64, .n_b = 8,
 		.c_off = 96, .n_c = 8, .first_a = 7, },
-	[local_I915_OA_FORMAT_A32u40_A4u32_B8_C8] = {
+	[I915_OA_FORMAT_A32u40_A4u32_B8_C8] = {
 		"A32u40_A4u32_B8_C8", .size = 256,
 		.a40_high_off = 160, .a40_low_off = 16, .n_a40 = 32,
 		.a_off = 144, .n_a = 4, .first_a = 32,
@@ -368,7 +268,7 @@ __perf_open(int fd, struct drm_i915_perf_open_param *param, bool prevent_pm)
 static int
 lookup_format(int i915_perf_fmt_id)
 {
-	igt_assert(i915_perf_fmt_id < local_I915_OA_FORMAT_MAX);
+	igt_assert(i915_perf_fmt_id < I915_OA_FORMAT_MAX);
 	igt_assert(get_oa_format(i915_perf_fmt_id).name);
 
 	return i915_perf_fmt_id;
@@ -1104,7 +1004,7 @@ init_sys_info(void)
 		drm_i915_getparam_t gp;
 
 		test_set_name = "TestOa";
-		test_oa_format = local_I915_OA_FORMAT_A32u40_A4u32_B8_C8;
+		test_oa_format = I915_OA_FORMAT_A32u40_A4u32_B8_C8;
 		undefined_a_counters = gen8_undefined_a_counters;
 		read_report_ticks = gen8_read_report_ticks;
 		sanity_check_reports = gen8_sanity_check_test_oa_reports;
