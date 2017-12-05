@@ -995,17 +995,18 @@ test_frequency(int gem_fd)
 	igt_assert(min[1] < max[1]);
 }
 
-static unsigned long rc6_enable_us(void)
+static bool wait_for_rc6(int fd)
 {
-	/*
-	 * To know how long we need to wait for the device to enter rc6 once
-	 * idle, we need to look at GEN6_RC_EVALUATION_INTERVAL. Currently,
-	 * this is set to 125000 (12500 * 1280ns or 0.16s) on all platforms.
-	 * We must complete at least one EI with activity below the
-	 * per-platform threshold for RC6 to kick. Therefore, we must wait
-	 * at least 2 EI cycles, before we can expect rc6 to start ticking.
-	 */
-	return 2 * 160 * 1000;
+	struct timespec tv = {};
+	uint64_t start, now;
+
+	start = pmu_read_single(fd);
+	do {
+		usleep(50);
+		now = pmu_read_single(fd);
+	} while (start == now && !igt_seconds_elapsed(&tv));
+
+	return start != now;
 }
 
 static void
@@ -1019,7 +1020,7 @@ test_rc6(int gem_fd)
 	fd = open_pmu(I915_PMU_RC6_RESIDENCY);
 
 	gem_quiescent_gpu(gem_fd);
-	usleep(rc6_enable_us()); /* wait for the rc6 cycle counter to kick in */
+	igt_require(wait_for_rc6(fd));
 
 	/* Go idle and check full RC6. */
 	prev = pmu_read_single(fd);
