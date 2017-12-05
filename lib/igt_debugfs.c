@@ -231,7 +231,7 @@ int igt_debugfs_dir(int device)
  * @mode: mode bits as used by open()
  *
  * This opens a debugfs file as a Unix file descriptor. The filename should be
- * relative to the drm device's root, i.e. without "drm/<minor>".
+ * relative to the drm device's root, i.e. without "drm/$minor".
  *
  * Returns:
  * The Unix file descriptor for the debugfs file or -1 if that didn't work out.

@@ -167,10 +167,10 @@
  *   test logic.
  *
  * - When adding a new feature test function which uses igt_skip() internally,
- *   use the <prefix>_require_<feature_name> naming scheme. When you
+ *   use the {prefix}_require_{feature_name} naming scheme. When you
  *   instead add a feature test function which returns a boolean, because your
  *   main test logic must take different actions depending upon the feature's
- *   availability, then instead use the <prefix>_has_<feature_name>.
+ *   availability, then instead use the {prefix}_has_{feature_name}.
  *
  * - As already mentioned eschew explicit error handling logic as much as
  *   possible. If your test absolutely has to handle the error of some function
