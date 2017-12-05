@@ -21,7 +21,8 @@ dri2proto = dependency('dri2proto', version : '>= 2.6', required : false)
 cairo_xlib = dependency('cairo-xlib', required : false)
 xrandr = dependency('xrandr', version : '>=1.3', required : false)
 
-gpu_overlay_deps = [ realtime, math, cairo, pciaccess, libdrm, libdrm_intel ]
+gpu_overlay_deps = [ realtime, math, cairo, pciaccess, libdrm,
+	libdrm_intel, lib_igt_perf ]
 
 both_x11_src = ''
 
@@ -55,6 +56,5 @@ if xrandr.found() and cairo.found()
 			include_directories : inc,
 			c_args : gpu_overlay_cflags,
 			dependencies : gpu_overlay_deps,
-			link_with : lib_igt_perf,
 			install : true)
 endif

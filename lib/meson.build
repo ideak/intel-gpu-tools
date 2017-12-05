@@ -180,8 +180,11 @@ lib_igt = declare_dependency(link_with : lib_igt_build,
 
 igt_deps = [ lib_igt ] + lib_deps
 
-lib_igt_perf = static_library('igt_perf',
+lib_igt_perf_build = static_library('igt_perf',
 	['igt_perf.c']
 )
+
+lib_igt_perf = declare_dependency(link_with : lib_igt_perf_build,
+				  include_directories : inc)
 
 subdir('tests')

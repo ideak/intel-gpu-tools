@@ -191,7 +191,6 @@ test_progs = [
 	'kms_vblank',
 	'meta_test',
 	'perf',
-	'perf_pmu',
 	'pm_backlight',
 	'pm_lpsp',
 	'pm_rc6_residency',
@@ -261,16 +260,17 @@ libexecdir = join_paths(get_option('prefix'), get_option('libexecdir'), 'intel-g
 test_executables = []
 
 foreach prog : test_progs
-	link = []
-	if prog == 'perf_pmu'
-		link += lib_igt_perf
-	endif
 	test_executables += executable(prog, prog + '.c',
 		   dependencies : test_deps,
 		   install_dir : libexecdir,
-		   link_with : link,
 		   install : true)
 endforeach
+
+test_executables += executable('perf_pmu', 'perf_pmu.c',
+	   dependencies : test_deps + [ lib_igt_perf ],
+	   install_dir : libexecdir,
+	   install : true)
+test_progs += 'perf_pmu'
 
 executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   dependencies : test_deps,

@@ -12,7 +12,6 @@ benchmark_progs = [
 	'gem_prw',
 	'gem_set_domain',
 	'gem_syslatency',
-	'gem_wsim',
 	'kms_vblank',
 	'prime_lookup',
 	'vgem_mmap',
@@ -31,11 +30,9 @@ endif
 foreach prog : benchmark_progs
 	# FIXME meson doesn't like binaries with the same name
 	# meanwhile just suffix with _bench
-	link = []
-	if prog == 'gem_wsim'
-		link += lib_igt_perf
-	endif
 	executable(prog + '_bench', prog + '.c',
-		   link_with : link,
 		   dependencies : test_deps)
 endforeach
+
+executable('gem_wsim_bench', 'gem_wsim.c',
+	   dependencies : test_deps + [ lib_igt_perf ])
