@@ -28,6 +28,8 @@ endforeach
 
 inc = include_directories('include/drm-uapi', 'lib', '.')
 
+inc_for_gtkdoc = include_directories('lib')
+
 config = configuration_data()
 
 libdrm = dependency('libdrm', version : '>=2.4.82')
@@ -136,3 +138,4 @@ if libdrm_intel.found()
 	endif
 endif
 subdir('man')
+subdir('docs')

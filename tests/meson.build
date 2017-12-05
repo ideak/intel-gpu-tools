@@ -258,12 +258,14 @@ endif
 
 libexecdir = join_paths(get_option('prefix'), get_option('libexecdir'), 'intel-gpu-tools')
 
+test_executables = []
+
 foreach prog : test_progs
 	link = []
 	if prog == 'perf_pmu'
 		link += lib_igt_perf
 	endif
-	executable(prog, prog + '.c',
+	test_executables += executable(prog, prog + '.c',
 		   dependencies : test_deps,
 		   install_dir : libexecdir,
 		   link_with : link,
@@ -279,7 +281,7 @@ test_progs += 'testdisplay'
 pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), 'intel-gpu-tools')
 
 gen_testlist = find_program('generate_testlist.sh')
-custom_target('testlist',
+test_list = custom_target('testlist',
 	      output : 'test-list.txt',
 	      command : [ gen_testlist, '@OUTPUT@', test_progs ],
 	      install : true,
