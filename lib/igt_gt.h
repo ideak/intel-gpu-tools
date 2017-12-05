@@ -27,6 +27,8 @@
 #include "igt_debugfs.h"
 #include "igt_core.h"
 
+#include "i915_drm.h"
+
 void igt_require_hang_ring(int fd, int ring);
 
 typedef struct igt_hang {
@@ -91,15 +93,6 @@ extern const struct intel_execution_engine2 {
 	for ((e__) = intel_execution_engines2;\
 	     (e__)->name; \
 	     (e__)++)
-
-enum drm_i915_gem_engine_class {
-	I915_ENGINE_CLASS_RENDER 	= 0,
-	I915_ENGINE_CLASS_COPY		= 1,
-	I915_ENGINE_CLASS_VIDEO		= 2,
-	I915_ENGINE_CLASS_VIDEO_ENHANCE	= 3,
-
-	I915_ENGINE_CLASS_INVALID	= -1
-};
 
 unsigned int
 gem_class_instance_to_eb_flags(int gem_fd,
