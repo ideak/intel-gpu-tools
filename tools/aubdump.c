@@ -417,6 +417,15 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 	}
 	if (gen == 0) {
 		gen = intel_gen(device);
+
+		/* If we don't know the device gen, then it probably is a
+		 * newer device. Set gen to some arbitrarily high number.
+		 */
+		if (gen == 0)
+			gen = 9999;
+
+		addr_bits = gen >= 8 ? 48 : 32;
+
 		write_header();
 
 		if (verbose)
@@ -424,11 +433,6 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 			       "output file %s, chipset id 0x%04x, gen %d]\n",
 			       filename, device, gen);
 	}
-
-	/* If we don't know the device gen, then it probably is a
-	 * newer device which uses 48-bit addresses.
-	 */
-	addr_bits = (gen >= 8 || gen == 0) ? 48 : 32;
 
 	if (verbose)
 		printf("Dumping execbuffer2:\n");
