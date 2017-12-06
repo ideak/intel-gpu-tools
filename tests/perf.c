@@ -1082,6 +1082,8 @@ init_sys_info(void)
 				igt_debug("unsupported Coffeelake GT size\n");
 				return false;
 			}
+		} else if (IS_CANNONLAKE(devid)) {
+			test_set_uuid = "db41edd4-d8e7-4730-ad11-b9a2d6833503";
 		} else {
 			igt_debug("unsupported GT\n");
 			return false;
