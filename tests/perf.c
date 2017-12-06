@@ -1075,8 +1075,11 @@ init_sys_info(void)
 			case 1:
 				test_set_uuid = "74fb4902-d3d3-4237-9e90-cbdc68d0a446";
 				break;
+			case 2:
+				test_set_uuid = "577e8e2c-3fa0-4875-8743-3538d585e3b0";
+				break;
 			default:
-				igt_debug("unsupported Cannonlake GT size\n");
+				igt_debug("unsupported Coffeelake GT size\n");
 				return false;
 			}
 		} else {
