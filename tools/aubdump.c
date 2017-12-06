@@ -46,6 +46,177 @@
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
 #endif
 
+#ifndef ALIGN
+#define ALIGN(x, y) (((x) + (y)-1) & ~((y)-1))
+#endif
+
+#define min(a, b) ({			\
+	typeof(a) _a = (a);		\
+	typeof(b) _b = (b);		\
+	_a < _b ? _a : _b;		\
+})
+
+#define HWS_PGA_RCSUNIT		0x02080
+#define HWS_PGA_VCSUNIT0	0x12080
+#define HWS_PGA_BCSUNIT		0x22080
+
+#define GFX_MODE_RCSUNIT	0x0229c
+#define GFX_MODE_VCSUNIT0	0x1229c
+#define GFX_MODE_BCSUNIT	0x2229c
+
+#define EXECLIST_SUBMITPORT_RCSUNIT	0x02230
+#define EXECLIST_SUBMITPORT_VCSUNIT0	0x12230
+#define EXECLIST_SUBMITPORT_BCSUNIT	0x22230
+
+#define EXECLIST_STATUS_RCSUNIT		0x02234
+#define EXECLIST_STATUS_VCSUNIT0	0x12234
+#define EXECLIST_STATUS_BCSUNIT		0x22234
+
+#define MEMORY_MAP_SIZE (64 /* MiB */ * 1024 * 1024)
+
+#define PTE_SIZE 4
+#define GEN8_PTE_SIZE 8
+
+#define NUM_PT_ENTRIES (ALIGN(MEMORY_MAP_SIZE, 4096) / 4096)
+#define PT_SIZE ALIGN(NUM_PT_ENTRIES * GEN8_PTE_SIZE, 4096)
+
+#define RING_SIZE			(1 * 4096)
+#define PPHWSP_SIZE			(1 * 4096)
+#define GEN10_LR_CONTEXT_RENDER_SIZE	(19 * 4096)
+#define GEN8_LR_CONTEXT_OTHER_SIZE	(2 * 4096)
+
+#define STATIC_GGTT_MAP_START 0
+
+#define RENDER_RING_ADDR STATIC_GGTT_MAP_START
+#define RENDER_CONTEXT_ADDR (RENDER_RING_ADDR + RING_SIZE)
+
+#define BLITTER_RING_ADDR (RENDER_CONTEXT_ADDR + PPHWSP_SIZE + GEN10_LR_CONTEXT_RENDER_SIZE)
+#define BLITTER_CONTEXT_ADDR (BLITTER_RING_ADDR + RING_SIZE)
+
+#define VIDEO_RING_ADDR (BLITTER_CONTEXT_ADDR + PPHWSP_SIZE + GEN8_LR_CONTEXT_OTHER_SIZE)
+#define VIDEO_CONTEXT_ADDR (VIDEO_RING_ADDR + RING_SIZE)
+
+#define STATIC_GGTT_MAP_END (VIDEO_CONTEXT_ADDR + PPHWSP_SIZE + GEN8_LR_CONTEXT_OTHER_SIZE)
+#define STATIC_GGTT_MAP_SIZE (STATIC_GGTT_MAP_END - STATIC_GGTT_MAP_START)
+
+#define CONTEXT_FLAGS (0x229)	/* Normal Priority | L3-LLC Coherency |
+	Legacy Context with no 64 bit VA support | Valid */
+
+#define RENDER_CONTEXT_DESCRIPTOR  ((uint64_t)1 << 32 | RENDER_CONTEXT_ADDR  | CONTEXT_FLAGS)
+#define BLITTER_CONTEXT_DESCRIPTOR ((uint64_t)2 << 32 | BLITTER_CONTEXT_ADDR | CONTEXT_FLAGS)
+#define VIDEO_CONTEXT_DESCRIPTOR   ((uint64_t)3 << 32 | VIDEO_CONTEXT_ADDR   | CONTEXT_FLAGS)
+
+static const uint32_t render_context_init[GEN10_LR_CONTEXT_RENDER_SIZE /
+					  sizeof(uint32_t)] = {
+	0 /* MI_NOOP */,
+	0x1100101B /* MI_LOAD_REGISTER_IMM */,
+	0x2244 /* CONTEXT_CONTROL */,		0x90009 /* Inhibit Synchronous Context Switch | Engine Context Restore Inhibit */,
+	0x2034 /* RING_HEAD */,			0,
+	0x2030 /* RING_TAIL */,			0,
+	0x2038 /* RING_BUFFER_START */,		RENDER_RING_ADDR,
+	0x203C /* RING_BUFFER_CONTROL */,	(RING_SIZE - 4096) | 1 /* Buffer Length | Ring Buffer Enable */,
+	0x2168 /* BB_HEAD_U */,			0,
+	0x2140 /* BB_HEAD_L */,			0,
+	0x2110 /* BB_STATE */,			0,
+	0x211C /* SECOND_BB_HEAD_U */,		0,
+	0x2114 /* SECOND_BB_HEAD_L */,		0,
+	0x2118 /* SECOND_BB_STATE */,		0,
+	0x21C0 /* BB_PER_CTX_PTR */,		0,
+	0x21C4 /* RCS_INDIRECT_CTX */,		0,
+	0x21C8 /* RCS_INDIRECT_CTX_OFFSET */,	0,
+	/* MI_NOOP */
+	0, 0,
+
+	0 /* MI_NOOP */,
+	0x11001011 /* MI_LOAD_REGISTER_IMM */,
+	0x23A8 /* CTX_TIMESTAMP */,	0,
+	0x228C /* PDP3_UDW */,		0,
+	0x2288 /* PDP3_LDW */,		0,
+	0x2284 /* PDP2_UDW */,		0,
+	0x2280 /* PDP2_LDW */,		0,
+	0x227C /* PDP1_UDW */,		0,
+	0x2278 /* PDP1_LDW */,		0,
+	0x2274 /* PDP0_UDW */,		0,
+	0x2270 /* PDP0_LDW */,		0,
+	/* MI_NOOP */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+	0 /* MI_NOOP */,
+	0x11000001 /* MI_LOAD_REGISTER_IMM */,
+	0x20C8 /* R_PWR_CLK_STATE */, 0x7FFFFFFF,
+	0x05000001 /* MI_BATCH_BUFFER_END */
+};
+
+static const uint32_t blitter_context_init[GEN8_LR_CONTEXT_OTHER_SIZE /
+					   sizeof(uint32_t)] = {
+	0 /* MI_NOOP */,
+	0x11001015 /* MI_LOAD_REGISTER_IMM */,
+	0x22244 /* CONTEXT_CONTROL */,		0x90009 /* Inhibit Synchronous Context Switch | Engine Context Restore Inhibit */,
+	0x22034 /* RING_HEAD */,		0,
+	0x22030 /* RING_TAIL */,		0,
+	0x22038 /* RING_BUFFER_START */,	BLITTER_RING_ADDR,
+	0x2203C /* RING_BUFFER_CONTROL */,	(RING_SIZE - 4096) | 1 /* Buffer Length | Ring Buffer Enable */,
+	0x22168 /* BB_HEAD_U */,		0,
+	0x22140 /* BB_HEAD_L */,		0,
+	0x22110 /* BB_STATE */,			0,
+	0x2211C /* SECOND_BB_HEAD_U */,		0,
+	0x22114 /* SECOND_BB_HEAD_L */,		0,
+	0x22118 /* SECOND_BB_STATE */,		0,
+	/* MI_NOOP */
+	0, 0, 0, 0, 0, 0, 0, 0,
+
+	0 /* MI_NOOP */,
+	0x11001011,
+	0x223A8 /* CTX_TIMESTAMP */,	0,
+	0x2228C /* PDP3_UDW */,		0,
+	0x22288 /* PDP3_LDW */,		0,
+	0x22284 /* PDP2_UDW */,		0,
+	0x22280 /* PDP2_LDW */,		0,
+	0x2227C /* PDP1_UDW */,		0,
+	0x22278 /* PDP1_LDW */,		0,
+	0x22274 /* PDP0_UDW */,		0,
+	0x22270 /* PDP0_LDW */,		0,
+	/* MI_NOOP */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+	0x05000001 /* MI_BATCH_BUFFER_END */
+};
+
+static const uint32_t video_context_init[GEN8_LR_CONTEXT_OTHER_SIZE /
+					 sizeof(uint32_t)] = {
+	0 /* MI_NOOP */,
+	0x11001015 /* MI_LOAD_REGISTER_IMM */,
+	0x1C244 /* CONTEXT_CONTROL */,		0x90009 /* Inhibit Synchronous Context Switch | Engine Context Restore Inhibit */,
+	0x1C034 /* RING_HEAD */,		0,
+	0x1C030 /* RING_TAIL */,		0,
+	0x1C038 /* RING_BUFFER_START */,	VIDEO_RING_ADDR,
+	0x1C03C /* RING_BUFFER_CONTROL */,	(RING_SIZE - 4096) | 1 /* Buffer Length | Ring Buffer Enable */,
+	0x1C168 /* BB_HEAD_U */,		0,
+	0x1C140 /* BB_HEAD_L */,		0,
+	0x1C110 /* BB_STATE */,			0,
+	0x1C11C /* SECOND_BB_HEAD_U */,		0,
+	0x1C114 /* SECOND_BB_HEAD_L */,		0,
+	0x1C118 /* SECOND_BB_STATE */,		0,
+	/* MI_NOOP */
+	0, 0, 0, 0, 0, 0, 0, 0,
+
+	0 /* MI_NOOP */,
+	0x11001011,
+	0x1C3A8 /* CTX_TIMESTAMP */,	0,
+	0x1C28C /* PDP3_UDW */,		0,
+	0x1C288 /* PDP3_LDW */,		0,
+	0x1C284 /* PDP2_UDW */,		0,
+	0x1C280 /* PDP2_LDW */,		0,
+	0x1C27C /* PDP1_UDW */,		0,
+	0x1C278 /* PDP1_LDW */,		0,
+	0x1C274 /* PDP0_UDW */,		0,
+	0x1C270 /* PDP0_LDW */,		0,
+	/* MI_NOOP */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+	0x05000001 /* MI_BATCH_BUFFER_END */
+};
+
 static int close_init_helper(int fd);
 static int ioctl_init_helper(int fd, unsigned long request, ...);
 
@@ -171,21 +342,131 @@ data_out(const void *data, size_t size)
 }
 
 static uint32_t
-gtt_entry_size(void)
-{
-	return addr_bits > 32 ? 8 : 4;
-}
-
-static uint32_t
 gtt_size(void)
 {
-	/* Enough for 64MB assuming 4kB pages. */
-	const unsigned entries = 0x4000;
-	return entries * gtt_entry_size();
+	return NUM_PT_ENTRIES * (addr_bits > 32 ? GEN8_PTE_SIZE : PTE_SIZE);
 }
 
 static void
-write_header(void)
+mem_trace_memory_write_header_out(uint64_t addr, uint32_t len,
+				  uint32_t addr_space)
+{
+	uint32_t dwords = ALIGN(len, sizeof(uint32_t)) / sizeof(uint32_t);
+
+	dword_out(CMD_MEM_TRACE_MEMORY_WRITE | (5 + dwords - 1));
+	dword_out(addr & 0xFFFFFFFF);	/* addr lo */
+	dword_out(addr >> 32);	/* addr hi */
+	dword_out(addr_space);	/* gtt */
+	dword_out(len);
+}
+
+static void
+register_write_out(uint32_t addr, uint32_t value)
+{
+	uint32_t dwords = 1;
+
+	dword_out(CMD_MEM_TRACE_REGISTER_WRITE | (5 + dwords - 1));
+	dword_out(addr);
+	dword_out(AUB_MEM_TRACE_REGISTER_SIZE_DWORD |
+		  AUB_MEM_TRACE_REGISTER_SPACE_MMIO);
+	dword_out(0xFFFFFFFF);	/* mask lo */
+	dword_out(0x00000000);	/* mask hi */
+	dword_out(value);
+}
+
+static void
+gen10_write_header(void)
+{
+	char app_name[8 * 4];
+	int app_name_len, dwords;
+	uint32_t entry = 0x3;	/* read/write | present */
+
+	app_name_len =
+	    snprintf(app_name, sizeof(app_name), "PCI-ID=0x%X %s", device,
+		     program_invocation_short_name);
+	app_name_len = ALIGN(app_name_len, sizeof(uint32_t));
+
+	dwords = 5 + app_name_len / sizeof(uint32_t);
+	dword_out(CMD_MEM_TRACE_VERSION | (dwords - 1));
+	dword_out(AUB_MEM_TRACE_VERSION_FILE_VERSION);
+	dword_out(AUB_MEM_TRACE_VERSION_DEVICE_CNL |
+		  AUB_MEM_TRACE_VERSION_METHOD_PHY);
+	dword_out(0);		/* version */
+	dword_out(0);		/* version */
+	data_out(app_name, app_name_len);
+
+	/* GGTT PT */
+	for (uint32_t page = 0; page < ALIGN(PT_SIZE, 4096) / 4096; page++) {
+		uint32_t to_write = min(PT_SIZE - page * 4096, 4096);
+		mem_trace_memory_write_header_out(page << 12, to_write,
+						  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_GGTT_ENTRY);
+		for (uint32_t i = 0; i < to_write / GEN8_PTE_SIZE; i++) {
+			dword_out(entry + 0x1000 * i + 0x200000 * page);
+			dword_out(0);
+		}
+	}
+
+	/* RENDER_RING */
+	mem_trace_memory_write_header_out(RENDER_RING_ADDR, RING_SIZE,
+					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+	for (uint32_t i = 0; i < RING_SIZE; i += sizeof(uint32_t))
+		dword_out(0);
+
+	/* RENDER_PPHWSP */
+	mem_trace_memory_write_header_out(RENDER_CONTEXT_ADDR,
+					  PPHWSP_SIZE +
+					  sizeof(render_context_init),
+					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+	for (uint32_t i = 0; i < PPHWSP_SIZE; i += sizeof(uint32_t))
+		dword_out(0);
+
+	/* RENDER_CONTEXT */
+	data_out(render_context_init, sizeof(render_context_init));
+
+	/* BLITTER_RING */
+	mem_trace_memory_write_header_out(BLITTER_RING_ADDR, RING_SIZE,
+					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+	for (uint32_t i = 0; i < RING_SIZE; i += sizeof(uint32_t))
+		dword_out(0);
+
+	/* BLITTER_PPHWSP */
+	mem_trace_memory_write_header_out(BLITTER_CONTEXT_ADDR,
+					  PPHWSP_SIZE +
+					  sizeof(blitter_context_init),
+					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+	for (uint32_t i = 0; i < PPHWSP_SIZE; i += sizeof(uint32_t))
+		dword_out(0);
+
+	/* BLITTER_CONTEXT */
+	data_out(blitter_context_init, sizeof(blitter_context_init));
+
+	/* VIDEO_RING */
+	mem_trace_memory_write_header_out(VIDEO_RING_ADDR, RING_SIZE,
+					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+	for (uint32_t i = 0; i < RING_SIZE; i += sizeof(uint32_t))
+		dword_out(0);
+
+	/* VIDEO_PPHWSP */
+	mem_trace_memory_write_header_out(VIDEO_CONTEXT_ADDR,
+					  PPHWSP_SIZE +
+					  sizeof(video_context_init),
+					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+	for (uint32_t i = 0; i < PPHWSP_SIZE; i += sizeof(uint32_t))
+		dword_out(0);
+
+	/* VIDEO_CONTEXT */
+	data_out(video_context_init, sizeof(video_context_init));
+
+	register_write_out(HWS_PGA_RCSUNIT, RENDER_CONTEXT_ADDR);
+	register_write_out(HWS_PGA_VCSUNIT0, VIDEO_CONTEXT_ADDR);
+	register_write_out(HWS_PGA_BCSUNIT, BLITTER_CONTEXT_ADDR);
+
+	register_write_out(GFX_MODE_RCSUNIT, 0x80008000 /* execlist enable */);
+	register_write_out(GFX_MODE_VCSUNIT0, 0x80008000 /* execlist enable */);
+	register_write_out(GFX_MODE_BCSUNIT, 0x80008000 /* execlist enable */);
+}
+
+static void write_header(void)
 {
 	char app_name[8 * 4];
 	char comment[16];
@@ -220,7 +501,7 @@ write_header(void)
 	dword_out(gtt_size()); /* size */
 	if (addr_bits > 32)
 		dword_out(0);
-	for (uint32_t i = 0; i * gtt_entry_size() < gtt_size(); i++) {
+	for (uint32_t i = 0; i < NUM_PT_ENTRIES; i++) {
 		dword_out(entry + 0x1000 * i);
 		if (addr_bits > 32)
 			dword_out(0);
@@ -245,15 +526,21 @@ aub_write_trace_block(uint32_t type, void *virtual, uint32_t size, uint64_t gtt_
 		if (block_size > 8 * 4096)
 			block_size = 8 * 4096;
 
-		dword_out(CMD_AUB_TRACE_HEADER_BLOCK |
-			  ((addr_bits > 32 ? 6 : 5) - 2));
-		dword_out(AUB_TRACE_MEMTYPE_GTT |
-			  type | AUB_TRACE_OP_DATA_WRITE);
-		dword_out(subtype);
-		dword_out(gtt_offset + offset);
-		dword_out(align_u32(block_size, 4));
-		if (addr_bits > 32)
-			dword_out((gtt_offset + offset) >> 32);
+		if (gen >= 10) {
+			mem_trace_memory_write_header_out(gtt_offset + offset,
+							  block_size,
+							  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+		} else {
+			dword_out(CMD_AUB_TRACE_HEADER_BLOCK |
+				  ((addr_bits > 32 ? 6 : 5) - 2));
+			dword_out(AUB_TRACE_MEMTYPE_GTT |
+				  type | AUB_TRACE_OP_DATA_WRITE);
+			dword_out(subtype);
+			dword_out(gtt_offset + offset);
+			dword_out(align_u32(block_size, 4));
+			if (addr_bits > 32)
+				dword_out((gtt_offset + offset) >> 32);
+		}
 
 		if (virtual)
 			data_out(((char *) GET_PTR(virtual)) + offset, block_size);
@@ -289,6 +576,64 @@ write_reloc(void *p, uint64_t v)
 	} else {
 		*(uint32_t *)p = v;
 	}
+}
+
+static void
+aub_dump_execlist(uint64_t batch_offset, int ring_flag)
+{
+	uint32_t ring_addr;
+	uint64_t descriptor;
+	uint32_t elsp_reg;
+	uint32_t status_reg;
+
+	switch (ring_flag) {
+	case I915_EXEC_DEFAULT:
+	case I915_EXEC_RENDER:
+		ring_addr = RENDER_RING_ADDR;
+		descriptor = RENDER_CONTEXT_DESCRIPTOR;
+		elsp_reg = EXECLIST_SUBMITPORT_RCSUNIT;
+		status_reg = EXECLIST_STATUS_RCSUNIT;
+		break;
+	case I915_EXEC_BSD:
+		ring_addr = VIDEO_RING_ADDR;
+		descriptor = VIDEO_CONTEXT_DESCRIPTOR;
+		elsp_reg = EXECLIST_SUBMITPORT_VCSUNIT0;
+		status_reg = EXECLIST_STATUS_VCSUNIT0;
+		break;
+	case I915_EXEC_BLT:
+		ring_addr = BLITTER_RING_ADDR;
+		descriptor = BLITTER_CONTEXT_DESCRIPTOR;
+		elsp_reg = EXECLIST_SUBMITPORT_BCSUNIT;
+		status_reg = EXECLIST_STATUS_BCSUNIT;
+		break;
+	}
+
+	mem_trace_memory_write_header_out(ring_addr, 16,
+					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+	dword_out(AUB_MI_BATCH_BUFFER_START | (3 - 2));
+	dword_out(batch_offset & 0xFFFFFFFF);
+	dword_out(batch_offset >> 32);
+	dword_out(0 /* MI_NOOP */);
+
+	mem_trace_memory_write_header_out(ring_addr + 8192 + 20, 4,
+					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+	dword_out(0); /* RING_BUFFER_HEAD */
+	mem_trace_memory_write_header_out(ring_addr + 8192 + 28, 4,
+					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
+	dword_out(16); /* RING_BUFFER_TAIL */
+
+	register_write_out(elsp_reg, 0);
+	register_write_out(elsp_reg, 8);
+	register_write_out(elsp_reg, descriptor >> 32);
+	register_write_out(elsp_reg, descriptor & 0xFFFFFFFF);
+
+	dword_out(CMD_MEM_TRACE_REGISTER_POLL | (5 + 1 - 1));
+	dword_out(status_reg);
+	dword_out(AUB_MEM_TRACE_REGISTER_SIZE_DWORD |
+		  AUB_MEM_TRACE_REGISTER_SPACE_MMIO);
+	dword_out(0x00000010);	/* mask lo */
+	dword_out(0x00000000);	/* mask hi */
+	dword_out(0x00000000);
 }
 
 static void
@@ -404,7 +749,7 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 	struct drm_i915_gem_exec_object2 *exec_objects =
 		(struct drm_i915_gem_exec_object2 *) (uintptr_t) execbuffer2->buffers_ptr;
 	uint32_t ring_flag = execbuffer2->flags & I915_EXEC_RING_MASK;
-	uint32_t offset = gtt_size();
+	uint32_t offset;
 	struct drm_i915_gem_exec_object2 *obj;
 	struct bo *bo, *batch_bo;
 	int batch_index;
@@ -426,13 +771,21 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 
 		addr_bits = gen >= 8 ? 48 : 32;
 
-		write_header();
+		if (gen >= 10)
+			gen10_write_header();
+		else
+			write_header();
 
 		if (verbose)
 			printf("[intel_aubdump: running, "
 			       "output file %s, chipset id 0x%04x, gen %d]\n",
 			       filename, device, gen);
 	}
+
+	if (gen >= 10)
+		offset = STATIC_GGTT_MAP_END;
+	else
+		offset = gtt_size();
 
 	if (verbose)
 		printf("Dumping execbuffer2:\n");
@@ -488,9 +841,15 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 			free(data);
 	}
 
-	/* Dump ring buffer */
-	aub_dump_ringbuffer(batch_bo->offset + execbuffer2->batch_start_offset,
-			    offset, ring_flag);
+	if (gen >= 10) {
+		aub_dump_execlist(batch_bo->offset +
+				  execbuffer2->batch_start_offset, ring_flag);
+	} else {
+		/* Dump ring buffer */
+		aub_dump_ringbuffer(batch_bo->offset +
+				    execbuffer2->batch_start_offset, offset,
+				    ring_flag);
+	}
 
 	for (int i = 0; i < ARRAY_SIZE(files); i++) {
 		if (files[i] != NULL)
