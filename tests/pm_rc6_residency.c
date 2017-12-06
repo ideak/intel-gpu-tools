@@ -170,13 +170,20 @@ static bool wait_for_rc6(void)
 	struct timespec tv = {};
 	unsigned long start, now;
 
-	start = read_rc6_residency("rc6");
-	do {
-		usleep(50);
-		now = read_rc6_residency("rc6");
-	} while (now == start && !igt_seconds_elapsed(&tv));
+	/* First wait for roughly an RC6 Evaluation Interval */
+        usleep(160 * 1000);
 
-	return now != start;
+        /* Then poll for RC6 to start ticking */
+	now = read_rc6_residency("rc6");
+	do {
+		start = now;
+		usleep(5000);
+		now = read_rc6_residency("rc6");
+		if (now - start > 1)
+			return true;
+	} while (!igt_seconds_elapsed(&tv));
+
+	return false;
 }
 
 igt_main

@@ -1000,13 +1000,20 @@ static bool wait_for_rc6(int fd)
 	struct timespec tv = {};
 	uint64_t start, now;
 
-	start = pmu_read_single(fd);
-	do {
-		usleep(50);
-		now = pmu_read_single(fd);
-	} while (start == now && !igt_seconds_elapsed(&tv));
+	/* First wait for roughly an RC6 Evaluation Interval */
+	usleep(160 * 1000);
 
-	return start != now;
+	/* Then poll for RC6 to start ticking */
+	now = pmu_read_single(fd);
+	do {
+		start = now;
+		usleep(5000);
+		now = pmu_read_single(fd);
+		if (now - start > 1e6)
+			return true;
+	} while (!igt_seconds_elapsed(&tv));
+
+	return false;
 }
 
 static void
