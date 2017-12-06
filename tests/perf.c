@@ -969,6 +969,29 @@ gen8_sanity_check_test_oa_reports(uint32_t *oa_report0, uint32_t *oa_report1,
 	}
 }
 
+static uint64_t
+get_cs_timestamp_frequency(void)
+{
+	int cs_ts_freq = 0;
+	drm_i915_getparam_t gp;
+
+	gp.param = I915_PARAM_CS_TIMESTAMP_FREQUENCY;
+	gp.value = &cs_ts_freq;
+	if (igt_ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp) == 0)
+		return cs_ts_freq;
+
+	igt_debug("Couldn't query CS timestamp frequency, trying to guess based on PCI-id\n");
+
+	if (IS_GEN7(devid) || IS_GEN8(devid))
+		return 12500000;
+	if (IS_SKYLAKE(devid) || IS_KABYLAKE(devid) || IS_COFFEELAKE(devid))
+		return 12000000;
+	if (IS_BROXTON(devid) || IS_GEMINILAKE(devid))
+		return 19200000;
+
+	igt_skip("Kernel with PARAM_CS_TIMESTAMP_FREQUENCY support required\n");
+}
+
 static bool
 init_sys_info(void)
 {
@@ -979,7 +1002,8 @@ init_sys_info(void)
 	igt_assert_neq(card, -1);
 	igt_assert_neq(devid, 0);
 
-	timestamp_frequency = 12500000;
+	timestamp_frequency = get_cs_timestamp_frequency();
+	igt_assert_neq(timestamp_frequency, 0);
 
 	if (IS_HASWELL(devid)) {
 		/* We don't have a TestOa metric set for Haswell so use
@@ -1030,10 +1054,8 @@ init_sys_info(void)
 				igt_debug("unsupported Skylake GT size\n");
 				return false;
 			}
-			timestamp_frequency = 12000000;
 		} else if (IS_BROXTON(devid)) {
 			test_set_uuid = "5ee72f5c-092f-421e-8b70-225f7c3e9612";
-			timestamp_frequency = 19200000;
 		} else if (IS_KABYLAKE(devid)) {
 			switch (intel_gt(devid)) {
 			case 1:
@@ -1046,10 +1068,8 @@ init_sys_info(void)
 				igt_debug("unsupported Kabylake GT size\n");
 				return false;
 			}
-			timestamp_frequency = 12000000;
 		} else if (IS_GEMINILAKE(devid)) {
 			test_set_uuid = "dd3fd789-e783-4204-8cd0-b671bbccb0cf";
-			timestamp_frequency = 19200000;
 		} else if (IS_COFFEELAKE(devid)) {
 			switch (intel_gt(devid)) {
 			case 1:
@@ -1059,7 +1079,6 @@ init_sys_info(void)
 				igt_debug("unsupported Cannonlake GT size\n");
 				return false;
 			}
-			timestamp_frequency = 12000000;
 		} else {
 			igt_debug("unsupported GT\n");
 			return false;
