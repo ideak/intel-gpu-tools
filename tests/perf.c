@@ -81,6 +81,8 @@ IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 #define PIPE_CONTROL_PPGTT_WRITE	(0 << 2)
 #define PIPE_CONTROL_GLOBAL_GTT_WRITE   (1 << 2)
 
+#define MAX_OA_BUF_SIZE (16 * 1024 * 1024)
+
 struct accumulator {
 #define MAX_RAW_OA_COUNTERS 62
 	enum drm_i915_oa_format format;
@@ -1336,7 +1338,7 @@ read_2_oa_reports(int format_id,
 	 * to indicate that the OA unit may be over taxed if lots of reports
 	 * are being lost.
 	 */
-	int max_reports = (16 * 1024 * 1024) / format_size;
+	int max_reports = MAX_OA_BUF_SIZE / format_size;
 	int buf_size = sample_size * max_reports * 1.5;
 	uint8_t *buf = malloc(buf_size);
 	int n = 0;
@@ -2654,7 +2656,7 @@ test_buffer_fill(void)
 	int buf_size = 65536 * (256 + sizeof(struct drm_i915_perf_record_header));
 	uint8_t *buf = malloc(buf_size);
 	int len;
-	size_t oa_buf_size = 16 * 1024 * 1024;
+	size_t oa_buf_size = MAX_OA_BUF_SIZE;
 	size_t report_size = get_oa_format(test_oa_format).size;
 	int n_full_oa_reports = oa_buf_size / report_size;
 	uint64_t fill_duration = n_full_oa_reports * oa_period;
@@ -2823,7 +2825,7 @@ test_enable_disable(void)
 	};
 	int buf_size = 65536 * (256 + sizeof(struct drm_i915_perf_record_header));
 	uint8_t *buf = malloc(buf_size);
-	size_t oa_buf_size = 16 * 1024 * 1024;
+	size_t oa_buf_size = MAX_OA_BUF_SIZE;
 	size_t report_size = get_oa_format(test_oa_format).size;
 	int n_full_oa_reports = oa_buf_size / report_size;
 	uint64_t fill_duration = n_full_oa_reports * oa_period;
@@ -3518,7 +3520,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 	size_t format_size = get_oa_format(test_oa_format).size;
 	size_t sample_size = (sizeof(struct drm_i915_perf_record_header) +
 			      format_size);
-	int max_reports = (16 * 1024 * 1024) / format_size;
+	int max_reports = MAX_OA_BUF_SIZE / format_size;
 	int buf_size = sample_size * max_reports * 1.5;
 	int child_ret;
 	uint8_t *buf = malloc(buf_size);
