@@ -15,6 +15,8 @@ lib_source_list =	 	\
 	igt.h			\
 	igt_debugfs.c		\
 	igt_debugfs.h		\
+	igt_device.c		\
+	igt_device.h		\
 	igt_aux.c		\
 	igt_aux.h		\
 	igt_edid_template.h	\

@@ -51,6 +51,7 @@
 #include "intel_chipset.h"
 #include "intel_io.h"
 #include "igt_debugfs.h"
+#include "igt_device.h"
 #include "igt_gt.h"
 #include "igt_kmod.h"
 #include "version.h"
@@ -423,8 +424,7 @@ int drm_open_driver_master(int chipset)
 {
 	int fd = drm_open_driver(chipset);
 
-	igt_require_f(drmSetMaster(fd) == 0, "Can't become DRM master, "
-		      "please check if no other DRM client is running.\n");
+	igt_device_set_master(fd);
 
 	return fd;
 }

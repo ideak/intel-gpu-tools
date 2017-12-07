@@ -1,0 +1,78 @@
+/*
+ * Copyright © 2017 Intel Corporation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
+
+#include "igt.h"
+#include "igt_device.h"
+
+int __igt_device_set_master(int fd)
+{
+	int err;
+
+	err = 0;
+	if (drmIoctl(fd, DRM_IOCTL_SET_MASTER, NULL))
+		err = -errno;
+
+	errno = 0;
+	return err;
+}
+
+/**
+ * igt_device_set_master: Set the device fd to be DRM master
+ * @fd: the device
+ *
+ * Tell the kernel to make this device fd become DRM master or skip the test.
+ */
+void igt_device_set_master(int fd)
+{
+	if (__igt_device_set_master(fd)) {
+		igt_debugfs_dump(fd, "clients");
+		igt_require_f(__igt_device_set_master(fd) == 0,
+			      "Can't become DRM master, "
+			      "please check if no other DRM client is running.\n");
+	}
+}
+
+int __igt_device_drop_master(int fd)
+{
+	int err;
+
+	err = 0;
+	if (drmIoctl(fd, DRM_IOCTL_DROP_MASTER, NULL))
+		err = -errno;
+
+	errno = 0;
+	return err;
+}
+
+/**
+ * igt_device_drop_master: Drop DRM master
+ * @fd: the device
+ *
+ * Tell the kernel we no longer want this device fd to be the DRM master;
+ * asserting that we lose the privilege.
+ */
+void igt_device_drop_master(int fd)
+{
+	igt_assert_eq(__igt_device_drop_master(fd), 0);
+}
