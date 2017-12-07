@@ -31,8 +31,12 @@ foreach prog : benchmark_progs
 	# FIXME meson doesn't like binaries with the same name
 	# meanwhile just suffix with _bench
 	executable(prog + '_bench', prog + '.c',
+		   install : true,
+		   install_dir : join_paths(get_option('libexecdir'), 'intel-gpu-tools', 'benchmarks'),
 		   dependencies : test_deps)
 endforeach
 
 executable('gem_wsim_bench', 'gem_wsim.c',
+	   install : true,
+	   install_dir : join_paths(get_option('libexecdir'), 'intel-gpu-tools', 'benchmarks'),
 	   dependencies : test_deps + [ lib_igt_perf ])
