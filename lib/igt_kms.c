@@ -2943,7 +2943,10 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 			output->changed &= 1 << IGT_CONNECTOR_CRTC_ID;
 	}
 
-	display->first_commit = false;
+	if (display->first_commit) {
+		igt_display_drop_events(display);
+		display->first_commit = false;
+	}
 }
 
 /*
@@ -3023,6 +3026,10 @@ int igt_display_try_commit_atomic(igt_display_t *display, uint32_t flags, void *
 
 	if (ret || (flags & DRM_MODE_ATOMIC_TEST_ONLY))
 		return ret;
+
+	if (display->first_commit)
+		igt_fail_on_f(flags & (DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK),
+			      "First commit has to drop all stale events\n");
 
 	display_commit_changed(display, COMMIT_ATOMIC);
 
@@ -3119,6 +3126,43 @@ int igt_display_try_commit2(igt_display_t *display, enum igt_commit_style s)
 int igt_display_commit(igt_display_t *display)
 {
 	return igt_display_commit2(display, COMMIT_LEGACY);
+}
+
+/**
+ * igt_display_drop_events:
+ * @display: DRM device handle
+ *
+ * Nonblockingly reads all current events and drops them, for highest
+ * reliablility, call igt_display_commit2() first to flush all outstanding
+ * events.
+ *
+ * This will be called on the first commit after igt_display_reset() too,
+ * to make sure any stale events are flushed.
+ *
+ * Returns: Number of dropped events.
+ */
+int igt_display_drop_events(igt_display_t *display)
+{
+	int ret = 0;
+
+	/* Clear all events from drm fd. */
+	struct pollfd pfd = {
+		.fd = display->drm_fd,
+		.events = POLLIN
+	};
+
+	while (poll(&pfd, 1, 0) > 0) {
+		struct drm_event ev;
+		char buf[128];
+
+		read(display->drm_fd, &ev, sizeof(ev));
+		igt_info("Dropping event type %u length %u\n", ev.type, ev.length);
+		igt_assert(ev.length <= sizeof(buf));
+		read(display->drm_fd, buf, ev.length);
+		ret++;
+	}
+
+	return ret;
 }
 
 const char *igt_output_name(igt_output_t *output)

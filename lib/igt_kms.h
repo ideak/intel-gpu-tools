@@ -365,6 +365,7 @@ int  igt_display_commit(igt_display_t *display);
 int  igt_display_try_commit_atomic(igt_display_t *display, uint32_t flags, void *user_data);
 void igt_display_commit_atomic(igt_display_t *display, uint32_t flags, void *user_data);
 int  igt_display_try_commit2(igt_display_t *display, enum igt_commit_style s);
+int  igt_display_drop_events(igt_display_t *display);
 int  igt_display_get_n_pipes(igt_display_t *display);
 void igt_display_require_output(igt_display_t *display);
 void igt_display_require_output_on_pipe(igt_display_t *display, enum pipe pipe);
