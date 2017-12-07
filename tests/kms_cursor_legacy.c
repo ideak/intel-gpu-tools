@@ -45,6 +45,8 @@
 
 IGT_TEST_DESCRIPTION("Stress legacy cursor ioctl");
 
+igt_pipe_crc_t *pipe_crc;
+
 static void stress(igt_display_t *display,
 		   enum pipe pipe, int num_children, unsigned mode,
 		   int timeout)
@@ -203,28 +205,20 @@ static void populate_cursor_args(igt_display_t *display, enum pipe pipe,
 	arg[1] = *arg;
 }
 
-static void do_cleanup_display(igt_display_t *display)
-{
-	enum pipe pipe;
-	igt_output_t *output;
-	igt_plane_t *plane;
-
-	for_each_pipe(display, pipe)
-		for_each_plane_on_pipe(display, pipe, plane)
-			igt_plane_set_fb(plane, NULL);
-
-	for_each_connected_output(display, output)
-		igt_output_set_pipe(output, PIPE_NONE);
-
-	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
-}
-
 static enum pipe find_connected_pipe(igt_display_t *display, bool second)
 {
 	enum pipe pipe, first = PIPE_NONE;
 	igt_output_t *output;
 	igt_output_t *first_output = NULL;
 	bool found = false;
+
+	if (!second) {
+		igt_pipe_crc_free(pipe_crc);
+		pipe_crc = NULL;
+
+		/* Clear display, events will be eaten by commit.. */
+		igt_display_reset(display);
+	}
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		if (first == pipe || output == first_output)
@@ -451,8 +445,6 @@ static void flip(igt_display_t *display,
 
 	munmap(results, 4096);
 
-	do_cleanup_display(display);
-
 	igt_remove_fb(display->drm_fd, &fb_info);
 	if (flip_pipe != cursor_pipe)
 		igt_remove_fb(display->drm_fd, &fb_info2);
@@ -608,7 +600,6 @@ static void basic_flip_cursor(igt_display_t *display,
 	if (miss1 || miss2)
 		igt_info("Failed to evade %i vblanks and missed %i page flips\n", miss1, miss2);
 
-	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
 
@@ -758,7 +749,6 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 		sched_setaffinity(0, sizeof(oldmask), &oldmask);
 	}
 
-	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
 
@@ -768,34 +758,12 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 		igt_remove_fb(display->drm_fd, &cursor_fb2);
 }
 
-static bool skip_on_unsupported_nonblocking_modeset(igt_display_t *display)
-{
-	enum pipe pipe;
-	int ret;
-
-	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-
-	ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK, NULL);
-
-	if (ret == -EINVAL)
-		return true;
-
-	igt_assert_eq(ret, 0);
-
-	/* Force the next state to update all crtc's, to synchronize with the nonblocking modeset. */
-	for_each_pipe(display, pipe)
-		igt_pipe_refresh(display, pipe, false);
-
-	return false;
-}
-
 static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 {
 	struct igt_fb fb_info, cursor_fb;
 	igt_output_t *output;
 	enum pipe pipe = find_connected_pipe(display, false);
 	struct drm_mode_cursor arg[2];
-	bool skip_test;
 	igt_plane_t *cursor = NULL, *plane;
 
 	igt_require(display->is_atomic);
@@ -815,13 +783,9 @@ static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 
 	igt_skip_on(!cursor);
 
-	if ((skip_test = skip_on_unsupported_nonblocking_modeset(display)))
-		goto cleanup;
-
 	/*
-	 * Start disabled, because skip_on_unsupported_nonblocking_modeset
-	 * will have enabled this pipe. No way around it, since the first
-	 * atomic commit may be unreliable with amount of events sent.
+	 * Start disabled. No way around it, since the first atomic
+	 * commit may be unreliable with amount of events sent.
 	 */
 	igt_output_set_pipe(output, PIPE_NONE);
 	igt_display_commit2(display, COMMIT_ATOMIC);
@@ -873,13 +837,8 @@ static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 		igt_reset_timeout();
 	}
 
-cleanup:
-	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
-
-	if (skip_test)
-		igt_skip("Nonblocking modeset is not supported by this kernel\n");
 }
 
 static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool modeset, bool atomic)
@@ -891,7 +850,6 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 	enum pipe pipe = find_connected_pipe(display, false);
 	enum pipe pipe2 = find_connected_pipe(display, true);
 	igt_output_t *output, *output2;
-	bool skip_test = false;
 
 	igt_fail_on(modeset && !atomic);
 
@@ -911,9 +869,6 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 	populate_cursor_args(display, pipe2, arg2, &cursor_fb);
 
 	arg2[1].x = arg2[1].y = 192;
-
-	if (modeset && (skip_test = skip_on_unsupported_nonblocking_modeset(display)))
-		goto cleanup;
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
@@ -977,14 +932,9 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 		}
 	}
 
-cleanup:
-	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info);
 	igt_remove_fb(display->drm_fd, &fb2_info);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
-
-	if (skip_test)
-		igt_skip("Nonblocking modeset is not supported by this kernel\n");
 }
 
 static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloops)
@@ -1066,7 +1016,6 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 			     vrefresh*target, vrefresh*target / 2);
 	}
 
-	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
 	munmap((void *)shared, 4096);
@@ -1173,7 +1122,6 @@ static void two_screens_cursor_vs_flip(igt_display_t *display, int nloops, bool 
 				    vrefresh[child]*target[child], vrefresh[child]*target[child] / 2);
 	}
 
-	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info[0]);
 	igt_remove_fb(display->drm_fd, &fb_info[1]);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
@@ -1187,7 +1135,6 @@ static void flip_vs_cursor_crc(igt_display_t *display, bool atomic)
 	struct igt_fb fb_info, cursor_fb;
 	unsigned vblank_start;
 	enum pipe pipe = find_connected_pipe(display, false);
-	igt_pipe_crc_t *pipe_crc;
 	igt_crc_t crcs[3];
 
 	if (atomic)
@@ -1232,10 +1179,8 @@ static void flip_vs_cursor_crc(igt_display_t *display, bool atomic)
 		igt_assert_crc_equal(&crcs[i], &crcs[2]);
 	}
 
-	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
-	igt_pipe_crc_free(pipe_crc);
 }
 
 static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
@@ -1245,7 +1190,6 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	struct igt_fb fb_info[2], cursor_fb;
 	unsigned vblank_start;
 	enum pipe pipe = find_connected_pipe(display, false);
-	igt_pipe_crc_t *pipe_crc;
 	igt_pipe_t *pipe_connected = &display->pipes[pipe];
 	igt_plane_t *plane_primary = igt_pipe_get_plane_type(pipe_connected, DRM_PLANE_TYPE_PRIMARY);
 	igt_crc_t crcs[2];
@@ -1333,17 +1277,9 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 		free(received_crcs);
 	}
 
-	do_cleanup_display(display);
 	igt_remove_fb(display->drm_fd, &fb_info[1]);
 	igt_remove_fb(display->drm_fd, &fb_info[0]);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
-
-	/*
-	 * igt_pipe_crc_stop() may force a modeset for workarounds, call
-	 * it after do_cleanup_display since we disable the display anyway.
-	 */
-	igt_pipe_crc_stop(pipe_crc);
-	igt_pipe_crc_free(pipe_crc);
 }
 
 igt_main
