@@ -75,6 +75,11 @@ unsigned gem_submission_method(int fd)
 	if (dir < 0)
 		return 0;
 
+	if (igt_sysfs_get_u32(dir, "enable_guc") & 1) {
+		flags |= GEM_SUBMISSION_GUC | GEM_SUBMISSION_EXECLISTS;
+		goto out;
+	}
+
 	if (igt_sysfs_get_boolean(dir, "enable_guc_submission")) {
 		flags |= GEM_SUBMISSION_GUC | GEM_SUBMISSION_EXECLISTS;
 		goto out;
