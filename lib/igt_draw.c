@@ -97,29 +97,28 @@ const char *igt_draw_get_method_name(enum igt_draw_method method)
 	}
 }
 
-#define BIT(num, bit) ((num >> bit) & 1)
-
-static int swizzle_addr(int addr, int swizzle)
+static unsigned long swizzle_bit(unsigned int bit, unsigned long offset)
 {
-	int bit6;
+	return (offset & (1ul << bit)) >> (bit - 6);
+}
 
+static int swizzle_addr(unsigned long addr, int swizzle)
+{
 	switch (swizzle) {
 	case I915_BIT_6_SWIZZLE_NONE:
-		bit6 = BIT(addr, 6);
-		break;
+		return addr;
 	case I915_BIT_6_SWIZZLE_9:
-		bit6 = BIT(addr, 6) ^ BIT(addr, 9);
-		break;
+		return addr ^ swizzle_bit(9, addr);
 	case I915_BIT_6_SWIZZLE_9_10:
-		bit6 = BIT(addr, 6) ^ BIT(addr, 9) ^ BIT(addr, 10);
-		break;
+		return addr ^ swizzle_bit(9, addr) ^ swizzle_bit(10, addr);
 	case I915_BIT_6_SWIZZLE_9_11:
-		bit6 = BIT(addr, 6) ^ BIT(addr, 9) ^ BIT(addr, 11);
-		break;
+		return addr ^ swizzle_bit(9, addr) ^ swizzle_bit(11, addr);
 	case I915_BIT_6_SWIZZLE_9_10_11:
-		bit6 = BIT(addr, 6) ^ BIT(addr, 9) ^ BIT(addr, 10) ^
-		       BIT(addr, 11);
-		break;
+		return (addr ^
+			swizzle_bit(9, addr) ^
+			swizzle_bit(10, addr) ^
+			swizzle_bit(11, addr));
+
 	case I915_BIT_6_SWIZZLE_UNKNOWN:
 	case I915_BIT_6_SWIZZLE_9_17:
 	case I915_BIT_6_SWIZZLE_9_10_17:
@@ -127,12 +126,8 @@ static int swizzle_addr(int addr, int swizzle)
 		/* If we hit this case, we need to implement support for the
 		 * appropriate swizzling method. */
 		igt_require(false);
-		break;
+		return addr;
 	}
-
-	addr &= ~(1 << 6);
-	addr |= (bit6 << 6);
-	return addr;
 }
 
 static int tile(int x, int y, uint32_t x_tile_size, uint32_t y_tile_size,
