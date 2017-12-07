@@ -54,36 +54,34 @@
 
 static int readN(int fd, char *buf, int len)
 {
-	int total = 0;
+	int ret, total = 0;
 	do {
-		int ret = read(fd, buf + total, len - total);
-		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
+		ret = read(fd, buf + total, len - total);
+		if (ret < 0)
+			ret = -errno;
+		if (ret == -EINTR || ret == -EAGAIN)
 			continue;
-
 		if (ret <= 0)
-			return total ?: ret;
-
+			break;
 		total += ret;
-		if (total == len)
-			return total;
-	} while (1);
+	} while (total != len);
+	return total ?: ret;
 }
 
 static int writeN(int fd, const char *buf, int len)
 {
-	int total = 0;
+	int ret, total = 0;
 	do {
-		int ret = write(fd, buf + total, len - total);
-		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
+		ret = write(fd, buf + total, len - total);
+		if (ret < 0)
+			ret = -errno;
+		if (ret == -EINTR || ret == -EAGAIN)
 			continue;
-
 		if (ret <= 0)
-			return total ?: ret;
-
+			break;
 		total += ret;
-		if (total == len)
-			return total;
-	} while (1);
+	} while (total != len);
+	return total ?: ret;
 }
 
 /**
@@ -238,7 +236,7 @@ int igt_sysfs_open_parameters(int device)
  * This writes @len bytes from @data to the sysfs file.
  *
  * Returns:
- * The number of bytes written, or -1 on error.
+ * The number of bytes written, or -errno on error.
  */
 int igt_sysfs_write(int dir, const char *attr, const void *data, int len)
 {
@@ -246,7 +244,7 @@ int igt_sysfs_write(int dir, const char *attr, const void *data, int len)
 
 	fd = openat(dir, attr, O_WRONLY);
 	if (fd < 0)
-		return false;
+		return -errno;
 
 	len = writeN(fd, data, len);
 	close(fd);
@@ -264,7 +262,7 @@ int igt_sysfs_write(int dir, const char *attr, const void *data, int len)
  * This reads @len bytes from the sysfs file to @data
  *
  * Returns:
- * The length read, -1 on failure.
+ * The length read, -errno on failure.
  */
 int igt_sysfs_read(int dir, const char *attr, void *data, int len)
 {
@@ -272,7 +270,7 @@ int igt_sysfs_read(int dir, const char *attr, void *data, int len)
 
 	fd = openat(dir, attr, O_RDONLY);
 	if (fd < 0)
-		return false;
+		return -errno;
 
 	len = readN(fd, data, len);
 	close(fd);
@@ -338,7 +336,7 @@ char *igt_sysfs_get(int dir, const char *attr)
 		rem = len - offset - 1;
 	}
 
-	if (ret != -1)
+	if (ret > 0)
 		offset += ret;
 	buf[offset] = '\0';
 	while (offset > 0 && buf[offset-1] == '\n')
