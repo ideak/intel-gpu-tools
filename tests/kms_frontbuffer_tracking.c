@@ -1130,8 +1130,7 @@ static void draw_rect(struct draw_pattern_info *pattern, struct fb_region *fb,
 			 fb->x + rect.x, fb->y + rect.y,
 			 rect.w, rect.h, rect.color);
 
-	if (method == IGT_DRAW_MMAP_WC)
-		fb_dirty_ioctl(fb, &rect);
+	fb_dirty_ioctl(fb, &rect);
 }
 
 static void draw_rect_igt_fb(struct draw_pattern_info *pattern,
@@ -2135,15 +2134,9 @@ static void multidraw_subtest(const struct test_mode *t)
 
 				draw_rect(pattern, target, used_method, r);
 
-				if (used_method == IGT_DRAW_MMAP_WC)
+				if (used_method == IGT_DRAW_MMAP_WC ||
+				    used_method == IGT_DRAW_MMAP_GTT)
 					wc_used = true;
-
-				if (used_method == IGT_DRAW_MMAP_GTT &&
-				    wc_used) {
-					struct rect rect =
-						pattern->get_rect(target, r);
-					fb_dirty_ioctl(target, &rect);
-				}
 
 				update_wanted_crc(t,
 						  &pattern->crcs[t->format][r]);
