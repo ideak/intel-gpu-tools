@@ -421,7 +421,7 @@ igt_main
 	int fd = -1;
 
 	igt_fixture {
-		fd = drm_open_driver(DRIVER_INTEL);
+		fd = drm_open_driver_master(DRIVER_INTEL); /* for SECURE */
 		igt_require_gem(fd);
 		gem_require_mocs_registers(fd);
 		igt_require(get_mocs_settings(fd, &table, false));
