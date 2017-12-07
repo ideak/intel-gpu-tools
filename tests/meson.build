@@ -293,7 +293,10 @@ foreach prog : test_progs
 			args : prog)
 endforeach
 
-executable('gem_stress', 'gem_stress.c', dependencies : igt_deps)
+executable('gem_stress', 'gem_stress.c',
+	   install : true,
+	   install_dir : libexecdir,
+	   dependencies : igt_deps)
 
 # IMPORTANT: These tests here are all disabled because the result in sometime
 # unrecoverable gpu hangs. Don't put real testcases here.
