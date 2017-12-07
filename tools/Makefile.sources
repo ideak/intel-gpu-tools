@@ -2,6 +2,7 @@ noinst_PROGRAMS =		\
 	hsw_compute_wrpll	\
 	skl_compute_wrpll	\
 	skl_ddb_allocation	\
+	cnl_compute_wrpll 	\
 	$(NULL)
 
 tools_prog_lists =		\
