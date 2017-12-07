@@ -145,8 +145,6 @@ if chamelium.found()
 	lib_sources += 'igt_chamelium.c'
 endif
 
-install_headers(lib_headers)
-
 pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), 'intel-gpu-tools')
 srcdir = join_paths(meson.source_root(), 'tests')
 
