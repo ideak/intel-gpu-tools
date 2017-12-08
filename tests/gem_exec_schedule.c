@@ -41,6 +41,7 @@
 #define MIN_PRIO LOCAL_I915_CONTEXT_MIN_USER_PRIORITY
 
 #define BUSY_QLEN 8
+#define MAX_ELSP_QLEN 16
 
 IGT_TEST_DESCRIPTION("Check that we can control the order of execution");
 
@@ -362,7 +363,7 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 {
 	uint32_t result = gem_create(fd, 4096);
 	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
-	igt_spin_t *spin[16];
+	igt_spin_t *spin[MAX_ELSP_QLEN];
 	uint32_t ctx[2];
 	igt_hang_t hang;
 
@@ -408,7 +409,7 @@ static void preempt_other(int fd, unsigned ring)
 {
 	uint32_t result = gem_create(fd, 4096);
 	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
-	igt_spin_t *spin[16];
+	igt_spin_t *spin[MAX_ELSP_QLEN];
 	unsigned int other;
 	unsigned int n, i;
 	uint32_t ctx[3];
@@ -466,7 +467,7 @@ static void preempt_self(int fd, unsigned ring)
 {
 	uint32_t result = gem_create(fd, 4096);
 	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
-	igt_spin_t *spin[16];
+	igt_spin_t *spin[MAX_ELSP_QLEN];
 	unsigned int other;
 	unsigned int n, i;
 	uint32_t ctx[3];
@@ -513,6 +514,39 @@ static void preempt_self(int fd, unsigned ring)
 
 	munmap(ptr, 4096);
 	gem_close(fd, result);
+}
+
+static void preemptive_hang(int fd, unsigned ring)
+{
+	igt_spin_t *spin[MAX_ELSP_QLEN];
+	igt_hang_t hang;
+	uint32_t ctx[2];
+
+	ctx[HI] = gem_context_create(fd);
+	gem_context_set_priority(fd, ctx[HI], MAX_PRIO);
+
+	for (int n = 0; n < 16; n++) {
+		ctx[LO] = gem_context_create(fd);
+		gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
+
+		spin[n] = __igt_spin_batch_new(fd, ctx[LO], ring, 0);
+
+		gem_context_destroy(fd, ctx[LO]);
+	}
+
+	hang = igt_hang_ctx(fd, ctx[HI], ring, 0, NULL);
+	igt_post_hang_ring(fd, hang);
+
+	for (int n = 0; n < 16; n++) {
+		/* Current behavior is to execute requests in order of submission.
+		 * This is subject to change as the scheduler evolve. The test should
+		 * be updated to reflect such changes.
+		 */
+		igt_assert(gem_bo_busy(fd, spin[n]->handle));
+		igt_spin_batch_free(fd, spin[n]);
+	}
+
+	gem_context_destroy(fd, ctx[HI]);
 }
 
 static void deep(int fd, unsigned ring)
@@ -1043,6 +1077,9 @@ igt_main
 						igt_subtest_f("preempt-hang-%s", e->name) {
 							preempt(fd, e->exec_id | e->flags, NEW_CTX | HANG_LP);
 						}
+
+						igt_subtest_f("preemptive-hang-%s", e->name)
+							preemptive_hang(fd, e->exec_id | e->flags);
 
 						igt_fixture {
 							igt_disallow_hang(fd, hang);
