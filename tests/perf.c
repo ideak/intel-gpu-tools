@@ -3964,6 +3964,17 @@ static void i915_perf_remove_config(int fd, uint64_t config_id)
 				&config_id), 0);
 }
 
+static bool has_i915_perf_userspace_config(int fd)
+{
+	uint64_t config = 0;
+	int ret = igt_ioctl(fd, DRM_IOCTL_I915_PERF_REMOVE_CONFIG, &config);
+	igt_assert_eq(ret, -1);
+
+	igt_debug("errno=%i\n", errno);
+
+	return errno != EINVAL;
+}
+
 static void
 test_invalid_create_userspace_config(void)
 {
@@ -3972,6 +3983,8 @@ test_invalid_create_userspace_config(void)
 	const char *invalid_uuid = "blablabla-wrong";
 	uint32_t mux_regs[] = { 0x9888 /* NOA_WRITE */, 0x0 };
 	uint32_t invalid_mux_regs[] = { 0x12345678 /* invalid register */, 0x0 };
+
+	igt_require(has_i915_perf_userspace_config(drm_fd));
 
 	memset(&config, 0, sizeof(config));
 
@@ -4032,6 +4045,8 @@ test_invalid_remove_userspace_config(void)
 	uint64_t config_id, wrong_config_id = 999999999;
 	char path[512];
 
+	igt_require(has_i915_perf_userspace_config(drm_fd));
+
 	snprintf(path, sizeof(path), "/sys/class/drm/card%d/metrics/%s/id", card, uuid);
 
 	/* Destroy previous configuration if present */
@@ -4089,6 +4104,8 @@ test_create_destroy_userspace_config(void)
 		.properties_ptr = to_user_pointer(properties),
 	};
 	char path[512];
+
+	igt_require(has_i915_perf_userspace_config(drm_fd));
 
 	snprintf(path, sizeof(path), "/sys/class/drm/card%d/metrics/%s/id", card, uuid);
 
@@ -4169,6 +4186,8 @@ test_whitelisted_registers_userspace_config(void)
 		0xe55c,
 		0xe65c
 	};
+
+	igt_require(has_i915_perf_userspace_config(drm_fd));
 
 	snprintf(path, sizeof(path), "/sys/class/drm/card%d/metrics/%s/id", card, uuid);
 
