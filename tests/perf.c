@@ -559,47 +559,46 @@ emit_report_perf_count(struct intel_batchbuffer *batch,
 }
 
 static uint32_t
-i915_get_one_gpu_timestamp(uint32_t *context_id)
+i915_get_one_gpu_timestamp(void)
 {
-	drm_intel_bufmgr *bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-	drm_intel_context *mi_rpc_ctx = drm_intel_gem_context_create(bufmgr);
-	drm_intel_bo *mi_rpc_bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
-	struct intel_batchbuffer *mi_rpc_batch = intel_batchbuffer_alloc(bufmgr, devid);
-	int ret;
+	const bool r64b = intel_gen(devid) >= 8;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_relocation_entry reloc;
+	uint32_t batch[16];
 	uint32_t timestamp;
+	int i;
 
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = gem_create(drm_fd, 4096);
+	obj[1].handle = gem_create(drm_fd, 4096);
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
+	obj[1].relocation_count = 1;
 
-	if (context_id) {
-		ret = drm_intel_gem_context_get_id(mi_rpc_ctx, context_id);
-		igt_assert_eq(ret, 0);
-	}
+	i = 0;
+	batch[i++] = 0x24 << 23 | (1 + r64b); /* SRM */
+	batch[i++] = 0x2358; /* RCS0 timestamp */
+	reloc.target_handle = obj[0].handle;
+	reloc.presumed_offset = obj[0].offset;
+	reloc.offset = i * sizeof(batch[0]);
+	reloc.delta = 0;
+	reloc.read_domains = I915_GEM_DOMAIN_RENDER;
+	reloc.write_domain = I915_GEM_DOMAIN_RENDER;
+	batch[i++] = reloc.delta;
+	if (r64b)
+		batch[i++] = 0;
+	batch[i] = MI_BATCH_BUFFER_END;
+	gem_write(drm_fd, obj[1].handle, 0, batch, sizeof(batch));
 
-	igt_assert(mi_rpc_ctx);
-	igt_assert(mi_rpc_bo);
-	igt_assert(mi_rpc_batch);
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+	execbuf.batch_len = 4096;
+	gem_execbuf(drm_fd, &execbuf);
+	gem_close(drm_fd, obj[1].handle);
 
-	ret = drm_intel_bo_map(mi_rpc_bo, true);
-	igt_assert_eq(ret, 0);
-	memset(mi_rpc_bo->virtual, 0x80, 4096);
-	drm_intel_bo_unmap(mi_rpc_bo);
-
-	emit_report_perf_count(mi_rpc_batch,
-			       mi_rpc_bo, /* dst */
-			       0, /* dst offset in bytes */
-			       0xdeadbeef); /* report ID */
-
-	intel_batchbuffer_flush_with_context(mi_rpc_batch, mi_rpc_ctx);
-
-	ret = drm_intel_bo_map(mi_rpc_bo, false /* write enable */);
-	igt_assert_eq(ret, 0);
-	timestamp = ((uint32_t *)mi_rpc_bo->virtual)[1];
-	drm_intel_bo_unmap(mi_rpc_bo);
-
-	drm_intel_bo_unreference(mi_rpc_bo);
-	intel_batchbuffer_free(mi_rpc_batch);
-	drm_intel_gem_context_destroy(mi_rpc_ctx);
-	drm_intel_bufmgr_destroy(bufmgr);
+	gem_read(drm_fd, obj[0].handle, 0, &timestamp, sizeof(timestamp));
+	gem_close(drm_fd, obj[0].handle);
 
 	return timestamp;
 }
@@ -1792,7 +1791,6 @@ test_oa_exponents(void)
 			uint32_t n_reports = 0;
 			uint32_t n_idle_reports = 0;
 			uint32_t n_reads = 0;
-			uint32_t context_id;
 			uint64_t first_timestamp = 0;
 			bool check_first_timestamp = true;
 			struct drm_i915_perf_record_header *header;
@@ -1821,7 +1819,7 @@ test_oa_exponents(void)
 			 * first timestamp as way to filter previously
 			 * scheduled work that would have configured
 			 * the OA unit at a different period. */
-			first_timestamp = i915_get_one_gpu_timestamp(&context_id);
+			first_timestamp = i915_get_one_gpu_timestamp();
 
 			while (n_reads < ARRAY_SIZE(reads) &&
 			       n_reports < ARRAY_SIZE(reports)) {
@@ -1947,8 +1945,8 @@ test_oa_exponents(void)
 				uint32_t *rpt = NULL, *last = NULL, *last_periodic = NULL;
 
 				igt_debug(" > More than 5%% error: avg_ts_delta = %"PRIu64", delta_delta = %"PRIu64", "
-					  "expected_delta = %"PRIu64", first_timestamp = %"PRIu64" ctx_id=%"PRIu32"\n",
-					  average_timestamp_delta, delta_delta, expected_timestamp_delta, first_timestamp, context_id);
+					  "expected_delta = %"PRIu64", first_timestamp = %"PRIu64"\n",
+					  average_timestamp_delta, delta_delta, expected_timestamp_delta, first_timestamp);
 				for (int i = 0; i < (n_reports - 1); i++) {
 					/* XXX: calculating with u32 arithmetic to account for overflow */
 					uint32_t u32_delta =
