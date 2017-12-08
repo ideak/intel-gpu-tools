@@ -1043,6 +1043,7 @@ static void destroy_cairo_surface__blit(void *arg)
 				   I915_TILING_NONE,
 				   0, 0, /* src_x, src_y */
 				   fb->width, fb->height,
+				   igt_drm_format_to_bpp(fb->drm_format),
 				   fb->gem_handle,
 				   fb->stride,
 				   obj_tiling,
@@ -1090,6 +1091,7 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 				   obj_tiling,
 				   0, 0, /* src_x, src_y */
 				   fb->width, fb->height,
+				   igt_drm_format_to_bpp(fb->drm_format),
 				   blit->linear.handle,
 				   blit->linear.stride,
 				   I915_TILING_NONE,

@@ -228,6 +228,7 @@ unsigned igt_buf_height(struct igt_buf *buf);
 void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 			  struct igt_buf *src, unsigned src_x, unsigned src_y,
 			  unsigned width, unsigned height,
+			  int bpp,
 			  struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
 
 void igt_blitter_fast_copy__raw(int fd,
@@ -239,6 +240,9 @@ void igt_blitter_fast_copy__raw(int fd,
 
 				/* size */
 				unsigned int width, unsigned int height,
+
+				/* bpp */
+				int bpp,
 
 				/* dst */
 				uint32_t dst_handle,

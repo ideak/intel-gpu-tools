@@ -2530,7 +2530,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /* dword 1 */
 #define   XY_FAST_COPY_SRC_TILING_Yf			(1 <<  31)
 #define   XY_FAST_COPY_DST_TILING_Yf			(1 <<  30)
+#define   XY_FAST_COPY_COLOR_DEPTH_8			(0  << 24)
+#define   XY_FAST_COPY_COLOR_DEPTH_16			(1  << 24)
 #define   XY_FAST_COPY_COLOR_DEPTH_32			(3  << 24)
+#define   XY_FAST_COPY_COLOR_DEPTH_64			(4  << 24)
+#define   XY_FAST_COPY_COLOR_DEPTH_128			(5  << 24)
 
 #define MI_STORE_DWORD_IMM		((0x20<<23)|2)
 #define   MI_MEM_VIRTUAL	(1 << 22) /* 965+ only */

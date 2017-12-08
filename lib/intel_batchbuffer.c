@@ -519,7 +519,8 @@ static uint32_t fast_copy_dword0(unsigned int src_tiling,
 }
 
 static uint32_t fast_copy_dword1(unsigned int src_tiling,
-				 unsigned int dst_tiling)
+				 unsigned int dst_tiling,
+				 int bpp)
 {
 	uint32_t dword1 = 0;
 
@@ -528,7 +529,25 @@ static uint32_t fast_copy_dword1(unsigned int src_tiling,
 	if (dst_tiling == I915_TILING_Yf)
 		dword1 |= XY_FAST_COPY_DST_TILING_Yf;
 
-	dword1 |= XY_FAST_COPY_COLOR_DEPTH_32;
+	switch (bpp) {
+	case 8:
+		dword1 |= XY_FAST_COPY_COLOR_DEPTH_8;
+		break;
+	case 16:
+		dword1 |= XY_FAST_COPY_COLOR_DEPTH_16;
+		break;
+	case 32:
+		dword1 |= XY_FAST_COPY_COLOR_DEPTH_32;
+		break;
+	case 64:
+		dword1 |= XY_FAST_COPY_COLOR_DEPTH_64;
+		break;
+	case 128:
+		dword1 |= XY_FAST_COPY_COLOR_DEPTH_128;
+		break;
+	default:
+		igt_assert(0);
+	}
 
 	return dword1;
 }
@@ -586,6 +605,7 @@ static void exec_blit(int fd,
  * @src_y: Y coordinate of the source region to copy
  * @width: Width of the region to copy
  * @height: Height of the region to copy
+ * @bpp: source and destination bits per pixel
  * @dst_handle: GEM handle of the source buffer
  * @dst_stride: Stride (in bytes) of the destination buffer
  * @dst_tiling: Tiling mode of the destination buffer
@@ -604,6 +624,9 @@ void igt_blitter_fast_copy__raw(int fd,
 				/* size */
 				unsigned int width, unsigned int height,
 
+				/* bpp */
+				int bpp,
+
 				/* dst */
 				uint32_t dst_handle,
 				unsigned int dst_stride,
@@ -621,7 +644,7 @@ void igt_blitter_fast_copy__raw(int fd,
 	src_pitch = fast_copy_pitch(src_stride, src_tiling);
 	dst_pitch = fast_copy_pitch(dst_stride, dst_tiling);
 	dword0 = fast_copy_dword0(src_tiling, dst_tiling);
-	dword1 = fast_copy_dword1(src_tiling, dst_tiling);
+	dword1 = fast_copy_dword1(src_tiling, dst_tiling, bpp);
 
 #define CHECK_RANGE(x)	((x) >= 0 && (x) < (1 << 15))
 	assert(CHECK_RANGE(src_x) && CHECK_RANGE(src_y) &&
@@ -671,6 +694,7 @@ void igt_blitter_fast_copy__raw(int fd,
  * @src_y: source pixel y-coordination
  * @width: width of the copied rectangle
  * @height: height of the copied rectangle
+ * @bpp: source and destination bits per pixel
  * @dst: destination i-g-t buffer object
  * @dst_x: destination pixel x-coordination
  * @dst_y: destination pixel y-coordination
@@ -682,6 +706,7 @@ void igt_blitter_fast_copy__raw(int fd,
 void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 			   struct igt_buf *src, unsigned src_x, unsigned src_y,
 			   unsigned width, unsigned height,
+			   int bpp,
 			   struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
 {
 	uint32_t src_pitch, dst_pitch;
@@ -690,7 +715,7 @@ void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 	src_pitch = fast_copy_pitch(src->stride, src->tiling);
 	dst_pitch = fast_copy_pitch(dst->stride, src->tiling);
 	dword0 = fast_copy_dword0(src->tiling, dst->tiling);
-	dword1 = fast_copy_dword1(src->tiling, dst->tiling);
+	dword1 = fast_copy_dword1(src->tiling, dst->tiling, bpp);
 
 #define CHECK_RANGE(x)	((x) >= 0 && (x) < (1 << 15))
 	assert(CHECK_RANGE(src_x) && CHECK_RANGE(src_y) &&
