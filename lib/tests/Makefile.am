@@ -7,13 +7,15 @@ AM_TESTS_ENVIRONMENT = \
 	top_builddir=$(top_builddir) \
 	top_srcdir=$(top_srcdir)
 
-AM_CFLAGS = $(DRM_CFLAGS) $(CWARNFLAGS) $(DEBUG_CFLAGS) \
+AM_CPPFLAGS = \
+	-I$(top_srcdir)/include/drm-uapi \
 	-I$(srcdir)/../.. \
 	-I$(srcdir)/.. \
 	-include "$(srcdir)/../../lib/check-ndebug.h" \
 	-DIGT_DATADIR=\""$(abs_srcdir)"\" \
 	-D_GNU_SOURCE
-	$(NULL)
+
+AM_CFLAGS = $(DRM_CFLAGS) $(CWARNFLAGS) $(DEBUG_CFLAGS)
 
 LDADD = ../libintel_tools.la $(PCIACCESS_LIBS) $(DRM_LIBS) $(LIBUNWIND_LIBS) $(TIMER_LIBS)
 

@@ -2,7 +2,7 @@ if BUILD_OVERLAY
 bin_PROGRAMS = intel-gpu-overlay
 endif
 
-AM_CPPFLAGS = -I.
+AM_CPPFLAGS = -I. -I$(top_srcdir)/include/drm-uapi
 AM_CFLAGS = $(DRM_CFLAGS) $(PCIACCESS_CFLAGS) $(CWARNFLAGS) \
 	$(CAIRO_CFLAGS) $(OVERLAY_CFLAGS) $(WERROR_CFLAGS) -I$(srcdir)/../lib
 LDADD = $(DRM_LIBS) $(PCIACCESS_LIBS) $(CAIRO_LIBS) $(OVERLAY_LIBS) $(top_builddir)/lib/libigt_perf.la

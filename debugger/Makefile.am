@@ -6,7 +6,8 @@ noinst_PROGRAMS = debug_rdata
 
 AM_CPPFLAGS = 			\
 	-I$(top_srcdir)		\
-	-I$(top_srcdir)/lib
+	-I$(top_srcdir)/lib	\
+	-I$(top_srcdir)/include/drm-uapi
 
 AM_CFLAGS = 			\
 	$(DRM_CFLAGS) 		\
