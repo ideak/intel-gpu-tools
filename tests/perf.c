@@ -39,6 +39,7 @@
 #include <math.h>
 
 #include "igt.h"
+#include "igt_sysfs.h"
 #include "drm.h"
 
 IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
@@ -180,6 +181,7 @@ static bool hsw_undefined_a_counters[45] = {
 static bool gen8_undefined_a_counters[45];
 
 static int drm_fd = -1;
+static int sysfs = -1;
 static int pm_fd = -1;
 static int stream_fd = -1;
 static uint32_t devid;
@@ -327,65 +329,14 @@ write_u64_file(const char *file, uint64_t val)
 	close(fd);
 }
 
-static uint64_t
+static unsigned long
 sysfs_read(const char *file)
 {
-	char buf[512];
+	unsigned long value;
 
-	snprintf(buf, sizeof(buf), "/sys/class/drm/card%d/%s", card, file);
+	igt_assert(igt_sysfs_scanf(sysfs, file, "%lu", &value) == 1);
 
-	return read_u64_file(buf);
-}
-
-static char *
-read_debugfs_record(int device, const char *file, const char *key)
-{
-	FILE *fp;
-	int fd;
-	char *line = NULL;
-	size_t line_buf_size = 0;
-	int len = 0;
-	int key_len = strlen(key);
-	char *value = NULL;
-
-	fd = igt_debugfs_open(device, file, O_RDONLY);
-	fp = fdopen(fd, "r");
-	igt_require(fp);
-
-	while ((len = getline(&line, &line_buf_size, fp)) > 0) {
-
-		if (line[len - 1] == '\n')
-			line[len - 1] = '\0';
-
-		if (strncmp(key, line, key_len) == 0 &&
-		    line[key_len] == ':' &&
-		    line[key_len + 1] == ' ')
-		{
-			value = strdup(line + key_len + 2);
-			goto done;
-		}
-	}
-
-	igt_assert(!"reached");
-done:
-	free(line);
-	fclose(fp);
-	close(fd);
 	return value;
-}
-
-static uint64_t
-read_debugfs_u64_record(int fd, const char *file, const char *key)
-{
-	char *str_val = read_debugfs_record(fd, file, key);
-	uint64_t val;
-
-	igt_require(str_val);
-
-	val = strtoull(str_val, NULL, 0);
-	free(str_val);
-
-	return val;
 }
 
 /* XXX: For Haswell this utility is only applicable to the render basic
@@ -3947,15 +3898,9 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 	} while (WEXITSTATUS(child_ret) == EAGAIN);
 }
 
-static bool
-rc6_enabled(void)
+static unsigned long rc6_residency_ms(void)
 {
-	char *rc6_status = read_debugfs_record(drm_fd, "i915_drpc_info",
-					       "RC6 Enabled");
-	bool enabled = strcmp(rc6_status, "yes") == 0;
-
-	free(rc6_status);
-	return enabled;
+	return sysfs_read("power/rc6_residency_ms");
 }
 
 static void
@@ -3975,32 +3920,25 @@ test_rc6_disable(void)
 		.num_properties = sizeof(properties) / 16,
 		.properties_ptr = to_user_pointer(properties),
 	};
-	uint64_t n_events_start, n_events_end;
+	unsigned long n_events_start, n_events_end;
+	unsigned long rc6_enabled;
 
-	igt_skip_on(!rc6_enabled());
+	rc6_enabled = 0;
+	igt_sysfs_scanf(sysfs, "power/rc6_enable", "%lu", &rc6_enabled);
+	igt_require(rc6_enabled);
 
 	stream_fd = __perf_open(drm_fd, &param, false);
 
-	n_events_start = read_debugfs_u64_record(drm_fd, "i915_drpc_info",
-						 "RC6 residency since boot");
-
+	n_events_start = rc6_residency_ms();
 	nanosleep(&(struct timespec){ .tv_sec = 0, .tv_nsec = 500000000 }, NULL);
-
-	n_events_end = read_debugfs_u64_record(drm_fd, "i915_drpc_info",
-					       "RC6 residency since boot");
-
+	n_events_end = rc6_residency_ms();
 	igt_assert_eq(n_events_end - n_events_start, 0);
 
 	__perf_close(stream_fd);
 
-	n_events_start = read_debugfs_u64_record(drm_fd, "i915_drpc_info",
-						 "RC6 residency since boot");
-
+	n_events_start = rc6_residency_ms();
 	nanosleep(&(struct timespec){ .tv_sec = 1, .tv_nsec = 0 }, NULL);
-
-	n_events_end = read_debugfs_u64_record(drm_fd, "i915_drpc_info",
-					       "RC6 residency since boot");
-
+	n_events_end = rc6_residency_ms();
 	igt_assert_neq(n_events_end - n_events_start, 0);
 }
 
@@ -4459,9 +4397,9 @@ igt_main
 		 * should have closed drm_fd...
 		 */
 		igt_assert_eq(drm_fd, -1);
-		drm_fd = drm_open_driver_render(DRIVER_INTEL);
+		drm_fd = drm_open_driver(DRIVER_INTEL);
 		devid = intel_get_drm_devid(drm_fd);
-		card = drm_get_card();
+		sysfs = igt_sysfs_open(drm_fd, &card);
 
 		igt_require(init_sys_info());
 
