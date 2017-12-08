@@ -26,6 +26,7 @@
  */
 
 #include "igt.h"
+#include "igt_device.h"
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 
@@ -710,7 +711,7 @@ igt_main
 
 	igt_subtest("headless") {
 		/* Requires master for changing display modes */
-		igt_require(drmSetMaster(device) == 0);
+		igt_device_set_master(device);
 		headless(device, handle);
 	}
 

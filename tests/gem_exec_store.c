@@ -28,6 +28,7 @@
  */
 
 #include "igt.h"
+#include "igt_device.h"
 #include "igt_gt.h"
 #include <strings.h>
 
@@ -320,7 +321,7 @@ igt_main
 
 		gen = print_welcome(fd);
 		if (gen > 3 && gen < 6) /* ctg and ilk need secure batches */
-			igt_require(drmSetMaster(fd) == 0);
+			igt_device_set_master(fd);
 
 		igt_require_gem(fd);
 		igt_require(gem_can_store_dword(fd, 0));

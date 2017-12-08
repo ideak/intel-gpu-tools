@@ -32,6 +32,7 @@
  */
 
 #include "igt.h"
+#include "igt_device.h"
 #include "igt_gt.h"
 #include "igt_vgem.h"
 
@@ -360,7 +361,7 @@ igt_main
 		igt_require(gem_can_store_dword(fd, 0));
 		gen = intel_gen(intel_get_drm_devid(fd));
 		if (gen > 3 && gen < 6) { /* ctg and ilk need secure batches */
-			igt_require(drmSetMaster(fd) == 0);
+			igt_device_set_master(fd);
 			master = true;
 		}
 

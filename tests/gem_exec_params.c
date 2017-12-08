@@ -26,6 +26,8 @@
  */
 
 #include "igt.h"
+#include "igt_device.h"
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -341,10 +343,10 @@ igt_main
 	}
 
 	igt_subtest("secure-non-master") {
-		do_or_die(drmDropMaster(fd));
+		igt_device_drop_master(fd);
 		execbuf.flags = I915_EXEC_RENDER | I915_EXEC_SECURE;
 		RUN_FAIL(EPERM);
-		do_or_die(drmSetMaster(fd));
+		igt_device_set_master(fd);
 		igt_assert(drmIoctl(fd,
 				    DRM_IOCTL_I915_GEM_EXECBUFFER2,
 				    &execbuf) == 0);
