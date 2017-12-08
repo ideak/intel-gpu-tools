@@ -303,14 +303,12 @@ hda_dynamic_debug(bool enable)
 
 igt_main
 {
-	int i, err;
-	char buf[64];
+	int err;
 
 	igt_fixture
 		hda_dynamic_debug(true);
 
 	igt_subtest("basic-reload") {
-
 		if ((err = reload(NULL)))
 			igt_fail(err);
 
@@ -322,11 +320,12 @@ igt_main
 		igt_assert_eq(reload("disable_display=1"), 0);
 
 	igt_subtest("basic-reload-inject") {
-		for (i = 0; i < 4; i++) {
-			memset(buf, 0, sizeof(buf));
-			snprintf(buf, sizeof(buf), "inject_load_failure=%d", i);
-			reload(buf);
-		}
+		char buf[64];
+		int i = 0;
+		do {
+			snprintf(buf, sizeof(buf),
+				 "inject_load_failure=%d", ++i);
+		} while (reload(buf));
 	}
 
 	igt_fixture {
