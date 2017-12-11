@@ -1331,7 +1331,14 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	if (o->flags & TEST_CHECK_TS)
 		calibrate_ts(o, crtc_idxs[0]);
 
-	igt_assert_eq(do_page_flip(o, o->fb_ids[1], true), 0);
+	if (o->flags & TEST_BO_TOOBIG) {
+		int err = do_page_flip(o, o->fb_ids[1], true);
+		igt_assert(err == 0 || err == -E2BIG);
+		if (err)
+			goto out;
+	} else {
+		igt_assert_eq(do_page_flip(o, o->fb_ids[1], true), 0);
+	}
 	wait_for_events(o);
 
 	o->current_fb_id = 1;
