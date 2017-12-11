@@ -206,6 +206,8 @@ static void load_helper_set_load(enum load load)
 
 	lh.load = load;
 	kill(lh.igt_proc.pid, SIGUSR2);
+
+	usleep(1000); /* wait for load-helper to switch */
 }
 
 static void load_helper_run(enum load load)
@@ -231,24 +233,26 @@ static void load_helper_run(enum load load)
 
 		igt_debug("Applying %s load...\n", lh.load ? "high" : "low");
 
+		spin[0] = igt_spin_batch_new(drm_fd, 0, 0, 0);
+		if (lh.load == HIGH)
+			spin[1] = __igt_spin_batch_new(drm_fd, 0, 0, 0);
 		while (!lh.exit) {
-			if (spin[0]) {
-				handle = spin[0]->handle;
-				igt_spin_batch_end(spin[0]);
-				while (gem_bo_busy(drm_fd, handle))
-					usleep(100);
-				igt_spin_batch_free(drm_fd, spin[0]);
-				usleep(100);
-			}
-			spin[0] = spin[1];
-			spin[lh.load == HIGH] =
-				igt_spin_batch_new(drm_fd, 0, 0, 0);
-		}
-
-		if (spin[0]) {
 			handle = spin[0]->handle;
 			igt_spin_batch_end(spin[0]);
+			while (gem_bo_busy(drm_fd, handle))
+				usleep(100);
+
+			igt_spin_batch_free(drm_fd, spin[0]);
+			usleep(100);
+
+			spin[0] = spin[1];
+			spin[lh.load == HIGH] =
+				__igt_spin_batch_new(drm_fd, 0, 0, 0);
 		}
+
+		handle = spin[0]->handle;
+		igt_spin_batch_end(spin[0]);
+
 		if (spin[1]) {
 			handle = spin[1]->handle;
 			igt_spin_batch_end(spin[1]);
