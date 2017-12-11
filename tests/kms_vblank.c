@@ -343,7 +343,7 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_fixture {
-		fd = drm_open_driver(DRIVER_ANY);
+		fd = drm_open_driver_master(DRIVER_ANY);
 		kmstest_set_vt_graphics_mode();
 		igt_display_init(&data.display, fd);
 		igt_display_require_output(&data.display);
