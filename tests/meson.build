@@ -319,3 +319,5 @@ image_files = [
   'pass.png',
 ]
 install_data(sources : image_files, install_dir : pkgdatadir)
+
+subdir('intel-ci')
