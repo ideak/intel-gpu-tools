@@ -36,6 +36,8 @@
 #define MADV_FREE 8
 #endif
 
+static unsigned int engines[16], nengine;
+
 static void get_pages(int fd, uint64_t alloc)
 {
 	uint32_t handle = gem_create(fd, alloc);
@@ -142,6 +144,39 @@ static void execbufN(int fd, uint64_t alloc)
 		obj[j].handle = gem_create(fd, 1 << 20);
 		execbuf.buffers_ptr = to_user_pointer(&obj[j]);
 		execbuf.buffer_count = i + 1;
+		gem_execbuf(fd, &execbuf);
+	}
+
+	for (int i = 0; i <= count; i++)
+		gem_madvise(fd, obj[i].handle, I915_MADV_DONTNEED);
+	munmap(obj, obj_size);
+}
+
+static void execbufX(int fd, uint64_t alloc)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 *obj;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	int count = alloc >> 20;
+	uint64_t obj_size;
+
+	obj = __gem_calloc(fd, alloc + 1, sizeof(*obj), &obj_size);
+	memset(&execbuf, 0, sizeof(execbuf));
+
+	obj[count].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[count].handle, 0, &bbe, sizeof(bbe));
+
+	for (int i = 1; i <= count; i++) {
+		int j = count - i;
+
+		obj[j+1].flags = 0;
+
+		obj[j].handle = gem_create(fd, 1 << 20);
+		obj[j].flags = EXEC_OBJECT_WRITE;
+
+		execbuf.buffers_ptr = to_user_pointer(&obj[j]);
+		execbuf.buffer_count = i + 1;
+		execbuf.flags = engines[j % nengine];
 		gem_execbuf(fd, &execbuf);
 	}
 
@@ -344,6 +379,7 @@ igt_main
 		{ "mmap-cpu", mmap_cpu },
 		{ "execbuf1", execbuf1 },
 		{ "execbufN", execbufN },
+		{ "execbufX", execbufX },
 		{ "hang", hang },
 		{ NULL },
 	};
@@ -364,6 +400,8 @@ igt_main
 
 	igt_fixture {
 		uint64_t mem_size = intel_get_total_ram_mb();
+		unsigned int engine;
+		int fd;
 
 		/* Spawn enough processes to use all memory, but each only
 		 * uses half the available mappable aperture ~128MiB.
@@ -379,6 +417,16 @@ igt_main
 
 		intel_require_memory(num_processes, alloc_size,
 				     CHECK_SWAP | CHECK_RAM);
+
+		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+
+		nengine = 0;
+		for_each_engine(fd, engine)
+			engines[nengine++] = engine;
+		igt_require(nengine);
+
+		close(fd);
 	}
 
 	igt_subtest("reclaim")
