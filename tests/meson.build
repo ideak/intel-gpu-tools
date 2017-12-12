@@ -285,7 +285,7 @@ test_list = custom_target('testlist',
 	      output : 'test-list.txt',
 	      command : [ gen_testlist, '@OUTPUT@', test_progs ],
 	      install : true,
-	      install_dir : pkgdatadir)
+	      install_dir : libexecdir)
 
 test_script = find_program('igt_command_line.sh')
 foreach prog : test_progs
