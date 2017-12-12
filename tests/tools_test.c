@@ -26,6 +26,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <libgen.h>
+#include <unistd.h>
+
+#define TOOLS "../tools/"
 
 struct line_check {
 	int found;
@@ -59,9 +63,23 @@ igt_main
 {
 	igt_skip_on_simulation();
 
+	igt_fixture {
+		char path[4096];
+
+		/* Try to guess where the TOOLS are! */
+		if (access(TOOLS, F_OK) &&
+		    readlink("/proc/self/exe", path, sizeof(path)) > 0)
+			chdir(dirname(path));
+
+		igt_require_f(chdir(TOOLS) == 0,
+			      "Unable to determine the tools directory, expecting them in $cwd/" TOOLS " or $path/" TOOLS "\n");
+	}
+
 	igt_subtest("sysfs_l3_parity") {
 		int exec_return;
 		struct line_check line;
+
+		igt_require(access("intel_l3_parity", X_OK) == 0);
 
 		/* Sanity check that l3 parity tool is usable: Enable
 		 * row,bank,subbank 0,0,0.
@@ -71,27 +89,28 @@ igt_main
 		 * piglit.
 		 */
 		igt_system_cmd(exec_return,
-			       "../tools/intel_l3_parity -r 0 -b 0 "
+			       "./intel_l3_parity -r 0 -b 0 "
 			       "-s 0 -e");
 		assert_cmd_success(exec_return);
 
 		/* Disable row,bank,subbank 0,0,0. */
-		igt_system_cmd(exec_return, "../tools/intel_l3_parity -r 0 -b 0 "
+		igt_system_cmd(exec_return,
+			       "./intel_l3_parity -r 0 -b 0 "
 			       "-s 0 -d");
 		assert_cmd_success(exec_return);
 
 		/* Check that disabling was successful */
-		igt_system_cmd(exec_return, "../tools/intel_l3_parity -l");
+		igt_system_cmd(exec_return,
+			       "./intel_l3_parity -l");
 		assert_cmd_success(exec_return);
 		line.substr = "Row 0, Bank 0, Subbank 0 is disabled";
 		line.found = 0;
-		igt_log_buffer_inspect(check_cmd_output,
-				       &line);
+		igt_log_buffer_inspect(check_cmd_output, &line);
 		igt_assert_eq(line.found, 1);
 
 		/* Re-enable row,bank,subbank 0,0,0 */
 		igt_system_cmd(exec_return,
-			       "../tools/intel_l3_parity -r 0 -b 0 "
+			       "./intel_l3_parity -r 0 -b 0 "
 			       "-s 0 -e");
 		assert_cmd_success(exec_return);
 
@@ -102,7 +121,8 @@ igt_main
 		 * The previously printed line is already in the log
 		 * buffer so we check for count 1.
 		 */
-		igt_system_cmd(exec_return, "../tools/intel_l3_parity -l");
+		igt_system_cmd(exec_return,
+			       "./intel_l3_parity -l");
 		assert_cmd_success(exec_return);
 		line.substr = "Row 0, Bank 0, Subbank 0 is disabled";
 		line.found = 0;
@@ -112,17 +132,12 @@ igt_main
 	}
 
 	igt_subtest("tools_test") {
-		char *cmd;
+		igt_require(access("intel_reg", X_OK) == 0);
 
-		igt_assert(asprintf(&cmd,
-				    "../tools/intel_reg read 0x4030")
-			   != -1);
-		igt_assert(igt_system_quiet(cmd) == IGT_EXIT_SUCCESS);
-		free(cmd);
+		igt_assert_eq(igt_system_quiet("./intel_reg read 0x4030"),
+			      IGT_EXIT_SUCCESS);
 
-		igt_assert(asprintf(&cmd, "../tools/intel_reg dump")
-			   != -1);
-		igt_assert(igt_system_quiet(cmd) == IGT_EXIT_SUCCESS);
-		free(cmd);
+		igt_assert_eq(igt_system_quiet("./intel_reg dump"),
+			      IGT_EXIT_SUCCESS);
 	}
 }
