@@ -60,6 +60,7 @@ static void cleanup_crtc(data_t *data)
 {
 	int i;
 
+	igt_display_reset(&data->display);
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = NULL;
 
@@ -79,7 +80,6 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 
 	cleanup_crtc(data);
 
-	igt_display_reset(display);
 	igt_output_set_pipe(output, pipe);
 
 	/* create the pipe_crc object for this pipe */
@@ -110,6 +110,125 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 		igt_plane_set_fb(primary, &data->fb[0]);
 	}
 	igt_display_commit2(display, COMMIT_ATOMIC);
+}
+
+static void paint_fb(data_t *d, struct igt_fb *fb)
+{
+	cairo_t *cr;
+
+	cr = igt_get_cairo_ctx(d->drm_fd, fb);
+	igt_paint_color(cr, 0, 0, fb->width, fb->height, 0.0, 1.0, 0.0);
+	igt_assert(cairo_status(cr) == 0);
+	cairo_destroy(cr);
+}
+
+static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
+					 uint32_t pixel_format,
+					 uint64_t tiling, enum pipe pipe,
+					 igt_output_t *output,
+					 igt_rotation_t rot)
+{
+	igt_display_t *display = &d->display;
+	int width, height;
+	drmModeModeInfo *mode;
+
+	cleanup_crtc(d);
+
+	igt_output_set_pipe(output, pipe);
+	mode = igt_output_get_mode(output);
+
+	/* create buffer in the range of  min and max source side limit.*/
+	width = height = 9;
+	igt_create_fb(display->drm_fd, width, height,
+		      pixel_format, tiling, &d->fb[0]);
+	paint_fb(d, &d->fb[0]);
+	igt_plane_set_fb(plane, &d->fb[0]);
+
+	/* Check min to full resolution upscaling */
+	igt_fb_set_position(&d->fb[0], plane, 0, 0);
+	igt_fb_set_size(&d->fb[0], plane, width, height);
+	igt_plane_set_position(plane, 0, 0);
+	igt_plane_set_size(plane, mode->hdisplay, mode->vdisplay);
+	igt_plane_set_rotation(plane, rot);
+	igt_display_commit2(display, COMMIT_ATOMIC);
+
+	igt_plane_set_fb(plane, NULL);
+	igt_plane_set_position(plane, 0, 0);
+}
+
+static const igt_rotation_t rotations[] = {
+	IGT_ROTATION_0,
+	IGT_ROTATION_90,
+	IGT_ROTATION_180,
+	IGT_ROTATION_270,
+};
+
+static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
+					   igt_output_t *output)
+{
+	igt_display_t *display = &d->display;
+	igt_plane_t *plane;
+
+	igt_output_set_pipe(output, pipe);
+	for_each_plane_on_pipe(display, pipe, plane) {
+		if (plane->type == DRM_PLANE_TYPE_CURSOR)
+			continue;
+
+		for (int i = 0; i < ARRAY_SIZE(rotations); i++) {
+			igt_rotation_t rot = rotations[i];
+
+			check_scaling_pipe_plane_rot(d, plane, DRM_FORMAT_XRGB8888,
+						     LOCAL_I915_FORMAT_MOD_Y_TILED,
+						     pipe, output, rot);
+		}
+	}
+}
+
+static bool can_draw(uint32_t drm_format)
+{
+	const uint32_t *drm_formats;
+	int format_count, i;
+
+	igt_get_all_cairo_formats(&drm_formats, &format_count);
+
+	for (i = 0; i < format_count; i++)
+		if (drm_formats[i] == drm_format)
+			return true;
+
+	return false;
+}
+
+static const uint64_t tilings[] = {
+	LOCAL_DRM_FORMAT_MOD_NONE,
+	LOCAL_I915_FORMAT_MOD_X_TILED,
+	LOCAL_I915_FORMAT_MOD_Y_TILED,
+	LOCAL_I915_FORMAT_MOD_Yf_TILED
+};
+
+static void test_scaler_with_pixel_format_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
+{
+	igt_display_t *display = &d->display;
+	igt_plane_t *plane;
+
+	igt_output_set_pipe(output, pipe);
+
+	for_each_plane_on_pipe(display, pipe, plane) {
+		if (plane->type == DRM_PLANE_TYPE_CURSOR)
+			continue;
+
+		for (int i = 0; i < ARRAY_SIZE(tilings); i++) {
+			uint64_t tiling = tilings[i];
+
+			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
+				uint32_t format = plane->drm_plane->formats[j];
+
+				if (can_draw(format))
+					check_scaling_pipe_plane_rot(d, plane,
+								     format, tiling,
+								     pipe, output, IGT_ROTATION_0);
+			}
+		}
+	}
 }
 
 /* does iterative scaling on plane2 */
@@ -295,6 +414,15 @@ igt_main
 		igt_subtest_f("pipe-%s-plane-scaling", kmstest_pipe_name(pipe))
 			for_each_valid_output_on_pipe(&data.display, pipe, output)
 				test_plane_scaling_on_pipe(&data, pipe, output);
+
+		igt_subtest_f("pipe-%s-scaler-with-pixel-format", kmstest_pipe_name(pipe))
+			for_each_valid_output_on_pipe(&data.display, pipe, output)
+				test_scaler_with_pixel_format_pipe(&data, pipe, output);
+
+		igt_subtest_f("pipe-%s-scaler-with-rotation", kmstest_pipe_name(pipe))
+			for_each_valid_output_on_pipe(&data.display, pipe, output)
+				test_scaler_with_rotation_pipe(&data, pipe, output);
+
 	}
 
 	igt_fixture
