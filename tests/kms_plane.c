@@ -368,6 +368,105 @@ test_plane_panning(data_t *data, enum pipe pipe, unsigned int flags)
 	igt_skip_on(connected_outs == 0);
 }
 
+static bool can_draw(uint32_t drm_format)
+{
+	const uint32_t *drm_formats;
+	int format_count, i;
+
+	igt_get_all_cairo_formats(&drm_formats, &format_count);
+
+	for (i = 0; i < format_count; i++)
+		if (drm_formats[i] == drm_format)
+			return true;
+
+	return false;
+}
+
+static void test_format_plane(data_t *data, enum pipe pipe,
+			      igt_output_t *output, igt_plane_t *plane)
+{
+	igt_plane_t *primary;
+	struct igt_fb primary_fb, fb;
+	drmModeModeInfo *mode;
+	cairo_t *cr;
+	int i;
+	uint32_t format;
+	uint64_t width, height;
+
+	mode = igt_output_get_mode(output);
+	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
+		width = mode->hdisplay;
+		height = mode->vdisplay;
+	} else {
+		if (!plane->drm_plane) {
+			igt_debug("Only legacy cursor ioctl supported, skipping cursor plane\n");
+			return;
+		}
+		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &width));
+		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_HEIGHT, &height));
+	}
+
+	igt_debug("Testing connector %s on %s plane %s.%u\n",
+		  igt_output_name(output), kmstest_plane_type_name(plane->type),
+		  kmstest_pipe_name(pipe), plane->index);
+
+	igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
+		      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, &primary_fb);
+
+	igt_output_set_pipe(output, pipe);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_fb(primary, &primary_fb);
+
+	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+	for (i = 0; i < plane->drm_plane->count_formats; i++) {
+		format = plane->drm_plane->formats[i];
+
+		if (!can_draw(format))
+			continue;
+
+		igt_debug("Testing format 0x%x on %s.%u\n",
+			  format, kmstest_pipe_name(pipe), plane->index);
+
+		igt_create_fb(data->drm_fd, width, height,
+			      format, LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+
+		cr = igt_get_cairo_ctx(data->drm_fd, &fb);
+		igt_paint_color(cr, 0, 0, width, height,
+				0.0, 1.0, 0.0);
+		if (width >= 164 && height >= 164)
+			igt_paint_color(cr, 100, 100, 64, 64, 0.0, 0.0, 0.0);
+		igt_assert(cairo_status(cr) == 0);
+		cairo_destroy(cr);
+
+		igt_plane_set_fb(plane, &fb);
+		igt_display_commit2(&data->display, COMMIT_UNIVERSAL);
+
+		igt_remove_fb(data->drm_fd, &fb);
+	}
+
+	igt_plane_set_fb(primary, NULL);
+	igt_plane_set_fb(plane, NULL);
+	igt_remove_fb(data->drm_fd, &primary_fb);
+}
+
+static void
+test_pixel_formats(data_t *data, enum pipe pipe)
+{
+	igt_output_t *output;
+
+	igt_display_require_output_on_pipe(&data->display, pipe);
+
+	for_each_valid_output_on_pipe(&data->display, pipe, output) {
+		igt_plane_t *plane;
+
+		for_each_plane_on_pipe(&data->display, pipe, plane)
+			test_format_plane(data, pipe, output, plane);
+
+		igt_output_set_pipe(output, PIPE_ANY);
+	}
+}
+
 static void
 run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 {
@@ -375,6 +474,10 @@ run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 		igt_skip_on(pipe >= data->display.n_pipes);
 		igt_require(data->display.pipes[pipe].n_planes > 0);
 	}
+
+	igt_subtest_f("pixel-format-pipe-%s-planes",
+		      kmstest_pipe_name(pipe))
+		test_pixel_formats(data, pipe);
 
 	igt_subtest_f("plane-position-covered-pipe-%s-planes",
 		      kmstest_pipe_name(pipe))
