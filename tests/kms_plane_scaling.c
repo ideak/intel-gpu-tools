@@ -53,8 +53,6 @@ typedef struct {
 	igt_plane_t *plane4;
 } data_t;
 
-#define FILE_NAME   "1080p-left.png"
-
 static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 			igt_plane_t *plane, drmModeModeInfo *mode, enum igt_commit_style s)
 {
@@ -156,7 +154,9 @@ static void iterate_plane_scaling(data_t *d, drmModeModeInfo *mode)
 
 		/* adjust fb size */
 		for (w = mode->hdisplay; w <= d->fb2.width; w+=10) {
-			h = w * mode->hdisplay / mode->vdisplay;
+			/* Source coordinates must not be clipped. */
+			h = min(w * mode->hdisplay / mode->vdisplay, d->fb2.height);
+
 			igt_fb_set_size(&d->fb2, d->plane2, w, h);
 			igt_display_commit2(display, COMMIT_UNIVERSAL);
 		}
@@ -173,11 +173,10 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
 
-	/* allocate fb2 with image size */
-	d->fb_id2 = igt_create_image_fb(d->drm_fd, 0, 0,
-					DRM_FORMAT_XRGB8888,
-					LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
-					FILE_NAME, &d->fb2);
+	d->fb_id2 = igt_create_color_pattern_fb(display->drm_fd, 600, 600,
+						DRM_FORMAT_XRGB8888,
+						LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
+						.5, .5, .5, &d->fb2);
 	igt_assert(d->fb_id2);
 
 	d->fb_id3 = igt_create_pattern_fb(d->drm_fd,
@@ -231,7 +230,9 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	igt_fb_set_position(&d->fb2, d->plane2, 0, 0);
 	igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width, d->fb2.height);
 	igt_plane_set_position(d->plane2, 10, 10);
-	igt_plane_set_size(d->plane2, 500, 500 * d->fb2.height/d->fb2.width);
+
+	/* Downscale (10/9)x of original image */
+	igt_plane_set_size(d->plane2, (d->fb2.width * 10)/9, (d->fb2.height * 10)/9);
 	igt_display_commit2(display, COMMIT_UNIVERSAL);
 
 	if (primary_plane_scaling) {
@@ -246,6 +247,11 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	/* Set up fb3->plane3 mapping. */
 	d->plane3 = igt_output_get_plane(output, 2);
 	igt_plane_set_fb(d->plane3, &d->fb3);
+
+	if(d->plane3->type == DRM_PLANE_TYPE_CURSOR) {
+		igt_debug("Plane-3 doesnt exist on pipe %s\n", kmstest_pipe_name(pipe));
+		goto cleanup;
+	}
 
 	/* 3rd plane windowed - no scaling */
 	igt_fb_set_position(&d->fb3, d->plane3, 100, 100);
@@ -280,6 +286,7 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 	}
 
+cleanup:
 	/* back to single plane mode */
 	igt_plane_set_fb(d->plane2, NULL);
 	igt_plane_set_fb(d->plane3, NULL);
