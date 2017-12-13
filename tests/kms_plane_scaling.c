@@ -387,6 +387,46 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	}
 }
 
+static void
+test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_output_t *output)
+{
+	drmModeModeInfo *mode;
+
+	igt_require(get_num_scalers(d->devid, pipe) >= 2);
+
+	mode = igt_output_get_mode(output);
+	d->plane1 = &d->display.pipes[pipe].planes[0];
+	prepare_crtc(d, output, pipe, d->plane1, mode);
+
+	igt_create_pattern_fb(d->drm_fd,
+			      mode->hdisplay, mode->vdisplay,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_X_TILED, &d->fb[1]);
+
+	igt_create_pattern_fb(d->drm_fd,
+			      mode->hdisplay, mode->vdisplay,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[2]);
+
+	igt_plane_set_fb(d->plane1, &d->fb[1]);
+	d->plane2 = igt_output_get_plane(output, 1);
+	igt_plane_set_fb(d->plane2, &d->fb[2]);
+
+	igt_fb_set_position(&d->fb[1], d->plane1, 0, 0);
+	igt_fb_set_size(&d->fb[1], d->plane1, 300, 300);
+	igt_plane_set_position(d->plane1, 100, 400);
+	igt_fb_set_position(&d->fb[2], d->plane2, 0, 0);
+	igt_fb_set_size(&d->fb[2], d->plane2, 400, 400);
+	igt_plane_set_position(d->plane2, 100, 100);
+
+	/* scaled window size is outside the modeset area.*/
+	igt_plane_set_size(d->plane1, mode->hdisplay + 200,
+					    mode->vdisplay + 200);
+	igt_plane_set_size(d->plane2, mode->hdisplay + 100,
+					    mode->vdisplay + 100);
+	igt_display_commit2(&d->display, COMMIT_ATOMIC);
+}
+
 igt_main
 {
 	data_t data = {};
@@ -423,6 +463,9 @@ igt_main
 			for_each_valid_output_on_pipe(&data.display, pipe, output)
 				test_scaler_with_rotation_pipe(&data, pipe, output);
 
+		igt_subtest_f("pipe-%s-scaler-with-clipping-clamping", kmstest_pipe_name(pipe))
+			for_each_valid_output_on_pipe(&data.display, pipe, output)
+				test_scaler_with_clipping_clamping_scenario(&data, pipe, output);
 	}
 
 	igt_fixture
