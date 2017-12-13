@@ -38,10 +38,12 @@ typedef struct {
 	int image_w;
 	int image_h;
 
-	struct igt_fb fb[3];
+	struct igt_fb fb[4];
+
 	igt_plane_t *plane1;
 	igt_plane_t *plane2;
 	igt_plane_t *plane3;
+	igt_plane_t *plane4;
 } data_t;
 
 static int get_num_scalers(uint32_t devid, enum pipe pipe)
@@ -427,6 +429,92 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 	igt_display_commit2(&d->display, COMMIT_ATOMIC);
 }
 
+static void find_connected_pipe(igt_display_t *display, bool second, enum pipe *pipe, igt_output_t **output)
+{
+	enum pipe first = PIPE_NONE;
+	igt_output_t *first_output = NULL;
+	bool found = false;
+
+	for_each_pipe_with_valid_output(display, *pipe, *output) {
+		if (first == *pipe || *output == first_output)
+			continue;
+
+		if (second) {
+			first = *pipe;
+			first_output = *output;
+			second = false;
+			continue;
+		}
+
+		return;
+	}
+
+	if (first_output)
+		igt_require_f(found, "No second valid output found\n");
+	else
+		igt_require_f(found, "No valid outputs found\n");
+}
+
+static void test_scaler_with_multi_pipe_plane(data_t *d)
+{
+	igt_display_t *display = &d->display;
+	igt_output_t *output1, *output2;
+	drmModeModeInfo *mode1, *mode2;
+	enum pipe pipe1, pipe2;
+
+	cleanup_crtc(d);
+
+	find_connected_pipe(display, false, &pipe1, &output1);
+	find_connected_pipe(display, true, &pipe2, &output2);
+
+	igt_skip_on(!output1 || !output2);
+
+	igt_output_set_pipe(output1, pipe1);
+	igt_output_set_pipe(output2, pipe2);
+
+	d->plane1 = igt_output_get_plane(output1, 0);
+	d->plane2 = get_num_scalers(d->devid, pipe1) >= 2 ? igt_output_get_plane(output1, 1) : NULL;
+	d->plane3 = igt_output_get_plane(output2, 0);
+	d->plane4 = get_num_scalers(d->devid, pipe2) >= 2 ? igt_output_get_plane(output2, 1) : NULL;
+
+	mode1 = igt_output_get_mode(output1);
+	mode2 = igt_output_get_mode(output2);
+
+	igt_create_pattern_fb(d->drm_fd, 600, 600,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[0]);
+
+	igt_create_pattern_fb(d->drm_fd, 500, 500,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[1]);
+
+	igt_create_pattern_fb(d->drm_fd, 700, 700,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[2]);
+
+	igt_create_pattern_fb(d->drm_fd, 400, 400,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[3]);
+
+	igt_plane_set_fb(d->plane1, &d->fb[0]);
+	if (d->plane2)
+		igt_plane_set_fb(d->plane2, &d->fb[1]);
+	igt_plane_set_fb(d->plane3, &d->fb[2]);
+	if (d->plane4)
+		igt_plane_set_fb(d->plane4, &d->fb[3]);
+	igt_display_commit2(display, COMMIT_ATOMIC);
+
+	/* Upscaling Primary */
+	igt_plane_set_size(d->plane1, mode1->hdisplay, mode1->vdisplay);
+	igt_plane_set_size(d->plane3, mode2->hdisplay, mode2->vdisplay);
+	igt_display_commit2(display, COMMIT_ATOMIC);
+
+	/* Upscaling Sprites */
+	igt_plane_set_size(d->plane2 ?: d->plane1, mode1->hdisplay, mode1->vdisplay);
+	igt_plane_set_size(d->plane4 ?: d->plane3, mode2->hdisplay, mode2->vdisplay);
+	igt_display_commit2(display, COMMIT_ATOMIC);
+}
+
 igt_main
 {
 	data_t data = {};
@@ -467,6 +555,9 @@ igt_main
 			for_each_valid_output_on_pipe(&data.display, pipe, output)
 				test_scaler_with_clipping_clamping_scenario(&data, pipe, output);
 	}
+
+	igt_subtest_f("2x-scaler-multi-pipe")
+		test_scaler_with_multi_pipe_plane(&data);
 
 	igt_fixture
 		igt_display_fini(&data.display);
