@@ -29,6 +29,19 @@ int __gem_context_create(int fd, uint32_t *ctx_id);
 void gem_context_destroy(int fd, uint32_t ctx_id);
 int __gem_context_destroy(int fd, uint32_t ctx_id);
 
+int __gem_context_clone(int i915,
+			uint32_t src, unsigned int share,
+			unsigned int flags,
+			uint32_t *out);
+uint32_t gem_context_clone(int i915,
+			   uint32_t src, unsigned int share,
+			   unsigned int flags);
+
+uint32_t gem_queue_create(int i915);
+
+bool gem_contexts_has_shared_gtt(int i915);
+bool gem_has_queues(int i915);
+
 bool gem_has_contexts(int fd);
 void gem_require_contexts(int fd);
 void gem_context_require_bannable(int fd);

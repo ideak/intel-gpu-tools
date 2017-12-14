@@ -119,6 +119,7 @@ i915_progs = [
 	'gem_ctx_exec',
 	'gem_ctx_isolation',
 	'gem_ctx_param',
+	'gem_ctx_shared',
 	'gem_ctx_switch',
 	'gem_ctx_thrash',
 	'gem_double_irq_loop',

@@ -272,6 +272,76 @@ void gem_context_set_priority(int fd, uint32_t ctx_id, int prio)
 	igt_assert_eq(__gem_context_set_priority(fd, ctx_id, prio), 0);
 }
 
+int
+__gem_context_clone(int i915,
+		    uint32_t src, unsigned int share,
+		    unsigned int flags,
+		    uint32_t *out)
+{
+	struct drm_i915_gem_context_create_ext_clone clone = {
+		{ .name = I915_CONTEXT_CREATE_EXT_CLONE },
+		.clone_id = src,
+		.flags = share,
+	};
+	struct drm_i915_gem_context_create_ext arg = {
+		.flags = flags | I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS,
+		.extensions = to_user_pointer(&clone),
+	};
+	int err = 0;
+
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT, &arg)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	*out = arg.ctx_id;
+
+	errno = 0;
+	return err;
+}
+
+static bool __gem_context_has(int i915, uint32_t share, unsigned int flags)
+{
+	uint32_t ctx;
+
+	__gem_context_clone(i915, 0, share, flags, &ctx);
+	if (ctx)
+		gem_context_destroy(i915, ctx);
+
+	errno = 0;
+	return ctx;
+}
+
+bool gem_contexts_has_shared_gtt(int i915)
+{
+	return __gem_context_has(i915, I915_CONTEXT_CLONE_VM, 0);
+}
+
+bool gem_has_queues(int i915)
+{
+	return __gem_context_has(i915,
+				 I915_CONTEXT_CLONE_VM,
+				 I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
+}
+
+uint32_t gem_context_clone(int i915,
+			   uint32_t src, unsigned int share,
+			   unsigned int flags)
+{
+	uint32_t ctx;
+
+	igt_assert_eq(__gem_context_clone(i915, src, share, flags, &ctx), 0);
+
+	return ctx;
+}
+
+uint32_t gem_queue_create(int i915)
+{
+	return gem_context_clone(i915, 0,
+				 I915_CONTEXT_CLONE_VM,
+				 I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
+}
+
 bool gem_context_has_engine(int fd, uint32_t ctx, uint64_t engine)
 {
 	struct drm_i915_gem_exec_object2 exec = {};

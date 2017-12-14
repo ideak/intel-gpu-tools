@@ -23,6 +23,7 @@ TESTS_progs = \
 	drm_mm \
 	drm_read \
 	i915/gem_ctx_clone \
+	i915/gem_ctx_shared \
 	i915/gem_vm_create \
 	kms_3d \
 	kms_addfb_basic \

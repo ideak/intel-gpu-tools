@@ -79,6 +79,7 @@ static void verify_reloc(int fd, uint32_t handle,
 #define SYNC 0x40
 #define PRIORITY 0x80
 #define ALL 0x100
+#define QUEUES 0x200
 
 struct hang {
 	struct drm_i915_gem_exec_object2 obj;
@@ -163,7 +164,7 @@ static void ctx_set_random_priority(int fd, uint32_t ctx)
 {
 	int prio = hars_petruska_f54_1_random_unsafe_max(1024) - 512;
 	gem_context_set_priority(fd, ctx, prio);
-};
+}
 
 static void whisper(int fd, unsigned engine, unsigned flags)
 {
@@ -219,6 +220,9 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 
 	if (flags & CONTEXTS)
 		gem_require_contexts(fd);
+
+	if (flags & QUEUES)
+		igt_require(gem_has_queues(fd));
 
 	if (flags & HANG)
 		init_hang(&hang);
@@ -294,6 +298,10 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		if (flags & CONTEXTS) {
 			for (n = 0; n < 64; n++)
 				contexts[n] = gem_context_create(fd);
+		}
+		if (flags & QUEUES) {
+			for (n = 0; n < 64; n++)
+				contexts[n] = gem_queue_create(fd);
 		}
 		if (flags & FDS) {
 			for (n = 0; n < 64; n++)
@@ -405,7 +413,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 						execbuf.flags &= ~ENGINE_MASK;
 						execbuf.flags |= engines[rand() % nengine];
 					}
-					if (flags & CONTEXTS) {
+					if (flags & (CONTEXTS | QUEUES)) {
 						execbuf.rsvd1 = contexts[rand() % 64];
 						if (flags & PRIORITY)
 							ctx_set_random_priority(this_fd, execbuf.rsvd1);
@@ -488,7 +496,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 			for (n = 0; n < 64; n++)
 				close(fds[n]);
 		}
-		if (flags & CONTEXTS) {
+		if (flags & (CONTEXTS | QUEUES)) {
 			for (n = 0; n < 64; n++)
 				gem_context_destroy(fd, contexts[n]);
 		}
@@ -524,18 +532,24 @@ igt_main
 		{ "chain-forked", CHAIN | FORKED },
 		{ "chain-interruptible", CHAIN | INTERRUPTIBLE },
 		{ "chain-sync", CHAIN | SYNC },
-		{ "contexts", CONTEXTS },
-		{ "contexts-interruptible", CONTEXTS | INTERRUPTIBLE},
-		{ "contexts-forked", CONTEXTS | FORKED},
-		{ "contexts-priority", CONTEXTS | FORKED | PRIORITY },
-		{ "contexts-chain", CONTEXTS | CHAIN },
-		{ "contexts-sync", CONTEXTS | SYNC },
 		{ "fds", FDS },
 		{ "fds-interruptible", FDS | INTERRUPTIBLE},
 		{ "fds-forked", FDS | FORKED},
 		{ "fds-priority", FDS | FORKED | PRIORITY },
 		{ "fds-chain", FDS | CHAIN},
 		{ "fds-sync", FDS | SYNC},
+		{ "contexts", CONTEXTS },
+		{ "contexts-interruptible", CONTEXTS | INTERRUPTIBLE},
+		{ "contexts-forked", CONTEXTS | FORKED},
+		{ "contexts-priority", CONTEXTS | FORKED | PRIORITY },
+		{ "contexts-chain", CONTEXTS | CHAIN },
+		{ "contexts-sync", CONTEXTS | SYNC },
+		{ "queues", QUEUES },
+		{ "queues-interruptible", QUEUES | INTERRUPTIBLE},
+		{ "queues-forked", QUEUES | FORKED},
+		{ "queues-priority", QUEUES | FORKED | PRIORITY },
+		{ "queues-chain", QUEUES | CHAIN },
+		{ "queues-sync", QUEUES | SYNC },
 		{ NULL }
 	};
 	int fd = -1;
