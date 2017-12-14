@@ -399,7 +399,9 @@ int igt_sysfs_vprintf(int dir, const char *attr, const char *fmt, va_list ap)
 
 	file = fdopen(fd, "w");
 	if (file) {
-		ret = vfprintf(file, fmt, ap);
+		do {
+			ret = vfprintf(file, fmt, ap);
+		} while (ret == -1 && errno == EINTR);
 		fclose(file);
 	}
 	close(fd);
