@@ -33,4 +33,6 @@ bool gem_has_semaphores(int fd);
 bool gem_has_execlists(int fd);
 bool gem_has_guc_submission(int fd);
 
+void gem_test_engine(int fd, unsigned int engine);
+
 #endif /* GEM_SUBMISSION_H */

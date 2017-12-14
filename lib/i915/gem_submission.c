@@ -21,14 +21,18 @@
  * IN THE SOFTWARE.
  */
 
+#include <errno.h>
 #include <stdbool.h>
 #include <sys/ioctl.h>
 
 #include <i915_drm.h>
 
 #include "igt_core.h"
+#include "igt_gt.h"
 #include "igt_sysfs.h"
 #include "intel_chipset.h"
+#include "intel_reg.h"
+#include "ioctl_wrappers.h"
 
 #include "i915/gem_submission.h"
 
@@ -158,4 +162,49 @@ bool gem_has_execlists(int fd)
 bool gem_has_guc_submission(int fd)
 {
 	return gem_submission_method(fd) & GEM_SUBMISSION_GUC;
+}
+
+static bool is_wedged(int i915)
+{
+	int err = 0;
+	if (ioctl(i915, DRM_IOCTL_I915_GEM_THROTTLE))
+		err = -errno;
+	return err == -EIO;
+}
+
+/**
+ * gem_test_engine:
+ * @i915: open i915 drm file descriptor
+ * @engine: the engine (I915_EXEC_RING id) to exercise
+ *
+ * Execute a nop batch on the specified, or -1 for all, and check it
+ * executes.
+ */
+void gem_test_engine(int i915, unsigned int engine)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(i915, 4096)
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+	};
+
+	igt_assert(!is_wedged(i915));
+	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
+
+	if (engine == -1u) {
+		for_each_engine(i915, engine) {
+			execbuf.flags = engine;
+			gem_execbuf(i915, &execbuf);
+		}
+	} else {
+		execbuf.flags = engine;
+		gem_execbuf(i915, &execbuf);
+	}
+	gem_sync(i915, obj.handle);
+	gem_close(i915, obj.handle);
+
+	igt_assert(!is_wedged(i915));
 }

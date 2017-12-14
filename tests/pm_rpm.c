@@ -1277,7 +1277,7 @@ static void gem_idle_subtest(void)
 
 	sleep(5);
 
-	gem_quiescent_gpu(drm_fd);
+	gem_test_engine(drm_fd, -1);
 }
 
 static void gem_evict_pwrite_subtest(void)
