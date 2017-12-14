@@ -887,20 +887,12 @@ bool igt_drop_caches_has(int drm_fd, uint64_t val)
  */
 void igt_drop_caches_set(int drm_fd, uint64_t val)
 {
-	int fd;
-	char data[19];
-	size_t nbytes;
+	int dir;
 
-	sprintf(data, "0x%" PRIx64, val);
-
-	fd = igt_debugfs_open(drm_fd, "i915_gem_drop_caches", O_WRONLY);
-
-	igt_assert(fd >= 0);
-	do {
-		nbytes = write(fd, data, strlen(data) + 1);
-	} while (nbytes == -1 && (errno == EINTR || errno == EAGAIN));
-	igt_assert(nbytes == strlen(data) + 1);
-	close(fd);
+	dir = igt_debugfs_dir(drm_fd);
+	igt_assert(igt_sysfs_printf(dir, "i915_gem_drop_caches",
+				    "0x%" PRIx64, val) > 0);
+	close(dir);
 }
 
 /*
