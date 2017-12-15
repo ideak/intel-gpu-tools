@@ -931,9 +931,10 @@ test_interrupts(int gem_fd)
 static void
 test_frequency(int gem_fd)
 {
-	const uint64_t duration_ns = 2e9;
 	uint32_t min_freq, max_freq, boost_freq;
-	uint64_t min[2], max[2], start[2];
+	uint64_t val[2], start[2];
+	double min[2], max[2];
+	unsigned long slept;
 	igt_spin_t *spin;
 	int fd, sysfs;
 
@@ -962,17 +963,18 @@ test_frequency(int gem_fd)
 	igt_require(igt_sysfs_set_u32(sysfs, "gt_boost_freq_mhz", min_freq));
 	igt_require(igt_sysfs_get_u32(sysfs, "gt_boost_freq_mhz") == min_freq);
 
+	gem_quiescent_gpu(gem_fd); /* Idle to be sure the change takes effect */
+	spin = igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
 	pmu_read_multi(fd, 2, start);
 
-	spin = igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
-	igt_spin_batch_set_timeout(spin, duration_ns);
-	gem_sync(gem_fd, spin->handle);
+	slept = measured_usleep(batch_duration_ns / 1000);
 
-	pmu_read_multi(fd, 2, min);
-	min[0] -= start[0];
-	min[1] -= start[1];
+	pmu_read_multi(fd, 2, val);
+	min[0] = 1e9*(val[0] - start[0]) / slept;
+	min[1] = 1e9*(val[1] - start[1]) / slept;
 
 	igt_spin_batch_free(gem_fd, spin);
+	gem_quiescent_gpu(gem_fd); /* Don't leak busy bo into the next phase */
 
 	usleep(1e6);
 
@@ -987,17 +989,18 @@ test_frequency(int gem_fd)
 	igt_require(igt_sysfs_set_u32(sysfs, "gt_min_freq_mhz", max_freq));
 	igt_require(igt_sysfs_get_u32(sysfs, "gt_min_freq_mhz") == max_freq);
 
+	gem_quiescent_gpu(gem_fd);
+	spin = igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
 	pmu_read_multi(fd, 2, start);
 
-	spin = igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
-	igt_spin_batch_set_timeout(spin, duration_ns);
-	gem_sync(gem_fd, spin->handle);
+	slept = measured_usleep(batch_duration_ns / 1000);
 
-	pmu_read_multi(fd, 2, max);
-	max[0] -= start[0];
-	max[1] -= start[1];
+	pmu_read_multi(fd, 2, val);
+	max[0] = 1e9*(val[0] - start[0]) / slept;
+	max[1] = 1e9*(val[1] - start[1]) / slept;
 
 	igt_spin_batch_free(gem_fd, spin);
+	gem_quiescent_gpu(gem_fd);
 
 	/*
 	 * Restore min/max.
@@ -1008,8 +1011,12 @@ test_frequency(int gem_fd)
 			 min_freq, igt_sysfs_get_u32(sysfs, "gt_min_freq_mhz"));
 	close(fd);
 
-	igt_assert(min[0] < max[0]);
-	igt_assert(min[1] < max[1]);
+	igt_info("Min frequency: requested %.1f, actual %.1f\n",
+		 min[0], min[1]);
+	igt_info("Max frequency: requested %.1f, actual %.1f\n",
+		 max[0], max[1]);
+	assert_within_epsilon(min[0], min_freq, tolerance);
+	assert_within_epsilon(max[0], max_freq, tolerance);
 }
 
 static bool wait_for_rc6(int fd)
