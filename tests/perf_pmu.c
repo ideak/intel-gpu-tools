@@ -103,7 +103,7 @@ static void pmu_read_multi(int fd, unsigned int num, uint64_t *val)
 	igt_assert_f((double)(x) <= (1.0 + (tolerance)) * (double)(ref) && \
 		     (double)(x) >= (1.0 - (tolerance)) * (double)(ref), \
 		     "'%s' != '%s' (%f not within %f%% tolerance of %f)\n",\
-		     #x, #ref, (double)(x), (tolerance) * 100.0, (double)ref)
+		     #x, #ref, (double)(x), (tolerance) * 100.0, (double)(ref))
 
 /*
  * Helper for cases where we assert on time spent sleeping (directly or
@@ -133,30 +133,28 @@ static unsigned int e2ring(int gem_fd, const struct intel_execution_engine2 *e)
 static void
 single(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 {
-	double ref = busy ? batch_duration_ns : 0.0f;
+	unsigned long slept;
 	igt_spin_t *spin;
 	uint64_t val;
 	int fd;
 
 	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
-	if (busy) {
-		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
-		igt_spin_batch_set_timeout(spin, batch_duration_ns);
-	} else {
-		usleep(batch_duration_ns / 1000);
-	}
-
 	if (busy)
-		gem_sync(gem_fd, spin->handle);
+		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
+	else
+		spin = NULL;
+
+	slept = measured_usleep(batch_duration_ns / 1000);
+	igt_spin_batch_end(spin);
 
 	val = pmu_read_single(fd);
 
-	if (busy)
-		igt_spin_batch_free(gem_fd, spin);
+	igt_spin_batch_free(gem_fd, spin);
 	close(fd);
 
-	assert_within_epsilon(val, ref, tolerance);
+	assert_within_epsilon(val, busy ? slept : 0.f, tolerance);
+	gem_quiescent_gpu(gem_fd);
 }
 
 static void log_busy(int fd, unsigned int num_engines, uint64_t *val)
