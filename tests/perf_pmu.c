@@ -183,6 +183,7 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	const struct intel_execution_engine2 *e_;
 	uint64_t val[num_engines];
 	int fd[num_engines];
+	unsigned long slept;
 	igt_spin_t *spin;
 	unsigned int busy_idx, i;
 
@@ -202,9 +203,8 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	igt_assert_eq(i, num_engines);
 
 	spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
-	igt_spin_batch_set_timeout(spin, batch_duration_ns);
-
-	gem_sync(gem_fd, spin->handle);
+	slept = measured_usleep(batch_duration_ns / 1000);
+	igt_spin_batch_end(spin);
 
 	pmu_read_multi(fd[0], num_engines, val);
 	log_busy(fd[0], num_engines, val);
@@ -212,13 +212,13 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
 
-	assert_within_epsilon(val[busy_idx], batch_duration_ns, tolerance);
+	assert_within_epsilon(val[busy_idx], slept, tolerance);
 	for (i = 0; i < num_engines; i++) {
 		if (i == busy_idx)
 			continue;
 		assert_within_epsilon(val[i], 0.0f, tolerance);
 	}
-
+	gem_quiescent_gpu(gem_fd);
 }
 
 static void
