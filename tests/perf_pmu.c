@@ -228,53 +228,58 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	const struct intel_execution_engine2 *e_;
 	uint64_t val[num_engines];
 	int fd[num_engines];
-	igt_spin_t *spin[num_engines];
+	unsigned long slept;
+	igt_spin_t *spin = NULL;
 	unsigned int idle_idx, i;
 
 	gem_require_engine(gem_fd, e->class, e->instance);
 
 	i = 0;
-	fd[0] = -1;
 	for_each_engine_class_instance(fd, e_) {
 		if (!gem_has_engine(gem_fd, e_->class, e_->instance))
 			continue;
 
-		fd[i] = open_group(I915_PMU_ENGINE_BUSY(e_->class,
-							e_->instance),
-				   fd[0]);
-
 		if (e == e_) {
 			idle_idx = i;
+		} else if (spin) {
+			struct drm_i915_gem_exec_object2 obj = {
+				.handle = spin->handle
+			};
+			struct drm_i915_gem_execbuffer2 eb = {
+				.buffer_count = 1,
+				.buffers_ptr = to_user_pointer(&obj),
+				.flags = e2ring(gem_fd, e_),
+			};
+			gem_execbuf(gem_fd, &eb);
 		} else {
-			spin[i] = igt_spin_batch_new(gem_fd, 0,
-						     e2ring(gem_fd, e_), 0);
-			igt_spin_batch_set_timeout(spin[i], batch_duration_ns);
+			spin = igt_spin_batch_new(gem_fd, 0,
+						  e2ring(gem_fd, e_), 0);
 		}
 
-		i++;
+		val[i++] = I915_PMU_ENGINE_BUSY(e_->class, e_->instance);
 	}
+	igt_assert(i == num_engines);
 
-	for (i = 0; i < num_engines; i++) {
-		if (i != idle_idx)
-			gem_sync(gem_fd, spin[i]->handle);
-	}
+	fd[0] = -1;
+	for (i = 0; i < num_engines; i++)
+		fd[i] = open_group(val[i], fd[0]);
+
+	slept = measured_usleep(batch_duration_ns / 1000);
+	igt_spin_batch_end(spin);
 
 	pmu_read_multi(fd[0], num_engines, val);
 	log_busy(fd[0], num_engines, val);
 
-	for (i = 0; i < num_engines; i++) {
-		if (i != idle_idx)
-			igt_spin_batch_free(gem_fd, spin[i]);
-	}
+	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
 
 	for (i = 0; i < num_engines; i++) {
 		if (i == idle_idx)
 			assert_within_epsilon(val[i], 0.0f, tolerance);
 		else
-			assert_within_epsilon(val[i], batch_duration_ns,
-					      tolerance);
+			assert_within_epsilon(val[i], slept, tolerance);
 	}
+	gem_quiescent_gpu(gem_fd);
 }
 
 static void
