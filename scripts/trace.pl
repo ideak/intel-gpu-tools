@@ -302,74 +302,6 @@ die if scalar(@args);
 
 @ARGV = @args;
 
-sub parse_req
-{
-	my ($line, $tp) = @_;
-	state %cache;
-
-	$cache{$tp} = qr/(\d+)\.(\d+):.*$tp.*ring=(\d+), ctx=(\d+), seqno=(\d+), global(?:_seqno)?=(\d+)/ unless exists $cache{$tp};
-
-	if ($line =~ $cache{$tp}) {
-		return ($1, $2, $3, $4, $5, $6);
-	} else {
-		return undef;
-	}
-}
-
-sub parse_req_hw
-{
-	my ($line, $tp) = @_;
-	state %cache;
-
-	$cache{$tp} = qr/(\d+)\.(\d+):.*$tp.*ring=(\d+), ctx=(\d+), seqno=(\d+), global(?:_seqno)?=(\d+), port=(\d+)/ unless exists $cache{$tp};
-
-	if ($line =~ $cache{$tp}) {
-		return ($1, $2, $3, $4, $5, $6, $7);
-	} else {
-		return undef;
-	}
-}
-
-sub parse_req_wait_begin
-{
-	my ($line, $tp) = @_;
-
-	if ($line =~ /(\d+)\.(\d+):.*i915_gem_request_wait_begin.*ring=(\d+), ctx=(\d+), seqno=(\d+)/) {
-		return ($1, $2, $3, $4, $5);
-	} else {
-		return undef;
-	}
-}
-
-sub parse_notify
-{
-	my ($line) = @_;
-
-	if ($line =~ /(\d+)\.(\d+):.*intel_engine_notify.*ring=(\d+), seqno=(\d+)/) {
-		return ($1, $2, $3, $4);
-	} else {
-		return undef;
-	}
-}
-
-sub parse_freq
-{
-	my ($line) = @_;
-
-	if ($line =~ /(\d+)\.(\d+):.*intel_gpu_freq_change.*new_freq=(\d+)/) {
-		return ($1, $2, $3);
-	} else {
-		return undef;
-	}
-}
-
-sub us
-{
-	my ($s, $us) = @_;
-
-	return $s * 1000000 + $us;
-}
-
 sub db_key
 {
 	my ($ring, $ctx, $seqno) = @_;
@@ -425,86 +357,87 @@ my $prev_freq_ts = 0;
 my $oldkernelwa = 0;
 my ($no_queue, $no_in);
 while (<>) {
-	my ($s, $us, $ring, $ctx, $seqno, $global_seqno, $port);
-	my $freq;
+	my @fields;
+	my @tmp;
+	my $tp_name;
+	my $time;
+	my %tp;
 	my $key;
 
 	chomp;
+	@fields = split ' ';
 
-	($s, $us, $ring, $ctx, $seqno) = parse_req_wait_begin($_);
-	if (defined $s) {
+	$tp_name = $fields[4];
+	@tmp = split ':', $tp_name, 2;
+	next unless $tmp[0] eq 'i915';
+	$tp_name = $tmp[1];
+	chop $tp_name;
+
+	chop $fields[3];
+	$time = $fields[3] * 1000000.0;
+	splice @fields, 0, 5;
+
+	foreach my $f (@fields) {
+		my @kv = split '=|,', $f;
+
+		$kv[0] = 'global' if $kv[0] eq 'global_seqno';
+
+		$tp{$kv[0]} = $kv[1];
+	}
+
+	return undef if exists $tp{'ring'} and exists $ignore_ring{$tp{'ring'}};
+
+	if ($tp_name eq 'i915_gem_request_wait_begin') {
 		my %rw;
 
-		next if exists $ignore_ring{$ring};
-
-		$ctx = sanitize_ctx($ctx, $ring);
-		$key = db_key($ring, $ctx, $seqno);
+		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
+		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 
 		next if exists $reqwait{$key};
 
 		$rw{'key'} = $key;
-		$rw{'ring'} = $ring;
-		$rw{'seqno'} = $seqno;
-		$rw{'ctx'} = $ctx;
-		$rw{'start'} = us($s, $us);
+		$rw{'ring'} = $tp{'ring'};
+		$rw{'seqno'} = $tp{'seqno'};
+		$rw{'ctx'} = $tp{'ctx'};
+		$rw{'start'} = $time;
 		$reqwait{$key} = \%rw;
 		next;
-	}
-
-	($s, $us, $ring, $ctx, $seqno, $global_seqno) = parse_req($_, 'i915:i915_gem_request_wait_end');
-	if (defined $s) {
-		next if exists $ignore_ring{$ring};
-
-		$ctx = sanitize_ctx($ctx, $ring);
-		$key = db_key($ring, $ctx, $seqno);
+	} elsif ($tp_name eq 'i915_gem_request_wait_end') {
+		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
+		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 
 		next unless exists $reqwait{$key};
 
-		$reqwait{$key}->{'end'} = us($s, $us);
+		$reqwait{$key}->{'end'} = $time;
 		next;
-	}
+	} elsif ($tp_name eq 'i915_gem_request_add') {
+		my $orig_ctx = $tp{'ctx'};
 
-	($s, $us, $ring, $ctx, $seqno, $global_seqno) = parse_req($_, 'i915:i915_gem_request_add');
-	if (defined $s) {
-		my $orig_ctx = $ctx;
-
-		next if exists $ignore_ring{$ring};
-
-		$ctx = sanitize_ctx($ctx, $ring);
-		$key = db_key($ring, $ctx, $seqno);
+		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
+		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 
 		if (exists $queue{$key}) {
 			$ctxdb{$orig_ctx}++;
-			$ctx = sanitize_ctx($orig_ctx, $ring);
-			$key = db_key($ring, $ctx, $seqno);
+			$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
+			$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 		}
 
-		$queue{$key} = us($s, $us);
+		$queue{$key} = $time;
 		next;
-	}
-
-	($s, $us, $ring, $ctx, $seqno, $global_seqno) = parse_req($_, 'i915:i915_gem_request_submit');
-	if (defined $s) {
-		next if exists $ignore_ring{$ring};
-
-		$ctx = sanitize_ctx($ctx, $ring);
-		$key = db_key($ring, $ctx, $seqno);
+	} elsif ($tp_name eq 'i915_gem_request_submit') {
+		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
+		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 
 		die if exists $submit{$key};
 		die unless exists $queue{$key};
 
-		$submit{$key} = us($s, $us);
+		$submit{$key} = $time;
 		next;
-	}
-
-	($s, $us, $ring, $ctx, $seqno, $global_seqno, $port) = parse_req_hw($_, 'i915:i915_gem_request_in');
-	if (defined $s) {
+	} elsif ($tp_name eq 'i915_gem_request_in') {
 		my %req;
 
-		next if exists $ignore_ring{$ring};
-
-		$ctx = sanitize_ctx($ctx, $ring);
-		$key = db_key($ring, $ctx, $seqno);
+		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
+		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 
 		die if exists $db{$key};
 		if (not exists $queue{$key} and $oldkernelwa) {
@@ -514,30 +447,25 @@ while (<>) {
 		die unless exists $queue{$key};
 		die unless exists $submit{$key};
 
-		$req{'start'} = us($s, $us);
-		$req{'ring'} = $ring;
-		$req{'seqno'} = $seqno;
-		$req{'ctx'} = $ctx;
-		$req{'name'} = $ctx . '/' . $seqno;
-		$req{'global'} = $global_seqno;
-		$req{'port'} = $port;
+		$req{'start'} = $time;
+		$req{'ring'} = $tp{'ring'};
+		$req{'seqno'} = $tp{'seqno'};
+		$req{'ctx'} = $tp{'ctx'};
+		$req{'name'} = $tp{'ctx'} . '/' . $tp{'seqno'};
+		$req{'global'} = $tp{'global'};
+		$req{'port'} = $tp{'port'};
 		$req{'queue'} = $queue{$key};
 		$req{'submit-delay'} = $submit{$key} - $queue{$key};
 		$req{'execute-delay'} = $req{'start'} - $submit{$key};
-		$rings{$ring} = $gid++ unless exists $rings{$ring};
-		$ringmap{$rings{$ring}} = $ring;
+		$rings{$tp{'ring'}} = $gid++ unless exists $rings{$tp{'ring'}};
+		$ringmap{$rings{$tp{'ring'}}} = $tp{'ring'};
 		$db{$key} = \%req;
 		next;
-	}
+	} elsif ($tp_name eq 'i915_gem_request_out') {
+		my $gkey = global_key($tp{'ring'}, $tp{'global'});
 
-	($s, $us, $ring, $ctx, $seqno, $global_seqno, $port) = parse_req($_, 'i915:i915_gem_request_out');
-	if (defined $s) {
-		my $gkey = global_key($ring, $global_seqno);
-
-		next if exists $ignore_ring{$ring};
-
-		$ctx = sanitize_ctx($ctx, $ring);
-		$key = db_key($ring, $ctx, $seqno);
+		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
+		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 
 		if (not exists $db{$key} and $oldkernelwa) {
 			$no_in++;
@@ -547,7 +475,7 @@ while (<>) {
 		die unless exists $db{$key}->{'start'};
 		die if exists $db{$key}->{'end'};
 
-		$db{$key}->{'end'} = us($s, $us);
+		$db{$key}->{'end'} = $time;
 		if (exists $notify{$gkey}) {
 			$db{$key}->{'notify'} = $notify{$gkey};
 		} else {
@@ -559,22 +487,13 @@ while (<>) {
 		$db{$key}->{'duration'} = $db{$key}->{'notify'} - $db{$key}->{'start'};
 		$db{$key}->{'context-complete-delay'} = $db{$key}->{'end'} - $db{$key}->{'notify'};
 		next;
-	}
-
-	($s, $us, $ring, $seqno) = parse_notify($_);
-	if (defined $s) {
-		next if exists $ignore_ring{$ring};
-		$notify{global_key($ring, $seqno)} = us($s, $us);
+	} elsif ($tp_name eq 'intel_engine_notify') {
+		$notify{global_key($tp{'ring'}, $tp{'seqno'})} = $time;
 		next;
-	}
-
-	($s, $us, $freq) = parse_freq($_);
-	if (defined $s) {
-		my $cur = us($s, $us);
-
-		push @freqs, [$prev_freq_ts, $cur, $prev_freq] if $prev_freq;
-		$prev_freq_ts = $cur;
-		$prev_freq = $freq;
+	} elsif ($tp_name eq 'intel_gpu_freq_change') {
+		push @freqs, [$prev_freq_ts, $time, $prev_freq] if $prev_freq;
+		$prev_freq_ts = $time;
+		$prev_freq = $tp{'new_freq'};
 		next;
 	}
 }
