@@ -1,6 +1,11 @@
 if BUILD_OVERLAY
 bin_PROGRAMS = intel-gpu-overlay
+
+BUILT_SOURCES = tracepoint_format.h
 endif
+
+tracepoint_format.h: tracepoint_format.leg
+	$(LEG) -o $@ $<
 
 AM_CPPFLAGS = -I. -I$(top_srcdir)/include/drm-uapi
 AM_CFLAGS = $(DRM_CFLAGS) $(PCIACCESS_CFLAGS) $(CWARNFLAGS) \

@@ -146,6 +146,13 @@ if test x"$build_x86" = xyes; then
 	AS_IF([test x"$LEX" != "x:" -a x"$YACC" != xyacc],
 		[enable_assembler=yes],
 		[enable_assembler=no])
+
+	AC_CHECK_TOOL([LEG], [leg])
+	if test x"$LEG" != xleg; then
+		enable_overlay_xvlib="no"
+		enable_overlay_xlib="no"
+		AC_MSG_NOTICE([Failed to find leg, required for overlay, try : apt-get install peg])
+	fi
 else
 	enable_overlay_xvlib="no"
 	enable_overlay_xlib="no"
@@ -158,7 +165,7 @@ AM_CONDITIONAL(BUILD_ASSEMBLER, [test "x$enable_assembler" = xyes])
 
 AM_CONDITIONAL(BUILD_OVERLAY_XVLIB, [test "x$enable_overlay_xvlib" = xyes])
 AM_CONDITIONAL(BUILD_OVERLAY_XLIB, [test "x$enable_overlay_xlib" = xyes])
-AM_CONDITIONAL(BUILD_OVERLAY, [test "x$enable_overlay_xlib" = xyes -o "x$enable_overlay_xvlib"])
+AM_CONDITIONAL(BUILD_OVERLAY, [test "x$enable_overlay_xlib" = xyes -o "x$enable_overlay_xvlib" = "xyes"])
 if test x$enable_overlay_xvlib = xyes; then
 	AC_DEFINE(HAVE_OVERLAY_XVLIB, 1, [Enable XV backend])
 fi

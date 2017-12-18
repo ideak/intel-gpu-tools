@@ -57,39 +57,125 @@ struct sample_event {
 	uint64_t time;
 	uint64_t id;
 	uint32_t raw_size;
-	uint32_t raw_hdr0;
-	uint32_t raw_hdr1;
-	uint32_t raw[0];
+	uint8_t tracepoint_data[0];
 };
 
 enum {
-	DEVICE = 0,
-	CTX,
-	ENGINE,
-	CTX_SEQNO,
-	GLOBAL_SEQNO
+	TP_GEM_REQUEST_ADD,
+	TP_GEM_REQUEST_WAIT_BEGIN,
+	TP_GEM_REQUEST_WAIT_END,
+	TP_FLIP_COMPLETE,
+	TP_GEM_RING_SYNC_TO,
+	TP_GEM_RING_SWITCH_CONTEXT,
+
+	TP_NB
 };
 
-static uint64_t tracepoint_id(const char *sys, const char *name)
+struct tracepoint {
+	const char *name;
+	int event_id;
+
+	struct {
+		char name[128];
+		int offset;
+		int size;
+		int is_signed;
+	} fields[20];
+	int n_fields;
+
+	int device_field;
+	int ctx_field;
+	int ring_field;
+	int seqno_field;
+	int global_seqno_field;
+	int plane_field;
+} tracepoints[TP_NB] = {
+	[TP_GEM_REQUEST_ADD]         = { .name = "i915/i915_gem_request_add", },
+	[TP_GEM_REQUEST_WAIT_BEGIN]  = { .name = "i915/i915_gem_request_wait_begin", },
+	[TP_GEM_REQUEST_WAIT_END]    = { .name = "i915/i915_gem_request_wait_end", },
+	[TP_FLIP_COMPLETE]           = { .name = "i915/flip_complete", },
+	[TP_GEM_RING_SYNC_TO]        = { .name = "i915/gem_ring_sync_to", },
+	[TP_GEM_RING_SWITCH_CONTEXT] = { .name = "i915/gem_ring_switch_context", },
+};
+
+union parser_value {
+    char *string;
+    int integer;
+};
+
+struct parser_ctx {
+	struct tracepoint *tp;
+	FILE *fp;
+};
+
+#define YY_CTX_LOCAL
+#define YY_CTX_MEMBERS struct parser_ctx ctx;
+#define YYSTYPE union parser_value
+#define YY_LOCAL(T) static __attribute__((unused)) T
+#define YY_PARSE(T) static T
+#define YY_INPUT(yy, buf, result, max)				\
+	{							\
+		int c = getc(yy->ctx.fp);			\
+		result = (EOF == c) ? 0 : (*(buf)= c, 1);	\
+		if (EOF != c) {					\
+			yyprintf((stderr, "<%c>", c));		\
+		}						\
+	}
+
+#include "tracepoint_format.h"
+
+static int
+tracepoint_id(int tp_id)
 {
+	struct tracepoint *tp = &tracepoints[tp_id];
+	yycontext ctx;
 	char buf[1024];
-	int fd, n;
 
-	snprintf(buf, sizeof(buf), "%s/tracing/events/%s/%s/id", debugfs_path, sys, name);
-	fd = open(buf, 0);
-	if (fd < 0)
-		return 0;
-	n = read(fd, buf, sizeof(buf)-1);
-	close(fd);
-	if (n < 0)
+	/* Already parsed? */
+	if (tp->event_id != 0)
+		return tp->event_id;
+
+	snprintf(buf, sizeof(buf), "%s/tracing/events/%s/format",
+		 debugfs_path, tp->name);
+
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.ctx.tp = tp;
+	ctx.ctx.fp = fopen(buf, "r");
+
+	if (ctx.ctx.fp == NULL)
 		return 0;
 
-	buf[n] = '\0';
-	return strtoull(buf, 0, 0);
+	if (yyparse(&ctx)) {
+		for (int f = 0; f < tp->n_fields; f++) {
+			if (!strcmp(tp->fields[f].name, "device")) {
+				tp->device_field = f;
+			} else if (!strcmp(tp->fields[f].name, "ctx")) {
+				tp->ctx_field = f;
+			} else if (!strcmp(tp->fields[f].name, "ring")) {
+				tp->ring_field = f;
+			} else if (!strcmp(tp->fields[f].name, "seqno")) {
+				tp->seqno_field = f;
+			} else if (!strcmp(tp->fields[f].name, "global_seqno")) {
+				tp->global_seqno_field = f;
+			} else if (!strcmp(tp->fields[f].name, "plane")) {
+				tp->plane_field = f;
+			}
+		}
+	} else
+		tp->event_id = tp->n_fields = 0;
+
+	yyrelease(&ctx);
+	fclose(ctx.ctx.fp);
+
+	return tp->event_id;
 }
 
-static int perf_tracepoint_open(struct gpu_perf *gp,
-				const char *sys, const char *name,
+#define READ_TP_FIELD_U32(sample, tp_id, field_name)			\
+	(*(const uint32_t *)((sample)->tracepoint_data +		\
+			     tracepoints[tp_id].fields[			\
+				     tracepoints[tp_id].field_name##_field].offset))
+
+static int perf_tracepoint_open(struct gpu_perf *gp, int tp_id,
 				int (*func)(struct gpu_perf *, const void *))
 {
 	struct perf_event_attr attr;
@@ -99,7 +185,7 @@ static int perf_tracepoint_open(struct gpu_perf *gp,
 	memset(&attr, 0, sizeof (attr));
 
 	attr.type = PERF_TYPE_TRACEPOINT;
-	attr.config = tracepoint_id(sys, name);
+	attr.config = tracepoint_id(tp_id);
 	if (attr.config == 0)
 		return ENOENT;
 
@@ -227,7 +313,7 @@ static int request_add(struct gpu_perf *gp, const void *event)
 	if (comm == NULL)
 		return 0;
 
-	comm->nr_requests[sample->raw[ENGINE]]++;
+	comm->nr_requests[READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_ADD, ring)]++;
 	return 1;
 }
 
@@ -235,7 +321,7 @@ static int flip_complete(struct gpu_perf *gp, const void *event)
 {
 	const struct sample_event *sample = event;
 
-	gp->flip_complete[sample->raw[0]]++;
+	gp->flip_complete[READ_TP_FIELD_U32(sample, TP_FLIP_COMPLETE, plane)]++;
 	return 1;
 }
 
@@ -243,7 +329,7 @@ static int ctx_switch(struct gpu_perf *gp, const void *event)
 {
 	const struct sample_event *sample = event;
 
-	gp->ctx_switch[sample->raw[ENGINE]]++;
+	gp->ctx_switch[READ_TP_FIELD_U32(sample, TP_GEM_RING_SWITCH_CONTEXT, ring)]++;
 	return 1;
 }
 
@@ -278,11 +364,11 @@ static int wait_begin(struct gpu_perf *gp, const void *event)
 
 	wait->comm = comm;
 	wait->comm->active = true;
-	wait->context = sample->raw[ENGINE];
-	wait->seqno = sample->raw[CTX_SEQNO];
+	wait->context = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_BEGIN, ctx);
+	wait->seqno = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_BEGIN, seqno);
 	wait->time = sample->time;
-	wait->next = gp->wait[sample->raw[CTX]];
-	gp->wait[sample->raw[CTX]] = wait;
+	wait->next = gp->wait[READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_BEGIN, ring)];
+	gp->wait[READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_BEGIN, ring)] = wait;
 
 	return 0;
 }
@@ -291,10 +377,12 @@ static int wait_end(struct gpu_perf *gp, const void *event)
 {
 	const struct sample_event *sample = event;
 	struct gpu_perf_time *wait, **prev;
+	uint32_t engine = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_END, ring);
+	uint32_t context = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_END, ctx);
+	uint32_t seqno = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_END, seqno);
 
-	for (prev = &gp->wait[sample->raw[ENGINE]]; (wait = *prev) != NULL; prev = &wait->next) {
-		if (wait->context != sample->raw[CTX] ||
-		    wait->seqno != sample->raw[CTX_SEQNO])
+	for (prev = &gp->wait[engine]; (wait = *prev) != NULL; prev = &wait->next) {
+		if (wait->context != context || wait->seqno != seqno)
 			continue;
 
 		wait->comm->wait_time += sample->time - wait->time;
@@ -314,12 +402,12 @@ void gpu_perf_init(struct gpu_perf *gp, unsigned flags)
 	gp->nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 	gp->page_size = getpagesize();
 
-	perf_tracepoint_open(gp, "i915", "i915_gem_request_add", request_add);
-	if (perf_tracepoint_open(gp, "i915", "i915_gem_request_wait_begin", wait_begin) == 0)
-		perf_tracepoint_open(gp, "i915", "i915_gem_request_wait_end", wait_end);
-	perf_tracepoint_open(gp, "i915", "i915_flip_complete", flip_complete);
-	perf_tracepoint_open(gp, "i915", "i915_gem_ring_sync_to", ring_sync);
-	perf_tracepoint_open(gp, "i915", "i915_gem_ring_switch_context", ctx_switch);
+	perf_tracepoint_open(gp, TP_GEM_REQUEST_ADD, request_add);
+	if (perf_tracepoint_open(gp, TP_GEM_REQUEST_WAIT_BEGIN, wait_begin) == 0)
+		perf_tracepoint_open(gp, TP_GEM_REQUEST_WAIT_END, wait_end);
+	perf_tracepoint_open(gp, TP_FLIP_COMPLETE, flip_complete);
+	perf_tracepoint_open(gp, TP_GEM_RING_SYNC_TO, ring_sync);
+	perf_tracepoint_open(gp, TP_GEM_RING_SWITCH_CONTEXT, ctx_switch);
 
 	if (gp->nr_events == 0) {
 		gp->error = "i915.ko tracepoints not available";

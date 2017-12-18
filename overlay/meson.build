@@ -51,7 +51,18 @@ gpu_overlay_src += both_x11_src
 
 gpu_overlay_src += 'kms/kms-overlay.c'
 
-if xrandr.found() and cairo.found()
+leg = find_program('leg', required : false)
+if leg.found()
+	leg_file = custom_target('tracepoint_format',
+		output: 'tracepoint_format.h',
+		input: 'tracepoint_format.leg',
+		command: [leg, '-P', '-o', '@OUTPUT@', '@INPUT@'])
+	gpu_overlay_src += leg_file
+else
+	warning('leg command not found, disabling overlay; try : apt-get install peg')
+endif
+
+if leg.found() and xrandr.found() and cairo.found()
 	executable('intel-gpu-overlay', gpu_overlay_src,
 			include_directories : inc,
 			c_args : gpu_overlay_cflags,
