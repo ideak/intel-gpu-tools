@@ -354,8 +354,6 @@ sub ts
 # trace using a hash of requests and some auxilliary data structures.
 my $prev_freq = 0;
 my $prev_freq_ts = 0;
-my $oldkernelwa = 0;
-my ($no_queue, $no_in);
 while (<>) {
 	my @fields;
 	my @tmp;
@@ -440,10 +438,6 @@ while (<>) {
 		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 
 		die if exists $db{$key};
-		if (not exists $queue{$key} and $oldkernelwa) {
-			$no_queue++;
-			next;
-		}
 		die unless exists $queue{$key};
 		die unless exists $submit{$key};
 
@@ -467,10 +461,6 @@ while (<>) {
 		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
 		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 
-		if (not exists $db{$key} and $oldkernelwa) {
-			$no_in++;
-			next;
-		}
 		die unless exists $db{$key};
 		die unless exists $db{$key}->{'start'};
 		die if exists $db{$key}->{'end'};
@@ -573,27 +563,6 @@ foreach my $key (sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db) {
 
 	$first_ts = $db{$key}->{'queue'} if not defined $first_ts or $db{$key}->{'queue'} < $first_ts;
 	$last_ts = $end if $end > $last_ts;
-
-	# Adjust batch start with legacy execlists.
-	# Port == 2 mean batch was merged udring queuing and hasn't actually
-	# been submitted to the gpu until the batch with port < 2 is found.
-	if ($correct_durations and $oldkernelwa and $db{$key}->{'port'} == 2) {
-		my $ctx = $db{$key}->{'ctx'};
-		my $seqno = $db{$key}->{'seqno'};
-		my $next_key;
-		my $i = 1;
-
-		do {
-			$next_key = db_key($ring, $ctx, $seqno + $i);
-			$i++;
-		} until ((exists $db{$next_key} and $db{$next_key}->{'port'} < 2) or $i > scalar(keys(%db)));  # ugly stop hack
-
-		if (exists $db{$next_key}) {
-			$db{$key}->{'start'} = $db{$next_key}->{'start'};
-			$db{$key}->{'end'} = $db{$next_key}->{'end'};
-			die if $db{$key}->{'start'} > $db{$key}->{'end'};
-		}
-	}
 
 	$running{$ring} += $end - $db{$key}->{'start'} unless exists $db{$key}->{'no-end'};
 	$runnable{$ring} += $db{$key}->{'execute-delay'};
