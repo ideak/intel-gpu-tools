@@ -383,7 +383,7 @@ while (<>) {
 		$tp{$kv[0]} = $kv[1];
 	}
 
-	return undef if exists $tp{'ring'} and exists $ignore_ring{$tp{'ring'}};
+	next if exists $tp{'ring'} and exists $ignore_ring{$tp{'ring'}};
 
 	if ($tp_name eq 'i915_gem_request_wait_begin') {
 		my %rw;
