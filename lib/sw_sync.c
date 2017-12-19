@@ -33,6 +33,8 @@
 #include <stdint.h>
 #include <sys/ioctl.h>
 
+#include "sync_file.h"
+
 #include "igt_debugfs.h"
 #include "igt_kmod.h"
 #include "sw_sync.h"
@@ -55,41 +57,6 @@ struct int_sync_create_fence_data {
 #define INT_SYNC_IOC_MAGIC 'W'
 #define INT_SYNC_IOC_CREATE_FENCE	_IOWR(INT_SYNC_IOC_MAGIC, 0, struct int_sync_create_fence_data)
 #define INT_SYNC_IOC_INC		_IOW(INT_SYNC_IOC_MAGIC, 1, __u32)
-
-struct local_sync_merge_data {
-	char name[32];
-
-	__s32 fd2;
-	__s32 fence;
-
-	__u32 flags;
-	__u32 pad;
-};
-
-struct local_sync_fence_info {
-	char obj_name[32];
-	char driver_name[32];
-
-	__s32 status;
-	__u32 flags;
-
-	__u64 timestamp_ns;
-};
-
-struct local_sync_file_info {
-	char  name[32];
-
-	__s32 status;
-	__u32 flags;
-	__u32 num_fences;
-	__u32 pad;
-
-	__u64 sync_fence_info;
-};
-
-#define UABI_SYNC_IOC_MAGIC '>'
-#define LOCAL_SYNC_IOC_MERGE		_IOWR(UABI_SYNC_IOC_MAGIC, 3, struct local_sync_merge_data)
-#define LOCAL_SYNC_IOC_FILE_INFO	_IOWR(UABI_SYNC_IOC_MAGIC, 4, struct local_sync_file_info)
 
 static bool kernel_sw_sync_path(char *path, int length)
 {
@@ -159,9 +126,9 @@ void sw_sync_timeline_inc(int fd, uint32_t count)
 
 int sync_fence_merge(int fd1, int fd2)
 {
-	struct local_sync_merge_data data = { .fd2 = fd2};
+	struct sync_merge_data data = { .fd2 = fd2};
 
-	if (ioctl(fd1, LOCAL_SYNC_IOC_MERGE, &data))
+	if (ioctl(fd1, SYNC_IOC_MERGE, &data))
 		return -errno;
 
 	return data.fence;
@@ -192,9 +159,9 @@ int sync_fence_wait(int fd, int timeout)
 
 int sync_fence_count(int fd)
 {
-	struct local_sync_file_info info = {};
+	struct sync_file_info info = {};
 
-	if (ioctl(fd, LOCAL_SYNC_IOC_FILE_INFO, &info))
+	if (ioctl(fd, SYNC_IOC_FILE_INFO, &info))
 		return -errno;
 
 	return info.num_fences;
@@ -202,12 +169,12 @@ int sync_fence_count(int fd)
 
 static int __sync_fence_count_status(int fd, int status)
 {
-	struct local_sync_file_info info = {};
-	struct local_sync_fence_info *fence_info;
+	struct sync_file_info info = {};
+	struct sync_fence_info *fence_info;
 	int count;
 	int i;
 
-	if (ioctl(fd, LOCAL_SYNC_IOC_FILE_INFO, &info))
+	if (ioctl(fd, SYNC_IOC_FILE_INFO, &info))
 		return -errno;
 
 	fence_info = calloc(info.num_fences, sizeof(*fence_info));
@@ -215,7 +182,7 @@ static int __sync_fence_count_status(int fd, int status)
 		return -ENOMEM;
 
 	info.sync_fence_info = to_user_pointer(fence_info);
-	if (ioctl(fd, LOCAL_SYNC_IOC_FILE_INFO, &info)) {
+	if (ioctl(fd, SYNC_IOC_FILE_INFO, &info)) {
 		count = -errno;
 	} else {
 		count = 0;
@@ -239,13 +206,13 @@ int sync_fence_count_status(int fd, int status)
 
 int sync_fence_status(int fence)
 {
-	struct local_sync_fence_info fence_info;
-	struct local_sync_file_info file_info = {
+	struct sync_fence_info fence_info;
+	struct sync_file_info file_info = {
 		.sync_fence_info = to_user_pointer(&fence_info),
 		.num_fences = 1,
 	};
 
-	if (ioctl(fence, LOCAL_SYNC_IOC_FILE_INFO, &file_info))
+	if (ioctl(fence, SYNC_IOC_FILE_INFO, &file_info))
 		return -errno;
 
 	if (file_info.num_fences != 1)

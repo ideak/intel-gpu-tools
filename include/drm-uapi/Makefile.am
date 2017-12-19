@@ -19,6 +19,7 @@ EXTRA_DIST = \
 	radeon_drm.h \
 	savage_drm.h \
 	sis_drm.h \
+	sync_file.h \
 	tegra_drm.h \
 	vc4_drm.h \
 	vgem_drm.h \
