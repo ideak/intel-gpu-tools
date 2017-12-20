@@ -416,7 +416,7 @@ while (<>) {
 
 		if (exists $queue{$key}) {
 			$ctxdb{$orig_ctx}++;
-			$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
+			$tp{'ctx'} = sanitize_ctx($orig_ctx, $tp{'ring'});
 			$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 		}
 
