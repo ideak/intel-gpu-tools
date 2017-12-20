@@ -1711,7 +1711,7 @@ static void do_status_assertions(int flags)
 		igt_require(!fbc_stride_not_supported());
 		if (!fbc_wait_until_enabled()) {
 			fbc_print_status();
-			igt_assert_f(false, "FBC disabled\n");
+			igt_assert_f(fbc_is_enabled(), "FBC disabled\n");
 		}
 
 		if (opt.fbc_check_compression)
@@ -1723,7 +1723,7 @@ static void do_status_assertions(int flags)
 	if (flags & ASSERT_PSR_ENABLED) {
 		if (!psr_wait_until_enabled()) {
 			psr_print_status();
-			igt_assert_f(false, "PSR disabled\n");
+			igt_assert_f(psr_is_enabled(), "PSR disabled\n");
 		}
 	} else if (flags & ASSERT_PSR_DISABLED) {
 		igt_assert(!psr_wait_until_enabled());
