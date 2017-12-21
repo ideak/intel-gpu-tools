@@ -792,20 +792,13 @@ static void __debugfs_read(const char *param, char *buf, int len)
 
 #define debugfs_read(p, arr) __debugfs_read(p, arr, sizeof(arr))
 
-static bool fbc_is_enabled(void)
+static bool fbc_is_enabled(int lvl)
 {
 	char buf[128];
 
 	debugfs_read("i915_fbc_status", buf);
+	igt_log(IGT_LOG_DOMAIN, lvl, "fbc_is_enabled()?\n%s", buf);
 	return strstr(buf, "FBC enabled\n");
-}
-
-static void fbc_print_status(void)
-{
-	char buf[128];
-
-	debugfs_read("i915_fbc_status", buf);
-	igt_info("FBC status:\n%s\n", buf);
 }
 
 static bool psr_is_enabled(void)
@@ -927,7 +920,7 @@ static bool fbc_stride_not_supported(void)
 
 static bool fbc_wait_until_enabled(void)
 {
-	return igt_wait(fbc_is_enabled(), 2000, 1);
+	return igt_wait(fbc_is_enabled(IGT_LOG_DEBUG), 2000, 1);
 }
 
 static bool psr_wait_until_enabled(void)
@@ -1710,8 +1703,8 @@ static void do_status_assertions(int flags)
 		igt_require(!fbc_not_enough_stolen());
 		igt_require(!fbc_stride_not_supported());
 		if (!fbc_wait_until_enabled()) {
-			fbc_print_status();
-			igt_assert_f(fbc_is_enabled(), "FBC disabled\n");
+			igt_assert_f(fbc_is_enabled(IGT_LOG_WARN),
+				     "FBC disabled\n");
 		}
 
 		if (opt.fbc_check_compression)
