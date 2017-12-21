@@ -222,6 +222,7 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 
 		for (unsigned e = 0; e < nengine; e++)
 			exec[e].cmd[0] = MI_BATCH_BUFFER_END;
+		__sync_synchronize();
 	}
 
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
