@@ -356,110 +356,94 @@ my $prev_freq = 0;
 my $prev_freq_ts = 0;
 while (<>) {
 	my @fields;
-	my @tmp;
 	my $tp_name;
-	my $time;
 	my %tp;
-	my $key;
+	my ($time, $ctx, $ring, $seqno, $orig_ctx, $key);
 
 	chomp;
 	@fields = split ' ';
 
-	$tp_name = $fields[4];
-	@tmp = split ':', $tp_name, 2;
-	next unless $tmp[0] eq 'i915';
-	$tp_name = $tmp[1];
-	chop $tp_name;
-
 	chop $fields[3];
-	$time = $fields[3] * 1000000.0;
+	$time = int($fields[3] * 1000000.0 + 0.5);
+
+	$tp_name = $fields[4];
+
 	splice @fields, 0, 5;
 
 	foreach my $f (@fields) {
-		my @kv = split '=|,', $f;
+		my ($k, $v);
 
-		$kv[0] = 'global' if $kv[0] eq 'global_seqno';
-
-		$tp{$kv[0]} = $kv[1];
+		next unless $f =~ m/=/;
+		($k, $v) = ($`, $');
+		$k = 'global' if $k eq 'global_seqno';
+		chop $v if substr($v, -1, 1) eq ',';
+		$tp{$k} = $v;
 	}
 
 	next if exists $tp{'ring'} and exists $ignore_ring{$tp{'ring'}};
 
-	if ($tp_name eq 'i915_gem_request_wait_begin') {
-		my %rw;
+	if (exists $tp{'ring'} and exists $tp{'seqno'}) {
+		$ring = $tp{'ring'};
+		$seqno = $tp{'seqno'};
 
-		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
-		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
+		if (exists $tp{'ctx'}) {
+			$ctx = $tp{'ctx'};
+			$orig_ctx = $ctx;
+			$ctx = sanitize_ctx($ctx, $ring);
+			$key = db_key($ring, $ctx, $seqno);
+		}
+	}
+
+	if ($tp_name eq 'i915:i915_gem_request_wait_begin:') {
+		my %rw;
 
 		next if exists $reqwait{$key};
 
 		$rw{'key'} = $key;
-		$rw{'ring'} = $tp{'ring'};
-		$rw{'seqno'} = $tp{'seqno'};
-		$rw{'ctx'} = $tp{'ctx'};
+		$rw{'ring'} = $ring;
+		$rw{'seqno'} = $seqno;
+		$rw{'ctx'} = $ctx;
 		$rw{'start'} = $time;
 		$reqwait{$key} = \%rw;
-		next;
-	} elsif ($tp_name eq 'i915_gem_request_wait_end') {
-		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
-		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
-
+	} elsif ($tp_name eq 'i915:i915_gem_request_wait_end:') {
 		next unless exists $reqwait{$key};
 
 		$reqwait{$key}->{'end'} = $time;
-		next;
-	} elsif ($tp_name eq 'i915_gem_request_add') {
-		my $orig_ctx = $tp{'ctx'};
-
-		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
-		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
-
+	} elsif ($tp_name eq 'i915:i915_gem_request_add:') {
 		if (exists $queue{$key}) {
 			$ctxdb{$orig_ctx}++;
-			$tp{'ctx'} = sanitize_ctx($orig_ctx, $tp{'ring'});
-			$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
+			$ctx = sanitize_ctx($orig_ctx, $ring);
+			$key = db_key($ring, $ctx, $seqno);
 		}
 
 		$queue{$key} = $time;
-		next;
-	} elsif ($tp_name eq 'i915_gem_request_submit') {
-		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
-		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
-
+	} elsif ($tp_name eq 'i915:i915_gem_request_submit:') {
 		die if exists $submit{$key};
 		die unless exists $queue{$key};
 
 		$submit{$key} = $time;
-		next;
-	} elsif ($tp_name eq 'i915_gem_request_in') {
+	} elsif ($tp_name eq 'i915:i915_gem_request_in:') {
 		my %req;
-
-		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
-		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
 
 		die if exists $db{$key};
 		die unless exists $queue{$key};
 		die unless exists $submit{$key};
 
 		$req{'start'} = $time;
-		$req{'ring'} = $tp{'ring'};
-		$req{'seqno'} = $tp{'seqno'};
-		$req{'ctx'} = $tp{'ctx'};
-		$req{'name'} = $tp{'ctx'} . '/' . $tp{'seqno'};
+		$req{'ring'} = $ring;
+		$req{'seqno'} = $seqno;
+		$req{'ctx'} = $ctx;
+		$req{'name'} = $ctx . '/' . $seqno;
 		$req{'global'} = $tp{'global'};
 		$req{'port'} = $tp{'port'};
 		$req{'queue'} = $queue{$key};
 		$req{'submit-delay'} = $submit{$key} - $queue{$key};
 		$req{'execute-delay'} = $req{'start'} - $submit{$key};
-		$rings{$tp{'ring'}} = $gid++ unless exists $rings{$tp{'ring'}};
-		$ringmap{$rings{$tp{'ring'}}} = $tp{'ring'};
+		$rings{$ring} = $gid++ unless exists $rings{$ring};
+		$ringmap{$rings{$ring}} = $ring;
 		$db{$key} = \%req;
-		next;
-	} elsif ($tp_name eq 'i915_gem_request_out') {
-		my $gkey = global_key($tp{'ring'}, $tp{'global'});
-
-		$tp{'ctx'} = sanitize_ctx($tp{'ctx'}, $tp{'ring'});
-		$key = db_key($tp{'ring'}, $tp{'ctx'}, $tp{'seqno'});
+	} elsif ($tp_name eq 'i915:i915_gem_request_out:') {
+		my $gkey = global_key($ring, $tp{'global'});
 
 		die unless exists $db{$key};
 		die unless exists $db{$key}->{'start'};
@@ -476,15 +460,12 @@ while (<>) {
 		}
 		$db{$key}->{'duration'} = $db{$key}->{'notify'} - $db{$key}->{'start'};
 		$db{$key}->{'context-complete-delay'} = $db{$key}->{'end'} - $db{$key}->{'notify'};
-		next;
-	} elsif ($tp_name eq 'intel_engine_notify') {
-		$notify{global_key($tp{'ring'}, $tp{'seqno'})} = $time;
-		next;
-	} elsif ($tp_name eq 'intel_gpu_freq_change') {
+	} elsif ($tp_name eq 'i915:intel_engine_notify:') {
+		$notify{global_key($ring, $seqno)} = $time;
+	} elsif ($tp_name eq 'i915:intel_gpu_freq_change:') {
 		push @freqs, [$prev_freq_ts, $time, $prev_freq] if $prev_freq;
 		$prev_freq_ts = $time;
 		$prev_freq = $tp{'new_freq'};
-		next;
 	}
 }
 
@@ -557,7 +538,10 @@ my (%submit_avg, %execute_avg, %ctxsave_avg);
 my $last_ts = 0;
 my $first_ts;
 
-foreach my $key (sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db) {
+my @sorted_keys = sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db;
+my $re_sort = 0;
+
+foreach my $key (@sorted_keys) {
 	my $ring = $db{$key}->{'ring'};
 	my $end = $db{$key}->{'end'};
 
@@ -585,6 +569,7 @@ foreach my $key (sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db) {
 
 		# 20us tolerance
 		if (exists $db{$next_key} and $db{$next_key}->{'start'} < $start + 20) {
+			$re_sort = 1;
 			$db{$next_key}->{'start'} = $start + $db{$key}->{'duration'};
 			$db{$next_key}->{'start'} = $db{$next_key}->{'end'} if $db{$next_key}->{'start'} > $db{$next_key}->{'end'};
 			$db{$next_key}->{'duration'} = $db{$next_key}->{'notify'} - $db{$next_key}->{'start'};
@@ -601,6 +586,8 @@ foreach my $key (sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db) {
 	$ctxsave_avg{$ring} += $db{$key}->{'end'} - $db{$key}->{'notify'};
 }
 
+@sorted_keys = sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db if $re_sort;
+
 foreach my $ring (keys %batch_avg) {
 	$batch_avg{$ring} /= $batch_count{$ring};
 	$batch_total_avg{$ring} /= $batch_count{$ring};
@@ -616,7 +603,7 @@ foreach my $gid (sort keys %rings) {
 	my (@s_, @e_);
 
 	# Extract all GPU busy intervals and sort them.
-	foreach my $key (sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db) {
+	foreach my $key (@sorted_keys) {
 		next unless $db{$key}->{'ring'} == $ring;
 		push @s_, $db{$key}->{'start'};
 		push @e_, $db{$key}->{'end'};
@@ -660,7 +647,7 @@ my @gpu_intervals;
 my (@s_, @e_);
 
 # Extract all GPU busy intervals and sort them.
-foreach my $key (sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db) {
+foreach my $key (@sorted_keys) {
 	push @s_, $db{$key}->{'start'};
 	push @e_, $db{$key}->{'end'};
 	die if $db{$key}->{'start'} > $db{$key}->{'end'};
