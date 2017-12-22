@@ -34,6 +34,7 @@
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
+#include "sw_sync.h"
 
 /**
  * SECTION:igt_dummyload
@@ -70,9 +71,9 @@ fill_reloc(struct drm_i915_gem_relocation_entry *reloc,
 	reloc->write_domain = write_domains;
 }
 
-static void emit_recursive_batch(igt_spin_t *spin,
-				 int fd, uint32_t ctx, unsigned engine,
-				 uint32_t dep)
+static int emit_recursive_batch(igt_spin_t *spin,
+				int fd, uint32_t ctx, unsigned engine,
+				uint32_t dep, bool out_fence)
 {
 #define SCRATCH 0
 #define BATCH 1
@@ -82,6 +83,7 @@ static void emit_recursive_batch(igt_spin_t *spin,
 	struct drm_i915_gem_execbuffer2 execbuf;
 	unsigned int engines[16];
 	unsigned int nengine;
+	int fence_fd = -1;
 	uint32_t *batch;
 	int i;
 
@@ -165,22 +167,44 @@ static void emit_recursive_batch(igt_spin_t *spin,
 	execbuf.buffers_ptr = to_user_pointer(obj + (2 - execbuf.buffer_count));
 	execbuf.rsvd1 = ctx;
 
+	if (out_fence)
+		execbuf.flags |= I915_EXEC_FENCE_OUT;
+
 	for (i = 0; i < nengine; i++) {
 		execbuf.flags &= ~ENGINE_MASK;
-		execbuf.flags = engines[i];
-		gem_execbuf(fd, &execbuf);
+		execbuf.flags |= engines[i];
+		gem_execbuf_wr(fd, &execbuf);
+		if (out_fence) {
+			int _fd = execbuf.rsvd2 >> 32;
+
+			igt_assert(_fd >= 0);
+			if (fence_fd == -1) {
+				fence_fd = _fd;
+			} else {
+				int old_fd = fence_fd;
+
+				fence_fd = sync_fence_merge(old_fd, _fd);
+				close(old_fd);
+				close(_fd);
+			}
+			igt_assert(fence_fd >= 0);
+		}
 	}
+
+	return fence_fd;
 }
 
-igt_spin_t *
-__igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
+static igt_spin_t *
+___igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep,
+		      int out_fence)
 {
 	igt_spin_t *spin;
 
 	spin = calloc(1, sizeof(struct igt_spin));
 	igt_assert(spin);
 
-	emit_recursive_batch(spin, fd, ctx, engine, dep);
+	spin->out_fence = emit_recursive_batch(spin, fd, ctx, engine, dep,
+					       out_fence);
 	igt_assert(gem_bo_busy(fd, spin->handle));
 
 	pthread_mutex_lock(&list_lock);
@@ -188,6 +212,12 @@ __igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
 	pthread_mutex_unlock(&list_lock);
 
 	return spin;
+}
+
+igt_spin_t *
+__igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
+{
+	return ___igt_spin_batch_new(fd, ctx, engine, dep, false);
 }
 
 /**
@@ -211,6 +241,36 @@ igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
 	igt_require_gem(fd);
 
 	return __igt_spin_batch_new(fd, ctx, engine, dep);
+}
+
+igt_spin_t *
+__igt_spin_batch_new_fence(int fd, uint32_t ctx, unsigned engine)
+{
+	return ___igt_spin_batch_new(fd, ctx, engine, 0, true);
+}
+
+/**
+ * igt_spin_batch_new_fence:
+ * @fd: open i915 drm file descriptor
+ * @engine: Ring to execute batch OR'd with execbuf flags. If value is less
+ *          than 0, execute on all available rings.
+ *
+ * Start a recursive batch on a ring. Immediately returns a #igt_spin_t that
+ * contains the batch's handle that can be waited upon. The returned structure
+ * must be passed to igt_spin_batch_free() for post-processing.
+ *
+ * igt_spin_t will contain an output fence associtated with this batch.
+ *
+ * Returns:
+ * Structure with helper internal state for igt_spin_batch_free().
+ */
+igt_spin_t *
+igt_spin_batch_new_fence(int fd, uint32_t ctx, unsigned engine)
+{
+	igt_require_gem(fd);
+	igt_require(gem_has_exec_fence(fd));
+
+	return __igt_spin_batch_new_fence(fd, ctx, engine);
 }
 
 static void notify(union sigval arg)
@@ -295,6 +355,10 @@ void igt_spin_batch_free(int fd, igt_spin_t *spin)
 	gem_munmap(spin->batch, BATCH_SIZE);
 
 	gem_close(fd, spin->handle);
+
+	if (spin->out_fence >= 0)
+		close(spin->out_fence);
+
 	free(spin);
 }
 
