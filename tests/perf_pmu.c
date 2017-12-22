@@ -816,93 +816,35 @@ static void cpu_hotplug(int gem_fd)
 	assert_within_epsilon(val, ref, tolerance);
 }
 
-static unsigned long calibrate_nop(int fd, const uint64_t calibration_us)
-{
-	const uint64_t cal_min_us = calibration_us * 3;
-	const unsigned int tolerance_pct = 10;
-	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	const unsigned int loops = 17;
-	struct drm_i915_gem_exec_object2 obj = {};
-	struct drm_i915_gem_execbuffer2 eb = {
-		.buffer_count = 1, .buffers_ptr = to_user_pointer(&obj),
-	};
-	struct timespec t_begin = { };
-	uint64_t size, last_size, ns;
-
-	igt_nsec_elapsed(&t_begin);
-
-	size = 256 * 1024;
-	do {
-		struct timespec t_start = { };
-
-		obj.handle = gem_create(fd, size);
-		gem_write(fd, obj.handle, size - sizeof(bbe), &bbe,
-			  sizeof(bbe));
-		gem_execbuf(fd, &eb);
-		gem_sync(fd, obj.handle);
-
-		igt_nsec_elapsed(&t_start);
-
-		for (int loop = 0; loop < loops; loop++)
-			gem_execbuf(fd, &eb);
-		gem_sync(fd, obj.handle);
-
-		ns = igt_nsec_elapsed(&t_start);
-
-		gem_close(fd, obj.handle);
-
-		last_size = size;
-		size = calibration_us * 1000 * size * loops / ns;
-		size = ALIGN(size, sizeof(uint32_t));
-	} while (igt_nsec_elapsed(&t_begin) / 1000 < cal_min_us ||
-		 abs(size - last_size) > (size * tolerance_pct / 100));
-
-	return size;
-}
-
 static void
 test_interrupts(int gem_fd)
 {
-	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	const unsigned int test_duration_ms = 1000;
-	struct drm_i915_gem_exec_object2 obj = { };
-	struct drm_i915_gem_execbuffer2 eb = {
-		.buffers_ptr = to_user_pointer(&obj),
-		.buffer_count = 1,
-		.flags = I915_EXEC_FENCE_OUT,
-	};
-	unsigned long sz;
-	igt_spin_t *spin;
 	const int target = 30;
+	igt_spin_t *spin[target];
 	struct pollfd pfd;
 	uint64_t idle, busy;
+	int fence_fd;
 	int fd;
 
-	sz = calibrate_nop(gem_fd, test_duration_ms * 1000 / target);
 	gem_quiescent_gpu(gem_fd);
 
 	fd = open_pmu(I915_PMU_INTERRUPTS);
-	spin = igt_spin_batch_new(gem_fd, 0, 0, 0);
 
-	obj.handle = gem_create(gem_fd, sz);
-	gem_write(gem_fd, obj.handle, sz - sizeof(bbe), &bbe, sizeof(bbe));
-
-	pfd.events = POLLIN;
-	pfd.fd = -1;
+	/* Queue spinning batches. */
 	for (int i = 0; i < target; i++) {
-		int new;
-
-		/* Merge all the fences together so we can wait on them all */
-		gem_execbuf_wr(gem_fd, &eb);
-		new = eb.rsvd2 >> 32;
-		if (pfd.fd == -1) {
-			pfd.fd = new;
+		spin[i] = igt_spin_batch_new_fence(gem_fd, 0, I915_EXEC_RENDER);
+		if (i == 0) {
+			fence_fd = spin[i]->out_fence;
 		} else {
-			int old = pfd.fd;
-			pfd.fd = sync_fence_merge(old, new);
-			close(old);
-			close(new);
+			int old_fd = fence_fd;
+
+			fence_fd = sync_fence_merge(old_fd,
+						    spin[i]->out_fence);
+			close(old_fd);
 		}
+
+		igt_assert(fence_fd >= 0);
 	}
 
 	/* Wait for idle state. */
@@ -913,13 +855,65 @@ test_interrupts(int gem_fd)
 		idle = pmu_read_single(fd);
 	} while (idle != busy);
 
-	/* Install the fences and enable signaling */
-	igt_assert_eq(poll(&pfd, 1, 10), 0);
+	/* Arm batch expiration. */
+	for (int i = 0; i < target; i++)
+		igt_spin_batch_set_timeout(spin[i],
+					   (i + 1) * test_duration_ms * 1e6
+					   / target);
 
-	/* Unplug the calibrated queue and wait for all the fences */
-	igt_spin_batch_free(gem_fd, spin);
+	/* Wait for last batch to finish. */
+	pfd.events = POLLIN;
+	pfd.fd = fence_fd;
 	igt_assert_eq(poll(&pfd, 1, 2 * test_duration_ms), 1);
-	close(pfd.fd);
+	close(fence_fd);
+
+	/* Free batches. */
+	for (int i = 0; i < target; i++)
+		igt_spin_batch_free(gem_fd, spin[i]);
+
+	/* Check at least as many interrupts has been generated. */
+	busy = pmu_read_single(fd) - idle;
+	close(fd);
+
+	igt_assert_lte(target, busy);
+}
+
+static void
+test_interrupts_sync(int gem_fd)
+{
+	const unsigned int test_duration_ms = 1000;
+	const int target = 30;
+	igt_spin_t *spin[target];
+	struct pollfd pfd;
+	uint64_t idle, busy;
+	int fd;
+
+	gem_quiescent_gpu(gem_fd);
+
+	fd = open_pmu(I915_PMU_INTERRUPTS);
+
+	/* Queue spinning batches. */
+	for (int i = 0; i < target; i++)
+		spin[i] = __igt_spin_batch_new_fence(gem_fd, 0, 0);
+
+	/* Wait for idle state. */
+	idle = pmu_read_single(fd);
+	do {
+		busy = idle;
+		usleep(1e3);
+		idle = pmu_read_single(fd);
+	} while (idle != busy);
+
+	/* Process the batch queue. */
+	pfd.events = POLLIN;
+	for (int i = 0; i < target; i++) {
+		const unsigned int timeout_ms = test_duration_ms / target;
+
+		pfd.fd = spin[i]->out_fence;
+		igt_spin_batch_set_timeout(spin[i], timeout_ms * 1e6);
+		igt_assert_eq(poll(&pfd, 1, 2 * timeout_ms), 1);
+		igt_spin_batch_free(gem_fd, spin[i]);
+	}
 
 	/* Check at least as many interrupts has been generated. */
 	busy = pmu_read_single(fd) - idle;
@@ -1207,6 +1201,9 @@ igt_main
 	 */
 	igt_subtest("interrupts")
 		test_interrupts(fd);
+
+	igt_subtest("interrupts-sync")
+		test_interrupts_sync(fd);
 
 	/**
 	 * Test RC6 residency reporting.
