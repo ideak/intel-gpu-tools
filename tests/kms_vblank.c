@@ -113,54 +113,47 @@ static int wait_vblank(int fd, union drm_wait_vblank *vbl)
 	return err;
 }
 
-static void run_test(data_t *data, int fd, void (*testfunc)(data_t *, int, int))
+static void run_test(data_t *data, void (*testfunc)(data_t *, int, int))
 {
 	int nchildren =
 		data->flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1;
 	igt_display_t *display = &data->display;
-	igt_output_t *output;
-	enum pipe p;
+	igt_output_t *output = data->output;
+	int fd = display->drm_fd;
 
-	for_each_pipe_with_valid_output(display, p, output) {
-		data->pipe = p;
-		prepare_crtc(data, fd, output);
+	prepare_crtc(data, fd, output);
 
-		igt_info("Beginning %s on pipe %s, connector %s (%d threads)\n",
-			 igt_subtest_name(),
-			 kmstest_pipe_name(data->pipe),
-			 igt_output_name(output),
-			 nchildren);
+	igt_info("Beginning %s on pipe %s, connector %s (%d threads)\n",
+		 igt_subtest_name(), kmstest_pipe_name(data->pipe),
+		 igt_output_name(output), nchildren);
 
-		if (data->flags & BUSY) {
-			union drm_wait_vblank vbl;
+	if (data->flags & BUSY) {
+		union drm_wait_vblank vbl;
 
-			memset(&vbl, 0, sizeof(vbl));
-			vbl.request.type =
-				DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT;
-			vbl.request.type |= kmstest_get_vbl_flag(data->pipe);
-			vbl.request.sequence = 120 + 12;
-			igt_assert_eq(wait_vblank(fd, &vbl), 0);
-		}
-
-		igt_fork(child, nchildren)
-			testfunc(data, fd, nchildren);
-		igt_waitchildren();
-
-		if (data->flags & BUSY) {
-			struct drm_event_vblank buf;
-			igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
-		}
-
-		igt_assert(poll(&(struct pollfd){fd, POLLIN}, 1, 0) == 0);
-
-		igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
-			 igt_subtest_name(),
-			 kmstest_pipe_name(data->pipe),
-			 igt_output_name(output));
-
-		/* cleanup what prepare_crtc() has done */
-		cleanup_crtc(data, fd, output);
+		memset(&vbl, 0, sizeof(vbl));
+		vbl.request.type =
+			DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT;
+		vbl.request.type |= kmstest_get_vbl_flag(data->pipe);
+		vbl.request.sequence = 120 + 12;
+		igt_assert_eq(wait_vblank(fd, &vbl), 0);
 	}
+
+	igt_fork(child, nchildren)
+		testfunc(data, fd, nchildren);
+	igt_waitchildren();
+
+	if (data->flags & BUSY) {
+		struct drm_event_vblank buf;
+		igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
+	}
+
+	igt_assert(poll(&(struct pollfd){fd, POLLIN}, 1, 0) == 0);
+
+	igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
+		 igt_subtest_name(), kmstest_pipe_name(data->pipe), igt_output_name(output));
+
+	/* cleanup what prepare_crtc() has done */
+	cleanup_crtc(data, fd, output);
 }
 
 static void crtc_id_subtest(data_t *data, int fd)
@@ -315,10 +308,8 @@ static void vblank_wait(data_t *data, int fd, int nchildren)
 		 elapsed(&start, &end, count));
 }
 
-igt_main
+static void run_subtests_for_pipe(data_t *data)
 {
-	int fd;
-	data_t data;
 	const struct {
 		const char *name;
 		void (*func)(data_t *, int, int);
@@ -329,6 +320,7 @@ igt_main
 		{ "wait", vblank_wait, IDLE | FORKED | BUSY },
 		{ }
 	}, *f;
+
 	const struct {
 		const char *name;
 		unsigned int flags;
@@ -339,6 +331,31 @@ igt_main
 		{ "forked-busy", BUSY | FORKED },
 		{ }
 	}, *m;
+
+	igt_fixture
+		igt_display_require_output_on_pipe(&data->display, data->pipe);
+
+	for (f = funcs; f->name; f++) {
+		for (m = modes; m->name; m++) {
+			if (m->flags & ~f->valid)
+				continue;
+
+			igt_subtest_f("pipe-%s-%s-%s",
+				      kmstest_pipe_name(data->pipe),
+				      f->name, m->name) {
+				for_each_valid_output_on_pipe(&data->display, data->pipe, data->output) {
+					data->flags = m->flags;
+					run_test(data, f->func);
+				}
+			}
+		}
+	}
+}
+
+igt_main
+{
+	int fd;
+	data_t data;
 
 	igt_skip_on_simulation();
 
@@ -352,15 +369,7 @@ igt_main
 	igt_subtest("crtc-id")
 		crtc_id_subtest(&data, fd);
 
-	for (f = funcs; f->name; f++) {
-		for (m = modes; m->name; m++) {
-			if (m->flags & ~f->valid)
-				continue;
-
-			igt_subtest_f("%s-%s", f->name, m->name) {
-				data.flags = m->flags;
-				run_test(&data, fd, f->func);
-			}
-		}
-	}
+	for_each_pipe_static(data.pipe)
+		igt_subtest_group
+			run_subtests_for_pipe(&data);
 }
