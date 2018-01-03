@@ -52,6 +52,7 @@
 #include "intel_chipset.h"
 #include "intel_io.h"
 #include "igt_debugfs.h"
+#include "igt_sysfs.h"
 #include "config.h"
 
 #ifdef HAVE_VALGRIND
@@ -1411,13 +1412,26 @@ void igt_require_gem(int fd)
 
 	igt_require_intel(fd);
 
-	/* We only want to use the throttle-ioctl for its -EIO reporting
+	/*
+	 * We only want to use the throttle-ioctl for its -EIO reporting
 	 * of a wedged device, not for actually waiting on outstanding
 	 * requests! So create a new drm_file for the device that is clean.
 	 */
 	snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
 	fd = open(path, O_RDWR);
 	igt_assert_lte(0, fd);
+
+	/*
+	 * Reset the global seqno at the start of each test. This ensures that
+	 * the test will not wrap unless it explicitly sets up seqno wrapping
+	 * itself, which avoids accidentally hanging when setting up long
+	 * sequences of batches.
+	 */
+	err = igt_debugfs_dir(fd);
+	if (err != -1) {
+		igt_sysfs_printf(err, "i915_next_seqno", "1");
+		close(err);
+	}
 
 	err = 0;
 	if (ioctl(fd, DRM_IOCTL_I915_GEM_THROTTLE))
