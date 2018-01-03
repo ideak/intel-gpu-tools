@@ -833,7 +833,8 @@ test_interrupts(int gem_fd)
 
 	/* Queue spinning batches. */
 	for (int i = 0; i < target; i++) {
-		spin[i] = igt_spin_batch_new_fence(gem_fd, 0, I915_EXEC_RENDER);
+		spin[i] = __igt_spin_batch_new_fence(gem_fd,
+						     0, I915_EXEC_RENDER);
 		if (i == 0) {
 			fence_fd = spin[i]->out_fence;
 		} else {
