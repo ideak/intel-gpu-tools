@@ -51,10 +51,14 @@ typedef struct {
 	igt_output_t *output;
 	enum pipe pipe;
 	unsigned int flags;
-#define IDLE 1
-#define BUSY 2
-#define FORKED 4
-#define NOHANG 8
+#define IDLE	0x1
+#define BUSY	0x2
+#define FORKED	0x4
+#define NOHANG	0x8
+#define MODESET 0x10
+#define DPMS	0x20
+#define SUSPEND 0x40
+#define RPM	0x80
 } data_t;
 
 static double elapsed(const struct timespec *start,
@@ -124,6 +128,9 @@ static void run_test(data_t *data, void (*testfunc)(data_t *, int, int))
 	igt_hang_t hang;
 
 	prepare_crtc(data, fd, output);
+
+	if (data->flags & RPM)
+		igt_require(igt_setup_runtime_pm());
 
 	igt_info("Beginning %s on pipe %s, connector %s (%d threads)\n",
 		 igt_subtest_name(), kmstest_pipe_name(data->pipe),
@@ -316,6 +323,69 @@ static void vblank_wait(data_t *data, int fd, int nchildren)
 		 elapsed(&start, &end, count));
 }
 
+static int get_vblank(int fd, enum pipe pipe, unsigned flags)
+{
+	union drm_wait_vblank vbl;
+
+	memset(&vbl, 0, sizeof(vbl));
+	vbl.request.type = DRM_VBLANK_RELATIVE | kmstest_get_vbl_flag(pipe) | flags;
+	do_or_die(igt_ioctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl));
+
+	return vbl.reply.sequence;
+}
+
+static void vblank_ts_cont(data_t *data, int fd, int nchildren)
+{
+	igt_display_t *display = &data->display;
+	igt_output_t *output = data->output;
+	int seq1, seq2;
+	union drm_wait_vblank vbl;
+
+	seq1 = get_vblank(fd, data->pipe, 0);
+
+	if (data->flags & DPMS) {
+		igt_output_set_prop_value(output, IGT_CONNECTOR_DPMS, DRM_MODE_DPMS_OFF);
+		igt_display_commit(display);
+	}
+
+	if (data->flags & MODESET) {
+		igt_output_set_pipe(output, PIPE_NONE);
+		igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+	}
+
+	if (data->flags & RPM)
+		igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
+
+	if (data->flags & SUSPEND)
+		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
+					      SUSPEND_TEST_NONE);
+
+	if (data->flags & (MODESET | DPMS)) {
+		/* Attempting to do a vblank while disabled should return -EINVAL */
+		memset(&vbl, 0, sizeof(vbl));
+		vbl.request.type = DRM_VBLANK_RELATIVE;
+		vbl.request.type |= kmstest_get_vbl_flag(data->pipe);
+		igt_assert_eq(wait_vblank(fd, &vbl), -EINVAL);
+	}
+
+	if (data->flags & DPMS) {
+		igt_output_set_prop_value(output, IGT_CONNECTOR_DPMS, DRM_MODE_DPMS_ON);
+		igt_display_commit(display);
+	}
+
+	if (data->flags & MODESET) {
+		igt_output_set_pipe(output, data->pipe);
+		igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+	}
+
+	seq2 = get_vblank(fd, data->pipe, 0);
+
+	igt_debug("testing ts continuity: Current frame %u, old frame %u\n", seq2, seq1);
+
+	igt_assert_f(seq2 - seq1 >= 0, "unexpected vblank seq %u, should be >= %u\n", seq2, seq1);
+	igt_assert_f(seq2 - seq1 <= 150, "unexpected vblank seq %u, should be < %u\n", seq2, seq1 + 150);
+}
+
 static void run_subtests_for_pipe(data_t *data)
 {
 	const struct {
@@ -330,6 +400,7 @@ static void run_subtests_for_pipe(data_t *data)
 		{ "accuracy", accuracy, IDLE | NOHANG },
 		{ "query", vblank_query, IDLE | FORKED | BUSY },
 		{ "wait", vblank_wait, IDLE | FORKED | BUSY },
+		{ "ts-continuation", vblank_ts_cont, IDLE | SUSPEND | MODESET | DPMS | RPM },
 		{ }
 	}, *f;
 
@@ -341,6 +412,11 @@ static void run_subtests_for_pipe(data_t *data)
 		{ "forked", IDLE | FORKED },
 		{ "busy", BUSY },
 		{ "forked-busy", BUSY | FORKED },
+		{ "dpms-rpm", DPMS | RPM | NOHANG },
+		{ "dpms-suspend", DPMS | SUSPEND | NOHANG},
+		{ "suspend", SUSPEND | NOHANG },
+		{ "modeset", MODESET },
+		{ "modeset-rpm", MODESET | RPM | NOHANG},
 		{ }
 	}, *m;
 
