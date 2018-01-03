@@ -459,17 +459,17 @@ static void close_race(int fd)
 		igt_assert(sched_setscheduler(getpid(), SCHED_RR, &rt) == 0);
 
 		for (i = 0; i < nhandles; i++) {
-			spin[i] = igt_spin_batch_new(fd, 0,
-						     engines[rand() % nengine], 0);
+			spin[i] = __igt_spin_batch_new(fd, 0,
+						       engines[rand() % nengine], 0);
 			handles[i] = spin[i]->handle;
 		}
 
 		igt_until_timeout(20) {
 			for (i = 0; i < nhandles; i++) {
 				igt_spin_batch_free(fd, spin[i]);
-				spin[i] = igt_spin_batch_new(fd, 0,
-							     engines[rand() % nengine],
-							     0);
+				spin[i] = __igt_spin_batch_new(fd, 0,
+							       engines[rand() % nengine],
+							       0);
 				handles[i] = spin[i]->handle;
 				__sync_synchronize();
 			}
