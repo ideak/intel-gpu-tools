@@ -59,7 +59,7 @@ if leg.found()
 		command: [leg, '-P', '-o', '@OUTPUT@', '@INPUT@'])
 	gpu_overlay_src += leg_file
 else
-	warning('leg command not found, disabling overlay; try : apt-get install peg')
+	message('WARNING: leg command not found, disabling overlay; try : apt-get install peg')
 endif
 
 if leg.found() and xrandr.found() and cairo.found()
