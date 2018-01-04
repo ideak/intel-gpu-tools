@@ -1527,7 +1527,6 @@ int main(int argc, char **argv)
 		int flags;
 		const char *name;
 	} tests[] = {
-		{ 30, TEST_VBLANK, "wf_vblank" },
 		{ 30, TEST_VBLANK | TEST_CHECK_TS, "wf_vblank-ts-check" },
 		{ 30, TEST_VBLANK | TEST_VBLANK_BLOCK | TEST_CHECK_TS,
 					"blocking-wf_vblank" },
@@ -1535,8 +1534,6 @@ int main(int argc, char **argv)
 					"absolute-wf_vblank" },
 		{ 30,  TEST_VBLANK | TEST_VBLANK_BLOCK | TEST_VBLANK_ABSOLUTE,
 					"blocking-absolute-wf_vblank" },
-		{ 60,  TEST_VBLANK | TEST_DPMS | TEST_EINVAL, "wf_vblank-vs-dpms" },
-		{ 60,  TEST_VBLANK | TEST_MODESET | TEST_EINVAL, "wf_vblank-vs-modeset" },
 		{ 10, TEST_FLIP | TEST_BASIC, "plain-flip" },
 		{ 30, TEST_FLIP | TEST_EBUSY , "busy-flip" },
 		{ 30, TEST_FLIP | TEST_FENCE_STRESS , "flip-vs-fences" },
@@ -1568,11 +1565,6 @@ int main(int argc, char **argv)
 		{ 0, TEST_ENOENT | TEST_NOEVENT, "nonexisting-fb" },
 		{ 10, TEST_DPMS_OFF | TEST_DPMS | TEST_VBLANK_RACE, "dpms-vs-vblank-race" },
 		{ 10, TEST_MODESET | TEST_VBLANK_RACE, "modeset-vs-vblank-race" },
-		{ 10, TEST_VBLANK | TEST_DPMS | TEST_RPM | TEST_TS_CONT, "vblank-vs-dpms-rpm" },
-		{ 10, TEST_VBLANK | TEST_MODESET | TEST_RPM | TEST_TS_CONT, "vblank-vs-modeset-rpm" },
-		{ 0, TEST_VBLANK | TEST_DPMS | TEST_SUSPEND | TEST_TS_CONT, "vblank-vs-dpms-suspend" },
-		{ 0, TEST_VBLANK | TEST_MODESET | TEST_SUSPEND | TEST_TS_CONT, "vblank-vs-modeset-suspend" },
-		{ 0, TEST_VBLANK | TEST_SUSPEND | TEST_TS_CONT, "vblank-vs-suspend" },
 		{ 0, TEST_BO_TOOBIG | TEST_NO_2X_OUTPUT, "bo-too-big" },
 	};
 	int i;
