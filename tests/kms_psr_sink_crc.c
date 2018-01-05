@@ -532,11 +532,13 @@ int main(int argc, char *argv[])
 	igt_subtest("psr_basic") {
 		setup_test_plane(&data);
 		igt_assert(wait_psr_entry(&data));
+		test_cleanup(&data);
 	}
 
 	igt_subtest("psr_drrs") {
 		setup_test_plane(&data);
 		igt_assert(drrs_disabled(&data));
+		test_cleanup(&data);
 	}
 
 	for (op = PAGE_FLIP; op <= RENDER; op++) {
