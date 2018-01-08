@@ -18,13 +18,13 @@ A short list of contribution guidelines:
 
   on its first invocation.
 
-- intel-gpu-tools is MIT lincensed and we require contributions to follow the
+- intel-gpu-tools is MIT licensed and we require contributions to follow the
   developer's certificate of origin: http://developercertificate.org/
 
 - When submitting new testcases please follow the naming conventions documented
-  in the generated documentation. Also please make full use of all the helpers and
-  convenience macros provided by the igt library. The semantic patch lib/igt.cocci
-  can help with the more automatic conversions.
+  in the generated documentation. Also please make full use of all the helpers
+  and convenience macros provided by the igt library. The semantic patch
+  lib/igt.cocci can help with the more automatic conversions.
 
 - Patches need to be reviewed on the mailing list. Exceptions only apply for
   testcases and tooling for drivers with just a single contributor (e.g. vc4).
