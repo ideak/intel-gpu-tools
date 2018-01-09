@@ -163,144 +163,151 @@ static void iterate_plane_scaling(data_t *d, drmModeModeInfo *mode)
 	}
 }
 
-static void test_plane_scaling(data_t *d)
+static void
+test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 {
 	igt_display_t *display = &d->display;
-	igt_output_t *output;
-	enum pipe pipe;
-	int valid_tests = 0;
+	drmModeModeInfo *mode;
 	int primary_plane_scaling = 0; /* For now */
 
-	igt_require(d->num_scalers);
+	igt_output_set_pipe(output, pipe);
+	mode = igt_output_get_mode(output);
 
-	for_each_pipe_with_valid_output(display, pipe, output) {
-		drmModeModeInfo *mode;
+	/* allocate fb2 with image size */
+	d->fb_id2 = igt_create_image_fb(d->drm_fd, 0, 0,
+					DRM_FORMAT_XRGB8888,
+					LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
+					FILE_NAME, &d->fb2);
+	igt_assert(d->fb_id2);
 
-		igt_output_set_pipe(output, pipe);
+	d->fb_id3 = igt_create_pattern_fb(d->drm_fd,
+					  mode->hdisplay, mode->vdisplay,
+					  DRM_FORMAT_XRGB8888,
+					  LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
+					  &d->fb3);
+	igt_assert(d->fb_id3);
 
-		mode = igt_output_get_mode(output);
+	/* Set up display with plane 1 */
+	d->plane1 = igt_output_get_plane(output, 0);
+	prepare_crtc(d, output, pipe, d->plane1, mode, COMMIT_UNIVERSAL);
 
-		/* allocate fb2 with image size */
-		d->fb_id2 = igt_create_image_fb(d->drm_fd, 0, 0,
-						DRM_FORMAT_XRGB8888,
-						LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
-						FILE_NAME, &d->fb2);
-		igt_assert(d->fb_id2);
+	if (primary_plane_scaling) {
+		/* Primary plane upscaling */
+		igt_fb_set_position(&d->fb1, d->plane1, 100, 100);
+		igt_fb_set_size(&d->fb1, d->plane1, 500, 500);
+		igt_plane_set_position(d->plane1, 0, 0);
+		igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
+		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-		d->fb_id3 = igt_create_pattern_fb(d->drm_fd,
-						  mode->hdisplay, mode->vdisplay,
-						  DRM_FORMAT_XRGB8888,
-						  LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
-						  &d->fb3);
-		igt_assert(d->fb_id3);
+		/* Primary plane 1:1 no scaling */
+		igt_fb_set_position(&d->fb1, d->plane1, 0, 0);
+		igt_fb_set_size(&d->fb1, d->plane1, d->fb1.width, d->fb1.height);
+		igt_plane_set_position(d->plane1, 0, 0);
+		igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
+		igt_display_commit2(display, COMMIT_UNIVERSAL);
+	}
 
-		/* Set up display with plane 1 */
-		d->plane1 = igt_output_get_plane(output, 0);
-		prepare_crtc(d, output, pipe, d->plane1, mode, COMMIT_UNIVERSAL);
+	/* Set up fb2->plane2 mapping. */
+	d->plane2 = igt_output_get_plane(output, 1);
+	igt_plane_set_fb(d->plane2, &d->fb2);
 
-		if (primary_plane_scaling) {
-			/* Primary plane upscaling */
-			igt_fb_set_position(&d->fb1, d->plane1, 100, 100);
-			igt_fb_set_size(&d->fb1, d->plane1, 500, 500);
-			igt_plane_set_position(d->plane1, 0, 0);
-			igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
-			igt_display_commit2(display, COMMIT_UNIVERSAL);
+	/* 2nd plane windowed */
+	igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
+	igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-200, d->fb2.height-200);
+	igt_plane_set_position(d->plane2, 100, 100);
+	igt_plane_set_size(d->plane2, mode->hdisplay-200, mode->vdisplay-200);
+	igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-			/* Primary plane 1:1 no scaling */
-			igt_fb_set_position(&d->fb1, d->plane1, 0, 0);
-			igt_fb_set_size(&d->fb1, d->plane1, d->fb1.width, d->fb1.height);
-			igt_plane_set_position(d->plane1, 0, 0);
-			igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
-			igt_display_commit2(display, COMMIT_UNIVERSAL);
-		}
+	iterate_plane_scaling(d, mode);
 
-		/* Set up fb2->plane2 mapping. */
-		d->plane2 = igt_output_get_plane(output, 1);
-		igt_plane_set_fb(d->plane2, &d->fb2);
+	/* 2nd plane up scaling */
+	igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
+	igt_fb_set_size(&d->fb2, d->plane2, 500, 500);
+	igt_plane_set_position(d->plane2, 10, 10);
+	igt_plane_set_size(d->plane2, mode->hdisplay-20, mode->vdisplay-20);
+	igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-		/* 2nd plane windowed */
+	/* 2nd plane downscaling */
+	igt_fb_set_position(&d->fb2, d->plane2, 0, 0);
+	igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width, d->fb2.height);
+	igt_plane_set_position(d->plane2, 10, 10);
+	igt_plane_set_size(d->plane2, 500, 500 * d->fb2.height/d->fb2.width);
+	igt_display_commit2(display, COMMIT_UNIVERSAL);
+
+	if (primary_plane_scaling) {
+		/* Primary plane up scaling */
+		igt_fb_set_position(&d->fb1, d->plane1, 100, 100);
+		igt_fb_set_size(&d->fb1, d->plane1, 500, 500);
+		igt_plane_set_position(d->plane1, 0, 0);
+		igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
+		igt_display_commit2(display, COMMIT_UNIVERSAL);
+	}
+
+	/* Set up fb3->plane3 mapping. */
+	d->plane3 = igt_output_get_plane(output, 2);
+	igt_plane_set_fb(d->plane3, &d->fb3);
+
+	/* 3rd plane windowed - no scaling */
+	igt_fb_set_position(&d->fb3, d->plane3, 100, 100);
+	igt_fb_set_size(&d->fb3, d->plane3, d->fb3.width-300, d->fb3.height-300);
+	igt_plane_set_position(d->plane3, 100, 100);
+	igt_plane_set_size(d->plane3, mode->hdisplay-300, mode->vdisplay-300);
+	igt_display_commit2(display, COMMIT_UNIVERSAL);
+
+	/* Switch scaler from plane 2 to plane 3 */
+	igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
+	igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-200, d->fb2.height-200);
+	igt_plane_set_position(d->plane2, 100, 100);
+	igt_plane_set_size(d->plane2, d->fb2.width-200, d->fb2.height-200);
+
+	igt_fb_set_position(&d->fb3, d->plane3, 100, 100);
+	igt_fb_set_size(&d->fb3, d->plane3, d->fb3.width-400, d->fb3.height-400);
+	igt_plane_set_position(d->plane3, 10, 10);
+	igt_plane_set_size(d->plane3, mode->hdisplay-300, mode->vdisplay-300);
+	igt_display_commit2(display, COMMIT_UNIVERSAL);
+
+	if (primary_plane_scaling) {
+		/* Switch scaler from plane 1 to plane 2 */
+		igt_fb_set_position(&d->fb1, d->plane1, 0, 0);
+		igt_fb_set_size(&d->fb1, d->plane1, d->fb1.width, d->fb1.height);
+		igt_plane_set_position(d->plane1, 0, 0);
+		igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
+
 		igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
-		igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-200, d->fb2.height-200);
+		igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-500,d->fb2.height-500);
 		igt_plane_set_position(d->plane2, 100, 100);
 		igt_plane_set_size(d->plane2, mode->hdisplay-200, mode->vdisplay-200);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
-
-		iterate_plane_scaling(d, mode);
-
-		/* 2nd plane up scaling */
-		igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
-		igt_fb_set_size(&d->fb2, d->plane2, 500, 500);
-		igt_plane_set_position(d->plane2, 10, 10);
-		igt_plane_set_size(d->plane2, mode->hdisplay-20, mode->vdisplay-20);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
-
-		/* 2nd plane downscaling */
-		igt_fb_set_position(&d->fb2, d->plane2, 0, 0);
-		igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width, d->fb2.height);
-		igt_plane_set_position(d->plane2, 10, 10);
-		igt_plane_set_size(d->plane2, 500, 500 * d->fb2.height/d->fb2.width);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
-
-		if (primary_plane_scaling) {
-			/* Primary plane up scaling */
-			igt_fb_set_position(&d->fb1, d->plane1, 100, 100);
-			igt_fb_set_size(&d->fb1, d->plane1, 500, 500);
-			igt_plane_set_position(d->plane1, 0, 0);
-			igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
-			igt_display_commit2(display, COMMIT_UNIVERSAL);
-		}
-
-		/* Set up fb3->plane3 mapping. */
-		d->plane3 = igt_output_get_plane(output, 2);
-		igt_plane_set_fb(d->plane3, &d->fb3);
-
-		/* 3rd plane windowed - no scaling */
-		igt_fb_set_position(&d->fb3, d->plane3, 100, 100);
-		igt_fb_set_size(&d->fb3, d->plane3, d->fb3.width-300, d->fb3.height-300);
-		igt_plane_set_position(d->plane3, 100, 100);
-		igt_plane_set_size(d->plane3, mode->hdisplay-300, mode->vdisplay-300);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
-
-		/* Switch scaler from plane 2 to plane 3 */
-		igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
-		igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-200, d->fb2.height-200);
-		igt_plane_set_position(d->plane2, 100, 100);
-		igt_plane_set_size(d->plane2, d->fb2.width-200, d->fb2.height-200);
-
-		igt_fb_set_position(&d->fb3, d->plane3, 100, 100);
-		igt_fb_set_size(&d->fb3, d->plane3, d->fb3.width-400, d->fb3.height-400);
-		igt_plane_set_position(d->plane3, 10, 10);
-		igt_plane_set_size(d->plane3, mode->hdisplay-300, mode->vdisplay-300);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
-
-		if (primary_plane_scaling) {
-			/* Switch scaler from plane 1 to plane 2 */
-			igt_fb_set_position(&d->fb1, d->plane1, 0, 0);
-			igt_fb_set_size(&d->fb1, d->plane1, d->fb1.width, d->fb1.height);
-			igt_plane_set_position(d->plane1, 0, 0);
-			igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
-
-			igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
-			igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-500,d->fb2.height-500);
-			igt_plane_set_position(d->plane2, 100, 100);
-			igt_plane_set_size(d->plane2, mode->hdisplay-200, mode->vdisplay-200);
-			igt_display_commit2(display, COMMIT_UNIVERSAL);
-		}
-
-		/* back to single plane mode */
-		igt_plane_set_fb(d->plane2, NULL);
-		igt_plane_set_fb(d->plane3, NULL);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
-
-		valid_tests++;
-		cleanup_crtc(d, output, d->plane1);
 	}
+
+	/* back to single plane mode */
+	igt_plane_set_fb(d->plane2, NULL);
+	igt_plane_set_fb(d->plane3, NULL);
+	igt_display_commit2(display, COMMIT_UNIVERSAL);
+
+	cleanup_crtc(d, output, d->plane1);
+}
+
+static void test_plane_scaling(data_t *d, enum pipe pipe)
+{
+	igt_output_t *output;
+	int valid_tests = 0;
+
+	igt_require(d->num_scalers);
+
+	for_each_valid_output_on_pipe(&d->display, pipe, output) {
+		test_plane_scaling_on_pipe(d, pipe, output);
+		igt_output_set_pipe(output, PIPE_ANY);
+		valid_tests++;
+	}
+
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 }
 
 igt_simple_main
 {
 	data_t data = {};
+	enum pipe pipe;
 
 	igt_skip_on_simulation();
 
@@ -312,7 +319,8 @@ igt_simple_main
 
 	data.num_scalers = intel_gen(data.devid) >= 9 ? 2 : 0;
 
-	test_plane_scaling(&data);
+	for_each_pipe_static(pipe)
+		test_plane_scaling(&data, pipe);
 
 	igt_display_fini(&data.display);
 }
