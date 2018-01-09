@@ -40,8 +40,8 @@
 #endif
 #ifdef HAVE_UDEV
 #include <libudev.h>
-#include <poll.h>
 #endif
+#include <poll.h>
 #include <errno.h>
 #include <time.h>
 
