@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include "igt.h"
+#include "igt_gt.h"
 #include "intel_io.h"
 #include "intel_chipset.h"
 
@@ -73,6 +74,10 @@ struct config {
 
 	/* register spec */
 	char *specfile;
+
+	/* fd for engine access avoiding reopens */
+	int fd;
+
 	struct reg *regs;
 	ssize_t regcount;
 
@@ -236,13 +241,130 @@ static void dump_decode(struct config *config, struct reg *reg, uint32_t val)
 	}
 }
 
+static const struct intel_execution_engine2 *find_engine(const char *name)
+{
+	const struct intel_execution_engine2 *e;
+
+	if (strlen(name) < 2)
+		return NULL;
+
+	if (name[0] == '-')
+		name++;
+
+	for (e = intel_execution_engines2; e->name; e++) {
+		if (!strcasecmp(e->name, name))
+			return e;
+	}
+
+	return NULL;
+}
+
+static int register_srm(struct config *config, struct reg *reg,
+			uint32_t *val_in)
+{
+	const int gen = intel_gen(config->devid);
+	const bool r64b = gen >= 8;
+	const uint32_t ctx = 0;
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_relocation_entry reloc[1];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	uint32_t *batch, *r;
+	const struct intel_execution_engine2 *engine;
+	bool secure;
+	int fd, i;
+	uint32_t val;
+
+	if (config->fd == -1) {
+		config->fd = __drm_open_driver(DRIVER_INTEL);
+		if (config->fd == -1) {
+			fprintf(stderr, "Error opening driver: %s",
+				strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	fd = config->fd;
+	engine = find_engine(reg->engine);
+	if (engine == NULL)
+		exit(EXIT_FAILURE);
+
+	secure = reg->engine[0] != '-';
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = gem_create(fd, 4096);
+	obj[1].handle = gem_create(fd, 4096);
+	obj[1].relocs_ptr = to_user_pointer(reloc);
+	obj[1].relocation_count = 1;
+
+	batch = gem_mmap__cpu(fd, obj[1].handle, 0, 4096, PROT_WRITE);
+	gem_set_domain(fd, obj[1].handle,
+		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+
+	i = 0;
+	if (val_in) {
+		batch[i++] = MI_NOOP;
+		batch[i++] = MI_NOOP;
+
+		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = reg->addr;
+		batch[i++] = *val_in;
+		batch[i++] = MI_NOOP;
+	}
+
+	batch[i++] = 0x24 << 23 | (1 + r64b); /* SRM */
+	batch[i++] = reg->addr;
+	reloc[0].target_handle = obj[0].handle;
+	reloc[0].presumed_offset = obj[0].offset;
+	reloc[0].offset = i * sizeof(uint32_t);
+	reloc[0].delta = 0;
+	reloc[0].read_domains = I915_GEM_DOMAIN_RENDER;
+	reloc[0].write_domain = I915_GEM_DOMAIN_RENDER;
+	batch[i++] = reloc[0].delta;
+	if (r64b)
+		batch[i++] = 0;
+
+	batch[i++] = MI_BATCH_BUFFER_END;
+	munmap(batch, 4096);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+	execbuf.flags = gem_class_instance_to_eb_flags(fd,
+						       engine->class,
+						       engine->instance);
+	if (secure)
+		execbuf.flags |= I915_EXEC_SECURE;
+
+	if (config->verbosity > 0)
+		printf("%s: using %sprivileged batch\n",
+		       engine->name,
+		       secure ? "" : "non-");
+
+	execbuf.rsvd1 = ctx;
+	gem_execbuf(fd, &execbuf);
+	gem_close(fd, obj[1].handle);
+
+	r = gem_mmap__cpu(fd, obj[0].handle, 0, 4096, PROT_READ);
+	gem_set_domain(fd, obj[0].handle, I915_GEM_DOMAIN_CPU, 0);
+
+	val = r[0];
+	munmap(r, 4096);
+
+	gem_close(fd, obj[0].handle);
+
+	return val;
+}
+
 static int read_register(struct config *config, struct reg *reg, uint32_t *valp)
 {
 	uint32_t val = 0;
 
 	switch (reg->port_desc.port) {
 	case PORT_MMIO:
-		val = INREG(reg->mmio_offset + reg->addr);
+		if (reg->engine)
+			val = register_srm(config, reg, NULL);
+		else
+			val = INREG(reg->mmio_offset + reg->addr);
 		break;
 	case PORT_PORTIO_VGA:
 		iopl(3);
@@ -299,7 +421,11 @@ static int write_register(struct config *config, struct reg *reg, uint32_t val)
 
 	switch (reg->port_desc.port) {
 	case PORT_MMIO:
-		OUTREG(reg->mmio_offset + reg->addr, val);
+		if (reg->engine) {
+			register_srm(config, reg, &val);
+		} else {
+			OUTREG(reg->mmio_offset + reg->addr, val);
+		}
 		break;
 	case PORT_PORTIO_VGA:
 		if (val > 0xff) {
@@ -351,7 +477,25 @@ static int write_register(struct config *config, struct reg *reg, uint32_t val)
 	return ret;
 }
 
-/* s has [(PORTNAME|PORTNUM|MMIO-OFFSET):](REGNAME|REGADDR) */
+static int parse_engine(struct reg *reg, const char *s)
+{
+	const struct intel_execution_engine2 *e;
+
+	e = find_engine(s);
+	if (e) {
+		reg->port_desc.port = PORT_MMIO;
+		reg->port_desc.name = strdup(s);
+		reg->port_desc.stride = 4;
+		reg->engine = strdup(s);
+		reg->mmio_offset = 0;
+	} else {
+		reg->engine = NULL;
+	}
+
+	return reg->engine == NULL;
+}
+
+/* s has [(PORTNAME|PORTNUM|ENGINE|MMIO-OFFSET):](REGNAME|REGADDR) */
 static int parse_reg(struct config *config, struct reg *reg, const char *s)
 {
 	unsigned long addr;
@@ -367,7 +511,9 @@ static int parse_reg(struct config *config, struct reg *reg, const char *s)
 	} else if (p) {
 		char *port_name = strndup(s, p - s);
 
-		ret = parse_port_desc(reg, port_name);
+		ret = parse_engine(reg, port_name);
+		if (ret)
+			ret = parse_port_desc(reg, port_name);
 
 		free(port_name);
 		p++;
@@ -616,6 +762,7 @@ static const struct command commands[] = {
 
 static int intel_reg_help(struct config *config, int argc, char *argv[])
 {
+	const struct intel_execution_engine2 *e;
 	int i;
 
 	printf("Intel graphics register multitool\n\n");
@@ -629,14 +776,18 @@ static int intel_reg_help(struct config *config, int argc, char *argv[])
 
 	printf("\n");
 	printf("REGISTER is defined as:\n");
-        printf("  [(PORTNAME|PORTNUM|MMIO-OFFSET):](REGNAME|REGADDR)\n");
+        printf("  [(PORTNAME|PORTNUM|ENGINE|MMIO-OFFSET):](REGNAME|REGADDR)\n");
 
 	printf("\n");
 	printf("PORTNAME is one of:\n");
 	intel_reg_spec_print_ports();
-	printf("\n");
+	printf("\n\n");
 
-	printf("\n");
+	printf("ENGINE is one of:\n");
+	for (e = intel_execution_engines2; e->name; e++)
+		printf("%s -%s ", e->name, e->name);
+	printf("\n\n");
+
 	printf("OPTIONS common to most COMMANDS:\n");
 	printf(" --spec=PATH    Read register spec from directory or file\n");
 	printf(" --mmio=FILE    Use an MMIO snapshot\n");
@@ -771,6 +922,7 @@ int main(int argc, char *argv[])
 	const struct command *command = NULL;
 	struct config config = {
 		.count = 1,
+		.fd = -1,
 	};
 	bool help = false;
 
@@ -897,6 +1049,9 @@ int main(int argc, char *argv[])
 	ret = command->function(&config, argc, argv);
 
 	free(config.mmiofile);
+
+	if (config.fd >= 0)
+		close(config.fd);
 
 	return ret;
 }

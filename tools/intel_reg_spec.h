@@ -53,6 +53,7 @@ struct port_desc {
 
 struct reg {
 	struct port_desc port_desc;
+	char *engine;
 	uint32_t mmio_offset;
 	uint32_t addr;
 	char *name;

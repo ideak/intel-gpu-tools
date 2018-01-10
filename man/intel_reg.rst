@@ -103,7 +103,7 @@ Display brief help.
 REGISTER REFERENCES
 ===================
 
-Registers are defined as [(PORTNAME|PORTNUM|MMIO-OFFSET):](REGNAME|REGADDR).
+Registers are defined as [(PORTNAME|PORTNUM|ENGINE|MMIO-OFFSET):](REGNAME|REGADDR).
 
 PORTNAME
     The register access method, most often MMIO, which is the default. The
@@ -119,6 +119,13 @@ PORTNUM
 
     Numbers above 0xff are automatically interpreted as MMIO offsets, not port
     numbers.
+
+ENGINE
+    Instead of cpu based MMIO, specified engine can be used for access method.
+    Batchbuffer will be targeted for the engine to do read/write. The list of
+    available engines is architecture specific and can be found with
+    "intel_reg help". Prefixing engine name with '-' uses non-privileged
+    batchbuffer for access.
 
 MMIO-OFFSET
     Use MMIO, and add this offset to the register address.
