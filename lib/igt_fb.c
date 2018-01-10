@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <inttypes.h>
 
 #include "drmtest.h"
 #include "igt_fb.h"

@@ -21,6 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
