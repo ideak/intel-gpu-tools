@@ -191,6 +191,71 @@ busy_start(int gem_fd, const struct intel_execution_engine2 *e)
 	gem_quiescent_gpu(gem_fd);
 }
 
+/*
+ * This test has a potentially low rate of catching the issue it is trying to
+ * catch. Or in other words, quite high rate of false negative successes. We
+ * will depend on the CI systems running it a lot to detect issues.
+ */
+static void
+busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
+{
+	unsigned long slept;
+	igt_spin_t *spin[2];
+	uint64_t val, val2;
+	uint32_t ctx;
+	int fd;
+
+	ctx = gem_context_create(gem_fd);
+
+	/*
+	 * Defeat the busy stats delayed disable, we need to guarantee we are
+	 * the first user.
+	 */
+	sleep(2);
+
+	/*
+	 * Submit two contexts, with a pause in between targeting the ELSP
+	 * re-submission in execlists mode. Make sure busyness is correctly
+	 * reported with the engine busy, and after the engine went idle.
+	 */
+	spin[0] = __igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
+	usleep(500e3);
+	spin[1] = __igt_spin_batch_new(gem_fd, ctx, e2ring(gem_fd, e), 0);
+
+	/*
+	 * Open PMU as fast as possible after the second spin batch in attempt
+	 * to be faster than the driver handling lite-restore.
+	 */
+	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
+
+	slept = measured_usleep(batch_duration_ns / 1000);
+	val = pmu_read_single(fd);
+
+	igt_spin_batch_end(spin[0]);
+	igt_spin_batch_end(spin[1]);
+
+	/* Wait for GPU idle to verify PMU reports idle. */
+	gem_quiescent_gpu(gem_fd);
+
+	val2 = pmu_read_single(fd);
+	usleep(batch_duration_ns / 1000);
+	val2 = pmu_read_single(fd) - val2;
+
+	igt_info("busy=%lu idle=%lu\n", val, val2);
+
+	igt_spin_batch_free(gem_fd, spin[0]);
+	igt_spin_batch_free(gem_fd, spin[1]);
+
+	close(fd);
+
+	gem_context_destroy(gem_fd, ctx);
+
+	assert_within_epsilon(val, slept, tolerance);
+	igt_assert_eq(val2, 0);
+
+	gem_quiescent_gpu(gem_fd);
+}
+
 static void log_busy(int fd, unsigned int num_engines, uint64_t *val)
 {
 	char buf[1024];
@@ -1205,6 +1270,13 @@ igt_main
 		 */
 		igt_subtest_f("busy-start-%s", e->name)
 			busy_start(fd, e);
+
+		/**
+		 * Check that reported usage is correct when PMU is enabled
+		 * after two batches are running.
+		 */
+		igt_subtest_f("busy-double-start-%s", e->name)
+			busy_double_start(fd, e);
 	}
 
 	/**
