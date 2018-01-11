@@ -170,6 +170,9 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	drmModeModeInfo *mode;
 	int primary_plane_scaling = 0; /* For now */
 
+	igt_require(d->num_scalers > 0);
+
+	igt_display_reset(display);
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
 
@@ -295,39 +298,32 @@ cleanup:
 	cleanup_crtc(d, output, d->plane1);
 }
 
-static void test_plane_scaling(data_t *d, enum pipe pipe)
-{
-	igt_output_t *output;
-	int valid_tests = 0;
-
-	igt_require(d->num_scalers);
-
-	for_each_valid_output_on_pipe(&d->display, pipe, output) {
-		test_plane_scaling_on_pipe(d, pipe, output);
-		igt_output_set_pipe(output, PIPE_ANY);
-		valid_tests++;
-	}
-
-	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
-}
-
-igt_simple_main
+igt_main
 {
 	data_t data = {};
 	enum pipe pipe;
 
 	igt_skip_on_simulation();
 
+	igt_fixture {
+		data.drm_fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_pipe_crc(data.drm_fd);
+		igt_display_init(&data.display, data.drm_fd);
+		data.devid = intel_get_drm_devid(data.drm_fd);
+		data.num_scalers = intel_gen(data.devid) >= 9 ? 2 : 0;
+	}
 
-	data.drm_fd = drm_open_driver(DRIVER_INTEL);
-	igt_require_pipe_crc(data.drm_fd);
-	igt_display_init(&data.display, data.drm_fd);
-	data.devid = intel_get_drm_devid(data.drm_fd);
+	for_each_pipe_static(pipe) igt_subtest_group {
+		igt_output_t *output;
 
-	data.num_scalers = intel_gen(data.devid) >= 9 ? 2 : 0;
+		igt_fixture
+			igt_display_require_output_on_pipe(&data.display, pipe);
 
-	for_each_pipe_static(pipe)
-		test_plane_scaling(&data, pipe);
+		igt_subtest_f("pipe-%s-plane-scaling", kmstest_pipe_name(pipe))
+			for_each_valid_output_on_pipe(&data.display, pipe, output)
+				test_plane_scaling_on_pipe(&data, pipe, output);
+	}
 
-	igt_display_fini(&data.display);
+	igt_fixture
+		igt_display_fini(&data.display);
 }
