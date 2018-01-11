@@ -1,4 +1,5 @@
 # Please keep sorted alphabetically
+cnl_compute_wrpll
 hsw_compute_wrpll
 igt_stats
 intel_aubdump
