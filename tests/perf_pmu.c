@@ -157,6 +157,40 @@ single(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 	gem_quiescent_gpu(gem_fd);
 }
 
+static void
+busy_start(int gem_fd, const struct intel_execution_engine2 *e)
+{
+	unsigned long slept;
+	igt_spin_t *spin;
+	uint64_t val;
+	int fd;
+
+	/*
+	 * Defeat the busy stats delayed disable, we need to guarantee we are
+	 * the first user.
+	 */
+	sleep(2);
+
+	spin = __igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
+
+	/*
+	 * Sleep for a bit after making the engine busy to make sure the PMU
+	 * gets enabled when the batch is already running.
+	 */
+	usleep(500e3);
+
+	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
+
+	slept = measured_usleep(batch_duration_ns / 1000);
+	val = pmu_read_single(fd);
+
+	igt_spin_batch_free(gem_fd, spin);
+	close(fd);
+
+	assert_within_epsilon(val, slept, tolerance);
+	gem_quiescent_gpu(gem_fd);
+}
+
 static void log_busy(int fd, unsigned int num_engines, uint64_t *val)
 {
 	char buf[1024];
@@ -1164,6 +1198,13 @@ igt_main
 		 */
 		igt_subtest_f("multi-client-%s", e->name)
 			multi_client(fd, e);
+
+		/**
+		 * Check that reported usage is correct when PMU is enabled
+		 * after the batch is running.
+		 */
+		igt_subtest_f("busy-start-%s", e->name)
+			busy_start(fd, e);
 	}
 
 	/**
