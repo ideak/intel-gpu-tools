@@ -52,13 +52,13 @@ test_list_files = []
 
 foreach group : test_groups
 	programs_xml = 'igt_test_programs_' + group + '_programs.xml'
-	test_list_files += custom_target(programs_xml,
+	custom_target(programs_xml,
 		      output : programs_xml,
 		      build_by_default : true,
 		      command : [ gen_programs, '@OUTPUT@', group, test_list ])
 
 	description_xml = 'igt_test_programs_' + group + '_description.xml'
-	test_list_files += custom_target(description_xml,
+	custom_target(description_xml,
 		      output : description_xml,
 		      build_by_default : true,
 		      depends : test_executables,
@@ -70,7 +70,7 @@ configure_file(input: 'version.xml.in',
 	       install: false, configuration: config)
 
 gnome.gtkdoc('intel-gpu-tools',
-	     content_files : ['igt_test_programs.xml', test_list_files ],
+	     content_files : ['igt_test_programs.xml'],
 	     dependencies : lib_igt,
 	     install : true,
 	     main_xml : 'intel-gpu-tools-docs.xml',
