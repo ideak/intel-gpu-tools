@@ -32,4 +32,6 @@ docs:
 
 EOF
 
+git config format.subjectprefix "PATCH i-g-t"
+
 make $@

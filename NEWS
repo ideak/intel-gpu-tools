@@ -1,3 +1,9 @@
+Release 1.21
+------------
+
+- Upgrade meson to official production status, automake is still kept around for
+  now.
+
 Release 1.20 (2017-10-03)
 -------------------------
 

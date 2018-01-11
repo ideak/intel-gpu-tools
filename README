@@ -167,11 +167,11 @@ The following dependencies are requires for building audio support
 	libasound2-dev
 	libgsl-dev
 
-Experimental meson build system support
----------------------------------------
+Meson build system support
+--------------------------
 
-Right now this is just a preview for developers, automake is still used by CI
-and needs to keep working. One-liner howto:
+Currently we support both meson and automake as build systems, but meson is the
+recommended choice. Oneliner to get started:
 
 $ mkdir build && meson build && cd build && ninja
 
@@ -181,7 +181,14 @@ Running testcases is done with
 
 $ cd build && ninja test
 
-gtkdocs is currently not yet supported.
+Documentation is built using
+
+$ cd build && ninja && ninja intel-gpu-tools-doc
+
+Note that there's a setup script similar to ./autogen.sh which creates a
+compatibility Makefile with a few useful default targets:
+
+$ ./meson.sh [make-arguments]
 
 Releases for maintainers
 ------------------------
