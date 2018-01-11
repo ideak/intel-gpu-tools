@@ -38,17 +38,10 @@ typedef struct {
 	int image_w;
 	int image_h;
 
-	struct igt_fb fb1;
-	struct igt_fb fb2;
-	struct igt_fb fb3;
-	int fb_id1;
-	int fb_id2;
-	int fb_id3;
-
+	struct igt_fb fb[3];
 	igt_plane_t *plane1;
 	igt_plane_t *plane2;
 	igt_plane_t *plane3;
-	igt_plane_t *plane4;
 } data_t;
 
 static int get_num_scalers(uint32_t devid, enum pipe pipe)
@@ -63,78 +56,60 @@ static int get_num_scalers(uint32_t devid, enum pipe pipe)
 		return 1;
 }
 
-static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
-			igt_plane_t *plane, drmModeModeInfo *mode, enum igt_commit_style s)
+static void cleanup_crtc(data_t *data)
 {
-	igt_display_t *display = &data->display;
-
-	igt_output_set_pipe(output, pipe);
-
-	/* create the pipe_crc object for this pipe */
-	igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
-
-	/* before allocating, free if any older fb */
-	if (data->fb_id1) {
-		igt_remove_fb(data->drm_fd, &data->fb1);
-		data->fb_id1 = 0;
-	}
-
-	/* allocate fb for plane 1 */
-	data->fb_id1 = igt_create_pattern_fb(data->drm_fd,
-					     mode->hdisplay, mode->vdisplay,
-					     DRM_FORMAT_XRGB8888,
-					     LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
-					     &data->fb1);
-	igt_assert(data->fb_id1);
-
-	/*
-	 * We always set the primary plane to actually enable the pipe as
-	 * there's no way (that works) to light up a pipe with only a sprite
-	 * plane enabled at the moment.
-	 */
-	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
-		igt_plane_t *primary;
-
-		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-		igt_plane_set_fb(primary, &data->fb1);
-	}
-
-	igt_plane_set_fb(plane, &data->fb1);
-	igt_display_commit2(display, s);
-}
-
-static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
-{
-	igt_display_t *display = &data->display;
+	int i;
 
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = NULL;
 
-	if (data->fb_id1) {
-		igt_remove_fb(data->drm_fd, &data->fb1);
-		data->fb_id1 = 0;
+	for (i = 0; i < ARRAY_SIZE(data->fb); i++) {
+		if (!data->fb[i].fb_id)
+			continue;
+
+		igt_remove_fb(data->drm_fd, &data->fb[i]);
+		data->fb[i].fb_id = 0;
 	}
-	if (data->fb_id2) {
-		igt_remove_fb(data->drm_fd, &data->fb2);
-		data->fb_id2 = 0;
-	}
-	if (data->fb_id3) {
-		igt_remove_fb(data->drm_fd, &data->fb3);
-		data->fb_id3 = 0;
-	}
+}
+
+static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
+			igt_plane_t *plane, drmModeModeInfo *mode)
+{
+	igt_display_t *display = &data->display;
+
+	cleanup_crtc(data);
+
+	igt_display_reset(display);
+	igt_output_set_pipe(output, pipe);
+
+	/* create the pipe_crc object for this pipe */
+	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+
+	/* allocate fb for plane 1 */
+	igt_create_pattern_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
+			      &data->fb[0]);
+
+	igt_plane_set_fb(plane, &data->fb[0]);
 
 	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
 		igt_plane_t *primary;
+		int ret;
 
+		/* Do we succeed without enabling the primary plane? */
+		ret = igt_display_try_commit2(display, COMMIT_ATOMIC);
+		if (!ret)
+			return;
+
+		/*
+		 * Fallback: set the primary plane to actually enable the pipe.
+		 * Some drivers always require the primary plane to be enabled.
+		 */
 		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-		igt_plane_set_fb(primary, NULL);
+		igt_plane_set_fb(primary, &data->fb[0]);
 	}
-
-	igt_plane_set_fb(plane, NULL);
-	igt_output_set_pipe(output, PIPE_ANY);
-
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 }
 
 /* does iterative scaling on plane2 */
@@ -142,33 +117,32 @@ static void iterate_plane_scaling(data_t *d, drmModeModeInfo *mode)
 {
 	igt_display_t *display = &d->display;
 
-	if (mode->hdisplay >= d->fb2.width) {
+	if (mode->hdisplay >= d->fb[1].width) {
 		int w, h;
 		/* fixed fb */
-		igt_fb_set_position(&d->fb2, d->plane2, 0, 0);
-		igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width, d->fb2.height);
+		igt_fb_set_position(&d->fb[1], d->plane2, 0, 0);
+		igt_fb_set_size(&d->fb[1], d->plane2, d->fb[1].width, d->fb[1].height);
 		igt_plane_set_position(d->plane2, 0, 0);
 
 		/* adjust plane size */
-		for (w = d->fb2.width; w <= mode->hdisplay; w+=10) {
-			h = w * d->fb2.height / d->fb2.width;
+		for (w = d->fb[1].width; w <= mode->hdisplay; w+=10) {
+			h = w * d->fb[1].height / d->fb[1].width;
 			igt_plane_set_size(d->plane2, w, h);
-			igt_display_commit2(display, COMMIT_UNIVERSAL);
+			igt_display_commit2(display, COMMIT_ATOMIC);
 		}
 	} else {
 		int w, h;
 		/* fixed plane */
 		igt_plane_set_position(d->plane2, 0, 0);
 		igt_plane_set_size(d->plane2, mode->hdisplay, mode->vdisplay);
-		igt_fb_set_position(&d->fb2, d->plane2, 0, 0);
+		igt_fb_set_position(&d->fb[1], d->plane2, 0, 0);
 
 		/* adjust fb size */
-		for (w = mode->hdisplay; w <= d->fb2.width; w+=10) {
+		for (w = mode->hdisplay; w <= d->fb[1].width; w+=10) {
 			/* Source coordinates must not be clipped. */
-			h = min(w * mode->hdisplay / mode->vdisplay, d->fb2.height);
-
-			igt_fb_set_size(&d->fb2, d->plane2, w, h);
-			igt_display_commit2(display, COMMIT_UNIVERSAL);
+			h = min(w * mode->hdisplay / mode->vdisplay, d->fb[1].height);
+			igt_fb_set_size(&d->fb[1], d->plane2, w, h);
+			igt_display_commit2(display, COMMIT_ATOMIC);
 		}
 	}
 }
@@ -180,130 +154,118 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	drmModeModeInfo *mode;
 	int primary_plane_scaling = 0; /* For now */
 
-	igt_display_reset(display);
-	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
 
-	d->fb_id2 = igt_create_color_pattern_fb(display->drm_fd, 600, 600,
-						DRM_FORMAT_XRGB8888,
-						LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
-						.5, .5, .5, &d->fb2);
-	igt_assert(d->fb_id2);
-
-	d->fb_id3 = igt_create_pattern_fb(d->drm_fd,
-					  mode->hdisplay, mode->vdisplay,
-					  DRM_FORMAT_XRGB8888,
-					  LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
-					  &d->fb3);
-	igt_assert(d->fb_id3);
-
 	/* Set up display with plane 1 */
-	d->plane1 = igt_output_get_plane(output, 0);
-	prepare_crtc(d, output, pipe, d->plane1, mode, COMMIT_UNIVERSAL);
+	d->plane1 = &display->pipes[pipe].planes[0];
+	prepare_crtc(d, output, pipe, d->plane1, mode);
+
+	igt_create_color_pattern_fb(display->drm_fd, 600, 600,
+				    DRM_FORMAT_XRGB8888,
+				    LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
+				    .5, .5, .5, &d->fb[1]);
+
+	igt_create_pattern_fb(d->drm_fd,
+			      mode->hdisplay, mode->vdisplay,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
+			      &d->fb[2]);
 
 	if (primary_plane_scaling) {
 		/* Primary plane upscaling */
-		igt_fb_set_position(&d->fb1, d->plane1, 100, 100);
-		igt_fb_set_size(&d->fb1, d->plane1, 500, 500);
+		igt_fb_set_position(&d->fb[0], d->plane1, 100, 100);
+		igt_fb_set_size(&d->fb[0], d->plane1, 500, 500);
 		igt_plane_set_position(d->plane1, 0, 0);
 		igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
+		igt_display_commit2(display, COMMIT_ATOMIC);
 
 		/* Primary plane 1:1 no scaling */
-		igt_fb_set_position(&d->fb1, d->plane1, 0, 0);
-		igt_fb_set_size(&d->fb1, d->plane1, d->fb1.width, d->fb1.height);
+		igt_fb_set_position(&d->fb[0], d->plane1, 0, 0);
+		igt_fb_set_size(&d->fb[0], d->plane1, d->fb[0].width, d->fb[0].height);
 		igt_plane_set_position(d->plane1, 0, 0);
 		igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
+		igt_display_commit2(display, COMMIT_ATOMIC);
 	}
 
-	/* Set up fb2->plane2 mapping. */
+	/* Set up fb[1]->plane2 mapping. */
 	d->plane2 = igt_output_get_plane(output, 1);
-	igt_plane_set_fb(d->plane2, &d->fb2);
+	igt_plane_set_fb(d->plane2, &d->fb[1]);
 
 	/* 2nd plane windowed */
-	igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
-	igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-200, d->fb2.height-200);
+	igt_fb_set_position(&d->fb[1], d->plane2, 100, 100);
+	igt_fb_set_size(&d->fb[1], d->plane2, d->fb[1].width-200, d->fb[1].height-200);
 	igt_plane_set_position(d->plane2, 100, 100);
 	igt_plane_set_size(d->plane2, mode->hdisplay-200, mode->vdisplay-200);
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	iterate_plane_scaling(d, mode);
 
 	/* 2nd plane up scaling */
-	igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
-	igt_fb_set_size(&d->fb2, d->plane2, 500, 500);
+	igt_fb_set_position(&d->fb[1], d->plane2, 100, 100);
+	igt_fb_set_size(&d->fb[1], d->plane2, 500, 500);
 	igt_plane_set_position(d->plane2, 10, 10);
 	igt_plane_set_size(d->plane2, mode->hdisplay-20, mode->vdisplay-20);
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	/* 2nd plane downscaling */
-	igt_fb_set_position(&d->fb2, d->plane2, 0, 0);
-	igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width, d->fb2.height);
+	igt_fb_set_position(&d->fb[1], d->plane2, 0, 0);
+	igt_fb_set_size(&d->fb[1], d->plane2, d->fb[1].width, d->fb[1].height);
 	igt_plane_set_position(d->plane2, 10, 10);
 
 	/* Downscale (10/9)x of original image */
-	igt_plane_set_size(d->plane2, (d->fb2.width * 10)/9, (d->fb2.height * 10)/9);
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
+	igt_plane_set_size(d->plane2, (d->fb[1].width * 10)/9, (d->fb[1].height * 10)/9);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	if (primary_plane_scaling) {
 		/* Primary plane up scaling */
-		igt_fb_set_position(&d->fb1, d->plane1, 100, 100);
-		igt_fb_set_size(&d->fb1, d->plane1, 500, 500);
+		igt_fb_set_position(&d->fb[0], d->plane1, 100, 100);
+		igt_fb_set_size(&d->fb[0], d->plane1, 500, 500);
 		igt_plane_set_position(d->plane1, 0, 0);
 		igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
+		igt_display_commit2(display, COMMIT_ATOMIC);
 	}
 
-	/* Set up fb3->plane3 mapping. */
+	/* Set up fb[2]->plane3 mapping. */
 	d->plane3 = igt_output_get_plane(output, 2);
-	igt_plane_set_fb(d->plane3, &d->fb3);
+	igt_plane_set_fb(d->plane3, &d->fb[2]);
 
 	if(d->plane3->type == DRM_PLANE_TYPE_CURSOR) {
 		igt_debug("Plane-3 doesnt exist on pipe %s\n", kmstest_pipe_name(pipe));
-		goto cleanup;
+		return;
 	}
 
 	/* 3rd plane windowed - no scaling */
-	igt_fb_set_position(&d->fb3, d->plane3, 100, 100);
-	igt_fb_set_size(&d->fb3, d->plane3, d->fb3.width-300, d->fb3.height-300);
+	igt_fb_set_position(&d->fb[2], d->plane3, 100, 100);
+	igt_fb_set_size(&d->fb[2], d->plane3, d->fb[2].width-300, d->fb[2].height-300);
 	igt_plane_set_position(d->plane3, 100, 100);
 	igt_plane_set_size(d->plane3, mode->hdisplay-300, mode->vdisplay-300);
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	/* Switch scaler from plane 2 to plane 3 */
-	igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
-	igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-200, d->fb2.height-200);
+	igt_fb_set_position(&d->fb[1], d->plane2, 100, 100);
+	igt_fb_set_size(&d->fb[1], d->plane2, d->fb[1].width-200, d->fb[1].height-200);
 	igt_plane_set_position(d->plane2, 100, 100);
-	igt_plane_set_size(d->plane2, d->fb2.width-200, d->fb2.height-200);
+	igt_plane_set_size(d->plane2, d->fb[1].width-200, d->fb[1].height-200);
 
-	igt_fb_set_position(&d->fb3, d->plane3, 100, 100);
-	igt_fb_set_size(&d->fb3, d->plane3, d->fb3.width-400, d->fb3.height-400);
+	igt_fb_set_position(&d->fb[2], d->plane3, 100, 100);
+	igt_fb_set_size(&d->fb[2], d->plane3, d->fb[2].width-400, d->fb[2].height-400);
 	igt_plane_set_position(d->plane3, 10, 10);
 	igt_plane_set_size(d->plane3, mode->hdisplay-300, mode->vdisplay-300);
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	if (primary_plane_scaling) {
 		/* Switch scaler from plane 1 to plane 2 */
-		igt_fb_set_position(&d->fb1, d->plane1, 0, 0);
-		igt_fb_set_size(&d->fb1, d->plane1, d->fb1.width, d->fb1.height);
+		igt_fb_set_position(&d->fb[0], d->plane1, 0, 0);
+		igt_fb_set_size(&d->fb[0], d->plane1, d->fb[0].width, d->fb[0].height);
 		igt_plane_set_position(d->plane1, 0, 0);
 		igt_plane_set_size(d->plane1, mode->hdisplay, mode->vdisplay);
 
-		igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
-		igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-500,d->fb2.height-500);
+		igt_fb_set_position(&d->fb[1], d->plane2, 100, 100);
+		igt_fb_set_size(&d->fb[1], d->plane2, d->fb[1].width-500,d->fb[1].height-500);
 		igt_plane_set_position(d->plane2, 100, 100);
 		igt_plane_set_size(d->plane2, mode->hdisplay-200, mode->vdisplay-200);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
+		igt_display_commit2(display, COMMIT_ATOMIC);
 	}
-
-cleanup:
-	/* back to single plane mode */
-	igt_plane_set_fb(d->plane2, NULL);
-	igt_plane_set_fb(d->plane3, NULL);
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
-
-	cleanup_crtc(d, output, d->plane1);
 }
 
 igt_main
@@ -318,6 +280,7 @@ igt_main
 		igt_require_pipe_crc(data.drm_fd);
 		igt_display_init(&data.display, data.drm_fd);
 		data.devid = intel_get_drm_devid(data.drm_fd);
+		igt_require(data.display.is_atomic);
 	}
 
 	for_each_pipe_static(pipe) igt_subtest_group {
