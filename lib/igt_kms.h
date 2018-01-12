@@ -429,8 +429,8 @@ static inline bool igt_output_is_connected(igt_output_t *output)
  */
 #define for_each_connected_output(display, output)		\
 	for (int i__ = 0;  assert(igt_can_fail()), i__ < (display)->n_outputs; i__++)	\
-		for_each_if (((output = &(display)->outputs[i__]), \
-			      igt_output_is_connected(output)))
+		for_each_if ((((output) = &(display)->outputs[i__]), \
+			      igt_output_is_connected((output))))
 
 /**
  * for_each_pipe:
@@ -468,11 +468,11 @@ static inline bool igt_output_is_connected(igt_output_t *output)
  * will try every combination of @pipe and @output.
  */
 #define for_each_pipe_with_valid_output(display, pipe, output) \
-	for (int con__ = pipe = 0; \
-	     assert(igt_can_fail()), pipe < igt_display_get_n_pipes((display)) && con__ < (display)->n_outputs; \
+	for (int con__ = (pipe) = 0; \
+	     assert(igt_can_fail()), (pipe) < igt_display_get_n_pipes((display)) && con__ < (display)->n_outputs; \
 	     con__ = (con__ + 1 < (display)->n_outputs) ? con__ + 1 : (pipe = pipe + 1, 0)) \
-		for_each_if (((output = &(display)->outputs[con__]), \
-			     igt_pipe_connector_valid(pipe, output)))
+		for_each_if ((((output) = &(display)->outputs[con__]), \
+			     igt_pipe_connector_valid((pipe), (output))))
 
 /**
  * for_each_valid_output_on_pipe:
@@ -485,8 +485,8 @@ static inline bool igt_output_is_connected(igt_output_t *output)
  * happens.
  */
 #define for_each_valid_output_on_pipe(display, pipe, output) \
-	for_each_connected_output(display, output) \
-		for_each_if (igt_pipe_connector_valid(pipe, output))
+	for_each_connected_output((display), (output)) \
+		for_each_if (igt_pipe_connector_valid((pipe), (output)))
 
 #define for_each_plane_on_pipe(display, pipe, plane)			\
 	for (int j__ = 0; assert(igt_can_fail()), (plane) = &(display)->pipes[(pipe)].planes[j__], \
