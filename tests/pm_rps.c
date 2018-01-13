@@ -487,12 +487,27 @@ static void stabilize_check(int *out)
 	igt_debug("Waited %d msec to stabilize cur\n", wait);
 }
 
+static void resubmit_batch(int fd, uint32_t handle, int count)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = handle
+	};
+	struct drm_i915_gem_execbuffer2 eb = {
+		.buffer_count = 1,
+		.buffers_ptr = to_user_pointer(&obj),
+	};
+	while (count--)
+		gem_execbuf(fd, &eb);
+}
+
 static void boost_freq(int fd, int *boost_freqs)
 {
 	int64_t timeout = 1;
 	igt_spin_t *load;
 
 	load = igt_spin_batch_new(fd, 0, 0, 0);
+	resubmit_batch(fd, load->handle, 16);
+
 	/* Waiting will grant us a boost to maximum */
 	gem_wait(fd, load->handle, &timeout);
 
