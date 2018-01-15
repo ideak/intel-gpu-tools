@@ -5,4 +5,4 @@ intelci_files = [
   'README',
 ]
 
-install_data(sources : intelci_files, install_dir : pkgdatadir)
+install_data(sources : intelci_files, install_dir : datadir)

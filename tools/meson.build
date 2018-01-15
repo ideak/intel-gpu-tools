@@ -56,8 +56,6 @@ foreach prog : tools_progs
 		   install : true)
 endforeach
 
-pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), 'intel-gpu-tools')
-
 if libudev.found()
 	intel_dp_compliance_src = [
 		'intel_dp_compliance.c',
@@ -78,14 +76,12 @@ executable('intel_reg', sources : intel_reg_src,
 	   dependencies : tool_deps,
 	   install : true,
 	   c_args : [
-	     '-DIGT_DATADIR="@0@"'.format(pkgdatadir),
+	     '-DIGT_DATADIR="@0@"'.format(datadir),
 	   ])
-
-bindir = join_paths(get_option('prefix'), get_option('bindir'))
 
 install_data('intel_gpu_abrt', install_dir : bindir)
 
-install_subdir('registers', install_dir : pkgdatadir,
+install_subdir('registers', install_dir : datadir,
 	       exclude_files : [
 		 'Makefile', 'Makefile.in', 'Makefile.am',
 	       ])
@@ -96,10 +92,10 @@ shared_library('intel_aubdump', 'aubdump.c',
 	       install : true)
 
 conf_data = configuration_data()
-conf_data.set('prefix', get_option('prefix'))
+conf_data.set('prefix', prefix)
 conf_data.set('exec_prefix', '${prefix}')
-conf_data.set('libdir', join_paths('${prefix}', get_option('libdir')))
+conf_data.set('libdir', join_paths('${prefix}', libdir))
 configure_file(input : 'intel_aubdump.in', output : 'intel_aubdump',
-               configuration : conf_data, install_dir : get_option('bindir'))
+               configuration : conf_data, install_dir : bindir)
 
 subdir('null_state_gen')

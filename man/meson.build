@@ -34,6 +34,6 @@ if rst2man.found()
 				input: manpage + '.rst',
 				output : manpage + '.1.gz',
 				install : true,
-				install_dir : join_paths(get_option('mandir'), 'man1'))
+				install_dir : join_paths(mandir, 'man1'))
 	endforeach
 endif

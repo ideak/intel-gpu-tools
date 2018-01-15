@@ -145,7 +145,6 @@ if chamelium.found()
 	lib_sources += 'igt_chamelium.c'
 endif
 
-pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), 'intel-gpu-tools')
 srcdir = join_paths(meson.source_root(), 'tests')
 
 lib_version = vcs_tag(input : 'version.h.in', output : 'version.h',
@@ -160,7 +159,7 @@ foreach f: lib_sources
 	include_directories: inc,
 	dependencies : lib_deps,
 	c_args : [
-	    '-DIGT_DATADIR="@0@"'.format(pkgdatadir),
+	    '-DIGT_DATADIR="@0@"'.format(datadir),
 	    '-DIGT_SRCDIR="@0@"'.format(srcdir),
 	    '-DIGT_LOG_DOMAIN="@0@"'.format(f.split('.')[0]),
 	])

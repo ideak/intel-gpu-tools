@@ -127,6 +127,15 @@ config.set_quoted('TARGET_CPU_PLATFORM', host_machine.cpu_family())
 
 configure_file(output: 'config.h', install: false, configuration: config)
 
+prefix = get_option('prefix')
+bindir = get_option('bindir')
+datadir = join_paths(get_option('datadir'), 'intel-gpu-tools')
+includedir = get_option('includedir')
+libdir = get_option('libdir')
+libexecdir = join_paths(get_option('libexecdir'), 'intel-gpu-tools')
+mandir = get_option('mandir')
+pkgconfigdir = join_paths(libdir, 'pkgconfig')
+
 subdir('lib')
 subdir('tests')
 subdir('benchmarks')

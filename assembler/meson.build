@@ -35,13 +35,11 @@ executable('intel-gen4asm', 'main.c', lfiles, pfiles,
 executable('intel-gen4disasm', 'disasm-main.c',
 	   link_with : lib_brw, install : true)
 
-pkgconfigdir = join_paths(get_option('libdir'), 'pgkconfig')
-
 conf_data = configuration_data()
-conf_data.set('prefix', get_option('prefix'))
+conf_data.set('prefix', prefix)
 conf_data.set('exec_prefix', '${prefix}')
-conf_data.set('libdir', join_paths('${prefix}', get_option('libdir')))
-conf_data.set('includedir', join_paths('${prefix}', get_option('includedir')))
+conf_data.set('libdir', join_paths('${prefix}', libdir))
+conf_data.set('includedir', join_paths('${prefix}', includedir))
 conf_data.set('VERSION', meson.project_version())
 configure_file(input : 'intel-gen4asm.pc.in', output : 'intel-gen4asm.pc',
 	       configuration : conf_data, install_dir : pkgconfigdir)

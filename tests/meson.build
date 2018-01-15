@@ -255,8 +255,6 @@ if alsa.found() and gsl.found()
 	test_deps += alsa
 endif
 
-libexecdir = join_paths(get_option('prefix'), get_option('libexecdir'), 'intel-gpu-tools')
-
 test_executables = []
 
 foreach prog : test_progs
@@ -277,8 +275,6 @@ executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   install_dir : libexecdir,
 	   install : true)
 test_progs += 'testdisplay'
-
-pkgdatadir = join_paths(get_option('prefix'), get_option('datadir'), 'intel-gpu-tools')
 
 gen_testlist = find_program('generate_testlist.sh')
 test_list = custom_target('testlist',
@@ -318,6 +314,6 @@ image_files = [
   '1080p-right.png',
   'pass.png',
 ]
-install_data(sources : image_files, install_dir : pkgdatadir)
+install_data(sources : image_files, install_dir : datadir)
 
 subdir('intel-ci')
