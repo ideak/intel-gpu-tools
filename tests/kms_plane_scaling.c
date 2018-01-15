@@ -38,8 +38,6 @@ typedef struct {
 	int image_w;
 	int image_h;
 
-	int num_scalers;
-
 	struct igt_fb fb1;
 	struct igt_fb fb2;
 	struct igt_fb fb3;
@@ -52,6 +50,18 @@ typedef struct {
 	igt_plane_t *plane3;
 	igt_plane_t *plane4;
 } data_t;
+
+static int get_num_scalers(uint32_t devid, enum pipe pipe)
+{
+	igt_require(intel_gen(devid) >= 9);
+
+	if (intel_gen(devid) >= 10)
+		return 2;
+	else if (pipe != PIPE_C)
+		return 2;
+	else
+		return 1;
+}
 
 static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 			igt_plane_t *plane, drmModeModeInfo *mode, enum igt_commit_style s)
@@ -169,8 +179,6 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	igt_display_t *display = &d->display;
 	drmModeModeInfo *mode;
 	int primary_plane_scaling = 0; /* For now */
-
-	igt_require(d->num_scalers > 0);
 
 	igt_display_reset(display);
 	igt_output_set_pipe(output, pipe);
@@ -310,14 +318,16 @@ igt_main
 		igt_require_pipe_crc(data.drm_fd);
 		igt_display_init(&data.display, data.drm_fd);
 		data.devid = intel_get_drm_devid(data.drm_fd);
-		data.num_scalers = intel_gen(data.devid) >= 9 ? 2 : 0;
 	}
 
 	for_each_pipe_static(pipe) igt_subtest_group {
 		igt_output_t *output;
 
-		igt_fixture
+		igt_fixture {
 			igt_display_require_output_on_pipe(&data.display, pipe);
+
+			igt_require(get_num_scalers(data.devid, pipe) > 0);
+		}
 
 		igt_subtest_f("pipe-%s-plane-scaling", kmstest_pipe_name(pipe))
 			for_each_valid_output_on_pipe(&data.display, pipe, output)
