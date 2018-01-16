@@ -1,4 +1,5 @@
 tools_progs_noisnt = [
+	'cnl_compute_wrpll',
 	'hsw_compute_wrpll',
 	'skl_compute_wrpll',
 	'skl_ddb_allocation',
