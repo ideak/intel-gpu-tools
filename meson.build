@@ -1,4 +1,4 @@
-project('IGT gpu tests', 'c',
+project('intel-gpu-tools', 'c',
 	version : '1.20',
         default_options: [
           'warning_level=2',
