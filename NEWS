@@ -1,8 +1,61 @@
-Release 1.21
+Release 1.21 (2018-01-16)
 ------------
 
-- Upgrade meson to official production status, automake is still kept around for
-  now.
+Library changes:
+
+- Added helpers for using DRM syncobj. (Jason Ekstrand)
+
+- Refactored several i915 helpers into library functions.
+  (Michał Winiarski)
+
+- Improved the GPU quiescing code to more thoroughly flush old data
+  and pending work. (Chris Wilson)
+
+- Reworked DRM property handling to be more suitable for
+  atomic commits. (Maarten Lankhorst)
+
+- Removed support for legacy CRC API. The generic API has been
+  available since kernel 4.10. (Maarten Lankhorst)
+
+- Opening a DRM device now automatically loads its module. (Chris Wilson)
+
+- Imported the drm-uapi headers as copies instead of using what's
+  installed in the system. (Eric Anholt)
+
+- Moved the perf code to its own library from
+  intel-gpu-overlay. (Tvrtko Ursulin)
+
+- Removed Android support due to lack of use and
+  maintenance. (Arkadiusz Hiler)
+
+- Upgraded meson to official production status, automake is still kept
+  around for now.
+
+Tools changes:
+
+- Improved the output of intel_vbt_decode. (Jani Nikula)
+
+- intel_error_decode now prints user buffers if they contain debug
+  logs. (Chris Wilson)
+
+- Improved the output of intel_watermark. (Ville Syrjälä,
+  Dhinakaran Pandiyan)
+
+- Aubdump can now simulate execlist submission, converting from ring
+  buffer submission method. (Scott D Phillips)
+
+- intel-gpu-overlay can now show data from perf PMU. (Tvrtko Ursulin,
+  Chris Wilson)
+
+- intel-gpu-overlay now parses tracepoint locations from
+  sysfs. (Lionel Landwerlin)
+
+Documentation changes:
+
+- Documentation can now be built with Meson. (Daniel Vetter)
+
+
+And many other bug fixes, improvements, cleanups and new tests.
 
 Release 1.20 (2017-10-03)
 -------------------------
