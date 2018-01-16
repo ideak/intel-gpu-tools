@@ -605,10 +605,7 @@ static void test_reset_count(const struct intel_execution_engine *e,
 
 		c2 = get_reset_count(fd, ctx);
 
-		if (ctx == 0)
-			igt_assert(c2 == -EPERM);
-		else
-			igt_assert(c2 == 0);
+		igt_assert(c2 == 0);
 	}
 
 	igt_waitchildren();
@@ -644,10 +641,11 @@ static void _check_param_ctx(const int fd, const int ctx, const cap_t cap)
 	const uint32_t bad = rand() + 1;
 
 	if (ctx == 0) {
-		if (cap == root)
-			igt_assert_eq(_test_params(fd, ctx, 0, 0), 0);
-		else
-			igt_assert_eq(_test_params(fd, ctx, 0, 0), -EPERM);
+		igt_assert_eq(_test_params(fd, ctx, 0, 0), 0);
+
+		if (cap != root) {
+			igt_assert(get_reset_count(fd, ctx) == 0);
+		}
 	}
 
 	igt_assert_eq(_test_params(fd, ctx, 0, bad), -EINVAL);
