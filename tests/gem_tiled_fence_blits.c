@@ -98,15 +98,19 @@ check_bo(int fd, drm_intel_bo *bo, uint32_t start_val)
 	}
 }
 
-static void run_test (int fd, int count)
+static void run_test(int fd, int count)
 {
-	drm_intel_bo *bo[4096];
-	uint32_t bo_start_val[4096];
+	drm_intel_bo **bo;
+	uint32_t *bo_start_val;
 	uint32_t start = 0;
 	int i;
 
 	count |= 1;
 	igt_info("Using %d 1MiB buffers\n", count);
+
+	bo = malloc(count * sizeof(*bo));
+	bo_start_val = malloc(count * sizeof(*bo_start_val));
+	igt_assert(bo && bo_start_val);
 
 	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
 	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
@@ -158,6 +162,9 @@ static void run_test (int fd, int count)
 
 	intel_batchbuffer_free(batch);
 	drm_intel_bufmgr_destroy(bufmgr);
+
+	free(bo_start_val);
+	free(bo);
 }
 
 #define MAX_32b ((1ull << 32) - 4096)
