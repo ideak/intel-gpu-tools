@@ -262,6 +262,7 @@ enum igt_atomic_plane_properties {
        IGT_PLANE_IN_FENCE_FD,
        IGT_PLANE_TYPE,
        IGT_PLANE_ROTATION,
+       IGT_PLANE_IN_FORMATS,
        IGT_NUM_PLANE_PROPS
 };
 
@@ -309,6 +310,10 @@ typedef struct {
 	uint64_t changed;
 	uint32_t props[IGT_NUM_PLANE_PROPS];
 	uint64_t values[IGT_NUM_PLANE_PROPS];
+
+	uint64_t *modifiers;
+	uint32_t *formats;
+	int format_mod_count;
 } igt_plane_t;
 
 struct igt_pipe {
@@ -357,6 +362,10 @@ struct igt_display {
 	bool has_cursor_plane;
 	bool is_atomic;
 	bool first_commit;
+
+	uint64_t *modifiers;
+	uint32_t *formats;
+	int format_mod_count;
 };
 
 void igt_display_init(igt_display_t *display, int drm_fd);
@@ -670,5 +679,8 @@ bool igt_hotplug_detected(struct udev_monitor *mon,
 			  int timeout_secs);
 void igt_flush_hotplugs(struct udev_monitor *mon);
 void igt_cleanup_hotplug(struct udev_monitor *mon);
+
+bool igt_display_has_format_mod(igt_display_t *display, uint32_t format, uint64_t modifier);
+bool igt_plane_has_format_mod(igt_plane_t *plane, uint32_t format, uint64_t modifier);
 
 #endif /* __IGT_KMS_H__ */

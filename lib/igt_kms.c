@@ -171,7 +171,8 @@ const char *igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	"CRTC_ID",
 	"IN_FENCE_FD",
 	"type",
-	"rotation"
+	"rotation",
+	"IN_FORMATS",
 };
 
 const char *igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
@@ -1801,6 +1802,9 @@ void igt_display_reset(igt_display_t *display)
 	}
 }
 
+static void igt_fill_plane_format_mod(igt_display_t *display, igt_plane_t *plane);
+static void igt_fill_display_format_mod(igt_display_t *display);
+
 /**
  * igt_display_init:
  * @display: a pointer to an #igt_display_t structure
@@ -1912,6 +1916,8 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 			plane->values[IGT_PLANE_IN_FENCE_FD] = ~0ULL;
 
 			igt_fill_plane_props(display, plane, IGT_NUM_PLANE_PROPS, igt_plane_prop_names);
+
+			igt_fill_plane_format_mod(display, plane);
 		}
 
 		/*
@@ -1928,6 +1934,8 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 
 		pipe->n_planes = n_planes;
 	}
+
+	igt_fill_display_format_mod(display);
 
 	/*
 	 * The number of connectors is set, so we just initialize the outputs
@@ -3821,4 +3829,165 @@ uint32_t kmstest_get_vbl_flag(uint32_t pipe_id)
 		igt_assert(!(pipe_flag & ~DRM_VBLANK_HIGH_CRTC_MASK));
 		return pipe_flag;
 	}
+}
+
+static inline const uint32_t *
+formats_ptr(const struct drm_format_modifier_blob *blob)
+{
+	return (const uint32_t *)((const char *)blob + blob->formats_offset);
+}
+
+static inline const struct drm_format_modifier *
+modifiers_ptr(const struct drm_format_modifier_blob *blob)
+{
+	return (const struct drm_format_modifier *)((const char *)blob + blob->modifiers_offset);
+}
+
+static int igt_count_plane_format_mod(const struct drm_format_modifier_blob *blob_data)
+{
+	const struct drm_format_modifier *modifiers;
+	int count = 0;
+
+	modifiers = modifiers_ptr(blob_data);
+
+	for (int i = 0; i < blob_data->count_modifiers; i++)
+		count += igt_hweight(modifiers[i].formats);
+
+	return count;
+}
+
+static void igt_fill_plane_format_mod(igt_display_t *display, igt_plane_t *plane)
+{
+	const struct drm_format_modifier_blob *blob_data;
+	drmModePropertyBlobPtr blob;
+	uint64_t blob_id;
+	int idx = 0;
+	int count;
+
+	blob_id = igt_plane_get_prop(plane, IGT_PLANE_IN_FORMATS);
+
+	blob = drmModeGetPropertyBlob(display->drm_fd, blob_id);
+	if (!blob)
+		return;
+
+	blob_data = (const struct drm_format_modifier_blob *) blob->data;
+
+	count = igt_count_plane_format_mod(blob_data);
+	if (!count)
+		return;
+
+	plane->format_mod_count = count;
+	plane->formats = calloc(count, sizeof(plane->formats[0]));
+	igt_assert(plane->formats);
+	plane->modifiers = calloc(count, sizeof(plane->modifiers[0]));
+	igt_assert(plane->modifiers);
+
+	for (int i = 0; i < blob_data->count_modifiers; i++) {
+		for (int j = 0; j < 64; j++) {
+			const struct drm_format_modifier *modifiers =
+				modifiers_ptr(blob_data);
+			const uint32_t *formats = formats_ptr(blob_data);
+
+			if (!(modifiers[i].formats & (1ULL << j)))
+				continue;
+
+			plane->formats[idx] = formats[modifiers[i].offset + j];
+			plane->modifiers[idx] = modifiers[i].modifier;
+			idx++;
+			igt_assert_lte(idx, plane->format_mod_count);
+		}
+	}
+
+	igt_assert_eq(idx, plane->format_mod_count);
+}
+
+bool igt_plane_has_format_mod(igt_plane_t *plane, uint32_t format,
+			      uint64_t modifier)
+{
+	int i;
+
+	for (i = 0; i < plane->format_mod_count; i++) {
+		if (plane->formats[i] == format &&
+		    plane->modifiers[i] == modifier)
+			return true;
+
+	}
+
+	return false;
+}
+
+static int igt_count_display_format_mod(igt_display_t *display)
+{
+	enum pipe pipe;
+	int count = 0;
+
+	for_each_pipe(display, pipe) {
+		igt_plane_t *plane;
+
+		for_each_plane_on_pipe(display, pipe, plane) {
+			count += plane->format_mod_count;
+		}
+	}
+
+	return count;
+}
+
+static void
+igt_add_display_format_mod(igt_display_t *display, uint32_t format,
+			   uint64_t modifier)
+{
+	int i;
+
+	for (i = 0; i < display->format_mod_count; i++) {
+		if (display->formats[i] == format &&
+		    display->modifiers[i] == modifier)
+			return;
+
+	}
+
+	display->formats[i] = format;
+	display->modifiers[i] = modifier;
+	display->format_mod_count++;
+}
+
+static void igt_fill_display_format_mod(igt_display_t *display)
+{
+	int count = igt_count_display_format_mod(display);
+	enum pipe pipe;
+
+	if (!count)
+		return;
+
+	display->formats = calloc(count, sizeof(display->formats[0]));
+	igt_assert(display->formats);
+	display->modifiers = calloc(count, sizeof(display->modifiers[0]));
+	igt_assert(display->modifiers);
+
+	for_each_pipe(display, pipe) {
+		igt_plane_t *plane;
+
+		for_each_plane_on_pipe(display, pipe, plane) {
+			for (int i = 0; i < plane->format_mod_count; i++) {
+				igt_add_display_format_mod(display,
+							   plane->formats[i],
+							   plane->modifiers[i]);
+				igt_assert_lte(display->format_mod_count, count);
+			}
+		}
+	}
+}
+
+bool igt_display_has_format_mod(igt_display_t *display, uint32_t format,
+				uint64_t modifier)
+{
+	int i;
+
+	for (i = 0; i < display->format_mod_count; i++) {
+		if (display->formats[i] == format &&
+		    display->modifiers[i] == modifier)
+			return true;
+
+	}
+
+	return false;
 }
