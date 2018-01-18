@@ -90,7 +90,7 @@ enum igt_text_align {
 
 void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 			  unsigned *width_ret, unsigned *height_ret);
-void igt_calc_fb_size(int fd, int width, int height, int bpp, uint64_t tiling,
+void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t tiling,
 		      unsigned *size_ret, unsigned *stride_ret);
 unsigned int
 igt_create_fb_with_bo_size(int fd, int width, int height,

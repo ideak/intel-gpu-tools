@@ -541,7 +541,6 @@ static void create_fb(enum pixel_format pformat, int width, int height,
 {
 	uint32_t format;
 	unsigned int size, stride;
-	int bpp;
 	uint64_t tiling_for_size;
 
 	switch (pformat) {
@@ -576,13 +575,12 @@ static void create_fb(enum pixel_format pformat, int width, int height,
 	 * the same size regardless of tiling since we want to properly exercise
 	 * the Kernel's specific tiling-checking code paths without accidentally
 	 * hitting size-checking ones first. */
-	bpp = igt_drm_format_to_bpp(format);
 	if (plane == PLANE_CUR)
 		tiling_for_size = LOCAL_DRM_FORMAT_MOD_NONE;
 	else
 		tiling_for_size = opt.tiling;
 
-	igt_calc_fb_size(drm.fd, width, height, bpp, tiling_for_size, &size,
+	igt_calc_fb_size(drm.fd, width, height, format, tiling_for_size, &size,
 			 &stride);
 
 	igt_create_fb_with_bo_size(drm.fd, width, height, format, tiling, fb,

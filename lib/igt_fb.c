@@ -147,7 +147,7 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
  * @fd: the DRM file descriptor
  * @width: width of the framebuffer in pixels
  * @height: height of the framebuffer in pixels
- * @bpp: bytes per pixel of the framebuffer
+ * @format: drm fourcc pixel format code
  * @tiling: tiling layout of the framebuffer (as framebuffer modifier)
  * @size_ret: returned size for the framebuffer
  * @stride_ret: returned stride for the framebuffer
@@ -155,10 +155,11 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
  * This function returns valid stride and size values for a framebuffer with the
  * specified parameters.
  */
-void igt_calc_fb_size(int fd, int width, int height, int bpp, uint64_t tiling,
+void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t tiling,
 		      unsigned *size_ret, unsigned *stride_ret)
 {
 	unsigned int tile_width, tile_height, stride, size;
+	int bpp = igt_drm_format_to_bpp(format);
 	int byte_width = width * (bpp / 8);
 
 	igt_get_fb_tile_size(fd, tiling, bpp, &tile_width, &tile_height);
@@ -249,13 +250,12 @@ static int create_bo_for_fb(int fd, int width, int height, uint32_t format,
 			    unsigned *size_ret, unsigned *stride_ret,
 			    bool *is_dumb)
 {
-	int bpp = igt_drm_format_to_bpp(format);
 	int bo;
 
 	if (tiling || size || stride) {
 		unsigned calculated_size, calculated_stride;
 
-		igt_calc_fb_size(fd, width, height, bpp, tiling,
+		igt_calc_fb_size(fd, width, height, format, tiling,
 				 &calculated_size, &calculated_stride);
 		if (stride == 0)
 			stride = calculated_stride;
@@ -290,6 +290,8 @@ static int create_bo_for_fb(int fd, int width, int height, uint32_t format,
 			return -EINVAL;
 		}
 	} else {
+		int bpp = igt_drm_format_to_bpp(format);
+
 		if (is_dumb)
 			*is_dumb = true;
 
