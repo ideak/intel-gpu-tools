@@ -32,15 +32,8 @@ typedef struct {
 	int drm_fd;
 	igt_display_t display;
 
-	int image_w;
-	int image_h;
-
 	struct igt_fb fb1;
 	struct igt_fb fb2;
-	struct igt_fb fb3;
-	int fb_id1;
-	int fb_id2;
-	int fb_id3;
 
 	igt_plane_t *plane1;
 	igt_plane_t *plane2;
@@ -58,18 +51,17 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_output_set_pipe(output, pipe);
 
 	/* before allocating, free if any older fb */
-	if (data->fb_id1) {
+	if (data->fb1.fb_id) {
 		igt_remove_fb(data->drm_fd, &data->fb1);
-		data->fb_id1 = 0;
+		data->fb1.fb_id = 0;
 	}
 
 	/* allocate fb for plane 1 */
-	data->fb_id1 = igt_create_pattern_fb(data->drm_fd,
-						mode->hdisplay, mode->vdisplay,
-						DRM_FORMAT_XRGB8888,
-						LOCAL_DRM_FORMAT_MOD_NONE,
-						&data->fb1);
-	igt_assert(data->fb_id1);
+	igt_create_pattern_fb(data->drm_fd,
+			      mode->hdisplay, mode->vdisplay,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_DRM_FORMAT_MOD_NONE,
+			      &data->fb1);
 
 	/*
 	 * We always set the primary plane to actually enable the pipe as
@@ -91,17 +83,13 @@ static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 {
 	igt_display_t *display = &data->display;
 
-	if (data->fb_id1) {
+	if (data->fb1.fb_id) {
 		igt_remove_fb(data->drm_fd, &data->fb1);
-		data->fb_id1 = 0;
+		data->fb1.fb_id = 0;
 	}
-	if (data->fb_id2) {
+	if (data->fb2.fb_id) {
 		igt_remove_fb(data->drm_fd, &data->fb2);
-		data->fb_id2 = 0;
-	}
-	if (data->fb_id3) {
-		igt_remove_fb(data->drm_fd, &data->fb3);
-		data->fb_id3 = 0;
+		data->fb2.fb_id = 0;
 	}
 
 	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
@@ -121,7 +109,6 @@ static void test_panel_fitting(data_t *d)
 {
 	igt_display_t *display = &d->display;
 	igt_output_t *output;
-	cairo_surface_t *image;
 	enum pipe pipe;
 	int valid_tests = 0;
 
@@ -146,18 +133,11 @@ static void test_panel_fitting(data_t *d)
 		mode = igt_output_get_mode(output);
 		native_mode = *mode;
 
-		/* allocate fb2 with image size */
-		image = igt_cairo_image_surface_create_from_png(FILE_NAME);
-		igt_assert(cairo_surface_status(image) == CAIRO_STATUS_SUCCESS);
-		d->image_w = cairo_image_surface_get_width(image);
-		d->image_h = cairo_image_surface_get_height(image);
-		cairo_surface_destroy(image);
-
-		d->fb_id2 = igt_create_image_fb(d->drm_fd, 0, 0,
-						DRM_FORMAT_XRGB8888,
-						LOCAL_DRM_FORMAT_MOD_NONE,
-						FILE_NAME, &d->fb2);
-		igt_assert(d->fb_id2);
+		/* allocate fb2 with image */
+		igt_create_image_fb(d->drm_fd, 0, 0,
+				    DRM_FORMAT_XRGB8888,
+				    LOCAL_DRM_FORMAT_MOD_NONE,
+				    FILE_NAME, &d->fb2);
 
 		/* Set up display to enable panel fitting */
 		mode->hdisplay = 640;
