@@ -44,8 +44,6 @@ struct plane_parms {
 	uint32_t width, height;
 };
 
-#define hweight32 __builtin_popcount
-
 /* globals for fence support */
 int *timeline;
 pthread_t *thread;
@@ -498,7 +496,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	}
 
 	for (i = 0; i < iter_max; i++) {
-		int n_enable_planes = hweight32(i);
+		int n_enable_planes = igt_hweight(i);
 
 		if (type == TRANSITION_MODESET_FAST &&
 		    n_enable_planes > 1 &&
@@ -524,7 +522,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 
 			/* i -> i+1 will be done when i increases, can be skipped here */
 			for (j = iter_max - 1; j > i + 1; j--) {
-				n_enable_planes = hweight32(j);
+				n_enable_planes = igt_hweight(j);
 
 				if (type == TRANSITION_MODESET_FAST &&
 				    n_enable_planes > 1 &&
@@ -568,7 +566,7 @@ cleanup:
 static void commit_display(igt_display_t *display, unsigned event_mask, bool nonblocking)
 {
 	unsigned flags;
-	int num_events = hweight32(event_mask);
+	int num_events = igt_hweight(event_mask);
 	ssize_t ret;
 
 	flags = DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_PAGE_FLIP_EVENT;
@@ -735,7 +733,7 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 		igt_crc_t crcs[5][IGT_MAX_PIPES];
 		unsigned event_mask;
 
-		if (hweight32(i) > howmany)
+		if (igt_hweight(i) > howmany)
 			continue;
 
 		event_mask = set_combinations(display, i, &fbs[0]);
@@ -747,10 +745,10 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 		collect_crcs_mask(pipe_crcs, i, crcs[0]);
 
 		for (j = iter_max - 1; j > i + 1; j--) {
-			if (hweight32(j) > howmany)
+			if (igt_hweight(j) > howmany)
 				continue;
 
-			if (hweight32(i) < howmany && hweight32(j) < howmany)
+			if (igt_hweight(i) < howmany && igt_hweight(j) < howmany)
 				continue;
 
 			event_mask = set_combinations(display, j, &fbs[1]);

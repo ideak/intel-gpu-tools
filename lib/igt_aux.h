@@ -385,4 +385,9 @@ static inline bool igt_list_empty(const struct igt_list *list)
 	     &pos->member != (head);					\
 	     pos = tmp, tmp = igt_list_next_entry(pos, member))
 
+#define igt_hweight(x) \
+	__builtin_choose_expr(sizeof(x) == 8, \
+			      __builtin_popcountll(x), \
+			      __builtin_popcount(x))
+
 #endif /* IGT_AUX_H */
