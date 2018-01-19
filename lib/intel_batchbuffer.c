@@ -695,12 +695,14 @@ void igt_blitter_fast_copy__raw(int fd,
  * igt_blitter_fast_copy:
  * @batch: batchbuffer object
  * @src: source i-g-t buffer object
+ * @src_delta: offset into the source i-g-t bo
  * @src_x: source pixel x-coordination
  * @src_y: source pixel y-coordination
  * @width: width of the copied rectangle
  * @height: height of the copied rectangle
  * @bpp: source and destination bits per pixel
  * @dst: destination i-g-t buffer object
+ * @dst_delta: offset into the destination i-g-t bo
  * @dst_x: destination pixel x-coordination
  * @dst_y: destination pixel y-coordination
  *
@@ -709,10 +711,12 @@ void igt_blitter_fast_copy__raw(int fd,
  * The source and destination surfaces cannot overlap.
  */
 void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
-			   struct igt_buf *src, unsigned src_x, unsigned src_y,
+			   struct igt_buf *src, unsigned src_delta,
+			   unsigned src_x, unsigned src_y,
 			   unsigned width, unsigned height,
 			   int bpp,
-			   struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
+			   struct igt_buf *dst, unsigned dst_delta,
+			   unsigned dst_x, unsigned dst_y)
 {
 	uint32_t src_pitch, dst_pitch;
 	uint32_t dword0, dword1;
@@ -736,11 +740,11 @@ void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 	OUT_BATCH(dword1 | dst_pitch);
 	OUT_BATCH((dst_y << 16) | dst_x); /* dst x1,y1 */
 	OUT_BATCH(((dst_y + height) << 16) | (dst_x + width)); /* dst x2,y2 */
-	OUT_RELOC(dst->bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
+	OUT_RELOC(dst->bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, dst_delta);
 	OUT_BATCH(0);	/* dst address upper bits */
 	OUT_BATCH((src_y << 16) | src_x); /* src x1,y1 */
 	OUT_BATCH(src_pitch);
-	OUT_RELOC(src->bo, I915_GEM_DOMAIN_RENDER, 0, 0);
+	OUT_RELOC(src->bo, I915_GEM_DOMAIN_RENDER, 0, src_delta);
 	OUT_BATCH(0);	/* src address upper bits */
 	ADVANCE_BATCH();
 
