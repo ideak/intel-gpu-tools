@@ -434,6 +434,7 @@ static void idle_check(void)
 		wait += IDLE_WAIT_TIMESTEP_MSEC;
 	} while (wait < IDLE_WAIT_TIMEOUT_MSEC);
 
+	igt_debugfs_dump(drm_fd, "i915_rps_boost_info");
 	igt_assert_eq(freqs[CUR], freqs[RPn]);
 	igt_debug("Required %d msec to reach cur=idle\n", wait);
 }
@@ -457,6 +458,7 @@ static void loaded_check(void)
 		wait += LOADED_WAIT_TIMESTEP_MSEC;
 	} while (wait < LOADED_WAIT_TIMEOUT_MSEC);
 
+	igt_debugfs_dump(drm_fd, "i915_rps_boost_info");
 	igt_assert_lte(freqs[MAX], freqs[CUR]);
 	igt_debug("Required %d msec to reach cur=max\n", wait);
 }
@@ -484,6 +486,7 @@ static void stabilize_check(int *out)
 		wait += STABILIZE_WAIT_TIMESTEP_MSEC;
 	} while (wait < STABILIZE_WAIT_TIMEOUT_MSEC);
 
+	igt_debugfs_dump(drm_fd, "i915_rps_boost_info");
 	igt_debug("Waited %d msec to stabilize cur\n", wait);
 }
 
