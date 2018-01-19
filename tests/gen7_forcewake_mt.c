@@ -41,12 +41,15 @@ IGT_TEST_DESCRIPTION("Exercise a suspect workaround required for"
 		     " FORCEWAKE_MT.");
 
 #define FORCEWAKE_MT 0xa188
+#define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
 
 struct thread {
 	pthread_t thread;
-	void *mmio;
+	pthread_mutex_t *lock;
+	volatile uint32_t *forcewake_mt;
 	int fd;
 	int bit;
+	bool done;
 };
 
 static const struct pci_id_match match[] = {
@@ -77,46 +80,56 @@ static struct pci_device *__igfx_get(void)
 		pci_iterator_destroy(iter);
 	}
 
+	pci_device_probe(dev);
 	return dev;
 }
 
-static void *igfx_get_mmio(void)
+static volatile uint32_t *igfx_mmio_forcewake_mt(void)
 {
 	struct pci_device *pci = __igfx_get();
-	void *mmio = NULL;
-	int error;
 
-	igt_skip_on(pci == NULL);
-	igt_skip_on(intel_gen(pci->device_id) != 7);
+	igt_require(pci && intel_gen(pci->device_id) == 7);
 
-	error = pci_device_probe(pci);
-	igt_assert_eq(error, 0);
+	intel_mmio_use_pci_bar(pci);
 
-	error = pci_device_map_range(pci,
-				     pci->regions[0].base_addr,
-				     2*1024*1024,
-				     PCI_DEV_MAP_FLAG_WRITABLE,
-				     &mmio);
-	igt_assert_eq(error, 0);
-	igt_assert(mmio != NULL);
-
-	return mmio;
+	return (volatile uint32_t *)((char *)igt_global_mmio + FORCEWAKE_MT);
 }
 
 static void *thread(void *arg)
 {
-	struct thread *t = arg;
-	uint32_t *forcewake_mt = (uint32_t *)((char *)t->mmio + FORCEWAKE_MT);
-	uint32_t bit = 1 << t->bit;
+	static const char acquire_error[] = "acquire";
+	static const char release_error[] = "release";
 
-	while (1) {
+	struct thread *t = arg;
+	const uint32_t bit = 1 << t->bit;
+	volatile uint32_t *forcewake_mt = t->forcewake_mt;
+	void *result = NULL;
+
+	while (!result && !READ_ONCE(t->done)) {
+		/*
+		 * The HW is fubar; concurrent mmio access to even
+		 * the FORCEWAKE_MT results in a machine lockup, nullifying
+		 * the entire purpose of FORCEWAKE_MT... Sigh.
+		 */
+		pthread_mutex_lock(t->lock);
+
 		*forcewake_mt = bit << 16 | bit;
-		igt_assert(*forcewake_mt & bit);
+		if (!igt_wait(*forcewake_mt & bit, 50, 1))
+			result = (void *)acquire_error;
+
+		/* Sleep to let another thread poke at a different bit */
+		pthread_mutex_unlock(t->lock);
+		usleep(1000);
+		pthread_mutex_lock(t->lock);
+
 		*forcewake_mt = bit << 16;
-		igt_assert((*forcewake_mt & bit) == 0);
+		if (!igt_wait((*forcewake_mt & bit) == 0, 50, 1))
+			result = (void *)release_error;
+
+		pthread_mutex_unlock(t->lock);
 	}
 
-	return NULL;
+	return result;
 }
 
 #define MI_STORE_REGISTER_MEM                   (0x24<<23)
@@ -124,20 +137,30 @@ static void *thread(void *arg)
 igt_simple_main
 {
 	struct thread t[16];
+	pthread_mutex_t lock;
+	bool success = true;
 	int i;
 
+	igt_assert(pthread_mutex_init(&lock, NULL) == 0);
+
+	t[0].lock = &lock;
 	t[0].fd = drm_open_driver(DRIVER_INTEL);
-	t[0].mmio = igfx_get_mmio();
+	t[0].forcewake_mt = igfx_mmio_forcewake_mt();
+	t[0].done = false;
 
 	for (i = 2; i < 16; i++) {
 		t[i] = t[0];
 		t[i].bit = i;
-		pthread_create(&t[i].thread, NULL, thread, &t[i]);
+		if (pthread_create(&t[i].thread, NULL, thread, &t[i])) {
+			igt_warn("Failed to create thread for BIT(%d)\n", i);
+			success = false;
+			goto error;
+		}
 	}
 
 	sleep(2);
 
-	for (i = 0; i < 1000; i++) {
+	igt_until_timeout(2) {
 		uint32_t *p;
 		struct drm_i915_gem_execbuffer2 execbuf;
 		struct drm_i915_gem_exec_object2 exec[2];
@@ -186,19 +209,46 @@ igt_simple_main
 		execbuf.batch_len = sizeof(b);
 		execbuf.flags = I915_EXEC_SECURE;
 
+		pthread_mutex_lock(t[0].lock);
 		gem_execbuf(t[0].fd, &execbuf);
 		gem_sync(t[0].fd, exec[1].handle);
+		pthread_mutex_unlock(t[0].lock);
 
 		p = gem_mmap__gtt(t[0].fd, exec[0].handle, 4096, PROT_READ);
 
-		igt_info("[%d]={ %08x %08x }\n", i, p[0], p[1]);
-		igt_assert(p[0] & 2);
-		igt_assert((p[1] & 2) == 0);
+		igt_debug("[%d]={ %08x %08x }\n", i, p[0], p[1]);
+		if ((p[0] & 2) == 0) {
+			igt_warn("Failed to acquire forcewake BIT(1) from batch\n");
+			success = false;
+		}
+		if ((p[1] & 2)) {
+			igt_warn("Failed to release forcewake BIT(1) from batch\n");
+			success = false;
+		}
 
 		munmap(p, 4096);
 		gem_close(t[0].fd, exec[0].handle);
 		gem_close(t[0].fd, exec[1].handle);
+		if (!success)
+			break;
 
 		usleep(1000);
 	}
+
+error:
+	while (--i >= 2) {
+		void *result = (char *)"pthread_join to";
+
+		t[i].done = true;
+		pthread_join(t[i].thread, &result);
+		if (result) {
+			igt_warn("Thread BIT(%d) failed to %s forcewake\n", i, (char *)result);
+			success = false;
+		}
+	}
+
+	/* And clear all forcewake bits before disappearing */
+	*t[0].forcewake_mt = 0xfffe << 16;
+
+	igt_assert(success);
 }
