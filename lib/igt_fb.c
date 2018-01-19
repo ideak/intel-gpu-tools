@@ -54,14 +54,16 @@
  */
 
 /* drm fourcc/cairo format maps */
-#define DF(did, cid, _bpp, _depth)	\
-	{ DRM_FORMAT_##did, CAIRO_FORMAT_##cid, # did, _bpp, _depth }
+#define DF(did, cid, ...)	\
+	{ DRM_FORMAT_##did, CAIRO_FORMAT_##cid, # did, __VA_ARGS__ }
 static struct format_desc_struct {
 	uint32_t drm_id;
 	cairo_format_t cairo_id;
 	const char *name;
 	int bpp;
 	int depth;
+	int planes;
+	int plane_bpp[4];
 } format_desc[] = {
 	DF(RGB565,	RGB16_565,	16, 16),
 	//DF(RGB888,	INVALID,	24, 24),
@@ -73,6 +75,20 @@ static struct format_desc_struct {
 
 #define for_each_format(f)	\
 	for (f = format_desc; f - format_desc < ARRAY_SIZE(format_desc); f++)
+
+static struct format_desc_struct *lookup_drm_format(uint32_t drm_format)
+{
+	struct format_desc_struct *format;
+
+	for_each_format(format) {
+		if (format->drm_id != drm_format)
+			continue;
+
+		return format;
+	}
+
+	return NULL;
+}
 
 /**
  * igt_get_fb_tile_size:
@@ -142,27 +158,68 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 	}
 }
 
-/**
- * igt_calc_fb_size:
- * @fd: the DRM file descriptor
- * @width: width of the framebuffer in pixels
- * @height: height of the framebuffer in pixels
- * @format: drm fourcc pixel format code
- * @tiling: tiling layout of the framebuffer (as framebuffer modifier)
- * @size_ret: returned size for the framebuffer
- * @stride_ret: returned stride for the framebuffer
- *
- * This function returns valid stride and size values for a framebuffer with the
- * specified parameters.
- */
-void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t tiling,
-		      unsigned *size_ret, unsigned *stride_ret)
+static unsigned planar_stride(struct format_desc_struct *format, unsigned width, int plane)
+{
+	unsigned cpp = format->plane_bpp[plane] / 8;
+
+	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
+		return (width + 1) / 2 * cpp;
+
+	return width * cpp;
+}
+
+static unsigned planar_height(struct format_desc_struct *format, unsigned height, int plane)
+{
+	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
+		return (height + 1) / 2;
+
+	return height;
+}
+
+static void calc_fb_size_planar(int fd, int width, int height,
+				struct format_desc_struct *format,
+				uint64_t tiling, unsigned *size_ret,
+				unsigned *stride_ret, unsigned *offsets)
+{
+	int plane;
+	unsigned stride = 0, tile_width, tile_height;
+
+	*size_ret = 0;
+
+	for (plane = 0; plane < format->planes; plane++) {
+		unsigned plane_stride;
+
+		igt_get_fb_tile_size(fd, tiling, format->plane_bpp[plane], &tile_width, &tile_height);
+
+		plane_stride = ALIGN(planar_stride(format, width, plane), tile_width);
+		if (stride < plane_stride)
+			stride = plane_stride;
+	}
+
+	for (plane = 0; plane < format->planes; plane++) {
+		if (offsets)
+			offsets[plane] = *size_ret;
+
+		igt_get_fb_tile_size(fd, tiling, format->plane_bpp[plane], &tile_width, &tile_height);
+
+		*size_ret += stride * ALIGN(planar_height(format, height, plane), tile_height);
+	}
+
+	if (offsets)
+		for (; plane < ARRAY_SIZE(format->plane_bpp); plane++)
+			offsets[plane] = 0;
+
+	*stride_ret = stride;
+}
+
+static void calc_fb_size_packed(int fd, int width, int height,
+				struct format_desc_struct *format, uint64_t tiling,
+				unsigned *size_ret, unsigned *stride_ret)
 {
 	unsigned int tile_width, tile_height, stride, size;
-	int bpp = igt_drm_format_to_bpp(format);
-	int byte_width = width * (bpp / 8);
+	int byte_width = width * (format->bpp / 8);
 
-	igt_get_fb_tile_size(fd, tiling, bpp, &tile_width, &tile_height);
+	igt_get_fb_tile_size(fd, tiling, format->bpp, &tile_width, &tile_height);
 
 	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    intel_gen(intel_get_drm_devid(fd)) <= 3) {
@@ -176,7 +233,7 @@ void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t t
 		 * tiled. But then that failure is expected.
 		 */
 
-		v = width * bpp / 8;
+		v = byte_width;
 		for (stride = 512; stride < v; stride *= 2)
 			;
 
@@ -190,6 +247,31 @@ void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t t
 
 	*stride_ret = stride;
 	*size_ret = size;
+}
+
+/**
+ * igt_calc_fb_size:
+ * @fd: the DRM file descriptor
+ * @width: width of the framebuffer in pixels
+ * @height: height of the framebuffer in pixels
+ * @format: drm fourcc pixel format code
+ * @tiling: tiling layout of the framebuffer (as framebuffer modifier)
+ * @size_ret: returned size for the framebuffer
+ * @stride_ret: returned stride for the framebuffer
+ *
+ * This function returns valid stride and size values for a framebuffer with the
+ * specified parameters.
+ */
+void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64_t tiling,
+		      unsigned *size_ret, unsigned *stride_ret)
+{
+	struct format_desc_struct *format = lookup_drm_format(drm_format);
+	igt_assert(format);
+
+	if (format->planes > 1)
+		calc_fb_size_planar(fd, width, height, format, tiling, size_ret, stride_ret, NULL);
+	else
+		calc_fb_size_packed(fd, width, height, format, tiling, size_ret, stride_ret);
 }
 
 /**
@@ -245,17 +327,20 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
 }
 
 /* helpers to create nice-looking framebuffers */
-static int create_bo_for_fb(int fd, int width, int height, uint32_t format,
+static int create_bo_for_fb(int fd, int width, int height,
+			    struct format_desc_struct *format,
 			    uint64_t tiling, unsigned size, unsigned stride,
 			    unsigned *size_ret, unsigned *stride_ret,
 			    bool *is_dumb)
 {
 	int bo;
 
-	if (tiling || size || stride) {
+	igt_assert(format);
+
+	if (tiling || size || stride || format->planes > 1) {
 		unsigned calculated_size, calculated_stride;
 
-		igt_calc_fb_size(fd, width, height, format, tiling,
+		igt_calc_fb_size(fd, width, height, format->drm_id, tiling,
 				 &calculated_size, &calculated_stride);
 		if (stride == 0)
 			stride = calculated_stride;
@@ -290,12 +375,10 @@ static int create_bo_for_fb(int fd, int width, int height, uint32_t format,
 			return -EINVAL;
 		}
 	} else {
-		int bpp = igt_drm_format_to_bpp(format);
-
 		if (is_dumb)
 			*is_dumb = true;
 
-		return kmstest_dumb_create(fd, width, height, bpp, stride_ret,
+		return kmstest_dumb_create(fd, width, height, format->bpp, stride_ret,
 					   size_ret);
 	}
 }
@@ -323,8 +406,8 @@ int igt_create_bo_with_dimensions(int fd, int width, int height,
 				  unsigned stride, unsigned *size_ret,
 				  unsigned *stride_ret, bool *is_dumb)
 {
-	return create_bo_for_fb(fd, width, height, format, modifier, 0, stride,
-			     size_ret, stride_ret, is_dumb);
+	return create_bo_for_fb(fd, width, height, lookup_drm_format(format),
+				modifier, 0, stride, size_ret, stride_ret, is_dumb);
 }
 
 /**
@@ -671,9 +754,10 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 	igt_debug("%s(width=%d, height=%d, format=0x%x, tiling=0x%"PRIx64", size=%d)\n",
 		  __func__, width, height, format, tiling, bo_size);
-	fb->gem_handle = create_bo_for_fb(fd, width, height, format, tiling,
-					  bo_size, bo_stride, &fb->size,
-					  &fb->stride, &fb->is_dumb);
+	fb->gem_handle = create_bo_for_fb(fd, width, height,
+					  lookup_drm_format(format),
+					  tiling, bo_size, bo_stride,
+					  &fb->size, &fb->stride, &fb->is_dumb);
 	igt_assert(fb->gem_handle > 0);
 
 	igt_debug("%s(handle=%d, pitch=%d)\n",
@@ -1069,7 +1153,7 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 	 * destination, tiling it at the same time.
 	 */
 	blit->linear.handle = create_bo_for_fb(fd, fb->width, fb->height,
-					       fb->drm_format,
+					       lookup_drm_format(fb->drm_format),
 					       LOCAL_DRM_FORMAT_MOD_NONE, 0,
 					       0, &blit->linear.size,
 					       &blit->linear.stride,
@@ -1293,14 +1377,12 @@ uint32_t igt_bpp_depth_to_drm_format(int bpp, int depth)
  */
 uint32_t igt_drm_format_to_bpp(uint32_t drm_format)
 {
-	struct format_desc_struct *f;
+	struct format_desc_struct *f = lookup_drm_format(drm_format);
 
-	for_each_format(f)
-		if (f->drm_id == drm_format)
-			return f->bpp;
-
-	igt_assert_f(0, "can't find a bpp format for %08x (%s)\n",
+	igt_assert_f(f, "can't find a bpp format for %08x (%s)\n",
 		     drm_format, igt_format_str(drm_format));
+
+	return f->bpp;
 }
 
 /**
@@ -1313,13 +1395,9 @@ uint32_t igt_drm_format_to_bpp(uint32_t drm_format)
  */
 const char *igt_format_str(uint32_t drm_format)
 {
-	struct format_desc_struct *f;
+	struct format_desc_struct *f = lookup_drm_format(drm_format);
 
-	for_each_format(f)
-		if (f->drm_id == drm_format)
-			return f->name;
-
-	return "invalid";
+	return f ? f->name : "invalid";
 }
 
 /**
