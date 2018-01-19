@@ -255,24 +255,49 @@ if alsa.found() and gsl.found()
 	test_deps += alsa
 endif
 
+if get_option('use_rpath')
+	# Set up runpath for the test executables towards libigt.so.
+	# The path should be relative to $ORIGIN so the library is
+	# still found properly even if installed to a path other than
+	# prefix.
+
+	# libdir and libexecdir are pathnames relative to
+	# prefix. meson enforces this.
+
+	# Start from the executable
+	rpathdir = '$ORIGIN'
+	# Executables are installed in libexecdir. Add a .. for each
+	# directory name in it.
+	foreach p : libexecdir.split('/')
+		rpathdir = join_paths(rpathdir, '..')
+	endforeach
+	# Add relative path to libdir
+	rpathdir = join_paths(rpathdir, libdir)
+else
+	rpathdir = ''
+endif
+
 test_executables = []
 
 foreach prog : test_progs
 	test_executables += executable(prog, prog + '.c',
 		   dependencies : test_deps,
 		   install_dir : libexecdir,
+		   install_rpath : rpathdir,
 		   install : true)
 endforeach
 
 test_executables += executable('perf_pmu', 'perf_pmu.c',
 	   dependencies : test_deps + [ lib_igt_perf ],
 	   install_dir : libexecdir,
+	   install_rpath : rpathdir,
 	   install : true)
 test_progs += 'perf_pmu'
 
 executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   dependencies : test_deps,
 	   install_dir : libexecdir,
+	   install_rpath : rpathdir,
 	   install : true)
 test_progs += 'testdisplay'
 
@@ -292,6 +317,7 @@ endforeach
 executable('gem_stress', 'gem_stress.c',
 	   install : true,
 	   install_dir : libexecdir,
+	   install_rpath : rpathdir,
 	   dependencies : igt_deps)
 
 # IMPORTANT: These tests here are all disabled because the result in sometime

@@ -50,9 +50,32 @@ if libdrm_intel.found()
 	tool_deps += zlib
 endif
 
+if get_option('use_rpath')
+	# Set up runpath for the test executables towards libigt.so.
+	# The path should be relative to $ORIGIN so the library is
+	# still found properly even if installed to a path other than
+	# prefix.
+
+	# libdir and bindir are pathnames relative to prefix. meson
+	# enforces this.
+
+	# Start from the executable
+	rpathdir = '$ORIGIN'
+	# Executables are installed in bindir. Add a .. for each
+	# directory name in it.
+	foreach p : bindir.split('/')
+		rpathdir = join_paths(rpathdir, '..')
+	endforeach
+	# Add relative path to libdir
+	rpathdir = join_paths(rpathdir, libdir)
+else
+	rpathdir = ''
+endif
+
 foreach prog : tools_progs
 	executable(prog, prog + '.c',
 		   dependencies : tool_deps,
+		   install_rpath : rpathdir,
 		   install : true)
 endforeach
 
@@ -63,18 +86,21 @@ if libudev.found()
 	]
 	executable('intel_dp_compliance', sources : intel_dp_compliance_src,
 		   dependencies : [tool_deps, libudev],
+		   install_rpath : rpathdir,
 		   install : true)
 endif
 
 intel_l3_parity_src = [ 'intel_l3_parity.c', 'intel_l3_udev_listener.c' ]
 executable('intel_l3_parity', sources : intel_l3_parity_src,
 	   dependencies : tool_deps,
+	   install_rpath : rpathdir,
 	   install : true)
 
 intel_reg_src = [ 'intel_reg.c', 'intel_reg_decode.c', 'intel_reg_spec.c' ]
 executable('intel_reg', sources : intel_reg_src,
 	   dependencies : tool_deps,
 	   install : true,
+	   install_rpath : rpathdir,
 	   c_args : [
 	     '-DIGT_DATADIR="@0@"'.format(join_paths(prefix, datadir)),
 	   ])
