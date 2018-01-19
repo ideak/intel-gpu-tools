@@ -520,7 +520,7 @@ static void test_plane_rotation_ytiled_obj(data_t *data,
 	igt_assert_eq(ret, 0);
 
 	do_or_die(__kms_addfb(fd, gem_handle, w, h, stride,
-		  format, tiling, LOCAL_DRM_MODE_FB_MODIFIERS,
+		  format, tiling, NULL, LOCAL_DRM_MODE_FB_MODIFIERS,
 		  &data->fb.fb_id));
 	data->fb.width = w;
 	data->fb.height = h;
@@ -601,7 +601,8 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 		}
 
 		ret = (__kms_addfb(fd, gem_handle, w, h, stride,
-		       format, tiling, LOCAL_DRM_MODE_FB_MODIFIERS,
+		       format, tiling, NULL,
+		       LOCAL_DRM_MODE_FB_MODIFIERS,
 		       &data2[i].fb.fb_id));
 		if (ret) {
 			igt_warn("failed to create framebuffer\n");

@@ -723,7 +723,7 @@ static void test_flip(int i915, int vgem, unsigned hang)
 
 		do_or_die(__kms_addfb(i915, handle[i],
 				      bo[i].width, bo[i].height, bo[i].pitch,
-				      DRM_FORMAT_XRGB8888, I915_TILING_NONE,
+				      DRM_FORMAT_XRGB8888, I915_TILING_NONE, NULL,
 				      LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id[i]));
 		igt_assert(fb_id[i]);
 	}

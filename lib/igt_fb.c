@@ -158,14 +158,19 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 	}
 }
 
+static unsigned planar_width(struct format_desc_struct *format, unsigned width, int plane)
+{
+	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
+		return (width + 1) / 2;
+
+	return width;
+}
+
 static unsigned planar_stride(struct format_desc_struct *format, unsigned width, int plane)
 {
 	unsigned cpp = format->plane_bpp[plane] / 8;
 
-	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
-		return (width + 1) / 2 * cpp;
-
-	return width * cpp;
+	return planar_width(format, width, plane) * cpp;
 }
 
 static unsigned planar_height(struct format_desc_struct *format, unsigned height, int plane)
@@ -331,17 +336,25 @@ static int create_bo_for_fb(int fd, int width, int height,
 			    struct format_desc_struct *format,
 			    uint64_t tiling, unsigned size, unsigned stride,
 			    unsigned *size_ret, unsigned *stride_ret,
-			    bool *is_dumb)
+			    uint32_t *offsets, bool *is_dumb)
 {
 	int bo;
 
 	igt_assert(format);
 
+	if (offsets)
+		memset(offsets, 0, ARRAY_SIZE(format->plane_bpp) * sizeof(*offsets));
+
 	if (tiling || size || stride || format->planes > 1) {
 		unsigned calculated_size, calculated_stride;
 
-		igt_calc_fb_size(fd, width, height, format->drm_id, tiling,
-				 &calculated_size, &calculated_stride);
+		if (format->planes > 1)
+			calc_fb_size_planar(fd, width, height, format, tiling,
+					    &calculated_size, &calculated_stride, offsets);
+		else
+			calc_fb_size_packed(fd, width, height, format, tiling,
+					    &calculated_size, &calculated_stride);
+
 		if (stride == 0)
 			stride = calculated_stride;
 		if (size == 0)
@@ -407,7 +420,7 @@ int igt_create_bo_with_dimensions(int fd, int width, int height,
 				  unsigned *stride_ret, bool *is_dumb)
 {
 	return create_bo_for_fb(fd, width, height, lookup_drm_format(format),
-				modifier, 0, stride, size_ret, stride_ret, is_dumb);
+				modifier, 0, stride, size_ret, stride_ret, NULL, is_dumb);
 }
 
 /**
@@ -748,16 +761,20 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 			   struct igt_fb *fb, unsigned bo_size,
 			   unsigned bo_stride)
 {
+	struct format_desc_struct *f = lookup_drm_format(format);
 	uint32_t fb_id;
+	int i;
+
+	igt_assert_f(f, "DRM format %08x not found\n", format);
 
 	memset(fb, 0, sizeof(*fb));
 
 	igt_debug("%s(width=%d, height=%d, format=0x%x, tiling=0x%"PRIx64", size=%d)\n",
 		  __func__, width, height, format, tiling, bo_size);
-	fb->gem_handle = create_bo_for_fb(fd, width, height,
-					  lookup_drm_format(format),
+	fb->gem_handle = create_bo_for_fb(fd, width, height, f,
 					  tiling, bo_size, bo_stride,
-					  &fb->size, &fb->stride, &fb->is_dumb);
+					  &fb->size, &fb->stride,
+					  fb->offsets, &fb->is_dumb);
 	igt_assert(fb->gem_handle > 0);
 
 	igt_debug("%s(handle=%d, pitch=%d)\n",
@@ -766,22 +783,24 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    tiling != LOCAL_I915_FORMAT_MOD_X_TILED) {
 		do_or_die(__kms_addfb(fd, fb->gem_handle, width, height,
-				      fb->stride, format, tiling,
+				      fb->stride, format, tiling, fb->offsets,
 				      LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id));
 	} else {
 		uint32_t handles[4];
 		uint32_t pitches[4];
-		uint32_t offsets[4];
 
 		memset(handles, 0, sizeof(handles));
 		memset(pitches, 0, sizeof(pitches));
-		memset(offsets, 0, sizeof(offsets));
 
 		handles[0] = fb->gem_handle;
 		pitches[0] = fb->stride;
+		for (i = 0; i < f->planes; i++) {
+			handles[i] = fb->gem_handle;
+			pitches[i] = fb->stride;
+		}
 
 		do_or_die(drmModeAddFB2(fd, width, height, format,
-					handles, pitches, offsets,
+					handles, pitches, fb->offsets,
 					&fb_id, 0));
 	}
 
@@ -791,6 +810,17 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	fb->drm_format = format;
 	fb->fb_id = fb_id;
 	fb->fd = fd;
+	fb->num_planes = f->planes ?: 1;
+	fb->plane_bpp[0] = f->bpp;
+	fb->plane_height[0] = height;
+	fb->plane_width[0] = width;
+
+	/* if f->planes is set, then plane_bpp is valid too so use that. */
+	for (i = 0; i < f->planes; i++) {
+		fb->plane_bpp[i] = f->plane_bpp[i];
+		fb->plane_height[i] = planar_height(f, height, i);
+		fb->plane_width[i] = planar_width(f, width, i);
+	}
 
 	return fb_id;
 }
@@ -1127,7 +1157,8 @@ static void destroy_cairo_surface__blit(void *arg)
 				   0, 0, /* src_x, src_y */
 				   fb->width, fb->height,
 				   igt_drm_format_to_bpp(fb->drm_format),
-				   fb->gem_handle, 0,
+				   fb->gem_handle,
+				   fb->offsets[0],
 				   fb->stride,
 				   obj_tiling,
 				   0, 0 /* dst_x, dst_y */);
@@ -1143,6 +1174,7 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 	struct fb_blit_upload *blit;
 	cairo_format_t cairo_format;
 	unsigned int obj_tiling = igt_fb_mod_to_tiling(fb->tiling);
+	uint32_t offsets[4];
 
 	blit = malloc(sizeof(*blit));
 	igt_assert(blit);
@@ -1157,7 +1189,7 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 					       LOCAL_DRM_FORMAT_MOD_NONE, 0,
 					       0, &blit->linear.size,
 					       &blit->linear.stride,
-					       &blit->linear.is_dumb);
+					       offsets, &blit->linear.is_dumb);
 
 	igt_assert(blit->linear.handle > 0);
 
@@ -1169,7 +1201,8 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 			I915_GEM_DOMAIN_GTT, 0);
 
 	igt_blitter_fast_copy__raw(fd,
-				   fb->gem_handle, 0,
+				   fb->gem_handle,
+				   fb->offsets[0],
 				   fb->stride,
 				   obj_tiling,
 				   0, 0, /* src_x, src_y */
@@ -1257,14 +1290,17 @@ static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
  * @fd: open drm file descriptor
  * @fb: pointer to an #igt_fb structure
  *
- * This function stores the contents of the supplied framebuffer into a cairo
- * surface and returns it.
+ * This function stores the contents of the supplied framebuffer's plane
+ * into a cairo surface and returns it.
  *
  * Returns:
  * A pointer to a cairo surface with the contents of the framebuffer.
  */
 cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 {
+	/* This doesn't work for planar formats for now, but we will convert them to RGB24 in the future. */
+	igt_assert(fb->num_planes < 2);
+
 	if (fb->cairo_surface == NULL) {
 		if (fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
 		    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED)

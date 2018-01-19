@@ -1659,10 +1659,10 @@ void igt_require_fb_modifiers(int fd)
 
 int __kms_addfb(int fd, uint32_t handle, uint32_t width, uint32_t height,
 		uint32_t stride, uint32_t pixel_format, uint64_t modifier,
-		uint32_t flags, uint32_t *buf_id)
+		uint32_t *offsets, uint32_t flags, uint32_t *buf_id)
 {
 	struct drm_mode_fb_cmd2 f;
-	int ret;
+	int ret, i;
 
 	igt_require_fb_modifiers(fd);
 
@@ -1675,6 +1675,13 @@ int __kms_addfb(int fd, uint32_t handle, uint32_t width, uint32_t height,
 	f.handles[0] = handle;
 	f.pitches[0] = stride;
 	f.modifier[0] = modifier;
+
+	for (i = 1; i < 4 && offsets && offsets[i]; i++) {
+		f.handles[i] = handle;
+		f.pitches[i] = stride;
+		f.modifier[i] = modifier;
+		f.offsets[i] = offsets[i];
+	}
 
 	ret = igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &f);
 

@@ -50,6 +50,11 @@
  * @size: size in bytes of the underlying backing storage
  * @cairo_surface: optionally attached cairo drawing surface
  * @domain: current domain for cache flushing tracking on i915.ko
+ * @num_planes: Amount of planes on this fb. >1 for planar formats.
+ * @offsets: Offset for each plane in bytes.
+ * @plane_bpp: The bpp for each plane.
+ * @plane_width: The width for each plane.
+ * @plane_height: The height for each plane.
  *
  * Tracking structure for KMS framebuffer objects.
  */
@@ -66,6 +71,11 @@ typedef struct igt_fb {
 	unsigned int size;
 	cairo_surface_t *cairo_surface;
 	unsigned int domain;
+	unsigned int num_planes;
+	uint32_t offsets[4];
+	unsigned int plane_bpp[4];
+	unsigned int plane_width[4];
+	unsigned int plane_height[4];
 } igt_fb_t;
 
 /**

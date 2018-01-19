@@ -163,7 +163,7 @@ static bool format_is_supported(uint32_t format, uint64_t modifier)
 						   format, modifier,
 						   0, NULL, &stride, NULL);
 	ret =  __kms_addfb(drm_fd, gem_handle, 64, 64,
-			   stride, format, modifier,
+			   stride, format, modifier, NULL,
 			   LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id);
 	drmModeRmFB(drm_fd, fb_id);
 	gem_close(drm_fd, gem_handle);
