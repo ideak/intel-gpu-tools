@@ -234,6 +234,7 @@ void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 void igt_blitter_fast_copy__raw(int fd,
 				/* src */
 				uint32_t src_handle,
+				unsigned int src_delta,
 				unsigned int src_stride,
 				unsigned int src_tiling,
 				unsigned int src_x, unsigned src_y,
@@ -246,6 +247,7 @@ void igt_blitter_fast_copy__raw(int fd,
 
 				/* dst */
 				uint32_t dst_handle,
+				unsigned int dst_delta,
 				unsigned int dst_stride,
 				unsigned int dst_tiling,
 				unsigned int dst_x, unsigned dst_y);

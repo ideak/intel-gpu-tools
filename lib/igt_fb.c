@@ -1121,13 +1121,13 @@ static void destroy_cairo_surface__blit(void *arg)
 			I915_GEM_DOMAIN_GTT, 0);
 
 	igt_blitter_fast_copy__raw(blit->fd,
-				   blit->linear.handle,
+				   blit->linear.handle, 0,
 				   blit->linear.stride,
 				   I915_TILING_NONE,
 				   0, 0, /* src_x, src_y */
 				   fb->width, fb->height,
 				   igt_drm_format_to_bpp(fb->drm_format),
-				   fb->gem_handle,
+				   fb->gem_handle, 0,
 				   fb->stride,
 				   obj_tiling,
 				   0, 0 /* dst_x, dst_y */);
@@ -1169,13 +1169,13 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 			I915_GEM_DOMAIN_GTT, 0);
 
 	igt_blitter_fast_copy__raw(fd,
-				   fb->gem_handle,
+				   fb->gem_handle, 0,
 				   fb->stride,
 				   obj_tiling,
 				   0, 0, /* src_x, src_y */
 				   fb->width, fb->height,
 				   igt_drm_format_to_bpp(fb->drm_format),
-				   blit->linear.handle,
+				   blit->linear.handle, 0,
 				   blit->linear.stride,
 				   I915_TILING_NONE,
 				   0, 0 /* dst_x, dst_y */);
