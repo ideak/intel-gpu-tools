@@ -159,7 +159,7 @@ foreach f: lib_sources
 	include_directories: inc,
 	dependencies : lib_deps,
 	c_args : [
-	    '-DIGT_DATADIR="@0@"'.format(datadir),
+	    '-DIGT_DATADIR="@0@"'.format(join_paths(prefix, datadir)),
 	    '-DIGT_SRCDIR="@0@"'.format(srcdir),
 	    '-DIGT_LOG_DOMAIN="@0@"'.format(f.split('.')[0]),
 	])

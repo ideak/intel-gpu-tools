@@ -76,7 +76,7 @@ executable('intel_reg', sources : intel_reg_src,
 	   dependencies : tool_deps,
 	   install : true,
 	   c_args : [
-	     '-DIGT_DATADIR="@0@"'.format(datadir),
+	     '-DIGT_DATADIR="@0@"'.format(join_paths(prefix, datadir)),
 	   ])
 
 install_data('intel_gpu_abrt', install_dir : bindir)
