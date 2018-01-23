@@ -29,7 +29,7 @@ A short list of contribution guidelines:
 - Patches need to be reviewed on the mailing list. Exceptions only apply for
   testcases and tooling for drivers with just a single contributor (e.g. vc4).
   In this case patches must still be submitted to the mailing list first.
-  Testcase should preferrably be cross-reviewed by the same people who write and
+  Testcase should preferably be cross-reviewed by the same people who write and
   review the kernel feature itself.
 
 - When patches from new contributors (without commit access) are stuck, for
@@ -38,9 +38,7 @@ A short list of contribution guidelines:
   contact one of the maintainers (listed in the MAINTAINERS file) and cc the
   intel-gfx mailing list.
 
-- Especially changes to the testcase should get tested on relevant platforms
-  before committing. For Intel employees that's best done using PRTS, see the
-  relevant internal howtos. Everyone else can just run piglit with i-g-t tests
-  locally.
+- Changes to the testcases are automatically tested. Take the results into
+  account before merging.
 
 Happy hacking!
