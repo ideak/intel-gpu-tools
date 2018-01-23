@@ -99,7 +99,7 @@ tools/
 	up the 2D build to ship them.  Instead, here's a separate package for
 	people debugging the driver.
 
-	These tools generally must be run as root, safe for the ones that just
+	These tools generally must be run as root, except for the ones that just
 	decode dumps.
 
 debugger/
