@@ -411,7 +411,7 @@ static void __test_plane_rotation(data_t *data, int plane_type, bool test_bad_fo
 				igt_plane_set_size(plane, data->fb.height, data->fb.width);
 
 			ret = igt_display_try_commit2(display, commit);
-			if (test_bad_format && (data->override_fmt || data->override_tiling)) {
+			if (test_bad_format) {
 				igt_assert_eq(ret, -EINVAL);
 				continue;
 			}
@@ -775,6 +775,7 @@ igt_main
 			test_plane_rotation(&data, subtest->plane);
 		}
 	}
+	data.flips = 0;
 
 	igt_subtest_f("sprite-rotation-90-pos-100-0") {
 		igt_require(gen >= 9);
@@ -783,23 +784,24 @@ igt_main
 		data.pos_y = 0;
 		test_plane_rotation(&data, DRM_PLANE_TYPE_OVERLAY);
 	}
+	data.pos_x = 0,
+	data.pos_y = 0;
 
 	igt_subtest_f("bad-pixel-format") {
 		igt_require(gen >= 9);
-		data.pos_x = 0,
-		data.pos_y = 0;
 		data.rotation = IGT_ROTATION_90;
 		data.override_fmt = DRM_FORMAT_RGB565;
 		test_bad_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
+	data.override_fmt = 0;
 
 	igt_subtest_f("bad-tiling") {
 		igt_require(gen >= 9);
-		data.override_fmt = 0;
 		data.rotation = IGT_ROTATION_90;
-		data.override_tiling = LOCAL_DRM_FORMAT_MOD_NONE;
+		data.override_tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
 		test_bad_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
 	}
+	data.override_tiling = 0;
 
 	igt_subtest_f("primary-rotation-90-Y-tiled") {
 		enum pipe pipe;
