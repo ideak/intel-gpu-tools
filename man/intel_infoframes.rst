@@ -6,7 +6,7 @@ intel_infoframes
 View and change HDMI InfoFrames
 -------------------------------
 .. include:: defs.rst
-:Author: Intel Graphics for Linux <intel-gfx@lists.freedesktop.org>
+:Author: IGT Developers <igt-dev@lists.freedesktop.org>
 :Date: 2016-03-01
 :Version: |PACKAGE_STRING|
 :Copyright: 2012,2016 Intel Corporation
