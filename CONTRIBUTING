@@ -6,11 +6,21 @@ improvements for documentation and new tools and testcases.
 A short list of contribution guidelines:
 
 - Please submit patches formatted with git send-email/git format-patch or
-  equivalent to
+  equivalent to:
+
+    Development mailing list for IGT GPU Tools <igt-dev@lists.freedesktop.org>
+
+  For a transition period patches are accepted on both the igt-dev mailing list
+  and the former intel-gfx mailing list (with the appropriate patch
+  subjectprefix, see below).
+
+  During the transition period, feel free to send patches to both lists if you
+  have a need to do so, as they will get deduplicated so they only appear and
+  are tested in one Patchwork instance.
 
     Intel GFX discussion <intel-gfx@lists.freedesktop.org>
 
-  Please use --subject-prefix="PATCH i-g-t" so that i-g-t patches are easily
+  Please use --subject-prefix="PATCH i-g-t" so IGT patches are easily
   identified in the massive amount mails on intel-gfx. To ensure this is always
   done, meson.sh (and autogen.sh) will run:
 
@@ -36,7 +46,7 @@ A short list of contribution guidelines:
   anything related to the regular releases, issues with packaging and
   integrating platform support or any other intel-gpu-tools issues, please
   contact one of the maintainers (listed in the MAINTAINERS file) and cc the
-  intel-gfx mailing list.
+  igt-dev mailing list.
 
 - Changes to the testcases are automatically tested. Take the results into
   account before merging.
