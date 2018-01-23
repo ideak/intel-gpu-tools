@@ -59,6 +59,7 @@ typedef struct {
 	enum pipe pipe;
 	enum test_flags flags;
 	igt_plane_t *plane;
+	igt_pipe_crc_t *pipe_crc;
 } data_t;
 
 #define RED			0x00ff0000
@@ -386,7 +387,8 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	fb->domain = 0;
 }
 
-static void try_config(data_t *data, enum test_fb_flags fb_flags)
+static void try_config(data_t *data, enum test_fb_flags fb_flags,
+		       igt_crc_t *crc)
 {
 	igt_display_t *display = &data->display;
 	igt_plane_t *primary;
@@ -433,10 +435,14 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags)
 		igt_plane_set_rotation(primary, IGT_ROTATION_90);
 
 	ret = igt_display_try_commit2(display, commit);
-	if (data->flags & TEST_BAD_ROTATION_90)
+	if (data->flags & TEST_BAD_ROTATION_90) {
 		igt_assert_eq(ret, -EINVAL);
-	else
+	} else {
 		igt_assert_eq(ret, 0);
+
+		if (crc)
+			igt_pipe_crc_collect_crc(data->pipe_crc, crc);
+	}
 
 	igt_debug_wait_for_keypress("ccs");
 
@@ -453,7 +459,6 @@ static void test_output(data_t *data)
 	igt_display_t *display = &data->display;
 	igt_plane_t *primary;
 	igt_crc_t crc, ref_crc;
-	igt_pipe_crc_t *pipe_crc;
 	enum test_fb_flags fb_flags = 0;
 
 	igt_display_require_output_on_pipe(display, data->pipe);
@@ -466,31 +471,28 @@ static void test_output(data_t *data)
 	igt_output_set_pipe(data->output, data->pipe);
 
 	if (data->flags & TEST_CRC) {
-		pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+		data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
-		try_config(data, fb_flags | FB_COMPRESSED);
-		igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
-
-		try_config(data, fb_flags);
-		igt_pipe_crc_collect_crc(pipe_crc, &crc);
+		try_config(data, fb_flags | FB_COMPRESSED, &ref_crc);
+		try_config(data, fb_flags, &crc);
 
 		igt_assert_crc_equal(&crc, &ref_crc);
 
-		igt_pipe_crc_free(pipe_crc);
-		pipe_crc = NULL;
+		igt_pipe_crc_free(data->pipe_crc);
+		data->pipe_crc = NULL;
 	}
 
 	if (data->flags & TEST_BAD_PIXEL_FORMAT ||
 	    data->flags & TEST_BAD_ROTATION_90 ||
 	    data->flags & TEST_NO_AUX_BUFFER ||
 	    data->flags & TEST_BAD_CCS_HANDLE) {
-		try_config(data, fb_flags | FB_COMPRESSED);
+		try_config(data, fb_flags | FB_COMPRESSED, NULL);
 	}
 
 	if (data->flags & TEST_BAD_AUX_STRIDE) {
-		try_config(data, fb_flags | FB_COMPRESSED | FB_MISALIGN_AUX_STRIDE);
-		try_config(data, fb_flags | FB_COMPRESSED | FB_SMALL_AUX_STRIDE);
-		try_config(data, fb_flags | FB_COMPRESSED | FB_ZERO_AUX_STRIDE);
+		try_config(data, fb_flags | FB_COMPRESSED | FB_MISALIGN_AUX_STRIDE , NULL);
+		try_config(data, fb_flags | FB_COMPRESSED | FB_SMALL_AUX_STRIDE , NULL);
+		try_config(data, fb_flags | FB_COMPRESSED | FB_ZERO_AUX_STRIDE , NULL);
 	}
 
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
