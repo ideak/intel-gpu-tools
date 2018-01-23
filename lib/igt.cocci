@@ -1,5 +1,5 @@
-// Semantic patch for common patters and their replacement by igt infrastructure
-// and macros. Please run with
+// Semantic patch for common patterns and their replacement by igt
+// infrastructure and macros. Please run with
 //
 // spatch --sp-file lib/igt.cocci --in-place tests/*.c
 //
