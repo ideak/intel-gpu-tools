@@ -29,6 +29,7 @@
 #define IGT_AUX_H
 
 #include <intel_bufmgr.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <sys/time.h>
@@ -251,30 +252,28 @@ void igt_unlock_mem(void);
  * True of COND evaluated to true, false otherwise.
  */
 #define igt_wait(COND, timeout_ms, interval_ms) ({			\
-	struct timeval start_, end_, diff_;				\
-	int elapsed_ms_;						\
-	bool ret_ = false;						\
+	const unsigned long interval_us__ = 1000 * (interval_ms);	\
+	const unsigned long timeout_ms__ = (timeout_ms);		\
+	struct timespec tv__ = {};					\
+	bool ret__;							\
 									\
-	igt_assert(gettimeofday(&start_, NULL) == 0);			\
 	do {								\
+		uint64_t elapsed__ = igt_nsec_elapsed(&tv__) >> 20;	\
+									\
 		if (COND) {						\
-			ret_ = true;					\
+			igt_debug("%s took %"PRIu64"ms\n", #COND, elapsed__); \
+			ret__ = true;					\
+			break;						\
+		}							\
+		if (elapsed__ > timeout_ms__) {				\
+			ret__ = false;					\
 			break;						\
 		}							\
 									\
-		usleep(interval_ms * 1000);				\
+		usleep(interval_us__);					\
+	} while (1);							\
 									\
-		igt_assert(gettimeofday(&end_, NULL) == 0);		\
-		timersub(&end_, &start_, &diff_);			\
-									\
-		elapsed_ms_ = diff_.tv_sec * 1000 +			\
-			      diff_.tv_usec / 1000;			\
-	} while (elapsed_ms_ < timeout_ms);				\
-									\
-	if (!ret_ && (COND))						\
-		ret_ = true;						\
-									\
-	ret_;								\
+	ret__;								\
 })
 
 struct igt_mean;
