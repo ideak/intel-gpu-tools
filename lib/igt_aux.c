@@ -578,6 +578,22 @@ void igt_exchange_int(void *array, unsigned i, unsigned j)
 }
 
 /**
+ * igt_exchange_int64:
+ * @array: pointer to the array of int64_t
+ * @i: first position
+ * @j: second position
+ *
+ * Exchanges the two values at array indices @i and @j. Useful as an exchange
+ * function for igt_permute_array().
+ */
+void igt_exchange_int64(void *array, unsigned i, unsigned j)
+{
+	int64_t *a = array;
+
+	igt_swap(a[i], a[j]);
+}
+
+/**
  * igt_permute_array:
  * @array: pointer to array
  * @size: size of the array

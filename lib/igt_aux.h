@@ -118,6 +118,7 @@ bool __igt_sigiter_continue(struct __igt_sigiter *iter, bool interrupt);
 	for (struct timespec t__={}; igt_nsec_elapsed(&t__)>>20 < (t); )
 
 void igt_exchange_int(void *array, unsigned i, unsigned j);
+void igt_exchange_int64(void *array, unsigned i, unsigned j);
 void igt_permute_array(void *array, unsigned size,
 			   void (*exchange_func)(void *array,
 						 unsigned i,
