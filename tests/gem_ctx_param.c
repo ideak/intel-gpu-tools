@@ -24,9 +24,124 @@
  *    Daniel Vetter <daniel.vetter@ffwll.ch>
  */
 
+#include <fcntl.h>
+#include <limits.h>
+
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Basic test for context set/get param input validation.");
+
+#define BIT(x) (1ul << (x))
+
+#define NEW_CTX	BIT(0)
+#define USER BIT(1)
+
+static int reopen_driver(int fd)
+{
+	char path[256];
+
+	snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
+	fd = open(path, O_RDWR);
+	igt_assert_lte(0, fd);
+
+	return fd;
+}
+
+static void set_priority(int i915)
+{
+	static const int64_t test_values[] = {
+		/* Test space too big, pick significant values */
+		INT_MIN,
+
+		I915_CONTEXT_MIN_USER_PRIORITY - 1,
+		I915_CONTEXT_MIN_USER_PRIORITY,
+		I915_CONTEXT_MIN_USER_PRIORITY + 1,
+
+		I915_CONTEXT_DEFAULT_PRIORITY - 1,
+		I915_CONTEXT_DEFAULT_PRIORITY,
+		I915_CONTEXT_DEFAULT_PRIORITY + 1,
+
+		I915_CONTEXT_MAX_USER_PRIORITY - 1,
+		I915_CONTEXT_MAX_USER_PRIORITY,
+		I915_CONTEXT_MAX_USER_PRIORITY + 1,
+
+		INT_MAX
+	};
+	unsigned int size;
+	int64_t *values;
+
+	igt_require(getuid() == 0);
+
+	size = ARRAY_SIZE(test_values);
+	values = malloc(sizeof(test_values) * 8);
+	igt_assert(values);
+
+	for (unsigned i = 0; i < size; i++) {
+		values[i + 0*size] = test_values[i];
+		values[i + 1*size] = test_values[i] | (uint64_t)1 << 32;
+		values[i + 2*size] = test_values[i] | (uint64_t)rand() << 32;
+		values[i + 3*size] = test_values[i] ^ rand();
+		values[i + 4*size] = rand() % (I915_CONTEXT_MAX_USER_PRIORITY - I915_CONTEXT_MIN_USER_PRIORITY) + I915_CONTEXT_MIN_USER_PRIORITY;
+		values[i + 5*size] = rand();
+		values[i + 6*size] = rand() | (uint64_t)rand() << 32;
+		values[i + 7*size] = (uint64_t)test_values[i] << 32;
+	}
+	size *= 8;
+
+	igt_permute_array(values, size, igt_exchange_int64);
+
+	igt_fork(flags, NEW_CTX | USER) {
+		int fd = reopen_driver(i915);
+		struct drm_i915_gem_context_param arg = {
+			.param = I915_CONTEXT_PARAM_PRIORITY,
+			.ctx_id = flags & NEW_CTX ? gem_context_create(fd) : 0,
+		};
+		int64_t old_prio;
+
+		if (flags & USER) {
+			igt_debug("Dropping root privilege\n");
+			igt_drop_root();
+		}
+
+		gem_context_get_param(fd, &arg);
+		old_prio = arg.value;
+
+		for (unsigned i = 0; i < size; i++) {
+			int64_t prio = values[i];
+			int expected = 0;
+			int err;
+
+			arg.value = prio;
+
+			if (flags & USER &&
+			    prio > I915_CONTEXT_DEFAULT_PRIORITY)
+				expected = -EPERM;
+
+			if (prio < I915_CONTEXT_MIN_USER_PRIORITY ||
+			    prio > I915_CONTEXT_MAX_USER_PRIORITY)
+				expected = -EINVAL;
+
+			err =__gem_context_set_param(fd, &arg);
+			igt_assert_f(err == expected,
+				     "Priority requested %" PRId64 " with flags %x, expected result %d, returned %d\n",
+				     prio, flags, expected, err);
+
+			gem_context_get_param(fd, &arg);
+			if (!err)
+				old_prio = prio;
+			igt_assert_eq(arg.value, old_prio);
+		}
+
+		arg.value = 0;
+		gem_context_set_param(fd, &arg);
+
+		if (flags & NEW_CTX)
+			gem_context_destroy(fd, arg.ctx_id);
+	}
+
+	igt_waitchildren();
+	free(values);
+}
 
 igt_main
 {
@@ -138,11 +253,52 @@ igt_main
 		gem_context_set_param(fd, &arg);
 	}
 
+	arg.param = I915_CONTEXT_PARAM_PRIORITY;
+
+	igt_subtest("set-priority-not-supported") {
+		igt_require(!gem_scheduler_has_ctx_priority(fd));
+
+		arg.ctx_id = ctx;
+		arg.size = 0;
+
+		igt_assert_eq(__gem_context_set_param(fd, &arg), -ENODEV);
+	}
+
+	igt_subtest_group {
+		igt_fixture {
+			igt_require(gem_scheduler_has_ctx_priority(fd));
+		}
+
+		igt_subtest("get-priority-new-ctx") {
+			struct drm_i915_gem_context_param local_arg = arg;
+			uint32_t local_ctx = gem_context_create(fd);
+
+			local_arg.ctx_id = local_ctx;
+
+			gem_context_get_param(fd, &local_arg);
+			igt_assert_eq(local_arg.value, I915_CONTEXT_DEFAULT_PRIORITY);
+
+			gem_context_destroy(fd, local_ctx);
+		}
+
+		igt_subtest("set-priority-invalid-size") {
+			struct drm_i915_gem_context_param local_arg = arg;
+			local_arg.ctx_id = ctx;
+			local_arg.value = 0;
+			local_arg.size = ~0;
+
+			igt_assert_eq(__gem_context_set_param(fd, &local_arg), -EINVAL);
+		}
+
+		igt_subtest("set-priority-range")
+			set_priority(fd);
+	}
+
 	/* NOTE: This testcase intentionally tests for the next free parameter
 	 * to catch ABI extensions. Don't "fix" this testcase without adding all
 	 * the tests for the new param first.
 	 */
-	arg.param = I915_CONTEXT_PARAM_BANNABLE + 1;
+	arg.param = I915_CONTEXT_PARAM_PRIORITY + 1;
 
 	igt_subtest("invalid-param-get") {
 		arg.ctx_id = ctx;
