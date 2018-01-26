@@ -53,8 +53,6 @@ enum test_fb_flags {
 typedef struct {
 	int drm_fd;
 	igt_display_t display;
-	struct igt_fb fb;
-	struct igt_fb fb_sprite;
 	igt_output_t *output;
 	enum pipe pipe;
 	enum test_flags flags;
@@ -394,6 +392,7 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags,
 	igt_plane_t *primary;
 	drmModeModeInfo *drm_mode = igt_output_get_mode(data->output);
 	enum igt_commit_style commit;
+	struct igt_fb fb, fb_sprite;
 	int ret;
 
 	if (data->display.is_atomic)
@@ -407,12 +406,12 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags,
 
 	if (data->plane && fb_flags & FB_COMPRESSED) {
 		plane_require_ccs(data, data->plane, DRM_FORMAT_XRGB8888);
-		generate_fb(data, &data->fb, drm_mode->hdisplay,
+		generate_fb(data, &fb, drm_mode->hdisplay,
 			    drm_mode->vdisplay,
 			    (fb_flags & ~FB_COMPRESSED) | FB_HAS_PLANE);
-		generate_fb(data, &data->fb_sprite, 256, 256, fb_flags);
+		generate_fb(data, &fb_sprite, 256, 256, fb_flags);
 	} else {
-		generate_fb(data, &data->fb, drm_mode->hdisplay,
+		generate_fb(data, &fb, drm_mode->hdisplay,
 			    drm_mode->vdisplay, fb_flags);
 	}
 
@@ -421,12 +420,12 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags,
 
 	igt_plane_set_position(primary, 0, 0);
 	igt_plane_set_size(primary, drm_mode->hdisplay, drm_mode->vdisplay);
-	igt_plane_set_fb(primary, &data->fb);
+	igt_plane_set_fb(primary, &fb);
 
 	if (data->plane && fb_flags & FB_COMPRESSED) {
 		igt_plane_set_position(data->plane, 0, 0);
 		igt_plane_set_size(data->plane, 256, 256);
-		igt_plane_set_fb(data->plane, &data->fb_sprite);
+		igt_plane_set_fb(data->plane, &fb_sprite);
 	}
 
 	if (data->flags & TEST_ROTATE_180)
@@ -450,14 +449,20 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags,
 		igt_plane_set_position(data->plane, 0, 0);
 		igt_plane_set_size(data->plane, 0, 0);
 		igt_plane_set_fb(data->plane, NULL);
-		igt_remove_fb(display->drm_fd, &data->fb_sprite);
+		igt_remove_fb(display->drm_fd, &fb_sprite);
 	}
+
+	igt_plane_set_fb(primary, NULL);
+	igt_plane_set_rotation(primary, IGT_ROTATION_0);
+	igt_display_commit2(display, commit);
+
+	if (data->flags & TEST_CRC)
+		igt_remove_fb(data->drm_fd, &fb);
 }
 
 static void test_output(data_t *data)
 {
 	igt_display_t *display = &data->display;
-	igt_plane_t *primary;
 	igt_crc_t crc, ref_crc;
 	enum test_fb_flags fb_flags = 0;
 
@@ -495,17 +500,8 @@ static void test_output(data_t *data)
 		try_config(data, fb_flags | FB_COMPRESSED | FB_ZERO_AUX_STRIDE , NULL);
 	}
 
-	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
-	igt_plane_set_fb(primary, NULL);
-	igt_plane_set_rotation(primary, IGT_ROTATION_0);
-	if (!display->is_atomic)
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
-
 	igt_output_set_pipe(data->output, PIPE_ANY);
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
-
-	if (data->flags & TEST_CRC)
-		igt_remove_fb(data->drm_fd, &data->fb);
 }
 
 static data_t data;
