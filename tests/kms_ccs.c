@@ -130,7 +130,7 @@ modifiers_ptr(struct local_drm_format_modifier_blob *blob)
 	return (struct local_drm_format_modifier *)(((char *)blob) + blob->modifiers_offset);
 }
 
-static void plane_require_ccs(data_t *data, igt_plane_t *plane, uint32_t format)
+static bool plane_has_format_with_ccs(data_t *data, igt_plane_t *plane, uint32_t format)
 {
 	drmModePropertyBlobPtr blob;
 	struct local_drm_format_modifier_blob *blob_data;
@@ -161,8 +161,8 @@ static void plane_require_ccs(data_t *data, igt_plane_t *plane, uint32_t format)
 		}
 	}
 
-	igt_skip_on_f(fmt_idx == -1,
-		      "Format 0x%x not supported by plane\n", format);
+	if (fmt_idx == -1)
+		return false;
 
 	modifiers = modifiers_ptr(blob_data);
 	last_mod = &modifiers[blob_data->count_modifiers];
@@ -177,12 +177,10 @@ static void plane_require_ccs(data_t *data, igt_plane_t *plane, uint32_t format)
 
 		if (modifiers[i].formats &
 		    (1UL << (fmt_idx - modifiers[i].offset)))
-			return;
-
-		igt_skip("i915 CCS modifier not supported for format\n");
+			return true;
 	}
 
-	igt_skip("i915 CCS modifier not supported by kernel for plane\n");
+	return false;
 }
 
 static void render_fb(data_t *data, uint32_t gem_handle, unsigned int size,
@@ -385,7 +383,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	fb->domain = 0;
 }
 
-static void try_config(data_t *data, enum test_fb_flags fb_flags,
+static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 		       igt_crc_t *crc)
 {
 	igt_display_t *display = &data->display;
@@ -402,10 +400,12 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags,
 
 	primary = igt_output_get_plane_type(data->output,
 					    DRM_PLANE_TYPE_PRIMARY);
-	plane_require_ccs(data, primary, DRM_FORMAT_XRGB8888);
+	if (!plane_has_format_with_ccs(data, primary, DRM_FORMAT_XRGB8888))
+		return false;
 
 	if (data->plane && fb_flags & FB_COMPRESSED) {
-		plane_require_ccs(data, data->plane, DRM_FORMAT_XRGB8888);
+		if (!plane_has_format_with_ccs(data, data->plane, DRM_FORMAT_XRGB8888))
+			return false;
 		generate_fb(data, &fb, drm_mode->hdisplay,
 			    drm_mode->vdisplay,
 			    (fb_flags & ~FB_COMPRESSED) | FB_HAS_PLANE);
@@ -416,7 +416,7 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags,
 	}
 
 	if (data->flags & TEST_FAIL_ON_ADDFB2)
-		return;
+		return true;
 
 	igt_plane_set_position(primary, 0, 0);
 	igt_plane_set_size(primary, drm_mode->hdisplay, drm_mode->vdisplay);
@@ -458,13 +458,16 @@ static void try_config(data_t *data, enum test_fb_flags fb_flags,
 
 	if (data->flags & TEST_CRC)
 		igt_remove_fb(data->drm_fd, &fb);
+
+	return true;
 }
 
-static void test_output(data_t *data)
+static int test_output(data_t *data)
 {
 	igt_display_t *display = &data->display;
 	igt_crc_t crc, ref_crc;
 	enum test_fb_flags fb_flags = 0;
+	int valid_tests = 0;
 
 	igt_display_require_output_on_pipe(display, data->pipe);
 
@@ -478,10 +481,11 @@ static void test_output(data_t *data)
 	if (data->flags & TEST_CRC) {
 		data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
-		try_config(data, fb_flags | FB_COMPRESSED, &ref_crc);
-		try_config(data, fb_flags, &crc);
-
-		igt_assert_crc_equal(&crc, &ref_crc);
+		if (try_config(data, fb_flags | FB_COMPRESSED, &ref_crc) &&
+		    try_config(data, fb_flags, &crc)) {
+			igt_assert_crc_equal(&crc, &ref_crc);
+			valid_tests++;
+		}
 
 		igt_pipe_crc_free(data->pipe_crc);
 		data->pipe_crc = NULL;
@@ -491,17 +495,19 @@ static void test_output(data_t *data)
 	    data->flags & TEST_BAD_ROTATION_90 ||
 	    data->flags & TEST_NO_AUX_BUFFER ||
 	    data->flags & TEST_BAD_CCS_HANDLE) {
-		try_config(data, fb_flags | FB_COMPRESSED, NULL);
+		valid_tests += try_config(data, fb_flags | FB_COMPRESSED, NULL);
 	}
 
 	if (data->flags & TEST_BAD_AUX_STRIDE) {
-		try_config(data, fb_flags | FB_COMPRESSED | FB_MISALIGN_AUX_STRIDE , NULL);
-		try_config(data, fb_flags | FB_COMPRESSED | FB_SMALL_AUX_STRIDE , NULL);
-		try_config(data, fb_flags | FB_COMPRESSED | FB_ZERO_AUX_STRIDE , NULL);
+		valid_tests += try_config(data, fb_flags | FB_COMPRESSED | FB_MISALIGN_AUX_STRIDE , NULL);
+		valid_tests += try_config(data, fb_flags | FB_COMPRESSED | FB_SMALL_AUX_STRIDE , NULL);
+		valid_tests += try_config(data, fb_flags | FB_COMPRESSED | FB_ZERO_AUX_STRIDE , NULL);
 	}
 
 	igt_output_set_pipe(data->output, PIPE_ANY);
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+	return valid_tests;
 }
 
 static data_t data;
@@ -522,52 +528,53 @@ igt_main
 
 	for_each_pipe_static(pipe) {
 		const char *pipe_name = kmstest_pipe_name(pipe);
-		int sprite_idx = 0;
 
 		data.pipe = pipe;
 
 		data.flags = TEST_BAD_PIXEL_FORMAT;
 		igt_subtest_f("pipe-%s-bad-pixel-format", pipe_name)
-			test_output(&data);
+			igt_require(test_output(&data));
 
 		data.flags = TEST_BAD_ROTATION_90;
 		igt_subtest_f("pipe-%s-bad-rotation-90", pipe_name)
-			test_output(&data);
+			igt_require(test_output(&data));
 
 		data.flags = TEST_CRC;
 		igt_subtest_f("pipe-%s-crc-primary-basic", pipe_name)
-			test_output(&data);
+			igt_require(test_output(&data));
 
 		data.flags = TEST_CRC | TEST_ROTATE_180;
 		igt_subtest_f("pipe-%s-crc-primary-rotation-180", pipe_name)
-			test_output(&data);
+			igt_require(test_output(&data));
 
 		data.flags = TEST_CRC;
 		igt_subtest_f("pipe-%s-crc-sprite-planes-basic", pipe_name) {
+			int valid_tests = 0;
 
 			igt_display_require_output_on_pipe(&data.display, data.pipe);
 
 			for_each_plane_on_pipe(&data.display, data.pipe, data.plane) {
 				if (data.plane->type == DRM_PLANE_TYPE_PRIMARY)
 					continue;
-				sprite_idx++;
-					test_output(&data);
+				valid_tests += test_output(&data);
 			}
+
+			igt_require(valid_tests);
 		}
 
 		data.plane = NULL;
 
 		data.flags = TEST_NO_AUX_BUFFER;
 		igt_subtest_f("pipe-%s-missing-ccs-buffer", pipe_name)
-			test_output(&data);
+			igt_require(test_output(&data));
 
 		data.flags = TEST_BAD_CCS_HANDLE;
 		igt_subtest_f("pipe-%s-ccs-on-another-bo", pipe_name)
-			test_output(&data);
+			igt_require(test_output(&data));
 
 		data.flags = TEST_BAD_AUX_STRIDE;
 		igt_subtest_f("pipe-%s-bad-aux-stride", pipe_name)
-			test_output(&data);
+			igt_require(test_output(&data));
 	}
 
 	igt_fixture
