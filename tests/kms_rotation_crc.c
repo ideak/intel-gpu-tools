@@ -356,7 +356,7 @@ static void wait_for_pageflip(int fd)
 	igt_assert(drmHandleEvent(fd, &evctx) == 0);
 }
 
-static void __test_plane_rotation(data_t *data, int plane_type, bool test_bad_format)
+static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_format)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
@@ -454,16 +454,6 @@ static void __test_plane_rotation(data_t *data, int plane_type, bool test_bad_fo
 		cleanup_crtc(data, output, plane);
 	}
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
-}
-
-static inline void test_bad_plane_rotation(data_t *data, int plane_type)
-{
-	__test_plane_rotation(data, plane_type, true);
-}
-
-static inline void test_plane_rotation(data_t *data, int plane_type)
-{
-	__test_plane_rotation(data, plane_type, false);
 }
 
 static void test_plane_rotation_ytiled_obj(data_t *data,
@@ -772,7 +762,7 @@ igt_main
 				    gen >= 9);
 			data.rotation = subtest->rot;
 			data.flips = subtest->flips;
-			test_plane_rotation(&data, subtest->plane);
+			test_plane_rotation(&data, subtest->plane, false);
 		}
 	}
 	data.flips = 0;
@@ -782,7 +772,7 @@ igt_main
 		data.rotation = IGT_ROTATION_90;
 		data.pos_x = 100,
 		data.pos_y = 0;
-		test_plane_rotation(&data, DRM_PLANE_TYPE_OVERLAY);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_OVERLAY, false);
 	}
 	data.pos_x = 0,
 	data.pos_y = 0;
@@ -791,7 +781,7 @@ igt_main
 		igt_require(gen >= 9);
 		data.rotation = IGT_ROTATION_90;
 		data.override_fmt = DRM_FORMAT_RGB565;
-		test_bad_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, true);
 	}
 	data.override_fmt = 0;
 
@@ -799,7 +789,7 @@ igt_main
 		igt_require(gen >= 9);
 		data.rotation = IGT_ROTATION_90;
 		data.override_tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
-		test_bad_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
+		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, true);
 	}
 	data.override_tiling = 0;
 
@@ -834,7 +824,7 @@ igt_main
 			data.rotation = (IGT_REFLECT_X | reflect_x->rot);
 			data.override_tiling = reflect_x->tiling;
 			data.flips = reflect_x->flips;
-			test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY);
+			test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, false);
 		}
 	}
 
