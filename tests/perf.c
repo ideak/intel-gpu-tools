@@ -473,12 +473,11 @@ oa_report_ctx_is_valid(uint32_t *report)
 		return false; /* TODO */
 	} else if (IS_GEN8(devid)) {
 		return report[0] & (1ul << 25);
-	} else if (IS_GEN9(devid)) {
+	} else if (AT_LEAST_GEN(devid, 9)) {
 		return report[0] & (1ul << 16);
 	}
 
-	/* Need to update this function for newer Gen. */
-	igt_assert(!"reached");
+	igt_assert(!"Please update this function for newer Gen");
 }
 
 static uint32_t
