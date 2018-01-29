@@ -101,6 +101,8 @@ static int test_read_flush(void)
 	drm_intel_bo_unreference(bo_1);
 	munmap(ptr_cpu, width * height);
 
+	close(dma_buf_fd);
+
 	return stale;
 }
 
@@ -168,6 +170,9 @@ static int test_write_flush(void)
 	drm_intel_bo_unreference(bo_1);
 	drm_intel_bo_unreference(bo_2);
 	munmap(ptr_cpu, width * height);
+
+	close(dma_buf2_fd);
+	close(dma_buf_fd);
 
 	return stale;
 }
