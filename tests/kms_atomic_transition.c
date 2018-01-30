@@ -410,7 +410,8 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 
 	mode = igt_output_get_mode(output);
 	override_mode = *mode;
-	override_mode.flags |= DRM_MODE_FLAG_HSKEW;
+	/* try to force a modeset */
+	override_mode.flags ^= DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_NHSYNC;
 
 	igt_create_fb(display->drm_fd, mode->hdisplay, mode->vdisplay,
 		      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, &fb);
