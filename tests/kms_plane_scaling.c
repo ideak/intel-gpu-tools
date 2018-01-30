@@ -58,13 +58,9 @@ static int get_num_scalers(uint32_t devid, enum pipe pipe)
 		return 1;
 }
 
-static void cleanup_crtc(data_t *data)
+static void cleanup_fbs(data_t *data)
 {
 	int i;
-
-	igt_display_reset(&data->display);
-	igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = NULL;
 
 	for (i = 0; i < ARRAY_SIZE(data->fb); i++) {
 		if (!data->fb[i].fb_id)
@@ -73,6 +69,15 @@ static void cleanup_crtc(data_t *data)
 		igt_remove_fb(data->drm_fd, &data->fb[i]);
 		data->fb[i].fb_id = 0;
 	}
+}
+
+static void cleanup_crtc(data_t *data)
+{
+	igt_display_reset(&data->display);
+	igt_pipe_crc_free(data->pipe_crc);
+	data->pipe_crc = NULL;
+
+	cleanup_fbs(data);
 }
 
 static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
@@ -401,28 +406,20 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 }
 
 static void
-test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_output_t *output)
+__test_scaler_with_clipping_clamping_scenario(data_t *d, drmModeModeInfo *mode,
+					      uint32_t f1, uint32_t f2)
 {
-	drmModeModeInfo *mode;
-
-	igt_require(get_num_scalers(d->devid, pipe) >= 2);
-
-	mode = igt_output_get_mode(output);
-	d->plane1 = &d->display.pipes[pipe].planes[0];
-	prepare_crtc(d, output, pipe, d->plane1, mode);
+	cleanup_fbs(d);
 
 	igt_create_pattern_fb(d->drm_fd,
-			      mode->hdisplay, mode->vdisplay,
-			      DRM_FORMAT_XRGB8888,
+			      mode->hdisplay, mode->vdisplay, f1,
 			      LOCAL_I915_FORMAT_MOD_X_TILED, &d->fb[1]);
 
 	igt_create_pattern_fb(d->drm_fd,
-			      mode->hdisplay, mode->vdisplay,
-			      DRM_FORMAT_XRGB8888,
+			      mode->hdisplay, mode->vdisplay, f2,
 			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[2]);
 
 	igt_plane_set_fb(d->plane1, &d->fb[1]);
-	d->plane2 = igt_output_get_plane(output, 1);
 	igt_plane_set_fb(d->plane2, &d->fb[2]);
 
 	igt_fb_set_position(&d->fb[1], d->plane1, 0, 0);
@@ -438,6 +435,34 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 	igt_plane_set_size(d->plane2, mode->hdisplay + 100,
 					    mode->vdisplay + 100);
 	igt_display_commit2(&d->display, COMMIT_ATOMIC);
+}
+
+static void
+test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_output_t *output)
+{
+	drmModeModeInfo *mode;
+
+	igt_require(get_num_scalers(d->devid, pipe) >= 2);
+
+	mode = igt_output_get_mode(output);
+	d->plane1 = &d->display.pipes[pipe].planes[0];
+	d->plane2 = &d->display.pipes[pipe].planes[1];
+	prepare_crtc(d, output, pipe, d->plane1, mode);
+
+	for (int i = 0; i < d->plane1->drm_plane->count_formats; i++) {
+		unsigned f1 = d->plane1->drm_plane->formats[i];
+		if (!can_draw(f1))
+			continue;
+
+		for (int j = 0; j < d->plane2->drm_plane->count_formats; j++) {
+			unsigned f2 = d->plane2->drm_plane->formats[j];
+
+			if (!can_draw(f2))
+				continue;
+
+			__test_scaler_with_clipping_clamping_scenario(d, mode, f1, f2);
+		}
+	}
 }
 
 static void find_connected_pipe(igt_display_t *display, bool second, enum pipe *pipe, igt_output_t **output)
