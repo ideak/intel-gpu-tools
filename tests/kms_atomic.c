@@ -485,6 +485,10 @@ static void plane_invalid_params(igt_pipe_t *pipe,
 	igt_plane_set_prop_value(plane, IGT_PLANE_FB_ID, pipe->values[IGT_CRTC_MODE_ID]);
 	plane_commit_atomic_err(plane, ATOMIC_RELAX_NONE, EINVAL);
 
+	/* Valid, but invalid because CRTC_ID is set. */
+	igt_plane_set_prop_value(plane, IGT_PLANE_FB_ID, 0);
+	plane_commit_atomic_err(plane, ATOMIC_RELAX_NONE, EINVAL);
+
 	igt_plane_set_fb(plane, fb);
 	plane_commit(plane, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
 
@@ -499,6 +503,10 @@ static void plane_invalid_params(igt_pipe_t *pipe,
 	plane_commit_atomic_err(plane, ATOMIC_RELAX_NONE, EINVAL);
 
 	igt_plane_set_prop_value(plane, IGT_PLANE_CRTC_ID, pipe->values[IGT_CRTC_MODE_ID]);
+	plane_commit_atomic_err(plane, ATOMIC_RELAX_NONE, EINVAL);
+
+	/* Valid, but invalid because FB_ID is set. */
+	igt_plane_set_prop_value(plane, IGT_PLANE_CRTC_ID, 0);
 	plane_commit_atomic_err(plane, ATOMIC_RELAX_NONE, EINVAL);
 
 	igt_plane_set_fb(plane, fb);
