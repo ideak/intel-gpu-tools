@@ -153,6 +153,45 @@ sync_ring(int fd, unsigned ring, int num_children, int timeout)
 }
 
 static void
+idle_ring(int fd, unsigned ring, int timeout)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 object;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	double start, elapsed;
+	unsigned long cycles;
+
+	gem_require_ring(fd, ring);
+
+	memset(&object, 0, sizeof(object));
+	object.handle = gem_create(fd, 4096);
+	gem_write(fd, object.handle, 0, &bbe, sizeof(bbe));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&object);
+	execbuf.buffer_count = 1;
+	execbuf.flags = ring;
+	gem_execbuf(fd, &execbuf);
+	gem_sync(fd, object.handle);
+
+	intel_detect_and_clear_missed_interrupts(fd);
+	start = gettime();
+	cycles = 0;
+	do {
+		do {
+			gem_execbuf(fd, &execbuf);
+			gem_quiescent_gpu(fd);
+		} while (++cycles & 1023);
+	} while ((elapsed = gettime() - start) < timeout);
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+
+	igt_info("Completed %ld cycles: %.3f us\n",
+		 cycles, elapsed*1e6/cycles);
+
+	gem_close(fd, object.handle);
+}
+
+static void
 store_ring(int fd, unsigned ring, int num_children, int timeout)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
@@ -802,6 +841,8 @@ igt_main
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%s", e->name)
 			sync_ring(fd, e->exec_id | e->flags, 1, 150);
+		igt_subtest_f("idle-%s", e->name)
+			idle_ring(fd, e->exec_id | e->flags, 150);
 		igt_subtest_f("store-%s", e->name)
 			store_ring(fd, e->exec_id | e->flags, 1, 150);
 		igt_subtest_f("many-%s", e->name)
