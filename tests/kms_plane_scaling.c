@@ -164,25 +164,13 @@ static const igt_rotation_t rotations[] = {
 	IGT_ROTATION_270,
 };
 
-static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
-					   igt_output_t *output)
+static bool can_rotate(unsigned format)
 {
-	igt_display_t *display = &d->display;
-	igt_plane_t *plane;
+	if (format == DRM_FORMAT_C8 ||
+	    format == DRM_FORMAT_RGB565)
+		return false;
 
-	igt_output_set_pipe(output, pipe);
-	for_each_plane_on_pipe(display, pipe, plane) {
-		if (plane->type == DRM_PLANE_TYPE_CURSOR)
-			continue;
-
-		for (int i = 0; i < ARRAY_SIZE(rotations); i++) {
-			igt_rotation_t rot = rotations[i];
-
-			check_scaling_pipe_plane_rot(d, plane, DRM_FORMAT_XRGB8888,
-						     LOCAL_I915_FORMAT_MOD_Y_TILED,
-						     pipe, output, rot);
-		}
-	}
+	return true;
 }
 
 static bool can_draw(uint32_t drm_format)
@@ -197,6 +185,30 @@ static bool can_draw(uint32_t drm_format)
 			return true;
 
 	return false;
+}
+
+static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
+					   igt_output_t *output)
+{
+	igt_display_t *display = &d->display;
+	igt_plane_t *plane;
+
+	igt_output_set_pipe(output, pipe);
+	for_each_plane_on_pipe(display, pipe, plane) {
+		if (plane->type == DRM_PLANE_TYPE_CURSOR)
+			continue;
+
+		for (int i = 0; i < ARRAY_SIZE(rotations); i++) {
+			igt_rotation_t rot = rotations[i];
+			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
+				unsigned format = plane->drm_plane->formats[j];
+				if (can_draw(format) && can_rotate(format))
+					check_scaling_pipe_plane_rot(d, plane, format,
+								     LOCAL_I915_FORMAT_MOD_Y_TILED,
+								     pipe, output, rot);
+			}
+		}
+	}
 }
 
 static const uint64_t tilings[] = {
