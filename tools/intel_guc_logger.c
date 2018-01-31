@@ -1,3 +1,26 @@
+/*
+ * Copyright © 2014-2018 Intel Corporation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -51,17 +74,27 @@ uint32_t test_duration, max_filesize;
 pthread_cond_t underflow_cond, overflow_cond;
 bool stop_logging, discard_oldlogs, capturing_stopped;
 
-static void guc_log_control(bool enable_logging)
+static void guc_log_control(bool enable, uint32_t log_level)
 {
 	int control_fd;
 	char data[19];
 	uint64_t val;
 	int ret;
 
+	igt_assert_lte(log_level, 3);
+
 	control_fd = igt_debugfs_open(-1, CONTROL_FILE_NAME, O_WRONLY);
 	igt_assert_f(control_fd >= 0, "couldn't open the guc log control file\n");
 
-	val = enable_logging ? ((verbosity_level << 4) | 0x1) : 0;
+	/*
+	 * i915 expects GuC log level to be specified as:
+	 * 0: disabled
+	 * 1: enabled (verbosity level 0 = min)
+	 * 2: enabled (verbosity level 1)
+	 * 3: enabled (verbosity level 2)
+	 * 4: enabled (verbosity level 3 = max)
+	 */
+	val = enable ? log_level + 1 : 0;
 
 	ret = snprintf(data, sizeof(data), "0x%" PRIx64, val);
 	igt_assert(ret > 2 && ret < sizeof(data));
@@ -288,7 +321,7 @@ static void init_main_thread(void)
 	/* Enable the logging, it may not have been enabled from boot and so
 	 * the relay file also wouldn't have been created.
 	 */
-	guc_log_control(true);
+	guc_log_control(true, verbosity_level);
 
 	open_relay_file();
 	open_output_file();
@@ -420,7 +453,7 @@ int main(int argc, char **argv)
 	} while (!stop_logging);
 
 	/* Pause logging on the GuC side */
-	guc_log_control(false);
+	guc_log_control(false, 0);
 
 	/* Signal flusher thread to make an exit */
 	capturing_stopped = 1;
