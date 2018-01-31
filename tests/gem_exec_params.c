@@ -343,13 +343,18 @@ igt_main
 	}
 
 	igt_subtest("secure-non-master") {
+		igt_require(__igt_device_set_master(fd) == 0); /* Requires root privilege */
+
 		igt_device_drop_master(fd);
 		execbuf.flags = I915_EXEC_RENDER | I915_EXEC_SECURE;
 		RUN_FAIL(EPERM);
+
 		igt_device_set_master(fd);
 		igt_assert(drmIoctl(fd,
 				    DRM_IOCTL_I915_GEM_EXECBUFFER2,
 				    &execbuf) == 0);
+
+		igt_device_drop_master(fd); /* Only needs temporary master */
 	}
 
 	/* HANDLE_LUT and NO_RELOC are already exercised by gem_exec_lut_handle,
