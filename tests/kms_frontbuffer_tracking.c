@@ -34,7 +34,7 @@
 
 
 IGT_TEST_DESCRIPTION("Test the Kernel's frontbuffer tracking mechanism and "
-		     "its related features: FBC and PSR");
+		     "its related features: FBC, PSR and DRRS");
 
 /*
  * One of the aspects of this test is that, for every subtest, we try different
@@ -105,8 +105,9 @@ struct test_mode {
 		FEATURE_NONE  = 0,
 		FEATURE_FBC   = 1,
 		FEATURE_PSR   = 2,
-		FEATURE_COUNT = 4,
-		FEATURE_DEFAULT = 4,
+		FEATURE_DRRS  = 4,
+		FEATURE_COUNT = 8,
+		FEATURE_DEFAULT = 8,
 	} feature;
 
 	/* Possible pixel formats. We just use FORMAT_DEFAULT for most tests and
@@ -182,6 +183,13 @@ struct {
 	.can_test = false,
 };
 
+#define MAX_DRRS_STATUS_BUF_LEN 256
+
+struct {
+	bool can_test;
+} drrs = {
+	.can_test = false,
+};
 
 #define SINK_CRC_SIZE 12
 typedef struct {
@@ -788,7 +796,13 @@ static void __debugfs_read(const char *param, char *buf, int len)
 	buf[len] = '\0';
 }
 
+static int __debugfs_write(const char *param, char *buf, int len)
+{
+	return igt_sysfs_write(drm.debugfs, param, buf, len - 1);
+}
+
 #define debugfs_read(p, arr) __debugfs_read(p, arr, sizeof(arr))
+#define debugfs_write(p, arr) __debugfs_write(p, arr, sizeof(arr))
 
 static bool fbc_is_enabled(int lvl)
 {
@@ -814,6 +828,68 @@ static void psr_print_status(void)
 
 	debugfs_read("i915_edp_psr_status", buf);
 	igt_info("PSR status:\n%s\n", buf);
+}
+
+void drrs_set(unsigned int val)
+{
+	char buf[2];
+	int ret;
+
+	igt_debug("Manually %sabling DRRS. %u\n", val ? "en" : "dis", val);
+	snprintf(buf, sizeof(buf), "%d", val);
+	ret = debugfs_write("i915_drrs_ctl", buf);
+
+	/*
+	 * drrs_enable() is called on DRRS capable platform only,
+	 * whereas drrs_disable() is called on all platforms.
+	 * So handle the failure of debugfs_write only for drrs_enable().
+	 */
+	if (val)
+		igt_assert_f(ret == (sizeof(buf) - 1), "debugfs_write failed");
+}
+
+static bool is_drrs_high(void)
+{
+	char buf[MAX_DRRS_STATUS_BUF_LEN];
+
+	debugfs_read("i915_drrs_status", buf);
+	return strstr(buf, "DRRS_HIGH_RR");
+}
+
+static bool is_drrs_low(void)
+{
+	char buf[MAX_DRRS_STATUS_BUF_LEN];
+
+	debugfs_read("i915_drrs_status", buf);
+	return strstr(buf, "DRRS_LOW_RR");
+}
+
+static bool is_drrs_supported(void)
+{
+	char buf[MAX_DRRS_STATUS_BUF_LEN];
+
+	debugfs_read("i915_drrs_status", buf);
+	return strstr(buf, "DRRS Supported: Yes");
+}
+
+static bool is_drrs_inactive(void)
+{
+	char buf[MAX_DRRS_STATUS_BUF_LEN];
+
+	debugfs_read("i915_drrs_status", buf);
+
+	if (strstr(buf, "DRRS_State: "))
+		return false;
+
+	return true;
+}
+
+static void drrs_print_status(void)
+{
+	char buf[MAX_DRRS_STATUS_BUF_LEN];
+
+	debugfs_read("i915_drrs_status", buf);
+	igt_info("DRRS STATUS :\n%s\n", buf);
 }
 
 static struct timespec fbc_get_last_action(void)
@@ -926,10 +1002,17 @@ static bool psr_wait_until_enabled(void)
 	return igt_wait(psr_is_enabled(), 5000, 1);
 }
 
+static bool drrs_wait_until_rr_switch_to_low(void)
+{
+	return igt_wait(is_drrs_low(), 5000, 1);
+}
+
 #define fbc_enable() igt_set_module_param_int("enable_fbc", 1)
 #define fbc_disable() igt_set_module_param_int("enable_fbc", 0)
 #define psr_enable() igt_set_module_param_int("enable_psr", 1)
 #define psr_disable() igt_set_module_param_int("enable_psr", 0)
+#define drrs_enable()	drrs_set(1)
+#define drrs_disable()	drrs_set(0)
 
 static void get_sink_crc(sink_crc_t *crc, bool mandatory)
 {
@@ -1175,6 +1258,7 @@ static void disable_features(const struct test_mode *t)
 
 	fbc_disable();
 	psr_disable();
+	drrs_disable();
 }
 
 static void *busy_thread_func(void *data)
@@ -1568,6 +1652,22 @@ static void teardown_psr(void)
 {
 }
 
+static void setup_drrs(void)
+{
+	if (get_connector(prim_mode_params.connector_id)->connector_type !=
+	    DRM_MODE_CONNECTOR_eDP) {
+		igt_info("Can't test DRRS: no usable eDP screen.\n");
+		return;
+	}
+
+	if (!is_drrs_supported()) {
+		igt_info("Can't test DRRS: Not supported.\n");
+		return;
+	}
+
+	drrs.can_test = true;
+}
+
 static void setup_environment(void)
 {
 	setup_drm();
@@ -1575,6 +1675,7 @@ static void setup_environment(void)
 
 	setup_fbc();
 	setup_psr();
+	setup_drrs();
 
 	setup_crcs();
 }
@@ -1653,6 +1754,11 @@ static void do_flush(const struct test_mode *t)
 #define ASSERT_PSR_ENABLED		(1 << 6)
 #define ASSERT_PSR_DISABLED		(1 << 7)
 
+#define DRRS_ASSERT_FLAGS		(7 << 8)
+#define ASSERT_DRRS_HIGH		(1 << 8)
+#define ASSERT_DRRS_LOW		(1 << 9)
+#define ASSERT_DRRS_INACTIVE		(1 << 10)
+
 static int adjust_assertion_flags(const struct test_mode *t, int flags)
 {
 	if (!(flags & DONT_ASSERT_FEATURE_STATUS)) {
@@ -1660,12 +1766,17 @@ static int adjust_assertion_flags(const struct test_mode *t, int flags)
 			flags |= ASSERT_FBC_ENABLED;
 		if (!(flags & ASSERT_PSR_DISABLED))
 			flags |= ASSERT_PSR_ENABLED;
+		if (!((flags & ASSERT_DRRS_LOW) ||
+		    (flags & ASSERT_DRRS_INACTIVE)))
+			flags |= ASSERT_DRRS_HIGH;
 	}
 
 	if ((t->feature & FEATURE_FBC) == 0)
 		flags &= ~FBC_ASSERT_FLAGS;
 	if ((t->feature & FEATURE_PSR) == 0)
 		flags &= ~PSR_ASSERT_FLAGS;
+	if ((t->feature & FEATURE_DRRS) == 0)
+		flags &= ~DRRS_ASSERT_FLAGS;
 
 	return flags;
 }
@@ -1695,6 +1806,23 @@ static void do_status_assertions(int flags)
 		/* Make sure we settle before continuing. */
 		sleep(1);
 		return;
+	}
+
+	if (flags & ASSERT_DRRS_HIGH) {
+		if (!is_drrs_high()) {
+			drrs_print_status();
+			igt_assert_f(false, "DRRS HIGH\n");
+		}
+	} else if (flags & ASSERT_DRRS_LOW) {
+		if (!drrs_wait_until_rr_switch_to_low()) {
+			drrs_print_status();
+			igt_assert_f(false, "DRRS LOW\n");
+		}
+	} else if (flags & ASSERT_DRRS_INACTIVE) {
+		if (!is_drrs_inactive()) {
+			drrs_print_status();
+			igt_assert_f(false, "DRRS INACTIVE\n");
+		}
 	}
 
 	if (flags & ASSERT_FBC_ENABLED) {
@@ -1824,6 +1952,8 @@ static void enable_features_for_test(const struct test_mode *t)
 		fbc_enable();
 	if (t->feature & FEATURE_PSR)
 		psr_enable();
+	if (t->feature & FEATURE_DRRS)
+		drrs_enable();
 }
 
 static void check_test_requirements(const struct test_mode *t)
@@ -1842,6 +1972,18 @@ static void check_test_requirements(const struct test_mode *t)
 		igt_require_f(sink_crc.supported,
 			      "Can't test PSR without sink CRCs\n");
 	}
+
+	if (t->feature & FEATURE_DRRS)
+		igt_require_f(drrs.can_test,
+			      "Can't test DRRS with the current outputs\n");
+
+	/*
+	 * In kernel, When PSR is enabled, DRRS will be disabled. So If a test
+	 * case needs DRRS + PSR enabled, that will be skipped.
+	 */
+	igt_require_f(!((t->feature & FEATURE_PSR) &&
+		      (t->feature & FEATURE_DRRS)),
+		      "Can't test PSR and DRRS together\n");
 
 	if (opt.only_pipes != PIPE_COUNT)
 		igt_require(t->pipes == opt.only_pipes);
@@ -1964,7 +2106,7 @@ static void rte_subtest(const struct test_mode *t)
 
 	unset_all_crtcs();
 	do_assertions(ASSERT_FBC_DISABLED | ASSERT_PSR_DISABLED |
-		      DONT_ASSERT_CRC);
+		      DONT_ASSERT_CRC | ASSERT_DRRS_INACTIVE);
 
 	enable_prim_screen_and_wait(t);
 	set_cursor_for_test(t, &prim_mode_params);
@@ -2055,6 +2197,13 @@ static void draw_subtest(const struct test_mode *t)
 
 	if (op_disables_psr(t, t->method))
 		assertions |= ASSERT_PSR_DISABLED;
+
+	/*
+	 * On FBS_INDIVIDUAL, write to offscreen plane will not touch the
+	 * current frambuffer. Hence assert for DRRS_LOW.
+	 */
+	if ((t->fbs == FBS_INDIVIDUAL) && (t->screen == SCREEN_OFFSCREEN))
+		assertions |= ASSERT_DRRS_LOW;
 
 	prepare_subtest(t, pattern);
 	target = pick_target(t, params);
@@ -2264,7 +2413,11 @@ static void slow_draw_subtest(const struct test_mode *t)
 		sleep(2);
 
 		update_wanted_crc(t, &pattern->crcs[t->format][r]);
-		do_assertions(0);
+
+		if (t->feature & FEATURE_DRRS)
+			do_assertions(ASSERT_DRRS_LOW);
+		else
+			do_assertions(0);
 	}
 }
 
@@ -2873,14 +3026,14 @@ static void suspend_subtest(const struct test_mode *t)
 	sleep(5);
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 	sleep(5);
-	do_assertions(0);
+	do_assertions(ASSERT_DRRS_LOW);
 
 	unset_all_crtcs();
 	sleep(5);
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 	sleep(5);
 	do_assertions(ASSERT_FBC_DISABLED | ASSERT_PSR_DISABLED |
-		      DONT_ASSERT_CRC);
+		      DONT_ASSERT_CRC | ASSERT_DRRS_INACTIVE);
 
 	set_mode_for_params(params);
 	do_assertions(0);
@@ -3362,6 +3515,14 @@ static const char *feature_str(int feature)
 		return "psr";
 	case FEATURE_FBC | FEATURE_PSR:
 		return "fbcpsr";
+	case FEATURE_DRRS:
+		return "drrs";
+	case FEATURE_FBC | FEATURE_DRRS:
+		return "fbcdrrs";
+	case FEATURE_PSR | FEATURE_DRRS:
+		return "psrdrrs";
+	case FEATURE_FBC | FEATURE_PSR | FEATURE_DRRS:
+		return "fbcpsrdrrs";
 	default:
 		igt_assert(false);
 	}
@@ -3626,7 +3787,7 @@ int main(int argc, char *argv[])
 				tilingchange_subtest(&t);
 		}
 
-		if (t.feature & FEATURE_PSR)
+		if ((t.feature & FEATURE_PSR) || (t.feature & FEATURE_DRRS))
 			igt_subtest_f("%s-slowdraw", feature_str(t.feature))
 				slow_draw_subtest(&t);
 
