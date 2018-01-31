@@ -449,70 +449,6 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 }
 
-static void test_plane_rotation_ytiled_obj(data_t *data,
-					   igt_output_t *output,
-					   int plane_type)
-{
-	igt_display_t *display = &data->display;
-	uint64_t tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
-	uint32_t format = DRM_FORMAT_XRGB8888;
-	int bpp = igt_drm_format_to_bpp(format);
-	enum igt_commit_style commit = COMMIT_LEGACY;
-	int fd = data->gfx_fd;
-	igt_plane_t *plane;
-	drmModeModeInfo *mode;
-	unsigned int stride, size, w, h;
-	uint32_t gem_handle;
-	int ret;
-
-	plane = igt_output_get_plane_type(output, plane_type);
-	igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
-
-	if (plane_type == DRM_PLANE_TYPE_PRIMARY || plane_type == DRM_PLANE_TYPE_CURSOR)
-		commit = COMMIT_UNIVERSAL;
-
-	if (plane_type == DRM_PLANE_TYPE_CURSOR)
-		igt_require(display->has_cursor_plane);
-
-	if (data->display.is_atomic)
-		commit = COMMIT_ATOMIC;
-
-	mode = igt_output_get_mode(output);
-	w = mode->hdisplay;
-	h = mode->vdisplay;
-
-	for (stride = 512; stride < (w * bpp / 8); stride *= 2)
-		;
-	for (size = 1024*1024; size < stride * h; size *= 2)
-		;
-
-	gem_handle = gem_create(fd, size);
-	ret = __gem_set_tiling(fd, gem_handle, I915_TILING_Y, stride);
-	igt_assert_eq(ret, 0);
-
-	do_or_die(__kms_addfb(fd, gem_handle, w, h, stride,
-		  format, tiling, NULL, LOCAL_DRM_MODE_FB_MODIFIERS,
-		  &data->fb.fb_id));
-	data->fb.width = w;
-	data->fb.height = h;
-	data->fb.gem_handle = gem_handle;
-
-	igt_plane_set_fb(plane, NULL);
-	igt_display_commit(display);
-
-	igt_plane_set_rotation(plane, data->rotation);
-	igt_plane_set_fb(plane, &data->fb);
-	igt_plane_set_size(plane, h, w);
-
-	ret = igt_display_try_commit2(display, commit);
-
-	igt_output_set_pipe(output, PIPE_NONE);
-
-	kmstest_restore_vt_mode();
-	igt_remove_fb(fd, &data->fb);
-	igt_assert_eq(ret, 0);
-}
-
 static void test_plane_rotation_exhaust_fences(data_t *data,
 					       igt_output_t *output,
 					       int plane_type)
@@ -756,26 +692,6 @@ igt_main
 		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, true);
 	}
 	data.override_tiling = 0;
-
-	igt_subtest_f("primary-rotation-90-Y-tiled") {
-		enum pipe pipe;
-		igt_output_t *output;
-		int valid_tests = 0;
-
-		igt_require(gen >= 9);
-		data.rotation = IGT_ROTATION_90;
-
-		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			igt_output_set_pipe(output, pipe);
-
-			test_plane_rotation_ytiled_obj(&data, output, DRM_PLANE_TYPE_PRIMARY);
-
-			valid_tests++;
-			break;
-		}
-
-		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
-	}
 
 	for (reflect_x = reflect_x_subtests; reflect_x->tiling; reflect_x++) {
 		igt_subtest_f("primary-%s-reflect-x-%s",
