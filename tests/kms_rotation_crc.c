@@ -33,7 +33,6 @@ typedef struct {
 	struct igt_fb fb;
 	struct igt_fb fb_reference;
 	struct igt_fb fb_unrotated;
-	struct igt_fb fb_modeset;
 	struct igt_fb fb_flip;
 	igt_crc_t ref_crc;
 	igt_crc_t flip_crc;
@@ -122,15 +121,32 @@ paint_squares(data_t *data, igt_rotation_t rotation,
 	igt_put_cairo_ctx(data->gfx_fd, fb, cr);
 }
 
-static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
-			 igt_plane_t *plane, enum igt_commit_style commit)
+static void remove_fbs(data_t *data)
 {
-	drmModeModeInfo *mode;
-	unsigned int w, h;
-	uint64_t tiling = data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE;
-	uint32_t pixel_format = data->override_fmt ?: DRM_FORMAT_XRGB8888;
+	igt_remove_fb(data->gfx_fd, &data->fb);
+	igt_remove_fb(data->gfx_fd, &data->fb_reference);
+	igt_remove_fb(data->gfx_fd, &data->fb_unrotated);
+	igt_remove_fb(data->gfx_fd, &data->fb_flip);
+}
+
+static void cleanup_crtc(data_t *data)
+{
 	igt_display_t *display = &data->display;
-	igt_plane_t *primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+
+	igt_pipe_crc_free(data->pipe_crc);
+	data->pipe_crc = NULL;
+
+	remove_fbs(data);
+
+	igt_display_reset(display);
+}
+
+static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
+			 igt_plane_t *plane)
+{
+	igt_display_t *display = &data->display;
+
+	cleanup_crtc(data);
 
 	igt_output_set_pipe(output, pipe);
 	igt_plane_set_rotation(plane, IGT_ROTATION_0);
@@ -139,44 +155,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
-	mode = igt_output_get_mode(output);
-
-	w = mode->hdisplay;
-	h = mode->vdisplay;
-
-	igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling, &data->fb_modeset);
-
-	/*
-	 * With igt_display_commit2 and COMMIT_UNIVERSAL, we call just the
-	 * setplane without a modeset. So, to be able to call
-	 * igt_display_commit and ultimately setcrtc to do the first modeset,
-	 * we create an fb covering the crtc and call commit
-	 *
-	 * It's also a good idea to set a primary fb on the primary plane
-	 * regardless, to force a underrun when watermarks are allocated
-	 * incorrectly for other planes.
-	 */
-	igt_plane_set_fb(primary, &data->fb_modeset);
-
-	if (commit < COMMIT_ATOMIC) {
-		igt_plane_clear_prop_changed(primary, IGT_PLANE_ROTATION);
-		igt_display_commit(display);
-
-		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
-			igt_plane_set_prop_changed(primary, IGT_PLANE_ROTATION);
-	}
-
-	igt_plane_set_fb(plane, NULL);
-
-	igt_display_commit2(display, commit);
-}
-
-static void remove_fbs(data_t *data)
-{
-	igt_remove_fb(data->gfx_fd, &data->fb);
-	igt_remove_fb(data->gfx_fd, &data->fb_reference);
-	igt_remove_fb(data->gfx_fd, &data->fb_unrotated);
-	igt_remove_fb(data->gfx_fd, &data->fb_flip);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 }
 
 enum rectangle_type {
@@ -247,28 +226,24 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	/*
 	 * Create a reference software rotated flip framebuffer.
 	 */
-	if (plane->type == DRM_PLANE_TYPE_PRIMARY || display->is_atomic) {
-		igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format, tiling,
-			      &data->fb_flip);
-		paint_squares(data, data->rotation, &data->fb_flip,
-			      flip_opacity);
-		igt_plane_set_fb(plane, &data->fb_flip);
-		if (plane->type != DRM_PLANE_TYPE_CURSOR)
-			igt_plane_set_position(plane, data->pos_x, data->pos_y);
-		igt_display_commit2(display,
-				    display->is_atomic ?
-				    COMMIT_ATOMIC : COMMIT_UNIVERSAL);
-		igt_pipe_crc_collect_crc(data->pipe_crc, &data->flip_crc);
+	igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format, tiling,
+		      &data->fb_flip);
+	paint_squares(data, data->rotation, &data->fb_flip,
+		      flip_opacity);
+	igt_plane_set_fb(plane, &data->fb_flip);
+	if (plane->type != DRM_PLANE_TYPE_CURSOR)
+		igt_plane_set_position(plane, data->pos_x, data->pos_y);
+	igt_display_commit2(display, COMMIT_ATOMIC);
+	igt_pipe_crc_collect_crc(data->pipe_crc, &data->flip_crc);
 
-		/*
-		 * Prepare the non-rotated flip fb.
-		 */
-		igt_remove_fb(data->gfx_fd, &data->fb_flip);
-		igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling,
-			      &data->fb_flip);
-		paint_squares(data, IGT_ROTATION_0, &data->fb_flip,
-			      flip_opacity);
-	}
+	/*
+	  * Prepare the non-rotated flip fb.
+	  */
+	igt_remove_fb(data->gfx_fd, &data->fb_flip);
+	igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling,
+		      &data->fb_flip);
+	paint_squares(data, IGT_ROTATION_0, &data->fb_flip,
+		      flip_opacity);
 
 	/*
 	 * Create a reference CRC for a software-rotated fb.
@@ -280,7 +255,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	igt_plane_set_fb(plane, &data->fb_reference);
 	if (plane->type != DRM_PLANE_TYPE_CURSOR)
 		igt_plane_set_position(plane, data->pos_x, data->pos_y);
-	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
 
@@ -293,7 +268,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	igt_plane_set_rotation(plane, IGT_ROTATION_0);
 	if (plane->type != DRM_PLANE_TYPE_CURSOR)
 		igt_plane_set_position(plane, data->pos_x, data->pos_y);
-	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	/*
 	 * Prepare the plane with an non-rotated fb let the hw rotate it.
@@ -304,35 +279,6 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 
 	if (plane->type != DRM_PLANE_TYPE_CURSOR)
 		igt_plane_set_position(plane, data->pos_x, data->pos_y);
-}
-
-static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
-{
-	igt_display_t *display = &data->display;
-
-	igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = NULL;
-
-	remove_fbs(data);
-
-	igt_remove_fb(data->gfx_fd, &data->fb_modeset);
-
-	/* XXX: see the note in prepare_crtc() */
-	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
-		igt_plane_t *primary;
-
-		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-		igt_plane_set_fb(primary, NULL);
-	}
-
-	igt_plane_set_fb(plane, NULL);
-	igt_plane_set_rotation(plane, IGT_ROTATION_0);
-
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
-
-	igt_output_set_pipe(output, PIPE_ANY);
-
-	igt_display_commit(display);
 }
 
 static void wait_for_pageflip(int fd)
@@ -359,17 +305,10 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 	enum pipe pipe;
 	int valid_tests = 0;
 	igt_crc_t crc_output;
-	enum igt_commit_style commit = COMMIT_LEGACY;
 	int ret;
-
-	if (plane_type == DRM_PLANE_TYPE_PRIMARY || plane_type == DRM_PLANE_TYPE_CURSOR)
-		commit = COMMIT_UNIVERSAL;
 
 	if (plane_type == DRM_PLANE_TYPE_CURSOR)
 		igt_require(display->has_cursor_plane);
-
-	if (data->display.is_atomic)
-		commit = COMMIT_ATOMIC;
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		igt_plane_t *plane;
@@ -383,7 +322,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 		plane = igt_output_get_plane_type(output, plane_type);
 		igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
 
-		prepare_crtc(data, output, pipe, plane, commit);
+		prepare_crtc(data, output, pipe, plane);
 
 		for (i = 0; i < num_rectangle_types; i++) {
 			/* Unsupported on i915 */
@@ -403,7 +342,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 			if (data->rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
 				igt_plane_set_size(plane, data->fb.height, data->fb.width);
 
-			ret = igt_display_try_commit2(display, commit);
+			ret = igt_display_try_commit2(display, COMMIT_ATOMIC);
 			if (test_bad_format) {
 				igt_assert_eq(ret, -EINVAL);
 				continue;
@@ -444,40 +383,27 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 		}
 
 		valid_tests++;
-		cleanup_crtc(data, output, plane);
 	}
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 }
 
 static void test_plane_rotation_exhaust_fences(data_t *data,
 					       igt_output_t *output,
-					       int plane_type)
+					       igt_plane_t *plane)
 {
 	igt_display_t *display = &data->display;
 	uint64_t tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
 	uint32_t format = DRM_FORMAT_XRGB8888;
 	int bpp = igt_drm_format_to_bpp(format);
-	enum igt_commit_style commit = COMMIT_LEGACY;
 	int fd = data->gfx_fd;
-	igt_plane_t *plane;
 	drmModeModeInfo *mode;
-	data_t data2[MAX_FENCES+1] = {};
+	struct igt_fb fb[MAX_FENCES+1] = {};
 	unsigned int stride, size, w, h;
 	uint32_t gem_handle;
 	uint64_t total_aperture_size, total_fbs_size;
 	int i, ret;
 
-	plane = igt_output_get_plane_type(output, plane_type);
 	igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
-
-	if (plane_type == DRM_PLANE_TYPE_PRIMARY || plane_type == DRM_PLANE_TYPE_CURSOR)
-		commit = COMMIT_UNIVERSAL;
-
-	if (plane_type == DRM_PLANE_TYPE_CURSOR)
-		igt_require(display->has_cursor_plane);
-
-	if (data->display.is_atomic)
-		commit = COMMIT_ATOMIC;
 
 	mode = igt_output_get_mode(output);
 	w = mode->hdisplay;
@@ -497,7 +423,7 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 	igt_require(total_fbs_size < total_aperture_size * 0.9);
 
 	igt_plane_set_fb(plane, NULL);
-	igt_display_commit(display);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	for (i = 0; i < MAX_FENCES + 1; i++) {
 		gem_handle = gem_create(fd, size);
@@ -510,20 +436,20 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 		ret = (__kms_addfb(fd, gem_handle, w, h, stride,
 		       format, tiling, NULL,
 		       LOCAL_DRM_MODE_FB_MODIFIERS,
-		       &data2[i].fb.fb_id));
+		       &fb[i].fb_id));
 		if (ret) {
 			igt_warn("failed to create framebuffer\n");
 			goto err_alloc;
 		}
 
-		data2[i].fb.width = w;
-		data2[i].fb.height = h;
-		data2[i].fb.gem_handle = gem_handle;
+		fb[i].width = w;
+		fb[i].height = h;
+		fb[i].gem_handle = gem_handle;
 
-		igt_plane_set_fb(plane, &data2[i].fb);
+		igt_plane_set_fb(plane, &fb[i]);
 		igt_plane_set_rotation(plane, IGT_ROTATION_0);
 
-		ret = igt_display_try_commit2(display, commit);
+		igt_display_commit2(display, COMMIT_ATOMIC);
 		if (ret) {
 			igt_warn("failed to commit unrotated fb\n");
 			goto err_commit;
@@ -532,7 +458,7 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 		igt_plane_set_rotation(plane, IGT_ROTATION_90);
 		igt_plane_set_size(plane, h, w);
 
-		igt_display_commit2(display, commit);
+		igt_display_commit2(display, COMMIT_ATOMIC);
 		if (ret) {
 			igt_warn("failed to commit hardware rotated fb: %i\n", ret);
 			goto err_commit;
@@ -545,19 +471,9 @@ err_alloc:
 
 	i--;
 err_commit:
-	igt_plane_set_fb(plane, NULL);
-	igt_plane_set_rotation(plane, IGT_ROTATION_0);
-
-	if (commit < COMMIT_ATOMIC)
-		igt_display_commit2(display, commit);
-
-	igt_output_set_pipe(output, PIPE_NONE);
-	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
-
 	for (; i >= 0; i--)
-		igt_remove_fb(fd, &data2[i].fb);
+		igt_remove_fb(fd, &fb[i]);
 
-	kmstest_restore_vt_mode();
 	igt_assert_eq(ret, 0);
 }
 
@@ -714,9 +630,10 @@ igt_main
 		igt_require(gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			igt_output_set_pipe(output, pipe);
+			igt_plane_t *primary = &data.display.pipes[pipe].planes[0];
+			prepare_crtc(&data, output, pipe, primary);
 
-			test_plane_rotation_exhaust_fences(&data, output, DRM_PLANE_TYPE_PRIMARY);
+			test_plane_rotation_exhaust_fences(&data, output, primary);
 
 			valid_tests++;
 			break;
