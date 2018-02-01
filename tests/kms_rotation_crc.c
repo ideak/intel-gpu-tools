@@ -388,31 +388,28 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 }
 
 static void test_plane_rotation_exhaust_fences(data_t *data,
+					       enum pipe pipe,
 					       igt_output_t *output,
 					       igt_plane_t *plane)
 {
 	igt_display_t *display = &data->display;
 	uint64_t tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
 	uint32_t format = DRM_FORMAT_XRGB8888;
-	int bpp = igt_drm_format_to_bpp(format);
 	int fd = data->gfx_fd;
 	drmModeModeInfo *mode;
 	struct igt_fb fb[MAX_FENCES+1] = {};
 	unsigned int stride, size, w, h;
-	uint32_t gem_handle;
 	uint64_t total_aperture_size, total_fbs_size;
-	int i, ret;
+	int i;
 
 	igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
 
+	prepare_crtc(data, output, pipe, plane);
 	mode = igt_output_get_mode(output);
 	w = mode->hdisplay;
 	h = mode->vdisplay;
 
-	for (stride = 512; stride < (w * bpp / 8); stride *= 2)
-		;
-	for (size = 1024*1024; size < stride * h; size *= 2)
-		;
+	igt_calc_fb_size(fd, w, h, format, tiling, &size, &stride);
 
 	/*
 	 * Make sure there is atleast 90% of the available GTT space left
@@ -422,59 +419,20 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 	total_aperture_size = gem_available_aperture_size(fd);
 	igt_require(total_fbs_size < total_aperture_size * 0.9);
 
-	igt_plane_set_fb(plane, NULL);
-	igt_display_commit2(display, COMMIT_ATOMIC);
-
 	for (i = 0; i < MAX_FENCES + 1; i++) {
-		gem_handle = gem_create(fd, size);
-		ret = __gem_set_tiling(fd, gem_handle, I915_TILING_Y, stride);
-		if (ret) {
-			igt_warn("failed to set tiling\n");
-			goto err_alloc;
-		}
-
-		ret = (__kms_addfb(fd, gem_handle, w, h, stride,
-		       format, tiling, NULL,
-		       LOCAL_DRM_MODE_FB_MODIFIERS,
-		       &fb[i].fb_id));
-		if (ret) {
-			igt_warn("failed to create framebuffer\n");
-			goto err_alloc;
-		}
-
-		fb[i].width = w;
-		fb[i].height = h;
-		fb[i].gem_handle = gem_handle;
+		igt_create_fb(fd, w, h, format, tiling, &fb[i]);
 
 		igt_plane_set_fb(plane, &fb[i]);
 		igt_plane_set_rotation(plane, IGT_ROTATION_0);
-
 		igt_display_commit2(display, COMMIT_ATOMIC);
-		if (ret) {
-			igt_warn("failed to commit unrotated fb\n");
-			goto err_commit;
-		}
 
 		igt_plane_set_rotation(plane, IGT_ROTATION_90);
 		igt_plane_set_size(plane, h, w);
-
 		igt_display_commit2(display, COMMIT_ATOMIC);
-		if (ret) {
-			igt_warn("failed to commit hardware rotated fb: %i\n", ret);
-			goto err_commit;
-		}
 	}
 
-err_alloc:
-	if (ret)
-		gem_close(fd, gem_handle);
-
-	i--;
-err_commit:
-	for (; i >= 0; i--)
+	for (i = 0; i < MAX_FENCES + 1; i++)
 		igt_remove_fb(fd, &fb[i]);
-
-	igt_assert_eq(ret, 0);
 }
 
 static const char *plane_test_str(unsigned plane)
@@ -622,24 +580,23 @@ igt_main
 		}
 	}
 
+	/*
+	 * exhaust-fences should be last test, if it fails we may OOM in
+	 * the following subtests otherwise.
+	 */
 	igt_subtest_f("exhaust-fences") {
 		enum pipe pipe;
 		igt_output_t *output;
-		int valid_tests = 0;
 
 		igt_require(gen >= 9);
+		igt_display_require_output(&data.display);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_plane_t *primary = &data.display.pipes[pipe].planes[0];
-			prepare_crtc(&data, output, pipe, primary);
 
-			test_plane_rotation_exhaust_fences(&data, output, primary);
-
-			valid_tests++;
+			test_plane_rotation_exhaust_fences(&data, pipe, output, primary);
 			break;
 		}
-
-		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 	}
 
 	igt_fixture {
