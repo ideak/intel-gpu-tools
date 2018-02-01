@@ -1,5 +1,5 @@
 TracepointFmt =
-    'name' ':' Space n:PropertyName EndLine { free(v.string); }
+    'name' ':' Space n:PropertyName EndLine { free(n.string); }
     'ID:' Space v:Number EndLine { yy->ctx.tp->event_id = v.integer; }
     'format:' EndLine
     Field+
