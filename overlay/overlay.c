@@ -840,6 +840,7 @@ static void usage(const char *progname)
 	printf("\t--geometry|-G <width>x<height>+<x-offset>+<y-offset>\tExact window placement and size\n");
 	printf("\t--position|-P (top|middle|bottom)-(left|centre|right)\tPlace the window in a particular corner\n");
 	printf("\t--size|-S <width>x<height> | <scale>%%\t\t\tWindow size\n");
+	printf("\t--foreground|-f\t\t\t\t\t\tKeep the application in foreground\n");
 	printf("\t--help|-h\t\t\t\t\t\tThis help message\n");
 }
 
@@ -850,6 +851,7 @@ int main(int argc, char **argv)
 		{"geometry", 1, 0, 'G'},
 		{"position", 1, 0, 'P'},
 		{"size", 1, 0, 'S'},
+		{"foreground", 0, 0, 'f'},
 		{"help", 0, 0, 'h'},
 		{NULL, 0, 0, 0,}
 	};
