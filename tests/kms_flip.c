@@ -976,8 +976,7 @@ static void paint_flip_mode(struct igt_fb *fb, bool odd_frame)
 	cairo_set_source_rgb(cr, 1, 1, 1);
 	cairo_fill(cr);
 
-	igt_assert(!cairo_status(cr));
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(drm_fd, fb, cr);
 }
 
 static int

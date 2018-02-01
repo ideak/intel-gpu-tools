@@ -161,7 +161,7 @@ static int paint_fb(struct igt_fb *fb, const char *test_name,
 					  crtc_str[i]);
 	}
 
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(drm_fd, fb, cr);
 
 	return 0;
 }

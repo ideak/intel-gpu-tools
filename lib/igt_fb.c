@@ -771,8 +771,7 @@ unsigned int igt_create_color_fb(int fd, int width, int height,
 
 	cr = igt_get_cairo_ctx(fd, fb);
 	igt_paint_color(cr, 0, 0, width, height, r, g, b);
-	igt_assert(cairo_status(cr) == 0);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(fd, fb, cr);
 
 	return fb_id;
 }
@@ -809,8 +808,7 @@ unsigned int igt_create_pattern_fb(int fd, int width, int height,
 
 	cr = igt_get_cairo_ctx(fd, fb);
 	igt_paint_test_pattern(cr, width, height);
-	igt_assert(cairo_status(cr) == 0);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(fd, fb, cr);
 
 	return fb_id;
 }
@@ -853,8 +851,7 @@ unsigned int igt_create_color_pattern_fb(int fd, int width, int height,
 	cr = igt_get_cairo_ctx(fd, fb);
 	igt_paint_color(cr, 0, 0, width, height, r, g, b);
 	igt_paint_test_pattern(cr, width, height);
-	igt_assert(cairo_status(cr) == 0);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(fd, fb, cr);
 
 	return fb_id;
 }
@@ -897,8 +894,7 @@ unsigned int igt_create_image_fb(int fd, int width, int height,
 
 	cr = igt_get_cairo_ctx(fd, fb);
 	igt_paint_image(cr, filename, 0, 0, width, height);
-	igt_assert(cairo_status(cr) == 0);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(fd, fb, cr);
 
 	return fb_id;
 }
@@ -998,7 +994,7 @@ unsigned int igt_create_stereo_fb(int drm_fd, drmModeModeInfo *mode,
 			layout.right.x, layout.right.y,
 			layout.right.width, layout.right.height);
 
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(drm_fd, &fb, cr);
 
 	return fb_id;
 }
@@ -1206,7 +1202,7 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
  *
  * This initializes a cairo surface for @fb and then allocates a drawing context
  * for it. The return cairo drawing context should be released by calling
- * cairo_destroy(). This also sets a default font for drawing text on
+ * igt_put_cairo_ctx(). This also sets a default font for drawing text on
  * framebuffers.
  *
  * Returns:
@@ -1227,6 +1223,24 @@ cairo_t *igt_get_cairo_ctx(int fd, struct igt_fb *fb)
 	igt_assert(cairo_status(cr) == CAIRO_STATUS_SUCCESS);
 
 	return cr;
+}
+
+/**
+ * igt_put_cairo_ctx:
+ * @fd: open i915 drm file descriptor
+ * @fb: pointer to an #igt_fb structure
+ * @cr: the cairo context returned by igt_get_cairo_ctx.
+ *
+ * This releases the cairo surface @cr returned by igt_get_cairo_ctx()
+ * for @fb, and writes the changes out to the framebuffer if cairo doesn't
+ * have native support for the format.
+ */
+void igt_put_cairo_ctx(int fd, struct igt_fb *fb, cairo_t *cr)
+{
+	cairo_status_t ret = cairo_status(cr);
+	igt_assert_f(ret == CAIRO_STATUS_SUCCESS, "Cairo failed to draw with %s\n", cairo_status_to_string(ret));
+
+	cairo_destroy(cr);
 }
 
 /**

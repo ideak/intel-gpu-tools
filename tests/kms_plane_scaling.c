@@ -120,8 +120,7 @@ static void paint_fb(data_t *d, struct igt_fb *fb)
 
 	cr = igt_get_cairo_ctx(d->drm_fd, fb);
 	igt_paint_color(cr, 0, 0, fb->width, fb->height, 0.0, 1.0, 0.0);
-	igt_assert(cairo_status(cr) == 0);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(d->drm_fd, fb, cr);
 }
 
 static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,

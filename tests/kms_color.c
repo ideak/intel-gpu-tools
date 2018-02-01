@@ -86,7 +86,7 @@ static void paint_gradient_rectangles(data_t *data,
 					       colors[i].b);
 	}
 
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 }
 
 static void paint_rectangles(data_t *data,
@@ -103,7 +103,7 @@ static void paint_rectangles(data_t *data,
 				colors[i].r, colors[i].g, colors[i].b);
 	}
 
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 }
 
 static double *generate_table(uint32_t lut_size, double exp)

@@ -120,7 +120,7 @@ paint_squares(data_t *data, igt_rotation_t rotation,
 	igt_paint_color(cr, 0, h / 2, w / 2, h / 2, RGB_COLOR(bl));
 	igt_paint_color(cr, w / 2, h / 2, w / 2, h / 2, RGB_COLOR(br));
 
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(data->gfx_fd, fb, cr);
 }
 
 static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,

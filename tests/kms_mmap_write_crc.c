@@ -92,7 +92,7 @@ static void test(data_t *data)
 
 	cr = igt_get_cairo_ctx(data->drm_fd, fb);
 	igt_paint_test_pattern(cr, fb->width, fb->height);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 
 	/* flip to it to make it UC/WC and fully flushed */
 	igt_plane_set_fb(data->primary, fb);
@@ -135,7 +135,7 @@ static void test(data_t *data)
 	 * fully flushed */
 	cr = igt_get_cairo_ctx(data->drm_fd, fb);
 	igt_paint_test_pattern(cr, fb->width, fb->height);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 
 	igt_plane_set_fb(data->primary, fb);
 	igt_display_commit(display);

@@ -173,8 +173,7 @@ create_fb_for_mode_position(data_t *data, igt_output_t *output, drmModeModeInfo 
 				rect_w[i], rect_h[i], 0.0, 0.0, 0.0);
 		}
 
-	igt_assert(cairo_status(cr) == 0);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(data->drm_fd, &data->fb[primary->index], cr);
 }
 
 

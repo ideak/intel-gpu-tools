@@ -141,13 +141,16 @@ static void do_single_test(data_t *data, int x, int y)
 	igt_pipe_crc_t *pipe_crc = data->pipe_crc;
 	igt_crc_t crc, ref_crc;
 	igt_plane_t *cursor;
-	cairo_t *cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
+	cairo_t *cr;
 	int ret = 0;
 
 	igt_print_activity();
 
 	/* Hardware test */
+	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
 	igt_paint_test_pattern(cr, data->screenw, data->screenh);
+	igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
+
 	cursor_enable(data);
 	cursor = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_CURSOR);
 	igt_plane_set_position(cursor, x, y);
@@ -190,7 +193,9 @@ static void do_single_test(data_t *data, int x, int y)
 	igt_display_commit(display);
 
 	/* Now render the same in software and collect crc */
+	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
 	draw_cursor(cr, x, y, data->curw, data->curh);
+	igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
 	igt_display_commit(display);
 
 	igt_wait_for_vblank(data->drm_fd, data->pipe);
@@ -198,20 +203,25 @@ static void do_single_test(data_t *data, int x, int y)
 	igt_assert_crc_equal(&crc, &ref_crc);
 
 	/* Clear screen afterwards */
+	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
 	igt_paint_color(cr, 0, 0, data->screenw, data->screenh, 0.0, 0.0, 0.0);
+	igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
 }
 
 static void do_fail_test(data_t *data, int x, int y, int expect)
 {
 	igt_display_t *display = &data->display;
 	igt_plane_t *cursor;
-	cairo_t *cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
+	cairo_t *cr;
 	int ret;
 
 	igt_print_activity();
 
 	/* Hardware test */
+	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
 	igt_paint_test_pattern(cr, data->screenw, data->screenh);
+	igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
+
 	cursor_enable(data);
 	cursor = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_CURSOR);
 	igt_plane_set_position(cursor, x, y);
@@ -446,7 +456,7 @@ static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb);
 	draw_cursor(cr, 0, 0, cur_w, cur_h);
-	igt_assert(cairo_status(cr) == 0);
+	igt_put_cairo_ctx(data->drm_fd, &data->fb, cr);
 }
 
 static bool has_nonsquare_cursors(uint32_t devid)
@@ -486,6 +496,7 @@ static void test_cursor_size(data_t *data)
 	/* Use a solid white rectangle as the cursor */
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb);
 	igt_paint_color_alpha(cr, 0, 0, cursor_max_size, cursor_max_size, 1.0, 1.0, 1.0, 1.0);
+	igt_put_cairo_ctx(data->drm_fd, &data->fb, cr);
 
 	/* Hardware test loop */
 	cursor_enable(data);
@@ -501,16 +512,20 @@ static void test_cursor_size(data_t *data)
 	}
 	cursor_disable(data);
 	/* Software test loop */
-	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
 	for (i = 0, size = cursor_max_size; size >= 64; size /= 2, i++) {
 		/* Now render the same in software and collect crc */
+		cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
 		igt_paint_color_alpha(cr, 0, 0, size, size, 1.0, 1.0, 1.0, 1.0);
+		igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
+
 		igt_display_commit(display);
 		igt_wait_for_vblank(data->drm_fd, data->pipe);
 		igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
 		/* Clear screen afterwards */
+		cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
 		igt_paint_color(cr, 0, 0, data->screenw, data->screenh,
 				0.0, 0.0, 0.0);
+		igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
 		igt_assert_crc_equal(&crc[i], &ref_crc);
 	}
 }

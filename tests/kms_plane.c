@@ -138,8 +138,7 @@ create_fb_for_mode__position(data_t *data, drmModeModeInfo *mode,
 	igt_paint_color(cr, 0, 0, mode->hdisplay, mode->vdisplay,
 			    0.0, 1.0, 0.0);
 	igt_paint_color(cr, rect_x, rect_y, rect_w, rect_h, 0.0, 0.0, 0.0);
-	igt_assert(cairo_status(cr) == 0);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 }
 
 enum {
@@ -279,8 +278,7 @@ create_fb_for_mode__panning(data_t *data, drmModeModeInfo *mode,
 			mode->hdisplay, mode->vdisplay,
 			0.0, 0.0, 1.0);
 
-	igt_assert(cairo_status(cr) == 0);
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 }
 
 enum {
@@ -436,8 +434,7 @@ static void test_format_plane(data_t *data, enum pipe pipe,
 				0.0, 1.0, 0.0);
 		if (width >= 164 && height >= 164)
 			igt_paint_color(cr, 100, 100, 64, 64, 0.0, 0.0, 0.0);
-		igt_assert(cairo_status(cr) == 0);
-		cairo_destroy(cr);
+		igt_put_cairo_ctx(data->drm_fd, &fb, cr);
 
 		igt_plane_set_fb(plane, &fb);
 		igt_display_commit2(&data->display, COMMIT_UNIVERSAL);
