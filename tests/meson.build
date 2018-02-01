@@ -180,7 +180,6 @@ test_progs = [
 	'kms_properties',
 	'kms_psr_sink_crc',
 	'kms_pwrite_crc',
-	'kms_render',
 	'kms_rmfb',
 	'kms_rotation_crc',
 	'kms_setmode',
