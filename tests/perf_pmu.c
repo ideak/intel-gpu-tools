@@ -145,8 +145,9 @@ single(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 	else
 		spin = NULL;
 
-	slept = measured_usleep(batch_duration_ns / 1000);
 	val = pmu_read_single(fd);
+	slept = measured_usleep(batch_duration_ns / 1000);
+	val = pmu_read_single(fd) - val;
 
 	igt_spin_batch_end(spin);
 	igt_spin_batch_free(gem_fd, spin);
@@ -180,8 +181,9 @@ busy_start(int gem_fd, const struct intel_execution_engine2 *e)
 
 	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
-	slept = measured_usleep(batch_duration_ns / 1000);
 	val = pmu_read_single(fd);
+	slept = measured_usleep(batch_duration_ns / 1000);
+	val = pmu_read_single(fd) - val;
 
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd);
@@ -227,8 +229,9 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	 */
 	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
-	slept = measured_usleep(batch_duration_ns / 1000);
 	val = pmu_read_single(fd);
+	slept = measured_usleep(batch_duration_ns / 1000);
+	val = pmu_read_single(fd) - val;
 
 	igt_spin_batch_end(spin[0]);
 	igt_spin_batch_end(spin[1]);
@@ -279,6 +282,7 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	       const unsigned int num_engines)
 {
 	const struct intel_execution_engine2 *e_;
+	uint64_t tval[2][num_engines];
 	uint64_t val[num_engines];
 	int fd[num_engines];
 	unsigned long slept;
@@ -301,12 +305,16 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	igt_assert_eq(i, num_engines);
 
 	spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
+	pmu_read_multi(fd[0], num_engines, tval[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
-	pmu_read_multi(fd[0], num_engines, val);
+	pmu_read_multi(fd[0], num_engines, tval[1]);
 
 	igt_spin_batch_end(spin);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
+
+	for (i = 0; i < num_engines; i++)
+		val[i] = tval[1][i] - tval[0][i];
 
 	log_busy(num_engines, val);
 
@@ -324,6 +332,7 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 		    const unsigned int num_engines)
 {
 	const struct intel_execution_engine2 *e_;
+	uint64_t tval[2][num_engines];
 	uint64_t val[num_engines];
 	int fd[num_engines];
 	unsigned long slept;
@@ -362,12 +371,16 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	for (i = 0; i < num_engines; i++)
 		fd[i] = open_group(val[i], fd[0]);
 
+	pmu_read_multi(fd[0], num_engines, tval[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
-	pmu_read_multi(fd[0], num_engines, val);
+	pmu_read_multi(fd[0], num_engines, tval[1]);
 
 	igt_spin_batch_end(spin);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
+
+	for (i = 0; i < num_engines; i++)
+		val[i] = tval[1][i] - tval[0][i];
 
 	log_busy(num_engines, val);
 
@@ -384,6 +397,7 @@ static void
 all_busy_check_all(int gem_fd, const unsigned int num_engines)
 {
 	const struct intel_execution_engine2 *e;
+	uint64_t tval[2][num_engines];
 	uint64_t val[num_engines];
 	int fd[num_engines];
 	unsigned long slept;
@@ -418,12 +432,16 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines)
 	for (i = 0; i < num_engines; i++)
 		fd[i] = open_group(val[i], fd[0]);
 
+	pmu_read_multi(fd[0], num_engines, tval[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
-	pmu_read_multi(fd[0], num_engines, val);
+	pmu_read_multi(fd[0], num_engines, tval[1]);
 
 	igt_spin_batch_end(spin);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
+
+	for (i = 0; i < num_engines; i++)
+		val[i] = tval[1][i] - tval[0][i];
 
 	log_busy(num_engines, val);
 
@@ -765,13 +783,15 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 	spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
 	igt_spin_batch_set_timeout(spin, 2 * batch_duration_ns);
 
-	slept = measured_usleep(batch_duration_ns / 1000);
+	val[0] = pmu_read_single(fd[0]);
 	val[1] = pmu_read_single(fd[1]);
+	slept = measured_usleep(batch_duration_ns / 1000);
+	val[1] = pmu_read_single(fd[1]) - val[1];
 	close(fd[1]);
 
 	gem_sync(gem_fd, spin->handle);
 
-	val[0] = pmu_read_single(fd[0]);
+	val[0] = pmu_read_single(fd[0]) - val[0];
 
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
