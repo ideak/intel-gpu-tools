@@ -1276,7 +1276,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	enum pipe pipe = find_connected_pipe(display, false);
 	igt_pipe_t *pipe_connected = &display->pipes[pipe];
 	igt_plane_t *plane_primary = igt_pipe_get_plane_type(pipe_connected, DRM_PLANE_TYPE_PRIMARY);
-	igt_crc_t crcs[2];
+	igt_crc_t crcs[2], test_crc;
 
 	if (atomic)
 		igt_require(display->is_atomic);
@@ -1290,7 +1290,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	pipe_crc = igt_pipe_crc_new_nonblock(display->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	pipe_crc = igt_pipe_crc_new(display->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	set_cursor_on_pipe(display, pipe, &cursor_fb);
 	igt_display_commit2(display, COMMIT_UNIVERSAL);
@@ -1322,9 +1322,6 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	/* Disable cursor, and immediately queue a flip. Check if resulting crc is correct. */
 	for (int i = 1; i >= 0; i--) {
 		igt_spin_t *spin;
-		igt_crc_t *received_crcs = NULL;
-		int ncrcs;
-		static const int max_crcs = 8;
 
 		spin = igt_spin_batch_new(display->drm_fd, 0, 0,
 					  fb_info[1].gem_handle);
@@ -1336,7 +1333,8 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 
 		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 
-		ncrcs = igt_pipe_crc_get_crcs(pipe_crc, max_crcs, &received_crcs);
+		igt_pipe_crc_drain(pipe_crc);
+		igt_pipe_crc_get_single(pipe_crc, &test_crc);
 
 		igt_spin_batch_free(display->drm_fd, spin);
 
@@ -1349,16 +1347,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 		igt_plane_set_fb(plane_primary, &fb_info[0]);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
-		/*
-		 * We collect the crc nonblockingly, and should have at least 1
-		 * but not so many crcs that we overflow. Last CRC is the only
-		 * one we care about here. Other CRCs may have been from before
-		 * the cursor update and can contain garbage.
-		 */
-		igt_assert(ncrcs > 0 && ncrcs < max_crcs);
-
-		igt_assert_crc_equal(&crcs[i], &received_crcs[ncrcs - 1]);
-		free(received_crcs);
+		igt_assert_crc_equal(&crcs[i], &test_crc);
 	}
 
 	igt_remove_fb(display->drm_fd, &fb_info[1]);

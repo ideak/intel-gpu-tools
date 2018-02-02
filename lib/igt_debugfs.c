@@ -706,15 +706,12 @@ static int read_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out)
 	bytes_read = read(pipe_crc->crc_fd, &buf, MAX_LINE_LEN);
 	igt_reset_timeout();
 
-	if (bytes_read < 0 && errno == EAGAIN)
-		igt_assert(pipe_crc->flags & O_NONBLOCK);
-
 	if (bytes_read < 0)
-		bytes_read = 0;
+		bytes_read = -errno;
+	else
+		buf[bytes_read] = '\0';
 
-	buf[bytes_read] = '\0';
-
-	if (bytes_read && !pipe_crc_init_from_string(pipe_crc, out, buf))
+	if (bytes_read > 0 && !pipe_crc_init_from_string(pipe_crc, out, buf))
 		return -EINVAL;
 
 	return bytes_read;
@@ -722,7 +719,9 @@ static int read_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out)
 
 static void read_one_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out)
 {
-	while (read_crc(pipe_crc, out) == 0)
+	int ret;
+
+	while ((ret = read_crc(pipe_crc, out)) <= 0 && ret != -EINVAL)
 		usleep(1000);
 }
 
@@ -852,6 +851,68 @@ void igt_pipe_crc_collect_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out_crc)
 	igt_pipe_crc_stop(pipe_crc);
 
 	crc_sanity_checks(out_crc);
+}
+
+/**
+ * igt_pipe_crc_drain:
+ * @pipe_crc: pipe CRC object
+ *
+ * Discards all currently queued CRC values from @pipe_crc. This function does
+ * not block, and is useful to flush @pipe_crc. Afterwards you can get a fresh
+ * CRC with igt_pipe_crc_get_single().
+ */
+void igt_pipe_crc_drain(igt_pipe_crc_t *pipe_crc)
+{
+	int ret;
+	igt_crc_t crc;
+
+	fcntl(pipe_crc->crc_fd, F_SETFL, pipe_crc->flags | O_NONBLOCK);
+
+	do {
+		ret = read_crc(pipe_crc, &crc);
+	} while (ret > 0 || ret == -EINVAL);
+
+	fcntl(pipe_crc->crc_fd, F_SETFL, pipe_crc->flags);
+}
+
+/**
+ * igt_pipe_crc_get_single:
+ * @pipe_crc: pipe CRC object
+ * @crc: buffer pointer for the captured CRC value
+ *
+ * Read a single @crc from @pipe_crc. This function does not block
+ * when nonblocking CRC is requested, and will return false if no CRC
+ * can be captured.
+ *
+ * If opened in blocking mode it will always block until a new CRC is read, like
+ * igt_pipe_crc_collect_crc().
+ *
+ * Callers must start and stop the capturing themselves by calling
+ * igt_pipe_crc_start() and igt_pipe_crc_stop(). For one-shot CRC collecting
+ * look at igt_pipe_crc_collect_crc().
+ *
+ * If capturing has been going on for a while and a fresh crc is required,
+ * you will need to call igt_pipe_crc_drain() first to remove stale entries.
+ *
+ * Returns:
+ * Whether a crc is captured, only false in non-blocking mode.
+ */
+bool
+igt_pipe_crc_get_single(igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
+{
+	bool found = true;
+
+	if (pipe_crc->flags & O_NONBLOCK) {
+		int ret = read_crc(pipe_crc, crc);
+
+		found = ret > 0;
+	} else
+		read_one_crc(pipe_crc, crc);
+
+	if (found)
+		crc_sanity_checks(crc);
+
+	return found;
 }
 
 /*
