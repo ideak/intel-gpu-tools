@@ -1623,9 +1623,13 @@ void igt_put_cairo_ctx(int fd, struct igt_fb *fb, cairo_t *cr)
  */
 void igt_remove_fb(int fd, struct igt_fb *fb)
 {
+	if (!fb || !fb->fb_id)
+		return;
+
 	cairo_surface_destroy(fb->cairo_surface);
 	do_or_die(drmModeRmFB(fd, fb->fb_id));
 	gem_close(fd, fb->gem_handle);
+	fb->fb_id = 0;
 }
 
 /**
