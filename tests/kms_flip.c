@@ -1332,8 +1332,7 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	igt_info("\n%s: PASSED\n\n", test_name);
 
 out:
-	if (o->fb_ids[2])
-		igt_remove_fb(drm_fd, &o->fb_info[2]);
+	igt_remove_fb(drm_fd, &o->fb_info[2]);
 	igt_remove_fb(drm_fd, &o->fb_info[1]);
 	igt_remove_fb(drm_fd, &o->fb_info[0]);
 

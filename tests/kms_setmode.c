@@ -361,6 +361,9 @@ static void cleanup_crtcs(struct crtc_config *crtcs, int crtc_count)
 	int i;
 
 	for (i = 0; i < crtc_count; i++) {
+		igt_remove_fb(drm_fd, &crtcs[i].fb_info);
+		drmModeSetCrtc(drm_fd, crtcs[i].crtc_id, 0, 0, 0, NULL, 0, NULL);
+
 		free(crtcs[i].cconfs);
 	}
 }
@@ -576,15 +579,6 @@ static void test_crtc_config(const struct test_config *tconf,
 
 	if (ret == 0 && tconf->flags & TEST_TIMINGS)
 		check_timings(crtcs[0].crtc_idx, &crtcs[0].mode);
-
-	for (i = 0; i < crtc_count; i++) {
-		if (crtcs[i].fb_info.fb_id) {
-			drmModeSetCrtc(drm_fd, crtcs[i].crtc_id, 0, 0, 0, NULL,
-					0, NULL);
-			drmModeRmFB(drm_fd, crtcs[i].fb_info.fb_id);
-			crtcs[i].fb_info.fb_id = 0;
-		}
-	}
 
 	return;
 }

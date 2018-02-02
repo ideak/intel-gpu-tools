@@ -51,10 +51,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_output_set_pipe(output, pipe);
 
 	/* before allocating, free if any older fb */
-	if (data->fb1.fb_id) {
-		igt_remove_fb(data->drm_fd, &data->fb1);
-		data->fb1.fb_id = 0;
-	}
+	igt_remove_fb(data->drm_fd, &data->fb1);
 
 	/* allocate fb for plane 1 */
 	igt_create_pattern_fb(data->drm_fd,
@@ -83,14 +80,8 @@ static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
 {
 	igt_display_t *display = &data->display;
 
-	if (data->fb1.fb_id) {
-		igt_remove_fb(data->drm_fd, &data->fb1);
-		data->fb1.fb_id = 0;
-	}
-	if (data->fb2.fb_id) {
-		igt_remove_fb(data->drm_fd, &data->fb2);
-		data->fb2.fb_id = 0;
-	}
+	igt_remove_fb(data->drm_fd, &data->fb1);
+	igt_remove_fb(data->drm_fd, &data->fb2);
 
 	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
 		igt_plane_t *primary;

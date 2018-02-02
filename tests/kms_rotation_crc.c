@@ -174,17 +174,10 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 
 static void remove_fbs(data_t *data)
 {
-	if (!data->fb.fb_id)
-		return;
-
 	igt_remove_fb(data->gfx_fd, &data->fb);
 	igt_remove_fb(data->gfx_fd, &data->fb_reference);
 	igt_remove_fb(data->gfx_fd, &data->fb_unrotated);
-
-	if (data->fb_flip.fb_id)
-		igt_remove_fb(data->gfx_fd, &data->fb_flip);
-
-	data->fb_flip.fb_id = data->fb.fb_id = 0;
+	igt_remove_fb(data->gfx_fd, &data->fb_flip);
 }
 
 enum rectangle_type {
@@ -205,12 +198,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	uint32_t pixel_format = data->override_fmt ?: DRM_FORMAT_XRGB8888;
 	const float flip_opacity = 0.75;
 
-	if (data->fb.fb_id) {
-		igt_plane_set_fb(plane, NULL);
-		igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
-
-		remove_fbs(data);
-	}
+	remove_fbs(data);
 
 	igt_plane_set_rotation(plane, IGT_ROTATION_0);
 

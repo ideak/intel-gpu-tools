@@ -62,13 +62,8 @@ static void cleanup_fbs(data_t *data)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(data->fb); i++) {
-		if (!data->fb[i].fb_id)
-			continue;
-
+	for (i = 0; i < ARRAY_SIZE(data->fb); i++)
 		igt_remove_fb(data->drm_fd, &data->fb[i]);
-		data->fb[i].fb_id = 0;
-	}
 }
 
 static void cleanup_crtc(data_t *data)
