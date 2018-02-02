@@ -366,20 +366,6 @@ test_plane_panning(data_t *data, enum pipe pipe, unsigned int flags)
 	igt_skip_on(connected_outs == 0);
 }
 
-static bool can_draw(uint32_t drm_format)
-{
-	const uint32_t *drm_formats;
-	int format_count, i;
-
-	igt_get_all_cairo_formats(&drm_formats, &format_count);
-
-	for (i = 0; i < format_count; i++)
-		if (drm_formats[i] == drm_format)
-			return true;
-
-	return false;
-}
-
 static void test_format_plane(data_t *data, enum pipe pipe,
 			      igt_output_t *output, igt_plane_t *plane)
 {
@@ -420,7 +406,7 @@ static void test_format_plane(data_t *data, enum pipe pipe,
 	for (i = 0; i < plane->drm_plane->count_formats; i++) {
 		format = plane->drm_plane->formats[i];
 
-		if (!can_draw(format))
+		if (!igt_fb_supported_format(format))
 			continue;
 
 		igt_debug("Testing format 0x%x on %s.%u\n",

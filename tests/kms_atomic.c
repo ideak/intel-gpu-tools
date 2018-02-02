@@ -264,20 +264,13 @@ static void crtc_commit_atomic_flags_err(igt_pipe_t *pipe, igt_plane_t *plane,
 static uint32_t plane_get_igt_format(igt_plane_t *plane)
 {
 	drmModePlanePtr plane_kms;
-	const uint32_t *igt_formats;
-	int num_igt_formats;
 	int i;
 
 	plane_kms = plane->drm_plane;
 
-	igt_get_all_cairo_formats(&igt_formats, &num_igt_formats);
-	for (i = 0; i < num_igt_formats; i++) {
-		int j;
-
-		for (j = 0; j < plane_kms->count_formats; j++) {
-			if (plane_kms->formats[j] == igt_formats[i])
-				return plane_kms->formats[j];
-		}
+	for (i = 0; i < plane_kms->count_formats; i++) {
+		if (igt_fb_supported_format(plane_kms->formats[i]))
+			return plane_kms->formats[i];
 	}
 
 	return 0;

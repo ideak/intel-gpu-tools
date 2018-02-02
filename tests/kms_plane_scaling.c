@@ -173,20 +173,6 @@ static bool can_rotate(unsigned format)
 	return true;
 }
 
-static bool can_draw(uint32_t drm_format)
-{
-	const uint32_t *drm_formats;
-	int format_count, i;
-
-	igt_get_all_cairo_formats(&drm_formats, &format_count);
-
-	for (i = 0; i < format_count; i++)
-		if (drm_formats[i] == drm_format)
-			return true;
-
-	return false;
-}
-
 static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 					   igt_output_t *output)
 {
@@ -202,7 +188,7 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 			igt_rotation_t rot = rotations[i];
 			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
 				unsigned format = plane->drm_plane->formats[j];
-				if (can_draw(format) && can_rotate(format))
+				if (igt_fb_supported_format(format) && can_rotate(format))
 					check_scaling_pipe_plane_rot(d, plane, format,
 								     LOCAL_I915_FORMAT_MOD_Y_TILED,
 								     pipe, output, rot);
@@ -235,7 +221,7 @@ static void test_scaler_with_pixel_format_pipe(data_t *d, enum pipe pipe, igt_ou
 			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
 				uint32_t format = plane->drm_plane->formats[j];
 
-				if (can_draw(format))
+				if (igt_fb_supported_format(format))
 					check_scaling_pipe_plane_rot(d, plane,
 								     format, tiling,
 								     pipe, output, IGT_ROTATION_0);
@@ -446,13 +432,13 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 
 	for (int i = 0; i < d->plane1->drm_plane->count_formats; i++) {
 		unsigned f1 = d->plane1->drm_plane->formats[i];
-		if (!can_draw(f1))
+		if (!igt_fb_supported_format(f1))
 			continue;
 
 		for (int j = 0; j < d->plane2->drm_plane->count_formats; j++) {
 			unsigned f2 = d->plane2->drm_plane->formats[j];
 
-			if (!can_draw(f2))
+			if (!igt_fb_supported_format(f2))
 				continue;
 
 			__test_scaler_with_clipping_clamping_scenario(d, mode, f1, f2);

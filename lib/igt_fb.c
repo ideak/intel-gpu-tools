@@ -1719,3 +1719,21 @@ void igt_get_all_cairo_formats(const uint32_t **formats, int *format_count)
 	*formats = drm_formats;
 	*format_count = n_formats;
 }
+
+/**
+ * igt_fb_supported_format:
+ * @drm_format: drm fourcc to test.
+ *
+ * This functions returns whether @drm_format can be succesfully created by
+ * igt_create_fb() and drawn to by igt_get_cairo_ctx().
+ */
+bool igt_fb_supported_format(uint32_t drm_format)
+{
+	struct format_desc_struct *f;
+
+	for_each_format(f)
+		if (f->drm_id == drm_format)
+			return f->cairo_id != CAIRO_FORMAT_INVALID;
+
+	return false;
+}
