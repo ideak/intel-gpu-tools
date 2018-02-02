@@ -146,10 +146,9 @@ single(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 		spin = NULL;
 
 	slept = measured_usleep(batch_duration_ns / 1000);
-	igt_spin_batch_end(spin);
-
 	val = pmu_read_single(fd);
 
+	igt_spin_batch_end(spin);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd);
 
@@ -256,7 +255,7 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	gem_quiescent_gpu(gem_fd);
 }
 
-static void log_busy(int fd, unsigned int num_engines, uint64_t *val)
+static void log_busy(unsigned int num_engines, uint64_t *val)
 {
 	char buf[1024];
 	int rem = sizeof(buf);
@@ -303,13 +302,13 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 
 	spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
 	slept = measured_usleep(batch_duration_ns / 1000);
-	igt_spin_batch_end(spin);
-
 	pmu_read_multi(fd[0], num_engines, val);
-	log_busy(fd[0], num_engines, val);
 
+	igt_spin_batch_end(spin);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
+
+	log_busy(num_engines, val);
 
 	assert_within_epsilon(val[busy_idx], slept, tolerance);
 	for (i = 0; i < num_engines; i++) {
@@ -364,13 +363,13 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 		fd[i] = open_group(val[i], fd[0]);
 
 	slept = measured_usleep(batch_duration_ns / 1000);
-	igt_spin_batch_end(spin);
-
 	pmu_read_multi(fd[0], num_engines, val);
-	log_busy(fd[0], num_engines, val);
 
+	igt_spin_batch_end(spin);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
+
+	log_busy(num_engines, val);
 
 	for (i = 0; i < num_engines; i++) {
 		if (i == idle_idx)
@@ -420,13 +419,13 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines)
 		fd[i] = open_group(val[i], fd[0]);
 
 	slept = measured_usleep(batch_duration_ns / 1000);
-	igt_spin_batch_end(spin);
-
 	pmu_read_multi(fd[0], num_engines, val);
-	log_busy(fd[0], num_engines, val);
 
+	igt_spin_batch_end(spin);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
+
+	log_busy(num_engines, val);
 
 	for (i = 0; i < num_engines; i++)
 		assert_within_epsilon(val[i], slept, tolerance);
@@ -903,12 +902,11 @@ static void cpu_hotplug(int gem_fd)
 
 	igt_waitchildren();
 
-	igt_spin_batch_end(spin);
-	gem_sync(gem_fd, spin->handle);
-
 	ref = igt_nsec_elapsed(&start);
 	val = pmu_read_single(fd);
 
+	igt_spin_batch_end(spin);
+	gem_sync(gem_fd, spin->handle);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd);
 
