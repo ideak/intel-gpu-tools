@@ -454,30 +454,31 @@ static void
 no_sema(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 {
 	igt_spin_t *spin;
-	uint64_t val[2];
+	uint64_t val[2][2];
 	int fd;
 
 	fd = open_group(I915_PMU_ENGINE_SEMA(e->class, e->instance), -1);
 	open_group(I915_PMU_ENGINE_WAIT(e->class, e->instance), fd);
 
-	if (busy) {
+	if (busy)
 		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
-		igt_spin_batch_set_timeout(spin, batch_duration_ns);
-	} else {
-		usleep(batch_duration_ns / 1000);
-	}
 
-	if (busy)
+	pmu_read_multi(fd, 2, val[0]);
+	measured_usleep(batch_duration_ns / 1000);
+	pmu_read_multi(fd, 2, val[1]);
+
+	val[0][0] = val[1][0] - val[0][0];
+	val[0][1] = val[1][1] - val[0][1];
+
+	if (busy) {
+		igt_spin_batch_end(spin);
 		gem_sync(gem_fd, spin->handle);
-
-	pmu_read_multi(fd, 2, val);
-
-	if (busy)
 		igt_spin_batch_free(gem_fd, spin);
+	}
 	close(fd);
 
-	assert_within_epsilon(val[0], 0.0f, tolerance);
-	assert_within_epsilon(val[1], 0.0f, tolerance);
+	assert_within_epsilon(val[0][0], 0.0f, tolerance);
+	assert_within_epsilon(val[0][1], 0.0f, tolerance);
 }
 
 #define MI_INSTR(opcode, flags) (((opcode) << 23) | (flags))
@@ -766,7 +767,7 @@ static void
 multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 {
 	uint64_t config = I915_PMU_ENGINE_BUSY(e->class, e->instance);
-	unsigned int slept;
+	unsigned int slept[2];
 	igt_spin_t *spin;
 	uint64_t val[2];
 	int fd[2];
@@ -781,23 +782,22 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 	fd[1] = open_pmu(config);
 
 	spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
-	igt_spin_batch_set_timeout(spin, 2 * batch_duration_ns);
 
-	val[0] = pmu_read_single(fd[0]);
-	val[1] = pmu_read_single(fd[1]);
-	slept = measured_usleep(batch_duration_ns / 1000);
+	val[0] = val[1] = pmu_read_single(fd[0]);
+	slept[1] = measured_usleep(batch_duration_ns / 1000);
 	val[1] = pmu_read_single(fd[1]) - val[1];
 	close(fd[1]);
 
-	gem_sync(gem_fd, spin->handle);
-
+	slept[0] = measured_usleep(batch_duration_ns / 1000) + slept[1];
 	val[0] = pmu_read_single(fd[0]) - val[0];
 
+	igt_spin_batch_end(spin);
+	gem_sync(gem_fd, spin->handle);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
 
-	assert_within_epsilon(val[0], 2 * batch_duration_ns, tolerance);
-	assert_within_epsilon(val[1], slept, tolerance);
+	assert_within_epsilon(val[0], slept[0], tolerance);
+	assert_within_epsilon(val[1], slept[1], tolerance);
 }
 
 /**
