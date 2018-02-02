@@ -2746,7 +2746,7 @@ static ssize_t get_regs(struct reg **regs, size_t *nregs, ssize_t index,
 		for (j = 0; j < known_registers[i].count; j++) {
 			const struct reg_debug *reg_in =
 				&known_registers[i].regs[j];
-			struct reg reg;
+			struct reg reg = {};
 
 			/* XXX: Could be optimized. */
 			parse_port_desc(&reg, NULL);

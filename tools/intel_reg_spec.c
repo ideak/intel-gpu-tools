@@ -219,8 +219,6 @@ static int parse_line(struct reg *reg, const char *line)
 		initialized = true;
 	}
 
-	memset(reg, 0, sizeof(*reg));
-
 	ret = regexec(&regex, line, ARRAY_SIZE(match), match, 0);
 	if (ret)
 		ret = -1;
@@ -267,7 +265,7 @@ static ssize_t parse_file(struct reg **regs, size_t *nregs,
 	}
 
 	while (getline(&line, &linesize, file) != -1) {
-		struct reg reg;
+		struct reg reg = {};
 
 		lineno++;
 
