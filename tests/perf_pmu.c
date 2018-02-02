@@ -130,8 +130,10 @@ static unsigned int e2ring(int gem_fd, const struct intel_execution_engine2 *e)
 	return gem_class_instance_to_eb_flags(gem_fd, e->class, e->instance);
 }
 
+#define TEST_BUSY (1)
+
 static void
-single(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
+single(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 {
 	unsigned long slept;
 	igt_spin_t *spin;
@@ -140,7 +142,7 @@ single(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 
 	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
-	if (busy)
+	if (flags & TEST_BUSY)
 		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
 	else
 		spin = NULL;
@@ -153,7 +155,7 @@ single(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd);
 
-	assert_within_epsilon(val, busy ? slept : 0.f, tolerance);
+	assert_within_epsilon(val, flags & TEST_BUSY ? slept : 0.f, tolerance);
 	gem_quiescent_gpu(gem_fd);
 }
 
@@ -451,7 +453,7 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines)
 }
 
 static void
-no_sema(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
+no_sema(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 {
 	igt_spin_t *spin;
 	uint64_t val[2][2];
@@ -460,7 +462,7 @@ no_sema(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 	fd = open_group(I915_PMU_ENGINE_SEMA(e->class, e->instance), -1);
 	open_group(I915_PMU_ENGINE_WAIT(e->class, e->instance), fd);
 
-	if (busy)
+	if (flags & TEST_BUSY)
 		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
 
 	pmu_read_multi(fd, 2, val[0]);
@@ -470,7 +472,7 @@ no_sema(int gem_fd, const struct intel_execution_engine2 *e, bool busy)
 	val[0][0] = val[1][0] - val[0][0];
 	val[0][1] = val[1][1] - val[0][1];
 
-	if (busy) {
+	if (flags & TEST_BUSY) {
 		igt_spin_batch_end(spin);
 		gem_sync(gem_fd, spin->handle);
 		igt_spin_batch_free(gem_fd, spin);
@@ -1231,13 +1233,13 @@ igt_main
 		 * Test that engines show no load when idle.
 		 */
 		igt_subtest_f("idle-%s", e->name)
-			single(fd, e, false);
+			single(fd, e, 0);
 
 		/**
 		 * Test that a single engine reports load correctly.
 		 */
 		igt_subtest_f("busy-%s", e->name)
-			single(fd, e, true);
+			single(fd, e, TEST_BUSY);
 
 		/**
 		 * Test that when one engine is loaded other report no load.
@@ -1257,10 +1259,10 @@ igt_main
 		 * or busy engines.
 		 */
 		igt_subtest_f("idle-no-semaphores-%s", e->name)
-			no_sema(fd, e, false);
+			no_sema(fd, e, 0);
 
 		igt_subtest_f("busy-no-semaphores-%s", e->name)
-			no_sema(fd, e, true);
+			no_sema(fd, e, TEST_BUSY);
 
 		/**
 		 * Test that semaphore waits are correctly reported.
@@ -1358,7 +1360,7 @@ igt_main
 
 		for_each_engine_class_instance(fd, e) {
 			igt_subtest_f("render-node-busy-%s", e->name)
-				single(fd, e, true);
+				single(fd, e, TEST_BUSY);
 		}
 
 		igt_fixture {
