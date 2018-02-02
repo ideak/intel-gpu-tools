@@ -113,8 +113,6 @@ static int wait_vblank(int fd, union drm_wait_vblank *vbl)
 
 static void run_test(data_t *data, void (*testfunc)(data_t *, int, int))
 {
-	int nchildren =
-		data->flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1;
 	igt_display_t *display = &data->display;
 	igt_output_t *output = data->output;
 	int fd = display->drm_fd;
@@ -125,9 +123,9 @@ static void run_test(data_t *data, void (*testfunc)(data_t *, int, int))
 	if (data->flags & RPM)
 		igt_require(igt_setup_runtime_pm());
 
-	igt_info("Beginning %s on pipe %s, connector %s (%d threads)\n",
+	igt_info("Beginning %s on pipe %s, connector %s\n",
 		 igt_subtest_name(), kmstest_pipe_name(data->pipe),
-		 igt_output_name(output), nchildren);
+		 igt_output_name(output));
 
 	if (!(data->flags & NOHANG))
 		hang = igt_hang_ring(fd, I915_EXEC_DEFAULT);
@@ -143,9 +141,16 @@ static void run_test(data_t *data, void (*testfunc)(data_t *, int, int))
 		igt_assert_eq(wait_vblank(fd, &vbl), 0);
 	}
 
-	igt_fork(child, nchildren)
-		testfunc(data, fd, nchildren);
-	igt_waitchildren();
+	if (data->flags & FORKED) {
+		int nchildren = sysconf(_SC_NPROCESSORS_ONLN);
+
+		igt_debug("Spawning %d threads\n", nchildren);
+
+		igt_fork(child, nchildren)
+			testfunc(data, fd, nchildren);
+		igt_waitchildren();
+	} else
+		testfunc(data, fd, 1);
 
 	if (data->flags & BUSY) {
 		struct drm_event_vblank buf;
