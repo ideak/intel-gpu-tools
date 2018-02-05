@@ -1222,6 +1222,60 @@ test_rc6(int gem_fd)
 	assert_within_epsilon(busy - prev, 0.0, tolerance);
 }
 
+static void
+test_enable_race(int gem_fd, const struct intel_execution_engine2 *e)
+{
+	uint64_t config = I915_PMU_ENGINE_BUSY(e->class, e->instance);
+	struct igt_helper_process engine_load = { };
+	const uint32_t bbend = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj = { };
+	struct drm_i915_gem_execbuffer2 eb = { };
+	int fd;
+
+	igt_require(gem_has_execlists(gem_fd));
+	igt_require(gem_has_engine(gem_fd, e->class, e->instance));
+
+	obj.handle = gem_create(gem_fd, 4096);
+	gem_write(gem_fd, obj.handle, 0, &bbend, sizeof(bbend));
+
+	eb.buffer_count = 1;
+	eb.buffers_ptr = to_user_pointer(&obj);
+	eb.flags = e2ring(gem_fd, e);
+
+	/*
+	 * This test is probabilistic so run in a few times to increase the
+	 * chance of hitting the race.
+	 */
+	igt_until_timeout(10) {
+		/*
+		 * Defeat the busy stats delayed disable, we need to guarantee
+		 * we are the first PMU user.
+		 */
+		gem_quiescent_gpu(gem_fd);
+		sleep(2);
+
+		/* Apply interrupt-heavy load on the engine. */
+		igt_fork_helper(&engine_load) {
+			for (;;)
+				gem_execbuf(gem_fd, &eb);
+		}
+
+		/* Wait a bit to allow engine load to start. */
+		usleep(500e3);
+
+		/* Enable the PMU. */
+		fd = open_pmu(config);
+
+		/* Stop load and close the PMU. */
+		igt_stop_helper(&engine_load);
+		close(fd);
+	}
+
+	/* Cleanup. */
+	gem_close(gem_fd, obj.handle);
+	gem_quiescent_gpu(gem_fd);
+}
+
 igt_main
 {
 	const unsigned int num_other_metrics =
@@ -1344,6 +1398,13 @@ igt_main
 		 */
 		igt_subtest_f("busy-double-start-%s", e->name)
 			busy_double_start(fd, e);
+
+		/**
+		 * Check that the PMU can be safely enabled in face of
+		 * interrupt-heavy engine load.
+		 */
+		igt_subtest_f("enable-race-%s", e->name)
+			test_enable_race(fd, e);
 	}
 
 	/**
