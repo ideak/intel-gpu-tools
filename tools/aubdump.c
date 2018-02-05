@@ -72,6 +72,14 @@
 #define EXECLIST_STATUS_VCSUNIT0	0x12234
 #define EXECLIST_STATUS_BCSUNIT		0x22234
 
+#define EXECLIST_SQ_CONTENTS0_RCSUNIT	0x02510
+#define EXECLIST_SQ_CONTENTS0_VCSUNIT0	0x12510
+#define EXECLIST_SQ_CONTENTS0_BCSUNIT	0x22510
+
+#define EXECLIST_CONTROL_RCSUNIT	0x02550
+#define EXECLIST_CONTROL_VCSUNIT0	0x12550
+#define EXECLIST_CONTROL_BCSUNIT	0x22550
+
 #define MEMORY_MAP_SIZE (64 /* MiB */ * 1024 * 1024)
 
 #define PTE_SIZE 4
@@ -584,7 +592,9 @@ aub_dump_execlist(uint64_t batch_offset, int ring_flag)
 	uint32_t ring_addr;
 	uint64_t descriptor;
 	uint32_t elsp_reg;
+	uint32_t elsq_reg;
 	uint32_t status_reg;
+	uint32_t control_reg;
 
 	switch (ring_flag) {
 	case I915_EXEC_DEFAULT:
@@ -592,19 +602,25 @@ aub_dump_execlist(uint64_t batch_offset, int ring_flag)
 		ring_addr = RENDER_RING_ADDR;
 		descriptor = RENDER_CONTEXT_DESCRIPTOR;
 		elsp_reg = EXECLIST_SUBMITPORT_RCSUNIT;
+		elsq_reg = EXECLIST_SQ_CONTENTS0_RCSUNIT;
 		status_reg = EXECLIST_STATUS_RCSUNIT;
+		control_reg = EXECLIST_CONTROL_RCSUNIT;
 		break;
 	case I915_EXEC_BSD:
 		ring_addr = VIDEO_RING_ADDR;
 		descriptor = VIDEO_CONTEXT_DESCRIPTOR;
 		elsp_reg = EXECLIST_SUBMITPORT_VCSUNIT0;
+		elsq_reg = EXECLIST_SQ_CONTENTS0_VCSUNIT0;
 		status_reg = EXECLIST_STATUS_VCSUNIT0;
+		control_reg = EXECLIST_CONTROL_VCSUNIT0;
 		break;
 	case I915_EXEC_BLT:
 		ring_addr = BLITTER_RING_ADDR;
 		descriptor = BLITTER_CONTEXT_DESCRIPTOR;
 		elsp_reg = EXECLIST_SUBMITPORT_BCSUNIT;
+		elsq_reg = EXECLIST_SQ_CONTENTS0_BCSUNIT;
 		status_reg = EXECLIST_STATUS_BCSUNIT;
+		control_reg = EXECLIST_CONTROL_BCSUNIT;
 		break;
 	}
 
@@ -622,18 +638,30 @@ aub_dump_execlist(uint64_t batch_offset, int ring_flag)
 					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
 	dword_out(16); /* RING_BUFFER_TAIL */
 
-	register_write_out(elsp_reg, 0);
-	register_write_out(elsp_reg, 8);
-	register_write_out(elsp_reg, descriptor >> 32);
-	register_write_out(elsp_reg, descriptor & 0xFFFFFFFF);
+	if (gen >= 11) {
+		register_write_out(elsq_reg, descriptor & 0xFFFFFFFF);
+		register_write_out(elsq_reg + sizeof(uint32_t), descriptor >> 32);
+		register_write_out(control_reg, 1);
+	} else {
+		register_write_out(elsp_reg, 0);
+		register_write_out(elsp_reg, 0);
+		register_write_out(elsp_reg, descriptor >> 32);
+		register_write_out(elsp_reg, descriptor & 0xFFFFFFFF);
+	}
 
 	dword_out(CMD_MEM_TRACE_REGISTER_POLL | (5 + 1 - 1));
 	dword_out(status_reg);
 	dword_out(AUB_MEM_TRACE_REGISTER_SIZE_DWORD |
 		  AUB_MEM_TRACE_REGISTER_SPACE_MMIO);
-	dword_out(0x00000010);	/* mask lo */
-	dword_out(0x00000000);	/* mask hi */
-	dword_out(0x00000000);
+	if (gen >= 11) {
+		dword_out(0x00000001);	/* mask lo */
+		dword_out(0x00000000);	/* mask hi */
+		dword_out(0x00000001);
+	} else {
+		dword_out(0x00000010);	/* mask lo */
+		dword_out(0x00000000);	/* mask hi */
+		dword_out(0x00000000);
+	}
 }
 
 static void
