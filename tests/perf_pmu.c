@@ -89,13 +89,21 @@ init(int gem_fd, const struct intel_execution_engine2 *e, uint8_t sample)
 	}
 }
 
-static uint64_t pmu_read_single(int fd)
+static uint64_t __pmu_read_single(int fd, uint64_t *ts)
 {
 	uint64_t data[2];
 
 	igt_assert_eq(read(fd, data, sizeof(data)), sizeof(data));
 
+	if (ts)
+		*ts = data[1];
+
 	return data[0];
+}
+
+static uint64_t pmu_read_single(int fd)
+{
+	return __pmu_read_single(fd, NULL);
 }
 
 static void pmu_read_multi(int fd, unsigned int num, uint64_t *val)
@@ -920,19 +928,28 @@ static bool cpu0_hotplug_support(void)
 
 static void cpu_hotplug(int gem_fd)
 {
-	struct timespec start = { };
-	igt_spin_t *spin;
-	uint64_t val, ref;
-	int fd;
+	igt_spin_t *spin[2];
+	uint64_t ts[2];
+	uint64_t val;
+	int link[2];
+	int fd, ret;
+	int cur = 0;
 
 	igt_require(cpu0_hotplug_support());
 
-	fd = perf_i915_open(I915_PMU_ENGINE_BUSY(I915_ENGINE_CLASS_RENDER, 0));
-	igt_assert(fd >= 0);
+	fd = open_pmu(I915_PMU_ENGINE_BUSY(I915_ENGINE_CLASS_RENDER, 0));
 
-	spin = igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
+	/*
+	 * Create two spinners so test can ensure shorter gaps in engine
+	 * busyness as it is terminating one and re-starting the other.
+	 */
+	spin[0] = igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
+	spin[1] = __igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
 
-	igt_nsec_elapsed(&start);
+	val = __pmu_read_single(fd, &ts[0]);
+
+	ret = pipe2(link, O_NONBLOCK);
+	igt_assert_eq(ret, 0);
 
 	/*
 	 * Toggle online status of all the CPUs in a child process and ensure
@@ -941,21 +958,29 @@ static void cpu_hotplug(int gem_fd)
 	igt_fork(child, 1) {
 		int cpu = 0;
 
+		close(link[0]);
+
 		for (;;) {
 			char name[128];
 			int cpufd;
 
-			sprintf(name, "/sys/devices/system/cpu/cpu%d/online",
-				cpu);
+			igt_assert_lt(snprintf(name, sizeof(name),
+					       "/sys/devices/system/cpu/cpu%d/online",
+					       cpu), sizeof(name));
 			cpufd = open(name, O_WRONLY);
 			if (cpufd == -1) {
 				igt_assert(cpu > 0);
+				/*
+				 * Signal parent that we cycled through all
+				 * CPUs and we are done.
+				 */
+				igt_assert_eq(write(link[1], "*", 1), 1);
 				break;
 			}
+
+			/* Offline followed by online a CPU. */
 			igt_assert_eq(write(cpufd, "0", 2), 2);
-
 			usleep(1e6);
-
 			igt_assert_eq(write(cpufd, "1", 2), 2);
 
 			close(cpufd);
@@ -963,17 +988,41 @@ static void cpu_hotplug(int gem_fd)
 		}
 	}
 
+	close(link[1]);
+
+	/*
+	 * Very long batches can be declared as GPU hangs so emit shorter ones
+	 * until the CPU core shuffler finishes one loop.
+	 */
+	for (;;) {
+		char buf;
+		int ret2;
+
+		usleep(500e3);
+		end_spin(gem_fd, spin[cur], 0);
+
+		/* Check if the child is signaling completion. */
+		ret2 = read(link[0], &buf, 1);
+		if ( ret2 == 1 || (ret2 < 0 && errno != EAGAIN))
+			break;
+
+		igt_spin_batch_free(gem_fd, spin[cur]);
+		spin[cur] = __igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER,
+						 0);
+		cur ^= 1;
+	}
+
+	val = __pmu_read_single(fd, &ts[1]) - val;
+
+	end_spin(gem_fd, spin[0], FLAG_SYNC);
+	end_spin(gem_fd, spin[1], FLAG_SYNC);
+	igt_spin_batch_free(gem_fd, spin[0]);
+	igt_spin_batch_free(gem_fd, spin[1]);
 	igt_waitchildren();
-
-	ref = igt_nsec_elapsed(&start);
-	val = pmu_read_single(fd);
-
-	igt_spin_batch_end(spin);
-	gem_sync(gem_fd, spin->handle);
-	igt_spin_batch_free(gem_fd, spin);
 	close(fd);
+	close(link[0]);
 
-	assert_within_epsilon(val, ref, tolerance);
+	assert_within_epsilon(val, ts[1] - ts[0], tolerance);
 }
 
 static void
