@@ -149,6 +149,8 @@ kms_chamelium_LDADD = $(LDADD) $(XMLRPC_LIBS) $(LIBUDEV_LIBS)
 audio_CFLAGS = $(AM_CFLAGS) $(ALSA_CFLAGS)
 audio_LDADD = $(LDADD) $(ALSA_LIBS)
 
+testdisplay_CFLAGS = $(AM_CFLAGS) $(GLIB_CFLAGS)
+
 amdgpu_amd_basic_CFLAGS = $(AM_CFLAGS) $(DRM_AMDGPU_CFLAGS)
 amdgpu_amd_basic_LDADD = $(LDADD) $(DRM_AMDGPU_LIBS)
 amdgpu_amd_cs_nop_CFLAGS = $(AM_CFLAGS) $(DRM_AMDGPU_CFLAGS)
