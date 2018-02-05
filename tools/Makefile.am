@@ -8,7 +8,7 @@ intel_error_decode_LDFLAGS = -lz
 endif
 
 bin_PROGRAMS += intel_dp_compliance
-intel_dp_compliance_CFLAGS = $(AM_CFLAGS)
+intel_dp_compliance_CFLAGS = $(AM_CFLAGS) $(GLIB_CFLAGS)
 intel_dp_compliance_LDADD = $(top_builddir)/lib/libintel_tools.la
 
 SUBDIRS = null_state_gen registers
