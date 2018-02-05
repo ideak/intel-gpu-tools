@@ -72,11 +72,21 @@ static int open_group(uint64_t config, int group)
 static void
 init(int gem_fd, const struct intel_execution_engine2 *e, uint8_t sample)
 {
-	int fd;
+	int fd, err = 0;
 
-	fd = open_pmu(__I915_PMU_ENGINE(e->class, e->instance, sample));
+	errno = 0;
+	fd = perf_i915_open(__I915_PMU_ENGINE(e->class, e->instance, sample));
+	if (fd < 0)
+		err = errno;
 
-	close(fd);
+	if (gem_has_engine(gem_fd, e->class, e->instance)) {
+		igt_assert_eq(err, 0);
+		igt_assert_fd(fd);
+		close(fd);
+	} else {
+		igt_assert_lt(fd, 0);
+		igt_assert_eq(err, ENODEV);
+	}
 }
 
 static uint64_t pmu_read_single(int fd)
