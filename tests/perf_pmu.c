@@ -131,6 +131,22 @@ static unsigned int e2ring(int gem_fd, const struct intel_execution_engine2 *e)
 }
 
 #define TEST_BUSY (1)
+#define FLAG_SYNC (2)
+#define TEST_TRAILING_IDLE (4)
+
+static void end_spin(int fd, igt_spin_t *spin, unsigned int flags)
+{
+	if (!spin)
+		return;
+
+	igt_spin_batch_end(spin);
+
+	if (flags & FLAG_SYNC)
+		gem_sync(fd, spin->handle);
+
+	if (flags & TEST_TRAILING_IDLE)
+		usleep(batch_duration_ns / 5000);
+}
 
 static void
 single(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
@@ -149,9 +165,11 @@ single(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 
 	val = pmu_read_single(fd);
 	slept = measured_usleep(batch_duration_ns / 1000);
+	if (flags & TEST_TRAILING_IDLE)
+		end_spin(gem_fd, spin, flags);
 	val = pmu_read_single(fd) - val;
 
-	igt_spin_batch_end(spin);
+	end_spin(gem_fd, spin, FLAG_SYNC);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd);
 
@@ -281,7 +299,7 @@ static void log_busy(unsigned int num_engines, uint64_t *val)
 
 static void
 busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
-	       const unsigned int num_engines)
+	       const unsigned int num_engines, unsigned int flags)
 {
 	const struct intel_execution_engine2 *e_;
 	uint64_t tval[2][num_engines];
@@ -309,9 +327,11 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
 	pmu_read_multi(fd[0], num_engines, tval[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
+	if (flags & TEST_TRAILING_IDLE)
+		end_spin(gem_fd, spin, flags);
 	pmu_read_multi(fd[0], num_engines, tval[1]);
 
-	igt_spin_batch_end(spin);
+	end_spin(gem_fd, spin, FLAG_SYNC);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
 
@@ -331,7 +351,7 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 
 static void
 most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
-		    const unsigned int num_engines)
+		    const unsigned int num_engines, unsigned int flags)
 {
 	const struct intel_execution_engine2 *e_;
 	uint64_t tval[2][num_engines];
@@ -375,9 +395,11 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 
 	pmu_read_multi(fd[0], num_engines, tval[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
+	if (flags & TEST_TRAILING_IDLE)
+		end_spin(gem_fd, spin, flags);
 	pmu_read_multi(fd[0], num_engines, tval[1]);
 
-	igt_spin_batch_end(spin);
+	end_spin(gem_fd, spin, FLAG_SYNC);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
 
@@ -396,7 +418,8 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 }
 
 static void
-all_busy_check_all(int gem_fd, const unsigned int num_engines)
+all_busy_check_all(int gem_fd, const unsigned int num_engines,
+		   unsigned int flags)
 {
 	const struct intel_execution_engine2 *e;
 	uint64_t tval[2][num_engines];
@@ -436,9 +459,11 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines)
 
 	pmu_read_multi(fd[0], num_engines, tval[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
+	if (flags & TEST_TRAILING_IDLE)
+		end_spin(gem_fd, spin, flags);
 	pmu_read_multi(fd[0], num_engines, tval[1]);
 
-	igt_spin_batch_end(spin);
+	end_spin(gem_fd, spin, FLAG_SYNC);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
 
@@ -464,17 +489,20 @@ no_sema(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 
 	if (flags & TEST_BUSY)
 		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
+	else
+		spin = NULL;
 
 	pmu_read_multi(fd, 2, val[0]);
 	measured_usleep(batch_duration_ns / 1000);
+	if (flags & TEST_TRAILING_IDLE)
+		end_spin(gem_fd, spin, flags);
 	pmu_read_multi(fd, 2, val[1]);
 
 	val[0][0] = val[1][0] - val[0][0];
 	val[0][1] = val[1][1] - val[0][1];
 
-	if (flags & TEST_BUSY) {
-		igt_spin_batch_end(spin);
-		gem_sync(gem_fd, spin->handle);
+	if (spin) {
+		end_spin(gem_fd, spin, FLAG_SYNC);
 		igt_spin_batch_free(gem_fd, spin);
 	}
 	close(fd);
@@ -489,7 +517,8 @@ no_sema(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 #define   MI_SEMAPHORE_SAD_GTE_SDD	(1<<12)
 
 static void
-sema_wait(int gem_fd, const struct intel_execution_engine2 *e)
+sema_wait(int gem_fd, const struct intel_execution_engine2 *e,
+	  unsigned int flags)
 {
 	struct drm_i915_gem_relocation_entry reloc[2] = {};
 	struct drm_i915_gem_exec_object2 obj[2] = {};
@@ -564,6 +593,8 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e)
 
 	val[0] = pmu_read_single(fd);
 	slept = measured_usleep(batch_duration_ns / 1000);
+	if (flags & TEST_TRAILING_IDLE)
+		obj_ptr[0] = 1;
 	val[1] = pmu_read_single(fd);
 	igt_debug("slept %.3fms, sampled %.3fms\n",
 		  slept*1e-6, (val[1] - val[0])*1e-6);
@@ -773,6 +804,8 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 	igt_spin_t *spin;
 	uint64_t val[2];
 	int fd[2];
+
+	gem_quiescent_gpu(gem_fd);
 
 	fd[0] = open_pmu(config);
 
@@ -1240,19 +1273,27 @@ igt_main
 		 */
 		igt_subtest_f("busy-%s", e->name)
 			single(fd, e, TEST_BUSY);
+		igt_subtest_f("busy-idle-%s", e->name)
+			single(fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
 
 		/**
 		 * Test that when one engine is loaded other report no load.
 		 */
 		igt_subtest_f("busy-check-all-%s", e->name)
-			busy_check_all(fd, e, num_engines);
+			busy_check_all(fd, e, num_engines, TEST_BUSY);
+		igt_subtest_f("busy-idle-check-all-%s", e->name)
+			busy_check_all(fd, e, num_engines,
+				       TEST_BUSY | TEST_TRAILING_IDLE);
 
 		/**
 		 * Test that when all except one engine are loaded all loads
 		 * are correctly reported.
 		 */
 		igt_subtest_f("most-busy-check-all-%s", e->name)
-			most_busy_check_all(fd, e, num_engines);
+			most_busy_check_all(fd, e, num_engines, TEST_BUSY);
+		igt_subtest_f("most-busy-idle-check-all-%s", e->name)
+			most_busy_check_all(fd, e, num_engines,
+					    TEST_BUSY | TEST_TRAILING_IDLE);
 
 		/**
 		 * Test that semphore counters report no activity on idle
@@ -1264,11 +1305,17 @@ igt_main
 		igt_subtest_f("busy-no-semaphores-%s", e->name)
 			no_sema(fd, e, TEST_BUSY);
 
+		igt_subtest_f("busy-idle-no-semaphores-%s", e->name)
+			no_sema(fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
+
 		/**
 		 * Test that semaphore waits are correctly reported.
 		 */
 		igt_subtest_f("semaphore-wait-%s", e->name)
-			sema_wait(fd, e);
+			sema_wait(fd, e, TEST_BUSY);
+
+		igt_subtest_f("semaphore-wait-idle-%s", e->name)
+			sema_wait(fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
 
 		/**
 		 * Test that event waits are correctly reported.
@@ -1304,7 +1351,10 @@ igt_main
 	 * correctly reported.
 	 */
 	igt_subtest("all-busy-check-all")
-		all_busy_check_all(fd, num_engines);
+		all_busy_check_all(fd, num_engines, TEST_BUSY);
+	igt_subtest("all-busy-idle-check-all")
+		all_busy_check_all(fd, num_engines,
+				   TEST_BUSY | TEST_TRAILING_IDLE);
 
 	/**
 	 * Test that non-engine counters can be initialized and read. Apart
@@ -1361,6 +1411,8 @@ igt_main
 		for_each_engine_class_instance(fd, e) {
 			igt_subtest_f("render-node-busy-%s", e->name)
 				single(fd, e, TEST_BUSY);
+			igt_subtest_f("render-node-busy-idle-%s", e->name)
+				single(fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
 		}
 
 		igt_fixture {
