@@ -402,6 +402,7 @@ void igt_force_gpu_reset(int drm_fd)
 	igt_sysfs_scanf(dir, "i915_wedged", "%d", &wedged);
 
 	close(dir);
+	errno = 0;
 
 	igt_assert(!wedged);
 }

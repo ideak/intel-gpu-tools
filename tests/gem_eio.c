@@ -67,6 +67,8 @@ static void trigger_reset(int fd)
 	/* And just check the gpu is indeed running again */
 	igt_debug("Checking that the GPU recovered\n");
 	gem_test_engine(fd, -1);
+
+	gem_quiescent_gpu(fd);
 }
 
 static void wedge_gpu(int fd)
@@ -133,21 +135,25 @@ static void test_execbuf(int fd)
 
 static int __gem_wait(int fd, uint32_t handle, int64_t timeout)
 {
-	struct drm_i915_gem_wait wait;
-	int err = 0;
+	struct drm_i915_gem_wait wait = {
+		.bo_handle = handle,
+		.timeout_ns = timeout,
+	};
+	int err;
 
-	memset(&wait, 0, sizeof(wait));
-	wait.bo_handle = handle;
-	wait.timeout_ns = timeout;
+	err = 0;
 	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_WAIT, &wait))
 		err = -errno;
 
+	errno = 0;
 	return err;
 }
 
 static void test_wait(int fd)
 {
 	igt_hang_t hang;
+
+	igt_require_gem(fd);
 
 	/* If the request we wait on completes due to a hang (even for
 	 * that request), the user expects the return value to 0 (success).
@@ -170,6 +176,9 @@ static void test_wait(int fd)
 
 static void test_suspend(int fd, int state)
 {
+	/* Do a suspend first so that we don't skip inside the test */
+	igt_system_suspend_autoresume(state, SUSPEND_TEST_DEVICES);
+
 	/* Check we can suspend when the driver is already wedged */
 	igt_require(i915_reset_control(false));
 	wedgeme(fd);
@@ -182,12 +191,11 @@ static void test_suspend(int fd, int state)
 
 static void test_inflight(int fd)
 {
-	struct drm_i915_gem_execbuffer2 execbuf;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj[2];
-	uint32_t bbe = MI_BATCH_BUFFER_END;
 	unsigned int engine;
-	int fence[64]; /* conservative estimate of ring size */
 
+	igt_require_gem(fd);
 	igt_require(gem_has_exec_fence(fd));
 
 	memset(obj, 0, sizeof(obj));
@@ -196,13 +204,17 @@ static void test_inflight(int fd)
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
 	for_each_engine(fd, engine) {
-		igt_hang_t hang;
+		struct drm_i915_gem_execbuffer2 execbuf;
+		igt_spin_t *hang;
+		int fence[64]; /* conservative estimate of ring size */
+
+		gem_quiescent_gpu(fd);
 
 		igt_debug("Starting %s on engine '%s'\n", __func__, e__->name);
 		igt_require(i915_reset_control(false));
 
-		hang = igt_hang_ring(fd, engine);
-		obj[0].handle = hang.handle;
+		hang = __igt_spin_batch_new(fd, 0, engine, 0);
+		obj[0].handle = hang->handle;
 
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(obj);
@@ -215,14 +227,13 @@ static void test_inflight(int fd)
 			igt_assert(fence[n] != -1);
 		}
 
-		igt_post_hang_ring(fd, hang);
-
 		igt_assert_eq(__gem_wait(fd, obj[1].handle, -1), 0);
 		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
 			close(fence[n]);
 		}
 
+		igt_spin_batch_free(fd, hang);
 		igt_assert(i915_reset_control(true));
 		trigger_reset(fd);
 	}
@@ -234,8 +245,9 @@ static void test_inflight_suspend(int fd)
 	struct drm_i915_gem_exec_object2 obj[2];
 	uint32_t bbe = MI_BATCH_BUFFER_END;
 	int fence[64]; /* conservative estimate of ring size */
-	igt_hang_t hang;
+	igt_spin_t *hang;
 
+	igt_require_gem(fd);
 	igt_require(gem_has_exec_fence(fd));
 	igt_require(i915_reset_control(false));
 
@@ -244,8 +256,8 @@ static void test_inflight_suspend(int fd)
 	obj[1].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
-	hang = igt_hang_ring(fd, 0);
-	obj[0].handle = hang.handle;
+	hang = __igt_spin_batch_new(fd, 0, 0, 0);
+	obj[0].handle = hang->handle;
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
@@ -261,34 +273,47 @@ static void test_inflight_suspend(int fd)
 	igt_set_autoresume_delay(30);
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 
-	igt_post_hang_ring(fd, hang);
-
 	igt_assert_eq(__gem_wait(fd, obj[1].handle, -1), 0);
 	for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
 		igt_assert_eq(sync_fence_status(fence[n]), -EIO);
 		close(fence[n]);
 	}
 
+	igt_spin_batch_free(fd, hang);
 	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
 }
 
+static uint32_t context_create_safe(int i915)
+{
+	struct drm_i915_gem_context_param param;
+
+	memset(&param, 0, sizeof(param));
+
+	param.ctx_id = gem_context_create(i915);
+	param.param = I915_CONTEXT_PARAM_BANNABLE;
+	gem_context_set_param(i915, &param);
+
+	param.param = I915_CONTEXT_PARAM_NO_ERROR_CAPTURE;
+	param.value = 1;
+	gem_context_set_param(i915, &param);
+
+	return param.ctx_id;
+}
+
 static void test_inflight_contexts(int fd)
 {
-	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
-	uint32_t bbe = MI_BATCH_BUFFER_END;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	unsigned int engine;
 	uint32_t ctx[64];
-	int fence[64];
 
+	igt_require_gem(fd);
 	igt_require(gem_has_exec_fence(fd));
 	gem_require_contexts(fd);
 
-	ctx[0] = gem_context_create(fd);
-	igt_require(ctx[0]);
-	for (unsigned int n = 1; n < ARRAY_SIZE(ctx); n++)
-		ctx[n] = gem_context_create(fd);
+	for (unsigned int n = 0; n < ARRAY_SIZE(ctx); n++)
+		ctx[n] = context_create_safe(fd);
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].flags = EXEC_OBJECT_WRITE;
@@ -296,13 +321,17 @@ static void test_inflight_contexts(int fd)
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
 	for_each_engine(fd, engine) {
-		igt_hang_t hang;
+		struct drm_i915_gem_execbuffer2 execbuf;
+		igt_spin_t *hang;
+		int fence[64];
+
+		gem_quiescent_gpu(fd);
 
 		igt_debug("Starting %s on engine '%s'\n", __func__, e__->name);
 		igt_require(i915_reset_control(false));
 
-		hang = igt_hang_ring(fd, engine);
-		obj[0].handle = hang.handle;
+		hang = __igt_spin_batch_new(fd, 0, engine, 0);
+		obj[0].handle = hang->handle;
 
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(obj);
@@ -316,14 +345,13 @@ static void test_inflight_contexts(int fd)
 			igt_assert(fence[n] != -1);
 		}
 
-		igt_post_hang_ring(fd, hang);
-
 		igt_assert_eq(__gem_wait(fd, obj[1].handle, -1), 0);
 		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
 			close(fence[n]);
 		}
 
+		igt_spin_batch_free(fd, hang);
 		igt_assert(i915_reset_control(true));
 		trigger_reset(fd);
 	}
@@ -334,12 +362,13 @@ static void test_inflight_contexts(int fd)
 
 static void test_inflight_external(int fd)
 {
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
-	uint32_t bbe = MI_BATCH_BUFFER_END;
-	igt_hang_t hang;
 	int timeline, fence;
+	igt_spin_t *hang;
 
+	igt_require_gem(fd);
 	igt_require_sw_sync();
 	igt_require(gem_has_exec_fence(fd));
 
@@ -347,7 +376,7 @@ static void test_inflight_external(int fd)
 	fence = sw_sync_timeline_create_fence(timeline, 1);
 
 	igt_require(i915_reset_control(false));
-	hang = igt_hang_ring(fd, I915_EXEC_DEFAULT);
+	hang = __igt_spin_batch_new(fd, 0, 0, 0);
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
@@ -365,13 +394,16 @@ static void test_inflight_external(int fd)
 	fence = execbuf.rsvd2 >> 32;
 	igt_assert(fence != -1);
 
-	igt_post_hang_ring(fd, hang); /* wedged, with an unready batch */
+	gem_sync(fd, hang->handle); /* wedged, with an unready batch */
+	igt_assert(!gem_bo_busy(fd, hang->handle));
+	igt_assert(gem_bo_busy(fd, obj.handle));
 	sw_sync_timeline_inc(timeline, 1); /* only now submit our batches */
 
 	igt_assert_eq(__gem_wait(fd, obj.handle, -1), 0);
 	igt_assert_eq(sync_fence_status(fence), -EIO);
 	close(fence);
 
+	igt_spin_batch_free(fd, hang);
 	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
 	close(timeline);
@@ -384,15 +416,16 @@ static void test_inflight_internal(int fd)
 	uint32_t bbe = MI_BATCH_BUFFER_END;
 	unsigned engine, nfence = 0;
 	int fences[16];
-	igt_hang_t hang;
+	igt_spin_t *hang;
 
+	igt_require_gem(fd);
 	igt_require(gem_has_exec_fence(fd));
 
 	igt_require(i915_reset_control(false));
-	hang = igt_hang_ring(fd, I915_EXEC_DEFAULT);
+	hang = __igt_spin_batch_new(fd, 0, 0, 0);
 
 	memset(obj, 0, sizeof(obj));
-	obj[0].handle = hang.handle;
+	obj[0].handle = hang->handle;
 	obj[0].flags = EXEC_OBJECT_WRITE;
 	obj[1].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
@@ -410,14 +443,13 @@ static void test_inflight_internal(int fd)
 		nfence++;
 	}
 
-	igt_post_hang_ring(fd, hang); /* wedged, with an unready batch */
-
 	igt_assert_eq(__gem_wait(fd, obj[1].handle, -1), 0);
 	while (nfence--) {
 		igt_assert_eq(sync_fence_status(fences[nfence]), -EIO);
 		close(fences[nfence]);
 	}
 
+	igt_spin_batch_free(fd, hang);
 	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
 }
@@ -444,7 +476,8 @@ igt_main
 
 		gem_submission_print_method(fd);
 		igt_require_gem(fd);
-		igt_require_hang_ring(fd, I915_EXEC_DEFAULT);
+
+		igt_allow_hang(fd, 0, 0);
 	}
 
 	igt_subtest("throttle")
