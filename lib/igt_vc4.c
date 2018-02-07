@@ -149,3 +149,15 @@ uint64_t igt_vc4_get_tiling(int fd, uint32_t handle)
 
 	return get.modifier;
 }
+
+bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable)
+{
+	struct drm_vc4_gem_madvise arg = {
+		.handle = handle,
+		.madv = purgeable ? VC4_MADV_DONTNEED : VC4_MADV_WILLNEED,
+	};
+
+	do_ioctl(fd, DRM_IOCTL_VC4_GEM_MADVISE, &arg);
+
+	return arg.retained;
+}
