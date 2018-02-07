@@ -1528,22 +1528,22 @@ igt_main
 		}
 	}
 
-	igt_subtest("long-history") {
-		long ring_size = measure_ring_size(i915) - 1;
+	igt_subtest_group {
+		long ring_size = 0;
 
-		igt_info("Ring size: %ld batches\n", ring_size);
-		igt_require(ring_size);
+		igt_fixture {
+			ring_size = measure_ring_size(i915) - 1;
+			igt_info("Ring size: %ld batches\n", ring_size);
+			igt_require(ring_size);
 
-		test_long_history(i915, ring_size, 0);
-	}
+			gem_require_contexts(i915);
+		}
 
-	igt_subtest("expired-history") {
-		long ring_size = measure_ring_size(i915) - 1;
+		igt_subtest("long-history")
+			test_long_history(i915, ring_size, 0);
 
-		igt_info("Ring size: %ld batches\n", ring_size);
-		igt_require(ring_size);
-
-		test_long_history(i915, ring_size, EXPIRED);
+		igt_subtest("expired-history")
+			test_long_history(i915, ring_size, EXPIRED);
 	}
 
 	igt_subtest("flip") {

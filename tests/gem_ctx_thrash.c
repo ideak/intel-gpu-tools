@@ -124,6 +124,8 @@ static void single(const char *name, bool all_engines)
 	igt_require_gem(fd);
 	igt_require(gem_can_store_dword(fd, 0));
 
+	gem_require_contexts(fd);
+
 	gen = intel_gen(intel_get_drm_devid(fd));
 
 	num_engines = 0;
@@ -371,6 +373,10 @@ static void threads(void)
 	struct thread data;
 
 	data.fd = drm_open_driver_render(DRIVER_INTEL);
+	igt_require_gem(data.fd);
+
+	gem_require_contexts(data.fd);
+
 	data.num_ctx = get_num_contexts(data.fd, false);
 	data.all_ctx = malloc(data.num_ctx * sizeof(uint32_t));
 	igt_assert(data.all_ctx);

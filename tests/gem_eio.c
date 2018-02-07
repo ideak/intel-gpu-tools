@@ -273,17 +273,6 @@ static void test_inflight_suspend(int fd)
 	trigger_reset(fd);
 }
 
-static uint32_t __gem_context_create(int fd)
-{
-	struct drm_i915_gem_context_create create;
-
-	memset(&create, 0, sizeof(create));
-	if (ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &create))
-		return 0;
-
-	return create.ctx_id;
-}
-
 static void test_inflight_contexts(int fd)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -294,8 +283,9 @@ static void test_inflight_contexts(int fd)
 	int fence[64];
 
 	igt_require(gem_has_exec_fence(fd));
+	gem_require_contexts(fd);
 
-	ctx[0] = __gem_context_create(fd);
+	ctx[0] = gem_context_create(fd);
 	igt_require(ctx[0]);
 	for (unsigned int n = 1; n < ARRAY_SIZE(ctx); n++)
 		ctx[n] = gem_context_create(fd);

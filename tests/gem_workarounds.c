@@ -182,8 +182,11 @@ static void check_workarounds(int fd, enum operation op, unsigned int flags)
 
 	if (flags & FD)
 		fd = reopen(fd);
-	if (flags & CONTEXT)
+
+	if (flags & CONTEXT) {
+		gem_require_contexts(fd);
 		ctx = gem_context_create(fd);
+	}
 
 	igt_assert_eq(workaround_fail_count(fd, ctx), 0);
 

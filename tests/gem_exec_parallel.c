@@ -55,22 +55,6 @@ static void check_bo(int fd, uint32_t handle, int pass)
 	munmap(map, 4096);
 }
 
-static uint32_t __gem_context_create(int fd)
-{
-	struct drm_i915_gem_context_create arg;
-
-	memset(&arg, 0, sizeof(arg));
-	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg) == 0)
-		gem_context_destroy(fd, arg.ctx_id);
-
-	return arg.ctx_id;
-}
-
-static void gem_require_context(int fd)
-{
-	igt_require(__gem_context_create(fd));
-}
-
 static bool ignore_engine(int fd, unsigned engine)
 {
 	if (engine == 0)
@@ -189,7 +173,7 @@ static void all(int fd, unsigned engine, unsigned flags)
 	int i;
 
 	if (flags & CONTEXTS)
-		gem_require_context(fd);
+		gem_require_contexts(fd);
 
 	if (flags & FDS)
 		igt_require(gen > 5);

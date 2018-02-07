@@ -64,7 +64,7 @@ static uint32_t batch(int fd)
 	return handle;
 }
 
-static uint32_t __gem_context_create(int fd)
+static uint32_t __gem_context_create_local(int fd)
 {
 	struct drm_i915_gem_context_create create;
 
@@ -101,7 +101,7 @@ static int loop(unsigned ring,
 	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 	if (mode != DEFAULT) {
-		execbuf.rsvd1 = __gem_context_create(fd);
+		execbuf.rsvd1 = __gem_context_create_local(fd);
 		if (execbuf.rsvd1 == 0)
 			return 77;
 	}
@@ -125,7 +125,7 @@ static int loop(unsigned ring,
 			uint32_t ctx = 0;
 
 			if (mode != DEFAULT && mode != NOP) {
-				execbuf.rsvd1 = __gem_context_create(fd);
+				execbuf.rsvd1 = __gem_context_create_local(fd);
 				ctx = gem_context_create(fd);
 			}
 

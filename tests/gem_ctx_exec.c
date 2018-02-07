@@ -158,11 +158,9 @@ igt_main
 		fd = drm_open_driver_render(DRIVER_INTEL);
 		igt_require_gem(fd);
 
-		handle = gem_create(fd, 4096);
+		gem_require_contexts(fd);
 
-		/* check that we can create contexts. */
-		ctx_id = gem_context_create(fd);
-		gem_context_destroy(fd, ctx_id);
+		handle = gem_create(fd, 4096);
 		gem_write(fd, handle, 0, batch, sizeof(batch));
 	}
 

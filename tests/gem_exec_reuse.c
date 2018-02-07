@@ -56,19 +56,6 @@ static void noop(struct noop *n,
 	gem_execbuf(n->fd, &execbuf);
 }
 
-static int __gem_context_create(int fd, uint32_t *ctx_id)
-{
-	struct drm_i915_gem_context_create arg;
-	int ret = 0;
-
-	memset(&arg, 0, sizeof(arg));
-	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg))
-		ret = -errno;
-
-	*ctx_id = arg.ctx_id;
-	return ret;
-}
-
 static int fls(uint64_t x)
 {
 	int t;
@@ -215,8 +202,9 @@ igt_main
 		const unsigned int ncontexts = 1024;
 		uint32_t contexts[ncontexts];
 
-		igt_require(__gem_context_create(no.fd, &contexts[0]) == 0);
-		for (n = 1; n < ncontexts; n++)
+		gem_require_contexts(no.fd);
+
+		for (n = 0; n < ncontexts; n++)
 			contexts[n] = gem_context_create(no.fd);
 
 		igt_until_timeout(timeout) {

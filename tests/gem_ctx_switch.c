@@ -45,19 +45,6 @@
 
 #define INTERRUPTIBLE 1
 
-static int __gem_context_create(int fd, uint32_t *ctx_id)
-{
-	struct drm_i915_gem_context_create arg;
-	int ret = 0;
-
-	memset(&arg, 0, sizeof(arg));
-	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg))
-		ret = -errno;
-
-	*ctx_id = arg.ctx_id;
-	return ret;
-}
-
 static double elapsed(const struct timespec *start, const struct timespec *end)
 {
 	return ((end->tv_sec - start->tv_sec) +
@@ -78,8 +65,7 @@ static void single(int fd, uint32_t handle,
 
 	gem_require_ring(fd, e->exec_id | e->flags);
 
-	igt_require(__gem_context_create(fd, &contexts[0]) == 0);
-	for (n = 1; n < 64; n++)
+	for (n = 0; n < 64; n++)
 		contexts[n] = gem_context_create(fd);
 
 	memset(&obj, 0, sizeof(obj));
@@ -152,6 +138,8 @@ igt_main
 
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
+
+		gem_require_contexts(fd);
 
 		light = gem_create(fd, 4096);
 		gem_write(fd, light, 0, &bbe, sizeof(bbe));

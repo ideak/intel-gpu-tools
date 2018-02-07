@@ -105,7 +105,7 @@ static double elapsed(const struct timespec *start, const struct timespec *end)
 	return 1e3*(end->tv_sec - start->tv_sec) + 1e-6*(end->tv_nsec - start->tv_nsec);
 }
 
-static uint32_t __gem_context_create(int fd)
+static uint32_t __gem_context_create_local(int fd)
 {
 	struct drm_i915_gem_context_create arg = {};
 	drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg);
@@ -216,7 +216,7 @@ static double replay(const char *filename, long nop, long range)
 				num_ctx = new_ctx;
 			}
 
-			ctx[t->handle] = __gem_context_create(fd);
+			ctx[t->handle] = __gem_context_create_local(fd);
 			break;
 		}
 	case DEL_CTX:

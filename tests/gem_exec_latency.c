@@ -486,6 +486,7 @@ igt_main
 
 				igt_subtest_group {
 					igt_fixture {
+						gem_require_contexts(device);
 						igt_require(gem_scheduler_has_preemption(device));
 					}
 

@@ -55,15 +55,6 @@ static bool ignore_engine(int fd, unsigned engine)
 	return false;
 }
 
-static uint32_t __gem_context_create(int fd)
-{
-	struct drm_i915_gem_context_create arg;
-
-	memset(&arg, 0, sizeof(arg));
-	drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg);
-	return arg.ctx_id;
-}
-
 static void xchg_obj(void *array, unsigned i, unsigned j)
 {
 	struct drm_i915_gem_exec_object2 *obj = array;
@@ -130,8 +121,7 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 					 LOCAL_I915_EXEC_HANDLE_LUT);
 
 		if (flags & CONTEXTS) {
-			exec[e].execbuf.rsvd1 = __gem_context_create(fd);
-			igt_require(exec[e].execbuf.rsvd1);
+			exec[e].execbuf.rsvd1 = gem_context_create(fd);
 		}
 
 		exec[e].exec[0].handle = gem_create(fd, 4096);
@@ -174,7 +164,7 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 
 			if (flags & CONTEXTS) {
 				gem_context_destroy(fd, exec[e].execbuf.rsvd1);
-				exec[e].execbuf.rsvd1 = __gem_context_create(fd);
+				exec[e].execbuf.rsvd1 = gem_context_create(fd);
 			}
 
 			exec[e].reloc.presumed_offset = exec[e].exec[1].offset;
@@ -358,8 +348,10 @@ igt_main
 	igt_subtest("wide-all")
 		wide(device, ring_size, 20, 0);
 
-	igt_subtest("wide-contexts")
+	igt_subtest("wide-contexts") {
+		gem_require_contexts(device);
 		wide(device, ring_size, 20, CONTEXTS);
+	}
 
 	igt_fixture {
 		igt_stop_hang_detector();

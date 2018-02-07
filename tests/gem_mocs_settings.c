@@ -453,6 +453,9 @@ igt_main
 					      flags & MOCS_NON_DEFAULT_CTX ? "-ctx": "",
 					      flags & MOCS_DIRTY_VALUES ? "-dirty" : "",
 					      e->name) {
+					if (flags & (MOCS_NON_DEFAULT_CTX | MOCS_DIRTY_VALUES))
+						gem_require_contexts(fd);
+
 					run_test(fd, e->exec_id | e->flags, flags, mode);
 				}
 			}

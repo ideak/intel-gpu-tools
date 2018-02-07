@@ -1456,8 +1456,10 @@ igt_main
 			 * Check that reported usage is correct when PMU is
 			 * enabled after two batches are running.
 			 */
-			igt_subtest_f("busy-double-start-%s", e->name)
+			igt_subtest_f("busy-double-start-%s", e->name) {
+				gem_require_contexts(fd);
 				busy_double_start(fd, e);
+			}
 
 			/**
 			 * Check that the PMU can be safely enabled in face of

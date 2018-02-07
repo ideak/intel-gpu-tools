@@ -38,6 +38,8 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver_render(DRIVER_INTEL);
+
+		gem_require_contexts(fd);
 		ctx = gem_context_create(fd);
 	}
 

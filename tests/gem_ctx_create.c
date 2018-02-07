@@ -45,7 +45,7 @@ static unsigned all_nengine;
 static unsigned ppgtt_engines[16];
 static unsigned ppgtt_nengine;
 
-static int __gem_context_create(int fd, struct drm_i915_gem_context_create *arg)
+static int __gem_context_create_local(int fd, struct drm_i915_gem_context_create *arg)
 {
 	int ret = 0;
 	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, arg))
@@ -233,7 +233,6 @@ static uint64_t total_avail_mem(unsigned mode)
 
 static void maximum(int fd, int ncpus, unsigned mode)
 {
-	struct drm_i915_gem_context_create create;
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -241,8 +240,8 @@ static void maximum(int fd, int ncpus, unsigned mode)
 	unsigned ctx_size = context_size(fd);
 	uint32_t *contexts = NULL;
 	unsigned long count = 0;
+	uint32_t ctx_id;
 
-	memset(&create, 0, sizeof(create));
 	do {
 		int err;
 
@@ -255,14 +254,14 @@ static void maximum(int fd, int ncpus, unsigned mode)
 
 		err = -ENOMEM;
 		if (avail_mem > (count + 1) * ctx_size)
-			err = __gem_context_create(fd, &create);
+			err = __gem_context_create(fd, &ctx_id);
 		if (err) {
 			igt_info("Created %lu contexts, before failing with '%s' [%d]\n",
 				 count, strerror(-err), -err);
 			break;
 		}
 
-		contexts[count++] = create.ctx_id;
+		contexts[count++] = ctx_id;
 	} while (1);
 	igt_require(count);
 
@@ -320,10 +319,7 @@ igt_main
 
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
-
-		memset(&create, 0, sizeof(create));
-		igt_require(__gem_context_create(fd, &create) == 0);
-		gem_context_destroy(fd, create.ctx_id);
+		gem_require_contexts(fd);
 
 		for_each_engine(fd, engine) {
 			if (engine == 0)
@@ -347,7 +343,7 @@ igt_main
 		memset(&create, 0, sizeof(create));
 		create.ctx_id = rand();
 		create.pad = 0;
-		igt_assert_eq(__gem_context_create(fd, &create), 0);
+		igt_assert_eq(__gem_context_create_local(fd, &create), 0);
 		igt_assert(create.ctx_id != 0);
 		gem_context_destroy(fd, create.ctx_id);
 	}
@@ -356,7 +352,7 @@ igt_main
 		memset(&create, 0, sizeof(create));
 		create.ctx_id = rand();
 		create.pad = 1;
-		igt_assert_eq(__gem_context_create(fd, &create), -EINVAL);
+		igt_assert_eq(__gem_context_create_local(fd, &create), -EINVAL);
 	}
 
 	igt_subtest("maximum-mem")

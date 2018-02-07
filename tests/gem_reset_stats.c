@@ -114,7 +114,10 @@ static int has_engine(int fd,
 static void check_context(const struct intel_execution_engine *e)
 {
 	int fd = drm_open_driver(DRIVER_INTEL);
+
+	gem_require_contexts(fd);
 	igt_require(has_engine(fd, gem_context_create(fd), e));
+
 	close(fd);
 }
 

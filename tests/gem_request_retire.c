@@ -227,7 +227,8 @@ int main(int argc, char **argv)
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
-		igt_assert(fd >= 0);
+
+		gem_require_contexts(fd);
 	}
 
 	igt_subtest("retire-vma-not-inactive")

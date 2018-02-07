@@ -416,8 +416,10 @@ igt_main
 		igt_require(err == 0);
 	}
 
-	igt_subtest("i915-to-amd")
+	igt_subtest("i915-to-amd") {
+		gem_require_contexts(i915);
 		i915_to_amd(i915, amd, device);
+	}
 
 	igt_subtest("amd-to-i915")
 		amd_to_i915(i915, amd, device);

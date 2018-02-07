@@ -44,6 +44,52 @@
  */
 
 /**
+ * gem_has_contexts:
+ * @fd: open i915 drm file descriptor
+ *
+ * Queries whether context creation is supported or not.
+ *
+ * Returns: Context creation availability.
+ */
+bool gem_has_contexts(int fd)
+{
+	uint32_t ctx_id = 0;
+
+	__gem_context_create(fd, &ctx_id);
+	if (ctx_id)
+		gem_context_destroy(fd, ctx_id);
+
+	return ctx_id;
+}
+
+/**
+ * gem_require_contexts:
+ * @fd: open i915 drm file descriptor
+ *
+ * This helper will automatically skip the test on platforms where context
+ * support is not available.
+ */
+void gem_require_contexts(int fd)
+{
+	igt_require(gem_has_contexts(fd));
+}
+
+int __gem_context_create(int fd, uint32_t *ctx_id)
+{
+       struct drm_i915_gem_context_create create;
+       int err = 0;
+
+       memset(&create, 0, sizeof(create));
+       if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &create) == 0)
+               *ctx_id = create.ctx_id;
+       else
+               err = -errno;
+
+       errno = 0;
+       return err;
+}
+
+/**
  * gem_context_create:
  * @fd: open i915 drm file descriptor
  *
@@ -55,18 +101,12 @@
  */
 uint32_t gem_context_create(int fd)
 {
-	struct drm_i915_gem_context_create create;
+	uint32_t ctx_id;
 
-	memset(&create, 0, sizeof(create));
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &create)) {
-		int err = -errno;
-		igt_skip_on(err == -ENODEV || errno == -EINVAL);
-		igt_assert_eq(err, 0);
-	}
-	igt_assert(create.ctx_id != 0);
-	errno = 0;
+	igt_assert_eq(__gem_context_create(fd, &ctx_id), 0);
+	igt_assert(ctx_id != 0);
 
-	return create.ctx_id;
+	return ctx_id;
 }
 
 int __gem_context_destroy(int fd, uint32_t ctx_id)

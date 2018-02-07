@@ -357,19 +357,6 @@ static void xchg(void *array, unsigned i, unsigned j)
 	u[j] = tmp;
 }
 
-static int __gem_context_create(int fd, uint32_t *ctx_id)
-{
-	struct drm_i915_gem_context_create arg;
-	int ret = 0;
-
-	memset(&arg, 0, sizeof(arg));
-	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg))
-		ret = -errno;
-
-	*ctx_id = arg.ctx_id;
-	return ret;
-}
-
 static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 {
 	const int ncpus = flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1;
@@ -380,6 +367,8 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 	double *results;
 	double time, sum;
 	unsigned n;
+
+	gem_require_contexts(fd);
 
 	results = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(results != MAP_FAILED);
@@ -699,6 +688,7 @@ igt_main
 
 	igt_subtest_group {
 		igt_fixture {
+			gem_require_contexts(device);
 			igt_require(gem_scheduler_has_ctx_priority(device));
 			igt_require(gem_scheduler_has_preemption(device));
 		}

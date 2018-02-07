@@ -839,6 +839,7 @@ igt_main
 
 	igt_subtest_group {
 		igt_fixture {
+			gem_require_contexts(fd);
 			igt_require(gem_scheduler_has_ctx_priority(fd));
 			igt_require(gem_scheduler_has_preemption(fd));
 		}

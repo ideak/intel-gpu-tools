@@ -45,6 +45,8 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver_render(DRIVER_INTEL);
 
+		gem_require_contexts(fd);
+
 		ctx_id = gem_context_create(fd);
 		/* Make sure a proper destroy works first */
 		gem_context_destroy(fd, ctx_id);

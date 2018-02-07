@@ -79,19 +79,6 @@ static void verify_reloc(int fd, uint32_t handle,
 	}
 }
 
-static int __gem_context_create(int fd, uint32_t *ctx_id)
-{
-	struct drm_i915_gem_context_create arg;
-	int ret = 0;
-
-	memset(&arg, 0, sizeof(arg));
-	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &arg))
-		ret = -errno;
-
-	*ctx_id = arg.ctx_id;
-	return ret;
-}
-
 static bool ignore_engine(int fd, unsigned engine)
 {
 	if (engine == 0)
@@ -244,10 +231,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	if (flags & FDS)
 		igt_require(gen >= 6);
 
-	if (flags & CONTEXTS) {
-		igt_require(__gem_context_create(fd, &contexts[0]) == 0);
-		gem_context_destroy(fd, contexts[0]);
-	}
+	if (flags & CONTEXTS)
+		gem_require_contexts(fd);
 
 	if (flags & HANG)
 		init_hang(&hang);
