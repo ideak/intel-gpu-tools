@@ -40,6 +40,7 @@
 #include "igt_core.h"
 #include "igt_perf.h"
 #include "igt_sysfs.h"
+#include "igt_pm.h"
 #include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Test the i915 pmu perf interface");
@@ -153,6 +154,8 @@ static unsigned int e2ring(int gem_fd, const struct intel_execution_engine2 *e)
 #define TEST_BUSY (1)
 #define FLAG_SYNC (2)
 #define TEST_TRAILING_IDLE (4)
+#define TEST_RUNTIME_PM (8)
+#define FLAG_LONG (16)
 
 static void end_spin(int fd, igt_spin_t *spin, unsigned int flags)
 {
@@ -1246,19 +1249,45 @@ static bool wait_for_rc6(int fd)
 }
 
 static void
-test_rc6(int gem_fd)
+test_rc6(int gem_fd, unsigned int flags)
 {
 	int64_t duration_ns = 2e9;
 	uint64_t idle, busy, prev;
 	unsigned int slept;
 	int fd, fw;
 
+	gem_quiescent_gpu(gem_fd);
+
 	fd = open_pmu(I915_PMU_RC6_RESIDENCY);
 
-	gem_quiescent_gpu(gem_fd);
+	if (flags & TEST_RUNTIME_PM) {
+		drmModeRes *res;
+
+		res = drmModeGetResources(gem_fd);
+		igt_assert(res);
+
+		/* force all connectors off */
+		kmstest_set_vt_graphics_mode();
+		kmstest_unset_all_crtcs(gem_fd, res);
+		drmModeFreeResources(res);
+
+		igt_require(igt_setup_runtime_pm());
+		igt_require(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
+
+		/*
+		 * Sleep for a bit to see if once woken up estimated RC6 hasn't
+		 * drifted to far in advance of real RC6.
+		 */
+		if (flags & FLAG_LONG) {
+			pmu_read_single(fd);
+			sleep(5);
+			pmu_read_single(fd);
+		}
+	}
+
 	igt_require(wait_for_rc6(fd));
 
-	/* Go idle and check full RC6. */
+	/* While idle check full RC6. */
 	prev = pmu_read_single(fd);
 	slept = measured_usleep(duration_ns / 1000);
 	idle = pmu_read_single(fd);
@@ -1525,7 +1554,13 @@ igt_main
 	 * Test RC6 residency reporting.
 	 */
 	igt_subtest("rc6")
-		test_rc6(fd);
+		test_rc6(fd, 0);
+
+	igt_subtest("rc6-runtime-pm")
+		test_rc6(fd, TEST_RUNTIME_PM);
+
+	igt_subtest("rc6-runtime-pm-long")
+		test_rc6(fd, TEST_RUNTIME_PM | FLAG_LONG);
 
 	/**
 	 * Check render nodes are counted.
