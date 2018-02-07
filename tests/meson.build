@@ -212,6 +212,7 @@ test_progs = [
 	'vc4_dmabuf_poll',
 	'vc4_label_bo',
 	'vc4_lookup_fail',
+	'vc4_purgeable_bo',
 	'vc4_tiling',
 	'vc4_wait_bo',
 	'vc4_wait_seqno',
