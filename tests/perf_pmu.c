@@ -106,7 +106,7 @@ static uint64_t pmu_read_single(int fd)
 	return __pmu_read_single(fd, NULL);
 }
 
-static void pmu_read_multi(int fd, unsigned int num, uint64_t *val)
+static uint64_t pmu_read_multi(int fd, unsigned int num, uint64_t *val)
 {
 	uint64_t buf[2 + num];
 	unsigned int i;
@@ -115,6 +115,8 @@ static void pmu_read_multi(int fd, unsigned int num, uint64_t *val)
 
 	for (i = 0; i < num; i++)
 		val[i] = buf[2 + i];
+
+	return buf[1];
 }
 
 #define assert_within_epsilon(x, ref, tolerance) \
@@ -1136,9 +1138,8 @@ static void
 test_frequency(int gem_fd)
 {
 	uint32_t min_freq, max_freq, boost_freq;
-	uint64_t val[2], start[2];
+	uint64_t val[2], start[2], slept;
 	double min[2], max[2];
-	unsigned long slept;
 	igt_spin_t *spin;
 	int fd, sysfs;
 
@@ -1169,11 +1170,11 @@ test_frequency(int gem_fd)
 
 	gem_quiescent_gpu(gem_fd); /* Idle to be sure the change takes effect */
 	spin = igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
-	pmu_read_multi(fd, 2, start);
 
-	slept = measured_usleep(batch_duration_ns / 1000);
+	slept = pmu_read_multi(fd, 2, start);
+	measured_usleep(batch_duration_ns / 1000);
+	slept = pmu_read_multi(fd, 2, val) - slept;
 
-	pmu_read_multi(fd, 2, val);
 	min[0] = 1e9*(val[0] - start[0]) / slept;
 	min[1] = 1e9*(val[1] - start[1]) / slept;
 
@@ -1195,11 +1196,11 @@ test_frequency(int gem_fd)
 
 	gem_quiescent_gpu(gem_fd);
 	spin = igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
-	pmu_read_multi(fd, 2, start);
 
-	slept = measured_usleep(batch_duration_ns / 1000);
+	slept = pmu_read_multi(fd, 2, start);
+	measured_usleep(batch_duration_ns / 1000);
+	slept = pmu_read_multi(fd, 2, val) - slept;
 
-	pmu_read_multi(fd, 2, val);
 	max[0] = 1e9*(val[0] - start[0]) / slept;
 	max[1] = 1e9*(val[1] - start[1]) / slept;
 
