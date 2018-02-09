@@ -60,6 +60,15 @@ static unsigned long get_rc6_enabled_mask(void)
 	return enabled;
 }
 
+static bool has_rc6_residency(const char *name)
+{
+	unsigned long residency;
+	char path[128];
+
+	sprintf(path, "power/%s_residency_ms", name);
+	return igt_sysfs_scanf(sysfs, path, "%lu", &residency) == 1;
+}
+
 static unsigned long read_rc6_residency(const char *name)
 {
 	unsigned long residency;
@@ -129,15 +138,15 @@ static void measure_residencies(int devid, unsigned int mask,
 	 */
 	read_residencies(devid, mask, &end);
 	igt_debug("time=%d: rc6=(%d, %d), rc6p=%d, rc6pp=%d\n",
-		 end.duration, end.rc6, end.media_rc6, end.rc6p, end.rc6pp);
+		  end.duration, end.rc6, end.media_rc6, end.rc6p, end.rc6pp);
 	for (retry = 0; retry < 2; retry++) {
 		start = end;
 		sleep(SLEEP_DURATION);
 		read_residencies(devid, mask, &end);
 
 		igt_debug("time=%d: rc6=(%d, %d), rc6p=%d, rc6pp=%d\n",
-			 end.duration,
-			 end.rc6, end.media_rc6, end.rc6p, end.rc6pp);
+			  end.duration,
+			  end.rc6, end.media_rc6, end.rc6p, end.rc6pp);
 
 		if (end.rc6 >= start.rc6 &&
 		    end.media_rc6 >= start.media_rc6 &&
@@ -171,9 +180,9 @@ static bool wait_for_rc6(void)
 	unsigned long start, now;
 
 	/* First wait for roughly an RC6 Evaluation Interval */
-        usleep(160 * 1000);
+	usleep(160 * 1000);
 
-        /* Then poll for RC6 to start ticking */
+	/* Then poll for RC6 to start ticking */
 	now = read_rc6_residency("rc6");
 	do {
 		start = now;
@@ -200,6 +209,8 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		devid = intel_get_drm_devid(fd);
 		sysfs = igt_sysfs_open(fd, NULL);
+
+		igt_require(has_rc6_residency("rc6"));
 
 		/* Make sure rc6 counters are running */
 		igt_drop_caches_set(fd, DROP_IDLE);
