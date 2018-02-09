@@ -1405,6 +1405,22 @@ void gem_require_caching(int fd)
 	errno = 0;
 }
 
+static void reset_device(int fd)
+{
+	int dir;
+
+	dir = igt_debugfs_dir(fd);
+	igt_require(dir >= 0);
+
+	if (ioctl(fd, DRM_IOCTL_I915_GEM_THROTTLE)) {
+		igt_info("Found wedged device, trying to reset and continue\n");
+		igt_sysfs_set(dir, "i915_wedged", "-1");
+	}
+	igt_sysfs_set(dir, "i915_next_seqno", "1");
+
+	close(dir);
+}
+
 void igt_require_gem(int fd)
 {
 	char path[256];
@@ -1427,15 +1443,12 @@ void igt_require_gem(int fd)
 	 * itself, which avoids accidentally hanging when setting up long
 	 * sequences of batches.
 	 */
-	err = igt_debugfs_dir(fd);
-	if (err != -1) {
-		igt_sysfs_printf(err, "i915_next_seqno", "1");
-		close(err);
-	}
+	reset_device(fd);
 
 	err = 0;
 	if (ioctl(fd, DRM_IOCTL_I915_GEM_THROTTLE))
 		err = -errno;
+
 	close(fd);
 
 	igt_require_f(err == 0, "Unresponsive i915/GEM device\n");
