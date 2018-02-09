@@ -74,13 +74,19 @@ static void
 init(int gem_fd, const struct intel_execution_engine2 *e, uint8_t sample)
 {
 	int fd, err = 0;
+	bool exists;
 
 	errno = 0;
 	fd = perf_i915_open(__I915_PMU_ENGINE(e->class, e->instance, sample));
 	if (fd < 0)
 		err = errno;
 
-	if (gem_has_engine(gem_fd, e->class, e->instance)) {
+	exists = gem_has_engine(gem_fd, e->class, e->instance);
+	if (intel_gen(intel_get_drm_devid(gem_fd)) < 6 &&
+	    sample == I915_SAMPLE_SEMA)
+		exists = false;
+
+	if (exists) {
 		igt_assert_eq(err, 0);
 		igt_assert_fd(fd);
 		close(fd);
