@@ -206,11 +206,15 @@ static void smoketest(int fd, unsigned ring, unsigned timeout)
 	uint32_t *ptr;
 
 	nengine = 0;
-	for_each_engine(fd, engine) {
-		if (ignore_engine(fd, engine))
-			continue;
+	if (ring == -1) {
+		for_each_engine(fd, engine) {
+			if (ignore_engine(fd, engine))
+				continue;
 
-		engines[nengine++] = engine;
+			engines[nengine++] = engine;
+		}
+	} else {
+		engines[nengine++] = ring;
 	}
 	igt_require(nengine);
 
