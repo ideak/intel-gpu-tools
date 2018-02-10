@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "igt_device.h"
 #include "igt_sysfs.h"
 
 #define LOCAL_OBJECT_CAPTURE (1 << 7)
@@ -141,6 +142,8 @@ static void capture(int fd, int dir, unsigned ring)
 	execbuf.buffers_ptr = (uintptr_t)obj;
 	execbuf.buffer_count = ARRAY_SIZE(obj);
 	execbuf.flags = ring;
+	if (gen > 3 && gen < 6)
+		execbuf.flags |= I915_EXEC_SECURE;
 	gem_execbuf(fd, &execbuf);
 
 	/* Wait for the request to start */
@@ -182,7 +185,14 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_fixture {
+		int gen;
+
 		fd = drm_open_driver(DRIVER_INTEL);
+
+		gen = intel_gen(intel_get_drm_devid(fd));
+		if (gen > 3 && gen < 6) /* ctg and ilk need secure batches */
+			igt_device_set_master(fd);
+
 		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
 		igt_require(has_capture(fd));
