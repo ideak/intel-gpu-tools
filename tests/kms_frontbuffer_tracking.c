@@ -1588,6 +1588,9 @@ static bool fbc_supported_on_chipset(void)
 	char buf[128];
 
 	debugfs_read("i915_fbc_status", buf);
+	if (*buf == '\0')
+		return false;
+
 	return !strstr(buf, "FBC unsupported on this chipset\n");
 }
 
