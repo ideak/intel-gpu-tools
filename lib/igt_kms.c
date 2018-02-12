@@ -618,6 +618,14 @@ uint32_t kmstest_dumb_create(int fd, int width, int height, int bpp,
 	return create.handle;
 }
 
+/**
+ * kmstest_dumb_map_buffer:
+ * @fd: Opened drm file descriptor
+ * @handle: Offset in the file referred to by fd
+ * @size: Length of the mapping, must be greater than 0
+ * @prot: Describes the memory protection of the mapping
+ * Returns: A pointer representing the start of the virtual mapping
+ */
 void *kmstest_dumb_map_buffer(int fd, uint32_t handle, uint64_t size,
 			      unsigned prot)
 {
@@ -1425,6 +1433,16 @@ static inline uint32_t pipe_select(int pipe)
 		return 0;
 }
 
+/**
+ * kmstest_get_vblank:
+ * @fd: Opened drm file descriptor
+ * @pipe: Display pipe
+ * @flags: Flags passed to drm_ioctl_wait_vblank
+ *
+ * Blocks or request a signal when a specified vblank event occurs
+ *
+ * Returns 0 on success or non-zero unsigned integer otherwise
+ */
 unsigned int kmstest_get_vblank(int fd, int pipe, unsigned int flags)
 {
 	union drm_wait_vblank vbl;
@@ -1552,6 +1570,14 @@ static void kmstest_get_crtc(int device, enum pipe pipe, struct kmstest_crtc *cr
 	igt_assert(ncrtc == 1);
 }
 
+/**
+ * igt_assert_plane_visible:
+ * @fd: Opened file descriptor
+ * @pipe: Display pipe
+ * @visibility: Boolean parameter to test against the plane's current visibility state
+ *
+ * Asserts only if the plane's visibility state matches the status being passed by @visibility
+ */
 void igt_assert_plane_visible(int fd, enum pipe pipe, bool visibility)
 {
 	struct kmstest_crtc crtc;
@@ -1935,11 +1961,24 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 	LOG_UNINDENT(display);
 }
 
+/**
+ * igt_display_get_n_pipes:
+ * @display: A pointer to an #igt_display_t structure
+ *
+ * Returns total number of pipes for the given @display
+ */
 int igt_display_get_n_pipes(igt_display_t *display)
 {
 	return display->n_pipes;
 }
 
+/**
+ * igt_display_require_output:
+ * @display: A pointer to an #igt_display_t structure
+ *
+ * Checks whether there's a valid @pipe/@output combination for the given @display
+ * Skips test if a valid combination of @pipe and @output is not found
+ */
 void igt_display_require_output(igt_display_t *display)
 {
 	enum pipe pipe;
@@ -1951,6 +1990,14 @@ void igt_display_require_output(igt_display_t *display)
 	igt_skip("No valid crtc/connector combinations found.\n");
 }
 
+/**
+ * igt_display_require_output_on_pipe:
+ * @display: A pointer to an #igt_display_t structure
+ * @pipe: Display pipe
+ *
+ * Checks whether there's a valid @pipe/@output combination for the given @display and @pipe
+ * Skips test if a valid @pipe is not found
+ */
 void igt_display_require_output_on_pipe(igt_display_t *display, enum pipe pipe)
 {
 	igt_output_t *output;
@@ -2111,7 +2158,16 @@ static igt_plane_t *igt_pipe_get_plane(igt_pipe_t *pipe, int plane_idx)
 	return &pipe->planes[plane_idx];
 }
 
-
+/**
+ * igt_pipe_get_plane_type:
+ * @pipe: Target pipe
+ * @plane_type: Cursor, primary or an overlay plane
+ *
+ * Finds a valid plane type for the given @pipe otherwise
+ * it skips the test if the right combination of @pipe/@plane_type is not found
+ *
+ * Returns: A #igt_plane_t structure that matches the requested plane type
+ */
 igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type)
 {
 	int i, plane_idx = -1;
@@ -3171,11 +3227,25 @@ int igt_display_drop_events(igt_display_t *display)
 	return ret;
 }
 
+/**
+ * igt_output_name:
+ * @output: Target output
+ *
+ * Returns: String representing a connector's name, e.g. "DP-1".
+ */
 const char *igt_output_name(igt_output_t *output)
 {
 	return output->name;
 }
 
+/**
+ * igt_output_get_mode:
+ * @output: Target output
+ *
+ * Get the current mode of the given connector
+ *
+ * Returns: A #drmModeModeInfo struct representing the current mode
+ */
 drmModeModeInfo *igt_output_get_mode(igt_output_t *output)
 {
 	if (output->use_override_mode)
@@ -3210,6 +3280,15 @@ void igt_output_override_mode(igt_output_t *output, drmModeModeInfo *mode)
 	}
 }
 
+/*
+ * igt_output_set_pipe:
+ * @output: Target output for which the pipe is being set to
+ * @pipe: Display pipe to set to
+ *
+ * This function sets a @pipe to a specific @output connector by
+ * setting the CRTC_ID property of the @pipe. The pipe
+ * is only activated for all pipes except PIPE_NONE.
+ */
 void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 {
 	igt_display_t *display = output->display;
@@ -3291,6 +3370,16 @@ igt_plane_t *igt_output_get_plane(igt_output_t *output, int plane_idx)
 	return igt_pipe_get_plane(pipe, plane_idx);
 }
 
+/**
+ * igt_output_get_plane_type:
+ * @output: Target output
+ * @plane_type: Cursor, primary or an overlay plane
+ *
+ * Finds a valid plane type for the given @output otherwise
+ * the test is skipped if the right combination of @output/@plane_type is not found
+ *
+ * Returns: A #igt_plane_t structure that matches the requested plane type
+ */
 igt_plane_t *igt_output_get_plane_type(igt_output_t *output, int plane_type)
 {
 	igt_pipe_t *pipe;
@@ -3301,6 +3390,16 @@ igt_plane_t *igt_output_get_plane_type(igt_output_t *output, int plane_type)
 	return igt_pipe_get_plane_type(pipe, plane_type);
 }
 
+/**
+ * igt_plane_set_fb:
+ * @plane: Plane
+ * @fb: Framebuffer pointer
+ *
+ * Pairs a given @framebuffer to a @plane
+ *
+ * This function also sets a default size and position for the framebuffer
+ * to avoid crashes on applications that ignore to set these.
+ */
 void igt_plane_set_fb(igt_plane_t *plane, struct igt_fb *fb)
 {
 	igt_pipe_t *pipe = plane->pipe;
@@ -3359,6 +3458,15 @@ void igt_plane_set_fence_fd(igt_plane_t *plane, int fence_fd)
 	igt_plane_set_prop_value(plane, IGT_PLANE_IN_FENCE_FD, fd);
 }
 
+/**
+ * igt_plane_set_position:
+ * @plane: Plane pointer for which position is to be set
+ * @x: X coordinate
+ * @y: Y coordinate
+ *
+ * This function sets a new (x,y) position for the given plane.
+ * New position will be committed at plane commit time via drmModeSetPlane().
+ */
 void igt_plane_set_position(igt_plane_t *plane, int x, int y)
 {
 	igt_pipe_t *pipe = plane->pipe;
@@ -3456,6 +3564,15 @@ static const char *rotation_name(igt_rotation_t rotation)
 	}
 }
 
+/**
+ * igt_plane_set_rotation:
+ * @plane: Plane pointer for which rotation is to be set
+ * @rotation: Plane rotation value (0, 90, 180, 270)
+ *
+ * This function sets a new rotation for the requested @plane.
+ * New @rotation will be committed at plane commit time via
+ * drmModeSetPlane().
+ */
 void igt_plane_set_rotation(igt_plane_t *plane, igt_rotation_t rotation)
 {
 	igt_pipe_t *pipe = plane->pipe;
@@ -3480,6 +3597,14 @@ void igt_pipe_request_out_fence(igt_pipe_t *pipe)
 	igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_OUT_FENCE_PTR, (ptrdiff_t)&pipe->out_fence_fd);
 }
 
+/**
+ * igt_wait_for_vblank_count:
+ * @drm_fd: A drm file descriptor
+ * @pipe: Pipe to wait_for_vblank on
+ * @count: Number of vblanks to wait on
+ *
+ * Waits for a given number of vertical blank intervals
+ */
 void igt_wait_for_vblank_count(int drm_fd, enum pipe pipe, int count)
 {
 	drmVBlank wait_vbl;
@@ -3495,6 +3620,13 @@ void igt_wait_for_vblank_count(int drm_fd, enum pipe pipe, int count)
 	igt_assert(drmWaitVBlank(drm_fd, &wait_vbl) == 0);
 }
 
+/**
+ * igt_wait_for_vblank:
+ * @drm_fd: A drm file descriptor
+ * @pipe: Pipe to wait_for_vblank on
+ *
+ * Waits for 1 vertical blank intervals
+ */
 void igt_wait_for_vblank(int drm_fd, enum pipe pipe)
 {
 	igt_wait_for_vblank_count(drm_fd, pipe, 1);
