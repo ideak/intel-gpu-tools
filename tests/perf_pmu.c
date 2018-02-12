@@ -126,11 +126,16 @@ static uint64_t pmu_read_multi(int fd, unsigned int num, uint64_t *val)
 	return buf[1];
 }
 
+#define __assert_within_epsilon(x, ref, tol_up, tol_down) \
+	igt_assert_f((double)(x) <= (1.0 + (tol_up)) * (double)(ref) && \
+		     (double)(x) >= (1.0 - (tol_down)) * (double)(ref), \
+		     "'%s' != '%s' (%f not within +%f%%/-%f%% tolerance of %f)\n",\
+		     #x, #ref, (double)(x), \
+		     (tol_up) * 100.0, (tol_down) * 100.0, \
+		     (double)(ref))
+
 #define assert_within_epsilon(x, ref, tolerance) \
-	igt_assert_f((double)(x) <= (1.0 + (tolerance)) * (double)(ref) && \
-		     (double)(x) >= (1.0 - (tolerance)) * (double)(ref), \
-		     "'%s' != '%s' (%f not within %f%% tolerance of %f)\n",\
-		     #x, #ref, (double)(x), (tolerance) * 100.0, (double)(ref))
+	__assert_within_epsilon(x, ref, tolerance, tolerance)
 
 /*
  * Helper for cases where we assert on time spent sleeping (directly or
@@ -1235,8 +1240,13 @@ test_frequency(int gem_fd)
 		 min[0], min[1]);
 	igt_info("Max frequency: requested %.1f, actual %.1f\n",
 		 max[0], max[1]);
+
 	assert_within_epsilon(min[0], min_freq, tolerance);
-	assert_within_epsilon(max[0], max_freq, tolerance);
+	/*
+	 * On thermally throttled devices we cannot be sure maximum frequency
+	 * can be reached so use larger tolerance downards.
+	 */
+	__assert_within_epsilon(max[0], max_freq, tolerance, 0.15f);
 }
 
 static bool wait_for_rc6(int fd)
