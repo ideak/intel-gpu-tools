@@ -619,11 +619,15 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e,
 
 	fd = open_pmu(I915_PMU_ENGINE_SEMA(e->class, e->instance));
 
+	val[0] = pmu_read_single(fd);
+
 	gem_execbuf(gem_fd, &eb);
 	do { /* wait for the batch to start executing */
 		usleep(5e3);
 	} while (!obj_ptr[1]);
-	usleep(5e3); /* wait for the register sampling */
+
+	igt_assert_f(igt_wait(pmu_read_single(fd) != val[0], 10, 1),
+		     "sampling failed to start withing 10ms");
 
 	val[0] = pmu_read_single(fd);
 	slept = measured_usleep(batch_duration_ns / 1000);
