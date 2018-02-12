@@ -210,8 +210,8 @@ static void
 busy_start(int gem_fd, const struct intel_execution_engine2 *e)
 {
 	unsigned long slept;
+	uint64_t val, ts[2];
 	igt_spin_t *spin;
-	uint64_t val;
 	int fd;
 
 	/*
@@ -230,14 +230,15 @@ busy_start(int gem_fd, const struct intel_execution_engine2 *e)
 
 	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
-	val = pmu_read_single(fd);
+	val = __pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
-	val = pmu_read_single(fd) - val;
+	val = __pmu_read_single(fd, &ts[1]) - val;
+	igt_debug("slept=%lu perf=%"PRIu64"\n", slept, ts[1] - ts[0]);
 
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd);
 
-	assert_within_epsilon(val, slept, tolerance);
+	assert_within_epsilon(val, ts[1] - ts[0], tolerance);
 	gem_quiescent_gpu(gem_fd);
 }
 
@@ -250,8 +251,8 @@ static void
 busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 {
 	unsigned long slept;
+	uint64_t val, val2, ts[2];
 	igt_spin_t *spin[2];
-	uint64_t val, val2;
 	uint32_t ctx;
 	int fd;
 
@@ -278,9 +279,10 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	 */
 	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
-	val = pmu_read_single(fd);
+	val = __pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
-	val = pmu_read_single(fd) - val;
+	val = __pmu_read_single(fd, &ts[1]) - val;
+	igt_debug("slept=%lu perf=%"PRIu64"\n", slept, ts[1] - ts[0]);
 
 	igt_spin_batch_end(spin[0]);
 	igt_spin_batch_end(spin[1]);
@@ -301,7 +303,7 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 
 	gem_context_destroy(gem_fd, ctx);
 
-	assert_within_epsilon(val, slept, tolerance);
+	assert_within_epsilon(val, ts[1] - ts[0], tolerance);
 	igt_assert_eq(val2, 0);
 
 	gem_quiescent_gpu(gem_fd);
@@ -827,9 +829,9 @@ static void
 multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 {
 	uint64_t config = I915_PMU_ENGINE_BUSY(e->class, e->instance);
-	unsigned int slept[2];
+	unsigned long slept[2];
+	uint64_t val[2], ts[2], perf_slept[2];
 	igt_spin_t *spin;
-	uint64_t val[2];
 	int fd[2];
 
 	gem_quiescent_gpu(gem_fd);
@@ -845,21 +847,25 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 
 	spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
 
-	val[0] = val[1] = pmu_read_single(fd[0]);
+	val[0] = val[1] = __pmu_read_single(fd[0], &ts[0]);
 	slept[1] = measured_usleep(batch_duration_ns / 1000);
-	val[1] = pmu_read_single(fd[1]) - val[1];
+	val[1] = __pmu_read_single(fd[1], &ts[1]) - val[1];
+	perf_slept[1] = ts[1] - ts[0];
+	igt_debug("slept=%lu perf=%"PRIu64"\n", slept[1], perf_slept[1]);
 	close(fd[1]);
 
 	slept[0] = measured_usleep(batch_duration_ns / 1000) + slept[1];
-	val[0] = pmu_read_single(fd[0]) - val[0];
+	val[0] = __pmu_read_single(fd[0], &ts[1]) - val[0];
+	perf_slept[0] = ts[1] - ts[0];
+	igt_debug("slept=%lu perf=%"PRIu64"\n", slept[0], perf_slept[0]);
 
 	igt_spin_batch_end(spin);
 	gem_sync(gem_fd, spin->handle);
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd[0]);
 
-	assert_within_epsilon(val[0], slept[0], tolerance);
-	assert_within_epsilon(val[1], slept[1], tolerance);
+	assert_within_epsilon(val[0], perf_slept[0], tolerance);
+	assert_within_epsilon(val[1], perf_slept[1], tolerance);
 }
 
 /**
@@ -1258,8 +1264,8 @@ static void
 test_rc6(int gem_fd, unsigned int flags)
 {
 	int64_t duration_ns = 2e9;
-	uint64_t idle, busy, prev;
-	unsigned int slept;
+	uint64_t idle, busy, prev, ts[2];
+	unsigned long slept;
 	int fd, fw;
 
 	gem_quiescent_gpu(gem_fd);
@@ -1294,11 +1300,12 @@ test_rc6(int gem_fd, unsigned int flags)
 	igt_require(wait_for_rc6(fd));
 
 	/* While idle check full RC6. */
-	prev = pmu_read_single(fd);
+	prev = __pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(duration_ns / 1000);
-	idle = pmu_read_single(fd);
+	idle = __pmu_read_single(fd, &ts[1]);
+	igt_debug("slept=%lu perf=%"PRIu64"\n", slept, ts[1] - ts[0]);
 
-	assert_within_epsilon(idle - prev, slept, tolerance);
+	assert_within_epsilon(idle - prev, ts[1] - ts[0], tolerance);
 
 	/* Wake up device and check no RC6. */
 	fw = igt_open_forcewake_handle(gem_fd);
