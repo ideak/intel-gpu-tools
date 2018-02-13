@@ -114,15 +114,6 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_display_commit2(display, COMMIT_ATOMIC);
 }
 
-static void paint_fb(data_t *d, struct igt_fb *fb)
-{
-	cairo_t *cr;
-
-	cr = igt_get_cairo_ctx(d->drm_fd, fb);
-	igt_paint_color(cr, 0, 0, fb->width, fb->height, 0.0, 1.0, 0.0);
-	igt_put_cairo_ctx(d->drm_fd, fb, cr);
-}
-
 static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 					 uint32_t pixel_format,
 					 uint64_t tiling, enum pipe pipe,
@@ -140,9 +131,8 @@ static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 
 	/* create buffer in the range of  min and max source side limit.*/
 	width = height = 9;
-	igt_create_fb(display->drm_fd, width, height,
-		      pixel_format, tiling, &d->fb[0]);
-	paint_fb(d, &d->fb[0]);
+	igt_create_color_fb(display->drm_fd, width, height,
+		       pixel_format, tiling, 0.0, 1.0, 0.0, &d->fb[0]);
 	igt_plane_set_fb(plane, &d->fb[0]);
 
 	/* Check min to full resolution upscaling */
