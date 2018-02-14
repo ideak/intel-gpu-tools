@@ -357,7 +357,14 @@ static void alarm_handler(int sig)
 
 static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 {
-	return ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf);
+	int err;
+
+	err = 0;
+	if (ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
+		err = -errno;
+
+	errno = 0;
+	return err;
 }
 
 static unsigned int measure_ring_size(int fd)
@@ -584,6 +591,94 @@ static void test_parallel(int fd, unsigned int master)
 	out[0] = MI_BATCH_BUFFER_END;
 	munmap(out, 4096);
 	gem_close(fd, handle[0]);
+}
+
+static uint32_t batch_create(int fd)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
+
+	handle = gem_create(fd, 4096);
+	gem_write(fd, handle, 0, &bbe, sizeof(bbe));
+
+	return handle;
+}
+
+static inline uint32_t lower_32_bits(uint64_t x)
+{
+	return x & 0xffffffff;
+}
+
+static inline uint32_t upper_32_bits(uint64_t x)
+{
+	return x >> 32;
+}
+
+static void test_keep_in_fence(int fd, unsigned int engine, unsigned int flags)
+{
+	struct sigaction sa = { .sa_handler = alarm_handler };
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = batch_create(fd),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = engine | LOCAL_EXEC_FENCE_OUT,
+	};
+	unsigned long count, last;
+	struct itimerval itv;
+	igt_spin_t *spin;
+	int fence;
+
+	spin = igt_spin_batch_new(fd, 0, engine, 0);
+
+	gem_execbuf_wr(fd, &execbuf);
+	fence = upper_32_bits(execbuf.rsvd2);
+
+	sigaction(SIGALRM, &sa, NULL);
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 100;
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 1000;
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	execbuf.flags |= LOCAL_EXEC_FENCE_IN;
+	execbuf.rsvd2 = fence;
+
+	last = -1;
+	count = 0;
+	do {
+		int err = __execbuf(fd, &execbuf);
+
+		igt_assert_eq(lower_32_bits(execbuf.rsvd2), fence);
+
+		if (err == 0) {
+			close(fence);
+
+			fence = upper_32_bits(execbuf.rsvd2);
+			execbuf.rsvd2 = fence;
+
+			count++;
+			continue;
+		}
+
+		igt_assert_eq(err, -EINTR);
+		igt_assert_eq(upper_32_bits(execbuf.rsvd2), 0);
+
+		if (last == count)
+			break;
+
+		last = count;
+	} while (1);
+
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	gem_close(fd, obj.handle);
+	close(fence);
+
+	igt_spin_batch_free(fd, spin);
+	gem_quiescent_gpu(fd);
 }
 
 #define EXPIRED 0x10000
@@ -1489,6 +1584,9 @@ igt_main
 					test_fence_await(i915, e->exec_id | e->flags, 0);
 				igt_subtest_f("nb-await-%s", e->name)
 					test_fence_await(i915, e->exec_id | e->flags, NONBLOCK);
+
+				igt_subtest_f("keep-in-fence-%s", e->name)
+					test_keep_in_fence(i915, e->exec_id | e->flags, 0);
 
 				if (e->exec_id &&
 				    !(e->exec_id == I915_EXEC_BSD && !e->flags)) {
