@@ -60,15 +60,6 @@ enum {
 	EDGE_BOTTOM = 0x8,
 };
 
-static void cursor_disable(data_t *data)
-{
-	igt_output_t *output = data->output;
-	igt_plane_t *cursor;
-
-	cursor = igt_output_get_plane_type(output, DRM_PLANE_TYPE_CURSOR);
-	igt_plane_set_fb(cursor, NULL);
-}
-
 static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 {
 	cairo_t *cr;
@@ -123,7 +114,7 @@ static void test_edge_pos(data_t *data, int sx, int ex, int y, bool swap_axis)
 
 	dx = (ex - sx)/XSTEP;
 
-	igt_pipe_crc_start(data->pipe_crc);
+	igt_pipe_crc_drain(data->pipe_crc);
 
 	i = 0;
 
@@ -154,7 +145,6 @@ static void test_edge_pos(data_t *data, int sx, int ex, int y, bool swap_axis)
 	}
 
 	n = igt_pipe_crc_get_crcs(data->pipe_crc, NCRC, &crc);
-	igt_pipe_crc_stop(data->pipe_crc);
 
 	if (!data->colored) {
 		igt_debug("Checking CRCs: ");
@@ -225,15 +215,27 @@ static void test_edges(data_t *data, unsigned int edges)
 	}
 }
 
+static void cleanup_crtc(data_t *data)
+{
+	igt_display_t *display = &data->display;
+
+	igt_display_reset(display);
+	igt_pipe_crc_free(data->pipe_crc);
+	data->pipe_crc = NULL;
+
+	igt_remove_fb(data->drm_fd, &data->primary_fb);
+}
+
 static void prepare_crtc(data_t *data)
 {
 	drmModeModeInfo *mode;
 	igt_display_t *display = &data->display;
 	igt_plane_t *primary;
 
+	cleanup_crtc(data);
+
 	/* select the pipe we want to use */
 	igt_output_set_pipe(data->output, data->pipe);
-	cursor_disable(data);
 
 	mode = igt_output_get_mode(data->output);
 	igt_create_pattern_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
@@ -250,43 +252,20 @@ static void prepare_crtc(data_t *data)
 	data->jump_y = (mode->vdisplay - data->curh) / 2;
 
 	/* create the pipe_crc object for this pipe */
-	if (data->pipe_crc)
-		igt_pipe_crc_free(data->pipe_crc);
-
 	data->pipe_crc = igt_pipe_crc_new_nonblock(data->drm_fd, data->pipe,
 						   INTEL_PIPE_CRC_SOURCE_AUTO);
 
-	/* make sure cursor is disabled */
-	cursor_disable(data);
-	igt_wait_for_vblank(data->drm_fd, data->pipe);
-
 	/* get reference crc w/o cursor */
-	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
-	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
-	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
-}
-
-static void cleanup_crtc(data_t *data)
-{
-	igt_display_t *display = &data->display;
-	igt_plane_t *primary;
-
-	igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = NULL;
-
-	igt_remove_fb(data->drm_fd, &data->primary_fb);
-
-	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
-	igt_plane_set_fb(primary, NULL);
-
-	igt_output_set_pipe(data->output, PIPE_ANY);
-	igt_display_commit(display);
+	igt_pipe_crc_start(data->pipe_crc);
+	igt_assert(igt_pipe_crc_get_single(data->pipe_crc, &data->ref_crc));
 }
 
 static void test_crtc(data_t *data, unsigned int edges)
 {
 	igt_display_t *display = &data->display;
 	int valid_tests = 0;
+
+	cleanup_crtc(data);
 
 	create_cursor_fb(data, data->curw, data->curh);
 
@@ -306,9 +285,6 @@ static void test_crtc(data_t *data, unsigned int edges)
 			 igt_subtest_name(),
 			 kmstest_pipe_name(data->pipe),
 			 igt_output_name(data->output));
-
-		/* cleanup what prepare_crtc() has done */
-		cleanup_crtc(data);
 	}
 
 	igt_remove_fb(data->drm_fd, &data->fb);
