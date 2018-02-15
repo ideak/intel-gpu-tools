@@ -561,7 +561,7 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e,
 	unsigned long slept;
 	uint32_t *obj_ptr;
 	uint32_t batch[16];
-	uint64_t val[2];
+	uint64_t val[2], ts[2];
 	int fd;
 
 	igt_require(intel_gen(intel_get_drm_devid(gem_fd)) >= 8);
@@ -629,13 +629,15 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e,
 	igt_assert_f(igt_wait(pmu_read_single(fd) != val[0], 10, 1),
 		     "sampling failed to start withing 10ms");
 
-	val[0] = pmu_read_single(fd);
+	val[0] = __pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
 	if (flags & TEST_TRAILING_IDLE)
 		obj_ptr[0] = 1;
-	val[1] = pmu_read_single(fd);
-	igt_debug("slept %.3fms, sampled %.3fms\n",
-		  slept*1e-6, (val[1] - val[0])*1e-6);
+	val[1] = __pmu_read_single(fd, &ts[1]);
+	igt_debug("slept %.3fms (perf %.3fms), sampled %.3fms\n",
+		  slept * 1e-6,
+		  (ts[1] - ts[0]) * 1e-6,
+		  (val[1] - val[0]) * 1e-6);
 
 	obj_ptr[0] = 1;
 	gem_sync(gem_fd, bb_handle);
