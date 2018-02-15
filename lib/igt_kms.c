@@ -3152,14 +3152,20 @@ int igt_display_drop_events(igt_display_t *display)
 	};
 
 	while (poll(&pfd, 1, 0) > 0) {
-		struct drm_event ev;
-		char buf[128];
+		struct drm_event *ev;
+		char buf[4096];
+		ssize_t retval;
 
-		read(display->drm_fd, &ev, sizeof(ev));
-		igt_info("Dropping event type %u length %u\n", ev.type, ev.length);
-		igt_assert(ev.length <= sizeof(buf));
-		read(display->drm_fd, buf, ev.length);
-		ret++;
+		retval = read(display->drm_fd, &buf, sizeof(buf));
+		igt_assert_lt(0, retval);
+
+		for (int i = 0; i < retval; i += ev->length) {
+			ev = (struct drm_event *)&buf[i];
+
+			igt_info("Dropping event type %u length %u\n", ev->type, ev->length);
+			igt_assert(ev->length + i <= sizeof(buf));
+			ret++;
+		}
 	}
 
 	return ret;
