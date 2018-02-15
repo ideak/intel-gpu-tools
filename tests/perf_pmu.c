@@ -35,6 +35,7 @@
 #include <dirent.h>
 #include <time.h>
 #include <poll.h>
+#include <sched.h>
 
 #include "igt.h"
 #include "igt_core.h"
@@ -386,6 +387,22 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 }
 
 static void
+__submit_spin_batch(int gem_fd, igt_spin_t *spin,
+		    const struct intel_execution_engine2 *e)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = spin->handle
+	};
+	struct drm_i915_gem_execbuffer2 eb = {
+		.buffer_count = 1,
+		.buffers_ptr = to_user_pointer(&obj),
+		.flags = e2ring(gem_fd, e),
+	};
+
+	gem_execbuf(gem_fd, &eb);
+}
+
+static void
 most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 		    const unsigned int num_engines, unsigned int flags)
 {
@@ -405,15 +422,7 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 		if (e == e_) {
 			idle_idx = i;
 		} else if (spin) {
-			struct drm_i915_gem_exec_object2 obj = {
-				.handle = spin->handle
-			};
-			struct drm_i915_gem_execbuffer2 eb = {
-				.buffer_count = 1,
-				.buffers_ptr = to_user_pointer(&obj),
-				.flags = e2ring(gem_fd, e_),
-			};
-			gem_execbuf(gem_fd, &eb);
+			__submit_spin_batch(gem_fd, spin, e_);
 		} else {
 			spin = igt_spin_batch_new(gem_fd, 0,
 						  e2ring(gem_fd, e_), 0);
@@ -469,15 +478,7 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines,
 			continue;
 
 		if (spin) {
-			struct drm_i915_gem_exec_object2 obj = {
-				.handle = spin->handle
-			};
-			struct drm_i915_gem_execbuffer2 eb = {
-				.buffer_count = 1,
-				.buffers_ptr = to_user_pointer(&obj),
-				.flags = e2ring(gem_fd, e),
-			};
-			gem_execbuf(gem_fd, &eb);
+			__submit_spin_batch(gem_fd, spin, e);
 		} else {
 			spin = igt_spin_batch_new(gem_fd, 0,
 						  e2ring(gem_fd, e), 0);
@@ -1392,6 +1393,157 @@ test_enable_race(int gem_fd, const struct intel_execution_engine2 *e)
 	gem_quiescent_gpu(gem_fd);
 }
 
+static double __error(double val, double ref)
+{
+	igt_assert(ref > 1e-5 /* smallval */);
+	return (100.0 * val / ref) - 100.0;
+}
+
+static void __rearm_spin_batch(igt_spin_t *spin)
+{
+	const uint32_t mi_arb_chk = 0x5 << 23;
+
+       *spin->batch = mi_arb_chk;
+       __sync_synchronize();
+}
+
+#define div_round_up(a, b) (((a) + (b) - 1) / (b))
+
+static void
+accuracy(int gem_fd, const struct intel_execution_engine2 *e,
+	 unsigned long target_busy_pct)
+{
+	const unsigned int min_test_loops = 7;
+	const unsigned long min_test_us = 1e6;
+	unsigned long busy_us = 2500;
+	unsigned long idle_us = 100 * (busy_us - target_busy_pct *
+				busy_us / 100) / target_busy_pct;
+	unsigned long pwm_calibration_us;
+	unsigned long test_us;
+	double busy_r;
+	uint64_t val[2];
+	uint64_t ts[2];
+	int fd;
+
+	/* Sampling platforms cannot reach the high accuracy criteria. */
+	igt_require(gem_has_execlists(gem_fd));
+
+	while (idle_us < 2500) {
+		busy_us *= 2;
+		idle_us *= 2;
+	}
+
+	pwm_calibration_us = min_test_loops * (busy_us + idle_us);
+	while (pwm_calibration_us < min_test_us)
+		pwm_calibration_us += busy_us + idle_us;
+	test_us = min_test_loops * (idle_us + busy_us);
+	while (test_us < min_test_us)
+		test_us += busy_us + idle_us;
+
+	igt_info("calibration=%luus, test=%luus; ratio=%.2f%% (%luus/%luus)\n",
+		 pwm_calibration_us, test_us,
+		 (double)busy_us / (busy_us + idle_us) * 100.0,
+		 busy_us, idle_us);
+
+	assert_within_epsilon((double)busy_us / (busy_us + idle_us),
+				(double)target_busy_pct / 100.0, tolerance);
+
+	/* Emit PWM pattern on the engine from a child. */
+	igt_fork(child, 1) {
+		struct sched_param rt = { .sched_priority = 99 };
+		const unsigned long timeout[] = { pwm_calibration_us * 1000,
+						  test_us * 2 * 1000 };
+		unsigned long sleep_busy = busy_us;
+		unsigned long sleep_idle = idle_us;
+		igt_spin_t *spin;
+		int ret;
+
+		/* We need the best sleep accuracy we can get. */
+		ret = sched_setscheduler(0,
+					 SCHED_FIFO | SCHED_RESET_ON_FORK,
+					 &rt);
+		if (ret)
+			igt_warn("Failed to set scheduling policy!\n");
+
+		/* Allocate our spin batch and idle it. */
+		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
+		igt_spin_batch_end(spin);
+		gem_sync(gem_fd, spin->handle);
+
+		/* 1st pass is calibration, second pass is the test. */
+		for (int pass = 0; pass < ARRAY_SIZE(timeout); pass++) {
+			unsigned long busy_ns = 0, idle_ns = 0;
+			struct timespec test_start = { };
+			unsigned long loops = 0;
+			double err_busy, err_idle;
+
+			igt_nsec_elapsed(&test_start);
+			do {
+				struct timespec t_busy = { };
+
+				igt_nsec_elapsed(&t_busy);
+
+				/* Restart the spinbatch. */
+				__rearm_spin_batch(spin);
+				__submit_spin_batch(gem_fd, spin, e);
+				measured_usleep(sleep_busy);
+				igt_spin_batch_end(spin);
+				gem_sync(gem_fd, spin->handle);
+
+				busy_ns += igt_nsec_elapsed(&t_busy);
+
+				idle_ns += measured_usleep(sleep_idle);
+
+				loops++;
+			} while (igt_nsec_elapsed(&test_start) < timeout[pass]);
+
+			busy_ns = div_round_up(busy_ns, loops);
+			idle_ns = div_round_up(idle_ns, loops);
+
+			err_busy = __error(busy_ns / 1000, busy_us);
+			err_idle = __error(idle_ns / 1000, idle_us);
+
+			igt_info("%u: busy %lu/%lu %.2f%%, idle %lu/%lu %.2f%%\n",
+				 pass,
+				 busy_ns / 1000, busy_us, err_busy,
+				 idle_ns / 1000, idle_us, err_idle);
+
+			if (pass == 0) {
+				sleep_busy = (double)busy_us -
+					     (double)busy_us * err_busy / 100.0;
+				sleep_idle = (double)idle_us -
+					     (double)idle_us * err_idle / 100.0;
+				igt_info("calibrated sleeps ratio %.2f%% (%lu/%lu)\n",
+					 (double)sleep_busy /
+					 (sleep_busy + sleep_idle) * 100.0,
+					 sleep_busy, sleep_idle);
+			}
+		}
+
+		igt_spin_batch_free(gem_fd, spin);
+	}
+
+	/* Let the child run. */
+	usleep(pwm_calibration_us * 2);
+
+	/* Collect engine busyness for an interesting part of child runtime. */
+	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
+	val[0] = __pmu_read_single(fd, &ts[0]);
+	usleep(test_us / 2);
+	val[1] = __pmu_read_single(fd, &ts[1]);
+	close(fd);
+
+	igt_waitchildren();
+
+	busy_r = (double)(val[1] - val[0]) / (ts[1] - ts[0]);
+
+	igt_info("error=%.2f%% (%.2f%% vs %lu%%)\n",
+		 __error(busy_r, target_busy_pct / 100.0),
+		 busy_r * 100.0, target_busy_pct);
+
+	assert_within_epsilon(busy_r, (double)target_busy_pct / 100.0, 0.15);
+}
+
 igt_main
 {
 	const unsigned int num_other_metrics =
@@ -1420,6 +1572,8 @@ igt_main
 		invalid_init();
 
 	for_each_engine_class_instance(fd, e) {
+		const unsigned int pct[] = { 2, 50, 98 };
+
 		/**
 		 * Test that a single engine metric can be initialized or it
 		 * is correctly rejected.
@@ -1526,6 +1680,15 @@ igt_main
 			 */
 			igt_subtest_f("enable-race-%s", e->name)
 				test_enable_race(fd, e);
+
+			/**
+			 * Check engine busyness accuracy is as expected.
+			 */
+			for (i = 0; i < ARRAY_SIZE(pct); i++) {
+				igt_subtest_f("busy-accuracy-%u-%s",
+					      pct[i], e->name)
+					accuracy(fd, e, pct[i]);
+			}
 		}
 
 		/**
