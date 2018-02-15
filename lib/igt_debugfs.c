@@ -794,10 +794,11 @@ igt_pipe_crc_get_crcs(igt_pipe_crc_t *pipe_crc, int n_crcs,
 		int ret;
 
 		ret = read_crc(pipe_crc, crc);
+		if (ret == -EAGAIN)
+			break;
+
 		if (ret < 0)
 			continue;
-		if (ret == 0)
-			break;
 
 		n++;
 	} while (n < n_crcs);
