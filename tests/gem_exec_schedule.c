@@ -40,8 +40,9 @@
 #define MAX_PRIO LOCAL_I915_CONTEXT_MAX_USER_PRIORITY
 #define MIN_PRIO LOCAL_I915_CONTEXT_MIN_USER_PRIORITY
 
-#define BUSY_QLEN 8
 #define MAX_ELSP_QLEN 16
+
+#define MAX_ENGINES 16
 
 #define MAX_CONTEXTS 1024
 
@@ -146,7 +147,7 @@ static uint32_t create_highest_priority(int fd)
 
 static void unplug_show_queue(int fd, struct cork *c, unsigned int engine)
 {
-	igt_spin_t *spin[BUSY_QLEN];
+	igt_spin_t *spin[MAX_ELSP_QLEN];
 
 	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
 		uint32_t ctx = create_highest_priority(fd);
@@ -201,7 +202,7 @@ static bool ignore_engine(int fd, unsigned engine)
 static void smoketest(int fd, unsigned ring, unsigned timeout)
 {
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
-	unsigned engines[16];
+	unsigned engines[MAX_ENGINES];
 	unsigned nengine;
 	unsigned engine;
 	uint32_t scratch;
@@ -382,7 +383,7 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 	if (flags & HANG_LP)
 		hang = igt_hang_ctx(fd, ctx[LO], ring, 0, NULL);
 
-	for (int n = 0; n < 16; n++) {
+	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
 		if (flags & NEW_CTX) {
 			gem_context_destroy(fd, ctx[LO]);
 			ctx[LO] = gem_context_create(fd);
@@ -398,7 +399,7 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 		igt_assert(gem_bo_busy(fd, spin[0]->handle));
 	}
 
-	for (int n = 0; n < 16; n++)
+	for (int n = 0; n < ARRAY_SIZE(spin); n++)
 		igt_spin_batch_free(fd, spin[n]);
 
 	if (flags & HANG_LP)
@@ -415,7 +416,7 @@ static void preempt_other(int fd, unsigned ring)
 {
 	uint32_t result = gem_create(fd, 4096);
 	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
-	igt_spin_t *spin[MAX_ELSP_QLEN];
+	igt_spin_t *spin[MAX_ENGINES];
 	unsigned int other;
 	unsigned int n, i;
 	uint32_t ctx[3];
@@ -440,6 +441,8 @@ static void preempt_other(int fd, unsigned ring)
 
 	n = 0;
 	for_each_engine(fd, other) {
+		igt_assert(n < ARRAY_SIZE(spin));
+
 		spin[n] = __igt_spin_batch_new(fd, ctx[NOISE], other, 0);
 		store_dword(fd, ctx[LO], other,
 			    result, (n + 1)*sizeof(uint32_t), n + 1,
@@ -532,7 +535,7 @@ static void preemptive_hang(int fd, unsigned ring)
 	ctx[HI] = gem_context_create(fd);
 	gem_context_set_priority(fd, ctx[HI], MAX_PRIO);
 
-	for (int n = 0; n < 16; n++) {
+	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
 		ctx[LO] = gem_context_create(fd);
 		gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
 
@@ -544,7 +547,7 @@ static void preemptive_hang(int fd, unsigned ring)
 	hang = igt_hang_ctx(fd, ctx[HI], ring, 0, NULL);
 	igt_post_hang_ring(fd, hang);
 
-	for (int n = 0; n < 16; n++) {
+	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
 		/* Current behavior is to execute requests in order of submission.
 		 * This is subject to change as the scheduler evolve. The test should
 		 * be updated to reflect such changes.
