@@ -208,10 +208,10 @@ static int __gem_set_caching(int fd, uint32_t handle, uint32_t caching)
 	arg.caching = caching;
 
 	err = 0;
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_SET_CACHING, &arg)) {
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_SET_CACHING, &arg))
 		err = -errno;
-		igt_assert(errno == ENOTTY || errno == EINVAL);
-	}
+
+	errno = 0;
 	return err;
 }
 
@@ -229,7 +229,6 @@ static int __gem_set_caching(int fd, uint32_t handle, uint32_t caching)
 void gem_set_caching(int fd, uint32_t handle, uint32_t caching)
 {
 	igt_require(__gem_set_caching(fd, handle, caching) == 0);
-	errno = 0;
 }
 
 /**
