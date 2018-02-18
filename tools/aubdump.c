@@ -383,11 +383,38 @@ register_write_out(uint32_t addr, uint32_t value)
 }
 
 static void
+gen8_map_ggtt_range(uint64_t start, uint64_t end)
+{
+	uint64_t entry_addr;
+	uint64_t page_num;
+	uint64_t end_aligned = align_u64(end, 4096);
+
+	if (start >= end || end > (1ull << 32))
+		return;
+
+	entry_addr = start & ~(4096 - 1);
+	do {
+		page_num = entry_addr >> 21;
+		uint64_t last_page_entry =
+			min((page_num + 1) << 21, end_aligned);
+		uint64_t num_entries = (last_page_entry - entry_addr) >> 12;
+		mem_trace_memory_write_header_out(
+			entry_addr >> 9, num_entries * GEN8_PTE_SIZE,
+			AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_GGTT_ENTRY);
+		while (num_entries-- > 0) {
+			dword_out((entry_addr & ~(4096 - 1)) |
+			          3 /* read/write | present */);
+			dword_out(entry_addr >> 32);
+			entry_addr += 4096;
+		}
+	} while (entry_addr < end);
+}
+
+static void
 gen10_write_header(void)
 {
 	char app_name[8 * 4];
 	int app_name_len, dwords;
-	uint32_t entry = 0x3;	/* read/write | present */
 
 	app_name_len =
 	    snprintf(app_name, sizeof(app_name), "PCI-ID=0x%X %s", device,
@@ -403,16 +430,7 @@ gen10_write_header(void)
 	dword_out(0);		/* version */
 	data_out(app_name, app_name_len);
 
-	/* GGTT PT */
-	for (uint32_t page = 0; page < ALIGN(PT_SIZE, 4096) / 4096; page++) {
-		uint32_t to_write = min(PT_SIZE - page * 4096, 4096);
-		mem_trace_memory_write_header_out(page << 12, to_write,
-						  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_GGTT_ENTRY);
-		for (uint32_t i = 0; i < to_write / GEN8_PTE_SIZE; i++) {
-			dword_out(entry + 0x1000 * i + 0x200000 * page);
-			dword_out(0);
-		}
-	}
+	gen8_map_ggtt_range(0, MEMORY_MAP_SIZE);
 
 	/* RENDER_RING */
 	mem_trace_memory_write_header_out(RENDER_RING_ADDR, RING_SIZE,
