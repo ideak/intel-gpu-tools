@@ -154,6 +154,9 @@ dbg_get_status(struct status *stat)
 	memset(stat, 0, sizeof(*stat));
 
 	dbg_get_status_section("SSEU Device Info", &first, &last);
+	for (char *tmp = first; tmp < last; tmp++)
+		igt_debug("%c", *tmp);
+	igt_debug("\n");
 	stat->info.slice_total =
 		dbg_get_int(first, last, "Available Slice Total:");
 	stat->info.subslice_total =
@@ -172,6 +175,9 @@ dbg_get_status(struct status *stat)
 		dbg_get_bool(first, last, "Has EU Power Gating:");
 
 	dbg_get_status_section("SSEU Device Status", &first, &last);
+	for (char *tmp = first; tmp < last; tmp++)
+		igt_debug("%c", *tmp);
+	igt_debug("\n");
 	stat->hw.slice_total =
 		dbg_get_int(first, last, "Enabled Slice Total:");
 	stat->hw.subslice_total =
