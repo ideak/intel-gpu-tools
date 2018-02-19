@@ -187,7 +187,7 @@ static bool has_syncobj(int fd)
 
 igt_main
 {
-	int fd;
+	int fd = -1;
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_ANY);

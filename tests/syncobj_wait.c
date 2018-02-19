@@ -317,7 +317,7 @@ test_single_wait(int fd, uint32_t test_flags, int expect)
 {
 	uint32_t syncobj = syncobj_create(fd, 0);
 	uint32_t flags = flags_for_test_flags(test_flags);
-	int timeline;
+	int timeline = -1;
 
 	if (test_flags & (WAIT_SUBMITTED | WAIT_SIGNALED))
 		timeline = syncobj_attach_sw_sync(fd, syncobj);
@@ -336,6 +336,8 @@ test_single_wait(int fd, uint32_t test_flags, int expect)
 	}
 
 	syncobj_destroy(fd, syncobj);
+	if (timeline != -1)
+		close(timeline);
 }
 
 static void
@@ -343,7 +345,7 @@ test_wait_delayed_signal(int fd, uint32_t test_flags)
 {
 	uint32_t syncobj = syncobj_create(fd, 0);
 	uint32_t flags = flags_for_test_flags(test_flags);
-	int timeline;
+	int timeline = -1;
 	timer_t timer;
 
 	if (test_flags & WAIT_FOR_SUBMIT) {
@@ -360,7 +362,7 @@ test_wait_delayed_signal(int fd, uint32_t test_flags)
 
 	timer_delete(timer);
 
-	if (!(test_flags & WAIT_FOR_SUBMIT))
+	if (timeline != -1)
 		close(timeline);
 
 	syncobj_destroy(fd, syncobj);
@@ -614,7 +616,7 @@ test_wait_complex(int fd, uint32_t test_flags)
 	uint32_t syncobjs[8];
 	enum syncobj_stage stage[8];
 	int i, j, timelines[8];
-	uint32_t first_signaled, num_signaled;
+	uint32_t first_signaled = -1, num_signaled = 0;
 	pthread_t thread;
 
 	for (i = 0; i < 8; i++) {
@@ -757,7 +759,7 @@ has_syncobj_wait(int fd)
 
 igt_main
 {
-	int fd;
+	int fd = -1;
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_ANY);
