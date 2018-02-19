@@ -25,17 +25,12 @@
  *
  */
 
-#include "igt.h"
 #include <stdlib.h>
-#include <sys/ioctl.h>
-#include <stdio.h>
 #include <string.h>
-#include <fcntl.h>
 #include <inttypes.h>
 #include <errno.h>
 
-#include <drm.h>
-
+#include "igt.h"
 
 IGT_TEST_DESCRIPTION("Test execbuf fence accounting.");
 
@@ -45,7 +40,7 @@ IGT_TEST_DESCRIPTION("Test execbuf fence accounting.");
 
 #define BATCH_SIZE 4096
 
-#define MAX_FENCES 32
+#define MAX_FENCES 64
 
 /*
  * Testcase: execbuf fence accounting
@@ -58,53 +53,6 @@ IGT_TEST_DESCRIPTION("Test execbuf fence accounting.");
  * with 2*num_avail_fence buffers, but alternating which half are fenced in
  * each command.
  */
-
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
-uint32_t devid;
-
-static void emit_dummy_load(void)
-{
-	int i;
-	uint32_t tile_flags = 0;
-	uint32_t tiling_mode = I915_TILING_X;
-	unsigned long pitch;
-	drm_intel_bo *dummy_bo;
-
-	dummy_bo = drm_intel_bo_alloc_tiled(bufmgr, "tiled dummy_bo", 2048, 2048,
-				      4, &tiling_mode, &pitch, 0);
-
-	if (IS_965(devid)) {
-		pitch /= 4;
-		tile_flags = XY_SRC_COPY_BLT_SRC_TILED |
-			XY_SRC_COPY_BLT_DST_TILED;
-	}
-
-	for (i = 0; i < 5; i++) {
-		BLIT_COPY_BATCH_START(tile_flags);
-		OUT_BATCH((3 << 24) | /* 32 bits */
-			  (0xcc << 16) | /* copy ROP */
-			  pitch);
-		OUT_BATCH(0 << 16 | 1024);
-		OUT_BATCH((2048) << 16 | (2048));
-		OUT_RELOC_FENCED(dummy_bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-		OUT_BATCH(0 << 16 | 0);
-		OUT_BATCH(pitch);
-		OUT_RELOC_FENCED(dummy_bo, I915_GEM_DOMAIN_RENDER, 0, 0);
-		ADVANCE_BATCH();
-
-		if (batch->gen >= 6) {
-			BEGIN_BATCH(3, 0);
-			OUT_BATCH(XY_SETUP_CLIP_BLT_CMD);
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-			ADVANCE_BATCH();
-		}
-	}
-	intel_batchbuffer_flush(batch);
-
-	drm_intel_bo_unreference(dummy_bo);
-}
 
 static uint32_t
 tiled_bo_create (int fd)
@@ -146,22 +94,14 @@ static void run_test(int fd, int num_fences, int expected_errno,
 		     unsigned flags)
 {
 	struct drm_i915_gem_execbuffer2 execbuf[2];
-	struct drm_i915_gem_exec_object2 exec[2][2*MAX_FENCES+3];
-	struct drm_i915_gem_relocation_entry reloc[2*MAX_FENCES+2];
+	struct drm_i915_gem_exec_object2 exec[2][2*MAX_FENCES+1];
+	struct drm_i915_gem_relocation_entry reloc[2*MAX_FENCES];
 
+	unsigned long count;
 	int i, n;
-	int loop = 1000;
 
-	if (flags & BUSY_LOAD) {
-		bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		batch = intel_batchbuffer_alloc(bufmgr, devid);
-
-		/* Takes forever otherwise. */
-		loop = 50;
-	}
-
-	if (flags & INTERRUPTIBLE)
-		igt_fork_signal_helper();
+	igt_assert(2*num_fences+1 <= ARRAY_SIZE(exec[0]));
+	igt_assert(2*num_fences <= ARRAY_SIZE(reloc));
 
 	memset(execbuf, 0, sizeof(execbuf));
 	memset(exec, 0, sizeof(exec));
@@ -186,16 +126,25 @@ static void run_test(int fd, int num_fences, int expected_errno,
 		execbuf[i].batch_len = 2*sizeof(uint32_t);
 	}
 
-	do {
-		if (flags & BUSY_LOAD)
-			emit_dummy_load();
+	count = 0;
+	igt_until_timeout(2) {
+		for (i = 0; i < 2; i++) {
+			igt_spin_t *spin = NULL;
 
-		igt_assert_eq(__gem_execbuf(fd, &execbuf[0]), -expected_errno);
-		igt_assert_eq(__gem_execbuf(fd, &execbuf[1]), -expected_errno);
-	} while (--loop);
+			if (flags & BUSY_LOAD)
+				spin = __igt_spin_batch_new(fd, 0, 0, 0);
 
-	if (flags & INTERRUPTIBLE)
-		igt_stop_signal_helper();
+			igt_while_interruptible(flags & INTERRUPTIBLE) {
+				igt_assert_eq(__gem_execbuf(fd, &execbuf[i]),
+					      -expected_errno);
+			}
+
+			igt_spin_batch_free(fd, spin);
+			gem_quiescent_gpu(fd);
+		}
+		count++;
+	}
+	igt_info("Completed %lu cycles\n", count);
 
 	/* Cleanup */
 	for (n = 0; n < 2*num_fences; n++)
@@ -203,28 +152,25 @@ static void run_test(int fd, int num_fences, int expected_errno,
 
 	for (i = 0; i < 2; i++)
 		gem_close(fd, exec[i][2*num_fences].handle);
-
-	if (flags & BUSY_LOAD) {
-		intel_batchbuffer_free(batch);
-		drm_intel_bufmgr_destroy(bufmgr);
-	}
 }
-
-int fd;
-int num_fences;
 
 igt_main
 {
+	uint32_t devid = 0;
+	unsigned int num_fences = 0;
+	int fd = -1;
+
 	igt_skip_on_simulation();
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
+
 		num_fences = gem_available_fences(fd);
 		igt_assert(num_fences > 4);
-		devid = intel_get_drm_devid(fd);
-
 		igt_assert(num_fences <= MAX_FENCES);
+
+		devid = intel_get_drm_devid(fd);
 	}
 
 	igt_subtest("2-spare-fences")
