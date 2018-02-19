@@ -300,7 +300,7 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	usleep(batch_duration_ns / 1000);
 	val2 = pmu_read_single(fd) - val2;
 
-	igt_info("busy=%lu idle=%lu\n", val, val2);
+	igt_info("busy=%"PRIu64" idle=%"PRIu64"\n", val, val2);
 
 	igt_spin_batch_free(gem_fd, spin[0]);
 	igt_spin_batch_free(gem_fd, spin[1]);
@@ -340,11 +340,11 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 {
 	const struct intel_execution_engine2 *e_;
 	uint64_t tval[2][num_engines];
+	unsigned int busy_idx = 0, i;
 	uint64_t val[num_engines];
 	int fd[num_engines];
 	unsigned long slept;
 	igt_spin_t *spin;
-	unsigned int busy_idx, i;
 
 	i = 0;
 	fd[0] = -1;
@@ -1764,7 +1764,7 @@ igt_main
 	 * Check render nodes are counted.
 	 */
 	igt_subtest_group {
-		int render_fd;
+		int render_fd = -1;
 
 		igt_fixture {
 			render_fd = drm_open_driver_render(DRIVER_INTEL);
