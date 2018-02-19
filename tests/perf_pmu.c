@@ -387,15 +387,13 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 }
 
 static void
-__submit_spin_batch(int gem_fd, igt_spin_t *spin,
+__submit_spin_batch(int gem_fd,
+		    struct drm_i915_gem_exec_object2 *obj,
 		    const struct intel_execution_engine2 *e)
 {
-	struct drm_i915_gem_exec_object2 obj = {
-		.handle = spin->handle
-	};
 	struct drm_i915_gem_execbuffer2 eb = {
 		.buffer_count = 1,
-		.buffers_ptr = to_user_pointer(&obj),
+		.buffers_ptr = to_user_pointer(obj),
 		.flags = e2ring(gem_fd, e),
 	};
 
@@ -406,6 +404,7 @@ static void
 most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 		    const unsigned int num_engines, unsigned int flags)
 {
+	struct drm_i915_gem_exec_object2 obj = {};
 	const struct intel_execution_engine2 *e_;
 	uint64_t tval[2][num_engines];
 	uint64_t val[num_engines];
@@ -422,10 +421,11 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 		if (e == e_) {
 			idle_idx = i;
 		} else if (spin) {
-			__submit_spin_batch(gem_fd, spin, e_);
+			__submit_spin_batch(gem_fd, &obj, e_);
 		} else {
 			spin = igt_spin_batch_new(gem_fd, 0,
 						  e2ring(gem_fd, e_), 0);
+			obj.handle = spin->handle;
 		}
 
 		val[i++] = I915_PMU_ENGINE_BUSY(e_->class, e_->instance);
@@ -464,6 +464,7 @@ static void
 all_busy_check_all(int gem_fd, const unsigned int num_engines,
 		   unsigned int flags)
 {
+	struct drm_i915_gem_exec_object2 obj = {};
 	const struct intel_execution_engine2 *e;
 	uint64_t tval[2][num_engines];
 	uint64_t val[num_engines];
@@ -478,10 +479,11 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines,
 			continue;
 
 		if (spin) {
-			__submit_spin_batch(gem_fd, spin, e);
+			__submit_spin_batch(gem_fd, &obj, e);
 		} else {
 			spin = igt_spin_batch_new(gem_fd, 0,
 						  e2ring(gem_fd, e), 0);
+			obj.handle = spin->handle;
 		}
 
 		val[i++] = I915_PMU_ENGINE_BUSY(e->class, e->instance);
@@ -1455,6 +1457,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 						  test_us * 2 * 1000 };
 		unsigned long sleep_busy = busy_us;
 		unsigned long sleep_idle = idle_us;
+		struct drm_i915_gem_exec_object2 obj = {};
 		igt_spin_t *spin;
 		int ret;
 
@@ -1467,8 +1470,11 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 
 		/* Allocate our spin batch and idle it. */
 		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
+		obj.handle = spin->handle;
+		__submit_spin_batch(gem_fd, &obj, e); /* record its location */
 		igt_spin_batch_end(spin);
-		gem_sync(gem_fd, spin->handle);
+		gem_sync(gem_fd, obj.handle);
+		obj.flags |= EXEC_OBJECT_PINNED;
 
 		/* 1st pass is calibration, second pass is the test. */
 		for (int pass = 0; pass < ARRAY_SIZE(timeout); pass++) {
@@ -1485,10 +1491,10 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 
 				/* Restart the spinbatch. */
 				__rearm_spin_batch(spin);
-				__submit_spin_batch(gem_fd, spin, e);
+				__submit_spin_batch(gem_fd, &obj, e);
 				measured_usleep(sleep_busy);
 				igt_spin_batch_end(spin);
-				gem_sync(gem_fd, spin->handle);
+				gem_sync(gem_fd, obj.handle);
 
 				busy_ns += igt_nsec_elapsed(&t_busy);
 
