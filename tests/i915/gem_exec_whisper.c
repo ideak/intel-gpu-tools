@@ -78,6 +78,7 @@ static void verify_reloc(int fd, uint32_t handle,
 #define HANG 0x20
 #define SYNC 0x40
 #define PRIORITY 0x80
+#define ALL 0x100
 
 struct hang {
 	struct drm_i915_gem_exec_object2 obj;
@@ -189,6 +190,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	uint64_t old_offset;
 	int i, n, loc;
 	int debugfs;
+	int nchild;
 
 	if (flags & PRIORITY) {
 		igt_require(gem_scheduler_enabled(fd));
@@ -205,6 +207,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 				engines[nengine++] = engine;
 		}
 	} else {
+		igt_assert(!(flags & ALL));
 		igt_require(gem_has_ring(fd, engine));
 		igt_require(gem_can_store_dword(fd, engine));
 		engines[nengine++] = engine;
@@ -220,10 +223,21 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	if (flags & HANG)
 		init_hang(&hang);
 
+	nchild = 1;
+	if (flags & FORKED)
+		nchild *= sysconf(_SC_NPROCESSORS_ONLN);
+	if (flags & ALL)
+		nchild *= nengine;
+
 	intel_detect_and_clear_missed_interrupts(fd);
 	gpu_power_read(&power, &sample[0]);
-	igt_fork(child, flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1)  {
+	igt_fork(child, nchild) {
 		unsigned int pass;
+
+		if (flags & ALL) {
+			engines[0] = engines[child % nengine];
+			nengine = 1;
+		}
 
 		memset(&scratch, 0, sizeof(scratch));
 		scratch.handle = gem_create(fd, 4096);
@@ -362,8 +376,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 
 				gem_write(fd, batches[1023].handle, loc, &pass, sizeof(pass));
 				for (n = 1024; --n >= 1; ) {
+					uint32_t handle[2] = {};
 					int this_fd = fd;
-					uint32_t handle[2];
 
 					execbuf.buffers_ptr = to_user_pointer(&batches[n-1]);
 					reloc_migrations += batches[n-1].offset != inter[n].presumed_offset;
@@ -524,7 +538,7 @@ igt_main
 		{ "fds-sync", FDS | SYNC},
 		{ NULL }
 	};
-	int fd;
+	int fd = -1;
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
@@ -535,9 +549,12 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	for (const struct mode *m = modes; m->name; m++)
+	for (const struct mode *m = modes; m->name; m++) {
 		igt_subtest_f("%s", m->name)
 			whisper(fd, ALL_ENGINES, m->flags);
+		igt_subtest_f("%s-all", m->name)
+			whisper(fd, ALL_ENGINES, m->flags | ALL);
+	}
 
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {
