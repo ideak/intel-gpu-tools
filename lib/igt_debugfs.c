@@ -110,16 +110,7 @@ static bool is_mountpoint(const char *path)
 	return dev != st.st_dev;
 }
 
-/**
- * igt_debugfs_mount:
- *
- * This attempts to locate where debugfs is mounted on the filesystem,
- * and if not found, will then try to mount debugfs at /sys/kernel/debug.
- *
- * Returns:
- * The path to the debugfs mount point (e.g. /sys/kernel/debug)
- */
-const char *igt_debugfs_mount(void)
+static const char *__igt_debugfs_mount(void)
 {
 	if (is_mountpoint("/sys/kernel/debug"))
 		return "/sys/kernel/debug";
@@ -131,6 +122,25 @@ const char *igt_debugfs_mount(void)
 		return NULL;
 
 	return "/sys/kernel/debug";
+}
+
+/**
+ * igt_debugfs_mount:
+ *
+ * This attempts to locate where debugfs is mounted on the filesystem,
+ * and if not found, will then try to mount debugfs at /sys/kernel/debug.
+ *
+ * Returns:
+ * The path to the debugfs mount point (e.g. /sys/kernel/debug)
+ */
+const char *igt_debugfs_mount(void)
+{
+	static const char *path;
+
+	if (!path)
+		path = __igt_debugfs_mount();
+
+	return path;
 }
 
 /**
