@@ -325,18 +325,22 @@ bool igt_debugfs_search(int device, const char *filename, const char *substring)
 static bool igt_find_crc_mismatch(const igt_crc_t *a, const igt_crc_t *b,
 				  int *index)
 {
+	int nwords = min(a->n_words, b->n_words);
 	int i;
 
-	if (a->n_words != b->n_words)
-		return true;
-
-	for (i = 0; i < a->n_words; i++) {
+	for (i = 0; i < nwords; i++) {
 		if (a->crc[i] != b->crc[i]) {
 			if (index)
 				*index = i;
 
 			return true;
 		}
+	}
+
+	if (a->n_words != b->n_words) {
+		if (index)
+			*index = i;
+		return true;
 	}
 
 	return false;
