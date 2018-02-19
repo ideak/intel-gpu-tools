@@ -426,6 +426,11 @@ static void batch(int fd, unsigned ring, int nchild, int timeout,
 			ptr = mmap(0, 64<<10, PROT_WRITE,
 				   MAP_PRIVATE | MAP_ANON, -1, 0);
 			break;
+
+		default:
+			igt_assert(!"reachable");
+			ptr = NULL;
+			break;
 		}
 
 		memset(&reloc, 0, sizeof(reloc));
