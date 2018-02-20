@@ -837,6 +837,8 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 		if (obj->flags & EXEC_OBJECT_PINNED) {
 			bo->offset = obj->offset;
 		} else {
+			if (obj->alignment != 0)
+				offset = align_u32(offset, obj->alignment);
 			bo->offset = offset;
 			offset = align_u32(offset + bo->size + 4095, 4096);
 		}
