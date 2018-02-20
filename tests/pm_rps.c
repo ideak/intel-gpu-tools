@@ -221,6 +221,8 @@ static void load_helper_run(enum load load)
 		return;
 	}
 
+	igt_require_gem(drm_fd);
+
 	lh.exit = false;
 	lh.load = load;
 
@@ -233,7 +235,7 @@ static void load_helper_run(enum load load)
 
 		igt_debug("Applying %s load...\n", lh.load ? "high" : "low");
 
-		spin[0] = igt_spin_batch_new(drm_fd, 0, 0, 0);
+		spin[0] = __igt_spin_batch_new(drm_fd, 0, 0, 0);
 		if (lh.load == HIGH)
 			spin[1] = __igt_spin_batch_new(drm_fd, 0, 0, 0);
 		while (!lh.exit) {

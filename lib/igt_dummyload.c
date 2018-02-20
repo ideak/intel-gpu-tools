@@ -25,6 +25,7 @@
 #include <time.h>
 #include <signal.h>
 #include <pthread.h>
+#include <sys/poll.h>
 
 #include <i915_drm.h>
 
@@ -207,7 +208,6 @@ ___igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep,
 
 	spin->out_fence = emit_recursive_batch(spin, fd, ctx, engine, dep,
 					       out_fence);
-	igt_assert(gem_bo_busy(fd, spin->handle));
 
 	pthread_mutex_lock(&list_lock);
 	igt_list_add(&spin->link, &spin_list);
@@ -240,9 +240,14 @@ __igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
 igt_spin_t *
 igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
 {
+	igt_spin_t *spin;
+
 	igt_require_gem(fd);
 
-	return __igt_spin_batch_new(fd, ctx, engine, dep);
+	spin = __igt_spin_batch_new(fd, ctx, engine, dep);
+	igt_assert(gem_bo_busy(fd, spin->handle));
+
+	return spin;
 }
 
 igt_spin_t *
@@ -269,10 +274,16 @@ __igt_spin_batch_new_fence(int fd, uint32_t ctx, unsigned engine)
 igt_spin_t *
 igt_spin_batch_new_fence(int fd, uint32_t ctx, unsigned engine)
 {
+	igt_spin_t *spin;
+
 	igt_require_gem(fd);
 	igt_require(gem_has_exec_fence(fd));
 
-	return __igt_spin_batch_new_fence(fd, ctx, engine);
+	spin = __igt_spin_batch_new_fence(fd, ctx, engine);
+	igt_assert(gem_bo_busy(fd, spin->handle));
+	igt_assert(poll(&(struct pollfd){spin->out_fence, POLLIN}, 1, 0) == 0);
+
+	return spin;
 }
 
 static void notify(union sigval arg)
