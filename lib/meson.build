@@ -123,6 +123,7 @@ if libdrm_intel.found()
 else
 	lib_headers += 'stubs/drm/intel_bufmgr.h'
 	lib_sources += 'stubs/drm/intel_bufmgr.c'
+	inc = [ inc, include_directories('stubs/drm') ]
 endif
 
 if valgrind.found()
