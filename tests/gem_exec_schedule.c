@@ -450,6 +450,7 @@ static void preempt_other(int fd, unsigned ring)
 		    result, (n + 1)*sizeof(uint32_t), n + 1,
 		    0, I915_GEM_DOMAIN_RENDER);
 
+	igt_debugfs_dump(fd, "i915_engine_info");
 	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
 
 	for (i = 0; i < n; i++) {
