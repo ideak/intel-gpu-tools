@@ -383,7 +383,7 @@ register_write_out(uint32_t addr, uint32_t value)
 }
 
 static void
-gen8_map_ggtt_range(uint64_t start, uint64_t end)
+gen8_emit_ggtt_pte_for_range(uint64_t start, uint64_t end)
 {
 	uint64_t entry_addr;
 	uint64_t page_num;
@@ -408,6 +408,100 @@ gen8_map_ggtt_range(uint64_t start, uint64_t end)
 			entry_addr += 4096;
 		}
 	} while (entry_addr < end);
+}
+
+/**
+ * Sets bits `start` through `end` - 1 in the bitmap array.
+ */
+static void
+set_bitmap_range(uint32_t *bitmap, uint32_t start, uint32_t end)
+{
+	uint32_t pos = start;
+	while (pos < end) {
+		const uint32_t bit = 1 << (pos & 0x1f);
+		if (bit == 1 && (end - pos) > 32) {
+			bitmap[pos >> 5] = 0xffffffff;
+			pos += 32;
+		} else {
+			bitmap[pos >> 5] |= bit;
+			pos++;
+		}
+	}
+}
+
+/**
+ * Finds the next `set` (or clear) bit in the bitmap array.
+ *
+ * The search starts at `*start` and only checks until `end` - 1.
+ *
+ * If found, returns true, and the found bit index in `*start`.
+ */
+static bool
+find_bitmap_bit(uint32_t *bitmap, bool set, uint32_t *start, uint32_t end)
+{
+	uint32_t pos = *start;
+	const uint32_t neg_dw = set ? 0 : -1;
+	while (pos < end) {
+		const uint32_t dw = bitmap[pos >> 5];
+		const uint32_t bit = 1 << (pos & 0x1f);
+		if (!!(dw & bit) == set) {
+			*start = pos;
+			return true;
+		} else if (bit == 1 && dw == neg_dw)
+			pos += 32;
+		else
+			pos++;
+	}
+	return false;
+}
+
+/**
+ * Finds a range of clear bits within the bitmap array.
+ *
+ * The search starts at `*start` and only checks until `*end` - 1.
+ *
+ * If found, returns true, and `*start` and `*end` are set for the
+ * range of clear bits.
+ */
+static bool
+find_bitmap_clear_bit_range(uint32_t *bitmap, uint32_t *start, uint32_t *end)
+{
+	if (find_bitmap_bit(bitmap, false, start, *end)) {
+		uint32_t found_end = *start;
+		if (find_bitmap_bit(bitmap, true, &found_end, *end))
+			*end = found_end;
+		return true;
+	}
+	return false;
+}
+
+static void
+gen8_map_ggtt_range(uint64_t start, uint64_t end)
+{
+	uint32_t pos1, pos2, end_pos;
+	static uint32_t *bitmap = NULL;
+	if (bitmap == NULL) {
+		/* 4GiB (32-bits) of 4KiB pages (12-bits) in dwords (5-bits) */
+		bitmap = calloc(1 << (32 - 12 - 5), sizeof(*bitmap));
+		if (bitmap == NULL)
+			return;
+	}
+
+	pos1 = start >> 12;
+	end_pos = (end + 4096 - 1) >> 12;
+	while (pos1 < end_pos) {
+		pos2 = end_pos;
+		if (!find_bitmap_clear_bit_range(bitmap, &pos1, &pos2))
+			break;
+
+		if (verbose)
+			printf("MAPPING 0x%08lx-0x%08lx\n",
+			       (uint64_t)pos1 << 12, (uint64_t)pos2 << 12);
+		gen8_emit_ggtt_pte_for_range((uint64_t)pos1 << 12,
+		                             (uint64_t)pos2 << 12);
+		set_bitmap_range(bitmap, (uint64_t)pos1, (uint64_t)pos2);
+		pos1 = pos2;
+	}
 }
 
 static void
