@@ -1002,6 +1002,11 @@ static bool psr_wait_until_enabled(void)
 	return igt_wait(psr_is_enabled(), 5000, 1);
 }
 
+static bool psr_wait_until_disabled(void)
+{
+	return igt_wait(!psr_is_enabled(), 5000, 1);
+}
+
 static bool drrs_wait_until_rr_switch_to_low(void)
 {
 	return igt_wait(is_drrs_low(), 5000, 1);
@@ -1845,10 +1850,13 @@ static void do_status_assertions(int flags)
 	if (flags & ASSERT_PSR_ENABLED) {
 		if (!psr_wait_until_enabled()) {
 			psr_print_status();
-			igt_assert_f(psr_is_enabled(), "PSR disabled\n");
+			igt_assert_f(psr_is_enabled(), "PSR still disabled\n");
 		}
 	} else if (flags & ASSERT_PSR_DISABLED) {
-		igt_assert(!psr_wait_until_enabled());
+		if (!psr_wait_until_disabled()) {
+			psr_print_status();
+			igt_assert_f(!psr_is_enabled(), "PSR still enabled\n");
+		}
 	}
 }
 
