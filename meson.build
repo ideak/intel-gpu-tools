@@ -47,7 +47,7 @@ if valgrind.found()
 	config.set('HAVE_VALGRIND', 1)
 endif
 
-cairo = dependency('cairo', version : '>1.12.0', required : false)
+cairo = dependency('cairo', version : '>1.12.0', required : true)
 
 libudev = dependency('libudev', required : false)
 if libudev.found()
