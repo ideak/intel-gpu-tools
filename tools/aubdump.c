@@ -505,6 +505,12 @@ gen8_map_ggtt_range(uint64_t start, uint64_t end)
 }
 
 static void
+gen8_map_base_size(uint64_t base, uint64_t size)
+{
+	gen8_map_ggtt_range(base, base + size);
+}
+
+static void
 gen10_write_header(void)
 {
 	char app_name[8 * 4];
@@ -524,15 +530,16 @@ gen10_write_header(void)
 	dword_out(0);		/* version */
 	data_out(app_name, app_name_len);
 
-	gen8_map_ggtt_range(0, MEMORY_MAP_SIZE);
-
 	/* RENDER_RING */
+	gen8_map_base_size(RENDER_RING_ADDR, RING_SIZE);
 	mem_trace_memory_write_header_out(RENDER_RING_ADDR, RING_SIZE,
 					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
 	for (uint32_t i = 0; i < RING_SIZE; i += sizeof(uint32_t))
 		dword_out(0);
 
 	/* RENDER_PPHWSP */
+	gen8_map_base_size(RENDER_CONTEXT_ADDR,
+	                   PPHWSP_SIZE + sizeof(render_context_init));
 	mem_trace_memory_write_header_out(RENDER_CONTEXT_ADDR,
 					  PPHWSP_SIZE +
 					  sizeof(render_context_init),
@@ -544,12 +551,15 @@ gen10_write_header(void)
 	data_out(render_context_init, sizeof(render_context_init));
 
 	/* BLITTER_RING */
+	gen8_map_base_size(BLITTER_RING_ADDR, RING_SIZE);
 	mem_trace_memory_write_header_out(BLITTER_RING_ADDR, RING_SIZE,
 					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
 	for (uint32_t i = 0; i < RING_SIZE; i += sizeof(uint32_t))
 		dword_out(0);
 
 	/* BLITTER_PPHWSP */
+	gen8_map_base_size(BLITTER_CONTEXT_ADDR,
+	                   PPHWSP_SIZE + sizeof(blitter_context_init));
 	mem_trace_memory_write_header_out(BLITTER_CONTEXT_ADDR,
 					  PPHWSP_SIZE +
 					  sizeof(blitter_context_init),
@@ -561,12 +571,15 @@ gen10_write_header(void)
 	data_out(blitter_context_init, sizeof(blitter_context_init));
 
 	/* VIDEO_RING */
+	gen8_map_base_size(VIDEO_RING_ADDR, RING_SIZE);
 	mem_trace_memory_write_header_out(VIDEO_RING_ADDR, RING_SIZE,
 					  AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_LOCAL);
 	for (uint32_t i = 0; i < RING_SIZE; i += sizeof(uint32_t))
 		dword_out(0);
 
 	/* VIDEO_PPHWSP */
+	gen8_map_base_size(VIDEO_CONTEXT_ADDR,
+	                   PPHWSP_SIZE + sizeof(video_context_init));
 	mem_trace_memory_write_header_out(VIDEO_CONTEXT_ADDR,
 					  PPHWSP_SIZE +
 					  sizeof(video_context_init),
@@ -961,6 +974,9 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 		if (bo->map == NULL && bo->size > 0)
 			bo->map = gem_mmap(fd, obj->handle, 0, bo->size);
 		fail_if(bo->map == MAP_FAILED, "intel_aubdump: bo mmap failed\n");
+
+		if (gen >= 10)
+			gen8_map_ggtt_range(bo->offset, bo->offset + bo->size);
 	}
 
 	batch_index = (execbuffer2->flags & I915_EXEC_BATCH_FIRST) ? 0 :
