@@ -1422,9 +1422,10 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 				busy_us / 100) / target_busy_pct;
 	unsigned long pwm_calibration_us;
 	unsigned long test_us;
-	double busy_r;
+	double busy_r, expected;
 	uint64_t val[2];
 	uint64_t ts[2];
+	int link[2];
 	int fd;
 
 	/* Sampling platforms cannot reach the high accuracy criteria. */
@@ -1450,14 +1451,16 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	assert_within_epsilon((double)busy_us / (busy_us + idle_us),
 				(double)target_busy_pct / 100.0, tolerance);
 
+	igt_assert(pipe(link) == 0);
+
 	/* Emit PWM pattern on the engine from a child. */
 	igt_fork(child, 1) {
 		struct sched_param rt = { .sched_priority = 99 };
-		const unsigned long timeout[] = { pwm_calibration_us * 1000,
-						  test_us * 2 * 1000 };
-		unsigned long sleep_busy = busy_us;
-		unsigned long sleep_idle = idle_us;
+		const unsigned long timeout[] = {
+			pwm_calibration_us * 1000, test_us * 2 * 1000
+		};
 		struct drm_i915_gem_exec_object2 obj = {};
+		uint64_t total_busy_ns = 0, total_idle_ns = 0;
 		igt_spin_t *spin;
 		int ret;
 
@@ -1478,76 +1481,67 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 
 		/* 1st pass is calibration, second pass is the test. */
 		for (int pass = 0; pass < ARRAY_SIZE(timeout); pass++) {
-			unsigned long busy_ns = 0, idle_ns = 0;
+			uint64_t busy_ns = -total_busy_ns;
+			uint64_t idle_ns = -total_idle_ns;
 			struct timespec test_start = { };
-			unsigned long loops = 0;
-			double err_busy, err_idle;
 
 			igt_nsec_elapsed(&test_start);
 			do {
 				struct timespec t_busy = { };
+				unsigned int target_idle_us;
 
 				igt_nsec_elapsed(&t_busy);
 
 				/* Restart the spinbatch. */
 				__rearm_spin_batch(spin);
 				__submit_spin_batch(gem_fd, &obj, e);
-				measured_usleep(sleep_busy);
+				measured_usleep(busy_us);
 				igt_spin_batch_end(spin);
 				gem_sync(gem_fd, obj.handle);
 
-				busy_ns += igt_nsec_elapsed(&t_busy);
+				total_busy_ns += igt_nsec_elapsed(&t_busy);
 
-				idle_ns += measured_usleep(sleep_idle);
-
-				loops++;
+				target_idle_us =
+					(100 * total_busy_ns / target_busy_pct - (total_busy_ns + total_idle_ns)) / 1000;
+				total_idle_ns += measured_usleep(target_idle_us);
 			} while (igt_nsec_elapsed(&test_start) < timeout[pass]);
 
-			busy_ns = div_round_up(busy_ns, loops);
-			idle_ns = div_round_up(idle_ns, loops);
+			busy_ns += total_busy_ns;
+			idle_ns += total_idle_ns;
 
-			err_busy = __error(busy_ns / 1000, busy_us);
-			err_idle = __error(idle_ns / 1000, idle_us);
-
-			igt_info("%u: busy %lu/%lu %.2f%%, idle %lu/%lu %.2f%%\n",
-				 pass,
-				 busy_ns / 1000, busy_us, err_busy,
-				 idle_ns / 1000, idle_us, err_idle);
-
-			if (pass == 0) {
-				sleep_busy = (double)busy_us -
-					     (double)busy_us * err_busy / 100.0;
-				sleep_idle = (double)idle_us -
-					     (double)idle_us * err_idle / 100.0;
-				igt_info("calibrated sleeps ratio %.2f%% (%lu/%lu)\n",
-					 (double)sleep_busy /
-					 (sleep_busy + sleep_idle) * 100.0,
-					 sleep_busy, sleep_idle);
-			}
+			expected = (double)busy_ns / (busy_ns + idle_ns);
+			igt_info("%u: busy %luus, idle %luus: %.2f%% (target: %lu%%)\n",
+				 pass, busy_ns / 1000, idle_ns / 1000,
+				 100 * expected, target_busy_pct);
+			write(link[1], &expected, sizeof(expected));
 		}
 
 		igt_spin_batch_free(gem_fd, spin);
 	}
 
 	/* Let the child run. */
-	usleep(pwm_calibration_us * 2);
+	read(link[0], &expected, sizeof(expected));
+	assert_within_epsilon(expected, target_busy_pct/100., 0.05);
 
 	/* Collect engine busyness for an interesting part of child runtime. */
 	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
 	val[0] = __pmu_read_single(fd, &ts[0]);
-	usleep(test_us / 2);
+	read(link[0], &expected, sizeof(expected));
 	val[1] = __pmu_read_single(fd, &ts[1]);
 	close(fd);
+
+	close(link[1]);
+	close(link[0]);
 
 	igt_waitchildren();
 
 	busy_r = (double)(val[1] - val[0]) / (ts[1] - ts[0]);
 
-	igt_info("error=%.2f%% (%.2f%% vs %lu%%)\n",
-		 __error(busy_r, target_busy_pct / 100.0),
-		 busy_r * 100.0, target_busy_pct);
+	igt_info("error=%.2f%% (%.2f%% vs %.2f%%)\n",
+		 __error(busy_r, expected), 100 * busy_r, 100 * expected);
 
-	assert_within_epsilon(busy_r, (double)target_busy_pct / 100.0, 0.15);
+	assert_within_epsilon(busy_r, expected, 0.15);
+	assert_within_epsilon(1 - busy_r, 1 - expected, 0.15);
 }
 
 igt_main
