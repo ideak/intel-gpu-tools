@@ -9,6 +9,8 @@ lib_source_list =	 	\
 	i915/gem_scheduler.h	\
 	i915/gem_submission.c	\
 	i915/gem_submission.h	\
+	i915/gem_ring.h	\
+	i915/gem_ring.c	\
 	i915_3d.h		\
 	i915_reg.h		\
 	i915_pciids.h		\
