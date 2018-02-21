@@ -76,10 +76,7 @@ static void spin_on_all_engines(int fd, unsigned int timeout_sec)
 {
 	unsigned engine;
 
-	for_each_engine(fd, engine) {
-		if (engine == 0)
-			continue;
-
+	for_each_physical_engine(fd, engine) {
 		igt_fork(child, 1) {
 			igt_install_exit_handler(spin_exit_handler);
 			spin(fd, engine, timeout_sec);

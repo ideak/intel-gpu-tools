@@ -28,17 +28,6 @@ IGT_TEST_DESCRIPTION("Fill the GTT with batches.");
 
 #define BATCH_SIZE (4096<<10)
 
-static bool ignore_engine(int fd, unsigned engine)
-{
-	if (engine == 0)
-		return true;
-
-	if (gem_has_bsd2(fd) && engine == I915_EXEC_BSD)
-		return true;
-
-	return false;
-}
-
 static void xchg_u32(void *array, unsigned i, unsigned j)
 {
 	uint32_t *u32 = array;
@@ -126,10 +115,7 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 
 	nengine = 0;
 	if (ring == 0) {
-		for_each_engine(fd, engine) {
-			if (ignore_engine(fd, engine))
-				continue;
-
+		for_each_physical_engine(fd, engine) {
 			if (!gem_can_store_dword(fd, engine))
 				continue;
 

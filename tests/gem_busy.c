@@ -157,7 +157,7 @@ static void semaphore(int fd, unsigned ring, uint32_t flags)
 
 #define PARALLEL 1
 #define HANG 2
-static void one(int fd, unsigned ring, uint32_t flags, unsigned test_flags)
+static void one(int fd, unsigned ring, unsigned test_flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -174,7 +174,7 @@ static void one(int fd, unsigned ring, uint32_t flags, unsigned test_flags)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
-	execbuf.flags = ring | flags;
+	execbuf.flags = ring;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
@@ -246,20 +246,17 @@ static void one(int fd, unsigned ring, uint32_t flags, unsigned test_flags)
 	__gem_busy(fd, obj[BATCH].handle, &read[BATCH], &write[BATCH]);
 
 	if (test_flags & PARALLEL) {
-		const struct intel_execution_engine *e;
+		unsigned other;
 
-		for (e = intel_execution_engines; e->name; e++) {
-			if (e->exec_id == 0 || e->exec_id == ring)
+		for_each_physical_engine(fd, other) {
+			if (other == ring)
 				continue;
 
-			if (!gem_has_ring(fd, e->exec_id | e->flags))
+			if (!gem_can_store_dword(fd, other))
 				continue;
 
-			if (!gem_can_store_dword(fd, e->exec_id | e->flags))
-				continue;
-
-			igt_debug("Testing %s in parallel\n", e->name);
-			one(fd, e->exec_id, e->flags, 0);
+			igt_debug("Testing %s in parallel\n", e__->name);
+			one(fd, other, 0);
 		}
 	}
 
@@ -497,10 +494,10 @@ igt_main
 					continue;
 
 				igt_subtest_f("extended-%s", e->name) {
-					gem_require_ring(fd, e->exec_id | e->flags);
+					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
 					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 					gem_quiescent_gpu(fd);
-					one(fd, e->exec_id, e->flags, 0);
+					one(fd, e->exec_id | e->flags, 0);
 					gem_quiescent_gpu(fd);
 				}
 			}
@@ -511,11 +508,11 @@ igt_main
 					continue;
 
 				igt_subtest_f("extended-parallel-%s", e->name) {
-					gem_require_ring(fd, e->exec_id | e->flags);
+					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
 					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 
 					gem_quiescent_gpu(fd);
-					one(fd, e->exec_id, e->flags, PARALLEL);
+					one(fd, e->exec_id | e->flags, PARALLEL);
 					gem_quiescent_gpu(fd);
 				}
 			}
@@ -576,11 +573,11 @@ igt_main
 
 				igt_subtest_f("extended-hang-%s", e->name) {
 					igt_skip_on_simulation();
-					gem_require_ring(fd, e->exec_id | e->flags);
+					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
 					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 
 					gem_quiescent_gpu(fd);
-					one(fd, e->exec_id, e->flags, HANG);
+					one(fd, e->exec_id | e->flags, HANG);
 					gem_quiescent_gpu(fd);
 				}
 			}

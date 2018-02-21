@@ -161,17 +161,6 @@ static void fifo(int fd, unsigned ring)
 	munmap(ptr, 4096);
 }
 
-static bool ignore_engine(int fd, unsigned engine)
-{
-	if (engine == 0)
-		return true;
-
-	if (gem_has_bsd2(fd) && engine == I915_EXEC_BSD)
-		return true;
-
-	return false;
-}
-
 static void smoketest(int fd, unsigned ring, unsigned timeout)
 {
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
@@ -183,12 +172,8 @@ static void smoketest(int fd, unsigned ring, unsigned timeout)
 
 	nengine = 0;
 	if (ring == -1) {
-		for_each_engine(fd, engine) {
-			if (ignore_engine(fd, engine))
-				continue;
-
+		for_each_physical_engine(fd, engine)
 			engines[nengine++] = engine;
-		}
 	} else {
 		engines[nengine++] = ring;
 	}
@@ -416,7 +401,7 @@ static void preempt_other(int fd, unsigned ring)
 	gem_context_set_priority(fd, ctx[HI], MAX_PRIO);
 
 	n = 0;
-	for_each_engine(fd, other) {
+	for_each_physical_engine(fd, other) {
 		igt_assert(n < ARRAY_SIZE(spin));
 
 		spin[n] = __igt_spin_batch_new(fd, ctx[NOISE], other, 0);
@@ -472,7 +457,7 @@ static void preempt_self(int fd, unsigned ring)
 
 	n = 0;
 	gem_context_set_priority(fd, ctx[HI], MIN_PRIO);
-	for_each_engine(fd, other) {
+	for_each_physical_engine(fd, other) {
 		spin[n] = __igt_spin_batch_new(fd, ctx[NOISE], other, 0);
 		store_dword(fd, ctx[HI], other,
 			    result, (n + 1)*sizeof(uint32_t), n + 1,
@@ -950,7 +935,7 @@ igt_main
 				continue;
 
 			igt_subtest_f("fifo-%s", e->name) {
-				gem_require_ring(fd, e->exec_id | e->flags);
+				igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
 				igt_require(gem_can_store_dword(fd, e->exec_id) | e->flags);
 				fifo(fd, e->exec_id | e->flags);
 			}
@@ -967,13 +952,12 @@ igt_main
 			smoketest(fd, -1, 30);
 
 		for (e = intel_execution_engines; e->name; e++) {
-			/* default exec-id is purely symbolic */
 			if (e->exec_id == 0)
 				continue;
 
 			igt_subtest_group {
 				igt_fixture {
-					gem_require_ring(fd, e->exec_id | e->flags);
+					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
 					igt_require(gem_can_store_dword(fd, e->exec_id) | e->flags);
 				}
 
@@ -1050,9 +1034,12 @@ igt_main
 		}
 
 		for (e = intel_execution_engines; e->name; e++) {
+			if (e->exec_id == 0)
+				continue;
+
 			igt_subtest_group {
 				igt_fixture {
-					gem_require_ring(fd, e->exec_id | e->flags);
+					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
 					igt_require(gem_scheduler_has_preemption(fd));
 				}
 

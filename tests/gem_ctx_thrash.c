@@ -86,33 +86,10 @@ static unsigned get_num_contexts(int fd, int num_engines)
 	return count;
 }
 
-static int has_engine(int fd, const struct intel_execution_engine *e, uint32_t ctx)
-{
-	uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 exec;
-	int ret;
-
-	memset(&exec, 0, sizeof(exec));
-	exec.handle = gem_create(fd, 4096);
-	gem_write(fd, exec.handle, 0, &bbe, sizeof(bbe));
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&exec);
-	execbuf.buffer_count = 1;
-	execbuf.flags = e->exec_id | e->flags;
-	execbuf.rsvd1 = ctx;
-	ret = __gem_execbuf(fd, &execbuf);
-	gem_close(fd, exec.handle);
-
-	return ret;
-}
-
 static void single(const char *name, bool all_engines)
 {
 	struct drm_i915_gem_exec_object2 *obj;
 	struct drm_i915_gem_relocation_entry *reloc;
-	const struct intel_execution_engine *e;
 	unsigned engines[16];
 	uint64_t size;
 	uint32_t *ctx, *map, scratch;
@@ -130,22 +107,9 @@ static void single(const char *name, bool all_engines)
 
 	num_engines = 0;
 	if (all_engines) {
-		for (e = intel_execution_engines; e->name; e++) {
-			if (e->exec_id == 0)
-				continue;
-
-			if (has_engine(fd, e, 0))
-				continue;
-
-			if (e->exec_id == I915_EXEC_BSD) {
-				int is_bsd2 = e->flags != 0;
-				if (gem_has_bsd2(fd) != is_bsd2)
-					continue;
-			}
-
-			igt_require(has_engine(fd, e, 1) == -ENOENT);
-
-			engines[num_engines++] = e->exec_id | e->flags;
+		unsigned engine;
+		for_each_physical_engine(fd, engine) {
+			engines[num_engines++] = engine;
 			if (num_engines == ARRAY_SIZE(engines))
 				break;
 		}
@@ -242,8 +206,7 @@ static void single(const char *name, bool all_engines)
 
 static void processes(void)
 {
-	const struct intel_execution_engine *e;
-	unsigned engines[16];
+	unsigned engines[16], engine;
 	int num_engines;
 	struct rlimit rlim;
 	unsigned num_ctx;
@@ -253,20 +216,8 @@ static void processes(void)
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	num_engines = 0;
-	for (e = intel_execution_engines; e->name; e++) {
-		if (e->exec_id == 0)
-			continue;
-
-		if (has_engine(fd, e, 0))
-			continue;
-
-		if (e->exec_id == I915_EXEC_BSD) {
-			int is_bsd2 = e->flags != 0;
-			if (gem_has_bsd2(fd) != is_bsd2)
-				continue;
-		}
-
-		engines[num_engines++] = e->exec_id | e->flags;
+	for_each_physical_engine(fd, engine) {
+		engines[num_engines++] = engine;
 		if (num_engines == ARRAY_SIZE(engines))
 			break;
 	}

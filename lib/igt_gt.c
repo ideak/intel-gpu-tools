@@ -660,3 +660,26 @@ bool gem_has_engine(int gem_fd,
 			    gem_class_instance_to_eb_flags(gem_fd, class,
 							   instance));
 }
+
+bool gem_ring_is_physical_engine(int fd, unsigned ring)
+{
+	if (ring == I915_EXEC_DEFAULT)
+		return false;
+
+	/* BSD uses an extra flag to chose between aliasing modes */
+	if ((ring & 63) == I915_EXEC_BSD) {
+		bool explicit_bsd = ring & (3 << 13);
+		bool has_bsd2 = gem_has_bsd2(fd);
+		return explicit_bsd ? has_bsd2 : !has_bsd2;
+	}
+
+	return true;
+}
+
+bool gem_ring_has_physical_engine(int fd, unsigned ring)
+{
+	if (!gem_ring_is_physical_engine(fd, ring))
+		return false;
+
+	return gem_has_ring(fd, ring);
+}

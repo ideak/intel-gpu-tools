@@ -220,7 +220,7 @@ static void store_all(int fd)
 
 	nengine = 0;
 	intel_detect_and_clear_missed_interrupts(fd);
-	for_each_engine(fd, engine) {
+	for_each_physical_engine(fd, engine) {
 		if (!gem_can_store_dword(fd, engine))
 			continue;
 

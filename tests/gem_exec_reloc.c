@@ -258,7 +258,7 @@ static void active(int fd, unsigned engine)
 
 	nengine = 0;
 	if (engine == -1) {
-		for_each_engine(fd, engine) {
+		for_each_physical_engine(fd, engine) {
 			if (gem_can_store_dword(fd, engine))
 				engines[nengine++] = engine;
 		}

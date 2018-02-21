@@ -88,6 +88,7 @@ static void one(int fd, unsigned ring, uint32_t flags)
 #define BATCH 1
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
+	unsigned int other;
 	uint32_t *batch;
 	int i;
 
@@ -142,19 +143,14 @@ static void one(int fd, unsigned ring, uint32_t flags)
 	gem_close(fd, obj[BATCH].handle);
 
 	i = 0;
-	for (const struct intel_execution_engine *e = intel_execution_engines;
-	     e->name; e++) {
-		if (e->exec_id == 0 || e->exec_id == ring)
+	for_each_physical_engine(fd, other) {
+		if (other == ring)
 			continue;
 
-		if (!gem_has_ring(fd, e->exec_id | e->flags))
+		if (!gem_can_store_dword(fd, other))
 			continue;
 
-		if (!gem_can_store_dword(fd, e->exec_id | e->flags))
-			continue;
-
-		store_dword(fd, e->exec_id | e->flags,
-			    obj[SCRATCH].handle, 4*i, i);
+		store_dword(fd, other, obj[SCRATCH].handle, 4*i, i);
 		i++;
 	}
 
@@ -209,6 +205,7 @@ igt_main
 			continue;
 
 		igt_subtest_f("concurrent-writes-%s", e->name) {
+			igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
 			igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 			one(fd, e->exec_id, e->flags);
 		}

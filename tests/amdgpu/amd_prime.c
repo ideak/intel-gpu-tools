@@ -179,12 +179,8 @@ static void i915_to_amd(int i915, int amd, amdgpu_device_handle device)
 	struct cork c;
 
 	nengine = 0;
-	for_each_engine(i915, engine) {
-		if (engine == 0)
-			continue;
-
+	for_each_physical_engine(i915, engine)
 		engines[nengine++] = engine;
-	}
 	igt_require(nengine);
 
 	memset(obj, 0, sizeof(obj));

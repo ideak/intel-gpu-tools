@@ -86,23 +86,9 @@ sync_ring(int fd, unsigned ring, int num_children, int timeout)
 	int num_engines = 0;
 
 	if (ring == ~0u) {
-		const struct intel_execution_engine *e;
-
-		for (e = intel_execution_engines; e->name; e++) {
-			if (e->exec_id == 0)
-				continue;
-
-			if (!gem_has_ring(fd, e->exec_id | e->flags))
-				continue;
-
-			if (e->exec_id == I915_EXEC_BSD) {
-				int is_bsd2 = e->flags != 0;
-				if (gem_has_bsd2(fd) != is_bsd2)
-					continue;
-			}
-
-			names[num_engines] = e->name;
-			engines[num_engines++] = e->exec_id | e->flags;
+		for_each_physical_engine(fd, ring) {
+			names[num_engines] = e__->name;
+			engines[num_engines++] = ring;
 			if (num_engines == ARRAY_SIZE(engines))
 				break;
 		}
@@ -200,26 +186,12 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 	int num_engines = 0;
 
 	if (ring == ~0u) {
-		const struct intel_execution_engine *e;
-
-		for (e = intel_execution_engines; e->name; e++) {
-			if (e->exec_id == 0)
+		for_each_physical_engine(fd, ring) {
+			if (!gem_can_store_dword(fd, ring))
 				continue;
 
-			if (!gem_has_ring(fd, e->exec_id | e->flags))
-				continue;
-
-			if (!gem_can_store_dword(fd, e->exec_id | e->flags))
-				continue;
-
-			if (e->exec_id == I915_EXEC_BSD) {
-				int is_bsd2 = e->flags != 0;
-				if (gem_has_bsd2(fd) != is_bsd2)
-					continue;
-			}
-
-			names[num_engines] = e->name;
-			engines[num_engines++] = e->exec_id | e->flags;
+			names[num_engines] = e__->name;
+			engines[num_engines++] = ring;
 			if (num_engines == ARRAY_SIZE(engines))
 				break;
 		}
@@ -502,31 +474,17 @@ store_many(int fd, unsigned ring, int timeout)
 	intel_detect_and_clear_missed_interrupts(fd);
 
 	if (ring == ~0u) {
-		const struct intel_execution_engine *e;
-
-		for (e = intel_execution_engines; e->name; e++) {
-			if (e->exec_id == 0)
+		for_each_physical_engine(fd, ring) {
+			if (!gem_can_store_dword(fd, ring))
 				continue;
-
-			if (!gem_has_ring(fd, e->exec_id | e->flags))
-				continue;
-
-			if (!gem_can_store_dword(fd, e->exec_id | e->flags))
-				continue;
-
-			if (e->exec_id == I915_EXEC_BSD) {
-				int is_bsd2 = e->flags != 0;
-				if (gem_has_bsd2(fd) != is_bsd2)
-					continue;
-			}
 
 			igt_fork(child, 1)
 				__store_many(fd,
-					     e->exec_id | e->flags,
+					     ring,
 					     timeout,
 					     &shared[n]);
 
-			names[n++] = e->name;
+			names[n++] = e__->name;
 		}
 		igt_waitchildren();
 	} else {
@@ -547,24 +505,11 @@ store_many(int fd, unsigned ring, int timeout)
 static void
 sync_all(int fd, int num_children, int timeout)
 {
-	const struct intel_execution_engine *e;
-	unsigned engines[16];
+	unsigned engines[16], engine;
 	int num_engines = 0;
 
-	for (e = intel_execution_engines; e->name; e++) {
-		if (e->exec_id == 0)
-			continue;
-
-		if (!gem_has_ring(fd, e->exec_id | e->flags))
-			continue;
-
-		if (e->exec_id == I915_EXEC_BSD) {
-			int is_bsd2 = e->flags != 0;
-			if (gem_has_bsd2(fd) != is_bsd2)
-				continue;
-		}
-
-		engines[num_engines++] = e->exec_id | e->flags;
+	for_each_physical_engine(fd, engine) {
+		engines[num_engines++] = engine;
 		if (num_engines == ARRAY_SIZE(engines))
 			break;
 	}
@@ -612,27 +557,15 @@ static void
 store_all(int fd, int num_children, int timeout)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
-	const struct intel_execution_engine *e;
 	unsigned engines[16];
 	int num_engines = 0;
+	unsigned int ring;
 
-	for (e = intel_execution_engines; e->name; e++) {
-		if (e->exec_id == 0)
+	for_each_physical_engine(fd, ring) {
+		if (!gem_can_store_dword(fd, ring))
 			continue;
 
-		if (!gem_has_ring(fd, e->exec_id | e->flags))
-			continue;
-
-		if (!gem_can_store_dword(fd, e->exec_id))
-			continue;
-
-		if (e->exec_id == I915_EXEC_BSD) {
-			int is_bsd2 = e->flags != 0;
-			if (gem_has_bsd2(fd) != is_bsd2)
-				continue;
-		}
-
-		engines[num_engines++] = e->exec_id | e->flags;
+		engines[num_engines++] = ring;
 		if (num_engines == ARRAY_SIZE(engines))
 			break;
 	}
@@ -737,23 +670,9 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 	uint32_t ctx[2];
 
 	if (ring == ~0u) {
-		const struct intel_execution_engine *e;
-
-		for (e = intel_execution_engines; e->name; e++) {
-			if (e->exec_id == 0)
-				continue;
-
-			if (!gem_has_ring(fd, e->exec_id | e->flags))
-				continue;
-
-			if (e->exec_id == I915_EXEC_BSD) {
-				int is_bsd2 = e->flags != 0;
-				if (gem_has_bsd2(fd) != is_bsd2)
-					continue;
-			}
-
-			names[num_engines] = e->name;
-			engines[num_engines++] = e->exec_id | e->flags;
+		for_each_physical_engine(fd, ring) {
+			names[num_engines] = e__->name;
+			engines[num_engines++] = ring;
 			if (num_engines == ARRAY_SIZE(engines))
 				break;
 		}

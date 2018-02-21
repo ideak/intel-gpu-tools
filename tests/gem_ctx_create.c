@@ -321,11 +321,8 @@ igt_main
 		igt_require_gem(fd);
 		gem_require_contexts(fd);
 
-		for_each_engine(fd, engine) {
-			if (engine == 0)
-				continue;
+		for_each_physical_engine(fd, engine)
 			all_engines[all_nengine++] = engine;
-		}
 		igt_require(all_nengine);
 
 		if (gem_uses_full_ppgtt(fd)) {

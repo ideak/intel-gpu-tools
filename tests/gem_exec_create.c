@@ -54,17 +54,6 @@ static double elapsed(const struct timespec *start, const struct timespec *end)
 		(end->tv_nsec - start->tv_nsec)*1e-9);
 }
 
-static bool ignore_engine(int fd, unsigned engine)
-{
-	if (engine == 0)
-		return true;
-
-	if (gem_has_bsd2(fd) && engine == I915_EXEC_BSD)
-		return true;
-
-	return false;
-}
-
 #define LEAK 0x1
 
 static void all(int fd, unsigned flags, int timeout, int ncpus)
@@ -77,12 +66,8 @@ static void all(int fd, unsigned flags, int timeout, int ncpus)
 	unsigned engine;
 
 	nengine = 0;
-	for_each_engine(fd, engine) {
-		if (ignore_engine(fd, engine))
-			continue;
-
+	for_each_physical_engine(fd, engine)
 		engines[nengine++] = engine;
-	}
 	igt_require(nengine);
 
 	memset(&obj, 0, sizeof(obj));

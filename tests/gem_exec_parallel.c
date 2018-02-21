@@ -55,17 +55,6 @@ static void check_bo(int fd, uint32_t handle, int pass)
 	munmap(map, 4096);
 }
 
-static bool ignore_engine(int fd, unsigned engine)
-{
-	if (engine == 0)
-		return true;
-
-	if (!gem_can_store_dword(fd, engine))
-		return true;
-
-	return false;
-}
-
 #define CONTEXTS 0x1
 #define FDS 0x2
 
@@ -180,8 +169,8 @@ static void all(int fd, unsigned engine, unsigned flags)
 
 	nengine = 0;
 	if (engine == -1) {
-		for_each_engine(fd, engine) {
-			if (!ignore_engine(fd, engine))
+		for_each_physical_engine(fd, engine) {
+			if (gem_can_store_dword(fd, engine))
 				engines[nengine++] = engine;
 		}
 	} else {

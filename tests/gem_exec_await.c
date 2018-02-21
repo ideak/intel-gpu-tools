@@ -45,17 +45,6 @@ static double elapsed(const struct timespec *start, const struct timespec *end)
 		(end->tv_nsec - start->tv_nsec)*1e-9);
 }
 
-static bool ignore_engine(int fd, unsigned engine)
-{
-	if (engine == 0)
-		return true;
-
-	if (gem_has_bsd2(fd) && engine == I915_EXEC_BSD)
-		return true;
-
-	return false;
-}
-
 static void xchg_obj(void *array, unsigned i, unsigned j)
 {
 	struct drm_i915_gem_exec_object2 *obj = array;
@@ -90,12 +79,8 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 	double time;
 
 	nengine = 0;
-	for_each_engine(fd, engine) {
-		if (ignore_engine(fd, engine))
-			continue;
-
+	for_each_physical_engine(fd, engine)
 		engines[nengine++] = engine;
-	}
 	igt_require(nengine);
 
 	exec = calloc(nengine, sizeof(*exec));

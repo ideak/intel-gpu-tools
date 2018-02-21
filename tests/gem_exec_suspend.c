@@ -62,25 +62,13 @@ static void check_bo(int fd, uint32_t handle)
 	munmap(map, 4096);
 }
 
-static bool ignore_engine(int fd, unsigned engine)
-{
-	if (engine == 0)
-		return true;
-
-	if (!gem_can_store_dword(fd, engine))
-		return true;
-
-	return false;
-}
-
 static void test_all(int fd, unsigned flags)
 {
 	unsigned engine;
 
-	for_each_engine(fd, engine) {
-		if (!ignore_engine(fd, engine))
+	for_each_physical_engine(fd, engine)
+		if (gem_can_store_dword(fd, engine))
 			run_test(fd, engine, flags & ~0xff);
-	}
 }
 
 static bool has_semaphores(int fd)
@@ -118,8 +106,8 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 		 * GPU is then unlikely to be active!)
 		 */
 		if (has_semaphores(fd)) {
-			for_each_engine(fd, engine) {
-				if (!ignore_engine(fd, engine))
+			for_each_physical_engine(fd, engine) {
+				if (gem_can_store_dword(fd, engine))
 					engines[nengine++] = engine;
 			}
 		} else {

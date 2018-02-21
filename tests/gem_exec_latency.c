@@ -202,13 +202,13 @@ static void latency_from_ring(int fd,
 			      unsigned ring, const char *name,
 			      unsigned flags)
 {
-	const struct intel_execution_engine *e;
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	const int has_64bit_reloc = gen >= 8;
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	const unsigned int repeats = ring_size / 2;
+	unsigned int other;
 	uint32_t *map, *results;
 	uint32_t ctx[2] = {};
 	int i, j;
@@ -254,22 +254,16 @@ static void latency_from_ring(int fd,
 	reloc.presumed_offset = obj[1].offset;
 	reloc.target_handle = flags & CORK ? 1 : 0;
 
-	for (e = intel_execution_engines; e->name; e++) {
+	for_each_physical_engine(fd, other) {
 		igt_spin_t *spin = NULL;
 		IGT_CORK_HANDLE(c);
-
-		if (e->exec_id == 0)
-			continue;
-
-		if (!gem_has_ring(fd, e->exec_id | e->flags))
-			continue;
 
 		gem_set_domain(fd, obj[2].handle,
 			       I915_GEM_DOMAIN_GTT,
 			       I915_GEM_DOMAIN_GTT);
 
 		if (flags & PREEMPT)
-			spin = igt_spin_batch_new(fd, ctx[0], ring, 0);
+			spin = __igt_spin_batch_new(fd, ctx[0], ring, 0);
 
 		if (flags & CORK) {
 			obj[0].handle = igt_cork_plug(&c, fd);
@@ -306,7 +300,7 @@ static void latency_from_ring(int fd,
 			gem_execbuf(fd, &execbuf);
 
 			execbuf.flags &= ~ENGINE_FLAGS;
-			execbuf.flags |= e->exec_id | e->flags;
+			execbuf.flags |= other;
 
 			execbuf.batch_start_offset = 64 * (j + repeats);
 			reloc.offset =
@@ -339,7 +333,8 @@ static void latency_from_ring(int fd,
 		igt_spin_batch_free(fd, spin);
 
 		igt_info("%s-%s delay: %.2f\n",
-			 name, e->name, (results[2*repeats-1] - results[0]) / (double)repeats);
+			 name, e__->name,
+			 (results[2*repeats-1] - results[0]) / (double)repeats);
 	}
 
 	munmap(map, 64*1024);
@@ -388,7 +383,7 @@ igt_main
 
 			igt_subtest_group {
 				igt_fixture {
-					gem_require_ring(device, e->exec_id | e->flags);
+					igt_require(gem_ring_has_physical_engine(device, e->exec_id | e->flags));
 				}
 
 				igt_subtest_f("%s-dispatch", e->name)

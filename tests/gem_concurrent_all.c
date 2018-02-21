@@ -960,7 +960,7 @@ static igt_hang_t all_hang(void)
 	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 
-	for_each_engine(fd, engine) {
+	for_each_physical_engine(fd, engine) {
 		hang = igt_hang_ring(fd, engine);
 
 		execbuf.flags = engine;

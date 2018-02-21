@@ -188,17 +188,6 @@ static void headless(int fd, uint32_t handle)
 	assert_within_epsilon(n_headless, n_display, 0.1f);
 }
 
-static bool ignore_engine(int fd, unsigned engine)
-{
-	if (engine == 0)
-		return true;
-
-	if (gem_has_bsd2(fd) && engine == I915_EXEC_BSD)
-		return true;
-
-	return false;
-}
-
 static void parallel(int fd, uint32_t handle, int timeout)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -212,10 +201,7 @@ static void parallel(int fd, uint32_t handle, int timeout)
 
 	sum = 0;
 	nengine = 0;
-	for_each_engine(fd, engine) {
-		if (ignore_engine(fd, engine))
-			continue;
-
+	for_each_physical_engine(fd, engine) {
 		engines[nengine] = engine;
 		names[nengine] = e__->name;
 		nengine++;
@@ -277,10 +263,7 @@ static void series(int fd, uint32_t handle, int timeout)
 	const char *name;
 
 	nengine = 0;
-	for_each_engine(fd, engine) {
-		if (ignore_engine(fd, engine))
-			continue;
-
+	for_each_physical_engine(fd, engine) {
 		time = nop_on_ring(fd, handle, engine, 1, &count) / count;
 		if (time > max) {
 			name = e__->name;
@@ -375,11 +358,8 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 
 	nengine = 0;
 	sum = 0;
-	for_each_engine(fd, n) {
+	for_each_physical_engine(fd, n) {
 		unsigned long count;
-
-		if (ignore_engine(fd, n))
-			continue;
 
 		time = nop_on_ring(fd, handle, n, 1, &count) / count;
 		sum += time;
@@ -509,12 +489,8 @@ static void fence_signal(int fd, uint32_t handle,
 
 	nengine = 0;
 	if (ring_id == -1) {
-		for_each_engine(fd, n) {
-			if (ignore_engine(fd, n))
-				continue;
-
+		for_each_physical_engine(fd, n)
 			engines[nengine++] = n;
-		}
 	} else {
 		gem_require_ring(fd, ring_id);
 		engines[nengine++] = ring_id;

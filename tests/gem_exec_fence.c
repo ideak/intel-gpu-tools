@@ -274,7 +274,7 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 	igt_assert(fence != -1);
 
 	i = 0;
-	for_each_engine(fd, engine) {
+	for_each_physical_engine(fd, engine) {
 		if (!gem_can_store_dword(fd, engine))
 			continue;
 
@@ -437,10 +437,7 @@ static void test_parallel(int fd, unsigned int master)
 	obj[BATCH].relocation_count = 1;
 
 	/* Queue all secondaries */
-	for_each_engine(fd, engine) {
-		if (engine == 0 || engine == I915_EXEC_BSD)
-			continue;
-
+	for_each_physical_engine(fd, engine) {
 		if (engine == master)
 			continue;
 
@@ -616,15 +613,8 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 		limit = ring_size / 3;
 
 	nengine = 0;
-	for_each_engine(fd, engine) {
-		if (engine == 0)
-			continue;
-
-		if (engine == I915_EXEC_BSD)
-			continue;
-
+	for_each_physical_engine(fd, engine)
 		engines[nengine++] = engine;
-	}
 	igt_require(nengine);
 
 	gem_quiescent_gpu(fd);

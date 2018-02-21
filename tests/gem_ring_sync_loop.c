@@ -48,7 +48,7 @@ sync_loop(int fd)
 	int i;
 
 	nengine = 0;
-	for_each_engine(fd, engine)
+	for_each_physical_engine(fd, engine)
 		engines[nengine++] = engine;
 	igt_require(nengine);
 
