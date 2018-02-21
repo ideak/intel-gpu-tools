@@ -41,6 +41,7 @@
 
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
+#include "i915/gem_ring.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
@@ -55,83 +56,6 @@
 
 static unsigned int ring_size;
 
-struct cork {
-	int device;
-	uint32_t handle;
-	uint32_t fence;
-};
-
-static void plug(int fd, struct cork *c)
-{
-	struct vgem_bo bo;
-	int dmabuf;
-
-	c->device = drm_open_driver(DRIVER_VGEM);
-
-	bo.width = bo.height = 1;
-	bo.bpp = 4;
-	vgem_create(c->device, &bo);
-	c->fence = vgem_fence_attach(c->device, &bo, VGEM_FENCE_WRITE);
-
-	dmabuf = prime_handle_to_fd(c->device, bo.handle);
-	c->handle = prime_fd_to_handle(fd, dmabuf);
-	close(dmabuf);
-}
-
-static void unplug(struct cork *c)
-{
-	vgem_fence_signal(c->device, c->fence);
-	close(c->device);
-}
-
-static void alarm_handler(int sig)
-{
-}
-
-static void set_timeout(int seconds)
-{
-	struct sigaction sa = { .sa_handler = alarm_handler };
-
-	sigaction(SIGALRM, seconds ? &sa : NULL, NULL);
-	alarm(seconds);
-}
-
-static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	return ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf);
-}
-
-static unsigned int measure_ring_size(int fd)
-{
-	struct drm_i915_gem_exec_object2 obj[2];
-	struct drm_i915_gem_execbuffer2 execbuf;
-	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	unsigned int count;
-	struct cork c;
-
-	memset(obj, 0, sizeof(obj));
-	obj[1].handle = gem_create(fd, 4096);
-	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
-
-	plug(fd, &c);
-	obj[0].handle = c.handle;
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.buffer_count = 2;
-
-	count = 0;
-	set_timeout(1);
-	while (__execbuf(fd, &execbuf) == 0)
-		count++;
-	set_timeout(0);
-
-	unplug(&c);
-	gem_close(fd, obj[1].handle);
-
-	return count;
-}
-
 #define RCS_TIMESTAMP (0x2000 + 0x358)
 static void latency_on_ring(int fd,
 			    unsigned ring, const char *name,
@@ -142,7 +66,7 @@ static void latency_on_ring(int fd,
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
-	struct cork c;
+	IGT_CORK_HANDLE(c);
 	volatile uint32_t *reg;
 	unsigned repeats = ring_size;
 	uint32_t start, end, *map, *results;
@@ -206,8 +130,7 @@ static void latency_on_ring(int fd,
 	}
 
 	if (flags & CORK) {
-		plug(fd, &c);
-		obj[0].handle = c.handle;
+		obj[0].handle = igt_cork_plug(&c, fd);
 		execbuf.buffers_ptr = to_user_pointer(&obj[0]);
 		execbuf.buffer_count = 3;
 	}
@@ -228,7 +151,7 @@ static void latency_on_ring(int fd,
 	igt_assert(reloc.presumed_offset == obj[1].offset);
 
 	if (flags & CORK)
-		unplug(&c);
+		igt_cork_unplug(&c);
 
 	gem_set_domain(fd, obj[1].handle, I915_GEM_DOMAIN_GTT, 0);
 	gpu_latency = (results[repeats-1] - results[0]) / (double)(repeats-1);
@@ -269,6 +192,8 @@ static void latency_on_ring(int fd,
 
 	munmap(map, 64*1024);
 	munmap(results, 4096);
+	if (flags & CORK)
+		gem_close(fd, obj[0].handle);
 	gem_close(fd, obj[1].handle);
 	gem_close(fd, obj[2].handle);
 }
@@ -331,7 +256,7 @@ static void latency_from_ring(int fd,
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_spin_t *spin = NULL;
-		struct cork c;
+		IGT_CORK_HANDLE(c);
 
 		if (e->exec_id == 0)
 			continue;
@@ -347,8 +272,7 @@ static void latency_from_ring(int fd,
 			spin = igt_spin_batch_new(fd, ctx[0], ring, 0);
 
 		if (flags & CORK) {
-			plug(fd, &c);
-			obj[0].handle = c.handle;
+			obj[0].handle = igt_cork_plug(&c, fd);
 			execbuf.buffers_ptr = to_user_pointer(&obj[0]);
 			execbuf.buffer_count = 3;
 		}
@@ -408,7 +332,7 @@ static void latency_from_ring(int fd,
 		}
 
 		if (flags & CORK)
-			unplug(&c);
+			igt_cork_unplug(&c);
 		gem_set_domain(fd, obj[1].handle,
 			       I915_GEM_DOMAIN_GTT,
 			       I915_GEM_DOMAIN_GTT);
@@ -420,6 +344,9 @@ static void latency_from_ring(int fd,
 
 	munmap(map, 64*1024);
 	munmap(results, 4096);
+
+	if (flags & CORK)
+		gem_close(fd, obj[0].handle);
 	gem_close(fd, obj[1].handle);
 	gem_close(fd, obj[2].handle);
 
@@ -441,7 +368,7 @@ igt_main
 
 		gem_submission_print_method(device);
 
-		ring_size = measure_ring_size(device);
+		ring_size = gem_measure_ring_inflight(device, 0, 0);
 		igt_info("Ring size: %d batches\n", ring_size);
 		igt_require(ring_size > 8);
 		ring_size -= 8; /* leave some spare */
