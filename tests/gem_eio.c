@@ -365,15 +365,14 @@ static void test_inflight_external(int fd)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
-	int timeline, fence;
 	igt_spin_t *hang;
+	uint32_t fence;
+	IGT_CORK_FENCE(cork);
 
-	igt_require_gem(fd);
 	igt_require_sw_sync();
 	igt_require(gem_has_exec_fence(fd));
 
-	timeline = sw_sync_timeline_create();
-	fence = sw_sync_timeline_create_fence(timeline, 1);
+	fence = igt_cork_plug(&cork, fd);
 
 	igt_require(i915_reset_control(false));
 	hang = __igt_spin_batch_new(fd, 0, 0, 0);
@@ -397,7 +396,7 @@ static void test_inflight_external(int fd)
 	gem_sync(fd, hang->handle); /* wedged, with an unready batch */
 	igt_assert(!gem_bo_busy(fd, hang->handle));
 	igt_assert(gem_bo_busy(fd, obj.handle));
-	sw_sync_timeline_inc(timeline, 1); /* only now submit our batches */
+	igt_cork_unplug(&cork); /* only now submit our batches */
 
 	igt_assert_eq(__gem_wait(fd, obj.handle, -1), 0);
 	igt_assert_eq(sync_fence_status(fence), -EIO);
@@ -406,7 +405,6 @@ static void test_inflight_external(int fd)
 	igt_spin_batch_free(fd, hang);
 	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
-	close(timeline);
 }
 
 static void test_inflight_internal(int fd)
