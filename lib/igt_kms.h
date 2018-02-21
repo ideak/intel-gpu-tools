@@ -47,7 +47,9 @@
  * @PIPE_A: First crtc.
  * @PIPE_B: Second crtc.
  * @PIPE_C: Third crtc.
- * ... and so on.
+ * @PIPE_D: Fourth crtc.
+ * @PIPE_E: Fifth crtc.
+ * @PIPE_F: Sixth crtc.
  * @IGT_MAX_PIPES: Max number of pipes allowed.
  */
 enum pipe {
@@ -495,10 +497,11 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 #define IGT_FIXED(i,f)	((i) << 16 | (f))
 
 /**
- * igt_plane_has_prop - Check whether plane supports a given property.
- *
+ * igt_plane_has_prop:
  * @plane: Plane to check.
  * @prop: Property to check.
+ *
+ * Check whether plane supports a given property.
  *
  * Returns: True if the property is supported, otherwise false.
  */
@@ -530,10 +533,11 @@ extern void igt_plane_replace_prop_blob(igt_plane_t *plane,
 					const void *ptr, size_t length);
 
 /**
- * igt_output_has_prop - Check whether output supports a given property.
- *
+ * igt_output_has_prop:
  * @output: Output to check.
  * @prop: Property to check.
+ *
+ * Check whether output supports a given property.
  *
  * Returns: True if the property is supported, otherwise false.
  */
@@ -564,10 +568,11 @@ extern void igt_output_replace_prop_blob(igt_output_t *output,
 					 const void *ptr, size_t length);
 
 /**
- * igt_pipe_obj_has_prop - Check whether pipe supports a given property.
- *
+ * igt_pipe_obj_has_prop:
  * @pipe: Pipe to check.
  * @prop: Property to check.
+ *
+ * Check whether pipe supports a given property.
  *
  * Returns: True if the property is supported, otherwise false.
  */
@@ -580,11 +585,12 @@ igt_pipe_obj_has_prop(igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop)
 uint64_t igt_pipe_obj_get_prop(igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop);
 
 /**
- * igt_pipe_get_prop - Return current value on a pipe for a given property.
- *
+ * igt_pipe_get_prop:
  * @display: Pointer to display.
  * @pipe: Target pipe.
  * @prop: Property to return.
+ *
+ * Return current value on a pipe for a given property.
  *
  * Returns: The value the property is set to, if this
  * is a blob, the blob id is returned. This can be passed
@@ -598,11 +604,12 @@ igt_pipe_get_prop(igt_display_t *display, enum pipe pipe,
 }
 
 /**
- * igt_pipe_has_prop - Check whether pipe supports a given property.
- *
+ * igt_pipe_has_prop:
  * @display: Pointer to display.
  * @pipe: Pipe to check.
  * @prop: Property to check.
+ *
+ * Check whether pipe supports a given property.
  *
  * Returns: True if the property is supported, otherwise false.
  */
