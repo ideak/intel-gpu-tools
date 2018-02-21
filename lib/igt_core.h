@@ -932,4 +932,21 @@ int igt_system_quiet(const char *command);
 		free(buf); \
 	} while (0)
 
+/**
+ * igt_kmsg:
+ * @format: printf-style format string with optional args
+ *
+ * Writes a message into the kernel log file (/dev/kmsg).
+ */
+__attribute__((format(printf, 1, 2)))
+void igt_kmsg(const char *format, ...);
+#define KMSG_EMER	"<0>[IGT] "
+#define KMSG_ALERT	"<1>[IGT] "
+#define KMSG_CRIT	"<2>[IGT] "
+#define KMSG_ERR	"<3>[IGT] "
+#define KMSG_WARNING	"<4>[IGT] "
+#define KMSG_NOTICE	"<5>[IGT] "
+#define KMSG_INFO	"<6>[IGT] "
+#define KMSG_DEBUG	"<7>[IGT] "
+
 #endif /* IGT_CORE_H */

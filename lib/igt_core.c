@@ -386,16 +386,7 @@ void igt_log_buffer_inspect(igt_buffer_log_handler_t check, void *data)
 	pthread_mutex_unlock(&log_buffer_mutex);
 }
 
-__attribute__((format(printf, 1, 2)))
-static void kmsg(const char *format, ...)
-#define KERN_EMER	"<0>"
-#define KERN_ALERT	"<1>"
-#define KERN_CRIT	"<2>"
-#define KERN_ERR	"<3>"
-#define KERN_WARNING	"<4>"
-#define KERN_NOTICE	"<5>"
-#define KERN_INFO	"<6>"
-#define KERN_DEBUG	"<7>"
+void igt_kmsg(const char *format, ...)
 {
 	va_list ap;
 	FILE *file;
@@ -811,7 +802,7 @@ out:
 
 	if (!list_subtests) {
 		kick_fbcon(false);
-		kmsg(KERN_INFO "[IGT] %s: executing\n", command_str);
+		igt_kmsg(KMSG_INFO "%s: executing\n", command_str);
 		print_version();
 
 		sync();
@@ -938,7 +929,8 @@ bool __igt_run_subtest(const char *subtest_name)
 		return false;
 	}
 
-	kmsg(KERN_INFO "[IGT] %s: starting subtest %s\n", command_str, subtest_name);
+	igt_kmsg(KMSG_INFO "%s: starting subtest %s\n",
+		 command_str, subtest_name);
 	igt_debug("Starting subtest: %s\n", subtest_name);
 
 	_igt_log_buffer_reset();
@@ -1447,8 +1439,8 @@ void igt_exit(void)
 	}
 
 	if (command_str)
-		kmsg(KERN_INFO "[IGT] %s: exiting, ret=%d\n",
-		     command_str, igt_exitcode);
+		igt_kmsg(KMSG_INFO "%s: exiting, ret=%d\n",
+			 command_str, igt_exitcode);
 	igt_debug("Exiting with status code %d\n", igt_exitcode);
 
 	for (int c = 0; c < num_test_children; c++)
