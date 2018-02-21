@@ -129,15 +129,10 @@ static void
 run_rmfb_test(struct rmfb_data *data, bool reopen)
 {
 	igt_output_t *output;
-	int valid_tests = 0;
 	enum pipe pipe;
 
-	for_each_pipe_with_valid_output(&data->display, pipe, output) {
+	for_each_pipe_with_single_output(&data->display, pipe, output)
 		test_rmfb(data, output, pipe, reopen);
-		valid_tests = 1;
-	}
-
-	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 }
 
 igt_main
@@ -152,6 +147,7 @@ igt_main
 		kmstest_set_vt_graphics_mode();
 
 		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require_output(&data.display);
 	}
 
 	igt_subtest_f("rmfb-ioctl")
