@@ -246,7 +246,7 @@ static void prepare_crtc(data_t *data)
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, &data->primary_fb);
 
-	igt_display_commit(display);
+	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	data->jump_x = (mode->hdisplay - data->curw) / 2;
 	data->jump_y = (mode->vdisplay - data->curh) / 2;
@@ -262,34 +262,15 @@ static void prepare_crtc(data_t *data)
 
 static void test_crtc(data_t *data, unsigned int edges)
 {
-	igt_display_t *display = &data->display;
-	int valid_tests = 0;
-
 	cleanup_crtc(data);
 
 	create_cursor_fb(data, data->curw, data->curh);
 
-	for_each_valid_output_on_pipe(display, data->pipe, data->output) {
-		prepare_crtc(data);
+	prepare_crtc(data);
 
-		valid_tests++;
-
-		igt_info("Beginning %s on pipe %s, connector %s\n",
-			 igt_subtest_name(),
-			 kmstest_pipe_name(data->pipe),
-			 igt_output_name(data->output));
-
-		test_edges(data, edges);
-
-		igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
-			 igt_subtest_name(),
-			 kmstest_pipe_name(data->pipe),
-			 igt_output_name(data->output));
-	}
+	test_edges(data, edges);
 
 	igt_remove_fb(data->drm_fd, &data->fb);
-
-	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 }
 
 static int opt_handler(int opt, int opt_index, void *_data)
@@ -354,36 +335,38 @@ int main(int argc, char **argv)
 		igt_display_init(&data.display, data.drm_fd);
 	}
 
-	for (data.curw = 64; data.curw <= 256; data.curw *= 2) {
-		data.curh = data.curw;
-		for (data.pipe = PIPE_A; data.pipe <= PIPE_C; data.pipe++) {
-			igt_subtest_f("pipe-%s-%dx%d-left-edge",
-				      kmstest_pipe_name(data.pipe),
-				      data.curw, data.curh) {
-				igt_require(data.pipe < data.display.n_pipes);
-				igt_require(data.curw <= max_curw && data.curh <= max_curh);
-				test_crtc(&data, EDGE_LEFT);
+	for_each_pipe_static(data.pipe) {
+		igt_subtest_group {
+			igt_fixture {
+				igt_display_require_output_on_pipe(&data.display, data.pipe);
+				data.output = igt_get_single_output_for_pipe(&data.display, data.pipe);
 			}
-			igt_subtest_f("pipe-%s-%dx%d-right-edge",
-				      kmstest_pipe_name(data.pipe),
-				      data.curw, data.curh) {
-				igt_require(data.pipe < data.display.n_pipes);
-				igt_require(data.curw <= max_curw && data.curh <= max_curh);
-				test_crtc(&data, EDGE_RIGHT);
-			}
-			igt_subtest_f("pipe-%s-%dx%d-top-edge",
-				      kmstest_pipe_name(data.pipe),
-				      data.curw, data.curh) {
-				igt_require(data.pipe < data.display.n_pipes);
-				igt_require(data.curw <= max_curw && data.curh <= max_curh);
-				test_crtc(&data, EDGE_TOP);
-			}
-			igt_subtest_f("pipe-%s-%dx%d-bottom-edge",
-				      kmstest_pipe_name(data.pipe),
-				      data.curw, data.curh) {
-				igt_require(data.pipe < data.display.n_pipes);
-				igt_require(data.curw <= max_curw && data.curh <= max_curh);
-				test_crtc(&data, EDGE_BOTTOM);
+
+			for (data.curw = 64; data.curw <= 256; data.curw *= 2) {
+				data.curh = data.curw;
+
+				igt_fixture
+					igt_require(data.curw <= max_curw && data.curh <= max_curh);
+
+				igt_subtest_f("pipe-%s-%dx%d-left-edge",
+					kmstest_pipe_name(data.pipe),
+					data.curw, data.curh)
+					test_crtc(&data, EDGE_LEFT);
+
+				igt_subtest_f("pipe-%s-%dx%d-right-edge",
+					kmstest_pipe_name(data.pipe),
+					data.curw, data.curh)
+					test_crtc(&data, EDGE_RIGHT);
+
+				igt_subtest_f("pipe-%s-%dx%d-top-edge",
+					kmstest_pipe_name(data.pipe),
+					data.curw, data.curh)
+					test_crtc(&data, EDGE_TOP);
+
+				igt_subtest_f("pipe-%s-%dx%d-bottom-edge",
+					kmstest_pipe_name(data.pipe),
+					data.curw, data.curh)
+					test_crtc(&data, EDGE_BOTTOM);
 			}
 		}
 	}
