@@ -35,31 +35,23 @@ IGT_TEST_DESCRIPTION("Basic check of KMS ABI with busy framebuffers.");
 static igt_output_t *
 set_fb_on_crtc(igt_display_t *dpy, int pipe, struct igt_fb *fb)
 {
+	drmModeModeInfoPtr mode;
+	igt_plane_t *primary;
 	igt_output_t *output;
 
-	for_each_valid_output_on_pipe(dpy, pipe, output) {
-		drmModeModeInfoPtr mode;
-		igt_plane_t *primary;
+	output = igt_get_single_output_for_pipe(dpy, pipe);
 
-		if (output->pending_pipe != PIPE_NONE)
-			continue;
+	igt_output_set_pipe(output, pipe);
+	mode = igt_output_get_mode(output);
 
-		igt_output_set_pipe(output, pipe);
-		mode = igt_output_get_mode(output);
+	igt_create_pattern_fb(dpy->drm_fd, mode->hdisplay, mode->vdisplay,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_I915_FORMAT_MOD_X_TILED, fb);
 
-		igt_create_pattern_fb(dpy->drm_fd,
-				      mode->hdisplay, mode->vdisplay,
-				      DRM_FORMAT_XRGB8888,
-				      LOCAL_I915_FORMAT_MOD_X_TILED,
-				      fb);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_fb(primary, fb);
 
-		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-		igt_plane_set_fb(primary, fb);
-
-		return output;
-	}
-
-	return NULL;
+	return output;
 }
 
 static void do_cleanup_display(igt_display_t *dpy)
@@ -168,7 +160,7 @@ static void test_flip(igt_display_t *dpy, unsigned ring, int pipe, bool modeset)
 
 	signal(SIGALRM, sighandler);
 
-	igt_require((output = set_fb_on_crtc(dpy, pipe, &fb[0])));
+	output = set_fb_on_crtc(dpy, pipe, &fb[0]);
 	igt_display_commit2(dpy, COMMIT_LEGACY);
 
 	igt_create_pattern_fb(dpy->drm_fd,
@@ -246,7 +238,7 @@ static void test_hang(igt_display_t *dpy, unsigned ring,
 	igt_output_t *output;
 	igt_plane_t *primary;
 
-	igt_require((output = set_fb_on_crtc(dpy, pipe, &fb[0])));
+	output = set_fb_on_crtc(dpy, pipe, &fb[0]);
 	igt_display_commit2(dpy, COMMIT_ATOMIC);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
@@ -290,7 +282,7 @@ static void test_pageflip_modeset_hang(igt_display_t *dpy,
 	igt_plane_t *primary;
 	igt_spin_t *t;
 
-	igt_require((output = set_fb_on_crtc(dpy, pipe, &fb)));
+	output = set_fb_on_crtc(dpy, pipe, &fb);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	igt_display_commit2(dpy, dpy->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
@@ -333,86 +325,84 @@ igt_main
 
 	/* XXX Extend to cover atomic rendering tests to all planes + legacy */
 
-	for_each_pipe_static(n) {
+	for_each_pipe_static(n) igt_subtest_group {
+		igt_hang_t hang;
+
 		errno = 0;
 
 		igt_fixture {
-			igt_skip_on(n >= display.n_pipes);
+			igt_display_require_output_on_pipe(&display, n);
 		}
 
 		igt_subtest_f("basic-flip-%s",
-			      kmstest_pipe_name(n)) {
+			kmstest_pipe_name(n)) {
 			igt_require(gem_has_ring(display.drm_fd,
 						e->exec_id | e->flags));
 
 			test_flip(&display, e->exec_id | e->flags, n, false);
 		}
 		igt_subtest_f("basic-modeset-%s",
-			      kmstest_pipe_name(n)) {
+			kmstest_pipe_name(n)) {
 			igt_require(gem_has_ring(display.drm_fd,
 						e->exec_id | e->flags));
 
 			test_flip(&display, e->exec_id | e->flags, n, true);
 		}
 
-		igt_subtest_group {
-			igt_hang_t hang;
+		igt_fixture {
+			igt_require(gem_has_ring(display.drm_fd,
+						e->exec_id | e->flags));
 
-			igt_fixture {
-				igt_require(gem_has_ring(display.drm_fd,
-							e->exec_id | e->flags));
+			hang = igt_allow_hang(display.drm_fd, 0, 0);
+		}
 
-				hang = igt_allow_hang(display.drm_fd, 0, 0);
-			}
+		igt_subtest_f("extended-pageflip-modeset-hang-oldfb-%s-%s",
+				e->name, kmstest_pipe_name(n)) {
+			igt_require(gem_has_ring(display.drm_fd,
+						e->exec_id | e->flags));
 
-			igt_subtest_f("extended-pageflip-modeset-hang-oldfb-%s-%s",
-				      e->name, kmstest_pipe_name(n)) {
-				igt_require(gem_has_ring(display.drm_fd,
-							e->exec_id | e->flags));
+			test_pageflip_modeset_hang(&display, e->exec_id | e->flags, n);
+		}
 
-				test_pageflip_modeset_hang(&display, e->exec_id | e->flags, n);
-			}
+		igt_fixture
+			igt_require(display.is_atomic);
 
-			igt_fixture
-				igt_require(display.is_atomic);
+		igt_subtest_f("extended-pageflip-hang-oldfb-%s-%s",
+				e->name, kmstest_pipe_name(n))
+			test_hang(&display, e->exec_id | e->flags, n, false, false);
 
-			igt_subtest_f("extended-pageflip-hang-oldfb-%s-%s",
-				      e->name, kmstest_pipe_name(n))
-				test_hang(&display, e->exec_id | e->flags, n, false, false);
+		igt_subtest_f("extended-pageflip-hang-newfb-%s-%s",
+				e->name, kmstest_pipe_name(n))
+			test_hang(&display, e->exec_id | e->flags, n, false, true);
 
-			igt_subtest_f("extended-pageflip-hang-newfb-%s-%s",
-				      e->name, kmstest_pipe_name(n))
-				test_hang(&display, e->exec_id | e->flags, n, false, true);
+		igt_subtest_f("extended-modeset-hang-oldfb-%s-%s",
+				e->name, kmstest_pipe_name(n))
+			test_hang(&display, e->exec_id | e->flags, n, true, false);
 
-			igt_subtest_f("extended-modeset-hang-oldfb-%s-%s",
-				      e->name, kmstest_pipe_name(n))
-				test_hang(&display, e->exec_id | e->flags, n, true, false);
+		igt_subtest_f("extended-modeset-hang-newfb-%s-%s",
+				e->name, kmstest_pipe_name(n))
+			test_hang(&display, e->exec_id | e->flags, n, true, true);
 
-			igt_subtest_f("extended-modeset-hang-newfb-%s-%s",
-				      e->name, kmstest_pipe_name(n))
-				test_hang(&display, e->exec_id | e->flags, n, true, true);
+		igt_subtest_f("extended-modeset-hang-oldfb-with-reset-%s-%s",
+				e->name, kmstest_pipe_name(n)) {
+			igt_set_module_param_int("force_reset_modeset_test", 1);
 
-			igt_subtest_f("extended-modeset-hang-oldfb-with-reset-%s-%s",
-				      e->name, kmstest_pipe_name(n)) {
-				igt_set_module_param_int("force_reset_modeset_test", 1);
+			test_hang(&display, e->exec_id | e->flags, n, true, false);
 
-				test_hang(&display, e->exec_id | e->flags, n, true, false);
+			igt_set_module_param_int("force_reset_modeset_test", 0);
+		}
 
-				igt_set_module_param_int("force_reset_modeset_test", 0);
-			}
+		igt_subtest_f("extended-modeset-hang-newfb-with-reset-%s-%s",
+				e->name, kmstest_pipe_name(n)) {
+			igt_set_module_param_int("force_reset_modeset_test", 1);
 
-			igt_subtest_f("extended-modeset-hang-newfb-with-reset-%s-%s",
-				      e->name, kmstest_pipe_name(n)) {
-				igt_set_module_param_int("force_reset_modeset_test", 1);
+			test_hang(&display, e->exec_id | e->flags, n, true, true);
 
-				test_hang(&display, e->exec_id | e->flags, n, true, true);
+			igt_set_module_param_int("force_reset_modeset_test", 0);
+		}
 
-				igt_set_module_param_int("force_reset_modeset_test", 0);
-			}
-
-			igt_fixture {
-				igt_disallow_hang(display.drm_fd, hang);
-			}
+		igt_fixture {
+			igt_disallow_hang(display.drm_fd, hang);
 		}
 	}
 
