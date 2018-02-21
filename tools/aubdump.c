@@ -888,6 +888,22 @@ dump_execbuffer2(int fd, struct drm_i915_gem_execbuffer2 *execbuffer2)
 		if (files[i] != NULL)
 			fflush(files[i]);
 	}
+
+	if (device_override &&
+	    (execbuffer2->flags & I915_EXEC_FENCE_ARRAY) != 0) {
+		struct drm_i915_gem_exec_fence *fences =
+			(void*)(uintptr_t)execbuffer2->cliprects_ptr;
+		for (uint32_t i = 0; i < execbuffer2->num_cliprects; i++) {
+			if ((fences[i].flags & I915_EXEC_FENCE_SIGNAL) != 0) {
+				struct drm_syncobj_array arg = {
+					.handles = (uintptr_t)&fences[i].handle,
+					.count_handles = 1,
+					.pad = 0,
+				};
+				libc_ioctl(fd, DRM_IOCTL_SYNCOBJ_SIGNAL, &arg);
+			}
+		}
+	}
 }
 
 static void
