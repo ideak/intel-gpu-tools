@@ -41,7 +41,7 @@ static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 	struct timespec itv = { };
 	uint64_t elapsed;
 
-	spin = igt_spin_batch_new(fd, 0, engine, 0);
+	spin = __igt_spin_batch_new(fd, 0, engine, 0);
 	while ((elapsed = igt_nsec_elapsed(&tv)) >> 30 < timeout_sec) {
 		igt_spin_t *next = __igt_spin_batch_new(fd, 0, engine, 0);
 
@@ -64,7 +64,6 @@ static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 		 loops, (long long)elapsed, (long)(elapsed / timeout_100ms));
 
 	assert_within_epsilon(timeout_100ms * loops, elapsed, MAX_ERROR);
-	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
 static void spin_exit_handler(int sig)
@@ -101,15 +100,18 @@ igt_main
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
-		if (e->exec_id == 0)
-			continue;
-
-		igt_subtest_f("basic-%s", e->name)
+		igt_subtest_f("basic-%s", e->name) {
+			intel_detect_and_clear_missed_interrupts(fd);
 			spin(fd, e->exec_id, 3);
+			igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+		}
 	}
 
-	igt_subtest("spin-each")
+	igt_subtest("spin-each") {
+		intel_detect_and_clear_missed_interrupts(fd);
 		spin_on_all_engines(fd, 3);
+		igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+	}
 
 	igt_fixture {
 		igt_stop_hang_detector();
