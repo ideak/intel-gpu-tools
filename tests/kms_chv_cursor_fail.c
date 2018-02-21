@@ -224,6 +224,7 @@ static void cleanup_crtc(data_t *data)
 	data->pipe_crc = NULL;
 
 	igt_remove_fb(data->drm_fd, &data->primary_fb);
+	igt_remove_fb(data->drm_fd, &data->fb);
 }
 
 static void prepare_crtc(data_t *data)
@@ -262,15 +263,11 @@ static void prepare_crtc(data_t *data)
 
 static void test_crtc(data_t *data, unsigned int edges)
 {
-	cleanup_crtc(data);
+	prepare_crtc(data);
 
 	create_cursor_fb(data, data->curw, data->curh);
 
-	prepare_crtc(data);
-
 	test_edges(data, edges);
-
-	igt_remove_fb(data->drm_fd, &data->fb);
 }
 
 static int opt_handler(int opt, int opt_index, void *_data)
