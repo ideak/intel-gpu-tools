@@ -69,51 +69,15 @@ static void invalid_buf(int fd)
 #define AWAIT 4
 #define WRITE 8
 
-struct cork {
-	int device;
-	uint32_t handle;
-	uint32_t fence;
-};
-
-static struct cork plug(int fd, unsigned flags)
-{
-	struct cork c;
-	struct vgem_bo bo;
-	int dmabuf;
-
-	if ((flags & (WRITE | AWAIT)) == 0)
-		return (struct cork){0};
-
-	c.device = drm_open_driver(DRIVER_VGEM);
-
-	bo.width = bo.height = 1;
-	bo.bpp = 4;
-	vgem_create(c.device, &bo);
-	c.fence = vgem_fence_attach(c.device, &bo, VGEM_FENCE_WRITE);
-
-	dmabuf = prime_handle_to_fd(c.device, bo.handle);
-	c.handle = prime_fd_to_handle(fd, dmabuf);
-	close(dmabuf);
-
-	return c;
-}
-
-static void unplug(struct cork *c)
-{
-	if (!c->device)
-		return;
-
-	vgem_fence_signal(c->device, c->fence);
-	close(c->device);
-}
-
 static void basic(int fd, unsigned engine, unsigned flags)
 {
-	struct cork cork = plug(fd, flags);
-	igt_spin_t *spin = igt_spin_batch_new(fd, 0, engine, cork.handle);
+	IGT_CORK_HANDLE(cork);
+	uint32_t plug =
+		flags & (WRITE | AWAIT) ? igt_cork_plug(&cork, fd) : 0;
+	igt_spin_t *spin = igt_spin_batch_new(fd, 0, engine, plug);
 	struct drm_i915_gem_wait wait = {
-	       	flags & WRITE ? cork.handle : spin->handle
-       	};
+		flags & WRITE ? plug : spin->handle
+	};
 
 	igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 
@@ -127,7 +91,9 @@ static void basic(int fd, unsigned engine, unsigned flags)
 			timeout = 1;
 		}
 
-		unplug(&cork);
+		if (flags & (WRITE | AWAIT))
+			igt_cork_unplug(&cork);
+
 		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 
 		while (__gem_wait(fd, &wait) == -ETIME)
@@ -137,7 +103,9 @@ static void basic(int fd, unsigned engine, unsigned flags)
 		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 		igt_assert_eq_s64(wait.timeout_ns, 0);
 
-		unplug(&cork);
+		if (flags & (WRITE | AWAIT))
+			igt_cork_unplug(&cork);
+
 		wait.timeout_ns = 0;
 		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 
@@ -157,6 +125,8 @@ static void basic(int fd, unsigned engine, unsigned flags)
 		igt_assert(wait.timeout_ns == 0);
 	}
 
+	if (plug)
+		gem_close(fd, plug);
 	igt_spin_batch_free(fd, spin);
 }
 
