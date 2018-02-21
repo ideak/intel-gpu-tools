@@ -361,9 +361,9 @@ int kmstest_pipe_to_index(char pipe)
 
 /**
  * kmstest_plane_type_name:
- * @plane: display plane
+ * @plane_type: display plane type
  *
- * Returns: String representing @plane, e.g. "overlay".
+ * Returns: String representing @plane_type, e.g. "overlay".
  */
 const char *kmstest_plane_type_name(int plane_type)
 {
@@ -2677,10 +2677,11 @@ static uint64_t igt_mode_object_get_prop(igt_display_t *display,
 }
 
 /**
- * igt_plane_get_prop - Return current value on a plane for a given property.
- *
+ * igt_plane_get_prop:
  * @plane: Target plane.
  * @prop: Property to check.
+ *
+ * Return current value on a plane for a given property.
  *
  * Returns: The value the property is set to, if this
  * is a blob, the blob id is returned. This can be passed
@@ -2727,10 +2728,11 @@ igt_plane_replace_prop_blob(igt_plane_t *plane, enum igt_atomic_plane_properties
 }
 
 /**
- * igt_output_get_prop - Return current value on an output for a given property.
- *
+ * igt_output_get_prop:
  * @output: Target output.
  * @prop: Property to return.
+ *
+ * Return current value on an output for a given property.
  *
  * Returns: The value the property is set to, if this
  * is a blob, the blob id is returned. This can be passed
@@ -2777,10 +2779,11 @@ igt_output_replace_prop_blob(igt_output_t *output, enum igt_atomic_connector_pro
 }
 
 /**
- * igt_pipe_obj_get_prop - Return current value on a pipe for a given property.
- *
+ * igt_pipe_obj_get_prop:
  * @pipe: Target pipe.
  * @prop: Property to return.
+ *
+ * Return current value on a pipe for a given property.
  *
  * Returns: The value the property is set to, if this
  * is a blob, the blob id is returned. This can be passed
@@ -3789,6 +3792,7 @@ void igt_flush_hotplugs(struct udev_monitor *mon)
 
 /**
  * igt_cleanup_hotplug:
+ * @mon: A udev monitor initialized with #igt_watch_hotplug
  *
  * Cleanup the resources allocated by #igt_watch_hotplug
  */

@@ -640,7 +640,7 @@ igt_pipe_has_prop(igt_display_t *display, enum pipe pipe,
 #define igt_pipe_set_prop_value(display, pipe, prop, value) \
 	igt_pipe_obj_set_prop_value(&(display)->pipes[(pipe)], prop, value)
 
-extern void igt_pipe_obj_replace_prop_blob(igt_pipe_t *pipe_obj,
+extern void igt_pipe_obj_replace_prop_blob(igt_pipe_t *pipe,
 					   enum igt_atomic_crtc_properties prop,
 					   const void *ptr, size_t length);
 
