@@ -389,7 +389,9 @@ igt_plane_t *igt_output_get_plane(igt_output_t *output, int plane_idx);
 igt_plane_t *igt_output_get_plane_type(igt_output_t *output, int plane_type);
 igt_output_t *igt_output_from_connector(igt_display_t *display,
     drmModeConnector *connector);
+
 igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type);
+igt_output_t *igt_get_single_output_for_pipe(igt_display_t *display, enum pipe pipe);
 
 void igt_pipe_request_out_fence(igt_pipe_t *pipe);
 
@@ -477,6 +479,10 @@ static inline bool igt_output_is_connected(igt_output_t *output)
  *
  * This for loop is called over all connected outputs. This function
  * will try every combination of @pipe and @output.
+ *
+ * If you only need to test a single output for each pipe, use
+ * for_each_pipe_with_single_output(), if you only need an
+ * output for a single pipe, use igt_get_single_output_for_pipe().
  */
 #define for_each_pipe_with_valid_output(display, pipe, output) \
 	for (int con__ = (pipe) = 0; \
@@ -484,6 +490,26 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 	     con__ = (con__ + 1 < (display)->n_outputs) ? con__ + 1 : (pipe = pipe + 1, 0)) \
 		for_each_if ((((output) = &(display)->outputs[con__]), \
 			     igt_pipe_connector_valid((pipe), (output))))
+
+igt_output_t **__igt_pipe_populate_outputs(igt_display_t *display,
+					   igt_output_t **chosen_outputs);
+
+/**
+ * for_each_pipe_with_single_output:
+ * @display: a pointer to an #igt_display_t structure
+ * @pipe: The pipe for which this @pipe / @output combination is valid.
+ * @output: The output for which this @pipe / @output combination is valid.
+ *
+ * This loop is called over all pipes, and will try to find a compatible output
+ * for each pipe. Unlike for_each_pipe_with_valid_output(), this function will
+ * be called at most once for each pipe.
+ */
+#define for_each_pipe_with_single_output(display, pipe, output) \
+	for (igt_output_t *__outputs[(display)->n_pipes], \
+	     **__output = __igt_pipe_populate_outputs((display), __outputs); \
+	     __output < &__outputs[(display)->n_pipes]; __output++) \
+		for_each_if (*__output && \
+			     ((pipe) = (__output - __outputs), (output) = *__output, 1))
 
 /**
  * for_each_valid_output_on_pipe:

@@ -2203,6 +2203,99 @@ igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type)
 	return &pipe->planes[plane_idx];
 }
 
+static bool output_is_internal_panel(igt_output_t *output)
+{
+	switch (output->config.connector->connector_type) {
+	case DRM_MODE_CONNECTOR_LVDS:
+	case DRM_MODE_CONNECTOR_eDP:
+	case DRM_MODE_CONNECTOR_DSI:
+	case DRM_MODE_CONNECTOR_DPI:
+		return true;
+	default:
+		return false;
+	}
+}
+
+igt_output_t **__igt_pipe_populate_outputs(igt_display_t *display, igt_output_t **chosen_outputs)
+{
+	unsigned full_pipe_mask = (1 << (display->n_pipes)) - 1, assigned_pipes = 0;
+	igt_output_t *output;
+	int i, j;
+
+	memset(chosen_outputs, 0, sizeof(*chosen_outputs) * display->n_pipes);
+
+	/*
+	 * Try to assign all outputs to the first available CRTC for
+	 * it, start with the outputs restricted to 1 pipe, then increase
+	 * number of pipes until we assign connectors to all pipes.
+	 */
+	for (i = 0; i <= display->n_pipes; i++) {
+		for_each_connected_output(display, output) {
+			uint32_t pipe_mask = output->config.valid_crtc_idx_mask & full_pipe_mask;
+			bool found = false;
+
+			if (output_is_internal_panel(output)) {
+				/*
+				 * Internal panel should be assigned to pipe A
+				 * if possible, so make sure they're enumerated
+				 * first.
+				 */
+
+				if (i)
+					continue;
+			} else if (__builtin_popcount(pipe_mask) != i)
+				continue;
+
+			for (j = 0; j < display->n_pipes; j++) {
+				bool pipe_assigned = assigned_pipes & (1 << j);
+
+				if (pipe_assigned || !(pipe_mask & (1 << j)))
+					continue;
+
+				if (!found) {
+					/* We found an unassigned pipe, use it! */
+					found = true;
+					assigned_pipes |= 1 << j;
+					chosen_outputs[j] = output;
+				} else if (!chosen_outputs[j] ||
+					   /*
+					    * Overwrite internal panel if not assigned,
+					    * external outputs are faster to do modesets
+					    */
+					   output_is_internal_panel(chosen_outputs[j]))
+					chosen_outputs[j] = output;
+			}
+
+			if (!found)
+				igt_warn("Output %s could not be assigned to a pipe\n",
+					 igt_output_name(output));
+		}
+	}
+
+	return chosen_outputs;
+}
+
+/**
+ * igt_get_single_output_for_pipe:
+ * @display: a pointer to an #igt_display_t structure
+ * @pipe: The pipe for which an #igt_output_t must be returned.
+ *
+ * Get a compatible output for a pipe.
+ *
+ * Returns: A compatible output for a given pipe, or NULL.
+ */
+igt_output_t *igt_get_single_output_for_pipe(igt_display_t *display, enum pipe pipe)
+{
+	igt_output_t *chosen_outputs[display->n_pipes];
+
+	igt_assert(pipe != PIPE_NONE);
+	igt_require(pipe < display->n_pipes);
+
+	__igt_pipe_populate_outputs(display, chosen_outputs);
+
+	return chosen_outputs[pipe];
+}
+
 static igt_output_t *igt_pipe_get_output(igt_pipe_t *pipe)
 {
 	igt_display_t *display = pipe->display;
