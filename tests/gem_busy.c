@@ -28,6 +28,7 @@
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_vgem.h"
+#include "i915/gem_ring.h"
 
 #define LOCAL_EXEC_NO_RELOC (1<<11)
 #define PAGE_ALIGN(x) ALIGN(x, 4096)
@@ -299,105 +300,10 @@ static void xchg_u32(void *array, unsigned i, unsigned j)
 	u32[j] = tmp;
 }
 
-struct cork {
-	int device;
-	uint32_t handle;
-	uint32_t fence;
-};
-
-static void plug(int fd, struct cork *c)
-{
-	struct vgem_bo bo;
-	int dmabuf;
-
-	c->device = drm_open_driver(DRIVER_VGEM);
-
-	bo.width = bo.height = 1;
-	bo.bpp = 4;
-	vgem_create(c->device, &bo);
-	c->fence = vgem_fence_attach(c->device, &bo, VGEM_FENCE_WRITE);
-
-	dmabuf = prime_handle_to_fd(c->device, bo.handle);
-	c->handle = prime_fd_to_handle(fd, dmabuf);
-	close(dmabuf);
-}
-
-static void unplug(struct cork *c)
-{
-	vgem_fence_signal(c->device, c->fence);
-	close(c->device);
-}
-
-static void alarm_handler(int sig)
-{
-}
-
-static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
-{
-	return ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf);
-}
-
-static unsigned int measure_ring_size(int fd)
-{
-	struct sigaction sa = { .sa_handler = alarm_handler };
-	struct drm_i915_gem_exec_object2 obj[2];
-	struct drm_i915_gem_execbuffer2 execbuf;
-	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	unsigned int count, last;
-	struct itimerval itv;
-	struct cork c;
-
-	memset(obj, 0, sizeof(obj));
-	obj[1].handle = gem_create(fd, 4096);
-	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj + 1);
-	execbuf.buffer_count = 1;
-	gem_execbuf(fd, &execbuf);
-	gem_sync(fd, obj[1].handle);
-
-	plug(fd, &c);
-	obj[0].handle = c.handle;
-
-	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.buffer_count = 2;
-
-	sigaction(SIGALRM, &sa, NULL);
-	itv.it_interval.tv_sec = 0;
-	itv.it_interval.tv_usec = 100;
-	itv.it_value.tv_sec = 0;
-	itv.it_value.tv_usec = 1000;
-	setitimer(ITIMER_REAL, &itv, NULL);
-
-	last = -1;
-	count = 0;
-	do {
-		if (__execbuf(fd, &execbuf) == 0) {
-			count++;
-			continue;
-		}
-
-		if (last == count)
-			break;
-
-		last = count;
-	} while (1);
-
-	memset(&itv, 0, sizeof(itv));
-	setitimer(ITIMER_REAL, &itv, NULL);
-
-	unplug(&c);
-	gem_close(fd, obj[1].handle);
-	gem_quiescent_gpu(fd);
-
-	return count;
-}
-
 static void close_race(int fd)
 {
 	const unsigned int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
-	const unsigned int nhandles = measure_ring_size(fd) / 2;
+	const unsigned int nhandles = gem_measure_ring_inflight(fd, 0, 0) / 2;
 	unsigned int engines[16], nengine;
 	unsigned long *control;
 	uint32_t *handles;
