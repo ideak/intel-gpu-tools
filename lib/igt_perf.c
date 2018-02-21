@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/sysinfo.h>
 
 #include "igt_perf.h"
 
@@ -31,6 +32,8 @@ static int
 _perf_open(uint64_t type, uint64_t config, int group, uint64_t format)
 {
 	struct perf_event_attr attr = { };
+	int nr_cpus = get_nprocs_conf();
+	int cpu = 0, ret;
 
 	attr.type = type;
 	if (attr.type == 0)
@@ -42,7 +45,11 @@ _perf_open(uint64_t type, uint64_t config, int group, uint64_t format)
 	attr.read_format = format;
 	attr.config = config;
 
-	return perf_event_open(&attr, -1, 0, group, 0);
+	do {
+		ret = perf_event_open(&attr, -1, cpu++, group, 0);
+	} while ((ret < 0 && errno == EINVAL) && (cpu < nr_cpus));
+
+	return ret;
 }
 
 int perf_i915_open(uint64_t config)
