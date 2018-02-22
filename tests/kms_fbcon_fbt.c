@@ -165,6 +165,9 @@ static bool psr_supported_on_chipset(int fd)
 	char buf[256];
 
 	igt_debugfs_read(fd, "i915_edp_psr_status", buf);
+	if (*buf == '\0') /* !HAS_PSR -> -ENODEV*/
+		return false;
+
 	return strstr(buf, "Sink_Support: yes\n");
 }
 
