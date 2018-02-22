@@ -1638,6 +1638,9 @@ static bool psr_sink_has_support(void)
 	char buf[256];
 
 	debugfs_read("i915_edp_psr_status", buf);
+	if (*buf == '\0') /* !HAS_PSR -> -ENODEV*/
+		return false;
+
 	return strstr(buf, "Sink_Support: yes\n");
 }
 
