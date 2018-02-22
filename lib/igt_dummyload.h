@@ -61,4 +61,36 @@ void igt_spin_batch_free(int fd, igt_spin_t *spin);
 
 void igt_terminate_spin_batches(void);
 
+enum igt_cork_type {
+	CORK_SYNC_FD = 1,
+	CORK_VGEM_HANDLE
+};
+
+struct igt_cork_vgem {
+	int device;
+	uint32_t fence;
+};
+
+struct igt_cork_sw_sync {
+	int timeline;
+};
+
+struct igt_cork {
+	enum igt_cork_type type;
+
+	union {
+		int fd;
+
+		struct igt_cork_vgem vgem;
+		struct igt_cork_sw_sync sw_sync;
+	};
+};
+
+#define IGT_CORK(name, cork_type) struct igt_cork name = { .type = cork_type, .fd = -1}
+#define IGT_CORK_HANDLE(name) IGT_CORK(name, CORK_VGEM_HANDLE)
+#define IGT_CORK_FENCE(name) IGT_CORK(name, CORK_SYNC_FD)
+
+uint32_t igt_cork_plug(struct igt_cork *cork, int fd);
+void igt_cork_unplug(struct igt_cork *cork);
+
 #endif /* __IGT_DUMMYLOAD_H__ */

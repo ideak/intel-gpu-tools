@@ -29,12 +29,14 @@
 #include <i915_drm.h>
 
 #include "igt_core.h"
+#include "drmtest.h"
 #include "igt_dummyload.h"
 #include "igt_gt.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
 #include "sw_sync.h"
+#include "igt_vgem.h"
 
 /**
  * SECTION:igt_dummyload
@@ -370,4 +372,121 @@ void igt_terminate_spin_batches(void)
 	igt_list_for_each(iter, &spin_list, link)
 		igt_spin_batch_end(iter);
 	pthread_mutex_unlock(&list_lock);
+}
+
+static uint32_t plug_vgem_handle(struct igt_cork *cork, int fd)
+{
+	struct vgem_bo bo;
+	int dmabuf;
+	uint32_t handle;
+
+	cork->vgem.device = drm_open_driver(DRIVER_VGEM);
+	igt_require(vgem_has_fences(cork->vgem.device));
+
+	bo.width = bo.height = 1;
+	bo.bpp = 4;
+	vgem_create(cork->vgem.device, &bo);
+	cork->vgem.fence = vgem_fence_attach(cork->vgem.device, &bo, VGEM_FENCE_WRITE);
+
+	dmabuf = prime_handle_to_fd(cork->vgem.device, bo.handle);
+	handle = prime_fd_to_handle(fd, dmabuf);
+	close(dmabuf);
+
+	return handle;
+}
+
+static void unplug_vgem_handle(struct igt_cork *cork)
+{
+	vgem_fence_signal(cork->vgem.device, cork->vgem.fence);
+	close(cork->vgem.device);
+}
+
+static uint32_t plug_sync_fd(struct igt_cork *cork)
+{
+	int fence;
+
+	igt_require_sw_sync();
+
+	cork->sw_sync.timeline = sw_sync_timeline_create();
+	fence = sw_sync_timeline_create_fence(cork->sw_sync.timeline, 1);
+
+	return fence;
+}
+
+static void unplug_sync_fd(struct igt_cork *cork)
+{
+	sw_sync_timeline_inc(cork->sw_sync.timeline, 1);
+	close(cork->sw_sync.timeline);
+}
+
+/**
+ * igt_cork_plug:
+ * @fd: open drm file descriptor
+ * @method: method to utilize for corking.
+ * @cork: structure that will be filled with the state of the cork bo.
+ * Note: this has to match the corking method.
+ *
+ * This function provides a mechanism to stall submission. It provides two
+ * blocking methods:
+ *
+ * VGEM_BO.
+ * Imports a vgem bo with a fence attached to it. This bo can be used as a
+ * dependency during submission to stall execution until the fence is signaled.
+ *
+ * SW_SYNC:
+ * Creates a timeline and then a fence on that timeline. The fence can be used
+ * as an input fence to a request, the request will be stalled until the fence
+ * is signaled.
+ *
+ * The parameters required to unblock the execution and to cleanup are stored in
+ * the provided cork structure.
+ *
+ * Returns:
+ * Handle of the imported BO / Sw sync fence FD.
+ */
+uint32_t igt_cork_plug(struct igt_cork *cork, int fd)
+{
+	igt_assert(cork->fd == -1);
+
+	switch (cork->type) {
+	case CORK_SYNC_FD:
+		return plug_sync_fd(cork);
+
+	case CORK_VGEM_HANDLE:
+		return plug_vgem_handle(cork, fd);
+
+	default:
+		igt_assert_f(0, "Invalid cork type!\n");
+		return 0;
+	}
+}
+
+/**
+ * igt_cork_unplug:
+ * @method: method to utilize for corking.
+ * @cork: cork state from igt_cork_plug()
+ *
+ * This function unblocks the execution by signaling the fence attached to the
+ * imported bo and does the necessary post-processing.
+ *
+ * NOTE: the handle returned by igt_cork_plug is not closed during this phase.
+ */
+void igt_cork_unplug(struct igt_cork *cork)
+{
+	igt_assert(cork->fd != -1);
+
+	switch (cork->type) {
+	case CORK_SYNC_FD:
+		unplug_sync_fd(cork);
+		break;
+
+	case CORK_VGEM_HANDLE:
+		unplug_vgem_handle(cork);
+		break;
+
+	default:
+		igt_assert_f(0, "Invalid cork type!\n");
+	}
+
+	cork->fd = -1; /* Reset cork */
 }
