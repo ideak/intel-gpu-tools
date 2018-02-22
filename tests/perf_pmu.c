@@ -1511,7 +1511,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 			idle_ns += total_idle_ns;
 
 			expected = (double)busy_ns / (busy_ns + idle_ns);
-			igt_info("%u: busy %luus, idle %luus: %.2f%% (target: %lu%%)\n",
+			igt_info("%u: busy %"PRIu64"us, idle %"PRIu64"us: %.2f%% (target: %lu%%)\n",
 				 pass, busy_ns / 1000, idle_ns / 1000,
 				 100 * expected, target_busy_pct);
 			write(link[1], &expected, sizeof(expected));
