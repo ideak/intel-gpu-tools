@@ -37,17 +37,21 @@ typedef struct {
 
 	igt_plane_t *plane1;
 	igt_plane_t *plane2;
-	igt_plane_t *plane3;
-	igt_plane_t *plane4;
 } data_t;
 
-#define FILE_NAME   "1080p-left.png"
+static void cleanup_crtc(data_t *data)
+{
+	igt_display_reset(&data->display);
+	igt_remove_fb(data->drm_fd, &data->fb1);
+	igt_remove_fb(data->drm_fd, &data->fb2);
+}
 
 static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 			igt_plane_t *plane, drmModeModeInfo *mode, enum igt_commit_style s)
 {
 	igt_display_t *display = &data->display;
 
+	igt_output_override_mode(output, mode);
 	igt_output_set_pipe(output, pipe);
 
 	/* before allocating, free if any older fb */
@@ -76,26 +80,6 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_display_commit2(display, s);
 }
 
-static void cleanup_crtc(data_t *data, igt_output_t *output, igt_plane_t *plane)
-{
-	igt_display_t *display = &data->display;
-
-	igt_remove_fb(data->drm_fd, &data->fb1);
-	igt_remove_fb(data->drm_fd, &data->fb2);
-
-	if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
-		igt_plane_t *primary;
-
-		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-		igt_plane_set_fb(primary, NULL);
-	}
-
-	igt_plane_set_fb(plane, NULL);
-	igt_output_set_pipe(output, PIPE_ANY);
-
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
-}
-
 static void test_panel_fitting(data_t *d)
 {
 	igt_display_t *display = &d->display;
@@ -105,30 +89,21 @@ static void test_panel_fitting(data_t *d)
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		drmModeModeInfo *mode, native_mode;
-		bool scaling_mode_set;
-
-		scaling_mode_set = kmstest_get_property(d->drm_fd,
-			output->config.connector->connector_id,
-			DRM_MODE_OBJECT_CONNECTOR,
-			"scaling mode",
-			NULL,
-			NULL,
-			NULL);
 
 		/* Check that the "scaling mode" property has been set. */
-		if (!scaling_mode_set)
+		if (!igt_output_has_prop(output, IGT_CONNECTOR_SCALING_MODE))
 			continue;
 
+		cleanup_crtc(d);
 		igt_output_set_pipe(output, pipe);
 
 		mode = igt_output_get_mode(output);
 		native_mode = *mode;
 
 		/* allocate fb2 with image */
-		igt_create_image_fb(d->drm_fd, 0, 0,
-				    DRM_FORMAT_XRGB8888,
-				    LOCAL_DRM_FORMAT_MOD_NONE,
-				    FILE_NAME, &d->fb2);
+		igt_create_pattern_fb(d->drm_fd, mode->hdisplay / 2, mode->vdisplay / 2,
+				      DRM_FORMAT_XRGB8888,
+				      LOCAL_DRM_FORMAT_MOD_NONE, &d->fb2);
 
 		/* Set up display to enable panel fitting */
 		mode->hdisplay = 640;
@@ -163,12 +138,7 @@ static void test_panel_fitting(data_t *d)
 		mode->vdisplay = 768;
 		prepare_crtc(d, output, pipe, d->plane1, mode, COMMIT_LEGACY);
 
-		/* back to single plane mode */
-		igt_plane_set_fb(d->plane2, NULL);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
-
 		valid_tests++;
-		cleanup_crtc(d, output, d->plane1);
 	}
 	igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 }
@@ -180,9 +150,8 @@ test_panel_fitting_fastset(igt_display_t *display, const enum pipe pipe, igt_out
 	drmModeModeInfo mode;
 	struct igt_fb red, green, blue;
 
-	igt_assert(kmstest_get_connector_default_mode(display->drm_fd, output->config.connector, &mode));
+	mode = *igt_output_get_mode(output);
 
-	igt_output_override_mode(output, &mode);
 	igt_output_set_pipe(output, pipe);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
@@ -221,18 +190,11 @@ test_panel_fitting_fastset(igt_display_t *display, const enum pipe pipe, igt_out
 	igt_output_override_mode(output, &mode);
 	igt_plane_set_fb(primary, &green);
 	igt_display_commit_atomic(display, 0, NULL);
-
-	/* Restore normal mode */
-	igt_plane_set_fb(primary, &blue);
-	igt_output_override_mode(output, NULL);
-	igt_display_commit_atomic(display, 0, NULL);
-
-	igt_plane_set_fb(primary, NULL);
-	igt_output_set_pipe(output, PIPE_NONE);
 }
 
-static void test_atomic_fastset(igt_display_t *display)
+static void test_atomic_fastset(data_t *data)
 {
+	igt_display_t *display = &data->display;
 	igt_output_t *output;
 	enum pipe pipe;
 	int valid_tests = 0;
@@ -246,9 +208,10 @@ static void test_atomic_fastset(igt_display_t *display)
 	igt_require(intel_gen(intel_get_drm_devid(display->drm_fd)) >= 5);
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
-		if (!output->props[IGT_CONNECTOR_SCALING_MODE])
+		if (!igt_output_has_prop(output, IGT_CONNECTOR_SCALING_MODE))
 			continue;
 
+		cleanup_crtc(data);
 		test_panel_fitting_fastset(display, pipe, output);
 		valid_tests++;
 	}
@@ -264,13 +227,14 @@ igt_main
 
 		data.drm_fd = drm_open_driver(DRIVER_ANY);
 		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require_output(&data.display);
 	}
 
 	igt_subtest("legacy")
 		test_panel_fitting(&data);
 
 	igt_subtest("atomic-fastset")
-		test_atomic_fastset(&data.display);
+		test_atomic_fastset(&data);
 
 	igt_fixture
 		igt_display_fini(&data.display);
