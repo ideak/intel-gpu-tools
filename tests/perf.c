@@ -1795,7 +1795,7 @@ test_oa_exponents(void)
 				  oa_report_get_ctx_id(timer_reports[i].report),
 				  delta, delta == expected_timestamp_delta ? "" : "******");
 
-			matches += expected_timestamp_delta >= delta;
+			matches += expected_timestamp_delta <= delta;
 		}
 
 		igt_debug("matches=%u/%u\n", matches, n_timer_reports - 1);
