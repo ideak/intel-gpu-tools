@@ -630,8 +630,8 @@ igt_main
 
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
+		igt_require(gem_has_contexts(fd));
 
-		gem_context_destroy(fd, gem_context_create(fd));
 		has_context_isolation = __has_context_isolation(fd);
 		igt_require(has_context_isolation);
 
