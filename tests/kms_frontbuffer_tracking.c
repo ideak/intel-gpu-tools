@@ -151,18 +151,11 @@ struct rect {
 	uint32_t color;
 };
 
-#define MAX_CONNECTORS 32
-#define MAX_PLANES 32
-#define MAX_ENCODERS 32
 struct {
 	int fd;
 	int debugfs;
-	drmModeResPtr res;
-	drmModeConnectorPtr connectors[MAX_CONNECTORS];
-	drmModeEncoderPtr encoders[MAX_ENCODERS];
-	drmModePlaneResPtr plane_res;
-	drmModePlanePtr planes[MAX_PLANES];
-	uint64_t plane_types[MAX_PLANES];
+	igt_display_t display;
+
 	drm_intel_bufmgr *bufmgr;
 } drm;
 
@@ -222,6 +215,7 @@ struct {
  * have a big framebuffer and the CRTC is just displaying a subregion of this
  * big FB. */
 struct fb_region {
+	igt_plane_t *plane;
 	struct igt_fb *fb;
 	int x;
 	int y;
@@ -277,17 +271,18 @@ struct {
 };
 
 struct modeset_params {
-	uint32_t crtc_id;
-	uint32_t connector_id;
-	uint32_t sprite_id;
-	drmModeModeInfoPtr mode;
-	struct fb_region fb;
+	enum pipe pipe;
+	igt_output_t *output;
+	drmModeModeInfo mode_copy, *mode;
+
+	struct fb_region primary;
 	struct fb_region cursor;
 	struct fb_region sprite;
 };
 
 struct modeset_params prim_mode_params;
 struct modeset_params scnd_mode_params;
+
 struct fb_region offscreen_fb;
 struct screen_fbs {
 	bool initialized;
@@ -337,13 +332,14 @@ drmModeModeInfo std_1024_mode = {
 	.name = "Custom 1024x768",
 };
 
-static drmModeModeInfoPtr get_connector_smallest_mode(drmModeConnectorPtr c)
+static drmModeModeInfo *get_connector_smallest_mode(igt_output_t *output)
 {
+	drmModeConnector *c = output->config.connector;
+	drmModeModeInfo *smallest = NULL;
 	int i;
-	drmModeModeInfoPtr smallest = NULL;
 
 	for (i = 0; i < c->count_modes; i++) {
-		drmModeModeInfoPtr mode = &c->modes[i];
+		drmModeModeInfo *mode = &c->modes[i];
 
 		if (!smallest)
 			smallest = mode;
@@ -359,71 +355,53 @@ static drmModeModeInfoPtr get_connector_smallest_mode(drmModeConnectorPtr c)
 	return smallest;
 }
 
-static drmModeConnectorPtr get_connector(uint32_t id)
+static drmModeModeInfo *connector_get_mode(igt_output_t *output)
 {
-	int i;
+	drmModeModeInfo *mode = NULL;
 
-	for (i = 0; i < drm.res->count_connectors; i++)
-		if (drm.res->connectors[i] == id)
-			return drm.connectors[i];
+	if (opt.small_modes)
+		mode = get_connector_smallest_mode(output);
+	else
+		mode = &output->config.default_mode;
 
-	igt_assert(false);
+	 /* On HSW the CRC WA is so awful that it makes you think everything is
+	  * bugged. */
+	if (IS_HASWELL(intel_get_drm_devid(drm.fd)) &&
+	    output->config.connector->connector_type == DRM_MODE_CONNECTOR_eDP)
+		mode = &std_1024_mode;
+
+	return mode;
 }
 
-static drmModeEncoderPtr get_encoder(uint32_t id)
+static void init_mode_params(struct modeset_params *params,
+			     igt_output_t *output, enum pipe pipe)
 {
-	int i;
+	drmModeModeInfo *mode;
 
-	for (i = 0; i < drm.res->count_encoders; i++)
-		if (drm.res->encoders[i] == id)
-			return drm.encoders[i];
+	igt_output_override_mode(output, NULL);
+	mode = connector_get_mode(output);
 
-	igt_assert(false);
-}
+	params->pipe = pipe;
+	params->output = output;
+	params->mode_copy = *mode;
+	params->mode = &params->mode_copy;
 
-static void print_mode_info(const char *screen, struct modeset_params *params)
-{
-	drmModeConnectorPtr c = get_connector(params->connector_id);
+	params->primary.plane = igt_pipe_get_plane_type(&drm.display.pipes[pipe], DRM_PLANE_TYPE_PRIMARY);
+	params->primary.fb = NULL;
+	params->primary.x = 0;
+	params->primary.y = 0;
+	params->primary.w = mode->hdisplay;
+	params->primary.h = mode->vdisplay;
 
-	igt_info("%s screen: %s %s, crtc %d\n",
-		 screen,
-		 kmstest_connector_type_str(c->connector_type),
-		 params->mode->name,
-		 kmstest_get_crtc_idx(drm.res, params->crtc_id));
-}
-
-static void init_mode_params(struct modeset_params *params, uint32_t crtc_id,
-			     drmModeConnectorPtr connector,
-			     drmModeModeInfoPtr mode)
-{
-	uint32_t overlay_plane_id = 0;
-	int crtc_idx = kmstest_get_crtc_idx(drm.res, crtc_id);
-	int i;
-
-	for (i = 0; i < drm.plane_res->count_planes; i++)
-		if ((drm.planes[i]->possible_crtcs & (1 << crtc_idx)) &&
-		    drm.plane_types[i] == DRM_PLANE_TYPE_OVERLAY) {
-			overlay_plane_id = drm.planes[i]->plane_id;
-			break;
-		}
-
-	igt_require(overlay_plane_id);
-
-	params->crtc_id = crtc_id;
-	params->connector_id = connector->connector_id;
-	params->mode = mode;
-	params->sprite_id = overlay_plane_id;
-
-	params->fb.fb = NULL;
-	params->fb.w = mode->hdisplay;
-	params->fb.h = mode->vdisplay;
-
+	params->cursor.plane = igt_pipe_get_plane_type(&drm.display.pipes[pipe], DRM_PLANE_TYPE_CURSOR);
 	params->cursor.fb = NULL;
 	params->cursor.x = 0;
 	params->cursor.y = 0;
 	params->cursor.w = 64;
 	params->cursor.h = 64;
 
+	params->sprite.plane = igt_pipe_get_plane_type(&drm.display.pipes[pipe], DRM_PLANE_TYPE_OVERLAY);
+	igt_require(params->sprite.plane);
 	params->sprite.fb = NULL;
 	params->sprite.x = 0;
 	params->sprite.y = 0;
@@ -431,63 +409,32 @@ static void init_mode_params(struct modeset_params *params, uint32_t crtc_id,
 	params->sprite.h = 64;
 }
 
-static bool connector_get_mode(drmModeConnectorPtr c, drmModeModeInfoPtr *mode)
+static bool find_connector(bool edp_only, bool pipe_a,
+			   igt_output_t *forbidden_output,
+			   enum pipe forbidden_pipe,
+			   igt_output_t **ret_output,
+			   enum pipe *ret_pipe)
 {
-	*mode = NULL;
+	igt_output_t *output;
+	enum pipe pipe;
 
-	if (c->connection != DRM_MODE_CONNECTED || !c->count_modes)
-		return false;
-
-	if (c->connector_type == DRM_MODE_CONNECTOR_eDP && opt.no_edp)
-		return false;
-
-	if (opt.small_modes)
-		*mode = get_connector_smallest_mode(c);
-	else
-		*mode = &c->modes[0];
-
-	 /* On HSW the CRC WA is so awful that it makes you think everything is
-	  * bugged. */
-	if (IS_HASWELL(intel_get_drm_devid(drm.fd)) &&
-	    c->connector_type == DRM_MODE_CONNECTOR_eDP)
-		*mode = &std_1024_mode;
-
-	return true;
-}
-
-static bool connector_supports_pipe_a(drmModeConnectorPtr connector)
-{
-	int i;
-
-	for (i = 0; i < connector->count_encoders; i++)
-		if (get_encoder(connector->encoders[i])->possible_crtcs & 1)
-			return true;
-
-	return false;
-}
-
-static bool find_connector(bool edp_only, bool pipe_a, uint32_t forbidden_id,
-			   drmModeConnectorPtr *ret_connector,
-			   drmModeModeInfoPtr *ret_mode)
-{
-	drmModeConnectorPtr c = NULL;
-	drmModeModeInfoPtr mode = NULL;
-	int i;
-
-	for (i = 0; i < drm.res->count_connectors; i++) {
-		c = drm.connectors[i];
+	for_each_pipe_with_valid_output(&drm.display, pipe, output) {
+		drmModeConnectorPtr c = output->config.connector;
 
 		if (edp_only && c->connector_type != DRM_MODE_CONNECTOR_eDP)
 			continue;
-		if (pipe_a && !connector_supports_pipe_a(c))
-			continue;
-		if (c->connector_id == forbidden_id)
-			continue;
-		if (!connector_get_mode(c, &mode))
+
+		if (pipe_a && pipe != PIPE_A)
 			continue;
 
-		*ret_connector = c;
-		*ret_mode = mode;
+		if (output == forbidden_output || pipe == forbidden_pipe)
+			continue;
+
+		if (c->connector_type == DRM_MODE_CONNECTOR_eDP && opt.no_edp)
+			continue;
+
+		*ret_output = output;
+		*ret_pipe = pipe;
 		return true;
 	}
 
@@ -496,9 +443,8 @@ static bool find_connector(bool edp_only, bool pipe_a, uint32_t forbidden_id,
 
 static bool init_modeset_cached_params(void)
 {
-	drmModeConnectorPtr prim_connector = NULL, scnd_connector = NULL;
-	drmModeModeInfoPtr prim_mode = NULL, scnd_mode = NULL;
-	uint32_t prim_crtc_id, scnd_crtc_id;
+	igt_output_t *prim_output = NULL, *scnd_output = NULL;
+	enum pipe prim_pipe, scnd_pipe;
 
 	/*
 	 * We have this problem where PSR is only present on eDP monitors and
@@ -508,39 +454,29 @@ static bool init_modeset_cached_params(void)
 	 * TODO: refactor the code in a way that allows us to have different
 	 * sets of prim/scnd structs for different features.
 	 */
-	find_connector(true, true, 0, &prim_connector, &prim_mode);
-	if (!prim_connector)
-		find_connector(true, false, 0, &prim_connector, &prim_mode);
-	if (!prim_connector)
-		find_connector(false, true, 0, &prim_connector, &prim_mode);
-	if (!prim_connector)
-		find_connector(false, false, 0, &prim_connector, &prim_mode);
+	find_connector(true, true, NULL, PIPE_NONE, &prim_output, &prim_pipe);
+	if (!prim_output)
+		find_connector(true, false, NULL, PIPE_NONE, &prim_output, &prim_pipe);
+	if (!prim_output)
+		find_connector(false, true, NULL, PIPE_NONE, &prim_output, &prim_pipe);
+	if (!prim_output)
+		find_connector(false, false, NULL, PIPE_NONE, &prim_output, &prim_pipe);
 
-	if (!prim_connector)
+	if (!prim_output)
 		return false;
 
-	find_connector(false, false, prim_connector->connector_id,
-		       &scnd_connector, &scnd_mode);
+	find_connector(false, false, prim_output, prim_pipe,
+		       &scnd_output, &scnd_pipe);
 
-	prim_crtc_id = kmstest_find_crtc_for_connector(drm.fd, drm.res,
-						       prim_connector, 0);
-	init_mode_params(&prim_mode_params, prim_crtc_id,
-			 prim_connector, prim_mode);
-	print_mode_info("Primary", &prim_mode_params);
+	init_mode_params(&prim_mode_params, prim_output, prim_pipe);
 
-	if (!scnd_connector) {
-		scnd_mode_params.connector_id = 0;
+	if (!scnd_output) {
+		scnd_mode_params.pipe = PIPE_NONE;
+		scnd_mode_params.output = NULL;
 		return true;
 	}
 
-	igt_require(drm.res->count_crtcs >= 2);
-	scnd_crtc_id = kmstest_find_crtc_for_connector(drm.fd, drm.res,
-						      scnd_connector,
-			1 << kmstest_get_crtc_idx(drm.res, prim_crtc_id));
-	init_mode_params(&scnd_mode_params, scnd_crtc_id,
-			 scnd_connector, scnd_mode);
-	print_mode_info("Secondary", &scnd_mode_params);
-
+	init_mode_params(&scnd_mode_params, scnd_output, scnd_pipe);
 	return true;
 }
 
@@ -699,7 +635,7 @@ static void create_shared_fb(enum pixel_format format)
 	prim_w = prim_mode_params.mode->hdisplay;
 	prim_h = prim_mode_params.mode->vdisplay;
 
-	if (scnd_mode_params.connector_id) {
+	if (scnd_mode_params.output) {
 		scnd_w = scnd_mode_params.mode->hdisplay;
 		scnd_h = scnd_mode_params.mode->vdisplay;
 	} else {
@@ -728,7 +664,7 @@ static void destroy_fbs(enum pixel_format format)
 	if (!s->initialized)
 		return;
 
-	if (scnd_mode_params.connector_id) {
+	if (scnd_mode_params.output) {
 		igt_remove_fb(drm.fd, &s->scnd_pri);
 		igt_remove_fb(drm.fd, &s->scnd_cur);
 		igt_remove_fb(drm.fd, &s->scnd_spr);
@@ -764,7 +700,7 @@ static void create_fbs(enum pixel_format format)
 
 	create_shared_fb(format);
 
-	if (!scnd_mode_params.connector_id)
+	if (!scnd_mode_params.output)
 		return;
 
 	create_fb(format, scnd_mode_params.mode->hdisplay,
@@ -776,14 +712,29 @@ static void create_fbs(enum pixel_format format)
 		  opt.tiling, PLANE_SPR, &s->scnd_spr);
 }
 
-static bool set_mode_for_params(struct modeset_params *params)
+static void __set_prim_plane_for_params(struct modeset_params *params)
 {
-	int rc;
+	igt_plane_set_fb(params->primary.plane, params->primary.fb);
+	igt_plane_set_position(params->primary.plane, 0, 0);
+	igt_plane_set_size(params->primary.plane, params->mode->hdisplay, params->mode->vdisplay);
+	igt_fb_set_position(params->primary.fb, params->primary.plane,
+			    params->primary.x, params->primary.y);
+	igt_fb_set_size(params->primary.fb, params->primary.plane,
+			params->mode->hdisplay, params->mode->vdisplay);
+}
 
-	rc = drmModeSetCrtc(drm.fd, params->crtc_id, params->fb.fb->fb_id,
-			    params->fb.x, params->fb.y,
-			    &params->connector_id, 1, params->mode);
-	return (rc == 0);
+static void __set_mode_for_params(struct modeset_params *params)
+{
+	igt_output_override_mode(params->output, params->mode);
+	igt_output_set_pipe(params->output, params->pipe);
+
+	__set_prim_plane_for_params(params);
+}
+
+static void set_mode_for_params(struct modeset_params *params)
+{
+	__set_mode_for_params(params);
+	igt_display_commit(&drm.display);
 }
 
 static void __debugfs_read(const char *param, char *buf, int len)
@@ -1238,22 +1189,8 @@ static void fill_fb_region(struct fb_region *region, enum color ecolor)
 
 static void unset_all_crtcs(void)
 {
-	int i, rc;
-
-	for (i = 0; i < drm.res->count_crtcs; i++) {
-		rc = drmModeSetCrtc(drm.fd, drm.res->crtcs[i], -1, 0, 0, NULL,
-				    0, NULL);
-		igt_assert_eq(rc, 0);
-
-		rc = drmModeSetCursor(drm.fd, drm.res->crtcs[i], 0, 0, 0);
-		igt_assert_eq(rc, 0);
-	}
-
-	for (i = 0; i < drm.plane_res->count_planes; i++) {
-		rc = drmModeSetPlane(drm.fd, drm.plane_res->planes[i], 0, 0, 0,
-				     0, 0, 0, 0, 0, 0, 0, 0);
-		igt_assert_eq(rc, 0);
-	}
+	igt_display_reset(&drm.display);
+	igt_display_commit(&drm.display);
 }
 
 static void disable_features(const struct test_mode *t)
@@ -1325,10 +1262,11 @@ static void collect_crcs(struct both_crcs *crcs, bool mandatory_sink_crc)
 	get_sink_crc(&crcs->sink, mandatory_sink_crc);
 }
 
+static void setup_sink_crc(void);
+
 static void init_blue_crc(enum pixel_format format, bool mandatory_sink_crc)
 {
 	struct igt_fb blue;
-	int rc;
 
 	if (blue_crcs[format].initialized)
 		return;
@@ -1339,10 +1277,18 @@ static void init_blue_crc(enum pixel_format format, bool mandatory_sink_crc)
 
 	fill_fb(&blue, COLOR_PRIM_BG);
 
-	rc = drmModeSetCrtc(drm.fd, prim_mode_params.crtc_id,
-			    blue.fb_id, 0, 0, &prim_mode_params.connector_id, 1,
-			    prim_mode_params.mode);
-	igt_assert_eq(rc, 0);
+	igt_output_set_pipe(prim_mode_params.output, prim_mode_params.pipe);
+	igt_output_override_mode(prim_mode_params.output, prim_mode_params.mode);
+	igt_plane_set_fb(prim_mode_params.primary.plane, &blue);
+	igt_display_commit(&drm.display);
+
+	if (!pipe_crc) {
+		pipe_crc = igt_pipe_crc_new(drm.fd, prim_mode_params.pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+		igt_assert(pipe_crc);
+
+		setup_sink_crc();
+	}
+
 	collect_crcs(&blue_crcs[format].crc, mandatory_sink_crc);
 
 	print_crc("Blue CRC:  ", &blue_crcs[format].crc);
@@ -1358,7 +1304,7 @@ static void init_crcs(enum pixel_format format,
 		      struct draw_pattern_info *pattern,
 		      bool mandatory_sink_crc)
 {
-	int r, r_, rc;
+	int r, r_;
 	struct igt_fb tmp_fbs[pattern->n_rects];
 
 	if (pattern->initialized[format])
@@ -1386,12 +1332,11 @@ static void init_crcs(enum pixel_format format,
 					 r);
 	}
 
+	igt_output_set_pipe(prim_mode_params.output, prim_mode_params.pipe);
 	for (r = 0; r < pattern->n_rects; r++) {
-		rc = drmModeSetCrtc(drm.fd, prim_mode_params.crtc_id,
-				   tmp_fbs[r].fb_id, 0, 0,
-				   &prim_mode_params.connector_id, 1,
-				   prim_mode_params.mode);
-		igt_assert_eq(rc, 0);
+		igt_plane_set_fb(prim_mode_params.primary.plane, &tmp_fbs[r]);
+		igt_display_commit(&drm.display);
+
 		collect_crcs(&pattern->crcs[format][r], mandatory_sink_crc);
 	}
 
@@ -1408,50 +1353,13 @@ static void init_crcs(enum pixel_format format,
 	pattern->initialized[format] = true;
 }
 
-static uint64_t get_plane_type(uint32_t plane_id)
-{
-	bool found;
-	uint64_t prop_value;
-	drmModePropertyPtr prop;
-
-	found = kmstest_get_property(drm.fd, plane_id, DRM_MODE_OBJECT_PLANE,
-				     "type", NULL, &prop_value, &prop);
-	igt_assert(found);
-	igt_assert(prop->flags & DRM_MODE_PROP_ENUM);
-	igt_assert(prop_value < prop->count_enums);
-
-	drmModeFreeProperty(prop);
-	return prop_value;
-}
-
 static void setup_drm(void)
 {
-	int i, rc;
-
 	drm.fd = drm_open_driver_master(DRIVER_INTEL);
 	drm.debugfs = igt_debugfs_dir(drm.fd);
 
-	drm.res = drmModeGetResources(drm.fd);
-	igt_assert(drm.res->count_connectors <= MAX_CONNECTORS);
-	igt_assert(drm.res->count_encoders <= MAX_ENCODERS);
-
-	for (i = 0; i < drm.res->count_connectors; i++)
-		drm.connectors[i] = drmModeGetConnectorCurrent(drm.fd,
-						drm.res->connectors[i]);
-	for (i = 0; i < drm.res->count_encoders; i++)
-		drm.encoders[i] = drmModeGetEncoder(drm.fd,
-						    drm.res->encoders[i]);
-
-	rc = drmSetClientCap(drm.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
-	igt_require(rc == 0);
-
-	drm.plane_res = drmModeGetPlaneResources(drm.fd);
-	igt_assert(drm.plane_res->count_planes <= MAX_PLANES);
-
-	for (i = 0; i < drm.plane_res->count_planes; i++) {
-		drm.planes[i] = drmModeGetPlane(drm.fd, drm.plane_res->planes[i]);
-		drm.plane_types[i] = get_plane_type(drm.plane_res->planes[i]);
-	}
+	kmstest_set_vt_graphics_mode();
+	igt_display_init(&drm.display, drm.fd);
 
 	drm.bufmgr = drm_intel_bufmgr_gem_init(drm.fd, 4096);
 	igt_assert(drm.bufmgr);
@@ -1460,20 +1368,8 @@ static void setup_drm(void)
 
 static void teardown_drm(void)
 {
-	int i;
-
 	drm_intel_bufmgr_destroy(drm.bufmgr);
-
-	for (i = 0; i < drm.plane_res->count_planes; i++)
-		drmModeFreePlane(drm.planes[i]);
-	drmModeFreePlaneResources(drm.plane_res);
-
-	for (i = 0; i < drm.res->count_encoders; i++)
-		drmModeFreeEncoder(drm.encoders[i]);
-	for (i = 0; i < drm.res->count_connectors; i++)
-		drmModeFreeConnector(drm.connectors[i]);
-
-	drmModeFreeResources(drm.res);
+	igt_display_fini(&drm.display);
 	close(drm.fd);
 }
 
@@ -1484,7 +1380,6 @@ static void setup_modeset(void)
 	offscreen_fb.w = 1024;
 	offscreen_fb.h = 1024;
 	create_fbs(FORMAT_DEFAULT);
-	kmstest_set_vt_graphics_mode();
 }
 
 static void teardown_modeset(void)
@@ -1500,7 +1395,7 @@ static void setup_sink_crc(void)
 	sink_crc_t crc;
 	drmModeConnectorPtr c;
 
-	c = get_connector(prim_mode_params.connector_id);
+	c = prim_mode_params.output->config.connector;
 	if (c->connector_type != DRM_MODE_CONNECTOR_eDP) {
 		igt_info("Sink CRC not supported: primary screen is not eDP\n");
 		sink_crc.supported = false;
@@ -1510,9 +1405,9 @@ static void setup_sink_crc(void)
 	/* We need to make sure there's a mode set on the eDP screen and it's
 	 * not on DPMS state, otherwise we fall into the "Unexpected sink CRC
 	 * error" case. */
-	prim_mode_params.fb.fb = &fbs[FORMAT_DEFAULT].prim_pri;
-	prim_mode_params.fb.x = prim_mode_params.fb.y = 0;
-	fill_fb_region(&prim_mode_params.fb, COLOR_PRIM_BG);
+	prim_mode_params.primary.fb = &fbs[FORMAT_DEFAULT].prim_pri;
+	prim_mode_params.primary.x = prim_mode_params.primary.y = 0;
+	fill_fb_region(&prim_mode_params.primary, COLOR_PRIM_BG);
 	set_mode_for_params(&prim_mode_params);
 
 	sink_crc.fd = openat(drm.debugfs, "i915_sink_crc_eDP1", O_RDONLY);
@@ -1525,11 +1420,6 @@ static void setup_sink_crc(void)
 static void setup_crcs(void)
 {
 	enum pixel_format f;
-	int crtc_idx = kmstest_get_crtc_idx(drm.res, prim_mode_params.crtc_id);
-
-	pipe_crc = igt_pipe_crc_new(drm.fd, crtc_idx, INTEL_PIPE_CRC_SOURCE_AUTO);
-
-	setup_sink_crc();
 
 	for (f = 0; f < FORMAT_COUNT; f++)
 		blue_crcs[f].initialized = false;
@@ -1601,7 +1491,6 @@ static bool fbc_supported_on_chipset(void)
 
 static void setup_fbc(void)
 {
-	drmModeConnectorPtr c = get_connector(prim_mode_params.connector_id);
 	int devid = intel_get_drm_devid(drm.fd);
 
 	if (!fbc_supported_on_chipset()) {
@@ -1614,7 +1503,7 @@ static void setup_fbc(void)
 	 * is not prepared for that yet.
 	 * TODO: solve this.
 	 */
-	if (!connector_supports_pipe_a(c)) {
+	if (prim_mode_params.pipe != PIPE_A) {
 		igt_info("Can't test FBC: primary connector doesn't support "
 			 "pipe A\n");
 		return;
@@ -1646,7 +1535,7 @@ static bool psr_sink_has_support(void)
 
 static void setup_psr(void)
 {
-	if (get_connector(prim_mode_params.connector_id)->connector_type !=
+	if (prim_mode_params.output->config.connector->connector_type !=
 	    DRM_MODE_CONNECTOR_eDP) {
 		igt_info("Can't test PSR: no usable eDP screen.\n");
 		return;
@@ -1665,7 +1554,7 @@ static void teardown_psr(void)
 
 static void setup_drrs(void)
 {
-	if (get_connector(prim_mode_params.connector_id)->connector_type !=
+	if (prim_mode_params.output->config.connector->connector_type !=
 	    DRM_MODE_CONNECTOR_eDP) {
 		igt_info("Can't test DRRS: no usable eDP screen.\n");
 		return;
@@ -1734,7 +1623,7 @@ static struct fb_region *pick_target(const struct test_mode *t,
 
 	switch (t->plane) {
 	case PLANE_PRI:
-		return &params->fb;
+		return &params->primary;
 	case PLANE_CUR:
 		return &params->cursor;
 	case PLANE_SPR:
@@ -1904,7 +1793,7 @@ static void __do_assertions(const struct test_mode *t, int flags,
 
 static void enable_prim_screen_and_wait(const struct test_mode *t)
 {
-	fill_fb_region(&prim_mode_params.fb, COLOR_PRIM_BG);
+	fill_fb_region(&prim_mode_params.primary, COLOR_PRIM_BG);
 	set_mode_for_params(&prim_mode_params);
 
 	wanted_crc = &blue_crcs[t->format].crc;
@@ -1915,45 +1804,23 @@ static void enable_prim_screen_and_wait(const struct test_mode *t)
 
 static void enable_scnd_screen_and_wait(const struct test_mode *t)
 {
-	fill_fb_region(&scnd_mode_params.fb, COLOR_SCND_BG);
+	fill_fb_region(&scnd_mode_params.primary, COLOR_SCND_BG);
 	set_mode_for_params(&scnd_mode_params);
 
 	do_assertions(ASSERT_NO_ACTION_CHANGE);
 }
 
-static void set_cursor_for_test(const struct test_mode *t,
-				struct modeset_params *params)
+static void set_region_for_test(const struct test_mode *t,
+				struct fb_region *reg)
 {
-	int rc;
+	fill_fb_region(reg, COLOR_PRIM_BG);
 
-	fill_fb_region(&params->cursor, COLOR_PRIM_BG);
+	igt_plane_set_fb(reg->plane, reg->fb);
+	igt_plane_set_position(reg->plane, 0, 0);
+	igt_plane_set_size(reg->plane, reg->w, reg->h);
+	igt_fb_set_size(reg->fb, reg->plane, reg->w, reg->h);
 
-	rc = drmModeMoveCursor(drm.fd, params->crtc_id, 0, 0);
-	igt_assert_eq(rc, 0);
-
-	rc = drmModeSetCursor(drm.fd, params->crtc_id,
-			      params->cursor.fb->gem_handle,
-			      params->cursor.w,
-			      params->cursor.h);
-	igt_assert_eq(rc, 0);
-
-	do_assertions(ASSERT_NO_ACTION_CHANGE);
-}
-
-static void set_sprite_for_test(const struct test_mode *t,
-				struct modeset_params *params)
-{
-	int rc;
-
-	fill_fb_region(&params->sprite, COLOR_PRIM_BG);
-
-	rc = drmModeSetPlane(drm.fd, params->sprite_id, params->crtc_id,
-			     params->sprite.fb->fb_id, 0, 0, 0,
-			     params->sprite.w, params->sprite.h,
-			     0, 0, params->sprite.w << 16,
-			     params->sprite.h << 16);
-	igt_assert_eq(rc, 0);
-
+	igt_display_commit(&drm.display);
 	do_assertions(ASSERT_NO_ACTION_CHANGE);
 }
 
@@ -1973,7 +1840,7 @@ static void enable_features_for_test(const struct test_mode *t)
 static void check_test_requirements(const struct test_mode *t)
 {
 	if (t->pipes == PIPE_DUAL)
-		igt_require_f(scnd_mode_params.connector_id,
+		igt_require_f(scnd_mode_params.output,
 			    "Can't test dual pipes with the current outputs\n");
 
 	if (t->feature & FEATURE_FBC)
@@ -2011,32 +1878,32 @@ static void set_crtc_fbs(const struct test_mode *t)
 
 	switch (t->fbs) {
 	case FBS_INDIVIDUAL:
-		prim_mode_params.fb.fb = &s->prim_pri;
-		scnd_mode_params.fb.fb = &s->scnd_pri;
+		prim_mode_params.primary.fb = &s->prim_pri;
+		scnd_mode_params.primary.fb = &s->scnd_pri;
 		offscreen_fb.fb = &s->offscreen;
 
-		prim_mode_params.fb.x = 0;
-		scnd_mode_params.fb.x = 0;
+		prim_mode_params.primary.x = 0;
+		scnd_mode_params.primary.x = 0;
 		offscreen_fb.x = 0;
 
-		prim_mode_params.fb.y = 0;
-		scnd_mode_params.fb.y = 0;
+		prim_mode_params.primary.y = 0;
+		scnd_mode_params.primary.y = 0;
 		offscreen_fb.y = 0;
 		break;
 	case FBS_SHARED:
 		/* Please see the comment at the top of create_shared_fb(). */
-		prim_mode_params.fb.fb = &s->big;
-		scnd_mode_params.fb.fb = &s->big;
+		prim_mode_params.primary.fb = &s->big;
+		scnd_mode_params.primary.fb = &s->big;
 		offscreen_fb.fb = &s->big;
 
-		prim_mode_params.fb.x = opt.shared_fb_x_offset;
-		scnd_mode_params.fb.x = opt.shared_fb_x_offset;
+		prim_mode_params.primary.x = opt.shared_fb_x_offset;
+		scnd_mode_params.primary.x = opt.shared_fb_x_offset;
 		offscreen_fb.x = opt.shared_fb_x_offset;
 
-		prim_mode_params.fb.y = opt.shared_fb_y_offset;
-		scnd_mode_params.fb.y = prim_mode_params.fb.y +
-					prim_mode_params.fb.h;
-		offscreen_fb.y = scnd_mode_params.fb.y + scnd_mode_params.fb.h;
+		prim_mode_params.primary.y = opt.shared_fb_y_offset;
+		scnd_mode_params.primary.y = prim_mode_params.primary.y +
+					prim_mode_params.primary.h;
+		offscreen_fb.y = scnd_mode_params.primary.y + scnd_mode_params.primary.h;
 		break;
 	default:
 		igt_assert(false);
@@ -2075,9 +1942,9 @@ static void prepare_subtest_screens(const struct test_mode *t)
 	enable_prim_screen_and_wait(t);
 	if (t->screen == SCREEN_PRIM) {
 		if (t->plane == PLANE_CUR)
-			set_cursor_for_test(t, &prim_mode_params);
+			set_region_for_test(t, &prim_mode_params.cursor);
 		if (t->plane == PLANE_SPR)
-			set_sprite_for_test(t, &prim_mode_params);
+			set_region_for_test(t, &prim_mode_params.sprite);
 	}
 
 	if (t->pipes == PIPE_SINGLE)
@@ -2086,9 +1953,9 @@ static void prepare_subtest_screens(const struct test_mode *t)
 	enable_scnd_screen_and_wait(t);
 	if (t->screen == SCREEN_SCND) {
 		if (t->plane == PLANE_CUR)
-			set_cursor_for_test(t, &scnd_mode_params);
+			set_region_for_test(t, &scnd_mode_params.cursor);
 		if (t->plane == PLANE_SPR)
-			set_sprite_for_test(t, &scnd_mode_params);
+			set_region_for_test(t, &scnd_mode_params.sprite);
 	}
 }
 
@@ -2123,15 +1990,15 @@ static void rte_subtest(const struct test_mode *t)
 		      DONT_ASSERT_CRC | ASSERT_DRRS_INACTIVE);
 
 	enable_prim_screen_and_wait(t);
-	set_cursor_for_test(t, &prim_mode_params);
-	set_sprite_for_test(t, &prim_mode_params);
+	set_region_for_test(t, &prim_mode_params.cursor);
+	set_region_for_test(t, &prim_mode_params.sprite);
 
 	if (t->pipes == PIPE_SINGLE)
 		return;
 
 	enable_scnd_screen_and_wait(t);
-	set_cursor_for_test(t, &scnd_mode_params);
-	set_sprite_for_test(t, &scnd_mode_params);
+	set_region_for_test(t, &scnd_mode_params.cursor);
+	set_region_for_test(t, &scnd_mode_params.sprite);
 }
 
 static void update_wanted_crc(const struct test_mode *t, struct both_crcs *crc)
@@ -2360,7 +2227,7 @@ static void badformat_subtest(const struct test_mode *t)
 
 	prepare_subtest_data(t, NULL);
 
-	fill_fb_region(&prim_mode_params.fb, COLOR_PRIM_BG);
+	fill_fb_region(&prim_mode_params.primary, COLOR_PRIM_BG);
 	set_mode_for_params(&prim_mode_params);
 
 	wanted_crc = &blue_crcs[t->format].crc;
@@ -2472,23 +2339,8 @@ static void wait_flip_event(void)
 
 static void set_prim_plane_for_params(struct modeset_params *params)
 {
-	int rc, i;
-	int crtc_idx = kmstest_get_crtc_idx(drm.res, params->crtc_id);
-	uint32_t plane_id = 0;
-
-	for (i = 0; i < drm.plane_res->count_planes; i++)
-		if ((drm.planes[i]->possible_crtcs & (1 << crtc_idx)) &&
-		    drm.plane_types[i] == DRM_PLANE_TYPE_PRIMARY)
-			plane_id = drm.planes[i]->plane_id;
-	igt_assert(plane_id);
-
-	rc = drmModeSetPlane(drm.fd, plane_id, params->crtc_id,
-			     params->fb.fb->fb_id, 0, 0, 0,
-			     params->mode->hdisplay,
-			     params->mode->vdisplay,
-			     params->fb.x << 16, params->fb.y << 16,
-			     params->fb.w << 16, params->fb.h << 16);
-	igt_assert(rc == 0);
+	__set_prim_plane_for_params(params);
+	igt_display_commit2(&drm.display, COMMIT_UNIVERSAL);
 }
 
 static void page_flip_for_params(struct modeset_params *params,
@@ -2498,8 +2350,8 @@ static void page_flip_for_params(struct modeset_params *params,
 
 	switch (type) {
 	case FLIP_PAGEFLIP:
-		rc = drmModePageFlip(drm.fd, params->crtc_id,
-				     params->fb.fb->fb_id,
+		rc = drmModePageFlip(drm.fd, drm.display.pipes[params->pipe].crtc_id,
+				     params->primary.fb->fb_id,
 				     DRM_MODE_PAGE_FLIP_EVENT, NULL);
 		igt_assert_eq(rc, 0);
 		wait_flip_event();
@@ -2554,17 +2406,17 @@ static void flip_subtest(const struct test_mode *t)
 
 	prepare_subtest(t, pattern);
 
-	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
+	create_fb(t->format, params->primary.fb->width, params->primary.fb->height,
 		  opt.tiling, t->plane, &fb2);
 	fill_fb(&fb2, bg_color);
-	orig_fb = params->fb.fb;
+	orig_fb = params->primary.fb;
 
 	for (r = 0; r < pattern->n_rects; r++) {
-		params->fb.fb = (r % 2 == 0) ? &fb2 : orig_fb;
+		params->primary.fb = (r % 2 == 0) ? &fb2 : orig_fb;
 
 		if (r != 0)
-			draw_rect(pattern, &params->fb, t->method, r - 1);
-		draw_rect(pattern, &params->fb, t->method, r);
+			draw_rect(pattern, &params->primary, t->method, r - 1);
+		draw_rect(pattern, &params->primary, t->method, r);
 		update_wanted_crc(t, &pattern->crcs[t->format][r]);
 
 		page_flip_for_params(params, t->flip);
@@ -2600,21 +2452,21 @@ static void fliptrack_subtest(const struct test_mode *t, enum flip_type type)
 
 	prepare_subtest(t, pattern);
 
-	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
+	create_fb(t->format, params->primary.fb->width, params->primary.fb->height,
 		  opt.tiling, t->plane, &fb2);
 	fill_fb(&fb2, COLOR_PRIM_BG);
-	orig_fb = params->fb.fb;
+	orig_fb = params->primary.fb;
 
 	for (r = 0; r < pattern->n_rects; r++) {
-		params->fb.fb = (r % 2 == 0) ? &fb2 : orig_fb;
+		params->primary.fb = (r % 2 == 0) ? &fb2 : orig_fb;
 
 		if (r != 0)
-			draw_rect(pattern, &params->fb, t->method, r - 1);
+			draw_rect(pattern, &params->primary, t->method, r - 1);
 
 		page_flip_for_params(params, type);
 		do_assertions(0);
 
-		draw_rect(pattern, &params->fb, t->method, r);
+		draw_rect(pattern, &params->primary, t->method, r);
 		update_wanted_crc(t, &pattern->crcs[t->format][r]);
 
 		do_assertions(ASSERT_PSR_DISABLED);
@@ -2639,41 +2491,30 @@ static void fliptrack_subtest(const struct test_mode *t, enum flip_type type)
  */
 static void move_subtest(const struct test_mode *t)
 {
-	int r, rc;
+	int r;
 	int assertions = ASSERT_NO_ACTION_CHANGE;
 	struct modeset_params *params = pick_params(t);
 	struct draw_pattern_info *pattern = &pattern3;
+	struct fb_region *reg = pick_target(t, params);
 	bool repeat = false;
 
 	prepare_subtest(t, pattern);
 
 	/* Just paint the right color since we start at 0x0. */
-	draw_rect(pattern, pick_target(t, params), t->method, 0);
+	draw_rect(pattern, reg, t->method, 0);
 	update_wanted_crc(t, &pattern->crcs[t->format][0]);
 
 	do_assertions(assertions);
 
 	for (r = 1; r < pattern->n_rects; r++) {
-		struct rect rect = pattern->get_rect(&params->fb, r);
+		struct rect rect = pattern->get_rect(&params->primary, r);
 
-		switch (t->plane) {
-		case PLANE_CUR:
-			rc = drmModeMoveCursor(drm.fd, params->crtc_id, rect.x,
-					       rect.y);
-			igt_assert_eq(rc, 0);
-			break;
-		case PLANE_SPR:
-			rc = drmModeSetPlane(drm.fd, params->sprite_id,
-					     params->crtc_id,
-					     params->sprite.fb->fb_id, 0,
-					     rect.x, rect.y, rect.w,
-					     rect.h, 0, 0, rect.w << 16,
-					     rect.h << 16);
-			igt_assert_eq(rc, 0);
-			break;
-		default:
-			igt_assert(false);
-		}
+		igt_plane_set_fb(reg->plane, reg->fb);
+		igt_plane_set_position(reg->plane, rect.x, rect.y);
+		igt_plane_set_size(reg->plane, rect.w, rect.h);
+		igt_fb_set_size(reg->fb, reg->plane, rect.w, rect.h);
+		igt_display_commit2(&drm.display, COMMIT_UNIVERSAL);
+
 		update_wanted_crc(t, &pattern->crcs[t->format][r]);
 
 		do_assertions(assertions);
@@ -2703,7 +2544,7 @@ static void move_subtest(const struct test_mode *t)
  */
 static void onoff_subtest(const struct test_mode *t)
 {
-	int r, rc;
+	int r;
 	int assertions = ASSERT_NO_ACTION_CHANGE;
 	struct modeset_params *params = pick_params(t);
 	struct draw_pattern_info *pattern = &pattern3;
@@ -2716,49 +2557,21 @@ static void onoff_subtest(const struct test_mode *t)
 	do_assertions(assertions);
 
 	for (r = 0; r < 4; r++) {
+		struct fb_region *reg = pick_target(t, params);
+
 		if (r % 2 == 0) {
-			switch (t->plane) {
-			case PLANE_CUR:
-				rc = drmModeSetCursor(drm.fd, params->crtc_id,
-						      0, 0, 0);
-				igt_assert_eq(rc, 0);
-				break;
-			case PLANE_SPR:
-				rc = drmModeSetPlane(drm.fd, params->sprite_id,
-						     0, 0, 0, 0, 0, 0, 0, 0, 0,
-						     0, 0);
-				igt_assert_eq(rc, 0);
-				break;
-			default:
-				igt_assert(false);
-			}
+			igt_plane_set_fb(reg->plane, NULL);
+			igt_display_commit(&drm.display);
+
 			update_wanted_crc(t, &blue_crcs[t->format].crc);
 
 		} else {
-			switch (t->plane) {
-			case PLANE_CUR:
-				rc = drmModeSetCursor(drm.fd, params->crtc_id,
-						  params->cursor.fb->gem_handle,
-						  params->cursor.w,
-						  params->cursor.h);
-				igt_assert_eq(rc, 0);
-				break;
-			case PLANE_SPR:
-				rc = drmModeSetPlane(drm.fd, params->sprite_id,
-						     params->crtc_id,
-						     params->sprite.fb->fb_id,
-						     0, 0, 0, params->sprite.w,
-						     params->sprite.h, 0,
-						     0,
-						     params->sprite.w << 16,
-						     params->sprite.h << 16);
-				igt_assert_eq(rc, 0);
-				break;
-			default:
-				igt_assert(false);
-			}
-			update_wanted_crc(t, &pattern->crcs[t->format][0]);
+			igt_plane_set_fb(reg->plane, reg->fb);
+			igt_plane_set_size(reg->plane, reg->w, reg->h);
+			igt_fb_set_size(reg->fb, reg->plane, reg->w, reg->h);
+			igt_display_commit(&drm.display);
 
+			update_wanted_crc(t, &pattern->crcs[t->format][0]);
 		}
 
 		do_assertions(assertions);
@@ -2767,24 +2580,11 @@ static void onoff_subtest(const struct test_mode *t)
 
 static bool prim_plane_disabled(void)
 {
-	int i, rc;
-	bool disabled, found = false;
-	int crtc_idx = kmstest_get_crtc_idx(drm.res, prim_mode_params.crtc_id);
-
-	for (i = 0; i < drm.plane_res->count_planes; i++) {
-		if ((drm.planes[i]->possible_crtcs & (1 << crtc_idx)) &&
-		    drm.plane_types[i] == DRM_PLANE_TYPE_PRIMARY) {
-			found = true;
-			disabled = (drm.planes[i]->crtc_id == 0);
-		}
-	}
-
-	igt_assert(found);
-
-	rc = drmSetClientCap(drm.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 0);
-	igt_assert_eq(rc, 0);
-
-	return disabled;
+	/*
+	 * Cannot use igt_plane_get_prop here to retrieve fb_id,
+	 * the testsuite doesn't require ATOMIC.
+	 */
+	return !prim_mode_params.primary.plane->values[IGT_PLANE_FB_ID];
 }
 
 /*
@@ -2807,11 +2607,10 @@ static void fullscreen_plane_subtest(const struct test_mode *t)
 	struct rect rect;
 	struct modeset_params *params = pick_params(t);
 	int assertions;
-	int rc;
 
 	prepare_subtest(t, pattern);
 
-	rect = pattern->get_rect(&params->fb, 0);
+	rect = pattern->get_rect(&params->primary, 0);
 	create_fb(t->format, rect.w, rect.h, opt.tiling, t->plane,
 		  &fullscreen_fb);
 	/* Call pick_color() again since PRI and SPR may not support the same
@@ -2819,12 +2618,8 @@ static void fullscreen_plane_subtest(const struct test_mode *t)
 	rect.color = pick_color(&fullscreen_fb, COLOR_GREEN);
 	igt_draw_fill_fb(drm.fd, &fullscreen_fb, rect.color);
 
-	rc = drmModeSetPlane(drm.fd, params->sprite_id, params->crtc_id,
-			     fullscreen_fb.fb_id, 0, 0, 0, fullscreen_fb.width,
-			     fullscreen_fb.height, 0, 0,
-			     fullscreen_fb.width << 16,
-			     fullscreen_fb.height << 16);
-	igt_assert_eq(rc, 0);
+	igt_plane_set_fb(params->sprite.plane, &fullscreen_fb);
+	igt_display_commit(&drm.display);
 	update_wanted_crc(t, &pattern->crcs[t->format][0]);
 
 	switch (t->screen) {
@@ -2842,9 +2637,8 @@ static void fullscreen_plane_subtest(const struct test_mode *t)
 	}
 	do_assertions(assertions);
 
-	rc = drmModeSetPlane(drm.fd, params->sprite_id, 0, 0, 0, 0, 0, 0, 0, 0,
-			     0, 0, 0);
-	igt_assert_eq(rc, 0);
+	igt_plane_set_fb(params->sprite.plane, NULL);
+	igt_display_commit(&drm.display);
 
 	if (t->screen == SCREEN_PRIM)
 		assertions = ASSERT_LAST_ACTION_CHANGED;
@@ -2878,98 +2672,69 @@ static void scaledprimary_subtest(const struct test_mode *t)
 {
 	struct igt_fb new_fb, *old_fb;
 	struct modeset_params *params = pick_params(t);
-	int i, rc;
-	uint32_t plane_id;
-	int prim_crtc_idx = kmstest_get_crtc_idx(drm.res,
-						 prim_mode_params.crtc_id);
+	struct fb_region *reg = &params->primary;
 
 	igt_require_f(intel_gen(intel_get_drm_devid(drm.fd)) >= 9,
 		      "Can't test primary plane scaling before gen 9\n");
 
 	prepare_subtest(t, NULL);
 
-	old_fb = params->fb.fb;
+	old_fb = reg->fb;
 
-	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
+	create_fb(t->format, reg->fb->width, reg->fb->height,
 		  opt.tiling, t->plane, &new_fb);
 	fill_fb(&new_fb, COLOR_BLUE);
 
 	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, &new_fb, t->method,
-			 params->fb.x, params->fb.y,
-			 params->fb.w / 2, params->fb.h / 2,
+			 reg->x, reg->y, reg->w / 2, reg->h / 2,
 			 pick_color(&new_fb, COLOR_GREEN));
 	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, &new_fb, t->method,
-			 params->fb.x + params->fb.w / 2,
-			 params->fb.y + params->fb.h / 2,
-			 params->fb.w / 2, params->fb.h / 2,
+			 reg->x + reg->w / 2, reg->y + reg->h / 2,
+			 reg->w / 2, reg->h / 2,
 			 pick_color(&new_fb, COLOR_RED));
 	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, &new_fb, t->method,
-			 params->fb.x + params->fb.w / 2,
-			 params->fb.y + params->fb.h / 2,
-			 params->fb.w / 4, params->fb.h / 4,
+			 reg->x + reg->w / 2, reg->y + reg->h / 2,
+			 reg->w / 4, reg->h / 4,
 			 pick_color(&new_fb, COLOR_MAGENTA));
 
-	for (i = 0; i < drm.plane_res->count_planes; i++)
-		if ((drm.planes[i]->possible_crtcs & (1 << prim_crtc_idx)) &&
-		    drm.plane_types[i] == DRM_PLANE_TYPE_PRIMARY)
-			plane_id = drm.planes[i]->plane_id;
-
 	/* No scaling. */
-	rc = drmModeSetPlane(drm.fd, plane_id, params->crtc_id,
-			     new_fb.fb_id, 0,
-			     0, 0,
-			     params->mode->hdisplay, params->mode->vdisplay,
-			     params->fb.x << 16, params->fb.y << 16,
-			     params->fb.w << 16, params->fb.h << 16);
-	igt_assert(rc == 0);
+	igt_plane_set_fb(reg->plane, &new_fb);
+	igt_fb_set_position(&new_fb, reg->plane, reg->x, reg->y);
+	igt_fb_set_size(&new_fb, reg->plane, reg->w, reg->h);
+	igt_plane_set_size(reg->plane, params->mode->hdisplay, params->mode->vdisplay);
+	igt_display_commit2(&drm.display, COMMIT_UNIVERSAL);
 	do_assertions(DONT_ASSERT_CRC);
 
 	/* Source upscaling. */
-	rc = drmModeSetPlane(drm.fd, plane_id, params->crtc_id,
-			     new_fb.fb_id, 0,
-			     0, 0,
-			     params->mode->hdisplay, params->mode->vdisplay,
-			     params->fb.x << 16, params->fb.y << 16,
-			     (params->fb.w / 2) << 16,
-			     (params->fb.h / 2) << 16);
-	igt_assert(rc == 0);
+	igt_fb_set_size(&new_fb, reg->plane, reg->w / 2, reg->h / 2);
+	igt_display_commit2(&drm.display, COMMIT_UNIVERSAL);
 	do_assertions(DONT_ASSERT_CRC);
 
 	/* Destination doesn't fill the entire CRTC, no scaling. */
-	rc = drmModeSetPlane(drm.fd, plane_id, params->crtc_id,
-			     new_fb.fb_id, 0,
-			     params->mode->hdisplay / 4,
-			     params->mode->vdisplay / 4,
-			     params->mode->hdisplay / 2,
-			     params->mode->vdisplay / 2,
-			     params->fb.x << 16, params->fb.y << 16,
-			     (params->fb.w / 2) << 16,
-			     (params->fb.h / 2) << 16);
-	igt_assert(rc == 0);
+	igt_fb_set_size(&new_fb, reg->plane, reg->w / 2, reg->h / 2);
+	igt_plane_set_position(reg->plane,
+			       params->mode->hdisplay / 4,
+			       params->mode->vdisplay / 4);
+	igt_plane_set_size(reg->plane,
+			   params->mode->hdisplay / 2,
+			   params->mode->vdisplay / 2);
+	igt_display_commit2(&drm.display, COMMIT_UNIVERSAL);
 	do_assertions(DONT_ASSERT_CRC);
 
 	/* Destination doesn't fill the entire CRTC, upscaling. */
-	rc = drmModeSetPlane(drm.fd, plane_id, params->crtc_id,
-			     new_fb.fb_id, 0,
-			     params->mode->hdisplay / 4,
-			     params->mode->vdisplay / 4,
-			     params->mode->hdisplay / 2,
-			     params->mode->vdisplay / 2,
-			     (params->fb.x + params->fb.w / 2) << 16,
-			     (params->fb.y + params->fb.h / 2) << 16,
-			     (params->fb.w / 4) << 16,
-			     (params->fb.h / 4) << 16);
-	igt_assert(rc == 0);
+	igt_fb_set_position(&new_fb, reg->plane,
+			    reg->x + reg->w / 4, reg->y + reg->h / 4);
+	igt_fb_set_size(&new_fb, reg->plane, reg->w / 2, reg->h / 2);
+	igt_display_commit2(&drm.display, COMMIT_UNIVERSAL);
 	do_assertions(DONT_ASSERT_CRC);
 
 	/* Back to the good and old blue fb. */
-	rc = drmModeSetPlane(drm.fd, plane_id, params->crtc_id,
-			     old_fb->fb_id, 0,
-			     0, 0,
-			     params->mode->hdisplay, params->mode->vdisplay,
-			     params->fb.x << 16, params->fb.y << 16,
-			     params->fb.w << 16, params->fb.h << 16);
-	igt_assert(rc == 0);
+	igt_plane_set_fb(reg->plane, old_fb);
+	igt_plane_set_position(params->primary.plane, 0, 0);
+	igt_plane_set_size(reg->plane, params->mode->hdisplay, params->mode->vdisplay);
+	igt_fb_set_position(reg->fb, reg->plane, reg->x, reg->y);
+	igt_fb_set_size(reg->fb, reg->plane, reg->w, reg->h);
+	igt_display_commit2(&drm.display, COMMIT_UNIVERSAL);
 	do_assertions(0);
 
 	igt_remove_fb(drm.fd, &new_fb);
@@ -2999,15 +2764,15 @@ static void modesetfrombusy_subtest(const struct test_mode *t)
 
 	prepare_subtest(t, NULL);
 
-	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
+	create_fb(t->format, params->primary.fb->width, params->primary.fb->height,
 		  opt.tiling, t->plane, &fb2);
 	fill_fb(&fb2, COLOR_PRIM_BG);
 
-	start_busy_thread(params->fb.fb);
+	start_busy_thread(params->primary.fb);
 	usleep(10000);
 
 	unset_all_crtcs();
-	params->fb.fb = &fb2;
+	params->primary.fb = &fb2;
 	set_mode_for_params(params);
 
 	do_assertions(0);
@@ -3109,9 +2874,9 @@ static void farfromfence_subtest(const struct test_mode *t)
 
 	fill_fb(&tall_fb, COLOR_PRIM_BG);
 
-	params->fb.fb = &tall_fb;
-	params->fb.x = 0;
-	params->fb.y = max_height - params->mode->vdisplay;
+	params->primary.fb = &tall_fb;
+	params->primary.x = 0;
+	params->primary.y = max_height - params->mode->vdisplay;
 	set_mode_for_params(params);
 	do_assertions(assertions);
 
@@ -3177,30 +2942,30 @@ static void badstride_subtest(const struct test_mode *t)
 
 	prepare_subtest(t, NULL);
 
-	old_fb = params->fb.fb;
+	old_fb = params->primary.fb;
 
-	create_fb(t->format, params->fb.fb->width + 4096, params->fb.fb->height,
+	create_fb(t->format, params->primary.fb->width + 4096, params->primary.fb->height,
 		  opt.tiling, t->plane, &wide_fb);
 	igt_assert(wide_fb.stride > 16384);
 
 	fill_fb(&wide_fb, COLOR_PRIM_BG);
 
 	/* Try a simple modeset with the new fb. */
-	params->fb.fb = &wide_fb;
+	params->primary.fb = &wide_fb;
 	set_mode_for_params(params);
 	do_assertions(ASSERT_FBC_DISABLED);
 
 	/* Go back to the old fb so FBC works again. */
-	params->fb.fb = old_fb;
+	params->primary.fb = old_fb;
 	set_mode_for_params(params);
 	do_assertions(0);
 
 	/* We're doing the equivalent of a modeset, but with the planes API. */
-	params->fb.fb = &wide_fb;
+	params->primary.fb = &wide_fb;
 	set_prim_plane_for_params(params);
 	do_assertions(ASSERT_FBC_DISABLED);
 
-	params->fb.fb = old_fb;
+	params->primary.fb = old_fb;
 	set_mode_for_params(params);
 	do_assertions(0);
 
@@ -3209,7 +2974,7 @@ static void badstride_subtest(const struct test_mode *t)
 	 * with a different stride. With the atomic page flip helper we can,
 	 * so allow page flip to fail and succeed.
 	 */
-	rc = drmModePageFlip(drm.fd, params->crtc_id, wide_fb.fb_id, 0, NULL);
+	rc = drmModePageFlip(drm.fd, drm.display.pipes[params->pipe].crtc_id, wide_fb.fb_id, 0, NULL);
 	igt_assert(rc == -EINVAL || rc == 0);
 	do_assertions(rc == 0 ? ASSERT_FBC_DISABLED : 0);
 
@@ -3244,9 +3009,9 @@ static void stridechange_subtest(const struct test_mode *t)
 
 	prepare_subtest(t, NULL);
 
-	old_fb = params->fb.fb;
+	old_fb = params->primary.fb;
 
-	create_fb(t->format, params->fb.fb->width + 512, params->fb.fb->height,
+	create_fb(t->format, params->primary.fb->width + 512, params->primary.fb->height,
 		  opt.tiling, t->plane, &new_fb);
 	fill_fb(&new_fb, COLOR_PRIM_BG);
 
@@ -3254,21 +3019,21 @@ static void stridechange_subtest(const struct test_mode *t)
 
 	/* We can't assert that FBC will be enabled since there may not be
 	 * enough space for the CFB, but we can check the CRC. */
-	params->fb.fb = &new_fb;
+	params->primary.fb = &new_fb;
 	set_mode_for_params(params);
 	do_assertions(DONT_ASSERT_FEATURE_STATUS);
 
 	/* Go back to the fb that can have FBC. */
-	params->fb.fb = old_fb;
+	params->primary.fb = old_fb;
 	set_mode_for_params(params);
 	do_assertions(0);
 
 	/* This operation is the same as above, but with the planes API. */
-	params->fb.fb = &new_fb;
+	params->primary.fb = &new_fb;
 	set_prim_plane_for_params(params);
 	do_assertions(DONT_ASSERT_FEATURE_STATUS);
 
-	params->fb.fb = old_fb;
+	params->primary.fb = old_fb;
 	set_prim_plane_for_params(params);
 	do_assertions(0);
 
@@ -3276,7 +3041,7 @@ static void stridechange_subtest(const struct test_mode *t)
 	 * Try to set a new stride. with the page flip api. This is allowed
 	 * with the atomic page flip helper, but not with the legacy page flip.
 	 */
-	rc = drmModePageFlip(drm.fd, params->crtc_id, new_fb.fb_id, 0, NULL);
+	rc = drmModePageFlip(drm.fd, drm.display.pipes[params->pipe].crtc_id, new_fb.fb_id, 0, NULL);
 	igt_assert(rc == -EINVAL || rc == 0);
 	do_assertions(0);
 
@@ -3307,9 +3072,9 @@ static void tilingchange_subtest(const struct test_mode *t)
 
 	prepare_subtest(t, NULL);
 
-	old_fb = params->fb.fb;
+	old_fb = params->primary.fb;
 
-	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
+	create_fb(t->format, params->primary.fb->width, params->primary.fb->height,
 		  LOCAL_DRM_FORMAT_MOD_NONE, t->plane, &new_fb);
 	fill_fb(&new_fb, COLOR_PRIM_BG);
 
@@ -3317,12 +3082,12 @@ static void tilingchange_subtest(const struct test_mode *t)
 		igt_debug("Flip type: %d\n", flip_type);
 
 		/* Set a buffer with no tiling. */
-		params->fb.fb = &new_fb;
+		params->primary.fb = &new_fb;
 		page_flip_for_params(params, flip_type);
 		do_assertions(ASSERT_FBC_DISABLED);
 
 		/* Put FBC back in a working state. */
-		params->fb.fb = old_fb;
+		params->primary.fb = old_fb;
 		page_flip_for_params(params, flip_type);
 		do_assertions(0);
 	}
@@ -3365,15 +3130,15 @@ static void basic_subtest(const struct test_mode *t)
 
 	prepare_subtest(t, pattern);
 
-	create_fb(t->format, params->fb.fb->width, params->fb.fb->height,
+	create_fb(t->format, params->primary.fb->width, params->primary.fb->height,
 		  opt.tiling, t->plane, &fb2);
-	fb1 = params->fb.fb;
+	fb1 = params->primary.fb;
 
 	for (r = 0, method = 0; method < IGT_DRAW_METHOD_COUNT; method++, r++) {
 		if (r == pattern->n_rects) {
-			params->fb.fb = (params->fb.fb == fb1) ? &fb2 : fb1;
+			params->primary.fb = (params->primary.fb == fb1) ? &fb2 : fb1;
 
-			fill_fb_region(&params->fb, COLOR_PRIM_BG);
+			fill_fb_region(&params->primary, COLOR_PRIM_BG);
 			update_wanted_crc(t, &blue_crcs[t->format].crc);
 
 			page_flip_for_params(params, t->flip);
@@ -3382,7 +3147,7 @@ static void basic_subtest(const struct test_mode *t)
 			r = 0;
 		}
 
-		draw_rect(pattern, &params->fb, method, r);
+		draw_rect(pattern, &params->primary, method, r);
 		update_wanted_crc(t, &pattern->crcs[t->format][r]);
 		do_assertions(assertions);
 	}
