@@ -52,7 +52,6 @@ static int exec(int fd, uint32_t handle, int ring, int ctx_id)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 gem_exec;
-	int ret = 0;
 
 	gem_exec.handle = handle;
 	gem_exec.relocation_count = 0;
@@ -75,10 +74,7 @@ static int exec(int fd, uint32_t handle, int ring, int ctx_id)
 	i915_execbuffer2_set_context_id(execbuf, ctx_id);
 	execbuf.rsvd2 = 0;
 
-	ret = drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2,
-			&execbuf);
-
-	return ret;
+	return __gem_execbuf(fd, &execbuf);
 }
 
 static void big_exec(int fd, uint32_t handle, int ring)
@@ -116,7 +112,7 @@ static void big_exec(int fd, uint32_t handle, int ring)
 
 	execbuf.buffer_count = 1;
 	i915_execbuffer2_set_context_id(execbuf, ctx_id1);
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf);
+	gem_execbuf(fd, &execbuf);
 
 	for (i = 0; i < num_buffers; i++) {
 		uint32_t tmp_handle = gem_create(fd, 4096);
@@ -127,8 +123,7 @@ static void big_exec(int fd, uint32_t handle, int ring)
 	execbuf.buffer_count = i + 1;
 
 	/* figure out how many buffers we can exactly fit */
-	while (drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2,
-			&execbuf) != 0) {
+	while (__gem_execbuf(fd, &execbuf) != 0) {
 		i--;
 		gem_close(fd, gem_exec[i].handle);
 		gem_exec[i].handle = handle;
@@ -140,10 +135,10 @@ static void big_exec(int fd, uint32_t handle, int ring)
 	       i - 1, num_buffers);
 
 	/* double check that it works */
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf);
+	gem_execbuf(fd, &execbuf);
 
 	i915_execbuffer2_set_context_id(execbuf, ctx_id2);
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf);
+	gem_execbuf(fd, &execbuf);
 	gem_sync(fd, handle);
 }
 

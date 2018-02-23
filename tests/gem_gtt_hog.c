@@ -113,7 +113,7 @@ static void busy(data_t *data, uint32_t handle, int size, int loops)
 	gem_pwrite.data_ptr = to_user_pointer(buf);
 	if (drmIoctl(data->fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite) == 0) {
 		while (loops--)
-			drmIoctl(data->fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf);
+			gem_execbuf(data->fd, &execbuf);
 	}
 
 	drmIoctl(data->fd, DRM_IOCTL_GEM_CLOSE, &create.handle);

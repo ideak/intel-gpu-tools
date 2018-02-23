@@ -1116,7 +1116,7 @@ static void submit_blt_cmd(uint32_t dst_handle, uint16_t x, uint16_t y,
 	execbuf.flags = I915_EXEC_BLT;
 	i915_execbuffer2_set_context_id(execbuf, 0);
 
-	do_ioctl(drm_fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf);
+	gem_execbuf(drm_fd, &execbuf);
 
 	*presumed_dst_offset = relocs[0].presumed_offset;
 
@@ -1257,7 +1257,7 @@ static void gem_execbuf_stress_subtest(int rounds, int wait_flags)
 	i915_execbuffer2_set_context_id(execbuf, 0);
 
 	for (i = 0; i < rounds; i++) {
-		do_ioctl(drm_fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf);
+		gem_execbuf(drm_fd, &execbuf);
 
 		if (wait_flags & WAIT_STATUS)
 			igt_assert(wait_for_suspended());
@@ -1387,7 +1387,7 @@ static void system_suspend_execbuf_subtest(void)
 	igt_assert(wait_for_suspended());
 
 	for (i = 0; i < 20; i++) {
-		do_ioctl(drm_fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf);
+		gem_execbuf(drm_fd, &execbuf);
 		igt_assert(wait_for_suspended());
 	}
 

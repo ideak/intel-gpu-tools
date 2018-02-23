@@ -95,7 +95,6 @@ static void multi_write_domain(int fd)
 	struct drm_i915_gem_exec_object2 exec[2];
 	struct drm_i915_gem_relocation_entry reloc[1];
 	uint32_t handle, handle_target;
-	int ret;
 
 	handle = gem_create(fd, 4096);
 	handle_target = gem_create(fd, 4096);
@@ -137,10 +136,7 @@ static void multi_write_domain(int fd)
 	i915_execbuffer2_set_context_id(execbuf, 0);
 	execbuf.rsvd2 = 0;
 
-	ret = drmIoctl(fd,
-		       DRM_IOCTL_I915_GEM_EXECBUFFER2,
-		       &execbuf);
-	igt_assert(ret != 0 && errno == EINVAL);
+	igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
 
 	gem_close(fd, handle);
 	gem_close(fd, handle_target);

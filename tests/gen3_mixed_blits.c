@@ -88,7 +88,6 @@ render_copy(int fd,
 	struct drm_i915_gem_execbuffer2 exec;
 	uint32_t handle;
 	uint32_t tiling_bits;
-	int ret;
 
 	/* invariant state */
 	*b++ = (_3DSTATE_AA_CMD |
@@ -310,12 +309,7 @@ render_copy(int fd,
 	i915_execbuffer2_set_context_id(exec, 0);
 	exec.rsvd2 = 0;
 
-	ret = drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &exec);
-	while (ret && errno == EBUSY) {
-		drmCommandNone(fd, DRM_I915_GEM_THROTTLE);
-		ret = drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &exec);
-	}
-	igt_assert_eq(ret, 0);
+	gem_execbuf(fd, &exec);
 
 	gem_close(fd, handle);
 }
@@ -327,7 +321,6 @@ static void blt_copy(int fd, uint32_t dst, uint32_t src)
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_execbuffer2 exec;
 	uint32_t handle;
-	int ret;
 
 	*b++ = (XY_SRC_COPY_BLT_CMD |
 		XY_SRC_COPY_BLT_WRITE_ALPHA |
@@ -388,12 +381,7 @@ static void blt_copy(int fd, uint32_t dst, uint32_t src)
 	i915_execbuffer2_set_context_id(exec, 0);
 	exec.rsvd2 = 0;
 
-	ret = drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &exec);
-	while (ret && errno == EBUSY) {
-		drmCommandNone(fd, DRM_I915_GEM_THROTTLE);
-		ret = drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &exec);
-	}
-	igt_assert_eq(ret, 0);
+	gem_execbuf(fd, &exec);
 
 	gem_close(fd, handle);
 }

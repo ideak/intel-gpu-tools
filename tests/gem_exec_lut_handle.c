@@ -77,7 +77,7 @@ static int has_exec_lut(int fd)
 	execbuf.buffer_count = 1;
 	execbuf.flags = LOCAL_I915_EXEC_HANDLE_LUT;
 
-	return drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf) == 0;
+	return __gem_execbuf(fd, &execbuf) == 0;
 }
 
 #define ELAPSED(a,b) (1e6*((b)->tv_sec - (a)->tv_sec) + ((b)->tv_usec - (a)->tv_usec))

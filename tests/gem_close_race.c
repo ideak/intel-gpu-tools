@@ -119,8 +119,7 @@ static void selfcopy(int fd, uint32_t handle, int loops)
 	gem_pwrite.size = sizeof(buf);
 	gem_pwrite.data_ptr = to_user_pointer(buf);
 	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite) == 0) {
-		while (loops-- &&
-		       drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf) == 0)
+		while (loops-- && __gem_execbuf(fd, &execbuf) == 0)
 			;
 	}
 

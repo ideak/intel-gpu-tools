@@ -228,12 +228,12 @@ static void run(int object_size, bool dumb)
 	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 
-	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf)) {
+	if (__gem_execbuf(fd, &execbuf)) {
 		len = gem_linear_blt(fd, buf, src, dst, object_size, reloc);
 		igt_assert(len == execbuf.batch_len);
 		gem_write(fd, handle, 0, buf, len);
 		execbuf.flags = ring;
-		do_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf);
+		gem_execbuf(fd, &execbuf);
 	}
 	gem_sync(fd, handle);
 

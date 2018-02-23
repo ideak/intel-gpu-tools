@@ -84,12 +84,7 @@ static int exec(int fd, uint32_t handle, unsigned int flags)
 	i915_execbuffer2_set_context_id(execbuf, 0);
 	execbuf.rsvd2 = 0;
 
-	if (drmIoctl(fd,
-		     DRM_IOCTL_I915_GEM_EXECBUFFER2,
-		     &execbuf))
-		return -errno;
-
-	return 0;
+	return __gem_execbuf(fd, &execbuf);
 }
 
 static int many_exec(int fd, uint32_t batch, int num_exec, int num_reloc, unsigned flags)
@@ -156,11 +151,7 @@ static int many_exec(int fd, uint32_t batch, int num_exec, int num_reloc, unsign
 	i915_execbuffer2_set_context_id(execbuf, 0);
 	execbuf.rsvd2 = 0;
 
-	ret = drmIoctl(fd,
-		       DRM_IOCTL_I915_GEM_EXECBUFFER2,
-		       &execbuf);
-	if (ret < 0)
-		ret = -errno;
+	ret = __gem_execbuf(fd, &execbuf);
 
 	for (n = 0; n < num_exec; n++)
 		gem_close(fd, gem_exec[n].handle);

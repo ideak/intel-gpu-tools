@@ -233,10 +233,7 @@ igt_main
 	}
 
 #define RUN_FAIL(expected_errno) do { \
-		igt_assert(drmIoctl(fd, \
-				    DRM_IOCTL_I915_GEM_EXECBUFFER2, \
-				    &execbuf) == -1); \
-		igt_assert_eq(errno, expected_errno); \
+		igt_assert_eq(__gem_execbuf(fd, &execbuf), -expected_errno); \
 	} while(0)
 
 	igt_subtest("no-bsd") {
@@ -350,9 +347,7 @@ igt_main
 		RUN_FAIL(EPERM);
 
 		igt_device_set_master(fd);
-		igt_assert(drmIoctl(fd,
-				    DRM_IOCTL_I915_GEM_EXECBUFFER2,
-				    &execbuf) == 0);
+		gem_execbuf(fd, &execbuf);
 
 		igt_device_drop_master(fd); /* Only needs temporary master */
 	}
