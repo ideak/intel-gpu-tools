@@ -147,4 +147,7 @@ if libdrm_intel.found()
 	endif
 endif
 subdir('man')
-subdir('docs')
+# has_exe_wrapper() is undefined if building natively
+if not meson.is_cross_build() or not meson.has_exe_wrapper()
+	subdir('docs')
+endif
