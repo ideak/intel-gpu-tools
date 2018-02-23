@@ -48,12 +48,7 @@ if valgrind.found()
 endif
 
 cairo = dependency('cairo', version : '>1.12.0', required : true)
-
-libudev = dependency('libudev', required : false)
-if libudev.found()
-	config.set('HAVE_UDEV', 1)
-endif
-
+libudev = dependency('libudev', required : true)
 glib = dependency('glib-2.0', required : false)
 if glib.found()
 	config.set('HAVE_GLIB', 1)

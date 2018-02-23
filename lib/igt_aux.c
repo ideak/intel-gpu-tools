@@ -50,6 +50,7 @@
 #include <assert.h>
 
 #include <proc/readproc.h>
+#include <libudev.h>
 
 #include "drmtest.h"
 #include "i915_drm.h"
@@ -425,8 +426,6 @@ void igt_stop_shrink_helper(void)
 	igt_stop_helper(&shrink_helper);
 }
 
-#ifdef HAVE_UDEV
-#include <libudev.h>
 
 static struct igt_helper_process hang_detector;
 static void __attribute__((noreturn))
@@ -506,17 +505,6 @@ void igt_stop_hang_detector(void)
 {
 	igt_stop_helper(&hang_detector);
 }
-#else
-void igt_fork_hang_detector(int fd)
-{
-	if (igt_only_list_subtests())
-		return;
-}
-
-void igt_stop_hang_detector(void)
-{
-}
-#endif
 
 /**
  * igt_check_boolean_env_var:

@@ -665,12 +665,10 @@ uint32_t kmstest_get_vbl_flag(uint32_t pipe_id);
 const unsigned char* igt_kms_get_base_edid(void);
 const unsigned char* igt_kms_get_alt_edid(void);
 
-#ifdef HAVE_UDEV
 struct udev_monitor *igt_watch_hotplug(void);
 bool igt_hotplug_detected(struct udev_monitor *mon,
 			  int timeout_secs);
 void igt_flush_hotplugs(struct udev_monitor *mon);
 void igt_cleanup_hotplug(struct udev_monitor *mon);
-#endif
 
 #endif /* __IGT_KMS_H__ */

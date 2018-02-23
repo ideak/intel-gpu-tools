@@ -39,10 +39,8 @@
 #include "igt_sysfs.h"
 #include "drmtest.h"
 #include "config.h"
-#ifdef HAVE_UDEV
 #include <libudev.h>
 #include <syslog.h>
-#endif
 #include "intel_l3_parity.h"
 
 static unsigned int devid;
@@ -318,10 +316,6 @@ int main(int argc, char *argv[])
 
 	/* Daemon doesn't work like the other commands */
 	if (action == 'L') {
-#ifndef HAVE_UDEV
-		fprintf(stderr, "Daemon requires udev support. Please reconfigure.\n");
-		exit(EXIT_FAILURE);
-#else
 		struct l3_parity par;
 		struct l3_location loc;
 		if (daemonize) {
@@ -332,7 +326,6 @@ int main(int argc, char *argv[])
 		assert(l3_uevent_setup(&par) == 0);
 		assert(l3_listen(&par, daemonize == 1, &loc) == 0);
 		exit(EXIT_SUCCESS);
-#endif
 	}
 
 	if (action == 'l')

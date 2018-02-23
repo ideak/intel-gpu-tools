@@ -32,7 +32,6 @@
 #include "config.h"
 
 
-#ifdef HAVE_UDEV
 #include <libudev.h>
 static struct udev_monitor *uevent_monitor;
 static struct udev *udev;
@@ -125,14 +124,3 @@ void testdisplay_cleanup_hotplug(void)
 	if (udev)
 		udev_unref(udev);
 }
-#else
-gboolean testdisplay_setup_hotplug(void)
-{
-	igt_warn("no hotplug support on this platform\n");
-	return TRUE;
-}
-
-void testdisplay_cleanup_hotplug(void)
-{
-}
-#endif

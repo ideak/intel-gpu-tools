@@ -39,9 +39,8 @@
 #elif HAVE_SYS_KD_H
 #include <sys/kd.h>
 #endif
-#ifdef HAVE_UDEV
+
 #include <libudev.h>
-#endif
 #include <poll.h>
 #include <errno.h>
 #include <time.h>
@@ -3698,8 +3697,6 @@ void igt_reset_connectors(void)
 			      "detect");
 }
 
-#ifdef HAVE_UDEV
-
 /**
  * igt_watch_hotplug:
  *
@@ -3804,7 +3801,6 @@ void igt_cleanup_hotplug(struct udev_monitor *mon)
 	mon = NULL;
 	udev_unref(udev);
 }
-#endif
 
 /**
  * kmstest_get_vbl_flag:

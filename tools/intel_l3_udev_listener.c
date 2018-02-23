@@ -23,7 +23,6 @@
 
 #include "config.h"
 
-#ifdef HAVE_UDEV
 #include <libudev.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -123,4 +122,3 @@ again:
 
 	return 0;
 }
-#endif
