@@ -1,58 +1,3 @@
-lib_headers = [
-	'debug.h',
-	'drmtest.h',
-	'i830_reg.h',
-	'i915/gem_context.h',
-	'i915/gem_scheduler.h',
-	'i915/gem_submission.h',
-	'i915/gem_ring.h',
-	'i915_3d.h',
-	'i915_reg.h',
-	'i915_pciids.h',
-	'igt.h',
-	'igt_debugfs.h',
-	'igt_device.h',
-	'igt_aux.h',
-	'igt_edid_template.h',
-	'igt_gt.h',
-	'igt_gvt.h',
-	'igt_primes.h',
-	'igt_rand.h',
-	'igt_rc.h',
-	'igt_stats.h',
-	'igt_syncobj.h',
-	'igt_sysfs.h',
-	'igt_x86.h',
-	'igt_vgem.h',
-	'instdone.h',
-	'intel_batchbuffer.h',
-	'intel_chipset.h',
-	'intel_io.h',
-	'intel_reg.h',
-	'ioctl_wrappers.h',
-	'media_fill.h',
-	'media_spin.h',
-	'gpgpu_fill.h',
-	'gen7_media.h',
-	'gen8_media.h',
-	'gen6_render.h',
-	'gen7_render.h',
-	'gen8_render.h',
-	'gen9_render.h',
-	'rendercopy.h',
-	'sw_sync.h',
-	'igt_kms.h',
-	'igt_fb.h',
-	'igt_core.h',
-	'igt_draw.h',
-	'igt_pm.h',
-	'igt_dummyload.h',
-	'uwildmat/uwildmat.h',
-	'igt_kmod.h',
-	'igt_vc4.h',
-	'vc4_packet.h',
-]
-
 lib_sources = [
 	'drmtest.c',
 	'i915/gem_context.c',
@@ -121,7 +66,6 @@ lib_deps = [
 if libdrm_intel.found()
 	lib_deps += libdrm_intel
 else
-	lib_headers += 'stubs/drm/intel_bufmgr.h'
 	lib_sources += 'stubs/drm/intel_bufmgr.c'
 	inc = [ inc, include_directories('stubs/drm') ]
 endif
@@ -132,19 +76,16 @@ endif
 
 if gsl.found() and pixman.found()
 	lib_deps += [ gsl, pixman ]
-	lib_headers += [ 'igt_frame.h', 'igt_audio.h' ]
 	lib_sources += [ 'igt_frame.c', 'igt_audio.c' ]
 endif
 
 if alsa.found()
 	lib_deps += alsa
-	lib_headers += 'igt_alsa.h'
 	lib_sources += 'igt_alsa.c'
 endif
 
 if chamelium.found()
 	lib_deps += chamelium
-	lib_headers += 'igt_chamelium.h'
 	lib_sources += 'igt_chamelium.c'
 endif
 
