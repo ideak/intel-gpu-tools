@@ -166,6 +166,7 @@ static void one(int fd, unsigned ring, unsigned test_flags)
 	struct drm_i915_gem_relocation_entry store[1024+1];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	unsigned size = ALIGN(ARRAY_SIZE(store)*16 + 4, 4096);
+	const unsigned uabi = ring & 63;
 	uint32_t read[2], write[2];
 	struct timespec tv;
 	uint32_t *batch, *bbe;
@@ -267,11 +268,11 @@ static void one(int fd, unsigned ring, unsigned test_flags)
 		timeout = 1;
 	}
 
-	igt_assert_eq(write[SCRATCH], ring);
-	igt_assert_eq_u32(read[SCRATCH], 1 << ring);
+	igt_assert_eq(write[SCRATCH], uabi);
+	igt_assert_eq_u32(read[SCRATCH], 1 << uabi);
 
 	igt_assert_eq(write[BATCH], 0);
-	igt_assert_eq_u32(read[BATCH], 1 << ring);
+	igt_assert_eq_u32(read[BATCH], 1 << uabi);
 
 	/* Calling busy in a loop should be enough to flush the rendering */
 	memset(&tv, 0, sizeof(tv));
