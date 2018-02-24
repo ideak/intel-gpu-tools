@@ -373,13 +373,78 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 	gem_close(fd, result);
 }
 
-static void preempt_other(int fd, unsigned ring)
+#define CHAIN 0x1
+#define CONTEXTS 0x2
+
+static igt_spin_t *__noise(int fd, uint32_t ctx, int prio, igt_spin_t *spin)
+{
+	unsigned other;
+
+	gem_context_set_priority(fd, ctx, prio);
+
+	for_each_physical_engine(fd, other) {
+		if (spin == NULL) {
+			spin = __igt_spin_batch_new(fd, ctx, other, 0);
+		} else {
+			struct drm_i915_gem_exec_object2 obj = {
+				.handle = spin->handle,
+			};
+			struct drm_i915_gem_execbuffer2 eb = {
+				.buffer_count = 1,
+				.buffers_ptr = to_user_pointer(&obj),
+				.rsvd1 = ctx,
+				.flags = other,
+			};
+			gem_execbuf(fd, &eb);
+		}
+	}
+
+	return spin;
+}
+
+static void __preempt_other(int fd,
+			    uint32_t *ctx,
+			    unsigned int target, unsigned int primary,
+			    unsigned flags)
 {
 	uint32_t result = gem_create(fd, 4096);
 	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
-	igt_spin_t *spin[MAX_ENGINES];
-	unsigned int other;
-	unsigned int n, i;
+	unsigned int n, i, other;
+
+	n = 0;
+	store_dword(fd, ctx[LO], primary,
+		    result, (n + 1)*sizeof(uint32_t), n + 1,
+		    0, I915_GEM_DOMAIN_RENDER);
+	n++;
+
+	if (flags & CHAIN) {
+		for_each_physical_engine(fd, other) {
+			store_dword(fd, ctx[LO], other,
+				    result, (n + 1)*sizeof(uint32_t), n + 1,
+				    0, I915_GEM_DOMAIN_RENDER);
+			n++;
+		}
+	}
+
+	store_dword(fd, ctx[HI], target,
+		    result, (n + 1)*sizeof(uint32_t), n + 1,
+		    0, I915_GEM_DOMAIN_RENDER);
+
+	igt_debugfs_dump(fd, "i915_engine_info");
+	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
+
+	n++;
+	for (i = 0; i <= n; i++)
+		igt_assert_eq_u32(ptr[i], i);
+
+	munmap(ptr, 4096);
+	gem_close(fd, result);
+}
+
+static void preempt_other(int fd, unsigned ring, unsigned int flags)
+{
+	unsigned int primary;
+	igt_spin_t *spin = NULL;
 	uint32_t ctx[3];
 
 	/* On each engine, insert
@@ -396,35 +461,96 @@ static void preempt_other(int fd, unsigned ring)
 	gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
 
 	ctx[NOISE] = gem_context_create(fd);
+	spin = __noise(fd, ctx[NOISE], 0, NULL);
 
 	ctx[HI] = gem_context_create(fd);
 	gem_context_set_priority(fd, ctx[HI], MAX_PRIO);
 
-	n = 0;
-	for_each_physical_engine(fd, other) {
-		igt_assert(n < ARRAY_SIZE(spin));
+	for_each_physical_engine(fd, primary) {
+		igt_debug("Primary engine: %s\n", e__->name);
+		__preempt_other(fd, ctx, ring, primary, flags);
 
-		spin[n] = __igt_spin_batch_new(fd, ctx[NOISE], other, 0);
-		store_dword(fd, ctx[LO], other,
-			    result, (n + 1)*sizeof(uint32_t), n + 1,
-			    0, I915_GEM_DOMAIN_RENDER);
-		n++;
 	}
-	store_dword(fd, ctx[HI], ring,
+
+	igt_assert(gem_bo_busy(fd, spin->handle));
+	igt_spin_batch_free(fd, spin);
+
+	gem_context_destroy(fd, ctx[LO]);
+	gem_context_destroy(fd, ctx[NOISE]);
+	gem_context_destroy(fd, ctx[HI]);
+}
+
+static void __preempt_queue(int fd,
+			    unsigned target, unsigned primary,
+			    unsigned depth, unsigned flags)
+{
+	uint32_t result = gem_create(fd, 4096);
+	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	igt_spin_t *above = NULL, *below = NULL;
+	unsigned int other, n, i;
+	int prio = MAX_PRIO;
+	uint32_t ctx[3] = {
+		gem_context_create(fd),
+		gem_context_create(fd),
+		gem_context_create(fd),
+	};
+
+	for (n = 0; n < depth; n++) {
+		if (flags & CONTEXTS) {
+			gem_context_destroy(fd, ctx[NOISE]);
+			ctx[NOISE] = gem_context_create(fd);
+		}
+		above = __noise(fd, ctx[NOISE], prio--, above);
+	}
+
+	gem_context_set_priority(fd, ctx[HI], prio--);
+
+	for (; n < MAX_ELSP_QLEN; n++) {
+		if (flags & CONTEXTS) {
+			gem_context_destroy(fd, ctx[NOISE]);
+			ctx[NOISE] = gem_context_create(fd);
+		}
+		below = __noise(fd, ctx[NOISE], prio--, below);
+	}
+
+	gem_context_set_priority(fd, ctx[LO], prio--);
+
+	n = 0;
+	store_dword(fd, ctx[LO], primary,
+		    result, (n + 1)*sizeof(uint32_t), n + 1,
+		    0, I915_GEM_DOMAIN_RENDER);
+	n++;
+
+	if (flags & CHAIN) {
+		for_each_physical_engine(fd, other) {
+			store_dword(fd, ctx[LO], other,
+				    result, (n + 1)*sizeof(uint32_t), n + 1,
+				    0, I915_GEM_DOMAIN_RENDER);
+			n++;
+		}
+	}
+
+	store_dword(fd, ctx[HI], target,
 		    result, (n + 1)*sizeof(uint32_t), n + 1,
 		    0, I915_GEM_DOMAIN_RENDER);
 
 	igt_debugfs_dump(fd, "i915_engine_info");
-	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
 
-	for (i = 0; i < n; i++) {
-		igt_assert(gem_bo_busy(fd, spin[i]->handle));
-		igt_spin_batch_free(fd, spin[i]);
+	if (above) {
+		igt_assert(gem_bo_busy(fd, above->handle));
+		igt_spin_batch_free(fd, above);
 	}
+
+	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
 
 	n++;
 	for (i = 0; i <= n; i++)
 		igt_assert_eq_u32(ptr[i], i);
+
+	if (below) {
+		igt_assert(gem_bo_busy(fd, below->handle));
+		igt_spin_batch_free(fd, below);
+	}
 
 	gem_context_destroy(fd, ctx[LO]);
 	gem_context_destroy(fd, ctx[NOISE]);
@@ -432,6 +558,16 @@ static void preempt_other(int fd, unsigned ring)
 
 	munmap(ptr, 4096);
 	gem_close(fd, result);
+}
+
+static void preempt_queue(int fd, unsigned ring, unsigned int flags)
+{
+	unsigned other;
+
+	for_each_physical_engine(fd, other) {
+		for (unsigned depth = 0; depth <= MAX_ELSP_QLEN; depth++)
+			__preempt_queue(fd, ring, other, depth, flags);
+	}
 }
 
 static void preempt_self(int fd, unsigned ring)
@@ -981,11 +1117,25 @@ igt_main
 					igt_subtest_f("preempt-contexts-%s", e->name)
 						preempt(fd, e->exec_id | e->flags, NEW_CTX);
 
-					igt_subtest_f("preempt-other-%s", e->name)
-						preempt_other(fd, e->exec_id | e->flags);
-
 					igt_subtest_f("preempt-self-%s", e->name)
 						preempt_self(fd, e->exec_id | e->flags);
+
+					igt_subtest_f("preempt-other-%s", e->name)
+						preempt_other(fd, e->exec_id | e->flags, 0);
+
+					igt_subtest_f("preempt-other-chain-%s", e->name)
+						preempt_other(fd, e->exec_id | e->flags, CHAIN);
+
+					igt_subtest_f("preempt-queue-%s", e->name)
+						preempt_queue(fd, e->exec_id | e->flags, 0);
+
+					igt_subtest_f("preempt-queue-chain-%s", e->name)
+						preempt_queue(fd, e->exec_id | e->flags, CHAIN);
+					igt_subtest_f("preempt-queue-contexts-%s", e->name)
+						preempt_queue(fd, e->exec_id | e->flags, CONTEXTS);
+
+					igt_subtest_f("preempt-queue-contexts-chain-%s", e->name)
+						preempt_queue(fd, e->exec_id | e->flags, CONTEXTS | CHAIN);
 
 					igt_subtest_group {
 						igt_hang_t hang;
