@@ -302,11 +302,11 @@ static void test_evict_snoop(int fd)
 
 	/* Find a hole */
 	memset(object, 0, sizeof(object));
-	object[0].handle = gem_create(fd, 3*4096);
+	object[0].handle = gem_create(fd, 5*4096);
 	gem_write(fd, object[0].handle, 0, &bbe, sizeof(bbe));
 	gem_execbuf(fd, &execbuf);
 	gem_close(fd, object[0].handle);
-	hole = object[0].offset;
+	hole = object[0].offset + 4096;
 
 	/* Create a snoop + uncached pair */
 	object[0].handle = gem_create(fd, 4096);
