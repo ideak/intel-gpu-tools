@@ -104,6 +104,14 @@ dbg_get_status_section(const char *title, char **first, char **last)
 	*last = pos - 1;
 }
 
+static bool
+dbg_has_line(const char *first, const char *last, const char *name)
+{
+	char *pos = strstr(first, name);
+
+	return pos != NULL && pos < last;
+}
+
 static int
 dbg_get_int(const char *first, const char *last, const char *name)
 {
@@ -161,8 +169,14 @@ dbg_get_status(struct status *stat)
 		dbg_get_int(first, last, "Available Slice Total:");
 	stat->info.subslice_total =
 		dbg_get_int(first, last, "Available Subslice Total:");
-	stat->info.subslice_per =
-		dbg_get_int(first, last, "Available Subslice Per Slice:");
+	/* Dealing with a change in 4.17. */
+	if (dbg_has_line(first, last, "Available Subslice Per Slice:")) {
+		stat->info.subslice_per =
+			dbg_get_int(first, last, "Available Subslice Per Slice:");
+	} else {
+		stat->info.subslice_per =
+			dbg_get_int(first, last, "Available Slice0 subslices:");
+	}
 	stat->info.eu_total =
 		dbg_get_int(first, last, "Available EU Total:");
 	stat->info.eu_per =
@@ -182,8 +196,14 @@ dbg_get_status(struct status *stat)
 		dbg_get_int(first, last, "Enabled Slice Total:");
 	stat->hw.subslice_total =
 		dbg_get_int(first, last, "Enabled Subslice Total:");
-	stat->hw.subslice_per =
-		dbg_get_int(first, last, "Enabled Subslice Per Slice:");
+	/* Dealing with a change in 4.17. */
+	if (dbg_has_line(first, last, "Enabled Subslice Per Slice:")) {
+		stat->hw.subslice_per =
+			dbg_get_int(first, last, "Enabled Subslice Per Slice:");
+	} else {
+		stat->hw.subslice_per =
+			dbg_get_int(first, last, "Enabled Slice0 subslices:");
+	}
 	stat->hw.eu_total =
 		dbg_get_int(first, last, "Enabled EU Total:");
 	stat->hw.eu_per =
