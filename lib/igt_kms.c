@@ -1723,6 +1723,7 @@ static void igt_plane_reset(igt_plane_t *plane)
 
 	igt_plane_clear_prop_changed(plane, IGT_PLANE_IN_FENCE_FD);
 	plane->values[IGT_PLANE_IN_FENCE_FD] = ~0ULL;
+	plane->gem_handle = 0;
 }
 
 static void igt_pipe_reset(igt_pipe_t *pipe)
