@@ -1129,14 +1129,14 @@ static void unset_all_crtcs(void)
 	igt_display_commit(&drm.display);
 }
 
-static void disable_features(const struct test_mode *t)
+static bool disable_features(const struct test_mode *t)
 {
 	if (t->feature == FEATURE_DEFAULT)
-		return;
+		return false;
 
 	fbc_disable();
-	psr_disable(drm.debugfs);
 	drrs_disable();
+	return psr_disable(drm.debugfs);
 }
 
 static void *busy_thread_func(void *data)
@@ -1717,17 +1717,21 @@ static void set_region_for_test(const struct test_mode *t,
 	do_assertions(ASSERT_NO_ACTION_CHANGE);
 }
 
-static void enable_features_for_test(const struct test_mode *t)
+static bool enable_features_for_test(const struct test_mode *t)
 {
+	bool ret = false;
+
 	if (t->feature == FEATURE_DEFAULT)
-		return;
+		return false;
 
 	if (t->feature & FEATURE_FBC)
 		fbc_enable();
 	if (t->feature & FEATURE_PSR)
-		psr_enable(drm.debugfs);
+		ret = psr_enable(drm.debugfs);
 	if (t->feature & FEATURE_DRRS)
 		drrs_enable();
+
+	return ret;
 }
 
 static void check_test_requirements(const struct test_mode *t)
@@ -1809,23 +1813,29 @@ static void set_crtc_fbs(const struct test_mode *t)
 static void prepare_subtest_data(const struct test_mode *t,
 				 struct draw_pattern_info *pattern)
 {
+	bool need_modeset;
+
 	check_test_requirements(t);
 
 	stop_busy_thread();
 
-	disable_features(t);
+	need_modeset = disable_features(t);
 	set_crtc_fbs(t);
 
 	if (t->screen == SCREEN_OFFSCREEN)
 		fill_fb_region(&offscreen_fb, COLOR_OFFSCREEN_BG);
 
-	unset_all_crtcs();
+	igt_display_reset(&drm.display);
+	if (need_modeset)
+		igt_display_commit(&drm.display);
 
 	init_blue_crc(t->format);
 	if (pattern)
 		init_crcs(t->format, pattern);
 
-	enable_features_for_test(t);
+	need_modeset = enable_features_for_test(t);
+	if (need_modeset)
+		igt_display_commit(&drm.display);
 }
 
 static void prepare_subtest_screens(const struct test_mode *t)
