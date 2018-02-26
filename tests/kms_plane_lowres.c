@@ -126,23 +126,6 @@ test_fini(data_t *data, igt_output_t *output, enum pipe pipe)
 }
 
 static void
-display_commit_mode(igt_display_t *display, igt_pipe_crc_t *pipe_crc,
-		    enum pipe pipe, int flags, igt_crc_t *out_crc)
-{
-	char buf[256];
-	int ret;
-
-	ret = igt_display_try_commit_atomic(display, flags, NULL);
-	igt_skip_on(ret != 0);
-
-	igt_set_timeout(1, "Stuck on page flip");
-	ret = read(display->drm_fd, buf, sizeof(buf));
-	igt_assert(ret >= 0);
-
-	igt_pipe_crc_collect_crc(pipe_crc, out_crc);
-}
-
-static void
 check_mode(drmModeModeInfo *mode1, drmModeModeInfo *mode2)
 {
 	igt_assert_eq(mode1->hdisplay, mode2->hdisplay);
@@ -151,7 +134,7 @@ check_mode(drmModeModeInfo *mode1, drmModeModeInfo *mode2)
 }
 
 static drmModeModeInfo *
-test_setup(data_t *data, enum pipe pipe, uint64_t modifier, int flags,
+test_setup(data_t *data, enum pipe pipe, uint64_t modifier,
 	   igt_output_t *output)
 {
 	drmModeModeInfo *mode;
@@ -211,13 +194,12 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 	drmModeModeInfo mode_lowres;
 	drmModeModeInfo *mode1, *mode2, *mode3;
 	int ret;
-	int flags = DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_ALLOW_MODESET;
 	igt_pipe_crc_t *pipe_crc;
 
 	igt_info("Testing connector %s using pipe %s\n",
 		 igt_output_name(output), kmstest_pipe_name(pipe));
 
-	mode1 = test_setup(data, pipe, modifier, flags, output);
+	mode1 = test_setup(data, pipe, modifier, output);
 
 	mode_lowres = get_lowres_mode(data->drm_fd, mode1);
 
@@ -225,8 +207,8 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 	igt_skip_on(ret != 0);
 
 	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
-
-	igt_pipe_crc_collect_crc(pipe_crc, &crc_hires1);
+	igt_pipe_crc_start(pipe_crc);
+	igt_pipe_crc_get_single(pipe_crc, &crc_hires1);
 
 	igt_assert_plane_visible(data->drm_fd, pipe, true);
 
@@ -238,7 +220,9 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	check_mode(&mode_lowres, mode2);
 
-	display_commit_mode(&data->display, pipe_crc, pipe, flags, &crc_lowres);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
+	igt_pipe_crc_drain(pipe_crc);
+	igt_pipe_crc_get_single(pipe_crc, &crc_lowres);
 
 	igt_assert_plane_visible(data->drm_fd, pipe, false);
 
@@ -250,7 +234,10 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	check_mode(mode1, mode3);
 
-	display_commit_mode(&data->display, pipe_crc, pipe, flags, &crc_hires2);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
+
+	igt_pipe_crc_drain(pipe_crc);
+	igt_pipe_crc_get_single(pipe_crc, &crc_hires2);
 
 	igt_assert_plane_visible(data->drm_fd, pipe, true);
 
