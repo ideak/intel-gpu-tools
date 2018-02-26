@@ -86,29 +86,39 @@ int main(int argc, char **argv)
 				    opt_handler, NULL);
 
 	igt_fixture {
+		unsigned vga_connector_id = 0;
+
 		drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		res = drmModeGetResources(drm_fd);
 		igt_assert(res);
 
 		/* find the vga connector */
 		for (int i = 0; i < res->count_connectors; i++) {
-
 			vga_connector = drmModeGetConnectorCurrent(drm_fd,
 								   res->connectors[i]);
 
 			if (vga_connector->connector_type == DRM_MODE_CONNECTOR_VGA) {
-				start_n_modes = vga_connector->count_modes;
-				start_connection = vga_connector->connection;
-				break;
+				/* Ensure that no override was left in place. */
+				kmstest_force_connector(drm_fd,
+							vga_connector,
+							FORCE_CONNECTOR_UNSPECIFIED);
+
+				/* Only use the first VGA connector. */
+				if (!vga_connector_id)
+					vga_connector_id = res->connectors[i];
 			}
 
 			drmModeFreeConnector(vga_connector);
-
-			vga_connector = NULL;
 		}
 
-		igt_require(vga_connector);
+		igt_require(vga_connector_id);
+
+		/* Reacquire status after clearing any previous overrides */
+		vga_connector = drmModeGetConnector(drm_fd, vga_connector_id);
 		igt_skip_on(vga_connector->connection == DRM_MODE_CONNECTED);
+
+		start_n_modes = vga_connector->count_modes;
+		start_connection = vga_connector->connection;
 	}
 
 	igt_subtest("force-load-detect") {
