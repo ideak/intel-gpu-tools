@@ -350,7 +350,7 @@ static int create_bo_for_fb(int fd, int width, int height,
 	if (offsets)
 		memset(offsets, 0, ARRAY_SIZE(format->plane_bpp) * sizeof(*offsets));
 
-	if (tiling || size || stride || format->planes > 1) {
+	if (tiling || size || stride || igt_format_is_yuv(format->drm_id)) {
 		unsigned calculated_size, calculated_stride;
 
 		if (format->planes > 1)
