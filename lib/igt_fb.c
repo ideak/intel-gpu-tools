@@ -32,8 +32,10 @@
 
 #include "drmtest.h"
 #include "igt_aux.h"
+#include "igt_color_encoding.h"
 #include "igt_fb.h"
 #include "igt_kms.h"
+#include "igt_matrix.h"
 #include "igt_x86.h"
 #include "ioctl_wrappers.h"
 #include "intel_batchbuffer.h"
@@ -1347,6 +1349,21 @@ static uint8_t clamprgb(float val)
 	return clamp((int)(val + 0.5f), 0, 255);
 }
 
+static void read_rgb(struct igt_vec4 *rgb, const uint8_t *rgb24)
+{
+	rgb->d[0] = rgb24[2];
+	rgb->d[1] = rgb24[1];
+	rgb->d[2] = rgb24[0];
+	rgb->d[3] = 1.0f;
+}
+
+static void write_rgb(uint8_t *rgb24, const struct igt_vec4 *rgb)
+{
+	rgb24[2] = clamprgb(rgb->d[0]);
+	rgb24[1] = clamprgb(rgb->d[1]);
+	rgb24[0] = clamprgb(rgb->d[2]);
+}
+
 static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
 {
 	int i, j;
@@ -1354,6 +1371,8 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride, planar_stride = blit->linear.stride;
 	uint8_t *buf = malloc(blit->linear.size);
+	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(IGT_COLOR_YCBCR_BT601,
+						    IGT_COLOR_YCBCR_LIMITED_RANGE);
 
 	/*
 	 * Reading from the BO is awfully slow because of lack of read caching,
@@ -1364,30 +1383,49 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	y = &buf[blit->linear.offsets[0]];
 	uv = &buf[blit->linear.offsets[1]];
 
-	/* Convert from limited color range BT.601 */
 	for (i = 0; i < fb->height / 2; i++) {
-		for (j = 0; j < fb->width; j++) {
-			float r_, g_, b_, y0, y1, cb, cr;
-			/* Convert 1x2 pixel blocks */
+		for (j = 0; j < fb->width / 2; j++) {
+			/* Convert 2x2 pixel blocks */
+			struct igt_vec4 yuv[4];
+			struct igt_vec4 rgb[4];
 
-			y0 = 1.164f * (y[j] - 16.f);
-			y1 = 1.164f * (y[j + planar_stride] - 16.f);
+			yuv[0].d[0] = y[j * 2 + 0];
+			yuv[1].d[0] = y[j * 2 + 1];
+			yuv[2].d[0] = y[j * 2 + 0 + planar_stride];
+			yuv[3].d[0] = y[j * 2 + 1 + planar_stride];
 
-			cb = uv[j & ~1] - 128.f;
-			cr = uv[j | 1] - 128.f;
+			yuv[0].d[1] = yuv[1].d[1] = yuv[2].d[1] = yuv[3].d[1] = uv[j * 2 + 0];
+			yuv[0].d[2] = yuv[1].d[2] = yuv[2].d[2] = yuv[3].d[2] = uv[j * 2 + 1];
+			yuv[0].d[3] = yuv[1].d[3] = yuv[2].d[3] = yuv[3].d[3] = 1.0f;
 
-			r_ =  0.000f * cb +  1.596f * cr;
-			g_ = -0.392f * cb + -0.813f * cr;
-			b_ =  2.017f * cb +  0.000f * cr;
+			rgb[0] = igt_matrix_transform(&m, &yuv[0]);
+			rgb[1] = igt_matrix_transform(&m, &yuv[1]);
+			rgb[2] = igt_matrix_transform(&m, &yuv[2]);
+			rgb[3] = igt_matrix_transform(&m, &yuv[3]);
 
-			rgb24[j * 4 + 2] = clamprgb(y0 + r_);
-			rgb24[j * 4 + 2 + rgb24_stride] = clamprgb(y1 + r_);
+			write_rgb(&rgb24[j * 8 + 0], &rgb[0]);
+			write_rgb(&rgb24[j * 8 + 4], &rgb[1]);
+			write_rgb(&rgb24[j * 8 + 0 + rgb24_stride], &rgb[2]);
+			write_rgb(&rgb24[j * 8 + 4 + rgb24_stride], &rgb[3]);
+		}
 
-			rgb24[j * 4 + 1] = clamprgb(y0 + g_);
-			rgb24[j * 4 + 1 + rgb24_stride] = clamprgb(y1 + g_);
+		if (fb->width & 1) {
+			/* Convert 1x2 pixel block */
+			struct igt_vec4 yuv[2];
+			struct igt_vec4 rgb[2];
 
-			rgb24[j * 4] = clamprgb(y0 + b_);
-			rgb24[j * 4 + rgb24_stride] = clamprgb(y1 + b_);
+			yuv[0].d[0] = y[j * 2 + 0];
+			yuv[1].d[0] = y[j * 2 + 0 + planar_stride];
+
+			yuv[0].d[1] = yuv[1].d[1] = uv[j * 2 + 0];
+			yuv[0].d[2] = yuv[1].d[2] = uv[j * 2 + 1];
+			yuv[0].d[3] = yuv[1].d[3] = 1.0f;
+
+			rgb[0] = igt_matrix_transform(&m, &yuv[0]);
+			rgb[1] = igt_matrix_transform(&m, &yuv[1]);
+
+			write_rgb(&rgb24[j * 8 + 0], &rgb[0]);
+			write_rgb(&rgb24[j * 8 + 0 + rgb24_stride], &rgb[1]);
 		}
 
 		rgb24 += 2 * rgb24_stride;
@@ -1397,21 +1435,37 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 
 	if (fb->height & 1) {
 		/* Convert last row */
-		for (j = 0; j < fb->width; j++) {
-			float r_, g_, b_, y0, cb, cr;
+		for (j = 0; j < fb->width / 2; j++) {
+			/* Convert 2x1 pixel blocks */
+			struct igt_vec4 yuv[2];
+			struct igt_vec4 rgb[2];
+
+			yuv[0].d[0] = y[j * 2 + 0];
+			yuv[1].d[0] = y[j * 2 + 1];
+			yuv[0].d[1] = yuv[1].d[1] = uv[j * 2 + 0];
+			yuv[0].d[2] = yuv[1].d[2] = uv[j * 2 + 1];
+			yuv[0].d[3] = yuv[1].d[3] = 1.0f;
+
+			rgb[0] = igt_matrix_transform(&m, &yuv[0]);
+			rgb[1] = igt_matrix_transform(&m, &yuv[1]);
+
+			write_rgb(&rgb24[j * 8 + 0], &rgb[0]);
+			write_rgb(&rgb24[j * 8 + 4], &rgb[0]);
+		}
+
+		if (fb->width & 1) {
 			/* Convert single pixel */
+			struct igt_vec4 yuv;
+			struct igt_vec4 rgb;
 
-			cb = uv[j & ~1] - 128.f;
-			cr = uv[j | 1] - 128.f;
+			yuv.d[0] = y[j * 2 + 0];
+			yuv.d[1] = uv[j * 2 + 0];
+			yuv.d[2] = uv[j * 2 + 1];
+			yuv.d[3] = 1.0f;
 
-			y0 = 1.164f * (y[j] - 16.f);
-			r_ =  0.000f * cb +  1.596f * cr;
-			g_ = -0.392f * cb + -0.813f * cr;
-			b_ =  2.017f * cb +  0.000f * cr;
+			rgb = igt_matrix_transform(&m, &yuv);
 
-			rgb24[j * 4 + 2] = clamprgb(y0 + r_);
-			rgb24[j * 4 + 1] = clamprgb(y0 + g_);
-			rgb24[j * 4] = clamprgb(y0 + b_);
+			write_rgb(&rgb24[j * 8 + 0], &rgb);
 		}
 	}
 
@@ -1426,65 +1480,101 @@ static void convert_rgb24_to_nv12(struct igt_fb *fb, struct fb_convert_blit_uplo
 	const uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride;
 	unsigned planar_stride = blit->linear.stride;
+	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(IGT_COLOR_YCBCR_BT601,
+						    IGT_COLOR_YCBCR_LIMITED_RANGE);
 
 	igt_assert_f(fb->drm_format == DRM_FORMAT_NV12,
 		     "Conversion not implemented for !NV12 planar formats\n");
 
-	for (i = 0; i < fb->plane_height[0]; i++) {
-		/* Use limited color range BT.601 */
-
-		for (j = 0; j < fb->plane_width[0]; j++) {
-			float yf = 0.257f * rgb24[j * 4 + 2] +
-				   0.504f * rgb24[j * 4 + 1] +
-				   0.098f * rgb24[j * 4] + 16;
-
-			y[j] = (uint8_t)yf;
-		}
-
-		rgb24 += rgb24_stride;
-		y += planar_stride;
-	}
-
-	rgb24 = blit->rgb24.map;
-
 	for (i = 0; i < fb->height / 2; i++) {
-		for (j = 0; j < fb->plane_width[1]; j++) {
+		for (j = 0; j < fb->width / 2; j++) {
+			/* Convert 2x2 pixel blocks */
+			struct igt_vec4 rgb[4];
+			struct igt_vec4 yuv[4];
+
+			read_rgb(&rgb[0], &rgb24[j * 8 + 0]);
+			read_rgb(&rgb[1], &rgb24[j * 8 + 4]);
+			read_rgb(&rgb[2], &rgb24[j * 8 + 0 + rgb24_stride]);
+			read_rgb(&rgb[3], &rgb24[j * 8 + 4 + rgb24_stride]);
+
+			yuv[0] = igt_matrix_transform(&m, &rgb[0]);
+			yuv[1] = igt_matrix_transform(&m, &rgb[1]);
+			yuv[2] = igt_matrix_transform(&m, &rgb[2]);
+			yuv[3] = igt_matrix_transform(&m, &rgb[3]);
+
+			y[j * 2 + 0] = yuv[0].d[0];
+			y[j * 2 + 1] = yuv[1].d[0];
+			y[j * 2 + 0 + planar_stride] = yuv[2].d[0];
+			y[j * 2 + 1 + planar_stride] = yuv[3].d[0];
+
 			/*
-			 * Pixel center for Cb'Cr' is between the left top and
+			 * We assume the MPEG2 chroma siting convention, where
+			 * pixel center for Cb'Cr' is between the left top and
 			 * bottom pixel in a 2x2 block, so take the average.
 			 */
-			float uf = -0.148f/2 * rgb24[j * 8 + 2] +
-				   -0.148f/2 * rgb24[j * 8 + 2 + rgb24_stride] +
-				   -0.291f/2 * rgb24[j * 8 + 1] +
-				   -0.291f/2 * rgb24[j * 8 + 1 + rgb24_stride] +
-				    0.439f/2 * rgb24[j * 8] +
-				    0.439f/2 * rgb24[j * 8 + rgb24_stride] + 128;
-			float vf =  0.439f/2 * rgb24[j * 8 + 2] +
-				    0.439f/2 * rgb24[j * 8 + 2 + rgb24_stride] +
-				   -0.368f/2 * rgb24[j * 8 + 1] +
-				   -0.368f/2 * rgb24[j * 8 + 1 + rgb24_stride] +
-				   -0.071f/2 * rgb24[j * 8] +
-				   -0.071f/2 * rgb24[j * 8 + rgb24_stride] + 128;
-			uv[j * 2] = (uint8_t)uf;
-			uv[j * 2 + 1] = (uint8_t)vf;
+			uv[j * 2 + 0] = (yuv[0].d[1] + yuv[2].d[1]) / 2.0f;
+			uv[j * 2 + 1] = (yuv[0].d[2] + yuv[2].d[2]) / 2.0f;
+		}
+
+		if (fb->width & 1) {
+			/* Convert 1x2 pixel block */
+			struct igt_vec4 rgb[2];
+			struct igt_vec4 yuv[2];
+
+			read_rgb(&rgb[0], &rgb24[j * 8 + 0]);
+			read_rgb(&rgb[2], &rgb24[j * 8 + 0 + rgb24_stride]);
+
+			yuv[0] = igt_matrix_transform(&m, &rgb[0]);
+			yuv[1] = igt_matrix_transform(&m, &rgb[1]);
+
+			y[j * 2 + 0] = yuv[0].d[0];
+			y[j * 2 + 0 + planar_stride] = yuv[1].d[0];
+
+			/*
+			 * We assume the MPEG2 chroma siting convention, where
+			 * pixel center for Cb'Cr' is between the left top and
+			 * bottom pixel in a 2x2 block, so take the average.
+			 */
+			uv[j * 2 + 0] = (yuv[0].d[1] + yuv[1].d[1]) / 2.0f;
+			uv[j * 2 + 1] = (yuv[0].d[2] + yuv[1].d[2]) / 2.0f;
 		}
 
 		rgb24 += 2 * rgb24_stride;
+		y += 2 * planar_stride;
 		uv += planar_stride;
 	}
 
 	/* Last row cannot be interpolated between 2 pixels, take the single value */
-	if (i < fb->plane_height[1]) {
-		for (j = 0; j < fb->plane_width[1]; j++) {
-			float uf = -0.148f * rgb24[j * 8 + 2] +
-				   -0.291f * rgb24[j * 8 + 1] +
-				    0.439f * rgb24[j * 8] + 128;
-			float vf =  0.439f * rgb24[j * 8 + 2] +
-				   -0.368f * rgb24[j * 8 + 1] +
-				   -0.071f * rgb24[j * 8] + 128;
+	if (fb->height & 1) {
+		for (j = 0; j < fb->width / 2; j++) {
+			/* Convert 2x1 pixel blocks */
+			struct igt_vec4 rgb[2];
+			struct igt_vec4 yuv[2];
 
-			uv[j * 2] = (uint8_t)uf;
-			uv[j * 2 + 1] = (uint8_t)vf;
+			read_rgb(&rgb[0], &rgb24[j * 8 + 0]);
+			read_rgb(&rgb[1], &rgb24[j * 8 + 4]);
+
+			yuv[0] = igt_matrix_transform(&m, &rgb[0]);
+			yuv[1] = igt_matrix_transform(&m, &rgb[1]);
+
+			y[j * 2 + 0] = yuv[0].d[0];
+			y[j * 2 + 1] = yuv[1].d[0];
+			uv[j * 2 + 0] = yuv[0].d[1];
+			uv[j * 2 + 1] = yuv[0].d[2];
+		}
+
+		if (fb->width & 1) {
+			/* Convert single pixel */
+			struct igt_vec4 rgb;
+			struct igt_vec4 yuv;
+
+			read_rgb(&rgb, &rgb24[j * 8 + 0]);
+
+			yuv = igt_matrix_transform(&m, &rgb);
+
+			y[j * 2 + 0] = yuv.d[0];
+			uv[j * 2 + 0] = yuv.d[1];
+			uv[j * 2 + 1] = yuv.d[2];
 		}
 	}
 }
