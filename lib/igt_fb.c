@@ -58,26 +58,35 @@
  */
 
 /* drm fourcc/cairo format maps */
-#define DF(did, cid, ...)	\
-	{ DRM_FORMAT_##did, CAIRO_FORMAT_##cid, # did, __VA_ARGS__ }
 static struct format_desc_struct {
+	const char *name;
 	uint32_t drm_id;
 	cairo_format_t cairo_id;
-	const char *name;
-	int bpp;
 	int depth;
-	int planes;
+	int num_planes;
 	int plane_bpp[4];
 } format_desc[] = {
-	DF(RGB565,	RGB16_565,	16, 16),
-	//DF(RGB888,	INVALID,	24, 24),
-	DF(XRGB8888,	RGB24,		32, 24),
-	DF(XRGB2101010,	RGB30,		32, 30),
-	DF(ARGB8888,	ARGB32,		32, 32),
-	DF(NV12,	RGB24,		32, -1, 2, {8, 16}),
+	{ .name = "RGB565", .depth = 16, .drm_id = DRM_FORMAT_RGB565,
+	  .cairo_id = CAIRO_FORMAT_RGB16_565,
+	  .num_planes = 1, .plane_bpp = { 16, },
+	},
+	{ .name = "XRGB8888", .depth = 24, .drm_id = DRM_FORMAT_XRGB8888,
+	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .num_planes = 1, .plane_bpp = { 32, },
+	},
+	{ .name = "XRGB2101010", .depth = 30, .drm_id = DRM_FORMAT_XRGB2101010,
+	  .cairo_id = CAIRO_FORMAT_RGB30,
+	  .num_planes = 1, .plane_bpp = { 32, },
+	},
+	{ .name = "ARGB8888", .depth = 32, .drm_id = DRM_FORMAT_ARGB8888,
+	  .cairo_id = CAIRO_FORMAT_ARGB32,
+	  .num_planes = 1, .plane_bpp = { 32, },
+	},
+	{ .name = "NV12", .depth = -1, .drm_id = DRM_FORMAT_NV12,
+	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .num_planes = 2, .plane_bpp = { 8, 16, },
+	},
 };
-#undef DF
-
 #define for_each_format(f)	\
 	for (f = format_desc; f - format_desc < ARRAY_SIZE(format_desc); f++)
 
@@ -196,7 +205,7 @@ static void calc_fb_size_planar(int fd, int width, int height,
 
 	*size_ret = 0;
 
-	for (plane = 0; plane < format->planes; plane++) {
+	for (plane = 0; plane < format->num_planes; plane++) {
 		unsigned plane_stride;
 
 		igt_get_fb_tile_size(fd, tiling, format->plane_bpp[plane], &tile_width, &tile_height);
@@ -206,7 +215,7 @@ static void calc_fb_size_planar(int fd, int width, int height,
 			stride = plane_stride;
 	}
 
-	for (plane = 0; plane < format->planes; plane++) {
+	for (plane = 0; plane < format->num_planes; plane++) {
 		if (offsets)
 			offsets[plane] = *size_ret;
 
@@ -227,9 +236,9 @@ static void calc_fb_size_packed(int fd, int width, int height,
 				unsigned *size_ret, unsigned *stride_ret)
 {
 	unsigned int tile_width, tile_height, stride, size;
-	int byte_width = width * (format->bpp / 8);
+	int byte_width = width * (format->plane_bpp[0] / 8);
 
-	igt_get_fb_tile_size(fd, tiling, format->bpp, &tile_width, &tile_height);
+	igt_get_fb_tile_size(fd, tiling, format->plane_bpp[0], &tile_width, &tile_height);
 
 	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    intel_gen(intel_get_drm_devid(fd)) <= 3) {
@@ -278,7 +287,7 @@ void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64
 	struct format_desc_struct *format = lookup_drm_format(drm_format);
 	igt_assert(format);
 
-	if (format->planes > 1)
+	if (format->num_planes > 1)
 		calc_fb_size_planar(fd, width, height, format, tiling, size_ret, stride_ret, NULL);
 	else
 		calc_fb_size_packed(fd, width, height, format, tiling, size_ret, stride_ret);
@@ -353,7 +362,7 @@ static int create_bo_for_fb(int fd, int width, int height,
 	if (tiling || size || stride || igt_format_is_yuv(format->drm_id)) {
 		unsigned calculated_size, calculated_stride;
 
-		if (format->planes > 1)
+		if (format->num_planes > 1)
 			calc_fb_size_planar(fd, width, height, format, tiling,
 					    &calculated_size, &calculated_stride, offsets);
 		else
@@ -416,8 +425,9 @@ static int create_bo_for_fb(int fd, int width, int height,
 		if (is_dumb)
 			*is_dumb = true;
 
-		return kmstest_dumb_create(fd, width, height, format->bpp, stride_ret,
-					   size_ret);
+		return kmstest_dumb_create(fd, width, height,
+					   format->plane_bpp[0],
+					   stride_ret, size_ret);
 	}
 }
 
@@ -819,7 +829,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 		handles[0] = fb->gem_handle;
 		pitches[0] = fb->stride;
-		for (i = 0; i < f->planes; i++) {
+		for (i = 0; i < f->num_planes; i++) {
 			handles[i] = fb->gem_handle;
 			pitches[i] = fb->stride;
 		}
@@ -835,13 +845,9 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	fb->drm_format = format;
 	fb->fb_id = fb_id;
 	fb->fd = fd;
-	fb->num_planes = f->planes ?: 1;
-	fb->plane_bpp[0] = f->bpp;
-	fb->plane_height[0] = height;
-	fb->plane_width[0] = width;
+	fb->num_planes = f->num_planes;
 
-	/* if f->planes is set, then plane_bpp is valid too so use that. */
-	for (i = 0; i < f->planes; i++) {
+	for (i = 0; i < f->num_planes; i++) {
 		fb->plane_bpp[i] = f->plane_bpp[i];
 		fb->plane_height[i] = planar_height(f, height, i);
 		fb->plane_width[i] = planar_width(f, width, i);
@@ -1660,7 +1666,7 @@ uint32_t igt_bpp_depth_to_drm_format(int bpp, int depth)
 	struct format_desc_struct *f;
 
 	for_each_format(f)
-		if (f->bpp == bpp && f->depth == depth)
+		if (f->plane_bpp[0] == bpp && f->depth == depth)
 			return f->drm_id;
 
 
@@ -1683,7 +1689,7 @@ uint32_t igt_drm_format_to_bpp(uint32_t drm_format)
 	igt_assert_f(f, "can't find a bpp format for %08x (%s)\n",
 		     drm_format, igt_format_str(drm_format));
 
-	return f->bpp;
+	return f->plane_bpp[0];
 }
 
 /**
