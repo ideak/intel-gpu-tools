@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <wchar.h>
 #include <inttypes.h>
 
 #include "drmtest.h"
@@ -368,7 +369,8 @@ static int create_bo_for_fb(int fd, int width, int height,
 			*is_dumb = false;
 
 		if (is_i915_device(fd)) {
-			uint8_t *ptr;
+			void *ptr;
+			bool full_range = false; /* FIXME */
 
 			bo = gem_create(fd, size);
 			gem_set_tiling(fd, bo, igt_fb_mod_to_tiling(tiling), stride);
@@ -377,10 +379,23 @@ static int create_bo_for_fb(int fd, int width, int height,
 			ptr = gem_mmap__gtt(fd, bo, size, PROT_READ | PROT_WRITE);
 			igt_assert(*(uint32_t *)ptr == 0);
 
-			if (format->drm_id == DRM_FORMAT_NV12) {
-				/* component formats have a different zero point */
-				memset(ptr, 16, offsets[1]);
-				memset(ptr + offsets[1], 0x80, (height + 1)/2 * stride);
+			switch (format->drm_id) {
+			case DRM_FORMAT_NV12:
+				memset(ptr + offsets[0], full_range ? 0x00 : 0x10,
+				       calculated_stride * height);
+				memset(ptr + offsets[1], 0x80,
+				       calculated_stride * height/2);
+				break;
+			case DRM_FORMAT_YUYV:
+			case DRM_FORMAT_YVYU:
+				wmemset(ptr, full_range ? 0x80008000 : 0x80108010,
+					calculated_stride * height / sizeof(wchar_t));
+				break;
+			case DRM_FORMAT_UYVY:
+			case DRM_FORMAT_VYUY:
+				wmemset(ptr, full_range ? 0x00800080 : 0x10801080,
+					calculated_stride * height / sizeof(wchar_t));
+				break;
 			}
 			gem_munmap(ptr, size);
 
