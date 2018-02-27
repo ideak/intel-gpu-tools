@@ -107,74 +107,15 @@ bo_copy (void *_arg)
 	return NULL;
 }
 
-#if defined(__x86_64__) && !defined(__clang__)
-
-#pragma GCC push_options
-#pragma GCC target("sse4.1")
-
-#include <smmintrin.h>
-
-#define MOVNT 512
-
-__attribute__((noinline))
-static void copy_wc_page(void *dst, void *src)
-{
-	if (igt_x86_features() & SSE4_1) {
-		__m128i *S = (__m128i *)src;
-		__m128i *D = (__m128i *)dst;
-
-		for (int i = 0; i < PAGE_SIZE/CACHELINE; i++) {
-			__m128i tmp[4];
-
-			tmp[0] = _mm_stream_load_si128(S++);
-			tmp[1] = _mm_stream_load_si128(S++);
-			tmp[2] = _mm_stream_load_si128(S++);
-			tmp[3] = _mm_stream_load_si128(S++);
-
-			_mm_store_si128(D++, tmp[0]);
-			_mm_store_si128(D++, tmp[1]);
-			_mm_store_si128(D++, tmp[2]);
-			_mm_store_si128(D++, tmp[3]);
-		}
-	} else
-		memcpy(dst, src, PAGE_SIZE);
-}
-
-static void copy_wc_cacheline(void *dst, void *src)
-{
-	if (igt_x86_features() & SSE4_1) {
-		__m128i *S = (__m128i *)src;
-		__m128i *D = (__m128i *)dst;
-		__m128i tmp[4];
-
-		tmp[0] = _mm_stream_load_si128(S++);
-		tmp[1] = _mm_stream_load_si128(S++);
-		tmp[2] = _mm_stream_load_si128(S++);
-		tmp[3] = _mm_stream_load_si128(S++);
-
-		_mm_store_si128(D++, tmp[0]);
-		_mm_store_si128(D++, tmp[1]);
-		_mm_store_si128(D++, tmp[2]);
-		_mm_store_si128(D++, tmp[3]);
-	} else
-		memcpy(dst, src, CACHELINE);
-}
-
-#pragma GCC pop_options
-
-#else
-
 static void copy_wc_page(void *dst, const void *src)
 {
-	memcpy(dst, src, PAGE_SIZE);
+	igt_memcpy_from_wc(dst, src, PAGE_SIZE);
 }
 
 static void copy_wc_cacheline(void *dst, const void *src)
 {
-	memcpy(dst, src, CACHELINE);
+	igt_memcpy_from_wc(dst, src, CACHELINE);
 }
-
-#endif
 
 static void
 _bo_write_verify(struct test *t)

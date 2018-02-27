@@ -100,45 +100,10 @@ create_bo(int fd)
 	return handle;
 }
 
-#if defined(__x86_64__) && !defined(__clang__)
-#define MOVNT 512
-
-#pragma GCC push_options
-#pragma GCC target("sse4.1")
-
-#include <smmintrin.h>
-__attribute__((noinline))
-static void copy_wc_page(void *dst, void *src)
-{
-	if (igt_x86_features() & SSE4_1) {
-		__m128i *S = (__m128i *)src;
-		__m128i *D = (__m128i *)dst;
-
-		for (int i = 0; i < PAGE_SIZE/64; i++) {
-			__m128i tmp[4];
-
-			tmp[0] = _mm_stream_load_si128(S++);
-			tmp[1] = _mm_stream_load_si128(S++);
-			tmp[2] = _mm_stream_load_si128(S++);
-			tmp[3] = _mm_stream_load_si128(S++);
-
-			_mm_store_si128(D++, tmp[0]);
-			_mm_store_si128(D++, tmp[1]);
-			_mm_store_si128(D++, tmp[2]);
-			_mm_store_si128(D++, tmp[3]);
-		}
-	} else
-		memcpy(dst, src, PAGE_SIZE);
-}
-
-#pragma GCC pop_options
-
-#else
 static void copy_wc_page(void *dst, const void *src)
 {
-	memcpy(dst, src, PAGE_SIZE);
+	igt_memcpy_from_wc(dst, src, PAGE_SIZE);
 }
-#endif
 
 igt_simple_main
 {

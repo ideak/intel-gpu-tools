@@ -32,6 +32,7 @@
 #include "drmtest.h"
 #include "igt_fb.h"
 #include "igt_kms.h"
+#include "igt_x86.h"
 #include "ioctl_wrappers.h"
 #include "intel_chipset.h"
 
@@ -1340,7 +1341,7 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	 * it's faster to copy the whole BO to a temporary buffer and convert
 	 * from there.
 	 */
-	memcpy(buf, blit->linear.map, blit->linear.size);
+	igt_memcpy_from_wc(buf, blit->linear.map, blit->linear.size);
 	y = &buf[blit->linear.offsets[0]];
 	uv = &buf[blit->linear.offsets[1]];
 

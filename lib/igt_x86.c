@@ -36,7 +36,11 @@
 #endif
 
 #include "igt_x86.h"
+#include "igt_aux.h"
+
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 /**
  * SECTION:igt_x86
@@ -172,5 +176,117 @@ char *igt_x86_features_to_string(unsigned features, char *line)
 		line += sprintf(line, ", avx2");
 
 	return ret;
+}
+#endif
+
+#if defined(__x86_64__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC target("sse4.1")
+#pragma GCC diagnostic ignored "-Wpointer-arith"
+
+#include <smmintrin.h>
+static void memcpy_from_wc_sse41(void *dst, const void *src, unsigned long len)
+{
+	char buf[16];
+
+	/* Flush the internal buffer of potential stale gfx data */
+	_mm_mfence();
+
+	if ((uintptr_t)src & 15) {
+		__m128i *S = (__m128i *)((uintptr_t)src & ~15);
+		unsigned long misalign = (uintptr_t)src & 15;
+		unsigned long copy = min(len, 16 - misalign);
+
+		_mm_storeu_si128((__m128i *)buf,
+				 _mm_stream_load_si128(S));
+
+		memcpy(dst, buf + misalign, copy);
+
+		dst += copy;
+		src += copy;
+		len -= copy;
+	}
+
+	/* We assume we are doing bulk transfers, so prefer aligned moves */
+	if (((uintptr_t)dst & 15) == 0) {
+		while (len >= 64) {
+			__m128i *S = (__m128i *)src;
+			__m128i *D = (__m128i *)dst;
+			__m128i tmp[4];
+
+			tmp[0] = _mm_stream_load_si128(S + 0);
+			tmp[1] = _mm_stream_load_si128(S + 1);
+			tmp[2] = _mm_stream_load_si128(S + 2);
+			tmp[3] = _mm_stream_load_si128(S + 3);
+
+			_mm_store_si128(D + 0, tmp[0]);
+			_mm_store_si128(D + 1, tmp[1]);
+			_mm_store_si128(D + 2, tmp[2]);
+			_mm_store_si128(D + 3, tmp[3]);
+
+			src += 64;
+			dst += 64;
+			len -= 64;
+		}
+	} else {
+		while (len >= 64) {
+			__m128i *S = (__m128i *)src;
+			__m128i *D = (__m128i *)dst;
+			__m128i tmp[4];
+
+			tmp[0] = _mm_stream_load_si128(S + 0);
+			tmp[1] = _mm_stream_load_si128(S + 1);
+			tmp[2] = _mm_stream_load_si128(S + 2);
+			tmp[3] = _mm_stream_load_si128(S + 3);
+
+			_mm_storeu_si128(D + 0, tmp[0]);
+			_mm_storeu_si128(D + 1, tmp[1]);
+			_mm_storeu_si128(D + 2, tmp[2]);
+			_mm_storeu_si128(D + 3, tmp[3]);
+
+			src += 64;
+			dst += 64;
+			len -= 64;
+		}
+	}
+
+	while (len >= 16) {
+		_mm_storeu_si128((__m128i *)dst,
+				 _mm_stream_load_si128((__m128i *)src));
+
+		src += 16;
+		dst += 16;
+		len -= 16;
+	}
+
+	if (len) {
+		_mm_storeu_si128((__m128i *)buf,
+				 _mm_stream_load_si128((__m128i *)src));
+		memcpy(dst, buf, len);
+	}
+}
+
+#pragma GCC pop_options
+
+static void memcpy_from_wc(void *dst, const void *src, unsigned long len)
+{
+	memcpy(dst, src, len);
+}
+
+static void (*resolve_memcpy_from_wc(void))(void *, const void *, unsigned long)
+{
+	if (igt_x86_features() & SSE4_1)
+		return memcpy_from_wc_sse41;
+
+	return memcpy_from_wc;
+}
+
+void igt_memcpy_from_wc(void *dst, const void *src, unsigned long len)
+	__attribute__((ifunc("resolve_memcpy_from_wc")));
+
+#else
+void igt_memcpy_from_wc(void *dst, const void *src, unsigned long len)
+{
+	memcpy(dst, src, len);
 }
 #endif

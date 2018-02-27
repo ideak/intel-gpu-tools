@@ -55,4 +55,6 @@ static inline char *igt_x86_features_to_string(unsigned features, char *line)
 }
 #endif
 
+void igt_memcpy_from_wc(void *dst, const void *src, unsigned long len);
+
 #endif /* IGT_X86_H */
