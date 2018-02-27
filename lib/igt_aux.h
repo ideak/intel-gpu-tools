@@ -228,6 +228,13 @@ void intel_require_files(uint64_t count);
 	_a > _b ? _a : _b;		\
 })
 
+#define clamp(x, min, max) ({		\
+	typeof(min) _min = (min);	\
+	typeof(max) _max = (max);	\
+	typeof(x) _x = (x);		\
+	_x < _min ? _min : _x > _max ? _max : _x;	\
+})
+
 #define igt_swap(a, b) do {	\
 	typeof(a) _tmp = (a);	\
 	(a) = (b);		\

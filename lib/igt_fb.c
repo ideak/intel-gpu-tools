@@ -30,6 +30,7 @@
 #include <inttypes.h>
 
 #include "drmtest.h"
+#include "igt_aux.h"
 #include "igt_fb.h"
 #include "igt_kms.h"
 #include "igt_x86.h"
@@ -1320,13 +1321,9 @@ struct fb_convert_blit_upload {
 	struct fb_blit_linear linear;
 };
 
-static uint8_t clamprgb(float val) {
-	if (val < 0)
-		return 0;
-	if (val > 255)
-		return 255;
-
-	return (uint8_t)val;
+static uint8_t clamprgb(float val)
+{
+	return clamp(val, 0.0f, 255.0f);
 }
 
 static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
