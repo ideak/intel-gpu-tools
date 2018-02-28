@@ -210,16 +210,6 @@ get_oa_format(enum drm_i915_oa_format format)
 	return gen8_oa_formats[format];
 }
 
-static bool
-double_value_within(double value,
-		    double expected,
-		    double percent_margin)
-{
-	return value >= (expected - expected * percent_margin / 100.0) &&
-	       value <= (expected + expected * percent_margin / 100.0);
-
-}
-
 static void
 __perf_close(int fd)
 {
@@ -477,17 +467,6 @@ oa_report_get_ctx_id(uint32_t *report)
 	if (!oa_report_ctx_is_valid(report))
 		return 0xffffffff;
 	return report[2];
-}
-
-static double
-oa_reports_tick_per_period(uint32_t *report0, uint32_t *report1)
-{
-	if (intel_gen(devid) < 8)
-		return 0.0;
-
-	/* Measure the number GPU tick delta to timestamp delta. */
-	return (double) (report1[3] - report0[3]) /
-	       (double) (report1[1] - report0[1]);
 }
 
 static void
@@ -2394,7 +2373,6 @@ test_buffer_fill(void)
 		uint32_t n_periodic_reports;
 		uint32_t first_timestamp = 0, last_timestamp = 0;
 		uint32_t last_periodic_report[64];
-		double tick_per_period;
 
 		do_ioctl(stream_fd, I915_PERF_IOCTL_ENABLE, 0);
 
@@ -2448,7 +2426,6 @@ test_buffer_fill(void)
 
 			for (int offset = 0; offset < len; offset += header->size) {
 				uint32_t *report;
-				double previous_tick_per_period;
 
 				header = (void *) (buf + offset);
 				report = (void *) (header + 1);
@@ -2459,41 +2436,22 @@ test_buffer_fill(void)
 					break;
 				case DRM_I915_PERF_RECORD_SAMPLE:
 					igt_debug(" > report ts=%u"
-						  " ts_delta_last_periodic=%8u is_timer=%i ctx_id=%8x gpu_ticks=%u nb_periodic=%u\n",
+						  " ts_delta_last_periodic=%8u is_timer=%i ctx_id=%8x nb_periodic=%u\n",
 						  report[1],
 						  n_periodic_reports > 0 ? report[1] - last_periodic_report[1] : 0,
 						  oa_report_is_periodic(oa_exponent, report),
 						  oa_report_get_ctx_id(report),
-						  n_periodic_reports > 0 ? report[3] - last_periodic_report[3] : 0,
 						  n_periodic_reports);
 
 					if (first_timestamp == 0)
 						first_timestamp = report[1];
 					last_timestamp = report[1];
 
-					previous_tick_per_period = tick_per_period;
-
-					if (n_periodic_reports > 1 &&
-					    oa_report_is_periodic(oa_exponent, report)) {
-						tick_per_period =
-							oa_reports_tick_per_period(last_periodic_report,
-										   report);
-
-						if (!double_value_within(previous_tick_per_period,
-									 tick_per_period, 5))
-							igt_debug("clock change!\n");
-
+					if (oa_report_is_periodic(oa_exponent, report)) {
 						memcpy(last_periodic_report, report,
 						       sizeof(last_periodic_report));
+						n_periodic_reports++;
 					}
-
-					/* We want to measure only the periodic
-					 * reports, ctx-switch might inflate the
-					 * content of the buffer and skew or
-					 * measurement.
-					 */
-					n_periodic_reports +=
-						oa_report_is_periodic(oa_exponent, report);
 					break;
 				case DRM_I915_PERF_RECORD_OA_BUFFER_LOST:
 					igt_assert(!"unexpected overflow");
