@@ -557,6 +557,7 @@ static void draw_rect_blt(int fd, struct cmd_data *cmd_data,
 
 	intel_batchbuffer_flush(batch);
 	intel_batchbuffer_free(batch);
+	drm_intel_bo_unreference(dst);
 }
 
 static void draw_rect_render(int fd, struct cmd_data *cmd_data,
@@ -624,6 +625,8 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 		   rect->h, &dst_buf, adjusted_dst_x, rect->y);
 
 	intel_batchbuffer_free(batch);
+	drm_intel_bo_unreference(src);
+	drm_intel_bo_unreference(dst);
 	gem_close(fd, tmp.handle);
 }
 
