@@ -830,7 +830,7 @@ static void psr_print_status(void)
 	igt_info("PSR status:\n%s\n", buf);
 }
 
-void drrs_set(unsigned int val)
+static void drrs_set(unsigned int val)
 {
 	char buf[2];
 	int ret;
