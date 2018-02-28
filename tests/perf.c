@@ -2562,7 +2562,6 @@ test_enable_disable(void)
 		struct drm_i915_perf_record_header *header;
 		uint32_t first_timestamp = 0, last_timestamp = 0;
 		uint32_t last_periodic_report[64];
-		double tick_per_period;
 
 		/* Giving enough time for an overflow might help catch whether
 		 * the OA unit has been enabled even if the driver might at
@@ -2599,7 +2598,6 @@ test_enable_disable(void)
 
 			for (int offset = 0; offset < len; offset += header->size) {
 				uint32_t *report;
-				double previous_tick_per_period;
 
 				header = (void *) (buf + offset);
 				report = (void *) (header + 1);
@@ -2612,38 +2610,27 @@ test_enable_disable(void)
 						first_timestamp = report[1];
 					last_timestamp = report[1];
 
-					previous_tick_per_period = tick_per_period;
+					igt_debug(" > report ts=%8x"
+						  " ts_delta_last_periodic=%s%8u"
+						  " is_timer=%i ctx_id=0x%8x\n",
+						  report[1],
+						  oa_report_is_periodic(oa_exponent, report) ? " " : "*",
+						  n_periodic_reports > 0 ? (report[1] - last_periodic_report[1]) : 0,
+						  oa_report_is_periodic(oa_exponent, report),
+						  oa_report_get_ctx_id(report));
 
-					if (n_periodic_reports > 0 &&
-					    oa_report_is_periodic(oa_exponent, report)) {
-						tick_per_period =
-							oa_reports_tick_per_period(last_periodic_report,
-										   report);
-
-						if (!double_value_within(tick_per_period,
-									 previous_tick_per_period, 5))
-							igt_debug("clock change!\n");
-
-						igt_debug(" > report ts=%u"
-							  " ts_delta_last_periodic=%8u is_timer=%i ctx_id=%8x gpu_ticks=%u nb_periodic=%u\n",
-							  report[1],
-							  report[1] - last_periodic_report[1],
-							  oa_report_is_periodic(oa_exponent, report),
-							  oa_report_get_ctx_id(report),
-							  report[3] - last_periodic_report[3],
-							  n_periodic_reports);
-
+					if (oa_report_is_periodic(oa_exponent, report)) {
 						memcpy(last_periodic_report, report,
 						       sizeof(last_periodic_report));
-					}
 
-					/* We want to measure only the periodic
-					 * reports, ctx-switch might inflate the
-					 * content of the buffer and skew or
-					 * measurement.
-					 */
-					n_periodic_reports +=
-						oa_report_is_periodic(oa_exponent, report);
+						/* We want to measure only the
+						 * periodic reports, ctx-switch
+						 * might inflate the content of
+						 * the buffer and skew or
+						 * measurement.
+						 */
+						n_periodic_reports++;
+					}
 					break;
 				case DRM_I915_PERF_RECORD_OA_BUFFER_LOST:
 					igt_assert(!"unexpected overflow");
