@@ -1726,6 +1726,7 @@ test_oa_exponents(void)
 		int buf_size = sample_size * max_reports * 1.5;
 		uint8_t *buf = calloc(1, buf_size);
 		int ret, n_timer_reports = 0;
+		uint32_t matches = 0;
 		struct {
 			uint32_t report[64];
 		} timer_reports[30];
@@ -1785,7 +1786,6 @@ test_oa_exponents(void)
 		igt_debug("report%04i ts=%08x hw_id=0x%08x\n", 0,
 			  timer_reports[0].report[1],
 			  oa_report_get_ctx_id(timer_reports[0].report));
-		uint32_t matches = 0;
 		for (int i = 1; i < n_timer_reports; i++) {
 			uint32_t delta =
 				timer_reports[i].report[1] - timer_reports[i - 1].report[1];
