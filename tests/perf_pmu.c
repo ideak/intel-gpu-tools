@@ -168,6 +168,7 @@ static unsigned int e2ring(int gem_fd, const struct intel_execution_engine2 *e)
 #define TEST_TRAILING_IDLE (4)
 #define TEST_RUNTIME_PM (8)
 #define FLAG_LONG (16)
+#define FLAG_HANG (32)
 
 static void end_spin(int fd, igt_spin_t *spin, unsigned int flags)
 {
@@ -204,11 +205,35 @@ single(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 		end_spin(gem_fd, spin, flags);
 	val = pmu_read_single(fd) - val;
 
-	end_spin(gem_fd, spin, FLAG_SYNC);
+	if (flags & FLAG_HANG)
+		igt_force_gpu_reset(gem_fd);
+	else
+		end_spin(gem_fd, spin, FLAG_SYNC);
+
+	assert_within_epsilon(val, flags & TEST_BUSY ? slept : 0.f, tolerance);
+
+	/* Check for idle after hang. */
+	if (flags & FLAG_HANG) {
+		/* Sleep for a bit for reset unwind to settle. */
+		usleep(500e3);
+		/*
+		 * Ensure batch was executing before reset, meaning it must be
+		 * idle by now. Unless it did not even manage to start before we
+		 * triggered the reset, in which case the idleness check below
+		 * might fail. The latter is very unlikely since there are two
+		 * sleeps during which it had an opportunity to start.
+		 */
+		igt_assert(!gem_bo_busy(gem_fd, spin->handle));
+		val = pmu_read_single(fd);
+		slept = measured_usleep(batch_duration_ns / 1000);
+		val = pmu_read_single(fd) - val;
+
+		assert_within_epsilon(val, 0, tolerance);
+	}
+
 	igt_spin_batch_free(gem_fd, spin);
 	close(fd);
 
-	assert_within_epsilon(val, flags & TEST_BUSY ? slept : 0.f, tolerance);
 	gem_quiescent_gpu(gem_fd);
 }
 
@@ -1690,6 +1715,9 @@ igt_main
 					      pct[i], e->name)
 					accuracy(fd, e, pct[i]);
 			}
+
+			igt_subtest_f("busy-hang-%s", e->name)
+				single(fd, e, TEST_BUSY | FLAG_HANG);
 		}
 
 		/**
