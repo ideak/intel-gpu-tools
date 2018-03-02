@@ -276,6 +276,7 @@ igt_hang_t igt_hang_ctx(int fd,
 	uint32_t b[16];
 	unsigned ban;
 	unsigned len;
+	int gen;
 
 	igt_require_hang_ring(fd, ring);
 
@@ -310,12 +311,26 @@ igt_hang_t igt_hang_ctx(int fd,
 
 	memset(b, 0xc5, sizeof(b));
 
-	len = 2;
-	if (intel_gen(intel_get_drm_devid(fd)) >= 8)
+	len = 0;
+	gen = intel_gen(intel_get_drm_devid(fd));
+	if (gen >= 8) {
+		b[len++] = MI_BATCH_BUFFER_START | 1 << 8 | 1;
+		b[len++] = 0;
+		b[len++] = 0;
+	} else if (gen >= 6) {
+		b[len++] = MI_BATCH_BUFFER_START | 1 << 8;
+		b[len++] = 0;
+	} else {
+		b[len++] = MI_BATCH_BUFFER_START | 2 << 6;
+		b[len] = 0;
+		if (gen < 4) {
+			b[len] |= 1;
+			reloc.delta = 1;
+		}
 		len++;
-	b[0] = MI_BATCH_BUFFER_START | (len - 2);
-	b[len] = MI_BATCH_BUFFER_END;
-	b[len+1] = MI_NOOP;
+	}
+	b[len++] = MI_BATCH_BUFFER_END;
+	b[len] = MI_NOOP;
 	gem_write(fd, exec.handle, 0, b, sizeof(b));
 
 	reloc.offset = sizeof(uint32_t);
@@ -364,8 +379,7 @@ void igt_post_hang_ring(int fd, igt_hang_t arg)
 	if (arg.handle == 0)
 		return;
 
-	gem_set_domain(fd, arg.handle,
-		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	gem_sync(fd, arg.handle);
 	gem_close(fd, arg.handle);
 
 	context_set_ban(fd, arg.ctx, arg.ban);
