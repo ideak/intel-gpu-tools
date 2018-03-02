@@ -311,6 +311,7 @@ void __igt_fail_assert(const char *domain, const char *file,
 		       const char *format, ...)
 	__attribute__((noreturn));
 void igt_exit(void) __attribute__((noreturn));
+void igt_fatal_error(void) __attribute__((noreturn));
 
 /**
  * igt_ignore_warn:

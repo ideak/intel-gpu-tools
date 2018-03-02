@@ -35,6 +35,8 @@ lib_source_list =	 	\
 	igt_stats.h		\
 	igt_sysfs.c		\
 	igt_sysfs.h		\
+	igt_sysrq.c		\
+	igt_sysrq.h		\
 	igt_x86.h		\
 	igt_x86.c		\
 	igt_vgem.c		\

@@ -990,6 +990,7 @@ static void cpu_hotplug(int gem_fd)
 	int link[2];
 	int fd, ret;
 	int cur = 0;
+	char buf;
 
 	igt_skip_on(IS_BROXTON(intel_get_drm_devid(gem_fd)));
 	igt_require(cpu0_hotplug_support());
@@ -1036,9 +1037,32 @@ static void cpu_hotplug(int gem_fd)
 			}
 
 			/* Offline followed by online a CPU. */
-			igt_assert_eq(write(cpufd, "0", 2), 2);
+
+			ret = write(cpufd, "0", 2);
+			if (ret < 0) {
+				/*
+				 * If we failed to offline a CPU we don't want
+				 * to proceed.
+				 */
+				igt_warn("Failed to offline cpu%u! (%d)\n",
+					 cpu, errno);
+				igt_assert_eq(write(link[1], "s", 1), 1);
+				break;
+			}
+
 			usleep(1e6);
-			igt_assert_eq(write(cpufd, "1", 2), 2);
+
+			ret = write(cpufd, "1", 2);
+			if (ret < 0) {
+				/*
+				 * Failed to bring a CPU back online is fatal
+				 * for the sanity of a test run so stop further
+				 * testing.
+				 */
+				igt_warn("Failed to online cpu%u! (%d)\n",
+					 cpu, errno);
+				igt_fatal_error();
+			}
 
 			close(cpufd);
 			cpu++;
@@ -1052,15 +1076,12 @@ static void cpu_hotplug(int gem_fd)
 	 * until the CPU core shuffler finishes one loop.
 	 */
 	for (;;) {
-		char buf;
-		int ret2;
-
 		usleep(500e3);
 		end_spin(gem_fd, spin[cur], 0);
 
 		/* Check if the child is signaling completion. */
-		ret2 = read(link[0], &buf, 1);
-		if ( ret2 == 1 || (ret2 < 0 && errno != EAGAIN))
+		ret = read(link[0], &buf, 1);
+		if ( ret == 1 || (ret < 0 && errno != EAGAIN))
 			break;
 
 		igt_spin_batch_free(gem_fd, spin[cur]);
@@ -1078,6 +1099,9 @@ static void cpu_hotplug(int gem_fd)
 	igt_waitchildren();
 	close(fd);
 	close(link[0]);
+
+	/* Skip if child signals a problem with offlining a CPU. */
+	igt_skip_on(buf == 's');
 
 	assert_within_epsilon(val, ts[1] - ts[0], tolerance);
 }

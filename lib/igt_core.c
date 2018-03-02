@@ -70,6 +70,7 @@
 #include "igt_core.h"
 #include "igt_aux.h"
 #include "igt_sysfs.h"
+#include "igt_sysrq.h"
 #include "igt_rc.h"
 
 #define UNW_LOCAL_ONLY
@@ -1135,6 +1136,28 @@ void igt_fail(int exitcode)
 		igt_exit();
 	}
 }
+
+/**
+ * igt_fatal_error: Stop test execution on fatal errors
+ *
+ * Stop test execution or optionally, if the IGT_REBOOT_ON_FATAL_ERROR
+ * environment variable is set, reboot the machine.
+ *
+ * Since out test runner (piglit) does support fatal test exit codes, we
+ * implement the default behaviour by waiting endlessly.
+ */
+void  __attribute__((noreturn)) igt_fatal_error(void)
+{
+	if (igt_check_boolean_env_var("IGT_REBOOT_ON_FATAL_ERROR", false)) {
+		igt_warn("FATAL ERROR - REBOOTING\n");
+		igt_sysrq_reboot();
+	} else {
+		igt_warn("FATAL ERROR\n");
+		for (;;)
+			pause();
+	}
+}
+
 
 /**
  * igt_can_fail:
