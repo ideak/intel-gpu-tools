@@ -63,6 +63,46 @@ enum {
 /* Remember to fix this if adding longer strings */
 #define MAX_POLICY_STRLEN	strlen(MAX_PERFORMANCE_STR)
 
+static char __igt_pm_audio_runtime_power_save[64];
+static char __igt_pm_audio_runtime_control[64];
+
+static void __igt_pm_audio_runtime_exit_handler(int sig)
+{
+	int fd;
+
+	igt_debug("Restoring audio power management to '%s' and '%s'\n",
+		  __igt_pm_audio_runtime_power_save,
+		  __igt_pm_audio_runtime_control);
+
+	fd = open("/sys/module/snd_hda_intel/parameters/power_save", O_WRONLY);
+	if (fd < 0)
+		return;
+	if (write(fd, __igt_pm_audio_runtime_power_save,
+		  strlen(__igt_pm_audio_runtime_power_save)) !=
+	    strlen(__igt_pm_audio_runtime_power_save))
+		igt_warn("Failed to restore audio power_save to '%s'\n",
+			 __igt_pm_audio_runtime_power_save);
+	close(fd);
+
+	fd = open("/sys/bus/pci/devices/0000:00:03.0/power/control", O_WRONLY);
+	if (fd < 0)
+		return;
+	if (write(fd, __igt_pm_audio_runtime_control,
+		  strlen(__igt_pm_audio_runtime_control)) !=
+	    strlen(__igt_pm_audio_runtime_control))
+		igt_warn("Failed to restore audio control to '%s'\n",
+			 __igt_pm_audio_runtime_control);
+	close(fd);
+}
+
+static void strchomp(char *str)
+{
+	int len = strlen(str);
+
+	if (len && str[len - 1] == '\n')
+		str[len - 1] = 0;
+}
+
 /**
  * igt_pm_enable_audio_runtime_pm:
  *
@@ -78,16 +118,32 @@ void igt_pm_enable_audio_runtime_pm(void)
 {
 	int fd;
 
-	fd = open("/sys/module/snd_hda_intel/parameters/power_save", O_WRONLY);
+	/* Check if already enabled. */
+	if (__igt_pm_audio_runtime_power_save[0])
+		return;
+
+	fd = open("/sys/module/snd_hda_intel/parameters/power_save", O_RDWR);
 	if (fd >= 0) {
+		igt_assert(read(fd, __igt_pm_audio_runtime_power_save,
+				sizeof(__igt_pm_audio_runtime_power_save)) > 0);
+		strchomp(__igt_pm_audio_runtime_power_save);
+		igt_install_exit_handler(__igt_pm_audio_runtime_exit_handler);
 		igt_assert_eq(write(fd, "1\n", 2), 2);
 		close(fd);
 	}
-	fd = open("/sys/bus/pci/devices/0000:00:03.0/power/control", O_WRONLY);
+	fd = open("/sys/bus/pci/devices/0000:00:03.0/power/control", O_RDWR);
 	if (fd >= 0) {
+		igt_assert(read(fd, __igt_pm_audio_runtime_control,
+				sizeof(__igt_pm_audio_runtime_control)) > 0);
+		strchomp(__igt_pm_audio_runtime_control);
 		igt_assert_eq(write(fd, "auto\n", 5), 5);
 		close(fd);
 	}
+
+	igt_debug("Saved audio power management as '%s' and '%s'\n",
+		  __igt_pm_audio_runtime_power_save,
+		  __igt_pm_audio_runtime_control);
+
 	/* Give some time for it to react. */
 	sleep(1);
 }
@@ -238,6 +294,38 @@ void igt_pm_restore_sata_link_power_management(int8_t *pm_data)
 /* We just leak this on exit ... */
 int pm_status_fd = -1;
 
+static char __igt_pm_runtime_autosuspend[64];
+static char __igt_pm_runtime_control[64];
+
+static void __igt_pm_runtime_exit_handler(int sig)
+{
+	int fd;
+
+	igt_debug("Restoring runtime management to '%s' and '%s'\n",
+		  __igt_pm_runtime_autosuspend,
+		  __igt_pm_runtime_control);
+
+	fd = open(POWER_DIR "/autosuspend_delay_ms", O_WRONLY);
+	if (fd < 0)
+		return;
+	if (write(fd, __igt_pm_runtime_autosuspend,
+		  strlen(__igt_pm_runtime_autosuspend)) !=
+	    strlen(__igt_pm_runtime_autosuspend))
+		igt_warn("Failed to restore runtime pm autosuspend delay to '%s'\n",
+			 __igt_pm_runtime_autosuspend);
+	close(fd);
+
+	fd = open(POWER_DIR "/control", O_WRONLY);
+	if (fd < 0)
+		return;
+	if (write(fd, __igt_pm_runtime_control,
+		  strlen(__igt_pm_runtime_control)) !=
+	    strlen(__igt_pm_runtime_control))
+		igt_warn("Failed to restore runtime pm control to '%s'\n",
+			 __igt_pm_runtime_control);
+	close(fd);
+}
+
 /**
  * igt_setup_runtime_pm:
  *
@@ -261,12 +349,29 @@ bool igt_setup_runtime_pm(void)
 	/* Our implementation uses autosuspend. Try to set it to 0ms so the test
 	 * suite goes faster and we have a higher probability of triggering race
 	 * conditions. */
-	fd = open(POWER_DIR "/autosuspend_delay_ms", O_WRONLY);
+	fd = open(POWER_DIR "/autosuspend_delay_ms", O_RDWR);
 	igt_assert_f(fd >= 0,
 		     "Can't open " POWER_DIR "/autosuspend_delay_ms\n");
 
-	/* If we fail to write to the file, it means this system doesn't support
-	 * runtime PM. */
+	/*
+	 * Save previous values to be able to  install exit handler to restore
+	 * them on test exit.
+	 */
+	size = read(fd, __igt_pm_runtime_autosuspend,
+		    sizeof(__igt_pm_runtime_autosuspend));
+
+	/*
+	 * If we fail to read from the file, it means this system doesn't
+	 * support runtime PM.
+	 */
+	if (size <= 0) {
+		close(fd);
+		return false;
+	}
+
+	strchomp(__igt_pm_runtime_autosuspend);
+	igt_install_exit_handler(__igt_pm_runtime_exit_handler);
+
 	size = write(fd, "0\n", 2);
 
 	close(fd);
@@ -277,6 +382,13 @@ bool igt_setup_runtime_pm(void)
 	/* We know we support runtime PM, let's try to enable it now. */
 	fd = open(POWER_DIR "/control", O_RDWR);
 	igt_assert_f(fd >= 0, "Can't open " POWER_DIR "/control\n");
+
+	igt_assert(read(fd, __igt_pm_runtime_control,
+			sizeof(__igt_pm_runtime_control)) > 0);
+	strchomp(__igt_pm_runtime_control);
+
+	igt_debug("Saved runtime power management as '%s' and '%s'\n",
+		  __igt_pm_runtime_autosuspend, __igt_pm_runtime_control);
 
 	size = write(fd, "auto\n", 5);
 	igt_assert(size == 5);
