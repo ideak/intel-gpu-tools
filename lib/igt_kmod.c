@@ -294,7 +294,7 @@ igt_i915_driver_load(const char *opts)
 		return IGT_EXIT_FAILURE;
 	}
 
-	kick_fbcon(true);
+	bind_fbcon(true);
 	igt_kmod_load("snd_hda_intel", NULL);
 
 	return IGT_EXIT_SUCCESS;
@@ -310,7 +310,7 @@ int
 igt_i915_driver_unload(void)
 {
 	/* unbind vt */
-	kick_fbcon(false);
+	bind_fbcon(false);
 
 	if (igt_kmod_is_loaded("snd_hda_intel")) {
 		igt_terminate_process(SIGTERM, "alsactl");

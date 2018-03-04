@@ -55,7 +55,7 @@ bool igt_sysfs_set_u32(int dir, const char *attr, uint32_t value);
 bool igt_sysfs_get_boolean(int dir, const char *attr);
 bool igt_sysfs_set_boolean(int dir, const char *attr, bool value);
 
-void kick_fbcon(bool enable);
+void bind_fbcon(bool enable);
 void kick_snd_hda_intel(void);
 
 #endif /* __IGT_SYSFS_H__ */

@@ -517,7 +517,7 @@ bool igt_exit_called;
 static void common_exit_handler(int sig)
 {
 	if (!igt_only_list_subtests()) {
-		kick_fbcon(true);
+		bind_fbcon(true);
 	}
 
 	/* When not killed by a signal check that igt_exit() has been properly
@@ -802,7 +802,7 @@ out:
 		exit(ret == -1 ? 0 : IGT_EXIT_INVALID);
 
 	if (!list_subtests) {
-		kick_fbcon(false);
+		bind_fbcon(false);
 		igt_kmsg(KMSG_INFO "%s: executing\n", command_str);
 		print_version();
 

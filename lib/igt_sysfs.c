@@ -546,13 +546,13 @@ static void bind_con(const char *name, bool enable)
 }
 
 /**
- * kick_fbcon:
+ * bind_fbcon:
  * @enable: boolean value
  *
  * This functions enables/disables the text console running on top of the
  * framebuffer device.
  */
-void kick_fbcon(bool enable)
+void bind_fbcon(bool enable)
 {
 	/*
 	 * The vtcon bind interface seems somewhat broken. Possibly
