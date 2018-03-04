@@ -503,14 +503,7 @@ bool igt_sysfs_set_boolean(int dir, const char *attr, bool value)
 	return igt_sysfs_printf(dir, attr, "%d", value) == 1;
 }
 
-/**
- * kick_fbcon:
- * @enable: boolean value
- *
- * This functions enables/disables the text console running on top of the
- * framebuffer device.
- */
-void kick_fbcon(bool enable)
+static void bind_con(const char *name, bool enable)
 {
 	const char *path = "/sys/class/vtconsole";
 	DIR *dir;
@@ -538,18 +531,37 @@ void kick_fbcon(bool enable)
 		if (len >= 0)
 			buf[len] = '\0';
 
-		if (!strstr(buf, enable ? "dummy device" :
-			    "frame buffer device"))
+		if (!strstr(buf, name))
 			continue;
 
 		sprintf(buf, "%s/%s/bind", path, de->d_name);
 		fd = open(buf, O_WRONLY);
 		if (fd != -1) {
-			igt_ignore_warn(write(fd, "0\n", 2));
+			igt_ignore_warn(write(fd, enable ? "1\n" : "0\n", 2));
 			close(fd);
 		}
+		break;
 	}
 	closedir(dir);
+}
+
+/**
+ * kick_fbcon:
+ * @enable: boolean value
+ *
+ * This functions enables/disables the text console running on top of the
+ * framebuffer device.
+ */
+void kick_fbcon(bool enable)
+{
+	/*
+	 * The vtcon bind interface seems somewhat broken. Possibly
+	 * depending on the order the console drivers have been
+	 * registered you either have to unbind the old driver,
+	 * or bind the new driver. Let's do both.
+	 */
+	bind_con("dummy device", !enable);
+	bind_con("frame buffer device", enable);
 }
 
 /**
