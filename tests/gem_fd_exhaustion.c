@@ -65,7 +65,7 @@ igt_simple_main
 		igt_drop_root();
 
 		for (int i = 0; ; i++) {
-			int leak = dup(fd);
+			int leak = open("/dev/null", O_RDONLY);
 			uint32_t handle;
 
 			if (__gem_create(fd, 4096, &handle) == 0)
@@ -73,6 +73,8 @@ igt_simple_main
 
 			if (leak < 0) {
 				igt_info("fd exhaustion after %i rounds.\n", i);
+				igt_assert(__gem_create(fd, 4096,
+							&handle) < 0);
 				break;
 			}
 		}
