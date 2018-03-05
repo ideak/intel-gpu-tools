@@ -551,9 +551,9 @@ static void test_keep_in_fence(int fd, unsigned int engine, unsigned int flags)
 
 	sigaction(SIGALRM, &sa, NULL);
 	itv.it_interval.tv_sec = 0;
-	itv.it_interval.tv_usec = 100;
+	itv.it_interval.tv_usec = 1000;
 	itv.it_value.tv_sec = 0;
-	itv.it_value.tv_usec = 1000;
+	itv.it_value.tv_usec = 10000;
 	setitimer(ITIMER_REAL, &itv, NULL);
 
 	execbuf.flags |= LOCAL_EXEC_FENCE_IN;

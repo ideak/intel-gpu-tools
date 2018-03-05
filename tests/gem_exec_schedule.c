@@ -833,9 +833,9 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 
 	sigaction(SIGALRM, &sa, NULL);
 	itv.it_interval.tv_sec = 0;
-	itv.it_interval.tv_usec = 100;
+	itv.it_interval.tv_usec = 1000;
 	itv.it_value.tv_sec = 0;
-	itv.it_value.tv_usec = 1000;
+	itv.it_value.tv_usec = 10000;
 	setitimer(ITIMER_REAL, &itv, NULL);
 
 	last = -1;

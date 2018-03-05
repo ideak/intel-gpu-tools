@@ -31,6 +31,18 @@
 #include "ioctl_wrappers.h"
 #include "igt_dummyload.h"
 
+static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err;
+
+	err = 0;
+	if (ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf))
+		err = -errno;
+
+	errno = 0;
+	return err;
+}
+
 static void alarm_handler(int sig)
 {
 }
@@ -81,15 +93,15 @@ gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags f
 
 	sigaction(SIGALRM, &sa, &old_sa);
 	itv.it_interval.tv_sec = 0;
-	itv.it_interval.tv_usec = 100;
+	itv.it_interval.tv_usec = 1000;
 	itv.it_value.tv_sec = 0;
-	itv.it_value.tv_usec = 1000;
+	itv.it_value.tv_usec = 10000;
 	setitimer(ITIMER_REAL, &itv, NULL);
 
 	last = -1;
 	count = 0;
 	do {
-		if (ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf) == 0) {
+		if (__execbuf(fd, &execbuf) == 0) {
 			count++;
 			continue;
 		}
@@ -99,6 +111,8 @@ gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags f
 
 		last = count;
 	} while (1);
+
+	igt_assert_eq(__execbuf(fd, &execbuf), -EINTR);
 
 	memset(&itv, 0, sizeof(itv));
 	setitimer(ITIMER_REAL, &itv, NULL);
