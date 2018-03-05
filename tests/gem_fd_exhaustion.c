@@ -33,17 +33,44 @@
 #include <fcntl.h>
 #include <limits.h>
 
+unsigned int original_nr_open;
+
+static int read_sysctl(const char *path)
+{
+	unsigned int val;
+	FILE *f = fopen(path, "r");
+
+	if (f) {
+		igt_assert(fscanf(f, "%u", &val) == 1);
+		fclose(f);
+		return val;
+	}
+	return -errno;
+}
+
+static int write_sysctl(const char *path, unsigned int val)
+{
+	FILE *f = fopen(path, "w");
+
+	if (f) {
+		igt_assert(fprintf(f, "%u", val));
+		fclose(f);
+		return 0;
+	}
+	return -errno;
+}
+
 static bool allow_unlimited_files(void)
 {
+	unsigned int nofile_rlim = 1024*1024;
 	struct rlimit rlim;
-	unsigned nofile_rlim = 1024*1024;
+	unsigned int buf;
 
-	FILE *file = fopen("/proc/sys/fs/file-max", "r");
-	if (file) {
-		igt_assert(fscanf(file, "%u", &nofile_rlim) == 1);
-		igt_info("System limit for open files is %u\n", nofile_rlim);
-		fclose(file);
-	}
+	buf = read_sysctl("/proc/sys/fs/file-max");
+	if (buf > 0)
+		nofile_rlim = buf;
+	original_nr_open = read_sysctl("/proc/sys/fs/nr_open");
+	igt_assert(write_sysctl("/proc/sys/fs/nr_open", nofile_rlim) == 0);
 
 	if (getrlimit(RLIMIT_NOFILE, &rlim))
 		return false;
@@ -53,6 +80,12 @@ static bool allow_unlimited_files(void)
 	return setrlimit(RLIMIT_NOFILE, &rlim) == 0;
 }
 
+static void restore_original_sysctl(void)
+{
+	if (original_nr_open > 0)
+		write_sysctl("/proc/sys/fs/nr_open", original_nr_open);
+}
+
 igt_simple_main
 {
 	int fd;
@@ -60,6 +93,8 @@ igt_simple_main
 	igt_require(allow_unlimited_files());
 
 	fd = drm_open_driver(DRIVER_INTEL);
+
+	igt_install_exit_handler(restore_original_sysctl);
 
 	igt_fork(n, 1) {
 		igt_drop_root();
