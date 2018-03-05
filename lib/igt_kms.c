@@ -159,39 +159,39 @@ const unsigned char* igt_kms_get_base_edid(void)
 #include "igt_edid_template.h"
 
 const char * const igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
-	"SRC_X",
-	"SRC_Y",
-	"SRC_W",
-	"SRC_H",
-	"CRTC_X",
-	"CRTC_Y",
-	"CRTC_W",
-	"CRTC_H",
-	"FB_ID",
-	"CRTC_ID",
-	"IN_FENCE_FD",
-	"type",
-	"rotation",
-	"IN_FORMATS",
+	[IGT_PLANE_SRC_X] = "SRC_X",
+	[IGT_PLANE_SRC_Y] = "SRC_Y",
+	[IGT_PLANE_SRC_W] = "SRC_W",
+	[IGT_PLANE_SRC_H] = "SRC_H",
+	[IGT_PLANE_CRTC_X] = "CRTC_X",
+	[IGT_PLANE_CRTC_Y] = "CRTC_Y",
+	[IGT_PLANE_CRTC_W] = "CRTC_W",
+	[IGT_PLANE_CRTC_H] = "CRTC_H",
+	[IGT_PLANE_FB_ID] = "FB_ID",
+	[IGT_PLANE_CRTC_ID] = "CRTC_ID",
+	[IGT_PLANE_IN_FENCE_FD] = "IN_FENCE_FD",
+	[IGT_PLANE_TYPE] = "type",
+	[IGT_PLANE_ROTATION] = "rotation",
+	[IGT_PLANE_IN_FORMATS] = "IN_FORMATS",
 };
 
 const char * const igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
-	"background_color",
-	"CTM",
-	"GAMMA_LUT",
-	"GAMMA_LUT_SIZE",
-	"DEGAMMA_LUT",
-	"DEGAMMA_LUT_SIZE",
-	"MODE_ID",
-	"ACTIVE",
-	"OUT_FENCE_PTR"
+	[IGT_CRTC_BACKGROUND] = "background_color",
+	[IGT_CRTC_CTM] = "CTM",
+	[IGT_CRTC_GAMMA_LUT] = "GAMMA_LUT",
+	[IGT_CRTC_GAMMA_LUT_SIZE] = "GAMMA_LUT_SIZE",
+	[IGT_CRTC_DEGAMMA_LUT] = "DEGAMMA_LUT",
+	[IGT_CRTC_DEGAMMA_LUT_SIZE] = "DEGAMMA_LUT_SIZE",
+	[IGT_CRTC_MODE_ID] = "MODE_ID",
+	[IGT_CRTC_ACTIVE] = "ACTIVE",
+	[IGT_CRTC_OUT_FENCE_PTR] = "OUT_FENCE_PTR",
 };
 
 const char * const igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
-	"scaling mode",
-	"CRTC_ID",
-	"DPMS",
-	"Broadcast RGB"
+	[IGT_CONNECTOR_SCALING_MODE] = "scaling mode",
+	[IGT_CONNECTOR_CRTC_ID] = "CRTC_ID",
+	[IGT_CONNECTOR_DPMS] = "DPMS",
+	[IGT_CONNECTOR_BROADCAST_RGB] = "Broadcast RGB",
 };
 
 /*
