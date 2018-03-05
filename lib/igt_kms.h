@@ -113,7 +113,7 @@ enum igt_atomic_crtc_properties {
  * igt_crtc_prop_names contains a list of crtc property names,
  * as indexed by the igt_atomic_crtc_properties enum.
  */
-extern const char *igt_crtc_prop_names[];
+extern const char * const igt_crtc_prop_names[];
 
 enum igt_atomic_connector_properties {
        IGT_CONNECTOR_SCALING_MODE = 0,
@@ -129,7 +129,7 @@ enum igt_atomic_connector_properties {
  * igt_connector_prop_names contains a list of crtc property names,
  * as indexed by the igt_atomic_connector_properties enum.
  */
-extern const char *igt_connector_prop_names[];
+extern const char * const igt_connector_prop_names[];
 
 struct kmstest_connector_config {
 	drmModeCrtc *crtc;
@@ -272,7 +272,7 @@ enum igt_atomic_plane_properties {
  * igt_plane_prop_names contains a list of crtc property names,
  * as indexed by the igt_atomic_plane_properties enum.
  */
-extern const char *igt_plane_prop_names[];
+extern const char * const igt_plane_prop_names[];
 
 typedef struct igt_display igt_display_t;
 typedef struct igt_pipe igt_pipe_t;

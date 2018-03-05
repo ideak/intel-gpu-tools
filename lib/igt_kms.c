@@ -158,7 +158,7 @@ const unsigned char* igt_kms_get_base_edid(void)
 #define EDID_NAME alt_edid
 #include "igt_edid_template.h"
 
-const char *igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
+const char * const igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	"SRC_X",
 	"SRC_Y",
 	"SRC_W",
@@ -175,7 +175,7 @@ const char *igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	"IN_FORMATS",
 };
 
-const char *igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
+const char * const igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
 	"background_color",
 	"CTM",
 	"GAMMA_LUT",
@@ -187,7 +187,7 @@ const char *igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
 	"OUT_FENCE_PTR"
 };
 
-const char *igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
+const char * const igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	"scaling mode",
 	"CRTC_ID",
 	"DPMS",
@@ -200,7 +200,7 @@ const char *igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
  */
 static void
 igt_fill_plane_props(igt_display_t *display, igt_plane_t *plane,
-		     int num_props, const char **prop_names)
+		     int num_props, const char * const prop_names[])
 {
 	drmModeObjectPropertiesPtr props;
 	int i, j, fd;
@@ -234,7 +234,7 @@ igt_fill_plane_props(igt_display_t *display, igt_plane_t *plane,
  */
 static void
 igt_atomic_fill_connector_props(igt_display_t *display, igt_output_t *output,
-			int num_connector_props, const char **conn_prop_names)
+			int num_connector_props, const char * const conn_prop_names[])
 {
 	drmModeObjectPropertiesPtr props;
 	int i, j, fd;
@@ -264,7 +264,7 @@ igt_atomic_fill_connector_props(igt_display_t *display, igt_output_t *output,
 
 static void
 igt_fill_pipe_props(igt_display_t *display, igt_pipe_t *pipe,
-		    int num_crtc_props, const char **crtc_prop_names)
+		    int num_crtc_props, const char * const crtc_prop_names[])
 {
 	drmModeObjectPropertiesPtr props;
 	int i, j, fd;
@@ -324,7 +324,9 @@ const unsigned char* igt_kms_get_alt_edid(void)
  */
 const char *kmstest_pipe_name(enum pipe pipe)
 {
-	const char *str[] = { "A", "B", "C", "D", "E", "F"};
+	static const char * const str[] = {
+		"A", "B", "C", "D", "E", "F",
+	};
 
 	if (pipe == PIPE_NONE)
 		return "None";
@@ -367,7 +369,7 @@ int kmstest_pipe_to_index(char pipe)
  */
 const char *kmstest_plane_type_name(int plane_type)
 {
-	static const char *names[] = {
+	static const char * const names[] = {
 		[DRM_PLANE_TYPE_OVERLAY] = "overlay",
 		[DRM_PLANE_TYPE_PRIMARY] = "primary",
 		[DRM_PLANE_TYPE_CURSOR] = "cursor",
