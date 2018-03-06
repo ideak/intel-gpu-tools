@@ -508,6 +508,7 @@ foreach my $key (keys %db) {
 }
 
 # Fix up incompletes
+my $key_count = scalar(keys %db);
 foreach my $key (keys %db) {
 	next unless exists $db{$key}->{'incomplete'};
 
@@ -522,7 +523,7 @@ foreach my $key (keys %db) {
 		$next_key = db_key($ring, $ctx, $seqno + $i);
 		$i++;
 	} until ((exists $db{$next_key} and not exists $db{$next_key}->{'incomplete'})
-		 or $i > scalar(keys(%db)));  # ugly stop hack
+		 or $i > $key_count);  # ugly stop hack
 
 	if (exists $db{$next_key}) {
 		$db{$key}->{'notify'} = $db{$next_key}->{'end'};
@@ -540,6 +541,8 @@ my $first_ts;
 
 my @sorted_keys = sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db;
 my $re_sort = 0;
+
+die "Database changed size?!" unless scalar(@sorted_keys) == $key_count;
 
 foreach my $key (@sorted_keys) {
 	my $ring = $db{$key}->{'ring'};
@@ -565,7 +568,7 @@ foreach my $key (@sorted_keys) {
 		do {
 			$next_key = db_key($ring, $ctx, $seqno + $i);
 			$i++;
-		} until (exists $db{$next_key} or $i > scalar(keys(%db)));  # ugly stop hack
+		} until (exists $db{$next_key} or $i > $key_count);  # ugly stop hack
 
 		# 20us tolerance
 		if (exists $db{$next_key} and $db{$next_key}->{'start'} < $start + 20) {
