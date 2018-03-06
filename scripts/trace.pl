@@ -596,7 +596,8 @@ foreach my $key (@sorted_keys) {
 	$db{$key}->{'submit-delay'} = $db{$key}->{'submit'} - $db{$key}->{'queue'};
 	$db{$key}->{'duration'} = $notify - $start;
 
-	$running{$ring} += $end - $start unless exists $db{$key}->{'no-end'};
+	$running{$ring} += $end - $start if $correct_durations or
+					    not exists $db{$key}->{'no-end'};
 	$runnable{$ring} += $db{$key}->{'execute-delay'};
 	$queued{$ring} += $start - $db{$key}->{'execute-delay'} - $db{$key}->{'queue'};
 
