@@ -432,16 +432,11 @@ while (<>) {
 		die if exists $db{$key}->{'end'};
 
 		$db{$key}->{'end'} = $time;
-		if (exists $notify{$gkey}) {
-			$db{$key}->{'notify'} = $notify{$gkey};
-		} else {
-			# No notify so far. Maybe it will arrive later which
-			# will be handled in the sanitation loop below.
-			$db{$key}->{'notify'} = $db{$key}->{'end'};
-			$db{$key}->{'no-notify'} = 1;
-		}
+		$db{$key}->{'notify'} = $notify{$gkey} if exists $notify{$gkey};
 	} elsif ($tp_name eq 'i915:intel_engine_notify:') {
-		$notify{global_key($ring, $seqno)} = $time;
+		my $gkey = global_key($ring, $seqno);
+
+		$notify{$gkey} = $time unless exists $notify{$gkey};
 	} elsif ($tp_name eq 'i915:intel_gpu_freq_change:') {
 		push @freqs, [$prev_freq_ts, $time, $prev_freq] if $prev_freq;
 		$prev_freq_ts = $time;
@@ -454,66 +449,116 @@ while (<>) {
 my $max_seqno = 0;
 foreach my $key (keys %db) {
 	my $gkey = global_key($db{$key}->{'ring'}, $db{$key}->{'global'});
-	my $notify = $notify{$gkey};
 
 	die unless exists $db{$key}->{'start'};
 
 	$max_seqno = $db{$key}->{'seqno'} if $db{$key}->{'seqno'} > $max_seqno;
 
-	unless (exists $db{$key}->{'end'}) {
-		# Context complete not received.
-		$db{$key}->{'no-end'} = 1;
+	# Notify arrived after context complete?
+	$db{$key}->{'notify'} = $notify{$gkey} if not exists $db{$key}->{'notify'}
+						  and exists $notify{$gkey};
 
-		if (defined($notify)) {
-			# No context complete due req merging - use notify.
-			$db{$key}->{'notify'} = $notify;
-			$db{$key}->{'end'} = $notify;
-		} else {
-			# No notify and no context complete - give up for now.
-			$db{$key}->{'incomplete'} = 1;
-		}
-	} else {
-		# Notify arrived after context complete.
-		if (exists $db{$key}->{'no-notify'} and defined($notify)) {
-			delete $db{$key}->{'no-notify'};
-			$db{$key}->{'notify'} = $notify;
-		}
+	# No notify but we have end?
+	$db{$key}->{'notify'} = $db{$key}->{'end'} if exists $db{$key}->{'end'} and
+						      not exists $db{$key}->{'notify'};
+
+	# If user interrupt arrived out of order push it back to be no later
+	# than request out.
+	if (exists $db{$key}->{'end'} and exists $db{$key}->{'notify'} and
+	    $db{$key}->{'notify'} > $db{$key}->{'end'}) {
+		$db{$key}->{'notify'} = $db{$key}->{'end'};
 	}
 }
 
-# Fix up incompletes
 my $key_count = scalar(keys %db);
-foreach my $key (keys %db) {
-	next unless exists $db{$key}->{'incomplete'};
 
-	# End the incomplete batch at the time next one starts
-	my $ring = $db{$key}->{'ring'};
-	my $ctx = $db{$key}->{'ctx'};
-	my $seqno = $db{$key}->{'seqno'};
-	my $next_key;
-	my $i = 1;
-	my $end;
+my %engine_timelines;
 
-	do {
-		$next_key = db_key($ring, $ctx, $seqno + $i);
-		$i++;
-	} until ((exists $db{$next_key} and not exists $db{$next_key}->{'incomplete'})
-		 or $i > $key_count);  # ugly stop hack
+sub sortEngine {
+	my $as = $db{$a}->{'global'};
+	my $bs = $db{$b}->{'global'};
+	my $val;
 
-	if (exists $db{$next_key}) {
-		$end = $db{$next_key}->{'end'};
-	} else {
-		# No info at all, fake it:
-		$end = $db{$key}->{'start'} + 999;
-	}
+	$val = $as <=> $bs;
 
-	$db{$key}->{'notify'} = $end;
-	$db{$key}->{'end'} = $end;
+	die if $val == 0;
+
+	return $val;
 }
 
-# GPU time accounting
-my (%running, %runnable, %queued, %batch_avg, %batch_total_avg, %batch_count);
-my (%submit_avg, %execute_avg, %ctxsave_avg);
+sub get_engine_timeline {
+	my ($ring) = @_;
+	my @timeline;
+
+	return $engine_timelines{$ring} if exists $engine_timelines{$ring};
+
+	@timeline = grep { $db{$_}->{'ring'} eq $ring } keys %db;
+	# FIXME seqno restart
+	@timeline = sort sortEngine @timeline;
+
+	$engine_timelines{$ring} = \@timeline;
+
+	return \@timeline;
+}
+
+# Fix up coalesced requests by ending them either when the following same
+# context request with known end ends, or when a different context starts.
+foreach my $gid (sort keys %rings) {
+	my $ring = $ringmap{$rings{$gid}};
+	my $timeline = get_engine_timeline($ring);
+	my $last_complete = -1;
+	my $last_ctx = -1;
+	my $complete;
+
+	foreach my $pos (0..$#{$timeline}) {
+		my $key = @{$timeline}[$pos];
+		my ($ctx, $end);
+
+		next if exists $db{$key}->{'end'};
+
+		$db{$key}->{'no-end'} = 1;
+		$ctx = $db{$key}->{'ctx'};
+
+		if ($pos > $last_complete or $ctx != $last_ctx) {
+			my $next = $pos;
+
+			undef $complete;
+
+			while ($next < $#{$timeline}) {
+				my $next_key = ${$timeline}[++$next];
+				if ($ctx == $db{$next_key}->{'ctx'} and
+				    exists $db{$next_key}->{'end'}) {
+					$last_ctx = $db{$next_key}->{'ctx'};
+					$last_complete = $next;
+					$complete = $next_key;
+					last;
+				}
+			}
+		}
+
+		if (defined $complete) {
+			if ($ctx == $db{$complete}->{'ctx'}) {
+				$end = $db{$complete}->{'end'};
+			} else {
+				$end = $db{$complete}->{'start'};
+			}
+		} else {
+			# No next submission. Use notify if available or give up.
+			if (exists $db{$key}->{'notify'}) {
+				$end = $db{$key}->{'notify'};
+			} else {
+				$end = $db{$key}->{'start'};
+				$db{$key}->{'incomplete'} = 1;
+			}
+		}
+
+		unless (exists $db{$key}->{'notify'}) {
+			$db{$key}->{'notify'} = $end;
+			$db{$key}->{'no-notify'} = 1;
+		}
+		$db{$key}->{'end'} = $end;
+	}
+}
 
 sub sortStart {
 	my $as = $db{$a}->{'start'};
@@ -562,6 +607,10 @@ foreach my $key (@sorted_keys) {
 
 @sorted_keys = sort sortStart keys %db if $re_sort;
 
+# GPU time accounting
+my (%running, %runnable, %queued, %batch_avg, %batch_total_avg, %batch_count);
+my (%submit_avg, %execute_avg, %ctxsave_avg);
+
 my $last_ts = 0;
 my $first_ts;
 my $min_ctx;
@@ -580,7 +629,11 @@ foreach my $key (@sorted_keys) {
 	$db{$key}->{'context-complete-delay'} = $end - $notify;
 	$db{$key}->{'execute-delay'} = $start - $db{$key}->{'submit'};
 	$db{$key}->{'submit-delay'} = $db{$key}->{'submit'} - $db{$key}->{'queue'};
-	$db{$key}->{'duration'} = $notify - $start;
+	unless (exists $db{$key}->{'no-notify'}) {
+		$db{$key}->{'duration'} = $notify - $start;
+	} else {
+		$db{$key}->{'duration'} = 0;
+	}
 
 	$running{$ring} += $end - $start if $correct_durations or
 					    not exists $db{$key}->{'no-end'};
