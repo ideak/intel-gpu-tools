@@ -62,13 +62,13 @@ Notes:
    The above will invoke perf record, or alternatively it can be done directly:
 
 	perf record -a -c 1 -e i915:intel_gpu_freq_change, \
-			       i915:i915_gem_request_add, \
-			       i915:i915_gem_request_submit, \
-			       i915:i915_gem_request_in, \
-			       i915:i915_gem_request_out, \
+			       i915:i915_request_add, \
+			       i915:i915_request_submit, \
+			       i915:i915_request_in, \
+			       i915:i915_request_out, \
 			       i915:intel_engine_notify, \
-			       i915:i915_gem_request_wait_begin, \
-			       i915:i915_gem_request_wait_end \
+			       i915:i915_request_wait_begin, \
+			       i915:i915_request_wait_end \
 			       [command-to-be-profiled]
 
    Then create the log file with:
@@ -169,13 +169,13 @@ sub arg_gpu_timeline
 sub arg_trace
 {
 	my @events = ( 'i915:intel_gpu_freq_change',
-		       'i915:i915_gem_request_add',
-		       'i915:i915_gem_request_submit',
-		       'i915:i915_gem_request_in',
-		       'i915:i915_gem_request_out',
+		       'i915:i915_request_add',
+		       'i915:i915_request_submit',
+		       'i915:i915_request_in',
+		       'i915:i915_request_out',
 		       'i915:intel_engine_notify',
-		       'i915:i915_gem_request_wait_begin',
-		       'i915:i915_gem_request_wait_end' );
+		       'i915:i915_request_wait_begin',
+		       'i915:i915_request_wait_end' );
 
 	return unless scalar(@_);
 
@@ -394,7 +394,7 @@ while (<>) {
 		}
 	}
 
-	if ($tp_name eq 'i915:i915_gem_request_wait_begin:') {
+	if ($tp_name eq 'i915:i915_request_wait_begin:') {
 		my %rw;
 
 		next if exists $reqwait{$key};
@@ -405,11 +405,11 @@ while (<>) {
 		$rw{'ctx'} = $ctx;
 		$rw{'start'} = $time;
 		$reqwait{$key} = \%rw;
-	} elsif ($tp_name eq 'i915:i915_gem_request_wait_end:') {
+	} elsif ($tp_name eq 'i915:i915_request_wait_end:') {
 		next unless exists $reqwait{$key};
 
 		$reqwait{$key}->{'end'} = $time;
-	} elsif ($tp_name eq 'i915:i915_gem_request_add:') {
+	} elsif ($tp_name eq 'i915:i915_request_add:') {
 		if (exists $queue{$key}) {
 			$ctxdb{$orig_ctx}++;
 			$ctx = sanitize_ctx($orig_ctx, $ring);
@@ -417,12 +417,12 @@ while (<>) {
 		}
 
 		$queue{$key} = $time;
-	} elsif ($tp_name eq 'i915:i915_gem_request_submit:') {
+	} elsif ($tp_name eq 'i915:i915_request_submit:') {
 		die if exists $submit{$key};
 		die unless exists $queue{$key};
 
 		$submit{$key} = $time;
-	} elsif ($tp_name eq 'i915:i915_gem_request_in:') {
+	} elsif ($tp_name eq 'i915:i915_request_in:') {
 		my %req;
 
 		die if exists $db{$key};
@@ -442,7 +442,7 @@ while (<>) {
 		$rings{$ring} = $gid++ unless exists $rings{$ring};
 		$ringmap{$rings{$ring}} = $ring;
 		$db{$key} = \%req;
-	} elsif ($tp_name eq 'i915:i915_gem_request_out:') {
+	} elsif ($tp_name eq 'i915:i915_request_out:') {
 		my $gkey = global_key($ring, $tp{'global'});
 
 		die unless exists $db{$key};
