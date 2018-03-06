@@ -531,8 +531,6 @@ foreach my $key (keys %db) {
 # GPU time accounting
 my (%running, %runnable, %queued, %batch_avg, %batch_total_avg, %batch_count);
 my (%submit_avg, %execute_avg, %ctxsave_avg);
-my $last_ts = 0;
-my $first_ts;
 
 sub sortStart {
 	my $as = $db{$a}->{'start'};
@@ -553,9 +551,6 @@ die "Database changed size?!" unless scalar(@sorted_keys) == $key_count;
 foreach my $key (@sorted_keys) {
 	my $ring = $db{$key}->{'ring'};
 	my $end = $db{$key}->{'end'};
-
-	$first_ts = $db{$key}->{'queue'} if not defined $first_ts or $db{$key}->{'queue'} < $first_ts;
-	$last_ts = $end if $end > $last_ts;
 
 	# correct duration of merged batches
 	if ($correct_durations and exists $db{$key}->{'no-end'}) {
@@ -584,11 +579,17 @@ foreach my $key (@sorted_keys) {
 
 @sorted_keys = sort sortStart keys %db if $re_sort;
 
+my $last_ts = 0;
+my $first_ts;
+
 foreach my $key (@sorted_keys) {
 	my $ring = $db{$key}->{'ring'};
 	my $end = $db{$key}->{'end'};
 	my $start = $db{$key}->{'start'};
 	my $notify = $db{$key}->{'notify'};
+
+	$first_ts = $db{$key}->{'queue'} if not defined $first_ts or $db{$key}->{'queue'} < $first_ts;
+	$last_ts = $end if $end > $last_ts;
 
 	$db{$key}->{'context-complete-delay'} = $end - $notify;
 	$db{$key}->{'execute-delay'} = $start - $db{$key}->{'submit'};
