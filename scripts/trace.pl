@@ -467,10 +467,11 @@ while (<>) {
 }
 
 # Sanitation pass to fixup up out of order notify and context complete, and to
-# fine the largest seqno to be used for timeline sorting purposes.
+# find the largest seqno to be used for timeline sorting purposes.
 my $max_seqno = 0;
 foreach my $key (keys %db) {
 	my $gkey = global_key($db{$key}->{'ring'}, $db{$key}->{'global'});
+	my $notify = $notify{$gkey};
 
 	die unless exists $db{$key}->{'start'};
 
@@ -478,23 +479,21 @@ foreach my $key (keys %db) {
 
 	unless (exists $db{$key}->{'end'}) {
 		# Context complete not received.
-		if (exists $notify{$gkey}) {
+		$db{$key}->{'no-end'} = 1;
+
+		if (defined($notify)) {
 			# No context complete due req merging - use notify.
-			$db{$key}->{'notify'} = $notify{$gkey};
-			$db{$key}->{'end'} = $db{$key}->{'notify'};
-			$db{$key}->{'no-end'} = 1;
+			$db{$key}->{'notify'} = $notify;
+			$db{$key}->{'end'} = $notify;
 		} else {
-			# No notify and no context complete - mark it.
-			$db{$key}->{'no-end'} = 1;
-			$db{$key}->{'end'} = $db{$key}->{'start'} + 999;
-			$db{$key}->{'notify'} = $db{$key}->{'end'};
+			# No notify and no context complete - give up for now.
 			$db{$key}->{'incomplete'} = 1;
 		}
 	} else {
 		# Notify arrived after context complete.
-		if (exists $db{$key}->{'no-notify'} and exists $notify{$gkey}) {
+		if (exists $db{$key}->{'no-notify'} and defined($notify)) {
 			delete $db{$key}->{'no-notify'};
-			$db{$key}->{'notify'} = $notify{$gkey};
+			$db{$key}->{'notify'} = $notify;
 		}
 	}
 }
@@ -510,6 +509,7 @@ foreach my $key (keys %db) {
 	my $seqno = $db{$key}->{'seqno'};
 	my $next_key;
 	my $i = 1;
+	my $end;
 
 	do {
 		$next_key = db_key($ring, $ctx, $seqno + $i);
@@ -518,9 +518,14 @@ foreach my $key (keys %db) {
 		 or $i > $key_count);  # ugly stop hack
 
 	if (exists $db{$next_key}) {
-		$db{$key}->{'notify'} = $db{$next_key}->{'end'};
-		$db{$key}->{'end'} = $db{$key}->{'notify'};
+		$end = $db{$next_key}->{'end'};
+	} else {
+		# No info at all, fake it:
+		$end = $db{$key}->{'start'} + 999;
 	}
+
+	$db{$key}->{'notify'} = $end;
+	$db{$key}->{'end'} = $end;
 }
 
 # GPU time accounting
