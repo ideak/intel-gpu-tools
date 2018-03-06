@@ -545,17 +545,6 @@ sub sortStart {
 	return $val;
 }
 
-sub sortQueue {
-	my $as = $db{$a}->{'queue'};
-	my $bs = $db{$b}->{'queue'};
-	my $val;
-
-	$val = $as <=> $bs;
-	$val = $a cmp $b if $val == 0;
-
-	return $val;
-}
-
 my @sorted_keys = sort sortStart keys %db;
 my $re_sort = 0;
 
@@ -858,6 +847,17 @@ print <<ENDHTML;
 
   var items = new vis.DataSet([
 ENDHTML
+
+sub sortQueue {
+	my $as = $db{$a}->{'queue'};
+	my $bs = $db{$b}->{'queue'};
+	my $val;
+
+	$val = $as <=> $bs;
+	$val = $a cmp $b if $val == 0;
+
+	return $val;
+}
 
 my $i = 0;
 foreach my $key (sort sortQueue keys %db) {
