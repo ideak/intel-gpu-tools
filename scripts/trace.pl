@@ -539,7 +539,29 @@ my (%submit_avg, %execute_avg, %ctxsave_avg);
 my $last_ts = 0;
 my $first_ts;
 
-my @sorted_keys = sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db;
+sub sortStart {
+	my $as = $db{$a}->{'start'};
+	my $bs = $db{$b}->{'start'};
+	my $val;
+
+	$val = $as <=> $bs;
+	$val = $a cmp $b if $val == 0;
+
+	return $val;
+}
+
+sub sortQueue {
+	my $as = $db{$a}->{'queue'};
+	my $bs = $db{$b}->{'queue'};
+	my $val;
+
+	$val = $as <=> $bs;
+	$val = $a cmp $b if $val == 0;
+
+	return $val;
+}
+
+my @sorted_keys = sort sortStart keys %db;
 my $re_sort = 0;
 
 die "Database changed size?!" unless scalar(@sorted_keys) == $key_count;
@@ -589,9 +611,9 @@ foreach my $key (@sorted_keys) {
 	$ctxsave_avg{$ring} += $db{$key}->{'end'} - $db{$key}->{'notify'};
 }
 
-@sorted_keys = sort {$db{$a}->{'start'} <=> $db{$b}->{'start'}} keys %db if $re_sort;
+@sorted_keys = sort sortStart keys %db if $re_sort;
 
-foreach my $ring (keys %batch_avg) {
+foreach my $ring (sort keys %batch_avg) {
 	$batch_avg{$ring} /= $batch_count{$ring};
 	$batch_total_avg{$ring} /= $batch_count{$ring};
 	$submit_avg{$ring} /= $batch_count{$ring};
@@ -831,7 +853,7 @@ print <<ENDHTML;
 ENDHTML
 
 my $i = 0;
-foreach my $key (sort {$db{$a}->{'queue'} <=> $db{$b}->{'queue'}} keys %db) {
+foreach my $key (sort sortQueue keys %db) {
 	my ($name, $ctx, $seqno) = ($db{$key}->{'name'}, $db{$key}->{'ctx'}, $db{$key}->{'seqno'});
 	my ($queue, $start, $notify, $end) = ($db{$key}->{'queue'}, $db{$key}->{'start'}, $db{$key}->{'notify'}, $db{$key}->{'end'});
 	my $submit = $queue + $db{$key}->{'submit-delay'};
