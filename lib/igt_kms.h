@@ -264,6 +264,8 @@ enum igt_atomic_plane_properties {
        IGT_PLANE_TYPE,
        IGT_PLANE_ROTATION,
        IGT_PLANE_IN_FORMATS,
+       IGT_PLANE_COLOR_ENCODING,
+       IGT_PLANE_COLOR_RANGE,
        IGT_NUM_PLANE_PROPS
 };
 
@@ -307,6 +309,13 @@ typedef struct {
 
 	/* gem handle for fb */
 	uint32_t gem_handle;
+
+	struct {
+		uint64_t values[IGT_NUM_COLOR_ENCODINGS];
+	} color_encoding;
+	struct {
+		uint64_t values[IGT_NUM_COLOR_RANGES];
+	} color_range;
 
 	uint64_t changed;
 	uint32_t props[IGT_NUM_PLANE_PROPS];

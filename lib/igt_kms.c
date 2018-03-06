@@ -173,6 +173,8 @@ const char * const igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	[IGT_PLANE_TYPE] = "type",
 	[IGT_PLANE_ROTATION] = "rotation",
 	[IGT_PLANE_IN_FORMATS] = "IN_FORMATS",
+	[IGT_PLANE_COLOR_ENCODING] = "COLOR_ENCODING",
+	[IGT_PLANE_COLOR_RANGE] = "COLOR_RANGE",
 };
 
 const char * const igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
@@ -192,6 +194,61 @@ const char * const igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	[IGT_CONNECTOR_CRTC_ID] = "CRTC_ID",
 	[IGT_CONNECTOR_DPMS] = "DPMS",
 	[IGT_CONNECTOR_BROADCAST_RGB] = "Broadcast RGB",
+};
+
+static const char * const igt_color_encoding_names[IGT_NUM_COLOR_ENCODINGS] = {
+	[IGT_COLOR_YCBCR_BT601] = "ITU-R BT.601 YCbCr",
+	[IGT_COLOR_YCBCR_BT709] = "ITU-R BT.709 YCbCr",
+	[IGT_COLOR_YCBCR_BT2020] = "ITU-R BT.2020 YCbCr",
+};
+
+static const char * const igt_color_range_names[IGT_NUM_COLOR_RANGES] = {
+	[IGT_COLOR_YCBCR_FULL_RANGE] = "YCbCr full range",
+	[IGT_COLOR_YCBCR_LIMITED_RANGE] = "YCbCr limited range",
+};
+
+static void parse_enum_prop(drmModePropertyPtr prop,
+			    int num_enums,
+			    uint64_t values[],
+			    const char * const enum_names[])
+{
+	igt_assert((prop->flags & ~(DRM_MODE_PROP_IMMUTABLE |
+				    DRM_MODE_PROP_ATOMIC)) == DRM_MODE_PROP_ENUM);
+	igt_assert(prop->count_enums == prop->count_values);
+	igt_assert(prop->count_enums >= 1);
+	igt_assert(!!(prop->flags & DRM_MODE_PROP_IMMUTABLE) == (prop->count_enums == 1));
+
+	for (int i = 0; i < prop->count_enums; i++) {
+		for (int j = 0; j < num_enums; j++) {
+			if (strcmp(prop->enums[i].name, enum_names[j]))
+				continue;
+
+			values[j] = prop->enums[i].value;
+		}
+	}
+}
+
+static void
+parse_color_encoding_prop(igt_plane_t *plane, drmModePropertyPtr prop)
+{
+	parse_enum_prop(prop, ARRAY_SIZE(igt_color_encoding_names),
+			plane->color_encoding.values,
+			igt_color_encoding_names);
+}
+
+static void
+parse_color_range_prop(igt_plane_t *plane, drmModePropertyPtr prop)
+{
+	parse_enum_prop(prop, ARRAY_SIZE(igt_color_range_names),
+			plane->color_range.values,
+			igt_color_range_names);
+}
+
+typedef void (*parse_plane_prop_t)(igt_plane_t *plane, drmModePropertyPtr prop);
+
+static const parse_plane_prop_t igt_parse_plane_prop[IGT_NUM_PLANE_PROPS] = {
+	[IGT_PLANE_COLOR_ENCODING] = parse_color_encoding_prop,
+	[IGT_PLANE_COLOR_RANGE] = parse_color_range_prop,
 };
 
 /*
@@ -217,6 +274,9 @@ igt_fill_plane_props(igt_display_t *display, igt_plane_t *plane,
 		for (j = 0; j < num_props; j++) {
 			if (strcmp(prop->name, prop_names[j]) != 0)
 				continue;
+
+			if (igt_parse_plane_prop[j])
+				igt_parse_plane_prop[j](plane, prop);
 
 			plane->props[j] = props->props[i];
 			break;
@@ -1744,6 +1804,13 @@ static void igt_plane_reset(igt_plane_t *plane)
 	/* Reset binding to fb and crtc. */
 	igt_plane_set_prop_value(plane, IGT_PLANE_FB_ID, 0);
 	igt_plane_set_prop_value(plane, IGT_PLANE_CRTC_ID, 0);
+
+	if (igt_plane_has_prop(plane, IGT_PLANE_COLOR_ENCODING))
+		igt_plane_set_prop_value(plane, IGT_PLANE_COLOR_ENCODING,
+					 plane->color_encoding.values[IGT_COLOR_YCBCR_BT601]);
+	if (igt_plane_has_prop(plane, IGT_PLANE_COLOR_RANGE))
+		igt_plane_set_prop_value(plane, IGT_PLANE_COLOR_RANGE,
+					 plane->color_range.values[IGT_COLOR_YCBCR_LIMITED_RANGE]);
 
 	/* Use default rotation */
 	if (igt_plane_has_prop(plane, IGT_PLANE_ROTATION))
@@ -3570,6 +3637,15 @@ void igt_plane_set_fb(igt_plane_t *plane, struct igt_fb *fb)
 		/* set default src pos/size as fb size */
 		igt_fb_set_position(fb, plane, 0, 0);
 		igt_fb_set_size(fb, plane, fb->width, fb->height);
+
+		if (igt_plane_has_prop(plane, IGT_PLANE_COLOR_ENCODING))
+			igt_plane_set_prop_value(plane,
+						 IGT_PLANE_COLOR_ENCODING,
+						 plane->color_encoding.values[fb->color_encoding]);
+		if (igt_plane_has_prop(plane, IGT_PLANE_COLOR_RANGE))
+			igt_plane_set_prop_value(plane,
+						 IGT_PLANE_COLOR_RANGE,
+						 plane->color_range.values[fb->color_range]);
 	} else {
 		igt_plane_set_size(plane, 0, 0);
 
