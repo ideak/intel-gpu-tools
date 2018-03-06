@@ -437,8 +437,7 @@ while (<>) {
 		$req{'global'} = $tp{'global'};
 		$req{'port'} = $tp{'port'};
 		$req{'queue'} = $queue{$key};
-		$req{'submit-delay'} = $submit{$key} - $queue{$key};
-		$req{'execute-delay'} = $req{'start'} - $submit{$key};
+		$req{'submit'} = $submit{$key};
 		$rings{$ring} = $gid++ unless exists $rings{$ring};
 		$ringmap{$rings{$ring}} = $ring;
 		$db{$key} = \%req;
@@ -458,8 +457,6 @@ while (<>) {
 			$db{$key}->{'notify'} = $db{$key}->{'end'};
 			$db{$key}->{'no-notify'} = 1;
 		}
-		$db{$key}->{'duration'} = $db{$key}->{'notify'} - $db{$key}->{'start'};
-		$db{$key}->{'context-complete-delay'} = $db{$key}->{'end'} - $db{$key}->{'notify'};
 	} elsif ($tp_name eq 'i915:intel_engine_notify:') {
 		$notify{global_key($ring, $seqno)} = $time;
 	} elsif ($tp_name eq 'i915:intel_gpu_freq_change:') {
@@ -493,16 +490,11 @@ foreach my $key (keys %db) {
 			$db{$key}->{'notify'} = $db{$key}->{'end'};
 			$db{$key}->{'incomplete'} = 1;
 		}
-
-		$db{$key}->{'duration'} = $db{$key}->{'notify'} - $db{$key}->{'start'};
-		$db{$key}->{'context-complete-delay'} = $db{$key}->{'end'} - $db{$key}->{'notify'};
 	} else {
 		# Notify arrived after context complete.
 		if (exists $db{$key}->{'no-notify'} and exists $notify{$gkey}) {
 			delete $db{$key}->{'no-notify'};
 			$db{$key}->{'notify'} = $notify{$gkey};
-			$db{$key}->{'duration'} = $db{$key}->{'notify'} - $db{$key}->{'start'};
-			$db{$key}->{'context-complete-delay'} = $db{$key}->{'end'} - $db{$key}->{'notify'};
 		}
 	}
 }
@@ -528,8 +520,6 @@ foreach my $key (keys %db) {
 	if (exists $db{$next_key}) {
 		$db{$key}->{'notify'} = $db{$next_key}->{'end'};
 		$db{$key}->{'end'} = $db{$key}->{'notify'};
-		$db{$key}->{'duration'} = $db{$key}->{'notify'} - $db{$key}->{'start'};
-		$db{$key}->{'context-complete-delay'} = $db{$key}->{'end'} - $db{$key}->{'notify'};
 	}
 }
 
@@ -573,17 +563,11 @@ foreach my $key (@sorted_keys) {
 	$first_ts = $db{$key}->{'queue'} if not defined $first_ts or $db{$key}->{'queue'} < $first_ts;
 	$last_ts = $end if $end > $last_ts;
 
-	$running{$ring} += $end - $db{$key}->{'start'} unless exists $db{$key}->{'no-end'};
-	$runnable{$ring} += $db{$key}->{'execute-delay'};
-	$queued{$ring} += $db{$key}->{'start'} - $db{$key}->{'execute-delay'} - $db{$key}->{'queue'};
-
-	$batch_count{$ring}++;
-
 	# correct duration of merged batches
 	if ($correct_durations and exists $db{$key}->{'no-end'}) {
-		my $start = $db{$key}->{'start'};
 		my $ctx = $db{$key}->{'ctx'};
 		my $seqno = $db{$key}->{'seqno'};
+		my $start = $db{$key}->{'start'};
 		my $next_key;
 		my $i = 1;
 
@@ -594,24 +578,42 @@ foreach my $key (@sorted_keys) {
 
 		# 20us tolerance
 		if (exists $db{$next_key} and $db{$next_key}->{'start'} < $start + 20) {
+			my $notify = $db{$key}->{'notify'};
 			$re_sort = 1;
-			$db{$next_key}->{'start'} = $start + $db{$key}->{'duration'};
+			$db{$next_key}->{'start'} = $notify;
 			$db{$next_key}->{'start'} = $db{$next_key}->{'end'} if $db{$next_key}->{'start'} > $db{$next_key}->{'end'};
-			$db{$next_key}->{'duration'} = $db{$next_key}->{'notify'} - $db{$next_key}->{'start'};
-			$end = $db{$key}->{'notify'};
 			die if $db{$next_key}->{'start'} > $db{$next_key}->{'end'};
 		}
-		die if $db{$key}->{'start'} > $db{$key}->{'end'};
+		die if $start > $end;
 	}
-	$batch_avg{$ring} += $db{$key}->{'duration'};
-	$batch_total_avg{$ring} += $end - $db{$key}->{'start'};
-
-	$submit_avg{$ring} += $db{$key}->{'submit-delay'};
-	$execute_avg{$ring} += $db{$key}->{'execute-delay'};
-	$ctxsave_avg{$ring} += $db{$key}->{'end'} - $db{$key}->{'notify'};
 }
 
 @sorted_keys = sort sortStart keys %db if $re_sort;
+
+foreach my $key (@sorted_keys) {
+	my $ring = $db{$key}->{'ring'};
+	my $end = $db{$key}->{'end'};
+	my $start = $db{$key}->{'start'};
+	my $notify = $db{$key}->{'notify'};
+
+	$db{$key}->{'context-complete-delay'} = $end - $notify;
+	$db{$key}->{'execute-delay'} = $start - $db{$key}->{'submit'};
+	$db{$key}->{'submit-delay'} = $db{$key}->{'submit'} - $db{$key}->{'queue'};
+	$db{$key}->{'duration'} = $notify - $start;
+
+	$running{$ring} += $end - $start unless exists $db{$key}->{'no-end'};
+	$runnable{$ring} += $db{$key}->{'execute-delay'};
+	$queued{$ring} += $start - $db{$key}->{'execute-delay'} - $db{$key}->{'queue'};
+
+	$batch_count{$ring}++;
+
+	$batch_avg{$ring} += $db{$key}->{'duration'};
+	$batch_total_avg{$ring} += $end - $start;
+
+	$submit_avg{$ring} += $db{$key}->{'submit-delay'};
+	$execute_avg{$ring} += $db{$key}->{'execute-delay'};
+	$ctxsave_avg{$ring} += $end - $notify;
+}
 
 foreach my $ring (sort keys %batch_avg) {
 	$batch_avg{$ring} /= $batch_count{$ring};
