@@ -365,6 +365,8 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
 
 /* helpers to create nice-looking framebuffers */
 static int create_bo_for_fb(int fd, int width, int height,
+			    enum igt_color_encoding color_encoding,
+			    enum igt_color_range color_range,
 			    struct format_desc_struct *format,
 			    uint64_t tiling, unsigned size, unsigned stride,
 			    unsigned *size_ret, unsigned *stride_ret,
@@ -397,7 +399,7 @@ static int create_bo_for_fb(int fd, int width, int height,
 
 		if (is_i915_device(fd)) {
 			void *ptr;
-			bool full_range = false; /* FIXME */
+			bool full_range = color_range == IGT_COLOR_YCBCR_FULL_RANGE;
 
 			bo = gem_create(fd, size);
 			gem_set_tiling(fd, bo, igt_fb_mod_to_tiling(tiling), stride);
@@ -472,7 +474,10 @@ int igt_create_bo_with_dimensions(int fd, int width, int height,
 				  unsigned stride, unsigned *size_ret,
 				  unsigned *stride_ret, bool *is_dumb)
 {
-	return create_bo_for_fb(fd, width, height, lookup_drm_format(format),
+	return create_bo_for_fb(fd, width, height,
+				IGT_COLOR_YCBCR_BT709,
+				IGT_COLOR_YCBCR_LIMITED_RANGE,
+				lookup_drm_format(format),
 				modifier, 0, stride, size_ret, stride_ret, NULL, is_dumb);
 }
 
@@ -814,6 +819,9 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 			   struct igt_fb *fb, unsigned bo_size,
 			   unsigned bo_stride)
 {
+	/* FIXME allow the caller to pass these in */
+	enum igt_color_encoding color_encoding = IGT_COLOR_YCBCR_BT709;
+	enum igt_color_range color_range = IGT_COLOR_YCBCR_LIMITED_RANGE;
 	struct format_desc_struct *f = lookup_drm_format(format);
 	uint32_t fb_id;
 	int i;
@@ -824,8 +832,9 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 	igt_debug("%s(width=%d, height=%d, format=0x%x, tiling=0x%"PRIx64", size=%d)\n",
 		  __func__, width, height, format, tiling, bo_size);
-	fb->gem_handle = create_bo_for_fb(fd, width, height, f,
-					  tiling, bo_size, bo_stride,
+	fb->gem_handle = create_bo_for_fb(fd, width, height,
+					  color_encoding, color_range,
+					  f, tiling, bo_size, bo_stride,
 					  &fb->size, &fb->stride,
 					  fb->offsets, &fb->is_dumb);
 	igt_assert(fb->gem_handle > 0);
@@ -864,6 +873,8 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	fb->fb_id = fb_id;
 	fb->fd = fd;
 	fb->num_planes = f->num_planes;
+	fb->color_encoding = color_encoding;
+	fb->color_range = color_range;
 
 	for (i = 0; i < f->num_planes; i++) {
 		fb->plane_bpp[i] = f->plane_bpp[i];
@@ -1240,11 +1251,12 @@ static void setup_linear_mapping(int fd, struct igt_fb *fb, struct fb_blit_linea
 	 * destination, tiling it at the same time.
 	 */
 	linear->handle = create_bo_for_fb(fd, fb->width, fb->height,
-					       lookup_drm_format(fb->drm_format),
-					       LOCAL_DRM_FORMAT_MOD_NONE, 0,
-					       0, &linear->size,
-					       &linear->stride,
-					       linear->offsets, &linear->is_dumb);
+					  fb->color_encoding, fb->color_range,
+					  lookup_drm_format(fb->drm_format),
+					  LOCAL_DRM_FORMAT_MOD_NONE, 0,
+					  0, &linear->size,
+					  &linear->stride,
+					  linear->offsets, &linear->is_dumb);
 
 	igt_assert(linear->handle > 0);
 
@@ -1387,8 +1399,8 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride, planar_stride = blit->linear.stride;
 	uint8_t *buf = malloc(blit->linear.size);
-	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(IGT_COLOR_YCBCR_BT601,
-						    IGT_COLOR_YCBCR_LIMITED_RANGE);
+	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
+						    fb->color_range);
 
 	/*
 	 * Reading from the BO is awfully slow because of lack of read caching,
@@ -1496,8 +1508,8 @@ static void convert_rgb24_to_nv12(struct igt_fb *fb, struct fb_convert_blit_uplo
 	const uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride;
 	unsigned planar_stride = blit->linear.stride;
-	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(IGT_COLOR_YCBCR_BT601,
-						    IGT_COLOR_YCBCR_LIMITED_RANGE);
+	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
+						    fb->color_range);
 
 	igt_assert_f(fb->drm_format == DRM_FORMAT_NV12,
 		     "Conversion not implemented for !NV12 planar formats\n");
@@ -1624,8 +1636,8 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride, yuyv_stride = blit->linear.stride;
 	uint8_t *buf = malloc(blit->linear.size);
-	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(IGT_COLOR_YCBCR_BT601,
-						    IGT_COLOR_YCBCR_LIMITED_RANGE);
+	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
+						    fb->color_range);
 
 	/*
 	 * Reading from the BO is awfully slow because of lack of read caching,
@@ -1683,8 +1695,8 @@ static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_uplo
 	const uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride;
 	unsigned yuyv_stride = blit->linear.stride;
-	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(IGT_COLOR_YCBCR_BT601,
-						    IGT_COLOR_YCBCR_LIMITED_RANGE);
+	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
+						    fb->color_range);
 
 	igt_assert_f(fb->drm_format == DRM_FORMAT_YUYV ||
 		     fb->drm_format == DRM_FORMAT_YVYU ||

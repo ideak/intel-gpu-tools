@@ -36,6 +36,8 @@
 
 #include <i915_drm.h>
 
+#include "igt_color_encoding.h"
+
 /**
  * igt_fb_t:
  * @fb_id: KMS ID of the framebuffer
@@ -66,6 +68,8 @@ typedef struct igt_fb {
 	uint32_t drm_format;
 	int width;
 	int height;
+	enum igt_color_encoding color_encoding;
+	enum igt_color_range color_range;
 	unsigned int stride;
 	uint64_t tiling;
 	unsigned int size;
