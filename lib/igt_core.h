@@ -576,6 +576,32 @@ static inline void igt_ignore_warn(bool value)
 #define igt_assert_lte(n1, n2) igt_assert_cmpint(n1, <=, >, n2)
 
 /**
+ * igt_assert_lte_u64:
+ * @n1: first integer
+ * @n2: second integer
+ *
+ * Fails (sub-)test if the second integer is strictly smaller than the first.
+ * Beware that for now this only works on integers.
+ *
+ * Like igt_assert(), but displays the values being compared on failure instead
+ * of simply printing the stringified expression.
+ */
+#define igt_assert_lte_u64(n1, n2) igt_assert_cmpu64(n1, <=, >, n2)
+
+/**
+ * igt_assert_lte_s64:
+ * @n1: first integer
+ * @n2: second integer
+ *
+ * Fails (sub-)test if the second integer is strictly smaller than the first.
+ * Beware that for now this only works on integers.
+ *
+ * Like igt_assert(), but displays the values being compared on failure instead
+ * of simply printing the stringified expression.
+ */
+#define igt_assert_lte_s64(n1, n2) igt_assert_cmps64(n1, <=, >, n2)
+
+/**
  * igt_assert_lt:
  * @n1: first integer
  * @n2: second integer
@@ -587,6 +613,32 @@ static inline void igt_ignore_warn(bool value)
  * of simply printing the stringified expression.
  */
 #define igt_assert_lt(n1, n2) igt_assert_cmpint(n1, <, >=, n2)
+
+/**
+ * igt_assert_lt_u64:
+ * @n1: first integer
+ * @n2: second integer
+ *
+ * Fails (sub-)test if the second integer is smaller than or equal to the first.
+ * Beware that for now this only works on integers.
+ *
+ * Like igt_assert(), but displays the values being compared on failure instead
+ * of simply printing the stringified expression.
+ */
+#define igt_assert_lt_u64(n1, n2) igt_assert_cmpu64(n1, <, >=, n2)
+
+/**
+ * igt_assert_lt_s64:
+ * @n1: first integer
+ * @n2: second integer
+ *
+ * Fails (sub-)test if the second integer is smaller than or equal to the first.
+ * Beware that for now this only works on integers.
+ *
+ * Like igt_assert(), but displays the values being compared on failure instead
+ * of simply printing the stringified expression.
+ */
+#define igt_assert_lt_s64(n1, n2) igt_assert_cmps64(n1, <, >=, n2)
 
 /**
  * igt_assert_fd:

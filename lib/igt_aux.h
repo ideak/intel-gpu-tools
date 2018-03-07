@@ -390,4 +390,6 @@ static inline bool igt_list_empty(const struct igt_list *list)
 			      __builtin_popcountll(x), \
 			      __builtin_popcount(x))
 
+#define is_power_of_two(x)  (((x) & ((x)-1)) == 0)
+
 #endif /* IGT_AUX_H */
