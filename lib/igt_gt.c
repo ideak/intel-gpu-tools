@@ -126,11 +126,10 @@ void igt_require_hang_ring(int fd, int ring)
 
 static unsigned context_get_ban(int fd, unsigned ctx)
 {
-	struct drm_i915_gem_context_param param;
-
-	param.param = I915_CONTEXT_PARAM_BANNABLE;
-	param.value = 0;
-	param.size = 0;
+	struct drm_i915_gem_context_param param = {
+		.ctx_id = ctx,
+		.param = I915_CONTEXT_PARAM_BANNABLE,
+	};
 
 	if (__gem_context_get_param(fd, &param) == -EINVAL) {
 		igt_assert(param.value == 0);
@@ -143,13 +142,11 @@ static unsigned context_get_ban(int fd, unsigned ctx)
 
 static void context_set_ban(int fd, unsigned ctx, unsigned ban)
 {
-	struct drm_i915_gem_context_param param;
-
-	memset(&param, 0, sizeof(param));
-	param.ctx_id = ctx;
-	param.value = ban;
-	param.size = 0;
-	param.param = I915_CONTEXT_PARAM_BANNABLE;
+	struct drm_i915_gem_context_param param = {
+		.ctx_id = ctx,
+		.param = I915_CONTEXT_PARAM_BANNABLE,
+		.value = ban,
+	};
 
 	if(__gem_context_set_param(fd, &param) == -EINVAL) {
 		igt_assert(param.value == ban);
@@ -160,7 +157,9 @@ static void context_set_ban(int fd, unsigned ctx, unsigned ban)
 
 igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 {
-	struct drm_i915_gem_context_param param;
+	struct drm_i915_gem_context_param param = {
+		.ctx_id = ctx,
+	};
 	unsigned ban;
 
 	igt_assert(igt_sysfs_set_parameter
@@ -171,9 +170,6 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 	gem_context_require_bannable(fd);
 	if (!igt_check_boolean_env_var("IGT_HANG_WITHOUT_RESET", false))
 		igt_require(has_gpu_reset(fd));
-
-	param.ctx_id = ctx;
-	param.size = 0;
 
 	if ((flags & HANG_ALLOW_CAPTURE) == 0) {
 		param.param = I915_CONTEXT_PARAM_NO_ERROR_CAPTURE;
@@ -194,7 +190,6 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 
 void igt_disallow_hang(int fd, igt_hang_t arg)
 {
-
 	context_set_ban(fd, arg.ctx, arg.ban);
 
 	if ((arg.flags & HANG_ALLOW_CAPTURE) == 0) {
@@ -297,7 +292,6 @@ igt_hang_t igt_hang_ctx(int fd,
 	}
 
 	ban = context_get_ban(fd, ctx);
-
 	if ((flags & HANG_ALLOW_BAN) == 0)
 		context_set_ban(fd, ctx, 0);
 
