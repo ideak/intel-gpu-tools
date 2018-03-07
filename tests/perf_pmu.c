@@ -1459,7 +1459,15 @@ static void __rearm_spin_batch(igt_spin_t *spin)
        __sync_synchronize();
 }
 
-#define div_round_up(a, b) (((a) + (b) - 1) / (b))
+#define __assert_within(x, ref, tol_up, tol_down) \
+	igt_assert_f((double)(x) <= ((double)(ref) + (tol_up)) && \
+		     (double)(x) >= ((double)(ref) - (tol_down)), \
+		     "%f not within +%f/-%f of %f! ('%s' vs '%s')\n", \
+		     (double)(x), (double)(tol_up), (double)(tol_down), \
+		     (double)(ref), #x, #ref)
+
+#define assert_within(x, ref, tolerance) \
+	__assert_within(x, ref, tolerance, tolerance)
 
 static void
 accuracy(int gem_fd, const struct intel_execution_engine2 *e,
@@ -1493,8 +1501,8 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	while (test_us < min_test_us)
 		test_us += busy_us + idle_us;
 
-	igt_info("calibration=%luus, test=%luus; ratio=%.2f%% (%luus/%luus)\n",
-		 pwm_calibration_us, test_us,
+	igt_info("calibration=%lums, test=%lums; ratio=%.2f%% (%luus/%luus)\n",
+		 pwm_calibration_us / 1000, test_us / 1000,
 		 (double)busy_us / (busy_us + idle_us) * 100.0,
 		 busy_us, idle_us);
 
@@ -1507,7 +1515,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	igt_fork(child, 1) {
 		struct sched_param rt = { .sched_priority = 99 };
 		const unsigned long timeout[] = {
-			pwm_calibration_us * 1000, test_us * 2 * 1000
+			pwm_calibration_us * 1000, test_us * 1000
 		};
 		struct drm_i915_gem_exec_object2 obj = {};
 		uint64_t total_busy_ns = 0, total_idle_ns = 0;
@@ -1537,19 +1545,23 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 
 			igt_nsec_elapsed(&test_start);
 			do {
-				struct timespec t_busy = { };
-				unsigned int target_idle_us;
-
-				igt_nsec_elapsed(&t_busy);
+				unsigned int target_idle_us, t_busy;
 
 				/* Restart the spinbatch. */
 				__rearm_spin_batch(spin);
 				__submit_spin_batch(gem_fd, &obj, e);
-				measured_usleep(busy_us);
+
+				/*
+				 * Note that the submission may be delayed to a
+				 * tasklet (ksoftirqd) which cannot run until we
+				 * sleep as we hog the cpu (we are RT).
+				 */
+
+				t_busy = measured_usleep(busy_us);
 				igt_spin_batch_end(spin);
 				gem_sync(gem_fd, obj.handle);
 
-				total_busy_ns += igt_nsec_elapsed(&t_busy);
+				total_busy_ns += t_busy;
 
 				target_idle_us =
 					(100 * total_busy_ns / target_busy_pct - (total_busy_ns + total_idle_ns)) / 1000;
@@ -1569,12 +1581,13 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 		igt_spin_batch_free(gem_fd, spin);
 	}
 
+	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
+
 	/* Let the child run. */
 	read(link[0], &expected, sizeof(expected));
-	assert_within_epsilon(expected, target_busy_pct/100., 0.05);
+	assert_within(100.0 * expected, target_busy_pct, 5);
 
 	/* Collect engine busyness for an interesting part of child runtime. */
-	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
 	val[0] = __pmu_read_single(fd, &ts[0]);
 	read(link[0], &expected, sizeof(expected));
 	val[1] = __pmu_read_single(fd, &ts[1]);
@@ -1590,8 +1603,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	igt_info("error=%.2f%% (%.2f%% vs %.2f%%)\n",
 		 __error(busy_r, expected), 100 * busy_r, 100 * expected);
 
-	assert_within_epsilon(busy_r, expected, 0.15);
-	assert_within_epsilon(1 - busy_r, 1 - expected, 0.15);
+	assert_within(100.0 * busy_r, 100.0 * expected, 2);
 }
 
 igt_main
