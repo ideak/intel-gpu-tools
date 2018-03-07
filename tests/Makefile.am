@@ -93,6 +93,7 @@ gem_create_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_create_LDADD = $(LDADD) -lpthread -latomic
 gem_close_race_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_close_race_LDADD = $(LDADD) -lpthread
+gem_ctx_freq_LDADD = $(LDADD) $(top_builddir)/lib/libigt_perf.la
 gem_ctx_thrash_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_ctx_thrash_LDADD = $(LDADD) -lpthread
 gem_ctx_sseu_LDADD = $(LDADD) $(top_builddir)/lib/libigt_perf.la

@@ -291,6 +291,14 @@ test_executables += executable('gem_create',
 	   install : true)
 test_list += 'gem_create'
 
+test_executables += executable('gem_ctx_freq',
+	   join_paths('i915', 'gem_ctx_freq.c'),
+	   dependencies : test_deps + [ lib_igt_perf ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'gem_ctx_freq'
+
 test_executables += executable('gem_ctx_sseu',
 	   join_paths('i915', 'gem_ctx_sseu.c'),
 	   dependencies : test_deps + [ lib_igt_perf ],

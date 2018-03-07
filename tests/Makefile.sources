@@ -152,6 +152,9 @@ gem_ctx_engines_SOURCES = i915/gem_ctx_engines.c
 TESTS_progs += gem_ctx_exec
 gem_ctx_exec_SOURCES = i915/gem_ctx_exec.c
 
+TESTS_progs += gem_ctx_freq
+gem_ctx_freq_SOURCES = i915/gem_ctx_freq.c
+
 TESTS_progs += gem_ctx_isolation
 gem_ctx_isolation_SOURCES = i915/gem_ctx_isolation.c
 
