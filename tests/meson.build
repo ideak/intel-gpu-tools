@@ -35,6 +35,7 @@ test_progs = [
 	'gem_ctx_bad_exec',
 	'gem_ctx_create',
 	'gem_ctx_exec',
+	'gem_ctx_isolation',
 	'gem_ctx_param',
 	'gem_ctx_switch',
 	'gem_ctx_thrash',
