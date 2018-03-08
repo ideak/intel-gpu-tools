@@ -32,10 +32,11 @@ inc_for_gtkdoc = include_directories('lib')
 
 config = configuration_data()
 
-libdrm = dependency('libdrm', version : '>=2.4.82')
-libdrm_intel = dependency('libdrm_intel', required : false)
-libdrm_nouveau = dependency('libdrm_nouveau', required : false)
-libdrm_amdgpu = dependency('libdrm_amdgpu', required : false)
+libdrm_version = '>=2.4.82'
+libdrm = dependency('libdrm', version : libdrm_version)
+libdrm_intel = dependency('libdrm_intel', version : libdrm_version, required : false)
+libdrm_nouveau = dependency('libdrm_nouveau', version : libdrm_version, required : false)
+libdrm_amdgpu = dependency('libdrm_amdgpu', version : libdrm_version, required : false)
 
 pciaccess = dependency('pciaccess', version : '>=0.10')
 libkmod = dependency('libkmod')
