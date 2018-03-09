@@ -1446,7 +1446,7 @@ static void cursor_subtest(bool dpms)
 		      LOCAL_DRM_FORMAT_MOD_NONE, &cursor_fb1);
 	igt_create_fb(drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
 		      LOCAL_DRM_FORMAT_MOD_NONE, &cursor_fb2);
-	igt_create_fb(drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+	igt_create_fb(drm_fd, 64, 64, DRM_FORMAT_XRGB8888,
 		      LOCAL_I915_FORMAT_MOD_X_TILED, &cursor_fb3);
 
 	fill_igt_fb(&cursor_fb1, 0xFF00FFFF);
