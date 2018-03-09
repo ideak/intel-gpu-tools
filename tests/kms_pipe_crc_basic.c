@@ -46,13 +46,6 @@ static struct {
 	{ .r = 0.0, .g = 1.0, .b = 1.0 },
 };
 
-static void test_bad_command(data_t *data, const char *cmd)
-{
-	igt_assert(!igt_sysfs_set(data->debugfs, "i915_display_crc_ctl", cmd));
-	igt_skip_on(errno == ENOENT);
-	igt_assert(errno == EINVAL);
-}
-
 static void test_bad_source(data_t *data)
 {
 	igt_assert(igt_sysfs_set(data->debugfs, "crtc-0/crc/control", "foo"));
@@ -193,17 +186,8 @@ igt_main
 		data.debugfs = igt_debugfs_dir(data.drm_fd);
 	}
 
-	igt_subtest("bad-pipe")
-		test_bad_command(&data, "pipe D none");
-
 	igt_subtest("bad-source")
 		test_bad_source(&data);
-
-	igt_subtest("bad-nb-words-1")
-		test_bad_command(&data, "pipe foo");
-
-	igt_subtest("bad-nb-words-3")
-		test_bad_command(&data, "pipe A none option");
 
 	igt_skip_on_simulation();
 
