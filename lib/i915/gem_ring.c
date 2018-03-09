@@ -100,6 +100,7 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 	} while (1);
 
 	igt_assert_eq(__execbuf(fd, &execbuf), -EINTR);
+	igt_assert(count);
 
 	memset(&itv, 0, sizeof(itv));
 	setitimer(ITIMER_REAL, &itv, NULL);
