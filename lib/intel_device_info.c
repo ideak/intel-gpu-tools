@@ -145,16 +145,48 @@ static const struct intel_device_info intel_valleyview_info = {
 	.codename = "valleyview"
 };
 
-static const struct intel_device_info intel_haswell_info = {
-	.gen = BIT(6),
-	.is_haswell = true,
+#define HASWELL_FIELDS \
+	.gen = BIT(6), \
+	.is_haswell = true, \
 	.codename = "haswell"
+
+static const struct intel_device_info intel_haswell_gt1_info = {
+	HASWELL_FIELDS,
+	.gt = 1,
 };
 
-static const struct intel_device_info intel_broadwell_info = {
-	.gen = BIT(7),
-	.is_broadwell = true,
+static const struct intel_device_info intel_haswell_gt2_info = {
+	HASWELL_FIELDS,
+	.gt = 2,
+};
+
+static const struct intel_device_info intel_haswell_gt3_info = {
+	HASWELL_FIELDS,
+	.gt = 3,
+};
+
+#define BROADWELL_FIELDS \
+	.gen = BIT(7), \
+	.is_broadwell = true, \
 	.codename = "broadwell"
+
+static const struct intel_device_info intel_broadwell_gt1_info = {
+	BROADWELL_FIELDS,
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_broadwell_gt2_info = {
+	BROADWELL_FIELDS,
+	.gt = 2,
+};
+
+static const struct intel_device_info intel_broadwell_gt3_info = {
+	BROADWELL_FIELDS,
+	.gt = 3,
+};
+
+static const struct intel_device_info intel_broadwell_unknown_info = {
+	BROADWELL_FIELDS,
 };
 
 static const struct intel_device_info intel_cherryview_info = {
@@ -163,10 +195,29 @@ static const struct intel_device_info intel_cherryview_info = {
 	.codename = "cherryview"
 };
 
-static const struct intel_device_info intel_skylake_info = {
-	.gen = BIT(8),
-	.is_skylake = true,
-	.codename = "skylake"
+#define SKYLAKE_FIELDS \
+	.gen = BIT(8), \
+	.codename = "skylake", \
+	.is_skylake = true
+
+static const struct intel_device_info intel_skylake_gt1_info = {
+	SKYLAKE_FIELDS,
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_skylake_gt2_info = {
+	SKYLAKE_FIELDS,
+	.gt = 2,
+};
+
+static const struct intel_device_info intel_skylake_gt3_info = {
+	SKYLAKE_FIELDS,
+	.gt = 3,
+};
+
+static const struct intel_device_info intel_skylake_gt4_info = {
+	SKYLAKE_FIELDS,
+	.gt = 4,
 };
 
 static const struct intel_device_info intel_broxton_info = {
@@ -175,10 +226,29 @@ static const struct intel_device_info intel_broxton_info = {
 	.codename = "broxton"
 };
 
-static const struct intel_device_info intel_kabylake_info = {
-	.gen = BIT(8),
-	.is_kabylake = true,
+#define KABYLAKE_FIELDS \
+	.gen = BIT(8), \
+	.is_kabylake = true, \
 	.codename = "kabylake"
+
+static const struct intel_device_info intel_kabylake_gt1_info = {
+	KABYLAKE_FIELDS,
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_kabylake_gt2_info = {
+	KABYLAKE_FIELDS,
+	.gt = 2,
+};
+
+static const struct intel_device_info intel_kabylake_gt3_info = {
+	KABYLAKE_FIELDS,
+	.gt = 3,
+};
+
+static const struct intel_device_info intel_kabylake_gt4_info = {
+	KABYLAKE_FIELDS,
+	.gt = 4,
 };
 
 static const struct intel_device_info intel_geminilake_info = {
@@ -187,10 +257,24 @@ static const struct intel_device_info intel_geminilake_info = {
 	.codename = "geminilake"
 };
 
-static const struct intel_device_info intel_coffeelake_info = {
-	.gen = BIT(8),
-	.is_coffeelake = true,
+#define COFFEELAKE_FIELDS \
+	.gen = BIT(8), \
+	.is_coffeelake = true, \
 	.codename = "coffeelake"
+
+static const struct intel_device_info intel_coffeelake_gt1_info = {
+	COFFEELAKE_FIELDS,
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_coffeelake_gt2_info = {
+	COFFEELAKE_FIELDS,
+	.gt = 2,
+};
+
+static const struct intel_device_info intel_coffeelake_gt3_info = {
+	COFFEELAKE_FIELDS,
+	.gt = 3,
 };
 
 static const struct intel_device_info intel_cannonlake_info = {
@@ -231,23 +315,39 @@ static const struct pci_id_match intel_device_match[] = {
 	INTEL_IVB_D_IDS(&intel_ivybridge_info),
 	INTEL_IVB_M_IDS(&intel_ivybridge_m_info),
 
-	INTEL_HSW_IDS(&intel_haswell_info),
+	INTEL_HSW_GT1_IDS(&intel_haswell_gt1_info),
+	INTEL_HSW_GT2_IDS(&intel_haswell_gt2_info),
+	INTEL_HSW_GT3_IDS(&intel_haswell_gt3_info),
 
 	INTEL_VLV_IDS(&intel_valleyview_info),
 
-	INTEL_BDW_IDS(&intel_broadwell_info),
+	INTEL_BDW_GT1_IDS(&intel_broadwell_gt1_info),
+	INTEL_BDW_GT2_IDS(&intel_broadwell_gt2_info),
+	INTEL_BDW_GT3_IDS(&intel_broadwell_gt3_info),
+	INTEL_BDW_RSVD_IDS(&intel_broadwell_unknown_info),
 
 	INTEL_CHV_IDS(&intel_cherryview_info),
 
-	INTEL_SKL_IDS(&intel_skylake_info),
+	INTEL_SKL_GT1_IDS(&intel_skylake_gt1_info),
+	INTEL_SKL_GT2_IDS(&intel_skylake_gt2_info),
+	INTEL_SKL_GT3_IDS(&intel_skylake_gt3_info),
+	INTEL_SKL_GT4_IDS(&intel_skylake_gt4_info),
 
 	INTEL_BXT_IDS(&intel_broxton_info),
 
-	INTEL_KBL_IDS(&intel_kabylake_info),
+	INTEL_KBL_GT1_IDS(&intel_kabylake_gt1_info),
+	INTEL_KBL_GT2_IDS(&intel_kabylake_gt2_info),
+	INTEL_KBL_GT3_IDS(&intel_kabylake_gt3_info),
+	INTEL_KBL_GT4_IDS(&intel_kabylake_gt4_info),
 
 	INTEL_GLK_IDS(&intel_geminilake_info),
 
-	INTEL_CFL_IDS(&intel_coffeelake_info),
+	INTEL_CFL_S_GT1_IDS(&intel_coffeelake_gt1_info),
+	INTEL_CFL_U_GT1_IDS(&intel_coffeelake_gt1_info),
+	INTEL_CFL_S_GT2_IDS(&intel_coffeelake_gt2_info),
+	INTEL_CFL_H_GT2_IDS(&intel_coffeelake_gt2_info),
+	INTEL_CFL_U_GT2_IDS(&intel_coffeelake_gt2_info),
+	INTEL_CFL_U_GT3_IDS(&intel_coffeelake_gt3_info),
 
 	INTEL_CNL_IDS(&intel_cannonlake_info),
 

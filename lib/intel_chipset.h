@@ -36,6 +36,7 @@ uint32_t intel_get_drm_devid(int fd);
 
 struct intel_device_info {
 	unsigned gen;
+	unsigned gt; /* 0 if unknown */
 	bool is_mobile : 1;
 	bool is_whitney : 1;
 	bool is_almador : 1;
