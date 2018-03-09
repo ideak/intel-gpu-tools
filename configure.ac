@@ -263,7 +263,7 @@ AC_ARG_ENABLE(amdgpu, AS_HELP_STRING([--disable-amdgpu],
 	      [Enable building of amdgpu tests (default: auto)]),
 	      [AMDGPU=$enableval], [AMDGPU=auto])
 if test "x$AMDGPU" = xauto; then
-	PKG_CHECK_EXISTS([libdrm_amdgpu], [AMDGPU=yes], [AMDGPU=no])
+	PKG_CHECK_EXISTS([libdrm_amdgpu >= 2.4.81], [AMDGPU=yes], [AMDGPU=no])
 fi
 if test "x$AMDGPU" = xyes; then
 	PKG_CHECK_MODULES(DRM_AMDGPU, [libdrm_amdgpu >= 2.4.81])
