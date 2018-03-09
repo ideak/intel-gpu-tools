@@ -266,7 +266,7 @@ if test "x$AMDGPU" = xauto; then
 	PKG_CHECK_EXISTS([libdrm_amdgpu], [AMDGPU=yes], [AMDGPU=no])
 fi
 if test "x$AMDGPU" = xyes; then
-	PKG_CHECK_MODULES(DRM_AMDGPU, [libdrm_amdgpu >= 2.4.76])
+	PKG_CHECK_MODULES(DRM_AMDGPU, [libdrm_amdgpu >= 2.4.81])
 	AC_DEFINE(HAVE_LIBDRM_AMDGPU, 1, [Have amdgpu support])
 fi
 AM_CONDITIONAL(HAVE_LIBDRM_AMDGPU, [test "x$AMDGPU" = xyes])
