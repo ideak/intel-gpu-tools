@@ -271,22 +271,6 @@ x11_overlay_create(struct config *config, int *width, int *height)
 
 	priv->x = x;
 	priv->y = y;
-	if (position != POS_UNSET) {
-		switch (position & 7) {
-		default:
-		case 0: priv->x = 0; break;
-		case 1: priv->x = (scr->width - image->width)/2; break;
-		case 2: priv->x = scr->width - image->width; break;
-		}
-
-		switch ((position >> 4) & 7) {
-		default:
-		case 0: priv->y = 0; break;
-		case 1: priv->y = (scr->height - image->height)/2; break;
-		case 2: priv->y = scr->height - image->height; break;
-		}
-	}
-
 
 	priv->image = image;
 	priv->image->data = (void *)&priv->name;
