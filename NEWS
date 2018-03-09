@@ -1,5 +1,53 @@
+Release 1.22 (2018-03-09)
+-------------------------
+
+General changes:
+
+- Libudev has been made a mandatory dependency. (Antonio Argenziano)
+
+- Documentation changed to refer to the new igt-dev mailing
+  list. (Rhys Kidd)
+
+Library changes:
+
+- Refactored timer usage for smaller code size. (Chris Wilson)
+
+- Various fixes to support planar framebuffers. (Maarten Lankhorst)
+
+- Added support for fetching the most recent CRC without waiting for a
+  vblank, along with flushing the queue of already collected
+  CRCs. (Maarten Lankhorst)
+
+- Added a helper to mark BOs purgeable on vc4. (Boris Brezillon)
+
+- Moved handling of a "cork" BO into lib from various tests.
+  (Daniele Ceraolo Spurio)
+
+- Added support for looping over physical i915 engines, as opposed to
+  uABI engines that can alias. (Chris Wilson)
+
+- Added an accelerated method for reading from WC buffers.
+  (Chris Wilson)
+
+Tools changes:
+
+- Improved intel_vbt_decode output, updated the data from current
+  kernel. (Jani Nikula)
+
+- intel_reg can now read/write registers using a given engine.
+  (Mika Kuoppala)
+
+- Aubdump can now simulate enhanced execlist submission, for
+  gen11+. (Scott D Phillips)
+
+
+
+
+
+And many other bug fixes, improvements, cleanups and new tests.
+
 Release 1.21 (2018-01-16)
-------------
+-------------------------
 
 Library changes:
 

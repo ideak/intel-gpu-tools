@@ -1,5 +1,5 @@
 project('intel-gpu-tools', 'c',
-	version : '1.21',
+	version : '1.22',
         default_options: [
           'warning_level=2',
           'c_std=gnu99',
