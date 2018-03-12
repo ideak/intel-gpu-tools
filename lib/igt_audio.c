@@ -266,9 +266,7 @@ bool audio_signal_detect(struct audio_signal *signal, int channels,
 		max = 0;
 
 		for (i = 0; i < frames / 2; i++) {
-			amplitude[i] = sqrt(data[i] * data[i] +
-					    data[frames - i] *
-					    data[frames - i]);
+			amplitude[i] = hypot(data[i], data[frames - i]);
 			if (amplitude[i] > max)
 				max = amplitude[i];
 		}
