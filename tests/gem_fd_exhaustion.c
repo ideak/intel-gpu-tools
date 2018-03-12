@@ -80,7 +80,7 @@ static bool allow_unlimited_files(void)
 	return setrlimit(RLIMIT_NOFILE, &rlim) == 0;
 }
 
-static void restore_original_sysctl(void)
+static void restore_original_sysctl(int sig)
 {
 	if (original_nr_open > 0)
 		write_sysctl("/proc/sys/fs/nr_open", original_nr_open);
