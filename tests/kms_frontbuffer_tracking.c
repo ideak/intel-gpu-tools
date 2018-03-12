@@ -941,8 +941,6 @@ static bool drrs_wait_until_rr_switch_to_low(void)
 
 #define fbc_enable() igt_set_module_param_int("enable_fbc", 1)
 #define fbc_disable() igt_set_module_param_int("enable_fbc", 0)
-#define psr_enable() igt_set_module_param_int("enable_psr", 1)
-#define psr_disable() igt_set_module_param_int("enable_psr", 0)
 #define drrs_enable()	drrs_set(1)
 #define drrs_disable()	drrs_set(0)
 
@@ -1137,7 +1135,7 @@ static void disable_features(const struct test_mode *t)
 		return;
 
 	fbc_disable();
-	psr_disable();
+	psr_disable(drm.debugfs);
 	drrs_disable();
 }
 
@@ -1719,7 +1717,7 @@ static void enable_features_for_test(const struct test_mode *t)
 	if (t->feature & FEATURE_FBC)
 		fbc_enable();
 	if (t->feature & FEATURE_PSR)
-		psr_enable();
+		psr_enable(drm.debugfs);
 	if (t->feature & FEATURE_DRRS)
 		drrs_enable();
 }

@@ -30,5 +30,7 @@
 
 bool psr_wait_entry(int fd);
 bool psr_active(int fd, bool check_active);
+bool psr_enable(int fd);
+bool psr_disable(int fd);
 
 #endif
