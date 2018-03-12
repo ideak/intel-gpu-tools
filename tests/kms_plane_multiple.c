@@ -32,7 +32,6 @@
 
 IGT_TEST_DESCRIPTION("Test atomic mode setting with multiple planes ");
 
-#define MAX_CRCS          2
 #define SIZE_PLANE      256
 #define SIZE_CURSOR     128
 #define LOOP_FOREVER     -1
@@ -46,6 +45,7 @@ typedef struct {
 typedef struct {
 	int drm_fd;
 	igt_display_t display;
+	igt_crc_t ref_crc;
 	igt_pipe_crc_t *pipe_crc;
 	igt_plane_t **plane;
 	struct igt_fb *fb;
@@ -78,6 +78,8 @@ static void test_init(data_t *data, enum pipe pipe, int n_planes)
 
 static void test_fini(data_t *data, igt_output_t *output, int n_planes)
 {
+	igt_pipe_crc_stop(data->pipe_crc);
+
 	for (int i = 0; i < n_planes; i++) {
 		igt_plane_t *plane = data->plane[i];
 		if (!plane)
@@ -92,20 +94,23 @@ static void test_fini(data_t *data, igt_output_t *output, int n_planes)
 	igt_output_set_pipe(output, PIPE_ANY);
 
 	igt_pipe_crc_free(data->pipe_crc);
+	data->pipe_crc = NULL;
 
 	free(data->plane);
 	data->plane = NULL;
-	free(data->fb);
-	data->fb = NULL;
+
+	igt_remove_fb(data->drm_fd, data->fb);
+
+	igt_display_reset(&data->display);
 }
 
 static void
-test_grab_crc(data_t *data, igt_output_t *output, enum pipe pipe, bool atomic,
-	      color_t *color, uint64_t tiling, igt_crc_t **crc /* out */)
+test_grab_crc(data_t *data, igt_output_t *output, enum pipe pipe,
+	      color_t *color, uint64_t tiling)
 {
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
-	int ret, n;
+	int ret;
 
 	igt_output_set_pipe(output, pipe);
 
@@ -122,13 +127,11 @@ test_grab_crc(data_t *data, igt_output_t *output, enum pipe pipe, bool atomic,
 
 	igt_plane_set_fb(data->plane[primary->index], &data->fb[primary->index]);
 
-	ret = igt_display_try_commit2(&data->display,
-				      atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+	ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
 	igt_skip_on(ret != 0);
 
 	igt_pipe_crc_start(data->pipe_crc);
-	n = igt_pipe_crc_get_crcs(data->pipe_crc, 1, crc);
-	igt_assert_eq(n, 1);
+	igt_pipe_crc_get_single(data->pipe_crc, &data->ref_crc);
 }
 
 /*
@@ -239,17 +242,13 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 }
 
 static void
-test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
-				       igt_output_t *output, int n_planes,
-				       uint64_t tiling)
+test_plane_position_with_output(data_t *data, enum pipe pipe,
+				igt_output_t *output, int n_planes,
+				uint64_t tiling)
 {
-	char buf[256];
-	struct drm_event *e = (void *)buf;
 	color_t blue  = { 0.0f, 0.0f, 1.0f };
-	igt_crc_t *ref = NULL;
-	igt_crc_t *crc = NULL;
-	unsigned int vblank_start, vblank_stop;
-	int i, n, ret;
+	igt_crc_t crc;
+	int i;
 	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
 	bool loop_forever;
 	char info[256];
@@ -269,103 +268,32 @@ test_atomic_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	test_init(data, pipe, n_planes);
 
-	test_grab_crc(data, output, pipe, true, &blue, tiling, &ref);
+	test_grab_crc(data, output, pipe, &blue, tiling);
 
 	i = 0;
 	while (i < iterations || loop_forever) {
 		prepare_planes(data, pipe, &blue, tiling, n_planes, output);
 
-		vblank_start = kmstest_get_vblank(data->display.drm_fd, pipe,
-						  DRM_VBLANK_NEXTONMISS);
+		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-		igt_display_commit_atomic(&data->display,
-					  DRM_MODE_PAGE_FLIP_EVENT,
-					  &data->display);
+		igt_pipe_crc_drain(data->pipe_crc);
+		igt_pipe_crc_get_single(data->pipe_crc, &crc);
 
-		igt_set_timeout(1, "Stuck on page flip");
-
-		ret = read(data->display.drm_fd, buf, sizeof(buf));
-		igt_assert(ret >= 0);
-
-		vblank_stop = kmstest_get_vblank(data->display.drm_fd, pipe, 0);
-		igt_assert_eq(e->type, DRM_EVENT_FLIP_COMPLETE);
-		igt_reset_timeout();
-
-		n = igt_pipe_crc_get_crcs(data->pipe_crc, vblank_stop - vblank_start, &crc);
-
-		igt_assert(vblank_stop - vblank_start <= MAX_CRCS);
-		igt_assert_eq(n, vblank_stop - vblank_start);
-
-		igt_assert_crc_equal(ref, crc);
+		igt_assert_crc_equal(&data->ref_crc, &crc);
 
 		i++;
 	}
-
-	igt_pipe_crc_stop(data->pipe_crc);
 
 	test_fini(data, output, n_planes);
 }
 
 static void
-test_legacy_plane_position_with_output(data_t *data, enum pipe pipe,
-				       igt_output_t *output, int n_planes,
-				       uint64_t tiling)
-{
-	color_t blue  = { 0.0f, 0.0f, 1.0f };
-	igt_crc_t *ref = NULL;
-	igt_crc_t *crc = NULL;
-	int i, n;
-	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
-	bool loop_forever;
-	char info[256];
-
-	if (opt.iterations == LOOP_FOREVER) {
-		loop_forever = true;
-		sprintf(info, "forever");
-	} else {
-		loop_forever = false;
-		sprintf(info, "for %d %s",
-			iterations, iterations > 1 ? "iterations" : "iteration");
-	}
-
-	igt_info("Testing connector %s using pipe %s with %d planes %s with seed %d\n",
-		 igt_output_name(output), kmstest_pipe_name(pipe), n_planes,
-		 info, opt.seed);
-
-	test_init(data, pipe, n_planes);
-
-	test_grab_crc(data, output, pipe, false, &blue, tiling, &ref);
-
-	i = 0;
-	while (i < iterations || loop_forever) {
-		prepare_planes(data, pipe, &blue, tiling, n_planes, output);
-
-		igt_display_commit2(&data->display, COMMIT_LEGACY);
-
-		n = igt_pipe_crc_get_crcs(data->pipe_crc, MAX_CRCS, &crc);
-
-		igt_assert_eq(n, MAX_CRCS);
-
-		igt_assert_crc_equal(ref, crc);
-
-		i++;
-	}
-
-	igt_pipe_crc_stop(data->pipe_crc);
-
-	test_fini(data, output, n_planes);
-}
-
-static void
-test_plane_position(data_t *data, enum pipe pipe, bool atomic, uint64_t tiling)
+test_plane_position(data_t *data, enum pipe pipe, uint64_t tiling)
 {
 	igt_output_t *output;
 	int connected_outs;
 	int devid = intel_get_drm_devid(data->drm_fd);
 	int n_planes = data->display.pipes[pipe].n_planes;
-
-	if (atomic)
-		igt_require(data->display.is_atomic);
 
 	if ((tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
 	     tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED))
@@ -378,17 +306,10 @@ test_plane_position(data_t *data, enum pipe pipe, bool atomic, uint64_t tiling)
 
 	connected_outs = 0;
 	for_each_valid_output_on_pipe(&data->display, pipe, output) {
-		if (atomic)
-			test_atomic_plane_position_with_output(data, pipe,
-							       output,
-							       n_planes,
-							       tiling);
-		else
-			test_legacy_plane_position_with_output(data, pipe,
-							       output,
-							       n_planes,
-							       tiling);
-
+		test_plane_position_with_output(data, pipe,
+						output,
+						n_planes,
+						tiling);
 		connected_outs++;
 	}
 
@@ -413,46 +334,17 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 		igt_require(data->display.pipes[pipe].n_planes > 0);
 	}
 
-
-	igt_subtest_f("legacy-pipe-%s-tiling-none",
-		      kmstest_pipe_name(pipe))
+	igt_subtest_f("atomic-pipe-%s-tiling-x", kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, false, LOCAL_DRM_FORMAT_MOD_NONE);
+			test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_X_TILED);
 
-	igt_subtest_f("atomic-pipe-%s-tiling-none",
-		      kmstest_pipe_name(pipe))
+	igt_subtest_f("atomic-pipe-%s-tiling-y", kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, true, LOCAL_I915_FORMAT_MOD_X_TILED);
+			test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_Y_TILED);
 
-	igt_subtest_f("legacy-pipe-%s-tiling-x",
-		      kmstest_pipe_name(pipe))
+	igt_subtest_f("atomic-pipe-%s-tiling-yf", kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, false, LOCAL_I915_FORMAT_MOD_X_TILED);
-
-	igt_subtest_f("atomic-pipe-%s-tiling-x",
-		      kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, true, LOCAL_I915_FORMAT_MOD_X_TILED);
-
-	igt_subtest_f("legacy-pipe-%s-tiling-y",
-		      kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, false, LOCAL_I915_FORMAT_MOD_Y_TILED);
-
-	igt_subtest_f("atomic-pipe-%s-tiling-y",
-		      kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, true, LOCAL_I915_FORMAT_MOD_Y_TILED);
-
-	igt_subtest_f("legacy-pipe-%s-tiling-yf",
-		      kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, false, LOCAL_I915_FORMAT_MOD_Yf_TILED);
-
-	igt_subtest_f("atomic-pipe-%s-tiling-yf",
-		      kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, true, LOCAL_I915_FORMAT_MOD_Yf_TILED);
+			test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_Yf_TILED);
 }
 
 static data_t data;
@@ -503,6 +395,7 @@ int main(int argc, char *argv[])
 		kmstest_set_vt_graphics_mode();
 		igt_require_pipe_crc(data.drm_fd);
 		igt_display_init(&data.display, data.drm_fd);
+		igt_require(data.display.is_atomic);
 		igt_require(data.display.n_pipes > 0);
 	}
 
