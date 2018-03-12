@@ -293,6 +293,13 @@ test_executables += executable('gem_eio',
 	   install : true)
 test_list += 'gem_eio'
 
+test_executables += executable('gem_exec_balancer', 'i915/gem_exec_balancer.c',
+	   dependencies : test_deps + [ lib_igt_perf ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_progs += 'gem_exec_balancer'
+
 test_executables += executable('gem_mocs_settings',
 	   join_paths('i915', 'gem_mocs_settings.c'),
 	   dependencies : test_deps + [ lib_igt_perf ],

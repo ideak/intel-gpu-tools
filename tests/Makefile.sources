@@ -25,6 +25,7 @@ TESTS_progs = \
 	i915/gem_ctx_clone \
 	i915/gem_ctx_engines \
 	i915/gem_ctx_shared \
+	i915/gem_exec_balancer \
 	i915/gem_vm_create \
 	kms_3d \
 	kms_addfb_basic \
