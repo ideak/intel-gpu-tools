@@ -1333,6 +1333,7 @@ static void init_crcs(enum pixel_format format,
 	}
 
 	igt_output_set_pipe(prim_mode_params.output, prim_mode_params.pipe);
+	igt_output_override_mode(prim_mode_params.output, prim_mode_params.mode);
 	for (r = 0; r < pattern->n_rects; r++) {
 		igt_plane_set_fb(prim_mode_params.primary.plane, &tmp_fbs[r]);
 		igt_display_commit(&drm.display);
