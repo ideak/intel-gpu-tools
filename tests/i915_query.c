@@ -69,9 +69,7 @@ static bool has_query_supports(int fd)
 static void test_query_garbage(int fd)
 {
 	struct drm_i915_query query;
-	struct drm_i915_query_item items[2];
-	struct drm_i915_query_item *items_ptr;
-	int i, n_items;
+	struct drm_i915_query_item item;
 
 	/* Verify that invalid query pointers are rejected. */
 	igt_assert_eq(__i915_query(fd, NULL), -EFAULT);
@@ -90,8 +88,15 @@ static void test_query_garbage(int fd)
 	i915_query_items_err(fd, (void *) 0, 1, EFAULT);
 
 	/* Test the invalid query id = 0. */
-	memset(items, 0, sizeof(items));
-	i915_query_items_err(fd, items, 1, EINVAL);
+	memset(&item, 0, sizeof(item));
+	i915_query_items_err(fd, &item, 1, EINVAL);
+}
+
+static void test_query_garbage_items(int fd)
+{
+	struct drm_i915_query_item items[2];
+	struct drm_i915_query_item *items_ptr;
+	int i, n_items;
 
 	/*
 	 * Query item flags field is currently valid only if equals to 0.
@@ -479,6 +484,11 @@ igt_main
 
 	igt_subtest("query-garbage")
 		test_query_garbage(fd);
+
+	igt_subtest("query-garbage-items") {
+		igt_require(query_topology_supported(fd));
+		test_query_garbage_items(fd);
+	}
 
 	igt_subtest("query-topology-kernel-writes") {
 		igt_require(query_topology_supported(fd));
