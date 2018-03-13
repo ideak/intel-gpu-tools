@@ -35,3 +35,11 @@ test per feature.
 
 The string "basic" in a test name means the test probably belongs in
 this list.
+
+=============
+meta.testlist
+=============
+
+Meta-testlist contains tests that are hardcoded to generate various
+different test results. It is used to test CI systems for proper
+result reporting, notification systems, etc.
