@@ -31,6 +31,13 @@ The results of CI runs on drm-tip and various other kernel trees can
 be found in https://intel-gfx-ci.01.org/CI/
 
 =============
+blacklist.txt
+=============
+
+This file contains regular expressions (one per line) for tests that
+are not to be executed in full suite test rounds.
+
+=============
 meta.testlist
 =============
 
