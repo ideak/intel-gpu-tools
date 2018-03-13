@@ -21,20 +21,14 @@ ask a maintainer (see MAINTAINERS).
 fast-feedback.testlist
 ======================
 
-Fast-feedback is the testlist that is run for Patchwork and Trybot
-testing. It is also run on various drm-intel-* branches.
+Fast-feedback contains tests that roughly tests a wide coverage of
+features in a short time. If the tests in fast-feedback report no
+regressions, the (almost) full suite of IGT tests is executed for
+proper testing. Results of a fast-feedback test round should only be
+considered to mean that the kernel is not obviously broken.
 
-The results of CI runs on drm-tip can be found in
-https://intel-gfx-ci.01.org/CI/
-
-Time limit: Full run must complete in 15 minutes on all tested
-platforms.
-
-Feature coverage: Should test all working features, with at least 1
-test per feature.
-
-The string "basic" in a test name means the test probably belongs in
-this list.
+The results of CI runs on drm-tip and various other kernel trees can
+be found in https://intel-gfx-ci.01.org/CI/
 
 =============
 meta.testlist
