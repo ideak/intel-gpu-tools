@@ -454,11 +454,17 @@ test_query_topology_known_pci_ids(int fd, int devid)
 		break;
 	case 2:
 		igt_assert_eq(n_slices, 1);
-		igt_assert_eq(n_subslices, 3);
+		if (dev_info->is_haswell)
+			igt_assert_eq(n_subslices, 2);
+		else
+			igt_assert_eq(n_subslices, 3);
 		break;
 	case 3:
 		igt_assert_eq(n_slices, 2);
-		igt_assert_eq(n_subslices, 2 * 3);
+		if (dev_info->is_haswell)
+			igt_assert_eq(n_subslices, 2 * 2);
+		else
+			igt_assert_eq(n_subslices, 2 * 3);
 		break;
 	case 4:
 		igt_assert_eq(n_slices, 3);
