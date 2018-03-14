@@ -133,6 +133,17 @@ static void test_panel_fitting(data_t *d)
 		igt_plane_set_size(d->plane2, mode->hdisplay-200, mode->vdisplay-200);
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
+		/*
+		 * gen9 pipe C has only 1 scaler shared with the crtc, which
+		 * means pipe scaling can't work simultaneously with panel
+		 * fitting.
+		 *
+		 * Since this is the legacy path, userspace has to know about
+		 * the HW limitations, whereas atomic can ask.
+		 */
+		if (intel_gen(intel_get_drm_devid(display->drm_fd)) == 9 && pipe == PIPE_C)
+			igt_plane_set_size(d->plane2, d->fb2.width-200, d->fb2.height-200);
+
 		/* enable panel fitting along with sprite scaling */
 		mode->hdisplay = 1024;
 		mode->vdisplay = 768;
