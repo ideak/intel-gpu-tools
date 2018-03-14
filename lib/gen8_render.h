@@ -131,7 +131,11 @@ struct gen8_surface_state
 	} ss5;
 
 	struct {
-		uint32_t pad; /* Multisample Control Surface stuff */
+		uint32_t aux_mode:3;
+		uint32_t aux_pitch:9;
+		uint32_t pad0:4;
+		uint32_t aux_qpitch:15;
+		uint32_t pad1:1;
 	} ss6;
 
 	struct {
@@ -159,13 +163,11 @@ struct gen8_surface_state
 	} ss9;
 
 	struct {
-		uint32_t pad0:12;
-		uint32_t aux_base_addr:20;
+		uint32_t aux_base_addr;
 	} ss10;
 
 	struct {
-		uint32_t aux_base_addr_hi:16;
-		uint32_t pad:16;
+		uint32_t aux_base_addr_hi;
 	} ss11;
 
 	struct {

@@ -189,6 +189,20 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	ss->ss7.shader_chanel_select_b = 6;
 	ss->ss7.shader_chanel_select_a = 7;
 
+	if (buf->aux.stride) {
+		ss->ss6.aux_mode = 0x5; /* AUX_CCS_E */
+		ss->ss6.aux_pitch = (buf->aux.stride / 128) - 1;
+
+		ss->ss10.aux_base_addr = buf->bo->offset64 + buf->aux.offset;
+		ss->ss11.aux_base_addr_hi = (buf->bo->offset64 + buf->aux.offset) >> 32;
+
+		ret = drm_intel_bo_emit_reloc(batch->bo,
+					      intel_batchbuffer_subdata_offset(batch, &ss->ss10),
+					      buf->bo, buf->aux.offset,
+					      read_domain, write_domain);
+		assert(ret == 0);
+	}
+
 	return offset;
 }
 
