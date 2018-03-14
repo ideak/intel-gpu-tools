@@ -171,7 +171,8 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	else if (buf->tiling == I915_TILING_Y)
 		ss->ss0.tiled_mode = 3;
 
-	ss->ss8.base_addr = buf->bo->offset;
+	ss->ss8.base_addr = buf->bo->offset64;
+	ss->ss9.base_addr_hi = buf->bo->offset64 >> 32;
 
 	ret = drm_intel_bo_emit_reloc(batch->bo,
 				      intel_batchbuffer_subdata_offset(batch, &ss->ss8),

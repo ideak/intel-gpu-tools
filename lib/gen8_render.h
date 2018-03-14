@@ -155,8 +155,7 @@ struct gen8_surface_state
 	} ss8;
 
 	struct {
-		uint32_t base_addr_hi:16;
-		uint32_t pad0:16;
+		uint32_t base_addr_hi;
 	} ss9;
 
 	struct {
