@@ -90,9 +90,9 @@ struct tracepoint {
 	int global_seqno_field;
 	int plane_field;
 } tracepoints[TP_NB] = {
-	[TP_GEM_REQUEST_ADD]         = { .name = "i915/i915_gem_request_add", },
-	[TP_GEM_REQUEST_WAIT_BEGIN]  = { .name = "i915/i915_gem_request_wait_begin", },
-	[TP_GEM_REQUEST_WAIT_END]    = { .name = "i915/i915_gem_request_wait_end", },
+	[TP_GEM_REQUEST_ADD]         = { .name = "i915/i915_request_add", },
+	[TP_GEM_REQUEST_WAIT_BEGIN]  = { .name = "i915/i915_request_wait_begin", },
+	[TP_GEM_REQUEST_WAIT_END]    = { .name = "i915/i915_request_wait_end", },
 	[TP_FLIP_COMPLETE]           = { .name = "i915/flip_complete", },
 	[TP_GEM_RING_SYNC_TO]        = { .name = "i915/gem_ring_sync_to", },
 	[TP_GEM_RING_SWITCH_CONTEXT] = { .name = "i915/gem_ring_switch_context", },
