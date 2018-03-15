@@ -24,21 +24,29 @@
 
 ROOT="`dirname $0`"
 ROOT="`readlink -f $ROOT/..`"
-IGT_TEST_ROOT="`readlink -f ${IGT_TEST_ROOT:-$ROOT/tests}`"
 IGT_CONFIG_PATH="`readlink -f ${IGT_CONFIG_PATH:-$HOME/.igtrc}`"
 RESULTS="$ROOT/results"
 PIGLIT=`which piglit 2> /dev/null`
 
-if [ ! -d "$IGT_TEST_ROOT" ]; then
-	echo "Error: could not find tests directory."
+if [ -z "$IGT_TEST_ROOT" ]; then
+	paths=("$ROOT/build/tests/test-list.txt"
+	       "$ROOT/tests/test-list.txt")
+	for p in "${paths[@]}"; do
+		if [ -f "$p" ]; then
+			echo "Found test list: \"$p\""
+			IGT_TEST_ROOT=$(dirname "$p")
+			break
+		fi
+	done
+fi
+
+if [ -z "$IGT_TEST_ROOT" ]; then
+	echo "Error: test list not found."
+	echo "Please build tests to generate the test list or use IGT_TEST_ROOT env var."
 	exit 1
 fi
 
-if [ ! -f "$IGT_TEST_ROOT/test-list.txt" ]; then
-	echo "Error: test list not found."
-	echo "Please run make in the tests directory to generate the test list."
-	exit 1
-fi
+IGT_TEST_ROOT="`readlink -f ${IGT_TEST_ROOT}`"
 
 function download_piglit {
 	git clone git://anongit.freedesktop.org/piglit "$ROOT/piglit"
