@@ -755,12 +755,24 @@ static int __debugfs_write(const char *param, char *buf, int len)
 #define debugfs_read(p, arr) __debugfs_read(p, arr, sizeof(arr))
 #define debugfs_write(p, arr) __debugfs_write(p, arr, sizeof(arr))
 
+static char last_fbc_buf[128];
+
 static bool fbc_is_enabled(int lvl)
 {
 	char buf[128];
+	bool print = true;
 
 	debugfs_read("i915_fbc_status", buf);
-	igt_log(IGT_LOG_DOMAIN, lvl, "fbc_is_enabled()?\n%s", buf);
+	if (lvl != IGT_LOG_DEBUG)
+		last_fbc_buf[0] = '\0';
+	else if (strcmp(last_fbc_buf, buf))
+		strcpy(last_fbc_buf, buf);
+	else
+		print = false;
+
+	if (print)
+		igt_log(IGT_LOG_DOMAIN, lvl, "fbc_is_enabled()?\n%s", buf);
+
 	return strstr(buf, "FBC enabled\n");
 }
 
@@ -945,6 +957,8 @@ static bool fbc_stride_not_supported(void)
 
 static bool fbc_wait_until_enabled(void)
 {
+	last_fbc_buf[0] = '\0';
+
 	return igt_wait(fbc_is_enabled(IGT_LOG_DEBUG), 2000, 1);
 }
 
