@@ -177,9 +177,12 @@ $ mkdir build && meson build && cd build && ninja
 
 Note that meson insist on separate build directories from the source tree.
 
-Running testcases is done with
+Running selfchecks for lib/tests and tests/ is done with
 
 $ cd build && ninja test
+
+Note that this doesn't actually run the testcases in tests/: scripts/run-tests.sh
+should continue to be used for that.
 
 Documentation is built using
 
