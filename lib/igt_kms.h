@@ -615,7 +615,7 @@ igt_pipe_get_prop(igt_display_t *display, enum pipe pipe,
  */
 static inline bool
 igt_pipe_has_prop(igt_display_t *display, enum pipe pipe,
-		  enum igt_atomic_connector_properties prop)
+		  enum igt_atomic_crtc_properties prop)
 {
 	return display->pipes[pipe].props[prop];
 }
