@@ -24,8 +24,8 @@
 
 ROOT="`dirname $0`"
 ROOT="`readlink -f $ROOT/..`"
-IGT_TEST_ROOT="${IGT_TEST_ROOT:-$ROOT/tests}"
-IGT_CONFIG_PATH="${IGT_CONFIG_PATH:-$HOME/.igtrc}"
+IGT_TEST_ROOT="`readlink -f ${IGT_TEST_ROOT:-$ROOT/tests}`"
+IGT_CONFIG_PATH="`readlink -f ${IGT_CONFIG_PATH:-$HOME/.igtrc}`"
 RESULTS="$ROOT/results"
 PIGLIT=`which piglit 2> /dev/null`
 
