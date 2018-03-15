@@ -131,6 +131,8 @@ static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 
 	/* create buffer in the range of  min and max source side limit.*/
 	width = height = 9;
+	if (pixel_format == DRM_FORMAT_NV12)
+		width = height = 17;
 	igt_create_color_fb(display->drm_fd, width, height,
 		       pixel_format, tiling, 0.0, 1.0, 0.0, &d->fb[0]);
 	igt_plane_set_fb(plane, &d->fb[0]);
