@@ -44,6 +44,21 @@ function download_piglit {
 	git clone git://anongit.freedesktop.org/piglit "$ROOT/piglit"
 }
 
+function run_piglit # as-root <args>
+{
+	local need_root=$1
+	shift
+	local sudo
+
+	export IGT_TEST_ROOT IGT_CONFIG_PATH
+
+	if [ "$need_root" -ne 0 -a "$EUID" -ne 0 ]; then
+		sudo="sudo --preserve-env=IGT_TEST_ROOT,IGT_CONFIG_PATH"
+	fi
+
+	$sudo $PIGLIT "$@"
+}
+
 function print_help {
 	echo "Usage: run-tests.sh [options]"
 	echo "Available options:"
@@ -111,18 +126,18 @@ if [ ! -x "$PIGLIT" ]; then
 fi
 
 if [ "x$LIST_TESTS" != "x" ]; then
-	IGT_TEST_ROOT="$IGT_TEST_ROOT" IGT_CONFIG_PATH="$IGT_CONFIG_PATH" "$PIGLIT" print-cmd --format "{name}" igt
+	run_piglit 0 print-cmd --format "{name}" igt
 	exit
 fi
 
 if [ "x$RESUME" != "x" ]; then
-	sudo IGT_TEST_ROOT="$IGT_TEST_ROOT" IGT_CONFIG_PATH="$IGT_CONFIG_PATH" "$PIGLIT" resume "$RESULTS" $NORETRY
+	run_piglit 1 resume "$RESULTS" $NORETRY
 else
 	mkdir -p "$RESULTS"
-	sudo IGT_TEST_ROOT="$IGT_TEST_ROOT" IGT_CONFIG_PATH="$IGT_CONFIG_PATH" "$PIGLIT" run igt --ignore-missing -o "$RESULTS" -s $VERBOSE $EXCLUDE $FILTER
+	run_piglit 1 run igt --ignore-missing -o "$RESULTS" -s $VERBOSE $EXCLUDE $FILTER
 fi
 
 if [ "$SUMMARY" == "html" ]; then
-	"$PIGLIT" summary html --overwrite "$RESULTS/html" "$RESULTS"
+	run_piglit 0 summary html --overwrite "$RESULTS/html" "$RESULTS"
 	echo "HTML summary has been written to $RESULTS/html/index.html"
 fi
