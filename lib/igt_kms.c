@@ -4132,8 +4132,28 @@ static void igt_fill_plane_format_mod(igt_display_t *display, igt_plane_t *plane
 	int idx = 0;
 	int count;
 
-	if (!igt_plane_has_prop(plane, IGT_PLANE_IN_FORMATS))
+	if (!igt_plane_has_prop(plane, IGT_PLANE_IN_FORMATS)) {
+		drmModePlanePtr p = plane->drm_plane;
+
+		count = p->count_formats;
+
+		plane->format_mod_count = count;
+		plane->formats = calloc(count, sizeof(plane->formats[0]));
+		igt_assert(plane->formats);
+		plane->modifiers = calloc(count, sizeof(plane->modifiers[0]));
+		igt_assert(plane->modifiers);
+
+		/*
+		 * We don't know which modifiers are
+		 * supported, so we'll assume linear only.
+		 */
+		for (int i = 0; i < count; i++) {
+			plane->formats[i] = p->formats[i];
+			plane->modifiers[i] = DRM_FORMAT_MOD_LINEAR;
+		}
+
 		return;
+	}
 
 	blob_id = igt_plane_get_prop(plane, IGT_PLANE_IN_FORMATS);
 
