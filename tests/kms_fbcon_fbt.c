@@ -189,7 +189,7 @@ static bool psr_is_enabled(int fd)
 	char buf[256];
 
 	igt_debugfs_read(fd, "i915_edp_psr_status", buf);
-	return strstr(buf, "\nActive: yes\n");
+	return strstr(buf, "\nHW Enabled & Active bit: yes\n");
 }
 
 static bool psr_wait_until_enabled(int fd)

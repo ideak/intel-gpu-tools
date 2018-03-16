@@ -781,8 +781,7 @@ static bool psr_is_enabled(void)
 	char buf[256];
 
 	debugfs_read("i915_edp_psr_status", buf);
-	return strstr(buf, "\nActive: yes\n") &&
-	       strstr(buf, "\nHW Enabled & Active bit: yes\n");
+	return strstr(buf, "\nHW Enabled & Active bit: yes\n");
 }
 
 static void psr_print_status(void)
