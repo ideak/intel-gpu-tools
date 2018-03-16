@@ -51,6 +51,38 @@ static double elapsed(const struct timespec *start, const struct timespec *end)
 		(end->tv_nsec - start->tv_nsec)*1e-9);
 }
 
+static int measure_qlen(int fd,
+			struct drm_i915_gem_execbuffer2 *execbuf,
+			unsigned int *engine, unsigned int nengine,
+			int timeout)
+{
+	const struct drm_i915_gem_exec_object2 * const obj =
+		(struct drm_i915_gem_exec_object2 *)(uintptr_t)execbuf->buffers_ptr;
+	int qlen = 64;
+
+	for (unsigned int n = 0; n < nengine; n++) {
+		uint64_t saved = execbuf->flags;
+		struct timespec tv = {};
+
+		execbuf->flags |= engine[n];
+
+		igt_nsec_elapsed(&tv);
+		for (int loop = 0; loop < qlen; loop++)
+			gem_execbuf(fd, execbuf);
+		gem_sync(fd, obj->handle);
+
+		execbuf->flags = saved;
+
+		/*
+		 * Be conservative and aim not to overshoot timeout, so scale
+		 * down by 8 for hopefully a max of 12.5% error.
+		 */
+		qlen = qlen * timeout * 1e9 / igt_nsec_elapsed(&tv) / 8 + 1;
+	}
+
+	return qlen;
+}
+
 static void single(int fd, uint32_t handle,
 		   const struct intel_execution_engine *e,
 		   unsigned flags,
@@ -141,7 +173,7 @@ static void all(int fd, uint32_t handle, unsigned flags, int timeout)
 	const char *name[16];
 	uint32_t contexts[65];
 	unsigned int nengine;
-	int n;
+	int n, qlen;
 
 	nengine = 0;
 	for_each_physical_engine(fd, e) {
@@ -165,6 +197,10 @@ static void all(int fd, uint32_t handle, unsigned flags, int timeout)
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 	gem_sync(fd, handle);
+
+	qlen = measure_qlen(fd, &execbuf, engine, nengine, timeout);
+	igt_info("Using timing depth of %d batches\n", qlen);
+
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 
@@ -184,11 +220,12 @@ static void all(int fd, uint32_t handle, unsigned flags, int timeout)
 
 				clock_gettime(CLOCK_MONOTONIC, &start);
 				do {
-					for (int loop = 0; loop < 1024; loop++) {
+					for (int loop = 0; loop < qlen; loop++) {
 						execbuf.rsvd1 = contexts[loop % nctx];
 						gem_execbuf(fd, &execbuf);
 					}
-					count += 1024;
+					count += qlen;
+					gem_sync(fd, obj[0].handle);
 					clock_gettime(CLOCK_MONOTONIC, &now);
 				} while (elapsed(&start, &now) < timeout);
 				gem_sync(fd, obj[0].handle);
