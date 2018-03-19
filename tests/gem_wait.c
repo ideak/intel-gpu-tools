@@ -156,23 +156,23 @@ igt_main
 
 		igt_subtest("basic-busy-all") {
 			gem_quiescent_gpu(fd);
-			basic(fd, -1, BUSY);
+			basic(fd, ALL_ENGINES, BUSY);
 		}
 		igt_subtest("basic-wait-all") {
 			gem_quiescent_gpu(fd);
-			basic(fd, -1, 0);
+			basic(fd, ALL_ENGINES, 0);
 		}
 		igt_subtest("basic-await-all") {
 			gem_quiescent_gpu(fd);
-			basic(fd, -1, AWAIT);
+			basic(fd, ALL_ENGINES, AWAIT);
 		}
 		igt_subtest("basic-busy-write-all") {
 			gem_quiescent_gpu(fd);
-			basic(fd, -1, BUSY | WRITE);
+			basic(fd, ALL_ENGINES, BUSY | WRITE);
 		}
 		igt_subtest("basic-wait-write-all") {
 			gem_quiescent_gpu(fd);
-			basic(fd, -1, WRITE);
+			basic(fd, ALL_ENGINES, WRITE);
 		}
 
 		for (e = intel_execution_engines; e->name; e++) {
@@ -216,20 +216,20 @@ igt_main
 
 		igt_subtest("hang-busy-all") {
 			gem_quiescent_gpu(fd);
-			basic(fd, -1, BUSY | HANG);
+			basic(fd, ALL_ENGINES, BUSY | HANG);
 		}
 		igt_subtest("hang-wait-all") {
 			gem_quiescent_gpu(fd);
-			basic(fd, -1, HANG);
+			basic(fd, ALL_ENGINES, HANG);
 		}
 
 		igt_subtest("hang-busy-write-all") {
 			gem_quiescent_gpu(fd);
-			basic(fd, -1, BUSY | WRITE | HANG);
+			basic(fd, ALL_ENGINES, BUSY | WRITE | HANG);
 		}
 		igt_subtest("hang-wait-write-all") {
 			gem_quiescent_gpu(fd);
-			basic(fd, -1, WRITE | HANG);
+			basic(fd, ALL_ENGINES, WRITE | HANG);
 		}
 
 		for (e = intel_execution_engines; e->name; e++) {

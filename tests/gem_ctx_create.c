@@ -110,7 +110,7 @@ static void active(int fd, unsigned engine, int timeout, int ncpus)
 	unsigned int nengine, engines[16];
 	unsigned *shared;
 
-	if (engine == -1) {
+	if (engine == ALL_ENGINES) {
 		igt_require(all_nengine);
 		nengine = all_nengine;
 		memcpy(engines, all_engines, sizeof(engines[0])*nengine);
@@ -365,9 +365,9 @@ igt_main
 		files(fd, 150, ncpus);
 
 	igt_subtest("active-all")
-		active(fd, -1, 120, 1);
+		active(fd, ALL_ENGINES, 120, 1);
 	igt_subtest("forked-active-all")
-		active(fd, -1, 120, ncpus);
+		active(fd, ALL_ENGINES, 120, ncpus);
 
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {

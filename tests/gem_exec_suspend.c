@@ -98,7 +98,7 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 	igt_spin_t *spin = NULL;
 
 	nengine = 0;
-	if (engine == -1) {
+	if (engine == ALL_ENGINES) {
 		/* If we don't have semaphores, then every ring switch
 		 * will result in a CPU stall until the previous write
 		 * has finished. This is likely to hide any issue with
@@ -254,15 +254,15 @@ igt_main
 	}
 
 	igt_subtest("basic")
-		run_test(fd, -1, NOSLEEP);
+		run_test(fd, ALL_ENGINES, NOSLEEP);
 	igt_subtest("basic-S3-devices")
-		run_test(fd, -1, SUSPEND_DEVICES);
+		run_test(fd, ALL_ENGINES, SUSPEND_DEVICES);
 	igt_subtest("basic-S3")
-		run_test(fd, -1, SUSPEND);
+		run_test(fd, ALL_ENGINES, SUSPEND);
 	igt_subtest("basic-S4-devices")
-		run_test(fd, -1, HIBERNATE_DEVICES);
+		run_test(fd, ALL_ENGINES, HIBERNATE_DEVICES);
 	igt_subtest("basic-S4")
-		run_test(fd, -1, HIBERNATE);
+		run_test(fd, ALL_ENGINES, HIBERNATE);
 
 	for (e = intel_execution_engines; e->name; e++) {
 		for (m = modes; m->suffix; m++) {

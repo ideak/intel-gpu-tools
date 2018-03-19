@@ -66,6 +66,8 @@ void igt_clflush_range(void *addr, int size);
 
 unsigned intel_detect_and_clear_missed_interrupts(int fd);
 
+#define ALL_ENGINES ~0u /* Use in interfaces to iterate all engines */
+
 extern const struct intel_execution_engine {
 	const char *name;
 	const char *full_name;

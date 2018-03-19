@@ -177,8 +177,8 @@ static bool is_wedged(int i915)
  * @i915: open i915 drm file descriptor
  * @engine: the engine (I915_EXEC_RING id) to exercise
  *
- * Execute a nop batch on the specified, or -1 for all, and check it
- * executes.
+ * Execute a nop batch on the engine specified, or ALL_ENGINES for all,
+ * and check it executes.
  */
 void gem_test_engine(int i915, unsigned int engine)
 {
@@ -194,7 +194,7 @@ void gem_test_engine(int i915, unsigned int engine)
 	igt_assert(!is_wedged(i915));
 	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
 
-	if (engine == -1u) {
+	if (engine == ALL_ENGINES) {
 		for_each_engine(i915, engine) {
 			execbuf.flags = engine;
 			gem_execbuf(i915, &execbuf);

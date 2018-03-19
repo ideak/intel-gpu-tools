@@ -171,7 +171,7 @@ static void smoketest(int fd, unsigned ring, unsigned timeout)
 	uint32_t *ptr;
 
 	nengine = 0;
-	if (ring == -1) {
+	if (ring == ALL_ENGINES) {
 		for_each_physical_engine(fd, engine)
 			engines[nengine++] = engine;
 	} else {
@@ -949,7 +949,7 @@ igt_main
 		}
 
 		igt_subtest("smoketest-all")
-			smoketest(fd, -1, 30);
+			smoketest(fd, ALL_ENGINES, 30);
 
 		for (e = intel_execution_engines; e->name; e++) {
 			if (e->exec_id == 0)

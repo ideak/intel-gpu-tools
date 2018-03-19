@@ -168,7 +168,7 @@ static void all(int fd, unsigned engine, unsigned flags)
 		igt_require(gen > 5);
 
 	nengine = 0;
-	if (engine == -1) {
+	if (engine == ALL_ENGINES) {
 		for_each_physical_engine(fd, engine) {
 			if (gem_can_store_dword(fd, engine))
 				engines[nengine++] = engine;
@@ -247,7 +247,7 @@ igt_main
 
 	for (const struct mode *m = modes; m->name; m++)
 		igt_subtest_f("%s", *m->name ? m->name : "basic")
-			all(fd, -1, m->flags);
+			all(fd, ALL_ENGINES, m->flags);
 
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {

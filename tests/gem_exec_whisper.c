@@ -205,7 +205,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	debugfs = igt_debugfs_dir(fd);
 
 	nengine = 0;
-	if (engine == -1) {
+	if (engine == ALL_ENGINES) {
 		for_each_physical_engine(fd, engine) {
 			if (gem_can_store_dword(fd, engine))
 				engines[nengine++] = engine;
@@ -534,7 +534,7 @@ igt_main
 
 	for (const struct mode *m = modes; m->name; m++)
 		igt_subtest_f("%s", m->name)
-			whisper(fd, -1, m->flags);
+			whisper(fd, ALL_ENGINES, m->flags);
 
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {
@@ -556,7 +556,7 @@ igt_main
 			if (m->flags & INTERRUPTIBLE)
 				continue;
 			igt_subtest_f("hang-%s", m->name)
-				whisper(fd, -1, m->flags | HANG);
+				whisper(fd, ALL_ENGINES, m->flags | HANG);
 		}
 	}
 

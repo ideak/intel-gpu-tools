@@ -85,7 +85,7 @@ sync_ring(int fd, unsigned ring, int num_children, int timeout)
 	const char *names[16];
 	int num_engines = 0;
 
-	if (ring == ~0u) {
+	if (ring == ALL_ENGINES) {
 		for_each_physical_engine(fd, ring) {
 			names[num_engines] = e__->name;
 			engines[num_engines++] = ring;
@@ -185,7 +185,7 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 	const char *names[16];
 	int num_engines = 0;
 
-	if (ring == ~0u) {
+	if (ring == ALL_ENGINES) {
 		for_each_physical_engine(fd, ring) {
 			if (!gem_can_store_dword(fd, ring))
 				continue;
@@ -473,7 +473,7 @@ store_many(int fd, unsigned ring, int timeout)
 
 	intel_detect_and_clear_missed_interrupts(fd);
 
-	if (ring == ~0u) {
+	if (ring == ALL_ENGINES) {
 		for_each_physical_engine(fd, ring) {
 			if (!gem_can_store_dword(fd, ring))
 				continue;
@@ -669,7 +669,7 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 	int num_engines = 0;
 	uint32_t ctx[2];
 
-	if (ring == ~0u) {
+	if (ring == ALL_ENGINES) {
 		for_each_physical_engine(fd, ring) {
 			names[num_engines] = e__->name;
 			engines[num_engines++] = ring;
@@ -773,15 +773,15 @@ igt_main
 	}
 
 	igt_subtest("basic-each")
-		sync_ring(fd, ~0u, 1, 5);
+		sync_ring(fd, ALL_ENGINES, 1, 5);
 	igt_subtest("basic-store-each")
-		store_ring(fd, ~0u, 1, 5);
+		store_ring(fd, ALL_ENGINES, 1, 5);
 	igt_subtest("basic-many-each")
-		store_many(fd, ~0u, 5);
+		store_many(fd, ALL_ENGINES, 5);
 	igt_subtest("forked-each")
-		sync_ring(fd, ~0u, ncpus, 150);
+		sync_ring(fd, ALL_ENGINES, ncpus, 150);
 	igt_subtest("forked-store-each")
-		store_ring(fd, ~0u, ncpus, 150);
+		store_ring(fd, ALL_ENGINES, ncpus, 150);
 
 	igt_subtest("basic-all")
 		sync_all(fd, 1, 5);
@@ -805,7 +805,7 @@ igt_main
 		}
 
 		igt_subtest("preempt-all")
-			preempt(fd, -1, 1, 20);
+			preempt(fd, ALL_ENGINES, 1, 20);
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("preempt-%s", e->name)

@@ -488,7 +488,7 @@ static void fence_signal(int fd, uint32_t handle,
 	igt_require(gem_has_exec_fence(fd));
 
 	nengine = 0;
-	if (ring_id == -1) {
+	if (ring_id == ALL_ENGINES) {
 		for_each_physical_engine(fd, n)
 			engines[nengine++] = n;
 	} else {
@@ -642,7 +642,7 @@ igt_main
 	}
 
 	igt_subtest("signal-all")
-		fence_signal(device, handle, -1, "all", 150);
+		fence_signal(device, handle, ALL_ENGINES, "all", 150);
 
 	igt_subtest("series")
 		series(device, handle, 150);

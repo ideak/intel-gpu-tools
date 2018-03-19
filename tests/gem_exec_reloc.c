@@ -257,7 +257,7 @@ static void active(int fd, unsigned engine)
 	int pass;
 
 	nengine = 0;
-	if (engine == -1) {
+	if (engine == ALL_ENGINES) {
 		for_each_physical_engine(fd, engine) {
 			if (gem_can_store_dword(fd, engine))
 				engines[nengine++] = engine;
@@ -746,7 +746,7 @@ igt_main
 		from_gpu(fd);
 
 	igt_subtest("active")
-		active(fd, -1);
+		active(fd, ALL_ENGINES);
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {
 		igt_subtest_f("active-%s", e->name)
