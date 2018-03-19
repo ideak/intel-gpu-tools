@@ -121,6 +121,14 @@ int main(int argc, char **argv)
 	}
 
 	igt_subtest("force-load-detect") {
+		int i, j, w = 64, h = 64;
+		drmModePlaneRes *plane_resources;
+		struct igt_fb xrgb_fb, argb_fb;
+
+		igt_create_fb(drm_fd, w, h, DRM_FORMAT_XRGB8888, 0, &xrgb_fb);
+		igt_create_fb(drm_fd, w, h, DRM_FORMAT_ARGB8888, 0, &argb_fb);
+		igt_assert(drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1) == 0);
+
 		/*
 		 * disable all outputs to make sure we have a
 		 * free crtc available for load detect
@@ -129,6 +137,42 @@ int main(int argc, char **argv)
 		kmstest_unset_all_crtcs(drm_fd, res);
 
 		igt_set_module_param_int("load_detect_test", 1);
+
+		plane_resources = drmModeGetPlaneResources(drm_fd);
+		igt_assert(plane_resources);
+
+		for (i = 0; i < plane_resources->count_planes; i++) {
+			drmModePlane *drm_plane;
+			bool found = false;
+			uint32_t plane_id = plane_resources->planes[i];
+
+			drm_plane = drmModeGetPlane(drm_fd, plane_id);
+			igt_assert(drm_plane);
+
+			for (j = 0; j < drm_plane->count_formats; j++) {
+				uint32_t format = drm_plane->formats[j];
+				uint32_t crtc = ffs(drm_plane->possible_crtcs) - 1;
+				uint32_t crtc_id = res->crtcs[crtc];
+
+				if (format == DRM_FORMAT_XRGB8888)
+					do_or_die(drmModeSetPlane(drm_fd, plane_id, crtc_id,
+							xrgb_fb.fb_id,
+							0, 0, 0, w, h,
+							0, 0, IGT_FIXED(w, 0), IGT_FIXED(h, 0)));
+				else if (format == DRM_FORMAT_ARGB8888)
+					do_or_die(drmModeSetPlane(drm_fd, plane_id, crtc_id,
+							argb_fb.fb_id,
+							0, 0, 0, w, h,
+							0, 0, IGT_FIXED(w, 0), IGT_FIXED(h, 0)));
+				else
+					continue;
+
+				found = true;
+				break;
+			}
+			drmModeFreePlane(drm_plane);
+			igt_assert(found);
+		}
 
 		/* This can't use drmModeGetConnectorCurrent
 		 * because connector probing is the point of this test.
@@ -140,6 +184,23 @@ int main(int argc, char **argv)
 		igt_assert(temp->connection != DRM_MODE_UNKNOWNCONNECTION);
 
 		drmModeFreeConnector(temp);
+
+		/* Look if planes are unmodified. */
+		for (i = 0; i < plane_resources->count_planes; i++) {
+			drmModePlane *drm_plane;
+
+			drm_plane = drmModeGetPlane(drm_fd,
+						    plane_resources->planes[i]);
+			igt_assert(drm_plane);
+
+			igt_assert(drm_plane->crtc_id);
+			igt_assert(drm_plane->fb_id);
+
+			if (drm_plane->fb_id != xrgb_fb.fb_id)
+				igt_assert_eq(drm_plane->fb_id, argb_fb.fb_id);
+
+			drmModeFreePlane(drm_plane);
+		}
 	}
 
 	igt_subtest("force-connector-state") {
