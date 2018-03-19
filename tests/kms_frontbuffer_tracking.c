@@ -2687,8 +2687,10 @@ static void scaledprimary_subtest(const struct test_mode *t)
 	struct igt_fb new_fb, *old_fb;
 	struct modeset_params *params = pick_params(t);
 	struct fb_region *reg = &params->primary;
+	int gen = intel_gen(intel_get_drm_devid(drm.fd));
+	int src_y_upscale = ALIGN(reg->h / 4, 4);
 
-	igt_require_f(intel_gen(intel_get_drm_devid(drm.fd)) >= 9,
+	igt_require_f(gen >= 9,
 		      "Can't test primary plane scaling before gen 9\n");
 
 	prepare_subtest(t, NULL);
@@ -2737,10 +2739,22 @@ static void scaledprimary_subtest(const struct test_mode *t)
 
 	/* Destination doesn't fill the entire CRTC, upscaling. */
 	igt_fb_set_position(&new_fb, reg->plane,
-			    reg->x + reg->w / 4, reg->y + reg->h / 4);
+			    reg->x + reg->w / 4, reg->y + src_y_upscale);
 	igt_fb_set_size(&new_fb, reg->plane, reg->w / 2, reg->h / 2);
 	igt_display_commit2(&drm.display, COMMIT_UNIVERSAL);
 	do_assertions(DONT_ASSERT_CRC);
+
+	/*
+	 * On gen <= 10 HW, FBC is not enabled on a plane with a Y offset
+	 * that isn't divisible by 4, because it causes FIFO underruns.
+	 *
+	 * Check that FBC is disabled.
+	 */
+	igt_fb_set_position(&new_fb, reg->plane,
+			    reg->x + reg->w / 4, reg->y + src_y_upscale + 3);
+	igt_fb_set_size(&new_fb, reg->plane, reg->w / 2, reg->h / 2);
+	igt_display_commit2(&drm.display, COMMIT_UNIVERSAL);
+	do_assertions(DONT_ASSERT_CRC | (gen <= 10 ? ASSERT_FBC_DISABLED : 0));
 
 	/* Back to the good and old blue fb. */
 	igt_plane_set_fb(reg->plane, old_fb);
