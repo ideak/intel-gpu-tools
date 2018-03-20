@@ -166,6 +166,7 @@ test_progs = [
 	'kms_flip_tiling',
 	'kms_force_connector_basic',
 	'kms_frontbuffer_tracking',
+	'kms_getfb',
 	'kms_hdmi_inject',
 	'kms_invalid_dotclock',
 	'kms_legacy_colorkey',
