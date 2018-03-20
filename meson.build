@@ -76,7 +76,7 @@ if not xmlrpc.found() and xmlrpc_cmd.found()
 	endif
 endif
 
-if pixman.found() and xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found()
+if pixman.found() and gsl.found() and xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found()
 	chamelium = declare_dependency(dependencies : [ pixman, xmlrpc,
 	  xmlrpc_util, xmlrpc_client])
 	config.set('HAVE_CHAMELIUM', 1)
