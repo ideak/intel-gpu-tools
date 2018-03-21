@@ -3957,6 +3957,9 @@ static void igt_fill_plane_format_mod(igt_display_t *display, igt_plane_t *plane
 	int idx = 0;
 	int count;
 
+	if (!igt_plane_has_prop(plane, IGT_PLANE_IN_FORMATS))
+		return;
+
 	blob_id = igt_plane_get_prop(plane, IGT_PLANE_IN_FORMATS);
 
 	blob = drmModeGetPropertyBlob(display->drm_fd, blob_id);
