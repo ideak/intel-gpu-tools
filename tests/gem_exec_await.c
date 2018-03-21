@@ -234,7 +234,7 @@ igt_main
 		igt_require_gem(device);
 		gem_submission_print_method(device);
 
-		ring_size = gem_measure_ring_inflight(device, 0, 0) - 10;
+		ring_size = gem_measure_ring_inflight(device, ALL_ENGINES, 0) - 10;
 		if (!gem_has_execlists(device))
 			ring_size /= 2;
 		igt_info("Ring size: %d batches\n", ring_size);

@@ -272,7 +272,7 @@ igt_main
 			master = true;
 		}
 
-		ring_size = gem_measure_ring_inflight(fd, 0, 0);
+		ring_size = gem_measure_ring_inflight(fd, ALL_ENGINES, 0);
 		igt_info("Ring size: %d batches\n", ring_size);
 		igt_require(ring_size);
 	}

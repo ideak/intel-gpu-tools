@@ -30,6 +30,7 @@
 #include "drmtest.h"
 #include "ioctl_wrappers.h"
 #include "igt_dummyload.h"
+#include "igt_gt.h"
 
 static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 {
@@ -47,22 +48,8 @@ static void alarm_handler(int sig)
 {
 }
 
-/**
- * gem_measure_ring_inflight:
- * @fd: open i915 drm file descriptor
- * @engine: execbuf engine flag
- * @flags: flags to affect measurement:
- *		- MEASURE_RING_NEW_CTX: use a new context to account for the space
- *		  used by the lrc init.
- *
- * This function calculates the maximum number of batches that can be inserted
- * at the same time in the ring on the selected engine.
- *
- * Returns:
- * Number of batches that fit in the ring
- */
-unsigned int
-gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags flags)
+static unsigned int
+__gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags flags)
 {
 	struct sigaction old_sa, sa = { .sa_handler = alarm_handler };
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -128,4 +115,38 @@ gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags f
 	gem_quiescent_gpu(fd);
 
 	return count;
+}
+
+/**
+ * gem_measure_ring_inflight:
+ * @fd: open i915 drm file descriptor
+ * @engine: execbuf engine flag. Use macro ALL_ENGINES to get the minimum
+ *			size across all physical engines.
+ * @flags: flags to affect measurement:
+ *		- MEASURE_RING_NEW_CTX: use a new context to account for the space
+ *		  used by the lrc init.
+ *
+ * This function calculates the maximum number of batches that can be inserted
+ * at the same time in the ring on the selected engine.
+ *
+ * Returns:
+ * Number of batches that fit in the ring
+ */
+unsigned int
+gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags flags)
+{
+	if (engine == ALL_ENGINES) {
+		unsigned int global_min = ~0u;
+
+		for_each_physical_engine(fd, engine) {
+			unsigned int engine_min = __gem_measure_ring_inflight(fd, engine, flags);
+
+			if (engine_min < global_min)
+				global_min = engine_min;
+		}
+
+		return global_min;
+	}
+
+	return __gem_measure_ring_inflight(fd, engine, flags);
 }

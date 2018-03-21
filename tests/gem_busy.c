@@ -301,7 +301,7 @@ static void xchg_u32(void *array, unsigned i, unsigned j)
 static void close_race(int fd)
 {
 	const unsigned int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
-	const unsigned int nhandles = gem_measure_ring_inflight(fd, 0, 0) / 2;
+	const unsigned int nhandles = gem_measure_ring_inflight(fd, ALL_ENGINES, 0) / 2;
 	unsigned int engines[16], nengine;
 	unsigned long *control;
 	uint32_t *handles;
