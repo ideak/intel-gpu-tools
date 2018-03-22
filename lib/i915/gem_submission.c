@@ -22,6 +22,7 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <sys/ioctl.h>
 
@@ -164,6 +165,17 @@ bool gem_has_guc_submission(int fd)
 	return gem_submission_method(fd) & GEM_SUBMISSION_GUC;
 }
 
+static int reopen_driver(int fd)
+{
+	char path[256];
+
+	snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
+	fd = open(path, O_RDWR);
+	igt_assert_fd(fd);
+
+	return fd;
+}
+
 static bool is_wedged(int i915)
 {
 	int err = 0;
@@ -183,19 +195,20 @@ static bool is_wedged(int i915)
 void gem_test_engine(int i915, unsigned int engine)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct drm_i915_gem_exec_object2 obj = {
-		.handle = gem_create(i915, 4096)
-	};
+	struct drm_i915_gem_exec_object2 obj = { };
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(&obj),
 		.buffer_count = 1,
 	};
 
+	i915 = reopen_driver(i915);
 	igt_assert(!is_wedged(i915));
+
+	obj.handle = gem_create(i915, 4096);
 	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
 
 	if (engine == ALL_ENGINES) {
-		for_each_engine(i915, engine) {
+		for_each_physical_engine(i915, engine) {
 			execbuf.flags = engine;
 			gem_execbuf(i915, &execbuf);
 		}
@@ -207,4 +220,5 @@ void gem_test_engine(int i915, unsigned int engine)
 	gem_close(i915, obj.handle);
 
 	igt_assert(!is_wedged(i915));
+	close(i915);
 }
