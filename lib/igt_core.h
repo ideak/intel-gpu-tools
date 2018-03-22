@@ -950,4 +950,6 @@ void igt_kmsg(const char *format, ...);
 #define KMSG_INFO	"<6>[IGT] "
 #define KMSG_DEBUG	"<7>[IGT] "
 
+#define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
+
 #endif /* IGT_CORE_H */

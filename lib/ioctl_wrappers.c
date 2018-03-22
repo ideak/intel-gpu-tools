@@ -198,7 +198,7 @@ void gem_set_tiling(int fd, uint32_t handle, uint32_t tiling, uint32_t stride)
 	igt_assert(__gem_set_tiling(fd, handle, tiling, stride) == 0);
 }
 
-static int __gem_set_caching(int fd, uint32_t handle, uint32_t caching)
+int __gem_set_caching(int fd, uint32_t handle, uint32_t caching)
 {
 	struct drm_i915_gem_caching arg;
 	int err;

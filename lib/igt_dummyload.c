@@ -74,35 +74,48 @@ fill_reloc(struct drm_i915_gem_relocation_entry *reloc,
 	reloc->write_domain = write_domains;
 }
 
-static int emit_recursive_batch(igt_spin_t *spin,
-				int fd, uint32_t ctx, unsigned engine,
-				uint32_t dep, bool out_fence)
+#define OUT_FENCE	(1 << 0)
+#define POLL_RUN	(1 << 1)
+
+static int
+emit_recursive_batch(igt_spin_t *spin, int fd, uint32_t ctx, unsigned engine,
+		     uint32_t dep, unsigned int flags)
 {
 #define SCRATCH 0
 #define BATCH 1
 	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj[2];
-	struct drm_i915_gem_relocation_entry relocs[2];
-	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_relocation_entry relocs[2], *r;
+	struct drm_i915_gem_execbuffer2 *execbuf;
+	struct drm_i915_gem_exec_object2 *obj;
 	unsigned int engines[16];
 	unsigned int nengine;
 	int fence_fd = -1;
-	uint32_t *batch;
+	uint32_t *batch, *batch_start;
 	int i;
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
-		for_each_engine(fd, engine)
-			if (engine)
+		for_each_engine(fd, engine) {
+			if (engine) {
+			if (flags & POLL_RUN)
+				igt_require(!(flags & POLL_RUN) ||
+					    gem_can_store_dword(fd, engine));
+
 				engines[nengine++] = engine;
+			}
+		}
 	} else {
 		gem_require_ring(fd, engine);
+		igt_require(!(flags & POLL_RUN) ||
+			    gem_can_store_dword(fd, engine));
 		engines[nengine++] = engine;
 	}
 	igt_require(nengine);
 
-	memset(&execbuf, 0, sizeof(execbuf));
-	memset(obj, 0, sizeof(obj));
+	memset(&spin->execbuf, 0, sizeof(spin->execbuf));
+	execbuf = &spin->execbuf;
+	memset(spin->obj, 0, sizeof(spin->obj));
+	obj = spin->obj;
 	memset(relocs, 0, sizeof(relocs));
 
 	obj[BATCH].handle = gem_create(fd, BATCH_SIZE);
@@ -113,19 +126,66 @@ static int emit_recursive_batch(igt_spin_t *spin,
 				       	BATCH_SIZE, PROT_WRITE);
 	gem_set_domain(fd, obj[BATCH].handle,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-	execbuf.buffer_count++;
+	execbuf->buffer_count++;
+	batch_start = batch;
 
 	if (dep) {
+		igt_assert(!(flags & POLL_RUN));
+
 		/* dummy write to dependency */
 		obj[SCRATCH].handle = dep;
 		fill_reloc(&relocs[obj[BATCH].relocation_count++],
 			   dep, 1020,
 			   I915_GEM_DOMAIN_RENDER,
 			   I915_GEM_DOMAIN_RENDER);
-		execbuf.buffer_count++;
+		execbuf->buffer_count++;
+	} else if (flags & POLL_RUN) {
+		unsigned int offset;
+
+		igt_assert(!dep);
+
+		if (gen == 4 || gen == 5)
+			execbuf->flags |= I915_EXEC_SECURE;
+
+		spin->poll_handle = gem_create(fd, 4096);
+
+		if (__gem_set_caching(fd, spin->poll_handle,
+				      I915_CACHING_CACHED) == 0)
+			spin->running = __gem_mmap__cpu(fd, spin->poll_handle,
+							0, 4096,
+							PROT_READ | PROT_WRITE);
+		else
+			spin->running = __gem_mmap__wc(fd, spin->poll_handle,
+						       0, 4096,
+						       PROT_READ | PROT_WRITE);
+		igt_assert(spin->running);
+		igt_assert_eq(*spin->running, 0);
+
+		*batch++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+
+		if (gen >= 8) {
+			offset = 1;
+			*batch++ = 0;
+			*batch++ = 0;
+		} else if (gen >= 4) {
+			offset = 2;
+			*batch++ = 0;
+			*batch++ = 0;
+		} else {
+			offset = 1;
+			batch[-1]--;
+			*batch++ = 0;
+		}
+
+		*batch++ = 1;
+
+		obj[SCRATCH].handle = spin->poll_handle;
+		fill_reloc(&relocs[obj[BATCH].relocation_count++],
+			   spin->poll_handle, offset, 0, 0);
+		execbuf->buffer_count++;
 	}
 
-	spin->batch = batch;
+	spin->batch = batch = batch_start + 64 / sizeof(*batch);
 	spin->handle = obj[BATCH].handle;
 
 	/* Allow ourselves to be preempted */
@@ -145,40 +205,42 @@ static int emit_recursive_batch(igt_spin_t *spin,
 	batch += 1000;
 
 	/* recurse */
-	fill_reloc(&relocs[obj[BATCH].relocation_count],
-		   obj[BATCH].handle, (batch - spin->batch) + 1,
-		   I915_GEM_DOMAIN_COMMAND, 0);
+	r = &relocs[obj[BATCH].relocation_count++];
+	r->target_handle = obj[BATCH].handle;
+	r->offset = (batch + 1 - batch_start) * sizeof(*batch);
+	r->read_domains = I915_GEM_DOMAIN_COMMAND;
+	r->delta = 64;
 	if (gen >= 8) {
 		*batch++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
-		*batch++ = 0;
+		*batch++ = r->delta;
 		*batch++ = 0;
 	} else if (gen >= 6) {
 		*batch++ = MI_BATCH_BUFFER_START | 1 << 8;
-		*batch++ = 0;
+		*batch++ = r->delta;
 	} else {
 		*batch++ = MI_BATCH_BUFFER_START | 2 << 6;
-		*batch = 0;
-		if (gen < 4) {
-			*batch |= 1;
-			relocs[obj[BATCH].relocation_count].delta = 1;
-		}
+		if (gen < 4)
+			r->delta |= 1;
+		*batch = r->delta;
 		batch++;
 	}
-	obj[BATCH].relocation_count++;
 	obj[BATCH].relocs_ptr = to_user_pointer(relocs);
 
-	execbuf.buffers_ptr = to_user_pointer(obj + (2 - execbuf.buffer_count));
-	execbuf.rsvd1 = ctx;
+	execbuf->buffers_ptr = to_user_pointer(obj +
+					       (2 - execbuf->buffer_count));
+	execbuf->rsvd1 = ctx;
 
-	if (out_fence)
-		execbuf.flags |= I915_EXEC_FENCE_OUT;
+	if (flags & OUT_FENCE)
+		execbuf->flags |= I915_EXEC_FENCE_OUT;
 
 	for (i = 0; i < nengine; i++) {
-		execbuf.flags &= ~ENGINE_MASK;
-		execbuf.flags |= engines[i];
-		gem_execbuf_wr(fd, &execbuf);
-		if (out_fence) {
-			int _fd = execbuf.rsvd2 >> 32;
+		execbuf->flags &= ~ENGINE_MASK;
+		execbuf->flags |= engines[i];
+
+		gem_execbuf_wr(fd, execbuf);
+
+		if (flags & OUT_FENCE) {
+			int _fd = execbuf->rsvd2 >> 32;
 
 			igt_assert(_fd >= 0);
 			if (fence_fd == -1) {
@@ -194,12 +256,20 @@ static int emit_recursive_batch(igt_spin_t *spin,
 		}
 	}
 
+	/* Make it easier for callers to resubmit. */
+
+	obj[BATCH].relocation_count = 0;
+	obj[BATCH].relocs_ptr = 0;
+
+	obj[SCRATCH].flags = EXEC_OBJECT_PINNED;
+	obj[BATCH].flags = EXEC_OBJECT_PINNED;
+
 	return fence_fd;
 }
 
 static igt_spin_t *
 ___igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep,
-		      int out_fence)
+		      unsigned int flags)
 {
 	igt_spin_t *spin;
 
@@ -207,7 +277,7 @@ ___igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep,
 	igt_assert(spin);
 
 	spin->out_fence = emit_recursive_batch(spin, fd, ctx, engine, dep,
-					       out_fence);
+					       flags);
 
 	pthread_mutex_lock(&list_lock);
 	igt_list_add(&spin->link, &spin_list);
@@ -219,7 +289,7 @@ ___igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep,
 igt_spin_t *
 __igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
 {
-	return ___igt_spin_batch_new(fd, ctx, engine, dep, false);
+	return ___igt_spin_batch_new(fd, ctx, engine, dep, 0);
 }
 
 /**
@@ -253,7 +323,7 @@ igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
 igt_spin_t *
 __igt_spin_batch_new_fence(int fd, uint32_t ctx, unsigned engine)
 {
-	return ___igt_spin_batch_new(fd, ctx, engine, 0, true);
+	return ___igt_spin_batch_new(fd, ctx, engine, 0, OUT_FENCE);
 }
 
 /**
@@ -282,6 +352,42 @@ igt_spin_batch_new_fence(int fd, uint32_t ctx, unsigned engine)
 	spin = __igt_spin_batch_new_fence(fd, ctx, engine);
 	igt_assert(gem_bo_busy(fd, spin->handle));
 	igt_assert(poll(&(struct pollfd){spin->out_fence, POLLIN}, 1, 0) == 0);
+
+	return spin;
+}
+
+igt_spin_t *
+__igt_spin_batch_new_poll(int fd, uint32_t ctx, unsigned engine)
+{
+	return ___igt_spin_batch_new(fd, ctx, engine, 0, POLL_RUN);
+}
+
+/**
+ * igt_spin_batch_new_poll:
+ * @fd: open i915 drm file descriptor
+ * @engine: Ring to execute batch OR'd with execbuf flags. If value is less
+ *          than 0, execute on all available rings.
+ *
+ * Start a recursive batch on a ring. Immediately returns a #igt_spin_t that
+ * contains the batch's handle that can be waited upon. The returned structure
+ * must be passed to igt_spin_batch_free() for post-processing.
+ *
+ * igt_spin_t->running will containt a pointer which target will change from
+ * zero to one once the spinner actually starts executing on the GPU.
+ *
+ * Returns:
+ * Structure with helper internal state for igt_spin_batch_free().
+ */
+igt_spin_t *
+igt_spin_batch_new_poll(int fd, uint32_t ctx, unsigned engine)
+{
+	igt_spin_t *spin;
+
+	igt_require_gem(fd);
+	igt_require(gem_mmap__has_wc(fd));
+
+	spin = __igt_spin_batch_new_poll(fd, ctx, engine);
+	igt_assert(gem_bo_busy(fd, spin->handle));
 
 	return spin;
 }
@@ -340,6 +446,8 @@ void igt_spin_batch_end(igt_spin_t *spin)
 	if (!spin)
 		return;
 
+	igt_assert(*spin->batch == MI_ARB_CHK ||
+		   *spin->batch == MI_BATCH_BUFFER_END);
 	*spin->batch = MI_BATCH_BUFFER_END;
 	__sync_synchronize();
 }
@@ -365,7 +473,13 @@ void igt_spin_batch_free(int fd, igt_spin_t *spin)
 		timer_delete(spin->timer);
 
 	igt_spin_batch_end(spin);
-	gem_munmap(spin->batch, BATCH_SIZE);
+	gem_munmap((void *)((unsigned long)spin->batch & (~4095UL)),
+		   BATCH_SIZE);
+
+	if (spin->running) {
+		gem_munmap(spin->running, 4096);
+		gem_close(fd, spin->poll_handle);
+	}
 
 	gem_close(fd, spin->handle);
 

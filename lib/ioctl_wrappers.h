@@ -61,6 +61,7 @@ bool gem_get_tiling(int fd, uint32_t handle, uint32_t *tiling, uint32_t *swizzle
 void gem_set_tiling(int fd, uint32_t handle, uint32_t tiling, uint32_t stride);
 int __gem_set_tiling(int fd, uint32_t handle, uint32_t tiling, uint32_t stride);
 
+int __gem_set_caching(int fd, uint32_t handle, uint32_t caching);
 void gem_set_caching(int fd, uint32_t handle, uint32_t caching);
 uint32_t gem_get_caching(int fd, uint32_t handle);
 uint32_t gem_flink(int fd, uint32_t handle);

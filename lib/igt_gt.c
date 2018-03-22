@@ -609,7 +609,7 @@ bool gem_can_store_dword(int fd, unsigned int engine)
 	if (gen == 3 && (info->is_grantsdale || info->is_alviso))
 		return false; /* only supports physical addresses */
 
-	if (gen == 6 && (engine & ~(3<<13)) == I915_EXEC_BSD)
+	if (gen == 6 && ((engine & 0x3f) == I915_EXEC_BSD))
 		return false; /* kills the machine! */
 
 	if (info->is_broadwater)

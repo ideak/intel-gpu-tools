@@ -36,6 +36,10 @@ typedef struct igt_spin {
 	struct igt_list link;
 	uint32_t *batch;
 	int out_fence;
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	uint32_t poll_handle;
+	bool *running;
 } igt_spin_t;
 
 igt_spin_t *__igt_spin_batch_new(int fd,
@@ -55,9 +59,22 @@ igt_spin_t *igt_spin_batch_new_fence(int fd,
 				     uint32_t ctx,
 				     unsigned engine);
 
+igt_spin_t *__igt_spin_batch_new_poll(int fd,
+				       uint32_t ctx,
+				       unsigned engine);
+igt_spin_t *igt_spin_batch_new_poll(int fd,
+				    uint32_t ctx,
+				    unsigned engine);
+
 void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns);
 void igt_spin_batch_end(igt_spin_t *spin);
 void igt_spin_batch_free(int fd, igt_spin_t *spin);
+
+static inline void igt_spin_busywait_until_running(igt_spin_t *spin)
+{
+	while (!READ_ONCE(*spin->running))
+		;
+}
 
 void igt_terminate_spin_batches(void);
 

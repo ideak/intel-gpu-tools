@@ -980,8 +980,6 @@ current_seqno(struct workload *wrk, enum intel_engine_id engine)
 		return wrk->seqno[engine];
 }
 
-#define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
-
 static uint32_t
 read_status_page(struct workload *wrk, unsigned int idx)
 {
