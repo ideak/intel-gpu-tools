@@ -40,7 +40,6 @@ test_progs = [
 	'gem_ctx_switch',
 	'gem_ctx_thrash',
 	'gem_double_irq_loop',
-	'gem_eio',
 	'gem_evict_alignment',
 	'gem_evict_everything',
 	'gem_exec_alignment',
@@ -288,6 +287,13 @@ foreach prog : test_progs
 		   install_rpath : rpathdir,
 		   install : true)
 endforeach
+
+test_executables += executable('gem_eio', 'gem_eio.c',
+	   dependencies : test_deps + [ realtime ],
+	   install_dir : libexecdir,
+	   install_rpath : rpathdir,
+	   install : true)
+test_progs += 'gem_eio'
 
 test_executables += executable('perf_pmu', 'perf_pmu.c',
 	   dependencies : test_deps + [ lib_igt_perf ],
