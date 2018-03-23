@@ -74,6 +74,23 @@ static void get_ccs_fb(int fd, struct drm_mode_fb_cmd2 *ret)
 		gem_close(fd, add.handles[0]);
 }
 
+/**
+ * Find and return an arbitrary valid property ID.
+ */
+static uint32_t get_any_prop_id(int fd)
+{
+	igt_display_t display;
+
+	igt_display_init(&display, fd);
+	for (int i = 0; i < display.n_outputs; i++) {
+		igt_output_t *output = &display.outputs[i];
+		if (output->props[IGT_CONNECTOR_DPMS] != 0)
+			return output->props[IGT_CONNECTOR_DPMS];
+	}
+
+	return 0;
+}
+
 static void test_handle_input(int fd)
 {
 	struct drm_mode_fb_cmd2 add = {};
@@ -113,23 +130,8 @@ static void test_handle_input(int fd)
 	}
 
 	igt_subtest("getfb-handle-not-fb") {
-		struct drm_mode_fb_cmd get = { };
-		uint32_t prop_id = 0;
-		igt_display_t display;
-
-		/* Find a valid property ID to use. */
-		igt_display_init(&display, fd);
-		for (int i = 0; i < display.n_outputs; i++) {
-			igt_output_t *output = &display.outputs[i];
-
-			if (output->props[IGT_CONNECTOR_DPMS] != 0) {
-				prop_id = output->props[IGT_CONNECTOR_DPMS];
-				break;
-			}
-		}
-		igt_require(prop_id > 0);
-
-		get.fb_id = prop_id;
+		struct drm_mode_fb_cmd get = { .fb_id = get_any_prop_id(fd) };
+		igt_require(get.fb_id > 0);
 		do_ioctl_err(fd, DRM_IOCTL_MODE_GETFB, &get, ENOENT);
 	}
 }
