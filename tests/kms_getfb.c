@@ -40,6 +40,40 @@
 #include "drm.h"
 #include "drm_fourcc.h"
 
+static void get_ccs_fb(int fd, struct drm_mode_fb_cmd2 *ret)
+{
+	struct drm_mode_fb_cmd2 add = {
+		.width = 1024,
+		.height = 1024,
+		.pixel_format = DRM_FORMAT_XRGB8888,
+		.flags = DRM_MODE_FB_MODIFIERS,
+		.modifier = {
+			I915_FORMAT_MOD_Y_TILED_CCS,
+			I915_FORMAT_MOD_Y_TILED_CCS,
+		},
+	};
+	int size;
+
+	igt_require_intel(fd);
+
+	/* An explanation of the magic numbers can be found in kms_ccs.c. */
+	add.pitches[0] = ALIGN(add.width * 4, 128);
+	add.offsets[1] = add.pitches[0] * ALIGN(add.height, 32);
+	add.pitches[1] = ALIGN(ALIGN(add.width * 4, 32) / 32, 128);
+
+	size = add.offsets[1];
+	size += add.pitches[1] * ALIGN(ALIGN(add.height, 16) / 16, 32);
+
+	add.handles[0] = gem_create(fd, size);
+	igt_require(add.handles[0] != 0);
+	add.handles[1] = add.handles[0];
+
+	if (drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &add) == 0)
+		*ret = add;
+	else
+		gem_close(fd, add.handles[0]);
+}
+
 static void test_handle_input(int fd)
 {
 	struct drm_mode_fb_cmd2 add = {};
@@ -133,6 +167,19 @@ static void test_duplicate_handles(int fd)
 
 		gem_close(fd, get1.handle);
 		gem_close(fd, get2.handle);
+	}
+
+	igt_subtest("getfb-reject-ccs") {
+		struct drm_mode_fb_cmd2 add_ccs = { };
+		struct drm_mode_fb_cmd get = { };
+
+		get_ccs_fb(fd, &add_ccs);
+		igt_require(add_ccs.handles[0] != 0);
+		get.fb_id = add_ccs.fb_id;
+		do_ioctl_err(fd, DRM_IOCTL_MODE_GETFB, &get, EINVAL);
+
+		do_ioctl(fd, DRM_IOCTL_MODE_RMFB, &add_ccs.fb_id);
+		gem_close(fd, add_ccs.handles[0]);
 	}
 
 	igt_fixture {
