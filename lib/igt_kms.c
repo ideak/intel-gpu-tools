@@ -1955,11 +1955,17 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 		 * We don't assign each output a pipe unless
 		 * a pipe is set with igt_output_set_pipe().
 		 */
-		output->force_reprobe = true;
+		output->pending_pipe = PIPE_NONE;
 		output->id = resources->connectors[i];
 		output->display = display;
 
 		igt_output_refresh(output);
+
+		if (output->config.connector &&
+		    output->config.connector->connection == DRM_MODE_UNKNOWNCONNECTION) {
+			output->force_reprobe = true;
+			igt_output_refresh(output);
+		}
 	}
 
 	drmModeFreePlaneResources(plane_resources);
