@@ -522,6 +522,32 @@ static void isolation(int fd,
 #define S4 (4 << 8)
 #define SLEEP_MASK (0xf << 8)
 
+static void inject_reset_context(int fd, unsigned int engine)
+{
+	igt_spin_t *spin;
+	uint32_t ctx;
+
+	/*
+	 * Force a context switch before triggering the reset, or else
+	 * we risk corrupting the target context and we can't blame the
+	 * HW for screwing up if the context was already broken.
+	 */
+
+	ctx = gem_context_create(fd);
+	if (gem_can_store_dword(fd, engine)) {
+		spin = __igt_spin_batch_new_poll(fd, ctx, engine);
+		igt_spin_busywait_until_running(spin);
+	} else {
+		spin = __igt_spin_batch_new(fd, ctx, engine, 0);
+		usleep(1000); /* better than nothing */
+	}
+
+	igt_force_gpu_reset(fd);
+
+	igt_spin_batch_free(fd, spin);
+	gem_context_destroy(fd, ctx);
+}
+
 static void preservation(int fd,
 			 const struct intel_execution_engine2 *e,
 			 unsigned int flags)
@@ -558,7 +584,7 @@ static void preservation(int fd,
 	igt_spin_batch_free(fd, spin);
 
 	if (flags & RESET)
-		igt_force_gpu_reset(fd);
+		inject_reset_context(fd, engine);
 
 	switch (flags & SLEEP_MASK) {
 	case NOSLEEP:
