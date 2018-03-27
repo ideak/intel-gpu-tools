@@ -77,3 +77,9 @@ igt@gem_softpin@noreloc-s4
 igt@gem_workarounds@hibernate-.*
 igt@gem_exec_suspend@basic-s4$
 igt@gem_ctx_isolation@.*-s4
+###############################################
+# pipe-d, pipe-e, pipe-f no current HW support
+###############################################
+igt@.*@.*pipe-d-.*
+igt@.*@.*pipe-e-.*
+igt@.*@.*pipe-f-.*
