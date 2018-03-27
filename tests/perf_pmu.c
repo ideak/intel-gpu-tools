@@ -513,6 +513,7 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 		val[i++] = I915_PMU_ENGINE_BUSY(e_->class, e_->instance);
 	}
 	igt_assert(i == num_engines);
+	igt_require(spin); /* at least one busy engine */
 
 	fd[0] = -1;
 	for (i = 0; i < num_engines; i++)
