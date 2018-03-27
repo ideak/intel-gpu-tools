@@ -31,6 +31,7 @@
 #include <time.h>
 #include <errno.h>
 #include <ctype.h>
+#include <locale.h>
 #include <math.h>
 
 #include "igt_perf.h"
@@ -97,12 +98,18 @@ static uint64_t rapl_gpu_power(void)
 
 static double filename_to_double(const char *filename)
 {
-	char buf[64];
+	char *oldlocale;
+	char buf[80];
+	double v;
 
 	if (filename_to_buf(filename, buf, sizeof(buf)))
 		return 0;
 
-	return strtod(buf, NULL);
+	oldlocale = setlocale(LC_ALL, "C");
+	v = strtod(buf, NULL);
+	setlocale(LC_ALL, oldlocale);
+
+	return v;
 }
 
 static double rapl_gpu_power_scale(void)
