@@ -35,4 +35,6 @@ bool gem_has_guc_submission(int fd);
 
 void gem_test_engine(int fd, unsigned int engine);
 
+int gem_reopen_driver(int fd);
+
 #endif /* GEM_SUBMISSION_H */

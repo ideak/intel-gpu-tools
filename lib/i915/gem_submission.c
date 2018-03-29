@@ -165,7 +165,14 @@ bool gem_has_guc_submission(int fd)
 	return gem_submission_method(fd) & GEM_SUBMISSION_GUC;
 }
 
-static int reopen_driver(int fd)
+/**
+ * gem_reopen_driver:
+ * @fd: re-open the i915 drm file descriptor
+ *
+ * Re-opens the drm fd which is useful in instances where a clean default
+ * context is needed.
+ */
+int gem_reopen_driver(int fd)
 {
 	char path[256];
 
@@ -201,7 +208,7 @@ void gem_test_engine(int i915, unsigned int engine)
 		.buffer_count = 1,
 	};
 
-	i915 = reopen_driver(i915);
+	i915 = gem_reopen_driver(i915);
 	igt_assert(!is_wedged(i915));
 
 	obj.handle = gem_create(i915, 4096);
