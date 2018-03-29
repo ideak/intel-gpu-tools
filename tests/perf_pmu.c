@@ -434,10 +434,8 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 
 	i = 0;
 	fd[0] = -1;
-	for_each_engine_class_instance(fd, e_) {
-		if (!gem_has_engine(gem_fd, e_->class, e_->instance))
-			continue;
-		else if (e == e_)
+	for_each_engine_class_instance(gem_fd, e_) {
+		if (e == e_)
 			busy_idx = i;
 
 		fd[i++] = open_group(I915_PMU_ENGINE_BUSY(e_->class,
@@ -499,10 +497,7 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	unsigned int idle_idx, i;
 
 	i = 0;
-	for_each_engine_class_instance(fd, e_) {
-		if (!gem_has_engine(gem_fd, e_->class, e_->instance))
-			continue;
-
+	for_each_engine_class_instance(gem_fd, e_) {
 		if (e == e_)
 			idle_idx = i;
 		else if (spin)
@@ -559,10 +554,7 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines,
 	unsigned int i;
 
 	i = 0;
-	for_each_engine_class_instance(fd, e) {
-		if (!gem_has_engine(gem_fd, e->class, e->instance))
-			continue;
-
+	for_each_engine_class_instance(gem_fd, e) {
 		if (spin)
 			__submit_spin_batch(gem_fd, spin, e, 64);
 		else
@@ -1677,10 +1669,8 @@ igt_main
 		igt_require_gem(fd);
 		igt_require(i915_type_id() > 0);
 
-		for_each_engine_class_instance(fd, e) {
-			if (gem_has_engine(fd, e->class, e->instance))
-				num_engines++;
-		}
+		for_each_engine_class_instance(fd, e)
+			num_engines++;
 	}
 
 	/**
@@ -1689,7 +1679,7 @@ igt_main
 	igt_subtest("invalid-init")
 		invalid_init();
 
-	for_each_engine_class_instance(fd, e) {
+	__for_each_engine_class_instance(fd, e) {
 		const unsigned int pct[] = { 2, 50, 98 };
 
 		/**
@@ -1888,7 +1878,7 @@ igt_main
 			gem_quiescent_gpu(fd);
 		}
 
-		for_each_engine_class_instance(fd, e) {
+		__for_each_engine_class_instance(render_fd, e) {
 			igt_subtest_group {
 				igt_fixture {
 					gem_require_engine(render_fd,
@@ -1897,10 +1887,10 @@ igt_main
 				}
 
 				igt_subtest_f("render-node-busy-%s", e->name)
-					single(fd, e, TEST_BUSY);
+					single(render_fd, e, TEST_BUSY);
 				igt_subtest_f("render-node-busy-idle-%s",
 					      e->name)
-					single(fd, e,
+					single(render_fd, e,
 					       TEST_BUSY | TEST_TRAILING_IDLE);
 			}
 		}
