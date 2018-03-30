@@ -102,7 +102,7 @@ static void test_handle_input(int fd)
 		add.pitches[0] = 1024*4;
 		add.handles[0] = igt_create_bo_with_dimensions(fd, 1024, 1024,
 			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
-		igt_assert(add.handles[0]);
+		igt_require(add.handles[0] != 0);
 		do_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &add);
 	}
 
@@ -134,6 +134,9 @@ static void test_handle_input(int fd)
 		igt_require(get.fb_id > 0);
 		do_ioctl_err(fd, DRM_IOCTL_MODE_GETFB, &get, ENOENT);
 	}
+
+	igt_fixture
+		gem_close(fd, add.handles[0]);
 }
 
 static void test_duplicate_handles(int fd)
@@ -198,9 +201,11 @@ igt_main
 	igt_fixture
 		fd = drm_open_driver_master(DRIVER_ANY);
 
-	test_handle_input(fd);
+	igt_subtest_group
+		test_handle_input(fd);
 
-	test_duplicate_handles(fd);
+	igt_subtest_group
+		test_duplicate_handles(fd);
 
 	igt_fixture
 		close(fd);
