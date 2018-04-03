@@ -58,6 +58,10 @@ igt@gem_userptr_blits@(major|minor|forked|mlocked|swapping).*
 igt@gem_wait@.*hang.*
 igt@gem_write_read_ring_switch(@.*)?
 ###############################################
+# There are no DRRS capable displays in CI lab
+###############################################
+igt@kms_frontbuffer_tracking@.*drrs.*
+###############################################
 # Broadcom
 ###############################################
 igt@vc4_.*
