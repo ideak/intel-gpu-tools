@@ -52,6 +52,7 @@ check_SCRIPTS = test/run-test.sh
 TESTS = \
 	test/mov \
 	test/frc \
+	test/regtype \
 	test/rndd \
 	test/rndu \
 	test/rnde \

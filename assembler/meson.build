@@ -47,6 +47,7 @@ configure_file(input : 'intel-gen4asm.pc.in', output : 'intel-gen4asm.pc',
 gen4asm_testcases = [
 	'test/mov',
 	'test/frc',
+	'test/regtype',
 	'test/rndd',
 	'test/rndu',
 	'test/rnde',
