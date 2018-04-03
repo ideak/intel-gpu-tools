@@ -591,6 +591,74 @@ static void test_inflight_internal(int fd, unsigned int wait)
 	close(fd);
 }
 
+/*
+ * Verify that we can submit and execute work after unwedging the GPU.
+ */
+static void test_reset_stress(int fd, unsigned int flags)
+{
+	uint32_t ctx0 = gem_context_create(fd);
+
+	igt_until_timeout(5) {
+		struct drm_i915_gem_execbuffer2 execbuf = { };
+		struct drm_i915_gem_exec_object2 obj = { };
+		uint32_t bbe = MI_BATCH_BUFFER_END;
+		igt_spin_t *hang;
+		unsigned int i;
+		uint32_t ctx;
+
+		gem_quiescent_gpu(fd);
+
+		igt_require(i915_reset_control(flags & TEST_WEDGE ?
+					       false : true));
+
+		ctx = context_create_safe(fd);
+
+		/*
+		 * Start executing a spin batch with some queued batches
+		 * against a different context after it.
+		 */
+		hang = spin_sync(fd, ctx0, 0);
+
+		obj.handle = gem_create(fd, 4096);
+		gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+		execbuf.buffers_ptr = to_user_pointer(&obj);
+		execbuf.buffer_count = 1;
+		execbuf.rsvd1 = ctx0;
+
+		for (i = 0; i < 10; i++)
+			gem_execbuf(fd, &execbuf);
+
+		/* Wedge after a small delay. */
+		igt_assert_eq(__check_wait(fd, obj.handle, 100e3), 0);
+
+		/* Unwedge by forcing a reset. */
+		igt_assert(i915_reset_control(true));
+		trigger_reset(fd);
+
+		gem_quiescent_gpu(fd);
+
+		/*
+		 * Verify that we are able to submit work after unwedging from
+		 * both contexts.
+		 */
+		execbuf.rsvd1 = ctx;
+		for (i = 0; i < 5; i++)
+			gem_execbuf(fd, &execbuf);
+
+		execbuf.rsvd1 = ctx0;
+		for (i = 0; i < 5; i++)
+			gem_execbuf(fd, &execbuf);
+
+		gem_sync(fd, obj.handle);
+		igt_spin_batch_free(fd, hang);
+		gem_context_destroy(fd, ctx);
+		gem_close(fd, obj.handle);
+	}
+
+	gem_context_destroy(fd, ctx0);
+}
+
 static int fd = -1;
 
 static void
@@ -634,6 +702,12 @@ igt_main
 
 	igt_subtest("in-flight-suspend")
 		test_inflight_suspend(fd);
+
+	igt_subtest("reset-stress")
+		test_reset_stress(fd, 0);
+
+	igt_subtest("unwedge-stress")
+		test_reset_stress(fd, TEST_WEDGE);
 
 	igt_subtest_group {
 		const struct {
