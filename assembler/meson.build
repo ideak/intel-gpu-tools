@@ -19,7 +19,7 @@ bison = find_program('bison')
 
 lgen = generator(flex,
 		output : '@BASENAME@.c',
-		arguments : ['-o', '@OUTPUT@', '@INPUT@'])
+		arguments : ['-i', '-o', '@OUTPUT@', '@INPUT@'])
 
 lfiles = lgen.process('lex.l')
 
