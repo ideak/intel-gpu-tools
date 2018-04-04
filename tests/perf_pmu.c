@@ -1497,12 +1497,6 @@ test_enable_race(int gem_fd, const struct intel_execution_engine2 *e)
 	gem_quiescent_gpu(gem_fd);
 }
 
-static double __error(double val, double ref)
-{
-	igt_assert(ref > 1e-5 /* smallval */);
-	return (100.0 * val / ref) - 100.0;
-}
-
 static void __rearm_spin_batch(igt_spin_t *spin)
 {
 	const uint32_t mi_arb_chk = 0x5 << 23;
@@ -1525,13 +1519,12 @@ static void
 accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	 unsigned long target_busy_pct)
 {
-	const unsigned int min_test_loops = 7;
-	const unsigned long min_test_us = 1e6;
-	unsigned long busy_us = 2500;
+	unsigned long busy_us = 10000 - 100 * (1 + abs(50 - target_busy_pct));
 	unsigned long idle_us = 100 * (busy_us - target_busy_pct *
 				busy_us / 100) / target_busy_pct;
-	unsigned long pwm_calibration_us;
-	unsigned long test_us;
+	const unsigned long min_test_us = 1e6;
+	const unsigned long pwm_calibration_us = min_test_us;
+	const unsigned long test_us = min_test_us;
 	double busy_r, expected;
 	uint64_t val[2];
 	uint64_t ts[2];
@@ -1546,13 +1539,6 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 		idle_us *= 2;
 	}
 
-	pwm_calibration_us = min_test_loops * (busy_us + idle_us);
-	while (pwm_calibration_us < min_test_us)
-		pwm_calibration_us += busy_us + idle_us;
-	test_us = min_test_loops * (idle_us + busy_us);
-	while (test_us < min_test_us)
-		test_us += busy_us + idle_us;
-
 	igt_info("calibration=%lums, test=%lums; ratio=%.2f%% (%luus/%luus)\n",
 		 pwm_calibration_us / 1000, test_us / 1000,
 		 (double)busy_us / (busy_us + idle_us) * 100.0,
@@ -1565,20 +1551,11 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 
 	/* Emit PWM pattern on the engine from a child. */
 	igt_fork(child, 1) {
-		struct sched_param rt = { .sched_priority = 99 };
 		const unsigned long timeout[] = {
 			pwm_calibration_us * 1000, test_us * 1000
 		};
-		uint64_t total_busy_ns = 0, total_idle_ns = 0;
+		uint64_t total_busy_ns = 0, total_ns = 0;
 		igt_spin_t *spin;
-		int ret;
-
-		/* We need the best sleep accuracy we can get. */
-		ret = sched_setscheduler(0,
-					 SCHED_FIFO | SCHED_RESET_ON_FORK,
-					 &rt);
-		if (ret)
-			igt_warn("Failed to set scheduling policy!\n");
 
 		/* Allocate our spin batch and idle it. */
 		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
@@ -1587,42 +1564,62 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 
 		/* 1st pass is calibration, second pass is the test. */
 		for (int pass = 0; pass < ARRAY_SIZE(timeout); pass++) {
-			uint64_t busy_ns = -total_busy_ns;
-			uint64_t idle_ns = -total_idle_ns;
-			struct timespec test_start = { };
+			unsigned int target_idle_us = idle_us;
+			uint64_t busy_ns = 0, idle_ns = 0;
+			struct timespec start = { };
+			unsigned long pass_ns = 0;
+			double avg = 0.0, var = 0.0;
+			unsigned int n = 0;
 
-			igt_nsec_elapsed(&test_start);
+			igt_nsec_elapsed(&start);
+
 			do {
-				unsigned int target_idle_us, t_busy;
+				unsigned long loop_ns, loop_busy;
+				struct timespec _ts = { };
+				double err, tmp;
+
+				/* PWM idle sleep. */
+				_ts.tv_nsec = target_idle_us * 1000;
+				nanosleep(&_ts, NULL);
 
 				/* Restart the spinbatch. */
 				__rearm_spin_batch(spin);
 				__submit_spin_batch(gem_fd, spin, e, 0);
 
-				/*
-				 * Note that the submission may be delayed to a
-				 * tasklet (ksoftirqd) which cannot run until we
-				 * sleep as we hog the cpu (we are RT).
-				 */
-
-				t_busy = measured_usleep(busy_us);
+				/* PWM busy sleep. */
+				loop_busy = igt_nsec_elapsed(&start);
+				_ts.tv_nsec = busy_us * 1000;
+				nanosleep(&_ts, NULL);
 				igt_spin_batch_end(spin);
-				gem_sync(gem_fd, spin->handle);
 
-				total_busy_ns += t_busy;
+				/* Time accounting. */
+				loop_ns = igt_nsec_elapsed(&start);
+				loop_busy = loop_ns - loop_busy;
+				loop_ns -= pass_ns;
 
-				target_idle_us =
-					(100 * total_busy_ns / target_busy_pct - (total_busy_ns + total_idle_ns)) / 1000;
-				total_idle_ns += measured_usleep(target_idle_us);
-			} while (igt_nsec_elapsed(&test_start) < timeout[pass]);
+				busy_ns += loop_busy;
+				total_busy_ns += loop_busy;
+				idle_ns += loop_ns - loop_busy;
+				pass_ns += loop_ns;
+				total_ns += loop_ns;
 
-			busy_ns += total_busy_ns;
-			idle_ns += total_idle_ns;
+				/* Re-calibrate. */
+				err = (double)total_busy_ns / total_ns -
+				      (double)target_busy_pct / 100.0;
+				target_idle_us = (double)target_idle_us *
+						 (1.0 + err);
 
-			expected = (double)busy_ns / (busy_ns + idle_ns);
-			igt_info("%u: busy %"PRIu64"us, idle %"PRIu64"us: %.2f%% (target: %lu%%)\n",
+				/* Running average and variance for debug. */
+				err = 100.0 * total_busy_ns / total_ns;
+				tmp = avg;
+				avg += (err - avg) / ++n;
+				var += (err - avg) * (err - tmp);
+			} while (pass_ns < timeout[pass]);
+
+			expected = (double)busy_ns / pass_ns;
+			igt_info("%u: busy %"PRIu64"us, idle %"PRIu64"us -> %.2f%% (target: %lu%%; average=%.2f, variance=%f)\n",
 				 pass, busy_ns / 1000, idle_ns / 1000,
-				 100 * expected, target_busy_pct);
+				 100 * expected, target_busy_pct, avg, var / n);
 			write(link[1], &expected, sizeof(expected));
 		}
 
@@ -1649,7 +1646,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	busy_r = (double)(val[1] - val[0]) / (ts[1] - ts[0]);
 
 	igt_info("error=%.2f%% (%.2f%% vs %.2f%%)\n",
-		 __error(busy_r, expected), 100 * busy_r, 100 * expected);
+		 (busy_r - expected) * 100, 100 * busy_r, 100 * expected);
 
 	assert_within(100.0 * busy_r, 100.0 * expected, 2);
 }
