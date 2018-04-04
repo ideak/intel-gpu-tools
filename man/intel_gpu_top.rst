@@ -7,9 +7,9 @@ Display a top-like summary of Intel GPU usage
 ---------------------------------------------
 .. include:: defs.rst
 :Author: IGT Developers <igt-dev@lists.freedesktop.org>
-:Date: 2016-03-01
+:Date: 2018-04-04
 :Version: |PACKAGE_STRING|
-:Copyright: 2009,2011,2012,2016 Intel Corporation
+:Copyright: 2009,2011,2012,2016,2018 Intel Corporation
 :Manual section: |MANUAL_SECTION|
 :Manual group: |MANUAL_GROUP|
 
@@ -21,42 +21,25 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-**intel_gpu_top** is a tool to display usage information of an Intel GPU. It
-requires root privilege to map the graphics device.
+**intel_gpu_top** is a tool to display usage information on Intel GPU's.
+
+The tool gathers data using perf performance counters (PMU) exposed by i915 and other platform drivers like RAPL (power) and Uncore IMC (memory bandwidth).
 
 OPTIONS
 =======
 
--s SAMPLES
-    Number of samples to acquire per second.
-
--o FILE
-    Collect usage statistics to FILE. If file is "-", run non-interactively
-    and output statistics to stdout.
-
--e COMMAND
-    Execute COMMAND to profile, and leave when it is finished. Note that the
-    entire command with all parameters should be included as one parameter.
+-s <ms>
+    Refresh period in milliseconds.
 
 -h
-    Show usage notes.
+    Show help text.
 
-EXAMPLES
-========
+LIMITATIONS
+===========
 
-intel_gpu_top -o "cairo-trace-gvim.log" -s 100 -e "cairo-perf-trace /tmp/gvim"
-    Run cairo-perf-trace with /tmp/gvim trace, non-interactively, saving the
-    statistics into cairo-trace-gvim.log file, and collecting 100 samples per
-    second.
+* Not all metrics are supported on all platforms. Where a metric is unsupported it's value will be replaced by a dashed line.
 
-Note that idle units are not displayed, so an entirely idle GPU will only
-display the ring status and header.
-
-BUGS
-====
-
-Some GPUs report some units as busy when they aren't, such that even when idle
-and not hung, it will show up as 100% busy.
+* Non-root access to perf counters is controlled by the *perf_event_paranoid* sysctl.
 
 REPORTING BUGS
 ==============

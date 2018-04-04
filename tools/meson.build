@@ -23,7 +23,6 @@ tools_progs = [
 	'intel_gpu_frequency',
 	'intel_firmware_decode',
 	'intel_gpu_time',
-	'intel_gpu_top',
 	'intel_gtt',
 	'intel_guc_logger',
 	'intel_infoframes',
@@ -116,6 +115,11 @@ shared_library('intel_aubdump', 'aubdump.c',
 	       dependencies : [ lib_igt_chipset, dlsym ],
 	       name_prefix : '',
 	       install : true)
+
+executable('intel_gpu_top', 'intel_gpu_top.c',
+	   install : true,
+	   install_rpath : rpathdir,
+	   dependencies : tool_deps + [ lib_igt_perf ])
 
 conf_data = configuration_data()
 conf_data.set('prefix', prefix)

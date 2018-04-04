@@ -1,6 +1,5 @@
 /*
- * Copyright © 2007 Intel Corporation
- * Copyright © 2011 Intel Corporation
+ * Copyright © 2007-2018 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,695 +23,832 @@
  * Authors:
  *    Eric Anholt <eric@anholt.net>
  *    Eugeni Dodonov <eugeni.dodonov@intel.com>
- *
  */
 
-#include "config.h"
-
-#include <inttypes.h>
-#include <unistd.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <err.h>
-#include <sys/ioctl.h>
-#include <sys/time.h>
-#include <sys/wait.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <stdint.h>
+#include <assert.h>
 #include <string.h>
-#ifdef HAVE_TERMIOS_H
-#include <termios.h>
-#endif
-#include "intel_io.h"
-#include "instdone.h"
-#include "intel_reg.h"
-#include "intel_chipset.h"
-#include "drmtest.h"
+#include <ctype.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <sys/ioctl.h>
+#include <errno.h>
+#include <math.h>
+#include <locale.h>
 
-#define  FORCEWAKE	    0xA18C
-#define  FORCEWAKE_ACK	    0x130090
+#include "igt_perf.h"
 
-#define SAMPLES_PER_SEC             10000
-#define SAMPLES_TO_PERCENT_RATIO    (SAMPLES_PER_SEC / 100)
-
-#define MAX_NUM_TOP_BITS            100
-
-#define HAS_STATS_REGS(devid)		IS_965(devid)
-
-struct top_bit {
-	struct instdone_bit *bit;
-	int count;
-} top_bits[MAX_NUM_TOP_BITS];
-struct top_bit *top_bits_sorted[MAX_NUM_TOP_BITS];
-
-static uint32_t instdone, instdone1;
-
-static const char *bars[] = {
-	" ",
-	"▏",
-	"▎",
-	"▍",
-	"▌",
-	"▋",
-	"▊",
-	"▉",
-	"█"
+struct pmu_pair {
+	uint64_t cur;
+	uint64_t prev;
 };
 
-enum stats_counts {
-	IA_VERTICES,
-	IA_PRIMITIVES,
-	VS_INVOCATION,
-	GS_INVOCATION,
-	GS_PRIMITIVES,
-	CL_INVOCATION,
-	CL_PRIMITIVES,
-	PS_INVOCATION,
-	PS_DEPTH,
-	STATS_COUNT
+struct pmu_counter {
+	bool present;
+	uint64_t config;
+	unsigned int idx;
+	struct pmu_pair val;
 };
 
-const uint32_t stats_regs[STATS_COUNT] = {
-	IA_VERTICES_COUNT_QW,
-	IA_PRIMITIVES_COUNT_QW,
-	VS_INVOCATION_COUNT_QW,
-	GS_INVOCATION_COUNT_QW,
-	GS_PRIMITIVES_COUNT_QW,
-	CL_INVOCATION_COUNT_QW,
-	CL_PRIMITIVES_COUNT_QW,
-	PS_INVOCATION_COUNT_QW,
-	PS_DEPTH_COUNT_QW,
+struct engine {
+	const char *name;
+	const char *display_name;
+
+	unsigned int class;
+	unsigned int instance;
+
+	unsigned int num_counters;
+
+	struct pmu_counter busy;
+	struct pmu_counter wait;
+	struct pmu_counter sema;
 };
 
-const char *stats_reg_names[STATS_COUNT] = {
-	"vert fetch",
-	"prim fetch",
-	"VS invocations",
-	"GS invocations",
-	"GS prims",
-	"CL invocations",
-	"CL prims",
-	"PS invocations",
-	"PS depth pass",
+struct engines {
+	unsigned int num_engines;
+	unsigned int num_counters;
+	DIR *root;
+	int fd;
+	struct pmu_pair ts;
+
+	int rapl_fd;
+	double rapl_scale;
+	const char *rapl_unit;
+
+	int imc_fd;
+	double imc_reads_scale;
+	const char *imc_reads_unit;
+	double imc_writes_scale;
+	const char *imc_writes_unit;
+
+	struct pmu_counter freq_req;
+	struct pmu_counter freq_act;
+	struct pmu_counter irq;
+	struct pmu_counter rc6;
+	struct pmu_counter rapl;
+	struct pmu_counter imc_reads;
+	struct pmu_counter imc_writes;
+
+	struct engine engine;
 };
 
-uint64_t stats[STATS_COUNT];
-uint64_t last_stats[STATS_COUNT];
-
-static unsigned long
-gettime(void)
+static uint64_t
+get_pmu_config(int dirfd, const char *name, const char *counter)
 {
-    struct timeval t;
-    gettimeofday(&t, NULL);
-    return (t.tv_usec + (t.tv_sec * 1000000));
-}
+	char buf[128], *p;
+	int fd, ret;
 
-static int
-top_bits_sort(const void *a, const void *b)
-{
-	struct top_bit * const *bit_a = a;
-	struct top_bit * const *bit_b = b;
-	int a_count = (*bit_a)->count;
-	int b_count = (*bit_b)->count;
-
-	if (a_count < b_count)
-		return 1;
-	else if (a_count == b_count)
-		return 0;
-	else
+	ret = snprintf(buf, sizeof(buf), "%s-%s", name, counter);
+	if (ret < 0 || ret == sizeof(buf))
 		return -1;
+
+	fd = openat(dirfd, buf, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	ret = read(fd, buf, sizeof(buf));
+	close(fd);
+	if (ret <= 0)
+		return -1;
+
+	p = index(buf, '0');
+	if (!p)
+		return -1;
+
+	return strtoul(p, NULL, 0);
 }
 
-static void
-update_idle_bit(struct top_bit *top_bit)
+#define engine_ptr(engines, n) (&engines->engine + (n))
+
+static const char *class_display_name(unsigned int class)
 {
-	uint32_t reg_val;
-
-	if (top_bit->bit->reg == INSTDONE_1)
-		reg_val = instdone1;
-	else
-		reg_val = instdone;
-
-	if ((reg_val & top_bit->bit->bit) == 0)
-		top_bit->count++;
+	switch (class) {
+	case I915_ENGINE_CLASS_RENDER:
+		return "Render/3D";
+	case I915_ENGINE_CLASS_COPY:
+		return "Blitter";
+	case I915_ENGINE_CLASS_VIDEO:
+		return "Video";
+	case I915_ENGINE_CLASS_VIDEO_ENHANCE:
+		return "VideoEnhance";
+	default:
+		return "[unknown]";
+	}
 }
 
-static void
-print_clock(const char *name, int clock) {
-	if (clock == -1)
-		printf("%s clock: unknown", name);
-	else
-		printf("%s clock: %d Mhz", name, clock);
-}
-
-static int
-print_clock_info(struct pci_device *pci_dev)
+static int engine_cmp(const void *__a, const void *__b)
 {
-	uint32_t devid = pci_dev->device_id;
-	uint16_t gcfgc;
+	const struct engine *a = (struct engine *)__a;
+	const struct engine *b = (struct engine *)__b;
 
-	if (IS_GM45(devid)) {
-		int core_clock = -1;
+	if (a->class != b->class)
+		return a->class - b->class;
+	else
+		return a->instance - b->instance;
+}
 
-		pci_device_cfg_read_u16(pci_dev, &gcfgc, I915_GCFGC);
+static struct engines *discover_engines(void)
+{
+	const char *sysfs_root = "/sys/devices/i915/events";
+	struct engines *engines;
+	struct dirent *dent;
+	int ret = 0;
+	DIR *d;
 
-		switch (gcfgc & 0xf) {
-		case 8:
-			core_clock = 266;
-			break;
-		case 9:
-			core_clock = 320;
-			break;
-		case 11:
-			core_clock = 400;
-			break;
-		case 13:
-			core_clock = 533;
-			break;
-		}
-		print_clock("core", core_clock);
-	} else if (IS_965(devid) && IS_MOBILE(devid)) {
-		int render_clock = -1, sampler_clock = -1;
+	engines = malloc(sizeof(struct engines));
+	if (!engines)
+		return NULL;
 
-		pci_device_cfg_read_u16(pci_dev, &gcfgc, I915_GCFGC);
+	memset(engines, 0, sizeof(*engines));
 
-		switch (gcfgc & 0xf) {
-		case 2:
-			render_clock = 250; sampler_clock = 267;
-			break;
-		case 3:
-			render_clock = 320; sampler_clock = 333;
-			break;
-		case 4:
-			render_clock = 400; sampler_clock = 444;
-			break;
-		case 5:
-			render_clock = 500; sampler_clock = 533;
-			break;
-		}
+	engines->num_engines = 0;
 
-		print_clock("render", render_clock);
-		printf("  ");
-		print_clock("sampler", sampler_clock);
-	} else if (IS_945(devid) && IS_MOBILE(devid)) {
-		int render_clock = -1, display_clock = -1;
+	d = opendir(sysfs_root);
+	if (!d)
+		return NULL;
 
-		pci_device_cfg_read_u16(pci_dev, &gcfgc, I915_GCFGC);
+	while ((dent = readdir(d)) != NULL) {
+		const char *endswith = "-busy";
+		const unsigned int endlen = strlen(endswith);
+		struct engine *engine =
+				engine_ptr(engines, engines->num_engines);
+		char buf[256];
 
-		switch (gcfgc & 0x7) {
-		case 0:
-			render_clock = 166;
-			break;
-		case 1:
-			render_clock = 200;
-			break;
-		case 3:
-			render_clock = 250;
-			break;
-		case 5:
-			render_clock = 400;
+		if (dent->d_type != DT_REG)
+			continue;
+
+		if (strlen(dent->d_name) >= sizeof(buf)) {
+			ret = ENAMETOOLONG;
 			break;
 		}
 
-		switch (gcfgc & 0x70) {
-		case 0:
-			display_clock = 200;
-			break;
-		case 4:
-			display_clock = 320;
+		strcpy(buf, dent->d_name);
+
+		/* xxxN-busy */
+		if (strlen(buf) < (endlen + 4))
+			continue;
+		if (strcmp(&buf[strlen(buf) - endlen], endswith))
+			continue;
+
+		memset(engine, 0, sizeof(*engine));
+
+		buf[strlen(buf) - endlen] = 0;
+		engine->name = strdup(buf);
+		if (!engine->name) {
+			ret = errno;
 			break;
 		}
-		if (gcfgc & (1 << 7))
-		    display_clock = 133;
 
-		print_clock("render", render_clock);
-		printf("  ");
-		print_clock("display", display_clock);
-	} else if (IS_915(devid) && IS_MOBILE(devid)) {
-		int render_clock = -1, display_clock = -1;
-
-		pci_device_cfg_read_u16(pci_dev, &gcfgc, I915_GCFGC);
-
-		switch (gcfgc & 0x7) {
-		case 0:
-			render_clock = 160;
-			break;
-		case 1:
-			render_clock = 190;
-			break;
-		case 4:
-			render_clock = 333;
+		engine->busy.config = get_pmu_config(dirfd(d), engine->name,
+						     "busy");
+		if (engine->busy.config == -1) {
+			ret = ENOENT;
 			break;
 		}
-		if (gcfgc & (1 << 13))
-		    render_clock = 133;
 
-		switch (gcfgc & 0x70) {
-		case 0:
-			display_clock = 190;
-			break;
-		case 4:
-			display_clock = 333;
+		engine->class = (engine->busy.config &
+				 (__I915_PMU_OTHER(0) - 1)) >>
+				I915_PMU_CLASS_SHIFT;
+
+		engine->instance = (engine->busy.config >>
+				    I915_PMU_SAMPLE_BITS) &
+				    ((1 << I915_PMU_SAMPLE_INSTANCE_BITS) - 1);
+
+		ret = snprintf(buf, sizeof(buf), "%s/%u",
+			       class_display_name(engine->class),
+			       engine->instance);
+		if (ret < 0 || ret == sizeof(buf)) {
+			ret = ENOBUFS;
 			break;
 		}
-		if (gcfgc & (1 << 7))
-		    display_clock = 133;
+		ret = 0;
 
-		print_clock("render", render_clock);
-		printf("  ");
-		print_clock("display", display_clock);
+		engine->display_name = strdup(buf);
+		if (!engine->display_name) {
+			ret = errno;
+			break;
+		}
+
+		engines->num_engines++;
+		engines = realloc(engines, sizeof(struct engines) +
+				  engines->num_engines * sizeof(struct engine));
+		if (!engines) {
+			ret = errno;
+			break;
+		}
 	}
 
+	if (ret) {
+		free(engines);
+		errno = ret;
 
-	printf("\n");
-	return -1;
+		return NULL;
+	}
+
+	qsort(engine_ptr(engines, 0), engines->num_engines,
+	      sizeof(struct engine), engine_cmp);
+
+	engines->root = d;
+
+	return engines;
 }
 
-#define STATS_LEN (20)
-#define PERCENTAGE_BAR_END	(79 - STATS_LEN)
+static int
+filename_to_buf(const char *filename, char *buf, unsigned int bufsize)
+{
+	int fd, err;
+	ssize_t ret;
+
+	fd = open(filename, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	ret = read(fd, buf, bufsize - 1);
+	err = errno;
+	close(fd);
+	if (ret < 1) {
+		errno = ret < 0 ? err : ENOMSG;
+
+		return -1;
+	}
+
+	if (ret > 1 && buf[ret - 1] == '\n')
+		buf[ret - 1] = '\0';
+	else
+		buf[ret] = '\0';
+
+	return 0;
+}
+
+static uint64_t filename_to_u64(const char *filename, int base)
+{
+	char buf[64], *b;
+
+	if (filename_to_buf(filename, buf, sizeof(buf)))
+		return 0;
+
+	/*
+	 * Handle both single integer and key=value formats by skipping
+	 * leading non-digits.
+	 */
+	b = buf;
+	while (*b && !isdigit(*b))
+		b++;
+
+	return strtoull(b, NULL, base);
+}
+
+static double filename_to_double(const char *filename)
+{
+	char *oldlocale;
+	char buf[80];
+	double v;
+
+	if (filename_to_buf(filename, buf, sizeof(buf)))
+		return 0;
+
+	oldlocale = setlocale(LC_ALL, "C");
+	v = strtod(buf, NULL);
+	setlocale(LC_ALL, oldlocale);
+
+	return v;
+}
+
+#define RAPL_ROOT "/sys/devices/power/"
+#define RAPL_EVENT "/sys/devices/power/events/"
+
+static uint64_t rapl_type_id(void)
+{
+	return filename_to_u64(RAPL_ROOT "type", 10);
+}
+
+static uint64_t rapl_gpu_power(void)
+{
+	return filename_to_u64(RAPL_EVENT "energy-gpu", 0);
+}
+
+static double rapl_gpu_power_scale(void)
+{
+	return filename_to_double(RAPL_EVENT "energy-gpu.scale");
+}
+
+static const char *rapl_gpu_power_unit(void)
+{
+	char buf[32];
+
+	if (filename_to_buf(RAPL_EVENT "energy-gpu.unit",
+			    buf, sizeof(buf)) == 0)
+		if (!strcmp(buf, "Joules"))
+			return strdup("Watts");
+		else
+			return strdup(buf);
+	else
+		return NULL;
+}
+
+#define IMC_ROOT "/sys/devices/uncore_imc/"
+#define IMC_EVENT "/sys/devices/uncore_imc/events/"
+
+static uint64_t imc_type_id(void)
+{
+	return filename_to_u64(IMC_ROOT "type", 10);
+}
+
+static uint64_t imc_data_reads(void)
+{
+	return filename_to_u64(IMC_EVENT "data_reads", 0);
+}
+
+static double imc_data_reads_scale(void)
+{
+	return filename_to_double(IMC_EVENT "data_reads.scale");
+}
+
+static const char *imc_data_reads_unit(void)
+{
+	char buf[32];
+
+	if (filename_to_buf(IMC_EVENT "data_reads.unit", buf, sizeof(buf)) == 0)
+		return strdup(buf);
+	else
+		return NULL;
+}
+
+static uint64_t imc_data_writes(void)
+{
+	return filename_to_u64(IMC_EVENT "data_writes", 0);
+}
+
+static double imc_data_writes_scale(void)
+{
+	return filename_to_double(IMC_EVENT "data_writes.scale");
+}
+
+static const char *imc_data_writes_unit(void)
+{
+	char buf[32];
+
+	if (filename_to_buf(IMC_EVENT "data_writes.unit",
+			    buf, sizeof(buf)) == 0)
+		return strdup(buf);
+	else
+		return NULL;
+}
+
+#define _open_pmu(cnt, pmu, fd) \
+({ \
+	int fd__; \
+\
+	fd__ = perf_i915_open_group((pmu)->config, (fd)); \
+	if (fd__ >= 0) { \
+		if ((fd) == -1) \
+			(fd) = fd__; \
+		(pmu)->present = true; \
+		(pmu)->idx = (cnt)++; \
+	} \
+\
+	fd__; \
+})
+
+#define _open_imc(cnt, pmu, fd) \
+({ \
+	int fd__; \
+\
+	fd__ = igt_perf_open_group(imc_type_id(), (pmu)->config, (fd)); \
+	if (fd__ >= 0) { \
+		if ((fd) == -1) \
+			(fd) = fd__; \
+		(pmu)->present = true; \
+		(pmu)->idx = (cnt)++; \
+	} \
+\
+	fd__; \
+})
+
+static int pmu_init(struct engines *engines)
+{
+	unsigned int i;
+	int fd;
+
+	engines->fd = -1;
+	engines->num_counters = 0;
+
+	engines->irq.config = I915_PMU_INTERRUPTS;
+	fd = _open_pmu(engines->num_counters, &engines->irq, engines->fd);
+	if (fd < 0)
+		return -1;
+
+	engines->freq_req.config = I915_PMU_REQUESTED_FREQUENCY;
+	_open_pmu(engines->num_counters, &engines->freq_req, engines->fd);
+
+	engines->freq_act.config = I915_PMU_ACTUAL_FREQUENCY;
+	_open_pmu(engines->num_counters, &engines->freq_act, engines->fd);
+
+	engines->rc6.config = I915_PMU_RC6_RESIDENCY;
+	_open_pmu(engines->num_counters, &engines->rc6, engines->fd);
+
+	for (i = 0; i < engines->num_engines; i++) {
+		struct engine *engine = engine_ptr(engines, i);
+		struct {
+			struct pmu_counter *pmu;
+			const char *counter;
+		} *cnt, counters[] = {
+			{ .pmu = &engine->busy, .counter = "busy" },
+			{ .pmu = &engine->wait, .counter = "wait" },
+			{ .pmu = &engine->sema, .counter = "sema" },
+			{ .pmu = NULL, .counter = NULL },
+		};
+
+		for (cnt = counters; cnt->pmu; cnt++) {
+			if (!cnt->pmu->config)
+				cnt->pmu->config =
+					get_pmu_config(dirfd(engines->root),
+						       engine->name,
+						       cnt->counter);
+			fd = _open_pmu(engines->num_counters, cnt->pmu,
+				       engines->fd);
+			if (fd >= 0)
+				engine->num_counters++;
+		}
+	}
+
+	engines->rapl_fd = -1;
+	if (rapl_type_id()) {
+		engines->rapl_scale = rapl_gpu_power_scale();
+		engines->rapl_unit = rapl_gpu_power_unit();
+		if (!engines->rapl_unit)
+			return -1;
+
+		engines->rapl.config = rapl_gpu_power();
+		if (!engines->rapl.config)
+			return -1;
+
+		engines->rapl_fd = igt_perf_open(rapl_type_id(),
+						 engines->rapl.config);
+		if (engines->rapl_fd < 0)
+			return -1;
+
+		engines->rapl.present = true;
+	}
+
+	engines->imc_fd = -1;
+	if (imc_type_id()) {
+		unsigned int num = 0;
+
+		engines->imc_reads_scale = imc_data_reads_scale();
+		engines->imc_writes_scale = imc_data_writes_scale();
+
+		engines->imc_reads_unit = imc_data_reads_unit();
+		if (!engines->imc_reads_unit)
+			return -1;
+
+		engines->imc_writes_unit = imc_data_writes_unit();
+		if (!engines->imc_writes_unit)
+			return -1;
+
+		engines->imc_reads.config = imc_data_reads();
+		if (!engines->imc_reads.config)
+			return -1;
+
+		engines->imc_writes.config = imc_data_writes();
+		if (!engines->imc_writes.config)
+			return -1;
+
+		fd = _open_imc(num, &engines->imc_reads, engines->imc_fd);
+		if (fd < 0)
+			return -1;
+		fd = _open_imc(num, &engines->imc_writes, engines->imc_fd);
+		if (fd < 0)
+			return -1;
+
+		engines->imc_reads.present = true;
+		engines->imc_writes.present = true;
+	}
+
+	return 0;
+}
+
+static uint64_t pmu_read_multi(int fd, unsigned int num, uint64_t *val)
+{
+	uint64_t buf[2 + num];
+	unsigned int i;
+	ssize_t len;
+
+	memset(buf, 0, sizeof(buf));
+
+	len = read(fd, buf, sizeof(buf));
+	assert(len == sizeof(buf));
+
+	for (i = 0; i < num; i++)
+		val[i] = buf[2 + i];
+
+	return buf[1];
+}
+
+static double __pmu_calc(struct pmu_pair *p, double d, double t, double s)
+{
+	double v;
+
+	v = p->cur - p->prev;
+	v /= d;
+	v /= t;
+	v *= s;
+
+	if (s == 100.0 && v > 100.0)
+		v = 100.0;
+
+	return v;
+}
+
+static void fill_str(char *buf, unsigned int bufsz, char c, unsigned int num)
+{
+	unsigned int i;
+
+	for (i = 0; i < num && i < (bufsz - 1); i++)
+		*buf++ = c;
+
+	*buf = 0;
+}
+
+static void pmu_calc(struct pmu_counter *cnt,
+		     char *buf, unsigned int bufsz,
+		     unsigned int width, unsigned width_dec,
+		     double d, double t, double s)
+{
+	double val;
+	int len;
+
+	assert(bufsz >= (width + width_dec + 1));
+
+	if (!cnt->present) {
+		fill_str(buf, bufsz, '-', width + width_dec);
+		return;
+	}
+
+	val = __pmu_calc(&cnt->val, d, t, s);
+
+	len = snprintf(buf, bufsz, "%*.*f", width + width_dec, width_dec, val);
+	if (len < 0 || len == bufsz) {
+		fill_str(buf, bufsz, 'X', width + width_dec);
+		return;
+	}
+}
+
+static uint64_t __pmu_read_single(int fd, uint64_t *ts)
+{
+	uint64_t data[2] = { };
+	ssize_t len;
+
+	len = read(fd, data, sizeof(data));
+	assert(len == sizeof(data));
+
+	if (ts)
+		*ts = data[1];
+
+	return data[0];
+}
+
+static uint64_t pmu_read_single(int fd)
+{
+	return __pmu_read_single(fd, NULL);
+}
+
+static void __update_sample(struct pmu_counter *counter, uint64_t val)
+{
+	counter->val.prev = counter->val.cur;
+	counter->val.cur = val;
+}
+
+static void update_sample(struct pmu_counter *counter, uint64_t *val)
+{
+	if (counter->present)
+		__update_sample(counter, val[counter->idx]);
+}
+
+static void pmu_sample(struct engines *engines)
+{
+	const int num_val = engines->num_counters;
+	uint64_t val[2 + num_val];
+	unsigned int i;
+
+	engines->ts.prev = engines->ts.cur;
+
+	if (engines->rapl_fd >= 0)
+		__update_sample(&engines->rapl,
+				pmu_read_single(engines->rapl_fd));
+
+	if (engines->imc_fd >= 0) {
+		pmu_read_multi(engines->imc_fd, 2, val);
+		update_sample(&engines->imc_reads, val);
+		update_sample(&engines->imc_writes, val);
+	}
+
+	engines->ts.cur = pmu_read_multi(engines->fd, num_val, val);
+
+	update_sample(&engines->freq_req, val);
+	update_sample(&engines->freq_act, val);
+	update_sample(&engines->irq, val);
+	update_sample(&engines->rc6, val);
+
+	for (i = 0; i < engines->num_engines; i++) {
+		struct engine *engine = engine_ptr(engines, i);
+
+		update_sample(&engine->busy, val);
+		update_sample(&engine->sema, val);
+		update_sample(&engine->wait, val);
+	}
+}
+
+static const char *bars[] = { " ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█" };
 
 static void
-print_percentage_bar(float percent, int cur_line_len)
+print_percentage_bar(double percent, int max_len)
 {
-	int bar_avail_len = (PERCENTAGE_BAR_END - cur_line_len - 1) * 8;
-	int bar_len = bar_avail_len * (percent + .5) / 100.0;
+	int bar_len = percent * (8 * (max_len - 2)) / 100.0;
 	int i;
 
-	for (i = bar_len; i >= 8; i -= 8) {
+	putchar('|');
+
+	for (i = bar_len; i >= 8; i -= 8)
 		printf("%s", bars[8]);
-		cur_line_len++;
-	}
-	if (i) {
+	if (i)
 		printf("%s", bars[i]);
-		cur_line_len++;
-	}
 
-	/* NB: We can't use a field width with utf8 so we manually
-	* guarantee a field with of 45 chars for any bar. */
-	printf("%*s", PERCENTAGE_BAR_END - cur_line_len, "");
+	for (i = 0; i < (max_len - 2 - (bar_len + 7) / 8); i++)
+		putchar(' ');
+
+	putchar('|');
 }
 
-struct ring {
-	const char *name;
-	uint32_t mmio;
-	int head, tail, size;
-	uint64_t full;
-	int idle;
-};
-
-static uint32_t ring_read(struct ring *ring, uint32_t reg)
-{
-	return INREG(ring->mmio + reg);
-}
-
-static void ring_init(struct ring *ring)
-{
-	ring->size = (((ring_read(ring, RING_LEN) & RING_NR_PAGES) >> 12) + 1) * 4096;
-}
-
-static void ring_reset(struct ring *ring)
-{
-	ring->idle = ring->full = 0;
-}
-
-static void ring_sample(struct ring *ring)
-{
-	int full;
-
-	if (!ring->size)
-		return;
-
-	ring->head = ring_read(ring, RING_HEAD) & HEAD_ADDR;
-	ring->tail = ring_read(ring, RING_TAIL) & TAIL_ADDR;
-
-	if (ring->tail == ring->head)
-		ring->idle++;
-
-	full = ring->tail - ring->head;
-	if (full < 0)
-		full += ring->size;
-	ring->full += full;
-}
-
-static void ring_print_header(FILE *out, struct ring *ring)
-{
-    fprintf(out, "%.6s%%\tops\t",
-            ring->name
-          );
-}
-
-static void ring_print(struct ring *ring, unsigned long samples_per_sec)
-{
-	int percent_busy, len;
-
-	if (!ring->size)
-		return;
-
-	percent_busy = 100 - 100 * ring->idle / samples_per_sec;
-
-	len = printf("%25s busy: %3d%%: ", ring->name, percent_busy);
-	print_percentage_bar (percent_busy, len);
-	printf("%24s space: %d/%d\n",
-		   ring->name,
-		   (int)(ring->full / samples_per_sec),
-		   ring->size);
-}
-
-static void ring_log(struct ring *ring, unsigned long samples_per_sec,
-		FILE *output)
-{
-	if (ring->size)
-		fprintf(output, "%3d\t%d\t",
-			(int)(100 - 100 * ring->idle / samples_per_sec),
-			(int)(ring->full / samples_per_sec));
-	else
-		fprintf(output, "-1\t-1\t");
-}
+#define DEFAULT_PERIOD_MS (1000)
 
 static void
 usage(const char *appname)
 {
 	printf("intel_gpu_top - Display a top-like summary of Intel GPU usage\n"
-			"\n"
-			"usage: %s [parameters]\n"
-			"\n"
-			"The following parameters apply:\n"
-			"[-s <samples>]       samples per seconds (default %d)\n"
-			"[-e <command>]       command to profile\n"
-			"[-o <file>]          output statistics to file. If file is '-',"
-			"                     run in batch mode and output statistics to stdio only \n"
-			"[-h]                 show this help screen\n"
-			"\n",
-			appname,
-			SAMPLES_PER_SEC
-		  );
-	return;
+		"\n"
+		"Usage: %s [parameters]\n"
+		"\n"
+		"\tThe following parameters are optional:\n\n"
+		"\t[-s <ms>]       Refresh period in milliseconds (default %ums).\n"
+		"\t[-h]            Show this help text.\n"
+		"\n",
+		appname, DEFAULT_PERIOD_MS);
 }
 
 int main(int argc, char **argv)
 {
-	uint32_t devid;
-	struct pci_device *pci_dev;
-	struct ring render_ring = {
-		.name = "render",
-		.mmio = 0x2030,
-	}, bsd_ring = {
-		.name = "bitstream",
-		.mmio = 0x4030,
-	}, bsd6_ring = {
-		.name = "bitstream",
-		.mmio = 0x12030,
-	}, blt_ring = {
-		.name = "blitter",
-		.mmio = 0x22030,
-	};
-	int i, ch;
-	int samples_per_sec = SAMPLES_PER_SEC;
-	FILE *output = NULL;
-	double elapsed_time=0;
-	int print_headers=1;
-	pid_t child_pid=-1;
-	int child_stat;
-	char *cmd=NULL;
-	int interactive=1;
+	unsigned int period_us = DEFAULT_PERIOD_MS * 1000;
+	int con_w = -1, con_h = -1;
+	struct engines *engines;
+	unsigned int i;
+	int ret, ch;
 
-	/* Parse options? */
-	while ((ch = getopt(argc, argv, "s:o:e:h")) != -1) {
+	/* Parse options */
+	while ((ch = getopt(argc, argv, "s:h")) != -1) {
 		switch (ch) {
-		case 'e': cmd = strdup(optarg);
-			break;
-		case 's': samples_per_sec = atoi(optarg);
-			if (samples_per_sec < 100) {
-				fprintf(stderr, "Error: samples per second must be >= 100\n");
-				exit(1);
-			}
-			break;
-		case 'o':
-			if (!strcmp(optarg, "-")) {
-				/* Running in non-interactive mode */
-				interactive = 0;
-				output = stdout;
-			}
-			else
-				output = fopen(optarg, "w");
-			if (!output)
-			{
-				perror("fopen");
-				exit(1);
-			}
+		case 's':
+			period_us = atoi(optarg) * 1000;
 			break;
 		case 'h':
 			usage(argv[0]);
 			exit(0);
-			break;
 		default:
-			fprintf(stderr, "Invalid flag %c!\n", (char)optopt);
+			fprintf(stderr, "Invalid option %c!\n", (char)optopt);
 			usage(argv[0]);
 			exit(1);
-			break;
 		}
 	}
 
-	pci_dev = intel_get_pci_device();
-	devid = pci_dev->device_id;
-	intel_mmio_use_pci_bar(pci_dev);
-	init_instdone_definitions(devid);
-
-	/* Do we have a command to run? */
-	if (cmd != NULL) {
-		if (output) {
-			fprintf(output, "# Profiling: %s\n", cmd);
-			fflush(output);
-		}
-		child_pid = fork();
-		if (child_pid < 0) {
-			perror("fork");
-			exit(1);
-		}
-		else if (child_pid == 0) {
-			int res;
-			res = system(cmd);
-			if (res < 0)
-				perror("running command");
-			if (output) {
-				fflush(output);
-				fprintf(output, "# %s exited with status %d\n", cmd, res);
-				fflush(output);
-			}
-			free(cmd);
-			exit(0);
-		} else {
-			free(cmd);
-		}
+	engines = discover_engines();
+	if (!engines) {
+		fprintf(stderr,
+			"Failed to detect engines! (%s)\n(Kernel 4.16 or newer is required for i915 PMU support.)\n",
+			strerror(errno));
+		return 1;
 	}
 
-	for (i = 0; i < num_instdone_bits; i++) {
-		top_bits[i].bit = &instdone_bits[i];
-		top_bits[i].count = 0;
-		top_bits_sorted[i] = &top_bits[i];
+	ret = pmu_init(engines);
+	if (ret) {
+		fprintf(stderr,
+			"Failed to initialize PMU! (%s)\n", strerror(errno));
+		return 1;
 	}
 
-	/* Grab access to the registers */
-	intel_register_access_init(pci_dev, 0, -1);
-
-	ring_init(&render_ring);
-	if (IS_GEN4(devid) || IS_GEN5(devid))
-		ring_init(&bsd_ring);
-	if (IS_GEN6(devid) || IS_GEN7(devid)) {
-		ring_init(&bsd6_ring);
-		ring_init(&blt_ring);
-	}
-
-	/* Initialize GPU stats */
-	if (HAS_STATS_REGS(devid)) {
-		for (i = 0; i < STATS_COUNT; i++) {
-			uint32_t stats_high, stats_low, stats_high_2;
-
-			do {
-				stats_high = INREG(stats_regs[i] + 4);
-				stats_low = INREG(stats_regs[i]);
-				stats_high_2 = INREG(stats_regs[i] + 4);
-			} while (stats_high != stats_high_2);
-
-			last_stats[i] = (uint64_t)stats_high << 32 |
-				stats_low;
-		}
-	}
+	pmu_sample(engines);
 
 	for (;;) {
-		int j;
-		unsigned long long t1, ti, tf, t2;
-		unsigned long long def_sleep = 1000000 / samples_per_sec;
-		unsigned long long last_samples_per_sec = samples_per_sec;
-		unsigned short int max_lines;
+		double t;
+#define BUFSZ 16
+		char freq[BUFSZ];
+		char fact[BUFSZ];
+		char irq[BUFSZ];
+		char rc6[BUFSZ];
+		char power[BUFSZ];
+		char reads[BUFSZ];
+		char writes[BUFSZ];
 		struct winsize ws;
-		char clear_screen[] = {0x1b, '[', 'H',
-				       0x1b, '[', 'J',
-				       0x0};
-		int percent;
-		int len;
+		int lines = 0;
 
-		t1 = gettime();
-
-		ring_reset(&render_ring);
-		ring_reset(&bsd_ring);
-		ring_reset(&bsd6_ring);
-		ring_reset(&blt_ring);
-
-		for (i = 0; i < samples_per_sec; i++) {
-			long long interval;
-			ti = gettime();
-			if (IS_965(devid)) {
-				instdone = INREG(INSTDONE_I965);
-				instdone1 = INREG(INSTDONE_1);
-			} else
-				instdone = INREG(INSTDONE);
-
-			for (j = 0; j < num_instdone_bits; j++)
-				update_idle_bit(&top_bits[j]);
-
-			ring_sample(&render_ring);
-			ring_sample(&bsd_ring);
-			ring_sample(&bsd6_ring);
-			ring_sample(&blt_ring);
-
-			tf = gettime();
-			if (tf - t1 >= 1000000) {
-				/* We are out of sync, bail out */
-				last_samples_per_sec = i+1;
-				break;
-			}
-			interval = def_sleep - (tf - ti);
-			if (interval > 0)
-				usleep(interval);
+		/* Update terminal size. */
+		if (ioctl(0, TIOCGWINSZ, &ws) != -1) {
+			con_w = ws.ws_col;
+			con_h = ws.ws_row;
 		}
 
-		if (HAS_STATS_REGS(devid)) {
-			for (i = 0; i < STATS_COUNT; i++) {
-				uint32_t stats_high, stats_low, stats_high_2;
+		pmu_sample(engines);
+		t = (double)(engines->ts.cur - engines->ts.prev) / 1e9;
 
-				do {
-					stats_high = INREG(stats_regs[i] + 4);
-					stats_low = INREG(stats_regs[i]);
-					stats_high_2 = INREG(stats_regs[i] + 4);
-				} while (stats_high != stats_high_2);
+		printf("\033[H\033[J");
 
-				stats[i] = (uint64_t)stats_high << 32 |
-					stats_low;
-			}
-		}
+		pmu_calc(&engines->freq_req, freq, BUFSZ, 4, 0, 1.0, t, 1);
+		pmu_calc(&engines->freq_act, fact, BUFSZ, 4, 0, 1.0, t, 1);
+		pmu_calc(&engines->irq, irq, BUFSZ, 8, 0, 1.0, t, 1);
+		pmu_calc(&engines->rc6, rc6, BUFSZ, 3, 0, 1e9, t, 100);
+		pmu_calc(&engines->rapl, power, BUFSZ, 4, 2, 1.0, t,
+			 engines->rapl_scale);
+		pmu_calc(&engines->imc_reads, reads, BUFSZ, 6, 0, 1.0, t,
+			 engines->imc_reads_scale);
+		pmu_calc(&engines->imc_writes, writes, BUFSZ, 6, 0, 1.0, t,
+			 engines->imc_writes_scale);
 
-		qsort(top_bits_sorted, num_instdone_bits,
-		      sizeof(struct top_bit *), top_bits_sort);
+		if (lines++ < con_h)
+			printf("intel-gpu-top - %s/%s MHz;  %s%% RC6; %s %s; %s irqs/s\n",
+			       fact, freq, rc6, power, engines->rapl_unit, irq);
 
-		/* Limit the number of lines printed to the terminal height so the
-		 * most important info (at the top) will stay on screen. */
-		max_lines = -1;
-		if (ioctl(0, TIOCGWINSZ, &ws) != -1)
-			max_lines = ws.ws_row - 6; /* exclude header lines */
-		if (max_lines >= num_instdone_bits)
-			max_lines = num_instdone_bits;
+		if (lines++ < con_h)
+			printf("\n");
 
-		t2 = gettime();
-		elapsed_time += (t2 - t1) / 1000000.0;
+		if (engines->imc_fd) {
+			if (lines++ < con_h)
+				printf("      IMC reads:   %s %s/s\n",
+				       reads, engines->imc_reads_unit);
 
-		if (interactive) {
-			printf("%s", clear_screen);
-			print_clock_info(pci_dev);
+			if (lines++ < con_h)
+				printf("     IMC writes:   %s %s/s\n",
+				       writes, engines->imc_writes_unit);
 
-			ring_print(&render_ring, last_samples_per_sec);
-			ring_print(&bsd_ring, last_samples_per_sec);
-			ring_print(&bsd6_ring, last_samples_per_sec);
-			ring_print(&blt_ring, last_samples_per_sec);
-
-			printf("\n%30s  %s\n", "task", "percent busy");
-			for (i = 0; i < max_lines; i++) {
-				if (top_bits_sorted[i]->count > 0) {
-					percent = (top_bits_sorted[i]->count * 100) /
-						last_samples_per_sec;
-					len = printf("%30s: %3d%%: ",
-							 top_bits_sorted[i]->bit->name,
-							 percent);
-					print_percentage_bar (percent, len);
-				} else {
-					printf("%*s", PERCENTAGE_BAR_END, "");
-				}
-
-				if (i < STATS_COUNT && HAS_STATS_REGS(devid)) {
-					printf("%13s: %llu (%lld/sec)",
-						   stats_reg_names[i],
-						   (long long)stats[i],
-						   (long long)(stats[i] - last_stats[i]));
-					last_stats[i] = stats[i];
-				} else {
-					if (!top_bits_sorted[i]->count)
-						break;
-				}
+			if (++lines < con_h)
 				printf("\n");
-			}
-		}
-		if (output) {
-			/* Print headers for columns at first run */
-			if (print_headers) {
-				fprintf(output, "# time\t");
-				ring_print_header(output, &render_ring);
-				ring_print_header(output, &bsd_ring);
-				ring_print_header(output, &bsd6_ring);
-				ring_print_header(output, &blt_ring);
-				for (i = 0; i < MAX_NUM_TOP_BITS; i++) {
-					if (i < STATS_COUNT && HAS_STATS_REGS(devid)) {
-						fprintf(output, "%.6s\t",
-							   stats_reg_names[i]
-							   );
-					}
-					if (!top_bits[i].count)
-						continue;
-				}
-				fprintf(output, "\n");
-				print_headers = 0;
-			}
-
-			/* Print statistics */
-			fprintf(output, "%.2f\t", elapsed_time);
-			ring_log(&render_ring, last_samples_per_sec, output);
-			ring_log(&bsd_ring, last_samples_per_sec, output);
-			ring_log(&bsd6_ring, last_samples_per_sec, output);
-			ring_log(&blt_ring, last_samples_per_sec, output);
-
-			for (i = 0; i < MAX_NUM_TOP_BITS; i++) {
-				if (i < STATS_COUNT && HAS_STATS_REGS(devid)) {
-					fprintf(output, "%"PRIu64"\t",
-						   stats[i] - last_stats[i]);
-					last_stats[i] = stats[i];
-				}
-					if (!top_bits[i].count)
-						continue;
-			}
-			fprintf(output, "\n");
-			fflush(output);
 		}
 
-		for (i = 0; i < num_instdone_bits; i++) {
-			top_bits_sorted[i]->count = 0;
+		for (i = 0; i < engines->num_engines; i++) {
+			struct engine *engine = engine_ptr(engines, i);
 
-			if (i < STATS_COUNT)
-				last_stats[i] = stats[i];
-		}
+			if (engine->num_counters && lines < con_h) {
+				const char *a = "          ENGINE      BUSY ";
+				const char *b = " MI_SEMA MI_WAIT";
 
-		/* Check if child has gone */
-		if (child_pid > 0) {
-			int res;
-			if ((res = waitpid(child_pid, &child_stat, WNOHANG)) == -1) {
-				perror("waitpid");
-				exit(1);
-			}
-			if (res == 0)
-				continue;
-			if (WIFEXITED(child_stat))
+				printf("\033[7m%s%*s%s\033[0m\n",
+				       a,
+				       (int)(con_w - 1 - strlen(a) - strlen(b)),
+				       " ", b);
+				lines++;
 				break;
+			}
 		}
+
+		for (i = 0; i < engines->num_engines && lines < con_h; i++) {
+			struct engine *engine = engine_ptr(engines, i);
+			unsigned int max_w = con_w - 1;
+			unsigned int len;
+			char sema[BUFSZ];
+			char wait[BUFSZ];
+			char busy[BUFSZ];
+			char buf[128];
+			double val;
+
+			if (!engine->num_counters)
+				continue;
+
+			pmu_calc(&engine->sema, sema, BUFSZ, 3, 0, 1e9, t, 100);
+			pmu_calc(&engine->wait, wait, BUFSZ, 3, 0, 1e9, t, 100);
+			len = snprintf(buf, sizeof(buf), "    %s%%    %s%%",
+				       sema, wait);
+
+			pmu_calc(&engine->busy, busy, BUFSZ, 6, 2, 1e9, t,
+				 100);
+			len += printf("%16s %s%% ", engine->display_name, busy);
+
+			val = __pmu_calc(&engine->busy.val, 1e9, t, 100);
+			print_percentage_bar(val, max_w - len);
+
+			printf("%s\n", buf);
+
+			lines++;
+		}
+
+		if (lines++ < con_h)
+			printf("\n");
+
+		usleep(period_us);
 	}
 
-	fclose(output);
-
-	intel_register_access_fini();
 	return 0;
 }

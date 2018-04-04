@@ -55,5 +55,6 @@ uint64_t i915_type_id(void);
 int perf_i915_open(uint64_t config);
 int perf_i915_open_group(uint64_t config, int group);
 int igt_perf_open(uint64_t type, uint64_t config);
+int igt_perf_open_group(uint64_t type, uint64_t config, int group);
 
 #endif /* I915_PERF_H */

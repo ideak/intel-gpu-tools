@@ -69,3 +69,9 @@ int igt_perf_open(uint64_t type, uint64_t config)
 	return _perf_open(type, config, -1,
 			  PERF_FORMAT_TOTAL_TIME_ENABLED);
 }
+
+int igt_perf_open_group(uint64_t type, uint64_t config, int group)
+{
+	return _perf_open(type, config, group,
+			  PERF_FORMAT_TOTAL_TIME_ENABLED | PERF_FORMAT_GROUP);
+}
