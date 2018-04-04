@@ -954,6 +954,14 @@ static bool fbc_stride_not_supported(void)
 	return strstr(buf, "FBC disabled: framebuffer stride not supported\n");
 }
 
+static bool fbc_mode_too_large(void)
+{
+	char buf[128];
+
+	debugfs_read("i915_fbc_status", buf);
+	return strstr(buf, "FBC disabled: mode too large for compression\n");
+}
+
 static bool fbc_wait_until_enabled(void)
 {
 	last_fbc_buf[0] = '\0';
@@ -1734,6 +1742,7 @@ static void do_status_assertions(int flags)
 	if (flags & ASSERT_FBC_ENABLED) {
 		igt_require(!fbc_not_enough_stolen());
 		igt_require(!fbc_stride_not_supported());
+		igt_require(!fbc_mode_too_large());
 		if (!fbc_wait_until_enabled()) {
 			igt_assert_f(fbc_is_enabled(IGT_LOG_WARN),
 				     "FBC disabled\n");
