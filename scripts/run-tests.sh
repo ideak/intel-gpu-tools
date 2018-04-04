@@ -49,7 +49,7 @@ fi
 IGT_TEST_ROOT="`readlink -f ${IGT_TEST_ROOT}`"
 
 function download_piglit {
-	git clone git://anongit.freedesktop.org/piglit "$ROOT/piglit"
+	git clone https://anongit.freedesktop.org/git/piglit.git "$ROOT/piglit"
 }
 
 function run_piglit # as-root <args>
