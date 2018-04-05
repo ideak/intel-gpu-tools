@@ -41,6 +41,7 @@
 #include <drm.h>
 
 #include "igt.h"
+#include "igt_device.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
 
@@ -674,6 +675,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_device_drop_master(fd);
 
 		igt_require(i915_reset_control(true));
 		igt_force_gpu_reset(fd);
