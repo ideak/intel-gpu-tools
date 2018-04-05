@@ -757,7 +757,10 @@ void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc)
 
 	sprintf(buf, "crtc-%d/crc/data", pipe_crc->pipe);
 
+	igt_set_timeout(10, "Opening crc fd, which waits for first CRC.");
 	pipe_crc->crc_fd = openat(pipe_crc->dir, buf, pipe_crc->flags);
+	igt_reset_timeout();
+
 	igt_assert(pipe_crc->crc_fd != -1);
 	errno = 0;
 }
