@@ -236,12 +236,6 @@ static void get_sink_crc(data_t *data, char *crc) {
 	close(dir);
 
 	igt_debug("%s\n", crc);
-	igt_debug_wait_for_keypress("crc");
-
-	/* The important value was already taken.
-	 * Now give a time for human eyes
-	 */
-	usleep(300000);
 
 	/* Black screen is always invalid */
 	igt_assert(strncmp(crc, CRC_BLACK, CRC_LEN) != 0);
