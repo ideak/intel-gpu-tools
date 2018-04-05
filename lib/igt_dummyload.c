@@ -31,6 +31,7 @@
 
 #include "igt_core.h"
 #include "drmtest.h"
+#include "igt_device.h"
 #include "igt_dummyload.h"
 #include "igt_gt.h"
 #include "intel_chipset.h"
@@ -144,8 +145,10 @@ emit_recursive_batch(igt_spin_t *spin, int fd, uint32_t ctx, unsigned engine,
 
 		igt_assert(!dep);
 
-		if (gen == 4 || gen == 5)
+		if (gen == 4 || gen == 5) {
 			execbuf->flags |= I915_EXEC_SECURE;
+			igt_require(__igt_device_set_master(fd) == 0);
+		}
 
 		spin->poll_handle = gem_create(fd, 4096);
 
