@@ -703,11 +703,17 @@ igt_main
 	igt_subtest("in-flight-suspend")
 		test_inflight_suspend(fd);
 
-	igt_subtest("reset-stress")
-		test_reset_stress(fd, 0);
+	igt_subtest_group {
+		igt_fixture {
+			igt_require(gem_has_contexts(fd));
+		}
 
-	igt_subtest("unwedge-stress")
-		test_reset_stress(fd, TEST_WEDGE);
+		igt_subtest("reset-stress")
+			test_reset_stress(fd, 0);
+
+		igt_subtest("unwedge-stress")
+			test_reset_stress(fd, TEST_WEDGE);
+	}
 
 	igt_subtest_group {
 		const struct {
