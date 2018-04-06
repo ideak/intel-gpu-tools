@@ -1416,14 +1416,6 @@ static void setup_sink_crc(void)
 		return;
 	}
 
-	/* We need to make sure there's a mode set on the eDP screen and it's
-	 * not on DPMS state, otherwise we fall into the "Unexpected sink CRC
-	 * error" case. */
-	prim_mode_params.primary.fb = &fbs[FORMAT_DEFAULT].prim_pri;
-	prim_mode_params.primary.x = prim_mode_params.primary.y = 0;
-	fill_fb_region(&prim_mode_params.primary, COLOR_PRIM_BG);
-	set_mode_for_params(&prim_mode_params);
-
 	sink_crc.fd = openat(drm.debugfs, "i915_sink_crc_eDP1", O_RDONLY);
 	igt_assert_lte(0, sink_crc.fd);
 
