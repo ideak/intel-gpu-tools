@@ -1033,9 +1033,10 @@ static bool _kmstest_connector_config(int drm_fd, uint32_t connector_id,
 		goto err2;
 
 	if (!connector->count_modes) {
-		igt_warn("connector %d/%s-%d has no modes\n", connector_id,
-			 kmstest_connector_type_str(connector->connector_type),
-			 connector->connector_type_id);
+		if (probe)
+			igt_warn("connector %d/%s-%d has no modes\n", connector_id,
+				kmstest_connector_type_str(connector->connector_type),
+				connector->connector_type_id);
 		goto err2;
 	}
 
@@ -1950,6 +1951,7 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 
 	for (i = 0; i < display->n_outputs; i++) {
 		igt_output_t *output = &display->outputs[i];
+		drmModeConnector *connector;
 
 		/*
 		 * We don't assign each output a pipe unless
@@ -1961,8 +1963,9 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 
 		igt_output_refresh(output);
 
-		if (output->config.connector &&
-		    output->config.connector->connection == DRM_MODE_UNKNOWNCONNECTION) {
+		connector = output->config.connector;
+		if (connector && (!connector->count_modes ||
+		    connector->connection == DRM_MODE_UNKNOWNCONNECTION)) {
 			output->force_reprobe = true;
 			igt_output_refresh(output);
 		}

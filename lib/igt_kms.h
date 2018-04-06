@@ -411,7 +411,8 @@ void igt_wait_for_vblank_count(int drm_fd, enum pipe pipe, int count);
 static inline bool igt_output_is_connected(igt_output_t *output)
 {
 	/* Something went wrong during probe? */
-	if (!output->config.connector)
+	if (!output->config.connector ||
+	    !output->config.connector->count_modes)
 		return false;
 
 	if (output->config.connector->connection == DRM_MODE_CONNECTED)
