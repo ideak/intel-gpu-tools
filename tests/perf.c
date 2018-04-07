@@ -3932,7 +3932,7 @@ test_whitelisted_registers_userspace_config(void)
 		mux_regs[i++] = 0;
 	}
 
-	if (intel_gen(devid) >= 8) {
+	if (intel_gen(devid) >= 8 && !IS_CHERRYVIEW(devid)) {
 		/* NOA_CONFIG */
 		mux_regs[i++] = 0xD04;
 		mux_regs[i++] = 0;
