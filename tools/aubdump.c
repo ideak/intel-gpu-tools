@@ -394,10 +394,11 @@ gen8_emit_ggtt_pte_for_range(uint64_t start, uint64_t end)
 
 	entry_addr = start & ~(4096 - 1);
 	do {
+		uint64_t last_page_entry, num_entries;
+
 		page_num = entry_addr >> 21;
-		uint64_t last_page_entry =
-			min((page_num + 1) << 21, end_aligned);
-		uint64_t num_entries = (last_page_entry - entry_addr) >> 12;
+		last_page_entry = min((page_num + 1) << 21, end_aligned);
+		num_entries = (last_page_entry - entry_addr) >> 12;
 		mem_trace_memory_write_header_out(
 			entry_addr >> 9, num_entries * GEN8_PTE_SIZE,
 			AUB_MEM_TRACE_MEMORY_ADDRESS_SPACE_GGTT_ENTRY);
