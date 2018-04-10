@@ -51,6 +51,7 @@
 #include "drmtest.h"
 #include "igt_aux.h"
 #include "igt_debugfs.h"
+#include "igt_sysfs.h"
 
 /**
  * intel_get_total_ram_mb:
@@ -280,9 +281,32 @@ int __intel_check_memory(uint64_t count, uint64_t size, unsigned mode,
 void intel_require_memory(uint64_t count, uint64_t size, unsigned mode)
 {
 	uint64_t required, total;
+	bool sufficient_memory;
 
-	igt_require_f(__intel_check_memory(count, size, mode,
-					    &required, &total),
+	sufficient_memory = __intel_check_memory(count, size, mode,
+						 &required, &total);
+	if (!sufficient_memory) {
+		int dir = open("/proc", O_RDONLY);
+		char *info;
+
+		info = igt_sysfs_get(dir, "meminfo");
+		if (info) {
+			igt_debug("Insufficient free memory; /proc/meminfo:\n%s",
+				  info);
+			free(info);
+		}
+
+		info = igt_sysfs_get(dir, "slabinfo");
+		if (info) {
+			igt_debug("Insuffucient free memory; /proc/slabinfo:\n%s",
+				  info);
+			free(info);
+		}
+
+		close(dir);
+	}
+
+	igt_require_f(sufficient_memory,
 		      "Estimated that we need %'llu objects and %'llu MiB for the test, but only have %'llu MiB available (%s%s) and a maximum of %'llu objects\n",
 		      (long long)count,
 		      (long long)((required + ((1<<20) - 1)) >> 20),
