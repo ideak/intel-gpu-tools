@@ -148,6 +148,8 @@ static void process(int child)
 	handle = load(fd);
 	if ((child & 63) == 63)
 		gem_read(fd, handle, 0, &handle, sizeof(handle));
+
+	gem_quiescent_gpu(fd);
 }
 
 struct crashme {
@@ -203,6 +205,8 @@ static void threads(int timeout)
 	}
 
 	timer_delete(timer);
+
+	gem_quiescent_gpu(fd);
 	close(fd);
 }
 
