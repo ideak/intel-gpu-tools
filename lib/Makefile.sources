@@ -64,6 +64,8 @@ lib_source_list =	 	\
 	media_spin.c		\
 	gpgpu_fill.h		\
 	gpgpu_fill.c		\
+	gpu_fill.h		\
+	gpu_fill.c		\
 	gen7_media.h            \
 	gen8_media.h            \
 	rendercopy_i915.c	\
