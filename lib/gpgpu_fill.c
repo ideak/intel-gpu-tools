@@ -99,8 +99,8 @@ static const uint32_t gen9_gpgpu_kernel[][4] = {
 void
 gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 		    struct igt_buf *dst,
-		    unsigned x, unsigned y,
-		    unsigned width, unsigned height,
+		    unsigned int x, unsigned int y,
+		    unsigned int width, unsigned int height,
 		    uint8_t color)
 {
 	uint32_t curbe_buffer, interface_descriptor;
@@ -120,8 +120,8 @@ gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
 
 	interface_descriptor = gen7_fill_interface_descriptor(batch, dst,
-							      gen7_gpgpu_kernel,
-							      sizeof(gen7_gpgpu_kernel));
+				gen7_gpgpu_kernel, sizeof(gen7_gpgpu_kernel));
+
 	igt_assert(batch->ptr < &batch->buffer[4095]);
 
 	batch->ptr = batch->buffer;
@@ -147,8 +147,8 @@ gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 void
 gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 		    struct igt_buf *dst,
-		    unsigned x, unsigned y,
-		    unsigned width, unsigned height,
+		    unsigned int x, unsigned int y,
+		    unsigned int width, unsigned int height,
 		    uint8_t color)
 {
 	uint32_t curbe_buffer, interface_descriptor;
@@ -168,8 +168,8 @@ gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
 
 	interface_descriptor = gen8_fill_interface_descriptor(batch, dst,
-							      gen8_gpgpu_kernel,
-							      sizeof(gen8_gpgpu_kernel));
+				gen8_gpgpu_kernel, sizeof(gen8_gpgpu_kernel));
+
 	igt_assert(batch->ptr < &batch->buffer[4095]);
 
 	batch->ptr = batch->buffer;
@@ -195,8 +195,8 @@ gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 void
 gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 		    struct igt_buf *dst,
-		    unsigned x, unsigned y,
-		    unsigned width, unsigned height,
+		    unsigned int x, unsigned int y,
+		    unsigned int width, unsigned int height,
 		    uint8_t color)
 {
 	uint32_t curbe_buffer, interface_descriptor;
@@ -216,8 +216,8 @@ gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
 
 	interface_descriptor = gen8_fill_interface_descriptor(batch, dst,
-							      gen9_gpgpu_kernel,
-							      sizeof(gen9_gpgpu_kernel));
+				gen9_gpgpu_kernel, sizeof(gen9_gpgpu_kernel));
+
 	igt_assert(batch->ptr < &batch->buffer[4095]);
 
 	batch->ptr = batch->buffer;

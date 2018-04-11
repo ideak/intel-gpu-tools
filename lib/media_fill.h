@@ -7,22 +7,22 @@
 void
 gen8_media_fillfunc(struct intel_batchbuffer *batch,
 		struct igt_buf *dst,
-		unsigned x, unsigned y,
-		unsigned width, unsigned height,
+		unsigned int x, unsigned int y,
+		unsigned int width, unsigned int height,
 		uint8_t color);
 
 void
 gen7_media_fillfunc(struct intel_batchbuffer *batch,
-                struct igt_buf *dst,
-                unsigned x, unsigned y,
-                unsigned width, unsigned height,
-                uint8_t color);
+		struct igt_buf *dst,
+		unsigned int x, unsigned int y,
+		unsigned int width, unsigned int height,
+		uint8_t color);
 
 void
 gen9_media_fillfunc(struct intel_batchbuffer *batch,
-                struct igt_buf *dst,
-                unsigned x, unsigned y,
-                unsigned width, unsigned height,
-                uint8_t color);
+		struct igt_buf *dst,
+		unsigned int x, unsigned int y,
+		unsigned int width, unsigned int height,
+		uint8_t color);
 
 #endif /* RENDE_MEDIA_FILL_H */

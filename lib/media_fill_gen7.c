@@ -47,8 +47,8 @@ static const uint32_t media_kernel[][4] = {
 void
 gen7_media_fillfunc(struct intel_batchbuffer *batch,
 		struct igt_buf *dst,
-		unsigned x, unsigned y,
-		unsigned width, unsigned height,
+		unsigned int x, unsigned int y,
+		unsigned int width, unsigned int height,
 		uint8_t color)
 {
 	uint32_t curbe_buffer, interface_descriptor;
@@ -61,8 +61,7 @@ gen7_media_fillfunc(struct intel_batchbuffer *batch,
 
 	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
 	interface_descriptor = gen7_fill_interface_descriptor(batch, dst,
-							      media_kernel,
-							      sizeof(media_kernel));
+					media_kernel, sizeof(media_kernel));
 	igt_assert(batch->ptr < &batch->buffer[4095]);
 
 	/* media pipeline */
