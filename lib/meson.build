@@ -26,7 +26,6 @@ lib_sources = [
 	'ioctl_wrappers.c',
 	'media_fill_gen7.c',
 	'media_fill_gen8.c',
-	'media_fill_gen8lp.c',
 	'media_fill_gen9.c',
 	'media_spin.c',
 	'gpgpu_fill.c',

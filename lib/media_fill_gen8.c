@@ -62,7 +62,7 @@ gen8_media_fillfunc(struct intel_batchbuffer *batch,
 	/* setup states */
 	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
 
-	curbe_buffer = gen8_fill_curbe_buffer_data(batch, color);
+	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
 	interface_descriptor = gen8_fill_interface_descriptor(batch, dst, media_kernel, sizeof(media_kernel));
 	igt_assert(batch->ptr < &batch->buffer[4095]);
 
@@ -73,17 +73,17 @@ gen8_media_fillfunc(struct intel_batchbuffer *batch,
 
 	gen8_emit_vfe_state(batch);
 
-	gen8_emit_curbe_load(batch, curbe_buffer);
+	gen7_emit_curbe_load(batch, curbe_buffer);
 
-	gen8_emit_interface_descriptor_load(batch, interface_descriptor);
+	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
 
-	gen8_emit_media_objects(batch, x, y, width, height);
+	gen7_emit_media_objects(batch, x, y, width, height);
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);
 
 	batch_end = batch_align(batch, 8);
 	igt_assert(batch_end < BATCH_STATE_SPLIT);
 
-	gen8_render_flush(batch, batch_end);
+	gen7_render_flush(batch, batch_end);
 	intel_batchbuffer_reset(batch);
 }

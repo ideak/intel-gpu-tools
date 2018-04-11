@@ -142,26 +142,18 @@ gen7_fill_binding_table(struct intel_batchbuffer *batch,
 
 	binding_table = batch_alloc(batch, 32, 64);
 	offset = batch_offset(batch, binding_table);
-	binding_table[0] = gen7_fill_surface_state(batch, dst,
+	if (IS_GEN7(batch->devid))
+		binding_table[0] = gen7_fill_surface_state(batch, dst,
 						GEN7_SURFACEFORMAT_R8_UNORM, 1);
+	else
+		binding_table[0] = gen8_fill_surface_state(batch, dst,
+						GEN8_SURFACEFORMAT_R8_UNORM, 1);
 
 	return offset;
 }
 
 uint32_t
-gen7_fill_media_kernel(struct intel_batchbuffer *batch,
-		const uint32_t kernel[][4],
-		size_t size)
-{
-	uint32_t offset;
-
-	offset = batch_copy(batch, kernel, size, 64);
-
-	return offset;
-}
-
-uint32_t
-gen8_fill_media_kernel(struct intel_batchbuffer *batch,
+gen7_fill_kernel(struct intel_batchbuffer *batch,
 		const uint32_t kernel[][4],
 		size_t size)
 {
@@ -181,7 +173,7 @@ gen7_fill_interface_descriptor(struct intel_batchbuffer *batch, struct igt_buf *
 	uint32_t binding_table_offset, kernel_offset;
 
 	binding_table_offset = gen7_fill_binding_table(batch, dst);
-	kernel_offset = gen7_fill_media_kernel(batch, kernel, size);
+	kernel_offset = gen7_fill_kernel(batch, kernel, size);
 
 	idd = batch_alloc(batch, sizeof(*idd), 64);
 	offset = batch_offset(batch, idd);
@@ -296,7 +288,10 @@ gen7_emit_interface_descriptor_load(struct intel_batchbuffer *batch, uint32_t in
 	OUT_BATCH(GEN7_MEDIA_INTERFACE_DESCRIPTOR_LOAD | (4 - 2));
 	OUT_BATCH(0);
 	/* interface descriptor data length */
-	OUT_BATCH(sizeof(struct gen7_interface_descriptor_data));
+	if (IS_GEN7(batch->devid))
+		OUT_BATCH(sizeof(struct gen7_interface_descriptor_data));
+	else
+		OUT_BATCH(sizeof(struct gen8_interface_descriptor_data));
 	/* interface descriptor address, is relative to the dynamics base address */
 	OUT_BATCH(interface_descriptor);
 }
@@ -326,6 +321,8 @@ gen7_emit_media_objects(struct intel_batchbuffer *batch,
 			/* inline data (xoffset, yoffset) */
 			OUT_BATCH(x + i * 16);
 			OUT_BATCH(y + j * 16);
+			if (AT_LEAST_GEN(batch->devid, 8) && !IS_CHERRYVIEW(batch->devid))
+				gen8_emit_media_state_flush(batch);
 		}
 	}
 }
@@ -387,33 +384,6 @@ gen7_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 	OUT_BATCH(0xffffffff);
 }
 
-void
-gen8_render_flush(struct intel_batchbuffer *batch, uint32_t batch_end)
-{
-	int ret;
-
-	ret = drm_intel_bo_subdata(batch->bo, 0, 4096, batch->buffer);
-	if (ret == 0)
-		ret = drm_intel_bo_mrb_exec(batch->bo, batch_end,
-					NULL, 0, 0, 0);
-	igt_assert(ret == 0);
-}
-
-
-uint32_t
-gen8_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
-			uint8_t color)
-{
-	uint8_t *curbe_buffer;
-	uint32_t offset;
-
-	curbe_buffer = batch_alloc(batch, sizeof(uint32_t) * 8, 64);
-	offset = batch_offset(batch, curbe_buffer);
-	*curbe_buffer = color;
-
-	return offset;
-}
-
 uint32_t
 gen8_fill_surface_state(struct intel_batchbuffer *batch,
 			struct igt_buf *buf,
@@ -466,29 +436,14 @@ gen8_fill_surface_state(struct intel_batchbuffer *batch,
 }
 
 uint32_t
-gen8_fill_binding_table(struct intel_batchbuffer *batch,
-			struct igt_buf *dst)
-{
-	uint32_t *binding_table, offset;
-
-	binding_table = batch_alloc(batch, 32, 64);
-	offset = batch_offset(batch, binding_table);
-
-	binding_table[0] = gen8_fill_surface_state(batch, dst,
-						GEN8_SURFACEFORMAT_R8_UNORM, 1);
-
-	return offset;
-}
-
-uint32_t
 gen8_fill_interface_descriptor(struct intel_batchbuffer *batch, struct igt_buf *dst,  const uint32_t kernel[][4], size_t size)
 {
 	struct gen8_interface_descriptor_data *idd;
 	uint32_t offset;
 	uint32_t binding_table_offset, kernel_offset;
 
-	binding_table_offset = gen8_fill_binding_table(batch, dst);
-	kernel_offset = gen8_fill_media_kernel(batch, kernel, size);
+	binding_table_offset = gen7_fill_binding_table(batch, dst);
+	kernel_offset = gen7_fill_kernel(batch, kernel, size);
 
 	idd = batch_alloc(batch, sizeof(*idd), 64);
 	offset = batch_offset(batch, idd);
@@ -547,9 +502,16 @@ gen8_emit_state_base_address(struct intel_batchbuffer *batch)
 }
 
 void
+gen8_emit_media_state_flush(struct intel_batchbuffer *batch)
+{
+	OUT_BATCH(GEN8_MEDIA_STATE_FLUSH | (2 - 2));
+	OUT_BATCH(0);
+}
+
+void
 gen8_emit_vfe_state(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN8_MEDIA_VFE_STATE | (9 - 2));
+	OUT_BATCH(GEN7_MEDIA_VFE_STATE | (9 - 2));
 
 	/* scratch buffer */
 	OUT_BATCH(0);
@@ -574,7 +536,7 @@ gen8_emit_vfe_state(struct intel_batchbuffer *batch)
 void
 gen8_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN8_MEDIA_VFE_STATE | (9 - 2));
+	OUT_BATCH(GEN7_MEDIA_VFE_STATE | (9 - 2));
 
 	/* scratch buffer */
 	OUT_BATCH(0);
@@ -594,92 +556,6 @@ gen8_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch)
 	OUT_BATCH(0);
 }
 
-void
-gen8_emit_curbe_load(struct intel_batchbuffer *batch, uint32_t curbe_buffer)
-{
-	OUT_BATCH(GEN8_MEDIA_CURBE_LOAD | (4 - 2));
-	OUT_BATCH(0);
-	/* curbe total data length */
-	OUT_BATCH(64);
-	/* curbe data start address, is relative to the dynamics base address */
-	OUT_BATCH(curbe_buffer);
-}
-
-void
-gen8_emit_interface_descriptor_load(struct intel_batchbuffer *batch, uint32_t interface_descriptor)
-{
-	OUT_BATCH(GEN8_MEDIA_INTERFACE_DESCRIPTOR_LOAD | (4 - 2));
-	OUT_BATCH(0);
-	/* interface descriptor data length */
-	OUT_BATCH(sizeof(struct gen8_interface_descriptor_data));
-	/* interface descriptor address, is relative to the dynamics base address */
-	OUT_BATCH(interface_descriptor);
-}
-
-void
-gen8_emit_media_state_flush(struct intel_batchbuffer *batch)
-{
-	OUT_BATCH(GEN8_MEDIA_STATE_FLUSH | (2 - 2));
-	OUT_BATCH(0);
-}
-
-void
-gen8_emit_media_objects(struct intel_batchbuffer *batch,
-			unsigned x, unsigned y,
-			unsigned width, unsigned height)
-{
-	int i, j;
-
-	for (i = 0; i < width / 16; i++) {
-		for (j = 0; j < height / 16; j++) {
-			OUT_BATCH(GEN8_MEDIA_OBJECT | (8 - 2));
-
-			/* interface descriptor offset */
-			OUT_BATCH(0);
-
-			/* without indirect data */
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-
-			/* scoreboard */
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-
-			/* inline data (xoffset, yoffset) */
-			OUT_BATCH(x + i * 16);
-			OUT_BATCH(y + j * 16);
-			gen8_emit_media_state_flush(batch);
-		}
-	}
-}
-void
-gen8lp_emit_media_objects(struct intel_batchbuffer *batch,
-			unsigned x, unsigned y,
-			unsigned width, unsigned height)
-{
-	int i, j;
-
-	for (i = 0; i < width / 16; i++) {
-		for (j = 0; j < height / 16; j++) {
-			OUT_BATCH(GEN8_MEDIA_OBJECT | (8 - 2));
-
-			/* interface descriptor offset */
-			OUT_BATCH(0);
-
-			/* without indirect data */
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-
-			/* scoreboard */
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-
-			/* inline data (xoffset, yoffset) */
-			OUT_BATCH(x + i * 16);
-			OUT_BATCH(y + j * 16);
-		}
-	}
-}
 void
 gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 		     unsigned x, unsigned y,

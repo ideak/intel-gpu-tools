@@ -70,12 +70,7 @@ gen7_fill_binding_table(struct intel_batchbuffer *batch,
 			struct igt_buf *dst);
 
 uint32_t
-gen7_fill_media_kernel(struct intel_batchbuffer *batch,
-		const uint32_t kernel[][4],
-		size_t size);
-
-uint32_t
-gen8_fill_media_kernel(struct intel_batchbuffer *batch,
+gen7_fill_kernel(struct intel_batchbuffer *batch,
 		const uint32_t kernel[][4],
 		size_t size);
 
@@ -108,22 +103,11 @@ gen7_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 		     unsigned x, unsigned y,
 		     unsigned width, unsigned height);
 
-void
-gen8_render_flush(struct intel_batchbuffer *batch, uint32_t batch_end);
-
-uint32_t
-gen8_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
-			uint8_t color);
-
 uint32_t
 gen8_fill_surface_state(struct intel_batchbuffer *batch,
 			struct igt_buf *buf,
 			uint32_t format,
 			int is_dst);
-
-uint32_t
-gen8_fill_binding_table(struct intel_batchbuffer *batch,
-			struct igt_buf *dst);
 
 uint32_t
 gen8_fill_interface_descriptor(struct intel_batchbuffer *batch, struct igt_buf *dst,  const uint32_t kernel[][4], size_t size);
@@ -132,29 +116,13 @@ void
 gen8_emit_state_base_address(struct intel_batchbuffer *batch);
 
 void
+gen8_emit_media_state_flush(struct intel_batchbuffer *batch);
+
+void
 gen8_emit_vfe_state(struct intel_batchbuffer *batch);
 
 void
 gen8_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch);
-
-void
-gen8_emit_curbe_load(struct intel_batchbuffer *batch, uint32_t curbe_buffer);
-
-void
-gen8_emit_interface_descriptor_load(struct intel_batchbuffer *batch, uint32_t interface_descriptor);
-
-void
-gen8_emit_media_state_flush(struct intel_batchbuffer *batch);
-
-void
-gen8_emit_media_objects(struct intel_batchbuffer *batch,
-			unsigned x, unsigned y,
-			unsigned width, unsigned height);
-
-void
-gen8lp_emit_media_objects(struct intel_batchbuffer *batch,
-			unsigned x, unsigned y,
-			unsigned width, unsigned height);
 
 void
 gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,

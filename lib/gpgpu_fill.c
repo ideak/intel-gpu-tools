@@ -180,7 +180,7 @@ gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	gen8_emit_state_base_address(batch);
 	gen8_emit_vfe_state_gpgpu(batch);
 	gen7_emit_curbe_load(batch, curbe_buffer);
-	gen8_emit_interface_descriptor_load(batch, interface_descriptor);
+	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
 	gen8_emit_gpgpu_walk(batch, x, y, width, height);
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);

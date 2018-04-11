@@ -58,7 +58,6 @@ lib_source_list =	 	\
 	media_fill.h            \
 	media_fill_gen7.c       \
 	media_fill_gen8.c       \
-	media_fill_gen8lp.c     \
 	media_fill_gen9.c       \
 	media_spin.h		\
 	media_spin.c		\
