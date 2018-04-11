@@ -223,7 +223,8 @@ gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	batch->ptr = batch->buffer;
 
 	/* GPGPU pipeline */
-	OUT_BATCH(GEN7_PIPELINE_SELECT | PIPELINE_SELECT_GPGPU);
+	OUT_BATCH(GEN7_PIPELINE_SELECT | GEN9_PIPELINE_SELECTION_MASK |
+		  PIPELINE_SELECT_GPGPU);
 
 	gen9_emit_state_base_address(batch);
 	gen8_emit_vfe_state_gpgpu(batch);
