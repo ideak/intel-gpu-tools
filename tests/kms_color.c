@@ -1158,8 +1158,9 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
-		data.devid = intel_get_drm_devid(data.drm_fd);
+		data.drm_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_AMDGPU);
+		if (is_i915_device(data.drm_fd))
+			data.devid = intel_get_drm_devid(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
 
 		igt_display_init(&data.display, data.drm_fd);
