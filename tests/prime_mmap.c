@@ -307,6 +307,19 @@ static int prime_handle_to_fd_no_assert(uint32_t handle, int flags, int *fd_out)
 	return ret;
 }
 
+static bool has_userptr(void)
+{
+	uint32_t handle = 0;
+	void *ptr;
+
+	igt_assert(posix_memalign(&ptr, 4096, 4096) == 0);
+	if ( __gem_userptr(fd, ptr, 4096, 0, 0, &handle) == 0)
+		gem_close(fd, handle);
+	free(ptr);
+
+	return handle;
+}
+
 /* test for mmap(dma_buf_export(userptr)) */
 static void
 test_userptr(void)
@@ -314,6 +327,8 @@ test_userptr(void)
 	int ret, dma_buf_fd;
 	void *ptr;
 	uint32_t handle;
+
+	igt_require(has_userptr());
 
 	/* create userptr bo */
 	ret = posix_memalign(&ptr, 4096, BO_SIZE);
