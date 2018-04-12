@@ -165,7 +165,12 @@ static struct _drm_color_lut *coeffs_to_lut(data_t *data,
 	struct _drm_color_lut *lut;
 	uint32_t i;
 	uint32_t max_value = (1 << 16) - 1;
-	uint32_t mask = ((1 << color_depth) - 1) << 8;
+	uint32_t mask;
+
+	if (is_i915_device(data->drm_fd))
+		mask = ((1 << color_depth) - 1) << 8;
+	else
+		mask = max_value;
 
 	lut = malloc(sizeof(struct _drm_color_lut) * lut_size);
 
