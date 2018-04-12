@@ -71,6 +71,7 @@ static void paint_gradient_rectangles(data_t *data,
 {
 	cairo_t *cr = igt_get_cairo_ctx(data->drm_fd, fb);
 	int i, l = mode->hdisplay / 3;
+	int rows_remaining = mode->hdisplay % 3;
 
 	/* Paint 3 gradient rectangles with red/green/blue between 1.0 and
 	 * 0.5. We want to avoid 0 so each max LUTs only affect their own
@@ -86,6 +87,16 @@ static void paint_gradient_rectangles(data_t *data,
 					       colors[i].b);
 	}
 
+	if (rows_remaining > 0)
+		igt_paint_color_gradient_range(cr, i * l, 0, rows_remaining,
+					       mode->vdisplay,
+					       colors[i-1].r != 0 ? 0.2 : 0,
+					       colors[i-1].g != 0 ? 0.2 : 0,
+					       colors[i-1].b != 0 ? 0.2 : 0,
+					       colors[i-1].r,
+					       colors[i-1].g,
+					       colors[i-1].b);
+
 	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 }
 
@@ -96,12 +107,17 @@ static void paint_rectangles(data_t *data,
 {
 	cairo_t *cr = igt_get_cairo_ctx(data->drm_fd, fb);
 	int i, l = mode->hdisplay / 3;
+	int rows_remaining = mode->hdisplay % 3;
 
 	/* Paint 3 solid rectangles. */
 	for (i = 0 ; i < 3; i++) {
 		igt_paint_color(cr, i * l, 0, l, mode->vdisplay,
 				colors[i].r, colors[i].g, colors[i].b);
 	}
+
+	if (rows_remaining > 0)
+		igt_paint_color(cr, i * l, 0, rows_remaining, mode->vdisplay,
+				colors[i-1].r, colors[i-1].g, colors[i-1].b);
 
 	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 }
