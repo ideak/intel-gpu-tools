@@ -186,7 +186,8 @@ emit_recursive_batch(igt_spin_t *spin,
 	spin->handle = obj[BATCH].handle;
 
 	/* Allow ourselves to be preempted */
-	*batch++ = MI_ARB_CHK;
+	if (!(opts->flags & IGT_SPIN_NO_PREEMPTION))
+		*batch++ = MI_ARB_CHK;
 
 	/* Pad with a few nops so that we do not completely hog the system.
 	 *
@@ -379,8 +380,6 @@ void igt_spin_batch_end(igt_spin_t *spin)
 	if (!spin)
 		return;
 
-	igt_assert(*spin->batch == MI_ARB_CHK ||
-		   *spin->batch == MI_BATCH_BUFFER_END);
 	*spin->batch = MI_BATCH_BUFFER_END;
 	__sync_synchronize();
 }
