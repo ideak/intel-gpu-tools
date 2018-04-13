@@ -51,4 +51,52 @@ A short list of contribution guidelines:
 - Changes to the testcases are automatically tested. Take the results into
   account before merging.
 
+Commit rights
+-------------
+
+Commit rights will be granted to anyone who requests them and fulfills the
+below criteria:
+
+- Submitted a few (5-10 as a rule of thumb) non-trivial (not just simple
+  spelling fixes and whitespace adjustment) patches that have been merged
+  already.
+
+- Are actively participating on discussions about their work (on the mailing
+  list or IRC). This should not be interpreted as a requirement to review other
+  peoples patches but just make sure that patch submission isn't one-way
+  communication. Cross-review is still highly encouraged.
+
+- Will be regularly contributing further patches. This includes regular
+  contributors to other parts of the open source graphics stack who only
+  do the oddball rare patch within igt itself.
+
+- Agrees to use their commit rights in accordance with the documented merge
+  criteria, tools, and processes.
+
+Apply for an account (and any other account change requests) through
+
+https://www.freedesktop.org/wiki/AccountRequests/
+
+and please ping the maintainers if your request is stuck.
+
+Committers are encouraged to request their commit rights get removed when they
+no longer contribute to the project. Commit rights will be reinstated when they
+come back to the project.
+
+Maintainers and committers should encourage contributors to request commit
+rights, especially junior contributors tend to underestimate their skills.
+
+Code of Conduct
+---------------
+
+Please be aware the fd.o Code of Conduct also applies to igt:
+
+https://www.freedesktop.org/wiki/CodeOfConduct/
+
+See the MAINTAINERS file for contact details of the igt maintainers.
+
+Abuse of commit rights, like engaging in commit fights or willfully pushing
+patches that violate the documented merge criteria, will also be handled through
+the Code of Conduct enforcement process.
+
 Happy hacking!
