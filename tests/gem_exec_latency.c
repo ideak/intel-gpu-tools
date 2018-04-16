@@ -36,11 +36,15 @@
 #include <sys/time.h>
 #include <sys/signal.h>
 #include <time.h>
+#include <sched.h>
 
 #include "drm.h"
 
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
+#include "igt_dummyload.h"
+#include "igt_stats.h"
+
 #include "i915/gem_ring.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
@@ -351,6 +355,216 @@ static void latency_from_ring(int fd,
 	}
 }
 
+static void __rearm_spin_batch(igt_spin_t *spin)
+{
+	const uint32_t mi_arb_chk = 0x5 << 23;
+
+       *spin->batch = mi_arb_chk;
+       *spin->running = 0;
+       __sync_synchronize();
+}
+
+static void
+__submit_spin_batch(int fd, igt_spin_t *spin, unsigned int flags)
+{
+	struct drm_i915_gem_execbuffer2 eb = spin->execbuf;
+
+	eb.flags &= ~(0x3f | I915_EXEC_BSD_MASK);
+	eb.flags |= flags | I915_EXEC_NO_RELOC;
+
+	gem_execbuf(fd, &eb);
+}
+
+struct rt_pkt {
+	struct igt_mean mean;
+	double min, max;
+};
+
+static bool __spin_wait(int fd, igt_spin_t *spin)
+{
+	while (!READ_ONCE(*spin->running)) {
+		if (!gem_bo_busy(fd, spin->handle))
+			return false;
+	}
+
+	return true;
+}
+
+/*
+ * Test whether RT thread which hogs the CPU a lot can submit work with
+ * reasonable latency.
+ */
+static void
+rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned int flags)
+#define RTIDLE 0x1
+{
+	const char *passname[] = {
+		"warmup",
+		"normal",
+		"rt[0]",
+		"rt[1]",
+		"rt[2]",
+		"rt[3]",
+		"rt[4]",
+		"rt[5]",
+		"rt[6]",
+	};
+#define NPASS ARRAY_SIZE(passname)
+#define MMAP_SZ (64 << 10)
+	struct rt_pkt *results;
+	unsigned int engines[16];
+	const char *names[16];
+	unsigned int nengine;
+	int ret;
+
+	igt_assert(ARRAY_SIZE(engines) * NPASS * sizeof(*results) <= MMAP_SZ);
+	results = mmap(NULL, MMAP_SZ, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(results != MAP_FAILED);
+
+	nengine = 0;
+	if (engine == ALL_ENGINES) {
+		for_each_physical_engine(fd, engine) {
+			if (!gem_can_store_dword(fd, engine))
+				continue;
+
+			engines[nengine] = engine;
+			names[nengine] = e__->name;
+			nengine++;
+		}
+		igt_require(nengine > 1);
+	} else {
+		igt_require(gem_can_store_dword(fd, engine));
+		engines[nengine] = engine;
+		names[nengine] = name;
+		nengine++;
+	}
+
+	gem_quiescent_gpu(fd);
+
+	igt_fork(child, nengine) {
+		unsigned int pass = 0; /* Three phases: warmup, normal, rt. */
+
+		engine = engines[child];
+		do {
+			struct igt_mean mean;
+			double min = HUGE_VAL;
+			double max = -HUGE_VAL;
+			igt_spin_t *spin;
+
+			igt_mean_init(&mean);
+
+			if (pass == 2) {
+				struct sched_param rt =
+				{ .sched_priority = 99 };
+
+				ret = sched_setscheduler(0,
+							 SCHED_FIFO | SCHED_RESET_ON_FORK,
+							 &rt);
+				if (ret) {
+					igt_warn("Failed to set scheduling policy!\n");
+					break;
+				}
+			}
+
+			usleep(250);
+
+			spin = __igt_spin_batch_new_poll(fd, 0, engine);
+			if (!spin) {
+				igt_warn("Failed to create spinner! (%s)\n",
+					 passname[pass]);
+				break;
+			}
+			igt_spin_busywait_until_running(spin);
+
+			igt_until_timeout(pass > 0 ? 5 : 2) {
+				struct timespec ts = { };
+				double t;
+
+				igt_spin_batch_end(spin);
+				gem_sync(fd, spin->handle);
+				if (flags & RTIDLE)
+					igt_drop_caches_set(fd, DROP_IDLE);
+
+				/*
+				 * If we are oversubscribed (more RT hogs than
+				 * cpus) give the others a change to run;
+				 * otherwise, they will interrupt us in the
+				 * middle of the measurement.
+				 */
+				if (nengine > 1)
+					usleep(10*nengine);
+
+				__rearm_spin_batch(spin);
+
+				igt_nsec_elapsed(&ts);
+				__submit_spin_batch(fd, spin, engine);
+				if (!__spin_wait(fd, spin)) {
+					igt_warn("Wait timeout! (%s)\n",
+						 passname[pass]);
+					break;
+				}
+
+				t = igt_nsec_elapsed(&ts) * 1e-9;
+				if (t > max)
+					max = t;
+				if (t < min)
+					min = t;
+
+				igt_mean_add(&mean, t);
+			}
+
+			igt_spin_batch_free(fd, spin);
+
+			igt_info("%8s %10s: mean=%.2fus stddev=%.3fus [%.2fus, %.2fus] (n=%lu)\n",
+				 names[child],
+				 passname[pass],
+				 igt_mean_get(&mean) * 1e6,
+				 sqrt(igt_mean_get_variance(&mean)) * 1e6,
+				 min * 1e6, max * 1e6,
+				 mean.count);
+
+			results[NPASS * child + pass].mean = mean;
+			results[NPASS * child + pass].min = min;
+			results[NPASS * child + pass].max = max;
+		} while (++pass < NPASS);
+	}
+
+	igt_waitchildren();
+
+	for (unsigned int child = 0; child < nengine; child++) {
+		struct rt_pkt normal = results[NPASS * child + 1];
+		igt_stats_t stats;
+		double variance;
+
+		igt_stats_init_with_size(&stats, NPASS);
+
+		for (unsigned int pass = 2; pass < NPASS; pass++) {
+			struct rt_pkt *rt = &results[NPASS * child + pass];
+
+			igt_assert(rt->max);
+
+			igt_stats_push_float(&stats, igt_mean_get(&rt->mean));
+			variance += igt_mean_get_variance(&rt->mean);
+		}
+		variance /= NPASS - 2;
+
+		igt_info("%8s: normal latency=%.2f±%.3fus, rt latency=%.2f±%.3fus\n",
+			 names[child],
+			 igt_mean_get(&normal.mean) * 1e6,
+			 sqrt(igt_mean_get_variance(&normal.mean)) * 1e6,
+			 igt_stats_get_median(&stats) * 1e6,
+			 sqrt(variance) * 1e6);
+
+		igt_assert(igt_stats_get_median(&stats) <
+			   igt_mean_get(&normal.mean) * 2);
+
+		/* The system is noisy; be conservative when declaring fail. */
+		igt_assert(variance < igt_mean_get_variance(&normal.mean) * 10);
+	}
+
+	munmap(results, MMAP_SZ);
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -373,6 +587,12 @@ igt_main
 		intel_register_access_init(intel_get_pci_device(), false, device);
 	}
 
+	igt_subtest("all-rtidle-submit")
+		rthog_latency_on_ring(device, ALL_ENGINES, "all", RTIDLE);
+
+	igt_subtest("all-rthog-submit")
+		rthog_latency_on_ring(device, ALL_ENGINES, "all", 0);
+
 	igt_subtest_group {
 		igt_fixture
 			igt_require(intel_gen(intel_get_drm_devid(device)) >= 7);
@@ -390,6 +610,20 @@ igt_main
 					latency_on_ring(device,
 							e->exec_id | e->flags,
 							e->name, 0);
+
+				igt_subtest_f("%s-rtidle-submit", e->name)
+					rthog_latency_on_ring(device,
+							      e->exec_id |
+							      e->flags,
+							      e->name,
+							      RTIDLE);
+
+				igt_subtest_f("%s-rthog-submit", e->name)
+					rthog_latency_on_ring(device,
+							      e->exec_id |
+							      e->flags,
+							      e->name,
+							      0);
 
 				igt_subtest_f("%s-dispatch-queued", e->name)
 					latency_on_ring(device,
