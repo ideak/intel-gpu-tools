@@ -223,16 +223,6 @@ test_progs = [
 
 test_deps = [ igt_deps ]
 
-if libdrm_amdgpu.found()
-	# FIXME meson/ninja really doesn't like build targets with paths in them
-	test_progs += [
-		'amdgpu/amd_basic',
-		'amdgpu/amd_cs_nop',
-		'amdgpu/amd_prime',
-	]
-	test_deps += libdrm_amdgpu
-endif
-
 if libdrm_nouveau.found()
 	test_progs += [
 		'prime_nv_api',
@@ -308,6 +298,8 @@ executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   install_rpath : rpathdir,
 	   install : true)
 test_progs += 'testdisplay'
+
+subdir('amdgpu')
 
 gen_testlist = find_program('generate_testlist.sh')
 test_list = custom_target('testlist',
