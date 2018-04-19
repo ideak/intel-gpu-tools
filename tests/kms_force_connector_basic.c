@@ -115,7 +115,6 @@ int main(int argc, char **argv)
 
 		/* Reacquire status after clearing any previous overrides */
 		vga_connector = drmModeGetConnector(drm_fd, vga_connector_id);
-		igt_skip_on(vga_connector->connection == DRM_MODE_CONNECTED);
 
 		start_n_modes = vga_connector->count_modes;
 		start_connection = vga_connector->connection;
