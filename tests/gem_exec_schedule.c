@@ -49,9 +49,9 @@
 
 IGT_TEST_DESCRIPTION("Check that we can control the order of execution");
 
-static void store_dword(int fd, uint32_t ctx, unsigned ring,
-			uint32_t target, uint32_t offset, uint32_t value,
-			uint32_t cork, unsigned write_domain)
+static uint32_t __store_dword(int fd, uint32_t ctx, unsigned ring,
+			      uint32_t target, uint32_t offset, uint32_t value,
+			      uint32_t cork, unsigned write_domain)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[3];
@@ -100,7 +100,17 @@ static void store_dword(int fd, uint32_t ctx, unsigned ring,
 	batch[++i] = MI_BATCH_BUFFER_END;
 	gem_write(fd, obj[2].handle, 0, batch, sizeof(batch));
 	gem_execbuf(fd, &execbuf);
-	gem_close(fd, obj[2].handle);
+
+	return obj[2].handle;
+}
+
+static void store_dword(int fd, uint32_t ctx, unsigned ring,
+			uint32_t target, uint32_t offset, uint32_t value,
+			uint32_t cork, unsigned write_domain)
+{
+	gem_close(fd, __store_dword(fd, ctx, ring,
+				    target, offset, value,
+				    cork, write_domain));
 }
 
 static uint32_t create_highest_priority(int fd)
@@ -159,6 +169,74 @@ static void fifo(int fd, unsigned ring)
 
 	igt_assert_eq_u32(ptr[0], 2);
 	munmap(ptr, 4096);
+}
+
+static void independent(int fd, unsigned int engine)
+{
+	IGT_CORK_HANDLE(cork);
+	uint32_t scratch, plug, batch;
+	igt_spin_t *spin = NULL;
+	unsigned int other;
+	uint32_t *ptr;
+
+	igt_require(engine != 0);
+
+	scratch = gem_create(fd, 4096);
+	ptr = gem_mmap__gtt(fd, scratch, 4096, PROT_READ);
+	igt_assert_eq(ptr[0], 0);
+
+	plug = igt_cork_plug(&cork, fd);
+
+	/* Check that we can submit to engine while all others are blocked */
+	for_each_physical_engine(fd, other) {
+		if (other == engine)
+			continue;
+
+		if (!gem_can_store_dword(fd, other))
+			continue;
+
+		if (spin == NULL) {
+			spin = __igt_spin_batch_new(fd, 0, other, 0);
+		} else {
+			struct drm_i915_gem_exec_object2 obj = {
+				.handle = spin->handle,
+			};
+			struct drm_i915_gem_execbuffer2 eb = {
+				.buffer_count = 1,
+				.buffers_ptr = to_user_pointer(&obj),
+				.flags = other,
+			};
+			gem_execbuf(fd, &eb);
+		}
+
+		store_dword(fd, 0, other, scratch, 0, other, plug, 0);
+	}
+	igt_require(spin);
+
+	/* Same priority, but different timeline (as different engine) */
+	batch = __store_dword(fd, 0, engine, scratch, 0, engine, plug, 0);
+
+	unplug_show_queue(fd, &cork, engine);
+	gem_close(fd, plug);
+
+	gem_sync(fd, batch);
+	igt_assert(!gem_bo_busy(fd, batch));
+	igt_assert(gem_bo_busy(fd, spin->handle));
+	gem_close(fd, batch);
+
+	/* Only the local engine should be free to complete. */
+	igt_assert(gem_bo_busy(fd, scratch));
+	igt_assert_eq(ptr[0], engine);
+
+	igt_spin_batch_free(fd, spin);
+	gem_quiescent_gpu(fd);
+
+	/* And we expect the others to have overwritten us, order unspecified */
+	igt_assert(!gem_bo_busy(fd, scratch));
+	igt_assert_neq(ptr[0], engine);
+
+	munmap(ptr, 4096);
+	gem_close(fd, scratch);
 }
 
 static void smoketest(int fd, unsigned ring, unsigned timeout)
@@ -1072,8 +1150,14 @@ igt_main
 
 			igt_subtest_f("fifo-%s", e->name) {
 				igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
-				igt_require(gem_can_store_dword(fd, e->exec_id) | e->flags);
+				igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 				fifo(fd, e->exec_id | e->flags);
+			}
+
+			igt_subtest_f("independent-%s", e->name) {
+				igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
+				igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
+				independent(fd, e->exec_id | e->flags);
 			}
 		}
 	}
@@ -1094,7 +1178,7 @@ igt_main
 			igt_subtest_group {
 				igt_fixture {
 					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
-					igt_require(gem_can_store_dword(fd, e->exec_id) | e->flags);
+					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
 				}
 
 				igt_subtest_f("in-order-%s", e->name)
