@@ -79,7 +79,7 @@ gen7_media_fillfunc(struct intel_batchbuffer *batch,
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);
 
-	batch_end = batch_align(batch, 8);
+	batch_end = intel_batchbuffer_align(batch, 8);
 	igt_assert(batch_end < BATCH_STATE_SPLIT);
 
 	gen7_render_flush(batch, batch_end);

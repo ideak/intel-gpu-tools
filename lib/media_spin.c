@@ -45,42 +45,6 @@ static const uint32_t spin_kernel[][4] = {
 	{ 0x07800031, 0x20000a40, 0x0e000e00, 0x82000010 }, /* send.ts (16)null<1> r112<0;1;0>:d 0x82000010 */
 };
 
-static uint32_t
-batch_used(struct intel_batchbuffer *batch)
-{
-	return batch->ptr - batch->buffer;
-}
-
-static uint32_t
-batch_align(struct intel_batchbuffer *batch, uint32_t align)
-{
-	uint32_t offset = batch_used(batch);
-	offset = ALIGN(offset, align);
-	batch->ptr = batch->buffer + offset;
-	return offset;
-}
-
-static void *
-batch_alloc(struct intel_batchbuffer *batch, uint32_t size, uint32_t align)
-{
-	uint32_t offset = batch_align(batch, align);
-	batch->ptr += size;
-	return memset(batch->buffer + offset, 0, size);
-}
-
-static uint32_t
-batch_offset(struct intel_batchbuffer *batch, void *ptr)
-{
-	return (uint8_t *)ptr - batch->buffer;
-}
-
-static uint32_t
-batch_copy(struct intel_batchbuffer *batch, const void *ptr, uint32_t size,
-	   uint32_t align)
-{
-	return batch_offset(batch, memcpy(batch_alloc(batch, size, align), ptr, size));
-}
-
 static void
 gen8_render_flush(struct intel_batchbuffer *batch, uint32_t batch_end)
 {
@@ -100,8 +64,8 @@ gen8_spin_curbe_buffer_data(struct intel_batchbuffer *batch,
 	uint32_t *curbe_buffer;
 	uint32_t offset;
 
-	curbe_buffer = batch_alloc(batch, 64, 64);
-	offset = batch_offset(batch, curbe_buffer);
+	curbe_buffer = intel_batchbuffer_subdata_alloc(batch, 64, 64);
+	offset = intel_batchbuffer_subdata_offset(batch, curbe_buffer);
 	*curbe_buffer = iters;
 
 	return offset;
@@ -124,8 +88,8 @@ gen8_spin_surface_state(struct intel_batchbuffer *batch,
 		read_domain = I915_GEM_DOMAIN_SAMPLER;
 	}
 
-	ss = batch_alloc(batch, sizeof(*ss), 64);
-	offset = batch_offset(batch, ss);
+	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 64);
+	offset = intel_batchbuffer_subdata_offset(batch, ss);
 
 	ss->ss0.surface_type = GEN8_SURFACE_2D;
 	ss->ss0.surface_format = format;
@@ -141,7 +105,7 @@ gen8_spin_surface_state(struct intel_batchbuffer *batch,
 	ss->ss8.base_addr = buf->bo->offset;
 
 	ret = drm_intel_bo_emit_reloc(batch->bo,
-				batch_offset(batch, ss) + 8 * 4,
+				intel_batchbuffer_subdata_offset(batch, ss) + 8 * 4,
 				buf->bo, 0,
 				read_domain, write_domain);
 	igt_assert_eq(ret, 0);
@@ -164,8 +128,8 @@ gen8_spin_binding_table(struct intel_batchbuffer *batch,
 {
 	uint32_t *binding_table, offset;
 
-	binding_table = batch_alloc(batch, 32, 64);
-	offset = batch_offset(batch, binding_table);
+	binding_table = intel_batchbuffer_subdata_alloc(batch, 32, 64);
+	offset = intel_batchbuffer_subdata_offset(batch, binding_table);
 
 	binding_table[0] = gen8_spin_surface_state(batch, dst,
 					GEN8_SURFACEFORMAT_R8_UNORM, 1);
@@ -180,7 +144,7 @@ gen8_spin_media_kernel(struct intel_batchbuffer *batch,
 {
 	uint32_t offset;
 
-	offset = batch_copy(batch, kernel, size, 64);
+	offset = intel_batchbuffer_copy_data(batch, kernel, size, 64);
 
 	return offset;
 }
@@ -197,8 +161,8 @@ gen8_spin_interface_descriptor(struct intel_batchbuffer *batch,
 	kernel_offset = gen8_spin_media_kernel(batch, spin_kernel,
 					       sizeof(spin_kernel));
 
-	idd = batch_alloc(batch, sizeof(*idd), 64);
-	offset = batch_offset(batch, idd);
+	idd = intel_batchbuffer_subdata_alloc(batch, sizeof(*idd), 64);
+	offset = intel_batchbuffer_subdata_offset(batch, idd);
 
 	idd->desc0.kernel_start_pointer = (kernel_offset >> 6);
 
@@ -444,7 +408,7 @@ gen8_media_spinfunc(struct intel_batchbuffer *batch,
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);
 
-	batch_end = batch_align(batch, 8);
+	batch_end = intel_batchbuffer_align(batch, 8);
 	igt_assert(batch_end < BATCH_STATE_SPLIT);
 
 	gen8_render_flush(batch, batch_end);
@@ -482,7 +446,7 @@ gen8lp_media_spinfunc(struct intel_batchbuffer *batch,
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);
 
-	batch_end = batch_align(batch, 8);
+	batch_end = intel_batchbuffer_align(batch, 8);
 	igt_assert(batch_end < BATCH_STATE_SPLIT);
 
 	gen8_render_flush(batch, batch_end);
@@ -532,7 +496,7 @@ gen9_media_spinfunc(struct intel_batchbuffer *batch,
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);
 
-	batch_end = batch_align(batch, 8);
+	batch_end = intel_batchbuffer_align(batch, 8);
 	igt_assert(batch_end < BATCH_STATE_SPLIT);
 
 	gen8_render_flush(batch, batch_end);

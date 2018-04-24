@@ -66,6 +66,61 @@
  */
 
 /**
+ * intel_batchbuffer_align:
+ * @batch: batchbuffer object
+ * @align: value in bytes to which we want to align
+ *
+ * Aligns the current in-batch offset to the given value.
+ *
+ * Returns: Batchbuffer offset aligned to the given value.
+ */
+uint32_t
+intel_batchbuffer_align(struct intel_batchbuffer *batch, uint32_t align)
+{
+	uint32_t offset = batch->ptr - batch->buffer;
+
+	offset = ALIGN(offset, align);
+	batch->ptr = batch->buffer + offset;
+	return offset;
+}
+
+/**
+ * intel_batchbuffer_subdata_alloc:
+ * @batch: batchbuffer object
+ * @size: amount of bytes need to allocate
+ * @align: value in bytes to which we want to align
+ *
+ * Verify if sufficient @size within @batch is available to deny overflow.
+ * Then allocate @size bytes within @batch.
+ *
+ * Returns: Offset within @batch between allocated subdata and base of @batch.
+ */
+void *
+intel_batchbuffer_subdata_alloc(struct intel_batchbuffer *batch, uint32_t size,
+				uint32_t align)
+{
+	uint32_t offset = intel_batchbuffer_align(batch, align);
+
+	igt_assert(size <= intel_batchbuffer_space(batch));
+
+	batch->ptr += size;
+	return memset(batch->buffer + offset, 0, size);
+}
+
+/**
+ * intel_batchbuffer_subdata_offset:
+ * @batch: batchbuffer object
+ * @ptr: pointer to given data
+ *
+ * Returns: Offset within @batch between @ptr and base of @batch.
+ */
+uint32_t
+intel_batchbuffer_subdata_offset(struct intel_batchbuffer *batch, void *ptr)
+{
+	return (uint8_t *)ptr - batch->buffer;
+}
+
+/**
  * intel_batchbuffer_reset:
  * @batch: batchbuffer object
  *
@@ -288,22 +343,31 @@ intel_batchbuffer_emit_reloc(struct intel_batchbuffer *batch,
 }
 
 /**
- * intel_batchbuffer_data:
+ * intel_batchbuffer_copy_data:
  * @batch: batchbuffer object
  * @data: pointer to the data to write into the batchbuffer
  * @bytes: number of bytes to write into the batchbuffer
+ * @align: value in bytes to which we want to align
  *
  * This transfers the given @data into the batchbuffer. Note that the length
- * must be DWORD aligned, i.e. multiples of 32bits.
+ * must be DWORD aligned, i.e. multiples of 32bits. The caller must
+ * confirm that there is enough space in the batch for the data to be
+ * copied.
+ *
+ * Returns: Offset of copied data.
  */
-void
-intel_batchbuffer_data(struct intel_batchbuffer *batch,
-                       const void *data, unsigned int bytes)
+uint32_t
+intel_batchbuffer_copy_data(struct intel_batchbuffer *batch,
+			    const void *data, unsigned int bytes,
+			    uint32_t align)
 {
+	uint32_t *subdata;
+
 	igt_assert((bytes & 3) == 0);
-	intel_batchbuffer_require_space(batch, bytes);
-	memcpy(batch->ptr, data, bytes);
-	batch->ptr += bytes;
+	subdata = intel_batchbuffer_subdata_alloc(batch, bytes, align);
+	memcpy(subdata, data, bytes);
+
+	return intel_batchbuffer_subdata_offset(batch, subdata);
 }
 
 /**

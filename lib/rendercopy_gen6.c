@@ -49,47 +49,13 @@ static const uint32_t ps_kernel_nomask_affine[][4] = {
 };
 
 static uint32_t
-batch_used(struct intel_batchbuffer *batch)
-{
-	return batch->ptr - batch->buffer;
-}
-
-static uint32_t
-batch_align(struct intel_batchbuffer *batch, uint32_t align)
-{
-	uint32_t offset = batch_used(batch);
-	offset = ALIGN(offset, align);
-	batch->ptr = batch->buffer + offset;
-	return offset;
-}
-
-static uint32_t
 batch_round_upto(struct intel_batchbuffer *batch, uint32_t divisor)
 {
-	uint32_t offset = batch_used(batch);
+	uint32_t offset = batch->ptr - batch->buffer;
+
 	offset = (offset + divisor-1) / divisor * divisor;
 	batch->ptr = batch->buffer + offset;
 	return offset;
-}
-
-static void *
-batch_alloc(struct intel_batchbuffer *batch, uint32_t size, uint32_t align)
-{
-	uint32_t offset = batch_align(batch, align);
-	batch->ptr += size;
-	return memset(batch->buffer + offset, 0, size);
-}
-
-static uint32_t
-batch_offset(struct intel_batchbuffer *batch, void *ptr)
-{
-	return (uint8_t *)ptr - batch->buffer;
-}
-
-static uint32_t
-batch_copy(struct intel_batchbuffer *batch, const void *ptr, uint32_t size, uint32_t align)
-{
-	return batch_offset(batch, memcpy(batch_alloc(batch, size, align), ptr, size));
 }
 
 static void
@@ -120,7 +86,7 @@ gen6_bind_buf(struct intel_batchbuffer *batch, struct igt_buf *buf,
 		read_domain = I915_GEM_DOMAIN_SAMPLER;
 	}
 
-	ss = batch_alloc(batch, sizeof(*ss), 32);
+	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 32);
 	ss->ss0.surface_type = GEN6_SURFACE_2D;
 	ss->ss0.surface_format = format;
 
@@ -129,7 +95,7 @@ gen6_bind_buf(struct intel_batchbuffer *batch, struct igt_buf *buf,
 	ss->ss1.base_addr = buf->bo->offset;
 
 	ret = drm_intel_bo_emit_reloc(batch->bo,
-				      batch_offset(batch, ss) + 4,
+				      intel_batchbuffer_subdata_offset(batch, ss) + 4,
 				      buf->bo, 0,
 				      read_domain, write_domain);
 	igt_assert(ret == 0);
@@ -140,7 +106,7 @@ gen6_bind_buf(struct intel_batchbuffer *batch, struct igt_buf *buf,
 	ss->ss3.tiled_surface = buf->tiling != I915_TILING_NONE;
 	ss->ss3.tile_walk     = buf->tiling == I915_TILING_Y;
 
-	return batch_offset(batch, ss);
+	return intel_batchbuffer_subdata_offset(batch, ss);
 }
 
 static uint32_t
@@ -150,14 +116,14 @@ gen6_bind_surfaces(struct intel_batchbuffer *batch,
 {
 	uint32_t *binding_table;
 
-	binding_table = batch_alloc(batch, 32, 32);
+	binding_table = intel_batchbuffer_subdata_alloc(batch, 32, 32);
 
 	binding_table[0] =
 		gen6_bind_buf(batch, dst, GEN6_SURFACEFORMAT_B8G8R8A8_UNORM, 1);
 	binding_table[1] =
 		gen6_bind_buf(batch, src, GEN6_SURFACEFORMAT_B8G8R8A8_UNORM, 0);
 
-	return batch_offset(batch, binding_table);
+	return intel_batchbuffer_subdata_offset(batch, binding_table);
 }
 
 static void
@@ -427,12 +393,12 @@ gen6_create_cc_viewport(struct intel_batchbuffer *batch)
 {
 	struct gen6_cc_viewport *vp;
 
-	vp = batch_alloc(batch, sizeof(*vp), 32);
+	vp = intel_batchbuffer_subdata_alloc(batch, sizeof(*vp), 32);
 
 	vp->min_depth = -1.e35;
 	vp->max_depth = 1.e35;
 
-	return batch_offset(batch, vp);
+	return intel_batchbuffer_subdata_offset(batch, vp);
 }
 
 static uint32_t
@@ -440,7 +406,7 @@ gen6_create_cc_blend(struct intel_batchbuffer *batch)
 {
 	struct gen6_blend_state *blend;
 
-	blend = batch_alloc(batch, sizeof(*blend), 64);
+	blend = intel_batchbuffer_subdata_alloc(batch, sizeof(*blend), 64);
 
 	blend->blend0.dest_blend_factor = GEN6_BLENDFACTOR_ZERO;
 	blend->blend0.source_blend_factor = GEN6_BLENDFACTOR_ONE;
@@ -450,13 +416,13 @@ gen6_create_cc_blend(struct intel_batchbuffer *batch)
 	blend->blend1.post_blend_clamp_enable = 1;
 	blend->blend1.pre_blend_clamp_enable = 1;
 
-	return batch_offset(batch, blend);
+	return intel_batchbuffer_subdata_offset(batch, blend);
 }
 
 static uint32_t
 gen6_create_kernel(struct intel_batchbuffer *batch)
 {
-	return batch_copy(batch, ps_kernel_nomask_affine,
+	return intel_batchbuffer_copy_data(batch, ps_kernel_nomask_affine,
 			  sizeof(ps_kernel_nomask_affine),
 			  64);
 }
@@ -468,7 +434,7 @@ gen6_create_sampler(struct intel_batchbuffer *batch,
 {
 	struct gen6_sampler_state *ss;
 
-	ss = batch_alloc(batch, sizeof(*ss), 32);
+	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 32);
 	ss->ss0.lod_preclamp = 1;	/* GL mode */
 
 	/* We use the legacy mode to get the semantics specified by
@@ -511,7 +477,7 @@ gen6_create_sampler(struct intel_batchbuffer *batch,
 		break;
 	}
 
-	return batch_offset(batch, ss);
+	return intel_batchbuffer_subdata_offset(batch, ss);
 }
 
 static void gen6_emit_vertex_buffer(struct intel_batchbuffer *batch)
@@ -535,7 +501,7 @@ static uint32_t gen6_emit_primitive(struct intel_batchbuffer *batch)
 		  0 << 9 |
 		  4);
 	OUT_BATCH(3);	/* vertex count */
-	offset = batch_used(batch);
+	offset = batch->ptr - batch->buffer;
 	OUT_BATCH(0);	/* vertex_index */
 	OUT_BATCH(1);	/* single instance */
 	OUT_BATCH(0);	/* start instance location */
@@ -557,7 +523,7 @@ void gen6_render_copyfunc(struct intel_batchbuffer *batch,
 	intel_batchbuffer_flush_with_context(batch, context);
 
 	batch->ptr = batch->buffer + 1024;
-	batch_alloc(batch, 64, 64);
+	intel_batchbuffer_subdata_alloc(batch, 64, 64);
 	wm_table  = gen6_bind_surfaces(batch, src, dst);
 	wm_kernel = gen6_create_kernel(batch);
 	wm_state  = gen6_create_sampler(batch,
@@ -594,7 +560,7 @@ void gen6_render_copyfunc(struct intel_batchbuffer *batch,
 	offset = gen6_emit_primitive(batch);
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);
-	batch_end = batch_align(batch, 8);
+	batch_end = intel_batchbuffer_align(batch, 8);
 
 	*(uint32_t*)(batch->buffer + offset) =
 		batch_round_upto(batch, VERTEX_SIZE)/VERTEX_SIZE;

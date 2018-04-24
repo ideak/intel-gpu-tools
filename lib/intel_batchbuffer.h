@@ -40,8 +40,9 @@ void intel_batchbuffer_flush_with_context(struct intel_batchbuffer *batch,
 
 void intel_batchbuffer_reset(struct intel_batchbuffer *batch);
 
-void intel_batchbuffer_data(struct intel_batchbuffer *batch,
-                            const void *data, unsigned int bytes);
+uint32_t intel_batchbuffer_copy_data(struct intel_batchbuffer *batch,
+				const void *data, unsigned int bytes,
+				uint32_t align);
 
 void intel_batchbuffer_emit_reloc(struct intel_batchbuffer *batch,
 				  drm_intel_bo *buffer,
@@ -49,6 +50,16 @@ void intel_batchbuffer_emit_reloc(struct intel_batchbuffer *batch,
 				  uint32_t read_domains,
 				  uint32_t write_domain,
 				  int fenced);
+
+uint32_t
+intel_batchbuffer_align(struct intel_batchbuffer *batch, uint32_t align);
+
+void *
+intel_batchbuffer_subdata_alloc(struct intel_batchbuffer *batch,
+				uint32_t size, uint32_t align);
+
+uint32_t
+intel_batchbuffer_subdata_offset(struct intel_batchbuffer *batch, void *ptr);
 
 /* Inline functions - might actually be better off with these
  * non-inlined.  Certainly better off switching all command packets to

@@ -37,21 +37,6 @@
 #include "intel_chipset.h"
 #include <assert.h>
 
-uint32_t
-batch_used(struct intel_batchbuffer *batch);
-
-uint32_t
-batch_align(struct intel_batchbuffer *batch, uint32_t align);
-
-void *
-batch_alloc(struct intel_batchbuffer *batch, uint32_t size, uint32_t align);
-
-uint32_t
-batch_offset(struct intel_batchbuffer *batch, void *ptr);
-
-uint32_t
-batch_copy(struct intel_batchbuffer *batch, const void *ptr, uint32_t size, uint32_t align);
-
 void
 gen7_render_flush(struct intel_batchbuffer *batch, uint32_t batch_end);
 
