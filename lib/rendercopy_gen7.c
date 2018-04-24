@@ -35,7 +35,7 @@ static const uint32_t ps_kernel[][4] = {
 static uint32_t
 batch_used(struct intel_batchbuffer *batch)
 {
-	return batch->state - batch->buffer;
+	return batch->ptr - batch->buffer;
 }
 
 static uint32_t
@@ -43,7 +43,7 @@ batch_align(struct intel_batchbuffer *batch, uint32_t align)
 {
 	uint32_t offset = batch_used(batch);
 	offset = ALIGN(offset, align);
-	batch->state = batch->buffer + offset;
+	batch->ptr = batch->buffer + offset;
 	return offset;
 }
 
@@ -51,7 +51,7 @@ static void *
 batch_alloc(struct intel_batchbuffer *batch, uint32_t size, uint32_t align)
 {
 	uint32_t offset = batch_align(batch, align);
-	batch->state += size;
+	batch->ptr += size;
 	return memset(batch->buffer + offset, 0, size);
 }
 
@@ -198,15 +198,9 @@ gen7_create_vertex_buffer(struct intel_batchbuffer *batch,
 static void gen7_emit_vertex_buffer(struct intel_batchbuffer *batch,
 				    int src_x, int src_y,
 				    int dst_x, int dst_y,
-				    int width, int height)
+				    int width, int height,
+				    uint32_t offset)
 {
-	uint32_t offset;
-
-	offset = gen7_create_vertex_buffer(batch,
-					   src_x, src_y,
-					   dst_x, dst_y,
-					   width, height);
-
 	OUT_BATCH(GEN7_3DSTATE_VERTEX_BUFFERS | (5 - 2));
 	OUT_BATCH(0 << GEN7_VB0_BUFFER_INDEX_SHIFT |
 		  GEN7_VB0_VERTEXDATA |
@@ -238,10 +232,11 @@ gen7_bind_surfaces(struct intel_batchbuffer *batch,
 static void
 gen7_emit_binding_table(struct intel_batchbuffer *batch,
 			struct igt_buf *src,
-			struct igt_buf *dst)
+			struct igt_buf *dst,
+			uint32_t bind_surf_off)
 {
 	OUT_BATCH(GEN7_3DSTATE_BINDING_TABLE_POINTERS_PS | (2 - 2));
-	OUT_BATCH(gen7_bind_surfaces(batch, src, dst));
+	OUT_BATCH(bind_surf_off);
 }
 
 static void
@@ -298,13 +293,14 @@ gen7_create_cc_viewport(struct intel_batchbuffer *batch)
 }
 
 static void
-gen7_emit_cc(struct intel_batchbuffer *batch)
+gen7_emit_cc(struct intel_batchbuffer *batch, uint32_t blend_state,
+	     uint32_t cc_viewport)
 {
-        OUT_BATCH(GEN7_3DSTATE_BLEND_STATE_POINTERS | (2 - 2));
-        OUT_BATCH(gen7_create_blend_state(batch));
+	OUT_BATCH(GEN7_3DSTATE_BLEND_STATE_POINTERS | (2 - 2));
+	OUT_BATCH(blend_state);
 
-        OUT_BATCH(GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_CC | (2 - 2));
-	OUT_BATCH(gen7_create_cc_viewport(batch));
+	OUT_BATCH(GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_CC | (2 - 2));
+	OUT_BATCH(cc_viewport);
 }
 
 static uint32_t
@@ -327,10 +323,10 @@ gen7_create_sampler(struct intel_batchbuffer *batch)
 }
 
 static void
-gen7_emit_sampler(struct intel_batchbuffer *batch)
+gen7_emit_sampler(struct intel_batchbuffer *batch, uint32_t sampler_off)
 {
-        OUT_BATCH(GEN7_3DSTATE_SAMPLER_STATE_POINTERS_PS | (2 - 2));
-        OUT_BATCH(gen7_create_sampler(batch));
+	OUT_BATCH(GEN7_3DSTATE_SAMPLER_STATE_POINTERS_PS | (2 - 2));
+	OUT_BATCH(sampler_off);
 }
 
 static void
@@ -468,7 +464,7 @@ gen7_emit_sbe(struct intel_batchbuffer *batch)
 }
 
 static void
-gen7_emit_ps(struct intel_batchbuffer *batch)
+gen7_emit_ps(struct intel_batchbuffer *batch, uint32_t kernel_off)
 {
 	int threads;
 
@@ -478,7 +474,7 @@ gen7_emit_ps(struct intel_batchbuffer *batch)
 		threads = 40 << IVB_PS_MAX_THREADS_SHIFT;
 
 	OUT_BATCH(GEN7_3DSTATE_PS | (8 - 2));
-	OUT_BATCH(batch_copy(batch, ps_kernel, sizeof(ps_kernel), 64));
+	OUT_BATCH(kernel_off);
 	OUT_BATCH(1 << GEN7_PS_SAMPLER_COUNT_SHIFT |
 		  2 << GEN7_PS_BINDING_TABLE_ENTRY_COUNT_SHIFT);
 	OUT_BATCH(0); /* scratch address */
@@ -535,12 +531,29 @@ void gen7_render_copyfunc(struct intel_batchbuffer *batch,
 			  unsigned width, unsigned height,
 			  struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
 {
+	uint32_t ps_binding_table, ps_sampler_off, ps_kernel_off;
+	uint32_t blend_state, cc_viewport;
+	uint32_t vertex_buffer;
 	uint32_t batch_end;
 
 	intel_batchbuffer_flush_with_context(batch, context);
 
-	batch->state = &batch->buffer[BATCH_STATE_SPLIT];
+	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
 
+
+	blend_state = gen7_create_blend_state(batch);
+	cc_viewport = gen7_create_cc_viewport(batch);
+	ps_sampler_off = gen7_create_sampler(batch);
+	ps_kernel_off = batch_copy(batch, ps_kernel, sizeof(ps_kernel), 64);
+	vertex_buffer = gen7_create_vertex_buffer(batch,
+						  src_x, src_y,
+						  dst_x, dst_y,
+						  width, height);
+	ps_binding_table = gen7_bind_surfaces(batch, src, dst);
+
+	igt_assert(batch->ptr < &batch->buffer[4095]);
+
+	batch->ptr = batch->buffer;
 	OUT_BATCH(GEN7_PIPELINE_SELECT | PIPELINE_SELECT_3D);
 
 	gen7_emit_state_base_address(batch);
@@ -556,18 +569,18 @@ void gen7_render_copyfunc(struct intel_batchbuffer *batch,
 	gen7_emit_wm(batch);
 	gen7_emit_streamout(batch);
 	gen7_emit_null_depth_buffer(batch);
-
-	gen7_emit_cc(batch);
-        gen7_emit_sampler(batch);
+	gen7_emit_cc(batch, blend_state, cc_viewport);
+	gen7_emit_sampler(batch, ps_sampler_off);
         gen7_emit_sbe(batch);
-        gen7_emit_ps(batch);
+	gen7_emit_ps(batch, ps_kernel_off);
         gen7_emit_vertex_elements(batch);
-        gen7_emit_vertex_buffer(batch,
-				src_x, src_y, dst_x, dst_y, width, height);
-	gen7_emit_binding_table(batch, src, dst);
+	gen7_emit_vertex_buffer(batch, src_x, src_y,
+				dst_x, dst_y, width,
+				height, vertex_buffer);
+	gen7_emit_binding_table(batch, src, dst, ps_binding_table);
 	gen7_emit_drawing_rectangle(batch, dst);
 
-        OUT_BATCH(GEN7_3DPRIMITIVE | (7- 2));
+	OUT_BATCH(GEN7_3DPRIMITIVE | (7 - 2));
         OUT_BATCH(GEN7_3DPRIMITIVE_VERTEX_SEQUENTIAL | _3DPRIM_RECTLIST);
         OUT_BATCH(3);
         OUT_BATCH(0);
