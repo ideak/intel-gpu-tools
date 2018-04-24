@@ -80,49 +80,72 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 	/* force the VGA output and test that it worked */
 	int drm_fd = 0;
 	drmModeRes *res;
-	drmModeConnector *vga_connector = NULL, *temp;
+	drmModeConnector *connector = NULL, *temp;
 	int start_n_modes, start_connection;
 
 	igt_fixture {
-		unsigned vga_connector_id = 0;
+		unsigned connector_id = 0;
 
 		drm_fd = drm_open_driver_master(DRIVER_INTEL);
 
 		res = drmModeGetResources(drm_fd);
 		igt_require(res);
 
-		/* find the vga connector */
+		/* find a vga connector */
 		for (int i = 0; i < res->count_connectors; i++) {
-			vga_connector = drmModeGetConnectorCurrent(drm_fd,
-								   res->connectors[i]);
+			connector = drmModeGetConnectorCurrent(drm_fd,
+							       res->connectors[i]);
 
-			if (vga_connector->connector_type == DRM_MODE_CONNECTOR_VGA) {
+			if (connector->connector_type == DRM_MODE_CONNECTOR_VGA) {
 				/* Ensure that no override was left in place. */
 				kmstest_force_connector(drm_fd,
-							vga_connector,
+							connector,
 							FORCE_CONNECTOR_UNSPECIFIED);
 
 				/* Only use the first VGA connector. */
-				if (!vga_connector_id)
-					vga_connector_id = res->connectors[i];
+				if (!connector_id)
+					connector_id = res->connectors[i];
 			}
 
-			drmModeFreeConnector(vga_connector);
+			drmModeFreeConnector(connector);
 		}
 
-		igt_require(vga_connector_id);
+		/* find a hdmi connector if we didn't find vga */
+		for (int i = 0; i < res->count_connectors; i++) {
+			connector = drmModeGetConnectorCurrent(drm_fd,
+							       res->connectors[i]);
+
+			if (connector->connector_type == DRM_MODE_CONNECTOR_HDMIA ||
+			    connector->connector_type == DRM_MODE_CONNECTOR_HDMIB) {
+				/* Ensure that no override was left in place. */
+				kmstest_force_connector(drm_fd,
+							connector,
+							FORCE_CONNECTOR_UNSPECIFIED);
+
+				/* Use the the first HDMI connector. */
+				if (!connector_id)
+					connector_id = res->connectors[i];
+			}
+
+			drmModeFreeConnector(connector);
+		}
+
+		igt_require(connector_id);
 
 		/* Reacquire status after clearing any previous overrides */
-		vga_connector = drmModeGetConnector(drm_fd, vga_connector_id);
+		connector = drmModeGetConnector(drm_fd, connector_id);
 
-		start_n_modes = vga_connector->count_modes;
-		start_connection = vga_connector->connection;
+		start_n_modes = connector->count_modes;
+		start_connection = connector->connection;
 	}
 
 	igt_subtest("force-load-detect") {
 		int i, j, w = 64, h = 64;
 		drmModePlaneRes *plane_resources;
 		struct igt_fb xrgb_fb, argb_fb;
+
+		/* no load detect on HDMI */
+		igt_require(connector->connector_type == DRM_MODE_CONNECTOR_VGA);
 
 		igt_create_fb(drm_fd, w, h, DRM_FORMAT_XRGB8888, 0, &xrgb_fb);
 		igt_create_fb(drm_fd, w, h, DRM_FORMAT_ARGB8888, 0, &argb_fb);
@@ -176,7 +199,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		/* This can't use drmModeGetConnectorCurrent
 		 * because connector probing is the point of this test.
 		 */
-		temp = drmModeGetConnector(drm_fd, vga_connector->connector_id);
+		temp = drmModeGetConnector(drm_fd, connector->connector_id);
 
 		igt_set_module_param_int("load_detect_test", 0);
 
@@ -206,9 +229,9 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		igt_display_t display;
 
 		/* force the connector on and check the reported values */
-		kmstest_force_connector(drm_fd, vga_connector, FORCE_CONNECTOR_ON);
+		kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_ON);
 		temp = drmModeGetConnectorCurrent(drm_fd,
-						  vga_connector->connector_id);
+						  connector->connector_id);
 		igt_assert_eq(temp->connection, DRM_MODE_CONNECTED);
 		igt_assert_lt(0, temp->count_modes);
 		drmModeFreeConnector(temp);
@@ -221,35 +244,35 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 
 
 		/* force the connector off */
-		kmstest_force_connector(drm_fd, vga_connector,
+		kmstest_force_connector(drm_fd, connector,
 					FORCE_CONNECTOR_OFF);
 		temp = drmModeGetConnectorCurrent(drm_fd,
-						  vga_connector->connector_id);
+						  connector->connector_id);
 		igt_assert_eq(temp->connection, DRM_MODE_DISCONNECTED);
 		igt_assert_eq(0, temp->count_modes);
 		drmModeFreeConnector(temp);
 
 		/* check that the previous state is restored */
-		kmstest_force_connector(drm_fd, vga_connector,
+		kmstest_force_connector(drm_fd, connector,
 					FORCE_CONNECTOR_UNSPECIFIED);
 		temp = drmModeGetConnectorCurrent(drm_fd,
-						  vga_connector->connector_id);
+						  connector->connector_id);
 		igt_assert_eq(temp->connection, start_connection);
 		drmModeFreeConnector(temp);
 	}
 
 	igt_subtest("force-edid") {
-		kmstest_force_connector(drm_fd, vga_connector,
+		kmstest_force_connector(drm_fd, connector,
 					FORCE_CONNECTOR_ON);
 		temp = drmModeGetConnectorCurrent(drm_fd,
-						  vga_connector->connector_id);
+						  connector->connector_id);
 		drmModeFreeConnector(temp);
 
 		/* test edid forcing */
-		kmstest_force_edid(drm_fd, vga_connector,
+		kmstest_force_edid(drm_fd, connector,
 				   igt_kms_get_base_edid());
 		temp = drmModeGetConnectorCurrent(drm_fd,
-						  vga_connector->connector_id);
+						  connector->connector_id);
 
 		igt_debug("num_conn %i\n", temp->count_modes);
 
@@ -260,11 +283,11 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		drmModeFreeConnector(temp);
 
 		/* remove edid */
-		kmstest_force_edid(drm_fd, vga_connector, NULL);
-		kmstest_force_connector(drm_fd, vga_connector,
+		kmstest_force_edid(drm_fd, connector, NULL);
+		kmstest_force_connector(drm_fd, connector,
 					FORCE_CONNECTOR_UNSPECIFIED);
 		temp = drmModeGetConnectorCurrent(drm_fd,
-						  vga_connector->connector_id);
+						  connector->connector_id);
 		/* the connector should now have the same number of modes that
 		 * it started with */
 		igt_assert_eq(temp->count_modes, start_n_modes);
@@ -275,14 +298,14 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 	igt_subtest("prune-stale-modes") {
 		int i;
 
-		kmstest_force_connector(drm_fd, vga_connector,
+		kmstest_force_connector(drm_fd, connector,
 					FORCE_CONNECTOR_ON);
 
 		/* test pruning of stale modes */
-		kmstest_force_edid(drm_fd, vga_connector,
+		kmstest_force_edid(drm_fd, connector,
 				   igt_kms_get_alt_edid());
 		temp = drmModeGetConnectorCurrent(drm_fd,
-						  vga_connector->connector_id);
+						  connector->connector_id);
 
 		for (i = 0; i < temp->count_modes; i++) {
 			if (temp->modes[i].hdisplay == 1400 &&
@@ -293,10 +316,10 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 
 		drmModeFreeConnector(temp);
 
-		kmstest_force_edid(drm_fd, vga_connector,
+		kmstest_force_edid(drm_fd, connector,
 				   igt_kms_get_base_edid());
 		temp = drmModeGetConnectorCurrent(drm_fd,
-						  vga_connector->connector_id);
+						  connector->connector_id);
 
 		for (i = 0; i < temp->count_modes; i++) {
 			if (temp->modes[i].hdisplay == 1400 &&
@@ -307,13 +330,13 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 
 		drmModeFreeConnector(temp);
 
-		kmstest_force_edid(drm_fd, vga_connector, NULL);
-		kmstest_force_connector(drm_fd, vga_connector,
+		kmstest_force_edid(drm_fd, connector, NULL);
+		kmstest_force_connector(drm_fd, connector,
 					FORCE_CONNECTOR_UNSPECIFIED);
 	}
 
 	igt_fixture {
-		drmModeFreeConnector(vga_connector);
+		drmModeFreeConnector(connector);
 		close(drm_fd);
 
 		reset_connectors();
