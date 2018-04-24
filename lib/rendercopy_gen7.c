@@ -175,7 +175,7 @@ gen7_create_vertex_buffer(struct intel_batchbuffer *batch,
 {
 	uint16_t *v;
 
-	v = batch_alloc(batch, 12*sizeof(*v), 8);
+	v = batch_alloc(batch, 12 * sizeof(*v), 8);
 
 	v[0] = dst_x + width;
 	v[1] = dst_y + height;
@@ -205,7 +205,7 @@ static void gen7_emit_vertex_buffer(struct intel_batchbuffer *batch,
 	OUT_BATCH(0 << GEN7_VB0_BUFFER_INDEX_SHIFT |
 		  GEN7_VB0_VERTEXDATA |
 		  GEN7_VB0_ADDRESS_MODIFY_ENABLE |
-		  4*2 << GEN7_VB0_BUFFER_PITCH_SHIFT);
+		  4 * 2 << GEN7_VB0_BUFFER_PITCH_SHIFT);
 
 	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_VERTEX, 0, offset);
 	OUT_BATCH(~0);
@@ -381,65 +381,65 @@ gen7_emit_vs(struct intel_batchbuffer *batch)
 static void
 gen7_emit_hs(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN7_3DSTATE_HS | (7 - 2));
-        OUT_BATCH(0); /* no HS kernel */
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0); /* pass-through */
+	OUT_BATCH(GEN7_3DSTATE_HS | (7 - 2));
+	OUT_BATCH(0); /* no HS kernel */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0); /* pass-through */
 }
 
 static void
 gen7_emit_te(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN7_3DSTATE_TE | (4 - 2));
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_TE | (4 - 2));
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
 }
 
 static void
 gen7_emit_ds(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN7_3DSTATE_DS | (6 - 2));
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_DS | (6 - 2));
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
 }
 
 static void
 gen7_emit_gs(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN7_3DSTATE_GS | (7 - 2));
-        OUT_BATCH(0); /* no GS kernel */
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0); /* pass-through  */
+	OUT_BATCH(GEN7_3DSTATE_GS | (7 - 2));
+	OUT_BATCH(0); /* no GS kernel */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0); /* pass-through  */
 }
 
 static void
 gen7_emit_streamout(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN7_3DSTATE_STREAMOUT | (3 - 2));
-        OUT_BATCH(0);
-        OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_STREAMOUT | (3 - 2));
+	OUT_BATCH(0);
+	OUT_BATCH(0);
 }
 
 static void
 gen7_emit_sf(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN7_3DSTATE_SF | (7 - 2));
-        OUT_BATCH(0);
-        OUT_BATCH(GEN7_3DSTATE_SF_CULL_NONE);
-        OUT_BATCH(2 << GEN7_3DSTATE_SF_TRIFAN_PROVOKE_SHIFT);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_SF | (7 - 2));
+	OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_SF_CULL_NONE);
+	OUT_BATCH(2 << GEN7_3DSTATE_SF_TRIFAN_PROVOKE_SHIFT);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
 }
 
 static void
@@ -489,39 +489,39 @@ gen7_emit_ps(struct intel_batchbuffer *batch, uint32_t kernel_off)
 static void
 gen7_emit_clip(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN7_3DSTATE_CLIP | (4 - 2));
-        OUT_BATCH(0);
-        OUT_BATCH(0); /* pass-through */
-        OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_CLIP | (4 - 2));
+	OUT_BATCH(0);
+	OUT_BATCH(0); /* pass-through */
+	OUT_BATCH(0);
 
-        OUT_BATCH(GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_SF_CL | (2 - 2));
-        OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_SF_CL | (2 - 2));
+	OUT_BATCH(0);
 }
 
 static void
 gen7_emit_wm(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN7_3DSTATE_WM | (3 - 2));
-        OUT_BATCH(GEN7_WM_DISPATCH_ENABLE |
-                  GEN7_WM_PERSPECTIVE_PIXEL_BARYCENTRIC);
-        OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_WM | (3 - 2));
+	OUT_BATCH(GEN7_WM_DISPATCH_ENABLE |
+		GEN7_WM_PERSPECTIVE_PIXEL_BARYCENTRIC);
+	OUT_BATCH(0);
 }
 
 static void
 gen7_emit_null_depth_buffer(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN7_3DSTATE_DEPTH_BUFFER | (7 - 2));
-        OUT_BATCH(GEN7_SURFACE_NULL << GEN7_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
-                  GEN7_DEPTHFORMAT_D32_FLOAT << GEN7_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
-        OUT_BATCH(0); /* disable depth, stencil and hiz */
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
-        OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_DEPTH_BUFFER | (7 - 2));
+	OUT_BATCH(GEN7_SURFACE_NULL << GEN7_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
+		  GEN7_DEPTHFORMAT_D32_FLOAT << GEN7_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
+	OUT_BATCH(0); /* disable depth, stencil and hiz */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
 
-        OUT_BATCH(GEN7_3DSTATE_CLEAR_PARAMS | (3 - 2));
-        OUT_BATCH(0);
-        OUT_BATCH(0);
+	OUT_BATCH(GEN7_3DSTATE_CLEAR_PARAMS | (3 - 2));
+	OUT_BATCH(0);
+	OUT_BATCH(0);
 }
 
 #define BATCH_STATE_SPLIT 2048
@@ -571,9 +571,9 @@ void gen7_render_copyfunc(struct intel_batchbuffer *batch,
 	gen7_emit_null_depth_buffer(batch);
 	gen7_emit_cc(batch, blend_state, cc_viewport);
 	gen7_emit_sampler(batch, ps_sampler_off);
-        gen7_emit_sbe(batch);
+	gen7_emit_sbe(batch);
 	gen7_emit_ps(batch, ps_kernel_off);
-        gen7_emit_vertex_elements(batch);
+	gen7_emit_vertex_elements(batch);
 	gen7_emit_vertex_buffer(batch, src_x, src_y,
 				dst_x, dst_y, width,
 				height, vertex_buffer);
@@ -581,12 +581,12 @@ void gen7_render_copyfunc(struct intel_batchbuffer *batch,
 	gen7_emit_drawing_rectangle(batch, dst);
 
 	OUT_BATCH(GEN7_3DPRIMITIVE | (7 - 2));
-        OUT_BATCH(GEN7_3DPRIMITIVE_VERTEX_SEQUENTIAL | _3DPRIM_RECTLIST);
-        OUT_BATCH(3);
-        OUT_BATCH(0);
-        OUT_BATCH(1);   /* single instance */
-        OUT_BATCH(0);   /* start instance location */
-        OUT_BATCH(0);   /* index buffer offset, ignored */
+	OUT_BATCH(GEN7_3DPRIMITIVE_VERTEX_SEQUENTIAL | _3DPRIM_RECTLIST);
+	OUT_BATCH(3);
+	OUT_BATCH(0);
+	OUT_BATCH(1);   /* single instance */
+	OUT_BATCH(0);   /* start instance location */
+	OUT_BATCH(0);   /* index buffer offset, ignored */
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);
 
