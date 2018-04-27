@@ -349,6 +349,7 @@
 #define INTEL_KBL_GT2_IDS(info)	\
 	INTEL_VGA_DEVICE(0x5916, info), /* ULT GT2 */ \
 	INTEL_VGA_DEVICE(0x5917, info), /* Mobile GT2 */ \
+	INTEL_VGA_DEVICE(0x591C, info), /* ULX GT2 */ \
 	INTEL_VGA_DEVICE(0x5921, info), /* ULT GT2F */ \
 	INTEL_VGA_DEVICE(0x591E, info), /* ULX GT2 */ \
 	INTEL_VGA_DEVICE(0x5912, info), /* DT  GT2 */ \
@@ -430,5 +431,17 @@
 	INTEL_VGA_DEVICE(0x5A5C, info), \
 	INTEL_VGA_DEVICE(0x5A44, info), \
 	INTEL_VGA_DEVICE(0x5A4C, info)
+
+/* ICL */
+#define INTEL_ICL_11_IDS(info) \
+	INTEL_VGA_DEVICE(0x8A50, info), \
+	INTEL_VGA_DEVICE(0x8A51, info), \
+	INTEL_VGA_DEVICE(0x8A5C, info), \
+	INTEL_VGA_DEVICE(0x8A5D, info), \
+	INTEL_VGA_DEVICE(0x8A52, info), \
+	INTEL_VGA_DEVICE(0x8A5A, info), \
+	INTEL_VGA_DEVICE(0x8A5B, info), \
+	INTEL_VGA_DEVICE(0x8A71, info), \
+	INTEL_VGA_DEVICE(0x8A70, info)
 
 #endif /* _I915_PCIIDS_H */
