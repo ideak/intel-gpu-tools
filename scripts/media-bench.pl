@@ -341,7 +341,10 @@ ENDHELP
 $verbose = 1 if defined $opts{'v'};
 $gt2 = 1 if defined $opts{'2'};
 $show_cmds = 1 if defined $opts{'x'};
-$balancer = $opts{'b'} if defined $opts{'b'};
+if (defined $opts{'b'}) {
+	die unless substr($opts{'b'}, 0, 2) eq '-b';
+	$balancer = $opts{'b'};
+}
 if (defined $opts{'B'}) {
 	@balancers = split /,/, $opts{'B'};
 } else {
