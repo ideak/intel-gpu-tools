@@ -27,11 +27,16 @@ use warnings;
 use 5.010;
 
 my $gid = 0;
-my (%db, %queue, %submit, %notify, %rings, %ctxdb, %ringmap, %reqwait,
+my (%db, %vdb, %queue, %submit, %notify, %rings, %ctxdb, %ringmap, %reqwait,
     %ctxtimelines);
+my (%cids, %ctxmap);
+my $cid = 0;
+my %queues;
 my @freqs;
 
-my $max_items = 3000;
+use constant VENG => '255:254';
+
+my $max_requests = 1000;
 my $width_us = 32000;
 my $correct_durations = 0;
 my %ignore_ring;
@@ -181,21 +186,21 @@ sub arg_trace
 	return @_;
 }
 
-sub arg_max_items
+sub arg_max_requests
 {
 	my $val;
 
 	return unless scalar(@_);
 
-	if ($_[0] eq '--max-items' or $_[0] eq '-m') {
+	if ($_[0] eq '--max-requests' or $_[0] eq '-m') {
 		shift @_;
 		$val = shift @_;
-	} elsif ($_[0] =~ /--max-items=(\d+)/) {
+	} elsif ($_[0] =~ /--max-requests=(\d+)/) {
 		shift @_;
 		$val = $1;
 	}
 
-	$max_items = int($val) if defined $val;
+	$max_requests = int($val) if defined $val;
 
 	return @_;
 }
@@ -292,7 +297,7 @@ while (@args) {
 	@args = arg_avg_delay_stats(@args);
 	@args = arg_gpu_timeline(@args);
 	@args = arg_trace(@args);
-	@args = arg_max_items(@args);
+	@args = arg_max_requests(@args);
 	@args = arg_zoom_width(@args);
 	@args = arg_split_requests(@args);
 	@args = arg_ignore_ring(@args);
@@ -329,6 +334,13 @@ sub sanitize_ctx
 	} else {
 		return $ctx;
 	}
+}
+
+sub is_veng
+{
+	my ($class, $instance) = split ':', shift;
+
+	return $instance eq '254';
 }
 
 # Main input loop - parse lines and build the internal representation of the
@@ -373,6 +385,7 @@ while (<>) {
 			$ctx = $tp{'ctx'};
 			$orig_ctx = $ctx;
 			$ctx = sanitize_ctx($ctx, $ring);
+			$ring = VENG if is_veng($ring);
 			$key = db_key($ring, $ctx, $seqno);
 		}
 	}
@@ -381,6 +394,7 @@ while (<>) {
 		my %rw;
 
 		next if exists $reqwait{$key};
+		die if $ring eq VENG and not exists $queues{$ctx};
 
 		$rw{'key'} = $key;
 		$rw{'ring'} = $ring;
@@ -389,9 +403,19 @@ while (<>) {
 		$rw{'start'} = $time;
 		$reqwait{$key} = \%rw;
 	} elsif ($tp_name eq 'i915:i915_request_wait_end:') {
-		next unless exists $reqwait{$key};
+		die if $ring eq VENG and not exists $queues{$ctx};
 
-		$reqwait{$key}->{'end'} = $time;
+		if (exists $reqwait{$key}) {
+			$reqwait{$key}->{'end'} = $time;
+		} else { # Virtual engine
+			my $vkey = db_key(VENG, $ctx, $seqno);
+
+			die unless exists $reqwait{$vkey};
+
+			# If the wait started on the virtual engine, attribute
+			# it to it completely.
+			$reqwait{$vkey}->{'end'} = $time;
+		}
 	} elsif ($tp_name eq 'i915:i915_request_add:') {
 		if (exists $queue{$key}) {
 			$ctxdb{$orig_ctx}++;
@@ -402,19 +426,52 @@ while (<>) {
 		}
 
 		$queue{$key} = $time;
+		if ($ring eq VENG and not exists $queues{$ctx}) {
+			$queues{$ctx} = 1 ;
+			$cids{$ctx} = $cid++;
+			$ctxmap{$cids{$ctx}} = $ctx;
+		}
 	} elsif ($tp_name eq 'i915:i915_request_submit:') {
 		die if exists $submit{$key};
 		die unless exists $queue{$key};
+		die if $ring eq VENG and not exists $queues{$ctx};
 
 		$submit{$key} = $time;
 	} elsif ($tp_name eq 'i915:i915_request_in:') {
+		my ($q, $s);
 		my %req;
 
 		# preemption
 		delete $db{$key} if exists $db{$key};
 
-		die unless exists $queue{$key};
-		die unless exists $submit{$key};
+		unless (exists $queue{$key}) {
+			# Virtual engine
+			my $vkey = db_key(VENG, $ctx, $seqno);
+			my %req;
+
+			die unless exists $queues{$ctx};
+			die unless exists $queue{$vkey};
+			die unless exists $submit{$vkey};
+
+			# Create separate request record on the queue timeline
+			$q = $queue{$vkey};
+			$s = $submit{$vkey};
+			$req{'queue'} = $q;
+			$req{'submit'} = $s;
+			$req{'start'} = $time;
+			$req{'end'} = $time;
+			$req{'ring'} = VENG;
+			$req{'seqno'} = $seqno;
+			$req{'ctx'} = $ctx;
+			$req{'name'} = $ctx . '/' . $seqno;
+			$req{'global'} = $tp{'global'};
+			$req{'port'} = $tp{'port'};
+
+			$vdb{$vkey} = \%req;
+		} else {
+			$q = $queue{$key};
+			$s = $submit{$key};
+		}
 
 		$req{'start'} = $time;
 		$req{'ring'} = $ring;
@@ -424,8 +481,9 @@ while (<>) {
 		$req{'name'} = $ctx . '/' . $seqno;
 		$req{'global'} = $tp{'global'};
 		$req{'port'} = $tp{'port'};
-		$req{'queue'} = $queue{$key};
-		$req{'submit'} = $submit{$key};
+		$req{'queue'} = $q;
+		$req{'submit'} = $s;
+		$req{'virtual'} = 1 if exists $queues{$ctx};
 		$rings{$ring} = $gid++ unless exists $rings{$ring};
 		$ringmap{$rings{$ring}} = $ring;
 		$db{$key} = \%req;
@@ -720,8 +778,10 @@ foreach my $key (@sorted_keys) {
 
 	$running{$ring} += $end - $start if $correct_durations or
 					    not exists $db{$key}->{'no-end'};
-	$runnable{$ring} += $db{$key}->{'execute-delay'};
-	$queued{$ring} += $start - $db{$key}->{'execute-delay'} - $db{$key}->{'queue'};
+	unless (exists $db{$key}->{'virtual'}) {
+		$runnable{$ring} += $db{$key}->{'execute-delay'};
+		$queued{$ring} += $start - $db{$key}->{'execute-delay'} - $db{$key}->{'queue'};
+	}
 
 	$batch_count{$ring}++;
 
@@ -838,6 +898,12 @@ $flat_busy{'gpu-idle'} = (1.0 - $total / ($last_ts - $first_ts)) * 100.0;
 my %reqw;
 foreach my $key (keys %reqwait) {
 	$reqw{$reqwait{$key}->{'ring'}} += $reqwait{$key}->{'end'} - $reqwait{$key}->{'start'};
+}
+
+# Add up all request waits per virtual engine
+my %vreqw;
+foreach my $key (keys %reqwait) {
+	$vreqw{$reqwait{$key}->{'ctx'}} += $reqwait{$key}->{'end'} - $reqwait{$key}->{'start'};
 }
 
 say sprintf('GPU: %.2f%% idle, %.2f%% busy',
@@ -961,18 +1027,24 @@ ENDHTML
 sub html_stats
 {
 	my ($stats, $group, $id) = @_;
+	my $veng = exists $stats->{'virtual'} ? 1 : 0;
 	my $name;
 
-	$name = 'Ring' . $group;
+	$name = $veng ? 'Virtual' : 'Ring';
+	$name .= $group;
 	$name .= '<br><small><br>';
-	$name .= sprintf('%.2f', $stats->{'idle'}) . '% idle<br><br>';
-	$name .= sprintf('%.2f', $stats->{'busy'}) . '% busy<br>';
+	unless ($veng) {
+		$name .= sprintf('%.2f', $stats->{'idle'}) . '% idle<br><br>';
+		$name .= sprintf('%.2f', $stats->{'busy'}) . '% busy<br>';
+	}
 	$name .= sprintf('%.2f', $stats->{'runnable'}) . '% runnable<br>';
 	$name .= sprintf('%.2f', $stats->{'queued'}) . '% queued<br><br>';
 	$name .= sprintf('%.2f', $stats->{'wait'}) . '% wait<br><br>';
 	$name .= $stats->{'count'} . ' batches<br>';
-	$name .= sprintf('%.2f', $stats->{'avg'}) . 'us avg batch<br>';
-	$name .= sprintf('%.2f', $stats->{'total-avg'}) . 'us avg engine batch<br>';
+	unless ($veng) {
+		$name .= sprintf('%.2f', $stats->{'avg'}) . 'us avg batch<br>';
+		$name .= sprintf('%.2f', $stats->{'total-avg'}) . 'us avg engine batch<br>';
+	}
 	$name .= '</small>';
 
 	print "\t{id: $id, content: '$name'},\n";
@@ -981,17 +1053,24 @@ sub html_stats
 sub stdio_stats
 {
 	my ($stats, $group, $id) = @_;
+	my $veng = exists $stats->{'virtual'} ? 1 : 0;
 	my $str;
 
-	$str = 'Ring' . $group . ': ';
+	$str = $veng ? 'Virtual' : 'Ring';
+	$str .= $group . ': ';
 	$str .= $stats->{'count'} . ' batches, ';
-	$str .= sprintf('%.2f (%.2f) avg batch us, ', $stats->{'avg'}, $stats->{'total-avg'});
-	$str .= sprintf('%.2f', $stats->{'idle'}) . '% idle, ';
-	$str .= sprintf('%.2f', $stats->{'busy'}) . '% busy, ';
+	unless ($veng) {
+		$str .= sprintf('%.2f (%.2f) avg batch us, ',
+				$stats->{'avg'}, $stats->{'total-avg'});
+		$str .= sprintf('%.2f', $stats->{'idle'}) . '% idle, ';
+		$str .= sprintf('%.2f', $stats->{'busy'}) . '% busy, ';
+	}
+
 	$str .= sprintf('%.2f', $stats->{'runnable'}) . '% runnable, ';
 	$str .= sprintf('%.2f', $stats->{'queued'}) . '% queued, ';
 	$str .= sprintf('%.2f', $stats->{'wait'}) . '% wait';
-	if ($avg_delay_stats) {
+
+	if ($avg_delay_stats and not $veng) {
 		$str .= ', submit/execute/save-avg=(';
 		$str .= sprintf('%.2f/%.2f/%.2f)', $stats->{'submit'}, $stats->{'execute'}, $stats->{'save'});
 	}
@@ -1013,8 +1092,16 @@ foreach my $group (sort keys %rings) {
 
 	$stats{'idle'} = (1.0 - $flat_busy{$ring} / $elapsed) * 100.0;
 	$stats{'busy'} = $running{$ring} / $elapsed * 100.0;
-	$stats{'runnable'} = $runnable{$ring} / $elapsed * 100.0;
-	$stats{'queued'} = $queued{$ring} / $elapsed * 100.0;
+	if (exists $runnable{$ring}) {
+		$stats{'runnable'} = $runnable{$ring} / $elapsed * 100.0;
+	} else {
+		$stats{'runnable'} = 0;
+	}
+	if (exists $queued{$ring}) {
+		$stats{'queued'} = $queued{$ring} / $elapsed * 100.0;
+	} else {
+		$stats{'queued'} = 0;
+	}
 	$reqw{$ring} = 0 unless exists $reqw{$ring};
 	$stats{'wait'} = $reqw{$ring} / $elapsed * 100.0;
 	$stats{'count'} = $batch_count{$ring};
@@ -1028,6 +1115,59 @@ foreach my $group (sort keys %rings) {
 		html_stats(\%stats, $group, $id);
 	} else {
 		stdio_stats(\%stats, $group, $id);
+	}
+}
+
+sub sortVQueue {
+	my $as = $vdb{$a}->{'queue'};
+	my $bs = $vdb{$b}->{'queue'};
+	my $val;
+
+	$val = $as <=> $bs;
+	$val = $a cmp $b if $val == 0;
+
+	return $val;
+}
+
+my @sorted_vkeys = sort sortVQueue keys %vdb;
+my (%vqueued, %vrunnable);
+
+foreach my $key (@sorted_vkeys) {
+	my $ctx = $vdb{$key}->{'ctx'};
+
+	$vdb{$key}->{'submit-delay'} = $vdb{$key}->{'submit'} - $vdb{$key}->{'queue'};
+	$vdb{$key}->{'execute-delay'} = $vdb{$key}->{'start'} - $vdb{$key}->{'submit'};
+
+	$vqueued{$ctx} += $vdb{$key}->{'submit-delay'};
+	$vrunnable{$ctx} += $vdb{$key}->{'execute-delay'};
+}
+
+my $veng_id = $engine_start_id + scalar(keys %rings);
+
+foreach my $cid (sort keys %ctxmap) {
+	my $ctx = $ctxmap{$cid};
+	my $elapsed = $last_ts - $first_ts;
+	my %stats;
+
+	$stats{'virtual'} = 1;
+	if (exists $vrunnable{$ctx}) {
+		$stats{'runnable'} = $vrunnable{$ctx} / $elapsed * 100.0;
+	} else {
+		$stats{'runnable'} = 0;
+	}
+	if (exists $vqueued{$ctx}) {
+		$stats{'queued'} = $vqueued{$ctx} / $elapsed * 100.0;
+	} else {
+		$stats{'queued'} = 0;
+	}
+	$vreqw{$ctx} = 0 unless exists $vreqw{$ctx};
+	$stats{'wait'} = $vreqw{$ctx} / $elapsed * 100.0;
+	$stats{'count'} = scalar(grep {$ctx == $vdb{$_}->{'ctx'}} keys %vdb);
+
+	if ($html) {
+		html_stats(\%stats, $cid, $veng_id++);
+	} else {
+		stdio_stats(\%stats, $cid, $veng_id++);
 	}
 }
 
@@ -1134,6 +1274,7 @@ sub box_style
 }
 
 my $i = 0;
+my $req = 0;
 foreach my $key (sort sortQueue keys %db) {
 	my ($name, $ctx, $seqno) = ($db{$key}->{'name'}, $db{$key}->{'ctx'}, $db{$key}->{'seqno'});
 	my ($queue, $start, $notify, $end) = ($db{$key}->{'queue'}, $db{$key}->{'start'}, $db{$key}->{'notify'}, $db{$key}->{'end'});
@@ -1147,7 +1288,7 @@ foreach my $key (sort sortQueue keys %db) {
 	my $skey;
 
 	# submit to execute
-	unless (exists $skip_box{'queue'}) {
+	unless (exists $skip_box{'queue'} or exists $db{$key}->{'virtual'}) {
 		$skey = 2 * $max_seqno * $ctx + 2 * $seqno;
 		$style = box_style($ctx, 'queue');
 		$content = "$name<br>$db{$key}->{'submit-delay'}us <small>($db{$key}->{'execute-delay'}us)</small>";
@@ -1158,7 +1299,7 @@ foreach my $key (sort sortQueue keys %db) {
 
 	# execute to start
 	$engine_start = $db{$key}->{'start'} unless defined $engine_start;
-	unless (exists $skip_box{'ready'}) {
+	unless (exists $skip_box{'ready'} or exists $db{$key}->{'virtual'}) {
 		$skey = 2 * $max_seqno * $ctx + 2 * $seqno + 1;
 		$style = box_style($ctx, 'ready');
 		$content = "<small>$name<br>$db{$key}->{'execute-delay'}us</small>";
@@ -1199,7 +1340,7 @@ foreach my $key (sort sortQueue keys %db) {
 
 	$last_ts = $end;
 
-	last if $i > $max_items;
+	last if ++$req > $max_requests;
 }
 
 push @freqs, [$prev_freq_ts, $last_ts, $prev_freq] if $prev_freq;
@@ -1230,6 +1371,43 @@ if ($gpu_timeline) {
 		print "\t{id: $i, type: 'range', group: 1, $startend},\n";
 		$i++;
 	}
+}
+
+$req = 0;
+$veng_id = $engine_start_id + scalar(keys %rings);
+foreach my $key (@sorted_vkeys) {
+	my ($name, $ctx, $seqno) = ($vdb{$key}->{'name'}, $vdb{$key}->{'ctx'}, $vdb{$key}->{'seqno'});
+	my $queue = $vdb{$key}->{'queue'};
+	my $submit = $vdb{$key}->{'submit'};
+	my $engine_start = $db{$key}->{'engine-start'};
+	my ($content, $style, $startend, $skey);
+	my $group = $veng_id + $cids{$ctx};
+	my $subgroup = $ctx - $min_ctx;
+	my $type = ' type: \'range\',';
+	my $duration;
+
+	# submit to execute
+	unless (exists $skip_box{'queue'}) {
+		$skey = 2 * $max_seqno * $ctx + 2 * $seqno;
+		$style = box_style($ctx, 'queue');
+		$content = "$name<br>$vdb{$key}->{'submit-delay'}us <small>($vdb{$key}->{'execute-delay'}us)</small>";
+		$startend = 'start: ' . $queue . ', end: ' . $submit;
+		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
+		$i++;
+	}
+
+	# execute to start
+	$engine_start = $vdb{$key}->{'start'} unless defined $engine_start;
+	unless (exists $skip_box{'ready'}) {
+		$skey = 2 * $max_seqno * $ctx + 2 * $seqno + 1;
+		$style = box_style($ctx, 'ready');
+		$content = "<small>$name<br>$vdb{$key}->{'execute-delay'}us</small>";
+		$startend = 'start: ' . $submit . ', end: ' . $engine_start;
+		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
+		$i++;
+	}
+
+	last if ++$req > $max_requests;
 }
 
 my $end_ts = $first_ts + $width_us;
