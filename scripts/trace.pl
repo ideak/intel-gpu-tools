@@ -408,7 +408,9 @@ while (<>) {
 	} elsif ($tp_name eq 'i915:i915_request_in:') {
 		my %req;
 
-		die if exists $db{$key};
+		# preemption
+		delete $db{$key} if exists $db{$key};
+
 		die unless exists $queue{$key};
 		die unless exists $submit{$key};
 
