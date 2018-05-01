@@ -348,15 +348,15 @@ void intel_require_memory(uint64_t count, uint64_t size, unsigned mode)
 
 		info = igt_sysfs_get(dir, "meminfo");
 		if (info) {
-			igt_debug("Insufficient free memory; /proc/meminfo:\n%s",
-				  info);
+			igt_warn("Insufficient free memory; /proc/meminfo:\n%s",
+				 info);
 			free(info);
 		}
 
 		info = igt_sysfs_get(dir, "slabinfo");
 		if (info) {
-			igt_debug("Insuffucient free memory; /proc/slabinfo:\n%s",
-				  info);
+			igt_warn("Insufficient free memory; /proc/slabinfo:\n%s",
+				 info);
 			free(info);
 		}
 
