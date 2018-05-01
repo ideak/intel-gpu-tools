@@ -34,20 +34,29 @@ IGT_TEST_DESCRIPTION("Inject missed interrupts and make sure they are caught");
 static void trigger_missed_interrupt(int fd, unsigned ring)
 {
 	igt_spin_t *spin = __igt_spin_batch_new(fd, 0, ring, 0);
+	uint32_t go;
+	int link[2];
+
+	igt_assert(pipe(link) == 0);
 
 	igt_fork(child, 1) {
-		/* We are now a low priority child on the *same* CPU as the
+		/*
+		 * We are now a low priority child on the *same* CPU as the
 		 * parent. We will have to wait for our parent to sleep
 		 * (gem_sync -> i915_wait_request) before we run.
 		 */
+		read(link[0], &go, sizeof(go));
 		igt_assert(gem_bo_busy(fd, spin->handle));
 		igt_spin_batch_end(spin);
 	}
 
+	write(link[1], &go, sizeof(go));
 	gem_sync(fd, spin->handle);
 	igt_waitchildren();
 
 	igt_spin_batch_free(fd, spin);
+	close(link[1]);
+	close(link[0]);
 }
 
 static void bind_to_cpu(int cpu)
