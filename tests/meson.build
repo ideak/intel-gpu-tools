@@ -170,7 +170,6 @@ test_progs = [
 	'kms_invalid_dotclock',
 	'kms_legacy_colorkey',
 	'kms_mmap_write_crc',
-	'kms_mmio_vs_cs_flip',
 	'kms_panel_fitting',
 	'kms_pipe_b_c_ivb',
 	'kms_pipe_crc_basic',
