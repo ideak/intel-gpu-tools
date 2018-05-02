@@ -113,7 +113,7 @@ static void basic(int fd, unsigned engine, unsigned flags)
 			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/2);
 			wait.timeout_ns = NSEC_PER_SEC; /* 1.0s */
 			igt_assert_eq(__gem_wait(fd, &wait), 0);
-			igt_assert(wait.timeout_ns > 0);
+			igt_assert(wait.timeout_ns >= 0);
 		} else {
 			wait.timeout_ns = -1;
 			igt_assert_eq(__gem_wait(fd, &wait), 0);
