@@ -43,7 +43,7 @@ IGT_TEST_DESCRIPTION("Test SW Sync Framework");
 typedef struct {
 	int timeline;
 	uint32_t thread_id;
-	volatile uint32_t * volatile counter;
+	uint32_t *counter;
 	sem_t *sem;
 } data_t;
 
@@ -508,7 +508,7 @@ static void * test_sync_multi_consumer_thread(void *arg)
 		if (sync_fence_wait(fence, 1000) < 0)
 			return (void *) 1;
 
-		if (*(data->counter) != next_point)
+		if (READ_ONCE(*data->counter) != next_point)
 			return (void *) 1;
 
 		sem_post(data->sem);
@@ -524,7 +524,7 @@ static void test_sync_multi_consumer(void)
 	pthread_t thread_arr[MULTI_CONSUMER_THREADS];
 	sem_t sem;
 	int timeline;
-	volatile uint32_t counter = 0;
+	uint32_t counter = 0;
 	uintptr_t thread_ret = 0;
 	data_t data;
 	int i, ret;
@@ -552,7 +552,7 @@ static void test_sync_multi_consumer(void)
 	{
 		sem_wait(&sem);
 
-		counter++;
+		__sync_fetch_and_add(&counter, 1);
 		sw_sync_timeline_inc(timeline, 1);
 	}
 
@@ -567,8 +567,8 @@ static void test_sync_multi_consumer(void)
 	close(timeline);
 	sem_destroy(&sem);
 
-	igt_assert_f(counter == MULTI_CONSUMER_THREADS * MULTI_CONSUMER_ITERATIONS,
-		     "Counter has unexpected value.\n");
+	igt_assert_eq(counter,
+		      MULTI_CONSUMER_THREADS * MULTI_CONSUMER_ITERATIONS);
 
 	igt_assert_f(thread_ret == 0, "A sync thread reported failure.\n");
 }
@@ -589,10 +589,8 @@ static void * test_sync_multi_consumer_producer_thread(void *arg)
 		if (sync_fence_wait(fence, 1000) < 0)
 			return (void *) 1;
 
-		if (*(data->counter) != next_point)
+		if (__sync_fetch_and_add(data->counter, 1) != next_point)
 			return (void *) 1;
-
-		(*data->counter)++;
 
 		/* Kick off the next thread. */
 		sw_sync_timeline_inc(timeline, 1);
@@ -607,7 +605,7 @@ static void test_sync_multi_consumer_producer(void)
 	data_t data_arr[MULTI_CONSUMER_PRODUCER_THREADS];
 	pthread_t thread_arr[MULTI_CONSUMER_PRODUCER_THREADS];
 	int timeline;
-	volatile uint32_t counter = 0;
+	uint32_t counter = 0;
 	uintptr_t thread_ret = 0;
 	data_t data;
 	int i, ret;
@@ -638,9 +636,9 @@ static void test_sync_multi_consumer_producer(void)
 
 	close(timeline);
 
-	igt_assert_f(counter == MULTI_CONSUMER_PRODUCER_THREADS *
-	                        MULTI_CONSUMER_PRODUCER_ITERATIONS,
-		     "Counter has unexpected value.\n");
+	igt_assert_eq(counter,
+		      MULTI_CONSUMER_PRODUCER_THREADS *
+		      MULTI_CONSUMER_PRODUCER_ITERATIONS);
 
 	igt_assert_f(thread_ret == 0, "A sync thread reported failure.\n");
 }
