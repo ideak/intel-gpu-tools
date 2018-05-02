@@ -41,6 +41,8 @@ my $show_cmds = 0;
 my $realtime_target = 0;
 my $wps_target = 0;
 my $wps_target_param = 0;
+my $multi_mode = 0;
+my @multi_workloads;
 my $w_direct;
 my $balancer;
 my $nop;
@@ -141,6 +143,7 @@ sub run_workload
 {
 	my (@args) = @_;
 	my ($time, $wps, $cmd);
+	my @ret;
 
 	@args = add_wps_arg(@args);
 	push @args, '-2' if $gt2;
@@ -155,11 +158,13 @@ sub run_workload
 		if (/^(\d+\.\d+)s elapsed \((\d+\.?\d+) workloads\/s\)$/) {
 			$time = $1;
 			$wps = $2;
+		} elsif (/(\d+)\: \d+\.\d+s elapsed \(\d+ cycles, (\d+\.?\d+) workloads\/s\)/) {
+			$ret[$1] = $2;
 		}
 	}
 	close WSIM;
 
-	return ($time, $wps);
+	return ($time, $wps, \@ret);
 }
 
 sub dump_cmd
@@ -223,7 +228,11 @@ sub trace_workload
 	}
 	close CMD;
 
-	$wrk =~ s/ /_/g;
+	$wrk =~ s/$wrk_root//g;
+	$wrk =~ s/\.wsim//g;
+	$wrk =~ s/-w/W/g;
+	$wrk =~ s/[ -]/_/g;
+	$wrk =~ s/\//-/g;
 	$b =~ s/[ <>]/_/g;
 	$file = "${wrk}_${b}_-r${r}_-c${c}";
 
@@ -259,6 +268,7 @@ sub calibrate_workload
 
 		($time, $wps) = run_workload(@args);
 
+		$wps = $r / $time if $w_direct;
 		$error = abs($time - $client_target_s) / $client_target_s;
 
 		last if $error <= $tol;
@@ -278,12 +288,14 @@ sub calibrate_workload
 sub find_saturation_point
 {
 	my ($wrk, $rr, $verbose, @args) = @_;
-	my ($last_wps, $c, $swps);
+	my ($last_wps, $c, $swps, $wwps);
 	my $target = $realtime_target > 0 ? $realtime_target : $wps_target;
 	my $r = $rr;
 	my $wcnt;
 	my $maxc;
 	my $max = 0;
+
+	push @args, '-v' if $multi_mode and $w_direct;
 
 	if (defined $w_direct) {
 		push @args, split /\s+/, $wrk;
@@ -297,8 +309,9 @@ sub find_saturation_point
 
 	for ($c = 1; ; $c = $c + 1) {
 		my ($time, $wps);
+		my @args_ = (@args, ('-r', $r, '-c', $c));
 
-		($time, $wps) = run_workload((@args, ('-r', $r, '-c', $c)));
+		($time, $wps, $wwps) = run_workload(@args_);
 
 		say "        $c clients is $wps wps." if $verbose;
 
@@ -324,21 +337,23 @@ sub find_saturation_point
 			$r = int($rr * ($client_target_s / $time));
 		} elsif ($c == 1) {
 			$swps = $wps;
-			return ($c, $wps, $swps) if $wcnt > 1 or
-						    ($wps_target_param < 0 and $wps_target == 0);
+			return ($c, $wps, $swps, $wwps) if $wcnt > 1 or
+							   $multi_mode or
+							   ($wps_target_param < 0 and
+							    $wps_target == 0);
 		}
 
 		$last_wps = $wps;
 	}
 
 	if ($target <= 0) {
-		return ($maxc, $max, $swps);
+		return ($maxc, $max, $swps, $wwps);
 	} else {
-		return ($c - 1, $last_wps, $swps);
+		return ($c - 1, $last_wps, $swps, $wwps);
 	}
 }
 
-getopts('hv2xn:b:W:B:r:t:i:R:T:w:', \%opts);
+getopts('hv2xmn:b:W:B:r:t:i:R:T:w:', \%opts);
 
 if (defined $opts{'h'}) {
 	print <<ENDHELP;
@@ -360,8 +375,11 @@ Supported options:
   -R wps      Run workloads in the real-time mode at wps rate.
   -T wps      Calibrate up to wps/client target instead of GPU saturation.
               Negative values set the target based on the single client
-	      performance where target = single-client-wps / -N.
+              performance where target = single-client-wps / -N.
   -w str      Pass-through to gem_wsim. Overrides normal workload selection.
+  -m          Multi-workload mode. All selected workloads will be run in
+              parallel and overal score will be relative to when run
+              individually.
 ENDHELP
 	exit 0;
 }
@@ -369,6 +387,7 @@ ENDHELP
 $verbose = 1 if defined $opts{'v'};
 $gt2 = 1 if defined $opts{'2'};
 $show_cmds = 1 if defined $opts{'x'};
+$multi_mode = 1 if defined $opts{'m'};
 if (defined $opts{'b'}) {
 	die unless substr($opts{'b'}, 0, 2) eq '-b';
 	$balancer = $opts{'b'};
@@ -387,7 +406,13 @@ $wps_target = $opts{'T'} if defined $opts{'T'};
 $wps_target_param = $wps_target;
 $w_direct = $opts{'w'} if defined $opts{'w'};
 
-@workloads =  ($w_direct ) if defined $w_direct;
+if ($multi_mode) {
+	die if $w_direct; # Not supported
+	@multi_workloads = @workloads;
+}
+
+@workloads = ($w_direct) if defined $w_direct;
+
 say "Workloads:";
 print map { "  $_\n" } @workloads;
 print "Balancers: ";
@@ -396,13 +421,14 @@ say "Target workload duration is ${client_target_s}s.";
 say "Calibration tolerance is $tolerance.";
 say "Real-time mode at ${realtime_target} wps." if $realtime_target > 0;
 say "Wps target is ${wps_target} wps." if $wps_target > 0;
+say "Multi-workload mode." if $multi_mode;
 $nop = $opts{'n'};
 $nop = calibrate_nop() unless $nop;
 say "Nop calibration is $nop.";
 
 goto VERIFY if defined $balancer;
 
-my %best_bal;
+my (%best_bal, %best_bid);
 my %results;
 my %scores;
 my %wscores;
@@ -438,12 +464,21 @@ sub add_points
 	}
 }
 
-foreach my $wrk (@workloads) {
+my @saturation_workloads = $multi_mode ? @multi_workloads : @workloads;
+my %allwps;
+my $widx = 0;
+
+push @saturation_workloads, '-w ' . join ' -w ', map("$wrk_root/$_", @workloads)
+     if $multi_mode;
+
+foreach my $wrk (@saturation_workloads) {
 	my @args = ( "-n $nop");
 	my ($r, $error, $should_b, $best);
 	my (%wps, %cwps, %mwps);
 	my @sorted;
 	my $range;
+
+	$w_direct = $wrk if $multi_mode and $widx == $#saturation_workloads;
 
 	$should_b = 1;
 	$should_b = can_balance_workload($wrk) unless defined $w_direct;
@@ -459,7 +494,7 @@ foreach my $wrk (@workloads) {
 		GBAL: foreach my $G ('', '-G', '-d', '-G -d') {
 			foreach my $H ('', '-H') {
 				my @xargs;
-				my ($w, $c, $s);
+				my ($w, $c, $s, $bwwps);
 				my $bid;
 
 				if ($bal ne '') {
@@ -476,19 +511,65 @@ foreach my $wrk (@workloads) {
 
 				$wps_target = 0 if $wps_target_param < 0;
 
-				($c, $w, $s) = find_saturation_point($wrk, $r,
-								     0,
-								     (@args,
-								      @xargs));
+				($c, $w, $s, $bwwps) =
+					find_saturation_point($wrk, $r, 0,
+							      (@args, @xargs));
 
 				if ($wps_target_param < 0) {
 					$wps_target = $s / -$wps_target_param;
 
-					($c, $w, $s) =
+					($c, $w, $s, $bwwps) =
 						find_saturation_point($wrk, $r,
 								      0,
 								      (@args,
 								       @xargs));
+				}
+
+				if ($multi_mode and $w_direct) {
+					my $widx;
+
+					die unless scalar(@multi_workloads) ==
+						   scalar(@{$bwwps});
+					die unless scalar(@multi_workloads) ==
+						   scalar(keys %allwps);
+
+					# Total of all workload wps from the
+					# mixed run.
+					$w = 0;
+					foreach $widx (0..$#{$bwwps}) {
+						$w += $bwwps->[$widx];
+					}
+
+					# Total of all workload wps from when
+					# ran individually with the best
+					# balancer.
+					my $tot = 0;
+					foreach my $wrk (@multi_workloads) {
+						$tot += $allwps{$wrk}->{$best_bid{$wrk}};
+					}
+
+					# Normalize mixed sum with sum of
+					# individual runs.
+					$w *= 100;
+					$w /= $tot;
+
+					# Second metric is average of each
+					# workload wps normalized by their
+					# individual run performance with the
+					# best balancer.
+					$s = 0;
+					$widx = 0;
+					foreach my $wrk (@multi_workloads) {
+						$s += 100 * $bwwps->[$widx] /
+						      $allwps{$wrk}->{$best_bid{$wrk}};
+						$widx++;
+					}
+					$s /= scalar(@multi_workloads);
+
+					say sprintf('Aggregate (normalized) %.2f%%; fairness %.2f%%',
+						    $w, $s);
+				} else {
+					$allwps{$wrk} = \%wps;
 				}
 
 				$wps{$bid} = $w;
@@ -500,7 +581,8 @@ foreach my $wrk (@workloads) {
 					$mwps{$bid} = $w + $s;
 				}
 
-				say "$c clients ($w wps, $s wps single client, score=$mwps{$bid}).";
+				say "$c clients ($w wps, $s wps single client, score=$mwps{$bid})."
+				    unless $multi_mode and $w_direct;
 
 				last BAL unless $should_b;
 				next BAL if $bal eq '';
@@ -509,19 +591,24 @@ foreach my $wrk (@workloads) {
 		}
 	}
 
+	$widx++;
+
 	@sorted = sort { $mwps{$b} <=> $mwps{$a} } keys %mwps;
-	$best = $sorted[0];
+	$best_bid{$wrk} = $sorted[0];
 	@sorted = sort { $b <=> $a } values %mwps;
 	$range = 1 - $sorted[-1] / $sorted[0];
 	$best_bal{$wrk} = $sorted[0];
-	say "  Best balancer is '$best' (range=$range).";
+
+	next if $multi_mode and not $w_direct;
+
+	say "  Best balancer is '$best_bid{$wrk}' (range=$range).";
 
 
 	$results{$wrk} = \%mwps;
 
 	add_points(\%wps, \%scores, \%wscores);
-	add_points(\%cwps, \%cscores, \%cwscores);
 	add_points(\%mwps, \%mscores, \%mwscores);
+	add_points(\%cwps, \%cscores, \%cwscores);
 }
 
 sub dump_scoreboard
@@ -552,12 +639,12 @@ sub dump_scoreboard
 	return $balancer;
 }
 
-dump_scoreboard('Total wps', \%scores);
-dump_scoreboard('Total weighted wps', \%wscores);
-dump_scoreboard('Per client wps', \%cscores);
-dump_scoreboard('Per client weighted wps', \%cwscores);
-dump_scoreboard('Combined wps', \%mscores);
-$balancer = dump_scoreboard('Combined weighted wps', \%mwscores);
+dump_scoreboard($multi_mode ? 'Throughput' : 'Total wps', \%scores);
+dump_scoreboard('Total weighted wps', \%wscores) unless $multi_mode;
+dump_scoreboard($multi_mode ? 'Fairness' : 'Per client wps', \%cscores);
+dump_scoreboard('Per client weighted wps', \%cwscores) unless $multi_mode;
+$balancer = dump_scoreboard($multi_mode ? 'Combined' : 'Combined wps', \%mscores);
+$balancer = dump_scoreboard('Combined weighted wps', \%mwscores) unless $multi_mode;
 
 VERIFY:
 
@@ -567,6 +654,11 @@ die unless defined $balancer;
 
 say "\nBalancer is '$balancer'.";
 say "Idleness tolerance is $idle_tolerance_pct%.";
+
+if ($multi_mode) {
+	$w_direct = '-w ' . join ' -w ', map("$wrk_root/$_", @workloads);
+	@workloads = ($w_direct);
+}
 
 foreach my $wrk (@workloads) {
 	my @args = ( "-n $nop" );
