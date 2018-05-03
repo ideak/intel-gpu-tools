@@ -426,6 +426,24 @@ void igt_stop_shrink_helper(void)
 	igt_stop_helper(&shrink_helper);
 }
 
+static void show_kernel_stack(pid_t pid)
+{
+	char buf[80], *str;
+	int dir;
+
+	snprintf(buf, sizeof(buf), "/proc/%d", pid);
+	dir = open(buf, O_RDONLY);
+	if (dir < 0)
+		return;
+
+	str = igt_sysfs_get(dir, "stack");
+	if (str) {
+		igt_debug("Kernel stack for pid %d:\n%s\n", pid, str);
+		free(str);
+	}
+
+	close(dir);
+}
 
 static struct igt_helper_process hang_detector;
 static void __attribute__((noreturn))
@@ -465,6 +483,7 @@ hang_detector_process(int fd, pid_t pid, dev_t rdev)
 			str = udev_device_get_property_value(dev, "ERROR");
 			if (str && atoi(str) == 1) {
 				igt_debugfs_dump(fd, "i915_error_state");
+				show_kernel_stack(pid);
 				kill(pid, SIGIO);
 			}
 		}
