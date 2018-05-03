@@ -707,9 +707,14 @@ foreach my $key (keys %reqwait) {
 say sprintf('GPU: %.2f%% idle, %.2f%% busy',
 	     $flat_busy{'gpu-idle'}, $flat_busy{'gpu-busy'}) unless $html;
 
-my $queued_colour = $colour_contexts ? 'multi-colour light' : 'blue';
-my $runnable_colour = $colour_contexts ? 'multi-colour dark' : 'grey';
-my $execute_colour = $colour_contexts ? 'multi-colour' : 'pink';
+my $timeline_text = $colour_contexts ?
+		    'Per context coloured shading like:' : 'Box shading like:';
+
+my $queued_style = box_style($min_ctx, 'queue');
+my $ready_style = box_style($min_ctx, 'ready');
+my $execute_style = box_style($min_ctx, 'execute');
+my $ctxsave_style = box_style($min_ctx, 'ctxsave');
+my $incomplete_style = box_style($min_ctx, 'incomplete');
 
 print <<ENDHTML if $html;
 <!DOCTYPE HTML>
@@ -728,9 +733,28 @@ print <<ENDHTML if $html;
 </head>
 <body>
 <p>
-$execute_colour = requests executing on the GPU<br>
-$runnable_colour = runnable requests waiting for a slot on GPU<br>
-$queued_colour = requests waiting on fences and dependencies before they are runnable<br>
+<b>Timeline request view:</b>
+<table>
+<tr><td colspan='4'>$timeline_text</td></tr>
+<tr>
+<td align='center'><div style='$queued_style'>QUEUED</div></td>
+<td align='center'><div style='$ready_style'>READY</div></td>
+<td align='center'><div style='$execute_style'>EXECUTE</div></td>
+<td align='center'><div style='$ctxsave_style'>CTXSAVE</div></td>
+</tr><tr>
+<td></td>
+<td></td>
+<td align='center'><div style='$incomplete_style'>(INCOMPLETE)</div></td>
+<td></td>
+</tr/></table>
+</p>
+<p>
+<small>
+QUEUED = requests executing on the GPU<br>
+READY = runnable requests waiting for a slot on GPU<br>
+EXECUTE = requests waiting on fences and dependencies before they are runnable<br>
+CTXSAVE = GPU saving the context image<br>
+</small>
 </p>
 <p>
 Boxes are in format 'ctx-id/seqno'.
@@ -850,17 +874,31 @@ sub sortQueue {
 
 sub ctx_colour
 {
-	my ($ctx, $stage) = (@_);
+	my ($ctx, $stage, $lfac) = (@_);
 	my ($s, $l);
 	my $val;
 
 	unless ($colour_contexts) {
 		if ($stage eq 'queue') {
-			return 'lightblue;';
+			$val = 210;
+			$s = 65;
+			$l = 52;
 		} elsif ($stage eq 'ready') {
-			return 'lightgrey;';
+			$val = 0;
+			$s = 0;
+			$l = 47;
 		} elsif ($stage eq 'execute') {
-			return 'pink;';
+			$val = 346;
+			$s = 68;
+			$l = 65;
+		} elsif ($stage eq 'ctxsave') {
+			$val = 26;
+			$s = 90;
+			$l = 52;
+		} elsif ($stage eq 'incomplete') {
+			$val = 0;
+			$s = 85;
+			$l = 50;
 		}
 	} else {
 		if ($stage eq 'queue') {
@@ -872,12 +910,45 @@ sub ctx_colour
 		} elsif ($stage eq 'execute') {
 			$s = 80;
 			$l = 65;
+		} elsif ($stage eq 'ctxsave') {
+			$s = 75;
+			$l = 70;
+		} elsif ($stage eq 'incomplete') {
+			$s = 80;
+			$l = 25;
 		}
+
+		$val = int(360 / ($max_ctx - $min_ctx + 1)) * ($ctx - $min_ctx);
 	}
 
-	$val = int(360 / ($max_ctx - $min_ctx + 1)) * ($ctx - $min_ctx);
+	$l = int($l * $lfac);
 
-	return "hsl($val, $s%, $l%);";
+	return "hsl($val, $s%, $l%)";
+}
+
+sub box_style
+{
+	my ($ctx, $stage) = @_;
+	my $deg;
+
+	if ($stage eq 'queue') {
+		$deg = 90;
+	} elsif ($stage eq 'ready') {
+		$deg = 45;
+	} elsif ($stage eq 'execute') {
+		$deg = 0;
+	} elsif ($stage eq 'ctxsave') {
+		$deg = 105;
+	} elsif ($stage eq 'incomplete') {
+		$deg = 0;
+	}
+
+	return 'color: black; background: repeating-linear-gradient(' .
+		$deg . 'deg, ' .
+		ctx_colour($ctx, $stage, 1.0) . ', ' .
+		ctx_colour($ctx, $stage, 1.0) . ' 10px, ' .
+		ctx_colour($ctx, $stage, 0.90) . ' 10px, ' .
+		ctx_colour($ctx, $stage, 0.90) . ' 20px);';
 }
 
 my $i = 0;
@@ -895,8 +966,7 @@ foreach my $key (sort sortQueue keys %db) {
 	# submit to execute
 	unless (exists $skip_box{'queue'}) {
 		$skey = 2 * $max_seqno * $ctx + 2 * $seqno;
-		$style = 'color: black; background-color: ' .
-			 ctx_colour($ctx, 'queue');
+		$style = box_style($ctx, 'queue');
 		$content = "$name<br>$db{$key}->{'submit-delay'}us <small>($db{$key}->{'execute-delay'}us)</small>";
 		$startend = 'start: ' . $queue . ', end: ' . $submit;
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
@@ -906,8 +976,7 @@ foreach my $key (sort sortQueue keys %db) {
 	# execute to start
 	unless (exists $skip_box{'ready'}) {
 		$skey = 2 * $max_seqno * $ctx + 2 * $seqno + 1;
-		$style = 'color: black; background-color: ' .
-			 ctx_colour($ctx, 'ready');
+		$style = box_style($ctx, 'ready');
 		$content = "<small>$name<br>$db{$key}->{'execute-delay'}us</small>";
 		$startend = 'start: ' . $submit . ', end: ' . $start;
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
@@ -917,12 +986,9 @@ foreach my $key (sort sortQueue keys %db) {
 	# start to user interrupt
 	unless (exists $skip_box{'execute'}) {
 		$skey = -2 * $max_seqno * $ctx - 2 * $seqno - 1;
-		if (exists $db{$key}->{'incomplete'}) {
-			$style = 'color: white; background-color: red;';
-		} else {
-			$style = 'color: black; background-color: ' .
-				  ctx_colour($ctx, 'execute');
-		}
+		$style = box_style($ctx,
+				   exists $db{$key}->{'incomplete'} ?
+				   'incomplete' : 'execute');
 		$content = "$name <small>$db{$key}->{'port'}</small>";
 		$content .= ' <small><i>???</i></small> ' if exists $db{$key}->{'incomplete'};
 		$content .= ' <small><i>++</i></small> ' if exists $db{$key}->{'no-end'};
@@ -936,7 +1002,7 @@ foreach my $key (sort sortQueue keys %db) {
 	# user interrupt to context complete
 	unless (exists $skip_box{'ctxsave'}) {
 		$skey = -2 * $max_seqno * $ctx - 2 * $seqno;
-		$style = 'color: black; background-color: orange;';
+		$style = box_style($ctx, 'ctxsave');
 		my $ctxsave = $db{$key}->{'end'} - $db{$key}->{'notify'};
 		$content = "<small>$name<br>${ctxsave}us</small>";
 		$content .= ' <small><i>???</i></small> ' if exists $db{$key}->{'incomplete'};

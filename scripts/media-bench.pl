@@ -207,7 +207,7 @@ sub trace_workload
 	show_cmd($cmd);
 	system($cmd);
 
-	$cmd = "perf script | $tracepl --html -x ctxsave -s ";
+	$cmd = "perf script | $tracepl --html -x ctxsave -s -c ";
 	$cmd .= join ' ', map("-i $_", @skip_engine);
 	$cmd .= " > ${file}.html";
 	show_cmd($cmd);
