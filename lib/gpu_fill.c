@@ -352,6 +352,20 @@ gen7_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 }
 
 uint32_t
+gen8_spin_curbe_buffer_data(struct intel_batchbuffer *batch,
+			    uint32_t iters)
+{
+	uint32_t *curbe_buffer;
+	uint32_t offset;
+
+	curbe_buffer = intel_batchbuffer_subdata_alloc(batch, 64, 64);
+	offset = intel_batchbuffer_subdata_offset(batch, curbe_buffer);
+	*curbe_buffer = iters;
+
+	return offset;
+}
+
+uint32_t
 gen8_fill_surface_state(struct intel_batchbuffer *batch,
 			struct igt_buf *buf,
 			uint32_t format,
@@ -526,6 +540,30 @@ gen8_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch)
 }
 
 void
+gen8_emit_vfe_state_spin(struct intel_batchbuffer *batch)
+{
+	OUT_BATCH(GEN8_MEDIA_VFE_STATE | (9 - 2));
+
+	/* scratch buffer */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+
+	/* number of threads & urb entries */
+	OUT_BATCH(2 << 8);
+
+	OUT_BATCH(0);
+
+	/* urb entry size & curbe size */
+	OUT_BATCH(2 << 16 |
+		2);
+
+	/* scoreboard */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+}
+
+void
 gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 		     unsigned x, unsigned y,
 		     unsigned width, unsigned height)
@@ -583,6 +621,49 @@ gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 
 	/* bottom mask, height 1, always 0xffffffff */
 	OUT_BATCH(0xffffffff);
+}
+
+void
+gen8_emit_media_objects_spin(struct intel_batchbuffer *batch)
+{
+	OUT_BATCH(GEN8_MEDIA_OBJECT | (8 - 2));
+
+	/* interface descriptor offset */
+	OUT_BATCH(0);
+
+	/* without indirect data */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+
+	/* scoreboard */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+
+	/* inline data (xoffset, yoffset) */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+	gen8_emit_media_state_flush(batch);
+}
+
+void
+gen8lp_emit_media_objects_spin(struct intel_batchbuffer *batch)
+{
+	OUT_BATCH(GEN8_MEDIA_OBJECT | (8 - 2));
+
+	/* interface descriptor offset */
+	OUT_BATCH(0);
+
+	/* without indirect data */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+
+	/* scoreboard */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
+
+	/* inline data (xoffset, yoffset) */
+	OUT_BATCH(0);
+	OUT_BATCH(0);
 }
 
 void

@@ -89,6 +89,10 @@ gen7_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 		     unsigned width, unsigned height);
 
 uint32_t
+gen8_spin_curbe_buffer_data(struct intel_batchbuffer *batch,
+			    uint32_t iters);
+
+uint32_t
 gen8_fill_surface_state(struct intel_batchbuffer *batch,
 			struct igt_buf *buf,
 			uint32_t format,
@@ -110,9 +114,18 @@ void
 gen8_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch);
 
 void
+gen8_emit_vfe_state_spin(struct intel_batchbuffer *batch);
+
+void
 gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 		     unsigned x, unsigned y,
 		     unsigned width, unsigned height);
+
+void
+gen8_emit_media_objects_spin(struct intel_batchbuffer *batch);
+
+void
+gen8lp_emit_media_objects_spin(struct intel_batchbuffer *batch);
 
 void
 gen9_emit_state_base_address(struct intel_batchbuffer *batch);
