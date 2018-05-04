@@ -107,44 +107,6 @@ gen8_media_spinfunc(struct intel_batchbuffer *batch,
 }
 
 void
-gen8lp_media_spinfunc(struct intel_batchbuffer *batch,
-		      struct igt_buf *dst, uint32_t spins)
-{
-	uint32_t curbe_buffer, interface_descriptor;
-	uint32_t batch_end;
-
-	intel_batchbuffer_flush_with_context(batch, NULL);
-
-	/* setup states */
-	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
-
-	curbe_buffer = gen8_spin_curbe_buffer_data(batch, spins);
-	interface_descriptor = gen8_fill_interface_descriptor(batch, dst, spin_kernel, sizeof(spin_kernel));
-	igt_assert(batch->ptr < &batch->buffer[4095]);
-
-	/* media pipeline */
-	batch->ptr = batch->buffer;
-	OUT_BATCH(GEN8_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA);
-	gen8_emit_state_base_address(batch);
-
-	gen8_emit_vfe_state_spin(batch);
-
-	gen7_emit_curbe_load(batch, curbe_buffer);
-
-	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
-
-	gen8lp_emit_media_objects_spin(batch);
-
-	OUT_BATCH(MI_BATCH_BUFFER_END);
-
-	batch_end = intel_batchbuffer_align(batch, 8);
-	igt_assert(batch_end < BATCH_STATE_SPLIT);
-
-	gen7_render_flush(batch, batch_end);
-	intel_batchbuffer_reset(batch);
-}
-
-void
 gen9_media_spinfunc(struct intel_batchbuffer *batch,
 		    struct igt_buf *dst, uint32_t spins)
 {

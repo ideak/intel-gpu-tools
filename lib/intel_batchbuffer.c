@@ -906,10 +906,8 @@ igt_media_spinfunc_t igt_get_media_spinfunc(int devid)
 
 	if (IS_GEN9(devid))
 		spin = gen9_media_spinfunc;
-	else if (IS_BROADWELL(devid))
+	else if (IS_GEN8(devid))
 		spin = gen8_media_spinfunc;
-	else if (IS_CHERRYVIEW(devid))
-		spin = gen8lp_media_spinfunc;
 
 	return spin;
 }

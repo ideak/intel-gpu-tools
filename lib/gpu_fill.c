@@ -642,28 +642,8 @@ gen8_emit_media_objects_spin(struct intel_batchbuffer *batch)
 	/* inline data (xoffset, yoffset) */
 	OUT_BATCH(0);
 	OUT_BATCH(0);
-	gen8_emit_media_state_flush(batch);
-}
-
-void
-gen8lp_emit_media_objects_spin(struct intel_batchbuffer *batch)
-{
-	OUT_BATCH(GEN8_MEDIA_OBJECT | (8 - 2));
-
-	/* interface descriptor offset */
-	OUT_BATCH(0);
-
-	/* without indirect data */
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-
-	/* scoreboard */
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-
-	/* inline data (xoffset, yoffset) */
-	OUT_BATCH(0);
-	OUT_BATCH(0);
+	if (AT_LEAST_GEN(batch->devid, 8) && !IS_CHERRYVIEW(batch->devid))
+		gen8_emit_media_state_flush(batch);
 }
 
 void

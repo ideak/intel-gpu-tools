@@ -30,9 +30,6 @@
 void gen8_media_spinfunc(struct intel_batchbuffer *batch,
 			 struct igt_buf *dst, uint32_t spins);
 
-void gen8lp_media_spinfunc(struct intel_batchbuffer *batch,
-			   struct igt_buf *dst, uint32_t spins);
-
 void gen9_media_spinfunc(struct intel_batchbuffer *batch,
 			 struct igt_buf *dst, uint32_t spins);
 

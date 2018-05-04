@@ -125,9 +125,6 @@ void
 gen8_emit_media_objects_spin(struct intel_batchbuffer *batch);
 
 void
-gen8lp_emit_media_objects_spin(struct intel_batchbuffer *batch);
-
-void
 gen9_emit_state_base_address(struct intel_batchbuffer *batch);
 
 #endif /* GPU_FILL_H */
