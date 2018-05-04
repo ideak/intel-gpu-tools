@@ -5,7 +5,7 @@
 #include "gen8_media.h"
 #include "intel_reg.h"
 #include "drmtest.h"
-#include "gpu_fill.h"
+#include "gpu_cmds.h"
 #include <assert.h>
 
 

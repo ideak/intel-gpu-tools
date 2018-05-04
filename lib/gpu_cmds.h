@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef GPU_FILL_H
-#define GPU_FILL_H
+#ifndef GPU_CMDS_H
+#define GPU_CMDS_H
 
 #include <intel_bufmgr.h>
 #include <i915_drm.h>
@@ -127,4 +127,4 @@ gen_emit_media_object(struct intel_batchbuffer *batch, unsigned int xoffset,
 void
 gen9_emit_state_base_address(struct intel_batchbuffer *batch);
 
-#endif /* GPU_FILL_H */
+#endif /* GPU_CMDS_H */

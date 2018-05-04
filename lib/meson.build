@@ -29,7 +29,7 @@ lib_sources = [
 	'media_fill_gen9.c',
 	'media_spin.c',
 	'gpgpu_fill.c',
-	'gpu_fill.c',
+	'gpu_cmds.c',
 	'rendercopy_i915.c',
 	'rendercopy_i830.c',
 	'rendercopy_gen6.c',

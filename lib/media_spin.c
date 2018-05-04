@@ -31,7 +31,7 @@
 #include "intel_batchbuffer.h"
 #include "gen8_media.h"
 #include "media_spin.h"
-#include "gpu_fill.h"
+#include "gpu_cmds.h"
 
 static const uint32_t spin_kernel[][4] = {
 	{ 0x00600001, 0x20800208, 0x008d0000, 0x00000000 }, /* mov (8)r4.0<1>:ud r0.0<8;8;1>:ud */

@@ -5,7 +5,7 @@
 #include "gen7_media.h"
 #include "intel_reg.h"
 #include "drmtest.h"
-#include "gpu_fill.h"
+#include "gpu_cmds.h"
 #include <assert.h>
 
 static const uint32_t media_kernel[][4] = {

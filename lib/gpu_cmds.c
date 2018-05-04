@@ -22,7 +22,7 @@
  *
  */
 
-#include "gpu_fill.h"
+#include "gpu_cmds.h"
 
 void
 gen7_render_flush(struct intel_batchbuffer *batch, uint32_t batch_end)

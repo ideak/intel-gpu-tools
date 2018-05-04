@@ -32,7 +32,7 @@
 #include "drmtest.h"
 
 #include "gpgpu_fill.h"
-#include "gpu_fill.h"
+#include "gpu_cmds.h"
 
 /* shaders/gpgpu/gpgpu_fill.gxa */
 static const uint32_t gen7_gpgpu_kernel[][4] = {
