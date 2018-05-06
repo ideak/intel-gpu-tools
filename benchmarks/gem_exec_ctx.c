@@ -42,6 +42,7 @@
 #include "ioctl_wrappers.h"
 #include "drmtest.h"
 #include "intel_io.h"
+#include "intel_reg.h"
 #include "igt_stats.h"
 
 enum mode { NOP, CREATE, SWITCH, DEFAULT };

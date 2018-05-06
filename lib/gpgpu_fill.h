@@ -27,6 +27,8 @@
 #ifndef GPGPU_FILL_H
 #define GPGPU_FILL_H
 
+#include "intel_batchbuffer.h"
+
 void
 gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 		    struct igt_buf *dst,

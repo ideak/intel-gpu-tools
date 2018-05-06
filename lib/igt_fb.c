@@ -34,6 +34,7 @@
 #include "igt_kms.h"
 #include "igt_x86.h"
 #include "ioctl_wrappers.h"
+#include "intel_batchbuffer.h"
 #include "intel_chipset.h"
 
 /**

@@ -36,7 +36,7 @@
 
 #include <xf86drm.h>
 
-#include "intel_batchbuffer.h"
+#include "igt_core.h"
 
 #define DRIVER_INTEL	(1 << 0)
 #define DRIVER_VC4	(1 << 1)

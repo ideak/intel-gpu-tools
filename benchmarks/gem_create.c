@@ -43,6 +43,7 @@
 #include "drmtest.h"
 #include "igt_aux.h"
 #include "igt_stats.h"
+#include "intel_reg.h"
 
 #define OBJECT_SIZE (1<<23)
 

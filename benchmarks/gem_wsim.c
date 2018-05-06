@@ -43,6 +43,7 @@
 
 
 #include "intel_chipset.h"
+#include "intel_reg.h"
 #include "drm.h"
 #include "ioctl_wrappers.h"
 #include "drmtest.h"

@@ -29,6 +29,7 @@
 #include <time.h>
 
 #include "igt_aux.h"
+#include "i915_drm.h"
 
 typedef struct igt_spin {
 	unsigned int handle;

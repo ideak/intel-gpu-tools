@@ -27,6 +27,7 @@
 #include "igt_draw.h"
 
 #include "drmtest.h"
+#include "intel_batchbuffer.h"
 #include "intel_chipset.h"
 #include "igt_core.h"
 #include "igt_fb.h"

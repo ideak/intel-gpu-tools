@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include "drm.h"
+#include "intel_reg.h"
 #include "ioctl_wrappers.h"
 #include "igt_debugfs.h"
 #include "drmtest.h"

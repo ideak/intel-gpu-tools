@@ -34,6 +34,7 @@
 #include <string.h>
 #include "intel_chipset.h"
 #include "intel_io.h"
+#include "intel_reg.h"
 #include "igt_debugfs.h"
 #include "drmtest.h"
 #include "igt_aux.h"

@@ -43,6 +43,7 @@
 #include "ioctl_wrappers.h"
 #include "drmtest.h"
 #include "intel_chipset.h"
+#include "intel_reg.h"
 #include "igt_stats.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
