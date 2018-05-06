@@ -124,10 +124,17 @@ lib_igt = declare_dependency(link_with : lib_igt_build,
 
 igt_deps = [ lib_igt ] + lib_deps
 
+lin_igt_chipset_build = static_library('igt_chipset',
+                                       ['intel_chipset.c',
+                                        'intel_device_info.c'],
+                                       include_directories : inc)
+
+lib_igt_chipset = declare_dependency(link_with : lin_igt_chipset_build,
+                                     include_directories : inc)
+
 lib_igt_perf_build = static_library('igt_perf',
 	['igt_perf.c'],
-	include_directories : inc
-)
+	include_directories : inc)
 
 lib_igt_perf = declare_dependency(link_with : lib_igt_perf_build,
 				  include_directories : inc)

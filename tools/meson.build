@@ -113,7 +113,7 @@ install_subdir('registers', install_dir : datadir,
 	       ])
 
 shared_library('intel_aubdump', 'aubdump.c',
-	       dependencies : [ igt_deps, dlsym ],
+	       dependencies : [ lib_igt_chipset, dlsym ],
 	       name_prefix : '',
 	       install : true)
 
