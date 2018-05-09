@@ -484,6 +484,7 @@ int main(int argc, char *argv[])
 
 	igt_subtest("no_drrs") {
 		setup_test_plane(&data);
+		igt_assert(wait_psr_entry(&data));
 		igt_assert(drrs_disabled(&data));
 		test_cleanup(&data);
 	}
