@@ -241,34 +241,14 @@ static void get_sink_crc(data_t *data, char *crc)
 
 static bool is_green(char *crc)
 {
-	char color_mask[5] = "FFFF\0";
-	char rs[5], gs[5], bs[5];
-	unsigned int rh, gh, bh, mask;
-	int ret;
-
+	const char *mask = "0000FFFF0000";
+	uint32_t *p = (uint32_t *)crc, *mask_p = (uint32_t *)mask;
 	if (igt_interactive_debug)
 		return false;
 
-	sscanf(color_mask, "%4x", &mask);
-
-	memcpy(rs, &crc[0], 4);
-	rs[4] = '\0';
-	ret = sscanf(rs, "%4x", &rh);
-	igt_require(ret > 0);
-
-	memcpy(gs, &crc[4], 4);
-	gs[4] = '\0';
-	ret = sscanf(gs, "%4x", &gh);
-	igt_require(ret > 0);
-
-	memcpy(bs, &crc[8], 4);
-	bs[4] = '\0';
-	ret = sscanf(bs, "%4x", &bh);
-	igt_require(ret > 0);
-
-	return ((rh & mask) == 0 &&
-		(gh & mask) != 0 &&
-		(bh & mask) == 0);
+	/* Check R and B components are 0 and G is non-zero */
+	return *p == *mask_p && *(p + 2) == *(mask_p + 2) &&
+	       (*(p + 1) & *(mask_p + 1)) != 0;
 }
 
 static void assert_or_manual(bool condition, const char *expected)
