@@ -442,6 +442,14 @@ static int test_input_checking(int fd)
 	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr);
 	igt_assert_neq(ret, 0);
 
+	/* Zero user_size. */
+	memset(&userptr, 0, sizeof(userptr));
+	userptr.user_ptr = 0;
+	userptr.user_size = 0;
+	userptr.flags = 0;
+	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr);
+	igt_assert_neq(ret, 0);
+
 	return 0;
 }
 
