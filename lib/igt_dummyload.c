@@ -123,7 +123,7 @@ emit_recursive_batch(igt_spin_t *spin, int fd, uint32_t ctx, unsigned engine,
 	batch = __gem_mmap__wc(fd, obj[BATCH].handle,
 			       0, BATCH_SIZE, PROT_WRITE);
 	if (!batch)
-		batch = __gem_mmap__gtt(fd, obj[BATCH].handle,
+		batch = gem_mmap__gtt(fd, obj[BATCH].handle,
 				       	BATCH_SIZE, PROT_WRITE);
 	gem_set_domain(fd, obj[BATCH].handle,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
