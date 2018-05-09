@@ -63,11 +63,13 @@ static void assert_color(int dir, enum color color)
 		igt_assert_lt(0, r);
 		igt_assert_eq(0, g);
 		igt_assert_eq(0, b);
+		igt_debug("sink CRC for red %.4x%.4x%.4x\n", r, g, b);
 		break;
 	case GREEN:
 		igt_assert_eq(0, r);
 		igt_assert_lt(0, g);
 		igt_assert_eq(0, b);
+		igt_debug("sink CRC for green %.4x%.4x%.4x\n", r, g, b);
 		break;
 	default:
 		igt_fail(IGT_EXIT_FAILURE);
