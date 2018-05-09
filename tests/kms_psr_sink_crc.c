@@ -416,11 +416,11 @@ static void setup_test_plane(data_t *data, int test_plane)
 	igt_display_commit(&data->display);
 }
 
-static void dpms_off_on(data_t data)
+static void dpms_off_on(data_t *data)
 {
-	kmstest_set_connector_dpms(data.drm_fd, data.output->config.connector,
+	kmstest_set_connector_dpms(data->drm_fd, data->output->config.connector,
 				   DRM_MODE_DPMS_OFF);
-	kmstest_set_connector_dpms(data.drm_fd, data.output->config.connector,
+	kmstest_set_connector_dpms(data->drm_fd, data->output->config.connector,
 				   DRM_MODE_DPMS_ON);
 }
 
@@ -519,7 +519,7 @@ int main(int argc, char *argv[])
 		data.op = RENDER;
 		setup_test_plane(&data, DRM_PLANE_TYPE_PRIMARY);
 		igt_assert(wait_psr_entry(&data));
-		dpms_off_on(data);
+		dpms_off_on(&data);
 		run_test(&data);
 		test_cleanup(&data);
 	}
