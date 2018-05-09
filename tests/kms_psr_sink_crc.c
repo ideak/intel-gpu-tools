@@ -193,7 +193,7 @@ static void fill_render(data_t *data, uint32_t handle, unsigned char color)
 	gem_bo_busy(data->drm_fd, handle);
 }
 
-static bool psr_possible(data_t *data)
+static bool sink_support(data_t *data)
 {
 	char buf[512];
 
@@ -513,8 +513,8 @@ int main(int argc, char *argv[])
 
 		igt_set_module_param_int("enable_psr", running_with_psr_disabled ?
 					 0 : 1);
-
-		igt_skip_on(!psr_possible(&data));
+		igt_require_f(sink_support(&data),
+			      "Sink does not support PSR\n");
 
 		data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
 		igt_assert(data.bufmgr);
