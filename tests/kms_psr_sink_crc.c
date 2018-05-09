@@ -203,7 +203,7 @@ static bool sink_support(data_t *data)
 		strstr(buf, "Sink_Support: yes\n");
 }
 
-static bool psr_active(data_t *data)
+static bool psr_enabled(data_t *data)
 {
 	char buf[512];
 
@@ -217,7 +217,7 @@ static bool wait_psr_entry(data_t *data)
 {
 	int timeout = 5;
 	while (timeout--) {
-		if (psr_active(data))
+		if (psr_enabled(data))
 			return true;
 		sleep(1);
 	}
