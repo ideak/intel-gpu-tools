@@ -426,7 +426,6 @@ static void dpms_off_on(data_t data)
 {
 	kmstest_set_connector_dpms(data.drm_fd, data.output->config.connector,
 				   DRM_MODE_DPMS_OFF);
-	sleep(1);
 	kmstest_set_connector_dpms(data.drm_fd, data.output->config.connector,
 				   DRM_MODE_DPMS_ON);
 }
