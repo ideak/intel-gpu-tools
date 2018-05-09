@@ -721,6 +721,8 @@ static void dump_driver_feature(struct context *context,
 	printf("\tLegacy CRT max Y: %d\n", feature->legacy_crt_max_y);
 	printf("\tLegacy CRT max refresh: %d\n",
 	       feature->legacy_crt_max_refresh);
+	printf("\tEnable DRRS: %s\n", YESNO(feature->drrs_enabled));
+	printf("\tEnable PSR: %s\n", YESNO(feature->psr_enabled));
 }
 
 static void dump_edp(struct context *context,
