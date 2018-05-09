@@ -39,7 +39,6 @@ bool running_with_psr_disabled;
 enum operations {
 	PAGE_FLIP,
 	MMAP_GTT,
-	MMAP_GTT_WAITING,
 	MMAP_CPU,
 	BLT,
 	RENDER,
@@ -52,7 +51,6 @@ static const char *op_str(enum operations op)
 	static const char * const name[] = {
 		[PAGE_FLIP] = "page_flip",
 		[MMAP_GTT] = "mmap_gtt",
-		[MMAP_GTT_WAITING] = "mmap_gtt_waiting",
 		[MMAP_CPU] = "mmap_cpu",
 		[BLT] = "blt",
 		[RENDER] = "render",
@@ -316,29 +314,6 @@ static void run_test(data_t *data)
 		gem_set_domain(data->drm_fd, handle,
 			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 		memset(ptr, 0xcc, data->mod_size);
-		munmap(ptr, data->mod_size);
-		expected = "BLACK or TRANSPARENT mark on top of plane in test";
-		break;
-	case MMAP_GTT_WAITING:
-		ptr = gem_mmap__gtt(data->drm_fd, handle, data->mod_size,
-				    PROT_WRITE);
-		gem_set_domain(data->drm_fd, handle,
-			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-		/* Printing white on white so the screen shouldn't change */
-		memset(ptr, 0xff, data->mod_size);
-		get_sink_crc(data, crc);
-		if (data->test_plane == DRM_PLANE_TYPE_PRIMARY)
-			assert_or_manual(strncmp(ref_crc, crc, CRC_LEN) == 0, "screen WHITE");
-		else
-			assert_or_manual(strncmp(ref_crc, crc, CRC_LEN) == 0,
-			       "GREEN background with WHITE box");
-
-		igt_info("Waiting 10s...\n");
-		sleep(10);
-
-		/* Now lets print black to change the screen */
-		memset(ptr, 0, data->mod_size);
 		munmap(ptr, data->mod_size);
 		expected = "BLACK or TRANSPARENT mark on top of plane in test";
 		break;
