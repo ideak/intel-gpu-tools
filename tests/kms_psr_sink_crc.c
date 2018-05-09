@@ -62,14 +62,13 @@ static const char *op_str(enum operations op)
 typedef struct {
 	int drm_fd;
 	int debugfs_fd;
-	int test_plane;
 	enum operations op;
 	uint32_t devid;
 	uint32_t crtc_id;
 	igt_display_t display;
 	drm_intel_bufmgr *bufmgr;
 	struct igt_fb fb_green, fb_white;
-	igt_plane_t *primary, *sprite, *cursor;
+	igt_plane_t *test_plane;
 	int mod_size;
 	int mod_stride;
 	drmModeModeInfo *mode;
@@ -265,7 +264,7 @@ static bool drrs_disabled(data_t *data)
 static void run_test(data_t *data)
 {
 	uint32_t handle = data->fb_white.gem_handle;
-	igt_plane_t *test_plane;
+	igt_plane_t *test_plane = data->test_plane;
 	void *ptr;
 	char ref_crc[CRC_LEN];
 	char crc[CRC_LEN];
@@ -281,18 +280,13 @@ static void run_test(data_t *data)
 	assert_or_manual(is_green(ref_crc), "screen GREEN");
 
 	/* Setting a secondary fb/plane */
-	switch (data->test_plane) {
-	case DRM_PLANE_TYPE_PRIMARY: default: test_plane = data->primary; break;
-	case DRM_PLANE_TYPE_OVERLAY: test_plane = data->sprite; break;
-	case DRM_PLANE_TYPE_CURSOR: test_plane = data->cursor; break;
-	}
 	igt_plane_set_fb(test_plane, &data->fb_white);
 	igt_display_commit(&data->display);
 
 	/* Confirm it is not Green anymore */
 	igt_assert(wait_psr_entry(data));
 	get_sink_crc(data, ref_crc);
-	if (data->test_plane == DRM_PLANE_TYPE_PRIMARY)
+	if (test_plane->type == DRM_PLANE_TYPE_PRIMARY)
 		assert_or_manual(!is_green(ref_crc), "screen WHITE");
 	else
 		assert_or_manual(!is_green(ref_crc), "GREEN background with WHITE box");
@@ -351,21 +345,22 @@ static void run_test(data_t *data)
 }
 
 static void test_cleanup(data_t *data) {
-	igt_plane_set_fb(data->primary, NULL);
-	if (data->test_plane == DRM_PLANE_TYPE_OVERLAY)
-		igt_plane_set_fb(data->sprite, NULL);
-	if (data->test_plane == DRM_PLANE_TYPE_CURSOR)
-		igt_plane_set_fb(data->cursor, NULL);
+	igt_plane_t *primary;
 
+	primary = igt_output_get_plane_type(data->output,
+					    DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_fb(primary, NULL);
+	igt_plane_set_fb(data->test_plane, NULL);
 	igt_display_commit(&data->display);
 
 	igt_remove_fb(data->drm_fd, &data->fb_green);
 	igt_remove_fb(data->drm_fd, &data->fb_white);
 }
 
-static void setup_test_plane(data_t *data)
+static void setup_test_plane(data_t *data, int test_plane)
 {
 	uint32_t white_h, white_v;
+	igt_plane_t *primary, *sprite, *cursor;
 
 	igt_create_color_fb(data->drm_fd,
 			    data->mode->hdisplay, data->mode->vdisplay,
@@ -374,8 +369,10 @@ static void setup_test_plane(data_t *data)
 			    0.0, 1.0, 0.0,
 			    &data->fb_green);
 
-	data->primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
-	igt_plane_set_fb(data->primary, NULL);
+	primary = igt_output_get_plane_type(data->output,
+					    DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_fb(primary, NULL);
+	data->test_plane = primary;
 
 	white_h = data->mode->hdisplay;
 	white_v = data->mode->vdisplay;
@@ -384,16 +381,14 @@ static void setup_test_plane(data_t *data)
 	data->mod_size = white_h * white_v;
 	data->mod_stride = white_h * 4;
 
-	switch (data->test_plane) {
+	switch (test_plane) {
 	case DRM_PLANE_TYPE_OVERLAY:
-		data->sprite = igt_output_get_plane_type(data->output,
-						    DRM_PLANE_TYPE_OVERLAY);
-		igt_plane_set_fb(data->sprite, NULL);
-		/* To make it different for human eyes let's make
-		 * sprite visible in only one quarter of the primary
-		 */
+		sprite = igt_output_get_plane_type(data->output,
+						   DRM_PLANE_TYPE_OVERLAY);
+		igt_plane_set_fb(sprite, NULL);
 		white_h = white_h/2;
 		white_v = white_v/2;
+		data->test_plane = sprite;
 	case DRM_PLANE_TYPE_PRIMARY:
 		igt_create_color_fb(data->drm_fd,
 				    white_h, white_v,
@@ -403,20 +398,21 @@ static void setup_test_plane(data_t *data)
 				    &data->fb_white);
 		break;
 	case DRM_PLANE_TYPE_CURSOR:
-		data->cursor = igt_output_get_plane_type(data->output,
-						    DRM_PLANE_TYPE_CURSOR);
-		igt_plane_set_fb(data->cursor, NULL);
+		cursor = igt_output_get_plane_type(data->output,
+						   DRM_PLANE_TYPE_CURSOR);
+		igt_plane_set_fb(cursor, NULL);
 		create_cursor_fb(data);
-		igt_plane_set_position(data->cursor, 0, 0);
+		igt_plane_set_position(cursor, 0, 0);
 
 		/* Cursor is 64 x 64, ignoring pitch and bbp again */
 		data->mod_size = 64 * 64;
+		data->test_plane = cursor;
 		break;
 	}
 
 	igt_display_commit(&data->display);
 
-	igt_plane_set_fb(data->primary, &data->fb_green);
+	igt_plane_set_fb(primary, &data->fb_green);
 	igt_display_commit(&data->display);
 }
 
@@ -477,13 +473,13 @@ int main(int argc, char *argv[])
 	}
 
 	igt_subtest("basic") {
-		setup_test_plane(&data);
+		setup_test_plane(&data, DRM_PLANE_TYPE_PRIMARY);
 		igt_assert(wait_psr_entry(&data));
 		test_cleanup(&data);
 	}
 
 	igt_subtest("no_drrs") {
-		setup_test_plane(&data);
+		setup_test_plane(&data, DRM_PLANE_TYPE_PRIMARY);
 		igt_assert(wait_psr_entry(&data));
 		igt_assert(drrs_disabled(&data));
 		test_cleanup(&data);
@@ -491,9 +487,8 @@ int main(int argc, char *argv[])
 
 	for (op = PAGE_FLIP; op <= RENDER; op++) {
 		igt_subtest_f("primary_%s", op_str(op)) {
-			data.test_plane = DRM_PLANE_TYPE_PRIMARY;
 			data.op = op;
-			setup_test_plane(&data);
+			setup_test_plane(&data, DRM_PLANE_TYPE_PRIMARY);
 			igt_assert(wait_psr_entry(&data));
 			run_test(&data);
 			test_cleanup(&data);
@@ -502,9 +497,8 @@ int main(int argc, char *argv[])
 
 	for (op = MMAP_GTT; op <= PLANE_ONOFF; op++) {
 		igt_subtest_f("sprite_%s", op_str(op)) {
-			data.test_plane = DRM_PLANE_TYPE_OVERLAY;
 			data.op = op;
-			setup_test_plane(&data);
+			setup_test_plane(&data, DRM_PLANE_TYPE_OVERLAY);
 			igt_assert(wait_psr_entry(&data));
 			run_test(&data);
 			test_cleanup(&data);
@@ -513,9 +507,8 @@ int main(int argc, char *argv[])
 
 	for (op = MMAP_GTT; op <= PLANE_ONOFF; op++) {
 		igt_subtest_f("cursor_%s", op_str(op)) {
-			data.test_plane = DRM_PLANE_TYPE_CURSOR;
 			data.op = op;
-			setup_test_plane(&data);
+			setup_test_plane(&data, DRM_PLANE_TYPE_CURSOR);
 			igt_assert(wait_psr_entry(&data));
 			run_test(&data);
 			test_cleanup(&data);
@@ -523,9 +516,8 @@ int main(int argc, char *argv[])
 	}
 
 	igt_subtest_f("dpms") {
-		data.test_plane = DRM_PLANE_TYPE_PRIMARY;
 		data.op = RENDER;
-		setup_test_plane(&data);
+		setup_test_plane(&data, DRM_PLANE_TYPE_PRIMARY);
 		igt_assert(wait_psr_entry(&data));
 		dpms_off_on(data);
 		run_test(&data);
@@ -533,9 +525,8 @@ int main(int argc, char *argv[])
 	}
 
 	igt_subtest_f("suspend") {
-		data.test_plane = DRM_PLANE_TYPE_CURSOR;
 		data.op = PLANE_ONOFF;
-		setup_test_plane(&data);
+		setup_test_plane(&data, DRM_PLANE_TYPE_CURSOR);
 		igt_assert(wait_psr_entry(&data));
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 					      SUSPEND_TEST_NONE);
