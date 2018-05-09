@@ -522,51 +522,23 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	igt_subtest_f("dpms_off_psr_active") {
+	igt_subtest_f("dpms") {
 		data.test_plane = DRM_PLANE_TYPE_PRIMARY;
 		data.op = RENDER;
 		setup_test_plane(&data);
 		igt_assert(wait_psr_entry(&data));
-
 		dpms_off_on(data);
-
 		run_test(&data);
 		test_cleanup(&data);
 	}
 
-	igt_subtest_f("dpms_off_psr_exit") {
-		data.test_plane = DRM_PLANE_TYPE_OVERLAY;
-		data.op = PLANE_ONOFF;
-		setup_test_plane(&data);
-
-		dpms_off_on(data);
-
-		igt_assert(wait_psr_entry(&data));
-		run_test(&data);
-		test_cleanup(&data);
-	}
-
-	igt_subtest_f("suspend_psr_active") {
-		data.test_plane = DRM_PLANE_TYPE_PRIMARY;
-		data.op = PAGE_FLIP;
-		setup_test_plane(&data);
-		igt_assert(wait_psr_entry(&data));
-
-		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-					      SUSPEND_TEST_NONE);
-
-		run_test(&data);
-		test_cleanup(&data);
-	}
-
-	igt_subtest_f("suspend_psr_exit") {
+	igt_subtest_f("suspend") {
 		data.test_plane = DRM_PLANE_TYPE_CURSOR;
 		data.op = PLANE_ONOFF;
 		setup_test_plane(&data);
-
+		igt_assert(wait_psr_entry(&data));
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 					      SUSPEND_TEST_NONE);
-
 		igt_assert(wait_psr_entry(&data));
 		run_test(&data);
 		test_cleanup(&data);
