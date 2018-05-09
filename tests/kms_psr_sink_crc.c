@@ -65,6 +65,7 @@ static const char *op_str(enum operations op)
 
 typedef struct {
 	int drm_fd;
+	int debugfs_fd;
 	int test_plane;
 	enum operations op;
 	uint32_t devid;
@@ -224,16 +225,14 @@ static bool wait_psr_entry(data_t *data)
 	return false;
 }
 
-static void get_sink_crc(data_t *data, char *crc) {
-	int dir;
-
+static void get_sink_crc(data_t *data, char *crc)
+{
 	if (igt_interactive_debug)
 		return;
 
-	dir = igt_debugfs_dir(data->drm_fd);
-	igt_require_f(igt_sysfs_scanf(dir, "i915_sink_crc_eDP1", "%s\n", crc),
+	igt_require_f(igt_sysfs_scanf(data->debugfs_fd, "i915_sink_crc_eDP1",
+				      "%s\n", crc),
 		      "Sink CRC is unreliable on this machine. Try manual debug with --interactive-debug=no-crc\n");
-	close(dir);
 
 	igt_debug("%s\n", crc);
 
@@ -508,6 +507,7 @@ int main(int argc, char *argv[])
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
 		data.devid = intel_get_drm_devid(data.drm_fd);
 
@@ -619,6 +619,7 @@ int main(int argc, char *argv[])
 	}
 
 	igt_fixture {
+		close(data.debugfs_fd);
 		drm_intel_bufmgr_destroy(data.bufmgr);
 		display_fini(&data);
 	}
