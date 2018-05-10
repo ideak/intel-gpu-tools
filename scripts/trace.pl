@@ -40,6 +40,7 @@ my $trace = 0;
 my $avg_delay_stats = 0;
 my $squash_context_id = 0;
 my $gpu_timeline = 0;
+my $colour_contexts = 0;
 
 my @args;
 
@@ -110,6 +111,8 @@ Usage:
       --squash-ctx-id			Squash context id by substracting engine
 					id from ctx id.
       --gpu-timeline			Draw overall GPU busy timeline.
+      --colour-contexts / -c		Use different colours for different
+					context execution boxes.
 ENDHELP
 
 		exit 0;
@@ -279,6 +282,20 @@ sub arg_skip_box
 	return @_;
 }
 
+sub arg_colour_contexts
+{
+	return unless scalar(@_);
+
+	if ($_[0] eq '--colour-contexts' or
+	    $_[0] eq '--color-contexts' or
+	    $_[0] eq '-c') {
+		shift @_;
+		$colour_contexts = 1;
+	}
+
+	return @_;
+}
+
 @args = @ARGV;
 while (@args) {
 	my $left = scalar(@args);
@@ -294,6 +311,7 @@ while (@args) {
 	@args = arg_split_requests(@args);
 	@args = arg_ignore_ring(@args);
 	@args = arg_skip_box(@args);
+	@args = arg_colour_contexts(@args);
 
 	last if $left == scalar(@args);
 }
@@ -581,6 +599,7 @@ foreach my $key (@sorted_keys) {
 
 my $last_ts = 0;
 my $first_ts;
+my ($min_ctx, $max_ctx);
 
 foreach my $key (@sorted_keys) {
 	my $ring = $db{$key}->{'ring'};
@@ -590,6 +609,10 @@ foreach my $key (@sorted_keys) {
 
 	$first_ts = $db{$key}->{'queue'} if not defined $first_ts or $db{$key}->{'queue'} < $first_ts;
 	$last_ts = $end if $end > $last_ts;
+	$min_ctx = $db{$key}->{'ctx'} if not defined $min_ctx or
+					 $db{$key}->{'ctx'} < $min_ctx;
+	$max_ctx = $db{$key}->{'ctx'} if not defined $max_ctx or
+					 $db{$key}->{'ctx'} > $max_ctx;
 
 	$db{$key}->{'context-complete-delay'} = $end - $notify;
 	$db{$key}->{'execute-delay'} = $start - $db{$key}->{'submit'};
@@ -720,6 +743,10 @@ foreach my $key (keys %reqwait) {
 say sprintf('GPU: %.2f%% idle, %.2f%% busy',
 	     $flat_busy{'gpu-idle'}, $flat_busy{'gpu-busy'}) unless $html;
 
+my $queued_colour = $colour_contexts ? 'multi-colour light' : 'blue';
+my $runnable_colour = $colour_contexts ? 'multi-colour dark' : 'grey';
+my $execute_colour = $colour_contexts ? 'multi-colour' : 'pink';
+
 print <<ENDHTML if $html;
 <!DOCTYPE HTML>
 <html>
@@ -740,9 +767,9 @@ print <<ENDHTML if $html;
 <button onclick="toggleStackSubgroups()">Toggle stacking</button>
 
 <p>
-pink = requests executing on the GPU<br>
-grey = runnable requests waiting for a slot on GPU<br>
-blue = requests waiting on fences and dependencies before they are runnable<br>
+$execute_colour = requests executing on the GPU<br>
+$runnable_colour = runnable requests waiting for a slot on GPU<br>
+$queued_colour = requests waiting on fences and dependencies before they are runnable<br>
 </p>
 <p>
 Boxes are in format 'ctx-id/seqno'.
@@ -860,6 +887,18 @@ sub sortQueue {
 	return $val;
 }
 
+sub ctx_colour
+{
+	my ($ctx, $s, $l) = (@_);
+	my $val;
+
+	return 'Pink;' unless $colour_contexts;
+
+	$val = int(360 / ($max_ctx - $min_ctx + 1)) * ($ctx - $min_ctx);
+
+	return "hsl($val, $s%, $l%);";
+}
+
 my $i = 0;
 foreach my $key (sort sortQueue keys %db) {
 	my ($name, $ctx, $seqno) = ($db{$key}->{'name'}, $db{$key}->{'ctx'}, $db{$key}->{'seqno'});
@@ -874,7 +913,8 @@ foreach my $key (sort sortQueue keys %db) {
 	# submit to execute
 	unless (exists $skip_box{'queue'}) {
 		$skey = 2 * $max_seqno * $ctx + 2 * $seqno;
-		$style = 'color: black; background-color: lightblue;';
+		$style = 'color: black; background-color: ' .
+			 ctx_colour($ctx, 35, 85);
 		$content = "$name<br>$db{$key}->{'submit-delay'}us <small>($db{$key}->{'execute-delay'}us)</small>";
 		$startend = 'start: \'' . ts($queue) . '\', end: \'' . ts($submit) . '\'';
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: 1, subgroupOrder: 1, content: '$content', $startend, style: \'$style\'},\n";
@@ -884,7 +924,8 @@ foreach my $key (sort sortQueue keys %db) {
 	# execute to start
 	unless (exists $skip_box{'ready'}) {
 		$skey = 2 * $max_seqno * $ctx + 2 * $seqno + 1;
-		$style = 'color: black; background-color: lightgrey;';
+		$style = 'color: black; background-color: ' .
+			 ctx_colour($ctx, 35, 45);
 		$content = "<small>$name<br>$db{$key}->{'execute-delay'}us</small>";
 		$startend = 'start: \'' . ts($submit) . '\', end: \'' . ts($start) . '\'';
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: 1, subgroupOrder: 2, content: '$content', $startend, style: \'$style\'},\n";
@@ -897,7 +938,8 @@ foreach my $key (sort sortQueue keys %db) {
 		if (exists $db{$key}->{'incomplete'}) {
 			$style = 'color: white; background-color: red;';
 		} else {
-			$style = 'color: black; background-color: pink;';
+			$style = 'color: black; background-color: ' .
+				  ctx_colour($ctx, 80, 65);
 		}
 		$content = "$name <small>$db{$key}->{'port'}</small>";
 		$content .= ' <small><i>???</i></small> ' if exists $db{$key}->{'incomplete'};
