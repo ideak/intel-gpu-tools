@@ -38,7 +38,6 @@ my %skip_box;
 my $html = 0;
 my $trace = 0;
 my $avg_delay_stats = 0;
-my $squash_context_id = 0;
 my $gpu_timeline = 0;
 my $colour_contexts = 0;
 
@@ -108,8 +107,6 @@ Usage:
       --html				Generate HTML output.
       --trace cmd			Trace the following command.
       --avg-delay-stats			Print average delay stats.
-      --squash-ctx-id			Squash context id by substracting engine
-					id from ctx id.
       --gpu-timeline			Draw overall GPU busy timeline.
       --colour-contexts / -c		Use different colours for different
 					context execution boxes.
@@ -140,18 +137,6 @@ sub arg_avg_delay_stats
 	if ($_[0] eq '--avg-delay-stats') {
 		shift @_;
 		$avg_delay_stats = 1;
-	}
-
-	return @_;
-}
-
-sub arg_squash_ctx_id
-{
-	return unless scalar(@_);
-
-	if ($_[0] eq '--squash-ctx-id') {
-		shift @_;
-		$squash_context_id = 1;
 	}
 
 	return @_;
@@ -303,7 +288,6 @@ while (@args) {
 	@args = arg_help(@args);
 	@args = arg_html(@args);
 	@args = arg_avg_delay_stats(@args);
-	@args = arg_squash_ctx_id(@args);
 	@args = arg_gpu_timeline(@args);
 	@args = arg_trace(@args);
 	@args = arg_max_items(@args);
@@ -337,8 +321,6 @@ sub global_key
 sub sanitize_ctx
 {
 	my ($ctx, $ring) = @_;
-
-	$ctx = $ctx - $ring if $squash_context_id;
 
 	if (exists $ctxdb{$ctx}) {
 		return $ctx . '.' . $ctxdb{$ctx};
