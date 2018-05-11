@@ -74,8 +74,7 @@ static void trigger_reset(int fd)
 	/* And just check the gpu is indeed running again */
 	igt_debug("Checking that the GPU recovered\n");
 	gem_test_engine(fd, ALL_ENGINES);
-
-	gem_quiescent_gpu(fd);
+	igt_drop_caches_set(fd, DROP_ACTIVE);
 
 	/* We expect forced reset and health check to be quick. */
 	igt_assert(igt_seconds_elapsed(&ts) < 2);
