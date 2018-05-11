@@ -131,7 +131,8 @@ sub add_wps_arg
 	return @args if $realtime_target <= 0;
 
 	$period = int(1000000 / $realtime_target);
-	push @args, "-a p.$period";
+	push @args, '-a';
+	push @args, 'p.$period';
 
 	return @args;
 }
@@ -144,7 +145,7 @@ sub run_workload
 	@args = add_wps_arg(@args);
 	push @args, '-2' if $gt2;
 
-	unshift @args, "$wsim";
+	unshift @args, $wsim;
 	$cmd = join ' ', @args;
 	show_cmd($cmd);
 
@@ -164,23 +165,31 @@ sub run_workload
 sub trace_workload
 {
 	my ($wrk, $b, $r, $c) = @_;
-	my @args = ( "-n $nop", "-r $r", "-c $c");
+	my @args = ($tracepl, '--trace', $wsim, '-q', '-n', $nop, '-r', $r, '-c', $c);
 	my $min_batches = 16 + $r * $c / 2;
 	my @skip_engine;
 	my %engines;
 	my ($cmd, $file);
-	my $warg = defined $w_direct ? $wrk : "-w $wrk_root/$wrk";
 
-	push @args, "$b -R" unless $b eq '<none>';
 	push @args, '-2' if $gt2;
-	push @args, $warg;
 
-	unshift @args, '-q';
-	unshift @args, "$tracepl --trace $wsim";
+	unless ($b eq '<none>') {
+		push @args, '-R';
+		push @args, split /\s+/, $b;
+	}
 
-	$cmd = join ' ', @args;
-	show_cmd($cmd);
-	system($cmd);
+	if (defined $w_direct) {
+		push @args, split /\s+/, $wrk;
+	} else {
+		push @args, '-w';
+		push @args, $wrk_root . '/' . $wrk;
+	}
+
+	show_cmd(join ' ', @args);
+	if (-e 'perf.data') {
+		unlink 'perf.data' or die;
+	}
+	system(@args) == 0 or die;
 
 	$cmd = "perf script | $tracepl";
 	show_cmd($cmd);
@@ -205,13 +214,13 @@ sub trace_workload
 
 	$cmd = "perf script > ${file}.trace";
 	show_cmd($cmd);
-	system($cmd);
+	system($cmd) == 0 or die;
 
 	$cmd = "perf script | $tracepl --html -x ctxsave -s -c ";
 	$cmd .= join ' ', map("-i $_", @skip_engine);
 	$cmd .= " > ${file}.html";
 	show_cmd($cmd);
-	system($cmd);
+	system($cmd) == 0 or die;
 
 	return \%engines;
 }
@@ -219,7 +228,6 @@ sub trace_workload
 sub calibrate_workload
 {
 	my ($wrk) = @_;
-	my $warg = defined $w_direct ? $wrk : "-w $wrk_root/$wrk";
 	my $tol = $tolerance;
 	my $loops = 0;
 	my $error;
@@ -227,8 +235,15 @@ sub calibrate_workload
 
 	$r = $realtime_target > 0 ? $realtime_target * $client_target_s : 23;
 	for (;;) {
-		my @args = ( "-n $nop", "-r $r", $warg);
+		my @args = ('-n', $nop, '-r', $r);
 		my ($time, $wps);
+
+		if (defined $w_direct) {
+			push @args, split /\s+/, $wrk;
+		} else {
+			push @args, '-w';
+			push @args, $wrk_root . '/' . $wrk;
+		}
 
 		($time, $wps) = run_workload(@args);
 
@@ -254,23 +269,24 @@ sub find_saturation_point
 	my ($last_wps, $c, $swps);
 	my $target = $realtime_target > 0 ? $realtime_target : $wps_target;
 	my $r = $rr;
-	my ($warg, $wcnt);
+	my $wcnt;
 	my $maxc;
 	my $max = 0;
 
 	if (defined $w_direct) {
-		$warg = $wrk;
+		push @args, split /\s+/, $wrk;
 		$wcnt = () = $wrk =~ /-[wW]/gi;
 
 	} else {
-		$warg = "-w $wrk_root/$wrk";
+		push @args, '-w';
+		push @args, $wrk_root . '/' . $wrk;
 		$wcnt = 1;
 	}
 
 	for ($c = 1; ; $c = $c + 1) {
 		my ($time, $wps);
 
-		($time, $wps) = run_workload((@args, ($warg, "-r $r", "-c $c")));
+		($time, $wps) = run_workload((@args, ('-r', $r, '-c', $c)));
 
 		say "        $c clients is $wps wps." if $verbose;
 
