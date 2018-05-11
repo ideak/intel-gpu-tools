@@ -46,6 +46,11 @@ static const uint32_t media_kernel[][4] = {
  */
 
 #define BATCH_STATE_SPLIT 2048
+/* VFE STATE params */
+#define THREADS 1
+#define MEDIA_URB_ENTRIES 2
+#define MEDIA_URB_SIZE 2
+#define MEDIA_CURBE_SIZE 2
 
 void
 gen8_media_fillfunc(struct intel_batchbuffer *batch,
@@ -72,7 +77,8 @@ gen8_media_fillfunc(struct intel_batchbuffer *batch,
 	OUT_BATCH(GEN8_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA);
 	gen8_emit_state_base_address(batch);
 
-	gen8_emit_vfe_state(batch);
+	gen8_emit_vfe_state(batch, THREADS, MEDIA_URB_ENTRIES, MEDIA_URB_SIZE,
+			    MEDIA_CURBE_SIZE);
 
 	gen7_emit_curbe_load(batch, curbe_buffer);
 

@@ -194,7 +194,9 @@ gen7_emit_state_base_address(struct intel_batchbuffer *batch)
 }
 
 void
-gen7_emit_vfe_state(struct intel_batchbuffer *batch)
+gen7_emit_vfe_state(struct intel_batchbuffer *batch, uint32_t threads,
+		    uint32_t urb_entries, uint32_t urb_size,
+		    uint32_t curbe_size, uint32_t mode)
 {
 	OUT_BATCH(GEN7_MEDIA_VFE_STATE | (8 - 2));
 
@@ -202,39 +204,15 @@ gen7_emit_vfe_state(struct intel_batchbuffer *batch)
 	OUT_BATCH(0);
 
 	/* number of threads & urb entries */
-	OUT_BATCH(1 << 16 |
-		2 << 8);
+	OUT_BATCH(threads << 16 |
+		urb_entries << 8 |
+		mode << 2); /* GPGPU vs media mode */
 
 	OUT_BATCH(0);
 
 	/* urb entry size & curbe size */
-	OUT_BATCH(2 << 16 |	/* in 256 bits unit */
-		  2);		/* in 256 bits unit */
-
-	/* scoreboard */
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-}
-
-void
-gen7_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch)
-{
-	OUT_BATCH(GEN7_MEDIA_VFE_STATE | (8 - 2));
-
-	/* scratch buffer */
-	OUT_BATCH(0);
-
-	/* number of threads & urb entries */
-	OUT_BATCH(1 << 16 | /* max num of threads */
-		  0 << 8 | /* num of URB entry */
-		  1 << 2); /* GPGPU mode */
-
-	OUT_BATCH(0);
-
-	/* urb entry size & curbe size */
-	OUT_BATCH(0 << 16 |	/* URB entry size in 256 bits unit */
-		  1);		/* CURBE entry size in 256 bits unit */
+	OUT_BATCH(urb_size << 16 |	/* in 256 bits unit */
+		  curbe_size);		/* in 256 bits unit */
 
 	/* scoreboard */
 	OUT_BATCH(0);
@@ -279,25 +257,7 @@ gen7_emit_media_objects(struct intel_batchbuffer *batch,
 
 	for (i = 0; i < width / 16; i++) {
 		for (j = 0; j < height / 16; j++) {
-			OUT_BATCH(GEN7_MEDIA_OBJECT | (8 - 2));
-
-			/* interface descriptor offset */
-			OUT_BATCH(0);
-
-			/* without indirect data */
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-
-			/* scoreboard */
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-
-			/* inline data (xoffset, yoffset) */
-			OUT_BATCH(x + i * 16);
-			OUT_BATCH(y + j * 16);
-			if (AT_LEAST_GEN(batch->devid, 8) &&
-			    !IS_CHERRYVIEW(batch->devid))
-				gen8_emit_media_state_flush(batch);
+			gen_emit_media_object(batch, x + i * 16, y + j * 16);
 		}
 	}
 }
@@ -505,7 +465,9 @@ gen8_emit_media_state_flush(struct intel_batchbuffer *batch)
 }
 
 void
-gen8_emit_vfe_state(struct intel_batchbuffer *batch)
+gen8_emit_vfe_state(struct intel_batchbuffer *batch, uint32_t threads,
+		    uint32_t urb_entries, uint32_t urb_size,
+		    uint32_t curbe_size)
 {
 	OUT_BATCH(GEN7_MEDIA_VFE_STATE | (9 - 2));
 
@@ -514,61 +476,14 @@ gen8_emit_vfe_state(struct intel_batchbuffer *batch)
 	OUT_BATCH(0);
 
 	/* number of threads & urb entries */
-	OUT_BATCH(1 << 16 |
-		2 << 8);
+	OUT_BATCH(threads << 16 |
+		urb_entries << 8);
 
 	OUT_BATCH(0);
 
 	/* urb entry size & curbe size */
-	OUT_BATCH(2 << 16 |
-		2);
-
-	/* scoreboard */
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-}
-
-void
-gen8_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch)
-{
-	OUT_BATCH(GEN7_MEDIA_VFE_STATE | (9 - 2));
-
-	/* scratch buffer */
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-
-	/* number of threads & urb entries */
-	OUT_BATCH(1 << 16 | 1 << 8);
-
-	OUT_BATCH(0);
-
-	/* urb entry size & curbe size */
-	OUT_BATCH(0 << 16 | 1);
-
-	/* scoreboard */
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-}
-
-void
-gen8_emit_vfe_state_spin(struct intel_batchbuffer *batch)
-{
-	OUT_BATCH(GEN8_MEDIA_VFE_STATE | (9 - 2));
-
-	/* scratch buffer */
-	OUT_BATCH(0);
-	OUT_BATCH(0);
-
-	/* number of threads & urb entries */
-	OUT_BATCH(2 << 8);
-
-	OUT_BATCH(0);
-
-	/* urb entry size & curbe size */
-	OUT_BATCH(2 << 16 |
-		2);
+	OUT_BATCH(urb_size << 16 |
+		curbe_size);
 
 	/* scoreboard */
 	OUT_BATCH(0);
@@ -637,9 +552,10 @@ gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 }
 
 void
-gen8_emit_media_objects_spin(struct intel_batchbuffer *batch)
+gen_emit_media_object(struct intel_batchbuffer *batch,
+		       unsigned int xoffset, unsigned int yoffset)
 {
-	OUT_BATCH(GEN8_MEDIA_OBJECT | (8 - 2));
+	OUT_BATCH(GEN7_MEDIA_OBJECT | (8 - 2));
 
 	/* interface descriptor offset */
 	OUT_BATCH(0);
@@ -653,8 +569,8 @@ gen8_emit_media_objects_spin(struct intel_batchbuffer *batch)
 	OUT_BATCH(0);
 
 	/* inline data (xoffset, yoffset) */
-	OUT_BATCH(0);
-	OUT_BATCH(0);
+	OUT_BATCH(xoffset);
+	OUT_BATCH(yoffset);
 	if (AT_LEAST_GEN(batch->devid, 8) && !IS_CHERRYVIEW(batch->devid))
 		gen8_emit_media_state_flush(batch);
 }

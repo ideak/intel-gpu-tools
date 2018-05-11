@@ -68,10 +68,9 @@ void
 gen7_emit_state_base_address(struct intel_batchbuffer *batch);
 
 void
-gen7_emit_vfe_state(struct intel_batchbuffer *batch);
-
-void
-gen7_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch);
+gen7_emit_vfe_state(struct intel_batchbuffer *batch, uint32_t threads,
+		    uint32_t urb_entries, uint32_t urb_size,
+		    uint32_t curbe_size, uint32_t mode);
 
 void
 gen7_emit_curbe_load(struct intel_batchbuffer *batch, uint32_t curbe_buffer);
@@ -112,13 +111,9 @@ void
 gen8_emit_media_state_flush(struct intel_batchbuffer *batch);
 
 void
-gen8_emit_vfe_state(struct intel_batchbuffer *batch);
-
-void
-gen8_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch);
-
-void
-gen8_emit_vfe_state_spin(struct intel_batchbuffer *batch);
+gen8_emit_vfe_state(struct intel_batchbuffer *batch, uint32_t threads,
+		    uint32_t urb_entries, uint32_t urb_size,
+		    uint32_t curbe_size);
 
 void
 gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
@@ -126,7 +121,8 @@ gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
 		     unsigned int width, unsigned int height);
 
 void
-gen8_emit_media_objects_spin(struct intel_batchbuffer *batch);
+gen_emit_media_object(struct intel_batchbuffer *batch, unsigned int xoffset,
+		  unsigned int yoffset);
 
 void
 gen9_emit_state_base_address(struct intel_batchbuffer *batch);

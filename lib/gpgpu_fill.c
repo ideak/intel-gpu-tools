@@ -95,6 +95,13 @@ static const uint32_t gen9_gpgpu_kernel[][4] = {
  */
 
 #define BATCH_STATE_SPLIT 2048
+/* VFE STATE params */
+#define THREADS 1
+#define GEN7_GPGPU_URB_ENTRIES 0
+#define GEN8_GPGPU_URB_ENTRIES 1
+#define GPGPU_URB_SIZE 0
+#define GPGPU_CURBE_SIZE 1
+#define GEN7_VFE_STATE_GPGPU_MODE 1
 
 void
 gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
@@ -129,7 +136,9 @@ gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	OUT_BATCH(GEN7_PIPELINE_SELECT | PIPELINE_SELECT_GPGPU);
 
 	gen7_emit_state_base_address(batch);
-	gen7_emit_vfe_state_gpgpu(batch);
+	gen7_emit_vfe_state(batch, THREADS, GEN7_GPGPU_URB_ENTRIES,
+			    GPGPU_URB_SIZE, GPGPU_CURBE_SIZE,
+			    GEN7_VFE_STATE_GPGPU_MODE);
 	gen7_emit_curbe_load(batch, curbe_buffer);
 	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
 	gen7_emit_gpgpu_walk(batch, x, y, width, height);
@@ -176,7 +185,8 @@ gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	OUT_BATCH(GEN7_PIPELINE_SELECT | PIPELINE_SELECT_GPGPU);
 
 	gen8_emit_state_base_address(batch);
-	gen8_emit_vfe_state_gpgpu(batch);
+	gen8_emit_vfe_state(batch, THREADS, GEN8_GPGPU_URB_ENTRIES,
+			    GPGPU_URB_SIZE, GPGPU_CURBE_SIZE);
 	gen7_emit_curbe_load(batch, curbe_buffer);
 	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
 	gen8_emit_gpgpu_walk(batch, x, y, width, height);
@@ -224,7 +234,8 @@ gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 		  PIPELINE_SELECT_GPGPU);
 
 	gen9_emit_state_base_address(batch);
-	gen8_emit_vfe_state_gpgpu(batch);
+	gen8_emit_vfe_state(batch, THREADS, GEN8_GPGPU_URB_ENTRIES,
+			    GPGPU_URB_SIZE, GPGPU_CURBE_SIZE);
 	gen7_emit_curbe_load(batch, curbe_buffer);
 	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
 	gen8_emit_gpgpu_walk(batch, x, y, width, height);

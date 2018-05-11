@@ -67,6 +67,17 @@ static const uint32_t spin_kernel[][4] = {
  */
 
 #define BATCH_STATE_SPLIT 2048
+/* VFE STATE params */
+#define THREADS 0
+#define MEDIA_URB_ENTRIES 2
+#define MEDIA_URB_SIZE 2
+#define MEDIA_CURBE_SIZE 2
+
+/* Offsets needed in gen_emit_media_object. In media_spin library this
+ * values do not matter.
+ */
+#define xoffset 0
+#define yoffset 0
 
 void
 gen8_media_spinfunc(struct intel_batchbuffer *batch,
@@ -90,13 +101,14 @@ gen8_media_spinfunc(struct intel_batchbuffer *batch,
 	OUT_BATCH(GEN8_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA);
 	gen8_emit_state_base_address(batch);
 
-	gen8_emit_vfe_state_spin(batch);
+	gen8_emit_vfe_state(batch, THREADS, MEDIA_URB_ENTRIES,
+			    MEDIA_URB_SIZE, MEDIA_CURBE_SIZE);
 
 	gen7_emit_curbe_load(batch, curbe_buffer);
 
 	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
 
-	gen8_emit_media_objects_spin(batch);
+	gen_emit_media_object(batch, xoffset, yoffset);
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);
 
@@ -134,13 +146,14 @@ gen9_media_spinfunc(struct intel_batchbuffer *batch,
 		  GEN9_FORCE_MEDIA_AWAKE_MASK);
 	gen9_emit_state_base_address(batch);
 
-	gen8_emit_vfe_state_spin(batch);
+	gen8_emit_vfe_state(batch, THREADS, MEDIA_URB_ENTRIES,
+			    MEDIA_URB_SIZE, MEDIA_CURBE_SIZE);
 
 	gen7_emit_curbe_load(batch, curbe_buffer);
 
 	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
 
-	gen8_emit_media_objects_spin(batch);
+	gen_emit_media_object(batch, xoffset, yoffset);
 
 	OUT_BATCH(GEN8_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA |
 		  GEN9_FORCE_MEDIA_AWAKE_DISABLE |
