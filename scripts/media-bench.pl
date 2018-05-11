@@ -162,6 +162,21 @@ sub run_workload
 	return ($time, $wps);
 }
 
+sub dump_cmd
+{
+	my ($cmd, $file) = @_;
+
+	show_cmd("$cmd > $file");
+
+	open FOUT, '>', $file or die;
+	open TIN, "$cmd |" or die;
+	while (<TIN>) {
+		print FOUT $_;
+	}
+	close TIN;
+	close FOUT;
+}
+
 sub trace_workload
 {
 	my ($wrk, $b, $r, $c) = @_;
@@ -212,15 +227,12 @@ sub trace_workload
 	$b =~ s/[ <>]/_/g;
 	$file = "${wrk}_${b}_-r${r}_-c${c}";
 
-	$cmd = "perf script > ${file}.trace";
-	show_cmd($cmd);
-	system($cmd) == 0 or die;
+	dump_cmd('perf script', "${file}.trace");
 
 	$cmd = "perf script | $tracepl --html -x ctxsave -s -c ";
 	$cmd .= join ' ', map("-i $_", @skip_engine);
-	$cmd .= " > ${file}.html";
-	show_cmd($cmd);
-	system($cmd) == 0 or die;
+
+	dump_cmd($cmd, "${file}.html");
 
 	return \%engines;
 }
