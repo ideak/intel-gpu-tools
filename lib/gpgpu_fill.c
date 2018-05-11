@@ -112,9 +112,8 @@ gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
 
 	/*
-	 * const buffer needs to fill for every thread, but as we have just 1 thread
-	 * per every group, so need only one curbe data.
-	 *
+	 * const buffer needs to fill for every thread, but as we have just 1
+	 * thread per every group, so need only one curbe data.
 	 * For each thread, just use thread group ID for buffer offset.
 	 */
 	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
@@ -160,9 +159,8 @@ gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
 
 	/*
-	 * const buffer needs to fill for every thread, but as we have just 1 thread
-	 * per every group, so need only one curbe data.
-	 *
+	 * const buffer needs to fill for every thread, but as we have just 1
+	 * thread per every group, so need only one curbe data.
 	 * For each thread, just use thread group ID for buffer offset.
 	 */
 	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
@@ -208,9 +206,8 @@ gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
 
 	/*
-	 * const buffer needs to fill for every thread, but as we have just 1 thread
-	 * per every group, so need only one curbe data.
-	 *
+	 * const buffer needs to fill for every thread, but as we have just 1
+	 * thread per every group, so need only one curbe data.
 	 * For each thread, just use thread group ID for buffer offset.
 	 */
 	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);

@@ -32,13 +32,13 @@ gen7_render_flush(struct intel_batchbuffer *batch, uint32_t batch_end)
 	ret = drm_intel_bo_subdata(batch->bo, 0, 4096, batch->buffer);
 	if (ret == 0)
 		ret = drm_intel_bo_mrb_exec(batch->bo, batch_end,
-					NULL, 0, 0, 0);
+					    NULL, 0, 0, 0);
 	igt_assert(ret == 0);
 }
 
 uint32_t
 gen7_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
-			uint8_t color)
+			    uint8_t color)
 {
 	uint8_t *curbe_buffer;
 	uint32_t offset;
@@ -132,8 +132,9 @@ gen7_fill_kernel(struct intel_batchbuffer *batch,
 }
 
 uint32_t
-gen7_fill_interface_descriptor(struct intel_batchbuffer *batch, struct igt_buf *dst,
-			       const uint32_t kernel[][4], size_t size)
+gen7_fill_interface_descriptor(struct intel_batchbuffer *batch,
+			       struct igt_buf *dst, const uint32_t kernel[][4],
+			       size_t size)
 {
 	struct gen7_interface_descriptor_data *idd;
 	uint32_t offset;
@@ -171,16 +172,19 @@ gen7_emit_state_base_address(struct intel_batchbuffer *batch)
 	OUT_BATCH(0);
 
 	/* surface */
-	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0, BASE_ADDRESS_MODIFY);
+	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0,
+		  BASE_ADDRESS_MODIFY);
 
 	/* dynamic */
-	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0, BASE_ADDRESS_MODIFY);
+	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0,
+		  BASE_ADDRESS_MODIFY);
 
 	/* indirect */
 	OUT_BATCH(0);
 
 	/* instruction */
-	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0, BASE_ADDRESS_MODIFY);
+	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0,
+		  BASE_ADDRESS_MODIFY);
 
 	/* general/dynamic/indirect/instruction access Bound */
 	OUT_BATCH(0);
@@ -204,8 +208,8 @@ gen7_emit_vfe_state(struct intel_batchbuffer *batch)
 	OUT_BATCH(0);
 
 	/* urb entry size & curbe size */
-	OUT_BATCH(2 << 16 | 	/* in 256 bits unit */
-		2);		/* in 256 bits unit */
+	OUT_BATCH(2 << 16 |	/* in 256 bits unit */
+		  2);		/* in 256 bits unit */
 
 	/* scoreboard */
 	OUT_BATCH(0);
@@ -229,7 +233,7 @@ gen7_emit_vfe_state_gpgpu(struct intel_batchbuffer *batch)
 	OUT_BATCH(0);
 
 	/* urb entry size & curbe size */
-	OUT_BATCH(0 << 16 | 	/* URB entry size in 256 bits unit */
+	OUT_BATCH(0 << 16 |	/* URB entry size in 256 bits unit */
 		  1);		/* CURBE entry size in 256 bits unit */
 
 	/* scoreboard */
@@ -250,7 +254,8 @@ gen7_emit_curbe_load(struct intel_batchbuffer *batch, uint32_t curbe_buffer)
 }
 
 void
-gen7_emit_interface_descriptor_load(struct intel_batchbuffer *batch, uint32_t interface_descriptor)
+gen7_emit_interface_descriptor_load(struct intel_batchbuffer *batch,
+				    uint32_t interface_descriptor)
 {
 	OUT_BATCH(GEN7_MEDIA_INTERFACE_DESCRIPTOR_LOAD | (4 - 2));
 	OUT_BATCH(0);
@@ -259,14 +264,16 @@ gen7_emit_interface_descriptor_load(struct intel_batchbuffer *batch, uint32_t in
 		OUT_BATCH(sizeof(struct gen7_interface_descriptor_data));
 	else
 		OUT_BATCH(sizeof(struct gen8_interface_descriptor_data));
-	/* interface descriptor address, is relative to the dynamics base address */
+	/* interface descriptor address, is relative to the dynamics base
+	 * address
+	 */
 	OUT_BATCH(interface_descriptor);
 }
 
 void
 gen7_emit_media_objects(struct intel_batchbuffer *batch,
-			unsigned x, unsigned y,
-			unsigned width, unsigned height)
+			unsigned int x, unsigned int y,
+			unsigned int width, unsigned int height)
 {
 	int i, j;
 
@@ -288,7 +295,8 @@ gen7_emit_media_objects(struct intel_batchbuffer *batch,
 			/* inline data (xoffset, yoffset) */
 			OUT_BATCH(x + i * 16);
 			OUT_BATCH(y + j * 16);
-			if (AT_LEAST_GEN(batch->devid, 8) && !IS_CHERRYVIEW(batch->devid))
+			if (AT_LEAST_GEN(batch->devid, 8) &&
+			    !IS_CHERRYVIEW(batch->devid))
 				gen8_emit_media_state_flush(batch);
 		}
 	}
@@ -296,8 +304,8 @@ gen7_emit_media_objects(struct intel_batchbuffer *batch,
 
 void
 gen7_emit_gpgpu_walk(struct intel_batchbuffer *batch,
-		     unsigned x, unsigned y,
-		     unsigned width, unsigned height)
+		     unsigned int x, unsigned int y,
+		     unsigned int width, unsigned int height)
 {
 	uint32_t x_dim, y_dim, tmp, right_mask;
 
@@ -400,8 +408,7 @@ gen8_fill_surface_state(struct intel_batchbuffer *batch,
 
 	ret = drm_intel_bo_emit_reloc(batch->bo,
 				intel_batchbuffer_subdata_offset(batch, ss) + 8 * 4,
-				buf->bo, 0,
-				read_domain, write_domain);
+				buf->bo, 0, read_domain, write_domain);
 	igt_assert(ret == 0);
 
 	ss->ss2.height = igt_buf_height(buf) - 1;
@@ -417,7 +424,9 @@ gen8_fill_surface_state(struct intel_batchbuffer *batch,
 }
 
 uint32_t
-gen8_fill_interface_descriptor(struct intel_batchbuffer *batch, struct igt_buf *dst,  const uint32_t kernel[][4], size_t size)
+gen8_fill_interface_descriptor(struct intel_batchbuffer *batch,
+			       struct igt_buf *dst, const uint32_t kernel[][4],
+			       size_t size)
 {
 	struct gen8_interface_descriptor_data *idd;
 	uint32_t offset;
@@ -464,15 +473,17 @@ gen8_emit_state_base_address(struct intel_batchbuffer *batch)
 	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_SAMPLER, 0, BASE_ADDRESS_MODIFY);
 
 	/* dynamic */
-	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION,
-		0, BASE_ADDRESS_MODIFY);
+	OUT_RELOC(batch->bo,
+		  I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION,
+		  0, BASE_ADDRESS_MODIFY);
 
 	/* indirect */
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 
 	/* instruction */
-	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0, BASE_ADDRESS_MODIFY);
+	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0,
+		  BASE_ADDRESS_MODIFY);
 
 	/* general state buffer size */
 	OUT_BATCH(0xfffff000 | 1);
@@ -480,7 +491,9 @@ gen8_emit_state_base_address(struct intel_batchbuffer *batch)
 	OUT_BATCH(1 << 12 | 1);
 	/* indirect object buffer size */
 	OUT_BATCH(0xfffff000 | 1);
-	/* intruction buffer size, must set modify enable bit, otherwise it may result in GPU hang */
+	/* instruction buffer size, must set modify enable bit, otherwise it may
+	 * result in GPU hang
+	 */
 	OUT_BATCH(1 << 12 | 1);
 }
 
@@ -565,8 +578,8 @@ gen8_emit_vfe_state_spin(struct intel_batchbuffer *batch)
 
 void
 gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
-		     unsigned x, unsigned y,
-		     unsigned width, unsigned height)
+		     unsigned int x, unsigned int y,
+		     unsigned int width, unsigned int height)
 {
 	uint32_t x_dim, y_dim, tmp, right_mask;
 
@@ -662,15 +675,17 @@ gen9_emit_state_base_address(struct intel_batchbuffer *batch)
 	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_SAMPLER, 0, BASE_ADDRESS_MODIFY);
 
 	/* dynamic */
-	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION,
-		0, BASE_ADDRESS_MODIFY);
+	OUT_RELOC(batch->bo,
+		  I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION,
+		  0, BASE_ADDRESS_MODIFY);
 
 	/* indirect */
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 
 	/* instruction */
-	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0, BASE_ADDRESS_MODIFY);
+	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_INSTRUCTION, 0,
+		  BASE_ADDRESS_MODIFY);
 
 	/* general state buffer size */
 	OUT_BATCH(0xfffff000 | 1);
@@ -678,7 +693,9 @@ gen9_emit_state_base_address(struct intel_batchbuffer *batch)
 	OUT_BATCH(1 << 12 | 1);
 	/* indirect object buffer size */
 	OUT_BATCH(0xfffff000 | 1);
-	/* intruction buffer size, must set modify enable bit, otherwise it may result in GPU hang */
+	/* intruction buffer size, must set modify enable bit, otherwise it may
+	 * result in GPU hang
+	 */
 	OUT_BATCH(1 << 12 | 1);
 
 	/* Bindless surface state base address */

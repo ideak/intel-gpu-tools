@@ -60,8 +60,9 @@ gen7_fill_kernel(struct intel_batchbuffer *batch,
 		size_t size);
 
 uint32_t
-gen7_fill_interface_descriptor(struct intel_batchbuffer *batch, struct igt_buf *dst,
-			       const uint32_t kernel[][4], size_t size);
+gen7_fill_interface_descriptor(struct intel_batchbuffer *batch,
+			       struct igt_buf *dst, const uint32_t kernel[][4],
+			       size_t size);
 
 void
 gen7_emit_state_base_address(struct intel_batchbuffer *batch);
@@ -76,17 +77,18 @@ void
 gen7_emit_curbe_load(struct intel_batchbuffer *batch, uint32_t curbe_buffer);
 
 void
-gen7_emit_interface_descriptor_load(struct intel_batchbuffer *batch, uint32_t interface_descriptor);
+gen7_emit_interface_descriptor_load(struct intel_batchbuffer *batch,
+				    uint32_t interface_descriptor);
 
 void
 gen7_emit_media_objects(struct intel_batchbuffer *batch,
-			unsigned x, unsigned y,
-			unsigned width, unsigned height);
+			unsigned int x, unsigned int y,
+			unsigned int width, unsigned int height);
 
 void
 gen7_emit_gpgpu_walk(struct intel_batchbuffer *batch,
-		     unsigned x, unsigned y,
-		     unsigned width, unsigned height);
+		     unsigned int x, unsigned int y,
+		     unsigned int width, unsigned int height);
 
 uint32_t
 gen8_spin_curbe_buffer_data(struct intel_batchbuffer *batch,
@@ -99,7 +101,9 @@ gen8_fill_surface_state(struct intel_batchbuffer *batch,
 			int is_dst);
 
 uint32_t
-gen8_fill_interface_descriptor(struct intel_batchbuffer *batch, struct igt_buf *dst,  const uint32_t kernel[][4], size_t size);
+gen8_fill_interface_descriptor(struct intel_batchbuffer *batch,
+			       struct igt_buf *dst, const uint32_t kernel[][4],
+			       size_t size);
 
 void
 gen8_emit_state_base_address(struct intel_batchbuffer *batch);
@@ -118,8 +122,8 @@ gen8_emit_vfe_state_spin(struct intel_batchbuffer *batch);
 
 void
 gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
-		     unsigned x, unsigned y,
-		     unsigned width, unsigned height);
+		     unsigned int x, unsigned int y,
+		     unsigned int width, unsigned int height);
 
 void
 gen8_emit_media_objects_spin(struct intel_batchbuffer *batch);

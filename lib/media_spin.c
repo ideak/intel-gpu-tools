@@ -81,7 +81,8 @@ gen8_media_spinfunc(struct intel_batchbuffer *batch,
 	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
 
 	curbe_buffer = gen8_spin_curbe_buffer_data(batch, spins);
-	interface_descriptor = gen8_fill_interface_descriptor(batch, dst, spin_kernel, sizeof(spin_kernel));
+	interface_descriptor = gen8_fill_interface_descriptor(batch, dst,
+					      spin_kernel, sizeof(spin_kernel));
 	igt_assert(batch->ptr < &batch->buffer[4095]);
 
 	/* media pipeline */
@@ -119,17 +120,18 @@ gen9_media_spinfunc(struct intel_batchbuffer *batch,
 	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
 
 	curbe_buffer = gen8_spin_curbe_buffer_data(batch, spins);
-	interface_descriptor = gen8_fill_interface_descriptor(batch, dst, spin_kernel, sizeof(spin_kernel));
+	interface_descriptor = gen8_fill_interface_descriptor(batch, dst,
+					      spin_kernel, sizeof(spin_kernel));
 	igt_assert(batch->ptr < &batch->buffer[4095]);
 
 	/* media pipeline */
 	batch->ptr = batch->buffer;
 	OUT_BATCH(GEN8_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA |
-			GEN9_FORCE_MEDIA_AWAKE_ENABLE |
-			GEN9_SAMPLER_DOP_GATE_DISABLE |
-			GEN9_PIPELINE_SELECTION_MASK |
-			GEN9_SAMPLER_DOP_GATE_MASK |
-			GEN9_FORCE_MEDIA_AWAKE_MASK);
+		  GEN9_FORCE_MEDIA_AWAKE_ENABLE |
+		  GEN9_SAMPLER_DOP_GATE_DISABLE |
+		  GEN9_PIPELINE_SELECTION_MASK |
+		  GEN9_SAMPLER_DOP_GATE_MASK |
+		  GEN9_FORCE_MEDIA_AWAKE_MASK);
 	gen9_emit_state_base_address(batch);
 
 	gen8_emit_vfe_state_spin(batch);
@@ -141,11 +143,11 @@ gen9_media_spinfunc(struct intel_batchbuffer *batch,
 	gen8_emit_media_objects_spin(batch);
 
 	OUT_BATCH(GEN8_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA |
-			GEN9_FORCE_MEDIA_AWAKE_DISABLE |
-			GEN9_SAMPLER_DOP_GATE_ENABLE |
-			GEN9_PIPELINE_SELECTION_MASK |
-			GEN9_SAMPLER_DOP_GATE_MASK |
-			GEN9_FORCE_MEDIA_AWAKE_MASK);
+		  GEN9_FORCE_MEDIA_AWAKE_DISABLE |
+		  GEN9_SAMPLER_DOP_GATE_ENABLE |
+		  GEN9_PIPELINE_SELECTION_MASK |
+		  GEN9_SAMPLER_DOP_GATE_MASK |
+		  GEN9_FORCE_MEDIA_AWAKE_MASK);
 
 	OUT_BATCH(MI_BATCH_BUFFER_END);
 
