@@ -90,17 +90,13 @@ static void single(const char *name, bool all_engines)
 {
 	struct drm_i915_gem_exec_object2 *obj;
 	struct drm_i915_gem_relocation_entry *reloc;
-	unsigned engines[16];
-	uint64_t size;
-	uint32_t *ctx, *map, scratch;
-	unsigned num_ctx;
-	int fd, gen, num_engines;
+	unsigned int engines[16], num_engines, num_ctx;
+	uint32_t *ctx, *map, scratch, size;
+	int fd, gen;
 #define MAX_LOOP 16
 
-	fd = drm_open_driver_master(DRIVER_INTEL);
+	fd = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(fd);
-	igt_require(gem_can_store_dword(fd, 0));
-
 	gem_require_contexts(fd);
 
 	gen = intel_gen(intel_get_drm_devid(fd));
@@ -108,54 +104,77 @@ static void single(const char *name, bool all_engines)
 	num_engines = 0;
 	if (all_engines) {
 		unsigned engine;
+
 		for_each_physical_engine(fd, engine) {
+			if (!gem_can_store_dword(fd, engine))
+				continue;
+
 			engines[num_engines++] = engine;
 			if (num_engines == ARRAY_SIZE(engines))
 				break;
 		}
-	} else
+	} else {
+		igt_require(gem_can_store_dword(fd, 0));
 		engines[num_engines++] = 0;
+	}
+	igt_require(num_engines);
 
 	num_ctx = get_num_contexts(fd, num_engines);
 
 	size = ALIGN(num_ctx * sizeof(uint32_t), 4096);
-	scratch = gem_create(fd, ALIGN(num_ctx * sizeof(uint32_t), 4096));
+	scratch = gem_create(fd, size);
 	gem_set_caching(fd, scratch, I915_CACHING_CACHED);
-	obj = calloc(num_ctx, 2 * sizeof(*obj));
-	reloc = calloc(num_ctx, sizeof(*reloc));
+	obj = calloc(num_ctx, 3 * sizeof(*obj));
+	reloc = calloc(num_ctx, 2 * sizeof(*reloc));
 
 	ctx = malloc(num_ctx * sizeof(uint32_t));
 	igt_assert(ctx);
 	for (unsigned n = 0; n < num_ctx; n++) {
 		ctx[n] = gem_context_create(fd);
-		obj[2*n + 0].handle = scratch;
 
-		reloc[n].target_handle = scratch;
-		reloc[n].presumed_offset = 0;
-		reloc[n].offset = sizeof(uint32_t);
-		reloc[n].delta = n * sizeof(uint32_t);
-		reloc[n].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-		reloc[n].write_domain = 0; /* lies! */
+		obj[3*n + 0].handle = gem_create(fd, 4096);
+		reloc[2*n + 0].target_handle = obj[3*n + 0].handle;
+		reloc[2*n + 0].presumed_offset = 0;
+		reloc[2*n + 0].offset = 4000;
+		reloc[2*n + 0].delta = 0;
+		reloc[2*n + 0].read_domains = I915_GEM_DOMAIN_RENDER;
+		reloc[2*n + 0].write_domain = I915_GEM_DOMAIN_RENDER;
+
+		obj[3*n + 1].handle = scratch;
+		reloc[2*n + 1].target_handle = scratch;
+		reloc[2*n + 1].presumed_offset = 0;
+		reloc[2*n + 1].offset = sizeof(uint32_t);
+		reloc[2*n + 1].delta = n * sizeof(uint32_t);
+		reloc[2*n + 1].read_domains = I915_GEM_DOMAIN_RENDER;
+		reloc[2*n + 1].write_domain = 0; /* lies! */
 		if (gen >= 4 && gen < 8)
-			reloc[n].offset += sizeof(uint32_t);
+			reloc[2*n + 1].offset += sizeof(uint32_t);
 
-		obj[2*n + 1].relocs_ptr = to_user_pointer(&reloc[n]);
-		obj[2*n + 1].relocation_count = 1;
+		obj[3*n + 2].relocs_ptr = to_user_pointer(&reloc[2*n]);
+		obj[3*n + 2].relocation_count = 2;
 	}
 
 	map = gem_mmap__cpu(fd, scratch, 0, size, PROT_WRITE);
-	for (unsigned loop = 1; loop <= MAX_LOOP; loop <<= 1) {
-		unsigned count = loop * num_ctx;
+	for (unsigned int loop = 1; loop <= MAX_LOOP; loop <<= 1) {
+		const unsigned int count = loop * num_ctx;
 		uint32_t *all;
 
 		all = malloc(count * sizeof(uint32_t));
-		for (unsigned n = 0; n < count; n++)
+		for (unsigned int n = 0; n < count; n++)
 			all[n] = ctx[n % num_ctx];
 		igt_permute_array(all, count, xchg_int);
-		for (unsigned n = 0; n < count; n++) {
-			struct drm_i915_gem_execbuffer2 execbuf;
-			unsigned r = n % num_ctx;
-			uint64_t offset = reloc[r].presumed_offset + reloc[r].delta;
+
+		for (unsigned int n = 0; n < count; n++) {
+			const unsigned int r = n % num_ctx;
+			struct drm_i915_gem_execbuffer2 execbuf = {
+				.buffers_ptr = to_user_pointer(&obj[3*r]),
+				.buffer_count = 3,
+				.flags = engines[n % num_engines],
+				.rsvd1 = all[n],
+			};
+			uint64_t offset =
+				reloc[2*r + 1].presumed_offset +
+				reloc[2*r + 1].delta;
 			uint32_t handle = gem_create(fd, 4096);
 			uint32_t buf[16];
 			int i;
@@ -176,27 +195,22 @@ static void single(const char *name, bool all_engines)
 			buf[++i] = all[n];
 			buf[++i] = MI_BATCH_BUFFER_END;
 			gem_write(fd, handle, 0, buf, sizeof(buf));
-			obj[2*r + 1].handle = handle;
+			obj[3*r + 2].handle = handle;
 
-			memset(&execbuf, 0, sizeof(execbuf));
-			execbuf.buffers_ptr = to_user_pointer(&obj[2*r]);
-			execbuf.buffer_count = 2;
-			execbuf.flags = engines[n % num_engines];
-			execbuf.rsvd1 = all[n];
 			gem_execbuf(fd, &execbuf);
 			gem_close(fd, handle);
 		}
 
-		/* Note we lied about the write-domain when writing from the
+		/*
+		 * Note we lied about the write-domain when writing from the
 		 * GPU (in order to avoid inter-ring synchronisation), so now
 		 * we have to force the synchronisation here.
 		 */
 		gem_set_domain(fd, scratch,
 			       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
-		for (unsigned n = count - num_ctx; n < count; n++)
+		for (unsigned int n = count - num_ctx; n < count; n++)
 			igt_assert_eq(map[n % num_ctx], all[n]);
 		free(all);
-		igt_progress(name, loop, MAX_LOOP);
 	}
 	munmap(map, size);
 
