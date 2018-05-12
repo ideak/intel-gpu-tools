@@ -44,7 +44,8 @@
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
 
-#define INTERRUPTIBLE 1
+#define INTERRUPTIBLE 0x1
+#define QUEUE 0x2
 
 static double elapsed(const struct timespec *start, const struct timespec *end)
 {
@@ -126,8 +127,12 @@ static void single(int fd, uint32_t handle,
 
 	gem_require_ring(fd, e->exec_id | e->flags);
 
-	for (n = 0; n < 64; n++)
-		contexts[n] = gem_context_create(fd);
+	for (n = 0; n < 64; n++) {
+		if (flags & QUEUE)
+			contexts[n] = gem_queue_create(fd);
+		else
+			contexts[n] = gem_context_create(fd);
+	}
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = handle;
@@ -232,8 +237,12 @@ static void all(int fd, uint32_t handle, unsigned flags, int timeout)
 	}
 	igt_require(nengine);
 
-	for (n = 0; n < ARRAY_SIZE(contexts); n++)
-		contexts[n] = gem_context_create(fd);
+	for (n = 0; n < ARRAY_SIZE(contexts); n++) {
+		if (flags & QUEUE)
+			contexts[n] = gem_queue_create(fd);
+		else
+			contexts[n] = gem_context_create(fd);
+	}
 
 	memset(obj, 0, sizeof(obj));
 	obj[1].handle = handle;
@@ -298,6 +307,17 @@ igt_main
 {
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	const struct intel_execution_engine *e;
+	static const struct {
+		const char *name;
+		unsigned int flags;
+		bool (*require)(int fd);
+	} phases[] = {
+		{ "", 0, NULL },
+		{ "-interruptible", INTERRUPTIBLE, NULL },
+		{ "-queue", QUEUE, gem_has_queues },
+		{ "-queue-interruptible", QUEUE | INTERRUPTIBLE, gem_has_queues },
+		{ }
+	};
 	uint32_t light = 0, heavy;
 	int fd = -1;
 
@@ -319,27 +339,42 @@ igt_main
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("%s%s", e->exec_id == 0 ? "basic-" : "", e->name)
-			single(fd, light, e, 0, 1, 5);
+		for (typeof(*phases) *p = phases; p->name; p++) {
+			igt_subtest_group {
+				igt_fixture {
+					if (p->require)
+						igt_require(p->require(fd));
+				}
 
-		igt_skip_on_simulation();
+				igt_subtest_f("%s%s%s", e->exec_id == 0 ? "basic-" : "", e->name, p->name)
+					single(fd, light, e, p->flags, 1, 5);
 
-		igt_subtest_f("%s%s-heavy", e->exec_id == 0 ? "basic-" : "", e->name)
-			single(fd, heavy, e, 0, 1, 5);
-		igt_subtest_f("%s-interruptible", e->name)
-			single(fd, light, e, INTERRUPTIBLE, 1, 150);
-		igt_subtest_f("forked-%s", e->name)
-			single(fd, light, e, 0, ncpus, 150);
-		igt_subtest_f("forked-%s-heavy", e->name)
-			single(fd, heavy, e, 0, ncpus, 150);
-		igt_subtest_f("forked-%s-interruptible", e->name)
-			single(fd, light, e, INTERRUPTIBLE, ncpus, 150);
+				igt_skip_on_simulation();
+
+				igt_subtest_f("%s%s-heavy%s", e->exec_id == 0 ? "basic-" : "", e->name, p->name)
+					single(fd, heavy, e, p->flags, 1, 5);
+				igt_subtest_f("forked-%s%s", e->name, p->name)
+					single(fd, light, e, p->flags, ncpus, 150);
+				igt_subtest_f("forked-%s-heavy%s", e->name, p->name)
+					single(fd, heavy, e, p->flags, ncpus, 150);
+			}
+		}
 	}
 
 	igt_subtest("basic-all-light")
 		all(fd, light, 0, 5);
 	igt_subtest("basic-all-heavy")
 		all(fd, heavy, 0, 5);
+
+	igt_subtest_group {
+		igt_fixture {
+			igt_require(gem_has_queues(fd));
+		}
+		igt_subtest("basic-queue-light")
+			all(fd, light, QUEUE, 5);
+		igt_subtest("basic-queue-heavy")
+			all(fd, heavy, QUEUE, 5);
+	}
 
 	igt_fixture {
 		igt_stop_hang_detector();
