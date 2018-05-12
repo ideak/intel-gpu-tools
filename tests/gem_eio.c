@@ -250,6 +250,52 @@ static int __check_wait(int fd, uint32_t bo, unsigned int wait)
 	return ret;
 }
 
+static void __test_banned(int fd)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(fd, 4096),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+	};
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned long count = 0;
+
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+	gem_quiescent_gpu(fd);
+	igt_require(i915_reset_control(true));
+
+	igt_until_timeout(5) {
+		igt_spin_t *hang;
+
+		if (__gem_execbuf(fd, &execbuf) == -EIO) {
+			igt_info("Banned after causing %lu hangs\n", count);
+			igt_assert(count > 1);
+			return;
+		}
+
+		/* Trigger a reset, making sure we are detected as guilty */
+		hang = spin_sync(fd, 0, 0);
+		trigger_reset(fd);
+		igt_spin_batch_free(fd, hang);
+
+		count++;
+	}
+
+	igt_assert_f(false,
+		     "Ran for 5s, %lu hangs without being banned\n",
+		     count);
+}
+
+static void test_banned(int fd)
+{
+	fd = gem_reopen_driver(fd);
+	__test_banned(fd);
+	close(fd);
+}
+
 #define TEST_WEDGE (1)
 
 static void test_wait(int fd, unsigned int flags, unsigned int wait)
@@ -692,6 +738,9 @@ igt_main
 
 	igt_subtest("execbuf")
 		test_execbuf(fd);
+
+	igt_subtest("banned")
+		test_banned(fd);
 
 	igt_subtest("suspend")
 		test_suspend(fd, SUSPEND_STATE_MEM);
