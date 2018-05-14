@@ -53,6 +53,7 @@ struct gem_busyspin {
 	pthread_t thread;
 	unsigned long count;
 	bool leak;
+	bool interrupts;
 };
 
 struct sys_wait {
@@ -94,7 +95,7 @@ static void *gem_busyspin(void *arg)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct gem_busyspin *bs = arg;
 	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 obj;
+	struct drm_i915_gem_exec_object2 obj[2];
 	const unsigned sz = bs->leak ? 16 << 20 : 4 << 10;
 	unsigned engines[16];
 	unsigned nengine;
@@ -107,13 +108,20 @@ static void *gem_busyspin(void *arg)
 	for_each_engine(fd, engine)
 		if (!ignore_engine(fd, engine)) engines[nengine++] = engine;
 
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, sz);
-	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = gem_create(fd, 4096);
+	obj[0].flags = EXEC_OBJECT_WRITE;
+	obj[1].handle = gem_create(fd, sz);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)&obj;
-	execbuf.buffer_count = 1;
+	if (bs->interrupts) {
+		execbuf.buffers_ptr = (uintptr_t)&obj[0];
+		execbuf.buffer_count = 2;
+	} else {
+		execbuf.buffers_ptr = (uintptr_t)&obj[1];
+		execbuf.buffer_count = 1;
+	}
 	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 	if (__gem_execbuf(fd, &execbuf)) {
@@ -129,9 +137,9 @@ static void *gem_busyspin(void *arg)
 		}
 		bs->count += nengine;
 		if (bs->leak) {
-			gem_madvise(fd, obj.handle, I915_MADV_DONTNEED);
-			obj.handle = gem_create(fd, sz);
-			gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+			gem_madvise(fd, obj[1].handle, I915_MADV_DONTNEED);
+			obj[1].handle = gem_create(fd, sz);
+			gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 		}
 	}
 
@@ -305,12 +313,16 @@ int main(int argc, char **argv)
 	int field = -1;
 	int enable_gem_sysbusy = 1;
 	bool leak = false;
+	bool interrupts = false;
 	int n, c;
 
-	while ((c = getopt(argc, argv, "t:f:bmn")) != -1) {
+	while ((c = getopt(argc, argv, "t:f:bmni")) != -1) {
 		switch (c) {
 		case 'n': /* dry run, measure baseline system latency */
 			enable_gem_sysbusy = 0;
+			break;
+		case 'i': /* interrupts ahoy! */
+			interrupts = true;
 			break;
 		case 't':
 			/* How long to run the benchmark for (seconds) */
@@ -346,6 +358,7 @@ int main(int argc, char **argv)
 		for (n = 0; n < ncpus; n++) {
 			bind_cpu(&attr, n);
 			busy[n].leak = leak;
+			busy[n].interrupts = interrupts;
 			pthread_create(&busy[n].thread, &attr,
 				       gem_busyspin, &busy[n]);
 		}
