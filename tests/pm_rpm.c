@@ -50,6 +50,11 @@
 #include "igt_sysfs.h"
 #include "igt_debugfs.h"
 
+#define MSR_PKG_CST_CONFIG_CONTROL	0xE2
+/* HSW/BDW: */
+#define  PKG_CST_LIMIT_MASK		0xF
+#define  PKG_CST_LIMIT_C8		0x6
+
 #define MSR_PC8_RES	0x630
 #define MSR_PC9_RES	0x631
 #define MSR_PC10_RES	0x632
@@ -138,6 +143,14 @@ static bool supports_pc8_plus_residencies(void)
 	rc = pread(msr_fd, &val, sizeof(uint64_t), MSR_PC10_RES);
 	if (rc != sizeof(val))
 		return false;
+
+	rc = pread(msr_fd, &val, sizeof(uint64_t), MSR_PKG_CST_CONFIG_CONTROL);
+	if (rc != sizeof(val))
+		return false;
+	if ((val & PKG_CST_LIMIT_MASK) < PKG_CST_LIMIT_C8) {
+		igt_info("PKG C-states limited below PC8 by the BIOS\n");
+		return false;
+	}
 
 	return true;
 }
