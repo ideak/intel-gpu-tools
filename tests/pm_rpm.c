@@ -741,7 +741,7 @@ static void pc8_residency_subtest(void)
 
 	/* Make sure PC8+ residencies move! */
 	disable_all_screens(&ms_data);
-	igt_assert_f(pc8_plus_residency_changed(120),
+	igt_assert_f(pc8_plus_residency_changed(30),
 		     "Machine is not reaching PC8+ states, please check its "
 		     "configuration.\n");
 
@@ -770,7 +770,7 @@ static void modeset_subtest(enum screen_type type, int rounds, int wait_flags)
 		if (wait_flags & WAIT_STATUS)
 			igt_assert(wait_for_suspended());
 		if (wait_flags & WAIT_PC8_RES)
-			igt_assert(pc8_plus_residency_changed(120));
+			igt_assert(pc8_plus_residency_changed(30));
 		if (wait_flags & WAIT_EXTRA)
 			sleep(5);
 
@@ -1275,7 +1275,7 @@ static void gem_execbuf_stress_subtest(int rounds, int wait_flags)
 		if (wait_flags & WAIT_STATUS)
 			igt_assert(wait_for_suspended());
 		if (wait_flags & WAIT_PC8_RES)
-			igt_assert(pc8_plus_residency_changed(120));
+			igt_assert(pc8_plus_residency_changed(30));
 		if (wait_flags & WAIT_EXTRA)
 			sleep(5);
 	}
