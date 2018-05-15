@@ -70,9 +70,17 @@ int __igt_device_drop_master(int fd)
  * @fd: the device
  *
  * Tell the kernel we no longer want this device fd to be the DRM master;
- * asserting that we lose the privilege.
+ * asserting that we lose the privilege. Return if we are master already.
  */
 void igt_device_drop_master(int fd)
 {
-	igt_assert_eq(__igt_device_drop_master(fd), 0);
+	/* Check if we are master before dropping */
+	if (__igt_device_set_master(fd))
+		return;
+
+	if (__igt_device_drop_master(fd)) {
+		igt_debugfs_dump(fd, "clients");
+		igt_assert_f(__igt_device_drop_master(fd) == 0,
+			      "Failed to drop DRM master.\n");
+	}
 }
