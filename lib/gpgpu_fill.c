@@ -200,12 +200,13 @@ gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	intel_batchbuffer_reset(batch);
 }
 
-void
-gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-		    struct igt_buf *dst,
-		    unsigned int x, unsigned int y,
-		    unsigned int width, unsigned int height,
-		    uint8_t color)
+static void
+__gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
+		      struct igt_buf *dst,
+		      unsigned int x, unsigned int y,
+		      unsigned int width, unsigned int height,
+		      uint8_t color, const uint32_t kernel[][4],
+		      size_t kernel_size)
 {
 	uint32_t curbe_buffer, interface_descriptor;
 	uint32_t batch_end;
@@ -223,7 +224,7 @@ gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
 
 	interface_descriptor = gen8_fill_interface_descriptor(batch, dst,
-				gen9_gpgpu_kernel, sizeof(gen9_gpgpu_kernel));
+				kernel, kernel_size);
 
 	igt_assert(batch->ptr < &batch->buffer[4095]);
 
@@ -247,4 +248,14 @@ gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 
 	gen7_render_flush(batch, batch_end);
 	intel_batchbuffer_reset(batch);
+}
+
+void gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
+			 struct igt_buf *dst,
+			 unsigned int x, unsigned int y,
+			 unsigned int width, unsigned int height,
+			 uint8_t color)
+{
+	__gen9_gpgpu_fillfunc(batch, dst, x, y, width, height, color,
+			      gen9_gpgpu_kernel, sizeof(gen9_gpgpu_kernel));
 }
