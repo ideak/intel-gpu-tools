@@ -74,7 +74,7 @@
  * functions have all igt_ prefixes. This part is still very much work in
  * progress and so also lacks a bit documentation for the individual functions.
  *
- * Note that this library's header pulls in the [i-g-t framebuffer](intel-gpu-tools-i-g-t-framebuffer.html)
+ * Note that this library's header pulls in the [i-g-t framebuffer](igt-gpu-tools-i-g-t-framebuffer.html)
  * library as a dependency.
  */
 

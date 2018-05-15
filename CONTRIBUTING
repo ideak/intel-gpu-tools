@@ -1,4 +1,4 @@
-Patches to intel-gpu-tools are very much welcome, we really want this to be the
+Patches to igt-gpu-tools are very much welcome, we really want this to be the
 universal set of low-level tools and testcases for the Intel kernel gfx driver
 on Linux and similar platforms. So please bring on porting patches, bugfixes,
 improvements for documentation and new tools and testcases.
@@ -28,7 +28,7 @@ A short list of contribution guidelines:
 
   on its first invocation.
 
-- intel-gpu-tools is MIT licensed and we require contributions to follow the
+- igt-gpu-tools is MIT licensed and we require contributions to follow the
   developer's certificate of origin: http://developercertificate.org/
 
 - When submitting new testcases please follow the naming conventions documented
@@ -44,7 +44,7 @@ A short list of contribution guidelines:
 
 - When patches from new contributors (without commit access) are stuck, for
   anything related to the regular releases, issues with packaging and
-  integrating platform support or any other intel-gpu-tools issues, please
+  integrating platform support or any other igt-gpu-tools issues, please
   contact one of the maintainers (listed in the MAINTAINERS file) and cc the
   igt-dev mailing list.
 

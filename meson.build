@@ -1,4 +1,4 @@
-project('intel-gpu-tools', 'c',
+project('igt-gpu-tools', 'c',
 	version : '1.22',
         default_options: [
           'warning_level=2',
@@ -125,10 +125,10 @@ configure_file(output: 'config.h', install: false, configuration: config)
 
 prefix = get_option('prefix')
 bindir = get_option('bindir')
-datadir = join_paths(get_option('datadir'), 'intel-gpu-tools')
+datadir = join_paths(get_option('datadir'), 'igt-gpu-tools')
 includedir = get_option('includedir')
 libdir = get_option('libdir')
-libexecdir = join_paths(get_option('libexecdir'), 'intel-gpu-tools')
+libexecdir = join_paths(get_option('libexecdir'), 'igt-gpu-tools')
 mandir = get_option('mandir')
 pkgconfigdir = join_paths(libdir, 'pkgconfig')
 

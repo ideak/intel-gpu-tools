@@ -90,6 +90,7 @@ gtk-doc.make
 gtk-doc.m4
 
 intel-gpu-tools-*/
+igt-gpu-tools-*/
 
 piglit
 results

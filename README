@@ -1,18 +1,18 @@
-Intel GPU Tools
-===============
+IGT GPU Tools
+=============
 
 Description
 -----------
 
-Intel GPU Tools is a collection of tools for development and testing of the
-Intel DRM driver. There are many macro-level test suites that get used against
-the driver, including xtest, rendercheck, piglit, and oglconform, but failures
-from those can be difficult to track down to kernel changes, and many require
+IGT GPU Tools is a collection of tools for development and testing of the DRM
+drivers. There are many macro-level test suites that get used against the
+drivers, including xtest, rendercheck, piglit, and oglconform, but failures from
+those can be difficult to track down to kernel changes, and many require
 complicated build procedures or specific testing environments to get useful
-results. Therefore, Intel GPU Tools includes low-level tools and tests
-specifically for development and testing of the Intel DRM Driver.
+results. Therefore, IGT GPU Tools includes low-level tools and tests
+specifically for development and testing of the DRM Drivers.
 
-Intel GPU Tools is split into several sections:
+IGT GPU Tools is split into several sections:
 
 benchmarks/
 	This is a collection of useful microbenchmarks that can be used to tune
@@ -63,7 +63,7 @@ tests/
 
 	Set the IGT_TEST_ROOT environment variable to point to the tests
 	directory, or set the path key in the "igt" section of piglit.conf to
-	the intel-gpu-tools root directory.
+	the igt-gpu-tools root directory.
 
 	The tests in the i-g-t sources need to have been built already. Then we
 	can run the testcases with (as usual as root, no other drm clients
@@ -112,7 +112,7 @@ debugger/
 	The debugger must be run as root: "sudo debugger/eudb"
 
 docs/
-	Contains the automatically generated intel-gpu-tools libraries
+	Contains the automatically generated igt-gpu-tools libraries
 	reference documentation in docs/reference/. You need to have the
 	gtk-doc tools installed and use the "--enable-gtk-doc" configure flag
 	to generate this API documentation.
@@ -123,8 +123,8 @@ docs/
 
 	If you've added/changed/removed a symbol or anything else that changes
 	the overall structure or indexes, this needs to be reflected in
-	intel-gpu-tools-sections.txt. Entirely new sections will also need to be
-	added to intel-gpu-tools-docs.xml in the appropriate place.
+	igt-gpu-tools-sections.txt. Entirely new sections will also need to be
+	added to igt-gpu-tools-docs.xml in the appropriate place.
 
 include/drm-uapi
 	Imported DRM uapi headers from airlied's drm-next branch.
@@ -186,7 +186,7 @@ should continue to be used for that.
 
 Documentation is built using
 
-$ cd build && ninja && ninja intel-gpu-tools-doc
+$ cd build && ninja && ninja igt-gpu-tools-doc
 
 Note that there's a setup script similar to ./autogen.sh which creates a
 compatibility Makefile with a few useful default targets:

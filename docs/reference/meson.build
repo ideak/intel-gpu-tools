@@ -1,1 +1,1 @@
-subdir('intel-gpu-tools')
+subdir('igt-gpu-tools')

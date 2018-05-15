@@ -1,4 +1,4 @@
-benchmarksdir=$(libexecdir)/intel-gpu-tools/benchmarks
+benchmarksdir=$(libexecdir)/igt-gpu-tools/benchmarks
 
 benchmarks_prog_list =			\
 	gem_blt				\

@@ -28,7 +28,7 @@ install uninstall:
 	echo "meson install support not yet completed" && false
 
 docs:
-	ninja -C build intel-gpu-tools-doc
+	ninja -C build igt-gpu-tools-doc
 
 EOF
 

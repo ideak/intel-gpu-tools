@@ -7,9 +7,9 @@
 ]>
 <book id="index">
   <bookinfo>
-    <title>intel-gpu-tools Reference Manual</title>
+    <title>igt-gpu-tools Reference Manual</title>
     <releaseinfo>
-      for intel-gpu-tools &version;.
+      for igt-gpu-tools &version;.
     </releaseinfo>
   </bookinfo>
 

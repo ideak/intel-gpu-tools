@@ -69,11 +69,11 @@ configure_file(input: 'version.xml.in',
 	       output: 'version.xml',
 	       install: false, configuration: config)
 
-gnome.gtkdoc('intel-gpu-tools',
+gnome.gtkdoc('igt-gpu-tools',
 	     content_files : ['igt_test_programs.xml'],
 	     dependencies : lib_igt,
 	     install : true,
-	     main_xml : 'intel-gpu-tools-docs.xml',
+	     main_xml : 'igt-gpu-tools-docs.xml',
 	     scan_args : '--rebuild-sections',
 	     mkdb_args : '--output-format=xml',
 	     ignore_headers : ignore_headers,

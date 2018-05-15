@@ -21,10 +21,10 @@
 # Process this file with autoconf to produce a configure script
 
 AC_PREREQ([2.60])
-AC_INIT([intel-gpu-tools],
+AC_INIT([igt-gpu-tools],
 	[1.22],
 	[https://bugs.freedesktop.org/enter_bug.cgi?product=DRI&component=IGT],
-	[intel-gpu-tools])
+	[igt-gpu-tools])
 
 AC_CONFIG_SRCDIR([Makefile.am])
 AC_CONFIG_HEADERS([config.h])
@@ -390,8 +390,8 @@ AC_CONFIG_FILES([
 		 benchmarks/wsim/Makefile
 		 docs/Makefile
 		 docs/reference/Makefile
-		 docs/reference/intel-gpu-tools/Makefile
-		 docs/reference/intel-gpu-tools/version.xml
+		 docs/reference/igt-gpu-tools/Makefile
+		 docs/reference/igt-gpu-tools/version.xml
 		 lib/Makefile
 		 lib/tests/Makefile
 		 man/Makefile
