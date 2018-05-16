@@ -316,8 +316,11 @@ int main(int argc, char **argv)
 	bool interrupts = false;
 	int n, c;
 
-	while ((c = getopt(argc, argv, "t:f:bmni")) != -1) {
+	while ((c = getopt(argc, argv, "t:f:bmni1")) != -1) {
 		switch (c) {
+		case '1':
+			ncpus = 1;
+			break;
 		case 'n': /* dry run, measure baseline system latency */
 			enable_gem_sysbusy = 0;
 			break;
