@@ -185,6 +185,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
+		gem_require_blitter(fd);
 
 		size = 1024 * 1024;
 		count = gem_aperture_size(fd);

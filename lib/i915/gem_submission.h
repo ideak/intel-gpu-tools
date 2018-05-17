@@ -35,6 +35,15 @@ bool gem_has_semaphores(int fd);
 bool gem_has_execlists(int fd);
 bool gem_has_guc_submission(int fd);
 
+int gem_cmdparser_version(int i915, uint32_t engine);
+static inline bool gem_has_cmdparser(int i915, uint32_t engine)
+{
+	return gem_cmdparser_version(i915, engine) > 0;
+}
+
+bool gem_has_blitter(int i915);
+void gem_require_blitter(int i915);
+
 void gem_test_engine(int fd, unsigned int engine);
 
 int gem_reopen_driver(int fd);

@@ -1832,6 +1832,7 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_assert(fd >= 0);
 		igt_require_gem(fd);
+		gem_require_blitter(fd);
 
 		size = sizeof(linear);
 

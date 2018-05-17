@@ -225,3 +225,31 @@ void gem_test_engine(int i915, unsigned int engine)
 	igt_assert(!is_wedged(i915));
 	close(i915);
 }
+
+int gem_cmdparser_version(int i915, uint32_t engine)
+{
+	int version = 0;
+	drm_i915_getparam_t gp = {
+		.param = I915_PARAM_CMD_PARSER_VERSION,
+		.value = &version,
+	};
+
+	ioctl(i915, DRM_IOCTL_I915_GETPARAM, &gp);
+	return version;
+}
+
+bool gem_has_blitter(int i915)
+{
+	unsigned int blt;
+
+	blt = 0;
+	if (intel_gen(intel_get_drm_devid(i915)) >= 6)
+		blt = I915_EXEC_BLT;
+
+	return gem_has_ring(i915, blt);
+}
+
+void gem_require_blitter(int i915)
+{
+	igt_require(gem_has_blitter(i915));
+}

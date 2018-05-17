@@ -213,6 +213,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
+		gem_require_blitter(fd);
 	}
 
 	igt_subtest("basic")
