@@ -125,23 +125,28 @@ struct event_state {
 	int seq_step;
 };
 
+static float timeval_float(const struct timeval *tv)
+{
+	return tv->tv_sec + tv->tv_usec / 1000000.0f;
+}
+
 static void dump_event_state(const struct event_state *es)
 {
 	igt_debug("name = %s\n"
-		  "last_ts = %ld.%06ld\n"
-		  "last_received_ts = %ld.%06ld\n"
+		  "last_ts = %.06f\n"
+		  "last_received_ts = %.06f\n"
 		  "last_seq = %u\n"
-		  "current_ts = %ld.%06ld\n"
-		  "current_received_ts = %ld.%06ld\n"
+		  "current_ts = %.06f\n"
+		  "current_received_ts = %.06f\n"
 		  "current_seq = %u\n"
 		  "count = %u\n"
 		  "seq_step = %d\n",
 		  es->name,
-		  es->last_ts.tv_sec, es->last_ts.tv_usec,
-		  es->last_received_ts.tv_sec, es->last_received_ts.tv_usec,
+		  timeval_float(&es->last_ts),
+		  timeval_float(&es->last_received_ts),
 		  es->last_seq,
-		  es->current_ts.tv_sec, es->current_ts.tv_usec,
-		  es->current_received_ts.tv_sec, es->current_received_ts.tv_usec,
+		  timeval_float(&es->current_ts),
+		  timeval_float(&es->current_received_ts),
 		  es->current_seq,
 		  es->count,
 		  es->seq_step);
@@ -472,9 +477,8 @@ static void check_state(const struct test_output *o, const struct event_state *e
 	timersub(&es->current_ts, &es->current_received_ts, &diff);
 	if (!analog_tv_connector(o)) {
 		igt_assert_f(diff.tv_sec < 0 || (diff.tv_sec == 0 && diff.tv_usec <= 2000),
-			     "%s ts delayed for too long: %ld.%06ld\n",
-			     es->name, diff.tv_sec, diff.tv_usec);
-
+			     "%s ts delayed for too long: %.06f\n",
+			     es->name, timeval_float(&diff));
 	}
 
 	if (es->count == 0)
@@ -483,9 +487,8 @@ static void check_state(const struct test_output *o, const struct event_state *e
 	timersub(&es->current_ts, &es->last_received_ts, &diff);
 	igt_assert_f(timercmp(&es->last_received_ts, &es->current_ts, <),
 		     "%s ts before the %s was issued!\n"
-		     "timerdiff %ld.%06ld\n",
-		     es->name, es->name,
-		     diff.tv_sec, diff.tv_usec);
+		     "timerdiff %.06f\n",
+		     es->name, es->name, timeval_float(&diff));
 
 	/* check only valid if no modeset happens in between, that increments by
 	 * (1 << 23) on each step. This bounding matches the one in
@@ -517,16 +520,16 @@ static void check_state(const struct test_output *o, const struct event_state *e
 		elapsed = 1e6*diff.tv_sec + diff.tv_usec;
 		expected = (es->current_seq - es->last_seq) * actual_frame_time(o);
 
-		igt_debug("%s ts/seq: last %ld.%06ld/%u, current %ld.%06ld/%u: elapsed=%.1fus expected=%.1fus +- %.1fus, error %.1f%%\n",
-			  es->name, es->last_ts.tv_sec, es->last_ts.tv_usec, es->last_seq,
-			  es->current_ts.tv_sec, es->current_ts.tv_usec, es->current_seq,
+		igt_debug("%s ts/seq: last %.06f/%u, current %.06f/%u: elapsed=%.1fus expected=%.1fus +- %.1fus, error %.1f%%\n",
+			  es->name, timeval_float(&es->last_ts), es->last_seq,
+			  timeval_float(&es->current_ts), es->current_seq,
 			  elapsed, expected, expected * 0.005,
 			  fabs((elapsed - expected) / expected) * 100);
 
 		igt_assert_f(fabs((elapsed - expected) / expected) <= 0.005,
-			     "inconsistent %s ts/seq: last %ld.%06ld/%u, current %ld.%06ld/%u: elapsed=%.1fus expected=%.1fus\n",
-			     es->name, es->last_ts.tv_sec, es->last_ts.tv_usec, es->last_seq,
-			     es->current_ts.tv_sec, es->current_ts.tv_usec, es->current_seq,
+			     "inconsistent %s ts/seq: last %.06f/%u, current %.06f/%u: elapsed=%.1fus expected=%.1fus\n",
+			     es->name, timeval_float(&es->last_ts), es->last_seq,
+			     timeval_float(&es->current_ts), es->current_seq,
 			     elapsed, expected);
 
 		igt_assert_f(es->current_seq == es->last_seq + o->seq_step,
