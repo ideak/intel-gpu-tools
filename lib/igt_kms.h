@@ -574,6 +574,14 @@ uint64_t igt_plane_get_prop(igt_plane_t *plane, enum igt_atomic_plane_properties
 		igt_plane_set_prop_changed(plane, prop); \
 	} while (0)
 
+extern bool igt_plane_try_prop_enum(igt_plane_t *plane,
+				    enum igt_atomic_plane_properties prop,
+				    const char *val);
+
+extern void igt_plane_set_prop_enum(igt_plane_t *plane,
+				    enum igt_atomic_plane_properties prop,
+				    const char *val);
+
 extern void igt_plane_replace_prop_blob(igt_plane_t *plane,
 					enum igt_atomic_plane_properties prop,
 					const void *ptr, size_t length);
@@ -609,10 +617,17 @@ uint64_t igt_output_get_prop(igt_output_t *output, enum igt_atomic_connector_pro
 		igt_output_set_prop_changed(output, prop); \
 	} while (0)
 
+extern bool igt_output_try_prop_enum(igt_output_t *output,
+				     enum igt_atomic_connector_properties prop,
+				     const char *val);
+
+extern void igt_output_set_prop_enum(igt_output_t *output,
+				     enum igt_atomic_connector_properties prop,
+				     const char *val);
+
 extern void igt_output_replace_prop_blob(igt_output_t *output,
 					 enum igt_atomic_connector_properties prop,
 					 const void *ptr, size_t length);
-
 /**
  * igt_pipe_obj_has_prop:
  * @pipe: Pipe to check.
@@ -692,6 +707,20 @@ igt_pipe_has_prop(igt_display_t *display, enum pipe pipe,
 
 #define igt_pipe_set_prop_value(display, pipe, prop, value) \
 	igt_pipe_obj_set_prop_value(&(display)->pipes[(pipe)], prop, value)
+
+extern bool igt_pipe_obj_try_prop_enum(igt_pipe_t *pipe,
+				       enum igt_atomic_crtc_properties prop,
+				       const char *val);
+
+extern void igt_pipe_obj_set_prop_enum(igt_pipe_t *pipe,
+				       enum igt_atomic_crtc_properties prop,
+				       const char *val);
+
+#define igt_pipe_try_prop_enum(display, pipe, prop, val) \
+	igt_pipe_obj_try_prop_enum(&(display)->pipes[(pipe)], prop, val)
+
+#define igt_pipe_set_prop_enum(display, pipe, prop, val) \
+	igt_pipe_obj_set_prop_enum(&(display)->pipes[(pipe)], prop, val)
 
 extern void igt_pipe_obj_replace_prop_blob(igt_pipe_t *pipe,
 					   enum igt_atomic_crtc_properties prop,

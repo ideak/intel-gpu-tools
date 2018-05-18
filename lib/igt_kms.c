@@ -2891,6 +2891,48 @@ uint64_t igt_plane_get_prop(igt_plane_t *plane, enum igt_atomic_plane_properties
 					plane->drm_plane->plane_id, plane->props[prop]);
 }
 
+static bool igt_mode_object_get_prop_enum_value(int drm_fd, uint32_t id, const char *str, uint64_t *val)
+{
+	drmModePropertyPtr prop = drmModeGetProperty(drm_fd, id);
+	int i;
+
+	igt_assert(id);
+	igt_assert(prop);
+
+	for (i = 0; i < prop->count_enums; i++)
+		if (!strcmp(str, prop->enums[i].name)) {
+			*val = prop->enums[i].value;
+			drmModeFreeProperty(prop);
+			return true;
+		}
+
+	return false;
+}
+
+bool igt_plane_try_prop_enum(igt_plane_t *plane,
+			     enum igt_atomic_plane_properties prop,
+			     const char *val)
+{
+	igt_display_t *display = plane->pipe->display;
+	uint64_t uval;
+
+	igt_assert(plane->props[prop]);
+
+	if (!igt_mode_object_get_prop_enum_value(display->drm_fd,
+						 plane->props[prop], val, &uval))
+		return false;
+
+	igt_plane_set_prop_value(plane, prop, uval);
+	return true;
+}
+
+void igt_plane_set_prop_enum(igt_plane_t *plane,
+			     enum igt_atomic_plane_properties prop,
+			     const char *val)
+{
+	igt_assert(igt_plane_try_prop_enum(plane, prop, val));
+}
+
 /**
  * igt_plane_replace_prop_blob:
  * @plane: plane to set property on.
@@ -2942,6 +2984,30 @@ uint64_t igt_output_get_prop(igt_output_t *output, enum igt_atomic_connector_pro
 					output->id, output->props[prop]);
 }
 
+bool igt_output_try_prop_enum(igt_output_t *output,
+			      enum igt_atomic_connector_properties prop,
+			      const char *val)
+{
+	igt_display_t *display = output->display;
+	uint64_t uval;
+
+	igt_assert(output->props[prop]);
+
+	if (!igt_mode_object_get_prop_enum_value(display->drm_fd,
+						 output->props[prop], val, &uval))
+		return false;
+
+	igt_output_set_prop_value(output, prop, uval);
+	return true;
+}
+
+void igt_output_set_prop_enum(igt_output_t *output,
+			      enum igt_atomic_connector_properties prop,
+			      const char *val)
+{
+	igt_assert(igt_output_try_prop_enum(output, prop, val));
+}
+
 /**
  * igt_output_replace_prop_blob:
  * @output: output to set property on.
@@ -2991,6 +3057,30 @@ uint64_t igt_pipe_obj_get_prop(igt_pipe_t *pipe, enum igt_atomic_crtc_properties
 
 	return igt_mode_object_get_prop(pipe->display, DRM_MODE_OBJECT_CRTC,
 					pipe->crtc_id, pipe->props[prop]);
+}
+
+bool igt_pipe_obj_try_prop_enum(igt_pipe_t *pipe_obj,
+				enum igt_atomic_crtc_properties prop,
+				const char *val)
+{
+	igt_display_t *display = pipe_obj->display;
+	uint64_t uval;
+
+	igt_assert(pipe_obj->props[prop]);
+
+	if (!igt_mode_object_get_prop_enum_value(display->drm_fd,
+						 pipe_obj->props[prop], val, &uval))
+		return false;
+
+	igt_pipe_obj_set_prop_value(pipe_obj, prop, uval);
+	return true;
+}
+
+void igt_pipe_obj_set_prop_enum(igt_pipe_t *pipe_obj,
+				enum igt_atomic_crtc_properties prop,
+				const char *val)
+{
+	igt_assert(igt_pipe_obj_try_prop_enum(pipe_obj, prop, val));
 }
 
 /**
