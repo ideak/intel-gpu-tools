@@ -280,6 +280,8 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	int ret;
 	uint32_t ccs_handle;
 
+	memset(fb, 0, sizeof(*fb));
+
 	/* Use either compressed or Y-tiled to test. However, given the lack of
 	 * available bandwidth, we use linear for the primary plane when
 	 * testing sprites, since we cannot fit two CCS planes into the
