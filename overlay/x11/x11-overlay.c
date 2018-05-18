@@ -123,7 +123,6 @@ cairo_surface_t *
 x11_overlay_create(struct config *config, int *width, int *height)
 {
 	Display *dpy;
-	Screen *scr;
 	cairo_surface_t *surface;
 	struct drm_i915_gem_create create;
 	struct drm_gem_flink flink;
@@ -135,7 +134,6 @@ x11_overlay_create(struct config *config, int *width, int *height)
 	XvImage *image;
 	XvPortID port = -1;
 	void *ptr, *mem;
-	enum position position;
 
 	dpy = XOpenDisplay(NULL);
 	if (dpy == NULL)
@@ -143,7 +141,7 @@ x11_overlay_create(struct config *config, int *width, int *height)
 
 	XSetErrorHandler(check_error_handler);
 
-	scr = ScreenOfDisplay(dpy, DefaultScreen(dpy));
+	ScreenOfDisplay(dpy, DefaultScreen(dpy));
 
 	fd = dri2_open(dpy);
 	if (fd < 0)
@@ -179,7 +177,7 @@ x11_overlay_create(struct config *config, int *width, int *height)
 
 	XSetErrorHandler(noop);
 
-	position = x11_position(dpy, *width, *height, config, &x, &y, &w, &h);
+	x11_position(dpy, *width, *height, config, &x, &y, &w, &h);
 
 	image = XvCreateImage(dpy, port, FOURCC_RGB565, NULL, w, h);
 	if (image == NULL)
