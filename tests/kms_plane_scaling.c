@@ -407,7 +407,16 @@ __test_scaler_with_clipping_clamping_scenario(data_t *d, drmModeModeInfo *mode,
 					    mode->vdisplay + 200);
 	igt_plane_set_size(d->plane2, mode->hdisplay + 100,
 					    mode->vdisplay + 100);
-	igt_display_commit2(&d->display, COMMIT_ATOMIC);
+
+	/*
+	 * Can't guarantee that the clipped coordinates are
+	 * suitably aligned for yuv. So allow the commit to fail.
+	 */
+	if (igt_format_is_yuv(d->fb[1].drm_format) ||
+	    igt_format_is_yuv(d->fb[2].drm_format))
+		igt_display_try_commit2(&d->display, COMMIT_ATOMIC);
+	else
+		igt_display_commit2(&d->display, COMMIT_ATOMIC);
 }
 
 static void

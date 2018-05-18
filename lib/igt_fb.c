@@ -1706,3 +1706,23 @@ bool igt_fb_supported_format(uint32_t drm_format)
 
 	return false;
 }
+
+/**
+ * igt_format_is_yuv:
+ * @drm_format: drm fourcc
+ *
+ * This functions returns whether @drm_format is YUV (as opposed to RGB).
+ */
+bool igt_format_is_yuv(uint32_t drm_format)
+{
+	switch (drm_format) {
+	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_YUYV:
+	case DRM_FORMAT_YVYU:
+	case DRM_FORMAT_UYVY:
+	case DRM_FORMAT_VYUY:
+		return true;
+	default:
+		return false;
+	}
+}
