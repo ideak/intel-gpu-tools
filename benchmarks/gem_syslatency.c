@@ -51,6 +51,7 @@ static volatile int done;
 
 struct gem_busyspin {
 	pthread_t thread;
+	unsigned long sz;
 	unsigned long count;
 	bool leak;
 	bool interrupts;
@@ -96,7 +97,8 @@ static void *gem_busyspin(void *arg)
 	struct gem_busyspin *bs = arg;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
-	const unsigned sz = bs->leak ? 16 << 20 : 4 << 10;
+	const unsigned sz =
+		bs->sz ? bs->sz + sizeof(bbe) : bs->leak ? 16 << 20 : 4 << 10;
 	unsigned engines[16];
 	unsigned nengine;
 	unsigned engine;
@@ -112,7 +114,7 @@ static void *gem_busyspin(void *arg)
 	obj[0].handle = gem_create(fd, 4096);
 	obj[0].flags = EXEC_OBJECT_WRITE;
 	obj[1].handle = gem_create(fd, sz);
-	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+	gem_write(fd, obj[1].handle, bs->sz, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	if (bs->interrupts) {
@@ -131,6 +133,12 @@ static void *gem_busyspin(void *arg)
 
 	while (!done) {
 		for (int n = 0; n < nengine; n++) {
+			const int m = rand() % nengine;
+			unsigned int tmp = engines[n];
+			engines[n] = engines[m];
+			engines[m] = tmp;
+		}
+		for (int n = 0; n < nengine; n++) {
 			execbuf.flags &= ~ENGINE_FLAGS;
 			execbuf.flags |= engines[n];
 			gem_execbuf(fd, &execbuf);
@@ -139,7 +147,7 @@ static void *gem_busyspin(void *arg)
 		if (bs->leak) {
 			gem_madvise(fd, obj[1].handle, I915_MADV_DONTNEED);
 			obj[1].handle = gem_create(fd, sz);
-			gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+			gem_write(fd, obj[1].handle, bs->sz, &bbe, sizeof(bbe));
 		}
 	}
 
@@ -299,6 +307,50 @@ static void *background_fs(void *path)
 	return NULL;
 }
 
+static unsigned long calibrate_nop(unsigned int target_us,
+				   unsigned int tolerance_pct)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	const unsigned int loops = 100;
+	struct drm_i915_gem_exec_object2 obj = {};
+	struct drm_i915_gem_execbuffer2 eb =
+		{ .buffer_count = 1, .buffers_ptr = (uintptr_t)&obj};
+	struct timespec t_0, t_end;
+	long sz, prev;
+	int fd;
+
+	fd = drm_open_driver(DRIVER_INTEL);
+
+	clock_gettime(CLOCK_MONOTONIC, &t_0);
+
+	sz = 256 * 1024;
+	do {
+		struct timespec t_start;
+
+		obj.handle = gem_create(fd, sz + sizeof(bbe));
+		gem_write(fd, obj.handle, sz, &bbe, sizeof(bbe));
+		gem_execbuf(fd, &eb);
+		gem_sync(fd, obj.handle);
+
+		clock_gettime(CLOCK_MONOTONIC, &t_start);
+		for (int loop = 0; loop < loops; loop++)
+			gem_execbuf(fd, &eb);
+		gem_sync(fd, obj.handle);
+		clock_gettime(CLOCK_MONOTONIC, &t_end);
+
+		gem_close(fd, obj.handle);
+
+		prev = sz;
+		sz = loops * sz / elapsed(&t_start, &t_end) * 1e3 * target_us;
+		sz = ALIGN(sz, sizeof(uint32_t));
+	} while (elapsed(&t_0, &t_end) < 5 ||
+		 abs(sz - prev) > (sz * tolerance_pct / 100));
+
+	close(fd);
+
+	return sz;
+}
+
 int main(int argc, char **argv)
 {
 	struct gem_busyspin *busy;
@@ -314,9 +366,10 @@ int main(int argc, char **argv)
 	int enable_gem_sysbusy = 1;
 	bool leak = false;
 	bool interrupts = false;
+	long batch = 0;
 	int n, c;
 
-	while ((c = getopt(argc, argv, "t:f:bmni1")) != -1) {
+	while ((c = getopt(argc, argv, "r:t:f:bmni1")) != -1) {
 		switch (c) {
 		case '1':
 			ncpus = 1;
@@ -332,6 +385,10 @@ int main(int argc, char **argv)
 			time = atoi(optarg);
 			if (time < 0)
 				time = INT_MAX;
+			break;
+		case 'r':
+			/* Duration of each batch (microseconds) */
+			batch = atoi(optarg);
 			break;
 		case 'f':
 			/* Select an output field */
@@ -355,11 +412,17 @@ int main(int argc, char **argv)
 	force_low_latency();
 	min = min_measurement_error();
 
+	if (batch > 0)
+		batch = calibrate_nop(batch, 2);
+	else
+		batch = -batch;
+
 	busy = calloc(ncpus, sizeof(*busy));
 	pthread_attr_init(&attr);
 	if (enable_gem_sysbusy) {
 		for (n = 0; n < ncpus; n++) {
 			bind_cpu(&attr, n);
+			busy[n].sz = batch;
 			busy[n].leak = leak;
 			busy[n].interrupts = interrupts;
 			pthread_create(&busy[n].thread, &attr,
