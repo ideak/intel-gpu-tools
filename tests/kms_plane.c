@@ -366,21 +366,84 @@ test_plane_panning(data_t *data, enum pipe pipe, unsigned int flags)
 	igt_skip_on(connected_outs == 0);
 }
 
+static const color_t colors[] = {
+	{ 1.0f, 0.0f, 0.0f, },
+	{ 0.0f, 1.0f, 0.0f, },
+	{ 0.0f, 0.0f, 1.0f, },
+	{ 1.0f, 1.0f, 1.0f, },
+	{ 0.0f, 0.0f, 0.0f, },
+	{ 0.0f, 1.0f, 1.0f, },
+	{ 1.0f, 0.0f, 1.0f, },
+	{ 1.0f, 1.0f, 0.0f, },
+};
+
+static void set_legacy_lut(data_t *data, enum pipe pipe,
+			   uint16_t mask)
+{
+	igt_pipe_t *pipe_obj = &data->display.pipes[pipe];
+	drmModeCrtc *crtc;
+	uint16_t *lut;
+	int i, lut_size;
+
+	crtc = drmModeGetCrtc(data->drm_fd, pipe_obj->crtc_id);
+	lut_size = crtc->gamma_size;
+	drmModeFreeCrtc(crtc);
+
+	lut = malloc(sizeof(uint16_t) * lut_size);
+
+	for (i = 0; i < lut_size; i++)
+		lut[i] = (i * 0xffff / (lut_size - 1)) & mask;
+
+	igt_assert_eq(drmModeCrtcSetGamma(data->drm_fd, pipe_obj->crtc_id,
+					  lut_size, lut, lut, lut), 0);
+
+	free(lut);
+}
+
+#define IGT_FORMAT_FMT "%c%c%c%c (0x%08x)"
+#define IGT_FORMAT_ARGS(f) ((f) >> 0) & 0xff, ((f) >> 8) & 0xff, \
+		((f) >> 16) & 0xff, ((f) >> 24) & 0xff, (f)
+
+static void test_format_plane_color(data_t *data, enum pipe pipe,
+				    igt_plane_t *plane,
+				    uint32_t format, int width, int height,
+				    int color, igt_crc_t *crc, struct igt_fb *fb)
+{
+	const color_t *c = &colors[color];
+	struct igt_fb old_fb = *fb;
+
+	igt_create_color_fb(data->drm_fd, width, height,
+			    format, LOCAL_DRM_FORMAT_MOD_NONE,
+			    c->red, c->green, c->blue, fb);
+
+	igt_plane_set_fb(plane, fb);
+
+	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
+
+	/* make sure the crc we get is for the new fb */
+	igt_wait_for_vblank(data->drm_fd, pipe);
+	igt_pipe_crc_drain(data->pipe_crc);
+	igt_pipe_crc_get_single(data->pipe_crc, crc);
+
+	igt_remove_fb(data->drm_fd, &old_fb);
+}
+
 static void test_format_plane(data_t *data, enum pipe pipe,
 			      igt_output_t *output, igt_plane_t *plane)
 {
 	igt_plane_t *primary;
-	struct igt_fb primary_fb, fb;
+	struct igt_fb primary_fb;
+	struct igt_fb fb = {};
 	drmModeModeInfo *mode;
-	cairo_t *cr;
-	int i;
-	uint32_t format;
+	uint32_t format, ref_format;
 	uint64_t width, height;
+	igt_crc_t ref_crc[ARRAY_SIZE(colors)];
 
 	mode = igt_output_get_mode(output);
 	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
 		width = mode->hdisplay;
 		height = mode->vdisplay;
+		ref_format = format = DRM_FORMAT_XRGB8888;
 	} else {
 		if (!plane->drm_plane) {
 			igt_debug("Only legacy cursor ioctl supported, skipping cursor plane\n");
@@ -388,6 +451,7 @@ static void test_format_plane(data_t *data, enum pipe pipe,
 		}
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &width));
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_HEIGHT, &height));
+		ref_format = format = DRM_FORMAT_ARGB8888;
 	}
 
 	igt_debug("Testing connector %s on %s plane %s.%u\n",
@@ -403,33 +467,55 @@ static void test_format_plane(data_t *data, enum pipe pipe,
 
 	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	for (i = 0; i < plane->drm_plane->count_formats; i++) {
+	set_legacy_lut(data, pipe, 0xfc00);
+
+	test_init(data, pipe);
+	igt_pipe_crc_start(data->pipe_crc);
+
+	igt_info("Testing format " IGT_FORMAT_FMT " on %s.%u\n",
+		 IGT_FORMAT_ARGS(format),
+		 kmstest_pipe_name(pipe), plane->index);
+
+	for (int i = 0; i < ARRAY_SIZE(colors); i++) {
+		test_format_plane_color(data, pipe, plane,
+					format, width, height,
+					i, &ref_crc[i], &fb);
+	}
+
+	for (int i = 0; i < plane->drm_plane->count_formats; i++) {
+		igt_crc_t crc;
+
 		format = plane->drm_plane->formats[i];
+
+		if (format == ref_format)
+			continue;
 
 		if (!igt_fb_supported_format(format))
 			continue;
 
-		igt_debug("Testing format 0x%x on %s.%u\n",
-			  format, kmstest_pipe_name(pipe), plane->index);
+		igt_info("Testing format " IGT_FORMAT_FMT " on %s.%u\n",
+			 IGT_FORMAT_ARGS(format),
+			 kmstest_pipe_name(pipe), plane->index);
 
-		igt_create_fb(data->drm_fd, width, height,
-			      format, LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+		for (int j = 0; j < ARRAY_SIZE(colors); j++) {
+			test_format_plane_color(data, pipe, plane,
+						format, width, height,
+						j, &crc, &fb);
 
-		cr = igt_get_cairo_ctx(data->drm_fd, &fb);
-		igt_paint_color(cr, 0, 0, width, height,
-				0.0, 1.0, 0.0);
-		if (width >= 164 && height >= 164)
-			igt_paint_color(cr, 100, 100, 64, 64, 0.0, 0.0, 0.0);
-		igt_put_cairo_ctx(data->drm_fd, &fb, cr);
-
-		igt_plane_set_fb(plane, &fb);
-		igt_display_commit2(&data->display, COMMIT_UNIVERSAL);
-
-		igt_remove_fb(data->drm_fd, &fb);
+			igt_assert_crc_equal(&crc, &ref_crc[j]);
+		}
 	}
+
+	igt_pipe_crc_stop(data->pipe_crc);
+	test_fini(data);
+
+	set_legacy_lut(data, pipe, 0xffff);
 
 	igt_plane_set_fb(primary, NULL);
 	igt_plane_set_fb(plane, NULL);
+	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+	igt_remove_fb(data->drm_fd, &fb);
 	igt_remove_fb(data->drm_fd, &primary_fb);
 }
 
