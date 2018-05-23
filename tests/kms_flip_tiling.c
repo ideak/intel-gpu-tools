@@ -30,7 +30,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 IGT_TEST_DESCRIPTION("Test page flips and tiling scenarios");
 
 typedef struct {
@@ -60,23 +59,6 @@ static void pipe_crc_free(void)
 		igt_pipe_crc_free(_pipe_crc);
 		_pipe_crc = NULL;
 	}
-}
-
-static void wait_for_pageflip(int fd)
-{
-	drmEventContext evctx = { .version = 2 };
-	struct timeval timeout = { .tv_sec = 0, .tv_usec = 50000 };
-	fd_set fds;
-	int ret;
-
-	/* Wait for pageflip completion, then consume event on fd */
-	FD_ZERO(&fds);
-	FD_SET(fd, &fds);
-	do {
-		ret = select(fd + 1, &fds, NULL, NULL, &timeout);
-	} while (ret < 0 && errno == EINTR);
-	igt_assert_eq(ret, 1);
-	igt_assert(drmHandleEvent(fd, &evctx) == 0);
 }
 
 static void
@@ -139,7 +121,7 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 	 */
 	igt_require(ret == 0);
 
-	wait_for_pageflip(data->drm_fd);
+	kmstest_wait_for_pageflip(data->drm_fd);
 
 	/* Get a crc and compare with the reference. */
 	igt_pipe_crc_collect_crc(pipe_crc, &crc);

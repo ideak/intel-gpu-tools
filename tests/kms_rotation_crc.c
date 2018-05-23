@@ -284,23 +284,6 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 		igt_plane_set_position(plane, data->pos_x, data->pos_y);
 }
 
-static void wait_for_pageflip(int fd)
-{
-	drmEventContext evctx = { .version = 2 };
-	struct timeval timeout = { .tv_sec = 0, .tv_usec = 50000 };
-	fd_set fds;
-	int ret;
-
-	/* Wait for pageflip completion, then consume event on fd */
-	FD_ZERO(&fds);
-	FD_SET(fd, &fds);
-	do {
-		ret = select(fd + 1, &fds, NULL, NULL, &timeout);
-	} while (ret < 0 && errno == EINTR);
-	igt_assert_eq(ret, 1);
-	igt_assert(drmHandleEvent(fd, &evctx) == 0);
-}
-
 static void test_single_case(data_t *data, enum pipe pipe,
 			     igt_output_t *output, igt_plane_t *plane,
 			     enum rectangle_type rect,
@@ -350,7 +333,7 @@ static void test_single_case(data_t *data, enum pipe pipe,
 					NULL);
 			igt_assert_eq(ret, 0);
 		}
-		wait_for_pageflip(data->gfx_fd);
+		kmstest_wait_for_pageflip(data->gfx_fd);
 		igt_pipe_crc_drain(data->pipe_crc);
 		igt_pipe_crc_get_single(data->pipe_crc, &crc_output);
 		igt_assert_crc_equal(&data->flip_crc,

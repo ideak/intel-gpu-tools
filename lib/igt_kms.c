@@ -1458,6 +1458,30 @@ unsigned int kmstest_get_vblank(int fd, int pipe, unsigned int flags)
 	return vbl.reply.sequence;
 }
 
+/**
+ * kmstest_wait_for_pageflip:
+ * @fd: Opened drm file descriptor
+ *
+ * Blocks until pageflip is completed
+ *
+ */
+void kmstest_wait_for_pageflip(int fd)
+{
+	drmEventContext evctx = { .version = 2 };
+	struct timeval timeout = { .tv_sec = 0, .tv_usec = 50000 };
+	fd_set fds;
+	int ret;
+
+	/* Wait for pageflip completion, then consume event on fd */
+	FD_ZERO(&fds);
+	FD_SET(fd, &fds);
+	do {
+		ret = select(fd + 1, &fds, NULL, NULL, &timeout);
+	} while (ret < 0 && errno == EINTR);
+	igt_assert_eq(ret, 1);
+	igt_assert(drmHandleEvent(fd, &evctx) == 0);
+}
+
 static void get_plane(char *str, int type, struct kmstest_plane *plane)
 {
 	int ret;
