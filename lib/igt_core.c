@@ -1702,20 +1702,7 @@ void igt_child_done(pid_t pid)
 		test_children[i] = test_children[i + 1];
 }
 
-/**
- * igt_waitchildren:
- *
- * Wait for all children forked with igt_fork.
- *
- * The magic here is that exit codes from children will be correctly propagated
- * to the main thread, including the relevant exit code if a child thread failed.
- * Of course if multiple children failed with different exit codes the resulting
- * exit code will be non-deterministic.
- *
- * Note that igt_skip() will not be forwarded, feature tests need to be done
- * before spawning threads with igt_fork().
- */
-void igt_waitchildren(void)
+int __igt_waitchildren(void)
 {
 	int err = 0;
 	int count;
@@ -1761,6 +1748,25 @@ void igt_waitchildren(void)
 	}
 
 	num_test_children = 0;
+	return err;
+}
+
+/**
+ * igt_waitchildren:
+ *
+ * Wait for all children forked with igt_fork.
+ *
+ * The magic here is that exit codes from children will be correctly propagated
+ * to the main thread, including the relevant exit code if a child thread failed.
+ * Of course if multiple children failed with different exit codes the resulting
+ * exit code will be non-deterministic.
+ *
+ * Note that igt_skip() will not be forwarded, feature tests need to be done
+ * before spawning threads with igt_fork().
+ */
+void igt_waitchildren(void)
+{
+	int err = __igt_waitchildren();
 	if (err)
 		igt_fail(err);
 }

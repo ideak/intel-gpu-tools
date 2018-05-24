@@ -161,6 +161,57 @@ test_sysfs_reader(bool hibernate)
 }
 
 static void
+test_shrink(int fd, unsigned int mode)
+{
+	uint64_t *can_mlock, pin;
+
+	gem_quiescent_gpu(fd);
+	intel_purge_vm_caches(fd);
+
+	pin = (intel_get_total_ram_mb() + 1) << 20;
+
+	igt_debug("Total memory %'"PRIu64" B (%'"PRIu64" MiB)\n",
+		  pin, pin >> 20);
+	can_mlock = mmap(NULL, pin, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_require(can_mlock != MAP_FAILED);
+
+	/* Lock all the system memory, forcing the driver into swap and OOM */
+	for (uint64_t inc = 64 << 20; inc >= 4 << 10; inc >>= 1) {
+		igt_debug("Testing+ %'"PRIu64" B (%'"PRIu64" MiB)\n",
+			  *can_mlock, *can_mlock >> 20);
+
+		igt_fork(child, 1) {
+			for (uint64_t bytes = *can_mlock;
+			     bytes <= pin;
+			     bytes += inc) {
+				if (mlock(can_mlock, bytes))
+					break;
+
+				*can_mlock = bytes;
+				__sync_synchronize();
+			}
+		}
+		__igt_waitchildren();
+	}
+
+	intel_purge_vm_caches(fd);
+
+	igt_require(*can_mlock > 64 << 20);
+	*can_mlock -= 64 << 20;
+
+	igt_debug("Locking %'"PRIu64" B (%'"PRIu64" MiB)\n",
+		  *can_mlock, *can_mlock >> 20);
+	igt_assert(!mlock(can_mlock, *can_mlock));
+	igt_info("Locked %'"PRIu64" B (%'"PRIu64" MiB)\n",
+		 *can_mlock, *can_mlock >> 20);
+
+	intel_purge_vm_caches(fd);
+	igt_system_suspend_autoresume(mode, SUSPEND_TEST_NONE);
+
+	munmap(can_mlock, pin);
+}
+
+static void
 test_forcewake(int fd, bool hibernate)
 {
 	int fw_fd;
@@ -198,6 +249,9 @@ igt_main
 
 	igt_subtest("sysfs-reader")
 		test_sysfs_reader(false);
+
+	igt_subtest("shrink")
+		test_shrink(fd, SUSPEND_STATE_MEM);
 
 	igt_subtest("forcewake")
 		test_forcewake(fd, false);

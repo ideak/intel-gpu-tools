@@ -742,6 +742,7 @@ bool __igt_fork(void);
 	for (int child = 0; child < (num_children); child++) \
 		for (; __igt_fork(); exit(0))
 void igt_child_done(pid_t pid);
+int __igt_waitchildren(void);
 void igt_waitchildren(void);
 void igt_waitchildren_timeout(int seconds, const char *reason);
 
