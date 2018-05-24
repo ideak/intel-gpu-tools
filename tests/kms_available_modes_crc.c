@@ -81,7 +81,7 @@ static void generate_comparison_crc_list(data_t *data, igt_output_t *output)
 	fbid = igt_create_color_fb(data->gfx_fd,
 				   mode->hdisplay,
 				   mode->vdisplay,
-				   intel_gen(intel_get_drm_devid(data->gfx_fd)) < 9 ? DRM_FORMAT_XRGB8888 : DRM_FORMAT_ARGB8888,
+				   DRM_FORMAT_XRGB8888,
 				   LOCAL_DRM_FORMAT_MOD_NONE,
 				   0, 0, 0,
 				   &data->primary_fb);
@@ -120,6 +120,55 @@ static void generate_comparison_crc_list(data_t *data, igt_output_t *output)
 	igt_remove_fb(data->gfx_fd, &data->primary_fb);
 }
 
+static const struct {
+	uint32_t	fourcc;
+	char		zeropadding;
+	enum		{ BYTES_PP_1=1,
+				BYTES_PP_2=2,
+				BYTES_PP_4=4,
+				NV12,
+				P010,
+				SKIP4 } bpp;
+	uint32_t	value;
+} fillers[] = {
+	{ DRM_FORMAT_C8, 0, BYTES_PP_1, 0xff},
+	{ DRM_FORMAT_RGB565, 0, BYTES_PP_2, 0xffff},
+	{ DRM_FORMAT_XRGB8888, 0, BYTES_PP_4, 0xffffffff},
+	{ DRM_FORMAT_XBGR8888, 0, BYTES_PP_4, 0xffffffff},
+
+	/*
+	 * following two are skipped because blending seems to work
+	 * incorrectly with exception of AR24 on cursor plane.
+	 * Test still creates the planes, just filling plane
+	 * and getting crc is skipped.
+	 */
+	{ DRM_FORMAT_ARGB8888, 0, SKIP4, 0xffffffff},
+	{ DRM_FORMAT_ABGR8888, 0, SKIP4, 0x00ffffff},
+
+	{ DRM_FORMAT_XRGB2101010, 0, BYTES_PP_4, 0xffffffff},
+	{ DRM_FORMAT_XBGR2101010, 0, BYTES_PP_4, 0xffffffff},
+
+	{ DRM_FORMAT_YUYV, 0, BYTES_PP_4, 0x80eb80eb},
+	{ DRM_FORMAT_YVYU, 0, BYTES_PP_4, 0x80eb80eb},
+	{ DRM_FORMAT_VYUY, 0, BYTES_PP_4, 0xeb80eb80},
+	{ DRM_FORMAT_UYVY, 0, BYTES_PP_4, 0xeb80eb80},
+
+	/*
+	 * (semi-)planar formats
+	 */
+	{ DRM_FORMAT_NV12, 0, NV12, 0x80eb},
+#ifdef DRM_FORMAT_P010
+	{ DRM_FORMAT_P010, 0, P010, 0x8000eb00},
+#endif
+#ifdef DRM_FORMAT_P012
+	{ DRM_FORMAT_P012, 0, P010, 0x8000eb00},
+#endif
+#ifdef DRM_FORMAT_P016
+	{ DRM_FORMAT_P016, 0, P010, 0x8000eb00},
+#endif
+	{ 0, 0, 0, 0 }
+};
+
 /*
  * fill_in_fb tell in return value if selected mode should be
  * proceed to crc check
@@ -130,57 +179,6 @@ static bool fill_in_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 	signed i, c, writesize;
 	unsigned short* ptemp_16_buf;
 	unsigned int* ptemp_32_buf;
-
-	const struct {
-		uint32_t	fourcc;
-		char		zeropadding;
-		enum		{ BYTES_PP_1=1,
-				  BYTES_PP_2=2,
-				  BYTES_PP_4=4,
-				  NV12,
-#if defined(DRM_FORMAT_P010) || defined(DRM_FORMAT_P012) || defined(DRM_FORMAT_P016)
-				  P010,
-#endif
-				  SKIP } bpp;
-		uint32_t	value;
-	} fillers[] = {
-		{ DRM_FORMAT_C8, 0, BYTES_PP_1, 0xff},
-		{ DRM_FORMAT_RGB565, 0, BYTES_PP_2, 0xffff},
-		{ DRM_FORMAT_XRGB8888, 0, BYTES_PP_4, 0xffffffff},
-		{ DRM_FORMAT_XBGR8888, 0, BYTES_PP_4, 0xffffffff},
-
-		/*
-		 * following two are skipped because blending seems to work
-		 * incorrectly with exception of AR24 on cursor plane.
-		 * Test still creates the planes, just filling plane
-		 * and getting crc is skipped.
-		 */
-		{ DRM_FORMAT_ARGB8888, 0, SKIP, 0xffffffff},
-		{ DRM_FORMAT_ABGR8888, 0, SKIP, 0x00ffffff},
-
-		{ DRM_FORMAT_XRGB2101010, 0, BYTES_PP_4, 0xffffffff},
-		{ DRM_FORMAT_XBGR2101010, 0, BYTES_PP_4, 0xffffffff},
-
-		{ DRM_FORMAT_YUYV, 0, BYTES_PP_4, 0x80eb80eb},
-		{ DRM_FORMAT_YVYU, 0, BYTES_PP_4, 0x80eb80eb},
-		{ DRM_FORMAT_VYUY, 0, BYTES_PP_4, 0xeb80eb80},
-		{ DRM_FORMAT_UYVY, 0, BYTES_PP_4, 0xeb80eb80},
-
-		/*
-		 * (semi-)planar formats
-		 */
-		{ DRM_FORMAT_NV12, 0, NV12, 0x80eb},
-#ifdef DRM_FORMAT_P010
-		{ DRM_FORMAT_P010, 0, P010, 0x8000eb00},
-#endif
-#ifdef DRM_FORMAT_P012
-		{ DRM_FORMAT_P012, 0, P010, 0x8000eb00},
-#endif
-#ifdef DRM_FORMAT_P016
-		{ DRM_FORMAT_P016, 0, P010, 0x8000eb00},
-#endif
-		{ 0, 0, 0, 0 }
-	};
 
 	for( i = 0; fillers[i].fourcc != 0; i++ ) {
 		if( fillers[i].fourcc == format )
@@ -213,7 +211,6 @@ static bool fill_in_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 
 		writesize = data->size+data->size/2;
 		break;
-#if defined(DRM_FORMAT_P010) || defined(DRM_FORMAT_P012) || defined(DRM_FORMAT_P016)
 	case P010:
 		ptemp_16_buf = (unsigned short*)data->buf;
 		for (c = 0; c < data->size/2; c++)
@@ -225,8 +222,7 @@ static bool fill_in_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 
 		writesize = data->size+data->size/2;
 		break;
-#endif
-	case SKIP:
+	case SKIP4:
 		if (fillers[i].fourcc == DRM_FORMAT_ARGB8888 &&
 		    plane->type == DRM_PLANE_TYPE_CURSOR) {
 		/*
@@ -261,67 +257,62 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 	signed ret, gemsize = 0;
 	unsigned tile_width, tile_height, stride;
 	uint32_t offsets[4] = {};
-	uint32_t* offsetpointer = NULL;
+	uint64_t tiling;
+	int bpp = 0;
+	int i;
 
 	mode = igt_output_get_mode(output);
 	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
-		w = mode->hdisplay ;
+		w = mode->hdisplay;
 		h = mode->vdisplay;
+		tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
 	} else {
 		drmGetCap(data->gfx_fd, DRM_CAP_CURSOR_WIDTH, &w);
 		drmGetCap(data->gfx_fd, DRM_CAP_CURSOR_HEIGHT, &h);
+		tiling = LOCAL_DRM_FORMAT_MOD_NONE;
 	}
 
-	switch(format) {
-#ifdef DRM_FORMAT_P010
-	case DRM_FORMAT_P010:
-#endif
-#ifdef DRM_FORMAT_P012
-	case DRM_FORMAT_P012:
-#endif
-#ifdef DRM_FORMAT_P016
-	case DRM_FORMAT_P016:
-#endif
-#if defined(DRM_FORMAT_P010) || defined(DRM_FORMAT_P012) || defined(DRM_FORMAT_P016)
-		tile_width = 512;
-		tile_height = 16;
-		stride = ALIGN(w*2, tile_width);
-		data->size = offsets[1] = stride*ALIGN(h, tile_height);
-		gemsize = data->size*2;
-		offsetpointer = (uint32_t*)&offsets;
-		break;
-#endif
-	case DRM_FORMAT_NV12:
-		tile_width = 512;
-		tile_height = 16;
-		stride = ALIGN(w, tile_width);
-		data->size = offsets[1] = stride*ALIGN(h, tile_height);
-		gemsize = data->size*2;
-		offsetpointer = (uint32_t*)&offsets;
-		break;
-	default:
-		tile_width = 512;
-		tile_height = 16;
+	for (i = 0; fillers[i].fourcc != 0; i++) {
+		if (fillers[i].fourcc == format)
+			break;
+	}
 
-		/*
-		 * w*4 so there's enough space
-		 */
-		stride = ALIGN(w*4, tile_width);
-		data->size = stride*ALIGN(h, tile_height);
-		offsetpointer = NULL;
-		gemsize = data->size;
+	switch (fillers[i].bpp) {
+	case NV12:
+	case BYTES_PP_1:
+		bpp = 8;
 		break;
+
+	case P010:
+	case BYTES_PP_2:
+		bpp = 16;
+		break;
+
+	case SKIP4:
+	case BYTES_PP_4:
+		bpp = 32;
+		break;
+	}
+
+	igt_get_fb_tile_size(data->gfx_fd, tiling, bpp,
+			     &tile_width, &tile_height);
+	stride = ALIGN(w * bpp / 8, tile_width);
+	gemsize = data->size = stride * ALIGN(h, tile_height);
+
+	if (fillers[i].bpp == P010 || fillers[i].bpp == NV12) {
+		offsets[1] = data->size;
+		gemsize = data->size * 2;
 	}
 
 	data->gem_handle = gem_create(data->gfx_fd, gemsize);
 	ret = __gem_set_tiling(data->gfx_fd, data->gem_handle,
-			       I915_TILING_NONE, stride);
+			       igt_fb_mod_to_tiling(tiling), stride);
 
 	igt_assert_eq(ret, 0);
 
 	ret = __kms_addfb(data->gfx_fd, data->gem_handle, w, h,
-			  stride, format, LOCAL_DRM_FORMAT_MOD_NONE,
-			  offsetpointer, LOCAL_DRM_MODE_FB_MODIFIERS,
+			  stride, format, tiling,
+			  offsets, LOCAL_DRM_MODE_FB_MODIFIERS,
 			  &data->fb.fb_id);
 
 	if(ret < 0) {
