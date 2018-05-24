@@ -89,6 +89,7 @@ static void test_panel_fitting(data_t *d)
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		drmModeModeInfo *mode, native_mode;
+		uint32_t devid = intel_get_drm_devid(display->drm_fd);
 
 		/* Check that the "scaling mode" property has been set. */
 		if (!igt_output_has_prop(output, IGT_CONNECTOR_SCALING_MODE))
@@ -134,6 +135,8 @@ static void test_panel_fitting(data_t *d)
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
 		/*
+		 * most of gen7 and all of gen8 doesn't support scaling at all.
+		 *
 		 * gen9 pipe C has only 1 scaler shared with the crtc, which
 		 * means pipe scaling can't work simultaneously with panel
 		 * fitting.
@@ -141,7 +144,8 @@ static void test_panel_fitting(data_t *d)
 		 * Since this is the legacy path, userspace has to know about
 		 * the HW limitations, whereas atomic can ask.
 		 */
-		if (intel_gen(intel_get_drm_devid(display->drm_fd)) == 9 && pipe == PIPE_C)
+		if (IS_GEN8(devid) || (IS_GEN7(devid) && !IS_IVYBRIDGE(devid)) ||
+		    (IS_GEN9(devid) && pipe == PIPE_C))
 			igt_plane_set_size(d->plane2, d->fb2.width-200, d->fb2.height-200);
 
 		/* enable panel fitting along with sprite scaling */
