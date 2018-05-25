@@ -80,6 +80,7 @@ lib_source_list =	 	\
 	rendercopy_gen8.c	\
 	rendercopy_gen9.c	\
 	rendercopy.h		\
+	surfaceformat.h		\
 	sw_sync.c		\
 	sw_sync.h		\
 	intel_reg_map.c		\

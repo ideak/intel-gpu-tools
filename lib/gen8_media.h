@@ -2,6 +2,7 @@
 #define GEN8_MEDIA_H
 
 #include <stdint.h>
+#include "surfaceformat.h"
 
 #define GEN8_SURFACEFORMAT_R32G32B32A32_FLOAT             0x000
 #define GEN8_SURFACEFORMAT_R32G32B32A32_SINT              0x001

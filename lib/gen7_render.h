@@ -2,6 +2,7 @@
 #define GEN7_RENDER_H
 
 #include <stdint.h>
+#include "surfaceformat.h"
 
 #define INTEL_MASK(high, low) (((1 << ((high) - (low) + 1)) - 1) << (low))
 
