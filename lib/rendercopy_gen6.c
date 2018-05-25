@@ -87,10 +87,10 @@ gen6_bind_buf(struct intel_batchbuffer *batch, struct igt_buf *buf,
 	}
 
 	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 32);
-	ss->ss0.surface_type = GEN6_SURFACE_2D;
+	ss->ss0.surface_type = SURFACE_2D;
 	ss->ss0.surface_format = format;
 
-	ss->ss0.data_return_format = GEN6_SURFACERETURNFORMAT_FLOAT32;
+	ss->ss0.data_return_format = SURFACERETURNFORMAT_FLOAT32;
 	ss->ss0.color_blend = 1;
 	ss->ss1.base_addr = buf->bo->offset;
 
@@ -119,9 +119,9 @@ gen6_bind_surfaces(struct intel_batchbuffer *batch,
 	binding_table = intel_batchbuffer_subdata_alloc(batch, 32, 32);
 
 	binding_table[0] =
-		gen6_bind_buf(batch, dst, GEN6_SURFACEFORMAT_B8G8R8A8_UNORM, 1);
+		gen6_bind_buf(batch, dst, SURFACEFORMAT_B8G8R8A8_UNORM, 1);
 	binding_table[1] =
-		gen6_bind_buf(batch, src, GEN6_SURFACEFORMAT_B8G8R8A8_UNORM, 0);
+		gen6_bind_buf(batch, src, SURFACEFORMAT_B8G8R8A8_UNORM, 0);
 
 	return intel_batchbuffer_subdata_offset(batch, binding_table);
 }
@@ -238,7 +238,7 @@ static void
 gen6_emit_null_depth_buffer(struct intel_batchbuffer *batch)
 {
 	OUT_BATCH(GEN6_3DSTATE_DEPTH_BUFFER | (7 - 2));
-	OUT_BATCH(GEN6_SURFACE_NULL << GEN6_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
+	OUT_BATCH(SURFACE_NULL << GEN6_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
 		  GEN6_DEPTHFORMAT_D32_FLOAT << GEN6_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
@@ -362,7 +362,7 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch)
 	OUT_BATCH(GEN6_3DSTATE_VERTEX_ELEMENTS | (2 * 3 + 1 - 2));
 
 	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
-		  GEN6_SURFACEFORMAT_R32G32B32A32_FLOAT << VE0_FORMAT_SHIFT |
+		  SURFACEFORMAT_R32G32B32A32_FLOAT << VE0_FORMAT_SHIFT |
 		  0 << VE0_OFFSET_SHIFT);
 	OUT_BATCH(GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
 		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
@@ -371,7 +371,7 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch)
 
 	/* x,y */
 	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
-		  GEN6_SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
+		  SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
 		  0 << VE0_OFFSET_SHIFT); /* offsets vb in bytes */
 	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
 		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
@@ -380,7 +380,7 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch)
 
 	/* u0, v0 */
 	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
-		  GEN6_SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
+		  SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
 		  4 << VE0_OFFSET_SHIFT);	/* offset vb in bytes */
 	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
 		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |

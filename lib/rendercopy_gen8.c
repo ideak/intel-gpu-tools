@@ -164,7 +164,7 @@ gen8_bind_buf(struct intel_batchbuffer *batch,
 	offset = intel_batchbuffer_subdata_offset(batch, ss);
 	annotation_add_state(aub, AUB_TRACE_SURFACE_STATE, offset, sizeof(*ss));
 
-	ss->ss0.surface_type = GEN6_SURFACE_2D;
+	ss->ss0.surface_type = SURFACE_2D;
 	ss->ss0.surface_format = format;
 	ss->ss0.render_cache_read_write = 1;
 	ss->ss0.vertical_alignment = 1; /* align 4 */
@@ -208,10 +208,10 @@ gen8_bind_surfaces(struct intel_batchbuffer *batch,
 
 	binding_table[0] =
 		gen8_bind_buf(batch, aub,
-			      dst, GEN6_SURFACEFORMAT_B8G8R8A8_UNORM, 1);
+			      dst, SURFACEFORMAT_B8G8R8A8_UNORM, 1);
 	binding_table[1] =
 		gen8_bind_buf(batch, aub,
-			      src, GEN6_SURFACEFORMAT_B8G8R8A8_UNORM, 0);
+			      src, SURFACEFORMAT_B8G8R8A8_UNORM, 0);
 
 	return offset;
 }
@@ -321,7 +321,7 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch) {
 	 * We don't really know or care what they do.
 	 */
 	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
-		  GEN6_SURFACEFORMAT_R32G32B32A32_FLOAT << VE0_FORMAT_SHIFT |
+		  SURFACEFORMAT_R32G32B32A32_FLOAT << VE0_FORMAT_SHIFT |
 		  0 << VE0_OFFSET_SHIFT); /* we specify 0, but it's really does not exist */
 	OUT_BATCH(GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
 		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
@@ -335,7 +335,7 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch) {
 	 * for doing this though.
 	 */
 	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
-		  GEN6_SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
+		  SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
 		  0 << VE0_OFFSET_SHIFT); /* offsets vb in bytes */
 	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
 		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
@@ -347,7 +347,7 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch) {
 	 * from the source buffer.
 	 */
 	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
-		  GEN6_SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
+		  SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
 		  4 << VE0_OFFSET_SHIFT);	/* offset vb in bytes */
 	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
 		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |

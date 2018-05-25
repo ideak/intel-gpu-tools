@@ -72,7 +72,7 @@ gen7_fill_surface_state(struct intel_batchbuffer *batch,
 	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 64);
 	offset = intel_batchbuffer_subdata_offset(batch, ss);
 
-	ss->ss0.surface_type = GEN7_SURFACE_2D;
+	ss->ss0.surface_type = SURFACE_2D;
 	ss->ss0.surface_format = format;
 	ss->ss0.render_cache_read_write = 1;
 
@@ -111,10 +111,10 @@ gen7_fill_binding_table(struct intel_batchbuffer *batch,
 	offset = intel_batchbuffer_subdata_offset(batch, binding_table);
 	if (IS_GEN7(batch->devid))
 		binding_table[0] = gen7_fill_surface_state(batch, dst,
-						GEN7_SURFACEFORMAT_R8_UNORM, 1);
+						SURFACEFORMAT_R8_UNORM, 1);
 	else
 		binding_table[0] = gen8_fill_surface_state(batch, dst,
-						GEN8_SURFACEFORMAT_R8_UNORM, 1);
+						SURFACEFORMAT_R8_UNORM, 1);
 
 	return offset;
 }
@@ -353,7 +353,7 @@ gen8_fill_surface_state(struct intel_batchbuffer *batch,
 	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 64);
 	offset = intel_batchbuffer_subdata_offset(batch, ss);
 
-	ss->ss0.surface_type = GEN8_SURFACE_2D;
+	ss->ss0.surface_type = SURFACE_2D;
 	ss->ss0.surface_format = format;
 	ss->ss0.render_cache_read_write = 1;
 	ss->ss0.vertical_alignment = 1; /* align 4 */

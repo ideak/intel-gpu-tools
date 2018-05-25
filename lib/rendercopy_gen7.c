@@ -75,7 +75,7 @@ gen7_bind_buf(struct intel_batchbuffer *batch,
 
 	ss = intel_batchbuffer_subdata_alloc(batch, 8 * sizeof(*ss), 32);
 
-	ss[0] = (GEN7_SURFACE_2D << GEN7_SURFACE_TYPE_SHIFT |
+	ss[0] = (SURFACE_2D << GEN7_SURFACE_TYPE_SHIFT |
 		 gen7_tiling_bits(buf->tiling) |
 		format << GEN7_SURFACE_FORMAT_SHIFT);
 	ss[1] = buf->bo->offset;
@@ -105,7 +105,7 @@ gen7_emit_vertex_elements(struct intel_batchbuffer *batch)
 		  ((2 * (1 + 2)) + 1 - 2));
 
 	OUT_BATCH(0 << GEN7_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN7_VE0_VALID |
-		  GEN7_SURFACEFORMAT_R32G32B32A32_FLOAT << GEN7_VE0_FORMAT_SHIFT |
+		  SURFACEFORMAT_R32G32B32A32_FLOAT << GEN7_VE0_FORMAT_SHIFT |
 		  0 << GEN7_VE0_OFFSET_SHIFT);
 
 	OUT_BATCH(GEN7_VFCOMPONENT_STORE_0 << GEN7_VE1_VFCOMPONENT_0_SHIFT |
@@ -115,7 +115,7 @@ gen7_emit_vertex_elements(struct intel_batchbuffer *batch)
 
 	/* x,y */
 	OUT_BATCH(0 << GEN7_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN7_VE0_VALID |
-		  GEN7_SURFACEFORMAT_R16G16_SSCALED << GEN7_VE0_FORMAT_SHIFT |
+		  SURFACEFORMAT_R16G16_SSCALED << GEN7_VE0_FORMAT_SHIFT |
 		  0 << GEN7_VE0_OFFSET_SHIFT); /* offsets vb in bytes */
 	OUT_BATCH(GEN7_VFCOMPONENT_STORE_SRC << GEN7_VE1_VFCOMPONENT_0_SHIFT |
 		  GEN7_VFCOMPONENT_STORE_SRC << GEN7_VE1_VFCOMPONENT_1_SHIFT |
@@ -124,7 +124,7 @@ gen7_emit_vertex_elements(struct intel_batchbuffer *batch)
 
 	/* s,t */
 	OUT_BATCH(0 << GEN7_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN7_VE0_VALID |
-		  GEN7_SURFACEFORMAT_R16G16_SSCALED << GEN7_VE0_FORMAT_SHIFT |
+		  SURFACEFORMAT_R16G16_SSCALED << GEN7_VE0_FORMAT_SHIFT |
 		  4 << GEN7_VE0_OFFSET_SHIFT);  /* offset vb in bytes */
 	OUT_BATCH(GEN7_VFCOMPONENT_STORE_SRC << GEN7_VE1_VFCOMPONENT_0_SHIFT |
 		  GEN7_VFCOMPONENT_STORE_SRC << GEN7_VE1_VFCOMPONENT_1_SHIFT |
@@ -187,9 +187,9 @@ gen7_bind_surfaces(struct intel_batchbuffer *batch,
 	binding_table = intel_batchbuffer_subdata_alloc(batch, 8, 32);
 
 	binding_table[0] =
-		gen7_bind_buf(batch, dst, GEN7_SURFACEFORMAT_B8G8R8A8_UNORM, 1);
+		gen7_bind_buf(batch, dst, SURFACEFORMAT_B8G8R8A8_UNORM, 1);
 	binding_table[1] =
-		gen7_bind_buf(batch, src, GEN7_SURFACEFORMAT_B8G8R8A8_UNORM, 0);
+		gen7_bind_buf(batch, src, SURFACEFORMAT_B8G8R8A8_UNORM, 0);
 
 	return intel_batchbuffer_subdata_offset(batch, binding_table);
 }
@@ -476,7 +476,7 @@ static void
 gen7_emit_null_depth_buffer(struct intel_batchbuffer *batch)
 {
 	OUT_BATCH(GEN7_3DSTATE_DEPTH_BUFFER | (7 - 2));
-	OUT_BATCH(GEN7_SURFACE_NULL << GEN7_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
+	OUT_BATCH(SURFACE_NULL << GEN7_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
 		  GEN7_DEPTHFORMAT_D32_FLOAT << GEN7_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
 	OUT_BATCH(0); /* disable depth, stencil and hiz */
 	OUT_BATCH(0);
