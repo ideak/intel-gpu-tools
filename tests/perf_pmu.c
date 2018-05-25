@@ -281,16 +281,9 @@ single(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 
 	/* Check for idle after hang. */
 	if (flags & FLAG_HANG) {
-		/* Sleep for a bit for reset unwind to settle. */
-		usleep(500e3);
-		/*
-		 * Ensure batch was executing before reset, meaning it must be
-		 * idle by now. Unless it did not even manage to start before we
-		 * triggered the reset, in which case the idleness check below
-		 * might fail. The latter is very unlikely since there are two
-		 * sleeps during which it had an opportunity to start.
-		 */
+		gem_quiescent_gpu(gem_fd);
 		igt_assert(!gem_bo_busy(gem_fd, spin->handle));
+
 		val = pmu_read_single(fd);
 		slept = measured_usleep(batch_duration_ns / 1000);
 		val = pmu_read_single(fd) - val;
