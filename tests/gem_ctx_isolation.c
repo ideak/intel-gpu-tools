@@ -63,10 +63,12 @@ static const struct named_register {
 	unsigned int engine_mask;
 	uint32_t offset;
 	uint32_t count;
+	uint32_t ignore_bits;
+	bool masked;
 } nonpriv_registers[] = {
 	{ "NOPID", NOCTX, RCS0, 0x2094 },
 	{ "MI_PREDICATE_RESULT_2", NOCTX, RCS0, 0x23bc },
-	{ "INSTPM", GEN9, RCS0, 0x20c0 },
+	{ "INSTPM", GEN6, RCS0, 0x20c0, 1, BIT(8) /* ro counter */, true },
 	{ "IA_VERTICES_COUNT", GEN4, RCS0, 0x2310, 2 },
 	{ "IA_PRIMITIVES_COUNT", GEN4, RCS0, 0x2318, 2 },
 	{ "VS_INVOCATION_COUNT", GEN4, RCS0, 0x2320, 2 },
@@ -165,6 +167,17 @@ static const char *register_name(uint32_t offset, char *buf, size_t len)
 	}
 
 	return "unknown";
+}
+
+static const struct named_register *lookup_register(uint32_t offset)
+{
+	for (const struct named_register *r = nonpriv_registers; r->name; r++) {
+		unsigned int width = r->count ? 4*r->count : 4;
+		if (offset >= r->offset && offset < r->offset + width)
+			return r;
+	}
+
+	return NULL;
 }
 
 static bool ignore_register(uint32_t offset)
@@ -283,7 +296,10 @@ static void write_regs(int fd,
 		     count--; offset += 4) {
 			*b++ = 0x22 << 23 | 1; /* LRI */
 			*b++ = offset;
-			*b++ = value;
+			if (r->masked)
+				*b++ = value | 0xffffu << 16;
+			else
+				*b++ = value;
 		}
 	}
 	*b++ = MI_BATCH_BUFFER_END;
@@ -424,14 +440,31 @@ static void compare_regs(int fd, uint32_t A, uint32_t B, const char *who)
 
 	num_errors = 0;
 	for (unsigned int n = 0; n < NUM_REGS; n++) {
+		const struct named_register *r;
 		uint32_t offset = n * sizeof(uint32_t);
-		if (a[n] != b[n] && !ignore_register(offset)) {
-			igt_warn("Register 0x%04x (%s): A=%08x B=%08x\n",
-				 offset,
-				 register_name(offset, buf, sizeof(buf)),
-				 a[n], b[n]);
-			num_errors++;
-		}
+		uint32_t mask;
+
+		if (a[n] == b[n])
+			continue;
+
+		if (ignore_register(offset))
+			continue;
+
+		mask = ~0u;
+		r = lookup_register(offset);
+		if (r && r->masked)
+			mask >>= 16;
+		if (r && r->ignore_bits)
+			mask &= ~r->ignore_bits;
+
+		if ((a[n] & mask) == (b[n] & mask))
+			continue;
+
+		igt_warn("Register 0x%04x (%s): A=%08x B=%08x\n",
+			 offset,
+			 register_name(offset, buf, sizeof(buf)),
+			 a[n] & mask, b[n] & mask);
+		num_errors++;
 	}
 	munmap(b, regs_size);
 	munmap(a, regs_size);
