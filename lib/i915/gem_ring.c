@@ -96,6 +96,8 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 		if (last == count)
 			break;
 
+		/* sleep until the next timer interrupt (woken on signal) */
+		pause();
 		last = count;
 	} while (1);
 
