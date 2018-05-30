@@ -62,6 +62,7 @@ lib_deps = [
 	pthreads,
 	math,
 	realtime,
+	ssl,
 ]
 
 if libdrm_intel.found()

@@ -869,7 +869,7 @@ int gem_madvise(int fd, uint32_t handle, int state)
 	return madv.retained;
 }
 
-int __gem_userptr(int fd, void *ptr, int size, int read_only, uint32_t flags, uint32_t *handle)
+int __gem_userptr(int fd, void *ptr, uint64_t size, int read_only, uint32_t flags, uint32_t *handle)
 {
 	struct drm_i915_gem_userptr userptr;
 
@@ -898,7 +898,7 @@ int __gem_userptr(int fd, void *ptr, int size, int read_only, uint32_t flags, ui
  *
  * Returns userptr handle for the GEM object.
  */
-void gem_userptr(int fd, void *ptr, int size, int read_only, uint32_t flags, uint32_t *handle)
+void gem_userptr(int fd, void *ptr, uint64_t size, int read_only, uint32_t flags, uint32_t *handle)
 {
 	igt_assert_eq(__gem_userptr(fd, ptr, size, read_only, flags, handle), 0);
 }

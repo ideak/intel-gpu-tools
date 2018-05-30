@@ -43,12 +43,16 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <errno.h>
+#include <setjmp.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/mman.h>
+#include <openssl/sha.h>
 #include <signal.h>
 #include <pthread.h>
 #include <time.h>
+
+#include <linux/memfd.h>
 
 #include "drm.h"
 #include "i915_drm.h"
@@ -236,6 +240,57 @@ blit(int fd, uint32_t dst, uint32_t src, uint32_t *all_bo, int n_bo)
 	free(obj);
 
 	return ret;
+}
+
+static void store_dword(int fd, uint32_t target,
+			uint32_t offset, uint32_t value)
+{
+	const int gen = intel_gen(intel_get_drm_devid(fd));
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_relocation_entry reloc;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	uint32_t batch[16];
+	int i;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = ARRAY_SIZE(obj);
+	execbuf.flags = 0;
+	if (gen < 6)
+		execbuf.flags |= I915_EXEC_SECURE;
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = target;
+	obj[1].handle = gem_create(fd, 4096);
+
+	memset(&reloc, 0, sizeof(reloc));
+	reloc.target_handle = obj[0].handle;
+	reloc.presumed_offset = 0;
+	reloc.offset = sizeof(uint32_t);
+	reloc.delta = offset;
+	reloc.read_domains = I915_GEM_DOMAIN_RENDER;
+	reloc.write_domain = I915_GEM_DOMAIN_RENDER;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
+	obj[1].relocation_count = 1;
+
+	i = 0;
+	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	if (gen >= 8) {
+		batch[++i] = offset;
+		batch[++i] = 0;
+	} else if (gen >= 4) {
+		batch[++i] = 0;
+		batch[++i] = offset;
+		reloc.offset += sizeof(uint32_t);
+	} else {
+		batch[i]--;
+		batch[++i] = offset;
+	}
+	batch[++i] = value;
+	batch[++i] = MI_BATCH_BUFFER_END;
+	gem_write(fd, obj[1].handle, 0, batch, sizeof(batch));
+	gem_execbuf(fd, &execbuf);
+	gem_close(fd, obj[1].handle);
 }
 
 static uint32_t
@@ -941,6 +996,303 @@ static int test_dmabuf(void)
 	return 0;
 }
 
+static void store_dword_rand(int i915, unsigned int engine,
+			     uint32_t target, uint64_t sz,
+			     int count)
+{
+	const int gen = intel_gen(intel_get_drm_devid(i915));
+	struct drm_i915_gem_relocation_entry *reloc;
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 exec;
+	unsigned int batchsz;
+	uint32_t *batch;
+	int i;
+
+	batchsz = count * 16 + 4;
+	batchsz = ALIGN(batchsz, 4096);
+
+	reloc = calloc(sizeof(*reloc), count);
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = target;
+	obj[0].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+	obj[1].handle = gem_create(i915, batchsz);
+	obj[1].relocation_count = count;
+	obj[1].relocs_ptr = to_user_pointer(reloc);
+
+	batch = gem_mmap__wc(i915, obj[1].handle, 0, batchsz, PROT_WRITE);
+
+	memset(&exec, 0, sizeof(exec));
+	exec.buffer_count = 2;
+	exec.buffers_ptr = to_user_pointer(obj);
+	exec.flags = engine;
+	if (gen < 6)
+		exec.flags |= I915_EXEC_SECURE;
+
+	i = 0;
+	for (int n = 0; n < count; n++) {
+		uint64_t offset;
+
+		reloc[n].target_handle = obj[0].handle;
+		reloc[n].delta = rand() % (sz / 4) * 4;
+		reloc[n].offset = (i + 1) * sizeof(uint32_t);
+		reloc[n].presumed_offset = obj[0].offset;
+		reloc[n].read_domains = I915_GEM_DOMAIN_RENDER;
+		reloc[n].write_domain = I915_GEM_DOMAIN_RENDER;
+
+		offset = reloc[n].presumed_offset + reloc[n].delta;
+
+		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		if (gen >= 8) {
+			batch[++i] = offset;
+			batch[++i] = offset >> 32;
+		} else if (gen >= 4) {
+			batch[++i] = 0;
+			batch[++i] = offset;
+			reloc[n].offset += sizeof(uint32_t);
+		} else {
+			batch[i]--;
+			batch[++i] = offset;
+		}
+		batch[++i] = rand();
+		i++;
+	}
+	batch[i] = MI_BATCH_BUFFER_END;
+	igt_assert(i * sizeof(uint32_t) < batchsz);
+	munmap(batch, batchsz);
+
+	gem_execbuf(i915, &exec);
+
+	gem_close(i915, obj[1].handle);
+	free(reloc);
+}
+
+static void test_readonly(int i915)
+{
+	unsigned char orig[SHA_DIGEST_LENGTH];
+	uint64_t aperture_size;
+	uint32_t whandle, rhandle;
+	size_t sz, total;
+	void *pages, *space;
+	int memfd;
+
+	/*
+	 * A small batch of pages; small enough to cheaply check for stray
+	 * writes but large enough that we don't create too many VMA pointing
+	 * back to this set from the large arena. The limit on total number
+	 * of VMA for a process is 65,536 (at least on this kernel).
+	 *
+	 * We then write from the GPU through the large arena into the smaller
+	 * backing storage, which we can cheaply check to see if those writes
+	 * have landed (using a SHA1sum). Repeating the same random GPU writes
+	 * though a read-only handle to confirm that this time the writes are
+	 * discarded and the backing store unchanged.
+	 */
+	sz = 16 << 12;
+	memfd = memfd_create("pages", 0);
+	igt_require(memfd != -1);
+	igt_require(ftruncate(memfd, sz) == 0);
+
+	pages = mmap(NULL, sz, PROT_WRITE, MAP_SHARED, memfd, 0);
+	igt_assert(pages != MAP_FAILED);
+
+	igt_require(__gem_userptr(i915, pages, sz, true, userptr_flags, &rhandle) == 0);
+	gem_close(i915, rhandle);
+
+	gem_userptr(i915, pages, sz, false, userptr_flags, &whandle);
+
+	/*
+	 * We have only a 31bit delta which we use for generating
+	 * the target address for MI_STORE_DWORD_IMM, so our maximum
+	 * usuable object size is only 2GiB. For now.
+	 */
+	total = 2048ull << 20;
+	aperture_size = gem_aperture_size(i915) / 2;
+	if (aperture_size < total)
+		total = aperture_size;
+	total = total / sz * sz;
+	igt_info("Using a %'zuB (%'zu pages) arena onto %zu pages\n",
+		 total, total >> 12, sz >> 12);
+
+	/* Create an arena all pointing to the same set of pages */
+	space = mmap(NULL, total, PROT_READ, MAP_ANON | MAP_SHARED, -1, 0);
+	igt_require(space != MAP_FAILED);
+	for (size_t offset = 0; offset < total; offset += sz) {
+		igt_assert(mmap(space + offset, sz,
+				PROT_WRITE, MAP_SHARED | MAP_FIXED,
+				memfd, 0) != MAP_FAILED);
+		*(uint32_t *)(space + offset) = offset;
+	}
+	igt_assert_eq_u32(*(uint32_t *)pages, (uint32_t)(total - sz));
+	igt_assert(mlock(space, total) == 0);
+	close(memfd);
+
+	/* Check we can create a normal userptr bo wrapping the wrapper */
+	gem_userptr(i915, space, total, false, userptr_flags, &rhandle);
+	gem_set_domain(i915, rhandle, I915_GEM_DOMAIN_CPU, 0);
+	for (size_t offset = 0; offset < total; offset += sz)
+		store_dword(i915, rhandle, offset + 4, offset / sz);
+	gem_sync(i915, rhandle);
+	igt_assert_eq_u32(*(uint32_t *)(pages + 0), (uint32_t)(total - sz));
+	igt_assert_eq_u32(*(uint32_t *)(pages + 4), (uint32_t)(total / sz - 1));
+	gem_close(i915, rhandle);
+
+	/* Now enforce read-only henceforth */
+	igt_assert(mprotect(space, total, PROT_READ) == 0);
+
+	SHA1(pages, sz, orig);
+	igt_fork(child, 1) {
+		unsigned int engine;
+
+		gem_userptr(i915, space, total, true, userptr_flags, &rhandle);
+
+		for_each_engine(i915, engine) {
+			unsigned char ref[SHA_DIGEST_LENGTH];
+			unsigned char result[SHA_DIGEST_LENGTH];
+
+			/* First tweak the backing store through the write */
+			store_dword_rand(i915, engine, whandle, sz, 1024);
+			gem_sync(i915, whandle);
+			SHA1(pages, sz, ref);
+
+			/* Check some writes did land */
+			igt_assert(memcmp(ref, orig, sizeof(ref)));
+			memcpy(orig, ref, sizeof(orig));
+
+			/* Now try the same through the read-only handle */
+			store_dword_rand(i915, engine, rhandle, total, 1024);
+			gem_sync(i915, rhandle);
+			SHA1(pages, sz, result);
+
+			/*
+			 * As the writes into the read-only GPU bo should fail,
+			 * the SHA1 hash of the backing store should be
+			 * unaffected.
+			 */
+			igt_assert(memcmp(ref, result, SHA_DIGEST_LENGTH) == 0);
+		}
+
+		gem_close(i915, rhandle);
+	}
+	igt_waitchildren();
+
+	munmap(space, total);
+	munmap(pages, sz);
+}
+
+static jmp_buf sigjmp;
+static void sigjmp_handler(int sig)
+{
+	siglongjmp(sigjmp, sig);
+}
+
+static void test_readonly_mmap(int i915)
+{
+	unsigned char original[SHA_DIGEST_LENGTH];
+	unsigned char result[SHA_DIGEST_LENGTH];
+	uint32_t handle;
+	uint32_t sz;
+	void *pages;
+	void *ptr;
+	int sig;
+
+	/*
+	 * A quick check to ensure that we cannot circumvent the
+	 * read-only nature of our memory by creating a GTT mmap into
+	 * the pages. Imagine receiving a readonly SHM segment from
+	 * another process, or a readonly file mmap, it must remain readonly
+	 * on the GPU as well.
+	 */
+
+	igt_require(igt_setup_clflush());
+
+	sz = 16 << 12;
+	pages = mmap(NULL, sz, PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+	igt_assert(pages != MAP_FAILED);
+
+	igt_require(__gem_userptr(i915, pages, sz, true, userptr_flags, &handle) == 0);
+	gem_set_caching(i915, handle, 0);
+
+	memset(pages, 0xa5, sz);
+	igt_clflush_range(pages, sz);
+	SHA1(pages, sz, original);
+
+	ptr = __gem_mmap__gtt(i915, handle, sz, PROT_WRITE);
+	igt_assert(ptr == NULL);
+
+	ptr = gem_mmap__gtt(i915, handle, sz, PROT_READ);
+	gem_close(i915, handle);
+
+	/* Check that a write into the GTT readonly map fails */
+	if (!(sig = sigsetjmp(sigjmp, 1))) {
+		signal(SIGBUS, sigjmp_handler);
+		signal(SIGSEGV, sigjmp_handler);
+		memset(ptr, 0x5a, sz);
+		igt_assert(0);
+	}
+	igt_assert_eq(sig, SIGSEGV);
+
+	/* Check that we disallow removing the readonly protection */
+	igt_assert(mprotect(ptr, sz, PROT_WRITE));
+	if (!(sig = sigsetjmp(sigjmp, 1))) {
+		signal(SIGBUS, sigjmp_handler);
+		signal(SIGSEGV, sigjmp_handler);
+		memset(ptr, 0x5a, sz);
+		igt_assert(0);
+	}
+	igt_assert_eq(sig, SIGSEGV);
+
+	/* A single read from the GTT pointer to prove that works */
+	igt_assert_eq_u32(*(uint8_t *)ptr, 0xa5);
+	munmap(ptr, sz);
+
+	/* Double check that the kernel did indeed not let any writes through */
+	igt_clflush_range(pages, sz);
+	SHA1(pages, sz, result);
+	igt_assert(!memcmp(original, result, sizeof(original)));
+
+	munmap(pages, sz);
+}
+
+static void test_readonly_pwrite(int i915)
+{
+	unsigned char original[SHA_DIGEST_LENGTH];
+	unsigned char result[SHA_DIGEST_LENGTH];
+	uint32_t handle;
+	uint32_t sz;
+	void *pages;
+
+	/*
+	 * Same as for GTT mmapings, we cannot alone ourselves to
+	 * circumvent readonly protection on a piece of memory via the
+	 * pwrite ioctl.
+	 */
+
+	igt_require(igt_setup_clflush());
+
+	sz = 16 << 12;
+	pages = mmap(NULL, sz, PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+	igt_assert(pages != MAP_FAILED);
+
+	igt_require(__gem_userptr(i915, pages, sz, true, userptr_flags, &handle) == 0);
+	memset(pages, 0xa5, sz);
+	SHA1(pages, sz, original);
+
+	for (int page = 0; page < 16; page++) {
+		char data[4096];
+
+		memset(data, page, sizeof(data));
+		igt_assert_eq(__gem_write(i915, handle, page << 12, data, sizeof(data)), -EINVAL);
+	}
+
+	gem_close(i915, handle);
+
+	SHA1(pages, sz, result);
+	igt_assert(!memcmp(original, result, sizeof(original)));
+
+	munmap(pages, sz);
+}
+
 static int test_usage_restrictions(int fd)
 {
 	void *ptr;
@@ -959,10 +1311,6 @@ static int test_usage_restrictions(int fd)
 
 	/* Both wrong. */
 	ret = __gem_userptr(fd, (char *)ptr + 1, PAGE_SIZE - 1, 0, userptr_flags, &handle);
-	igt_assert_neq(ret, 0);
-
-	/* Read-only not supported. */
-	ret = __gem_userptr(fd, (char *)ptr, PAGE_SIZE, 1, userptr_flags, &handle);
 	igt_assert_neq(ret, 0);
 
 	free(ptr);
@@ -1501,6 +1849,15 @@ int main(int argc, char **argv)
 
 		igt_subtest("dmabuf-unsync")
 			test_dmabuf();
+
+		igt_subtest("readonly-unsync")
+			test_readonly(fd);
+
+		igt_subtest("readonly-mmap-unsync")
+			test_readonly_mmap(fd);
+
+		igt_subtest("readonly-pwrite-unsync")
+			test_readonly_pwrite(fd);
 
 		for (unsigned flags = 0; flags < ALL_FORKING_EVICTIONS + 1; flags++) {
 			igt_subtest_f("forked-unsync%s%s%s-%s",

@@ -133,8 +133,8 @@ struct local_i915_gem_userptr {
 #define LOCAL_I915_USERPTR_UNSYNCHRONIZED (1<<31)
 	uint32_t handle;
 };
-void gem_userptr(int fd, void *ptr, int size, int read_only, uint32_t flags, uint32_t *handle);
-int __gem_userptr(int fd, void *ptr, int size, int read_only, uint32_t flags, uint32_t *handle);
+void gem_userptr(int fd, void *ptr, uint64_t size, int read_only, uint32_t flags, uint32_t *handle);
+int __gem_userptr(int fd, void *ptr, uint64_t size, int read_only, uint32_t flags, uint32_t *handle);
 
 void gem_sw_finish(int fd, uint32_t handle);
 
