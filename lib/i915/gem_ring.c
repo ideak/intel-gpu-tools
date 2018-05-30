@@ -55,7 +55,7 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	unsigned int count, last;
+	unsigned int last[2]= { -1, -1 }, count;
 	struct itimerval itv;
 	IGT_CORK_HANDLE(cork);
 
@@ -85,7 +85,6 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 	itv.it_value.tv_usec = 10000;
 	setitimer(ITIMER_REAL, &itv, NULL);
 
-	last = -1;
 	count = 0;
 	do {
 		if (__execbuf(fd, &execbuf) == 0) {
@@ -93,12 +92,13 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 			continue;
 		}
 
-		if (last == count)
+		if (last[1] == count)
 			break;
 
 		/* sleep until the next timer interrupt (woken on signal) */
 		pause();
-		last = count;
+		last[1] = last[0];
+		last[0] = count;
 	} while (1);
 
 	igt_assert_eq(__execbuf(fd, &execbuf), -EINTR);
