@@ -1037,7 +1037,6 @@ static void cpu_hotplug(int gem_fd)
 	int cur = 0;
 	char buf;
 
-	igt_skip_on(IS_BROXTON(intel_get_drm_devid(gem_fd)));
 	igt_require(cpu0_hotplug_support());
 
 	fd = open_pmu(I915_PMU_ENGINE_BUSY(I915_ENGINE_CLASS_RENDER, 0));
