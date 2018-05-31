@@ -141,16 +141,19 @@ create_bo(int fd, uint32_t val)
 static void
 check_bo(int fd, uint32_t handle, uint32_t val)
 {
+	int num_errors;
 	int i;
 
 	gem_read(fd, handle, 0, linear, sizeof(linear));
+
+	num_errors = 0;
 	for (i = 0; i < WIDTH*HEIGHT; i++) {
-		igt_assert_f(linear[i] == val,
-			     "Expected 0x%08x, found 0x%08x "
-			     "at offset 0x%08x\n",
-			     val, linear[i], i * 4);
+		if (linear[i] != val && num_errors++ < 32)
+			igt_warn("[%08x] Expected 0x%08x, found 0x%08x (difference 0x%08x)\n",
+				 i * 4, val, linear[i], val ^ linear[i]);
 		val++;
 	}
+	igt_assert_eq(num_errors, 0);
 }
 
 static void run_test(int fd, int count)

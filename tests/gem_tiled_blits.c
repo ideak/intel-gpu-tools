@@ -90,10 +90,11 @@ create_bo(uint32_t start_val)
 }
 
 static void
-check_bo(drm_intel_bo *bo, uint32_t start_val)
+check_bo(drm_intel_bo *bo, uint32_t val)
 {
 	drm_intel_bo *linear_bo;
 	uint32_t *linear;
+	int num_errors;
 	int i;
 
 	linear_bo = drm_intel_bo_alloc(bufmgr, "linear dst", 1024 * 1024, 4096);
@@ -103,13 +104,14 @@ check_bo(drm_intel_bo *bo, uint32_t start_val)
 	do_or_die(drm_intel_bo_map(linear_bo, 0));
 	linear = linear_bo->virtual;
 
+	num_errors = 0;
 	for (i = 0; i < 1024 * 1024 / 4; i++) {
-		igt_assert_f(linear[i] == start_val,
-			     "Expected 0x%08x, found 0x%08x "
-			     "at offset 0x%08x\n",
-			     start_val, linear[i], i * 4);
-		start_val++;
+		if (linear[i] != val && num_errors++ < 32)
+			igt_warn("[%08x] Expected 0x%08x, found 0x%08x (difference 0x%08x)\n",
+				 i * 4, val, linear[i], val ^ linear[i]);
+		val++;
 	}
+	igt_assert_eq(num_errors, 0);
 	drm_intel_bo_unmap(linear_bo);
 
 	drm_intel_bo_unreference(linear_bo);
