@@ -378,6 +378,8 @@ while (<>) {
 		$k = 'global' if $k eq 'global_seqno';
 		chop $v if substr($v, -1, 1) eq ',';
 		$tp{$k} = $v;
+
+		$tp{'ring'} = $tp{'engine'} if $k eq 'engine';
 	}
 
 	next if exists $tp{'ring'} and exists $ignore_ring{$tp{'ring'}};
@@ -631,7 +633,7 @@ foreach my $gid (sort keys %rings) {
 
 	# Extract all GPU busy intervals and sort them.
 	foreach my $key (@sorted_keys) {
-		next unless $db{$key}->{'ring'} == $ring;
+		next unless $db{$key}->{'ring'} eq $ring;
 		push @s_, $db{$key}->{'start'};
 		push @e_, $db{$key}->{'end'};
 		die if $db{$key}->{'start'} > $db{$key}->{'end'};
