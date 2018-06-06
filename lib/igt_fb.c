@@ -1323,7 +1323,7 @@ struct fb_convert_blit_upload {
 
 static uint8_t clamprgb(float val)
 {
-	return clamp(val, 0.0f, 255.0f);
+	return clamp((int)(val + 0.5f), 0, 255);
 }
 
 static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
