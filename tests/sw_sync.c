@@ -667,7 +667,7 @@ static struct {
 	pthread_mutex_t lock;
 } test_mpsc_data;
 
-static int mpsc_producer_thread(void *d)
+static void *mpsc_producer_thread(void *d)
 {
 	int id = (long)d;
 	int fence, i;
@@ -700,7 +700,7 @@ static int mpsc_producer_thread(void *d)
 		close(fence);
 	}
 
-	return 0;
+	return NULL;
 }
 
 static int mpsc_consumer_thread(void)
