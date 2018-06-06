@@ -384,9 +384,10 @@ const unsigned char* igt_kms_get_alt_edid(void)
  */
 const char *kmstest_pipe_name(enum pipe pipe)
 {
-	static const char * const str[] = {
-		"A", "B", "C", "D", "E", "F",
-	};
+	static const char str[] = "A\0B\0C\0D\0E\0F";
+
+	_Static_assert(sizeof(str) == IGT_MAX_PIPES * 2,
+		       "Missing pipe name");
 
 	if (pipe == PIPE_NONE)
 		return "None";
@@ -394,7 +395,7 @@ const char *kmstest_pipe_name(enum pipe pipe)
 	if (pipe >= IGT_MAX_PIPES)
 		return "invalid";
 
-	return str[pipe];
+	return str + (pipe * 2);
 }
 
 /**
@@ -405,20 +406,12 @@ const char *kmstest_pipe_name(enum pipe pipe)
  */
 int kmstest_pipe_to_index(char pipe)
 {
-	if (pipe == 'A')
-		return 0;
-	else if (pipe == 'B')
-		return 1;
-	else if (pipe == 'C')
-		return 2;
-	else if (pipe == 'D')
-		return 3;
-	else if (pipe == 'E')
-		return 4;
-	else if (pipe == 'F')
-		return 5;
-	else
+	int r = pipe - 'A';
+
+	if (r < 0 || r >= IGT_MAX_PIPES)
 		return -EINVAL;
+
+	return r;
 }
 
 /**
