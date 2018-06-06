@@ -36,11 +36,9 @@ static const struct color_encoding color_encodings[IGT_NUM_COLOR_ENCODINGS] = {
 
 static struct igt_mat4 rgb_to_ycbcr_matrix(const struct color_encoding *e)
 {
-	float kr, kg, kb;
-
-	kr = e->kr;
-	kb = e->kb;
-	kg = 1.0f - kr - kb;
+	float kr = e->kr;
+	float kb = e->kb;
+	float kg = 1.0f - kr - kb;
 
 	struct igt_mat4 ret = {
 		.d[m(0, 0)] = kr,
@@ -63,11 +61,9 @@ static struct igt_mat4 rgb_to_ycbcr_matrix(const struct color_encoding *e)
 
 static struct igt_mat4 ycbcr_to_rgb_matrix(const struct color_encoding *e)
 {
-	float kr, kg, kb;
-
-	kr = e->kr;
-	kb = e->kb;
-	kg = 1.0f - kr - kb;
+	float kr = e->kr;
+	float kb = e->kb;
+	float kg = 1.0f - kr - kb;
 
 	struct igt_mat4 ret = {
 		.d[m(0, 0)] = 1.0f,
