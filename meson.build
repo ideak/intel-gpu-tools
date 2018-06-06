@@ -2,7 +2,7 @@ project('igt-gpu-tools', 'c',
 	version : '1.22',
         default_options: [
           'warning_level=2',
-          'c_std=gnu99',
+          'c_std=gnu11',
         ],
 	license : 'MIT',
 	meson_version : '>0.44.0')
