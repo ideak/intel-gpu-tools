@@ -234,6 +234,43 @@ reload(const char *opts_i915)
 	return err;
 }
 
+static int open_parameters(const char *module_name)
+{
+	char path[256];
+
+	snprintf(path, sizeof(path), "/sys/module/%s/parameters", module_name);
+	return open(path, O_RDONLY);
+}
+
+static int
+inject_fault(const char *module_name, const char *opt, int fault)
+{
+	char buf[1024];
+	int dir;
+
+	igt_assert(fault > 0);
+	snprintf(buf, sizeof(buf), "%s=%d", opt, fault);
+
+	if (igt_kmod_load(module_name, buf)) {
+		igt_warn("Failed to load module '%s' with options '%s'\n",
+			 module_name, buf);
+		return 1;
+	}
+
+	dir = open_parameters(module_name);
+	igt_sysfs_scanf(dir, opt, "%d", &fault);
+	close(dir);
+
+	igt_debug("Loaded '%s %s', result=%d\n", module_name, buf, fault);
+
+	if (strcmp(module_name, "i915")) /* XXX better ideas! */
+		igt_kmod_unload(module_name, 0);
+	else
+		igt_i915_driver_unload();
+
+	return fault;
+}
+
 static void
 gem_sanitycheck(void)
 {
@@ -320,12 +357,15 @@ igt_main
 		igt_assert_eq(reload("disable_display=1"), 0);
 
 	igt_subtest("basic-reload-inject") {
-		char buf[64];
 		int i = 0;
-		do {
-			snprintf(buf, sizeof(buf),
-				 "inject_load_failure=%d", ++i);
-		} while (reload(buf));
+
+		igt_i915_driver_unload();
+
+		while (inject_fault("i915", "inject_load_failure", ++i) == 0)
+			;
+
+		/* We expect to hit at least one fault! */
+		igt_assert(i > 1);
 	}
 
 	igt_fixture {
