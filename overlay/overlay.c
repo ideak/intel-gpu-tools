@@ -148,6 +148,7 @@ static void init_gpu_top(struct overlay_context *ctx,
 		{ 0.25, 1, 0.25, 1 },
 		{ 0.25, 0.25, 1, 1 },
 		{ 1, 1, 1, 1 },
+		{ 1, 1, 0.25, 1 },
 	};
 	int n;
 
@@ -311,11 +312,11 @@ static void show_gpu_perf(struct overlay_context *ctx, struct overlay_gpu_perf *
 		{ 1, 1, 1, 1 },
 	};
 	struct gpu_perf_comm *comm, **prev;
-	const char *ring_name[] = {
-		"R",
-		"B",
-		"V0",
-		"V1",
+	const char *ring_name[MAX_RINGS] = {
+		"R", "?", "?", "?",
+		"B", "?", "?", "?",
+		"V0", "V1", "?", "?",
+		"VE0", "?", "?", "?",
 	};
 	double range[2];
 	char buf[1024];
@@ -326,7 +327,7 @@ static void show_gpu_perf(struct overlay_context *ctx, struct overlay_gpu_perf *
 
 	gpu_perf_update(&gp->gpu_perf);
 
-	for (n = 0; n < 4; n++) {
+	for (n = 0; n < MAX_RINGS; n++) {
 		if (gp->gpu_perf.ctx_switch[n])
 			has_ctx = n + 1;
 		if (gp->gpu_perf.flip_complete[n])
@@ -389,7 +390,7 @@ static void show_gpu_perf(struct overlay_context *ctx, struct overlay_gpu_perf *
 		}
 
 		total = 0;
-		for (n = 0; n < 3; n++)
+		for (n = 0; n < MAX_RINGS; n++)
 			total += comm->nr_requests[n];
 		chart_add_sample(comm->user_data, total);
 	}
@@ -433,7 +434,7 @@ static void show_gpu_perf(struct overlay_context *ctx, struct overlay_gpu_perf *
 			goto skip_comm;
 
 		len = sprintf(buf, "%s:", comm->name);
-		for (n = 0; n < sizeof(ring_name)/sizeof(ring_name[0]); n++) {
+		for (n = 0; n < MAX_RINGS; n++) {
 			if (comm->nr_requests[n] == 0)
 				continue;
 			len += sprintf(buf + len, "%s %d%s", need_comma ? "," : "", comm->nr_requests[n], ring_name[n]);

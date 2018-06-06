@@ -33,6 +33,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "igt_perf.h"
 
@@ -85,7 +86,8 @@ struct tracepoint {
 
 	int device_field;
 	int ctx_field;
-	int ring_field;
+	int class_field;
+	int instance_field;
 	int seqno_field;
 	int global_seqno_field;
 	int plane_field;
@@ -151,8 +153,10 @@ tracepoint_id(int tp_id)
 				tp->device_field = f;
 			} else if (!strcmp(tp->fields[f].name, "ctx")) {
 				tp->ctx_field = f;
-			} else if (!strcmp(tp->fields[f].name, "ring")) {
-				tp->ring_field = f;
+			} else if (!strcmp(tp->fields[f].name, "class")) {
+				tp->class_field = f;
+			} else if (!strcmp(tp->fields[f].name, "instance")) {
+				tp->instance_field = f;
 			} else if (!strcmp(tp->fields[f].name, "seqno")) {
 				tp->seqno_field = f;
 			} else if (!strcmp(tp->fields[f].name, "global_seqno")) {
@@ -174,6 +178,26 @@ tracepoint_id(int tp_id)
 	(*(const uint32_t *)((sample)->tracepoint_data +		\
 			     tracepoints[tp_id].fields[			\
 				     tracepoints[tp_id].field_name##_field].offset))
+
+#define READ_TP_FIELD_U16(sample, tp_id, field_name)			\
+	(*(const uint16_t *)((sample)->tracepoint_data +		\
+			     tracepoints[tp_id].fields[			\
+				     tracepoints[tp_id].field_name##_field].offset))
+
+#define GET_RING_ID(sample, tp_id) \
+({ \
+	unsigned char class, instance, ring; \
+\
+	class = READ_TP_FIELD_U16(sample, tp_id, class); \
+	instance = READ_TP_FIELD_U16(sample, tp_id, instance); \
+\
+	assert(class <= I915_ENGINE_CLASS_VIDEO_ENHANCE); \
+	assert(instance <= 4); \
+\
+	ring = class * 4 + instance; \
+\
+	ring; \
+})
 
 static int perf_tracepoint_open(struct gpu_perf *gp, int tp_id,
 				int (*func)(struct gpu_perf *, const void *))
@@ -313,7 +337,7 @@ static int request_add(struct gpu_perf *gp, const void *event)
 	if (comm == NULL)
 		return 0;
 
-	comm->nr_requests[READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_ADD, ring)]++;
+	comm->nr_requests[GET_RING_ID(sample, TP_GEM_REQUEST_ADD)]++;
 	return 1;
 }
 
@@ -329,7 +353,7 @@ static int ctx_switch(struct gpu_perf *gp, const void *event)
 {
 	const struct sample_event *sample = event;
 
-	gp->ctx_switch[READ_TP_FIELD_U32(sample, TP_GEM_RING_SWITCH_CONTEXT, ring)]++;
+	gp->ctx_switch[GET_RING_ID(sample, TP_GEM_RING_SWITCH_CONTEXT)]++;
 	return 1;
 }
 
@@ -367,8 +391,8 @@ static int wait_begin(struct gpu_perf *gp, const void *event)
 	wait->context = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_BEGIN, ctx);
 	wait->seqno = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_BEGIN, seqno);
 	wait->time = sample->time;
-	wait->next = gp->wait[READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_BEGIN, ring)];
-	gp->wait[READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_BEGIN, ring)] = wait;
+	wait->next = gp->wait[GET_RING_ID(sample, TP_GEM_REQUEST_WAIT_BEGIN)];
+	gp->wait[GET_RING_ID(sample, TP_GEM_REQUEST_WAIT_BEGIN)] = wait;
 
 	return 0;
 }
@@ -377,7 +401,7 @@ static int wait_end(struct gpu_perf *gp, const void *event)
 {
 	const struct sample_event *sample = event;
 	struct gpu_perf_time *wait, **prev;
-	uint32_t engine = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_END, ring);
+	uint32_t engine = GET_RING_ID(sample, TP_GEM_REQUEST_WAIT_END);
 	uint32_t context = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_END, ctx);
 	uint32_t seqno = READ_TP_FIELD_U32(sample, TP_GEM_REQUEST_WAIT_END, seqno);
 
