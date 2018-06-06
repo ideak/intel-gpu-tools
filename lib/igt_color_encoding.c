@@ -43,19 +43,19 @@ static struct igt_mat4 rgb_to_ycbcr_matrix(const struct color_encoding *e)
 	kg = 1.0f - kr - kb;
 
 	struct igt_mat4 ret = {
-		.d[0 * 4 + 0] = kr,
-		.d[1 * 4 + 0] = kg,
-		.d[2 * 4 + 0] = kb,
+		.d[m(0, 0)] = kr,
+		.d[m(0, 1)] = kg,
+		.d[m(0, 2)] = kb,
 
-		.d[0 * 4 + 1] = -kr / (1.0f - kb),
-		.d[1 * 4 + 1] = -kg / (1.0f - kb),
-		.d[2 * 4 + 1] = 1.0f,
+		.d[m(1, 0)] = -kr / (1.0f - kb),
+		.d[m(1, 1)] = -kg / (1.0f - kb),
+		.d[m(1, 2)] = 1.0f,
 
-		.d[0 * 4 + 2] = 1.0f,
-		.d[1 * 4 + 2] = -kg / (1.0f - kr),
-		.d[2 * 4 + 2] = -kb / (1.0f - kr),
+		.d[m(2, 0)] = 1.0f,
+		.d[m(2, 1)] = -kg / (1.0f - kr),
+		.d[m(2, 2)] = -kb / (1.0f - kr),
 
-		.d[3 * 4 + 3] = 1.0f,
+		.d[m(3, 3)] = 1.0f,
 	};
 
 	return ret;
@@ -70,19 +70,19 @@ static struct igt_mat4 ycbcr_to_rgb_matrix(const struct color_encoding *e)
 	kg = 1.0f - kr - kb;
 
 	struct igt_mat4 ret = {
-		.d[0 * 4 + 0] = 1.0f,
-		.d[1 * 4 + 0] = 0.0f,
-		.d[2 * 4 + 0] = 1.0 - kr,
+		.d[m(0, 0)] = 1.0f,
+		.d[m(0, 1)] = 0.0f,
+		.d[m(0, 2)] = 1.0 - kr,
 
-		.d[0 * 4 + 1] = 1.0f,
-		.d[1 * 4 + 1] = -(1.0 - kb) * kb / kg,
-		.d[2 * 4 + 1] = -(1.0 - kr) * kr / kg,
+		.d[m(1, 0)] = 1.0f,
+		.d[m(1, 1)] = -(1.0 - kb) * kb / kg,
+		.d[m(1, 2)] = -(1.0 - kr) * kr / kg,
 
-		.d[0 * 4 + 2] = 1.0f,
-		.d[1 * 4 + 2] = 1.0 - kb,
-		.d[2 * 4 + 2] = 0.0f,
+		.d[m(2, 0)] = 1.0f,
+		.d[m(2, 1)] = 1.0 - kb,
+		.d[m(2, 2)] = 0.0f,
 
-		.d[3 * 4 + 3] = 1.0f,
+		.d[m(3, 3)] = 1.0f,
 	};
 
 	return ret;
