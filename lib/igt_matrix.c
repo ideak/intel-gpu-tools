@@ -24,8 +24,6 @@
 #include "igt_core.h"
 #include "igt_matrix.h"
 
-#define m(row, col) ((col) * 4 + (row))
-
 /**
  * SECTION:igt_matrix
  * @short_description: Matrix math library
@@ -106,29 +104,6 @@ struct igt_mat4 igt_matrix_translate(float x, float y, float z)
 		.d[m(2, 3)] = z,
 		.d[m(3, 3)] = 1.0f,
 	};
-
-	return ret;
-}
-
-/**
- * igt_matrix_transform:
- *
- * Transform the vector @v by the matrix @m. @m is on the left,
- * @v on the right.
- *
- * Returns:
- * The transformed vector.
- */
-struct igt_vec4 igt_matrix_transform(const struct igt_mat4 *m,
-				     const struct igt_vec4 *v)
-{
-	struct igt_vec4 ret = {};
-
-	for (int row = 0; row < 4; row++) {
-		for (int i = 0; i < 4; i++) {
-			ret.d[row] += m->d[m(row, i)] * v->d[i];
-		}
-	}
 
 	return ret;
 }
