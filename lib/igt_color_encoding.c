@@ -24,6 +24,8 @@
 #include "igt_color_encoding.h"
 #include "igt_matrix.h"
 #include "igt_core.h"
+#include "igt_fb.h"
+#include "drmtest.h"
 
 struct color_encoding {
 	float kr, kb;
@@ -85,60 +87,113 @@ static struct igt_mat4 ycbcr_to_rgb_matrix(const struct color_encoding *e)
 	return ret;
 }
 
-static struct igt_mat4 ycbcr_input_convert_matrix(enum igt_color_range color_range)
+static struct igt_mat4 ycbcr_input_convert_matrix(enum igt_color_range color_range, float scale,
+						  float ofs_y, float max_y,
+						  float ofs_cbcr, float mid_cbcr, float max_cbcr,
+						  float max_val)
 {
 	struct igt_mat4 t, s;
 
 	if (color_range == IGT_COLOR_YCBCR_FULL_RANGE) {
-		t = igt_matrix_translate(0.0f, -128.0f, -128.0f);
-		s = igt_matrix_scale(1.0f, 2.0f, 2.0f);
+		t = igt_matrix_translate(0.f, -mid_cbcr, -mid_cbcr);
+		s = igt_matrix_scale(scale, 2.0f * scale, 2.0f * scale);
 	} else {
-		t = igt_matrix_translate(-16.0f, -128.0f, -128.0f);
-		s = igt_matrix_scale(255.0f / (235.0f - 16.0f),
-				     255.0f / (240.0f - 128.0f),
-				     255.0f / (240.0f - 128.0f));
+		t = igt_matrix_translate(-ofs_y, -mid_cbcr, -mid_cbcr);
+		s = igt_matrix_scale(scale * max_val / (max_y - ofs_y),
+				     scale * max_val / (max_cbcr - mid_cbcr),
+				     scale * max_val / (max_cbcr - mid_cbcr));
 	}
 
 	return igt_matrix_multiply(&s, &t);
 }
 
-static struct igt_mat4 ycbcr_output_convert_matrix(enum igt_color_range color_range)
+static struct igt_mat4 ycbcr_output_convert_matrix(enum igt_color_range color_range, float scale,
+						   float ofs_y, float max_y,
+						   float ofs_cbcr, float mid_cbcr, float max_cbcr,
+						   float max_val)
 {
 	struct igt_mat4 s, t;
 
 	if (color_range == IGT_COLOR_YCBCR_FULL_RANGE) {
-		s = igt_matrix_scale(1.0f, 0.5f, 0.5f);
-		t = igt_matrix_translate(0.0f, 128.0f, 128.0f);
+		s = igt_matrix_scale(scale, 0.5f * scale, 0.5f * scale);
+		t = igt_matrix_translate(0.f, mid_cbcr, mid_cbcr);
 	} else {
-		s = igt_matrix_scale((235.0f - 16.0f) / 255.0f,
-				     (240.0f - 128.0f) / 255.0f,
-				     (240.0f - 128.0f) / 255.0f);
-		t = igt_matrix_translate(16.0f, 128.0f, 128.0f);
+		s = igt_matrix_scale(scale * (max_y - ofs_y) / max_val,
+				     scale * (max_cbcr - mid_cbcr) / max_val,
+				     scale * (max_cbcr - mid_cbcr) / max_val);
+		t = igt_matrix_translate(ofs_y, mid_cbcr, mid_cbcr);
 	}
 
 	return igt_matrix_multiply(&t, &s);
 }
 
-struct igt_mat4 igt_ycbcr_to_rgb_matrix(enum igt_color_encoding color_encoding,
+static const struct color_encoding_format {
+	uint32_t fourcc;
+
+	float max_val;
+
+	float ofs_y, max_y, ofs_cbcr, mid_cbcr, max_cbcr;
+} formats[] = {
+	{ DRM_FORMAT_XRGB8888, 255.f, },
+	{ DRM_FORMAT_NV12, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_NV16, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_NV21, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_NV61, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_YUV420, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_YUV422, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_YVU420, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_YVU422, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_YUYV, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_YVYU, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_UYVY, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+	{ DRM_FORMAT_VYUY, 255.f, 16.f, 235.f, 16.f, 128.f, 240.f },
+};
+
+static const struct color_encoding_format *lookup_fourcc(uint32_t fourcc)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(formats); i++)
+		if (fourcc == formats[i].fourcc)
+			return &formats[i];
+
+	igt_assert_f(0, "Could not look up fourcc %.4s\n", (char *)&fourcc);
+}
+
+struct igt_mat4 igt_ycbcr_to_rgb_matrix(uint32_t from_fourcc,
+					uint32_t to_fourcc,
+					enum igt_color_encoding color_encoding,
 					enum igt_color_range color_range)
 {
 	const struct color_encoding *e = &color_encodings[color_encoding];
 	struct igt_mat4 r, c;
+	const struct color_encoding_format *fycbcr = lookup_fourcc(from_fourcc);
+	const struct color_encoding_format *frgb = lookup_fourcc(to_fourcc);
+	float scale = frgb->max_val / fycbcr->max_val;
 
-	r = ycbcr_input_convert_matrix(color_range);
+	igt_assert(fycbcr->ofs_y && !frgb->ofs_y);
+
+	r = ycbcr_input_convert_matrix(color_range, scale, fycbcr->ofs_y, fycbcr->max_y, fycbcr->ofs_cbcr, fycbcr->mid_cbcr, fycbcr->max_cbcr, fycbcr->max_val);
 	c = ycbcr_to_rgb_matrix(e);
 
 	return igt_matrix_multiply(&c, &r);
 }
 
-struct igt_mat4 igt_rgb_to_ycbcr_matrix(enum igt_color_encoding color_encoding,
+struct igt_mat4 igt_rgb_to_ycbcr_matrix(uint32_t from_fourcc,
+					uint32_t to_fourcc,
+					enum igt_color_encoding color_encoding,
 					enum igt_color_range color_range)
 {
 	const struct color_encoding *e = &color_encodings[color_encoding];
+	const struct color_encoding_format *frgb = lookup_fourcc(from_fourcc);
+	const struct color_encoding_format *fycbcr = lookup_fourcc(to_fourcc);
 	struct igt_mat4 c, r;
+	float scale = fycbcr->max_val / frgb->max_val;
+
+	igt_assert(fycbcr->ofs_y && !frgb->ofs_y);
 
 	c = rgb_to_ycbcr_matrix(e);
-	r = ycbcr_output_convert_matrix(color_range);
+	r = ycbcr_output_convert_matrix(color_range, scale, fycbcr->ofs_y, fycbcr->max_y, fycbcr->ofs_cbcr, fycbcr->mid_cbcr, fycbcr->max_cbcr, fycbcr->max_val);
 
 	return igt_matrix_multiply(&r, &c);
 }

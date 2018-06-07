@@ -25,6 +25,7 @@
 #define __IGT_COLOR_ENCODING_H__
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "igt_matrix.h"
 
@@ -44,9 +45,13 @@ enum igt_color_range {
 const char *igt_color_encoding_to_str(enum igt_color_encoding encoding);
 const char *igt_color_range_to_str(enum igt_color_range range);
 
-struct igt_mat4 igt_ycbcr_to_rgb_matrix(enum igt_color_encoding color_encoding,
+struct igt_mat4 igt_ycbcr_to_rgb_matrix(uint32_t ycbcr_fourcc,
+					uint32_t rgb_fourcc,
+					enum igt_color_encoding color_encoding,
 					enum igt_color_range color_range);
-struct igt_mat4 igt_rgb_to_ycbcr_matrix(enum igt_color_encoding color_encoding,
+struct igt_mat4 igt_rgb_to_ycbcr_matrix(uint32_t rgb_fourcc,
+					uint32_t ycbcr_fourcc,
+					enum igt_color_encoding color_encoding,
 					enum igt_color_range color_range);
 
 #endif /* __IGT_COLOR_ENCODING_H__ */

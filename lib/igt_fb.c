@@ -1564,7 +1564,7 @@ static void *igt_fb_create_cairo_shadow_buffer(int fd,
 		DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
 		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
-	shadow->strides[0] = ALIGN(width * 4, 16);
+	shadow->strides[0] = ALIGN(width * shadow->plane_bpp[0], 16);
 	shadow->size = ALIGN(shadow->strides[0] * height,
 			     sysconf(_SC_PAGESIZE));
 	ptr = mmap(NULL, shadow->size, PROT_READ | PROT_WRITE,
@@ -1777,7 +1777,9 @@ static void convert_yuv_to_rgb24(struct fb_convert *cvt)
 	uint8_t *y, *u, *v;
 	uint8_t *rgb24 = cvt->dst.ptr;
 	unsigned int rgb24_stride = cvt->dst.fb->strides[0];
-	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
+	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->drm_format,
+						    cvt->dst.fb->drm_format,
+						    cvt->src.fb->color_encoding,
 						    cvt->src.fb->color_range);
 	uint8_t *buf;
 	struct yuv_parameters params = { };
@@ -1838,7 +1840,9 @@ static void convert_rgb24_to_yuv(struct fb_convert *cvt)
 	const uint8_t *rgb24 = cvt->src.ptr;
 	uint8_t bpp = 4;
 	unsigned rgb24_stride = cvt->src.fb->strides[0];
-	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->dst.fb->color_encoding,
+	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->src.fb->drm_format,
+						    cvt->dst.fb->drm_format,
+						    cvt->dst.fb->color_encoding,
 						    cvt->dst.fb->color_range);
 	struct yuv_parameters params = { };
 
