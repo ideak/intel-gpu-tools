@@ -135,6 +135,9 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 	gem_write(fd, obj[nengine*ring_size].handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj[nengine*ring_size]);
+	execbuf.buffer_count = 1;
+	gem_execbuf(fd, &execbuf); /* tag the object as a batch in the GTT */
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = nengine*ring_size + 1;
 
