@@ -445,6 +445,24 @@ static int max_tile_width(uint32_t devid, int tiling)
 		return 8 << 10;
 }
 
+static bool known_swizzling(int fd, uint32_t handle)
+{
+	struct drm_i915_gem_get_tiling2 {
+		uint32_t handle;
+		uint32_t tiling_mode;
+		uint32_t swizzle_mode;
+		uint32_t phys_swizzle_mode;
+	} arg = {
+		.handle = handle,
+	};
+#define DRM_IOCTL_I915_GEM_GET_TILING2	DRM_IOWR (DRM_COMMAND_BASE + DRM_I915_GEM_GET_TILING, struct drm_i915_gem_get_tiling2)
+
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_GET_TILING2, &arg))
+		return false;
+
+	return arg.phys_swizzle_mode == arg.swizzle_mode;
+}
+
 static void
 test_huge_bo(int fd, int huge, int tiling)
 {
@@ -488,6 +506,8 @@ test_huge_bo(int fd, int huge, int tiling)
 	bo = gem_create(fd, PAGE_SIZE);
 	if (tiling)
 		igt_require(__gem_set_tiling(fd, bo, tiling, pitch) == 0);
+	igt_require(known_swizzling(fd, bo));
+
 	linear_pattern = gem_mmap__gtt(fd, bo, PAGE_SIZE,
 				       PROT_READ | PROT_WRITE);
 	for (i = 0; i < PAGE_SIZE; i++)
