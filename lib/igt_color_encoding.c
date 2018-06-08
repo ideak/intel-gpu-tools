@@ -23,6 +23,7 @@
 
 #include "igt_color_encoding.h"
 #include "igt_matrix.h"
+#include "igt_core.h"
 
 struct color_encoding {
 	float kr, kb;
@@ -140,4 +141,23 @@ struct igt_mat4 igt_rgb_to_ycbcr_matrix(enum igt_color_encoding color_encoding,
 	r = ycbcr_output_convert_matrix(color_range);
 
 	return igt_matrix_multiply(&r, &c);
+}
+
+const char *igt_color_encoding_to_str(enum igt_color_encoding encoding)
+{
+	switch (encoding) {
+	case IGT_COLOR_YCBCR_BT601: return "ITU-R BT.601 YCbCr";
+	case IGT_COLOR_YCBCR_BT709: return "ITU-R BT.709 YCbCr";
+	case IGT_COLOR_YCBCR_BT2020: return "ITU-R BT.2020 YCbCr";
+	default: igt_assert(0); return NULL;
+	}
+}
+
+const char *igt_color_range_to_str(enum igt_color_range range)
+{
+	switch (range) {
+	case IGT_COLOR_YCBCR_LIMITED_RANGE: return "YCbCr limited range";
+	case IGT_COLOR_YCBCR_FULL_RANGE: return "YCbCr full range";
+	default: igt_assert(0); return NULL;
+	}
 }

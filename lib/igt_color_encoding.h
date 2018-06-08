@@ -41,6 +41,9 @@ enum igt_color_range {
 	IGT_NUM_COLOR_RANGES,
 };
 
+const char *igt_color_encoding_to_str(enum igt_color_encoding encoding);
+const char *igt_color_range_to_str(enum igt_color_range range);
+
 struct igt_mat4 igt_ycbcr_to_rgb_matrix(enum igt_color_encoding color_encoding,
 					enum igt_color_range color_range);
 struct igt_mat4 igt_rgb_to_ycbcr_matrix(enum igt_color_encoding color_encoding,
