@@ -25,37 +25,52 @@
 
 IGT_TEST_DESCRIPTION("Basic sanity check of execbuf-ioctl rings.");
 
+static uint32_t batch_create(int fd)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
+
+	handle = gem_create(fd, 4096);
+	gem_write(fd, handle, 0, &bbe, sizeof(bbe));
+
+	return handle;
+}
+
+static void batch_fini(int fd, uint32_t handle)
+{
+	gem_sync(fd, handle); /* catch any GPU hang */
+	gem_close(fd, handle);
+}
+
 static void noop(int fd, unsigned ring)
 {
-	uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 exec;
 
 	gem_require_ring(fd, ring);
 
 	memset(&exec, 0, sizeof(exec));
-	exec.handle = gem_create(fd, 4096);
-	gem_write(fd, exec.handle, 0, &bbe, sizeof(bbe));
+
+	exec.handle = batch_create(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&exec);
 	execbuf.buffer_count = 1;
 	execbuf.flags = ring;
 	gem_execbuf(fd, &execbuf);
-	gem_close(fd, exec.handle);
+
+	batch_fini(fd, exec.handle);
 }
 
 static void readonly(int fd, unsigned ring)
 {
-	uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 *execbuf;
 	struct drm_i915_gem_exec_object2 exec;
 
 	gem_require_ring(fd, ring);
 
 	memset(&exec, 0, sizeof(exec));
-	exec.handle = gem_create(fd, 4096);
-	gem_write(fd, exec.handle, 0, &bbe, sizeof(bbe));
+	exec.handle = batch_create(fd);
 
 	execbuf = mmap(NULL, 4096, PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
 	igt_assert(execbuf != NULL);
@@ -66,13 +81,14 @@ static void readonly(int fd, unsigned ring)
 	igt_assert(mprotect(execbuf, 4096, PROT_READ) == 0);
 
 	gem_execbuf(fd, execbuf);
+
 	munmap(execbuf, 4096);
-	gem_close(fd, exec.handle);
+
+	batch_fini(fd, exec.handle);
 }
 
 static void gtt(int fd, unsigned ring)
 {
-	uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 *execbuf;
 	struct drm_i915_gem_exec_object2 *exec;
 	uint32_t handle;
@@ -86,16 +102,15 @@ static void gtt(int fd, unsigned ring)
 	exec = (struct drm_i915_gem_exec_object2 *)(execbuf + 1);
 	gem_close(fd, handle);
 
-	exec->handle = gem_create(fd, 4096);
-	gem_write(fd, exec->handle, 0, &bbe, sizeof(bbe));
+	exec->handle = batch_create(fd);
 
 	execbuf->buffers_ptr = to_user_pointer(exec);
 	execbuf->buffer_count = 1;
 	execbuf->flags = ring;
 
 	gem_execbuf(fd, execbuf);
-	gem_close(fd, exec->handle);
 
+	batch_fini(fd, exec->handle);
 	munmap(execbuf, 4096);
 }
 
