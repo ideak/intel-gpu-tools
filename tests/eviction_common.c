@@ -133,47 +133,33 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 			      uint64_t surface_size,
 			      uint64_t surface_count)
 {
-	unsigned int *can_mlock;
-	uint64_t sz, pin;
+	void *mem;
+	uint64_t sz, pin_total;
 
 	intel_require_memory(surface_count, surface_size, CHECK_RAM);
 
 	sz = surface_size*surface_count;
-	pin = intel_get_avail_ram_mb();
-	pin *= 1024 * 1024;
-	igt_require(pin > sz);
-	pin -= sz;
+	pin_total = intel_get_total_pinnable_mem();
+	igt_require(pin_total > sz);
 
-	igt_debug("Pinning [%'lld, %'lld] MiB\n",
-		  (long long)pin/(1024*1024),
-		  (long long)(pin + sz)/(1024*1024));
-
-	can_mlock = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
-	igt_assert(can_mlock != MAP_FAILED);
+	mem = mmap(NULL, pin_total, PROT_READ, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(mem != MAP_FAILED);
 
 	igt_fork(child, 1) {
-		void *locked;
-
-		locked = malloc(pin + sz);
-		if (locked != NULL && !mlock(locked, pin + sz))
-			*can_mlock = 1;
-	}
-	igt_waitchildren();
-	igt_require(*can_mlock);
-	munmap(can_mlock, 4096);
-
-	igt_fork(child, 1) {
-		void *locked;
 		uint32_t *bo;
 		uint64_t n;
 		int ret;
+		size_t lock = pin_total - sz;
 
-		bo = malloc(surface_count*sizeof(*bo));
+		bo = malloc(surface_count * sizeof(*bo));
 		igt_assert(bo);
+		lock -= ALIGN(surface_count * sizeof(*bo), 4096);
 
-		locked = malloc(pin);
-		if (locked == NULL || mlock(locked, pin))
-			exit(ENOSPC);
+		igt_debug("Locking %'"PRIu64" B (%'"PRIu64" MiB)\n",
+			  lock, lock >> 20);
+		igt_assert(!mlock(mem, lock));
+		igt_info("Locked %'"PRIu64" B (%'"PRIu64" MiB)\n",
+			 lock, lock >> 20);
 
 		for (n = 0; n < surface_count; n++)
 			bo[n] = ops->create(fd, surface_size);
@@ -188,17 +174,19 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 			 * our pages into memory), start a memory hog to
 			 * force evictions.
 			 */
-
-			locked = malloc(surface_size);
-			if (locked == NULL || mlock(locked, surface_size))
-				free(locked);
+			lock += surface_size;
+			igt_assert(!mlock(mem, lock));
+			igt_debug("Total locked %'"PRIu64" B (%'"PRIu64" MiB)\n",
+				  lock,
+				  lock >> 20);
 		}
 
 		for (n = 0; n < surface_count; n++)
 			ops->close(fd, bo[n]);
 	}
-
 	igt_waitchildren();
+
+	munmap(mem, pin_total);
 }
 
 static int swapping_evictions(int fd, struct igt_eviction_test_ops *ops,
