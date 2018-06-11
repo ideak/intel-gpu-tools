@@ -183,6 +183,63 @@ intel_get_total_swap_mb(void)
 	return retval / (1024*1024);
 }
 
+/**
+ * intel_get_total_pinnable_mem:
+ *
+ * Compute the amount of memory that we're able to safely lock.
+ * Note that in order to achieve this, we're attempting to repeatedly lock more
+ * and more memory, which is a time consuming process.
+ *
+ * Returns: Amount of memory that can be safely pinned, in bytes.
+ */
+size_t
+intel_get_total_pinnable_mem(void)
+{
+	uint64_t *can_mlock, pin, avail;
+	size_t ret;
+
+	pin = (intel_get_total_ram_mb() + 1) << 20;
+	avail = (intel_get_avail_ram_mb() + 1) << 20;
+
+	can_mlock = mmap(NULL, pin, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_require(can_mlock != MAP_FAILED);
+
+	/*
+	 * We can reasonably assume that we should be able to lock at
+	 * least 3/4 of available RAM
+	 */
+	*can_mlock = (avail >> 1) + (avail >> 2);
+	if (mlock(can_mlock, *can_mlock)) {
+		*can_mlock = 0;
+		goto out;
+	}
+
+	for (uint64_t inc = 1024 << 20; inc >= 4 << 10; inc >>= 2) {
+		igt_debug("Testing mlock %'"PRIu64" B (%'"PRIu64" MiB)\n",
+			  *can_mlock, *can_mlock >> 20);
+
+		igt_fork(child, 1) {
+			for (uint64_t bytes = *can_mlock;
+			     bytes <= pin;
+			     bytes += inc) {
+				if (mlock(can_mlock, bytes))
+					break;
+
+				*can_mlock = bytes;
+				__sync_synchronize();
+			}
+		}
+		__igt_waitchildren();
+		igt_assert(!mlock(can_mlock, *can_mlock));
+	}
+
+out:
+	ret = *can_mlock;
+	munmap(can_mlock, pin);
+
+	return ret;
+}
+
 static uint64_t vfs_file_max(void)
 {
 	static long long unsigned max;
