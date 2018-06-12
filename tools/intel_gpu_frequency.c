@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015 Intel Corporation
+ * Copyright © 2015,2018 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,31 +19,6 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * Example:
- * Get all frequencies:
- * intel_gpu_frequency --get
- *
- * Same as above:
- * intel_gpu_frequency -g
- *
- * Lock the GPU frequency to 300MHz:
- * intel_gpu_frequency --set 300
- *
- * Set the maximum frequency to 900MHz:
- * intel_gpu_frequency --custom max=900
- *
- * Lock the GPU frequency to its maximum frequency:
- * intel_gpu_frequency --max
- *
- * Lock the GPU frequency to its most efficient frequency:
- * intel_gpu_frequency -e
- *
- * Lock The GPU frequency to its minimum frequency:
- * intel_gpu_frequency --min
- *
- * Reset the GPU to hardware defaults
- * intel_gpu_frequency -d
  */
 
 #include <assert.h>
@@ -145,7 +120,7 @@ static void __attribute__((noreturn))
 usage(const char *prog)
 {
 	printf("%s A program to manipulate Intel GPU frequencies.\n\n", prog);
-	printf("Usage: %s [-e] [--min | --max] [-g (min|max|efficient)] [-s frequency_mhz]\n\n", prog);
+	printf("Usage: %s [-e] [--min | --max] [--get] [--set frequency_mhz]\n\n", prog);
 	printf("Options: \n");
 	printf("  -e		Lock frequency to the most efficient frequency\n");
 	printf("  -g, --get     Get all the frequency settings\n");
@@ -158,9 +133,9 @@ usage(const char *prog)
 	printf("  -v  --version Version\n");
 	printf("\n");
 	printf("Examples:\n");
-	printf("   intel_gpu_frequency -gmin,cur\tGet the current and minimum frequency\n");
-	printf("   intel_gpu_frequency -s 400\tLock frequency to 400Mhz\n");
-	printf("   intel_gpu_frequency -c max=750\tSet the max frequency to 750MHz\n");
+	printf("   intel_gpu_frequency --get\t\tGet the current and minimum frequency\n");
+	printf("   intel_gpu_frequency --set 400\tLock frequency to 400Mhz\n");
+	printf("   intel_gpu_frequency --custom max=750\tSet the max frequency to 750MHz\n");
 	printf("\n");
 	printf("Report bugs to <bugs.freedesktop.org>\n");
 	exit(EXIT_FAILURE);
@@ -170,7 +145,7 @@ static void
 version(const char *prog)
 {
 	printf("%s: %s\n", prog, VERSION);
-	printf("Copyright © 2015 Intel Corporation\n");
+	printf("Copyright © 2015,2018 Intel Corporation\n");
 }
 
 /* Returns read or write operation */
