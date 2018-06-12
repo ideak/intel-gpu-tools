@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "surfaceformat.h"
+#include "gen6_render.h"
 
 #define INTEL_MASK(high, low) (((1 << ((high) - (low) + 1)) - 1) << (low))
 
@@ -1182,19 +1183,5 @@ struct gen7_cc_viewport {
 	float min_depth;
 	float max_depth;
 };
-
-typedef enum {
-	SAMPLER_FILTER_NEAREST = 0,
-	SAMPLER_FILTER_BILINEAR,
-	FILTER_COUNT
-} sampler_filter_t;
-
-typedef enum {
-	SAMPLER_EXTEND_NONE = 0,
-	SAMPLER_EXTEND_REPEAT,
-	SAMPLER_EXTEND_PAD,
-	SAMPLER_EXTEND_REFLECT,
-	EXTEND_COUNT
-} sampler_extend_t;
 
 #endif
