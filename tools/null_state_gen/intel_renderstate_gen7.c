@@ -49,36 +49,36 @@ gen7_bind_buf_null(struct intel_batchbuffer *batch)
 static void
 gen7_emit_vertex_elements(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_3DSTATE_VERTEX_ELEMENTS |
+	OUT_BATCH(GEN6_3DSTATE_VERTEX_ELEMENTS |
 		  ((2 * (1 + 2)) + 1 - 2));
 
-	OUT_BATCH(0 << GEN7_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN7_VE0_VALID |
+	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
 		  SURFACEFORMAT_R32G32B32A32_FLOAT <<
-		  GEN7_VE0_FORMAT_SHIFT |
-		  0 << GEN7_VE0_OFFSET_SHIFT);
+		  VE0_FORMAT_SHIFT |
+		  0 << VE0_OFFSET_SHIFT);
 
-	OUT_BATCH(GEN7_VFCOMPONENT_STORE_0 << GEN7_VE1_VFCOMPONENT_0_SHIFT |
-		  GEN7_VFCOMPONENT_STORE_0 << GEN7_VE1_VFCOMPONENT_1_SHIFT |
-		  GEN7_VFCOMPONENT_STORE_0 << GEN7_VE1_VFCOMPONENT_2_SHIFT |
-		  GEN7_VFCOMPONENT_STORE_0 << GEN7_VE1_VFCOMPONENT_3_SHIFT);
+	OUT_BATCH(GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
+		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
+		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
 
 	/* x,y */
-	OUT_BATCH(0 << GEN7_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN7_VE0_VALID |
-		  SURFACEFORMAT_R16G16_SSCALED << GEN7_VE0_FORMAT_SHIFT |
-		  0 << GEN7_VE0_OFFSET_SHIFT); /* offsets vb in bytes */
-	OUT_BATCH(GEN7_VFCOMPONENT_STORE_SRC << GEN7_VE1_VFCOMPONENT_0_SHIFT |
-		  GEN7_VFCOMPONENT_STORE_SRC << GEN7_VE1_VFCOMPONENT_1_SHIFT |
-		  GEN7_VFCOMPONENT_STORE_0 << GEN7_VE1_VFCOMPONENT_2_SHIFT |
-		  GEN7_VFCOMPONENT_STORE_1_FLT << GEN7_VE1_VFCOMPONENT_3_SHIFT);
+	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
+		  SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
+		  0 << VE0_OFFSET_SHIFT); /* offsets vb in bytes */
+	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+		  GEN6_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
 
 	/* s,t */
-	OUT_BATCH(0 << GEN7_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN7_VE0_VALID |
-		  SURFACEFORMAT_R16G16_SSCALED << GEN7_VE0_FORMAT_SHIFT |
-		  4 << GEN7_VE0_OFFSET_SHIFT);  /* offset vb in bytes */
-	OUT_BATCH(GEN7_VFCOMPONENT_STORE_SRC << GEN7_VE1_VFCOMPONENT_0_SHIFT |
-		  GEN7_VFCOMPONENT_STORE_SRC << GEN7_VE1_VFCOMPONENT_1_SHIFT |
-		  GEN7_VFCOMPONENT_STORE_0 << GEN7_VE1_VFCOMPONENT_2_SHIFT |
-		  GEN7_VFCOMPONENT_STORE_1_FLT << GEN7_VE1_VFCOMPONENT_3_SHIFT);
+	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
+		  SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
+		  4 << VE0_OFFSET_SHIFT);  /* offset vb in bytes */
+	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+		  GEN6_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
 }
 
 static uint32_t
@@ -95,12 +95,12 @@ static void gen7_emit_vertex_buffer(struct intel_batchbuffer *batch)
 
 	offset = gen7_create_vertex_buffer(batch);
 
-	OUT_BATCH(GEN7_3DSTATE_VERTEX_BUFFERS | (5 - 2));
-	OUT_BATCH(0 << GEN7_VB0_BUFFER_INDEX_SHIFT |
-		  GEN7_VB0_VERTEXDATA |
+	OUT_BATCH(GEN6_3DSTATE_VERTEX_BUFFERS | (5 - 2));
+	OUT_BATCH(0 << VB0_BUFFER_INDEX_SHIFT |
+		  VB0_VERTEXDATA |
 		  GEN7_VB0_ADDRESS_MODIFY_ENABLE |
-		  GEN7_VB0_NULL_VERTEX_BUFFER |
-		  4*2 << GEN7_VB0_BUFFER_PITCH_SHIFT);
+		  VB0_NULL_VERTEX_BUFFER |
+		  4*2 << VB0_BUFFER_PITCH_SHIFT);
 
 	OUT_RELOC_STATE(batch, I915_GEM_DOMAIN_VERTEX, 0, offset);
 	OUT_BATCH(~0);
@@ -130,7 +130,7 @@ gen7_emit_binding_table(struct intel_batchbuffer *batch)
 static void
 gen7_emit_drawing_rectangle(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
+	OUT_BATCH(GEN6_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
 	/* Purposedly set min > max for null rectangle */
 	OUT_BATCH(0xffffffff);
 	OUT_BATCH(0 | 0);
@@ -140,12 +140,12 @@ gen7_emit_drawing_rectangle(struct intel_batchbuffer *batch)
 static uint32_t
 gen7_create_blend_state(struct intel_batchbuffer *batch)
 {
-	struct gen7_blend_state blend;
+	struct gen6_blend_state blend;
 	memset(&blend, 0, sizeof(blend));
 
-	blend.blend0.dest_blend_factor = GEN7_BLENDFACTOR_ZERO;
-	blend.blend0.source_blend_factor = GEN7_BLENDFACTOR_ONE;
-	blend.blend0.blend_func = GEN7_BLENDFUNCTION_ADD;
+	blend.blend0.dest_blend_factor = GEN6_BLENDFACTOR_ZERO;
+	blend.blend0.source_blend_factor = GEN6_BLENDFACTOR_ONE;
+	blend.blend0.blend_func = GEN6_BLENDFUNCTION_ADD;
 	blend.blend1.post_blend_clamp_enable = 1;
 	blend.blend1.pre_blend_clamp_enable = 1;
 
@@ -155,7 +155,7 @@ gen7_create_blend_state(struct intel_batchbuffer *batch)
 static void
 gen7_emit_state_base_address(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_STATE_BASE_ADDRESS | (10 - 2));
+	OUT_BATCH(GEN6_STATE_BASE_ADDRESS | (10 - 2));
 	OUT_BATCH(0);
 	OUT_RELOC(batch, I915_GEM_DOMAIN_INSTRUCTION, 0, BASE_ADDRESS_MODIFY);
 	OUT_RELOC(batch, I915_GEM_DOMAIN_INSTRUCTION, 0, BASE_ADDRESS_MODIFY);
@@ -171,7 +171,7 @@ gen7_emit_state_base_address(struct intel_batchbuffer *batch)
 static uint32_t
 gen7_create_cc_viewport(struct intel_batchbuffer *batch)
 {
-	struct gen7_cc_viewport vp;
+	struct gen6_cc_viewport vp;
 	memset(&vp, 0, sizeof(vp));
 
 	vp.min_depth = -1.e35;
@@ -196,12 +196,12 @@ gen7_create_sampler(struct intel_batchbuffer *batch)
 	struct gen7_sampler_state ss;
 	memset(&ss, 0, sizeof(ss));
 
-	ss.ss0.min_filter = GEN7_MAPFILTER_NEAREST;
-	ss.ss0.mag_filter = GEN7_MAPFILTER_NEAREST;
+	ss.ss0.min_filter = GEN6_MAPFILTER_NEAREST;
+	ss.ss0.mag_filter = GEN6_MAPFILTER_NEAREST;
 
-	ss.ss3.r_wrap_mode = GEN7_TEXCOORDMODE_CLAMP;
-	ss.ss3.s_wrap_mode = GEN7_TEXCOORDMODE_CLAMP;
-	ss.ss3.t_wrap_mode = GEN7_TEXCOORDMODE_CLAMP;
+	ss.ss3.r_wrap_mode = GEN6_TEXCOORDMODE_CLAMP;
+	ss.ss3.s_wrap_mode = GEN6_TEXCOORDMODE_CLAMP;
+	ss.ss3.t_wrap_mode = GEN6_TEXCOORDMODE_CLAMP;
 
 	ss.ss3.non_normalized_coord = 1;
 
@@ -218,13 +218,13 @@ gen7_emit_sampler(struct intel_batchbuffer *batch)
 static void
 gen7_emit_multisample(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_3DSTATE_MULTISAMPLE | (4 - 2));
-	OUT_BATCH(GEN7_3DSTATE_MULTISAMPLE_PIXEL_LOCATION_CENTER |
-		  GEN7_3DSTATE_MULTISAMPLE_NUMSAMPLES_1); /* 1 sample/pixel */
+	OUT_BATCH(GEN6_3DSTATE_MULTISAMPLE | (4 - 2));
+	OUT_BATCH(GEN6_3DSTATE_MULTISAMPLE_PIXEL_LOCATION_CENTER |
+		  GEN6_3DSTATE_MULTISAMPLE_NUMSAMPLES_1); /* 1 sample/pixel */
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 
-	OUT_BATCH(GEN7_3DSTATE_SAMPLE_MASK | (2 - 2));
+	OUT_BATCH(GEN6_3DSTATE_SAMPLE_MASK | (2 - 2));
 	OUT_BATCH(1);
 }
 
@@ -256,7 +256,7 @@ gen7_emit_urb(struct intel_batchbuffer *batch)
 static void
 gen7_emit_vs(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_3DSTATE_VS | (6 - 2));
+	OUT_BATCH(GEN6_3DSTATE_VS | (6 - 2));
 	OUT_BATCH(0); /* no VS kernel */
 	OUT_BATCH(0);
 	OUT_BATCH(0);
@@ -299,7 +299,7 @@ gen7_emit_ds(struct intel_batchbuffer *batch)
 static void
 gen7_emit_gs(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_3DSTATE_GS | (7 - 2));
+	OUT_BATCH(GEN6_3DSTATE_GS | (7 - 2));
 	OUT_BATCH(0); /* no GS kernel */
 	OUT_BATCH(0);
 	OUT_BATCH(0);
@@ -319,10 +319,10 @@ gen7_emit_streamout(struct intel_batchbuffer *batch)
 static void
 gen7_emit_sf(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_3DSTATE_SF | (7 - 2));
+	OUT_BATCH(GEN6_3DSTATE_SF | (7 - 2));
 	OUT_BATCH(0);
-	OUT_BATCH(GEN7_3DSTATE_SF_CULL_NONE);
-	OUT_BATCH(2 << GEN7_3DSTATE_SF_TRIFAN_PROVOKE_SHIFT);
+	OUT_BATCH(GEN6_3DSTATE_SF_CULL_NONE);
+	OUT_BATCH(2 << GEN6_3DSTATE_SF_TRIFAN_PROVOKE_SHIFT);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
@@ -379,7 +379,7 @@ gen7_emit_ps(struct intel_batchbuffer *batch)
 static void
 gen7_emit_clip(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_3DSTATE_CLIP | (4 - 2));
+	OUT_BATCH(GEN6_3DSTATE_CLIP | (4 - 2));
 	OUT_BATCH(0);
 	OUT_BATCH(0); /* pass-through */
 	OUT_BATCH(0);
@@ -391,7 +391,7 @@ gen7_emit_clip(struct intel_batchbuffer *batch)
 static void
 gen7_emit_wm(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_3DSTATE_WM | (3 - 2));
+	OUT_BATCH(GEN6_3DSTATE_WM | (3 - 2));
 	OUT_BATCH(GEN7_WM_DISPATCH_ENABLE |
 		  GEN7_WM_PERSPECTIVE_PIXEL_BARYCENTRIC);
 	OUT_BATCH(0);
@@ -402,7 +402,7 @@ gen7_emit_null_depth_buffer(struct intel_batchbuffer *batch)
 {
 	OUT_BATCH(GEN7_3DSTATE_DEPTH_BUFFER | (7 - 2));
 	OUT_BATCH(SURFACE_NULL << GEN7_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
-		  GEN7_DEPTHFORMAT_D32_FLOAT <<
+		  GEN6_DEPTHFORMAT_D32_FLOAT <<
 		  GEN7_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
 	OUT_BATCH(0); /* disable depth, stencil and hiz */
 	OUT_BATCH(0);
@@ -417,7 +417,7 @@ gen7_emit_null_depth_buffer(struct intel_batchbuffer *batch)
 
 void gen7_setup_null_render_state(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN7_PIPELINE_SELECT | PIPELINE_SELECT_3D);
+	OUT_BATCH(GEN6_PIPELINE_SELECT | PIPELINE_SELECT_3D);
 
 	gen7_emit_state_base_address(batch);
 	gen7_emit_multisample(batch);
@@ -442,8 +442,8 @@ void gen7_setup_null_render_state(struct intel_batchbuffer *batch)
 	gen7_emit_binding_table(batch);
 	gen7_emit_drawing_rectangle(batch);
 
-	OUT_BATCH(GEN7_3DPRIMITIVE | (7 - 2));
-	OUT_BATCH(GEN7_3DPRIMITIVE_VERTEX_SEQUENTIAL | _3DPRIM_RECTLIST);
+	OUT_BATCH(GEN6_3DPRIMITIVE | (7 - 2));
+	OUT_BATCH(GEN6_3DPRIMITIVE_VERTEX_SEQUENTIAL | _3DPRIM_RECTLIST);
 	OUT_BATCH(3);
 	OUT_BATCH(0);
 	OUT_BATCH(1);   /* single instance */
