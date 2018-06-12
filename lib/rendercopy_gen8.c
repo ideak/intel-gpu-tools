@@ -365,7 +365,7 @@ static void gen8_emit_vertex_buffer(struct intel_batchbuffer *batch,
 				    uint32_t offset) {
 	OUT_BATCH(GEN6_3DSTATE_VERTEX_BUFFERS | (1 + (4 * 1) - 2));
 	OUT_BATCH(0 << VB0_BUFFER_INDEX_SHIFT | /* VB 0th index */
-		  GEN7_VB0_BUFFER_ADDR_MOD_EN | /* Address Modify Enable */
+		  GEN8_VB0_BUFFER_ADDR_MOD_EN | /* Address Modify Enable */
 		  VERTEX_SIZE << VB0_BUFFER_PITCH_SHIFT);
 	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_VERTEX, 0, offset);
 	OUT_BATCH(3 * VERTEX_SIZE);
@@ -478,11 +478,11 @@ static void
 gen7_emit_push_constants(struct intel_batchbuffer *batch) {
 	OUT_BATCH(GEN7_3DSTATE_PUSH_CONSTANT_ALLOC_VS);
 	OUT_BATCH(0);
-	OUT_BATCH(GEN7_3DSTATE_PUSH_CONSTANT_ALLOC_HS);
+	OUT_BATCH(GEN8_3DSTATE_PUSH_CONSTANT_ALLOC_HS);
 	OUT_BATCH(0);
-	OUT_BATCH(GEN7_3DSTATE_PUSH_CONSTANT_ALLOC_DS);
+	OUT_BATCH(GEN8_3DSTATE_PUSH_CONSTANT_ALLOC_DS);
 	OUT_BATCH(0);
-	OUT_BATCH(GEN7_3DSTATE_PUSH_CONSTANT_ALLOC_GS);
+	OUT_BATCH(GEN8_3DSTATE_PUSH_CONSTANT_ALLOC_GS);
 	OUT_BATCH(0);
 	OUT_BATCH(GEN7_3DSTATE_PUSH_CONSTANT_ALLOC_PS);
 	OUT_BATCH(0);
@@ -616,7 +616,7 @@ gen8_emit_hs(struct intel_batchbuffer *batch) {
 	OUT_BATCH(GEN7_3DSTATE_BINDING_TABLE_POINTERS_HS);
 	OUT_BATCH(0);
 
-	OUT_BATCH(GEN7_3DSTATE_SAMPLER_STATE_POINTERS_HS);
+	OUT_BATCH(GEN8_3DSTATE_SAMPLER_STATE_POINTERS_HS);
 	OUT_BATCH(0);
 }
 
@@ -679,7 +679,7 @@ gen8_emit_ds(struct intel_batchbuffer *batch) {
 	OUT_BATCH(GEN7_3DSTATE_BINDING_TABLE_POINTERS_DS);
 	OUT_BATCH(0);
 
-	OUT_BATCH(GEN7_3DSTATE_SAMPLER_STATE_POINTERS_DS);
+	OUT_BATCH(GEN8_3DSTATE_SAMPLER_STATE_POINTERS_DS);
 	OUT_BATCH(0);
 }
 
@@ -753,7 +753,7 @@ gen8_emit_ps(struct intel_batchbuffer *batch, uint32_t kernel) {
 	OUT_BATCH(/* XXX: I don't understand the BARYCENTRIC stuff, but it
 		   * appears we need it to put our setup data in the place we
 		   * expect (g6, see below) */
-		  GEN7_3DSTATE_PS_PERSPECTIVE_PIXEL_BARYCENTRIC);
+		  GEN8_3DSTATE_PS_PERSPECTIVE_PIXEL_BARYCENTRIC);
 
 	OUT_BATCH(GEN6_3DSTATE_CONSTANT_PS | (11-2));
 	OUT_BATCH(0);
@@ -804,13 +804,13 @@ gen8_emit_depth(struct intel_batchbuffer *batch) {
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 
-	OUT_BATCH(GEN7_3DSTATE_HIER_DEPTH_BUFFER | (5 - 2));
+	OUT_BATCH(GEN8_3DSTATE_HIER_DEPTH_BUFFER | (5 - 2));
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 
-	OUT_BATCH(GEN7_3DSTATE_STENCIL_BUFFER | (5 - 2));
+	OUT_BATCH(GEN8_3DSTATE_STENCIL_BUFFER | (5 - 2));
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
@@ -940,7 +940,7 @@ void gen8_render_copyfunc(struct intel_batchbuffer *batch,
 
 	OUT_BATCH(GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_CC);
 	OUT_BATCH(viewport.cc_state);
-	OUT_BATCH(GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_SF_CLIP);
+	OUT_BATCH(GEN8_3DSTATE_VIEWPORT_STATE_POINTERS_SF_CLIP);
 	OUT_BATCH(viewport.sf_clip_state);
 
 	gen7_emit_urb(batch);
@@ -969,7 +969,7 @@ void gen8_render_copyfunc(struct intel_batchbuffer *batch,
 
 	gen8_emit_ps(batch, ps_kernel_off);
 
-	OUT_BATCH(GEN6_3DSTATE_SCISSOR_STATE_POINTERS);
+	OUT_BATCH(GEN8_3DSTATE_SCISSOR_STATE_POINTERS);
 	OUT_BATCH(scissor_state);
 
 	gen8_emit_depth(batch);
