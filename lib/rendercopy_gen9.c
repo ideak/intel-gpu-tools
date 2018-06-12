@@ -846,7 +846,7 @@ static void gen8_emit_vf_topology(struct intel_batchbuffer *batch)
 /* Vertex elements MUST be defined before this according to spec */
 static void gen8_emit_primitive(struct intel_batchbuffer *batch, uint32_t offset)
 {
-	OUT_BATCH(GEN7_3DSTATE_VF | (2 - 2));
+	OUT_BATCH(GEN8_3DSTATE_VF | (2 - 2));
 	OUT_BATCH(0);
 
 	OUT_BATCH(GEN8_3DSTATE_VF_INSTANCING | (3 - 2));

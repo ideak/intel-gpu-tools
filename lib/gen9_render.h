@@ -3,7 +3,6 @@
 
 #include "gen8_render.h"
 
-#define GEN7_3DSTATE_VF				GEN6_3D(3, 0, 0x0c)
 #define GEN9_3DSTATE_COMPONENT_PACKING		GEN6_3D(3, 0, 0x55)
 
 #define GEN9_SBE_ACTIVE_COMPONENT_NONE		0
