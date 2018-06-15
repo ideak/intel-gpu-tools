@@ -249,6 +249,18 @@ static void test_partial_read_writes(void)
 	}
 }
 
+static bool known_swizzling(uint32_t handle)
+{
+	struct drm_i915_gem_get_tiling arg = {
+		.handle = handle,
+	};
+
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_GET_TILING, &arg))
+		return false;
+
+	return arg.phys_swizzle_mode == arg.swizzle_mode;
+}
+
 igt_main
 {
 	uint32_t tiling_mode = I915_TILING_X;
@@ -271,6 +283,12 @@ igt_main
 						      &tiling_mode, &scratch_pitch, 0);
 		igt_assert(tiling_mode == I915_TILING_X);
 		igt_assert(scratch_pitch == 4096);
+
+		/*
+		 * As we want to compare our template tiled pattern against
+		 * the target bo, we need consistent swizzling on both.
+		 */
+		igt_require(known_swizzling(scratch_bo->handle));
 		staging_bo = drm_intel_bo_alloc(bufmgr, "staging bo", BO_SIZE, 4096);
 		tiled_staging_bo = drm_intel_bo_alloc_tiled(bufmgr, "scratch bo", 1024,
 							    BO_SIZE/4096, 4,
