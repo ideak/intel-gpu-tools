@@ -258,7 +258,6 @@ igt_main
 		igt_require_gem(fd);
 
 		bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		//drm_intel_bufmgr_gem_enable_reuse(bufmgr);
 		devid = intel_get_drm_devid(fd);
 		batch = intel_batchbuffer_alloc(bufmgr, devid);
 
