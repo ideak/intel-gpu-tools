@@ -642,7 +642,7 @@ static void test_inflight_internal(int fd, unsigned int wait)
  */
 static void test_reset_stress(int fd, unsigned int flags)
 {
-	uint32_t ctx0 = gem_context_create(fd);
+	uint32_t ctx0 = context_create_safe(fd);
 
 	igt_until_timeout(5) {
 		struct drm_i915_gem_execbuffer2 execbuf = { };
