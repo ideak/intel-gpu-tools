@@ -75,7 +75,7 @@ igt_simple_main
 	memset(data, 0, OBJECT_SIZE);
 	gem_read(fd, handle, 0, data, OBJECT_SIZE);
 	for (i = 0; i < OBJECT_SIZE/4; i++)
-		igt_assert(i == data[i]);
+		igt_assert_eq_u32(data[i], i);
 
 	/* touch it before changing the tiling, so that the fence sticks around */
 	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
@@ -88,7 +88,7 @@ igt_simple_main
 	memset(data, 0, OBJECT_SIZE);
 	gem_read(fd, handle, 0, data, OBJECT_SIZE);
 	for (i = 0; i < OBJECT_SIZE/4; i++)
-		igt_assert(i == data[i]);
+		igt_assert_eq_u32(data[i], i);
 
 	munmap(ptr, OBJECT_SIZE);
 
