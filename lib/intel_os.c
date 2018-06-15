@@ -379,32 +379,34 @@ void intel_purge_vm_caches(int drm_fd)
 {
 	int fd;
 
-	igt_drop_caches_set(drm_fd, DROP_SHRINK_ALL | DROP_IDLE | DROP_FREED);
-
 	fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
 	if (fd >= 0) {
-		/* BIT(2): Be quiet. Cannot be combined with other operations,
+		/*
+		 * BIT(2): Be quiet. Cannot be combined with other operations,
 		 * the sysctl has a max value of 4.
 		 */
 		igt_ignore_warn(write(fd, "4\n", 2));
 		close(fd);
 	}
 
-	/* Reset write position back to start. Do as a seperate write to keep
-	 * the stages segregated and avoid failure from the squelching stopping
-	 * the purge.
-	 */
-	fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
-	if (fd < 0)
-		return;
+	for (int loop = 0; loop < 2; loop++) {
+		igt_drop_caches_set(drm_fd,
+				    DROP_SHRINK_ALL | DROP_IDLE | DROP_FREED);
 
-	/* BIT(0): Drop page cache
-	 * BIT(1): Drop slab cache
-	 */
-	igt_ignore_warn(write(fd, "3\n", 2));
-	close(fd);
+		fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
+		if (fd < 0)
+			continue;
+
+		/*
+		 * BIT(0): Drop page cache
+		 * BIT(1): Drop slab cache
+		 */
+		igt_ignore_warn(write(fd, "3\n", 2));
+		close(fd);
+	}
+
+	errno = 0;
 }
-
 
 /*
  * When testing a port to a new platform, create a standalone test binary
