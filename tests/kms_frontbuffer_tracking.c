@@ -1770,8 +1770,8 @@ static void do_status_assertions(int flags)
 static void __do_assertions(const struct test_mode *t, int flags,
 			    int line)
 {
-	flags = adjust_assertion_flags(t, flags);
 	bool mandatory_sink_crc = t->feature & FEATURE_PSR;
+	flags = adjust_assertion_flags(t, flags);
 
 	igt_debug("checking asserts in line %i\n", line);
 
