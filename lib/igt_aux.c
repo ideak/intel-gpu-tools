@@ -1240,7 +1240,7 @@ static void igt_save_module_param(const char *name, const char *file_path)
 	data = calloc(1, sizeof (*data));
 	igt_assert(data);
 
-	strncpy(data->name, name, PARAM_NAME_MAX_SZ);
+	strncpy(data->name, name, PARAM_NAME_MAX_SZ - 1);
 
 	fd = open(file_path, O_RDONLY);
 	igt_assert(fd >= 0);
