@@ -104,6 +104,129 @@ static double nop_on_ring(int fd, uint32_t handle, unsigned ring_id,
 	return elapsed(&start, &now);
 }
 
+static void poll_ring(int fd, unsigned ring, const char *name, int timeout)
+{
+	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const uint32_t MI_ARB_CHK = 0x5 << 23;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj;
+	struct drm_i915_gem_relocation_entry reloc[4], *r;
+	uint32_t *bbe[2], *state, *batch;
+	unsigned engines[16], nengine, flags;
+	struct timespec tv = {};
+	unsigned long cycles;
+	uint64_t elapsed;
+
+	flags = I915_EXEC_NO_RELOC;
+	if (gen == 4 || gen == 5)
+		flags |= I915_EXEC_SECURE;
+
+	nengine = 0;
+	if (ring == ALL_ENGINES) {
+		for_each_physical_engine(fd, ring) {
+			if (!gem_can_store_dword(fd, ring))
+				continue;
+
+			engines[nengine++] = ring;
+		}
+	} else {
+		gem_require_ring(fd, ring);
+		igt_require(gem_can_store_dword(fd, ring));
+		engines[nengine++] = ring;
+	}
+	igt_require(nengine);
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = gem_create(fd, 4096);
+	obj.relocs_ptr = to_user_pointer(reloc);
+	obj.relocation_count = ARRAY_SIZE(reloc);
+
+	r = memset(reloc, 0, sizeof(reloc));
+	batch = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
+
+	for (unsigned int start_offset = 0;
+	     start_offset <= 128;
+	     start_offset += 128) {
+		uint32_t *b = batch + start_offset / sizeof(*batch);
+
+		r->target_handle = obj.handle;
+		r->offset = (b - batch + 1) * sizeof(uint32_t);
+		r->delta = 4092;
+		r->read_domains = I915_GEM_DOMAIN_RENDER;
+
+		*b = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		if (gen >= 8) {
+			*++b = r->delta;
+			*++b = 0;
+		} else if (gen >= 4) {
+			r->offset += sizeof(uint32_t);
+			*++b = 0;
+			*++b = r->delta;
+		} else {
+			*b -= 1;
+			*++b = r->delta;
+		}
+		*++b = start_offset != 0;
+		r++;
+
+		b = batch + (start_offset + 64) / sizeof(*batch);
+		bbe[start_offset != 0] = b;
+		*b++ = MI_ARB_CHK;
+
+		r->target_handle = obj.handle;
+		r->offset = (b - batch + 1) * sizeof(uint32_t);
+		r->read_domains = I915_GEM_DOMAIN_COMMAND;
+		r->delta = start_offset + 64;
+		if (gen >= 8) {
+			*b++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
+			*b++ = r->delta;
+			*b++ = 0;
+		} else if (gen >= 6) {
+			*b++ = MI_BATCH_BUFFER_START | 1 << 8;
+			*b++ = r->delta;
+		} else {
+			*b++ = MI_BATCH_BUFFER_START | 2 << 6;
+			if (gen < 4)
+				r->delta |= 1;
+			*b++ = r->delta;
+		}
+		r++;
+	}
+	igt_assert(r == reloc + ARRAY_SIZE(reloc));
+	state = batch + 1023;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags = engines[0];
+
+	cycles = 0;
+	do {
+		unsigned int idx = ++cycles & 1;
+
+		*bbe[idx] = MI_ARB_CHK;
+		execbuf.batch_start_offset =
+			(bbe[idx] - batch) * sizeof(*batch) - 64;
+
+		execbuf.flags = engines[cycles % nengine] | flags;
+		gem_execbuf(fd, &execbuf);
+
+		*bbe[!idx] = MI_BATCH_BUFFER_END;
+		__sync_synchronize();
+
+		while (READ_ONCE(*state) != idx)
+			;
+	} while ((elapsed = igt_nsec_elapsed(&tv)) >> 30 < timeout);
+	*bbe[cycles & 1] = MI_BATCH_BUFFER_END;
+	gem_sync(fd, obj.handle);
+
+	igt_info("%s completed %ld cycles: %.3f us\n",
+		 name, cycles, elapsed*1e-3/cycles);
+
+	munmap(batch, 4096);
+	gem_close(fd, obj.handle);
+}
+
 static void single(int fd, uint32_t handle,
 		   unsigned ring_id, const char *ring_name)
 {
@@ -675,10 +798,25 @@ igt_main
 		}
 	}
 
-	igt_subtest("headless") {
-		/* Requires master for changing display modes */
-		igt_device_set_master(device);
-		headless(device, handle);
+	igt_subtest_group {
+		igt_fixture {
+			igt_device_set_master(device);
+		}
+
+		for (e = intel_execution_engines; e->name; e++) {
+			/* Requires master for STORE_DWORD on gen4/5 */
+			igt_subtest_f("poll-%s", e->name)
+				poll_ring(device,
+					  e->exec_id | e->flags, e->name, 20);
+		}
+
+		igt_subtest("poll-sequential")
+			poll_ring(device, ALL_ENGINES, "Sequential", 20);
+
+		igt_subtest("headless") {
+			/* Requires master for changing display modes */
+			headless(device, handle);
+		}
 	}
 
 	igt_fixture {
