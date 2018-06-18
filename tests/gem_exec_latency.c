@@ -60,6 +60,51 @@
 
 static unsigned int ring_size;
 
+static void
+poll_ring(int fd, unsigned ring, const char *name)
+{
+	struct timespec tv = {};
+	unsigned long cycles;
+	igt_spin_t *spin[2];
+	uint64_t elapsed;
+	uint32_t cmd;
+
+	gem_require_ring(fd, ring);
+	igt_require(gem_can_store_dword(fd, ring));
+
+	spin[0] = __igt_spin_batch_new_poll(fd, 0, ring);
+	igt_assert(spin[0]->running);
+	cmd = *spin[0]->batch;
+
+	spin[1] = __igt_spin_batch_new_poll(fd, 0, ring);
+	igt_assert(spin[1]->running);
+	igt_assert(cmd == *spin[1]->batch);
+
+	igt_spin_batch_end(spin[0]);
+	while (!READ_ONCE(*spin[1]->running))
+		;
+	igt_assert(!gem_bo_busy(fd, spin[0]->handle));
+
+	cycles = 0;
+	while ((elapsed = igt_nsec_elapsed(&tv)) < 2ull << 30) {
+		unsigned int idx = cycles++ & 1;
+
+		*spin[idx]->batch = cmd;
+		*spin[idx]->running = 0;
+		gem_execbuf(fd, &spin[idx]->execbuf);
+
+		igt_spin_batch_end(spin[!idx]);
+		while (!READ_ONCE(*spin[idx]->running))
+			;
+	}
+
+	igt_info("%s completed %ld cycles: %.3f us\n",
+		 name, cycles, elapsed*1e-3/cycles);
+
+	igt_spin_batch_free(fd, spin[1]);
+	igt_spin_batch_free(fd, spin[0]);
+}
+
 #define RCS_TIMESTAMP (0x2000 + 0x358)
 static void latency_on_ring(int fd,
 			    unsigned ring, const char *name,
@@ -610,6 +655,11 @@ igt_main
 					latency_on_ring(device,
 							e->exec_id | e->flags,
 							e->name, 0);
+
+				igt_subtest_f("%s-poll", e->name)
+					poll_ring(device,
+						  e->exec_id | e->flags,
+						  e->name);
 
 				igt_subtest_f("%s-rtidle-submit", e->name)
 					rthog_latency_on_ring(device,
