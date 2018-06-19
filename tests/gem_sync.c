@@ -207,7 +207,7 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 object;
 		struct drm_i915_gem_execbuffer2 execbuf;
-		double end, this, elapsed, now;
+		double end, this, elapsed, now, baseline;
 		unsigned long cycles;
 		uint32_t cmd;
 		igt_spin_t *spin;
@@ -233,6 +233,32 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 		igt_spin_batch_end(spin);
 		gem_sync(fd, object.handle);
 
+		for (int warmup = 0; warmup <= 1; warmup++) {
+			end = gettime() + timeout/10.;
+			elapsed = 0;
+			cycles = 0;
+			do {
+				*spin->batch = cmd;
+				*spin->running = 0;
+				gem_execbuf(fd, &spin->execbuf);
+				while (!READ_ONCE(*spin->running))
+					;
+
+				this = gettime();
+				igt_spin_batch_end(spin);
+				gem_sync(fd, spin->handle);
+				now = gettime();
+
+				elapsed += now - this;
+				cycles++;
+			} while (now < end);
+			baseline = elapsed / cycles;
+		}
+		igt_info("%s%saseline %ld cycles: %.3f us\n",
+			 names[child % num_engines] ?: "",
+			 names[child % num_engines] ? " b" : "B",
+			 cycles, elapsed*1e6/cycles);
+
 		end = gettime() + timeout;
 		elapsed = 0;
 		cycles = 0;
@@ -254,16 +280,17 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 			elapsed += now - this;
 			cycles++;
 		} while (now < end);
+		elapsed -= cycles * baseline;
 
-		igt_info("%s%sompleted %ld cycles: %.3f us\n",
+		igt_info("%s%sompleted %ld cycles: %.3f + %.3f us\n",
 			 names[child % num_engines] ?: "",
 			 names[child % num_engines] ? " c" : "C",
-			 cycles, elapsed*1e6/cycles);
+			 cycles, 1e6*baseline, elapsed*1e6/cycles);
 
 		igt_spin_batch_free(fd, spin);
 		gem_close(fd, object.handle);
 	}
-	igt_waitchildren_timeout(timeout+10, NULL);
+	igt_waitchildren_timeout(2*timeout, NULL);
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
