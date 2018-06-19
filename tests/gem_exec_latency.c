@@ -65,7 +65,7 @@ poll_ring(int fd, unsigned ring, const char *name)
 {
 	const struct igt_spin_factory opts = {
 		.engine = ring,
-		.flags = IGT_SPIN_POLL_RUN,
+		.flags = IGT_SPIN_POLL_RUN | IGT_SPIN_FAST,
 	};
 	struct timespec tv = {};
 	unsigned long cycles;
@@ -464,7 +464,7 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 #define MMAP_SZ (64 << 10)
 	const struct igt_spin_factory opts = {
 		.engine = engine,
-		.flags = IGT_SPIN_POLL_RUN,
+		.flags = IGT_SPIN_POLL_RUN | IGT_SPIN_FAST,
 	};
 	struct rt_pkt *results;
 	unsigned int engines[16];

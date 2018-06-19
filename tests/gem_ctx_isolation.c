@@ -560,6 +560,7 @@ static void inject_reset_context(int fd, unsigned int engine)
 	struct igt_spin_factory opts = {
 		.ctx = gem_context_create(fd),
 		.engine = engine,
+		.flags = IGT_SPIN_FAST,
 	};
 	igt_spin_t *spin;
 

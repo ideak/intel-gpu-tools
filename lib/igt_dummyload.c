@@ -199,7 +199,8 @@ emit_recursive_batch(igt_spin_t *spin,
 	 * between function calls, that appears enough to keep SNB out of
 	 * trouble. See https://bugs.freedesktop.org/show_bug.cgi?id=102262
 	 */
-	batch += 1000;
+	if (!(opts->flags & IGT_SPIN_FAST))
+		batch += 1000;
 
 	/* recurse */
 	r = &relocs[obj[BATCH].relocation_count++];

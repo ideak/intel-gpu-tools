@@ -160,6 +160,7 @@ static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 	struct igt_spin_factory opts = {
 		.ctx = ctx,
 		.engine = flags,
+		.flags = IGT_SPIN_FAST,
 	};
 
 	if (gem_can_store_dword(fd, opts.engine))
