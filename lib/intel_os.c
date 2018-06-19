@@ -105,6 +105,7 @@ intel_get_avail_ram_mb(void)
 
 	igt_assert(sysinfo(&sysinf) == 0);
 	retval = sysinf.freeram;
+	retval += min(sysinf.freeswap, sysinf.bufferram);
 	retval *= sysinf.mem_unit;
 #elif defined(_SC_PAGESIZE) && defined(_SC_AVPHYS_PAGES) /* Solaris */
 	long pagesize, npages;
