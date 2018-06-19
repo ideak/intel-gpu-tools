@@ -178,7 +178,7 @@ idle_ring(int fd, unsigned ring, int timeout)
 }
 
 static void
-wakeup_ring(int fd, unsigned ring, int timeout)
+wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 {
 	unsigned engines[16];
 	const char *names[16];
@@ -243,7 +243,8 @@ wakeup_ring(int fd, unsigned ring, int timeout)
 			while (!READ_ONCE(*spin->running))
 				;
 
-			gem_execbuf(fd, &execbuf);
+			for (int n = 0; n < wlen; n++)
+				gem_execbuf(fd, &execbuf);
 
 			this = gettime();
 			igt_spin_batch_end(spin);
@@ -851,7 +852,9 @@ igt_main
 		igt_subtest_f("idle-%s", e->name)
 			idle_ring(fd, e->exec_id | e->flags, 150);
 		igt_subtest_f("wakeup-%s", e->name)
-			wakeup_ring(fd, e->exec_id | e->flags, 150);
+			wakeup_ring(fd, e->exec_id | e->flags, 150, 1);
+		igt_subtest_f("double-wakeup-%s", e->name)
+			wakeup_ring(fd, e->exec_id | e->flags, 150, 2);
 		igt_subtest_f("store-%s", e->name)
 			store_ring(fd, e->exec_id | e->flags, 1, 150);
 		igt_subtest_f("many-%s", e->name)
@@ -873,7 +876,9 @@ igt_main
 	igt_subtest("forked-store-each")
 		store_ring(fd, ALL_ENGINES, ncpus, 150);
 	igt_subtest("wakeup-each")
-		wakeup_ring(fd, ALL_ENGINES, 150);
+		wakeup_ring(fd, ALL_ENGINES, 150, 1);
+	igt_subtest("double-wakeup-each")
+		wakeup_ring(fd, ALL_ENGINES, 150, 2);
 
 	igt_subtest("basic-all")
 		sync_all(fd, 1, 5);
