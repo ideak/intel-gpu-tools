@@ -50,27 +50,46 @@ gen_programs = find_program('generate_programs_xml.sh')
 
 test_list_files = []
 
-foreach group : test_groups
-	programs_xml = 'igt_test_programs_' + group + '_programs.xml'
-	custom_target(programs_xml,
-		      output : programs_xml,
-		      build_by_default : true,
-		      command : [ gen_programs, '@OUTPUT@', group, test_list ])
-
-	description_xml = 'igt_test_programs_' + group + '_description.xml'
-	custom_target(description_xml,
-		      output : description_xml,
-		      build_by_default : true,
-		      depends : test_executables,
-		      command : [ gen_description, '@OUTPUT@', group, test_list ])
-endforeach
+generated_docs = []
 
 configure_file(input: 'version.xml.in',
 	       output: 'version.xml',
 	       install: false, configuration: config)
 
+if meson.version().version_compare('>= 0.47')
+	foreach group : test_groups
+		programs_xml = 'igt_test_programs_' + group + '_programs.xml'
+		generated_docs += custom_target(programs_xml,
+			      output : programs_xml,
+			      command : [ gen_programs, '@OUTPUT@', group, test_list ])
+
+		description_xml = 'igt_test_programs_' + group + '_description.xml'
+		generated_docs += custom_target(description_xml,
+			      output : description_xml,
+			      depends : test_executables,
+			      command : [ gen_description, '@OUTPUT@', group, test_list ])
+	endforeach
+else
+	# older meson needs the build_by_default hack because gtkdoc dependency
+	# handling is broken
+	foreach group : test_groups
+		programs_xml = 'igt_test_programs_' + group + '_programs.xml'
+		custom_target(programs_xml,
+			      build_by_default : true,
+			      output : programs_xml,
+			      command : [ gen_programs, '@OUTPUT@', group, test_list ])
+
+		description_xml = 'igt_test_programs_' + group + '_description.xml'
+		custom_target(description_xml,
+			      build_by_default : true,
+			      output : description_xml,
+			      depends : test_executables,
+			      command : [ gen_description, '@OUTPUT@', group, test_list ])
+	endforeach
+endif
+
 gnome.gtkdoc('igt-gpu-tools',
-	     content_files : ['igt_test_programs.xml'],
+	     content_files : ['igt_test_programs.xml'] + generated_docs,
 	     dependencies : lib_igt,
 	     install : true,
 	     main_xml : 'igt-gpu-tools-docs.xml',
