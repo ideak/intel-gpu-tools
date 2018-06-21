@@ -214,10 +214,10 @@
  * code will only reflect the overall result.
  *
  * To do that obtain the lists of subtests with "--list-subtests", which can be
- * run as non-root and doesn't require the i915 driver to be loaded (or any
- * intel gpu to be present). Then individual subtests can be run with
- * "--run-subtest". Usage help for tests with subtests can be obtained with the
- * "--help" command line option.
+ * run as non-root and doesn't require a DRM driver to be loaded (or any GPU to
+ * be present). Then individual subtests can be run with "--run-subtest". Usage
+ * help for tests with subtests can be obtained with the "--help" command line
+ * option.
  *
  * A wildcard expression can be given to --run-subtest to specify a subset of
  * subtests to run. See https://tools.ietf.org/html/rfc3977#section-4 for a
