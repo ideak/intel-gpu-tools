@@ -35,10 +35,10 @@ foreach prog : benchmark_progs
 	executable(prog + '_bench', prog + '.c',
 		   install : true,
 		   install_dir : benchmarksdir,
-		   dependencies : test_deps)
+		   dependencies : igt_deps)
 endforeach
 
 executable('gem_wsim_bench', 'gem_wsim.c',
 	   install : true,
 	   install_dir : benchmarksdir,
-	   dependencies : test_deps + [ lib_igt_perf ])
+	   dependencies : igt_deps + [ lib_igt_perf ])

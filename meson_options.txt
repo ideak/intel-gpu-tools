@@ -1,3 +1,57 @@
+option('build_overlay',
+       type : 'combo',
+       value : 'auto',
+       choices : ['auto', 'true', 'false'],
+       description : 'Build overlay')
+
+option('overlay_backends',
+       type : 'array',
+       value : ['auto'],
+       choices : [ 'auto', 'x', 'xv' ],
+       description : 'Overlay backends to enable')
+
+option('build_audio',
+       type : 'combo',
+       value : 'auto',
+       choices : ['auto', 'true', 'false'],
+       description : 'Build audio test')
+
+option('build_chamelium',
+       type : 'combo',
+       value : 'auto',
+       choices : ['auto', 'true', 'false'],
+       description : 'Build chamelium test')
+
+option('with_valgrind',
+       type : 'combo',
+       value : 'auto',
+       choices : ['auto', 'true', 'false'],
+       description : 'Build with support for valgrind annotations')
+
+option('build_man',
+       type : 'combo',
+       value : 'auto',
+       choices : ['auto', 'true', 'false'],
+       description : 'Build man pages')
+
+option('build_docs',
+       type : 'combo',
+       value : 'auto',
+       choices : ['auto', 'true', 'false'],
+       description : 'Build documentation')
+
+option('build_tests',
+       type : 'combo',
+       value : 'auto',
+       choices : ['auto', 'true', 'false'],
+       description : 'Build tests')
+
+option('with_libdrm',
+       type : 'array',
+       value : ['auto'],
+       choices : ['', 'auto', 'intel', 'nouveau', 'amdgpu'],
+       description : 'libdrm libraries to be used')
+
 option('use_rpath',
        type : 'boolean',
        value : false,

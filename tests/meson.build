@@ -232,14 +232,14 @@ if libdrm_nouveau.found()
 	test_deps += libdrm_nouveau
 endif
 
-if chamelium.found()
+if _build_chamelium and chamelium.found()
 	test_progs += [
 		'kms_chamelium',
 	]
 	test_deps += chamelium
 endif
 
-if alsa.found() and gsl.found()
+if _build_audio and alsa.found() and gsl.found()
 	test_progs += [
 		'audio',
 	]
