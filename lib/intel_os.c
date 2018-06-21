@@ -84,6 +84,19 @@ intel_get_total_ram_mb(void)
 	return retval / (1024*1024);
 }
 
+static uint64_t get_meminfo(const char *info, const char *tag)
+{
+	const char *str;
+	unsigned long val;
+
+	str = strstr(info, tag);
+	if (str && sscanf(str + strlen(tag), " %lu", &val) == 1)
+		return (uint64_t)val << 10;
+
+	igt_warn("Unrecognised /proc/meminfo field: '%s'\n", tag);
+	return 0;
+}
+
 /**
  * intel_get_avail_ram_mb:
  *
@@ -96,17 +109,38 @@ intel_get_avail_ram_mb(void)
 	uint64_t retval;
 
 #ifdef HAVE_STRUCT_SYSINFO_TOTALRAM /* Linux */
-	struct sysinfo sysinf;
+	char *info;
 	int fd;
 
 	fd = drm_open_driver(DRIVER_INTEL);
 	intel_purge_vm_caches(fd);
 	close(fd);
 
-	igt_assert(sysinfo(&sysinf) == 0);
-	retval = sysinf.freeram;
-	retval += min(sysinf.freeswap, sysinf.bufferram);
-	retval *= sysinf.mem_unit;
+	fd = open("/proc", O_RDONLY);
+	info = igt_sysfs_get(fd, "meminfo");
+	close(fd);
+
+	if (info) {
+		retval  = get_meminfo(info, "MemAvailable:");
+		retval += get_meminfo(info, "Buffers:");
+		/*
+		 * Include the file+swap cache as "available" for the test.
+		 * We believe that we can revoke these pages back to their
+		 * on disk counterpart, with no loss of functionality while
+		 * the test runs using those pages for ourselves without the
+		 * test itself being swapped to disk.
+		 */
+		retval += get_meminfo(info, "Cached:");
+		retval += get_meminfo(info, "SwapCached:");
+		free(info);
+	} else {
+		struct sysinfo sysinf;
+
+		igt_assert(sysinfo(&sysinf) == 0);
+		retval = sysinf.freeram;
+		retval += min(sysinf.freeswap, sysinf.bufferram);
+		retval *= sysinf.mem_unit;
+	}
 #elif defined(_SC_PAGESIZE) && defined(_SC_AVPHYS_PAGES) /* Solaris */
 	long pagesize, npages;
 
