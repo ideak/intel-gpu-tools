@@ -55,9 +55,7 @@
 #include <limits.h>
 #include <locale.h>
 #include <uwildmat/uwildmat.h>
-#ifdef HAVE_GLIB
 #include <glib.h>
-#endif
 
 #include "drmtest.h"
 #include "intel_chipset.h"
@@ -299,9 +297,7 @@ static struct {
 } log_buffer;
 static pthread_mutex_t log_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-#ifdef HAVE_GLIB
 GKeyFile *igt_key_file;
-#endif
 
 char *igt_frame_dump_path;
 
@@ -573,7 +569,6 @@ static void oom_adjust_for_doom(void)
 
 }
 
-#ifdef HAVE_GLIB
 static void common_init_config(void)
 {
 	char *key_file_env = NULL;
@@ -624,7 +619,6 @@ out:
 	if (!key_file_env && key_file_loc)
 		free(key_file_loc);
 }
-#endif
 
 static void common_init_env(void)
 {
@@ -778,9 +772,7 @@ static int common_init(int *argc, char **argv,
 		}
 	}
 
-#ifdef HAVE_GLIB
 	common_init_config();
-#endif
 
 out:
 	free(short_opts);
@@ -1435,10 +1427,8 @@ void igt_exit(void)
 {
 	igt_exit_called = true;
 
-#ifdef HAVE_GLIB
 	if (igt_key_file)
 		g_key_file_free(igt_key_file);
-#endif
 
 	if (run_single_subtest && !run_single_subtest_found) {
 		igt_warn("Unknown subtest: %s\n", run_single_subtest);

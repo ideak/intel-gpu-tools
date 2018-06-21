@@ -50,10 +50,7 @@ endif
 
 cairo = dependency('cairo', version : '>1.12.0', required : true)
 libudev = dependency('libudev', required : true)
-glib = dependency('glib-2.0', required : false)
-if glib.found()
-	config.set('HAVE_GLIB', 1)
-endif
+glib = dependency('glib-2.0', required : true)
 
 gsl = dependency('gsl', required : false)
 alsa = dependency('alsa', required : false)

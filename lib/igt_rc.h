@@ -25,10 +25,8 @@
 #ifndef IGT_RC_H
 #define IGT_RC_H
 
-#ifdef HAVE_GLIB
 #include <glib.h>
 
 extern GKeyFile *igt_key_file;
 
-#endif /* HAVE_GLIB */
 #endif /* IGT_RC_H */
