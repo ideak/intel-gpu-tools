@@ -958,6 +958,8 @@ init_sys_info(void)
 			}
 		} else if (IS_CANNONLAKE(devid)) {
 			test_set_uuid = "db41edd4-d8e7-4730-ad11-b9a2d6833503";
+		} else if (IS_ICELAKE(devid)) {
+			test_set_uuid = "a291665e-244b-4b76-9b9a-01de9d3c8068";
 		} else {
 			igt_debug("unsupported GT\n");
 			return false;
