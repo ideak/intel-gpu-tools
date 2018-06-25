@@ -74,7 +74,9 @@ static void basic(int fd, unsigned engine, unsigned flags)
 	IGT_CORK_HANDLE(cork);
 	uint32_t plug =
 		flags & (WRITE | AWAIT) ? igt_cork_plug(&cork, fd) : 0;
-	igt_spin_t *spin = igt_spin_batch_new(fd, 0, engine, plug);
+	igt_spin_t *spin = igt_spin_batch_new(fd,
+					      .engine = engine,
+					      .dependency = plug);
 	struct drm_i915_gem_wait wait = {
 		flags & WRITE ? plug : spin->handle
 	};

@@ -63,6 +63,10 @@ static unsigned int ring_size;
 static void
 poll_ring(int fd, unsigned ring, const char *name)
 {
+	const struct igt_spin_factory opts = {
+		.engine = ring,
+		.flags = IGT_SPIN_POLL_RUN,
+	};
 	struct timespec tv = {};
 	unsigned long cycles;
 	igt_spin_t *spin[2];
@@ -72,11 +76,11 @@ poll_ring(int fd, unsigned ring, const char *name)
 	gem_require_ring(fd, ring);
 	igt_require(gem_can_store_dword(fd, ring));
 
-	spin[0] = __igt_spin_batch_new_poll(fd, 0, ring);
+	spin[0] = __igt_spin_batch_factory(fd, &opts);
 	igt_assert(spin[0]->running);
 	cmd = *spin[0]->batch;
 
-	spin[1] = __igt_spin_batch_new_poll(fd, 0, ring);
+	spin[1] = __igt_spin_batch_factory(fd, &opts);
 	igt_assert(spin[1]->running);
 	igt_assert(cmd == *spin[1]->batch);
 
@@ -312,7 +316,9 @@ static void latency_from_ring(int fd,
 			       I915_GEM_DOMAIN_GTT);
 
 		if (flags & PREEMPT)
-			spin = __igt_spin_batch_new(fd, ctx[0], ring, 0);
+			spin = __igt_spin_batch_new(fd,
+						    .ctx = ctx[0],
+						    .engine = ring);
 
 		if (flags & CORK) {
 			obj[0].handle = igt_cork_plug(&c, fd);
@@ -456,6 +462,10 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 	};
 #define NPASS ARRAY_SIZE(passname)
 #define MMAP_SZ (64 << 10)
+	const struct igt_spin_factory opts = {
+		.engine = engine,
+		.flags = IGT_SPIN_POLL_RUN,
+	};
 	struct rt_pkt *results;
 	unsigned int engines[16];
 	const char *names[16];
@@ -513,7 +523,7 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 
 			usleep(250);
 
-			spin = __igt_spin_batch_new_poll(fd, 0, engine);
+			spin = __igt_spin_batch_factory(fd, &opts);
 			if (!spin) {
 				igt_warn("Failed to create spinner! (%s)\n",
 					 passname[pass]);

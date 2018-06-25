@@ -157,10 +157,15 @@ static int __gem_wait(int fd, uint32_t handle, int64_t timeout)
 
 static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 {
-	if (gem_can_store_dword(fd, flags))
-		return __igt_spin_batch_new_poll(fd, ctx, flags);
-	else
-		return __igt_spin_batch_new(fd, ctx, flags, 0);
+	struct igt_spin_factory opts = {
+		.ctx = ctx,
+		.engine = flags,
+	};
+
+	if (gem_can_store_dword(fd, opts.engine))
+		opts.flags |= IGT_SPIN_POLL_RUN;
+
+	return __igt_spin_batch_factory(fd, &opts);
 }
 
 static void __spin_wait(int fd, igt_spin_t *spin)

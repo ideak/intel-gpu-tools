@@ -75,12 +75,9 @@ fill_reloc(struct drm_i915_gem_relocation_entry *reloc,
 	reloc->write_domain = write_domains;
 }
 
-#define OUT_FENCE	(1 << 0)
-#define POLL_RUN	(1 << 1)
-
 static int
-emit_recursive_batch(igt_spin_t *spin, int fd, uint32_t ctx, unsigned engine,
-		     uint32_t dep, unsigned int flags)
+emit_recursive_batch(igt_spin_t *spin,
+		     int fd, const struct igt_spin_factory *opts)
 {
 #define SCRATCH 0
 #define BATCH 1
@@ -95,21 +92,18 @@ emit_recursive_batch(igt_spin_t *spin, int fd, uint32_t ctx, unsigned engine,
 	int i;
 
 	nengine = 0;
-	if (engine == ALL_ENGINES) {
-		for_each_engine(fd, engine) {
-			if (engine) {
-			if (flags & POLL_RUN)
-				igt_require(!(flags & POLL_RUN) ||
-					    gem_can_store_dword(fd, engine));
+	if (opts->engine == ALL_ENGINES) {
+		unsigned int engine;
 
-				engines[nengine++] = engine;
-			}
+		for_each_physical_engine(fd, engine) {
+			if (opts->flags & IGT_SPIN_POLL_RUN &&
+			    !gem_can_store_dword(fd, engine))
+				continue;
+
+			engines[nengine++] = engine;
 		}
 	} else {
-		gem_require_ring(fd, engine);
-		igt_require(!(flags & POLL_RUN) ||
-			    gem_can_store_dword(fd, engine));
-		engines[nengine++] = engine;
+		engines[nengine++] = opts->engine;
 	}
 	igt_require(nengine);
 
@@ -130,20 +124,20 @@ emit_recursive_batch(igt_spin_t *spin, int fd, uint32_t ctx, unsigned engine,
 	execbuf->buffer_count++;
 	batch_start = batch;
 
-	if (dep) {
-		igt_assert(!(flags & POLL_RUN));
+	if (opts->dependency) {
+		igt_assert(!(opts->flags & IGT_SPIN_POLL_RUN));
 
 		/* dummy write to dependency */
-		obj[SCRATCH].handle = dep;
+		obj[SCRATCH].handle = opts->dependency;
 		fill_reloc(&relocs[obj[BATCH].relocation_count++],
-			   dep, 1020,
+			   opts->dependency, 1020,
 			   I915_GEM_DOMAIN_RENDER,
 			   I915_GEM_DOMAIN_RENDER);
 		execbuf->buffer_count++;
-	} else if (flags & POLL_RUN) {
+	} else if (opts->flags & IGT_SPIN_POLL_RUN) {
 		unsigned int offset;
 
-		igt_assert(!dep);
+		igt_assert(!opts->dependency);
 
 		if (gen == 4 || gen == 5) {
 			execbuf->flags |= I915_EXEC_SECURE;
@@ -231,9 +225,9 @@ emit_recursive_batch(igt_spin_t *spin, int fd, uint32_t ctx, unsigned engine,
 
 	execbuf->buffers_ptr = to_user_pointer(obj +
 					       (2 - execbuf->buffer_count));
-	execbuf->rsvd1 = ctx;
+	execbuf->rsvd1 = opts->ctx;
 
-	if (flags & OUT_FENCE)
+	if (opts->flags & IGT_SPIN_FENCE_OUT)
 		execbuf->flags |= I915_EXEC_FENCE_OUT;
 
 	for (i = 0; i < nengine; i++) {
@@ -242,7 +236,7 @@ emit_recursive_batch(igt_spin_t *spin, int fd, uint32_t ctx, unsigned engine,
 
 		gem_execbuf_wr(fd, execbuf);
 
-		if (flags & OUT_FENCE) {
+		if (opts->flags & IGT_SPIN_FENCE_OUT) {
 			int _fd = execbuf->rsvd2 >> 32;
 
 			igt_assert(_fd >= 0);
@@ -271,16 +265,14 @@ emit_recursive_batch(igt_spin_t *spin, int fd, uint32_t ctx, unsigned engine,
 }
 
 static igt_spin_t *
-___igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep,
-		      unsigned int flags)
+spin_batch_create(int fd, const struct igt_spin_factory *opts)
 {
 	igt_spin_t *spin;
 
 	spin = calloc(1, sizeof(struct igt_spin));
 	igt_assert(spin);
 
-	spin->out_fence = emit_recursive_batch(spin, fd, ctx, engine, dep,
-					       flags);
+	spin->out_fence = emit_recursive_batch(spin, fd, opts);
 
 	pthread_mutex_lock(&list_lock);
 	igt_list_add(&spin->link, &spin_list);
@@ -290,18 +282,15 @@ ___igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep,
 }
 
 igt_spin_t *
-__igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
+__igt_spin_batch_factory(int fd, const struct igt_spin_factory *opts)
 {
-	return ___igt_spin_batch_new(fd, ctx, engine, dep, 0);
+	return spin_batch_create(fd, opts);
 }
 
 /**
- * igt_spin_batch_new:
+ * igt_spin_batch_factory:
  * @fd: open i915 drm file descriptor
- * @engine: Ring to execute batch OR'd with execbuf flags. If value is less
- *          than 0, execute on all available rings.
- * @dep: handle to a buffer object dependency. If greater than 0, add a
- *              relocation entry to this buffer within the batch.
+ * @opts: controlling options such as context, engine, dependencies etc
  *
  * Start a recursive batch on a ring. Immediately returns a #igt_spin_t that
  * contains the batch's handle that can be waited upon. The returned structure
@@ -311,86 +300,26 @@ __igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
  * Structure with helper internal state for igt_spin_batch_free().
  */
 igt_spin_t *
-igt_spin_batch_new(int fd, uint32_t ctx, unsigned engine, uint32_t dep)
+igt_spin_batch_factory(int fd, const struct igt_spin_factory *opts)
 {
 	igt_spin_t *spin;
 
 	igt_require_gem(fd);
 
-	spin = __igt_spin_batch_new(fd, ctx, engine, dep);
+	if (opts->engine != ALL_ENGINES) {
+		gem_require_ring(fd, opts->engine);
+		if (opts->flags & IGT_SPIN_POLL_RUN)
+			igt_require(gem_can_store_dword(fd, opts->engine));
+	}
+
+	spin = spin_batch_create(fd, opts);
+
 	igt_assert(gem_bo_busy(fd, spin->handle));
+	if (opts->flags & IGT_SPIN_FENCE_OUT) {
+		struct pollfd pfd = { spin->out_fence, POLLIN };
 
-	return spin;
-}
-
-igt_spin_t *
-__igt_spin_batch_new_fence(int fd, uint32_t ctx, unsigned engine)
-{
-	return ___igt_spin_batch_new(fd, ctx, engine, 0, OUT_FENCE);
-}
-
-/**
- * igt_spin_batch_new_fence:
- * @fd: open i915 drm file descriptor
- * @engine: Ring to execute batch OR'd with execbuf flags. If value is less
- *          than 0, execute on all available rings.
- *
- * Start a recursive batch on a ring. Immediately returns a #igt_spin_t that
- * contains the batch's handle that can be waited upon. The returned structure
- * must be passed to igt_spin_batch_free() for post-processing.
- *
- * igt_spin_t will contain an output fence associtated with this batch.
- *
- * Returns:
- * Structure with helper internal state for igt_spin_batch_free().
- */
-igt_spin_t *
-igt_spin_batch_new_fence(int fd, uint32_t ctx, unsigned engine)
-{
-	igt_spin_t *spin;
-
-	igt_require_gem(fd);
-	igt_require(gem_has_exec_fence(fd));
-
-	spin = __igt_spin_batch_new_fence(fd, ctx, engine);
-	igt_assert(gem_bo_busy(fd, spin->handle));
-	igt_assert(poll(&(struct pollfd){spin->out_fence, POLLIN}, 1, 0) == 0);
-
-	return spin;
-}
-
-igt_spin_t *
-__igt_spin_batch_new_poll(int fd, uint32_t ctx, unsigned engine)
-{
-	return ___igt_spin_batch_new(fd, ctx, engine, 0, POLL_RUN);
-}
-
-/**
- * igt_spin_batch_new_poll:
- * @fd: open i915 drm file descriptor
- * @engine: Ring to execute batch OR'd with execbuf flags. If value is less
- *          than 0, execute on all available rings.
- *
- * Start a recursive batch on a ring. Immediately returns a #igt_spin_t that
- * contains the batch's handle that can be waited upon. The returned structure
- * must be passed to igt_spin_batch_free() for post-processing.
- *
- * igt_spin_t->running will containt a pointer which target will change from
- * zero to one once the spinner actually starts executing on the GPU.
- *
- * Returns:
- * Structure with helper internal state for igt_spin_batch_free().
- */
-igt_spin_t *
-igt_spin_batch_new_poll(int fd, uint32_t ctx, unsigned engine)
-{
-	igt_spin_t *spin;
-
-	igt_require_gem(fd);
-	igt_require(gem_mmap__has_wc(fd));
-
-	spin = __igt_spin_batch_new_poll(fd, ctx, engine);
-	igt_assert(gem_bo_busy(fd, spin->handle));
+		igt_assert(poll(&pfd, 1, 0) == 0);
+	}
 
 	return spin;
 }

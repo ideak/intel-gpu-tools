@@ -715,9 +715,8 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 		do {
 			igt_spin_t *spin =
 				__igt_spin_batch_new(fd,
-						     ctx[0],
-						     execbuf.flags,
-						     0);
+						     .ctx = ctx[0],
+						     .engine = execbuf.flags);
 
 			do {
 				gem_execbuf(fd, &execbuf);

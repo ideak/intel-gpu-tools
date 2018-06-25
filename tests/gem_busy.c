@@ -114,7 +114,9 @@ static void semaphore(int fd, unsigned ring, uint32_t flags)
 
 	/* Create a long running batch which we can use to hog the GPU */
 	handle[BUSY] = gem_create(fd, 4096);
-	spin = igt_spin_batch_new(fd, 0, ring, handle[BUSY]);
+	spin = igt_spin_batch_new(fd,
+				  .engine = ring,
+				  .dependency = handle[BUSY]);
 
 	/* Queue a batch after the busy, it should block and remain "busy" */
 	igt_assert(exec_noop(fd, handle, ring | flags, false));
@@ -363,17 +365,16 @@ static void close_race(int fd)
 		igt_assert(sched_setscheduler(getpid(), SCHED_RR, &rt) == 0);
 
 		for (i = 0; i < nhandles; i++) {
-			spin[i] = __igt_spin_batch_new(fd, 0,
-						       engines[rand() % nengine], 0);
+			spin[i] = __igt_spin_batch_new(fd,
+						       .engine = engines[rand() % nengine]);
 			handles[i] = spin[i]->handle;
 		}
 
 		igt_until_timeout(20) {
 			for (i = 0; i < nhandles; i++) {
 				igt_spin_batch_free(fd, spin[i]);
-				spin[i] = __igt_spin_batch_new(fd, 0,
-							       engines[rand() % nengine],
-							       0);
+				spin[i] = __igt_spin_batch_new(fd,
+							       .engine = engines[rand() % nengine]);
 				handles[i] = spin[i]->handle;
 				__sync_synchronize();
 			}
@@ -415,7 +416,7 @@ static bool has_semaphores(int fd)
 
 static bool has_extended_busy_ioctl(int fd)
 {
-	igt_spin_t *spin = igt_spin_batch_new(fd, 0, I915_EXEC_RENDER, 0);
+	igt_spin_t *spin = igt_spin_batch_new(fd, .engine = I915_EXEC_RENDER);
 	uint32_t read, write;
 
 	__gem_busy(fd, spin->handle, &read, &write);
@@ -426,7 +427,7 @@ static bool has_extended_busy_ioctl(int fd)
 
 static void basic(int fd, unsigned ring, unsigned flags)
 {
-	igt_spin_t *spin = igt_spin_batch_new(fd, 0, ring, 0);
+	igt_spin_t *spin = igt_spin_batch_new(fd, .engine = ring);
 	struct timespec tv;
 	int timeout;
 	bool busy;

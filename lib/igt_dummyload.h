@@ -43,29 +43,25 @@ typedef struct igt_spin {
 	bool *running;
 } igt_spin_t;
 
-igt_spin_t *__igt_spin_batch_new(int fd,
-				 uint32_t ctx,
-				 unsigned engine,
-				 uint32_t  dep);
-igt_spin_t *igt_spin_batch_new(int fd,
-			       uint32_t ctx,
-			       unsigned engine,
-			       uint32_t  dep);
+struct igt_spin_factory {
+	uint32_t ctx;
+	uint32_t dependency;
+	unsigned int engine;
+	unsigned int flags;
+};
 
-igt_spin_t *__igt_spin_batch_new_fence(int fd,
-				       uint32_t ctx,
-				       unsigned engine);
+#define IGT_SPIN_FENCE_OUT (1 << 0)
+#define IGT_SPIN_POLL_RUN  (1 << 1)
 
-igt_spin_t *igt_spin_batch_new_fence(int fd,
-				     uint32_t ctx,
-				     unsigned engine);
+igt_spin_t *
+__igt_spin_batch_factory(int fd, const struct igt_spin_factory *opts);
+igt_spin_t *
+igt_spin_batch_factory(int fd, const struct igt_spin_factory *opts);
 
-igt_spin_t *__igt_spin_batch_new_poll(int fd,
-				       uint32_t ctx,
-				       unsigned engine);
-igt_spin_t *igt_spin_batch_new_poll(int fd,
-				    uint32_t ctx,
-				    unsigned engine);
+#define __igt_spin_batch_new(fd, ...) \
+	__igt_spin_batch_factory(fd, &((struct igt_spin_factory){__VA_ARGS__}))
+#define igt_spin_batch_new(fd, ...) \
+	igt_spin_batch_factory(fd, &((struct igt_spin_factory){__VA_ARGS__}))
 
 void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns);
 void igt_spin_batch_end(igt_spin_t *spin);

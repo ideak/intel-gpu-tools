@@ -84,7 +84,8 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 	struct drm_event_vblank ev;
 
 	igt_spin_t *t = igt_spin_batch_new(dpy->drm_fd,
-					   0, ring, fb->gem_handle);
+					   .engine = ring,
+					   .dependency = fb->gem_handle);
 
 	if (modeset) {
 		/*
@@ -200,7 +201,8 @@ static void test_atomic_commit_hang(igt_display_t *dpy, igt_plane_t *primary,
 				    struct igt_fb *busy_fb, unsigned ring)
 {
 	igt_spin_t *t = igt_spin_batch_new(dpy->drm_fd,
-					   0, ring, busy_fb->gem_handle);
+					   .engine = ring,
+					   .dependency = busy_fb->gem_handle);
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
 	unsigned flags = 0;
 	struct drm_event_vblank ev;
@@ -287,7 +289,9 @@ static void test_pageflip_modeset_hang(igt_display_t *dpy,
 
 	igt_display_commit2(dpy, dpy->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	t = igt_spin_batch_new(dpy->drm_fd, 0, ring, fb.gem_handle);
+	t = igt_spin_batch_new(dpy->drm_fd,
+			       .engine = ring,
+			       .dependency = fb.gem_handle);
 
 	do_or_die(drmModePageFlip(dpy->drm_fd, dpy->pipes[pipe].crtc_id, fb.fb_id, DRM_MODE_PAGE_FLIP_EVENT, &fb));
 

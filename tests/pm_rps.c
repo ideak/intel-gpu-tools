@@ -235,9 +235,9 @@ static void load_helper_run(enum load load)
 
 		igt_debug("Applying %s load...\n", lh.load ? "high" : "low");
 
-		spin[0] = __igt_spin_batch_new(drm_fd, 0, 0, 0);
+		spin[0] = __igt_spin_batch_new(drm_fd);
 		if (lh.load == HIGH)
-			spin[1] = __igt_spin_batch_new(drm_fd, 0, 0, 0);
+			spin[1] = __igt_spin_batch_new(drm_fd);
 		while (!lh.exit) {
 			handle = spin[0]->handle;
 			igt_spin_batch_end(spin[0]);
@@ -248,8 +248,7 @@ static void load_helper_run(enum load load)
 			usleep(100);
 
 			spin[0] = spin[1];
-			spin[lh.load == HIGH] =
-				__igt_spin_batch_new(drm_fd, 0, 0, 0);
+			spin[lh.load == HIGH] = __igt_spin_batch_new(drm_fd);
 		}
 
 		handle = spin[0]->handle;
@@ -510,7 +509,7 @@ static void boost_freq(int fd, int *boost_freqs)
 	int64_t timeout = 1;
 	igt_spin_t *load;
 
-	load = igt_spin_batch_new(fd, 0, 0, 0);
+	load = igt_spin_batch_new(fd);
 	resubmit_batch(fd, load->handle, 16);
 
 	/* Waiting will grant us a boost to maximum */

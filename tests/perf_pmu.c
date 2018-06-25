@@ -172,10 +172,15 @@ static unsigned int e2ring(int gem_fd, const struct intel_execution_engine2 *e)
 
 static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 {
+	struct igt_spin_factory opts = {
+		.ctx = ctx,
+		.engine = flags,
+	};
+
 	if (gem_can_store_dword(fd, flags))
-		return __igt_spin_batch_new_poll(fd, ctx, flags);
-	else
-		return __igt_spin_batch_new(fd, ctx, flags, 0);
+		opts.flags |= IGT_SPIN_POLL_RUN;
+
+	return __igt_spin_batch_factory(fd, &opts);
 }
 
 static unsigned long __spin_wait(int fd, igt_spin_t *spin)
@@ -356,7 +361,9 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	 */
 	spin[0] = __spin_sync(gem_fd, 0, e2ring(gem_fd, e));
 	usleep(500e3);
-	spin[1] = __igt_spin_batch_new(gem_fd, ctx, e2ring(gem_fd, e), 0);
+	spin[1] = __igt_spin_batch_new(gem_fd,
+				       .ctx = ctx,
+				       .engine = e2ring(gem_fd, e));
 
 	/*
 	 * Open PMU as fast as possible after the second spin batch in attempt
@@ -1045,8 +1052,8 @@ static void cpu_hotplug(int gem_fd)
 	 * Create two spinners so test can ensure shorter gaps in engine
 	 * busyness as it is terminating one and re-starting the other.
 	 */
-	spin[0] = igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
-	spin[1] = __igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER, 0);
+	spin[0] = igt_spin_batch_new(gem_fd, .engine = I915_EXEC_RENDER);
+	spin[1] = __igt_spin_batch_new(gem_fd, .engine = I915_EXEC_RENDER);
 
 	val = __pmu_read_single(fd, &ts[0]);
 
@@ -1129,8 +1136,8 @@ static void cpu_hotplug(int gem_fd)
 			break;
 
 		igt_spin_batch_free(gem_fd, spin[cur]);
-		spin[cur] = __igt_spin_batch_new(gem_fd, 0, I915_EXEC_RENDER,
-						 0);
+		spin[cur] = __igt_spin_batch_new(gem_fd,
+						 .engine = I915_EXEC_RENDER);
 		cur ^= 1;
 	}
 
@@ -1167,8 +1174,9 @@ test_interrupts(int gem_fd)
 
 	/* Queue spinning batches. */
 	for (int i = 0; i < target; i++) {
-		spin[i] = __igt_spin_batch_new_fence(gem_fd,
-						     0, I915_EXEC_RENDER);
+		spin[i] = __igt_spin_batch_new(gem_fd,
+					       .engine = I915_EXEC_RENDER,
+					       .flags = IGT_SPIN_FENCE_OUT);
 		if (i == 0) {
 			fence_fd = spin[i]->out_fence;
 		} else {
@@ -1229,7 +1237,8 @@ test_interrupts_sync(int gem_fd)
 
 	/* Queue spinning batches. */
 	for (int i = 0; i < target; i++)
-		spin[i] = __igt_spin_batch_new_fence(gem_fd, 0, 0);
+		spin[i] = __igt_spin_batch_new(gem_fd,
+					       .flags = IGT_SPIN_FENCE_OUT);
 
 	/* Wait for idle state. */
 	idle = pmu_read_single(fd);
@@ -1550,7 +1559,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 		igt_spin_t *spin;
 
 		/* Allocate our spin batch and idle it. */
-		spin = igt_spin_batch_new(gem_fd, 0, e2ring(gem_fd, e), 0);
+		spin = igt_spin_batch_new(gem_fd, .engine = e2ring(gem_fd, e));
 		igt_spin_batch_end(spin);
 		gem_sync(gem_fd, spin->handle);
 

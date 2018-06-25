@@ -502,7 +502,7 @@ static void isolation(int fd,
 		ctx[0] = gem_context_create(fd);
 		regs[0] = read_regs(fd, ctx[0], e, flags);
 
-		spin = igt_spin_batch_new(fd, ctx[0], engine, 0);
+		spin = igt_spin_batch_new(fd, .ctx = ctx[0], .engine = engine);
 
 		if (flags & DIRTY1) {
 			igt_debug("%s[%d]: Setting all registers of ctx 0 to 0x%08x\n",
@@ -557,8 +557,11 @@ static void isolation(int fd,
 
 static void inject_reset_context(int fd, unsigned int engine)
 {
+	struct igt_spin_factory opts = {
+		.ctx = gem_context_create(fd),
+		.engine = engine,
+	};
 	igt_spin_t *spin;
-	uint32_t ctx;
 
 	/*
 	 * Force a context switch before triggering the reset, or else
@@ -566,19 +569,20 @@ static void inject_reset_context(int fd, unsigned int engine)
 	 * HW for screwing up if the context was already broken.
 	 */
 
-	ctx = gem_context_create(fd);
-	if (gem_can_store_dword(fd, engine)) {
-		spin = __igt_spin_batch_new_poll(fd, ctx, engine);
+	if (gem_can_store_dword(fd, engine))
+		opts.flags |= IGT_SPIN_POLL_RUN;
+
+	spin = __igt_spin_batch_factory(fd, &opts);
+
+	if (spin->running)
 		igt_spin_busywait_until_running(spin);
-	} else {
-		spin = __igt_spin_batch_new(fd, ctx, engine, 0);
+	else
 		usleep(1000); /* better than nothing */
-	}
 
 	igt_force_gpu_reset(fd);
 
 	igt_spin_batch_free(fd, spin);
-	gem_context_destroy(fd, ctx);
+	gem_context_destroy(fd, opts.ctx);
 }
 
 static void preservation(int fd,
@@ -604,7 +608,7 @@ static void preservation(int fd,
 	gem_quiescent_gpu(fd);
 
 	ctx[num_values] = gem_context_create(fd);
-	spin = igt_spin_batch_new(fd, ctx[num_values], engine, 0);
+	spin = igt_spin_batch_new(fd, .ctx = ctx[num_values], .engine = engine);
 	regs[num_values][0] = read_regs(fd, ctx[num_values], e, flags);
 	for (int v = 0; v < num_values; v++) {
 		ctx[v] = gem_context_create(fd);
@@ -644,7 +648,7 @@ static void preservation(int fd,
 		break;
 	}
 
-	spin = igt_spin_batch_new(fd, ctx[num_values], engine, 0);
+	spin = igt_spin_batch_new(fd, .ctx = ctx[num_values], .engine = engine);
 	for (int v = 0; v < num_values; v++)
 		regs[v][1] = read_regs(fd, ctx[v], e, flags);
 	regs[num_values][1] = read_regs(fd, ctx[num_values], e, flags);
