@@ -28,18 +28,25 @@ IGT_TEST_DESCRIPTION("Fill the GTT with batches.");
 
 #define BATCH_SIZE (4096<<10)
 
-static void xchg_u32(void *array, unsigned i, unsigned j)
+struct batch {
+	uint32_t handle;
+	void *ptr;
+};
+
+static void xchg_batch(void *array, unsigned int i, unsigned int j)
 {
-	uint32_t *u32 = array;
-	uint32_t tmp = u32[i];
-	u32[i] = u32[j];
-	u32[j] = tmp;
+	struct batch *batches = array;
+	struct batch tmp;
+
+	tmp = batches[i];
+	batches[i] = batches[j];
+	batches[j] = tmp;
 }
 
 static void submit(int fd, int gen,
 		   struct drm_i915_gem_execbuffer2 *eb,
 		   struct drm_i915_gem_relocation_entry *reloc,
-		   uint32_t *handles, unsigned count)
+		   struct batch *batches, unsigned int count)
 {
 	struct drm_i915_gem_exec_object2 obj;
 	uint32_t batch[16];
@@ -80,7 +87,7 @@ static void submit(int fd, int gen,
 
 	eb->buffers_ptr = to_user_pointer(&obj);
 	for (unsigned i = 0; i < count; i++) {
-		obj.handle = handles[i];
+		obj.handle = batches[i].handle;
 		reloc[0].target_handle = obj.handle;
 		reloc[1].target_handle = obj.handle;
 
@@ -88,8 +95,8 @@ static void submit(int fd, int gen,
 		reloc[0].presumed_offset = obj.offset;
 		reloc[1].presumed_offset = obj.offset;
 
-		gem_write(fd, obj.handle, eb->batch_start_offset,
-			  batch, sizeof(batch));
+		memcpy(batches[i].ptr + eb->batch_start_offset,
+		       batch, sizeof(batch));
 
 		gem_execbuf(fd, eb);
 	}
@@ -103,7 +110,7 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_relocation_entry reloc[2];
 	volatile uint64_t *shared;
-	unsigned *handles;
+	struct batch *batches;
 	unsigned engines[16];
 	unsigned nengine;
 	unsigned engine;
@@ -145,29 +152,38 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
-	handles = calloc(count, sizeof(handles));
-	igt_assert(handles);
-	for (unsigned i = 0; i < count; i++)
-		handles[i] = gem_create(fd, BATCH_SIZE);
+	batches = calloc(count, sizeof(*batches));
+	igt_assert(batches);
+	for (unsigned i = 0; i < count; i++) {
+		batches[i].handle = gem_create(fd, BATCH_SIZE);
+		batches[i].ptr =
+			__gem_mmap__wc(fd, batches[i].handle,
+				       0, BATCH_SIZE, PROT_WRITE);
+		if (!batches[i].ptr) {
+			batches[i].ptr =
+				__gem_mmap__gtt(fd, batches[i].handle,
+						BATCH_SIZE, PROT_WRITE);
+		}
+		igt_require(batches[i].ptr);
+	}
 
 	/* Flush all memory before we start the timer */
-	submit(fd, gen, &execbuf, reloc, handles, count);
+	submit(fd, gen, &execbuf, reloc, batches, count);
 
 	igt_fork(child, nengine) {
 		uint64_t cycles = 0;
 		hars_petruska_f54_1_random_perturb(child);
-		igt_permute_array(handles, count, xchg_u32);
+		igt_permute_array(batches, count, xchg_batch);
 		execbuf.batch_start_offset = child*64;
 		execbuf.flags |= engines[child];
 		igt_until_timeout(timeout) {
-			submit(fd, gen, &execbuf, reloc, handles, count);
+			submit(fd, gen, &execbuf, reloc, batches, count);
 			for (unsigned i = 0; i < count; i++) {
-				uint32_t handle = handles[i];
-				uint64_t buf[2];
+				uint64_t offset, delta;
 
-				gem_read(fd, handle, reloc[1].offset, &buf[0], sizeof(buf[0]));
-				gem_read(fd, handle, reloc[0].delta, &buf[1], sizeof(buf[1]));
-				igt_assert_eq_u64(buf[0], buf[1]);
+				offset = *(uint64_t *)(batches[i].ptr + reloc[1].offset);
+				delta = *(uint64_t *)(batches[i].ptr + reloc[0].delta);
+				igt_assert_eq_u64(offset, delta);
 			}
 			cycles++;
 		}
@@ -176,8 +192,10 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	}
 	igt_waitchildren();
 
-	for (unsigned i = 0; i < count; i++)
-		gem_close(fd, handles[i]);
+	for (unsigned i = 0; i < count; i++) {
+		munmap(batches[i].ptr, BATCH_SIZE);
+		gem_close(fd, batches[i].handle);
+	}
 
 	shared[nengine] = 0;
 	for (unsigned i = 0; i < nengine; i++)
