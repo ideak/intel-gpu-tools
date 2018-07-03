@@ -90,7 +90,7 @@ gen7_bind_buf(struct intel_batchbuffer *batch,
 		ss[7] |= HSW_SURFACE_SWIZZLE(RED, GREEN, BLUE, ALPHA);
 
 	ret = drm_intel_bo_emit_reloc(batch->bo,
-				      intel_batchbuffer_subdata_offset(batch, ss) + 4,
+				      intel_batchbuffer_subdata_offset(batch, &ss[1]),
 				      buf->bo, 0,
 				      read_domain, write_domain);
 	igt_assert(ret == 0);
