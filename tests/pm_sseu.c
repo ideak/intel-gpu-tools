@@ -35,7 +35,7 @@
 
 IGT_TEST_DESCRIPTION("Tests slice/subslice/EU power gating functionality.\n");
 
-struct {
+static struct {
 	int init;
 	int drm_fd;
 	int devid;

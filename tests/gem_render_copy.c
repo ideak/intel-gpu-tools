@@ -206,6 +206,8 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 
 	bo = drm_intel_bo_alloc(data->bufmgr, "", size, 4096);
 
+	memset(buf, 0, sizeof(*buf));
+
 	buf->bo = bo;
 	buf->stride = stride;
 	buf->tiling = I915_TILING_NONE;

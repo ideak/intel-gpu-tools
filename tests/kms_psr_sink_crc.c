@@ -150,6 +150,8 @@ static void fill_blt(data_t *data, uint32_t handle, unsigned char color)
 static void scratch_buf_init(struct igt_buf *buf, drm_intel_bo *bo,
 			     int size, int stride)
 {
+	memset(buf, 0, sizeof(*buf));
+
 	buf->bo = bo;
 	buf->stride = stride;
 	buf->tiling = I915_TILING_X;

@@ -495,6 +495,8 @@ scratch_buf_init(drm_intel_bufmgr *bufmgr,
 
 	scratch_buf_memset(bo, width, height, color);
 
+	memset(buf, 0, sizeof(*buf));
+
 	buf->bo = bo;
 	buf->stride = stride;
 	buf->tiling = I915_TILING_NONE;

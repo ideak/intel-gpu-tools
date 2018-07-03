@@ -131,6 +131,8 @@ static void bo_check(data_t *data, drm_intel_bo *bo, uint32_t val)
 
 static void scratch_buf_init_from_bo(struct igt_buf *buf, drm_intel_bo *bo)
 {
+	memset(buf, 0, sizeof(*buf));
+
 	buf->bo = bo;
 	buf->stride = 4 * WIDTH;
 	buf->tiling = I915_TILING_NONE;

@@ -66,6 +66,8 @@ static void scratch_buf_init(struct igt_buf *buf,
 			     drm_intel_bufmgr *bufmgr,
 			     uint32_t pixel)
 {
+	memset(buf, 0, sizeof(*buf));
+
 	buf->bo = create_bo(bufmgr, pixel);
 	buf->stride = STRIDE;
 	buf->tiling = I915_TILING_NONE;
@@ -109,7 +111,7 @@ static void fork_rcs_copy(int target, drm_intel_bo **dst, int count, unsigned fl
 
 	igt_fork(child, count) {
 		struct intel_batchbuffer *batch;
-		struct igt_buf buf;
+		struct igt_buf buf = {};
 
 		batch = intel_batchbuffer_alloc(dst[child]->bufmgr,
 						devid);

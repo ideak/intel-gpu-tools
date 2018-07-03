@@ -61,7 +61,7 @@ static int snoop;
 static void
 check_bo(struct intel_batchbuffer *batch, struct igt_buf *buf, uint32_t val)
 {
-	struct igt_buf tmp;
+	struct igt_buf tmp = {};
 	uint32_t *ptr;
 	int i;
 

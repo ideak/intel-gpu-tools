@@ -478,6 +478,8 @@ static void sanitize_stride(struct igt_buf *buf)
 
 static void init_buffer(struct igt_buf *buf, unsigned size)
 {
+	memset(buf, 0, sizeof(*buf));
+
 	buf->bo = drm_intel_bo_alloc(bufmgr, "tiled bo", size, 4096);
 	buf->size = size;
 	igt_assert(buf->bo);

@@ -103,6 +103,8 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 	gem_write(data->fd, bo->handle, 0, data->linear,
 		  sizeof(data->linear));
 
+	memset(buf, 0, sizeof(*buf));
+
 	buf->bo = bo;
 	buf->stride = stride;
 	buf->tiling = I915_TILING_NONE;
