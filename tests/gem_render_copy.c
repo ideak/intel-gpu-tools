@@ -51,32 +51,25 @@
 IGT_TEST_DESCRIPTION("Basic test for the render_copy() function.");
 
 #define WIDTH 512
-#define STRIDE (WIDTH*4)
 #define HEIGHT 512
 
 typedef struct {
 	int drm_fd;
 	uint32_t devid;
 	drm_intel_bufmgr *bufmgr;
+	struct intel_batchbuffer *batch;
+	igt_render_copyfunc_t render_copy;
 } data_t;
 static int opt_dump_png = false;
 static int check_all_pixels = false;
 
-static void scratch_buf_write_to_png(struct igt_buf *buf, const char *filename)
+static const char *make_filename(const char *filename)
 {
-	cairo_surface_t *surface;
-	cairo_status_t ret;
+	static char buf[64];
 
-	drm_intel_bo_map(buf->bo, 0);
-	surface = cairo_image_surface_create_for_data(buf->bo->virtual,
-						      CAIRO_FORMAT_RGB24,
-						      igt_buf_width(buf),
-						      igt_buf_height(buf),
-						      buf->stride);
-	ret = cairo_surface_write_to_png(surface, filename);
-	igt_assert(ret == CAIRO_STATUS_SUCCESS);
-	cairo_surface_destroy(surface);
-	drm_intel_bo_unmap(buf->bo);
+	snprintf(buf, sizeof(buf), "%s_%s", igt_subtest_name(), filename);
+
+	return buf;
 }
 
 static void *linear_copy(data_t *data, struct igt_buf *buf)
@@ -96,6 +89,27 @@ static void *linear_copy(data_t *data, struct igt_buf *buf)
 	munmap(map, buf->bo->size);
 
 	return linear;
+}
+
+static void scratch_buf_write_to_png(data_t *data, struct igt_buf *buf,
+				     const char *filename)
+{
+	cairo_surface_t *surface;
+	cairo_status_t ret;
+	void *linear;
+
+	linear = linear_copy(data, buf);
+
+	surface = cairo_image_surface_create_for_data(linear,
+						      CAIRO_FORMAT_RGB24,
+						      igt_buf_width(buf),
+						      igt_buf_height(buf),
+						      buf->stride);
+	ret = cairo_surface_write_to_png(surface, make_filename(filename));
+	igt_assert(ret == CAIRO_STATUS_SUCCESS);
+	cairo_surface_destroy(surface);
+
+	free(linear);
 }
 
 static void scratch_buf_draw_pattern(data_t *data, struct igt_buf *buf,
@@ -199,19 +213,22 @@ scratch_buf_copy(data_t *data,
 }
 
 static void scratch_buf_init(data_t *data, struct igt_buf *buf,
-			     int width, int height, int stride)
+			     int width, int height,
+			     uint32_t req_tiling)
 {
-	drm_intel_bo *bo;
-	int size = height * stride;
-
-	bo = drm_intel_bo_alloc(data->bufmgr, "", size, 4096);
+	uint32_t tiling = req_tiling;
+	unsigned long pitch;
 
 	memset(buf, 0, sizeof(*buf));
 
-	buf->bo = bo;
-	buf->stride = stride;
-	buf->tiling = I915_TILING_NONE;
-	buf->size = size;
+	buf->bo = drm_intel_bo_alloc_tiled(data->bufmgr, "",
+				      width, height, 4,
+				      &tiling, &pitch, 0);
+	igt_assert_eq(tiling, req_tiling);
+
+	buf->stride = pitch;
+	buf->tiling = tiling;
+	buf->size = pitch * height;
 
 	igt_assert(igt_buf_width(buf) == width);
 	igt_assert(igt_buf_height(buf) == height);
@@ -275,6 +292,99 @@ scratch_buf_check_all(data_t *data,
 	free(linear_buf);
 }
 
+static void test(data_t *data, uint32_t tiling)
+{
+	struct igt_buf dst, ref;
+	struct {
+		struct igt_buf buf;
+		const char *filename;
+		uint32_t tiling;
+		int x, y;
+	} src[3] = {
+		{
+			.filename = "source-linear.png",
+			.tiling = I915_TILING_NONE,
+			.x = 1, .y = HEIGHT/2+1,
+		},
+		{
+			.filename = "source-x-tiled.png",
+			.tiling = I915_TILING_X,
+			.x = WIDTH/2+1, .y = HEIGHT/2+1,
+		},
+		{
+			.filename = "source-y-tiled.png",
+			.tiling = I915_TILING_Y,
+			.x = WIDTH/2+1, .y = 1,
+		},
+	};
+
+	int opt_dump_aub = igt_aub_dump_enabled();
+
+	for (int i = 0; i < ARRAY_SIZE(src); i++)
+		scratch_buf_init(data, &src[i].buf, WIDTH, HEIGHT, src[i].tiling);
+	scratch_buf_init(data, &dst, WIDTH, HEIGHT, tiling);
+	scratch_buf_init(data, &ref, WIDTH, HEIGHT, I915_TILING_NONE);
+
+	for (int i = 0; i < ARRAY_SIZE(src); i++)
+		scratch_buf_draw_pattern(data, &src[i].buf,
+					 0, 0, WIDTH, HEIGHT,
+					 0, 0, WIDTH, HEIGHT, true);
+	scratch_buf_draw_pattern(data, &dst,
+				 0, 0, WIDTH, HEIGHT,
+				 0, 0, WIDTH, HEIGHT, false);
+
+	scratch_buf_copy(data,
+			 &dst, 0, 0, WIDTH, HEIGHT,
+			 &ref, 0, 0);
+	for (int i = 0; i < ARRAY_SIZE(src); i++)
+		scratch_buf_copy(data,
+				 &src[i].buf, WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
+				 &ref, src[i].x, src[i].y);
+
+	if (opt_dump_png) {
+		for (int i = 0; i < ARRAY_SIZE(src); i++)
+			scratch_buf_write_to_png(data, &src[i].buf, src[i].filename);
+		scratch_buf_write_to_png(data, &dst, "destination.png");
+		scratch_buf_write_to_png(data, &ref, "reference.png");
+	}
+
+	if (opt_dump_aub) {
+		drm_intel_bufmgr_gem_set_aub_filename(data->bufmgr,
+						      "rendercopy.aub");
+		drm_intel_bufmgr_gem_set_aub_dump(data->bufmgr, true);
+	}
+
+	/* This will copy the src to the mid point of the dst buffer. Presumably
+	 * the out of bounds accesses will get clipped.
+	 * Resulting buffer should look like:
+	 *	  _______
+	 *	 |dst|dst|
+	 *	 |dst|src|
+	 *	  -------
+	 */
+	for (int i = 0; i < ARRAY_SIZE(src); i++)
+		data->render_copy(data->batch, NULL,
+				  &src[i].buf, WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
+				  &dst, src[i].x, src[i].y);
+
+	if (opt_dump_png)
+		scratch_buf_write_to_png(data, &dst, "result.png");
+
+	if (opt_dump_aub) {
+		drm_intel_gem_bo_aub_dump_bmp(dst.bo,
+					      0, 0, igt_buf_width(&dst),
+					      igt_buf_height(&dst),
+					      AUB_DUMP_BMP_FORMAT_ARGB_8888,
+					      dst.stride, 0);
+		drm_intel_bufmgr_gem_set_aub_dump(data->bufmgr, false);
+	} else if (check_all_pixels) {
+		scratch_buf_check_all(data, &dst, &ref);
+	} else {
+		scratch_buf_check(data, &dst, &ref, 10, 10);
+		scratch_buf_check(data, &dst, &ref, WIDTH - 10, HEIGHT - 10);
+	}
+}
+
 static int opt_handler(int opt, int opt_index, void *data)
 {
 	if (opt == 'd') {
@@ -291,13 +401,9 @@ static int opt_handler(int opt, int opt_index, void *data)
 int main(int argc, char **argv)
 {
 	data_t data = {0, };
-	struct intel_batchbuffer *batch = NULL;
-	struct igt_buf src, dst, ref;
-	igt_render_copyfunc_t render_copy = NULL;
-	int opt_dump_aub = igt_aub_dump_enabled();
 
-	igt_simple_init_parse_opts(&argc, argv, "da", NULL, NULL,
-				   opt_handler, NULL);
+	igt_subtest_init_parse_opts(&argc, argv, "da", NULL, NULL,
+				    opt_handler, NULL);
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_render(DRIVER_INTEL);
@@ -306,70 +412,24 @@ int main(int argc, char **argv)
 		data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
 		igt_assert(data.bufmgr);
 
-		render_copy = igt_get_render_copyfunc(data.devid);
-		igt_require_f(render_copy,
+		data.render_copy = igt_get_render_copyfunc(data.devid);
+		igt_require_f(data.render_copy,
 			      "no render-copy function\n");
 
-		batch = intel_batchbuffer_alloc(data.bufmgr, data.devid);
-		igt_assert(batch);
+		data.batch = intel_batchbuffer_alloc(data.bufmgr, data.devid);
+		igt_assert(data.batch);
 	}
 
-	scratch_buf_init(&data, &src, WIDTH, HEIGHT, STRIDE);
-	scratch_buf_init(&data, &dst, WIDTH, HEIGHT, STRIDE);
-	scratch_buf_init(&data, &ref, WIDTH, HEIGHT, STRIDE);
+	igt_subtest("linear")
+		test(&data, I915_TILING_NONE);
+	igt_subtest("x-tiled")
+		test(&data, I915_TILING_X);
+	igt_subtest("y-tiled")
+		test(&data, I915_TILING_Y);
 
-	scratch_buf_draw_pattern(&data, &src,
-				 0, 0, WIDTH, HEIGHT,
-				 0, 0, WIDTH, HEIGHT, true);
-	scratch_buf_draw_pattern(&data, &dst,
-				 0, 0, WIDTH, HEIGHT,
-				 0, 0, WIDTH, HEIGHT, false);
-
-	scratch_buf_copy(&data,
-			 &dst, 0, 0, WIDTH, HEIGHT,
-			 &ref, 0, 0);
-	scratch_buf_copy(&data,
-			 &src, WIDTH/4, WIDTH/4, WIDTH/2, HEIGHT/2,
-			 &ref, WIDTH/2-1, WIDTH/2-1);
-
-	if (opt_dump_png) {
-		scratch_buf_write_to_png(&src, "source.png");
-		scratch_buf_write_to_png(&dst, "destination.png");
-		scratch_buf_write_to_png(&ref, "reference.png");
-	}
-
-	if (opt_dump_aub) {
-		drm_intel_bufmgr_gem_set_aub_filename(data.bufmgr,
-						      "rendercopy.aub");
-		drm_intel_bufmgr_gem_set_aub_dump(data.bufmgr, true);
-	}
-
-	/* This will copy the src to the mid point of the dst buffer. Presumably
-	 * the out of bounds accesses will get clipped.
-	 * Resulting buffer should look like:
-	 *	  _______
-	 *	 |dst|dst|
-	 *	 |dst|src|
-	 *	  -------
-	 */
-	render_copy(batch, NULL,
-		    &src, WIDTH/4, HEIGHT/4, WIDTH/2, HEIGHT/2,
-		    &dst, WIDTH/2-1, HEIGHT/2-1);
-
-	if (opt_dump_png)
-		scratch_buf_write_to_png(&dst, "result.png");
-
-	if (opt_dump_aub) {
-		drm_intel_gem_bo_aub_dump_bmp(dst.bo,
-			0, 0, WIDTH, HEIGHT,
-			AUB_DUMP_BMP_FORMAT_ARGB_8888,
-			STRIDE, 0);
-		drm_intel_bufmgr_gem_set_aub_dump(data.bufmgr, false);
-	} else if (check_all_pixels) {
-		scratch_buf_check_all(&data, &dst, &ref);
-	} else {
-		scratch_buf_check(&data, &dst, &ref, 10, 10);
-		scratch_buf_check(&data, &dst, &ref, WIDTH - 10, HEIGHT - 10);
+	igt_fixture {
+		intel_batchbuffer_free(data.batch);
+		drm_intel_bufmgr_destroy(data.bufmgr);
 	}
 
 	igt_exit();
