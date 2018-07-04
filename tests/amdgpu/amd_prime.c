@@ -348,7 +348,7 @@ static void amd_to_i915(int i915, int amd, amdgpu_device_handle device)
 	count = 0;
 	size = 64 << 10;
 	contexts = malloc(size * sizeof(*contexts));
-	igt_until_timeout(5) {
+	igt_until_timeout(2) { /* must all complete within vgem timeout (10s) */
 		if (count == size) {
 			size *= 2;
 			contexts = realloc(contexts, size * sizeof(*contexts));
