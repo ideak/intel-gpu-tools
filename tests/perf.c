@@ -4109,7 +4109,10 @@ igt_main
 		 * should have closed drm_fd...
 		 */
 		igt_assert_eq(drm_fd, -1);
+
 		drm_fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(drm_fd);
+
 		devid = intel_get_drm_devid(drm_fd);
 		sysfs = igt_sysfs_open(drm_fd, &card);
 
