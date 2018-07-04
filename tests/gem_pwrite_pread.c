@@ -272,6 +272,7 @@ int main(int argc, char **argv)
 		uint32_t devid;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
 
 		dst = gem_create(fd, object_size);
 		src = gem_create(fd, object_size);
