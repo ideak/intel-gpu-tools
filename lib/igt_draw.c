@@ -568,7 +568,7 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 	drm_intel_bo *src, *dst;
 	uint32_t devid = intel_get_drm_devid(fd);
 	igt_render_copyfunc_t rendercopy = igt_get_render_copyfunc(devid);
-	struct igt_buf src_buf, dst_buf;
+	struct igt_buf src_buf = {}, dst_buf = {};
 	struct intel_batchbuffer *batch;
 	uint32_t tiling, swizzle;
 	struct buf_data tmp;
