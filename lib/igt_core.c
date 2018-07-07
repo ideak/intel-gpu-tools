@@ -1169,10 +1169,10 @@ bool igt_can_fail(void)
 
 static bool run_under_gdb(void)
 {
-	char buf[1024];
+	char pathname[30], buf[1024];
 
-	sprintf(buf, "/proc/%d/exe", getppid());
-	return (readlink (buf, buf, sizeof (buf)) != -1 &&
+	sprintf(pathname, "/proc/%d/exe", getppid());
+	return (readlink(pathname, buf, sizeof (buf)) != -1 &&
 		strncmp(basename(buf), "gdb", 3) == 0);
 }
 
