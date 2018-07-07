@@ -1277,7 +1277,7 @@ DEBUGSTRING(ironlake_debug_pch_dpll)
 			p2 = "Div 7";
 		else
 			p2 = "Div 14";
-	} else if ((val & DPLLB_MODE_LVDS) == DPLLB_MODE_DAC_SERIAL) {
+	} else if ((val & DPLLB_MODE_DAC_SERIAL) == DPLLB_MODE_DAC_SERIAL) {
 		mode = "Non-LVDS";
 		if (val & DPLL_DAC_SERIAL_P2_CLOCK_DIV_5)
 			p2 = "Div 5";
