@@ -1485,7 +1485,7 @@ __igt_lsof(const char *dir)
 	PROCTAB *proc;
 	proc_t *proc_info;
 
-	char path[PATH_MAX];
+	char path[30];
 	char *name_lnk;
 	struct stat st;
 	int state = 0;
