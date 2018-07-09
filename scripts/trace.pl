@@ -322,7 +322,7 @@ sub sanitize_ctx
 {
 	my ($ctx, $ring) = @_;
 
-	if (exists $ctxdb{$ctx}) {
+	if (exists $ctxdb{$ctx} and $ctxdb{$ctx} > 1) {
 		return $ctx . '.' . $ctxdb{$ctx};
 	} else {
 		return $ctx;
@@ -395,6 +395,8 @@ while (<>) {
 			$ctxdb{$orig_ctx}++;
 			$ctx = sanitize_ctx($orig_ctx, $ring);
 			$key = db_key($ring, $ctx, $seqno);
+		} else {
+			$ctxdb{$orig_ctx} = 1;
 		}
 
 		$queue{$key} = $time;
@@ -562,7 +564,7 @@ foreach my $key (@sorted_keys) {
 
 my $last_ts = 0;
 my $first_ts;
-my ($min_ctx, $max_ctx);
+my $min_ctx;
 
 foreach my $key (@sorted_keys) {
 	my $ring = $db{$key}->{'ring'};
@@ -574,8 +576,6 @@ foreach my $key (@sorted_keys) {
 	$last_ts = $end if $end > $last_ts;
 	$min_ctx = $db{$key}->{'ctx'} if not defined $min_ctx or
 					 $db{$key}->{'ctx'} < $min_ctx;
-	$max_ctx = $db{$key}->{'ctx'} if not defined $max_ctx or
-					 $db{$key}->{'ctx'} > $max_ctx;
 
 	$db{$key}->{'context-complete-delay'} = $end - $notify;
 	$db{$key}->{'execute-delay'} = $start - $db{$key}->{'submit'};
@@ -709,6 +709,21 @@ say sprintf('GPU: %.2f%% idle, %.2f%% busy',
 
 my $timeline_text = $colour_contexts ?
 		    'Per context coloured shading like:' : 'Box shading like:';
+
+my %ctx_colours;
+
+sub generate_ctx_colours
+{
+	my $num_ctx = keys %ctxdb;
+	my $i = 0;
+
+	foreach my $ctx (sort keys %ctxdb) {
+		$ctx_colours{$ctx} = int(360 / $num_ctx * $i++);
+	}
+}
+
+
+generate_ctx_colours() if $html and $colour_contexts;
 
 my $queued_style = box_style($min_ctx, 'queue');
 my $ready_style = box_style($min_ctx, 'ready');
@@ -918,7 +933,7 @@ sub ctx_colour
 			$l = 25;
 		}
 
-		$val = int(360 / ($max_ctx - $min_ctx + 1)) * ($ctx - $min_ctx);
+		$val = $ctx_colours{$ctx};
 	}
 
 	$l = int($l * $lfac);
