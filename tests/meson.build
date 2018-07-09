@@ -250,16 +250,16 @@ if get_option('use_rpath')
 	# prefix. meson enforces this.
 
 	# Start from the executable
-	rpathdir = '$ORIGIN'
+	libexecdir_rpathdir = '$ORIGIN'
 	# Executables are installed in libexecdir. Add a .. for each
 	# directory name in it.
 	foreach p : libexecdir.split('/')
-		rpathdir = join_paths(rpathdir, '..')
+		libexecdir_rpathdir = join_paths(libexecdir_rpathdir, '..')
 	endforeach
 	# Add relative path to libdir
-	rpathdir = join_paths(rpathdir, libdir)
+	libexecdir_rpathdir = join_paths(libexecdir_rpathdir, libdir)
 else
-	rpathdir = ''
+	libexecdir_rpathdir = ''
 endif
 
 test_executables = []
@@ -268,28 +268,28 @@ foreach prog : test_progs
 	test_executables += executable(prog, prog + '.c',
 		   dependencies : test_deps,
 		   install_dir : libexecdir,
-		   install_rpath : rpathdir,
+		   install_rpath : libexecdir_rpathdir,
 		   install : true)
 endforeach
 
 test_executables += executable('gem_eio', 'gem_eio.c',
 	   dependencies : test_deps + [ realtime ],
 	   install_dir : libexecdir,
-	   install_rpath : rpathdir,
+	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_progs += 'gem_eio'
 
 test_executables += executable('perf_pmu', 'perf_pmu.c',
 	   dependencies : test_deps + [ lib_igt_perf ],
 	   install_dir : libexecdir,
-	   install_rpath : rpathdir,
+	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_progs += 'perf_pmu'
 
 executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   dependencies : test_deps,
 	   install_dir : libexecdir,
-	   install_rpath : rpathdir,
+	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_progs += 'testdisplay'
 
@@ -311,7 +311,7 @@ endforeach
 executable('gem_stress', 'gem_stress.c',
 	   install : true,
 	   install_dir : libexecdir,
-	   install_rpath : rpathdir,
+	   install_rpath : libexecdir_rpathdir,
 	   dependencies : igt_deps)
 
 # IMPORTANT: These tests here are all disabled because the result in sometime
