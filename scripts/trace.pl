@@ -873,10 +873,30 @@ sub sortQueue {
 
 sub ctx_colour
 {
-	my ($ctx, $s, $l) = (@_);
+	my ($ctx, $stage) = (@_);
+	my ($s, $l);
 	my $val;
 
-	return 'Pink;' unless $colour_contexts;
+	unless ($colour_contexts) {
+		if ($stage eq 'queue') {
+			return 'lightblue;';
+		} elsif ($stage eq 'ready') {
+			return 'lightgrey;';
+		} elsif ($stage eq 'execute') {
+			return 'pink;';
+		}
+	} else {
+		if ($stage eq 'queue') {
+			$s = 35;
+			$l = 85;
+		} elsif ($stage eq 'ready') {
+			$s = 35;
+			$l = 45;
+		} elsif ($stage eq 'execute') {
+			$s = 80;
+			$l = 65;
+		}
+	}
 
 	$val = int(360 / ($max_ctx - $min_ctx + 1)) * ($ctx - $min_ctx);
 
@@ -898,7 +918,7 @@ foreach my $key (sort sortQueue keys %db) {
 	unless (exists $skip_box{'queue'}) {
 		$skey = 2 * $max_seqno * $ctx + 2 * $seqno;
 		$style = 'color: black; background-color: ' .
-			 ctx_colour($ctx, 35, 85);
+			 ctx_colour($ctx, 'queue');
 		$content = "$name<br>$db{$key}->{'submit-delay'}us <small>($db{$key}->{'execute-delay'}us)</small>";
 		$startend = 'start: \'' . ts($queue) . '\', end: \'' . ts($submit) . '\'';
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: 1, subgroupOrder: 1, content: '$content', $startend, style: \'$style\'},\n";
@@ -909,7 +929,7 @@ foreach my $key (sort sortQueue keys %db) {
 	unless (exists $skip_box{'ready'}) {
 		$skey = 2 * $max_seqno * $ctx + 2 * $seqno + 1;
 		$style = 'color: black; background-color: ' .
-			 ctx_colour($ctx, 35, 45);
+			 ctx_colour($ctx, 'ready');
 		$content = "<small>$name<br>$db{$key}->{'execute-delay'}us</small>";
 		$startend = 'start: \'' . ts($submit) . '\', end: \'' . ts($start) . '\'';
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: 1, subgroupOrder: 2, content: '$content', $startend, style: \'$style\'},\n";
@@ -923,7 +943,7 @@ foreach my $key (sort sortQueue keys %db) {
 			$style = 'color: white; background-color: red;';
 		} else {
 			$style = 'color: black; background-color: ' .
-				  ctx_colour($ctx, 80, 65);
+				  ctx_colour($ctx, 'execute');
 		}
 		$content = "$name <small>$db{$key}->{'port'}</small>";
 		$content .= ' <small><i>???</i></small> ' if exists $db{$key}->{'incomplete'};
