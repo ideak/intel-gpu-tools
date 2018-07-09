@@ -740,9 +740,6 @@ print <<ENDHTML if $html;
   <link href="node_modules/vis//dist/vis.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
-
-<button onclick="toggleStackSubgroups()">Toggle stacking</button>
-
 <p>
 $execute_colour = requests executing on the GPU<br>
 $runnable_colour = runnable requests waiting for a slot on GPU<br>
@@ -903,6 +900,7 @@ foreach my $key (sort sortQueue keys %db) {
 	my $submit = $queue + $db{$key}->{'submit-delay'};
 	my ($content, $style);
 	my $group = $engine_start_id + $rings{$db{$key}->{'ring'}};
+	my $subgroup = $ctx - $min_ctx;
 	my $type = ' type: \'range\',';
 	my $startend;
 	my $skey;
@@ -914,7 +912,7 @@ foreach my $key (sort sortQueue keys %db) {
 			 ctx_colour($ctx, 'queue');
 		$content = "$name<br>$db{$key}->{'submit-delay'}us <small>($db{$key}->{'execute-delay'}us)</small>";
 		$startend = 'start: \'' . ts($queue) . '\', end: \'' . ts($submit) . '\'';
-		print "\t{id: $i, key: $skey, $type group: $group, subgroup: 1, subgroupOrder: 1, content: '$content', $startend, style: \'$style\'},\n";
+		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
 		$i++;
 	}
 
@@ -925,7 +923,7 @@ foreach my $key (sort sortQueue keys %db) {
 			 ctx_colour($ctx, 'ready');
 		$content = "<small>$name<br>$db{$key}->{'execute-delay'}us</small>";
 		$startend = 'start: \'' . ts($submit) . '\', end: \'' . ts($start) . '\'';
-		print "\t{id: $i, key: $skey, $type group: $group, subgroup: 1, subgroupOrder: 2, content: '$content', $startend, style: \'$style\'},\n";
+		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
 		$i++;
 	}
 
@@ -944,7 +942,7 @@ foreach my $key (sort sortQueue keys %db) {
 		$content .= ' <small><i>+</i></small> ' if exists $db{$key}->{'no-notify'};
 		$content .= "<br>$db{$key}->{'duration'}us <small>($db{$key}->{'context-complete-delay'}us)</small>";
 		$startend = 'start: \'' . ts($start) . '\', end: \'' . ts($notify) . '\'';
-		print "\t{id: $i, key: $skey, $type group: $group, subgroup: 2, subgroupOrder: 3, content: '$content', $startend, style: \'$style\'},\n";
+		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
 		$i++;
 	}
 
@@ -958,7 +956,7 @@ foreach my $key (sort sortQueue keys %db) {
 		$content .= ' <small><i>++</i></small> ' if exists $db{$key}->{'no-end'};
 		$content .= ' <small><i>+</i></small> ' if exists $db{$key}->{'no-notify'};
 		$startend = 'start: \'' . ts($notify) . '\', end: \'' . ts($end) . '\'';
-		print "\t{id: $i, key: $skey, $type group: $group, subgroup: 2, subgroupOrder: 4, content: '$content', $startend, style: \'$style\'},\n";
+		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
 		$i++;
 	}
 
@@ -1001,29 +999,18 @@ $first_ts = ts($first_ts);
 print <<ENDHTML;
   ]);
 
-  function customOrder (a, b) {
-  // order by id
-    return a.subgroupOrder - b.subgroupOrder;
-  }
-
   // Configuration for the Timeline
   var options = { groupOrder: 'content',
 		  horizontalScroll: true,
-		  stack: true,
+		  stack: false,
 		  stackSubgroups: false,
 		  zoomKey: 'ctrlKey',
 		  orientation: 'top',
-		  order: customOrder,
 		  start: '$first_ts',
 		  end: '$end_ts'};
 
   // Create a Timeline
   var timeline = new vis.Timeline(container, items, groups, options);
-
-    function toggleStackSubgroups() {
-        options.stackSubgroups = !options.stackSubgroups;
-        timeline.setOptions(options);
-    }
 ENDHTML
 
 print <<ENDHTML;
