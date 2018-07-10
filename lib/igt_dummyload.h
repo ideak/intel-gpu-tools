@@ -28,7 +28,8 @@
 #include <stdint.h>
 #include <time.h>
 
-#include "igt_aux.h"
+#include "igt_core.h"
+#include "igt_list.h"
 #include "i915_drm.h"
 
 typedef struct igt_spin {

@@ -40,6 +40,7 @@
 #include "ioctl_wrappers.h"
 #include "intel_reg.h"
 #include "intel_chipset.h"
+#include "igt_dummyload.h"
 
 /**
  * SECTION:igt_gt
@@ -265,20 +266,11 @@ static bool has_ctx_exec(int fd, unsigned ring, uint32_t ctx)
  * Returns:
  * Structure with helper internal state for igt_post_hang_ring().
  */
-igt_hang_t igt_hang_ctx(int fd,
-			uint32_t ctx,
-			int ring,
-			unsigned flags,
-			uint64_t *offset)
+igt_hang_t igt_hang_ctx(int fd, uint32_t ctx, int ring, unsigned flags)
 {
-	struct drm_i915_gem_relocation_entry reloc;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 exec;
 	struct drm_i915_gem_context_param param;
-	uint32_t b[16];
+	igt_spin_t *spin;
 	unsigned ban;
-	unsigned len;
-	int gen;
 
 	igt_require_hang_ring(fd, ring);
 
@@ -302,52 +294,12 @@ igt_hang_t igt_hang_ctx(int fd,
 	if ((flags & HANG_ALLOW_BAN) == 0)
 		context_set_ban(fd, ctx, 0);
 
-	memset(&reloc, 0, sizeof(reloc));
-	memset(&exec, 0, sizeof(exec));
-	memset(&execbuf, 0, sizeof(execbuf));
+	spin = __igt_spin_batch_new(fd,
+				    .ctx = ctx,
+				    .engine = ring,
+				    .flags = IGT_SPIN_NO_PREEMPTION);
 
-	exec.handle = gem_create(fd, 4096);
-	exec.relocation_count = 1;
-	exec.relocs_ptr = to_user_pointer(&reloc);
-
-	memset(b, 0xc5, sizeof(b));
-
-	len = 0;
-	gen = intel_gen(intel_get_drm_devid(fd));
-	if (gen >= 8) {
-		b[len++] = MI_BATCH_BUFFER_START | 1 << 8 | 1;
-		b[len++] = 0;
-		b[len++] = 0;
-	} else if (gen >= 6) {
-		b[len++] = MI_BATCH_BUFFER_START | 1 << 8;
-		b[len++] = 0;
-	} else {
-		b[len++] = MI_BATCH_BUFFER_START | 2 << 6;
-		b[len] = 0;
-		if (gen < 4) {
-			b[len] |= 1;
-			reloc.delta = 1;
-		}
-		len++;
-	}
-	b[len++] = MI_BATCH_BUFFER_END;
-	b[len] = MI_NOOP;
-	gem_write(fd, exec.handle, 0, b, sizeof(b));
-
-	reloc.offset = sizeof(uint32_t);
-	reloc.target_handle = exec.handle;
-	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
-
-	execbuf.buffers_ptr = to_user_pointer(&exec);
-	execbuf.buffer_count = 1;
-	execbuf.flags = ring;
-	i915_execbuffer2_set_context_id(execbuf, ctx);
-	gem_execbuf(fd, &execbuf);
-
-	if (offset)
-		*offset = exec.offset;
-
-	return (igt_hang_t){ exec.handle, ctx, ban, flags };
+	return (igt_hang_t){ spin, ctx, ban, flags };
 }
 
 /**
@@ -364,7 +316,7 @@ igt_hang_t igt_hang_ctx(int fd,
  */
 igt_hang_t igt_hang_ring(int fd, int ring)
 {
-	return igt_hang_ctx(fd, 0, ring, 0, NULL);
+	return igt_hang_ctx(fd, 0, ring, 0);
 }
 
 /**
@@ -377,11 +329,11 @@ igt_hang_t igt_hang_ring(int fd, int ring)
  */
 void igt_post_hang_ring(int fd, igt_hang_t arg)
 {
-	if (arg.handle == 0)
+	if (!arg.spin)
 		return;
 
-	gem_sync(fd, arg.handle);
-	gem_close(fd, arg.handle);
+	gem_sync(fd, arg.spin->handle); /* Wait until it hangs */
+	igt_spin_batch_free(fd, arg.spin);
 
 	context_set_ban(fd, arg.ctx, arg.ban);
 

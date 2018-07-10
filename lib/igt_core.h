@@ -1005,4 +1005,8 @@ void igt_kmsg(const char *format, ...);
 
 #define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
 
+#define MSEC_PER_SEC (1000)
+#define USEC_PER_SEC (1000*MSEC_PER_SEC)
+#define NSEC_PER_SEC (1000*USEC_PER_SEC)
+
 #endif /* IGT_CORE_H */

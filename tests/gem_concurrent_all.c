@@ -946,30 +946,19 @@ static igt_hang_t rcs_hang(void)
 
 static igt_hang_t all_hang(void)
 {
-	uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 obj;
-	igt_hang_t hang;
+	igt_hang_t hang = igt_hang_ring(fd, I915_EXEC_RENDER);
 	unsigned engine;
 
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, 4096);
-	gem_write(fd, obj.handle, 0, &bbe, sizeof(&bbe));
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&obj);
-	execbuf.buffer_count = 1;
-
 	for_each_physical_engine(fd, engine) {
-		hang = igt_hang_ring(fd, engine);
+		struct drm_i915_gem_execbuffer2 eb = hang.spin->execbuf;
 
-		execbuf.flags = engine;
-		__gem_execbuf(fd, &execbuf);
+		if (engine == I915_EXEC_RENDER)
+			continue;
 
-		gem_close(fd, hang.handle);
+		eb.flags = engine;
+		__gem_execbuf(fd, &eb);
 	}
 
-	hang.handle = obj.handle;
 	return hang;
 }
 

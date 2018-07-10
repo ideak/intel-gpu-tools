@@ -25,6 +25,7 @@
 #define IGT_GT_H
 
 #include "igt_debugfs.h"
+#include "igt_dummyload.h"
 #include "igt_core.h"
 
 #include "i915_drm.h"
@@ -32,7 +33,7 @@
 void igt_require_hang_ring(int fd, int ring);
 
 typedef struct igt_hang {
-	unsigned handle;
+	igt_spin_t *spin;
 	unsigned ctx;
 	unsigned ban;
 	unsigned flags;
@@ -43,11 +44,7 @@ void igt_disallow_hang(int fd, igt_hang_t arg);
 
 #define HANG_POISON 0xc5c5c5c5
 
-igt_hang_t igt_hang_ctx(int fd,
-			uint32_t ctx,
-			int ring,
-			unsigned flags,
-			uint64_t *offset);
+igt_hang_t igt_hang_ctx(int fd, uint32_t ctx, int ring, unsigned flags);
 #define HANG_ALLOW_BAN 1
 #define HANG_ALLOW_CAPTURE 2
 

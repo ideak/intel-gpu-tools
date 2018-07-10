@@ -24,9 +24,10 @@
 #include <signal.h>
 #include <errno.h>
 
+#include "igt_aux.h"
 #include "igt_core.h"
-#include "igt_sysfs.h"
 #include "igt_kmod.h"
+#include "igt_sysfs.h"
 
 /**
  * SECTION:igt_kmod

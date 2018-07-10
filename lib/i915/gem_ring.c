@@ -25,6 +25,7 @@
 
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 
 #include "intel_reg.h"
 #include "drmtest.h"

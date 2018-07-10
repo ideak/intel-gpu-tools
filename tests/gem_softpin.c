@@ -359,11 +359,12 @@ static void test_evict_hang(int fd)
 	execbuf.buffers_ptr = to_user_pointer(&object);
 	execbuf.buffer_count = 1;
 
-	hang = igt_hang_ctx(fd, 0, 0, 0, (uint64_t *)&expected);
-	object.offset = expected;
-	object.flags = EXEC_OBJECT_PINNED;
+	hang = igt_hang_ctx(fd, 0, 0, 0);
+	expected = hang.spin->obj[1].offset;
 
 	/* Replace the hung batch with ourselves, forcing an eviction */
+	object.offset = expected;
+	object.flags = EXEC_OBJECT_PINNED;
 	gem_execbuf(fd, &execbuf);
 	igt_assert_eq_u64(object.offset, expected);
 

@@ -208,7 +208,7 @@ static void hang(int fd, uint64_t alloc)
 		gem_execbuf(fd, &execbuf);
 	}
 
-	gem_close(fd, igt_hang_ring(fd, 0).handle);
+	gem_close(fd, igt_hang_ring(fd, 0).spin->handle);
 	for (int i = 0; i <= count; i++)
 		gem_madvise(fd, obj[i].handle, I915_MADV_DONTNEED);
 	munmap(obj, obj_size);

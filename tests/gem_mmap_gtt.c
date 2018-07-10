@@ -399,7 +399,7 @@ test_hang(int fd)
 
 		last_pattern = next_pattern;
 		next_pattern = (next_pattern + 1) % ARRAY_SIZE(patterns);
-	} while (gem_bo_busy(fd, hang.handle));
+	} while (gem_bo_busy(fd, hang.spin->handle));
 
 	igt_post_hang_ring(fd, hang);
 
