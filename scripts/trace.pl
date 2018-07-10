@@ -708,9 +708,48 @@ say sprintf('GPU: %.2f%% idle, %.2f%% busy',
 	     $flat_busy{'gpu-idle'}, $flat_busy{'gpu-busy'}) unless $html;
 
 my $timeline_text = $colour_contexts ?
-		    'Per context coloured shading like:' : 'Box shading like:';
+		    'per context coloured shading like' : 'box shading like';
 
 my %ctx_colours;
+my $ctx_table;
+
+sub generate_ctx_table
+{
+	my @states = ('queue', 'ready', 'execute', 'ctxsave', 'incomplete');
+	my $max_show = 6;
+	my (@ctxts, @disp_ctxts);
+	my $step;
+
+	if( $colour_contexts ) {
+		@ctxts = sort keys %ctxdb;
+	} else {
+		@ctxts = ($min_ctx);
+	}
+
+	# Limit number of shown context examples
+	$step = int(scalar(@ctxts) / $max_show);
+	if ($step) {
+		foreach my $i (0..$#ctxts) {
+			push @disp_ctxts, $ctxts[$i] unless $i % $step;
+			last if scalar(@disp_ctxts) == $max_show;
+		}
+	} else {
+		@disp_ctxts = @ctxts;
+	}
+
+	$ctx_table .= '<table>';
+
+	foreach my $ctx (@disp_ctxts) {
+		$ctx_table .= "<tr>\n";
+		$ctx_table .= "  <td>Context $ctx</td>\n" if $colour_contexts;
+		foreach my $state (@states) {
+			$ctx_table .= "  <td align='center' valign='middle'><div style='" . box_style($ctx, $state) . " padding-top: 6px; padding-bottom: 6px; padding-left: 6x; padding-right: 6px;'>" . uc($state) . "</div></td>\n";
+		}
+		$ctx_table .= "</tr>\n";
+	}
+
+	$ctx_table .= '</table>';
+}
 
 sub generate_ctx_colours
 {
@@ -724,12 +763,7 @@ sub generate_ctx_colours
 
 
 generate_ctx_colours() if $html and $colour_contexts;
-
-my $queued_style = box_style($min_ctx, 'queue');
-my $ready_style = box_style($min_ctx, 'ready');
-my $execute_style = box_style($min_ctx, 'execute');
-my $ctxsave_style = box_style($min_ctx, 'ctxsave');
-my $incomplete_style = box_style($min_ctx, 'incomplete');
+generate_ctx_table() if $html;
 
 print <<ENDHTML if $html;
 <!DOCTYPE HTML>
@@ -748,35 +782,27 @@ print <<ENDHTML if $html;
 </head>
 <body>
 <p>
-<b>Timeline request view:</b>
+<b>Timeline request view is $timeline_text:</b>
 <table>
-<tr><td colspan='4'>$timeline_text</td></tr>
 <tr>
-<td align='center'><div style='$queued_style'>QUEUED</div></td>
-<td align='center'><div style='$ready_style'>READY</div></td>
-<td align='center'><div style='$execute_style'>EXECUTE</div></td>
-<td align='center'><div style='$ctxsave_style'>CTXSAVE</div></td>
-</tr><tr>
-<td></td>
-<td></td>
-<td align='center'><div style='$incomplete_style'>(INCOMPLETE)</div></td>
-<td></td>
-</tr/></table>
-</p>
-<p>
-<small>
-QUEUED = requests executing on the GPU<br>
+<td>
+$ctx_table
+</td>
+<td>
+QUEUE = requests executing on the GPU<br>
 READY = runnable requests waiting for a slot on GPU<br>
 EXECUTE = requests waiting on fences and dependencies before they are runnable<br>
 CTXSAVE = GPU saving the context image<br>
-</small>
-</p>
+INCOMPLETE = request of unknown completion time
 <p>
 Boxes are in format 'ctx-id/seqno'.
 </p>
 <p>
 Use Ctrl+scroll-action to zoom-in/out and scroll-action or dragging to move around the timeline.
 </p>
+</td>
+</tr>
+</table>
 <p>
 <b>GPU idle: $flat_busy{'gpu-idle'}%</b>
 <br>
@@ -945,20 +971,24 @@ sub box_style
 {
 	my ($ctx, $stage) = @_;
 	my $deg;
+	my $text_col = 'white';
 
 	if ($stage eq 'queue') {
 		$deg = 90;
+		$text_col = 'black' if $colour_contexts;
 	} elsif ($stage eq 'ready') {
 		$deg = 45;
 	} elsif ($stage eq 'execute') {
 		$deg = 0;
+		$text_col = 'black' if $colour_contexts;
 	} elsif ($stage eq 'ctxsave') {
 		$deg = 105;
+		$text_col = 'black' if $colour_contexts;
 	} elsif ($stage eq 'incomplete') {
 		$deg = 0;
 	}
 
-	return 'color: black; background: repeating-linear-gradient(' .
+	return "color: $text_col; background: repeating-linear-gradient(" .
 		$deg . 'deg, ' .
 		ctx_colour($ctx, $stage, 1.0) . ', ' .
 		ctx_colour($ctx, $stage, 1.0) . ' 10px, ' .
