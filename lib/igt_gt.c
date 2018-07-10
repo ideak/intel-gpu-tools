@@ -162,6 +162,13 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 	};
 	unsigned ban;
 
+	/*
+	 * If the driver is already wedged, we don't expect it to be able
+	 * to recover from reset and for it to remain wedged. It's hard to
+	 * say even if we do hang/reset making the test suspect.
+	 */
+	igt_require_gem(fd);
+
 	igt_assert(igt_sysfs_set_parameter
 		   (fd, "reset", "%d", INT_MAX /* any reset method */));
 
