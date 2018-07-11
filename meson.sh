@@ -24,8 +24,11 @@ reconfigure: build/build.ninja
 check distcheck dist distclean:
 	echo "This is the meson wrapper, not automake" && false
 
-install uninstall:
-	echo "meson install support not yet completed" && false
+install: build/build.ninja
+	ninja -C build install
+
+uninstall: build/build.ninja
+	ninja -C build uninstall
 
 docs:
 	ninja -C build igt-gpu-tools-doc
