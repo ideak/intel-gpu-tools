@@ -141,7 +141,13 @@ out:
 
 static int modprobe(struct kmod_module *kmod, const char *options)
 {
-	return kmod_module_probe_insert_module(kmod, 0, options,
+	unsigned int flags;
+
+	flags = 0;
+	if (options) /* force a fresh load to set the new options */
+		flags |= KMOD_PROBE_FAIL_ON_LOADED;
+
+	return kmod_module_probe_insert_module(kmod, flags, options,
 					       NULL, NULL, NULL);
 }
 
