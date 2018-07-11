@@ -89,9 +89,35 @@ list_engines(int i915, uint32_t class_mask, unsigned int *out)
 	return engines;
 }
 
+static int __set_engines(int i915, uint32_t ctx,
+			 const struct i915_engine_class_instance *ci,
+			 unsigned int count)
+{
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, count);
+	struct drm_i915_gem_context_param p = {
+		.ctx_id = ctx,
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.size = sizeof(engines),
+		.value = to_user_pointer(&engines)
+	};
+
+	engines.extensions = 0;
+	memcpy(engines.engines, ci, sizeof(engines.engines));
+
+	return __gem_context_set_param(i915, &p);
+}
+
+static void set_engines(int i915, uint32_t ctx,
+			const struct i915_engine_class_instance *ci,
+			unsigned int count)
+{
+	igt_assert_eq(__set_engines(i915, ctx, ci, count), 0);
+}
+
 static int __set_load_balancer(int i915, uint32_t ctx,
 			       const struct i915_engine_class_instance *ci,
-			       unsigned int count)
+			       unsigned int count,
+			       void *ext)
 {
 	I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(balancer, count);
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 1 + count);
@@ -104,6 +130,7 @@ static int __set_load_balancer(int i915, uint32_t ctx,
 
 	memset(&balancer, 0, sizeof(balancer));
 	balancer.base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
+	balancer.base.next_extension = to_user_pointer(ext);
 
 	igt_assert(count);
 	balancer.num_siblings = count;
@@ -122,9 +149,10 @@ static int __set_load_balancer(int i915, uint32_t ctx,
 
 static void set_load_balancer(int i915, uint32_t ctx,
 			      const struct i915_engine_class_instance *ci,
-			      unsigned int count)
+			      unsigned int count,
+			      void *ext)
 {
-	igt_assert_eq(__set_load_balancer(i915, ctx, ci, count), 0);
+	igt_assert_eq(__set_load_balancer(i915, ctx, ci, count, ext), 0);
 }
 
 static uint32_t load_balancer_create(int i915,
@@ -134,7 +162,7 @@ static uint32_t load_balancer_create(int i915,
 	uint32_t ctx;
 
 	ctx = gem_context_create(i915);
-	set_load_balancer(i915, ctx, ci, count);
+	set_load_balancer(i915, ctx, ci, count, NULL);
 
 	return ctx;
 }
@@ -278,6 +306,74 @@ static void invalid_balancer(int i915)
 	}
 }
 
+static void invalid_bonds(int i915)
+{
+	I915_DEFINE_CONTEXT_ENGINES_BOND(bonds[16], 1);
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 1);
+	struct drm_i915_gem_context_param p = {
+		.ctx_id = gem_context_create(i915),
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.value = to_user_pointer(&engines),
+		.size = sizeof(engines),
+	};
+	uint32_t handle;
+	void *ptr;
+
+	memset(&engines, 0, sizeof(engines));
+	gem_context_set_param(i915, &p);
+
+	memset(bonds, 0, sizeof(bonds));
+	for (int n = 0; n < ARRAY_SIZE(bonds); n++) {
+		bonds[n].base.name = I915_CONTEXT_ENGINES_EXT_BOND;
+		bonds[n].base.next_extension =
+			n ? to_user_pointer(&bonds[n - 1]) : 0;
+		bonds[n].num_bonds = 1;
+	}
+	engines.extensions = to_user_pointer(&bonds);
+	gem_context_set_param(i915, &p);
+
+	bonds[0].base.next_extension = -1ull;
+	igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+
+	bonds[0].base.next_extension = to_user_pointer(&bonds[0]);
+	igt_assert_eq(__gem_context_set_param(i915, &p), -E2BIG);
+
+	engines.extensions = to_user_pointer(&bonds[1]);
+	igt_assert_eq(__gem_context_set_param(i915, &p), -E2BIG);
+	bonds[0].base.next_extension = 0;
+	gem_context_set_param(i915, &p);
+
+	handle = gem_create(i915, 4096 * 3);
+	ptr = gem_mmap__gtt(i915, handle, 4096 * 3, PROT_WRITE);
+	gem_close(i915, handle);
+
+	memcpy(ptr + 4096, &bonds[0], sizeof(bonds[0]));
+	engines.extensions = to_user_pointer(ptr) + 4096;
+	gem_context_set_param(i915, &p);
+
+	memcpy(ptr, &bonds[0], sizeof(bonds[0]));
+	bonds[0].base.next_extension = to_user_pointer(ptr);
+	memcpy(ptr + 4096, &bonds[0], sizeof(bonds[0]));
+	gem_context_set_param(i915, &p);
+
+	munmap(ptr, 4096);
+	igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+
+	bonds[0].base.next_extension = 0;
+	memcpy(ptr + 8192, &bonds[0], sizeof(bonds[0]));
+	bonds[0].base.next_extension = to_user_pointer(ptr) + 8192;
+	memcpy(ptr + 4096, &bonds[0], sizeof(bonds[0]));
+	gem_context_set_param(i915, &p);
+
+	munmap(ptr + 8192, 4096);
+	igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+
+	munmap(ptr + 4096, 4096);
+	igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+
+	gem_context_destroy(i915, p.ctx_id);
+}
+
 static void kick_kthreads(void)
 {
 	usleep(20 * 1000); /* 20ms should be enough for ksoftirqd! */
@@ -335,6 +431,31 @@ static double measure_min_load(int pmu, unsigned int num, int period_us)
 		  d_t, min / (double)d_t * 100,  max / (double)d_t * 100);
 
 	return min / (double)d_t;
+}
+
+static void measure_all_load(int pmu, double *v, unsigned int num, int period_us)
+{
+	uint64_t data[2 + num];
+	uint64_t d_t, d_v[num];
+
+	kick_kthreads();
+
+	igt_assert_eq(read(pmu, data, sizeof(data)), sizeof(data));
+	for (unsigned int n = 0; n < num; n++)
+		d_v[n] = -data[2 + n];
+	d_t = -data[1];
+
+	usleep(period_us);
+
+	igt_assert_eq(read(pmu, data, sizeof(data)), sizeof(data));
+
+	d_t += data[1];
+	for (unsigned int n = 0; n < num; n++) {
+		d_v[n] += data[2 + n];
+		igt_debug("engine[%d]: %.1f%%\n",
+			  n, d_v[n] / (double)d_t * 100);
+		v[n] = d_v[n] / (double)d_t;
+	}
 }
 
 static int add_pmu(int pmu, const struct i915_engine_class_instance *ci)
@@ -407,7 +528,7 @@ static void individual(int i915)
 		for (int pass = 0; pass < count; pass++) { /* approx. count! */
 			igt_assert(sizeof(*ci) == sizeof(int));
 			igt_permute_array(ci, count, igt_exchange_int);
-			set_load_balancer(i915, ctx, ci, count);
+			set_load_balancer(i915, ctx, ci, count, NULL);
 			for (unsigned int n = 0; n < count; n++)
 				check_individual_engine(i915, ctx, ci, n);
 		}
@@ -417,6 +538,145 @@ static void individual(int i915)
 
 	gem_context_destroy(i915, ctx);
 	gem_quiescent_gpu(i915);
+}
+
+static void bonded(int i915, unsigned int flags)
+#define CORK 0x1
+{
+	I915_DEFINE_CONTEXT_ENGINES_BOND(bonds[16], 1);
+	struct i915_engine_class_instance *master_engines;
+	uint32_t master;
+
+	/*
+	 * I915_CONTEXT_PARAM_ENGINE provides an extension that allows us
+	 * to specify which engine(s) to pair with a parallel (EXEC_SUBMIT)
+	 * request submitted to another engine.
+	 */
+
+	master = gem_queue_create(i915);
+
+	memset(bonds, 0, sizeof(bonds));
+	for (int n = 0; n < ARRAY_SIZE(bonds); n++) {
+		bonds[n].base.name = I915_CONTEXT_ENGINES_EXT_BOND;
+		bonds[n].base.next_extension =
+			n ? to_user_pointer(&bonds[n - 1]) : 0;
+		bonds[n].num_bonds = 1;
+	}
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *siblings;
+		unsigned int count, limit, *order;
+		uint32_t ctx;
+		int n;
+
+		siblings = list_engines(i915, 1u << class, &count);
+		if (!siblings)
+			continue;
+
+		if (count < 2) {
+			free(siblings);
+			continue;
+		}
+
+		master_engines = list_engines(i915, ~(1u << class), &limit);
+		set_engines(i915, master, master_engines, limit);
+
+		limit = min(count, limit);
+		igt_assert(limit <= ARRAY_SIZE(bonds));
+		for (n = 0; n < limit; n++) {
+			bonds[n].master = master_engines[n];
+			bonds[n].engines[0] = siblings[n];
+		}
+
+		ctx = gem_context_clone(i915,
+					master, I915_CONTEXT_CLONE_VM,
+					I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
+		set_load_balancer(i915, ctx, siblings, count, &bonds[limit - 1]);
+
+		order = malloc(sizeof(*order) * 8 * limit);
+		igt_assert(order);
+		for (n = 0; n < limit; n++)
+			order[2 * limit - n - 1] = order[n] = n % limit;
+		memcpy(order + 2 * limit, order, 2 * limit * sizeof(*order));
+		memcpy(order + 4 * limit, order, 4 * limit * sizeof(*order));
+		igt_permute_array(order + 2 * limit, 6 * limit, igt_exchange_int);
+
+		for (n = 0; n < 8 * limit; n++) {
+			struct drm_i915_gem_execbuffer2 eb;
+			igt_spin_t *spin, *plug;
+			IGT_CORK_HANDLE(cork);
+			double v[limit];
+			int pmu[limit + 1];
+			int bond = order[n];
+
+			pmu[0] = -1;
+			for (int i = 0; i < limit; i++)
+				pmu[i] = add_pmu(pmu[0], &siblings[i]);
+			pmu[limit] = add_pmu(pmu[0], &master_engines[bond]);
+
+			igt_assert(siblings[bond].engine_class !=
+				   master_engines[bond].engine_class);
+
+			plug = NULL;
+			if (flags & CORK) {
+				plug = __igt_spin_new(i915,
+						      .ctx = master,
+						      .engine = bond,
+						      .dependency = igt_cork_plug(&cork, i915));
+			}
+
+			spin = __igt_spin_new(i915,
+					      .ctx = master,
+					      .engine = bond,
+					      .flags = IGT_SPIN_FENCE_OUT);
+
+			eb = spin->execbuf;
+			eb.rsvd1 = ctx;
+			eb.rsvd2 = spin->out_fence;
+			eb.flags = I915_EXEC_FENCE_SUBMIT;
+			gem_execbuf(i915, &eb);
+
+			if (plug) {
+				igt_cork_unplug(&cork);
+				igt_spin_free(i915, plug);
+			}
+
+			measure_all_load(pmu[0], v, limit + 1, 10000);
+			igt_spin_free(i915, spin);
+
+			igt_assert_f(v[bond] > 0.90,
+				     "engine %d (class:instance %s:%d) was found to be only %.1f%% busy\n",
+				     bond,
+				     class_to_str(siblings[bond].engine_class),
+				     siblings[bond].engine_instance,
+				     100 * v[bond]);
+			for (int other = 0; other < limit; other++) {
+				if (other == bond)
+					continue;
+
+				igt_assert_f(v[other] == 0,
+					     "engine %d (class:instance %s:%d) was not idle, and actually %.1f%% busy\n",
+					     other,
+					     class_to_str(siblings[other].engine_class),
+					     siblings[other].engine_instance,
+					     100 * v[other]);
+			}
+			igt_assert_f(v[limit] > 0.90,
+				     "master (class:instance %s:%d) was found to be only %.1f%% busy\n",
+				     class_to_str(master_engines[bond].engine_class),
+				     master_engines[bond].engine_instance,
+				     100 * v[limit]);
+
+			close(pmu[0]);
+		}
+
+		free(order);
+		gem_context_destroy(i915, ctx);
+		free(master_engines);
+		free(siblings);
+	}
+
+	gem_context_destroy(i915, master);
 }
 
 static void indices(int i915)
@@ -851,7 +1111,7 @@ static void semaphore(int i915)
 		count = ARRAY_SIZE(block);
 
 		for (int i = 0; i < count; i++) {
-			set_load_balancer(i915, block[i], ci, count);
+			set_load_balancer(i915, block[i], ci, count, NULL);
 			spin[i] = __igt_spin_new(i915,
 						 .ctx = block[i],
 						 .dependency = scratch);
@@ -862,7 +1122,7 @@ static void semaphore(int i915)
 		 * or we let the vip through. If not, we hang.
 		 */
 		vip = gem_context_create(i915);
-		set_load_balancer(i915, vip, ci, count);
+		set_load_balancer(i915, vip, ci, count, NULL);
 		ping(i915, vip, 0);
 		gem_context_destroy(i915, vip);
 
@@ -977,7 +1237,7 @@ static bool has_load_balancer(int i915)
 	int err;
 
 	ctx = gem_context_create(i915);
-	err = __set_load_balancer(i915, ctx, &ci, 1);
+	err = __set_load_balancer(i915, ctx, &ci, 1, NULL);
 	gem_context_destroy(i915, ctx);
 
 	return err == 0;
@@ -1002,6 +1262,9 @@ igt_main
 
 	igt_subtest("invalid-balancer")
 		invalid_balancer(i915);
+
+	igt_subtest("invalid-bonds")
+		invalid_bonds(i915);
 
 	igt_subtest("individual")
 		individual(i915);
@@ -1036,6 +1299,12 @@ igt_main
 
 	igt_subtest("smoke")
 		smoketest(i915, 20);
+
+	igt_subtest("bonded-imm")
+		bonded(i915, 0);
+
+	igt_subtest("bonded-cork")
+		bonded(i915, CORK);
 
 	igt_fixture {
 		igt_stop_hang_detector();
