@@ -1167,13 +1167,19 @@ bool igt_can_fail(void)
 	return !test_with_subtests || in_fixture || in_subtest;
 }
 
-static bool run_under_gdb(void)
+static bool running_under_gdb(void)
 {
 	char pathname[30], buf[1024];
+	ssize_t len;
 
 	sprintf(pathname, "/proc/%d/exe", getppid());
-	return (readlink(pathname, buf, sizeof (buf)) != -1 &&
-		strncmp(basename(buf), "gdb", 3) == 0);
+	len = readlink(pathname, buf, sizeof(buf) - 1);
+	if (len < 0)
+		return false;
+
+	buf[len] = '\0';
+
+	return strncmp(basename(buf), "gdb", 3) == 0;
 }
 
 static void __write_stderr(const char *str, size_t len)
@@ -1404,7 +1410,7 @@ void __igt_fail_assert(const char *domain, const char *file, const int line,
 
 	print_backtrace();
 
-	if (run_under_gdb())
+	if (running_under_gdb())
 		abort();
 	igt_fail(IGT_EXIT_FAILURE);
 }
