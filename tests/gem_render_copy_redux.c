@@ -209,6 +209,7 @@ int main(int argc, char **argv)
 
 	igt_fixture {
 		data_init(&data);
+		igt_require_gem(data.fd);
 	}
 
 	igt_subtest("normal") {
