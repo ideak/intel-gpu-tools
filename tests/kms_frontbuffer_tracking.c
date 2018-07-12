@@ -184,32 +184,12 @@ struct {
 	.can_test = false,
 };
 
-#define SINK_CRC_SIZE 12
-typedef struct {
-	char data[SINK_CRC_SIZE];
-} sink_crc_t;
-
-struct both_crcs {
-	igt_crc_t pipe;
-	sink_crc_t sink;
-};
-
 igt_pipe_crc_t *pipe_crc;
+igt_crc_t *wanted_crc;
 struct {
 	bool initialized;
-	struct both_crcs crc;
+	igt_crc_t crc;
 } blue_crcs[FORMAT_COUNT];
-struct both_crcs *wanted_crc;
-
-struct {
-	int fd;
-	bool supported;
-	bool reliable;
-} sink_crc = {
-	.fd = -1,
-	.supported = true,
-	.reliable = true,
-};
 
 /* The goal of this structure is to easily allow us to deal with cases where we
  * have a big framebuffer and the CRTC is just displaying a subregion of this
@@ -229,7 +209,7 @@ struct draw_pattern_info {
 	struct rect (*get_rect)(struct fb_region *fb, int r);
 
 	bool initialized[FORMAT_COUNT];
-	struct both_crcs *crcs[FORMAT_COUNT];
+	igt_crc_t *crcs[FORMAT_COUNT];
 };
 
 /* Draw big rectangles on the screen. */
@@ -991,44 +971,6 @@ static bool drrs_wait_until_rr_switch_to_low(void)
 #define drrs_enable()	drrs_set(1)
 #define drrs_disable()	drrs_set(0)
 
-static void get_sink_crc(sink_crc_t *crc, bool mandatory)
-{
-	int rc, errno_;
-
-	if (!sink_crc.supported) {
-		memcpy(crc, "unsupported!", SINK_CRC_SIZE);
-		return;
-	}
-
-	lseek(sink_crc.fd, 0, SEEK_SET);
-
-	rc = read(sink_crc.fd, crc->data, SINK_CRC_SIZE);
-	errno_ = errno;
-
-	if (rc == -1 && errno_ == ENOTTY) {
-		igt_info("Sink CRC not supported: panel doesn't support it\n");
-		sink_crc.supported = false;
-	} else if (rc == -1 && errno_ == ETIMEDOUT) {
-		if (sink_crc.reliable) {
-			igt_info("Sink CRC is unreliable on this machine.\n");
-			sink_crc.reliable = false;
-		}
-
-		if (mandatory)
-			igt_skip("Sink CRC is unreliable on this machine.\n");
-	} else {
-		igt_assert_f(rc != -1, "Unexpected error: %d\n", errno_);
-		igt_assert(rc == SINK_CRC_SIZE);
-	}
-}
-
-static bool sink_crc_equal(sink_crc_t *a, sink_crc_t *b)
-{
-	return (memcmp(a->data, b->data, SINK_CRC_SIZE) == 0);
-}
-
-#define assert_sink_crc_equal(a, b) igt_assert(sink_crc_equal(a, b))
-
 static struct rect pat1_get_rect(struct fb_region *fb, int r)
 {
 	struct rect rect;
@@ -1262,30 +1204,23 @@ static void stop_busy_thread(void)
 	}
 }
 
-static void print_crc(const char *str, struct both_crcs *crc)
+static void print_crc(const char *str, igt_crc_t *crc)
 {
-	int i;
 	char *pipe_str;
 
-	pipe_str = igt_crc_to_string(&crc->pipe);
+	pipe_str = igt_crc_to_string(crc);
 
-	igt_debug("%s pipe:[%s] sink:[", str, pipe_str);
-	for (i = 0; i < SINK_CRC_SIZE; i++)
-		igt_debug("%c", crc->sink.data[i]);
-	igt_debug("]\n");
+	igt_debug("%s pipe:[%s]\n", str, pipe_str);
 
 	free(pipe_str);
 }
 
-static void collect_crcs(struct both_crcs *crcs, bool mandatory_sink_crc)
+static void collect_crc(igt_crc_t *crc)
 {
-	igt_pipe_crc_collect_crc(pipe_crc, &crcs->pipe);
-	get_sink_crc(&crcs->sink, mandatory_sink_crc);
+	igt_pipe_crc_collect_crc(pipe_crc, crc);
 }
 
-static void setup_sink_crc(void);
-
-static void init_blue_crc(enum pixel_format format, bool mandatory_sink_crc)
+static void init_blue_crc(enum pixel_format format)
 {
 	struct igt_fb blue;
 
@@ -1306,11 +1241,9 @@ static void init_blue_crc(enum pixel_format format, bool mandatory_sink_crc)
 	if (!pipe_crc) {
 		pipe_crc = igt_pipe_crc_new(drm.fd, prim_mode_params.pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 		igt_assert(pipe_crc);
-
-		setup_sink_crc();
 	}
 
-	collect_crcs(&blue_crcs[format].crc, mandatory_sink_crc);
+	collect_crc(&blue_crcs[format].crc);
 
 	print_crc("Blue CRC:  ", &blue_crcs[format].crc);
 
@@ -1322,8 +1255,7 @@ static void init_blue_crc(enum pixel_format format, bool mandatory_sink_crc)
 }
 
 static void init_crcs(enum pixel_format format,
-		      struct draw_pattern_info *pattern,
-		      bool mandatory_sink_crc)
+		      struct draw_pattern_info *pattern)
 {
 	int r, r_;
 	struct igt_fb tmp_fbs[pattern->n_rects];
@@ -1359,7 +1291,7 @@ static void init_crcs(enum pixel_format format,
 		igt_plane_set_fb(prim_mode_params.primary.plane, &tmp_fbs[r]);
 		igt_display_commit(&drm.display);
 
-		collect_crcs(&pattern->crcs[format][r], mandatory_sink_crc);
+		collect_crc(&pattern->crcs[format][r]);
 	}
 
 	for (r = 0; r < pattern->n_rects; r++) {
@@ -1410,25 +1342,6 @@ static void teardown_modeset(void)
 
 	for (f = 0; f < FORMAT_COUNT; f++)
 		destroy_fbs(f);
-}
-
-static void setup_sink_crc(void)
-{
-	sink_crc_t crc;
-	drmModeConnectorPtr c;
-
-	c = prim_mode_params.output->config.connector;
-	if (c->connector_type != DRM_MODE_CONNECTOR_eDP) {
-		igt_info("Sink CRC not supported: primary screen is not eDP\n");
-		sink_crc.supported = false;
-		return;
-	}
-
-	sink_crc.fd = openat(drm.debugfs, "i915_sink_crc_eDP1", O_RDONLY);
-	igt_assert_lte(0, sink_crc.fd);
-
-	/* Do a first read to try to detect if it's supported. */
-	get_sink_crc(&crc, false);
 }
 
 static void setup_crcs(void)
@@ -1485,9 +1398,6 @@ static void teardown_crcs(void)
 		if (pattern4.crcs[f])
 			free(pattern4.crcs[f]);
 	}
-
-	if (sink_crc.fd != -1)
-		close(sink_crc.fd);
 
 	igt_pipe_crc_free(pipe_crc);
 }
@@ -1695,23 +1605,18 @@ static int adjust_assertion_flags(const struct test_mode *t, int flags)
 	return flags;
 }
 
-static void do_crc_assertions(int flags, bool mandatory_sink_crc)
+static void do_crc_assertions(int flags)
 {
-	struct both_crcs crc;
+	igt_crc_t crc;
 
 	if (!opt.check_crc || (flags & DONT_ASSERT_CRC))
 		return;
 
-	collect_crcs(&crc, mandatory_sink_crc);
+	collect_crc(&crc);
 	print_crc("Calculated CRC:", &crc);
 
 	igt_assert(wanted_crc);
-	igt_assert_crc_equal(&crc.pipe, &wanted_crc->pipe);
-	if (mandatory_sink_crc)
-		assert_sink_crc_equal(&crc.sink, &wanted_crc->sink);
-	else if (sink_crc.reliable &&
-		 !sink_crc_equal(&crc.sink, &wanted_crc->sink))
-		igt_info("Sink CRC differ, but not required\n");
+	igt_assert_crc_equal(&crc, wanted_crc);
 }
 
 static void do_status_assertions(int flags)
@@ -1770,7 +1675,6 @@ static void do_status_assertions(int flags)
 static void __do_assertions(const struct test_mode *t, int flags,
 			    int line)
 {
-	bool mandatory_sink_crc = t->feature & FEATURE_PSR;
 	flags = adjust_assertion_flags(t, flags);
 
 	igt_debug("checking asserts in line %i\n", line);
@@ -1779,7 +1683,7 @@ static void __do_assertions(const struct test_mode *t, int flags,
 
 	/* Check the CRC to make sure the drawing operations work
 	 * immediately, independently of the features being enabled. */
-	do_crc_assertions(flags, mandatory_sink_crc);
+	do_crc_assertions(flags);
 
 	/* Now we can flush things to make the test faster. */
 	do_flush(t);
@@ -1792,7 +1696,7 @@ static void __do_assertions(const struct test_mode *t, int flags,
 	 * would only delay the test suite while adding no value to the
 	 * test suite. */
 	if (t->screen == SCREEN_PRIM)
-		do_crc_assertions(flags, mandatory_sink_crc);
+		do_crc_assertions(flags);
 
 	if (fbc.supports_last_action && opt.fbc_check_last_action) {
 		if (flags & ASSERT_LAST_ACTION_CHANGED)
@@ -1865,8 +1769,6 @@ static void check_test_requirements(const struct test_mode *t)
 	if (t->feature & FEATURE_PSR) {
 		igt_require_f(psr.can_test,
 			      "Can't test PSR with the current outputs\n");
-		igt_require_f(sink_crc.supported,
-			      "Can't test PSR without sink CRCs\n");
 	}
 
 	if (t->feature & FEATURE_DRRS)
@@ -1945,9 +1847,9 @@ static void prepare_subtest_data(const struct test_mode *t,
 
 	unset_all_crtcs();
 
-	init_blue_crc(t->format, t->feature & FEATURE_PSR);
+	init_blue_crc(t->format);
 	if (pattern)
-		init_crcs(t->format, pattern, t->feature & FEATURE_PSR);
+		init_crcs(t->format, pattern);
 
 	enable_features_for_test(t);
 }
@@ -2016,7 +1918,7 @@ static void rte_subtest(const struct test_mode *t)
 	set_region_for_test(t, &scnd_mode_params.sprite);
 }
 
-static void update_wanted_crc(const struct test_mode *t, struct both_crcs *crc)
+static void update_wanted_crc(const struct test_mode *t, igt_crc_t *crc)
 {
 	if (t->screen == SCREEN_PRIM)
 		wanted_crc = crc;
@@ -3140,9 +3042,6 @@ static void tilingchange_subtest(const struct test_mode *t)
  *   If you get a failure here, you should run the more specific draw and flip
  *   subtests of each feature in order to discover what exactly is failing and
  *   why.
- *
- * TODO: do sink CRC assertions in case sink_crc.supported. Only do this after
- * our sink CRC code gets 100% reliable, in order to avoid CI false negatives.
  */
 static void basic_subtest(const struct test_mode *t)
 {
