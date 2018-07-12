@@ -329,20 +329,6 @@ sub sanitize_ctx
 	}
 }
 
-sub ts
-{
-	my ($us) = @_;
-	my ($y, $mo, $d, $h, $m, $s);
-
-	$s = int($us / 1000000);
-	$us = $us % 1000000;
-
-	($s, $m, $h, $d, $mo, $y) = gmtime($s);
-
-	return sprintf('%04u-%02u-%02u %02u:%02u:%02u.%06u',
-		        $y, 1 + $mo, $d, $h, $m, $s, int($us));
-}
-
 # Main input loop - parse lines and build the internal representation of the
 # trace using a hash of requests and some auxilliary data structures.
 my $prev_freq = 0;
@@ -912,7 +898,7 @@ foreach my $key (sort sortQueue keys %db) {
 		$style = 'color: black; background-color: ' .
 			 ctx_colour($ctx, 'queue');
 		$content = "$name<br>$db{$key}->{'submit-delay'}us <small>($db{$key}->{'execute-delay'}us)</small>";
-		$startend = 'start: \'' . ts($queue) . '\', end: \'' . ts($submit) . '\'';
+		$startend = 'start: ' . $queue . ', end: ' . $submit;
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
 		$i++;
 	}
@@ -923,7 +909,7 @@ foreach my $key (sort sortQueue keys %db) {
 		$style = 'color: black; background-color: ' .
 			 ctx_colour($ctx, 'ready');
 		$content = "<small>$name<br>$db{$key}->{'execute-delay'}us</small>";
-		$startend = 'start: \'' . ts($submit) . '\', end: \'' . ts($start) . '\'';
+		$startend = 'start: ' . $submit . ', end: ' . $start;
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
 		$i++;
 	}
@@ -942,7 +928,7 @@ foreach my $key (sort sortQueue keys %db) {
 		$content .= ' <small><i>++</i></small> ' if exists $db{$key}->{'no-end'};
 		$content .= ' <small><i>+</i></small> ' if exists $db{$key}->{'no-notify'};
 		$content .= "<br>$db{$key}->{'duration'}us <small>($db{$key}->{'context-complete-delay'}us)</small>";
-		$startend = 'start: \'' . ts($start) . '\', end: \'' . ts($notify) . '\'';
+		$startend = 'start: ' . $start . ', end: ' . $notify;
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
 		$i++;
 	}
@@ -956,7 +942,7 @@ foreach my $key (sort sortQueue keys %db) {
 		$content .= ' <small><i>???</i></small> ' if exists $db{$key}->{'incomplete'};
 		$content .= ' <small><i>++</i></small> ' if exists $db{$key}->{'no-end'};
 		$content .= ' <small><i>+</i></small> ' if exists $db{$key}->{'no-notify'};
-		$startend = 'start: \'' . ts($notify) . '\', end: \'' . ts($end) . '\'';
+		$startend = 'start: ' . $notify . ', end: ' . $end;
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
 		$i++;
 	}
@@ -974,7 +960,7 @@ foreach my $item (@freqs) {
 
 	$start = $first_ts if $start < $first_ts;
 	$end = $last_ts if $end > $last_ts;
-	$startend = 'start: \'' . ts($start) . '\', end: \'' . ts($end) . '\'';
+	$startend = 'start: ' . $start . ', end: ' . $end;
 	print "\t{id: $i, type: 'range', group: 0, content: '$freq', $startend},\n";
 	$i++;
 }
@@ -988,17 +974,54 @@ if ($gpu_timeline) {
 
 		$start = $first_ts if $start < $first_ts;
 		$end = $last_ts if $end > $last_ts;
-		$startend = 'start: \'' . ts($start) . '\', end: \'' . ts($end) . '\'';
+		$startend = 'start: ' . $start . ', end: ' . $end;
 		print "\t{id: $i, type: 'range', group: 1, $startend},\n";
 		$i++;
 	}
 }
 
-my $end_ts = ts($first_ts + $width_us);
-$first_ts = ts($first_ts);
+my $end_ts = $first_ts + $width_us;
+$first_ts = $first_ts;
 
 print <<ENDHTML;
   ]);
+
+  function majorAxis(date, scale, step) {
+	var s = date / 1000000;
+	var precision;
+
+	if (scale == 'millisecond')
+		precision = 6;
+	else if (scale == 'second')
+		precision = 3;
+	else
+		precision = 0;
+
+	return s.toFixed(precision) + "s";
+  }
+
+  function minorAxis(date, scale, step) {
+	var t = date;
+	var precision;
+	var unit;
+
+	if (scale == 'millisecond') {
+		t %= 1000;
+		precision = 0;
+		unit = 'us';
+	} else if (scale == 'second') {
+		t /= 1000;
+		t %= 1000;
+		precision = 0;
+		unit = 'ms';
+	} else {
+		t /= 1000000;
+		precision = 1;
+		unit = 's';
+	}
+
+	return t.toFixed(precision) + unit;
+  }
 
   // Configuration for the Timeline
   var options = { groupOrder: 'content',
@@ -1007,8 +1030,9 @@ print <<ENDHTML;
 		  stackSubgroups: false,
 		  zoomKey: 'ctrlKey',
 		  orientation: 'top',
-		  start: '$first_ts',
-		  end: '$end_ts'};
+		  format: { majorLabels: majorAxis, minorLabels: minorAxis },
+		  start: $first_ts,
+		  end: $end_ts};
 
   // Create a Timeline
   var timeline = new vis.Timeline(container, items, groups, options);
