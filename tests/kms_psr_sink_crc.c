@@ -28,11 +28,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-
 #include "intel_bufmgr.h"
-
-#define CRC_BLACK "000000000000"
-#define CRC_LEN 12
 
 enum operations {
 	PAGE_FLIP,
@@ -222,36 +218,17 @@ static bool wait_psr_entry(data_t *data)
 	return false;
 }
 
-static void get_sink_crc(data_t *data, char *crc)
+static bool psr_inactive(data_t *data)
 {
-	if (igt_interactive_debug)
-		return;
+	char buf[512];
 
-	igt_require_f(igt_sysfs_read(data->debugfs_fd, "i915_sink_crc_eDP1",
-				     crc, CRC_LEN) == CRC_LEN,
-		      "Sink CRC is unreliable on this machine. Try manual debug with --interactive-debug=no-crc\n");
-	igt_debug("sink CRC: %.*s\n", CRC_LEN, crc);
-
-	/* Black screen is always invalid */
-	igt_assert(strncmp(crc, CRC_BLACK, CRC_LEN));
+	igt_debugfs_read(data->drm_fd, "i915_edp_psr_status", buf);
+	return !(strstr(buf, "SRDENT") || strstr("SLEEP"));
 }
 
-static bool is_green(char *crc)
+static inline void manual(const char *expected)
 {
-	const char *mask = "0000FFFF0000";
-	uint32_t *p = (uint32_t *)crc, *mask_p = (uint32_t *)mask;
-	if (igt_interactive_debug)
-		return false;
-
-	/* Check R and B components are 0 and G is non-zero */
-	return *p == *mask_p && *(p + 2) == *(mask_p + 2) &&
-	       (*(p + 1) & *(mask_p + 1)) != 0;
-}
-
-static void assert_or_manual(bool condition, const char *expected)
-{
-	igt_debug_manual_check("no-crc", expected);
-	igt_assert(igt_interactive_debug || condition);
+	igt_debug_manual_check("all", expected);
 }
 
 static bool drrs_disabled(data_t *data)
@@ -268,39 +245,32 @@ static void run_test(data_t *data)
 	uint32_t handle = data->fb_white.gem_handle;
 	igt_plane_t *test_plane = data->test_plane;
 	void *ptr;
-	char ref_crc[CRC_LEN];
-	char crc[CRC_LEN];
 	const char *expected = "";
 
 	/* Confirm that screen became Green */
-	get_sink_crc(data, ref_crc);
-	assert_or_manual(is_green(ref_crc), "screen GREEN");
+	manual("screen GREEN");
 
 	/* Confirm screen stays Green after PSR got active */
 	igt_assert(wait_psr_entry(data));
-	get_sink_crc(data, ref_crc);
-	assert_or_manual(is_green(ref_crc), "screen GREEN");
+	manual("screen GREEN");
 
 	/* Setting a secondary fb/plane */
 	igt_plane_set_fb(test_plane, &data->fb_white);
 	igt_display_commit(&data->display);
 
 	/* Confirm it is not Green anymore */
-	igt_assert(wait_psr_entry(data));
-	get_sink_crc(data, ref_crc);
 	if (test_plane->type == DRM_PLANE_TYPE_PRIMARY)
-		assert_or_manual(!is_green(ref_crc), "screen WHITE");
+		manual("screen WHITE");
 	else
-		assert_or_manual(!is_green(ref_crc), "GREEN background with WHITE box");
+		manual("GREEN background with WHITE box");
 
+	igt_assert(wait_psr_entry(data));
 	switch (data->op) {
 	case PAGE_FLIP:
 		/* Only in use when testing primary plane */
 		igt_assert(drmModePageFlip(data->drm_fd, data->crtc_id,
 					   data->fb_green.fb_id, 0, NULL) == 0);
-		get_sink_crc(data, crc);
-		assert_or_manual(is_green(crc), "screen GREEN");
-		expected = "still GREEN";
+		expected = "GREEN";
 		break;
 	case MMAP_GTT:
 		ptr = gem_mmap__gtt(data->drm_fd, handle, data->mod_size,
@@ -342,8 +312,8 @@ static void run_test(data_t *data)
 		expected = "screen GREEN";
 		break;
 	}
-	get_sink_crc(data, crc);
-	assert_or_manual(strncmp(ref_crc, crc, CRC_LEN) != 0, expected);
+	assert(psr_inactive(data));
+	manual(expected);
 }
 
 static void test_cleanup(data_t *data) {
@@ -444,7 +414,7 @@ static int opt_handler(int opt, int opt_index, void *_data)
 int main(int argc, char *argv[])
 {
 	const char *help_str =
-	       "  --no-psr\tRun test without PSR to check the CRC test logic.";
+	       "  --no-psr\tRun test without PSR.";
 	static struct option long_options[] = {
 		{"no-psr", 0, 0, 'n'},
 		{ 0, 0, 0, 0 }
