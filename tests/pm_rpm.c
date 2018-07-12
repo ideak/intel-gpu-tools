@@ -125,7 +125,7 @@ static int8_t *pm_data = NULL;
 
 static int modprobe(const char *driver)
 {
-	return igt_kmod_load(driver, "");
+	return igt_kmod_load(driver, NULL);
 }
 
 /* If the read fails, then the machine doesn't support PC8+ residencies. */

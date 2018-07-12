@@ -223,7 +223,7 @@ int sync_fence_status(int fence)
 
 static void modprobe(const char *driver)
 {
-	igt_kmod_load(driver, "");
+	igt_kmod_load(driver, NULL);
 }
 
 static bool kernel_has_sw_sync(void)
