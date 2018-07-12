@@ -129,7 +129,7 @@ gen6_bind_surfaces(struct intel_batchbuffer *batch,
 static void
 gen6_emit_sip(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN6_STATE_SIP | 0);
+	OUT_BATCH(GEN4_STATE_SIP | 0);
 	OUT_BATCH(0);
 }
 
@@ -146,7 +146,7 @@ gen6_emit_urb(struct intel_batchbuffer *batch)
 static void
 gen6_emit_state_base_address(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN6_STATE_BASE_ADDRESS | (10 - 2));
+	OUT_BATCH(GEN4_STATE_BASE_ADDRESS | (10 - 2));
 	OUT_BATCH(0); /* general */
 	OUT_RELOC(batch->bo, /* surface */
 		  I915_GEM_DOMAIN_INSTRUCTION, 0,
@@ -237,23 +237,23 @@ gen6_emit_wm_constants(struct intel_batchbuffer *batch)
 static void
 gen6_emit_null_depth_buffer(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN6_3DSTATE_DEPTH_BUFFER | (7 - 2));
-	OUT_BATCH(SURFACE_NULL << GEN6_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
-		  GEN6_DEPTHFORMAT_D32_FLOAT << GEN6_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
+	OUT_BATCH(GEN4_3DSTATE_DEPTH_BUFFER | (7 - 2));
+	OUT_BATCH(SURFACE_NULL << GEN4_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
+		  GEN4_DEPTHFORMAT_D32_FLOAT << GEN4_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 
-	OUT_BATCH(GEN6_3DSTATE_CLEAR_PARAMS | (2 - 2));
+	OUT_BATCH(GEN4_3DSTATE_CLEAR_PARAMS | (2 - 2));
 	OUT_BATCH(0);
 }
 
 static void
 gen6_emit_invariant(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN6_PIPELINE_SELECT | PIPELINE_SELECT_3D);
+	OUT_BATCH(G4X_PIPELINE_SELECT | PIPELINE_SELECT_3D);
 
 	OUT_BATCH(GEN6_3DSTATE_MULTISAMPLE | (3 - 2));
 	OUT_BATCH(GEN6_3DSTATE_MULTISAMPLE_PIXEL_LOCATION_CENTER |
@@ -332,7 +332,7 @@ gen6_emit_wm(struct intel_batchbuffer *batch, int kernel)
 static void
 gen6_emit_binding_table(struct intel_batchbuffer *batch, uint32_t wm_table)
 {
-	OUT_BATCH(GEN6_3DSTATE_BINDING_TABLE_POINTERS |
+	OUT_BATCH(GEN4_3DSTATE_BINDING_TABLE_POINTERS |
 		  GEN6_3DSTATE_BINDING_TABLE_MODIFY_PS |
 		  (4 - 2));
 	OUT_BATCH(0);		/* vs */
@@ -343,7 +343,7 @@ gen6_emit_binding_table(struct intel_batchbuffer *batch, uint32_t wm_table)
 static void
 gen6_emit_drawing_rectangle(struct intel_batchbuffer *batch, const struct igt_buf *dst)
 {
-	OUT_BATCH(GEN6_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
+	OUT_BATCH(GEN4_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
 	OUT_BATCH(0);
 	OUT_BATCH((igt_buf_height(dst) - 1) << 16 | (igt_buf_width(dst) - 1));
 	OUT_BATCH(0);
@@ -359,39 +359,39 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch)
 	 *
 	 * dword 4-11 are fetched from vertex buffer
 	 */
-	OUT_BATCH(GEN6_3DSTATE_VERTEX_ELEMENTS | (2 * 3 + 1 - 2));
+	OUT_BATCH(GEN4_3DSTATE_VERTEX_ELEMENTS | (2 * 3 + 1 - 2));
 
-	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
+	OUT_BATCH(0 << GEN6_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN6_VE0_VALID |
 		  SURFACEFORMAT_R32G32B32A32_FLOAT << VE0_FORMAT_SHIFT |
 		  0 << VE0_OFFSET_SHIFT);
-	OUT_BATCH(GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
+	OUT_BATCH(GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
 
 	/* x,y */
-	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
+	OUT_BATCH(0 << GEN6_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN6_VE0_VALID |
 		  SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
 		  0 << VE0_OFFSET_SHIFT); /* offsets vb in bytes */
-	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_2_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
+	OUT_BATCH(GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_2_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
 
 	/* u0, v0 */
-	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
+	OUT_BATCH(0 << GEN6_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN6_VE0_VALID |
 		  SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
 		  4 << VE0_OFFSET_SHIFT);	/* offset vb in bytes */
-	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
+	OUT_BATCH(GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
 }
 
 static uint32_t
 gen6_create_cc_viewport(struct intel_batchbuffer *batch)
 {
-	struct gen6_cc_viewport *vp;
+	struct gen4_cc_viewport *vp;
 
 	vp = intel_batchbuffer_subdata_alloc(batch, sizeof(*vp), 32);
 
@@ -439,41 +439,41 @@ gen6_create_sampler(struct intel_batchbuffer *batch,
 
 	/* We use the legacy mode to get the semantics specified by
 	 * the Render extension. */
-	ss->ss0.border_color_mode = GEN6_BORDER_COLOR_MODE_LEGACY;
+	ss->ss0.border_color_mode = GEN4_BORDER_COLOR_MODE_LEGACY;
 
 	switch (filter) {
 	default:
 	case SAMPLER_FILTER_NEAREST:
-		ss->ss0.min_filter = GEN6_MAPFILTER_NEAREST;
-		ss->ss0.mag_filter = GEN6_MAPFILTER_NEAREST;
+		ss->ss0.min_filter = GEN4_MAPFILTER_NEAREST;
+		ss->ss0.mag_filter = GEN4_MAPFILTER_NEAREST;
 		break;
 	case SAMPLER_FILTER_BILINEAR:
-		ss->ss0.min_filter = GEN6_MAPFILTER_LINEAR;
-		ss->ss0.mag_filter = GEN6_MAPFILTER_LINEAR;
+		ss->ss0.min_filter = GEN4_MAPFILTER_LINEAR;
+		ss->ss0.mag_filter = GEN4_MAPFILTER_LINEAR;
 		break;
 	}
 
 	switch (extend) {
 	default:
 	case SAMPLER_EXTEND_NONE:
-		ss->ss1.r_wrap_mode = GEN6_TEXCOORDMODE_CLAMP_BORDER;
-		ss->ss1.s_wrap_mode = GEN6_TEXCOORDMODE_CLAMP_BORDER;
-		ss->ss1.t_wrap_mode = GEN6_TEXCOORDMODE_CLAMP_BORDER;
+		ss->ss1.r_wrap_mode = GEN4_TEXCOORDMODE_CLAMP_BORDER;
+		ss->ss1.s_wrap_mode = GEN4_TEXCOORDMODE_CLAMP_BORDER;
+		ss->ss1.t_wrap_mode = GEN4_TEXCOORDMODE_CLAMP_BORDER;
 		break;
 	case SAMPLER_EXTEND_REPEAT:
-		ss->ss1.r_wrap_mode = GEN6_TEXCOORDMODE_WRAP;
-		ss->ss1.s_wrap_mode = GEN6_TEXCOORDMODE_WRAP;
-		ss->ss1.t_wrap_mode = GEN6_TEXCOORDMODE_WRAP;
+		ss->ss1.r_wrap_mode = GEN4_TEXCOORDMODE_WRAP;
+		ss->ss1.s_wrap_mode = GEN4_TEXCOORDMODE_WRAP;
+		ss->ss1.t_wrap_mode = GEN4_TEXCOORDMODE_WRAP;
 		break;
 	case SAMPLER_EXTEND_PAD:
-		ss->ss1.r_wrap_mode = GEN6_TEXCOORDMODE_CLAMP;
-		ss->ss1.s_wrap_mode = GEN6_TEXCOORDMODE_CLAMP;
-		ss->ss1.t_wrap_mode = GEN6_TEXCOORDMODE_CLAMP;
+		ss->ss1.r_wrap_mode = GEN4_TEXCOORDMODE_CLAMP;
+		ss->ss1.s_wrap_mode = GEN4_TEXCOORDMODE_CLAMP;
+		ss->ss1.t_wrap_mode = GEN4_TEXCOORDMODE_CLAMP;
 		break;
 	case SAMPLER_EXTEND_REFLECT:
-		ss->ss1.r_wrap_mode = GEN6_TEXCOORDMODE_MIRROR;
-		ss->ss1.s_wrap_mode = GEN6_TEXCOORDMODE_MIRROR;
-		ss->ss1.t_wrap_mode = GEN6_TEXCOORDMODE_MIRROR;
+		ss->ss1.r_wrap_mode = GEN4_TEXCOORDMODE_MIRROR;
+		ss->ss1.s_wrap_mode = GEN4_TEXCOORDMODE_MIRROR;
+		ss->ss1.t_wrap_mode = GEN4_TEXCOORDMODE_MIRROR;
 		break;
 	}
 
@@ -482,9 +482,9 @@ gen6_create_sampler(struct intel_batchbuffer *batch,
 
 static void gen6_emit_vertex_buffer(struct intel_batchbuffer *batch)
 {
-	OUT_BATCH(GEN6_3DSTATE_VERTEX_BUFFERS | 3);
-	OUT_BATCH(VB0_VERTEXDATA |
-		  0 << VB0_BUFFER_INDEX_SHIFT |
+	OUT_BATCH(GEN4_3DSTATE_VERTEX_BUFFERS | 3);
+	OUT_BATCH(GEN6_VB0_VERTEXDATA |
+		  0 << GEN6_VB0_BUFFER_INDEX_SHIFT |
 		  VERTEX_SIZE << VB0_BUFFER_PITCH_SHIFT);
 	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_VERTEX, 0, 0);
 	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_VERTEX, 0, batch->bo->size-1);
@@ -495,9 +495,9 @@ static uint32_t gen6_emit_primitive(struct intel_batchbuffer *batch)
 {
 	uint32_t offset;
 
-	OUT_BATCH(GEN6_3DPRIMITIVE |
-		  GEN6_3DPRIMITIVE_VERTEX_SEQUENTIAL |
-		  _3DPRIM_RECTLIST << GEN6_3DPRIMITIVE_TOPOLOGY_SHIFT |
+	OUT_BATCH(GEN4_3DPRIMITIVE |
+		  GEN4_3DPRIMITIVE_VERTEX_SEQUENTIAL |
+		  _3DPRIM_RECTLIST << GEN4_3DPRIMITIVE_TOPOLOGY_SHIFT |
 		  0 << 9 |
 		  4);
 	OUT_BATCH(3);	/* vertex count */

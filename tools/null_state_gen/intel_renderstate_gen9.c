@@ -163,11 +163,11 @@ static void gen8_emit_vertex_buffers(struct intel_batchbuffer *batch)
 	const int buffers = 33;
 	int i;
 
-	OUT_BATCH(GEN6_3DSTATE_VERTEX_BUFFERS |
+	OUT_BATCH(GEN4_3DSTATE_VERTEX_BUFFERS |
 		(((4 * buffers) + 1)- 2) /* DWORD count - 2 */);
 
 	for (i = 0; i < buffers; i++) {
-		OUT_BATCH(i << VB0_BUFFER_INDEX_SHIFT |
+		OUT_BATCH(i << GEN6_VB0_BUFFER_INDEX_SHIFT |
 			  GEN8_VB0_BUFFER_ADDR_MOD_EN);
 		OUT_BATCH(0); /* Address */
 		OUT_BATCH(0);
@@ -180,16 +180,16 @@ static void gen8_emit_vertex_elements(struct intel_batchbuffer *batch)
 	const int elements = 34;
 	int i;
 
-	OUT_BATCH(GEN6_3DSTATE_VERTEX_ELEMENTS |
+	OUT_BATCH(GEN4_3DSTATE_VERTEX_ELEMENTS |
 		(((2 * elements) + 1) - 2) /* DWORD count - 2 */);
 
 	/* Element 0 */
-	OUT_BATCH(VE0_VALID);
+	OUT_BATCH(GEN6_VE0_VALID);
 	OUT_BATCH(
-		GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
-		GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
-		GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
-		GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
+		GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
+		GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
+		GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+		GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
 	/* Elements 1 -> 33 */
 	for (i = 1; i < elements; i++) {
 		OUT_BATCH(0);
@@ -277,18 +277,18 @@ static void gen8_emit_viewport_state_pointers_sf_clip(struct intel_batchbuffer *
 
 static void gen8_emit_primitive(struct intel_batchbuffer *batch)
 {
-        OUT_BATCH(GEN6_3DPRIMITIVE | (7-2));
-        OUT_BATCH(4);   /* gen8+ ignore the topology type field */
-        OUT_BATCH(1);   /* vertex count */
-        OUT_BATCH(0);
-        OUT_BATCH(1);   /* single instance */
-        OUT_BATCH(0);   /* start instance location */
-        OUT_BATCH(0);   /* index buffer offset, ignored */
+	OUT_BATCH(GEN4_3DPRIMITIVE | (7 - 2));
+	OUT_BATCH(4);   /* gen8+ ignore the topology type field */
+	OUT_BATCH(1);   /* vertex count */
+	OUT_BATCH(0);
+	OUT_BATCH(1);   /* single instance */
+	OUT_BATCH(0);   /* start instance location */
+	OUT_BATCH(0);   /* index buffer offset, ignored */
 }
 
 static void gen9_emit_state_base_address(struct intel_batchbuffer *batch) {
 	const unsigned offset = 0;
-	OUT_BATCH(GEN6_STATE_BASE_ADDRESS |
+	OUT_BATCH(GEN4_STATE_BASE_ADDRESS |
 		(19 - 2) /* DWORD count - 2 */);
 
 	/* general state base address - requires BB address
@@ -414,8 +414,8 @@ void gen9_setup_null_render_state(struct intel_batchbuffer *batch)
 	/* State base addresses */
 	gen9_emit_state_base_address(batch);
 
-	OUT_CMD(GEN6_STATE_SIP, 3);
-	OUT_CMD(GEN6_3DSTATE_DRAWING_RECTANGLE, 4);
+	OUT_CMD(GEN4_STATE_SIP, 3);
+	OUT_CMD(GEN4_3DSTATE_DRAWING_RECTANGLE, 4);
 	OUT_CMD(GEN7_3DSTATE_DEPTH_BUFFER, 8);
 
 	/* Chroma key */

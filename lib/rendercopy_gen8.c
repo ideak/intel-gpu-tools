@@ -228,11 +228,11 @@ gen8_create_sampler(struct intel_batchbuffer *batch,
 	annotation_add_state(aub, AUB_TRACE_SAMPLER_STATE,
 			     offset, sizeof(*ss));
 
-	ss->ss0.min_filter = GEN6_MAPFILTER_NEAREST;
-	ss->ss0.mag_filter = GEN6_MAPFILTER_NEAREST;
-	ss->ss3.r_wrap_mode = GEN6_TEXCOORDMODE_CLAMP;
-	ss->ss3.s_wrap_mode = GEN6_TEXCOORDMODE_CLAMP;
-	ss->ss3.t_wrap_mode = GEN6_TEXCOORDMODE_CLAMP;
+	ss->ss0.min_filter = GEN4_MAPFILTER_NEAREST;
+	ss->ss0.mag_filter = GEN4_MAPFILTER_NEAREST;
+	ss->ss3.r_wrap_mode = GEN4_TEXCOORDMODE_CLAMP;
+	ss->ss3.s_wrap_mode = GEN4_TEXCOORDMODE_CLAMP;
+	ss->ss3.t_wrap_mode = GEN4_TEXCOORDMODE_CLAMP;
 
 	/* I've experimented with non-normalized coordinates and using the LD
 	 * sampler fetch, but couldn't make it work. */
@@ -314,18 +314,18 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch) {
 	 *    dword 4-7: position (x, y, 0, 1.0),
 	 *    dword 8-11: texture coordinate 0 (u0, v0, 0, 1.0)
 	 */
-	OUT_BATCH(GEN6_3DSTATE_VERTEX_ELEMENTS | (3 * 2 + 1 - 2));
+	OUT_BATCH(GEN4_3DSTATE_VERTEX_ELEMENTS | (3 * 2 + 1 - 2));
 
 	/* Element state 0. These are 4 dwords of 0 required for the VUE format.
 	 * We don't really know or care what they do.
 	 */
-	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
+	OUT_BATCH(0 << GEN6_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN6_VE0_VALID |
 		  SURFACEFORMAT_R32G32B32A32_FLOAT << VE0_FORMAT_SHIFT |
 		  0 << VE0_OFFSET_SHIFT); /* we specify 0, but it's really does not exist */
-	OUT_BATCH(GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
+	OUT_BATCH(GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
 
 	/* Element state 1 - Our "destination" vertices. These are passed down
 	 * through the pipeline, and eventually make it to the pixel shader as
@@ -333,25 +333,25 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch) {
 	 * signed/scaled because of gen6 rendercopy. I see no particular reason
 	 * for doing this though.
 	 */
-	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
+	OUT_BATCH(0 << GEN6_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN6_VE0_VALID |
 		  SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
 		  0 << VE0_OFFSET_SHIFT); /* offsets vb in bytes */
-	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
+	OUT_BATCH(GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
 
 	/* Element state 2. Last but not least we store the U,V components as
 	 * normalized floats. These will be used in the pixel shader to sample
 	 * from the source buffer.
 	 */
-	OUT_BATCH(0 << VE0_VERTEX_BUFFER_INDEX_SHIFT | VE0_VALID |
+	OUT_BATCH(0 << GEN6_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN6_VE0_VALID |
 		  SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
 		  4 << VE0_OFFSET_SHIFT);	/* offset vb in bytes */
-	OUT_BATCH(GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
-		  GEN6_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
+	OUT_BATCH(GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+		  GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
 }
 
 /*
@@ -362,8 +362,8 @@ gen6_emit_vertex_elements(struct intel_batchbuffer *batch) {
  */
 static void gen8_emit_vertex_buffer(struct intel_batchbuffer *batch,
 				    uint32_t offset) {
-	OUT_BATCH(GEN6_3DSTATE_VERTEX_BUFFERS | (1 + (4 * 1) - 2));
-	OUT_BATCH(0 << VB0_BUFFER_INDEX_SHIFT | /* VB 0th index */
+	OUT_BATCH(GEN4_3DSTATE_VERTEX_BUFFERS | (1 + (4 * 1) - 2));
+	OUT_BATCH(0 << GEN6_VB0_BUFFER_INDEX_SHIFT | /* VB 0th index */
 		  GEN8_VB0_BUFFER_ADDR_MOD_EN | /* Address Modify Enable */
 		  VERTEX_SIZE << VB0_BUFFER_PITCH_SHIFT);
 	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_VERTEX, 0, offset);
@@ -414,7 +414,7 @@ static uint32_t
 gen6_create_cc_viewport(struct intel_batchbuffer *batch,
 			struct annotations_context *aub)
 {
-	struct gen6_cc_viewport *vp;
+	struct gen4_cc_viewport *vp;
 	uint32_t offset;
 
 	vp = intel_batchbuffer_subdata_alloc(batch, sizeof(*vp), 32);
@@ -468,7 +468,7 @@ gen6_create_scissor_rect(struct intel_batchbuffer *batch,
 
 static void
 gen8_emit_sip(struct intel_batchbuffer *batch) {
-	OUT_BATCH(GEN6_STATE_SIP | (3 - 2));
+	OUT_BATCH(GEN4_STATE_SIP | (3 - 2));
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 }
@@ -489,7 +489,7 @@ gen7_emit_push_constants(struct intel_batchbuffer *batch) {
 
 static void
 gen8_emit_state_base_address(struct intel_batchbuffer *batch) {
-	OUT_BATCH(GEN6_STATE_BASE_ADDRESS | (16 - 2));
+	OUT_BATCH(GEN4_STATE_BASE_ADDRESS | (16 - 2));
 
 	/* general */
 	OUT_BATCH(0 | BASE_ADDRESS_MODIFY);
@@ -826,7 +826,7 @@ gen7_emit_clear(struct intel_batchbuffer *batch) {
 static void
 gen6_emit_drawing_rectangle(struct intel_batchbuffer *batch, const struct igt_buf *dst)
 {
-	OUT_BATCH(GEN6_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
+	OUT_BATCH(GEN4_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
 	OUT_BATCH(0);
 	OUT_BATCH((igt_buf_height(dst) - 1) << 16 | (igt_buf_width(dst) - 1));
 	OUT_BATCH(0);
@@ -845,7 +845,7 @@ static void gen8_emit_primitive(struct intel_batchbuffer *batch, uint32_t offset
 	OUT_BATCH(0);
 	OUT_BATCH(0);
 
-	OUT_BATCH(GEN6_3DPRIMITIVE | (7-2));
+	OUT_BATCH(GEN4_3DPRIMITIVE | (7-2));
 	OUT_BATCH(0);	/* gen8+ ignore the topology type field */
 	OUT_BATCH(3);	/* vertex count */
 	OUT_BATCH(0);	/*  We're specifying this instead with offset in GEN6_3DSTATE_VERTEX_BUFFERS */
@@ -929,7 +929,7 @@ void gen8_render_copyfunc(struct intel_batchbuffer *batch,
 
 	/* Start emitting the commands. The order roughly follows the mesa blorp
 	 * order */
-	OUT_BATCH(GEN6_PIPELINE_SELECT | PIPELINE_SELECT_3D);
+	OUT_BATCH(G4X_PIPELINE_SELECT | PIPELINE_SELECT_3D);
 
 	gen8_emit_sip(batch);
 

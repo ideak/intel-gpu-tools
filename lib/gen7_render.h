@@ -85,21 +85,21 @@
 # define GEN7_3DPRIM_VERTEXBUFFER_ACCESS_SEQUENTIAL     (0 << 8)
 # define GEN7_3DPRIM_VERTEXBUFFER_ACCESS_RANDOM         (1 << 8)
 
-#define GEN7_3DSTATE_CLEAR_PARAMS               GEN6_3D(3, 0, 0x04)
-#define GEN7_3DSTATE_DEPTH_BUFFER               GEN6_3D(3, 0, 0x05)
+#define GEN7_3DSTATE_CLEAR_PARAMS               GEN4_3D(3, 0, 0x04)
+#define GEN7_3DSTATE_DEPTH_BUFFER               GEN4_3D(3, 0, 0x05)
 # define GEN7_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT	29
 # define GEN7_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT	18
 /* DW1 */
 # define GEN7_3DSTATE_DEPTH_CLEAR_VALID		(1 << 15)
 
-#define GEN7_3DSTATE_CONSTANT_HS                GEN6_3D(3, 0, 0x19)
-#define GEN7_3DSTATE_CONSTANT_DS                GEN6_3D(3, 0, 0x1a)
+#define GEN7_3DSTATE_CONSTANT_HS                GEN4_3D(3, 0, 0x19)
+#define GEN7_3DSTATE_CONSTANT_DS                GEN4_3D(3, 0, 0x1a)
 
-#define GEN7_3DSTATE_HS                         GEN6_3D(3, 0, 0x1b)
-#define GEN7_3DSTATE_TE                         GEN6_3D(3, 0, 0x1c)
-#define GEN7_3DSTATE_DS                         GEN6_3D(3, 0, 0x1d)
-#define GEN7_3DSTATE_STREAMOUT                  GEN6_3D(3, 0, 0x1e)
-#define GEN7_3DSTATE_SBE                        GEN6_3D(3, 0, 0x1f)
+#define GEN7_3DSTATE_HS                         GEN4_3D(3, 0, 0x1b)
+#define GEN7_3DSTATE_TE                         GEN4_3D(3, 0, 0x1c)
+#define GEN7_3DSTATE_DS                         GEN4_3D(3, 0, 0x1d)
+#define GEN7_3DSTATE_STREAMOUT                  GEN4_3D(3, 0, 0x1e)
+#define GEN7_3DSTATE_SBE                        GEN4_3D(3, 0, 0x1f)
 
 /* DW1 */
 # define GEN7_SBE_SWIZZLE_CONTROL_MODE          (1 << 28)
@@ -109,7 +109,7 @@
 # define GEN7_SBE_URB_ENTRY_READ_LENGTH_SHIFT   11
 # define GEN7_SBE_URB_ENTRY_READ_OFFSET_SHIFT   4
 
-#define GEN7_3DSTATE_PS                                 GEN6_3D(3, 0, 0x20)
+#define GEN7_3DSTATE_PS                                 GEN4_3D(3, 0, 0x20)
 /* DW1: kernel pointer */
 /* DW2 */
 # define GEN7_PS_SPF_MODE                               (1 << 31)
@@ -140,33 +140,33 @@
 /* DW6: kernel 1 pointer */
 /* DW7: kernel 2 pointer */
 
-#define GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_SF_CL      GEN6_3D(3, 0, 0x21)
-#define GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_CC         GEN6_3D(3, 0, 0x23)
+#define GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_SF_CL      GEN4_3D(3, 0, 0x21)
+#define GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_CC         GEN4_3D(3, 0, 0x23)
 
-#define GEN7_3DSTATE_BLEND_STATE_POINTERS               GEN6_3D(3, 0, 0x24)
-#define GEN7_3DSTATE_DEPTH_STENCIL_STATE_POINTERS       GEN6_3D(3, 0, 0x25)
+#define GEN7_3DSTATE_BLEND_STATE_POINTERS               GEN4_3D(3, 0, 0x24)
+#define GEN7_3DSTATE_DEPTH_STENCIL_STATE_POINTERS       GEN4_3D(3, 0, 0x25)
 
-#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_VS          GEN6_3D(3, 0, 0x26)
-#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_HS          GEN6_3D(3, 0, 0x27)
-#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_DS          GEN6_3D(3, 0, 0x28)
-#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_GS          GEN6_3D(3, 0, 0x29)
-#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_PS          GEN6_3D(3, 0, 0x2a)
+#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_VS          GEN4_3D(3, 0, 0x26)
+#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_HS          GEN4_3D(3, 0, 0x27)
+#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_DS          GEN4_3D(3, 0, 0x28)
+#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_GS          GEN4_3D(3, 0, 0x29)
+#define GEN7_3DSTATE_BINDING_TABLE_POINTERS_PS          GEN4_3D(3, 0, 0x2a)
 
-#define GEN7_3DSTATE_SAMPLER_STATE_POINTERS_VS          GEN6_3D(3, 0, 0x2b)
-#define GEN7_3DSTATE_SAMPLER_STATE_POINTERS_GS          GEN6_3D(3, 0, 0x2e)
-#define GEN7_3DSTATE_SAMPLER_STATE_POINTERS_PS          GEN6_3D(3, 0, 0x2f)
+#define GEN7_3DSTATE_SAMPLER_STATE_POINTERS_VS          GEN4_3D(3, 0, 0x2b)
+#define GEN7_3DSTATE_SAMPLER_STATE_POINTERS_GS          GEN4_3D(3, 0, 0x2e)
+#define GEN7_3DSTATE_SAMPLER_STATE_POINTERS_PS          GEN4_3D(3, 0, 0x2f)
 
-#define GEN7_3DSTATE_URB_VS                             GEN6_3D(3, 0, 0x30)
-#define GEN7_3DSTATE_URB_HS                             GEN6_3D(3, 0, 0x31)
-#define GEN7_3DSTATE_URB_DS                             GEN6_3D(3, 0, 0x32)
-#define GEN7_3DSTATE_URB_GS                             GEN6_3D(3, 0, 0x33)
+#define GEN7_3DSTATE_URB_VS                             GEN4_3D(3, 0, 0x30)
+#define GEN7_3DSTATE_URB_HS                             GEN4_3D(3, 0, 0x31)
+#define GEN7_3DSTATE_URB_DS                             GEN4_3D(3, 0, 0x32)
+#define GEN7_3DSTATE_URB_GS                             GEN4_3D(3, 0, 0x33)
 /* DW1 */
 # define GEN7_URB_ENTRY_NUMBER_SHIFT            0
 # define GEN7_URB_ENTRY_SIZE_SHIFT              16
 # define GEN7_URB_STARTING_ADDRESS_SHIFT        25
 
-#define GEN7_3DSTATE_PUSH_CONSTANT_ALLOC_VS             GEN6_3D(3, 1, 0x12)
-#define GEN7_3DSTATE_PUSH_CONSTANT_ALLOC_PS             GEN6_3D(3, 1, 0x16)
+#define GEN7_3DSTATE_PUSH_CONSTANT_ALLOC_VS             GEN4_3D(3, 1, 0x12)
+#define GEN7_3DSTATE_PUSH_CONSTANT_ALLOC_PS             GEN4_3D(3, 1, 0x16)
 /* DW1 */
 # define GEN7_PUSH_CONSTANT_BUFFER_OFFSET_SHIFT 16
 
