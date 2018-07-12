@@ -442,10 +442,14 @@ static void run_subtests_for_pipe(data_t *data)
 			igt_subtest_f("pipe-%s-%s-%s-hang",
 				      kmstest_pipe_name(data->pipe),
 				      f->name, m->name) {
+				igt_hang_t hang;
+
+				hang = igt_allow_hang(data->display.drm_fd, 0, 0);
 				for_each_valid_output_on_pipe(&data->display, data->pipe, data->output) {
 					data->flags = m->flags;
 					run_test(data, f->func);
 				}
+				igt_disallow_hang(data->display.drm_fd, hang);
 			}
 		}
 	}
