@@ -175,7 +175,7 @@ test_progs = [
 	'kms_plane_multiple',
 	'kms_plane_scaling',
 	'kms_properties',
-	'kms_psr_sink_crc',
+	'kms_psr',
 	'kms_pwrite_crc',
 	'kms_rmfb',
 	'kms_rotation_crc',
