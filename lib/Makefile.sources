@@ -71,10 +71,12 @@ lib_source_list =	 	\
 	gen8_media.h            \
 	rendercopy_i915.c	\
 	rendercopy_i830.c	\
+	gen4_render.h		\
 	gen6_render.h		\
 	gen7_render.h		\
 	gen8_render.h		\
 	gen9_render.h		\
+	rendercopy_gen4.c	\
 	rendercopy_gen6.c	\
 	rendercopy_gen7.c	\
 	rendercopy_gen8.c	\

@@ -833,6 +833,8 @@ igt_render_copyfunc_t igt_get_render_copyfunc(int devid)
 		copy = gen2_render_copyfunc;
 	else if (IS_GEN3(devid))
 		copy = gen3_render_copyfunc;
+	else if (IS_GEN4(devid) || IS_GEN5(devid))
+		copy = gen4_render_copyfunc;
 	else if (IS_GEN6(devid))
 		copy = gen6_render_copyfunc;
 	else if (IS_GEN7(devid))
