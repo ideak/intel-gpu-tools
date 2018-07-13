@@ -289,4 +289,3 @@ igt@vgem_basic@unload
 igt@drv_module_reload@basic-reload
 igt@drv_module_reload@basic-no-display
 igt@drv_module_reload@basic-reload-inject
-igt@gvt_basic@invalid-placeholder-test
