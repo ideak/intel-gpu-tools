@@ -175,7 +175,7 @@ static int tio_fd;
 struct termios saved_tio;
 
 drmModeRes *resources;
-int drm_fd, modes;
+int drm_fd, modes, gen;
 uint64_t tiling = LOCAL_DRM_FORMAT_MOD_NONE;
 uint32_t depth = 24, stride, bpp;
 int specified_mode_num = -1, specified_disp_id = -1;
@@ -506,9 +506,13 @@ static int setup_video_pattern_framebuffer(struct connector *dp_conn)
 
 	video_width = dp_conn->test_pattern.hdisplay;
 	video_height = dp_conn->test_pattern.vdisplay;
+	/*
+	 * Display WA1172: Gen10 To pass the color data unaffected set either
+	 * per-pixel alpha or Plane alpha to 0xff. Use ARGB8888 and set alpha to 0xff.
+	 */
 	dp_conn->test_pattern.fb = igt_create_fb(drm_fd,
 						 video_width, video_height,
-						 DRM_FORMAT_XRGB8888,
+						 gen == 10 ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
 						 LOCAL_DRM_FORMAT_MOD_NONE,
 						 &dp_conn->test_pattern.fb_pattern);
 	igt_assert(dp_conn->test_pattern.fb);
@@ -537,6 +541,7 @@ static int fill_framebuffer(struct connector *dp_conn)
 	uint32_t *red_ptr, *green_ptr, *blue_ptr, *white_ptr, *src_ptr, *dst_ptr;
 	int x, y;
 	int32_t pixel_val;
+	uint8_t alpha;
 
 	video_width = dp_conn->test_pattern.hdisplay;
 	video_height = dp_conn->test_pattern.vdisplay;
@@ -554,10 +559,12 @@ static int fill_framebuffer(struct connector *dp_conn)
 	while (x < video_width) {
 		for (pixel_val = 0; pixel_val < 256;
 		     pixel_val = pixel_val + (256 / tile_width)) {
-			red_ptr[x] = pixel_val << 16;
-			green_ptr[x] = pixel_val << 8;
-			blue_ptr[x] = pixel_val << 0;
-			white_ptr[x] = red_ptr[x] | green_ptr[x] | blue_ptr[x];
+			alpha = gen == 10 ? 0xff : 0;
+			red_ptr[x] = alpha << 24 | pixel_val << 16;
+			green_ptr[x] = alpha << 24 | pixel_val << 8;
+			blue_ptr[x] = alpha << 24 | pixel_val << 0;
+			white_ptr[x] = alpha << 24 | red_ptr[x] | green_ptr[x] |
+				       blue_ptr[x];
 			if (++x >= video_width)
 				break;
 		}
@@ -1036,6 +1043,7 @@ int main(int argc, char **argv)
 	set_termio_mode();
 
 	drm_fd = drm_open_driver(DRIVER_ANY);
+	gen = intel_gen(intel_get_drm_devid(drm_fd));
 
 	kmstest_set_vt_graphics_mode();
 	setup_debugfs_files();
