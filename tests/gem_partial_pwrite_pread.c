@@ -56,7 +56,6 @@ drm_intel_bo *scratch_bo;
 drm_intel_bo *staging_bo;
 #define BO_SIZE (4*4096)
 uint32_t devid;
-uint64_t mappable_gtt_limit;
 int fd;
 
 static void
@@ -91,9 +90,7 @@ blt_bo_fill(drm_intel_bo *tmp_bo, drm_intel_bo *bo, uint8_t val)
 
 	drm_intel_gem_bo_unmap_gtt(tmp_bo);
 
-	if (bo->offset < mappable_gtt_limit &&
-	    (IS_G33(devid) || intel_gen(devid) >= 4))
-		igt_trash_aperture();
+	igt_drop_caches_set(fd, DROP_BOUND);
 
 	copy_bo(tmp_bo, bo);
 }
@@ -264,9 +261,6 @@ igt_main
 		/* overallocate the buffers we're actually using because */
 		scratch_bo = drm_intel_bo_alloc(bufmgr, "scratch bo", BO_SIZE, 4096);
 		staging_bo = drm_intel_bo_alloc(bufmgr, "staging bo", BO_SIZE, 4096);
-
-		igt_init_aperture_trashers(bufmgr);
-		mappable_gtt_limit = gem_mappable_aperture_size();
 	}
 
 	do_tests(-1, "");
@@ -277,7 +271,6 @@ igt_main
 	do_tests(2, "-display");
 
 	igt_fixture {
-		igt_cleanup_aperture_trashers();
 		drm_intel_bufmgr_destroy(bufmgr);
 
 		close(fd);
