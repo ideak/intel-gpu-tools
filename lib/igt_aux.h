@@ -28,15 +28,12 @@
 #ifndef IGT_AUX_H
 #define IGT_AUX_H
 
-#include <intel_bufmgr.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <sys/time.h>
 
 #include <i915/gem_submission.h>
-
-extern drm_intel_bo **trash_bos;
-extern int num_trash_bos;
 
 /* signal interrupt helpers */
 #define gettid() syscall(__NR_gettid)
@@ -121,11 +118,6 @@ void igt_print_activity(void);
 bool igt_check_boolean_env_var(const char *env_var, bool default_value);
 
 bool igt_aub_dump_enabled(void);
-
-/* helpers based upon the libdrm buffer manager */
-void igt_init_aperture_trashers(drm_intel_bufmgr *bufmgr);
-void igt_trash_aperture(void);
-void igt_cleanup_aperture_trashers(void);
 
 /* suspend/hibernate and auto-resume system */
 

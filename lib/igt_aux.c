@@ -682,63 +682,6 @@ void igt_print_activity(void)
 	igt_interactive_info(".");
 }
 
-/* mappable aperture trasher helper */
-drm_intel_bo **trash_bos;
-int num_trash_bos;
-
-/**
- * igt_init_aperture_trashers:
- * @bufmgr: libdrm buffer manager
- *
- * Initialize the aperture trasher using @bufmgr, which can then be run with
- * igt_trash_aperture().
- */
-void igt_init_aperture_trashers(drm_intel_bufmgr *bufmgr)
-{
-	int i;
-
-	num_trash_bos = gem_mappable_aperture_size() / (1024*1024);
-
-	trash_bos = malloc(num_trash_bos * sizeof(drm_intel_bo *));
-	igt_assert(trash_bos);
-
-	for (i = 0; i < num_trash_bos; i++)
-		trash_bos[i] = drm_intel_bo_alloc(bufmgr, "trash bo", 1024*1024, 4096);
-}
-
-/**
- * igt_trash_aperture:
- *
- * Trash the aperture by walking a set of GTT memory mapped objects.
- */
-void igt_trash_aperture(void)
-{
-	int i;
-	uint8_t *gtt_ptr;
-
-	for (i = 0; i < num_trash_bos; i++) {
-		drm_intel_gem_bo_map_gtt(trash_bos[i]);
-		gtt_ptr = trash_bos[i]->virtual;
-		*gtt_ptr = 0;
-		drm_intel_gem_bo_unmap_gtt(trash_bos[i]);
-	}
-}
-
-/**
- * igt_cleanup_aperture_trashers:
- *
- * Clean up all aperture trasher state set up with igt_init_aperture_trashers().
- */
-void igt_cleanup_aperture_trashers(void)
-{
-	int i;
-
-	for (i = 0; i < num_trash_bos; i++)
-		drm_intel_bo_unreference(trash_bos[i]);
-
-	free(trash_bos);
-}
-
 static int autoresume_delay;
 
 static const char *suspend_state_name[] = {

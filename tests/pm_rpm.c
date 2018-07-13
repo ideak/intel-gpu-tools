@@ -1295,25 +1295,36 @@ static void gem_idle_subtest(void)
 
 static void gem_evict_pwrite_subtest(void)
 {
-	static drm_intel_bufmgr *bufmgr;
+	struct {
+		uint32_t handle;
+		uint32_t *ptr;
+	} *trash_bos;
+	unsigned int num_trash_bos, n;
 	uint32_t buf;
-	int i;
 
-	bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-	igt_assert(bufmgr);
-	igt_init_aperture_trashers(bufmgr);
+	num_trash_bos = gem_mappable_aperture_size() / (1024*1024) + 1;
+	trash_bos = malloc(num_trash_bos * sizeof(*trash_bos));
+	igt_assert(trash_bos);
 
-	igt_trash_aperture();
+	for (n = 0; n < num_trash_bos; n++) {
+		trash_bos[n].handle = gem_create(drm_fd, 1024*1024);
+		trash_bos[n].ptr = gem_mmap__gtt(drm_fd, trash_bos[n].handle,
+						 1024*1024, PROT_WRITE);
+		*trash_bos[n].ptr = 0;
+	}
 
 	disable_or_dpms_all_screens_and_wait(&ms_data, true);
 	igt_assert(wait_for_suspended());
 
 	buf = 0;
-	for (i = 0; i < num_trash_bos; i++)
-		gem_write(drm_fd, trash_bos[i]->handle, 0, &buf, sizeof(buf));
+	for (n = 0; n < num_trash_bos; n++)
+		gem_write(drm_fd, trash_bos[n].handle, 0, &buf, sizeof(buf));
 
-	igt_cleanup_aperture_trashers();
-	drm_intel_bufmgr_destroy(bufmgr);
+	for (n = 0; n < num_trash_bos; n++) {
+		munmap(trash_bos[n].ptr, 1024*1024);
+		gem_close(drm_fd, trash_bos[n].handle);
+	}
+	free(trash_bos);
 }
 
 /* This also triggered WARNs on dmesg at some point. */
