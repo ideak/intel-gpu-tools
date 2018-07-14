@@ -179,7 +179,6 @@ test_progs = [
 	'kms_rmfb',
 	'kms_rotation_crc',
 	'kms_setmode',
-	'kms_sink_crc_basic',
 	'kms_sysfs_edid_timing',
 	'kms_tv_load_detect',
 	'kms_universal_plane',

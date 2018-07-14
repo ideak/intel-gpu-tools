@@ -245,7 +245,6 @@ igt@kms_pipe_crc_basic@suspend-read-crc-pipe-b
 igt@kms_pipe_crc_basic@suspend-read-crc-pipe-c
 igt@kms_psr@basic
 igt@kms_setmode@basic-clone-single-crtc
-igt@kms_sink_crc_basic
 igt@pm_backlight@basic-brightness
 igt@pm_rpm@basic-pci-d3-state
 igt@pm_rpm@basic-rte
