@@ -26,6 +26,7 @@
 
 #include "igt.h"
 #include "igt_sysfs.h"
+#include "igt_psr.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -756,22 +757,6 @@ static bool fbc_is_enabled(int lvl)
 	return strstr(buf, "FBC enabled\n");
 }
 
-static bool psr_is_enabled(void)
-{
-	char buf[256];
-
-	debugfs_read("i915_edp_psr_status", buf);
-	return strstr(buf, "\nHW Enabled & Active bit: yes\n");
-}
-
-static void psr_print_status(void)
-{
-	char buf[256];
-
-	debugfs_read("i915_edp_psr_status", buf);
-	igt_info("PSR status:\n%s\n", buf);
-}
-
 static void drrs_set(unsigned int val)
 {
 	char buf[2];
@@ -947,16 +932,6 @@ static bool fbc_wait_until_enabled(void)
 	last_fbc_buf[0] = '\0';
 
 	return igt_wait(fbc_is_enabled(IGT_LOG_DEBUG), 2000, 1);
-}
-
-static bool psr_wait_until_enabled(void)
-{
-	return igt_wait(psr_is_enabled(), 5000, 1);
-}
-
-static bool psr_wait_until_disabled(void)
-{
-	return igt_wait(!psr_is_enabled(), 5000, 1);
 }
 
 static bool drrs_wait_until_rr_switch_to_low(void)
@@ -1659,17 +1634,10 @@ static void do_status_assertions(int flags)
 		igt_assert(!fbc_wait_until_enabled());
 	}
 
-	if (flags & ASSERT_PSR_ENABLED) {
-		if (!psr_wait_until_enabled()) {
-			psr_print_status();
-			igt_assert_f(psr_is_enabled(), "PSR still disabled\n");
-		}
-	} else if (flags & ASSERT_PSR_DISABLED) {
-		if (!psr_wait_until_disabled()) {
-			psr_print_status();
-			igt_assert_f(!psr_is_enabled(), "PSR still enabled\n");
-		}
-	}
+	if (flags & ASSERT_PSR_ENABLED)
+		igt_assert_f(psr_wait_entry(drm.fd), "PSR still disabled\n");
+	else if (flags & ASSERT_PSR_DISABLED)
+		igt_assert_f(psr_active(drm.fd, false), "PSR still enabled\n");
 }
 
 static void __do_assertions(const struct test_mode *t, int flags,
