@@ -48,6 +48,7 @@ lib_sources = [
 	'uwildmat/uwildmat.c',
 	'igt_kmod.c',
 	'igt_vc4.c',
+	'igt_psr.c',
 ]
 
 lib_deps = [

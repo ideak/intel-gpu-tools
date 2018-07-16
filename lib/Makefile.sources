@@ -103,6 +103,8 @@ lib_source_list =	 	\
 	igt_kmod.h		\
 	igt_syncobj.c		\
 	igt_syncobj.h		\
+	igt_psr.c		\
+	igt_psr.h		\
 	$(NULL)
 
 .PHONY: version.h.tmp
