@@ -197,12 +197,12 @@ static bool sink_support(data_t *data)
 		strstr(buf, "Sink_Support: yes\n");
 }
 
-static bool psr_active(data_t *data, bool check_active)
+static bool psr_active(int fd, bool check_active)
 {
 	bool active;
 	char buf[512];
 
-	igt_debugfs_read(data->drm_fd, "i915_edp_psr_status", buf);
+	igt_debugfs_read(fd, "i915_edp_psr_status", buf);
 
 	active = strstr(buf, "HW Enabled & Active bit: yes\n") &&
 		 (strstr(buf, "SRDENT") || strstr(buf, "SLEEP"));
@@ -214,7 +214,7 @@ static bool wait_psr_entry(data_t *data)
 	if (data->with_psr_disabled)
 		return true;
 
-	return igt_wait((psr_active(data, true)), 500, 1);
+	return igt_wait((psr_active(data->drm_fd, true)), 500, 1);
 }
 
 static inline void manual(const char *expected)
@@ -303,7 +303,7 @@ static void run_test(data_t *data)
 		expected = "screen GREEN";
 		break;
 	}
-	igt_assert(psr_active(data, false));
+	igt_assert(psr_active(data->drm_fd, false));
 	manual(expected);
 }
 
