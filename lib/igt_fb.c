@@ -1374,16 +1374,13 @@ static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
 }
 
 struct fb_convert_blit_upload {
-	int fd;
-	struct igt_fb *fb;
+	struct fb_blit_upload base;
 
 	struct {
 		uint64_t size;
 		uint8_t *map;
 		unsigned stride;
 	} rgb24;
-
-	struct fb_blit_linear linear;
 };
 
 static uint8_t clamprgb(float val)
@@ -1411,8 +1408,8 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	int i, j;
 	const uint8_t *y, *uv;
 	uint8_t *rgb24 = blit->rgb24.map;
-	unsigned rgb24_stride = blit->rgb24.stride, planar_stride = blit->linear.stride;
-	uint8_t *buf = malloc(blit->linear.size);
+	unsigned rgb24_stride = blit->rgb24.stride, planar_stride = blit->base.linear.stride;
+	uint8_t *buf = malloc(blit->base.linear.size);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
 						    fb->color_range);
 
@@ -1421,9 +1418,9 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	 * it's faster to copy the whole BO to a temporary buffer and convert
 	 * from there.
 	 */
-	igt_memcpy_from_wc(buf, blit->linear.map, blit->linear.size);
-	y = &buf[blit->linear.offsets[0]];
-	uv = &buf[blit->linear.offsets[1]];
+	igt_memcpy_from_wc(buf, blit->base.linear.map, blit->base.linear.size);
+	y = &buf[blit->base.linear.offsets[0]];
+	uv = &buf[blit->base.linear.offsets[1]];
 
 	for (i = 0; i < fb->height / 2; i++) {
 		for (j = 0; j < fb->width / 2; j++) {
@@ -1517,11 +1514,11 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 static void convert_rgb24_to_nv12(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
 {
 	int i, j;
-	uint8_t *y = &blit->linear.map[blit->linear.offsets[0]];
-	uint8_t *uv = &blit->linear.map[blit->linear.offsets[1]];
+	uint8_t *y = &blit->base.linear.map[blit->base.linear.offsets[0]];
+	uint8_t *uv = &blit->base.linear.map[blit->base.linear.offsets[1]];
 	const uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride;
-	unsigned planar_stride = blit->linear.stride;
+	unsigned planar_stride = blit->base.linear.stride;
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
 						    fb->color_range);
 
@@ -1648,8 +1645,8 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	int i, j;
 	const uint8_t *yuyv;
 	uint8_t *rgb24 = blit->rgb24.map;
-	unsigned rgb24_stride = blit->rgb24.stride, yuyv_stride = blit->linear.stride;
-	uint8_t *buf = malloc(blit->linear.size);
+	unsigned rgb24_stride = blit->rgb24.stride, yuyv_stride = blit->base.linear.stride;
+	uint8_t *buf = malloc(blit->base.linear.size);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
 						    fb->color_range);
 
@@ -1658,7 +1655,7 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	 * it's faster to copy the whole BO to a temporary buffer and convert
 	 * from there.
 	 */
-	igt_memcpy_from_wc(buf, blit->linear.map, blit->linear.size);
+	igt_memcpy_from_wc(buf, blit->base.linear.map, blit->base.linear.size);
 	yuyv = buf;
 
 	for (i = 0; i < fb->height; i++) {
@@ -1705,10 +1702,10 @@ static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_uplo
 				  const unsigned char swz[4])
 {
 	int i, j;
-	uint8_t *yuyv = blit->linear.map;
+	uint8_t *yuyv = blit->base.linear.map;
 	const uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride;
-	unsigned yuyv_stride = blit->linear.stride;
+	unsigned yuyv_stride = blit->base.linear.stride;
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
 						    fb->color_range);
 
@@ -1757,7 +1754,7 @@ static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_uplo
 static void destroy_cairo_surface__convert(void *arg)
 {
 	struct fb_convert_blit_upload *blit = arg;
-	struct igt_fb *fb = blit->fb;
+	struct igt_fb *fb = blit->base.fb;
 
 	/* Convert linear rgb back! */
 	switch(fb->drm_format) {
@@ -1777,10 +1774,10 @@ static void destroy_cairo_surface__convert(void *arg)
 
 	munmap(blit->rgb24.map, blit->rgb24.size);
 
-	if (blit->linear.handle)
-		free_linear_mapping(blit->fd, blit->fb, &blit->linear);
+	if (blit->base.linear.handle)
+		free_linear_mapping(blit->base.fd, blit->base.fb, &blit->base.linear);
 	else
-		gem_munmap(blit->linear.map, fb->size);
+		gem_munmap(blit->base.linear.map, fb->size);
 
 	free(blit);
 
@@ -1792,8 +1789,8 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	struct fb_convert_blit_upload *blit = malloc(sizeof(*blit));
 	igt_assert(blit);
 
-	blit->fd = fd;
-	blit->fb = fb;
+	blit->base.fd = fd;
+	blit->base.fb = fb;
 	blit->rgb24.stride = ALIGN(fb->width * 4, 16);
 	blit->rgb24.size = ALIGN((uint64_t) blit->rgb24.stride * fb->height, sysconf(_SC_PAGESIZE));
 	blit->rgb24.map = mmap(NULL, blit->rgb24.size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -1801,17 +1798,17 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 
 	if (fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
 	    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED) {
-		setup_linear_mapping(fd, fb, &blit->linear);
+		setup_linear_mapping(fd, fb, &blit->base.linear);
 	} else {
-		blit->linear.handle = 0;
+		blit->base.linear.handle = 0;
 		gem_set_domain(fd, fb->gem_handle,
 			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-		blit->linear.map = gem_mmap__gtt(fd, fb->gem_handle, fb->size,
-					      PROT_READ | PROT_WRITE);
-		igt_assert(blit->linear.map);
-		blit->linear.stride = fb->stride;
-		blit->linear.size = fb->size;
-		memcpy(blit->linear.offsets, fb->offsets, sizeof(fb->offsets));
+		blit->base.linear.map = gem_mmap__gtt(fd, fb->gem_handle, fb->size,
+						      PROT_READ | PROT_WRITE);
+		igt_assert(blit->base.linear.map);
+		blit->base.linear.stride = fb->stride;
+		blit->base.linear.size = fb->size;
+		memcpy(blit->base.linear.offsets, fb->offsets, sizeof(fb->offsets));
 	}
 
 	/* Convert to linear rgb! */
