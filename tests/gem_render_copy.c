@@ -254,8 +254,11 @@ scratch_buf_copy(data_t *data,
 	linear_src = gem_mmap__gtt(data->drm_fd, src->bo->handle,
 				   src->bo->size, PROT_READ);
 
-	w = min(w, min(width - sx, width - dx));
-	w = min(h, min(height - sy, height - dy));
+	w = min(w, width - sx);
+	w = min(w, width - dx);
+
+	h = min(h, height - sy);
+	h = min(h, height - dy);
 
 	for (int y = 0; y < h; y++) {
 		igt_memcpy_from_wc(&linear_dst[(dy+y) * width + dx],
