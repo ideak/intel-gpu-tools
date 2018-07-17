@@ -378,7 +378,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	fb->drm_format = f.pixel_format;
 	fb->width = f.width;
 	fb->height = f.height;
-	fb->stride = f.pitches[0];
+	fb->strides[0] = f.pitches[0];
 	fb->tiling = f.modifier[0];
 	fb->size = size[0];
 	fb->cairo_surface = NULL;

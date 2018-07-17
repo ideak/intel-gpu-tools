@@ -1157,7 +1157,7 @@ static void start_busy_thread(struct igt_fb *fb)
 	busy_thread.stop = false;
 	busy_thread.handle = fb->gem_handle;
 	busy_thread.size = fb->size;
-	busy_thread.stride = fb->stride;
+	busy_thread.stride = fb->strides[0];
 	busy_thread.width = fb->width;
 	busy_thread.height = fb->height;
 	busy_thread.color = pick_color(fb, COLOR_PRIM_BG);
@@ -2859,7 +2859,7 @@ static void badstride_subtest(const struct test_mode *t)
 
 	create_fb(t->format, params->primary.fb->width + 4096, params->primary.fb->height,
 		  opt.tiling, t->plane, &wide_fb);
-	igt_assert(wide_fb.stride > 16384);
+	igt_assert(wide_fb.strides[0] > 16384);
 
 	fill_fb(&wide_fb, COLOR_PRIM_BG);
 
@@ -2928,7 +2928,7 @@ static void stridechange_subtest(const struct test_mode *t)
 		  opt.tiling, t->plane, &new_fb);
 	fill_fb(&new_fb, COLOR_PRIM_BG);
 
-	igt_assert(old_fb->stride != new_fb.stride);
+	igt_assert(old_fb->strides[0] != new_fb.strides[0]);
 
 	/* We can't assert that FBC will be enabled since there may not be
 	 * enough space for the CFB, but we can check the CRC. */

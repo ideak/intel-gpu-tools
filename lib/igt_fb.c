@@ -190,50 +190,72 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 	}
 }
 
-static unsigned fb_plane_width(const struct format_desc_struct *format,
-			       int plane, unsigned width)
+static unsigned fb_plane_width(const struct igt_fb *fb, int plane)
 {
-	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
-		return DIV_ROUND_UP(width, 2);
+	if (fb->drm_format == DRM_FORMAT_NV12 && plane == 1)
+		return DIV_ROUND_UP(fb->width, 2);
 
-	return width;
+	return fb->width;
 }
 
-static unsigned fb_plane_bpp(const struct format_desc_struct *format, int plane)
+static unsigned fb_plane_bpp(const struct igt_fb *fb, int plane)
 {
+	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
+
 	return format->plane_bpp[plane];
 }
 
-static unsigned fb_plane_min_stride(const struct format_desc_struct *format,
-				    int plane, unsigned width)
+static unsigned fb_plane_height(const struct igt_fb *fb, int plane)
 {
-	unsigned cpp = fb_plane_bpp(format, plane) / 8;
+	if (fb->drm_format == DRM_FORMAT_NV12 && plane == 1)
+		return DIV_ROUND_UP(fb->height, 2);
 
-	return fb_plane_width(format, width, plane) * cpp;
+	return fb->height;
 }
 
-static unsigned fb_plane_height(const struct format_desc_struct *format,
-				int plane, unsigned height)
+static int fb_num_planes(const struct igt_fb *fb)
 {
-	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
-		return DIV_ROUND_UP(height, 2);
+	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	return height;
-}
-
-static int fb_num_planes(const struct format_desc_struct *format)
-{
 	return format->num_planes;
 }
 
-static unsigned calc_plane_stride(int fd,
-				  const struct format_desc_struct *format,
-				  int width, uint64_t tiling, int plane)
+static void fb_init(struct igt_fb *fb,
+		    int fd, int width, int height,
+		    uint32_t drm_format,
+		    uint64_t modifier,
+		    enum igt_color_encoding color_encoding,
+		    enum igt_color_range color_range)
 {
-	uint32_t min_stride = fb_plane_min_stride(format, width, plane);
+	const struct format_desc_struct *f = lookup_drm_format(drm_format);
 
-	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
-	    intel_gen(intel_get_drm_devid(fd)) <= 3) {
+	igt_assert_f(f, "DRM format %08x not found\n", drm_format);
+
+	memset(fb, 0, sizeof(*fb));
+
+	fb->width = width;
+	fb->height = height;
+	fb->tiling = modifier;
+	fb->drm_format = drm_format;
+	fb->fd = fd;
+	fb->num_planes = fb_num_planes(fb);
+	fb->color_encoding = color_encoding;
+	fb->color_range = color_range;
+
+	for (int i = 0; i < fb->num_planes; i++) {
+		fb->plane_bpp[i] = fb_plane_bpp(fb, i);
+		fb->plane_height[i] = fb_plane_height(fb, i);
+		fb->plane_width[i] = fb_plane_width(fb, i);
+	}
+}
+
+static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
+{
+	uint32_t min_stride = fb->plane_width[plane] *
+		(fb->plane_bpp[plane] / 8);
+
+	if (fb->tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
+	    intel_gen(intel_get_drm_devid(fb->fd)) <= 3) {
 		uint32_t stride;
 
 		/* Round the tiling up to the next power-of-two and the region
@@ -251,22 +273,19 @@ static unsigned calc_plane_stride(int fd,
 	} else {
 		unsigned int tile_width, tile_height;
 
-		igt_get_fb_tile_size(fd, tiling,
-				     fb_plane_bpp(format, plane),
+		igt_get_fb_tile_size(fb->fd, fb->tiling, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
 
 		return ALIGN(min_stride, tile_width);
 	}
 }
 
-static uint64_t calc_plane_size(int fd, int width, int height,
-				const struct format_desc_struct *format,
-				uint64_t tiling, int plane,
-				uint32_t stride)
+static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 {
-	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
-	    intel_gen(intel_get_drm_devid(fd)) <= 3) {
-		uint64_t min_size = (uint64_t) stride * height;
+	if (fb->tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
+	    intel_gen(intel_get_drm_devid(fb->fd)) <= 3) {
+		uint64_t min_size = (uint64_t) fb->strides[plane] *
+			fb->plane_height[plane];
 		uint64_t size;
 
 		/* Round the tiling up to the next power-of-two and the region
@@ -284,38 +303,27 @@ static uint64_t calc_plane_size(int fd, int width, int height,
 	} else {
 		unsigned int tile_width, tile_height;
 
-		igt_get_fb_tile_size(fd, tiling, fb_plane_bpp(format, plane),
+		igt_get_fb_tile_size(fb->fd, fb->tiling, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
 
-		return (uint64_t) stride * ALIGN(height, tile_height);
+		return (uint64_t) fb->strides[plane] *
+			ALIGN(fb->plane_height[plane], tile_height);
 	}
 }
 
-static uint64_t calc_fb_size(int fd, int width, int height,
-			     const struct format_desc_struct *format,
-			     uint64_t tiling,
-			     uint32_t strides[4], uint32_t offsets[4])
+static uint64_t calc_fb_size(struct igt_fb *fb)
 {
 	uint64_t size = 0;
 	int plane;
 
-	for (plane = 0; plane < fb_num_planes(format); plane++) {
-		if (!strides[plane])
-			strides[plane] = calc_plane_stride(fd, format,
-							   width, tiling, plane);
+	for (plane = 0; plane < fb->num_planes; plane++) {
+		/* respect the stride requested by the caller */
+		if (!fb->strides[plane])
+			fb->strides[plane] = calc_plane_stride(fb, plane);
 
-		if (offsets)
-			offsets[plane] = size;
+		fb->offsets[plane] = size;
 
-		size += calc_plane_size(fd, width, height,
-					format, tiling, plane,
-					strides[plane]);
-	}
-
-	for (; plane < ARRAY_SIZE(format->plane_bpp); plane++) {
-		strides[plane] = 0;
-		if (offsets)
-			offsets[plane] = 0;
+		size += calc_plane_size(fb, plane);
 	}
 
 	return size;
@@ -337,13 +345,17 @@ static uint64_t calc_fb_size(int fd, int width, int height,
 void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64_t tiling,
 		      uint64_t *size_ret, unsigned *stride_ret)
 {
-	const struct format_desc_struct *format = lookup_drm_format(drm_format);
-	uint32_t strides[4] = {};
+	struct igt_fb fb;
 
-	igt_assert(format);
+	fb_init(&fb, fd, width, height, drm_format, tiling,
+		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
-	*size_ret = calc_fb_size(fd, width, height, format, tiling, strides, NULL);
-	*stride_ret = strides[0];
+	fb.size = calc_fb_size(&fb);
+
+	if (size_ret)
+		*size_ret = fb.size;
+	if (stride_ret)
+		*stride_ret = fb.strides[0];
 }
 
 /**
@@ -399,80 +411,64 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
 }
 
 /* helpers to create nice-looking framebuffers */
-static int create_bo_for_fb(int fd, int width, int height,
-			    enum igt_color_encoding color_encoding,
-			    enum igt_color_range color_range,
-			    const struct format_desc_struct *format,
-			    uint64_t tiling, uint64_t size, unsigned stride,
-			    uint64_t *size_ret, unsigned *stride_ret,
-			    uint32_t offsets[4], bool *is_dumb)
+static int create_bo_for_fb(struct igt_fb *fb)
 {
-	int bo;
+	int fd = fb->fd;
 
-	igt_assert(format);
+	if (fb->tiling || fb->size || fb->strides[0] || igt_format_is_yuv(fb->drm_format)) {
+		uint64_t size;
 
-	if (offsets)
-		memset(offsets, 0, ARRAY_SIZE(format->plane_bpp) * sizeof(*offsets));
+		size = calc_fb_size(fb);
 
-	if (tiling || size || stride || igt_format_is_yuv(format->drm_id)) {
-		uint64_t calculated_size;
-		uint32_t strides[4] = {
-			stride,
-		};
+		/* respect the size requested by the caller */
+		if (fb->size == 0)
+			fb->size = size;
 
-		calculated_size = calc_fb_size(fd, width, height,
-					       format, tiling,
-					       strides, offsets);
-
-		if (stride == 0)
-			stride = strides[0];
-		if (size == 0)
-			size = calculated_size;
-
-		if (is_dumb)
-			*is_dumb = false;
+		fb->is_dumb = false;
 
 		if (is_i915_device(fd)) {
 			void *ptr;
-			bool full_range = color_range == IGT_COLOR_YCBCR_FULL_RANGE;
+			bool full_range = fb->color_range == IGT_COLOR_YCBCR_FULL_RANGE;
 
-			bo = gem_create(fd, size);
-			gem_set_tiling(fd, bo, igt_fb_mod_to_tiling(tiling), stride);
+			fb->gem_handle = gem_create(fd, fb->size);
 
-			gem_set_domain(fd, bo,
+			gem_set_tiling(fd, fb->gem_handle,
+				       igt_fb_mod_to_tiling(fb->tiling),
+				       fb->strides[0]);
+
+			gem_set_domain(fd, fb->gem_handle,
 				       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 			/* Ensure the framebuffer is preallocated */
-			ptr = gem_mmap__gtt(fd, bo, size, PROT_READ | PROT_WRITE);
+			ptr = gem_mmap__gtt(fd, fb->gem_handle,
+					    fb->size, PROT_READ | PROT_WRITE);
 			igt_assert(*(uint32_t *)ptr == 0);
 
-			switch (format->drm_id) {
+			switch (fb->drm_format) {
 			case DRM_FORMAT_NV12:
-				memset(ptr + offsets[0], full_range ? 0x00 : 0x10,
-				       strides[0] * height);
-				memset(ptr + offsets[1], 0x80,
-				       strides[1] * height/2);
+				memset(ptr + fb->offsets[0],
+				       full_range ? 0x00 : 0x10,
+				       fb->strides[0] * fb->plane_height[0]);
+				memset(ptr + fb->offsets[1],
+				       0x80,
+				       fb->strides[1] * fb->plane_height[1]);
 				break;
 			case DRM_FORMAT_YUYV:
 			case DRM_FORMAT_YVYU:
-				wmemset(ptr, full_range ? 0x80008000 : 0x80108010,
-					strides[0] * height / sizeof(wchar_t));
+				wmemset(ptr + fb->offsets[0],
+					full_range ? 0x80008000 : 0x80108010,
+					fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
 				break;
 			case DRM_FORMAT_UYVY:
 			case DRM_FORMAT_VYUY:
-				wmemset(ptr, full_range ? 0x00800080 : 0x10801080,
-					strides[0] * height / sizeof(wchar_t));
+				wmemset(ptr + fb->offsets[0],
+					full_range ? 0x00800080 : 0x10801080,
+					fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
 				break;
 			}
-			gem_munmap(ptr, size);
+			gem_munmap(ptr, fb->size);
 
-			if (size_ret)
-				*size_ret = size;
-
-			if (stride_ret)
-				*stride_ret = strides[0];
-
-			return bo;
+			return fb->gem_handle;
 		} else {
 			bool driver_has_gem_api = false;
 
@@ -480,12 +476,13 @@ static int create_bo_for_fb(int fd, int width, int height,
 			return -EINVAL;
 		}
 	} else {
-		if (is_dumb)
-			*is_dumb = true;
+		fb->is_dumb = true;
 
-		return kmstest_dumb_create(fd, width, height,
-					   fb_plane_bpp(format, 0),
-					   stride_ret, size_ret);
+		fb->gem_handle = kmstest_dumb_create(fd, fb->width, fb->height,
+						     fb->plane_bpp[0],
+						     &fb->strides[0], &fb->size);
+
+		return fb->gem_handle;
 	}
 }
 
@@ -512,11 +509,24 @@ int igt_create_bo_with_dimensions(int fd, int width, int height,
 				  unsigned stride, uint64_t *size_ret,
 				  unsigned *stride_ret, bool *is_dumb)
 {
-	return create_bo_for_fb(fd, width, height,
-				IGT_COLOR_YCBCR_BT709,
-				IGT_COLOR_YCBCR_LIMITED_RANGE,
-				lookup_drm_format(format),
-				modifier, 0, stride, size_ret, stride_ret, NULL, is_dumb);
+	struct igt_fb fb;
+
+	fb_init(&fb, fd, width, height, format, modifier,
+		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
+
+	for (int i = 0; i < fb.num_planes; i++)
+		fb.strides[i] = stride;
+
+	create_bo_for_fb(&fb);
+
+	if (size_ret)
+		*size_ret = fb.size;
+	if (stride_ret)
+		*stride_ret = fb.strides[0];
+	if (is_dumb)
+		*is_dumb = fb.is_dumb;
+
+	return fb.gem_handle;
 }
 
 /**
@@ -860,52 +870,32 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	/* FIXME allow the caller to pass these in */
 	enum igt_color_encoding color_encoding = IGT_COLOR_YCBCR_BT709;
 	enum igt_color_range color_range = IGT_COLOR_YCBCR_LIMITED_RANGE;
-	const struct format_desc_struct *f = lookup_drm_format(format);
-	uint32_t pitches[4];
-	uint32_t fb_id;
-	int i;
 
-	igt_assert_f(f, "DRM format %08x not found\n", format);
+	fb_init(fb, fd, width, height, format, tiling,
+		color_encoding, color_range);
 
-	memset(fb, 0, sizeof(*fb));
+	for (int i = 0; i < fb->num_planes; i++)
+		fb->strides[i] = bo_stride;
+
+	fb->size = bo_size;
 
 	igt_debug("%s(width=%d, height=%d, format=0x%x, tiling=0x%"PRIx64", size=%"PRIu64")\n",
 		  __func__, width, height, format, tiling, bo_size);
-	fb->gem_handle = create_bo_for_fb(fd, width, height,
-					  color_encoding, color_range,
-					  f, tiling, bo_size, bo_stride,
-					  &fb->size, &fb->stride,
-					  fb->offsets, &fb->is_dumb);
+
+	create_bo_for_fb(fb);
 	igt_assert(fb->gem_handle > 0);
 
 	igt_debug("%s(handle=%d, pitch=%d)\n",
-		  __func__, fb->gem_handle, fb->stride);
+		  __func__, fb->gem_handle, fb->strides[0]);
 
-	for (i = 0; i < fb_num_planes(f); i++)
-		pitches[i] = fb->stride;
+	do_or_die(__kms_addfb(fb->fd, fb->gem_handle,
+			      fb->width, fb->height,
+			      fb->drm_format, fb->tiling,
+			      fb->strides, fb->offsets, fb->num_planes,
+			      LOCAL_DRM_MODE_FB_MODIFIERS,
+			      &fb->fb_id));
 
-	do_or_die(__kms_addfb(fd, fb->gem_handle, width, height,
-			      format, tiling, pitches, fb->offsets,
-			      fb_num_planes(f),
-			      LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id));
-
-	fb->width = width;
-	fb->height = height;
-	fb->tiling = tiling;
-	fb->drm_format = format;
-	fb->fb_id = fb_id;
-	fb->fd = fd;
-	fb->num_planes = fb_num_planes(f);
-	fb->color_encoding = color_encoding;
-	fb->color_range = color_range;
-
-	for (i = 0; i < fb_num_planes(f); i++) {
-		fb->plane_bpp[i] = fb_plane_bpp(f, i);
-		fb->plane_height[i] = fb_plane_height(f, height, i);
-		fb->plane_width[i] = fb_plane_width(f, width, i);
-	}
-
-	return fb_id;
+	return fb->fb_id;
 }
 
 /**
@@ -1211,12 +1201,8 @@ static cairo_format_t drm_format_to_cairo(uint32_t drm_format)
 }
 
 struct fb_blit_linear {
-	uint64_t size;
-	uint32_t handle;
-	unsigned int stride;
+	struct igt_fb fb;
 	uint8_t *map;
-	bool is_dumb;
-	uint32_t offsets[4];
 };
 
 struct fb_blit_upload {
@@ -1233,27 +1219,27 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 	unsigned int obj_tiling = igt_fb_mod_to_tiling(fb->tiling);
 	int i;
 
-	gem_munmap(linear->map, linear->size);
-	gem_set_domain(fd, linear->handle,
+	gem_munmap(linear->map, linear->fb.size);
+	gem_set_domain(fd, linear->fb.gem_handle,
 		       I915_GEM_DOMAIN_GTT, 0);
 
 	for (i = 0; i < fb->num_planes; i++)
 		igt_blitter_fast_copy__raw(fd,
-					   linear->handle,
-					   linear->offsets[i],
-					   linear->stride,
+					   linear->fb.gem_handle,
+					   linear->fb.offsets[i],
+					   linear->fb.strides[i],
 					   I915_TILING_NONE,
 					   0, 0, /* src_x, src_y */
 					   fb->plane_width[i], fb->plane_height[i],
 					   fb->plane_bpp[i],
 					   fb->gem_handle,
 					   fb->offsets[i],
-					   fb->stride,
+					   fb->strides[i],
 					   obj_tiling,
 					   0, 0 /* dst_x, dst_y */);
 
-	gem_sync(fd, linear->handle);
-	gem_close(fd, linear->handle);
+	gem_sync(fd, linear->fb.gem_handle);
+	gem_close(fd, linear->fb.gem_handle);
 }
 
 static void destroy_cairo_surface__blit(void *arg)
@@ -1277,42 +1263,42 @@ static void setup_linear_mapping(int fd, struct igt_fb *fb, struct fb_blit_linea
 	 * cairo). This linear bo will be then blitted to its final
 	 * destination, tiling it at the same time.
 	 */
-	linear->handle = create_bo_for_fb(fd, fb->width, fb->height,
-					  fb->color_encoding, fb->color_range,
-					  lookup_drm_format(fb->drm_format),
-					  LOCAL_DRM_FORMAT_MOD_NONE, 0,
-					  0, &linear->size,
-					  &linear->stride,
-					  linear->offsets, &linear->is_dumb);
 
-	igt_assert(linear->handle > 0);
+	fb_init(&linear->fb, fb->fd, fb->width, fb->height,
+		fb->drm_format, LOCAL_DRM_FORMAT_MOD_NONE,
+		fb->color_encoding, fb->color_range);
+
+	create_bo_for_fb(&linear->fb);
+
+	igt_assert(linear->fb.gem_handle > 0);
 
 	/* Copy fb content to linear BO */
-	gem_set_domain(fd, linear->handle,
+	gem_set_domain(fd, linear->fb.gem_handle,
 			I915_GEM_DOMAIN_GTT, 0);
 
 	for (i = 0; i < fb->num_planes; i++)
 		igt_blitter_fast_copy__raw(fd,
-					  fb->gem_handle,
-					  fb->offsets[i],
-					  fb->stride,
-					  obj_tiling,
-					  0, 0, /* src_x, src_y */
-					  fb->plane_width[i], fb->plane_height[i],
-					  fb->plane_bpp[i],
-					  linear->handle, linear->offsets[i],
-					  linear->stride,
-					  I915_TILING_NONE,
-					  0, 0 /* dst_x, dst_y */);
+					   fb->gem_handle,
+					   fb->offsets[i],
+					   fb->strides[i],
+					   obj_tiling,
+					   0, 0, /* src_x, src_y */
+					   fb->plane_width[i], fb->plane_height[i],
+					   fb->plane_bpp[i],
+					   linear->fb.gem_handle,
+					   linear->fb.offsets[i],
+					   linear->fb.strides[i],
+					   I915_TILING_NONE,
+					   0, 0 /* dst_x, dst_y */);
 
-	gem_sync(fd, linear->handle);
+	gem_sync(fd, linear->fb.gem_handle);
 
-	gem_set_domain(fd, linear->handle,
+	gem_set_domain(fd, linear->fb.gem_handle,
 		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 	/* Setup cairo context */
-	linear->map = gem_mmap__cpu(fd, linear->handle,
-				    0, linear->size, PROT_READ | PROT_WRITE);
+	linear->map = gem_mmap__cpu(fd, linear->fb.gem_handle,
+				    0, linear->fb.size, PROT_READ | PROT_WRITE);
 }
 
 static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
@@ -1332,7 +1318,7 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 		cairo_image_surface_create_for_data(blit->linear.map,
 						    cairo_format,
 						    fb->width, fb->height,
-						    blit->linear.stride);
+						    blit->linear.fb.strides[0]);
 	fb->domain = I915_GEM_DOMAIN_GTT;
 
 	cairo_surface_set_user_data(fb->cairo_surface,
@@ -1382,7 +1368,7 @@ static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
 	fb->cairo_surface =
 		cairo_image_surface_create_for_data(ptr,
 						    drm_format_to_cairo(fb->drm_format),
-						    fb->width, fb->height, fb->stride);
+						    fb->width, fb->height, fb->strides[0]);
 	fb->domain = I915_GEM_DOMAIN_GTT;
 
 	cairo_surface_set_user_data(fb->cairo_surface,
@@ -1425,8 +1411,8 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	int i, j;
 	const uint8_t *y, *uv;
 	uint8_t *rgb24 = blit->rgb24.map;
-	unsigned rgb24_stride = blit->rgb24.stride, planar_stride = blit->base.linear.stride;
-	uint8_t *buf = malloc(blit->base.linear.size);
+	unsigned rgb24_stride = blit->rgb24.stride, planar_stride = blit->base.linear.fb.strides[0];
+	uint8_t *buf = malloc(blit->base.linear.fb.size);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
 						    fb->color_range);
 
@@ -1435,9 +1421,9 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	 * it's faster to copy the whole BO to a temporary buffer and convert
 	 * from there.
 	 */
-	igt_memcpy_from_wc(buf, blit->base.linear.map, blit->base.linear.size);
-	y = &buf[blit->base.linear.offsets[0]];
-	uv = &buf[blit->base.linear.offsets[1]];
+	igt_memcpy_from_wc(buf, blit->base.linear.map, blit->base.linear.fb.size);
+	y = &buf[blit->base.linear.fb.offsets[0]];
+	uv = &buf[blit->base.linear.fb.offsets[1]];
 
 	for (i = 0; i < fb->height / 2; i++) {
 		for (j = 0; j < fb->width / 2; j++) {
@@ -1531,11 +1517,11 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 static void convert_rgb24_to_nv12(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
 {
 	int i, j;
-	uint8_t *y = &blit->base.linear.map[blit->base.linear.offsets[0]];
-	uint8_t *uv = &blit->base.linear.map[blit->base.linear.offsets[1]];
+	uint8_t *y = &blit->base.linear.map[blit->base.linear.fb.offsets[0]];
+	uint8_t *uv = &blit->base.linear.map[blit->base.linear.fb.offsets[1]];
 	const uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride;
-	unsigned planar_stride = blit->base.linear.stride;
+	unsigned planar_stride = blit->base.linear.fb.strides[0];
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
 						    fb->color_range);
 
@@ -1662,8 +1648,8 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	int i, j;
 	const uint8_t *yuyv;
 	uint8_t *rgb24 = blit->rgb24.map;
-	unsigned rgb24_stride = blit->rgb24.stride, yuyv_stride = blit->base.linear.stride;
-	uint8_t *buf = malloc(blit->base.linear.size);
+	unsigned rgb24_stride = blit->rgb24.stride, yuyv_stride = blit->base.linear.fb.strides[0];
+	uint8_t *buf = malloc(blit->base.linear.fb.size);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
 						    fb->color_range);
 
@@ -1672,7 +1658,7 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	 * it's faster to copy the whole BO to a temporary buffer and convert
 	 * from there.
 	 */
-	igt_memcpy_from_wc(buf, blit->base.linear.map, blit->base.linear.size);
+	igt_memcpy_from_wc(buf, blit->base.linear.map, blit->base.linear.fb.size);
 	yuyv = buf;
 
 	for (i = 0; i < fb->height; i++) {
@@ -1722,7 +1708,7 @@ static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_uplo
 	uint8_t *yuyv = blit->base.linear.map;
 	const uint8_t *rgb24 = blit->rgb24.map;
 	unsigned rgb24_stride = blit->rgb24.stride;
-	unsigned yuyv_stride = blit->base.linear.stride;
+	unsigned yuyv_stride = blit->base.linear.fb.strides[0];
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
 						    fb->color_range);
 
@@ -1791,7 +1777,7 @@ static void destroy_cairo_surface__convert(void *arg)
 
 	munmap(blit->rgb24.map, blit->rgb24.size);
 
-	if (blit->base.linear.handle)
+	if (blit->base.linear.fb.gem_handle)
 		free_linear_mapping(&blit->base);
 	else
 		gem_munmap(blit->base.linear.map, fb->size);
@@ -1817,15 +1803,15 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED) {
 		setup_linear_mapping(fd, fb, &blit->base.linear);
 	} else {
-		blit->base.linear.handle = 0;
+		blit->base.linear.fb.gem_handle = 0;
 		gem_set_domain(fd, fb->gem_handle,
 			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 		blit->base.linear.map = gem_mmap__gtt(fd, fb->gem_handle, fb->size,
 						      PROT_READ | PROT_WRITE);
 		igt_assert(blit->base.linear.map);
-		blit->base.linear.stride = fb->stride;
-		blit->base.linear.size = fb->size;
-		memcpy(blit->base.linear.offsets, fb->offsets, sizeof(fb->offsets));
+		blit->base.linear.fb.size = fb->size;
+		memcpy(blit->base.linear.fb.strides, fb->strides, sizeof(fb->strides));
+		memcpy(blit->base.linear.fb.offsets, fb->offsets, sizeof(fb->offsets));
 	}
 
 	/* Convert to linear rgb! */

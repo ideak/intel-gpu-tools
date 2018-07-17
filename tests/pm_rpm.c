@@ -1547,7 +1547,7 @@ static void cursor_subtest(bool dpms)
 	 * hopefully it has some fences around it. */
 	rc = drmModeRmFB(drm_fd, cursor_fb3.fb_id);
 	igt_assert_eq(rc, 0);
-	gem_set_tiling(drm_fd, cursor_fb3.gem_handle, false, cursor_fb3.stride);
+	gem_set_tiling(drm_fd, cursor_fb3.gem_handle, false, cursor_fb3.strides[0]);
 	igt_assert(wait_for_suspended());
 
 	rc = drmModeSetCursor(drm_fd, crtc_id, cursor_fb3.gem_handle,

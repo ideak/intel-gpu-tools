@@ -720,7 +720,7 @@ void igt_draw_rect_fb(int fd, drm_intel_bufmgr *bufmgr,
 		      enum igt_draw_method method, int rect_x, int rect_y,
 		      int rect_w, int rect_h, uint32_t color)
 {
-	igt_draw_rect(fd, bufmgr, context, fb->gem_handle, fb->size, fb->stride,
+	igt_draw_rect(fd, bufmgr, context, fb->gem_handle, fb->size, fb->strides[0],
 		      method, rect_x, rect_y, rect_w, rect_h, color,
 		      igt_drm_format_to_bpp(fb->drm_format));
 }

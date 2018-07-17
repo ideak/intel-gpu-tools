@@ -47,12 +47,12 @@
  * @drm_format: DRM FOURCC code
  * @width: width in pixels
  * @height: height in pixels
- * @stride: line stride in bytes
  * @tiling: tiling mode as a DRM framebuffer modifier
  * @size: size in bytes of the underlying backing storage
  * @cairo_surface: optionally attached cairo drawing surface
  * @domain: current domain for cache flushing tracking on i915.ko
  * @num_planes: Amount of planes on this fb. >1 for planar formats.
+ * @strides: line stride for each plane in bytes
  * @offsets: Offset for each plane in bytes.
  * @plane_bpp: The bpp for each plane.
  * @plane_width: The width for each plane.
@@ -70,12 +70,12 @@ typedef struct igt_fb {
 	int height;
 	enum igt_color_encoding color_encoding;
 	enum igt_color_range color_range;
-	unsigned int stride;
 	uint64_t tiling;
 	uint64_t size;
 	cairo_surface_t *cairo_surface;
 	unsigned int domain;
 	unsigned int num_planes;
+	uint32_t strides[4];
 	uint32_t offsets[4];
 	unsigned int plane_bpp[4];
 	unsigned int plane_width[4];

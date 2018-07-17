@@ -592,7 +592,7 @@ static void recreate_fb(struct test_output *o)
 	igt_assert(r);
 
 	do_or_die(drmModeAddFB(drm_fd, o->fb_width, o->fb_height, o->depth,
-			       o->bpp, fb_info->stride,
+			       o->bpp, fb_info->strides[0],
 			       r->handle, &new_fb_id));
 
 	gem_close(drm_fd, r->handle);
@@ -612,7 +612,7 @@ static void set_y_tiling(struct test_output *o, int fb_idx)
 	r = drmModeGetFB(drm_fd, fb_info->fb_id);
 	igt_assert(r);
 	/* Newer kernels don't allow such shenagians any more, so skip the test. */
-	igt_require(__gem_set_tiling(drm_fd, r->handle, I915_TILING_Y, fb_info->stride) == 0);
+	igt_require(__gem_set_tiling(drm_fd, r->handle, I915_TILING_Y, fb_info->strides[0]) == 0);
 	gem_close(drm_fd, r->handle);
 	drmFree(r);
 }
