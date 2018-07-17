@@ -242,8 +242,6 @@ static void test_query_topology_unsupported(int fd)
 	igt_assert_eq(item.length, -ENODEV);
 }
 
-#define DIV_ROUND_UP(val, div) (ALIGN(val, div) / div)
-
 static bool
 slice_available(const struct drm_i915_query_topology_info *topo_info,
 		int s)

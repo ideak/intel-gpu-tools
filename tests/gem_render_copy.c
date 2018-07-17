@@ -112,8 +112,6 @@ static void scratch_buf_write_to_png(data_t *data, struct igt_buf *buf,
 	free(linear);
 }
 
-#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-
 static int scratch_buf_aux_width(const struct igt_buf *buf)
 {
 	return DIV_ROUND_UP(igt_buf_width(buf), 1024) * 128;

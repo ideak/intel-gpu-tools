@@ -293,4 +293,6 @@ void igt_lsof(const char *dpath);
 
 #define roundup_power_of_two(x) ((x) != 0 ? 1 << igt_fls((x) - 1) : 0)
 
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+
 #endif /* IGT_AUX_H */

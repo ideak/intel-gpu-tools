@@ -193,7 +193,7 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 static unsigned planar_width(struct format_desc_struct *format, unsigned width, int plane)
 {
 	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
-		return (width + 1) / 2;
+		return DIV_ROUND_UP(width, 2);
 
 	return width;
 }
@@ -208,7 +208,7 @@ static unsigned planar_stride(struct format_desc_struct *format, unsigned width,
 static unsigned planar_height(struct format_desc_struct *format, unsigned height, int plane)
 {
 	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
-		return (height + 1) / 2;
+		return DIV_ROUND_UP(height, 2);
 
 	return height;
 }
