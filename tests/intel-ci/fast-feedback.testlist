@@ -243,7 +243,10 @@ igt@kms_pipe_crc_basic@read-crc-pipe-c-frame-sequence
 igt@kms_pipe_crc_basic@suspend-read-crc-pipe-a
 igt@kms_pipe_crc_basic@suspend-read-crc-pipe-b
 igt@kms_pipe_crc_basic@suspend-read-crc-pipe-c
-igt@kms_psr@basic
+igt@kms_psr@primary_page_flip
+igt@kms_psr@cursor_plane_move
+igt@kms_psr@sprite_plane_onoff
+igt@kms_psr@primary_mmap_gtt
 igt@kms_setmode@basic-clone-single-crtc
 igt@pm_backlight@basic-brightness
 igt@pm_rpm@basic-pci-d3-state
