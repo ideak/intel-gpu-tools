@@ -199,10 +199,15 @@ static unsigned fb_plane_width(struct format_desc_struct *format,
 	return width;
 }
 
+static unsigned fb_plane_bpp(struct format_desc_struct *format, int plane)
+{
+	return format->plane_bpp[plane];
+}
+
 static unsigned fb_plane_min_stride(struct format_desc_struct *format,
 				    unsigned width, int plane)
 {
-	unsigned cpp = format->plane_bpp[plane] / 8;
+	unsigned cpp = fb_plane_bpp(format, plane) / 8;
 
 	return fb_plane_width(format, width, plane) * cpp;
 }
@@ -230,7 +235,8 @@ static void calc_fb_size_planar(int fd, int width, int height,
 	for (plane = 0; plane < format->num_planes; plane++) {
 		unsigned plane_stride;
 
-		igt_get_fb_tile_size(fd, tiling, format->plane_bpp[plane], &tile_width, &tile_height);
+		igt_get_fb_tile_size(fd, tiling, fb_plane_bpp(format, plane),
+				     &tile_width, &tile_height);
 
 		plane_stride = ALIGN(fb_plane_min_stride(format, width, plane), tile_width);
 		if (max_stride < plane_stride)
@@ -244,7 +250,8 @@ static void calc_fb_size_planar(int fd, int width, int height,
 		if (offsets)
 			offsets[plane] = *size_ret;
 
-		igt_get_fb_tile_size(fd, tiling, format->plane_bpp[plane], &tile_width, &tile_height);
+		igt_get_fb_tile_size(fd, tiling, fb_plane_bpp(format, plane),
+				     &tile_width, &tile_height);
 
 		*size_ret += stride * ALIGN(fb_plane_height(format, height, plane), tile_height);
 	}
@@ -264,7 +271,8 @@ static void calc_fb_size_packed(int fd, int width, int height,
 	uint64_t size;
 	unsigned int byte_width = fb_plane_min_stride(format, width, 0);
 
-	igt_get_fb_tile_size(fd, tiling, format->plane_bpp[0], &tile_width, &tile_height);
+	igt_get_fb_tile_size(fd, tiling, fb_plane_bpp(format, 0),
+			     &tile_width, &tile_height);
 
 	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    intel_gen(intel_get_drm_devid(fd)) <= 3) {
@@ -458,7 +466,7 @@ static int create_bo_for_fb(int fd, int width, int height,
 			*is_dumb = true;
 
 		return kmstest_dumb_create(fd, width, height,
-					   format->plane_bpp[0],
+					   fb_plane_bpp(format, 0),
 					   stride_ret, size_ret);
 	}
 }
@@ -889,7 +897,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	fb->color_range = color_range;
 
 	for (i = 0; i < f->num_planes; i++) {
-		fb->plane_bpp[i] = f->plane_bpp[i];
+		fb->plane_bpp[i] = fb_plane_bpp(f, i);
 		fb->plane_height[i] = fb_plane_height(f, height, i);
 		fb->plane_width[i] = fb_plane_width(f, width, i);
 	}
