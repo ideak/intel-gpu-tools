@@ -848,6 +848,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	enum igt_color_encoding color_encoding = IGT_COLOR_YCBCR_BT709;
 	enum igt_color_range color_range = IGT_COLOR_YCBCR_LIMITED_RANGE;
 	struct format_desc_struct *f = lookup_drm_format(format);
+	uint32_t pitches[4];
 	uint32_t fb_id;
 	int i;
 
@@ -867,35 +868,13 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	igt_debug("%s(handle=%d, pitch=%d)\n",
 		  __func__, fb->gem_handle, fb->stride);
 
-	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
-	    tiling != LOCAL_I915_FORMAT_MOD_X_TILED) {
-		uint32_t pitches[4];
+	for (i = 0; i < fb_num_planes(f); i++)
+		pitches[i] = fb->stride;
 
-		for (i = 0; i < fb_num_planes(f); i++)
-			pitches[i] = fb->stride;
-
-		do_or_die(__kms_addfb(fd, fb->gem_handle, width, height,
-				      format, tiling, pitches, fb->offsets,
-				      fb_num_planes(f),
-				      LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id));
-	} else {
-		uint32_t handles[4];
-		uint32_t pitches[4];
-
-		memset(handles, 0, sizeof(handles));
-		memset(pitches, 0, sizeof(pitches));
-
-		handles[0] = fb->gem_handle;
-		pitches[0] = fb->stride;
-		for (i = 0; i < fb_num_planes(f); i++) {
-			handles[i] = fb->gem_handle;
-			pitches[i] = fb->stride;
-		}
-
-		do_or_die(drmModeAddFB2(fd, width, height, format,
-					handles, pitches, fb->offsets,
-					&fb_id, 0));
-	}
+	do_or_die(__kms_addfb(fd, fb->gem_handle, width, height,
+			      format, tiling, pitches, fb->offsets,
+			      fb_num_planes(f),
+			      LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id));
 
 	fb->width = width;
 	fb->height = height;
