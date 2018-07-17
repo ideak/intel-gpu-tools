@@ -1211,8 +1211,11 @@ struct fb_blit_upload {
 	struct fb_blit_linear linear;
 };
 
-static void free_linear_mapping(int fd, struct igt_fb *fb, struct fb_blit_linear *linear)
+static void free_linear_mapping(struct fb_blit_upload *blit)
 {
+	int fd = blit->fd;
+	struct igt_fb *fb = blit->fb;
+	struct fb_blit_linear *linear = &blit->linear;
 	unsigned int obj_tiling = igt_fb_mod_to_tiling(fb->tiling);
 	int i;
 
@@ -1245,7 +1248,7 @@ static void destroy_cairo_surface__blit(void *arg)
 
 	blit->fb->cairo_surface = NULL;
 
-	free_linear_mapping(blit->fd, blit->fb, &blit->linear);
+	free_linear_mapping(blit);
 
 	free(blit);
 }
@@ -1775,7 +1778,7 @@ static void destroy_cairo_surface__convert(void *arg)
 	munmap(blit->rgb24.map, blit->rgb24.size);
 
 	if (blit->base.linear.handle)
-		free_linear_mapping(blit->base.fd, blit->base.fb, &blit->base.linear);
+		free_linear_mapping(&blit->base);
 	else
 		gem_munmap(blit->base.linear.map, fb->size);
 
