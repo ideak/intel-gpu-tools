@@ -221,6 +221,11 @@ static unsigned fb_plane_height(struct format_desc_struct *format,
 	return height;
 }
 
+static int fb_num_planes(struct format_desc_struct *format)
+{
+	return format->num_planes;
+}
+
 static void calc_fb_size_planar(int fd, int width, int height,
 				struct format_desc_struct *format,
 				uint64_t tiling, unsigned stride,
@@ -232,7 +237,7 @@ static void calc_fb_size_planar(int fd, int width, int height,
 
 	*size_ret = 0;
 
-	for (plane = 0; plane < format->num_planes; plane++) {
+	for (plane = 0; plane < fb_num_planes(format); plane++) {
 		unsigned plane_stride;
 
 		igt_get_fb_tile_size(fd, tiling, fb_plane_bpp(format, plane),
@@ -246,7 +251,7 @@ static void calc_fb_size_planar(int fd, int width, int height,
 	if (!stride)
 		stride = max_stride;
 
-	for (plane = 0; plane < format->num_planes; plane++) {
+	for (plane = 0; plane < fb_num_planes(format); plane++) {
 		if (offsets)
 			offsets[plane] = *size_ret;
 
@@ -321,7 +326,7 @@ void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64
 	struct format_desc_struct *format = lookup_drm_format(drm_format);
 	igt_assert(format);
 
-	if (format->num_planes > 1)
+	if (fb_num_planes(format) > 1)
 		calc_fb_size_planar(fd, width, height, format, tiling, 0, size_ret, stride_ret, NULL);
 	else
 		calc_fb_size_packed(fd, width, height, format, tiling, 0, size_ret, stride_ret);
@@ -399,7 +404,7 @@ static int create_bo_for_fb(int fd, int width, int height,
 		uint64_t calculated_size;
 		unsigned int calculated_stride;
 
-		if (format->num_planes > 1)
+		if (fb_num_planes(format) > 1)
 			calc_fb_size_planar(fd, width, height, format, tiling, stride,
 					    &calculated_size, &calculated_stride, offsets);
 		else
@@ -876,7 +881,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 		handles[0] = fb->gem_handle;
 		pitches[0] = fb->stride;
-		for (i = 0; i < f->num_planes; i++) {
+		for (i = 0; i < fb_num_planes(f); i++) {
 			handles[i] = fb->gem_handle;
 			pitches[i] = fb->stride;
 		}
@@ -892,11 +897,11 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	fb->drm_format = format;
 	fb->fb_id = fb_id;
 	fb->fd = fd;
-	fb->num_planes = f->num_planes;
+	fb->num_planes = fb_num_planes(f);
 	fb->color_encoding = color_encoding;
 	fb->color_range = color_range;
 
-	for (i = 0; i < f->num_planes; i++) {
+	for (i = 0; i < fb_num_planes(f); i++) {
 		fb->plane_bpp[i] = fb_plane_bpp(f, i);
 		fb->plane_height[i] = fb_plane_height(f, height, i);
 		fb->plane_width[i] = fb_plane_width(f, width, i);
