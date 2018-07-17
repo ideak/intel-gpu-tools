@@ -235,9 +235,11 @@ void igt_require_fb_modifiers(int fd);
  *
  * Creates a framebuffer object.
  */
-int __kms_addfb(int fd, uint32_t handle, uint32_t width, uint32_t height,
-		uint32_t stride, uint32_t pixel_format, uint64_t modifier,
-		uint32_t *offsets, uint32_t flags, uint32_t *buf_id);
+int __kms_addfb(int fd, uint32_t handle,
+		uint32_t width, uint32_t height,
+		uint32_t pixel_format, uint64_t modifier,
+		uint32_t strides[4], uint32_t offsets[4],
+		uint32_t flags, uint32_t *buf_id);
 
 /**
  * to_user_pointer:

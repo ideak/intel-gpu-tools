@@ -750,6 +750,7 @@ static void test_flip(int i915, int vgem, unsigned hang)
 	signal(SIGHUP, sighandler);
 
 	for (int i = 0; i < 2; i++) {
+		uint32_t strides[4] = {};
 		int fd;
 
 		bo[i].width = 1024;
@@ -762,9 +763,12 @@ static void test_flip(int i915, int vgem, unsigned hang)
 		igt_assert(handle[i]);
 		close(fd);
 
+		strides[0] = bo[i].pitch;
+
 		do_or_die(__kms_addfb(i915, handle[i],
-				      bo[i].width, bo[i].height, bo[i].pitch,
-				      DRM_FORMAT_XRGB8888, I915_TILING_NONE, NULL,
+				      bo[i].width, bo[i].height,
+				      DRM_FORMAT_XRGB8888, I915_TILING_NONE,
+				      strides, NULL,
 				      LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id[i]));
 		igt_assert(fb_id[i]);
 	}

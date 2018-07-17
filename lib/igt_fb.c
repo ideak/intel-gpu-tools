@@ -869,8 +869,13 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    tiling != LOCAL_I915_FORMAT_MOD_X_TILED) {
+		uint32_t pitches[4];
+
+		for (i = 0; i < fb_num_planes(f); i++)
+			pitches[i] = fb->stride;
+
 		do_or_die(__kms_addfb(fd, fb->gem_handle, width, height,
-				      fb->stride, format, tiling, fb->offsets,
+				      format, tiling, pitches, fb->offsets,
 				      LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id));
 	} else {
 		uint32_t handles[4];

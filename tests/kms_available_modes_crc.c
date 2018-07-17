@@ -253,7 +253,8 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 	drmModeModeInfo *mode;
 	uint64_t w, h;
 	signed ret, gemsize = 0;
-	unsigned tile_width, tile_height, stride;
+	unsigned tile_width, tile_height;
+	uint32_t strides[4] = {};
 	uint32_t offsets[4] = {};
 	uint64_t tiling;
 	int bpp = 0;
@@ -294,24 +295,24 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 
 	igt_get_fb_tile_size(data->gfx_fd, tiling, bpp,
 			     &tile_width, &tile_height);
-	stride = ALIGN(w * bpp / 8, tile_width);
-	gemsize = data->size = stride * ALIGN(h, tile_height);
+	strides[0] = ALIGN(w * bpp / 8, tile_width);
+	gemsize = data->size = strides[0] * ALIGN(h, tile_height);
 
 	if (fillers[i].bpp == P010 || fillers[i].bpp == NV12) {
 		offsets[1] = data->size;
+		strides[1] = strides[0];
 		gemsize = data->size * 2;
 	}
 
 	data->gem_handle = gem_create(data->gfx_fd, gemsize);
 	ret = __gem_set_tiling(data->gfx_fd, data->gem_handle,
-			       igt_fb_mod_to_tiling(tiling), stride);
+			       igt_fb_mod_to_tiling(tiling), strides[0]);
 
 	igt_assert_eq(ret, 0);
 
 	ret = __kms_addfb(data->gfx_fd, data->gem_handle, w, h,
-			  stride, format, tiling,
-			  offsets, LOCAL_DRM_MODE_FB_MODIFIERS,
-			  &data->fb.fb_id);
+			  format, tiling, strides, offsets,
+			  LOCAL_DRM_MODE_FB_MODIFIERS, &data->fb.fb_id);
 
 	if(ret < 0) {
 		igt_info("Creating fb for format %s failed, return code %d\n",
