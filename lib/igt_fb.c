@@ -190,7 +190,8 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 	}
 }
 
-static unsigned planar_width(struct format_desc_struct *format, unsigned width, int plane)
+static unsigned fb_plane_width(struct format_desc_struct *format,
+			       unsigned width, int plane)
 {
 	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
 		return DIV_ROUND_UP(width, 2);
@@ -198,14 +199,16 @@ static unsigned planar_width(struct format_desc_struct *format, unsigned width, 
 	return width;
 }
 
-static unsigned planar_stride(struct format_desc_struct *format, unsigned width, int plane)
+static unsigned fb_plane_min_stride(struct format_desc_struct *format,
+				    unsigned width, int plane)
 {
 	unsigned cpp = format->plane_bpp[plane] / 8;
 
-	return planar_width(format, width, plane) * cpp;
+	return fb_plane_width(format, width, plane) * cpp;
 }
 
-static unsigned planar_height(struct format_desc_struct *format, unsigned height, int plane)
+static unsigned fb_plane_height(struct format_desc_struct *format,
+				unsigned height, int plane)
 {
 	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
 		return DIV_ROUND_UP(height, 2);
@@ -229,7 +232,7 @@ static void calc_fb_size_planar(int fd, int width, int height,
 
 		igt_get_fb_tile_size(fd, tiling, format->plane_bpp[plane], &tile_width, &tile_height);
 
-		plane_stride = ALIGN(planar_stride(format, width, plane), tile_width);
+		plane_stride = ALIGN(fb_plane_min_stride(format, width, plane), tile_width);
 		if (max_stride < plane_stride)
 			max_stride = plane_stride;
 	}
@@ -243,7 +246,7 @@ static void calc_fb_size_planar(int fd, int width, int height,
 
 		igt_get_fb_tile_size(fd, tiling, format->plane_bpp[plane], &tile_width, &tile_height);
 
-		*size_ret += stride * ALIGN(planar_height(format, height, plane), tile_height);
+		*size_ret += stride * ALIGN(fb_plane_height(format, height, plane), tile_height);
 	}
 
 	if (offsets)
@@ -259,7 +262,7 @@ static void calc_fb_size_packed(int fd, int width, int height,
 {
 	unsigned int tile_width, tile_height;
 	uint64_t size;
-	int byte_width = width * (format->plane_bpp[0] / 8);
+	unsigned int byte_width = fb_plane_min_stride(format, width, 0);
 
 	igt_get_fb_tile_size(fd, tiling, format->plane_bpp[0], &tile_width, &tile_height);
 
@@ -887,8 +890,8 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 	for (i = 0; i < f->num_planes; i++) {
 		fb->plane_bpp[i] = f->plane_bpp[i];
-		fb->plane_height[i] = planar_height(f, height, i);
-		fb->plane_width[i] = planar_width(f, width, i);
+		fb->plane_height[i] = fb_plane_height(f, height, i);
+		fb->plane_width[i] = fb_plane_width(f, width, i);
 	}
 
 	return fb_id;
