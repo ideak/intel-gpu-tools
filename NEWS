@@ -1,3 +1,65 @@
+Release 1.23 (2018-07-18)
+-------------------------
+
+General changes:
+
+- Bumped used C standard to gnu11. (Lucas De Marchi)
+
+- Bumped required meson version to 0.44. (Petri Latvala)
+
+- Introduced meson options for explicit control over optional dependencies.
+  (Petri Latvala)
+
+- Added a meson option to set runpath for the installed executables.
+  (Petri Latvala)
+
+- GLib is now a mandatory dependency. (Petri Latvala)
+
+- Added testlists for the vc4 driver. (Maxime Ripard)
+
+- The project has now finalized its name change and is now IGT GPU Tools,
+  docs and install paths are now "igt-gpu-tools". (Arkadiusz Hiler)
+
+- Added a blacklist for the Intel CI. (Petri Latvala)
+
+
+Library changes:
+
+- i915_pciids.h updated to include KBL, ICL, WHL and AML.
+  (José Roberto de Souza, Paulo Zanoni)
+
+- Overhaul of gpu_cmds, gpgpu_fill, media_fill and rendercopy.
+  (Katarzyna Dec, Lukasz Kalamarz)
+
+- Added igt_matrix and igt_color_encoding helper libraries. (Ville Syrjälä)
+
+- IGT now shows the kernel stack trace when reporting a GPU hang. (Chris Wilson)
+
+- Added Icelake platform support. (Arkadiusz Hiler, Paulo Zanoni)
+
+
+Tools changes:
+
+- intel-gpu-top was rewritten to be safe to use. (Tvrtko Ursulin)
+
+
+Documentation changes:
+
+- Documented commit rights in CONTRIBUTING. (Daniel Vetter)
+
+
+Test changes:
+
+- kms_prs_sink_crc was renamed to kms_psr. (Dhinakaran Pandiyan)
+
+- kms_frontbuffer_tracking no longer tests sink crc. (Dhinakaran Pandiyan)
+
+- drm_vma_limiter is no more. (Chris Wilson)
+
+
+And many other bug fixes, improvements, cleanups and new tests.
+
+
 Release 1.22 (2018-03-09)
 -------------------------
 
