@@ -10,7 +10,6 @@ igt@gem_basic@bad-close
 igt@gem_basic@create-close
 igt@gem_basic@create-fd-close
 igt@gem_busy@basic-busy-default
-igt@gem_busy@basic-hang-default
 igt@gem_close_race@basic-process
 igt@gem_close_race@basic-threads
 igt@gem_cpu_reloc@basic
@@ -47,7 +46,6 @@ igt@gem_exec_create@basic
 igt@gem_exec_fence@basic-busy-default
 igt@gem_exec_fence@basic-wait-default
 igt@gem_exec_fence@basic-await-default
-igt@gem_exec_fence@await-hang-default
 igt@gem_exec_fence@nb-await-default
 igt@gem_exec_gttfill@basic
 igt@gem_exec_nop@basic-parallel
@@ -130,7 +128,6 @@ igt@gem_ringfill@basic-default
 igt@gem_ringfill@basic-default-interruptible
 igt@gem_ringfill@basic-default-forked
 igt@gem_ringfill@basic-default-fd
-igt@gem_ringfill@basic-default-hang
 igt@gem_sync@basic-all
 igt@gem_sync@basic-each
 igt@gem_sync@basic-many-each

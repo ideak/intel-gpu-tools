@@ -4,7 +4,7 @@ igt@meta_test(@.*)?
 ###############################################
 igt@drv_selftest(@.*)?
 igt@drm_mm(@.*)?
-igt@gem_busy@.*hang.*
+igt@gem_busy@(?!.*basic).*hang.*
 igt@gem_close_race@(?!.*basic).*
 igt@gem_concurrent_blit(@.*)?
 igt@gem_cs_prefetch(@.*)?
