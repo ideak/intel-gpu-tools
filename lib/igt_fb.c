@@ -215,11 +215,12 @@ static unsigned planar_height(struct format_desc_struct *format, unsigned height
 
 static void calc_fb_size_planar(int fd, int width, int height,
 				struct format_desc_struct *format,
-				uint64_t tiling, uint64_t *size_ret,
-				unsigned *stride_ret, unsigned *offsets)
+				uint64_t tiling, unsigned stride,
+				uint64_t *size_ret, unsigned *stride_ret,
+				unsigned *offsets)
 {
 	int plane;
-	unsigned stride = 0, tile_width, tile_height;
+	unsigned max_stride = 0, tile_width, tile_height;
 
 	*size_ret = 0;
 
@@ -229,9 +230,12 @@ static void calc_fb_size_planar(int fd, int width, int height,
 		igt_get_fb_tile_size(fd, tiling, format->plane_bpp[plane], &tile_width, &tile_height);
 
 		plane_stride = ALIGN(planar_stride(format, width, plane), tile_width);
-		if (stride < plane_stride)
-			stride = plane_stride;
+		if (max_stride < plane_stride)
+			max_stride = plane_stride;
 	}
+
+	if (!stride)
+		stride = max_stride;
 
 	for (plane = 0; plane < format->num_planes; plane++) {
 		if (offsets)
@@ -251,9 +255,9 @@ static void calc_fb_size_planar(int fd, int width, int height,
 
 static void calc_fb_size_packed(int fd, int width, int height,
 				struct format_desc_struct *format, uint64_t tiling,
-				uint64_t *size_ret, unsigned *stride_ret)
+				unsigned stride, uint64_t *size_ret, unsigned *stride_ret)
 {
-	unsigned int tile_width, tile_height, stride;
+	unsigned int tile_width, tile_height;
 	uint64_t size;
 	int byte_width = width * (format->plane_bpp[0] / 8);
 
@@ -269,13 +273,17 @@ static void calc_fb_size_packed(int fd, int width, int height,
 		 * tiled. But then that failure is expected.
 		 */
 
-		stride = max(byte_width, 512);
-		stride = roundup_power_of_two(stride);
+		if (!stride) {
+			stride = max(byte_width, 512);
+			stride = roundup_power_of_two(stride);
+		}
 
 		size = max((uint64_t) stride * height, 1024*1024);
 		size = roundup_power_of_two(size);
 	} else {
-		stride = ALIGN(byte_width, tile_width);
+		if (!stride)
+			stride = ALIGN(byte_width, tile_width);
+
 		size = (uint64_t) stride * ALIGN(height, tile_height);
 	}
 
@@ -303,9 +311,9 @@ void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64
 	igt_assert(format);
 
 	if (format->num_planes > 1)
-		calc_fb_size_planar(fd, width, height, format, tiling, size_ret, stride_ret, NULL);
+		calc_fb_size_planar(fd, width, height, format, tiling, 0, size_ret, stride_ret, NULL);
 	else
-		calc_fb_size_packed(fd, width, height, format, tiling, size_ret, stride_ret);
+		calc_fb_size_packed(fd, width, height, format, tiling, 0, size_ret, stride_ret);
 }
 
 /**
@@ -381,10 +389,10 @@ static int create_bo_for_fb(int fd, int width, int height,
 		unsigned int calculated_stride;
 
 		if (format->num_planes > 1)
-			calc_fb_size_planar(fd, width, height, format, tiling,
+			calc_fb_size_planar(fd, width, height, format, tiling, stride,
 					    &calculated_size, &calculated_stride, offsets);
 		else
-			calc_fb_size_packed(fd, width, height, format, tiling,
+			calc_fb_size_packed(fd, width, height, format, tiling, stride,
 					    &calculated_size, &calculated_stride);
 
 		if (stride == 0)
