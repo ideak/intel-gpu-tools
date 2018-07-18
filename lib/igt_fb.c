@@ -259,59 +259,16 @@ static unsigned calc_plane_stride(int fd,
 	}
 }
 
-static void calc_fb_size_planar(int fd, int width, int height,
+static uint64_t calc_plane_size(int fd, int width, int height,
 				struct format_desc_struct *format,
-				uint64_t tiling, unsigned stride,
-				uint64_t *size_ret, unsigned *stride_ret,
-				unsigned *offsets)
+				uint64_t tiling, int plane,
+				uint32_t stride)
 {
-	int plane;
-	unsigned max_stride = 0, tile_width, tile_height;
-
-	*size_ret = 0;
-
-	for (plane = 0; plane < fb_num_planes(format); plane++) {
-		unsigned plane_stride;
-
-		igt_get_fb_tile_size(fd, tiling, fb_plane_bpp(format, plane),
-				     &tile_width, &tile_height);
-
-		plane_stride = ALIGN(fb_plane_min_stride(format, width, plane), tile_width);
-		if (max_stride < plane_stride)
-			max_stride = plane_stride;
-	}
-
-	if (!stride)
-		stride = max_stride;
-
-	for (plane = 0; plane < fb_num_planes(format); plane++) {
-		if (offsets)
-			offsets[plane] = *size_ret;
-
-		igt_get_fb_tile_size(fd, tiling, fb_plane_bpp(format, plane),
-				     &tile_width, &tile_height);
-
-		*size_ret += stride * ALIGN(fb_plane_height(format, height, plane), tile_height);
-	}
-
-	if (offsets)
-		for (; plane < ARRAY_SIZE(format->plane_bpp); plane++)
-			offsets[plane] = 0;
-
-	*stride_ret = stride;
-}
-
-static void calc_fb_size_packed(int fd, int width, int height,
-				struct format_desc_struct *format, uint64_t tiling,
-				unsigned stride, uint64_t *size_ret, unsigned *stride_ret)
-{
-	uint64_t size;
-
-	if (!stride)
-		stride = calc_plane_stride(fd, format, width, tiling, 0);
-
 	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    intel_gen(intel_get_drm_devid(fd)) <= 3) {
+		uint64_t min_size = (uint64_t) stride * height;
+		uint64_t size;
+
 		/* Round the tiling up to the next power-of-two and the region
 		 * up to the next pot fence size so that this works on all
 		 * generations.
@@ -320,19 +277,48 @@ static void calc_fb_size_packed(int fd, int width, int height,
 		 * tiled. But then that failure is expected.
 		 */
 
-		size = max((uint64_t) stride * height, 1024*1024);
+		size = max(min_size, 1024*1024);
 		size = roundup_power_of_two(size);
+
+		return size;
 	} else {
 		unsigned int tile_width, tile_height;
 
-		igt_get_fb_tile_size(fd, tiling, fb_plane_bpp(format, 0),
+		igt_get_fb_tile_size(fd, tiling, fb_plane_bpp(format, plane),
 				     &tile_width, &tile_height);
 
-		size = (uint64_t) stride * ALIGN(height, tile_height);
+		return (uint64_t) stride * ALIGN(height, tile_height);
+	}
+}
+
+static uint64_t calc_fb_size(int fd, int width, int height,
+			     struct format_desc_struct *format,
+			     uint64_t tiling,
+			     uint32_t strides[4], uint32_t offsets[4])
+{
+	uint64_t size = 0;
+	int plane;
+
+	for (plane = 0; plane < fb_num_planes(format); plane++) {
+		if (!strides[plane])
+			strides[plane] = calc_plane_stride(fd, format,
+							   width, tiling, plane);
+
+		if (offsets)
+			offsets[plane] = size;
+
+		size += calc_plane_size(fd, width, height,
+					format, tiling, plane,
+					strides[plane]);
 	}
 
-	*stride_ret = stride;
-	*size_ret = size;
+	for (; plane < ARRAY_SIZE(format->plane_bpp); plane++) {
+		strides[plane] = 0;
+		if (offsets)
+			offsets[plane] = 0;
+	}
+
+	return size;
 }
 
 /**
@@ -352,12 +338,12 @@ void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64
 		      uint64_t *size_ret, unsigned *stride_ret)
 {
 	struct format_desc_struct *format = lookup_drm_format(drm_format);
+	uint32_t strides[4] = {};
+
 	igt_assert(format);
 
-	if (fb_num_planes(format) > 1)
-		calc_fb_size_planar(fd, width, height, format, tiling, 0, size_ret, stride_ret, NULL);
-	else
-		calc_fb_size_packed(fd, width, height, format, tiling, 0, size_ret, stride_ret);
+	*size_ret = calc_fb_size(fd, width, height, format, tiling, strides, NULL);
+	*stride_ret = strides[0];
 }
 
 /**
@@ -419,7 +405,7 @@ static int create_bo_for_fb(int fd, int width, int height,
 			    struct format_desc_struct *format,
 			    uint64_t tiling, uint64_t size, unsigned stride,
 			    uint64_t *size_ret, unsigned *stride_ret,
-			    uint32_t *offsets, bool *is_dumb)
+			    uint32_t offsets[4], bool *is_dumb)
 {
 	int bo;
 
@@ -430,17 +416,16 @@ static int create_bo_for_fb(int fd, int width, int height,
 
 	if (tiling || size || stride || igt_format_is_yuv(format->drm_id)) {
 		uint64_t calculated_size;
-		unsigned int calculated_stride;
+		uint32_t strides[4] = {
+			stride,
+		};
 
-		if (fb_num_planes(format) > 1)
-			calc_fb_size_planar(fd, width, height, format, tiling, stride,
-					    &calculated_size, &calculated_stride, offsets);
-		else
-			calc_fb_size_packed(fd, width, height, format, tiling, stride,
-					    &calculated_size, &calculated_stride);
+		calculated_size = calc_fb_size(fd, width, height,
+					       format, tiling,
+					       strides, offsets);
 
 		if (stride == 0)
-			stride = calculated_stride;
+			stride = strides[0];
 		if (size == 0)
 			size = calculated_size;
 
@@ -464,19 +449,19 @@ static int create_bo_for_fb(int fd, int width, int height,
 			switch (format->drm_id) {
 			case DRM_FORMAT_NV12:
 				memset(ptr + offsets[0], full_range ? 0x00 : 0x10,
-				       calculated_stride * height);
+				       strides[0] * height);
 				memset(ptr + offsets[1], 0x80,
-				       calculated_stride * height/2);
+				       strides[1] * height/2);
 				break;
 			case DRM_FORMAT_YUYV:
 			case DRM_FORMAT_YVYU:
 				wmemset(ptr, full_range ? 0x80008000 : 0x80108010,
-					calculated_stride * height / sizeof(wchar_t));
+					strides[0] * height / sizeof(wchar_t));
 				break;
 			case DRM_FORMAT_UYVY:
 			case DRM_FORMAT_VYUY:
 				wmemset(ptr, full_range ? 0x00800080 : 0x10801080,
-					calculated_stride * height / sizeof(wchar_t));
+					strides[0] * height / sizeof(wchar_t));
 				break;
 			}
 			gem_munmap(ptr, size);
@@ -485,7 +470,7 @@ static int create_bo_for_fb(int fd, int width, int height,
 				*size_ret = size;
 
 			if (stride_ret)
-				*stride_ret = stride;
+				*stride_ret = strides[0];
 
 			return bo;
 		} else {
