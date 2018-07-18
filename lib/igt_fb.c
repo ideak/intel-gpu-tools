@@ -1211,32 +1211,44 @@ struct fb_blit_upload {
 	struct fb_blit_linear linear;
 };
 
+static void blitcopy(const struct igt_fb *dst_fb,
+		     const struct igt_fb *src_fb)
+{
+	igt_assert_eq(dst_fb->fd, src_fb->fd);
+	igt_assert_eq(dst_fb->num_planes, src_fb->num_planes);
+
+	for (int i = 0; i < dst_fb->num_planes; i++) {
+		igt_assert_eq(dst_fb->plane_bpp[i], src_fb->plane_bpp[i]);
+		igt_assert_eq(dst_fb->plane_width[i], src_fb->plane_width[i]);
+		igt_assert_eq(dst_fb->plane_height[i], src_fb->plane_height[i]);
+
+		igt_blitter_fast_copy__raw(dst_fb->fd,
+					   src_fb->gem_handle,
+					   src_fb->offsets[i],
+					   src_fb->strides[i],
+					   igt_fb_mod_to_tiling(src_fb->tiling),
+					   0, 0, /* src_x, src_y */
+					   dst_fb->plane_width[i], dst_fb->plane_height[i],
+					   dst_fb->plane_bpp[i],
+					   dst_fb->gem_handle,
+					   dst_fb->offsets[i],
+					   dst_fb->strides[i],
+					   igt_fb_mod_to_tiling(dst_fb->tiling),
+					   0, 0 /* dst_x, dst_y */);
+	}
+}
+
 static void free_linear_mapping(struct fb_blit_upload *blit)
 {
 	int fd = blit->fd;
 	struct igt_fb *fb = blit->fb;
 	struct fb_blit_linear *linear = &blit->linear;
-	unsigned int obj_tiling = igt_fb_mod_to_tiling(fb->tiling);
-	int i;
 
 	gem_munmap(linear->map, linear->fb.size);
 	gem_set_domain(fd, linear->fb.gem_handle,
 		       I915_GEM_DOMAIN_GTT, 0);
 
-	for (i = 0; i < fb->num_planes; i++)
-		igt_blitter_fast_copy__raw(fd,
-					   linear->fb.gem_handle,
-					   linear->fb.offsets[i],
-					   linear->fb.strides[i],
-					   I915_TILING_NONE,
-					   0, 0, /* src_x, src_y */
-					   fb->plane_width[i], fb->plane_height[i],
-					   fb->plane_bpp[i],
-					   fb->gem_handle,
-					   fb->offsets[i],
-					   fb->strides[i],
-					   obj_tiling,
-					   0, 0 /* dst_x, dst_y */);
+	blitcopy(fb, &linear->fb);
 
 	gem_sync(fd, linear->fb.gem_handle);
 	gem_close(fd, linear->fb.gem_handle);
@@ -1255,9 +1267,6 @@ static void destroy_cairo_surface__blit(void *arg)
 
 static void setup_linear_mapping(int fd, struct igt_fb *fb, struct fb_blit_linear *linear)
 {
-	unsigned int obj_tiling = igt_fb_mod_to_tiling(fb->tiling);
-	int i;
-
 	/*
 	 * We create a linear BO that we'll map for the CPU to write to (using
 	 * cairo). This linear bo will be then blitted to its final
@@ -1276,20 +1285,7 @@ static void setup_linear_mapping(int fd, struct igt_fb *fb, struct fb_blit_linea
 	gem_set_domain(fd, linear->fb.gem_handle,
 			I915_GEM_DOMAIN_GTT, 0);
 
-	for (i = 0; i < fb->num_planes; i++)
-		igt_blitter_fast_copy__raw(fd,
-					   fb->gem_handle,
-					   fb->offsets[i],
-					   fb->strides[i],
-					   obj_tiling,
-					   0, 0, /* src_x, src_y */
-					   fb->plane_width[i], fb->plane_height[i],
-					   fb->plane_bpp[i],
-					   linear->fb.gem_handle,
-					   linear->fb.offsets[i],
-					   linear->fb.strides[i],
-					   I915_TILING_NONE,
-					   0, 0 /* dst_x, dst_y */);
+	blitcopy(&linear->fb, fb);
 
 	gem_sync(fd, linear->fb.gem_handle);
 
