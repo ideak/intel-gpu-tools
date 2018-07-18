@@ -156,6 +156,7 @@ static void get_method_crc(enum igt_draw_method method, uint32_t drm_format,
 static bool format_is_supported(uint32_t format, uint64_t modifier)
 {
 	uint32_t gem_handle, fb_id;
+	unsigned int offsets[4] = {};
 	unsigned int strides[4] = {};
 	int ret;
 
@@ -163,7 +164,7 @@ static bool format_is_supported(uint32_t format, uint64_t modifier)
 						   format, modifier,
 						   0, NULL, &strides[0], NULL);
 	ret =  __kms_addfb(drm_fd, gem_handle, 64, 64,
-			   format, modifier, strides, NULL,
+			   format, modifier, strides, offsets, 1,
 			   LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id);
 	drmModeRmFB(drm_fd, fb_id);
 	gem_close(drm_fd, gem_handle);

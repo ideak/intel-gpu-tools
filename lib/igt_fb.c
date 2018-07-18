@@ -876,6 +876,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 		do_or_die(__kms_addfb(fd, fb->gem_handle, width, height,
 				      format, tiling, pitches, fb->offsets,
+				      fb_num_planes(f),
 				      LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id));
 	} else {
 		uint32_t handles[4];

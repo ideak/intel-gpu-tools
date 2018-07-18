@@ -256,6 +256,7 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 	unsigned tile_width, tile_height;
 	uint32_t strides[4] = {};
 	uint32_t offsets[4] = {};
+	int num_planes = 1;
 	uint64_t tiling;
 	int bpp = 0;
 	int i;
@@ -302,6 +303,7 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 		offsets[1] = data->size;
 		strides[1] = strides[0];
 		gemsize = data->size * 2;
+		num_planes = 2;
 	}
 
 	data->gem_handle = gem_create(data->gfx_fd, gemsize);
@@ -312,7 +314,8 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 
 	ret = __kms_addfb(data->gfx_fd, data->gem_handle, w, h,
 			  format, tiling, strides, offsets,
-			  LOCAL_DRM_MODE_FB_MODIFIERS, &data->fb.fb_id);
+			  num_planes, LOCAL_DRM_MODE_FB_MODIFIERS,
+			  &data->fb.fb_id);
 
 	if(ret < 0) {
 		igt_info("Creating fb for format %s failed, return code %d\n",
