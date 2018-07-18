@@ -60,7 +60,7 @@
  */
 
 /* drm fourcc/cairo format maps */
-static struct format_desc_struct {
+static const struct format_desc_struct {
 	const char *name;
 	uint32_t drm_id;
 	cairo_format_t cairo_id;
@@ -108,9 +108,9 @@ static struct format_desc_struct {
 #define for_each_format(f)	\
 	for (f = format_desc; f - format_desc < ARRAY_SIZE(format_desc); f++)
 
-static struct format_desc_struct *lookup_drm_format(uint32_t drm_format)
+static const struct format_desc_struct *lookup_drm_format(uint32_t drm_format)
 {
-	struct format_desc_struct *format;
+	const struct format_desc_struct *format;
 
 	for_each_format(format) {
 		if (format->drm_id != drm_format)
@@ -190,8 +190,8 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 	}
 }
 
-static unsigned fb_plane_width(struct format_desc_struct *format,
-			       unsigned width, int plane)
+static unsigned fb_plane_width(const struct format_desc_struct *format,
+			       int plane, unsigned width)
 {
 	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
 		return DIV_ROUND_UP(width, 2);
@@ -199,21 +199,21 @@ static unsigned fb_plane_width(struct format_desc_struct *format,
 	return width;
 }
 
-static unsigned fb_plane_bpp(struct format_desc_struct *format, int plane)
+static unsigned fb_plane_bpp(const struct format_desc_struct *format, int plane)
 {
 	return format->plane_bpp[plane];
 }
 
-static unsigned fb_plane_min_stride(struct format_desc_struct *format,
-				    unsigned width, int plane)
+static unsigned fb_plane_min_stride(const struct format_desc_struct *format,
+				    int plane, unsigned width)
 {
 	unsigned cpp = fb_plane_bpp(format, plane) / 8;
 
 	return fb_plane_width(format, width, plane) * cpp;
 }
 
-static unsigned fb_plane_height(struct format_desc_struct *format,
-				unsigned height, int plane)
+static unsigned fb_plane_height(const struct format_desc_struct *format,
+				int plane, unsigned height)
 {
 	if (format->drm_id == DRM_FORMAT_NV12 && plane == 1)
 		return DIV_ROUND_UP(height, 2);
@@ -221,13 +221,13 @@ static unsigned fb_plane_height(struct format_desc_struct *format,
 	return height;
 }
 
-static int fb_num_planes(struct format_desc_struct *format)
+static int fb_num_planes(const struct format_desc_struct *format)
 {
 	return format->num_planes;
 }
 
 static unsigned calc_plane_stride(int fd,
-				  struct format_desc_struct *format,
+				  const struct format_desc_struct *format,
 				  int width, uint64_t tiling, int plane)
 {
 	uint32_t min_stride = fb_plane_min_stride(format, width, plane);
@@ -260,7 +260,7 @@ static unsigned calc_plane_stride(int fd,
 }
 
 static uint64_t calc_plane_size(int fd, int width, int height,
-				struct format_desc_struct *format,
+				const struct format_desc_struct *format,
 				uint64_t tiling, int plane,
 				uint32_t stride)
 {
@@ -292,7 +292,7 @@ static uint64_t calc_plane_size(int fd, int width, int height,
 }
 
 static uint64_t calc_fb_size(int fd, int width, int height,
-			     struct format_desc_struct *format,
+			     const struct format_desc_struct *format,
 			     uint64_t tiling,
 			     uint32_t strides[4], uint32_t offsets[4])
 {
@@ -337,7 +337,7 @@ static uint64_t calc_fb_size(int fd, int width, int height,
 void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64_t tiling,
 		      uint64_t *size_ret, unsigned *stride_ret)
 {
-	struct format_desc_struct *format = lookup_drm_format(drm_format);
+	const struct format_desc_struct *format = lookup_drm_format(drm_format);
 	uint32_t strides[4] = {};
 
 	igt_assert(format);
@@ -402,7 +402,7 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
 static int create_bo_for_fb(int fd, int width, int height,
 			    enum igt_color_encoding color_encoding,
 			    enum igt_color_range color_range,
-			    struct format_desc_struct *format,
+			    const struct format_desc_struct *format,
 			    uint64_t tiling, uint64_t size, unsigned stride,
 			    uint64_t *size_ret, unsigned *stride_ret,
 			    uint32_t offsets[4], bool *is_dumb)
@@ -860,7 +860,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	/* FIXME allow the caller to pass these in */
 	enum igt_color_encoding color_encoding = IGT_COLOR_YCBCR_BT709;
 	enum igt_color_range color_range = IGT_COLOR_YCBCR_LIMITED_RANGE;
-	struct format_desc_struct *f = lookup_drm_format(format);
+	const struct format_desc_struct *f = lookup_drm_format(format);
 	uint32_t pitches[4];
 	uint32_t fb_id;
 	int i;
@@ -1200,7 +1200,7 @@ unsigned int igt_create_stereo_fb(int drm_fd, drmModeModeInfo *mode,
 
 static cairo_format_t drm_format_to_cairo(uint32_t drm_format)
 {
-	struct format_desc_struct *f;
+	const struct format_desc_struct *f;
 
 	for_each_format(f)
 		if (f->drm_id == drm_format)
@@ -1961,7 +1961,7 @@ void igt_remove_fb(int fd, struct igt_fb *fb)
  */
 uint32_t igt_bpp_depth_to_drm_format(int bpp, int depth)
 {
-	struct format_desc_struct *f;
+	const struct format_desc_struct *f;
 
 	for_each_format(f)
 		if (f->plane_bpp[0] == bpp && f->depth == depth)
@@ -1982,7 +1982,7 @@ uint32_t igt_bpp_depth_to_drm_format(int bpp, int depth)
  */
 uint32_t igt_drm_format_to_bpp(uint32_t drm_format)
 {
-	struct format_desc_struct *f = lookup_drm_format(drm_format);
+	const struct format_desc_struct *f = lookup_drm_format(drm_format);
 
 	igt_assert_f(f, "can't find a bpp format for %08x (%s)\n",
 		     drm_format, igt_format_str(drm_format));
@@ -2000,7 +2000,7 @@ uint32_t igt_drm_format_to_bpp(uint32_t drm_format)
  */
 const char *igt_format_str(uint32_t drm_format)
 {
-	struct format_desc_struct *f = lookup_drm_format(drm_format);
+	const struct format_desc_struct *f = lookup_drm_format(drm_format);
 
 	return f ? f->name : "invalid";
 }
@@ -2014,7 +2014,7 @@ const char *igt_format_str(uint32_t drm_format)
  */
 bool igt_fb_supported_format(uint32_t drm_format)
 {
-	struct format_desc_struct *f;
+	const struct format_desc_struct *f;
 
 	for_each_format(f)
 		if (f->drm_id == drm_format)
