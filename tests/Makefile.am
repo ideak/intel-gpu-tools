@@ -109,6 +109,7 @@ gem_close_race_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_close_race_LDADD = $(LDADD) -lpthread
 gem_ctx_thrash_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_ctx_thrash_LDADD = $(LDADD) -lpthread
+gem_exec_capture_LDADD = $(LDADD) -lz
 gem_exec_parallel_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_exec_parallel_LDADD = $(LDADD) -lpthread
 gem_fence_thrash_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)

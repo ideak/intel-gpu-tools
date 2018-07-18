@@ -56,16 +56,18 @@ lib_deps = [
 	cairo,
 	glib,
 	libdrm,
+	libdw,
 	libkmod,
 	libprocps,
 	libudev,
 	libdw,
-	pciaccess,
-	pthreads,
 	math,
+	pciaccess,
+	pixman,
+	pthreads,
 	realtime,
 	ssl,
-	pixman,
+	zlib
 ]
 
 if libdrm_intel.found()
