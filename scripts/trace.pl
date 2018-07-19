@@ -27,7 +27,7 @@ use warnings;
 use 5.010;
 
 my $gid = 0;
-my (%db, %queue, %submit, %notify, %rings, %ctxdb, %ringmap, %reqwait);
+my (%db, %queue, %submit, %notify, %rings, %ctxdb, %ringmap, %reqwait, %ctxtimelines);
 my @freqs;
 
 my $max_items = 3000;
@@ -418,6 +418,7 @@ while (<>) {
 		$req{'ring'} = $ring;
 		$req{'seqno'} = $seqno;
 		$req{'ctx'} = $ctx;
+		$ctxtimelines{$ctx . '/' . $ring} = 1;
 		$req{'name'} = $ctx . '/' . $seqno;
 		$req{'global'} = $tp{'global'};
 		$req{'port'} = $tp{'port'};
@@ -573,41 +574,113 @@ sub sortStart {
 	return $val;
 }
 
-my @sorted_keys = sort sortStart keys %db;
-my $re_sort = 0;
+my $re_sort = 1;
+my @sorted_keys;
 
-die "Database changed size?!" unless scalar(@sorted_keys) == $key_count;
-
-foreach my $key (@sorted_keys) {
-	my $ring = $db{$key}->{'ring'};
-	my $end = $db{$key}->{'end'};
-
-	# correct duration of merged batches
-	if ($correct_durations and exists $db{$key}->{'no-end'}) {
-		my $ctx = $db{$key}->{'ctx'};
-		my $seqno = $db{$key}->{'seqno'};
-		my $start = $db{$key}->{'start'};
-		my $next_key;
-		my $i = 1;
-
-		do {
-			$next_key = db_key($ring, $ctx, $seqno + $i);
-			$i++;
-		} until (exists $db{$next_key} or $i > $key_count);  # ugly stop hack
-
-		# 20us tolerance
-		if (exists $db{$next_key} and $db{$next_key}->{'start'} < $start + 20) {
-			my $notify = $db{$key}->{'notify'};
-			$re_sort = 1;
-			$db{$next_key}->{'start'} = $notify;
-			$db{$next_key}->{'start'} = $db{$next_key}->{'end'} if $db{$next_key}->{'start'} > $db{$next_key}->{'end'};
-			die if $db{$next_key}->{'start'} > $db{$next_key}->{'end'};
-		}
-		die if $start > $end;
+sub maybe_sort_keys
+{
+	if ($re_sort) {
+		@sorted_keys = sort sortStart keys %db;
+		$re_sort = 0;
+		die "Database changed size?!" unless scalar(@sorted_keys) ==
+						     $key_count;
 	}
 }
 
-@sorted_keys = sort sortStart keys %db if $re_sort;
+maybe_sort_keys();
+
+my %ctx_timelines;
+
+sub sortContext {
+	my $as = $db{$a}->{'seqno'};
+	my $bs = $db{$b}->{'seqno'};
+	my $val;
+
+	$val = $as <=> $bs;
+
+	die if $val == 0;
+
+	return $val;
+}
+
+sub get_ctx_timeline {
+	my ($ctx, $ring, $key) = @_;
+	my @timeline;
+
+	return $ctx_timelines{$key} if exists $ctx_timelines{$key};
+
+	@timeline = grep { $db{$_}->{'ring'} eq $ring and
+			   $db{$_}->{'ctx'} == $ctx } @sorted_keys;
+	# FIXME seqno restart
+	@timeline = sort sortContext @timeline;
+
+	$ctx_timelines{$key} = \@timeline;
+
+	return \@timeline;
+}
+
+# Split out merged batches if requested.
+if ($correct_durations) {
+	# Shift !port0 requests start time to after the previous context on the
+	# same timeline has finished.
+	foreach my $gid (sort keys %rings) {
+		my $ring = $ringmap{$rings{$gid}};
+		my $timeline = get_engine_timeline($ring);
+		my $complete;
+
+		foreach my $pos (0..$#{$timeline}) {
+			my $key = @{$timeline}[$pos];
+			my $prev = $complete;
+			my $pkey;
+
+			$complete = $key unless exists $db{$key}->{'no-end'};
+			$pkey = $complete;
+
+			next if $db{$key}->{'port'} == 0;
+
+			$pkey = $prev if $complete eq $key;
+
+			die unless defined $pkey;
+
+			$db{$key}->{'start'} = $db{$pkey}->{'end'};
+			$db{$key}->{'start'} = $db{$pkey}->{'notify'} if $db{$key}->{'start'} > $db{$key}->{'end'};
+
+			die if $db{$key}->{'start'} > $db{$key}->{'end'};
+
+			$re_sort = 1;
+		}
+	}
+
+	maybe_sort_keys();
+
+	# Batch with no-end (no request_out) means it was submitted as part of
+	# coalesced context. This means it's start time should be set to the end
+	# time of a following request on this context timeline.
+	foreach my $tkey (sort keys %ctxtimelines) {
+		my ($ctx, $ring) = split '/', $tkey;
+		my $timeline = get_ctx_timeline($ctx, $ring, $tkey);
+		my $last_complete = -1;
+		my $complete;
+
+		foreach my $pos (0..$#{$timeline}) {
+			my $key = @{$timeline}[$pos];
+			my $next_key;
+
+			next unless exists $db{$key}->{'no-end'};
+			last if $pos == $#{$timeline};
+
+			# Shift following request to start after the current one
+			$next_key = ${$timeline}[$pos + 1];
+			if (exists $db{$key}->{'notify'}) {
+				$db{$next_key}->{'engine-start'} = $db{$next_key}->{'start'};
+				$db{$next_key}->{'start'} = $db{$key}->{'notify'};
+				$re_sort = 1;
+			}
+		}
+	}
+}
+
+maybe_sort_keys();
 
 # GPU time accounting
 my (%running, %runnable, %queued, %batch_avg, %batch_total_avg, %batch_count);
@@ -621,6 +694,7 @@ foreach my $key (@sorted_keys) {
 	my $ring = $db{$key}->{'ring'};
 	my $end = $db{$key}->{'end'};
 	my $start = $db{$key}->{'start'};
+	my $engine_start = $db{$key}->{'engine_start'};
 	my $notify = $db{$key}->{'notify'};
 
 	$first_ts = $db{$key}->{'queue'} if not defined $first_ts or $db{$key}->{'queue'} < $first_ts;
@@ -633,7 +707,9 @@ foreach my $key (@sorted_keys) {
 	} else {
 		$db{$key}->{'context-complete-delay'} = 0;
 	}
-	$db{$key}->{'execute-delay'} = $start - $db{$key}->{'submit'};
+
+	$engine_start = $db{$key}->{'start'} unless defined $engine_start;
+	$db{$key}->{'execute-delay'} = $engine_start - $db{$key}->{'submit'};
 	$db{$key}->{'submit-delay'} = $db{$key}->{'submit'} - $db{$key}->{'queue'};
 	unless (exists $db{$key}->{'no-notify'}) {
 		$db{$key}->{'duration'} = $notify - $start;
@@ -1059,6 +1135,7 @@ my $i = 0;
 foreach my $key (sort sortQueue keys %db) {
 	my ($name, $ctx, $seqno) = ($db{$key}->{'name'}, $db{$key}->{'ctx'}, $db{$key}->{'seqno'});
 	my ($queue, $start, $notify, $end) = ($db{$key}->{'queue'}, $db{$key}->{'start'}, $db{$key}->{'notify'}, $db{$key}->{'end'});
+	my $engine_start = $db{$key}->{'engine-start'};
 	my $submit = $queue + $db{$key}->{'submit-delay'};
 	my ($content, $style);
 	my $group = $engine_start_id + $rings{$db{$key}->{'ring'}};
@@ -1078,11 +1155,12 @@ foreach my $key (sort sortQueue keys %db) {
 	}
 
 	# execute to start
+	$engine_start = $db{$key}->{'start'} unless defined $engine_start;
 	unless (exists $skip_box{'ready'}) {
 		$skey = 2 * $max_seqno * $ctx + 2 * $seqno + 1;
 		$style = box_style($ctx, 'ready');
 		$content = "<small>$name<br>$db{$key}->{'execute-delay'}us</small>";
-		$startend = 'start: ' . $submit . ', end: ' . $start;
+		$startend = 'start: ' . $submit . ', end: ' . $engine_start;
 		print "\t{id: $i, key: $skey, $type group: $group, subgroup: $subgroup, subgroupOrder: $subgroup, content: '$content', $startend, style: \'$style\'},\n";
 		$i++;
 	}
