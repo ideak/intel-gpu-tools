@@ -84,122 +84,6 @@ static const uint64_t ccs_modifiers[] = {
  */
 #define MAX_SPRITE_PLANE_WIDTH 2000
 
-struct local_drm_format_modifier {
-       /* Bitmask of formats in get_plane format list this info applies to. The
-	* offset allows a sliding window of which 64 formats (bits).
-	*
-	* Some examples:
-	* In today's world with < 65 formats, and formats 0, and 2 are
-	* supported
-	* 0x0000000000000005
-	*		  ^-offset = 0, formats = 5
-	*
-	* If the number formats grew to 128, and formats 98-102 are
-	* supported with the modifier:
-	*
-	* 0x0000003c00000000 0000000000000000
-	*		  ^
-	*		  |__offset = 64, formats = 0x3c00000000
-	*
-	*/
-       uint64_t formats;
-       uint32_t offset;
-       uint32_t pad;
-
-       /* This modifier can be used with the format for this plane. */
-       uint64_t modifier;
-};
-
-struct local_drm_format_modifier_blob {
-#define LOCAL_FORMAT_BLOB_CURRENT 1
-	/* Version of this blob format */
-	uint32_t version;
-
-	/* Flags */
-	uint32_t flags;
-
-	/* Number of fourcc formats supported */
-	uint32_t count_formats;
-
-	/* Where in this blob the formats exist (in bytes) */
-	uint32_t formats_offset;
-
-	/* Number of drm_format_modifiers */
-	uint32_t count_modifiers;
-
-	/* Where in this blob the modifiers exist (in bytes) */
-	uint32_t modifiers_offset;
-
-	/* u32 formats[] */
-	/* struct drm_format_modifier modifiers[] */
-};
-
-static inline uint32_t *
-formats_ptr(struct local_drm_format_modifier_blob *blob)
-{
-	return (uint32_t *)(((char *)blob) + blob->formats_offset);
-}
-
-static inline struct local_drm_format_modifier *
-modifiers_ptr(struct local_drm_format_modifier_blob *blob)
-{
-	return (struct local_drm_format_modifier *)(((char *)blob) + blob->modifiers_offset);
-}
-
-static bool plane_has_format_with_ccs(data_t *data, igt_plane_t *plane,
-				      uint32_t format)
-{
-	drmModePropertyBlobPtr blob;
-	struct local_drm_format_modifier_blob *blob_data;
-	struct local_drm_format_modifier *modifiers, *last_mod;
-	uint32_t *formats, *last_fmt;
-	uint64_t blob_id;
-	bool ret;
-	int fmt_idx = -1;
-
-	ret = kmstest_get_property(data->drm_fd, plane->drm_plane->plane_id,
-				   DRM_MODE_OBJECT_PLANE, "IN_FORMATS",
-				   NULL, &blob_id, NULL);
-	igt_skip_on_f(ret == false, "IN_FORMATS not supported by kernel\n");
-	igt_skip_on_f(blob_id == 0, "IN_FORMATS not supported by plane\n");
-	blob = drmModeGetPropertyBlob(data->drm_fd, blob_id);
-	igt_assert(blob);
-	igt_assert_lte(sizeof(struct local_drm_format_modifier_blob),
-		       blob->length);
-
-	blob_data = (struct local_drm_format_modifier_blob *) blob->data;
-	formats = formats_ptr(blob_data);
-	last_fmt = &formats[blob_data->count_formats];
-	igt_assert_lte(((char *) last_fmt - (char *) blob_data), blob->length);
-	for (int i = 0; i < blob_data->count_formats; i++) {
-		if (formats[i] == format) {
-			fmt_idx = i;
-			break;
-		}
-	}
-
-	if (fmt_idx == -1)
-		return false;
-
-	modifiers = modifiers_ptr(blob_data);
-	last_mod = &modifiers[blob_data->count_modifiers];
-	igt_assert_lte(((char *) last_mod - (char *) blob_data), blob->length);
-	for (int i = 0; i < blob_data->count_modifiers; i++) {
-		if (modifiers[i].modifier != data->ccs_modifier)
-			continue;
-
-		if (modifiers[i].offset > fmt_idx ||
-		    fmt_idx > modifiers[i].offset + 63)
-			continue;
-
-		if (modifiers[i].formats &
-		    (1UL << (fmt_idx - modifiers[i].offset)))
-			return true;
-	}
-
-	return false;
-}
-
 static void addfb_init(struct igt_fb *fb, struct drm_mode_fb_cmd2 *f)
 {
 	int i;
@@ -314,11 +198,13 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 
 	primary = igt_output_get_plane_type(data->output,
 					    DRM_PLANE_TYPE_PRIMARY);
-	if (!plane_has_format_with_ccs(data, primary, DRM_FORMAT_XRGB8888))
+	if (!igt_plane_has_format_mod(primary, DRM_FORMAT_XRGB8888,
+				      data->ccs_modifier))
 		return false;
 
 	if (data->plane && fb_flags & FB_COMPRESSED) {
-		if (!plane_has_format_with_ccs(data, data->plane, DRM_FORMAT_XRGB8888))
+		if (!igt_plane_has_format_mod(data->plane, DRM_FORMAT_XRGB8888,
+					      data->ccs_modifier))
 			return false;
 
 		generate_fb(data, &fb, min(MAX_SPRITE_PLANE_WIDTH, drm_mode->hdisplay),
