@@ -1201,6 +1201,8 @@ foreach my $key (sort sortQueue keys %db) {
 	last if $i > $max_items;
 }
 
+push @freqs, [$prev_freq_ts, $last_ts, $prev_freq] if $prev_freq;
+
 foreach my $item (@freqs) {
 	my ($start, $end, $freq) = @$item;
 	my $startend;
