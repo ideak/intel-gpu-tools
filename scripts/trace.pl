@@ -628,7 +628,11 @@ foreach my $key (@sorted_keys) {
 	$min_ctx = $db{$key}->{'ctx'} if not defined $min_ctx or
 					 $db{$key}->{'ctx'} < $min_ctx;
 
-	$db{$key}->{'context-complete-delay'} = $end - $notify;
+	unless (exists $db{$key}->{'no-end'}) {
+		$db{$key}->{'context-complete-delay'} = $end - $notify;
+	} else {
+		$db{$key}->{'context-complete-delay'} = 0;
+	}
 	$db{$key}->{'execute-delay'} = $start - $db{$key}->{'submit'};
 	$db{$key}->{'submit-delay'} = $db{$key}->{'submit'} - $db{$key}->{'queue'};
 	unless (exists $db{$key}->{'no-notify'}) {
@@ -649,7 +653,7 @@ foreach my $key (@sorted_keys) {
 
 	$submit_avg{$ring} += $db{$key}->{'submit-delay'};
 	$execute_avg{$ring} += $db{$key}->{'execute-delay'};
-	$ctxsave_avg{$ring} += $end - $notify;
+	$ctxsave_avg{$ring} += $db{$key}->{'context-complete-delay'};
 }
 
 foreach my $ring (sort keys %batch_avg) {
@@ -1100,7 +1104,7 @@ foreach my $key (sort sortQueue keys %db) {
 	}
 
 	# user interrupt to context complete
-	unless (exists $skip_box{'ctxsave'}) {
+	unless (exists $skip_box{'ctxsave'} or exists $db{$key}->{'no-end'}) {
 		$skey = -2 * $max_seqno * $ctx - 2 * $seqno;
 		$style = box_style($ctx, 'ctxsave');
 		my $ctxsave = $db{$key}->{'end'} - $db{$key}->{'notify'};
