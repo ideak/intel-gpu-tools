@@ -935,6 +935,7 @@ Boxes are in format 'ctx-id/seqno'.
 <p>
 Use Ctrl+scroll-action to zoom-in/out and scroll-action or dragging to move around the timeline.
 </p>
+<button onclick="toggleStacking()">Toggle overlap stacking</button>
 </td>
 </tr>
 </table>
@@ -1284,6 +1285,12 @@ print <<ENDHTML;
 
   // Create a Timeline
   var timeline = new vis.Timeline(container, items, groups, options);
+
+  function toggleStacking() {
+	options.stack = !options.stack;
+	options.stackSubgroups = !options.stackSubgroups;
+	timeline.setOptions(options);
+  }
 ENDHTML
 
 print <<ENDHTML;
