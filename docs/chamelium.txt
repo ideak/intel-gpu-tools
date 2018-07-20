@@ -125,7 +125,7 @@ Current Support in IGT
 
 Support for the Chamelium platform in IGT is found in the following places:
 * lib/igt_chamelium.c: library with Chamelium-related helpers
-* tests/chamelium.c: sub-tests using the Chamelium
+* tests/kms_chamelium.c: sub-tests using the Chamelium
 
 As of late August 2017, the following features are tested by IGT:
 * Pixel-by-pixel frame integrity tests for DP and HDMI
