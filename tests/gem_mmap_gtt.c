@@ -309,6 +309,18 @@ test_write_gtt(int fd)
 	munmap(src, OBJECT_SIZE);
 }
 
+static bool is_coherent(int i915)
+{
+	int val = 1; /* by default, we assume GTT is coherent, hence the test */
+	struct drm_i915_getparam gp = {
+		gp.param = 52, /* GTT_COHERENT */
+		gp.value = &val,
+	};
+
+	ioctl(i915, DRM_IOCTL_I915_GETPARAM, &gp);
+	return val;
+}
+
 static void
 test_coherency(int fd)
 {
@@ -316,6 +328,7 @@ test_coherency(int fd)
 	uint32_t *gtt, *cpu;
 	int i;
 
+	igt_require(is_coherent(fd));
 	igt_require(igt_setup_clflush());
 
 	handle = gem_create(fd, OBJECT_SIZE);

@@ -24,6 +24,7 @@
 #include "igt.h"
 #include "igt_vgem.h"
 
+#include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <signal.h>
 #include <time.h>
@@ -236,12 +237,26 @@ static void test_gtt(int vgem, int i915)
 	gem_close(vgem, scratch.handle);
 }
 
+static bool is_coherent(int i915)
+{
+	int val = 1; /* by default, we assume GTT is coherent, hence the test */
+	struct drm_i915_getparam gp = {
+		gp.param = 52, /* GTT_COHERENT */
+		gp.value = &val,
+	};
+
+	ioctl(i915, DRM_IOCTL_I915_GETPARAM, &gp);
+	return val;
+}
+
 static void test_gtt_interleaved(int vgem, int i915)
 {
 	struct vgem_bo scratch;
 	uint32_t handle;
 	uint32_t *ptr, *gtt;
 	int dmabuf, i;
+
+	igt_require(is_coherent(i915));
 
 	scratch.width = 1024;
 	scratch.height = 1024;
