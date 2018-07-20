@@ -135,7 +135,7 @@ gen4_render_flush(struct intel_batchbuffer *batch,
 
 static uint32_t
 gen4_bind_buf(struct intel_batchbuffer *batch,
-	      struct igt_buf *buf,
+	      const struct igt_buf *buf,
 	      uint32_t format, int is_dst)
 {
 	struct gen4_surface_state *ss;
@@ -175,8 +175,8 @@ gen4_bind_buf(struct intel_batchbuffer *batch,
 
 static uint32_t
 gen4_bind_surfaces(struct intel_batchbuffer *batch,
-		   struct igt_buf *src,
-		   struct igt_buf *dst)
+		   const struct igt_buf *src,
+		   const struct igt_buf *dst)
 {
 	uint32_t *binding_table;
 
@@ -415,7 +415,7 @@ gen4_emit_binding_table(struct intel_batchbuffer *batch,
 
 static void
 gen4_emit_drawing_rectangle(struct intel_batchbuffer *batch,
-			    struct igt_buf *dst)
+			    const struct igt_buf *dst)
 {
 	OUT_BATCH(GEN4_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
 	OUT_BATCH(0);
@@ -638,9 +638,11 @@ static uint32_t gen4_emit_primitive(struct intel_batchbuffer *batch)
 
 void gen4_render_copyfunc(struct intel_batchbuffer *batch,
 			  drm_intel_context *context,
-			  struct igt_buf *src, unsigned src_x, unsigned src_y,
+			  const struct igt_buf *src,
+			  unsigned src_x, unsigned src_y,
 			  unsigned width, unsigned height,
-			  struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
+			  const struct igt_buf *dst,
+			  unsigned dst_x, unsigned dst_y)
 {
 	uint32_t cc, cc_vp;
 	uint32_t wm, wm_sampler, wm_kernel, wm_table;
