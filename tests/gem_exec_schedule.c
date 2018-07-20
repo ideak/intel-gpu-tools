@@ -748,20 +748,28 @@ static void preemptive_hang(int fd, unsigned ring)
 static void deep(int fd, unsigned ring)
 {
 #define XS 8
-	const unsigned int nreq = MAX_PRIO - MIN_PRIO;
-	const unsigned size = ALIGN(4*nreq, 4096);
+	const unsigned int max_req = MAX_PRIO - MIN_PRIO;
+	const unsigned size = ALIGN(4*max_req, 4096);
 	struct timespec tv = {};
 	IGT_CORK_HANDLE(cork);
+	unsigned int nreq;
 	uint32_t plug;
 	uint32_t result, dep[XS];
 	uint32_t expected = 0;
 	uint32_t *ptr;
 	uint32_t *ctx;
+	int dep_nreq;
+	int n;
 
 	ctx = malloc(sizeof(*ctx) * MAX_CONTEXTS);
-	for (int n = 0; n < MAX_CONTEXTS; n++) {
+	for (n = 0; n < MAX_CONTEXTS; n++) {
 		ctx[n] = gem_context_create(fd);
 	}
+
+	nreq = gem_measure_ring_inflight(fd, ring, 0) / (4 * XS) * MAX_CONTEXTS;
+	if (nreq > max_req)
+		nreq = max_req;
+	igt_info("Using %d requests (prio range %d)\n", nreq, max_req);
 
 	result = gem_create(fd, size);
 	for (int m = 0; m < XS; m ++)
@@ -774,7 +782,7 @@ static void deep(int fd, unsigned ring)
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 
 		memset(obj, 0, sizeof(obj));
-		for (int n = 0; n < XS; n++)
+		for (n = 0; n < XS; n++)
 			obj[n].handle = dep[n];
 		obj[XS].handle = result;
 		obj[XS+1].handle = gem_create(fd, 4096);
@@ -784,7 +792,7 @@ static void deep(int fd, unsigned ring)
 		execbuf.buffers_ptr = to_user_pointer(obj);
 		execbuf.buffer_count = XS + 2;
 		execbuf.flags = ring;
-		for (int n = 0; n < MAX_CONTEXTS; n++) {
+		for (n = 0; n < MAX_CONTEXTS; n++) {
 			execbuf.rsvd1 = ctx[n];
 			gem_execbuf(fd, &execbuf);
 		}
@@ -795,15 +803,62 @@ static void deep(int fd, unsigned ring)
 	plug = igt_cork_plug(&cork, fd);
 
 	/* Create a deep dependency chain, with a few branches */
-	for (int n = 0; n < nreq && igt_seconds_elapsed(&tv) < 8; n++) {
-		uint32_t context = ctx[n % MAX_CONTEXTS];
-		gem_context_set_priority(fd, context, MAX_PRIO - nreq + n);
+	for (n = 0; n < nreq && igt_seconds_elapsed(&tv) < 2; n++) {
+		const int gen = intel_gen(intel_get_drm_devid(fd));
+		struct drm_i915_gem_exec_object2 obj[3];
+		struct drm_i915_gem_relocation_entry reloc;
+		struct drm_i915_gem_execbuffer2 eb = {
+			.buffers_ptr = to_user_pointer(obj),
+			.buffer_count = 3,
+			.flags = ring | (gen < 6 ? I915_EXEC_SECURE : 0),
+			.rsvd1 = ctx[n % MAX_CONTEXTS],
+		};
+		uint32_t batch[16];
+		int i;
 
-		for (int m = 0; m < XS; m++)
-			store_dword(fd, context, ring, dep[m], 4*n, context, plug, I915_GEM_DOMAIN_INSTRUCTION);
+		memset(obj, 0, sizeof(obj));
+		obj[0].handle = plug;
+
+		memset(&reloc, 0, sizeof(reloc));
+		reloc.presumed_offset = 0;
+		reloc.offset = sizeof(uint32_t);
+		reloc.delta = sizeof(uint32_t) * n;
+		reloc.read_domains = I915_GEM_DOMAIN_RENDER;
+		reloc.write_domain = I915_GEM_DOMAIN_RENDER;
+		obj[2].handle = gem_create(fd, 4096);
+		obj[2].relocs_ptr = to_user_pointer(&reloc);
+		obj[2].relocation_count = 1;
+
+		i = 0;
+		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		if (gen >= 8) {
+			batch[++i] = reloc.delta;
+			batch[++i] = 0;
+		} else if (gen >= 4) {
+			batch[++i] = 0;
+			batch[++i] = reloc.delta;
+			reloc.offset += sizeof(uint32_t);
+		} else {
+			batch[i]--;
+			batch[++i] = reloc.delta;
+		}
+		batch[++i] = eb.rsvd1;
+		batch[++i] = MI_BATCH_BUFFER_END;
+		gem_write(fd, obj[2].handle, 0, batch, sizeof(batch));
+
+		gem_context_set_priority(fd, eb.rsvd1, MAX_PRIO - nreq + n);
+		for (int m = 0; m < XS; m++) {
+			obj[1].handle = dep[m];
+			reloc.target_handle = obj[1].handle;
+			gem_execbuf(fd, &eb);
+		}
+		gem_close(fd, obj[2].handle);
 	}
+	igt_info("First deptree: %d requests [%.3fs]\n",
+		 n * XS, 1e-9*igt_nsec_elapsed(&tv));
+	dep_nreq = n;
 
-	for (int n = 0; n < nreq && igt_seconds_elapsed(&tv) < 6; n++) {
+	for (n = 0; n < nreq && igt_seconds_elapsed(&tv) < 4; n++) {
 		uint32_t context = ctx[n % MAX_CONTEXTS];
 		gem_context_set_priority(fd, context, MAX_PRIO - nreq + n);
 
@@ -813,12 +868,14 @@ static void deep(int fd, unsigned ring)
 		}
 		expected = context;
 	}
+	igt_info("Second deptree: %d requests [%.3fs]\n",
+		 n * XS, 1e-9*igt_nsec_elapsed(&tv));
 
 	unplug_show_queue(fd, &cork, ring);
 	gem_close(fd, plug);
 	igt_require(expected); /* too slow */
 
-	for (int n = 0; n < MAX_CONTEXTS; n++)
+	for (n = 0; n < MAX_CONTEXTS; n++)
 		gem_context_destroy(fd, ctx[n]);
 
 	for (int m = 0; m < XS; m++) {
@@ -827,7 +884,7 @@ static void deep(int fd, unsigned ring)
 				I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 		gem_close(fd, dep[m]);
 
-		for (int n = 0; n < nreq; n++)
+		for (n = 0; n < dep_nreq; n++)
 			igt_assert_eq_u32(ptr[n], ctx[n % MAX_CONTEXTS]);
 		munmap(ptr, size);
 	}
