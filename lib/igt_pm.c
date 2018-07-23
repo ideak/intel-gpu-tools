@@ -66,33 +66,47 @@ enum {
 static char __igt_pm_audio_runtime_power_save[64];
 static char __igt_pm_audio_runtime_control[64];
 
-static void __igt_pm_audio_runtime_exit_handler(int sig)
+static int __igt_pm_audio_restore_runtime_pm(void)
 {
 	int fd;
 
-	igt_debug("Restoring audio power management to '%s' and '%s'\n",
-		  __igt_pm_audio_runtime_power_save,
-		  __igt_pm_audio_runtime_control);
+	if (!__igt_pm_audio_runtime_power_save[0])
+		return 0;
 
 	fd = open("/sys/module/snd_hda_intel/parameters/power_save", O_WRONLY);
 	if (fd < 0)
-		return;
+		return errno;
+
 	if (write(fd, __igt_pm_audio_runtime_power_save,
 		  strlen(__igt_pm_audio_runtime_power_save)) !=
-	    strlen(__igt_pm_audio_runtime_power_save))
-		igt_warn("Failed to restore audio power_save to '%s'\n",
-			 __igt_pm_audio_runtime_power_save);
+	    strlen(__igt_pm_audio_runtime_power_save)) {
+		close(fd);
+		return errno;
+	}
+
 	close(fd);
 
 	fd = open("/sys/bus/pci/devices/0000:00:03.0/power/control", O_WRONLY);
 	if (fd < 0)
-		return;
+		return errno;
+
 	if (write(fd, __igt_pm_audio_runtime_control,
 		  strlen(__igt_pm_audio_runtime_control)) !=
-	    strlen(__igt_pm_audio_runtime_control))
-		igt_warn("Failed to restore audio control to '%s'\n",
-			 __igt_pm_audio_runtime_control);
+	    strlen(__igt_pm_audio_runtime_control)) {
+		close(fd);
+		return errno;
+	}
+
 	close(fd);
+
+	__igt_pm_audio_runtime_power_save[0] = 0;
+
+	return 0;
+}
+
+static void __igt_pm_audio_runtime_exit_handler(int sig)
+{
+	__igt_pm_audio_restore_runtime_pm();
 }
 
 static void strchomp(char *str)
@@ -297,33 +311,48 @@ int pm_status_fd = -1;
 static char __igt_pm_runtime_autosuspend[64];
 static char __igt_pm_runtime_control[64];
 
-static void __igt_pm_runtime_exit_handler(int sig)
+static int __igt_restore_runtime_pm(void)
 {
 	int fd;
 
-	igt_debug("Restoring runtime management to '%s' and '%s'\n",
-		  __igt_pm_runtime_autosuspend,
-		  __igt_pm_runtime_control);
+	if (pm_status_fd < 0)
+		return 0;
 
 	fd = open(POWER_DIR "/autosuspend_delay_ms", O_WRONLY);
 	if (fd < 0)
-		return;
+		return errno;
+
 	if (write(fd, __igt_pm_runtime_autosuspend,
 		  strlen(__igt_pm_runtime_autosuspend)) !=
-	    strlen(__igt_pm_runtime_autosuspend))
-		igt_warn("Failed to restore runtime pm autosuspend delay to '%s'\n",
-			 __igt_pm_runtime_autosuspend);
+	    strlen(__igt_pm_runtime_autosuspend)) {
+		close(fd);
+		return errno;
+	}
+
 	close(fd);
 
 	fd = open(POWER_DIR "/control", O_WRONLY);
 	if (fd < 0)
-		return;
+		return errno;
+
 	if (write(fd, __igt_pm_runtime_control,
 		  strlen(__igt_pm_runtime_control)) !=
-	    strlen(__igt_pm_runtime_control))
-		igt_warn("Failed to restore runtime pm control to '%s'\n",
-			 __igt_pm_runtime_control);
+	    strlen(__igt_pm_runtime_control)) {
+		close(fd);
+		return errno;
+	}
+
 	close(fd);
+
+	close(pm_status_fd);
+	pm_status_fd = -1;
+
+	return 0;
+}
+
+static void __igt_pm_runtime_exit_handler(int sig)
+{
+	__igt_restore_runtime_pm();
 }
 
 /**
