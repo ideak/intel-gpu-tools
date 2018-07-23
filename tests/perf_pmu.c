@@ -1441,6 +1441,9 @@ test_rc6(int gem_fd, unsigned int flags)
 	close(fw);
 	close(fd);
 
+	if (flags & TEST_RUNTIME_PM)
+		igt_restore_runtime_pm();
+
 	assert_within_epsilon(busy - prev, 0.0, tolerance);
 }
 
