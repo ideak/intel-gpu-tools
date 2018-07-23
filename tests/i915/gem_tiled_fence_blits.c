@@ -42,54 +42,38 @@
  */
 
 #include "igt.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/time.h>
+#include "igt_x86.h"
 
-#include <drm.h>
-
-#include "intel_bufmgr.h"
-
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
-enum {width=512, height=512};
-static const int bo_size = width * height * 4;
+enum { width = 512, height = 512 };
 static uint32_t linear[width * height];
+static const int bo_size = sizeof(linear);
 
-static drm_intel_bo *
-create_bo(int fd, uint32_t start_val)
+static uint32_t create_bo(int fd, uint32_t start_val)
 {
-	drm_intel_bo *bo;
-	uint32_t tiling = I915_TILING_X;
-	int ret, i;
+	uint32_t handle;
+	uint32_t *ptr;
 
-	bo = drm_intel_bo_alloc(bufmgr, "tiled bo", bo_size, 4096);
-	ret = drm_intel_bo_set_tiling(bo, &tiling, width * 4);
-	igt_assert_eq(ret, 0);
-	igt_assert(tiling == I915_TILING_X);
+	handle = gem_create(fd, bo_size);
+	gem_set_tiling(fd, handle, I915_TILING_X, width * 4);
 
 	/* Fill the BO with dwords starting at start_val */
-	for (i = 0; i < width * height; i++)
-		linear[i] = start_val++;
+	ptr = gem_mmap__gtt(fd, handle, bo_size, PROT_WRITE);
+	for (int i = 0; i < width * height; i++)
+		ptr[i] = start_val++;
+	munmap(ptr, bo_size);
 
-	gem_write(fd, bo->handle, 0, linear, sizeof(linear));
-
-	return bo;
+	return handle;
 }
 
-static void
-check_bo(int fd, drm_intel_bo *bo, uint32_t start_val)
+static void check_bo(int fd, uint32_t handle, uint32_t start_val)
 {
-	int i;
+	uint32_t *ptr;
 
-	gem_read(fd, bo->handle, 0, linear, sizeof(linear));
+	ptr = gem_mmap__gtt(fd, handle, bo_size, PROT_READ);
+	igt_memcpy_from_wc(linear, ptr, bo_size);
+	munmap(ptr, bo_size);
 
-	for (i = 0; i < width * height; i++) {
+	for (int i = 0; i < width * height; i++) {
 		igt_assert_f(linear[i] == start_val,
 			     "Expected 0x%08x, found 0x%08x "
 			     "at offset 0x%08x\n",
@@ -98,73 +82,122 @@ check_bo(int fd, drm_intel_bo *bo, uint32_t start_val)
 	}
 }
 
+static uint32_t
+create_batch(int fd, struct drm_i915_gem_relocation_entry *reloc)
+{
+	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const bool has_64b_reloc = gen >= 8;
+	uint32_t *batch;
+	uint32_t handle;
+	uint32_t pitch;
+	int i = 0;
+
+	handle = gem_create(fd, 4096);
+	batch = gem_mmap__cpu(fd, handle, 0, 4096, PROT_WRITE);
+
+	batch[i] = (XY_SRC_COPY_BLT_CMD |
+		    XY_SRC_COPY_BLT_WRITE_ALPHA |
+		    XY_SRC_COPY_BLT_WRITE_RGB);
+	if (gen >= 4) {
+		batch[i] |= (XY_SRC_COPY_BLT_SRC_TILED |
+			     XY_SRC_COPY_BLT_DST_TILED);
+		pitch = width;
+	} else {
+		pitch = 4 * width;
+	}
+	batch[i++] |= 6 + 2 * has_64b_reloc;
+
+	batch[i++] = 3 << 24 | 0xcc << 16 | pitch;
+	batch[i++] = 0; /* dst (x1, y1) */
+	batch[i++] = height << 16 | width; /* dst (x2 y2) */
+	reloc[0].offset = sizeof(*batch) * i;
+	reloc[0].read_domains = I915_GEM_DOMAIN_RENDER;
+	reloc[0].write_domain = I915_GEM_DOMAIN_RENDER;
+	batch[i++] = 0;
+	if (has_64b_reloc)
+		batch[i++] = 0;
+
+	batch[i++] = 0; /* src (x1, y1) */
+	batch[i++] = pitch;
+	reloc[1].offset = sizeof(*batch) * i;
+	reloc[1].read_domains = I915_GEM_DOMAIN_RENDER;
+	batch[i++] = 0;
+	if (has_64b_reloc)
+		batch[i++] = 0;
+
+	batch[i++] = MI_BATCH_BUFFER_END;
+	munmap(batch, 4096);
+
+	return handle;
+}
+
 static void run_test(int fd, int count)
 {
-	drm_intel_bo **bo;
-	uint32_t *bo_start_val;
+	struct drm_i915_gem_relocation_entry reloc[2];
+	struct drm_i915_gem_exec_object2 obj[3];
+	struct drm_i915_gem_execbuffer2 eb;
+	uint32_t *bo, *bo_start_val;
 	uint32_t start = 0;
-	int i;
+
+	memset(reloc, 0, sizeof(reloc));
+	memset(obj, 0, sizeof(obj));
+	obj[2].handle = create_batch(fd, reloc);
+	obj[2].relocs_ptr = to_user_pointer(reloc);
+	obj[2].relocation_count = ARRAY_SIZE(reloc);
+
+	memset(&eb, 0, sizeof(eb));
+	eb.buffers_ptr = to_user_pointer(obj);
+	eb.buffer_count = ARRAY_SIZE(obj);
+	if (intel_gen(intel_get_drm_devid(fd)) >= 6)
+		eb.flags = I915_EXEC_BLT;
 
 	count |= 1;
 	igt_info("Using %d 1MiB buffers\n", count);
 
-	bo = malloc(count * sizeof(*bo));
-	bo_start_val = malloc(count * sizeof(*bo_start_val));
-	igt_assert(bo && bo_start_val);
+	bo = malloc(count * (sizeof(*bo) + sizeof(*bo_start_val)));
+	igt_assert(bo);
+	bo_start_val = bo + count;
 
-	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-	batch = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(fd));
-
-	for (i = 0; i < count; i++) {
+	for (int i = 0; i < count; i++) {
 		bo[i] = create_bo(fd, start);
 		bo_start_val[i] = start;
-
-		/*
-		igt_info("Creating bo %d\n", i);
-		check_bo(bo[i], bo_start_val[i]);
-		*/
-
 		start += width * height;
 	}
 
-	for (i = 0; i < count; i++) {
-		int src = count - i - 1;
-		intel_copy_bo(batch, bo[i], bo[src], bo_size);
-		bo_start_val[i] = bo_start_val[src];
+	for (int dst = 0; dst < count; dst++) {
+		int src = count - dst - 1;
+
+		if (src == dst)
+			continue;
+
+		reloc[0].target_handle = obj[0].handle = bo[dst];
+		reloc[1].target_handle = obj[1].handle = bo[src];
+
+		gem_execbuf(fd, &eb);
+		bo_start_val[dst] = bo_start_val[src];
 	}
 
-	for (i = 0; i < count * 4; i++) {
+	for (int i = 0; i < count * 4; i++) {
 		int src = random() % count;
 		int dst = random() % count;
 
 		if (src == dst)
 			continue;
 
-		intel_copy_bo(batch, bo[dst], bo[src], bo_size);
+		reloc[0].target_handle = obj[0].handle = bo[dst];
+		reloc[1].target_handle = obj[1].handle = bo[src];
+
+		gem_execbuf(fd, &eb);
 		bo_start_val[dst] = bo_start_val[src];
-
-		/*
-		check_bo(bo[dst], bo_start_val[dst]);
-		igt_info("%d: copy bo %d to %d\n", i, src, dst);
-		*/
 	}
 
-	for (i = 0; i < count; i++) {
-		/*
-		igt_info("check %d\n", i);
-		*/
+	for (int i = 0; i < count; i++) {
 		check_bo(fd, bo[i], bo_start_val[i]);
-
-		drm_intel_bo_unreference(bo[i]);
-		bo[i] = NULL;
+		gem_close(fd, bo[i]);
 	}
-
-	intel_batchbuffer_free(batch);
-	drm_intel_bufmgr_destroy(bufmgr);
-
-	free(bo_start_val);
 	free(bo);
+
+	gem_close(fd, obj[2].handle);
 }
 
 #define MAX_32b ((1ull << 32) - 4096)
@@ -178,9 +211,8 @@ igt_main
 		igt_require_gem(fd);
 	}
 
-	igt_subtest("basic") {
+	igt_subtest("basic")
 		run_test (fd, 2);
-	}
 
 	/* the rest of the tests are too long for simulation */
 	igt_skip_on_simulation();
