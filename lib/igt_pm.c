@@ -108,6 +108,23 @@ static int __igt_pm_audio_restore_runtime_pm(void)
 	return 0;
 }
 
+static void igt_pm_audio_restore_runtime_pm(void)
+{
+	int ret;
+
+	if (!__igt_pm_audio_runtime_power_save[0])
+		return;
+
+	igt_debug("Restoring audio power management to '%s' and '%s'\n",
+		  __igt_pm_audio_runtime_power_save,
+		  __igt_pm_audio_runtime_control);
+
+	ret = __igt_pm_audio_restore_runtime_pm();
+	if (ret)
+		igt_warn("Failed to restore runtime audio PM! (errno=%d)\n",
+			 ret);
+}
+
 static void __igt_pm_audio_runtime_exit_handler(int sig)
 {
 	__igt_pm_audio_restore_runtime_pm();
@@ -413,6 +430,30 @@ static int __igt_restore_runtime_pm(void)
 	pm_status_fd = -1;
 
 	return 0;
+}
+
+/**
+ * igt_restore_runtime_pm:
+ *
+ * Restores the runtime PM configuration as it was before the call to
+ * igt_setup_runtime_pm.
+ */
+void igt_restore_runtime_pm(void)
+{
+	int ret;
+
+	if (pm_status_fd < 0)
+		return;
+
+	igt_debug("Restoring runtime PM management to '%s' and '%s'\n",
+		  __igt_pm_runtime_autosuspend,
+		  __igt_pm_runtime_control);
+
+	ret = __igt_restore_runtime_pm();
+	if (ret)
+		igt_warn("Failed to restore runtime PM! (errno=%d)\n", ret);
+
+	igt_pm_audio_restore_runtime_pm();
 }
 
 static void __igt_pm_runtime_exit_handler(int sig)

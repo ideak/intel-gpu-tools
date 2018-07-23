@@ -47,6 +47,7 @@ enum igt_runtime_pm_status {
 };
 
 bool igt_setup_runtime_pm(void);
+void igt_restore_runtime_pm(void);
 enum igt_runtime_pm_status igt_get_runtime_pm_status(void);
 bool igt_wait_for_pm_status(enum igt_runtime_pm_status status);
 
