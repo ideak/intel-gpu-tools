@@ -913,7 +913,7 @@ void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
 	debugfs_fd = igt_debugfs_open(drm_fd, path, O_WRONLY | O_TRUNC);
 	free(path);
 
-	igt_assert(debugfs_fd != -1);
+	igt_require(debugfs_fd != -1);
 
 	if (length == 0)
 		ret = write(debugfs_fd, "reset", 5);
