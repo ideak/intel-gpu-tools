@@ -419,11 +419,7 @@ static void test_format_plane_color(data_t *data, enum pipe pipe,
 	igt_plane_set_fb(plane, fb);
 
 	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
-
-	/* make sure the crc we get is for the new fb */
-	igt_wait_for_vblank(data->drm_fd, pipe);
-	igt_pipe_crc_drain(data->pipe_crc);
-	igt_pipe_crc_get_single(data->pipe_crc, crc);
+	igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, crc);
 
 	igt_remove_fb(data->drm_fd, &old_fb);
 }

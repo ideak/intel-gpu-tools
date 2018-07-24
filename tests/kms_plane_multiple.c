@@ -276,8 +276,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-		igt_pipe_crc_drain(data->pipe_crc);
-		igt_pipe_crc_get_single(data->pipe_crc, &crc);
+		igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, &crc);
 
 		igt_assert_crc_equal(&data->ref_crc, &crc);
 

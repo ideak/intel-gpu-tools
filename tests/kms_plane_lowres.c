@@ -221,8 +221,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 	check_mode(&mode_lowres, mode2);
 
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
-	igt_pipe_crc_drain(pipe_crc);
-	igt_pipe_crc_get_single(pipe_crc, &crc_lowres);
+	igt_pipe_crc_get_current(data->display.drm_fd, pipe_crc, &crc_lowres);
 
 	igt_assert_plane_visible(data->drm_fd, pipe, false);
 
@@ -236,8 +235,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-	igt_pipe_crc_drain(pipe_crc);
-	igt_pipe_crc_get_single(pipe_crc, &crc_hires2);
+	igt_pipe_crc_get_current(data->display.drm_fd, pipe_crc, &crc_hires2);
 
 	igt_assert_plane_visible(data->drm_fd, pipe, true);
 

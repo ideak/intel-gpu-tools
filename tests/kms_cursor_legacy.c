@@ -1334,8 +1334,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 
 		igt_assert_eq(get_vblank(display->drm_fd, pipe, 0), vblank_start);
 
-		igt_pipe_crc_drain(pipe_crc);
-		igt_pipe_crc_get_single(pipe_crc, &test_crc);
+		igt_pipe_crc_get_current(display->drm_fd, pipe_crc, &test_crc);
 
 		igt_spin_batch_free(display->drm_fd, spin);
 

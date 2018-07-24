@@ -101,8 +101,7 @@ static void generate_comparison_crc_list(data_t *data, igt_output_t *output)
 	igt_plane_set_fb(primary, &data->primary_fb);
 	igt_display_commit2(&data->display, data->commit);
 
-	igt_pipe_crc_drain(data->pipe_crc);
-	igt_pipe_crc_get_single(data->pipe_crc, &data->cursor_crc);
+	igt_pipe_crc_get_current(data->gfx_fd, data->pipe_crc, &data->cursor_crc);
 	igt_plane_set_fb(primary, NULL);
 	igt_display_commit2(&data->display, data->commit);
 
@@ -113,8 +112,7 @@ static void generate_comparison_crc_list(data_t *data, igt_output_t *output)
 	igt_plane_set_fb(primary, &data->primary_fb);
 	igt_display_commit2(&data->display, data->commit);
 
-	igt_pipe_crc_drain(data->pipe_crc);
-	igt_pipe_crc_get_single(data->pipe_crc, &data->fullscreen_crc);
+	igt_pipe_crc_get_current(data->gfx_fd, data->pipe_crc, &data->fullscreen_crc);
 
 	cairo_destroy(cr);
 	igt_remove_fb(data->gfx_fd, &data->primary_fb);
@@ -400,8 +398,7 @@ test_one_mode(data_t* data, igt_output_t *output, igt_plane_t* plane,
 		igt_display_commit2(&data->display, data->commit);
 
 		if (do_crc) {
-			igt_pipe_crc_drain(data->pipe_crc);
-			igt_pipe_crc_get_single(data->pipe_crc, &current_crc);
+			igt_pipe_crc_get_current(data->gfx_fd, data->pipe_crc, &current_crc);
 
 			if (plane->type != DRM_PLANE_TYPE_CURSOR) {
 				if (!igt_check_crc_equal(&current_crc,

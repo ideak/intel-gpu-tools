@@ -235,8 +235,8 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	if (plane->type != DRM_PLANE_TYPE_CURSOR)
 		igt_plane_set_position(plane, data->pos_x, data->pos_y);
 	igt_display_commit2(display, COMMIT_ATOMIC);
-	igt_pipe_crc_drain(data->pipe_crc);
-	igt_pipe_crc_get_single(data->pipe_crc, &data->flip_crc);
+
+	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &data->flip_crc);
 
 	/*
 	  * Prepare the non-rotated flip fb.
@@ -259,8 +259,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 		igt_plane_set_position(plane, data->pos_x, data->pos_y);
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
-	igt_pipe_crc_drain(data->pipe_crc);
-	igt_pipe_crc_get_single(data->pipe_crc, &data->ref_crc);
+	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &data->ref_crc);
 
 	/*
 	 * Prepare the non-rotated reference fb.
@@ -310,8 +309,7 @@ static void test_single_case(data_t *data, enum pipe pipe,
 	igt_assert_eq(ret, 0);
 
 	/* Check CRC */
-	igt_pipe_crc_drain(data->pipe_crc);
-	igt_pipe_crc_get_single(data->pipe_crc, &crc_output);
+	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc_output);
 	igt_assert_crc_equal(&data->ref_crc, &crc_output);
 
 	/*
@@ -334,8 +332,7 @@ static void test_single_case(data_t *data, enum pipe pipe,
 			igt_assert_eq(ret, 0);
 		}
 		kmstest_wait_for_pageflip(data->gfx_fd);
-		igt_pipe_crc_drain(data->pipe_crc);
-		igt_pipe_crc_get_single(data->pipe_crc, &crc_output);
+		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc_output);
 		igt_assert_crc_equal(&data->flip_crc,
 				     &crc_output);
 	}
