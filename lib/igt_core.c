@@ -235,7 +235,7 @@
  *
  * Some of IGT's behavior can be configured through a configuration file.
  * By default, this file is expected to exist in ~/.igtrc . The directory for
- * this can be overriden by setting the environment variable %IGT_CONFIG_PATH.
+ * this can be overridden by setting the environment variable %IGT_CONFIG_PATH.
  * An example configuration follows:
  *
  * |[<!-- language="plain" -->
