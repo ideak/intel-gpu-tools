@@ -88,6 +88,7 @@ AM_CFLAGS = $(CWARNFLAGS) -Wno-unused-result $(DEBUG_CFLAGS)\
 	-I$(top_srcdir)/include/drm-uapi \
 	-I$(srcdir)/.. \
 	-I$(srcdir)/../lib \
+	-I$(top_srcdir)/lib/stubs/syscalls \
 	-include "$(srcdir)/../lib/check-ndebug.h" \
 	-DIGT_SRCDIR=\""$(abs_srcdir)"\" \
 	-DIGT_DATADIR=\""$(pkgdatadir)"\" \

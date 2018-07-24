@@ -52,7 +52,8 @@ endif
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir)/include/drm-uapi \
-	-I$(top_srcdir)
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/lib/stubs/syscalls
 
 AM_CFLAGS = \
 	    $(CWARNFLAGS) \

@@ -11,6 +11,7 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/include/drm-uapi \
 	-I$(srcdir)/../.. \
 	-I$(srcdir)/.. \
+	-I$(top_srcdir)/lib/stubs/syscalls \
 	-include "$(srcdir)/../../lib/check-ndebug.h" \
 	-DIGT_DATADIR=\""$(abs_srcdir)"\" \
 	-D_GNU_SOURCE

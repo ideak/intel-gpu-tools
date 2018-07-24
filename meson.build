@@ -64,7 +64,7 @@ _tests_required = build_tests == 'true'
 
 build_info = []
 
-inc = include_directories('include/drm-uapi', 'lib', '.')
+inc = include_directories('include/drm-uapi', 'lib', 'lib/stubs/syscalls', '.')
 
 inc_for_gtkdoc = include_directories('lib')
 

@@ -7,7 +7,8 @@ endif
 tracepoint_format.h: tracepoint_format.leg
 	$(LEG) -o $@ $<
 
-AM_CPPFLAGS = -I. -I$(top_srcdir)/include/drm-uapi
+AM_CPPFLAGS = -I. -I$(top_srcdir)/include/drm-uapi \
+	      -I$(top_srcdir)/lib/stubs/syscalls
 AM_CFLAGS = $(DRM_CFLAGS) $(PCIACCESS_CFLAGS) $(CWARNFLAGS) \
 	$(CAIRO_CFLAGS) $(OVERLAY_CFLAGS) $(WERROR_CFLAGS) -I$(srcdir)/../lib
 LDADD = $(DRM_LIBS) $(PCIACCESS_LIBS) $(CAIRO_LIBS) $(OVERLAY_LIBS) $(top_builddir)/lib/libigt_perf.la
