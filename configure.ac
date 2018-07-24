@@ -81,6 +81,9 @@ AC_CHECK_FUNCS(timer_create, [], [
 ])
 AC_SUBST(TIMER_LIBS)
 
+dnl Check for memfd_create
+AC_CHECK_FUNCS(memfd_create)
+
 dnl Check for CPUID
 cpuid="yes"
 AC_TRY_LINK([

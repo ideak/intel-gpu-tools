@@ -196,6 +196,9 @@ if cc.has_member('struct sysinfo', 'totalram',
 	config.set('HAVE_STRUCT_SYSINFO_TOTALRAM', 1)
 endif
 
+have = cc.has_function('memfd_create', prefix : '''#include <sys/mman.h>''', args : '-D_GNU_SOURCE')
+config.set10('HAVE_MEMFD_CREATE', have)
+
 add_project_arguments('-D_GNU_SOURCE', language : 'c')
 add_project_arguments('-include', 'config.h', language : 'c')
 
