@@ -917,7 +917,7 @@ void igt_pipe_crc_drain(igt_pipe_crc_t *pipe_crc)
  * look at igt_pipe_crc_collect_crc().
  *
  * If capturing has been going on for a while and a fresh crc is required,
- * you will need to call igt_pipe_crc_drain() first to remove stale entries.
+ * you should use igt_pipe_crc_get_current() instead.
  *
  * Returns:
  * Whether a crc is captured, only false in non-blocking mode.
@@ -938,6 +938,36 @@ igt_pipe_crc_get_single(igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
 		crc_sanity_checks(crc);
 
 	return found;
+}
+
+/**
+ * igt_pipe_crc_get_current:
+ * @drm_fd: Pointer to drm fd for vblank counter
+ * @pipe_crc: pipe CRC object
+ * @crc: buffer pointer for the captured CRC value
+ *
+ * Same as igt_pipe_crc_get_single(), but will wait until a new CRC can be captured.
+ * This is useful for retrieving the current CRC in a more race free way than
+ * igt_pipe_crc_drain() + igt_pipe_crc_get_single().
+ */
+void
+igt_pipe_crc_get_current(int drm_fd, igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
+{
+	unsigned vblank = kmstest_get_vblank(drm_fd, pipe_crc->pipe, 0);
+
+	igt_assert(!(pipe_crc->flags & O_NONBLOCK));
+	do {
+		read_one_crc(pipe_crc, crc);
+
+		/* Only works with valid frame counter */
+		if (!crc->has_valid_frame) {
+			igt_pipe_crc_drain(pipe_crc);
+			igt_pipe_crc_get_single(pipe_crc, crc);
+			return;
+		}
+	} while (crc->frame <= vblank);
+
+	crc_sanity_checks(crc);
 }
 
 /*
