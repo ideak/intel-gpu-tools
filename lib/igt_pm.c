@@ -33,6 +33,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <dirent.h>
 
 #include "drmtest.h"
 #include "igt_pm.h"
@@ -64,6 +65,7 @@ enum {
 #define MAX_POLICY_STRLEN	strlen(MAX_PERFORMANCE_STR)
 
 static char __igt_pm_audio_runtime_power_save[64];
+static char * __igt_pm_audio_runtime_control_path;
 static char __igt_pm_audio_runtime_control[64];
 
 static int __igt_pm_audio_restore_runtime_pm(void)
@@ -86,7 +88,7 @@ static int __igt_pm_audio_restore_runtime_pm(void)
 
 	close(fd);
 
-	fd = open("/sys/bus/pci/devices/0000:00:03.0/power/control", O_WRONLY);
+	fd = open(__igt_pm_audio_runtime_control_path, O_WRONLY);
 	if (fd < 0)
 		return errno;
 
@@ -100,6 +102,8 @@ static int __igt_pm_audio_restore_runtime_pm(void)
 	close(fd);
 
 	__igt_pm_audio_runtime_power_save[0] = 0;
+	free(__igt_pm_audio_runtime_control_path);
+	__igt_pm_audio_runtime_control_path = NULL;
 
 	return 0;
 }
@@ -130,29 +134,84 @@ static void strchomp(char *str)
  */
 void igt_pm_enable_audio_runtime_pm(void)
 {
+	char *path = NULL;
+	struct dirent *de;
+	DIR *dir;
 	int fd;
 
 	/* Check if already enabled. */
 	if (__igt_pm_audio_runtime_power_save[0])
 		return;
 
+	dir = opendir("/sys/class/sound");
+	if (!dir)
+		return;
+
+	/* Find PCI device claimed by snd_hda_intel and tied to i915. */
+	while ((de = readdir(dir))) {
+		const char *match = "hwC";
+		char buf[32] = { }; /* for Valgrind */
+		char *tmp;
+		int ret;
+
+		if (de->d_type != DT_LNK ||
+		    strncmp(de->d_name, match, strlen(match)))
+			continue;
+
+		igt_assert(asprintf(&tmp,
+				    "/sys/class/sound/%s/vendor_name",
+				    de->d_name));
+
+		fd = open(tmp, O_RDONLY);
+		free(tmp);
+		igt_assert_fd(fd);
+		ret = read(fd, buf, sizeof(buf));
+		close(fd);
+		igt_assert(ret > 0);
+		strchomp(buf);
+
+		/* Realtek and similar devices are not what we are after. */
+		if (strcmp(buf, "Intel"))
+			continue;
+
+		igt_assert(asprintf(&path,
+				    "/sys/class/sound/%s/device/device/power/control",
+				    de->d_name));
+
+		igt_debug("Audio device path is %s\n", path);
+
+		break;
+	}
+
 	fd = open("/sys/module/snd_hda_intel/parameters/power_save", O_RDWR);
-	if (fd >= 0) {
-		igt_assert(read(fd, __igt_pm_audio_runtime_power_save,
-				sizeof(__igt_pm_audio_runtime_power_save)) > 0);
-		strchomp(__igt_pm_audio_runtime_power_save);
-		igt_install_exit_handler(__igt_pm_audio_runtime_exit_handler);
-		igt_assert_eq(write(fd, "1\n", 2), 2);
+	if (fd < 0)
+		return;
+
+	/* snd_hda_intel loaded but no path found is an error. */
+	if (!path) {
 		close(fd);
+		errno = ESRCH;
+		goto err;
 	}
-	fd = open("/sys/bus/pci/devices/0000:00:03.0/power/control", O_RDWR);
-	if (fd >= 0) {
-		igt_assert(read(fd, __igt_pm_audio_runtime_control,
-				sizeof(__igt_pm_audio_runtime_control)) > 0);
-		strchomp(__igt_pm_audio_runtime_control);
-		igt_assert_eq(write(fd, "auto\n", 5), 5);
-		close(fd);
-	}
+
+	igt_assert(read(fd, __igt_pm_audio_runtime_power_save,
+			sizeof(__igt_pm_audio_runtime_power_save)) > 0);
+	strchomp(__igt_pm_audio_runtime_power_save);
+	igt_install_exit_handler(__igt_pm_audio_runtime_exit_handler);
+	igt_assert_eq(write(fd, "1\n", 2), 2);
+	close(fd);
+
+	fd = open(path, O_RDWR);
+	if (fd < 0)
+		goto err;
+
+	igt_assert(read(fd, __igt_pm_audio_runtime_control,
+			sizeof(__igt_pm_audio_runtime_control)) > 0);
+	strchomp(__igt_pm_audio_runtime_control);
+	igt_assert_eq(write(fd, "auto\n", 5), 5);
+	close(fd);
+
+	__igt_pm_audio_runtime_control_path = path;
 
 	igt_debug("Saved audio power management as '%s' and '%s'\n",
 		  __igt_pm_audio_runtime_power_save,
@@ -160,6 +219,12 @@ void igt_pm_enable_audio_runtime_pm(void)
 
 	/* Give some time for it to react. */
 	sleep(1);
+
+	return;
+
+err:
+	igt_warn("Failed to enable audio runtime PM! (%d)", errno);
+	free(path);
 }
 
 /**
