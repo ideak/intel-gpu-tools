@@ -106,6 +106,7 @@ i915_progs = [
 	'gen3_render_tiledy_blits',
 	'gem_bad_reloc',
 	'gem_basic',
+	'gem_blits',
 	'gem_busy',
 	'gem_caching',
 	'gem_close',
