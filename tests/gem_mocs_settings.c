@@ -29,6 +29,7 @@
 
 #include "igt.h"
 #include "igt_gt.h"
+#include "igt_perf.h"
 #include "igt_sysfs.h"
 
 #define MAX_NUMBER_MOCS_REGISTERS	(64)
@@ -328,24 +329,39 @@ static void check_l3cc_registers(int fd,
 	gem_close(fd, dst_handle);
 }
 
-
-static uint32_t rc6_residency(int dir)
+static void rc6_wait(int i915)
 {
-	return igt_sysfs_get_u32(dir, "power/rc6_residency_ms");
-}
+	uint64_t start[2], now[2], prev;
+	bool rc6 = false;
+	int fd;
 
-static void rc6_wait(int fd)
-{
-	int sysfs;
-	uint32_t residency;
+	fd = perf_i915_open(I915_PMU_RC6_RESIDENCY);
+	igt_require(fd != -1);
 
-	sysfs = igt_sysfs_open(fd, NULL);
-	igt_assert_lte(0, sysfs);
+	/* First wait for roughly an RC6 Evaluation Interval */
+	gem_quiescent_gpu(i915);
+	usleep(320e3);
 
-	residency = rc6_residency(sysfs);
-	igt_require(igt_wait(rc6_residency(sysfs) != residency, 10000, 2));
+	/* Then poll for RC6 to start ticking */
+	igt_assert_eq(read(fd, start, sizeof(start)), sizeof(start));
+	prev = start[1];
+	do {
+		usleep(5e3);
+		igt_assert_eq(read(fd, now, sizeof(now)), sizeof(now));
+		if (now[1] - prev > 1e6) {
+			rc6 = true;
+			break;
+		}
+		prev = now[1];
+	} while (now[0] - start[0] < 1e9);
 
-	close(sysfs);
+	close(fd);
+
+	igt_debug("rc6 residency %.2fms (delta %.1fms over 5ms), elapsed %.2fms\n",
+		  1e-6 * (now[1] - start[1]),
+		  1e-6 * (now[1] - prev),
+		  1e-6 * (now[0] - start[0]));
+	igt_require(rc6);
 }
 
 static void check_mocs_values(int fd, unsigned engine, uint32_t ctx_id, bool dirty)

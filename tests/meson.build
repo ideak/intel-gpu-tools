@@ -82,7 +82,6 @@ test_progs = [
 	'gem_mmap_gtt',
 	'gem_mmap_offset_exhaustion',
 	'gem_mmap_wc',
-	'gem_mocs_settings',
 	'gem_partial_pwrite_pread',
 	'gem_persistent_relocs',
 	'gem_pipe_control_store_loop',
@@ -278,6 +277,13 @@ test_executables += executable('gem_eio', 'gem_eio.c',
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_progs += 'gem_eio'
+
+test_executables += executable('gem_mocs_settings', 'gem_mocs_settings.c',
+	   dependencies : test_deps + [ lib_igt_perf ],
+	   install_dir : libexecdir,
+	   install_rpath : rpathdir,
+	   install : true)
+test_progs += 'gem_mocs_settings'
 
 test_executables += executable('perf_pmu', 'perf_pmu.c',
 	   dependencies : test_deps + [ lib_igt_perf ],
