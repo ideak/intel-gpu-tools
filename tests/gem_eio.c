@@ -190,7 +190,8 @@ static igt_spin_t * spin_sync(int fd, uint32_t ctx, unsigned long flags)
 
 struct hang_ctx {
 	int debugfs;
-	struct timespec ts;
+	struct timespec delay;
+	struct timespec *ts;
 	timer_t timer;
 };
 
@@ -198,8 +199,10 @@ static void hang_handler(union sigval arg)
 {
 	struct hang_ctx *ctx = arg.sival_ptr;
 
-	igt_debug("hang delay = %.2fus\n", igt_nsec_elapsed(&ctx->ts) / 1000.0);
+	igt_debug("hang delay = %.2fus\n",
+		  igt_nsec_elapsed(&ctx->delay) / 1000.0);
 
+	igt_nsec_elapsed(ctx->ts);
 	igt_assert(igt_sysfs_set(ctx->debugfs, "i915_wedged", "-1"));
 
 	igt_assert_eq(timer_delete(ctx->timer), 0);
@@ -207,7 +210,7 @@ static void hang_handler(union sigval arg)
 	free(ctx);
 }
 
-static void hang_after(int fd, unsigned int us)
+static void hang_after(int fd, unsigned int us, struct timespec *ts)
 {
 	struct sigevent sev = {
 		.sigev_notify = SIGEV_THREAD,
@@ -229,30 +232,30 @@ static void hang_after(int fd, unsigned int us)
 
 	igt_assert_eq(timer_create(CLOCK_MONOTONIC, &sev, &ctx->timer), 0);
 
-	igt_nsec_elapsed(&ctx->ts);
+	ctx->ts = ts;
+	igt_nsec_elapsed(&ctx->delay);
 
 	igt_assert_eq(timer_settime(ctx->timer, 0, &its, NULL), 0);
 }
 
-static int __check_wait(int fd, uint32_t bo, unsigned int wait)
+static void check_wait(int fd, uint32_t bo, unsigned int wait)
 {
-	unsigned long wait_timeout = 250e6; /* Some margin for actual reset. */
-	int ret;
+	struct timespec ts = {};
+	uint64_t elapsed;
 
 	if (wait) {
-		/*
-		 * Double the wait plus some fixed margin to ensure gem_wait
-		 * can never time out before the async hang runs.
-		 */
-		wait_timeout += wait * 2000 + 250e6;
-		hang_after(fd, wait);
+		hang_after(fd, wait, &ts);
 	} else {
+		igt_nsec_elapsed(&ts);
 		manual_hang(fd);
 	}
 
-	ret = __gem_wait(fd, bo, wait_timeout);
+	gem_sync(fd, bo);
 
-	return ret;
+	elapsed = igt_nsec_elapsed(&ts);
+	igt_assert_f(elapsed < 250e6,
+		     "Wake up following reset+wedge took %.3fms\n",
+		     elapsed*1e-6);
 }
 
 static void __test_banned(int fd)
@@ -322,7 +325,7 @@ static void test_wait(int fd, unsigned int flags, unsigned int wait)
 
 	hang = spin_sync(fd, 0, I915_EXEC_DEFAULT);
 
-	igt_assert_eq(__check_wait(fd, hang->handle, wait), 0);
+	check_wait(fd, hang->handle, wait);
 
 	igt_spin_batch_free(fd, hang);
 
@@ -392,7 +395,7 @@ static void test_inflight(int fd, unsigned int wait)
 			igt_assert(fence[n] != -1);
 		}
 
-		igt_assert_eq(__check_wait(fd, obj[1].handle, wait), 0);
+		check_wait(fd, obj[1].handle, wait);
 
 		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
@@ -443,7 +446,7 @@ static void test_inflight_suspend(int fd)
 	igt_set_autoresume_delay(30);
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 
-	igt_assert_eq(__check_wait(fd, obj[1].handle, 10), 0);
+	check_wait(fd, obj[1].handle, 10);
 
 	for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
 		igt_assert_eq(sync_fence_status(fence[n]), -EIO);
@@ -521,7 +524,7 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 			igt_assert(fence[n] != -1);
 		}
 
-		igt_assert_eq(__check_wait(fd, obj[1].handle, wait), 0);
+		check_wait(fd, obj[1].handle, wait);
 
 		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
@@ -630,7 +633,7 @@ static void test_inflight_internal(int fd, unsigned int wait)
 		nfence++;
 	}
 
-	igt_assert_eq(__check_wait(fd, obj[1].handle, wait), 0);
+	check_wait(fd, obj[1].handle, wait);
 
 	while (nfence--) {
 		igt_assert_eq(sync_fence_status(fences[nfence]), -EIO);
@@ -682,7 +685,7 @@ static void test_reset_stress(int fd, unsigned int flags)
 			gem_execbuf(fd, &execbuf);
 
 		/* Wedge after a small delay. */
-		igt_assert_eq(__check_wait(fd, obj.handle, 100e3), 0);
+		check_wait(fd, obj.handle, 100e3);
 
 		/* Unwedge by forcing a reset. */
 		igt_assert(i915_reset_control(true));
