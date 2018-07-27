@@ -281,7 +281,7 @@ test_progs += 'gem_eio'
 test_executables += executable('gem_mocs_settings', 'gem_mocs_settings.c',
 	   dependencies : test_deps + [ lib_igt_perf ],
 	   install_dir : libexecdir,
-	   install_rpath : rpathdir,
+	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_progs += 'gem_mocs_settings'
 
