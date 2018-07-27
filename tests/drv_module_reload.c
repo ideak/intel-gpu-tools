@@ -220,20 +220,6 @@ static void store_all(int fd)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
-static int
-reload(const char *opts_i915)
-{
-	int err = IGT_EXIT_SUCCESS;
-
-	if ((err = igt_i915_driver_unload()))
-		return err;
-
-	if ((err = igt_i915_driver_load(opts_i915)))
-		return err;
-
-	return err;
-}
-
 static int open_parameters(const char *module_name)
 {
 	char path[256];
@@ -340,21 +326,30 @@ hda_dynamic_debug(bool enable)
 
 igt_main
 {
-	int err;
-
-	igt_fixture
-		hda_dynamic_debug(true);
-
 	igt_subtest("basic-reload") {
-		if ((err = reload(NULL)))
-			igt_fail(err);
+		int load_error;
+
+		igt_i915_driver_unload();
+
+		hda_dynamic_debug(true);
+		load_error = igt_i915_driver_load(NULL);
+		hda_dynamic_debug(false);
+
+		igt_assert_eq(load_error, 0);
 
 		gem_sanitycheck();
 		gem_exec_store();
+
+		/* only default modparams, can leave module loaded */
 	}
 
-	igt_subtest("basic-no-display")
-		igt_assert_eq(reload("disable_display=1"), 0);
+	igt_subtest("basic-no-display") {
+		igt_i915_driver_unload();
+
+		igt_assert_eq(igt_i915_driver_load("disable_display=1"), 0);
+
+		igt_i915_driver_unload();
+	}
 
 	igt_subtest("basic-reload-inject") {
 		int i = 0;
@@ -366,14 +361,9 @@ igt_main
 
 		/* We expect to hit at least one fault! */
 		igt_assert(i > 1);
+
+		/* inject_fault() leaves the module unloaded */
 	}
 
-	igt_fixture {
-		if ((err = reload(NULL)))
-			igt_fail(err);
-
-		gem_sanitycheck();
-		gem_exec_store();
-		hda_dynamic_debug(false);
-	}
+	/* Subtests should unload the module themselves if they use modparams */
 }
