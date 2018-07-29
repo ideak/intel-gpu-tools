@@ -120,16 +120,23 @@ static int check_tools(void)
 
 static void create_guest(void)
 {
-    char create_qcow_cmd[PATH_MAX] = {0};
-    char create_vgpu_cmd[PATH_MAX] = {0};
-    char create_instance_cmd[PATH_MAX] = {0};
+    unsigned int max_size_cmd = 4 * PATH_MAX;
+    char *command;
 
-    sprintf(create_qcow_cmd, "qemu-img create -b %s -f qcow2 %s.qcow2",
+    command = malloc(max_size_cmd);
+    if (!command)
+        return;
+
+    sprintf(command, "qemu-img create -b %s -f qcow2 %s.qcow2",
             hda_path, hda_path);
-    sprintf(create_vgpu_cmd, "echo \"%s\" > /sys/bus/pci/devices/0000:00:02.0/"
+    igt_assert_eq(system(command), 0);
+
+    sprintf(command, "echo \"%s\" > /sys/bus/pci/devices/0000:00:02.0/"
            "mdev_supported_types/$(ls /sys/bus/pci/devices/0000:00:02.0/"
            "mdev_supported_types |awk {'print $1'}|tail -1)/create", uuid);
-    sprintf(create_instance_cmd, "%s -m 2048 -smp 2 -M pc -name gvtg_guest"
+    igt_assert_eq(system(command), 0);
+
+    sprintf(command, "%s -m 2048 -smp 2 -M pc -name gvtg_guest"
            " -hda %s.qcow2 -bios %s -enable-kvm --net nic,macaddr=%s -net"
            " tap,script=/etc/qemu-ifup -vga cirrus -k en-us"
            " -serial stdio -vnc :1 -machine kernel_irqchip=on -global"
@@ -137,9 +144,9 @@ static void create_guest(void)
            " -usb -usbdevice tablet -device vfio-pci,sysfsdev="
            "/sys/bus/pci/devices/0000:00:02.0/%s &",
            qemu_path, hda_path, bios_path, mac_addr, uuid);
-    igt_assert_eq(system(create_qcow_cmd), 0);
-    igt_assert_eq(system(create_vgpu_cmd), 0);
-    igt_assert_eq(system(create_instance_cmd), 0);
+    igt_assert_eq(system(command), 0);
+
+    free(command);
 }
 
 static void destroy_all_guest(void)
