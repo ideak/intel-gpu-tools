@@ -87,6 +87,17 @@ static bool has_exec_batch_first(int fd)
 	return val > 0;
 }
 
+static bool has_resource_streamer(int fd)
+{
+	int val = -1;
+	struct drm_i915_getparam gp = {
+		.param = I915_PARAM_HAS_RESOURCE_STREAMER,
+		.value = &val,
+	};
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM , &gp);
+	return val > 0;
+}
+
 static void test_batch_first(int fd)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
@@ -374,28 +385,18 @@ igt_main
 		execbuf.num_cliprects = 0;
 	}
 
-	igt_subtest("rs-invalid-on-bsd-ring") {
-		igt_require(IS_HASWELL(devid) || intel_gen(devid) >= 8);
-		execbuf.flags = I915_EXEC_BSD | LOCAL_I915_EXEC_RESOURCE_STREAMER;
-		RUN_FAIL(EINVAL);
-	}
+	igt_subtest("rs-invalid") {
+		bool has_rs = has_resource_streamer(fd);
+		unsigned int engine;
 
-	igt_subtest("rs-invalid-on-blt-ring") {
-		igt_require(IS_HASWELL(devid) || intel_gen(devid) >= 8);
-		execbuf.flags = I915_EXEC_BLT | LOCAL_I915_EXEC_RESOURCE_STREAMER;
-		RUN_FAIL(EINVAL);
-	}
+		for_each_engine(fd, engine) {
+			int expect = -EINVAL;
+			if (has_rs && (engine == 0 || engine == I915_EXEC_RENDER))
+				expect = 0;
 
-	igt_subtest("rs-invalid-on-vebox-ring") {
-		igt_require(IS_HASWELL(devid) || intel_gen(devid) >= 8);
-		execbuf.flags = I915_EXEC_VEBOX | LOCAL_I915_EXEC_RESOURCE_STREAMER;
-		RUN_FAIL(EINVAL);
-	}
-
-	igt_subtest("rs-invalid-gen") {
-		igt_require(!IS_HASWELL(devid) && intel_gen(devid) < 8);
-		execbuf.flags = I915_EXEC_RENDER | LOCAL_I915_EXEC_RESOURCE_STREAMER;
-		RUN_FAIL(EINVAL);
+			execbuf.flags = engine | LOCAL_I915_EXEC_RESOURCE_STREAMER;
+			igt_assert_eq(__gem_execbuf(fd, &execbuf), expect);
+		}
 	}
 
 	igt_subtest("invalid-fence-in") {
