@@ -49,8 +49,10 @@ static struct {
 static void test_bad_source(data_t *data)
 {
 	errno = 0;
-	if (igt_sysfs_set(data->debugfs, "crtc-0/crc/control", "foo"))
+	if (igt_sysfs_set(data->debugfs, "crtc-0/crc/control", "foo")) {
 		igt_assert(openat(data->debugfs, "crtc-0/crc/data", O_WRONLY) == -1);
+		igt_skip_on(errno == EIO);
+	}
 
 	igt_assert_eq(errno, EINVAL);
 }
