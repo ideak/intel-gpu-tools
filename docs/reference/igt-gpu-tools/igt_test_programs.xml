@@ -229,7 +229,7 @@
   <refentry id="igt-prime-tests">
     <refnamediv>
       <refname>Prime Tests</refname>
-      <refpurpose>Tests for buffer sharding</refpurpose>
+      <refpurpose>Tests for buffer sharing</refpurpose>
     </refnamediv>
     <xi:include href="igt_test_programs_prime_programs.xml"/>
     <xi:include href="igt_test_programs_prime_description.xml"/>
