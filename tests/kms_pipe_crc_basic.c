@@ -48,8 +48,11 @@ static struct {
 
 static void test_bad_source(data_t *data)
 {
-	igt_assert(igt_sysfs_set(data->debugfs, "crtc-0/crc/control", "foo"));
-	igt_assert(openat(data->debugfs, "crtc-0/crc/data", O_WRONLY) == -1);
+	errno = 0;
+	if (igt_sysfs_set(data->debugfs, "crtc-0/crc/control", "foo"))
+		igt_assert(openat(data->debugfs, "crtc-0/crc/data", O_WRONLY) == -1);
+
+	igt_assert_eq(errno, EINVAL);
 }
 
 #define N_CRCS	3
