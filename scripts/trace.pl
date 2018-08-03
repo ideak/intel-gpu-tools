@@ -170,8 +170,9 @@ sub arg_trace
 	if ($_[0] eq '--trace') {
 		shift @_;
 
+		unshift @_, '--';
 		unshift @_, join(',', @events);
-		unshift @_, ('perf', 'record', '-a', '-c', '1', '-q', '-e');
+		unshift @_, ('perf', 'record', '-a', '-c', '1', '-q', '-o', 'perf.data', '-e');
 
 		exec @_;
 	}
