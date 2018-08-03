@@ -187,7 +187,7 @@ sub trace_workload
 	open CMD, "$cmd |" or die;
 	while (<CMD>) {
 		chomp;
-		if (/Ring(\d+): (\d+) batches.*?(\d+\.?\d+)% idle,/) {
+		if (/Ring(\S+): (\d+) batches.*?(\d+\.?\d+)% idle,/) {
 			if ($2 >= $min_batches) {
 				$engines{$1} = $3;
 			} else {
@@ -542,7 +542,7 @@ foreach my $wrk (@workloads) {
 	my ($r, $error, $c, $wps, $swps);
 	my $saturated = 0;
 	my $result = 'Pass';
-	my $vcs2 = $gt2 ? '1' : '3';
+	my $vcs2 = $gt2 ? '1:0' : '2:1';
 	my %problem;
 	my $engines;
 
@@ -575,11 +575,11 @@ foreach my $wrk (@workloads) {
 	if ($saturated == 0) {
 		# Not a single saturated engine
 		$result = 'FAIL';
-	} elsif (not exists $engines->{'2'} or not exists $engines->{$vcs2}) {
+	} elsif (not exists $engines->{'2:0'} or not exists $engines->{$vcs2}) {
 		# VCS1 and VCS2 not present in a balancing workload
 		$result = 'FAIL';
 	} elsif ($saturated == 1 and
-		 ($engines->{'2'} < $idle_tolerance_pct or
+		 ($engines->{'2:0'} < $idle_tolerance_pct or
 		  $engines->{$vcs2} < $idle_tolerance_pct)) {
 		# Only one VCS saturated
 		$result = 'WARN';
