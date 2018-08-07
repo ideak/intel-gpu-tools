@@ -692,8 +692,11 @@ static void setup_pc8(void)
 	has_pc8 = true;
 }
 
-static void setup_environment(void)
+static bool setup_environment(void)
 {
+	if (has_runtime_pm)
+		goto out;
+
 	drm_fd = drm_open_driver_master(DRIVER_INTEL);
 	debugfs = igt_debugfs_dir(drm_fd);
 	igt_require(debugfs != -1);
@@ -707,8 +710,11 @@ static void setup_environment(void)
 
 	igt_info("Runtime PM support: %d\n", has_runtime_pm);
 	igt_info("PC8 residency support: %d\n", has_pc8);
-
 	igt_require(has_runtime_pm);
+
+out:
+	disable_all_screens(&ms_data);
+	return wait_for_suspended();
 }
 
 static void restore_environment(void)
@@ -1372,10 +1378,11 @@ static void __attribute__((noreturn)) stay_subtest(void)
 		sleep(600);
 }
 
-static void system_suspend_subtest(void)
+static void system_suspend_subtest(int state, int debug)
 {
 	disable_all_screens_and_wait(&ms_data);
-	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
+
+	igt_system_suspend_autoresume(state, debug);
 	igt_assert(wait_for_suspended());
 }
 
@@ -1898,19 +1905,22 @@ int main(int argc, char *argv[])
 	igt_subtest_init_parse_opts(&argc, argv, "", long_options,
 				    help_str, opt_handler, NULL);
 
+	igt_subtest("basic-rte") {
+		igt_assert(setup_environment());
+		basic_subtest();
+	}
+
 	/* Skip instead of failing in case the machine is not prepared to reach
 	 * PC8+. We don't want bug reports from cases where the machine is just
 	 * not properly configured. */
 	igt_fixture
-		setup_environment();
+		igt_require(setup_environment());
 
 	if (stay)
 		igt_subtest("stay")
 			stay_subtest();
 
 	/* Essential things */
-	igt_subtest("basic-rte")
-		basic_subtest();
 	igt_subtest("drm-resources-equal")
 		drm_resources_equal_subtest();
 	igt_subtest("basic-pci-d3-state")
@@ -1992,12 +2002,19 @@ int main(int argc, char *argv[])
 				WAIT_STATUS | WAIT_EXTRA);
 
 	/* System suspend */
+	igt_subtest("system-suspend-devices")
+		system_suspend_subtest(SUSPEND_STATE_MEM, SUSPEND_TEST_DEVICES);
 	igt_subtest("system-suspend")
-		system_suspend_subtest();
+		system_suspend_subtest(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 	igt_subtest("system-suspend-execbuf")
 		system_suspend_execbuf_subtest();
 	igt_subtest("system-suspend-modeset")
 		system_suspend_modeset_subtest();
+	igt_subtest("system-hibernate-devices")
+		system_suspend_subtest(SUSPEND_STATE_DISK,
+				       SUSPEND_TEST_DEVICES);
+	igt_subtest("system-hibernate")
+		system_suspend_subtest(SUSPEND_STATE_DISK, SUSPEND_TEST_NONE);
 
 	/* GEM stress */
 	igt_subtest("gem-execbuf-stress")
