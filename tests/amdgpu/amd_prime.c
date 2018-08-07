@@ -392,6 +392,35 @@ static void amd_to_i915(int i915, int amd, amdgpu_device_handle device)
 				 ib_result_mc_address, 4096);
 }
 
+static void shrink(int i915, int amd, amdgpu_device_handle device)
+{
+	struct amdgpu_bo_alloc_request request = {
+		.alloc_size = 1024 * 1024 * 4,
+		.phys_alignment = 4096,
+		.preferred_heap = AMDGPU_GEM_DOMAIN_GTT,
+	};
+	amdgpu_bo_handle bo;
+	uint32_t handle;
+	int dmabuf;
+
+	igt_assert_eq(amdgpu_bo_alloc(device, &request, &bo), 0);
+	amdgpu_bo_export(bo,
+			 amdgpu_bo_handle_type_dma_buf_fd,
+			 (uint32_t *)&dmabuf);
+	amdgpu_bo_free(bo);
+
+	handle = prime_fd_to_handle(i915, dmabuf);
+	close(dmabuf);
+
+	/* Populate the i915_bo->pages. */
+	gem_set_domain(i915, handle, I915_GEM_DOMAIN_GTT, 0);
+
+	/* Now evict them, establishing the link from i915:shrinker to amd. */
+	igt_drop_caches_set(i915, DROP_SHRINK_ALL);
+
+	gem_close(i915, handle);
+}
+
 igt_main
 {
 	amdgpu_device_handle device;
@@ -419,6 +448,9 @@ igt_main
 
 	igt_subtest("amd-to-i915")
 		amd_to_i915(i915, amd, device);
+
+	igt_subtest("shrink")
+		shrink(i915, amd, device);
 
 	igt_fixture {
 		amdgpu_device_deinitialize(device);
