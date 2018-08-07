@@ -237,6 +237,32 @@ static void test_gtt(int vgem, int i915)
 	gem_close(vgem, scratch.handle);
 }
 
+static void test_shrink(int vgem, int i915)
+{
+	struct vgem_bo scratch = {
+		.width = 1024,
+		.height = 1024,
+		.bpp = 32
+	};
+	int dmabuf;
+
+	vgem_create(vgem, &scratch);
+
+	dmabuf = prime_handle_to_fd(vgem, scratch.handle);
+	gem_close(vgem, scratch.handle);
+
+	scratch.handle = prime_fd_to_handle(i915, dmabuf);
+	close(dmabuf);
+
+	/* Populate the i915_bo->pages. */
+	gem_set_domain(i915, scratch.handle, I915_GEM_DOMAIN_GTT, 0);
+
+	/* Now evict them, establishing the link from i915:shrinker to vgem. */
+	igt_drop_caches_set(i915, DROP_SHRINK_ALL);
+
+	gem_close(i915, scratch.handle);
+}
+
 static bool is_coherent(int i915)
 {
 	int val = 1; /* by default, we assume GTT is coherent, hence the test */
@@ -793,6 +819,9 @@ igt_main
 
 	igt_subtest("basic-gtt")
 		test_gtt(vgem, i915);
+
+	igt_subtest("shrink")
+		test_shrink(vgem, i915);
 
 	igt_subtest("coherency-gtt")
 		test_gtt_interleaved(vgem, i915);
