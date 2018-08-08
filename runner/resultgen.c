@@ -1,0 +1,962 @@
+#include <ctype.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <json.h>
+
+#include "igt_core.h"
+#include "resultgen.h"
+#include "settings.h"
+#include "executor.h"
+#include "output_strings.h"
+
+struct subtests
+{
+	char **names;
+	size_t size;
+};
+
+/*
+ * A lot of string handling here operates on an mmapped buffer, and
+ * thus we can't assume null-terminated strings. Buffers will be
+ * passed around as pointer+size, or pointer+pointer-past-the-end, the
+ * mem*() family of functions is used instead of str*().
+ */
+
+static char *find_line_starting_with(char *haystack, const char *needle, char *end)
+{
+	while (haystack < end) {
+		char *line_end = memchr(haystack, '\n', end - haystack);
+
+		if (end - haystack < strlen(needle))
+			return NULL;
+		if (!memcmp(haystack, needle, strlen(needle)))
+			return haystack;
+		if (line_end == NULL)
+			return NULL;
+		haystack = line_end + 1;
+	}
+
+	return NULL;
+}
+
+static char *find_line_starting_with_either(char *haystack,
+					    const char *needle1,
+					    const char *needle2,
+					    char *end)
+{
+	while (haystack < end) {
+		char *line_end = memchr(haystack, '\n', end - haystack);
+		size_t linelen = line_end != NULL ? line_end - haystack : end - haystack;
+		if ((linelen >= strlen(needle1) && !memcmp(haystack, needle1, strlen(needle1))) ||
+		    (linelen >= strlen(needle2) && !memcmp(haystack, needle2, strlen(needle2))))
+			return haystack;
+
+		if (line_end == NULL)
+			return NULL;
+
+		haystack = line_end + 1;
+	}
+
+	return NULL;
+}
+
+static char *next_line(char *line, char *bufend)
+{
+	char *ret;
+
+	if (!line)
+		return NULL;
+
+	ret = memchr(line, '\n', bufend - line);
+	if (ret)
+		ret++;
+
+	if (ret < bufend)
+		return ret;
+	else
+		return NULL;
+}
+
+static char *find_line_after_last(char *begin,
+				  const char *needle1,
+				  const char *needle2,
+				  char *end)
+{
+	char *one, *two;
+	char *current_pos = begin;
+	char *needle1_newline = malloc(strlen(needle1) + 2);
+	char *needle2_newline = malloc(strlen(needle2) + 2);
+
+	needle1_newline[0] = needle2_newline[0] = '\n';
+	strcpy(needle1_newline + 1, needle1);
+	strcpy(needle2_newline + 1, needle2);
+
+	while (true) {
+		one = memmem(current_pos, end - current_pos, needle1_newline, strlen(needle1_newline));
+		two = memmem(current_pos, end - current_pos, needle2_newline, strlen(needle2_newline));
+		if (one == NULL && two == NULL)
+			break;
+
+		if (one != NULL && current_pos < one)
+			current_pos = one;
+		if (two != NULL && current_pos < two)
+			current_pos = two;
+
+		one = next_line(current_pos, end);
+		if (one != NULL)
+			current_pos = one;
+	}
+	free(needle1_newline);
+	free(needle2_newline);
+
+	one = memchr(current_pos, '\n', end - current_pos);
+	if (one != NULL)
+		return ++one;
+
+	return current_pos;
+}
+
+static size_t count_lines(const char *buf, const char *bufend)
+{
+	size_t ret = 0;
+	while (buf < bufend && (buf = memchr(buf, '\n', bufend - buf)) != NULL) {
+		ret++;
+		buf++;
+	}
+
+	return ret;
+}
+
+static char *lowercase(const char *str)
+{
+	char *ret = malloc(strlen(str) + 1);
+	char *q = ret;
+
+	while (*str) {
+		if (isspace(*str))
+			break;
+
+		*q++ = tolower(*str++);
+	}
+	*q = '\0';
+
+	return ret;
+}
+
+static void append_line(char **buf, size_t *buflen, char *line)
+{
+	size_t linelen = strlen(line);
+
+	*buf = realloc(*buf, *buflen + linelen + 1);
+	strcpy(*buf + *buflen, line);
+	*buflen += linelen;
+}
+
+static void generate_piglit_name(const char *binary, const char *subtest,
+				 char *namebuf, size_t namebuf_size)
+{
+	char *lc_binary = lowercase(binary);
+	char *lc_subtest = NULL;
+
+	if (!subtest) {
+		snprintf(namebuf, namebuf_size, "igt@%s", lc_binary);
+		free(lc_binary);
+		return;
+	}
+
+	lc_subtest = lowercase(subtest);
+
+	snprintf(namebuf, namebuf_size, "igt@%s@%s", lc_binary, lc_subtest);
+
+	free(lc_binary);
+	free(lc_subtest);
+}
+
+static const struct {
+	const char *output_str;
+	const char *result_str;
+} resultmap[] = {
+	{ "SUCCESS", "pass" },
+	{ "SKIP", "skip" },
+	{ "FAIL", "fail" },
+	{ "CRASH", "crash" },
+	{ "TIMEOUT", "timeout" },
+};
+static void parse_result_string(char *resultstring, size_t len, const char **result, double *time)
+{
+	size_t i;
+	size_t wordlen = 0;
+
+	while (wordlen < len && !isspace(resultstring[wordlen])) {
+		wordlen++;
+	}
+
+	*result = NULL;
+	for (i = 0; i < (sizeof(resultmap) / sizeof(resultmap[0])); i++) {
+		if (!strncmp(resultstring, resultmap[i].output_str, wordlen)) {
+			*result = resultmap[i].result_str;
+			break;
+		}
+	}
+
+	/* If the result string is unknown, use incomplete */
+	if (!*result)
+		*result = "incomplete";
+
+	/*
+	 * Check for subtest runtime after the result. The string is
+	 * '(' followed by the runtime in seconds as floating point,
+	 * followed by 's)'.
+	 */
+	wordlen++;
+	if (wordlen < len && resultstring[wordlen] == '(') {
+		char *dup;
+
+		wordlen++;
+		dup = malloc(len - wordlen + 1);
+		memcpy(dup, resultstring + wordlen, len - wordlen);
+		dup[len - wordlen] = '\0';
+		*time = strtod(dup, NULL);
+
+		free(dup);
+	}
+}
+
+static void parse_subtest_result(char *subtest, const char **result, double *time, char *buf, char *bufend)
+{
+	char *line;
+	char *line_end;
+	char *resultstring;
+	size_t linelen;
+	size_t subtestlen = strlen(subtest);
+
+	*result = NULL;
+	*time = 0.0;
+
+	if (!buf) return;
+
+	/*
+	 * The result line structure is:
+	 *
+	 * - The string "Subtest " (`SUBTEST_RESULT` from output_strings.h)
+	 * - The subtest name
+	 * - The characters ':' and ' '
+	 * - Subtest result string
+	 * - Optional:
+	 * -- The characters ' ' and '('
+	 * -- Subtest runtime in seconds as floating point
+	 * -- The characters 's' and ')'
+	 *
+	 * Example:
+	 * Subtest subtestname: PASS (0.003s)
+	 */
+
+	line = find_line_starting_with(buf, SUBTEST_RESULT, bufend);
+	if (!line) {
+		*result = "incomplete";
+		return;
+	}
+
+	line_end = memchr(line, '\n', bufend - line);
+	linelen = line_end != NULL ? line_end - line : bufend - line;
+
+	if (strlen(SUBTEST_RESULT) + subtestlen + strlen(": ") > linelen ||
+	    strncmp(line + strlen(SUBTEST_RESULT), subtest, subtestlen))
+		return parse_subtest_result(subtest, result, time, line + linelen, bufend);
+
+	resultstring = line + strlen(SUBTEST_RESULT) + subtestlen + strlen(": ");
+	parse_result_string(resultstring, linelen - (resultstring - line), result, time);
+}
+
+static struct json_object *get_or_create_json_object(struct json_object *base,
+						     const char *key)
+{
+	struct json_object *ret;
+
+	if (json_object_object_get_ex(base, key, &ret))
+		return ret;
+
+	ret = json_object_new_object();
+	json_object_object_add(base, key, ret);
+
+	return ret;
+}
+
+static void set_result(struct json_object *obj, const char *result)
+{
+	json_object_object_add(obj, "result",
+			       json_object_new_string(result));
+}
+
+static void add_runtime(struct json_object *obj, double time)
+{
+	double oldtime;
+	struct json_object *timeobj = get_or_create_json_object(obj, "time");
+	struct json_object *oldend;
+
+	json_object_object_add(timeobj, "__type__",
+			       json_object_new_string("TimeAttribute"));
+	json_object_object_add(timeobj, "start",
+			       json_object_new_double(0.0));
+
+	if (!json_object_object_get_ex(timeobj, "end", &oldend)) {
+		json_object_object_add(timeobj, "end",
+				       json_object_new_double(time));
+		return;
+	}
+
+	/* Add the runtime to the existing runtime. */
+	oldtime = json_object_get_double(oldend);
+	time += oldtime;
+	json_object_object_add(timeobj, "end",
+			       json_object_new_double(time));
+}
+
+static void set_runtime(struct json_object *obj, double time)
+{
+	struct json_object *timeobj = get_or_create_json_object(obj, "time");
+
+	json_object_object_add(timeobj, "__type__",
+			       json_object_new_string("TimeAttribute"));
+	json_object_object_add(timeobj, "start",
+			       json_object_new_double(0.0));
+	json_object_object_add(timeobj, "end",
+			       json_object_new_double(time));
+}
+
+static bool fill_from_output(int fd, const char *binary, const char *key,
+			     struct subtests *subtests,
+			     struct json_object *tests)
+{
+	char *buf, *bufend;
+	struct stat statbuf;
+	char piglit_name[256];
+	char *igt_version = NULL;
+	size_t igt_version_len = 0;
+	struct json_object *current_test = NULL;
+	size_t i;
+
+	if (fstat(fd, &statbuf))
+		return false;
+
+	if (statbuf.st_size != 0) {
+		buf = mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
+		if (buf == MAP_FAILED)
+			return false;
+	} else {
+		buf = NULL;
+	}
+
+	bufend = buf + statbuf.st_size;
+
+	igt_version = find_line_starting_with(buf, IGT_VERSIONSTRING, bufend);
+	if (igt_version) {
+		char *newline = memchr(igt_version, '\n', bufend - igt_version);
+		igt_version_len = newline - igt_version;
+	}
+
+	/* TODO: Refactor to helper functions */
+	if (subtests->size == 0) {
+		/* No subtests */
+		generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+		current_test = get_or_create_json_object(tests, piglit_name);
+
+		json_object_object_add(current_test, key,
+				       json_object_new_string_len(buf, statbuf.st_size));
+		if (igt_version)
+			json_object_object_add(current_test, "igt-version",
+					       json_object_new_string_len(igt_version,
+									  igt_version_len));
+
+		return true;
+	}
+
+	for (i = 0; i < subtests->size; i++) {
+		char *this_sub_begin, *this_sub_result;
+		const char *resulttext;
+		char *beg, *end, *startline;
+		double time;
+		int begin_len;
+		int result_len;
+
+		generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+		current_test = get_or_create_json_object(tests, piglit_name);
+
+		begin_len = asprintf(&this_sub_begin, "%s%s\n", STARTING_SUBTEST, subtests->names[i]);
+		result_len = asprintf(&this_sub_result, "%s%s: ", SUBTEST_RESULT, subtests->names[i]);
+
+		if (begin_len < 0 || result_len < 0) {
+			fprintf(stderr, "Failure generating strings\n");
+			return false;
+		}
+
+		beg = find_line_starting_with(buf, this_sub_begin, bufend);
+		end = find_line_starting_with(buf, this_sub_result, bufend);
+		startline = beg;
+
+		free(this_sub_begin);
+		free(this_sub_result);
+
+		if (beg == NULL && end == NULL) {
+			/* No output at all */
+			beg = bufend;
+			end = bufend;
+		}
+
+		if (beg == NULL) {
+			/*
+			 * Subtest didn't start, probably skipped from
+			 * fixture already. Start from the result
+			 * line, it gets adjusted below.
+			 */
+			beg = end;
+		}
+
+		/* Include the output after the previous subtest output */
+		beg = find_line_after_last(buf,
+					   STARTING_SUBTEST,
+					   SUBTEST_RESULT,
+					   beg);
+
+		if (end == NULL) {
+			/* Incomplete result. Find the next starting subtest or result. */
+			end = next_line(startline, bufend);
+			if (end != NULL) {
+				end = find_line_starting_with_either(end,
+								     STARTING_SUBTEST,
+								     SUBTEST_RESULT,
+								     bufend);
+			}
+			if (end == NULL) {
+				end = bufend;
+			}
+		} else {
+			/*
+			 * Now pointing to the line where this sub's
+			 * result is. We need to include that of
+			 * course.
+			 */
+			char *nexttest = next_line(end, bufend);
+
+			/* Stretch onwards until the next subtest begins or ends */
+			if (nexttest != NULL) {
+				nexttest = find_line_starting_with_either(nexttest,
+									  STARTING_SUBTEST,
+									  SUBTEST_RESULT,
+									  bufend);
+			}
+			if (nexttest != NULL) {
+				end = nexttest;
+			} else {
+				end = bufend;
+			}
+		}
+
+		json_object_object_add(current_test, key,
+				       json_object_new_string_len(beg, end - beg));
+
+		if (igt_version) {
+			json_object_object_add(current_test, "igt-version",
+					       json_object_new_string_len(igt_version,
+									  igt_version_len));
+		}
+
+		if (!json_object_object_get_ex(current_test, "result", NULL)) {
+			parse_subtest_result(subtests->names[i], &resulttext, &time, beg, end);
+			set_result(current_test, resulttext);
+			set_runtime(current_test, time);
+		}
+	}
+
+	return true;
+}
+
+/*
+ * This regexp controls the kmsg handling. All kernel log records that
+ * have log level of warning or higher convert the result to
+ * dmesg-warn/dmesg-fail unless they match this regexp.
+ *
+ * TODO: Move this to external files, i915-suppressions.txt,
+ * general-suppressions.txt et al.
+ */
+
+#define _ "|"
+static const char igt_dmesg_whitelist[] =
+	"ACPI: button: The lid device is not compliant to SW_LID" _
+	"ACPI: .*: Unable to dock!" _
+	"IRQ [0-9]+: no longer affine to CPU[0-9]+" _
+	"IRQ fixup: irq [0-9]+ move in progress, old vector [0-9]+" _
+	/* i915 tests set module options, expected message */
+	"Setting dangerous option [a-z_]+ - tainting kernel" _
+	/* Raw printk() call, uses default log level (warn) */
+	"Suspending console\\(s\\) \\(use no_console_suspend to debug\\)" _
+	"atkbd serio[0-9]+: Failed to (deactivate|enable) keyboard on isa[0-9]+/serio[0-9]+" _
+	"cache: parent cpu[0-9]+ should not be sleeping" _
+	"hpet[0-9]+: lost [0-9]+ rtc interrupts" _
+	/* i915 selftests terminate normally with ENODEV from the
+	 * module load after the testing finishes, which produces this
+	 * message.
+	 */
+	"i915: probe of [0-9:.]+ failed with error -25" _
+	/* swiotbl warns even when asked not to */
+	"mock: DMA: Out of SW-IOMMU space for [0-9]+ bytes" _
+	"usb usb[0-9]+: root hub lost power or was reset"
+	;
+#undef _
+
+static regex_t re;
+
+static int init_regex_whitelist(void)
+{
+	static int status = -1;
+
+	if (status == -1) {
+		if (regcomp(&re, igt_dmesg_whitelist, REG_EXTENDED | REG_NOSUB) != 0) {
+			fprintf(stderr, "Cannot compile dmesg whitelist regexp\n");
+			status = 1;
+			return false;
+		}
+
+		status = 0;
+	}
+
+	return status;
+}
+
+static bool parse_dmesg_line(char* line,
+			     unsigned *flags, unsigned long long *ts_usec,
+			     char *continuation, char **message)
+{
+	unsigned long long seq;
+	int s;
+
+	s = sscanf(line, "%u,%llu,%llu,%c;", flags, &seq, ts_usec, continuation);
+	if (s != 4) {
+		/*
+		 * Machine readable key/value pairs begin with
+		 * a space. We ignore them.
+		 */
+		if (line[0] != ' ') {
+			fprintf(stderr, "Cannot parse kmsg record: %s\n", line);
+		}
+		return false;
+	}
+
+	*message = strchr(line, ';');
+	if (!message) {
+		fprintf(stderr, "No ; found in kmsg record, this shouldn't happen\n");
+		return false;
+	}
+	(*message)++;
+
+	return true;
+}
+
+static void add_dmesg(struct json_object *obj,
+		      const char *dmesg, size_t dmesglen,
+		      const char *warnings, size_t warningslen)
+{
+	json_object_object_add(obj, "dmesg",
+			       json_object_new_string_len(dmesg, dmesglen));
+
+	if (warnings) {
+		json_object_object_add(obj, "dmesg-warnings",
+				       json_object_new_string_len(warnings, warningslen));
+	}
+}
+
+static void add_empty_dmesgs_where_missing(struct json_object *tests,
+					   char *binary,
+					   struct subtests *subtests)
+{
+	struct json_object *current_test;
+	char piglit_name[256];
+	size_t i;
+
+	for (i = 0; i < subtests->size; i++) {
+		generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+		current_test = get_or_create_json_object(tests, piglit_name);
+		if (!json_object_object_get_ex(current_test, "dmesg", NULL)) {
+			add_dmesg(current_test, "", 0, NULL, 0);
+		}
+	}
+
+}
+
+static bool fill_from_dmesg(int fd, char *binary,
+			    struct subtests *subtests,
+			    struct json_object *tests)
+{
+	char *line = NULL, *warnings = NULL, *dmesg = NULL;
+	size_t linelen = 0, warningslen = 0, dmesglen = 0;
+	struct json_object *current_test = NULL;
+	FILE *f = fdopen(fd, "r");
+	char piglit_name[256];
+	ssize_t read;
+	size_t i;
+
+	if (!f) {
+		return false;
+	}
+
+	if (init_regex_whitelist()) {
+		fclose(f);
+		return false;
+	}
+
+	while ((read = getline(&line, &linelen, f)) > 0) {
+		char *formatted;
+		unsigned flags;
+		unsigned long long ts_usec;
+		char continuation;
+		char *message, *subtest;
+
+		if (!parse_dmesg_line(line, &flags, &ts_usec, &continuation, &message))
+			continue;
+
+		asprintf(&formatted, "<%u> [%llu.%06llu] %s",
+			 flags & 0x07, ts_usec / 1000000, ts_usec % 1000000, message);
+
+		if ((subtest = strstr(message, STARTING_SUBTEST_DMESG)) != NULL) {
+			if (current_test != NULL) {
+				/* Done with the previous subtest, file up */
+				add_dmesg(current_test, dmesg, dmesglen, warnings, warningslen);
+
+				free(dmesg);
+				free(warnings);
+				dmesg = warnings = NULL;
+				dmesglen = warningslen = 0;
+			}
+
+			subtest += strlen(STARTING_SUBTEST_DMESG);
+			generate_piglit_name(binary, subtest, piglit_name, sizeof(piglit_name));
+			current_test = get_or_create_json_object(tests, piglit_name);
+		}
+
+		if ((flags & 0x07) <= 4 && continuation != 'c' &&
+		    regexec(&re, message, (size_t)0, NULL, 0) == REG_NOMATCH) {
+			append_line(&warnings, &warningslen, formatted);
+		}
+		append_line(&dmesg, &dmesglen, formatted);
+		free(formatted);
+	}
+
+	if (current_test != NULL) {
+		add_dmesg(current_test, dmesg, dmesglen, warnings, warningslen);
+	} else {
+		/*
+		 * Didn't get any subtest messages at all. If there
+		 * are subtests, add all of the dmesg gotten to all of
+		 * them.
+		 */
+		for (i = 0; i < subtests->size; i++) {
+			generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+			current_test = get_or_create_json_object(tests, piglit_name);
+			/*
+			 * Don't bother with warnings, any subtests
+			 * there are would have skip as their result
+			 * anyway.
+			 */
+			add_dmesg(current_test, dmesg, dmesglen, NULL, 0);
+		}
+
+		if (subtests->size == 0) {
+			generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+			current_test = get_or_create_json_object(tests, piglit_name);
+			add_dmesg(current_test, dmesg, dmesglen, warnings, warningslen);
+		}
+	}
+
+	add_empty_dmesgs_where_missing(tests, binary, subtests);
+
+	free(dmesg);
+	free(warnings);
+	fclose(f);
+	return true;
+}
+
+static const char *result_from_exitcode(int exitcode)
+{
+	switch (exitcode) {
+	case IGT_EXIT_TIMEOUT:
+		return "timeout";
+	case IGT_EXIT_SKIP:
+		return "skip";
+	case IGT_EXIT_SUCCESS:
+		return "pass";
+	case IGT_EXIT_INVALID:
+		return "notrun";
+	default:
+		return "fail";
+	}
+}
+
+static void add_subtest(struct subtests *subtests, char *subtest)
+{
+	size_t len = strlen(subtest);
+
+	if (len == 0)
+		return;
+
+	if (subtest[len - 1] == '\n')
+		subtest[len - 1] = '\0';
+
+	subtests->size++;
+	subtests->names = realloc(subtests->names, sizeof(*subtests->names) * subtests->size);
+	subtests->names[subtests->size - 1] = subtest;
+}
+
+static void fill_from_journal(int fd, char *binary,
+			      struct subtests *subtests,
+			      struct json_object *tests)
+{
+	FILE *f = fdopen(fd, "r");
+	char *line = NULL;
+	size_t linelen = 0;
+	ssize_t read;
+	char exitline[] = "exit:";
+	char timeoutline[] = "timeout:";
+	int exitcode = -1;
+	bool has_timeout = false;
+
+	while ((read = getline(&line, &linelen, f)) > 0) {
+		if (read >= strlen(exitline) && !memcmp(line, exitline, strlen(exitline))) {
+			char *p = strchr(line, '(');
+			char piglit_name[256];
+			double time = 0.0;
+			struct json_object *obj;
+
+			generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+			obj = get_or_create_json_object(tests, piglit_name);
+
+			exitcode = atoi(line + strlen(exitline));
+
+			if (p)
+				time = strtod(p + 1, NULL);
+
+			add_runtime(obj, time);
+		} else if (read >= strlen(timeoutline) && !memcmp(line, timeoutline, strlen(timeoutline))) {
+			has_timeout = true;
+
+			if (subtests->size) {
+				/* Assign the timeout to the previously appeared subtest */
+				char *last_subtest = subtests->names[subtests->size - 1];
+				char piglit_name[256];
+				char *p = strchr(line, '(');
+				double time = 0.0;
+				struct json_object *obj;
+
+				generate_piglit_name(binary, last_subtest, piglit_name, sizeof(piglit_name));
+				obj = get_or_create_json_object(tests, piglit_name);
+
+				set_result(obj, "timeout");
+
+				if (p)
+					time = strtod(p + 1, NULL);
+
+				/* Add runtime for the subtest... */
+				add_runtime(obj, time);
+
+				/* ... and also for the binary */
+				generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+				obj = get_or_create_json_object(tests, piglit_name);
+				add_runtime(obj, time);
+			}
+		} else {
+			add_subtest(subtests, strdup(line));
+		}
+	}
+
+	if (subtests->size == 0) {
+		char piglit_name[256];
+		struct json_object *obj;
+		const char *result = has_timeout ? "timeout" : result_from_exitcode(exitcode);
+
+		generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+		obj = get_or_create_json_object(tests, piglit_name);
+		set_result(obj, result);
+	}
+
+	free(line);
+}
+
+static void override_result_single(struct json_object *obj)
+{
+	const char *errtext = NULL, *result = NULL;
+	struct json_object *textobj;
+	bool dmesgwarns = false;
+
+	if (json_object_object_get_ex(obj, "err", &textobj))
+		errtext = json_object_get_string(textobj);
+	if (json_object_object_get_ex(obj, "result", &textobj))
+		result = json_object_get_string(textobj);
+	if (json_object_object_get_ex(obj, "dmesg-warnings", &textobj))
+		dmesgwarns = true;
+
+	if (!strcmp(result, "pass") &&
+	    count_lines(errtext, errtext + strlen(errtext)) > 2) {
+		set_result(obj, "warn");
+	}
+
+	if (dmesgwarns) {
+		if (!strcmp(result, "pass") || !strcmp(result, "warn")) {
+			set_result(obj, "dmesg-warn");
+		} else if (!strcmp(result, "fail")) {
+			set_result(obj, "dmesg-fail");
+		}
+	}
+}
+
+static void override_results(char *binary,
+			     struct subtests *subtests,
+			     struct json_object *tests)
+{
+	struct json_object *obj;
+	char piglit_name[256];
+	size_t i;
+
+	if (subtests->size == 0) {
+		generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+		obj = get_or_create_json_object(tests, piglit_name);
+		override_result_single(obj);
+		return;
+	}
+
+	for (i = 0; i < subtests->size; i++) {
+		generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+		obj = get_or_create_json_object(tests, piglit_name);
+		override_result_single(obj);
+	}
+}
+
+static bool parse_test_directory(int dirfd, char *binary, struct json_object *tests)
+{
+	int fds[_F_LAST];
+	struct subtests subtests = {};
+
+	if (!open_output_files(dirfd, fds, false)) {
+		fprintf(stderr, "Error opening output files\n");
+		return false;
+	}
+
+	/*
+	 * fill_from_journal fills the subtests struct and adds
+	 * timeout results where applicable.
+	 */
+	fill_from_journal(fds[_F_JOURNAL], binary, &subtests, tests);
+
+	if (!fill_from_output(fds[_F_OUT], binary, "out", &subtests, tests) ||
+	    !fill_from_output(fds[_F_ERR], binary, "err", &subtests, tests) ||
+	    !fill_from_dmesg(fds[_F_DMESG], binary, &subtests, tests)) {
+		fprintf(stderr, "Error parsing output files\n");
+		return false;
+	}
+
+	override_results(binary, &subtests, tests);
+
+	close_outputs(fds);
+
+	return true;
+}
+
+bool generate_results(int dirfd)
+{
+	struct settings settings;
+	struct job_list job_list;
+	struct json_object *obj, *tests;
+	int resultsfd, testdirfd, unamefd;
+	const char *json_string;
+	size_t i;
+
+	init_settings(&settings);
+	init_job_list(&job_list);
+
+	if (!read_settings(&settings, dirfd)) {
+		fprintf(stderr, "resultgen: Cannot parse settings\n");
+		return false;
+	}
+
+	if (!read_job_list(&job_list, dirfd)) {
+		fprintf(stderr, "resultgen: Cannot parse job list\n");
+		return false;
+	}
+
+	/* TODO: settings.overwrite */
+	if ((resultsfd = openat(dirfd, "results.json", O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0) {
+		fprintf(stderr, "resultgen: Cannot create results file\n");
+		return false;
+	}
+
+	obj = json_object_new_object();
+	json_object_object_add(obj, "__type__", json_object_new_string("TestrunResult"));
+	json_object_object_add(obj, "results_version", json_object_new_int(9));
+	json_object_object_add(obj, "name",
+			       settings.name ?
+			       json_object_new_string(settings.name) :
+			       json_object_new_string(""));
+
+	if ((unamefd = openat(dirfd, "uname.txt", O_RDONLY)) >= 0) {
+		char buf[128];
+		ssize_t r = read(unamefd, buf, 128);
+
+		if (r > 0 && buf[r - 1] == '\n')
+			r--;
+
+		json_object_object_add(obj, "uname",
+				       json_object_new_string_len(buf, r));
+		close(unamefd);
+	}
+
+	/*
+	 * Result fields that won't be added:
+	 *
+	 * - glxinfo
+	 * - wglinfo
+	 * - clinfo
+	 *
+	 * Result fields that are TODO:
+	 *
+	 * - lspci
+	 * - options
+	 * - time_elapsed
+	 * - totals
+	 */
+
+	tests = json_object_new_object();
+	json_object_object_add(obj, "tests", tests);
+
+	for (i = 0; i < job_list.size; i++) {
+		char name[16];
+
+		snprintf(name, 16, "%zd", i);
+		if ((testdirfd = openat(dirfd, name, O_DIRECTORY | O_RDONLY)) < 0) {
+			fprintf(stderr, "Warning: Cannot open result directory %s\n", name);
+			break;
+		}
+
+		if (!parse_test_directory(testdirfd, job_list.entries[i].binary, tests)) {
+			close(resultsfd);
+			return false;
+		}
+	}
+
+	json_string = json_object_to_json_string_ext(obj, JSON_C_TO_STRING_PRETTY);
+	write(resultsfd, json_string, strlen(json_string));
+	return true;
+}
+
+bool generate_results_path(char *resultspath)
+{
+	int dirfd = open(resultspath, O_DIRECTORY | O_RDONLY);
+
+	if (dirfd < 0)
+		return false;
+
+	return generate_results(dirfd);
+}

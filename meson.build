@@ -38,6 +38,8 @@ _build_docs = false
 _docs_required = false
 _build_tests = false
 _tests_required = false
+_build_runner = false
+_runner_required = false
 
 build_overlay = get_option('build_overlay')
 overlay_backends = get_option('overlay_backends')
@@ -48,6 +50,7 @@ build_chamelium = get_option('build_chamelium')
 build_docs = get_option('build_docs')
 build_tests = get_option('build_tests')
 with_libdrm = get_option('with_libdrm')
+build_runner = get_option('build_runner')
 
 _build_overlay = build_overlay != 'false'
 _overlay_required = build_overlay == 'true'
@@ -61,6 +64,8 @@ _build_docs = build_docs != 'false'
 _docs_required = build_docs == 'true'
 _build_tests = build_tests != 'false'
 _tests_required = build_tests == 'true'
+_build_runner = build_runner != 'false'
+_runner_required = build_runner == 'true'
 
 build_info = []
 
@@ -228,6 +233,7 @@ else
 endif
 subdir('benchmarks')
 subdir('tools')
+subdir('runner')
 if libdrm_intel.found()
 	subdir('assembler')
 endif

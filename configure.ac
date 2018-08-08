@@ -374,6 +374,18 @@ fi
 AM_CONDITIONAL(BUILD_TESTS, [test "x$BUILD_TESTS" = xyes])
 AC_DEFINE_UNQUOTED(TARGET_CPU_PLATFORM, ["$host_cpu"], [Target platform])
 
+AC_ARG_ENABLE(runner,
+	      AS_HELP_STRING([--disable-runner],
+	      [Enable building test runner (default: auto)]),
+	      [BUILD_RUNNER=$enableval], [BUILD_RUNNER="auto"])
+if test "x$BUILD_RUNNER" = xauto; then
+	PKG_CHECK_EXISTS([json-c], [BUILD_RUNNER=yes], [BUILD_RUNNER=no])
+fi
+if test "x$BUILD_RUNNER" = xyes; then
+	PKG_CHECK_MODULES(JSONC, [json-c])
+fi
+AM_CONDITIONAL(BUILD_RUNNER, [test "x$BUILD_RUNNER" = xyes])
+
 files="broadwell cherryview haswell ivybridge sandybridge valleyview skylake"
 for file in $files; do
 	REGISTER_FILES="$REGISTER_FILES $file `cat $srcdir/tools/registers/$file`"
@@ -408,6 +420,7 @@ AC_CONFIG_FILES([
 		 assembler/test/Makefile
 		 assembler/intel-gen4asm.pc
 		 overlay/Makefile
+		 runner/Makefile
 		 ])
 
 AC_CONFIG_FILES([tools/intel_aubdump], [chmod +x tools/intel_aubdump])
@@ -431,6 +444,7 @@ echo "       Assembler          : ${enable_assembler}"
 echo "       Debugger           : ${enable_debugger}"
 echo "       Overlay            : X: ${enable_overlay_xlib}, Xv: ${enable_overlay_xvlib}"
 echo "       x86-specific tools : ${build_x86}"
+echo "       Test runner        : ${BUILD_RUNNER}"
 echo ""
 echo " • API-Documentation      : ${enable_gtk_doc}"
 echo " • Fail on warnings       : ${enable_werror}"

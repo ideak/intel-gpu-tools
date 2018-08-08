@@ -1,0 +1,40 @@
+#include <stdio.h>
+#include <string.h>
+
+#include "settings.h"
+#include "job_list.h"
+#include "executor.h"
+#include "resultgen.h"
+
+int main(int argc, char **argv)
+{
+	struct settings settings;
+	struct job_list job_list;
+	struct execute_state state;
+
+	init_settings(&settings);
+	init_job_list(&job_list);
+
+	if (!parse_options(argc, argv, &settings)) {
+		return 1;
+	}
+
+	if (!create_job_list(&job_list, &settings)) {
+		return 1;
+	}
+
+	if (!initialize_execute_state(&state, &settings, &job_list)) {
+		return 1;
+	}
+
+	if (!execute(&state, &settings, &job_list)) {
+		return 1;
+	}
+
+	if (!generate_results_path(settings.results_path)) {
+		return 1;
+	}
+
+	printf("Done.\n");
+	return 0;
+}

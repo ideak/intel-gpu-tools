@@ -27,6 +27,10 @@ if BUILD_TESTS
 SUBDIRS += tests
 endif
 
+if BUILD_RUNNER
+SUBDIRS += runner
+endif
+
 if BUILD_X86
 if BUILD_ASSEMBLER
 SUBDIRS += assembler

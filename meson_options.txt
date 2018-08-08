@@ -52,6 +52,12 @@ option('with_libdrm',
        choices : ['', 'auto', 'intel', 'nouveau', 'amdgpu'],
        description : 'libdrm libraries to be used')
 
+option('build_runner',
+       type : 'combo',
+       value : 'auto',
+       choices : ['auto', 'true', 'false'],
+       description : 'Build test runner')
+
 option('use_rpath',
        type : 'boolean',
        value : false,
