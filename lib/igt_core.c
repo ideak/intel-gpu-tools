@@ -403,9 +403,8 @@ void igt_kmsg(const char *format, ...)
 
 #define time_valid(ts) ((ts)->tv_sec || (ts)->tv_nsec)
 
-static double
-time_elapsed(struct timespec *then,
-	     struct timespec* now)
+double igt_time_elapsed(struct timespec *then,
+			struct timespec *now)
 {
 	double elapsed = -1.;
 
@@ -417,7 +416,7 @@ time_elapsed(struct timespec *then,
 	return elapsed;
 }
 
-static int gettime(struct timespec *ts)
+int igt_gettime(struct timespec *ts)
 {
 	memset(ts, 0, sizeof(*ts));
 	errno = 0;
@@ -450,7 +449,7 @@ uint64_t igt_nsec_elapsed(struct timespec *start)
 {
 	struct timespec now;
 
-	gettime(&now);
+	igt_gettime(&now);
 	if ((start->tv_sec | start->tv_nsec) == 0) {
 		*start = now;
 		return 0;
@@ -811,7 +810,7 @@ out:
 	igt_install_exit_handler(common_exit_handler);
 
 	if (!test_with_subtests)
-		gettime(&subtest_time);
+		igt_gettime(&subtest_time);
 
 	for (i = 0; (optind + i) < *argc; i++)
 		argv[i + 1] = argv[optind + i];
@@ -940,7 +939,7 @@ bool __igt_run_subtest(const char *subtest_name)
 
 	_igt_log_buffer_reset();
 
-	gettime(&subtest_time);
+	igt_gettime(&subtest_time);
 	return (in_subtest = subtest_name);
 }
 
@@ -985,15 +984,15 @@ static void exit_subtest(const char *result)
 {
 	struct timespec now;
 
-	gettime(&now);
+	igt_gettime(&now);
 	igt_info("%sSubtest %s: %s (%.3fs)%s\n",
 		 (!__igt_plain_output) ? "\x1b[1m" : "",
-		 in_subtest, result, time_elapsed(&subtest_time, &now),
+		 in_subtest, result, igt_time_elapsed(&subtest_time, &now),
 		 (!__igt_plain_output) ? "\x1b[0m" : "");
 	fflush(stdout);
 	if (stderr_needs_sentinel)
 		fprintf(stderr, "Subtest %s: %s (%.3fs)\n",
-			in_subtest, result, time_elapsed(&subtest_time, &now));
+			in_subtest, result, igt_time_elapsed(&subtest_time, &now));
 
 	igt_terminate_spin_batches();
 
@@ -1484,7 +1483,7 @@ void igt_exit(void)
 		struct timespec now;
 		const char *result;
 
-		gettime(&now);
+		igt_gettime(&now);
 
 		switch (igt_exitcode) {
 			case IGT_EXIT_SUCCESS:
@@ -1501,7 +1500,7 @@ void igt_exit(void)
 		}
 
 		printf("%s (%.3fs)\n",
-		       result, time_elapsed(&subtest_time, &now));
+		       result, igt_time_elapsed(&subtest_time, &now));
 	}
 
 	exit(igt_exitcode);

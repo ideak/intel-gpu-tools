@@ -929,6 +929,26 @@ void igt_set_timeout(unsigned int seconds,
 		     const char *op);
 
 /**
+ * igt_gettime:
+ * @ts: current monotonic clock reading
+ *
+ * Reports the current time in the monotonic clock.
+ * Returns: 0 on success, -errno on failure.
+ */
+int igt_gettime(struct timespec *ts);
+
+/**
+ * igt_time_elapsed:
+ * @then: Earlier timestamp
+ * @now: Later timestamp
+ *
+ * Returns: Time between two timestamps in seconds, as a floating
+ * point number.
+ */
+double igt_time_elapsed(struct timespec *then,
+			struct timespec *now);
+
+/**
  * igt_nsec_elapsed:
  * @start: measure from this point in time
  *
