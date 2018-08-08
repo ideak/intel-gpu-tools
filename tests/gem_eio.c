@@ -650,20 +650,26 @@ static void reset_stress(int fd,
 			 uint32_t ctx0, unsigned int engine,
 			 unsigned int flags)
 {
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(fd, 4096)
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = engine,
+	};
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
 	igt_until_timeout(5) {
-		struct drm_i915_gem_execbuffer2 execbuf = { };
-		struct drm_i915_gem_exec_object2 obj = { };
-		uint32_t bbe = MI_BATCH_BUFFER_END;
+		uint32_t ctx = context_create_safe(fd);
 		igt_spin_t *hang;
 		unsigned int i;
-		uint32_t ctx;
 
 		gem_quiescent_gpu(fd);
 
 		igt_require(i915_reset_control(flags & TEST_WEDGE ?
 					       false : true));
-
-		ctx = context_create_safe(fd);
 
 		/*
 		 * Start executing a spin batch with some queued batches
@@ -671,14 +677,11 @@ static void reset_stress(int fd,
 		 */
 		hang = spin_sync(fd, ctx0, engine);
 
-		obj.handle = gem_create(fd, 4096);
-		gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+		execbuf.rsvd1 = ctx;
+		for (i = 0; i < 10; i++)
+			gem_execbuf(fd, &execbuf);
 
-		execbuf.buffers_ptr = to_user_pointer(&obj);
-		execbuf.buffer_count = 1;
 		execbuf.rsvd1 = ctx0;
-		execbuf.flags = engine;
-
 		for (i = 0; i < 10; i++)
 			gem_execbuf(fd, &execbuf);
 
@@ -706,8 +709,9 @@ static void reset_stress(int fd,
 		gem_sync(fd, obj.handle);
 		igt_spin_batch_free(fd, hang);
 		gem_context_destroy(fd, ctx);
-		gem_close(fd, obj.handle);
 	}
+
+	gem_close(fd, obj.handle);
 }
 
 /*
