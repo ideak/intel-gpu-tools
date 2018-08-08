@@ -646,13 +646,10 @@ static void test_inflight_internal(int fd, unsigned int wait)
 	close(fd);
 }
 
-/*
- * Verify that we can submit and execute work after unwedging the GPU.
- */
-static void test_reset_stress(int fd, unsigned int flags)
+static void reset_stress(int fd,
+			 uint32_t ctx0, unsigned int engine,
+			 unsigned int flags)
 {
-	uint32_t ctx0 = context_create_safe(fd);
-
 	igt_until_timeout(5) {
 		struct drm_i915_gem_execbuffer2 execbuf = { };
 		struct drm_i915_gem_exec_object2 obj = { };
@@ -672,7 +669,7 @@ static void test_reset_stress(int fd, unsigned int flags)
 		 * Start executing a spin batch with some queued batches
 		 * against a different context after it.
 		 */
-		hang = spin_sync(fd, ctx0, 0);
+		hang = spin_sync(fd, ctx0, engine);
 
 		obj.handle = gem_create(fd, 4096);
 		gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
@@ -680,6 +677,7 @@ static void test_reset_stress(int fd, unsigned int flags)
 		execbuf.buffers_ptr = to_user_pointer(&obj);
 		execbuf.buffer_count = 1;
 		execbuf.rsvd1 = ctx0;
+		execbuf.flags = engine;
 
 		for (i = 0; i < 10; i++)
 			gem_execbuf(fd, &execbuf);
@@ -710,6 +708,18 @@ static void test_reset_stress(int fd, unsigned int flags)
 		gem_context_destroy(fd, ctx);
 		gem_close(fd, obj.handle);
 	}
+}
+
+/*
+ * Verify that we can submit and execute work after unwedging the GPU.
+ */
+static void test_reset_stress(int fd, unsigned int flags)
+{
+	uint32_t ctx0 = context_create_safe(fd);
+	unsigned int engine;
+
+	for_each_engine(fd, engine)
+		reset_stress(fd, ctx0, engine, flags);
 
 	gem_context_destroy(fd, ctx0);
 }
