@@ -301,6 +301,8 @@ GKeyFile *igt_key_file;
 
 char *igt_frame_dump_path;
 
+static bool stderr_needs_sentinel = false;
+
 const char *igt_test_name(void)
 {
 	return command_str;
@@ -643,6 +645,8 @@ static void common_init_env(void)
 	}
 
 	igt_frame_dump_path = getenv("IGT_FRAME_DUMP_PATH");
+
+	stderr_needs_sentinel = getenv("IGT_SENTINEL_ON_STDERR") != NULL;
 }
 
 static int common_init(int *argc, char **argv,
@@ -919,12 +923,20 @@ bool __igt_run_subtest(const char *subtest_name)
 		       (!__igt_plain_output) ? "\x1b[1m" : "", subtest_name,
 		       skip_subtests_henceforth == SKIP ?
 		       "SKIP" : "FAIL", (!__igt_plain_output) ? "\x1b[0m" : "");
+		fflush(stdout);
+		if (stderr_needs_sentinel)
+			fprintf(stderr, "Subtest %s: %s\n", subtest_name,
+				skip_subtests_henceforth == SKIP ?
+				"SKIP" : "FAIL");
 		return false;
 	}
 
 	igt_kmsg(KMSG_INFO "%s: starting subtest %s\n",
 		 command_str, subtest_name);
-	igt_debug("Starting subtest: %s\n", subtest_name);
+	igt_info("Starting subtest: %s\n", subtest_name);
+	fflush(stdout);
+	if (stderr_needs_sentinel)
+		fprintf(stderr, "Starting subtest: %s\n", subtest_name);
 
 	_igt_log_buffer_reset();
 
@@ -979,6 +991,9 @@ static void exit_subtest(const char *result)
 		 in_subtest, result, time_elapsed(&subtest_time, &now),
 		 (!__igt_plain_output) ? "\x1b[0m" : "");
 	fflush(stdout);
+	if (stderr_needs_sentinel)
+		fprintf(stderr, "Subtest %s: %s (%.3fs)\n",
+			in_subtest, result, time_elapsed(&subtest_time, &now));
 
 	igt_terminate_spin_batches();
 
