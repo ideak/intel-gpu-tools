@@ -1577,8 +1577,8 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 		/* 1st pass is calibration, second pass is the test. */
 		for (int pass = 0; pass < ARRAY_SIZE(timeout); pass++) {
 			unsigned int target_idle_us = idle_us;
-			uint64_t busy_ns = 0, idle_ns = 0;
 			struct timespec start = { };
+			uint64_t busy_ns = 0;
 			unsigned long pass_ns = 0;
 			double avg = 0.0, var = 0.0;
 			unsigned int n = 0;
@@ -1589,6 +1589,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 				unsigned long loop_ns, loop_busy;
 				struct timespec _ts = { };
 				double err, tmp;
+				uint64_t now;
 
 				/* PWM idle sleep. */
 				_ts.tv_nsec = target_idle_us * 1000;
@@ -1605,14 +1606,13 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 				igt_spin_batch_end(spin);
 
 				/* Time accounting. */
-				loop_ns = igt_nsec_elapsed(&start);
-				loop_busy = loop_ns - loop_busy;
-				loop_ns -= pass_ns;
+				now = igt_nsec_elapsed(&start);
+				loop_busy = now - loop_busy;
+				loop_ns = now - pass_ns;
+				pass_ns = now;
 
 				busy_ns += loop_busy;
 				total_busy_ns += loop_busy;
-				idle_ns += loop_ns - loop_busy;
-				pass_ns += loop_ns;
 				total_ns += loop_ns;
 
 				/* Re-calibrate. */
@@ -1628,10 +1628,15 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 				var += (err - avg) * (err - tmp);
 			} while (pass_ns < timeout[pass]);
 
+			pass_ns = igt_nsec_elapsed(&start);
 			expected = (double)busy_ns / pass_ns;
-			igt_info("%u: busy %"PRIu64"us, idle %"PRIu64"us -> %.2f%% (target: %lu%%; average=%.2f, variance=%f)\n",
-				 pass, busy_ns / 1000, idle_ns / 1000,
-				 100 * expected, target_busy_pct, avg, var / n);
+
+			igt_info("%u: %d cycles, busy %"PRIu64"us, idle %"PRIu64"us -> %.2f%% (target: %lu%%; average=%.2f±%.3f%%)\n",
+				 pass, n,
+				 busy_ns / 1000, (pass_ns - busy_ns) / 1000,
+				 100 * expected, target_busy_pct,
+				 avg, sqrt(var / n));
+
 			write(link[1], &expected, sizeof(expected));
 		}
 
