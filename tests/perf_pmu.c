@@ -1521,14 +1521,13 @@ static void __rearm_spin_batch(igt_spin_t *spin)
 
 static void
 accuracy(int gem_fd, const struct intel_execution_engine2 *e,
-	 unsigned long target_busy_pct)
+	 unsigned long target_busy_pct,
+	 unsigned long target_iters)
 {
-	unsigned long busy_us = 10000 - 100 * (1 + abs(50 - target_busy_pct));
-	unsigned long idle_us = 100 * (busy_us - target_busy_pct *
-				busy_us / 100) / target_busy_pct;
 	const unsigned long min_test_us = 1e6;
-	const unsigned long pwm_calibration_us = min_test_us;
-	const unsigned long test_us = min_test_us;
+	unsigned long pwm_calibration_us;
+	unsigned long test_us;
+	unsigned long cycle_us, busy_us, idle_us;
 	double busy_r, expected;
 	uint64_t val[2];
 	uint64_t ts[2];
@@ -1538,18 +1537,27 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	/* Sampling platforms cannot reach the high accuracy criteria. */
 	igt_require(gem_has_execlists(gem_fd));
 
-	while (idle_us < 2500) {
+	/* Aim for approximately 100 iterations for calibration */
+	cycle_us = min_test_us / target_iters;
+	busy_us = cycle_us * target_busy_pct / 100;
+	idle_us = cycle_us - busy_us;
+
+	while (idle_us < 2500 || busy_us < 2500) {
 		busy_us *= 2;
 		idle_us *= 2;
 	}
+	cycle_us = busy_us + idle_us;
+	pwm_calibration_us = target_iters * cycle_us / 2;
+	test_us = target_iters * cycle_us;
 
-	igt_info("calibration=%lums, test=%lums; ratio=%.2f%% (%luus/%luus)\n",
-		 pwm_calibration_us / 1000, test_us / 1000,
-		 (double)busy_us / (busy_us + idle_us) * 100.0,
+	igt_info("calibration=%lums, test=%lums, cycle=%lums; ratio=%.2f%% (%luus/%luus)\n",
+		 pwm_calibration_us / 1000, test_us / 1000, cycle_us / 1000,
+		 (double)busy_us / cycle_us * 100.0,
 		 busy_us, idle_us);
 
-	assert_within_epsilon((double)busy_us / (busy_us + idle_us),
-				(double)target_busy_pct / 100.0, tolerance);
+	assert_within_epsilon((double)busy_us / cycle_us,
+			      (double)target_busy_pct / 100.0,
+			      tolerance);
 
 	igt_assert(pipe(link) == 0);
 
@@ -1796,7 +1804,7 @@ igt_main
 			for (i = 0; i < ARRAY_SIZE(pct); i++) {
 				igt_subtest_f("busy-accuracy-%u-%s",
 					      pct[i], e->name)
-					accuracy(fd, e, pct[i]);
+					accuracy(fd, e, pct[i], 10);
 			}
 
 			igt_subtest_f("busy-hang-%s", e->name)
