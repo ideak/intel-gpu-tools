@@ -535,7 +535,7 @@ unsigned intel_detect_and_clear_missed_interrupts(int fd)
 	dir = igt_debugfs_dir(fd);
 
 	missed = 0;
-	igt_assert(igt_sysfs_scanf(dir, "i915_ring_missed_irq", "%x", &missed) == 1);
+	igt_sysfs_scanf(dir, "i915_ring_missed_irq", "%x", &missed);
 	if (missed)
 		igt_sysfs_set(dir, "i915_ring_missed_irq", "0");
 

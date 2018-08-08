@@ -113,6 +113,7 @@ igt_simple_main
 	debugfs = igt_debugfs_dir(device);
 
 	expect_rings = engine_mask(debugfs);
+	igt_require(expect_rings);
 
 	igt_debug("Clearing rings %x\n", expect_rings);
 	intel_detect_and_clear_missed_interrupts(device);
