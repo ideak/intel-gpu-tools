@@ -421,6 +421,7 @@ AC_CONFIG_FILES([
 		 assembler/intel-gen4asm.pc
 		 overlay/Makefile
 		 runner/Makefile
+		 runner/testdata/Makefile
 		 ])
 
 AC_CONFIG_FILES([tools/intel_aubdump], [chmod +x tools/intel_aubdump])

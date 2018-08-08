@@ -9,6 +9,7 @@ runnerlib_sources = [ 'settings.c',
 runner_sources = [ 'runner.c' ]
 resume_sources = [ 'resume.c' ]
 results_sources = [ 'results.c' ]
+runner_test_sources = [ 'runner_tests.c' ]
 
 if _build_runner and jsonc.found()
 	subdir('testdata')
@@ -34,6 +35,13 @@ if _build_runner and jsonc.found()
 			     install : true,
 			     install_dir : bindir,
 			     dependencies : igt_deps)
+
+	runner_test = executable('runner_test', runner_test_sources,
+				 c_args : '-DTESTDATA_DIRECTORY="@0@"'.format(testdata_dir),
+				 link_with : runnerlib,
+				 install : false,
+				 dependencies : igt_deps)
+	test('runner', runner_test)
 
 	build_info += 'Build test runner: Yes'
 else
