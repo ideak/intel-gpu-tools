@@ -93,6 +93,7 @@
  **  accompanying test suite achieves 100% coverage of this file.
  */
 
+#include <ctype.h>
 #include <string.h>
 #include <stdint.h>
 #include "uwildmat/uwildmat.h"
@@ -222,6 +223,7 @@ match_class(uint32_t text, const unsigned char *start,
 	const unsigned char *p = start;
 	uint32_t first = 0;
 	uint32_t last;
+	uint32_t lc = tolower(text);
 
 	/* Check for an inverted character class (starting with ^).  If the
 	   character matches the character class, we return !reversed; that way,
@@ -244,12 +246,13 @@ match_class(uint32_t text, const unsigned char *start,
 		if (allowrange && *p == '-' && p < end) {
 			p++;
 			p += utf8_decode(p, end, &last);
-			if (text >= first && text <= last)
+			if ((text >= first && text <= last) ||
+			    (lc >= first && lc <= last))
 				return !reversed;
 			allowrange = false;
 		} else {
 			p += utf8_decode(p, end, &first);
-			if (text == first)
+			if (text == first || lc == first)
 				return !reversed;
 			allowrange = true;
 		}
@@ -272,6 +275,7 @@ match_pattern(const unsigned char *text, const unsigned char *start,
 	bool ismeta;
 	int matched, width;
 	uint32_t c;
+	unsigned char lc;
 
 	for (; p <= end; p++) {
 		if (!*text && *p != '*')
@@ -284,7 +288,8 @@ match_pattern(const unsigned char *text, const unsigned char *start,
 			/* Fall through. */
 
 		default:
-			if (*text++ != *p)
+			lc = tolower(*text);
+			if (*text++ != *p && lc != *p)
 				return false;
 			break;
 
