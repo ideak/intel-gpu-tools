@@ -5,6 +5,15 @@ igt@meta_test(@.*)?
 igt@drv_selftest(@.*)?
 igt@drm_mm(@.*)?
 ###############################################
+# Handle module reloads with great care!
+#
+# Reloading a module is more likely to leave
+# the machine in an unexpected state than other
+# self-contained tests, leading to random
+# failures in tests run afterwards.
+###############################################
+igt@drv_module_reload(@.*)?
+###############################################
 # GEM
 ###############################################
 igt@gem_busy@(?!.*basic).*hang.*
