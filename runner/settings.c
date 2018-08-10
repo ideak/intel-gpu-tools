@@ -334,35 +334,44 @@ bool validate_settings(struct settings *settings)
 	return true;
 }
 
+static char *_dirname(const char *path)
+{
+	char *tmppath = strdup(path);
+	char *tmpname = dirname(tmppath);
+	tmpname = strdup(tmpname);
+	free(tmppath);
+	return tmpname;
+}
+
+static char *_basename(const char *path)
+{
+	char *tmppath = strdup(path);
+	char *tmpname = basename(tmppath);
+	tmpname = strdup(tmpname);
+	free(tmppath);
+	return tmpname;
+}
+
 char *absolute_path(char *path)
 {
 	char *result = NULL;
-	char *tmppath, *tmpname;
+	char *base, *dir;
+	char *ret;
 
 	result = realpath(path, NULL);
 	if (result != NULL)
 		return result;
 
-	tmppath = strdup(path);
-	tmpname = dirname(tmppath);
-	free(result);
-	result = realpath(tmpname, NULL);
-	free(tmppath);
+	dir = _dirname(path);
+	ret = absolute_path(dir);
+	free(dir);
 
-	if (result != NULL) {
-		char *ret;
+	base = _basename(path);
+	asprintf(&result, "%s/%s", ret, base);
+	free(base);
+	free(ret);
 
-		tmppath = strdup(path);
-		tmpname = basename(tmppath);
-
-		asprintf(&ret, "%s/%s", result, tmpname);
-		free(result);
-		free(tmppath);
-		return ret;
-	}
-
-	free(result);
-	return NULL;
+	return result;
 }
 
 static char settings_filename[] = "metadata.txt";

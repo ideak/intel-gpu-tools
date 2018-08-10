@@ -231,28 +231,18 @@ igt_main
 		}
 
 		igt_subtest("absolute-path-converter") {
-			struct {
-				char *path;
-				bool null;
-			} data[] = { { "simple-name", false },
-				     { "foo/bar", true },
-				     { ".", false },
-			};
+			char paths[][15] = { "simple-name", "foo/bar", "." };
 			size_t i;
 
-			for (i = 0; i < ARRAY_SIZE(data); i++) {
+			for (i = 0; i < ARRAY_SIZE(paths); i++) {
 				free(path);
-				path = absolute_path(data[i].path);
-				if (data[i].null) {
-					igt_assert(path == NULL);
-					continue;
-				}
+				path = absolute_path(paths[i]);
 
 				igt_assert(path[0] == '/');
-				igt_debug("Got path %s for %s\n", path, data[i].path);
+				igt_debug("Got path %s for %s\n", path, paths[i]);
 				igt_assert(strstr(path, cwd) == path);
-				if (strcmp(data[i].path, ".")) {
-					igt_assert(strstr(path, data[i].path) != NULL);
+				if (strcmp(paths[i], ".")) {
+					igt_assert(strstr(path, paths[i]) != NULL);
 				}
 			}
 		}
