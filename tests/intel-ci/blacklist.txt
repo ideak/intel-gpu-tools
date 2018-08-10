@@ -1,9 +1,12 @@
 igt@meta_test(@.*)?
 ###############################################
-# GEM
+# Kernel selftests (run separately)
 ###############################################
 igt@drv_selftest(@.*)?
 igt@drm_mm(@.*)?
+###############################################
+# GEM
+###############################################
 igt@gem_busy@(?!.*basic).*hang.*
 igt@gem_close_race@(?!.*basic).*
 igt@gem_concurrent_blit(@.*)?
