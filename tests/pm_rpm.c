@@ -2033,5 +2033,27 @@ int main(int argc, char *argv[])
 	igt_fixture
 		teardown_environment();
 
+	igt_subtest("module-reload") {
+		igt_debug("Reload w/o display\n");
+		igt_i915_driver_unload();
+		igt_assert_eq(igt_i915_driver_load("disable_display=1"), 0);
+
+		igt_assert(setup_environment());
+		basic_subtest();
+		drm_resources_equal_subtest();
+		pci_d3_state_subtest();
+		teardown_environment();
+
+		igt_debug("Reload as normal\n");
+		igt_i915_driver_unload();
+		igt_assert_eq(igt_i915_driver_load(NULL), 0);
+
+		igt_assert(setup_environment());
+		basic_subtest();
+		drm_resources_equal_subtest();
+		pci_d3_state_subtest();
+		teardown_environment();
+	}
+
 	igt_exit();
 }
