@@ -294,6 +294,74 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
+static void active_ring(int fd, unsigned ring, int timeout)
+{
+	unsigned engines[16];
+	const char *names[16];
+	int num_engines = 0;
+
+	if (ring == ALL_ENGINES) {
+		for_each_physical_engine(fd, ring) {
+			if (!gem_can_store_dword(fd, ring))
+				continue;
+
+			names[num_engines] = e__->name;
+			engines[num_engines++] = ring;
+			if (num_engines == ARRAY_SIZE(engines))
+				break;
+		}
+		igt_require(num_engines);
+	} else {
+		gem_require_ring(fd, ring);
+		igt_require(gem_can_store_dword(fd, ring));
+		names[num_engines] = NULL;
+		engines[num_engines++] = ring;
+	}
+
+	intel_detect_and_clear_missed_interrupts(fd);
+	igt_fork(child, num_engines) {
+		double start, end, elapsed;
+		unsigned long cycles;
+		igt_spin_t *spin[2];
+		uint32_t cmd;
+
+		spin[0] = __igt_spin_batch_new(fd,
+					       .engine = ring,
+					       .flags = IGT_SPIN_FAST);
+		cmd = *spin[0]->batch;
+
+		spin[1] = __igt_spin_batch_new(fd,
+					       .engine = ring,
+					       .flags = IGT_SPIN_FAST);
+		igt_assert(*spin[1]->batch == cmd);
+
+		start = gettime();
+		end = start + timeout;
+		cycles = 0;
+		do {
+			for (int loop = 0; loop < 1024; loop++) {
+				igt_spin_t *s = spin[loop & 1];
+
+				igt_spin_batch_end(s);
+				gem_sync(fd, s->handle);
+
+				*s->batch = cmd;
+				gem_execbuf(fd, &s->execbuf);
+			}
+			cycles += 1024;
+		} while ((elapsed = gettime()) < end);
+		igt_spin_batch_free(fd, spin[1]);
+		igt_spin_batch_free(fd, spin[0]);
+
+		igt_info("%s%sompleted %ld cycles: %.3f us\n",
+			 names[child % num_engines] ?: "",
+			 names[child % num_engines] ? " c" : "C",
+			 cycles, (elapsed - start)*1e6/cycles);
+	}
+	igt_waitchildren_timeout(2*timeout, NULL);
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+}
+
 static void
 active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 {
@@ -1154,6 +1222,8 @@ igt_main
 			sync_ring(fd, e->exec_id | e->flags, 1, 150);
 		igt_subtest_f("idle-%s", e->name)
 			idle_ring(fd, e->exec_id | e->flags, 150);
+		igt_subtest_f("active-%s", e->name)
+			active_ring(fd, e->exec_id | e->flags, 150);
 		igt_subtest_f("wakeup-%s", e->name)
 			wakeup_ring(fd, e->exec_id | e->flags, 150, 1);
 		igt_subtest_f("active-wakeup-%s", e->name)
@@ -1188,6 +1258,8 @@ igt_main
 		sync_ring(fd, ALL_ENGINES, ncpus, 150);
 	igt_subtest("forked-store-each")
 		store_ring(fd, ALL_ENGINES, ncpus, 150);
+	igt_subtest("active-each")
+		active_ring(fd, ALL_ENGINES, 150);
 	igt_subtest("wakeup-each")
 		wakeup_ring(fd, ALL_ENGINES, 150, 1);
 	igt_subtest("active-wakeup-each")
