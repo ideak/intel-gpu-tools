@@ -221,8 +221,46 @@ datadir = join_paths(get_option('datadir'), 'igt-gpu-tools')
 includedir = get_option('includedir')
 libdir = get_option('libdir')
 libexecdir = join_paths(get_option('libexecdir'), 'igt-gpu-tools')
+amdgpudir = join_paths(libexecdir, 'amdgpu')
 mandir = get_option('mandir')
 pkgconfigdir = join_paths(libdir, 'pkgconfig')
+
+if get_option('use_rpath')
+	# Set up runpath for the test executables towards libigt.so.
+	# The path should be relative to $ORIGIN so the library is
+	# still found properly even if installed to a path other than
+	# prefix.
+
+	# libdir and bindir are pathnames relative to prefix. meson
+	# enforces this.
+
+	# 1. Start from the executable.
+	# 2. Executables are installed in certain dir. Add a .. for each
+	#    directory name in it.
+	# 3. Add relative path to libdir.
+
+	bindir_rpathdir = '$ORIGIN'
+	foreach p : bindir.split('/')
+		bindir_rpathdir = join_paths(bindir_rpathdir, '..')
+	endforeach
+	bindir_rpathdir = join_paths(bindir_rpathdir, libdir)
+
+	libexecdir_rpathdir = '$ORIGIN'
+	foreach p : libexecdir.split('/')
+		libexecdir_rpathdir = join_paths(libexecdir_rpathdir, '..')
+	endforeach
+	libexecdir_rpathdir = join_paths(libexecdir_rpathdir, libdir)
+
+	amdgpudir_rpathdir = '$ORIGIN'
+	foreach p : amdgpudir.split('/')
+		amdgpudir_rpathdir = join_paths(amdgpudir_rpathdir, '..')
+	endforeach
+	amdgpudir_rpathdir = join_paths(amdgpudir_rpathdir, libdir)
+else
+	bindir_rpathdir = ''
+	libexecdir_rpathdir = ''
+	amdgpudir_rpathdir = ''
+endif
 
 subdir('lib')
 if _build_tests

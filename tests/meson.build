@@ -239,28 +239,6 @@ if _build_audio and alsa.found() and gsl.found()
 	test_deps += alsa
 endif
 
-if get_option('use_rpath')
-	# Set up runpath for the test executables towards libigt.so.
-	# The path should be relative to $ORIGIN so the library is
-	# still found properly even if installed to a path other than
-	# prefix.
-
-	# libdir and libexecdir are pathnames relative to
-	# prefix. meson enforces this.
-
-	# Start from the executable
-	libexecdir_rpathdir = '$ORIGIN'
-	# Executables are installed in libexecdir. Add a .. for each
-	# directory name in it.
-	foreach p : libexecdir.split('/')
-		libexecdir_rpathdir = join_paths(libexecdir_rpathdir, '..')
-	endforeach
-	# Add relative path to libdir
-	libexecdir_rpathdir = join_paths(libexecdir_rpathdir, libdir)
-else
-	libexecdir_rpathdir = ''
-endif
-
 test_executables = []
 
 foreach prog : test_progs
