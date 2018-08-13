@@ -22,18 +22,21 @@ if _build_runner and jsonc.found()
 			    link_with : runnerlib,
 			    install : true,
 			    install_dir : bindir,
+			    install_rpath : bindir_rpathdir,
 			    dependencies : igt_deps)
 
 	resume = executable('igt_resume', resume_sources,
 			    link_with : runnerlib,
 			    install : true,
 			    install_dir : bindir,
+			    install_rpath : bindir_rpathdir,
 			    dependencies : igt_deps)
 
 	results = executable('igt_results', results_sources,
 			     link_with : runnerlib,
 			     install : true,
 			     install_dir : bindir,
+			     install_rpath : bindir_rpathdir,
 			     dependencies : igt_deps)
 
 	runner_test = executable('runner_test', runner_test_sources,
