@@ -35,6 +35,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <i915_drm.h>
+#include <poll.h>
 
 #include "drmtest.h"
 #include "igt_aux.h"
@@ -748,6 +749,7 @@ static void read_one_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out)
 void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc)
 {
 	const char *src = pipe_crc_source_name(pipe_crc->source);
+	struct pollfd pfd;
 	char buf[32];
 
 	/* Stop first just to make sure we don't have lingering state left. */
@@ -757,11 +759,16 @@ void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc)
 
 	sprintf(buf, "crtc-%d/crc/data", pipe_crc->pipe);
 
-	igt_set_timeout(10, "Opening crc fd, which waits for first CRC.");
+	igt_set_timeout(10, "Opening crc fd, and poll for first CRC.");
 	pipe_crc->crc_fd = openat(pipe_crc->dir, buf, pipe_crc->flags);
+	igt_assert(pipe_crc->crc_fd != -1);
+
+	pfd.fd = pipe_crc->crc_fd;
+	pfd.events = POLLIN;
+	poll(&pfd, 1, -1);
+
 	igt_reset_timeout();
 
-	igt_assert(pipe_crc->crc_fd != -1);
 	errno = 0;
 }
 
