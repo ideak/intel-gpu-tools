@@ -310,7 +310,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
 			fstart = NULL;
 
-			if (!strcasecmp(field, "d")) {
+			if (!strcmp(field, "d")) {
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
@@ -326,7 +326,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					step.delay = tmp;
 					goto add_step;
 				}
-			} else if (!strcasecmp(field, "p")) {
+			} else if (!strcmp(field, "p")) {
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
@@ -342,7 +342,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					step.period = tmp;
 					goto add_step;
 				}
-			} else if (!strcasecmp(field, "s")) {
+			} else if (!strcmp(field, "s")) {
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
@@ -359,7 +359,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					step.target = tmp;
 					goto add_step;
 				}
-			} else if (!strcasecmp(field, "t")) {
+			} else if (!strcmp(field, "t")) {
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
@@ -375,7 +375,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					step.throttle = tmp;
 					goto add_step;
 				}
-			} else if (!strcasecmp(field, "q")) {
+			} else if (!strcmp(field, "q")) {
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
@@ -391,7 +391,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					step.throttle = tmp;
 					goto add_step;
 				}
-			} else if (!strcasecmp(field, "a")) {
+			} else if (!strcmp(field, "a")) {
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
@@ -407,7 +407,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					step.target = tmp;
 					goto add_step;
 				}
-			} else if (!strcasecmp(field, "f")) {
+			} else if (!strcmp(field, "f")) {
 				step.type = SW_FENCE;
 				goto add_step;
 			}
