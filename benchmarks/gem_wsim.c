@@ -686,6 +686,25 @@ static unsigned long get_bb_sz(unsigned int duration)
 }
 
 static void
+init_bb(struct w_step *w, unsigned int flags)
+{
+	/* Preemption point every 100us. */
+	const unsigned int arb_period = get_bb_sz(100) / sizeof(uint32_t);
+	unsigned int i;
+	uint32_t *ptr;
+
+	gem_set_domain(fd, w->bb_handle,
+		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
+
+	ptr = gem_mmap__wc(fd, w->bb_handle, 0, w->bb_sz, PROT_WRITE);
+
+	for (i = arb_period; i < w->bb_sz / sizeof(uint32_t); i += arb_period)
+		ptr[i] = 0x5 << 23; /* MI_ARB_CHK */
+
+	munmap(ptr, w->bb_sz);
+}
+
+static void
 terminate_bb(struct w_step *w, unsigned int flags)
 {
 	const uint32_t bbe = 0xa << 23;
@@ -839,6 +858,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 
 	w->bb_sz = get_bb_sz(w->duration.max);
 	w->bb_handle = w->obj[j].handle = gem_create(fd, w->bb_sz);
+	init_bb(w, flags);
 	terminate_bb(w, flags);
 
 	if (flags & SEQNO) {
