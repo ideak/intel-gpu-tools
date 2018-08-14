@@ -3,7 +3,7 @@ Workload descriptor format
 
 ctx.engine.duration_us.dependency.wait,...
 <uint>.<str>.<uint>[-<uint>].<int <= 0>[/<int <= 0>][...].<0|1>,...
-P.<uint>.<int>
+P|X.<uint>.<int>
 d|p|s|t|q|a.<int>,...
 f
 
@@ -24,6 +24,7 @@ Additional workload steps are also supported:
  'f' - Create a sync fence.
  'a' - Advance the previously created sync fence.
  'P' - Context priority.
+ 'X' - Context preemption control.
 
 Engine ids: RCS, BCS, VCS, VCS1, VCS2, VECS
 
@@ -128,3 +129,18 @@ is submitted against it which depends on the batch from context 1.
 Context priority command is executed at workload runtime and is valid until
 overriden by another (optional) same context priority change. Actual driver
 ioctls are executed only if the priority level has changed for the context.
+
+Context preemption control
+--------------------------
+
+  X.1.0
+  1.RCS.1000.0.0
+  X.1.500
+  1.RCS.1000.0.0
+
+Context 1 is marked as non-preemptable batches and a batch is sent against 1.
+The same context is then marked to have batches which can be preempted every
+500us and another batch is submitted.
+
+Same as with context priority, context preemption commands are valid until
+optionally overriden by another preemption control change on the same context.

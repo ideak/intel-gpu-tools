@@ -83,7 +83,8 @@ enum w_type
 	QD_THROTTLE,
 	SW_FENCE,
 	SW_FENCE_SIGNAL,
-	CTX_PRIORITY
+	CTX_PRIORITY,
+	PREEMPTION
 };
 
 struct deps
@@ -122,6 +123,7 @@ struct w_step
 	unsigned int idx;
 	struct igt_list rq_link;
 	unsigned int request;
+	unsigned int preempt_us;
 
 	struct drm_i915_gem_execbuffer2 eb;
 	struct drm_i915_gem_exec_object2 *obj;
@@ -443,6 +445,42 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			} else if (!strcmp(field, "f")) {
 				step.type = SW_FENCE;
 				goto add_step;
+			} else if (!strcmp(field, "X")) {
+				unsigned int nr = 0;
+				while ((field = strtok_r(fstart, ".", &fctx)) !=
+				    NULL) {
+					tmp = atoi(field);
+					if (tmp <= 0 && nr == 0) {
+						if (verbose)
+							fprintf(stderr,
+								"Invalid context at step %u!\n",
+								nr_steps);
+						return NULL;
+					} else if (tmp < 0 && nr == 1) {
+						if (verbose)
+							fprintf(stderr,
+								"Invalid preemption period at step %u!\n",
+								nr_steps);
+						return NULL;
+					}
+
+					if (nr == 0) {
+						step.context = tmp;
+					} else if (nr == 1) {
+						step.period = tmp;
+					} else {
+						if (verbose)
+							fprintf(stderr,
+								"Invalid preemption format at step %u!\n",
+								nr_steps);
+						return NULL;
+					}
+
+					nr++;
+				}
+
+				step.type = PREEMPTION;
+				goto add_step;
 			}
 
 			tmp = atoi(field);
@@ -688,10 +726,13 @@ static unsigned long get_bb_sz(unsigned int duration)
 static void
 init_bb(struct w_step *w, unsigned int flags)
 {
-	/* Preemption point every 100us. */
-	const unsigned int arb_period = get_bb_sz(100) / sizeof(uint32_t);
+	const unsigned int arb_period =
+			get_bb_sz(w->preempt_us) / sizeof(uint32_t);
 	unsigned int i;
 	uint32_t *ptr;
+
+	if (!arb_period)
+		return;
 
 	gem_set_domain(fd, w->bb_handle,
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
@@ -968,6 +1009,41 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 		}
 	}
 
+	/* Record default preemption. */
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		if (w->type == BATCH)
+			w->preempt_us = 100;
+	}
+
+	/*
+	 * Scan for contexts with modified preemption config and record their
+	 * preemption period for the following steps belonging to the same
+	 * context.
+	 */
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		struct w_step *w2;
+		int j;
+
+		if (w->type != PREEMPTION)
+			continue;
+
+		for (j = i + 1; j < wrk->nr_steps; j++) {
+			w2 = &wrk->steps[j];
+
+			if (w2->context != w->context)
+				continue;
+			else if (w2->type == PREEMPTION)
+				break;
+			else if (w2->type != BATCH)
+				continue;
+
+			w2->preempt_us = w->period;
+		}
+	}
+
+	/*
+	 * Allocate batch buffers.
+	 */
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
 		unsigned int _flags = flags;
 		enum intel_engine_id engine = w->engine;
@@ -1855,6 +1931,8 @@ static void *run_workload(void *data)
 					wrk->ctx_list[w->context].priority =
 								    w->priority;
 				}
+				continue;
+			} else if (w->type == PREEMPTION) {
 				continue;
 			}
 
