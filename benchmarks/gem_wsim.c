@@ -82,7 +82,8 @@ enum w_type
 	THROTTLE,
 	QD_THROTTLE,
 	SW_FENCE,
-	SW_FENCE_SIGNAL
+	SW_FENCE_SIGNAL,
+	CTX_PRIORITY
 };
 
 struct deps
@@ -114,6 +115,7 @@ struct w_step
 		int target;
 		int throttle;
 		int fence_signal;
+		int priority;
 	};
 
 	/* Implementation details */
@@ -162,6 +164,7 @@ struct workload
 	unsigned int nr_ctxs;
 	struct {
 		uint32_t id;
+		int priority;
 		unsigned int static_vcs;
 	} *ctx_list;
 
@@ -342,6 +345,36 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					step.period = tmp;
 					goto add_step;
 				}
+			} else if (!strcmp(field, "P")) {
+				unsigned int nr = 0;
+				while ((field = strtok_r(fstart, ".", &fctx)) !=
+				    NULL) {
+					tmp = atoi(field);
+					if (tmp <= 0 && nr == 0) {
+						if (verbose)
+							fprintf(stderr,
+								"Invalid context at step %u!\n",
+								nr_steps);
+						return NULL;
+					}
+
+					if (nr == 0) {
+						step.context = tmp;
+					} else if (nr == 1) {
+						step.priority = tmp;
+					} else {
+						if (verbose)
+							fprintf(stderr,
+								"Invalid priority format at step %u!\n",
+								nr_steps);
+						return NULL;
+					}
+
+					nr++;
+				}
+
+				step.type = CTX_PRIORITY;
+				goto add_step;
 			} else if (!strcmp(field, "s")) {
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
@@ -1789,6 +1822,19 @@ static void *run_workload(void *data)
 				cur_seqno += wrk->steps[tgt].idx;
 				inc = cur_seqno - wrk->sync_seqno;
 				sw_sync_timeline_inc(wrk->sync_timeline, inc);
+				continue;
+			} else if (w->type == CTX_PRIORITY) {
+				if (w->priority != wrk->ctx_list[w->context].priority) {
+					struct drm_i915_gem_context_param param = {
+						.ctx_id = wrk->ctx_list[w->context].id,
+						.param = I915_CONTEXT_PARAM_PRIORITY,
+						.value = w->priority,
+					};
+
+					gem_context_set_param(fd, &param);
+					wrk->ctx_list[w->context].priority =
+								    w->priority;
+				}
 				continue;
 			}
 
