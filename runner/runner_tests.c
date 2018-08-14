@@ -514,6 +514,8 @@ igt_main
 	job_list_filter_test("binary-exclude", "-x", "successtest", 3, 2);
 	job_list_filter_test("subtest-include", "-t", "first-subtest", 1, 1);
 	job_list_filter_test("subtest-exclude", "-x", "second-subtest", 4, 3);
+	job_list_filter_test("piglit-names", "-t", "igt@successtest", 2, 1);
+	job_list_filter_test("piglit-names-subtest", "-t", "igt@successtest@first", 1, 1);
 
 	igt_subtest_group {
 		char filename[] = "tmplistXXXXXX";
