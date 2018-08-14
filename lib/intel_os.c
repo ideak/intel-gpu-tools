@@ -329,8 +329,11 @@ int __intel_check_memory(uint64_t count, uint64_t size, unsigned mode,
 		  mode & CHECK_SWAP ? " + swap": "");
 
 	total = 0;
-	if (mode & (CHECK_RAM | CHECK_SWAP))
-		total += intel_get_avail_ram_mb();
+	if (mode & (CHECK_RAM | CHECK_SWAP)) {
+		total = intel_get_avail_ram_mb();
+		/* Keep some in reserve for the runner. */
+		total -= min(total / 2, 1000);
+	}
 	if (mode & CHECK_SWAP)
 		total += intel_get_total_swap_mb();
 	total *= 1024 * 1024;
