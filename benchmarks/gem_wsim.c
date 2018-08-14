@@ -592,7 +592,7 @@ add_step:
 		}
 	}
 
-	if (bcs_used && verbose)
+	if (bcs_used && (flags & VCS2REMAP) && verbose)
 		printf("BCS usage in workload with VCS2 remapping enabled!\n");
 
 	return wrk;
