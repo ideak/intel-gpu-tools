@@ -697,7 +697,10 @@ static bool setup_environment(void)
 	if (has_runtime_pm)
 		goto out;
 
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
+	drm_fd = __drm_open_driver(DRIVER_INTEL);
+	igt_require(drm_fd != -1);
+	igt_device_set_master(drm_fd);
+
 	debugfs = igt_debugfs_dir(drm_fd);
 	igt_require(debugfs != -1);
 
