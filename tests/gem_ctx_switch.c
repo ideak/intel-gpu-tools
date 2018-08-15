@@ -93,7 +93,14 @@ static void single(int fd, uint32_t handle,
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_relocation_entry reloc;
 	uint32_t contexts[64];
+	struct {
+		double elapsed;
+		unsigned long count;
+	} *shared;
 	int n;
+
+	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(shared != MAP_FAILED);
 
 	gem_require_ring(fd, e->exec_id | e->flags);
 
@@ -158,11 +165,31 @@ static void single(int fd, uint32_t handle,
 		igt_info("[%d] %s: %'u cycles: %.3fus%s\n",
 			 child, e->name, count, elapsed(&start, &now)*1e6 / count,
 			 flags & INTERRUPTIBLE ? " (interruptible)" : "");
+
+		shared[child].elapsed = elapsed(&start, &now);
+		shared[child].count = count;
 	}
 	igt_waitchildren();
 
+	if (ncpus > 1) {
+		unsigned long total = 0;
+		double max = 0;
+
+		for (n = 0; n < ncpus; n++) {
+			total += shared[n].count;
+			if (shared[n].elapsed > max)
+				max = shared[n].elapsed;
+		}
+
+		igt_info("Total %s: %'lu cycles: %.3fus%s\n",
+			 e->name, total, max*1e6 / total,
+			 flags & INTERRUPTIBLE ? " (interruptible)" : "");
+	}
+
 	for (n = 0; n < 64; n++)
 		gem_context_destroy(fd, contexts[n]);
+
+	munmap(shared, 4096);
 }
 
 static void all(int fd, uint32_t handle, unsigned flags, int timeout)
