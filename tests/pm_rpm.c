@@ -717,21 +717,23 @@ out:
 	return wait_for_suspended();
 }
 
-static void restore_environment(void)
-{
-	igt_pm_restore_sata_link_power_management(pm_data);
-	free(pm_data);
-}
-
 static void teardown_environment(void)
 {
-	restore_environment();
-	fini_mode_set_data(&ms_data);
-	close(debugfs);
-	drmClose(drm_fd);
 	close(msr_fd);
 	if (has_pc8)
 		close(pc8_status_fd);
+
+	igt_restore_runtime_pm();
+
+	igt_pm_restore_sata_link_power_management(pm_data);
+	free(pm_data);
+
+	fini_mode_set_data(&ms_data);
+
+	close(debugfs);
+	close(drm_fd);
+
+	has_runtime_pm = false;
 }
 
 static void basic_subtest(void)
