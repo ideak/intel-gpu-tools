@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -14,6 +15,13 @@
 #include "settings.h"
 #include "executor.h"
 #include "output_strings.h"
+
+#define INCOMPLETE_EXITCODE -1
+
+_Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_TIMEOUT, "exit code clash");
+_Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_SKIP, "exit code clash");
+_Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_SUCCESS, "exit code clash");
+_Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_INVALID, "exit code clash");
 
 struct subtests
 {
@@ -692,6 +700,8 @@ static const char *result_from_exitcode(int exitcode)
 		return "pass";
 	case IGT_EXIT_INVALID:
 		return "notrun";
+	case INCOMPLETE_EXITCODE:
+		return "incomplete";
 	default:
 		return "fail";
 	}
@@ -712,7 +722,8 @@ static void add_subtest(struct subtests *subtests, char *subtest)
 	subtests->names[subtests->size - 1] = subtest;
 }
 
-static void fill_from_journal(int fd, char *binary,
+static void fill_from_journal(int fd,
+			      struct job_list_entry *entry,
 			      struct subtests *subtests,
 			      struct json_object *tests)
 {
@@ -722,7 +733,7 @@ static void fill_from_journal(int fd, char *binary,
 	ssize_t read;
 	char exitline[] = "exit:";
 	char timeoutline[] = "timeout:";
-	int exitcode = -1;
+	int exitcode = INCOMPLETE_EXITCODE;
 	bool has_timeout = false;
 
 	while ((read = getline(&line, &linelen, f)) > 0) {
@@ -732,7 +743,7 @@ static void fill_from_journal(int fd, char *binary,
 			double time = 0.0;
 			struct json_object *obj;
 
-			generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+			generate_piglit_name(entry->binary, NULL, piglit_name, sizeof(piglit_name));
 			obj = get_or_create_json_object(tests, piglit_name);
 
 			exitcode = atoi(line + strlen(exitline));
@@ -752,7 +763,7 @@ static void fill_from_journal(int fd, char *binary,
 				double time = 0.0;
 				struct json_object *obj;
 
-				generate_piglit_name(binary, last_subtest, piglit_name, sizeof(piglit_name));
+				generate_piglit_name(entry->binary, last_subtest, piglit_name, sizeof(piglit_name));
 				obj = get_or_create_json_object(tests, piglit_name);
 
 				set_result(obj, "timeout");
@@ -764,7 +775,7 @@ static void fill_from_journal(int fd, char *binary,
 				add_runtime(obj, time);
 
 				/* ... and also for the binary */
-				generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+				generate_piglit_name(entry->binary, NULL, piglit_name, sizeof(piglit_name));
 				obj = get_or_create_json_object(tests, piglit_name);
 				add_runtime(obj, time);
 			}
@@ -774,11 +785,23 @@ static void fill_from_journal(int fd, char *binary,
 	}
 
 	if (subtests->size == 0) {
+		char *subtestname = NULL;
 		char piglit_name[256];
 		struct json_object *obj;
 		const char *result = has_timeout ? "timeout" : result_from_exitcode(exitcode);
 
-		generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+		/*
+		 * If the test was killed before it printed that it's
+		 * entering a subtest, we would incorrectly generate
+		 * results as the binary had no subtests. If we know
+		 * otherwise, do otherwise.
+		 */
+		if (entry->subtest_count > 0) {
+			subtestname = entry->subtests[0];
+			add_subtest(subtests, strdup(subtestname));
+		}
+
+		generate_piglit_name(entry->binary, subtestname, piglit_name, sizeof(piglit_name));
 		obj = get_or_create_json_object(tests, piglit_name);
 		set_result(obj, result);
 	}
@@ -835,7 +858,9 @@ static void override_results(char *binary,
 	}
 }
 
-static bool parse_test_directory(int dirfd, char *binary, struct json_object *tests)
+static bool parse_test_directory(int dirfd,
+				 struct job_list_entry *entry,
+				 struct json_object *tests)
 {
 	int fds[_F_LAST];
 	struct subtests subtests = {};
@@ -849,16 +874,16 @@ static bool parse_test_directory(int dirfd, char *binary, struct json_object *te
 	 * fill_from_journal fills the subtests struct and adds
 	 * timeout results where applicable.
 	 */
-	fill_from_journal(fds[_F_JOURNAL], binary, &subtests, tests);
+	fill_from_journal(fds[_F_JOURNAL], entry, &subtests, tests);
 
-	if (!fill_from_output(fds[_F_OUT], binary, "out", &subtests, tests) ||
-	    !fill_from_output(fds[_F_ERR], binary, "err", &subtests, tests) ||
-	    !fill_from_dmesg(fds[_F_DMESG], binary, &subtests, tests)) {
+	if (!fill_from_output(fds[_F_OUT], entry->binary, "out", &subtests, tests) ||
+	    !fill_from_output(fds[_F_ERR], entry->binary, "err", &subtests, tests) ||
+	    !fill_from_dmesg(fds[_F_DMESG], entry->binary, &subtests, tests)) {
 		fprintf(stderr, "Error parsing output files\n");
 		return false;
 	}
 
-	override_results(binary, &subtests, tests);
+	override_results(entry->binary, &subtests, tests);
 
 	close_outputs(fds);
 
@@ -940,7 +965,7 @@ bool generate_results(int dirfd)
 			break;
 		}
 
-		if (!parse_test_directory(testdirfd, job_list.entries[i].binary, tests)) {
+		if (!parse_test_directory(testdirfd, &job_list.entries[i], tests)) {
 			close(resultsfd);
 			return false;
 		}
