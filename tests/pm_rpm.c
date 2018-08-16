@@ -2045,9 +2045,7 @@ int main(int argc, char *argv[])
 		igt_assert_eq(igt_i915_driver_load("disable_display=1"), 0);
 
 		igt_assert(setup_environment());
-		basic_subtest();
-		drm_resources_equal_subtest();
-		pci_d3_state_subtest();
+		igt_assert(igt_wait(device_in_pci_d3(), 2000, 100));
 		teardown_environment();
 
 		igt_debug("Reload as normal\n");
@@ -2055,9 +2053,9 @@ int main(int argc, char *argv[])
 		igt_assert_eq(igt_i915_driver_load(NULL), 0);
 
 		igt_assert(setup_environment());
-		basic_subtest();
-		drm_resources_equal_subtest();
-		pci_d3_state_subtest();
+		igt_assert(igt_wait(device_in_pci_d3(), 2000, 100));
+		if (enable_one_screen_with_type(&ms_data, SCREEN_TYPE_ANY))
+			drm_resources_equal_subtest();
 		teardown_environment();
 	}
 
