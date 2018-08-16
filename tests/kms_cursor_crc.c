@@ -59,7 +59,6 @@ typedef struct {
 	int curw, curh; /* cursor size */
 	int cursor_max_w, cursor_max_h;
 	igt_pipe_crc_t *pipe_crc;
-	uint32_t devid;
 	unsigned flags;
 } data_t;
 
@@ -108,6 +107,13 @@ static void cursor_disable(data_t *data)
 
 static bool chv_cursor_broken(data_t *data, int x)
 {
+	uint32_t devid;
+
+	if (!is_i915_device(data->drm_fd))
+		return false;
+
+	devid = intel_get_drm_devid(data->drm_fd);
+
 	/*
 	 * CHV gets a FIFO underrun on pipe C when cursor x coordinate
 	 * is negative and the cursor visible.
@@ -121,7 +127,7 @@ static bool chv_cursor_broken(data_t *data, int x)
 	if (x >= 0)
 		return false;
 
-	return IS_CHERRYVIEW(data->devid) && data->pipe == PIPE_C;
+	return IS_CHERRYVIEW(devid) && data->pipe == PIPE_C;
 }
 
 static bool cursor_visible(data_t *data, int x, int y)
@@ -459,8 +465,15 @@ static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 	igt_put_cairo_ctx(data->drm_fd, &data->fb, cr);
 }
 
-static bool has_nonsquare_cursors(uint32_t devid)
+static bool has_nonsquare_cursors(data_t *data)
 {
+	uint32_t devid;
+
+	if (!is_i915_device(data->drm_fd))
+		return false;
+
+	devid = intel_get_drm_devid(data->drm_fd);
+
 	/*
 	 * Test non-square cursors a bit on the platforms
 	 * that support such things.
@@ -616,19 +629,19 @@ static void run_test_generic(data_t *data)
 
 		/* Using created cursor FBs to test cursor support */
 		igt_subtest_f("cursor-%dx%d-onscreen", w, h) {
-			igt_require(has_nonsquare_cursors(data->devid));
+			igt_require(has_nonsquare_cursors(data));
 			run_test(data, test_crc_onscreen, w, h);
 		}
 		igt_subtest_f("cursor-%dx%d-offscreen", w, h) {
-			igt_require(has_nonsquare_cursors(data->devid));
+			igt_require(has_nonsquare_cursors(data));
 			run_test(data, test_crc_offscreen, w, h);
 		}
 		igt_subtest_f("cursor-%dx%d-sliding", w, h) {
-			igt_require(has_nonsquare_cursors(data->devid));
+			igt_require(has_nonsquare_cursors(data));
 			run_test(data, test_crc_sliding, w, h);
 		}
 		igt_subtest_f("cursor-%dx%d-random", w, h) {
-			igt_require(has_nonsquare_cursors(data->devid));
+			igt_require(has_nonsquare_cursors(data));
 			run_test(data, test_crc_random, w, h);
 		}
 
@@ -647,9 +660,7 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
-
-		data.devid = intel_get_drm_devid(data.drm_fd);
+		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
 		ret = drmGetCap(data.drm_fd, DRM_CAP_CURSOR_WIDTH, &cursor_width);
 		igt_assert(ret == 0 || errno == EINVAL);
