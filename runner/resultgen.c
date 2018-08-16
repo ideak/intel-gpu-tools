@@ -858,9 +858,89 @@ static void override_results(char *binary,
 	}
 }
 
+static struct json_object *get_totals_object(struct json_object *totals,
+					     const char *key)
+{
+	struct json_object *obj = NULL;
+
+	if (json_object_object_get_ex(totals, key, &obj))
+		return obj;
+
+	obj = json_object_new_object();
+	json_object_object_add(totals, key, obj);
+
+	json_object_object_add(obj, "crash", json_object_new_int(0));
+	json_object_object_add(obj, "pass", json_object_new_int(0));
+	json_object_object_add(obj, "dmesg-fail", json_object_new_int(0));
+	json_object_object_add(obj, "dmesg-warn", json_object_new_int(0));
+	json_object_object_add(obj, "skip", json_object_new_int(0));
+	json_object_object_add(obj, "incomplete", json_object_new_int(0));
+	json_object_object_add(obj, "timeout", json_object_new_int(0));
+	json_object_object_add(obj, "notrun", json_object_new_int(0));
+	json_object_object_add(obj, "fail", json_object_new_int(0));
+	json_object_object_add(obj, "warn", json_object_new_int(0));
+
+	return obj;
+}
+
+static void add_result_to_totals(struct json_object *totals,
+				 const char *result)
+{
+	json_object *numobj = NULL;
+	int old;
+
+	if (!json_object_object_get_ex(totals, result, &numobj)) {
+		fprintf(stderr, "Warning: Totals object without count for %s\n", result);
+		return;
+	}
+
+	old = json_object_get_int(numobj);
+	json_object_object_add(totals, result, json_object_new_int(old + 1));
+}
+
+static void add_to_totals(char *binary,
+			  struct subtests *subtests,
+			  struct json_object *tests,
+			  struct json_object *totals)
+{
+	struct json_object *test, *resultobj, *roottotal, *binarytotal;
+	char piglit_name[256];
+	const char *result;
+	size_t i;
+
+	generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
+	roottotal = get_totals_object(totals, "");
+	binarytotal = get_totals_object(totals, piglit_name);
+
+	if (subtests->size == 0) {
+		test = get_or_create_json_object(tests, piglit_name);
+		if (!json_object_object_get_ex(test, "result", &resultobj)) {
+			fprintf(stderr, "Warning: No results set for %s\n", piglit_name);
+			return;
+		}
+		result = json_object_get_string(resultobj);
+		add_result_to_totals(roottotal, result);
+		add_result_to_totals(binarytotal, result);
+		return;
+	}
+
+	for (i = 0; i < subtests->size; i++) {
+		generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+		test = get_or_create_json_object(tests, piglit_name);
+		if (!json_object_object_get_ex(test, "result", &resultobj)) {
+			fprintf(stderr, "Warning: No results set for %s\n", piglit_name);
+			return;
+		}
+		result = json_object_get_string(resultobj);
+		add_result_to_totals(roottotal, result);
+		add_result_to_totals(binarytotal, result);
+	}
+}
+
 static bool parse_test_directory(int dirfd,
 				 struct job_list_entry *entry,
-				 struct json_object *tests)
+				 struct json_object *tests,
+				 struct json_object *totals)
 {
 	int fds[_F_LAST];
 	struct subtests subtests = {};
@@ -884,6 +964,7 @@ static bool parse_test_directory(int dirfd,
 	}
 
 	override_results(entry->binary, &subtests, tests);
+	add_to_totals(entry->binary, &subtests, tests, totals);
 
 	close_outputs(fds);
 
@@ -894,7 +975,7 @@ bool generate_results(int dirfd)
 {
 	struct settings settings;
 	struct job_list job_list;
-	struct json_object *obj, *tests;
+	struct json_object *obj, *tests, *totals;
 	int resultsfd, testdirfd, unamefd;
 	const char *json_string;
 	size_t i;
@@ -950,11 +1031,12 @@ bool generate_results(int dirfd)
 	 * - lspci
 	 * - options
 	 * - time_elapsed
-	 * - totals
 	 */
 
 	tests = json_object_new_object();
 	json_object_object_add(obj, "tests", tests);
+	totals = json_object_new_object();
+	json_object_object_add(obj, "totals", totals);
 
 	for (i = 0; i < job_list.size; i++) {
 		char name[16];
@@ -965,7 +1047,7 @@ bool generate_results(int dirfd)
 			break;
 		}
 
-		if (!parse_test_directory(testdirfd, &job_list.entries[i], tests)) {
+		if (!parse_test_directory(testdirfd, &job_list.entries[i], tests, totals)) {
 			close(resultsfd);
 			return false;
 		}
