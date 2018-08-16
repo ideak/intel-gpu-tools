@@ -138,31 +138,17 @@ static void strchomp(char *str)
 		str[len - 1] = 0;
 }
 
-/**
- * igt_pm_enable_audio_runtime_pm:
- *
- * We know that if we don't enable audio runtime PM, snd_hda_intel will never
- * release its power well refcount, and we'll never reach the LPSP state.
- * There's no guarantee that it will release the power well if we enable
- * runtime PM, but at least we can try.
- *
- * We don't have any assertions on open since the user may not even have
- * snd_hda_intel loaded, which is not a problem.
- */
-void igt_pm_enable_audio_runtime_pm(void)
+static int __igt_pm_enable_audio_runtime_pm(void)
 {
 	char *path = NULL;
 	struct dirent *de;
 	DIR *dir;
+	int err;
 	int fd;
-
-	/* Check if already enabled. */
-	if (__igt_pm_audio_runtime_power_save[0])
-		return;
 
 	dir = opendir("/sys/class/sound");
 	if (!dir)
-		return;
+		return 0;
 
 	/* Find PCI device claimed by snd_hda_intel and tied to i915. */
 	while ((de = readdir(dir))) {
@@ -196,18 +182,18 @@ void igt_pm_enable_audio_runtime_pm(void)
 				    de->d_name));
 
 		igt_debug("Audio device path is %s\n", path);
-
 		break;
 	}
+	closedir(dir);
 
 	fd = open("/sys/module/snd_hda_intel/parameters/power_save", O_RDWR);
 	if (fd < 0)
-		return;
+		return 0;
 
 	/* snd_hda_intel loaded but no path found is an error. */
 	if (!path) {
 		close(fd);
-		errno = ESRCH;
+		err = -ESRCH;
 		goto err;
 	}
 
@@ -219,8 +205,10 @@ void igt_pm_enable_audio_runtime_pm(void)
 	close(fd);
 
 	fd = open(path, O_RDWR);
-	if (fd < 0)
+	if (fd < 0) {
+		err = -errno;
 		goto err;
+	}
 
 	igt_assert(read(fd, __igt_pm_audio_runtime_control,
 			sizeof(__igt_pm_audio_runtime_control)) > 0);
@@ -236,12 +224,43 @@ void igt_pm_enable_audio_runtime_pm(void)
 
 	/* Give some time for it to react. */
 	sleep(1);
-
-	return;
+	return 0;
 
 err:
-	igt_warn("Failed to enable audio runtime PM! (%d)", errno);
 	free(path);
+	return err;
+}
+
+/**
+ * igt_pm_enable_audio_runtime_pm:
+ *
+ * We know that if we don't enable audio runtime PM, snd_hda_intel will never
+ * release its power well refcount, and we'll never reach the LPSP state.
+ * There's no guarantee that it will release the power well if we enable
+ * runtime PM, but at least we can try.
+ *
+ * We don't have any assertions on open since the user may not even have
+ * snd_hda_intel loaded, which is not a problem.
+ */
+void igt_pm_enable_audio_runtime_pm(void)
+{
+	int err;
+
+	/* Check if already enabled. */
+	if (__igt_pm_audio_runtime_power_save[0])
+		return;
+
+	for (int count = 0; count < 5; count++) {
+		if (!__igt_pm_enable_audio_runtime_pm())
+			return;
+
+		/* modprobe(sna-hda-intel) acts async so poll for sysfs */
+		sleep(1);
+	}
+
+	err = __igt_pm_enable_audio_runtime_pm();
+	if (err)
+		igt_warn("Failed to enable audio runtime PM! (%d)\n", -err);
 }
 
 /**
