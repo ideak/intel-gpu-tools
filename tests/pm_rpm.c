@@ -49,6 +49,7 @@
 #include "igt_kmod.h"
 #include "igt_sysfs.h"
 #include "igt_debugfs.h"
+#include "igt_device.h"
 
 #define MSR_PKG_CST_CONFIG_CONTROL	0xE2
 /* HSW/BDW: */
