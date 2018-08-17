@@ -1220,7 +1220,7 @@ static void init_blue_crc(enum pixel_format format)
 
 	print_crc("Blue CRC:  ", &blue_crcs[format].crc);
 
-	unset_all_crtcs();
+	igt_display_reset(&drm.display);
 
 	igt_remove_fb(drm.fd, &blue);
 
@@ -1272,7 +1272,7 @@ static void init_crcs(enum pixel_format format,
 		print_crc("", &pattern->crcs[format][r]);
 	}
 
-	unset_all_crtcs();
+	igt_display_reset(&drm.display);
 
 	for (r = 0; r < pattern->n_rects; r++)
 		igt_remove_fb(drm.fd, &tmp_fbs[r]);
