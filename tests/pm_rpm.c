@@ -693,6 +693,21 @@ static void setup_pc8(void)
 	has_pc8 = true;
 }
 
+static bool dmc_loaded(void)
+{
+	char buf[15];
+	int len;
+
+	len = igt_sysfs_read(debugfs, "i915_dmc_info", buf, sizeof(buf) - 1);
+	if (len < 0)
+	    return true; /* no CSR support, no DMC requirement */
+
+	buf[len] = '\0';
+
+	igt_info("DMC: %s\n", buf);
+	return strstr(buf, "fw loaded: yes");
+}
+
 static bool setup_environment(void)
 {
 	if (has_runtime_pm)
@@ -715,6 +730,7 @@ static bool setup_environment(void)
 	igt_info("Runtime PM support: %d\n", has_runtime_pm);
 	igt_info("PC8 residency support: %d\n", has_pc8);
 	igt_require(has_runtime_pm);
+	igt_require(dmc_loaded());
 
 out:
 	disable_all_screens(&ms_data);
