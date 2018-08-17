@@ -2058,7 +2058,7 @@ int main(int argc, char *argv[])
 	igt_subtest("module-reload") {
 		igt_debug("Reload w/o display\n");
 		igt_i915_driver_unload();
-		igt_assert_eq(igt_i915_driver_load("disable_display=1"), 0);
+		igt_assert_eq(igt_i915_driver_load("disable_display=1 mmio_debug=-1"), 0);
 
 		igt_assert(setup_environment());
 		igt_assert(igt_wait(device_in_pci_d3(), 2000, 100));
@@ -2066,13 +2066,16 @@ int main(int argc, char *argv[])
 
 		igt_debug("Reload as normal\n");
 		igt_i915_driver_unload();
-		igt_assert_eq(igt_i915_driver_load(NULL), 0);
+		igt_assert_eq(igt_i915_driver_load("mmio_debug=-1"), 0);
 
 		igt_assert(setup_environment());
 		igt_assert(igt_wait(device_in_pci_d3(), 2000, 100));
 		if (enable_one_screen_with_type(&ms_data, SCREEN_TYPE_ANY))
 			drm_resources_equal_subtest();
 		teardown_environment();
+
+		/* Remove our mmio_debugging module */
+		igt_i915_driver_unload();
 	}
 
 	igt_exit();
