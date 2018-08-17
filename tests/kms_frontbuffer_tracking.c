@@ -1687,10 +1687,18 @@ static void enable_prim_screen_and_wait(const struct test_mode *t)
 	do_assertions(ASSERT_NO_ACTION_CHANGE);
 }
 
-static void enable_scnd_screen_and_wait(const struct test_mode *t)
+static void enable_both_screens_and_wait(const struct test_mode *t)
 {
+	fill_fb_region(&prim_mode_params.primary, COLOR_PRIM_BG);
 	fill_fb_region(&scnd_mode_params.primary, COLOR_SCND_BG);
-	set_mode_for_params(&scnd_mode_params);
+
+	__set_mode_for_params(&prim_mode_params);
+	__set_mode_for_params(&scnd_mode_params);
+
+	igt_display_commit2(&drm.display, drm.display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+	wanted_crc = &blue_crcs[t->format].crc;
+	fbc_update_last_action();
 
 	do_assertions(ASSERT_NO_ACTION_CHANGE);
 }
@@ -1822,7 +1830,11 @@ static void prepare_subtest_data(const struct test_mode *t,
 
 static void prepare_subtest_screens(const struct test_mode *t)
 {
-	enable_prim_screen_and_wait(t);
+	if (t->pipes == PIPE_DUAL)
+		enable_both_screens_and_wait(t);
+	else
+		enable_prim_screen_and_wait(t);
+
 	if (t->screen == SCREEN_PRIM) {
 		if (t->plane == PLANE_CUR)
 			set_region_for_test(t, &prim_mode_params.cursor);
@@ -1830,11 +1842,7 @@ static void prepare_subtest_screens(const struct test_mode *t)
 			set_region_for_test(t, &prim_mode_params.sprite);
 	}
 
-	if (t->pipes == PIPE_SINGLE)
-		return;
-
-	enable_scnd_screen_and_wait(t);
-	if (t->screen == SCREEN_SCND) {
+	if (t->pipes == PIPE_DUAL && t->screen == SCREEN_SCND) {
 		if (t->plane == PLANE_CUR)
 			set_region_for_test(t, &scnd_mode_params.cursor);
 		if (t->plane == PLANE_SPR)
@@ -1872,16 +1880,18 @@ static void rte_subtest(const struct test_mode *t)
 	do_assertions(ASSERT_FBC_DISABLED | ASSERT_PSR_DISABLED |
 		      DONT_ASSERT_CRC | ASSERT_DRRS_INACTIVE);
 
-	enable_prim_screen_and_wait(t);
+	if (t->pipes == PIPE_SINGLE)
+		enable_prim_screen_and_wait(t);
+	else
+		enable_both_screens_and_wait(t);
+
 	set_region_for_test(t, &prim_mode_params.cursor);
 	set_region_for_test(t, &prim_mode_params.sprite);
 
-	if (t->pipes == PIPE_SINGLE)
-		return;
-
-	enable_scnd_screen_and_wait(t);
-	set_region_for_test(t, &scnd_mode_params.cursor);
-	set_region_for_test(t, &scnd_mode_params.sprite);
+	if (t->pipes == PIPE_DUAL) {
+		set_region_for_test(t, &scnd_mode_params.cursor);
+		set_region_for_test(t, &scnd_mode_params.sprite);
+	}
 }
 
 static void update_wanted_crc(const struct test_mode *t, igt_crc_t *crc)
