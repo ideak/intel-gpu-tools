@@ -65,7 +65,7 @@ mmap_coherent(int fd, uint32_t handle, int size)
 }
 
 static void
-store_dword_loop(int fd, int ring, int count, int divider)
+store_dword_loop(int fd, int ring, int divider)
 {
 	int i, val = 0;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -143,19 +143,19 @@ store_dword_loop(int fd, int ring, int count, int divider)
 }
 
 static void
-store_test(int fd, int ring, int count)
+store_test(int fd, int ring)
 {
 	gem_require_ring(fd, ring);
-	store_dword_loop(fd, ring, count, 1);
-	store_dword_loop(fd, ring, count, 2);
+	store_dword_loop(fd, ring, 1);
+	store_dword_loop(fd, ring, 2);
 	if (!igt_run_in_simulation()) {
-		store_dword_loop(fd, ring, count, 3);
-		store_dword_loop(fd, ring, count, 5);
-		store_dword_loop(fd, ring, count, 7);
-		store_dword_loop(fd, ring, count, 11);
-		store_dword_loop(fd, ring, count, 13);
-		store_dword_loop(fd, ring, count, 17);
-		store_dword_loop(fd, ring, count, 19);
+		store_dword_loop(fd, ring, 3);
+		store_dword_loop(fd, ring, 5);
+		store_dword_loop(fd, ring, 7);
+		store_dword_loop(fd, ring, 11);
+		store_dword_loop(fd, ring, 13);
+		store_dword_loop(fd, ring, 17);
+		store_dword_loop(fd, ring, 19);
 	}
 }
 
@@ -184,14 +184,9 @@ igt_main
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("short-%s", e->name) {
+		igt_subtest_f("store-%s", e->name) {
 			check_test_requirements(fd, e->exec_id);
-			store_test(fd, e->exec_id | e->flags, 4*1024);
-		}
-
-		igt_subtest_f("long-%s", e->name) {
-			check_test_requirements(fd, e->exec_id);
-			store_test(fd, e->exec_id | e->flags, 4*1024*1024);
+			store_test(fd, e->exec_id | e->flags);
 		}
 	}
 
