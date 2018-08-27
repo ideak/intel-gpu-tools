@@ -156,10 +156,10 @@ static const igt_rotation_t rotations[] = {
 	IGT_ROTATION_270,
 };
 
-static bool can_rotate(unsigned format)
+static bool can_rotate(data_t *d, unsigned format)
 {
 	if (format == DRM_FORMAT_C8 ||
-	    format == DRM_FORMAT_RGB565)
+	    (intel_gen(d->devid) < 11 && format == DRM_FORMAT_RGB565))
 		return false;
 
 	return true;
@@ -180,7 +180,8 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 			igt_rotation_t rot = rotations[i];
 			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
 				unsigned format = plane->drm_plane->formats[j];
-				if (igt_fb_supported_format(format) && can_rotate(format))
+				if (igt_fb_supported_format(format) &&
+				    can_rotate(d, format))
 					check_scaling_pipe_plane_rot(d, plane, format,
 								     LOCAL_I915_FORMAT_MOD_Y_TILED,
 								     pipe, output, rot);
