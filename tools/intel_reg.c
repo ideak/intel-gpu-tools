@@ -180,9 +180,9 @@ static void to_binary(char *buf, size_t buflen, uint32_t val)
 
 static void dump_decode(struct config *config, struct reg *reg, uint32_t val)
 {
-	char decode[1024];
+	char decode[1300];
 	char tmp[1024];
-	char bin[1024];
+	char bin[200];
 
 	if (config->binary)
 		to_binary(bin, sizeof(bin), val);
