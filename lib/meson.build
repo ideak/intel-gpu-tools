@@ -60,6 +60,7 @@ lib_deps = [
 	libprocps,
 	libudev,
 	libunwind,
+	libdw,
 	pciaccess,
 	pthreads,
 	math,

@@ -60,6 +60,7 @@ AM_CFLAGS = \
 	    $(DRM_CFLAGS) \
 	    $(PCIACCESS_CFLAGS) \
 	    $(LIBUNWIND_CFLAGS) \
+	    $(LIBDW_CFLAGS) \
 	    $(GSL_CFLAGS) \
 	    $(KMOD_CFLAGS) \
 	    $(PROCPS_CFLAGS) \
@@ -86,6 +87,7 @@ libintel_tools_la_LIBADD = \
 	$(CAIRO_LIBS) \
 	$(LIBUDEV_LIBS) \
 	$(LIBUNWIND_LIBS) \
+	$(LIBDW_LIBS) \
 	$(TIMER_LIBS) \
 	$(XMLRPC_LIBS) \
 	$(LIBUDEV_LIBS) \

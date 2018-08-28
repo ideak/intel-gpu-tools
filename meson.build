@@ -103,6 +103,7 @@ pciaccess = dependency('pciaccess', version : '>=0.10')
 libkmod = dependency('libkmod')
 libprocps = dependency('libprocps', required : true)
 libunwind = dependency('libunwind', required : true)
+libdw = dependency('libdw', required : true)
 ssl = dependency('openssl', required : true)
 
 valgrind = null_dep

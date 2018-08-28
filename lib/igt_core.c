@@ -73,6 +73,7 @@
 
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
+#include <elfutils/libdwfl.h>
 
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>   /* for basename() on Solaris */
@@ -1212,20 +1213,59 @@ static void print_backtrace(void)
 	unw_context_t uc;
 	int stack_num = 0;
 
+	Dwfl_Callbacks cbs = {
+		.find_elf = dwfl_linux_proc_find_elf,
+		.find_debuginfo = dwfl_standard_find_debuginfo,
+	};
+
+	Dwfl *dwfl = dwfl_begin(&cbs);
+
+	if (dwfl_linux_proc_report(dwfl, getpid())) {
+		dwfl_end(dwfl);
+		dwfl = NULL;
+	} else
+		dwfl_report_end(dwfl, NULL, NULL);
+
 	igt_info("Stack trace:\n");
 
 	unw_getcontext(&uc);
 	unw_init_local(&cursor, &uc);
 	while (unw_step(&cursor) > 0) {
 		char name[255];
-		unw_word_t off;
+		unw_word_t off, ip;
+		Dwfl_Module *mod = NULL;
+
+		unw_get_reg(&cursor, UNW_REG_IP, &ip);
+
+		if (dwfl)
+			mod = dwfl_addrmodule(dwfl, ip);
+
+		if (mod) {
+			const char *src, *dwfl_name;
+			Dwfl_Line *line;
+			int lineno;
+			GElf_Sym sym;
+
+			line = dwfl_module_getsrc(mod, ip);
+			dwfl_name = dwfl_module_addrsym(mod, ip, &sym, NULL);
+
+			if (line && dwfl_name) {
+				src = dwfl_lineinfo(line, NULL, &lineno, NULL, NULL, NULL);
+				igt_info("  #%d %s:%d %s()\n", stack_num++, src, lineno, dwfl_name);
+				continue;
+			}
+		}
 
 		if (unw_get_proc_name(&cursor, name, 255, &off) < 0)
-			strcpy(name, "<unknown>");
-
-		igt_info("  #%d [%s+0x%x]\n", stack_num++, name,
-			 (unsigned int) off);
+			igt_info("  #%d [<unknown>+0x%x]\n", stack_num++,
+				 (unsigned int) ip);
+		else
+			igt_info("  #%d [%s+0x%x]\n", stack_num++, name,
+				 (unsigned int) off);
 	}
+
+	if (dwfl)
+		dwfl_end(dwfl);
 }
 
 static const char hex[] = "0123456789abcdef";
