@@ -557,7 +557,12 @@ igt_main
 	data.pos_y = 0;
 
 	igt_subtest_f("bad-pixel-format") {
-		igt_require(gen >= 9);
+		/*
+		 * gen11 enables RGB565 rotation for 90/270 degrees.
+		 * DRM_FORMAT_C8 fmt need to be enabled for IGT if want to run
+		 * this test on gen11 and later.
+		 */
+		igt_require(gen >= 9 && gen < 11);
 		data.rotation = IGT_ROTATION_90;
 		data.override_fmt = DRM_FORMAT_RGB565;
 		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, true);
