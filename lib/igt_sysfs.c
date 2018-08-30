@@ -387,22 +387,39 @@ int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
 
 int igt_sysfs_vprintf(int dir, const char *attr, const char *fmt, va_list ap)
 {
-	FILE *file;
-	int fd;
-	int ret = -1;
+	char stack[128], *buf = stack;
+	va_list tmp;
+	int ret, fd;
 
 	fd = openat(dir, attr, O_WRONLY);
 	if (fd < 0)
-		return -1;
+		return -errno;
 
-	file = fdopen(fd, "w");
-	if (file) {
-		do {
-			ret = vfprintf(file, fmt, ap);
-		} while (ret == -1 && errno == EINTR);
-		fclose(file);
+	va_copy(tmp, ap);
+	ret = vsnprintf(buf, sizeof(stack), fmt, tmp);
+	va_end(tmp);
+	if (ret < 0)
+		return -EINVAL;
+
+	if (ret > sizeof(stack)) {
+		unsigned int len = ret + 1;
+
+		buf = malloc(len);
+		if (!buf)
+			return -ENOMEM;
+
+		ret = vsnprintf(buf, ret, fmt, ap);
+		if (ret > len) {
+			free(buf);
+			return -EINVAL;
+		}
 	}
+
+	ret = writeN(fd, buf, ret);
+
 	close(fd);
+	if (buf != stack)
+		free(buf);
 
 	return ret;
 }
