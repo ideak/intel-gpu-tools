@@ -29,6 +29,13 @@ struct subtests
 	size_t size;
 };
 
+struct results
+{
+	struct json_object *tests;
+	struct json_object *totals;
+	struct json_object *runtimes;
+};
+
 /*
  * A lot of string handling here operates on an mmapped buffer, and
  * thus we can't assume null-terminated strings. Buffers will be
@@ -725,7 +732,7 @@ static void add_subtest(struct subtests *subtests, char *subtest)
 static void fill_from_journal(int fd,
 			      struct job_list_entry *entry,
 			      struct subtests *subtests,
-			      struct json_object *tests)
+			      struct results *results)
 {
 	FILE *f = fdopen(fd, "r");
 	char *line = NULL;
@@ -735,6 +742,8 @@ static void fill_from_journal(int fd,
 	char timeoutline[] = "timeout:";
 	int exitcode = INCOMPLETE_EXITCODE;
 	bool has_timeout = false;
+	struct json_object *tests = results->tests;
+	struct json_object *runtimes = results->runtimes;
 
 	while ((read = getline(&line, &linelen, f)) > 0) {
 		if (read >= strlen(exitline) && !memcmp(line, exitline, strlen(exitline))) {
@@ -743,15 +752,20 @@ static void fill_from_journal(int fd,
 			double time = 0.0;
 			struct json_object *obj;
 
-			generate_piglit_name(entry->binary, NULL, piglit_name, sizeof(piglit_name));
-			obj = get_or_create_json_object(tests, piglit_name);
-
 			exitcode = atoi(line + strlen(exitline));
 
 			if (p)
 				time = strtod(p + 1, NULL);
 
+			generate_piglit_name(entry->binary, NULL, piglit_name, sizeof(piglit_name));
+			obj = get_or_create_json_object(runtimes, piglit_name);
 			add_runtime(obj, time);
+
+			/* If no subtests, the test result node also gets the runtime */
+			if (subtests->size == 0) {
+				obj = get_or_create_json_object(tests, piglit_name);
+				add_runtime(obj, time);
+			}
 		} else if (read >= strlen(timeoutline) && !memcmp(line, timeoutline, strlen(timeoutline))) {
 			has_timeout = true;
 
@@ -776,7 +790,7 @@ static void fill_from_journal(int fd,
 
 				/* ... and also for the binary */
 				generate_piglit_name(entry->binary, NULL, piglit_name, sizeof(piglit_name));
-				obj = get_or_create_json_object(tests, piglit_name);
+				obj = get_or_create_json_object(runtimes, piglit_name);
 				add_runtime(obj, time);
 			}
 		} else {
@@ -900,8 +914,7 @@ static void add_result_to_totals(struct json_object *totals,
 
 static void add_to_totals(char *binary,
 			  struct subtests *subtests,
-			  struct json_object *tests,
-			  struct json_object *totals)
+			  struct results *results)
 {
 	struct json_object *test, *resultobj, *roottotal, *binarytotal;
 	char piglit_name[256];
@@ -909,11 +922,11 @@ static void add_to_totals(char *binary,
 	size_t i;
 
 	generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
-	roottotal = get_totals_object(totals, "");
-	binarytotal = get_totals_object(totals, piglit_name);
+	roottotal = get_totals_object(results->totals, "");
+	binarytotal = get_totals_object(results->totals, piglit_name);
 
 	if (subtests->size == 0) {
-		test = get_or_create_json_object(tests, piglit_name);
+		test = get_or_create_json_object(results->tests, piglit_name);
 		if (!json_object_object_get_ex(test, "result", &resultobj)) {
 			fprintf(stderr, "Warning: No results set for %s\n", piglit_name);
 			return;
@@ -926,7 +939,7 @@ static void add_to_totals(char *binary,
 
 	for (i = 0; i < subtests->size; i++) {
 		generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
-		test = get_or_create_json_object(tests, piglit_name);
+		test = get_or_create_json_object(results->tests, piglit_name);
 		if (!json_object_object_get_ex(test, "result", &resultobj)) {
 			fprintf(stderr, "Warning: No results set for %s\n", piglit_name);
 			return;
@@ -939,8 +952,7 @@ static void add_to_totals(char *binary,
 
 static bool parse_test_directory(int dirfd,
 				 struct job_list_entry *entry,
-				 struct json_object *tests,
-				 struct json_object *totals)
+				 struct results *results)
 {
 	int fds[_F_LAST];
 	struct subtests subtests = {};
@@ -954,28 +966,40 @@ static bool parse_test_directory(int dirfd,
 	 * fill_from_journal fills the subtests struct and adds
 	 * timeout results where applicable.
 	 */
-	fill_from_journal(fds[_F_JOURNAL], entry, &subtests, tests);
+	fill_from_journal(fds[_F_JOURNAL], entry, &subtests, results);
 
-	if (!fill_from_output(fds[_F_OUT], entry->binary, "out", &subtests, tests) ||
-	    !fill_from_output(fds[_F_ERR], entry->binary, "err", &subtests, tests) ||
-	    !fill_from_dmesg(fds[_F_DMESG], entry->binary, &subtests, tests)) {
+	if (!fill_from_output(fds[_F_OUT], entry->binary, "out", &subtests, results->tests) ||
+	    !fill_from_output(fds[_F_ERR], entry->binary, "err", &subtests, results->tests) ||
+	    !fill_from_dmesg(fds[_F_DMESG], entry->binary, &subtests, results->tests)) {
 		fprintf(stderr, "Error parsing output files\n");
 		return false;
 	}
 
-	override_results(entry->binary, &subtests, tests);
-	add_to_totals(entry->binary, &subtests, tests, totals);
+	override_results(entry->binary, &subtests, results->tests);
+	add_to_totals(entry->binary, &subtests, results);
 
 	close_outputs(fds);
 
 	return true;
 }
 
+static void create_result_root_nodes(struct json_object *root,
+				     struct results *results)
+{
+	results->tests = json_object_new_object();
+	json_object_object_add(root, "tests", results->tests);
+	results->totals = json_object_new_object();
+	json_object_object_add(root, "totals", results->totals);
+	results->runtimes = json_object_new_object();
+	json_object_object_add(root, "runtimes", results->runtimes);
+}
+
 bool generate_results(int dirfd)
 {
 	struct settings settings;
 	struct job_list job_list;
-	struct json_object *obj, *tests, *totals;
+	struct json_object *obj;
+	struct results results;
 	int resultsfd, testdirfd, unamefd;
 	const char *json_string;
 	size_t i;
@@ -1019,6 +1043,8 @@ bool generate_results(int dirfd)
 		close(unamefd);
 	}
 
+	create_result_root_nodes(obj, &results);
+
 	/*
 	 * Result fields that won't be added:
 	 *
@@ -1033,11 +1059,6 @@ bool generate_results(int dirfd)
 	 * - time_elapsed
 	 */
 
-	tests = json_object_new_object();
-	json_object_object_add(obj, "tests", tests);
-	totals = json_object_new_object();
-	json_object_object_add(obj, "totals", totals);
-
 	for (i = 0; i < job_list.size; i++) {
 		char name[16];
 
@@ -1047,7 +1068,7 @@ bool generate_results(int dirfd)
 			break;
 		}
 
-		if (!parse_test_directory(testdirfd, &job_list.entries[i], tests, totals)) {
+		if (!parse_test_directory(testdirfd, &job_list.entries[i], &results)) {
 			close(resultsfd);
 			return false;
 		}
