@@ -33,6 +33,7 @@ struct settings {
 	bool use_watchdog;
 	char *test_root;
 	char *results_path;
+	bool piglit_style_dmesg;
 };
 
 /**

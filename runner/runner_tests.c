@@ -152,6 +152,7 @@ static void assert_settings_equal(struct settings *one, struct settings *two)
 	igt_assert_eq(one->use_watchdog, two->use_watchdog);
 	igt_assert_eqstr(one->test_root, two->test_root);
 	igt_assert_eqstr(one->results_path, two->results_path);
+	igt_assert_eq(one->piglit_style_dmesg, two->piglit_style_dmesg);
 }
 
 static void assert_job_list_equal(struct job_list *one, struct job_list *two)
@@ -219,6 +220,7 @@ igt_main
 		igt_assert(!settings.use_watchdog);
 		igt_assert(strstr(settings.test_root, "test-root-dir") != NULL);
 		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
+		igt_assert(!settings.piglit_style_dmesg);
 	}
 
 	igt_subtest_group {
@@ -332,6 +334,7 @@ igt_main
 		igt_assert(!settings.use_watchdog);
 		igt_assert(strstr(settings.test_root, testdatadir) != NULL);
 		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
+		igt_assert(!settings.piglit_style_dmesg);
 	}
 
 	igt_fixture {
@@ -355,6 +358,7 @@ igt_main
 				 "--multiple-mode",
 				 "--inactivity-timeout", "27",
 				 "--use-watchdog",
+				 "--piglit-style-dmesg",
 				 "test-root-dir",
 				 "path-to-results",
 		};
@@ -379,6 +383,7 @@ igt_main
 		igt_assert(settings.use_watchdog);
 		igt_assert(strstr(settings.test_root, "test-root-dir") != NULL);
 		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
+		igt_assert(settings.piglit_style_dmesg);
 	}
 
 	igt_subtest("invalid-option") {
@@ -578,6 +583,22 @@ igt_main
 
 		igt_subtest("settings-serialize") {
 			char *argv[] = { "runner",
+					 "-n", "foo",
+					 "--abort-on-monitored-error",
+					 "--test-list", "path-to-test-list",
+					 "--ignore-missing",
+					 "--dry-run",
+					 "-t", "pattern1",
+					 "-t", "pattern2",
+					 "-x", "xpattern1",
+					 "-x", "xpattern2",
+					 "-s",
+					 "-l", "verbose",
+					 "--overwrite",
+					 "--multiple-mode",
+					 "--inactivity-timeout", "27",
+					 "--use-watchdog",
+					 "--piglit-style-dmesg",
 					 testdatadir,
 					 dirname,
 			};

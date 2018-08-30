@@ -16,6 +16,7 @@ enum {
 	OPT_ABORT_ON_ERROR,
 	OPT_TEST_LIST,
 	OPT_IGNORE_MISSING,
+	OPT_PIGLIT_DMESG,
 	OPT_HELP = 'h',
 	OPT_NAME = 'n',
 	OPT_DRY_RUN = 'd',
@@ -89,6 +90,12 @@ static const char *usage_str =
 	"  --use-watchdog        Use hardware watchdog for lethal enforcement of the\n"
 	"                        above timeout. Killing the test process is still\n"
 	"                        attempted at timeout trigger.\n"
+	"  --piglit-style-dmesg  Filter dmesg like piglit does. Piglit considers matches\n"
+	"                        against a short filter list to mean the test result\n"
+	"                        should be changed to dmesg-warn/dmesg-fail. Without\n"
+	"                        this option everything except matches against a\n"
+	"                        (longer) filter list means the test result should\n"
+	"                        change.\n"
 	"  [test_root]           Directory that contains the IGT tests. The environment\n"
 	"                        variable IGT_TEST_ROOT will be used if set, overriding\n"
 	"                        this option if given.\n"
@@ -192,6 +199,7 @@ bool parse_options(int argc, char **argv,
 		{"multiple-mode", no_argument, NULL, OPT_MULTIPLE},
 		{"inactivity-timeout", required_argument, NULL, OPT_TIMEOUT},
 		{"use-watchdog", no_argument, NULL, OPT_WATCHDOG},
+		{"piglit-style-dmesg", no_argument, NULL, OPT_PIGLIT_DMESG},
 		{ 0, 0, 0, 0},
 	};
 
@@ -247,6 +255,9 @@ bool parse_options(int argc, char **argv,
 			break;
 		case OPT_WATCHDOG:
 			settings->use_watchdog = true;
+			break;
+		case OPT_PIGLIT_DMESG:
+			settings->piglit_style_dmesg = true;
 			break;
 		case '?':
 			usage(NULL, stderr);
@@ -438,6 +449,7 @@ bool serialize_settings(struct settings *settings)
 	SERIALIZE_LINE(f, settings, multiple_mode, "%d");
 	SERIALIZE_LINE(f, settings, inactivity_timeout, "%d");
 	SERIALIZE_LINE(f, settings, use_watchdog, "%d");
+	SERIALIZE_LINE(f, settings, piglit_style_dmesg, "%d");
 	SERIALIZE_LINE(f, settings, test_root, "%s");
 	SERIALIZE_LINE(f, settings, results_path, "%s");
 
@@ -491,6 +503,7 @@ bool read_settings(struct settings *settings, int dirfd)
 		PARSE_LINE(settings, name, val, multiple_mode, numval);
 		PARSE_LINE(settings, name, val, inactivity_timeout, numval);
 		PARSE_LINE(settings, name, val, use_watchdog, numval);
+		PARSE_LINE(settings, name, val, piglit_style_dmesg, numval);
 		PARSE_LINE(settings, name, val, test_root, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, results_path, val ? strdup(val) : NULL);
 

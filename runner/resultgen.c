@@ -525,15 +525,22 @@ static const char igt_dmesg_whitelist[] =
 	;
 #undef _
 
+static const char igt_piglit_style_dmesg_blacklist[] =
+	"(\\[drm:|drm_|intel_|i915_)";
+
 static regex_t re;
 
-static int init_regex_whitelist(void)
+static int init_regex_whitelist(struct settings *settings)
 {
 	static int status = -1;
 
 	if (status == -1) {
-		if (regcomp(&re, igt_dmesg_whitelist, REG_EXTENDED | REG_NOSUB) != 0) {
-			fprintf(stderr, "Cannot compile dmesg whitelist regexp\n");
+		const char *regex = settings->piglit_style_dmesg ?
+			igt_piglit_style_dmesg_blacklist :
+			igt_dmesg_whitelist;
+
+		if (regcomp(&re, regex, REG_EXTENDED | REG_NOSUB) != 0) {
+			fprintf(stderr, "Cannot compile dmesg regexp\n");
 			status = 1;
 			return false;
 		}
@@ -604,7 +611,9 @@ static void add_empty_dmesgs_where_missing(struct json_object *tests,
 
 }
 
-static bool fill_from_dmesg(int fd, char *binary,
+static bool fill_from_dmesg(int fd,
+			    struct settings *settings,
+			    char *binary,
 			    struct subtests *subtests,
 			    struct json_object *tests)
 {
@@ -620,7 +629,7 @@ static bool fill_from_dmesg(int fd, char *binary,
 		return false;
 	}
 
-	if (init_regex_whitelist()) {
+	if (init_regex_whitelist(settings)) {
 		fclose(f);
 		return false;
 	}
@@ -654,9 +663,16 @@ static bool fill_from_dmesg(int fd, char *binary,
 			current_test = get_or_create_json_object(tests, piglit_name);
 		}
 
-		if ((flags & 0x07) <= 4 && continuation != 'c' &&
-		    regexec(&re, message, (size_t)0, NULL, 0) == REG_NOMATCH) {
-			append_line(&warnings, &warningslen, formatted);
+		if (settings->piglit_style_dmesg) {
+			if ((flags & 0x07) <= 5 && continuation != 'c' &&
+			    regexec(&re, message, (size_t)0, NULL, 0) != REG_NOMATCH) {
+				append_line(&warnings, &warningslen, formatted);
+			}
+		} else {
+			if ((flags & 0x07) <= 4 && continuation != 'c' &&
+			    regexec(&re, message, (size_t)0, NULL, 0) == REG_NOMATCH) {
+				append_line(&warnings, &warningslen, formatted);
+			}
 		}
 		append_line(&dmesg, &dmesglen, formatted);
 		free(formatted);
@@ -952,6 +968,7 @@ static void add_to_totals(char *binary,
 
 static bool parse_test_directory(int dirfd,
 				 struct job_list_entry *entry,
+				 struct settings *settings,
 				 struct results *results)
 {
 	int fds[_F_LAST];
@@ -970,7 +987,7 @@ static bool parse_test_directory(int dirfd,
 
 	if (!fill_from_output(fds[_F_OUT], entry->binary, "out", &subtests, results->tests) ||
 	    !fill_from_output(fds[_F_ERR], entry->binary, "err", &subtests, results->tests) ||
-	    !fill_from_dmesg(fds[_F_DMESG], entry->binary, &subtests, results->tests)) {
+	    !fill_from_dmesg(fds[_F_DMESG], settings, entry->binary, &subtests, results->tests)) {
 		fprintf(stderr, "Error parsing output files\n");
 		return false;
 	}
@@ -1068,7 +1085,7 @@ bool generate_results(int dirfd)
 			break;
 		}
 
-		if (!parse_test_directory(testdirfd, &job_list.entries[i], &results)) {
+		if (!parse_test_directory(testdirfd, &job_list.entries[i], &settings, &results)) {
 			close(resultsfd);
 			return false;
 		}
