@@ -22,14 +22,14 @@ defs_rst = configure_file(input : 'defs.rst.in',
 		output : 'defs.rst',
 		configuration : config)
 
-rst2man = find_program('rst2man', required : _man_required)
+rst2man = find_program('rst2man-3', 'rst2man', required : _man_required)
 rst2man_script = find_program('rst2man.sh')
 
 if _build_man and rst2man.found()
 	foreach manpage : manpages
 		custom_target(manpage + '.1',
 				build_by_default : true,
-				command : [ rst2man_script, '@INPUT@', '@OUTPUT@' ],
+				command : [ rst2man_script, rst2man, '@INPUT@', '@OUTPUT@' ],
 				depend_files : [ defs_rst ],
 				input: manpage + '.rst',
 				output : manpage + '.1.gz',
