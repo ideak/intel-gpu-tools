@@ -47,6 +47,7 @@ struct context {
 #define FADESPEED 100 /* milliseconds between steps */
 
 IGT_TEST_DESCRIPTION("Basic backlight sysfs test");
+static int8_t *pm_data = NULL;
 
 static int backlight_read(int *result, const char *fname)
 {
@@ -150,19 +151,38 @@ static void test_fade(struct context *context)
 		nanosleep(&ts, NULL);
 	}
 }
+static void test_fade_with_dpms(struct context *context, igt_output_t *output)
+{
+	bool has_runtime_pm;
+	has_runtime_pm = igt_setup_runtime_pm();
+	igt_info("Runtime PM support: %d\n", has_runtime_pm);
+	igt_assert(has_runtime_pm);
+	kmstest_set_connector_dpms(output->display->drm_fd, output->config.connector, DRM_MODE_DPMS_OFF);
+	igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
+	kmstest_set_connector_dpms(output->display->drm_fd, output->config.connector, DRM_MODE_DPMS_ON);
+	igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_ACTIVE));
+	test_fade(context);
+}
+static void test_fade_with_suspend(struct context *context, igt_output_t *output)
+{
+	kmstest_set_connector_dpms(output->display->drm_fd, output->config.connector, DRM_MODE_DPMS_OFF);
+	igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
+	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
+	test_fade(context);
+}
 
 igt_main
 {
 	struct context context = {0};
 	int old;
 	igt_display_t display;
+	igt_output_t *output;
 	struct igt_fb fb;
 
 	igt_skip_on_simulation();
 
 	igt_fixture {
 		enum pipe pipe;
-		igt_output_t *output;
 		bool found = false;
 		char full_name[32] = {};
 		char *name;
@@ -187,7 +207,6 @@ igt_main
 		for_each_pipe_with_valid_output(&display, pipe, output) {
 			if (strcmp(name + 6, output->name))
 				continue;
-
 			found = true;
 			break;
 		}
@@ -205,6 +224,7 @@ igt_main
 		igt_plane_set_fb(primary, &fb);
 
 		igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+		pm_data = igt_pm_enable_sata_link_power_management();
 	}
 
 	igt_subtest("basic-brightness")
@@ -213,6 +233,10 @@ igt_main
 		test_bad_brightness(&context);
 	igt_subtest("fade")
 		test_fade(&context);
+	igt_subtest("fade_with_dpms")
+		test_fade_with_dpms(&context, output);
+	igt_subtest("fade_with_suspend")
+		test_fade_with_suspend(&context, output);
 
 	igt_fixture {
 		/* Restore old brightness */
@@ -220,6 +244,8 @@ igt_main
 
 		igt_display_fini(&display);
 		igt_remove_fb(display.drm_fd, &fb);
+		igt_pm_restore_sata_link_power_management(pm_data);
+		free(pm_data);
 		close(display.drm_fd);
 	}
 }
