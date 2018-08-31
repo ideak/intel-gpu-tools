@@ -260,7 +260,7 @@ void igt_pm_enable_audio_runtime_pm(void)
 
 	err = __igt_pm_enable_audio_runtime_pm();
 	if (err)
-		igt_warn("Failed to enable audio runtime PM! (%d)\n", -err);
+		igt_debug("Failed to enable audio runtime PM! (%d)\n", -err);
 }
 
 /**
