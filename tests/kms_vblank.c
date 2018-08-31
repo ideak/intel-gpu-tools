@@ -352,7 +352,7 @@ static void vblank_ts_cont(data_t *data, int fd, int nchildren)
 	}
 
 	if (data->flags & RPM)
-		igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
+		igt_require(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
 
 	if (data->flags & SUSPEND)
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
