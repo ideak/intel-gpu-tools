@@ -75,8 +75,6 @@
  * and [batchbuffer](igt-gpu-tools-intel-batchbuffer.html) libraries as dependencies.
  */
 
-uint16_t __drm_device_id;
-
 static int __get_drm_device_name(int fd, char *name)
 {
 	drm_version_t version;
@@ -142,7 +140,6 @@ static bool has_known_intel_chipset(int fd)
 	if (!intel_gen(devid))
 		return false;
 
-	__drm_device_id = devid;
 	return true;
 }
 
