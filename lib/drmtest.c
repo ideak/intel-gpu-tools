@@ -75,12 +75,12 @@
  * and [batchbuffer](igt-gpu-tools-intel-batchbuffer.html) libraries as dependencies.
  */
 
-static int __get_drm_device_name(int fd, char *name)
+static int __get_drm_device_name(int fd, char *name, int name_size)
 {
 	drm_version_t version;
 
 	memset(&version, 0, sizeof(version));
-	version.name_len = 4;
+	version.name_len = name_size;
 	version.name = name;
 
 	if (!drmIoctl(fd, DRM_IOCTL_VERSION, &version)){
@@ -94,7 +94,7 @@ static bool __is_device(int fd, const char *expect)
 {
 	char name[5] = "";
 
-	if (__get_drm_device_name(fd, name))
+	if (__get_drm_device_name(fd, name, sizeof(name) - 1))
 		return false;
 
 	return strcmp(expect, name) == 0;
@@ -103,26 +103,6 @@ static bool __is_device(int fd, const char *expect)
 bool is_i915_device(int fd)
 {
 	return __is_device(fd, "i915");
-}
-
-static bool is_vc4_device(int fd)
-{
-	return __is_device(fd, "vc4");
-}
-
-static bool is_vgem_device(int fd)
-{
-	return __is_device(fd, "vgem");
-}
-
-static bool is_virtio_device(int fd)
-{
-	return __is_device(fd, "virt");
-}
-
-static bool is_amd_device(int fd)
-{
-	return __is_device(fd, "amdg");
 }
 
 static bool has_known_intel_chipset(int fd)
@@ -215,38 +195,57 @@ static void modprobe_i915(const char *name)
 	igt_i915_driver_load(NULL);
 }
 
-static int __open_device(const char *base, int offset, unsigned int chipset)
+static const struct module {
+	unsigned int bit;
+	const char *module;
+	void (*modprobe)(const char *name);
+} modules[] = {
+	{ DRIVER_AMDGPU, "amdgpu" },
+	{ DRIVER_INTEL, "i915", modprobe_i915 },
+	{ DRIVER_VC4, "vc4" },
+	{ DRIVER_VGEM, "vgem" },
+	{ DRIVER_VIRTIO, "virtio-gpu" },
+	{ DRIVER_VIRTIO, "virtio_gpu" },
+	{}
+};
+
+static int open_device(const char *name, unsigned int chipset)
+{
+	char dev_name[16] = "";
+	int chip = DRIVER_ANY;
+	int fd;
+
+	fd = open(name, O_RDWR);
+	if (fd == -1)
+		return -1;
+
+	if (__get_drm_device_name(fd, dev_name, sizeof(dev_name) - 1) == -1)
+		goto err;
+
+	for (const struct module *m = modules; m->module; m++) {
+		if (strcmp(m->module, dev_name) == 0) {
+			chip = m->bit;
+			break;
+		}
+	}
+	if (chipset & chip)
+		return fd;
+
+err:
+	close(fd);
+	return -1;
+}
+
+static int __search_and_open(const char *base, int offset, unsigned int chipset)
 {
 	for (int i = 0; i < 16; i++) {
 		char name[80];
 		int fd;
 
 		sprintf(name, "%s%u", base, i + offset);
-		fd = open(name, O_RDWR);
-		if (fd == -1)
-			continue;
-
-		if (chipset & DRIVER_INTEL && is_i915_device(fd) &&
-		    has_known_intel_chipset(fd))
+		fd = open_device(name, chipset);
+		if (fd != -1)
 			return fd;
-
-		if (chipset & DRIVER_VC4 && is_vc4_device(fd))
-			return fd;
-
-		if (chipset & DRIVER_VGEM && is_vgem_device(fd))
-			return fd;
-
-		if (chipset & DRIVER_VIRTIO && is_virtio_device(fd))
-			return fd;
-
-		if (chipset & DRIVER_AMDGPU && is_amd_device(fd))
-			return fd;
-
-		/* Only VGEM-specific tests should be run on VGEM */
-		if (chipset == DRIVER_ANY && !is_vgem_device(fd))
-			return fd;
-
-		close(fd);
 	}
 
 	return -1;
@@ -255,21 +254,9 @@ static int __open_device(const char *base, int offset, unsigned int chipset)
 static int __open_driver(const char *base, int offset, unsigned int chipset)
 {
 	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-	static const struct module {
-		unsigned int bit;
-		const char *module;
-		void (*modprobe)(const char *name);
-	} modules[] = {
-		{ DRIVER_AMDGPU, "amdgpu" },
-		{ DRIVER_INTEL, "i915", modprobe_i915 },
-		{ DRIVER_VC4, "vc4" },
-		{ DRIVER_VGEM, "vgem" },
-		{ DRIVER_VIRTIO, "virtio-gpu" },
-		{}
-	};
 	int fd;
 
-	fd = __open_device(base, offset, chipset);
+	fd = __search_and_open(base, offset, chipset);
 	if (fd != -1)
 		return fd;
 
@@ -284,7 +271,7 @@ static int __open_driver(const char *base, int offset, unsigned int chipset)
 	}
 	pthread_mutex_unlock(&mutex);
 
-	return __open_device(base, offset, chipset);
+	return __search_and_open(base, offset, chipset);
 }
 
 /**
