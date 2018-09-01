@@ -222,9 +222,15 @@ static int open_device(const char *name, unsigned int chipset)
 	if (__get_drm_device_name(fd, dev_name, sizeof(dev_name) - 1) == -1)
 		goto err;
 
-	for (const struct module *m = modules; m->module; m++) {
-		if (strcmp(m->module, dev_name) == 0) {
-			chip = m->bit;
+	for (int start = 0, end = ARRAY_SIZE(modules) - 1; start < end; ){
+		int mid = start + (end - start) / 2;
+		int ret = strcmp(modules[mid].module, dev_name);
+		if (ret < 0) {
+			end = mid;
+		} else if (ret > 0) {
+			start = mid + 1;
+		} else {
+			chip = modules[mid].bit;
 			break;
 		}
 	}
