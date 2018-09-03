@@ -154,20 +154,28 @@ static int __igt_pm_enable_audio_runtime_pm(void)
 	while ((de = readdir(dir))) {
 		const char *match = "hwC";
 		char buf[32] = { }; /* for Valgrind */
-		char *tmp;
+		int loops = 500;
+		int base;
 		int ret;
 
 		if (de->d_type != DT_LNK ||
 		    strncmp(de->d_name, match, strlen(match)))
 			continue;
 
-		igt_assert(asprintf(&tmp,
-				    "/sys/class/sound/%s/vendor_name",
-				    de->d_name));
+		base = openat(dirfd(dir), de->d_name, O_RDONLY);
+		igt_assert_fd(base);
 
-		fd = open(tmp, O_RDONLY);
-		free(tmp);
-		igt_assert_fd(fd);
+		do {
+			fd = openat(base, "vendor_name", O_RDONLY);
+			if (fd < 0) /* module is still loading? */
+				usleep(1000);
+			else
+				break;
+		} while (--loops);
+		close(base);
+		if (fd < 0)
+			continue;
+
 		ret = read(fd, buf, sizeof(buf));
 		close(fd);
 		igt_assert(ret > 0);
