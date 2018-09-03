@@ -226,9 +226,9 @@ static int open_device(const char *name, unsigned int chipset)
 		int mid = start + (end - start) / 2;
 		int ret = strcmp(modules[mid].module, dev_name);
 		if (ret < 0) {
-			end = mid;
-		} else if (ret > 0) {
 			start = mid + 1;
+		} else if (ret > 0) {
+			end = mid;
 		} else {
 			chip = modules[mid].bit;
 			break;
