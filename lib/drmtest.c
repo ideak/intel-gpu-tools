@@ -234,7 +234,7 @@ static int open_device(const char *name, unsigned int chipset)
 			break;
 		}
 	}
-	if (chipset & chip)
+	if ((chipset & chip) == chip)
 		return fd;
 
 err:
