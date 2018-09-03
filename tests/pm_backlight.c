@@ -151,23 +151,37 @@ static void test_fade(struct context *context)
 		nanosleep(&ts, NULL);
 	}
 }
-static void test_fade_with_dpms(struct context *context, igt_output_t *output)
+
+static void
+test_fade_with_dpms(struct context *context, igt_output_t *output)
 {
-	bool has_runtime_pm;
-	has_runtime_pm = igt_setup_runtime_pm();
-	igt_info("Runtime PM support: %d\n", has_runtime_pm);
-	igt_assert(has_runtime_pm);
-	kmstest_set_connector_dpms(output->display->drm_fd, output->config.connector, DRM_MODE_DPMS_OFF);
-	igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
-	kmstest_set_connector_dpms(output->display->drm_fd, output->config.connector, DRM_MODE_DPMS_ON);
+	igt_require(igt_setup_runtime_pm());
+
+	kmstest_set_connector_dpms(output->display->drm_fd,
+				   output->config.connector,
+				   DRM_MODE_DPMS_OFF);
+	igt_require(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
+
+	kmstest_set_connector_dpms(output->display->drm_fd,
+				   output->config.connector,
+				   DRM_MODE_DPMS_ON);
 	igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_ACTIVE));
+
 	test_fade(context);
 }
-static void test_fade_with_suspend(struct context *context, igt_output_t *output)
+
+static void
+test_fade_with_suspend(struct context *context, igt_output_t *output)
 {
-	kmstest_set_connector_dpms(output->display->drm_fd, output->config.connector, DRM_MODE_DPMS_OFF);
-	igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
+	igt_require(igt_setup_runtime_pm());
+
+	kmstest_set_connector_dpms(output->display->drm_fd,
+				   output->config.connector,
+				   DRM_MODE_DPMS_OFF);
+	igt_require(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
+
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
+
 	test_fade(context);
 }
 
