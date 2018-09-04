@@ -181,8 +181,10 @@ enum load {
 };
 
 static struct load_helper {
+	int link;
 	enum load load;
 	bool exit;
+	bool signal;
 	struct igt_helper_process igt_proc;
 } lh;
 
@@ -190,6 +192,7 @@ static void load_helper_signal_handler(int sig)
 {
 	if (sig == SIGUSR2) {
 		lh.load = !lh.load;
+		lh.signal = true;
 		igt_debug("Switching background load to %s\n", lh.load ? "high" : "low");
 	} else
 		lh.exit = true;
@@ -199,6 +202,8 @@ static void load_helper_signal_handler(int sig)
 #define LOAD_HELPER_BO_SIZE (16*1024*1024)
 static void load_helper_set_load(enum load load)
 {
+	bool dummy;
+
 	igt_assert(lh.igt_proc.running);
 
 	if (lh.load == load)
@@ -207,11 +212,14 @@ static void load_helper_set_load(enum load load)
 	lh.load = load;
 	kill(lh.igt_proc.pid, SIGUSR2);
 
-	usleep(1000); /* wait for load-helper to switch */
+	/* wait for load-helper to switch */
+	igt_assert_eq(read(lh.link, &dummy, sizeof(dummy)), sizeof(dummy));
 }
 
 static void load_helper_run(enum load load)
 {
+	int link[2];
+
 	/*
 	 * FIXME fork helpers won't get cleaned up when started from within a
 	 * subtest, so handle the case where it sticks around a bit too long.
@@ -225,6 +233,10 @@ static void load_helper_run(enum load load)
 
 	lh.exit = false;
 	lh.load = load;
+	lh.signal = false;
+
+	pipe(link);
+	lh.link = link[1];
 
 	igt_fork_helper(&lh.igt_proc) {
 		igt_spin_t *spin[2] = {};
@@ -249,6 +261,11 @@ static void load_helper_run(enum load load)
 
 			spin[0] = spin[1];
 			spin[lh.load == HIGH] = __igt_spin_batch_new(drm_fd);
+
+			if (lh.signal) {
+				write(lh.link, &lh.signal, sizeof(lh.signal));
+				lh.signal = false;
+			}
 		}
 
 		handle = spin[0]->handle;
@@ -274,6 +291,9 @@ static void load_helper_run(enum load load)
 		igt_spin_batch_free(drm_fd, spin[1]);
 		igt_spin_batch_free(drm_fd, spin[0]);
 	}
+
+	close(lh.link);
+	lh.link = link[0];
 }
 
 static void load_helper_stop(void)
