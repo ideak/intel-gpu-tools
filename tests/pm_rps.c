@@ -198,12 +198,17 @@ static void load_helper_signal_handler(int sig)
 		lh.exit = true;
 }
 
+static void load_helper_sync(void)
+{
+	bool dummy;
+
+	igt_assert_eq(read(lh.link, &dummy, sizeof(dummy)), sizeof(dummy));
+}
+
 #define LOAD_HELPER_PAUSE_USEC 500
 #define LOAD_HELPER_BO_SIZE (16*1024*1024)
 static void load_helper_set_load(enum load load)
 {
-	bool dummy;
-
 	igt_assert(lh.igt_proc.running);
 
 	if (lh.load == load)
@@ -213,7 +218,7 @@ static void load_helper_set_load(enum load load)
 	kill(lh.igt_proc.pid, SIGUSR2);
 
 	/* wait for load-helper to switch */
-	igt_assert_eq(read(lh.link, &dummy, sizeof(dummy)), sizeof(dummy));
+	load_helper_sync();
 }
 
 static void load_helper_run(enum load load)
@@ -233,13 +238,14 @@ static void load_helper_run(enum load load)
 
 	lh.exit = false;
 	lh.load = load;
-	lh.signal = false;
+	lh.signal = true;
 
 	pipe(link);
 	lh.link = link[1];
 
 	igt_fork_helper(&lh.igt_proc) {
 		igt_spin_t *spin[2] = {};
+		bool prev_load;
 		uint32_t handle;
 
 		signal(SIGUSR1, load_helper_signal_handler);
@@ -247,10 +253,14 @@ static void load_helper_run(enum load load)
 
 		igt_debug("Applying %s load...\n", lh.load ? "high" : "low");
 
+		prev_load = lh.load == HIGH;
 		spin[0] = __igt_spin_batch_new(drm_fd);
-		if (lh.load == HIGH)
+		if (prev_load)
 			spin[1] = __igt_spin_batch_new(drm_fd);
+		prev_load = !prev_load; /* send the initial signal */
 		while (!lh.exit) {
+			bool high_load;
+
 			handle = spin[0]->handle;
 			igt_spin_batch_end(spin[0]);
 			while (gem_bo_busy(drm_fd, handle))
@@ -259,13 +269,20 @@ static void load_helper_run(enum load load)
 			igt_spin_batch_free(drm_fd, spin[0]);
 			usleep(100);
 
-			spin[0] = spin[1];
-			spin[lh.load == HIGH] = __igt_spin_batch_new(drm_fd);
+			high_load = lh.load == HIGH;
+			if (!high_load && spin[1]) {
+				igt_spin_batch_free(drm_fd, spin[1]);
+				spin[1] = NULL;
+			} else {
+				spin[0] = spin[1];
+			}
+			spin[high_load] = __igt_spin_batch_new(drm_fd);
 
-			if (lh.signal) {
+			if (lh.signal && high_load != prev_load) {
 				write(lh.link, &lh.signal, sizeof(lh.signal));
 				lh.signal = false;
 			}
+			prev_load = high_load;
 		}
 
 		handle = spin[0]->handle;
@@ -294,6 +311,9 @@ static void load_helper_run(enum load load)
 
 	close(lh.link);
 	lh.link = link[0];
+
+	/* wait for our helper to complete its first round */
+	load_helper_sync();
 }
 
 static void load_helper_stop(void)
