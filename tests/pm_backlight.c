@@ -211,7 +211,9 @@ igt_main
 			break;
 		}
 
-		igt_assert_f(found, "Could not map \"%s\" to output (%s?)\n", name, name + 6);
+		igt_require_f(found,
+			      "Could not map backlight for \"%s\" to connected output\n",
+			      name);
 
 		igt_output_set_pipe(output, pipe);
 		mode = igt_output_get_mode(output);
