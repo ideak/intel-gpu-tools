@@ -258,12 +258,15 @@ void igt_pm_enable_audio_runtime_pm(void)
 	if (__igt_pm_audio_runtime_power_save[0])
 		return;
 
-	for (int count = 0; count < 5; count++) {
+	for (int count = 0; count < 110; count++) {
 		if (!__igt_pm_enable_audio_runtime_pm())
 			return;
 
 		/* modprobe(sna-hda-intel) acts async so poll for sysfs */
-		sleep(1);
+		if (count < 100)
+			usleep(10 * 1000); /* poll at 10ms for the first 1s */
+		else
+			sleep(1);
 	}
 
 	err = __igt_pm_enable_audio_runtime_pm();
