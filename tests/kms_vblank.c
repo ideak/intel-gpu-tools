@@ -455,6 +455,48 @@ static void run_subtests_for_pipe(data_t *data)
 	}
 }
 
+static void invalid_subtest(data_t *data, int fd)
+{
+	union drm_wait_vblank vbl;
+	unsigned long valid_flags;
+
+	igt_display_require_output_on_pipe(&data->display, 0);
+
+	/* First check all is well with a simple query */
+	memset(&vbl, 0, sizeof(vbl));
+	vbl.request.type = DRM_VBLANK_RELATIVE;
+	igt_assert_eq(wait_vblank(fd, &vbl), 0);
+
+	valid_flags = (_DRM_VBLANK_TYPES_MASK |
+		       _DRM_VBLANK_FLAGS_MASK |
+		       _DRM_VBLANK_HIGH_CRTC_MASK);
+
+	/* pick some interesting invalid permutations */
+	memset(&vbl, 0, sizeof(vbl));
+	vbl.request.type = _DRM_VBLANK_RELATIVE | ~valid_flags;
+	igt_assert_eq(wait_vblank(fd, &vbl), -EINVAL);
+	for (int bit = 0; bit < 32; bit++) {
+		int err;
+
+		if (valid_flags & (1 << bit))
+			continue;
+
+		memset(&vbl, 0, sizeof(vbl));
+		vbl.request.type = _DRM_VBLANK_RELATIVE | (1 << bit);
+		err = wait_vblank(fd, &vbl);
+		igt_assert_f(err == -EINVAL,
+			     "vblank wait with invalid request.type bit %d [0x%08x] did not report -EINVAL, got %d\n",
+			     bit, 1 << bit, err);
+	}
+
+	/* check the maximum pipe, nobody should have that many pipes! */
+	memset(&vbl, 0, sizeof(vbl));
+	vbl.request.type = _DRM_VBLANK_RELATIVE;
+	vbl.request.type |= _DRM_VBLANK_SECONDARY;
+	vbl.request.type |= _DRM_VBLANK_FLAGS_MASK;
+	igt_assert_eq(wait_vblank(fd, &vbl), -EINVAL);
+}
+
 igt_main
 {
 	int fd;
@@ -468,6 +510,9 @@ igt_main
 		igt_display_init(&data.display, fd);
 		igt_display_require_output(&data.display);
 	}
+
+	igt_subtest("invalid")
+		invalid_subtest(&data, fd);
 
 	igt_subtest("crtc-id")
 		crtc_id_subtest(&data, fd);
