@@ -25,6 +25,7 @@
  */
 
 #include "igt.h"
+#include "igt_psr.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -209,28 +210,38 @@ static bool psr_wait_until_enabled(int fd)
 	return r;
 }
 
+static void disable_features(int fd)
+{
+	igt_set_module_param_int("enable_fbc", 0);
+	psr_disable(fd);
+}
+
+static inline void fbc_modparam_enable(int fd)
+{
+	igt_set_module_param_int("enable_fbc", 1);
+}
+
+static inline void psr_debugfs_enable(int fd)
+{
+	psr_enable(fd);
+}
+
 struct feature {
 	bool (*supported_on_chipset)(int fd);
 	bool (*wait_until_enabled)(int fd);
 	bool (*connector_possible_fn)(drmModeConnectorPtr connector);
-	const char *param_name;
+	void (*enable)(int fd);
 } fbc = {
 	.supported_on_chipset = fbc_supported_on_chipset,
 	.wait_until_enabled = fbc_wait_until_enabled,
 	.connector_possible_fn = connector_can_fbc,
-	.param_name = "enable_fbc",
+	.enable = fbc_modparam_enable,
 }, psr = {
 	.supported_on_chipset = psr_supported_on_chipset,
 	.wait_until_enabled = psr_wait_until_enabled,
 	.connector_possible_fn = connector_can_psr,
-	.param_name = "enable_psr",
+	.enable = psr_debugfs_enable,
 };
-
-static void disable_features(void)
-{
-	igt_set_module_param_int(fbc.param_name, 0);
-	igt_set_module_param_int(psr.param_name, 0);
-}
 
 static void subtest(struct feature *feature, bool suspend)
 {
@@ -241,8 +252,8 @@ static void subtest(struct feature *feature, bool suspend)
 
 	igt_require(feature->supported_on_chipset(drm.debugfs_fd));
 
-	disable_features();
-	igt_set_module_param_int(feature->param_name, 1);
+	disable_features(drm.debugfs_fd);
+	feature->enable(drm.debugfs_fd);
 
 	kmstest_unset_all_crtcs(drm.fd, drm.res);
 	wait_user("Modes unset.");
