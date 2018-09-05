@@ -511,12 +511,16 @@ bool igt_setup_runtime_pm(void)
 
 	igt_pm_enable_audio_runtime_pm();
 
-	/* Our implementation uses autosuspend. Try to set it to 0ms so the test
-	 * suite goes faster and we have a higher probability of triggering race
-	 * conditions. */
+	/*
+	 * Our implementation uses autosuspend. Try to set it to 0ms so the
+	 * test suite goes faster and we have a higher probability of
+	 * triggering race conditions.
+	 */
 	fd = open(POWER_DIR "/autosuspend_delay_ms", O_RDWR);
-	igt_assert_f(fd >= 0,
-		     "Can't open " POWER_DIR "/autosuspend_delay_ms\n");
+	if (fd < 0) {
+		igt_pm_audio_restore_runtime_pm();
+		return false;
+	}
 
 	/*
 	 * Save previous values to be able to  install exit handler to restore
@@ -531,6 +535,7 @@ bool igt_setup_runtime_pm(void)
 	 */
 	if (size <= 0) {
 		close(fd);
+		igt_pm_audio_restore_runtime_pm();
 		return false;
 	}
 
