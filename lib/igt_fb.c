@@ -404,6 +404,9 @@ static int create_bo_for_fb(int fd, int width, int height,
 			bo = gem_create(fd, size);
 			gem_set_tiling(fd, bo, igt_fb_mod_to_tiling(tiling), stride);
 
+			gem_set_domain(fd, bo,
+				       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
 			/* Ensure the framebuffer is preallocated */
 			ptr = gem_mmap__gtt(fd, bo, size, PROT_READ | PROT_WRITE);
 			igt_assert(*(uint32_t *)ptr == 0);
@@ -1342,6 +1345,9 @@ static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
 {
 	void *ptr;
 
+	gem_set_domain(fd, fb->gem_handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
 	if (fb->is_dumb)
 		ptr = kmstest_dumb_map_buffer(fd, fb->gem_handle, fb->size,
 					      PROT_READ | PROT_WRITE);
@@ -1790,6 +1796,8 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 		setup_linear_mapping(fd, fb, &blit->linear);
 	} else {
 		blit->linear.handle = 0;
+		gem_set_domain(fd, fb->gem_handle,
+			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 		blit->linear.map = gem_mmap__gtt(fd, fb->gem_handle, fb->size,
 					      PROT_READ | PROT_WRITE);
 		igt_assert(blit->linear.map);
@@ -1847,10 +1855,6 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 		else
 			create_cairo_surface__gtt(fd, fb);
 	}
-
-	if (!fb->is_dumb)
-		gem_set_domain(fd, fb->gem_handle, I915_GEM_DOMAIN_CPU,
-			       I915_GEM_DOMAIN_CPU);
 
 	igt_assert(cairo_surface_status(fb->cairo_surface) == CAIRO_STATUS_SUCCESS);
 	return fb->cairo_surface;
