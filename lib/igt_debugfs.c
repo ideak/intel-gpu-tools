@@ -263,25 +263,46 @@ int igt_debugfs_open(int device, const char *filename, int mode)
 }
 
 /**
+ * igt_debugfs_simple_read:
+ * @filename: file name
+ * @buf: buffer where the contents will be stored, allocated by the caller
+ * @size: size of the buffer
+ *
+ * This function is similar to __igt_debugfs_read, the difference is that it
+ * expects the debugfs directory to be open and it's descriptor passed as the
+ * first argument.
+ *
+ * Returns:
+ * -errorno on failure or bytes read on success
+ */
+int igt_debugfs_simple_read(int dir, const char *filename, char *buf, int size)
+{
+	int len;
+
+	len = igt_sysfs_read(dir, filename, buf, size - 1);
+	if (len < 0)
+		buf[0] = '\0';
+	else
+		buf[len] = '\0';
+
+	return len;
+}
+
+/**
  * __igt_debugfs_read:
  * @filename: file name
  * @buf: buffer where the contents will be stored, allocated by the caller
- * @buf_size: size of the buffer
+ * @size: size of the buffer
  *
  * This function opens the debugfs file, reads it, stores the content in the
  * provided buffer, then closes the file. Users should make sure that the buffer
  * provided is big enough to fit the whole file, plus one byte.
  */
-void __igt_debugfs_read(int fd, const char *filename, char *buf, int buf_size)
+void __igt_debugfs_read(int fd, const char *filename, char *buf, int size)
 {
-	int dir;
-	int len;
+	int dir = igt_debugfs_dir(fd);
 
-	dir = igt_debugfs_dir(fd);
-	len = igt_sysfs_read(dir, filename, buf, buf_size - 1);
-	if (len < 0)
-		len = 0;
-	buf[len] = '\0';
+	igt_debugfs_simple_read(dir, filename, buf, size);
 	close(dir);
 }
 

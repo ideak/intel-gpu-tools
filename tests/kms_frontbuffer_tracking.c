@@ -720,12 +720,9 @@ static void set_mode_for_params(struct modeset_params *params)
 
 static void __debugfs_read(const char *param, char *buf, int len)
 {
-	len = igt_sysfs_read(drm.debugfs, param, buf, len - 1);
-	if (len < 0) {
+	len = igt_debugfs_simple_read(drm.debugfs, param, buf, len);
+	if (len < 0)
 		igt_assert_eq(len, -ENODEV);
-		len = 0;
-	}
-	buf[len] = '\0';
 }
 
 static int __debugfs_write(const char *param, char *buf, int len)

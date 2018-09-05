@@ -37,7 +37,8 @@ char *igt_debugfs_path(int device, char *path, int pathlen);
 int igt_debugfs_dir(int device);
 
 int igt_debugfs_open(int fd, const char *filename, int mode);
-void __igt_debugfs_read(int fd, const char *filename, char *buf, int buf_size);
+void __igt_debugfs_read(int fd, const char *filename, char *buf, int size);
+int igt_debugfs_simple_read(int dir, const char *filename, char *buf, int size);
 bool igt_debugfs_search(int fd, const char *filename, const char *substring);
 
 /**
