@@ -38,8 +38,34 @@
 #include "drm.h"
 #include "drm_fourcc.h"
 
+#include "igt_rand.h"
+
 uint32_t gem_bo;
 uint32_t gem_bo_small;
+
+static int legacy_addfb(int fd, struct drm_mode_fb_cmd *arg)
+{
+	int err;
+
+	err = 0;
+	if (igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB, arg))
+		err = -errno;
+
+	errno = 0;
+	return err;
+}
+
+static int rmfb(int fd, uint32_t id)
+{
+	int err;
+
+	err = 0;
+	if (igt_ioctl(fd, DRM_IOCTL_MODE_RMFB, &id))
+		err = -errno;
+
+	errno = 0;
+	return err;
+}
 
 static void invalid_tests(int fd)
 {
@@ -111,6 +137,108 @@ static void invalid_tests(int fd)
 		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
 		f.fb_id = 0;
 		igt_assert(f.modifier[0] == 0);
+	}
+
+	igt_subtest("legacy-format") {
+		struct {
+			/* drm_mode_legacy_fb_format() */
+			int bpp, depth;
+			int expect;
+		} known_formats[] = {
+			{  8,  8 }, /* c8 (palette) */
+			{ 16, 15 }, /* x1r5g5b5 */
+			{ 16, 16 }, /* r5g6b5 or a1r5g5b5! */
+			{ 24, 24 }, /* r8g8b8 */
+			{ 32, 24 }, /* x8r8g8b8 */
+			{ 32, 30 }, /* x2r10g10b10 */
+			{ 32, 32 }, /* a8r8g8b8 or a2r10g10b10! */
+		};
+		struct drm_mode_fb_cmd arg = {
+			.handle = f.handles[0],
+			.width  = f.width,
+			.height = f.height,
+			.pitch  = f.pitches[0],
+		};
+		uint32_t prng = 0x12345678;
+		unsigned long timeout = 1;
+		unsigned long count = 0;
+
+		/*
+		 * First confirm the kernel recognises our known_formats;
+		 * some may be invalid for different devices.
+		 */
+		for (int i = 0; i < ARRAY_SIZE(known_formats); i++) {
+			arg.bpp = known_formats[i].bpp;
+			arg.depth = known_formats[i].depth;
+			known_formats[i].expect = legacy_addfb(fd, &arg);
+			igt_debug("{bpp:%d, depth:%d} -> expect:%d\n",
+				  arg.bpp, arg.depth, known_formats[i].expect);
+			if (arg.fb_id) {
+				igt_assert_eq(rmfb(fd, arg.fb_id), 0);
+				arg.fb_id = 0;
+			}
+		}
+
+		igt_until_timeout(timeout) {
+			int expect = -EINVAL;
+			int err;
+
+			arg.bpp = hars_petruska_f54_1_random(&prng);
+			arg.depth = hars_petruska_f54_1_random(&prng);
+			for (int start = 0, end = ARRAY_SIZE(known_formats);
+			     start < end; ) {
+				int mid = start + (end - start) / 2;
+				typeof(*known_formats) *tbl = &known_formats[mid];
+
+				if (arg.bpp < tbl->bpp) {
+					end = mid;
+				} else if (arg.bpp > tbl->bpp) {
+					start = mid + 1;
+				} else {
+					if (arg.depth < tbl->depth) {
+						end = mid;
+					} else if (arg.depth > tbl->depth) {
+						start = mid + 1;
+					} else {
+						expect = tbl->expect;
+						break;
+					}
+				}
+			}
+
+			err = legacy_addfb(fd, &arg);
+			igt_assert_f(err == expect,
+				     "Expected %d with {bpp:%d, depth:%d}, got %d instead\n",
+				     expect, arg.bpp, arg.depth, err);
+			if (arg.fb_id) {
+				igt_assert_eq(rmfb(fd, arg.fb_id), 0);
+				arg.fb_id = 0;
+			}
+
+			count++;
+		}
+
+		/* After all the abuse, confirm the known_formats */
+		for (int i = 0; i < ARRAY_SIZE(known_formats); i++) {
+			int err;
+
+			arg.bpp = known_formats[i].bpp;
+			arg.depth = known_formats[i].depth;
+
+			err = legacy_addfb(fd, &arg);
+			igt_assert_f(err == known_formats[i].expect,
+				     "Expected %d with {bpp:%d, depth:%d}, got %d instead\n",
+				     known_formats[i].expect,
+				     arg.bpp, arg.depth,
+				     err);
+			if (arg.fb_id) {
+				igt_assert_eq(rmfb(fd, arg.fb_id), 0);
+				arg.fb_id = 0;
+			}
+		}
+
+		igt_info("Successfully fuzzed %lu {bpp, depth} variations\n",
+			 count);
 	}
 
 	igt_fixture {
