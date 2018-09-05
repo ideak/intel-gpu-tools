@@ -414,8 +414,9 @@ int main(int argc, char *argv[])
 		kmstest_set_vt_graphics_mode();
 		data.devid = intel_get_drm_devid(data.drm_fd);
 
-		igt_set_module_param_int("enable_psr", data.with_psr_disabled ?
-					 0 : 1);
+		if (!data.with_psr_disabled)
+			psr_enable(data.debugfs_fd);
+
 		igt_require_f(sink_support(&data),
 			      "Sink does not support PSR\n");
 
@@ -490,6 +491,9 @@ int main(int argc, char *argv[])
 	}
 
 	igt_fixture {
+		if (!data.with_psr_disabled)
+			psr_disable(data.debugfs_fd);
+
 		close(data.debugfs_fd);
 		drm_intel_bufmgr_destroy(data.bufmgr);
 		display_fini(&data);
