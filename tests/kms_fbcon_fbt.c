@@ -39,6 +39,7 @@ static bool do_wait_user = false;
 
 struct drm_info {
 	int fd;
+	int debugfs_fd;
 	drmModeResPtr res;
 	drmModeConnectorPtr connectors[MAX_CONNECTORS];
 };
@@ -58,6 +59,7 @@ static void setup_drm(struct drm_info *drm)
 	int i;
 
 	drm->fd = drm_open_driver_master(DRIVER_INTEL);
+	drm->debugfs_fd = igt_debugfs_dir(drm->fd);
 
 	drm->res = drmModeGetResources(drm->fd);
 	igt_assert(drm->res->count_connectors <= MAX_CONNECTORS);
@@ -82,12 +84,14 @@ static void teardown_drm(struct drm_info *drm)
 	igt_assert(close(drm->fd) == 0);
 }
 
-static bool fbc_supported_on_chipset(int fd)
+static bool fbc_supported_on_chipset(int debugfs_fd)
 {
 	char buf[128];
+	int ret;
 
-	igt_debugfs_read(fd, "i915_fbc_status", buf);
-	if (*buf == '\0') /* !HAS_FBC -> -ENODEV*/
+	ret = igt_debugfs_simple_read(debugfs_fd, "i915_fbc_status",
+				      buf, sizeof(buf));
+	if (ret < 0)
 		return false;
 
 	return !strstr(buf, "FBC unsupported on this chipset\n");
@@ -98,19 +102,21 @@ static bool connector_can_fbc(drmModeConnectorPtr connector)
 	return true;
 }
 
-static void fbc_print_status(int fd)
+static void fbc_print_status(int debugfs_fd)
 {
 	static char buf[128];
 
-	igt_debugfs_read(fd, "i915_fbc_status", buf);
+	igt_debugfs_simple_read(debugfs_fd, "i915_fbc_status", buf,
+				sizeof(buf));
 	igt_debug("FBC status: %s\n", buf);
 }
 
-static bool fbc_is_enabled(int fd)
+static bool fbc_is_enabled(int debugfs_fd)
 {
 	char buf[128];
 
-	igt_debugfs_read(fd, "i915_fbc_status", buf);
+	igt_debugfs_simple_read(debugfs_fd, "i915_fbc_status", buf,
+				sizeof(buf));
 	return strstr(buf, "FBC enabled\n");
 }
 
@@ -160,12 +166,14 @@ static void set_mode_for_one_screen(struct drm_info *drm, struct igt_fb *fb,
 	igt_assert_eq(rc, 0);
 }
 
-static bool psr_supported_on_chipset(int fd)
+static bool psr_supported_on_chipset(int debugfs_fd)
 {
 	char buf[256];
+	int ret;
 
-	igt_debugfs_read(fd, "i915_edp_psr_status", buf);
-	if (*buf == '\0') /* !HAS_PSR -> -ENODEV*/
+	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status",
+				      buf, sizeof(buf));
+	if (ret < 0)
 		return false;
 
 	return strstr(buf, "Sink_Support: yes\n");
@@ -176,19 +184,21 @@ static bool connector_can_psr(drmModeConnectorPtr connector)
 	return (connector->connector_type == DRM_MODE_CONNECTOR_eDP);
 }
 
-static void psr_print_status(int fd)
+static void psr_print_status(int debugfs_fd)
 {
 	static char buf[256];
 
-	igt_debugfs_read(fd, "i915_edp_psr_status", buf);
+	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
+				sizeof(buf));
 	igt_debug("PSR status: %s\n", buf);
 }
 
-static bool psr_is_enabled(int fd)
+static bool psr_is_enabled(int debugfs_fd)
 {
 	char buf[256];
 
-	igt_debugfs_read(fd, "i915_edp_psr_status", buf);
+	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
+				sizeof(buf));
 	return strstr(buf, "\nHW Enabled & Active bit: yes\n");
 }
 
@@ -229,24 +239,24 @@ static void subtest(struct feature *feature, bool suspend)
 
 	setup_drm(&drm);
 
-	igt_require(feature->supported_on_chipset(drm.fd));
+	igt_require(feature->supported_on_chipset(drm.debugfs_fd));
 
 	disable_features();
 	igt_set_module_param_int(feature->param_name, 1);
 
 	kmstest_unset_all_crtcs(drm.fd, drm.res);
 	wait_user("Modes unset.");
-	igt_assert(!feature->wait_until_enabled(drm.fd));
+	igt_assert(!feature->wait_until_enabled(drm.debugfs_fd));
 
 	set_mode_for_one_screen(&drm, &fb, feature->connector_possible_fn);
 	wait_user("Screen set.");
-	igt_assert(feature->wait_until_enabled(drm.fd));
+	igt_assert(feature->wait_until_enabled(drm.debugfs_fd));
 
 	if (suspend) {
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 					      SUSPEND_TEST_NONE);
 		sleep(5);
-		igt_assert(feature->wait_until_enabled(drm.fd));
+		igt_assert(feature->wait_until_enabled(drm.debugfs_fd));
 	}
 
 	igt_remove_fb(drm.fd, &fb);
@@ -256,13 +266,13 @@ static void subtest(struct feature *feature, bool suspend)
 	sleep(3);
 
 	wait_user("Back to fbcon.");
-	igt_assert(!feature->wait_until_enabled(drm.fd));
+	igt_assert(!feature->wait_until_enabled(drm.debugfs_fd));
 
 	if (suspend) {
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 					      SUSPEND_TEST_NONE);
 		sleep(5);
-		igt_assert(!feature->wait_until_enabled(drm.fd));
+		igt_assert(!feature->wait_until_enabled(drm.debugfs_fd));
 	}
 }
 
