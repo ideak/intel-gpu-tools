@@ -14,6 +14,7 @@ test_progs = [
 	'kms_atomic_interruptible',
 	'kms_atomic_transition',
 	'kms_available_modes_crc',
+	'kms_big_fb',
 	'kms_busy',
 	'kms_ccs',
 	'kms_color',
