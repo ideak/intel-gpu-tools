@@ -465,7 +465,8 @@ static void create_fb(enum pixel_format pformat, int width, int height,
 		      uint64_t tiling, int plane, struct igt_fb *fb)
 {
 	uint32_t format;
-	unsigned int size, stride;
+	uint64_t size;
+	unsigned int stride;
 	uint64_t tiling_for_size;
 
 	switch (pformat) {

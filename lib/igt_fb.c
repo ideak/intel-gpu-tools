@@ -215,7 +215,7 @@ static unsigned planar_height(struct format_desc_struct *format, unsigned height
 
 static void calc_fb_size_planar(int fd, int width, int height,
 				struct format_desc_struct *format,
-				uint64_t tiling, unsigned *size_ret,
+				uint64_t tiling, uint64_t *size_ret,
 				unsigned *stride_ret, unsigned *offsets)
 {
 	int plane;
@@ -251,9 +251,10 @@ static void calc_fb_size_planar(int fd, int width, int height,
 
 static void calc_fb_size_packed(int fd, int width, int height,
 				struct format_desc_struct *format, uint64_t tiling,
-				unsigned *size_ret, unsigned *stride_ret)
+				uint64_t *size_ret, unsigned *stride_ret)
 {
-	unsigned int tile_width, tile_height, stride, size;
+	unsigned int tile_width, tile_height, stride;
+	uint64_t size;
 	int byte_width = width * (format->plane_bpp[0] / 8);
 
 	igt_get_fb_tile_size(fd, tiling, format->plane_bpp[0], &tile_width, &tile_height);
@@ -279,7 +280,7 @@ static void calc_fb_size_packed(int fd, int width, int height,
 			;
 	} else {
 		stride = ALIGN(byte_width, tile_width);
-		size = stride * ALIGN(height, tile_height);
+		size = (uint64_t) stride * ALIGN(height, tile_height);
 	}
 
 	*stride_ret = stride;
@@ -300,7 +301,7 @@ static void calc_fb_size_packed(int fd, int width, int height,
  * specified parameters.
  */
 void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64_t tiling,
-		      unsigned *size_ret, unsigned *stride_ret)
+		      uint64_t *size_ret, unsigned *stride_ret)
 {
 	struct format_desc_struct *format = lookup_drm_format(drm_format);
 	igt_assert(format);
@@ -368,8 +369,8 @@ static int create_bo_for_fb(int fd, int width, int height,
 			    enum igt_color_encoding color_encoding,
 			    enum igt_color_range color_range,
 			    struct format_desc_struct *format,
-			    uint64_t tiling, unsigned size, unsigned stride,
-			    unsigned *size_ret, unsigned *stride_ret,
+			    uint64_t tiling, uint64_t size, unsigned stride,
+			    uint64_t *size_ret, unsigned *stride_ret,
 			    uint32_t *offsets, bool *is_dumb)
 {
 	int bo;
@@ -380,7 +381,8 @@ static int create_bo_for_fb(int fd, int width, int height,
 		memset(offsets, 0, ARRAY_SIZE(format->plane_bpp) * sizeof(*offsets));
 
 	if (tiling || size || stride || igt_format_is_yuv(format->drm_id)) {
-		unsigned calculated_size, calculated_stride;
+		uint64_t calculated_size;
+		unsigned int calculated_stride;
 
 		if (format->num_planes > 1)
 			calc_fb_size_planar(fd, width, height, format, tiling,
@@ -474,7 +476,7 @@ static int create_bo_for_fb(int fd, int width, int height,
  */
 int igt_create_bo_with_dimensions(int fd, int width, int height,
 				  uint32_t format, uint64_t modifier,
-				  unsigned stride, unsigned *size_ret,
+				  unsigned stride, uint64_t *size_ret,
 				  unsigned *stride_ret, bool *is_dumb)
 {
 	return create_bo_for_fb(fd, width, height,
@@ -819,7 +821,7 @@ void igt_paint_image(cairo_t *cr, const char *filename,
 unsigned int
 igt_create_fb_with_bo_size(int fd, int width, int height,
 			   uint32_t format, uint64_t tiling,
-			   struct igt_fb *fb, unsigned bo_size,
+			   struct igt_fb *fb, uint64_t bo_size,
 			   unsigned bo_stride)
 {
 	/* FIXME allow the caller to pass these in */
@@ -833,7 +835,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 	memset(fb, 0, sizeof(*fb));
 
-	igt_debug("%s(width=%d, height=%d, format=0x%x, tiling=0x%"PRIx64", size=%d)\n",
+	igt_debug("%s(width=%d, height=%d, format=0x%x, tiling=0x%"PRIx64", size=%"PRIu64")\n",
 		  __func__, width, height, format, tiling, bo_size);
 	fb->gem_handle = create_bo_for_fb(fd, width, height,
 					  color_encoding, color_range,
@@ -1191,8 +1193,9 @@ static cairo_format_t drm_format_to_cairo(uint32_t drm_format)
 }
 
 struct fb_blit_linear {
+	uint64_t size;
 	uint32_t handle;
-	unsigned size, stride;
+	unsigned int stride;
 	uint8_t *map;
 	bool is_dumb;
 	uint32_t offsets[4];
@@ -1371,8 +1374,9 @@ struct fb_convert_blit_upload {
 	struct igt_fb *fb;
 
 	struct {
+		uint64_t size;
 		uint8_t *map;
-		unsigned stride, size;
+		unsigned stride;
 	} rgb24;
 
 	struct fb_blit_linear linear;
@@ -1787,7 +1791,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	blit->fd = fd;
 	blit->fb = fb;
 	blit->rgb24.stride = ALIGN(fb->width * 4, 16);
-	blit->rgb24.size = ALIGN(blit->rgb24.stride * fb->height, sysconf(_SC_PAGESIZE));
+	blit->rgb24.size = ALIGN((uint64_t) blit->rgb24.stride * fb->height, sysconf(_SC_PAGESIZE));
 	blit->rgb24.map = mmap(NULL, blit->rgb24.size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	igt_assert(blit->rgb24.map != MAP_FAILED);
 

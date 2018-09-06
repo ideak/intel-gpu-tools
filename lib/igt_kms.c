@@ -592,7 +592,7 @@ uint32_t kmstest_find_crtc_for_connector(int fd, drmModeRes *res,
  * Returns: The file-private handle of the created buffer object
  */
 uint32_t kmstest_dumb_create(int fd, int width, int height, int bpp,
-			     unsigned *stride, unsigned *size)
+			     unsigned *stride, uint64_t *size)
 {
 	struct drm_mode_create_dumb create;
 
@@ -604,7 +604,7 @@ uint32_t kmstest_dumb_create(int fd, int width, int height, int bpp,
 	create.handle = 0;
 	do_ioctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &create);
 	igt_assert(create.handle);
-	igt_assert(create.size >= width * height * bpp / 8);
+	igt_assert(create.size >= (uint64_t) width * height * bpp / 8);
 
 	if (stride)
 		*stride = create.pitch;

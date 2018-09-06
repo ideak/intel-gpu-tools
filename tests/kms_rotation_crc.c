@@ -403,7 +403,8 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 	int fd = data->gfx_fd;
 	drmModeModeInfo *mode;
 	struct igt_fb fb[MAX_FENCES+1] = {};
-	unsigned int stride, size, w, h;
+	uint64_t size;
+	unsigned int stride, w, h;
 	uint64_t total_aperture_size, total_fbs_size;
 	int i;
 

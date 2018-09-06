@@ -72,7 +72,7 @@ typedef struct igt_fb {
 	enum igt_color_range color_range;
 	unsigned int stride;
 	uint64_t tiling;
-	unsigned int size;
+	uint64_t size;
 	cairo_surface_t *cairo_surface;
 	unsigned int domain;
 	unsigned int num_planes;
@@ -105,11 +105,11 @@ enum igt_text_align {
 void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 			  unsigned *width_ret, unsigned *height_ret);
 void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t tiling,
-		      unsigned *size_ret, unsigned *stride_ret);
+		      uint64_t *size_ret, unsigned *stride_ret);
 unsigned int
 igt_create_fb_with_bo_size(int fd, int width, int height,
 			   uint32_t format, uint64_t tiling,
-			   struct igt_fb *fb, unsigned bo_size,
+			   struct igt_fb *fb, uint64_t bo_size,
 			   unsigned bo_stride);
 unsigned int igt_create_fb(int fd, int width, int height, uint32_t format,
 			   uint64_t tiling, struct igt_fb *fb);
@@ -135,7 +135,7 @@ int igt_dirty_fb(int fd, struct igt_fb *fb);
 
 int igt_create_bo_with_dimensions(int fd, int width, int height, uint32_t format,
 				  uint64_t modifier, unsigned stride,
-				  unsigned *stride_ret, unsigned *size_ret,
+				  uint64_t *size_ret, unsigned *stride_ret,
 				  bool *is_dumb);
 
 uint64_t igt_fb_mod_to_tiling(uint64_t modifier);
