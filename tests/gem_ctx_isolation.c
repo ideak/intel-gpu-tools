@@ -700,7 +700,9 @@ igt_main
 		igt_require(has_context_isolation);
 
 		gen = intel_gen(intel_get_drm_devid(fd));
-		//igt_ci_fail_on(gen > LAST_KNOWN_GEN);
+
+		igt_warn_on_f(gen > LAST_KNOWN_GEN,
+					  "GEN not recognized! Test needs to be updated to run.");
 		igt_skip_on(gen > LAST_KNOWN_GEN);
 	}
 
