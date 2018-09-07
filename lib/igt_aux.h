@@ -287,4 +287,10 @@ void igt_lsof(const char *dpath);
 
 #define is_power_of_two(x)  (((x) & ((x)-1)) == 0)
 
+#define igt_fls(x) ((x) ? __builtin_choose_expr(sizeof(x) == 8, \
+						64 - __builtin_clzll(x), \
+						32 - __builtin_clz(x)) : 0)
+
+#define roundup_power_of_two(x) ((x) != 0 ? 1 << igt_fls((x) - 1) : 0)
+
 #endif /* IGT_AUX_H */

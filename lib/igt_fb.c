@@ -261,8 +261,6 @@ static void calc_fb_size_packed(int fd, int width, int height,
 
 	if (tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    intel_gen(intel_get_drm_devid(fd)) <= 3) {
-		int v;
-
 		/* Round the tiling up to the next power-of-two and the region
 		 * up to the next pot fence size so that this works on all
 		 * generations.
@@ -271,13 +269,11 @@ static void calc_fb_size_packed(int fd, int width, int height,
 		 * tiled. But then that failure is expected.
 		 */
 
-		v = byte_width;
-		for (stride = 512; stride < v; stride *= 2)
-			;
+		stride = max(byte_width, 512);
+		stride = roundup_power_of_two(stride);
 
-		v = stride * height;
-		for (size = 1024*1024; size < v; size *= 2)
-			;
+		size = max((uint64_t) stride * height, 1024*1024);
+		size = roundup_power_of_two(size);
 	} else {
 		stride = ALIGN(byte_width, tile_width);
 		size = (uint64_t) stride * ALIGN(height, tile_height);

@@ -56,16 +56,6 @@ static void noop(struct noop *n,
 	gem_execbuf(n->fd, &execbuf);
 }
 
-static int fls(uint64_t x)
-{
-	int t;
-
-	for (t = 0; x >> t; t++)
-		;
-
-	return t;
-}
-
 static bool allow_unlimited_files(void)
 {
 	struct rlimit rlim;
@@ -151,7 +141,7 @@ igt_main
 		if (max < gtt_size)
 			gtt_size = max;
 
-		no.nhandles = 1 << (fls(gtt_size) - 1);
+		no.nhandles = 1 << (igt_fls(gtt_size) - 1);
 		intel_require_memory(no.nhandles, 4096, CHECK_RAM);
 
 		no.max_age = no.nhandles / 2;
