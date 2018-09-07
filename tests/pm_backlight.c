@@ -98,8 +98,8 @@ static int backlight_write(int value, const char *fname)
 
 static void test_and_verify(struct context *context, int val)
 {
+	const int tolerance = val * TOLERANCE / 100;
 	int result;
-	int tolerance = val * TOLERANCE / 100;
 
 	igt_assert_eq(backlight_write(val, "brightness"), 0);
 	igt_assert_eq(backlight_read(&result, "brightness"), 0);
@@ -107,9 +107,11 @@ static void test_and_verify(struct context *context, int val)
 	igt_assert_eq(result, val);
 
 	igt_assert_eq(backlight_read(&result, "actual_brightness"), 0);
-	/* Some rounding may happen depending on hw. Just check that it's close enough. */
-	igt_assert_lte(result, min(context->max, val + tolerance));
-	igt_assert_lte(max(0, val - tolerance), result);
+	/* Some rounding may happen depending on hw */
+	igt_assert_f(result >= max(0, val - tolerance) &&
+		     result <= min(context->max, val + tolerance),
+		     "actual_brightness [%d] did not match expected brightness [%d +- %d]\n",
+		     result, val, tolerance);
 }
 
 static void test_brightness(struct context *context)
