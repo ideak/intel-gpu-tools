@@ -30,6 +30,7 @@
  */
 
 #include "igt.h"
+#include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -142,6 +143,42 @@ static void big_exec(int fd, uint32_t handle, int ring)
 	gem_sync(fd, handle);
 }
 
+static void invalid_context(int fd, unsigned ring, uint32_t handle)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = handle,
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = ring,
+	};
+	unsigned int i;
+	uint32_t ctx;
+
+	/* Verify everything works. */
+	i915_execbuffer2_set_context_id(execbuf, 0);
+	gem_execbuf(fd, &execbuf);
+
+	ctx = gem_context_create(fd);
+	i915_execbuffer2_set_context_id(execbuf, ctx);
+	gem_execbuf(fd, &execbuf);
+
+	gem_context_destroy(fd, ctx);
+
+	/* Go through the non-existent context id's. */
+	for (i = 0; i < 32; i++) {
+		i915_execbuffer2_set_context_id(execbuf, 1UL << i);
+		igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOENT);
+	}
+
+	i915_execbuffer2_set_context_id(execbuf, INT_MAX);
+	igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOENT);
+
+	i915_execbuffer2_set_context_id(execbuf, UINT_MAX);
+	igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOENT);
+}
+
 uint32_t handle;
 uint32_t batch[2] = {0, MI_BATCH_BUFFER_END};
 uint32_t ctx_id, ctx_id2;
@@ -149,6 +186,8 @@ int fd;
 
 igt_main
 {
+	const struct intel_execution_engine *e;
+
 	igt_fixture {
 		fd = drm_open_driver_render(DRIVER_INTEL);
 		igt_require_gem(fd);
@@ -172,6 +211,13 @@ igt_main
 
 		igt_assert(exec(fd, handle, I915_EXEC_RENDER, ctx_id) < 0);
 		gem_sync(fd, handle);
+	}
+
+	for (e = intel_execution_engines; e->name; e++) {
+		igt_subtest_f("basic-invalid-context-%s", e->name) {
+			gem_require_ring(fd, e->exec_id | e->flags);
+			invalid_context(fd, e->exec_id | e->flags, handle);
+		}
 	}
 
 	igt_subtest("eviction")
