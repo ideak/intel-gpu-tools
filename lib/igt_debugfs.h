@@ -191,6 +191,18 @@ void igt_require_hpd_storm_ctl(int fd);
  */
 #define DROP_IDLE 0x40
 /**
+ * DROP_RESET_ACTIVE:
+ *
+ * Cancel all outstanding requests by forcing a gpu reset
+ */
+#define DROP_RESET_ACTIVE 0x80
+/**
+ * DROP_RESET_SEQNO:
+ *
+ * Reset the global request seqno counter back to 0
+ */
+#define DROP_RESET_SEQNO 0x100
+/**
  * DROP_ALL:
  *
  * All of the above DROP_ flags combined.

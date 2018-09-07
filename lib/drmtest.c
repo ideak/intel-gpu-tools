@@ -302,22 +302,35 @@ static int __drm_open_driver_render(int chipset)
 static int at_exit_drm_fd = -1;
 static int at_exit_drm_render_fd = -1;
 
-static void quiescent_gpu_at_exit(int sig)
+static void __cancel_work_at_exit(int fd)
+{
+	igt_terminate_spin_batches(); /* for older kernels */
+
+	igt_drop_caches_set(fd,
+			    /* cancel everything */
+			    DROP_RESET_ACTIVE | DROP_RESET_SEQNO |
+			    /* cleanup */
+			    DROP_ACTIVE | DROP_RETIRE | DROP_IDLE | DROP_FREED);
+}
+
+static void cancel_work_at_exit(int sig)
 {
 	if (at_exit_drm_fd < 0)
 		return;
 
-	gem_quiescent_gpu(at_exit_drm_fd);
+	__cancel_work_at_exit(at_exit_drm_fd);
+
 	close(at_exit_drm_fd);
 	at_exit_drm_fd = -1;
 }
 
-static void quiescent_gpu_at_exit_render(int sig)
+static void cancel_work_at_exit_render(int sig)
 {
 	if (at_exit_drm_render_fd < 0)
 		return;
 
-	gem_quiescent_gpu(at_exit_drm_render_fd);
+	__cancel_work_at_exit(at_exit_drm_render_fd);
+
 	close(at_exit_drm_render_fd);
 	at_exit_drm_render_fd = -1;
 }
@@ -369,7 +382,7 @@ int drm_open_driver(int chipset)
 			gem_quiescent_gpu(fd);
 
 			at_exit_drm_fd = __drm_open_driver(chipset);
-			igt_install_exit_handler(quiescent_gpu_at_exit);
+			igt_install_exit_handler(cancel_work_at_exit);
 		}
 	}
 
@@ -418,7 +431,7 @@ int drm_open_driver_render(int chipset)
 	at_exit_drm_render_fd = __drm_open_driver(chipset);
 	if(chipset & DRIVER_INTEL){
 		gem_quiescent_gpu(fd);
-		igt_install_exit_handler(quiescent_gpu_at_exit_render);
+		igt_install_exit_handler(cancel_work_at_exit_render);
 	}
 
 	return fd;
