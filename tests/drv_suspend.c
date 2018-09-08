@@ -177,10 +177,10 @@ test_shrink(int fd, unsigned int mode)
 
 	intel_purge_vm_caches(fd);
 
-	igt_debug("Locking %'"PRIu64" B (%'"PRIu64" MiB)\n",
+	igt_debug("Locking %'zu B (%'zu MiB)\n",
 		  size, size >> 20);
 	igt_assert(!mlock(mem, size));
-	igt_info("Locked %'"PRIu64" B (%'"PRIu64" MiB)\n",
+	igt_info("Locked %'zu B (%'zu MiB)\n",
 		 size, size >> 20);
 
 	intel_purge_vm_caches(fd);

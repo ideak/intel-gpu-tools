@@ -155,10 +155,10 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 		igt_assert(bo);
 		lock -= ALIGN(surface_count * sizeof(*bo), 4096);
 
-		igt_debug("Locking %'"PRIu64" B (%'"PRIu64" MiB)\n",
+		igt_debug("Locking %'zu B (%'zu MiB)\n",
 			  lock, lock >> 20);
 		igt_assert(!mlock(mem, lock));
-		igt_info("Locked %'"PRIu64" B (%'"PRIu64" MiB)\n",
+		igt_info("Locked %'zu B (%'zu MiB)\n",
 			 lock, lock >> 20);
 
 		for (n = 0; n < surface_count; n++)
@@ -176,7 +176,7 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 			 */
 			lock += surface_size;
 			igt_assert(!mlock(mem, lock));
-			igt_debug("Total locked %'"PRIu64" B (%'"PRIu64" MiB)\n",
+			igt_debug("Total locked %'zu B (%'zu MiB)\n",
 				  lock,
 				  lock >> 20);
 		}
