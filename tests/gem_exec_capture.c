@@ -117,7 +117,7 @@ static void __capture(int fd, int dir, unsigned ring, uint32_t target)
 		batch[++i] = 0;
 	}
 	batch[++i] = 0xc0ffee;
-	if (gen < 3)
+	if (gen < 4)
 		batch[++i] = MI_NOOP;
 
 	batch[++i] = MI_BATCH_BUFFER_START; /* not crashed? try again! */
@@ -144,10 +144,12 @@ static void __capture(int fd, int dir, unsigned ring, uint32_t target)
 	execbuf.flags = ring;
 	if (gen > 3 && gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
+
+	igt_assert(!READ_ONCE(*seqno));
 	gem_execbuf(fd, &execbuf);
 
 	/* Wait for the request to start */
-	while (*(volatile uint32_t *)seqno != 0xc0ffee)
+	while (READ_ONCE(*seqno) != 0xc0ffee)
 		igt_assert(gem_bo_busy(fd, obj[SCRATCH].handle));
 	munmap(seqno, 4096);
 
