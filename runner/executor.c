@@ -247,6 +247,7 @@ static void dump_dmesg(int kmsgfd, int outfd)
 
 	if (comparefd < 0)
 		return;
+	lseek(comparefd, 0, SEEK_END);
 
 	if (fcntl(kmsgfd, F_SETFL, O_NONBLOCK))
 		return;
