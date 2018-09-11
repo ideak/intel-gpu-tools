@@ -778,7 +778,7 @@ static void fill_from_journal(int fd,
 			add_runtime(obj, time);
 
 			/* If no subtests, the test result node also gets the runtime */
-			if (subtests->size == 0) {
+			if (subtests->size == 0 && entry->subtest_count == 0) {
 				obj = get_or_create_json_object(tests, piglit_name);
 				add_runtime(obj, time);
 			}
