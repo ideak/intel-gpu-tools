@@ -667,12 +667,37 @@ static void prop_tests(int fd)
 
 }
 
+static bool has_addfb2_iface(int fd)
+{
+	struct local_drm_mode_fb_cmd2 f = {};
+	int err;
+
+	err = 0;
+	if (drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f))
+		err = -errno;
+	switch (err) {
+	case -ENOTTY: /* ioctl unrecognised (kernel too old) */
+	case -ENOTSUP: /* driver doesn't support KMS */
+		return false;
+
+		/*
+		 * The only other valid response is -EINVAL, but we leave
+		 * that for the actual tests themselves to discover for
+		 * more accurate reporting.
+		 */
+	default:
+		return true;
+	}
+}
+
 int fd;
 
 igt_main
 {
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_ANY);
+		igt_require(has_addfb2_iface(fd));
+	}
 
 	invalid_tests(fd);
 
