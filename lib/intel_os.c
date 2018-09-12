@@ -375,6 +375,8 @@ void intel_require_memory(uint64_t count, uint64_t size, unsigned mode)
 	uint64_t required, total;
 	bool sufficient_memory;
 
+	igt_skip_on_simulation();
+
 	sufficient_memory = __intel_check_memory(count, size, mode,
 						 &required, &total);
 	if (!sufficient_memory) {
@@ -406,8 +408,6 @@ void intel_require_memory(uint64_t count, uint64_t size, unsigned mode)
 		      mode & (CHECK_RAM | CHECK_SWAP) ? "RAM" : "",
 		      mode & CHECK_SWAP ? " + swap": "",
 		      (long long)vfs_file_max());
-
-	igt_skip_on_simulation();
 }
 
 void intel_purge_vm_caches(int drm_fd)
