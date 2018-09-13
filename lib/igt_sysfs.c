@@ -379,8 +379,9 @@ int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
 		va_end(ap);
 
 		fclose(file);
+	} else {
+		close(fd);
 	}
-	close(fd);
 
 	return ret;
 }
