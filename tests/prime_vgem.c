@@ -766,11 +766,13 @@ static void test_flip(int i915, int vgem, unsigned hang)
 
 		strides[0] = bo[i].pitch;
 
-		do_or_die(__kms_addfb(i915, handle[i],
-				      bo[i].width, bo[i].height,
-				      DRM_FORMAT_XRGB8888, I915_TILING_NONE,
-				      strides, offsets, 1,
-				      LOCAL_DRM_MODE_FB_MODIFIERS, &fb_id[i]));
+		/* May skip if i915 has no displays */
+		igt_require(__kms_addfb(i915, handle[i],
+					bo[i].width, bo[i].height,
+					DRM_FORMAT_XRGB8888, I915_TILING_NONE,
+					strides, offsets, 1,
+					LOCAL_DRM_MODE_FB_MODIFIERS,
+					&fb_id[i]) == 0);
 		igt_assert(fb_id[i]);
 	}
 
