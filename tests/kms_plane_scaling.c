@@ -544,7 +544,7 @@ igt_main
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_pipe_crc(data.drm_fd);
-		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require(&data.display, data.drm_fd);
 		data.devid = intel_get_drm_devid(data.drm_fd);
 		igt_require(data.display.is_atomic);
 	}

@@ -103,7 +103,7 @@ igt_simple_main
 	data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 	kmstest_set_vt_graphics_mode();
 
-	igt_display_init(&data.display, data.drm_fd);
+	igt_display_require(&data.display, data.drm_fd);
 
 	for_each_pipe_with_valid_output(&data.display, pipe, output) {
 		test(&data, pipe, output);

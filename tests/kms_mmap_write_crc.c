@@ -281,7 +281,7 @@ int main(int argc, char **argv)
 
 		igt_require_pipe_crc(data.drm_fd);
 
-		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require(&data.display, data.drm_fd);
 
 		fork_cpuhog_helper();
 	}

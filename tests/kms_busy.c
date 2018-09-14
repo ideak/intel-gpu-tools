@@ -323,8 +323,7 @@ igt_main
 		gem_require_mmap_wc(fd);
 
 		kmstest_set_vt_graphics_mode();
-		igt_display_init(&display, fd);
-		igt_require(display.n_pipes > 0);
+		igt_display_require(&display, fd);
 	}
 
 	/* XXX Extend to cover atomic rendering tests to all planes + legacy */

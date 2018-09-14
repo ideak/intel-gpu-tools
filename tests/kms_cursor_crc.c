@@ -675,7 +675,7 @@ igt_main
 
 		igt_require_pipe_crc(data.drm_fd);
 
-		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require(&data.display, data.drm_fd);
 	}
 
 	data.cursor_max_w = cursor_width;

@@ -532,7 +532,7 @@ igt_main
 
 		igt_require_pipe_crc(data.gfx_fd);
 
-		igt_display_init(&data.display, data.gfx_fd);
+		igt_display_require(&data.display, data.gfx_fd);
 	}
 
 	for (subtest = subtests; subtest->rot; subtest++) {

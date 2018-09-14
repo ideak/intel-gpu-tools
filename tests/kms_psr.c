@@ -111,7 +111,7 @@ static void setup_output(data_t *data)
 
 static void display_init(data_t *data)
 {
-	igt_display_init(&data->display, data->drm_fd);
+	igt_display_require(&data->display, data->drm_fd);
 	setup_output(data);
 }
 

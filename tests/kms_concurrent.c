@@ -407,8 +407,7 @@ int main(int argc, char *argv[])
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 		kmstest_set_vt_graphics_mode();
-		igt_display_init(&data.display, data.drm_fd);
-		igt_require(data.display.n_pipes > 0);
+		igt_display_require(&data.display, data.drm_fd);
 		igt_require(data.display.is_atomic);
 	}
 

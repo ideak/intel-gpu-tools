@@ -263,7 +263,7 @@ igt_main
 		igt_skip_on(!IS_IVYBRIDGE(devid));
 
 		kmstest_set_vt_graphics_mode();
-		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require(&data.display, data.drm_fd);
 	}
 
 	igt_subtest("pipe-B-dpms-off-modeset-pipe-C")

@@ -133,7 +133,7 @@ igt_simple_main
 
 	igt_enable_connectors();
 	kmstest_set_vt_graphics_mode();
-	igt_display_init(&data.display, data.drm_fd);
+	igt_display_require(&data.display, data.drm_fd);
 	data.res = drmModeGetResources(data.drm_fd);
 	kmstest_unset_all_crtcs(data.drm_fd, data.res);
 

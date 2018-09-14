@@ -210,7 +210,7 @@ igt_simple_main
 	igt_assert(data.bufmgr);
 	drm_intel_bufmgr_gem_enable_reuse(data.bufmgr);
 
-	igt_display_init(&data.display, data.drm_fd);
+	igt_display_require(&data.display, data.drm_fd);
 
 	ctx = drm_intel_gem_context_create(data.bufmgr);
 	igt_require(ctx);

@@ -51,7 +51,7 @@ igt_simple_main
 
 	kmstest_set_vt_graphics_mode();
 
-	igt_display_init(&display, drm_fd);
+	igt_display_require(&display, drm_fd);
 
 	for_each_pipe(&display, p) {
 		for_each_plane_on_pipe(&display, p, plane) {

@@ -1365,8 +1365,7 @@ igt_main
 		display.drm_fd = drm_open_driver_master(DRIVER_ANY);
 		kmstest_set_vt_graphics_mode();
 
-		igt_display_init(&display, display.drm_fd);
-		igt_require(display.n_pipes > 0);
+		igt_display_require(&display, display.drm_fd);
 	}
 
 	igt_subtest_group {

@@ -180,7 +180,7 @@ igt_simple_main
 
 	data.gfx_fd = drm_open_driver(DRIVER_INTEL);
 	igt_require_pipe_crc(data.gfx_fd);
-	igt_display_init(&data.display, data.gfx_fd);
+	igt_display_require(&data.display, data.gfx_fd);
 
 	test_crtc_background(&data);
 

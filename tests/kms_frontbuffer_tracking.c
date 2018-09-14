@@ -1284,7 +1284,7 @@ static void setup_drm(void)
 	drm.debugfs = igt_debugfs_dir(drm.fd);
 
 	kmstest_set_vt_graphics_mode();
-	igt_display_init(&drm.display, drm.fd);
+	igt_display_require(&drm.display, drm.fd);
 
 	drm.bufmgr = drm_intel_bufmgr_gem_init(drm.fd, 4096);
 	igt_assert(drm.bufmgr);

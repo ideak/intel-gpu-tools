@@ -279,10 +279,8 @@ igt_main
 
 		kmstest_set_vt_graphics_mode();
 
-		igt_display_init(&display, display.drm_fd);
-
+		igt_display_require(&display, display.drm_fd);
 		igt_require(display.is_atomic);
-
 		igt_display_require_output(&display);
 
 		igt_require_sw_sync();

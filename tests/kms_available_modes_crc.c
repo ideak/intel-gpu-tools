@@ -498,7 +498,7 @@ igt_main
 	igt_fixture {
 		data.gfx_fd = drm_open_driver_master(DRIVER_INTEL);
 		kmstest_set_vt_graphics_mode();
-		igt_display_init(&data.display, data.gfx_fd);
+		igt_display_require(&data.display, data.gfx_fd);
 		igt_require_pipe_crc(data.gfx_fd);
 	}
 

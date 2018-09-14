@@ -241,7 +241,7 @@ igt_main
 		igt_skip_on_simulation();
 
 		data.drm_fd = drm_open_driver(DRIVER_ANY);
-		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require(&data.display, data.drm_fd);
 		igt_display_require_output(&data.display);
 	}
 

@@ -393,9 +393,8 @@ int main(int argc, char *argv[])
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		kmstest_set_vt_graphics_mode();
 		igt_require_pipe_crc(data.drm_fd);
-		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require(&data.display, data.drm_fd);
 		igt_require(data.display.is_atomic);
-		igt_require(data.display.n_pipes > 0);
 	}
 
 	for_each_pipe_static(pipe) {

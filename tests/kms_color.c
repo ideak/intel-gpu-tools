@@ -1163,7 +1163,7 @@ igt_main
 			data.devid = intel_get_drm_devid(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
 
-		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require(&data.display, data.drm_fd);
 	}
 
 	for_each_pipe_static(pipe)
