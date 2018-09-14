@@ -352,6 +352,7 @@ int main(int argc, char **argv)
 	if (count == 0)
 		count = 3 * gem_aperture_size(fd) / (1024*1024) / 2;
 	igt_info("Using %d 1MiB buffers\n", count);
+	intel_require_memory(count, 1024*1024, CHECK_RAM);
 
 	handle = malloc(sizeof(uint32_t)*count*3);
 	tiling = handle + count;
