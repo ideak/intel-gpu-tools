@@ -3271,6 +3271,9 @@ static int do_display_commit(igt_display_t *display,
 	enum pipe pipe;
 	LOG_INDENT(display, "commit");
 
+	if (!display->n_pipes || !display->n_outputs)
+		return 0; /* nothing to do */
+
 	igt_display_refresh(display);
 
 	if (s == COMMIT_ATOMIC) {
@@ -3320,6 +3323,9 @@ static int do_display_commit(igt_display_t *display,
 int igt_display_try_commit_atomic(igt_display_t *display, uint32_t flags, void *user_data)
 {
 	int ret;
+
+	if (!display->n_pipes || !display->n_outputs)
+		return 0; /* nothing to do */
 
 	LOG_INDENT(display, "commit");
 
