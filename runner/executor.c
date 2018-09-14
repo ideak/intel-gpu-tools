@@ -242,7 +242,7 @@ static void dump_dmesg(int kmsgfd, int outfd)
 	unsigned flags;
 	unsigned long long seq, cmpseq, usec;
 	char cont;
-	char buf[256];
+	char buf[2048];
 	ssize_t r;
 
 	if (comparefd < 0)
@@ -323,7 +323,7 @@ static int monitor_output(pid_t child,
 			   struct settings *settings)
 {
 	fd_set set;
-	char buf[256];
+	char buf[2048];
 	char *outbuf = NULL;
 	size_t outbufsize = 0;
 	char current_subtest[256] = {};
@@ -539,11 +539,13 @@ static int monitor_output(pid_t child,
 		if (kmsgfd >= 0 && FD_ISSET(kmsgfd, &set)) {
 			s = read(kmsgfd, buf, sizeof(buf));
 			if (s < 0) {
-				if (errno != EPIPE) {
+				if (errno != EPIPE && errno != EINVAL) {
 					fprintf(stderr, "Error reading from kmsg, stopping monitoring: %s\n",
 						strerror(errno));
 					close(kmsgfd);
 					kmsgfd = -1;
+				} else if (errno == EINVAL) {
+					fprintf(stderr, "Warning: Buffer too small for kernel log record, record lost.\n");
 				}
 			} else {
 				write(outputs[_F_DMESG], buf, s);
