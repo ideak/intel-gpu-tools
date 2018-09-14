@@ -40,6 +40,40 @@
 #include "drm.h"
 #include "drm_fourcc.h"
 
+static bool has_getfb_iface(int fd)
+{
+	struct drm_mode_fb_cmd arg = { };
+	int err;
+
+	err = 0;
+	if (drmIoctl(fd, DRM_IOCTL_MODE_GETFB, &arg))
+		err = -errno;
+	switch (err) {
+	case -ENOTTY: /* ioctl unrecognised (kernel too old) */
+	case -ENOTSUP: /* driver doesn't support KMS */
+		return false;
+	default:
+		return true;
+	}
+}
+
+static bool has_addfb2_iface(int fd)
+{
+	struct drm_mode_fb_cmd2 arg = { };
+	int err;
+
+	err = 0;
+	if (drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &arg))
+		err = -errno;
+	switch (err) {
+	case -ENOTTY: /* ioctl unrecognised (kernel too old) */
+	case -ENOTSUP: /* driver doesn't support KMS */
+		return false;
+	default:
+		return true;
+	}
+}
+
 static void get_ccs_fb(int fd, struct drm_mode_fb_cmd2 *ret)
 {
 	struct drm_mode_fb_cmd2 add = {
@@ -54,6 +88,7 @@ static void get_ccs_fb(int fd, struct drm_mode_fb_cmd2 *ret)
 	};
 	int size;
 
+	igt_require(has_addfb2_iface(fd));
 	igt_require_intel(fd);
 
 	/* An explanation of the magic numbers can be found in kms_ccs.c. */
@@ -191,15 +226,16 @@ static void test_duplicate_handles(int fd)
 		do_ioctl(fd, DRM_IOCTL_MODE_RMFB, &add.fb_id);
 		gem_close(fd, add.handles[0]);
 	}
-
 }
 
 igt_main
 {
 	int fd;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_ANY);
+		igt_require(has_getfb_iface(fd));
+	}
 
 	igt_subtest_group
 		test_handle_input(fd);
