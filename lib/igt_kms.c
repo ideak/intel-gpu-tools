@@ -1843,8 +1843,9 @@ static void igt_fill_display_format_mod(igt_display_t *display);
  * Initialize @display and allocate the various resources required. Use
  * #igt_display_fini to release the resources when they are no longer required.
  *
+ * Returns: true if the display has outputs and pipes available, false otherwise
  */
-void igt_display_init(igt_display_t *display, int drm_fd)
+bool igt_display_init(igt_display_t *display, int drm_fd)
 {
 	drmModeRes *resources;
 	drmModePlaneRes *plane_resources;
@@ -1857,7 +1858,8 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 	display->drm_fd = drm_fd;
 
 	resources = drmModeGetResources(display->drm_fd);
-	igt_assert(resources);
+	if (!resources)
+		goto out;
 
 	/*
 	 * We cache the number of pipes, that number is a physical limit of the
@@ -2004,7 +2006,15 @@ void igt_display_init(igt_display_t *display, int drm_fd)
 	/* Set reasonable default values for every object in the display. */
 	igt_display_reset(display);
 
+out:
 	LOG_UNINDENT(display);
+
+	return display->n_pipes && display->n_outputs;
+}
+
+void igt_display_require(igt_display_t *display, int drm_fd)
+{
+	igt_require(igt_display_init(display, drm_fd));
 }
 
 /**
