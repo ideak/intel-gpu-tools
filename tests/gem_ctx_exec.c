@@ -24,11 +24,6 @@
  *    Ben Widawsky <ben@bwidawsk.net>
  *
  */
-
-/*
- * This test covers basic context switch functionality
- */
-
 #include "igt.h"
 #include <limits.h>
 #include <unistd.h>
@@ -46,44 +41,32 @@
 #include <drm.h>
 
 
-IGT_TEST_DESCRIPTION("Test basic context switch functionality.");
+IGT_TEST_DESCRIPTION("Test context batch buffer execution.");
 
 /* Copied from gem_exec_nop.c */
 static int exec(int fd, uint32_t handle, int ring, int ctx_id)
 {
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 gem_exec;
+	struct drm_i915_gem_exec_object2 obj = { .handle = handle };
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = ring,
+	};
 
-	gem_exec.handle = handle;
-	gem_exec.relocation_count = 0;
-	gem_exec.relocs_ptr = 0;
-	gem_exec.alignment = 0;
-	gem_exec.offset = 0;
-	gem_exec.flags = 0;
-	gem_exec.rsvd1 = 0;
-	gem_exec.rsvd2 = 0;
-
-	execbuf.buffers_ptr = to_user_pointer(&gem_exec);
-	execbuf.buffer_count = 1;
-	execbuf.batch_start_offset = 0;
-	execbuf.batch_len = 8;
-	execbuf.cliprects_ptr = 0;
-	execbuf.num_cliprects = 0;
-	execbuf.DR1 = 0;
-	execbuf.DR4 = 0;
-	execbuf.flags = ring;
 	i915_execbuffer2_set_context_id(execbuf, ctx_id);
-	execbuf.rsvd2 = 0;
 
 	return __gem_execbuf(fd, &execbuf);
 }
 
 static void big_exec(int fd, uint32_t handle, int ring)
 {
-	struct drm_i915_gem_execbuffer2 execbuf;
+	int num_buffers = gem_global_aperture_size(fd) / 4096;
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffer_count = num_buffers,
+		.flags = ring,
+	};
 	struct drm_i915_gem_exec_object2 *gem_exec;
 	uint32_t ctx_id1, ctx_id2;
-	int num_buffers = gem_global_aperture_size(fd) / 4096;
 	int i;
 
 	/* Make sure we only fill half of RAM with gem objects. */
@@ -93,33 +76,19 @@ static void big_exec(int fd, uint32_t handle, int ring)
 	igt_assert(gem_exec);
 	memset(gem_exec, 0, (num_buffers + 1) * sizeof(*gem_exec));
 
-
 	ctx_id1 = gem_context_create(fd);
 	ctx_id2 = gem_context_create(fd);
 
 	gem_exec[0].handle = handle;
 
-
 	execbuf.buffers_ptr = to_user_pointer(gem_exec);
-	execbuf.buffer_count = num_buffers + 1;
-	execbuf.batch_start_offset = 0;
-	execbuf.batch_len = 8;
-	execbuf.cliprects_ptr = 0;
-	execbuf.num_cliprects = 0;
-	execbuf.DR1 = 0;
-	execbuf.DR4 = 0;
-	execbuf.flags = ring;
-	execbuf.rsvd2 = 0;
 
 	execbuf.buffer_count = 1;
 	i915_execbuffer2_set_context_id(execbuf, ctx_id1);
 	gem_execbuf(fd, &execbuf);
 
-	for (i = 0; i < num_buffers; i++) {
-		uint32_t tmp_handle = gem_create(fd, 4096);
-
-		gem_exec[i].handle = tmp_handle;
-	}
+	for (i = 0; i < num_buffers; i++)
+		gem_exec[i].handle = gem_create(fd, 4096);
 	gem_exec[i].handle = handle;
 	execbuf.buffer_count = i + 1;
 
@@ -132,8 +101,7 @@ static void big_exec(int fd, uint32_t handle, int ring)
 		igt_info("trying buffer count %i\n", i - 1);
 	}
 
-	igt_info("reduced buffer count to %i from %i\n",
-	       i - 1, num_buffers);
+	igt_info("reduced buffer count to %i from %i\n", i - 1, num_buffers);
 
 	/* double check that it works */
 	gem_execbuf(fd, &execbuf);
@@ -179,14 +147,13 @@ static void invalid_context(int fd, unsigned ring, uint32_t handle)
 	igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOENT);
 }
 
-uint32_t handle;
-uint32_t batch[2] = {0, MI_BATCH_BUFFER_END};
-uint32_t ctx_id, ctx_id2;
-int fd;
-
 igt_main
 {
+	const uint32_t batch[2] = { 0, MI_BATCH_BUFFER_END };
 	const struct intel_execution_engine *e;
+	uint32_t handle;
+	uint32_t ctx_id;
+	int fd;
 
 	igt_fixture {
 		fd = drm_open_driver_render(DRIVER_INTEL);
@@ -200,16 +167,16 @@ igt_main
 
 	igt_subtest("basic") {
 		ctx_id = gem_context_create(fd);
-		igt_assert(exec(fd, handle, I915_EXEC_RENDER, ctx_id) == 0);
+		igt_assert(exec(fd, handle, 0, ctx_id) == 0);
 		gem_sync(fd, handle);
 		gem_context_destroy(fd, ctx_id);
 
 		ctx_id = gem_context_create(fd);
-		igt_assert(exec(fd, handle, I915_EXEC_RENDER, ctx_id) == 0);
+		igt_assert(exec(fd, handle, 0, ctx_id) == 0);
 		gem_sync(fd, handle);
 		gem_context_destroy(fd, ctx_id);
 
-		igt_assert(exec(fd, handle, I915_EXEC_RENDER, ctx_id) < 0);
+		igt_assert(exec(fd, handle, 0, ctx_id) < 0);
 		gem_sync(fd, handle);
 	}
 
@@ -221,7 +188,7 @@ igt_main
 	}
 
 	igt_subtest("eviction")
-		big_exec(fd, handle, I915_EXEC_RENDER);
+		big_exec(fd, handle, 0);
 
 	igt_subtest("reset-pin-leak") {
 		int i;
@@ -241,40 +208,13 @@ igt_main
 		 * the last context is leaked at every reset.
 		 */
 		for (i = 0; i < 20; i++) {
-			igt_hang_t hang = igt_hang_ring(fd, I915_EXEC_RENDER);
-			igt_assert(exec(fd, handle, I915_EXEC_RENDER, 0) == 0);
-			igt_assert(exec(fd, handle, I915_EXEC_RENDER, ctx_id) == 0);
+			igt_hang_t hang = igt_hang_ring(fd, 0);
+
+			igt_assert_eq(exec(fd, handle, 0, 0), 0);
+			igt_assert_eq(exec(fd, handle, 0, ctx_id), 0);
 			igt_post_hang_ring(fd, hang);
 		}
 
 		gem_context_destroy(fd, ctx_id);
-	}
-
-	igt_subtest("lrc-lite-restore") {
-		int i, j;
-
-		/*
-		 * Need 2 contexts to be able to replicate a lite restore,
-		 * i.e. a running context is resubmitted.
-		 */
-		ctx_id = gem_context_create(fd);
-		ctx_id2 = gem_context_create(fd);
-
-		/*
-		 * Queue several small batchbuffers to be sure we'll send execlists
-		 * with 2 valid context, and likely cause a lite restore when ctxB
-		 * is resubmitted at the top of the new execlist.
-		 */
-		for (i = 0; i < 20; i++) {
-			for (j = 0; j < 200; j++) {
-				igt_assert(exec(fd, handle, I915_EXEC_RENDER, ctx_id) == 0);
-				igt_assert(exec(fd, handle, I915_EXEC_RENDER, ctx_id2) == 0);
-			}
-
-			gem_sync(fd, handle);
-		}
-
-		gem_context_destroy(fd, ctx_id);
-		gem_context_destroy(fd, ctx_id2);
 	}
 }
