@@ -74,6 +74,19 @@ static const uint32_t gen9_gpgpu_kernel[][4] = {
 	{ 0x07800031, 0x20000a40, 0x06000e00, 0x82000010 },
 };
 
+static const uint32_t gen11_gpgpu_kernel[][4] = {
+	{ 0x00400001, 0x20202288, 0x00000020, 0x00000000 },
+	{ 0x00000009, 0x20400208, 0x06000004, 0x00000004 },
+	{ 0x00000001, 0x20440208, 0x00000018, 0x00000000 },
+	{ 0x00600001, 0x20800208, 0x008d0000, 0x00000000 },
+	{ 0x00200001, 0x20800208, 0x00450040, 0x00000000 },
+	{ 0x00000001, 0x20880608, 0x00000000, 0x0000000f },
+	{ 0x00800001, 0x20a00208, 0x00000020, 0x00000000 },
+	{ 0x0c800031, 0x24000a40, 0x06000080, 0x040a8000 },
+	{ 0x00600001, 0x2e000208, 0x008d0000, 0x00000000 },
+	{ 0x07800031, 0x20000a40, 0x06000e00, 0x82000010 },
+};
+
 /*
  * This sets up the gpgpu pipeline,
  *
@@ -258,4 +271,14 @@ void gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 {
 	__gen9_gpgpu_fillfunc(batch, dst, x, y, width, height, color,
 			      gen9_gpgpu_kernel, sizeof(gen9_gpgpu_kernel));
+}
+
+void gen11_gpgpu_fillfunc(struct intel_batchbuffer *batch,
+			  const struct igt_buf *dst,
+			  unsigned int x, unsigned int y,
+			  unsigned int width, unsigned int height,
+			  uint8_t color)
+{
+	__gen9_gpgpu_fillfunc(batch, dst, x, y, width, height, color,
+			      gen11_gpgpu_kernel, sizeof(gen11_gpgpu_kernel));
 }

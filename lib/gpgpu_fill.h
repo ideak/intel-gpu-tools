@@ -50,4 +50,11 @@ gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
 		    unsigned int width, unsigned int height,
 		    uint8_t color);
 
+void
+gen11_gpgpu_fillfunc(struct intel_batchbuffer *batch,
+		     const struct igt_buf *dst,
+		     unsigned int x, unsigned int y,
+		     unsigned int width, unsigned int height,
+		     uint8_t color);
+
 #endif /* GPGPU_FILL_H */
