@@ -780,6 +780,14 @@ static int execute_entry(size_t idx,
 		printf("\n");
 	}
 
+	/*
+	 * Flush outputs before forking so our (buffered) output won't
+	 * end up in the test outputs.
+	 */
+
+	fflush(stdout);
+	fflush(stderr);
+
 	if ((child = fork())) {
 		int outfd = outpipe[0];
 		int errfd = errpipe[0];
