@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/limits.h>
@@ -282,6 +283,42 @@ static bool job_list_from_test_list(struct job_list *job_list,
 	free(line);
 	fclose(f);
 	return any;
+}
+
+static char *lowercase(const char *str)
+{
+	char *ret = malloc(strlen(str) + 1);
+	char *q = ret;
+
+	while (*str) {
+		if (isspace(*str))
+			break;
+
+		*q++ = tolower(*str++);
+	}
+	*q = '\0';
+
+	return ret;
+}
+
+void generate_piglit_name(const char *binary, const char *subtest,
+			  char *namebuf, size_t namebuf_size)
+{
+	char *lc_binary = lowercase(binary);
+	char *lc_subtest = NULL;
+
+	if (!subtest) {
+		snprintf(namebuf, namebuf_size, "igt@%s", lc_binary);
+		free(lc_binary);
+		return;
+	}
+
+	lc_subtest = lowercase(subtest);
+
+	snprintf(namebuf, namebuf_size, "igt@%s@%s", lc_binary, lc_subtest);
+
+	free(lc_binary);
+	free(lc_subtest);
 }
 
 void init_job_list(struct job_list *job_list)

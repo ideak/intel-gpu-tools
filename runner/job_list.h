@@ -27,6 +27,9 @@ struct job_list
 	size_t size;
 };
 
+void generate_piglit_name(const char *binary, const char *subtest,
+			  char *namebuf, size_t namebuf_size);
+
 void init_job_list(struct job_list *job_list);
 void free_job_list(struct job_list *job_list);
 bool create_job_list(struct job_list *job_list, struct settings *settings);

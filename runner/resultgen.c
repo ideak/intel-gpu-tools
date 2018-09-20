@@ -148,22 +148,6 @@ static size_t count_lines(const char *buf, const char *bufend)
 	return ret;
 }
 
-static char *lowercase(const char *str)
-{
-	char *ret = malloc(strlen(str) + 1);
-	char *q = ret;
-
-	while (*str) {
-		if (isspace(*str))
-			break;
-
-		*q++ = tolower(*str++);
-	}
-	*q = '\0';
-
-	return ret;
-}
-
 static void append_line(char **buf, size_t *buflen, char *line)
 {
 	size_t linelen = strlen(line);
@@ -171,26 +155,6 @@ static void append_line(char **buf, size_t *buflen, char *line)
 	*buf = realloc(*buf, *buflen + linelen + 1);
 	strcpy(*buf + *buflen, line);
 	*buflen += linelen;
-}
-
-static void generate_piglit_name(const char *binary, const char *subtest,
-				 char *namebuf, size_t namebuf_size)
-{
-	char *lc_binary = lowercase(binary);
-	char *lc_subtest = NULL;
-
-	if (!subtest) {
-		snprintf(namebuf, namebuf_size, "igt@%s", lc_binary);
-		free(lc_binary);
-		return;
-	}
-
-	lc_subtest = lowercase(subtest);
-
-	snprintf(namebuf, namebuf_size, "igt@%s@%s", lc_binary, lc_subtest);
-
-	free(lc_binary);
-	free(lc_subtest);
 }
 
 static const struct {
