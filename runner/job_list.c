@@ -75,19 +75,17 @@ static void add_subtests(struct job_list *job_list, struct settings *settings,
 	}
 
 	while (fscanf(p, "%ms", &subtestname) == 1) {
-		char *piglitname;
+		char piglitname[256];
 
-		asprintf(&piglitname, "igt@%s@%s", binary, subtestname);
+		generate_piglit_name(binary, subtestname, piglitname, sizeof(piglitname));
 
 		if (exclude && exclude->size && matches_any(piglitname, exclude)) {
 			free(subtestname);
-			free(piglitname);
 			continue;
 		}
 
 		if (include && include->size && !matches_any(piglitname, include)) {
 			free(subtestname);
-			free(piglitname);
 			continue;
 		}
 
@@ -103,7 +101,6 @@ static void add_subtests(struct job_list *job_list, struct settings *settings,
 		}
 
 		free(subtestname);
-		free(piglitname);
 	}
 
 	if (num_subtests)
