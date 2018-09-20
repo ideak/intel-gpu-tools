@@ -211,6 +211,12 @@ static bool job_list_from_test_list(struct job_list *job_list,
 		if ((delim = strchr(line, '#')) != NULL)
 			*delim = '\0';
 
+		if (settings->exclude_regexes.size && matches_any(line, &settings->exclude_regexes))
+			continue;
+
+		if (settings->include_regexes.size && !matches_any(line, &settings->include_regexes))
+			continue;
+
 		if (sscanf(line, "igt@%ms", &binary) == 1) {
 			if ((delim = strchr(binary, '@')) != NULL)
 				*delim++ = '\0';

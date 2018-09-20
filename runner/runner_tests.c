@@ -562,6 +562,26 @@ igt_main
 				igt_assert_eqstr(list.entries[0].subtests[0], "first-subtest");
 				igt_assert_eqstr(list.entries[multiple ? 0 : 1].subtests[multiple ? 1 : 0], "second-subtest");
 			}
+
+			igt_subtest_f("job-list-testlist-filtered-%s", multiple ? "multiple" : "normal") {
+				char *argv[] = { "runner",
+						 "--test-list", filename,
+						 multiple ? "--multiple-mode" : "--sync",
+						 "-t", "successtest",
+						 "-x", "first",
+						 testdatadir,
+						 "path-to-results",
+				};
+
+				igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+				igt_assert(create_job_list(&list, &settings));
+
+				igt_assert_eq(list.size, 1);
+				igt_assert_eqstr(list.entries[0].binary, "successtest");
+
+				igt_assert_eq(list.entries[0].subtest_count, 1);
+				igt_assert_eqstr(list.entries[0].subtests[0], "second-subtest");
+			}
 		}
 
 		igt_fixture {
