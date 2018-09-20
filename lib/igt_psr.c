@@ -25,28 +25,30 @@
 #include "igt_sysfs.h"
 #include <errno.h>
 
-bool psr_active(int fd, bool check_active)
+bool psr_active(int debugfs_fd, bool check_active)
 {
 	bool active;
 	char buf[512];
 
-	igt_debugfs_simple_read(fd, "i915_edp_psr_status", buf, sizeof(buf));
+	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
+				sizeof(buf));
 	active = strstr(buf, "HW Enabled & Active bit: yes\n") &&
 		(strstr(buf, "SRDENT") || strstr(buf, "SLEEP"));
 	return check_active ? active : !active;
 }
 
-bool psr_wait_entry(int fd)
+bool psr_wait_entry(int debugfs_fd)
 {
-	return igt_wait(psr_active(fd, true), 500, 1);
+	return igt_wait(psr_active(debugfs_fd, true), 500, 1);
 }
 
-static ssize_t psr_write(int fd, const char *buf)
+static ssize_t psr_write(int debugfs_fd, const char *buf)
 {
-	return igt_sysfs_write(fd, "i915_edp_psr_debug", buf, strlen(buf));
+	return igt_sysfs_write(debugfs_fd, "i915_edp_psr_debug", buf,
+			       strlen(buf));
 }
 
-static int has_psr_debugfs(int fd)
+static int has_psr_debugfs(int debugfs_fd)
 {
 	int ret;
 
@@ -55,14 +57,14 @@ static int has_psr_debugfs(int fd)
 	 * Legacy mode will return OK here, debugfs api will return -EINVAL.
 	 * -ENODEV is returned when PSR is unavailable.
 	 */
-	ret = psr_write(fd, "0xf");
+	ret = psr_write(debugfs_fd, "0xf");
 	if (ret == -EINVAL)
 		return 0;
 	else if (ret < 0)
 		return ret;
 
 	/* legacy debugfs api, we enabled irqs by writing, disable them. */
-	psr_write(fd, "0");
+	psr_write(debugfs_fd, "0");
 	return -EINVAL;
 }
 
@@ -86,11 +88,11 @@ static void restore_psr_debugfs(int sig)
 	psr_write(psr_restore_debugfs_fd, "0");
 }
 
-static bool psr_set(int fd, bool enable)
+static bool psr_set(int debugfs_fd, bool enable)
 {
 	int ret;
 
-	ret = has_psr_debugfs(fd);
+	ret = has_psr_debugfs(debugfs_fd);
 	if (ret == -ENODEV) {
 		igt_skip_on_f(enable, "PSR not available\n");
 		return false;
@@ -99,13 +101,13 @@ static bool psr_set(int fd, bool enable)
 	if (ret == -EINVAL) {
 		ret = psr_modparam_set(enable);
 	} else {
-		ret = psr_write(fd, enable ? "0x3" : "0x1");
+		ret = psr_write(debugfs_fd, enable ? "0x3" : "0x1");
 		igt_assert(ret > 0);
 	}
 
 	/* Restore original value on exit */
 	if (psr_restore_debugfs_fd == -1) {
-		psr_restore_debugfs_fd = dup(fd);
+		psr_restore_debugfs_fd = dup(debugfs_fd);
 		igt_assert(psr_restore_debugfs_fd >= 0);
 		igt_install_exit_handler(restore_psr_debugfs);
 	}
@@ -113,12 +115,12 @@ static bool psr_set(int fd, bool enable)
 	return ret;
 }
 
-bool psr_enable(int fd)
+bool psr_enable(int debugfs_fd)
 {
-	return psr_set(fd, true);
+	return psr_set(debugfs_fd, true);
 }
 
-bool psr_disable(int fd)
+bool psr_disable(int debugfs_fd)
 {
-	return psr_set(fd, false);
+	return psr_set(debugfs_fd, false);
 }

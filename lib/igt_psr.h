@@ -28,9 +28,9 @@
 #include "igt_core.h"
 #include "igt_aux.h"
 
-bool psr_wait_entry(int fd);
-bool psr_active(int fd, bool check_active);
-bool psr_enable(int fd);
-bool psr_disable(int fd);
+bool psr_wait_entry(int debugfs_fd);
+bool psr_active(int debugfs_fd, bool check_active);
+bool psr_enable(int debugfs_fd);
+bool psr_disable(int debugfs_fd);
 
 #endif
