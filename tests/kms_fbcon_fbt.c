@@ -121,10 +121,10 @@ static bool fbc_is_enabled(int debugfs_fd)
 	return strstr(buf, "FBC enabled\n");
 }
 
-static bool fbc_wait_until_enabled(int fd)
+static bool fbc_wait_until_enabled(int debugfs_fd)
 {
-	bool r = igt_wait(fbc_is_enabled(fd), 5000, 1);
-	fbc_print_status(fd);
+	bool r = igt_wait(fbc_is_enabled(debugfs_fd), 5000, 1);
+	fbc_print_status(debugfs_fd);
 	return r;
 }
 
@@ -203,34 +203,35 @@ static bool psr_is_enabled(int debugfs_fd)
 	return strstr(buf, "\nHW Enabled & Active bit: yes\n");
 }
 
-static bool psr_wait_until_enabled(int fd)
+static bool psr_wait_until_enabled(int debugfs_fd)
 {
-	bool r = igt_wait(psr_is_enabled(fd), 5000, 1);
-	psr_print_status(fd);
+	bool r = igt_wait(psr_is_enabled(debugfs_fd), 5000, 1);
+
+	psr_print_status(debugfs_fd);
 	return r;
 }
 
-static void disable_features(int fd)
+static void disable_features(int debugfs_fd)
 {
 	igt_set_module_param_int("enable_fbc", 0);
-	psr_disable(fd);
+	psr_disable(debugfs_fd);
 }
 
-static inline void fbc_modparam_enable(int fd)
+static inline void fbc_modparam_enable(int debugfs_fd)
 {
 	igt_set_module_param_int("enable_fbc", 1);
 }
 
-static inline void psr_debugfs_enable(int fd)
+static inline void psr_debugfs_enable(int debugfs_fd)
 {
-	psr_enable(fd);
+	psr_enable(debugfs_fd);
 }
 
 struct feature {
-	bool (*supported_on_chipset)(int fd);
-	bool (*wait_until_enabled)(int fd);
+	bool (*supported_on_chipset)(int debugfs_fd);
+	bool (*wait_until_enabled)(int debugfs_fd);
 	bool (*connector_possible_fn)(drmModeConnectorPtr connector);
-	void (*enable)(int fd);
+	void (*enable)(int debugfs_fd);
 } fbc = {
 	.supported_on_chipset = fbc_supported_on_chipset,
 	.wait_until_enabled = fbc_wait_until_enabled,
