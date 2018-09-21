@@ -2593,6 +2593,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MI_BATCH_BUFFER		((0x30 << 23) | 1)
 #define MI_BATCH_BUFFER_START	(0x31 << 23)
 #define MI_BATCH_BUFFER_END	(0xA << 23)
+#define MI_COND_BATCH_BUFFER_END	(0x36 << 23)
+#define MI_DO_COMPARE                   (1 << 21)
+
 #define MI_BATCH_NON_SECURE		(1)
 #define MI_BATCH_NON_SECURE_I965	(1 << 8)
 #define MI_BATCH_NON_SECURE_HSW		(1<<13) /* Additional bit for RCS */

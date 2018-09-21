@@ -52,8 +52,6 @@ static drm_intel_bo *target_buffer, *blt_bo;
 IGT_TEST_DESCRIPTION("Basic check for missed IRQs on blt ring.");
 
 
-#define MI_COND_BATCH_BUFFER_END	(0x36<<23 | 1)
-#define MI_DO_COMPARE			(1<<21)
 static void
 dummy_reloc_loop(void)
 {

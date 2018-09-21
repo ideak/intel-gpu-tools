@@ -115,7 +115,7 @@ static void run_test(int ring)
 	 * otherwise the obj->last_write_seqno will be updated. */
 	if (ring == I915_EXEC_RENDER) {
 		BEGIN_BATCH(4, 1);
-		OUT_BATCH(MI_COND_BATCH_BUFFER_END | MI_DO_COMPARE);
+		OUT_BATCH(MI_COND_BATCH_BUFFER_END | MI_DO_COMPARE | 1);
 		OUT_BATCH(0xffffffff); /* compare dword */
 		OUT_RELOC(target_bo, I915_GEM_DOMAIN_RENDER, 0, 0);
 		OUT_BATCH(MI_NOOP);

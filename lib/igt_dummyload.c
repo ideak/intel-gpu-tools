@@ -75,7 +75,7 @@ emit_recursive_batch(igt_spin_t *spin,
 #define SCRATCH 0
 #define BATCH IGT_SPIN_BATCH
 	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_relocation_entry relocs[2], *r;
+	struct drm_i915_gem_relocation_entry relocs[3], *r;
 	struct drm_i915_gem_execbuffer2 *execbuf;
 	struct drm_i915_gem_exec_object2 *obj;
 	unsigned int flags[GEM_MAX_ENGINES];
@@ -205,7 +205,42 @@ emit_recursive_batch(igt_spin_t *spin,
 	 * trouble. See https://bugs.freedesktop.org/show_bug.cgi?id=102262
 	 */
 	if (!(opts->flags & IGT_SPIN_FAST))
-		cs += 1000;
+		cs += 960;
+
+	/*
+	 * When using a cmdparser, the batch is copied into a read only location
+	 * and validated. We are then unable to alter the executing batch,
+	 * breaking the older *spin->condition = MI_BB_END termination.
+	 * Instead we can use a conditional MI_BB_END here that looks at
+	 * the user's copy of the batch and terminates when they modified it,
+	 * no matter how they modify it (from either the GPU or CPU).
+	 */
+	if (gen >= 8) { /* arbitrary cutoff between ring/execlists submission */
+		r = &relocs[obj[BATCH].relocation_count++];
+
+		/*
+		 * On Sandybridge+ the comparison is a strict greater-than:
+		 * if the value at spin->condition is greater than BB_END,
+		 * we loop back to the beginning.
+		 * Beginning with Kabylake, we can select the comparison mode
+		 * and loop back to the beginning if spin->condition != BB_END
+		 * (using 5 << 12).
+		 * For simplicity, we try to stick to a one-size fits all.
+		 */
+		spin->condition = batch + BATCH_SIZE / sizeof(*batch) - 2;
+		*spin->condition = 0xffffffff;
+
+		r->presumed_offset = 0;
+		r->target_handle = obj[BATCH].handle;
+		r->offset = (cs + 2 - batch) * sizeof(*cs);
+		r->read_domains = I915_GEM_DOMAIN_COMMAND;
+		r->delta = (spin->condition - batch) * sizeof(*cs);
+
+		*cs++ = MI_COND_BATCH_BUFFER_END | MI_DO_COMPARE | 2;
+		*cs++ = MI_BATCH_BUFFER_END;
+		*cs++ = r->delta;
+		*cs++ = 0;
+	}
 
 	/* recurse */
 	r = &relocs[obj[BATCH].relocation_count++];
