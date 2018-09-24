@@ -68,6 +68,15 @@ typedef struct {
 #define CCS_UNCOMPRESSED	0x0
 #define CCS_COMPRESSED		0x55
 
+/*
+ * Limit maximum used sprite plane width so this test will not mistakenly
+ * fail on hardware limitations which are not interesting to this test.
+ * On this test too wide sprite plane may fail during creation with dmesg
+ * comment saying:
+ * "Requested display configuration exceeds system watermark limitations"
+ */
+#define MAX_SPRITE_PLANE_WIDTH 2000
+
 struct local_drm_format_modifier {
        /* Bitmask of formats in get_plane format list this info applies to. The
 	* offset allows a sliding window of which 64 formats (bits).
@@ -408,12 +417,12 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 	if (data->plane && fb_flags & FB_COMPRESSED) {
 		if (!plane_has_format_with_ccs(data, data->plane, DRM_FORMAT_XRGB8888))
 			return false;
-		generate_fb(data, &fb, drm_mode->hdisplay,
+		generate_fb(data, &fb, min(MAX_SPRITE_PLANE_WIDTH, drm_mode->hdisplay),
 			    drm_mode->vdisplay,
 			    (fb_flags & ~FB_COMPRESSED) | FB_HAS_PLANE);
 		generate_fb(data, &fb_sprite, 256, 256, fb_flags);
 	} else {
-		generate_fb(data, &fb, drm_mode->hdisplay,
+		generate_fb(data, &fb, min(MAX_SPRITE_PLANE_WIDTH, drm_mode->hdisplay),
 			    drm_mode->vdisplay, fb_flags);
 	}
 
