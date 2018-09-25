@@ -258,7 +258,7 @@ static void prepare_crtc(data_t *data)
 
 	/* get reference crc w/o cursor */
 	igt_pipe_crc_start(data->pipe_crc);
-	igt_assert(igt_pipe_crc_get_single(data->pipe_crc, &data->ref_crc));
+	igt_pipe_crc_get_single(data->pipe_crc, &data->ref_crc);
 }
 
 static void test_crtc(data_t *data, unsigned int edges)
