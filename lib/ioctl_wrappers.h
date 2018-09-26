@@ -147,7 +147,6 @@ bool gem_has_bsd(int fd);
 bool gem_has_blt(int fd);
 bool gem_has_vebox(int fd);
 bool gem_has_bsd2(int fd);
-int gem_gtt_type(int fd);
 bool gem_uses_ppgtt(int fd);
 bool gem_uses_full_ppgtt(int fd);
 int gem_gpu_reset_type(int fd);

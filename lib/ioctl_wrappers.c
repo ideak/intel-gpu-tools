@@ -954,12 +954,11 @@ bool gem_bo_busy(int fd, uint32_t handle)
  * Feature test macro to check what type of gtt is being used by the kernel:
  * 0 - global gtt
  * 1 - aliasing ppgtt
- * 2 - full ppgtt, limited to 32bit address space
- * 3 - full ppgtt, 64bit address space
+ * 2 - full ppgtt
  *
  * Returns: Type of gtt being used.
  */
-int gem_gtt_type(int fd)
+static int gem_gtt_type(int fd)
 {
 	struct drm_i915_getparam gp;
 	int val = 0;
