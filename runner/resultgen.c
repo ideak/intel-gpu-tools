@@ -313,7 +313,7 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 			     struct subtests *subtests,
 			     struct json_object *tests)
 {
-	char *buf, *bufend;
+	char *buf, *bufend, *nullchr;
 	struct stat statbuf;
 	char piglit_name[256];
 	char *igt_version = NULL;
@@ -330,6 +330,14 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 			return false;
 	} else {
 		buf = NULL;
+	}
+
+	/*
+	 * Avoid null characters: Just pretend the output stops at the
+	 * first such character, if any.
+	 */
+	if ((nullchr = memchr(buf, '\0', statbuf.st_size)) != NULL) {
+		statbuf.st_size = nullchr - buf;
 	}
 
 	bufend = buf + statbuf.st_size;
