@@ -40,7 +40,6 @@ static struct {
 	int drm_fd;
 	int devid;
 	int gen;
-	int has_ppgtt;
 	drm_intel_bufmgr *bufmgr;
 	struct intel_batchbuffer *batch;
 	igt_media_spinfunc_t spinfunc;
@@ -289,8 +288,6 @@ gem_init(void)
 
 	gem.spinfunc = igt_get_media_spinfunc(gem.devid);
 	igt_require(gem.spinfunc);
-
-	gem.has_ppgtt = gem_uses_ppgtt(gem.drm_fd);
 
 	gem.bufmgr = drm_intel_bufmgr_gem_init(gem.drm_fd, 4096);
 	igt_assert(gem.bufmgr);
