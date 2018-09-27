@@ -9,6 +9,7 @@
 #include <sys/select.h>
 #include <sys/signalfd.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
@@ -860,7 +861,9 @@ static bool clear_old_results(char *path)
 		return false;
 	}
 
-	if (unlinkat(dirfd, "uname.txt", 0) && errno != ENOENT) {
+	if (remove_file(dirfd, "uname.txt") ||
+	    remove_file(dirfd, "starttime.txt") ||
+	    remove_file(dirfd, "endtime.txt")) {
 		close(dirfd);
 		fprintf(stderr, "Error clearing old results: %s\n", strerror(errno));
 		return false;
@@ -890,6 +893,15 @@ static bool clear_old_results(char *path)
 	close(dirfd);
 
 	return true;
+}
+
+static double timeofday_double()
+{
+	struct timeval tv;
+
+	if (!gettimeofday(&tv, NULL))
+		return tv.tv_sec + tv.tv_usec / 1000000.0;
+	return 0.0;
 }
 
 bool initialize_execute_state_from_resume(int dirfd,
@@ -973,7 +985,7 @@ bool execute(struct execute_state *state,
 	     struct job_list *job_list)
 {
 	struct utsname unamebuf;
-	int resdirfd, testdirfd, unamefd;
+	int resdirfd, testdirfd, unamefd, timefd;
 
 	if ((resdirfd = open(settings->results_path, O_DIRECTORY | O_RDONLY)) < 0) {
 		/* Initialize state should have done this */
@@ -991,11 +1003,21 @@ bool execute(struct execute_state *state,
 
 	/* TODO: On resume, don't rewrite, verify that content matches current instead */
 	if ((unamefd = openat(resdirfd, "uname.txt", O_CREAT | O_WRONLY | O_TRUNC, 0666)) < 0) {
-		fprintf(stderr, "Error: Failure creating opening uname.txt: %s\n",
+		fprintf(stderr, "Error: Failure opening uname.txt: %s\n",
 			strerror(errno));
 		close(testdirfd);
 		close(resdirfd);
 		return false;
+	}
+
+	if ((timefd = openat(resdirfd, "starttime.txt", O_CREAT | O_WRONLY | O_EXCL, 0666)) >= 0) {
+		/*
+		 * Ignore failure to open. If this is a resume, we
+		 * don't want to overwrite. For other errors, we
+		 * ignore the start time.
+		 */
+		dprintf(timefd, "%f\n", timeofday_double());
+		close(timefd);
 	}
 
 	init_watchdogs(settings);
@@ -1029,6 +1051,11 @@ bool execute(struct execute_state *state,
 			close(resdirfd);
 			return false;
 		}
+	}
+
+	if ((timefd = openat(resdirfd, "endtime.txt", O_CREAT | O_WRONLY | O_EXCL, 0666)) >= 0) {
+		dprintf(timefd, "%f\n", timeofday_double());
+		close(timefd);
 	}
 
 	close(testdirfd);

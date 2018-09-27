@@ -987,9 +987,9 @@ bool generate_results(int dirfd)
 {
 	struct settings settings;
 	struct job_list job_list;
-	struct json_object *obj;
+	struct json_object *obj, *elapsed;
 	struct results results;
-	int resultsfd, testdirfd, unamefd;
+	int resultsfd, testdirfd, fd;
 	const char *json_string;
 	size_t i;
 
@@ -1020,17 +1020,33 @@ bool generate_results(int dirfd)
 			       json_object_new_string(settings.name) :
 			       json_object_new_string(""));
 
-	if ((unamefd = openat(dirfd, "uname.txt", O_RDONLY)) >= 0) {
+	if ((fd = openat(dirfd, "uname.txt", O_RDONLY)) >= 0) {
 		char buf[128];
-		ssize_t r = read(unamefd, buf, 128);
+		ssize_t r = read(fd, buf, sizeof(buf));
 
 		if (r > 0 && buf[r - 1] == '\n')
 			r--;
 
 		json_object_object_add(obj, "uname",
 				       json_object_new_string_len(buf, r));
-		close(unamefd);
+		close(fd);
 	}
+
+	elapsed = json_object_new_object();
+	json_object_object_add(elapsed, "__type__", json_object_new_string("TimeAttribute"));
+	if ((fd = openat(dirfd, "starttime.txt", O_RDONLY)) >= 0) {
+		char buf[128] = {};
+		read(fd, buf, sizeof(buf));
+		json_object_object_add(elapsed, "start", json_object_new_double(atof(buf)));
+		close(fd);
+	}
+	if ((fd = openat(dirfd, "endtime.txt", O_RDONLY)) >= 0) {
+		char buf[128] = {};
+		read(fd, buf, sizeof(buf));
+		json_object_object_add(elapsed, "end", json_object_new_double(atof(buf)));
+		close(fd);
+	}
+	json_object_object_add(obj, "time_elapsed", elapsed);
 
 	create_result_root_nodes(obj, &results);
 
@@ -1045,7 +1061,6 @@ bool generate_results(int dirfd)
 	 *
 	 * - lspci
 	 * - options
-	 * - time_elapsed
 	 */
 
 	for (i = 0; i < job_list.size; i++) {
