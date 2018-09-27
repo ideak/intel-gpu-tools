@@ -249,15 +249,19 @@ static void dump_dmesg(int kmsgfd, int outfd)
 		return;
 	lseek(comparefd, 0, SEEK_END);
 
-	if (fcntl(kmsgfd, F_SETFL, O_NONBLOCK))
+	if (fcntl(kmsgfd, F_SETFL, O_NONBLOCK)) {
+		close(comparefd);
 		return;
+	}
 
 	while (1) {
 		if (comparefd >= 0) {
 			r = read(comparefd, buf, sizeof(buf) - 1);
 			if (r < 0) {
-				if (errno != EAGAIN && errno != EPIPE)
+				if (errno != EAGAIN && errno != EPIPE) {
+					close(comparefd);
 					return;
+				}
 			} else {
 				buf[r] = '\0';
 				if (sscanf(buf, "%u,%llu,%llu,%c;",
@@ -278,6 +282,7 @@ static void dump_dmesg(int kmsgfd, int outfd)
 			 * If EAGAIN, we're done. If some other error,
 			 * we can't do anything anyway.
 			 */
+			close(comparefd);
 			return;
 		}
 
