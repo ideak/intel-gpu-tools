@@ -294,7 +294,7 @@ static void run_test(data_t *data)
 		expected = "screen GREEN";
 		break;
 	}
-	igt_assert(psr_active(data->debugfs_fd, false));
+	igt_assert(psr_wait_exit(data->debugfs_fd));
 	manual(expected);
 }
 

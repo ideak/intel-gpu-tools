@@ -25,7 +25,7 @@
 #include "igt_sysfs.h"
 #include <errno.h>
 
-bool psr_active(int debugfs_fd, bool check_active)
+static bool psr_active(int debugfs_fd, bool check_active)
 {
 	bool active;
 	char buf[512];
@@ -40,6 +40,11 @@ bool psr_active(int debugfs_fd, bool check_active)
 bool psr_wait_entry(int debugfs_fd)
 {
 	return igt_wait(psr_active(debugfs_fd, true), 500, 1);
+}
+
+bool psr_wait_exit(int debugfs_fd)
+{
+	return igt_wait(psr_active(debugfs_fd, false), 40, 10);
 }
 
 static ssize_t psr_write(int debugfs_fd, const char *buf)
