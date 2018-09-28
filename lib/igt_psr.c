@@ -39,7 +39,7 @@ static bool psr_active(int debugfs_fd, bool check_active)
 
 bool psr_wait_entry(int debugfs_fd)
 {
-	return igt_wait(psr_active(debugfs_fd, true), 500, 1);
+	return igt_wait(psr_active(debugfs_fd, true), 500, 20);
 }
 
 bool psr_wait_exit(int debugfs_fd)
