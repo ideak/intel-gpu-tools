@@ -1,0 +1,78 @@
+image: registry.freedesktop.org/drm/igt-gpu-tools/igt-fedora:latest
+variables:
+  MESON_OPTIONS: >
+    -Dwith_libdrm=intel,nouveau,amdgpu
+    -Dbuild_overlay=true
+    -Dbuild_audio=true
+    -Dbuild_chamelium=true
+    -Dwith_valgrind=true
+    -Dbuild_man=true
+    -Dbuild_tests=true
+    -Dbuild_runner=true
+
+stages:
+  - containers
+  - build
+  - test
+  - deploy
+
+build:tests-fedora:
+  stage: build
+  script:
+    # Feodora does not have peg packaged
+    - meson $MESON_OPTIONS build
+    - ninja -C build
+  artifacts:
+    paths:
+      - build
+
+build:tests-debian:
+  image: registry.freedesktop.org/drm/igt-gpu-tools/igt-debian:latest
+  stage: build
+  script:
+    - meson $MESON_OPTIONS build
+    - ninja -C build
+
+ninja:test:
+  stage: test
+  script:
+    - ninja -C build test
+
+pages:
+  stage: deploy
+  script:
+    - ninja -C build igt-gpu-tools-doc
+    - cp -r build/docs/reference/igt-gpu-tools/html public
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
+
+containers:igt-debian:
+  stage: containers
+  when: manual
+  image: docker:stable
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian -f Dockerfile.debian .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian
+
+containers:igt-fedora:
+  stage: containers
+  when: manual
+  image: docker:stable
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-fedora -f Dockerfile.fedora .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-fedora
