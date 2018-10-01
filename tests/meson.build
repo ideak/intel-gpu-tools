@@ -168,6 +168,7 @@ test_progs = [
 	'kms_pipe_b_c_ivb',
 	'kms_pipe_crc_basic',
 	'kms_plane',
+	'kms_plane_alpha_blend',
 	'kms_plane_lowres',
 	'kms_plane_multiple',
 	'kms_plane_scaling',

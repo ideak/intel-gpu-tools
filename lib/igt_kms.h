@@ -266,6 +266,8 @@ enum igt_atomic_plane_properties {
        IGT_PLANE_IN_FORMATS,
        IGT_PLANE_COLOR_ENCODING,
        IGT_PLANE_COLOR_RANGE,
+       IGT_PLANE_PIXEL_BLEND_MODE,
+       IGT_PLANE_ALPHA,
        IGT_NUM_PLANE_PROPS
 };
 

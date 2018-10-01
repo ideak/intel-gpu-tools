@@ -175,6 +175,8 @@ const char * const igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	[IGT_PLANE_IN_FORMATS] = "IN_FORMATS",
 	[IGT_PLANE_COLOR_ENCODING] = "COLOR_ENCODING",
 	[IGT_PLANE_COLOR_RANGE] = "COLOR_RANGE",
+	[IGT_PLANE_PIXEL_BLEND_MODE] = "pixel blend mode",
+	[IGT_PLANE_ALPHA] = "alpha",
 };
 
 const char * const igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
