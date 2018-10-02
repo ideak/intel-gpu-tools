@@ -138,6 +138,7 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 	igt_assert(poll(&pfd, 1, 0) == 0);
 
 	if (modeset) {
+		gem_quiescent_gpu(dpy->drm_fd);
 		igt_set_module_param_int("enable_hangcheck", 1);
 
 		/* Clear old mode blob. */
