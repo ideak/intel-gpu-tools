@@ -220,9 +220,10 @@ static bool wait_for_active(void)
 
 static void disable_all_screens_dpms(struct mode_set_data *data)
 {
-	int i;
+	if (!data->res)
+		return;
 
-	for (i = 0; i < data->res->count_connectors; i++) {
+	for (int i = 0; i < data->res->count_connectors; i++) {
 		drmModeConnectorPtr c = data->connectors[i];
 
 		kmstest_set_connector_dpms(drm_fd, c, DRM_MODE_DPMS_OFF);
@@ -231,7 +232,8 @@ static void disable_all_screens_dpms(struct mode_set_data *data)
 
 static void disable_all_screens(struct mode_set_data *data)
 {
-	kmstest_unset_all_crtcs(drm_fd, data->res);
+	if (data->res)
+		kmstest_unset_all_crtcs(drm_fd, data->res);
 }
 
 #define disable_all_screens_and_wait(data) do { \
@@ -256,11 +258,13 @@ static bool init_modeset_params_for_type(struct mode_set_data *data,
 					 struct modeset_params *params,
 					 enum screen_type type)
 {
-	int i;
 	drmModeConnectorPtr connector = NULL;
 	drmModeModeInfoPtr mode = NULL;
 
-	for (i = 0; i < data->res->count_connectors; i++) {
+	if (!data->res)
+		return false;
+
+	for (int i = 0; i < data->res->count_connectors; i++) {
 		drmModeConnectorPtr c = data->connectors[i];
 
 		if (type == SCREEN_TYPE_LPSP &&
@@ -386,34 +390,31 @@ static drmModePropertyBlobPtr get_connector_edid(drmModeConnectorPtr connector,
 
 static void init_mode_set_data(struct mode_set_data *data)
 {
-	int i;
-
 	data->res = drmModeGetResources(drm_fd);
-	igt_assert(data->res);
-	igt_assert(data->res->count_connectors <= MAX_CONNECTORS);
+	if (data->res) {
+		igt_assert(data->res->count_connectors <= MAX_CONNECTORS);
+		for (int i = 0; i < data->res->count_connectors; i++) {
+			data->connectors[i] = drmModeGetConnectorCurrent(drm_fd,
+									 data->res->connectors[i]);
+			data->edids[i] = get_connector_edid(data->connectors[i], i);
+		}
 
-	for (i = 0; i < data->res->count_connectors; i++) {
-		data->connectors[i] = drmModeGetConnectorCurrent(drm_fd,
-						data->res->connectors[i]);
-		data->edids[i] = get_connector_edid(data->connectors[i], i);
+		kmstest_set_vt_graphics_mode();
 	}
 
 	data->devid = intel_get_drm_devid(drm_fd);
-
-	kmstest_set_vt_graphics_mode();
-
 	init_modeset_cached_params(&ms_data);
 }
 
 static void fini_mode_set_data(struct mode_set_data *data)
 {
-	int i;
-
-	for (i = 0; i < data->res->count_connectors; i++) {
-		drmModeFreeConnector(data->connectors[i]);
-		drmModeFreePropertyBlob(data->edids[i]);
+	if (data->res) {
+		for (int i = 0; i < data->res->count_connectors; i++) {
+			drmModeFreeConnector(data->connectors[i]);
+			drmModeFreePropertyBlob(data->edids[i]);
+		}
+		drmModeFreeResources(data->res);
 	}
-	drmModeFreeResources(data->res);
 }
 
 static void get_drm_info(struct compare_data *data)
@@ -421,7 +422,8 @@ static void get_drm_info(struct compare_data *data)
 	int i;
 
 	data->res = drmModeGetResources(drm_fd);
-	igt_assert(data->res);
+	if (!data->res)
+		return;
 
 	igt_assert(data->res->count_connectors <= MAX_CONNECTORS);
 	igt_assert(data->res->count_encoders <= MAX_ENCODERS);
@@ -444,6 +446,9 @@ static void get_drm_info(struct compare_data *data)
 static void free_drm_info(struct compare_data *data)
 {
 	int i;
+
+	if (!data->res)
+		return;
 
 	for (i = 0; i < data->res->count_connectors; i++) {
 		drmModeFreeConnector(data->connectors[i]);
@@ -545,6 +550,12 @@ static void assert_drm_infos_equal(struct compare_data *d1,
 {
 	int i;
 
+	if (d1->res == d2->res)
+		return;
+
+	igt_assert(d1->res);
+	igt_assert(d2->res);
+
 	assert_drm_resources_equal(d1, d2);
 
 	for (i = 0; i < d1->res->count_connectors; i++) {
@@ -572,9 +583,12 @@ static bool edid_is_valid(const unsigned char *edid)
 
 static int count_drm_valid_edids(struct mode_set_data *data)
 {
-	int i, ret = 0;
+	int ret = 0;
 
-	for (i = 0; i < data->res->count_connectors; i++)
+	if (!data->res)
+		return 0;
+
+	for (int i = 0; i < data->res->count_connectors; i++)
 		if (data->edids[i] && edid_is_valid(data->edids[i]->data))
 			ret++;
 	return ret;
@@ -635,9 +649,12 @@ static int count_i2c_valid_edids(void)
 
 static int count_vga_outputs(struct mode_set_data *data)
 {
-	int i, count = 0;
+	int count = 0;
 
-	for (i = 0; i < data->res->count_connectors; i++)
+	if (!data->res)
+		return 0;
+
+	for (int i = 0; i < data->res->count_connectors; i++)
 		if (data->connectors[i]->connector_type ==
 		    DRM_MODE_CONNECTOR_VGA)
 			count++;
