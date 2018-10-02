@@ -147,6 +147,51 @@ static void invalid_context(int fd, unsigned ring, uint32_t handle)
 	igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOENT);
 }
 
+static bool has_recoverable_param(int i915)
+{
+	struct drm_i915_gem_context_param param = {
+		.param = I915_CONTEXT_PARAM_RECOVERABLE
+	};
+
+	return __gem_context_get_param(i915, &param) == 0;
+}
+
+static void norecovery(int i915)
+{
+	igt_require(has_recoverable_param(i915));
+
+	for (int pass = 1; pass >= 0; pass--) {
+		struct drm_i915_gem_context_param param = {
+			.ctx_id = gem_context_create(i915),
+			.param = I915_CONTEXT_PARAM_RECOVERABLE,
+			.value = pass,
+		};
+		int expect = pass == 0 ? -EIO : 0;
+		igt_spin_t *spin;
+
+		gem_context_set_param(i915, &param);
+
+		param.value = !pass;
+		gem_context_get_param(i915, &param);
+		igt_assert_eq(param.value, pass);
+
+		spin = __igt_spin_batch_new(i915,
+					    .ctx = param.ctx_id,
+					    .flags = IGT_SPIN_POLL_RUN);
+		igt_assert(spin->running);
+
+		while (!READ_ONCE(*spin->running))
+			;
+		igt_force_gpu_reset(i915);
+
+		igt_spin_batch_end(spin);
+		igt_assert_eq(__gem_execbuf(i915, &spin->execbuf), expect);
+		igt_spin_batch_free(i915, spin);
+
+		gem_context_destroy(i915, param.ctx_id);
+	}
+}
+
 igt_main
 {
 	const uint32_t batch[2] = { 0, MI_BATCH_BUFFER_END };
@@ -189,6 +234,9 @@ igt_main
 
 	igt_subtest("eviction")
 		big_exec(fd, handle, 0);
+
+	igt_subtest("basic-norecovery")
+		norecovery(fd);
 
 	igt_subtest("reset-pin-leak") {
 		int i;
