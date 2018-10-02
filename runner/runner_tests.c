@@ -1003,6 +1003,24 @@ igt_main
 		}
 	}
 
+	igt_subtest("file-descriptor-leakage") {
+		int i;
+
+		/*
+		 * This is a build-time test, and it's expected that
+		 * all subtests are normally run. Keep this one at the
+		 * end.
+		 *
+		 * Try to close some number of fds after stderr and
+		 * expect EBADF for each one.
+		 */
+		for (i = 3; i < 400; i++) {
+			errno = 0;
+			igt_assert_neq(close(i), 0);
+			igt_assert_eq(errno, EBADF);
+		}
+	}
+
 	igt_fixture
 		free_settings(&settings);
 }
