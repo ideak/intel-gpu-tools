@@ -131,7 +131,7 @@ igt_simple_main
 	data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 	igt_require_intel(data.drm_fd);
 
-	igt_enable_connectors();
+	igt_enable_connectors(data.drm_fd);
 	kmstest_set_vt_graphics_mode();
 	igt_display_require(&data.display, data.drm_fd);
 	data.res = drmModeGetResources(data.drm_fd);

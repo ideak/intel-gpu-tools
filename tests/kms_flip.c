@@ -1575,7 +1575,7 @@ int main(int argc, char **argv)
 	igt_fixture {
 		drm_fd = drm_open_driver_master(DRIVER_ANY);
 
-		igt_enable_connectors();
+		igt_enable_connectors(drm_fd);
 
 		kmstest_set_vt_graphics_mode();
 		igt_install_exit_handler(kms_flip_exit_handler);

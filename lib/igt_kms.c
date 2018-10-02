@@ -3905,15 +3905,13 @@ void igt_wait_for_vblank(int drm_fd, enum pipe pipe)
  * An exit handler is installed to ensure connectors are reset when the test
  * exits.
  */
-void igt_enable_connectors(void)
+void igt_enable_connectors(int drm_fd)
 {
 	drmModeRes *res;
-	int drm_fd;
-
-	drm_fd = drm_open_driver(DRIVER_ANY);
 
 	res = drmModeGetResources(drm_fd);
-	igt_assert(res != NULL);
+	if (!res)
+		return;
 
 	for (int i = 0; i < res->count_connectors; i++) {
 		drmModeConnector *c;
@@ -3940,8 +3938,6 @@ void igt_enable_connectors(void)
 
 		drmModeFreeConnector(c);
 	}
-
-	close(drm_fd);
 }
 
 /**

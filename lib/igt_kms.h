@@ -734,7 +734,7 @@ extern void igt_pipe_obj_replace_prop_blob(igt_pipe_t *pipe,
 
 void igt_pipe_refresh(igt_display_t *display, enum pipe pipe, bool force);
 
-void igt_enable_connectors(void);
+void igt_enable_connectors(int drm_fd);
 void igt_reset_connectors(void);
 
 uint32_t kmstest_get_vbl_flag(uint32_t pipe_id);
