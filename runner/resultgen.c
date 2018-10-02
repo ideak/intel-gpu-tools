@@ -809,6 +809,7 @@ static void fill_from_journal(int fd,
 	}
 
 	free(line);
+	fclose(f);
 }
 
 static void override_result_single(struct json_object *obj)
@@ -1073,13 +1074,16 @@ bool generate_results(int dirfd)
 		}
 
 		if (!parse_test_directory(testdirfd, &job_list.entries[i], &settings, &results)) {
+			close(testdirfd);
 			close(resultsfd);
 			return false;
 		}
+		close(testdirfd);
 	}
 
 	json_string = json_object_to_json_string_ext(obj, JSON_C_TO_STRING_PRETTY);
 	write(resultsfd, json_string, strlen(json_string));
+	close(resultsfd);
 	return true;
 }
 

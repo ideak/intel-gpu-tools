@@ -50,6 +50,8 @@ static char *dump_file(int dirfd, char *name)
 	}
 
 	s = read(fd, buf, 255);
+	close(fd);
+
 	if (s < 0) {
 		free(buf);
 		return NULL;
