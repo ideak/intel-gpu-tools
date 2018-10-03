@@ -140,7 +140,8 @@ static bool prune_from_journal(struct job_list_entry *entry, int fd)
 {
 	char *subtest;
 	FILE *f;
-	bool any_pruned = false;
+	size_t pruned = 0;
+	size_t old_count = entry->subtest_count;
 
 	/*
 	 * Each journal line is a subtest that has been started, or
@@ -169,11 +170,19 @@ static bool prune_from_journal(struct job_list_entry *entry, int fd)
 		prune_subtest(entry, subtest);
 
 		free(subtest);
-		any_pruned = true;
+		pruned++;
 	}
 
 	fclose(f);
-	return any_pruned;
+
+	/*
+	 * If we know the subtests we originally wanted to run, check
+	 * if we got an equal amount already.
+	 */
+	if (old_count > 0 && pruned >= old_count)
+		entry->binary[0] = '\0';
+
+	return pruned > 0;
 }
 
 static const char *filenames[_F_LAST] = {
