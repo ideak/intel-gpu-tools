@@ -810,6 +810,60 @@ igt_main
 			igt_require(mkdtemp(dirname) != NULL);
 		}
 
+		igt_subtest("execute-initialize-all-subtests-started") {
+			struct execute_state state;
+			char *argv[] = { "runner",
+					 "--multiple-mode",
+					 "-t", "successtest@first-subtest",
+					 "-t", "successtest@second-subtest",
+					 testdatadir,
+					 dirname,
+			};
+			char journaltext[] = "first-subtest\nsecond-subtest\n";
+
+			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(create_job_list(&list, &settings));
+			igt_assert(list.size == 1);
+			igt_assert(list.entries[0].subtest_count == 2);
+
+			igt_assert(serialize_settings(&settings));
+			igt_assert(serialize_job_list(&list, &settings));
+
+			igt_assert((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0);
+			igt_assert(mkdirat(dirfd, "0", 0770) == 0);
+			igt_assert((subdirfd = openat(dirfd, "0", O_DIRECTORY | O_RDONLY)) >= 0);
+			igt_assert((fd = openat(subdirfd, "journal.txt", O_CREAT | O_WRONLY | O_EXCL, 0660)) >= 0);
+			igt_assert(write(fd, journaltext, strlen(journaltext)) == strlen(journaltext));
+
+			free_job_list(&list);
+			free_settings(&settings);
+			igt_assert(initialize_execute_state_from_resume(dirfd, &state, &settings, &list));
+
+			/* All subtests are in journal, the entry should be considered completed */
+			igt_assert_eq(state.next, 1);
+			igt_assert_eq(list.size, 1);
+			igt_assert_eq(list.entries[0].subtest_count, 4);
+		}
+
+		igt_fixture {
+			close(fd);
+			close(subdirfd);
+			close(dirfd);
+			clear_directory(dirname);
+			free_job_list(&list);
+		}
+	}
+
+	igt_subtest_group {
+		char dirname[] = "tmpdirXXXXXX";
+		struct job_list list;
+		int dirfd = -1, subdirfd = -1, fd = -1;
+
+		igt_fixture {
+			init_job_list(&list);
+			igt_require(mkdtemp(dirname) != NULL);
+		}
+
 		igt_subtest("execute-initialize-subtests-complete") {
 			struct execute_state state;
 			char *argv[] = { "runner",
