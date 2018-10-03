@@ -420,7 +420,7 @@ prepare_output(data_t *data,
 	enum pipe pipe;
 	bool found = false;
 
-	igt_assert(res = drmModeGetResources(data->drm_fd));
+	igt_require(res = drmModeGetResources(data->drm_fd));
 
 	/* The chamelium's default EDID has a lot of resolutions, way more then
 	 * we need to test

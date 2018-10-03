@@ -133,8 +133,11 @@ igt_simple_main
 
 	igt_enable_connectors(data.drm_fd);
 	kmstest_set_vt_graphics_mode();
+
 	igt_display_require(&data.display, data.drm_fd);
 	data.res = drmModeGetResources(data.drm_fd);
+	igt_assert(data.res);
+
 	kmstest_unset_all_crtcs(data.drm_fd, data.res);
 
 	data.max_dotclock = i915_max_dotclock(&data);

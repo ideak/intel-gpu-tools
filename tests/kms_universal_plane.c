@@ -333,6 +333,7 @@ sanity_test_init(sanity_test_t *test, igt_output_t *output, enum pipe pipe)
 			    &test->undersized_fb);
 
 	test->moderes = drmModeGetResources(data->drm_fd);
+	igt_assert(test->moderes);
 }
 
 static void

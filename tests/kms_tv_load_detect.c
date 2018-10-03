@@ -37,8 +37,9 @@ int main(int argc, char **argv)
 
 	igt_fixture {
 		drm_fd = drm_open_driver_master(DRIVER_INTEL);
+
 		res = drmModeGetResources(drm_fd);
-		igt_assert(res);
+		igt_require(res);
 
 		/* find the TV connector */
 		for (int i = 0; i < res->count_connectors; i++) {

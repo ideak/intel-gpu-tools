@@ -63,6 +63,7 @@ static void setup_drm(struct drm_info *drm)
 	drm->debugfs_fd = igt_debugfs_dir(drm->fd);
 
 	drm->res = drmModeGetResources(drm->fd);
+	igt_require(drm->res);
 	igt_assert(drm->res->count_connectors <= MAX_CONNECTORS);
 
 	for (i = 0; i < drm->res->count_connectors; i++)

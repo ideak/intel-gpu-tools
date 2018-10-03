@@ -1355,7 +1355,7 @@ static int run_test(int duration, int flags)
 		igt_require(igt_setup_runtime_pm());
 
 	resources = drmModeGetResources(drm_fd);
-	igt_assert(resources);
+	igt_require(resources);
 
 	/* Count output configurations to scale test runtime. */
 	for (i = 0; i < resources->count_connectors; i++) {
@@ -1412,7 +1412,7 @@ static int run_pair(int duration, int flags)
 	igt_require((flags & TEST_HANG) == 0 || !is_wedged(drm_fd));
 
 	resources = drmModeGetResources(drm_fd);
-	igt_assert(resources);
+	igt_require(resources);
 
 	/* Find a pair of connected displays */
 	for (i = 0; i < resources->count_connectors; i++) {

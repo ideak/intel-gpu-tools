@@ -36,7 +36,9 @@ igt_simple_main
 	int mode_count, connector_id;
 
 	drm_fd = drm_open_driver_master(DRIVER_INTEL);
+
 	res = drmModeGetResources(drm_fd);
+	igt_require(res);
 
 	igt_assert(drmSetClientCap(drm_fd, DRM_CLIENT_CAP_STEREO_3D, 1) >= 0);
 

@@ -280,7 +280,7 @@ static void headless(int fd, uint32_t handle)
 	double n_display, n_headless;
 
 	res = drmModeGetResources(fd);
-	igt_assert(res);
+	igt_require(res);
 
 	/* require at least one connected connector for the test */
 	for (int i = 0; i < res->count_connectors; i++) {

@@ -254,7 +254,9 @@ igt_main
 
 	igt_fixture {
 		drm_fd = drm_open_driver_master(DRIVER_INTEL);
+
 		res = drmModeGetResources(drm_fd);
+		igt_require(res);
 
 		connector = get_connector(drm_fd, res);
 		igt_require(connector);

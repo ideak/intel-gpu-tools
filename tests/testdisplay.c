@@ -156,12 +156,15 @@ static void dump_connectors_fd(int drmfd)
 
 static void dump_crtcs_fd(int drmfd)
 {
-	int i;
-	drmModeRes *mode_resources = drmModeGetResources(drmfd);
+	drmModeRes *mode_resources;
+
+	mode_resources = drmModeGetResources(drmfd);
+	if (!mode_resources)
+		return;
 
 	igt_info("CRTCs:\n");
 	igt_info("id\tfb\tpos\tsize\n");
-	for (i = 0; i < mode_resources->count_crtcs; i++) {
+	for (int i = 0; i < mode_resources->count_crtcs; i++) {
 		drmModeCrtc *crtc;
 
 		crtc = drmModeGetCrtc(drmfd, mode_resources->crtcs[i]);

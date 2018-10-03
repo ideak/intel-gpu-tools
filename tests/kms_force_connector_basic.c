@@ -89,8 +89,9 @@ int main(int argc, char **argv)
 		unsigned vga_connector_id = 0;
 
 		drm_fd = drm_open_driver_master(DRIVER_INTEL);
+
 		res = drmModeGetResources(drm_fd);
-		igt_assert(res);
+		igt_require(res);
 
 		/* find the vga connector */
 		for (int i = 0; i < res->count_connectors; i++) {

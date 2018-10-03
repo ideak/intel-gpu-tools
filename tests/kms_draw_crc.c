@@ -254,6 +254,7 @@ static void setup_environment(void)
 	igt_require(drm_fd >= 0);
 
 	drm_res = drmModeGetResources(drm_fd);
+	igt_require(drm_res);
 	igt_assert(drm_res->count_connectors <= MAX_CONNECTORS);
 
 	for (i = 0; i < drm_res->count_connectors; i++)

@@ -199,6 +199,7 @@ igt_main
 		devid = intel_get_drm_devid(drm_fd);
 
 		drm_res = drmModeGetResources(drm_fd);
+		igt_require(drm_res);
 		igt_assert(drm_res->count_connectors <= MAX_CONNECTORS);
 
 		for (i = 0; i < drm_res->count_connectors; i++)

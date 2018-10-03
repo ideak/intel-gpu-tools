@@ -858,7 +858,7 @@ int main(int argc, char **argv)
 			kmstest_set_vt_graphics_mode();
 
 		drm_resources = drmModeGetResources(drm_fd);
-		igt_assert(drm_resources);
+		igt_require(drm_resources);
 	}
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {

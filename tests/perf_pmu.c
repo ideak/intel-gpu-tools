@@ -1398,7 +1398,7 @@ test_rc6(int gem_fd, unsigned int flags)
 		drmModeRes *res;
 
 		res = drmModeGetResources(gem_fd);
-		igt_assert(res);
+		igt_require(res);
 
 		/* force all connectors off */
 		kmstest_set_vt_graphics_mode();
