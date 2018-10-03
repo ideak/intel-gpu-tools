@@ -49,7 +49,7 @@ struct {
 	uint32_t sf_clip_state;
 } viewport;
 
-/* see shaders/ps/blit.g7a */
+/* see lib/i915/shaders/ps/blit.g7a */
 static const uint32_t ps_kernel[][4] = {
 #if 1
    { 0x0080005a, 0x2f403ae8, 0x3a0000c0, 0x008d0040 },

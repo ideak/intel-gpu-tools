@@ -34,7 +34,7 @@
 #include "gpgpu_fill.h"
 #include "gpu_cmds.h"
 
-/* shaders/gpgpu/gpgpu_fill.gxa */
+/* lib/i915/shaders/gpgpu/gpgpu_fill.gxa */
 static const uint32_t gen7_gpgpu_kernel[][4] = {
 	{ 0x00400001, 0x20200231, 0x00000020, 0x00000000 },
 	{ 0x00000041, 0x20400c21, 0x00000004, 0x00000010 },
