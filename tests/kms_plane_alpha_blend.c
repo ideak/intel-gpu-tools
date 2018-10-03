@@ -266,8 +266,9 @@ static void basic_alpha(data_t *data, enum pipe pipe, igt_plane_t *plane)
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc);
-	igt_pipe_crc_stop(data->pipe_crc);
 	igt_assert_crc_equal(&ref_crc, &crc);
+
+	igt_pipe_crc_stop(data->pipe_crc);
 }
 
 static void argb_opaque(data_t *data, enum pipe pipe, igt_plane_t *plane)
@@ -390,6 +391,7 @@ static void alpha_7efc(data_t *data, enum pipe pipe, igt_plane_t *plane)
 	if (plane->type != DRM_PLANE_TYPE_PRIMARY)
 		igt_plane_set_fb(igt_pipe_get_plane_type(&display->pipes[pipe], DRM_PLANE_TYPE_PRIMARY), &data->gray_fb);
 
+	igt_display_commit2(display, COMMIT_ATOMIC);
 	igt_pipe_crc_start(data->pipe_crc);
 
 	/* for coverage, plane alpha and fb alpha should be swappable, so swap fb and alpha */
@@ -407,6 +409,8 @@ static void alpha_7efc(data_t *data, enum pipe pipe, igt_plane_t *plane)
 		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc);
 		igt_assert_crc_equal(&ref_crc, &crc);
 	}
+
+	igt_pipe_crc_stop(data->pipe_crc);
 }
 
 static void coverage_7efc(data_t *data, enum pipe pipe, igt_plane_t *plane)
@@ -416,6 +420,7 @@ static void coverage_7efc(data_t *data, enum pipe pipe, igt_plane_t *plane)
 	int i;
 
 	igt_plane_set_prop_enum(plane, IGT_PLANE_PIXEL_BLEND_MODE, "Coverage");
+	igt_display_commit2(display, COMMIT_ATOMIC);
 	igt_pipe_crc_start(data->pipe_crc);
 
 	/* for coverage, plane alpha and fb alpha should be swappable, so swap fb and alpha */
@@ -433,6 +438,8 @@ static void coverage_7efc(data_t *data, enum pipe pipe, igt_plane_t *plane)
 		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc);
 		igt_assert_crc_equal(&ref_crc, &crc);
 	}
+
+	igt_pipe_crc_stop(data->pipe_crc);
 }
 
 static void coverage_premult_constant(data_t *data, enum pipe pipe, igt_plane_t *plane)
@@ -462,6 +469,8 @@ static void coverage_premult_constant(data_t *data, enum pipe pipe, igt_plane_t 
 	igt_display_commit2(display, COMMIT_ATOMIC);
 	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc);
 	igt_assert_crc_equal(&ref_crc, &crc);
+
+	igt_pipe_crc_stop(data->pipe_crc);
 }
 
 static void run_test_on_pipe_planes(data_t *data, enum pipe pipe, bool blend,
@@ -554,8 +563,6 @@ igt_main
 	enum pipe pipe;
 
 	igt_fixture {
-		igt_skip_on_simulation();
-
 		data.gfx_fd = drm_open_driver(DRIVER_ANY);
 		igt_require_pipe_crc(data.gfx_fd);
 		igt_display_init(&data.display, data.gfx_fd);
