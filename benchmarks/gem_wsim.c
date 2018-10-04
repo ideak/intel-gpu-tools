@@ -289,6 +289,27 @@ parse_dependencies(unsigned int nr_steps, struct w_step *w, char *_desc)
 	return 0;
 }
 
+static void __attribute__((format(printf, 1, 2)))
+wsim_err(const char *fmt, ...)
+{
+	va_list ap;
+
+	if (!verbose)
+		return;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+}
+
+#define check_arg(cond, fmt, ...) \
+{ \
+	if (cond) { \
+		wsim_err(fmt, __VA_ARGS__); \
+		return NULL; \
+	} \
+}
+
 static struct workload *
 parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 {
@@ -319,14 +340,9 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
-					if (tmp <= 0) {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid delay at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
-
+					check_arg(tmp <= 0,
+						  "Invalid delay at step %u!\n",
+						  nr_steps);
 					step.type = DELAY;
 					step.delay = tmp;
 					goto add_step;
@@ -335,14 +351,9 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
-					if (tmp <= 0) {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid period at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
-
+					check_arg(tmp <= 0,
+						  "Invalid period at step %u!\n",
+						  nr_steps);
 					step.type = PERIOD;
 					step.period = tmp;
 					goto add_step;
@@ -352,25 +363,17 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				while ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
-					if (tmp <= 0 && nr == 0) {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid context at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
+					check_arg(nr == 0 && tmp <= 0,
+						  "Invalid context at step %u!\n",
+						  nr_steps);
+					check_arg(nr > 1,
+						  "Invalid priority format at step %u!\n",
+						  nr_steps);
 
-					if (nr == 0) {
+					if (nr == 0)
 						step.context = tmp;
-					} else if (nr == 1) {
+					else
 						step.priority = tmp;
-					} else {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid priority format at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
 
 					nr++;
 				}
@@ -381,15 +384,10 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
-					if (tmp >= 0 ||
-					    ((int)nr_steps + tmp) < 0) {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid sync target at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
-
+					check_arg(tmp >= 0 ||
+						  ((int)nr_steps + tmp) < 0,
+						  "Invalid sync target at step %u!\n",
+						  nr_steps);
 					step.type = SYNC;
 					step.target = tmp;
 					goto add_step;
@@ -398,14 +396,9 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
-					if (tmp < 0) {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid throttle at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
-
+					check_arg(tmp < 0,
+						  "Invalid throttle at step %u!\n",
+						  nr_steps);
 					step.type = THROTTLE;
 					step.throttle = tmp;
 					goto add_step;
@@ -414,14 +407,9 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
-					if (tmp < 0) {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid qd throttle at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
-
+					check_arg(tmp < 0,
+						  "Invalid qd throttle at step %u!\n",
+						  nr_steps);
 					step.type = QD_THROTTLE;
 					step.throttle = tmp;
 					goto add_step;
@@ -430,14 +418,9 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				if ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
-					if (tmp >= 0) {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid sw fence signal at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
-
+					check_arg(tmp >= 0,
+						  "Invalid sw fence signal at step %u!\n",
+						  nr_steps);
 					step.type = SW_FENCE_SIGNAL;
 					step.target = tmp;
 					goto add_step;
@@ -450,31 +433,20 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				while ((field = strtok_r(fstart, ".", &fctx)) !=
 				    NULL) {
 					tmp = atoi(field);
-					if (tmp <= 0 && nr == 0) {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid context at step %u!\n",
-								nr_steps);
-						return NULL;
-					} else if (tmp < 0 && nr == 1) {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid preemption period at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
+					check_arg(nr == 0 && tmp <= 0,
+						  "Invalid context at step %u!\n",
+						  nr_steps);
+					check_arg(nr == 1 && tmp < 0,
+						  "Invalid preemption period at step %u!\n",
+						  nr_steps);
+					check_arg(nr > 1,
+						  "Invalid preemption format at step %u!\n",
+						  nr_steps);
 
-					if (nr == 0) {
+					if (nr == 0)
 						step.context = tmp;
-					} else if (nr == 1) {
+					else
 						step.period = tmp;
-					} else {
-						if (verbose)
-							fprintf(stderr,
-								"Invalid preemption format at step %u!\n",
-								nr_steps);
-						return NULL;
-					}
 
 					nr++;
 				}
@@ -492,13 +464,8 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			}
 
 			tmp = atoi(field);
-			if (tmp < 0) {
-				if (verbose)
-					fprintf(stderr,
-						"Invalid ctx id at step %u!\n",
-						nr_steps);
-				return NULL;
-			}
+			check_arg(tmp < 0, "Invalid ctx id at step %u!\n",
+				  nr_steps);
 			step.context = tmp;
 
 			valid++;
@@ -519,13 +486,8 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				}
 			}
 
-			if (old_valid == valid) {
-				if (verbose)
-					fprintf(stderr,
-						"Invalid engine id at step %u!\n",
-						nr_steps);
-				return NULL;
-			}
+			check_arg(old_valid == valid,
+				  "Invalid engine id at step %u!\n", nr_steps);
 		}
 
 		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
@@ -535,25 +497,19 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			fstart = NULL;
 
 			tmpl = strtol(field, &sep, 10);
-			if (tmpl <= 0 || tmpl == LONG_MIN || tmpl == LONG_MAX) {
-				if (verbose)
-					fprintf(stderr,
-						"Invalid duration at step %u!\n",
-						nr_steps);
-				return NULL;
-			}
+			check_arg(tmpl <= 0 || tmpl == LONG_MIN ||
+				  tmpl == LONG_MAX,
+				  "Invalid duration at step %u!\n", nr_steps);
 			step.duration.min = tmpl;
 
 			if (sep && *sep == '-') {
 				tmpl = strtol(sep + 1, NULL, 10);
-				if (tmpl <= 0 || tmpl <= step.duration.min ||
-				    tmpl == LONG_MIN || tmpl == LONG_MAX) {
-					if (verbose)
-						fprintf(stderr,
-							"Invalid duration range at step %u!\n",
-							nr_steps);
-					return NULL;
-				}
+				check_arg(tmpl <= 0 ||
+					  tmpl <= step.duration.min ||
+					  tmpl == LONG_MIN ||
+					  tmpl == LONG_MAX,
+					  "Invalid duration range at step %u!\n",
+					  nr_steps);
 				step.duration.max = tmpl;
 			} else {
 				step.duration.max = step.duration.min;
@@ -566,13 +522,8 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			fstart = NULL;
 
 			tmp = parse_dependencies(nr_steps, &step, field);
-			if (tmp < 0) {
-				if (verbose)
-					fprintf(stderr,
-						"Invalid dependency at step %u!\n",
-						nr_steps);
-				return NULL;
-			}
+			check_arg(tmp < 0,
+				  "Invalid dependency at step %u!\n", nr_steps);
 
 			valid++;
 		}
@@ -580,25 +531,16 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
 			fstart = NULL;
 
-			if (strlen(field) != 1 ||
-			    (field[0] != '0' && field[0] != '1')) {
-				if (verbose)
-					fprintf(stderr,
-						"Invalid wait boolean at step %u!\n",
-						nr_steps);
-				return NULL;
-			}
+			check_arg(strlen(field) != 1 ||
+				  (field[0] != '0' && field[0] != '1'),
+				  "Invalid wait boolean at step %u!\n",
+				  nr_steps);
 			step.sync = field[0] - '0';
 
 			valid++;
 		}
 
-		if (valid != 5) {
-			if (verbose)
-				fprintf(stderr, "Invalid record at step %u!\n",
-					nr_steps);
-			return NULL;
-		}
+		check_arg(valid != 5, "Invalid record at step %u!\n", nr_steps);
 
 		step.type = BATCH;
 
@@ -643,15 +585,10 @@ add_step:
 	for (i = 0; i < nr_steps; i++) {
 		for (j = 0; j < steps[i].fence_deps.nr; j++) {
 			tmp = steps[i].idx + steps[i].fence_deps.list[j];
-			if (tmp < 0 || tmp >= i ||
-			    (steps[tmp].type != BATCH &&
-			     steps[tmp].type != SW_FENCE)) {
-				if (verbose)
-					fprintf(stderr,
-						"Invalid dependency target %u!\n",
-						i);
-				return NULL;
-			}
+			check_arg(tmp < 0 || tmp >= i ||
+				  (steps[tmp].type != BATCH &&
+				   steps[tmp].type != SW_FENCE),
+				  "Invalid dependency target %u!\n", i);
 			steps[tmp].emit_fence = -1;
 		}
 	}
@@ -660,14 +597,9 @@ add_step:
 	for (i = 0; i < nr_steps; i++) {
 		if (steps[i].type == SW_FENCE_SIGNAL) {
 			tmp = steps[i].idx + steps[i].target;
-			if (tmp < 0 || tmp >= i ||
-			    steps[tmp].type != SW_FENCE) {
-				if (verbose)
-					fprintf(stderr,
-						"Invalid sw fence target %u!\n",
-						i);
-				return NULL;
-			}
+			check_arg(tmp < 0 || tmp >= i ||
+				  steps[tmp].type != SW_FENCE,
+				  "Invalid sw fence target %u!\n", i);
 		}
 	}
 
