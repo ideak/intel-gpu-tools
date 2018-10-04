@@ -947,6 +947,46 @@ igt_main
 			test_display_crc_all_modes(&data, port,
 						   DRM_FORMAT_XRGB8888, 3);
 
+		connector_subtest("hdmi-crc-argb8888", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_ARGB8888, 1);
+
+		connector_subtest("hdmi-crc-abgr8888", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_ABGR8888, 1);
+
+		connector_subtest("hdmi-crc-xrgb8888", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_XRGB8888, 1);
+
+		connector_subtest("hdmi-crc-xbgr8888", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_XBGR8888, 1);
+
+		connector_subtest("hdmi-crc-rgb888", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_RGB888, 1);
+
+		connector_subtest("hdmi-crc-bgr888", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_BGR888, 1);
+
+		connector_subtest("hdmi-crc-rgb565", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_RGB565, 1);
+
+		connector_subtest("hdmi-crc-bgr565", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_BGR565, 1);
+
+		connector_subtest("hdmi-crc-argb1555", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_ARGB1555, 1);
+
+		connector_subtest("hdmi-crc-xrgb1555", HDMIA)
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_XRGB1555, 1);
+
 		connector_subtest("hdmi-frame-dump", HDMIA)
 			test_display_frame_dump(&data, port);
 	}
