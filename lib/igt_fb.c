@@ -1356,8 +1356,9 @@ static void *map_bo(int fd, struct igt_fb *fb)
 {
 	void *ptr;
 
-	gem_set_domain(fd, fb->gem_handle,
-		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	if (is_i915_device(fd))
+		gem_set_domain(fd, fb->gem_handle,
+			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 	if (fb->is_dumb)
 		ptr = kmstest_dumb_map_buffer(fd, fb->gem_handle, fb->size,
