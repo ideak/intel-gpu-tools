@@ -87,6 +87,7 @@ enum w_type
 struct deps
 {
 	int nr;
+	bool submit_fence;
 	int *list;
 };
 
@@ -253,17 +254,23 @@ parse_dependencies(unsigned int nr_steps, struct w_step *w, char *_desc)
 		   w->data_deps.list == w->fence_deps.list);
 
 	while ((token = strtok_r(tstart, "/", &tctx)) != NULL) {
+		bool submit_fence = false;
 		char *str = token;
 		struct deps *deps;
 		int dep;
 
 		tstart = NULL;
 
-		if (strlen(token) > 1 && token[0] == 'f') {
+		if (str[0] == '-' || (str[0] >= '0' && str[0] <= '9')) {
+			deps = &w->data_deps;
+		} else {
+			if (str[0] == 's')
+				submit_fence = true;
+			else if (str[0] != 'f')
+				return -1;
+
 			deps = &w->fence_deps;
 			str++;
-		} else {
-			deps = &w->data_deps;
 		}
 
 		dep = atoi(str);
@@ -281,6 +288,7 @@ parse_dependencies(unsigned int nr_steps, struct w_step *w, char *_desc)
 					     sizeof(*deps->list) * deps->nr);
 			igt_assert(deps->list);
 			deps->list[deps->nr - 1] = dep;
+			deps->submit_fence = submit_fence;
 		}
 	}
 
@@ -1944,7 +1952,11 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
 		igt_assert(tgt >= 0 && tgt < w->idx);
 		igt_assert(wrk->steps[tgt].emit_fence > 0);
 
-		w->eb.flags |= I915_EXEC_FENCE_IN;
+		if (w->fence_deps.submit_fence)
+			w->eb.flags |= I915_EXEC_FENCE_SUBMIT;
+		else
+			w->eb.flags |= I915_EXEC_FENCE_IN;
+
 		w->eb.rsvd2 = wrk->steps[tgt].emit_fence;
 	}
 

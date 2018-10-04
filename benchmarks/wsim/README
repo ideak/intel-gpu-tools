@@ -114,6 +114,23 @@ runnable. When the second RCS batch completes the standalone fence is signaled
 which allows the two VCS batches to be executed. Finally we wait until the both
 VCS batches have completed before starting the (optional) next iteration.
 
+Submit fences
+-------------
+
+Submit fences are a type of input fence which are signalled when the originating
+batch buffer is submitted to the GPU. (In contrary to normal sync fences, which
+are signalled when completed.)
+
+Submit fences have the identical syntax as the sync fences with the lower-case
+'s' being used to select them. Eg:
+
+  1.RCS.500-1000.0.0
+  1.VCS1.3000.s-1.0
+  1.VCS2.3000.s-2.0
+
+Here VCS1 and VCS2 batches will only be submitted for executing once the RCS
+batch enters the GPU.
+
 Context priority
 ----------------
 
