@@ -66,6 +66,7 @@ lib_deps = [
 	math,
 	realtime,
 	ssl,
+	pixman,
 ]
 
 if libdrm_intel.found()
@@ -79,8 +80,8 @@ if valgrind.found()
 	lib_deps += valgrind
 endif
 
-if gsl.found() and pixman.found()
-	lib_deps += [ gsl, pixman ]
+if gsl.found()
+	lib_deps += [ gsl ]
 	lib_sources += [ 'igt_frame.c', 'igt_audio.c' ]
 endif
 

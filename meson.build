@@ -105,6 +105,7 @@ libprocps = dependency('libprocps', required : true)
 libunwind = dependency('libunwind', required : true)
 libdw = dependency('libdw', required : true)
 ssl = dependency('openssl', required : true)
+pixman = dependency('pixman-1', required : true)
 
 valgrind = null_dep
 valgrindinfo = 'No'
@@ -123,15 +124,11 @@ glib = dependency('glib-2.0', required : true)
 
 gsl = null_dep
 alsa = null_dep
-pixman = null_dep
 if _build_audio or _build_chamelium
 	gsl = dependency('gsl', required : _audio_required or _chamelium_required)
 endif
 if _build_audio
 	alsa = dependency('alsa', required : _audio_required)
-endif
-if _build_chamelium
-	pixman = dependency('pixman-1', required : _chamelium_required)
 endif
 
 audioinfo = 'No'
@@ -164,8 +161,8 @@ endif
 
 chamelium = null_dep
 chameliuminfo = 'No'
-if _build_chamelium and pixman.found() and gsl.found() and xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found()
-	chamelium = declare_dependency(dependencies : [ pixman, xmlrpc,
+if _build_chamelium and gsl.found() and xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found()
+	chamelium = declare_dependency(dependencies : [ xmlrpc,
 							xmlrpc_util, xmlrpc_client])
 	config.set('HAVE_CHAMELIUM', 1)
 	chameliuminfo = 'Yes'

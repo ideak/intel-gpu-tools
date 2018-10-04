@@ -183,6 +183,7 @@ PKG_CHECK_MODULES(XRANDR, xrandr >= 1.3, AC_DEFINE(HAVE_XRANDR, 1, [Have libXran
 PKG_CHECK_MODULES(CAIRO, [cairo >= 1.12.0])
 PKG_CHECK_MODULES(LIBUDEV, [libudev])
 PKG_CHECK_MODULES(GLIB, [glib-2.0])
+PKG_CHECK_MODULES(PIXMAN, [pixman-1])
 PKG_CHECK_MODULES(GSL, [gsl], [gsl=yes], [gsl=no])
 AM_CONDITIONAL(HAVE_GSL, [test "x$gsl" = xyes])
 
@@ -206,8 +207,6 @@ if test "x$enable_chamelium" = xyes; then
 			AC_MSG_ERROR([Failed to find xmlrpc, required by chamelium.])
 		fi
 	fi
-	PKG_CHECK_MODULES(PIXMAN, pixman-1, [],
-			  [AC_MSG_ERROR([Failed to find pixman, required by chamelium.])])
 	if test x"$gsl" != xyes; then
 		AC_MSG_ERROR([Failed to find gsl, required by chamelium.])
 	fi

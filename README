@@ -145,6 +145,7 @@ the default configuration (package names may vary):
 	libcairo2-dev
 	libdrm-dev
 	libkmod-dev
+	libpixman-1-dev
 	libpciaccess-dev
 	libprocps-dev
 	libunwind-dev
@@ -157,7 +158,6 @@ The following dependencies are required for building chamelium support
 (package names may vary):
 
 	libxmlrpc-core-c3-dev
-	libpixman-1-dev
 	libudev-dev
 	libglib2.0-dev
 	libgsl-dev
