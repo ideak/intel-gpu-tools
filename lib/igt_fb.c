@@ -1392,12 +1392,38 @@ static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
 struct fb_convert_blit_upload {
 	struct fb_blit_upload base;
 
-	struct {
-		uint64_t size;
-		uint8_t *map;
-		unsigned stride;
-	} rgb24;
+	struct igt_fb shadow_fb;
+	uint8_t *shadow_ptr;
 };
+
+static void *igt_fb_create_cairo_shadow_buffer(int fd,
+					       unsigned int width,
+					       unsigned int height,
+					       struct igt_fb *shadow)
+{
+	void *ptr;
+
+	igt_assert(shadow);
+
+	fb_init(shadow, fd, width, height,
+		DRM_FORMAT_RGB888, LOCAL_DRM_FORMAT_MOD_NONE,
+		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
+
+	shadow->strides[0] = ALIGN(width * 4, 16);
+	shadow->size = ALIGN(shadow->strides[0] * height,
+			     sysconf(_SC_PAGESIZE));
+	ptr = mmap(NULL, shadow->size, PROT_READ | PROT_WRITE,
+		   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	igt_assert(ptr != MAP_FAILED);
+
+	return ptr;
+}
+
+static void igt_fb_destroy_cairo_shadow_buffer(struct igt_fb *shadow,
+					       void *ptr)
+{
+	munmap(ptr, shadow->size);
+}
 
 static uint8_t clamprgb(float val)
 {
@@ -1423,8 +1449,9 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 {
 	int i, j;
 	const uint8_t *y, *uv;
-	uint8_t *rgb24 = blit->rgb24.map;
-	unsigned rgb24_stride = blit->rgb24.stride, planar_stride = blit->base.linear.fb.strides[0];
+	uint8_t *rgb24 = blit->shadow_ptr;
+	unsigned rgb24_stride = blit->shadow_fb.strides[0];
+	unsigned planar_stride = blit->base.linear.fb.strides[0];
 	uint8_t *buf = malloc(blit->base.linear.fb.size);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
 						    fb->color_range);
@@ -1532,8 +1559,8 @@ static void convert_rgb24_to_nv12(struct igt_fb *fb, struct fb_convert_blit_uplo
 	int i, j;
 	uint8_t *y = &blit->base.linear.map[blit->base.linear.fb.offsets[0]];
 	uint8_t *uv = &blit->base.linear.map[blit->base.linear.fb.offsets[1]];
-	const uint8_t *rgb24 = blit->rgb24.map;
-	unsigned rgb24_stride = blit->rgb24.stride;
+	const uint8_t *rgb24 = blit->shadow_ptr;
+	unsigned rgb24_stride = blit->shadow_fb.strides[0];
 	unsigned planar_stride = blit->base.linear.fb.strides[0];
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
 						    fb->color_range);
@@ -1660,8 +1687,9 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 {
 	int i, j;
 	const uint8_t *yuyv;
-	uint8_t *rgb24 = blit->rgb24.map;
-	unsigned rgb24_stride = blit->rgb24.stride, yuyv_stride = blit->base.linear.fb.strides[0];
+	uint8_t *rgb24 = blit->shadow_ptr;
+	unsigned rgb24_stride = blit->shadow_fb.strides[0];
+	unsigned yuyv_stride = blit->base.linear.fb.strides[0];
 	uint8_t *buf = malloc(blit->base.linear.fb.size);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
 						    fb->color_range);
@@ -1719,8 +1747,8 @@ static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_uplo
 {
 	int i, j;
 	uint8_t *yuyv = blit->base.linear.map;
-	const uint8_t *rgb24 = blit->rgb24.map;
-	unsigned rgb24_stride = blit->rgb24.stride;
+	const uint8_t *rgb24 = blit->shadow_ptr;
+	unsigned rgb24_stride = blit->shadow_fb.strides[0];
 	unsigned yuyv_stride = blit->base.linear.fb.strides[0];
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
 						    fb->color_range);
@@ -1788,7 +1816,7 @@ static void destroy_cairo_surface__convert(void *arg)
 			     fb->drm_format);
 	}
 
-	munmap(blit->rgb24.map, blit->rgb24.size);
+	igt_fb_destroy_cairo_shadow_buffer(&blit->shadow_fb, blit->shadow_ptr);
 
 	if (blit->base.linear.fb.gem_handle)
 		free_linear_mapping(&blit->base);
@@ -1803,14 +1831,16 @@ static void destroy_cairo_surface__convert(void *arg)
 static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 {
 	struct fb_convert_blit_upload *blit = malloc(sizeof(*blit));
+
 	igt_assert(blit);
 
 	blit->base.fd = fd;
 	blit->base.fb = fb;
-	blit->rgb24.stride = ALIGN(fb->width * 4, 16);
-	blit->rgb24.size = ALIGN((uint64_t) blit->rgb24.stride * fb->height, sysconf(_SC_PAGESIZE));
-	blit->rgb24.map = mmap(NULL, blit->rgb24.size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	igt_assert(blit->rgb24.map != MAP_FAILED);
+	blit->shadow_ptr = igt_fb_create_cairo_shadow_buffer(fd,
+							     fb->width,
+							     fb->height,
+							     &blit->shadow_fb);
+	igt_assert(blit->shadow_ptr);
 
 	if (fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
 	    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED) {
@@ -1841,10 +1871,10 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	}
 
 	fb->cairo_surface =
-		cairo_image_surface_create_for_data(blit->rgb24.map,
+		cairo_image_surface_create_for_data(blit->shadow_ptr,
 						    CAIRO_FORMAT_RGB24,
 						    fb->width, fb->height,
-						    blit->rgb24.stride);
+						    blit->shadow_fb.strides[0]);
 
 	cairo_surface_set_user_data(fb->cairo_surface,
 				    (cairo_user_data_key_t *)create_cairo_surface__convert,
