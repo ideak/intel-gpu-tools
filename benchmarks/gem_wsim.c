@@ -318,6 +318,18 @@ wsim_err(const char *fmt, ...)
 	} \
 }
 
+static int str_to_engine(const char *str)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(ring_str_map); i++) {
+		if (!strcasecmp(str, ring_str_map[i]))
+			return i;
+	}
+
+	return -1;
+}
+
 static struct workload *
 parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 {
@@ -480,22 +492,18 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 		}
 
 		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
-			unsigned int old_valid = valid;
-
 			fstart = NULL;
 
-			for (i = 0; i < ARRAY_SIZE(ring_str_map); i++) {
-				if (!strcasecmp(field, ring_str_map[i])) {
-					step.engine = i;
-					if (step.engine == BCS)
-						bcs_used = true;
-					valid++;
-					break;
-				}
-			}
-
-			check_arg(old_valid == valid,
+			i = str_to_engine(field);
+			check_arg(i < 0,
 				  "Invalid engine id at step %u!\n", nr_steps);
+
+			valid++;
+
+			step.engine = i;
+
+			if (step.engine == BCS)
+				bcs_used = true;
 		}
 
 		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
