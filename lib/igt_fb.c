@@ -1682,8 +1682,7 @@ static const unsigned char *yuyv_swizzle(uint32_t format)
 	}
 }
 
-static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_upload *blit,
-				  const unsigned char swz[4])
+static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
 {
 	int i, j;
 	const uint8_t *yuyv;
@@ -1693,6 +1692,7 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	uint8_t *buf = malloc(blit->base.linear.fb.size);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
 						    fb->color_range);
+	const unsigned char *swz = yuyv_swizzle(fb->drm_format);
 
 	/*
 	 * Reading from the BO is awfully slow because of lack of read caching,
@@ -1742,8 +1742,7 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	free(buf);
 }
 
-static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_upload *blit,
-				  const unsigned char swz[4])
+static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
 {
 	int i, j;
 	uint8_t *yuyv = blit->base.linear.map;
@@ -1752,6 +1751,7 @@ static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_uplo
 	unsigned yuyv_stride = blit->base.linear.fb.strides[0];
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
 						    fb->color_range);
+	const unsigned char *swz = yuyv_swizzle(fb->drm_format);
 
 	igt_assert_f(fb->drm_format == DRM_FORMAT_YUYV ||
 		     fb->drm_format == DRM_FORMAT_YVYU ||
@@ -1809,7 +1809,7 @@ static void destroy_cairo_surface__convert(void *arg)
 	case DRM_FORMAT_YVYU:
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
-		convert_rgb24_to_yuyv(fb, blit, yuyv_swizzle(fb->drm_format));
+		convert_rgb24_to_yuyv(fb, blit);
 		break;
 	default:
 		igt_assert_f(false, "Conversion not implemented for formats 0x%x\n",
@@ -1863,7 +1863,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	case DRM_FORMAT_YVYU:
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
-		convert_yuyv_to_rgb24(fb, blit, yuyv_swizzle(fb->drm_format));
+		convert_yuyv_to_rgb24(fb, blit);
 		break;
 	default:
 		igt_assert_f(false, "Conversion not implemented for formats 0x%x\n",
