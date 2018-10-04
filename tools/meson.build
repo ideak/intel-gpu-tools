@@ -36,6 +36,7 @@ tools_progs = [
 	'intel_watermark',
 	'intel_gem_info',
 	'intel_gvtg_test',
+	'dpcd_reg',
 ]
 tool_deps = igt_deps
 

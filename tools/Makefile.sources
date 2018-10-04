@@ -7,6 +7,7 @@ noinst_PROGRAMS =		\
 
 tools_prog_lists =		\
 	igt_stats		\
+	dpcd_reg		\
 	intel_audio_dump	\
 	intel_reg		\
 	intel_backlight		\
