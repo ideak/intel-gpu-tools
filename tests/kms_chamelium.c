@@ -524,22 +524,26 @@ static int chamelium_get_pattern_fb(data_t *data, drmModeModeInfo *mode,
 
 static void do_test_display_crc(data_t *data, struct chamelium_port *port,
 				igt_output_t *output, drmModeModeInfo *mode,
-				int count)
+				uint32_t fourcc, int count)
 {
 	igt_crc_t *crc;
 	igt_crc_t *expected_crc;
 	struct chamelium_fb_crc_async_data *fb_crc;
-	struct igt_fb fb;
+	struct igt_fb frame_fb, fb;
 	int i, fb_id, captured_frame_count;
+	int frame_id;
 
 	fb_id = chamelium_get_pattern_fb(data, mode,
 					 DRM_FORMAT_XRGB8888, &fb);
 	igt_assert(fb_id > 0);
 
+	frame_id = igt_fb_convert(&frame_fb, &fb, fourcc);
+	igt_assert(frame_id > 0);
+
 	fb_crc = chamelium_calculate_fb_crc_async_start(data->drm_fd,
 							&fb);
 
-	enable_output(data, port, output, mode, &fb);
+	enable_output(data, port, output, mode, &frame_fb);
 
 	/* We want to keep the display running for a little bit, since
 	 * there's always the potential the driver isn't able to keep
@@ -563,11 +567,12 @@ static void do_test_display_crc(data_t *data, struct chamelium_port *port,
 	free(expected_crc);
 	free(crc);
 
+	igt_remove_fb(data->drm_fd, &frame_fb);
 	igt_remove_fb(data->drm_fd, &fb);
 }
 
 static void test_display_crc_one_mode(data_t *data, struct chamelium_port *port,
-				      int count)
+				      uint32_t fourcc, int count)
 {
 	igt_output_t *output;
 	drmModeConnector *connector;
@@ -580,13 +585,13 @@ static void test_display_crc_one_mode(data_t *data, struct chamelium_port *port,
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
-	do_test_display_crc(data, port, output, &connector->modes[0], count);
+	do_test_display_crc(data, port, output, &connector->modes[0], fourcc, count);
 
 	drmModeFreeConnector(connector);
 }
 
 static void test_display_crc_all_modes(data_t *data, struct chamelium_port *port,
-					int count)
+				       uint32_t fourcc, int count)
 {
 	igt_output_t *output;
 	igt_plane_t *primary;
@@ -603,7 +608,7 @@ static void test_display_crc_all_modes(data_t *data, struct chamelium_port *port
 	for (i = 0; i < connector->count_modes; i++) {
 		drmModeModeInfo *mode = &connector->modes[i];
 
-		do_test_display_crc(data, port, output, mode, count);
+		do_test_display_crc(data, port, output, mode, fourcc, count);
 	}
 
 	drmModeFreeConnector(connector);
@@ -864,13 +869,16 @@ igt_main
 							edid_id, alt_edid_id);
 
 		connector_subtest("dp-crc-single", DisplayPort)
-			test_display_crc_all_modes(&data, port, 1);
+			test_display_crc_all_modes(&data, port,
+						   DRM_FORMAT_XRGB8888, 1);
 
 		connector_subtest("dp-crc-fast", DisplayPort)
-			test_display_crc_one_mode(&data, port, 1);
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_XRGB8888, 1);
 
 		connector_subtest("dp-crc-multiple", DisplayPort)
-			test_display_crc_all_modes(&data, port, 3);
+			test_display_crc_all_modes(&data, port,
+						   DRM_FORMAT_XRGB8888, 3);
 
 		connector_subtest("dp-frame-dump", DisplayPort)
 			test_display_frame_dump(&data, port);
@@ -928,13 +936,16 @@ igt_main
 							edid_id, alt_edid_id);
 
 		connector_subtest("hdmi-crc-single", HDMIA)
-			test_display_crc_all_modes(&data, port, 1);
+			test_display_crc_all_modes(&data, port,
+						   DRM_FORMAT_XRGB8888, 1);
 
 		connector_subtest("hdmi-crc-fast", HDMIA)
-			test_display_crc_one_mode(&data, port, 1);
+			test_display_crc_one_mode(&data, port,
+						  DRM_FORMAT_XRGB8888, 1);
 
 		connector_subtest("hdmi-crc-multiple", HDMIA)
-			test_display_crc_all_modes(&data, port, 3);
+			test_display_crc_all_modes(&data, port,
+						   DRM_FORMAT_XRGB8888, 3);
 
 		connector_subtest("hdmi-frame-dump", HDMIA)
 			test_display_frame_dump(&data, port);
