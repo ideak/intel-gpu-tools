@@ -1445,28 +1445,38 @@ static void write_rgb(uint8_t *rgb24, const struct igt_vec4 *rgb)
 	rgb24[0] = clamprgb(rgb->d[2]);
 }
 
-static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
+struct fb_convert_buf {
+	void			*ptr;
+	struct igt_fb		*fb;
+};
+
+struct fb_convert {
+	struct fb_convert_buf	dst;
+	struct fb_convert_buf	src;
+};
+
+static void convert_nv12_to_rgb24(struct fb_convert *cvt)
 {
 	int i, j;
 	const uint8_t *y, *uv;
-	uint8_t *rgb24 = blit->shadow_ptr;
-	unsigned rgb24_stride = blit->shadow_fb.strides[0];
-	unsigned planar_stride = blit->base.linear.fb.strides[0];
-	uint8_t *buf = malloc(blit->base.linear.fb.size);
-	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
-						    fb->color_range);
+	uint8_t *rgb24 = cvt->dst.ptr;
+	unsigned int rgb24_stride = cvt->dst.fb->strides[0];
+	unsigned int planar_stride = cvt->src.fb->strides[0];
+	uint8_t *buf = malloc(cvt->src.fb->size);
+	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
+						    cvt->src.fb->color_range);
 
 	/*
 	 * Reading from the BO is awfully slow because of lack of read caching,
 	 * it's faster to copy the whole BO to a temporary buffer and convert
 	 * from there.
 	 */
-	igt_memcpy_from_wc(buf, blit->base.linear.map, blit->base.linear.fb.size);
-	y = &buf[blit->base.linear.fb.offsets[0]];
-	uv = &buf[blit->base.linear.fb.offsets[1]];
+	igt_memcpy_from_wc(buf, cvt->src.ptr, cvt->src.fb->size);
+	y = cvt->src.ptr + cvt->src.fb->offsets[0];
+	uv = cvt->src.ptr + cvt->src.fb->offsets[1];
 
-	for (i = 0; i < fb->height / 2; i++) {
-		for (j = 0; j < fb->width / 2; j++) {
+	for (i = 0; i < cvt->dst.fb->height / 2; i++) {
+		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
 			/* Convert 2x2 pixel blocks */
 			struct igt_vec4 yuv[4];
 			struct igt_vec4 rgb[4];
@@ -1491,7 +1501,7 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 			write_rgb(&rgb24[j * 8 + 4 + rgb24_stride], &rgb[3]);
 		}
 
-		if (fb->width & 1) {
+		if (cvt->dst.fb->width & 1) {
 			/* Convert 1x2 pixel block */
 			struct igt_vec4 yuv[2];
 			struct igt_vec4 rgb[2];
@@ -1515,9 +1525,9 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 		uv += planar_stride;
 	}
 
-	if (fb->height & 1) {
+	if (cvt->dst.fb->height & 1) {
 		/* Convert last row */
-		for (j = 0; j < fb->width / 2; j++) {
+		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
 			/* Convert 2x1 pixel blocks */
 			struct igt_vec4 yuv[2];
 			struct igt_vec4 rgb[2];
@@ -1535,7 +1545,7 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 			write_rgb(&rgb24[j * 8 + 4], &rgb[0]);
 		}
 
-		if (fb->width & 1) {
+		if (cvt->dst.fb->width & 1) {
 			/* Convert single pixel */
 			struct igt_vec4 yuv;
 			struct igt_vec4 rgb;
@@ -1554,22 +1564,22 @@ static void convert_nv12_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	free(buf);
 }
 
-static void convert_rgb24_to_nv12(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
+static void convert_rgb24_to_nv12(struct fb_convert *cvt)
 {
 	int i, j;
-	uint8_t *y = &blit->base.linear.map[blit->base.linear.fb.offsets[0]];
-	uint8_t *uv = &blit->base.linear.map[blit->base.linear.fb.offsets[1]];
-	const uint8_t *rgb24 = blit->shadow_ptr;
-	unsigned rgb24_stride = blit->shadow_fb.strides[0];
-	unsigned planar_stride = blit->base.linear.fb.strides[0];
-	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
-						    fb->color_range);
+	uint8_t *y = cvt->dst.ptr + cvt->dst.fb->offsets[0];
+	uint8_t *uv = cvt->dst.ptr + cvt->dst.fb->offsets[1];
+	const uint8_t *rgb24 = cvt->src.ptr;
+	unsigned rgb24_stride = cvt->src.fb->strides[0];
+	unsigned planar_stride = cvt->dst.fb->strides[0];
+	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->dst.fb->color_encoding,
+						    cvt->dst.fb->color_range);
 
-	igt_assert_f(fb->drm_format == DRM_FORMAT_NV12,
+	igt_assert_f(cvt->dst.fb->drm_format == DRM_FORMAT_NV12,
 		     "Conversion not implemented for !NV12 planar formats\n");
 
-	for (i = 0; i < fb->height / 2; i++) {
-		for (j = 0; j < fb->width / 2; j++) {
+	for (i = 0; i < cvt->dst.fb->height / 2; i++) {
+		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
 			/* Convert 2x2 pixel blocks */
 			struct igt_vec4 rgb[4];
 			struct igt_vec4 yuv[4];
@@ -1598,7 +1608,7 @@ static void convert_rgb24_to_nv12(struct igt_fb *fb, struct fb_convert_blit_uplo
 			uv[j * 2 + 1] = (yuv[0].d[2] + yuv[2].d[2]) / 2.0f;
 		}
 
-		if (fb->width & 1) {
+		if (cvt->dst.fb->width & 1) {
 			/* Convert 1x2 pixel block */
 			struct igt_vec4 rgb[2];
 			struct igt_vec4 yuv[2];
@@ -1627,8 +1637,8 @@ static void convert_rgb24_to_nv12(struct igt_fb *fb, struct fb_convert_blit_uplo
 	}
 
 	/* Last row cannot be interpolated between 2 pixels, take the single value */
-	if (fb->height & 1) {
-		for (j = 0; j < fb->width / 2; j++) {
+	if (cvt->dst.fb->height & 1) {
+		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
 			/* Convert 2x1 pixel blocks */
 			struct igt_vec4 rgb[2];
 			struct igt_vec4 yuv[2];
@@ -1645,7 +1655,7 @@ static void convert_rgb24_to_nv12(struct igt_fb *fb, struct fb_convert_blit_uplo
 			uv[j * 2 + 1] = yuv[0].d[2];
 		}
 
-		if (fb->width & 1) {
+		if (cvt->dst.fb->width & 1) {
 			/* Convert single pixel */
 			struct igt_vec4 rgb;
 			struct igt_vec4 yuv;
@@ -1682,28 +1692,28 @@ static const unsigned char *yuyv_swizzle(uint32_t format)
 	}
 }
 
-static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
+static void convert_yuyv_to_rgb24(struct fb_convert *cvt)
 {
 	int i, j;
 	const uint8_t *yuyv;
-	uint8_t *rgb24 = blit->shadow_ptr;
-	unsigned rgb24_stride = blit->shadow_fb.strides[0];
-	unsigned yuyv_stride = blit->base.linear.fb.strides[0];
-	uint8_t *buf = malloc(blit->base.linear.fb.size);
-	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(fb->color_encoding,
-						    fb->color_range);
-	const unsigned char *swz = yuyv_swizzle(fb->drm_format);
+	uint8_t *rgb24 = cvt->dst.ptr;
+	unsigned int rgb24_stride = cvt->dst.fb->strides[0];
+	unsigned int yuyv_stride = cvt->src.fb->strides[0];
+	uint8_t *buf = malloc(cvt->src.fb->size);
+	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
+						    cvt->src.fb->color_range);
+	const unsigned char *swz = yuyv_swizzle(cvt->src.fb->drm_format);
 
 	/*
 	 * Reading from the BO is awfully slow because of lack of read caching,
 	 * it's faster to copy the whole BO to a temporary buffer and convert
 	 * from there.
 	 */
-	igt_memcpy_from_wc(buf, blit->base.linear.map, blit->base.linear.fb.size);
+	igt_memcpy_from_wc(buf, cvt->src.ptr, cvt->src.fb->size);
 	yuyv = buf;
 
-	for (i = 0; i < fb->height; i++) {
-		for (j = 0; j < fb->width / 2; j++) {
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
 			/* Convert 2x1 pixel blocks */
 			struct igt_vec4 yuv[2];
 			struct igt_vec4 rgb[2];
@@ -1721,7 +1731,7 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 			write_rgb(&rgb24[j * 8 + 4], &rgb[1]);
 		}
 
-		if (fb->width & 1) {
+		if (cvt->dst.fb->width & 1) {
 			struct igt_vec4 yuv;
 			struct igt_vec4 rgb;
 
@@ -1742,25 +1752,25 @@ static void convert_yuyv_to_rgb24(struct igt_fb *fb, struct fb_convert_blit_uplo
 	free(buf);
 }
 
-static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_upload *blit)
+static void convert_rgb24_to_yuyv(struct fb_convert *cvt)
 {
 	int i, j;
-	uint8_t *yuyv = blit->base.linear.map;
-	const uint8_t *rgb24 = blit->shadow_ptr;
-	unsigned rgb24_stride = blit->shadow_fb.strides[0];
-	unsigned yuyv_stride = blit->base.linear.fb.strides[0];
-	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(fb->color_encoding,
-						    fb->color_range);
-	const unsigned char *swz = yuyv_swizzle(fb->drm_format);
+	uint8_t *yuyv = cvt->dst.ptr;
+	const uint8_t *rgb24 = cvt->src.ptr;
+	unsigned rgb24_stride = cvt->src.fb->strides[0];
+	unsigned yuyv_stride = cvt->dst.fb->strides[0];
+	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->dst.fb->color_encoding,
+						    cvt->dst.fb->color_range);
+	const unsigned char *swz = yuyv_swizzle(cvt->dst.fb->drm_format);
 
-	igt_assert_f(fb->drm_format == DRM_FORMAT_YUYV ||
-		     fb->drm_format == DRM_FORMAT_YVYU ||
-		     fb->drm_format == DRM_FORMAT_UYVY ||
-		     fb->drm_format == DRM_FORMAT_VYUY,
+	igt_assert_f(cvt->dst.fb->drm_format == DRM_FORMAT_YUYV ||
+		     cvt->dst.fb->drm_format == DRM_FORMAT_YVYU ||
+		     cvt->dst.fb->drm_format == DRM_FORMAT_UYVY ||
+		     cvt->dst.fb->drm_format == DRM_FORMAT_VYUY,
 		     "Conversion not implemented for !YUYV planar formats\n");
 
-	for (i = 0; i < fb->height; i++) {
-		for (j = 0; j < fb->width / 2; j++) {
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
 			/* Convert 2x1 pixel blocks */
 			struct igt_vec4 rgb[2];
 			struct igt_vec4 yuv[2];
@@ -1777,7 +1787,7 @@ static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_uplo
 			yuyv[j * 4 + swz[3]] = (yuv[0].d[2] + yuv[1].d[2]) / 2.0f;
 		}
 
-		if (fb->width & 1) {
+		if (cvt->dst.fb->width & 1) {
 			struct igt_vec4 rgb;
 			struct igt_vec4 yuv;
 
@@ -1795,27 +1805,56 @@ static void convert_rgb24_to_yuyv(struct igt_fb *fb, struct fb_convert_blit_uplo
 	}
 }
 
+static void fb_convert(struct fb_convert *cvt)
+{
+	if (cvt->dst.fb->drm_format == DRM_FORMAT_RGB888) {
+		switch (cvt->src.fb->drm_format) {
+		case DRM_FORMAT_NV12:
+			convert_nv12_to_rgb24(cvt);
+			return;
+		case DRM_FORMAT_YUYV:
+		case DRM_FORMAT_YVYU:
+		case DRM_FORMAT_UYVY:
+		case DRM_FORMAT_VYUY:
+			convert_yuyv_to_rgb24(cvt);
+			return;
+		}
+	} else if (cvt->src.fb->drm_format == DRM_FORMAT_RGB888) {
+		switch (cvt->dst.fb->drm_format) {
+		case DRM_FORMAT_NV12:
+			convert_rgb24_to_nv12(cvt);
+			return;
+		case DRM_FORMAT_YUYV:
+		case DRM_FORMAT_YVYU:
+		case DRM_FORMAT_UYVY:
+		case DRM_FORMAT_VYUY:
+			convert_rgb24_to_yuyv(cvt);
+			return;
+		}
+	}
+
+	igt_assert_f(false,
+		     "Conversion not implemented (from format 0x%x to 0x%x)\n",
+		     cvt->src.fb->drm_format, cvt->dst.fb->drm_format);
+}
+
 static void destroy_cairo_surface__convert(void *arg)
 {
 	struct fb_convert_blit_upload *blit = arg;
 	struct igt_fb *fb = blit->base.fb;
+	struct fb_convert cvt = {
+		.dst	= {
+			.ptr	= blit->base.linear.map,
+			.fb	= blit->base.fb,
+		},
 
-	/* Convert linear rgb back! */
-	switch(fb->drm_format) {
-	case DRM_FORMAT_NV12:
-		convert_rgb24_to_nv12(fb, blit);
-		break;
-	case DRM_FORMAT_YUYV:
-	case DRM_FORMAT_YVYU:
-	case DRM_FORMAT_UYVY:
-	case DRM_FORMAT_VYUY:
-		convert_rgb24_to_yuyv(fb, blit);
-		break;
-	default:
-		igt_assert_f(false, "Conversion not implemented for formats 0x%x\n",
-			     fb->drm_format);
-	}
+		.src	= {
+			.ptr	= blit->shadow_ptr,
+			.fb	= &blit->shadow_fb,
+		},
+	};
 
+	fb_convert(&cvt);
 	igt_fb_destroy_cairo_shadow_buffer(&blit->shadow_fb, blit->shadow_ptr);
 
 	if (blit->base.linear.fb.gem_handle)
@@ -1831,6 +1870,7 @@ static void destroy_cairo_surface__convert(void *arg)
 static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 {
 	struct fb_convert_blit_upload *blit = malloc(sizeof(*blit));
+	struct fb_convert cvt = { 0 };
 
 	igt_assert(blit);
 
@@ -1854,21 +1894,11 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 		memcpy(blit->base.linear.fb.offsets, fb->offsets, sizeof(fb->offsets));
 	}
 
-	/* Convert to linear rgb! */
-	switch(fb->drm_format) {
-	case DRM_FORMAT_NV12:
-		convert_nv12_to_rgb24(fb, blit);
-		break;
-	case DRM_FORMAT_YUYV:
-	case DRM_FORMAT_YVYU:
-	case DRM_FORMAT_UYVY:
-	case DRM_FORMAT_VYUY:
-		convert_yuyv_to_rgb24(fb, blit);
-		break;
-	default:
-		igt_assert_f(false, "Conversion not implemented for formats 0x%x\n",
-			     fb->drm_format);
-	}
+	cvt.dst.ptr = blit->shadow_ptr;
+	cvt.dst.fb = &blit->shadow_fb;
+	cvt.src.ptr = blit->base.linear.map;
+	cvt.src.fb = blit->base.fb;
+	fb_convert(&cvt);
 
 	fb->cairo_surface =
 		cairo_image_surface_create_for_data(blit->shadow_ptr,
