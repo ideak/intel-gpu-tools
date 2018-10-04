@@ -168,19 +168,6 @@ static void set_mode_for_one_screen(struct drm_info *drm, struct igt_fb *fb,
 	igt_assert_eq(rc, 0);
 }
 
-static bool psr_supported_on_chipset(int debugfs_fd)
-{
-	char buf[PSR_STATUS_MAX_LEN];
-	int ret;
-
-	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status",
-				      buf, sizeof(buf));
-	if (ret < 0)
-		return false;
-
-	return strstr(buf, "Sink_Support: yes\n");
-}
-
 static bool connector_can_psr(drmModeConnectorPtr connector)
 {
 	return (connector->connector_type == DRM_MODE_CONNECTOR_eDP);
@@ -239,7 +226,7 @@ struct feature {
 	.connector_possible_fn = connector_can_fbc,
 	.enable = fbc_modparam_enable,
 }, psr = {
-	.supported_on_chipset = psr_supported_on_chipset,
+	.supported_on_chipset = psr_sink_support,
 	.wait_until_enabled = psr_wait_until_enabled,
 	.connector_possible_fn = connector_can_psr,
 	.enable = psr_debugfs_enable,

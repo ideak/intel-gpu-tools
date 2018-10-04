@@ -1417,17 +1417,6 @@ static void teardown_fbc(void)
 {
 }
 
-static bool psr_sink_has_support(void)
-{
-	char buf[PSR_STATUS_MAX_LEN];
-
-	debugfs_read("i915_edp_psr_status", buf);
-	if (*buf == '\0') /* !HAS_PSR -> -ENODEV*/
-		return false;
-
-	return strstr(buf, "Sink_Support: yes\n");
-}
-
 static void setup_psr(void)
 {
 	if (prim_mode_params.output->config.connector->connector_type !=
@@ -1436,7 +1425,7 @@ static void setup_psr(void)
 		return;
 	}
 
-	if (!psr_sink_has_support()) {
+	if (!psr_sink_support(drm.debugfs)) {
 		igt_info("Can't test PSR: not supported by sink.\n");
 		return;
 	}

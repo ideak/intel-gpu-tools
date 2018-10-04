@@ -129,3 +129,13 @@ bool psr_disable(int debugfs_fd)
 {
 	return psr_set(debugfs_fd, false);
 }
+
+bool psr_sink_support(int debugfs_fd)
+{
+	char buf[PSR_STATUS_MAX_LEN];
+	int ret;
+
+	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
+				      sizeof(buf));
+	return ret > 0 && strstr(buf, "Sink_Support: yes\n");
+}

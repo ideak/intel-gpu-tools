@@ -34,5 +34,6 @@ bool psr_wait_entry(int debugfs_fd);
 bool psr_wait_exit(int debugfs_fd);
 bool psr_enable(int debugfs_fd);
 bool psr_disable(int debugfs_fd);
+bool psr_sink_support(int debugfs_fd);
 
 #endif
