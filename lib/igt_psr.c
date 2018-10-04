@@ -32,8 +32,8 @@ static bool psr_active(int debugfs_fd, bool check_active)
 
 	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				sizeof(buf));
-	active = strstr(buf, "HW Enabled & Active bit: yes\n") &&
-		(strstr(buf, "SRDENT") || strstr(buf, "SLEEP"));
+
+	active = strstr(buf, "SRDENT") || strstr(buf, "SLEEP");
 	return check_active ? active : !active;
 }
 
@@ -137,5 +137,6 @@ bool psr_sink_support(int debugfs_fd)
 
 	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				      sizeof(buf));
-	return ret > 0 && strstr(buf, "Sink_Support: yes\n");
+	return ret > 0 && (strstr(buf, "Sink_Support: yes\n") ||
+			   strstr(buf, "Sink support: yes"));
 }
