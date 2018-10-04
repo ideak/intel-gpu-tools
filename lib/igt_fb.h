@@ -130,6 +130,8 @@ unsigned int igt_create_image_fb(int drm_fd,  int width, int height,
 				 struct igt_fb *fb /* out */);
 unsigned int igt_create_stereo_fb(int drm_fd, drmModeModeInfo *mode,
 				  uint32_t format, uint64_t tiling);
+unsigned int igt_fb_convert(struct igt_fb *dst, struct igt_fb *src,
+			    uint32_t dst_fourcc);
 void igt_remove_fb(int fd, struct igt_fb *fb);
 int igt_dirty_fb(int fd, struct igt_fb *fb);
 void *igt_fb_map_buffer(int fd, struct igt_fb *fb);

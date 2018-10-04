@@ -2037,6 +2037,51 @@ void igt_remove_fb(int fd, struct igt_fb *fb)
 }
 
 /**
+ * igt_fb_convert:
+ * @dst: pointer to the #igt_fb structure that will store the conversion result
+ * @src: pointer to the #igt_fb structure that stores the frame we convert
+ * @dst_fourcc: DRM format specifier to convert to
+ *
+ * This will convert a given @src content to the @dst_fourcc format,
+ * storing the result in the @dst fb, allocating the @dst fb
+ * underlying buffer.
+ *
+ * Once done with @dst, the caller will have to call igt_remove_fb()
+ * on it to free the associated resources.
+ *
+ * Returns:
+ * The kms id of the created framebuffer.
+ */
+unsigned int igt_fb_convert(struct igt_fb *dst, struct igt_fb *src,
+			    uint32_t dst_fourcc)
+{
+	struct fb_convert cvt = { 0 };
+	void *dst_ptr, *src_ptr;
+	int fb_id;
+
+	fb_id = igt_create_fb(src->fd, src->width, src->height,
+			      dst_fourcc, LOCAL_DRM_FORMAT_MOD_NONE, dst);
+	igt_assert(fb_id > 0);
+
+	src_ptr = igt_fb_map_buffer(src->fd, src);
+	igt_assert(src_ptr);
+
+	dst_ptr = igt_fb_map_buffer(dst->fd, dst);
+	igt_assert(dst_ptr);
+
+	cvt.dst.ptr = dst_ptr;
+	cvt.dst.fb = dst;
+	cvt.src.ptr = src_ptr;
+	cvt.src.fb = src;
+	fb_convert(&cvt);
+
+	igt_fb_unmap_buffer(dst, dst_ptr);
+	igt_fb_unmap_buffer(src, src_ptr);
+
+	return fb_id;
+}
+
+/**
  * igt_bpp_depth_to_drm_format:
  * @bpp: desired bits per pixel
  * @depth: desired depth
