@@ -1336,18 +1336,23 @@ int igt_dirty_fb(int fd, struct igt_fb *fb)
 	return drmModeDirtyFB(fb->fd, fb->fb_id, NULL, 0);
 }
 
-static void destroy_cairo_surface__gtt(void *arg)
+static void unmap_bo(struct igt_fb *fb, void *ptr)
 {
-	struct igt_fb *fb = arg;
-
-	gem_munmap(cairo_image_surface_get_data(fb->cairo_surface), fb->size);
-	fb->cairo_surface = NULL;
+	gem_munmap(ptr, fb->size);
 
 	if (fb->is_dumb)
 		igt_dirty_fb(fb->fd, fb);
 }
 
-static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
+static void destroy_cairo_surface__gtt(void *arg)
+{
+	struct igt_fb *fb = arg;
+
+	unmap_bo(fb, cairo_image_surface_get_data(fb->cairo_surface));
+	fb->cairo_surface = NULL;
+}
+
+static void *map_bo(int fd, struct igt_fb *fb)
 {
 	void *ptr;
 
@@ -1360,6 +1365,13 @@ static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
 	else
 		ptr = gem_mmap__gtt(fd, fb->gem_handle, fb->size,
 				    PROT_READ | PROT_WRITE);
+
+	return ptr;
+}
+
+static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
+{
+	void *ptr = map_bo(fd, fb);
 
 	fb->cairo_surface =
 		cairo_image_surface_create_for_data(ptr,
@@ -1776,7 +1788,7 @@ static void destroy_cairo_surface__convert(void *arg)
 	if (blit->base.linear.fb.gem_handle)
 		free_linear_mapping(&blit->base);
 	else
-		gem_munmap(blit->base.linear.map, fb->size);
+		unmap_bo(fb, blit->base.linear.map);
 
 	free(blit);
 
@@ -1800,10 +1812,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 		setup_linear_mapping(fd, fb, &blit->base.linear);
 	} else {
 		blit->base.linear.fb.gem_handle = 0;
-		gem_set_domain(fd, fb->gem_handle,
-			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-		blit->base.linear.map = gem_mmap__gtt(fd, fb->gem_handle, fb->size,
-						      PROT_READ | PROT_WRITE);
+		blit->base.linear.map = map_bo(fd, fb);
 		igt_assert(blit->base.linear.map);
 		blit->base.linear.fb.size = fb->size;
 		memcpy(blit->base.linear.fb.strides, fb->strides, sizeof(fb->strides));
@@ -1835,6 +1844,36 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	cairo_surface_set_user_data(fb->cairo_surface,
 				    (cairo_user_data_key_t *)create_cairo_surface__convert,
 				    blit, destroy_cairo_surface__convert);
+}
+
+/**
+ * igt_fb_map_buffer:
+ * @fd: open drm file descriptor
+ * @fb: pointer to an #igt_fb structure
+ *
+ * This function will creating a new mapping of the buffer and return a pointer
+ * to the content of the supplied framebuffer's plane. This mapping needs to be
+ * deleted using igt_fb_unmap_buffer().
+ *
+ * Returns:
+ * A pointer to a buffer with the contents of the framebuffer
+ */
+void *igt_fb_map_buffer(int fd, struct igt_fb *fb)
+{
+	return map_bo(fd, fb);
+}
+
+/**
+ * igt_fb_unmap_buffer:
+ * @fb: pointer to the backing igt_fb structure
+ * @buffer: pointer to the buffer previously mappped
+ *
+ * This function will unmap a buffer mapped previously with
+ * igt_fb_map_buffer().
+ */
+void igt_fb_unmap_buffer(struct igt_fb *fb, void *buffer)
+{
+	return unmap_bo(fb, buffer);
 }
 
 /**
