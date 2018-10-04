@@ -29,6 +29,7 @@
 #include <math.h>
 #include <wchar.h>
 #include <inttypes.h>
+#include <pixman.h>
 
 #include "drmtest.h"
 #include "igt_aux.h"
@@ -59,33 +60,41 @@
  * functions to work with these pixel format codes.
  */
 
+#define PIXMAN_invalid	0
+
 /* drm fourcc/cairo format maps */
 static const struct format_desc_struct {
 	const char *name;
 	uint32_t drm_id;
 	cairo_format_t cairo_id;
+	pixman_format_code_t pixman_id;
 	int depth;
 	int num_planes;
 	int plane_bpp[4];
 } format_desc[] = {
 	{ .name = "RGB565", .depth = 16, .drm_id = DRM_FORMAT_RGB565,
 	  .cairo_id = CAIRO_FORMAT_RGB16_565,
+	  .pixman_id = PIXMAN_r5g6b5,
 	  .num_planes = 1, .plane_bpp = { 16, },
 	},
 	{ .name = "RGB888", .depth = -1, .drm_id = DRM_FORMAT_RGB888,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .pixman_id = PIXMAN_r8g8b8,
 	  .num_planes = 1, .plane_bpp = { 24, },
 	},
 	{ .name = "XRGB8888", .depth = 24, .drm_id = DRM_FORMAT_XRGB8888,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .pixman_id = PIXMAN_x8r8g8b8,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	},
 	{ .name = "XRGB2101010", .depth = 30, .drm_id = DRM_FORMAT_XRGB2101010,
 	  .cairo_id = CAIRO_FORMAT_RGB30,
+	  .pixman_id = PIXMAN_x2r10g10b10,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	},
 	{ .name = "ARGB8888", .depth = 32, .drm_id = DRM_FORMAT_ARGB8888,
 	  .cairo_id = CAIRO_FORMAT_ARGB32,
+	  .pixman_id = PIXMAN_a8r8g8b8,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	},
 	{ .name = "NV12", .depth = -1, .drm_id = DRM_FORMAT_NV12,
@@ -1192,6 +1201,18 @@ unsigned int igt_create_stereo_fb(int drm_fd, drmModeModeInfo *mode,
 	return fb_id;
 }
 
+static pixman_format_code_t drm_format_to_pixman(uint32_t drm_format)
+{
+	const struct format_desc_struct *f;
+
+	for_each_format(f)
+		if (f->drm_id == drm_format)
+			return f->pixman_id;
+
+	igt_assert_f(0, "can't find a pixman format for %08x (%s)\n",
+		     drm_format, igt_format_str(drm_format));
+}
+
 static cairo_format_t drm_format_to_cairo(uint32_t drm_format)
 {
 	const struct format_desc_struct *f;
@@ -1805,9 +1826,43 @@ static void convert_rgb24_to_yuyv(struct fb_convert *cvt)
 	}
 }
 
+static void convert_pixman(struct fb_convert *cvt)
+{
+	pixman_format_code_t src_pixman = drm_format_to_pixman(cvt->src.fb->drm_format);
+	pixman_format_code_t dst_pixman = drm_format_to_pixman(cvt->dst.fb->drm_format);
+	pixman_image_t *dst_image, *src_image;
+
+	igt_assert((src_pixman != PIXMAN_invalid) &&
+		   (dst_pixman != PIXMAN_invalid));
+
+	src_image = pixman_image_create_bits(src_pixman,
+					     cvt->src.fb->width,
+					     cvt->src.fb->height,
+					     cvt->src.ptr,
+					     cvt->src.fb->strides[0]);
+	igt_assert(src_image);
+
+	dst_image = pixman_image_create_bits(dst_pixman,
+					     cvt->dst.fb->width,
+					     cvt->dst.fb->height,
+					     cvt->dst.ptr,
+					     cvt->dst.fb->strides[0]);
+	igt_assert(dst_image);
+
+	pixman_image_composite(PIXMAN_OP_SRC, src_image, NULL, dst_image,
+			       0, 0, 0, 0, 0, 0,
+			       cvt->dst.fb->width, cvt->dst.fb->height);
+	pixman_image_unref(dst_image);
+	pixman_image_unref(src_image);
+}
+
 static void fb_convert(struct fb_convert *cvt)
 {
-	if (cvt->dst.fb->drm_format == DRM_FORMAT_RGB888) {
+	if ((drm_format_to_pixman(cvt->src.fb->drm_format) != PIXMAN_invalid) &&
+	    (drm_format_to_pixman(cvt->dst.fb->drm_format) != PIXMAN_invalid)) {
+		convert_pixman(cvt);
+		return;
+	} else if (cvt->dst.fb->drm_format == DRM_FORMAT_RGB888) {
 		switch (cvt->src.fb->drm_format) {
 		case DRM_FORMAT_NV12:
 			convert_nv12_to_rgb24(cvt);
@@ -1954,8 +2009,12 @@ void igt_fb_unmap_buffer(struct igt_fb *fb, void *buffer)
  */
 cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 {
+	const struct format_desc_struct *f = lookup_drm_format(fb->drm_format);
+
 	if (fb->cairo_surface == NULL) {
-		if (igt_format_is_yuv(fb->drm_format))
+		if (igt_format_is_yuv(fb->drm_format) ||
+		    ((f->cairo_id == CAIRO_FORMAT_INVALID) &&
+		     (f->pixman_id != PIXMAN_invalid)))
 			create_cairo_surface__convert(fd, fb);
 		else if (fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
 		    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED)
@@ -2149,7 +2208,8 @@ bool igt_fb_supported_format(uint32_t drm_format)
 
 	for_each_format(f)
 		if (f->drm_id == drm_format)
-			return f->cairo_id != CAIRO_FORMAT_INVALID;
+			return (f->cairo_id != CAIRO_FORMAT_INVALID) ||
+				(f->pixman_id != PIXMAN_invalid);
 
 	return false;
 }
