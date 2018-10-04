@@ -2419,9 +2419,7 @@ int main(int argc, char **argv)
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
-				if (verbose)
-					fprintf(stderr,
-						"Only one master workload can be given!\n");
+				wsim_err("Only one master workload can be given!\n");
 				return 1;
 			}
 			master_workload = nr_w_args;
@@ -2434,9 +2432,7 @@ int main(int argc, char **argv)
 			break;
 		case 'a':
 			if (append_workload_arg) {
-				if (verbose)
-					fprintf(stderr,
-						"Only one append workload can be given!\n");
+				wsim_err("Only one append workload can be given!\n");
 				return 1;
 			}
 			append_workload_arg = optarg;
@@ -2497,10 +2493,8 @@ int main(int argc, char **argv)
 			}
 
 			if (!balancer) {
-				if (verbose)
-					fprintf(stderr,
-						"Unknown balancing mode '%s'!\n",
-						optarg);
+				wsim_err("Unknown balancing mode '%s'!\n",
+					 optarg);
 				return 1;
 			}
 			break;
@@ -2513,14 +2507,12 @@ int main(int argc, char **argv)
 	}
 
 	if ((flags & HEARTBEAT) && !(flags & SEQNO)) {
-		if (verbose)
-			fprintf(stderr, "Heartbeat needs a seqno based balancer!\n");
+		wsim_err("Heartbeat needs a seqno based balancer!\n");
 		return 1;
 	}
 
 	if ((flags & VCS2REMAP) && (flags & I915)) {
-		if (verbose)
-			fprintf(stderr, "VCS remapping not supported with i915 balancing!\n");
+		wsim_err("VCS remapping not supported with i915 balancing!\n");
 		return 1;
 	}
 
@@ -2537,31 +2529,24 @@ int main(int argc, char **argv)
 	}
 
 	if (!nr_w_args) {
-		if (verbose)
-			fprintf(stderr, "No workload descriptor(s)!\n");
+		wsim_err("No workload descriptor(s)!\n");
 		return 1;
 	}
 
 	if (nr_w_args > 1 && clients > 1) {
-		if (verbose)
-			fprintf(stderr,
-				"Cloned clients cannot be combined with multiple workloads!\n");
+		wsim_err("Cloned clients cannot be combined with multiple workloads!\n");
 		return 1;
 	}
 
 	if ((flags & GLOBAL_BALANCE) && !balancer) {
-		if (verbose)
-			fprintf(stderr,
-				"Balancer not specified in global balancing mode!\n");
+		wsim_err("Balancer not specified in global balancing mode!\n");
 		return 1;
 	}
 
 	if (append_workload_arg) {
 		append_workload_arg = load_workload_descriptor(append_workload_arg);
 		if (!append_workload_arg) {
-			if (verbose)
-				fprintf(stderr,
-					"Failed to load append workload descriptor!\n");
+			wsim_err("Failed to load append workload descriptor!\n");
 			return 1;
 		}
 	}
@@ -2570,9 +2555,7 @@ int main(int argc, char **argv)
 		struct w_arg arg = { NULL, append_workload_arg, 0 };
 		app_w = parse_workload(&arg, flags, NULL);
 		if (!app_w) {
-			if (verbose)
-				fprintf(stderr,
-					"Failed to parse append workload!\n");
+			wsim_err("Failed to parse append workload!\n");
 			return 1;
 		}
 	}
@@ -2584,18 +2567,13 @@ int main(int argc, char **argv)
 		w_args[i].desc = load_workload_descriptor(w_args[i].filename);
 
 		if (!w_args[i].desc) {
-			if (verbose)
-				fprintf(stderr,
-					"Failed to load workload descriptor %u!\n",
-					i);
+			wsim_err("Failed to load workload descriptor %u!\n", i);
 			return 1;
 		}
 
 		wrk[i] = parse_workload(&w_args[i], flags, app_w);
 		if (!wrk[i]) {
-			if (verbose)
-				fprintf(stderr,
-					"Failed to parse workload %u!\n", i);
+			wsim_err("Failed to parse workload %u!\n", i);
 			return 1;
 		}
 	}
@@ -2655,10 +2633,8 @@ int main(int argc, char **argv)
 		if (balancer && balancer->init) {
 			int ret = balancer->init(balancer, w[i]);
 			if (ret) {
-				if (verbose)
-					fprintf(stderr,
-						"Failed to initialize balancing! (%u=%d)\n",
-						i, ret);
+				wsim_err("Failed to initialize balancing! (%u=%d)\n",
+					 i, ret);
 				return 1;
 			}
 		}
