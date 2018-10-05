@@ -777,7 +777,10 @@ static void basic_subtest(void)
 {
 	disable_all_screens_and_wait(&ms_data);
 
-	enable_one_screen_and_wait(&ms_data);
+	if (ms_data.res)
+		enable_one_screen_and_wait(&ms_data);
+
+	/* XXX Also we can test wake up via exec nop */
 }
 
 static void pc8_residency_subtest(void)
@@ -1405,8 +1408,10 @@ static void pci_d3_state_subtest(void)
 	disable_all_screens_and_wait(&ms_data);
 	igt_assert(igt_wait(device_in_pci_d3(), 2000, 100));
 
-	enable_one_screen_and_wait(&ms_data);
-	igt_assert(!device_in_pci_d3());
+	if (ms_data.res) {
+		enable_one_screen_and_wait(&ms_data);
+		igt_assert(!device_in_pci_d3());
+	}
 }
 
 static void __attribute__((noreturn)) stay_subtest(void)
