@@ -95,3 +95,4 @@ igt-gpu-tools-*/
 piglit
 results
 build
+patches
