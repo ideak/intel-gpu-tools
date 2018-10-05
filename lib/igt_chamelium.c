@@ -1422,6 +1422,10 @@ static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 	int port_i, i, j;
 	bool ret = true;
 
+	res = drmModeGetResources(drm_fd);
+	if (!res)
+		return false;
+
 	group_list = g_key_file_get_groups(igt_key_file, NULL);
 
 	/* Count how many connector mappings are specified in the config */
@@ -1433,7 +1437,6 @@ static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 	chamelium->ports = calloc(sizeof(struct chamelium_port),
 				  chamelium->port_count);
 	port_i = 0;
-	res = drmModeGetResources(drm_fd);
 
 	for (i = 0; group_list[i] != NULL; i++) {
 		group = group_list[i];
@@ -1494,8 +1497,8 @@ static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 	}
 
 out:
-	drmModeFreeResources(res);
 	g_strfreev(group_list);
+	drmModeFreeResources(res);
 
 	return ret;
 }
