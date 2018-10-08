@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <unistd.h>
+#include <linux/limits.h>
 
 #define TOOLS "../tools/"
 
@@ -59,20 +60,33 @@ static void assert_cmd_success(int exec_return)
 	igt_assert_eq(exec_return, IGT_EXIT_SUCCESS);
 }
 
+static bool chdir_to_tools_dir(void)
+{
+	char path[PATH_MAX];
+
+	/* Try TOOLS relative to cwd */
+	if (chdir(TOOLS) == 0)
+		return true;
+
+	/* Try TOOLS and install dir relative to test binary */
+	if (readlink("/proc/self/exe", path, sizeof(path)) > 0)
+		chdir(dirname(path));
+
+	return chdir(TOOLS) == 0 || chdir("../../bin") == 0;
+}
+
 igt_main
 {
 	igt_skip_on_simulation();
 
 	igt_fixture {
-		char path[4096];
+		char *path;
 
-		/* Try to guess where the TOOLS are! */
-		if (access(TOOLS, F_OK) &&
-		    readlink("/proc/self/exe", path, sizeof(path)) > 0)
-			chdir(dirname(path));
-
-		igt_require_f(chdir(TOOLS) == 0,
+		igt_require_f(chdir_to_tools_dir(),
 			      "Unable to determine the tools directory, expecting them in $cwd/" TOOLS " or $path/" TOOLS "\n");
+		path = get_current_dir_name();
+		igt_info("Using tools from %s\n", path);
+		free(path);
 	}
 
 	igt_subtest("sysfs_l3_parity") {
