@@ -1674,6 +1674,19 @@ static void load_helper_fini(void)
 		drm_intel_bufmgr_destroy(lh.bufmgr);
 }
 
+static bool expected_report_timing_delta(uint32_t delta, uint32_t expected_delta)
+{
+	/*
+	 * On ICL, the OA unit appears to be a bit more relaxed about
+	 * its timing for emitting OA reports (often missing the
+	 * deadline by 1 timestamp).
+	 */
+	if (IS_ICELAKE(devid))
+		return delta <= (expected_delta + 3);
+	else
+		return delta <= expected_delta;
+}
+
 static void
 test_oa_exponents(void)
 {
@@ -1774,9 +1787,10 @@ test_oa_exponents(void)
 			igt_debug("report%04i ts=%08x hw_id=0x%08x delta=%u %s\n", i,
 				  timer_reports[i].report[1],
 				  oa_report_get_ctx_id(timer_reports[i].report),
-				  delta, delta == expected_timestamp_delta ? "" : "******");
+				  delta, expected_report_timing_delta(delta,
+								      expected_timestamp_delta) ? "" : "******");
 
-			matches += expected_timestamp_delta <= delta;
+			matches += expected_report_timing_delta(delta,expected_timestamp_delta);
 		}
 
 		igt_debug("matches=%u/%u\n", matches, n_timer_reports - 1);
