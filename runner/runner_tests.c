@@ -219,6 +219,7 @@ igt_main
 		igt_assert(!settings.overwrite);
 		igt_assert(!settings.multiple_mode);
 		igt_assert_eq(settings.inactivity_timeout, 0);
+		igt_assert_eq(settings.overall_timeout, 0);
 		igt_assert(!settings.use_watchdog);
 		igt_assert(strstr(settings.test_root, "test-root-dir") != NULL);
 		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
@@ -333,6 +334,7 @@ igt_main
 		igt_assert(!settings.overwrite);
 		igt_assert(!settings.multiple_mode);
 		igt_assert_eq(settings.inactivity_timeout, 0);
+		igt_assert_eq(settings.overall_timeout, 0);
 		igt_assert(!settings.use_watchdog);
 		igt_assert(strstr(settings.test_root, testdatadir) != NULL);
 		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
@@ -359,6 +361,7 @@ igt_main
 				 "--overwrite",
 				 "--multiple-mode",
 				 "--inactivity-timeout", "27",
+				 "--overall-timeout", "360",
 				 "--use-watchdog",
 				 "--piglit-style-dmesg",
 				 "test-root-dir",
@@ -382,6 +385,7 @@ igt_main
 		igt_assert(settings.overwrite);
 		igt_assert(settings.multiple_mode);
 		igt_assert_eq(settings.inactivity_timeout, 27);
+		igt_assert_eq(settings.overall_timeout, 360);
 		igt_assert(settings.use_watchdog);
 		igt_assert(strstr(settings.test_root, "test-root-dir") != NULL);
 		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
@@ -619,6 +623,7 @@ igt_main
 					 "--overwrite",
 					 "--multiple-mode",
 					 "--inactivity-timeout", "27",
+					 "--overall-timeout", "360",
 					 "--use-watchdog",
 					 "--piglit-style-dmesg",
 					 testdatadir,

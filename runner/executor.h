@@ -7,6 +7,12 @@
 struct execute_state
 {
 	size_t next;
+	/*
+	 * < 0 : No overall timeout used.
+	 * = 0 : Timeouted, don't execute any more.
+	 * > 0 : Timeout in use, time left.
+	 */
+	double time_left;
 };
 
 enum {

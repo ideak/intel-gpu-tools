@@ -30,6 +30,7 @@ struct settings {
 	bool overwrite;
 	bool multiple_mode;
 	int inactivity_timeout;
+	int overall_timeout;
 	bool use_watchdog;
 	char *test_root;
 	char *results_path;

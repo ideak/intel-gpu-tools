@@ -335,6 +335,7 @@ static bool kill_child(int sig, pid_t child)
 static int monitor_output(pid_t child,
 			   int outfd, int errfd, int kmsgfd, int sigfd,
 			   int *outputs,
+			   double *time_spent,
 			   struct settings *settings)
 {
 	fd_set set;
@@ -619,6 +620,9 @@ static int monitor_output(pid_t child,
 				if (settings->sync) {
 					fdatasync(outputs[_F_JOURNAL]);
 				}
+
+				if (time_spent)
+					*time_spent = time;
 			}
 
 			close(sigfd);
@@ -698,17 +702,30 @@ static int digits(size_t num)
 	return ret;
 }
 
+static void print_time_left(struct execute_state *state,
+			    struct settings *settings)
+{
+	int width;
+
+	if (settings->overall_timeout <= 0)
+		return;
+
+	width = digits(settings->overall_timeout);
+	printf("(%*.0fs left) ", width, state->time_left);
+}
+
 /*
  * Returns:
  *  =0 - Success
  *  <0 - Failure executing
  *  >0 - Timeout happened, need to recreate from journal
  */
-static int execute_entry(size_t idx,
-			  size_t total,
-			  struct settings *settings,
-			  struct job_list_entry *entry,
-			  int testdirfd, int resdirfd)
+static int execute_next_entry(struct execute_state *state,
+			      size_t total,
+			      double *time_spent,
+			      struct settings *settings,
+			      struct job_list_entry *entry,
+			      int testdirfd, int resdirfd)
 {
 	int dirfd;
 	int outputs[_F_LAST];
@@ -720,6 +737,7 @@ static int execute_entry(size_t idx,
 	char name[32];
 	pid_t child;
 	int result;
+	size_t idx = state->next;
 
 	snprintf(name, sizeof(name), "%zd", idx);
 	mkdirat(resdirfd, name, 0777);
@@ -780,7 +798,12 @@ static int execute_entry(size_t idx,
 
 	if (settings->log_level >= LOG_LEVEL_NORMAL) {
 		int width = digits(total);
-		printf("[%0*zd/%0*zd] %s", width, idx + 1, width, total, entry->binary);
+		printf("[%0*zd/%0*zd] ", width, idx + 1, width, total);
+
+		print_time_left(state, settings);
+
+		printf("%s", entry->binary);
+
 		if (entry->subtest_count > 0) {
 			size_t i;
 			const char *delim = "";
@@ -792,6 +815,7 @@ static int execute_entry(size_t idx,
 			}
 			printf(")");
 		}
+
 		printf("\n");
 	}
 
@@ -810,7 +834,7 @@ static int execute_entry(size_t idx,
 		close(errpipe[1]);
 
 		result = monitor_output(child, outfd, errfd, kmsgfd, sigfd,
-					outputs, settings);
+					outputs, time_spent, settings);
 	} else {
 		int outfd = outpipe[1];
 		int errfd = errpipe[1];
@@ -913,6 +937,15 @@ static double timeofday_double()
 	return 0.0;
 }
 
+static void init_time_left(struct execute_state *state,
+			   struct settings *settings)
+{
+	if (settings->overall_timeout <= 0)
+		state->time_left = -1;
+	else
+		state->time_left = settings->overall_timeout;
+}
+
 bool initialize_execute_state_from_resume(int dirfd,
 					  struct execute_state *state,
 					  struct settings *settings,
@@ -930,6 +963,8 @@ bool initialize_execute_state_from_resume(int dirfd,
 		close(dirfd);
 		return false;
 	}
+
+	init_time_left(state, settings);
 
 	for (i = list->size; i >= 0; i--) {
 		char name[32];
@@ -986,7 +1021,27 @@ bool initialize_execute_state(struct execute_state *state,
 	    !clear_old_results(settings->results_path))
 		return false;
 
+	init_time_left(state, settings);
+
 	return true;
+}
+
+static void reduce_time_left(struct settings *settings,
+			     struct execute_state *state,
+			     double time_spent)
+{
+	if (state->time_left < 0)
+		return;
+
+	if (time_spent > state->time_left)
+		state->time_left = 0.0;
+	else
+		state->time_left -= time_spent;
+}
+
+static bool overall_timeout_exceeded(struct execute_state *state)
+{
+	return state->time_left == 0.0;
 }
 
 bool execute(struct execute_state *state,
@@ -995,6 +1050,8 @@ bool execute(struct execute_state *state,
 {
 	struct utsname unamebuf;
 	int resdirfd, testdirfd, unamefd, timefd;
+	double time_spent = 0.0;
+	bool status = true;
 
 	if ((resdirfd = open(settings->results_path, O_DIRECTORY | O_RDONLY)) < 0) {
 		/* Initialize state should have done this */
@@ -1045,20 +1102,36 @@ bool execute(struct execute_state *state,
 
 	for (; state->next < job_list->size;
 	     state->next++) {
-		int result = execute_entry(state->next,
-					   job_list->size,
-					   settings,
-					   &job_list->entries[state->next],
-					   testdirfd, resdirfd);
-		if (result != 0) {
+		int result = execute_next_entry(state,
+						job_list->size,
+						&time_spent,
+						settings,
+						&job_list->entries[state->next],
+						testdirfd, resdirfd);
+
+		if (result < 0) {
+			status = false;
+			break;
+		}
+
+		reduce_time_left(settings, state, time_spent);
+
+		if (overall_timeout_exceeded(state)) {
+			if (settings->log_level >= LOG_LEVEL_NORMAL) {
+				printf("Overall timeout time exceeded, stopping.\n");
+			}
+
+			break;
+		}
+
+		if (result > 0) {
+			double time_left = state->time_left;
+
 			close(testdirfd);
 			close_watchdogs(settings);
-			if (result > 0) {
-				initialize_execute_state_from_resume(resdirfd, state, settings, job_list);
-				return execute(state, settings, job_list);
-			}
-			close(resdirfd);
-			return false;
+			initialize_execute_state_from_resume(resdirfd, state, settings, job_list);
+			state->time_left = time_left;
+			return execute(state, settings, job_list);
 		}
 	}
 
@@ -1070,5 +1143,5 @@ bool execute(struct execute_state *state,
 	close(testdirfd);
 	close(resdirfd);
 	close_watchdogs(settings);
-	return true;
+	return status;
 }
