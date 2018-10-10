@@ -50,23 +50,54 @@ struct {
 } viewport;
 
 /* see lib/i915/shaders/ps/blit.g7a */
-static const uint32_t ps_kernel[][4] = {
+static const uint32_t ps_kernel_gen9[][4] = {
 #if 1
-   { 0x0080005a, 0x2f403ae8, 0x3a0000c0, 0x008d0040 },
-   { 0x0080005a, 0x2f803ae8, 0x3a0000d0, 0x008d0040 },
-   { 0x02800031, 0x2e203a48, 0x0e8d0f40, 0x08840001 },
-   { 0x05800031, 0x20003a40, 0x0e8d0e20, 0x90031000 },
+	{ 0x0080005a, 0x2f403ae8, 0x3a0000c0, 0x008d0040 },
+	{ 0x0080005a, 0x2f803ae8, 0x3a0000d0, 0x008d0040 },
+	{ 0x02800031, 0x2e203a48, 0x0e8d0f40, 0x08840001 },
+	{ 0x05800031, 0x20003a40, 0x0e8d0e20, 0x90031000 },
 #else
-   /* Write all -1 */
-   { 0x00600001, 0x2e000608, 0x00000000, 0x3f800000 },
-   { 0x00600001, 0x2e200608, 0x00000000, 0x3f800000 },
-   { 0x00600001, 0x2e400608, 0x00000000, 0x3f800000 },
-   { 0x00600001, 0x2e600608, 0x00000000, 0x3f800000 },
-   { 0x00600001, 0x2e800608, 0x00000000, 0x3f800000 },
-   { 0x00600001, 0x2ea00608, 0x00000000, 0x3f800000 },
-   { 0x00600001, 0x2ec00608, 0x00000000, 0x3f800000 },
-   { 0x00600001, 0x2ee00608, 0x00000000, 0x3f800000 },
-   { 0x05800031, 0x200022e0, 0x0e000e00, 0x90031000 },
+	/* Write all -1 */
+	{ 0x00600001, 0x2e000608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2e200608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2e400608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2e600608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2e800608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2ea00608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2ec00608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2ee00608, 0x00000000, 0x3f800000 },
+	{ 0x05800031, 0x200022e0, 0x0e000e00, 0x90031000 },
+#endif
+};
+
+/* see lib/i915/shaders/ps/blit.g11a */
+static const uint32_t ps_kernel_gen11[][4] = {
+#if 1
+	{ 0x0060005b, 0x2000c01c, 0x07206601, 0x01800404 },
+	{ 0x0060005b, 0x7100480c, 0x0722003b, 0x01880406 },
+	{ 0x0060005b, 0x2000c01c, 0x07206601, 0x01800408 },
+	{ 0x0060005b, 0x7200480c, 0x0722003b, 0x0188040a },
+	{ 0x0060005b, 0x2000c01c, 0x07206e01, 0x01a00404 },
+	{ 0x0060005b, 0x7300480c, 0x0722003b, 0x01a80406 },
+	{ 0x0060005b, 0x2000c01c, 0x07206e01, 0x01a00408 },
+	{ 0x0060005b, 0x7400480c, 0x0722003b, 0x01a8040a },
+	{ 0x02800031, 0x21804a4c, 0x06000e20, 0x08840001 },
+	{ 0x00800001, 0x2e204b28, 0x008d0180, 0x00000000 },
+	{ 0x00800001, 0x2e604b28, 0x008d01c0, 0x00000000 },
+	{ 0x00800001, 0x2ea04b28, 0x008d0200, 0x00000000 },
+	{ 0x00800001, 0x2ee04b28, 0x008d0240, 0x00000000 },
+	{ 0x05800031, 0x20004a44, 0x06000e20, 0x90031000 },
+#else
+	/* Write all -1 */
+	{ 0x00600001, 0x2e000608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2e200608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2e400608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2e600608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2e800608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2ea00608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2ec00608, 0x00000000, 0x3f800000 },
+	{ 0x00600001, 0x2ee00608, 0x00000000, 0x3f800000 },
+	{ 0x05800031, 0x200022e0, 0x0e000e00, 0x90031000 },
 #endif
 };
 
@@ -907,11 +938,14 @@ static void gen8_emit_primitive(struct intel_batchbuffer *batch, uint32_t offset
 
 #define BATCH_STATE_SPLIT 2048
 
-void gen9_render_copyfunc(struct intel_batchbuffer *batch,
+static
+void _gen9_render_copyfunc(struct intel_batchbuffer *batch,
 			  drm_intel_context *context,
-			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
+			  const struct igt_buf *src, unsigned src_x,
+			  unsigned src_y, unsigned width, unsigned height,
+			  const struct igt_buf *dst, unsigned dst_x,
+			  unsigned dst_y, const uint32_t ps_kernel[][4],
+			  uint32_t ps_kernel_size)
 {
 	uint32_t ps_sampler_state, ps_kernel_off, ps_binding_table;
 	uint32_t scissor_state;
@@ -928,7 +962,7 @@ void gen9_render_copyfunc(struct intel_batchbuffer *batch,
 
 	ps_binding_table  = gen8_bind_surfaces(batch, src, dst);
 	ps_sampler_state  = gen8_create_sampler(batch);
-	ps_kernel_off = gen8_fill_ps(batch, ps_kernel, sizeof(ps_kernel));
+	ps_kernel_off = gen8_fill_ps(batch, ps_kernel, ps_kernel_size);
 	vertex_buffer = gen7_fill_vertex_buffer_data(batch, src,
 						     src_x, src_y,
 						     dst_x, dst_y,
@@ -1013,4 +1047,28 @@ void gen9_render_copyfunc(struct intel_batchbuffer *batch,
 
 	gen6_render_flush(batch, context, batch_end);
 	intel_batchbuffer_reset(batch);
+}
+
+void gen9_render_copyfunc(struct intel_batchbuffer *batch,
+			  drm_intel_context *context,
+			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
+			  unsigned width, unsigned height,
+			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
+
+{
+	_gen9_render_copyfunc(batch, context, src, src_x, src_y,
+			  width, height, dst, dst_x, dst_y, ps_kernel_gen9,
+			  sizeof(ps_kernel_gen9));
+}
+
+void gen11_render_copyfunc(struct intel_batchbuffer *batch,
+			  drm_intel_context *context,
+			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
+			  unsigned width, unsigned height,
+			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
+
+{
+	_gen9_render_copyfunc(batch, context, src, src_x, src_y,
+			  width, height, dst, dst_x, dst_y, ps_kernel_gen11,
+			  sizeof(ps_kernel_gen11));
 }

@@ -843,6 +843,8 @@ igt_render_copyfunc_t igt_get_render_copyfunc(int devid)
 		copy = gen8_render_copyfunc;
 	else if (IS_GEN9(devid) || IS_GEN10(devid))
 		copy = gen9_render_copyfunc;
+	else if (IS_GEN11(devid))
+		copy = gen11_render_copyfunc;
 
 	return copy;
 }
