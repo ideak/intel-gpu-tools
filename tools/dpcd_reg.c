@@ -41,17 +41,48 @@
 
 const char aux_dev[] = "/dev/drm_dp_aux";
 
+struct dpcd_block {
+	/* DPCD dump start address. */
+	uint32_t offset;
+	/* DPCD number of bytes to read. If unset, defaults to 1. */
+	size_t count;
+};
+
 struct dpcd_data {
 	int devid;
 	int file_op;
-	uint32_t offset;
+	struct dpcd_block rw;
 	enum command {
-		INVALID = -1,
-		READ = 2,
+		DUMP,
+		READ,
 		WRITE,
 	} cmd;
-	size_t count;
 	uint8_t val;
+};
+
+static const struct dpcd_block dump_list[] = {
+	/* DP_DPCD_REV */
+	{ .offset = 0, .count = 15 },
+	/* DP_PSR_SUPPORT to DP_PSR_CAPS*/
+	{ .offset =  0x70, .count = 2 },
+	/* DP_DOWNSTREAM_PORT_0 */
+	{ .offset =  0x80, .count = 16 },
+	/* DP_LINK_BW_SET to DP_EDP_CONFIGURATION_SET */
+	{ .offset = 0x100, .count = 11 },
+	/* DP_SINK_COUNT to DP_ADJUST_REQUEST_LANE2_3 */
+	{ .offset = 0x200, .count = 8 },
+	/* DP_SET_POWER */
+	{ .offset = 0x600 },
+	/* DP_EDP_DPCD_REV */
+	{ .offset =  0x700 },
+	/* DP_EDP_GENERAL_CAP_1 to DP_EDP_GENERAL_CAP_3 */
+	{ .offset = 0x701, .count = 4 },
+	/* DP_EDP_DISPLAY_CONTROL_REGISTER to DP_EDP_BACKLIGHT_FREQ_CAP_MAX_LSB */
+	{ .offset = 0x720, .count = 16},
+	/* DP_EDP_DBC_MINIMUM_BRIGHTNESS_SET to DP_EDP_DBC_MAXIMUM_BRIGHTNESS_SET */
+	{ .offset =  0x732, .count = 2 },
+	/* DP_PSR_STATUS to DP_PSR_STATUS */
+	{ .offset = 0x2008, .count = 1 },
 };
 
 static void print_usage(void)
@@ -103,7 +134,7 @@ static int parse_opts(struct dpcd_data *dpcd, int argc, char **argv)
 				print_usage();
 				return EXIT_FAILURE;
 			}
-			dpcd->count = temp;
+			dpcd->rw.count = temp;
 			break;
 		case 'd':
 			temp = strtol(optarg, &endptr, 10);
@@ -131,7 +162,7 @@ static int parse_opts(struct dpcd_data *dpcd, int argc, char **argv)
 				print_usage();
 				return ERANGE;
 			}
-			dpcd->offset = temp;
+			dpcd->rw.offset = temp;
 			break;
 		case 'v':
 			vflag = 'v';
@@ -147,16 +178,15 @@ static int parse_opts(struct dpcd_data *dpcd, int argc, char **argv)
 		/* Command parsing */
 		case 1:
 			if (strcmp(optarg, "read") == 0) {
-				temp = READ;
+				dpcd->cmd = READ;
 			} else if (strcmp(optarg, "write") == 0) {
-				temp = WRITE;
+				dpcd->cmd = WRITE;
 				dpcd->file_op = O_WRONLY;
-			} else {
+			} else if (strcmp(optarg, "dump") != 0) {
 				fprintf(stderr, "Unrecognized command\n");
 				print_usage();
 				return EXIT_FAILURE;
 			}
-			dpcd->cmd = temp;
 			break;
 		case ':':
 			fprintf(stderr, "Option -%c requires an argument\n",
@@ -170,7 +200,7 @@ static int parse_opts(struct dpcd_data *dpcd, int argc, char **argv)
 		}
 	}
 
-	if ((dpcd->count + dpcd->offset) > (MAX_DP_OFFSET + 1)) {
+	if ((dpcd->rw.count + dpcd->rw.offset) > (MAX_DP_OFFSET + 1)) {
 		fprintf(stderr, "Out of bounds. Count + Offset <= 0x100000\n");
 		return ERANGE;
 	}
@@ -207,7 +237,7 @@ static int dpcd_read(int fd, uint32_t offset, size_t count)
 		ret = EXIT_FAILURE;
 	}
 
-	printf("0x%02x: ", offset);
+	printf("0x%04x: ", offset);
 	for (i = 0; i < pret; i++)
 		printf(" %02x", *(buf + i));
 	printf("\n");
@@ -233,6 +263,23 @@ static int dpcd_write(int fd, uint32_t offset, uint8_t val)
 	return ret;
 }
 
+static int dpcd_dump(int fd)
+{
+	size_t count;
+	int ret, i;
+
+	for (i = 0; i < sizeof(dump_list) / sizeof(dump_list[0]); i++) {
+		count = dump_list[i].count ? dump_list[i].count: 1;
+		ret = dpcd_read(fd, dump_list[i].offset, count);
+		if (ret != EXIT_SUCCESS) {
+			fprintf(stderr, "Dump failed while reading %04x\n",
+				 dump_list[i].offset);
+			return ret;
+		}
+	}
+	return ret;
+}
+
 int main(int argc, char **argv)
 {
 	char dev_name[20];
@@ -241,9 +288,9 @@ int main(int argc, char **argv)
 	struct dpcd_data dpcd = {
 		.devid = 0,
 		.file_op = O_RDONLY,
-		.offset = 0x0,
-		.cmd = INVALID,
-		.count = 1,
+		.rw.offset = 0x0,
+		.rw.count = 1,
+		.cmd = DUMP,
 	};
 
 	ret = parse_opts(&dpcd, argc, argv);
@@ -262,15 +309,14 @@ int main(int argc, char **argv)
 
 	switch (dpcd.cmd) {
 	case READ:
-		ret = dpcd_read(fd, dpcd.offset, dpcd.count);
+		ret = dpcd_read(fd, dpcd.rw.offset, dpcd.rw.count);
 		break;
 	case WRITE:
-		ret = dpcd_write(fd, dpcd.offset, dpcd.val);
+		ret = dpcd_write(fd, dpcd.rw.offset, dpcd.val);
 		break;
+	case DUMP:
 	default:
-		fprintf(stderr, "Please specify a command: read/write.\n");
-		print_usage();
-		ret = EXIT_FAILURE;
+		ret = dpcd_dump(fd);
 		break;
 	}
 
