@@ -1661,7 +1661,7 @@ void igt_require_fb_modifiers(int fd)
 		int ret;
 
 		ret = drmGetCap(fd, DRM_CAP_ADDFB2_MODIFIERS, &cap_modifiers);
-		igt_assert(ret == 0 || errno == EINVAL);
+		igt_assert(ret == 0 || errno == EINVAL || errno == EOPNOTSUPP);
 		has_modifiers = ret == 0 && cap_modifiers == 1;
 		cap_modifiers_tested = true;
 	}
