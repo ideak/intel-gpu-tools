@@ -457,10 +457,7 @@ int update_display(bool probe)
 	int c;
 
 	resources = drmModeGetResources(drm_fd);
-	if (!resources) {
-		igt_warn("drmModeGetResources failed: %s\n", strerror(errno));
-		return 0;
-	}
+	igt_require(resources);
 
 	connectors = calloc(resources->count_connectors,
 			    sizeof(struct connector));
