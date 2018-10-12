@@ -82,7 +82,37 @@ static bool ignore_property(uint32_t obj_type, uint32_t prop_flags,
 	return false;
 }
 
-static const struct additional_test property_functional_test[] = {};
+static void max_bpc_prop_test(int fd, uint32_t id, uint32_t type, drmModePropertyPtr prop,
+			      uint32_t prop_id, uint64_t prop_value, bool atomic)
+{
+	drmModeAtomicReqPtr req = NULL;
+	int i, ret;
+
+	if (atomic)
+		req = drmModeAtomicAlloc();
+
+	for ( i = prop->values[0]; i < prop->values[1] ; i++) {
+		if (!atomic) {
+			ret = drmModeObjectSetProperty(fd, id, type, prop_id, i);
+
+			igt_assert_eq(ret, 0);
+		} else {
+			ret = drmModeAtomicAddProperty(req, id, prop_id, i);
+			igt_assert(ret >= 0);
+
+			ret = drmModeAtomicCommit(fd, req, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
+			igt_assert_eq(ret, 0);
+		}
+	}
+
+	if (atomic)
+		drmModeAtomicFree(req);
+}
+
+static const struct additional_test property_functional_test[] = {
+									{"max bpc", DRM_MODE_OBJECT_CONNECTOR,
+									 max_bpc_prop_test},
+								 };
 
 static bool has_additional_test_lookup(uint32_t obj_type, const char *name,
 				bool atomic, int *index)
