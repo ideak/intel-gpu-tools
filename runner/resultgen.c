@@ -828,6 +828,7 @@ static void override_result_single(struct json_object *obj)
 	if (!strcmp(result, "pass") &&
 	    count_lines(errtext, errtext + strlen(errtext)) > 2) {
 		set_result(obj, "warn");
+		result = "warn";
 	}
 
 	if (dmesgwarns) {
