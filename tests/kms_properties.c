@@ -29,6 +29,13 @@
 #include <string.h>
 #include <time.h>
 
+struct additional_test {
+	char *name;
+	uint32_t obj_type;
+	void (*prop_test)(int fd, uint32_t id, uint32_t type, drmModePropertyPtr prop,
+			  uint32_t prop_id, uint64_t prop_value, bool atomic);
+};
+
 static void prepare_pipe(igt_display_t *display, enum pipe pipe, igt_output_t *output, struct igt_fb *fb)
 {
 	drmModeModeInfo *mode = igt_output_get_mode(output);
@@ -75,11 +82,27 @@ static bool ignore_property(uint32_t obj_type, uint32_t prop_flags,
 	return false;
 }
 
+static const struct additional_test property_functional_test[] = {};
+
+static bool has_additional_test_lookup(uint32_t obj_type, const char *name,
+				bool atomic, int *index)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(property_functional_test); i++)
+		if (property_functional_test[i].obj_type == obj_type &&
+		    !strcmp(name, property_functional_test[i].name)) {
+			*index = i;
+			return true;
+		}
+
+	return false;
+}
 static void test_properties(int fd, uint32_t type, uint32_t id, bool atomic)
 {
 	drmModeObjectPropertiesPtr props =
 		drmModeObjectGetProperties(fd, id, type);
-	int i, ret;
+	int i, j, ret;
 	drmModeAtomicReqPtr req = NULL;
 
 	igt_assert(props);
@@ -113,6 +136,9 @@ static void test_properties(int fd, uint32_t type, uint32_t id, bool atomic)
 			ret = drmModeAtomicCommit(fd, req, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
 			igt_assert_eq(ret, 0);
 		}
+
+		if (has_additional_test_lookup(type, prop->name, atomic, &j))
+			property_functional_test[j].prop_test(fd, id, type, prop, prop_id, prop_value, atomic);
 
 		drmModeFreeProperty(prop);
 	}
