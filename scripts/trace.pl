@@ -488,16 +488,21 @@ while (<>) {
 		$ringmap{$rings{$ring}} = $ring;
 		$db{$key} = \%req;
 	} elsif ($tp_name eq 'i915:i915_request_out:') {
-		my $nkey;
+		if ($tp{'completed?'}) {
+			my $nkey;
 
-		die unless exists $db{$key};
-		die unless exists $db{$key}->{'start'};
-		die if exists $db{$key}->{'end'};
+			die unless exists $db{$key};
+			die unless exists $db{$key}->{'start'};
+			die if exists $db{$key}->{'end'};
 
-		$nkey = notify_key($ctx, $seqno);
+			$nkey = notify_key($ctx, $seqno);
 
-		$db{$key}->{'end'} = $time;
-		$db{$key}->{'notify'} = $notify{$nkey} if exists $notify{$nkey};
+			$db{$key}->{'end'} = $time;
+			$db{$key}->{'notify'} = $notify{$nkey}
+						if exists $notify{$nkey};
+		} else {
+			delete $db{$key};
+		}
 	} elsif ($tp_name eq 'dma_fence:dma_fence_signaled:') {
 		my $nkey;
 
