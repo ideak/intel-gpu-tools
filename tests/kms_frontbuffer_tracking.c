@@ -246,7 +246,7 @@ struct {
 	.show_hidden= false,
 	.step = 0,
 	.only_pipes = PIPE_COUNT,
-	.shared_fb_x_offset = 500,
+	.shared_fb_x_offset = 248,
 	.shared_fb_y_offset = 500,
 	.tiling = LOCAL_I915_FORMAT_MOD_X_TILED,
 };
