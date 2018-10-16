@@ -177,6 +177,7 @@ test_progs = [
 	'kms_pwrite_crc',
 	'kms_rmfb',
 	'kms_rotation_crc',
+	'kms_selftest',
 	'kms_setmode',
 	'kms_sysfs_edid_timing',
 	'kms_tv_load_detect',
