@@ -913,6 +913,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	/* FIXME allow the caller to pass these in */
 	enum igt_color_encoding color_encoding = IGT_COLOR_YCBCR_BT709;
 	enum igt_color_range color_range = IGT_COLOR_YCBCR_LIMITED_RANGE;
+	uint32_t flags = 0;
 
 	fb_init(fb, fd, width, height, format, tiling,
 		color_encoding, color_range);
@@ -931,11 +932,13 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	igt_debug("%s(handle=%d, pitch=%d)\n",
 		  __func__, fb->gem_handle, fb->strides[0]);
 
+	if (fb->tiling || igt_has_fb_modifiers(fd))
+		flags = LOCAL_DRM_MODE_FB_MODIFIERS;
+
 	do_or_die(__kms_addfb(fb->fd, fb->gem_handle,
 			      fb->width, fb->height,
 			      fb->drm_format, fb->tiling,
-			      fb->strides, fb->offsets, fb->num_planes,
-			      LOCAL_DRM_MODE_FB_MODIFIERS,
+			      fb->strides, fb->offsets, fb->num_planes, flags,
 			      &fb->fb_id));
 
 	return fb->fb_id;

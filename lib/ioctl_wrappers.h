@@ -227,6 +227,7 @@ struct local_drm_mode_fb_cmd2 {
 
 #define LOCAL_DRM_CAP_ADDFB2_MODIFIERS	0x10
 
+bool igt_has_fb_modifiers(int fd);
 void igt_require_fb_modifiers(int fd);
 
 /**

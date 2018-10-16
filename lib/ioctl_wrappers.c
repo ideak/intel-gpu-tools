@@ -1646,13 +1646,7 @@ void prime_sync_end(int dma_buf_fd, bool write)
 	do_ioctl(dma_buf_fd, LOCAL_DMA_BUF_IOCTL_SYNC, &sync_end);
 }
 
-/**
- * igt_require_fb_modifiers:
- * @fd: Open DRM file descriptor.
- *
- * Requires presence of DRM_CAP_ADDFB2_MODIFIERS.
- */
-void igt_require_fb_modifiers(int fd)
+bool igt_has_fb_modifiers(int fd)
 {
 	static bool has_modifiers, cap_modifiers_tested;
 
@@ -1666,7 +1660,18 @@ void igt_require_fb_modifiers(int fd)
 		cap_modifiers_tested = true;
 	}
 
-	igt_require(has_modifiers);
+	return has_modifiers;
+}
+
+/**
+ * igt_require_fb_modifiers:
+ * @fd: Open DRM file descriptor.
+ *
+ * Requires presence of DRM_CAP_ADDFB2_MODIFIERS.
+ */
+void igt_require_fb_modifiers(int fd)
+{
+	igt_require(igt_has_fb_modifiers(fd));
 }
 
 int __kms_addfb(int fd, uint32_t handle,
@@ -1678,7 +1683,8 @@ int __kms_addfb(int fd, uint32_t handle,
 	struct drm_mode_fb_cmd2 f;
 	int ret, i;
 
-	igt_require_fb_modifiers(fd);
+	if (flags & DRM_MODE_FB_MODIFIERS)
+		igt_require_fb_modifiers(fd);
 
 	memset(&f, 0, sizeof(f));
 
