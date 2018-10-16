@@ -2121,7 +2121,10 @@ void igt_remove_fb(int fd, struct igt_fb *fb)
 
 	cairo_surface_destroy(fb->cairo_surface);
 	do_or_die(drmModeRmFB(fd, fb->fb_id));
-	gem_close(fd, fb->gem_handle);
+	if (fb->is_dumb)
+		kmstest_dumb_destroy(fd, fb->gem_handle);
+	else
+		gem_close(fd, fb->gem_handle);
 	fb->fb_id = 0;
 }
 

@@ -641,6 +641,28 @@ void *kmstest_dumb_map_buffer(int fd, uint32_t handle, uint64_t size,
 	return ptr;
 }
 
+static int __kmstest_dumb_destroy(int fd, uint32_t handle)
+{
+	struct drm_mode_destroy_dumb arg = { handle };
+	int err = 0;
+
+	if (drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg))
+		err = -errno;
+
+	errno = 0;
+	return err;
+}
+
+/**
+ * kmstest_dumb_destroy:
+ * @fd: Opened drm file descriptor
+ * @handle: Offset in the file referred to by fd
+ */
+void kmstest_dumb_destroy(int fd, uint32_t handle)
+{
+	igt_assert_eq(__kmstest_dumb_destroy(fd, handle), 0);
+}
+
 /*
  * Returns: the previous mode, or KD_GRAPHICS if no /dev/tty0 was
  * found and nothing was done.
