@@ -1433,6 +1433,10 @@ static void create_cairo_surface__gtt(int fd, struct igt_fb *fb)
 		cairo_image_surface_create_for_data(ptr,
 						    drm_format_to_cairo(fb->drm_format),
 						    fb->width, fb->height, fb->strides[0]);
+	igt_require_f(cairo_surface_status(fb->cairo_surface) == CAIRO_STATUS_SUCCESS,
+		      "Unable to create a cairo surface: %s\n",
+		      cairo_status_to_string(cairo_surface_status(fb->cairo_surface)));
+
 	fb->domain = I915_GEM_DOMAIN_GTT;
 
 	cairo_surface_set_user_data(fb->cairo_surface,
