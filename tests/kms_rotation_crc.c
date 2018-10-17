@@ -142,7 +142,7 @@ static void cleanup_crtc(data_t *data)
 }
 
 static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
-			 igt_plane_t *plane)
+			 igt_plane_t *plane, bool start_crc)
 {
 	igt_display_t *display = &data->display;
 
@@ -156,7 +156,9 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 
 	igt_display_commit2(display, COMMIT_ATOMIC);
 	data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
-	igt_pipe_crc_start(data->pipe_crc);
+
+	if (start_crc)
+		igt_pipe_crc_start(data->pipe_crc);
 }
 
 enum rectangle_type {
@@ -361,7 +363,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 		plane = igt_output_get_plane_type(output, plane_type);
 		igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
 
-		prepare_crtc(data, output, pipe, plane);
+		prepare_crtc(data, output, pipe, plane, true);
 
 		for (i = 0; i < num_rectangle_types; i++) {
 			/* Unsupported on i915 */
@@ -389,6 +391,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 						 data->override_fmt, test_bad_format);
 			}
 		}
+		igt_pipe_crc_stop(data->pipe_crc);
 	}
 }
 
@@ -410,7 +413,8 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 
 	igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
 
-	prepare_crtc(data, output, pipe, plane);
+	prepare_crtc(data, output, pipe, plane, false);
+
 	mode = igt_output_get_mode(output);
 	w = mode->hdisplay;
 	h = mode->vdisplay;
