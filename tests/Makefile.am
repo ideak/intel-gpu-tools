@@ -46,10 +46,12 @@ noinst_PROGRAMS = \
 	$(NULL)
 
 pkglibexec_PROGRAMS = \
-	gem_stress \
 	$(TESTS_progs) \
 	$(TESTS_progs_X) \
 	$(NULL)
+
+pkglibexec_PROGRAMS += gem_stress
+gem_stress_SOURCES = i915/gem_stress.c
 
 # Piglit expects test-list*.txt to be in the same directory as the
 # tests. pkglibexec_DATA is an invalid combo to autotools, so work

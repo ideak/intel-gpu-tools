@@ -15,5 +15,5 @@ foreach prog : amdgpu_progs
 				       install_dir : amdgpudir,
 				       install_rpath : amdgpudir_rpathdir,
 				       install : true)
-	test_progs += join_paths('amdgpu', prog)
+	test_list += join_paths('amdgpu', prog)
 endforeach

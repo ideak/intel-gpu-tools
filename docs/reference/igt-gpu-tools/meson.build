@@ -48,8 +48,6 @@ test_groups = [
 gen_description = find_program('generate_description_xml.sh')
 gen_programs = find_program('generate_programs_xml.sh')
 
-test_list_files = []
-
 generated_docs = []
 
 configure_file(input: 'version.xml.in',
@@ -61,13 +59,13 @@ if meson.version().version_compare('>= 0.47')
 		programs_xml = 'igt_test_programs_' + group + '_programs.xml'
 		generated_docs += custom_target(programs_xml,
 			      output : programs_xml,
-			      command : [ gen_programs, '@OUTPUT@', group, test_list ])
+			      command : [ gen_programs, '@OUTPUT@', group, test_list_target ])
 
 		description_xml = 'igt_test_programs_' + group + '_description.xml'
 		generated_docs += custom_target(description_xml,
 			      output : description_xml,
 			      depends : test_executables,
-			      command : [ gen_description, '@OUTPUT@', group, test_list ])
+			      command : [ gen_description, '@OUTPUT@', group, test_list_target ])
 	endforeach
 else
 	# older meson needs the build_by_default hack because gtkdoc dependency
@@ -77,14 +75,14 @@ else
 		custom_target(programs_xml,
 			      build_by_default : true,
 			      output : programs_xml,
-			      command : [ gen_programs, '@OUTPUT@', group, test_list ])
+			      command : [ gen_programs, '@OUTPUT@', group, test_list_target ])
 
 		description_xml = 'igt_test_programs_' + group + '_description.xml'
 		custom_target(description_xml,
 			      build_by_default : true,
 			      output : description_xml,
 			      depends : test_executables,
-			      command : [ gen_description, '@OUTPUT@', group, test_list ])
+			      command : [ gen_description, '@OUTPUT@', group, test_list_target ])
 	endforeach
 endif
 

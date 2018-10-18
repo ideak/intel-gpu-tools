@@ -16,6 +16,89 @@ test_progs = [
 	'drv_module_reload',
 	'drv_selftest',
 	'drv_suspend',
+	'kms_3d',
+	'kms_addfb_basic',
+	'kms_atomic',
+	'kms_atomic_interruptible',
+	'kms_atomic_transition',
+	'kms_available_modes_crc',
+	'kms_busy',
+	'kms_ccs',
+	'kms_chv_cursor_fail',
+	'kms_color',
+	'kms_concurrent',
+	'kms_crtc_background_color',
+	'kms_cursor_crc',
+	'kms_cursor_legacy',
+	'kms_draw_crc',
+	'kms_fbcon_fbt',
+	'kms_fence_pin_leak',
+	'kms_flip',
+	'kms_flip_event_leak',
+	'kms_flip_tiling',
+	'kms_force_connector_basic',
+	'kms_frontbuffer_tracking',
+	'kms_getfb',
+	'kms_hdmi_inject',
+	'kms_invalid_dotclock',
+	'kms_legacy_colorkey',
+	'kms_mmap_write_crc',
+	'kms_panel_fitting',
+	'kms_pipe_b_c_ivb',
+	'kms_pipe_crc_basic',
+	'kms_plane',
+	'kms_plane_alpha_blend',
+	'kms_plane_lowres',
+	'kms_plane_multiple',
+	'kms_plane_scaling',
+	'kms_properties',
+	'kms_psr',
+	'kms_pwrite_crc',
+	'kms_rmfb',
+	'kms_rotation_crc',
+	'kms_selftest',
+	'kms_setmode',
+	'kms_sysfs_edid_timing',
+	'kms_tv_load_detect',
+	'kms_universal_plane',
+	'kms_vblank',
+	'meta_test',
+	'perf',
+	'pm_backlight',
+	'pm_lpsp',
+	'pm_rc6_residency',
+	'pm_rpm',
+	'pm_rps',
+	'pm_sseu',
+	'prime_busy',
+	'prime_mmap',
+	'prime_mmap_coherency',
+	'prime_mmap_kms',
+	'prime_self_import',
+	'prime_udl',
+	'prime_vgem',
+	'sw_sync',
+	'syncobj_basic',
+	'syncobj_wait',
+	'template',
+	'tools_test',
+	'vc4_create_bo',
+	'vc4_dmabuf_poll',
+	'vc4_label_bo',
+	'vc4_lookup_fail',
+	'vc4_purgeable_bo',
+	'vc4_tiling',
+	'vc4_wait_bo',
+	'vc4_wait_seqno',
+	'vgem_basic',
+	'vgem_slow',
+]
+
+i915_progs = [
+	'query',
+]
+
+gem_progs = [
 	'gem_bad_reloc',
 	'gem_basic',
 	'gem_busy',
@@ -131,88 +214,14 @@ test_progs = [
 	'gem_wait',
 	'gem_workarounds',
 	'gem_write_read_ring_switch',
+]
+
+gen3_progs = [
 	'gen3_mixed_blits',
 	'gen3_render_linear_blits',
 	'gen3_render_mixed_blits',
 	'gen3_render_tiledx_blits',
 	'gen3_render_tiledy_blits',
-	'i915_query',
-	'kms_3d',
-	'kms_addfb_basic',
-	'kms_atomic',
-	'kms_atomic_interruptible',
-	'kms_atomic_transition',
-	'kms_available_modes_crc',
-	'kms_busy',
-	'kms_ccs',
-	'kms_chv_cursor_fail',
-	'kms_color',
-	'kms_concurrent',
-	'kms_crtc_background_color',
-	'kms_cursor_crc',
-	'kms_cursor_legacy',
-	'kms_draw_crc',
-	'kms_fbcon_fbt',
-	'kms_fence_pin_leak',
-	'kms_flip',
-	'kms_flip_event_leak',
-	'kms_flip_tiling',
-	'kms_force_connector_basic',
-	'kms_frontbuffer_tracking',
-	'kms_getfb',
-	'kms_hdmi_inject',
-	'kms_invalid_dotclock',
-	'kms_legacy_colorkey',
-	'kms_mmap_write_crc',
-	'kms_panel_fitting',
-	'kms_pipe_b_c_ivb',
-	'kms_pipe_crc_basic',
-	'kms_plane',
-	'kms_plane_alpha_blend',
-	'kms_plane_lowres',
-	'kms_plane_multiple',
-	'kms_plane_scaling',
-	'kms_properties',
-	'kms_psr',
-	'kms_pwrite_crc',
-	'kms_rmfb',
-	'kms_rotation_crc',
-	'kms_selftest',
-	'kms_setmode',
-	'kms_sysfs_edid_timing',
-	'kms_tv_load_detect',
-	'kms_universal_plane',
-	'kms_vblank',
-	'meta_test',
-	'perf',
-	'pm_backlight',
-	'pm_lpsp',
-	'pm_rc6_residency',
-	'pm_rpm',
-	'pm_rps',
-	'pm_sseu',
-	'prime_busy',
-	'prime_mmap',
-	'prime_mmap_coherency',
-	'prime_mmap_kms',
-	'prime_self_import',
-	'prime_udl',
-	'prime_vgem',
-	'sw_sync',
-	'syncobj_basic',
-	'syncobj_wait',
-	'template',
-	'tools_test',
-	'vc4_create_bo',
-	'vc4_dmabuf_poll',
-	'vc4_label_bo',
-	'vc4_lookup_fail',
-	'vc4_purgeable_bo',
-	'vc4_tiling',
-	'vc4_wait_bo',
-	'vc4_wait_seqno',
-	'vgem_basic',
-	'vgem_slow',
 ]
 
 test_deps = [ igt_deps ]
@@ -241,6 +250,7 @@ if _build_audio and alsa.found() and gsl.found()
 endif
 
 test_executables = []
+test_list = []
 
 foreach prog : test_progs
 	test_executables += executable(prog, prog + '.c',
@@ -248,52 +258,75 @@ foreach prog : test_progs
 		   install_dir : libexecdir,
 		   install_rpath : libexecdir_rpathdir,
 		   install : true)
+	test_list += prog
 endforeach
 
-test_executables += executable('gem_eio', 'gem_eio.c',
+foreach prog : i915_progs
+	prog_name = 'i915_' + prog
+	test_executables += executable(prog_name,
+		   join_paths('i915', prog + '.c'),
+		   dependencies : test_deps,
+		   install_dir : libexecdir,
+		   install_rpath : libexecdir_rpathdir,
+		   install : true)
+	test_list += prog_name
+endforeach
+
+foreach prog : gem_progs + gen3_progs
+	test_executables += executable(prog,
+		   join_paths('i915', prog + '.c'),
+		   dependencies : test_deps,
+		   install_dir : libexecdir,
+		   install_rpath : libexecdir_rpathdir,
+		   install : true)
+	test_list += prog
+endforeach
+
+test_executables += executable('gem_eio',
+	   join_paths('i915', 'gem_eio.c'),
 	   dependencies : test_deps + [ realtime ],
 	   install_dir : libexecdir,
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
-test_progs += 'gem_eio'
+test_list += 'gem_eio'
 
-test_executables += executable('gem_mocs_settings', 'gem_mocs_settings.c',
+test_executables += executable('gem_mocs_settings',
+	   join_paths('i915', 'gem_mocs_settings.c'),
 	   dependencies : test_deps + [ lib_igt_perf ],
 	   install_dir : libexecdir,
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
-test_progs += 'gem_mocs_settings'
+test_list += 'gem_mocs_settings'
 
 test_executables += executable('perf_pmu', 'perf_pmu.c',
 	   dependencies : test_deps + [ lib_igt_perf ],
 	   install_dir : libexecdir,
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
-test_progs += 'perf_pmu'
+test_list += 'perf_pmu'
 
 executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   dependencies : test_deps,
 	   install_dir : libexecdir,
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
-test_progs += 'testdisplay'
+test_list += 'testdisplay'
 
 subdir('amdgpu')
 
 gen_testlist = find_program('generate_testlist.sh')
-test_list = custom_target('testlist',
+test_list_target = custom_target('testlist',
 	      output : 'test-list.txt',
-	      command : [ gen_testlist, '@OUTPUT@', test_progs ],
+	      command : [ gen_testlist, '@OUTPUT@', test_list ],
 	      install : true,
 	      install_dir : libexecdir)
 
 test_script = find_program('igt_command_line.sh')
-foreach prog : test_progs
-	test('testcase check: ' + prog, test_script,
-			args : prog)
+foreach prog : test_list
+	test('testcase check: ' + prog, test_script, args : prog)
 endforeach
 
-executable('gem_stress', 'gem_stress.c',
+executable('gem_stress', 'i915/gem_stress.c',
 	   install : true,
 	   install_dir : libexecdir,
 	   install_rpath : libexecdir_rpathdir,
@@ -309,7 +342,7 @@ hang_progs = [
 	'gem_non_secure_batch',
 ]
 foreach prog : hang_progs
-	executable(prog, prog + '.c',
+	executable(prog, join_paths('i915', prog + '.c'),
 			dependencies : igt_deps,
 			install : false)
 endforeach
