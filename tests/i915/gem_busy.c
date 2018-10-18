@@ -66,6 +66,19 @@ static void __gem_busy(int fd,
 	*read = busy.busy >> 16;
 }
 
+static uint32_t ring_to_class(unsigned int ring)
+{
+	uint32_t class[] = {
+		[I915_EXEC_DEFAULT] = I915_ENGINE_CLASS_RENDER,
+		[I915_EXEC_RENDER]  = I915_ENGINE_CLASS_RENDER,
+		[I915_EXEC_BLT]     = I915_ENGINE_CLASS_COPY,
+		[I915_EXEC_BSD]     = I915_ENGINE_CLASS_VIDEO,
+		[I915_EXEC_VEBOX]   = I915_ENGINE_CLASS_VIDEO_ENHANCE,
+	};
+	igt_assert(ring < ARRAY_SIZE(class));
+	return class[ring];
+}
+
 static bool exec_noop(int fd,
 		      uint32_t *handles,
 		      unsigned ring,
@@ -100,6 +113,7 @@ static bool still_busy(int fd, uint32_t handle)
 static void semaphore(int fd, unsigned ring, uint32_t flags)
 {
 	uint32_t bbe = MI_BATCH_BUFFER_END;
+	const unsigned uabi = ring_to_class(ring & 63);
 	igt_spin_t *spin;
 	uint32_t handle[3];
 	uint32_t read, write;
@@ -122,26 +136,26 @@ static void semaphore(int fd, unsigned ring, uint32_t flags)
 	igt_assert(exec_noop(fd, handle, ring | flags, false));
 	igt_assert(still_busy(fd, handle[BUSY]));
 	__gem_busy(fd, handle[TEST], &read, &write);
-	igt_assert_eq(read, 1 << ring);
+	igt_assert_eq(read, 1 << uabi);
 	igt_assert_eq(write, 0);
 
 	/* Requeue with a write */
 	igt_assert(exec_noop(fd, handle, ring | flags, true));
 	igt_assert(still_busy(fd, handle[BUSY]));
 	__gem_busy(fd, handle[TEST], &read, &write);
-	igt_assert_eq(read, 1 << ring);
-	igt_assert_eq(write, ring);
+	igt_assert_eq(read, 1 << uabi);
+	igt_assert_eq(write, 1 + uabi);
 
 	/* Now queue it for a read across all available rings */
 	active = 0;
 	for (i = I915_EXEC_RENDER; i <= I915_EXEC_VEBOX; i++) {
 		if (exec_noop(fd, handle, i | flags, false))
-			active |= 1 << i;
+			active |= 1 << ring_to_class(i);
 	}
 	igt_assert(still_busy(fd, handle[BUSY]));
 	__gem_busy(fd, handle[TEST], &read, &write);
 	igt_assert_eq(read, active);
-	igt_assert_eq(write, ring); /* from the earlier write */
+	igt_assert_eq(write, 1 + uabi); /* from the earlier write */
 
 	/* Check that our long batch was long enough */
 	igt_assert(still_busy(fd, handle[BUSY]));
@@ -168,7 +182,7 @@ static void one(int fd, unsigned ring, unsigned test_flags)
 	struct drm_i915_gem_relocation_entry store[1024+1];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	unsigned size = ALIGN(ARRAY_SIZE(store)*16 + 4, 4096);
-	const unsigned uabi = ring & 63;
+	const unsigned uabi = ring_to_class(ring & 63);
 	uint32_t read[2], write[2];
 	struct timespec tv;
 	uint32_t *batch, *bbe;
@@ -270,7 +284,7 @@ static void one(int fd, unsigned ring, unsigned test_flags)
 		timeout = 1;
 	}
 
-	igt_assert_eq(write[SCRATCH], uabi);
+	igt_assert_eq(write[SCRATCH], 1 + uabi);
 	igt_assert_eq_u32(read[SCRATCH], 1 << uabi);
 
 	igt_assert_eq(write[BATCH], 0);
