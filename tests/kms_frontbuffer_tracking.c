@@ -2915,7 +2915,7 @@ static void badstride_subtest(const struct test_mode *t)
  */
 static void stridechange_subtest(const struct test_mode *t)
 {
-	struct igt_fb new_fb, *old_fb;
+	struct igt_fb *new_fb, *old_fb;
 	struct modeset_params *params = pick_params(t);
 	int rc;
 
@@ -2923,15 +2923,14 @@ static void stridechange_subtest(const struct test_mode *t)
 
 	old_fb = params->primary.fb;
 
-	create_fb(t->format, params->primary.fb->width + 512, params->primary.fb->height,
-		  opt.tiling, t->plane, &new_fb);
-	fill_fb(&new_fb, COLOR_PRIM_BG);
-
-	igt_assert(old_fb->strides[0] != new_fb.strides[0]);
-
 	/* We can't assert that FBC will be enabled since there may not be
 	 * enough space for the CFB, but we can check the CRC. */
-	params->primary.fb = &new_fb;
+	new_fb = &fbs[t->format].big;
+	igt_assert(old_fb->strides[0] != new_fb->strides[0]);
+
+	params->primary.fb = new_fb;
+	fill_fb_region(&params->primary, COLOR_PRIM_BG);
+
 	set_mode_for_params(params);
 	do_assertions(DONT_ASSERT_FEATURE_STATUS);
 
@@ -2941,7 +2940,7 @@ static void stridechange_subtest(const struct test_mode *t)
 	do_assertions(0);
 
 	/* This operation is the same as above, but with the planes API. */
-	params->primary.fb = &new_fb;
+	params->primary.fb = new_fb;
 	set_prim_plane_for_params(params);
 	do_assertions(DONT_ASSERT_FEATURE_STATUS);
 
@@ -2953,11 +2952,9 @@ static void stridechange_subtest(const struct test_mode *t)
 	 * Try to set a new stride. with the page flip api. This is allowed
 	 * with the atomic page flip helper, but not with the legacy page flip.
 	 */
-	rc = drmModePageFlip(drm.fd, drm.display.pipes[params->pipe].crtc_id, new_fb.fb_id, 0, NULL);
+	rc = drmModePageFlip(drm.fd, drm.display.pipes[params->pipe].crtc_id, new_fb->fb_id, 0, NULL);
 	igt_assert(rc == -EINVAL || rc == 0);
 	do_assertions(0);
-
-	igt_remove_fb(drm.fd, &new_fb);
 }
 
 /**
