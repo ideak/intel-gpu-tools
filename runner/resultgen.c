@@ -906,13 +906,14 @@ static void add_to_totals(char *binary,
 			  struct subtests *subtests,
 			  struct results *results)
 {
-	struct json_object *test, *resultobj, *roottotal, *binarytotal;
+	struct json_object *test, *resultobj, *emptystrtotal, *roottotal, *binarytotal;
 	char piglit_name[256];
 	const char *result;
 	size_t i;
 
 	generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
-	roottotal = get_totals_object(results->totals, "");
+	emptystrtotal = get_totals_object(results->totals, "");
+	roottotal = get_totals_object(results->totals, "root");
 	binarytotal = get_totals_object(results->totals, piglit_name);
 
 	if (subtests->size == 0) {
@@ -922,6 +923,7 @@ static void add_to_totals(char *binary,
 			return;
 		}
 		result = json_object_get_string(resultobj);
+		add_result_to_totals(emptystrtotal, result);
 		add_result_to_totals(roottotal, result);
 		add_result_to_totals(binarytotal, result);
 		return;
@@ -935,6 +937,7 @@ static void add_to_totals(char *binary,
 			return;
 		}
 		result = json_object_get_string(resultobj);
+		add_result_to_totals(emptystrtotal, result);
 		add_result_to_totals(roottotal, result);
 		add_result_to_totals(binarytotal, result);
 	}
