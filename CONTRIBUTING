@@ -73,11 +73,10 @@ below criteria:
 - Agrees to use their commit rights in accordance with the documented merge
   criteria, tools, and processes.
 
-Apply for an account (and any other account change requests) through
-
-https://www.freedesktop.org/wiki/AccountRequests/
-
-and please ping the maintainers if your request is stuck.
+Create a gitlab account at https://gitlab.freedesktop.org/ and apply
+for access to the IGT gitlab project,
+http://gitlab.freedesktop.org/drm/igt-gpu-tools and please ping the
+maintainers if your request is stuck.
 
 Committers are encouraged to request their commit rights get removed when they
 no longer contribute to the project. Commit rights will be reinstated when they
