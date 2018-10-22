@@ -196,6 +196,7 @@ const char * const igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	[IGT_CONNECTOR_CRTC_ID] = "CRTC_ID",
 	[IGT_CONNECTOR_DPMS] = "DPMS",
 	[IGT_CONNECTOR_BROADCAST_RGB] = "Broadcast RGB",
+	[IGT_CONNECTOR_CONTENT_PROTECTION] = "Content Protection",
 };
 
 /*

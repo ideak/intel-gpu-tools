@@ -120,6 +120,7 @@ enum igt_atomic_connector_properties {
        IGT_CONNECTOR_CRTC_ID,
        IGT_CONNECTOR_DPMS,
        IGT_CONNECTOR_BROADCAST_RGB,
+       IGT_CONNECTOR_CONTENT_PROTECTION,
        IGT_NUM_CONNECTOR_PROPS
 };
 
