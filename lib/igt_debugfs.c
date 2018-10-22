@@ -237,6 +237,33 @@ int igt_debugfs_dir(int device)
 }
 
 /**
+ * igt_debugfs_connector_dir:
+ * @device: fd of the device
+ * @conn_name: conenctor name
+ * @mode: mode bits as used by open()
+ *
+ * This opens the debugfs directory corresponding to connector on the device
+ * for use with igt_sysfs_get() and related functions.
+ *
+ * Returns:
+ * The directory fd, or -1 on failure.
+ */
+int igt_debugfs_connector_dir(int device, char *conn_name, int mode)
+{
+	int dir, ret;
+
+	dir = igt_debugfs_dir(device);
+	if (dir < 0)
+		return dir;
+
+	ret = openat(dir, conn_name, mode);
+
+	close(dir);
+
+	return ret;
+}
+
+/**
  * igt_debugfs_open:
  * @filename: name of the debugfs node to open
  * @mode: mode bits as used by open()
