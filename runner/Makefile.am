@@ -30,10 +30,20 @@ AM_CFLAGS = $(JSONC_CFLAGS) \
 	-I$(srcdir)/../lib \
 	-D_GNU_SOURCE
 
-TESTS = runner_test
-check_PROGRAMS = runner_test
+TESTS = runner_test runner_json_test
+check_PROGRAMS = runner_test runner_json_test
+
 runner_test_SOURCES = runner_tests.c
 runner_test_CFLAGS = -DTESTDATA_DIRECTORY=\"$(abs_builddir)/testdata\" \
+	-I$(top_srcdir)/include/drm-uapi \
+	$(DRM_CFLAGS) $(CAIRO_CFLAGS) $(LIBUDEV_CFLAGS) \
+	-I$(srcdir)/.. \
+	-I$(srcdir)/../lib \
+	-D_GNU_SOURCE
+
+runner_json_test_SOURCES = runner_json_tests.c
+runner_json_test_CFLAGS = -DJSON_TESTS_DIRECTORY=\"$(abs_builddir)/json_tests_data\" \
+	$(JSONC_CFLAGS) \
 	-I$(top_srcdir)/include/drm-uapi \
 	$(DRM_CFLAGS) $(CAIRO_CFLAGS) $(LIBUDEV_CFLAGS) \
 	-I$(srcdir)/.. \

@@ -10,6 +10,7 @@ runner_sources = [ 'runner.c' ]
 resume_sources = [ 'resume.c' ]
 results_sources = [ 'results.c' ]
 runner_test_sources = [ 'runner_tests.c' ]
+runner_json_test_sources = [ 'runner_json_tests.c' ]
 
 if _build_runner and jsonc.found()
 	subdir('testdata')
@@ -45,6 +46,13 @@ if _build_runner and jsonc.found()
 				 install : false,
 				 dependencies : igt_deps)
 	test('runner', runner_test)
+
+	runner_json_test = executable('runner_json_test', runner_json_test_sources,
+				      c_args : '-DJSON_TESTS_DIRECTORY="@0@"'.format(join_paths(meson.current_source_dir(), 'json_tests_data')),
+				      link_with : runnerlib,
+				      install : false,
+				      dependencies : [igt_deps, jsonc])
+	test('runner_json', runner_json_test)
 
 	build_info += 'Build test runner: Yes'
 else
