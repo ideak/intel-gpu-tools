@@ -191,7 +191,7 @@ static void fill_render(data_t *data, uint32_t handle, unsigned char color)
 
 static bool sink_support(data_t *data)
 {
-	char buf[512];
+	char buf[PSR_STATUS_MAX_LEN];
 
 	igt_debugfs_simple_read(data->debugfs_fd, "i915_edp_psr_status",
 			 buf, sizeof(buf));

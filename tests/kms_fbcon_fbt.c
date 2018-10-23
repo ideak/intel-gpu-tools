@@ -170,7 +170,7 @@ static void set_mode_for_one_screen(struct drm_info *drm, struct igt_fb *fb,
 
 static bool psr_supported_on_chipset(int debugfs_fd)
 {
-	char buf[256];
+	char buf[PSR_STATUS_MAX_LEN];
 	int ret;
 
 	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status",
@@ -188,7 +188,7 @@ static bool connector_can_psr(drmModeConnectorPtr connector)
 
 static void psr_print_status(int debugfs_fd)
 {
-	static char buf[256];
+	static char buf[PSR_STATUS_MAX_LEN];
 
 	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				sizeof(buf));
@@ -197,7 +197,7 @@ static void psr_print_status(int debugfs_fd)
 
 static bool psr_is_enabled(int debugfs_fd)
 {
-	char buf[256];
+	char buf[PSR_STATUS_MAX_LEN];
 
 	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				sizeof(buf));

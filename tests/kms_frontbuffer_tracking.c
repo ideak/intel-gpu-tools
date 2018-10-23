@@ -1419,7 +1419,7 @@ static void teardown_fbc(void)
 
 static bool psr_sink_has_support(void)
 {
-	char buf[256];
+	char buf[PSR_STATUS_MAX_LEN];
 
 	debugfs_read("i915_edp_psr_status", buf);
 	if (*buf == '\0') /* !HAS_PSR -> -ENODEV*/

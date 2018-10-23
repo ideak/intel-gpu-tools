@@ -28,7 +28,7 @@
 static bool psr_active(int debugfs_fd, bool check_active)
 {
 	bool active;
-	char buf[512];
+	char buf[PSR_STATUS_MAX_LEN];
 
 	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				sizeof(buf));
