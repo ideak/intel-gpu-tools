@@ -49,6 +49,7 @@ test_progs = [
 	'kms_plane_scaling',
 	'kms_properties',
 	'kms_psr',
+	'kms_psr2_su',
 	'kms_pwrite_crc',
 	'kms_rmfb',
 	'kms_rotation_crc',
