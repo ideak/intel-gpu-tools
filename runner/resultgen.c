@@ -988,14 +988,13 @@ static void create_result_root_nodes(struct json_object *root,
 	json_object_object_add(root, "runtimes", results->runtimes);
 }
 
-bool generate_results(int dirfd)
+struct json_object *generate_results_json(int dirfd)
 {
 	struct settings settings;
 	struct job_list job_list;
 	struct json_object *obj, *elapsed;
 	struct results results;
-	int resultsfd, testdirfd, fd;
-	const char *json_string;
+	int testdirfd, fd;
 	size_t i;
 
 	init_settings(&settings);
@@ -1003,18 +1002,12 @@ bool generate_results(int dirfd)
 
 	if (!read_settings(&settings, dirfd)) {
 		fprintf(stderr, "resultgen: Cannot parse settings\n");
-		return false;
+		return NULL;
 	}
 
 	if (!read_job_list(&job_list, dirfd)) {
 		fprintf(stderr, "resultgen: Cannot parse job list\n");
-		return false;
-	}
-
-	/* TODO: settings.overwrite */
-	if ((resultsfd = openat(dirfd, "results.json", O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0) {
-		fprintf(stderr, "resultgen: Cannot create results file\n");
-		return false;
+		return NULL;
 	}
 
 	obj = json_object_new_object();
@@ -1079,10 +1072,27 @@ bool generate_results(int dirfd)
 
 		if (!parse_test_directory(testdirfd, &job_list.entries[i], &settings, &results)) {
 			close(testdirfd);
-			close(resultsfd);
-			return false;
+			return NULL;
 		}
 		close(testdirfd);
+	}
+
+	return obj;
+}
+
+bool generate_results(int dirfd)
+{
+	struct json_object *obj = generate_results_json(dirfd);
+	const char *json_string;
+	int resultsfd;
+
+	if (obj == NULL)
+		return false;
+
+	/* TODO: settings.overwrite */
+	if ((resultsfd = openat(dirfd, "results.json", O_WRONLY | O_CREAT | O_TRUNC, 0666)) < 0) {
+		fprintf(stderr, "resultgen: Cannot create results file\n");
+		return false;
 	}
 
 	json_string = json_object_to_json_string_ext(obj, JSON_C_TO_STRING_PRETTY);
