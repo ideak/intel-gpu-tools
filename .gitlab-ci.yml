@@ -16,6 +16,8 @@ stages:
   - test
   - deploy
 
+#################### BUILD #########################
+
 build:tests-fedora:
   stage: build
   script:
@@ -26,12 +28,17 @@ build:tests-fedora:
     paths:
       - build
 
-build:tests-debian:
+build:tests-debian-meson:
   image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian:latest
   stage: build
   script:
     - meson $MESON_OPTIONS build
     - ninja -C build
+    - cp build/tests/test-list.txt meson-test-list.txt
+  artifacts:
+    paths:
+      - meson-test-list.txt
+
 
 build:tests-debian-autotools:
   image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian:latest
@@ -39,13 +46,31 @@ build:tests-debian-autotools:
   script:
     - ./autogen.sh --enable-{chamelium,audio,intel,amdgpu,nouveau,tests,runner}
     - make -j
+    - cp tests/test-list.txt autotools-test-list.txt
+  artifacts:
+    paths:
+      - autotools-test-list.txt
 
-ninja:test:
+#################### TEST ##########################
+
+test:ninja-test:
+  dependencies:
+    - build:tests-fedora
   stage: test
-  script:
-    - ninja -C build test
+  script: ninja -C build test
+
+test:test-list-diff:
+  dependencies:
+    - build:tests-debian-autotools
+    - build:tests-debian-meson
+  stage: test
+  script: diff <(sed "s/ /\n/g" meson-test-list.txt| sort) <(sed "s/ /\n/g" autotools-test-list.txt | sort) 
+
+################### DEPLOY #########################
 
 pages:
+  dependencies:
+    - build:tests-fedora
   stage: deploy
   script:
     - ninja -C build igt-gpu-tools-doc
@@ -55,6 +80,8 @@ pages:
       - public
   only:
     - master
+
+################# CONTAINERS #######################
 
 containers:igt-debian:
   stage: containers
