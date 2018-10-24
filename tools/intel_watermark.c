@@ -1142,12 +1142,12 @@ int main(int argc, char *argv[])
 {
 	devid = intel_get_pci_device()->device_id;
 
-	if (IS_GEN9(devid)) {
+	if (intel_gen(devid) >= 9) {
 		skl_wm_dump();
 	} else if (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid)) {
 		display_base = 0x180000;
 		vlv_wm_dump();
-	} else if (HAS_PCH_SPLIT(devid)) {
+	} else if (intel_gen(devid) >= 5) {
 		ilk_wm_dump();
 	} else if (IS_G4X(devid)) {
 		g4x_wm_dump();
