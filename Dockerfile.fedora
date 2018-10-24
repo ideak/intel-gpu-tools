@@ -10,6 +10,7 @@ RUN dnf install -y gcc \
 		kmod-devel \
 		glib2-devel \
 		cairo-devel \
+		ninja-build \
 		procps-devel \
 		pixman-devel \
 		json-c-devel \
@@ -34,3 +35,10 @@ RUN curl -O http://piumarta.com/software/peg/peg-0.1.18.tar.gz
 RUN tar xf peg-0.1.18.tar.gz
 RUN cd peg-0.1.18 && make PREFIX=/usr install
 RUN rm -fr /tmp/peg
+
+# Meson version switching shenanigans
+WORKDIR /usr/src
+RUN curl -O https://files.pythonhosted.org/packages/c0/98/bcbda7862f8ca18dbdaa57b9c51cf7333cdc59b48278ed279217cd6ad8ff/meson-0.44.0.tar.gz
+
+# Cleanup workdir
+WORKDIR /

@@ -21,12 +21,21 @@ stages:
 build:tests-fedora:
   stage: build
   script:
-    # Feodora does not have peg packaged
     - meson $MESON_OPTIONS build
     - ninja -C build
   artifacts:
     paths:
       - build
+
+# documentation building is different with meson<0.47
+build:tests-fedora-oldest-meson:
+  stage: build
+  script:
+    - dnf remove -y meson
+    - pip3 install /usr/src/meson-*.tar.gz
+    - meson $MESON_OPTIONS build
+    - ninja -C build
+    - ninja -C build igt-gpu-tools-doc
 
 build:tests-debian-meson:
   image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian:latest
