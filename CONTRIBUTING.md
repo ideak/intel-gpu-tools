@@ -8,7 +8,7 @@ A short list of contribution guidelines:
 - Please submit patches formatted with git send-email/git format-patch or
   equivalent to:
 
-    Development mailing list for IGT GPU Tools <igt-dev@lists.freedesktop.org>
+      Development mailing list for IGT GPU Tools <igt-dev@lists.freedesktop.org>
 
   For a transition period patches are accepted on both the igt-dev mailing list
   and the former intel-gfx mailing list (with the appropriate patch
@@ -18,13 +18,13 @@ A short list of contribution guidelines:
   have a need to do so, as they will get deduplicated so they only appear and
   are tested in one Patchwork instance.
 
-    Intel GFX discussion <intel-gfx@lists.freedesktop.org>
+      Intel GFX discussion <intel-gfx@lists.freedesktop.org>
 
   Please use --subject-prefix="PATCH i-g-t" so IGT patches are easily
   identified in the massive amount mails on intel-gfx. To ensure this is always
   done, meson.sh (and autogen.sh) will run:
 
-    git config format.subjectprefix "PATCH i-g-t"
+      git config format.subjectprefix "PATCH i-g-t"
 
   on its first invocation.
 
