@@ -1,4 +1,4 @@
-image: registry.freedesktop.org/drm/igt-gpu-tools/igt-fedora:latest
+image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-fedora:latest
 variables:
   MESON_OPTIONS: >
     -Dwith_libdrm=intel,nouveau,amdgpu
@@ -27,7 +27,7 @@ build:tests-fedora:
       - build
 
 build:tests-debian:
-  image: registry.freedesktop.org/drm/igt-gpu-tools/igt-debian:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian:latest
   stage: build
   script:
     - meson $MESON_OPTIONS build
