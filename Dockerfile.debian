@@ -33,3 +33,11 @@ RUN apt-get install -t stretch-backports -y \
 					meson \
 					libdrm-dev \
 					libdrm-intel1
+
+# autotools build deps
+RUN apt-get install -y \
+			autoconf \
+			automake \
+			xutils-dev \
+			libtool \
+			make

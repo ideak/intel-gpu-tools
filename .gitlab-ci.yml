@@ -33,6 +33,13 @@ build:tests-debian:
     - meson $MESON_OPTIONS build
     - ninja -C build
 
+build:tests-debian-autotools:
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian:latest
+  stage: build
+  script:
+    - ./autogen.sh --enable-{chamelium,audio,intel,amdgpu,nouveau,tests,runner}
+    - make -j
+
 ninja:test:
   stage: test
   script:
