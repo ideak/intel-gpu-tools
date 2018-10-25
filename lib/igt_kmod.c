@@ -333,6 +333,17 @@ igt_i915_driver_unload(void)
 		}
 	}
 
+	if (igt_kmod_is_loaded("snd_hdmi_lpe_audio")) {
+		igt_terminate_process(SIGTERM, "alsactl");
+
+		if (igt_kmod_unload("snd_hdmi_lpe_audio", 0)) {
+			igt_warn("Could not unload snd_hdmi_lpe_audio\n");
+			igt_kmod_list_loaded();
+			igt_lsof("/dev/snd");
+			return IGT_EXIT_FAILURE;
+		}
+	}
+
 	/* gen5 */
 	if (igt_kmod_is_loaded("intel_ips"))
 		igt_kmod_unload("intel_ips", 0);
