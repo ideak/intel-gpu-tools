@@ -145,15 +145,6 @@
     <xi:include href="igt_test_programs_drm_description.xml"/>
   </refentry>
 
-  <refentry id="igt-drv-tests">
-    <refnamediv>
-      <refname>DRV Tests</refname>
-      <refpurpose>Tests for overall driver behaviour</refpurpose>
-    </refnamediv>
-    <xi:include href="igt_test_programs_drv_programs.xml"/>
-    <xi:include href="igt_test_programs_drv_description.xml"/>
-  </refentry>
-
   <refentry id="igt-gem-tests">
     <refnamediv>
       <refname>GEM Tests</refname>
@@ -188,6 +179,15 @@
     </refnamediv>
     <xi:include href="igt_test_programs_gvt_programs.xml"/>
     <xi:include href="igt_test_programs_gvt_description.xml"/>
+  </refentry>
+
+  <refentry id="igt-i915-tests">
+    <refnamediv>
+      <refname>i915 Tests</refname>
+      <refpurpose>Tests for overall i915 driver behaviour</refpurpose>
+    </refnamediv>
+    <xi:include href="igt_test_programs_i915_programs.xml"/>
+    <xi:include href="igt_test_programs_i915_description.xml"/>
   </refentry>
 
   <refentry id="igt-kms-tests">

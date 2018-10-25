@@ -2,7 +2,7 @@ igt@meta_test(@.*)?
 ###############################################
 # Kernel selftests (run separately)
 ###############################################
-igt@drv_selftest(@.*)?
+igt@i915_selftest(@.*)?
 igt@drm_mm(@.*)?
 ###############################################
 # Handle module reloads with great care!
@@ -12,7 +12,7 @@ igt@drm_mm(@.*)?
 # self-contained tests, leading to random
 # failures in tests run afterwards.
 ###############################################
-igt@drv_module_reload(@.*)?
+igt@i915_module_load(@.*)?
 igt@pm_rpm@module-reload
 ###############################################
 # GEM

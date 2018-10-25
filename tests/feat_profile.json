@@ -24,11 +24,6 @@
         "exclude_tests" : "",
         "target_rate" : 90
     },
-    "drv" : {
-        "include_tests" : "drv",
-        "exclude_tests" : "",
-        "target_rate" : 90
-    },
     "gem" : {
         "include_tests" : "gem",
         "exclude_tests" : "",
@@ -37,6 +32,11 @@
     "hang" : {
         "comment" : "gpu hang recovery",
 	"include_tests" : "hang",
+        "exclude_tests" : "",
+        "target_rate" : 90
+    },
+    "i915" : {
+        "include_tests" : "i915",
         "exclude_tests" : "",
         "target_rate" : 90
     },

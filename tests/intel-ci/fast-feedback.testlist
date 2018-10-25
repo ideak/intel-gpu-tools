@@ -3,9 +3,6 @@
 igt@core_auth@basic-auth
 igt@core_prop_blob@basic
 igt@debugfs_test@read_all_entries
-igt@drv_getparams_basic@basic-eu-total
-igt@drv_getparams_basic@basic-subslice-total
-igt@drv_hangman@error-state-basic
 igt@gem_basic@bad-close
 igt@gem_basic@create-close
 igt@gem_basic@create-fd-close
@@ -139,6 +136,9 @@ igt@gem_wait@basic-busy-all
 igt@gem_wait@basic-wait-all
 igt@gem_wait@basic-await-all
 igt@gem_workarounds@basic-read
+igt@i915_getparams_basic@basic-eu-total
+igt@i915_getparams_basic@basic-subslice-total
+igt@i915_hangman@error-state-basic
 igt@kms_addfb_basic@addfb25-bad-modifier
 igt@kms_addfb_basic@addfb25-framebuffer-vs-set-tiling
 igt@kms_addfb_basic@addfb25-modifier-no-flag
@@ -269,7 +269,7 @@ igt@vgem_basic@sysfs
 # driver in a broken state that is not otherwise noticed in that test.
 
 igt@vgem_basic@unload
-igt@drv_module_reload@basic-reload
-igt@drv_module_reload@basic-no-display
-igt@drv_module_reload@basic-reload-inject
+igt@i915_module_load@reload
+igt@i915_module_load@reload-no-display
+igt@i915_module_load@reload-with-fault-injection
 igt@pm_rpm@module-reload

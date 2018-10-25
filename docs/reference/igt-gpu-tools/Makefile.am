@@ -144,8 +144,6 @@ test_program_files = xml/igt_test_programs_amdgpu_description.xml \
 		     xml/igt_test_programs_debugfs_programs.xml \
 		     xml/igt_test_programs_drm_description.xml \
 		     xml/igt_test_programs_drm_programs.xml \
-		     xml/igt_test_programs_drv_description.xml \
-		     xml/igt_test_programs_drv_programs.xml \
 		     xml/igt_test_programs_gem_description.xml \
 		     xml/igt_test_programs_gem_programs.xml \
 		     xml/igt_test_programs_gen3_description.xml \
@@ -154,6 +152,8 @@ test_program_files = xml/igt_test_programs_amdgpu_description.xml \
 		     xml/igt_test_programs_gen7_programs.xml \
 		     xml/igt_test_programs_gvt_description.xml \
 		     xml/igt_test_programs_gvt_programs.xml \
+		     xml/igt_test_programs_i915_description.xml \
+		     xml/igt_test_programs_i915_programs.xml \
 		     xml/igt_test_programs_kms_description.xml \
 		     xml/igt_test_programs_kms_programs.xml \
 		     xml/igt_test_programs_meta_description.xml \

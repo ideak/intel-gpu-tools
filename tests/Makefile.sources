@@ -33,12 +33,6 @@ TESTS_progs = \
 	drm_import_export \
 	drm_mm \
 	drm_read \
-	drv_getparams_basic \
-	drv_hangman \
-	drv_missed_irq \
-	drv_module_reload \
-	drv_selftest \
-	drv_suspend \
 	kms_3d \
 	kms_addfb_basic \
 	kms_atomic \
@@ -479,9 +473,26 @@ gen3_render_tiledx_blits_SOURCES = i915/gen3_render_tiledx_blits.c
 TESTS_progs += gen3_render_tiledy_blits
 gen3_render_tiledy_blits_SOURCES = i915/gen3_render_tiledy_blits.c
 
+TESTS_progs += i915_getparams_basic
+i915_getparams_basic_SOURCES = i915/getparams_basic.c
+
+TESTS_progs += i915_hangman
+i915_hangman_SOURCES = i915/hangman.c
+
+TESTS_progs += i915_missed_irq
+i915_missed_irq_SOURCES = i915/missed_irq.c
+
+TESTS_progs += i915_module_load
+i915_module_load_SOURCES = i915/module_load.c
+
 TESTS_progs += i915_query
 i915_query_SOURCES = i915/query.c
 
+TESTS_progs += i915_selftest
+i915_selftest_SOURCES = i915/selftest.c
+
+TESTS_progs += i915_suspend
+i915_suspend_SOURCES = i915/suspend.c
 
 TESTS_progs_X = gem_concurrent_all
 gem_concurrent_all_SOURCES = i915/gem_concurrent_all.c

@@ -326,7 +326,7 @@ hda_dynamic_debug(bool enable)
 
 igt_main
 {
-	igt_subtest("basic-reload") {
+	igt_subtest("reload") {
 		int load_error;
 
 		igt_i915_driver_unload();
@@ -343,7 +343,7 @@ igt_main
 		/* only default modparams, can leave module loaded */
 	}
 
-	igt_subtest("basic-no-display") {
+	igt_subtest("reload-no-display") {
 		igt_i915_driver_unload();
 
 		igt_assert_eq(igt_i915_driver_load("disable_display=1"), 0);
@@ -351,7 +351,7 @@ igt_main
 		igt_i915_driver_unload();
 	}
 
-	igt_subtest("basic-reload-inject") {
+	igt_subtest("reload-with-fault-injection") {
 		int i = 0;
 
 		igt_i915_driver_unload();

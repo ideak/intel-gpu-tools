@@ -10,12 +10,6 @@ test_progs = [
 	'drm_import_export',
 	'drm_mm',
 	'drm_read',
-	'drv_getparams_basic',
-	'drv_hangman',
-	'drv_missed_irq',
-	'drv_module_reload',
-	'drv_selftest',
-	'drv_suspend',
 	'kms_3d',
 	'kms_addfb_basic',
 	'kms_atomic',
@@ -98,7 +92,13 @@ test_progs = [
 ]
 
 i915_progs = [
+	'getparams_basic',
+	'hangman',
+	'missed_irq',
+	'module_load',
 	'query',
+	'selftest',
+	'suspend',
 ]
 
 gem_progs = [
