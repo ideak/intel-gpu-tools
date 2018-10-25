@@ -170,9 +170,14 @@ test_cp_enable_disable(const enum pipe pipe, igt_output_t *output,
 			igt_debug("Retry (%d/2) ...\n", 3 - retry);
 	} while (retry && !ret);
 
+	/*
+	 * Even on HDCP enable failed scenario, IGT should exit leaving the
+	 * "content protection" at "UNDESIRED".
+	 */
+	igt_output_set_prop_value(output, IGT_CONNECTOR_CONTENT_PROTECTION, 0);
+
 	igt_assert_f(ret, "Content Protection not enabled\n");
 
-	igt_output_set_prop_value(output, IGT_CONNECTOR_CONTENT_PROTECTION, 0);
 	igt_plane_set_fb(primary, &red);
 	igt_display_commit2(display, s);
 
