@@ -1530,8 +1530,8 @@ static void convert_nv12_to_rgb24(struct fb_convert *cvt)
 	 * from there.
 	 */
 	igt_memcpy_from_wc(buf, cvt->src.ptr, cvt->src.fb->size);
-	y = cvt->src.ptr + cvt->src.fb->offsets[0];
-	uv = cvt->src.ptr + cvt->src.fb->offsets[1];
+	y = buf + cvt->src.fb->offsets[0];
+	uv = buf + cvt->src.fb->offsets[1];
 
 	for (i = 0; i < cvt->dst.fb->height / 2; i++) {
 		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
