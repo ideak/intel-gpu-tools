@@ -175,11 +175,10 @@ test_cp_enable_disable(const enum pipe pipe, igt_output_t *output,
 	 * "content protection" at "UNDESIRED".
 	 */
 	igt_output_set_prop_value(output, IGT_CONNECTOR_CONTENT_PROTECTION, 0);
-
-	igt_assert_f(ret, "Content Protection not enabled\n");
-
 	igt_plane_set_fb(primary, &red);
 	igt_display_commit2(display, s);
+
+	igt_assert_f(ret, "Content Protection not enabled\n");
 
 	/* Wait for HDCP to be disabled, before crtc off */
 	wait_for_prop_value(output, 0, 1000);
