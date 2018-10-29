@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "igt_rand.h"
 #include "drmtest.h"
 #include "sw_sync.h"
 #include <errno.h>
@@ -41,7 +42,7 @@
 
 struct plane_parms {
 	struct igt_fb *fb;
-	uint32_t width, height;
+	uint32_t width, height, mask;
 };
 
 /* globals for fence support */
@@ -131,7 +132,7 @@ wm_setup_plane(igt_display_t *display, enum pipe pipe,
 	for_each_plane_on_pipe(display, pipe, plane) {
 		int i = plane->index;
 
-		if (!((1 << plane->index) & mask)) {
+		if (!mask || !(parms[i].mask & mask)) {
 			if (plane->values[IGT_PLANE_FB_ID])
 				igt_plane_set_fb(plane, NULL);
 			continue;
@@ -192,13 +193,16 @@ static void setup_parms(igt_display_t *display, enum pipe pipe,
 			struct igt_fb *primary_fb,
 			struct igt_fb *argb_fb,
 			struct igt_fb *sprite_fb,
-			struct plane_parms *parms)
+			struct plane_parms *parms,
+			unsigned *iter_max)
 {
 	uint64_t cursor_width, cursor_height;
 	unsigned sprite_width, sprite_height, prev_w, prev_h;
 	bool max_sprite_width, max_sprite_height, alpha = true;
 	uint32_t n_planes = display->pipes[pipe].n_planes;
+	uint32_t n_overlays = 0, overlays[n_planes];
 	igt_plane_t *plane;
+	uint32_t iter_mask = 3;
 
 	do_or_die(drmGetCap(display->drm_fd, DRM_CAP_CURSOR_WIDTH, &cursor_width));
 	if (cursor_width >= mode->hdisplay)
@@ -215,12 +219,37 @@ static void setup_parms(igt_display_t *display, enum pipe pipe,
 			parms[i].fb = primary_fb;
 			parms[i].width = mode->hdisplay;
 			parms[i].height = mode->vdisplay;
+			parms[i].mask = 1 << 0;
 		} else if (plane->type == DRM_PLANE_TYPE_CURSOR) {
 			parms[i].fb = argb_fb;
 			parms[i].width = cursor_width;
 			parms[i].height = cursor_height;
-		} else
+			parms[i].mask = 1 << 1;
+		} else {
 			parms[i].fb = sprite_fb;
+			parms[i].mask = 1 << 2;
+
+			iter_mask |= 1 << 2;
+
+			overlays[n_overlays++] = i;
+		}
+	}
+
+	if (n_overlays >= 2) {
+		uint32_t i;
+
+		/*
+		 * Create 2 groups for overlays, make sure 1 plane is put
+		 * in each then spread the rest out.
+		 */
+		iter_mask |= 1 << 3;
+		parms[overlays[n_overlays - 1]].mask = 1 << 3;
+
+		for (i = 1; i < n_overlays - 1; i++) {
+			int val = hars_petruska_f54_1_random_unsafe_max(2);
+
+			parms[overlays[i]].mask = 1 << (2 + val);
+		}
 	}
 
 	igt_create_fb(display->drm_fd, cursor_width, cursor_height,
@@ -229,7 +258,8 @@ static void setup_parms(igt_display_t *display, enum pipe pipe,
 	igt_create_fb(display->drm_fd, cursor_width, cursor_height,
 		      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE, sprite_fb);
 
-	if (n_planes < 3)
+	*iter_max = iter_mask + 1;
+	if (!n_overlays)
 		return;
 
 	/*
@@ -390,7 +420,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 	drmModeModeInfo *mode, override_mode;
 	igt_plane_t *plane;
 	igt_pipe_t *pipe_obj = &display->pipes[pipe];
-	uint32_t iter_max = 1 << pipe_obj->n_planes, i;
+	uint32_t iter_max, i;
 	struct plane_parms parms[pipe_obj->n_planes];
 	unsigned flags = 0;
 	int ret;
@@ -428,7 +458,7 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
-	setup_parms(display, pipe, mode, &fb, &argb_fb, &sprite_fb, parms);
+	setup_parms(display, pipe, mode, &fb, &argb_fb, &sprite_fb, parms, &iter_max);
 
 	/*
 	 * In some configurations the tests may not run to completion with all
