@@ -141,6 +141,8 @@ static void run_test(int fd, int count)
 
 	memset(reloc, 0, sizeof(reloc));
 	memset(obj, 0, sizeof(obj));
+	obj[0].flags = EXEC_OBJECT_NEEDS_FENCE;
+	obj[1].flags = EXEC_OBJECT_NEEDS_FENCE;
 	obj[2].handle = create_batch(fd, reloc);
 	obj[2].relocs_ptr = to_user_pointer(reloc);
 	obj[2].relocation_count = ARRAY_SIZE(reloc);
