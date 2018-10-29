@@ -47,16 +47,20 @@
 static drm_intel_bo *create_bo(drm_intel_bufmgr *bufmgr,
 			       uint32_t pixel)
 {
+	uint64_t value = (uint64_t)pixel << 32 | pixel, *v;
 	drm_intel_bo *bo;
-	uint32_t *v;
 
 	bo = drm_intel_bo_alloc(bufmgr, "surface", SIZE, 4096);
 	igt_assert(bo);
 
 	do_or_die(drm_intel_bo_map(bo, 1));
 	v = bo->virtual;
-	for (int i = 0; i < SIZE/4; i++)
-		v[i] = pixel;
+	for (int i = 0; i < SIZE / sizeof(value); i += 8) {
+		v[i + 0] = value; v[i + 1] = value;
+		v[i + 2] = value; v[i + 3] = value;
+		v[i + 4] = value; v[i + 5] = value;
+		v[i + 6] = value; v[i + 7] = value;
+	}
 	drm_intel_bo_unmap(bo);
 
 	return bo;
