@@ -12,7 +12,7 @@
 
 static char testdatadir[] = TESTDATA_DIRECTORY;
 
-static void igt_assert_eqstr(char *one, char *two)
+static void igt_assert_eqstr(const char *one, const char *two)
 {
 	if (one == NULL && two == NULL)
 		return;
@@ -38,7 +38,7 @@ static void debug_print_executions(struct job_list *list)
 
 }
 
-static char *dump_file(int dirfd, char *name)
+static char *dump_file(int dirfd, const char *name)
 {
 	int fd = openat(dirfd, name, O_RDONLY);
 	ssize_t s;
@@ -61,7 +61,7 @@ static char *dump_file(int dirfd, char *name)
 	return buf;
 }
 
-static void job_list_filter_test(char *name, char *filterarg1, char *filterarg2,
+static void job_list_filter_test(const char *name, const char *filterarg1, const char *filterarg2,
 				 size_t expected_normal, size_t expected_multiple)
 {
 	int multiple;
@@ -73,18 +73,18 @@ static void job_list_filter_test(char *name, char *filterarg1, char *filterarg2,
 	for (multiple = 0; multiple < 2; multiple++) {
 		igt_subtest_f("job-list-filters-%s-%s", name, multiple ? "multiple" : "normal") {
 			struct job_list list;
-			char *argv[] = { "runner",
-					 /* Ugly but does the trick */
-					 multiple ? "--multiple-mode" : "--sync",
-					 filterarg1, filterarg2,
-					 testdatadir,
-					 "path-to-results",
+			const char *argv[] = { "runner",
+					       /* Ugly but does the trick */
+					       multiple ? "--multiple-mode" : "--sync",
+					       filterarg1, filterarg2,
+					       testdatadir,
+					       "path-to-results",
 			};
 			bool success = false;
 			size_t size;
 
 			init_job_list(&list);
-			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 			success = create_job_list(&list, &settings);
 			size = list.size;
@@ -176,7 +176,7 @@ static void assert_job_list_equal(struct job_list *one, struct job_list *two)
 	}
 }
 
-static void assert_execution_created(int dirfd, char *name)
+static void assert_execution_created(int dirfd, const char *name)
 {
 	int fd;
 
@@ -201,12 +201,12 @@ igt_main
 		init_settings(&settings);
 
 	igt_subtest("default-settings") {
-		char *argv[] = { "runner",
-				 "test-root-dir",
-				 "path-to-results",
+		const char *argv[] = { "runner",
+				       "test-root-dir",
+				       "path-to-results",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 		igt_assert(!settings.abort_on_error);
 		igt_assert(!settings.test_list);
@@ -281,13 +281,13 @@ igt_main
 		}
 
 		igt_subtest("absolute-path-usage") {
-			char *argv[] = { "runner",
-					 "--test-list", pathtotestlist,
-					 testdatadir,
-					 dirname,
+			const char *argv[] = { "runner",
+					       "--test-list", pathtotestlist,
+					       testdatadir,
+					       dirname,
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 			path = realpath(testdatadir, NULL);
 			igt_assert(path != NULL);
@@ -315,13 +315,13 @@ igt_main
 	}
 
 	igt_subtest("environment-overrides-test-root-flag") {
-		char *argv[] = { "runner",
-				 "test-root-dir",
-				 "path-to-results",
+		const char *argv[] = { "runner",
+				       "test-root-dir",
+				       "path-to-results",
 		};
 
 		setenv("IGT_TEST_ROOT", testdatadir, 1);
-		igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 		igt_assert(!settings.abort_on_error);
 		igt_assert(!settings.test_list);
@@ -346,29 +346,29 @@ igt_main
 	}
 
 	igt_subtest("parse-all-settings") {
-		char *argv[] = { "runner",
-				 "-n", "foo",
-				 "--abort-on-monitored-error",
-				 "--test-list", "path-to-test-list",
-				 "--ignore-missing",
-				 "--dry-run",
-				 "-t", "pattern1",
-				 "-t", "pattern2",
-				 "-x", "xpattern1",
-				 "-x", "xpattern2",
-				 "-s",
-				 "-l", "verbose",
-				 "--overwrite",
-				 "--multiple-mode",
-				 "--inactivity-timeout", "27",
-				 "--overall-timeout", "360",
-				 "--use-watchdog",
-				 "--piglit-style-dmesg",
-				 "test-root-dir",
-				 "path-to-results",
+		const char *argv[] = { "runner",
+				       "-n", "foo",
+				       "--abort-on-monitored-error",
+				       "--test-list", "path-to-test-list",
+				       "--ignore-missing",
+				       "--dry-run",
+				       "-t", "pattern1",
+				       "-t", "pattern2",
+				       "-x", "xpattern1",
+				       "-x", "xpattern2",
+				       "-s",
+				       "-l", "verbose",
+				       "--overwrite",
+				       "--multiple-mode",
+				       "--inactivity-timeout", "27",
+				       "--overall-timeout", "360",
+				       "--use-watchdog",
+				       "--piglit-style-dmesg",
+				       "test-root-dir",
+				       "path-to-results",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 		igt_assert(settings.abort_on_error);
 		igt_assert(strstr(settings.test_list, "path-to-test-list") != NULL);
@@ -393,50 +393,50 @@ igt_main
 	}
 
 	igt_subtest("invalid-option") {
-		char *argv[] = { "runner",
-				 "--no-such-option",
-				 "test-root-dir",
-				 "results-path",
+		const char *argv[] = { "runner",
+				       "--no-such-option",
+				       "test-root-dir",
+				       "results-path",
 		};
 
-		igt_assert(!parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 	}
 
 	igt_subtest("paths-missing") {
-		char *argv[] = { "runner",
-				 "-o",
+		const char *argv[] = { "runner",
+				       "-o",
 		};
-		igt_assert(!parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 	}
 
 	igt_subtest("log-levels") {
-		char *argv[] = { "runner",
-				 "-l", "normal",
-				 "test-root-dir",
-				 "results-path",
+		const char *argv[] = { "runner",
+				       "-l", "normal",
+				       "test-root-dir",
+				       "results-path",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 		igt_assert_eq(settings.log_level, LOG_LEVEL_NORMAL);
 
 		argv[2] = "quiet";
-		igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 		igt_assert_eq(settings.log_level, LOG_LEVEL_QUIET);
 
 		argv[2] = "verbose";
-		igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 		igt_assert_eq(settings.log_level, LOG_LEVEL_VERBOSE);
 	}
 
 	igt_subtest("parse-clears-old-data") {
-		char *argv[] = { "runner",
-				 "-n", "foo",
-				 "--dry-run",
-				 "test-root-dir",
-				 "results-path",
+		const char *argv[] = { "runner",
+				       "-n", "foo",
+				       "--dry-run",
+				       "test-root-dir",
+				       "results-path",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 		igt_assert_eqstr(settings.name, "foo");
 		igt_assert(settings.dry_run);
@@ -446,7 +446,7 @@ igt_main
 		argv[1] = "--test-list";
 		argv[3] = "--sync";
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 		igt_assert_eqstr(settings.name, "results-path");
 		igt_assert(!settings.dry_run);
@@ -464,13 +464,13 @@ igt_main
 		}
 
 		igt_subtest("validate-ok") {
-			char *argv[] = { "runner",
-					 "--test-list", filename,
-					 testdatadir,
-					 "path-to-results",
+			const char *argv[] = { "runner",
+					       "--test-list", filename,
+					       testdatadir,
+					       "path-to-results",
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 			igt_assert(validate_settings(&settings));
 		}
@@ -481,15 +481,15 @@ igt_main
 	}
 
 	igt_subtest("validate-no-test-list") {
-		char *nosuchfile = "no-such-file";
-		char *argv[] = { "runner",
-				 "--test-list", nosuchfile,
-				 testdatadir,
-				 "path-to-results",
+		const char *nosuchfile = "no-such-file";
+		const char *argv[] = { "runner",
+				       "--test-list", nosuchfile,
+				       testdatadir,
+				       "path-to-results",
 		};
 
 		igt_assert_lt(open(nosuchfile, O_RDONLY), 0);
-		igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 		igt_assert(!validate_settings(&settings));
 	}
@@ -504,12 +504,12 @@ igt_main
 		}
 
 		igt_subtest("job-list-no-test-list-txt") {
-			char *argv[] = { "runner",
-					 dirname,
-					 "path-to-results",
+			const char *argv[] = { "runner",
+					       dirname,
+					       "path-to-results",
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 			igt_assert(!create_job_list(&list, &settings));
 		}
@@ -545,14 +545,14 @@ igt_main
 
 		for (multiple = 0; multiple < 2; multiple++) {
 			igt_subtest_f("job-list-testlist-%s", multiple ? "multiple" : "normal") {
-				char *argv[] = { "runner",
-						 "--test-list", filename,
-						 multiple ? "--multiple-mode" : "--sync",
-						 testdatadir,
-						 "path-to-results",
+				const char *argv[] = { "runner",
+						       "--test-list", filename,
+						       multiple ? "--multiple-mode" : "--sync",
+						       testdatadir,
+						       "path-to-results",
 				};
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 				igt_assert(create_job_list(&list, &settings));
 
 				igt_assert_eq(list.size, multiple ? 2 : 3);
@@ -570,16 +570,16 @@ igt_main
 			}
 
 			igt_subtest_f("job-list-testlist-filtered-%s", multiple ? "multiple" : "normal") {
-				char *argv[] = { "runner",
-						 "--test-list", filename,
-						 multiple ? "--multiple-mode" : "--sync",
-						 "-t", "successtest",
-						 "-x", "first",
-						 testdatadir,
-						 "path-to-results",
+				const char *argv[] = { "runner",
+						       "--test-list", filename,
+						       multiple ? "--multiple-mode" : "--sync",
+						       "-t", "successtest",
+						       "-x", "first",
+						       testdatadir,
+						       "path-to-results",
 				};
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 				igt_assert(create_job_list(&list, &settings));
 
 				igt_assert_eq(list.size, 1);
@@ -608,29 +608,29 @@ igt_main
 		}
 
 		igt_subtest("settings-serialize") {
-			char *argv[] = { "runner",
-					 "-n", "foo",
-					 "--abort-on-monitored-error",
-					 "--test-list", "path-to-test-list",
-					 "--ignore-missing",
-					 "--dry-run",
-					 "-t", "pattern1",
-					 "-t", "pattern2",
-					 "-x", "xpattern1",
-					 "-x", "xpattern2",
-					 "-s",
-					 "-l", "verbose",
-					 "--overwrite",
-					 "--multiple-mode",
-					 "--inactivity-timeout", "27",
-					 "--overall-timeout", "360",
-					 "--use-watchdog",
-					 "--piglit-style-dmesg",
-					 testdatadir,
-					 dirname,
+			const char *argv[] = { "runner",
+					       "-n", "foo",
+					       "--abort-on-monitored-error",
+					       "--test-list", "path-to-test-list",
+					       "--ignore-missing",
+					       "--dry-run",
+					       "-t", "pattern1",
+					       "-t", "pattern2",
+					       "-x", "xpattern1",
+					       "-x", "xpattern2",
+					       "-s",
+					       "-l", "verbose",
+					       "--overwrite",
+					       "--multiple-mode",
+					       "--inactivity-timeout", "27",
+					       "--overall-timeout", "360",
+					       "--use-watchdog",
+					       "--piglit-style-dmesg",
+					       testdatadir,
+					       dirname,
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
 			igt_assert(serialize_settings(&settings));
 
@@ -668,14 +668,14 @@ igt_main
 
 		for (multiple = 0; multiple < 2; multiple++) {
 			igt_subtest_f("job-list-serialize-%s", multiple ? "multiple" : "normal") {
-				char *argv[] = { "runner",
-						 /* Ugly */
-						 multiple ? "--multiple-mode" : "--sync",
-						 testdatadir,
-						 dirname,
+				const char *argv[] = { "runner",
+						       /* Ugly */
+						       multiple ? "--multiple-mode" : "--sync",
+						       testdatadir,
+						       dirname,
 				};
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 				igt_assert(create_job_list(&list, &settings));
 
 				igt_assert(serialize_settings(&settings));
@@ -716,12 +716,12 @@ igt_main
 
 		igt_subtest("execute-initialize-new-run") {
 			struct execute_state state;
-			char *argv[] = { "runner",
-					 testdatadir,
-					 dirname,
+			const char *argv[] = { "runner",
+					       testdatadir,
+					       dirname,
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 			igt_assert(create_job_list(&list, &settings));
 
 			igt_assert(initialize_execute_state(&state, &settings, &list));
@@ -762,16 +762,16 @@ igt_main
 
 		igt_subtest("execute-initialize-subtest-started") {
 			struct execute_state state;
-			char *argv[] = { "runner",
-					 "--multiple-mode",
-					 "-t", "successtest",
-					 testdatadir,
-					 dirname,
+			const char *argv[] = { "runner",
+					       "--multiple-mode",
+					       "-t", "successtest",
+					       testdatadir,
+					       dirname,
 			};
 			char journaltext[] = "first-subtest\n";
 			char excludestring[] = "!first-subtest";
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 			igt_assert(create_job_list(&list, &settings));
 			igt_assert(list.size == 1);
 			igt_assert(list.entries[0].subtest_count == 0);
@@ -817,16 +817,16 @@ igt_main
 
 		igt_subtest("execute-initialize-all-subtests-started") {
 			struct execute_state state;
-			char *argv[] = { "runner",
-					 "--multiple-mode",
-					 "-t", "successtest@first-subtest",
-					 "-t", "successtest@second-subtest",
-					 testdatadir,
-					 dirname,
+			const char *argv[] = { "runner",
+					       "--multiple-mode",
+					       "-t", "successtest@first-subtest",
+					       "-t", "successtest@second-subtest",
+					       testdatadir,
+					       dirname,
 			};
 			char journaltext[] = "first-subtest\nsecond-subtest\n";
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 			igt_assert(create_job_list(&list, &settings));
 			igt_assert(list.size == 1);
 			igt_assert(list.entries[0].subtest_count == 2);
@@ -871,14 +871,14 @@ igt_main
 
 		igt_subtest("execute-initialize-subtests-complete") {
 			struct execute_state state;
-			char *argv[] = { "runner",
-					 "--multiple-mode",
-					 testdatadir,
-					 dirname,
+			const char *argv[] = { "runner",
+					       "--multiple-mode",
+					       testdatadir,
+					       dirname,
 			};
 			char journaltext[] = "first-subtest\nsecond-subtest\nexit:0\n";
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 			igt_assert(create_job_list(&list, &settings));
 			igt_assert(list.size == 3);
 
@@ -935,17 +935,17 @@ igt_main
 
 			igt_subtest_f("execute-subtests-%s", multiple ? "multiple" : "normal") {
 				struct execute_state state;
-				char *argv[] = { "runner",
-						 multiple ? "--multiple-mode" : "--sync",
-						 "-t", "-subtest",
-						 testdatadir,
-						 dirname,
+				const char *argv[] = { "runner",
+						       multiple ? "--multiple-mode" : "--sync",
+						       "-t", "-subtest",
+						       testdatadir,
+						       dirname,
 				};
 				char testdirname[16];
 				size_t expected_tests = multiple ? 2 : 3;
 				size_t i;
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 				igt_assert(create_job_list(&list, &settings));
 				igt_assert(initialize_execute_state(&state, &settings, &list));
 
@@ -1001,19 +1001,19 @@ igt_main
 
 			igt_subtest_f("execute-skipper-journal-%s", multiple ? "multiple" : "normal") {
 				struct execute_state state;
-				char *argv[] = { "runner",
-						 multiple ? "--multiple-mode" : "--sync",
-						 "-t", "skippers",
-						 testdatadir,
-						 dirname,
+				const char *argv[] = { "runner",
+						       multiple ? "--multiple-mode" : "--sync",
+						       "-t", "skippers",
+						       testdatadir,
+						       dirname,
 				};
 				char *dump;
-				char *expected_0 = multiple ?
+				const char *expected_0 = multiple ?
 					"skip-one\nskip-two\nexit:77 (" :
 					"skip-one\nexit:77 (";
-				char *expected_1 = "skip-two\nexit:77 (";
+				const char *expected_1 = "skip-two\nexit:77 (";
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), argv, &settings));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 				igt_assert(create_job_list(&list, &settings));
 				igt_assert(initialize_execute_state(&state, &settings, &list));
 
