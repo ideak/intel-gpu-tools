@@ -928,7 +928,7 @@ static bool clear_old_results(char *path)
 	return true;
 }
 
-static double timeofday_double()
+static double timeofday_double(void)
 {
 	struct timeval tv;
 
