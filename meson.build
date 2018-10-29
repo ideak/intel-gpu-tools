@@ -10,14 +10,48 @@ project('igt-gpu-tools', 'c',
 cc = meson.get_compiler('c')
 
 cc_args = [
-	'-Wno-unused-parameter',
-	'-Wno-sign-compare',
-	'-Wno-missing-field-initializers',
-	'-Wno-clobbered',
-# Macros asserting on the range of their arguments triggers this.
-	'-Wno-type-limits',
+	'-Wbad-function-cast',
+	'-Wdeclaration-after-statement',
+	'-Wformat=2',
 # igt_assert(0) in switch statements triggers a bunch of this.
 	'-Wimplicit-fallthrough=0',
+	'-Wlogical-op',
+	'-Wmissing-declarations',
+	'-Wmissing-format-attribute',
+	'-Wmissing-noreturn',
+	'-Wmissing-prototypes',
+	'-Wnested-externs',
+	'-Wold-style-definition',
+	'-Wpointer-arith',
+	'-Wredundant-decls',
+	'-Wshadow',
+	'-Wstrict-prototypes',
+	'-Wuninitialized',
+	'-Wunused',
+
+	'-Wno-clobbered',
+	'-Wno-maybe-uninitialized',
+	'-Wno-missing-field-initializers',
+	'-Wno-pointer-arith',
+	'-Wno-sign-compare',
+# Macros asserting on the range of their arguments triggers this.
+	'-Wno-type-limits',
+	'-Wno-unused-parameter',
+	'-Wno-unused-result',
+
+	'-Werror=address',
+	'-Werror=array-bounds',
+	'-Werror=implicit',
+	'-Werror=init-self',
+	'-Werror=int-to-pointer-cast',
+	'-Werror=main',
+	'-Werror=missing-braces',
+	'-Werror=nonnull',
+	'-Werror=pointer-to-int-cast',
+	'-Werror=return-type',
+	'-Werror=sequence-point',
+	'-Werror=trigraphs',
+	'-Werror=write-strings',
 ]
 
 foreach cc_arg : cc_args

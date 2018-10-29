@@ -11,7 +11,23 @@ lib_brw_src = [
 	'ralloc.c',
 ]
 
+assembler_warnflags = [
+	'-Wno-declaration-after-statement',
+	'-Wno-discarded-qualifiers',
+	'-Wno-missing-format-attribute',
+	'-Wno-old-style-definition',
+	'-Wno-redundant-decls',
+	'-Wno-shadow',
+]
+assembler_args = []
+foreach flag : assembler_warnflags
+	if cc.has_argument(flag)
+		assembler_args += flag
+	endif
+endforeach
+
 lib_brw = static_library('brw', lib_brw_src,
+			 c_args : assembler_args,
 			 dependencies : igt_deps)
 
 flex = find_program('flex')
@@ -30,9 +46,11 @@ pgen = generator(bison,
 pfiles = pgen.process('gram.y')
 
 executable('intel-gen4asm', 'main.c', lfiles, pfiles,
+	   c_args : assembler_args,
 	   link_with : lib_brw, install : true)
 
 executable('intel-gen4disasm', 'disasm-main.c',
+	   c_args : assembler_args,
 	   link_with : lib_brw, install : true)
 
 conf_data = configuration_data()
