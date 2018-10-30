@@ -481,6 +481,9 @@ gen3_render_tiledx_blits_SOURCES = i915/gen3_render_tiledx_blits.c
 TESTS_progs += gen3_render_tiledy_blits
 gen3_render_tiledy_blits_SOURCES = i915/gen3_render_tiledy_blits.c
 
+TESTS_progs += i915_fb_tiling
+i915_fb_tiling_SOURCES = i915/fb_tiling.c
+
 TESTS_progs += i915_getparams_basic
 i915_getparams_basic_SOURCES = i915/getparams_basic.c
 

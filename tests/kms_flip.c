@@ -60,7 +60,7 @@
 #define TEST_RMFB		(1 << 14)
 #define TEST_HANG		(1 << 15)
 #define TEST_NOEVENT		(1 << 16)
-#define TEST_FB_BAD_TILING	(1 << 17)
+
 #define TEST_SINGLE_BUFFER	(1 << 18)
 #define TEST_DPMS_OFF		(1 << 19)
 #define TEST_NO_2X_OUTPUT	(1 << 20)
@@ -603,20 +603,6 @@ static void recreate_fb(struct test_output *o)
 	o->fb_info[o->current_fb_id].fb_id = new_fb_id;
 }
 
-static void set_y_tiling(struct test_output *o, int fb_idx)
-{
-	drmModeFBPtr r;
-	struct igt_fb *fb_info = &o->fb_info[fb_idx];
-
-	/* Call rmfb/getfb/addfb to ensure those don't introduce stalls */
-	r = drmModeGetFB(drm_fd, fb_info->fb_id);
-	igt_assert(r);
-	/* Newer kernels don't allow such shenagians any more, so skip the test. */
-	igt_require(__gem_set_tiling(drm_fd, r->handle, I915_TILING_Y, fb_info->strides[0]) == 0);
-	gem_close(drm_fd, r->handle);
-	drmFree(r);
-}
-
 static igt_hang_t hang_gpu(int fd)
 {
 	return igt_hang_ring(fd, I915_EXEC_DEFAULT);
@@ -695,9 +681,6 @@ static unsigned int run_test_step(struct test_output *o)
 		recreate_fb(o);
 	new_fb_id = o->fb_ids[o->current_fb_id];
 
-	if (o->flags & TEST_FB_BAD_TILING)
-		new_fb_id = o->fb_ids[2];
-
 	if ((o->flags & TEST_VBLANK_EXPIRED_SEQ) &&
 	    !(o->pending_events & EVENT_VBLANK) && o->flip_state.count > 0) {
 		struct vblank_reply reply;
@@ -722,9 +705,6 @@ static unsigned int run_test_step(struct test_output *o)
 
 	if (do_flip && (o->flags & TEST_EINVAL) && o->flip_state.count > 0)
 		igt_assert(do_page_flip(o, new_fb_id, true) == expected_einval);
-
-	if (o->flags & TEST_FB_BAD_TILING)
-		new_fb_id = o->fb_ids[o->current_fb_id];
 
 	if (do_vblank && (o->flags & TEST_EINVAL) && o->vblank_state.count > 0)
 		igt_assert(do_wait_for_vblank(o, o->pipe, target_seq, &vbl_reply)
@@ -840,7 +820,7 @@ static unsigned int run_test_step(struct test_output *o)
 		igt_assert(do_wait_for_vblank(o, o->pipe, target_seq, &vbl_reply)
 			   == -EINVAL);
 
-	if (do_flip && (o->flags & TEST_EINVAL) && !(o->flags & TEST_FB_BAD_TILING))
+	if (do_flip && (o->flags & TEST_EINVAL))
 		igt_assert(do_page_flip(o, new_fb_id, true) == expected_einval);
 
 	unhang_gpu(drm_fd, hang);
@@ -1265,21 +1245,11 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	igt_assert(o->fb_ids[0]);
 	igt_assert(o->fb_ids[1]);
 
-	if (o->flags & TEST_FB_BAD_TILING) {
-		o->fb_ids[2] = igt_create_fb(drm_fd, o->fb_width, o->fb_height,
-				igt_bpp_depth_to_drm_format(o->bpp, o->depth),
-				LOCAL_I915_FORMAT_MOD_X_TILED, &o->fb_info[2]);
-		igt_require(o->fb_ids[2]);
-	}
-
 	paint_flip_mode(&o->fb_info[0], false);
 	if (!(o->flags & TEST_BO_TOOBIG))
 		paint_flip_mode(&o->fb_info[1], true);
 	if (o->fb_ids[2])
 		paint_flip_mode(&o->fb_info[2], true);
-
-	if (o->flags & TEST_FB_BAD_TILING)
-		set_y_tiling(o, 2);
 
 	for (i = 0; i < o->count; i++)
 		kmstest_dump_mode(&o->kmode[i]);
@@ -1556,7 +1526,6 @@ int main(int argc, char **argv)
 			TEST_CHECK_TS, "flip-vs-blocking-wf-vblank" },
 		{ 30, TEST_FLIP | TEST_MODESET | TEST_HANG | TEST_NOEVENT, "flip-vs-modeset-vs-hang" },
 		{ 30, TEST_FLIP | TEST_PAN | TEST_HANG, "flip-vs-panning-vs-hang" },
-		{ 1, TEST_FLIP | TEST_EINVAL | TEST_FB_BAD_TILING, "flip-vs-bad-tiling" },
 
 		{ 1, TEST_DPMS_OFF | TEST_MODESET | TEST_FLIP,
 					"flip-vs-dpms-off-vs-modeset" },

@@ -96,6 +96,7 @@ test_progs = [
 ]
 
 i915_progs = [
+	'fb_tiling',
 	'getparams_basic',
 	'hangman',
 	'missed_irq',
