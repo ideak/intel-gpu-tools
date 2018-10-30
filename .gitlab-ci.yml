@@ -24,6 +24,7 @@ build:tests-fedora:
   script:
     - meson $MESON_OPTIONS build
     - ninja -C build
+    - ninja -C build igt-gpu-tools-doc
   artifacts:
     paths:
       - build
