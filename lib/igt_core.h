@@ -46,6 +46,14 @@
 #endif
 
 
+#ifndef STATIC_ANALYSIS_BUILD
+#if defined(__clang_analyzer__) || defined(__COVERITY__) || defined(__KLOCWORK__)
+#define STATIC_ANALYSIS_BUILD 1
+#else
+#define STATIC_ANALYSIS_BUILD 0
+#endif
+#endif
+
 extern const char* __igt_test_description __attribute__((weak));
 extern bool __igt_plain_output;
 extern char *igt_frame_dump_path;
@@ -110,8 +118,9 @@ void __igt_fixture_end(void) __attribute__((noreturn));
  */
 #define igt_fixture for (volatile int igt_tokencat(__tmpint,__LINE__) = 0; \
 			 igt_tokencat(__tmpint,__LINE__) < 1 && \
-			 __igt_fixture() && \
-			 (sigsetjmp(igt_subtest_jmpbuf, 1) == 0); \
+			 (STATIC_ANALYSIS_BUILD || \
+			 (__igt_fixture() && \
+			 (sigsetjmp(igt_subtest_jmpbuf, 1) == 0))); \
 			 igt_tokencat(__tmpint,__LINE__) ++, \
 			 __igt_fixture_complete())
 
