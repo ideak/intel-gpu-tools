@@ -94,8 +94,10 @@ pages:
 
 containers:igt-debian:
   stage: containers
-  when: manual
   image: docker:stable
+  only:
+    changes:
+      - Dockerfile.debian
   services:
     - docker:dind
   variables:
@@ -108,8 +110,10 @@ containers:igt-debian:
 
 containers:igt-fedora:
   stage: containers
-  when: manual
   image: docker:stable
+  only:
+    changes:
+      - Dockerfile.fedora
   services:
     - docker:dind
   variables:
