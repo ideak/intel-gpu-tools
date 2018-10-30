@@ -50,6 +50,7 @@ build_chamelium = get_option('build_chamelium')
 build_docs = get_option('build_docs')
 build_tests = get_option('build_tests')
 with_libdrm = get_option('with_libdrm')
+with_libunwind = get_option('with_libunwind')
 build_runner = get_option('build_runner')
 
 _build_overlay = build_overlay != 'false'
@@ -102,7 +103,17 @@ build_info += 'With libdrm: ' + ','.join(libdrm_info)
 pciaccess = dependency('pciaccess', version : '>=0.10')
 libkmod = dependency('libkmod')
 libprocps = dependency('libprocps', required : true)
-libunwind = dependency('libunwind', required : true)
+
+libunwind = null_dep
+libunwindinfo = 'No'
+if with_libunwind != 'false'
+	libunwind = dependency('libunwind', required : with_libunwind == 'true')
+	if libunwind.found()
+		libunwindinfo = 'Yes'
+	endif
+endif
+build_info += 'With libunwind: ' + libunwindinfo
+
 libdw = dependency('libdw', required : true)
 ssl = dependency('openssl', required : true)
 pixman = dependency('pixman-1', required : true)

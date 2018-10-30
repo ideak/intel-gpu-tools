@@ -59,7 +59,6 @@ lib_deps = [
 	libkmod,
 	libprocps,
 	libudev,
-	libunwind,
 	libdw,
 	pciaccess,
 	pthreads,
@@ -74,6 +73,12 @@ if libdrm_intel.found()
 else
 	lib_sources += 'stubs/drm/intel_bufmgr.c'
 	inc = [ inc, include_directories('stubs/drm') ]
+endif
+
+if libunwind.found()
+	lib_deps += libunwind
+else
+	inc = [ inc, include_directories('stubs/libunwind') ]
 endif
 
 if valgrind.found()
