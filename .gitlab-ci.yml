@@ -9,6 +9,7 @@ variables:
     -Dbuild_man=true
     -Dbuild_tests=true
     -Dbuild_runner=true
+    -Dwith_libunwind=true
 
 stages:
   - containers
@@ -26,6 +27,13 @@ build:tests-fedora:
   artifacts:
     paths:
       - build
+
+build:tests-fedora-no-libunwind:
+  stage: build
+  script:
+    - dnf remove -y libunwind-devel
+    - meson -Dlibunwind=false build
+    - ninja -C build
 
 # documentation building is different with meson<0.47
 build:tests-fedora-oldest-meson:
