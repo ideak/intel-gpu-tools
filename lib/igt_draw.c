@@ -581,9 +581,7 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 	 * smaller bpps you won't succeeed if you need to copy "half" of a 32bpp
 	 * pixel or something similar. */
 	igt_skip_on(rect->x % (32 / buf->bpp) != 0 ||
-		    rect->y % (32 / buf->bpp) != 0 ||
-		    rect->w % (32 / buf->bpp) != 0 ||
-		    rect->h % (32 / buf->bpp) != 0);
+		    rect->w % (32 / buf->bpp) != 0);
 
 	igt_require(gem_get_tiling(fd, buf->handle, &tiling, &swizzle));
 
