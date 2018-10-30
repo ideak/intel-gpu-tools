@@ -57,6 +57,15 @@ build:tests-debian-meson:
     paths:
       - meson-test-list.txt
 
+build:tests-debian-meson-arm64:
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64:latest
+  stage: build
+  script:
+    - PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig/ meson --cross-file meson-cross-arm64.txt build
+    - ninja -C build
+  artifacts:
+    paths:
+      - build
 
 build:tests-debian-autotools:
   image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian:latest
@@ -74,6 +83,14 @@ build:tests-debian-autotools:
 test:ninja-test:
   dependencies:
     - build:tests-fedora
+  stage: test
+  script: ninja -C build test
+
+test:ninja-test-arm64:
+  when: manual
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64:latest
+  dependencies:
+    - build:tests-debian-meson-arm64
   stage: test
   script: ninja -C build test
 
@@ -116,6 +133,22 @@ containers:igt-debian:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian -f Dockerfile.debian .
     - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian
+
+containers:igt-debian-arm64:
+  stage: containers
+  image: docker:stable
+  only:
+    changes:
+      - Dockerfile.debian-arm64
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64 -f Dockerfile.debian-arm64 .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64
 
 containers:igt-fedora:
   stage: containers
