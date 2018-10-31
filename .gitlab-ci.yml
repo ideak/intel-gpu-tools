@@ -124,6 +124,7 @@ containers:igt-debian:
   only:
     changes:
       - Dockerfile.debian
+      - .gitlab-ci.yml
   services:
     - docker:dind
   variables:
@@ -140,6 +141,7 @@ containers:igt-debian-arm64:
   only:
     changes:
       - Dockerfile.debian-arm64
+      - .gitlab-ci.yml
   services:
     - docker:dind
   variables:
@@ -156,6 +158,7 @@ containers:igt-fedora:
   only:
     changes:
       - Dockerfile.fedora
+      - .gitlab-ci.yml
   services:
     - docker:dind
   variables:
