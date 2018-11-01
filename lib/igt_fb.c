@@ -1946,7 +1946,7 @@ static void destroy_cairo_surface__convert(void *arg)
 	struct fb_convert cvt = {
 		.dst	= {
 			.ptr	= blit->base.linear.map,
-			.fb	= blit->base.fb,
+			.fb	= &blit->base.linear.fb,
 		},
 
 		.src	= {
@@ -1987,18 +1987,16 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED) {
 		setup_linear_mapping(fd, fb, &blit->base.linear);
 	} else {
+		blit->base.linear.fb = *fb;
 		blit->base.linear.fb.gem_handle = 0;
 		blit->base.linear.map = map_bo(fd, fb);
 		igt_assert(blit->base.linear.map);
-		blit->base.linear.fb.size = fb->size;
-		memcpy(blit->base.linear.fb.strides, fb->strides, sizeof(fb->strides));
-		memcpy(blit->base.linear.fb.offsets, fb->offsets, sizeof(fb->offsets));
 	}
 
 	cvt.dst.ptr = blit->shadow_ptr;
 	cvt.dst.fb = &blit->shadow_fb;
 	cvt.src.ptr = blit->base.linear.map;
-	cvt.src.fb = blit->base.fb;
+	cvt.src.fb = &blit->base.linear.fb;
 	fb_convert(&cvt);
 
 	fb->cairo_surface =
