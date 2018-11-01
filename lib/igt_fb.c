@@ -1506,12 +1506,41 @@ static void write_rgb(uint8_t *rgb24, const struct igt_vec4 *rgb)
 struct fb_convert_buf {
 	void			*ptr;
 	struct igt_fb		*fb;
+	bool                     slow_reads;
 };
 
 struct fb_convert {
 	struct fb_convert_buf	dst;
 	struct fb_convert_buf	src;
 };
+
+static void *convert_src_get(const struct fb_convert *cvt)
+{
+	void *buf;
+
+	if (!cvt->src.slow_reads)
+		return cvt->src.ptr;
+
+	/*
+	 * Reading from the BO is awfully slow because of lack of read caching,
+	 * it's faster to copy the whole BO to a temporary buffer and convert
+	 * from there.
+	 */
+	buf = malloc(cvt->src.fb->size);
+	if (!buf)
+		return cvt->src.ptr;
+
+	igt_memcpy_from_wc(buf, cvt->src.ptr, cvt->src.fb->size);
+
+	return buf;
+}
+
+static void convert_src_put(const struct fb_convert *cvt,
+			    void *src_buf)
+{
+	if (src_buf != cvt->src.ptr)
+		free(src_buf);
+}
 
 static void convert_nv12_to_rgb24(struct fb_convert *cvt)
 {
@@ -1520,19 +1549,14 @@ static void convert_nv12_to_rgb24(struct fb_convert *cvt)
 	uint8_t *rgb24 = cvt->dst.ptr;
 	unsigned int rgb24_stride = cvt->dst.fb->strides[0];
 	unsigned int planar_stride = cvt->src.fb->strides[0];
-	uint8_t *buf = malloc(cvt->src.fb->size);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
 						    cvt->src.fb->color_range);
+	uint8_t *buf;
 
 	igt_assert(cvt->src.fb->drm_format == DRM_FORMAT_NV12 &&
 		   cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888);
 
-	/*
-	 * Reading from the BO is awfully slow because of lack of read caching,
-	 * it's faster to copy the whole BO to a temporary buffer and convert
-	 * from there.
-	 */
-	igt_memcpy_from_wc(buf, cvt->src.ptr, cvt->src.fb->size);
+	buf = convert_src_get(cvt);
 	y = buf + cvt->src.fb->offsets[0];
 	uv = buf + cvt->src.fb->offsets[1];
 
@@ -1622,7 +1646,7 @@ static void convert_nv12_to_rgb24(struct fb_convert *cvt)
 		}
 	}
 
-	free(buf);
+	convert_src_put(cvt, buf);
 }
 
 static void convert_rgb24_to_nv12(struct fb_convert *cvt)
@@ -1760,10 +1784,10 @@ static void convert_yuyv_to_rgb24(struct fb_convert *cvt)
 	uint8_t *rgb24 = cvt->dst.ptr;
 	unsigned int rgb24_stride = cvt->dst.fb->strides[0];
 	unsigned int yuyv_stride = cvt->src.fb->strides[0];
-	uint8_t *buf = malloc(cvt->src.fb->size);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
 						    cvt->src.fb->color_range);
 	const unsigned char *swz = yuyv_swizzle(cvt->src.fb->drm_format);
+	uint8_t *buf;
 
 	igt_assert((cvt->src.fb->drm_format == DRM_FORMAT_YUYV ||
 		    cvt->src.fb->drm_format == DRM_FORMAT_UYVY ||
@@ -1771,12 +1795,7 @@ static void convert_yuyv_to_rgb24(struct fb_convert *cvt)
 		    cvt->src.fb->drm_format == DRM_FORMAT_VYUY) &&
 		   cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888);
 
-	/*
-	 * Reading from the BO is awfully slow because of lack of read caching,
-	 * it's faster to copy the whole BO to a temporary buffer and convert
-	 * from there.
-	 */
-	igt_memcpy_from_wc(buf, cvt->src.ptr, cvt->src.fb->size);
+	buf = convert_src_get(cvt);
 	yuyv = buf;
 
 	for (i = 0; i < cvt->dst.fb->height; i++) {
@@ -1816,7 +1835,7 @@ static void convert_yuyv_to_rgb24(struct fb_convert *cvt)
 		yuyv += yuyv_stride;
 	}
 
-	free(buf);
+	convert_src_put(cvt, buf);
 }
 
 static void convert_rgb24_to_yuyv(struct fb_convert *cvt)
@@ -1877,14 +1896,17 @@ static void convert_pixman(struct fb_convert *cvt)
 	pixman_format_code_t src_pixman = drm_format_to_pixman(cvt->src.fb->drm_format);
 	pixman_format_code_t dst_pixman = drm_format_to_pixman(cvt->dst.fb->drm_format);
 	pixman_image_t *dst_image, *src_image;
+	void *src_ptr;
 
 	igt_assert((src_pixman != PIXMAN_invalid) &&
 		   (dst_pixman != PIXMAN_invalid));
 
+	src_ptr = convert_src_get(cvt);
+
 	src_image = pixman_image_create_bits(src_pixman,
 					     cvt->src.fb->width,
 					     cvt->src.fb->height,
-					     cvt->src.ptr,
+					     src_ptr,
 					     cvt->src.fb->strides[0]);
 	igt_assert(src_image);
 
@@ -1900,6 +1922,8 @@ static void convert_pixman(struct fb_convert *cvt)
 			       cvt->dst.fb->width, cvt->dst.fb->height);
 	pixman_image_unref(dst_image);
 	pixman_image_unref(src_image);
+
+	convert_src_put(cvt, src_ptr);
 }
 
 static void fb_convert(struct fb_convert *cvt)
@@ -1991,6 +2015,9 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 		blit->base.linear.fb.gem_handle = 0;
 		blit->base.linear.map = map_bo(fd, fb);
 		igt_assert(blit->base.linear.map);
+
+		/* reading via gtt mmap is slow */
+		cvt.src.slow_reads = is_i915_device(fd);
 	}
 
 	cvt.dst.ptr = blit->shadow_ptr;
