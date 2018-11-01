@@ -1464,7 +1464,7 @@ static void *igt_fb_create_cairo_shadow_buffer(int fd,
 	igt_assert(shadow);
 
 	fb_init(shadow, fd, width, height,
-		DRM_FORMAT_RGB888, LOCAL_DRM_FORMAT_MOD_NONE,
+		DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
 		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
 	shadow->strides[0] = ALIGN(width * 4, 16);
@@ -1899,7 +1899,7 @@ static void fb_convert(struct fb_convert *cvt)
 	    (drm_format_to_pixman(cvt->dst.fb->drm_format) != PIXMAN_invalid)) {
 		convert_pixman(cvt);
 		return;
-	} else if (cvt->dst.fb->drm_format == DRM_FORMAT_RGB888) {
+	} else if (cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888) {
 		switch (cvt->src.fb->drm_format) {
 		case DRM_FORMAT_NV12:
 			convert_nv12_to_rgb24(cvt);
@@ -1911,7 +1911,7 @@ static void fb_convert(struct fb_convert *cvt)
 			convert_yuyv_to_rgb24(cvt);
 			return;
 		}
-	} else if (cvt->src.fb->drm_format == DRM_FORMAT_RGB888) {
+	} else if (cvt->src.fb->drm_format == DRM_FORMAT_XRGB8888) {
 		switch (cvt->dst.fb->drm_format) {
 		case DRM_FORMAT_NV12:
 			convert_rgb24_to_nv12(cvt);
