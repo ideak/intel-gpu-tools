@@ -1524,6 +1524,9 @@ static void convert_nv12_to_rgb24(struct fb_convert *cvt)
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
 						    cvt->src.fb->color_range);
 
+	igt_assert(cvt->src.fb->drm_format == DRM_FORMAT_NV12 &&
+		   cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888);
+
 	/*
 	 * Reading from the BO is awfully slow because of lack of read caching,
 	 * it's faster to copy the whole BO to a temporary buffer and convert
@@ -1633,8 +1636,8 @@ static void convert_rgb24_to_nv12(struct fb_convert *cvt)
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->dst.fb->color_encoding,
 						    cvt->dst.fb->color_range);
 
-	igt_assert_f(cvt->dst.fb->drm_format == DRM_FORMAT_NV12,
-		     "Conversion not implemented for !NV12 planar formats\n");
+	igt_assert(cvt->src.fb->drm_format == DRM_FORMAT_XRGB8888 &&
+		   cvt->dst.fb->drm_format == DRM_FORMAT_NV12);
 
 	for (i = 0; i < cvt->dst.fb->height / 2; i++) {
 		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
@@ -1762,6 +1765,12 @@ static void convert_yuyv_to_rgb24(struct fb_convert *cvt)
 						    cvt->src.fb->color_range);
 	const unsigned char *swz = yuyv_swizzle(cvt->src.fb->drm_format);
 
+	igt_assert((cvt->src.fb->drm_format == DRM_FORMAT_YUYV ||
+		    cvt->src.fb->drm_format == DRM_FORMAT_UYVY ||
+		    cvt->src.fb->drm_format == DRM_FORMAT_YVYU ||
+		    cvt->src.fb->drm_format == DRM_FORMAT_VYUY) &&
+		   cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888);
+
 	/*
 	 * Reading from the BO is awfully slow because of lack of read caching,
 	 * it's faster to copy the whole BO to a temporary buffer and convert
@@ -1821,11 +1830,11 @@ static void convert_rgb24_to_yuyv(struct fb_convert *cvt)
 						    cvt->dst.fb->color_range);
 	const unsigned char *swz = yuyv_swizzle(cvt->dst.fb->drm_format);
 
-	igt_assert_f(cvt->dst.fb->drm_format == DRM_FORMAT_YUYV ||
-		     cvt->dst.fb->drm_format == DRM_FORMAT_YVYU ||
-		     cvt->dst.fb->drm_format == DRM_FORMAT_UYVY ||
-		     cvt->dst.fb->drm_format == DRM_FORMAT_VYUY,
-		     "Conversion not implemented for !YUYV planar formats\n");
+	igt_assert(cvt->src.fb->drm_format == DRM_FORMAT_XRGB8888 &&
+		   (cvt->dst.fb->drm_format == DRM_FORMAT_YUYV ||
+		    cvt->dst.fb->drm_format == DRM_FORMAT_UYVY ||
+		    cvt->dst.fb->drm_format == DRM_FORMAT_YVYU ||
+		    cvt->dst.fb->drm_format == DRM_FORMAT_VYUY));
 
 	for (i = 0; i < cvt->dst.fb->height; i++) {
 		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
