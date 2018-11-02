@@ -42,6 +42,7 @@ test_progs = [
 	'kms_getfb',
 	'kms_hdmi_inject',
 	'kms_invalid_dotclock',
+	'kms_lease',
 	'kms_legacy_colorkey',
 	'kms_mmap_write_crc',
 	'kms_panel_fitting',
