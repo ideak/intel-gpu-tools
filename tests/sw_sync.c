@@ -175,6 +175,7 @@ static void test_sync_busy_fork_unixsocket(void)
 	int timeline;
 	int skip = 0;
 	int sv[2];
+	struct igt_helper_process proc;
 
 
 	timeline = sw_sync_timeline_create();
@@ -185,9 +186,7 @@ static void test_sync_busy_fork_unixsocket(void)
 		goto out;
 	}
 
-	switch (fork()) {
-	case 0:
-	{
+	igt_fork_helper(&proc) {
 		/* Child process */
 		int socket = sv[1];
 		int socket_timeline;
@@ -213,17 +212,8 @@ static void test_sync_busy_fork_unixsocket(void)
 
 		/* Advance timeline from 0 -> 1 */
 		sw_sync_timeline_inc(socket_timeline, 1);
+	}
 
-		_Exit(0);
-		break;
-	}
-	case -1:
-	{
-		/* Failed fork */
-		skip = 1;
-		break;
-	}
-	default:
 	{
 		/* Parent process */
 		int socket = sv[0];
@@ -252,14 +242,13 @@ static void test_sync_busy_fork_unixsocket(void)
 
 		if (sendmsg(socket, &msg, 0) < 0) {
 		    skip = 1;
-		    goto out;
+		} else {
+			igt_assert_f(sync_fence_wait(fence, 2*1000) == 0,
+				     "Fence not signaled (timeline value 1 fence seqno 1)\n");
 		}
+	}
 
-		igt_assert_f(sync_fence_wait(fence, 2*1000) == 0,
-			     "Fence not signaled (timeline value 1 fence seqno 1)\n");
-		break;
-	}
-	}
+	igt_stop_helper(&proc);
 
 out:
 	close(fence);
@@ -272,31 +261,24 @@ static void test_sync_busy_fork(void)
 	int fence;
 	int timeline;
 	int skip = 0;
+	struct igt_helper_process proc;
 
 	timeline = sw_sync_timeline_create();
 	fence = sw_sync_timeline_create_fence(timeline, 1);
 
-	switch (fork()) {
-	case 0:
-		/* Child process */
+	igt_fork_helper(&proc) {
 		usleep(1*1000*1000);
 		/* Advance timeline from 0 -> 1 */
 		sw_sync_timeline_inc(timeline, 1);
-		_Exit(0);
-		break;
-	case -1:
-		/* Failed fork */
-		skip = 1;
-		break;
-	default:
-		/* Parent process */
-		igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
-			     "Fence signaled (it should not have been signalled yet)\n");
-
-		igt_assert_f(sync_fence_wait(fence, 2*1000) == 0,
-			     "Fence not signaled (timeline value 1 fence seqno 1)\n");
-		break;
 	}
+
+	igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
+		     "Fence signaled (it should not have been signalled yet)\n");
+
+	igt_assert_f(sync_fence_wait(fence, 2*1000) == 0,
+		     "Fence not signaled (timeline value 1 fence seqno 1)\n");
+
+	igt_stop_helper(&proc);
 
 	close(fence);
 	close(timeline);
