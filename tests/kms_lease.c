@@ -246,6 +246,10 @@ static int make_lease(data_t *data, lease_t *lease)
 
 	object_ids[mcl.object_count++] = data->connector_id;
 	object_ids[mcl.object_count++] = data->crtc_id;
+	/* We use universal planes, must add the primary plane */
+	object_ids[mcl.object_count++] =
+		igt_pipe_get_plane_type(&data->master.display.pipes[data->pipe],
+					DRM_PLANE_TYPE_PRIMARY)->drm_plane->plane_id;
 
 	ret = create_lease(data->master.fd, &mcl);
 
