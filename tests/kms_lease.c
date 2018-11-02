@@ -121,6 +121,7 @@ typedef struct {
 	enum pipe pipe;
 	uint32_t crtc_id;
 	uint32_t connector_id;
+	uint32_t plane_id;
 } data_t;
 
 static uint32_t pipe_to_crtc_id(igt_display_t *display, enum pipe pipe)
@@ -247,9 +248,7 @@ static int make_lease(data_t *data, lease_t *lease)
 	object_ids[mcl.object_count++] = data->connector_id;
 	object_ids[mcl.object_count++] = data->crtc_id;
 	/* We use universal planes, must add the primary plane */
-	object_ids[mcl.object_count++] =
-		igt_pipe_get_plane_type(&data->master.display.pipes[data->pipe],
-					DRM_PLANE_TYPE_PRIMARY)->drm_plane->plane_id;
+	object_ids[mcl.object_count++] = data->plane_id;
 
 	ret = create_lease(data->master.fd, &mcl);
 
@@ -366,8 +365,11 @@ static void lease_get(data_t *data)
 {
 	lease_t lease;
 	struct local_drm_mode_get_lease mgl;
-	uint32_t objects[2];
+	int num_leased_obj = 3;
+	uint32_t objects[num_leased_obj];
 	int o;
+
+	mgl.pad = 0;
 
 	/* Create a valid lease */
 	igt_assert_eq(make_lease(data, &lease), 0);
@@ -378,7 +380,7 @@ static void lease_get(data_t *data)
 	igt_assert_eq(get_lease(lease.fd, &mgl), 0);
 
 	/* Make sure it's 2 */
-	igt_assert_eq(mgl.count_objects, 2);
+	igt_assert_eq(mgl.count_objects, num_leased_obj);
 
 	/* Get the objects */
 	mgl.objects_ptr = (uint64_t) (uintptr_t) objects;
@@ -386,20 +388,35 @@ static void lease_get(data_t *data)
 	igt_assert_eq(get_lease(lease.fd, &mgl), 0);
 
 	/* Make sure it's 2 */
-	igt_assert_eq(mgl.count_objects, 2);
+	igt_assert_eq(mgl.count_objects, num_leased_obj);
 
-	/* Make sure we got both the connector and crtc back */
-	for (o = 0; o < 2; o++)
+	/* Make sure we got the connector, crtc and plane back */
+	for (o = 0; o < num_leased_obj; o++)
 		if (objects[o] == data->connector_id)
 			break;
 
-	igt_assert_neq(o, 2);
+	igt_assert_neq(o, num_leased_obj);
 
-	for (o = 0; o < 2; o++)
+	for (o = 0; o < num_leased_obj; o++)
 		if (objects[o] == data->crtc_id)
 			break;
 
-	igt_assert_neq(o, 2);
+	igt_assert_neq(o, num_leased_obj);
+
+	for (o = 0; o < num_leased_obj; o++)
+		if (objects[o] == data->plane_id)
+			break;
+
+	igt_assert_neq(o, num_leased_obj);
+
+	/* invalid pad */
+	mgl.pad = -1;
+	igt_assert_eq(get_lease(lease.fd, &mgl), -EINVAL);
+	mgl.pad = 0;
+
+	/* invalid pointer */
+	mgl.objects_ptr = 0;
+	igt_assert_eq(get_lease(lease.fd, &mgl), -EFAULT);
 
 	terminate_lease(&lease);
 }
@@ -566,6 +583,9 @@ static void run_test(data_t *data, void (*testfunc)(data_t *))
 		data->pipe = p;
 		data->crtc_id = pipe_to_crtc_id(display, p);
 		data->connector_id = output->id;
+		data->plane_id =
+			igt_pipe_get_plane_type(&data->master.display.pipes[data->pipe],
+						DRM_PLANE_TYPE_PRIMARY)->drm_plane->plane_id;
 
 		testfunc(data);
 
