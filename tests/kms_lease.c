@@ -426,6 +426,7 @@ static void lease_unleased_crtc(data_t *data)
 	lease_t lease;
 	enum pipe p;
 	uint32_t bad_crtc_id;
+	drmModeCrtc *crtc;
 	int ret;
 
 	/* Create a valid lease */
@@ -443,15 +444,22 @@ static void lease_unleased_crtc(data_t *data)
 	/* Give up if there isn't another crtc */
 	igt_skip_on(bad_crtc_id == 0);
 
-	/* Attempt to use the unleased crtc id. Note that the
-	 * failure here is not directly from the kernel because the
-	 * resources returned from the kernel will not contain this resource
-	 * id and hence the igt helper functions will fail to find it
-	 */
-	ret = prepare_crtc(&lease, data->connector_id, bad_crtc_id);
+	/* sanity check */
+	ret = drmModeSetCrtc(lease.fd, data->crtc_id, 0, 0, 0, NULL, 0, NULL);
+	igt_assert_eq(ret, 0);
+	crtc = drmModeGetCrtc(lease.fd, data->crtc_id);
+	igt_assert(crtc);
+	drmModeFreeCrtc(crtc);
 
-	/* Ensure the expected error is returned */
+	/* Attempt to use the unleased crtc id. We need raw ioctl to bypass the
+	 * igt_kms helpers.
+	 */
+	ret = drmModeSetCrtc(lease.fd, bad_crtc_id, 0, 0, 0, NULL, 0, NULL);
 	igt_assert_eq(ret, -ENOENT);
+	crtc = drmModeGetCrtc(lease.fd, bad_crtc_id);
+	igt_assert(!crtc);
+	igt_assert_eq(errno, ENOENT);
+	drmModeFreeCrtc(crtc);
 
 	terminate_lease(&lease);
 }
@@ -461,7 +469,7 @@ static void lease_unleased_connector(data_t *data)
 	lease_t lease;
 	int o;
 	uint32_t bad_connector_id;
-	int ret;
+	drmModeConnector *c;
 
 	/* Create a valid lease */
 	igt_assert_eq(make_lease(data, &lease), 0);
@@ -478,15 +486,15 @@ static void lease_unleased_connector(data_t *data)
 	/* Give up if there isn't another connector */
 	igt_skip_on(bad_connector_id == 0);
 
-	/* Attempt to use the unleased connector id. Note that the
-	 * failure here is not directly from the kernel because the
-	 * resources returned from the kernel will not contain this resource
-	 * id and hence the igt helper functions will fail to find it
-	 */
-	ret = prepare_crtc(&lease, bad_connector_id, data->crtc_id);
+	/* sanity check */
+	c = drmModeGetConnector(lease.fd, data->connector_id);
+	igt_assert(c);
 
-	/* Ensure the expected error is returned */
-	igt_assert_eq(ret, -ENOENT);
+	/* Attempt to use the unleased connector id. Note that the
+	 */
+	c = drmModeGetConnector(lease.fd, bad_connector_id);
+	igt_assert(!c);
+	igt_assert_eq(errno, ENOENT);
 
 	terminate_lease(&lease);
 }
