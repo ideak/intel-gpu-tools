@@ -299,7 +299,7 @@ static void simple_lease(data_t *data)
 	/* Paint something attractive */
 	paint_fb(lease.fd, &lease.primary_fb, "simple_lease",
 		 lease.mode->name, igt_output_name(lease.output), kmstest_pipe_name(data->pipe));
-	sleep(3);
+	igt_debug_wait_for_keypress("lease");
 	cleanup_crtc(&lease,
 		     connector_id_to_output(&lease.display, data->connector_id));
 
