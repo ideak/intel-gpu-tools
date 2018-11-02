@@ -317,8 +317,16 @@ static void lessee_list(data_t *data)
 	struct local_drm_mode_list_lessees mll;
 	uint32_t lessees[1];
 
+	mll.pad = 0;
+
 	/* Create a valid lease */
 	igt_assert_eq(make_lease(data, &lease), 0);
+
+	/* check for nested leases */
+	mll.count_lessees = 0;
+	mll.lessees_ptr = 0;
+	igt_assert_eq(list_lessees(lease.fd, &mll), 0);
+	igt_assert_eq(mll.count_lessees, 0);
 
 	/* Get the number of lessees */
 	mll.count_lessees = 0;
@@ -327,6 +335,9 @@ static void lessee_list(data_t *data)
 
 	/* Make sure there's a single lessee */
 	igt_assert_eq(mll.count_lessees, 1);
+
+	/* invalid ptr */
+	igt_assert_eq(list_lessees(data->master.fd, &mll), -EFAULT);
 
 	mll.lessees_ptr = (uint64_t) (uintptr_t) &lessees[0];
 
@@ -338,7 +349,16 @@ static void lessee_list(data_t *data)
 	/* Make sure the listed lease is the same as the one we created */
 	igt_assert_eq(lessees[0], lease.lessee_id);
 
+	/* invalid pad */
+	mll.pad = -1;
+	igt_assert_eq(list_lessees(data->master.fd, &mll), -EINVAL);
+	mll.pad = 0;
+
 	terminate_lease(&lease);
+
+	/* Make sure the lease is gone */
+	igt_assert_eq(list_lessees(data->master.fd, &mll), 0);
+	igt_assert_eq(mll.count_lessees, 0);
 }
 
 /* Test getting the contents of a lease */
