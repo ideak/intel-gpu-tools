@@ -59,6 +59,7 @@ test_progs = [
 	'kms_rotation_crc',
 	'kms_selftest',
 	'kms_setmode',
+	'kms_sequence',
 	'kms_sysfs_edid_timing',
 	'kms_tv_load_detect',
 	'kms_universal_plane',
