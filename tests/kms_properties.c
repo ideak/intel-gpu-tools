@@ -30,7 +30,7 @@
 #include <time.h>
 
 struct additional_test {
-	char *name;
+	const char *name;
 	uint32_t obj_type;
 	void (*prop_test)(int fd, uint32_t id, uint32_t type, drmModePropertyPtr prop,
 			  uint32_t prop_id, uint64_t prop_value, bool atomic);
