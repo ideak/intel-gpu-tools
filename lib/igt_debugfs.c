@@ -971,7 +971,7 @@ igt_pipe_crc_get_current(int drm_fd, igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
 			igt_pipe_crc_get_single(pipe_crc, crc);
 			return;
 		}
-	} while (crc->frame <= vblank);
+	} while (igt_vblank_before_eq(crc->frame, vblank));
 
 	crc_sanity_checks(crc);
 }

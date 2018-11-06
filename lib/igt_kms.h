@@ -767,4 +767,64 @@ void igt_cleanup_hotplug(struct udev_monitor *mon);
 bool igt_display_has_format_mod(igt_display_t *display, uint32_t format, uint64_t modifier);
 bool igt_plane_has_format_mod(igt_plane_t *plane, uint32_t format, uint64_t modifier);
 
+/**
+ * igt_vblank_after_eq:
+ * @a: First vblank sequence number.
+ * @b: Second vblank sequence number.
+ *
+ * Compare vblank sequence numbers,
+ * handling wraparound correctly.
+ *
+ * Returns: @a >= @b
+ */
+static inline bool igt_vblank_after_eq(uint32_t a, uint32_t b)
+{
+	return (int32_t)(a - b) >= 0;
+}
+
+/**
+ * igt_vblank_before_eq:
+ * @a: First vblank sequence number.
+ * @b: Second vblank sequence number.
+ *
+ * Compare vblank sequence numbers,
+ * handling wraparound correctly.
+ *
+ * Returns: @a <= @b
+ */
+static inline bool igt_vblank_before_eq(uint32_t a, uint32_t b)
+{
+	return igt_vblank_after_eq(b, a);
+}
+
+/**
+ * igt_vblank_after:
+ * @a: First vblank sequence number.
+ * @b: Second vblank sequence number.
+ *
+ * Compare vblank sequence numbers,
+ * handling wraparound correctly.
+ *
+ * Returns: @a > @b
+ */
+static inline bool igt_vblank_after(uint32_t a, uint32_t b)
+{
+	return (int32_t)(b - a) < 0;
+}
+
+/**
+ * igt_vblank_before:
+ * @a: First vblank sequence number.
+ * @b: Second vblank sequence number.
+ *
+ * Compare vblank sequence numbers,
+ * handling wraparound correctly.
+ *
+ * Returns: @a < @b
+ */
+static inline bool igt_vblank_before(uint32_t a, uint32_t b)
+{
+	return igt_vblank_after(b, a);
+}
+
 #endif /* __IGT_KMS_H__ */
