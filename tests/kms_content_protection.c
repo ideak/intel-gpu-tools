@@ -89,7 +89,8 @@ wait_for_prop_value(igt_output_t *output, uint64_t expected,
 			return true;
 		usleep(1000);
 	}
-	igt_info("prop_value mismatch %ld != %ld\n", val, expected);
+	igt_info("prop_value mismatch %" PRId64 " != %" PRId64 "\n",
+		 val, expected);
 
 	return false;
 }
