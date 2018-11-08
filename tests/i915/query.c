@@ -373,12 +373,20 @@ test_query_topology_matches_eu_total(int fd)
 	for (s = 0; s < topo_info->max_slices; s++) {
 		int ss;
 
-		igt_debug("slice%i:\n", s);
+		igt_debug("slice%i: (%s)\n", s,
+			  slice_available(topo_info, s) ? "available" : "fused");
+
+		if (!slice_available(topo_info, s))
+			continue;
 
 		for (ss = 0; ss < topo_info->max_subslices; ss++) {
 			int eu, n_subslice_eus = 0;
 
-			igt_debug("\tsubslice: %i\n", ss);
+			igt_debug("\tsubslice%i: (%s)\n", ss,
+				  subslice_available(topo_info, s, ss) ? "available" : "fused");
+
+			if (!subslice_available(topo_info, s, ss))
+				continue;
 
 			igt_debug("\t\teu_mask: 0b");
 			for (eu = 0; eu < topo_info->max_eus_per_subslice; eu++) {
