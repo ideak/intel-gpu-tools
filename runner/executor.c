@@ -108,6 +108,91 @@ static void ping_watchdogs(void)
 	}
 }
 
+static char *handle_lockdep(void)
+{
+	const char *header = "Lockdep not active\n\n/proc/lockdep_stats contents:\n";
+	int fd = open("/proc/lockdep_stats", O_RDONLY);
+	const char *debug_locks_line = " debug_locks:";
+	char buf[4096], *p;
+	ssize_t bufsize = 0;
+	int val;
+
+	if (fd < 0)
+		return NULL;
+
+	strcpy(buf, header);
+
+	if ((bufsize = read(fd, buf + strlen(header), sizeof(buf) - strlen(header) - 1)) < 0)
+		return NULL;
+	bufsize += strlen(header);
+	buf[bufsize] = '\0';
+	close(fd);
+
+	if ((p = strstr(buf, debug_locks_line)) != NULL &&
+	    sscanf(p + strlen(debug_locks_line), "%d", &val) == 1 &&
+	    val != 1) {
+		return strdup(buf);
+	}
+
+	return NULL;
+}
+
+static char *handle_taint(void)
+{
+	const unsigned long bad_taints =
+		0x20  | /* TAINT_PAGE */
+		0x80  | /* TAINT_DIE */
+		0x200; /* TAINT_OOPS */
+	unsigned long taints = 0;
+	char *reason = NULL;
+	FILE *f;
+
+	f = fopen("/proc/sys/kernel/tainted", "r");
+	if (f) {
+		fscanf(f, "%lu", &taints);
+		fclose(f);
+	}
+
+	if (taints & bad_taints)
+		asprintf(&reason,
+			 "Kernel tainted (%#lx -- %lx)",
+			 taints, taints & bad_taints);
+
+	return reason;
+}
+
+static const struct {
+	int condition;
+	char *(*handler)(void);
+} abort_handlers[] = {
+	{ ABORT_LOCKDEP, handle_lockdep },
+	{ ABORT_TAINT, handle_taint },
+	{ 0, 0 },
+};
+
+static char *need_to_abort(const struct settings* settings)
+{
+	typeof(*abort_handlers) *it;
+
+	for (it = abort_handlers; it->condition; it++) {
+		char *abort;
+
+		if (!(settings->abort_mask & it->condition))
+			continue;
+
+		abort = it->handler();
+		if (!abort)
+			continue;
+
+		if (settings->log_level >= LOG_LEVEL_NORMAL)
+			fprintf(stderr, "Aborting: %s\n", abort);
+
+		return abort;
+	}
+
+	return NULL;
+}
+
 static void prune_subtest(struct job_list_entry *entry, char *subtest)
 {
 	char *excl;
@@ -714,6 +799,37 @@ static void print_time_left(struct execute_state *state,
 	printf("(%*.0fs left) ", width, state->time_left);
 }
 
+static char *entry_display_name(struct job_list_entry *entry)
+{
+	size_t size = strlen(entry->binary) + 1;
+	char *ret = malloc(size);
+
+	sprintf(ret, "%s", entry->binary);
+
+	if (entry->subtest_count > 0) {
+		size_t i;
+		const char *delim = "";
+
+		size += 3; /* strlen(" (") + strlen(")") */
+		ret = realloc(ret, size);
+		strcat(ret, " (");
+
+		for (i = 0; i < entry->subtest_count; i++) {
+			size += strlen(delim) + strlen(entry->subtests[i]);
+			ret = realloc(ret, size);
+
+			strcat(ret, delim);
+			strcat(ret, entry->subtests[i]);
+
+			delim = ", ";
+		}
+		/* There's already room for this */
+		strcat(ret, ")");
+	}
+
+	return ret;
+}
+
 /*
  * Returns:
  *  =0 - Success
@@ -797,24 +913,15 @@ static int execute_next_entry(struct execute_state *state,
 	}
 
 	if (settings->log_level >= LOG_LEVEL_NORMAL) {
+		char *displayname;
 		int width = digits(total);
 		printf("[%0*zd/%0*zd] ", width, idx + 1, width, total);
 
 		print_time_left(state, settings);
 
-		printf("%s", entry->binary);
-
-		if (entry->subtest_count > 0) {
-			size_t i;
-			const char *delim = "";
-
-			printf(" (");
-			for (i = 0; i < entry->subtest_count; i++) {
-				printf("%s%s", delim, entry->subtests[i]);
-				delim = ", ";
-			}
-			printf(")");
-		}
+		displayname = entry_display_name(entry);
+		printf("%s", displayname);
+		free(displayname);
 
 		printf("\n");
 	}
@@ -896,7 +1003,8 @@ static bool clear_old_results(char *path)
 
 	if (remove_file(dirfd, "uname.txt") ||
 	    remove_file(dirfd, "starttime.txt") ||
-	    remove_file(dirfd, "endtime.txt")) {
+	    remove_file(dirfd, "endtime.txt") ||
+	    remove_file(dirfd, "aborted.txt")) {
 		close(dirfd);
 		fprintf(stderr, "Error clearing old results: %s\n", strerror(errno));
 		return false;
@@ -957,6 +1065,7 @@ bool initialize_execute_state_from_resume(int dirfd,
 	free_settings(settings);
 	free_job_list(list);
 	memset(state, 0, sizeof(*state));
+	state->resuming = true;
 
 	if (!read_settings(settings, dirfd) ||
 	    !read_job_list(list, dirfd)) {
@@ -1044,6 +1153,27 @@ static bool overall_timeout_exceeded(struct execute_state *state)
 	return state->time_left == 0.0;
 }
 
+static void write_abort_file(int resdirfd,
+			     const char *reason,
+			     const char *testbefore,
+			     const char *testafter)
+{
+	int abortfd;
+
+	if ((abortfd = openat(resdirfd, "aborted.txt", O_CREAT | O_WRONLY | O_EXCL, 0666)) >= 0) {
+		/*
+		 * Ignore failure to open, there's
+		 * already an abort probably (if this
+		 * is a resume)
+		 */
+		dprintf(abortfd, "Aborting.\n");
+		dprintf(abortfd, "Previous test: %s\n", testbefore);
+		dprintf(abortfd, "Next test: %s\n\n", testafter);
+		write(abortfd, reason, strlen(reason));
+		close(abortfd);
+	}
+}
+
 bool execute(struct execute_state *state,
 	     struct settings *settings,
 	     struct job_list *job_list)
@@ -1100,14 +1230,31 @@ bool execute(struct execute_state *state,
 	}
 	close(unamefd);
 
+	/* Check if we're already in abort-state at bootup */
+	if (!state->resuming) {
+		char *reason;
+
+		if ((reason = need_to_abort(settings)) != NULL) {
+			char *nexttest = entry_display_name(&job_list->entries[state->next]);
+			write_abort_file(resdirfd, reason, "nothing", nexttest);
+			free(reason);
+			free(nexttest);
+
+			goto end;
+		}
+	}
+
 	for (; state->next < job_list->size;
 	     state->next++) {
-		int result = execute_next_entry(state,
-						job_list->size,
-						&time_spent,
-						settings,
-						&job_list->entries[state->next],
-						testdirfd, resdirfd);
+		char *reason;
+		int result;
+
+		result = execute_next_entry(state,
+					    job_list->size,
+					    &time_spent,
+					    settings,
+					    &job_list->entries[state->next],
+					    testdirfd, resdirfd);
 
 		if (result < 0) {
 			status = false;
@@ -1121,6 +1268,18 @@ bool execute(struct execute_state *state,
 				printf("Overall timeout time exceeded, stopping.\n");
 			}
 
+			break;
+		}
+
+		if ((reason = need_to_abort(settings)) != NULL) {
+			char *prev = entry_display_name(&job_list->entries[state->next]);
+			char *next = (state->next + 1 < job_list->size ?
+				      entry_display_name(&job_list->entries[state->next + 1]) :
+				      strdup("nothing"));
+			write_abort_file(resdirfd, reason, prev, next);
+			free(prev);
+			free(next);
+			free(reason);
 			break;
 		}
 
@@ -1140,6 +1299,7 @@ bool execute(struct execute_state *state,
 		close(timefd);
 	}
 
+ end:
 	close(testdirfd);
 	close(resdirfd);
 	close_watchdogs(settings);

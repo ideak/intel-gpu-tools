@@ -41,6 +41,16 @@ static struct {
 	{ 0, 0 },
 };
 
+static struct {
+	int value;
+	const char *name;
+} abort_conditions[] = {
+	{ ABORT_TAINT, "taint" },
+	{ ABORT_LOCKDEP, "lockdep" },
+	{ ABORT_ALL, "all" },
+	{ 0, 0 },
+};
+
 static bool set_log_level(struct settings* settings, const char *level)
 {
 	typeof(*log_levels) *it;
@@ -55,6 +65,56 @@ static bool set_log_level(struct settings* settings, const char *level)
 	return false;
 }
 
+static bool set_abort_condition(struct settings* settings, const char *cond)
+{
+	typeof(*abort_conditions) *it;
+
+	if (!cond) {
+		settings->abort_mask = ABORT_ALL;
+		return true;
+	}
+
+	if (strlen(cond) == 0) {
+		settings->abort_mask = 0;
+		return true;
+	}
+
+	for (it = abort_conditions; it->name; it++) {
+		if (!strcmp(cond, it->name)) {
+			settings->abort_mask |= it->value;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool parse_abort_conditions(struct settings *settings, const char *optarg)
+{
+	char *dup, *origdup, *p;
+	if (!optarg)
+		return set_abort_condition(settings, NULL);
+
+	origdup = dup = strdup(optarg);
+	while (dup) {
+		if ((p = strchr(dup, ',')) != NULL) {
+			*p = '\0';
+			p++;
+		}
+
+		if (!set_abort_condition(settings, dup)) {
+			free(origdup);
+			return false;
+		}
+
+		dup = p;
+	}
+
+	free(origdup);
+
+	return true;
+}
+
 static const char *usage_str =
 	"usage: runner [options] [test_root] results-path\n\n"
 	"Options:\n"
@@ -67,9 +127,15 @@ static const char *usage_str =
 	"                        Run only matching tests (can be used more than once)\n"
 	"  -x <regex>, --exclude-tests <regex>\n"
 	"                        Exclude matching tests (can be used more than once)\n"
-	"  --abort-on-monitored-error\n"
+	"  --abort-on-monitored-error[=list]\n"
 	"                        Abort execution when a fatal condition is detected.\n"
-	"                        <TODO>\n"
+	"                        A comma-separated list of conditions to check can be\n"
+	"                        given. If not given, all conditions are checked. An\n"
+	"                        empty string as a condition disables aborting\n"
+	"                        Possible conditions:\n"
+	"                         lockdep - abort when kernel lockdep has been angered.\n"
+	"                         taint   - abort when kernel becomes fatally tainted.\n"
+	"                         all     - abort for all of the above.\n"
 	"  -s, --sync            Sync results to disk after every test\n"
 	"  -l {quiet,verbose,dummy}, --log-level {quiet,verbose,dummy}\n"
 	"                        Set the logger verbosity level\n"
@@ -193,7 +259,7 @@ bool parse_options(int argc, char **argv,
 		{"dry-run", no_argument, NULL, OPT_DRY_RUN},
 		{"include-tests", required_argument, NULL, OPT_INCLUDE},
 		{"exclude-tests", required_argument, NULL, OPT_EXCLUDE},
-		{"abort-on-monitored-error", no_argument, NULL, OPT_ABORT_ON_ERROR},
+		{"abort-on-monitored-error", optional_argument, NULL, OPT_ABORT_ON_ERROR},
 		{"sync", no_argument, NULL, OPT_SYNC},
 		{"log-level", required_argument, NULL, OPT_LOG_LEVEL},
 		{"test-list", required_argument, NULL, OPT_TEST_LIST},
@@ -231,7 +297,8 @@ bool parse_options(int argc, char **argv,
 				goto error;
 			break;
 		case OPT_ABORT_ON_ERROR:
-			settings->abort_on_error = true;
+			if (!parse_abort_conditions(settings, optarg))
+				goto error;
 			break;
 		case OPT_SYNC:
 			settings->sync = true;
@@ -444,7 +511,7 @@ bool serialize_settings(struct settings *settings)
 		return false;
 	}
 
-	SERIALIZE_LINE(f, settings, abort_on_error, "%d");
+	SERIALIZE_LINE(f, settings, abort_mask, "%d");
 	if (settings->test_list)
 		SERIALIZE_LINE(f, settings, test_list, "%s");
 	if (settings->name)
@@ -501,7 +568,7 @@ bool read_settings(struct settings *settings, int dirfd)
 
 	while (fscanf(f, "%ms : %ms", &name, &val) == 2) {
 		int numval = atoi(val);
-		PARSE_LINE(settings, name, val, abort_on_error, numval);
+		PARSE_LINE(settings, name, val, abort_mask, numval);
 		PARSE_LINE(settings, name, val, test_list, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, name, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, dry_run, numval);

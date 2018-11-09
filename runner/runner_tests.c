@@ -142,7 +142,7 @@ static void assert_settings_equal(struct settings *one, struct settings *two)
 	 * Regex lists are not serialized, and thus won't be compared
 	 * here.
 	 */
-	igt_assert_eq(one->abort_on_error, two->abort_on_error);
+	igt_assert_eq(one->abort_mask, two->abort_mask);
 	igt_assert_eqstr(one->test_list, two->test_list);
 	igt_assert_eqstr(one->name, two->name);
 	igt_assert_eq(one->dry_run, two->dry_run);
@@ -208,7 +208,7 @@ igt_main
 
 		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
-		igt_assert(!settings.abort_on_error);
+		igt_assert_eq(settings.abort_mask, 0);
 		igt_assert(!settings.test_list);
 		igt_assert_eqstr(settings.name, "path-to-results");
 		igt_assert(!settings.dry_run);
@@ -323,7 +323,7 @@ igt_main
 		setenv("IGT_TEST_ROOT", testdatadir, 1);
 		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
-		igt_assert(!settings.abort_on_error);
+		igt_assert_eq(settings.abort_mask, 0);
 		igt_assert(!settings.test_list);
 		igt_assert_eqstr(settings.name, "path-to-results");
 		igt_assert(!settings.dry_run);
@@ -348,7 +348,7 @@ igt_main
 	igt_subtest("parse-all-settings") {
 		const char *argv[] = { "runner",
 				       "-n", "foo",
-				       "--abort-on-monitored-error",
+				       "--abort-on-monitored-error=taint,lockdep",
 				       "--test-list", "path-to-test-list",
 				       "--ignore-missing",
 				       "--dry-run",
@@ -370,7 +370,7 @@ igt_main
 
 		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 
-		igt_assert(settings.abort_on_error);
+		igt_assert_eq(settings.abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
 		igt_assert(strstr(settings.test_list, "path-to-test-list") != NULL);
 		igt_assert_eqstr(settings.name, "foo");
 		igt_assert(settings.dry_run);
@@ -426,6 +426,45 @@ igt_main
 		argv[2] = "verbose";
 		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
 		igt_assert_eq(settings.log_level, LOG_LEVEL_VERBOSE);
+	}
+
+	igt_subtest("abort-conditions") {
+		const char *argv[] = { "runner",
+				       "--abort-on-monitored-error=taint",
+				       "test-root-dir",
+				       "results-path",
+		};
+
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert_eq(settings.abort_mask, ABORT_TAINT);
+
+		argv[1] = "--abort-on-monitored-error=lockdep";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert_eq(settings.abort_mask, ABORT_LOCKDEP);
+
+		argv[1] = "--abort-on-monitored-error=taint";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert_eq(settings.abort_mask, ABORT_TAINT);
+
+		argv[1] = "--abort-on-monitored-error=lockdep,taint";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert_eq(settings.abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
+
+		argv[1] = "--abort-on-monitored-error=taint,lockdep";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert_eq(settings.abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
+
+		argv[1] = "--abort-on-monitored-error=all";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert_eq(settings.abort_mask, ABORT_ALL);
+
+		argv[1] = "--abort-on-monitored-error=";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert_eq(settings.abort_mask, 0);
+
+		argv[1] = "--abort-on-monitored-error=doesnotexist";
+		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+
 	}
 
 	igt_subtest("parse-clears-old-data") {

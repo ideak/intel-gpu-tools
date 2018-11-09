@@ -154,6 +154,8 @@ static const char *dirnames[] = {
 	"piglit-style-dmesg",
 	"incomplete-before-any-subtests",
 	"dmesg-results",
+	"aborted-on-boot",
+	"aborted-after-a-test",
 };
 
 igt_main

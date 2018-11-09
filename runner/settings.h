@@ -12,6 +12,12 @@ enum {
 	LOG_LEVEL_VERBOSE = 1,
 };
 
+#define ABORT_TAINT   (1 << 0)
+#define ABORT_LOCKDEP (1 << 1)
+#define ABORT_ALL     (ABORT_TAINT | ABORT_LOCKDEP)
+
+_Static_assert(ABORT_ALL == (ABORT_TAINT | ABORT_LOCKDEP), "ABORT_ALL must be all conditions bitwise or'd");
+
 struct regex_list {
 	char **regex_strings;
 	regex_t** regexes;
@@ -19,7 +25,7 @@ struct regex_list {
 };
 
 struct settings {
-	bool abort_on_error;
+	int abort_mask;
 	char *test_list;
 	char *name;
 	bool dry_run;

@@ -649,6 +649,7 @@ static bool fill_from_dmesg(int fd,
 		append_line(&dmesg, &dmesglen, formatted);
 		free(formatted);
 	}
+	free(line);
 
 	if (current_test != NULL) {
 		add_dmesg(current_test, dmesg, dmesglen, warnings, warningslen);
@@ -715,6 +716,15 @@ static void add_subtest(struct subtests *subtests, char *subtest)
 	subtests->size++;
 	subtests->names = realloc(subtests->names, sizeof(*subtests->names) * subtests->size);
 	subtests->names[subtests->size - 1] = subtest;
+}
+
+static void free_subtests(struct subtests *subtests)
+{
+	size_t i;
+
+	for (i = 0; i < subtests->size; i++)
+		free(subtests->names[i]);
+	free(subtests->names);
 }
 
 static void fill_from_journal(int fd,
@@ -902,7 +912,7 @@ static void add_result_to_totals(struct json_object *totals,
 	json_object_object_add(totals, result, json_object_new_int(old + 1));
 }
 
-static void add_to_totals(char *binary,
+static void add_to_totals(const char *binary,
 			  struct subtests *subtests,
 			  struct results *results)
 {
@@ -950,6 +960,7 @@ static bool parse_test_directory(int dirfd,
 {
 	int fds[_F_LAST];
 	struct subtests subtests = {};
+	bool status = true;
 
 	if (!open_output_files(dirfd, fds, false)) {
 		fprintf(stderr, "Error opening output files\n");
@@ -966,15 +977,18 @@ static bool parse_test_directory(int dirfd,
 	    !fill_from_output(fds[_F_ERR], entry->binary, "err", &subtests, results->tests) ||
 	    !fill_from_dmesg(fds[_F_DMESG], settings, entry->binary, &subtests, results->tests)) {
 		fprintf(stderr, "Error parsing output files\n");
-		return false;
+		status = false;
+		goto parse_output_end;
 	}
 
 	override_results(entry->binary, &subtests, results->tests);
 	add_to_totals(entry->binary, &subtests, results);
 
+ parse_output_end:
 	close_outputs(fds);
+	free_subtests(&subtests);
 
-	return true;
+	return status;
 }
 
 static void create_result_root_nodes(struct json_object *root,
@@ -1076,6 +1090,34 @@ struct json_object *generate_results_json(int dirfd)
 		}
 		close(testdirfd);
 	}
+
+	if ((fd = openat(dirfd, "aborted.txt", O_RDONLY)) >= 0) {
+		char buf[4096];
+		char piglit_name[] = "igt@runner@aborted";
+		struct subtests abortsub = {};
+		struct json_object *aborttest = get_or_create_json_object(results.tests, piglit_name);
+		ssize_t s;
+
+		add_subtest(&abortsub, strdup("aborted"));
+
+		s = read(fd, buf, sizeof(buf));
+
+		json_object_object_add(aborttest, "out",
+				       json_object_new_string_len(buf, s));
+		json_object_object_add(aborttest, "err",
+				       json_object_new_string(""));
+		json_object_object_add(aborttest, "dmesg",
+				       json_object_new_string(""));
+		json_object_object_add(aborttest, "result",
+				       json_object_new_string("fail"));
+
+		add_to_totals("runner", &abortsub, &results);
+
+		free_subtests(&abortsub);
+	}
+
+	free_settings(&settings);
+	free_job_list(&job_list);
 
 	return obj;
 }
