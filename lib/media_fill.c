@@ -338,7 +338,7 @@ __gen11_media_vme_func(struct intel_batchbuffer *batch,
 	batch_end = intel_batchbuffer_align(batch, 8);
 	assert(batch_end < BATCH_STATE_SPLIT);
 
-	gen7_render_flush(batch, batch_end);
+	gen7_render_context_flush(batch, batch_end);
 	intel_batchbuffer_reset(batch);
 }
 

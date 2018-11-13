@@ -36,6 +36,18 @@ gen7_render_flush(struct intel_batchbuffer *batch, uint32_t batch_end)
 	igt_assert(ret == 0);
 }
 
+void
+gen7_render_context_flush(struct intel_batchbuffer *batch, uint32_t batch_end)
+{
+	int ret;
+
+	ret = drm_intel_bo_subdata(batch->bo, 0, 4096, batch->buffer);
+	if (ret == 0)
+		ret = drm_intel_gem_bo_context_exec(batch->bo, batch->ctx,
+				batch_end, 0);
+	igt_assert(ret == 0);
+}
+
 uint32_t
 gen7_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
 			    uint8_t color)

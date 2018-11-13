@@ -81,6 +81,52 @@ static void scratch_buf_init_dst(drm_intel_bufmgr *bufmgr, struct igt_buf *buf)
 	buf->stride = 1;
 }
 
+static uint64_t switch_off_n_bits(uint64_t mask, unsigned int n)
+{
+	unsigned int i;
+
+	igt_assert(n > 0 && n <= (sizeof(mask) * 8));
+	igt_assert(n <= __builtin_popcount(mask));
+
+	for (i = 0; n && i < (sizeof(mask) * 8); i++) {
+		uint64_t bit = 1ULL << i;
+
+		if (bit & mask) {
+			mask &= ~bit;
+			n--;
+		}
+	}
+
+	return mask;
+}
+
+static void shut_non_vme_subslices(int drm_fd, uint32_t ctx)
+{
+	struct drm_i915_gem_context_param_sseu sseu = { };
+	struct drm_i915_gem_context_param arg = {
+		.param = I915_CONTEXT_PARAM_SSEU,
+		.ctx_id = ctx,
+		.size = sizeof(sseu),
+		.value = to_user_pointer(&sseu),
+	};
+	int ret;
+
+	if (__gem_context_get_param(drm_fd, &arg))
+		return; /* no sseu support */
+
+	ret = __gem_context_set_param(drm_fd, &arg);
+	igt_assert(ret == 0 || ret == -ENODEV || ret == -EINVAL);
+	if (ret)
+		return; /* no sseu support */
+
+	/* shutdown half subslices */
+	sseu.subslice_mask =
+		switch_off_n_bits(sseu.subslice_mask,
+				  __builtin_popcount(sseu.subslice_mask) / 2);
+
+	gem_context_set_param(drm_fd, &arg);
+}
+
 igt_simple_main
 {
 	int drm_fd;
@@ -106,6 +152,20 @@ igt_simple_main
 
 	scratch_buf_init_src(bufmgr, &src);
 	scratch_buf_init_dst(bufmgr, &dst);
+
+	batch->ctx = drm_intel_gem_context_create(bufmgr);
+	igt_assert(batch->ctx);
+
+	/* ICL hangs if non-VME enabled slices are enabled with a VME kernel. */
+	if (intel_gen(devid) == 11) {
+		uint32_t ctx_id;
+		int ret;
+
+		ret = drm_intel_gem_context_get_id(batch->ctx, &ctx_id);
+		igt_assert_eq(ret, 0);
+
+		shut_non_vme_subslices(drm_fd, ctx_id);
+	}
 
 	igt_fork_hang_detector(drm_fd);
 

@@ -40,6 +40,9 @@
 void
 gen7_render_flush(struct intel_batchbuffer *batch, uint32_t batch_end);
 
+void
+gen7_render_context_flush(struct intel_batchbuffer *batch, uint32_t batch_end);
+
 uint32_t
 gen7_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
 			uint8_t color);
