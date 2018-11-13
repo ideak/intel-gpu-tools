@@ -325,6 +325,13 @@ typedef void (*igt_fillfunc_t)(struct intel_batchbuffer *batch,
 igt_fillfunc_t igt_get_media_fillfunc(int devid);
 igt_fillfunc_t igt_get_gpgpu_fillfunc(int devid);
 
+typedef void (*igt_vme_func_t)(struct intel_batchbuffer *batch,
+			       const struct igt_buf *src,
+			       unsigned int width, unsigned int height,
+			       const struct igt_buf *dst);
+
+igt_vme_func_t igt_get_media_vme_func(int devid);
+
 /**
  * igt_media_spinfunc_t:
  * @batch: batchbuffer object

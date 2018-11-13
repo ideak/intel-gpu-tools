@@ -873,6 +873,15 @@ igt_fillfunc_t igt_get_media_fillfunc(int devid)
 	return fill;
 }
 
+igt_vme_func_t igt_get_media_vme_func(int devid)
+{
+	igt_vme_func_t fill = NULL;
+
+	if (IS_GEN9(devid) || IS_GEN10(devid) || IS_GEN11(devid))
+		fill = gen11_media_vme_func;
+
+	return fill;
+}
 /**
  * igt_get_gpgpu_fillfunc:
  * @devid: pci device id

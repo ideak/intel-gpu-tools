@@ -53,6 +53,22 @@ gen7_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
 }
 
 uint32_t
+gen11_fill_curbe_buffer_data(struct intel_batchbuffer *batch)
+{
+	uint32_t *curbe_buffer;
+	uint32_t offset;
+
+	curbe_buffer = intel_batchbuffer_subdata_alloc(batch,
+						       sizeof(uint32_t) * 8,
+						       64);
+	offset = intel_batchbuffer_subdata_offset(batch, curbe_buffer);
+	*curbe_buffer++ = 0;
+	*curbe_buffer   = 1;
+
+	return offset;
+}
+
+uint32_t
 gen7_fill_surface_state(struct intel_batchbuffer *batch,
 			const struct igt_buf *buf,
 			uint32_t format,
@@ -115,6 +131,26 @@ gen7_fill_binding_table(struct intel_batchbuffer *batch,
 	else
 		binding_table[0] = gen8_fill_surface_state(batch, dst,
 						SURFACEFORMAT_R8_UNORM, 1);
+
+	return offset;
+}
+
+uint32_t
+gen11_fill_binding_table(struct intel_batchbuffer *batch,
+			const struct igt_buf *src,const struct igt_buf *dst)
+{
+	uint32_t *binding_table, offset;
+
+	binding_table = intel_batchbuffer_subdata_alloc(batch, 64, 64);
+	offset = intel_batchbuffer_subdata_offset(batch, binding_table);
+	binding_table[0] = gen11_fill_surface_state(batch, src,
+						SURFACE_1D,SURFACEFORMAT_R32G32B32A32_FLOAT,
+						0,0,
+						0);
+	binding_table[1] = gen11_fill_surface_state(batch, dst,
+						SURFACE_BUFFER, SURFACEFORMAT_RAW,
+						1,1,
+						1);
 
 	return offset;
 }
@@ -385,6 +421,71 @@ gen8_fill_surface_state(struct intel_batchbuffer *batch,
 }
 
 uint32_t
+gen11_fill_surface_state(struct intel_batchbuffer *batch,
+			const struct igt_buf *buf,
+			uint32_t surface_type,
+			uint32_t format,
+			uint32_t vertical_alignment,
+			uint32_t horizontal_alignment,
+			int is_dst)
+{
+	struct gen8_surface_state *ss;
+	uint32_t write_domain, read_domain, offset;
+	int ret;
+
+	if (is_dst) {
+		write_domain = read_domain = I915_GEM_DOMAIN_RENDER;
+	} else {
+		write_domain = 0;
+		read_domain = I915_GEM_DOMAIN_SAMPLER;
+	}
+
+	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 64);
+	offset = intel_batchbuffer_subdata_offset(batch, ss);
+
+	ss->ss0.surface_type = surface_type;
+	ss->ss0.surface_format = format;
+	ss->ss0.render_cache_read_write = 1;
+	ss->ss0.vertical_alignment = vertical_alignment; /* align 4 */
+	ss->ss0.horizontal_alignment = horizontal_alignment; /* align 4 */
+
+	if (buf->tiling == I915_TILING_X)
+		ss->ss0.tiled_mode = 2;
+	else if (buf->tiling == I915_TILING_Y)
+		ss->ss0.tiled_mode = 3;
+	else
+		ss->ss0.tiled_mode = 0;
+
+	ss->ss8.base_addr = buf->bo->offset;
+
+	ret = drm_intel_bo_emit_reloc(batch->bo,
+				intel_batchbuffer_subdata_offset(batch, ss) + 8 * 4,
+				buf->bo, 0, read_domain, write_domain);
+	igt_assert(ret == 0);
+
+	if (is_dst) {
+		ss->ss1.memory_object_control = 2;
+		ss->ss2.height = 1;
+		ss->ss2.width  = 95;
+		ss->ss3.pitch  = 0;
+		ss->ss7.shader_chanel_select_r = 4;
+		ss->ss7.shader_chanel_select_g = 5;
+		ss->ss7.shader_chanel_select_b = 6;
+		ss->ss7.shader_chanel_select_a = 7;
+	}
+	else {
+		ss->ss1.qpitch = 4040;
+		ss->ss1.base_mip_level = 31;
+		ss->ss2.height = 9216;
+		ss->ss2.width  = 1019;
+		ss->ss3.pitch  = 64;
+		ss->ss5.mip_count = 2;
+	}
+
+	return offset;
+}
+
+uint32_t
 gen8_fill_interface_descriptor(struct intel_batchbuffer *batch,
 			       const struct igt_buf *dst,
 			       const uint32_t kernel[][4],
@@ -395,6 +496,41 @@ gen8_fill_interface_descriptor(struct intel_batchbuffer *batch,
 	uint32_t binding_table_offset, kernel_offset;
 
 	binding_table_offset = gen7_fill_binding_table(batch, dst);
+	kernel_offset = gen7_fill_kernel(batch, kernel, size);
+
+	idd = intel_batchbuffer_subdata_alloc(batch, sizeof(*idd), 64);
+	offset = intel_batchbuffer_subdata_offset(batch, idd);
+
+	idd->desc0.kernel_start_pointer = (kernel_offset >> 6);
+
+	idd->desc2.single_program_flow = 1;
+	idd->desc2.floating_point_mode = GEN8_FLOATING_POINT_IEEE_754;
+
+	idd->desc3.sampler_count = 0;      /* 0 samplers used */
+	idd->desc3.sampler_state_pointer = 0;
+
+	idd->desc4.binding_table_entry_count = 0;
+	idd->desc4.binding_table_pointer = (binding_table_offset >> 5);
+
+	idd->desc5.constant_urb_entry_read_offset = 0;
+	idd->desc5.constant_urb_entry_read_length = 1; /* grf 1 */
+
+	idd->desc6.num_threads_in_tg = 1;
+
+	return offset;
+}
+
+uint32_t
+gen11_fill_interface_descriptor(struct intel_batchbuffer *batch,
+			       const struct igt_buf *src,const struct igt_buf *dst,
+			       const uint32_t kernel[][4],
+			       size_t size)
+{
+	struct gen8_interface_descriptor_data *idd;
+	uint32_t offset;
+	uint32_t binding_table_offset, kernel_offset;
+
+	binding_table_offset = gen11_fill_binding_table(batch, src,dst);
 	kernel_offset = gen7_fill_kernel(batch, kernel, size);
 
 	idd = intel_batchbuffer_subdata_alloc(batch, sizeof(*idd), 64);

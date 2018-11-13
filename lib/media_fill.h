@@ -49,4 +49,10 @@ gen9_media_fillfunc(struct intel_batchbuffer *batch,
 		    unsigned int width, unsigned int height,
 		    uint8_t color);
 
+void
+gen11_media_vme_func(struct intel_batchbuffer *batch,
+		     const struct igt_buf *src,
+		     unsigned int width, unsigned int height,
+		     const struct igt_buf *dst);
+
 #endif /* RENDE_MEDIA_FILL_H */

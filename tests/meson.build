@@ -168,6 +168,7 @@ gem_progs = [
 	'gem_lut_handle',
 	'gem_madvise',
 	'gem_media_fill',
+	'gem_media_vme',
 	'gem_mmap',
 	'gem_mmap_gtt',
 	'gem_mmap_offset_exhaustion',
