@@ -552,6 +552,50 @@ static bool parse_dmesg_line(char* line,
 	return true;
 }
 
+static void generate_formatted_dmesg_line(char *message,
+					  unsigned flags,
+					  unsigned long long ts_usec,
+					  char **formatted)
+{
+	char prefix[512];
+	size_t messagelen;
+	size_t prefixlen;
+	char *p, *f;
+
+	snprintf(prefix, sizeof(prefix),
+		 "<%u> [%llu.%06llu] ",
+		 flags & 0x07,
+		 ts_usec / 1000000,
+		 ts_usec % 1000000);
+
+	messagelen = strlen(message);
+	prefixlen = strlen(prefix);
+
+	/*
+	 * Decoding the hex escapes only makes the string shorter, so
+	 * we can use the original length
+	 */
+	*formatted = malloc(strlen(prefix) + messagelen + 1);
+	strcpy(*formatted, prefix);
+
+	f = *formatted + prefixlen;
+	for (p = message; *p; p++, f++) {
+		if (p - message + 4 < messagelen &&
+		    p[0] == '\\' && p[1] == 'x') {
+			int c = 0;
+			/* newline and tab are not isprint(), but they are isspace() */
+			if (sscanf(p, "\\x%2x", &c) == 1 &&
+			    (isprint(c) || isspace(c))) {
+				*f = c;
+				p += 3;
+				continue;
+			}
+		}
+		*f = *p;
+	}
+	*f = '\0';
+}
+
 static void add_dmesg(struct json_object *obj,
 		      const char *dmesg, size_t dmesglen,
 		      const char *warnings, size_t warningslen)
@@ -616,8 +660,7 @@ static bool fill_from_dmesg(int fd,
 		if (!parse_dmesg_line(line, &flags, &ts_usec, &continuation, &message))
 			continue;
 
-		asprintf(&formatted, "<%u> [%llu.%06llu] %s",
-			 flags & 0x07, ts_usec / 1000000, ts_usec % 1000000, message);
+		generate_formatted_dmesg_line(message, flags, ts_usec, &formatted);
 
 		if ((subtest = strstr(message, STARTING_SUBTEST_DMESG)) != NULL) {
 			if (current_test != NULL) {

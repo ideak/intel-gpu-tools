@@ -156,6 +156,7 @@ static const char *dirnames[] = {
 	"dmesg-results",
 	"aborted-on-boot",
 	"aborted-after-a-test",
+	"dmesg-escapes",
 };
 
 igt_main
