@@ -175,8 +175,10 @@ check_analog_bridge(data_t *data, struct chamelium_port *port)
 	unsigned char *edid;
 	char edid_vendor[3];
 
-	if (chamelium_port_get_type(port) != DRM_MODE_CONNECTOR_VGA)
+	if (chamelium_port_get_type(port) != DRM_MODE_CONNECTOR_VGA) {
+		drmModeFreeConnector(connector);
 		return false;
+	}
 
 	igt_assert(kmstest_get_property(data->drm_fd, connector->connector_id,
 					DRM_MODE_OBJECT_CONNECTOR, "EDID", NULL,
@@ -191,13 +193,13 @@ check_analog_bridge(data_t *data, struct chamelium_port *port)
 			  ((edid[9] & 0xe0) >> 5)) + '@';
 	edid_vendor[2] = (edid[9] & 0x1f) + '@';
 
+	drmModeFreePropertyBlob(edid_blob);
+	drmModeFreeConnector(connector);
+
 	/* Analog bridges provide their own EDID */
 	if (edid_vendor[0] != 'I' || edid_vendor[1] != 'G' ||
 	    edid_vendor[0] != 'T')
 		return true;
-
-	drmModeFreePropertyBlob(edid_blob);
-	drmModeFreeConnector(connector);
 
 	return false;
 }
