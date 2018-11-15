@@ -41,6 +41,7 @@ typedef struct {
 	int drm_fd;
 	igt_display_t display;
 	igt_pipe_crc_t *pipe_crc;
+	uint32_t crop;
 } data_t;
 
 static color_t red   = { 1.0f, 0.0f, 0.0f };
@@ -412,11 +413,48 @@ static void test_format_plane_color(data_t *data, enum pipe pipe,
 	const color_t *c = &colors[color];
 	struct igt_fb old_fb = *fb;
 
-	igt_create_color_fb(data->drm_fd, width, height,
-			    format, LOCAL_DRM_FORMAT_MOD_NONE,
-			    c->red, c->green, c->blue, fb);
+	if (data->crop == 0 || format == DRM_FORMAT_XRGB8888) {
+		igt_create_color_fb(data->drm_fd, width, height, format,
+				    LOCAL_DRM_FORMAT_MOD_NONE,
+				    c->red, c->green, c->blue, fb);
+	} else {
+	/*
+	 * paint border in inverted color, then visible area in middle
+	 * with correct color for clamping test
+	 */
+		cairo_t *cr;
+
+		igt_create_fb(data->drm_fd, width + data->crop * 2,
+				    height + data->crop * 2, format,
+				    LOCAL_DRM_FORMAT_MOD_NONE,
+				    fb);
+
+		cr = igt_get_cairo_ctx(data->drm_fd, fb);
+
+		igt_paint_color(cr, 0, 0,
+				width+data->crop * 2,
+				height+data->crop * 2,
+				1.0f - c->red,
+				1.0f - c->green,
+				1.0f - c->blue);
+
+		igt_paint_color(cr, data->crop, data->crop,
+				width, height,
+				c->red, c->green, c->blue);
+
+		igt_put_cairo_ctx(data->drm_fd, fb, cr);
+	}
 
 	igt_plane_set_fb(plane, fb);
+
+	/*
+	 * if clamping test. DRM_FORMAT_XRGB8888 is used for reference color.
+	 */
+	if (data->crop != 0  && format != DRM_FORMAT_XRGB8888) {
+		igt_plane_set_size(plane, width, height);
+		igt_fb_set_position(fb, plane, data->crop, data->crop);
+		igt_fb_set_size(fb, plane, width, height);
+	}
 
 	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
 	igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, crc);
@@ -434,6 +472,12 @@ static void test_format_plane(data_t *data, enum pipe pipe,
 	uint32_t format, ref_format;
 	uint64_t width, height;
 	igt_crc_t ref_crc[ARRAY_SIZE(colors)];
+
+	/*
+	 * No clamping test for cursor plane
+	 */
+	if (data->crop != 0 && plane->type == DRM_PLANE_TYPE_CURSOR)
+		return;
 
 	mode = igt_output_get_mode(output);
 	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
@@ -554,6 +598,13 @@ run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 		      kmstest_pipe_name(pipe))
 		test_pixel_formats(data, pipe);
 
+	igt_subtest_f("pixel-format-pipe-%s-planes-source-clamping",
+		      kmstest_pipe_name(pipe)) {
+		data->crop = 4;
+		test_pixel_formats(data, pipe);
+	}
+
+	data->crop = 0;
 	igt_subtest_f("plane-position-covered-pipe-%s-planes",
 		      kmstest_pipe_name(pipe))
 		test_plane_position(data, pipe, TEST_POSITION_FULLY_COVERED);
