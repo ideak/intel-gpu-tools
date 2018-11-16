@@ -303,6 +303,7 @@ gem_init(void)
 	gem.buf.tiling = I915_TILING_NONE;
 	gem.buf.size = gem.buf.stride;
 	gem.buf.bo = drm_intel_bo_alloc(gem.bufmgr, "", gem.buf.size, 4096);
+	gem.buf.bpp = 32;
 	igt_assert(gem.buf.bo);
 	gem.init = 4;
 

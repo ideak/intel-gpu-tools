@@ -111,11 +111,13 @@ static void run_test (int fd, int count)
 		src.stride = STRIDE;
 		src.tiling = I915_TILING_NONE;
 		src.size = SIZE;
+		src.bpp = 32;
 
 		dst.bo = bo[(i + 1) % count];
 		dst.stride = STRIDE;
 		dst.tiling = I915_TILING_NONE;
 		dst.size = SIZE;
+		dst.bpp = 32;
 
 		render_copy(batch, NULL, &src, 0, 0, WIDTH, HEIGHT, &dst, 0, 0);
 		start_val[(i + 1) % count] = start_val[i % count];
@@ -134,11 +136,13 @@ static void run_test (int fd, int count)
 		src.stride = STRIDE;
 		src.tiling = I915_TILING_NONE;
 		src.size = SIZE;
+		src.bpp = 32;
 
 		dst.bo = bo[i % count];
 		dst.stride = STRIDE;
 		dst.tiling = I915_TILING_NONE;
 		dst.size = SIZE;
+		dst.bpp = 32;
 
 		render_copy(batch, NULL, &src, 0, 0, WIDTH, HEIGHT, &dst, 0, 0);
 		start_val[i % count] = start_val[(i + 1) % count];
@@ -159,11 +163,13 @@ static void run_test (int fd, int count)
 		src.stride = STRIDE;
 		src.tiling = I915_TILING_NONE;
 		src.size = SIZE;
+		src.bpp = 32;
 
 		dst.bo = bo[d];
 		dst.stride = STRIDE;
 		dst.tiling = I915_TILING_NONE;
 		dst.size = SIZE;
+		dst.bpp = 32;
 
 		render_copy(batch, NULL, &src, 0, 0, WIDTH, HEIGHT, &dst, 0, 0);
 		start_val[d] = start_val[s];

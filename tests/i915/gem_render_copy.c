@@ -287,6 +287,7 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 		buf->stride = ALIGN(width * 4, 128);
 		buf->size = buf->stride * height;
 		buf->tiling = tiling;
+		buf->bpp = 32;
 
 		aux_width = scratch_buf_aux_width(buf);
 		aux_height = scratch_buf_aux_height(buf);
@@ -309,6 +310,7 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 		buf->stride = pitch;
 		buf->tiling = tiling;
 		buf->size = pitch * height;
+		buf->bpp = 32;
 	}
 
 	igt_assert(igt_buf_width(buf) == width);

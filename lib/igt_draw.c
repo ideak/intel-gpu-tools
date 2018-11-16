@@ -602,10 +602,12 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 	src_buf.stride = tmp.stride;
 	src_buf.tiling = I915_TILING_NONE;
 	src_buf.size = tmp.size;
+	src_buf.bpp = 32;
 	dst_buf.bo = dst;
 	dst_buf.stride = buf->stride;
 	dst_buf.tiling = tiling;
 	dst_buf.size = buf->size;
+	dst_buf.bpp = 32;
 
 	batch = intel_batchbuffer_alloc(cmd_data->bufmgr, devid);
 	igt_assert(batch);

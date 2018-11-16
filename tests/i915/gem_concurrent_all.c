@@ -854,11 +854,13 @@ static void render_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *s
 		.size = b->npixels * 4,
 		.num_tiles = b->npixels * 4,
 		.stride = b->width * 4,
+		.bpp = 32,
 	}, s = {
 		.bo = src,
 		.size = b->npixels * 4,
 		.num_tiles = b->npixels * 4,
 		.stride = b->width * 4,
+		.bpp = 32,
 	};
 	uint32_t swizzle;
 

@@ -78,6 +78,7 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 	buf->stride = stride;
 	buf->tiling = I915_TILING_NONE;
 	buf->size = SIZE;
+	buf->bpp = 32;
 }
 
 static void

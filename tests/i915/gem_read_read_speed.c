@@ -56,11 +56,13 @@ static drm_intel_bo *rcs_copy_bo(drm_intel_bo *dst, drm_intel_bo *src)
 		.size = width * height * 4,
 		.num_tiles = width * height * 4,
 		.stride = width * 4,
+		.bpp = 32,
 	}, s = {
 		.bo = src,
 		.size = width * height * 4,
 		.num_tiles = width * height * 4,
 		.stride = width * 4,
+		.bpp = 32,
 	};
 	uint32_t swizzle;
 	drm_intel_bo *bo = batch->bo;

@@ -511,7 +511,7 @@ intel_copy_bo(struct intel_batchbuffer *batch,
  */
 unsigned igt_buf_width(const struct igt_buf *buf)
 {
-	return buf->stride/sizeof(uint32_t);
+	return buf->stride/(buf->bpp / 8);
 }
 
 /**
@@ -764,7 +764,6 @@ void igt_blitter_fast_copy__raw(int fd,
  * @src_y: source pixel y-coordination
  * @width: width of the copied rectangle
  * @height: height of the copied rectangle
- * @bpp: source and destination bits per pixel
  * @dst: destination i-g-t buffer object
  * @dst_delta: offset into the destination i-g-t bo
  * @dst_x: destination pixel x-coordination
@@ -785,10 +784,12 @@ void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 	uint32_t src_pitch, dst_pitch;
 	uint32_t dword0, dword1;
 
+	igt_assert(src->bpp == dst->bpp);
+
 	src_pitch = fast_copy_pitch(src->stride, src->tiling);
 	dst_pitch = fast_copy_pitch(dst->stride, src->tiling);
 	dword0 = fast_copy_dword0(src->tiling, dst->tiling);
-	dword1 = fast_copy_dword1(src->tiling, dst->tiling, bpp);
+	dword1 = fast_copy_dword1(src->tiling, dst->tiling, dst->bpp);
 
 #define CHECK_RANGE(x)	((x) >= 0 && (x) < (1 << 15))
 	assert(CHECK_RANGE(src_x) && CHECK_RANGE(src_y) &&

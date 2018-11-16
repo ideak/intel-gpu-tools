@@ -485,6 +485,7 @@ static void init_buffer(struct igt_buf *buf, unsigned size)
 	igt_assert(buf->bo);
 	buf->tiling = I915_TILING_NONE;
 	buf->stride = 4096;
+	buf->bpp = 32;
 
 	sanitize_stride(buf);
 

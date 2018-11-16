@@ -76,6 +76,7 @@ static void scratch_buf_init(struct igt_buf *buf,
 	buf->stride = STRIDE;
 	buf->tiling = I915_TILING_NONE;
 	buf->size = SIZE;
+	buf->bpp = 32;
 }
 
 static void scratch_buf_fini(struct igt_buf *buf)
@@ -132,6 +133,7 @@ static void fork_rcs_copy(int target, drm_intel_bo **dst, int count, unsigned fl
 		buf.stride = STRIDE;
 		buf.tiling = I915_TILING_NONE;
 		buf.size = SIZE;
+		buf.bpp = 32;
 
 		for (int i = 0; i <= target; i++) {
 			struct igt_buf src;

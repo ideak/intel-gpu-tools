@@ -215,6 +215,7 @@ void intel_copy_bo(struct intel_batchbuffer *batch,
  * @bo: underlying libdrm buffer object
  * @stride: stride of the buffer
  * @tiling: tiling mode bits
+ * @bpp: bits per pixel, 8, 16 or 32.
  * @data: pointer to the memory mapping of the buffer
  * @size: size of the buffer object
  *
@@ -226,6 +227,7 @@ struct igt_buf {
 	drm_intel_bo *bo;
 	uint32_t stride;
 	uint32_t tiling;
+	uint32_t bpp;
 	uint32_t *data;
 	uint32_t size;
 	struct {

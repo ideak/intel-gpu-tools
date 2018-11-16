@@ -137,6 +137,7 @@ static void scratch_buf_init_from_bo(struct igt_buf *buf, drm_intel_bo *bo)
 	buf->stride = 4 * WIDTH;
 	buf->tiling = I915_TILING_NONE;
 	buf->size = 4 * WIDTH * HEIGHT;
+	buf->bpp = 32;
 }
 
 static void scratch_buf_init(data_t *data, struct igt_buf *buf,

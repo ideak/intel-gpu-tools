@@ -501,6 +501,7 @@ scratch_buf_init(drm_intel_bufmgr *bufmgr,
 	buf->stride = stride;
 	buf->tiling = I915_TILING_NONE;
 	buf->size = size;
+	buf->bpp = 32;
 }
 
 static void
