@@ -1240,6 +1240,8 @@ bool execute(struct execute_state *state,
 			free(reason);
 			free(nexttest);
 
+			status = false;
+
 			goto end;
 		}
 	}
@@ -1280,6 +1282,7 @@ bool execute(struct execute_state *state,
 			free(prev);
 			free(next);
 			free(reason);
+			status = false;
 			break;
 		}
 
