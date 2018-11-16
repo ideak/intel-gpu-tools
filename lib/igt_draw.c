@@ -573,15 +573,8 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 	uint32_t tiling, swizzle;
 	struct buf_data tmp;
 	int pixel_size = buf->bpp / 8;
-	unsigned adjusted_w, adjusted_dst_x;
 
 	igt_skip_on(!rendercopy);
-
-	/* Rendercopy works at 32bpp, so if you try to do copies on buffers with
-	 * smaller bpps you won't succeeed if you need to copy "half" of a 32bpp
-	 * pixel or something similar. */
-	igt_skip_on(rect->x % (32 / buf->bpp) != 0 ||
-		    rect->w % (32 / buf->bpp) != 0);
 
 	igt_require(gem_get_tiling(fd, buf->handle, &tiling, &swizzle));
 
@@ -602,28 +595,18 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 	src_buf.stride = tmp.stride;
 	src_buf.tiling = I915_TILING_NONE;
 	src_buf.size = tmp.size;
-	src_buf.bpp = 32;
+	src_buf.bpp = tmp.bpp;
 	dst_buf.bo = dst;
 	dst_buf.stride = buf->stride;
 	dst_buf.tiling = tiling;
 	dst_buf.size = buf->size;
-	dst_buf.bpp = 32;
+	dst_buf.bpp = buf->bpp;
 
 	batch = intel_batchbuffer_alloc(cmd_data->bufmgr, devid);
 	igt_assert(batch);
 
-	switch (buf->bpp) {
-	case 16:
-	case 32:
-		adjusted_w = rect->w / (32 / buf->bpp);
-		adjusted_dst_x = rect->x / (32 / buf->bpp);
-		break;
-	default:
-		igt_assert(false);
-	}
-
-	rendercopy(batch, cmd_data->context, &src_buf, 0, 0, adjusted_w,
-		   rect->h, &dst_buf, adjusted_dst_x, rect->y);
+	rendercopy(batch, cmd_data->context, &src_buf, 0, 0, rect->w,
+		   rect->h, &dst_buf, rect->x, rect->y);
 
 	intel_batchbuffer_free(batch);
 	drm_intel_bo_unreference(src);
