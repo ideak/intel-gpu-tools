@@ -59,12 +59,18 @@ gen7_tiling_bits(uint32_t tiling)
 static uint32_t
 gen7_bind_buf(struct intel_batchbuffer *batch,
 	      const struct igt_buf *buf,
-	      uint32_t format,
 	      int is_dst)
 {
-	uint32_t *ss;
+	uint32_t format, *ss;
 	uint32_t write_domain, read_domain;
 	int ret;
+
+	switch (buf->bpp) {
+		case 8: format = SURFACEFORMAT_R8_UNORM; break;
+		case 16: format = SURFACEFORMAT_R8G8_UNORM; break;
+		case 32: format = SURFACEFORMAT_B8G8R8A8_UNORM; break;
+		default: igt_assert(0);
+	}
 
 	if (is_dst) {
 		write_domain = read_domain = I915_GEM_DOMAIN_RENDER;
@@ -186,10 +192,8 @@ gen7_bind_surfaces(struct intel_batchbuffer *batch,
 
 	binding_table = intel_batchbuffer_subdata_alloc(batch, 8, 32);
 
-	binding_table[0] =
-		gen7_bind_buf(batch, dst, SURFACEFORMAT_B8G8R8A8_UNORM, 1);
-	binding_table[1] =
-		gen7_bind_buf(batch, src, SURFACEFORMAT_B8G8R8A8_UNORM, 0);
+	binding_table[0] = gen7_bind_buf(batch, dst, 1);
+	binding_table[1] = gen7_bind_buf(batch, src, 0);
 
 	return intel_batchbuffer_subdata_offset(batch, binding_table);
 }
@@ -501,6 +505,7 @@ void gen7_render_copyfunc(struct intel_batchbuffer *batch,
 	uint32_t vertex_buffer;
 	uint32_t batch_end;
 
+	igt_assert(src->bpp == dst->bpp);
 	intel_batchbuffer_flush_with_context(batch, context);
 
 	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];

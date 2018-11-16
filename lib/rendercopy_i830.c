@@ -136,6 +136,14 @@ static void gen2_emit_target(struct intel_batchbuffer *batch,
 			     const struct igt_buf *dst)
 {
 	uint32_t tiling;
+	uint32_t format;
+
+	switch (dst->bpp) {
+		case 8: format = COLR_BUF_8BIT; break;
+		case 16: format = COLR_BUF_RGB565; break;
+		case 32: format = COLR_BUF_ARGB8888; break;
+		default: igt_assert(0);
+	}
 
 	tiling = 0;
 	if (dst->tiling != I915_TILING_NONE)
@@ -148,7 +156,7 @@ static void gen2_emit_target(struct intel_batchbuffer *batch,
 	OUT_RELOC(dst->bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
 
 	OUT_BATCH(_3DSTATE_DST_BUF_VARS_CMD);
-	OUT_BATCH(COLR_BUF_ARGB8888 |
+	OUT_BATCH(format |
 		  DSTORG_HORT_BIAS(0x8) |
 		  DSTORG_VERT_BIAS(0x8));
 
@@ -165,6 +173,14 @@ static void gen2_emit_texture(struct intel_batchbuffer *batch,
 			      int unit)
 {
 	uint32_t tiling;
+	uint32_t format;
+
+	switch (src->bpp) {
+		case 8: format = MAPSURF_8BIT | MT_8BIT_L8; break;
+		case 16: format = MAPSURF_16BIT | MT_16BIT_RGB565; break;
+		case 32: format = MAPSURF_32BIT | MT_32BIT_ARGB8888; break;
+		default: igt_assert(0);
+	}
 
 	tiling = 0;
 	if (src->tiling != I915_TILING_NONE)
@@ -176,7 +192,7 @@ static void gen2_emit_texture(struct intel_batchbuffer *batch,
 	OUT_RELOC(src->bo, I915_GEM_DOMAIN_SAMPLER, 0, 0);
 	OUT_BATCH((igt_buf_height(src) - 1) << TM0S1_HEIGHT_SHIFT |
 		  (igt_buf_width(src) - 1) << TM0S1_WIDTH_SHIFT |
-		  MAPSURF_32BIT | MT_32BIT_ARGB8888 | tiling);
+		  format | tiling);
 	OUT_BATCH((src->stride / 4 - 1) << TM0S2_PITCH_SHIFT | TM0S2_MAP_2D);
 	OUT_BATCH(FILTER_NEAREST << TM0S3_MAG_FILTER_SHIFT |
 		  FILTER_NEAREST << TM0S3_MIN_FILTER_SHIFT |
@@ -213,6 +229,8 @@ void gen2_render_copyfunc(struct intel_batchbuffer *batch,
 			  unsigned width, unsigned height,
 			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
 {
+	igt_assert(src->bpp == dst->bpp);
+
 	gen2_emit_invariant(batch);
 	gen2_emit_copy_pipeline(batch);
 

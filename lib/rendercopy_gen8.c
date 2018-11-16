@@ -144,8 +144,7 @@ gen6_render_flush(struct intel_batchbuffer *batch,
 static uint32_t
 gen8_bind_buf(struct intel_batchbuffer *batch,
 	      struct annotations_context *aub,
-	      const struct igt_buf *buf,
-	      uint32_t format, int is_dst)
+	      const struct igt_buf *buf, int is_dst)
 {
 	struct gen8_surface_state *ss;
 	uint32_t write_domain, read_domain, offset;
@@ -163,7 +162,12 @@ gen8_bind_buf(struct intel_batchbuffer *batch,
 	annotation_add_state(aub, AUB_TRACE_SURFACE_STATE, offset, sizeof(*ss));
 
 	ss->ss0.surface_type = SURFACE_2D;
-	ss->ss0.surface_format = format;
+	switch (buf->bpp) {
+		case 8: ss->ss0.surface_format = SURFACEFORMAT_R8_UNORM; break;
+		case 16: ss->ss0.surface_format = SURFACEFORMAT_R8G8_UNORM; break;
+		case 32: ss->ss0.surface_format = SURFACEFORMAT_B8G8R8A8_UNORM; break;
+		default: igt_assert(0);
+	}
 	ss->ss0.render_cache_read_write = 1;
 	ss->ss0.vertical_alignment = 1; /* align 4 */
 	ss->ss0.horizontal_alignment = 1; /* align 4 */
@@ -205,12 +209,8 @@ gen8_bind_surfaces(struct intel_batchbuffer *batch,
 	offset = intel_batchbuffer_subdata_offset(batch, binding_table);
 	annotation_add_state(aub, AUB_TRACE_BINDING_TABLE, offset, 8);
 
-	binding_table[0] =
-		gen8_bind_buf(batch, aub,
-			      dst, SURFACEFORMAT_B8G8R8A8_UNORM, 1);
-	binding_table[1] =
-		gen8_bind_buf(batch, aub,
-			      src, SURFACEFORMAT_B8G8R8A8_UNORM, 0);
+	binding_table[0] = gen8_bind_buf(batch, aub, dst, 1);
+	binding_table[1] = gen8_bind_buf(batch, aub, src, 0);
 
 	return offset;
 }
@@ -898,6 +898,7 @@ void gen8_render_copyfunc(struct intel_batchbuffer *batch,
 	uint32_t vertex_buffer;
 	uint32_t batch_end;
 
+	igt_assert(src->bpp == dst->bpp);
 	intel_batchbuffer_flush_with_context(batch, context);
 
 	intel_batchbuffer_align(batch, 8);

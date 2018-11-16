@@ -25,6 +25,8 @@ void gen3_render_copyfunc(struct intel_batchbuffer *batch,
 			  unsigned width, unsigned height,
 			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
 {
+	igt_assert(src->bpp == dst->bpp);
+
 	/* invariant state */
 	{
 		OUT_BATCH(_3DSTATE_AA_CMD |
@@ -84,17 +86,23 @@ void gen3_render_copyfunc(struct intel_batchbuffer *batch,
 	/* samler state */
 	{
 #define TEX_COUNT 1
-		uint32_t tiling_bits = 0;
+		uint32_t format_bits, tiling_bits = 0;
 		if (src->tiling != I915_TILING_NONE)
 			tiling_bits = MS3_TILED_SURFACE;
 		if (src->tiling == I915_TILING_Y)
 			tiling_bits |= MS3_TILE_WALK;
 
+		switch (src->bpp) {
+			case 8: format_bits = MAPSURF_8BIT | MT_8BIT_L8; break;
+			case 16: format_bits = MAPSURF_16BIT | MT_16BIT_RGB565; break;
+			case 32: format_bits = MAPSURF_32BIT | MT_32BIT_ARGB8888; break;
+			default: igt_assert(0);
+		}
+
 		OUT_BATCH(_3DSTATE_MAP_STATE | (3 * TEX_COUNT));
 		OUT_BATCH((1 << TEX_COUNT) - 1);
 		OUT_RELOC(src->bo, I915_GEM_DOMAIN_SAMPLER, 0, 0);
-		OUT_BATCH(MAPSURF_32BIT | MT_32BIT_ARGB8888 |
-			  tiling_bits |
+		OUT_BATCH(format_bits | tiling_bits |
 			  (igt_buf_height(src) - 1) << MS3_HEIGHT_SHIFT |
 			  (igt_buf_width(src) - 1) << MS3_WIDTH_SHIFT);
 		OUT_BATCH((src->stride/4-1) << MS4_PITCH_SHIFT);
@@ -113,6 +121,15 @@ void gen3_render_copyfunc(struct intel_batchbuffer *batch,
 	/* render target state */
 	{
 		uint32_t tiling_bits = 0;
+		uint32_t format_bits;
+
+		switch (dst->bpp) {
+			case 8: format_bits = COLR_BUF_8BIT; break;
+			case 16: format_bits = COLR_BUF_RGB565; break;
+			case 32: format_bits = COLR_BUF_ARGB8888; break;
+			default: igt_assert(0);
+		}
+
 		if (dst->tiling != I915_TILING_NONE)
 			tiling_bits = BUF_3D_TILED_SURFACE;
 		if (dst->tiling == I915_TILING_Y)
@@ -124,7 +141,7 @@ void gen3_render_copyfunc(struct intel_batchbuffer *batch,
 		OUT_RELOC(dst->bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
 
 		OUT_BATCH(_3DSTATE_DST_BUF_VARS_CMD);
-		OUT_BATCH(COLR_BUF_ARGB8888 |
+		OUT_BATCH(format_bits |
 			  DSTORG_HORT_BIAS(0x8) |
 			  DSTORG_VERT_BIAS(0x8));
 

@@ -136,7 +136,7 @@ gen4_render_flush(struct intel_batchbuffer *batch,
 static uint32_t
 gen4_bind_buf(struct intel_batchbuffer *batch,
 	      const struct igt_buf *buf,
-	      uint32_t format, int is_dst)
+	      int is_dst)
 {
 	struct gen4_surface_state *ss;
 	uint32_t write_domain, read_domain;
@@ -152,7 +152,12 @@ gen4_bind_buf(struct intel_batchbuffer *batch,
 	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 32);
 
 	ss->ss0.surface_type = SURFACE_2D;
-	ss->ss0.surface_format = format;
+	switch (buf->bpp) {
+		case 8: ss->ss0.surface_format = SURFACEFORMAT_R8_UNORM; break;
+		case 16: ss->ss0.surface_format = SURFACEFORMAT_R8G8_UNORM; break;
+		case 32: ss->ss0.surface_format = SURFACEFORMAT_B8G8R8A8_UNORM; break;
+		default: igt_assert(0);
+	}
 
 	ss->ss0.data_return_format = SURFACERETURNFORMAT_FLOAT32;
 	ss->ss0.color_blend = 1;
@@ -182,10 +187,8 @@ gen4_bind_surfaces(struct intel_batchbuffer *batch,
 
 	binding_table = intel_batchbuffer_subdata_alloc(batch, 32, 32);
 
-	binding_table[0] =
-		gen4_bind_buf(batch, dst, SURFACEFORMAT_B8G8R8A8_UNORM, 1);
-	binding_table[1] =
-		gen4_bind_buf(batch, src, SURFACEFORMAT_B8G8R8A8_UNORM, 0);
+	binding_table[0] = gen4_bind_buf(batch, dst, 1);
+	binding_table[1] = gen4_bind_buf(batch, src, 0);
 
 	return intel_batchbuffer_subdata_offset(batch, binding_table);
 }
@@ -650,6 +653,7 @@ void gen4_render_copyfunc(struct intel_batchbuffer *batch,
 	uint32_t vs;
 	uint32_t offset, batch_end;
 
+	igt_assert(src->bpp == dst->bpp);
 	intel_batchbuffer_flush_with_context(batch, context);
 
 	batch->ptr = batch->buffer + 1024;
