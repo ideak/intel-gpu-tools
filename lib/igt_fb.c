@@ -1995,7 +1995,7 @@ static void destroy_cairo_surface__convert(void *arg)
 static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 {
 	struct fb_convert_blit_upload *blit = malloc(sizeof(*blit));
-	struct fb_convert cvt = { 0 };
+	struct fb_convert cvt = { };
 
 	igt_assert(blit);
 
@@ -2188,7 +2188,7 @@ void igt_remove_fb(int fd, struct igt_fb *fb)
 unsigned int igt_fb_convert(struct igt_fb *dst, struct igt_fb *src,
 			    uint32_t dst_fourcc)
 {
-	struct fb_convert cvt = { 0 };
+	struct fb_convert cvt = { };
 	void *dst_ptr, *src_ptr;
 	int fb_id;
 
