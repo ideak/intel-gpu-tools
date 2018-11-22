@@ -447,8 +447,17 @@ static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 	wait.request.type |= DRM_VBLANK_ABSOLUTE | DRM_VBLANK_EVENT;
 	wait.request.sequence = last_seq;
 	for (n = 0; n < CALIBRATE_TS_STEPS; n++) {
+		drmVBlank check = {};
+
 		++wait.request.sequence;
 		do_or_die(drmWaitVBlank(drm_fd, &wait));
+
+		/* Double check that haven't already missed the vblank */
+		check.request.type = kmstest_get_vbl_flag(crtc_idx);
+		check.request.type |= DRM_VBLANK_RELATIVE;
+		do_or_die(drmWaitVBlank(drm_fd, &check));
+
+		igt_assert(!igt_vblank_after(check.reply.sequence, wait.request.sequence));
 	}
 
 	igt_stats_init_with_size(&stats, CALIBRATE_TS_STEPS);
