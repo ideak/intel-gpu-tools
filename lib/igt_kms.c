@@ -3292,8 +3292,8 @@ static int do_display_commit(igt_display_t *display,
 	enum pipe pipe;
 	LOG_INDENT(display, "commit");
 
-	if (!display->n_pipes || !display->n_outputs)
-		return 0; /* nothing to do */
+	/* someone managed to bypass igt_display_require, catch them */
+	assert(display->n_pipes && display->n_outputs);
 
 	igt_display_refresh(display);
 
@@ -3345,8 +3345,8 @@ int igt_display_try_commit_atomic(igt_display_t *display, uint32_t flags, void *
 {
 	int ret;
 
-	if (!display->n_pipes || !display->n_outputs)
-		return 0; /* nothing to do */
+	/* someone managed to bypass igt_display_require, catch them */
+	assert(display->n_pipes && display->n_outputs);
 
 	LOG_INDENT(display, "commit");
 
