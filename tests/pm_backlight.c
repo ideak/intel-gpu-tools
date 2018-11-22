@@ -214,7 +214,7 @@ igt_main
 		 * try to enable all.
 		 */
 		kmstest_set_vt_graphics_mode();
-		igt_display_init(&display, drm_open_driver(DRIVER_INTEL));
+		igt_display_require(&display, drm_open_driver(DRIVER_INTEL));
 
 		/* should be ../../cardX-$output */
 		igt_assert_lt(12, readlink(BACKLIGHT_PATH "/device", full_name, sizeof(full_name) - 1));

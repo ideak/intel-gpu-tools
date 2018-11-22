@@ -811,7 +811,7 @@ event_wait(int gem_fd, const struct intel_execution_engine2 *e)
 	igt_skip_on(IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid));
 
 	kmstest_set_vt_graphics_mode();
-	igt_display_init(&data.display, gem_fd);
+	igt_display_require(&data.display, gem_fd);
 
 	/**
 	 * We will use the display to render event forwarind so need to

@@ -248,7 +248,7 @@ igt_main
 
 		igt_require_pipe_crc(gpu.drm_fd);
 
-		igt_display_init(&gpu.display, gpu.drm_fd);
+		igt_display_require(&gpu.display, gpu.drm_fd);
 	}
 
 	igt_subtest("buffer-sharing")

@@ -116,7 +116,7 @@ static uint32_t get_any_prop_id(int fd)
 {
 	igt_display_t display;
 
-	igt_display_init(&display, fd);
+	igt_display_require(&display, fd);
 	for (int i = 0; i < display.n_outputs; i++) {
 		igt_output_t *output = &display.outputs[i];
 		if (output->props[IGT_CONNECTOR_DPMS] != 0)

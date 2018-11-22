@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include "igt.h"
 #include "igt_sysfs.h"
+#include "igt_kms.h"
 
 IGT_TEST_DESCRIPTION("Test content protection (HDCP)");
 
@@ -291,7 +292,7 @@ igt_main
 
 		data.drm_fd = drm_open_driver(DRIVER_ANY);
 
-		igt_display_init(&data.display, data.drm_fd);
+		igt_display_require(&data.display, data.drm_fd);
 	}
 
 	igt_subtest("legacy")

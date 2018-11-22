@@ -217,7 +217,7 @@ int main(int argc, char **argv)
 
 		/* attempt to use the display */
 		kmstest_set_vt_graphics_mode();
-		igt_display_init(&display, drm_fd);
+		igt_display_require(&display, drm_fd);
 		igt_display_commit(&display);
 		igt_display_fini(&display);
 

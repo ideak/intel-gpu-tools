@@ -1547,7 +1547,7 @@ static void chamelium_exit_handler(int sig)
 /**
  * chamelium_init:
  * @chamelium: The Chamelium instance to use
- * @drm_fd: a display initialized with #igt_display_init
+ * @drm_fd: a display initialized with #igt_display_require
  *
  * Sets up a connection with a chamelium, using the URL specified in the
  * Chamelium configuration. This must be called first before trying to use the

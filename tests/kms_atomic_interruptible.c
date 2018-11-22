@@ -85,8 +85,8 @@ static void run_plane_test(igt_display_t *display, enum pipe pipe, igt_output_t 
 
 	/*
 	 * Make sure we start with everything disabled to force a real modeset.
-	 * igt_display_init only sets sw state, and assumes the first test doesn't care
-	 * about hw state.
+	 * igt_display_require only sets sw state, and assumes the first test
+	 * doesn't care about hw state.
 	 */
 	igt_display_commit2(display, COMMIT_ATOMIC);
 

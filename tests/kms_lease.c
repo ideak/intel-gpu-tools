@@ -294,7 +294,7 @@ static void simple_lease(data_t *data)
 	/* Create a valid lease */
 	igt_assert_eq(make_lease(data, &lease), 0);
 
-	igt_display_init(&lease.display, lease.fd);
+	igt_display_require(&lease.display, lease.fd);
 
 	/* Set a mode on the leased output */
 	igt_assert_eq(0, prepare_crtc(&lease, data->connector_id, data->crtc_id));
@@ -432,7 +432,7 @@ static void lease_unleased_crtc(data_t *data)
 	/* Create a valid lease */
 	igt_assert_eq(make_lease(data, &lease), 0);
 
-	igt_display_init(&lease.display, lease.fd);
+	igt_display_require(&lease.display, lease.fd);
 
 	/* Find another CRTC that we don't control */
 	bad_crtc_id = 0;
@@ -474,7 +474,7 @@ static void lease_unleased_connector(data_t *data)
 	/* Create a valid lease */
 	igt_assert_eq(make_lease(data, &lease), 0);
 
-	igt_display_init(&lease.display, lease.fd);
+	igt_display_require(&lease.display, lease.fd);
 
 	/* Find another connector that we don't control */
 	bad_connector_id = 0;
@@ -509,7 +509,7 @@ static void lease_revoke(data_t *data)
 	/* Create a valid lease */
 	igt_assert_eq(make_lease(data, &lease), 0);
 
-	igt_display_init(&lease.display, lease.fd);
+	igt_display_require(&lease.display, lease.fd);
 
 	/* Revoke the lease using the master fd */
 	mrl.lessee_id = lease.lessee_id;
@@ -633,7 +633,7 @@ igt_main
 	igt_fixture {
 		data.master.fd = drm_open_driver_master(DRIVER_ANY);
 		kmstest_set_vt_graphics_mode();
-		igt_display_init(&data.master.display, data.master.fd);
+		igt_display_require(&data.master.display, data.master.fd);
 	}
 
 	for (f = funcs; f->name; f++) {
