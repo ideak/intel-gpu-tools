@@ -382,7 +382,6 @@ struct igt_display {
 	int format_mod_count;
 };
 
-bool igt_display_init(igt_display_t *display, int drm_fd);
 void igt_display_require(igt_display_t *display, int drm_fd);
 void igt_display_fini(igt_display_t *display);
 void igt_display_reset(igt_display_t *display);

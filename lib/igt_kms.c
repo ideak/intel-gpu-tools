@@ -1861,16 +1861,17 @@ static void igt_fill_plane_format_mod(igt_display_t *display, igt_plane_t *plane
 static void igt_fill_display_format_mod(igt_display_t *display);
 
 /**
- * igt_display_init:
+ * igt_display_require:
  * @display: a pointer to an #igt_display_t structure
  * @drm_fd: a drm file descriptor
  *
  * Initialize @display and allocate the various resources required. Use
  * #igt_display_fini to release the resources when they are no longer required.
  *
- * Returns: true if the display has outputs and pipes available, false otherwise
+ * This function automatically skips if the kernel driver doesn't support any
+ * CRTC or outputs.
  */
-bool igt_display_init(igt_display_t *display, int drm_fd)
+void igt_display_require(igt_display_t *display, int drm_fd)
 {
 	drmModeRes *resources;
 	drmModePlaneRes *plane_resources;
@@ -2034,12 +2035,7 @@ bool igt_display_init(igt_display_t *display, int drm_fd)
 out:
 	LOG_UNINDENT(display);
 
-	return display->n_pipes && display->n_outputs;
-}
-
-void igt_display_require(igt_display_t *display, int drm_fd)
-{
-	igt_require(igt_display_init(display, drm_fd));
+	igt_require(display->n_pipes && display->n_outputs);
 }
 
 /**
