@@ -87,25 +87,16 @@ static void read_and_discard_sysfs_entries(int path_fd, int indent)
 	closedir(dir);
 }
 
-igt_main
+static void kms_tests(int fd, int debugfs)
 {
-	int fd = -1, debugfs;
 	igt_display_t display;
 	struct igt_fb fb[IGT_MAX_PIPES];
 	enum pipe pipe;
 
-	igt_skip_on_simulation();
+	igt_fixture
+		igt_display_require(&display, fd);
 
-	igt_fixture {
-		fd = drm_open_driver_master(DRIVER_INTEL);
-		igt_require_gem(fd);
-		debugfs = igt_debugfs_dir(fd);
-
-		kmstest_set_vt_graphics_mode();
-		igt_display_init(&display, fd);
-	}
-
-	igt_subtest("read_all_entries") {
+	igt_subtest("read_all_entries_display_on") {
 		/* try to light all pipes */
 		for_each_pipe(&display, pipe) {
 			igt_output_t *output;
@@ -152,6 +143,30 @@ igt_main
 		read_and_discard_sysfs_entries(debugfs, 0);
 	}
 
+	igt_fixture
+		igt_display_fini(&display);
+}
+
+igt_main
+{
+	int fd = -1, debugfs;
+
+	igt_skip_on_simulation();
+
+	igt_fixture {
+		fd = drm_open_driver_master(DRIVER_INTEL);
+		igt_require_gem(fd);
+		debugfs = igt_debugfs_dir(fd);
+
+		kmstest_set_vt_graphics_mode();
+	}
+
+	igt_subtest("read_all_entries")
+		read_and_discard_sysfs_entries(debugfs, 0);
+
+	igt_subtest_group
+		kms_tests(fd, debugfs);
+
 	igt_subtest("emon_crash") {
 		int i;
 		/*
@@ -174,7 +189,6 @@ igt_main
 	}
 
 	igt_fixture {
-		igt_display_fini(&display);
 		close(debugfs);
 		close(fd);
 	}
