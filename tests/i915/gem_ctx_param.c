@@ -156,14 +156,14 @@ igt_main
 
 		gem_require_contexts(fd);
 		ctx = gem_context_create(fd);
+
+		arg.param = I915_CONTEXT_PARAM_BAN_PERIOD;
+
+		/* XXX start to enforce ban period returning -EINVAL when
+		 * transition has been done */
+		if (__gem_context_get_param(fd, &arg) == -EINVAL)
+			arg.param = I915_CONTEXT_PARAM_BANNABLE;
 	}
-
-	arg.param = I915_CONTEXT_PARAM_BAN_PERIOD;
-
-	/* XXX start to enforce ban period returning -EINVAL when
-	 * transition has been done */
-	if (__gem_context_get_param(fd, &arg) == -EINVAL)
-		arg.param = I915_CONTEXT_PARAM_BANNABLE;
 
 	igt_subtest("basic") {
 		arg.ctx_id = ctx;
