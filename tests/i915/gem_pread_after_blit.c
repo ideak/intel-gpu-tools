@@ -248,5 +248,6 @@ igt_main
 		drm_intel_bufmgr_destroy(bufmgr);
 	}
 
-	close(fd);
+	igt_fixture
+		close(fd);
 }

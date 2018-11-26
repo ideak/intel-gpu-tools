@@ -235,5 +235,6 @@ igt_main
 			thread_fini(&threads[n]);
 	}
 
-	close(fd);
+	igt_fixture
+		close(fd);
 }

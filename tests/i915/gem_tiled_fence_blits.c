@@ -230,5 +230,6 @@ igt_main
 		run_test(fd, count);
 	}
 
-	close(fd);
+	igt_fixture
+		close(fd);
 }
