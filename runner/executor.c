@@ -137,27 +137,35 @@ static char *handle_lockdep(void)
 	return NULL;
 }
 
-static char *handle_taint(void)
+static unsigned long tainted(unsigned long *taints)
 {
 	const unsigned long bad_taints =
 		0x20  | /* TAINT_PAGE */
 		0x80  | /* TAINT_DIE */
 		0x200; /* TAINT_OOPS */
-	unsigned long taints = 0;
-	char *reason = NULL;
 	FILE *f;
+
+	*taints = 0;
 
 	f = fopen("/proc/sys/kernel/tainted", "r");
 	if (f) {
-		fscanf(f, "%lu", &taints);
+		fscanf(f, "%lu", taints);
 		fclose(f);
 	}
 
-	if (taints & bad_taints)
-		asprintf(&reason,
-			 "Kernel tainted (%#lx -- %lx)",
-			 taints, taints & bad_taints);
+	return *taints & bad_taints;
+}
 
+static char *handle_taint(void)
+{
+	unsigned long taints, bad_taints;
+	char *reason;
+
+	bad_taints = tainted(&taints);
+	if (!bad_taints)
+		return NULL;
+
+	asprintf(&reason, "Kernel tainted (%#lx -- %lx)", taints, bad_taints);
 	return reason;
 }
 
@@ -437,6 +445,7 @@ static int monitor_output(pid_t child,
 	int wd_extra = 10;
 	int killed = 0; /* 0 if not killed, signal number otherwise */
 	struct timespec time_beg, time_end;
+	unsigned long taints = 0;
 	bool aborting = false;
 
 	igt_gettime(&time_beg);
@@ -493,10 +502,8 @@ static int monitor_output(pid_t child,
 		}
 
 		if (n == 0) {
-			intervals_left--;
-			if (intervals_left) {
+			if (--intervals_left)
 				continue;
-			}
 
 			ping_watchdogs();
 
@@ -504,6 +511,7 @@ static int monitor_output(pid_t child,
 			case 0:
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
 					printf("Timeout. Killing the current test with SIGTERM.\n");
+					fflush(stdout);
 				}
 
 				killed = SIGTERM;
@@ -514,13 +522,14 @@ static int monitor_output(pid_t child,
 				 * Now continue the loop and let the
 				 * dying child be handled normally.
 				 */
-				timeout = 2; /* Timeout for waiting selected by fair dice roll. */
-				watchdogs_set_timeout(20);
+				timeout = 20;
+				watchdogs_set_timeout(120);
 				intervals_left = timeout_intervals = 1;
 				break;
 			case SIGTERM:
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
 					printf("Timeout. Killing the current test with SIGKILL.\n");
+					fflush(stdout);
 				}
 
 				killed = SIGKILL;
@@ -530,9 +539,21 @@ static int monitor_output(pid_t child,
 				intervals_left = timeout_intervals = 1;
 				break;
 			case SIGKILL:
+				/*
+				 * If the child still exists, and the kernel
+				 * hasn't oopsed, assume it is still making
+				 * forward progress towards exiting (i.e. still
+				 * freeing all of its resources).
+				 */
+				if (kill(0, child) == 0 && !tainted(&taints)) {
+					intervals_left =  1;
+					break;
+				}
+
 				/* Nothing that can be done, really. Let's tell the caller we want to abort. */
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					fprintf(stderr, "Child refuses to die. Aborting.\n");
+					fprintf(stderr, "Child refuses to die, tainted %x. Aborting.\n",
+						taints);
 				}
 				close_watchdogs(settings);
 				free(outbuf);
