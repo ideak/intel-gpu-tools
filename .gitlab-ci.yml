@@ -87,7 +87,6 @@ test:ninja-test:
   script: ninja -C build test
 
 test:ninja-test-arm64:
-  when: manual
   image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64:latest
   dependencies:
     - build:tests-debian-meson-arm64
