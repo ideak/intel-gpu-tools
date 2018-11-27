@@ -545,7 +545,7 @@ static int monitor_output(pid_t child,
 				 * forward progress towards exiting (i.e. still
 				 * freeing all of its resources).
 				 */
-				if (kill(0, child) == 0 && !tainted(&taints)) {
+				if (kill(child, 0) == 0 && !tainted(&taints)) {
 					intervals_left =  1;
 					break;
 				}
