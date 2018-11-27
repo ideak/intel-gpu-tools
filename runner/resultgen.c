@@ -466,8 +466,8 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 
 /*
  * This regexp controls the kmsg handling. All kernel log records that
- * have log level of warning or higher convert a passing result to
- * warn unless they match this regexp.
+ * have log level of warning or higher convert the result to
+ * dmesg-warn/dmesg-fail unless they match this regexp.
  *
  * TODO: Move this to external files, i915-suppressions.txt,
  * general-suppressions.txt et al.
@@ -826,11 +826,14 @@ static void override_result_single(struct json_object *obj)
 {
 	const char *errtext = NULL, *result = NULL;
 	struct json_object *textobj;
+	bool dmesgwarns = false;
 
 	if (json_object_object_get_ex(obj, "err", &textobj))
 		errtext = json_object_get_string(textobj);
 	if (json_object_object_get_ex(obj, "result", &textobj))
 		result = json_object_get_string(textobj);
+	if (json_object_object_get_ex(obj, "dmesg-warnings", &textobj))
+		dmesgwarns = true;
 
 	if (!strcmp(result, "pass") &&
 	    count_lines(errtext, errtext + strlen(errtext)) > 2) {
@@ -838,9 +841,13 @@ static void override_result_single(struct json_object *obj)
 		result = "warn";
 	}
 
-	if (json_object_object_get_ex(obj, "dmesg-warnings", &textobj) &&
-	    !strcmp(result, "pass"))
-		set_result(obj, "warn");
+	if (dmesgwarns) {
+		if (!strcmp(result, "pass") || !strcmp(result, "warn")) {
+			set_result(obj, "dmesg-warn");
+		} else if (!strcmp(result, "fail")) {
+			set_result(obj, "dmesg-fail");
+		}
+	}
 }
 
 static void override_results(char *binary,
