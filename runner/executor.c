@@ -552,7 +552,7 @@ static int monitor_output(pid_t child,
 
 				/* Nothing that can be done, really. Let's tell the caller we want to abort. */
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					fprintf(stderr, "Child refuses to die, tainted %x. Aborting.\n",
+					fprintf(stderr, "Child refuses to die, tainted %lx. Aborting.\n",
 						taints);
 				}
 				close_watchdogs(settings);
