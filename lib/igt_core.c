@@ -1852,14 +1852,29 @@ static struct {
 
 static igt_exit_handler_t exit_handler_fn[MAX_EXIT_HANDLERS];
 static bool exit_handler_disabled;
+static const struct {
+	int number;
+	const char *name;
+	size_t name_len;
+} handled_signals[] = {
 #define SIGDEF(x) { x, #x, sizeof(#x) - 1 }
 #define SILENT(x) { x, NULL, 0 }
-static const struct { int number; const char *name; size_t name_len; } handled_signals[] =
-	{ SILENT(SIGINT), SILENT(SIGHUP), SILENT(SIGTERM), SILENT(SIGQUIT),
-	  SILENT(SIGPIPE), SIGDEF(SIGABRT), SIGDEF(SIGSEGV), SIGDEF(SIGBUS),
-	  SIGDEF(SIGFPE) };
+
+	SILENT(SIGINT),
+	SILENT(SIGHUP),
+	SILENT(SIGPIPE),
+	SILENT(SIGTERM),
+
+	SIGDEF(SIGQUIT), /* used by igt_runner for its external timeout */
+
+	SIGDEF(SIGABRT),
+	SIGDEF(SIGSEGV),
+	SIGDEF(SIGBUS),
+	SIGDEF(SIGFPE)
+
 #undef SILENT
 #undef SIGDEF
+};
 
 static int install_sig_handler(int sig_num, sighandler_t handler)
 {
@@ -1940,15 +1955,15 @@ static void fatal_sig_handler(int sig)
 			__write_stderr(handled_signals[i].name,
 				       handled_signals[i].name_len);
 			write_stderr(".\n");
+
+			print_backtrace_sig_safe();
 		}
 
 		if (crash_signal(sig)) {
 			/* Linux standard to return exit code as 128 + signal */
 			if (!failed_one)
 				igt_exitcode = 128 + sig;
-
 			failed_one = true;
-			print_backtrace_sig_safe();
 
 			if (in_subtest)
 				exit_subtest("CRASH");

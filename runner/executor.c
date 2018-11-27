@@ -510,11 +510,11 @@ static int monitor_output(pid_t child,
 			switch (killed) {
 			case 0:
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					printf("Timeout. Killing the current test with SIGTERM.\n");
+					printf("Timeout. Killing the current test with SIGQUIT.\n");
 					fflush(stdout);
 				}
 
-				killed = SIGTERM;
+				killed = SIGQUIT;
 				if (!kill_child(killed, child))
 					return -1;
 
@@ -526,7 +526,7 @@ static int monitor_output(pid_t child,
 				watchdogs_set_timeout(120);
 				intervals_left = timeout_intervals = 1;
 				break;
-			case SIGTERM:
+			case SIGQUIT:
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
 					printf("Timeout. Killing the current test with SIGKILL.\n");
 					fflush(stdout);
@@ -706,7 +706,7 @@ static int monitor_output(pid_t child,
 
 				aborting = true;
 				timeout = 2;
-				killed = SIGTERM;
+				killed = SIGQUIT;
 				if (!kill_child(killed, child))
 					return -1;
 
