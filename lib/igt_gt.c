@@ -176,8 +176,8 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 	if (!igt_check_boolean_env_var("IGT_HANG_WITHOUT_RESET", false))
 		igt_require(has_gpu_reset(fd));
 
-	igt_assert(igt_sysfs_set_parameter
-		   (fd, "reset", "%d", INT_MAX /* any reset method */));
+	igt_require(igt_sysfs_set_parameter
+		    (fd, "reset", "%d", INT_MAX /* any reset method */));
 
 	if ((flags & HANG_ALLOW_CAPTURE) == 0) {
 		param.param = I915_CONTEXT_PARAM_NO_ERROR_CAPTURE;
