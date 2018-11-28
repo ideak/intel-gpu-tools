@@ -100,7 +100,7 @@ static void max_bpc_prop_test(int fd, uint32_t id, uint32_t type, drmModePropert
 			ret = drmModeAtomicAddProperty(req, id, prop_id, i);
 			igt_assert(ret >= 0);
 
-			ret = drmModeAtomicCommit(fd, req, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
+			ret = drmModeAtomicCommit(fd, req, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 			igt_assert_eq(ret, 0);
 		}
 	}
