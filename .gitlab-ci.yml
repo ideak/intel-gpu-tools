@@ -91,7 +91,13 @@ test:ninja-test-arm64:
   dependencies:
     - build:tests-debian-meson-arm64
   stage: test
-  script: ninja -C build test
+  script:
+    - env > build/envdump.txt
+    - ninja -C build test
+  artifacts:
+    paths:
+      - build
+    when: on_failure
 
 test:test-list-diff:
   dependencies:
