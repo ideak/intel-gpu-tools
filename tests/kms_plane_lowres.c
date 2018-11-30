@@ -142,6 +142,10 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier,
 	int i = 1, x, y;
 	igt_plane_t *plane;
 
+	igt_skip_on(!igt_display_has_format_mod(&data->display,
+						DRM_FORMAT_XRGB8888,
+						modifier));
+
 	igt_output_set_pipe(output, pipe);
 
 	mode = igt_output_get_mode(output);
@@ -158,6 +162,9 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier,
 
 	/* yellow sprite plane in lower left corner */
 	for_each_plane_on_pipe(&data->display, pipe, plane) {
+		uint64_t plane_modifier;
+		uint32_t plane_format;
+
 		if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
 			igt_plane_set_fb(plane, &data->fb[0]);
 			continue;
@@ -171,10 +178,19 @@ test_setup(data_t *data, enum pipe pipe, uint64_t modifier,
 		x = 0;
 		y = mode->vdisplay - size;
 
+		plane_format = plane->type == DRM_PLANE_TYPE_CURSOR ?
+			DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888;
+
+		plane_modifier = plane->type == DRM_PLANE_TYPE_CURSOR ?
+			LOCAL_DRM_FORMAT_MOD_NONE : modifier;
+
+		igt_skip_on(!igt_plane_has_format_mod(plane, plane_format,
+						      plane_modifier));
+
 		igt_create_color_fb(data->drm_fd,
 				    size, size,
-				    plane->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
-				    plane->type == DRM_PLANE_TYPE_CURSOR ? LOCAL_DRM_FORMAT_MOD_NONE : modifier,
+				    plane_format,
+				    plane_modifier,
 				    1.0, 1.0, 0.0,
 				    &data->fb[i]);
 
@@ -251,11 +267,6 @@ static void
 test_plane_position(data_t *data, enum pipe pipe, uint64_t modifier)
 {
 	igt_output_t *output;
-	const int gen = intel_gen(intel_get_drm_devid(data->drm_fd));
-
-	if (modifier == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-	    modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED)
-		igt_skip_on(gen < 9);
 
 	for_each_valid_output_on_pipe(&data->display, pipe, output)
 		test_plane_position_with_output(data, pipe, output, modifier);
