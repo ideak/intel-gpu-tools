@@ -26,6 +26,25 @@
 #include <math.h>
 
 #define MAX_FENCES 32
+#define MAXMULTIPLANESAMOUNT 2
+
+struct p_struct {
+	igt_plane_t *plane;
+	struct igt_fb fb;
+};
+
+enum p_pointorigo {
+	p_top = 1 << 0,
+	p_bottom = 1 << 1,
+	p_left = 1 << 2,
+	p_right = 1 << 3
+};
+
+struct p_point{
+	enum p_pointorigo origo;
+	float_t x;
+	float_t y;
+};
 
 typedef struct {
 	int gfx_fd;
@@ -43,6 +62,9 @@ typedef struct {
 	uint32_t override_fmt;
 	uint64_t override_tiling;
 	int devid;
+
+	struct p_struct *multiplaneoldview;
+	struct p_point planepos[MAXMULTIPLANESAMOUNT];
 } data_t;
 
 typedef struct {
@@ -395,6 +417,194 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 	}
 }
 
+typedef struct {
+	int32_t x1, y1;
+	uint64_t width, height, tiling, planetype, format;
+	igt_rotation_t rotation_sw, rotation_hw;
+} planeinfos;
+
+static void get_multiplane_crc(data_t *data, igt_output_t *output,
+			       igt_crc_t *crc_output, planeinfos *planeinfo,
+			       int numplanes)
+{
+	uint32_t w, h;
+	igt_display_t *display = &data->display;
+	struct p_struct *planes, *oldplanes;
+	int c, ret;
+
+	oldplanes = data->multiplaneoldview;
+	planes = malloc(sizeof(*planes) * numplanes);
+
+	for (c = 0; c < numplanes; c++) {
+		planes[c].plane = igt_output_get_plane_type(output,
+							    planeinfo[c].planetype);
+
+		w = planeinfo[c].width;
+		h = planeinfo[c].height;
+
+		if (planeinfo[c].rotation_sw & (IGT_ROTATION_90 | IGT_ROTATION_270))
+			igt_swap(w, h);
+
+		igt_create_fb(data->gfx_fd, w, h, planeinfo[c].format,
+			      planeinfo[c].tiling, &planes[c].fb);
+
+		paint_squares(data, planeinfo[c].rotation_sw, &planes[c].fb, 1.0f);
+		igt_plane_set_fb(planes[c].plane, &planes[c].fb);
+
+		if (planeinfo[c].rotation_hw & (IGT_ROTATION_90 | IGT_ROTATION_270))
+			igt_plane_set_size(planes[c].plane, h, w);
+
+		igt_plane_set_position(planes[c].plane, planeinfo[c].x1, planeinfo[c].y1);
+		igt_plane_set_rotation(planes[c].plane, planeinfo[c].rotation_hw);
+	}
+
+	ret = igt_display_try_commit2(display, COMMIT_ATOMIC);
+	igt_assert_eq(ret, 0);
+
+	igt_pipe_crc_get_current(data->gfx_fd, data->pipe_crc, crc_output);
+
+	for (c = 0; c < numplanes && oldplanes; c++)
+		igt_remove_fb(data->gfx_fd, &oldplanes[c].fb);
+
+	free(oldplanes);
+	data->multiplaneoldview = (void*)planes;
+}
+
+static void pointlocation(data_t *data, planeinfos *p, drmModeModeInfo *mode,
+			  int c)
+{
+	p[c].x1 = (int32_t)(data->planepos[c].x * mode->hdisplay)
+			+ ((data->planepos[c].origo & p_right) ? mode->hdisplay : 0);
+	p[c].y1 = (int32_t)(data->planepos[c].y * mode->vdisplay)
+			+ ((data->planepos[c].origo & p_bottom) ? mode->vdisplay : 0);
+}
+
+/*
+ * Here is pipe parameter which is now used only for first pipe.
+ * It is left here if this test ever was wanted to be run on
+ * different pipes.
+ */
+static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
+{
+	igt_display_t *display = &data->display;
+	igt_output_t *output;
+	igt_crc_t retcrc_sw, retcrc_hw;
+	planeinfos p[2];
+	int c;
+	struct p_struct *oldplanes;
+	drmModeModeInfo *mode;
+
+	const static struct {
+		igt_rotation_t rotation;
+		float_t width;
+		float_t height;
+		uint64_t tiling;
+	} planeconfigs[] = {
+	{IGT_ROTATION_0, .2f, .4f, LOCAL_DRM_FORMAT_MOD_NONE },
+	{IGT_ROTATION_0, .2f, .4f, LOCAL_I915_FORMAT_MOD_X_TILED },
+	{IGT_ROTATION_0, .2f, .4f, LOCAL_I915_FORMAT_MOD_Y_TILED },
+	{IGT_ROTATION_0, .2f, .4f, LOCAL_I915_FORMAT_MOD_Yf_TILED },
+	{IGT_ROTATION_90, .2f, .4f, LOCAL_I915_FORMAT_MOD_Y_TILED },
+	{IGT_ROTATION_90, .2f, .4f, LOCAL_I915_FORMAT_MOD_Yf_TILED },
+	{IGT_ROTATION_180, .2f, .4f, LOCAL_DRM_FORMAT_MOD_NONE },
+	{IGT_ROTATION_180, .2f, .4f, LOCAL_I915_FORMAT_MOD_X_TILED },
+	{IGT_ROTATION_180, .2f, .4f, LOCAL_I915_FORMAT_MOD_Y_TILED },
+	{IGT_ROTATION_180, .2f, .4f, LOCAL_I915_FORMAT_MOD_Yf_TILED },
+	{IGT_ROTATION_270, .2f, .4f, LOCAL_I915_FORMAT_MOD_Y_TILED },
+	{IGT_ROTATION_270, .2f, .4f, LOCAL_I915_FORMAT_MOD_Yf_TILED },
+	};
+
+	/*
+	* These are those modes which are tested. For testing feel interesting
+	* case with tiling are 2 byte wide and 4 byte wide.
+	*
+	* TODO:
+	* Built support for NV12 here.
+	*/
+	const static uint32_t  formatlist[] = {DRM_FORMAT_RGB565,
+					       DRM_FORMAT_XRGB8888};
+
+	for_each_valid_output_on_pipe(display, pipe, output) {
+		int i, j, k, l;
+		igt_output_set_pipe(output, pipe);
+		mode = igt_output_get_mode(output);
+		igt_display_require_output(display);
+		igt_display_commit2(display, COMMIT_ATOMIC);
+
+		data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe,
+						  INTEL_PIPE_CRC_SOURCE_AUTO);
+		igt_pipe_crc_start(data->pipe_crc);
+
+		for (i = 0; i < ARRAY_SIZE(planeconfigs); i++) {
+			p[0].planetype = DRM_PLANE_TYPE_PRIMARY;
+			p[0].width = (uint64_t)(planeconfigs[i].width * mode->hdisplay);
+			p[0].height = (uint64_t)(planeconfigs[i].height * mode->vdisplay);
+			p[0].tiling = planeconfigs[i].tiling;
+			pointlocation(data, (planeinfos *)&p, mode, 0);
+
+			for (k = 0; k < ARRAY_SIZE(formatlist); k++) {
+				p[0].format = formatlist[k];
+
+				for (j = 0; j < ARRAY_SIZE(planeconfigs); j++) {
+					p[1].planetype = DRM_PLANE_TYPE_OVERLAY;
+					p[1].width = (uint64_t)(planeconfigs[j].width * mode->hdisplay);
+					p[1].height = (uint64_t)(planeconfigs[j].height * mode->vdisplay);
+					p[1].tiling = planeconfigs[j].tiling;
+					pointlocation(data, (planeinfos *)&p,
+						      mode, 1);
+
+					for (l = 0; l < ARRAY_SIZE(formatlist); l++) {
+						p[1].format = formatlist[l];
+
+						/*
+						 * RGB565 90/270 degrees rotation is supported
+						 * from gen11 onwards.
+						 */
+						if (p[0].format == DRM_FORMAT_RGB565 &&
+						     (planeconfigs[i].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
+						     && intel_gen(data->devid) < 11)
+							continue;
+
+						if (p[1].format == DRM_FORMAT_RGB565 &&
+						     (planeconfigs[j].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
+						     && intel_gen(data->devid) < 11)
+							continue;
+
+						p[0].rotation_sw = planeconfigs[i].rotation;
+						p[0].rotation_hw = IGT_ROTATION_0;
+						p[1].rotation_sw = planeconfigs[j].rotation;
+						p[1].rotation_hw = IGT_ROTATION_0;
+						get_multiplane_crc(data, output, &retcrc_sw,
+								   (planeinfos *)&p, MAXMULTIPLANESAMOUNT);
+
+						igt_swap(p[0].rotation_sw, p[0].rotation_hw);
+						igt_swap(p[1].rotation_sw, p[1].rotation_hw);
+						get_multiplane_crc(data, output, &retcrc_hw,
+								   (planeinfos *)&p, MAXMULTIPLANESAMOUNT);
+
+						igt_assert_crc_equal(&retcrc_sw, &retcrc_hw);
+					}
+				}
+			}
+		}
+		igt_pipe_crc_stop(data->pipe_crc);
+		igt_pipe_crc_free(data->pipe_crc);
+		igt_output_set_pipe(output, PIPE_ANY);
+	}
+
+	/*
+	* Old fbs are deleted only after new ones are set on planes.
+	* This is done to speed up the test
+	*/
+	oldplanes = data->multiplaneoldview;
+	for (c = 0; c < MAXMULTIPLANESAMOUNT && oldplanes; c++)
+		igt_remove_fb(data->gfx_fd, &oldplanes[c].fb);
+
+	free(oldplanes);
+	data->multiplaneoldview = NULL;
+	data->pipe_crc = NULL;
+}
+
 static void test_plane_rotation_exhaust_fences(data_t *data,
 					       enum pipe pipe,
 					       igt_output_t *output,
@@ -593,6 +803,42 @@ igt_main
 			data.override_tiling = reflect_x->tiling;
 			test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, false);
 		}
+	}
+
+	igt_subtest_f("multiplane-rotation") {
+		igt_require(gen >= 9);
+		cleanup_crtc(&data);
+		data.planepos[0].origo = p_top | p_left;
+		data.planepos[0].x = .2f;
+		data.planepos[0].y = .1f;
+		data.planepos[1].origo = p_top | p_right;
+		data.planepos[1].x = -.4f;
+		data.planepos[1].y = .1f;
+		test_multi_plane_rotation(&data, 0);
+	}
+
+	igt_subtest_f("multiplane-rotation-cropping-top") {
+		igt_require(gen >= 9);
+		cleanup_crtc(&data);
+		data.planepos[0].origo = p_top | p_left;
+		data.planepos[0].x = -.05f;
+		data.planepos[0].y = -.15f;
+		data.planepos[1].origo = p_top | p_right;
+		data.planepos[1].x = -.15f;
+		data.planepos[1].y = -.15f;
+		test_multi_plane_rotation(&data, 0);
+	}
+
+	igt_subtest_f("multiplane-rotation-cropping-bottom") {
+		igt_require(gen >= 9);
+		cleanup_crtc(&data);
+		data.planepos[0].origo = p_bottom | p_left;
+		data.planepos[0].x = -.05f;
+		data.planepos[0].y = -.20f;
+		data.planepos[1].origo = p_bottom | p_right;
+		data.planepos[1].x = -.15f;
+		data.planepos[1].y = -.20f;
+		test_multi_plane_rotation(&data, 0);
 	}
 
 	/*
