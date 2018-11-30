@@ -157,6 +157,10 @@ create_fb_for_mode_position(data_t *data, igt_output_t *output, drmModeModeInfo 
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
+	igt_skip_on(!igt_display_has_format_mod(&data->display,
+						DRM_FORMAT_XRGB8888,
+						tiling));
+
 	fb_id = igt_create_fb(data->drm_fd,
 			      mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
@@ -210,6 +214,8 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 	y[primary->index] = 0;
 	for (i = 0; i < max_planes; i++) {
 		igt_plane_t *plane = igt_output_get_plane(output, i);
+		uint32_t plane_format;
+		uint64_t plane_tiling;
 
 		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
 			continue;
@@ -223,10 +229,16 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 
 		data->plane[i] = plane;
 
+		plane_format = data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888;
+		plane_tiling = data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? LOCAL_DRM_FORMAT_MOD_NONE : tiling;
+
+		igt_skip_on(!igt_plane_has_format_mod(plane, plane_format,
+						      plane_tiling));
+
 		igt_create_color_fb(data->drm_fd,
 				    size[i], size[i],
-				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
-				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? LOCAL_DRM_FORMAT_MOD_NONE : tiling,
+				    plane_format,
+				    plane_tiling,
 				    color->red, color->green, color->blue,
 				    &data->fb[i]);
 
@@ -291,12 +303,7 @@ test_plane_position(data_t *data, enum pipe pipe, uint64_t tiling)
 {
 	igt_output_t *output;
 	int connected_outs;
-	int devid = intel_get_drm_devid(data->drm_fd);
 	int n_planes = data->display.pipes[pipe].n_planes;
-
-	if ((tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-	     tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED))
-		igt_require(AT_LEAST_GEN(devid, 9));
 
 	if (!opt.user_seed)
 		opt.seed = time(NULL);
@@ -344,6 +351,10 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 	igt_subtest_f("atomic-pipe-%s-tiling-yf", kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_Yf_TILED);
+
+	igt_subtest_f("atomic-pipe-%s-tiling-none", kmstest_pipe_name(pipe))
+		for_each_valid_output_on_pipe(&data->display, pipe, output)
+			test_plane_position(data, pipe, LOCAL_DRM_FORMAT_MOD_NONE);
 }
 
 static data_t data;
