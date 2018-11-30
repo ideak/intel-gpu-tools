@@ -46,11 +46,14 @@ typedef struct {
 	igt_plane_t *plane4;
 } data_t;
 
-static int get_num_scalers(uint32_t devid, enum pipe pipe)
+static int get_num_scalers(data_t* d, enum pipe pipe)
 {
-	igt_require(intel_gen(devid) >= 9);
+	if (!is_i915_device(d->drm_fd))
+		return 1;
 
-	if (intel_gen(devid) >= 10)
+	igt_require(intel_gen(d->devid) >= 9);
+
+	if (intel_gen(d->devid) >= 10)
 		return 2;
 	else if (pipe != PIPE_C)
 		return 2;
@@ -79,6 +82,8 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 			igt_plane_t *plane, drmModeModeInfo *mode)
 {
 	igt_display_t *display = &data->display;
+	uint64_t tiling = is_i915_device(data->drm_fd) ?
+		LOCAL_I915_FORMAT_MOD_X_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
 
 	cleanup_crtc(data);
 
@@ -87,10 +92,13 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	/* create the pipe_crc object for this pipe */
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
+	igt_skip_on(!igt_display_has_format_mod(display, DRM_FORMAT_XRGB8888,
+						tiling));
+
 	/* allocate fb for plane 1 */
 	igt_create_pattern_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
+			      tiling,
 			      &data->fb[0]);
 
 	igt_plane_set_fb(plane, &data->fb[0]);
@@ -128,6 +136,9 @@ static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
+
+	igt_skip_on(!igt_plane_has_format_mod(plane, pixel_format,
+					      tiling));
 
 	/* create buffer in the range of  min and max source side limit.*/
 	width = height = 8;
@@ -170,6 +181,8 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 {
 	igt_display_t *display = &d->display;
 	igt_plane_t *plane;
+	uint64_t tiling = is_i915_device(d->drm_fd) ?
+		LOCAL_I915_FORMAT_MOD_Y_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
 
 	igt_output_set_pipe(output, pipe);
 	for_each_plane_on_pipe(display, pipe, plane) {
@@ -183,8 +196,8 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 				if (igt_fb_supported_format(format) &&
 				    can_rotate(d, format))
 					check_scaling_pipe_plane_rot(d, plane, format,
-								     LOCAL_I915_FORMAT_MOD_Y_TILED,
-								     pipe, output, rot);
+								     tiling, pipe,
+								     output, rot);
 			}
 		}
 	}
@@ -264,6 +277,11 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	igt_display_t *display = &d->display;
 	drmModeModeInfo *mode;
 	int primary_plane_scaling = 0; /* For now */
+	uint64_t tiling = is_i915_device(display->drm_fd) ?
+		LOCAL_I915_FORMAT_MOD_X_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
+
+	igt_skip_on(!igt_display_has_format_mod(display, DRM_FORMAT_XRGB8888,
+						tiling));
 
 	mode = igt_output_get_mode(output);
 
@@ -273,13 +291,13 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 
 	igt_create_color_pattern_fb(display->drm_fd, 600, 600,
 				    DRM_FORMAT_XRGB8888,
-				    LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
+				    tiling,
 				    .5, .5, .5, &d->fb[1]);
 
 	igt_create_pattern_fb(d->drm_fd,
 			      mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_X_TILED, /* tiled */
+			      tiling,
 			      &d->fb[2]);
 
 	if (primary_plane_scaling) {
@@ -425,7 +443,7 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 {
 	drmModeModeInfo *mode;
 
-	igt_require(get_num_scalers(d->devid, pipe) >= 2);
+	igt_require(get_num_scalers(d, pipe) >= 2);
 
 	mode = igt_output_get_mode(output);
 	d->plane1 = &d->display.pipes[pipe].planes[0];
@@ -480,6 +498,8 @@ static void test_scaler_with_multi_pipe_plane(data_t *d)
 	igt_output_t *output1, *output2;
 	drmModeModeInfo *mode1, *mode2;
 	enum pipe pipe1, pipe2;
+	uint64_t tiling = is_i915_device(display->drm_fd) ?
+		LOCAL_I915_FORMAT_MOD_Y_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
 
 	cleanup_crtc(d);
 
@@ -492,28 +512,31 @@ static void test_scaler_with_multi_pipe_plane(data_t *d)
 	igt_output_set_pipe(output2, pipe2);
 
 	d->plane1 = igt_output_get_plane(output1, 0);
-	d->plane2 = get_num_scalers(d->devid, pipe1) >= 2 ? igt_output_get_plane(output1, 1) : NULL;
+	d->plane2 = get_num_scalers(d, pipe1) >= 2 ? igt_output_get_plane(output1, 1) : NULL;
 	d->plane3 = igt_output_get_plane(output2, 0);
-	d->plane4 = get_num_scalers(d->devid, pipe2) >= 2 ? igt_output_get_plane(output2, 1) : NULL;
+	d->plane4 = get_num_scalers(d, pipe2) >= 2 ? igt_output_get_plane(output2, 1) : NULL;
 
 	mode1 = igt_output_get_mode(output1);
 	mode2 = igt_output_get_mode(output2);
 
+	igt_skip_on(!igt_display_has_format_mod(display, DRM_FORMAT_XRGB8888,
+						tiling));
+
 	igt_create_pattern_fb(d->drm_fd, 600, 600,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[0]);
+			      tiling, &d->fb[0]);
 
 	igt_create_pattern_fb(d->drm_fd, 500, 500,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[1]);
+			      tiling, &d->fb[1]);
 
 	igt_create_pattern_fb(d->drm_fd, 700, 700,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[2]);
+			      tiling, &d->fb[2]);
 
 	igt_create_pattern_fb(d->drm_fd, 400, 400,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[3]);
+			      tiling, &d->fb[3]);
 
 	igt_plane_set_fb(d->plane1, &d->fb[0]);
 	if (d->plane2)
@@ -545,7 +568,8 @@ igt_main
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_pipe_crc(data.drm_fd);
 		igt_display_require(&data.display, data.drm_fd);
-		data.devid = intel_get_drm_devid(data.drm_fd);
+		data.devid = is_i915_device(data.drm_fd) ?
+			intel_get_drm_devid(data.drm_fd) : 0;
 		igt_require(data.display.is_atomic);
 	}
 
@@ -555,7 +579,7 @@ igt_main
 		igt_fixture {
 			igt_display_require_output_on_pipe(&data.display, pipe);
 
-			igt_require(get_num_scalers(data.devid, pipe) > 0);
+			igt_require(get_num_scalers(&data, pipe) > 0);
 		}
 
 		igt_subtest_f("pipe-%s-plane-scaling", kmstest_pipe_name(pipe))
