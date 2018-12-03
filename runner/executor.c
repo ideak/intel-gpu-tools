@@ -137,13 +137,23 @@ static char *handle_lockdep(void)
 	return NULL;
 }
 
+/* see Linux's include/linux/kernel.h */
+static const struct {
+	unsigned long bit;
+	const char *explanation;
+} abort_taints[] = {
+  {(1 << 5), "TAINT_BAD_PAGE: Bad page reference or an unexpected page flags."},
+  {(1 << 7), "TAINT_DIE: Kernel has died - BUG/OOPS."},
+  {(1 << 9), "TAINT_WARN: WARN_ON has happened."},
+  {0, 0}};
+
 static unsigned long tainted(unsigned long *taints)
 {
-	const unsigned long bad_taints =
-		0x20  | /* TAINT_PAGE */
-		0x80  | /* TAINT_DIE */
-		0x200; /* TAINT_OOPS */
 	FILE *f;
+	unsigned long bad_taints = 0;
+
+	for (typeof(*abort_taints) *taint = abort_taints; taint->bit; taint++)
+		bad_taints |= taint->bit;
 
 	*taints = 0;
 
@@ -158,14 +168,26 @@ static unsigned long tainted(unsigned long *taints)
 
 static char *handle_taint(void)
 {
-	unsigned long taints, bad_taints;
+	unsigned long taints;
 	char *reason;
 
-	bad_taints = tainted(&taints);
-	if (!bad_taints)
+	if (!tainted(&taints))
 		return NULL;
 
-	asprintf(&reason, "Kernel tainted (%#lx -- %lx)", taints, bad_taints);
+	asprintf(&reason, "Kernel badly tainted (%#lx) (check dmesg for details):\n",
+		 taints);
+
+	for (typeof(*abort_taints) *taint = abort_taints; taint->bit; taint++) {
+		if (taint->bit & taints) {
+			char *old_reason = reason;
+			asprintf(&reason, "%s\t(%#lx) %s\n",
+					old_reason,
+					taint->bit,
+					taint->explanation);
+			free(old_reason);
+		}
+	}
+
 	return reason;
 }
 
