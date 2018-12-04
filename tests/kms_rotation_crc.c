@@ -494,7 +494,7 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 	struct p_struct *oldplanes;
 	drmModeModeInfo *mode;
 
-	const static struct {
+	static const struct {
 		igt_rotation_t rotation;
 		float_t width;
 		float_t height;
@@ -521,8 +521,8 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 	* TODO:
 	* Built support for NV12 here.
 	*/
-	const static uint32_t  formatlist[] = {DRM_FORMAT_RGB565,
-					       DRM_FORMAT_XRGB8888};
+	static const uint32_t formatlist[] = {DRM_FORMAT_RGB565,
+		DRM_FORMAT_XRGB8888};
 
 	for_each_valid_output_on_pipe(display, pipe, output) {
 		int i, j, k, l;
