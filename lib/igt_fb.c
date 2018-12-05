@@ -2553,14 +2553,15 @@ void igt_remove_fb(int fd, struct igt_fb *fb)
 }
 
 /**
- * igt_fb_convert:
+ * igt_fb_convert_with_stride:
  * @dst: pointer to the #igt_fb structure that will store the conversion result
  * @src: pointer to the #igt_fb structure that stores the frame we convert
  * @dst_fourcc: DRM format specifier to convert to
+ * @dst_stride: Stride for the resulting framebuffer (0 for automatic stride)
  *
  * This will convert a given @src content to the @dst_fourcc format,
  * storing the result in the @dst fb, allocating the @dst fb
- * underlying buffer.
+ * underlying buffer with a stride of @dst_stride stride.
  *
  * Once done with @dst, the caller will have to call igt_remove_fb()
  * on it to free the associated resources.
@@ -2568,15 +2569,18 @@ void igt_remove_fb(int fd, struct igt_fb *fb)
  * Returns:
  * The kms id of the created framebuffer.
  */
-unsigned int igt_fb_convert(struct igt_fb *dst, struct igt_fb *src,
-			    uint32_t dst_fourcc)
+unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
+					uint32_t dst_fourcc,
+					unsigned int dst_stride)
 {
 	struct fb_convert cvt = { };
 	void *dst_ptr, *src_ptr;
 	int fb_id;
 
-	fb_id = igt_create_fb(src->fd, src->width, src->height,
-			      dst_fourcc, LOCAL_DRM_FORMAT_MOD_NONE, dst);
+	fb_id = igt_create_fb_with_bo_size(src->fd, src->width, src->height,
+					   dst_fourcc,
+					   LOCAL_DRM_FORMAT_MOD_NONE,
+					   dst, 0, dst_stride);
 	igt_assert(fb_id > 0);
 
 	src_ptr = igt_fb_map_buffer(src->fd, src);
@@ -2595,6 +2599,28 @@ unsigned int igt_fb_convert(struct igt_fb *dst, struct igt_fb *src,
 	igt_fb_unmap_buffer(src, src_ptr);
 
 	return fb_id;
+}
+
+/**
+ * igt_fb_convert:
+ * @dst: pointer to the #igt_fb structure that will store the conversion result
+ * @src: pointer to the #igt_fb structure that stores the frame we convert
+ * @dst_fourcc: DRM format specifier to convert to
+ *
+ * This will convert a given @src content to the @dst_fourcc format,
+ * storing the result in the @dst fb, allocating the @dst fb
+ * underlying buffer.
+ *
+ * Once done with @dst, the caller will have to call igt_remove_fb()
+ * on it to free the associated resources.
+ *
+ * Returns:
+ * The kms id of the created framebuffer.
+ */
+unsigned int igt_fb_convert(struct igt_fb *dst, struct igt_fb *src,
+			    uint32_t dst_fourcc)
+{
+	return igt_fb_convert_with_stride(dst, src, dst_fourcc, 0);
 }
 
 /**
