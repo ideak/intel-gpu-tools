@@ -2727,3 +2727,19 @@ bool igt_format_is_yuv(uint32_t drm_format)
 		return false;
 	}
 }
+
+/**
+ * igt_format_plane_bpp:
+ * @drm_format: drm fourcc
+ * @plane: format plane index
+ *
+ * This functions returns the number of bits per pixel for the given @plane
+ * index of the @drm_format.
+ */
+int igt_format_plane_bpp(uint32_t drm_format, int plane)
+{
+	const struct format_desc_struct *format =
+		lookup_drm_format(drm_format);
+
+	return format->plane_bpp[plane];
+}

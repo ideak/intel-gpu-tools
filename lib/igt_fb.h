@@ -181,6 +181,7 @@ uint32_t igt_drm_format_to_bpp(uint32_t drm_format);
 const char *igt_format_str(uint32_t drm_format);
 bool igt_fb_supported_format(uint32_t drm_format);
 bool igt_format_is_yuv(uint32_t drm_format);
+int igt_format_plane_bpp(uint32_t drm_format, int plane);
 
 #endif /* __IGT_FB_H__ */
 
