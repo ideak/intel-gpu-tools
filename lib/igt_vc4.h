@@ -33,4 +33,8 @@ bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable);
 void igt_vc4_set_tiling(int fd, uint32_t handle, uint64_t modifier);
 uint64_t igt_vc4_get_tiling(int fd, uint32_t handle);
 
+unsigned int igt_vc4_fb_t_tiled_convert(struct igt_fb *dst, struct igt_fb *src);
+size_t igt_vc4_t_tiled_offset(size_t stride, size_t height, size_t bpp,
+			      size_t x, size_t y);
+
 #endif /* IGT_VC4_H */

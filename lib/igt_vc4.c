@@ -34,6 +34,7 @@
 #include "drmtest.h"
 #include "igt_aux.h"
 #include "igt_core.h"
+#include "igt_fb.h"
 #include "igt_vc4.h"
 #include "ioctl_wrappers.h"
 #include "intel_reg.h"
@@ -175,4 +176,134 @@ bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable)
 	do_ioctl(fd, DRM_IOCTL_VC4_GEM_MADVISE, &arg);
 
 	return arg.retained;
+}
+
+unsigned int igt_vc4_fb_t_tiled_convert(struct igt_fb *dst, struct igt_fb *src)
+{
+	unsigned int fb_id;
+	unsigned int i, j;
+	void *src_buf;
+	void *dst_buf;
+	size_t bpp = src->plane_bpp[0];
+	size_t dst_stride = ALIGN(src->strides[0], 128);
+
+	fb_id = igt_create_fb_with_bo_size(src->fd, src->width, src->height,
+					   src->drm_format,
+					   DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED,
+					   dst, 0, dst_stride);
+	igt_assert(fb_id > 0);
+
+	igt_assert(bpp == 16 || bpp == 32);
+
+	src_buf = igt_fb_map_buffer(src->fd, src);
+	igt_assert(src_buf);
+
+	dst_buf = igt_fb_map_buffer(dst->fd, dst);
+	igt_assert(dst_buf);
+
+	for (i = 0; i < src->height; i++) {
+		for (j = 0; j < src->width; j++) {
+			size_t src_offset = src->offsets[0];
+			size_t dst_offset = dst->offsets[0];
+
+			src_offset += src->strides[0] * i + j * bpp / 8;
+			dst_offset += igt_vc4_t_tiled_offset(dst_stride,
+							     src->height,
+							     bpp, j, i);
+
+			switch (bpp) {
+			case 16:
+				*(uint16_t *)(dst_buf + dst_offset) =
+					*(uint16_t *)(src_buf + src_offset);
+				break;
+			case 32:
+				*(uint32_t *)(dst_buf + dst_offset) =
+					*(uint32_t *)(src_buf + src_offset);
+				break;
+			}
+		}
+	}
+
+	igt_fb_unmap_buffer(src, src_buf);
+	igt_fb_unmap_buffer(dst, dst_buf);
+
+	return fb_id;
+}
+
+/* Calculate the t-tile width so that size = width * height * bpp / 8. */
+#define VC4_T_TILE_W(size, height, bpp) ((size) / (height) / ((bpp) / 8))
+
+size_t igt_vc4_t_tiled_offset(size_t stride, size_t height, size_t bpp,
+			      size_t x, size_t y)
+{
+	const size_t t1k_map_even[] = { 0, 3, 1, 2 };
+	const size_t t1k_map_odd[] = { 2, 1, 3, 0 };
+	const size_t t4k_t_h = 32;
+	const size_t t1k_t_h = 16;
+	const size_t t64_t_h = 4;
+	size_t offset = 0;
+	size_t t4k_t_w, t4k_w, t4k_x, t4k_y;
+	size_t t1k_t_w, t1k_x, t1k_y;
+	size_t t64_t_w, t64_x, t64_y;
+	size_t pix_x, pix_y;
+	unsigned int index;
+
+	/* T-tiling is only supported for 16 and 32 bpp. */
+	igt_assert(bpp == 16 || bpp == 32);
+
+	/* T-tiling stride must be aligned to the 4K tiles strides. */
+	igt_assert((stride % (4096 / t4k_t_h)) == 0);
+
+	/* Calculate the tile width for the bpp. */
+	t4k_t_w = VC4_T_TILE_W(4096, t4k_t_h, bpp);
+	t1k_t_w = VC4_T_TILE_W(1024, t1k_t_h, bpp);
+	t64_t_w = VC4_T_TILE_W(64, t64_t_h, bpp);
+
+	/* Aligned total width in number of 4K tiles. */
+	t4k_w = (stride / (bpp / 8)) / t4k_t_w;
+
+	/* X and y coordinates in number of 4K tiles. */
+	t4k_x = x / t4k_t_w;
+	t4k_y = y / t4k_t_h;
+
+	/* Increase offset to the beginning of the 4K tile row. */
+	offset += t4k_y * t4k_w * 4096;
+
+	/* X and Y coordinates in number of 1K tiles within the 4K tile. */
+	t1k_x = (x % t4k_t_w) / t1k_t_w;
+	t1k_y = (y % t4k_t_h) / t1k_t_h;
+
+	/* Index for 1K tile map lookup. */
+	index = 2 * t1k_y + t1k_x;
+
+	/* Odd rows start from the right, even rows from the left. */
+	if (t4k_y % 2) {
+		/* Increase offset to the 4K tile (starting from the right). */
+		offset += (t4k_w - t4k_x - 1) * 4096;
+
+		/* Incrase offset to the beginning of the (odd) 1K tile. */
+		offset += t1k_map_odd[index] * 1024;
+	} else {
+		/* Increase offset to the 4K tile (starting from the left). */
+		offset += t4k_x * 4096;
+
+		/* Incrase offset to the beginning of the (even) 1K tile. */
+		offset += t1k_map_even[index] * 1024;
+	}
+
+	/* X and Y coordinates in number of 64 byte tiles within the 1K tile. */
+	t64_x = (x % t1k_t_w) / t64_t_w;
+	t64_y = (y % t1k_t_h) / t64_t_h;
+
+	/* Increase offset to the beginning of the 64-byte tile. */
+	offset += (t64_y * (t1k_t_w / t64_t_w) + t64_x) * 64;
+
+	/* X and Y coordinates in number of pixels within the 64-byte tile. */
+	pix_x = x % t64_t_w;
+	pix_y = y % t64_t_h;
+
+	/* Increase offset to the correct pixel. */
+	offset += (pix_y * t64_t_w + pix_x) * bpp / 8;
+
+	return offset;
 }
