@@ -1069,7 +1069,7 @@ struct json_object *generate_results_json(int dirfd)
 
 	obj = json_object_new_object();
 	json_object_object_add(obj, "__type__", json_object_new_string("TestrunResult"));
-	json_object_object_add(obj, "results_version", json_object_new_int(9));
+	json_object_object_add(obj, "results_version", json_object_new_int(10));
 	json_object_object_add(obj, "name",
 			       settings.name ?
 			       json_object_new_string(settings.name) :
