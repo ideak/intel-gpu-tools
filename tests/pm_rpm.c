@@ -725,6 +725,18 @@ static bool dmc_loaded(void)
 	return strstr(buf, "fw loaded: yes");
 }
 
+static void dump_file(int dir, const char *filename)
+{
+	char *contents;
+
+	contents = igt_sysfs_get(dir, filename);
+	if (!contents)
+		return;
+
+	igt_info("%s:\n%s\n", filename, contents);
+	free(contents);
+}
+
 static bool setup_environment(void)
 {
 	if (has_runtime_pm)
@@ -743,6 +755,8 @@ static bool setup_environment(void)
 
 	has_runtime_pm = igt_setup_runtime_pm();
 	setup_pc8();
+
+	dump_file(debugfs, "i915_runtime_pm_status");
 
 	igt_info("Runtime PM support: %d\n", has_runtime_pm);
 	igt_info("PC8 residency support: %d\n", has_pc8);
