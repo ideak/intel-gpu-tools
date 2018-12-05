@@ -106,6 +106,11 @@ bool is_i915_device(int fd)
 	return __is_device(fd, "i915");
 }
 
+bool is_vc4_device(int fd)
+{
+	return __is_device(fd, "vc4");
+}
+
 static bool has_known_intel_chipset(int fd)
 {
 	struct drm_i915_getparam gp;
@@ -483,4 +488,9 @@ int drm_open_driver_render(int chipset)
 void igt_require_intel(int fd)
 {
 	igt_require(is_i915_device(fd) && has_known_intel_chipset(fd));
+}
+
+void igt_require_vc4(int fd)
+{
+	igt_require(is_vc4_device(fd));
 }

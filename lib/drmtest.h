@@ -80,8 +80,10 @@ int __drm_open_driver(int chipset);
 void gem_quiescent_gpu(int fd);
 
 void igt_require_intel(int fd);
+void igt_require_vc4(int fd);
 
 bool is_i915_device(int fd);
+bool is_vc4_device(int fd);
 
 /**
  * do_or_die:
