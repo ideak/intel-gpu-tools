@@ -397,6 +397,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		(fb->plane_bpp[plane] / 8);
 
 	if (fb->tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
+	    is_i915_device(fb->fd) &&
 	    intel_gen(intel_get_drm_devid(fb->fd)) <= 3) {
 		uint32_t stride;
 
@@ -425,6 +426,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 {
 	if (fb->tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
+	    is_i915_device(fb->fd) &&
 	    intel_gen(intel_get_drm_devid(fb->fd)) <= 3) {
 		uint64_t min_size = (uint64_t) fb->strides[plane] *
 			fb->plane_height[plane];
@@ -1559,9 +1561,11 @@ static void *map_bo(int fd, struct igt_fb *fb)
 	if (fb->is_dumb)
 		ptr = kmstest_dumb_map_buffer(fd, fb->gem_handle, fb->size,
 					      PROT_READ | PROT_WRITE);
-	else
+	else if (is_i915_device(fd))
 		ptr = gem_mmap__gtt(fd, fb->gem_handle, fb->size,
 				    PROT_READ | PROT_WRITE);
+	else
+		igt_assert(false);
 
 	return ptr;
 }
