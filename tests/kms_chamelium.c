@@ -26,6 +26,7 @@
 
 #include "config.h"
 #include "igt.h"
+#include "igt_vc4.h"
 
 #include <fcntl.h>
 #include <string.h>
@@ -703,6 +704,435 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 	drmModeFreeConnector(connector);
 }
 
+static void select_tiled_modifier(igt_plane_t *plane, uint32_t width,
+				  uint32_t height, uint32_t format,
+				  uint64_t *modifier)
+{
+	if (igt_plane_has_format_mod(plane, format,
+				     DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED)) {
+		igt_debug("Selecting VC4 T-tiling\n");
+
+		*modifier = DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED;
+	} else if (igt_plane_has_format_mod(plane, format,
+					    DRM_FORMAT_MOD_BROADCOM_SAND256)) {
+		/* Randomize the column height to less than twice the minimum. */
+		size_t column_height = (rand() % height) + height;
+
+		igt_debug("Selecting VC4 SAND256 tiling with column height %ld\n",
+			  column_height);
+
+		*modifier = DRM_FORMAT_MOD_BROADCOM_SAND256_COL_HEIGHT(column_height);
+	} else {
+		*modifier = DRM_FORMAT_MOD_LINEAR;
+	}
+}
+
+static void randomize_plane_format_stride(igt_plane_t *plane,
+					  uint32_t width, uint32_t height,
+					  uint32_t *format, uint64_t *modifier,
+					  size_t *stride, bool allow_yuv)
+{
+	size_t stride_min;
+	uint32_t *formats_array;
+	unsigned int formats_count;
+	unsigned int count = 0;
+	unsigned int i;
+	bool tiled;
+	int index;
+
+	igt_format_array_fill(&formats_array, &formats_count, allow_yuv);
+
+	/* First pass to count the supported formats. */
+	for (i = 0; i < formats_count; i++)
+		if (igt_plane_has_format_mod(plane, formats_array[i],
+					     DRM_FORMAT_MOD_LINEAR))
+			count++;
+
+	igt_assert(count > 0);
+
+	index = rand() % count;
+
+	/* Second pass to get the index-th supported format. */
+	for (i = 0; i < formats_count; i++) {
+		if (!igt_plane_has_format_mod(plane, formats_array[i],
+					      DRM_FORMAT_MOD_LINEAR))
+			continue;
+
+		if (!index--) {
+			*format = formats_array[i];
+			break;
+		}
+	}
+
+	free(formats_array);
+
+	igt_assert(index < 0);
+
+	stride_min = width * igt_format_plane_bpp(*format, 0) / 8;
+
+	/* Randomize the stride to less than twice the minimum. */
+	*stride = (rand() % stride_min) + stride_min;
+
+	/* Pixman requires the stride to be aligned to 32-byte words. */
+	*stride = ALIGN(*stride, sizeof(uint32_t));
+
+	/* Randomize the use of a tiled mode with a 1/4 probability. */
+	tiled = ((rand() % 4) == 0);
+
+	if (tiled)
+		select_tiled_modifier(plane, width, height, *format, modifier);
+	else
+		*modifier = DRM_FORMAT_MOD_LINEAR;
+}
+
+static void randomize_plane_dimensions(drmModeModeInfo *mode,
+				       uint32_t *width, uint32_t *height,
+				       uint32_t *src_w, uint32_t *src_h,
+				       uint32_t *src_x, uint32_t *src_y,
+				       uint32_t *crtc_w, uint32_t *crtc_h,
+				       int32_t *crtc_x, int32_t *crtc_y,
+				       bool allow_scaling)
+{
+	double ratio;
+
+	/* Randomize width and height in the mode dimensions range. */
+	*width = (rand() % mode->hdisplay) + 1;
+	*height = (rand() % mode->vdisplay) + 1;
+
+	/* Randomize source offset in the first half of the original size. */
+	*src_x = rand() % (*width / 2);
+	*src_y = rand() % (*height / 2);
+
+	/* The source size only includes the active source area. */
+	*src_w = *width - *src_x;
+	*src_h = *height - *src_y;
+
+	if (allow_scaling) {
+		*crtc_w = (rand() % mode->hdisplay) + 1;
+		*crtc_h = (rand() % mode->vdisplay) + 1;
+
+		/*
+		 * Don't bother with scaling if dimensions are quite close in
+		 * order to get non-scaling cases more frequently. Also limit
+		 * scaling to 3x to avoid agressive filtering that makes
+		 * comparison less reliable.
+		 */
+
+		ratio = ((double) *crtc_w / *src_w);
+		if (ratio > 0.8 && ratio < 1.2)
+			*crtc_w = *src_w;
+		else if (ratio > 3.0)
+			*crtc_w = *src_w * 3;
+
+		ratio = ((double) *crtc_h / *src_h);
+		if (ratio > 0.8 && ratio < 1.2)
+			*crtc_h = *src_h;
+		else if (ratio > 3.0)
+			*crtc_h = *src_h * 3;
+	} else {
+		*crtc_w = *src_w;
+		*crtc_h = *src_h;
+	}
+
+	if (*crtc_w != *src_w || *crtc_h != *src_h) {
+		/*
+		 * When scaling is involved, make sure to not go off-bounds or
+		 * scaled clipping may result in decimal dimensions, that most
+		 * drivers don't support.
+		 */
+		*crtc_x = rand() % (mode->hdisplay - *crtc_w);
+		*crtc_y = rand() % (mode->vdisplay - *crtc_h);
+	} else {
+		/*
+		 * Randomize the on-crtc position and allow the plane to go
+		 * off-display by less than half of its on-crtc dimensions.
+		 */
+		*crtc_x = (rand() % mode->hdisplay) - *crtc_w / 2;
+		*crtc_y = (rand() % mode->vdisplay) - *crtc_h / 2;
+	}
+}
+
+static void blit_plane_cairo(data_t *data, cairo_surface_t *result,
+			     uint32_t src_w, uint32_t src_h,
+			     uint32_t src_x, uint32_t src_y,
+			     uint32_t crtc_w, uint32_t crtc_h,
+			     int32_t crtc_x, int32_t crtc_y,
+			     struct igt_fb *fb)
+{
+	cairo_surface_t *surface;
+	cairo_surface_t *clipped_surface;
+	cairo_t *cr;
+
+	surface = igt_get_cairo_surface(data->drm_fd, fb);
+
+	if (src_x || src_y) {
+		clipped_surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
+							     src_w, src_h);
+
+		cr = cairo_create(clipped_surface);
+
+		cairo_translate(cr, -1. * src_x, -1. * src_y);
+
+		cairo_set_source_surface(cr, surface, 0, 0);
+
+		cairo_paint(cr);
+		cairo_surface_flush(clipped_surface);
+
+		cairo_destroy(cr);
+	} else {
+		clipped_surface = surface;
+	}
+
+	cr = cairo_create(result);
+
+	cairo_translate(cr, crtc_x, crtc_y);
+
+	if (src_w != crtc_w || src_h != crtc_h) {
+		cairo_scale(cr, (double) crtc_w / src_w,
+			    (double) crtc_h / src_h);
+	}
+
+	cairo_set_source_surface(cr, clipped_surface, 0, 0);
+	cairo_surface_destroy(clipped_surface);
+
+	if (src_w != crtc_w || src_h != crtc_h) {
+		cairo_pattern_set_filter(cairo_get_source(cr),
+					 CAIRO_FILTER_BILINEAR);
+		cairo_pattern_set_extend(cairo_get_source(cr),
+					 CAIRO_EXTEND_NONE);
+	}
+
+	cairo_paint(cr);
+	cairo_surface_flush(result);
+
+	cairo_destroy(cr);
+}
+
+static void configure_plane(igt_plane_t *plane, uint32_t src_w, uint32_t src_h,
+			    uint32_t src_x, uint32_t src_y, uint32_t crtc_w,
+			    uint32_t crtc_h, int32_t crtc_x, int32_t crtc_y,
+			    struct igt_fb *fb)
+{
+	igt_plane_set_fb(plane, fb);
+
+	igt_plane_set_position(plane, crtc_x, crtc_y);
+	igt_plane_set_size(plane, crtc_w, crtc_h);
+
+	igt_fb_set_position(fb, plane, src_x, src_y);
+	igt_fb_set_size(fb, plane, src_w, src_h);
+}
+
+static void prepare_randomized_plane(data_t *data,
+				     drmModeModeInfo *mode,
+				     igt_plane_t *plane,
+				     struct igt_fb *overlay_fb,
+				     unsigned int index,
+				     cairo_surface_t *result_surface,
+				     bool allow_scaling, bool allow_yuv)
+{
+	struct igt_fb pattern_fb;
+	uint32_t overlay_fb_w, overlay_fb_h;
+	uint32_t overlay_src_w, overlay_src_h;
+	uint32_t overlay_src_x, overlay_src_y;
+	int32_t overlay_crtc_x, overlay_crtc_y;
+	uint32_t overlay_crtc_w, overlay_crtc_h;
+	uint32_t format;
+	uint64_t modifier;
+	size_t stride;
+	bool tiled;
+	int fb_id;
+
+	randomize_plane_dimensions(mode, &overlay_fb_w, &overlay_fb_h,
+				   &overlay_src_w, &overlay_src_h,
+				   &overlay_src_x, &overlay_src_y,
+				   &overlay_crtc_w, &overlay_crtc_h,
+				   &overlay_crtc_x, &overlay_crtc_y,
+				   allow_scaling);
+
+	igt_debug("Plane %d: framebuffer size %dx%d\n", index,
+		  overlay_fb_w, overlay_fb_h);
+	igt_debug("Plane %d: on-crtc size %dx%d\n", index,
+		  overlay_crtc_w, overlay_crtc_h);
+	igt_debug("Plane %d: on-crtc position %dx%d\n", index,
+		  overlay_crtc_x, overlay_crtc_y);
+	igt_debug("Plane %d: in-framebuffer size %dx%d\n", index,
+		  overlay_src_w, overlay_src_h);
+	igt_debug("Plane %d: in-framebuffer position %dx%d\n", index,
+		  overlay_src_x, overlay_src_y);
+
+	/* Get a pattern framebuffer for the overlay plane. */
+	fb_id = chamelium_get_pattern_fb(data, overlay_fb_w, overlay_fb_h,
+					 DRM_FORMAT_XRGB8888, 32, &pattern_fb);
+	igt_assert(fb_id > 0);
+
+	randomize_plane_format_stride(plane, overlay_fb_w, overlay_fb_h,
+				      &format, &modifier, &stride, allow_yuv);
+
+	tiled = (modifier != LOCAL_DRM_FORMAT_MOD_NONE);
+
+	igt_debug("Plane %d: %s format (%s) with stride %ld\n", index,
+		  igt_format_str(format), tiled ? "tiled" : "linear", stride);
+
+	fb_id = igt_fb_convert_with_stride(overlay_fb, &pattern_fb, format,
+					   modifier, stride);
+	igt_assert(fb_id > 0);
+
+	blit_plane_cairo(data, result_surface, overlay_src_w, overlay_src_h,
+			 overlay_src_x, overlay_src_y,
+			 overlay_crtc_w, overlay_crtc_h,
+			 overlay_crtc_x, overlay_crtc_y, &pattern_fb);
+
+	configure_plane(plane, overlay_src_w, overlay_src_h,
+			overlay_src_x, overlay_src_y,
+			overlay_crtc_w, overlay_crtc_h,
+			overlay_crtc_x, overlay_crtc_y, overlay_fb);
+
+	/* Remove the original pattern framebuffer. */
+	igt_remove_fb(data->drm_fd, &pattern_fb);
+}
+
+static void test_display_planes_random(data_t *data,
+				       struct chamelium_port *port,
+				       enum chamelium_check check)
+{
+	igt_output_t *output;
+	drmModeModeInfo *mode;
+	igt_plane_t *primary_plane;
+	struct igt_fb primary_fb;
+	struct igt_fb result_fb;
+	struct igt_fb *overlay_fbs;
+	igt_crc_t *crc;
+	igt_crc_t *expected_crc;
+	struct chamelium_fb_crc_async_data *fb_crc;
+	unsigned int overlay_planes_max = 0;
+	unsigned int overlay_planes_count;
+	cairo_surface_t *result_surface;
+	int captured_frame_count;
+	bool allow_scaling;
+	bool allow_yuv;
+	unsigned int i;
+	unsigned int fb_id;
+
+	switch (check) {
+	case CHAMELIUM_CHECK_CRC:
+		allow_scaling = false;
+		allow_yuv = false;
+		break;
+	case CHAMELIUM_CHECK_CHECKERBOARD:
+		allow_scaling = true;
+		allow_yuv = true;
+		break;
+	default:
+		igt_assert(false);
+	}
+
+	srand(time(NULL));
+
+	reset_state(data, port);
+
+	/* Find the connector and pipe. */
+	output = prepare_output(data, port);
+
+	mode = igt_output_get_mode(output);
+
+	/* Get a framebuffer for the primary plane. */
+	primary_plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_assert(primary_plane);
+
+	fb_id = chamelium_get_pattern_fb(data, mode->hdisplay, mode->vdisplay,
+					 DRM_FORMAT_XRGB8888, 64, &primary_fb);
+	igt_assert(fb_id > 0);
+
+	/* Get a framebuffer for the cairo composition result. */
+	fb_id = igt_create_fb(data->drm_fd, mode->hdisplay,
+			      mode->vdisplay, DRM_FORMAT_XRGB8888,
+			      LOCAL_DRM_FORMAT_MOD_NONE, &result_fb);
+	igt_assert(fb_id > 0);
+
+	result_surface = igt_get_cairo_surface(data->drm_fd, &result_fb);
+
+	/* Paint the primary framebuffer on the result surface. */
+	blit_plane_cairo(data, result_surface, 0, 0, 0, 0, 0, 0, 0, 0,
+			 &primary_fb);
+
+	/* Configure the primary plane. */
+	igt_plane_set_fb(primary_plane, &primary_fb);
+
+	overlay_planes_max =
+		igt_output_count_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
+
+	/* Limit the number of planes to a reasonable scene. */
+	overlay_planes_max = max(overlay_planes_max, 4);
+
+	overlay_planes_count = (rand() % overlay_planes_max) + 1;
+	igt_debug("Using %d overlay planes\n", overlay_planes_count);
+
+	overlay_fbs = calloc(sizeof(struct igt_fb), overlay_planes_count);
+
+	for (i = 0; i < overlay_planes_count; i++) {
+		struct igt_fb *overlay_fb = &overlay_fbs[i];
+		igt_plane_t *plane =
+			igt_output_get_plane_type_index(output,
+							DRM_PLANE_TYPE_OVERLAY,
+							i);
+		igt_assert(plane);
+
+		prepare_randomized_plane(data, mode, plane, overlay_fb, i,
+					 result_surface, allow_scaling,
+					 allow_yuv);
+	}
+
+	cairo_surface_destroy(result_surface);
+
+	if (check == CHAMELIUM_CHECK_CRC)
+		fb_crc = chamelium_calculate_fb_crc_async_start(data->drm_fd,
+								&result_fb);
+
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
+
+	if (check == CHAMELIUM_CHECK_CRC) {
+		chamelium_capture(data->chamelium, port, 0, 0, 0, 0, 1);
+		crc = chamelium_read_captured_crcs(data->chamelium,
+						   &captured_frame_count);
+
+		igt_assert(captured_frame_count == 1);
+
+		expected_crc = chamelium_calculate_fb_crc_async_finish(fb_crc);
+
+		chamelium_assert_crc_eq_or_dump(data->chamelium,
+						expected_crc, crc,
+						&result_fb, 0);
+
+		free(expected_crc);
+		free(crc);
+	} else if (check == CHAMELIUM_CHECK_CHECKERBOARD) {
+		struct chamelium_frame_dump *dump;
+
+		dump = chamelium_port_dump_pixels(data->chamelium, port, 0, 0,
+						  0, 0);
+		chamelium_assert_frame_match_or_dump(data->chamelium, port,
+						     dump, &result_fb, check);
+		chamelium_destroy_frame_dump(dump);
+	}
+
+	for (i = 0; i < overlay_planes_count; i++) {
+		struct igt_fb *overlay_fb = &overlay_fbs[i];
+		igt_plane_t *plane;
+
+		plane = igt_output_get_plane_type_index(output,
+							DRM_PLANE_TYPE_OVERLAY,
+							i);
+		igt_assert(plane);
+
+		igt_remove_fb(data->drm_fd, overlay_fb);
+	}
+
+	free(overlay_fbs);
+
+	igt_remove_fb(data->drm_fd, &primary_fb);
+	igt_remove_fb(data->drm_fd, &result_fb);
+}
+
 static void
 test_hpd_without_ddc(data_t *data, struct chamelium_port *port)
 {
@@ -977,6 +1407,10 @@ igt_main
 			test_display_one_mode(&data, port, DRM_FORMAT_XRGB1555,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		connector_subtest("hdmi-crc-planes-random", HDMIA)
+			test_display_planes_random(&data, port,
+						   CHAMELIUM_CHECK_CRC);
+
 		connector_subtest("hdmi-cmp-nv12", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_NV12,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
@@ -1008,6 +1442,10 @@ igt_main
 		connector_subtest("hdmi-cmp-yv16", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_YVU422,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
+
+		connector_subtest("hdmi-cmp-planes-random", HDMIA)
+			test_display_planes_random(&data, port,
+						   CHAMELIUM_CHECK_CHECKERBOARD);
 
 		connector_subtest("hdmi-frame-dump", HDMIA)
 			test_display_frame_dump(&data, port);
