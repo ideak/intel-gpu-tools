@@ -181,8 +181,6 @@ igt_main
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
-		igt_enable_connectors(data.drm_fd);
-
 		kmstest_set_vt_graphics_mode();
 
 		igt_require_pipe_crc(data.drm_fd);

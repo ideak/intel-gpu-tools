@@ -2035,7 +2035,11 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 out:
 	LOG_UNINDENT(display);
 
-	igt_require(display->n_pipes && display->n_outputs);
+	if (display->n_pipes && display->n_outputs)
+		igt_enable_connectors(drm_fd);
+	else
+		igt_skip("No KMS driver or no outputs, pipes: %d, outputs: %d\n",
+			 display->n_pipes, display->n_outputs);
 }
 
 /**
