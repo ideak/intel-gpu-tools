@@ -10,6 +10,7 @@ variables:
     -Dbuild_tests=true
     -Dbuild_runner=true
     -Dwith_libunwind=true
+  LANG: "C.UTF-8"
 
 stages:
   - containers
