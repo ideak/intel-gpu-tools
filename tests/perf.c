@@ -2025,7 +2025,7 @@ test_blocking(void)
 	int64_t tick_ns = 1000000000 / sysconf(_SC_CLK_TCK);
 	int64_t test_duration_ns = tick_ns * 1000;
 
-	int max_iterations = (test_duration_ns / oa_period) + 1;
+	int max_iterations = (test_duration_ns / oa_period) + 2;
 	int n_extra_iterations = 0;
 
 	/* It's a bit tricky to put a lower limit here, but we expect a
@@ -2116,12 +2116,6 @@ test_blocking(void)
 		n++;
 	}
 
-	/* Updated the maximum of iterations based on the time spent
-	 * in the loop.
-	 */
-	max_iterations = (end - start) / oa_period + 1;
-	igt_debug("adjusted max iter. = %d\n", max_iterations);
-
 	times(&end_times);
 
 	/* Using nanosecond units is fairly silly here, given the tick in-
@@ -2190,7 +2184,7 @@ test_polling(void)
 	int64_t tick_ns = 1000000000 / sysconf(_SC_CLK_TCK);
 	int64_t test_duration_ns = tick_ns * 1000;
 
-	int max_iterations = (test_duration_ns / oa_period) + 1;
+	int max_iterations = (test_duration_ns / oa_period) + 2;
 	int n_extra_iterations = 0;
 
 	/* It's a bit tricky to put a lower limit here, but we expect a
@@ -2308,12 +2302,6 @@ test_polling(void)
 
 		n++;
 	}
-
-	/* Updated the maximum of iterations based on the time spent
-	 * in the loop.
-	 */
-	max_iterations = (end - start) / oa_period + 1;
-	igt_debug("adjusted max iter. = %d\n", max_iterations);
 
 	times(&end_times);
 
