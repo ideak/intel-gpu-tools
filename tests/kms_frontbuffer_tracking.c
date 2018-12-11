@@ -1551,8 +1551,10 @@ static void do_flush(const struct test_mode *t)
 
 #define DRRS_ASSERT_FLAGS		(7 << 8)
 #define ASSERT_DRRS_HIGH		(1 << 8)
-#define ASSERT_DRRS_LOW		(1 << 9)
+#define ASSERT_DRRS_LOW			(1 << 9)
 #define ASSERT_DRRS_INACTIVE		(1 << 10)
+
+#define ASSERT_NO_IDLE_GPU		(1 << 11)
 
 static int adjust_assertion_flags(const struct test_mode *t, int flags)
 {
@@ -1641,6 +1643,10 @@ static void __do_assertions(const struct test_mode *t, int flags,
 			    int line)
 {
 	flags = adjust_assertion_flags(t, flags);
+
+	/* Make sure any submitted rendering is now idle. */
+	if (!(flags & ASSERT_NO_IDLE_GPU))
+		gem_quiescent_gpu(drm.fd);
 
 	igt_debug("checking asserts in line %i\n", line);
 
@@ -2691,7 +2697,7 @@ static void modesetfrombusy_subtest(const struct test_mode *t)
 	params->primary.fb = &fb2;
 	set_mode_for_params(params);
 
-	do_assertions(0);
+	do_assertions(ASSERT_NO_IDLE_GPU);
 
 	stop_busy_thread();
 
