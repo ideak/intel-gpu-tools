@@ -126,7 +126,7 @@ to generate this API documentation.
 
 To regenerate the html files when updating documentation, use:
 
-    $ make clean -C docs && make -C docs
+    $ ninja -C build igt-gpu-tools-doc
 
 If you've added/changed/removed a symbol or anything else that changes
 the overall structure or indexes, this needs to be reflected in
@@ -188,14 +188,19 @@ Note that meson insist on separate build directories from the source tree.
 
 Running selfchecks for lib/tests and tests/ is done with
 
-    $ cd build && ninja test
+    $ ninja -C build test
 
 Note that this doesn't actually run the testcases in tests/: scripts/run-tests.sh
 should continue to be used for that.
 
 Documentation is built using
 
-    $ cd build && ninja && ninja igt-gpu-tools-doc
+    $ ninja -C build igt-gpu-tools-doc
+
+Note that this needs meson v0.47 or later, earlier versions of meson do not
+track depencies correctly for the documentation build and need:
+
+    $ ninja -C build && ninja -C build igt-gpu-tools-doc
 
 Note that there's a setup script similar to ./autogen.sh which creates a
 compatibility Makefile with a few useful default targets:
