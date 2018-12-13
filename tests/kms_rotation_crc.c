@@ -126,6 +126,9 @@ paint_squares(data_t *data, igt_rotation_t rotation,
 	unsigned int h = fb->height;
 	rgb_color_t tl, tr, bl, br;
 
+	igt_assert_f(!(w&1), "rotation image must be even width, now attempted %d\n", w);
+	igt_assert_f(!(h&1), "rotation image must be even height, now attempted %d\n", h);
+
 	cr = igt_get_cairo_ctx(data->gfx_fd, fb);
 
 	set_color(&tl, o, 0.0f, 0.0f);
@@ -439,8 +442,12 @@ static void get_multiplane_crc(data_t *data, igt_output_t *output,
 		planes[c].plane = igt_output_get_plane_type(output,
 							    planeinfo[c].planetype);
 
-		w = planeinfo[c].width;
-		h = planeinfo[c].height;
+		/*
+		 * make plane and fb width and height always even due to
+		 * test image rendering
+		 */
+		w = planeinfo[c].width & ~1;
+		h = planeinfo[c].height & ~1;
 
 		if (planeinfo[c].rotation_sw & (IGT_ROTATION_90 | IGT_ROTATION_270))
 			igt_swap(w, h);
