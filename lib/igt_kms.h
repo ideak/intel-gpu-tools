@@ -403,6 +403,9 @@ void igt_output_override_mode(igt_output_t *output, drmModeModeInfo *mode);
 void igt_output_set_pipe(igt_output_t *output, enum pipe pipe);
 igt_plane_t *igt_output_get_plane(igt_output_t *output, int plane_idx);
 igt_plane_t *igt_output_get_plane_type(igt_output_t *output, int plane_type);
+int igt_output_count_plane_type(igt_output_t *output, int plane_type);
+igt_plane_t *igt_output_get_plane_type_index(igt_output_t *output,
+					     int plane_type, int index);
 igt_output_t *igt_output_from_connector(igt_display_t *display,
     drmModeConnector *connector);
 

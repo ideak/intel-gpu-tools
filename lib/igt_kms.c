@@ -3717,6 +3717,42 @@ igt_plane_t *igt_output_get_plane_type(igt_output_t *output, int plane_type)
 }
 
 /**
+ * igt_output_count_plane_type:
+ * @output: Target output
+ * @plane_type: Cursor, primary or an overlay plane
+ *
+ * Counts the number of planes of type @plane_type for the provided @output.
+ *
+ * Returns: The number of planes that match the requested plane type
+ */
+int igt_output_count_plane_type(igt_output_t *output, int plane_type)
+{
+	igt_pipe_t *pipe = igt_output_get_driving_pipe(output);
+	igt_assert(pipe);
+
+	return igt_pipe_count_plane_type(pipe, plane_type);
+}
+
+/**
+ * igt_output_get_plane_type_index:
+ * @output: Target output
+ * @plane_type: Cursor, primary or an overlay plane
+ * @index: the index of the plane among planes of the same type
+ *
+ * Get the @index th plane of type @plane_type for the provided @output.
+ *
+ * Returns: The @index th plane that matches the requested plane type
+ */
+igt_plane_t *igt_output_get_plane_type_index(igt_output_t *output,
+					     int plane_type, int index)
+{
+	igt_pipe_t *pipe = igt_output_get_driving_pipe(output);
+	igt_assert(pipe);
+
+	return igt_pipe_get_plane_type_index(pipe, plane_type, index);
+}
+
+/**
  * igt_plane_set_fb:
  * @plane: Plane
  * @fb: Framebuffer pointer
