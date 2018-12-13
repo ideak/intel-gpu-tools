@@ -407,6 +407,9 @@ igt_output_t *igt_output_from_connector(igt_display_t *display,
     drmModeConnector *connector);
 
 igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type);
+int igt_pipe_count_plane_type(igt_pipe_t *pipe, int plane_type);
+igt_plane_t *igt_pipe_get_plane_type_index(igt_pipe_t *pipe, int plane_type,
+					   int index);
 igt_output_t *igt_get_single_output_for_pipe(igt_display_t *display, enum pipe pipe);
 
 void igt_pipe_request_out_fence(igt_pipe_t *pipe);

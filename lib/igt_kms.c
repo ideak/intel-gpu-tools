@@ -2279,6 +2279,54 @@ igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type)
 	return &pipe->planes[plane_idx];
 }
 
+/**
+ * igt_pipe_count_plane_type:
+ * @pipe: Target pipe
+ * @plane_type: Cursor, primary or an overlay plane
+ *
+ * Counts the number of planes of type @plane_type for the provided @pipe.
+ *
+ * Returns: The number of planes that match the requested plane type
+ */
+int igt_pipe_count_plane_type(igt_pipe_t *pipe, int plane_type)
+{
+	int i, count = 0;
+
+	for(i = 0; i < pipe->n_planes; i++)
+		if (pipe->planes[i].type == plane_type)
+			count++;
+
+	return count;
+}
+
+/**
+ * igt_pipe_get_plane_type_index:
+ * @pipe: Target pipe
+ * @plane_type: Cursor, primary or an overlay plane
+ * @index: the index of the plane among planes of the same type
+ *
+ * Get the @index th plane of type @plane_type for the provided @pipe.
+ *
+ * Returns: The @index th plane that matches the requested plane type
+ */
+igt_plane_t *igt_pipe_get_plane_type_index(igt_pipe_t *pipe, int plane_type,
+					   int index)
+{
+	int i, type_index = 0;
+
+	for(i = 0; i < pipe->n_planes; i++) {
+		if (pipe->planes[i].type != plane_type)
+			continue;
+
+		if (type_index == index)
+			return &pipe->planes[i];
+
+		type_index++;
+	}
+
+	return NULL;
+}
+
 static bool output_is_internal_panel(igt_output_t *output)
 {
 	switch (output->config.connector->connector_type) {
