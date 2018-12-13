@@ -182,18 +182,9 @@ static void psr_print_status(int debugfs_fd)
 	igt_debug("PSR status: %s\n", buf);
 }
 
-static bool psr_is_enabled(int debugfs_fd)
-{
-	char buf[PSR_STATUS_MAX_LEN];
-
-	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
-				sizeof(buf));
-	return strstr(buf, "\nHW Enabled & Active bit: yes\n");
-}
-
 static bool psr_wait_until_enabled(int debugfs_fd)
 {
-	bool r = igt_wait(psr_is_enabled(debugfs_fd), 5000, 1);
+	bool r = psr_wait_entry(debugfs_fd, PSR_MODE_1);
 
 	psr_print_status(debugfs_fd);
 	return r;
