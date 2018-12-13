@@ -354,8 +354,8 @@ static void amd_to_i915(int i915, int amd, amdgpu_device_handle device)
 			contexts = realloc(contexts, size * sizeof(*contexts));
 		}
 
-		r = amdgpu_cs_ctx_create(device, &contexts[count]);
-		igt_assert_eq(r, 0);
+		if (amdgpu_cs_ctx_create(device, &contexts[count]))
+			break;
 
 		r = amdgpu_cs_submit(contexts[count], 0, &ibs_request, 1);
 		igt_assert_eq(r, 0);
@@ -364,6 +364,7 @@ static void amd_to_i915(int i915, int amd, amdgpu_device_handle device)
 	}
 
 	igt_info("Reservation width = %ld\n", count);
+	igt_require(count);
 
 	amdgpu_bo_export(ib_result_handle,
 			 amdgpu_bo_handle_type_dma_buf_fd,
