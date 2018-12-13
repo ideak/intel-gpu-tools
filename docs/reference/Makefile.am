@@ -1,1 +1,0 @@
-SUBDIRS = igt-gpu-tools

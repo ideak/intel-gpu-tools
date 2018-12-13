@@ -43,8 +43,6 @@ endif
 SUBDIRS += overlay benchmarks
 endif
 
-SUBDIRS += docs
-
 MAINTAINERCLEANFILES = ChangeLog INSTALL
 
 .PHONY: ChangeLog INSTALL

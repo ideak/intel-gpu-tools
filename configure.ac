@@ -43,14 +43,6 @@ AC_PROG_CC
 AC_PROG_LEX
 AC_PROG_YACC
 
-# check for gtk-doc
-m4_ifdef([GTK_DOC_CHECK], [
-GTK_DOC_CHECK([1.14],[--flavour no-tmpl])
-],[
-AM_CONDITIONAL([ENABLE_GTK_DOC], false)
-enable_gtk_doc=no
-])
-
 # check for rst2man for generating man pages
 AC_CHECK_PROG(RST2MAN, rst2man, yes, no)
 AM_CONDITIONAL(HAVE_RST2MAN, [test "x$RST2MAN" = xyes])
@@ -398,10 +390,6 @@ AC_CONFIG_FILES([
 		 benchmarks/Makefile
 		 benchmarks/ezbench.d/Makefile
 		 benchmarks/wsim/Makefile
-		 docs/Makefile
-		 docs/reference/Makefile
-		 docs/reference/igt-gpu-tools/Makefile
-		 docs/reference/igt-gpu-tools/version.xml
 		 lib/Makefile
 		 lib/tests/Makefile
 		 man/Makefile
@@ -447,7 +435,6 @@ echo "       Overlay            : X: ${enable_overlay_xlib}, Xv: ${enable_overla
 echo "       x86-specific tools : ${build_x86}"
 echo "       Test runner        : ${BUILD_RUNNER}"
 echo ""
-echo " • API-Documentation      : ${enable_gtk_doc}"
 echo " • Fail on warnings       : ${enable_werror}"
 echo ""
 
