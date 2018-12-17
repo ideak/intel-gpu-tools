@@ -9,6 +9,36 @@
     "end":1539953735.1723731
   },
   "tests":{
+    "igt@successtest@first-subtest":{
+	"out":"",
+	"err":"",
+	"dmesg":"",
+	"result":"notrun"
+    },
+    "igt@successtest@second-subtest":{
+	"out":"",
+	"err":"",
+	"dmesg":"",
+	"result":"notrun"
+    },
+    "igt@no-subtests":{
+	"out":"",
+	"err":"",
+	"dmesg":"",
+	"result":"notrun"
+    },
+      "igt@skippers@skip-one":{
+	"out":"",
+	"err":"",
+	"dmesg":"",
+	"result":"notrun"
+    },
+      "igt@skippers@skip-two":{
+	"out":"",
+	"err":"",
+	"dmesg":"",
+	"result":"notrun"
+    },
     "igt@runner@aborted":{
 	"out":"Aborted after: startup\n\nKernel tainted (0x200)\n",
 	"result":"fail",
@@ -25,7 +55,7 @@
       "skip":0,
       "incomplete":0,
       "timeout":0,
-      "notrun":0,
+      "notrun":5,
       "fail":1,
       "warn":0
     },
@@ -37,8 +67,44 @@
       "skip":0,
       "incomplete":0,
       "timeout":0,
-      "notrun":0,
+      "notrun":5,
       "fail":1,
+      "warn":0
+    },
+    "igt@successtest":{
+      "crash":0,
+      "pass":0,
+      "dmesg-fail":0,
+      "dmesg-warn":0,
+      "skip":0,
+      "incomplete":0,
+      "timeout":0,
+      "notrun":2,
+      "fail":0,
+      "warn":0
+    },
+    "igt@no-subtests":{
+      "crash":0,
+      "pass":0,
+      "dmesg-fail":0,
+      "dmesg-warn":0,
+      "skip":0,
+      "incomplete":0,
+      "timeout":0,
+      "notrun":1,
+      "fail":0,
+      "warn":0
+    },
+    "igt@skippers":{
+      "crash":0,
+      "pass":0,
+      "dmesg-fail":0,
+      "dmesg-warn":0,
+      "skip":0,
+      "incomplete":0,
+      "timeout":0,
+      "notrun":2,
+      "fail":0,
       "warn":0
     },
     "igt@runner":{

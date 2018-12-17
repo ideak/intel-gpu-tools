@@ -15,7 +15,31 @@
       "result":"incomplete",
       "err":"",
       "dmesg":"<6> [3216186.095083] Console: switching to colour dummy device 80x25\n<6> [3216186.095097] [IGT] successtest: executing\n"
-    }
+    },
+    "igt@successtest@second-subtest":{
+	"out":"",
+	"err":"",
+	"dmesg":"",
+	"result":"notrun"
+    },
+    "igt@no-subtests":{
+	"out":"",
+	"err":"",
+	"dmesg":"",
+	"result":"notrun"
+    },
+      "igt@skippers@skip-one":{
+	"out":"",
+	"err":"",
+	"dmesg":"",
+	"result":"notrun"
+    },
+      "igt@skippers@skip-two":{
+	"out":"",
+	"err":"",
+	"dmesg":"",
+	"result":"notrun"
+    },
   },
   "totals":{
     "":{
@@ -26,7 +50,7 @@
       "skip":0,
       "incomplete":1,
       "timeout":0,
-      "notrun":0,
+      "notrun":4,
       "fail":0,
       "warn":0
     },
@@ -38,7 +62,7 @@
       "skip":0,
       "incomplete":1,
       "timeout":0,
-      "notrun":0,
+      "notrun":4,
       "fail":0,
       "warn":0
     },
@@ -50,10 +74,34 @@
       "skip":0,
       "incomplete":1,
       "timeout":0,
-      "notrun":0,
+      "notrun":1,
       "fail":0,
       "warn":0
     },
+    "igt@no-subtests":{
+      "crash":0,
+      "pass":0,
+      "dmesg-fail":0,
+      "dmesg-warn":0,
+      "skip":0,
+      "incomplete":0,
+      "timeout":0,
+      "notrun":1,
+      "fail":0,
+      "warn":0
+    },
+    "igt@skippers":{
+      "crash":0,
+      "pass":0,
+      "dmesg-fail":0,
+      "dmesg-warn":0,
+      "skip":0,
+      "incomplete":0,
+      "timeout":0,
+      "notrun":2,
+      "fail":0,
+      "warn":0
+    }
   },
   "runtimes":{
   }

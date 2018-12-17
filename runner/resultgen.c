@@ -1034,6 +1034,44 @@ static bool parse_test_directory(int dirfd,
 	return status;
 }
 
+static void try_add_notrun_results(const struct job_list_entry *entry,
+				   const struct settings *settings,
+				   struct results *results)
+{
+	struct subtests subtests = {};
+	struct json_object *current_test;
+	size_t i;
+
+	if (entry->subtest_count == 0) {
+		char piglit_name[256];
+
+		/* We cannot distinguish no-subtests from run-all-subtests in multiple-mode */
+		if (settings->multiple_mode)
+			return;
+		generate_piglit_name(entry->binary, NULL, piglit_name, sizeof(piglit_name));
+		current_test = get_or_create_json_object(results->tests, piglit_name);
+		json_object_object_add(current_test, "out", json_object_new_string(""));
+		json_object_object_add(current_test, "err", json_object_new_string(""));
+		json_object_object_add(current_test, "dmesg", json_object_new_string(""));
+		json_object_object_add(current_test, "result", json_object_new_string("notrun"));
+	}
+
+	for (i = 0; i < entry->subtest_count; i++) {
+		char piglit_name[256];
+
+		generate_piglit_name(entry->binary, entry->subtests[i], piglit_name, sizeof(piglit_name));
+		current_test = get_or_create_json_object(results->tests, piglit_name);
+		json_object_object_add(current_test, "out", json_object_new_string(""));
+		json_object_object_add(current_test, "err", json_object_new_string(""));
+		json_object_object_add(current_test, "dmesg", json_object_new_string(""));
+		json_object_object_add(current_test, "result", json_object_new_string("notrun"));
+		add_subtest(&subtests, strdup(entry->subtests[i]));
+	}
+
+	add_to_totals(entry->binary, &subtests, results);
+	free_subtests(&subtests);
+}
+
 static void create_result_root_nodes(struct json_object *root,
 				     struct results *results)
 {
@@ -1123,8 +1161,8 @@ struct json_object *generate_results_json(int dirfd)
 
 		snprintf(name, 16, "%zd", i);
 		if ((testdirfd = openat(dirfd, name, O_DIRECTORY | O_RDONLY)) < 0) {
-			fprintf(stderr, "Warning: Cannot open result directory %s\n", name);
-			break;
+			try_add_notrun_results(&job_list.entries[i], &settings, &results);
+			continue;
 		}
 
 		if (!parse_test_directory(testdirfd, &job_list.entries[i], &settings, &results)) {

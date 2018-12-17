@@ -22,34 +22,22 @@
       "dmesg":"<6> [3216186.095083] Console: switching to colour dummy device 80x25\n<6> [3216186.095097] [IGT] successtest: executing\n<6> [3216186.101115] [IGT] successtest: starting subtest first-subtest\n<6> [3216186.101160] [IGT] successtest: exiting, ret=0\n<6> [3216186.101299] Console: switching to colour frame buffer device 240x75\n"
     },
     "igt@successtest@second-subtest":{
+      "result":"notrun",
 	"out":"",
 	"err":"",
-	"dmesg":"",
-	"result":"notrun"
+      "dmesg":""
     },
-    "igt@no-subtests":{
+    "igt@skippers@skip-one":{
+      "result":"notrun",
 	"out":"",
 	"err":"",
-	"dmesg":"",
-	"result":"notrun"
-    },
-      "igt@skippers@skip-one":{
+      "dmesg":""
+      },
+    "igt@skippers@skip-two":{
+      "result":"notrun",
 	"out":"",
 	"err":"",
-	"dmesg":"",
-	"result":"notrun"
-    },
-      "igt@skippers@skip-two":{
-	"out":"",
-	"err":"",
-	"dmesg":"",
-	"result":"notrun"
-    },
-    "igt@runner@aborted":{
-	"out":"Aborted after: successtest (first-subtest)\n\nKernel tainted (0x200)\n",
-	"result":"fail",
-	"err":"",
-	"dmesg":"",
+      "dmesg":""
     }
   },
   "totals":{
@@ -61,8 +49,8 @@
       "skip":0,
       "incomplete":0,
       "timeout":0,
-      "notrun":4,
-      "fail":1,
+      "notrun":3,
+      "fail":0,
       "warn":0
     },
     "root":{
@@ -73,25 +61,13 @@
       "skip":0,
       "incomplete":0,
       "timeout":0,
-      "notrun":4,
-      "fail":1,
+      "notrun":3,
+      "fail":0,
       "warn":0
     },
     "igt@successtest":{
       "crash":0,
       "pass":1,
-      "dmesg-fail":0,
-      "dmesg-warn":0,
-      "skip":0,
-      "incomplete":0,
-      "timeout":0,
-      "notrun":1,
-      "fail":0,
-      "warn":0
-    },
-    "igt@no-subtests":{
-      "crash":0,
-      "pass":0,
       "dmesg-fail":0,
       "dmesg-warn":0,
       "skip":0,
@@ -112,19 +88,7 @@
       "notrun":2,
       "fail":0,
       "warn":0
-    },
-    "igt@runner":{
-      "crash":0,
-      "pass":0,
-      "dmesg-fail":0,
-      "dmesg-warn":0,
-      "skip":0,
-      "incomplete":0,
-      "timeout":0,
-      "notrun":0,
-      "fail":1,
-      "warn":0
-    },
+    }
   },
   "runtimes":{
     "igt@successtest":{

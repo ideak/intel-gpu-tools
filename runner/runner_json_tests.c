@@ -157,6 +157,8 @@ static const char *dirnames[] = {
 	"aborted-on-boot",
 	"aborted-after-a-test",
 	"dmesg-escapes",
+	"notrun-results",
+	"notrun-results-multiple-mode",
 };
 
 igt_main
