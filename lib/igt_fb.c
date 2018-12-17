@@ -102,6 +102,10 @@ static const struct format_desc_struct {
 	  .pixman_id = PIXMAN_r8g8b8,
 	  .num_planes = 1, .plane_bpp = { 24, },
 	},
+	{ .name = "XYUV8888", .depth = -1, .drm_id = DRM_FORMAT_XYUV8888,
+	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .num_planes = 1, .plane_bpp = { 32, },
+	},
 	{ .name = "XRGB8888", .depth = 24, .drm_id = DRM_FORMAT_XRGB8888,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
 	  .pixman_id = PIXMAN_x8r8g8b8,
@@ -495,6 +499,10 @@ static int create_bo_for_fb(struct igt_fb *fb)
 				memset(ptr + fb->offsets[1],
 				       0x80,
 				       fb->strides[1] * fb->plane_height[1]);
+				break;
+			case DRM_FORMAT_XYUV8888:
+				wmemset(ptr + fb->offsets[0], full_range ? 0x00008080 : 0x00108080,
+					fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
 				break;
 			case DRM_FORMAT_YUYV:
 			case DRM_FORMAT_YVYU:
@@ -1649,6 +1657,79 @@ static void convert_nv12_to_rgb24(struct fb_convert *cvt)
 	convert_src_put(cvt, buf);
 }
 
+static void convert_yuv444_to_rgb24(struct fb_convert *cvt)
+{
+	int i, j;
+	uint8_t *yuv24;
+	uint8_t *rgb24 = cvt->dst.ptr;
+	unsigned rgb24_stride = cvt->dst.fb->strides[0], xyuv_stride = cvt->src.fb->strides[0];
+	uint8_t *buf = malloc(cvt->src.fb->size);
+	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
+						    cvt->src.fb->color_range);
+
+	/*
+	 * Reading from the BO is awfully slow because of lack of read caching,
+	 * it's faster to copy the whole BO to a temporary buffer and convert
+	 * from there.
+	 */
+	igt_memcpy_from_wc(buf, cvt->src.ptr + cvt->src.fb->offsets[0], cvt->src.fb->size);
+	yuv24 = buf;
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		for (j = 0; j < cvt->dst.fb->width; j++) {
+			float y, u, v;
+			struct igt_vec4 yuv;
+			struct igt_vec4 rgb;
+
+			v = yuv24[i * xyuv_stride + j * 4];
+			u = yuv24[i * xyuv_stride + j * 4 + 1];
+			y = yuv24[i * xyuv_stride + j * 4 + 2];
+			yuv.d[0] = y;
+			yuv.d[1] = u;
+			yuv.d[2] = v;
+			yuv.d[3] = 1.0f;
+
+			rgb = igt_matrix_transform(&m, &yuv);
+
+			write_rgb(&rgb24[i * rgb24_stride + j * 4], &rgb);
+		}
+	}
+
+	free(buf);
+}
+
+
+static void convert_rgb24_to_yuv444(struct fb_convert *cvt)
+{
+	int i, j;
+	uint8_t *rgb24;
+	uint8_t *yuv444 = cvt->dst.ptr + cvt->dst.fb->offsets[0];
+	unsigned int rgb24_stride = cvt->src.fb->strides[0], xyuv_stride = cvt->dst.fb->strides[0];
+	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->dst.fb->color_encoding,
+						    cvt->dst.fb->color_range);
+
+	rgb24 = cvt->src.ptr;
+
+	igt_assert_f(cvt->dst.fb->drm_format == DRM_FORMAT_XYUV8888,
+		     "Conversion not implemented for !XYUV packed formats\n");
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		for (j = 0; j < cvt->dst.fb->width; j++) {
+			struct igt_vec4 rgb;
+			struct igt_vec4 yuv;
+			float y, u, v;
+
+			read_rgb(&rgb, &rgb24[i * rgb24_stride + j * 4]);
+
+			yuv = igt_matrix_transform(&m, &rgb);
+
+			yuv444[i * xyuv_stride + j * 4] = yuv.d[2];
+			yuv444[i * xyuv_stride + j * 4 + 1] = yuv.d[1];
+			yuv444[i * xyuv_stride + j * 4 + 2] = yuv.d[0];
+		}
+	}
+}
+
 static void convert_rgb24_to_nv12(struct fb_convert *cvt)
 {
 	int i, j;
@@ -1934,6 +2015,9 @@ static void fb_convert(struct fb_convert *cvt)
 		return;
 	} else if (cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888) {
 		switch (cvt->src.fb->drm_format) {
+		case DRM_FORMAT_XYUV8888:
+			convert_yuv444_to_rgb24(cvt);
+			return;
 		case DRM_FORMAT_NV12:
 			convert_nv12_to_rgb24(cvt);
 			return;
@@ -1946,6 +2030,9 @@ static void fb_convert(struct fb_convert *cvt)
 		}
 	} else if (cvt->src.fb->drm_format == DRM_FORMAT_XRGB8888) {
 		switch (cvt->dst.fb->drm_format) {
+		case DRM_FORMAT_XYUV8888:
+			convert_rgb24_to_yuv444(cvt);
+			return;
 		case DRM_FORMAT_NV12:
 			convert_rgb24_to_nv12(cvt);
 			return;
@@ -2036,6 +2123,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 				    (cairo_user_data_key_t *)create_cairo_surface__convert,
 				    blit, destroy_cairo_surface__convert);
 }
+
 
 /**
  * igt_fb_map_buffer:
@@ -2302,6 +2390,7 @@ bool igt_format_is_yuv(uint32_t drm_format)
 	case DRM_FORMAT_YVYU:
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
+	case DRM_FORMAT_XYUV8888:
 		return true;
 	default:
 		return false;
