@@ -319,7 +319,7 @@ static void skl_wm_dump(void)
 		for (level = 0; level < num_levels; level++) {
 			printf("%5d", level);
 			for (plane = 0; plane < num_planes; plane++) {
-				blocks = REG_DECODE1(wm[level][pipe][plane], 0, 9);
+				blocks = REG_DECODE1(wm[level][pipe][plane], 0, 11);
 				lines = REG_DECODE1(wm[level][pipe][plane], 14, 5);
 				enable = REG_DECODE1(wm[level][pipe][plane], 31, 1);
 
@@ -334,7 +334,7 @@ static void skl_wm_dump(void)
 
 		printf("TRANS");
 		for (plane = 0; plane < num_planes; plane++) {
-			blocks = REG_DECODE1(wm_trans[pipe][plane], 0, 9);
+			blocks = REG_DECODE1(wm_trans[pipe][plane], 0, 11);
 			lines = REG_DECODE1(wm_trans[pipe][plane], 14, 5);
 			enable = REG_DECODE1(wm_trans[pipe][plane], 31, 1);
 
