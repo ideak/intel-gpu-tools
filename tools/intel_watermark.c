@@ -180,6 +180,20 @@ static const char *skl_wm_linetime_reg_name(int pipe)
 	return reg_name;
 }
 
+static const char *skl_plane_ctl_reg_name(int pipe, int plane)
+{
+	static char reg_name[32];
+
+	if (plane == 0)
+		snprintf(reg_name, sizeof(reg_name), "CUR_CTL_%c",
+			 pipe_name(pipe));
+	else
+		snprintf(reg_name, sizeof(reg_name), "PLANE_CTL_%1d_%c",
+			 plane, pipe_name(pipe));
+
+	return reg_name;
+}
+
 static const char *skl_wm_reg_name(int pipe, int plane, int level)
 {
 	static char reg_name[32];
@@ -231,6 +245,7 @@ static void skl_wm_dump(void)
 	uint32_t wm[num_levels][num_pipes][max_planes];
 	uint32_t wm_trans[num_pipes][max_planes];
 	uint32_t buf_cfg[num_pipes][max_planes];
+	uint32_t plane_ctl[num_pipes][max_planes];
 	uint32_t wm_linetime[num_pipes];
 
 	intel_register_access_init(intel_get_pci_device(), 0, -1);
@@ -243,6 +258,7 @@ static void skl_wm_dump(void)
 		for (plane = 0; plane < num_planes; plane++) {
 			addr =  base_addr +  pipe * 0x1000 + plane * 0x100;
 
+			plane_ctl[pipe][plane] = read_reg(addr + 0x80);
 			wm_trans[pipe][plane] = read_reg(addr + 0x00168);
 			buf_cfg[pipe][plane] = read_reg(addr + 0x0017C);
 			for (level = 0; level < num_levels; level++) {
@@ -258,6 +274,19 @@ static void skl_wm_dump(void)
 		       wm_linetime[pipe]);
 	}
 	printf("\n\n");
+
+	for (plane = 0; plane < max_planes; plane++) {
+		for (pipe = 0; pipe < num_pipes; pipe++) {
+			if (plane >= skl_num_planes(devid, pipe))
+				break;
+
+			printf("%18s 0x%08x\t" ,
+			       skl_plane_ctl_reg_name(pipe, plane),
+			       plane_ctl[pipe][plane]);
+		}
+		printf("\n");
+	}
+	printf("\n");
 
 	for (plane = 0; plane < max_planes; plane++) {
 		for (level = 0; level < num_levels; level++) {
@@ -312,8 +341,15 @@ static void skl_wm_dump(void)
 		printf("LINETIME: %d (%.3f usec)\n", linetime, linetime* 0.125f);
 
 		printf("LEVEL");
-		for (plane = 0; plane < num_planes; plane++)
-			printf("%10s", skl_plane_name(pipe, plane));
+		for (plane = 0; plane < num_planes; plane++) {
+			if (plane == 0)
+				enable = REG_DECODE1(plane_ctl[pipe][plane], 0, 3) ||
+					REG_DECODE1(plane_ctl[pipe][plane], 5, 1);
+			else
+				enable = REG_DECODE1(plane_ctl[pipe][plane], 31, 1);
+			printf("%9s%c", skl_plane_name(pipe, plane),
+			       endis_ast(enable));
+		}
 		printf("\n");
 
 		for (level = 0; level < num_levels; level++) {
