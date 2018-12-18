@@ -276,6 +276,88 @@ static uint32_t plane_get_igt_format(igt_plane_t *plane)
 	return 0;
 }
 
+static void
+plane_primary_overlay_zpos(igt_pipe_t *pipe, igt_output_t *output,
+			   igt_plane_t *primary, igt_plane_t *overlay,
+			   uint32_t format_primary, uint32_t format_overlay)
+{
+	struct igt_fb fb_primary, fb_overlay;
+	drmModeModeInfo *mode = igt_output_get_mode(output);
+	cairo_t *cr;
+
+	/* for primary */
+	uint32_t w = mode->hdisplay;
+	uint32_t h = mode->vdisplay;
+
+	/* for overlay */
+	uint32_t w_overlay = mode->hdisplay / 2;
+	uint32_t h_overlay = mode->vdisplay / 2;
+
+	igt_create_color_pattern_fb(pipe->display->drm_fd,
+				    w, h, format_primary, I915_TILING_NONE,
+				    0.2, 0.2, 0.2, &fb_primary);
+
+	igt_create_color_pattern_fb(pipe->display->drm_fd,
+				    w_overlay, h_overlay,
+				    format_overlay, I915_TILING_NONE,
+				    0.2, 0.2, 0.2, &fb_overlay);
+
+	/* Draw a hole in the overlay */
+	cr = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_overlay);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	igt_paint_color_alpha(cr, w_overlay / 4, h_overlay / 4,
+			      w_overlay / 2, h_overlay / 2,
+			      0.0, 0.0, 0.0, 0.0);
+	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+	igt_put_cairo_ctx(pipe->display->drm_fd, &fb_overlay, cr);
+
+	igt_plane_set_fb(primary, &fb_primary);
+	igt_plane_set_fb(overlay, &fb_overlay);
+
+	igt_plane_set_position(overlay, w_overlay / 2, h_overlay / 2);
+
+	igt_plane_set_prop_value(primary, IGT_PLANE_ZPOS, 0);
+	igt_plane_set_prop_value(overlay, IGT_PLANE_ZPOS, 1);
+
+	igt_info("Committing with overlay on top, it has a hole "\
+		  "through which the primary should be seen\n");
+	plane_commit(primary, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	igt_assert_eq_u64(igt_plane_get_prop(primary, IGT_PLANE_ZPOS), 0);
+	igt_assert_eq_u64(igt_plane_get_prop(overlay, IGT_PLANE_ZPOS), 1);
+
+	igt_plane_set_prop_value(primary, IGT_PLANE_ZPOS, 1);
+	igt_plane_set_prop_value(overlay, IGT_PLANE_ZPOS, 0);
+
+	igt_info("Committing with primary on top, only the primary "\
+		 "should be visible\n");
+	plane_commit(primary, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	igt_assert_eq_u64(igt_plane_get_prop(primary, IGT_PLANE_ZPOS), 1);
+	igt_assert_eq_u64(igt_plane_get_prop(overlay, IGT_PLANE_ZPOS), 0);
+
+	/* Draw a hole in the primary exactly on top of the overlay plane */
+	cr = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_primary);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	igt_paint_color_alpha(cr, w_overlay / 2, h_overlay / 2,
+			      w_overlay, h_overlay,
+			      0.0, 0.0, 0.0, 0.5);
+	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+	igt_put_cairo_ctx(pipe->display->drm_fd, &fb_primary, cr);
+
+	igt_info("Committing with a hole in the primary through "\
+		  "which the underlay should be seen\n");
+	plane_commit(primary, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	/* reset it back to initial state */
+	igt_plane_set_prop_value(primary, IGT_PLANE_ZPOS, 0);
+	igt_plane_set_prop_value(overlay, IGT_PLANE_ZPOS, 1);
+	plane_commit(primary, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	igt_assert_eq_u64(igt_plane_get_prop(primary, IGT_PLANE_ZPOS), 0);
+	igt_assert_eq_u64(igt_plane_get_prop(overlay, IGT_PLANE_ZPOS), 1);
+}
+
 static void plane_overlay(igt_pipe_t *pipe, igt_output_t *output, igt_plane_t *plane)
 {
 	drmModeModeInfo *mode = igt_output_get_mode(output);
@@ -903,6 +985,25 @@ igt_main
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		plane_primary(pipe_obj, primary, &fb);
+	}
+
+	igt_subtest("plane_primary_overlay_zpos") {
+		uint32_t format_primary = DRM_FORMAT_ARGB8888;
+		uint32_t format_overlay = DRM_FORMAT_ARGB1555;
+
+		igt_plane_t *overlay =
+			igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_OVERLAY);
+
+		igt_require(overlay);
+		igt_require(igt_plane_has_prop(primary, IGT_PLANE_ZPOS));
+		igt_require(igt_plane_has_prop(overlay, IGT_PLANE_ZPOS));
+
+		igt_require(igt_plane_has_format_mod(primary, format_primary, 0x0));
+		igt_require(igt_plane_has_format_mod(overlay, format_overlay, 0x0));
+
+		igt_output_set_pipe(output, pipe);
+		plane_primary_overlay_zpos(pipe_obj, output, primary, overlay,
+					   format_primary, format_overlay);
 	}
 
 	igt_subtest("test_only") {
