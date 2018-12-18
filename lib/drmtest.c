@@ -123,6 +123,31 @@ static bool has_known_intel_chipset(int fd)
 	return true;
 }
 
+static char _forced_driver[16] = "";
+
+/**
+ * __set_forced_driver:
+ * @name: name of driver to forcibly use
+ *
+ * Set the name of a driver to use when calling #drm_open_driver with
+ * the #DRIVER_ANY flag.
+ */
+void __set_forced_driver(const char *name)
+{
+	if (!name)
+		igt_warn("No driver specified, keep default behaviour\n");
+
+	strncpy(_forced_driver, name, sizeof(_forced_driver) - 1);
+}
+
+static const char *forced_driver(void)
+{
+	if (_forced_driver[0])
+		return _forced_driver;
+
+	return NULL;
+}
+
 #define LOCAL_I915_EXEC_VEBOX	(4 << 0)
 /**
  * gem_quiescent_gpu:
@@ -212,6 +237,7 @@ static const struct module {
 
 static int open_device(const char *name, unsigned int chipset)
 {
+	const char *forced;
 	char dev_name[16] = "";
 	int chip = DRIVER_ANY;
 	int fd;
@@ -222,6 +248,12 @@ static int open_device(const char *name, unsigned int chipset)
 
 	if (__get_drm_device_name(fd, dev_name, sizeof(dev_name) - 1) == -1)
 		goto err;
+
+	forced = forced_driver();
+	if (forced && chipset == DRIVER_ANY && !strcmp(forced, dev_name)) {
+		igt_debug("Force option used: Using driver %s\n", dev_name);
+		return fd;
+	}
 
 	for (int start = 0, end = ARRAY_SIZE(modules) - 1; start < end; ){
 		int mid = start + (end - start) / 2;

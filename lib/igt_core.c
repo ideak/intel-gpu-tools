@@ -647,6 +647,11 @@ static void common_init_env(void)
 	igt_frame_dump_path = getenv("IGT_FRAME_DUMP_PATH");
 
 	stderr_needs_sentinel = getenv("IGT_SENTINEL_ON_STDERR") != NULL;
+
+	env = getenv("IGT_FORCE_DRIVER");
+	if (env) {
+		__set_forced_driver(env);
+	}
 }
 
 static int common_init(int *argc, char **argv,

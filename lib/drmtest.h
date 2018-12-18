@@ -52,6 +52,8 @@
  */
 #define DRIVER_ANY 	~(DRIVER_VGEM)
 
+void __set_forced_driver(const char *name);
+
 /**
  * ARRAY_SIZE:
  * @arr: static array
