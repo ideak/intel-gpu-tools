@@ -349,20 +349,20 @@ static void skl_wm_dump(void)
 
 		printf("\nstart");
 		for (plane = 0; plane < num_planes; plane++) {
-			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 10);
+			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 11);
 			printf("%10d", start);
 		}
 
 		printf("\n  end");
 		for (plane = 0; plane < num_planes; plane++) {
-			end = REG_DECODE1(buf_cfg[pipe][plane], 16, 10);
+			end = REG_DECODE1(buf_cfg[pipe][plane], 16, 11);
 			printf("%10d", end);
 		}
 
 		printf("\n size");
 		for (plane = 0; plane < num_planes; plane++) {
-			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 10);
-			end =  REG_DECODE1(buf_cfg[pipe][plane], 16, 10);
+			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 11);
+			end =  REG_DECODE1(buf_cfg[pipe][plane], 16, 11);
 			size = end - start + 1;
 			printf("%10d", (end == 0 && size == 1) ? 0 : size);
 		}
