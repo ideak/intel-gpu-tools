@@ -225,6 +225,16 @@ static const char *skl_buf_cfg_reg_name(int pipe, int plane)
 	return reg_name;
 }
 
+static const char *skl_nv12_buf_cfg_reg_name(int pipe, int plane)
+{
+	static char reg_name[32];
+
+	snprintf(reg_name, sizeof(reg_name), "PLANE_NV12_BUF_CFG_%1d_%c",
+		 plane, pipe_name(pipe));
+
+	return reg_name;
+}
+
 static void skl_wm_dump(void)
 {
 	int pipe, plane, level;
@@ -235,6 +245,7 @@ static void skl_wm_dump(void)
 	uint32_t wm[num_levels][num_pipes][max_planes];
 	uint32_t wm_trans[num_pipes][max_planes];
 	uint32_t buf_cfg[num_pipes][max_planes];
+	uint32_t nv12_buf_cfg[num_pipes][max_planes];
 	uint32_t plane_ctl[num_pipes][max_planes];
 	uint32_t wm_linetime[num_pipes];
 
@@ -251,6 +262,10 @@ static void skl_wm_dump(void)
 			plane_ctl[pipe][plane] = read_reg(addr + 0x80);
 			wm_trans[pipe][plane] = read_reg(addr + 0x00168);
 			buf_cfg[pipe][plane] = read_reg(addr + 0x0017C);
+			if (plane != 0 && intel_gen(devid) < 11)
+				nv12_buf_cfg[pipe][plane] = read_reg(addr + 0x00178);
+			else
+				nv12_buf_cfg[pipe][plane] = 0;
 			for (level = 0; level < num_levels; level++) {
 				wm_offset = addr + 0x00140 + level * 0x4;
 				wm[level][pipe][plane] = read_reg(wm_offset);
@@ -314,6 +329,22 @@ static void skl_wm_dump(void)
 			printf("%18s 0x%08x\t",
 			       skl_buf_cfg_reg_name(pipe, plane),
 			       buf_cfg[pipe][plane]);
+		}
+		printf("\n");
+
+		if (intel_gen(devid) >= 11)
+			continue;
+
+		if (plane == 0)
+			continue;
+
+		for (pipe = 0; pipe < num_pipes; pipe++) {
+			if (plane >= skl_num_planes(devid, pipe))
+				break;
+
+			printf("%18s 0x%08x\t",
+			       skl_nv12_buf_cfg_reg_name(pipe, plane),
+			       nv12_buf_cfg[pipe][plane]);
 		}
 		printf("\n");
 	}
@@ -391,6 +422,31 @@ static void skl_wm_dump(void)
 			end =  REG_DECODE1(buf_cfg[pipe][plane], 16, 11);
 			size = end - start + 1;
 			printf("%10d", (end == 0 && size == 1) ? 0 : size);
+		}
+		printf("\n");
+
+		if (intel_gen(devid) < 11) {
+			printf("\nNV12 DDB allocation:");
+
+			printf("\nstart");
+			for (plane = 0; plane < num_planes; plane++) {
+				start = REG_DECODE1(nv12_buf_cfg[pipe][plane], 0, 11);
+				printf("%10d", start);
+			}
+
+			printf("\n  end");
+			for (plane = 0; plane < num_planes; plane++) {
+				end = REG_DECODE1(nv12_buf_cfg[pipe][plane], 16, 11);
+				printf("%10d", end);
+			}
+
+			printf("\n size");
+			for (plane = 0; plane < num_planes; plane++) {
+				start = REG_DECODE1(nv12_buf_cfg[pipe][plane], 0, 11);
+				end =  REG_DECODE1(nv12_buf_cfg[pipe][plane], 16, 11);
+				size = end - start + 1;
+				printf("%10d", (end == 0 && size == 1) ? 0 : size);
+			}
 		}
 
 		printf("\n\n\n");
