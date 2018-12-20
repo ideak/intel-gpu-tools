@@ -1717,7 +1717,6 @@ static void convert_rgb24_to_yuv444(struct fb_convert *cvt)
 		for (j = 0; j < cvt->dst.fb->width; j++) {
 			struct igt_vec4 rgb;
 			struct igt_vec4 yuv;
-			float y, u, v;
 
 			read_rgb(&rgb, &rgb24[i * rgb24_stride + j * 4]);
 
