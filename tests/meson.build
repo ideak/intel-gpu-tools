@@ -25,6 +25,7 @@ test_progs = [
 	'kms_crtc_background_color',
 	'kms_cursor_crc',
 	'kms_cursor_legacy',
+	'kms_dp_dsc',
 	'kms_draw_crc',
 	'kms_fbcon_fbt',
 	'kms_fence_pin_leak',
