@@ -426,7 +426,7 @@ typedef struct {
 	igt_rotation_t rotation_sw, rotation_hw;
 } planeinfos;
 
-static void get_multiplane_crc(data_t *data, igt_output_t *output,
+static bool get_multiplane_crc(data_t *data, igt_output_t *output,
 			       igt_crc_t *crc_output, planeinfos *planeinfo,
 			       int numplanes)
 {
@@ -436,21 +436,26 @@ static void get_multiplane_crc(data_t *data, igt_output_t *output,
 	int c, ret;
 
 	oldplanes = data->multiplaneoldview;
-	planes = malloc(sizeof(*planes) * numplanes);
+	planes = calloc(sizeof(*planes), numplanes);
 
 	for (c = 0; c < numplanes; c++) {
 		planes[c].plane = igt_output_get_plane_type(output,
 							    planeinfo[c].planetype);
 
 		/*
-		 * make plane and fb width and height always even due to
-		 * test image rendering
+		 * make plane and fb width and height always divisible by 4
+		 * due to NV12 support and Intel hw workarounds.
 		 */
-		w = planeinfo[c].width & ~1;
-		h = planeinfo[c].height & ~1;
+		w = planeinfo[c].width & ~3;
+		h = planeinfo[c].height & ~3;
 
 		if (planeinfo[c].rotation_sw & (IGT_ROTATION_90 | IGT_ROTATION_270))
 			igt_swap(w, h);
+
+		if (!igt_plane_has_format_mod(planes[c].plane,
+					      planeinfo[c].format,
+					      planeinfo[c].tiling))
+			return false;
 
 		igt_create_fb(data->gfx_fd, w, h, planeinfo[c].format,
 			      planeinfo[c].tiling, &planes[c].fb);
@@ -475,6 +480,7 @@ static void get_multiplane_crc(data_t *data, igt_output_t *output,
 
 	free(oldplanes);
 	data->multiplaneoldview = (void*)planes;
+	return true;
 }
 
 static void pointlocation(data_t *data, planeinfos *p, drmModeModeInfo *mode,
@@ -523,13 +529,10 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 
 	/*
 	* These are those modes which are tested. For testing feel interesting
-	* case with tiling are 2 byte wide and 4 byte wide.
-	*
-	* TODO:
-	* Built support for NV12 here.
+	* case with tiling are 2 bpp, 4 bpp and NV12.
 	*/
 	static const uint32_t formatlist[] = {DRM_FORMAT_RGB565,
-		DRM_FORMAT_XRGB8888};
+		DRM_FORMAT_XRGB8888, DRM_FORMAT_NV12};
 
 	for_each_valid_output_on_pipe(display, pipe, output) {
 		int i, j, k, l;
@@ -581,13 +584,15 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 						p[0].rotation_hw = IGT_ROTATION_0;
 						p[1].rotation_sw = planeconfigs[j].rotation;
 						p[1].rotation_hw = IGT_ROTATION_0;
-						get_multiplane_crc(data, output, &retcrc_sw,
-								   (planeinfos *)&p, MAXMULTIPLANESAMOUNT);
+						if (!get_multiplane_crc(data, output, &retcrc_sw,
+								   (planeinfos *)&p, MAXMULTIPLANESAMOUNT))
+							continue;
 
 						igt_swap(p[0].rotation_sw, p[0].rotation_hw);
 						igt_swap(p[1].rotation_sw, p[1].rotation_hw);
-						get_multiplane_crc(data, output, &retcrc_hw,
-								   (planeinfos *)&p, MAXMULTIPLANESAMOUNT);
+						if (!get_multiplane_crc(data, output, &retcrc_hw,
+								   (planeinfos *)&p, MAXMULTIPLANESAMOUNT))
+							continue;
 
 						igt_assert_crc_equal(&retcrc_sw, &retcrc_hw);
 					}
