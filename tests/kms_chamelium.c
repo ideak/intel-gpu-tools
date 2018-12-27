@@ -518,7 +518,7 @@ static int chamelium_get_pattern_fb(data_t *data, drmModeModeInfo *mode,
 	ptr = igt_fb_map_buffer(fb->fd, fb);
 	igt_assert(ptr);
 
-	chamelium_paint_xr24_pattern(ptr, mode->vdisplay, mode->hdisplay);
+	chamelium_paint_xr24_pattern(ptr, mode->hdisplay, mode->vdisplay);
 	igt_fb_unmap_buffer(fb, ptr);
 
 	return fb_id;
