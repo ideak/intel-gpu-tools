@@ -1033,6 +1033,9 @@ void chamelium_assert_crc_eq_or_dump(struct chamelium *chamelium,
 	char *capture_suffix;
 	bool eq;
 
+	igt_debug("Reference CRC: %s\n", igt_crc_to_string(reference_crc));
+	igt_debug("Captured CRC: %s\n", igt_crc_to_string(capture_crc));
+
 	eq = igt_check_crc_equal(reference_crc, capture_crc);
 	if (!eq && igt_frame_dump_is_enabled()) {
 		/* Grab the reference frame from framebuffer */
@@ -1100,6 +1103,10 @@ void chamelium_assert_analog_frame_match_or_dump(struct chamelium *chamelium,
 							   fb);
 		capture_crc = chamelium_get_crc_for_area(chamelium, port, 0, 0,
 							 0, 0);
+
+		igt_debug("Reference CRC: %s\n",
+			  igt_crc_to_string(reference_crc));
+		igt_debug("Captured CRC: %s\n", igt_crc_to_string(capture_crc));
 
 		reference_suffix = igt_crc_to_string_extended(reference_crc,
 							      '-', 2);
