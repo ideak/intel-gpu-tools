@@ -489,7 +489,8 @@ enable_output(data_t *data,
 }
 
 static void chamelium_paint_xr24_pattern(uint32_t *data,
-					 size_t width, size_t height)
+					 size_t width, size_t height,
+					 size_t stride)
 {
 	uint32_t colors[] = { 0xff000000,
 			      0xffff0000,
@@ -500,7 +501,7 @@ static void chamelium_paint_xr24_pattern(uint32_t *data,
 
 	for (i = 0; i < height; i++)
 		for (j = 0; j < width; j++)
-			*(data + i * width + j) = colors[((j / 64) + (i / 64)) % 5];
+			*(data + i * stride / 4 + j) = colors[((j / 64) + (i / 64)) % 5];
 }
 
 static int chamelium_get_pattern_fb(data_t *data, drmModeModeInfo *mode,
@@ -518,7 +519,8 @@ static int chamelium_get_pattern_fb(data_t *data, drmModeModeInfo *mode,
 	ptr = igt_fb_map_buffer(fb->fd, fb);
 	igt_assert(ptr);
 
-	chamelium_paint_xr24_pattern(ptr, mode->hdisplay, mode->vdisplay);
+	chamelium_paint_xr24_pattern(ptr, mode->hdisplay, mode->vdisplay,
+				     fb->strides[0]);
 	igt_fb_unmap_buffer(fb, ptr);
 
 	return fb_id;
