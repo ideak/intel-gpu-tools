@@ -504,7 +504,7 @@ static void chamelium_paint_xr24_pattern(uint32_t *data,
 			*(data + i * stride / 4 + j) = colors[((j / 64) + (i / 64)) % 5];
 }
 
-static int chamelium_get_pattern_fb(data_t *data, drmModeModeInfo *mode,
+static int chamelium_get_pattern_fb(data_t *data, size_t width, size_t height,
 				    uint32_t fourcc, struct igt_fb *fb)
 {
 	int fb_id;
@@ -512,15 +512,14 @@ static int chamelium_get_pattern_fb(data_t *data, drmModeModeInfo *mode,
 
 	igt_assert(fourcc == DRM_FORMAT_XRGB8888);
 
-	fb_id = igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-			      fourcc, LOCAL_DRM_FORMAT_MOD_NONE, fb);
+	fb_id = igt_create_fb(data->drm_fd, width, height, fourcc,
+			      LOCAL_DRM_FORMAT_MOD_NONE, fb);
 	igt_assert(fb_id > 0);
 
 	ptr = igt_fb_map_buffer(fb->fd, fb);
 	igt_assert(ptr);
 
-	chamelium_paint_xr24_pattern(ptr, mode->hdisplay, mode->vdisplay,
-				     fb->strides[0]);
+	chamelium_paint_xr24_pattern(ptr, width, height, fb->strides[0]);
 	igt_fb_unmap_buffer(fb, ptr);
 
 	return fb_id;
@@ -537,7 +536,7 @@ static void do_test_display_crc(data_t *data, struct chamelium_port *port,
 	int i, fb_id, captured_frame_count;
 	int frame_id;
 
-	fb_id = chamelium_get_pattern_fb(data, mode,
+	fb_id = chamelium_get_pattern_fb(data, mode->hdisplay, mode->vdisplay,
 					 DRM_FORMAT_XRGB8888, &fb);
 	igt_assert(fb_id > 0);
 
