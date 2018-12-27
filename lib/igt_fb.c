@@ -1981,6 +1981,10 @@ static void convert_pixman(struct fb_convert *cvt)
 	igt_assert((src_pixman != PIXMAN_invalid) &&
 		   (dst_pixman != PIXMAN_invalid));
 
+	/* Pixman requires the stride to be aligned to 32 bits. */
+	igt_assert((cvt->src.fb->strides[0] % sizeof(uint32_t)) == 0);
+	igt_assert((cvt->dst.fb->strides[0] % sizeof(uint32_t)) == 0);
+
 	src_ptr = convert_src_get(cvt);
 
 	src_image = pixman_image_create_bits(src_pixman,
