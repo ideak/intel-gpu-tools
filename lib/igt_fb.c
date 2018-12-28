@@ -483,6 +483,13 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		igt_get_fb_tile_size(fb->fd, fb->tiling, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
 
+		/* Special case where the "tile height" represents a
+		 * height-based stride, such as with VC4 SAND tiling modes.
+		 */
+
+		if (tile_height > fb->plane_height[plane])
+			return fb->strides[plane] * tile_height;
+
 		return (uint64_t) fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], tile_height);
 	}
