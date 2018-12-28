@@ -271,8 +271,12 @@ static const struct format_desc_struct *lookup_drm_format(uint32_t drm_format)
 void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 			  unsigned *width_ret, unsigned *height_ret)
 {
-	if (is_vc4_device(fd))
+	uint32_t vc4_tiling_param = 0;
+
+	if (is_vc4_device(fd)) {
+		vc4_tiling_param = fourcc_mod_broadcom_param(tiling);
 		tiling = fourcc_mod_broadcom_mod(tiling);
+	}
 
 	switch (tiling) {
 	case LOCAL_DRM_FORMAT_MOD_NONE:
@@ -331,6 +335,26 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 		igt_require_vc4(fd);
 		*width_ret = 128;
 		*height_ret = 32;
+		break;
+	case DRM_FORMAT_MOD_BROADCOM_SAND32:
+		igt_require_vc4(fd);
+		*width_ret = 32;
+		*height_ret = vc4_tiling_param;
+		break;
+	case DRM_FORMAT_MOD_BROADCOM_SAND64:
+		igt_require_vc4(fd);
+		*width_ret = 64;
+		*height_ret = vc4_tiling_param;
+		break;
+	case DRM_FORMAT_MOD_BROADCOM_SAND128:
+		igt_require_vc4(fd);
+		*width_ret = 128;
+		*height_ret = vc4_tiling_param;
+		break;
+	case DRM_FORMAT_MOD_BROADCOM_SAND256:
+		igt_require_vc4(fd);
+		*width_ret = 256;
+		*height_ret = vc4_tiling_param;
 		break;
 	default:
 		igt_assert(false);
