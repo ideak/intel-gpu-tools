@@ -427,7 +427,10 @@ static bool has_extended_busy_ioctl(int fd)
 
 static void basic(int fd, unsigned ring, unsigned flags)
 {
-	igt_spin_t *spin = igt_spin_batch_new(fd, .engine = ring);
+	igt_spin_t *spin =
+		igt_spin_batch_new(fd,
+				   .engine = ring,
+				   .flags = IGT_SPIN_NO_PREEMPTION);
 	struct timespec tv;
 	int timeout;
 	bool busy;
