@@ -8,7 +8,7 @@
 #define op(ho, hp, vo, vp) ((ho) & 0xff), ((hp) & 0xff), \
 		(((vo) & 0xf) << 4) | ((vp) & 0xf), \
 		(((ho) & 0x300) >> 2) | (((hp) & 0x300) >> 4) \
-		| (((vo) & 0x30) >> 2) | ((vp) & 0x30 >> 4)
+		| (((vo) & 0x30) >> 2) | (((vp) & 0x30) >> 4)
 
 static unsigned char EDID_NAME[EDID_LENGTH] = {
 	0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, /* header */
