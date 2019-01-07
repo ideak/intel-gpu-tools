@@ -122,7 +122,7 @@ igt_simple_main
 		current_tiling_mode = I915_TILING_X;
 
 		handle = create_bo_and_fill(fd);
-		gem_get_tiling(fd, handle, &tiling, &swizzle);
+		igt_require(gem_get_tiling(fd, handle, &tiling, &swizzle));
 
 		gem_read(fd, handle, 0, linear, sizeof(linear));
 
