@@ -26,6 +26,7 @@
 
 #include "igt.h"
 #include "igt_psr.h"
+#include "igt_sysfs.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -279,6 +280,12 @@ static void setup_environment(void)
 	drm_fd = drm_open_driver_master(DRIVER_INTEL);
 	igt_require(drm_fd >= 0);
 	igt_assert(close(drm_fd) == 0);
+
+	/*
+	 * igt_main()->igt_subtest_init_parse_opts()->common_init() disables the
+	 * fbcon bind, so to test it is necessary enable it again
+	 */
+	bind_fbcon(true);
 }
 
 static void teardown_environment(void)
