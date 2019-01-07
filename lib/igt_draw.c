@@ -34,6 +34,13 @@
 #include "ioctl_wrappers.h"
 #include "i830_reg.h"
 
+#ifndef PAGE_ALIGN
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
+#define PAGE_ALIGN(x) ALIGN(x, PAGE_SIZE)
+#endif
+
 /**
  * SECTION:igt_draw
  * @short_description: drawing helpers for tests
@@ -336,7 +343,7 @@ static void draw_rect_mmap_cpu(int fd, struct buf_data *buf, struct rect *rect,
 	if (tiling != I915_TILING_NONE)
 		igt_require(intel_gen(intel_get_drm_devid(fd)) >= 5);
 
-	ptr = gem_mmap__cpu(fd, buf->handle, 0, buf->size, 0);
+	ptr = gem_mmap__cpu(fd, buf->handle, 0, PAGE_ALIGN(buf->size), 0);
 
 	switch (tiling) {
 	case I915_TILING_NONE:
@@ -365,7 +372,8 @@ static void draw_rect_mmap_gtt(int fd, struct buf_data *buf, struct rect *rect,
 	gem_set_domain(fd, buf->handle, I915_GEM_DOMAIN_GTT,
 		       I915_GEM_DOMAIN_GTT);
 
-	ptr = gem_mmap__gtt(fd, buf->handle, buf->size, PROT_READ | PROT_WRITE);
+	ptr = gem_mmap__gtt(fd, buf->handle, PAGE_ALIGN(buf->size),
+			    PROT_READ | PROT_WRITE);
 
 	draw_rect_ptr_linear(ptr, buf->stride, rect, color, buf->bpp);
 
@@ -386,7 +394,7 @@ static void draw_rect_mmap_wc(int fd, struct buf_data *buf, struct rect *rect,
 	if (tiling != I915_TILING_NONE)
 		igt_require(intel_gen(intel_get_drm_devid(fd)) >= 5);
 
-	ptr = gem_mmap__wc(fd, buf->handle, 0, buf->size,
+	ptr = gem_mmap__wc(fd, buf->handle, 0, PAGE_ALIGN(buf->size),
 			   PROT_READ | PROT_WRITE);
 
 	switch (tiling) {
