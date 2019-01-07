@@ -96,7 +96,7 @@ static const struct named_register {
 	{ "GPGPU_THREADS_DISPATCHED", GEN8, RCS0, 0x2290, 2 },
 	{ "PS_INVOCATION_COUNT_1", GEN8, RCS0, 0x22f0, 2 },
 	{ "PS_DEPTH_COUNT_1", GEN8, RCS0, 0x22f8, 2 },
-	{ "BB_OFFSET", GEN8, RCS0, 0x2158 },
+	{ "BB_OFFSET", GEN8, RCS0, 0x2158, .ignore_bits = 0x4 },
 	{ "MI_PREDICATE_RESULT_1", GEN8, RCS0, 0x241c },
 	{ "CS_GPR", GEN8, RCS0, 0x2600, 32 },
 	{ "OA_CTX_CONTROL", GEN8, RCS0, 0x2360 },
