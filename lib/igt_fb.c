@@ -37,6 +37,7 @@
 #include "igt_fb.h"
 #include "igt_kms.h"
 #include "igt_matrix.h"
+#include "igt_vc4.h"
 #include "igt_x86.h"
 #include "ioctl_wrappers.h"
 #include "intel_batchbuffer.h"
@@ -270,6 +271,9 @@ static const struct format_desc_struct *lookup_drm_format(uint32_t drm_format)
 void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 			  unsigned *width_ret, unsigned *height_ret)
 {
+	if (is_vc4_device(fd))
+		tiling = fourcc_mod_broadcom_mod(tiling);
+
 	switch (tiling) {
 	case LOCAL_DRM_FORMAT_MOD_NONE:
 		if (is_i915_device(fd))
@@ -322,6 +326,11 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 		default:
 			igt_assert(false);
 		}
+		break;
+	case DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED:
+		igt_require_vc4(fd);
+		*width_ret = 128;
+		*height_ret = 32;
 		break;
 	default:
 		igt_assert(false);
@@ -638,6 +647,12 @@ static int create_bo_for_fb(struct igt_fb *fb)
 			gem_set_tiling(fd, fb->gem_handle,
 				       igt_fb_mod_to_tiling(fb->tiling),
 				       fb->strides[0]);
+		} else if (is_vc4_device(fd)) {
+			fb->gem_handle = igt_vc4_create_bo(fd, fb->size);
+
+			if (fb->tiling == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED)
+				igt_vc4_set_tiling(fd, fb->gem_handle,
+						   fb->tiling);
 		} else {
 			igt_assert(false);
 		}
@@ -1569,6 +1584,9 @@ static void *map_bo(int fd, struct igt_fb *fb)
 	else if (is_i915_device(fd))
 		ptr = gem_mmap__gtt(fd, fb->gem_handle, fb->size,
 				    PROT_READ | PROT_WRITE);
+	else if (is_vc4_device(fd))
+		ptr = igt_vc4_mmap_bo(fd, fb->gem_handle, fb->size,
+				      PROT_READ | PROT_WRITE);
 	else
 		igt_assert(false);
 
