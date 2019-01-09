@@ -1779,7 +1779,7 @@ static void convert_rgb24_to_nv12(struct fb_convert *cvt)
 			struct igt_vec4 yuv[2];
 
 			read_rgb(&rgb[0], &rgb24[j * 8 + 0]);
-			read_rgb(&rgb[2], &rgb24[j * 8 + 0 + rgb24_stride]);
+			read_rgb(&rgb[1], &rgb24[j * 8 + 0 + rgb24_stride]);
 
 			yuv[0] = igt_matrix_transform(&m, &rgb[0]);
 			yuv[1] = igt_matrix_transform(&m, &rgb[1]);
