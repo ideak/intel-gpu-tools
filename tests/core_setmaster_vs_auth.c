@@ -38,11 +38,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef __linux__
-# include <sys/syscall.h>
-#else
-# include <pthread.h>
-#endif
 
 IGT_TEST_DESCRIPTION("Check that drop/setMaster correctly transfer master "
 		     "state");
