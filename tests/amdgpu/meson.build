@@ -2,7 +2,8 @@
 amdgpu_progs = []
 amdgpu_deps = test_deps
 if libdrm_amdgpu.found()
-	amdgpu_progs += [ 'amd_basic',
+	amdgpu_progs += [ 'amd_abm',
+			  'amd_basic',
 			  'amd_cs_nop',
 			  'amd_prime',
 			]
