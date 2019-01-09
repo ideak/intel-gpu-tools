@@ -65,7 +65,7 @@ typedef struct {
 #define TEST_DPMS (1<<0)
 #define TEST_SUSPEND (1<<1)
 
-static void draw_cursor(cairo_t *cr, int x, int y, int cw, int ch)
+static void draw_cursor(cairo_t *cr, int x, int y, int cw, int ch, double a)
 {
 	int wl, wr, ht, hb;
 
@@ -80,10 +80,10 @@ static void draw_cursor(cairo_t *cr, int x, int y, int cw, int ch)
 		return;
 	cairo_set_antialias(cr, CAIRO_ANTIALIAS_NONE);
 	/* 4 color rectangles in the corners, RGBY */
-	igt_paint_color_alpha(cr, x,      y,      wl, ht, 1.0, 0.0, 0.0, 1.0);
-	igt_paint_color_alpha(cr, x + wl, y,      wr, ht, 0.0, 1.0, 0.0, 1.0);
-	igt_paint_color_alpha(cr, x,      y + ht, wl, hb, 0.0, 0.0, 1.0, 1.0);
-	igt_paint_color_alpha(cr, x + wl, y + ht, wr, hb, 0.5, 0.5, 0.5, 1.0);
+	igt_paint_color_alpha(cr, x,      y,      wl, ht, 1.0, 0.0, 0.0, a);
+	igt_paint_color_alpha(cr, x + wl, y,      wr, ht, 0.0, 1.0, 0.0, a);
+	igt_paint_color_alpha(cr, x,      y + ht, wl, hb, 0.0, 0.0, 1.0, a);
+	igt_paint_color_alpha(cr, x + wl, y + ht, wr, hb, 0.5, 0.5, 0.5, a);
 }
 
 static void cursor_enable(data_t *data)
@@ -200,7 +200,7 @@ static void do_single_test(data_t *data, int x, int y)
 
 	/* Now render the same in software and collect crc */
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
-	draw_cursor(cr, x, y, data->curw, data->curh);
+	draw_cursor(cr, x, y, data->curw, data->curh, 1.0);
 	igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
 	igt_display_commit(display);
 
@@ -404,6 +404,64 @@ static void cleanup_crtc(data_t *data, igt_output_t *output)
 	igt_display_commit(display);
 }
 
+static void test_cursor_alpha(data_t *data, double a)
+{
+	igt_display_t *display = &data->display;
+	igt_pipe_crc_t *pipe_crc = data->pipe_crc;
+	igt_crc_t crc, ref_crc;
+	cairo_t *cr;
+	uint32_t fb_id;
+	int curw=data->curw;
+	int curh=data->curh;
+
+	/*alpha cursor fb*/
+	fb_id = igt_create_color_fb(data->drm_fd, curw, curh,
+				    DRM_FORMAT_ARGB8888,
+				    LOCAL_DRM_FORMAT_MOD_NONE,
+				    1.0, 1.0, 1.0,
+				    &data->fb);
+	igt_assert(fb_id);
+	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb);
+	draw_cursor(cr, 0, 0, curw, curh, a);
+	igt_put_cairo_ctx(data->drm_fd, &data->fb, cr);
+
+	/*Hardware Test*/
+	cursor_enable(data);
+	igt_display_commit(display);
+	igt_wait_for_vblank(data->drm_fd, data->pipe);
+	igt_pipe_crc_collect_crc(pipe_crc, &crc);
+	cursor_disable(data);
+
+	/*Software Test*/
+	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
+	igt_paint_color_alpha(cr, 0, 0, curw, curh, 1.0, 1.0, 1.0, a);
+	igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
+
+	igt_display_commit(display);
+	igt_wait_for_vblank(data->drm_fd, data->pipe);
+	igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
+	igt_assert_crc_equal(&crc, &ref_crc);
+
+	/*Clear Screen*/
+	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
+	igt_paint_color(cr, 0, 0, data->screenw, data->screenh,
+			0.0, 0.0, 0.0);
+	igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
+	igt_remove_fb(data->drm_fd, &data->fb);
+}
+
+static void test_cursor_transparent(data_t *data)
+{
+	test_cursor_alpha(data, 0.0);
+
+}
+
+static void test_cursor_opaque(data_t *data)
+{
+	test_cursor_alpha(data, 1.0);
+}
+
+
 static void run_test(data_t *data, void (*testfunc)(data_t *), int cursor_w, int cursor_h)
 {
 	igt_display_t *display = &data->display;
@@ -461,7 +519,7 @@ static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 	igt_assert(fb_id);
 
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb);
-	draw_cursor(cr, 0, 0, cur_w, cur_h);
+	draw_cursor(cr, 0, 0, cur_w, cur_h, 1.0);
 	igt_put_cairo_ctx(data->drm_fd, &data->fb, cr);
 }
 
@@ -683,6 +741,14 @@ igt_main
 
 	igt_subtest_f("cursor-size-change")
 		run_test(&data, test_cursor_size, cursor_width, cursor_height);
+
+	igt_subtest_f("cursor-alpha-opaque") {
+		run_test(&data, test_cursor_opaque, cursor_width, cursor_height);
+	 }
+
+	igt_subtest_f("cursor-alpha-transparent") {
+		run_test(&data, test_cursor_transparent, cursor_width, cursor_height);
+	 }
 
 	run_test_generic(&data);
 
