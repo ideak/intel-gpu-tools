@@ -708,12 +708,12 @@ bool gem_mmap__has_wc(int fd)
 		has_wc = 0;
 
 		memset(&gp, 0, sizeof(gp));
-		gp.param = 40; /* MMAP_GTT_VERSION */
+		gp.param = I915_PARAM_MMAP_GTT_VERSION;
 		gp.value = &gtt_version;
 		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
 
 		memset(&gp, 0, sizeof(gp));
-		gp.param = 30; /* MMAP_VERSION */
+		gp.param = I915_PARAM_MMAP_VERSION;
 		gp.value = &mmap_version;
 		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
 
@@ -964,7 +964,7 @@ static int gem_gtt_type(int fd)
 	int val = 0;
 
 	memset(&gp, 0, sizeof(gp));
-	gp.param = 18; /* HAS_ALIASING_PPGTT */
+	gp.param = I915_PARAM_HAS_ALIASING_PPGTT;
 	gp.value = &val;
 
 	if (ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp)))
