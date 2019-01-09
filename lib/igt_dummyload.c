@@ -148,14 +148,13 @@ emit_recursive_batch(igt_spin_t *spin,
 
 		if (__gem_set_caching(fd, spin->poll_handle,
 				      I915_CACHING_CACHED) == 0)
-			spin->running = __gem_mmap__cpu(fd, spin->poll_handle,
-							0, 4096,
-							PROT_READ | PROT_WRITE);
+			spin->running = gem_mmap__cpu(fd, spin->poll_handle,
+						      0, 4096,
+						      PROT_READ | PROT_WRITE);
 		else
-			spin->running = __gem_mmap__wc(fd, spin->poll_handle,
-						       0, 4096,
-						       PROT_READ | PROT_WRITE);
-		igt_assert(spin->running);
+			spin->running = gem_mmap__wc(fd, spin->poll_handle,
+						     0, 4096,
+						     PROT_READ | PROT_WRITE);
 		igt_assert_eq(*spin->running, 0);
 
 		*batch++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
