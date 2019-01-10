@@ -2743,3 +2743,38 @@ int igt_format_plane_bpp(uint32_t drm_format, int plane)
 
 	return format->plane_bpp[plane];
 }
+
+/**
+ * igt_format_array_fill:
+ * @formats_array: a pointer to the formats array pointer to be allocated
+ * @count: a pointer to the number of elements contained in the allocated array
+ * @allow_yuv: a boolean indicating whether YUV formats should be included
+ *
+ * This functions allocates and fills a @formats_array that lists the DRM
+ * formats current available.
+ */
+void igt_format_array_fill(uint32_t **formats_array, unsigned int *count,
+			   bool allow_yuv)
+{
+	const struct format_desc_struct *format;
+	unsigned int index = 0;
+
+	*count = 0;
+
+	for_each_format(format) {
+		if (!allow_yuv && igt_format_is_yuv(format->drm_id))
+			continue;
+
+		(*count)++;
+	}
+
+	*formats_array = calloc(*count, sizeof(uint32_t));
+	igt_assert(*formats_array);
+
+	for_each_format(format) {
+		if (!allow_yuv && igt_format_is_yuv(format->drm_id))
+			continue;
+
+		(*formats_array)[index++] = format->drm_id;
+	}
+}
