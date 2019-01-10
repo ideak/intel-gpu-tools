@@ -576,15 +576,19 @@ static void do_test_display(data_t *data, struct chamelium_port *port,
 
 		free(expected_crc);
 		free(crc);
-	} else if (check == CHAMELIUM_CHECK_ANALOG) {
+	} else if (check == CHAMELIUM_CHECK_ANALOG ||
+		   check == CHAMELIUM_CHECK_CHECKERBOARD) {
 		struct chamelium_frame_dump *dump;
 
 		igt_assert(count == 1);
 
 		dump = chamelium_port_dump_pixels(data->chamelium, port, 0, 0,
 						  0, 0);
-		chamelium_crop_analog_frame(dump, mode->hdisplay,
-					    mode->vdisplay);
+
+		if (check == CHAMELIUM_CHECK_ANALOG)
+			chamelium_crop_analog_frame(dump, mode->hdisplay,
+						    mode->vdisplay);
+
 		chamelium_assert_frame_match_or_dump(data->chamelium, port,
 						     dump, &fb, check);
 		chamelium_destroy_frame_dump(dump);
@@ -975,35 +979,35 @@ igt_main
 
 		connector_subtest("hdmi-cmp-nv12", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_NV12,
-					      CHAMELIUM_CHECK_ANALOG, 1);
+					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
 		connector_subtest("hdmi-cmp-nv16", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_NV16,
-					      CHAMELIUM_CHECK_ANALOG, 1);
+					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
 		connector_subtest("hdmi-cmp-nv21", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_NV21,
-					      CHAMELIUM_CHECK_ANALOG, 1);
+					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
 		connector_subtest("hdmi-cmp-nv61", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_NV61,
-					      CHAMELIUM_CHECK_ANALOG, 1);
+					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
 		connector_subtest("hdmi-cmp-yu12", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_YUV420,
-					      CHAMELIUM_CHECK_ANALOG, 1);
+					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
 		connector_subtest("hdmi-cmp-yu16", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_YUV422,
-					      CHAMELIUM_CHECK_ANALOG, 1);
+					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
 		connector_subtest("hdmi-cmp-yv12", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_YVU420,
-					      CHAMELIUM_CHECK_ANALOG, 1);
+					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
 		connector_subtest("hdmi-cmp-yv16", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_YVU422,
-					      CHAMELIUM_CHECK_ANALOG, 1);
+					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
 		connector_subtest("hdmi-frame-dump", HDMIA)
 			test_display_frame_dump(&data, port);
