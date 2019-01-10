@@ -49,6 +49,7 @@ struct chamelium_fb_crc_async_data;
  */
 enum chamelium_check {
 	CHAMELIUM_CHECK_ANALOG,
+	CHAMELIUM_CHECK_CHECKERBOARD,
 	CHAMELIUM_CHECK_CRC,
 };
 

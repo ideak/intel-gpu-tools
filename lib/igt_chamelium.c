@@ -1127,6 +1127,9 @@ void chamelium_assert_frame_match_or_dump(struct chamelium *chamelium,
 	case CHAMELIUM_CHECK_ANALOG:
 		match = igt_check_analog_frame_match(reference, capture);
 		break;
+	case CHAMELIUM_CHECK_CHECKERBOARD:
+		match = igt_check_checkerboard_frame_match(reference, capture);
+		break;
 	default:
 		igt_assert(false);
 	}
@@ -1155,7 +1158,6 @@ void chamelium_assert_frame_match_or_dump(struct chamelium *chamelium,
 	cairo_surface_destroy(reference);
 	cairo_surface_destroy(capture);
 }
-
 
 /**
  * chamelium_analog_frame_crop:
