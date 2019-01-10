@@ -36,5 +36,9 @@ uint64_t igt_vc4_get_tiling(int fd, uint32_t handle);
 unsigned int igt_vc4_fb_t_tiled_convert(struct igt_fb *dst, struct igt_fb *src);
 size_t igt_vc4_t_tiled_offset(size_t stride, size_t height, size_t bpp,
 			      size_t x, size_t y);
+unsigned int vc4_fb_sand_tiled_convert(struct igt_fb *dst, struct igt_fb *src,
+				       uint64_t modifier);
+size_t vc4_sand_tiled_offset(size_t column_width, size_t column_size, size_t x,
+			     size_t y, size_t bpp);
 
 #endif /* IGT_VC4_H */
