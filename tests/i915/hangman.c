@@ -42,13 +42,16 @@
 static int device = -1;
 static int sysfs = -1;
 
-static void test_sysfs_error_exists(void)
+static bool has_error_state(int dir)
 {
-	char *error;
+	int fd;
 
-	error = igt_sysfs_get(sysfs, "error");
-	igt_assert(error);
-	free(error);
+	fd = openat(dir, "error", O_RDONLY);
+	if (fd < 0)
+		return false;
+
+	close(fd);
+	return true;
 }
 
 static void assert_entry(const char *s, bool expect)
@@ -256,12 +259,12 @@ igt_main
 
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
+
 		sysfs = igt_sysfs_open(device, &idx);
 		igt_assert(sysfs != -1);
-	}
 
-	igt_subtest("error-state-sysfs-entry")
-		test_sysfs_error_exists();
+		igt_require(has_error_state(sysfs));
+	}
 
 	igt_subtest("error-state-basic")
 		test_error_state_basic();
