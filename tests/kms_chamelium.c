@@ -527,11 +527,6 @@ static int chamelium_get_pattern_fb(data_t *data, size_t width, size_t height,
 	return fb_id;
 }
 
-enum chamelium_check {
-	CHAMELIUM_CHECK_ANALOG,
-	CHAMELIUM_CHECK_CRC,
-};
-
 static void do_test_display(data_t *data, struct chamelium_port *port,
 			    igt_output_t *output, drmModeModeInfo *mode,
 			    uint32_t fourcc, enum chamelium_check check,
@@ -590,8 +585,8 @@ static void do_test_display(data_t *data, struct chamelium_port *port,
 						  0, 0);
 		chamelium_crop_analog_frame(dump, mode->hdisplay,
 					    mode->vdisplay);
-		chamelium_assert_analog_frame_match_or_dump(data->chamelium,
-							    port, dump, &fb);
+		chamelium_assert_frame_match_or_dump(data->chamelium, port,
+						     dump, &fb, check);
 		chamelium_destroy_frame_dump(dump);
 	}
 

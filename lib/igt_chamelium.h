@@ -40,6 +40,18 @@ struct chamelium_port;
 struct chamelium_frame_dump;
 struct chamelium_fb_crc_async_data;
 
+/**
+ * chamelium_check:
+ * @CHAMELIUM_CHECK_ANALOG: Fuzzy checking method for analog interfaces
+ * @CHAMELIUM_CHECK_CRC: CRC-based checking method for pixel-perfect interfaces
+ *
+ * Checking method for comparing between reference and captured frames.
+ */
+enum chamelium_check {
+	CHAMELIUM_CHECK_ANALOG,
+	CHAMELIUM_CHECK_CRC,
+};
+
 struct chamelium *chamelium_init(int drm_fd);
 void chamelium_deinit(struct chamelium *chamelium);
 void chamelium_reset(struct chamelium *chamelium);
@@ -110,10 +122,11 @@ void chamelium_assert_crc_eq_or_dump(struct chamelium *chamelium,
 				     igt_crc_t *reference_crc,
 				     igt_crc_t *capture_crc, struct igt_fb *fb,
 				     int index);
-void chamelium_assert_analog_frame_match_or_dump(struct chamelium *chamelium,
-						 struct chamelium_port *port,
-						 const struct chamelium_frame_dump *frame,
-						 struct igt_fb *fb);
+void chamelium_assert_frame_match_or_dump(struct chamelium *chamelium,
+					  struct chamelium_port *port,
+					  const struct chamelium_frame_dump *frame,
+					  struct igt_fb *fb,
+					  enum chamelium_check check);
 void chamelium_crop_analog_frame(struct chamelium_frame_dump *dump, int width,
 				 int height);
 void chamelium_destroy_frame_dump(struct chamelium_frame_dump *dump);
