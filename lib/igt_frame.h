@@ -38,5 +38,7 @@ void igt_write_compared_frames_to_png(cairo_surface_t *reference,
 				      const char *capture_suffix);
 bool igt_check_analog_frame_match(cairo_surface_t *reference,
 				  cairo_surface_t *capture);
+bool igt_check_checkerboard_frame_match(cairo_surface_t *reference,
+					cairo_surface_t *capture);
 
 #endif

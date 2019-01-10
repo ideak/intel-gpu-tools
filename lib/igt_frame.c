@@ -267,3 +267,138 @@ complete:
 
 	return match;
 }
+
+#define XR24_COLOR_VALUE(data, stride, x, y, c) \
+	*((uint8_t *)(data) + (y) * (stride) + 4 * (x) + (c))
+
+/**
+ * igt_check_checkerboard_frame_match:
+ * @reference: The reference cairo surface
+ * @capture: The captured cairo surface
+ *
+ * Checks that the reference frame matches the captured frame using a
+ * method designed for checkerboard patterns. These patterns are made of
+ * consecutive rectangular shapes with alternating solid colors.
+ *
+ * The intent of this method is to cover cases where the captured result is
+ * not pixel-perfect due to features such as scaling or YUV conversion and
+ * subsampling. Such effects are mostly noticeable on the edges of the
+ * patterns, so they are detected and excluded from the comparison.
+ *
+ * The algorithm works with two major steps. First, the edges of the reference
+ * pattern are detected on the x and y axis independently. The detection is done
+ * by calculating an absolute difference with a span of a few pixels before and
+ * after the current position on the given axis, accumulated for each color
+ * component. If the sum is above a given threshold on one of the axis, the
+ * position is marked as an edge. In the second step, the pixel values are
+ * compared per-component, excluding positions that were marked as edges or
+ * that are at a transition between an edge and a non-edge. An error threshold
+ * (for each individual color component) is used to mark the position as
+ * erroneous or not. The ratio of erroneous pixels over compared pixels (that
+ * does not count excluded pixels) is then calculated and compared to the error
+ * rate threshold to determine whether the frames match or not.
+ *
+ * Returns: a boolean indicating whether the frames match
+ */
+bool igt_check_checkerboard_frame_match(cairo_surface_t *reference,
+					cairo_surface_t *capture)
+{
+	unsigned int width, height, ref_stride, cap_stride;
+	void *ref_data, *cap_data;
+	unsigned char *edges_map;
+	unsigned int x, y, c;
+	unsigned int errors = 0, pixels = 0;
+	unsigned int edge_threshold = 100;
+	unsigned int color_error_threshold = 24;
+	double error_rate_threshold = 0.01;
+	double error_rate;
+	unsigned int span = 2;
+	bool match = false;
+
+	width = cairo_image_surface_get_width(reference);
+	height = cairo_image_surface_get_height(reference);
+
+	ref_stride = cairo_image_surface_get_stride(reference);
+	ref_data = cairo_image_surface_get_data(reference);
+	igt_assert(ref_data);
+
+	cap_stride = cairo_image_surface_get_stride(capture);
+	cap_data = cairo_image_surface_get_data(capture);
+	igt_assert(cap_data);
+
+	edges_map = calloc(1, width * height);
+	igt_assert(edges_map);
+
+	/* First pass to detect the pattern edges. */
+	for (y = 0; y < height; y++) {
+		if (y < span || y > (height - span - 1))
+			continue;
+
+		for (x = 0; x < width; x++) {
+			unsigned int xdiff = 0, ydiff = 0;
+
+			if (x < span || x > (width - span - 1))
+				continue;
+
+			for (c = 0; c < 3; c++) {
+				xdiff += abs(XR24_COLOR_VALUE(ref_data, ref_stride, x + span, y, c) -
+					     XR24_COLOR_VALUE(ref_data, ref_stride, x - span, y, c));
+				ydiff += abs(XR24_COLOR_VALUE(ref_data, ref_stride, x, y + span, c) -
+					     XR24_COLOR_VALUE(ref_data, ref_stride, x, y - span, c));
+			}
+
+			edges_map[y * width + x] = (xdiff > edge_threshold ||
+						    ydiff > edge_threshold);
+		}
+	}
+
+	/* Second pass to detect errors. */
+	for (y = 0; y < height; y++) {
+		for (x = 0; x < width; x++) {
+			bool error = false;
+
+			if (edges_map[y * width + x])
+				continue;
+
+			for (c = 0; c < 3; c++) {
+				unsigned int diff;
+
+				/* Compare the reference and capture values. */
+				diff = abs(XR24_COLOR_VALUE(ref_data, ref_stride, x, y, c) -
+					   XR24_COLOR_VALUE(cap_data, cap_stride, x, y, c));
+
+				if (diff > color_error_threshold)
+					error = true;
+			}
+
+			/* Allow error if coming on or off an edge (on x). */
+			if (error && x >= span && x <= (width - span - 1) &&
+			    edges_map[y * width + (x - span)] !=
+			    edges_map[y * width + (x + span)])
+				continue;
+
+			/* Allow error if coming on or off an edge (on y). */
+			if (error && y >= span && y <= (height - span - 1) &&
+			    edges_map[(y - span) * width + x] !=
+			    edges_map[(y + span) * width + x] && error)
+				continue;
+
+			if (error)
+				errors++;
+
+			pixels++;
+		}
+	}
+
+	free(edges_map);
+
+	error_rate = (double) errors / pixels;
+
+	if (error_rate < error_rate_threshold)
+		match = true;
+
+	igt_debug("Checkerboard pattern %s with error rate %f %%\n",
+		  match ? "matched" : "not matched", error_rate * 100);
+
+	return match;
+}
