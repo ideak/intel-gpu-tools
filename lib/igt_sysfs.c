@@ -189,7 +189,7 @@ bool igt_sysfs_set_parameter(int device,
 
 /**
  * igt_sysfs_open_parameters:
- * @device: fd of the device (or -1 to default to Intel)
+ * @device: fd of the device
  *
  * This opens the module parameters directory (under sysfs) corresponding
  * to the device for use with igt_sysfs_set() and igt_sysfs_get().
@@ -199,15 +199,15 @@ bool igt_sysfs_set_parameter(int device,
  */
 int igt_sysfs_open_parameters(int device)
 {
-	int dir, params;
+	int dir, params = -1;
 
 	dir = igt_sysfs_open(device, &params);
-	if (dir < 0)
-		return -1;
-
-	params = -1;
-	//params = openat(dir, "device/driver/module/parameters", O_RDONLY);
-	close(dir);
+	if (dir >= 0) {
+		params = openat(dir,
+				"device/driver/module/parameters",
+				O_RDONLY);
+		close(dir);
+	}
 
 	if (params < 0) { /* builtin? */
 		drm_version_t version;
