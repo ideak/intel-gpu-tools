@@ -1060,9 +1060,9 @@ void chamelium_assert_crc_eq_or_dump(struct chamelium *chamelium,
 		free(reference_suffix);
 		free(capture_suffix);
 
-		chamelium_destroy_frame_dump(frame);
-
+		cairo_surface_destroy(reference);
 		cairo_surface_destroy(capture);
+		chamelium_destroy_frame_dump(frame);
 	}
 
 	igt_assert(eq);
@@ -1120,11 +1120,14 @@ void chamelium_assert_analog_frame_match_or_dump(struct chamelium *chamelium,
 
 		free(reference_suffix);
 		free(capture_suffix);
+		free(reference_crc);
+		free(capture_crc);
 	}
 
-	cairo_surface_destroy(capture);
-
 	igt_assert(match);
+
+	cairo_surface_destroy(reference);
+	cairo_surface_destroy(capture);
 }
 
 
@@ -1322,6 +1325,8 @@ igt_crc_t *chamelium_calculate_fb_crc(int fd, struct igt_fb *fb)
 	fb_surface = igt_get_cairo_surface(fd, fb);
 
 	chamelium_do_calculate_fb_crc(fb_surface, ret);
+
+	cairo_surface_destroy(fb_surface);
 
 	return ret;
 }
