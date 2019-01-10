@@ -124,6 +124,9 @@ struct chamelium {
 
 static struct chamelium *cleanup_instance;
 
+static void chamelium_do_calculate_fb_crc(cairo_surface_t *fb_surface,
+					  igt_crc_t *out);
+
 /**
  * chamelium_get_ports:
  * @chamelium: The Chamelium instance to use
@@ -967,6 +970,39 @@ static cairo_surface_t *convert_frame_dump_argb32(const struct chamelium_frame_d
 	return dump_surface;
 }
 
+static void compared_frames_dump(cairo_surface_t *reference,
+				 cairo_surface_t *capture,
+				 igt_crc_t *reference_crc,
+				 igt_crc_t *capture_crc)
+{
+	char *reference_suffix;
+	char *capture_suffix;
+	igt_crc_t local_reference_crc;
+	igt_crc_t local_capture_crc;
+
+	igt_assert(reference && capture);
+
+	if (!reference_crc) {
+		chamelium_do_calculate_fb_crc(reference, &local_reference_crc);
+		reference_crc = &local_reference_crc;
+	}
+
+	if (!capture_crc) {
+		chamelium_do_calculate_fb_crc(reference, &local_capture_crc);
+		capture_crc = &local_capture_crc;
+	}
+
+	reference_suffix = igt_crc_to_string_extended(reference_crc, '-', 2);
+	capture_suffix = igt_crc_to_string_extended(capture_crc, '-', 2);
+
+	/* Write reference and capture frames to png. */
+	igt_write_compared_frames_to_png(reference, capture, reference_suffix,
+					 capture_suffix);
+
+	free(reference_suffix);
+	free(capture_suffix);
+}
+
 /**
  * chamelium_assert_frame_eq:
  * @chamelium: The chamelium instance the frame dump belongs to
@@ -1029,8 +1065,6 @@ void chamelium_assert_crc_eq_or_dump(struct chamelium *chamelium,
 	struct chamelium_frame_dump *frame;
 	cairo_surface_t *reference;
 	cairo_surface_t *capture;
-	char *reference_suffix;
-	char *capture_suffix;
 	bool eq;
 
 	igt_debug("Reference CRC: %s\n", igt_crc_to_string(reference_crc));
@@ -1038,27 +1072,19 @@ void chamelium_assert_crc_eq_or_dump(struct chamelium *chamelium,
 
 	eq = igt_check_crc_equal(reference_crc, capture_crc);
 	if (!eq && igt_frame_dump_is_enabled()) {
-		/* Grab the reference frame from framebuffer */
+		/* Convert the reference framebuffer to cairo. */
 		reference = igt_get_cairo_surface(chamelium->drm_fd, fb);
 
-		/* Grab the captured frame from chamelium */
+		/* Grab the captured frame from the Chamelium. */
 		frame = chamelium_read_captured_frame(chamelium, index);
 		igt_assert(frame);
 
+		/* Convert the captured frame to cairo. */
 		capture = convert_frame_dump_argb32(frame);
+		igt_assert(capture);
 
-		reference_suffix = igt_crc_to_string_extended(reference_crc,
-							      '-', 2);
-		capture_suffix = igt_crc_to_string_extended(capture_crc, '-',
-							    2);
-
-		/* Write reference and capture frames to png */
-		igt_write_compared_frames_to_png(reference, capture,
-						 reference_suffix,
-						 capture_suffix);
-
-		free(reference_suffix);
-		free(capture_suffix);
+		compared_frames_dump(reference, capture, reference_crc,
+				     capture_crc);
 
 		cairo_surface_destroy(reference);
 		cairo_surface_destroy(capture);
@@ -1087,8 +1113,6 @@ void chamelium_assert_analog_frame_match_or_dump(struct chamelium *chamelium,
 	cairo_surface_t *capture;
 	igt_crc_t *reference_crc;
 	igt_crc_t *capture_crc;
-	char *reference_suffix;
-	char *capture_suffix;
 	bool match;
 
 	/* Grab the reference frame from framebuffer */
@@ -1099,27 +1123,20 @@ void chamelium_assert_analog_frame_match_or_dump(struct chamelium *chamelium,
 
 	match = igt_check_analog_frame_match(reference, capture);
 	if (!match && igt_frame_dump_is_enabled()) {
-		reference_crc = chamelium_calculate_fb_crc(chamelium->drm_fd,
-							   fb);
+		reference_crc = malloc(sizeof(igt_crc_t));
+		igt_assert(reference_crc);
+
+		/* Calculate the reference frame CRC. */
+		chamelium_do_calculate_fb_crc(reference, reference_crc);
+
+		/* Get the captured frame CRC from the Chamelium. */
 		capture_crc = chamelium_get_crc_for_area(chamelium, port, 0, 0,
 							 0, 0);
+		igt_assert(capture_crc);
 
-		igt_debug("Reference CRC: %s\n",
-			  igt_crc_to_string(reference_crc));
-		igt_debug("Captured CRC: %s\n", igt_crc_to_string(capture_crc));
+		compared_frames_dump(reference, capture, reference_crc,
+				     capture_crc);
 
-		reference_suffix = igt_crc_to_string_extended(reference_crc,
-							      '-', 2);
-		capture_suffix = igt_crc_to_string_extended(capture_crc, '-',
-							    2);
-
-		/* Write reference and capture frames to png */
-		igt_write_compared_frames_to_png(reference, capture,
-						 reference_suffix,
-						 capture_suffix);
-
-		free(reference_suffix);
-		free(capture_suffix);
 		free(reference_crc);
 		free(capture_crc);
 	}
