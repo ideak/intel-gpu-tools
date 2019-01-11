@@ -737,6 +737,42 @@ bool gem_mmap__has_wc(int fd)
 }
 
 /**
+ * __gem_mmap:
+ * @fd: open i915 drm file descriptor
+ * @handle: gem buffer object handle
+ * @offset: offset in the gem buffer of the mmap arena
+ * @size: size of the mmap arena
+ * @prot: memory protection bits as used by mmap()
+ * @flags: flags used to determine caching
+ *
+ * This functions wraps up procedure to establish a memory mapping through
+ * direct cpu access, bypassing the gpu (valid for wc == false). For wc == true
+ * it also bypass cpu caches completely and GTT system agent (i.e. there is no
+ * automatic tiling of the mmapping through the fence registers).
+ *
+ * Returns: A pointer to the created memory mapping, NULL on failure.
+ */
+static void
+*__gem_mmap(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned int prot, uint64_t flags)
+{
+	struct drm_i915_gem_mmap arg;
+
+	memset(&arg, 0, sizeof(arg));
+	arg.handle = handle;
+	arg.offset = offset;
+	arg.size = size;
+	arg.flags = flags;
+
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg))
+		return NULL;
+
+	VG(VALGRIND_MAKE_MEM_DEFINED(from_user_pointer(arg.addr_ptr), arg.size));
+
+	errno = 0;
+	return from_user_pointer(arg.addr_ptr);
+}
+
+/**
  * __gem_mmap__wc:
  * @fd: open i915 drm file descriptor
  * @handle: gem buffer object handle
@@ -753,25 +789,7 @@ bool gem_mmap__has_wc(int fd)
  */
 void *__gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot)
 {
-	struct drm_i915_gem_mmap arg;
-
-	if (!gem_mmap__has_wc(fd)) {
-		errno = ENOSYS;
-		return NULL;
-	}
-
-	memset(&arg, 0, sizeof(arg));
-	arg.handle = handle;
-	arg.offset = offset;
-	arg.size = size;
-	arg.flags = I915_MMAP_WC;
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg))
-		return NULL;
-
-	VG(VALGRIND_MAKE_MEM_DEFINED(from_user_pointer(arg.addr_ptr), arg.size));
-
-	errno = 0;
-	return from_user_pointer(arg.addr_ptr);
+	return __gem_mmap(fd, handle, offset, size, prot, I915_MMAP_WC);
 }
 
 /**
@@ -808,19 +826,7 @@ void *gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsi
  */
 void *__gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot)
 {
-	struct drm_i915_gem_mmap mmap_arg;
-
-	memset(&mmap_arg, 0, sizeof(mmap_arg));
-	mmap_arg.handle = handle;
-	mmap_arg.offset = offset;
-	mmap_arg.size = size;
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &mmap_arg))
-		return NULL;
-
-	VG(VALGRIND_MAKE_MEM_DEFINED(from_user_pointer(mmap_arg.addr_ptr), mmap_arg.size));
-
-	errno = 0;
-	return from_user_pointer(mmap_arg.addr_ptr);
+	return __gem_mmap(fd, handle, offset, size, prot, 0);
 }
 
 /**
