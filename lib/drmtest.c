@@ -250,10 +250,8 @@ static int open_device(const char *name, unsigned int chipset)
 		goto err;
 
 	forced = forced_driver();
-	if (forced && chipset == DRIVER_ANY && !strcmp(forced, dev_name)) {
-		igt_debug("Force option used: Using driver %s\n", dev_name);
-		return fd;
-	}
+	if (forced && chipset == DRIVER_ANY && strcmp(forced, dev_name))
+		goto err;
 
 	for (int start = 0, end = ARRAY_SIZE(modules) - 1; start < end; ){
 		int mid = start + (end - start) / 2;
@@ -277,6 +275,12 @@ err:
 
 static int __search_and_open(const char *base, int offset, unsigned int chipset)
 {
+	const char *forced;
+
+	forced = forced_driver();
+	if (forced)
+		igt_info("Force option used: Using driver %s\n", forced);
+
 	for (int i = 0; i < 16; i++) {
 		char name[80];
 		int fd;
