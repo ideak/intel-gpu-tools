@@ -44,14 +44,20 @@ static int sysfs = -1;
 
 static bool has_error_state(int dir)
 {
+	bool result;
 	int fd;
 
 	fd = openat(dir, "error", O_RDONLY);
 	if (fd < 0)
 		return false;
 
+	if (read(fd, &result, sizeof(result)) < 0)
+		result = false;
+	else
+		result = true;
+
 	close(fd);
-	return true;
+	return result;
 }
 
 static void assert_entry(const char *s, bool expect)
