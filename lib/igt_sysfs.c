@@ -86,7 +86,7 @@ static int writeN(int fd, const char *buf, int len)
 
 /**
  * igt_sysfs_path:
- * @device: fd of the device (or -1 to default to Intel)
+ * @device: fd of the device
  * @path: buffer to fill with the sysfs path to the device
  * @pathlen: length of @path buffer
  * @idx: optional pointer to store the card index of the opened device
@@ -100,33 +100,29 @@ char *igt_sysfs_path(int device, char *path, int pathlen, int *idx)
 {
 	struct stat st;
 
-	if (device != -1 && (fstat(device, &st) || !S_ISCHR(st.st_mode)))
+	if (device < 0)
+		return NULL;
+
+	if (fstat(device, &st) || !S_ISCHR(st.st_mode))
 		return NULL;
 
 	for (int n = 0; n < 16; n++) {
-		int len = snprintf(path, pathlen, "/sys/class/drm/card%d", n);
-		if (device != -1) {
-			FILE *file;
-			int ret, maj, min;
+		int len, ret, maj, min;
+		FILE *file;
 
-			sprintf(path + len, "/dev");
-			file = fopen(path, "r");
-			if (!file)
-				continue;
+		len = snprintf(path, pathlen, "/sys/class/drm/card%d", n);
 
-			ret = fscanf(file, "%d:%d", &maj, &min);
-			fclose(file);
+		sprintf(path + len, "/dev");
+		file = fopen(path, "r");
+		if (!file)
+			continue;
 
-			if (ret != 2 ||
-			    major(st.st_rdev) != maj ||
-			    minor(st.st_rdev) != min)
-				continue;
-		} else {
-			/* Bleh. Search for intel */
-			sprintf(path + len, "/error");
-			if (stat(path, &st))
-				continue;
-		}
+		ret = fscanf(file, "%d:%d", &maj, &min);
+		fclose(file);
+
+		if (ret != 2 || major(st.st_rdev) != maj ||
+		    minor(st.st_rdev) != min)
+			continue;
 
 		path[len] = '\0';
 		if (idx)
@@ -139,7 +135,7 @@ char *igt_sysfs_path(int device, char *path, int pathlen, int *idx)
 
 /**
  * igt_sysfs_open:
- * @device: fd of the device (or -1 to default to Intel)
+ * @device: fd of the device
  * @idx: optional pointer to store the card index of the opened device
  *
  * This opens the sysfs directory corresponding to device for use
@@ -160,7 +156,7 @@ int igt_sysfs_open(int device, int *idx)
 
 /**
  * igt_sysfs_set_parameters:
- * @device: fd of the device (or -1 to default to Intel)
+ * @device: fd of the device
  * @parameter: the name of the parameter to set
  * @fmt: printf-esque format string
  *
