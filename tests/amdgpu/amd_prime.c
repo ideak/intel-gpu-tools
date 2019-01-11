@@ -437,7 +437,7 @@ igt_main
 		igt_require_gem(i915);
 		igt_require(gem_has_exec_fence(i915));
 
-		amd = __drm_open_driver(DRIVER_AMDGPU);
+		amd = drm_open_driver(DRIVER_AMDGPU);
 		err = amdgpu_device_initialize(amd, &major, &minor, &device);
 		igt_require(err == 0);
 	}

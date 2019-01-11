@@ -219,8 +219,7 @@ igt_main
 		uint32_t major, minor;
 		int err;
 
-		fd = __drm_open_driver(DRIVER_AMDGPU);
-		igt_require(fd >= 0);
+		fd = drm_open_driver(DRIVER_AMDGPU);
 
 		err = amdgpu_device_initialize(fd, &major, &minor, &device);
 		igt_require(err == 0);
