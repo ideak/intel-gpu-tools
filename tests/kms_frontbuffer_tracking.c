@@ -1625,7 +1625,8 @@ static void do_status_assertions(int flags)
 		igt_assert_f(psr_wait_entry(drm.debugfs),
 			     "PSR still disabled\n");
 	else if (flags & ASSERT_PSR_DISABLED)
-		igt_assert_f(psr_wait_exit(drm.debugfs), "PSR still enabled\n");
+		igt_assert_f(psr_wait_update(drm.debugfs),
+			     "PSR still enabled\n");
 }
 
 static void __do_assertions(const struct test_mode *t, int flags,
