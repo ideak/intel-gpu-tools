@@ -33,7 +33,7 @@ static bool psr_active(int debugfs_fd, bool check_active)
 	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				sizeof(buf));
 
-	active = strstr(buf, "SRDENT") || strstr(buf, "SLEEP");
+	active = strstr(buf, "SRDENT") || strstr(buf, "DEEP_SLEEP");
 	return check_active ? active : !active;
 }
 
