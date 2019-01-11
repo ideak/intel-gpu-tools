@@ -104,27 +104,6 @@ calculate_expected(int offset)
 	return (base_y + tile_y) * WIDTH + base_x + tile_x;
 }
 
-static void
-get_tiling(int fd, uint32_t handle, uint32_t *tiling, uint32_t *swizzle)
-{
-	struct drm_i915_gem_get_tiling2 {
-		uint32_t handle;
-		uint32_t tiling_mode;
-		uint32_t swizzle_mode;
-		uint32_t phys_swizzle_mode;
-	} arg;
-#define DRM_IOCTL_I915_GEM_GET_TILING2	DRM_IOWR (DRM_COMMAND_BASE + DRM_I915_GEM_GET_TILING, struct drm_i915_gem_get_tiling2)
-
-	memset(&arg, 0, sizeof(arg));
-	arg.handle = handle;
-
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_GET_TILING2, &arg);
-	igt_require(arg.phys_swizzle_mode == arg.swizzle_mode);
-
-	*tiling = arg.tiling_mode;
-	*swizzle = arg.swizzle_mode;
-}
-
 igt_simple_main
 {
 	int fd;
@@ -136,7 +115,7 @@ igt_simple_main
 	gem_require_mmap_wc(fd);
 
 	handle = create_bo(fd);
-	get_tiling(fd, handle, &tiling, &swizzle);
+	igt_require(gem_get_tiling(fd, handle, &tiling, &swizzle));
 
 	if (IS_GEN2(intel_get_drm_devid(fd))) {
 		tile_height = 16;
