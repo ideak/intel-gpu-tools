@@ -199,7 +199,7 @@ static bool psr_wait_entry_if_enabled(data_t *data)
 	if (data->with_psr_disabled)
 		return true;
 
-	return psr_wait_entry(data->debugfs_fd);
+	return psr_wait_entry(data->debugfs_fd, PSR_MODE_1);
 }
 
 static inline void manual(const char *expected)
@@ -289,7 +289,7 @@ static void run_test(data_t *data)
 		expected = "screen GREEN";
 		break;
 	}
-	igt_assert(psr_wait_update(data->debugfs_fd));
+	igt_assert(psr_wait_update(data->debugfs_fd, PSR_MODE_1));
 	manual(expected);
 }
 

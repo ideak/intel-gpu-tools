@@ -30,8 +30,13 @@
 
 #define PSR_STATUS_MAX_LEN 512
 
-bool psr_wait_entry(int debugfs_fd);
-bool psr_wait_update(int debugfs_fd);
+enum psr_mode {
+	PSR_MODE_1,
+	PSR_MODE_2
+};
+
+bool psr_wait_entry(int debugfs_fd, enum psr_mode mode);
+bool psr_wait_update(int debugfs_fd, enum psr_mode mode);
 bool psr_enable(int debugfs_fd);
 bool psr_disable(int debugfs_fd);
 bool psr_sink_support(int debugfs_fd);

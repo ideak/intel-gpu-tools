@@ -25,26 +25,33 @@
 #include "igt_sysfs.h"
 #include <errno.h>
 
-static bool psr_active(int debugfs_fd, bool check_active)
+static bool psr_active_check(int debugfs_fd, enum psr_mode mode)
 {
-	bool active;
 	char buf[PSR_STATUS_MAX_LEN];
+	const char *state = mode == PSR_MODE_1 ? "SRDENT" : "DEEP_SLEEP";
 
 	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				sizeof(buf));
 
-	active = strstr(buf, "SRDENT") || strstr(buf, "DEEP_SLEEP");
-	return check_active ? active : !active;
+	return strstr(buf, state);
 }
 
-bool psr_wait_entry(int debugfs_fd)
+static inline const char *psr_active_state_get(enum psr_mode mode)
 {
-	return igt_wait(psr_active(debugfs_fd, true), 500, 20);
+	return mode == PSR_MODE_1 ? "SRDENT" : "DEEP_SLEEP";
 }
 
-bool psr_wait_update(int debugfs_fd)
+/*
+ * For PSR1, we wait until PSR is active. We wait until DEEP_SLEEP for PSR2.
+ */
+bool psr_wait_entry(int debugfs_fd, enum psr_mode mode)
 {
-	return igt_wait(psr_active(debugfs_fd, false), 40, 10);
+	return igt_wait(psr_active_check(debugfs_fd, mode), 500, 20);
+}
+
+bool psr_wait_update(int debugfs_fd, enum psr_mode mode)
+{
+	return igt_wait(!psr_active_check(debugfs_fd, mode), 40, 10);
 }
 
 static ssize_t psr_write(int debugfs_fd, const char *buf)

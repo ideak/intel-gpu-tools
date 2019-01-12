@@ -1622,10 +1622,10 @@ static void do_status_assertions(int flags)
 	}
 
 	if (flags & ASSERT_PSR_ENABLED)
-		igt_assert_f(psr_wait_entry(drm.debugfs),
+		igt_assert_f(psr_wait_entry(drm.debugfs, PSR_MODE_1),
 			     "PSR still disabled\n");
 	else if (flags & ASSERT_PSR_DISABLED)
-		igt_assert_f(psr_wait_update(drm.debugfs),
+		igt_assert_f(psr_wait_update(drm.debugfs, PSR_MODE_1),
 			     "PSR still enabled\n");
 }
 
