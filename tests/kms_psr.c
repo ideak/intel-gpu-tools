@@ -61,6 +61,7 @@ typedef struct {
 	int debugfs_fd;
 	enum operations op;
 	int test_plane_id;
+	enum psr_mode op_psr_mode;
 	uint32_t devid;
 	uint32_t crtc_id;
 	igt_display_t display;
@@ -72,6 +73,7 @@ typedef struct {
 	drmModeModeInfo *mode;
 	igt_output_t *output;
 	bool with_psr_disabled;
+	bool supports_psr2;
 } data_t;
 
 static void create_cursor_fb(data_t *data)
@@ -190,10 +192,10 @@ static void fill_render(data_t *data, uint32_t handle, unsigned char color)
 	gem_bo_busy(data->drm_fd, handle);
 }
 
-static bool sink_support(data_t *data)
+static bool sink_support(data_t *data, enum psr_mode mode)
 {
 	return data->with_psr_disabled ||
-	       psr_sink_support(data->debugfs_fd, PSR_MODE_1);
+	       psr_sink_support(data->debugfs_fd, mode);
 }
 
 static bool psr_wait_entry_if_enabled(data_t *data)
@@ -201,7 +203,23 @@ static bool psr_wait_entry_if_enabled(data_t *data)
 	if (data->with_psr_disabled)
 		return true;
 
-	return psr_wait_entry(data->debugfs_fd, PSR_MODE_1);
+	return psr_wait_entry(data->debugfs_fd, data->op_psr_mode);
+}
+
+static bool psr_wait_update_if_enabled(data_t *data)
+{
+	if (data->with_psr_disabled)
+		return true;
+
+	return psr_wait_update(data->debugfs_fd, data->op_psr_mode);
+}
+
+static bool psr_enable_if_enabled(data_t *data)
+{
+	if (data->with_psr_disabled)
+		return true;
+
+	return psr_enable(data->debugfs_fd, data->op_psr_mode);
 }
 
 static inline void manual(const char *expected)
@@ -291,7 +309,7 @@ static void run_test(data_t *data)
 		expected = "screen GREEN";
 		break;
 	}
-	igt_assert(psr_wait_update(data->debugfs_fd, PSR_MODE_1));
+	igt_assert(psr_wait_update_if_enabled(data));
 	manual(expected);
 }
 
@@ -369,6 +387,9 @@ static void setup_test_plane(data_t *data, int test_plane)
 
 static void test_setup(data_t *data)
 {
+	if (data->op_psr_mode == PSR_MODE_2)
+		igt_require(data->supports_psr2);
+	psr_enable_if_enabled(data);
 	setup_test_plane(data, data->test_plane_id);
 	igt_assert(psr_wait_entry_if_enabled(data));
 }
@@ -399,13 +420,17 @@ static int opt_handler(int opt, int opt_index, void *_data)
 int main(int argc, char *argv[])
 {
 	const char *help_str =
-	       "  --no-psr\tRun test without PSR.";
+	       "  --no-psr\tRun test without PSR/PSR2.";
 	static struct option long_options[] = {
 		{"no-psr", 0, 0, 'n'},
 		{ 0, 0, 0, 0 }
 	};
 	data_t data = {};
 	enum operations op;
+	const char *append_subtest_name[2] = {
+		"",
+		"psr2_"
+	};
 
 	igt_subtest_init_parse_opts(&argc, argv, "", long_options,
 				    help_str, opt_handler, &data);
@@ -417,11 +442,10 @@ int main(int argc, char *argv[])
 		kmstest_set_vt_graphics_mode();
 		data.devid = intel_get_drm_devid(data.drm_fd);
 
-		if (!data.with_psr_disabled)
-			psr_enable(data.debugfs_fd, PSR_MODE_1);
-
-		igt_require_f(sink_support(&data),
+		igt_require_f(sink_support(&data, PSR_MODE_1),
 			      "Sink does not support PSR\n");
+
+		data.supports_psr2 = sink_support(&data, PSR_MODE_2);
 
 		data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
 		igt_assert(data.bufmgr);
@@ -430,67 +454,75 @@ int main(int argc, char *argv[])
 		display_init(&data);
 	}
 
-	igt_subtest("basic") {
-		data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
-		test_setup(&data);
-		test_cleanup(&data);
-	}
+	for (data.op_psr_mode = PSR_MODE_1; data.op_psr_mode <= PSR_MODE_2;
+	     data.op_psr_mode++) {
 
-	igt_subtest("no_drrs") {
-		data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
-		test_setup(&data);
-		igt_assert(drrs_disabled(&data));
-		test_cleanup(&data);
-	}
-
-	for (op = PAGE_FLIP; op <= RENDER; op++) {
-		igt_subtest_f("primary_%s", op_str(op)) {
-			data.op = op;
+		igt_subtest_f("%sbasic", append_subtest_name[data.op_psr_mode]) {
 			data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
 			test_setup(&data);
-			run_test(&data);
 			test_cleanup(&data);
 		}
-	}
 
-	for (op = MMAP_GTT; op <= PLANE_ONOFF; op++) {
-		igt_subtest_f("sprite_%s", op_str(op)) {
-			data.op = op;
-			data.test_plane_id = DRM_PLANE_TYPE_OVERLAY;
+		igt_subtest_f("%sno_drrs", append_subtest_name[data.op_psr_mode]) {
+			data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
 			test_setup(&data);
+			igt_assert(drrs_disabled(&data));
+			test_cleanup(&data);
+		}
+
+		for (op = PAGE_FLIP; op <= RENDER; op++) {
+			igt_subtest_f("%sprimary_%s",
+				      append_subtest_name[data.op_psr_mode],
+				      op_str(op)) {
+				data.op = op;
+				data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
+				test_setup(&data);
+				run_test(&data);
+				test_cleanup(&data);
+			}
+		}
+
+		for (op = MMAP_GTT; op <= PLANE_ONOFF; op++) {
+			igt_subtest_f("%ssprite_%s",
+				      append_subtest_name[data.op_psr_mode],
+				      op_str(op)) {
+				data.op = op;
+				data.test_plane_id = DRM_PLANE_TYPE_OVERLAY;
+				test_setup(&data);
+				run_test(&data);
+				test_cleanup(&data);
+			}
+
+			igt_subtest_f("%scursor_%s",
+				      append_subtest_name[data.op_psr_mode],
+				      op_str(op)) {
+				data.op = op;
+				data.test_plane_id = DRM_PLANE_TYPE_CURSOR;
+				test_setup(&data);
+				run_test(&data);
+				test_cleanup(&data);
+			}
+		}
+
+		igt_subtest_f("%sdpms", append_subtest_name[data.op_psr_mode]) {
+			data.op = RENDER;
+			data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
+			test_setup(&data);
+			dpms_off_on(&data);
 			run_test(&data);
 			test_cleanup(&data);
 		}
-	}
 
-	for (op = MMAP_GTT; op <= PLANE_ONOFF; op++) {
-		igt_subtest_f("cursor_%s", op_str(op)) {
-			data.op = op;
+		igt_subtest_f("%ssuspend", append_subtest_name[data.op_psr_mode]) {
+			data.op = PLANE_ONOFF;
 			data.test_plane_id = DRM_PLANE_TYPE_CURSOR;
 			test_setup(&data);
+			igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
+						      SUSPEND_TEST_NONE);
+			igt_assert(psr_wait_entry_if_enabled(&data));
 			run_test(&data);
 			test_cleanup(&data);
 		}
-	}
-
-	igt_subtest_f("dpms") {
-		data.op = RENDER;
-		data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
-		test_setup(&data);
-		dpms_off_on(&data);
-		run_test(&data);
-		test_cleanup(&data);
-	}
-
-	igt_subtest_f("suspend") {
-		data.op = PLANE_ONOFF;
-		data.test_plane_id = DRM_PLANE_TYPE_CURSOR;
-		test_setup(&data);
-		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-					      SUSPEND_TEST_NONE);
-		igt_assert(psr_wait_entry_if_enabled(&data));
-		run_test(&data);
-		test_cleanup(&data);
 	}
 
 	igt_fixture {
