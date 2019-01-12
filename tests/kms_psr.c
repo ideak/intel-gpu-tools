@@ -60,6 +60,7 @@ typedef struct {
 	int drm_fd;
 	int debugfs_fd;
 	enum operations op;
+	int test_plane_id;
 	uint32_t devid;
 	uint32_t crtc_id;
 	igt_display_t display;
@@ -366,6 +367,12 @@ static void setup_test_plane(data_t *data, int test_plane)
 	igt_display_commit(&data->display);
 }
 
+static void test_setup(data_t *data)
+{
+	setup_test_plane(data, data->test_plane_id);
+	igt_assert(psr_wait_entry_if_enabled(data));
+}
+
 static void dpms_off_on(data_t *data)
 {
 	kmstest_set_connector_dpms(data->drm_fd, data->output->config.connector,
@@ -424,14 +431,14 @@ int main(int argc, char *argv[])
 	}
 
 	igt_subtest("basic") {
-		setup_test_plane(&data, DRM_PLANE_TYPE_PRIMARY);
-		igt_assert(psr_wait_entry_if_enabled(&data));
+		data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
+		test_setup(&data);
 		test_cleanup(&data);
 	}
 
 	igt_subtest("no_drrs") {
-		setup_test_plane(&data, DRM_PLANE_TYPE_PRIMARY);
-		igt_assert(psr_wait_entry_if_enabled(&data));
+		data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
+		test_setup(&data);
 		igt_assert(drrs_disabled(&data));
 		test_cleanup(&data);
 	}
@@ -439,8 +446,8 @@ int main(int argc, char *argv[])
 	for (op = PAGE_FLIP; op <= RENDER; op++) {
 		igt_subtest_f("primary_%s", op_str(op)) {
 			data.op = op;
-			setup_test_plane(&data, DRM_PLANE_TYPE_PRIMARY);
-			igt_assert(psr_wait_entry_if_enabled(&data));
+			data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
+			test_setup(&data);
 			run_test(&data);
 			test_cleanup(&data);
 		}
@@ -449,8 +456,8 @@ int main(int argc, char *argv[])
 	for (op = MMAP_GTT; op <= PLANE_ONOFF; op++) {
 		igt_subtest_f("sprite_%s", op_str(op)) {
 			data.op = op;
-			setup_test_plane(&data, DRM_PLANE_TYPE_OVERLAY);
-			igt_assert(psr_wait_entry_if_enabled(&data));
+			data.test_plane_id = DRM_PLANE_TYPE_OVERLAY;
+			test_setup(&data);
 			run_test(&data);
 			test_cleanup(&data);
 		}
@@ -459,8 +466,8 @@ int main(int argc, char *argv[])
 	for (op = MMAP_GTT; op <= PLANE_ONOFF; op++) {
 		igt_subtest_f("cursor_%s", op_str(op)) {
 			data.op = op;
-			setup_test_plane(&data, DRM_PLANE_TYPE_CURSOR);
-			igt_assert(psr_wait_entry_if_enabled(&data));
+			data.test_plane_id = DRM_PLANE_TYPE_CURSOR;
+			test_setup(&data);
 			run_test(&data);
 			test_cleanup(&data);
 		}
@@ -468,8 +475,8 @@ int main(int argc, char *argv[])
 
 	igt_subtest_f("dpms") {
 		data.op = RENDER;
-		setup_test_plane(&data, DRM_PLANE_TYPE_PRIMARY);
-		igt_assert(psr_wait_entry_if_enabled(&data));
+		data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
+		test_setup(&data);
 		dpms_off_on(&data);
 		run_test(&data);
 		test_cleanup(&data);
@@ -477,8 +484,8 @@ int main(int argc, char *argv[])
 
 	igt_subtest_f("suspend") {
 		data.op = PLANE_ONOFF;
-		setup_test_plane(&data, DRM_PLANE_TYPE_CURSOR);
-		igt_assert(psr_wait_entry_if_enabled(&data));
+		data.test_plane_id = DRM_PLANE_TYPE_CURSOR;
+		test_setup(&data);
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 					      SUSPEND_TEST_NONE);
 		igt_assert(psr_wait_entry_if_enabled(&data));
