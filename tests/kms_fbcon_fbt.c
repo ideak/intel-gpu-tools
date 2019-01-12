@@ -199,6 +199,11 @@ static bool psr_wait_until_enabled(int debugfs_fd)
 	return r;
 }
 
+static bool psr_supported_on_chipset(int debugfs_fd)
+{
+	return psr_sink_support(debugfs_fd, PSR_MODE_1);
+}
+
 static void disable_features(int debugfs_fd)
 {
 	igt_set_module_param_int("enable_fbc", 0);
@@ -212,7 +217,7 @@ static inline void fbc_modparam_enable(int debugfs_fd)
 
 static inline void psr_debugfs_enable(int debugfs_fd)
 {
-	psr_enable(debugfs_fd);
+	psr_enable(debugfs_fd, PSR_MODE_1);
 }
 
 struct feature {
@@ -226,7 +231,7 @@ struct feature {
 	.connector_possible_fn = connector_can_fbc,
 	.enable = fbc_modparam_enable,
 }, psr = {
-	.supported_on_chipset = psr_sink_support,
+	.supported_on_chipset = psr_supported_on_chipset,
 	.wait_until_enabled = psr_wait_until_enabled,
 	.connector_possible_fn = connector_can_psr,
 	.enable = psr_debugfs_enable,

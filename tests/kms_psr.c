@@ -191,7 +191,8 @@ static void fill_render(data_t *data, uint32_t handle, unsigned char color)
 
 static bool sink_support(data_t *data)
 {
-	return data->with_psr_disabled || psr_sink_support(data->debugfs_fd);
+	return data->with_psr_disabled ||
+	       psr_sink_support(data->debugfs_fd, PSR_MODE_1);
 }
 
 static bool psr_wait_entry_if_enabled(data_t *data)
@@ -410,7 +411,7 @@ int main(int argc, char *argv[])
 		data.devid = intel_get_drm_devid(data.drm_fd);
 
 		if (!data.with_psr_disabled)
-			psr_enable(data.debugfs_fd);
+			psr_enable(data.debugfs_fd, PSR_MODE_1);
 
 		igt_require_f(sink_support(&data),
 			      "Sink does not support PSR\n");

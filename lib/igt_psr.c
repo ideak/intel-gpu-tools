@@ -100,20 +100,40 @@ static void restore_psr_debugfs(int sig)
 	psr_write(psr_restore_debugfs_fd, "0");
 }
 
-static bool psr_set(int debugfs_fd, bool enable)
+static bool psr_set(int debugfs_fd, enum psr_mode mode)
 {
 	int ret;
 
 	ret = has_psr_debugfs(debugfs_fd);
 	if (ret == -ENODEV) {
-		igt_skip_on_f(enable, "PSR not available\n");
+		igt_skip("PSR not available\n");
 		return false;
 	}
 
 	if (ret == -EINVAL) {
-		ret = psr_modparam_set(enable);
+		/*
+		 * We can not control what PSR version is going to be enabled
+		 * by setting enable_psr parameter, when unmatched the PSR
+		 * version enabled and the PSR version of the test, it will
+		 * fail in the first psr_wait_entry() of the test.
+		 */
+		ret = psr_modparam_set(mode <= PSR_MODE_2);
 	} else {
-		ret = psr_write(debugfs_fd, enable ? "0x3" : "0x1");
+		const char *debug_val;
+
+		switch (mode) {
+		case PSR_MODE_1:
+			debug_val = "0x3";
+			break;
+		case PSR_MODE_2:
+			debug_val = "0x2";
+			break;
+		default:
+			/* Disables PSR */
+			debug_val = "0x1";
+		}
+
+		ret = psr_write(debugfs_fd, debug_val);
 		igt_assert(ret > 0);
 	}
 
@@ -127,23 +147,34 @@ static bool psr_set(int debugfs_fd, bool enable)
 	return ret;
 }
 
-bool psr_enable(int debugfs_fd)
+bool psr_enable(int debugfs_fd, enum psr_mode mode)
 {
-	return psr_set(debugfs_fd, true);
+	return psr_set(debugfs_fd, mode);
 }
 
 bool psr_disable(int debugfs_fd)
 {
-	return psr_set(debugfs_fd, false);
+	/* Any mode different than PSR_MODE_1/2 will disable PSR */
+	return psr_set(debugfs_fd, PSR_MODE_2 + 1);
 }
 
-bool psr_sink_support(int debugfs_fd)
+bool psr_sink_support(int debugfs_fd, enum psr_mode mode)
 {
 	char buf[PSR_STATUS_MAX_LEN];
 	int ret;
 
 	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				      sizeof(buf));
-	return ret > 0 && (strstr(buf, "Sink_Support: yes\n") ||
-			   strstr(buf, "Sink support: yes"));
+	if (ret < 1)
+		return false;
+
+	if (mode == PSR_MODE_1)
+		return strstr(buf, "Sink_Support: yes\n") ||
+		       strstr(buf, "Sink support: yes");
+	else
+		/*
+		 * i915 requires PSR version 0x03 that is PSR2 + SU with
+		 * Y-coordinate to support PSR2
+		 */
+		return strstr(buf, "Sink support: yes [0x03]");
 }

@@ -1425,7 +1425,7 @@ static void setup_psr(void)
 		return;
 	}
 
-	if (!psr_sink_support(drm.debugfs)) {
+	if (!psr_sink_support(drm.debugfs, PSR_MODE_1)) {
 		igt_info("Can't test PSR: not supported by sink.\n");
 		return;
 	}
@@ -1722,7 +1722,7 @@ static bool enable_features_for_test(const struct test_mode *t)
 	if (t->feature & FEATURE_FBC)
 		fbc_enable();
 	if (t->feature & FEATURE_PSR)
-		ret = psr_enable(drm.debugfs);
+		ret = psr_enable(drm.debugfs, PSR_MODE_1);
 	if (t->feature & FEATURE_DRRS)
 		drrs_enable();
 
