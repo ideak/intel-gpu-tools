@@ -59,214 +59,251 @@
 
 #include "intel_bufmgr.h"
 
+#define MI_INSTR(opcode, flags) ((opcode) << 23 | (flags))
+
 IGT_TEST_DESCRIPTION("Test the relocations through the CPU domain.");
 
-static uint32_t use_blt;
-
-static void copy(int fd, uint32_t batch, uint32_t src, uint32_t dst)
+static uint32_t *
+gen2_emit_store_addr(uint32_t *cs, struct drm_i915_gem_relocation_entry *addr)
 {
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_relocation_entry gem_reloc[2];
-	struct drm_i915_gem_exec_object2 gem_exec[3];
-
-	gem_reloc[0].offset = 4 * sizeof(uint32_t);
-	gem_reloc[0].delta = 0;
-	gem_reloc[0].target_handle = dst;
-	gem_reloc[0].read_domains = I915_GEM_DOMAIN_RENDER;
-	gem_reloc[0].write_domain = I915_GEM_DOMAIN_RENDER;
-	gem_reloc[0].presumed_offset = -1;
-
-	gem_reloc[1].offset = 7 * sizeof(uint32_t);
-	if (intel_gen(intel_get_drm_devid(fd)) >= 8)
-		gem_reloc[1].offset += sizeof(uint32_t);
-	gem_reloc[1].delta = 0;
-	gem_reloc[1].target_handle = src;
-	gem_reloc[1].read_domains = I915_GEM_DOMAIN_RENDER;
-	gem_reloc[1].write_domain = 0;
-	gem_reloc[1].presumed_offset = -1;
-
-	memset(gem_exec, 0, sizeof(gem_exec));
-	gem_exec[0].handle = src;
-	gem_exec[1].handle = dst;
-	gem_exec[2].handle = batch;
-	gem_exec[2].relocation_count = 2;
-	gem_exec[2].relocs_ptr = to_user_pointer(gem_reloc);
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(gem_exec);
-	execbuf.buffer_count = 3;
-	execbuf.batch_len = 4096;
-	execbuf.flags = use_blt;
-
-	gem_execbuf(fd, &execbuf);
+	*cs++ = MI_STORE_DWORD_IMM - 1;
+	addr->offset += sizeof(*cs);
+	cs += 1; /* addr */
+	cs += 1; /* value: implicit 0xffffffff */
+	return cs;
 }
 
-static void exec(int fd, uint32_t handle)
+static uint32_t *
+gen4_emit_store_addr(uint32_t *cs, struct drm_i915_gem_relocation_entry *addr)
 {
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 gem_exec;
-
-	memset(&gem_exec, 0, sizeof(gem_exec));
-	gem_exec.handle = handle;
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&gem_exec);
-	execbuf.buffer_count = 1;
-	execbuf.batch_len = 4096;
-
-	gem_execbuf(fd, &execbuf);
+	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = 0;
+	addr->offset += 2 * sizeof(*cs);
+	cs += 1; /* addr */
+	cs += 1; /* value: implicit 0xffffffff */
+	return cs;
 }
 
-uint32_t gen6_batch[] = {
-	(XY_SRC_COPY_BLT_CMD | 6 |
-	 XY_SRC_COPY_BLT_WRITE_ALPHA |
-	 XY_SRC_COPY_BLT_WRITE_RGB),
-	(3 << 24 | /* 32 bits */
-	 0xcc << 16 | /* copy ROP */
-	 4096),
-	0 << 16 | 0, /* dst x1, y1 */
-	1 << 16 | 2,
-	0, /* dst relocation */
-	0 << 16 | 0, /* src x1, y1 */
-	4096,
-	0, /* src relocation */
-	MI_BATCH_BUFFER_END,
-};
-
-uint32_t gen8_batch[] = {
-	(XY_SRC_COPY_BLT_CMD | 8 |
-	 XY_SRC_COPY_BLT_WRITE_ALPHA |
-	 XY_SRC_COPY_BLT_WRITE_RGB),
-	(3 << 24 | /* 32 bits */
-	 0xcc << 16 | /* copy ROP */
-	 4096),
-	0 << 16 | 0, /* dst x1, y1 */
-	1 << 16 | 2,
-	0, /* dst relocation */
-	0, /* FIXME */
-	0 << 16 | 0, /* src x1, y1 */
-	4096,
-	0, /* src relocation */
-	0, /* FIXME */
-	MI_BATCH_BUFFER_END,
-};
-
-uint32_t *batch = gen6_batch;
-uint32_t batch_size = sizeof(gen6_batch);
-
-static void run_test(int fd, int count)
+static uint32_t *
+gen8_emit_store_addr(uint32_t *cs, struct drm_i915_gem_relocation_entry *addr)
 {
-	const uint32_t hang[] = {-1, -1, -1, -1};
-	const uint32_t end[] = {MI_BATCH_BUFFER_END, 0};
-	uint32_t noop;
-	uint32_t *handles;
-	int i;
+	*cs++ = (MI_STORE_DWORD_IMM | 1 << 21) + 1;
+	addr->offset += sizeof(*cs);
+	igt_assert((addr->delta & 7) == 0);
+	cs += 2; /* addr */
+	cs += 2; /* value: implicit 0xffffffffffffffff */
+	return cs;
+}
 
-	noop = intel_get_drm_devid(fd);
+static uint32_t *
+gen2_emit_bb_start(uint32_t *cs, struct drm_i915_gem_relocation_entry *addr)
+{
+	*cs++ = MI_BATCH_BUFFER_START | 2 << 6;
+	addr->offset += sizeof(*cs);
+	addr->delta += 1;
+	cs += 1; /* addr */
+	return cs;
+}
 
-	use_blt = 0;
-	if (intel_gen(noop) >= 6)
-		use_blt = I915_EXEC_BLT;
+static uint32_t *
+gen4_emit_bb_start(uint32_t *cs, struct drm_i915_gem_relocation_entry *addr)
+{
+	*cs++ = MI_BATCH_BUFFER_START | 2 << 6 | 1 << 8;
+	addr->offset += sizeof(*cs);
+	cs += 1; /* addr */
+	return cs;
+}
 
-	if (intel_gen(noop) >= 8) {
-		batch = gen8_batch;
-		batch_size += 2 * 4;
+static uint32_t *
+gen6_emit_bb_start(uint32_t *cs, struct drm_i915_gem_relocation_entry *addr)
+{
+	*cs++ = MI_BATCH_BUFFER_START | 1 << 8;
+	addr->offset += sizeof(*cs);
+	cs += 1; /* addr */
+	return cs;
+}
+
+static uint32_t *
+hsw_emit_bb_start(uint32_t *cs, struct drm_i915_gem_relocation_entry *addr)
+{
+	*cs++ = MI_BATCH_BUFFER_START | 2 << 6 | 1 << 8 | 1 << 13;
+	addr->offset += sizeof(*cs);
+	cs += 1; /* addr */
+	return cs;
+}
+
+static uint32_t *
+gen8_emit_bb_start(uint32_t *cs, struct drm_i915_gem_relocation_entry *addr)
+{
+	if (((uintptr_t)cs & 7) == 0) {
+		*cs++ = MI_NOOP; /* align addr for MI_STORE_DWORD_IMM */
+		addr->offset += sizeof(*cs);
 	}
 
-	handles = malloc (count * sizeof(uint32_t));
+	*cs++ = MI_BATCH_BUFFER_START + 1;
+	addr->offset += sizeof(*cs);
+	cs += 2; /* addr */
+
+	return cs;
+}
+
+static void *
+create_tmpl(int i915, struct drm_i915_gem_relocation_entry *reloc)
+{
+	const uint32_t devid = intel_get_drm_devid(i915);
+	const int gen = intel_gen(devid);
+	uint32_t *(*emit_store_addr)(uint32_t *cs,
+				   struct drm_i915_gem_relocation_entry *addr);
+	uint32_t *(*emit_bb_start)(uint32_t *cs,
+				   struct drm_i915_gem_relocation_entry *reloc);
+	void *tmpl;
+
+	/* could use BLT_FILL instead for gen2 */
+	igt_require(gem_can_store_dword(i915, 0));
+
+	if (gen >= 8)
+		emit_store_addr = gen8_emit_store_addr;
+	else if (gen >= 4)
+		emit_store_addr = gen4_emit_store_addr;
+	else
+		emit_store_addr = gen2_emit_store_addr;
+
+	if (gen >= 8)
+		emit_bb_start = gen8_emit_bb_start;
+	else if (IS_HASWELL(devid))
+		emit_bb_start = hsw_emit_bb_start;
+	else if (gen >= 6)
+		emit_bb_start = gen6_emit_bb_start;
+	else if (gen >= 4)
+		emit_bb_start = gen4_emit_bb_start;
+	else
+		emit_bb_start = gen2_emit_bb_start;
+
+	tmpl = malloc(4096);
+	igt_assert(tmpl);
+	memset(tmpl, 0xff, 4096);
+
+	/* Jump over the booby traps to the end */
+	reloc[0].delta = 64;
+	emit_bb_start(tmpl, &reloc[0]);
+
+	/* Restore the bad address to catch missing relocs */
+	reloc[1].offset = 64;
+	reloc[1].delta = reloc[0].offset;
+	*emit_store_addr(tmpl + 64, &reloc[1]) = MI_BATCH_BUFFER_END;
+
+	return tmpl;
+}
+
+static void run_test(int i915, int count)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_relocation_entry reloc[2];
+	struct drm_i915_gem_exec_object2 obj;
+
+	uint32_t *handles;
+	uint32_t *tmpl;
+
+	handles = malloc(count * sizeof(uint32_t));
 	igt_assert(handles);
 
-	noop = gem_create(fd, 4096);
-	gem_write(fd, noop, 0, end, sizeof(end));
+	memset(reloc, 0, sizeof(reloc));
+	tmpl = create_tmpl(i915, reloc);
+	for (int i = 0; i < count; i++) {
+		handles[i] = gem_create(i915, 4096);
+		gem_write(i915, handles[i], 0, tmpl, 4096);
+	}
+	free(tmpl);
+
+	memset(&obj, 0, sizeof(obj));
+	obj.relocs_ptr = to_user_pointer(reloc);
+	obj.relocation_count = ARRAY_SIZE(reloc);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
 
 	/* fill the entire gart with batches and run them */
-	for (i = 0; i < count; i++) {
-		uint32_t bad;
+	for (int i = 0; i < count; i++) {
+		obj.handle = handles[i];
 
-		handles[i] = gem_create(fd, 4096);
-		gem_write(fd, handles[i], 0, batch, batch_size);
+		reloc[0].target_handle = obj.handle;
+		reloc[0].presumed_offset = -1;
+		reloc[1].target_handle = obj.handle;
+		reloc[1].presumed_offset = -1;
 
-		bad = gem_create(fd, 4096);
-		gem_write(fd, bad, 0, hang, sizeof(hang));
-		gem_write(fd, bad, 4096-sizeof(end), end, sizeof(end));
-
-		/* launch the newly created batch */
-		copy(fd, handles[i], noop, bad);
-		exec(fd, bad);
-		gem_close(fd, bad);
-
-		igt_progress("gem_cpu_reloc: ", i, 2*count);
+		gem_execbuf(i915, &execbuf);
 	}
 
 	/* And again in reverse to try and catch the relocation code out */
-	for (i = 0; i < count; i++) {
-		uint32_t bad;
+	for (int i = 0; i < count; i++) {
+		obj.handle = handles[count - i - 1];
 
-		bad = gem_create(fd, 4096);
-		gem_write(fd, bad, 0, hang, sizeof(hang));
-		gem_write(fd, bad, 4096-sizeof(end), end, sizeof(end));
+		reloc[0].target_handle = obj.handle;
+		reloc[0].presumed_offset = -1;
+		reloc[1].target_handle = obj.handle;
+		reloc[1].presumed_offset = -1;
 
-		/* launch the newly created batch */
-		copy(fd, handles[count-i-1], noop, bad);
-		exec(fd, bad);
-		gem_close(fd, bad);
-
-		igt_progress("gem_cpu_reloc: ", count+i, 3*count);
+		gem_execbuf(i915, &execbuf);
 	}
 
-	/* Third time lucky? */
-	for (i = 0; i < count; i++) {
-		uint32_t bad;
+	/* Third time unlucky? */
+	for (int i = 0; i < count; i++) {
+		obj.handle = handles[i];
 
-		bad = gem_create(fd, 4096);
-		gem_write(fd, bad, 0, hang, sizeof(hang));
-		gem_write(fd, bad, 4096-sizeof(end), end, sizeof(end));
+		reloc[0].target_handle = obj.handle;
+		reloc[0].presumed_offset = -1;
+		reloc[1].target_handle = obj.handle;
+		reloc[1].presumed_offset = -1;
 
-		/* launch the newly created batch */
-		gem_set_domain(fd, handles[i],
-			       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
-		copy(fd, handles[i], noop, bad);
-		exec(fd, bad);
-		gem_close(fd, bad);
+		gem_set_domain(i915, obj.handle,
+			       I915_GEM_DOMAIN_CPU,
+			       I915_GEM_DOMAIN_CPU);
 
-		igt_progress("gem_cpu_reloc: ", 2*count+i, 3*count);
+		gem_execbuf(i915, &execbuf);
 	}
 
-	igt_info("Subtest suceeded, cleanup up - this might take a while.\n");
-	for (i = 0; i < count; i++) {
-		gem_close(fd, handles[i]);
-	}
-	gem_close(fd, noop);
+	for (int i = 0; i < count; i++)
+		gem_close(i915, handles[i]);
 	free(handles);
 }
 
 igt_main
 {
-	uint64_t aper_size;
-	int fd, count;
+	int i915;
 
 	igt_fixture {
-		fd = drm_open_driver(DRIVER_INTEL);
-		igt_require_gem(fd);
+		i915 = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(i915);
+
+		igt_fork_hang_detector(i915);
 	}
 
-	igt_subtest("basic") {
-		run_test (fd, 10);
-	}
-
+	igt_subtest("basic")
+		run_test(i915, 1);
 
 	igt_subtest("full") {
-		aper_size = gem_mappable_aperture_size();
-		count = aper_size / 4096 * 2;
+		uint64_t aper_size = gem_mappable_aperture_size();
+		unsigned long count = aper_size / 4096 + 1;
 
-		/* count + 2 (noop & bad) buffers. A gem object appears to
-                   require about 2kb + buffer + kernel overhead */
-		intel_require_memory(2+count, 2048+4096, CHECK_RAM);
+		intel_require_memory(count, 4096, CHECK_RAM);
 
-		run_test (fd, count);
+		run_test(i915, count);
+	}
+
+	igt_subtest("forked") {
+		uint64_t aper_size = gem_mappable_aperture_size();
+		unsigned long count = aper_size / 4096 + 1;
+		int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+
+		intel_require_memory(count, 4096, CHECK_RAM);
+
+		igt_fork(child, ncpus)
+			run_test(i915, count / ncpus + 1);
+		igt_waitchildren();
 	}
 
 	igt_fixture {
-		close(fd);
+		igt_stop_hang_detector();
 	}
 }
