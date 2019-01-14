@@ -902,36 +902,6 @@ static void crc_sanity_checks(igt_crc_t *crc)
 }
 
 /**
- * igt_pipe_crc_collect_crc:
- * @pipe_crc: pipe CRC object
- * @out_crc: buffer for the captured CRC values
- *
- * Read a single CRC from @pipe_crc. This function blocks until the CRC is
- * retrieved, irrespective of whether @pipe_crc has been opened with
- * igt_pipe_crc_new() or igt_pipe_crc_new_nonblock().  @out_crc must be
- * allocated by the caller.
- *
- * This function takes care of the pipe_crc book-keeping, it will start/stop
- * the collection of the CRC.
- *
- * This function also calls the interactive debug with the "crc" domain, so you
- * can make use of this feature to actually see the screen that is being CRC'd.
- *
- * For continuous CRC collection look at igt_pipe_crc_start(),
- * igt_pipe_crc_get_crcs() and igt_pipe_crc_stop().
- */
-void igt_pipe_crc_collect_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out_crc)
-{
-	igt_debug_wait_for_keypress("crc");
-
-	igt_pipe_crc_start(pipe_crc);
-	read_one_crc(pipe_crc, out_crc);
-	igt_pipe_crc_stop(pipe_crc);
-
-	crc_sanity_checks(out_crc);
-}
-
-/**
  * igt_pipe_crc_drain:
  * @pipe_crc: pipe CRC object
  *
@@ -1002,6 +972,34 @@ igt_pipe_crc_get_current(int drm_fd, igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
 	} while (crc->frame <= vblank);
 
 	crc_sanity_checks(crc);
+}
+
+/**
+ * igt_pipe_crc_collect_crc:
+ * @pipe_crc: pipe CRC object
+ * @out_crc: buffer for the captured CRC values
+ *
+ * Read a single CRC from @pipe_crc. This function blocks until the CRC is
+ * retrieved, irrespective of whether @pipe_crc has been opened with
+ * igt_pipe_crc_new() or igt_pipe_crc_new_nonblock().  @out_crc must be
+ * allocated by the caller.
+ *
+ * This function takes care of the pipe_crc book-keeping, it will start/stop
+ * the collection of the CRC.
+ *
+ * This function also calls the interactive debug with the "crc" domain, so you
+ * can make use of this feature to actually see the screen that is being CRC'd.
+ *
+ * For continuous CRC collection look at igt_pipe_crc_start(),
+ * igt_pipe_crc_get_crcs() and igt_pipe_crc_stop().
+ */
+void igt_pipe_crc_collect_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out_crc)
+{
+	igt_debug_wait_for_keypress("crc");
+
+	igt_pipe_crc_start(pipe_crc);
+	igt_pipe_crc_get_single(pipe_crc, out_crc);
+	igt_pipe_crc_stop(pipe_crc);
 }
 
 /*
