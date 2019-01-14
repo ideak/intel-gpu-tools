@@ -52,15 +52,14 @@ static void write_seqno(int dir, unsigned offset)
 	igt_debug("next seqno set to: 0x%x\n", seqno);
 }
 
-static void check_bo(int fd, uint32_t handle)
+static void check_bo(int fd, uint32_t handle, int pass)
 {
 	uint32_t *map;
-	int i;
 
 	igt_debug("Verifying result\n");
 	map = gem_mmap__cpu(fd, handle, 0, 4096, PROT_READ);
 	gem_set_domain(fd, handle, I915_GEM_DOMAIN_CPU, 0);
-	for (i = 0; i < 1024; i++)
+	for (int i = 0; i < pass; i++)
 		igt_assert_eq(map[i], i);
 	munmap(map, 4096);
 }
@@ -228,6 +227,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	igt_fork(child, flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1)  {
+		unsigned int pass;
+
 		memset(&scratch, 0, sizeof(scratch));
 		scratch.handle = gem_create(fd, 4096);
 		scratch.flags = EXEC_OBJECT_WRITE;
@@ -323,8 +324,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		}
 
 		igt_while_interruptible(flags & INTERRUPTIBLE) {
-			unsigned int pass = 0;
-
+			pass = 0;
 			igt_until_timeout(150) {
 				uint64_t offset;
 
@@ -473,7 +473,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		igt_info("Number of migrations for execbuf: %d\n", eb_migrations);
 		igt_info("Number of migrations for reloc: %d, interrupted %d, patched %d\n", reloc_migrations, reloc_interruptions, relocations);
 
-		check_bo(fd, scratch.handle);
+		check_bo(fd, scratch.handle, pass);
 		gem_close(fd, scratch.handle);
 		gem_close(fd, store.handle);
 
