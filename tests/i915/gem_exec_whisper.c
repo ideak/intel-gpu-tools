@@ -189,12 +189,12 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	unsigned engines[16];
 	unsigned nengine;
 	uint32_t batch[16];
-	int i, n, pass, loc;
 	unsigned int relocations = 0;
 	unsigned int reloc_migrations = 0;
 	unsigned int reloc_interruptions = 0;
 	unsigned int eb_migrations = 0;
 	uint64_t old_offset;
+	int i, n, loc;
 	int debugfs;
 
 	if (flags & PRIORITY) {
@@ -323,7 +323,9 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		}
 
 		igt_while_interruptible(flags & INTERRUPTIBLE) {
-			for (pass = 0; pass < 1024; pass++) {
+			unsigned int pass = 0;
+
+			igt_until_timeout(150) {
 				uint64_t offset;
 
 				if (!(flags & FORKED))
@@ -384,10 +386,10 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 						handle[1] = batches[n].handle;
 						batches[n-1].handle =
 							gem_open(this_fd,
-									gem_flink(fd, handle[0]));
+								 gem_flink(fd, handle[0]));
 						batches[n].handle =
 							gem_open(this_fd,
-									gem_flink(fd, handle[1]));
+								 gem_flink(fd, handle[1]));
 						if (flags & PRIORITY)
 							ctx_set_random_priority(this_fd, 0);
 					}
@@ -462,7 +464,11 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 
 				store = tmp[1];
 				scratch = tmp[0];
+
+				if (++pass == 1024)
+					break;
 			}
+			igt_debug("Completed %d/1024 passes\n", pass);
 		}
 		igt_info("Number of migrations for execbuf: %d\n", eb_migrations);
 		igt_info("Number of migrations for reloc: %d, interrupted %d, patched %d\n", reloc_migrations, reloc_interruptions, relocations);
