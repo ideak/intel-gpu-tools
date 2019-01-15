@@ -1104,7 +1104,7 @@ static void test_readonly(int i915)
 	/*
 	 * We have only a 31bit delta which we use for generating
 	 * the target address for MI_STORE_DWORD_IMM, so our maximum
-	 * usuable object size is only 2GiB. For now.
+	 * usable object size is only 2GiB. For now.
 	 */
 	total = 2048ull << 20;
 	aperture_size = gem_aperture_size(i915) / 2;
@@ -1124,7 +1124,7 @@ static void test_readonly(int i915)
 		*(uint32_t *)(space + offset) = offset;
 	}
 	igt_assert_eq_u32(*(uint32_t *)pages, (uint32_t)(total - sz));
-	igt_assert(mlock(space, total) == 0);
+	igt_assert(mlock(pages, sz) == 0);
 	close(memfd);
 
 	/* Check we can create a normal userptr bo wrapping the wrapper */
@@ -1176,6 +1176,7 @@ static void test_readonly(int i915)
 	}
 	igt_waitchildren();
 
+	munlock(pages, sz);
 	munmap(space, total);
 	munmap(pages, sz);
 }
