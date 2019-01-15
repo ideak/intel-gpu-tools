@@ -57,5 +57,6 @@ bool igt_sysfs_set_boolean(int dir, const char *attr, bool value);
 
 void bind_fbcon(bool enable);
 void kick_snd_hda_intel(void);
+void fbcon_blink_enable(bool enable);
 
 #endif /* __IGT_SYSFS_H__ */

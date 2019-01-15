@@ -610,3 +610,46 @@ void kick_snd_hda_intel(void)
 out:
 	close(fd);
 }
+
+static int fbcon_cursor_blink_fd = -1;
+static char fbcon_cursor_blink_prev_value[2];
+
+static void fbcon_cursor_blink_restore(int sig)
+{
+	write(fbcon_cursor_blink_fd, fbcon_cursor_blink_prev_value,
+	      strlen(fbcon_cursor_blink_prev_value) + 1);
+	close(fbcon_cursor_blink_fd);
+}
+
+/**
+ * fbcon_blink_enable:
+ * @enable: if true enables the fbcon cursor blinking otherwise disables it
+ *
+ * Enables or disables the cursor blinking in fbcon, it also restores the
+ * previous blinking state when exiting test.
+ *
+ */
+void fbcon_blink_enable(bool enable)
+{
+	const char *cur_blink_path = "/sys/class/graphics/fbcon/cursor_blink";
+	int fd, r;
+	char buffer[2];
+
+	fd = open(cur_blink_path, O_RDWR);
+	igt_require(fd >= 0);
+
+	/* Restore original value on exit */
+	if (fbcon_cursor_blink_fd == -1) {
+		r = read(fd, fbcon_cursor_blink_prev_value,
+			 sizeof(fbcon_cursor_blink_prev_value));
+		if (r > 0) {
+			fbcon_cursor_blink_fd = dup(fd);
+			igt_assert(fbcon_cursor_blink_fd >= 0);
+			igt_install_exit_handler(fbcon_cursor_blink_restore);
+		}
+	}
+
+	r = snprintf(buffer, sizeof(buffer), enable ? "1" : "0");
+	write(fd, buffer, r + 1);
+	close(fd);
+}

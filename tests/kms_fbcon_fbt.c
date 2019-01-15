@@ -286,6 +286,7 @@ static void setup_environment(void)
 	 * fbcon bind, so to test it is necessary enable it again
 	 */
 	bind_fbcon(true);
+	fbcon_blink_enable(true);
 }
 
 static void teardown_environment(void)
