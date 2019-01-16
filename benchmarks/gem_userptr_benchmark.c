@@ -355,8 +355,9 @@ static void test_impact_overlap(int fd, const char *prefix)
 
 		for (i = 0; i < nr_bos[subtest]; i++)
 			gem_close(fd, handles[i]);
-		if (block)
-			free(block);
+
+		free(block);
+		block = NULL;
 	}
 }
 
