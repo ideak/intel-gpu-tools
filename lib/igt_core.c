@@ -591,7 +591,7 @@ static void common_init_config(void)
 	igt_key_file = g_key_file_new();
 	ret = g_key_file_load_from_file(igt_key_file, key_file_loc,
 					G_KEY_FILE_NONE, &error);
-	if (error && error->code == G_KEY_FILE_ERROR) {
+	if (!ret) {
 		g_error_free(error);
 		g_key_file_free(igt_key_file);
 		igt_key_file = NULL;
