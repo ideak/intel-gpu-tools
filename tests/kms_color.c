@@ -124,8 +124,12 @@ static void paint_rectangles(data_t *data,
 
 static double *generate_table(uint32_t lut_size, double exp)
 {
-	double *coeffs = malloc(sizeof(double) * lut_size);
+	double *coeffs;
 	uint32_t i;
+
+	igt_assert_lt(0, lut_size);
+
+	coeffs = malloc(sizeof(double) * lut_size);
 
 	for (i = 0; i < lut_size; i++)
 		coeffs[i] = powf((double) i * 1.0 / (double) (lut_size - 1), exp);
@@ -135,9 +139,12 @@ static double *generate_table(uint32_t lut_size, double exp)
 
 static double *generate_table_max(uint32_t lut_size)
 {
-	double *coeffs = malloc(sizeof(double) * lut_size);
+	double *coeffs;
 	uint32_t i;
 
+	igt_assert_lt(0, lut_size);
+
+	coeffs = malloc(sizeof(double) * lut_size);
 	coeffs[0] = 0.0;
 	for (i = 1; i < lut_size; i++)
 		coeffs[i] = 1.0;
@@ -868,6 +875,8 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 			igt_pipe_obj_get_prop(&data->display.pipes[p],
 					      IGT_CRTC_GAMMA_LUT_SIZE);
 
+		igt_assert_lt(0, data->degamma_lut_size);
+		igt_assert_lt(0, data->gamma_lut_size);
 		igt_display_require_output_on_pipe(&data->display, p);
 	}
 
