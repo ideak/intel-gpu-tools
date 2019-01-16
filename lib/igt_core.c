@@ -760,6 +760,7 @@ static int common_init(int *argc, char **argv,
 				list_subtests = true;
 			break;
 		case OPT_RUN_SUBTEST:
+			assert(optarg);
 			if (!list_subtests)
 				run_single_subtest = strdup(optarg);
 			break;
