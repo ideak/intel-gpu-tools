@@ -1234,7 +1234,7 @@ init_cea_block(const unsigned char *edid, size_t length,
 
 	*new_length = length + 128;
 
-	new_edid.data = calloc(*new_length, sizeof(char));
+	new_edid.data = calloc(*new_length, sizeof(*new_edid.data));
 	igt_assert_f(new_edid.data, "Failed to allocate %zu bytes for edid\n", sizeof(new_length));
 	memcpy(new_edid.data, edid, length);
 	*new_edid_ptr = new_edid.data;
