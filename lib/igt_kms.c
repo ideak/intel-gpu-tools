@@ -1932,7 +1932,7 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 			drmModeFreePlane(drm_plane);
 		}
 
-		igt_assert_lte(0, n_planes);
+		igt_assert_lt(0, n_planes);
 		pipe->planes = calloc(sizeof(igt_plane_t), n_planes);
 		igt_assert_f(pipe->planes, "Failed to allocate memory for %d planes\n", n_planes);
 		last_plane = n_planes - 1;
