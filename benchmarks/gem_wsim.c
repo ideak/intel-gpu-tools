@@ -483,6 +483,14 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				goto add_step;
 			}
 
+			if (!field) {
+				if (verbose)
+					fprintf(stderr,
+						"Parse error at step %u!\n",
+						nr_steps);
+				return NULL;
+			}
+
 			tmp = atoi(field);
 			if (tmp < 0) {
 				if (verbose)
