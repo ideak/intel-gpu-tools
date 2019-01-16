@@ -728,8 +728,9 @@ static int common_init(int *argc, char **argv,
 	all_opt_count += ARRAY_SIZE(long_options);
 
 	combined_opts = malloc(all_opt_count * sizeof(*combined_opts));
-	memcpy(combined_opts, extra_long_opts,
-	       extra_opt_count * sizeof(*combined_opts));
+	if (extra_opt_count > 0)
+		memcpy(combined_opts, extra_long_opts,
+		       extra_opt_count * sizeof(*combined_opts));
 
 	/* Copy the subtest long options (and the final NULL entry) */
 	memcpy(&combined_opts[extra_opt_count], long_options,
