@@ -1593,6 +1593,7 @@ static void kmstest_get_crtc(int device, enum pipe pipe, struct kmstest_crtc *cr
 
 				n = ftell(file);
 				crtc->n_planes = parse_planes(file, NULL);
+				igt_assert_lt(0, crtc->n_planes);
 				crtc->planes = calloc(crtc->n_planes, sizeof(*crtc->planes));
 				igt_assert_f(crtc->planes, "Failed to allocate memory for %d planes\n", crtc->n_planes);
 
