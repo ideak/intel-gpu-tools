@@ -494,6 +494,7 @@ int gpu_perf_update(struct gpu_perf *gp)
 			const struct perf_event_header *header;
 
 			header = (const struct perf_event_header *)(data + (tail & mask));
+			assert(header->size > 0);
 			if (header->size > head - tail)
 				break;
 
