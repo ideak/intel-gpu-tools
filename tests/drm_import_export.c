@@ -129,8 +129,6 @@ static void * test_thread(void * par)
 	return NULL;
 }
 
-#define IMPORT_RACE_LOOPS 100000
-
 struct import_race_thread_data {
 	int prime_fd;
 	uint32_t flink_name;
@@ -189,7 +187,6 @@ static void *import_close_thread(void *data)
 static void test_import_close_race(void)
 {
 	pthread_t t;
-	unsigned int loops = IMPORT_RACE_LOOPS;
 	drm_intel_bo *bo;
 	struct import_race_thread_data t_data;
 
@@ -199,7 +196,7 @@ static void test_import_close_race(void)
 
 	igt_assert_eq(pthread_create(&t, NULL, import_close_thread , &t_data), 0);
 
-	while (loops--) {
+	igt_until_timeout(15) {
 		bo = drm_intel_bo_alloc(bufmgr, "buf-shared", 4096, 4096);
 		igt_assert(bo != NULL);
 		/*
