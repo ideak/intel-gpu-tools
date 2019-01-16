@@ -523,8 +523,6 @@ int alsa_run(struct alsa *alsa, int duration_ms)
 			reached = false;
 
 			if (!output_ready) {
-				output_ready = true;
-
 				for (i = 0; i < alsa->output_handles_count; i++)
 					output_counts[i] = 0;
 
