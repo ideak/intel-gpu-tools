@@ -2391,7 +2391,7 @@ err:
  */
 int igt_system_quiet(const char *command)
 {
-	int stderr_fd_copy, stdout_fd_copy, status, nullfd;
+	int stderr_fd_copy = -1, stdout_fd_copy = -1, status, nullfd = -1;
 
 	/* redirect */
 	if ((nullfd = open("/dev/null", O_WRONLY)) == -1)
