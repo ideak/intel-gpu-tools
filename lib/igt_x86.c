@@ -175,6 +175,8 @@ char *igt_x86_features_to_string(unsigned features, char *line)
 	if (features & AVX2)
 		line += sprintf(line, ", avx2");
 
+	(void)line;
+
 	return ret;
 }
 #endif
