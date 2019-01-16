@@ -250,7 +250,7 @@ bool audio_signal_detect(struct audio_signal *signal, int channels,
 	int threshold;
 	bool above;
 	int error;
-	int freq;
+	int freq = 0;
 	int max;
 	int c, i, j;
 
