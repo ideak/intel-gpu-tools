@@ -718,6 +718,9 @@ static enum igt_suspend_test get_suspend_test(int power_dir)
 			break;
 		}
 
+	if (!test_name)
+		return SUSPEND_TEST_NONE;
+
 	for (test = SUSPEND_TEST_NONE; test < SUSPEND_TEST_NUM; test++)
 		if (strcmp(suspend_test_name[test], test_name) == 0)
 			break;
