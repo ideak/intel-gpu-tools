@@ -134,8 +134,10 @@ static char _forced_driver[16] = "";
  */
 void __set_forced_driver(const char *name)
 {
-	if (!name)
+	if (!name) {
 		igt_warn("No driver specified, keep default behaviour\n");
+		return;
+	}
 
 	strncpy(_forced_driver, name, sizeof(_forced_driver) - 1);
 }
