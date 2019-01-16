@@ -86,6 +86,7 @@ static struct kmod_ctx *kmod_ctx(void)
 
 		p = config_paths_str;
 		for (i = 0; i < count; ++i) {
+			igt_assert(p != NULL);
 			config_paths[i] = p;
 
 			if ((p = strchr(p, ':')))
