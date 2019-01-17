@@ -38,6 +38,7 @@
 #include "drm.h"
 
 #include "igt.h"
+#include "igt_sysfs.h"
 #include "igt_x86.h"
 
 #ifndef PAGE_SIZE
@@ -375,50 +376,86 @@ test_clflush(int fd)
 static void
 test_hang(int fd)
 {
-	igt_hang_t hang;
-	uint32_t patterns[] = {
+	const uint32_t patterns[] = {
 		0, 0xaaaaaaaa, 0x55555555, 0xcccccccc,
 	};
-	uint32_t *gtt[3];
-	int last_pattern = 0;
-	int next_pattern = 1;
-	int i;
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	struct {
+		bool done;
+		bool error;
+	} *control;
+	unsigned long count;
+	igt_hang_t hang;
+	int dir;
 
-	for (i = I915_TILING_NONE; i <= I915_TILING_Y; i++) {
-		uint32_t handle;
+	hang = igt_allow_hang(fd, 0, 0);
+	igt_require(igt_sysfs_set_parameter(fd, "reset", "1")); /* global */
 
-		handle = gem_create(fd, OBJECT_SIZE);
-		gem_set_tiling(fd, handle, i, 2048);
+	control = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(control != MAP_FAILED);
 
-		gtt[i] = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_WRITE);
-		set_domain_gtt(fd, handle);
-		gem_close(fd, handle);
-	}
+	igt_fork(child, ncpus) {
+		int last_pattern = 0;
+		int next_pattern = 1;
+		uint32_t *gtt[2];
 
-	hang = igt_hang_ring(fd, I915_EXEC_RENDER);
+		for (int i = 0; i < ARRAY_SIZE(gtt); i++) {
+			uint32_t handle;
 
-	do {
-		for (i = 0; i < OBJECT_SIZE / 64; i++) {
-			int x = 16*i + (i%16);
+			handle = gem_create(fd, OBJECT_SIZE);
+			gem_set_tiling(fd, handle, I915_TILING_X + i, 2048);
 
-			igt_assert(gtt[0][x] == patterns[last_pattern]);
-			igt_assert(gtt[1][x] == patterns[last_pattern]);
-			igt_assert(gtt[2][x] == patterns[last_pattern]);
-
-			gtt[0][x] = patterns[next_pattern];
-			gtt[1][x] = patterns[next_pattern];
-			gtt[2][x] = patterns[next_pattern];
+			gtt[i] = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_WRITE);
+			set_domain_gtt(fd, handle);
+			gem_close(fd, handle);
 		}
 
-		last_pattern = next_pattern;
-		next_pattern = (next_pattern + 1) % ARRAY_SIZE(patterns);
-	} while (gem_bo_busy(fd, hang.spin->handle));
+		while (!READ_ONCE(control->done)) {
+			for (int i = 0; i < OBJECT_SIZE / 64; i++) {
+				const unsigned int x = 16 * i + ( i% 16);
+				uint32_t expected = patterns[last_pattern];
+				uint32_t found[2];
 
-	igt_post_hang_ring(fd, hang);
+				found[0] = READ_ONCE(gtt[0][x]);
+				found[1] = READ_ONCE(gtt[1][x]);
 
-	munmap(gtt[0], OBJECT_SIZE);
-	munmap(gtt[1], OBJECT_SIZE);
-	munmap(gtt[2], OBJECT_SIZE);
+				if (found[0] != expected ||
+				    found[1] != expected) {
+					igt_warn("child[%d] found (%x, %x), expecting %x\n",
+						 child,
+						 found[0], found[1],
+						 expected);
+					control->error = true;
+					exit(0);
+				}
+
+				gtt[0][x] = patterns[next_pattern];
+				gtt[1][x] = patterns[next_pattern];
+			}
+
+			last_pattern = next_pattern;
+			next_pattern = (next_pattern + 1) % ARRAY_SIZE(patterns);
+		}
+	}
+
+	count = 0;
+	dir = igt_debugfs_dir(fd);
+	igt_until_timeout(5) {
+		igt_sysfs_set(dir, "i915_wedged", "-1");
+		if (READ_ONCE(control->error))
+			break;
+		count++;
+	}
+	close(dir);
+	igt_info("%lu resets\n", count);
+
+	control->done = true;
+	igt_waitchildren();
+
+	igt_assert(!control->error);
+	munmap(control, 4096);
+
+	igt_disallow_hang(fd, hang);
 }
 
 static int min_tile_width(uint32_t devid, int tiling)
