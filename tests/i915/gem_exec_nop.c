@@ -104,7 +104,7 @@ static double nop_on_ring(int fd, uint32_t handle, unsigned ring_id,
 	return elapsed(&start, &now);
 }
 
-static void poll_ring(int fd, unsigned ring, const char *name, int timeout)
+static void poll_ring(int fd, unsigned engine, const char *name, int timeout)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	const uint32_t MI_ARB_CHK = 0x5 << 23;
@@ -112,29 +112,17 @@ static void poll_ring(int fd, unsigned ring, const char *name, int timeout)
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_relocation_entry reloc[4], *r;
 	uint32_t *bbe[2], *state, *batch;
-	unsigned engines[16], nengine, flags;
 	struct timespec tv = {};
 	unsigned long cycles;
+	unsigned flags;
 	uint64_t elapsed;
 
 	flags = I915_EXEC_NO_RELOC;
 	if (gen == 4 || gen == 5)
 		flags |= I915_EXEC_SECURE;
 
-	nengine = 0;
-	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(fd, ring) {
-			if (!gem_can_store_dword(fd, ring))
-				continue;
-
-			engines[nengine++] = ring;
-		}
-	} else {
-		gem_require_ring(fd, ring);
-		igt_require(gem_can_store_dword(fd, ring));
-		engines[nengine++] = ring;
-	}
-	igt_require(nengine);
+	gem_require_ring(fd, engine);
+	igt_require(gem_can_store_dword(fd, engine));
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
@@ -198,7 +186,131 @@ static void poll_ring(int fd, unsigned ring, const char *name, int timeout)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
-	execbuf.flags = engines[0];
+	execbuf.flags = engine | flags;
+
+	cycles = 0;
+	do {
+		unsigned int idx = ++cycles & 1;
+
+		*bbe[idx] = MI_ARB_CHK;
+		execbuf.batch_start_offset =
+			(bbe[idx] - batch) * sizeof(*batch) - 64;
+
+		gem_execbuf(fd, &execbuf);
+
+		*bbe[!idx] = MI_BATCH_BUFFER_END;
+		__sync_synchronize();
+
+		while (READ_ONCE(*state) != idx)
+			;
+	} while ((elapsed = igt_nsec_elapsed(&tv)) >> 30 < timeout);
+	*bbe[cycles & 1] = MI_BATCH_BUFFER_END;
+	gem_sync(fd, obj.handle);
+
+	igt_info("%s completed %ld cycles: %.3f us\n",
+		 name, cycles, elapsed*1e-3/cycles);
+
+	munmap(batch, 4096);
+	gem_close(fd, obj.handle);
+}
+
+static void poll_sequential(int fd, const char *name, int timeout)
+{
+	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const uint32_t MI_ARB_CHK = 0x5 << 23;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_relocation_entry reloc[4], *r;
+	uint32_t *bbe[2], *state, *batch;
+	unsigned engines[16], nengine, engine, flags;
+	struct timespec tv = {};
+	unsigned long cycles;
+	uint64_t elapsed;
+	bool cached;
+
+	flags = I915_EXEC_NO_RELOC;
+	if (gen == 4 || gen == 5)
+		flags |= I915_EXEC_SECURE;
+
+	nengine = 0;
+	for_each_physical_engine(fd, engine) {
+		if (!gem_can_store_dword(fd, engine))
+			continue;
+
+		engines[nengine++] = engine;
+	}
+	igt_require(nengine);
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = gem_create(fd, 4096);
+	obj[0].flags = EXEC_OBJECT_WRITE;
+	cached = __gem_set_caching(fd, obj[0].handle, 1) == 0;
+	obj[1].handle = gem_create(fd, 4096);
+	obj[1].relocs_ptr = to_user_pointer(reloc);
+	obj[1].relocation_count = ARRAY_SIZE(reloc);
+
+	r = memset(reloc, 0, sizeof(reloc));
+	batch = gem_mmap__wc(fd, obj[1].handle, 0, 4096, PROT_WRITE);
+
+	for (unsigned int start_offset = 0;
+	     start_offset <= 128;
+	     start_offset += 128) {
+		uint32_t *b = batch + start_offset / sizeof(*batch);
+
+		r->target_handle = obj[0].handle;
+		r->offset = (b - batch + 1) * sizeof(uint32_t);
+		r->delta = 0;
+		r->read_domains = I915_GEM_DOMAIN_RENDER;
+		r->write_domain = I915_GEM_DOMAIN_RENDER;
+
+		*b = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		if (gen >= 8) {
+			*++b = r->delta;
+			*++b = 0;
+		} else if (gen >= 4) {
+			r->offset += sizeof(uint32_t);
+			*++b = 0;
+			*++b = r->delta;
+		} else {
+			*b -= 1;
+			*++b = r->delta;
+		}
+		*++b = start_offset != 0;
+		r++;
+
+		b = batch + (start_offset + 64) / sizeof(*batch);
+		bbe[start_offset != 0] = b;
+		*b++ = MI_ARB_CHK;
+
+		r->target_handle = obj[1].handle;
+		r->offset = (b - batch + 1) * sizeof(uint32_t);
+		r->read_domains = I915_GEM_DOMAIN_COMMAND;
+		r->delta = start_offset + 64;
+		if (gen >= 8) {
+			*b++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
+			*b++ = r->delta;
+			*b++ = 0;
+		} else if (gen >= 6) {
+			*b++ = MI_BATCH_BUFFER_START | 1 << 8;
+			*b++ = r->delta;
+		} else {
+			*b++ = MI_BATCH_BUFFER_START | 2 << 6;
+			if (gen < 4)
+				r->delta |= 1;
+			*b++ = r->delta;
+		}
+		r++;
+	}
+	igt_assert(r == reloc + ARRAY_SIZE(reloc));
+
+	if (cached)
+		state = gem_mmap__cpu(fd, obj[0].handle, 0, 4096, PROT_READ);
+	else
+		state = gem_mmap__wc(fd, obj[0].handle, 0, 4096, PROT_READ);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = ARRAY_SIZE(obj);
 
 	cycles = 0;
 	do {
@@ -218,13 +330,15 @@ static void poll_ring(int fd, unsigned ring, const char *name, int timeout)
 			;
 	} while ((elapsed = igt_nsec_elapsed(&tv)) >> 30 < timeout);
 	*bbe[cycles & 1] = MI_BATCH_BUFFER_END;
-	gem_sync(fd, obj.handle);
+	gem_sync(fd, obj[1].handle);
 
 	igt_info("%s completed %ld cycles: %.3f us\n",
 		 name, cycles, elapsed*1e-3/cycles);
 
+	munmap(state, 4096);
 	munmap(batch, 4096);
-	gem_close(fd, obj.handle);
+	gem_close(fd, obj[1].handle);
+	gem_close(fd, obj[0].handle);
 }
 
 static void single(int fd, uint32_t handle,
@@ -813,7 +927,7 @@ igt_main
 		}
 
 		igt_subtest("poll-sequential")
-			poll_ring(device, ALL_ENGINES, "Sequential", 20);
+			poll_sequential(device, "Sequential", 20);
 
 		igt_subtest("headless") {
 			/* Requires master for changing display modes */
