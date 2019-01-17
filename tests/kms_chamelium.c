@@ -437,6 +437,9 @@ prepare_output(data_t *data,
 
 	output = igt_output_from_connector(display, connector);
 
+	/* Refresh pipe to update connected status */
+	igt_output_set_pipe(output, PIPE_NONE);
+
 	for_each_pipe(display, pipe) {
 		if (!igt_pipe_connector_valid(pipe, output))
 			continue;
@@ -615,6 +618,8 @@ static void test_display_one_mode(data_t *data, struct chamelium_port *port,
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
+	igt_require(igt_plane_has_format_mod(primary, fourcc, LOCAL_DRM_FORMAT_MOD_NONE));
+
 	mode = &connector->modes[0];
 	if (check == CHAMELIUM_CHECK_ANALOG) {
 		bool bridge = check_analog_bridge(data, port);
@@ -643,6 +648,7 @@ static void test_display_all_modes(data_t *data, struct chamelium_port *port,
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
+	igt_require(igt_plane_has_format_mod(primary, fourcc, LOCAL_DRM_FORMAT_MOD_NONE));
 
 	if (check == CHAMELIUM_CHECK_ANALOG)
 		bridge = check_analog_bridge(data, port);
