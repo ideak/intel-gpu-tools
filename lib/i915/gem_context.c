@@ -80,10 +80,12 @@ int __gem_context_create(int fd, uint32_t *ctx_id)
        int err = 0;
 
        memset(&create, 0, sizeof(create));
-       if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &create) == 0)
+       if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &create) == 0) {
                *ctx_id = create.ctx_id;
-       else
-               err = -errno;
+       } else {
+	       err = -errno;
+	       igt_assume(err != 0);
+       }
 
        errno = 0;
        return err;
