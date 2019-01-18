@@ -484,6 +484,7 @@ test_available_modes(data_t* data)
 		igt_pipe_crc_stop(data->pipe_crc);
 		igt_pipe_crc_free(data->pipe_crc);
 		igt_display_commit2(&data->display, data->commit);
+		igt_output_set_pipe(output, PIPE_NONE);
 	}
 	igt_assert(invalids == 0);
 }
