@@ -547,10 +547,12 @@ int __gem_create(int fd, uint64_t size, uint32_t *handle)
 	};
 	int err = 0;
 
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CREATE, &create) == 0)
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CREATE, &create) == 0) {
 		*handle = create.handle;
-	else
+	} else {
 		err = -errno;
+		igt_assume(err != 0);
+	}
 
 	errno = 0;
 	return err;
@@ -586,8 +588,10 @@ uint32_t gem_create(int fd, uint64_t size)
 int __gem_execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 {
 	int err = 0;
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf))
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf)) {
 		err = -errno;
+		igt_assume(err != 0);
+	}
 	errno = 0;
 	return err;
 }
@@ -616,8 +620,10 @@ void gem_execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 int __gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 {
 	int err = 0;
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf))
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf)) {
 		err = -errno;
+		igt_assume(err != 0);
+	}
 	errno = 0;
 	return err;
 }
