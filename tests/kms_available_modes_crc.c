@@ -197,17 +197,18 @@ static bool fill_in_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 		writesize = data->size;
 		break;
 	case BYTES_PP_1:
-		memset((void*)data->buf, fillers[i].value, data->size);
+		memset((void *)data->buf, fillers[i].value, data->size);
 		writesize = data->size;
 		break;
 	case NV12:
-		memset((void*)data->buf, fillers[i].value&0xff,
-		       data->size);
+		memset((void *)data->buf, fillers[i].value&0xff,
+		       data->fb.offsets[1]);
 
-		memset((void*)(data->buf+data->size),
-		       (fillers[i].value>>8)&0xff, data->size/2);
+		memset((void *)(data->buf+data->fb.offsets[1]),
+		       (fillers[i].value>>8)&0xff,
+		       data->size - data->fb.offsets[1]);
 
-		writesize = data->size+data->size/2;
+		writesize = data->size;
 		break;
 	case P010:
 		ptemp_16_buf = (unsigned short*)data->buf;
@@ -302,6 +303,10 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 		data->fb.offsets[1] = data->size;
 		data->fb.strides[1] = data->fb.strides[0];
 		gemsize = data->size * 2;
+
+		if (fillers[i].bpp == NV12)
+			data->size += data->fb.strides[1] * ALIGN(h/2, tile_height);
+
 		num_planes = 2;
 	}
 
