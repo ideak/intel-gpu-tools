@@ -544,6 +544,7 @@ igt_main
 
 		dir = igt_sysfs_open(fd, NULL);
 		igt_require(igt_sysfs_set(dir, "error", "Begone!"));
+		igt_require(igt_sysfs_get(dir, "error"));
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
