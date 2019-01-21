@@ -30,6 +30,7 @@
 #ifndef IGT_CORE_H
 #define IGT_CORE_H
 
+#include <assert.h>
 #include <setjmp.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -52,6 +53,30 @@
 #else
 #define STATIC_ANALYSIS_BUILD 0
 #endif
+#endif
+
+/**
+ * BUILD_BUG_ON_INVALID:
+ * @expr: Expression
+ *
+ * A macro that takes an expression and generates no code. Used for
+ * checking at build-time that an expression is valid code.
+ */
+#define BUILD_BUG_ON_INVALID(e) ((void)(sizeof((long)(e))))
+
+/**
+ * igt_assume:
+ * @expr: Condition to test
+ *
+ * An assert-like macro to be used for tautologies to give hints to
+ * static analysis of code. No-op if STATIC_ANALYSIS_BUILD is not
+ * defined, expands to an assert() if it is.
+ */
+#if STATIC_ANALYSIS_BUILD
+#define igt_assume(e) assert(e)
+#else
+/* Make sure the expression is still parsed even though it generates no code */
+#define igt_assume(e) BUILD_BUG_ON_INVALID(e)
 #endif
 
 extern const char* __igt_test_description __attribute__((weak));
