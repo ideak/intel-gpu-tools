@@ -81,7 +81,7 @@ int drm_fd, modes;
 int test_all_modes = 0, test_preferred_mode = 0, force_mode = 0, test_plane,
     test_stereo_modes;
 uint64_t tiling = LOCAL_DRM_FORMAT_MOD_NONE;
-int sleep_between_modes = 5;
+int sleep_between_modes = 0;
 int do_dpms = 0; /* This aliases to DPMS_ON */
 uint32_t depth = 24, stride, bpp;
 int qr_code = 0;
@@ -525,7 +525,7 @@ static void __attribute__((noreturn)) usage(char *name, char opt)
 	igt_info("usage: %s [-hiasdpmtf]\n", name);
 	igt_info("\t-i\tdump info\n");
 	igt_info("\t-a\ttest all modes\n");
-	igt_info("\t-s\t<duration>\tsleep between each mode test\n");
+	igt_info("\t-s\t<duration>\tsleep between each mode test (default: 0)\n");
 	igt_info("\t-d\t<depth>\tbit depth of scanout buffer\n");
 	igt_info("\t-p\t<planew,h>,<crtcx,y>,<crtcw,h> test overlay plane\n");
 	igt_info("\t-m\ttest the preferred mode\n");
