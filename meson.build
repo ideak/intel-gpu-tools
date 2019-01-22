@@ -149,7 +149,6 @@ endif
 build_info += 'With libunwind: ' + libunwindinfo
 
 libdw = dependency('libdw', required : true)
-ssl = dependency('openssl', required : true)
 pixman = dependency('pixman-1', required : true)
 
 valgrind = null_dep

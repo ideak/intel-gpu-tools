@@ -121,7 +121,6 @@ PKG_CHECK_MODULES(KMOD, [libkmod])
 PKG_CHECK_MODULES(PROCPS, [libprocps])
 PKG_CHECK_MODULES(LIBUNWIND, [libunwind])
 PKG_CHECK_MODULES(LIBDW, [libdw])
-PKG_CHECK_MODULES(SSL, [openssl])
 PKG_CHECK_MODULES(VALGRIND, [valgrind], [have_valgrind=yes], [have_valgrind=no])
 
 if test x$have_valgrind = xyes; then

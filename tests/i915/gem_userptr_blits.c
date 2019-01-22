@@ -47,7 +47,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/mman.h>
-#include <openssl/sha.h>
+#include <glib.h>
 #include <signal.h>
 #include <pthread.h>
 #include <time.h>
@@ -1069,7 +1069,6 @@ static void store_dword_rand(int i915, unsigned int engine,
 
 static void test_readonly(int i915)
 {
-	unsigned char orig[SHA_DIGEST_LENGTH];
 	uint64_t aperture_size;
 	uint32_t whandle, rhandle;
 	size_t sz, total;
@@ -1140,39 +1139,47 @@ static void test_readonly(int i915)
 	/* Now enforce read-only henceforth */
 	igt_assert(mprotect(space, total, PROT_READ) == 0);
 
-	SHA1(pages, sz, orig);
 	igt_fork(child, 1) {
 		unsigned int engine;
+		char *orig;
+
+		orig = g_compute_checksum_for_data(G_CHECKSUM_SHA1, pages, sz);
 
 		gem_userptr(i915, space, total, true, userptr_flags, &rhandle);
 
 		for_each_engine(i915, engine) {
-			unsigned char ref[SHA_DIGEST_LENGTH];
-			unsigned char result[SHA_DIGEST_LENGTH];
+			char *ref, *result;
 
 			/* First tweak the backing store through the write */
 			store_dword_rand(i915, engine, whandle, sz, 1024);
 			gem_sync(i915, whandle);
-			SHA1(pages, sz, ref);
+			ref = g_compute_checksum_for_data(G_CHECKSUM_SHA1,
+							  pages, sz);
 
 			/* Check some writes did land */
-			igt_assert(memcmp(ref, orig, sizeof(ref)));
-			memcpy(orig, ref, sizeof(orig));
+			igt_assert(strcmp(ref, orig));
 
 			/* Now try the same through the read-only handle */
 			store_dword_rand(i915, engine, rhandle, total, 1024);
 			gem_sync(i915, rhandle);
-			SHA1(pages, sz, result);
+			result = g_compute_checksum_for_data(G_CHECKSUM_SHA1,
+							     pages, sz);
 
 			/*
 			 * As the writes into the read-only GPU bo should fail,
 			 * the SHA1 hash of the backing store should be
 			 * unaffected.
 			 */
-			igt_assert(memcmp(ref, result, SHA_DIGEST_LENGTH) == 0);
+			igt_assert(strcmp(ref, result) == 0);
+
+			g_free(result);
+			g_free(orig);
+			orig = ref;
 		}
 
 		gem_close(i915, rhandle);
+
+		g_free(orig);
 	}
 	igt_waitchildren();
 
@@ -1189,8 +1196,7 @@ static void sigjmp_handler(int sig)
 
 static void test_readonly_mmap(int i915)
 {
-	unsigned char original[SHA_DIGEST_LENGTH];
-	unsigned char result[SHA_DIGEST_LENGTH];
+	char *original, *result;
 	uint32_t handle;
 	uint32_t sz;
 	void *pages;
@@ -1216,7 +1222,7 @@ static void test_readonly_mmap(int i915)
 
 	memset(pages, 0xa5, sz);
 	igt_clflush_range(pages, sz);
-	SHA1(pages, sz, original);
+	original = g_compute_checksum_for_data(G_CHECKSUM_SHA1, pages, sz);
 
 	ptr = __gem_mmap__gtt(i915, handle, sz, PROT_WRITE);
 	igt_assert(ptr == NULL);
@@ -1249,16 +1255,18 @@ static void test_readonly_mmap(int i915)
 
 	/* Double check that the kernel did indeed not let any writes through */
 	igt_clflush_range(pages, sz);
-	SHA1(pages, sz, result);
-	igt_assert(!memcmp(original, result, sizeof(original)));
+	result = g_compute_checksum_for_data(G_CHECKSUM_SHA1, pages, sz);
+	igt_assert(!strcmp(original, result));
+
+	g_free(original);
+	g_free(result);
 
 	munmap(pages, sz);
 }
 
 static void test_readonly_pwrite(int i915)
 {
-	unsigned char original[SHA_DIGEST_LENGTH];
-	unsigned char result[SHA_DIGEST_LENGTH];
+	char *original, *result;
 	uint32_t handle;
 	uint32_t sz;
 	void *pages;
@@ -1277,7 +1285,7 @@ static void test_readonly_pwrite(int i915)
 
 	igt_require(__gem_userptr(i915, pages, sz, true, userptr_flags, &handle) == 0);
 	memset(pages, 0xa5, sz);
-	SHA1(pages, sz, original);
+	original = g_compute_checksum_for_data(G_CHECKSUM_SHA1, pages, sz);
 
 	for (int page = 0; page < 16; page++) {
 		char data[4096];
@@ -1288,8 +1296,11 @@ static void test_readonly_pwrite(int i915)
 
 	gem_close(i915, handle);
 
-	SHA1(pages, sz, result);
-	igt_assert(!memcmp(original, result, sizeof(original)));
+	result = g_compute_checksum_for_data(G_CHECKSUM_SHA1, pages, sz);
+	igt_assert(!strcmp(original, result));
+
+	g_free(original);
+	g_free(result);
 
 	munmap(pages, sz);
 }

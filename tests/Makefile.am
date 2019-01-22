@@ -133,8 +133,8 @@ gem_tiled_swapping_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_tiled_swapping_LDADD = $(LDADD) -lpthread
 prime_self_import_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 prime_self_import_LDADD = $(LDADD) -lpthread
-gem_userptr_blits_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS) $(SSL_CFLAGS)
-gem_userptr_blits_LDADD = $(LDADD) $(SSL_LIBS) -lpthread
+gem_userptr_blits_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
+gem_userptr_blits_LDADD = $(LDADD) -lpthread
 perf_pmu_LDADD = $(LDADD) $(top_builddir)/lib/libigt_perf.la
 
 gem_eio_LDADD = $(LDADD) -lrt

@@ -67,7 +67,6 @@ lib_deps = [
 	pixman,
 	pthreads,
 	realtime,
-	ssl,
 	zlib
 ]
 
