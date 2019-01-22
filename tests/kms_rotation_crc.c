@@ -486,10 +486,31 @@ static bool get_multiplane_crc(data_t *data, igt_output_t *output,
 static void pointlocation(data_t *data, planeinfos *p, drmModeModeInfo *mode,
 			  int c)
 {
-	p[c].x1 = (int32_t)(data->planepos[c].x * mode->hdisplay)
-			+ ((data->planepos[c].origo & p_right) ? mode->hdisplay : 0);
-	p[c].y1 = (int32_t)(data->planepos[c].y * mode->vdisplay)
-			+ ((data->planepos[c].origo & p_bottom) ? mode->vdisplay : 0);
+	if (data->planepos[c].origo & p_right) {
+		p[c].x1 = (int32_t)(data->planepos[c].x * mode->hdisplay
+				+ mode->hdisplay);
+		p[c].x1 &= ~3;
+		/*
+		 * At this point is handled surface on right side. If display
+		 * mode is not divisible by 4 but with 2 point location is
+		 * fixed to match requirements. Because of YUV planes here is
+		 * intentionally ignored bit 1.
+		 */
+		p[c].x1 -= mode->hdisplay & 2;
+	} else {
+		p[c].x1 = (int32_t)(data->planepos[c].x * mode->hdisplay);
+		p[c].x1 &= ~3;
+	}
+
+	if (data->planepos[c].origo & p_bottom) {
+		p[c].y1 = (int32_t)(data->planepos[c].y * mode->vdisplay
+				+ mode->vdisplay);
+		p[c].y1 &= ~3;
+		p[c].y1 -= mode->vdisplay & 2;
+	} else {
+		p[c].y1 = (int32_t)(data->planepos[c].y * mode->vdisplay);
+		p[c].y1 &= ~3;
+	}
 }
 
 /*
