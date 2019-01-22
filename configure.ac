@@ -353,5 +353,7 @@ echo "       Test runner        : ${BUILD_RUNNER}"
 echo ""
 echo " • Fail on warnings       : ${enable_werror}"
 echo ""
+echo " WARNING: automake is deprecated, please use meson"
+echo ""
 
 # vim: set ft=config ts=8 sw=8 tw=0 noet :
