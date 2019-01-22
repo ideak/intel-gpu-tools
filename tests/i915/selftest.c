@@ -28,10 +28,16 @@ IGT_TEST_DESCRIPTION("Basic unit tests for i915.ko");
 
 igt_main
 {
-	igt_kselftests("i915",
-		       "mock_selftests=-1 disable_display=1",
-		       NULL, "mock");
-	igt_kselftests("i915",
-		       "live_selftests=-1 disable_display=1",
-		       "live_selftests", "live");
+	const char *env = getenv("SELFTESTS") ?: "";
+	char opts[1024];
+
+	igt_assert(snprintf(opts, sizeof(opts),
+			    "mock_selftests=-1 disable_display=1 st_filter=%s",
+			    env) < sizeof(opts));
+	igt_kselftests("i915", opts, NULL, "mock");
+
+	igt_assert(snprintf(opts, sizeof(opts),
+			    "live_selftests=-1 disable_display=1 st_filter=%s",
+			    env) < sizeof(opts));
+	igt_kselftests("i915", opts, "live_selftests", "live");
 }
