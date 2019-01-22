@@ -1080,14 +1080,14 @@ void igt_lock_mem(size_t size)
 
 	locked_mem = malloc(locked_size);
 	igt_require_f(locked_mem,
-		      "Could not allocate enough memory to lock.\n");
+		      "Could not malloc %zdMiB for locking.\n", size);
 
 	/* write into each page to ensure it is allocated */
 	for (i = 0; i < locked_size; i += pagesize)
 		locked_mem[i] = i;
 
 	ret = mlock(locked_mem, locked_size);
-	igt_assert_f(ret == 0, "Could not lock memory into RAM.\n");
+	igt_assert_f(ret == 0, "Could not mlock %zdMiB.\n", size);
 }
 
 /**
