@@ -33,7 +33,3 @@ intel_gpu_top_LDADD = $(top_builddir)/lib/libigt_perf.la
 
 bin_SCRIPTS = intel_aubdump
 CLEANFILES = $(bin_SCRIPTS)
-
-EXTRA_DIST = \
-	meson.build \
-	$(NULL)

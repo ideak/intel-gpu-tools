@@ -301,8 +301,6 @@ AC_SUBST(REGISTER_FILES)
 AC_CONFIG_FILES([
 		 Makefile
 		 benchmarks/Makefile
-		 benchmarks/ezbench.d/Makefile
-		 benchmarks/wsim/Makefile
 		 lib/Makefile
 		 lib/tests/Makefile
 		 scripts/Makefile
@@ -312,7 +310,6 @@ AC_CONFIG_FILES([
 		 tools/null_state_gen/Makefile
 		 tools/registers/Makefile
 		 include/Makefile
-		 include/drm-uapi/Makefile
 		 overlay/Makefile
 		 ])
 

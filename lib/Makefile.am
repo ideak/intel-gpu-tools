@@ -94,9 +94,3 @@ libintel_tools_la_LIBADD = \
 	$(PIXMAN_LIBS) \
 	$(GLIB_LIBS) \
 	-lm
-
-EXTRA_DIST = \
-	dummy.c \
-	meson.build \
-	version.h.in \
-	$(NULL)

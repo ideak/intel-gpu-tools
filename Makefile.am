@@ -21,7 +21,7 @@
 
 ACLOCAL_AMFLAGS = ${ACLOCAL_FLAGS} -I m4
 
-SUBDIRS = lib tools scripts benchmarks include
+SUBDIRS = lib tools scripts benchmarks
 
 if BUILD_TESTS
 SUBDIRS += tests
@@ -42,8 +42,3 @@ ChangeLog:
 	$(CHANGELOG_CMD)
 
 dist-hook: ChangeLog INSTALL
-
-EXTRA_DIST = \
-	meson.build \
-	meson.sh \
-	$(NULL)
