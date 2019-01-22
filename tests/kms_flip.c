@@ -1567,6 +1567,7 @@ int main(int argc, char **argv)
 		{ 10, TEST_DPMS_OFF | TEST_DPMS | TEST_VBLANK_RACE, "dpms-vs-vblank-race" },
 		{ 10, TEST_MODESET | TEST_VBLANK_RACE, "modeset-vs-vblank-race" },
 		{ 0, TEST_BO_TOOBIG | TEST_NO_2X_OUTPUT, "bo-too-big" },
+		{ 10, TEST_FLIP | TEST_SUSPEND, "flip-vs-suspend" },
 	};
 	int i;
 
