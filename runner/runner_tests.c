@@ -745,6 +745,76 @@ igt_main
 	igt_subtest_group {
 		char dirname[] = "tmpdirXXXXXX";
 		struct job_list list;
+		int dirfd = -1, subdirfd = -1, fd = -1;
+
+		igt_fixture {
+			init_job_list(&list);
+			igt_require(mkdtemp(dirname) != NULL);
+			rmdir(dirname);
+		}
+
+		igt_subtest("dry-run-option") {
+			struct execute_state state;
+			const char *argv[] = { "runner",
+					       "--dry-run",
+					       testdatadir,
+					       dirname,
+			};
+
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+			igt_assert(create_job_list(&list, &settings));
+
+			igt_assert(initialize_execute_state(&state, &settings, &list));
+			igt_assert_eq(state.next, 0);
+			igt_assert(state.dry);
+			igt_assert_eq(list.size, 5);
+
+			igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
+				     "Dry run initialization didn't create the results directory.\n");
+
+			/* Execute from just initialize_execute_state should fail */
+			igt_assert(!execute(&state, &settings, &list));
+			igt_assert(openat(dirfd, "0", O_DIRECTORY | O_RDONLY) < 0);
+			igt_assert_f((fd = openat(dirfd, "metadata.txt", O_RDONLY)) >= 0,
+				     "Dry run initialization didn't serialize settings.\n");
+			close(fd);
+			igt_assert_f((fd = openat(dirfd, "joblist.txt", O_RDONLY)) >= 0,
+				     "Dry run initialization didn't serialize the job list.\n");
+			close(fd);
+			igt_assert_f((fd = openat(dirfd, "uname.txt", O_RDONLY)) < 0,
+				     "Dry run initialization created uname.txt.\n");
+
+			igt_assert(initialize_execute_state_from_resume(dirfd, &state, &settings, &list));
+			igt_assert_eq(state.next, 0);
+			igt_assert(!state.dry);
+			igt_assert_eq(list.size, 5);
+			/* initialize_execute_state_from_resume() closes the dirfd */
+			igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
+				     "Dry run resume somehow deleted the results directory.\n");
+
+			/* Execute from resume should work */
+			igt_assert(execute(&state, &settings, &list));
+			igt_assert_f((fd = openat(dirfd, "uname.txt", O_RDONLY)) >= 0,
+				     "Dry run resume didn't create uname.txt.\n");
+			close(fd);
+			igt_assert_f((subdirfd = openat(dirfd, "0", O_DIRECTORY | O_RDONLY)) >= 0,
+				     "Dry run resume didn't create result directory.\n");
+			igt_assert_f((fd = openat(subdirfd, "journal.txt", O_RDONLY)) >= 0,
+				     "Dry run resume didn't create a journal.\n");
+		}
+
+		igt_fixture {
+			close(fd);
+			close(dirfd);
+			close(subdirfd);
+			clear_directory(dirname);
+			free_job_list(&list);
+		}
+	}
+
+	igt_subtest_group {
+		char dirname[] = "tmpdirXXXXXX";
+		struct job_list list;
 		int dirfd = -1, fd = -1;
 
 		igt_fixture {

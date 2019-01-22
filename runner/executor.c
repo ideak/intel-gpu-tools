@@ -1153,6 +1153,8 @@ bool initialize_execute_state(struct execute_state *state,
 
 	init_time_left(state, settings);
 
+	state->dry = settings->dry_run;
+
 	return true;
 }
 
@@ -1203,6 +1205,11 @@ bool execute(struct execute_state *state,
 	int resdirfd, testdirfd, unamefd, timefd;
 	double time_spent = 0.0;
 	bool status = true;
+
+	if (state->dry) {
+		printf("Dry run, not executing. Invoke igt_resume if you want to execute.\n");
+		return false;
+	}
 
 	if ((resdirfd = open(settings->results_path, O_DIRECTORY | O_RDONLY)) < 0) {
 		/* Initialize state should have done this */

@@ -14,6 +14,7 @@ struct execute_state
 	 */
 	double time_left;
 	double resuming;
+	bool dry;
 };
 
 enum {
