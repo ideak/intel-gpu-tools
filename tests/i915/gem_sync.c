@@ -651,7 +651,7 @@ switch_ring(int fd, unsigned ring, int num_children, int timeout)
 			struct drm_i915_gem_relocation_entry reloc[1024];
 			struct drm_i915_gem_execbuffer2 execbuf;
 		} contexts[2];
-		double start, elapsed;
+		double elapsed, baseline;
 		unsigned long cycles;
 
 		for (int i = 0; i < ARRAY_SIZE(contexts); i++) {
@@ -679,7 +679,7 @@ switch_ring(int fd, unsigned ring, int num_children, int timeout)
 			c->object[1].handle = gem_create(fd, sz);
 
 			c->object[1].relocs_ptr = to_user_pointer(c->reloc);
-			c->object[1].relocation_count = 1024;
+			c->object[1].relocation_count = 1024 * i;
 
 			batch = gem_mmap__cpu(fd, c->object[1].handle, 0, sz,
 					PROT_WRITE | PROT_READ);
@@ -688,7 +688,7 @@ switch_ring(int fd, unsigned ring, int num_children, int timeout)
 
 			memset(c->reloc, 0, sizeof(c->reloc));
 			b = batch;
-			for (int r = 0; r < 1024; r++) {
+			for (int r = 0; r < c->object[1].relocation_count; r++) {
 				uint64_t offset;
 
 				c->reloc[r].presumed_offset = c->object[0].offset;
@@ -722,26 +722,44 @@ switch_ring(int fd, unsigned ring, int num_children, int timeout)
 		}
 
 		cycles = 0;
-		elapsed = 0;
-		start = gettime();
-		do {
+		baseline = 0;
+		igt_until_timeout(timeout) {
 			do {
 				double this;
 
-				gem_execbuf(fd, &contexts[0].execbuf);
 				gem_execbuf(fd, &contexts[1].execbuf);
+				gem_execbuf(fd, &contexts[0].execbuf);
 
 				this = gettime();
 				gem_sync(fd, contexts[1].object[1].handle);
+				gem_sync(fd, contexts[0].object[1].handle);
+				baseline += gettime() - this;
+			} while (++cycles & 1023);
+		}
+		baseline /= cycles;
+
+		cycles = 0;
+		elapsed = 0;
+		igt_until_timeout(timeout) {
+			do {
+				double this;
+
+				gem_execbuf(fd, &contexts[1].execbuf);
+				gem_execbuf(fd, &contexts[0].execbuf);
+
+				this = gettime();
+				gem_sync(fd, contexts[0].object[1].handle);
 				elapsed += gettime() - this;
 
-				gem_sync(fd, contexts[0].object[1].handle);
+				gem_sync(fd, contexts[1].object[1].handle);
 			} while (++cycles & 1023);
-		} while ((gettime() - start) < timeout);
-		igt_info("%s%sompleted %ld cycles: %.3f us\n",
+		}
+		elapsed /= cycles;
+
+		igt_info("%s%sompleted %ld cycles: %.3f us, baseline %.3f us\n",
 			 names[child % num_engines] ?: "",
 			 names[child % num_engines] ? " c" : "C",
-			 cycles, elapsed*1e6/cycles);
+			 cycles, elapsed*1e6, baseline*1e6);
 
 		for (int i = 0; i < ARRAY_SIZE(contexts); i++) {
 			gem_close(fd, contexts[i].object[1].handle);
