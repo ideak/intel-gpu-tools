@@ -21,7 +21,7 @@
 
 ACLOCAL_AMFLAGS = ${ACLOCAL_FLAGS} -I m4
 
-SUBDIRS = lib man tools scripts benchmarks include
+SUBDIRS = lib tools scripts benchmarks include
 
 if BUILD_TESTS
 SUBDIRS += tests

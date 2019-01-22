@@ -43,10 +43,6 @@ AC_PROG_CC
 AC_PROG_LEX
 AC_PROG_YACC
 
-# check for rst2man for generating man pages
-AC_CHECK_PROG(RST2MAN, rst2man, yes, no)
-AM_CONDITIONAL(HAVE_RST2MAN, [test "x$RST2MAN" = xyes])
-
 # Checks for functions, headers, structures, etc.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([termios.h linux/kd.h sys/kd.h libgen.h sys/io.h])
@@ -391,7 +387,6 @@ AC_CONFIG_FILES([
 		 benchmarks/wsim/Makefile
 		 lib/Makefile
 		 lib/tests/Makefile
-		 man/Makefile
 		 scripts/Makefile
 		 tests/Makefile
 		 tests/intel-ci/Makefile
