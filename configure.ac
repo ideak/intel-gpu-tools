@@ -101,16 +101,6 @@ m4_ifndef([XORG_MACROS_VERSION],
 XORG_MACROS_VERSION(1.16)
 XORG_DEFAULT_OPTIONS
 
-# warning flags for the assembler. We can't quite use CWARNFLAGS for it yet as
-# it generates waaaay too many warnings.
-ASSEMBLER_WARN_CFLAGS=""
-if test "x$GCC" = "xyes"; then
-	ASSEMBLER_WARN_CFLAGS="-Wall -Wstrict-prototypes \
-	-Wmissing-prototypes -Wmissing-declarations \
-	-Wnested-externs -fno-strict-aliasing"
-fi
-AC_SUBST(ASSEMBLER_WARN_CFLAGS)
-
 PKG_CHECK_MODULES(DRM, [libdrm >= 2.4.82])
 PKG_CHECK_MODULES(PCIACCESS, [pciaccess >= 0.10])
 PKG_CHECK_MODULES(KMOD, [libkmod])
@@ -132,28 +122,7 @@ case "$target_cpu" in
 		;;
 esac
 
-if test x"$build_x86" = xyes; then
-	PKG_CHECK_MODULES(OVERLAY_XVLIB, [xv x11 xext dri2proto >= 2.6], enable_overlay_xvlib=yes, enable_overlay_xvlib=no)
-	PKG_CHECK_MODULES(OVERLAY_XLIB, [cairo-xlib dri2proto >= 2.6], enable_overlay_xlib=yes, enable_overlay_xlib=no)
-	AS_IF([test x"$LEX" != "x:" -a x"$YACC" != xyacc],
-		[enable_assembler=yes],
-		[enable_assembler=no])
-
-	AC_CHECK_TOOL([LEG], [leg])
-	if test x"$LEG" != xleg; then
-		enable_overlay_xvlib="no"
-		enable_overlay_xlib="no"
-		AC_MSG_NOTICE([Failed to find leg, required for overlay, try : apt-get install peg])
-	fi
-else
-	enable_overlay_xvlib="no"
-	enable_overlay_xlib="no"
-	enable_assembler="no"
-	BUILD_SHADER_DEBUGGER="no"
-fi
 AM_CONDITIONAL(BUILD_X86, [test "x$build_x86" = xyes])
-
-AM_CONDITIONAL(BUILD_ASSEMBLER, [test "x$enable_assembler" = xyes])
 
 AM_CONDITIONAL(BUILD_OVERLAY_XVLIB, [test "x$enable_overlay_xvlib" = xyes])
 AM_CONDITIONAL(BUILD_OVERLAY_XLIB, [test "x$enable_overlay_xlib" = xyes])
@@ -277,45 +246,6 @@ if test "x$VC4" = xyes; then
 fi
 AM_CONDITIONAL(BUILD_VC4, [test "x$VC4" = xyes])
 
-# Define a configure option for the shader debugger
-AC_ARG_ENABLE(shader-debugger, AS_HELP_STRING([--enable-shader-debugger],
-	      [Enable shader debugging support [autodetected]]),
-	      [BUILD_SHADER_DEBUGGER="$enableval"], [BUILD_SHADER_DEBUGGER=no])
-
-# Shader debugger depends on python3, intel-genasm and objcopy
-if test "x$BUILD_SHADER_DEBUGGER" != xno; then
-	# Check that the assembler is built
-	if test "x$enable_assembler" = xno; then
-		BUILD_SHADER_DEBUGGER=no
-		if test "x$BUILD_SHADER_DEBUGGER" = xyes; then
-			AC_MSG_ERROR([Shader debugger requested, but assembler not enabled.])
-		fi
-	fi
-
-	# Check Python 3 is installed
-	if test "$PYTHON" = ":" ; then
-		if test "x$BUILD_SHADER_DEBUGGER" = xyes; then
-			AC_MSG_ERROR([Shader debugger requested, python version 3 not found.])
-		else
-			BUILD_SHADER_DEBUGGER=no
-		fi
-	fi
-
-	# Check for the objcopy GNU binary utiliy command
-	AC_PATH_PROGS([OBJCOPY], objcopy)
-	if test -z "$OBJCOPY" ; then
-		if test "x$BUILD_SHADER_DEBUGGER" = xyes; then
-			AC_MSG_ERROR([Shader debugger requested, but objcopy command not found.])
-		else
-			BUILD_SHADER_DEBUGGER=no
-		fi
-	fi
-fi
-
-AM_CONDITIONAL(BUILD_SHADER_DEBUGGER, [test "x$BUILD_SHADER_DEBUGGER" != xno])
-AS_IF([test "x$BUILD_SHADER_DEBUGGER" != xno],
-      [enable_debugger=yes], [enable_debugger=no])
-
 # enable debug symbols
 AC_ARG_ENABLE(debug,
 	      AS_HELP_STRING([--disable-debug],
@@ -395,12 +325,6 @@ AC_CONFIG_FILES([
 		 tools/registers/Makefile
 		 include/Makefile
 		 include/drm-uapi/Makefile
-		 debugger/Makefile
-		 debugger/system_routine/Makefile
-		 assembler/Makefile
-		 assembler/doc/Makefile
-		 assembler/test/Makefile
-		 assembler/intel-gen4asm.pc
 		 overlay/Makefile
 		 runner/Makefile
 		 runner/testdata/Makefile
@@ -423,8 +347,6 @@ echo "       Compile prime tests: ${NOUVEAU}"
 echo "       Debug flags        : ${DEBUG_CFLAGS}"
 echo ""
 echo " • Tools:"
-echo "       Assembler          : ${enable_assembler}"
-echo "       Debugger           : ${enable_debugger}"
 echo "       Overlay            : X: ${enable_overlay_xlib}, Xv: ${enable_overlay_xvlib}"
 echo "       x86-specific tools : ${build_x86}"
 echo "       Test runner        : ${BUILD_RUNNER}"

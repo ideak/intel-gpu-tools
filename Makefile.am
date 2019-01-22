@@ -32,14 +32,6 @@ SUBDIRS += runner
 endif
 
 if BUILD_X86
-if BUILD_ASSEMBLER
-SUBDIRS += assembler
-endif
-
-if BUILD_SHADER_DEBUGGER
-SUBDIRS += debugger
-endif
-
 SUBDIRS += overlay benchmarks
 endif
 
