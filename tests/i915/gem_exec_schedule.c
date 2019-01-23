@@ -48,6 +48,10 @@
 
 #define MAX_CONTEXTS 1024
 
+#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
+#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
+#define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+
 IGT_TEST_DESCRIPTION("Check that we can control the order of execution");
 
 static inline
@@ -318,6 +322,86 @@ static void smoketest(int fd, unsigned ring, unsigned timeout)
 		 */
 		igt_info("Child[%d] completed %u cycles\n",  n, result[(2 * n) + 1]);
 	}
+}
+
+static uint32_t __batch_create(int i915, uint32_t offset)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
+
+	handle = gem_create(i915, ALIGN(offset + 4, 4096));
+	gem_write(i915, handle, offset, &bbe, sizeof(bbe));
+
+	return handle;
+}
+
+static uint32_t batch_create(int i915)
+{
+	return __batch_create(i915, 0);
+}
+
+static void semaphore_userlock(int i915)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = batch_create(i915),
+	};
+	igt_spin_t *spin = NULL;
+	unsigned int engine;
+	uint32_t scratch;
+
+	igt_require(gem_scheduler_has_semaphores(i915));
+
+	/*
+	 * Given the use of semaphores to govern parallel submission
+	 * of nearly-ready work to HW, we still want to run actually
+	 * ready work immediately. Without semaphores, the dependent
+	 * work wouldn't be submitted so our ready work will run.
+	 */
+
+	scratch = gem_create(i915, 4096);
+	for_each_physical_engine(i915, engine) {
+		if (!spin) {
+			spin = igt_spin_batch_new(i915,
+						  .dependency = scratch,
+						  .engine = engine);
+		} else {
+			uint64_t saved = spin->execbuf.flags;
+
+			spin->execbuf.flags &= ~ENGINE_MASK;
+			spin->execbuf.flags |= engine;
+
+			gem_execbuf(i915, &spin->execbuf);
+
+			spin->execbuf.flags = saved;
+		}
+	}
+	igt_require(spin);
+	gem_close(i915, scratch);
+
+	/*
+	 * On all dependent engines, the request may be executing (busywaiting
+	 * on a HW semaphore) but it should not prevent any real work from
+	 * taking precedence.
+	 */
+	scratch = gem_context_create(i915);
+	for_each_physical_engine(i915, engine) {
+		struct drm_i915_gem_execbuffer2 execbuf = {
+			.buffers_ptr = to_user_pointer(&obj),
+			.buffer_count = 1,
+			.flags = engine,
+			.rsvd1 = scratch,
+		};
+
+		if (engine == (spin->execbuf.flags & ENGINE_MASK))
+			continue;
+
+		gem_execbuf(i915, &execbuf);
+	}
+	gem_context_destroy(i915, scratch);
+	gem_sync(i915, obj.handle); /* to hang unless we can preempt */
+	gem_close(i915, obj.handle);
+
+	igt_spin_batch_free(i915, spin);
 }
 
 static void reorder(int fd, unsigned ring, unsigned flags)
@@ -1306,6 +1390,9 @@ igt_main
 			igt_require(gem_scheduler_enabled(fd));
 			igt_require(gem_scheduler_has_ctx_priority(fd));
 		}
+
+		igt_subtest("semaphore-user")
+			semaphore_userlock(fd);
 
 		igt_subtest("smoketest-all")
 			smoketest(fd, ALL_ENGINES, 30);
