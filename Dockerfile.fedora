@@ -15,7 +15,6 @@ RUN dnf install -y gcc \
 		pixman-devel \
 		json-c-devel \
 		libdrm-devel \
-		openssl-devel \
 		libudev-devel \
 		xmlrpc-c-devel \
 		elfutils-devel \
