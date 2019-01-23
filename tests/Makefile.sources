@@ -4,23 +4,6 @@ NOUVEAU_TESTS = \
 	prime_nv_test \
 	$(NULL)
 
-VC4_TESTS = \
-	vc4_create_bo \
-	vc4_dmabuf_poll \
-	vc4_lookup_fail \
-	vc4_label_bo \
-	vc4_purgeable_bo \
-	vc4_tiling \
-	vc4_wait_bo \
-	vc4_wait_seqno \
-	$(NULL)
-
-V3D_TESTS = \
-	v3d_get_bo_offset \
-	v3d_get_param \
-	v3d_mmap \
-	$(NULL)
-
 AMDGPU_TESTS = \
 	amdgpu/amd_basic \
 	amdgpu/amd_cs_nop \

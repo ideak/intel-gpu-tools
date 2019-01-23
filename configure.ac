@@ -238,14 +238,6 @@ if test "x$NOUVEAU" = xyes; then
 fi
 AM_CONDITIONAL(HAVE_LIBDRM_NOUVEAU, [test "x$NOUVEAU" = xyes])
 
-AC_ARG_ENABLE(vc4, AS_HELP_STRING([--disable-vc4],
-	      [Enable building of vc4 tests (default: yes)]),
-	      [VC4=$enableval], [VC4=yes])
-if test "x$VC4" = xyes; then
-	AC_DEFINE(BUILD_VC4, 1, [Have vc4 support])
-fi
-AM_CONDITIONAL(BUILD_VC4, [test "x$VC4" = xyes])
-
 # enable debug symbols
 AC_ARG_ENABLE(debug,
 	      AS_HELP_STRING([--disable-debug],
@@ -309,7 +301,6 @@ AC_CONFIG_FILES([
 		 tools/Makefile
 		 tools/null_state_gen/Makefile
 		 tools/registers/Makefile
-		 include/Makefile
 		 overlay/Makefile
 		 ])
 
