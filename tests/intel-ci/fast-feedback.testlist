@@ -43,8 +43,6 @@ igt@gem_exec_fence@basic-wait-default
 igt@gem_exec_fence@basic-await-default
 igt@gem_exec_fence@nb-await-default
 igt@gem_exec_gttfill@basic
-igt@gem_exec_nop@basic-parallel
-igt@gem_exec_nop@basic-series
 igt@gem_exec_parallel@basic
 igt@gem_exec_parse@basic-allowed
 igt@gem_exec_parse@basic-rejected
