@@ -1,6 +1,5 @@
 test_progs = [
 	'core_auth',
-	'core_get_client_auth',
 	'core_getclient',
 	'core_getstats',
 	'core_getversion',

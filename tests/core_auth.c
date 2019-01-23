@@ -42,7 +42,43 @@
 #include <sys/resource.h>
 #include "drm.h"
 
+#ifdef __linux__
+# include <sys/syscall.h>
+#else
+# include <pthread.h>
+#endif
+
 IGT_TEST_DESCRIPTION("Call drmGetMagic() and drmAuthMagic() and see if it behaves.");
+
+static bool
+is_local_tid(pid_t tid)
+{
+#ifndef __linux__
+	return pthread_self() == tid;
+#else
+	/* On Linux systems, drmGetClient() would return the thread ID
+	   instead of the actual process ID */
+	return syscall(SYS_gettid) == tid;
+#endif
+}
+
+
+static bool check_auth(int fd)
+{
+	pid_t client_pid;
+	int i, auth, pid, uid;
+	unsigned long magic, iocs;
+	bool is_authenticated = false;
+
+	client_pid = getpid();
+	for (i = 0; !is_authenticated; i++) {
+		if (drmGetClient(fd, i, &auth, &pid, &uid, &magic, &iocs) != 0)
+			break;
+		is_authenticated = auth && (pid == client_pid || is_local_tid(pid));
+	}
+	return is_authenticated;
+}
+
 
 static int magic_cmp(const void *p1, const void *p2)
 {
@@ -158,13 +194,38 @@ igt_main
 {
 	int master;
 
-	igt_fixture
-		master = drm_open_driver_master(DRIVER_ANY);
+	/* root (which we run igt as) should always be authenticated */
+	igt_subtest("getclient-simple") {
+		int fd = drm_open_driver(DRIVER_ANY);
 
-	igt_subtest("basic-auth")
-		test_basic_auth(master);
+		igt_assert(check_auth(fd) == true);
 
-	/* this must be last, we adjust the rlimit */
-	igt_subtest("many-magics")
-		test_many_magics(master);
+		close(fd);
+	}
+
+	igt_subtest("getclient-master-drop") {
+		int fd = drm_open_driver(DRIVER_ANY);
+		int fd2 = drm_open_driver(DRIVER_ANY);
+
+		igt_assert(check_auth(fd2) == true);
+
+		close(fd);
+
+		igt_assert(check_auth(fd2) == true);
+
+		close(fd2);
+	}
+
+	/* above tests require that no drm fd is open */
+	igt_subtest_group {
+		igt_fixture
+			master = drm_open_driver_master(DRIVER_ANY);
+
+		igt_subtest("basic-auth")
+			test_basic_auth(master);
+
+		/* this must be last, we adjust the rlimit */
+		igt_subtest("many-magics")
+			test_many_magics(master);
+	}
 }
