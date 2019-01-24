@@ -2576,23 +2576,30 @@ unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
 					unsigned int dst_stride)
 {
 	struct fb_convert cvt = { };
+	struct igt_fb linear;
 	void *dst_ptr, *src_ptr;
+	uint64_t base_modifier;
 	int fb_id;
+
+	if (is_vc4_device(src->fd))
+		base_modifier = fourcc_mod_broadcom_mod(dst_modifier);
+	else
+		base_modifier = dst_modifier;
 
 	fb_id = igt_create_fb_with_bo_size(src->fd, src->width, src->height,
 					   dst_fourcc,
-					   LOCAL_DRM_FORMAT_MOD_NONE, dst, 0,
-					   dst_stride);
+					   LOCAL_DRM_FORMAT_MOD_NONE, &linear,
+					   0, dst_stride);
 	igt_assert(fb_id > 0);
 
 	src_ptr = igt_fb_map_buffer(src->fd, src);
 	igt_assert(src_ptr);
 
-	dst_ptr = igt_fb_map_buffer(dst->fd, dst);
+	dst_ptr = igt_fb_map_buffer(linear.fd, &linear);
 	igt_assert(dst_ptr);
 
 	cvt.dst.ptr = dst_ptr;
-	cvt.dst.fb = dst;
+	cvt.dst.fb = &linear;
 	cvt.src.ptr = src_ptr;
 	cvt.src.fb = src;
 	fb_convert(&cvt);
@@ -2600,7 +2607,26 @@ unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
 	igt_fb_unmap_buffer(dst, dst_ptr);
 	igt_fb_unmap_buffer(src, src_ptr);
 
-	igt_assert(dst_modifier == LOCAL_DRM_FORMAT_MOD_NONE);
+	switch (base_modifier) {
+	case DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED:
+		fb_id = igt_vc4_fb_t_tiled_convert(dst, &linear);
+		break;
+	case DRM_FORMAT_MOD_BROADCOM_SAND32:
+	case DRM_FORMAT_MOD_BROADCOM_SAND64:
+	case DRM_FORMAT_MOD_BROADCOM_SAND128:
+	case DRM_FORMAT_MOD_BROADCOM_SAND256:
+		fb_id = vc4_fb_sand_tiled_convert(dst, &linear, dst_modifier);
+		break;
+	default:
+		igt_assert(dst_modifier == LOCAL_DRM_FORMAT_MOD_NONE);
+	}
+
+	igt_assert(fb_id > 0);
+
+	if (dst_modifier == LOCAL_DRM_FORMAT_MOD_NONE)
+		*dst = linear;
+	else
+		igt_remove_fb(linear.fd, &linear);
 
 	return fb_id;
 }
