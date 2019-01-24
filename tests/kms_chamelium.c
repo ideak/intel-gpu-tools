@@ -546,7 +546,8 @@ static void do_test_display(data_t *data, struct chamelium_port *port,
 					 DRM_FORMAT_XRGB8888, 64, &fb);
 	igt_assert(fb_id > 0);
 
-	frame_id = igt_fb_convert(&frame_fb, &fb, fourcc);
+	frame_id = igt_fb_convert(&frame_fb, &fb, fourcc,
+				  LOCAL_DRM_FORMAT_MOD_NONE);
 	igt_assert(frame_id > 0);
 
 	if (check == CHAMELIUM_CHECK_CRC)

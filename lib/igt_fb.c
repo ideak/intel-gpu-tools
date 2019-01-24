@@ -2557,6 +2557,7 @@ void igt_remove_fb(int fd, struct igt_fb *fb)
  * @dst: pointer to the #igt_fb structure that will store the conversion result
  * @src: pointer to the #igt_fb structure that stores the frame we convert
  * @dst_fourcc: DRM format specifier to convert to
+ * @dst_modifier: DRM format modifier to convert to
  * @dst_stride: Stride for the resulting framebuffer (0 for automatic stride)
  *
  * This will convert a given @src content to the @dst_fourcc format,
@@ -2571,6 +2572,7 @@ void igt_remove_fb(int fd, struct igt_fb *fb)
  */
 unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
 					uint32_t dst_fourcc,
+					uint64_t dst_modifier,
 					unsigned int dst_stride)
 {
 	struct fb_convert cvt = { };
@@ -2579,8 +2581,8 @@ unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
 
 	fb_id = igt_create_fb_with_bo_size(src->fd, src->width, src->height,
 					   dst_fourcc,
-					   LOCAL_DRM_FORMAT_MOD_NONE,
-					   dst, 0, dst_stride);
+					   LOCAL_DRM_FORMAT_MOD_NONE, dst, 0,
+					   dst_stride);
 	igt_assert(fb_id > 0);
 
 	src_ptr = igt_fb_map_buffer(src->fd, src);
@@ -2598,6 +2600,8 @@ unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
 	igt_fb_unmap_buffer(dst, dst_ptr);
 	igt_fb_unmap_buffer(src, src_ptr);
 
+	igt_assert(dst_modifier == LOCAL_DRM_FORMAT_MOD_NONE);
+
 	return fb_id;
 }
 
@@ -2606,6 +2610,7 @@ unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
  * @dst: pointer to the #igt_fb structure that will store the conversion result
  * @src: pointer to the #igt_fb structure that stores the frame we convert
  * @dst_fourcc: DRM format specifier to convert to
+ * @dst_modifier: DRM format modifier to convert to
  *
  * This will convert a given @src content to the @dst_fourcc format,
  * storing the result in the @dst fb, allocating the @dst fb
@@ -2618,9 +2623,10 @@ unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
  * The kms id of the created framebuffer.
  */
 unsigned int igt_fb_convert(struct igt_fb *dst, struct igt_fb *src,
-			    uint32_t dst_fourcc)
+			    uint32_t dst_fourcc, uint64_t dst_modifier)
 {
-	return igt_fb_convert_with_stride(dst, src, dst_fourcc, 0);
+	return igt_fb_convert_with_stride(dst, src, dst_fourcc, dst_modifier,
+					  0);
 }
 
 /**
