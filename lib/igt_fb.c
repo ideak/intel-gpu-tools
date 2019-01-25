@@ -204,7 +204,11 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 {
 	switch (tiling) {
 	case LOCAL_DRM_FORMAT_MOD_NONE:
-		*width_ret = 64;
+		if (is_i915_device(fd))
+			*width_ret = 64;
+		else
+			*width_ret = 1;
+
 		*height_ret = 1;
 		break;
 	case LOCAL_I915_FORMAT_MOD_X_TILED:
