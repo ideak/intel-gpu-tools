@@ -71,85 +71,104 @@ static const struct format_desc_struct {
 	int depth;
 	int num_planes;
 	int plane_bpp[4];
+	uint8_t hsub;
+	uint8_t vsub;
 } format_desc[] = {
 	{ .name = "ARGB1555", .depth = -1, .drm_id = DRM_FORMAT_ARGB1555,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_a1r5g5b5,
 	  .num_planes = 1, .plane_bpp = { 16, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XRGB1555", .depth = -1, .drm_id = DRM_FORMAT_XRGB1555,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_x1r5g5b5,
 	  .num_planes = 1, .plane_bpp = { 16, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "RGB565", .depth = 16, .drm_id = DRM_FORMAT_RGB565,
 	  .cairo_id = CAIRO_FORMAT_RGB16_565,
 	  .pixman_id = PIXMAN_r5g6b5,
 	  .num_planes = 1, .plane_bpp = { 16, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "BGR565", .depth = -1, .drm_id = DRM_FORMAT_BGR565,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_b5g6r5,
 	  .num_planes = 1, .plane_bpp = { 16, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "BGR888", .depth = -1, .drm_id = DRM_FORMAT_BGR888,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_b8g8r8,
 	  .num_planes = 1, .plane_bpp = { 24, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "RGB888", .depth = -1, .drm_id = DRM_FORMAT_RGB888,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_r8g8b8,
 	  .num_planes = 1, .plane_bpp = { 24, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XYUV8888", .depth = -1, .drm_id = DRM_FORMAT_XYUV8888,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
 	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XRGB8888", .depth = 24, .drm_id = DRM_FORMAT_XRGB8888,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
 	  .pixman_id = PIXMAN_x8r8g8b8,
 	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XBGR8888", .depth = -1, .drm_id = DRM_FORMAT_XBGR8888,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_x8b8g8r8,
 	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XRGB2101010", .depth = 30, .drm_id = DRM_FORMAT_XRGB2101010,
 	  .cairo_id = CAIRO_FORMAT_RGB30,
 	  .pixman_id = PIXMAN_x2r10g10b10,
 	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "ARGB8888", .depth = 32, .drm_id = DRM_FORMAT_ARGB8888,
 	  .cairo_id = CAIRO_FORMAT_ARGB32,
 	  .pixman_id = PIXMAN_a8r8g8b8,
 	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "ABGR8888", .depth = -1, .drm_id = DRM_FORMAT_ABGR8888,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_a8b8g8r8,
 	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "NV12", .depth = -1, .drm_id = DRM_FORMAT_NV12,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
 	  .num_planes = 2, .plane_bpp = { 8, 16, },
+	  .hsub = 2, .vsub = 2,
 	},
 	{ .name = "YUYV", .depth = -1, .drm_id = DRM_FORMAT_YUYV,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
 	  .num_planes = 1, .plane_bpp = { 16, },
+	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "YVYU", .depth = -1, .drm_id = DRM_FORMAT_YVYU,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
 	  .num_planes = 1, .plane_bpp = { 16, },
+	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "UYVY", .depth = -1, .drm_id = DRM_FORMAT_UYVY,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
 	  .num_planes = 1, .plane_bpp = { 16, },
+	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "VYUY", .depth = -1, .drm_id = DRM_FORMAT_VYUY,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
 	  .num_planes = 1, .plane_bpp = { 16, },
+	  .hsub = 2, .vsub = 1,
 	},
 };
 #define for_each_format(f)	\
@@ -239,10 +258,12 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 
 static unsigned fb_plane_width(const struct igt_fb *fb, int plane)
 {
-	if (fb->drm_format == DRM_FORMAT_NV12 && plane == 1)
-		return DIV_ROUND_UP(fb->width, 2);
+	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	return fb->width;
+	if (plane == 0)
+		return fb->width;
+
+	return DIV_ROUND_UP(fb->width, format->hsub);
 }
 
 static unsigned fb_plane_bpp(const struct igt_fb *fb, int plane)
@@ -254,10 +275,12 @@ static unsigned fb_plane_bpp(const struct igt_fb *fb, int plane)
 
 static unsigned fb_plane_height(const struct igt_fb *fb, int plane)
 {
-	if (fb->drm_format == DRM_FORMAT_NV12 && plane == 1)
-		return DIV_ROUND_UP(fb->height, 2);
+	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	return fb->height;
+	if (plane == 0)
+		return fb->height;
+
+	return DIV_ROUND_UP(fb->height, format->vsub);
 }
 
 static int fb_num_planes(const struct igt_fb *fb)
