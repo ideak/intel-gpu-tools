@@ -1577,424 +1577,237 @@ static void convert_src_put(const struct fb_convert *cvt,
 		free(src_buf);
 }
 
-static void convert_nv12_to_rgb24(struct fb_convert *cvt)
+struct yuv_parameters {
+	unsigned	y_inc;
+	unsigned	uv_inc;
+	unsigned	y_stride;
+	unsigned	uv_stride;
+	unsigned	y_offset;
+	unsigned	u_offset;
+	unsigned	v_offset;
+};
+
+static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 {
-	int i, j;
-	const uint8_t *y, *uv;
-	uint8_t *rgb24 = cvt->dst.ptr;
-	unsigned int rgb24_stride = cvt->dst.fb->strides[0];
-	unsigned int planar_stride = cvt->src.fb->strides[0];
-	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
-						    cvt->src.fb->color_range);
-	uint8_t *buf;
+	igt_assert(igt_format_is_yuv(fb->drm_format));
 
-	igt_assert(cvt->src.fb->drm_format == DRM_FORMAT_NV12 &&
-		   cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888);
+	switch (fb->drm_format) {
+	case DRM_FORMAT_NV12:
+		params->y_inc = 1;
+		params->uv_inc = 2;
+		break;
 
-	buf = convert_src_get(cvt);
-	y = buf + cvt->src.fb->offsets[0];
-	uv = buf + cvt->src.fb->offsets[1];
-
-	for (i = 0; i < cvt->dst.fb->height / 2; i++) {
-		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
-			/* Convert 2x2 pixel blocks */
-			struct igt_vec4 yuv[4];
-			struct igt_vec4 rgb[4];
-
-			yuv[0].d[0] = y[j * 2 + 0];
-			yuv[1].d[0] = y[j * 2 + 1];
-			yuv[2].d[0] = y[j * 2 + 0 + planar_stride];
-			yuv[3].d[0] = y[j * 2 + 1 + planar_stride];
-
-			yuv[0].d[1] = yuv[1].d[1] = yuv[2].d[1] = yuv[3].d[1] = uv[j * 2 + 0];
-			yuv[0].d[2] = yuv[1].d[2] = yuv[2].d[2] = yuv[3].d[2] = uv[j * 2 + 1];
-			yuv[0].d[3] = yuv[1].d[3] = yuv[2].d[3] = yuv[3].d[3] = 1.0f;
-
-			rgb[0] = igt_matrix_transform(&m, &yuv[0]);
-			rgb[1] = igt_matrix_transform(&m, &yuv[1]);
-			rgb[2] = igt_matrix_transform(&m, &yuv[2]);
-			rgb[3] = igt_matrix_transform(&m, &yuv[3]);
-
-			write_rgb(&rgb24[j * 8 + 0], &rgb[0]);
-			write_rgb(&rgb24[j * 8 + 4], &rgb[1]);
-			write_rgb(&rgb24[j * 8 + 0 + rgb24_stride], &rgb[2]);
-			write_rgb(&rgb24[j * 8 + 4 + rgb24_stride], &rgb[3]);
-		}
-
-		if (cvt->dst.fb->width & 1) {
-			/* Convert 1x2 pixel block */
-			struct igt_vec4 yuv[2];
-			struct igt_vec4 rgb[2];
-
-			yuv[0].d[0] = y[j * 2 + 0];
-			yuv[1].d[0] = y[j * 2 + 0 + planar_stride];
-
-			yuv[0].d[1] = yuv[1].d[1] = uv[j * 2 + 0];
-			yuv[0].d[2] = yuv[1].d[2] = uv[j * 2 + 1];
-			yuv[0].d[3] = yuv[1].d[3] = 1.0f;
-
-			rgb[0] = igt_matrix_transform(&m, &yuv[0]);
-			rgb[1] = igt_matrix_transform(&m, &yuv[1]);
-
-			write_rgb(&rgb24[j * 8 + 0], &rgb[0]);
-			write_rgb(&rgb24[j * 8 + 0 + rgb24_stride], &rgb[1]);
-		}
-
-		rgb24 += 2 * rgb24_stride;
-		y += 2 * planar_stride;
-		uv += planar_stride;
-	}
-
-	if (cvt->dst.fb->height & 1) {
-		/* Convert last row */
-		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
-			/* Convert 2x1 pixel blocks */
-			struct igt_vec4 yuv[2];
-			struct igt_vec4 rgb[2];
-
-			yuv[0].d[0] = y[j * 2 + 0];
-			yuv[1].d[0] = y[j * 2 + 1];
-			yuv[0].d[1] = yuv[1].d[1] = uv[j * 2 + 0];
-			yuv[0].d[2] = yuv[1].d[2] = uv[j * 2 + 1];
-			yuv[0].d[3] = yuv[1].d[3] = 1.0f;
-
-			rgb[0] = igt_matrix_transform(&m, &yuv[0]);
-			rgb[1] = igt_matrix_transform(&m, &yuv[1]);
-
-			write_rgb(&rgb24[j * 8 + 0], &rgb[0]);
-			write_rgb(&rgb24[j * 8 + 4], &rgb[0]);
-		}
-
-		if (cvt->dst.fb->width & 1) {
-			/* Convert single pixel */
-			struct igt_vec4 yuv;
-			struct igt_vec4 rgb;
-
-			yuv.d[0] = y[j * 2 + 0];
-			yuv.d[1] = uv[j * 2 + 0];
-			yuv.d[2] = uv[j * 2 + 1];
-			yuv.d[3] = 1.0f;
-
-			rgb = igt_matrix_transform(&m, &yuv);
-
-			write_rgb(&rgb24[j * 8 + 0], &rgb);
-		}
-	}
-
-	convert_src_put(cvt, buf);
-}
-
-static void convert_yuv444_to_rgb24(struct fb_convert *cvt)
-{
-	int i, j;
-	uint8_t *yuv24;
-	uint8_t *rgb24 = cvt->dst.ptr;
-	unsigned rgb24_stride = cvt->dst.fb->strides[0], xyuv_stride = cvt->src.fb->strides[0];
-	uint8_t *buf = malloc(cvt->src.fb->size);
-	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
-						    cvt->src.fb->color_range);
-
-	/*
-	 * Reading from the BO is awfully slow because of lack of read caching,
-	 * it's faster to copy the whole BO to a temporary buffer and convert
-	 * from there.
-	 */
-	igt_memcpy_from_wc(buf, cvt->src.ptr + cvt->src.fb->offsets[0], cvt->src.fb->size);
-	yuv24 = buf;
-
-	for (i = 0; i < cvt->dst.fb->height; i++) {
-		for (j = 0; j < cvt->dst.fb->width; j++) {
-			float y, u, v;
-			struct igt_vec4 yuv;
-			struct igt_vec4 rgb;
-
-			v = yuv24[i * xyuv_stride + j * 4];
-			u = yuv24[i * xyuv_stride + j * 4 + 1];
-			y = yuv24[i * xyuv_stride + j * 4 + 2];
-			yuv.d[0] = y;
-			yuv.d[1] = u;
-			yuv.d[2] = v;
-			yuv.d[3] = 1.0f;
-
-			rgb = igt_matrix_transform(&m, &yuv);
-
-			write_rgb(&rgb24[i * rgb24_stride + j * 4], &rgb);
-		}
-	}
-
-	free(buf);
-}
-
-
-static void convert_rgb24_to_yuv444(struct fb_convert *cvt)
-{
-	int i, j;
-	uint8_t *rgb24;
-	uint8_t *yuv444 = cvt->dst.ptr + cvt->dst.fb->offsets[0];
-	unsigned int rgb24_stride = cvt->src.fb->strides[0], xyuv_stride = cvt->dst.fb->strides[0];
-	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->dst.fb->color_encoding,
-						    cvt->dst.fb->color_range);
-
-	rgb24 = cvt->src.ptr;
-
-	igt_assert_f(cvt->dst.fb->drm_format == DRM_FORMAT_XYUV8888,
-		     "Conversion not implemented for !XYUV packed formats\n");
-
-	for (i = 0; i < cvt->dst.fb->height; i++) {
-		for (j = 0; j < cvt->dst.fb->width; j++) {
-			struct igt_vec4 rgb;
-			struct igt_vec4 yuv;
-
-			read_rgb(&rgb, &rgb24[i * rgb24_stride + j * 4]);
-
-			yuv = igt_matrix_transform(&m, &rgb);
-
-			yuv444[i * xyuv_stride + j * 4] = yuv.d[2];
-			yuv444[i * xyuv_stride + j * 4 + 1] = yuv.d[1];
-			yuv444[i * xyuv_stride + j * 4 + 2] = yuv.d[0];
-		}
-	}
-}
-
-static void convert_rgb24_to_nv12(struct fb_convert *cvt)
-{
-	int i, j;
-	uint8_t *y = cvt->dst.ptr + cvt->dst.fb->offsets[0];
-	uint8_t *uv = cvt->dst.ptr + cvt->dst.fb->offsets[1];
-	const uint8_t *rgb24 = cvt->src.ptr;
-	unsigned rgb24_stride = cvt->src.fb->strides[0];
-	unsigned planar_stride = cvt->dst.fb->strides[0];
-	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->dst.fb->color_encoding,
-						    cvt->dst.fb->color_range);
-
-	igt_assert(cvt->src.fb->drm_format == DRM_FORMAT_XRGB8888 &&
-		   cvt->dst.fb->drm_format == DRM_FORMAT_NV12);
-
-	for (i = 0; i < cvt->dst.fb->height / 2; i++) {
-		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
-			/* Convert 2x2 pixel blocks */
-			struct igt_vec4 rgb[4];
-			struct igt_vec4 yuv[4];
-
-			read_rgb(&rgb[0], &rgb24[j * 8 + 0]);
-			read_rgb(&rgb[1], &rgb24[j * 8 + 4]);
-			read_rgb(&rgb[2], &rgb24[j * 8 + 0 + rgb24_stride]);
-			read_rgb(&rgb[3], &rgb24[j * 8 + 4 + rgb24_stride]);
-
-			yuv[0] = igt_matrix_transform(&m, &rgb[0]);
-			yuv[1] = igt_matrix_transform(&m, &rgb[1]);
-			yuv[2] = igt_matrix_transform(&m, &rgb[2]);
-			yuv[3] = igt_matrix_transform(&m, &rgb[3]);
-
-			y[j * 2 + 0] = yuv[0].d[0];
-			y[j * 2 + 1] = yuv[1].d[0];
-			y[j * 2 + 0 + planar_stride] = yuv[2].d[0];
-			y[j * 2 + 1 + planar_stride] = yuv[3].d[0];
-
-			/*
-			 * We assume the MPEG2 chroma siting convention, where
-			 * pixel center for Cb'Cr' is between the left top and
-			 * bottom pixel in a 2x2 block, so take the average.
-			 */
-			uv[j * 2 + 0] = (yuv[0].d[1] + yuv[2].d[1]) / 2.0f;
-			uv[j * 2 + 1] = (yuv[0].d[2] + yuv[2].d[2]) / 2.0f;
-		}
-
-		if (cvt->dst.fb->width & 1) {
-			/* Convert 1x2 pixel block */
-			struct igt_vec4 rgb[2];
-			struct igt_vec4 yuv[2];
-
-			read_rgb(&rgb[0], &rgb24[j * 8 + 0]);
-			read_rgb(&rgb[1], &rgb24[j * 8 + 0 + rgb24_stride]);
-
-			yuv[0] = igt_matrix_transform(&m, &rgb[0]);
-			yuv[1] = igt_matrix_transform(&m, &rgb[1]);
-
-			y[j * 2 + 0] = yuv[0].d[0];
-			y[j * 2 + 0 + planar_stride] = yuv[1].d[0];
-
-			/*
-			 * We assume the MPEG2 chroma siting convention, where
-			 * pixel center for Cb'Cr' is between the left top and
-			 * bottom pixel in a 2x2 block, so take the average.
-			 */
-			uv[j * 2 + 0] = (yuv[0].d[1] + yuv[1].d[1]) / 2.0f;
-			uv[j * 2 + 1] = (yuv[0].d[2] + yuv[1].d[2]) / 2.0f;
-		}
-
-		rgb24 += 2 * rgb24_stride;
-		y += 2 * planar_stride;
-		uv += planar_stride;
-	}
-
-	/* Last row cannot be interpolated between 2 pixels, take the single value */
-	if (cvt->dst.fb->height & 1) {
-		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
-			/* Convert 2x1 pixel blocks */
-			struct igt_vec4 rgb[2];
-			struct igt_vec4 yuv[2];
-
-			read_rgb(&rgb[0], &rgb24[j * 8 + 0]);
-			read_rgb(&rgb[1], &rgb24[j * 8 + 4]);
-
-			yuv[0] = igt_matrix_transform(&m, &rgb[0]);
-			yuv[1] = igt_matrix_transform(&m, &rgb[1]);
-
-			y[j * 2 + 0] = yuv[0].d[0];
-			y[j * 2 + 1] = yuv[1].d[0];
-			uv[j * 2 + 0] = yuv[0].d[1];
-			uv[j * 2 + 1] = yuv[0].d[2];
-		}
-
-		if (cvt->dst.fb->width & 1) {
-			/* Convert single pixel */
-			struct igt_vec4 rgb;
-			struct igt_vec4 yuv;
-
-			read_rgb(&rgb, &rgb24[j * 8 + 0]);
-
-			yuv = igt_matrix_transform(&m, &rgb);
-
-			y[j * 2 + 0] = yuv.d[0];
-			uv[j * 2 + 0] = yuv.d[1];
-			uv[j * 2 + 1] = yuv.d[2];
-		}
-	}
-}
-
-/* { Y0, U, Y1, V } */
-static const unsigned char swizzle_yuyv[] = { 0, 1, 2, 3 };
-static const unsigned char swizzle_yvyu[] = { 0, 3, 2, 1 };
-static const unsigned char swizzle_uyvy[] = { 1, 0, 3, 2 };
-static const unsigned char swizzle_vyuy[] = { 1, 2, 3, 0 };
-
-static const unsigned char *yuyv_swizzle(uint32_t format)
-{
-	switch (format) {
-	default:
 	case DRM_FORMAT_YUYV:
-		return swizzle_yuyv;
 	case DRM_FORMAT_YVYU:
-		return swizzle_yvyu;
 	case DRM_FORMAT_UYVY:
-		return swizzle_uyvy;
 	case DRM_FORMAT_VYUY:
-		return swizzle_vyuy;
+		params->y_inc = 2;
+		params->uv_inc = 4;
+		break;
+
+	case DRM_FORMAT_XYUV8888:
+		params->y_inc = 4;
+		params->uv_inc = 4;
+		break;
+	}
+
+	switch (fb->drm_format) {
+	case DRM_FORMAT_NV12:
+		params->y_stride = fb->strides[0];
+		params->uv_stride = fb->strides[1];
+		break;
+
+	case DRM_FORMAT_YUYV:
+	case DRM_FORMAT_YVYU:
+	case DRM_FORMAT_UYVY:
+	case DRM_FORMAT_VYUY:
+	case DRM_FORMAT_XYUV8888:
+		params->y_stride = fb->strides[0];
+		params->uv_stride = fb->strides[0];
+		break;
+	}
+
+	switch (fb->drm_format) {
+	case DRM_FORMAT_NV12:
+		params->y_offset = fb->offsets[0];
+		params->u_offset = fb->offsets[1];
+		params->v_offset = fb->offsets[1] + 1;
+		break;
+
+	case DRM_FORMAT_YUYV:
+		params->y_offset = fb->offsets[0];
+		params->u_offset = fb->offsets[0] + 1;
+		params->v_offset = fb->offsets[0] + 3;
+		break;
+
+	case DRM_FORMAT_YVYU:
+		params->y_offset = fb->offsets[0];
+		params->u_offset = fb->offsets[0] + 3;
+		params->v_offset = fb->offsets[0] + 1;
+		break;
+
+	case DRM_FORMAT_UYVY:
+		params->y_offset = fb->offsets[0] + 1;
+		params->u_offset = fb->offsets[0];
+		params->v_offset = fb->offsets[0] + 2;
+		break;
+
+	case DRM_FORMAT_VYUY:
+		params->y_offset = fb->offsets[0] + 1;
+		params->u_offset = fb->offsets[0] + 2;
+		params->v_offset = fb->offsets[0];
+		break;
+
+	case DRM_FORMAT_XYUV8888:
+		params->y_offset = fb->offsets[0] + 1;
+		params->u_offset = fb->offsets[0] + 2;
+		params->v_offset = fb->offsets[0] + 3;
+		break;
 	}
 }
 
-static void convert_yuyv_to_rgb24(struct fb_convert *cvt)
+static void convert_yuv_to_rgb24(struct fb_convert *cvt)
 {
+	const struct format_desc_struct *src_fmt =
+		lookup_drm_format(cvt->src.fb->drm_format);
 	int i, j;
-	const uint8_t *yuyv;
+	uint8_t bpp = 4;
+	uint8_t *y, *u, *v;
 	uint8_t *rgb24 = cvt->dst.ptr;
 	unsigned int rgb24_stride = cvt->dst.fb->strides[0];
-	unsigned int yuyv_stride = cvt->src.fb->strides[0];
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->color_encoding,
 						    cvt->src.fb->color_range);
-	const unsigned char *swz = yuyv_swizzle(cvt->src.fb->drm_format);
 	uint8_t *buf;
+	struct yuv_parameters params = { };
 
-	igt_assert((cvt->src.fb->drm_format == DRM_FORMAT_YUYV ||
-		    cvt->src.fb->drm_format == DRM_FORMAT_UYVY ||
-		    cvt->src.fb->drm_format == DRM_FORMAT_YVYU ||
-		    cvt->src.fb->drm_format == DRM_FORMAT_VYUY) &&
-		   cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888);
+	igt_assert(cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888 &&
+		   igt_format_is_yuv(cvt->src.fb->drm_format));
 
 	buf = convert_src_get(cvt);
-	yuyv = buf;
+	get_yuv_parameters(cvt->src.fb, &params);
+	y = buf + params.y_offset;
+	u = buf + params.u_offset;
+	v = buf + params.v_offset;
 
 	for (i = 0; i < cvt->dst.fb->height; i++) {
-		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
-			/* Convert 2x1 pixel blocks */
-			struct igt_vec4 yuv[2];
-			struct igt_vec4 rgb[2];
+		const uint8_t *y_tmp = y;
+		const uint8_t *u_tmp = u;
+		const uint8_t *v_tmp = v;
+		uint8_t *rgb_tmp = rgb24;
 
-			yuv[0].d[0] = yuyv[j * 4 + swz[0]];
-			yuv[1].d[0] = yuyv[j * 4 + swz[2]];
-			yuv[0].d[1] = yuv[1].d[1] = yuyv[j * 4 + swz[1]];
-			yuv[0].d[2] = yuv[1].d[2] = yuyv[j * 4 + swz[3]];
-			yuv[0].d[3] = yuv[1].d[3] = 1.0f;
+		for (j = 0; j < cvt->dst.fb->width; j++) {
+			struct igt_vec4 rgb, yuv;
 
-			rgb[0] = igt_matrix_transform(&m, &yuv[0]);
-			rgb[1] = igt_matrix_transform(&m, &yuv[1]);
-
-			write_rgb(&rgb24[j * 8 + 0], &rgb[0]);
-			write_rgb(&rgb24[j * 8 + 4], &rgb[1]);
-		}
-
-		if (cvt->dst.fb->width & 1) {
-			struct igt_vec4 yuv;
-			struct igt_vec4 rgb;
-
-			yuv.d[0] = yuyv[j * 4 + swz[0]];
-			yuv.d[1] = yuyv[j * 4 + swz[1]];
-			yuv.d[2] = yuyv[j * 4 + swz[3]];
+			yuv.d[0] = *y_tmp;
+			yuv.d[1] = *u_tmp;
+			yuv.d[2] = *v_tmp;
 			yuv.d[3] = 1.0f;
 
 			rgb = igt_matrix_transform(&m, &yuv);
+			write_rgb(rgb_tmp, &rgb);
 
-			write_rgb(&rgb24[j * 8 + 0], &rgb);
+			rgb_tmp += bpp;
+			y_tmp += params.y_inc;
+
+			if ((src_fmt->hsub == 1) || (j % src_fmt->hsub)) {
+				u_tmp += params.uv_inc;
+				v_tmp += params.uv_inc;
+			}
 		}
 
 		rgb24 += rgb24_stride;
-		yuyv += yuyv_stride;
+		y += params.y_stride;
+
+		if ((src_fmt->vsub == 1) || (i % src_fmt->vsub)) {
+			u += params.uv_stride;
+			v += params.uv_stride;
+		}
 	}
 
 	convert_src_put(cvt, buf);
 }
 
-static void convert_rgb24_to_yuyv(struct fb_convert *cvt)
+static void convert_rgb24_to_yuv(struct fb_convert *cvt)
 {
+	const struct format_desc_struct *dst_fmt =
+		lookup_drm_format(cvt->dst.fb->drm_format);
 	int i, j;
-	uint8_t *yuyv = cvt->dst.ptr;
+	uint8_t *y, *u, *v;
 	const uint8_t *rgb24 = cvt->src.ptr;
+	uint8_t bpp = 4;
 	unsigned rgb24_stride = cvt->src.fb->strides[0];
-	unsigned yuyv_stride = cvt->dst.fb->strides[0];
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->dst.fb->color_encoding,
 						    cvt->dst.fb->color_range);
-	const unsigned char *swz = yuyv_swizzle(cvt->dst.fb->drm_format);
+	struct yuv_parameters params = { };
 
 	igt_assert(cvt->src.fb->drm_format == DRM_FORMAT_XRGB8888 &&
-		   (cvt->dst.fb->drm_format == DRM_FORMAT_YUYV ||
-		    cvt->dst.fb->drm_format == DRM_FORMAT_UYVY ||
-		    cvt->dst.fb->drm_format == DRM_FORMAT_YVYU ||
-		    cvt->dst.fb->drm_format == DRM_FORMAT_VYUY));
+		   igt_format_is_yuv(cvt->dst.fb->drm_format));
+
+	get_yuv_parameters(cvt->dst.fb, &params);
+	y = cvt->dst.ptr + params.y_offset;
+	u = cvt->dst.ptr + params.u_offset;
+	v = cvt->dst.ptr + params.v_offset;
 
 	for (i = 0; i < cvt->dst.fb->height; i++) {
-		for (j = 0; j < cvt->dst.fb->width / 2; j++) {
-			/* Convert 2x1 pixel blocks */
-			struct igt_vec4 rgb[2];
-			struct igt_vec4 yuv[2];
+		const uint8_t *rgb_tmp = rgb24;
+		uint8_t *y_tmp = y;
+		uint8_t *u_tmp = u;
+		uint8_t *v_tmp = v;
 
-			read_rgb(&rgb[0], &rgb24[j * 8 + 0]);
-			read_rgb(&rgb[1], &rgb24[j * 8 + 4]);
+		for (j = 0; j < cvt->dst.fb->width; j++) {
+			const uint8_t *pair_rgb24 = rgb_tmp;
+			struct igt_vec4 pair_rgb, rgb;
+			struct igt_vec4 pair_yuv, yuv;
 
-			yuv[0] = igt_matrix_transform(&m, &rgb[0]);
-			yuv[1] = igt_matrix_transform(&m, &rgb[1]);
-
-			yuyv[j * 4 + swz[0]] = yuv[0].d[0];
-			yuyv[j * 4 + swz[2]] = yuv[1].d[0];
-			yuyv[j * 4 + swz[1]] = (yuv[0].d[1] + yuv[1].d[1]) / 2.0f;
-			yuyv[j * 4 + swz[3]] = (yuv[0].d[2] + yuv[1].d[2]) / 2.0f;
-		}
-
-		if (cvt->dst.fb->width & 1) {
-			struct igt_vec4 rgb;
-			struct igt_vec4 yuv;
-
-			read_rgb(&rgb, &rgb24[j * 8 + 0]);
-
+			read_rgb(&rgb, rgb_tmp);
 			yuv = igt_matrix_transform(&m, &rgb);
 
-			yuyv[j * 4 + swz[0]] = yuv.d[0];
-			yuyv[j * 4 + swz[1]] = yuv.d[1];
-			yuyv[j * 4 + swz[3]] = yuv.d[2];
+			rgb_tmp += bpp;
+
+			*y_tmp = yuv.d[0];
+			y_tmp += params.y_inc;
+
+			if ((i % dst_fmt->vsub) || (j % dst_fmt->hsub))
+				continue;
+
+			/*
+			 * We assume the MPEG2 chroma siting convention, where
+			 * pixel center for Cb'Cr' is between the left top and
+			 * bottom pixel in a 2x2 block, so take the average.
+			 *
+			 * Therefore, if we use subsampling, we only really care
+			 * about two pixels all the time, either the two
+			 * subsequent pixels horizontally, vertically, or the
+			 * two corners in a 2x2 block.
+			 *
+			 * The only corner case is when we have an odd number of
+			 * pixels, but this can be handled pretty easily by not
+			 * incrementing the paired pixel pointer in the
+			 * direction it's odd in.
+			 */
+			if (j != (cvt->dst.fb->width - 1))
+				pair_rgb24 += (dst_fmt->hsub - 1) * bpp;
+
+			if (i != (cvt->dst.fb->height - 1))
+				pair_rgb24 += rgb24_stride * (dst_fmt->vsub - 1);
+
+			read_rgb(&pair_rgb, pair_rgb24);
+			pair_yuv = igt_matrix_transform(&m, &pair_rgb);
+
+			*u_tmp = (yuv.d[1] + pair_yuv.d[1]) / 2.0f;
+			*v_tmp = (yuv.d[2] + pair_yuv.d[2]) / 2.0f;
+
+			u_tmp += params.uv_inc;
+			v_tmp += params.uv_inc;
 		}
 
 		rgb24 += rgb24_stride;
-		yuyv += yuyv_stride;
+		y += params.y_stride;
+
+		if ((i % dst_fmt->vsub) == (dst_fmt->vsub - 1)) {
+			u += params.uv_stride;
+			v += params.uv_stride;
+		}
 	}
 }
 
@@ -2046,31 +1859,23 @@ static void fb_convert(struct fb_convert *cvt)
 	} else if (cvt->dst.fb->drm_format == DRM_FORMAT_XRGB8888) {
 		switch (cvt->src.fb->drm_format) {
 		case DRM_FORMAT_XYUV8888:
-			convert_yuv444_to_rgb24(cvt);
-			return;
 		case DRM_FORMAT_NV12:
-			convert_nv12_to_rgb24(cvt);
-			return;
-		case DRM_FORMAT_YUYV:
-		case DRM_FORMAT_YVYU:
 		case DRM_FORMAT_UYVY:
 		case DRM_FORMAT_VYUY:
-			convert_yuyv_to_rgb24(cvt);
+		case DRM_FORMAT_YUYV:
+		case DRM_FORMAT_YVYU:
+			convert_yuv_to_rgb24(cvt);
 			return;
 		}
 	} else if (cvt->src.fb->drm_format == DRM_FORMAT_XRGB8888) {
 		switch (cvt->dst.fb->drm_format) {
 		case DRM_FORMAT_XYUV8888:
-			convert_rgb24_to_yuv444(cvt);
-			return;
 		case DRM_FORMAT_NV12:
-			convert_rgb24_to_nv12(cvt);
-			return;
 		case DRM_FORMAT_YUYV:
 		case DRM_FORMAT_YVYU:
 		case DRM_FORMAT_UYVY:
 		case DRM_FORMAT_VYUY:
-			convert_rgb24_to_yuyv(cvt);
+			convert_rgb24_to_yuv(cvt);
 			return;
 		}
 	}
