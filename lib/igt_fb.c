@@ -484,6 +484,47 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
 	}
 }
 
+static void clear_yuv_buffer(struct igt_fb *fb)
+{
+	bool full_range = fb->color_range == IGT_COLOR_YCBCR_FULL_RANGE;
+	void *ptr;
+
+	igt_assert(igt_format_is_yuv(fb->drm_format));
+
+	/* Ensure the framebuffer is preallocated */
+	ptr = igt_fb_map_buffer(fb->fd, fb);
+	igt_assert(*(uint32_t *)ptr == 0);
+
+	switch (fb->drm_format) {
+	case DRM_FORMAT_NV12:
+		memset(ptr + fb->offsets[0],
+		       full_range ? 0x00 : 0x10,
+		       fb->strides[0] * fb->plane_height[0]);
+		memset(ptr + fb->offsets[1],
+		       0x80,
+		       fb->strides[1] * fb->plane_height[1]);
+		break;
+	case DRM_FORMAT_XYUV8888:
+		wmemset(ptr + fb->offsets[0], full_range ? 0x00008080 : 0x00108080,
+			fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+		break;
+	case DRM_FORMAT_YUYV:
+	case DRM_FORMAT_YVYU:
+		wmemset(ptr + fb->offsets[0],
+			full_range ? 0x80008000 : 0x80108010,
+			fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+		break;
+	case DRM_FORMAT_UYVY:
+	case DRM_FORMAT_VYUY:
+		wmemset(ptr + fb->offsets[0],
+			full_range ? 0x00800080 : 0x10801080,
+			fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+		break;
+	}
+
+	igt_fb_unmap_buffer(fb, ptr);
+}
+
 /* helpers to create nice-looking framebuffers */
 static int create_bo_for_fb(struct igt_fb *fb)
 {
@@ -501,50 +542,13 @@ static int create_bo_for_fb(struct igt_fb *fb)
 		fb->is_dumb = false;
 
 		if (is_i915_device(fd)) {
-			void *ptr;
-			bool full_range = fb->color_range == IGT_COLOR_YCBCR_FULL_RANGE;
 
 			fb->gem_handle = gem_create(fd, fb->size);
 
 			gem_set_tiling(fd, fb->gem_handle,
 				       igt_fb_mod_to_tiling(fb->tiling),
 				       fb->strides[0]);
-
-			gem_set_domain(fd, fb->gem_handle,
-				       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-			/* Ensure the framebuffer is preallocated */
-			ptr = gem_mmap__gtt(fd, fb->gem_handle,
-					    fb->size, PROT_READ | PROT_WRITE);
-			igt_assert(*(uint32_t *)ptr == 0);
-
-			switch (fb->drm_format) {
-			case DRM_FORMAT_NV12:
-				memset(ptr + fb->offsets[0],
-				       full_range ? 0x00 : 0x10,
-				       fb->strides[0] * fb->plane_height[0]);
-				memset(ptr + fb->offsets[1],
-				       0x80,
-				       fb->strides[1] * fb->plane_height[1]);
-				break;
-			case DRM_FORMAT_XYUV8888:
-				wmemset(ptr + fb->offsets[0], full_range ? 0x00008080 : 0x00108080,
-					fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
-				break;
-			case DRM_FORMAT_YUYV:
-			case DRM_FORMAT_YVYU:
-				wmemset(ptr + fb->offsets[0],
-					full_range ? 0x80008000 : 0x80108010,
-					fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
-				break;
-			case DRM_FORMAT_UYVY:
-			case DRM_FORMAT_VYUY:
-				wmemset(ptr + fb->offsets[0],
-					full_range ? 0x00800080 : 0x10801080,
-					fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
-				break;
-			}
-			gem_munmap(ptr, fb->size);
+			clear_yuv_buffer(fd);
 
 			return fb->gem_handle;
 		} else {
