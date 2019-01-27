@@ -1671,12 +1671,16 @@ static bool helper_was_alive(struct igt_helper_process *proc,
  * igt_stop_helper:
  * @proc: #igt_helper_process structure
  *
- * Terminates a helper process. It is an error to call this on a helper process
- * which hasn't been spawned yet.
+ * Terminates a helper process. It is legal to call this on a helper process
+ * which hasn't been spawned yet, e.g. if the helper was skipped due to
+ * HW restrictions.
  */
 void igt_stop_helper(struct igt_helper_process *proc)
 {
 	int status;
+
+	if (!proc->running) /* never even started */
+		return;
 
 	/* failure here means the pid is already dead and so waiting is safe */
 	kill(proc->pid, proc->use_SIGKILL ? SIGKILL : SIGTERM);
