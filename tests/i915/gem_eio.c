@@ -745,14 +745,14 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_device_drop_master(fd);
 
-		igt_require(i915_reset_control(true));
-		igt_force_gpu_reset(fd);
-		igt_install_exit_handler(exit_handler);
-
 		gem_submission_print_method(fd);
 		igt_require_gem(fd);
 
 		igt_allow_hang(fd, 0, 0);
+
+		igt_require(i915_reset_control(true));
+		igt_force_gpu_reset(fd);
+		igt_install_exit_handler(exit_handler);
 	}
 
 	igt_subtest("throttle")
