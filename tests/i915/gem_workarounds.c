@@ -282,9 +282,32 @@ igt_main
 	}
 
 	for (op = ops; op->name; op++) {
-		for (m = modes; m->name; m++) {
-			igt_subtest_f("%s%s", op->name, m->name)
-				check_workarounds(device, op->op, m->flags);
+		igt_subtest_group {
+			igt_hang_t hang = {};
+
+			igt_fixture {
+				switch (op->op) {
+				case GPU_RESET:
+					hang = igt_allow_hang(device, 0, 0);
+					break;
+				default:
+					break;
+				}
+			}
+
+			for (m = modes; m->name; m++)
+				igt_subtest_f("%s%s", op->name, m->name)
+					check_workarounds(device, op->op, m->flags);
+
+			igt_fixture {
+				switch (op->op) {
+				case GPU_RESET:
+					igt_disallow_hang(device, hang);
+					break;
+				default:
+					break;
+				}
+			}
 		}
 	}
 }
