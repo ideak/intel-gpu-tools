@@ -1220,6 +1220,8 @@ static void gem_execbuf_subtest(void)
 	int sq_x = 5, sq_y = 10, sq_w = 15, sq_h = 20;
 	uint32_t color;
 
+	igt_require_gem(drm_fd);
+
 	/* Create and set data while the device is active. */
 	enable_one_screen_and_wait(&ms_data);
 
@@ -1307,6 +1309,8 @@ static void gem_execbuf_stress_subtest(int rounds, int wait_flags)
 	uint32_t handle;
 	struct drm_i915_gem_execbuffer2 execbuf = {};
 	struct drm_i915_gem_exec_object2 objs[1] = {{}};
+
+	igt_require_gem(drm_fd);
 
 	if (wait_flags & WAIT_PC8_RES)
 		igt_require(has_pc8);
