@@ -100,13 +100,13 @@ static void restore_psr_debugfs(int sig)
 	psr_write(psr_restore_debugfs_fd, "0");
 }
 
-static bool psr_set(int debugfs_fd, enum psr_mode mode)
+static bool psr_set(int debugfs_fd, int mode)
 {
 	int ret;
 
 	ret = has_psr_debugfs(debugfs_fd);
 	if (ret == -ENODEV) {
-		igt_skip("PSR not available\n");
+		igt_skip_on_f(mode >= PSR_MODE_1, "PSR not available\n");
 		return false;
 	}
 
@@ -117,7 +117,7 @@ static bool psr_set(int debugfs_fd, enum psr_mode mode)
 		 * version enabled and the PSR version of the test, it will
 		 * fail in the first psr_wait_entry() of the test.
 		 */
-		ret = psr_modparam_set(mode <= PSR_MODE_2);
+		ret = psr_modparam_set(mode >= PSR_MODE_1);
 	} else {
 		const char *debug_val;
 
@@ -155,7 +155,7 @@ bool psr_enable(int debugfs_fd, enum psr_mode mode)
 bool psr_disable(int debugfs_fd)
 {
 	/* Any mode different than PSR_MODE_1/2 will disable PSR */
-	return psr_set(debugfs_fd, PSR_MODE_2 + 1);
+	return psr_set(debugfs_fd, -1);
 }
 
 bool psr_sink_support(int debugfs_fd, enum psr_mode mode)
