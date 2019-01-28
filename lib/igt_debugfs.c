@@ -458,17 +458,17 @@ char *igt_crc_to_string_extended(igt_crc_t *crc, char delimiter, int crc_size)
 	int i;
 	int len = 0;
 	int field_width = 2 * crc_size; /* Two chars per byte. */
-	char *buf = malloc((field_width+1) * crc->n_words * sizeof(char));
+	char *buf = malloc((field_width+1) * crc->n_words);
 
 	if (!buf)
 		return NULL;
 
-	for (i = 0; i < crc->n_words; i++)
+	for (i = 0; i < crc->n_words - 1; i++)
 		len += sprintf(buf + len, "%0*x%c", field_width,
 			       crc->crc[i], delimiter);
 
-	/* Eat the last delimiter */
-	buf[len - 1] = '\0';
+	sprintf(buf + len, "%0*x", field_width, crc->crc[i]);
+
 	return buf;
 }
 
