@@ -1812,8 +1812,13 @@ igt_main
 					accuracy(fd, e, pct[i], 10);
 			}
 
-			igt_subtest_f("busy-hang-%s", e->name)
+			igt_subtest_f("busy-hang-%s", e->name) {
+				igt_hang_t hang = igt_allow_hang(fd, 0, 0);
+
 				single(fd, e, TEST_BUSY | FLAG_HANG);
+
+				igt_disallow_hang(fd, hang);
+			}
 		}
 
 		/**
