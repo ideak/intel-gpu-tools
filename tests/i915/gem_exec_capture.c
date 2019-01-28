@@ -445,7 +445,7 @@ static void many(int fd, int dir, uint64_t size, unsigned int flags)
 		addr = strtoul(str, &str, 16);
 		addr <<= 32;
 		addr |= strtoul(str + 1, &str, 16);
-		igt_assert(*str++ = '\n');
+		igt_assert(*str++ == '\n');
 
 		if (!(*str == ':' || *str == '~'))
 			continue;
