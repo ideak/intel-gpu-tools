@@ -189,6 +189,7 @@ const char * const igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
 	[IGT_CRTC_MODE_ID] = "MODE_ID",
 	[IGT_CRTC_ACTIVE] = "ACTIVE",
 	[IGT_CRTC_OUT_FENCE_PTR] = "OUT_FENCE_PTR",
+	[IGT_CRTC_VRR_ENABLED] = "VRR_ENABLED",
 };
 
 const char * const igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
@@ -197,6 +198,7 @@ const char * const igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	[IGT_CONNECTOR_DPMS] = "DPMS",
 	[IGT_CONNECTOR_BROADCAST_RGB] = "Broadcast RGB",
 	[IGT_CONNECTOR_CONTENT_PROTECTION] = "Content Protection",
+	[IGT_CONNECTOR_VRR_CAPABLE] = "vrr_capable",
 };
 
 /*
@@ -1788,6 +1790,9 @@ static void igt_pipe_reset(igt_pipe_t *pipe)
 	igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_MODE_ID, 0);
 	igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_ACTIVE, 0);
 	igt_pipe_obj_clear_prop_changed(pipe, IGT_CRTC_OUT_FENCE_PTR);
+
+	if (igt_pipe_obj_has_prop(pipe, IGT_CRTC_VRR_ENABLED))
+		igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_VRR_ENABLED, 0);
 
 	pipe->out_fence_fd = -1;
 }

@@ -89,6 +89,7 @@ TESTS_progs = \
 	kms_tv_load_detect \
 	kms_universal_plane \
 	kms_vblank \
+	kms_vrr \
 	kms_sequence \
 	meta_test \
 	perf \

@@ -104,6 +104,7 @@ enum igt_atomic_crtc_properties {
        IGT_CRTC_MODE_ID,
        IGT_CRTC_ACTIVE,
        IGT_CRTC_OUT_FENCE_PTR,
+       IGT_CRTC_VRR_ENABLED,
        IGT_NUM_CRTC_PROPS
 };
 
@@ -121,6 +122,7 @@ enum igt_atomic_connector_properties {
        IGT_CONNECTOR_DPMS,
        IGT_CONNECTOR_BROADCAST_RGB,
        IGT_CONNECTOR_CONTENT_PROTECTION,
+       IGT_CONNECTOR_VRR_CAPABLE,
        IGT_NUM_CONNECTOR_PROPS
 };
 
