@@ -59,6 +59,7 @@
 #define PREEMPT 0x2
 
 static unsigned int ring_size;
+static double rcs_clock;
 
 static void
 poll_ring(int fd, unsigned ring, const char *name)
@@ -238,10 +239,11 @@ static void latency_on_ring(int fd,
 	igt_assert(offset == obj[2].offset);
 
 	gem_set_domain(fd, obj[1].handle, I915_GEM_DOMAIN_GTT, 0);
-	igt_info("%s: dispatch latency: %.2f, execution latency: %.2f (target %.2f)\n",
+	igt_info("%s: dispatch latency: %.1fns, execution latency: %.1fns (target %.1fns)\n",
 		 name,
-		 (end - start) / (double)repeats,
-		 gpu_latency, (results[repeats - 1] - results[0]) / (double)(repeats - 1));
+		 (end - start) / (double)repeats * rcs_clock,
+		 gpu_latency * rcs_clock,
+		 (results[repeats - 1] - results[0]) / (double)(repeats - 1) * rcs_clock);
 
 	munmap(map, 64*1024);
 	munmap(results, 4096);
@@ -387,9 +389,9 @@ static void latency_from_ring(int fd,
 			       I915_GEM_DOMAIN_GTT);
 		igt_spin_batch_free(fd, spin);
 
-		igt_info("%s-%s delay: %.2f\n",
+		igt_info("%s-%s delay: %.2fns\n",
 			 name, e__->name,
-			 (results[2*repeats-1] - results[0]) / (double)repeats);
+			 (results[2*repeats-1] - results[0]) / (double)repeats * rcs_clock);
 	}
 
 	munmap(map, 64*1024);
@@ -620,6 +622,38 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 	munmap(results, MMAP_SZ);
 }
 
+static double clockrate(int i915, int reg)
+{
+	volatile uint32_t *mmio;
+	uint32_t r_start, r_end;
+	struct timespec tv;
+	uint64_t t_start, t_end;
+	uint64_t elapsed;
+	int cs_timestamp_freq;
+	drm_i915_getparam_t gp = {
+		.value = &cs_timestamp_freq,
+		.param = I915_PARAM_CS_TIMESTAMP_FREQUENCY,
+	};
+
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GETPARAM, &gp) == 0)
+		return cs_timestamp_freq;
+
+	mmio = (volatile uint32_t *)((volatile char *)igt_global_mmio + reg);
+
+	t_start = igt_nsec_elapsed(&tv);
+	r_start = *mmio;
+	elapsed = igt_nsec_elapsed(&tv) - t_start;
+
+	usleep(1000);
+
+	t_end = igt_nsec_elapsed(&tv);
+	r_end = *mmio;
+	elapsed += igt_nsec_elapsed(&tv) - t_end;
+
+	elapsed = (t_end - t_start) + elapsed / 2;
+	return (r_end - r_start) * 1e9 / elapsed;
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -640,6 +674,10 @@ igt_main
 			ring_size = 1024;
 
 		intel_register_access_init(intel_get_pci_device(), false, device);
+		rcs_clock = clockrate(device, RCS_TIMESTAMP);
+		igt_info("RCS timestamp clock: %.0fKHz, %.1fns\n",
+			 rcs_clock / 1e3, 1e9 / rcs_clock);
+		rcs_clock = 1e9 / rcs_clock;
 	}
 
 	igt_subtest("all-rtidle-submit")
