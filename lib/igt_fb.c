@@ -221,6 +221,36 @@ static const struct format_desc_struct {
 	  .num_planes = 3, .plane_bpp = { 8, 8, 8, },
 	  .hsub = 2, .vsub = 1,
 	},
+	{ .name = "Y410", .depth = -1, .drm_id = DRM_FORMAT_Y410,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
+	},
+	{ .name = "Y412", .depth = -1, .drm_id = DRM_FORMAT_Y412,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	  .hsub = 1, .vsub = 1,
+	},
+	{ .name = "Y416", .depth = -1, .drm_id = DRM_FORMAT_Y416,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	  .hsub = 1, .vsub = 1,
+	},
+	{ .name = "XV30", .depth = -1, .drm_id = DRM_FORMAT_XVYU2101010,
+	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
+	},
+	{ .name = "XV36", .depth = -1, .drm_id = DRM_FORMAT_XVYU12_16161616,
+	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	  .hsub = 1, .vsub = 1,
+	},
+	{ .name = "XV48", .depth = -1, .drm_id = DRM_FORMAT_XVYU16161616,
+	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	  .hsub = 1, .vsub = 1,
+	},
 	{ .name = "P010", .depth = -1, .drm_id = DRM_FORMAT_P010,
 	  .cairo_id = CAIRO_FORMAT_RGB96F,
 	  .num_planes = 2, .plane_bpp = { 16, 32 },
@@ -638,6 +668,12 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
 	}
 }
 
+static void memset64(uint64_t *s, uint64_t c, size_t n)
+{
+	for (int i = 0; i < n; i++)
+		s[i] = c;
+}
+
 static void clear_yuv_buffer(struct igt_fb *fb)
 {
 	bool full_range = fb->color_range == IGT_COLOR_YCBCR_FULL_RANGE;
@@ -690,6 +726,21 @@ static void clear_yuv_buffer(struct igt_fb *fb)
 			fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
 		break;
 
+	case DRM_FORMAT_XVYU2101010:
+	case DRM_FORMAT_Y410:
+		wmemset(ptr + fb->offsets[0],
+			full_range ? 0x20000200 : 0x20010200,
+		fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+		break;
+
+	case DRM_FORMAT_XVYU12_16161616:
+	case DRM_FORMAT_XVYU16161616:
+	case DRM_FORMAT_Y412:
+	case DRM_FORMAT_Y416:
+		memset64(ptr + fb->offsets[0],
+			 full_range ? 0x800000008000ULL : 0x800010008000ULL,
+			 fb->strides[0] * fb->plane_height[0] / sizeof(uint64_t));
+		break;
 	}
 
 	igt_fb_unmap_buffer(fb, ptr);
@@ -1903,10 +1954,11 @@ static void convert_src_put(const struct fb_convert *cvt,
 }
 
 struct yuv_parameters {
-	unsigned	y_inc;
+	unsigned	ay_inc;
 	unsigned	uv_inc;
-	unsigned	y_stride;
+	unsigned	ay_stride;
 	unsigned	uv_stride;
+	unsigned	a_offset;
 	unsigned	y_offset;
 	unsigned	u_offset;
 	unsigned	v_offset;
@@ -1924,7 +1976,7 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_P012:
 	case DRM_FORMAT_P016:
-		params->y_inc = 1;
+		params->ay_inc = 1;
 		params->uv_inc = 2;
 		break;
 
@@ -1932,7 +1984,7 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 	case DRM_FORMAT_YUV422:
 	case DRM_FORMAT_YVU420:
 	case DRM_FORMAT_YVU422:
-		params->y_inc = 1;
+		params->ay_inc = 1;
 		params->uv_inc = 1;
 		break;
 
@@ -1943,12 +1995,16 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 	case DRM_FORMAT_Y210:
 	case DRM_FORMAT_Y212:
 	case DRM_FORMAT_Y216:
-		params->y_inc = 2;
+		params->ay_inc = 2;
 		params->uv_inc = 4;
 		break;
 
+	case DRM_FORMAT_XVYU12_16161616:
+	case DRM_FORMAT_XVYU16161616:
+	case DRM_FORMAT_Y412:
+	case DRM_FORMAT_Y416:
 	case DRM_FORMAT_XYUV8888:
-		params->y_inc = 4;
+		params->ay_inc = 4;
 		params->uv_inc = 4;
 		break;
 	}
@@ -1965,7 +2021,7 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_P012:
 	case DRM_FORMAT_P016:
-		params->y_stride = fb->strides[0];
+		params->ay_stride = fb->strides[0];
 		params->uv_stride = fb->strides[1];
 		break;
 
@@ -1977,7 +2033,11 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 	case DRM_FORMAT_Y212:
 	case DRM_FORMAT_Y216:
 	case DRM_FORMAT_XYUV8888:
-		params->y_stride = fb->strides[0];
+	case DRM_FORMAT_XVYU12_16161616:
+	case DRM_FORMAT_XVYU16161616:
+	case DRM_FORMAT_Y412:
+	case DRM_FORMAT_Y416:
+		params->ay_stride = fb->strides[0];
 		params->uv_stride = fb->strides[0];
 		break;
 	}
@@ -2051,6 +2111,16 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 		params->v_offset = fb->offsets[0] + 6;
 		break;
 
+	case DRM_FORMAT_XVYU12_16161616:
+	case DRM_FORMAT_XVYU16161616:
+	case DRM_FORMAT_Y412:
+	case DRM_FORMAT_Y416:
+		params->a_offset = fb->offsets[0] + 6;
+		params->y_offset = fb->offsets[0] + 2;
+		params->u_offset = fb->offsets[0];
+		params->v_offset = fb->offsets[0] + 4;
+		break;
+
 	case DRM_FORMAT_XYUV8888:
 		params->y_offset = fb->offsets[0] + 1;
 		params->u_offset = fb->offsets[0] + 2;
@@ -2102,7 +2172,7 @@ static void convert_yuv_to_rgb24(struct fb_convert *cvt)
 			write_rgb(rgb_tmp, &rgb);
 
 			rgb_tmp += bpp;
-			y_tmp += params.y_inc;
+			y_tmp += params.ay_inc;
 
 			if ((src_fmt->hsub == 1) || (j % src_fmt->hsub)) {
 				u_tmp += params.uv_inc;
@@ -2111,7 +2181,7 @@ static void convert_yuv_to_rgb24(struct fb_convert *cvt)
 		}
 
 		rgb24 += rgb24_stride;
-		y += params.y_stride;
+		y += params.ay_stride;
 
 		if ((src_fmt->vsub == 1) || (i % src_fmt->vsub)) {
 			u += params.uv_stride;
@@ -2162,7 +2232,7 @@ static void convert_rgb24_to_yuv(struct fb_convert *cvt)
 			rgb_tmp += bpp;
 
 			*y_tmp = yuv.d[0];
-			y_tmp += params.y_inc;
+			y_tmp += params.ay_inc;
 
 			if ((i % dst_fmt->vsub) || (j % dst_fmt->hsub))
 				continue;
@@ -2199,7 +2269,7 @@ static void convert_rgb24_to_yuv(struct fb_convert *cvt)
 		}
 
 		rgb24 += rgb24_stride;
-		y += params.y_stride;
+		y += params.ay_stride;
 
 		if ((i % dst_fmt->vsub) == (dst_fmt->vsub - 1)) {
 			u += params.uv_stride;
@@ -2223,13 +2293,13 @@ static void write_rgbf(float *rgb24, const struct igt_vec4 *rgb)
 	rgb24[2] = rgb->d[2];
 }
 
-static void convert_yuv16_to_float(struct fb_convert *cvt)
+static void convert_yuv16_to_float(struct fb_convert *cvt, bool alpha)
 {
 	const struct format_desc_struct *src_fmt =
 		lookup_drm_format(cvt->src.fb->drm_format);
 	int i, j;
-	uint8_t fpp = 3;
-	uint16_t *y, *u, *v;
+	uint8_t fpp = alpha ? 4 : 3;
+	uint16_t *a, *y, *u, *v;
 	float *ptr = cvt->dst.ptr;
 	unsigned int float_stride = cvt->dst.fb->strides[0] / sizeof(*ptr);
 	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->drm_format,
@@ -2248,11 +2318,13 @@ static void convert_yuv16_to_float(struct fb_convert *cvt)
 		   !(params.u_offset % sizeof(*buf)) &&
 		   !(params.v_offset % sizeof(*buf)));
 
+	a = buf + params.a_offset / sizeof(*buf);
 	y = buf + params.y_offset / sizeof(*buf);
 	u = buf + params.u_offset / sizeof(*buf);
 	v = buf + params.v_offset / sizeof(*buf);
 
 	for (i = 0; i < cvt->dst.fb->height; i++) {
+		const uint16_t *a_tmp = a;
 		const uint16_t *y_tmp = y;
 		const uint16_t *u_tmp = u;
 		const uint16_t *v_tmp = v;
@@ -2269,8 +2341,13 @@ static void convert_yuv16_to_float(struct fb_convert *cvt)
 			rgb = igt_matrix_transform(&m, &yuv);
 			write_rgbf(rgb_tmp, &rgb);
 
+			if (alpha) {
+				rgb_tmp[3] = ((float)*a_tmp) / 65535.f;
+				a_tmp += params.ay_inc;
+			}
+
 			rgb_tmp += fpp;
-			y_tmp += params.y_inc;
+			y_tmp += params.ay_inc;
 
 			if ((src_fmt->hsub == 1) || (j % src_fmt->hsub)) {
 				u_tmp += params.uv_inc;
@@ -2279,7 +2356,9 @@ static void convert_yuv16_to_float(struct fb_convert *cvt)
 		}
 
 		ptr += float_stride;
-		y += params.y_stride / sizeof(*y);
+
+		a += params.ay_stride / sizeof(*a);
+		y += params.ay_stride / sizeof(*y);
 
 		if ((src_fmt->vsub == 1) || (i % src_fmt->vsub)) {
 			u += params.uv_stride / sizeof(*u);
@@ -2290,14 +2369,14 @@ static void convert_yuv16_to_float(struct fb_convert *cvt)
 	convert_src_put(cvt, buf);
 }
 
-static void convert_float_to_yuv16(struct fb_convert *cvt)
+static void convert_float_to_yuv16(struct fb_convert *cvt, bool alpha)
 {
 	const struct format_desc_struct *dst_fmt =
 		lookup_drm_format(cvt->dst.fb->drm_format);
 	int i, j;
-	uint16_t *y, *u, *v;
+	uint16_t *a, *y, *u, *v;
 	const float *ptr = cvt->src.ptr;
-	uint8_t fpp = 3;
+	uint8_t fpp = alpha ? 4 : 3;
 	unsigned float_stride = cvt->src.fb->strides[0] / sizeof(*ptr);
 	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->src.fb->drm_format,
 						    cvt->dst.fb->drm_format,
@@ -2309,16 +2388,19 @@ static void convert_float_to_yuv16(struct fb_convert *cvt)
 		   igt_format_is_yuv(cvt->dst.fb->drm_format));
 
 	get_yuv_parameters(cvt->dst.fb, &params);
-	igt_assert(!(params.y_offset % sizeof(*y)) &&
+	igt_assert(!(params.a_offset % sizeof(*a)) &&
+		   !(params.y_offset % sizeof(*y)) &&
 		   !(params.u_offset % sizeof(*u)) &&
 		   !(params.v_offset % sizeof(*v)));
 
+	a = cvt->dst.ptr + params.a_offset;
 	y = cvt->dst.ptr + params.y_offset;
 	u = cvt->dst.ptr + params.u_offset;
 	v = cvt->dst.ptr + params.v_offset;
 
 	for (i = 0; i < cvt->dst.fb->height; i++) {
 		const float *rgb_tmp = ptr;
+		uint16_t *a_tmp = a;
 		uint16_t *y_tmp = y;
 		uint16_t *u_tmp = u;
 		uint16_t *v_tmp = v;
@@ -2331,10 +2413,15 @@ static void convert_float_to_yuv16(struct fb_convert *cvt)
 			read_rgbf(&rgb, rgb_tmp);
 			yuv = igt_matrix_transform(&m, &rgb);
 
+			if (alpha) {
+				*a_tmp = rgb_tmp[3] * 65535.f + .5f;
+				a_tmp += params.ay_inc;
+			}
+
 			rgb_tmp += fpp;
 
 			*y_tmp = yuv.d[0];
-			y_tmp += params.y_inc;
+			y_tmp += params.ay_inc;
 
 			if ((i % dst_fmt->vsub) || (j % dst_fmt->hsub))
 				continue;
@@ -2371,12 +2458,102 @@ static void convert_float_to_yuv16(struct fb_convert *cvt)
 		}
 
 		ptr += float_stride;
-		y += params.y_stride / sizeof(*y);
+		a += params.ay_stride / sizeof(*a);
+		y += params.ay_stride / sizeof(*y);
 
 		if ((i % dst_fmt->vsub) == (dst_fmt->vsub - 1)) {
 			u += params.uv_stride / sizeof(*u);
 			v += params.uv_stride / sizeof(*v);
 		}
+	}
+}
+
+static void convert_Y410_to_float(struct fb_convert *cvt, bool alpha)
+{
+	int i, j;
+	const uint32_t *uyv;
+	uint32_t *buf;
+	float *ptr = cvt->dst.ptr;
+	unsigned int float_stride = cvt->dst.fb->strides[0] / sizeof(*ptr);
+	unsigned int uyv_stride = cvt->src.fb->strides[0] / sizeof(*uyv);
+	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->drm_format,
+						    cvt->dst.fb->drm_format,
+						    cvt->src.fb->color_encoding,
+						    cvt->src.fb->color_range);
+	unsigned bpp = alpha ? 4 : 3;
+
+	igt_assert((cvt->src.fb->drm_format == DRM_FORMAT_Y410 ||
+		    cvt->src.fb->drm_format == DRM_FORMAT_XVYU2101010) &&
+		   cvt->dst.fb->drm_format == IGT_FORMAT_FLOAT);
+
+	uyv = buf = convert_src_get(cvt);
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		for (j = 0; j < cvt->dst.fb->width; j++) {
+			/* Convert 2x1 pixel blocks */
+			struct igt_vec4 yuv;
+			struct igt_vec4 rgb;
+
+			yuv.d[0] = (uyv[j] >> 10) & 0x3ff;
+			yuv.d[1] = uyv[j] & 0x3ff;
+			yuv.d[2] = (uyv[j] >> 20) & 0x3ff;
+			yuv.d[3] = 1.f;
+
+			rgb = igt_matrix_transform(&m, &yuv);
+
+			write_rgbf(&ptr[j * bpp], &rgb);
+			if (alpha)
+				ptr[j * bpp + 3] = (float)(uyv[j] >> 30) / 3.f;
+		}
+
+		ptr += float_stride;
+		uyv += uyv_stride;
+	}
+
+	convert_src_put(cvt, buf);
+}
+
+static void convert_float_to_Y410(struct fb_convert *cvt, bool alpha)
+{
+	int i, j;
+	uint32_t *uyv = cvt->dst.ptr;
+	const float *ptr = cvt->src.ptr;
+	unsigned float_stride = cvt->src.fb->strides[0] / sizeof(*ptr);
+	unsigned uyv_stride = cvt->dst.fb->strides[0] / sizeof(*uyv);
+	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->src.fb->drm_format,
+						    cvt->dst.fb->drm_format,
+						    cvt->dst.fb->color_encoding,
+						    cvt->dst.fb->color_range);
+	unsigned bpp = alpha ? 4 : 3;
+
+	igt_assert(cvt->src.fb->drm_format == IGT_FORMAT_FLOAT &&
+		   (cvt->dst.fb->drm_format == DRM_FORMAT_Y410 ||
+		    cvt->dst.fb->drm_format == DRM_FORMAT_XVYU2101010));
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		for (j = 0; j < cvt->dst.fb->width; j++) {
+			struct igt_vec4 rgb;
+			struct igt_vec4 yuv;
+			uint8_t a = 0;
+			uint16_t y, cb, cr;
+
+			read_rgbf(&rgb, &ptr[j * bpp]);
+			if (alpha)
+				 a = ptr[j * bpp + 3] * 3.f + .5f;
+
+			yuv = igt_matrix_transform(&m, &rgb);
+			y = yuv.d[0];
+			cb = yuv.d[1];
+			cr = yuv.d[2];
+
+			uyv[j] = ((cb & 0x3ff) << 0) |
+				  ((y & 0x3ff) << 10) |
+				  ((cr & 0x3ff) << 20) |
+				  (a << 30);
+		}
+
+		ptr += float_stride;
+		uyv += uyv_stride;
 	}
 }
 
@@ -2469,7 +2646,19 @@ static void fb_convert(struct fb_convert *cvt)
 		case DRM_FORMAT_Y210:
 		case DRM_FORMAT_Y212:
 		case DRM_FORMAT_Y216:
-			convert_yuv16_to_float(cvt);
+		case DRM_FORMAT_XVYU12_16161616:
+		case DRM_FORMAT_XVYU16161616:
+			convert_yuv16_to_float(cvt, false);
+			return;
+		case DRM_FORMAT_Y410:
+			convert_Y410_to_float(cvt, true);
+			return;
+		case DRM_FORMAT_XVYU2101010:
+			convert_Y410_to_float(cvt, false);
+			return;
+		case DRM_FORMAT_Y412:
+		case DRM_FORMAT_Y416:
+			convert_yuv16_to_float(cvt, true);
 			return;
 		}
 	} else if (cvt->src.fb->drm_format == IGT_FORMAT_FLOAT) {
@@ -2480,7 +2669,19 @@ static void fb_convert(struct fb_convert *cvt)
 		case DRM_FORMAT_Y210:
 		case DRM_FORMAT_Y212:
 		case DRM_FORMAT_Y216:
-			convert_float_to_yuv16(cvt);
+		case DRM_FORMAT_XVYU12_16161616:
+		case DRM_FORMAT_XVYU16161616:
+			convert_float_to_yuv16(cvt, false);
+			return;
+		case DRM_FORMAT_Y410:
+			convert_float_to_Y410(cvt, true);
+			return;
+		case DRM_FORMAT_XVYU2101010:
+			convert_float_to_Y410(cvt, false);
+			return;
+		case DRM_FORMAT_Y412:
+		case DRM_FORMAT_Y416:
+			convert_float_to_yuv16(cvt, true);
 			return;
 		}
 	}
@@ -2947,6 +3148,12 @@ bool igt_format_is_yuv(uint32_t drm_format)
 	case DRM_FORMAT_Y210:
 	case DRM_FORMAT_Y212:
 	case DRM_FORMAT_Y216:
+	case DRM_FORMAT_XVYU2101010:
+	case DRM_FORMAT_XVYU12_16161616:
+	case DRM_FORMAT_XVYU16161616:
+	case DRM_FORMAT_Y410:
+	case DRM_FORMAT_Y412:
+	case DRM_FORMAT_Y416:
 	case DRM_FORMAT_YUYV:
 	case DRM_FORMAT_YVYU:
 	case DRM_FORMAT_UYVY:
