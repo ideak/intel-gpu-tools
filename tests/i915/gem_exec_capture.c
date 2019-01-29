@@ -519,6 +519,11 @@ static bool has_capture(int fd)
 	return async > 0;
 }
 
+static size_t safer_strlen(const char *s)
+{
+	return s ? strlen(s) : 0;
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -544,7 +549,7 @@ igt_main
 
 		dir = igt_sysfs_open(fd, NULL);
 		igt_require(igt_sysfs_set(dir, "error", "Begone!"));
-		igt_require(igt_sysfs_get(dir, "error"));
+		igt_require(safer_strlen(igt_sysfs_get(dir, "error")) > 0);
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
