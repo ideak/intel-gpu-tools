@@ -55,8 +55,9 @@
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
-#define CORK 0x1
-#define PREEMPT 0x2
+#define LIVE 0x1
+#define CORK 0x2
+#define PREEMPT 0x4
 
 static unsigned int ring_size;
 static double rcs_clock;
@@ -120,6 +121,7 @@ static void latency_on_ring(int fd,
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
+	igt_spin_t *spin = NULL;
 	IGT_CORK_HANDLE(c);
 	volatile uint32_t *reg;
 	unsigned repeats = ring_size;
@@ -189,6 +191,9 @@ static void latency_on_ring(int fd,
 		execbuf.buffer_count = 3;
 	}
 
+	if (flags & LIVE)
+		spin = igt_spin_batch_new(fd, .engine = ring);
+
 	start = *reg;
 	for (j = 0; j < repeats; j++) {
 		uint64_t presumed_offset = reloc.presumed_offset;
@@ -204,6 +209,7 @@ static void latency_on_ring(int fd,
 	end = *reg;
 	igt_assert(reloc.presumed_offset == obj[1].offset);
 
+	igt_spin_batch_free(fd, spin);
 	if (flags & CORK)
 		igt_cork_unplug(&c);
 
@@ -704,6 +710,11 @@ igt_main
 							e->exec_id | e->flags,
 							e->name, 0);
 
+				igt_subtest_f("%s-live-dispatch", e->name)
+					latency_on_ring(device,
+							e->exec_id | e->flags,
+							e->name, LIVE);
+
 				igt_subtest_f("%s-poll", e->name)
 					poll_ring(device,
 						  e->exec_id | e->flags,
@@ -723,6 +734,10 @@ igt_main
 							      e->name,
 							      0);
 
+				igt_subtest_f("%s-live-dispatch-queued", e->name)
+					latency_on_ring(device,
+							e->exec_id | e->flags,
+							e->name, LIVE | CORK);
 				igt_subtest_f("%s-dispatch-queued", e->name)
 					latency_on_ring(device,
 							e->exec_id | e->flags,
