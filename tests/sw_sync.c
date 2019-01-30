@@ -171,12 +171,11 @@ static void test_sync_busy(void)
 
 static void test_sync_busy_fork_unixsocket(void)
 {
+	struct igt_helper_process proc = {};
 	int fence;
 	int timeline;
 	int skip = 0;
 	int sv[2];
-	struct igt_helper_process proc;
-
 
 	timeline = sw_sync_timeline_create();
 	fence = sw_sync_timeline_create_fence(timeline, 1);
@@ -258,10 +257,10 @@ out:
 
 static void test_sync_busy_fork(void)
 {
+	struct igt_helper_process proc = {};
 	int fence;
 	int timeline;
 	int skip = 0;
-	struct igt_helper_process proc;
 
 	timeline = sw_sync_timeline_create();
 	fence = sw_sync_timeline_create_fence(timeline, 1);
