@@ -44,6 +44,7 @@
 #include "igt_device.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+#include "i915/gem_ring.h"
 
 IGT_TEST_DESCRIPTION("Test that specific ioctls report a wedged GPU (EIO).");
 
@@ -358,16 +359,21 @@ static void test_inflight(int fd, unsigned int wait)
 {
 	int parent_fd = fd;
 	unsigned int engine;
+	int fence[64]; /* mostly conservative estimate of ring size */
+	int max;
 
 	igt_require_gem(fd);
 	igt_require(gem_has_exec_fence(fd));
+
+	max = gem_measure_ring_inflight(fd, -1, 0);
+	igt_require(max > 1);
+	max = min(max - 1, ARRAY_SIZE(fence));
 
 	for_each_engine(parent_fd, engine) {
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 obj[2];
 		struct drm_i915_gem_execbuffer2 execbuf;
 		igt_spin_t *hang;
-		int fence[64]; /* conservative estimate of ring size */
 
 		fd = gem_reopen_driver(parent_fd);
 		igt_require_gem(fd);
@@ -389,7 +395,7 @@ static void test_inflight(int fd, unsigned int wait)
 		execbuf.buffer_count = 2;
 		execbuf.flags = engine | I915_EXEC_FENCE_OUT;
 
-		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
+		for (unsigned int n = 0; n < max; n++) {
 			gem_execbuf_wr(fd, &execbuf);
 			fence[n] = execbuf.rsvd2 >> 32;
 			igt_assert(fence[n] != -1);
@@ -397,7 +403,7 @@ static void test_inflight(int fd, unsigned int wait)
 
 		check_wait(fd, obj[1].handle, wait);
 
-		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
+		for (unsigned int n = 0; n < max; n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
 			close(fence[n]);
 		}
@@ -416,8 +422,13 @@ static void test_inflight_suspend(int fd)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
 	uint32_t bbe = MI_BATCH_BUFFER_END;
-	int fence[64]; /* conservative estimate of ring size */
+	int fence[64]; /* mostly conservative estimate of ring size */
 	igt_spin_t *hang;
+	int max;
+
+	max = gem_measure_ring_inflight(fd, -1, 0);
+	igt_require(max > 1);
+	max = min(max - 1, ARRAY_SIZE(fence));
 
 	fd = gem_reopen_driver(fd);
 	igt_require_gem(fd);
@@ -437,7 +448,7 @@ static void test_inflight_suspend(int fd)
 	execbuf.buffer_count = 2;
 	execbuf.flags = I915_EXEC_FENCE_OUT;
 
-	for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
+	for (unsigned int n = 0; n < max; n++) {
 		gem_execbuf_wr(fd, &execbuf);
 		fence[n] = execbuf.rsvd2 >> 32;
 		igt_assert(fence[n] != -1);
@@ -448,7 +459,7 @@ static void test_inflight_suspend(int fd)
 
 	check_wait(fd, obj[1].handle, 10);
 
-	for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
+	for (unsigned int n = 0; n < max; n++) {
 		igt_assert_eq(sync_fence_status(fence[n]), -EIO);
 		close(fence[n]);
 	}
