@@ -158,9 +158,6 @@ create_tmpl(int i915, struct drm_i915_gem_relocation_entry *reloc)
 				   struct drm_i915_gem_relocation_entry *reloc);
 	void *tmpl;
 
-	/* could use BLT_FILL instead for gen2 */
-	igt_require(gem_can_store_dword(i915, 0));
-
 	if (gen >= 8)
 		emit_store_addr = gen8_emit_store_addr;
 	else if (gen >= 4)
@@ -275,6 +272,9 @@ igt_main
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(i915);
+
+		/* could use BLT_FILL instead for gen2 */
+		igt_require(gem_can_store_dword(i915, 0));
 
 		igt_fork_hang_detector(i915);
 	}
