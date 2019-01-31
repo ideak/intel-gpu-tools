@@ -3223,10 +3223,9 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 			pipe_obj->values[IGT_CRTC_OUT_FENCE_PTR] = 0;
 			pipe_obj->changed = 0;
 		} else {
-			igt_pipe_obj_clear_prop_changed(pipe_obj, IGT_CRTC_BACKGROUND);
-			igt_pipe_obj_clear_prop_changed(pipe_obj, IGT_CRTC_CTM);
-			igt_pipe_obj_clear_prop_changed(pipe_obj, IGT_CRTC_DEGAMMA_LUT);
-			igt_pipe_obj_clear_prop_changed(pipe_obj, IGT_CRTC_GAMMA_LUT);
+			for (i = 0; i < IGT_NUM_CRTC_PROPS; i++)
+				if (!is_atomic_prop(i))
+					igt_pipe_obj_clear_prop_changed(pipe_obj, i);
 
 			if (s != COMMIT_UNIVERSAL) {
 				igt_pipe_obj_clear_prop_changed(pipe_obj, IGT_CRTC_MODE_ID);
