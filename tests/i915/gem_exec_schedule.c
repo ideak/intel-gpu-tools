@@ -29,9 +29,10 @@
 #include <signal.h>
 
 #include "igt.h"
-#include "igt_vgem.h"
+#include "igt_gpu_power.h"
 #include "igt_rand.h"
 #include "igt_sysfs.h"
+#include "igt_vgem.h"
 #include "i915/gem_ring.h"
 
 #define LO 0
@@ -1202,6 +1203,65 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	munmap(result, 4096);
 }
 
+static void measure_semaphore_power(int i915)
+{
+	struct gpu_power power;
+	unsigned int engine, signaler;
+
+	igt_require(gpu_power_open(&power) == 0);
+
+	for_each_physical_engine(i915, signaler) {
+		struct gpu_power_sample s_spin[2];
+		struct gpu_power_sample s_sema[2];
+		double baseline, total;
+		int64_t jiffie = 1;
+		igt_spin_t *spin;
+
+		spin = __igt_spin_batch_new(i915,
+					    .engine = signaler,
+					    .flags = IGT_SPIN_POLL_RUN);
+		gem_wait(i915, spin->handle, &jiffie); /* waitboost */
+		igt_assert(spin->running);
+		igt_spin_busywait_until_running(spin);
+
+		gpu_power_read(&power, &s_spin[0]);
+		usleep(100*1000);
+		gpu_power_read(&power, &s_spin[1]);
+
+		/* Add a waiter to each engine */
+		for_each_physical_engine(i915, engine) {
+			igt_spin_t *sema;
+
+			if (engine == signaler)
+				continue;
+
+			sema = __igt_spin_batch_new(i915,
+						    .engine = engine,
+						    .dependency = spin->handle);
+
+			igt_spin_batch_free(i915, sema);
+		}
+		usleep(10); /* just give the tasklets a chance to run */
+
+		gpu_power_read(&power, &s_sema[0]);
+		usleep(100*1000);
+		gpu_power_read(&power, &s_sema[1]);
+
+		igt_spin_batch_free(i915, spin);
+
+		baseline = gpu_power_W(&power, &s_spin[0], &s_spin[1]);
+		total = gpu_power_W(&power, &s_sema[0], &s_sema[1]);
+
+		igt_info("%s: %.1fmW + %.1fmW (total %1.fmW)\n",
+			 e__->name,
+			 1e3 * baseline,
+			 1e3 * (total - baseline),
+			 1e3 * total);
+	}
+
+	gpu_power_close(&power);
+}
+
 igt_main
 {
 	const struct intel_execution_engine *e;
@@ -1360,6 +1420,16 @@ igt_main
 					test_pi_ringfull(fd, e->exec_id | e->flags);
 			}
 		}
+	}
+
+	igt_subtest_group {
+		igt_fixture {
+			igt_require(gem_scheduler_enabled(fd));
+			igt_require(gem_scheduler_has_semaphores(fd));
+		}
+
+		igt_subtest("semaphore-power")
+			measure_semaphore_power(fd);
 	}
 
 	igt_fixture {
