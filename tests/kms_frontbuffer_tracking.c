@@ -1134,7 +1134,7 @@ static bool disable_features(const struct test_mode *t)
 
 	fbc_disable();
 	drrs_disable();
-	return psr_disable(drm.debugfs);
+	return psr.can_test ? psr_disable(drm.debugfs) : false;
 }
 
 static void *busy_thread_func(void *data)

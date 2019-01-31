@@ -106,7 +106,7 @@ static bool psr_set(int debugfs_fd, int mode)
 
 	ret = has_psr_debugfs(debugfs_fd);
 	if (ret == -ENODEV) {
-		igt_skip_on_f(mode >= PSR_MODE_1, "PSR not available\n");
+		igt_skip("PSR not available\n");
 		return false;
 	}
 
