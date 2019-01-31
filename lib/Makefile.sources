@@ -26,6 +26,8 @@ lib_source_list =	 	\
 	igt_color_encoding.c	\
 	igt_color_encoding.h	\
 	igt_edid_template.h	\
+	igt_gpu_power.c		\
+	igt_gpu_power.h		\
 	igt_gt.c		\
 	igt_gt.h		\
 	igt_gvt.c		\

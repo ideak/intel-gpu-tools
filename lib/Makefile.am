@@ -84,4 +84,5 @@ libintel_tools_la_LIBADD = \
 	$(LIBUDEV_LIBS) \
 	$(PIXMAN_LIBS) \
 	$(GLIB_LIBS) \
+	libigt_perf.la \
 	-lm
