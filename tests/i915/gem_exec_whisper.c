@@ -28,8 +28,9 @@
  */
 
 #include "igt.h"
-#include "igt_gt.h"
 #include "igt_debugfs.h"
+#include "igt_gpu_power.h"
+#include "igt_gt.h"
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 
@@ -192,6 +193,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	unsigned int reloc_migrations = 0;
 	unsigned int reloc_interruptions = 0;
 	unsigned int eb_migrations = 0;
+	struct gpu_power_sample sample[2];
+	struct gpu_power power;
 	uint64_t old_offset;
 	int i, n, loc;
 	int debugfs;
@@ -202,6 +205,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	}
 
 	debugfs = igt_debugfs_dir(fd);
+	gpu_power_open(&power);
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
@@ -226,6 +230,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		init_hang(&hang);
 
 	intel_detect_and_clear_missed_interrupts(fd);
+	gpu_power_read(&power, &sample[0]);
 	igt_fork(child, flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1)  {
 		unsigned int pass;
 
@@ -495,6 +500,10 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		fini_hang(&hang);
 	else
 		igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+	if (gpu_power_read(&power, &sample[1]))  {
+		igt_info("Total energy used: %.1fmJ\n",
+			 gpu_power_J(&power, &sample[0], &sample[1]) * 1e3);
+	}
 
 	close(debugfs);
 }
