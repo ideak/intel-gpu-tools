@@ -38,6 +38,12 @@
 
 #include "igt_color_encoding.h"
 
+/*
+ * Internal format to denote a buffer compatible with pixman's
+ * floating point format. Range [0-1].
+ */
+#define IGT_FORMAT_FLOAT fourcc_code('I', 'G', 'F', 'x')
+
 /**
  * igt_fb_t:
  * @fb_id: KMS ID of the framebuffer

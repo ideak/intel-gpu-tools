@@ -136,10 +136,17 @@ fi
 PKG_CHECK_MODULES(XRANDR, xrandr >= 1.3, AC_DEFINE(HAVE_XRANDR, 1, [Have libXrandr]), [have_xrandr=no])
 
 # for testdisplay
-PKG_CHECK_MODULES(CAIRO, [cairo >= 1.12.0])
+PKG_CHECK_MODULES(CAIRO, [cairo >= 1.17.2], [],
+	[AC_MSG_WARN([Cairo too old, HDR formats not available. Upgrade to cairo 1.17.2])
+	PKG_CHECK_MODULES(CAIRO, [cairo >= 1.12.0])]
+)
 PKG_CHECK_MODULES(LIBUDEV, [libudev])
 PKG_CHECK_MODULES(GLIB, [glib-2.0])
-PKG_CHECK_MODULES(PIXMAN, [pixman-1])
+PKG_CHECK_MODULES(PIXMAN, [pixman-1 >= 0.36.0], [], [
+	AC_MSG_WARN([Pixman too old, HDR formats not available. Upgrade to pixman 0.36.0])
+	PKG_CHECK_MODULES(PIXMAN, [pixman-1])
+])
+
 PKG_CHECK_MODULES(GSL, [gsl], [gsl=yes], [gsl=no])
 AM_CONDITIONAL(HAVE_GSL, [test "x$gsl" = xyes])
 

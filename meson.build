@@ -336,3 +336,13 @@ message('=============')
 foreach str : build_info
 	message(str)
 endforeach
+
+if cairo.version().version_compare('<1.17.2')
+	if pixman.version().version_compare('<0.36.0')
+		warning('Pixman < 0.36.0 found, cannot test HDR formats')
+	endif
+	warning('Cairo < 1.17.2 found, cannot test HDR formats')
+elif pixman.version().version_compare('<0.36.0')
+	# Cairo 1.17.2 requires 0.36.0 to compile, but somehow it went missing?
+	error('Cairo with floating point support found, but pixman version too old')
+endif

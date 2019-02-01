@@ -62,6 +62,20 @@
 
 #define PIXMAN_invalid	0
 
+#if CAIRO_VERSION < CAIRO_VERSION_ENCODE(1, 17, 2)
+/*
+ * We need cairo 1.17.2 to use HDR formats, but the only thing added is a value
+ * to cairo_format_t.
+ *
+ * To prevent going outside the enum, make cairo_format_t an int and define
+ * ourselves.
+ */
+
+#define CAIRO_FORMAT_RGB96F (6)
+#define CAIRO_FORMAT_RGBA128F (7)
+#define cairo_format_t int
+#endif
+
 /* drm fourcc/cairo format maps */
 static const struct format_desc_struct {
 	const char *name;
@@ -204,6 +218,25 @@ static const struct format_desc_struct {
 	  .cairo_id = CAIRO_FORMAT_RGB24,
 	  .num_planes = 3, .plane_bpp = { 8, 8, 8, },
 	  .hsub = 2, .vsub = 1,
+	},
+	{ .name = "P010", .depth = -1, .drm_id = DRM_FORMAT_P010,
+	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .num_planes = 2, .plane_bpp = { 16, 32 },
+	  .vsub = 2, .hsub = 2,
+	},
+	{ .name = "P012", .depth = -1, .drm_id = DRM_FORMAT_P012,
+	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .num_planes = 2, .plane_bpp = { 16, 32 },
+	  .vsub = 2, .hsub = 2,
+	},
+	{ .name = "P016", .depth = -1, .drm_id = DRM_FORMAT_P016,
+	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .num_planes = 2, .plane_bpp = { 16, 32 },
+	  .vsub = 2, .hsub = 2,
+	},
+	{ .name = "IGT-FLOAT", .depth = -1, .drm_id = IGT_FORMAT_FLOAT,
+	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .num_planes = 1, .plane_bpp = { 128 },
 	},
 };
 #define for_each_format(f)	\
@@ -554,6 +587,14 @@ static void clear_yuv_buffer(struct igt_fb *fb)
 		wmemset(ptr + fb->offsets[0],
 			full_range ? 0x00800080 : 0x10801080,
 			fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+		break;
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
+		wmemset(ptr, full_range ? 0 : 0x10001000,
+			fb->offsets[1] / sizeof(wchar_t));
+		wmemset(ptr + fb->offsets[1], 0x80008000,
+			fb->strides[1] * fb->plane_height[1] / sizeof(wchar_t));
 		break;
 	}
 
@@ -1552,6 +1593,7 @@ struct fb_convert_blit_upload {
 };
 
 static void *igt_fb_create_cairo_shadow_buffer(int fd,
+					       unsigned drm_format,
 					       unsigned int width,
 					       unsigned int height,
 					       struct igt_fb *shadow)
@@ -1561,7 +1603,7 @@ static void *igt_fb_create_cairo_shadow_buffer(int fd,
 	igt_assert(shadow);
 
 	fb_init(shadow, fd, width, height,
-		DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+		drm_format, LOCAL_DRM_FORMAT_MOD_NONE,
 		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
 	shadow->strides[0] = ALIGN(width * shadow->plane_bpp[0], 16);
@@ -1658,6 +1700,9 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 	case DRM_FORMAT_NV16:
 	case DRM_FORMAT_NV21:
 	case DRM_FORMAT_NV61:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
 		params->y_inc = 1;
 		params->uv_inc = 2;
 		break;
@@ -1693,6 +1738,9 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 	case DRM_FORMAT_YUV422:
 	case DRM_FORMAT_YVU420:
 	case DRM_FORMAT_YVU422:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
 		params->y_stride = fb->strides[0];
 		params->uv_stride = fb->strides[1];
 		break;
@@ -1734,6 +1782,12 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 		params->y_offset = fb->offsets[0];
 		params->u_offset = fb->offsets[2];
 		params->v_offset = fb->offsets[1];
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
+		params->y_offset = fb->offsets[0];
+		params->u_offset = fb->offsets[1];
+		params->v_offset = fb->offsets[1] + 2;
 		break;
 
 	case DRM_FORMAT_YUYV:
@@ -1917,6 +1971,178 @@ static void convert_rgb24_to_yuv(struct fb_convert *cvt)
 	}
 }
 
+static void read_rgbf(struct igt_vec4 *rgb, const float *rgb24)
+{
+	rgb->d[0] = rgb24[0];
+	rgb->d[1] = rgb24[1];
+	rgb->d[2] = rgb24[2];
+	rgb->d[3] = 1.0f;
+}
+
+static void write_rgbf(float *rgb24, const struct igt_vec4 *rgb)
+{
+	rgb24[0] = rgb->d[0];
+	rgb24[1] = rgb->d[1];
+	rgb24[2] = rgb->d[2];
+}
+
+static void convert_yuv16_to_float(struct fb_convert *cvt)
+{
+	const struct format_desc_struct *src_fmt =
+		lookup_drm_format(cvt->src.fb->drm_format);
+	int i, j;
+	uint8_t fpp = 3;
+	uint16_t *y, *u, *v;
+	float *ptr = cvt->dst.ptr;
+	unsigned int float_stride = cvt->dst.fb->strides[0] / sizeof(*ptr);
+	struct igt_mat4 m = igt_ycbcr_to_rgb_matrix(cvt->src.fb->drm_format,
+						    cvt->dst.fb->drm_format,
+						    cvt->src.fb->color_encoding,
+						    cvt->src.fb->color_range);
+	uint16_t *buf;
+	struct yuv_parameters params = { };
+
+	igt_assert(cvt->dst.fb->drm_format == IGT_FORMAT_FLOAT &&
+		   igt_format_is_yuv(cvt->src.fb->drm_format));
+
+	buf = convert_src_get(cvt);
+	get_yuv_parameters(cvt->src.fb, &params);
+	igt_assert(!(params.y_offset % sizeof(*buf)) &&
+		   !(params.u_offset % sizeof(*buf)) &&
+		   !(params.v_offset % sizeof(*buf)));
+
+	y = buf + params.y_offset / sizeof(*buf);
+	u = buf + params.u_offset / sizeof(*buf);
+	v = buf + params.v_offset / sizeof(*buf);
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		const uint16_t *y_tmp = y;
+		const uint16_t *u_tmp = u;
+		const uint16_t *v_tmp = v;
+		float *rgb_tmp = ptr;
+
+		for (j = 0; j < cvt->dst.fb->width; j++) {
+			struct igt_vec4 rgb, yuv;
+
+			yuv.d[0] = *y_tmp;
+			yuv.d[1] = *u_tmp;
+			yuv.d[2] = *v_tmp;
+			yuv.d[3] = 1.0f;
+
+			rgb = igt_matrix_transform(&m, &yuv);
+			write_rgbf(rgb_tmp, &rgb);
+
+			rgb_tmp += fpp;
+			y_tmp += params.y_inc;
+
+			if ((src_fmt->hsub == 1) || (j % src_fmt->hsub)) {
+				u_tmp += params.uv_inc;
+				v_tmp += params.uv_inc;
+			}
+		}
+
+		ptr += float_stride;
+		y += params.y_stride / sizeof(*y);
+
+		if ((src_fmt->vsub == 1) || (i % src_fmt->vsub)) {
+			u += params.uv_stride / sizeof(*u);
+			v += params.uv_stride / sizeof(*v);
+		}
+	}
+
+	convert_src_put(cvt, buf);
+}
+
+static void convert_float_to_yuv16(struct fb_convert *cvt)
+{
+	const struct format_desc_struct *dst_fmt =
+		lookup_drm_format(cvt->dst.fb->drm_format);
+	int i, j;
+	uint16_t *y, *u, *v;
+	const float *ptr = cvt->src.ptr;
+	uint8_t fpp = 3;
+	unsigned float_stride = cvt->src.fb->strides[0] / sizeof(*ptr);
+	struct igt_mat4 m = igt_rgb_to_ycbcr_matrix(cvt->src.fb->drm_format,
+						    cvt->dst.fb->drm_format,
+						    cvt->dst.fb->color_encoding,
+						    cvt->dst.fb->color_range);
+	struct yuv_parameters params = { };
+
+	igt_assert(cvt->src.fb->drm_format == IGT_FORMAT_FLOAT &&
+		   igt_format_is_yuv(cvt->dst.fb->drm_format));
+
+	get_yuv_parameters(cvt->dst.fb, &params);
+	igt_assert(!(params.y_offset % sizeof(*y)) &&
+		   !(params.u_offset % sizeof(*u)) &&
+		   !(params.v_offset % sizeof(*v)));
+
+	y = cvt->dst.ptr + params.y_offset;
+	u = cvt->dst.ptr + params.u_offset;
+	v = cvt->dst.ptr + params.v_offset;
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		const float *rgb_tmp = ptr;
+		uint16_t *y_tmp = y;
+		uint16_t *u_tmp = u;
+		uint16_t *v_tmp = v;
+
+		for (j = 0; j < cvt->dst.fb->width; j++) {
+			const float *pair_float = rgb_tmp;
+			struct igt_vec4 pair_rgb, rgb;
+			struct igt_vec4 pair_yuv, yuv;
+
+			read_rgbf(&rgb, rgb_tmp);
+			yuv = igt_matrix_transform(&m, &rgb);
+
+			rgb_tmp += fpp;
+
+			*y_tmp = yuv.d[0];
+			y_tmp += params.y_inc;
+
+			if ((i % dst_fmt->vsub) || (j % dst_fmt->hsub))
+				continue;
+
+			/*
+			 * We assume the MPEG2 chroma siting convention, where
+			 * pixel center for Cb'Cr' is between the left top and
+			 * bottom pixel in a 2x2 block, so take the average.
+			 *
+			 * Therefore, if we use subsampling, we only really care
+			 * about two pixels all the time, either the two
+			 * subsequent pixels horizontally, vertically, or the
+			 * two corners in a 2x2 block.
+			 *
+			 * The only corner case is when we have an odd number of
+			 * pixels, but this can be handled pretty easily by not
+			 * incrementing the paired pixel pointer in the
+			 * direction it's odd in.
+			 */
+			if (j != (cvt->dst.fb->width - 1))
+				pair_float += (dst_fmt->hsub - 1) * fpp;
+
+			if (i != (cvt->dst.fb->height - 1))
+				pair_float += float_stride * (dst_fmt->vsub - 1);
+
+			read_rgbf(&pair_rgb, pair_float);
+			pair_yuv = igt_matrix_transform(&m, &pair_rgb);
+
+			*u_tmp = (yuv.d[1] + pair_yuv.d[1]) / 2.0f;
+			*v_tmp = (yuv.d[2] + pair_yuv.d[2]) / 2.0f;
+
+			u_tmp += params.uv_inc;
+			v_tmp += params.uv_inc;
+		}
+
+		ptr += float_stride;
+		y += params.y_stride / sizeof(*y);
+
+		if ((i % dst_fmt->vsub) == (dst_fmt->vsub - 1)) {
+			u += params.uv_stride / sizeof(*u);
+			v += params.uv_stride / sizeof(*v);
+		}
+	}
+}
+
 static void convert_pixman(struct fb_convert *cvt)
 {
 	pixman_format_code_t src_pixman = drm_format_to_pixman(cvt->src.fb->drm_format);
@@ -1998,6 +2224,22 @@ static void fb_convert(struct fb_convert *cvt)
 			convert_rgb24_to_yuv(cvt);
 			return;
 		}
+	} else if (cvt->dst.fb->drm_format == IGT_FORMAT_FLOAT) {
+		switch (cvt->src.fb->drm_format) {
+		case DRM_FORMAT_P010:
+		case DRM_FORMAT_P012:
+		case DRM_FORMAT_P016:
+			convert_yuv16_to_float(cvt);
+			return;
+		}
+	} else if (cvt->src.fb->drm_format == IGT_FORMAT_FLOAT) {
+		switch (cvt->dst.fb->drm_format) {
+		case DRM_FORMAT_P010:
+		case DRM_FORMAT_P012:
+		case DRM_FORMAT_P016:
+			convert_float_to_yuv16(cvt);
+			return;
+		}
 	}
 
 	igt_assert_f(false,
@@ -2038,12 +2280,37 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 {
 	struct fb_convert_blit_upload *blit = malloc(sizeof(*blit));
 	struct fb_convert cvt = { };
+	const struct format_desc_struct *f = lookup_drm_format(fb->drm_format);
+	unsigned drm_format;
+	cairo_format_t cairo_id;
+
+	if (f->cairo_id != CAIRO_FORMAT_INVALID) {
+		cairo_id = f->cairo_id;
+
+		switch (f->cairo_id) {
+		case CAIRO_FORMAT_RGB96F:
+		case CAIRO_FORMAT_RGBA128F:
+			drm_format = IGT_FORMAT_FLOAT;
+			break;
+		case CAIRO_FORMAT_RGB24:
+			drm_format = DRM_FORMAT_XRGB8888;
+			break;
+		default:
+			igt_assert_f(0, "Unsupported format %u", f->cairo_id);
+		}
+	} else if (PIXMAN_FORMAT_A(f->pixman_id)) {
+		cairo_id = CAIRO_FORMAT_ARGB32;
+		drm_format = DRM_FORMAT_ARGB8888;
+	} else {
+		cairo_id = CAIRO_FORMAT_RGB24;
+		drm_format = DRM_FORMAT_XRGB8888;
+	}
 
 	igt_assert(blit);
 
 	blit->base.fd = fd;
 	blit->base.fb = fb;
-	blit->shadow_ptr = igt_fb_create_cairo_shadow_buffer(fd,
+	blit->shadow_ptr = igt_fb_create_cairo_shadow_buffer(fd, drm_format,
 							     fb->width,
 							     fb->height,
 							     &blit->shadow_fb);
@@ -2070,7 +2337,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 
 	fb->cairo_surface =
 		cairo_image_surface_create_for_data(blit->shadow_ptr,
-						    CAIRO_FORMAT_RGB24,
+						    cairo_id,
 						    fb->width, fb->height,
 						    blit->shadow_fb.strides[0]);
 
@@ -2135,6 +2402,21 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 			create_cairo_surface__blit(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);
+
+		if (f->cairo_id == CAIRO_FORMAT_RGB96F ||
+		    f->cairo_id == CAIRO_FORMAT_RGBA128F) {
+			cairo_status_t status = cairo_surface_status(fb->cairo_surface);
+
+			igt_skip_on_f(status == CAIRO_STATUS_INVALID_FORMAT &&
+				      cairo_version() < CAIRO_VERSION_ENCODE(1, 17, 2),
+				      "Cairo version too old, need 1.17.2, have %s\n",
+				      cairo_version_string());
+
+			igt_skip_on_f(status == CAIRO_STATUS_NO_MEMORY &&
+				      pixman_version() < PIXMAN_VERSION_ENCODE(0, 36, 0),
+				      "Pixman version too old, need 0.36.0, have %s\n",
+				      pixman_version_string());
+		}
 	}
 
 	igt_assert(cairo_surface_status(fb->cairo_surface) == CAIRO_STATUS_SUCCESS);
@@ -2348,6 +2630,9 @@ bool igt_format_is_yuv(uint32_t drm_format)
 	case DRM_FORMAT_YUV422:
 	case DRM_FORMAT_YVU420:
 	case DRM_FORMAT_YVU422:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
 	case DRM_FORMAT_YUYV:
 	case DRM_FORMAT_YVYU:
 	case DRM_FORMAT_UYVY:
