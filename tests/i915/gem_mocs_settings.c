@@ -453,26 +453,40 @@ igt_main
 			continue;
 
 		for (unsigned mode = NONE; mode < MAX_MOCS_TEST_MODES; mode++) {
-			for (unsigned flags = 0; flags < ALL_MOCS_FLAGS + 1; flags++) {
-				/* Trying to test non-render engines for dirtying MOCS
-				 * values from one context having effect on different
-				 * context is bound to fail - only render engine is
-				 * doing context save/restore of MOCS registers.
-				 * Let's also limit testing values on non-default
-				 * contexts to render-only.
-				 */
-				if (flags && e->exec_id != I915_EXEC_RENDER)
-					continue;
+			igt_subtest_group {
+				igt_hang_t hang = {};
 
-				igt_subtest_f("mocs-%s%s%s-%s",
-					      test_modes[mode],
-					      flags & MOCS_NON_DEFAULT_CTX ? "-ctx": "",
-					      flags & MOCS_DIRTY_VALUES ? "-dirty" : "",
-					      e->name) {
-					if (flags & (MOCS_NON_DEFAULT_CTX | MOCS_DIRTY_VALUES))
-						gem_require_contexts(fd);
+				igt_fixture {
+					if (mode == RESET)
+						hang = igt_allow_hang(fd, 0, 0);
+				}
 
-					run_test(fd, e->exec_id | e->flags, flags, mode);
+				for (unsigned flags = 0; flags < ALL_MOCS_FLAGS + 1; flags++) {
+					/* Trying to test non-render engines for dirtying MOCS
+					 * values from one context having effect on different
+					 * context is bound to fail - only render engine is
+					 * doing context save/restore of MOCS registers.
+					 * Let's also limit testing values on non-default
+					 * contexts to render-only.
+					 */
+					if (flags && e->exec_id != I915_EXEC_RENDER)
+						continue;
+
+					igt_subtest_f("mocs-%s%s%s-%s",
+						      test_modes[mode],
+						      flags & MOCS_NON_DEFAULT_CTX ? "-ctx": "",
+						      flags & MOCS_DIRTY_VALUES ? "-dirty" : "",
+						      e->name) {
+						if (flags & (MOCS_NON_DEFAULT_CTX | MOCS_DIRTY_VALUES))
+							gem_require_contexts(fd);
+
+						run_test(fd, e->exec_id | e->flags, flags, mode);
+					}
+				}
+
+				igt_fixture {
+					if (mode == RESET)
+						igt_disallow_hang(fd, hang);
 				}
 			}
 		}
