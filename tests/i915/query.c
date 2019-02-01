@@ -456,7 +456,7 @@ test_query_topology_known_pci_ids(int fd, int devid)
 	switch (dev_info->gt) {
 	case 1:
 		igt_assert_eq(n_slices, 1);
-		igt_assert(n_subslices == 2 || n_subslices == 3);
+		igt_assert(n_subslices == 1 || n_subslices == 2 || n_subslices == 3);
 		break;
 	case 2:
 		igt_assert_eq(n_slices, 1);
