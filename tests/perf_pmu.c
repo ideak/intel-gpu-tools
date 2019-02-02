@@ -707,7 +707,7 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e,
 	} while (!obj_ptr[1]);
 
 	igt_assert_f(igt_wait(pmu_read_single(fd) != val[0], 10, 1),
-		     "sampling failed to start withing 10ms");
+		     "sampling failed to start withing 10ms\n");
 
 	val[0] = __pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
