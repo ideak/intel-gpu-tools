@@ -583,6 +583,7 @@ static void test_cursor_size(data_t *data)
 		igt_pipe_crc_collect_crc(pipe_crc, &crc[i]);
 	}
 	cursor_disable(data);
+	igt_remove_fb(data->drm_fd, &data->fb);
 	/* Software test loop */
 	for (i = 0, size = cursor_max_size; size >= 64; size /= 2, i++) {
 		/* Now render the same in software and collect crc */
