@@ -411,26 +411,28 @@ static void test_cursor_alpha(data_t *data, double a)
 	igt_crc_t crc, ref_crc;
 	cairo_t *cr;
 	uint32_t fb_id;
-	int curw=data->curw;
-	int curh=data->curh;
+	int curw = data->curw;
+	int curh = data->curh;
+	int ret;
 
 	/*alpha cursor fb*/
-	fb_id = igt_create_color_fb(data->drm_fd, curw, curh,
+	fb_id = igt_create_fb(data->drm_fd, curw, curh,
 				    DRM_FORMAT_ARGB8888,
 				    LOCAL_DRM_FORMAT_MOD_NONE,
-				    1.0, 1.0, 1.0,
 				    &data->fb);
 	igt_assert(fb_id);
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb);
-	draw_cursor(cr, 0, 0, curw, curh, a);
+	igt_paint_color_alpha(cr, 0, 0, curw, curh, 1.0, 1.0, 1.0, a);
 	igt_put_cairo_ctx(data->drm_fd, &data->fb, cr);
 
 	/*Hardware Test*/
 	cursor_enable(data);
-	igt_display_commit(display);
+	ret = drmModeSetCursor(data->drm_fd, data->output->config.crtc->crtc_id, data->fb.gem_handle, curw, curh);
+	igt_assert_eq(ret, 0);
 	igt_wait_for_vblank(data->drm_fd, data->pipe);
 	igt_pipe_crc_collect_crc(pipe_crc, &crc);
 	cursor_disable(data);
+	igt_remove_fb(data->drm_fd, &data->fb);
 
 	/*Software Test*/
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
@@ -447,7 +449,6 @@ static void test_cursor_alpha(data_t *data, double a)
 	igt_paint_color(cr, 0, 0, data->screenw, data->screenh,
 			0.0, 0.0, 0.0);
 	igt_put_cairo_ctx(data->drm_fd, &data->primary_fb, cr);
-	igt_remove_fb(data->drm_fd, &data->fb);
 }
 
 static void test_cursor_transparent(data_t *data)
