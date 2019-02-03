@@ -67,7 +67,7 @@ unsigned gem_scheduler_capability(int fd)
 }
 
 /**
- * gem_has_scheduler:
+ * gem_scheduler_enabled:
  * @fd: open i915 drm file descriptor
  *
  * Feature test macro to query whether the driver has scheduling capability.
@@ -75,11 +75,11 @@ unsigned gem_scheduler_capability(int fd)
 bool gem_scheduler_enabled(int fd)
 {
 	return gem_scheduler_capability(fd) &
-	       LOCAL_I915_SCHEDULER_CAP_ENABLED;
+		I915_SCHEDULER_CAP_ENABLED;
 }
 
 /**
- * gem_has_ctx_priority:
+ * gem_scheduler_has_ctx_priority:
  * @fd: open i915 drm file descriptor
  *
  * Feature test macro to query whether the driver supports assigning custom
@@ -88,11 +88,11 @@ bool gem_scheduler_enabled(int fd)
 bool gem_scheduler_has_ctx_priority(int fd)
 {
 	return gem_scheduler_capability(fd) &
-	       LOCAL_I915_SCHEDULER_CAP_PRIORITY;
+		I915_SCHEDULER_CAP_PRIORITY;
 }
 
 /**
- * gem_has_preemption:
+ * gem_scheduler_has_preemption:
  * @fd: open i915 drm file descriptor
  *
  * Feature test macro to query whether the driver supports preempting active
@@ -101,7 +101,21 @@ bool gem_scheduler_has_ctx_priority(int fd)
 bool gem_scheduler_has_preemption(int fd)
 {
 	return gem_scheduler_capability(fd) &
-	       LOCAL_I915_SCHEDULER_CAP_PREEMPTION;
+		I915_SCHEDULER_CAP_PREEMPTION;
+}
+
+/**
+ * gem_scheduler_has_semaphores:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether the driver supports using HW semaphores
+ * to schedule dependencies in parallel (using the HW to delay execution until
+ * ready to reduce latency).
+ */
+bool gem_scheduler_has_semaphores(int fd)
+{
+	return gem_scheduler_capability(fd) &
+		I915_SCHEDULER_CAP_SEMAPHORES;
 }
 
 /**
@@ -118,8 +132,10 @@ void gem_scheduler_print_capability(int fd)
 		return;
 
 	igt_info("Has kernel scheduler\n");
-	if (caps & LOCAL_I915_SCHEDULER_CAP_PRIORITY)
+	if (caps & I915_SCHEDULER_CAP_PRIORITY)
 		igt_info(" - With priority sorting\n");
-	if (caps & LOCAL_I915_SCHEDULER_CAP_PREEMPTION)
+	if (caps & I915_SCHEDULER_CAP_PREEMPTION)
 		igt_info(" - With preemption enabled\n");
+	if (caps & I915_SCHEDULER_CAP_SEMAPHORES)
+		igt_info(" - With HW semaphores enabled\n");
 }

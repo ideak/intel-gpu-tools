@@ -24,14 +24,13 @@
 #ifndef GEM_SCHEDULER_H
 #define GEM_SCHEDULER_H
 
-#define LOCAL_I915_SCHEDULER_CAP_ENABLED	(1 << 0)
-#define LOCAL_I915_SCHEDULER_CAP_PRIORITY	(1 << 1)
-#define LOCAL_I915_SCHEDULER_CAP_PREEMPTION	(1 << 2)
+#include <stdbool.h>
 
 unsigned gem_scheduler_capability(int fd);
 bool gem_scheduler_enabled(int fd);
 bool gem_scheduler_has_ctx_priority(int fd);
 bool gem_scheduler_has_preemption(int fd);
+bool gem_scheduler_has_semaphores(int fd);
 void gem_scheduler_print_capability(int fd);
 
 #endif /* GEM_SCHEDULER_H */
