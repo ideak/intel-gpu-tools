@@ -548,7 +548,9 @@ static int create_bo_for_fb(struct igt_fb *fb)
 			gem_set_tiling(fd, fb->gem_handle,
 				       igt_fb_mod_to_tiling(fb->tiling),
 				       fb->strides[0]);
-			clear_yuv_buffer(fd);
+
+			if (igt_format_is_yuv(fb->drm_format))
+				clear_yuv_buffer(fb);
 
 			return fb->gem_handle;
 		} else {
