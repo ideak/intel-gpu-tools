@@ -1,5 +1,5 @@
 /*
- * Copyright © 2007-2018 Intel Corporation
+ * Copyright © 2007-2019 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,10 +19,6 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Eric Anholt <eric@anholt.net>
- *    Eugeni Dodonov <eugeni.dodonov@intel.com>
  */
 
 #include <stdio.h>
@@ -41,6 +37,8 @@
 #include <errno.h>
 #include <math.h>
 #include <locale.h>
+#include <limits.h>
+#include <signal.h>
 
 #include "igt_perf.h"
 
@@ -58,7 +56,8 @@ struct pmu_counter {
 
 struct engine {
 	const char *name;
-	const char *display_name;
+	char *display_name;
+	char *short_name;
 
 	unsigned int class;
 	unsigned int instance;
@@ -142,6 +141,22 @@ static const char *class_display_name(unsigned int class)
 	}
 }
 
+static const char *class_short_name(unsigned int class)
+{
+	switch (class) {
+	case I915_ENGINE_CLASS_RENDER:
+		return "RCS";
+	case I915_ENGINE_CLASS_COPY:
+		return "BCS";
+	case I915_ENGINE_CLASS_VIDEO:
+		return "VCS";
+	case I915_ENGINE_CLASS_VIDEO_ENHANCE:
+		return "VECS";
+	default:
+		return "UNKN";
+	}
+}
+
 static int engine_cmp(const void *__a, const void *__b)
 {
 	const struct engine *a = (struct engine *)__a;
@@ -220,17 +235,18 @@ static struct engines *discover_engines(void)
 				    I915_PMU_SAMPLE_BITS) &
 				    ((1 << I915_PMU_SAMPLE_INSTANCE_BITS) - 1);
 
-		ret = snprintf(buf, sizeof(buf), "%s/%u",
+		ret = asprintf(&engine->display_name, "%s/%u",
 			       class_display_name(engine->class),
 			       engine->instance);
-		if (ret < 0 || ret == sizeof(buf)) {
-			ret = ENOBUFS;
+		if (ret <= 0) {
+			ret = errno;
 			break;
 		}
-		ret = 0;
 
-		engine->display_name = strdup(buf);
-		if (!engine->display_name) {
+		ret = asprintf(&engine->short_name, "%s/%u",
+			       class_short_name(engine->class),
+			       engine->instance);
+		if (ret <= 0) {
 			ret = errno;
 			break;
 		}
@@ -242,6 +258,8 @@ static struct engines *discover_engines(void)
 			ret = errno;
 			break;
 		}
+
+		ret = 0;
 	}
 
 	if (ret) {
@@ -551,7 +569,7 @@ static uint64_t pmu_read_multi(int fd, unsigned int num, uint64_t *val)
 	return buf[1];
 }
 
-static double __pmu_calc(struct pmu_pair *p, double d, double t, double s)
+static double pmu_calc(struct pmu_pair *p, double d, double t, double s)
 {
 	double v;
 
@@ -574,30 +592,6 @@ static void fill_str(char *buf, unsigned int bufsz, char c, unsigned int num)
 		*buf++ = c;
 
 	*buf = 0;
-}
-
-static void pmu_calc(struct pmu_counter *cnt,
-		     char *buf, unsigned int bufsz,
-		     unsigned int width, unsigned width_dec,
-		     double d, double t, double s)
-{
-	double val;
-	int len;
-
-	assert(bufsz >= (width + width_dec + 1));
-
-	if (!cnt->present) {
-		fill_str(buf, bufsz, '-', width + width_dec);
-		return;
-	}
-
-	val = __pmu_calc(&cnt->val, d, t, s);
-
-	len = snprintf(buf, bufsz, "%*.*f", width + width_dec, width_dec, val);
-	if (len < 0 || len == bufsz) {
-		fill_str(buf, bufsz, 'X', width + width_dec);
-		return;
-	}
 }
 
 static uint64_t __pmu_read_single(int fd, uint64_t *ts)
@@ -697,9 +691,559 @@ usage(const char *appname)
 		"\n"
 		"\tThe following parameters are optional:\n\n"
 		"\t[-s <ms>]       Refresh period in milliseconds (default %ums).\n"
+		"\t[-l]            List data to standard out.\n"
+		"\t[-J]            JSON data to standard out.\n"
 		"\t[-h]            Show this help text.\n"
 		"\n",
 		appname, DEFAULT_PERIOD_MS);
+}
+
+static enum {
+	INTERACTIVE,
+	STDOUT,
+	JSON
+} output_mode;
+
+struct cnt_item {
+	struct pmu_counter *pmu;
+	unsigned int fmt_width;
+	unsigned int fmt_precision;
+	double d;
+	double t;
+	double s;
+	const char *name;
+	const char *unit;
+
+	/* Internal fields. */
+	char buf[16];
+};
+
+struct cnt_group {
+	const char *name;
+	const char *display_name;
+	struct cnt_item *items;
+};
+
+static unsigned int json_indent_level;
+
+static const char *json_indent[] = {
+	"",
+	"\t",
+	"\t\t",
+	"\t\t\t",
+	"\t\t\t\t",
+	"\t\t\t\t\t",
+};
+
+#define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
+
+static unsigned int json_prev_struct_members;
+static unsigned int json_struct_members;
+
+static void
+json_open_struct(const char *name)
+{
+	assert(json_indent_level < ARRAY_SIZE(json_indent));
+
+	json_prev_struct_members = json_struct_members;
+	json_struct_members = 0;
+
+	if (name)
+		printf("%s%s\"%s\": {\n",
+		       json_prev_struct_members ? ",\n" : "",
+		       json_indent[json_indent_level],
+		       name);
+	else
+		printf("%s\n%s{\n",
+		       json_prev_struct_members ? "," : "",
+		       json_indent[json_indent_level]);
+
+	json_indent_level++;
+}
+
+static void
+json_close_struct(void)
+{
+	assert(json_indent_level > 0);
+
+	printf("\n%s}", json_indent[--json_indent_level]);
+
+	if (json_indent_level == 0)
+		fflush(stdout);
+}
+
+static unsigned int
+json_add_member(const struct cnt_group *parent, struct cnt_item *item,
+		unsigned int headers)
+{
+	assert(json_indent_level < ARRAY_SIZE(json_indent));
+
+	printf("%s%s\"%s\": ",
+		json_struct_members ? ",\n" : "",
+		json_indent[json_indent_level], item->name);
+
+	json_struct_members++;
+
+	if (!strcmp(item->name, "unit"))
+		printf("\"%s\"", item->unit);
+	else
+		printf("%f",
+		       pmu_calc(&item->pmu->val, item->d, item->t, item->s));
+
+	return 1;
+}
+
+static unsigned int stdout_level;
+
+#define STDOUT_HEADER_REPEAT 20
+static unsigned int stdout_lines = STDOUT_HEADER_REPEAT;
+
+static void
+stdout_open_struct(const char *name)
+{
+	stdout_level++;
+	assert(stdout_level > 0);
+}
+
+static void
+stdout_close_struct(void)
+{
+	assert(stdout_level > 0);
+	if (--stdout_level == 0) {
+		stdout_lines++;
+		printf("\n");
+		fflush(stdout);
+	}
+}
+
+static unsigned int
+stdout_add_member(const struct cnt_group *parent, struct cnt_item *item,
+		  unsigned int headers)
+{
+	unsigned int fmt_tot = item->fmt_width + (item->fmt_precision ? 1 : 0);
+	char buf[fmt_tot + 1];
+	double val;
+	int len;
+
+	if (!item->pmu)
+		return 0;
+	else if (!item->pmu->present)
+		return 0;
+
+	if (headers == 1) {
+		unsigned int grp_tot = 0;
+		struct cnt_item *it;
+
+		if (item != parent->items)
+			return 0;
+
+		for (it = parent->items; it->pmu; it++) {
+			if (!it->pmu->present)
+				continue;
+
+			grp_tot += 1 + it->fmt_width +
+				   (it->fmt_precision ? 1 : 0);
+		}
+
+		printf("%*s ", grp_tot - 1, parent->display_name);
+		return 0;
+	} else if (headers == 2) {
+		printf("%*s ", fmt_tot, item->unit ?: item->name);
+		return 0;
+	}
+
+	val = pmu_calc(&item->pmu->val, item->d, item->t, item->s);
+
+	len = snprintf(buf, sizeof(buf), "%*.*f",
+		       fmt_tot, item->fmt_precision, val);
+	if (len < 0 || len == sizeof(buf))
+		fill_str(buf, sizeof(buf), 'X', fmt_tot);
+
+	len = printf("%s ", buf);
+
+	return len > 0 ? len : 0;
+}
+
+static void
+term_open_struct(const char *name)
+{
+}
+
+static void
+term_close_struct(void)
+{
+}
+
+static unsigned int
+term_add_member(const struct cnt_group *parent, struct cnt_item *item,
+		unsigned int headers)
+{
+	unsigned int fmt_tot = item->fmt_width + (item->fmt_precision ? 1 : 0);
+	double val;
+	int len;
+
+	if (!item->pmu)
+		return 0;
+
+	assert(fmt_tot <= sizeof(item->buf));
+
+	if (!item->pmu->present) {
+		fill_str(item->buf, sizeof(item->buf), '-', fmt_tot);
+		return 1;
+	}
+
+	val = pmu_calc(&item->pmu->val, item->d, item->t, item->s);
+	len = snprintf(item->buf, sizeof(item->buf),
+		       "%*.*f",
+		       fmt_tot, item->fmt_precision, val);
+
+	if (len < 0 || len == sizeof(item->buf))
+		fill_str(item->buf, sizeof(item->buf), 'X', fmt_tot);
+
+	return 1;
+}
+
+struct print_operations {
+	void (*open_struct)(const char *name);
+	void (*close_struct)(void);
+	unsigned int (*add_member)(const struct cnt_group *parent,
+				   struct cnt_item *item,
+				   unsigned int headers);
+	bool (*print_group)(struct cnt_group *group, unsigned int headers);
+};
+
+static const struct print_operations *pops;
+
+static unsigned int
+present_in_group(const struct cnt_group *grp)
+{
+	unsigned int present = 0;
+	struct cnt_item *item;
+
+	for (item = grp->items; item->name; item++) {
+		if (item->pmu && item->pmu->present)
+			present++;
+	}
+
+	return present;
+}
+
+static bool
+print_group(struct cnt_group *grp, unsigned int headers)
+{
+	unsigned int consumed = 0;
+	struct cnt_item *item;
+
+	if (!present_in_group(grp))
+		return false;
+
+	pops->open_struct(grp->name);
+
+	for (item = grp->items; item->name; item++)
+		consumed += pops->add_member(grp, item, headers);
+
+	pops->close_struct();
+
+	return consumed;
+}
+
+static bool
+term_print_group(struct cnt_group *grp, unsigned int headers)
+{
+	unsigned int consumed = 0;
+	struct cnt_item *item;
+
+	pops->open_struct(grp->name);
+
+	for (item = grp->items; item->name; item++)
+		consumed += pops->add_member(grp, item, headers);
+
+	pops->close_struct();
+
+	return consumed;
+}
+
+static const struct print_operations json_pops = {
+	.open_struct = json_open_struct,
+	.close_struct = json_close_struct,
+	.add_member = json_add_member,
+	.print_group = print_group,
+};
+
+static const struct print_operations stdout_pops = {
+	.open_struct = stdout_open_struct,
+	.close_struct = stdout_close_struct,
+	.add_member = stdout_add_member,
+	.print_group = print_group,
+};
+
+static const struct print_operations term_pops = {
+	.open_struct = term_open_struct,
+	.close_struct = term_close_struct,
+	.add_member = term_add_member,
+	.print_group = term_print_group,
+};
+
+static bool print_groups(struct cnt_group **groups)
+{
+	unsigned int headers = stdout_lines % STDOUT_HEADER_REPEAT + 1;
+	bool print_data = true;
+
+	if (output_mode == STDOUT && (headers == 1 || headers == 2)) {
+		for (struct cnt_group **grp = groups; *grp; grp++)
+			print_data = pops->print_group(*grp, headers);
+	}
+
+	for (struct cnt_group **grp = groups; print_data && *grp; grp++)
+		pops->print_group(*grp, false);
+
+	return print_data;
+}
+
+static int
+print_header(struct engines *engines, double t,
+	     int lines, int con_w, int con_h, bool *consumed)
+{
+	struct pmu_counter fake_pmu = {
+		.present = true,
+		.val.cur = 1,
+	};
+	struct cnt_item period_items[] = {
+		{ &fake_pmu, 0, 0, 1.0, 1.0, t * 1e3, "duration" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "ms" },
+		{ },
+	};
+	struct cnt_group period_group = {
+		.name = "period",
+		.items = period_items,
+	};
+	struct cnt_item freq_items[] = {
+		{ &engines->freq_req, 4, 0, 1.0, t, 1, "requested", "req" },
+		{ &engines->freq_act, 4, 0, 1.0, t, 1, "actual", "act" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "MHz" },
+		{ },
+	};
+	struct cnt_group freq_group = {
+		.name = "frequency",
+		.display_name = "Freq MHz",
+		.items = freq_items,
+	};
+	struct cnt_item irq_items[] = {
+		{ &engines->irq, 8, 0, 1.0, t, 1, "count", "/s" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "irq/s" },
+		{ },
+	};
+	struct cnt_group irq_group = {
+		.name = "interrupts",
+		.display_name = "IRQ",
+		.items = irq_items,
+	};
+	struct cnt_item rc6_items[] = {
+		{ &engines->rc6, 3, 0, 1e9, t, 100, "value", "%" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "%" },
+		{ },
+	};
+	struct cnt_group rc6_group = {
+		.name = "rc6",
+		.display_name = "RC6",
+		.items = rc6_items,
+	};
+	struct cnt_item power_items[] = {
+		{ &engines->rapl, 4, 2, 1.0, t, engines->rapl_scale, "value",
+		  "W" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "W" },
+		{ },
+	};
+	struct cnt_group power_group = {
+		.name = "power",
+		.display_name = "Power",
+		.items = power_items,
+	};
+	struct cnt_group *groups[] = {
+		&period_group,
+		&freq_group,
+		&irq_group,
+		&rc6_group,
+		&power_group,
+		NULL
+	};
+
+	if (output_mode != JSON)
+		memmove(&groups[0], &groups[1],
+			sizeof(groups) - sizeof(groups[0]));
+
+	pops->open_struct(NULL);
+
+	*consumed = print_groups(groups);
+
+	if (output_mode == INTERACTIVE) {
+		printf("\033[H\033[J");
+
+		if (lines++ < con_h)
+			printf("intel-gpu-top - %s/%s MHz;  %s%% RC6; %s %s; %s irqs/s\n",
+			       freq_items[1].buf, freq_items[0].buf,
+			       rc6_items[0].buf, power_items[0].buf,
+			       engines->rapl_unit,
+			       irq_items[0].buf);
+
+		if (lines++ < con_h)
+			printf("\n");
+	}
+
+	return lines;
+}
+
+static int
+print_imc(struct engines *engines, double t, int lines, int con_w, int con_h)
+{
+	struct cnt_item imc_items[] = {
+		{ &engines->imc_reads, 6, 0, 1.0, t, engines->imc_reads_scale,
+		  "reads", "rd" },
+		{ &engines->imc_writes, 6, 0, 1.0, t, engines->imc_writes_scale,
+		  "writes", "wr" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit" },
+		{ },
+	};
+	struct cnt_group imc_group = {
+		.name = "imc-bandwidth",
+		.items = imc_items,
+	};
+	struct cnt_group *groups[] = {
+		&imc_group,
+		NULL
+	};
+	int ret;
+
+	ret = asprintf((char **)&imc_group.display_name, "IMC %s/s",
+			engines->imc_reads_unit);
+	assert(ret >= 0);
+
+	ret = asprintf((char **)&imc_items[2].unit, "%s/s",
+			engines->imc_reads_unit);
+	assert(ret >= 0);
+
+	print_groups(groups);
+
+	free((void *)imc_group.display_name);
+	free((void *)imc_items[2].unit);
+
+	if (output_mode == INTERACTIVE) {
+		if (lines++ < con_h)
+			printf("      IMC reads:   %s %s/s\n",
+			       imc_items[0].buf, engines->imc_reads_unit);
+
+		if (lines++ < con_h)
+			printf("     IMC writes:   %s %s/s\n",
+			       imc_items[1].buf, engines->imc_writes_unit);
+
+		if (lines++ < con_h)
+			printf("\n");
+	}
+
+	return lines;
+}
+
+static int
+print_engines_header(struct engines *engines, double t,
+		     int lines, int con_w, int con_h)
+{
+	for (unsigned int i = 0;
+	     i < engines->num_engines && lines < con_h;
+	     i++) {
+		struct engine *engine = engine_ptr(engines, i);
+
+		if (!engine->num_counters)
+			continue;
+
+		pops->open_struct("engines");
+
+		if (output_mode == INTERACTIVE) {
+			const char *a = "          ENGINE      BUSY ";
+			const char *b = " MI_SEMA MI_WAIT";
+
+			printf("\033[7m%s%*s%s\033[0m\n",
+			       a, (int)(con_w - 1 - strlen(a) - strlen(b)),
+			       " ", b);
+
+			lines++;
+		}
+
+		break;
+	}
+
+	return lines;
+}
+
+static int
+print_engine(struct engines *engines, unsigned int i, double t,
+	     int lines, int con_w, int con_h)
+{
+	struct engine *engine = engine_ptr(engines, i);
+	struct cnt_item engine_items[] = {
+		{ &engine->busy, 6, 2, 1e9, t, 100, "busy", "%" },
+		{ &engine->sema, 3, 0, 1e9, t, 100, "sema", "se" },
+		{ &engine->wait, 3, 0, 1e9, t, 100, "wait", "wa" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "%" },
+		{ },
+	};
+	struct cnt_group engine_group = {
+		.name = engine->display_name,
+		.display_name = engine->short_name,
+		.items = engine_items,
+	};
+	struct cnt_group *groups[] = {
+		&engine_group,
+		NULL
+	};
+
+	if (!engine->num_counters)
+		return lines;
+
+	print_groups(groups);
+
+	if (output_mode == INTERACTIVE) {
+		unsigned int max_w = con_w - 1;
+		unsigned int len;
+		char buf[128];
+		double val;
+
+		len = snprintf(buf, sizeof(buf), "    %s%%    %s%%",
+			       engine_items[1].buf, engine_items[2].buf);
+
+		len += printf("%16s %s%% ",
+			      engine->display_name, engine_items[0].buf);
+
+		val = pmu_calc(&engine->busy.val, 1e9, t, 100);
+		print_percentage_bar(val, max_w - len);
+
+		printf("%s\n", buf);
+
+		lines++;
+	}
+
+	return lines;
+}
+
+static int
+print_engines_footer(struct engines *engines, double t,
+		     int lines, int con_w, int con_h)
+{
+	pops->close_struct();
+	pops->close_struct();
+
+	if (output_mode == INTERACTIVE) {
+		if (lines++ < con_h)
+			printf("\n");
+	}
+
+	return lines;
+}
+
+static bool stop_top;
+
+static void sigint_handler(int  sig)
+{
+	stop_top = true;
 }
 
 int main(int argc, char **argv)
@@ -711,10 +1255,16 @@ int main(int argc, char **argv)
 	int ret, ch;
 
 	/* Parse options */
-	while ((ch = getopt(argc, argv, "s:h")) != -1) {
+	while ((ch = getopt(argc, argv, "s:Jlh")) != -1) {
 		switch (ch) {
 		case 's':
 			period_us = atoi(optarg) * 1000;
+			break;
+		case 'J':
+			output_mode = JSON;
+			break;
+		case 'l':
+			output_mode = STDOUT;
 			break;
 		case 'h':
 			usage(argv[0]);
@@ -725,6 +1275,31 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
+
+	if (output_mode == INTERACTIVE && isatty(1) != 1)
+		output_mode = STDOUT;
+
+	if (output_mode != INTERACTIVE) {
+		sighandler_t sig = signal(SIGINT, sigint_handler);
+
+		if (sig == SIG_ERR)
+			fprintf(stderr, "Failed to install signal handler!\n");
+	}
+
+	switch (output_mode) {
+	case INTERACTIVE:
+		pops = &term_pops;
+		break;
+	case STDOUT:
+		pops = &stdout_pops;
+		break;
+	case JSON:
+		pops = &json_pops;
+		break;
+	default:
+		assert(0);
+		break;
+	};
 
 	engines = discover_engines();
 	if (!engines) {
@@ -743,21 +1318,16 @@ int main(int argc, char **argv)
 
 	pmu_sample(engines);
 
-	for (;;) {
-		double t;
-#define BUFSZ 16
-		char freq[BUFSZ];
-		char fact[BUFSZ];
-		char irq[BUFSZ];
-		char rc6[BUFSZ];
-		char power[BUFSZ];
-		char reads[BUFSZ];
-		char writes[BUFSZ];
-		struct winsize ws;
+	while (!stop_top) {
+		bool consumed = false;
 		int lines = 0;
+		struct winsize ws;
+		double t;
 
 		/* Update terminal size. */
-		if (ioctl(0, TIOCGWINSZ, &ws) != -1) {
+		if (output_mode != INTERACTIVE) {
+			con_w = con_h = INT_MAX;
+		} else if (ioctl(0, TIOCGWINSZ, &ws) != -1) {
 			con_w = ws.ws_col;
 			con_h = ws.ws_row;
 		}
@@ -765,87 +1335,32 @@ int main(int argc, char **argv)
 		pmu_sample(engines);
 		t = (double)(engines->ts.cur - engines->ts.prev) / 1e9;
 
-		printf("\033[H\033[J");
+		if (stop_top)
+			break;
 
-		pmu_calc(&engines->freq_req, freq, BUFSZ, 4, 0, 1.0, t, 1);
-		pmu_calc(&engines->freq_act, fact, BUFSZ, 4, 0, 1.0, t, 1);
-		pmu_calc(&engines->irq, irq, BUFSZ, 8, 0, 1.0, t, 1);
-		pmu_calc(&engines->rc6, rc6, BUFSZ, 3, 0, 1e9, t, 100);
-		pmu_calc(&engines->rapl, power, BUFSZ, 4, 2, 1.0, t,
-			 engines->rapl_scale);
-		pmu_calc(&engines->imc_reads, reads, BUFSZ, 6, 0, 1.0, t,
-			 engines->imc_reads_scale);
-		pmu_calc(&engines->imc_writes, writes, BUFSZ, 6, 0, 1.0, t,
-			 engines->imc_writes_scale);
+		while (!consumed) {
+			lines = print_header(engines, t, lines, con_w, con_h,
+					     &consumed);
 
-		if (lines++ < con_h)
-			printf("intel-gpu-top - %s/%s MHz;  %s%% RC6; %s %s; %s irqs/s\n",
-			       fact, freq, rc6, power, engines->rapl_unit, irq);
+			if (engines->imc_fd)
+				lines = print_imc(engines, t, lines, con_w,
+						  con_h);
 
-		if (lines++ < con_h)
-			printf("\n");
+			lines = print_engines_header(engines, t, lines, con_w,
+						     con_h);
 
-		if (engines->imc_fd) {
-			if (lines++ < con_h)
-				printf("      IMC reads:   %s %s/s\n",
-				       reads, engines->imc_reads_unit);
+			for (i = 0;
+			     i < engines->num_engines && lines < con_h;
+			     i++)
+				lines = print_engine(engines, i, t, lines,
+						     con_w, con_h);
 
-			if (lines++ < con_h)
-				printf("     IMC writes:   %s %s/s\n",
-				       writes, engines->imc_writes_unit);
-
-			if (++lines < con_h)
-				printf("\n");
+			lines = print_engines_footer(engines, t, lines, con_w,
+						     con_h);
 		}
 
-		for (i = 0; i < engines->num_engines; i++) {
-			struct engine *engine = engine_ptr(engines, i);
-
-			if (engine->num_counters && lines < con_h) {
-				const char *a = "          ENGINE      BUSY ";
-				const char *b = " MI_SEMA MI_WAIT";
-
-				printf("\033[7m%s%*s%s\033[0m\n",
-				       a,
-				       (int)(con_w - 1 - strlen(a) - strlen(b)),
-				       " ", b);
-				lines++;
-				break;
-			}
-		}
-
-		for (i = 0; i < engines->num_engines && lines < con_h; i++) {
-			struct engine *engine = engine_ptr(engines, i);
-			unsigned int max_w = con_w - 1;
-			unsigned int len;
-			char sema[BUFSZ];
-			char wait[BUFSZ];
-			char busy[BUFSZ];
-			char buf[128];
-			double val;
-
-			if (!engine->num_counters)
-				continue;
-
-			pmu_calc(&engine->sema, sema, BUFSZ, 3, 0, 1e9, t, 100);
-			pmu_calc(&engine->wait, wait, BUFSZ, 3, 0, 1e9, t, 100);
-			len = snprintf(buf, sizeof(buf), "    %s%%    %s%%",
-				       sema, wait);
-
-			pmu_calc(&engine->busy, busy, BUFSZ, 6, 2, 1e9, t,
-				 100);
-			len += printf("%16s %s%% ", engine->display_name, busy);
-
-			val = __pmu_calc(&engine->busy.val, 1e9, t, 100);
-			print_percentage_bar(val, max_w - len);
-
-			printf("%s\n", buf);
-
-			lines++;
-		}
-
-		if (lines++ < con_h)
-			printf("\n");
+		if (stop_top)
+			break;
 
 		usleep(period_us);
 	}

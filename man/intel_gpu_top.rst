@@ -7,9 +7,9 @@ Display a top-like summary of Intel GPU usage
 ---------------------------------------------
 .. include:: defs.rst
 :Author: IGT Developers <igt-dev@lists.freedesktop.org>
-:Date: 2018-04-04
+:Date: 2019-02-08
 :Version: |PACKAGE_STRING|
-:Copyright: 2009,2011,2012,2016,2018 Intel Corporation
+:Copyright: 2009,2011,2012,2016,2018,2019 Intel Corporation
 :Manual section: |MANUAL_SECTION|
 :Manual group: |MANUAL_GROUP|
 
@@ -31,6 +31,11 @@ OPTIONS
 -s <ms>
     Refresh period in milliseconds.
 
+-l
+    List text data to standard out.
+
+-J
+    Output JSON formatted data to standard output.
 -h
     Show help text.
 
