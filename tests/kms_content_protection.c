@@ -216,11 +216,13 @@ static bool igt_pipe_is_free(igt_display_t *display, enum pipe pipe)
 
 
 static void test_content_protection_on_output(igt_output_t *output,
-					      enum igt_commit_style s)
+					      enum igt_commit_style s,
+					      bool dpms_test)
 {
 	igt_display_t *display = &data.display;
 	igt_plane_t *primary;
 	enum pipe pipe;
+	bool ret;
 
 	for_each_pipe(display, pipe) {
 		if (!igt_pipe_connector_valid(pipe, output))
@@ -237,8 +239,22 @@ static void test_content_protection_on_output(igt_output_t *output,
 
 		modeset_with_fb(pipe, output, s);
 		test_cp_enable_with_retry(output, s, 3);
-		test_cp_disable(output, s);
 
+		if (dpms_test) {
+			igt_pipe_set_prop_value(display, pipe,
+						IGT_CRTC_ACTIVE, 0);
+			igt_display_commit2(display, s);
+
+			igt_pipe_set_prop_value(display, pipe,
+						IGT_CRTC_ACTIVE, 1);
+			igt_display_commit2(display, s);
+
+			ret = wait_for_prop_value(output, 2, 18000);
+			if (!ret)
+				test_cp_enable_with_retry(output, s, 2);
+		}
+
+		test_cp_disable(output, s);
 		primary = igt_output_get_plane_type(output,
 						    DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, NULL);
@@ -282,7 +298,7 @@ static bool sink_hdcp_capable(igt_output_t *output)
 
 
 static void
-test_content_protection(enum igt_commit_style s)
+test_content_protection(enum igt_commit_style s, bool dpms_test)
 {
 	igt_display_t *display = &data.display;
 	igt_output_t *output;
@@ -299,7 +315,7 @@ test_content_protection(enum igt_commit_style s)
 			continue;
 		}
 
-		test_content_protection_on_output(output, s);
+		test_content_protection_on_output(output, s, dpms_test);
 		valid_tests++;
 	}
 
@@ -317,11 +333,16 @@ igt_main
 	}
 
 	igt_subtest("legacy")
-		test_content_protection(COMMIT_LEGACY);
+		test_content_protection(COMMIT_LEGACY, false);
 
 	igt_subtest("atomic") {
 		igt_require(data.display.is_atomic);
-		test_content_protection(COMMIT_ATOMIC);
+		test_content_protection(COMMIT_ATOMIC, false);
+	}
+
+	igt_subtest("atomic-dpms") {
+		igt_require(data.display.is_atomic);
+		test_content_protection(COMMIT_ATOMIC, true);
 	}
 
 	igt_fixture
