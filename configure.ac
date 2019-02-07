@@ -294,7 +294,6 @@ AC_CONFIG_FILES([
 		 Makefile
 		 benchmarks/Makefile
 		 lib/Makefile
-		 lib/tests/Makefile
 		 scripts/Makefile
 		 tests/Makefile
 		 tests/intel-ci/Makefile
