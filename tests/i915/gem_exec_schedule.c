@@ -1087,6 +1087,7 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	unsigned int last, count;
 	struct itimerval itv;
 	IGT_CORK_HANDLE(c);
+	uint32_t vip;
 	bool *result;
 
 	result = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
@@ -1101,9 +1102,16 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
 	execbuf.buffer_count = 1;
 	execbuf.flags = engine;
+
+	/* Warm up both (hi/lo) contexts */
+	execbuf.rsvd1 = gem_context_create(fd);
+	gem_context_set_priority(fd, execbuf.rsvd1, MAX_PRIO);
+	gem_execbuf(fd, &execbuf);
+	gem_sync(fd, obj[1].handle);
+	vip = execbuf.rsvd1;
+
 	execbuf.rsvd1 = gem_context_create(fd);
 	gem_context_set_priority(fd, execbuf.rsvd1, MIN_PRIO);
-
 	gem_execbuf(fd, &execbuf);
 	gem_sync(fd, obj[1].handle);
 
@@ -1147,14 +1155,12 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	igt_fork(child, 1) {
 		result[0] = true;
 
-		igt_debug("Creating HP context\n");
-		execbuf.rsvd1 = gem_context_create(fd);
-		gem_context_set_priority(fd, execbuf.rsvd1, MAX_PRIO);
-
+		igt_debug("Waking parent\n");
 		kill(getppid(), SIGALRM);
 		sched_yield();
 		result[1] = true;
 
+		sigaction(SIGALRM, &sa, NULL);
 		itv.it_value.tv_sec = 0;
 		itv.it_value.tv_usec = 10000;
 		setitimer(ITIMER_REAL, &itv, NULL);
@@ -1163,8 +1169,8 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 		 * able to add ourselves to *our* ring without interruption.
 		 */
 		igt_debug("HP child executing\n");
+		execbuf.rsvd1 = vip;
 		result[2] = __execbuf(fd, &execbuf) == 0;
-		gem_context_destroy(fd, execbuf.rsvd1);
 	}
 
 	/* Relinquish CPU just to allow child to create a context */
@@ -1186,6 +1192,7 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	igt_waitchildren();
 
 	gem_context_destroy(fd, execbuf.rsvd1);
+	gem_context_destroy(fd, vip);
 	gem_close(fd, obj[1].handle);
 	gem_close(fd, obj[0].handle);
 	munmap(result, 4096);
