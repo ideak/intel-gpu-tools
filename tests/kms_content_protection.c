@@ -33,6 +33,7 @@ IGT_TEST_DESCRIPTION("Test content protection (HDCP)");
 struct data {
 	int drm_fd;
 	igt_display_t display;
+	struct igt_fb red, green;
 } data;
 
 
@@ -116,16 +117,12 @@ commit_display_and_wait_for_flip(enum igt_commit_style s)
 	}
 }
 
-static void
-test_cp_enable_disable(const enum pipe pipe, igt_output_t *output,
-		       enum igt_commit_style s)
+static void modeset_with_fb(const enum pipe pipe, igt_output_t *output,
+			    enum igt_commit_style s)
 {
 	igt_display_t *display = &data.display;
 	drmModeModeInfo mode;
 	igt_plane_t *primary;
-	struct igt_fb red, green;
-	bool ret;
-	int retry = 3;
 
 	igt_assert(kmstest_get_connector_default_mode(
 			display->drm_fd, output->config.connector, &mode));
@@ -135,58 +132,75 @@ test_cp_enable_disable(const enum pipe pipe, igt_output_t *output,
 
 	igt_create_color_fb(display->drm_fd, mode.hdisplay, mode.vdisplay,
 			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
-			    1.f, 0.f, 0.f, &red);
+			    1.f, 0.f, 0.f, &data.red);
 	igt_create_color_fb(display->drm_fd, mode.hdisplay, mode.vdisplay,
 			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
-			    0.f, 1.f, 0.f, &green);
+			    0.f, 1.f, 0.f, &data.green);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_display_commit2(display, s);
-
-	igt_plane_set_fb(primary, &red);
+	igt_plane_set_fb(primary, &data.red);
 
 	/* Wait for Flip completion before starting the HDCP authentication */
 	commit_display_and_wait_for_flip(s);
+}
 
-	do {
-		igt_output_set_prop_value(output,
-					  IGT_CONNECTOR_CONTENT_PROTECTION, 0);
+static bool test_cp_enable(igt_output_t *output, enum igt_commit_style s)
+{
+	igt_display_t *display = &data.display;
+	igt_plane_t *primary;
+	bool ret;
+
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+
+	igt_output_set_prop_value(output,
+				  IGT_CONNECTOR_CONTENT_PROTECTION, 1);
+	igt_display_commit2(display, s);
+
+	/* Wait for 18000mSec (3 authentication * 6Sec) */
+	ret = wait_for_prop_value(output, 2, 18000);
+	if (ret) {
+		igt_plane_set_fb(primary, &data.green);
 		igt_display_commit2(display, s);
+	}
 
-		/* Wait for HDCP to be disabled for fresh start. */
-		ret = wait_for_prop_value(output, 0, 1000);
-		igt_assert_f(ret, "Content Protection not cleared\n");
+	return ret;
+}
 
-		igt_output_set_prop_value(output,
-					  IGT_CONNECTOR_CONTENT_PROTECTION, 1);
-		igt_display_commit2(display, s);
+static void test_cp_disable(igt_output_t *output, enum igt_commit_style s)
+{
+	igt_display_t *display = &data.display;
+	igt_plane_t *primary;
+	bool ret;
 
-		/* Wait for 18000mSec (3 authentication * 6Sec) */
-		ret = wait_for_prop_value(output, 2, 18000);
-		if (ret) {
-			igt_plane_set_fb(primary, &green);
-			igt_display_commit2(display, s);
-		}
-
-		if (!ret && --retry)
-			igt_debug("Retry (%d/2) ...\n", 3 - retry);
-	} while (retry && !ret);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	/*
 	 * Even on HDCP enable failed scenario, IGT should exit leaving the
 	 * "content protection" at "UNDESIRED".
 	 */
 	igt_output_set_prop_value(output, IGT_CONNECTOR_CONTENT_PROTECTION, 0);
-	igt_plane_set_fb(primary, &red);
+	igt_plane_set_fb(primary, &data.red);
 	igt_display_commit2(display, s);
 
-	igt_assert_f(ret, "Content Protection not enabled\n");
-
 	/* Wait for HDCP to be disabled, before crtc off */
-	wait_for_prop_value(output, 0, 1000);
+	ret = wait_for_prop_value(output, 0, 1000);
+	igt_assert_f(ret, "Content Protection not cleared\n");
+}
 
-	igt_plane_set_fb(primary, NULL);
-	igt_output_set_pipe(output, PIPE_NONE);
+static void test_cp_enable_with_retry(igt_output_t *output,
+				      enum igt_commit_style s, int retry)
+{
+	bool ret;
+
+	do {
+		test_cp_disable(output, s);
+		ret = test_cp_enable(output, s);
+
+		if (!ret && --retry)
+			igt_debug("Retry (%d/2) ...\n", 3 - retry);
+	} while (retry && !ret);
+	igt_assert_f(ret, "Content Protection not enabled\n");
 }
 
 static bool igt_pipe_is_free(igt_display_t *display, enum pipe pipe)
@@ -200,11 +214,12 @@ static bool igt_pipe_is_free(igt_display_t *display, enum pipe pipe)
 	return true;
 }
 
-static void
-test_content_protection_on_output(igt_output_t *output,
-				  enum igt_commit_style s)
+
+static void test_content_protection_on_output(igt_output_t *output,
+					      enum igt_commit_style s)
 {
 	igt_display_t *display = &data.display;
+	igt_plane_t *primary;
 	enum pipe pipe;
 
 	for_each_pipe(display, pipe) {
@@ -220,7 +235,14 @@ test_content_protection_on_output(igt_output_t *output,
 		if (!igt_pipe_is_free(display, pipe))
 			continue;
 
-		test_cp_enable_disable(pipe, output, s);
+		modeset_with_fb(pipe, output, s);
+		test_cp_enable_with_retry(output, s, 3);
+		test_cp_disable(output, s);
+
+		primary = igt_output_get_plane_type(output,
+						    DRM_PLANE_TYPE_PRIMARY);
+		igt_plane_set_fb(primary, NULL);
+		igt_output_set_pipe(output, PIPE_NONE);
 
 		/*
 		 * Testing a output with a pipe is enough for HDCP
@@ -229,7 +251,6 @@ test_content_protection_on_output(igt_output_t *output,
 		 */
 		break;
 	}
-
 }
 
 static void __debugfs_read(int fd, const char *param, char *buf, int len)
