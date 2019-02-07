@@ -214,6 +214,14 @@ static bool igt_pipe_is_free(igt_display_t *display, enum pipe pipe)
 	return true;
 }
 
+static void test_cp_lic(igt_output_t *output)
+{
+	bool ret;
+
+	/* Wait for 4Secs (min 2 cycles of Link Integrity Check) */
+	ret = wait_for_prop_value(output, 1, 4 * 1000);
+	igt_assert_f(!ret, "Content Protection LIC Failed\n");
+}
 
 static void test_content_protection_on_output(igt_output_t *output,
 					      enum igt_commit_style s,
@@ -239,6 +247,7 @@ static void test_content_protection_on_output(igt_output_t *output,
 
 		modeset_with_fb(pipe, output, s);
 		test_cp_enable_with_retry(output, s, 3);
+		test_cp_lic(output);
 
 		if (dpms_test) {
 			igt_pipe_set_prop_value(display, pipe,
