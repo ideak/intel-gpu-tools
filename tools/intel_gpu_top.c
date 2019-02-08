@@ -690,10 +690,11 @@ usage(const char *appname)
 		"Usage: %s [parameters]\n"
 		"\n"
 		"\tThe following parameters are optional:\n\n"
-		"\t[-s <ms>]       Refresh period in milliseconds (default %ums).\n"
-		"\t[-l]            List data to standard out.\n"
-		"\t[-J]            JSON data to standard out.\n"
 		"\t[-h]            Show this help text.\n"
+		"\t[-J]            Output JSON formatted data.\n"
+		"\t[-l]            List plain text data.\n"
+		"\t[-o <file|->]   Output to specified file or '-' for standard out.\n"
+		"\t[-s <ms>]       Refresh period in milliseconds (default %ums).\n"
 		"\n",
 		appname, DEFAULT_PERIOD_MS);
 }
@@ -740,6 +741,8 @@ static const char *json_indent[] = {
 static unsigned int json_prev_struct_members;
 static unsigned int json_struct_members;
 
+FILE *out;
+
 static void
 json_open_struct(const char *name)
 {
@@ -749,14 +752,14 @@ json_open_struct(const char *name)
 	json_struct_members = 0;
 
 	if (name)
-		printf("%s%s\"%s\": {\n",
-		       json_prev_struct_members ? ",\n" : "",
-		       json_indent[json_indent_level],
-		       name);
+		fprintf(out, "%s%s\"%s\": {\n",
+			json_prev_struct_members ? ",\n" : "",
+			json_indent[json_indent_level],
+			name);
 	else
-		printf("%s\n%s{\n",
-		       json_prev_struct_members ? "," : "",
-		       json_indent[json_indent_level]);
+		fprintf(out, "%s\n%s{\n",
+			json_prev_struct_members ? "," : "",
+			json_indent[json_indent_level]);
 
 	json_indent_level++;
 }
@@ -766,7 +769,7 @@ json_close_struct(void)
 {
 	assert(json_indent_level > 0);
 
-	printf("\n%s}", json_indent[--json_indent_level]);
+	fprintf(out, "\n%s}", json_indent[--json_indent_level]);
 
 	if (json_indent_level == 0)
 		fflush(stdout);
@@ -778,17 +781,17 @@ json_add_member(const struct cnt_group *parent, struct cnt_item *item,
 {
 	assert(json_indent_level < ARRAY_SIZE(json_indent));
 
-	printf("%s%s\"%s\": ",
+	fprintf(out, "%s%s\"%s\": ",
 		json_struct_members ? ",\n" : "",
 		json_indent[json_indent_level], item->name);
 
 	json_struct_members++;
 
 	if (!strcmp(item->name, "unit"))
-		printf("\"%s\"", item->unit);
+		fprintf(out, "\"%s\"", item->unit);
 	else
-		printf("%f",
-		       pmu_calc(&item->pmu->val, item->d, item->t, item->s));
+		fprintf(out, "%f",
+			pmu_calc(&item->pmu->val, item->d, item->t, item->s));
 
 	return 1;
 }
@@ -811,8 +814,8 @@ stdout_close_struct(void)
 	assert(stdout_level > 0);
 	if (--stdout_level == 0) {
 		stdout_lines++;
-		printf("\n");
-		fflush(stdout);
+		fputs("\n", out);
+		fflush(out);
 	}
 }
 
@@ -845,10 +848,10 @@ stdout_add_member(const struct cnt_group *parent, struct cnt_item *item,
 				   (it->fmt_precision ? 1 : 0);
 		}
 
-		printf("%*s ", grp_tot - 1, parent->display_name);
+		fprintf(out, "%*s ", grp_tot - 1, parent->display_name);
 		return 0;
 	} else if (headers == 2) {
-		printf("%*s ", fmt_tot, item->unit ?: item->name);
+		fprintf(out, "%*s ", fmt_tot, item->unit ?: item->name);
 		return 0;
 	}
 
@@ -859,7 +862,7 @@ stdout_add_member(const struct cnt_group *parent, struct cnt_item *item,
 	if (len < 0 || len == sizeof(buf))
 		fill_str(buf, sizeof(buf), 'X', fmt_tot);
 
-	len = printf("%s ", buf);
+	len = fprintf(out, "%s ", buf);
 
 	return len > 0 ? len : 0;
 }
@@ -1250,13 +1253,17 @@ int main(int argc, char **argv)
 {
 	unsigned int period_us = DEFAULT_PERIOD_MS * 1000;
 	int con_w = -1, con_h = -1;
+	char *output_path = NULL;
 	struct engines *engines;
 	unsigned int i;
 	int ret, ch;
 
 	/* Parse options */
-	while ((ch = getopt(argc, argv, "s:Jlh")) != -1) {
+	while ((ch = getopt(argc, argv, "o:s:Jlh")) != -1) {
 		switch (ch) {
+		case 'o':
+			output_path = optarg;
+			break;
 		case 's':
 			period_us = atoi(optarg) * 1000;
 			break;
@@ -1276,8 +1283,20 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (output_mode == INTERACTIVE && isatty(1) != 1)
+	if (output_mode == INTERACTIVE && (output_path || isatty(1) != 1))
 		output_mode = STDOUT;
+
+	if (output_path && strcmp(output_path, "-")) {
+		out = fopen(output_path, "w");
+
+		if (!out) {
+			fprintf(stderr, "Failed to open output file - '%s'!\n",
+				strerror(errno));
+			exit(1);
+		}
+	} else {
+		out = stdout;
+	}
 
 	if (output_mode != INTERACTIVE) {
 		sighandler_t sig = signal(SIGINT, sigint_handler);

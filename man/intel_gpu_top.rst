@@ -28,16 +28,21 @@ The tool gathers data using perf performance counters (PMU) exposed by i915 and 
 OPTIONS
 =======
 
--s <ms>
-    Refresh period in milliseconds.
-
--l
-    List text data to standard out.
-
--J
-    Output JSON formatted data to standard output.
 -h
     Show help text.
+
+-J
+    Output JSON formatted data.
+
+-l
+    List plain text data.
+
+-o <file path | ->
+    Output to the specified file instead of standard output.
+    '-' can also be specified to explicitly select standard output.
+
+-s <ms>
+    Refresh period in milliseconds.
 
 LIMITATIONS
 ===========
