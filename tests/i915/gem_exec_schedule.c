@@ -1153,7 +1153,9 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	bind_to_cpu(0);
 
 	igt_fork(child, 1) {
-		result[0] = true;
+		int err;
+
+		result[0] = vip != execbuf.rsvd1;
 
 		igt_debug("Waking parent\n");
 		kill(getppid(), SIGALRM);
@@ -1170,12 +1172,18 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 		 */
 		igt_debug("HP child executing\n");
 		execbuf.rsvd1 = vip;
-		result[2] = __execbuf(fd, &execbuf) == 0;
+		err = __execbuf(fd, &execbuf);
+		igt_debug("HP execbuf returned %d\n", err);
+
+		memset(&itv, 0, sizeof(itv));
+		setitimer(ITIMER_REAL, &itv, NULL);
+
+		result[2] = err == 0;
 	}
 
 	/* Relinquish CPU just to allow child to create a context */
 	sleep(1);
-	igt_assert_f(result[0], "HP context (child) not created");
+	igt_assert_f(result[0], "HP context (child) not created\n");
 	igt_assert_f(!result[1], "Child released too early!\n");
 
 	/* Parent sleeps waiting for ringspace, releasing child */
