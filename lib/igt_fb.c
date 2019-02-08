@@ -596,6 +596,9 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	fb->gem_handle = kmstest_dumb_create(fd, fb->width, fb->height,
 					     bpp, strides, &fb->size);
 
+	if (igt_format_is_yuv(fb->drm_format))
+		clear_yuv_buffer(fb);
+
 	return fb->gem_handle;
 }
 
