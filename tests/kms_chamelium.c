@@ -977,6 +977,38 @@ igt_main
 			test_display_one_mode(&data, port, DRM_FORMAT_XRGB1555,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		connector_subtest("hdmi-cmp-nv12", HDMIA)
+			test_display_one_mode(&data, port, DRM_FORMAT_NV12,
+					      CHAMELIUM_CHECK_ANALOG, 1);
+
+		connector_subtest("hdmi-cmp-nv16", HDMIA)
+			test_display_one_mode(&data, port, DRM_FORMAT_NV16,
+					      CHAMELIUM_CHECK_ANALOG, 1);
+
+		connector_subtest("hdmi-cmp-nv21", HDMIA)
+			test_display_one_mode(&data, port, DRM_FORMAT_NV21,
+					      CHAMELIUM_CHECK_ANALOG, 1);
+
+		connector_subtest("hdmi-cmp-nv61", HDMIA)
+			test_display_one_mode(&data, port, DRM_FORMAT_NV61,
+					      CHAMELIUM_CHECK_ANALOG, 1);
+
+		connector_subtest("hdmi-cmp-yu12", HDMIA)
+			test_display_one_mode(&data, port, DRM_FORMAT_YUV420,
+					      CHAMELIUM_CHECK_ANALOG, 1);
+
+		connector_subtest("hdmi-cmp-yu16", HDMIA)
+			test_display_one_mode(&data, port, DRM_FORMAT_YUV422,
+					      CHAMELIUM_CHECK_ANALOG, 1);
+
+		connector_subtest("hdmi-cmp-yv12", HDMIA)
+			test_display_one_mode(&data, port, DRM_FORMAT_YVU420,
+					      CHAMELIUM_CHECK_ANALOG, 1);
+
+		connector_subtest("hdmi-cmp-yv16", HDMIA)
+			test_display_one_mode(&data, port, DRM_FORMAT_YVU422,
+					      CHAMELIUM_CHECK_ANALOG, 1);
+
 		connector_subtest("hdmi-frame-dump", HDMIA)
 			test_display_frame_dump(&data, port);
 	}
