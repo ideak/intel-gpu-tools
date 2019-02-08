@@ -561,6 +561,16 @@ static int create_bo_for_fb(struct igt_fb *fb)
 		}
 	}
 
+	/*
+	 * The current dumb buffer allocation API doesn't really allow to
+	 * specify a custom size or stride. Yet the caller is free to specify
+	 * them, so we need to make sure to error out in this case.
+	 */
+	igt_assert(fb->size == 0);
+	igt_assert(fb->strides[0] == 0);
+
+	fb->size = calc_fb_size(fb);
+
 	fb->is_dumb = true;
 	fb->gem_handle = kmstest_dumb_create(fd, fb->width, fb->height,
 					     fb->plane_bpp[0],
