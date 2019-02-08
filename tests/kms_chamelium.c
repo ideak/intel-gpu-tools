@@ -528,6 +528,7 @@ static int chamelium_get_pattern_fb(data_t *data, size_t width, size_t height,
 }
 
 enum chamelium_check {
+	CHAMELIUM_CHECK_ANALOG,
 	CHAMELIUM_CHECK_CRC,
 };
 
@@ -579,6 +580,18 @@ static void do_test_display(data_t *data, struct chamelium_port *port,
 
 		free(expected_crc);
 		free(crc);
+	} else if (check == CHAMELIUM_CHECK_ANALOG) {
+		struct chamelium_frame_dump *dump;
+
+		igt_assert(count == 1);
+
+		dump = chamelium_port_dump_pixels(data->chamelium, port, 0, 0,
+						  0, 0);
+		chamelium_crop_analog_frame(dump, mode->hdisplay,
+					    mode->vdisplay);
+		chamelium_assert_analog_frame_match_or_dump(data->chamelium,
+							    port, dump, &fb);
+		chamelium_destroy_frame_dump(dump);
 	}
 
 	igt_remove_fb(data->drm_fd, &frame_fb);
@@ -589,8 +602,9 @@ static void test_display_one_mode(data_t *data, struct chamelium_port *port,
 				  uint32_t fourcc, enum chamelium_check check,
 				  int count)
 {
-	igt_output_t *output;
 	drmModeConnector *connector;
+	drmModeModeInfo *mode;
+	igt_output_t *output;
 	igt_plane_t *primary;
 
 	reset_state(data, port);
@@ -600,8 +614,14 @@ static void test_display_one_mode(data_t *data, struct chamelium_port *port,
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
-	do_test_display(data, port, output, &connector->modes[0], fourcc,
-			check, count);
+	mode = &connector->modes[0];
+	if (check == CHAMELIUM_CHECK_ANALOG) {
+		bool bridge = check_analog_bridge(data, port);
+
+		igt_assert(!(bridge && prune_vga_mode(data, mode)));
+	}
+
+	do_test_display(data, port, output, mode, fourcc, check, count);
 
 	drmModeFreeConnector(connector);
 }
@@ -613,6 +633,7 @@ static void test_display_all_modes(data_t *data, struct chamelium_port *port,
 	igt_output_t *output;
 	igt_plane_t *primary;
 	drmModeConnector *connector;
+	bool bridge;
 	int i;
 
 	reset_state(data, port);
@@ -622,8 +643,15 @@ static void test_display_all_modes(data_t *data, struct chamelium_port *port,
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
+	if (check == CHAMELIUM_CHECK_ANALOG)
+		bridge = check_analog_bridge(data, port);
+
 	for (i = 0; i < connector->count_modes; i++) {
 		drmModeModeInfo *mode = &connector->modes[i];
+
+		if (check == CHAMELIUM_CHECK_ANALOG && bridge &&
+		    prune_vga_mode(data, mode))
+			continue;
 
 		do_test_display(data, port, output, mode, fourcc, check, count);
 	}
@@ -668,61 +696,6 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 			chamelium_assert_frame_eq(data->chamelium, frame, &fb);
 			chamelium_destroy_frame_dump(frame);
 		}
-
-		igt_remove_fb(data->drm_fd, &fb);
-	}
-
-	drmModeFreeConnector(connector);
-}
-
-static void
-test_analog_frame_dump(data_t *data, struct chamelium_port *port)
-{
-	igt_output_t *output;
-	igt_plane_t *primary;
-	struct igt_fb fb;
-	struct chamelium_frame_dump *frame;
-	drmModeModeInfo *mode;
-	drmModeConnector *connector;
-	int fb_id, i;
-	bool bridge;
-
-	reset_state(data, port);
-
-	output = prepare_output(data, port);
-	connector = chamelium_port_get_connector(data->chamelium, port, false);
-	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-	igt_assert(primary);
-
-	bridge = check_analog_bridge(data, port);
-
-	for (i = 0; i < connector->count_modes; i++) {
-		mode = &connector->modes[i];
-
-		if (bridge && prune_vga_mode(data, mode))
-			continue;
-
-		fb_id = igt_create_color_pattern_fb(data->drm_fd,
-						    mode->hdisplay, mode->vdisplay,
-						    DRM_FORMAT_XRGB8888,
-						    LOCAL_DRM_FORMAT_MOD_NONE,
-						    0, 0, 0, &fb);
-		igt_assert(fb_id > 0);
-
-		enable_output(data, port, output, mode, &fb);
-
-		igt_debug("Reading frame dumps from Chamelium...\n");
-
-		frame = chamelium_port_dump_pixels(data->chamelium, port, 0, 0,
-						   0, 0);
-
-		chamelium_crop_analog_frame(frame, mode->hdisplay,
-					    mode->vdisplay);
-
-		chamelium_assert_analog_frame_match_or_dump(data->chamelium,
-							    port, frame, &fb);
-
-		chamelium_destroy_frame_dump(frame);
 
 		igt_remove_fb(data->drm_fd, &fb);
 	}
@@ -1041,7 +1014,8 @@ igt_main
 			test_hpd_without_ddc(&data, port);
 
 		connector_subtest("vga-frame-dump", VGA)
-			test_analog_frame_dump(&data, port);
+			test_display_all_modes(&data, port, DRM_FORMAT_XRGB8888,
+					       CHAMELIUM_CHECK_ANALOG, 1);
 	}
 
 	igt_subtest_group {
