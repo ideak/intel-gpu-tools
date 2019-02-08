@@ -531,6 +531,7 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	const struct format_desc_struct *fmt = lookup_drm_format(fb->drm_format);
 	unsigned int bpp = 0;
 	unsigned int plane;
+	unsigned *strides = &fb->strides[0];
 	int fd = fb->fd;
 
 	if (fb->tiling || fb->size || fb->strides[0] || igt_format_is_yuv(fb->drm_format)) {
@@ -578,8 +579,22 @@ static int create_bo_for_fb(struct igt_fb *fb)
 				    plane ? fmt->hsub * fmt->vsub : 1);
 
 	fb->is_dumb = true;
+
+	/*
+	 * We can't really pass the stride array here since the dumb
+	 * buffer allocation is assuming that it operates on one
+	 * plane, and therefore will calculate the stride as if each
+	 * pixel was stored on a single plane.
+	 *
+	 * This might cause issues at some point on drivers that would
+	 * change the stride of YUV buffers, but we haven't
+	 * encountered any yet.
+	 */
+	if (fb->num_planes > 1)
+		strides = NULL;
+
 	fb->gem_handle = kmstest_dumb_create(fd, fb->width, fb->height,
-					     bpp, &fb->strides[0], &fb->size);
+					     bpp, strides, &fb->size);
 
 	return fb->gem_handle;
 }
