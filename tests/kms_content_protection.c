@@ -36,6 +36,16 @@ struct data {
 	struct igt_fb red, green;
 } data;
 
+#define CP_UNDESIRED				0
+#define CP_DESIRED				1
+#define CP_ENABLED				2
+
+#define LIC_PERIOD_MSEC				(4 * 1000)
+/* Kernel retry count=3, Max time per authentication allowed = 6Sec */
+#define KERNEL_AUTH_TIME_ALLOWED_MSEC		(3 *  6 * 1000)
+#define KERNEL_DISABLE_TIME_ALLOWED_MSEC	(1 * 1000)
+#define FLIP_EVENT_POLLING_TIMEOUT_MSEC		1000
+
 
 static void flip_handler(int fd, unsigned int sequence, unsigned int tv_sec,
 			 unsigned int tv_usec, void *_data)
@@ -57,7 +67,7 @@ static int wait_flip_event(void)
 	pfd.events = POLLIN;
 	pfd.revents = 0;
 
-	rc = poll(&pfd, 1, 1000);
+	rc = poll(&pfd, 1, FLIP_EVENT_POLLING_TIMEOUT_MSEC);
 	switch (rc) {
 	case 0:
 		igt_info("Poll timeout. 1Sec.\n");
@@ -154,11 +164,11 @@ static bool test_cp_enable(igt_output_t *output, enum igt_commit_style s)
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	igt_output_set_prop_value(output,
-				  IGT_CONNECTOR_CONTENT_PROTECTION, 1);
+				  IGT_CONNECTOR_CONTENT_PROTECTION, CP_DESIRED);
 	igt_display_commit2(display, s);
 
-	/* Wait for 18000mSec (3 authentication * 6Sec) */
-	ret = wait_for_prop_value(output, 2, 18000);
+	ret = wait_for_prop_value(output, CP_ENABLED,
+				  KERNEL_AUTH_TIME_ALLOWED_MSEC);
 	if (ret) {
 		igt_plane_set_fb(primary, &data.green);
 		igt_display_commit2(display, s);
@@ -179,12 +189,14 @@ static void test_cp_disable(igt_output_t *output, enum igt_commit_style s)
 	 * Even on HDCP enable failed scenario, IGT should exit leaving the
 	 * "content protection" at "UNDESIRED".
 	 */
-	igt_output_set_prop_value(output, IGT_CONNECTOR_CONTENT_PROTECTION, 0);
+	igt_output_set_prop_value(output, IGT_CONNECTOR_CONTENT_PROTECTION,
+				  CP_UNDESIRED);
 	igt_plane_set_fb(primary, &data.red);
 	igt_display_commit2(display, s);
 
 	/* Wait for HDCP to be disabled, before crtc off */
-	ret = wait_for_prop_value(output, 0, 1000);
+	ret = wait_for_prop_value(output, CP_UNDESIRED,
+				  KERNEL_DISABLE_TIME_ALLOWED_MSEC);
 	igt_assert_f(ret, "Content Protection not cleared\n");
 }
 
@@ -219,7 +231,7 @@ static void test_cp_lic(igt_output_t *output)
 	bool ret;
 
 	/* Wait for 4Secs (min 2 cycles of Link Integrity Check) */
-	ret = wait_for_prop_value(output, 1, 4 * 1000);
+	ret = wait_for_prop_value(output, CP_DESIRED, LIC_PERIOD_MSEC);
 	igt_assert_f(!ret, "Content Protection LIC Failed\n");
 }
 
@@ -258,7 +270,8 @@ static void test_content_protection_on_output(igt_output_t *output,
 						IGT_CRTC_ACTIVE, 1);
 			igt_display_commit2(display, s);
 
-			ret = wait_for_prop_value(output, 2, 18000);
+			ret = wait_for_prop_value(output, CP_ENABLED,
+						  KERNEL_AUTH_TIME_ALLOWED_MSEC);
 			if (!ret)
 				test_cp_enable_with_retry(output, s, 2);
 		}
