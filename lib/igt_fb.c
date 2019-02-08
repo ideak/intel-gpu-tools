@@ -559,15 +559,14 @@ static int create_bo_for_fb(struct igt_fb *fb)
 			igt_require(driver_has_gem_api);
 			return -EINVAL;
 		}
-	} else {
-		fb->is_dumb = true;
-
-		fb->gem_handle = kmstest_dumb_create(fd, fb->width, fb->height,
-						     fb->plane_bpp[0],
-						     &fb->strides[0], &fb->size);
-
-		return fb->gem_handle;
 	}
+
+	fb->is_dumb = true;
+	fb->gem_handle = kmstest_dumb_create(fd, fb->width, fb->height,
+					     fb->plane_bpp[0],
+					     &fb->strides[0], &fb->size);
+
+	return fb->gem_handle;
 }
 
 /**
