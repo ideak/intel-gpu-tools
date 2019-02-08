@@ -528,6 +528,9 @@ static void clear_yuv_buffer(struct igt_fb *fb)
 /* helpers to create nice-looking framebuffers */
 static int create_bo_for_fb(struct igt_fb *fb)
 {
+	const struct format_desc_struct *fmt = lookup_drm_format(fb->drm_format);
+	unsigned int bpp = 0;
+	unsigned int plane;
 	int fd = fb->fd;
 
 	if (fb->tiling || fb->size || fb->strides[0] || igt_format_is_yuv(fb->drm_format)) {
@@ -570,11 +573,13 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	igt_assert(fb->strides[0] == 0);
 
 	fb->size = calc_fb_size(fb);
+	for (plane = 0; plane < fb->num_planes; plane++)
+		bpp += DIV_ROUND_UP(fb->plane_bpp[plane],
+				    plane ? fmt->hsub * fmt->vsub : 1);
 
 	fb->is_dumb = true;
 	fb->gem_handle = kmstest_dumb_create(fd, fb->width, fb->height,
-					     fb->plane_bpp[0],
-					     &fb->strides[0], &fb->size);
+					     bpp, &fb->strides[0], &fb->size);
 
 	return fb->gem_handle;
 }
