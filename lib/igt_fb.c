@@ -534,7 +534,8 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	unsigned *strides = &fb->strides[0];
 	int fd = fb->fd;
 
-	if (fb->tiling || fb->size || fb->strides[0] || igt_format_is_yuv(fb->drm_format)) {
+	if (is_i915_device(fd) &&
+	   (fb->tiling || fb->size || fb->strides[0] || igt_format_is_yuv(fb->drm_format))) {
 		uint64_t size;
 
 		size = calc_fb_size(fb);
@@ -544,25 +545,12 @@ static int create_bo_for_fb(struct igt_fb *fb)
 			fb->size = size;
 
 		fb->is_dumb = false;
+		fb->gem_handle = gem_create(fd, fb->size);
+		gem_set_tiling(fd, fb->gem_handle,
+			       igt_fb_mod_to_tiling(fb->tiling),
+			       fb->strides[0]);
 
-		if (is_i915_device(fd)) {
-
-			fb->gem_handle = gem_create(fd, fb->size);
-
-			gem_set_tiling(fd, fb->gem_handle,
-				       igt_fb_mod_to_tiling(fb->tiling),
-				       fb->strides[0]);
-
-			if (igt_format_is_yuv(fb->drm_format))
-				clear_yuv_buffer(fb);
-
-			return fb->gem_handle;
-		} else {
-			bool driver_has_gem_api = false;
-
-			igt_require(driver_has_gem_api);
-			return -EINVAL;
-		}
+		goto out;
 	}
 
 	/*
@@ -596,6 +584,7 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	fb->gem_handle = kmstest_dumb_create(fd, fb->width, fb->height,
 					     bpp, strides, &fb->size);
 
+out:
 	if (igt_format_is_yuv(fb->drm_format))
 		clear_yuv_buffer(fb);
 
