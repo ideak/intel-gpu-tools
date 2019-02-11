@@ -303,15 +303,15 @@ test_lri(int fd, uint32_t handle, struct test_lri *test)
 
 static void test_allocations(int fd)
 {
-	uint32_t bbe = MI_BATCH_BUFFER_END;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[17];
-	int i, j;
+	unsigned long count;
 
 	intel_require_memory(2, 1ull<<(12 + ARRAY_SIZE(obj)), CHECK_RAM);
 
 	memset(obj, 0, sizeof(obj));
-	for (i = 0; i < ARRAY_SIZE(obj); i++) {
+	for (int i = 0; i < ARRAY_SIZE(obj); i++) {
 		uint64_t size = 1ull << (12 + i);
 
 		obj[i].handle = gem_create(fd, size);
@@ -322,17 +322,21 @@ static void test_allocations(int fd)
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffer_count = 1;
-	for (j = 0; j < 16384; j++) {
-		igt_progress("allocations ", j, 16384);
-		i = rand() % ARRAY_SIZE(obj);
+
+	count = 0;
+	igt_until_timeout(20) {
+		int i = rand() % ARRAY_SIZE(obj);
 		execbuf.buffers_ptr = to_user_pointer(&obj[i]);
 		execbuf.batch_start_offset = (rand() % (1ull<<i)) << 12;
 		execbuf.batch_start_offset += 64 * (rand() % 64);
 		execbuf.batch_len = (1ull<<(12+i)) - execbuf.batch_start_offset;
 		gem_execbuf(fd, &execbuf);
+		count++;
 	}
+	igt_info("Submitted %lu execbufs\n", count);
+	igt_drop_caches_set(fd, DROP_RESET_ACTIVE); /* Cancel the queued work */
 
-	for (i = 0; i < ARRAY_SIZE(obj); i++) {
+	for (int i = 0; i < ARRAY_SIZE(obj); i++) {
 		gem_sync(fd, obj[i].handle);
 		gem_close(fd, obj[i].handle);
 	}
