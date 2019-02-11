@@ -57,15 +57,15 @@ typedef struct {
 } data_t;
 
 
-static int do_write(int fd, int handle, void *buf, int size)
-{
-	struct drm_i915_gem_pwrite write;
-	memset(&write, 0x00, sizeof(write));
-	write.handle = handle;
-	write.data_ptr = (uintptr_t)buf;
-	write.size = size;
-	write.offset = 0;
-	return igt_ioctl(fd, DRM_IOCTL_I915_GEM_PWRITE, &write);
+static void do_write(int fd, int handle, void *buf, int size)
+{	void *screenbuf;
+
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	screenbuf = gem_mmap__gtt(fd, handle, size, PROT_WRITE);
+	memcpy(screenbuf, buf, size);
+	gem_munmap(screenbuf, size);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	gem_sync(fd, handle);
 }
 
 
@@ -96,74 +96,39 @@ static void generate_comparison_crc_list(data_t *data, igt_output_t *output)
 			    0.0, 0.0, 0.0);
 	igt_paint_color(cr, 0, 0, w, h, 1.0, 1.0, 1.0);
 	igt_assert(cairo_status(cr) == 0);
+	igt_put_cairo_ctx(data->gfx_fd, &data->primary_fb, cr);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, &data->primary_fb);
 	igt_display_commit2(&data->display, data->commit);
 
+	igt_pipe_crc_drain(data->pipe_crc);
 	igt_pipe_crc_get_current(data->gfx_fd, data->pipe_crc, &data->cursor_crc);
 	igt_plane_set_fb(primary, NULL);
 	igt_display_commit2(&data->display, data->commit);
 
-	intel_gen(intel_get_drm_devid(data->gfx_fd)) < 9 ?
-		  igt_paint_color(cr, 0, 0, mode->hdisplay, mode->vdisplay, 1.0, 1.0, 1.0) :
-		  igt_paint_color_alpha(cr, 0, 0, mode->hdisplay, mode->vdisplay, 1.0, 1.0, 1.0, 1.0);
+	cr = igt_get_cairo_ctx(data->gfx_fd, &data->primary_fb);
+	igt_paint_color(cr, 0, 0, mode->hdisplay, mode->vdisplay, 1.0, 1.0, 1.0);
+	igt_put_cairo_ctx(data->gfx_fd, &data->primary_fb, cr);
 
 	igt_plane_set_fb(primary, &data->primary_fb);
 	igt_display_commit2(&data->display, data->commit);
 
+	igt_pipe_crc_drain(data->pipe_crc);
 	igt_pipe_crc_get_current(data->gfx_fd, data->pipe_crc, &data->fullscreen_crc);
 
-	cairo_destroy(cr);
 	igt_remove_fb(data->gfx_fd, &data->primary_fb);
 }
 
 static const struct {
 	uint32_t	fourcc;
 	char		zeropadding;
-	enum		{ BYTES_PP_1=1,
-				BYTES_PP_2=2,
-				BYTES_PP_4=4,
-				NV12,
-				P010,
-				SKIP4 } bpp;
+	enum		{ BYTES_PP_1 = 1,
+				BYTES_PP_4 = 4} bpp;
 	uint32_t	value;
 } fillers[] = {
 	{ DRM_FORMAT_C8, 0, BYTES_PP_1, 0xff},
-	{ DRM_FORMAT_RGB565, 0, BYTES_PP_2, 0xffff},
-	{ DRM_FORMAT_XRGB8888, 0, BYTES_PP_4, 0xffffffff},
-	{ DRM_FORMAT_XBGR8888, 0, BYTES_PP_4, 0xffffffff},
-
-	/*
-	 * following two are skipped because blending seems to work
-	 * incorrectly with exception of AR24 on cursor plane.
-	 * Test still creates the planes, just filling plane
-	 * and getting crc is skipped.
-	 */
-	{ DRM_FORMAT_ARGB8888, 0, SKIP4, 0xffffffff},
-	{ DRM_FORMAT_ABGR8888, 0, SKIP4, 0x00ffffff},
-
-	{ DRM_FORMAT_XRGB2101010, 0, BYTES_PP_4, 0xffffffff},
 	{ DRM_FORMAT_XBGR2101010, 0, BYTES_PP_4, 0xffffffff},
-
-	{ DRM_FORMAT_YUYV, 0, BYTES_PP_4, 0x80eb80eb},
-	{ DRM_FORMAT_YVYU, 0, BYTES_PP_4, 0x80eb80eb},
-	{ DRM_FORMAT_VYUY, 0, BYTES_PP_4, 0xeb80eb80},
-	{ DRM_FORMAT_UYVY, 0, BYTES_PP_4, 0xeb80eb80},
-
-	/*
-	 * (semi-)planar formats
-	 */
-	{ DRM_FORMAT_NV12, 0, NV12, 0x80eb},
-#ifdef DRM_FORMAT_P010
-	{ DRM_FORMAT_P010, 0, P010, 0x8000eb00},
-#endif
-#ifdef DRM_FORMAT_P012
-	{ DRM_FORMAT_P012, 0, P010, 0x8000eb00},
-#endif
-#ifdef DRM_FORMAT_P016
-	{ DRM_FORMAT_P016, 0, P010, 0x8000eb00},
-#endif
 	{ 0, 0, 0, 0 }
 };
 
@@ -175,11 +140,10 @@ static bool fill_in_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 		       uint32_t format)
 {
 	signed i, c, writesize;
-	unsigned short* ptemp_16_buf;
 	unsigned int* ptemp_32_buf;
 
-	for( i = 0; fillers[i].fourcc != 0; i++ ) {
-		if( fillers[i].fourcc == format )
+	for (i = 0; i < ARRAY_SIZE(fillers)-1; i++) {
+		if (fillers[i].fourcc == format)
 			break;
 	}
 
@@ -190,57 +154,12 @@ static bool fill_in_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 			ptemp_32_buf[c] = fillers[i].value;
 		writesize = data->size;
 		break;
-	case BYTES_PP_2:
-		ptemp_16_buf = (unsigned short*)data->buf;
-		for (c = 0; c < data->size/2; c++)
-			ptemp_16_buf[c] = (unsigned short)fillers[i].value;
-		writesize = data->size;
-		break;
 	case BYTES_PP_1:
 		memset((void *)data->buf, fillers[i].value, data->size);
 		writesize = data->size;
 		break;
-	case NV12:
-		memset((void *)data->buf, fillers[i].value&0xff,
-		       data->fb.offsets[1]);
-
-		memset((void *)(data->buf+data->fb.offsets[1]),
-		       (fillers[i].value>>8)&0xff,
-		       data->size - data->fb.offsets[1]);
-
-		writesize = data->size;
-		break;
-	case P010:
-		ptemp_16_buf = (unsigned short*)data->buf;
-		for (c = 0; c < data->size/2; c++)
-			ptemp_16_buf[c] = (unsigned short)fillers[i].value&0xffff;
-
-		ptemp_16_buf = (unsigned short*)(data->buf+data->size);
-		for (c = 0; c < data->size/2; c++)
-			ptemp_16_buf[c] = (unsigned short)(fillers[i].value>>16)&0xffff;
-
-		writesize = data->size+data->size/2;
-		break;
-	case SKIP4:
-		if (fillers[i].fourcc == DRM_FORMAT_ARGB8888 &&
-		    plane->type == DRM_PLANE_TYPE_CURSOR) {
-		/*
-		 * special for cursor plane where blending works correctly.
-		 */
-			ptemp_32_buf = (unsigned int*)data->buf;
-			for (c = 0; c < data->size/4; c++)
-				ptemp_32_buf[c] = fillers[i].value;
-			writesize = data->size;
-			break;
-		}
-		igt_info("Format %s CRC comparison skipped by design.\n",
-			 (char*)&fillers[i].fourcc);
-
-		return false;
 	default:
-		igt_info("Unsupported mode for test %s\n",
-			 (char*)&fillers[i].fourcc);
-		return false;
+		igt_assert_f(0, "unknown bpp");
 	}
 
 	do_write(data->gfx_fd, data->gem_handle, (void*)data->buf, writesize);
@@ -271,26 +190,20 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 		tiling = LOCAL_DRM_FORMAT_MOD_NONE;
 	}
 
-	for (i = 0; fillers[i].fourcc != 0; i++) {
+	for (i = 0; i < ARRAY_SIZE(fillers)-1; i++) {
 		if (fillers[i].fourcc == format)
 			break;
 	}
 
 	switch (fillers[i].bpp) {
-	case NV12:
 	case BYTES_PP_1:
 		bpp = 8;
 		break;
-
-	case P010:
-	case BYTES_PP_2:
-		bpp = 16;
-		break;
-
-	case SKIP4:
 	case BYTES_PP_4:
 		bpp = 32;
 		break;
+	default:
+		igt_assert_f(0, "unknown bpp");
 	}
 
 	igt_get_fb_tile_size(data->gfx_fd, tiling, bpp,
@@ -298,22 +211,17 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 	data->fb.offsets[0] = 0;
 	data->fb.strides[0] = ALIGN(w * bpp / 8, tile_width);
 	gemsize = data->size = data->fb.strides[0] * ALIGN(h, tile_height);
-
-	if (fillers[i].bpp == P010 || fillers[i].bpp == NV12) {
-		data->fb.offsets[1] = data->size;
-		data->fb.strides[1] = data->fb.strides[0];
-		gemsize = data->size * 2;
-
-		if (fillers[i].bpp == NV12)
-			data->size += data->fb.strides[1] * ALIGN(h/2, tile_height);
-
-		num_planes = 2;
-	}
+	data->buf = (unsigned char *)calloc(data->size*2, 1);
 
 	data->gem_handle = gem_create(data->gfx_fd, gemsize);
 	ret = __gem_set_tiling(data->gfx_fd, data->gem_handle,
 			       igt_fb_mod_to_tiling(tiling),
 			       data->fb.strides[0]);
+
+	data->fb.gem_handle = data->gem_handle;
+	data->fb.width = w;
+	data->fb.height = h;
+	fill_in_fb(data, output, plane, format);
 
 	igt_assert_eq(ret, 0);
 
@@ -329,9 +237,6 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 		return false;
 	}
 
-	data->fb.width = w;
-	data->fb.height = h;
-	data->fb.gem_handle = data->gem_handle;
 	return true;
 }
 
@@ -378,63 +283,66 @@ static bool prepare_crtc(data_t *data, igt_output_t *output,
 	if (!setup_fb(data, output, plane, format))
 		return false;
 
-	free((void*)data->buf);
-	data->buf = (unsigned char*)calloc(data->size*2, 1);
 	return true;
 }
 
 
 static int
 test_one_mode(data_t* data, igt_output_t *output, igt_plane_t* plane,
-	      int mode)
+	      int mode, enum pipe pipe)
 {
 	igt_crc_t current_crc;
 	signed rVal = 0;
-	bool do_crc;
-	char* crccompare[2];
+	int i;
 
-	if (prepare_crtc(data, output, plane, mode)){
-		/*
-		 * we have fb from prepare_crtc(..) so now fill it in
-		 * correctly in fill_in_fb(..)
-		 */
-		do_crc = fill_in_fb(data, output, plane, mode);
+	/*
+	 * Limit tests only to those fb formats listed in fillers table
+	 */
+	for (i = 0; i < ARRAY_SIZE(fillers)-1; i++) {
+		if (fillers[i].fourcc == mode)
+			break;
+	}
 
+	if (fillers[i].bpp == 0)
+		return false;
+
+	if (prepare_crtc(data, output, plane, mode)) {
 		igt_plane_set_fb(plane, &data->fb);
 		igt_fb_set_size(&data->fb, plane, data->fb.width, data->fb.height);
 		igt_plane_set_size(plane, data->fb.width, data->fb.height);
 		igt_fb_set_position(&data->fb, plane, 0, 0);
 		igt_display_commit2(&data->display, data->commit);
 
-		if (do_crc) {
-			igt_pipe_crc_get_current(data->gfx_fd, data->pipe_crc, &current_crc);
+		igt_wait_for_vblank(data->gfx_fd, pipe);
+		igt_pipe_crc_drain(data->pipe_crc);
+		igt_pipe_crc_get_current(data->gfx_fd, data->pipe_crc, &current_crc);
 
-			if (plane->type != DRM_PLANE_TYPE_CURSOR) {
-				if (!igt_check_crc_equal(&current_crc,
-					&data->fullscreen_crc)) {
-					crccompare[0] = igt_crc_to_string(&current_crc);
-					crccompare[1] = igt_crc_to_string(&data->fullscreen_crc);
-					igt_warn("crc mismatch. target %.8s, result %.8s.\n", crccompare[0], crccompare[1]);
-					free(crccompare[0]);
-					free(crccompare[1]);
-					rVal++;
-				}
-			} else {
-				if (!igt_check_crc_equal(&current_crc,
-					&data->cursor_crc)) {
-					crccompare[0] = igt_crc_to_string(&current_crc);
-					crccompare[1] = igt_crc_to_string(&data->cursor_crc);
-					igt_warn("crc mismatch. target %.8s, result %.8s.\n", crccompare[0], crccompare[1]);
-					free(crccompare[0]);
-					free(crccompare[1]);
-					rVal++;
-				}
+		if (plane->type != DRM_PLANE_TYPE_CURSOR) {
+			if (!igt_check_crc_equal(&current_crc,
+				&data->fullscreen_crc)) {
+				igt_warn("crc mismatch. connector %s using pipe %s" \
+					" plane index %d mode %.4s\n",
+					igt_output_name(output),
+					kmstest_pipe_name(pipe),
+					plane->index,
+					(char *)&mode);
+				rVal++;
+			}
+		} else {
+			if (!igt_check_crc_equal(&current_crc,
+				&data->cursor_crc)) {
+				igt_warn("crc mismatch. connector %s using pipe %s" \
+					" plane index %d mode %.4s\n",
+					igt_output_name(output),
+					kmstest_pipe_name(pipe),
+					plane->index,
+					(char *)&mode);
+				rVal++;
 			}
 		}
-		remove_fb(data, output, plane);
-		return rVal;
 	}
-	return 1;
+	remove_fb(data, output, plane);
+	return rVal;
 }
 
 
@@ -445,13 +353,43 @@ test_available_modes(data_t* data)
 	igt_plane_t *plane;
 	int modeindex;
 	enum pipe pipe;
-	int invalids = 0;
+	int invalids = 0, i, lut_size;
 	drmModePlane *modePlane;
-	char planetype[3][8] = {"OVERLAY\0", "PRIMARY\0", "CURSOR\0" };
+
+	struct {
+		uint16_t red;
+		uint16_t green;
+		uint16_t blue;
+		uint16_t reserved;
+	} *lut = NULL;
 
 	for_each_pipe_with_valid_output(&data->display, pipe, output) {
 		igt_output_set_pipe(output, pipe);
 		igt_display_commit2(&data->display, data->commit);
+
+		if (igt_pipe_obj_has_prop(&data->display.pipes[pipe], IGT_CRTC_GAMMA_LUT_SIZE)) {
+			lut_size = igt_pipe_get_prop(&data->display, pipe,
+						     IGT_CRTC_GAMMA_LUT_SIZE);
+
+			lut = calloc(sizeof(*lut), lut_size);
+
+			for (i = 0; i < lut_size; i++) {
+				lut[i].red = (i * 0xffff / (lut_size - 1)) & 0xfc00;
+				lut[i].green = (i * 0xffff / (lut_size - 1)) & 0xfc00;
+				lut[i].blue = (i * 0xffff / (lut_size - 1)) & 0xfc00;
+			}
+
+			igt_pipe_replace_prop_blob(&data->display, pipe,
+						   IGT_CRTC_GAMMA_LUT,
+						   lut, sizeof(*lut) * lut_size);
+			igt_display_commit2(&data->display, data->commit);
+
+			for (i = 0; i < lut_size; i++) {
+				lut[i].red = i * 0xffff / (lut_size - 1);
+				lut[i].green = i * 0xffff / (lut_size - 1);
+				lut[i].blue = i * 0xffff / (lut_size - 1);
+			}
+		}
 
 		data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe,
 						  INTEL_PIPE_CRC_SOURCE_AUTO);
@@ -467,29 +405,34 @@ test_available_modes(data_t* data)
 			modePlane = drmModeGetPlane(data->gfx_fd,
 						    plane->drm_plane->plane_id);
 
+			if (plane->type == DRM_PLANE_TYPE_CURSOR)
+				continue;
+
 			for (modeindex = 0;
 			     modeindex < modePlane->count_formats;
 			     modeindex++) {
 				data->format.dword = modePlane->formats[modeindex];
 
-				igt_info("Testing connector %s using pipe %s" \
-					 " plane index %d type %s mode %s\n",
-					 igt_output_name(output),
-					 kmstest_pipe_name(pipe),
-					 plane->index,
-					 planetype[plane->type],
-					 (char*)&data->format.name);
-
 				invalids += test_one_mode(data, output,
 							  plane,
-							  modePlane->formats[modeindex]);
+							  modePlane->formats[modeindex],
+							  pipe);
 			}
 			drmModeFreePlane(modePlane);
 		}
 		igt_pipe_crc_stop(data->pipe_crc);
 		igt_pipe_crc_free(data->pipe_crc);
-		igt_display_commit2(&data->display, data->commit);
+
+		if (lut != NULL) {
+			igt_pipe_replace_prop_blob(&data->display, pipe,
+						   IGT_CRTC_GAMMA_LUT,
+						   lut, sizeof(*lut) * lut_size);
+			free(lut);
+			lut = NULL;
+		}
+
 		igt_output_set_pipe(output, PIPE_NONE);
+		igt_display_commit2(&data->display, data->commit);
 	}
 	igt_assert(invalids == 0);
 }
