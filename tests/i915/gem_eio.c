@@ -259,7 +259,7 @@ static void check_wait(int fd, uint32_t bo, unsigned int wait, igt_stats_t *st)
 
 static void check_wait_elapsed(int fd, igt_stats_t *st)
 {
-	double med, max;
+	double med, max, limit;
 
 	igt_info("Completed %d resets, wakeups took %.3f+-%.3fms (min:%.3fms, median:%.3fms, max:%.3fms)\n",
 		 st->n_values,
@@ -272,15 +272,24 @@ static void check_wait_elapsed(int fd, igt_stats_t *st)
 	if (st->n_values < 9)
 		return; /* too few for stable median */
 
+	/*
+	 * Older platforms need to reset the display (incl. modeset to off,
+	 * modeset back on) around resets, so may take a lot longer.
+	 */
+	limit = 250e6;
+	if (intel_gen(intel_get_drm_devid(fd)) < 5)
+		limit += 300e6; /* guestimate for 2x worstcase modeset */
+
 	med = igt_stats_get_median(st);
 	max = igt_stats_get_max(st);
-	igt_assert_f(med < 250e6 && max < 1250e6,
-		     "Wake up following reset+wedge took %.3f+-%.3fms (min:%.3fms, median:%.3fms, max:%.3fms)\n",
+	igt_assert_f(med < limit && max < 5 * limit,
+		     "Wake up following reset+wedge took %.3f+-%.3fms (min:%.3fms, median:%.3fms, max:%.3fms); limit set to %.0fms on average and %.0fms maximum\n",
 		     igt_stats_get_mean(st)*1e-6,
 		     igt_stats_get_std_deviation(st)*1e-6,
 		     igt_stats_get_min(st)*1e-6,
 		     igt_stats_get_median(st)*1e-6,
-		     igt_stats_get_max(st)*1e-6);
+		     igt_stats_get_max(st)*1e-6,
+		     limit*1e-6, limit*5e-6);
 }
 
 static void __test_banned(int fd)
