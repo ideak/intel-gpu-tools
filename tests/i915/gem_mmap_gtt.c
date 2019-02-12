@@ -450,7 +450,7 @@ test_hang(int fd)
 	igt_info("%lu resets\n", count);
 
 	control->done = true;
-	igt_waitchildren();
+	igt_waitchildren_timeout(2, NULL);
 
 	igt_assert(!control->error);
 	munmap(control, 4096);
