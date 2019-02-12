@@ -71,7 +71,7 @@ static void exec1(int fd, uint32_t handle, uint64_t reloc_ofs, unsigned flags, c
 	gem_exec[0].relocs_ptr = to_user_pointer(gem_reloc);
 	gem_exec[0].alignment = 0;
 	gem_exec[0].offset = 0;
-	gem_exec[0].flags = 0;
+	gem_exec[0].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	gem_exec[0].rsvd1 = 0;
 	gem_exec[0].rsvd2 = 0;
 
@@ -154,12 +154,11 @@ static void execN(int fd, uint32_t handle, uint64_t batch_size, unsigned flags, 
 	gem_exec[0].handle = handle;
 	gem_exec[0].relocation_count = nreloc;
 	gem_exec[0].relocs_ptr = to_user_pointer(gem_reloc);
+	gem_exec[0].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = 1;
-	execbuf.batch_start_offset = 0;
-	execbuf.batch_len = 8;
 	execbuf.flags = flags;
 
 	/* Avoid hitting slowpaths in the reloc processing which might yield a
@@ -197,16 +196,10 @@ static void execN(int fd, uint32_t handle, uint64_t batch_size, unsigned flags, 
 #undef reloc_ofs
 }
 
-igt_simple_main
+static void exhaustive(int fd)
 {
 	uint32_t batch[2] = {MI_BATCH_BUFFER_END};
 	uint64_t batch_size, max, ggtt_max, reloc_ofs;
-	int fd;
-
-	fd = drm_open_driver(DRIVER_INTEL);
-	igt_require_gem(fd);
-
-	use_64bit_relocs = intel_gen(intel_get_drm_devid(fd)) >= 8;
 
 	max = 3 * gem_aperture_size(fd) / 4;
 	ggtt_max = 3 * gem_global_aperture_size(fd) / 4;
@@ -258,6 +251,61 @@ igt_simple_main
 		else
 			batch_size *= 2;
 	}
+}
 
-	close(fd);
+static void single(int i915)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint64_t batch_size, limit;
+	uint32_t handle;
+	void *ptr;
+
+	batch_size = (intel_get_avail_ram_mb() - 128) << 20; /* CI slack */
+	limit = gem_aperture_size(i915) - (256 << 10); /* low pages reserved */
+	if (!gem_uses_full_ppgtt(i915))
+		limit = 3 * limit / 4;
+
+	batch_size = min(batch_size, limit);
+	batch_size = ALIGN(batch_size, 4096);
+	igt_info("Submitting a %'"PRId64"MiB batch, %saperture size %'"PRId64"MiB\n",
+		 batch_size >> 20,
+		 gem_uses_full_ppgtt(i915) ? "" : "shared ",
+		 gem_aperture_size(i915) >> 20);
+	intel_require_memory(1, batch_size, CHECK_RAM);
+
+	handle = gem_create(i915, batch_size);
+	gem_write(i915, handle, 0, &bbe, sizeof(bbe));
+
+	if (!FORCE_PREAD_PWRITE && gem_has_llc(i915))
+		ptr = __gem_mmap__cpu(i915, handle, 0, batch_size, PROT_READ);
+	else if (!FORCE_PREAD_PWRITE && gem_mmap__has_wc(i915))
+		ptr = __gem_mmap__wc(i915, handle, 0, batch_size, PROT_READ);
+	else
+		ptr = NULL;
+
+	execN(i915, handle, batch_size, 0, ptr);
+
+	if (ptr)
+		munmap(ptr, batch_size);
+}
+
+igt_main
+{
+	int i915 = -1;
+
+	igt_fixture {
+		i915 = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(i915);
+
+		use_64bit_relocs = intel_gen(intel_get_drm_devid(i915)) >= 8;
+	}
+
+	igt_subtest("single")
+		single(i915);
+
+	igt_subtest("exhaustive")
+		exhaustive(i915);
+
+	igt_fixture
+		close(i915);
 }
