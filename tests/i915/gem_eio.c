@@ -42,6 +42,7 @@
 
 #include "igt.h"
 #include "igt_device.h"
+#include "igt_stats.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
 #include "i915/gem_ring.h"
@@ -239,10 +240,9 @@ static void hang_after(int fd, unsigned int us, struct timespec *ts)
 	igt_assert_eq(timer_settime(ctx->timer, 0, &its, NULL), 0);
 }
 
-static void check_wait(int fd, uint32_t bo, unsigned int wait)
+static void check_wait(int fd, uint32_t bo, unsigned int wait, igt_stats_t *st)
 {
 	struct timespec ts = {};
-	uint64_t elapsed;
 
 	if (wait) {
 		hang_after(fd, wait, &ts);
@@ -253,10 +253,34 @@ static void check_wait(int fd, uint32_t bo, unsigned int wait)
 
 	gem_sync(fd, bo);
 
-	elapsed = igt_nsec_elapsed(&ts);
-	igt_assert_f(elapsed < 250e6,
-		     "Wake up following reset+wedge took %.3fms\n",
-		     elapsed*1e-6);
+	if (st)
+		igt_stats_push(st, igt_nsec_elapsed(&ts));
+}
+
+static void check_wait_elapsed(int fd, igt_stats_t *st)
+{
+	double med, max;
+
+	igt_info("Completed %d resets, wakeups took %.3f+-%.3fms (min:%.3fms, median:%.3fms, max:%.3fms)\n",
+		 st->n_values,
+		 igt_stats_get_mean(st)*1e-6,
+		 igt_stats_get_std_deviation(st)*1e-6,
+		 igt_stats_get_min(st)*1e-6,
+		 igt_stats_get_median(st)*1e-6,
+		 igt_stats_get_max(st)*1e-6);
+
+	if (st->n_values < 9)
+		return; /* too few for stable median */
+
+	med = igt_stats_get_median(st);
+	max = igt_stats_get_max(st);
+	igt_assert_f(med < 250e6 && max < 1250e6,
+		     "Wake up following reset+wedge took %.3f+-%.3fms (min:%.3fms, median:%.3fms, max:%.3fms)\n",
+		     igt_stats_get_mean(st)*1e-6,
+		     igt_stats_get_std_deviation(st)*1e-6,
+		     igt_stats_get_min(st)*1e-6,
+		     igt_stats_get_median(st)*1e-6,
+		     igt_stats_get_max(st)*1e-6);
 }
 
 static void __test_banned(int fd)
@@ -326,7 +350,7 @@ static void test_wait(int fd, unsigned int flags, unsigned int wait)
 
 	hang = spin_sync(fd, 0, I915_EXEC_DEFAULT);
 
-	check_wait(fd, hang->handle, wait);
+	check_wait(fd, hang->handle, wait, NULL);
 
 	igt_spin_batch_free(fd, hang);
 
@@ -401,7 +425,7 @@ static void test_inflight(int fd, unsigned int wait)
 			igt_assert(fence[n] != -1);
 		}
 
-		check_wait(fd, obj[1].handle, wait);
+		check_wait(fd, obj[1].handle, wait, NULL);
 
 		for (unsigned int n = 0; n < max; n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
@@ -457,7 +481,7 @@ static void test_inflight_suspend(int fd)
 	igt_set_autoresume_delay(30);
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 
-	check_wait(fd, obj[1].handle, 10);
+	check_wait(fd, obj[1].handle, 10, NULL);
 
 	for (unsigned int n = 0; n < max; n++) {
 		igt_assert_eq(sync_fence_status(fence[n]), -EIO);
@@ -535,7 +559,7 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 			igt_assert(fence[n] != -1);
 		}
 
-		check_wait(fd, obj[1].handle, wait);
+		check_wait(fd, obj[1].handle, wait, NULL);
 
 		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
@@ -644,7 +668,7 @@ static void test_inflight_internal(int fd, unsigned int wait)
 		nfence++;
 	}
 
-	check_wait(fd, obj[1].handle, wait);
+	check_wait(fd, obj[1].handle, wait, NULL);
 
 	while (nfence--) {
 		igt_assert_eq(sync_fence_status(fences[nfence]), -EIO);
@@ -670,8 +694,11 @@ static void reset_stress(int fd,
 		.buffer_count = 1,
 		.flags = engine,
 	};
+	igt_stats_t stats;
+
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
+	igt_stats_init(&stats);
 	igt_until_timeout(5) {
 		uint32_t ctx = context_create_safe(fd);
 		igt_spin_t *hang;
@@ -697,7 +724,7 @@ static void reset_stress(int fd,
 			gem_execbuf(fd, &execbuf);
 
 		/* Wedge after a small delay. */
-		check_wait(fd, obj.handle, 100e3);
+		check_wait(fd, obj.handle, 100e3, &stats);
 
 		/* Unwedge by forcing a reset. */
 		igt_assert(i915_reset_control(true));
@@ -721,6 +748,8 @@ static void reset_stress(int fd,
 		igt_spin_batch_free(fd, hang);
 		gem_context_destroy(fd, ctx);
 	}
+	check_wait_elapsed(fd, &stats);
+	igt_stats_fini(&stats);
 
 	gem_close(fd, obj.handle);
 }
