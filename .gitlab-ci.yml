@@ -113,6 +113,20 @@ test:ninja-test-arm64:
       - build
     when: on_failure
 
+test:ninja-test-armhf:
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-armhf:latest
+  dependencies:
+    - build:tests-debian-meson-armhf
+  stage: test
+  script:
+    - export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig/
+    - env > build/envdump.txt
+    - ninja -C build test
+  artifacts:
+    paths:
+      - build
+    when: on_failure
+
 test:test-list-diff:
   dependencies:
     - build:tests-debian-autotools
