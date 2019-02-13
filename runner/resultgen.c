@@ -18,7 +18,6 @@
 
 #define INCOMPLETE_EXITCODE -1
 
-_Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_TIMEOUT, "exit code clash");
 _Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_SKIP, "exit code clash");
 _Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_SUCCESS, "exit code clash");
 _Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_INVALID, "exit code clash");
@@ -731,8 +730,6 @@ static bool fill_from_dmesg(int fd,
 static const char *result_from_exitcode(int exitcode)
 {
 	switch (exitcode) {
-	case IGT_EXIT_TIMEOUT:
-		return "timeout";
 	case IGT_EXIT_SKIP:
 		return "skip";
 	case IGT_EXIT_SUCCESS:

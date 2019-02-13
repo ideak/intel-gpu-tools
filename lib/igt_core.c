@@ -1135,10 +1135,7 @@ void igt_fail(int exitcode)
 	_igt_log_buffer_dump();
 
 	if (in_subtest) {
-		if (exitcode == IGT_EXIT_TIMEOUT)
-			exit_subtest("TIMEOUT");
-		else
-			exit_subtest("FAIL");
+		exit_subtest("FAIL");
 	} else {
 		assert(igt_can_fail());
 
@@ -1540,9 +1537,6 @@ void igt_exit(void)
 		switch (igt_exitcode) {
 			case IGT_EXIT_SUCCESS:
 				result = "SUCCESS";
-				break;
-			case IGT_EXIT_TIMEOUT:
-				result = "TIMEOUT";
 				break;
 			case IGT_EXIT_SKIP:
 				result = "SKIP";

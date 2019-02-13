@@ -94,13 +94,6 @@ extern char *igt_frame_dump_path;
 #define IGT_TEST_DESCRIPTION(str) const char* __igt_test_description = str
 
 /**
- * IGT_EXIT_TIMEOUT:
- *
- * Exit status indicating a timeout occurred.
- */
-#define IGT_EXIT_TIMEOUT 78
-
-/**
  * IGT_EXIT_SKIP:
  *
  * Exit status indicating the test was skipped.
