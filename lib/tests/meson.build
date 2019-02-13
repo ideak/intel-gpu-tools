@@ -1,5 +1,6 @@
 lib_tests = [
 	'igt_fork_helper',
+	'igt_fork',
 	'igt_list_only',
 	'igt_simulation',
 	'igt_stats',
