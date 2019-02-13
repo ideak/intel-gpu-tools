@@ -1492,6 +1492,8 @@ void __igt_fail_assert(const char *domain, const char *file, const int line,
  */
 void igt_exit(void)
 {
+	int tmp;
+
 	igt_exit_called = true;
 
 	if (igt_key_file)
@@ -1526,6 +1528,8 @@ void igt_exit(void)
 	for (int c = 0; c < num_test_children; c++)
 		kill(test_children[c], SIGKILL);
 	assert(!num_test_children);
+
+	assert(waitpid(-1, &tmp, WNOHANG) == -1 && errno == ECHILD);
 
 	if (!test_with_subtests) {
 		struct timespec now;

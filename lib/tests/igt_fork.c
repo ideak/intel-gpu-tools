@@ -68,6 +68,20 @@ static void igt_fork_leak(void)
 	}
 }
 
+static void plain_fork_leak(void)
+{
+	int pid;
+
+	switch (pid = fork()) {
+	case -1:
+		internal_assert(0);
+	case 0:
+		sleep(1);
+	default:
+		exit(0);
+	}
+}
+
 static void igt_fork_timeout_leak(void)
 {
 	igt_fork(i, 1) {
@@ -119,4 +133,8 @@ int main(int argc, char **argv)
 	/* check that igt_waitchildren_timeout cleans up*/
 	ret = do_fork(igt_fork_timeout_leak);
 	internal_assert(WEXITSTATUS(ret) == SIGKILL + 128);
+
+	/* check that any other process leaks are caught*/
+	ret = do_fork(plain_fork_leak);
+	internal_assert(WTERMSIG(ret) == SIGABRT);
 }
