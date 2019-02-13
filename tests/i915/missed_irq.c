@@ -108,12 +108,12 @@ igt_simple_main
 	igt_require_gem(device);
 	igt_skip_on(gem_has_guc_submission(device)); /* irq forced for guc */
 	gem_require_mmap_wc(device);
-	igt_fork_hang_detector(device);
-
 	debugfs = igt_debugfs_dir(device);
 
 	expect_rings = engine_mask(debugfs);
 	igt_require(expect_rings);
+
+	igt_fork_hang_detector(device);
 
 	igt_debug("Clearing rings %x\n", expect_rings);
 	intel_detect_and_clear_missed_interrupts(device);

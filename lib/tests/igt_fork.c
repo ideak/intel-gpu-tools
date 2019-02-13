@@ -61,6 +61,22 @@ static void igt_fork_vs_assert(void)
 	igt_waitchildren();
 }
 
+static void igt_fork_leak(void)
+{
+	igt_fork(i, 1) {
+		sleep(10);
+	}
+}
+
+static void igt_fork_timeout_leak(void)
+{
+	igt_fork(i, 1) {
+		sleep(10);
+	}
+
+	igt_waitchildren_timeout(1, "library test");
+}
+
 static int do_fork(void (*test_to_run)(void))
 {
 	int pid, status;
@@ -95,4 +111,12 @@ int main(int argc, char **argv)
 	/* check that igt_skip within a fork blows up */
 	ret = do_fork(igt_fork_vs_skip);
 	internal_assert(WEXITSTATUS(ret) == SIGABRT + 128);
+
+	/* check that failure to clean up fails */
+	ret = do_fork(igt_fork_leak);
+	internal_assert(WTERMSIG(ret) == SIGABRT);
+
+	/* check that igt_waitchildren_timeout cleans up*/
+	ret = do_fork(igt_fork_timeout_leak);
+	internal_assert(WEXITSTATUS(ret) == SIGKILL + 128);
 }
