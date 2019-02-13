@@ -36,6 +36,8 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <errno.h>
+#include <sched.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -243,17 +245,24 @@ static void test_unauth_vs_render(int master)
 {
 	int slave;
 	uint32_t handle;
+	struct stat statbuf;
+	bool has_render;
 
-	/*
-	 * FIXME: when drm_open_driver() fails to open() a node (insufficient
-	 * permissions or otherwise, it will igt_skip.
-	 * As of today, igt_skip and igt_fork do not work together.
-	 */
-	slave = __drm_open_driver(DRIVER_ANY);
-	/*
-	 * FIXME: relate to the master fd passed with the above open and fix
-	 * all of IGT.
-	 */
+	/* need to check for render nodes before we wreak the filesystem */
+	has_render = has_render_node(master);
+
+	/* create a card node matching master which (only) we can access as
+	 * non-root */
+	do_or_die(fstat(master, &statbuf));
+	do_or_die(unshare(CLONE_NEWNS));
+	do_or_die(mount(NULL, "/", NULL, MS_PRIVATE | MS_REC, NULL));
+	do_or_die(mount("none", "/dev/dri", "tmpfs", 0, NULL));
+	umask(0);
+	do_or_die(mknod("/dev/dri/card", S_IFCHR | 0666, statbuf.st_rdev));
+
+	igt_drop_root();
+
+	slave = open("/dev/dri/card", O_RDWR);
 
 	igt_assert(slave >= 0);
 
@@ -276,7 +285,7 @@ static void test_unauth_vs_render(int master)
 	 * Note: We are _not_ interested in the FD2HANDLE specific errno,
 	 * yet the EBADF check is added on the explicit request by danvet.
 	 */
-	if (has_render_node(slave))
+	if (has_render)
 		igt_assert(errno == EBADF);
 	else
 		igt_assert(errno == EACCES);
@@ -330,10 +339,8 @@ igt_main
 		igt_subtest("unauth-vs-render") {
 			check_auth_sanity(master);
 
-			igt_fork(child, 1) {
-				igt_drop_root();
+			igt_fork(child, 1)
 				test_unauth_vs_render(master);
-			}
 			igt_waitchildren();
 		}
 	}
