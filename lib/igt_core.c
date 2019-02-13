@@ -1525,6 +1525,7 @@ void igt_exit(void)
 
 	for (int c = 0; c < num_test_children; c++)
 		kill(test_children[c], SIGKILL);
+	assert(!num_test_children);
 
 	if (!test_with_subtests) {
 		struct timespec now;
@@ -1832,20 +1833,40 @@ void igt_waitchildren(void)
 		igt_fail(err);
 }
 
+static void igt_alarm_killchildren(int signal)
+{
+	igt_info("Timed out waiting for children\n");
+
+	for (int c = 0; c < num_test_children; c++)
+		kill(test_children[c], SIGKILL);
+}
+
 /**
  * igt_waitchildren_timeout:
  * @seconds: timeout in seconds to wait
  * @reason: debug string explaining what timedout
  *
- * Wait for all children forked with igt_fork, for a maximum of @seconds.
- *
- * Wraps igt_waitchildren() and igt_set_timeout()
+ * Wait for all children forked with igt_fork, for a maximum of @seconds. If the
+ * timeout expires, kills all children, cleans them up, and then fails by
+ * calling igt_fail().
  */
 void igt_waitchildren_timeout(int seconds, const char *reason)
 {
-	igt_set_timeout(seconds, reason);
-	igt_waitchildren();
+	struct sigaction sa;
+	int ret;
+
+	sa.sa_handler = igt_alarm_killchildren;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+
+	sigaction(SIGALRM, &sa, NULL);
+
+	alarm(seconds);
+
+	ret = __igt_waitchildren();
 	igt_reset_timeout();
+	if (ret)
+		igt_fail(ret);
 }
 
 /* exit handler code */
