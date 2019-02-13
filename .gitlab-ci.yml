@@ -58,6 +58,17 @@ build:tests-debian-meson:
     paths:
       - meson-test-list.txt
 
+build:tests-debian-meson-armhf:
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-armhf:latest
+  stage: build
+  script:
+    - export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig/
+    - meson --cross-file meson-cross-armhf.txt build
+    - ninja -C build
+  artifacts:
+    paths:
+      - build
+
 build:tests-debian-meson-arm64:
   image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64:latest
   stage: build
@@ -142,6 +153,23 @@ containers:igt-debian:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian -f Dockerfile.debian .
     - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian
+
+containers:igt-debian-armhf:
+  stage: containers
+  image: docker:stable
+  only:
+    changes:
+      - Dockerfile.debian-armhf
+      - .gitlab-ci.yml
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-armhf -f Dockerfile.debian-armhf .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-armhf
 
 containers:igt-debian-arm64:
   stage: containers
