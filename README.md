@@ -176,6 +176,8 @@ The following dependencies are requires for building audio support
 	libasound2-dev
 	libgsl-dev
 
+See Dockerfiles.* for package names in different distributions.
+
 Meson build system support
 --------------------------
 
