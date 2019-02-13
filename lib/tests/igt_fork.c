@@ -43,6 +43,15 @@
 char test[] = "test";
 char *argv_run[] = { test };
 
+static void igt_fork_vs_skip(void)
+{
+	igt_fork(i, 1) {
+		igt_skip("skipping");
+	}
+
+	igt_waitchildren();
+}
+
 static void igt_fork_vs_assert(void)
 {
 	igt_fork(i, 1) {
@@ -79,6 +88,11 @@ int main(int argc, char **argv)
 {
 	int ret;
 
+	/* check that igt_assert is forwarded */
 	ret = do_fork(igt_fork_vs_assert);
 	internal_assert(WEXITSTATUS(ret) == IGT_EXIT_FAILURE);
+
+	/* check that igt_skip within a fork blows up */
+	ret = do_fork(igt_fork_vs_skip);
+	internal_assert(WEXITSTATUS(ret) == SIGABRT + 128);
 }
