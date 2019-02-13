@@ -79,10 +79,7 @@ static int do_fork(void)
 		       errno == EINTR)
 			;
 
-		if(WIFSIGNALED(status))
-			return WTERMSIG(status) + 128;
-
-		return WEXITSTATUS(status);
+		return status;
 	}
 }
 
@@ -161,7 +158,7 @@ igt_main
 	test_to_run = test_cmpint_negative;
 	ret = do_fork();
 	igt_subtest("igt_cmpint_negative")
-		internal_assert(ret == IGT_EXIT_FAILURE);
+		internal_assert(WEXITSTATUS(ret) == IGT_EXIT_FAILURE);
 
 	igt_subtest("igt_assert_fd")
 		test_fd();
@@ -169,5 +166,5 @@ igt_main
 	test_to_run = test_fd_negative;
 	ret = do_fork();
 	igt_subtest("igt_assert_fd_negative")
-		internal_assert(ret == IGT_EXIT_FAILURE);
+		internal_assert(WEXITSTATUS(ret) == IGT_EXIT_FAILURE);
 }

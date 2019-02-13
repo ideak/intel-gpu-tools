@@ -99,7 +99,7 @@ static int do_fork(void)
 
 		internal_assert(WIFEXITED(status));
 
-		return WEXITSTATUS(status);
+		return status;
 	}
 }
 
@@ -108,10 +108,10 @@ int main(int argc, char **argv)
 	/* simple tests */
 	simple = true;
 	internal_assert(setenv("INTEL_SIMULATION", "1", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SKIP);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SKIP);
 
 	internal_assert(setenv("INTEL_SIMULATION", "0", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
 
 	/* subtests, list mode */
 	simple = false;
@@ -119,25 +119,29 @@ int main(int argc, char **argv)
 
 	in_fixture = false;
 	internal_assert(setenv("INTEL_SIMULATION", "1", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
 
 	internal_assert(setenv("INTEL_SIMULATION", "0", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
 
 	in_fixture = true;
 	internal_assert(setenv("INTEL_SIMULATION", "1", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
+
 
 	internal_assert(setenv("INTEL_SIMULATION", "0", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
+
 
 	in_fixture = false;
 	in_subtest = true;
 	internal_assert(setenv("INTEL_SIMULATION", "1", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
+
 
 	internal_assert(setenv("INTEL_SIMULATION", "0", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
+
 
 	/* subtest, run mode */
 	simple = false;
@@ -145,25 +149,30 @@ int main(int argc, char **argv)
 
 	in_fixture = false;
 	internal_assert(setenv("INTEL_SIMULATION", "1", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SKIP);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SKIP);
 
 	internal_assert(setenv("INTEL_SIMULATION", "0", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
+
 
 	in_fixture = true;
 	internal_assert(setenv("INTEL_SIMULATION", "1", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SKIP);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SKIP);
+
 
 	internal_assert(setenv("INTEL_SIMULATION", "0", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
+
 
 	in_fixture = false;
 	in_subtest = true;
 	internal_assert(setenv("INTEL_SIMULATION", "1", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SKIP);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SKIP);
+
 
 	internal_assert(setenv("INTEL_SIMULATION", "0", 1) == 0);
-	internal_assert(do_fork() == IGT_EXIT_SUCCESS);
+	internal_assert(WEXITSTATUS(do_fork()) == IGT_EXIT_SUCCESS);
+
 
 	return 0;
 }
