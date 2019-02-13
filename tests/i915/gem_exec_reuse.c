@@ -213,4 +213,7 @@ igt_main
 		for (n = 0; n < ncontexts; n++)
 			gem_context_destroy(no.fd, contexts[n]);
 	}
+
+	igt_fixture
+		igt_stop_hang_detector();
 }
