@@ -381,7 +381,7 @@ test_ggtt_args(int fd)
 	igt_assert_eq(__gem_context_get_param(fd, &arg), 0);
 	igt_assert_eq(__gem_context_set_param(fd, &arg), 0);
 
-	munmap((void *)arg.value, 4096);
+	munmap((void *)(uintptr_t)arg.value, 4096);
 	gem_close(fd, bo);
 	gem_context_destroy(fd, arg.ctx_id);
 }
