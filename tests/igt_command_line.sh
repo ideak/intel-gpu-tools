@@ -100,10 +100,6 @@ check_test ()
 	./$test --run-subtest invalid-subtest > /dev/null 2>&1 && fail $test
 }
 
-if [ "$EUID" -eq 0 ]; then
-    fail "Don't run $0 as root. It executes igt_fixture blocks."
-fi
-
 TESTLISTFILE="$tests_dir/test-list.txt"
 if [ ! -r "$TESTLISTFILE" ]; then
 	tests_dir="tests"
