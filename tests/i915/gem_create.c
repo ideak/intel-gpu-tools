@@ -44,6 +44,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <getopt.h>
+#include <pthread.h>
 
 #include <drm.h>
 
@@ -141,6 +142,73 @@ static void invalid_nonaligned_size(int fd)
 	gem_close(fd, handle);
 }
 
+static uint64_t get_npages(uint64_t *global, uint64_t npages)
+{
+	uint64_t try, old, max;
+
+	max = *global;
+	do {
+		old = max;
+		try = npages % (max / 2);
+		max -= try;
+	} while ((max = __sync_val_compare_and_swap(global, old, max)) != old);
+
+	return try;
+}
+
+struct thread_clear {
+	uint64_t max;
+	int timeout;
+	int i915;
+};
+
+static void *thread_clear(void *data)
+{
+	struct thread_clear *arg = data;
+	int i915 = arg->i915;
+
+	igt_until_timeout(arg->timeout) {
+		uint32_t handle;
+		uint64_t npages;
+
+		npages = random();
+		npages <<= 32;
+		npages |= random();
+		npages = get_npages(&arg->max, npages);
+
+		handle = gem_create(i915, npages << 12);
+		for (uint64_t page = 0; page < npages; page++) {
+			uint64_t x;
+
+			gem_read(i915, handle,
+				 page * 4096 + (page % (4096 - sizeof(x))),
+				 &x, sizeof(x));
+			igt_assert_eq_u64(x, 0);
+		}
+		gem_close(i915, handle);
+
+		__sync_add_and_fetch(&arg->max, npages);
+	}
+
+	return NULL;
+}
+
+static void always_clear(int i915, int timeout)
+{
+	struct thread_clear arg = {
+		.i915 = i915,
+		.timeout = timeout,
+		.max = intel_get_avail_ram_mb() << (20 - 12), /* in pages */
+	};
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	pthread_t thread[ncpus];
+
+	for (int i = 0; i < ncpus; i++)
+		pthread_create(&thread[i], NULL, thread_clear, &arg);
+	for (int i = 0; i < ncpus; i++)
+		pthread_join(thread[i], NULL);
+}
+
 igt_main
 {
 	int fd = -1;
@@ -162,4 +230,7 @@ igt_main
 
 	igt_subtest("create-invalid-nonaligned")
 		invalid_nonaligned_size(fd);
+
+	igt_subtest("create-clear")
+		always_clear(fd, 30);
 }
