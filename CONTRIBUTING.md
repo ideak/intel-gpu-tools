@@ -1,5 +1,5 @@
 Patches to igt-gpu-tools are very much welcome, we really want this to be the
-universal set of low-level tools and testcases for the Intel kernel gfx driver
+universal set of low-level tools and testcases for kernel graphics drivers
 on Linux and similar platforms. So please bring on porting patches, bugfixes,
 improvements for documentation and new tools and testcases.
 
@@ -10,19 +10,14 @@ A short list of contribution guidelines:
 
       Development mailing list for IGT GPU Tools <igt-dev@lists.freedesktop.org>
 
-  For a transition period patches are accepted on both the igt-dev mailing list
-  and the former intel-gfx mailing list (with the appropriate patch
-  subjectprefix, see below).
+  For patches affecting the driver directly please "cc" the appropriate driver
+  mailing list and make sure you are using:
 
-  During the transition period, feel free to send patches to both lists if you
-  have a need to do so, as they will get deduplicated so they only appear and
-  are tested in one Patchwork instance.
+      --subject-prefix="PATCH i-g-t"
 
-      Intel GFX discussion <intel-gfx@lists.freedesktop.org>
-
-  Please use --subject-prefix="PATCH i-g-t" so IGT patches are easily
-  identified in the massive amount mails on intel-gfx. To ensure this is always
-  done, meson.sh (and autogen.sh) will run:
+  so IGT patches are easily identified in the massive amount mails on driver's
+  mailing list. To ensure this is always done, meson.sh (and autogen.sh) will
+  run:
 
       git config format.subjectprefix "PATCH i-g-t"
 
