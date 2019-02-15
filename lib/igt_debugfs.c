@@ -497,26 +497,8 @@ struct _igt_pipe_crc {
 	int flags;
 
 	enum pipe pipe;
-	enum intel_pipe_crc_source source;
+	char *source;
 };
-
-static const char *pipe_crc_sources[] = {
-	"none",
-	"plane1",
-	"plane2",
-	"pf",
-	"pipe",
-	"TV",
-	"DP-B",
-	"DP-C",
-	"DP-D",
-	"auto"
-};
-
-static const char *pipe_crc_source_name(enum intel_pipe_crc_source source)
-{
-        return pipe_crc_sources[source];
-}
 
 /**
  * igt_require_pipe_crc:
@@ -660,11 +642,13 @@ void igt_require_hpd_storm_ctl(int drm_fd)
 }
 
 static igt_pipe_crc_t *
-pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source, int flags)
+pipe_crc_new(int fd, enum pipe pipe, const char *source, int flags)
 {
 	igt_pipe_crc_t *pipe_crc;
 	char buf[128];
 	int debugfs;
+
+	igt_assert(source);
 
 	debugfs = igt_debugfs_dir(fd);
 	igt_assert(debugfs != -1);
@@ -679,7 +663,8 @@ pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source, int flag
 	pipe_crc->fd = fd;
 	pipe_crc->dir = debugfs;
 	pipe_crc->pipe = pipe;
-	pipe_crc->source = source;
+	pipe_crc->source = strdup(source);
+	igt_assert(pipe_crc->source);
 	pipe_crc->flags = flags;
 
 	return pipe_crc;
@@ -698,7 +683,7 @@ pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source, int flag
  * least INTEL_PIPE_CRC_SOURCE_AUTO everywhere.
  */
 igt_pipe_crc_t *
-igt_pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source)
+igt_pipe_crc_new(int fd, enum pipe pipe, const char *source)
 {
 	return pipe_crc_new(fd, pipe, source, O_RDONLY);
 }
@@ -716,7 +701,7 @@ igt_pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source)
  * least INTEL_PIPE_CRC_SOURCE_AUTO everywhere.
  */
 igt_pipe_crc_t *
-igt_pipe_crc_new_nonblock(int fd, enum pipe pipe, enum intel_pipe_crc_source source)
+igt_pipe_crc_new_nonblock(int fd, enum pipe pipe, const char *source)
 {
 	return pipe_crc_new(fd, pipe, source, O_RDONLY | O_NONBLOCK);
 }
@@ -735,6 +720,7 @@ void igt_pipe_crc_free(igt_pipe_crc_t *pipe_crc)
 	close(pipe_crc->ctl_fd);
 	close(pipe_crc->crc_fd);
 	close(pipe_crc->dir);
+	free(pipe_crc->source);
 	free(pipe_crc);
 }
 
@@ -801,7 +787,7 @@ static void read_one_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out)
  */
 void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc)
 {
-	const char *src = pipe_crc_source_name(pipe_crc->source);
+	const char *src = pipe_crc->source;
 	struct pollfd pfd;
 	char buf[32];
 

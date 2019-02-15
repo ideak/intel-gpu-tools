@@ -82,39 +82,7 @@ typedef struct {
 	uint32_t crc[DRM_MAX_CRC_NR];
 } igt_crc_t;
 
-/**
- * intel_pipe_crc_source:
- * @INTEL_PIPE_CRC_SOURCE_NONE: No source
- * @INTEL_PIPE_CRC_SOURCE_PLANE1: Plane 1
- * @INTEL_PIPE_CRC_SOURCE_PLANE2: Plane 2
- * @INTEL_PIPE_CRC_SOURCE_PF: Panel Filter
- * @INTEL_PIPE_CRC_SOURCE_PIPE: Pipe
- * @INTEL_PIPE_CRC_SOURCE_TV: TV
- * @INTEL_PIPE_CRC_SOURCE_DP_B: DisplayPort B
- * @INTEL_PIPE_CRC_SOURCE_DP_C: DisplayPort C
- * @INTEL_PIPE_CRC_SOURCE_DP_D: DisplayPort D
- * @INTEL_PIPE_CRC_SOURCE_AUTO: Automatic source selection
- * @INTEL_PIPE_CRC_SOURCE_MAX: Number of available sources
- *
- * Enumeration of all supported pipe CRC sources. Not all platforms and all
- * outputs support all of them. Generic tests should just use
- * INTEL_PIPE_CRC_SOURCE_AUTO. It should always map to an end-of-pipe CRC
- * suitable for checking planes, cursor, color correction and any other
- * output-agnostic features.
- */
-enum intel_pipe_crc_source {
-        INTEL_PIPE_CRC_SOURCE_NONE,
-        INTEL_PIPE_CRC_SOURCE_PLANE1,
-        INTEL_PIPE_CRC_SOURCE_PLANE2,
-        INTEL_PIPE_CRC_SOURCE_PF,
-        INTEL_PIPE_CRC_SOURCE_PIPE,
-        INTEL_PIPE_CRC_SOURCE_TV,
-        INTEL_PIPE_CRC_SOURCE_DP_B,
-        INTEL_PIPE_CRC_SOURCE_DP_C,
-        INTEL_PIPE_CRC_SOURCE_DP_D,
-        INTEL_PIPE_CRC_SOURCE_AUTO,
-        INTEL_PIPE_CRC_SOURCE_MAX,
-};
+#define INTEL_PIPE_CRC_SOURCE_AUTO "auto"
 
 void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
 bool igt_check_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
@@ -123,9 +91,9 @@ char *igt_crc_to_string(igt_crc_t *crc);
 
 void igt_require_pipe_crc(int fd);
 igt_pipe_crc_t *
-igt_pipe_crc_new(int fd, enum pipe pipe, enum intel_pipe_crc_source source);
+igt_pipe_crc_new(int fd, enum pipe pipe, const char *source);
 igt_pipe_crc_t *
-igt_pipe_crc_new_nonblock(int fd, enum pipe pipe, enum intel_pipe_crc_source source);
+igt_pipe_crc_new_nonblock(int fd, enum pipe pipe, const char *source);
 void igt_pipe_crc_free(igt_pipe_crc_t *pipe_crc);
 void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc);
 void igt_pipe_crc_stop(igt_pipe_crc_t *pipe_crc);
