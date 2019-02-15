@@ -54,6 +54,7 @@
 #include "igt_device.h"
 #include "igt_gt.h"
 #include "igt_kmod.h"
+#include "igt_sysfs.h"
 #include "version.h"
 #include "config.h"
 #include "intel_reg.h"
@@ -345,6 +346,7 @@ static void __cancel_work_at_exit(int fd)
 {
 	igt_terminate_spin_batches(); /* for older kernels */
 
+	igt_sysfs_set_parameter(fd, "reset", "%x", -1u /* any method */);
 	igt_drop_caches_set(fd,
 			    /* cancel everything */
 			    DROP_RESET_ACTIVE | DROP_RESET_SEQNO |
