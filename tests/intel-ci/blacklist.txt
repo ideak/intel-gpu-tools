@@ -97,6 +97,10 @@ igt@gem_workarounds@hibernate-.*
 igt@gem_exec_suspend@basic-s4$
 igt@gem_ctx_isolation@.*-s4
 ###############################################
+# Out-of-memory: spammy and often broken
+###############################################
+igt@i915_suspend@shrink
+###############################################
 # pipe-d, pipe-e, pipe-f no current HW support
 ###############################################
 igt@.*@.*pipe-d-.*
