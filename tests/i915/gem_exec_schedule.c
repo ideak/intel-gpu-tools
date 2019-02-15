@@ -49,6 +49,24 @@
 
 IGT_TEST_DESCRIPTION("Check that we can control the order of execution");
 
+static inline
+uint32_t __sync_read_u32(int fd, uint32_t handle, uint64_t offset)
+{
+	uint32_t value;
+
+	gem_sync(fd, handle); /* No write hazard lies! */
+	gem_read(fd, handle, offset, &value, sizeof(value));
+
+	return value;
+}
+
+static inline
+void __sync_read_u32_count(int fd, uint32_t handle, uint32_t *dst, uint64_t size)
+{
+	gem_sync(fd, handle); /* No write hazard lies! */
+	gem_read(fd, handle, 0, dst, size);
+}
+
 static uint32_t __store_dword(int fd, uint32_t ctx, unsigned ring,
 			      uint32_t target, uint32_t offset, uint32_t value,
 			      uint32_t cork, unsigned write_domain)
@@ -152,7 +170,7 @@ static void fifo(int fd, unsigned ring)
 {
 	IGT_CORK_HANDLE(cork);
 	uint32_t scratch, plug;
-	uint32_t *ptr;
+	uint32_t result;
 
 	scratch = gem_create(fd, 4096);
 
@@ -165,13 +183,10 @@ static void fifo(int fd, unsigned ring)
 	unplug_show_queue(fd, &cork, ring);
 	gem_close(fd, plug);
 
-	ptr = gem_mmap__gtt(fd, scratch, 4096, PROT_READ);
-	gem_set_domain(fd, scratch, /* no write hazard lies! */
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	result =  __sync_read_u32(fd, scratch, 0);
 	gem_close(fd, scratch);
 
-	igt_assert_eq_u32(ptr[0], 2);
-	munmap(ptr, 4096);
+	igt_assert_eq_u32(result, 2);
 }
 
 static void independent(int fd, unsigned int engine)
@@ -249,7 +264,7 @@ static void smoketest(int fd, unsigned ring, unsigned timeout)
 	unsigned nengine;
 	unsigned engine;
 	uint32_t scratch;
-	uint32_t *ptr;
+	uint32_t result[2 * ncpus];
 
 	nengine = 0;
 	if (ring == ALL_ENGINES) {
@@ -287,22 +302,19 @@ static void smoketest(int fd, unsigned ring, unsigned timeout)
 	}
 	igt_waitchildren();
 
-	ptr = gem_mmap__gtt(fd, scratch, 4096, PROT_READ);
-	gem_set_domain(fd, scratch, /* no write hazard lies! */
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	__sync_read_u32_count(fd, scratch, result, sizeof(result));
 	gem_close(fd, scratch);
 
 	for (unsigned n = 0; n < ncpus; n++) {
-		igt_assert_eq_u32(ptr[2*n], ~n);
+		igt_assert_eq_u32(result[2 * n], ~n);
 		/*
 		 * Note this count is approximate due to unconstrained
 		 * ordering of the dword writes between engines.
 		 *
 		 * Take the result with a pinch of salt.
 		 */
-		igt_info("Child[%d] completed %u cycles\n",  n, ptr[2*n+1]);
+		igt_info("Child[%d] completed %u cycles\n",  n, result[(2 * n) + 1]);
 	}
-	munmap(ptr, 4096);
 }
 
 static void reorder(int fd, unsigned ring, unsigned flags)
@@ -310,7 +322,7 @@ static void reorder(int fd, unsigned ring, unsigned flags)
 {
 	IGT_CORK_HANDLE(cork);
 	uint32_t scratch, plug;
-	uint32_t *ptr;
+	uint32_t result;
 	uint32_t ctx[2];
 
 	ctx[LO] = gem_context_create(fd);
@@ -334,23 +346,20 @@ static void reorder(int fd, unsigned ring, unsigned flags)
 	gem_context_destroy(fd, ctx[LO]);
 	gem_context_destroy(fd, ctx[HI]);
 
-	ptr = gem_mmap__gtt(fd, scratch, 4096, PROT_READ);
-	gem_set_domain(fd, scratch, /* no write hazard lies! */
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	result =  __sync_read_u32(fd, scratch, 0);
 	gem_close(fd, scratch);
 
 	if (flags & EQUAL) /* equal priority, result will be fifo */
-		igt_assert_eq_u32(ptr[0], ctx[HI]);
+		igt_assert_eq_u32(result, ctx[HI]);
 	else
-		igt_assert_eq_u32(ptr[0], ctx[LO]);
-	munmap(ptr, 4096);
+		igt_assert_eq_u32(result, ctx[LO]);
 }
 
 static void promotion(int fd, unsigned ring)
 {
 	IGT_CORK_HANDLE(cork);
 	uint32_t result, dep;
-	uint32_t *ptr;
+	uint32_t result_read, dep_read;
 	uint32_t ctx[3];
 	uint32_t plug;
 
@@ -389,21 +398,14 @@ static void promotion(int fd, unsigned ring)
 	gem_context_destroy(fd, ctx[LO]);
 	gem_context_destroy(fd, ctx[HI]);
 
-	ptr = gem_mmap__gtt(fd, dep, 4096, PROT_READ);
-	gem_set_domain(fd, dep, /* no write hazard lies! */
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	dep_read = __sync_read_u32(fd, dep, 0);
 	gem_close(fd, dep);
 
-	igt_assert_eq_u32(ptr[0], ctx[HI]);
-	munmap(ptr, 4096);
-
-	ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
-	gem_set_domain(fd, result, /* no write hazard lies! */
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	result_read = __sync_read_u32(fd, result, 0);
 	gem_close(fd, result);
 
-	igt_assert_eq_u32(ptr[0], ctx[NOISE]);
-	munmap(ptr, 4096);
+	igt_assert_eq_u32(dep_read, ctx[HI]);
+	igt_assert_eq_u32(result_read, ctx[NOISE]);
 }
 
 #define NEW_CTX (0x1 << 0)
@@ -411,7 +413,7 @@ static void promotion(int fd, unsigned ring)
 static void preempt(int fd, unsigned ring, unsigned flags)
 {
 	uint32_t result = gem_create(fd, 4096);
-	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	uint32_t result_read;
 	igt_spin_t *spin[MAX_ELSP_QLEN];
 	uint32_t ctx[2];
 	igt_hang_t hang;
@@ -438,8 +440,8 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 
 		store_dword(fd, ctx[HI], ring, result, 0, n + 1, 0, I915_GEM_DOMAIN_RENDER);
 
-		gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
-		igt_assert_eq_u32(ptr[0], n + 1);
+		result_read = __sync_read_u32(fd, result, 0);
+		igt_assert_eq_u32(result_read, n + 1);
 		igt_assert(gem_bo_busy(fd, spin[0]->handle));
 	}
 
@@ -452,7 +454,6 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 	gem_context_destroy(fd, ctx[LO]);
 	gem_context_destroy(fd, ctx[HI]);
 
-	munmap(ptr, 4096);
 	gem_close(fd, result);
 }
 
@@ -493,7 +494,7 @@ static void __preempt_other(int fd,
 			    unsigned flags)
 {
 	uint32_t result = gem_create(fd, 4096);
-	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	uint32_t result_read[4096 / sizeof(uint32_t)];
 	unsigned int n, i, other;
 
 	n = 0;
@@ -519,10 +520,11 @@ static void __preempt_other(int fd,
 	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
 
 	n++;
-	for (i = 0; i <= n; i++)
-		igt_assert_eq_u32(ptr[i], i);
 
-	munmap(ptr, 4096);
+	__sync_read_u32_count(fd, result, result_read, sizeof(result_read));
+	for (i = 0; i <= n; i++)
+		igt_assert_eq_u32(result_read[i], i);
+
 	gem_close(fd, result);
 }
 
@@ -570,7 +572,7 @@ static void __preempt_queue(int fd,
 			    unsigned depth, unsigned flags)
 {
 	uint32_t result = gem_create(fd, 4096);
-	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	uint32_t result_read[4096 / sizeof(uint32_t)];
 	igt_spin_t *above = NULL, *below = NULL;
 	unsigned int other, n, i;
 	int prio = MAX_PRIO;
@@ -628,9 +630,11 @@ static void __preempt_queue(int fd,
 
 	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
 
+	__sync_read_u32_count(fd, result, result_read, sizeof(result_read));
+
 	n++;
 	for (i = 0; i <= n; i++)
-		igt_assert_eq_u32(ptr[i], i);
+		igt_assert_eq_u32(result_read[i], i);
 
 	if (below) {
 		igt_assert(gem_bo_busy(fd, below->handle));
@@ -641,7 +645,6 @@ static void __preempt_queue(int fd,
 	gem_context_destroy(fd, ctx[NOISE]);
 	gem_context_destroy(fd, ctx[HI]);
 
-	munmap(ptr, 4096);
 	gem_close(fd, result);
 }
 
@@ -658,7 +661,7 @@ static void preempt_queue(int fd, unsigned ring, unsigned int flags)
 static void preempt_self(int fd, unsigned ring)
 {
 	uint32_t result = gem_create(fd, 4096);
-	uint32_t *ptr = gem_mmap__gtt(fd, result, 4096, PROT_READ);
+	uint32_t result_read[4096 / sizeof(uint32_t)];
 	igt_spin_t *spin[MAX_ELSP_QLEN];
 	unsigned int other;
 	unsigned int n, i;
@@ -699,14 +702,15 @@ static void preempt_self(int fd, unsigned ring)
 		igt_spin_batch_free(fd, spin[i]);
 	}
 
+	__sync_read_u32_count(fd, result, result_read, sizeof(result_read));
+
 	n++;
 	for (i = 0; i <= n; i++)
-		igt_assert_eq_u32(ptr[i], i);
+		igt_assert_eq_u32(result_read[i], i);
 
 	gem_context_destroy(fd, ctx[NOISE]);
 	gem_context_destroy(fd, ctx[HI]);
 
-	munmap(ptr, 4096);
 	gem_close(fd, result);
 }
 
@@ -755,8 +759,8 @@ static void deep(int fd, unsigned ring)
 	unsigned int nreq;
 	uint32_t plug;
 	uint32_t result, dep[XS];
+	uint32_t read_buf[size / sizeof(uint32_t)];
 	uint32_t expected = 0;
-	uint32_t *ptr;
 	uint32_t *ctx;
 	int dep_nreq;
 	int n;
@@ -879,25 +883,19 @@ static void deep(int fd, unsigned ring)
 		gem_context_destroy(fd, ctx[n]);
 
 	for (int m = 0; m < XS; m++) {
-		ptr = gem_mmap__gtt(fd, dep[m], size, PROT_READ);
-		gem_set_domain(fd, dep[m], /* no write hazard lies! */
-				I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+		__sync_read_u32_count(fd, dep[m], read_buf, sizeof(read_buf));
 		gem_close(fd, dep[m]);
 
 		for (n = 0; n < dep_nreq; n++)
-			igt_assert_eq_u32(ptr[n], ctx[n % MAX_CONTEXTS]);
-		munmap(ptr, size);
+			igt_assert_eq_u32(read_buf[n], ctx[n % MAX_CONTEXTS]);
 	}
 
-	ptr = gem_mmap__gtt(fd, result, size, PROT_READ);
-	gem_set_domain(fd, result, /* no write hazard lies! */
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	__sync_read_u32_count(fd, result, read_buf, sizeof(read_buf));
 	gem_close(fd, result);
 
 	/* No reordering due to PI on all contexts because of the common dep */
 	for (int m = 0; m < XS; m++)
-		igt_assert_eq_u32(ptr[m], expected);
-	munmap(ptr, size);
+		igt_assert_eq_u32(read_buf[m], expected);
 
 	free(ctx);
 #undef XS
@@ -923,7 +921,7 @@ static void wide(int fd, unsigned ring)
 	IGT_CORK_HANDLE(cork);
 	uint32_t plug;
 	uint32_t result;
-	uint32_t *ptr;
+	uint32_t result_read[MAX_CONTEXTS];
 	uint32_t *ctx;
 	unsigned int count;
 
@@ -952,12 +950,9 @@ static void wide(int fd, unsigned ring)
 	for (int n = 0; n < MAX_CONTEXTS; n++)
 		gem_context_destroy(fd, ctx[n]);
 
-	ptr = gem_mmap__gtt(fd, result, 4*MAX_CONTEXTS, PROT_READ);
-	gem_set_domain(fd, result, /* no write hazard lies! */
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	__sync_read_u32_count(fd, result, result_read, sizeof(result_read));
 	for (int n = 0; n < MAX_CONTEXTS; n++)
-		igt_assert_eq_u32(ptr[n], ctx[n]);
-	munmap(ptr, 4*MAX_CONTEXTS);
+		igt_assert_eq_u32(result_read[n], ctx[n]);
 
 	gem_close(fd, result);
 	free(ctx);
@@ -973,7 +968,8 @@ static void reorder_wide(int fd, unsigned ring)
 	unsigned int ring_size = gem_measure_ring_inflight(fd, ring, MEASURE_RING_NEW_CTX);
 	IGT_CORK_HANDLE(cork);
 	uint32_t result, target, plug;
-	uint32_t *found, *expected;
+	uint32_t result_read[1024];
+	uint32_t *expected;
 
 	result = gem_create(fd, 4096);
 	target = gem_create(fd, 4096);
@@ -1053,12 +1049,10 @@ static void reorder_wide(int fd, unsigned ring)
 	unplug_show_queue(fd, &cork, ring);
 	gem_close(fd, plug);
 
-	found = gem_mmap__gtt(fd, result, 4096, PROT_READ);
-	gem_set_domain(fd, result, /* no write hazard lies! */
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	__sync_read_u32_count(fd, result, result_read, sizeof(result_read));
 	for (int n = 0; n < 1024; n++)
-		igt_assert_eq_u32(found[n], expected[n]);
-	munmap(found, 4096);
+		igt_assert_eq_u32(result_read[n], expected[n]);
+
 	munmap(expected, 4096);
 
 	gem_close(fd, result);
