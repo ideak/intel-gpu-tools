@@ -118,6 +118,17 @@ static void test_throttle(int fd)
 	trigger_reset(fd);
 }
 
+static void test_context_create(int fd)
+{
+	uint32_t ctx;
+
+	wedge_gpu(fd);
+
+	igt_assert_eq(__gem_context_create(fd, &ctx), -EIO);
+
+	trigger_reset(fd);
+}
+
 static void test_execbuf(int fd)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -818,6 +829,9 @@ igt_main
 
 	igt_subtest("throttle")
 		test_throttle(fd);
+
+	igt_subtest("context-create")
+		test_context_create(fd);
 
 	igt_subtest("execbuf")
 		test_execbuf(fd);
