@@ -54,7 +54,8 @@ uint32_t __sync_read_u32(int fd, uint32_t handle, uint64_t offset)
 {
 	uint32_t value;
 
-	gem_sync(fd, handle); /* No write hazard lies! */
+	gem_set_domain(fd, handle, /* No write hazard lies! */
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	gem_read(fd, handle, offset, &value, sizeof(value));
 
 	return value;
@@ -63,7 +64,8 @@ uint32_t __sync_read_u32(int fd, uint32_t handle, uint64_t offset)
 static inline
 void __sync_read_u32_count(int fd, uint32_t handle, uint32_t *dst, uint64_t size)
 {
-	gem_sync(fd, handle); /* No write hazard lies! */
+	gem_set_domain(fd, handle, /* No write hazard lies! */
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	gem_read(fd, handle, 0, dst, size);
 }
 
