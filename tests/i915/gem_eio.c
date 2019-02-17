@@ -313,8 +313,20 @@ static void __test_banned(int fd)
 		igt_spin_t *hang;
 
 		if (__gem_execbuf(fd, &execbuf) == -EIO) {
+			uint32_t ctx = 0;
+
 			igt_info("Banned after causing %lu hangs\n", count);
 			igt_assert(count > 1);
+
+			/* Only this context, not the file, should be banned */
+			igt_assert_neq(__gem_context_create(fd, &ctx), -EIO);
+			igt_assert_neq(ctx, 0);
+
+			/* And check it actually works! */
+			execbuf.rsvd1 = ctx;
+			gem_execbuf(fd, &execbuf);
+
+			gem_context_destroy(fd, ctx);
 			return;
 		}
 
