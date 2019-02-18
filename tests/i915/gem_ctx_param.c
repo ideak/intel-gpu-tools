@@ -296,11 +296,7 @@ igt_main
 
 	/* I915_CONTEXT_PARAM_SSEU tests are located in gem_ctx_sseu.c */
 
-	/* NOTE: This testcase intentionally tests for the next free parameter
-	 * to catch ABI extensions. Don't "fix" this testcase without adding all
-	 * the tests for the new param first.
-	 */
-	arg.param = I915_CONTEXT_PARAM_SSEU + 1;
+	arg.param = -1; /* Should be safely unused for a while */
 
 	igt_subtest("invalid-param-get") {
 		arg.ctx_id = ctx;
