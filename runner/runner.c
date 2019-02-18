@@ -32,6 +32,14 @@ int main(int argc, char **argv)
 		exitcode = 1;
 	}
 
+	if (state.time_left == 0.0) {
+		/*
+		 * Overall timeout happened. Results generation can
+		 * override this
+		 */
+		exitcode = 2;
+	}
+
 	if (!generate_results_path(settings.results_path)) {
 		exitcode = 1;
 	}

@@ -15,6 +15,7 @@ int main(int argc, char **argv)
 	struct settings settings;
 	struct job_list job_list;
 	struct execute_state state;
+	int exitcode = 0;
 	int dirfd;
 
 	init_settings(&settings);
@@ -35,13 +36,21 @@ int main(int argc, char **argv)
 	}
 
 	if (!execute(&state, &settings, &job_list)) {
-		return 1;
+		exitcode = 1;
+	}
+
+	if (state.time_left == 0.0) {
+		/*
+		 * Overall timeout happened. Results generation can
+		 * override this
+		 */
+		exitcode = 2;
 	}
 
 	if (!generate_results_path(settings.results_path)) {
-		return 1;
+		exitcode = 1;
 	}
 
 	printf("Done.\n");
-	return 0;
+	return exitcode;
 }
