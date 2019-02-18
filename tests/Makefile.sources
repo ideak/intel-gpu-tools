@@ -77,12 +77,6 @@ TESTS_progs = \
 	meta_test \
 	perf \
 	perf_pmu \
-	pm_backlight \
-	pm_lpsp \
-	pm_rc6_residency \
-	pm_rpm \
-	pm_rps \
-	pm_sseu \
 	prime_busy \
 	prime_mmap \
 	prime_mmap_coherency \
@@ -485,6 +479,24 @@ i915_missed_irq_SOURCES = i915/i915_missed_irq.c
 
 TESTS_progs += i915_module_load
 i915_module_load_SOURCES = i915/i915_module_load.c
+
+TESTS_progs += i915_pm_backlight
+i915_pm_backlight_SOURCES = i915/i915_pm_backlight.c
+
+TESTS_progs += i915_pm_lpsp
+i915_pm_lpsp_SOURCES = i915/i915_pm_lpsp.c
+
+TESTS_progs += i915_pm_rc6_residency
+i915_pm_rc6_residency_SOURCES = i915/i915_pm_rc6_residency.c
+
+TESTS_progs += i915_pm_rpm
+i915_pm_rpm_SOURCES = i915/i915_pm_rpm.c
+
+TESTS_progs += i915_pm_rps
+i915_pm_rps_SOURCES = i915/i915_pm_rps.c
+
+TESTS_progs += i915_pm_sseu
+i915_pm_sseu_SOURCES = i915/i915_pm_sseu.c
 
 TESTS_progs += i915_query
 i915_query_SOURCES = i915/i915_query.c

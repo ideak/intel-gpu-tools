@@ -13,7 +13,7 @@ igt@drm_mm(@.*)?
 # failures in tests run afterwards.
 ###############################################
 igt@i915_module_load(@.*)?
-igt@pm_rpm@module-reload
+igt@i915_pm_rpm@module-reload
 ###############################################
 # GEM
 ###############################################
