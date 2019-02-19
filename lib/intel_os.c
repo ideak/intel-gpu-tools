@@ -227,11 +227,9 @@ intel_get_total_swap_mb(void)
  *
  * Returns: Amount of memory that can be safely pinned, in bytes.
  */
-size_t
-intel_get_total_pinnable_mem(void)
+void *intel_get_total_pinnable_mem(size_t *total)
 {
 	uint64_t *can_mlock, pin, avail;
-	size_t ret;
 
 	pin = (intel_get_total_ram_mb() + 1) << 20;
 	avail = (intel_get_avail_ram_mb() + 1) << 20;
@@ -245,34 +243,40 @@ intel_get_total_pinnable_mem(void)
 	 */
 	*can_mlock = (avail >> 1) + (avail >> 2);
 	if (mlock(can_mlock, *can_mlock)) {
-		*can_mlock = 0;
-		goto out;
+		munmap(can_mlock, pin);
+		return MAP_FAILED;
 	}
 
 	for (uint64_t inc = 1024 << 20; inc >= 4 << 10; inc >>= 2) {
-		igt_debug("Testing mlock %'"PRIu64" B (%'"PRIu64" MiB)\n",
-			  *can_mlock, *can_mlock >> 20);
+		uint64_t locked = *can_mlock;
+
+		igt_debug("Testing mlock %'"PRIu64"B (%'"PRIu64"MiB) + %'"PRIu64"B\n",
+			  locked, locked >> 20, inc);
 
 		igt_fork(child, 1) {
-			for (uint64_t bytes = *can_mlock;
-			     bytes <= pin;
-			     bytes += inc) {
-				if (mlock(can_mlock, bytes))
+			uint64_t bytes = *can_mlock;
+
+			while (bytes <= pin) {
+				if (mlock((void *)can_mlock + bytes, inc))
 					break;
 
-				*can_mlock = bytes;
+				*can_mlock = bytes += inc;
 				__sync_synchronize();
 			}
 		}
 		__igt_waitchildren();
-		igt_assert(!mlock(can_mlock, *can_mlock));
+
+		if (*can_mlock > locked + inc) { /* Weird bit of mm/ lore */
+			*can_mlock -= inc;
+			igt_debug("Claiming mlock %'"PRIu64"B (%'"PRIu64"MiB)\n",
+				  *can_mlock, *can_mlock >> 20);
+			igt_assert(!mlock((void *)can_mlock + locked,
+					  *can_mlock - locked));
+		}
 	}
 
-out:
-	ret = *can_mlock;
-	munmap(can_mlock, pin);
-
-	return ret;
+	*total = pin;
+	return can_mlock;
 }
 
 static uint64_t vfs_file_max(void)

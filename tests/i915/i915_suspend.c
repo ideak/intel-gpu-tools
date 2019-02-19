@@ -163,25 +163,14 @@ test_sysfs_reader(bool hibernate)
 static void
 test_shrink(int fd, unsigned int mode)
 {
-	void *mem;
 	size_t size;
+	void *mem;
 
 	gem_quiescent_gpu(fd);
 	intel_purge_vm_caches(fd);
 
-	size = intel_get_total_pinnable_mem();
-	igt_require(size > 64 << 20);
-	size -= 64 << 20;
-
-	mem = mmap(NULL, size, PROT_READ, MAP_SHARED | MAP_ANON, -1, 0);
-
-	intel_purge_vm_caches(fd);
-
-	igt_debug("Locking %'zu B (%'zu MiB)\n",
-		  size, size >> 20);
-	igt_assert(!mlock(mem, size));
-	igt_info("Locked %'zu B (%'zu MiB)\n",
-		 size, size >> 20);
+	mem = intel_get_total_pinnable_mem(&size);
+	igt_assert(mem != MAP_FAILED);
 
 	intel_purge_vm_caches(fd);
 	igt_system_suspend_autoresume(mode, SUSPEND_TEST_NONE);

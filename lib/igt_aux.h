@@ -194,7 +194,7 @@ void intel_purge_vm_caches(int fd);
 uint64_t intel_get_avail_ram_mb(void);
 uint64_t intel_get_total_ram_mb(void);
 uint64_t intel_get_total_swap_mb(void);
-size_t intel_get_total_pinnable_mem(void);
+void *intel_get_total_pinnable_mem(size_t *pinned);
 
 int __intel_check_memory(uint64_t count, uint64_t size, unsigned mode,
 			 uint64_t *out_required, uint64_t *out_total);

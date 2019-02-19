@@ -133,23 +133,24 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 			      uint64_t surface_size,
 			      uint64_t surface_count)
 {
+	uint64_t sz, pin, total;
 	void *mem;
-	uint64_t sz, pin_total;
 
 	intel_require_memory(surface_count, surface_size, CHECK_RAM);
 
-	sz = surface_size*surface_count;
-	pin_total = intel_get_total_pinnable_mem();
-	igt_require(pin_total > sz);
-
-	mem = mmap(NULL, pin_total, PROT_READ, MAP_SHARED | MAP_ANON, -1, 0);
+	mem = intel_get_total_pinnable_mem(&total);
 	igt_assert(mem != MAP_FAILED);
+	pin = *(uint64_t *)mem;
+	igt_assert(!munlock(mem, pin));
+
+	sz = surface_size * surface_count;
+	igt_require(pin > sz);
 
 	igt_fork(child, 1) {
 		uint32_t *bo;
 		uint64_t n;
 		int ret;
-		size_t lock = pin_total - sz;
+		size_t lock = pin - sz;
 
 		bo = malloc(surface_count * sizeof(*bo));
 		igt_assert(bo);
@@ -186,7 +187,7 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 	}
 	igt_waitchildren();
 
-	munmap(mem, pin_total);
+	munmap(mem, total);
 }
 
 static int swapping_evictions(int fd, struct igt_eviction_test_ops *ops,
