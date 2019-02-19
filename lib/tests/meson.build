@@ -7,6 +7,7 @@ lib_tests = [
 	'igt_fork_helper',
 	'igt_hdmi_inject',
 	'igt_list_only',
+	'igt_invalid_subtest_name',
 	'igt_no_exit',
 	'igt_segfault',
 	'igt_simulation',
@@ -18,7 +19,6 @@ lib_fail_tests = [
 	'igt_no_subtest',
 	'igt_simple_test_subtests',
 	'igt_timeout',
-	'igt_invalid_subtest_name',
 ]
 
 foreach lib_test : lib_tests

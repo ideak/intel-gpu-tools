@@ -21,11 +21,71 @@
  * IN THE SOFTWARE.
  */
 
+#include <errno.h>
+#include <sys/wait.h>
+
 #include "igt_core.h"
 
-igt_main
+#include "igt_tests_common.h"
+
+static void invalid_subtest_name(void)
 {
+	char prog[] = "igt_no_exit";
+	char *fake_argv[] = {prog};
+	int fake_argc = 1;
+
+	igt_subtest_init(fake_argc, fake_argv);
+
 	igt_subtest("# invalid name !") {
 		igt_info("Invalid subtest name test\n");
 	}
+
+	igt_exit();
+}
+
+static void nonexisting_subtest(void)
+{
+	char prog[] = "igt_no_exit";
+	char arg1[] = "--run-subtest";
+	char arg2[] = "invalid-subtest";
+	char *fake_argv[] = {prog, arg1, arg2};
+	int fake_argc = 3;
+
+	igt_subtest_init(fake_argc, fake_argv);
+
+	igt_subtest("some-subtest")
+		;
+
+	igt_exit();
+}
+
+static int do_fork(void (*test_to_run)(void))
+{
+	int pid, status;
+
+	switch (pid = fork()) {
+	case -1:
+		internal_assert(0);
+	case 0:
+		test_to_run();
+	default:
+		while (waitpid(pid, &status, 0) == -1 &&
+		       errno == EINTR)
+			;
+
+		return status;
+	}
+}
+
+int main(int argc, char **argv)
+{
+	int ret;
+
+	ret = do_fork(invalid_subtest_name);
+	internal_assert_wsignaled(ret, SIGABRT);
+
+	ret = do_fork(nonexisting_subtest);
+	internal_assert_wexited(ret, IGT_EXIT_INVALID);
+
+	return 0;
 }
