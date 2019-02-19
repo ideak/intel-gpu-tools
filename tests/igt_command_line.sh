@@ -94,10 +94,6 @@ check_test ()
 			fail $test
 		fi
 	fi
-
-	# check invalid subtest handling
-	echo "  Checking invalid subtest handling..."
-	./$test --run-subtest invalid-subtest > /dev/null 2>&1 && fail $test
 }
 
 TESTLISTFILE="$tests_dir/test-list.txt"
