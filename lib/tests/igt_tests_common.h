@@ -35,4 +35,15 @@
  */
 #define internal_assert assert
 
+static inline void internal_assert_wexited(int wstatus, int exitcode)
+{
+	internal_assert(WIFEXITED(wstatus) &&
+			WEXITSTATUS(wstatus) == exitcode);
+}
+
+static inline void internal_assert_wsignaled(int wstatus, int signal)
+{
+	internal_assert(WIFSIGNALED(wstatus) &&
+			WTERMSIG(wstatus) == signal);
+}
 #endif

@@ -94,10 +94,7 @@ static int do_fork(void)
 		       errno == EINTR)
 			;
 
-		if(WIFSIGNALED(status))
-			return WTERMSIG(status) + 128;
-
-		return WEXITSTATUS(status);
+		return status;
 	}
 }
 
@@ -109,20 +106,20 @@ int main(int argc, char **argv)
 	runc=false;
 	igt_info("Simple test.\n");
 	fflush(stdout);
-	internal_assert(WTERMSIG(do_fork()) == SIGSEGV);
+	internal_assert_wsignaled(do_fork(), SIGSEGV);
 
 	/* Test crash in a single subtest is reported */
 	simple = false;
 	igt_info("Single subtest.\n");
 	fflush(stdout);
-	internal_assert(WTERMSIG(do_fork()) == SIGSEGV);
+	internal_assert_wexited(do_fork(), SIGSEGV + 128);
 
 	/* Test crash in a subtest following a pass is reported */
 	simple = false;
 	runa=true;
 	igt_info("Passing then crashing subtest.\n");
 	fflush(stdout);
-	internal_assert(WTERMSIG(do_fork()) == SIGSEGV);
+	internal_assert_wexited(do_fork(), SIGSEGV + 128);
 
 	/* Test crash in a subtest preceeding a pass is reported */
 	simple = false;
@@ -130,8 +127,7 @@ int main(int argc, char **argv)
 	runc=true;
 	igt_info("Crashing then passing subtest.\n");
 	fflush(stdout);
-	internal_assert(WTERMSIG(do_fork()) == SIGSEGV);
+	internal_assert_wexited(do_fork(), SIGSEGV + 128);
 
 	return 0;
 }
-

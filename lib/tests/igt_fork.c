@@ -113,21 +113,21 @@ int main(int argc, char **argv)
 
 	/* check that igt_assert is forwarded */
 	ret = do_fork(igt_fork_vs_assert);
-	internal_assert(WEXITSTATUS(ret) == IGT_EXIT_FAILURE);
+	internal_assert_wexited(ret, IGT_EXIT_FAILURE);
 
 	/* check that igt_skip within a fork blows up */
 	ret = do_fork(igt_fork_vs_skip);
-	internal_assert(WEXITSTATUS(ret) == SIGABRT + 128);
+	internal_assert_wexited(ret, SIGABRT + 128);
 
 	/* check that failure to clean up fails */
 	ret = do_fork(igt_fork_leak);
-	internal_assert(WTERMSIG(ret) == SIGABRT);
+	internal_assert_wsignaled(ret, SIGABRT);
 
 	/* check that igt_waitchildren_timeout cleans up*/
 	ret = do_fork(igt_fork_timeout_leak);
-	internal_assert(WEXITSTATUS(ret) == SIGKILL + 128);
+	internal_assert_wexited(ret, SIGKILL + 128);
 
 	/* check that any other process leaks are caught*/
 	ret = do_fork(plain_fork_leak);
-	internal_assert(WTERMSIG(ret) == SIGABRT);
+	internal_assert_wsignaled(ret, SIGABRT);
 }

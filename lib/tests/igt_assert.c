@@ -151,7 +151,7 @@ igt_main
 	test_to_run = test_cmpint_negative;
 	ret = do_fork();
 	igt_subtest("igt_cmpint_negative")
-		internal_assert(WEXITSTATUS(ret) == IGT_EXIT_FAILURE);
+		internal_assert_wexited(ret, IGT_EXIT_FAILURE);
 
 	igt_subtest("igt_assert_fd")
 		test_fd();
@@ -159,5 +159,5 @@ igt_main
 	test_to_run = test_fd_negative;
 	ret = do_fork();
 	igt_subtest("igt_assert_fd_negative")
-		internal_assert(WEXITSTATUS(ret) == IGT_EXIT_FAILURE);
+		internal_assert_wexited(ret, IGT_EXIT_FAILURE);
 }

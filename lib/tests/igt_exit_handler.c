@@ -118,11 +118,11 @@ int main(int argc, char **argv)
 	internal_assert(testfunc(NORMAL) == 0);
 
 	status = testfunc(FAIL);
-	assert(WIFEXITED(status) && WEXITSTATUS(status) == 1);
+	internal_assert_wexited(status, 1);
 
 	status = testfunc(SKIP);
-	assert(WIFEXITED(status) && WEXITSTATUS(status) == IGT_EXIT_SKIP);
+	internal_assert_wexited(status, IGT_EXIT_SKIP);
 
 	status = testfunc(SIG);
-	assert(WIFSIGNALED(status) && WTERMSIG(status) == SIGTERM);
+	internal_assert_wsignaled(status, SIGTERM);
 }
