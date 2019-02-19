@@ -30,15 +30,13 @@ endif
 benchmarksdir = join_paths(libexecdir, 'benchmarks')
 
 foreach prog : benchmark_progs
-	# FIXME meson doesn't like binaries with the same name
-	# meanwhile just suffix with _bench
-	executable(prog + '_bench', prog + '.c',
+	executable(prog, prog + '.c',
 		   install : true,
 		   install_dir : benchmarksdir,
 		   dependencies : igt_deps)
 endforeach
 
-executable('gem_wsim_bench', 'gem_wsim.c',
+executable('gem_wsim', 'gem_wsim.c',
 	   install : true,
 	   install_dir : benchmarksdir,
 	   dependencies : igt_deps + [ lib_igt_perf ])
