@@ -1208,7 +1208,7 @@ bool execute(struct execute_state *state,
 
 	if (state->dry) {
 		printf("Dry run, not executing. Invoke igt_resume if you want to execute.\n");
-		return false;
+		return true;
 	}
 
 	if ((resdirfd = open(settings->results_path, O_DIRECTORY | O_RDONLY)) < 0) {

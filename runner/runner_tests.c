@@ -773,8 +773,9 @@ igt_main
 				     "Dry run initialization didn't create the results directory.\n");
 
 			/* Execute from just initialize_execute_state should fail */
-			igt_assert(!execute(&state, &settings, &list));
-			igt_assert(openat(dirfd, "0", O_DIRECTORY | O_RDONLY) < 0);
+			igt_assert(execute(&state, &settings, &list));
+			igt_assert_f(openat(dirfd, "0", O_DIRECTORY | O_RDONLY) < 0,
+				     "Dry run executed when it should not have.\n");
 			igt_assert_f((fd = openat(dirfd, "metadata.txt", O_RDONLY)) >= 0,
 				     "Dry run initialization didn't serialize settings.\n");
 			close(fd);
