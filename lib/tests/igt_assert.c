@@ -22,7 +22,6 @@
  *
  */
 
-#include <assert.h>
 #include <errno.h>
 #include <float.h>
 #include <limits.h>
@@ -36,13 +35,7 @@
 
 #include "igt_core.h"
 
-/*
- * We need to hide assert from the cocci igt test refactor spatch.
- *
- * IMPORTANT: Test infrastructure tests are the only valid places where using
- * assert is allowed.
- */
-#define internal_assert assert
+#include "igt_tests_common.h"
 
 char test[] = "test";
 char *argv_run[] = { test };

@@ -22,11 +22,11 @@
  *
  */
 
-#include <assert.h>
 #include "igt_core.h"
 
+#include "igt_tests_common.h"
 
 igt_simple_main
 {
-	assert(igt_can_fail());
+	internal_assert(igt_can_fail());
 }

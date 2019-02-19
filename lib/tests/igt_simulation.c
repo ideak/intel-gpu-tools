@@ -28,19 +28,12 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <sys/types.h>
-#include <assert.h>
 #include <errno.h>
 
 #include "drmtest.h"
 #include "igt_core.h"
 
-/*
- * We need to hide assert from the cocci igt test refactor spatch.
- *
- * IMPORTANT: Test infrastructure tests are the only valid places where using
- * assert is allowed.
- */
-#define internal_assert assert
+#include "igt_tests_common.h"
 
 bool simple;
 bool list_subtests;

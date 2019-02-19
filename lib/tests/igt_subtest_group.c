@@ -22,8 +22,9 @@
  *
  */
 
-#include <assert.h>
 #include "igt_core.h"
+
+#include "igt_tests_common.h"
 
 igt_main
 {
@@ -41,7 +42,7 @@ igt_main
 			}
 
 			igt_subtest("not-run") {
-				assert(0);
+				internal_assert(0);
 			}
 
 			igt_subtest_group {
@@ -49,35 +50,35 @@ igt_main
 				 * restore to "run testcases" when an outer
 				 * group is already in SKIP state. */
 				igt_subtest("still-not-run") {
-					assert(0);
+					internal_assert(0);
 				}
 			}
 		}
 
 		igt_subtest("run") {
 			t1 = true;
-			assert(1);
+			internal_assert(1);
 		}
 	}
 
 	igt_subtest_group {
 		igt_fixture {
-			assert(t2 == 0);
+			internal_assert(t2 == 0);
 			t2 = 1;
 		}
 
 		igt_subtest("run-again") {
-			assert(t2 == 1);
+			internal_assert(t2 == 1);
 			t2 = 2;
 		}
 
 		igt_fixture {
-			assert(t2 == 2);
+			internal_assert(t2 == 2);
 			t2 = 3;
 
 		}
 	}
 
-	assert(t1);
-	assert(t2 == 3);
+	internal_assert(t1);
+	internal_assert(t2 == 3);
 }

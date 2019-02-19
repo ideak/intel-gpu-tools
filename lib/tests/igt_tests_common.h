@@ -1,5 +1,5 @@
 /*
- * Copyright © 2017 Intel Corporation
+ * Copyright © 2019 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,23 +22,17 @@
  *
  */
 
-#include "igt_core.h"
+#ifndef IGT_LIB_TESTS_COMMON_H
+#define IGT_LIB_TESTS_COMMON_H
 
-#include "igt_tests_common.h"
+#include <assert.h>
 
-igt_main
-{
-	internal_assert(igt_can_fail() == false);
+/*
+ * We need to hide assert from the cocci igt test refactor spatch.
+ *
+ * IMPORTANT: Test infrastructure tests are the only valid places where using
+ * assert is allowed.
+ */
+#define internal_assert assert
 
-	igt_fixture {
-		internal_assert(igt_can_fail());
-	}
-
-	internal_assert(igt_can_fail() == false);
-
-	igt_subtest("subtest") {
-		internal_assert(igt_can_fail());
-	}
-
-	internal_assert(igt_can_fail() == false);
-}
+#endif

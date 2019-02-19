@@ -21,19 +21,20 @@
  * IN THE SOFTWARE.
  */
 
-#include <assert.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "igt_core.h"
 
+#include "igt_tests_common.h"
+
 int test;
 int pipes[2];
 
 static void exit_handler1(int sig)
 {
-	assert(test == 1);
+	internal_assert(test == 1);
 	test++;
 }
 
@@ -42,12 +43,12 @@ static void exit_handler2(int sig)
 	char tmp = 1;
 
 	/* ensure exit handlers are called in reverse */
-	assert(test == 0);
+	internal_assert(test == 0);
 	test++;
 
 	/* we need to get a side effect to the parent to make sure exit handlers
 	 * actually run. */
-	assert(write(pipes[1], &tmp, 1) == 1);
+	internal_assert(write(pipes[1], &tmp, 1) == 1);
 }
 
 enum test_type {
@@ -67,7 +68,7 @@ static int testfunc(enum test_type test_type)
 	int status;
 	char tmp = 0;
 
-	assert(pipe2(pipes, O_NONBLOCK) == 0);
+	internal_assert(pipe2(pipes, O_NONBLOCK) == 0);
 
 	pid = fork();
 
@@ -100,10 +101,10 @@ static int testfunc(enum test_type test_type)
 		igt_exit();
 	}
 
-	assert(waitpid(pid, &status, 0) != -1);
+	internal_assert(waitpid(pid, &status, 0) != -1);
 
-	assert(read(pipes[0], &tmp, 1) == 1);
-	assert(tmp == 1);
+	internal_assert(read(pipes[0], &tmp, 1) == 1);
+	internal_assert(tmp == 1);
 
 	return status;
 }
@@ -112,9 +113,9 @@ int main(int argc, char **argv)
 {
 	int status;
 
-	assert(testfunc(SUC) == 0);
+	internal_assert(testfunc(SUC) == 0);
 
-	assert(testfunc(NORMAL) == 0);
+	internal_assert(testfunc(NORMAL) == 0);
 
 	status = testfunc(FAIL);
 	assert(WIFEXITED(status) && WEXITSTATUS(status) == 1);
