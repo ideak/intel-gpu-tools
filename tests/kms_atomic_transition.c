@@ -188,6 +188,12 @@ static void set_sprite_wh(igt_display_t *display, enum pipe pipe,
 		      LOCAL_DRM_FORMAT_MOD_NONE, sprite_fb);
 }
 
+#define is_atomic_check_failure_errno(errno) \
+		(errno != -EINVAL && errno != 0)
+
+#define is_atomic_check_plane_size_errno(errno) \
+		(errno == -EINVAL)
+
 static void setup_parms(igt_display_t *display, enum pipe pipe,
 			const drmModeModeInfo *mode,
 			struct igt_fb *primary_fb,
@@ -281,8 +287,9 @@ retry:
 
 		wm_setup_plane(display, pipe, (1 << n_planes) - 1, parms, false);
 		ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+		igt_assert(!is_atomic_check_failure_errno(ret));
 
-		if (ret == -EINVAL) {
+		if (is_atomic_check_plane_size_errno(ret)) {
 			if (cursor_width == sprite_width &&
 			    cursor_height == sprite_height) {
 				igt_assert_f(alpha,
@@ -472,7 +479,9 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 			igt_pipe_request_out_fence(pipe_obj);
 
 		ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-		if (ret != -EINVAL || pipe_obj->n_planes < 3)
+		igt_assert(!is_atomic_check_failure_errno(ret));
+
+		if (!is_atomic_check_plane_size_errno(ret) || pipe_obj->n_planes < 3)
 			break;
 
 		ret = 0;
