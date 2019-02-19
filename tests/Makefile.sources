@@ -472,28 +472,28 @@ TESTS_progs += gen3_render_tiledy_blits
 gen3_render_tiledy_blits_SOURCES = i915/gen3_render_tiledy_blits.c
 
 TESTS_progs += i915_fb_tiling
-i915_fb_tiling_SOURCES = i915/fb_tiling.c
+i915_fb_tiling_SOURCES = i915/i915_fb_tiling.c
 
 TESTS_progs += i915_getparams_basic
-i915_getparams_basic_SOURCES = i915/getparams_basic.c
+i915_getparams_basic_SOURCES = i915/i915_getparams_basic.c
 
 TESTS_progs += i915_hangman
-i915_hangman_SOURCES = i915/hangman.c
+i915_hangman_SOURCES = i915/i915_hangman.c
 
 TESTS_progs += i915_missed_irq
-i915_missed_irq_SOURCES = i915/missed_irq.c
+i915_missed_irq_SOURCES = i915/i915_missed_irq.c
 
 TESTS_progs += i915_module_load
-i915_module_load_SOURCES = i915/module_load.c
+i915_module_load_SOURCES = i915/i915_module_load.c
 
 TESTS_progs += i915_query
-i915_query_SOURCES = i915/query.c
+i915_query_SOURCES = i915/i915_query.c
 
 TESTS_progs += i915_selftest
-i915_selftest_SOURCES = i915/selftest.c
+i915_selftest_SOURCES = i915/i915_selftest.c
 
 TESTS_progs += i915_suspend
-i915_suspend_SOURCES = i915/suspend.c
+i915_suspend_SOURCES = i915/i915_suspend.c
 
 TESTS_progs_X = gem_concurrent_all
 gem_concurrent_all_SOURCES = i915/gem_concurrent_all.c

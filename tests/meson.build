@@ -97,17 +97,11 @@ test_progs = [
 ]
 
 i915_progs = [
-	'fb_tiling',
-	'getparams_basic',
-	'hangman',
-	'missed_irq',
-	'module_load',
-	'query',
-	'selftest',
-	'suspend',
-]
-
-gem_progs = [
+	'gen3_mixed_blits',
+	'gen3_render_linear_blits',
+	'gen3_render_mixed_blits',
+	'gen3_render_tiledx_blits',
+	'gen3_render_tiledy_blits',
 	'gem_bad_reloc',
 	'gem_basic',
 	'gem_busy',
@@ -224,14 +218,14 @@ gem_progs = [
 	'gem_wait',
 	'gem_workarounds',
 	'gem_write_read_ring_switch',
-]
-
-gen3_progs = [
-	'gen3_mixed_blits',
-	'gen3_render_linear_blits',
-	'gen3_render_mixed_blits',
-	'gen3_render_tiledx_blits',
-	'gen3_render_tiledy_blits',
+	'i915_fb_tiling',
+	'i915_getparams_basic',
+	'i915_hangman',
+	'i915_missed_irq',
+	'i915_module_load',
+	'i915_query',
+	'i915_selftest',
+	'i915_suspend',
 ]
 
 test_deps = [ igt_deps ]
@@ -272,17 +266,6 @@ foreach prog : test_progs
 endforeach
 
 foreach prog : i915_progs
-	prog_name = 'i915_' + prog
-	test_executables += executable(prog_name,
-		   join_paths('i915', prog + '.c'),
-		   dependencies : test_deps,
-		   install_dir : libexecdir,
-		   install_rpath : libexecdir_rpathdir,
-		   install : true)
-	test_list += prog_name
-endforeach
-
-foreach prog : gem_progs + gen3_progs
 	test_executables += executable(prog,
 		   join_paths('i915', prog + '.c'),
 		   dependencies : test_deps,
