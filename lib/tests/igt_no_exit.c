@@ -25,9 +25,26 @@
  *
  */
 
+#include <sys/wait.h>
+
 #include "drmtest.h"
 
-int main(int argc, char **argv)
+#include "igt_tests_common.h"
+
+static void no_exit_list_only(void)
+{
+	char prog[] = "igt_list_only";
+	char arg[] = "--list-subtests";
+	char *fake_argv[] = {prog, arg};
+	int fake_argc = 2;
+
+	igt_subtest_init(fake_argc, fake_argv);
+
+	igt_subtest("A")
+		;
+}
+
+static void no_exit(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
@@ -37,4 +54,35 @@ int main(int argc, char **argv)
 
 	igt_subtest("A")
 		;
+}
+
+static int do_fork(void (*test_to_run)(void))
+{
+	int pid, status;
+
+	switch (pid = fork()) {
+	case -1:
+		internal_assert(0);
+	case 0:
+		test_to_run();
+	default:
+		while (waitpid(pid, &status, 0) == -1 &&
+		       errno == EINTR)
+			;
+
+		return status;
+	}
+}
+
+int main(int argc, char **argv)
+{
+	int ret;
+
+	ret = do_fork(no_exit);
+	internal_assert_wsignaled(ret, SIGABRT);
+
+	ret = do_fork(no_exit_list_only);
+	internal_assert_wsignaled(ret, SIGABRT);
+
+	return 0;
 }
