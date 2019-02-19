@@ -1,3 +1,10 @@
+Unreleased
+----------
+
+General changes:
+
+ - Bumped required meson version to 0.46. (Arkadiusz Hiler)
+
 Release 1.23 (2018-07-18)
 -------------------------
 

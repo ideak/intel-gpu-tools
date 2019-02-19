@@ -5,7 +5,7 @@ project('igt-gpu-tools', 'c',
           'c_std=gnu11',
         ],
 	license : 'MIT',
-	meson_version : '>=0.44.0')
+	meson_version : '>=0.46.0')
 
 cc = meson.get_compiler('c')
 
