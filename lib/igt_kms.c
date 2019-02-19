@@ -3269,14 +3269,10 @@ display_commit_changed(igt_display_t *display, enum igt_commit_style s)
 	}
 
 	if (display->first_commit) {
-		int fd = igt_debugfs_open(display->drm_fd, "i915_fifo_underrun_reset", O_WRONLY);
-		if (fd >= 0) {
-			igt_assert_eq(write(fd, "y", 1), 1);
-
-			close(fd);
-		}
+		igt_reset_fifo_underrun_reporting(display->drm_fd);
 
 		igt_display_drop_events(display);
+
 		display->first_commit = false;
 	}
 }

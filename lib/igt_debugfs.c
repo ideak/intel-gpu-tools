@@ -808,6 +808,8 @@ void igt_pipe_crc_start(igt_pipe_crc_t *pipe_crc)
 	/* Stop first just to make sure we don't have lingering state left. */
 	igt_pipe_crc_stop(pipe_crc);
 
+	igt_reset_fifo_underrun_reporting(pipe_crc->fd);
+
 	igt_assert_eq(write(pipe_crc->ctl_fd, src, strlen(src)), strlen(src));
 
 	sprintf(buf, "crtc-%d/crc/data", pipe_crc->pipe);
@@ -1000,6 +1002,25 @@ void igt_pipe_crc_collect_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out_crc)
 	igt_pipe_crc_start(pipe_crc);
 	igt_pipe_crc_get_single(pipe_crc, out_crc);
 	igt_pipe_crc_stop(pipe_crc);
+}
+
+/**
+ * igt_reset_fifo_underrun_reporting:
+ * @drm_fd: drm device file descriptor
+ *
+ * Resets fifo underrun reporting, if supported by the device. Useful since fifo
+ * underrun reporting tends to be one-shot, so good to reset it before the
+ * actual functional test again in case there's been a separate issue happening
+ * while preparing the test setup.
+ */
+void igt_reset_fifo_underrun_reporting(int drm_fd)
+{
+	int fd = igt_debugfs_open(drm_fd, "i915_fifo_underrun_reset", O_WRONLY);
+	if (fd >= 0) {
+		igt_assert_eq(write(fd, "y", 1), 1);
+
+		close(fd);
+	}
 }
 
 /*

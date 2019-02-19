@@ -216,6 +216,8 @@ void igt_require_hpd_storm_ctl(int fd);
 		  DROP_FREED | \
 		  DROP_IDLE)
 
+void igt_reset_fifo_underrun_reporting(int drm_fd);
+
 bool igt_drop_caches_has(int fd, uint64_t val);
 void igt_drop_caches_set(int fd, uint64_t val);
 
