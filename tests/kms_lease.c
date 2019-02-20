@@ -511,6 +511,14 @@ static void lease_revoke(data_t *data)
 
 	igt_display_require(&lease.display, lease.fd);
 
+	/* try to revoke an invalid lease */
+	mrl.lessee_id = 0;
+	igt_assert_eq(revoke_lease(data->master.fd, &mrl), -ENOENT);
+
+	/* try to revoke with the wrong fd */
+	mrl.lessee_id = lease.lessee_id;
+	igt_assert_eq(revoke_lease(lease.fd, &mrl), -EACCES);
+
 	/* Revoke the lease using the master fd */
 	mrl.lessee_id = lease.lessee_id;
 	igt_assert_eq(revoke_lease(data->master.fd, &mrl), 0);
@@ -522,6 +530,10 @@ static void lease_revoke(data_t *data)
 	igt_assert_eq(ret, -ENOENT);
 
 	terminate_lease(&lease);
+
+	/* make sure the lease is gone */
+	mrl.lessee_id = lease.lessee_id;
+	igt_assert_eq(revoke_lease(data->master.fd, &mrl), -ENOENT);
 }
 
 /* Test leasing objects more than once */
