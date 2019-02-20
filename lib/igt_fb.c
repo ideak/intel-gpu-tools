@@ -610,36 +610,41 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	unsigned int bpp = 0;
 	unsigned int plane;
 	unsigned *strides = &fb->strides[0];
+	bool device_bo = false;
 	int fd = fb->fd;
-
-	if (is_i915_device(fd) &&
-	   (fb->tiling || fb->size || fb->strides[0] || igt_format_is_yuv(fb->drm_format))) {
-		uint64_t size;
-
-		size = calc_fb_size(fb);
-
-		/* respect the size requested by the caller */
-		if (fb->size == 0)
-			fb->size = size;
-
-		fb->is_dumb = false;
-		fb->gem_handle = gem_create(fd, fb->size);
-		gem_set_tiling(fd, fb->gem_handle,
-			       igt_fb_mod_to_tiling(fb->tiling),
-			       fb->strides[0]);
-
-		goto out;
-	}
+	uint64_t size;
 
 	/*
 	 * The current dumb buffer allocation API doesn't really allow to
 	 * specify a custom size or stride. Yet the caller is free to specify
-	 * them, so we need to make sure to error out in this case.
+	 * them, so we need to make sure to use a device BO then.
 	 */
-	igt_assert(fb->size == 0);
-	igt_assert(fb->strides[0] == 0);
+	if (fb->tiling || fb->size || fb->strides[0] ||
+	    (is_i915_device(fd) && igt_format_is_yuv(fb->drm_format)))
+		device_bo = true;
 
-	fb->size = calc_fb_size(fb);
+	/* Sets offets and stride if necessary. */
+	size = calc_fb_size(fb);
+
+	/* Respect the size requested by the caller. */
+	if (fb->size == 0)
+		fb->size = size;
+
+	if (device_bo) {
+		fb->is_dumb = false;
+
+		if (is_i915_device(fd)) {
+			fb->gem_handle = gem_create(fd, fb->size);
+			gem_set_tiling(fd, fb->gem_handle,
+				       igt_fb_mod_to_tiling(fb->tiling),
+				       fb->strides[0]);
+		} else {
+			igt_assert(false);
+		}
+
+		goto out;
+	}
+
 	for (plane = 0; plane < fb->num_planes; plane++)
 		bpp += DIV_ROUND_UP(fb->plane_bpp[plane],
 				    plane ? fmt->hsub * fmt->vsub : 1);
