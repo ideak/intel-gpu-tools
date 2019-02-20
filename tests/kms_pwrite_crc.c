@@ -176,21 +176,17 @@ igt_simple_main
 {
 	igt_skip_on_simulation();
 
-	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+	data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 
-		data.devid = intel_get_drm_devid(data.drm_fd);
+	data.devid = intel_get_drm_devid(data.drm_fd);
 
-		kmstest_set_vt_graphics_mode();
+	kmstest_set_vt_graphics_mode();
 
-		igt_require_pipe_crc(data.drm_fd);
+	igt_require_pipe_crc(data.drm_fd);
 
-		igt_display_require(&data.display, data.drm_fd);
-	}
+	igt_display_require(&data.display, data.drm_fd);
 
 	run_test(&data);
 
-	igt_fixture {
-		igt_display_fini(&data.display);
-	}
+	igt_display_fini(&data.display);
 }
