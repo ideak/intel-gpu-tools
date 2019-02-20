@@ -623,6 +623,101 @@ static void run_test(data_t *data, void (*testfunc)(data_t *))
 		      "no valid crtc/connector combinations found\n");
 }
 
+static void invalid_create_leases(data_t *data)
+{
+	uint32_t object_ids[4];
+	struct local_drm_mode_create_lease mcl;
+	drmModeRes *resources;
+	int tmp_fd;
+
+	/* empty lease */
+	mcl.object_ids = 0;
+	mcl.object_count = 0;
+	mcl.flags = 0;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -EINVAL);
+
+	/* NULL array pointer */
+	mcl.object_count = 1;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -EFAULT);
+
+	/* nil object */
+	object_ids[0] = 0;
+	mcl.object_ids = (uint64_t) (uintptr_t) object_ids;
+	mcl.object_count = 1;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -ENOENT);
+
+	/* no crtc, non-universal_plane */
+	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 0);
+	object_ids[0] = data->master.display.outputs[0].id;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -EINVAL);
+
+	/* no connector, non-universal_plane */
+	object_ids[0] = data->master.display.pipes[0].crtc_id;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -EINVAL);
+
+	/* sanity check */
+	object_ids[0] = data->master.display.pipes[0].crtc_id;
+	object_ids[1] = data->master.display.outputs[0].id;
+	mcl.object_count = 2;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+	close(mcl.fd);
+
+	/* no plane, universal planes */
+	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -EINVAL);
+
+	/* sanity check */
+	object_ids[2] = igt_pipe_get_plane_type(&data->master.display.pipes[0],
+						DRM_PLANE_TYPE_PRIMARY)->drm_plane->plane_id;
+	mcl.object_count = 3;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+	close(mcl.fd);
+
+	/* array overflow, do a small scan around overflow sizes */
+	for (int i = 1; i <= 4; i++) {
+		mcl.object_count = UINT32_MAX / sizeof(object_ids[0]) + i;
+		igt_assert_eq(create_lease(data->master.fd, &mcl), -ENOMEM);
+	}
+
+	/* sanity check */
+	mcl.object_count = 3;
+	mcl.flags = O_CLOEXEC | O_NONBLOCK;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+	close(mcl.fd);
+
+	/* invalid flags */
+	mcl.flags = -1;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -EINVAL);
+
+	/* no subleasing */
+	mcl.object_count = 3;
+	mcl.flags = 0;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+	tmp_fd = mcl.fd;
+	igt_assert_eq(create_lease(tmp_fd, &mcl), -EINVAL);
+	close(tmp_fd);
+
+	/* no double-leasing */
+	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+	tmp_fd = mcl.fd;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -EBUSY);
+	close(tmp_fd);
+
+	/* no double leasing */
+	object_ids[3] = object_ids[2];
+	mcl.object_count = 4;
+	/* Note: the ENOSPC is from idr double-insertion failing */
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -ENOSPC);
+
+	/* no encoder leasing */
+	resources = drmModeGetResources(data->master.fd);
+	igt_assert(resources);
+	igt_assert(resources->count_encoders > 0);
+	object_ids[3] = resources->encoders[0];
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -EINVAL);
+	drmModeFreeResources(resources);
+}
+
 igt_main
 {
 	data_t data;
@@ -655,4 +750,7 @@ igt_main
 			run_test(&data, f->func);
 		}
 	}
+
+	igt_subtest("invalid-create-leases")
+		invalid_create_leases(&data);
 }
