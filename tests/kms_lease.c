@@ -837,7 +837,8 @@ static bool is_master(int fd)
 	/* FIXME: replace with drmIsMaster once we bumped libdrm version */
 	return drmAuthMagic(fd, 0) != -EACCES;
 }
-static void master_vs_lease(data_t *data)
+
+static int _create_simple_lease(int master_fd, data_t *data, int expected_ret)
 {
 	uint32_t object_ids[3];
 	struct local_drm_mode_create_lease mcl;
@@ -850,28 +851,80 @@ static void master_vs_lease(data_t *data)
 	mcl.object_count = 3;
 	mcl.flags = 0;
 
-	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+	igt_assert_eq(create_lease(master_fd, &mcl), expected_ret);
 
-	igt_assert_eq(drmDropMaster(mcl.fd), -1);
+	return expected_ret == 0 ? mcl.fd : 0;
+}
+
+static int create_simple_lease(int master_fd, data_t *data)
+{
+	return _create_simple_lease(master_fd, data, 0);
+}
+
+/* check lease master status in lockdep with lessors, but can't change it
+ * themselves */
+static void master_vs_lease(data_t *data)
+{
+	int lease_fd;
+
+	lease_fd = create_simple_lease(data->master.fd, data);
+
+	igt_assert_eq(drmDropMaster(lease_fd), -1);
 	igt_assert_eq(errno, EINVAL);
 
 	igt_assert(is_master(data->master.fd));
-	igt_assert(is_master(mcl.fd));
+	igt_assert(is_master(lease_fd));
 
 	do_or_die(drmDropMaster(data->master.fd));
 
 	igt_assert(!is_master(data->master.fd));
-	igt_assert(!is_master(mcl.fd));
+	igt_assert(!is_master(lease_fd));
 
-	igt_assert_eq(drmSetMaster(mcl.fd), -1);
+	igt_assert_eq(drmSetMaster(lease_fd), -1);
 	igt_assert_eq(errno, EINVAL);
 
 	do_or_die(drmSetMaster(data->master.fd));
 
 	igt_assert(is_master(data->master.fd));
-	igt_assert(is_master(mcl.fd));
+	igt_assert(is_master(lease_fd));
 
-	close(mcl.fd);
+	close(lease_fd);
+}
+
+static void multimaster_lease(data_t *data)
+{
+	int lease_fd, master2_fd, lease2_fd;
+
+	lease_fd = create_simple_lease(data->master.fd, data);
+
+	igt_assert(is_master(data->master.fd));
+	igt_assert(is_master(lease_fd));
+
+	master2_fd = drm_open_driver(DRIVER_ANY);
+
+	igt_assert(!is_master(master2_fd));
+
+	_create_simple_lease(master2_fd, data, -EACCES);
+
+	do_or_die(drmDropMaster(data->master.fd));
+	do_or_die(drmSetMaster(master2_fd));
+
+	igt_assert(!is_master(data->master.fd));
+	igt_assert(!is_master(lease_fd));
+	igt_assert(is_master(master2_fd));
+
+	drmSetClientCap(master2_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+	lease2_fd = create_simple_lease(master2_fd, data);
+
+	close(master2_fd); /* close is an implicit DropMaster */
+	igt_assert(!is_master(lease2_fd));
+
+	do_or_die(drmSetMaster(data->master.fd));
+	igt_assert(is_master(data->master.fd));
+	igt_assert(is_master(lease_fd));
+
+	close(lease2_fd);
+	close(lease_fd);
 }
 
 igt_main
@@ -915,4 +968,7 @@ igt_main
 
 	igt_subtest("master-vs-lease")
 		master_vs_lease(&data);
+
+	igt_subtest("multimaster-lease")
+		multimaster_lease(&data);
 }
