@@ -730,6 +730,108 @@ static void invalid_create_leases(data_t *data)
 	drmModeFreeResources(resources);
 }
 
+static void check_crtc_masks(int master_fd, int lease_fd, uint32_t crtc_mask)
+{
+	drmModeRes *resources;
+	drmModePlaneRes *plane_resources;
+	int i;
+
+	resources = drmModeGetResources(master_fd);
+	igt_assert(resources);
+	plane_resources = drmModeGetPlaneResources(master_fd);
+	igt_assert(plane_resources);
+
+	for (i = 0; i < resources->count_encoders; i++) {
+		drmModeEncoder *master_e, *lease_e;
+		bool possible;
+
+		master_e = drmModeGetEncoder(master_fd, resources->encoders[i]);
+		igt_assert(master_e);
+		lease_e = drmModeGetEncoder(lease_fd, resources->encoders[i]);
+		igt_assert(lease_e);
+
+		possible = master_e->possible_crtcs & crtc_mask;
+
+		igt_assert_eq(lease_e->possible_crtcs,
+			      possible ? 1 : 0);
+		igt_assert_eq(master_e->possible_crtcs & crtc_mask,
+			      possible ? crtc_mask : 0);
+		drmModeFreeEncoder(master_e);
+		drmModeFreeEncoder(lease_e);
+	}
+
+	for (i = 0; i < plane_resources->count_planes; i++) {
+		drmModePlane *master_p, *lease_p;
+		bool possible;
+
+		master_p = drmModeGetPlane(master_fd, plane_resources->planes[i]);
+		igt_assert(master_p);
+		lease_p = drmModeGetPlane(lease_fd, plane_resources->planes[i]);
+		igt_assert(lease_p);
+
+		possible = master_p->possible_crtcs & crtc_mask;
+
+		igt_assert_eq(lease_p->possible_crtcs,
+			      possible ? 1 : 0);
+		igt_assert_eq(master_p->possible_crtcs & crtc_mask,
+			      possible ? crtc_mask : 0);
+		drmModeFreePlane(master_p);
+		drmModeFreePlane(lease_p);
+	}
+
+	drmModeFreePlaneResources(plane_resources);
+	drmModeFreeResources(resources);
+}
+
+static void possible_crtcs_filtering(data_t *data)
+{
+	uint32_t *object_ids;
+	struct local_drm_mode_create_lease mcl;
+	drmModeRes *resources;
+	drmModePlaneRes *plane_resources;
+	int i;
+	int master_fd = data->master.fd;
+
+	resources = drmModeGetResources(master_fd);
+	igt_assert(resources);
+	plane_resources = drmModeGetPlaneResources(master_fd);
+	igt_assert(plane_resources);
+	mcl.object_count = resources->count_connectors +
+		plane_resources->count_planes + 1;
+	object_ids = calloc(mcl.object_count, sizeof(*object_ids));
+	igt_assert(object_ids);
+
+	for (i = 0; i < resources->count_connectors; i++)
+		object_ids[i] = resources->connectors[i];
+
+	for (i = 0; i < plane_resources->count_planes; i++)
+		object_ids[i + resources->count_connectors] =
+			plane_resources->planes[i];
+
+	mcl.object_ids = (uint64_t) (uintptr_t) object_ids;
+	mcl.flags = 0;
+
+	for (i = 0; i < resources->count_crtcs; i++) {
+		int lease_fd;
+
+		object_ids[mcl.object_count - 1] =
+			resources->crtcs[i];
+
+		igt_assert_eq(create_lease(master_fd, &mcl), 0);
+		lease_fd = mcl.fd;
+
+		drmSetClientCap(lease_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+
+		check_crtc_masks(master_fd, lease_fd, 1 << i);
+
+		close(lease_fd);
+	}
+
+	free(object_ids);
+	drmModeFreePlaneResources(plane_resources);
+	drmModeFreeResources(resources);
+}
+
 igt_main
 {
 	data_t data;
@@ -765,4 +867,7 @@ igt_main
 
 	igt_subtest("invalid-create-leases")
 		invalid_create_leases(&data);
+
+	igt_subtest("possible-crtcs-filtering")
+		possible_crtcs_filtering(&data);
 }
