@@ -25,6 +25,7 @@
 #include <sys/wait.h>
 
 #include "igt_core.h"
+#include "drmtest.h"
 
 #include "igt_tests_common.h"
 
@@ -32,7 +33,7 @@ static void invalid_subtest_name(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
-	int fake_argc = 1;
+	int fake_argc = ARRAY_SIZE(fake_argv);
 
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -49,7 +50,7 @@ static void nonexisting_subtest(void)
 	char arg1[] = "--run-subtest";
 	char arg2[] = "invalid-subtest";
 	char *fake_argv[] = {prog, arg1, arg2};
-	int fake_argc = 3;
+	int fake_argc = ARRAY_SIZE(fake_argv);
 
 	igt_subtest_init(fake_argc, fake_argv);
 

@@ -65,15 +65,13 @@ static int do_fork(void)
 	case -1:
 		internal_assert(0);
 	case 0:
+		argc = ARRAY_SIZE(argv_run);
 		if (simple) {
-			argc = 1;
 			igt_simple_init(argc, argv_run);
 			crashme();
 
 			igt_exit();
 		} else {
-
-			argc = 1;
 			igt_subtest_init(argc, argv_run);
 
 			if(runa)

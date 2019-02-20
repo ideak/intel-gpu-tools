@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "igt_core.h"
+#include "drmtest.h"
 
 #include "igt_tests_common.h"
 
@@ -63,7 +64,7 @@ static int testfunc(enum test_type test_type)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
-	int fake_argc = 1;
+	int fake_argc = ARRAY_SIZE(fake_argv);
 	pid_t pid;
 	int status;
 	char tmp = 0;

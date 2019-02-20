@@ -30,6 +30,7 @@
 #include <sys/wait.h>
 
 #include "igt_core.h"
+#include "drmtest.h"
 
 #include "igt_tests_common.h"
 
@@ -93,7 +94,7 @@ static int do_fork(void (*test_to_run)(void))
 	case -1:
 		internal_assert(0);
 	case 0:
-		argc = 1;
+		argc = ARRAY_SIZE(argv_run);
 		igt_simple_init(argc, argv_run);
 		test_to_run();
 		igt_exit();

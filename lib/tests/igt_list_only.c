@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 	char prog[] = "igt_list_only";
 	char arg[] = "--list-subtests";
 	char *fake_argv[] = {prog, arg};
-	int fake_argc = 2;
+	int fake_argc = ARRAY_SIZE(fake_argv);
 
 	igt_subtest_init(fake_argc, fake_argv);
 

@@ -36,7 +36,7 @@ static void no_exit_list_only(void)
 	char prog[] = "igt_list_only";
 	char arg[] = "--list-subtests";
 	char *fake_argv[] = {prog, arg};
-	int fake_argc = 2;
+	int fake_argc = ARRAY_SIZE(fake_argv);
 
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -48,7 +48,7 @@ static void no_exit(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
-	int fake_argc = 1;
+	int fake_argc = ARRAY_SIZE(fake_argv);
 
 	igt_subtest_init(fake_argc, fake_argv);
 
