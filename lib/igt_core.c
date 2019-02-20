@@ -463,6 +463,7 @@ uint64_t igt_nsec_elapsed(struct timespec *start)
 bool __igt_fixture(void)
 {
 	assert(!in_fixture);
+	assert(test_with_subtests);
 
 	if (igt_only_list_subtests())
 		return false;
@@ -975,6 +976,8 @@ bool igt_only_list_subtests(void)
 
 void __igt_subtest_group_save(int *save)
 {
+	assert(test_with_subtests);
+
 	*save = skip_subtests_henceforth;
 }
 
