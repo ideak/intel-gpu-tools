@@ -158,7 +158,10 @@ static bool has_recoverable_param(int i915)
 
 static void norecovery(int i915)
 {
+	igt_hang_t hang;
+
 	igt_require(has_recoverable_param(i915));
+	hang = igt_allow_hang(i915, 0, 0);
 
 	for (int pass = 1; pass >= 0; pass--) {
 		struct drm_i915_gem_context_param param = {
@@ -190,6 +193,8 @@ static void norecovery(int i915)
 
 		gem_context_destroy(i915, param.ctx_id);
 	}
+
+	 igt_disallow_hang(i915, hang);
 }
 
 igt_main
