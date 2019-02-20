@@ -4015,16 +4015,8 @@ struct udev_monitor *igt_watch_hotplug(void)
 	return mon;
 }
 
-/**
- * igt_hotplug_detected:
- * @mon: A udev monitor initialized with #igt_watch_hotplug
- * @timeout_secs: How long to wait for a hotplug event to occur.
- *
- * Assert that a hotplug event was received since we last checked the monitor.
- *
- * Returns: true if a sysfs hotplug event was received, false if we timed out
- */
-bool igt_hotplug_detected(struct udev_monitor *mon, int timeout_secs)
+static bool event_detected(struct udev_monitor *mon, int timeout_secs,
+			   const char *property)
 {
 	struct udev_device *dev;
 	const char *hotplug_val;
@@ -4042,7 +4034,7 @@ bool igt_hotplug_detected(struct udev_monitor *mon, int timeout_secs)
 	while (!hotplug_received && poll(&fd, 1, timeout_secs * 1000)) {
 		dev = udev_monitor_receive_device(mon);
 
-		hotplug_val = udev_device_get_property_value(dev, "HOTPLUG");
+		hotplug_val = udev_device_get_property_value(dev, property);
 		if (hotplug_val && atoi(hotplug_val) == 1)
 			hotplug_received = true;
 
@@ -4050,6 +4042,34 @@ bool igt_hotplug_detected(struct udev_monitor *mon, int timeout_secs)
 	}
 
 	return hotplug_received;
+}
+
+/**
+ * igt_hotplug_detected:
+ * @mon: A udev monitor initialized with #igt_watch_hotplug
+ * @timeout_secs: How long to wait for a hotplug event to occur.
+ *
+ * Assert that a hotplug event was received since we last checked the monitor.
+ *
+ * Returns: true if a sysfs hotplug event was received, false if we timed out
+ */
+bool igt_hotplug_detected(struct udev_monitor *mon, int timeout_secs)
+{
+	return event_detected(mon, timeout_secs, "HOTPLUG");
+}
+
+/**
+ * igt_lease_change_detected:
+ * @mon: A udev monitor initialized with #igt_watch_hotplug
+ * @timeout_secs: How long to wait for a lease change event to occur.
+ *
+ * Assert that a lease change event was received since we last checked the monitor.
+ *
+ * Returns: true if a sysfs lease change event was received, false if we timed out
+ */
+bool igt_lease_change_detected(struct udev_monitor *mon, int timeout_secs)
+{
+	return event_detected(mon, timeout_secs, "LEASE");
 }
 
 /**

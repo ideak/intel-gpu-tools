@@ -40,6 +40,8 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 
+#include <libudev.h>
+
 #include <drm.h>
 
 IGT_TEST_DESCRIPTION("Test of CreateLease.");
@@ -974,6 +976,37 @@ static void implicit_plane_lease(data_t *data)
 	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 }
 
+static void lease_uevent(data_t *data)
+{
+	int lease_fd;
+	struct local_drm_mode_list_lessees mll;
+	struct udev_monitor *uevent_monitor;
+
+	uevent_monitor = igt_watch_hotplug();
+
+	igt_flush_hotplugs(uevent_monitor);
+
+	lease_fd = create_simple_lease(data->master.fd, data);
+
+	igt_assert(!igt_lease_change_detected(uevent_monitor, 1));
+
+	mll.pad = 0;
+	mll.count_lessees = 0;
+	mll.lessees_ptr = 0;
+	igt_assert_eq(list_lessees(data->master.fd, &mll), 0);
+	igt_assert_eq(mll.count_lessees, 1);
+
+	close(lease_fd);
+
+	igt_assert(igt_lease_change_detected(uevent_monitor, 1));
+
+	mll.lessees_ptr = 0;
+	igt_assert_eq(list_lessees(data->master.fd, &mll), 0);
+	igt_assert_eq(mll.count_lessees, 0);
+
+	igt_cleanup_hotplug(uevent_monitor);
+}
+
 igt_main
 {
 	data_t data;
@@ -1021,4 +1054,7 @@ igt_main
 
 	igt_subtest("implicit-plane-lease")
 		implicit_plane_lease(&data);
+
+	igt_subtest("lease-uevent")
+		lease_uevent(&data);
 }
