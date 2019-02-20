@@ -573,6 +573,20 @@ static void lease_invalid_crtc(data_t *data)
 	igt_assert_eq(ret, -EINVAL);
 }
 
+static void lease_invalid_plane(data_t *data)
+{
+	lease_t lease;
+	uint32_t save_plane_id;
+	int ret;
+
+	/* Create an invalid lease */
+	save_plane_id = data->plane_id;
+	data->plane_id = 0xbaadf00d;
+	ret = make_lease(data, &lease);
+	data->plane_id = save_plane_id;
+	igt_assert_eq(ret, -EINVAL);
+}
+
 
 static void run_test(data_t *data, void (*testfunc)(data_t *))
 {
@@ -625,6 +639,7 @@ igt_main
 		{ "lease_again", lease_again },
 		{ "lease_invalid_connector", lease_invalid_connector },
 		{ "lease_invalid_crtc", lease_invalid_crtc },
+		{ "lease_invalid_plane", lease_invalid_plane },
 		{ }
 	}, *f;
 
