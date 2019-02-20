@@ -927,6 +927,53 @@ static void multimaster_lease(data_t *data)
 	close(lease_fd);
 }
 
+static void implicit_plane_lease(data_t *data)
+{
+	uint32_t object_ids[3];
+	struct local_drm_mode_create_lease mcl;
+	struct local_drm_mode_get_lease mgl;
+
+	uint32_t cursor_id = igt_pipe_get_plane_type(&data->master.display.pipes[0],
+						     DRM_PLANE_TYPE_CURSOR)->drm_plane->plane_id;
+
+	object_ids[0] = data->master.display.pipes[0].crtc_id;
+	object_ids[1] = data->master.display.outputs[0].id;
+	object_ids[2] = igt_pipe_get_plane_type(&data->master.display.pipes[0],
+						DRM_PLANE_TYPE_PRIMARY)->drm_plane->plane_id;
+	mcl.object_ids = (uint64_t) (uintptr_t) object_ids;
+	mcl.object_count = 3;
+	mcl.flags = 0;
+
+	/* sanity check */
+	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+	close(mcl.fd);
+	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 0);
+
+	/* non universal plane automatically adds primary/cursor plane */
+	mcl.object_count = 2;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+
+	mgl.pad = 0;
+	mgl.count_objects = 0;
+	mgl.objects_ptr = 0;
+	igt_assert_eq(get_lease(mcl.fd, &mgl), 0);
+
+	igt_assert_eq(mgl.count_objects, 3 + (cursor_id ? 1 : 0));
+
+	close(mcl.fd);
+
+	/* check that implicit lease doesn't lead to confusion when
+	 * explicitly adding primary plane */
+	mcl.object_count = 3;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -ENOSPC);
+
+	/* same for the cursor */
+	object_ids[2] = cursor_id;
+	igt_assert_eq(create_lease(data->master.fd, &mcl), -ENOSPC);
+
+	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+}
+
 igt_main
 {
 	data_t data;
@@ -971,4 +1018,7 @@ igt_main
 
 	igt_subtest("multimaster-lease")
 		multimaster_lease(&data);
+
+	igt_subtest("implicit-plane-lease")
+		implicit_plane_lease(&data);
 }
