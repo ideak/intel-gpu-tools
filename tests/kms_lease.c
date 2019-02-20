@@ -832,6 +832,48 @@ static void possible_crtcs_filtering(data_t *data)
 	drmModeFreeResources(resources);
 }
 
+static bool is_master(int fd)
+{
+	/* FIXME: replace with drmIsMaster once we bumped libdrm version */
+	return drmAuthMagic(fd, 0) != -EACCES;
+}
+static void master_vs_lease(data_t *data)
+{
+	uint32_t object_ids[3];
+	struct local_drm_mode_create_lease mcl;
+
+	object_ids[0] = data->master.display.pipes[0].crtc_id;
+	object_ids[1] = data->master.display.outputs[0].id;
+	object_ids[2] = igt_pipe_get_plane_type(&data->master.display.pipes[0],
+						DRM_PLANE_TYPE_PRIMARY)->drm_plane->plane_id;
+	mcl.object_ids = (uint64_t) (uintptr_t) object_ids;
+	mcl.object_count = 3;
+	mcl.flags = 0;
+
+	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+
+	igt_assert_eq(drmDropMaster(mcl.fd), -1);
+	igt_assert_eq(errno, EINVAL);
+
+	igt_assert(is_master(data->master.fd));
+	igt_assert(is_master(mcl.fd));
+
+	do_or_die(drmDropMaster(data->master.fd));
+
+	igt_assert(!is_master(data->master.fd));
+	igt_assert(!is_master(mcl.fd));
+
+	igt_assert_eq(drmSetMaster(mcl.fd), -1);
+	igt_assert_eq(errno, EINVAL);
+
+	do_or_die(drmSetMaster(data->master.fd));
+
+	igt_assert(is_master(data->master.fd));
+	igt_assert(is_master(mcl.fd));
+
+	close(mcl.fd);
+}
+
 igt_main
 {
 	data_t data;
@@ -870,4 +912,7 @@ igt_main
 
 	igt_subtest("possible-crtcs-filtering")
 		possible_crtcs_filtering(&data);
+
+	igt_subtest("master-vs-lease")
+		master_vs_lease(&data);
 }
