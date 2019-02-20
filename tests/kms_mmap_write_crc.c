@@ -268,7 +268,8 @@ static data_t data;
 int main(int argc, char **argv)
 {
 	int i;
-	igt_simple_init_parse_opts(&argc, argv, "n", NULL, NULL, opt_handler, NULL);
+	igt_subtest_init_parse_opts(&argc, argv, "n", NULL, NULL,
+				    opt_handler, NULL);
 
 	igt_skip_on_simulation();
 
@@ -286,10 +287,12 @@ int main(int argc, char **argv)
 		fork_cpuhog_helper();
 	}
 
-	igt_info("Using %d rounds for the test\n", ROUNDS);
+	igt_subtest("main") {
+		igt_info("Using %d rounds for the test\n", ROUNDS);
 
-	for (i = 0; i < ROUNDS; i++)
-		run_test(&data);
+		for (i = 0; i < ROUNDS; i++)
+			run_test(&data);
+	}
 
 	igt_fixture {
 		igt_display_fini(&data.display);
