@@ -59,8 +59,12 @@ check_bo(int fd1, uint32_t handle1, int fd2, uint32_t handle2)
 	char *ptr1, *ptr2;
 	int i;
 
-	ptr1 = gem_mmap__gtt(fd1, handle1, BO_SIZE, PROT_READ | PROT_WRITE);
-	ptr2 = gem_mmap__gtt(fd2, handle2, BO_SIZE, PROT_READ | PROT_WRITE);
+
+	ptr1 = gem_mmap__cpu(fd1, handle1, 0, BO_SIZE, PROT_READ | PROT_WRITE);
+	ptr2 = gem_mmap__cpu(fd2, handle2, 0, BO_SIZE, PROT_READ | PROT_WRITE);
+
+	gem_set_domain(fd1, handle1, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	gem_set_domain(fd2, handle2, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 	/* check whether it's still our old object first. */
 	for (i = 0; i < BO_SIZE; i++) {
