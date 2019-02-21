@@ -256,6 +256,7 @@
 
 static unsigned int exit_handler_count;
 const char *igt_interactive_debug;
+bool igt_skip_crc_compare;
 
 /* subtests helpers */
 static bool list_subtests = false;
@@ -289,6 +290,7 @@ enum {
 	OPT_DESCRIPTION,
 	OPT_DEBUG,
 	OPT_INTERACTIVE_DEBUG,
+	OPT_SKIP_CRC,
 	OPT_HELP = 'h'
 };
 
@@ -557,6 +559,7 @@ static void print_usage(const char *help_str, bool output_on_stderr)
 		   "  --run-subtest <pattern>\n"
 		   "  --debug[=log-domain]\n"
 		   "  --interactive-debug[=domain]\n"
+		   "  --skip-crc-compare\n"
 		   "  --help-description\n"
 		   "  --help|-h\n");
 	if (help_str)
@@ -675,6 +678,7 @@ static int common_init(int *argc, char **argv,
 		{"help-description",  no_argument,       NULL, OPT_DESCRIPTION},
 		{"debug",             optional_argument, NULL, OPT_DEBUG},
 		{"interactive-debug", optional_argument, NULL, OPT_INTERACTIVE_DEBUG},
+		{"skip-crc-compare",  no_argument,       NULL, OPT_SKIP_CRC},
 		{"help",              no_argument,       NULL, OPT_HELP},
 		{0, 0, 0, 0}
 	};
@@ -785,6 +789,9 @@ static int common_init(int *argc, char **argv,
 		case OPT_DESCRIPTION:
 			print_test_description();
 			ret = -1;
+			goto out;
+		case OPT_SKIP_CRC:
+			igt_skip_crc_compare = true;
 			goto out;
 		case OPT_HELP:
 			print_usage(help_str, false);

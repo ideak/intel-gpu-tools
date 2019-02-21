@@ -405,6 +405,12 @@ static bool igt_find_crc_mismatch(const igt_crc_t *a, const igt_crc_t *b,
  * assert that CRCs match, never that they are different. Otherwise there might
  * be random testcase failures when different screen contents end up with the
  * same CRC by chance.
+ *
+ * Passing --skip-crc-compare on the command line will force this function
+ * to always pass, which can be useful in interactive debugging where you
+ * might know the test will fail, but still want the test to keep going as if
+ * it had succeeded so that you can see the on-screen behavior.
+ *
  */
 void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
 {
@@ -413,10 +419,11 @@ void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b)
 
 	mismatch = igt_find_crc_mismatch(a, b, &index);
 	if (mismatch)
-		igt_debug("CRC mismatch at index %d: 0x%x != 0x%x\n", index,
-			  a->crc[index], b->crc[index]);
+		igt_debug("CRC mismatch%s at index %d: 0x%x != 0x%x\n",
+			  igt_skip_crc_compare ? " (ignored)" : "",
+			  index, a->crc[index], b->crc[index]);
 
-	igt_assert(!mismatch);
+	igt_assert(!mismatch || igt_skip_crc_compare);
 }
 
 /**

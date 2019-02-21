@@ -877,6 +877,7 @@ bool igt_run_in_simulation(void);
 void igt_skip_on_simulation(void);
 
 extern const char *igt_interactive_debug;
+extern bool igt_skip_crc_compare;
 
 /**
  * igt_log_level:
