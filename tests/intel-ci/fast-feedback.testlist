@@ -226,10 +226,10 @@ igt@kms_psr@cursor_plane_move
 igt@kms_psr@sprite_plane_onoff
 igt@kms_psr@primary_mmap_gtt
 igt@kms_setmode@basic-clone-single-crtc
-igt@pm_backlight@basic-brightness
-igt@pm_rpm@basic-pci-d3-state
-igt@pm_rpm@basic-rte
-igt@pm_rps@basic-api
+igt@i915_pm_backlight@basic-brightness
+igt@i915_pm_rpm@basic-pci-d3-state
+igt@i915_pm_rpm@basic-rte
+igt@i915_pm_rps@basic-api
 igt@prime_busy@basic-after-default
 igt@prime_busy@basic-before-default
 igt@prime_busy@basic-wait-after-default
@@ -269,4 +269,4 @@ igt@vgem_basic@unload
 igt@i915_module_load@reload
 igt@i915_module_load@reload-no-display
 igt@i915_module_load@reload-with-fault-injection
-igt@pm_rpm@module-reload
+igt@i915_pm_rpm@module-reload
