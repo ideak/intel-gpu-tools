@@ -59,16 +59,23 @@ enum {
 
 static const struct named_register {
 	const char *name;
-	unsigned int gen_mask;
-	unsigned int engine_mask;
-	uint32_t offset;
+	unsigned int gen_mask; /* on which gen the register exists */
+	unsigned int engine_mask; /* preferred engine / powerwell */
+	uint32_t offset; /* address of register, from bottom of mmio bar */
 	uint32_t count;
 	uint32_t ignore_bits;
+	uint32_t write_mask; /* some registers bits do not exist */
 	bool masked;
 } nonpriv_registers[] = {
 	{ "NOPID", NOCTX, RCS0, 0x2094 },
 	{ "MI_PREDICATE_RESULT_2", NOCTX, RCS0, 0x23bc },
-	{ "INSTPM", GEN6, RCS0, 0x20c0, 1, BIT(8) /* ro counter */, true },
+	{
+		"INSTPM",
+		GEN6, RCS0, 0x20c0,
+		.ignore_bits = BIT(8) /* ro counter */,
+		.write_mask = BIT(8) /* rsvd varies between gen */,
+		.masked = true,
+	},
 	{ "IA_VERTICES_COUNT", GEN4, RCS0, 0x2310, 2 },
 	{ "IA_PRIMITIVES_COUNT", GEN4, RCS0, 0x2318, 2 },
 	{ "VS_INVOCATION_COUNT", GEN4, RCS0, 0x2320, 2 },
@@ -78,7 +85,7 @@ static const struct named_register {
 	{ "GS_PRIMITIVES_COUNT", GEN4, RCS0, 0x2330, 2 },
 	{ "CL_INVOCATION_COUNT", GEN4, RCS0, 0x2338, 2 },
 	{ "CL_PRIMITIVES_COUNT", GEN4, RCS0, 0x2340, 2 },
-	{ "PS_INVOCATION_COUNT_0", GEN4, RCS0, 0x22c8, 2 },
+	{ "PS_INVOCATION_COUNT_0", GEN4, RCS0, 0x22c8, 2, .write_mask = ~0x3 },
 	{ "PS_DEPTH_COUNT_0", GEN4, RCS0, 0x22d8, 2 },
 	{ "GPUGPU_DISPATCHDIMX", GEN8, RCS0, 0x2500 },
 	{ "GPUGPU_DISPATCHDIMY", GEN8, RCS0, 0x2504 },
@@ -86,7 +93,7 @@ static const struct named_register {
 	{ "MI_PREDICATE_SRC0", GEN8, RCS0, 0x2400, 2 },
 	{ "MI_PREDICATE_SRC1", GEN8, RCS0, 0x2408, 2 },
 	{ "MI_PREDICATE_DATA", GEN8, RCS0, 0x2410, 2 },
-	{ "MI_PRED_RESULT", GEN8, RCS0, 0x2418 },
+	{ "MI_PRED_RESULT", GEN8, RCS0, 0x2418, .write_mask = 0x1 },
 	{ "3DPRIM_END_OFFSET", GEN6, RCS0, 0x2420 },
 	{ "3DPRIM_START_VERTEX", GEN6, RCS0, 0x2430 },
 	{ "3DPRIM_VERTEX_COUNT", GEN6, RCS0, 0x2434 },
@@ -94,45 +101,45 @@ static const struct named_register {
 	{ "3DPRIM_START_INSTANCE", GEN6, RCS0, 0x243c },
 	{ "3DPRIM_BASE_VERTEX", GEN6, RCS0, 0x2440 },
 	{ "GPGPU_THREADS_DISPATCHED", GEN8, RCS0, 0x2290, 2 },
-	{ "PS_INVOCATION_COUNT_1", GEN8, RCS0, 0x22f0, 2 },
+	{ "PS_INVOCATION_COUNT_1", GEN8, RCS0, 0x22f0, 2, .write_mask = ~0x3 },
 	{ "PS_DEPTH_COUNT_1", GEN8, RCS0, 0x22f8, 2 },
 	{ "BB_OFFSET", GEN8, RCS0, 0x2158, .ignore_bits = 0x4 },
 	{ "MI_PREDICATE_RESULT_1", GEN8, RCS0, 0x241c },
 	{ "CS_GPR", GEN8, RCS0, 0x2600, 32 },
 	{ "OA_CTX_CONTROL", GEN8, RCS0, 0x2360 },
 	{ "OACTXID", GEN8, RCS0, 0x2364 },
-	{ "PS_INVOCATION_COUNT_2", GEN8, RCS0, 0x2448, 2 },
+	{ "PS_INVOCATION_COUNT_2", GEN8, RCS0, 0x2448, 2, .write_mask = ~0x3 },
 	{ "PS_DEPTH_COUNT_2", GEN8, RCS0, 0x2450, 2 },
-	{ "Cache_Mode_0", GEN7, RCS0, 0x7000 },
-	{ "Cache_Mode_1", GEN7, RCS0, 0x7004 },
-	{ "GT_MODE", GEN8, RCS0, 0x7008 },
-	{ "L3_Config", GEN7, RCS0, 0x7034 },
-	{ "TD_CTL", GEN8, RCS0, 0xe400 },
+	{ "Cache_Mode_0", GEN7, RCS0, 0x7000, .masked = true },
+	{ "Cache_Mode_1", GEN7, RCS0, 0x7004, .masked = true },
+	{ "GT_MODE", GEN8, RCS0, 0x7008, .masked = true },
+	{ "L3_Config", GEN8, RCS0, 0x7034 },
+	{ "TD_CTL", GEN8, RCS0, 0xe400, .write_mask = 0xffff },
 	{ "TD_CTL2", GEN8, RCS0, 0xe404 },
-	{ "SO_NUM_PRIMS_WRITEN0", GEN6, RCS0, 0x5200, 2 },
-	{ "SO_NUM_PRIMS_WRITEN1", GEN6, RCS0, 0x5208, 2 },
-	{ "SO_NUM_PRIMS_WRITEN2", GEN6, RCS0, 0x5210, 2 },
-	{ "SO_NUM_PRIMS_WRITEN3", GEN6, RCS0, 0x5218, 2 },
+	{ "SO_NUM_PRIMS_WRITTEN0", GEN6, RCS0, 0x5200, 2 },
+	{ "SO_NUM_PRIMS_WRITTEN1", GEN6, RCS0, 0x5208, 2 },
+	{ "SO_NUM_PRIMS_WRITTEN2", GEN6, RCS0, 0x5210, 2 },
+	{ "SO_NUM_PRIMS_WRITTEN3", GEN6, RCS0, 0x5218, 2 },
 	{ "SO_PRIM_STORAGE_NEEDED0", GEN6, RCS0, 0x5240, 2 },
 	{ "SO_PRIM_STORAGE_NEEDED1", GEN6, RCS0, 0x5248, 2 },
 	{ "SO_PRIM_STORAGE_NEEDED2", GEN6, RCS0, 0x5250, 2 },
 	{ "SO_PRIM_STORAGE_NEEDED3", GEN6, RCS0, 0x5258, 2 },
-	{ "SO_WRITE_OFFSET0", GEN7, RCS0, 0x5280 },
-	{ "SO_WRITE_OFFSET1", GEN7, RCS0, 0x5284 },
-	{ "SO_WRITE_OFFSET2", GEN7, RCS0, 0x5288 },
-	{ "SO_WRITE_OFFSET3", GEN7, RCS0, 0x528c },
+	{ "SO_WRITE_OFFSET0", GEN7, RCS0, 0x5280, .write_mask = ~0x3 },
+	{ "SO_WRITE_OFFSET1", GEN7, RCS0, 0x5284, .write_mask = ~0x3 },
+	{ "SO_WRITE_OFFSET2", GEN7, RCS0, 0x5288, .write_mask = ~0x3 },
+	{ "SO_WRITE_OFFSET3", GEN7, RCS0, 0x528c, .write_mask = ~0x3 },
 	{ "OA_CONTROL", NOCTX, RCS0, 0x2b00 },
 	{ "PERF_CNT_1", NOCTX, RCS0, 0x91b8, 2 },
 	{ "PERF_CNT_2", NOCTX, RCS0, 0x91c0, 2 },
 
 	/* Privileged (enabled by w/a + FORCE_TO_NONPRIV) */
 	{ "CTX_PREEMPT", NOCTX /* GEN_RANGE(9, 10) */, RCS0, 0x2248 },
-	{ "CS_CHICKEN1", GEN_RANGE(9, 10), RCS0, 0x2580 },
-	{ "HDC_CHICKEN1", GEN_RANGE(9, 10), RCS0, 0x7304 },
-	{ "L3SQREG1", GEN8, RCS0, 0xb010 },
+	{ "CS_CHICKEN1", GEN_RANGE(9, 10), RCS0, 0x2580, .masked = true },
+	{ "HDC_CHICKEN1", GEN_RANGE(9, 10), RCS0, 0x7304, .masked = true },
+	{ "L3SQREG4", NOCTX /* GEN9:skl,kbl */, RCS0, 0xb118, .write_mask = ~0x1ffff0 },
 
 	{ "BCS_GPR", GEN9, BCS0, 0x22600, 32 },
-	{ "BCS_SWCTRL", GEN8, BCS0, 0x22200 },
+	{ "BCS_SWCTRL", GEN8, BCS0, 0x22200, .write_mask = 0x3, .masked = true },
 
 	{ "VCS0_GPR", GEN9, VCS0, 0x12600, 32 },
 	{ "MFC_VDBOX1", NOCTX, VCS0, 0x12800, 64 },
@@ -189,6 +196,42 @@ static bool ignore_register(uint32_t offset)
 	}
 
 	return false;
+}
+
+static void tmpl_regs(int fd,
+		      uint32_t ctx,
+		      const struct intel_execution_engine2 *e,
+		      uint32_t handle,
+		      uint32_t value)
+{
+	const unsigned int gen_bit = 1 << intel_gen(intel_get_drm_devid(fd));
+	const unsigned int engine_bit = ENGINE(e->class, e->instance);
+	unsigned int regs_size;
+	uint32_t *regs;
+
+	regs_size = NUM_REGS * sizeof(uint32_t);
+	regs_size = PAGE_ALIGN(regs_size);
+
+	regs = gem_mmap__cpu(fd, handle, 0, regs_size, PROT_WRITE);
+	gem_set_domain(fd, handle,
+		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+
+	for (const struct named_register *r = nonpriv_registers; r->name; r++) {
+		if (!(r->engine_mask & engine_bit))
+			continue;
+		if (!(r->gen_mask & gen_bit))
+			continue;
+		for (unsigned count = r->count ?: 1, offset = r->offset;
+		     count--; offset += 4) {
+			uint32_t x = value;
+			if (r->write_mask)
+				x &= r->write_mask;
+			if (r->masked)
+				x &= 0xffff;
+			regs[offset/sizeof(*regs)] = x;
+		}
+	}
+	munmap(regs, regs_size);
 }
 
 static uint32_t read_regs(int fd,
@@ -294,12 +337,15 @@ static void write_regs(int fd,
 			continue;
 		for (unsigned count = r->count ?: 1, offset = r->offset;
 		     count--; offset += 4) {
+			uint32_t x = value;
+			if (r->write_mask)
+				x &= r->write_mask;
+			if (r->masked)
+				x |= 0xffffu << 16;
+
 			*b++ = 0x22 << 23 | 1; /* LRI */
 			*b++ = offset;
-			if (r->masked)
-				*b++ = value | 0xffffu << 16;
-			else
-				*b++ = value;
+			*b++ = x;
 		}
 	}
 	*b++ = MI_BATCH_BUFFER_END;
@@ -472,6 +518,66 @@ static void compare_regs(int fd, uint32_t A, uint32_t B, const char *who)
 	igt_assert_f(num_errors == 0,
 		     "%d registers mistached between %s.\n",
 		     num_errors, who);
+}
+
+static void nonpriv(int fd,
+		    const struct intel_execution_engine2 *e,
+		    unsigned int flags)
+{
+	static const uint32_t values[] = {
+		0x0,
+		0xffffffff,
+		0xcccccccc,
+		0x33333333,
+		0x55555555,
+		0xaaaaaaaa,
+		0xf0f00f0f,
+		0xa0a00303,
+		0x0505c0c0,
+		0xdeadbeef
+	};
+	unsigned int engine =
+		gem_class_instance_to_eb_flags(fd, e->class, e->instance);
+	unsigned int num_values = ARRAY_SIZE(values);
+
+	/* Sigh -- hsw: we need cmdparser access to our own registers! */
+	igt_skip_on(intel_gen(intel_get_drm_devid(fd)) < 8);
+
+	gem_quiescent_gpu(fd);
+
+	for (int v = 0; v < num_values; v++) {
+		igt_spin_t *spin = NULL;
+		uint32_t ctx, regs[2], tmpl;
+
+		ctx = gem_context_create(fd);
+		tmpl = read_regs(fd, ctx, e, flags);
+		regs[0] = read_regs(fd, ctx, e, flags);
+
+		tmpl_regs(fd, ctx, e, tmpl, values[v]);
+
+		spin = igt_spin_batch_new(fd, .ctx = ctx, .engine = engine);
+
+		igt_debug("%s[%d]: Setting all registers to 0x%08x\n",
+			  __func__, v, values[v]);
+		write_regs(fd, ctx, e, flags, values[v]);
+
+		regs[1] = read_regs(fd, ctx, e, flags);
+
+		/*
+		 * Restore the original register values before the HW idles.
+		 * Or else it may never restart!
+		 */
+		restore_regs(fd, ctx, e, flags, regs[0]);
+
+		igt_spin_batch_free(fd, spin);
+
+		compare_regs(fd, tmpl, regs[1], "nonpriv read/writes");
+
+		for (int n = 0; n < ARRAY_SIZE(regs); n++)
+			gem_close(fd, regs[n]);
+		gem_context_destroy(fd, ctx);
+		gem_close(fd, tmpl);
+	}
 }
 
 static void isolation(int fd,
@@ -714,6 +820,9 @@ igt_main
 				gem_require_engine(fd, e->class, e->instance);
 				igt_fork_hang_detector(fd);
 			}
+
+			igt_subtest_f("%s-nonpriv", e->name)
+				nonpriv(fd, e, 0);
 
 			igt_subtest_f("%s-clean", e->name)
 				isolation(fd, e, 0);
