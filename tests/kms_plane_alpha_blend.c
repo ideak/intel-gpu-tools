@@ -83,6 +83,7 @@ static void draw_squares(struct igt_fb *fb, int w, int h, double a)
 {
 	cairo_t *cr = igt_get_cairo_ctx(fb->fd, fb);
 
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	igt_paint_color_alpha(cr, 0, 0,         w / 2, h / 2, 1., 0., 0., a);
 	igt_paint_color_alpha(cr, w / 2, 0,     w / 2, h / 2, 0., 1., 0., a);
 	igt_paint_color_alpha(cr, 0, h / 2,     w / 2, h / 2, 0., 0., 1., a);
@@ -197,7 +198,8 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 			      &data->argb_fb_0);
 
 		cr = igt_get_cairo_ctx(data->gfx_fd, &data->argb_fb_0);
-		igt_paint_color_alpha(cr, 0, 0, w, h, 0., 0., 0., 1.0);
+		cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+		igt_paint_color_alpha(cr, 0, 0, w, h, 0., 0., 0., 0.0);
 		igt_put_cairo_ctx(data->gfx_fd, &data->argb_fb_0, cr);
 
 		igt_create_fb(data->gfx_fd, w, h,
