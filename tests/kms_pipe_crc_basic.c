@@ -62,21 +62,25 @@ static void test_bad_source(data_t *data)
 #define TEST_SEQUENCE (1<<0)
 #define TEST_NONBLOCK (1<<1)
 
-static void
-test_read_crc_for_output(data_t *data, int pipe, igt_output_t *output,
-			 unsigned flags)
+static void test_read_crc(data_t *data, enum pipe pipe, unsigned flags)
 {
 	igt_display_t *display = &data->display;
+	igt_output_t *output = igt_get_single_output_for_pipe(display, pipe);
 	igt_plane_t *primary;
 	drmModeModeInfo *mode;
 	igt_crc_t *crcs = NULL;
 	int c, j;
 
+	igt_skip_on(pipe >= data->display.n_pipes);
+	igt_require_f(output, "No connector found for pipe %s\n",
+		      kmstest_pipe_name(pipe));
+
+	igt_display_reset(display);
+	igt_output_set_pipe(output, pipe);
+
 	for (c = 0; c < ARRAY_SIZE(colors); c++) {
 		char *crc_str;
 		int n_crcs;
-
-		igt_output_set_pipe(output, pipe);
 
 		igt_debug("Clearing the fb with color (%.02lf,%.02lf,%.02lf)\n",
 			  colors[c].r, colors[c].g, colors[c].b);
@@ -146,32 +150,7 @@ test_read_crc_for_output(data_t *data, int pipe, igt_output_t *output,
 
 		free(crcs);
 		igt_remove_fb(data->drm_fd, &data->fb);
-		igt_plane_set_fb(primary, NULL);
-
-		igt_output_set_pipe(output, PIPE_ANY);
 	}
-}
-
-static void test_read_crc(data_t *data, enum pipe pipe, unsigned flags)
-{
-	igt_display_t *display = &data->display;
-	int valid_connectors = 0;
-	igt_output_t *output;
-
-	igt_skip_on(pipe >= data->display.n_pipes);
-
-	for_each_valid_output_on_pipe(display, pipe, output) {
-
-		igt_info("%s: Testing connector %s using pipe %s\n",
-			 igt_subtest_name(), igt_output_name(output),
-			 kmstest_pipe_name(pipe));
-
-		test_read_crc_for_output(data, pipe, output, flags);
-		valid_connectors ++;
-	}
-
-	igt_require_f(valid_connectors, "No connector found for pipe %s\n",
-		      kmstest_pipe_name(pipe));
 }
 
 data_t data = {0, };
