@@ -152,7 +152,7 @@ test_read_crc_for_output(data_t *data, int pipe, igt_output_t *output,
 	}
 }
 
-static void test_read_crc(data_t *data, int pipe, unsigned flags)
+static void test_read_crc(data_t *data, enum pipe pipe, unsigned flags)
 {
 	igt_display_t *display = &data->display;
 	int valid_connectors = 0;
@@ -178,6 +178,8 @@ data_t data = {0, };
 
 igt_main
 {
+	enum pipe pipe;
+
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
@@ -194,38 +196,38 @@ igt_main
 
 	igt_skip_on_simulation();
 
-	for (int i = 0; i < 3; i++) {
-		igt_subtest_f("read-crc-pipe-%c", 'A'+i)
-			test_read_crc(&data, i, 0);
+	for_each_pipe_static(pipe) {
+		igt_subtest_f("read-crc-pipe-%s", kmstest_pipe_name(pipe))
+			test_read_crc(&data, pipe, 0);
 
-		igt_subtest_f("read-crc-pipe-%c-frame-sequence", 'A'+i)
-			test_read_crc(&data, i, TEST_SEQUENCE);
+		igt_subtest_f("read-crc-pipe-%s-frame-sequence", kmstest_pipe_name(pipe))
+			test_read_crc(&data, pipe, TEST_SEQUENCE);
 
-		igt_subtest_f("nonblocking-crc-pipe-%c", 'A'+i)
-			test_read_crc(&data, i, TEST_NONBLOCK);
+		igt_subtest_f("nonblocking-crc-pipe-%s", kmstest_pipe_name(pipe))
+			test_read_crc(&data, pipe, TEST_NONBLOCK);
 
-		igt_subtest_f("nonblocking-crc-pipe-%c-frame-sequence", 'A'+i)
-			test_read_crc(&data, i, TEST_SEQUENCE | TEST_NONBLOCK);
+		igt_subtest_f("nonblocking-crc-pipe-%s-frame-sequence", kmstest_pipe_name(pipe))
+			test_read_crc(&data, pipe, TEST_SEQUENCE | TEST_NONBLOCK);
 
-		igt_subtest_f("suspend-read-crc-pipe-%c", 'A'+i) {
-			igt_skip_on(i >= data.display.n_pipes);
+		igt_subtest_f("suspend-read-crc-pipe-%s", kmstest_pipe_name(pipe)) {
+			igt_skip_on(pipe >= data.display.n_pipes);
 
-			test_read_crc(&data, i, 0);
+			test_read_crc(&data, pipe, 0);
 
 			igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 						      SUSPEND_TEST_NONE);
 
-			test_read_crc(&data, i, 0);
+			test_read_crc(&data, pipe, 0);
 		}
 
-		igt_subtest_f("hang-read-crc-pipe-%c", 'A'+i) {
+		igt_subtest_f("hang-read-crc-pipe-%s", kmstest_pipe_name(pipe)) {
 			igt_hang_t hang = igt_allow_hang(data.drm_fd, 0, 0);
 
-			test_read_crc(&data, i, 0);
+			test_read_crc(&data, pipe, 0);
 
 			igt_force_gpu_reset(data.drm_fd);
 
-			test_read_crc(&data, i, 0);
+			test_read_crc(&data, pipe, 0);
 
 			igt_disallow_hang(data.drm_fd, hang);
 		}
