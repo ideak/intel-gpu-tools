@@ -122,6 +122,8 @@ static void test_context_create(int fd)
 {
 	uint32_t ctx;
 
+	gem_require_contexts(fd);
+
 	wedge_gpu(fd);
 
 	igt_assert_eq(__gem_context_create(fd, &ctx), -EIO);
