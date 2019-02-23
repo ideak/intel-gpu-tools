@@ -26,6 +26,7 @@
  */
 
 #include "igt.h"
+#include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -58,29 +59,50 @@ static int measure_qlen(int fd,
 {
 	const struct drm_i915_gem_exec_object2 * const obj =
 		(struct drm_i915_gem_exec_object2 *)(uintptr_t)execbuf->buffers_ptr;
-	int qlen = 64;
+	uint32_t ctx[64];
+	int min = INT_MAX, max = 0;
+
+	for (int i = 0; i < ARRAY_SIZE(ctx); i++)
+		ctx[i] = gem_context_create(fd);
 
 	for (unsigned int n = 0; n < nengine; n++) {
 		uint64_t saved = execbuf->flags;
 		struct timespec tv = {};
+		int q;
 
 		execbuf->flags |= engine[n];
 
-		igt_nsec_elapsed(&tv);
-		for (int loop = 0; loop < qlen; loop++)
+		for (int i = 0; i < ARRAY_SIZE(ctx); i++) {
+			execbuf->rsvd1 = ctx[i];
 			gem_execbuf(fd, execbuf);
+		}
 		gem_sync(fd, obj->handle);
 
-		execbuf->flags = saved;
+		igt_nsec_elapsed(&tv);
+		for (int i = 0; i < ARRAY_SIZE(ctx); i++) {
+			execbuf->rsvd1 = ctx[i];
+			gem_execbuf(fd, execbuf);
+		}
+		gem_sync(fd, obj->handle);
 
 		/*
 		 * Be conservative and aim not to overshoot timeout, so scale
 		 * down by 8 for hopefully a max of 12.5% error.
 		 */
-		qlen = qlen * timeout * 1e9 / igt_nsec_elapsed(&tv) / 8 + 1;
+		q = ARRAY_SIZE(ctx) * timeout * 1e9 / igt_nsec_elapsed(&tv) / 8 + 1;
+		if (q < min)
+			min = q;
+		if (q > max)
+			max = q;
+
+		execbuf->flags = saved;
 	}
 
-	return qlen;
+	for (int i = 0; i < ARRAY_SIZE(ctx); i++)
+		gem_context_destroy(fd, ctx[i]);
+
+	igt_debug("Estimated qlen: {min:%d, max:%d}\n", min, max);
+	return min;
 }
 
 static void single(int fd, uint32_t handle,
@@ -259,9 +281,10 @@ static void all(int fd, uint32_t handle, unsigned flags, int timeout)
 				clock_gettime(CLOCK_MONOTONIC, &now);
 				gem_close(fd, obj[0].handle);
 
-				igt_info("[%d:%d] %s: %'u cycles: %.3fus%s\n",
+				igt_info("[%d:%d] %s: %'u cycles: %.3fus%s (elapsed: %.3fs)\n",
 					 nctx, child, name[child], count, elapsed(&start, &now)*1e6 / count,
-					 flags & INTERRUPTIBLE ? " (interruptible)" : "");
+					 flags & INTERRUPTIBLE ? " (interruptible)" : "",
+					 elapsed(&start, &now));
 			}
 			igt_waitchildren();
 		}
