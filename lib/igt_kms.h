@@ -300,9 +300,10 @@ typedef enum {
 #define IGT_ROTATION_MASK \
 	(IGT_ROTATION_0 | IGT_ROTATION_90 | IGT_ROTATION_180 | IGT_ROTATION_270)
 
-typedef struct {
+typedef struct igt_plane {
 	/*< private >*/
 	igt_pipe_t *pipe;
+	struct igt_plane *ref;
 	int index;
 	/* capabilities */
 	int type;
@@ -372,8 +373,10 @@ struct igt_display {
 	int drm_fd;
 	int log_shift;
 	int n_pipes;
+	int n_planes;
 	int n_outputs;
 	igt_output_t *outputs;
+	igt_plane_t *planes;
 	igt_pipe_t *pipes;
 	bool has_cursor_plane;
 	bool is_atomic;
@@ -419,6 +422,7 @@ void igt_pipe_request_out_fence(igt_pipe_t *pipe);
 
 void igt_plane_set_fb(igt_plane_t *plane, struct igt_fb *fb);
 void igt_plane_set_fence_fd(igt_plane_t *plane, int fence_fd);
+void igt_plane_set_pipe(igt_plane_t *plane, igt_pipe_t *pipe);
 void igt_plane_set_position(igt_plane_t *plane, int x, int y);
 void igt_plane_set_size(igt_plane_t *plane, int w, int h);
 void igt_plane_set_rotation(igt_plane_t *plane, igt_rotation_t rotation);

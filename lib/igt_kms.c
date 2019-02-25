@@ -1905,6 +1905,26 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 	plane_resources = drmModeGetPlaneResources(display->drm_fd);
 	igt_assert(plane_resources);
 
+	display->n_planes = plane_resources->count_planes;
+	display->planes = calloc(sizeof(igt_plane_t), display->n_planes);
+	igt_assert_f(display->planes, "Failed to allocate memory for %d planes\n", display->n_planes);
+
+	for (i = 0; i < plane_resources->count_planes; ++i) {
+		igt_plane_t *plane = &display->planes[i];
+		uint32_t id = plane_resources->planes[i];
+
+		plane->drm_plane = drmModeGetPlane(display->drm_fd, id);
+		igt_assert(plane->drm_plane);
+
+		plane->type = get_drm_plane_type(display->drm_fd, id);
+
+		/*
+		 * TODO: Fill in the rest of the plane properties here and
+		 * move away from the plane per pipe model to align closer
+		 * to the DRM KMS model.
+		 */
+	}
+
 	for_each_pipe(display, i) {
 		igt_pipe_t *pipe = &display->pipes[i];
 		igt_plane_t *plane;
@@ -1922,17 +1942,12 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 		igt_fill_pipe_props(display, pipe, IGT_NUM_CRTC_PROPS, igt_crtc_prop_names);
 
 		/* count number of valid planes */
-		for (j = 0; j < plane_resources->count_planes; j++) {
-			drmModePlane *drm_plane;
-
-			drm_plane = drmModeGetPlane(display->drm_fd,
-						    plane_resources->planes[j]);
+		for (j = 0; j < display->n_planes; j++) {
+			drmModePlane *drm_plane = display->planes[j].drm_plane;
 			igt_assert(drm_plane);
 
 			if (drm_plane->possible_crtcs & (1 << i))
 				n_planes++;
-
-			drmModeFreePlane(drm_plane);
 		}
 
 		igt_assert_lt(0, n_planes);
@@ -1941,20 +1956,14 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 		last_plane = n_planes - 1;
 
 		/* add the planes that can be used with that pipe */
-		for (j = 0; j < plane_resources->count_planes; j++) {
-			drmModePlane *drm_plane;
+		for (j = 0; j < display->n_planes; j++) {
+			igt_plane_t *global_plane = &display->planes[j];
+			drmModePlane *drm_plane = global_plane->drm_plane;
 
-			drm_plane = drmModeGetPlane(display->drm_fd,
-						    plane_resources->planes[j]);
-			igt_assert(drm_plane);
-
-			if (!(drm_plane->possible_crtcs & (1 << i))) {
-				drmModeFreePlane(drm_plane);
+			if (!(drm_plane->possible_crtcs & (1 << i)))
 				continue;
-			}
 
-			type = get_drm_plane_type(display->drm_fd,
-						  plane_resources->planes[j]);
+			type = global_plane->type;
 
 			if (type == DRM_PLANE_TYPE_PRIMARY && pipe->plane_primary == -1) {
 				plane = &pipe->planes[0];
@@ -1975,6 +1984,14 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 			plane->pipe = pipe;
 			plane->drm_plane = drm_plane;
 			plane->values[IGT_PLANE_IN_FENCE_FD] = ~0ULL;
+			plane->ref = global_plane;
+
+			/*
+			 * HACK: point the global plane to the first pipe that
+			 * it can go on.
+			 */
+			if (!global_plane->ref)
+				igt_plane_set_pipe(plane, pipe);
 
 			igt_fill_plane_props(display, plane, IGT_NUM_PLANE_PROPS, igt_plane_prop_names);
 
@@ -2127,17 +2144,6 @@ igt_output_t *igt_output_from_connector(igt_display_t *display,
 
 static void igt_pipe_fini(igt_pipe_t *pipe)
 {
-	int i;
-
-	for (i = 0; i < pipe->n_planes; i++) {
-		igt_plane_t *plane = &pipe->planes[i];
-
-		if (plane->drm_plane) {
-			drmModeFreePlane(plane->drm_plane);
-			plane->drm_plane = NULL;
-		}
-	}
-
 	free(pipe->planes);
 	pipe->planes = NULL;
 
@@ -2163,6 +2169,15 @@ void igt_display_fini(igt_display_t *display)
 {
 	int i;
 
+	for (i = 0; i < display->n_planes; ++i) {
+		igt_plane_t *plane = &display->planes[i];
+
+		if (plane->drm_plane) {
+			drmModeFreePlane(plane->drm_plane);
+			plane->drm_plane = NULL;
+		}
+	}
+
 	for (i = 0; i < display->n_pipes; i++)
 		igt_pipe_fini(&display->pipes[i]);
 
@@ -2172,6 +2187,8 @@ void igt_display_fini(igt_display_t *display)
 	display->outputs = NULL;
 	free(display->pipes);
 	display->pipes = NULL;
+	free(display->planes);
+	display->planes = NULL;
 }
 
 static void igt_display_refresh(igt_display_t *display)
@@ -2837,6 +2854,10 @@ static int igt_pipe_commit(igt_pipe_t *pipe,
 	for (i = 0; i < pipe->n_planes; i++) {
 		igt_plane_t *plane = &pipe->planes[i];
 
+		/* skip planes that are handled by another pipe */
+		if (plane->ref->pipe != pipe)
+			continue;
+
 		ret = igt_plane_commit(plane, pipe, s, fail_on_error);
 		CHECK_RETURN(ret, fail_on_error);
 	}
@@ -3225,6 +3246,10 @@ static int igt_atomic_commit(igt_display_t *display, uint32_t flags, void *user_
 			igt_atomic_prepare_crtc_commit(pipe_obj, req);
 
 		for_each_plane_on_pipe(display, pipe, plane) {
+			/* skip planes that are handled by another pipe */
+			if (plane->ref->pipe != pipe_obj)
+				continue;
+
 			if (plane->changed)
 				igt_atomic_prepare_plane_commit(plane, pipe_obj, req);
 		}
@@ -3793,6 +3818,9 @@ void igt_plane_set_fb(igt_plane_t *plane, struct igt_fb *fb)
 		if (igt_plane_has_prop(plane, IGT_PLANE_COLOR_RANGE))
 			igt_plane_set_prop_enum(plane, IGT_PLANE_COLOR_RANGE,
 				igt_color_range_to_str(fb->color_range));
+
+		/* Hack to prioritize the plane on the pipe that last set fb */
+		igt_plane_set_pipe(plane, pipe);
 	} else {
 		igt_plane_set_size(plane, 0, 0);
 
@@ -3825,6 +3853,23 @@ void igt_plane_set_fence_fd(igt_plane_t *plane, int fence_fd)
 		fd = -1;
 
 	igt_plane_set_prop_value(plane, IGT_PLANE_IN_FENCE_FD, fd);
+}
+
+/**
+ * igt_plane_set_pipe:
+ * @plane: Target plane pointer
+ * @pipe: The pipe to assign the plane to
+ *
+ */
+void igt_plane_set_pipe(igt_plane_t *plane, igt_pipe_t *pipe)
+{
+	/*
+	 * HACK: Point the global plane back to the local plane.
+	 * This is used to help apply the correct atomic state while
+	 * we're moving away from the single pipe per plane model.
+	 */
+	plane->ref->ref = plane;
+	plane->ref->pipe = pipe;
 }
 
 /**
