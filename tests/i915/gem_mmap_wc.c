@@ -51,6 +51,21 @@ struct local_i915_gem_mmap_v2 {
 
 static int OBJECT_SIZE = 16*1024*1024;
 
+/*
+ * Local WC mmap wrapper. This is used to make sure we go through
+ * the GEM_MMAP IOCTL.
+ * */
+static void *
+local_gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot)
+{
+	void *ptr;
+
+	ptr = __gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	igt_assert(ptr);
+
+	return ptr;
+}
+
 static void set_domain(int fd, uint32_t handle)
 {
 	gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
@@ -61,7 +76,7 @@ mmap_bo(int fd, uint32_t handle)
 {
 	void *ptr;
 
-	ptr = gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	ptr = local_gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
 
 	return ptr;
 }
@@ -177,9 +192,9 @@ test_read_write2(int fd, enum test_read_write order)
 	handle = gem_create(fd, OBJECT_SIZE);
 	set_domain(fd, handle);
 
-	r = gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ);
+	r = local_gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ);
 
-	w = gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	w = local_gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
 
 	if (order == READ_BEFORE_WRITE) {
 		val = *(uint32_t *)r;
@@ -221,7 +236,7 @@ test_coherency(int fd)
 
 	handle = gem_create(fd, OBJECT_SIZE);
 
-	wc = gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	wc = local_gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
 	cpu = gem_mmap__cpu(fd, handle, 0, OBJECT_SIZE, PROT_READ | PROT_WRITE);
 	gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
@@ -299,7 +314,7 @@ test_write_cpu_read_wc(int fd, int force_domain)
 
 	handle = gem_create(fd, OBJECT_SIZE);
 
-	dst = gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ);
+	dst = local_gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ);
 
 	src = gem_mmap__cpu(fd, handle, 0, OBJECT_SIZE, PROT_WRITE);
 
@@ -322,7 +337,7 @@ test_write_gtt_read_wc(int fd)
 	handle = gem_create(fd, OBJECT_SIZE);
 	set_domain(fd, handle);
 
-	dst = gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ);
+	dst = local_gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ);
 
 	src = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_WRITE);
 
