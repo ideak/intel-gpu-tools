@@ -45,6 +45,7 @@
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "igt_stats.h"
+#include "i915/gem_mman.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)

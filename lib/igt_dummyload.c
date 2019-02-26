@@ -39,6 +39,7 @@
 #include "ioctl_wrappers.h"
 #include "sw_sync.h"
 #include "igt_vgem.h"
+#include "i915/gem_mman.h"
 
 /**
  * SECTION:igt_dummyload

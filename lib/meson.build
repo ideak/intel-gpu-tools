@@ -4,6 +4,7 @@ lib_sources = [
 	'i915/gem_scheduler.c',
 	'i915/gem_submission.c',
 	'i915/gem_ring.c',
+	'i915/gem_mman.c',
 	'igt_color_encoding.c',
 	'igt_debugfs.c',
 	'igt_device.c',

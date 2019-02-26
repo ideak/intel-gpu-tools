@@ -42,6 +42,7 @@
 #include "ioctl_wrappers.h"
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
+#include "i915/gem_mman.h"
 
 /**
  * SECTION:igt_fb

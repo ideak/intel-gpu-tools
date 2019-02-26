@@ -45,6 +45,7 @@
 #include "drmtest.h"
 #include "igt_debugfs.h"
 #include "ioctl_wrappers.h"
+#include "i915/gem_mman.h"
 
 #define BO_SIZE (16*1024)
 

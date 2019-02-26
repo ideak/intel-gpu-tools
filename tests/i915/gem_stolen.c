@@ -56,6 +56,7 @@
 #include "drmtest.h"
 #include "drm.h"
 #include "i915_drm.h"
+#include "i915/gem_mman.h"
 
 IGT_TEST_DESCRIPTION("This test verifies the exetended gem_create ioctl,"
 		     " that includes allocation of obj from stolen region");

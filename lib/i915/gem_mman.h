@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015 Intel Corporation
+ * Copyright © 2007, 2011, 2013, 2014, 2019 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,39 +19,37 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
+ *
  */
 
-#ifndef IGT_H
-#define IGT_H
+#ifndef GEM_MMAN_H
+#define GEM_MMAN_H
 
-#include "drmtest.h"
-#include "i915_3d.h"
-#include "i915_pciids.h"
-#include "igt_aux.h"
-#include "igt_core.h"
-#include "igt_core.h"
-#include "igt_debugfs.h"
-#include "igt_draw.h"
-#include "igt_dummyload.h"
-#include "igt_fb.h"
-#include "igt_frame.h"
-#include "igt_alsa.h"
-#include "igt_audio.h"
-#include "igt_gt.h"
-#include "igt_kms.h"
-#include "igt_pm.h"
-#include "igt_stats.h"
-#ifdef HAVE_CHAMELIUM
-#include "igt_chamelium.h"
+void *gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot);
+void *gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
+
+bool gem_mmap__has_wc(int fd);
+void *gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
+
+#ifndef I915_GEM_DOMAIN_WC
+#define I915_GEM_DOMAIN_WC 0x80
 #endif
-#include "instdone.h"
-#include "intel_batchbuffer.h"
-#include "intel_chipset.h"
-#include "intel_io.h"
-#include "ioctl_wrappers.h"
-#include "media_fill.h"
-#include "media_spin.h"
-#include "rendercopy.h"
-#include "i915/gem_mman.h"
 
-#endif /* IGT_H */
+void *__gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot);
+void *__gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
+void *__gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
+
+int gem_munmap(void *ptr, uint64_t size);
+
+/**
+ * gem_require_mmap_wc:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether direct (i.e. cpu access path, bypassing
+ * the gtt) write-combine memory mappings are available. Automatically skips
+ * through igt_require() if not.
+ */
+#define gem_require_mmap_wc(fd) igt_require(gem_mmap__has_wc(fd))
+
+#endif /* GEM_MMAN_H */
+

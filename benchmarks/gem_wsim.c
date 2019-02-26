@@ -53,6 +53,7 @@
 #include "igt_rand.h"
 #include "igt_perf.h"
 #include "sw_sync.h"
+#include "i915/gem_mman.h"
 
 #include "ewma.h"
 

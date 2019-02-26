@@ -84,21 +84,9 @@ int __gem_execbuf_wr(int fd, struct drm_i915_gem_execbuffer2 *execbuf);
 void gem_execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf);
 int __gem_execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf);
 
-void *gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot);
-void *gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
-
-bool gem_mmap__has_wc(int fd);
-void *gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
-
 #ifndef I915_GEM_DOMAIN_WC
 #define I915_GEM_DOMAIN_WC 0x80
 #endif
-
-void *__gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot);
-void *__gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
-void *__gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
-
-int gem_munmap(void *ptr, uint64_t size);
 
 /**
  * gem_require_stolen_support:
@@ -110,16 +98,6 @@ int gem_munmap(void *ptr, uint64_t size);
 #define gem_require_stolen_support(fd) \
 			igt_require(gem_create__has_stolen_support(fd) && \
 				    (gem_total_stolen_size(fd) > 0))
-
-/**
- * gem_require_mmap_wc:
- * @fd: open i915 drm file descriptor
- *
- * Feature test macro to query whether direct (i.e. cpu access path, bypassing
- * the gtt) write-combine memory mappings are available. Automatically skips
- * through igt_require() if not.
- */
-#define gem_require_mmap_wc(fd) igt_require(gem_mmap__has_wc(fd))
 
 int gem_madvise(int fd, uint32_t handle, int state);
 

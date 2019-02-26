@@ -33,6 +33,7 @@
 #include "igt_fb.h"
 #include "ioctl_wrappers.h"
 #include "i830_reg.h"
+#include "i915/gem_mman.h"
 
 #ifndef PAGE_ALIGN
 #ifndef PAGE_SIZE

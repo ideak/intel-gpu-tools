@@ -40,6 +40,7 @@
 #include "ioctl_wrappers.h"
 #include "igt_debugfs.h"
 #include "drmtest.h"
+#include "i915/gem_mman.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
