@@ -109,6 +109,8 @@ lib_source_list =	 	\
 	igt_psr.h		\
 	igt_v3d.c		\
 	igt_v3d.h		\
+	igt_vc4.c		\
+	igt_vc4.h		\
 	$(NULL)
 
 .PHONY: version.h.tmp
