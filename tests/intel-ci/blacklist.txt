@@ -34,7 +34,7 @@ igt@gem_exec_flush@(?!.*basic).*
 igt@gem_exec_gttfill@(?!.*basic).*
 igt@gem_exec_latency(@.*)?
 igt@gem_exec_lut_handle(@.*)?
-igt@gem_exec_nop@(?!.*(basic|signal-all)).*
+igt@gem_exec_nop@(?!.*basic).*
 igt@gem_exec_reloc@(?!.*basic).*
 igt@gem_exec_suspend@(?!.*basic).*
 igt@gem_exec_whisper@(?!normal$).*
