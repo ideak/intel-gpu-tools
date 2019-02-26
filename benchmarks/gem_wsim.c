@@ -737,6 +737,7 @@ init_bb(struct w_step *w, unsigned int flags)
 {
 	const unsigned int arb_period =
 			get_bb_sz(w->preempt_us) / sizeof(uint32_t);
+	const unsigned int mmap_len = ALIGN(w->bb_sz, 4096);
 	unsigned int i;
 	uint32_t *ptr;
 
@@ -746,12 +747,12 @@ init_bb(struct w_step *w, unsigned int flags)
 	gem_set_domain(fd, w->bb_handle,
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
-	ptr = gem_mmap__wc(fd, w->bb_handle, 0, w->bb_sz, PROT_WRITE);
+	ptr = gem_mmap__wc(fd, w->bb_handle, 0, mmap_len, PROT_WRITE);
 
 	for (i = arb_period; i < w->bb_sz / sizeof(uint32_t); i += arb_period)
 		ptr[i] = 0x5 << 23; /* MI_ARB_CHK */
 
-	munmap(ptr, w->bb_sz);
+	munmap(ptr, mmap_len);
 }
 
 static void
@@ -771,7 +772,7 @@ terminate_bb(struct w_step *w, unsigned int flags)
 		batch_start -= 12 * sizeof(uint32_t);
 
 	mmap_start = rounddown(batch_start, PAGE_SIZE);
-	mmap_len = w->bb_sz - mmap_start;
+	mmap_len = ALIGN(w->bb_sz - mmap_start, PAGE_SIZE);
 
 	gem_set_domain(fd, w->bb_handle,
 		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
