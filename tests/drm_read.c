@@ -43,6 +43,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/poll.h>
+#include <pthread.h>
 #include "drm.h"
 
 IGT_TEST_DESCRIPTION("Call read(drm) and see if it behaves.");
@@ -166,6 +167,89 @@ static void test_short_buffer(int in, int nonblock, enum pipe pipe)
 	teardown(fd);
 }
 
+struct short_buffer_wakeup {
+	pthread_mutex_t mutex;
+	pthread_cond_t send, recv;
+	int counter;
+	int done;
+	int fd;
+};
+
+static void *thread_short_buffer_wakeup(void *arg)
+{
+	struct short_buffer_wakeup *w = arg;
+	char buffer; /* events are typically 32 bytes */
+
+	while (!w->done) {
+		/* Short read, does not consume the event. */
+		igt_assert_eq(read(w->fd, &buffer, sizeof(buffer)), 0);
+
+		pthread_mutex_lock(&w->mutex);
+		if (!--w->counter)
+			pthread_cond_signal(&w->send);
+		pthread_cond_wait(&w->recv, &w->mutex);
+		pthread_mutex_unlock(&w->mutex);
+	}
+
+	return NULL;
+}
+
+static void test_short_buffer_wakeup(int in, enum pipe pipe)
+{
+	const int nt = sysconf(_SC_NPROCESSORS_ONLN) + 1;
+	struct short_buffer_wakeup w = {
+		.fd = setup(in, 0),
+	};
+	pthread_t t[nt];
+	char buffer[1024]; /* events are typically 32 bytes */
+
+	pthread_mutex_init(&w.mutex, NULL);
+	pthread_cond_init(&w.send, NULL);
+	pthread_cond_init(&w.recv, NULL);
+
+	for (int n = 0; n < nt; n++)
+		pthread_create(&t[n], NULL, thread_short_buffer_wakeup, &w);
+
+	igt_until_timeout(30) {
+		struct timespec tv;
+		int err = 0;
+
+		pthread_mutex_lock(&w.mutex);
+		w.counter = nt;
+		pthread_cond_broadcast(&w.recv);
+		pthread_mutex_unlock(&w.mutex);
+
+		/* Give each thread a chance to sleep in drm_read() */
+		pthread_yield();
+
+		/* One event should wake all threads as none consume */
+		generate_event(w.fd, pipe);
+
+		clock_gettime(CLOCK_REALTIME, &tv);
+		tv.tv_sec += 5; /* Let's be very generous to the scheduler */
+
+		pthread_mutex_lock(&w.mutex);
+		while (w.counter && !err)
+			err = pthread_cond_timedwait(&w.send, &w.mutex, &tv);
+		pthread_mutex_unlock(&w.mutex);
+
+		igt_assert_f(err == 0,
+			     "Timed out waiting for drm_read() to wakeup on an event\n");
+
+		/* No thread should consume the event */
+		igt_assert(read(w.fd, buffer, sizeof(buffer)) > 0);
+	}
+	pthread_mutex_lock(&w.mutex);
+	w.done = true;
+	pthread_cond_broadcast(&w.recv);
+	pthread_mutex_unlock(&w.mutex);
+
+	for (int n = 0; n < nt; n++)
+		pthread_join(t[n], NULL);
+
+	close(w.fd);
+}
+
 igt_main
 {
 	int fd;
@@ -218,4 +302,7 @@ igt_main
 
 	igt_subtest("short-buffer-nonblock")
 		test_short_buffer(fd, 1, pipe);
+
+	igt_subtest("short-buffer-wakeup")
+		test_short_buffer_wakeup(fd, pipe);
 }
