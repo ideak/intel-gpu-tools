@@ -320,9 +320,11 @@ endif
 subdir('overlay')
 subdir('man')
 
+gtk_doc = dependency('gtk-doc', required : _docs_required)
+
 docs_info = 'No'
 if _build_docs
-	if _build_tests
+	if _build_tests and gtk_doc.found()
 		subdir('docs')
 		docs_info = 'Yes'
 	elif _docs_required
