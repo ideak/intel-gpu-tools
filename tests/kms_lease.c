@@ -43,6 +43,7 @@
 #include <libudev.h>
 
 #include <drm.h>
+#include "igt_device.h"
 
 IGT_TEST_DESCRIPTION("Test of CreateLease.");
 
@@ -877,7 +878,7 @@ static void master_vs_lease(data_t *data)
 	igt_assert(is_master(data->master.fd));
 	igt_assert(is_master(lease_fd));
 
-	do_or_die(drmDropMaster(data->master.fd));
+	igt_device_drop_master(data->master.fd);
 
 	igt_assert(!is_master(data->master.fd));
 	igt_assert(!is_master(lease_fd));
@@ -885,7 +886,7 @@ static void master_vs_lease(data_t *data)
 	igt_assert_eq(drmSetMaster(lease_fd), -1);
 	igt_assert_eq(errno, EINVAL);
 
-	do_or_die(drmSetMaster(data->master.fd));
+	igt_device_set_master(data->master.fd);
 
 	igt_assert(is_master(data->master.fd));
 	igt_assert(is_master(lease_fd));
@@ -908,8 +909,8 @@ static void multimaster_lease(data_t *data)
 
 	_create_simple_lease(master2_fd, data, -EACCES);
 
-	do_or_die(drmDropMaster(data->master.fd));
-	do_or_die(drmSetMaster(master2_fd));
+	igt_device_drop_master(data->master.fd);
+	igt_device_set_master(master2_fd);
 
 	igt_assert(!is_master(data->master.fd));
 	igt_assert(!is_master(lease_fd));
@@ -921,7 +922,7 @@ static void multimaster_lease(data_t *data)
 	close(master2_fd); /* close is an implicit DropMaster */
 	igt_assert(!is_master(lease2_fd));
 
-	do_or_die(drmSetMaster(data->master.fd));
+	igt_device_set_master(data->master.fd);
 	igt_assert(is_master(data->master.fd));
 	igt_assert(is_master(lease_fd));
 

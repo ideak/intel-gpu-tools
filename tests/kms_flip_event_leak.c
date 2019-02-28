@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "igt_device.h"
 
 typedef struct {
 	int drm_fd;
@@ -63,11 +64,9 @@ static void test(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	fd = drm_open_driver(DRIVER_ANY);
 
-	ret = drmDropMaster(data->drm_fd);
-	igt_assert_eq(ret, 0);
+	igt_device_drop_master(data->drm_fd);
 
-	ret = drmSetMaster(fd);
-	igt_assert_eq(ret, 0);
+	igt_device_set_master(fd);
 
 	igt_create_color_fb(fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
@@ -81,8 +80,7 @@ static void test(data_t *data, enum pipe pipe, igt_output_t *output)
 	ret = close(fd);
 	igt_assert_eq(ret, 0);
 
-	ret = drmSetMaster(data->drm_fd);
-	igt_assert_eq(ret, 0);
+	igt_device_set_master(data->drm_fd);
 
 	igt_plane_set_fb(primary, NULL);
 	igt_output_set_pipe(output, PIPE_ANY);

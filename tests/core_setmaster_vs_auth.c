@@ -39,6 +39,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "igt_device.h"
+
 IGT_TEST_DESCRIPTION("Check that drop/setMaster correctly transfer master "
 		     "state");
 
@@ -56,8 +58,8 @@ igt_simple_main
 
 	/* Open an fd an make it master */
 	master2 = drm_open_driver(DRIVER_ANY);
-	do_or_die(drmDropMaster(master1));
-	do_or_die(drmSetMaster(master2));
+	igt_device_drop_master(master1);
+	igt_device_set_master(master2);
 
 	/* Auth shouldn't work since we're authenticating with a different
 	 * master than the one we got the magic from. */
