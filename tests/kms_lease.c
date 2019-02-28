@@ -373,6 +373,65 @@ static void page_flip_implicit_plane(data_t *data)
 		     connector_id_to_output(&data->master.display, data->connector_id));
 }
 
+static void setcrtc_implicit_plane(data_t *data)
+{
+	uint32_t object_ids[3];
+	struct local_drm_mode_create_lease mcl;
+	drmModePlaneRes *plane_resources;
+	uint32_t wrong_plane_id = 0;
+	igt_output_t *output =
+		connector_id_to_output(&data->master.display,
+				       data->connector_id);
+	drmModeModeInfo *mode = igt_output_get_mode(output);
+	int i;
+
+	/* find a plane which isn't the primary one for us */
+	plane_resources = drmModeGetPlaneResources(data->master.fd);
+	for (i = 0; i < plane_resources->count_planes; i++) {
+		if (plane_resources->planes[i] != data->plane_id) {
+			wrong_plane_id = plane_resources->planes[i];
+			break;
+		}
+	}
+	drmModeFreePlaneResources(plane_resources);
+	igt_require(wrong_plane_id);
+
+	mcl.object_ids = (uint64_t) (uintptr_t) &object_ids[0];
+	mcl.object_count = 0;
+	mcl.flags = 0;
+
+	object_ids[mcl.object_count++] = data->connector_id;
+	object_ids[mcl.object_count++] = data->crtc_id;
+
+	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 0);
+	do_or_die(create_lease(data->master.fd, &mcl));
+	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+
+	/* Set a mode on the leased output */
+	igt_assert_eq(0, prepare_crtc(&data->master, data->connector_id, data->crtc_id));
+
+	/* sanity check */
+	do_or_die(drmModeSetCrtc(data->master.fd, data->crtc_id, -1,
+				 0, 0, object_ids, 1, mode));
+	do_or_die(drmModeSetCrtc(mcl.fd, data->crtc_id, -1,
+				 0, 0, object_ids, 1, mode));
+	close(mcl.fd);
+
+	object_ids[mcl.object_count++] = wrong_plane_id;
+	do_or_die(create_lease(data->master.fd, &mcl));
+
+	igt_assert_eq(drmModeSetCrtc(mcl.fd, data->crtc_id, -1,
+				     0, 0, object_ids, 1, mode),
+		      -EACCES);
+	/* make sure we are allowed to turn the CRTC off */
+	do_or_die(drmModeSetCrtc(mcl.fd, data->crtc_id,
+				 0, 0, 0, NULL, 0, NULL));
+	close(mcl.fd);
+
+	cleanup_crtc(&data->master,
+		     connector_id_to_output(&data->master.display, data->connector_id));
+}
+
 /* Test listing lessees */
 static void lessee_list(data_t *data)
 {
@@ -1087,6 +1146,7 @@ igt_main
 		{ "lease_invalid_crtc", lease_invalid_crtc },
 		{ "lease_invalid_plane", lease_invalid_plane },
 		{ "page_flip_implicit_plane", page_flip_implicit_plane },
+		{ "setcrtc_implicit_plane", setcrtc_implicit_plane },
 		{ }
 	}, *f;
 
