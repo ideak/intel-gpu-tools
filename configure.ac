@@ -256,6 +256,9 @@ AC_ARG_ENABLE(werror,
 			     [Fail on warnings]),
 	      [], [enable_werror=no])
 
+# disable "warning: pointer of type ‘void *’ used in arithmetic"
+AS_COMPILER_FLAG([-Wno-pointer-arith], [CWARNFLAGS+=" -Wno-pointer-arith"], [])
+
 if test "x$enable_debug" = xyes; then
 	AS_COMPILER_FLAG([-g3], [DEBUG_CFLAGS="-g3"], [DEBUG_CFLAGS="-g"])
 	AS_COMPILER_FLAG([-Og], [DEBUG_CFLAGS+=" -Og -Wno-maybe-uninitialized"], # disable maybe-uninitialized due to false positives
