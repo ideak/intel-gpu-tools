@@ -468,6 +468,94 @@ static void cursor_implicit_plane(data_t *data)
 		     connector_id_to_output(&data->master.display, data->connector_id));
 }
 
+static void atomic_implicit_crtc(data_t *data)
+{
+	uint32_t object_ids[3];
+	struct local_drm_mode_create_lease mcl;
+	drmModeRes *resources;
+	drmModeObjectPropertiesPtr props;
+	uint32_t wrong_crtc_id = 0;
+	uint32_t crtc_id_prop = 0;
+	drmModeAtomicReqPtr req = NULL;
+	int ret;
+
+	igt_require(data->master.display.is_atomic);
+
+	mcl.object_ids = (uint64_t) (uintptr_t) &object_ids[0];
+	mcl.object_count = 0;
+	mcl.flags = 0;
+
+	object_ids[mcl.object_count++] = data->connector_id;
+	object_ids[mcl.object_count++] = data->plane_id;
+
+	/* find a plane which isn't the primary one for us */
+	resources = drmModeGetResources(data->master.fd);
+	igt_assert(resources);
+	for (int i = 0; i < resources->count_crtcs; i++) {
+		if (resources->crtcs[i] != data->crtc_id) {
+			wrong_crtc_id = resources->crtcs[i];
+			break;
+		}
+	}
+	drmModeFreeResources(resources);
+	igt_require(wrong_crtc_id);
+	object_ids[mcl.object_count++] = wrong_crtc_id;
+
+	/* find the CRTC_ID prop, it's global */
+	props = drmModeObjectGetProperties(data->master.fd, data->plane_id,
+					   DRM_MODE_OBJECT_PLANE);
+	igt_assert(props);
+	for (int i = 0; i < props->count_props; i++) {
+		drmModePropertyPtr prop = drmModeGetProperty(data->master.fd,
+							     props->props[i]);
+		if (strcmp(prop->name, "CRTC_ID") == 0)
+			crtc_id_prop = props->props[i];
+
+		printf("prop name %s, prop id %u, prop id %u\n",
+		       prop->name, props->props[i], prop->prop_id);
+		drmModeFreeProperty(prop);
+		if (crtc_id_prop)
+			break;
+	}
+	drmModeFreeObjectProperties(props);
+	igt_assert(crtc_id_prop);
+
+	do_or_die(create_lease(data->master.fd, &mcl));
+	do_or_die(drmSetClientCap(mcl.fd, DRM_CLIENT_CAP_ATOMIC, 1));
+
+	/* check CRTC_ID property on the plane */
+	req = drmModeAtomicAlloc();
+	igt_assert(req);
+	ret = drmModeAtomicAddProperty(req, data->plane_id,
+				       crtc_id_prop, data->crtc_id);
+	igt_assert(ret >= 0);
+
+	/* sanity check */
+	ret = drmModeAtomicCommit(data->master.fd, req, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
+	igt_assert(ret == 0 || ret == -EINVAL);
+
+	ret = drmModeAtomicCommit(mcl.fd, req, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
+	igt_assert(ret == -EACCES);
+	drmModeAtomicFree(req);
+
+	/* check CRTC_ID property on the connector */
+	req = drmModeAtomicAlloc();
+	igt_assert(req);
+	ret = drmModeAtomicAddProperty(req, data->connector_id,
+				       crtc_id_prop, data->crtc_id);
+	igt_assert(ret >= 0);
+
+	/* sanity check */
+	ret = drmModeAtomicCommit(data->master.fd, req, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
+	igt_assert(ret == 0 || ret == -EINVAL);
+
+	ret = drmModeAtomicCommit(mcl.fd, req, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
+	igt_assert(ret == -EACCES);
+	drmModeAtomicFree(req);
+
+	close(mcl.fd);
+}
+
 /* Test listing lessees */
 static void lessee_list(data_t *data)
 {
@@ -1195,6 +1283,7 @@ igt_main
 		{ "page_flip_implicit_plane", page_flip_implicit_plane },
 		{ "setcrtc_implicit_plane", setcrtc_implicit_plane },
 		{ "cursor_implicit_plane", cursor_implicit_plane },
+		{ "atomic_implicit_crtc", atomic_implicit_crtc },
 		{ }
 	}, *f;
 
