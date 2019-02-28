@@ -131,7 +131,6 @@ struct w_step
 	struct drm_i915_gem_relocation_entry reloc[4];
 	unsigned long bb_sz;
 	uint32_t bb_handle;
-	uint32_t *mapped_batch;
 	uint32_t *seqno_value;
 	uint32_t *seqno_address;
 	uint32_t *rt0_value;
@@ -139,7 +138,6 @@ struct w_step
 	uint32_t *rt1_address;
 	uint32_t *latch_value;
 	uint32_t *latch_address;
-	unsigned int mapped_len;
 };
 
 DECLARE_EWMA(uint64_t, rt, 4, 2)
@@ -824,9 +822,6 @@ terminate_bb(struct w_step *w, unsigned int flags)
 	}
 
 	*cs = bbe;
-
-	w->mapped_batch = ptr;
-	w->mapped_len = mmap_len;
 }
 
 static const unsigned int eb_engine_map[NUM_ENGINES] = {
