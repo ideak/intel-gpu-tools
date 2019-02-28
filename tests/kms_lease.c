@@ -714,6 +714,10 @@ static void lease_again(data_t *data)
 	terminate_lease(&lease_b);
 }
 
+#define assert_unleased(ret) \
+	igt_assert_f((ret) == -EINVAL || (ret) == -ENOENT, \
+		     "wrong return code %i, %s\n", ret, \
+		     strerror(ret))
 /* Test leasing an invalid connector */
 static void lease_invalid_connector(data_t *data)
 {
@@ -726,7 +730,7 @@ static void lease_invalid_connector(data_t *data)
 	data->connector_id = 0xbaadf00d;
 	ret = make_lease(data, &lease);
 	data->connector_id = save_connector_id;
-	igt_assert_eq(ret, -EINVAL);
+	assert_unleased(ret);
 }
 
 /* Test leasing an invalid crtc */
@@ -741,7 +745,7 @@ static void lease_invalid_crtc(data_t *data)
 	data->crtc_id = 0xbaadf00d;
 	ret = make_lease(data, &lease);
 	data->crtc_id = save_crtc_id;
-	igt_assert_eq(ret, -EINVAL);
+	assert_unleased(ret);
 }
 
 static void lease_invalid_plane(data_t *data)
@@ -755,7 +759,7 @@ static void lease_invalid_plane(data_t *data)
 	data->plane_id = 0xbaadf00d;
 	ret = make_lease(data, &lease);
 	data->plane_id = save_plane_id;
-	igt_assert_eq(ret, -EINVAL);
+	assert_unleased(ret);
 }
 
 
