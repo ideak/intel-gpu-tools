@@ -39,6 +39,7 @@
 #include "drm_fourcc.h"
 
 #include "igt_rand.h"
+#include "igt_device.h"
 
 uint32_t gem_bo;
 uint32_t gem_bo_small;
@@ -667,6 +668,45 @@ static void prop_tests(int fd)
 
 }
 
+static void master_tests(int fd)
+{
+	struct drm_mode_fb_cmd2 f = {};
+
+	f.width = 1024;
+	f.height = 1024;
+	f.pixel_format = DRM_FORMAT_XRGB8888;
+	f.pitches[0] = 1024*4;
+
+	igt_fixture {
+		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
+			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+		igt_assert(gem_bo);
+
+		f.handles[0] = gem_bo;
+
+		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) == 0);
+	}
+
+	igt_subtest("master-rmfb") {
+		int master2_fd;
+
+		igt_device_drop_master(fd);
+
+		master2_fd = drm_open_driver_master(DRIVER_ANY);
+
+		igt_assert_eq(rmfb(master2_fd, f.fb_id), -ENOENT);
+
+		igt_device_drop_master(master2_fd);
+		close(master2_fd);
+
+		igt_device_set_master(fd);
+	}
+
+	igt_fixture
+		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
+
+}
+
 static bool has_addfb2_iface(int fd)
 {
 	struct local_drm_mode_fb_cmd2 f = {};
@@ -712,6 +752,8 @@ igt_main
 	tiling_tests(fd);
 
 	prop_tests(fd);
+
+	master_tests(fd);
 
 	igt_fixture
 		close(fd);
