@@ -16,7 +16,6 @@ TESTS_progs = \
 	core_getclient \
 	core_getstats \
 	core_getversion \
-	core_prop_blob \
 	core_setmaster_vs_auth \
 	debugfs_test \
 	drm_import_export \
@@ -60,6 +59,7 @@ TESTS_progs = \
 	kms_plane_lowres \
 	kms_plane_multiple \
 	kms_plane_scaling \
+	kms_prop_blob \
 	kms_properties \
 	kms_psr \
 	kms_psr2_su \
@@ -67,13 +67,13 @@ TESTS_progs = \
 	kms_rmfb \
 	kms_rotation_crc \
 	kms_selftest \
+	kms_sequence \
 	kms_setmode \
 	kms_sysfs_edid_timing \
 	kms_tv_load_detect \
 	kms_universal_plane \
 	kms_vblank \
 	kms_vrr \
-	kms_sequence \
 	meta_test \
 	perf \
 	perf_pmu \

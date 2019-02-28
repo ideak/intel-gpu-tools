@@ -1,7 +1,6 @@
 # Keep alphabetically sorted by default
 
 igt@core_auth@basic-auth
-igt@core_prop_blob@basic
 igt@debugfs_test@read_all_entries
 igt@gem_basic@bad-close
 igt@gem_basic@create-close
@@ -185,6 +184,7 @@ igt@kms_chamelium@hdmi-crc-fast
 igt@kms_chamelium@vga-hpd-fast
 igt@kms_chamelium@vga-edid-read
 igt@kms_chamelium@common-hpd-after-suspend
+igt@kms_prop_blob@basic
 igt@kms_cursor_legacy@basic-busy-flip-before-cursor-atomic
 igt@kms_cursor_legacy@basic-busy-flip-before-cursor-legacy
 igt@kms_cursor_legacy@basic-flip-after-cursor-atomic
