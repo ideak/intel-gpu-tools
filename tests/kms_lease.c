@@ -432,6 +432,42 @@ static void setcrtc_implicit_plane(data_t *data)
 		     connector_id_to_output(&data->master.display, data->connector_id));
 }
 
+static void cursor_implicit_plane(data_t *data)
+{
+	uint32_t object_ids[3];
+	struct local_drm_mode_create_lease mcl;
+
+	mcl.object_ids = (uint64_t) (uintptr_t) &object_ids[0];
+	mcl.object_count = 0;
+	mcl.flags = 0;
+
+	object_ids[mcl.object_count++] = data->connector_id;
+	object_ids[mcl.object_count++] = data->crtc_id;
+
+	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 0);
+	do_or_die(create_lease(data->master.fd, &mcl));
+	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+
+	/* Set a mode on the leased output */
+	igt_assert_eq(0, prepare_crtc(&data->master, data->connector_id, data->crtc_id));
+
+	/* sanity check */
+	do_or_die(drmModeSetCursor(data->master.fd, data->crtc_id, 0, 0, 0));
+	do_or_die(drmModeSetCursor(mcl.fd, data->crtc_id, 0, 0, 0));
+	close(mcl.fd);
+
+	/* primary plane is never the cursor */
+	object_ids[mcl.object_count++] = data->plane_id;
+	do_or_die(create_lease(data->master.fd, &mcl));
+
+	igt_assert_eq(drmModeSetCursor(mcl.fd, data->crtc_id, 0, 0, 0),
+		      -EACCES);
+	close(mcl.fd);
+
+	cleanup_crtc(&data->master,
+		     connector_id_to_output(&data->master.display, data->connector_id));
+}
+
 /* Test listing lessees */
 static void lessee_list(data_t *data)
 {
@@ -1147,6 +1183,7 @@ igt_main
 		{ "lease_invalid_plane", lease_invalid_plane },
 		{ "page_flip_implicit_plane", page_flip_implicit_plane },
 		{ "setcrtc_implicit_plane", setcrtc_implicit_plane },
+		{ "cursor_implicit_plane", cursor_implicit_plane },
 		{ }
 	}, *f;
 
