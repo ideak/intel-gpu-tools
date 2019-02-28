@@ -798,12 +798,16 @@ static void run_test(data_t *data, void (*testfunc)(data_t *))
 		      "no valid crtc/connector combinations found\n");
 }
 
+#define assert_double_id_err(ret) \
+	igt_assert_f((ret) == -EBUSY || (ret) == -ENOSPC, \
+		     "wrong return code %i, %s\n", ret, \
+		     strerror(ret))
 static void invalid_create_leases(data_t *data)
 {
 	uint32_t object_ids[4];
 	struct local_drm_mode_create_lease mcl;
 	drmModeRes *resources;
-	int tmp_fd;
+	int tmp_fd, ret;
 
 	/* empty lease */
 	mcl.object_ids = 0;
@@ -882,7 +886,8 @@ static void invalid_create_leases(data_t *data)
 	object_ids[3] = object_ids[2];
 	mcl.object_count = 4;
 	/* Note: the ENOSPC is from idr double-insertion failing */
-	igt_assert_eq(create_lease(data->master.fd, &mcl), -ENOSPC);
+	ret = create_lease(data->master.fd, &mcl);
+	assert_double_id_err(ret);
 
 	/* no encoder leasing */
 	resources = drmModeGetResources(data->master.fd);
@@ -1095,7 +1100,7 @@ static void implicit_plane_lease(data_t *data)
 	uint32_t object_ids[3];
 	struct local_drm_mode_create_lease mcl;
 	struct local_drm_mode_get_lease mgl;
-
+	int ret;
 	uint32_t cursor_id = igt_pipe_get_plane_type(&data->master.display.pipes[0],
 						     DRM_PLANE_TYPE_CURSOR)->drm_plane->plane_id;
 
@@ -1128,11 +1133,13 @@ static void implicit_plane_lease(data_t *data)
 	/* check that implicit lease doesn't lead to confusion when
 	 * explicitly adding primary plane */
 	mcl.object_count = 3;
-	igt_assert_eq(create_lease(data->master.fd, &mcl), -ENOSPC);
+	ret = create_lease(data->master.fd, &mcl);
+	assert_double_id_err(ret);
 
 	/* same for the cursor */
 	object_ids[2] = cursor_id;
-	igt_assert_eq(create_lease(data->master.fd, &mcl), -ENOSPC);
+	ret = create_lease(data->master.fd, &mcl);
+	assert_double_id_err(ret);
 
 	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 }
