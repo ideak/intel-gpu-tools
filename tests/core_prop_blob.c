@@ -33,27 +33,6 @@
 
 IGT_TEST_DESCRIPTION("Tests behaviour of mass-data 'blob' properties.");
 
-struct local_drm_mode_get_blob {
-	uint32_t blob_id;
-	uint32_t length;
-	uint64_t data;
-};
-struct local_drm_mode_create_blob {
-	uint64_t data;
-	uint32_t length;
-	uint32_t blob_id;
-};
-struct local_drm_mode_destroy_blob {
-	uint32_t blob_id;
-};
-
-#define LOCAL_DRM_IOCTL_MODE_GETPROPBLOB	DRM_IOWR(0xAC, \
-						struct local_drm_mode_get_blob)
-#define LOCAL_DRM_IOCTL_MODE_CREATEPROPBLOB	DRM_IOWR(0xBD, \
-						struct local_drm_mode_create_blob)
-#define LOCAL_DRM_IOCTL_MODE_DESTROYPROPBLOB	DRM_IOWR(0xBE, \
-						struct local_drm_mode_destroy_blob)
-
 static const struct drm_mode_modeinfo test_mode_valid = {
 	.clock = 1234,
 	.hdisplay = 640,
@@ -80,33 +59,33 @@ static const struct drm_mode_modeinfo test_mode_valid = {
 
 static void igt_require_propblob(int fd)
 {
-	struct local_drm_mode_create_blob c;
-	struct local_drm_mode_destroy_blob d;
+	struct drm_mode_create_blob c;
+	struct drm_mode_destroy_blob d;
 	uint32_t blob_data;
 	c.data = (uintptr_t) &blob_data;
 	c.length = sizeof(blob_data);
 
-	igt_require(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_CREATEPROPBLOB, &c) == 0);
+	igt_require(drmIoctl(fd, DRM_IOCTL_MODE_CREATEPROPBLOB, &c) == 0);
 	d.blob_id = c.blob_id;
-	igt_require(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_DESTROYPROPBLOB, &d) == 0);
+	igt_require(drmIoctl(fd, DRM_IOCTL_MODE_DESTROYPROPBLOB, &d) == 0);
 }
 
 static int
 validate_prop(int fd, uint32_t prop_id)
 {
-	struct local_drm_mode_get_blob get;
+	struct drm_mode_get_blob get;
 	struct drm_mode_modeinfo ret_mode;
 
 	get.blob_id = prop_id;
 	get.length = 0;
 	get.data = (uintptr_t) 0;
-	ioctl_or_ret_errno(fd, LOCAL_DRM_IOCTL_MODE_GETPROPBLOB, &get);
+	ioctl_or_ret_errno(fd, DRM_IOCTL_MODE_GETPROPBLOB, &get);
 
 	if (get.length != sizeof(test_mode_valid))
 		return ENOMEM;
 
 	get.data = (uintptr_t) &ret_mode;
-	ioctl_or_ret_errno(fd, LOCAL_DRM_IOCTL_MODE_GETPROPBLOB, &get);
+	ioctl_or_ret_errno(fd, DRM_IOCTL_MODE_GETPROPBLOB, &get);
 
 	if (memcmp(&ret_mode, &test_mode_valid, sizeof(test_mode_valid)) != 0)
 		return EINVAL;
@@ -117,12 +96,12 @@ validate_prop(int fd, uint32_t prop_id)
 static uint32_t
 create_prop(int fd)
 {
-	struct local_drm_mode_create_blob create;
+	struct drm_mode_create_blob create;
 
 	create.length = sizeof(test_mode_valid);
 	create.data = (uintptr_t) &test_mode_valid;
 
-	do_ioctl(fd, LOCAL_DRM_IOCTL_MODE_CREATEPROPBLOB, &create);
+	do_ioctl(fd, DRM_IOCTL_MODE_CREATEPROPBLOB, &create);
 	igt_assert_neq_u32(create.blob_id, 0);
 
 	return create.blob_id;
@@ -131,10 +110,10 @@ create_prop(int fd)
 static int
 destroy_prop(int fd, uint32_t prop_id)
 {
-	struct local_drm_mode_destroy_blob destroy;
+	struct drm_mode_destroy_blob destroy;
 
 	destroy.blob_id = prop_id;
-	ioctl_or_ret_errno(fd, LOCAL_DRM_IOCTL_MODE_DESTROYPROPBLOB, &destroy);
+	ioctl_or_ret_errno(fd, DRM_IOCTL_MODE_DESTROYPROPBLOB, &destroy);
 
 	return 0;
 }
@@ -142,8 +121,8 @@ destroy_prop(int fd, uint32_t prop_id)
 static void
 test_validate(int fd)
 {
-	struct local_drm_mode_create_blob create;
-	struct local_drm_mode_get_blob get;
+	struct drm_mode_create_blob create;
+	struct drm_mode_get_blob get;
 	char too_small[32];
 	uint32_t prop_id;
 
@@ -152,24 +131,24 @@ test_validate(int fd)
 	/* Outlandish size. */
 	create.length = 0x10000;
 	create.data = (uintptr_t) &too_small;
-	do_ioctl_err(fd, LOCAL_DRM_IOCTL_MODE_CREATEPROPBLOB, &create, EFAULT);
+	do_ioctl_err(fd, DRM_IOCTL_MODE_CREATEPROPBLOB, &create, EFAULT);
 
 	/* Outlandish address. */
 	create.length = sizeof(test_mode_valid);
 	create.data = (uintptr_t) 0xdeadbeee;
-	do_ioctl_err(fd, LOCAL_DRM_IOCTL_MODE_CREATEPROPBLOB, &create, EFAULT);
+	do_ioctl_err(fd, DRM_IOCTL_MODE_CREATEPROPBLOB, &create, EFAULT);
 
 	/* When we pass an incorrect size, the kernel should correct us. */
 	prop_id = create_prop(fd);
 	get.blob_id = prop_id;
 	get.length = sizeof(too_small);
 	get.data = (uintptr_t) too_small;
-	do_ioctl(fd, LOCAL_DRM_IOCTL_MODE_GETPROPBLOB, &get);
+	do_ioctl(fd, DRM_IOCTL_MODE_GETPROPBLOB, &get);
 	igt_assert_eq_u32(get.length, sizeof(test_mode_valid));
 
 	get.blob_id = prop_id;
 	get.data = (uintptr_t) 0xdeadbeee;
-	do_ioctl_err(fd, LOCAL_DRM_IOCTL_MODE_CREATEPROPBLOB, &create, EFAULT);
+	do_ioctl_err(fd, DRM_IOCTL_MODE_CREATEPROPBLOB, &create, EFAULT);
 }
 
 static void
