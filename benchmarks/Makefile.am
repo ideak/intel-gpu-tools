@@ -24,5 +24,5 @@ gem_exec_tracer_la_LIBADD = -ldl
 gem_latency_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_latency_LDADD = $(LDADD) -lpthread
 gem_syslatency_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
-gem_syslatency_LDADD = $(LDADD) -lpthread -lrt
+gem_syslatency_LDADD = $(LDADD) -lpthread
 gem_wsim_LDADD = $(LDADD) $(top_builddir)/lib/libigt_perf.la -lpthread

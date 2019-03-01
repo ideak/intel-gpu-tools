@@ -128,10 +128,7 @@ gem_userptr_blits_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_userptr_blits_LDADD = $(LDADD) -lpthread
 perf_pmu_LDADD = $(LDADD) $(top_builddir)/lib/libigt_perf.la
 
-gem_eio_LDADD = $(LDADD) -lrt
-gem_wait_LDADD = $(LDADD) -lrt
-kms_flip_LDADD = $(LDADD) -lrt -lpthread
-pm_rc6_residency_LDADD = $(LDADD) -lrt
+kms_flip_LDADD = $(LDADD) -lpthread
 
 prime_nv_test_CFLAGS = $(AM_CFLAGS) $(DRM_NOUVEAU_CFLAGS)
 prime_nv_test_LDADD = $(LDADD) $(DRM_NOUVEAU_LIBS)

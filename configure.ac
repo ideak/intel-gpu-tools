@@ -58,12 +58,12 @@ AX_GCC_FUNC_ATTRIBUTE([constructor])
 dnl Check for POSIX timers
 AC_CHECK_FUNCS(timer_create, [], [
 	AC_CHECK_LIB(rt, timer_create, [
-		AC_DEFINE(HAVE_TIMER_CREATE, 1)
 		TIMER_LIBS="-lrt"
 		], [
 		AC_CHECK_LIB(pthread, timer_create, [
-			AC_DEFINE(HAVE_TIMER_CREATE, 1)
 			TIMER_LIBS="-lpthread"
+		], [
+		AC_MSG_ERROR([Failed to find library containing timer_create.])
 		])
 	])
 ])
