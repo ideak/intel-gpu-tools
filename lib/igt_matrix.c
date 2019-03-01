@@ -71,6 +71,9 @@ struct igt_mat4 igt_matrix_identity(void)
 
 /**
  * igt_matrix_scale:
+ * @x: x scaling amount
+ * @y: y scaling amount
+ * @z: z scaling amount
  *
  * Returns:
  * An scaling matrix.
@@ -89,6 +92,9 @@ struct igt_mat4 igt_matrix_scale(float x, float y, float z)
 
 /**
  * igt_matrix_translate:
+ * @x: x translation amount
+ * @y: y translation amount
+ * @z: z translation amount
  *
  * Returns:
  * A translation matrix.
@@ -110,6 +116,8 @@ struct igt_mat4 igt_matrix_translate(float x, float y, float z)
 
 /**
  * igt_matrix_multiply:
+ * @a: Left matrix
+ * @b: Right matrix
  *
  * Multiply two matrices together. @a is on the left,
  * @b on the right.

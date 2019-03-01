@@ -55,6 +55,8 @@ struct igt_mat4 igt_matrix_multiply(const struct igt_mat4 *a,
 
 /**
  * igt_matrix_transform:
+ * @m: The matrix
+ * @v: The vector
  *
  * Transform the vector @v by the matrix @m. @m is on the left,
  * @v on the right.
