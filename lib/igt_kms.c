@@ -4048,6 +4048,7 @@ void igt_wait_for_vblank(int drm_fd, enum pipe pipe)
 
 /**
  * igt_enable_connectors:
+ * @drm_fd: A drm file descriptor
  *
  * Force connectors to be enabled where this is known to work well. Use
  * #igt_reset_connectors to revert the changes.
