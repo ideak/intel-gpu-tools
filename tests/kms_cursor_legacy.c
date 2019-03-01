@@ -43,6 +43,8 @@
 #define DRM_CAP_CURSOR_HEIGHT 0x9
 #endif
 
+#define PAGE_SIZE	4096
+
 IGT_TEST_DESCRIPTION("Stress legacy cursor ioctl");
 
 igt_pipe_crc_t *pipe_crc;
@@ -63,7 +65,7 @@ static void stress(igt_display_t *display,
 		num_children = -num_children;
 	}
 
-	results = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	results = mmap(NULL, PAGE_SIZE, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(results != MAP_FAILED);
 
 	memset(&arg, 0, sizeof(arg));
@@ -146,7 +148,7 @@ static void stress(igt_display_t *display,
 	}
 
 	gem_close(display->drm_fd, arg.handle);
-	munmap(results, 4096);
+	munmap(results, PAGE_SIZE);
 }
 
 static igt_output_t *set_fb_on_crtc(igt_display_t *display, enum pipe pipe, struct igt_fb *fb_info)
@@ -387,7 +389,7 @@ static void flip(igt_display_t *display,
 	uint64_t *results;
 	struct igt_fb fb_info, fb_info2, argb_fb, cursor_fb, cursor_fb2;
 
-	results = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	results = mmap(NULL, PAGE_SIZE, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(results != MAP_FAILED);
 
 	flip_pipe = find_connected_pipe(display, !!flip_pipe);
@@ -451,7 +453,7 @@ static void flip(igt_display_t *display,
 	}
 	igt_waitchildren();
 
-	munmap(results, 4096);
+	munmap(results, PAGE_SIZE);
 
 	igt_remove_fb(display->drm_fd, &fb_info);
 	if (flip_pipe != cursor_pipe)
@@ -690,7 +692,7 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 	 * variations caused by cpu speed changing are eliminated.
 	 */
 	if (target > 1) {
-		shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+		shared = mmap(NULL, PAGE_SIZE, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 		igt_assert(shared != MAP_FAILED);
 
 		cpu = sched_getcpu();
@@ -754,7 +756,7 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 	if (target > 1) {
 		shared[0] = 1;
 		igt_waitchildren();
-		munmap((void *)shared, 4096);
+		munmap((void *)shared, PAGE_SIZE);
 		sched_setaffinity(0, sizeof(oldmask), &oldmask);
 	}
 
@@ -870,7 +872,7 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 		igt_require(drmGetCap(display->drm_fd, DRM_CAP_CRTC_IN_VBLANK_EVENT, &val) == 0);
 	}
 
-	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	shared = mmap(NULL, PAGE_SIZE, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(shared != MAP_FAILED);
 
 	igt_fail_on(modeset && !atomic);
@@ -1020,6 +1022,7 @@ done:
 	igt_remove_fb(display->drm_fd, &fb_info);
 	igt_remove_fb(display->drm_fd, &fb2_info);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
+	munmap((void *)shared, PAGE_SIZE);
 }
 
 static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloops)
@@ -1037,7 +1040,7 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 	if (mode >= flip_test_atomic)
 		igt_require(display->is_atomic);
 
-	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	shared = mmap(NULL, PAGE_SIZE, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(shared != MAP_FAILED);
 
 	igt_require((output = set_fb_on_crtc(display, pipe, &fb_info)));
@@ -1103,7 +1106,7 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 
 	igt_remove_fb(display->drm_fd, &fb_info);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
-	munmap((void *)shared, 4096);
+	munmap((void *)shared, PAGE_SIZE);
 	if (argb_fb.gem_handle)
 		igt_remove_fb(display->drm_fd, &argb_fb);
 	if (cursor_fb2.gem_handle)
@@ -1123,7 +1126,7 @@ static void two_screens_cursor_vs_flip(igt_display_t *display, int nloops, bool 
 	};
 	igt_output_t *outputs[2];
 
-	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	shared = mmap(NULL, PAGE_SIZE, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(shared != MAP_FAILED);
 
 	if (atomic)
@@ -1210,7 +1213,7 @@ static void two_screens_cursor_vs_flip(igt_display_t *display, int nloops, bool 
 	igt_remove_fb(display->drm_fd, &fb_info[0]);
 	igt_remove_fb(display->drm_fd, &fb_info[1]);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
-	munmap((void *)shared, 4096);
+	munmap((void *)shared, PAGE_SIZE);
 }
 
 static void flip_vs_cursor_crc(igt_display_t *display, bool atomic)
