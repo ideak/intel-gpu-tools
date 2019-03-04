@@ -68,7 +68,6 @@
 #define TEST_ENOENT		(1 << 22)
 #define TEST_FENCE_STRESS	(1 << 23)
 #define TEST_VBLANK_RACE	(1 << 24)
-#define TEST_RPM		(1 << 25)
 #define TEST_SUSPEND		(1 << 26)
 #define TEST_TS_CONT		(1 << 27)
 #define TEST_BO_TOOBIG		(1 << 28)
@@ -809,9 +808,6 @@ static unsigned int run_test_step(struct test_output *o)
 			     "failed to disable output: %s\n",
 			     strerror(errno));
 
-	if (o->flags & TEST_RPM)
-		igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
-
 	if (o->flags & TEST_SUSPEND)
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 					      SUSPEND_TEST_NONE);
@@ -1330,9 +1326,6 @@ static int run_test(int duration, int flags)
 
 	igt_require((flags & TEST_HANG) == 0 || !is_wedged(drm_fd));
 
-	if (flags & TEST_RPM)
-		igt_require(igt_setup_runtime_pm());
-
 	resources = drmModeGetResources(drm_fd);
 	igt_require(resources);
 
@@ -1579,10 +1572,6 @@ int main(int argc, char **argv)
 		if (tests[i].flags & TEST_NO_2X_OUTPUT)
 			continue;
 
-		/* code doesn't disable all crtcs, so skip rpm tests */
-		if (tests[i].flags & TEST_RPM)
-			continue;
-
 		igt_subtest_f( "2x-%s", tests[i].name)
 			run_pair(tests[i].duration, tests[i].flags);
 	}
@@ -1599,10 +1588,6 @@ int main(int argc, char **argv)
 			run_test(tests[i].duration, tests[i].flags);
 
 		if (tests[i].flags & TEST_NO_2X_OUTPUT)
-			continue;
-
-		/* code doesn't disable all crtcs, so skip rpm tests */
-		if (tests[i].flags & TEST_RPM)
 			continue;
 
 		igt_subtest_f( "2x-%s-interruptible", tests[i].name)
