@@ -609,22 +609,24 @@ static bool is_wedged(int fd)
 
 static int set_mode(struct test_output *o, uint32_t fb, int x, int y)
 {
-	int n;
+	int n, ret;
 
 	for (n = o->count - 1; n >= 0; n--) {
+		uint32_t buffer_id = fb, x_crtc = x, y_crtc = y;
+		uint32_t *conn = &o->_connector[n];
+		int count = 1;
+		drmModeModeInfoPtr mode = &o->kmode[n];
+
 		if (fb == 0) {
-			int ret = drmModeSetCrtc(drm_fd, o->_crtc[n],
-						 0, 0, 0,
-						 0, 0, 0);
-			if (ret)
-				return ret;
-		} else {
-			int ret = drmModeSetCrtc(drm_fd, o->_crtc[n],
-						 fb, x, y,
-						 &o->_connector[n], 1, &o->kmode[n]);
-			if (ret)
-				return ret;
+			buffer_id = x_crtc = y_crtc = count = 0;
+			conn = NULL; mode = NULL;
 		}
+
+		ret = drmModeSetCrtc(drm_fd, o->_crtc[n],
+				     buffer_id, x_crtc, y_crtc,
+				     conn, count, mode);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
