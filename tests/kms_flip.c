@@ -69,7 +69,6 @@
 #define TEST_FENCE_STRESS	(1 << 23)
 #define TEST_VBLANK_RACE	(1 << 24)
 #define TEST_SUSPEND		(1 << 26)
-#define TEST_TS_CONT		(1 << 27)
 #define TEST_BO_TOOBIG		(1 << 28)
 
 #define TEST_BASIC		(1 << 30)
@@ -496,21 +495,6 @@ static void check_state(const struct test_output *o, const struct event_state *e
 		igt_assert_f(es->current_seq - (es->last_seq + o->seq_step) <= 1UL << 23,
 			     "unexpected %s seq %u, should be >= %u\n",
 			     es->name, es->current_seq, es->last_seq + o->seq_step);
-
-	/* Check that the vblank frame didn't wrap unexpectedly. */
-	if (o->flags & TEST_TS_CONT) {
-		/* Ignore seq_step here since vblank waits time out immediately
-		 * when we kill the crtc. */
-		igt_assert_f(es->current_seq - es->last_seq >= 0,
-			     "unexpected %s seq %u, should be >= %u\n",
-			     es->name, es->current_seq, es->last_seq);
-		igt_assert_f(es->current_seq - es->last_seq <= 150,
-			     "unexpected %s seq %u, should be < %u\n",
-			     es->name, es->current_seq, es->last_seq + 150);
-
-		igt_debug("testing ts continuity: Current frame %u, old frame %u\n",
-			  es->current_seq, es->last_seq);
-	}
 
 	if (o->flags & TEST_CHECK_TS) {
 		double elapsed, expected;
