@@ -76,6 +76,9 @@
 #define EVENT_FLIP		(1 << 0)
 #define EVENT_VBLANK		(1 << 1)
 
+#define RUN_TEST		1
+#define RUN_PAIR		2
+
 #ifndef DRM_CAP_TIMESTAMP_MONOTONIC
 #define DRM_CAP_TIMESTAMP_MONOTONIC 6
 #endif
@@ -1175,7 +1178,7 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	int i;
 
 	switch (crtc_count) {
-	case 1:
+	case RUN_TEST:
 		connector_find_preferred_mode(o->_connector[0], crtc_idxs[0], o);
 		if (!o->mode_valid)
 			return;
@@ -1186,7 +1189,7 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 			 kmstest_connector_type_str(o->kconnector[0]->connector_type),
 			 o->kconnector[0]->connector_type_id);
 		break;
-	case 2:
+	case RUN_PAIR:
 		connector_find_compatible_mode(crtc_idxs[0], crtc_idxs[1], o);
 		if (!o->mode_valid)
 			return;
@@ -1352,7 +1355,7 @@ static int run_test(int duration, int flags)
 			o.depth = 24;
 
 			crtc_idx = n;
-			run_test_on_crtc_set(&o, &crtc_idx, 1, duration);
+			run_test_on_crtc_set(&o, &crtc_idx, RUN_TEST, duration);
 		}
 	}
 
@@ -1421,7 +1424,8 @@ static int run_pair(int duration, int flags)
 					crtc_idxs[0] = n;
 					crtc_idxs[1] = m;
 
-					run_test_on_crtc_set(&o, crtc_idxs, 2,
+					run_test_on_crtc_set(&o, crtc_idxs,
+							     RUN_PAIR,
 							     duration);
 				}
 			}
