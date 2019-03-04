@@ -1537,10 +1537,12 @@ int main(int argc, char **argv)
 		igt_install_exit_handler(kms_flip_exit_handler);
 		get_timestamp_format();
 
-		bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-		if (bufmgr) {
-			devid = intel_get_drm_devid(drm_fd);
-			batch = intel_batchbuffer_alloc(bufmgr, devid);
+		if (is_i915_device(drm_fd)) {
+			bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
+			if (bufmgr) {
+				devid = intel_get_drm_devid(drm_fd);
+				batch = intel_batchbuffer_alloc(bufmgr, devid);
+			}
 		}
 	}
 
