@@ -947,8 +947,7 @@ static void paint_flip_mode(struct igt_fb *fb, bool odd_frame)
 	igt_put_cairo_ctx(drm_fd, fb, cr);
 }
 
-static int
-fb_is_bound(struct test_output *o, int fb)
+static bool fb_is_bound(struct test_output *o, int fb)
 {
 	int n;
 
@@ -958,7 +957,7 @@ fb_is_bound(struct test_output *o, int fb)
 		};
 
 		if (drmIoctl(drm_fd, DRM_IOCTL_MODE_GETCRTC, &mode))
-			return 0;
+			return false;
 
 		if (!mode.mode_valid || mode.fb_id != fb)
 			return false;
