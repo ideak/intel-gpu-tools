@@ -204,8 +204,14 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	ss->ss0.horizontal_alignment = 1; /* align 4 */
 	if (buf->tiling == I915_TILING_X)
 		ss->ss0.tiled_mode = 2;
-	else if (buf->tiling == I915_TILING_Y)
+	else if (buf->tiling != I915_TILING_NONE)
 		ss->ss0.tiled_mode = 3;
+
+	if (buf->tiling == I915_TILING_Yf)
+		ss->ss5.trmode = 1;
+	else if (buf->tiling == I915_TILING_Ys)
+		ss->ss5.trmode = 2;
+	ss->ss5.mip_tail_start_lod = 1; /* needed with trmode */
 
 	ss->ss8.base_addr = buf->bo->offset64;
 	ss->ss9.base_addr_hi = buf->bo->offset64 >> 32;

@@ -67,9 +67,11 @@ struct gen9_surface_state {
 	struct {
 		uint32_t mip_count:4;
 		uint32_t min_lod:4;
-		uint32_t pad3:6;
+		uint32_t mip_tail_start_lod:4;
+		uint32_t pad3:2;
 		uint32_t coherency_type:1;
-		uint32_t pad2:5;
+		uint32_t pad2:3;
+		uint32_t trmode:2;
 		uint32_t ewa_disable_for_cube:1;
 		uint32_t y_offset:3;
 		uint32_t pad0:1;
