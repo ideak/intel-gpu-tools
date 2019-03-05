@@ -176,7 +176,7 @@ gen6_render_flush(struct intel_batchbuffer *batch,
 static uint32_t
 gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	      int is_dst) {
-	struct gen8_surface_state *ss;
+	struct gen9_surface_state *ss;
 	uint32_t write_domain, read_domain, offset;
 	int ret;
 
