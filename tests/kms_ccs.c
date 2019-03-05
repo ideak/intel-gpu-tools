@@ -60,13 +60,14 @@ typedef struct {
 	igt_pipe_crc_t *pipe_crc;
 } data_t;
 
-#define RED			0x00ff0000
-#define COMPRESSED_RED		0x0ff0000f
-#define GREEN			0x0000ff00
-#define COMPRESSED_GREEN	0x000ff00f
-
-#define CCS_UNCOMPRESSED	0x0
-#define CCS_COMPRESSED		0x55
+static const struct {
+	double r;
+	double g;
+	double b;
+} colors[2] = {
+	{1.0, 0.0, 0.0},
+	{0.0, 1.0, 0.0}
+};
 
 /*
  * Limit maximum used sprite plane width so this test will not mistakenly
@@ -192,104 +193,32 @@ static bool plane_has_format_with_ccs(data_t *data, igt_plane_t *plane, uint32_t
 	return false;
 }
 
-static void render_fb(data_t *data, uint32_t gem_handle, unsigned int size,
-		      enum test_fb_flags fb_flags,
-		      int height, unsigned int stride)
+static void addfb_init(struct igt_fb *fb, struct drm_mode_fb_cmd2 *f)
 {
-	uint32_t *ptr;
-	unsigned int half_height, half_size;
-	uint32_t uncompressed_color = data->plane ? GREEN : RED;
-	uint32_t compressed_color =
-		data->plane ? COMPRESSED_GREEN : COMPRESSED_RED;
-	uint32_t bad_color = RED;
 	int i;
 
-	ptr = gem_mmap__cpu(data->drm_fd, gem_handle, 0, size,
-			    PROT_READ | PROT_WRITE);
+	f->width = fb->width;
+	f->height = fb->height;
+	f->pixel_format = fb->drm_format;
+	f->flags = LOCAL_DRM_MODE_FB_MODIFIERS;
 
-	if (fb_flags & FB_COMPRESSED) {
-		/* In the compressed case, we want the top half of the
-		 * surface to be uncompressed and the bottom half to be
-		 * compressed.
-		 *
-		 * We need to cut the surface on a CCS cache-line boundary,
-		 * otherwise, we're going to be in trouble when we try to
-		 * generate CCS data for the surface.  A cache line in the
-		 * CCS is 16x16 cache-line-pairs in the main surface.  16
-		 * cache lines is 64 rows high.
-		 */
-		half_height = ALIGN(height, 128) / 2;
-		half_size = half_height * stride;
-		for (i = 0; i < size / 4; i++) {
-			if (i < half_size / 4)
-				ptr[i] = uncompressed_color;
-			else
-				ptr[i] = compressed_color;
-		}
-	} else {
-		/* When we're displaying the primary plane underneath a
-		 * sprite plane, cut out a 128 x 128 area (less than the sprite)
-		 * plane size which we paint red, so we know easily if it's
-		 * bad.
-		 */
-		for (i = 0; i < size / 4; i++) {
-			if ((fb_flags & FB_HAS_PLANE) &&
-			    (i / (stride / 4)) < 128 &&
-			    (i % (stride / 4)) < 128) {
-				ptr[i] = bad_color;
-			} else {
-				ptr[i] = uncompressed_color;
-			}
-		}
+	for (i = 0; i < fb->num_planes; i++) {
+		f->handles[i] = fb->gem_handle;
+		f->modifier[i] = fb->modifier;
+		f->pitches[i] = fb->strides[i];
+		f->offsets[i] = fb->offsets[i];
 	}
-
-	munmap(ptr, size);
-}
-
-static unsigned int
-y_tile_y_pos(unsigned int offset, unsigned int stride)
-{
-	unsigned int y_tiles, y;
-	y_tiles = (offset / 4096) / (stride / 128);
-	y = y_tiles * 32 + ((offset & 0x1f0) >> 4);
-	return y;
-}
-
-static void render_ccs(data_t *data, uint32_t gem_handle,
-		       uint32_t offset, uint32_t size,
-		       int height, unsigned int ccs_stride)
-{
-	unsigned int half_height, ccs_half_height;
-	uint8_t *ptr;
-	int i;
-
-	half_height = ALIGN(height, 128) / 2;
-	ccs_half_height = half_height / 16;
-
-	ptr = gem_mmap__cpu(data->drm_fd, gem_handle, offset, size,
-			    PROT_READ | PROT_WRITE);
-
-	for (i = 0; i < size; i++) {
-		if (y_tile_y_pos(i, ccs_stride) < ccs_half_height)
-			ptr[i] = CCS_UNCOMPRESSED;
-		else
-			ptr[i] = CCS_COMPRESSED;
-	}
-
-	munmap(ptr, size);
 }
 
 static void generate_fb(data_t *data, struct igt_fb *fb,
 			int width, int height,
 			enum test_fb_flags fb_flags)
 {
-	struct local_drm_mode_fb_cmd2 f = {};
-	unsigned int size[2];
+	struct drm_mode_fb_cmd2 f = {0};
+	uint32_t format;
 	uint64_t modifier;
+	cairo_t *cr;
 	int ret;
-	uint32_t ccs_handle;
-
-	memset(fb, 0, sizeof(*fb));
 
 	/* Use either compressed or Y-tiled to test. However, given the lack of
 	 * available bandwidth, we use linear for the primary plane when
@@ -303,74 +232,52 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	else
 		modifier = 0;
 
-	f.flags = LOCAL_DRM_MODE_FB_MODIFIERS;
-	f.width = width;
-	f.height = height;
-
 	if (data->flags & TEST_BAD_PIXEL_FORMAT)
-		f.pixel_format = DRM_FORMAT_RGB565;
+		format = DRM_FORMAT_RGB565;
 	else
-		f.pixel_format = DRM_FORMAT_XRGB8888;
+		format = DRM_FORMAT_XRGB8888;
 
-	f.pitches[0] = ALIGN(width * 4, 128);
-	f.modifier[0] = modifier;
-	f.offsets[0] = 0;
-	size[0] = f.pitches[0] * ALIGN(height, 32);
+	igt_create_bo_for_fb(data->drm_fd, width, height, format, modifier, fb);
+	igt_assert(fb->gem_handle > 0);
+
+	addfb_init(fb, &f);
 
 	if (fb_flags & FB_COMPRESSED) {
-		/* From the Sky Lake PRM, Vol 12, "Color Control Surface":
-		 *
-		 *    "The compression state of the cache-line pair is
-		 *    specified by 2 bits in the CCS.  Each CCS cache-line
-		 *    represents an area on the main surface of 16x16 sets
-		 *    of 128 byte Y-tiled cache-line-pairs. CCS is always Y
-		 *    tiled."
-		 *
-		 * A "cache-line-pair" for a Y-tiled surface is two
-		 * horizontally adjacent cache lines.  When operating in
-		 * bytes and rows, this gives us a scale-down factor of
-		 * 32x16.  Since the main surface has a 32-bit format, we
-		 * need to multiply width by 4 to get bytes.
-		 */
-		int ccs_width = ALIGN(width * 4, 32) / 32;
-		int ccs_height = ALIGN(height, 16) / 16;
-		int ccs_pitches = ALIGN(ccs_width * 1, 128);
-		int ccs_offsets = size[0];
-
 		if (fb_flags & FB_MISALIGN_AUX_STRIDE) {
 			igt_skip_on_f(width <= 1024,
 				      "FB already has the smallest possible stride\n");
-			ccs_pitches -= 64;
+			f.pitches[1] -= 64;
 		}
-		else if (fb_flags & FB_SMALL_AUX_STRIDE) {
+
+		if (fb_flags & FB_SMALL_AUX_STRIDE) {
 			igt_skip_on_f(width <= 1024,
 				      "FB already has the smallest possible stride\n");
-			ccs_pitches = ALIGN(ccs_width/2, 128);
+			f.pitches[1] = ALIGN(f.pitches[1]/2, 128);
 		}
 
-		size[1] = ccs_pitches * ALIGN(ccs_height, 32);
+		if (fb_flags & FB_ZERO_AUX_STRIDE)
+			f.pitches[1] = 0;
 
-		f.handles[0] = gem_create(data->drm_fd, size[0] + size[1]);
-		if (data->flags & TEST_BAD_CCS_HANDLE) {
-			/* Put the CCS buffer on a different BO. */
-			ccs_handle = gem_create(data->drm_fd, size[0] + size[1]);
-		} else
-			ccs_handle = f.handles[0];
+		/* Put the CCS buffer on a different BO. */
+		if (data->flags & TEST_BAD_CCS_HANDLE)
+			f.handles[1] = gem_create(data->drm_fd, fb->size);
 
-		if (!(data->flags & TEST_NO_AUX_BUFFER)) {
-			f.modifier[1] = modifier;
-			f.handles[1] = ccs_handle;
-			f.offsets[1] = ccs_offsets;
-			f.pitches[1] = (fb_flags & FB_ZERO_AUX_STRIDE)? 0:ccs_pitches;
-
-			render_ccs(data, f.handles[1], f.offsets[1], size[1],
-				   height, ccs_pitches);
+		if (data->flags & TEST_NO_AUX_BUFFER) {
+			f.handles[1] = 0;
+			f.modifier[1] = 0;
+			f.pitches[1] = 0;
+			f.offsets[1] = 0;
 		}
-	} else {
-		f.handles[0] = gem_create(data->drm_fd, size[0]);
 	}
 
-	render_fb(data, f.handles[0], size[0], fb_flags, height, f.pitches[0]);
+	if (!(data->flags & TEST_BAD_PIXEL_FORMAT)) {
+		int c = !!data->plane;
+
+		cr = igt_get_cairo_ctx(data->drm_fd, fb);
+		igt_paint_color(cr, 0, 0, width, height,
+				colors[c].r, colors[c].g, colors[c].b);
+		igt_put_cairo_ctx(data->drm_fd, fb, cr);
+	}
 
 	ret = drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f);
 	if (data->flags & TEST_FAIL_ON_ADDFB2) {
@@ -381,17 +288,6 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		igt_assert_eq(ret, 0);
 
 	fb->fb_id = f.fb_id;
-	fb->fd = data->drm_fd;
-	fb->gem_handle = f.handles[0];
-	fb->is_dumb = false;
-	fb->drm_format = f.pixel_format;
-	fb->width = f.width;
-	fb->height = f.height;
-	fb->strides[0] = f.pitches[0];
-	fb->modifier = f.modifier[0];
-	fb->size = size[0];
-	fb->cairo_surface = NULL;
-	fb->domain = 0;
 }
 
 static bool try_config(data_t *data, enum test_fb_flags fb_flags,
