@@ -261,7 +261,7 @@ static const struct format_desc_struct *lookup_drm_format(uint32_t drm_format)
 /**
  * igt_get_fb_tile_size:
  * @fd: the DRM file descriptor
- * @tiling: tiling layout of the framebuffer (as framebuffer modifier)
+ * @modifier: tiling layout of the framebuffer (as framebuffer modifier)
  * @fb_bpp: bits per pixel of the framebuffer
  * @width_ret: width of the tile in bytes
  * @height_ret: height of the tile in lines
@@ -269,17 +269,17 @@ static const struct format_desc_struct *lookup_drm_format(uint32_t drm_format)
  * This function returns width and height of a tile based on the given tiling
  * format.
  */
-void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
+void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 			  unsigned *width_ret, unsigned *height_ret)
 {
-	uint32_t vc4_tiling_param = 0;
+	uint32_t vc4_modifier_param = 0;
 
 	if (is_vc4_device(fd)) {
-		vc4_tiling_param = fourcc_mod_broadcom_param(tiling);
-		tiling = fourcc_mod_broadcom_mod(tiling);
+		vc4_modifier_param = fourcc_mod_broadcom_param(modifier);
+		modifier = fourcc_mod_broadcom_mod(modifier);
 	}
 
-	switch (tiling) {
+	switch (modifier) {
 	case LOCAL_DRM_FORMAT_MOD_NONE:
 		if (is_i915_device(fd))
 			*width_ret = 64;
@@ -342,22 +342,22 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 	case DRM_FORMAT_MOD_BROADCOM_SAND32:
 		igt_require_vc4(fd);
 		*width_ret = 32;
-		*height_ret = vc4_tiling_param;
+		*height_ret = vc4_modifier_param;
 		break;
 	case DRM_FORMAT_MOD_BROADCOM_SAND64:
 		igt_require_vc4(fd);
 		*width_ret = 64;
-		*height_ret = vc4_tiling_param;
+		*height_ret = vc4_modifier_param;
 		break;
 	case DRM_FORMAT_MOD_BROADCOM_SAND128:
 		igt_require_vc4(fd);
 		*width_ret = 128;
-		*height_ret = vc4_tiling_param;
+		*height_ret = vc4_modifier_param;
 		break;
 	case DRM_FORMAT_MOD_BROADCOM_SAND256:
 		igt_require_vc4(fd);
 		*width_ret = 256;
-		*height_ret = vc4_tiling_param;
+		*height_ret = vc4_modifier_param;
 		break;
 	default:
 		igt_assert(false);
@@ -374,7 +374,7 @@ static unsigned fb_plane_width(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->tiling) && plane == 1)
+	if (is_ccs_modifier(fb->modifier) && plane == 1)
 		return DIV_ROUND_UP(fb->width, 1024) * 128;
 
 	if (plane == 0)
@@ -387,7 +387,7 @@ static unsigned fb_plane_bpp(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->tiling) && plane == 1)
+	if (is_ccs_modifier(fb->modifier) && plane == 1)
 		return 8;
 	else
 		return format->plane_bpp[plane];
@@ -397,7 +397,7 @@ static unsigned fb_plane_height(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->tiling) && plane == 1)
+	if (is_ccs_modifier(fb->modifier) && plane == 1)
 		return DIV_ROUND_UP(fb->height, 512) * 32;
 
 	if (plane == 0)
@@ -410,7 +410,7 @@ static int fb_num_planes(const struct igt_fb *fb)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->tiling))
+	if (is_ccs_modifier(fb->modifier))
 		return 2;
 	else
 		return format->num_planes;
@@ -431,7 +431,7 @@ static void fb_init(struct igt_fb *fb,
 
 	fb->width = width;
 	fb->height = height;
-	fb->tiling = modifier;
+	fb->modifier = modifier;
 	fb->drm_format = drm_format;
 	fb->fd = fd;
 	fb->num_planes = fb_num_planes(fb);
@@ -450,7 +450,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 	uint32_t min_stride = fb->plane_width[plane] *
 		(fb->plane_bpp[plane] / 8);
 
-	if (fb->tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
+	if (fb->modifier != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    is_i915_device(fb->fd) &&
 	    intel_gen(intel_get_drm_devid(fb->fd)) <= 3) {
 		uint32_t stride;
@@ -470,7 +470,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 	} else {
 		unsigned int tile_width, tile_height;
 
-		igt_get_fb_tile_size(fb->fd, fb->tiling, fb->plane_bpp[plane],
+		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
 
 		return ALIGN(min_stride, tile_width);
@@ -479,7 +479,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 
 static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 {
-	if (fb->tiling != LOCAL_DRM_FORMAT_MOD_NONE &&
+	if (fb->modifier != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    is_i915_device(fb->fd) &&
 	    intel_gen(intel_get_drm_devid(fb->fd)) <= 3) {
 		uint64_t min_size = (uint64_t) fb->strides[plane] *
@@ -501,7 +501,7 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 	} else {
 		unsigned int tile_width, tile_height;
 
-		igt_get_fb_tile_size(fb->fd, fb->tiling, fb->plane_bpp[plane],
+		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
 
 		/* Special case where the "tile height" represents a
@@ -540,19 +540,19 @@ static uint64_t calc_fb_size(struct igt_fb *fb)
  * @width: width of the framebuffer in pixels
  * @height: height of the framebuffer in pixels
  * @format: drm fourcc pixel format code
- * @tiling: tiling layout of the framebuffer (as framebuffer modifier)
+ * @modifier: tiling layout of the framebuffer (as framebuffer modifier)
  * @size_ret: returned size for the framebuffer
  * @stride_ret: returned stride for the framebuffer
  *
  * This function returns valid stride and size values for a framebuffer with the
  * specified parameters.
  */
-void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64_t tiling,
+void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64_t modifier,
 		      uint64_t *size_ret, unsigned *stride_ret)
 {
 	struct igt_fb fb;
 
-	fb_init(&fb, fd, width, height, drm_format, tiling,
+	fb_init(&fb, fd, width, height, drm_format, modifier,
 		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
 	fb.size = calc_fb_size(&fb);
@@ -682,7 +682,7 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	 * specify a custom size or stride. Yet the caller is free to specify
 	 * them, so we need to make sure to use a device BO then.
 	 */
-	if (fb->tiling || fb->size || fb->strides[0] ||
+	if (fb->modifier || fb->size || fb->strides[0] ||
 	    (is_i915_device(fd) && igt_format_is_yuv(fb->drm_format)))
 		device_bo = true;
 
@@ -699,14 +699,14 @@ static int create_bo_for_fb(struct igt_fb *fb)
 		if (is_i915_device(fd)) {
 			fb->gem_handle = gem_create(fd, fb->size);
 			gem_set_tiling(fd, fb->gem_handle,
-				       igt_fb_mod_to_tiling(fb->tiling),
+				       igt_fb_mod_to_tiling(fb->modifier),
 				       fb->strides[0]);
 		} else if (is_vc4_device(fd)) {
 			fb->gem_handle = igt_vc4_create_bo(fd, fb->size);
 
-			if (fb->tiling == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED)
+			if (fb->modifier == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED)
 				igt_vc4_set_tiling(fd, fb->gem_handle,
-						   fb->tiling);
+						   fb->modifier);
 		} else {
 			igt_assert(false);
 		}
@@ -1103,7 +1103,7 @@ void igt_paint_image(cairo_t *cr, const char *filename,
  * @width: width of the framebuffer in pixel
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
- * @tiling: tiling layout of the framebuffer (as framebuffer modifier)
+ * @modifier: tiling layout of the framebuffer (as framebuffer modifier)
  * @fb: pointer to an #igt_fb structure
  * @bo_size: size of the backing bo (0 for automatic size)
  * @bo_stride: stride of the backing bo (0 for automatic stride)
@@ -1120,7 +1120,7 @@ void igt_paint_image(cairo_t *cr, const char *filename,
  */
 unsigned int
 igt_create_fb_with_bo_size(int fd, int width, int height,
-			   uint32_t format, uint64_t tiling,
+			   uint32_t format, uint64_t modifier,
 			   struct igt_fb *fb, uint64_t bo_size,
 			   unsigned bo_stride)
 {
@@ -1129,7 +1129,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	enum igt_color_range color_range = IGT_COLOR_YCBCR_LIMITED_RANGE;
 	uint32_t flags = 0;
 
-	fb_init(fb, fd, width, height, format, tiling,
+	fb_init(fb, fd, width, height, format, modifier,
 		color_encoding, color_range);
 
 	for (int i = 0; i < fb->num_planes; i++)
@@ -1137,8 +1137,8 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 	fb->size = bo_size;
 
-	igt_debug("%s(width=%d, height=%d, format=0x%x, tiling=0x%"PRIx64", size=%"PRIu64")\n",
-		  __func__, width, height, format, tiling, bo_size);
+	igt_debug("%s(width=%d, height=%d, format=0x%x, modifier=0x%"PRIx64", size=%"PRIu64")\n",
+		  __func__, width, height, format, modifier, bo_size);
 
 	create_bo_for_fb(fb);
 	igt_assert(fb->gem_handle > 0);
@@ -1146,12 +1146,12 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 	igt_debug("%s(handle=%d, pitch=%d)\n",
 		  __func__, fb->gem_handle, fb->strides[0]);
 
-	if (fb->tiling || igt_has_fb_modifiers(fd))
+	if (fb->modifier || igt_has_fb_modifiers(fd))
 		flags = LOCAL_DRM_MODE_FB_MODIFIERS;
 
 	do_or_die(__kms_addfb(fb->fd, fb->gem_handle,
 			      fb->width, fb->height,
-			      fb->drm_format, fb->tiling,
+			      fb->drm_format, fb->modifier,
 			      fb->strides, fb->offsets, fb->num_planes, flags,
 			      &fb->fb_id));
 
@@ -1164,7 +1164,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
  * @width: width of the framebuffer in pixel
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
- * @tiling: tiling layout of the framebuffer
+ * @modifier: tiling layout of the framebuffer
  * @fb: pointer to an #igt_fb structure
  *
  * This function allocates a gem buffer object suitable to back a framebuffer
@@ -1178,9 +1178,9 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
  * The kms id of the created framebuffer.
  */
 unsigned int igt_create_fb(int fd, int width, int height, uint32_t format,
-			   uint64_t tiling, struct igt_fb *fb)
+			   uint64_t modifier, struct igt_fb *fb)
 {
-	return igt_create_fb_with_bo_size(fd, width, height, format, tiling, fb,
+	return igt_create_fb_with_bo_size(fd, width, height, format, modifier, fb,
 					  0, 0);
 }
 
@@ -1190,7 +1190,7 @@ unsigned int igt_create_fb(int fd, int width, int height, uint32_t format,
  * @width: width of the framebuffer in pixel
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
- * @tiling: tiling layout of the framebuffer
+ * @modifier: tiling layout of the framebuffer
  * @r: red value to use as fill color
  * @g: green value to use as fill color
  * @b: blue value to use as fill color
@@ -1208,14 +1208,14 @@ unsigned int igt_create_fb(int fd, int width, int height, uint32_t format,
  * failure.
  */
 unsigned int igt_create_color_fb(int fd, int width, int height,
-				 uint32_t format, uint64_t tiling,
+				 uint32_t format, uint64_t modifier,
 				 double r, double g, double b,
 				 struct igt_fb *fb /* out */)
 {
 	unsigned int fb_id;
 	cairo_t *cr;
 
-	fb_id = igt_create_fb(fd, width, height, format, tiling, fb);
+	fb_id = igt_create_fb(fd, width, height, format, modifier, fb);
 	igt_assert(fb_id);
 
 	cr = igt_get_cairo_ctx(fd, fb);
@@ -1231,7 +1231,7 @@ unsigned int igt_create_color_fb(int fd, int width, int height,
  * @width: width of the framebuffer in pixel
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
- * @tiling: tiling layout of the framebuffer
+ * @modifier: tiling layout of the framebuffer
  * @fb: pointer to an #igt_fb structure
  *
  * This function allocates a gem buffer object suitable to back a framebuffer
@@ -1246,13 +1246,13 @@ unsigned int igt_create_color_fb(int fd, int width, int height,
  * failure.
  */
 unsigned int igt_create_pattern_fb(int fd, int width, int height,
-				   uint32_t format, uint64_t tiling,
+				   uint32_t format, uint64_t modifier,
 				   struct igt_fb *fb /* out */)
 {
 	unsigned int fb_id;
 	cairo_t *cr;
 
-	fb_id = igt_create_fb(fd, width, height, format, tiling, fb);
+	fb_id = igt_create_fb(fd, width, height, format, modifier, fb);
 	igt_assert(fb_id);
 
 	cr = igt_get_cairo_ctx(fd, fb);
@@ -1268,7 +1268,7 @@ unsigned int igt_create_pattern_fb(int fd, int width, int height,
  * @width: width of the framebuffer in pixel
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
- * @tiling: tiling layout of the framebuffer
+ * @modifier: tiling layout of the framebuffer
  * @r: red value to use as fill color
  * @g: green value to use as fill color
  * @b: blue value to use as fill color
@@ -1287,14 +1287,14 @@ unsigned int igt_create_pattern_fb(int fd, int width, int height,
  * failure.
  */
 unsigned int igt_create_color_pattern_fb(int fd, int width, int height,
-					 uint32_t format, uint64_t tiling,
+					 uint32_t format, uint64_t modifier,
 					 double r, double g, double b,
 					 struct igt_fb *fb /* out */)
 {
 	unsigned int fb_id;
 	cairo_t *cr;
 
-	fb_id = igt_create_fb(fd, width, height, format, tiling, fb);
+	fb_id = igt_create_fb(fd, width, height, format, modifier, fb);
 	igt_assert(fb_id);
 
 	cr = igt_get_cairo_ctx(fd, fb);
@@ -1311,7 +1311,7 @@ unsigned int igt_create_color_pattern_fb(int fd, int width, int height,
  * @width: width of the framebuffer in pixel or 0
  * @height: height of the framebuffer in pixel or 0
  * @format: drm fourcc pixel format code
- * @tiling: tiling layout of the framebuffer
+ * @modifier: tiling layout of the framebuffer
  * @filename: filename of the png image to draw
  * @fb: pointer to an #igt_fb structure
  *
@@ -1323,7 +1323,7 @@ unsigned int igt_create_color_pattern_fb(int fd, int width, int height,
  * failure.
  */
 unsigned int igt_create_image_fb(int fd, int width, int height,
-				 uint32_t format, uint64_t tiling,
+				 uint32_t format, uint64_t modifier,
 				 const char *filename,
 				 struct igt_fb *fb /* out */)
 {
@@ -1339,7 +1339,7 @@ unsigned int igt_create_image_fb(int fd, int width, int height,
 		height = cairo_image_surface_get_height(image);
 	cairo_surface_destroy(image);
 
-	fb_id = igt_create_fb(fd, width, height, format, tiling, fb);
+	fb_id = igt_create_fb(fd, width, height, format, modifier, fb);
 
 	cr = igt_get_cairo_ctx(fd, fb);
 	igt_paint_image(cr, filename, 0, 0, width, height);
@@ -1415,7 +1415,7 @@ static void stereo_fb_layout_from_mode(struct stereo_fb_layout *layout,
  * @drm_fd: open i915 drm file descriptor
  * @mode: A stereo 3D mode.
  * @format: drm fourcc pixel format code
- * @tiling: tiling layout of the framebuffer
+ * @modifier: tiling layout of the framebuffer
  *
  * Create a framebuffer for use with the stereo 3D mode specified by @mode.
  *
@@ -1424,7 +1424,7 @@ static void stereo_fb_layout_from_mode(struct stereo_fb_layout *layout,
  * failure.
  */
 unsigned int igt_create_stereo_fb(int drm_fd, drmModeModeInfo *mode,
-				  uint32_t format, uint64_t tiling)
+				  uint32_t format, uint64_t modifier)
 {
 	struct stereo_fb_layout layout;
 	cairo_t *cr;
@@ -1433,7 +1433,7 @@ unsigned int igt_create_stereo_fb(int drm_fd, drmModeModeInfo *mode,
 
 	stereo_fb_layout_from_mode(&layout, mode);
 	fb_id = igt_create_fb(drm_fd, layout.fb_width, layout.fb_height, format,
-			      tiling, &fb);
+			      modifier, &fb);
 	cr = igt_get_cairo_ctx(drm_fd, &fb);
 
 	igt_paint_image(cr, "1080p-left.png",
@@ -1494,12 +1494,12 @@ static void init_buf(struct fb_blit_upload *blit,
 
 	buf->bo = gem_handle_to_libdrm_bo(blit->bufmgr, blit->fd,
 					  name, fb->gem_handle);
-	buf->tiling = igt_fb_mod_to_tiling(fb->tiling);
+	buf->tiling = igt_fb_mod_to_tiling(fb->modifier);
 	buf->stride = fb->strides[0];
 	buf->bpp = fb->plane_bpp[0];
 	buf->size = fb->size;
 
-	if (is_ccs_modifier(fb->tiling)) {
+	if (is_ccs_modifier(fb->modifier)) {
 		igt_assert_eq(fb->strides[0] & 127, 0);
 		igt_assert_eq(fb->strides[1] & 127, 0);
 
@@ -1544,14 +1544,14 @@ static void blitcopy(const struct igt_fb *dst_fb,
 					   src_fb->gem_handle,
 					   src_fb->offsets[i],
 					   src_fb->strides[i],
-					   igt_fb_mod_to_tiling(src_fb->tiling),
+					   igt_fb_mod_to_tiling(src_fb->modifier),
 					   0, 0, /* src_x, src_y */
 					   dst_fb->plane_width[i], dst_fb->plane_height[i],
 					   dst_fb->plane_bpp[i],
 					   dst_fb->gem_handle,
 					   dst_fb->offsets[i],
 					   dst_fb->strides[i],
-					   igt_fb_mod_to_tiling(dst_fb->tiling),
+					   igt_fb_mod_to_tiling(dst_fb->modifier),
 					   0, 0 /* dst_x, dst_y */);
 	}
 }
@@ -2494,7 +2494,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	blit->base.fd = fd;
 	blit->base.fb = fb;
 
-	if (is_ccs_modifier(fb->tiling)) {
+	if (is_ccs_modifier(fb->modifier)) {
 		blit->base.bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
 		blit->base.batch = intel_batchbuffer_alloc(blit->base.bufmgr,
 						   intel_get_drm_devid(fd));
@@ -2506,10 +2506,10 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 							     &blit->shadow_fb);
 	igt_assert(blit->shadow_ptr);
 
-	if (fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-	    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED ||
-	    fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED_CCS ||
-	    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS) {
+	if (fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED ||
+	    fb->modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED ||
+	    fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_CCS ||
+	    fb->modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS) {
 		setup_linear_mapping(&blit->base);
 	} else {
 		blit->base.linear.fb = *fb;
@@ -2589,10 +2589,10 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 		    ((f->cairo_id == CAIRO_FORMAT_INVALID) &&
 		     (f->pixman_id != PIXMAN_invalid)))
 			create_cairo_surface__convert(fd, fb);
-		else if (is_ccs_modifier(fb->tiling))
+		else if (is_ccs_modifier(fb->modifier))
 			create_cairo_surface__rendercopy(fd, fb);
-		else if (fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-			 fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED)
+		else if (fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED ||
+			 fb->modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED)
 			create_cairo_surface__blit(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);

@@ -53,7 +53,7 @@
  * @drm_format: DRM FOURCC code
  * @width: width in pixels
  * @height: height in pixels
- * @tiling: tiling mode as a DRM framebuffer modifier
+ * @modifier: tiling mode as a DRM framebuffer modifier
  * @size: size in bytes of the underlying backing storage
  * @cairo_surface: optionally attached cairo drawing surface
  * @domain: current domain for cache flushing tracking on i915.ko
@@ -76,7 +76,7 @@ typedef struct igt_fb {
 	int height;
 	enum igt_color_encoding color_encoding;
 	enum igt_color_range color_range;
-	uint64_t tiling;
+	uint64_t modifier;
 	uint64_t size;
 	cairo_surface_t *cairo_surface;
 	unsigned int domain;
@@ -108,34 +108,34 @@ enum igt_text_align {
 	align_hcenter	= 0x08,
 };
 
-void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
+void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 			  unsigned *width_ret, unsigned *height_ret);
-void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t tiling,
+void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t modifier,
 		      uint64_t *size_ret, unsigned *stride_ret);
 unsigned int
 igt_create_fb_with_bo_size(int fd, int width, int height,
-			   uint32_t format, uint64_t tiling,
+			   uint32_t format, uint64_t modifier,
 			   struct igt_fb *fb, uint64_t bo_size,
 			   unsigned bo_stride);
 unsigned int igt_create_fb(int fd, int width, int height, uint32_t format,
-			   uint64_t tiling, struct igt_fb *fb);
+			   uint64_t modifier, struct igt_fb *fb);
 unsigned int igt_create_color_fb(int fd, int width, int height,
-				 uint32_t format, uint64_t tiling,
+				 uint32_t format, uint64_t modifier,
 				 double r, double g, double b,
 				 struct igt_fb *fb /* out */);
 unsigned int igt_create_pattern_fb(int fd, int width, int height,
-				   uint32_t format, uint64_t tiling,
+				   uint32_t format, uint64_t modifier,
 				   struct igt_fb *fb /* out */);
 unsigned int igt_create_color_pattern_fb(int fd, int width, int height,
-					 uint32_t format, uint64_t tiling,
+					 uint32_t format, uint64_t modifier,
 					 double r, double g, double b,
 					 struct igt_fb *fb /* out */);
 unsigned int igt_create_image_fb(int drm_fd,  int width, int height,
-				 uint32_t format, uint64_t tiling,
+				 uint32_t format, uint64_t modifier,
 				 const char *filename,
 				 struct igt_fb *fb /* out */);
 unsigned int igt_create_stereo_fb(int drm_fd, drmModeModeInfo *mode,
-				  uint32_t format, uint64_t tiling);
+				  uint32_t format, uint64_t modifier);
 unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
 					uint32_t dst_fourcc,
 					uint64_t dst_modifier,
