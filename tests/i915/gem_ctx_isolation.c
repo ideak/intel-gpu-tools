@@ -24,7 +24,7 @@
 #include "igt.h"
 #include "igt_dummyload.h"
 
-#define MAX_REG 0x40000
+#define MAX_REG 0x200000
 #define NUM_REGS (MAX_REG / sizeof(uint32_t))
 
 #define PAGE_ALIGN(x) ALIGN(x, 4096)
@@ -41,6 +41,8 @@ enum {
 	BCS0 = ENGINE(I915_ENGINE_CLASS_COPY, 0),
 	VCS0 = ENGINE(I915_ENGINE_CLASS_VIDEO, 0),
 	VCS1 = ENGINE(I915_ENGINE_CLASS_VIDEO, 1),
+	VCS2 = ENGINE(I915_ENGINE_CLASS_VIDEO, 2),
+	VCS3 = ENGINE(I915_ENGINE_CLASS_VIDEO, 3),
 	VECS0 = ENGINE(I915_ENGINE_CLASS_VIDEO_ENHANCE, 0),
 };
 
@@ -52,10 +54,12 @@ enum {
 #define GEN7 (ALL << 7)
 #define GEN8 (ALL << 8)
 #define GEN9 (ALL << 9)
+#define GEN10 (ALL << 10)
+#define GEN11 (ALL << 11)
 
 #define NOCTX 0
 
-#define LAST_KNOWN_GEN 10
+#define LAST_KNOWN_GEN 11
 
 static const struct named_register {
 	const char *name;
@@ -103,7 +107,7 @@ static const struct named_register {
 	{ "GPGPU_THREADS_DISPATCHED", GEN8, RCS0, 0x2290, 2 },
 	{ "PS_INVOCATION_COUNT_1", GEN8, RCS0, 0x22f0, 2, .write_mask = ~0x3 },
 	{ "PS_DEPTH_COUNT_1", GEN8, RCS0, 0x22f8, 2 },
-	{ "BB_OFFSET", GEN8, RCS0, 0x2158, .ignore_bits = 0x4 },
+	{ "BB_OFFSET", GEN8, RCS0, 0x2158, .ignore_bits = 0x7 },
 	{ "MI_PREDICATE_RESULT_1", GEN8, RCS0, 0x241c },
 	{ "CS_GPR", GEN8, RCS0, 0x2600, 32 },
 	{ "OA_CTX_CONTROL", GEN8, RCS0, 0x2360 },
@@ -132,30 +136,49 @@ static const struct named_register {
 	{ "PERF_CNT_1", NOCTX, RCS0, 0x91b8, 2 },
 	{ "PERF_CNT_2", NOCTX, RCS0, 0x91c0, 2 },
 
+	{ "CTX_PREEMPT", NOCTX /* GEN10 */, RCS0, 0x2248 },
+	{ "CS_CHICKEN1", GEN11, RCS0, 0x2580, .masked = true },
+	{ "HDC_CHICKEN1", GEN_RANGE(10, 10), RCS0, 0x7304, .masked = true },
+
 	/* Privileged (enabled by w/a + FORCE_TO_NONPRIV) */
-	{ "CTX_PREEMPT", NOCTX /* GEN_RANGE(9, 10) */, RCS0, 0x2248 },
+	{ "CTX_PREEMPT", NOCTX /* GEN9 */, RCS0, 0x2248 },
 	{ "CS_CHICKEN1", GEN_RANGE(9, 10), RCS0, 0x2580, .masked = true },
-	{ "HDC_CHICKEN1", GEN_RANGE(9, 10), RCS0, 0x7304, .masked = true },
+	{ "HDC_CHICKEN1", GEN_RANGE(9, 9), RCS0, 0x7304, .masked = true },
 	{ "L3SQREG4", NOCTX /* GEN9:skl,kbl */, RCS0, 0xb118, .write_mask = ~0x1ffff0 },
+	{ "HALF_SLICE_CHICKEN7", GEN_RANGE(11, 11), RCS0, 0xe194, .masked = true },
+	{ "SAMPLER_MODE", GEN_RANGE(11, 11), RCS0, 0xe18c, .masked = true },
 
 	{ "BCS_GPR", GEN9, BCS0, 0x22600, 32 },
 	{ "BCS_SWCTRL", GEN8, BCS0, 0x22200, .write_mask = 0x3, .masked = true },
 
-	{ "VCS0_GPR", GEN9, VCS0, 0x12600, 32 },
 	{ "MFC_VDBOX1", NOCTX, VCS0, 0x12800, 64 },
-
-	{ "VCS1_GPR", GEN9, VCS1, 0x1c600, 32 },
 	{ "MFC_VDBOX2", NOCTX, VCS1, 0x1c800, 64 },
 
-	{ "VECS_GPR", GEN9, VECS0, 0x1a600, 32 },
+	{ "VCS0_GPR", GEN_RANGE(9, 10), VCS0, 0x12600, 32 },
+	{ "VCS1_GPR", GEN_RANGE(9, 10), VCS1, 0x1c600, 32 },
+	{ "VECS_GPR", GEN_RANGE(9, 10), VECS0, 0x1a600, 32 },
+
+	{ "VCS0_GPR", GEN11, VCS0, 0x1c0600, 32 },
+	{ "VCS1_GPR", GEN11, VCS1, 0x1c4600, 32 },
+	{ "VCS2_GPR", GEN11, VCS2, 0x1d0600, 32 },
+	{ "VCS3_GPR", GEN11, VCS3, 0x1d4600, 32 },
+	{ "VECS_GPR", GEN11, VECS0, 0x1c8600, 32 },
 
 	{}
 }, ignore_registers[] = {
 	{ "RCS timestamp", GEN6, ~0u, 0x2358 },
-	{ "VCS0 timestamp", GEN7, ~0u, 0x12358 },
-	{ "VCS1 timestamp", GEN7, ~0u, 0x1c358 },
 	{ "BCS timestamp", GEN7, ~0u, 0x22358 },
-	{ "VECS timestamp", GEN8, ~0u, 0x1a358 },
+
+	{ "VCS0 timestamp", GEN_RANGE(7, 10), ~0u, 0x12358 },
+	{ "VCS1 timestamp", GEN_RANGE(7, 10), ~0u, 0x1c358 },
+	{ "VECS timestamp", GEN_RANGE(8, 10), ~0u, 0x1a358 },
+
+	{ "VCS0 timestamp", GEN11, ~0u, 0x1c0358 },
+	{ "VCS1 timestamp", GEN11, ~0u, 0x1c4358 },
+	{ "VCS2 timestamp", GEN11, ~0u, 0x1d0358 },
+	{ "VCS3 timestamp", GEN11, ~0u, 0x1d4358 },
+	{ "VECS timestamp", GEN11, ~0u, 0x1c8358 },
+
 	{}
 };
 
