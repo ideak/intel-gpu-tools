@@ -299,6 +299,7 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 		}
 		break;
 	case LOCAL_I915_FORMAT_MOD_Y_TILED:
+	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
 		igt_require_intel(fd);
 		if (intel_gen(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
@@ -312,6 +313,7 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 		}
 		break;
 	case LOCAL_I915_FORMAT_MOD_Yf_TILED:
+	case LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS:
 		igt_require_intel(fd);
 		switch (fb_bpp) {
 		case 8:
@@ -362,9 +364,18 @@ void igt_get_fb_tile_size(int fd, uint64_t tiling, int fb_bpp,
 	}
 }
 
+static bool is_ccs_modifier(uint64_t modifier)
+{
+	return modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_CCS ||
+		modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS;
+}
+
 static unsigned fb_plane_width(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
+
+	if (is_ccs_modifier(fb->tiling) && plane == 1)
+		return DIV_ROUND_UP(fb->width, 1024) * 128;
 
 	if (plane == 0)
 		return fb->width;
@@ -376,12 +387,18 @@ static unsigned fb_plane_bpp(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	return format->plane_bpp[plane];
+	if (is_ccs_modifier(fb->tiling) && plane == 1)
+		return 8;
+	else
+		return format->plane_bpp[plane];
 }
 
 static unsigned fb_plane_height(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
+
+	if (is_ccs_modifier(fb->tiling) && plane == 1)
+		return DIV_ROUND_UP(fb->height, 512) * 32;
 
 	if (plane == 0)
 		return fb->height;
@@ -393,7 +410,10 @@ static int fb_num_planes(const struct igt_fb *fb)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	return format->num_planes;
+	if (is_ccs_modifier(fb->tiling))
+		return 2;
+	else
+		return format->num_planes;
 }
 
 static void fb_init(struct igt_fb *fb,
@@ -561,8 +581,10 @@ uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 	case LOCAL_I915_FORMAT_MOD_X_TILED:
 		return I915_TILING_X;
 	case LOCAL_I915_FORMAT_MOD_Y_TILED:
+	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
 		return I915_TILING_Y;
 	case LOCAL_I915_FORMAT_MOD_Yf_TILED:
+	case LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS:
 		return I915_TILING_Yf;
 	default:
 		igt_assert(0);
@@ -1459,7 +1481,53 @@ struct fb_blit_upload {
 	int fd;
 	struct igt_fb *fb;
 	struct fb_blit_linear linear;
+	drm_intel_bufmgr *bufmgr;
+	struct intel_batchbuffer *batch;
 };
+
+static void init_buf(struct fb_blit_upload *blit,
+		     struct igt_buf *buf,
+		     const struct igt_fb *fb,
+		     const char *name)
+{
+	igt_assert_eq(fb->offsets[0], 0);
+
+	buf->bo = gem_handle_to_libdrm_bo(blit->bufmgr, blit->fd,
+					  name, fb->gem_handle);
+	buf->tiling = igt_fb_mod_to_tiling(fb->tiling);
+	buf->stride = fb->strides[0];
+	buf->bpp = fb->plane_bpp[0];
+	buf->size = fb->size;
+
+	if (is_ccs_modifier(fb->tiling)) {
+		igt_assert_eq(fb->strides[0] & 127, 0);
+		igt_assert_eq(fb->strides[1] & 127, 0);
+
+		buf->aux.offset = fb->offsets[1];
+		buf->aux.stride = fb->strides[1];
+	}
+}
+
+static void rendercopy(struct fb_blit_upload *blit,
+		       const struct igt_fb *dst_fb,
+		       const struct igt_fb *src_fb)
+{
+	struct igt_buf src = {}, dst = {};
+	igt_render_copyfunc_t render_copy =
+		igt_get_render_copyfunc(intel_get_drm_devid(blit->fd));
+
+	igt_require(render_copy);
+
+	igt_assert_eq(dst_fb->offsets[0], 0);
+	igt_assert_eq(src_fb->offsets[0], 0);
+
+	init_buf(blit, &src, src_fb, "cairo rendercopy src");
+	init_buf(blit, &dst, dst_fb, "cairo rendercopy dst");
+
+	render_copy(blit->batch, NULL,
+		    &src, 0, 0, dst_fb->plane_width[0], dst_fb->plane_height[0],
+		    &dst, 0, 0);
+}
 
 static void blitcopy(const struct igt_fb *dst_fb,
 		     const struct igt_fb *src_fb)
@@ -1498,7 +1566,10 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 	gem_set_domain(fd, linear->fb.gem_handle,
 		       I915_GEM_DOMAIN_GTT, 0);
 
-	blitcopy(fb, &linear->fb);
+	if (blit->batch)
+		rendercopy(blit, fb, &linear->fb);
+	else
+		blitcopy(fb, &linear->fb);
 
 	gem_sync(fd, linear->fb.gem_handle);
 	gem_close(fd, linear->fb.gem_handle);
@@ -1515,8 +1586,26 @@ static void destroy_cairo_surface__blit(void *arg)
 	free(blit);
 }
 
-static void setup_linear_mapping(int fd, struct igt_fb *fb, struct fb_blit_linear *linear)
+static void destroy_cairo_surface__rendercopy(void *arg)
 {
+	struct fb_blit_upload *blit = arg;
+
+	blit->fb->cairo_surface = NULL;
+
+	free_linear_mapping(blit);
+
+	intel_batchbuffer_free(blit->batch);
+	drm_intel_bufmgr_destroy(blit->bufmgr);
+
+	free(blit);
+}
+
+static void setup_linear_mapping(struct fb_blit_upload *blit)
+{
+	int fd = blit->fd;
+	struct igt_fb *fb = blit->fb;
+	struct fb_blit_linear *linear = &blit->linear;
+
 	/*
 	 * We create a linear BO that we'll map for the CPU to write to (using
 	 * cairo). This linear bo will be then blitted to its final
@@ -1535,7 +1624,10 @@ static void setup_linear_mapping(int fd, struct igt_fb *fb, struct fb_blit_linea
 	gem_set_domain(fd, linear->fb.gem_handle,
 			I915_GEM_DOMAIN_GTT, 0);
 
-	blitcopy(&linear->fb, fb);
+	if (blit->batch)
+		rendercopy(blit, &linear->fb, fb);
+	else
+		blitcopy(&linear->fb, fb);
 
 	gem_sync(fd, linear->fb.gem_handle);
 
@@ -1552,12 +1644,12 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 	struct fb_blit_upload *blit;
 	cairo_format_t cairo_format;
 
-	blit = malloc(sizeof(*blit));
+	blit = calloc(1, sizeof(*blit));
 	igt_assert(blit);
 
 	blit->fd = fd;
 	blit->fb = fb;
-	setup_linear_mapping(fd, fb, &blit->linear);
+	setup_linear_mapping(blit);
 
 	cairo_format = drm_format_to_cairo(fb->drm_format);
 	fb->cairo_surface =
@@ -1570,6 +1662,36 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 	cairo_surface_set_user_data(fb->cairo_surface,
 				    (cairo_user_data_key_t *)create_cairo_surface__blit,
 				    blit, destroy_cairo_surface__blit);
+}
+
+static void create_cairo_surface__rendercopy(int fd, struct igt_fb *fb)
+{
+	struct fb_blit_upload *blit;
+	cairo_format_t cairo_format;
+
+	blit = calloc(1, sizeof(*blit));
+	igt_assert(blit);
+
+	blit->fd = fd;
+	blit->fb = fb;
+
+	blit->bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
+	blit->batch = intel_batchbuffer_alloc(blit->bufmgr,
+					      intel_get_drm_devid(fd));
+
+	setup_linear_mapping(blit);
+
+	cairo_format = drm_format_to_cairo(fb->drm_format);
+	fb->cairo_surface =
+		cairo_image_surface_create_for_data(blit->linear.map,
+						    cairo_format,
+						    fb->width, fb->height,
+						    blit->linear.fb.strides[0]);
+	fb->domain = I915_GEM_DOMAIN_GTT;
+
+	cairo_surface_set_user_data(fb->cairo_surface,
+				    (cairo_user_data_key_t *)create_cairo_surface__rendercopy,
+				    blit, destroy_cairo_surface__rendercopy);
 }
 
 /**
@@ -2339,7 +2461,7 @@ static void destroy_cairo_surface__convert(void *arg)
 
 static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 {
-	struct fb_convert_blit_upload *blit = malloc(sizeof(*blit));
+	struct fb_convert_blit_upload *blit = calloc(1, sizeof(*blit));
 	struct fb_convert cvt = { };
 	const struct format_desc_struct *f = lookup_drm_format(fb->drm_format);
 	unsigned drm_format;
@@ -2371,6 +2493,13 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 
 	blit->base.fd = fd;
 	blit->base.fb = fb;
+
+	if (is_ccs_modifier(fb->tiling)) {
+		blit->base.bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
+		blit->base.batch = intel_batchbuffer_alloc(blit->base.bufmgr,
+						   intel_get_drm_devid(fd));
+	}
+
 	blit->shadow_ptr = igt_fb_create_cairo_shadow_buffer(fd, drm_format,
 							     fb->width,
 							     fb->height,
@@ -2378,8 +2507,10 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	igt_assert(blit->shadow_ptr);
 
 	if (fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-	    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED) {
-		setup_linear_mapping(fd, fb, &blit->base.linear);
+	    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED ||
+	    fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED_CCS ||
+	    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS) {
+		setup_linear_mapping(&blit->base);
 	} else {
 		blit->base.linear.fb = *fb;
 		blit->base.linear.fb.gem_handle = 0;
@@ -2458,8 +2589,10 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 		    ((f->cairo_id == CAIRO_FORMAT_INVALID) &&
 		     (f->pixman_id != PIXMAN_invalid)))
 			create_cairo_surface__convert(fd, fb);
+		else if (is_ccs_modifier(fb->tiling))
+			create_cairo_surface__rendercopy(fd, fb);
 		else if (fb->tiling == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-		    fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED)
+			 fb->tiling == LOCAL_I915_FORMAT_MOD_Yf_TILED)
 			create_cairo_surface__blit(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);
