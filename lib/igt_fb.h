@@ -147,6 +147,9 @@ int igt_dirty_fb(int fd, struct igt_fb *fb);
 void *igt_fb_map_buffer(int fd, struct igt_fb *fb);
 void igt_fb_unmap_buffer(struct igt_fb *fb, void *buffer);
 
+void igt_create_bo_for_fb(int fd, int width, int height,
+			  uint32_t format, uint64_t modifier,
+			  struct igt_fb *fb);
 int igt_create_bo_with_dimensions(int fd, int width, int height, uint32_t format,
 				  uint64_t modifier, unsigned stride,
 				  uint64_t *size_ret, unsigned *stride_ret,

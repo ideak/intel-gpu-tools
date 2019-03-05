@@ -743,6 +743,15 @@ out:
 	return fb->gem_handle;
 }
 
+void igt_create_bo_for_fb(int fd, int width, int height,
+			  uint32_t format, uint64_t modifier,
+			  struct igt_fb *fb /* out */)
+{
+	fb_init(fb, fd, width, height, format, modifier,
+		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
+	create_bo_for_fb(fb);
+}
+
 /**
  * igt_create_bo_with_dimensions:
  * @fd: open drm file descriptor
