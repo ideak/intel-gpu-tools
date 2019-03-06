@@ -106,30 +106,13 @@ char *igt_sysfs_path(int device, char *path, int pathlen)
 	if (fstat(device, &st) || !S_ISCHR(st.st_mode))
 		return NULL;
 
-	for (int n = 0; n < 16; n++) {
-		int len, ret, maj, min;
-		FILE *file;
+	snprintf(path, pathlen, "/sys/dev/char/%d:%d",
+		 major(st.st_rdev), minor(st.st_rdev));
 
-		len = snprintf(path, pathlen, "/sys/class/drm/card%d", n);
+	if (access(path, F_OK))
+		return NULL;
 
-		sprintf(path + len, "/dev");
-		file = fopen(path, "r");
-		if (!file)
-			continue;
-
-		ret = fscanf(file, "%d:%d", &maj, &min);
-		fclose(file);
-
-		if (ret != 2 || major(st.st_rdev) != maj ||
-		    minor(st.st_rdev) != min)
-			continue;
-
-		path[len] = '\0';
-
-		return path;
-	}
-
-	return NULL;
+	return path;
 }
 
 /**
