@@ -101,7 +101,12 @@ static int __igt_pm_audio_restore_runtime_pm(void)
 
 	close(fd);
 
-	__igt_pm_audio_runtime_power_save[0] = 0;
+	memset(__igt_pm_audio_runtime_power_save, 0,
+	       sizeof(__igt_pm_audio_runtime_power_save));
+
+	memset(__igt_pm_audio_runtime_control, 0,
+	       sizeof(__igt_pm_audio_runtime_control));
+
 	free(__igt_pm_audio_runtime_control_path);
 	__igt_pm_audio_runtime_control_path = NULL;
 
@@ -176,9 +181,10 @@ static int __igt_pm_enable_audio_runtime_pm(void)
 		if (fd < 0)
 			continue;
 
-		ret = read(fd, buf, sizeof(buf));
+		ret = read(fd, buf, sizeof(buf) - 1);
 		close(fd);
 		igt_assert(ret > 0);
+		buf[ret] = '\0';
 		strchomp(buf);
 
 		/* Realtek and similar devices are not what we are after. */
@@ -206,7 +212,7 @@ static int __igt_pm_enable_audio_runtime_pm(void)
 	}
 
 	igt_assert(read(fd, __igt_pm_audio_runtime_power_save,
-			sizeof(__igt_pm_audio_runtime_power_save)) > 0);
+			sizeof(__igt_pm_audio_runtime_power_save) - 1) > 0);
 	strchomp(__igt_pm_audio_runtime_power_save);
 	igt_install_exit_handler(__igt_pm_audio_runtime_exit_handler);
 	igt_assert_eq(write(fd, "1\n", 2), 2);
@@ -219,7 +225,7 @@ static int __igt_pm_enable_audio_runtime_pm(void)
 	}
 
 	igt_assert(read(fd, __igt_pm_audio_runtime_control,
-			sizeof(__igt_pm_audio_runtime_control)) > 0);
+			sizeof(__igt_pm_audio_runtime_control) - 1) > 0);
 	strchomp(__igt_pm_audio_runtime_control);
 	igt_assert_eq(write(fd, "auto\n", 5), 5);
 	close(fd);
@@ -527,7 +533,7 @@ bool igt_setup_runtime_pm(void)
 	 * them on test exit.
 	 */
 	size = read(fd, __igt_pm_runtime_autosuspend,
-		    sizeof(__igt_pm_runtime_autosuspend));
+		    sizeof(__igt_pm_runtime_autosuspend) - 1);
 
 	/*
 	 * If we fail to read from the file, it means this system doesn't
@@ -538,6 +544,8 @@ bool igt_setup_runtime_pm(void)
 		igt_pm_audio_restore_runtime_pm();
 		return false;
 	}
+
+	__igt_pm_runtime_autosuspend[size] = '\0';
 
 	strchomp(__igt_pm_runtime_autosuspend);
 	igt_install_exit_handler(__igt_pm_runtime_exit_handler);
@@ -554,7 +562,7 @@ bool igt_setup_runtime_pm(void)
 	igt_assert_f(fd >= 0, "Can't open " POWER_DIR "/control\n");
 
 	igt_assert(read(fd, __igt_pm_runtime_control,
-			sizeof(__igt_pm_runtime_control)) > 0);
+			sizeof(__igt_pm_runtime_control) - 1) > 0);
 	strchomp(__igt_pm_runtime_control);
 
 	igt_debug("Saved runtime power management as '%s' and '%s'\n",
@@ -588,7 +596,7 @@ enum igt_runtime_pm_status igt_get_runtime_pm_status(void)
 	char buf[32];
 
 	lseek(pm_status_fd, 0, SEEK_SET);
-	n_read = read(pm_status_fd, buf, ARRAY_SIZE(buf));
+	n_read = read(pm_status_fd, buf, ARRAY_SIZE(buf) - 1);
 	igt_assert(n_read >= 0);
 	buf[n_read] = '\0';
 
