@@ -44,15 +44,6 @@
 
 #define VERIFY 0
 
-static void write_seqno(int dir, unsigned offset)
-{
-	uint32_t seqno = UINT32_MAX - offset;
-
-	igt_sysfs_printf(dir, "i915_next_seqno", "0x%x", seqno);
-
-	igt_debug("next seqno set to: 0x%x\n", seqno);
-}
-
 static void check_bo(int fd, uint32_t handle, int pass)
 {
 	uint32_t *map;
@@ -332,9 +323,6 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 			pass = 0;
 			igt_until_timeout(150) {
 				uint64_t offset;
-
-				if (!(flags & FORKED))
-					write_seqno(debugfs, pass);
 
 				if (flags & HANG)
 					submit_hang(&hang, engines, nengine, flags);
