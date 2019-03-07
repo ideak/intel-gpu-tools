@@ -628,7 +628,7 @@ bool igt_hpd_storm_detected(int drm_fd)
 	if (fd < 0)
 		return false;
 
-	igt_assert_lt(0, read(fd, buf, sizeof(buf)));
+	igt_assert_lt(0, read(fd, buf, sizeof(buf) - 1));
 	igt_assert(start_loc = strstr(buf, "Detected: "));
 	igt_assert_eq(sscanf(start_loc, "Detected: %s\n", detected_str), 1);
 
