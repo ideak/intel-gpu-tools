@@ -1419,6 +1419,8 @@ again:
 		free(copy_fd_lnk);
 		free(fd_lnk);
 	}
+
+	closedir(dp);
 }
 
 /*
