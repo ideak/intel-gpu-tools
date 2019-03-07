@@ -1841,6 +1841,8 @@ static void get_yuv_parameters(struct igt_fb *fb, struct yuv_parameters *params)
 		params->y_offset = fb->offsets[0];
 		params->u_offset = fb->offsets[2];
 		params->v_offset = fb->offsets[1];
+		break;
+
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_P012:
 	case DRM_FORMAT_P016:
