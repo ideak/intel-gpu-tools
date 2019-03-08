@@ -1286,7 +1286,13 @@ static const uint8_t *dump_sequence(const uint8_t *data, uint8_t seq_version)
 			operation_size = *data++;
 
 		if (mipi_elem_dump) {
+			const uint8_t *next = data + operation_size;
+
 			data = mipi_elem_dump(data, seq_version);
+
+			if (operation_size && next != data)
+				printf("Error: Inconsistent operation size: %d\n",
+					operation_size);
 		} else if (operation_size) {
 			/* We have size, skip. */
 			data += operation_size;
