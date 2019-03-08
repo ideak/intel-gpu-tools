@@ -1151,7 +1151,7 @@ static void dump_mipi_config(struct context *context,
 	printf("\t\tPanel power cycle delay: %d\n", pps->panel_power_cycle_delay);
 }
 
-static const uint8_t *mipi_dump_send_packet(const uint8_t *data)
+static const uint8_t *mipi_dump_send_packet(const uint8_t *data, uint8_t seq_version)
 {
 	uint8_t flags, type;
 	uint16_t len, i;
@@ -1174,29 +1174,36 @@ static const uint8_t *mipi_dump_send_packet(const uint8_t *data)
 	return data;
 }
 
-static const uint8_t *mipi_dump_delay(const uint8_t *data)
+static const uint8_t *mipi_dump_delay(const uint8_t *data, uint8_t seq_version)
 {
 	printf("\t\tDelay: %u us\n", *((const uint32_t *)data));
 
 	return data + 4;
 }
 
-static const uint8_t *mipi_dump_gpio(const uint8_t *data)
+static const uint8_t *mipi_dump_gpio(const uint8_t *data, uint8_t seq_version)
 {
-	uint8_t index, flags;
+	uint8_t index, number, flags;
 
-	index = *data++;
-	flags = *data++;
+	if (seq_version >= 3) {
+		index = *data++;
+		number = *data++;
+		flags = *data++;
 
-	printf("\t\tGPIO index %u, source %d, set %d\n",
-	       index,
-	       (flags >> 1) & 3,
-	       flags & 1);
+		printf("\t\tGPIO index %u, number %u, set %d\n",
+		       index, number, flags & 1);
+	} else {
+		index = *data++;
+		flags = *data++;
+
+		printf("\t\tGPIO index %u, source %d, set %d\n",
+		       index, (flags >> 1) & 3, flags & 1);
+	}
 
 	return data;
 }
 
-static const uint8_t *mipi_dump_i2c(const uint8_t *data)
+static const uint8_t *mipi_dump_i2c(const uint8_t *data, uint8_t seq_version)
 {
 	uint8_t flags, index, bus, offset, len, i;
 	uint16_t address;
@@ -1218,7 +1225,7 @@ static const uint8_t *mipi_dump_i2c(const uint8_t *data)
 	return data;
 }
 
-typedef const uint8_t * (*fn_mipi_elem_dump)(const uint8_t *data);
+typedef const uint8_t * (*fn_mipi_elem_dump)(const uint8_t *data, uint8_t seq_version);
 
 static const fn_mipi_elem_dump dump_elem[] = {
 	[MIPI_SEQ_ELEM_SEND_PKT] = mipi_dump_send_packet,
@@ -1279,7 +1286,7 @@ static const uint8_t *dump_sequence(const uint8_t *data, uint8_t seq_version)
 			operation_size = *data++;
 
 		if (mipi_elem_dump) {
-			data = mipi_elem_dump(data);
+			data = mipi_elem_dump(data, seq_version);
 		} else if (operation_size) {
 			/* We have size, skip. */
 			data += operation_size;
