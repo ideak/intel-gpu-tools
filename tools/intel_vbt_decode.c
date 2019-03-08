@@ -1190,14 +1190,14 @@ static const uint8_t *mipi_dump_gpio(const uint8_t *data, uint8_t seq_version)
 		number = *data++;
 		flags = *data++;
 
-		printf("\t\tGPIO index %u, number %u, set %d\n",
-		       index, number, flags & 1);
+		printf("\t\tGPIO index %u, number %u, set %d (0x%02x)\n",
+		       index, number, flags & 1, flags);
 	} else {
 		index = *data++;
 		flags = *data++;
 
-		printf("\t\tGPIO index %u, source %d, set %d\n",
-		       index, (flags >> 1) & 3, flags & 1);
+		printf("\t\tGPIO index %u, source %d, set %d (0x%02x)\n",
+		       index, (flags >> 1) & 3, flags & 1, flags);
 	}
 
 	return data;
