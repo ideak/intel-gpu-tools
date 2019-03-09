@@ -72,11 +72,104 @@ static const char *make_filename(const char *filename)
 	return buf;
 }
 
-static void *linear_copy(data_t *data, struct igt_buf *buf)
+static void *yf_ptr(void *ptr,
+		    unsigned int x, unsigned int y,
+		    unsigned int stride, unsigned int cpp)
 {
-	void *map, *linear;
+	const int tile_size = 4 * 1024;
+	const int tile_width = 128;
+	int row_size = (stride / tile_width) * tile_size;
 
-	igt_assert_eq(posix_memalign(&linear, 16, buf->bo->size), 0);
+	x *= cpp; /* convert to Byte offset */
+
+
+	/*
+	 * Within a 4k Yf tile, the byte swizzling pattern is
+	 * msb......lsb
+	 * xyxyxyyyxxxx
+	 * The tiles themselves are laid out in row major order.
+	 */
+	return ptr +
+		((x & 0xf) * 1) + /* 4x1 pixels(32bpp) = 16B */
+		((y & 0x3) * 16) + /* 4x4 pixels = 64B */
+		(((y & 0x4) >> 2) * 64) + /* 1x2 64B blocks */
+		(((x & 0x10) >> 4) * 128) + /* 2x2 64B blocks = 256B block */
+		(((y & 0x8) >> 3) * 256) + /* 2x1 256B blocks */
+		(((x & 0x20) >> 5) * 512) + /* 2x2 256B blocks */
+		(((y & 0x10) >> 4) * 1024) + /* 4x2 256 blocks */
+		(((x & 0x40) >> 6) * 2048) + /* 4x4 256B blocks = 4k tile */
+		(((x & ~0x7f) >> 7) * tile_size) + /* row of tiles */
+		(((y & ~0x1f) >> 5) * row_size);
+}
+
+static void copy_linear_to_yf(data_t *data, struct igt_buf *buf,
+			      const uint32_t *linear)
+{
+	int height = igt_buf_height(buf);
+	int width = igt_buf_width(buf);
+	void *map;
+
+	gem_set_domain(data->drm_fd, buf->bo->handle,
+		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	map = gem_mmap__cpu(data->drm_fd, buf->bo->handle, 0,
+			    buf->bo->size, PROT_READ | PROT_WRITE);
+
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			uint32_t *ptr = yf_ptr(map, x, y,
+					       buf->stride, buf->bpp / 8);
+
+			*ptr = linear[y * width + x];
+		}
+	}
+
+	munmap(map, buf->bo->size);
+}
+
+static void copy_yf_to_linear(data_t *data, struct igt_buf *buf,
+			      uint32_t *linear)
+{
+	int height = igt_buf_height(buf);
+	int width = igt_buf_width(buf);
+	void *map;
+
+	gem_set_domain(data->drm_fd, buf->bo->handle,
+		       I915_GEM_DOMAIN_CPU, 0);
+	map = gem_mmap__cpu(data->drm_fd, buf->bo->handle, 0,
+			    buf->bo->size, PROT_READ);
+
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			uint32_t *ptr = yf_ptr(map, x, y,
+					       buf->stride, buf->bpp / 8);
+
+			linear[y * width + x] = *ptr;
+		}
+	}
+
+	munmap(map, buf->bo->size);
+}
+
+static void copy_linear_to_gtt(data_t *data, struct igt_buf *buf,
+			       const uint32_t *linear)
+{
+	void *map;
+
+	gem_set_domain(data->drm_fd, buf->bo->handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
+	map = gem_mmap__gtt(data->drm_fd, buf->bo->handle,
+			    buf->bo->size, PROT_READ | PROT_WRITE);
+
+	memcpy(map, linear, buf->bo->size);
+
+	munmap(map, buf->bo->size);
+}
+
+static void copy_gtt_to_linear(data_t *data, struct igt_buf *buf,
+			       uint32_t *linear)
+{
+	void *map;
 
 	gem_set_domain(data->drm_fd, buf->bo->handle,
 		       I915_GEM_DOMAIN_GTT, 0);
@@ -87,6 +180,19 @@ static void *linear_copy(data_t *data, struct igt_buf *buf)
 	igt_memcpy_from_wc(linear, map, buf->bo->size);
 
 	munmap(map, buf->bo->size);
+}
+
+static void *linear_copy(data_t *data, struct igt_buf *buf)
+{
+	void *linear;
+
+	/* 16B alignment allows to potentially make use of SSE4 for copying */
+	igt_assert_eq(posix_memalign(&linear, 16, buf->bo->size), 0);
+
+	if (buf->tiling == I915_TILING_Yf)
+		copy_yf_to_linear(data, buf, linear);
+	else
+		copy_gtt_to_linear(data, buf, linear);
 
 	return linear;
 }
@@ -173,7 +279,7 @@ static void scratch_buf_draw_pattern(data_t *data, struct igt_buf *buf,
 	cairo_surface_t *surface;
 	cairo_pattern_t *pat;
 	cairo_t *cr;
-	void *map, *linear;
+	void *linear;
 
 	linear = linear_copy(data, buf);
 
@@ -216,15 +322,10 @@ static void scratch_buf_draw_pattern(data_t *data, struct igt_buf *buf,
 
 	cairo_surface_destroy(surface);
 
-	gem_set_domain(data->drm_fd, buf->bo->handle,
-		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	map = gem_mmap__gtt(data->drm_fd, buf->bo->handle,
-			    buf->bo->size, PROT_READ | PROT_WRITE);
-
-	memcpy(map, linear, buf->bo->size);
-
-	munmap(map, buf->bo->size);
+	if (buf->tiling == I915_TILING_Yf)
+		copy_linear_to_yf(data, buf, linear);
+	else
+		copy_linear_to_gtt(data, buf, linear);
 
 	free(linear);
 }
@@ -236,21 +337,12 @@ scratch_buf_copy(data_t *data,
 {
 	int width = igt_buf_width(dst);
 	int height  = igt_buf_height(dst);
-	uint32_t *linear_dst, *linear_src;
+	uint32_t *linear_dst;
 
 	igt_assert_eq(igt_buf_width(dst), igt_buf_width(src));
 	igt_assert_eq(igt_buf_height(dst), igt_buf_height(src));
 	igt_assert_eq(dst->bo->size, src->bo->size);
-
-	gem_set_domain(data->drm_fd, dst->bo->handle,
-		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-	gem_set_domain(data->drm_fd, src->bo->handle,
-		       I915_GEM_DOMAIN_GTT, 0);
-
-	linear_dst = gem_mmap__gtt(data->drm_fd, dst->bo->handle,
-				   dst->bo->size, PROT_WRITE);
-	linear_src = gem_mmap__gtt(data->drm_fd, src->bo->handle,
-				   src->bo->size, PROT_READ);
+	igt_assert_eq(dst->bpp, src->bpp);
 
 	w = min(w, width - sx);
 	w = min(w, width - dx);
@@ -258,14 +350,49 @@ scratch_buf_copy(data_t *data,
 	h = min(h, height - sy);
 	h = min(h, height - dy);
 
-	for (int y = 0; y < h; y++) {
-		igt_memcpy_from_wc(&linear_dst[(dy+y) * width + dx],
-				   &linear_src[(sy+y) * width + sx],
-				   w * 4);
+	gem_set_domain(data->drm_fd, dst->bo->handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	linear_dst = gem_mmap__gtt(data->drm_fd, dst->bo->handle,
+				   dst->bo->size, PROT_WRITE);
+
+	if (src->tiling == I915_TILING_Yf) {
+		void *map;
+
+		gem_set_domain(data->drm_fd, src->bo->handle,
+			       I915_GEM_DOMAIN_CPU, 0);
+		map = gem_mmap__cpu(data->drm_fd, src->bo->handle, 0,
+				    src->bo->size, PROT_READ);
+
+		for (int y = 0; y < h; y++) {
+			for (int x = 0; x < w; x++) {
+				const uint32_t *ptr = yf_ptr(map, sx+x, sy+y,
+							     src->stride,
+							     src->bpp / 8);
+
+				linear_dst[(dy+y) * width + dx+x] = *ptr;
+			}
+		}
+
+		munmap(map, src->bo->size);
+	} else {
+		uint32_t *linear_src;
+
+		gem_set_domain(data->drm_fd, src->bo->handle,
+			       I915_GEM_DOMAIN_GTT, 0);
+
+		linear_src = gem_mmap__gtt(data->drm_fd, src->bo->handle,
+					   src->bo->size, PROT_READ);
+
+		for (int y = 0; y < h; y++) {
+			igt_memcpy_from_wc(&linear_dst[(dy+y) * width + dx],
+					   &linear_src[(sy+y) * width + sx],
+					   w * (src->bpp / 8));
+		}
+
+		munmap(linear_src, src->bo->size);
 	}
 
 	munmap(linear_dst, dst->bo->size);
-	munmap(linear_src, src->bo->size);
 }
 
 static void scratch_buf_init(data_t *data, struct igt_buf *buf,
@@ -274,6 +401,7 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 {
 	uint32_t tiling = req_tiling;
 	unsigned long pitch;
+	int bpp = 32;
 
 	memset(buf, 0, sizeof(*buf));
 
@@ -282,12 +410,13 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 		int size;
 
 		igt_require(intel_gen(data->devid) >= 9);
-		igt_assert_eq(tiling, I915_TILING_Y);
+		igt_assert(tiling == I915_TILING_Y ||
+			   tiling == I915_TILING_Yf);
 
-		buf->stride = ALIGN(width * 4, 128);
+		buf->stride = ALIGN(width * (bpp / 8), 128);
 		buf->size = buf->stride * height;
 		buf->tiling = tiling;
-		buf->bpp = 32;
+		buf->bpp = bpp;
 
 		aux_width = scratch_buf_aux_width(buf);
 		aux_height = scratch_buf_aux_height(buf);
@@ -299,18 +428,31 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 
 		buf->bo = drm_intel_bo_alloc(data->bufmgr, "", size, 4096);
 
-		drm_intel_bo_set_tiling(buf->bo, &tiling, buf->stride);
-		igt_assert_eq(tiling, req_tiling);
+		if (tiling == I915_TILING_Y) {
+			drm_intel_bo_set_tiling(buf->bo, &tiling, buf->stride);
+			igt_assert_eq(tiling, req_tiling);
+		}
+	} else if (req_tiling == I915_TILING_Yf) {
+		int size;
+
+		buf->stride = ALIGN(width * (bpp / 8), 128);
+		buf->size = buf->stride * height;
+		buf->tiling = tiling;
+		buf->bpp = bpp;
+
+		size = buf->stride * ALIGN(height, 32);
+
+		buf->bo = drm_intel_bo_alloc(data->bufmgr, "", size, 4096);
 	} else {
 		buf->bo = drm_intel_bo_alloc_tiled(data->bufmgr, "",
-						   width, height, 4,
+						   width, height, bpp / 8,
 						   &tiling, &pitch, 0);
 		igt_assert_eq(tiling, req_tiling);
 
 		buf->stride = pitch;
 		buf->tiling = tiling;
 		buf->size = pitch * height;
-		buf->bpp = 32;
+		buf->bpp = bpp;
 	}
 
 	igt_assert(igt_buf_width(buf) == width);
@@ -396,7 +538,7 @@ static void scratch_buf_aux_check(data_t *data,
 		     "Aux surface indicates that nothing was compressed\n");
 }
 
-static void test(data_t *data, uint32_t tiling, bool test_ccs)
+static void test(data_t *data, uint32_t tiling, uint64_t ccs_modifier)
 {
 	struct igt_buf dst, ccs, ref;
 	struct {
@@ -404,7 +546,7 @@ static void test(data_t *data, uint32_t tiling, bool test_ccs)
 		const char *filename;
 		uint32_t tiling;
 		int x, y;
-	} src[3] = {
+	} src[] = {
 		{
 			.filename = "source-linear.png",
 			.tiling = I915_TILING_NONE,
@@ -420,18 +562,31 @@ static void test(data_t *data, uint32_t tiling, bool test_ccs)
 			.tiling = I915_TILING_Y,
 			.x = WIDTH/2+1, .y = 1,
 		},
+		{
+			.filename = "source-yf-tiled.png",
+			.tiling = I915_TILING_Yf,
+			.x = 1, .y = 1,
+		},
 	};
 
 	int opt_dump_aub = igt_aub_dump_enabled();
+	int num_src = ARRAY_SIZE(src);
 
-	for (int i = 0; i < ARRAY_SIZE(src); i++)
+	/* no Yf before gen9 */
+	if (intel_gen(data->devid) < 9)
+		num_src--;
+
+	if (tiling == I915_TILING_Yf || ccs_modifier)
+		igt_require(intel_gen(data->devid) >= 9);
+
+	for (int i = 0; i < num_src; i++)
 		scratch_buf_init(data, &src[i].buf, WIDTH, HEIGHT, src[i].tiling, false);
 	scratch_buf_init(data, &dst, WIDTH, HEIGHT, tiling, false);
-	if (test_ccs)
-		scratch_buf_init(data, &ccs, WIDTH, HEIGHT, I915_TILING_Y, true);
+	if (ccs_modifier)
+		scratch_buf_init(data, &ccs, WIDTH, HEIGHT, ccs_modifier, true);
 	scratch_buf_init(data, &ref, WIDTH, HEIGHT, I915_TILING_NONE, false);
 
-	for (int i = 0; i < ARRAY_SIZE(src); i++)
+	for (int i = 0; i < num_src; i++)
 		scratch_buf_draw_pattern(data, &src[i].buf,
 					 0, 0, WIDTH, HEIGHT,
 					 0, 0, WIDTH, HEIGHT, true);
@@ -442,13 +597,13 @@ static void test(data_t *data, uint32_t tiling, bool test_ccs)
 	scratch_buf_copy(data,
 			 &dst, 0, 0, WIDTH, HEIGHT,
 			 &ref, 0, 0);
-	for (int i = 0; i < ARRAY_SIZE(src); i++)
+	for (int i = 0; i < num_src; i++)
 		scratch_buf_copy(data,
 				 &src[i].buf, WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
 				 &ref, src[i].x, src[i].y);
 
 	if (opt_dump_png) {
-		for (int i = 0; i < ARRAY_SIZE(src); i++)
+		for (int i = 0; i < num_src; i++)
 			scratch_buf_write_to_png(data, &src[i].buf, src[i].filename);
 		scratch_buf_write_to_png(data, &dst, "destination.png");
 		scratch_buf_write_to_png(data, &ref, "reference.png");
@@ -468,24 +623,24 @@ static void test(data_t *data, uint32_t tiling, bool test_ccs)
 	 *	 |dst|src|
 	 *	  -------
 	 */
-	if (test_ccs)
+	if (ccs_modifier)
 		data->render_copy(data->batch, NULL,
 				  &dst, 0, 0, WIDTH, HEIGHT,
 				  &ccs, 0, 0);
 
-	for (int i = 0; i < ARRAY_SIZE(src); i++)
+	for (int i = 0; i < num_src; i++)
 		data->render_copy(data->batch, NULL,
 				  &src[i].buf, WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
-				  test_ccs ? &ccs : &dst, src[i].x, src[i].y);
+				  ccs_modifier ? &ccs : &dst, src[i].x, src[i].y);
 
-	if (test_ccs)
+	if (ccs_modifier)
 		data->render_copy(data->batch, NULL,
 				  &ccs, 0, 0, WIDTH, HEIGHT,
 				  &dst, 0, 0);
 
 	if (opt_dump_png){
 		scratch_buf_write_to_png(data, &dst, "result.png");
-		if (test_ccs) {
+		if (ccs_modifier) {
 			scratch_buf_write_to_png(data, &ccs, "compressed.png");
 			scratch_buf_aux_write_to_png(data, &ccs, "compressed-aux.png");
 		}
@@ -505,7 +660,7 @@ static void test(data_t *data, uint32_t tiling, bool test_ccs)
 		scratch_buf_check(data, &dst, &ref, WIDTH - 10, HEIGHT - 10);
 	}
 
-	if (test_ccs)
+	if (ccs_modifier)
 		scratch_buf_aux_check(data, &ccs);
 }
 
@@ -546,18 +701,31 @@ int main(int argc, char **argv)
 	}
 
 	igt_subtest("linear")
-		test(&data, I915_TILING_NONE, false);
+		test(&data, I915_TILING_NONE, 0);
 	igt_subtest("x-tiled")
-		test(&data, I915_TILING_X, false);
+		test(&data, I915_TILING_X, 0);
 	igt_subtest("y-tiled")
-		test(&data, I915_TILING_Y, false);
+		test(&data, I915_TILING_Y, 0);
+	igt_subtest("yf-tiled")
+		test(&data, I915_TILING_Yf, 0);
 
 	igt_subtest("y-tiled-ccs-to-linear")
-		test(&data, I915_TILING_NONE, true);
+		test(&data, I915_TILING_NONE, I915_TILING_Y);
 	igt_subtest("y-tiled-ccs-to-x-tiled")
-		test(&data, I915_TILING_X, true);
+		test(&data, I915_TILING_X, I915_TILING_Y);
 	igt_subtest("y-tiled-ccs-to-y-tiled")
-		test(&data, I915_TILING_Y, true);
+		test(&data, I915_TILING_Y, I915_TILING_Y);
+	igt_subtest("y-tiled-ccs-to-yf-tiled")
+		test(&data, I915_TILING_Yf, I915_TILING_Y);
+
+	igt_subtest("yf-tiled-ccs-to-linear")
+		test(&data, I915_TILING_NONE, I915_TILING_Yf);
+	igt_subtest("yf-tiled-ccs-to-x-tiled")
+		test(&data, I915_TILING_X, I915_TILING_Yf);
+	igt_subtest("yf-tiled-ccs-to-y-tiled")
+		test(&data, I915_TILING_Y, I915_TILING_Yf);
+	igt_subtest("yf-tiled-ccs-to-yf-tiled")
+		test(&data, I915_TILING_Yf, I915_TILING_Yf);
 
 	igt_fixture {
 		intel_batchbuffer_free(data.batch);
