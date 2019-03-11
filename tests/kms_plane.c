@@ -462,7 +462,7 @@ static void test_format_plane_color(data_t *data, enum pipe pipe,
 	igt_remove_fb(data->drm_fd, &old_fb);
 }
 
-static void test_format_plane(data_t *data, enum pipe pipe,
+static bool test_format_plane(data_t *data, enum pipe pipe,
 			      igt_output_t *output, igt_plane_t *plane)
 {
 	igt_plane_t *primary;
@@ -472,12 +472,13 @@ static void test_format_plane(data_t *data, enum pipe pipe,
 	uint32_t format, ref_format;
 	uint64_t width, height;
 	igt_crc_t ref_crc[ARRAY_SIZE(colors)];
+	bool result = true;
 
 	/*
 	 * No clamping test for cursor plane
 	 */
 	if (data->crop != 0 && plane->type == DRM_PLANE_TYPE_CURSOR)
-		return;
+		return true;
 
 	mode = igt_output_get_mode(output);
 	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
@@ -487,7 +488,7 @@ static void test_format_plane(data_t *data, enum pipe pipe,
 	} else {
 		if (!plane->drm_plane) {
 			igt_debug("Only legacy cursor ioctl supported, skipping cursor plane\n");
-			return;
+			return true;
 		}
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &width));
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_HEIGHT, &height));
@@ -548,11 +549,19 @@ static void test_format_plane(data_t *data, enum pipe pipe,
 			 kmstest_pipe_name(pipe), plane->index);
 
 		for (int j = 0; j < ARRAY_SIZE(colors); j++) {
+			bool crc_equal;
+
 			test_format_plane_color(data, pipe, plane,
 						format, width, height,
 						j, &crc, &fb);
 
-			igt_assert_crc_equal(&crc, &ref_crc[j]);
+			crc_equal = igt_check_crc_equal(&crc, &ref_crc[j]);
+			result &= crc_equal;
+
+			if (!crc_equal)
+				igt_warn("CRC mismatch with format " IGT_FORMAT_FMT " on %s.%u\n",
+					 IGT_FORMAT_ARGS(format),
+					 kmstest_pipe_name(pipe), plane->index);
 		}
 	}
 
@@ -567,6 +576,8 @@ static void test_format_plane(data_t *data, enum pipe pipe,
 
 	igt_remove_fb(data->drm_fd, &fb);
 	igt_remove_fb(data->drm_fd, &primary_fb);
+
+	return result;
 }
 
 static void
@@ -577,10 +588,14 @@ test_pixel_formats(data_t *data, enum pipe pipe)
 	igt_display_require_output_on_pipe(&data->display, pipe);
 
 	for_each_valid_output_on_pipe(&data->display, pipe, output) {
+		bool result = true;
 		igt_plane_t *plane;
 
 		for_each_plane_on_pipe(&data->display, pipe, plane)
-			test_format_plane(data, pipe, output, plane);
+			result &= test_format_plane(data, pipe, output, plane);
+
+		igt_assert_f(result, "At least one CRC mismatch happened\n");
+
 
 		igt_output_set_pipe(output, PIPE_ANY);
 	}
