@@ -33,7 +33,6 @@ typedef struct {
 	int drm_fd;
 	igt_display_t display;
 	igt_crc_t ref_crc;
-	igt_pipe_crc_t *pipe_crc;
 
 	int image_w;
 	int image_h;
@@ -72,8 +71,6 @@ static void cleanup_fbs(data_t *data)
 static void cleanup_crtc(data_t *data)
 {
 	igt_display_reset(&data->display);
-	igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = NULL;
 
 	cleanup_fbs(data);
 }
@@ -88,9 +85,6 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	cleanup_crtc(data);
 
 	igt_output_set_pipe(output, pipe);
-
-	/* create the pipe_crc object for this pipe */
-	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
 	igt_skip_on(!igt_display_has_format_mod(display, DRM_FORMAT_XRGB8888,
 						tiling));
@@ -566,7 +560,6 @@ igt_main
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_AMDGPU);
-		igt_require_pipe_crc(data.drm_fd);
 		igt_display_require(&data.display, data.drm_fd);
 		data.devid = is_i915_device(data.drm_fd) ?
 			intel_get_drm_devid(data.drm_fd) : 0;
