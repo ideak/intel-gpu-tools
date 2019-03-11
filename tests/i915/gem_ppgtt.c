@@ -97,7 +97,7 @@ static void fork_rcs_copy(int timeout, uint32_t final,
 	mem_per_child = SIZE;
 	if (flags & CREATE_CONTEXT)
 		mem_per_child += 2 * 128 * 1024; /* rough context sizes */
-	intel_require_memory(mem_per_child, count, CHECK_RAM);
+	intel_require_memory(count, mem_per_child, CHECK_RAM);
 
 	for (int child = 0; child < count; child++) {
 		int fd = drm_open_driver(DRIVER_INTEL);
