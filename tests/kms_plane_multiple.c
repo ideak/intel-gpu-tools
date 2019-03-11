@@ -341,20 +341,16 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 	}
 
 	igt_subtest_f("atomic-pipe-%s-tiling-x", kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_X_TILED);
+		test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_X_TILED);
 
 	igt_subtest_f("atomic-pipe-%s-tiling-y", kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_Y_TILED);
+		test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_Y_TILED);
 
 	igt_subtest_f("atomic-pipe-%s-tiling-yf", kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_Yf_TILED);
+		test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_Yf_TILED);
 
 	igt_subtest_f("atomic-pipe-%s-tiling-none", kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			test_plane_position(data, pipe, LOCAL_DRM_FORMAT_MOD_NONE);
+		test_plane_position(data, pipe, LOCAL_DRM_FORMAT_MOD_NONE);
 }
 
 static data_t data;
