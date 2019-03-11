@@ -534,16 +534,6 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		if (!igt_fb_supported_format(format))
 			continue;
 
-		/*
-		 * There seems to be some issue there with the CRC not
-		 * matching. Both CRCs are stable, but don't match,
-		 * which seems to indicate some issue with the CRC
-		 * computation logic, but I haven't been able to find
-		 * what.
-		 */
-		if (format == DRM_FORMAT_XBGR8888)
-			continue;
-
 		igt_info("Testing format " IGT_FORMAT_FMT " on %s.%u\n",
 			 IGT_FORMAT_ARGS(format),
 			 kmstest_pipe_name(pipe), plane->index);
