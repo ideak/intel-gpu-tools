@@ -28,6 +28,7 @@
 #include <limits.h>
 
 #include "igt.h"
+#include "i915/gem_vm.h"
 
 IGT_TEST_DESCRIPTION("Basic test for context set/get param input validation.");
 
@@ -35,17 +36,6 @@ IGT_TEST_DESCRIPTION("Basic test for context set/get param input validation.");
 
 #define NEW_CTX	BIT(0)
 #define USER BIT(1)
-
-static int reopen_driver(int fd)
-{
-	char path[256];
-
-	snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
-	fd = open(path, O_RDWR);
-	igt_assert_lte(0, fd);
-
-	return fd;
-}
 
 static void set_priority(int i915)
 {
@@ -91,7 +81,7 @@ static void set_priority(int i915)
 	igt_permute_array(values, size, igt_exchange_int64);
 
 	igt_fork(flags, NEW_CTX | USER) {
-		int fd = reopen_driver(i915);
+		int fd = gem_reopen_driver(i915);
 		struct drm_i915_gem_context_param arg = {
 			.param = I915_CONTEXT_PARAM_PRIORITY,
 			.ctx_id = flags & NEW_CTX ? gem_context_create(fd) : 0,
@@ -141,6 +131,105 @@ static void set_priority(int i915)
 
 	igt_waitchildren();
 	free(values);
+}
+
+static uint32_t __batch_create(int i915, uint32_t offset)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
+
+	handle = gem_create(i915, ALIGN(offset + 4, 4096));
+	gem_write(i915, handle, offset, &bbe, sizeof(bbe));
+
+	return handle;
+}
+
+static uint32_t batch_create(int i915)
+{
+	return __batch_create(i915, 0);
+}
+
+static void test_vm(int i915)
+{
+	const uint64_t nonzero_offset = 48 << 20;
+	struct drm_i915_gem_exec_object2 batch = {
+		.handle = batch_create(i915),
+	};
+	struct drm_i915_gem_execbuffer2 eb = {
+		.buffers_ptr = to_user_pointer(&batch),
+		.buffer_count = 1,
+	};
+	struct drm_i915_gem_context_param arg = {
+		.param = I915_CONTEXT_PARAM_VM,
+	};
+	uint32_t parent, child;
+
+	/*
+	 * Proving 2 contexts share the same GTT is quite tricky as we have no
+	 * means of directly comparing them (each handle returned to userspace
+	 * is unique). What we do instead is rely on a quirk of execbuf that
+	 * it does not try to move an VMA without good reason, and so that
+	 * having used an object in one context, it will have the same address
+	 * in the next context that shared the VM.
+	 */
+
+	arg.value = -1ull;
+	igt_require(__gem_context_set_param(i915, &arg) == -ENOENT);
+
+	parent = gem_context_create(i915);
+	child = gem_context_create(i915);
+
+	/* Using implicit soft-pinning */
+	eb.rsvd1 = parent;
+	batch.offset = nonzero_offset;
+	gem_execbuf(i915, &eb);
+	igt_assert_eq_u64(batch.offset, nonzero_offset);
+
+	eb.rsvd1 = child;
+	batch.offset = 0;
+	gem_execbuf(i915, &eb);
+	igt_assert_eq_u64(batch.offset, 0);
+
+	eb.rsvd1 = parent;
+	gem_execbuf(i915, &eb);
+	igt_assert_eq_u64(batch.offset, nonzero_offset);
+
+	arg.ctx_id = parent;
+	gem_context_get_param(i915, &arg);
+	gem_context_set_param(i915, &arg);
+
+	/* Still the same VM, so expect the old VMA again */
+	batch.offset = 0;
+	gem_execbuf(i915, &eb);
+	igt_assert_eq_u64(batch.offset, nonzero_offset);
+
+	arg.ctx_id = child;
+	gem_context_set_param(i915, &arg);
+
+	eb.rsvd1 = child;
+	batch.offset = 0;
+	gem_execbuf(i915, &eb);
+	igt_assert_eq_u64(batch.offset, nonzero_offset);
+
+	gem_context_destroy(i915, child);
+	gem_context_destroy(i915, parent);
+
+	/* both contexts destroyed, but we still keep hold of the vm */
+	child = gem_context_create(i915);
+
+	arg.ctx_id = child;
+	gem_context_set_param(i915, &arg);
+
+	eb.rsvd1 = child;
+	batch.offset = 0;
+	gem_execbuf(i915, &eb);
+	igt_assert_eq_u64(batch.offset, nonzero_offset);
+
+	gem_context_destroy(i915, child);
+	gem_vm_destroy(i915, arg.value);
+
+	gem_sync(i915, batch.handle);
+	gem_close(i915, batch.handle);
 }
 
 igt_main
@@ -252,6 +341,9 @@ igt_main
 		arg.value = 0;
 		gem_context_set_param(fd, &arg);
 	}
+
+	igt_subtest("vm")
+		test_vm(fd);
 
 	arg.param = I915_CONTEXT_PARAM_PRIORITY;
 
