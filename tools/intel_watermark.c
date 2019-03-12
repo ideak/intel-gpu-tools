@@ -41,6 +41,11 @@ static uint32_t read_reg(uint32_t addr)
 	return INREG(display_base + addr);
 }
 
+static void write_reg(uint32_t addr, uint32_t val)
+{
+	OUTREG(display_base + addr, val);
+}
+
 struct gmch_wm {
 	int wm, wm1, dl, fifo, fbc, burst;
 	bool dl_prec, valid;
@@ -249,6 +254,7 @@ static void skl_wm_dump(void)
 	uint32_t nv12_buf_cfg[num_pipes][max_planes];
 	uint32_t plane_ctl[num_pipes][max_planes];
 	uint32_t wm_linetime[num_pipes];
+	uint32_t wm_dbg;
 
 	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
 
@@ -455,6 +461,17 @@ static void skl_wm_dump(void)
 
 	printf("* plane watermark enabled\n");
 	printf("(x) line watermark if enabled\n");
+
+	wm_dbg = read_reg(0x45280);
+	printf("WM_DBG: 0x%08x\n", wm_dbg);
+	printf(" LP used:");
+	for (level = 1; level < num_levels; level++) {
+		if (wm_dbg & (1 << (23 + level)))
+			printf(" LP%d", level);
+	}
+	printf("\n");
+	/* clear the sticky bits */
+	write_reg(0x45280, wm_dbg);
 }
 
 static void ilk_wm_dump(void)
@@ -608,6 +625,22 @@ static void ilk_wm_dump(void)
 	}
 	printf("FBC watermark = %s\n",
 	       endis(!REG_DECODE1(arb_ctl, 15, 1)));
+
+	if (IS_BROADWELL(devid) || IS_HASWELL(devid)) {
+		uint32_t wm_dbg = read_reg(0x45280);
+		printf("WM_DBG: 0x%08x\n", wm_dbg);
+		if (wm_dbg & (1 << 31))
+			printf(" Full maxfifo used\n");
+		if (wm_dbg & (1 << 30))
+			printf(" Sprite maxfifo used\n");
+		printf(" LP used:");
+		for (i = 1; i < 4; i++) {
+			if (wm_dbg & (1 << (23+i)))
+				printf(" LP%d", i);
+		}
+		/* clear the sticky bits */
+		write_reg(0x45280, wm_dbg);
+	}
 }
 
 static void vlv_wm_dump(void)
