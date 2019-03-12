@@ -29,7 +29,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "intel_io.h"
-#include "intel_chipset.h"
 
 struct eu_rdata {
 	union {
@@ -133,7 +132,11 @@ find_stuck_threads(void)
 
 int main(int argc, char *argv[]) {
 	struct pci_device *pci_dev;
-	pci_dev = intel_get_pci_device();
+	int fd;
+
+	fd = drm_open_driver(DRIVER_INTEL);
+	pci_dev = igt_device_get_pci_device(fd);
+	close(fd);
 
 	intel_register_access_init(pci_dev, 1);
 	find_stuck_threads();

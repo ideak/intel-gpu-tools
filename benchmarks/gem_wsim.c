@@ -41,7 +41,6 @@
 #include <limits.h>
 #include <pthread.h>
 
-
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "drm.h"
@@ -50,6 +49,7 @@
 
 #include "intel_io.h"
 #include "igt_aux.h"
+#include "igt_device.h"
 #include "igt_rand.h"
 #include "igt_perf.h"
 #include "sw_sync.h"
@@ -2223,7 +2223,7 @@ static void init_clocks(void)
 	uint32_t rcs_start, rcs_end;
 	double overhead, t;
 
-	intel_register_access_init(intel_get_pci_device(), false, fd);
+	intel_register_access_init(igt_device_get_pci_device(fd), false, fd);
 
 	if (verbose <= 1)
 		return;

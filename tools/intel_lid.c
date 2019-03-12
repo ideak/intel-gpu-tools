@@ -37,9 +37,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "drmtest.h"
+#include "igt_device.h"
 #include "intel_io.h"
 #include "intel_reg.h"
-#include "intel_chipset.h"
 
 #define SWF14_LID_STATUS_CLOSED	(1<<29) /* 0 here means open */
 
@@ -118,8 +119,11 @@ out:
 int main(int argc, char **argv)
 {
 	int swf14, acpi_lid;
+	int fd;
 
-	intel_mmio_use_pci_bar(intel_get_pci_device());
+	fd = drm_open_driver(DRIVER_INTEL);
+	intel_mmio_use_pci_bar(igt_device_get_pci_device(fd));
+	close(fd);
 
 	while (1) {
 		swf14 = INREG(SWF14);
@@ -142,5 +146,6 @@ int main(int argc, char **argv)
 		}
 		sleep(2);
 	}
+
 	return 0;
 }

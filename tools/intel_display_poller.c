@@ -36,6 +36,7 @@
 #include "intel_io.h"
 #include "intel_reg.h"
 #include "igt_debugfs.h"
+#include "igt_device.h"
 #include "drmtest.h"
 #include "igt_aux.h"
 
@@ -971,6 +972,7 @@ int main(int argc, char *argv[])
 	uint32_t a, b;
 	enum test test = TEST_INVALID;
 	const int count = ARRAY_SIZE(min)/2;
+	int fd;
 
 	for (;;) {
 		static const struct option long_options[] = {
@@ -1046,7 +1048,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	devid = intel_get_pci_device()->device_id;
+	fd = drm_open_driver(DRIVER_INTEL);
+	devid = igt_device_get_pci_device(fd)->device_id;
 
 	/*
 	 * check if the requires registers are
@@ -1187,7 +1190,7 @@ int main(int argc, char *argv[])
 		break;
 	}
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(igt_device_get_pci_device(fd), 0, -1);
 
 	printf("%s?\n", test_name(test, pipe, bit, test_pixelcount));
 
@@ -1263,6 +1266,7 @@ int main(int argc, char *argv[])
 	}
 
 	intel_register_access_fini();
+	close(fd);
 
 	if (quit)
 		return 0;

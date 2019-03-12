@@ -36,6 +36,7 @@
 #include <getopt.h>
 #include "intel_chipset.h"
 #include "intel_io.h"
+#include "igt_device.h"
 #include "igt_sysfs.h"
 #include "drmtest.h"
 #include "config.h"
@@ -189,7 +190,7 @@ int main(int argc, char *argv[])
 	if (intel_gen(devid) < 7 || IS_VALLEYVIEW(devid))
 		exit(77);
 
-	assert(intel_register_access_init(intel_get_pci_device(), 0, device) == 0);
+	assert(intel_register_access_init(igt_device_get_pci_device(device), 0, device) == 0);
 
 	dir = igt_sysfs_open(device);
 

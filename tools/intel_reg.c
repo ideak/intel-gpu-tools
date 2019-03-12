@@ -33,9 +33,9 @@
 #include <unistd.h>
 
 #include "igt.h"
+#include "igt_device.h"
 #include "igt_gt.h"
 #include "intel_io.h"
-#include "intel_chipset.h"
 
 #include "intel_reg_spec.h"
 
@@ -273,15 +273,6 @@ static int register_srm(struct config *config, struct reg *reg,
 	bool secure;
 	int fd, i;
 	uint32_t val;
-
-	if (config->fd == -1) {
-		config->fd = __drm_open_driver(DRIVER_INTEL);
-		if (config->fd == -1) {
-			fprintf(stderr, "Error opening driver: %s",
-				strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-	}
 
 	fd = config->fd;
 	engine = find_engine(reg->engine);
@@ -1015,6 +1006,13 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	config.fd = __drm_open_driver(DRIVER_INTEL);
+	if (config.fd == -1) {
+		fprintf(stderr, "Error opening driver: %s",
+			strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
 	if (config.mmiofile) {
 		if (!config.devid) {
 			fprintf(stderr, "--mmio requires --devid\n");
@@ -1026,7 +1024,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "--devid without --mmio\n");
 			return EXIT_FAILURE;
 		}
-		config.pci_dev = intel_get_pci_device();
+		config.pci_dev = igt_device_get_pci_device(config.fd);
 		config.devid = config.pci_dev->device_id;
 	}
 
@@ -1050,8 +1048,7 @@ int main(int argc, char *argv[])
 
 	free(config.mmiofile);
 
-	if (config.fd >= 0)
-		close(config.fd);
+	close(config.fd);
 
 	return ret;
 }

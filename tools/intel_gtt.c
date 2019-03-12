@@ -34,6 +34,8 @@
 #include <pciaccess.h>
 #include <unistd.h>
 
+#include "drmtest.h"
+#include "igt_device.h"
 #include "intel_io.h"
 #include "intel_chipset.h"
 
@@ -140,13 +142,17 @@ int main(int argc, char **argv)
 {
 	struct pci_device *pci_dev;
 	unsigned int start, gtt_size;
+	int fd;
 	int flag[] = {
 		PCI_DEV_MAP_FLAG_WRITE_COMBINE,
 		PCI_DEV_MAP_FLAG_WRITABLE,
 		0
 	}, f;
 
-	pci_dev = intel_get_pci_device();
+	fd = drm_open_driver(DRIVER_INTEL);
+	pci_dev = igt_device_get_pci_device(fd);
+	close(fd);
+
 	devid = pci_dev->device_id;
 
 	if (IS_GEN2(devid)) {

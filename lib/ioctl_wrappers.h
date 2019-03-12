@@ -136,7 +136,7 @@ uint64_t gem_total_stolen_size(int fd);
 uint64_t gem_available_aperture_size(int fd);
 uint64_t gem_aperture_size(int fd);
 uint64_t gem_global_aperture_size(int fd);
-uint64_t gem_mappable_aperture_size(void);
+uint64_t gem_mappable_aperture_size(int fd);
 bool gem_has_softpin(int fd);
 bool gem_has_exec_fence(int fd);
 

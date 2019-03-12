@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include "igt_device.h"
 #include "intel_io.h"
 #include "intel_chipset.h"
 #include "drmtest.h"
@@ -1081,6 +1082,7 @@ printf("Options:\n"
 int main(int argc, char *argv[])
 {
 	int opt;
+	int fd;
 	int ret = 0;
 	Transcoder transcoder = TRANSC_INVALID;
 	DipType dip = DIP_INVALID;
@@ -1107,7 +1109,10 @@ int main(int argc, char *argv[])
 	printf("WARNING: This is just a debugging tool! Don't expect it to work"
 	       " perfectly: the Kernel might undo our changes.\n");
 
-	pci_dev = intel_get_pci_device();
+	fd = drm_open_driver(DRIVER_INTEL);
+	pci_dev = igt_device_get_pci_device(fd);
+	close(fd);
+
 	intel_register_access_init(pci_dev, 0, -1);
 	intel_check_pch();
 

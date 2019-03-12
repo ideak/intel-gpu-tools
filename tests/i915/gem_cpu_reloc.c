@@ -283,7 +283,7 @@ igt_main
 		run_test(i915, 1);
 
 	igt_subtest("full") {
-		uint64_t aper_size = gem_mappable_aperture_size();
+		uint64_t aper_size = gem_mappable_aperture_size(i915);
 		unsigned long count = aper_size / 4096 + 1;
 
 		intel_require_memory(count, 4096, CHECK_RAM);
@@ -292,7 +292,7 @@ igt_main
 	}
 
 	igt_subtest("forked") {
-		uint64_t aper_size = gem_mappable_aperture_size();
+		uint64_t aper_size = gem_mappable_aperture_size(i915);
 		unsigned long count = aper_size / 4096 + 1;
 		int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 

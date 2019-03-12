@@ -409,7 +409,7 @@ igt_main
 		 * we expect the shrinker to start purging objects,
 		 * and possibly fail.
 		 */
-		alloc_size = gem_mappable_aperture_size() / 2;
+		alloc_size = gem_mappable_aperture_size(fd) / 2;
 		num_processes = 1 + (mem_size / (alloc_size >> 20));
 
 		igt_info("Using %d processes and %'lluMiB per process\n",

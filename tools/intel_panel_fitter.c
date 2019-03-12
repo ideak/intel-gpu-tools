@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include "igt_device.h"
 #include "intel_io.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
@@ -273,13 +274,17 @@ int main (int argc, char *argv[])
 	bool do_disable = false, do_dump = false, do_usage = false;
 	struct pci_device *pci_dev;
 	uint32_t devid;
+	int fd;
 
 	printf("WARNING:\n"
 	       "This tool is a workaround for people that don't have a Kernel "
 	       "with overscan compensation properties: it is just a temporary "
 	       "solution that may or may not work. Use it at your own risk.\n");
 
-	pci_dev = intel_get_pci_device();
+	fd = drm_open_driver(DRIVER_INTEL);
+	pci_dev = igt_device_get_pci_device(fd);
+	close(fd);
+
 	intel_register_access_init(pci_dev, 0, -1);
 	devid = pci_dev->device_id;
 
@@ -343,5 +348,6 @@ int main (int argc, char *argv[])
 
 out:
 	intel_register_access_fini();
+
 	return ret;
 }

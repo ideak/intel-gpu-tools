@@ -53,6 +53,7 @@
 #include "intel_chipset.h"
 #include "intel_io.h"
 #include "igt_debugfs.h"
+#include "igt_device.h"
 #include "igt_sysfs.h"
 #include "config.h"
 
@@ -1096,9 +1097,9 @@ uint64_t gem_aperture_size(int fd)
  *
  * Returns: The mappable gtt address space size.
  */
-uint64_t gem_mappable_aperture_size(void)
+uint64_t gem_mappable_aperture_size(int fd)
 {
-	struct pci_device *pci_dev = intel_get_pci_device();
+	struct pci_device *pci_dev = igt_device_get_pci_device(fd);
 	int bar;
 
 	if (intel_gen(pci_dev->device_id) < 3)
