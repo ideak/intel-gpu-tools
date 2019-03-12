@@ -27,7 +27,8 @@ use warnings;
 use 5.010;
 
 my $gid = 0;
-my (%db, %queue, %submit, %notify, %rings, %ctxdb, %ringmap, %reqwait, %ctxtimelines);
+my (%db, %queue, %submit, %notify, %rings, %ctxdb, %ringmap, %reqwait,
+    %ctxtimelines);
 my @freqs;
 
 my $max_items = 3000;
@@ -66,7 +67,7 @@ Notes:
 			       i915:i915_request_submit, \
 			       i915:i915_request_in, \
 			       i915:i915_request_out, \
-			       i915:intel_engine_notify, \
+			       dma_fence:dma_fence_signaled, \
 			       i915:i915_request_wait_begin, \
 			       i915:i915_request_wait_end \
 			       [command-to-be-profiled]
@@ -161,7 +162,7 @@ sub arg_trace
 		       'i915:i915_request_submit',
 		       'i915:i915_request_in',
 		       'i915:i915_request_out',
-		       'i915:intel_engine_notify',
+		       'dma_fence:dma_fence_signaled',
 		       'i915:i915_request_wait_begin',
 		       'i915:i915_request_wait_end' );
 
@@ -312,11 +313,11 @@ sub db_key
 	return $ring . '/' . $ctx . '/' . $seqno;
 }
 
-sub global_key
+sub notify_key
 {
-	my ($ring, $seqno) = @_;
+	my ($ctx, $seqno) = @_;
 
-	return $ring . '/' . $seqno;
+	return $ctx . '/' . $seqno;
 }
 
 sub sanitize_ctx
@@ -429,18 +430,23 @@ while (<>) {
 		$ringmap{$rings{$ring}} = $ring;
 		$db{$key} = \%req;
 	} elsif ($tp_name eq 'i915:i915_request_out:') {
-		my $gkey = global_key($ring, $tp{'global'});
+		my $nkey;
 
 		die unless exists $db{$key};
 		die unless exists $db{$key}->{'start'};
 		die if exists $db{$key}->{'end'};
 
-		$db{$key}->{'end'} = $time;
-		$db{$key}->{'notify'} = $notify{$gkey} if exists $notify{$gkey};
-	} elsif ($tp_name eq 'i915:intel_engine_notify:') {
-		my $gkey = global_key($ring, $seqno);
+		$nkey = notify_key($ctx, $seqno);
 
-		$notify{$gkey} = $time unless exists $notify{$gkey};
+		$db{$key}->{'end'} = $time;
+		$db{$key}->{'notify'} = $notify{$nkey} if exists $notify{$nkey};
+	} elsif ($tp_name eq 'dma_fence:dma_fence_signaled:') {
+		my $nkey;
+
+		$nkey = notify_key($tp{'context'}, $tp{'seqno'});
+
+		die if exists $notify{$nkey};
+		$notify{$nkey} = $time unless exists $notify{$nkey};
 	} elsif ($tp_name eq 'i915:intel_gpu_freq_change:') {
 		push @freqs, [$prev_freq_ts, $time, $prev_freq] if $prev_freq;
 		$prev_freq_ts = $time;
@@ -452,15 +458,15 @@ while (<>) {
 # find the largest seqno to be used for timeline sorting purposes.
 my $max_seqno = 0;
 foreach my $key (keys %db) {
-	my $gkey = global_key($db{$key}->{'ring'}, $db{$key}->{'global'});
+	my $nkey = notify_key($db{$key}->{'ctx'}, $db{$key}->{'seqno'});
 
 	die unless exists $db{$key}->{'start'};
 
 	$max_seqno = $db{$key}->{'seqno'} if $db{$key}->{'seqno'} > $max_seqno;
 
 	# Notify arrived after context complete?
-	$db{$key}->{'notify'} = $notify{$gkey} if not exists $db{$key}->{'notify'}
-						  and exists $notify{$gkey};
+	$db{$key}->{'notify'} = $notify{$nkey} if not exists $db{$key}->{'notify'}
+						  and exists $notify{$nkey};
 
 	# No notify but we have end?
 	$db{$key}->{'notify'} = $db{$key}->{'end'} if exists $db{$key}->{'end'} and
@@ -478,14 +484,13 @@ my $key_count = scalar(keys %db);
 
 my %engine_timelines;
 
-sub sortEngine {
-	my $as = $db{$a}->{'global'};
-	my $bs = $db{$b}->{'global'};
+sub sortStart {
+	my $as = $db{$a}->{'start'};
+	my $bs = $db{$b}->{'start'};
 	my $val;
 
 	$val = $as <=> $bs;
-
-	die if $val == 0;
+	$val = $a cmp $b if $val == 0;
 
 	return $val;
 }
@@ -497,9 +502,7 @@ sub get_engine_timeline {
 	return $engine_timelines{$ring} if exists $engine_timelines{$ring};
 
 	@timeline = grep { $db{$_}->{'ring'} eq $ring } keys %db;
-	# FIXME seqno restart
-	@timeline = sort sortEngine @timeline;
-
+	@timeline = sort sortStart @timeline;
 	$engine_timelines{$ring} = \@timeline;
 
 	return \@timeline;
@@ -561,18 +564,8 @@ foreach my $gid (sort keys %rings) {
 			$db{$key}->{'no-notify'} = 1;
 		}
 		$db{$key}->{'end'} = $end;
+		$db{$key}->{'notify'} = $end if $db{$key}->{'notify'} > $end;
 	}
-}
-
-sub sortStart {
-	my $as = $db{$a}->{'start'};
-	my $bs = $db{$b}->{'start'};
-	my $val;
-
-	$val = $as <=> $bs;
-	$val = $a cmp $b if $val == 0;
-
-	return $val;
 }
 
 my $re_sort = 1;
@@ -670,9 +663,13 @@ if ($correct_durations) {
 			next unless exists $db{$key}->{'no-end'};
 			last if $pos == $#{$timeline};
 
-			# Shift following request to start after the current one
+			# Shift following request to start after the current
+			# one, but only if that wouldn't make it zero duration,
+			# which would indicate notify arrived after context
+			# complete.
 			$next_key = ${$timeline}[$pos + 1];
-			if (exists $db{$key}->{'notify'}) {
+			if (exists $db{$key}->{'notify'} and
+			    $db{$key}->{'notify'} < $db{$key}->{'end'}) {
 				$db{$next_key}->{'engine-start'} = $db{$next_key}->{'start'};
 				$db{$next_key}->{'start'} = $db{$key}->{'notify'};
 				$re_sort = 1;
@@ -750,9 +747,9 @@ foreach my $gid (sort keys %rings) {
 	# Extract all GPU busy intervals and sort them.
 	foreach my $key (@sorted_keys) {
 		next unless $db{$key}->{'ring'} eq $ring;
+		die if $db{$key}->{'start'} > $db{$key}->{'end'};
 		push @s_, $db{$key}->{'start'};
 		push @e_, $db{$key}->{'end'};
-		die if $db{$key}->{'start'} > $db{$key}->{'end'};
 	}
 
 	die unless $#s_ == $#e_;
