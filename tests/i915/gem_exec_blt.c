@@ -38,6 +38,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include "drm.h"
+#include "igt_sysfs.h"
 
 #define OBJECT_SIZE 16384
 
@@ -181,18 +182,15 @@ static int dcmp(const void *A, const void *B)
 		return 0;
 }
 
-static void run(int object_size, bool dumb)
+static void run(int fd, int object_size, bool dumb)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 exec[3];
 	struct drm_i915_gem_relocation_entry reloc[4];
 	uint32_t buf[20];
 	uint32_t handle, src, dst;
-	int fd, len, count;
+	int len, count;
 	int ring;
-
-	fd = drm_open_driver(DRIVER_INTEL);
-	igt_require_gem(fd);
 
 	if (dumb)
 		handle = kmstest_dumb_create(fd, 32, 32, 32, NULL, NULL);
@@ -262,81 +260,36 @@ static void run(int object_size, bool dumb)
 		fflush(stdout);
 	}
 	gem_close(fd, handle);
-
-	close(fd);
 }
 
-static int sysfs_read(const char *name)
+static void set_auto_freq(int sysfs)
 {
-	char buf[4096];
-	int sysfd;
-	int len;
-
-	sprintf(buf, "/sys/class/drm/card%d/%s",
-		drm_get_card(), name);
-	sysfd = open(buf, O_RDONLY);
-	if (sysfd < 0)
-		return -1;
-
-	len = read(sysfd, buf, sizeof(buf)-1);
-	close(sysfd);
-	if (len < 0)
-		return -1;
-
-	buf[len] = '\0';
-	return atoi(buf);
-}
-
-static int sysfs_write(const char *name, int value)
-{
-	char buf[4096];
-	int sysfd;
-	int len;
-
-	sprintf(buf, "/sys/class/drm/card%d/%s",
-		drm_get_card(), name);
-	sysfd = open(buf, O_WRONLY);
-	if (sysfd < 0)
-		return -1;
-
-	len = sprintf(buf, "%d", value);
-	len = write(sysfd, buf, len);
-	close(sysfd);
-
-	if (len < 0)
-		return len;
-
-	return 0;
-}
-
-static void set_auto_freq(void)
-{
-	int min = sysfs_read("gt_RPn_freq_mhz");
-	int max = sysfs_read("gt_RP0_freq_mhz");
+	int min = igt_sysfs_get_u32(sysfs, "gt_RPn_freq_mhz");
+	int max = igt_sysfs_get_u32(sysfs, "gt_RP0_freq_mhz");
 	if (max <= min)
 		return;
 
 	igt_debug("Setting min to %dMHz, and max to %dMHz\n", min, max);
-	sysfs_write("gt_min_freq_mhz", min);
-	sysfs_write("gt_max_freq_mhz", max);
+	igt_sysfs_set_u32(sysfs, "gt_min_freq_mhz", min);
+	igt_sysfs_set_u32(sysfs, "gt_max_freq_mhz", max);
 }
 
-static void set_min_freq(void)
+static void set_min_freq(int sysfs)
 {
-	int min = sysfs_read("gt_RPn_freq_mhz");
+	int min = igt_sysfs_get_u32(sysfs, "gt_RPn_freq_mhz");
 	igt_require(min > 0);
 	igt_debug("Setting min/max to %dMHz\n", min);
-	igt_require(sysfs_write("gt_min_freq_mhz", min) == 0 &&
-		    sysfs_write("gt_max_freq_mhz", min) == 0);
+	igt_require(igt_sysfs_set_u32(sysfs, "gt_min_freq_mhz", min) &&
+		    igt_sysfs_set_u32(sysfs, "gt_max_freq_mhz", min));
 }
 
-static void set_max_freq(void)
+static void set_max_freq(int sysfs)
 {
-	int max = sysfs_read("gt_RP0_freq_mhz");
+	int max = igt_sysfs_get_u32(sysfs, "gt_RP0_freq_mhz");
 	igt_require(max > 0);
 	igt_debug("Setting min/max to %dMHz\n", max);
-	igt_require(sysfs_write("gt_max_freq_mhz", max) == 0 &&
-		    sysfs_write("gt_min_freq_mhz", max) == 0);
+	igt_require(igt_sysfs_set_u32(sysfs, "gt_max_freq_mhz", max) &&
+		    igt_sysfs_set_u32(sysfs, "gt_min_freq_mhz", max));
 }
 
 
@@ -344,7 +297,7 @@ int main(int argc, char **argv)
 {
 	const struct {
 		const char *suffix;
-		void (*func)(void);
+		void (*func)(int);
 	} rps[] = {
 		{ "", set_auto_freq },
 		{ "-min", set_min_freq },
@@ -352,44 +305,44 @@ int main(int argc, char **argv)
 		{ NULL, NULL },
 	}, *r;
 	int min = -1, max = -1;
-	int i;
+	int fd, sysfs;
 
 	igt_subtest_init(argc, argv);
 
 	igt_skip_on_simulation();
 
-	if (argc > 1) {
-		for (i = 1; i < argc; i++) {
-			int object_size = atoi(argv[i]);
-			if (object_size)
-				run((object_size + 3) & -4, false);
-		}
-		_exit(0); /* blergh */
-	}
-
 	igt_fixture {
-		min = sysfs_read("gt_min_freq_mhz");
-		max = sysfs_read("gt_max_freq_mhz");
+		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+
+		sysfs = igt_sysfs_open(fd, NULL);
+		igt_require(sysfs >= 0);
+
+		min = igt_sysfs_get_u32(sysfs, "gt_min_freq_mhz");
+		max = igt_sysfs_get_u32(sysfs, "gt_max_freq_mhz");
 	}
 
 	for (r = rps; r->suffix; r++) {
-		igt_fixture r->func();
+		igt_fixture r->func(sysfs);
 
 		igt_subtest_f("cold%s", r->suffix)
-			run(OBJECT_SIZE, false);
+			run(fd, OBJECT_SIZE, false);
 
 		igt_subtest_f("normal%s", r->suffix)
-			run(OBJECT_SIZE, false);
+			run(fd, OBJECT_SIZE, false);
 
 		igt_subtest_f("dumb-buf%s", r->suffix)
-			run(OBJECT_SIZE, true);
+			run(fd, OBJECT_SIZE, true);
 	}
 
 	igt_fixture {
 		if (min > 0)
-			sysfs_write("gt_min_freq_mhz", min);
+			igt_sysfs_set_u32(sysfs, "gt_min_freq_mhz", min);
 		if (max > 0)
-			sysfs_write("gt_max_freq_mhz", max);
+			igt_sysfs_set_u32(sysfs, "gt_max_freq_mhz", max);
+
+		close(sysfs);
+		close(fd);
 	}
 
 	igt_exit();
