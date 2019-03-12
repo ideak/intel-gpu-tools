@@ -1146,8 +1146,10 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 	fb->size = bo_size;
 
-	igt_debug("%s(width=%d, height=%d, format=0x%x, modifier=0x%"PRIx64", size=%"PRIu64")\n",
-		  __func__, width, height, format, modifier, bo_size);
+	igt_debug("%s(width=%d, height=%d, format=" IGT_FORMAT_FMT
+		  ", modifier=0x%"PRIx64", size=%"PRIu64")\n",
+		  __func__, width, height, IGT_FORMAT_ARGS(format), modifier,
+		  bo_size);
 
 	create_bo_for_fb(fb);
 	igt_assert(fb->gem_handle > 0);

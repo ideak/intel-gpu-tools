@@ -401,9 +401,6 @@ static void set_legacy_lut(data_t *data, enum pipe pipe,
 	free(lut);
 }
 
-#define IGT_FORMAT_FMT "%c%c%c%c (0x%08x)"
-#define IGT_FORMAT_ARGS(f) ((f) >> 0) & 0xff, ((f) >> 8) & 0xff, \
-		((f) >> 16) & 0xff, ((f) >> 24) & 0xff, (f)
 
 static void test_format_plane_color(data_t *data, enum pipe pipe,
 				    igt_plane_t *plane,

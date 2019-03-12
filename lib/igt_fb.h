@@ -44,6 +44,10 @@
  */
 #define IGT_FORMAT_FLOAT fourcc_code('I', 'G', 'F', 'x')
 
+#define IGT_FORMAT_FMT "%c%c%c%c(0x%08x)"
+#define IGT_FORMAT_ARGS(f) ((f) >> 0) & 0xff, ((f) >> 8) & 0xff, \
+		((f) >> 16) & 0xff, ((f) >> 24) & 0xff, (f)
+
 /**
  * igt_fb_t:
  * @fb_id: KMS ID of the framebuffer
