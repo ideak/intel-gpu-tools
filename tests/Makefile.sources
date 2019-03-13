@@ -22,6 +22,7 @@ TESTS_progs = \
 	drm_import_export \
 	drm_mm \
 	drm_read \
+	i915/gem_ctx_clone \
 	i915/gem_vm_create \
 	kms_3d \
 	kms_addfb_basic \

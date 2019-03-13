@@ -371,13 +371,13 @@ static void basic_ext_param(int i915)
 		gem_context_destroy(i915, create.ctx_id);
 
 		/* Having demonstrated a valid setup, check a few invalids */
-		ext.ctx_id = 1;
+		ext.param.ctx_id = 1;
 		igt_assert_eq(create_ext_ioctl(i915, &create), -EINVAL);
-		ext.ctx_id = create.ctx_id;
+		ext.param.ctx_id = create.ctx_id;
 		igt_assert_eq(create_ext_ioctl(i915, &create), -EINVAL);
-		ext.ctx_id = -1;
+		ext.param.ctx_id = -1;
 		igt_assert_eq(create_ext_ioctl(i915, &create), -EINVAL);
-		ext.ctx_id = 0;
+		ext.param.ctx_id = 0;
 	}
 }
 
