@@ -71,7 +71,6 @@ void __set_forced_driver(const char *name);
  */
 #define ALIGN(v, a) (((v) + (a)-1) & ~((a)-1))
 
-int drm_get_card(void);
 int drm_open_driver(int chipset);
 int drm_open_driver_master(int chipset);
 int drm_open_driver_render(int chipset);

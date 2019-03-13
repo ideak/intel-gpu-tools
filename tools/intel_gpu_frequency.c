@@ -28,6 +28,7 @@
 #include <unistd.h>
 
 #include "drmtest.h"
+#include "igt_device.h"
 #include "intel_chipset.h"
 
 #define VERSION "1.0"
@@ -280,10 +281,12 @@ int main(int argc, char *argv[])
 {
 
 	bool write, fail, targets[MAX+1] = {false};
-	int i, try = 1, set_freq[MAX+1] = {0};
+	int i, fd, try = 1, set_freq[MAX+1] = {0};
 
-	devid = intel_get_drm_devid(drm_open_driver(DRIVER_INTEL));
-	device = drm_get_card();
+	fd = drm_open_driver(DRIVER_INTEL);
+	devid = intel_get_drm_devid(fd);
+	device = igt_device_get_card_index(fd);
+	close(fd);
 
 	write = parse(argc, argv, targets, ARRAY_SIZE(targets), set_freq);
 	fail = write;

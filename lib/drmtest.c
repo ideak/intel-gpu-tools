@@ -177,46 +177,6 @@ void gem_quiescent_gpu(int fd)
 			    DROP_ACTIVE | DROP_RETIRE | DROP_IDLE | DROP_FREED);
 }
 
-/**
- * drm_get_card:
- *
- * Get an i915 drm card index number for use in /dev or /sys. The minor index of
- * the legacy node is returned, not of the control or render node.
- *
- * Returns:
- * The i915 drm index or -1 on error
- */
-int drm_get_card(void)
-{
-	char *name;
-	int i, fd;
-
-	for (i = 0; i < 16; i++) {
-		int ret;
-
-		ret = asprintf(&name, "/dev/dri/card%u", i);
-		igt_assert(ret != -1);
-
-		fd = open(name, O_RDWR);
-		free(name);
-
-		if (fd == -1)
-			continue;
-
-		if (!is_i915_device(fd) || !has_known_intel_chipset(fd)) {
-			close(fd);
-			continue;
-		}
-
-		close(fd);
-		return i;
-	}
-
-	igt_skip("No intel gpu found\n");
-
-	return -1;
-}
-
 static int modprobe(const char *driver)
 {
 	return igt_kmod_load(driver, "");

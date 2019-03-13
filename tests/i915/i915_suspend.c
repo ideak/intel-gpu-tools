@@ -39,6 +39,7 @@
 
 #include <drm.h>
 
+#include "igt_device.h"
 
 #define OBJECT_SIZE (16*1024*1024)
 
@@ -101,7 +102,7 @@ test_fence_restore(int fd, bool tiled2untiled, bool hibernate)
 }
 
 static void
-test_debugfs_reader(bool hibernate)
+test_debugfs_reader(int fd, bool hibernate)
 {
 	struct igt_helper_process reader = {};
 	reader.use_SIGKILL = true;
@@ -112,7 +113,7 @@ test_debugfs_reader(bool hibernate)
 
 		snprintf(tmp, sizeof(tmp) - 1,
 			 "while true; do find %s/%i/ -type f ! -path \"*/crc/*\" | xargs cat > /dev/null 2>&1; done",
-			 dfs_base, drm_get_card());
+			 dfs_base, igt_device_get_card_index(fd));
 		igt_assert(execl("/bin/sh", "sh", "-c", tmp, (char *) NULL) != -1);
 	}
 
@@ -131,7 +132,7 @@ test_debugfs_reader(bool hibernate)
 }
 
 static void
-test_sysfs_reader(bool hibernate)
+test_sysfs_reader(int fd, bool hibernate)
 {
 	struct igt_helper_process reader = {};
 	reader.use_SIGKILL = true;
@@ -142,7 +143,7 @@ test_sysfs_reader(bool hibernate)
 
 		snprintf(tmp, sizeof(tmp) - 1,
 			 "while true; do find %s%i*/ -type f | xargs cat > /dev/null 2>&1; done",
-			 dfs_base, drm_get_card());
+			 dfs_base, igt_device_get_card_index(fd));
 		igt_assert(execl("/bin/sh", "sh", "-c", tmp, (char *) NULL) != -1);
 	}
 
@@ -212,10 +213,10 @@ igt_main
 		test_fence_restore(fd, false, false);
 
 	igt_subtest("debugfs-reader")
-		test_debugfs_reader(false);
+		test_debugfs_reader(fd, false);
 
 	igt_subtest("sysfs-reader")
-		test_sysfs_reader(false);
+		test_sysfs_reader(fd, false);
 
 	igt_subtest("shrink")
 		test_shrink(fd, SUSPEND_STATE_MEM);
@@ -230,10 +231,10 @@ igt_main
 		test_fence_restore(fd, false, true);
 
 	igt_subtest("debugfs-reader-hibernate")
-		test_debugfs_reader(true);
+		test_debugfs_reader(fd, true);
 
 	igt_subtest("sysfs-reader-hibernate")
-		test_sysfs_reader(true);
+		test_sysfs_reader(fd, true);
 
 	igt_subtest("forcewake-hibernate")
 		test_forcewake(fd, true);
