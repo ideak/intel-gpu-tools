@@ -76,7 +76,7 @@ static void eat_error_state(int dev)
 {
 	int dir;
 
-	dir = igt_sysfs_open(dev, NULL);
+	dir = igt_sysfs_open(dev);
 	if (dir < 0)
 		return;
 

@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
 
 	assert(intel_register_access_init(intel_get_pci_device(), 0, device) == 0);
 
-	dir = igt_sysfs_open(device, NULL);
+	dir = igt_sysfs_open(device);
 
 	for_each_slice(i) {
 		fd[i] = openat(dir, path[i], O_RDWR);

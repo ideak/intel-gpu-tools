@@ -208,7 +208,7 @@ igt_main
 
 		fd = drm_open_driver(DRIVER_INTEL);
 		devid = intel_get_drm_devid(fd);
-		sysfs = igt_sysfs_open(fd, NULL);
+		sysfs = igt_sysfs_open(fd);
 
 		igt_require(has_rc6_residency("rc6"));
 

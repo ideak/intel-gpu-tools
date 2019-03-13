@@ -315,7 +315,7 @@ int main(int argc, char **argv)
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 
-		sysfs = igt_sysfs_open(fd, NULL);
+		sysfs = igt_sysfs_open(fd);
 		igt_require(sysfs >= 0);
 
 		min = igt_sysfs_get_u32(sysfs, "gt_min_freq_mhz");

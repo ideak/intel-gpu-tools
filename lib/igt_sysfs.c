@@ -135,7 +135,6 @@ char *igt_sysfs_path(int device, char *path, int pathlen)
 /**
  * igt_sysfs_open:
  * @device: fd of the device
- * @idx: optional pointer to store the card index of the opened device
  *
  * This opens the sysfs directory corresponding to device for use
  * with igt_sysfs_set() and igt_sysfs_get().
@@ -143,15 +142,12 @@ char *igt_sysfs_path(int device, char *path, int pathlen)
  * Returns:
  * The directory fd, or -1 on failure.
  */
-int igt_sysfs_open(int device, int *idx)
+int igt_sysfs_open(int device)
 {
 	char path[80];
 
 	if (!igt_sysfs_path(device, path, sizeof(path)))
 		return -1;
-
-	if (idx)
-		*idx = igt_device_get_card_index(device);
 
 	return open(path, O_RDONLY);
 }
@@ -199,7 +195,7 @@ int igt_sysfs_open_parameters(int device)
 {
 	int dir, params = -1;
 
-	dir = igt_sysfs_open(device, &params);
+	dir = igt_sysfs_open(device);
 	if (dir >= 0) {
 		params = openat(dir,
 				"device/driver/module/parameters",

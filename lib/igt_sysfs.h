@@ -29,7 +29,7 @@
 #include <stdarg.h>
 
 char *igt_sysfs_path(int device, char *path, int pathlen);
-int igt_sysfs_open(int device, int *idx);
+int igt_sysfs_open(int device);
 int igt_sysfs_open_parameters(int device);
 bool igt_sysfs_set_parameter(int device,
 			     const char *parameter,

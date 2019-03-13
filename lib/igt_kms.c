@@ -52,6 +52,7 @@
 #include "igt_aux.h"
 #include "intel_chipset.h"
 #include "igt_debugfs.h"
+#include "igt_device.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
 
@@ -806,8 +807,12 @@ bool kmstest_force_connector(int drm_fd, drmModeConnector *connector,
 		break;
 	}
 
-	dir = igt_sysfs_open(drm_fd, &idx);
+	dir = igt_sysfs_open(drm_fd);
 	if (dir < 0)
+		return false;
+
+	idx = igt_device_get_card_index(drm_fd);
+	if (idx < 0 || idx > 63)
 		return false;
 
 	if (asprintf(&path, "card%d-%s-%d/status",

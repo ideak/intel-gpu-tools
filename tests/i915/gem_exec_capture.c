@@ -547,7 +547,7 @@ igt_main
 		igt_require(has_capture(fd));
 		igt_allow_hang(fd, 0, HANG_ALLOW_CAPTURE);
 
-		dir = igt_sysfs_open(fd, NULL);
+		dir = igt_sysfs_open(fd);
 		igt_require(igt_sysfs_set(dir, "error", "Begone!"));
 		igt_require(safer_strlen(igt_sysfs_get(dir, "error")) > 0);
 	}

@@ -1275,7 +1275,7 @@ test_frequency(int gem_fd)
 	igt_spin_t *spin;
 	int fd, sysfs;
 
-	sysfs = igt_sysfs_open(gem_fd, NULL);
+	sysfs = igt_sysfs_open(gem_fd);
 	igt_require(sysfs >= 0);
 
 	min_freq = igt_sysfs_get_u32(sysfs, "gt_RPn_freq_mhz");

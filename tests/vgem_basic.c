@@ -262,7 +262,7 @@ static void test_dmabuf_fence_before(int fd)
 
 static void test_sysfs_read(int fd)
 {
-	int dir = igt_sysfs_open(fd, NULL);
+	int dir = igt_sysfs_open(fd);
 	DIR *dirp = fdopendir(dir);
 	struct dirent *de;
 

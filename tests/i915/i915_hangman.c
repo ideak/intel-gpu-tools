@@ -262,14 +262,12 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_fixture {
-		int idx;
-
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
 
 		hang = igt_allow_hang(device, 0, HANG_ALLOW_CAPTURE);
 
-		sysfs = igt_sysfs_open(device, &idx);
+		sysfs = igt_sysfs_open(device);
 		igt_assert(sysfs != -1);
 
 		igt_require(has_error_state(sysfs));

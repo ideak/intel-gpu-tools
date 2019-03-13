@@ -4092,7 +4092,7 @@ igt_main
 		igt_require_gem(drm_fd);
 
 		devid = intel_get_drm_devid(drm_fd);
-		sysfs = igt_sysfs_open(drm_fd, NULL);
+		sysfs = igt_sysfs_open(drm_fd);
 
 		igt_require(init_sys_info());
 
