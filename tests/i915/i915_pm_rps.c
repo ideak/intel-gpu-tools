@@ -38,12 +38,12 @@
 
 #include "igt.h"
 #include "igt_dummyload.h"
+#include "igt_sysfs.h"
 
 IGT_TEST_DESCRIPTION("Render P-States tests - verify GPU frequency changes");
 
 static int drm_fd;
 
-static const char sysfs_base_path[] = "/sys/class/drm/card%d/gt_%s_freq_mhz";
 enum {
 	CUR,
 	MIN,
@@ -629,20 +629,23 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_fixture {
-		const int device = drm_get_card();
 		struct sysfs_file *sysfs_file = sysfs_files;
+		char sysfs_path[80];
 		int ret;
 
 		/* Use drm_open_driver to verify device existence */
 		drm_fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(drm_fd);
 		igt_require(gem_can_store_dword(drm_fd, 0));
+		igt_assert(igt_sysfs_path(drm_fd, sysfs_path,
+					  sizeof(sysfs_path), NULL));
 
 		do {
 			int val = -1;
 			char *path;
 
-			ret = asprintf(&path, sysfs_base_path, device, sysfs_file->name);
+			ret = asprintf(&path, "%s/gt_%s_freq_mhz",
+				       sysfs_path, sysfs_file->name);
 			igt_assert(ret != -1);
 			sysfs_file->filp = fopen(path, sysfs_file->mode);
 			igt_require(sysfs_file->filp);
