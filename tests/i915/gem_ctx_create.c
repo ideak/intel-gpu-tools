@@ -33,6 +33,7 @@
 #include <time.h>
 
 #include "igt_rand.h"
+#include "sw_sync.h"
 
 #define LOCAL_I915_EXEC_BSD_SHIFT      (13)
 #define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
@@ -45,12 +46,33 @@ static unsigned all_nengine;
 static unsigned ppgtt_engines[16];
 static unsigned ppgtt_nengine;
 
-static int __gem_context_create_local(int fd, struct drm_i915_gem_context_create *arg)
+static int create_ioctl(int fd, struct drm_i915_gem_context_create *arg)
 {
-	int ret = 0;
-	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, arg))
-		ret = -errno;
-	return ret;
+	int err;
+
+	err = 0;
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, arg)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
+}
+
+static int create_ext_ioctl(int i915,
+			    struct drm_i915_gem_context_create_ext *arg)
+{
+	int err;
+
+	err = 0;
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT, arg)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
 }
 
 static double elapsed(const struct timespec *start,
@@ -308,6 +330,196 @@ static void maximum(int fd, int ncpus, unsigned mode)
 	free(contexts);
 }
 
+static void basic_ext_param(int i915)
+{
+	struct drm_i915_gem_context_create_ext_setparam ext = {
+		{ .name = I915_CONTEXT_CREATE_EXT_SETPARAM },
+	};
+	struct drm_i915_gem_context_create_ext create = {
+		.flags = I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS
+	};
+	struct drm_i915_gem_context_param get;
+
+	igt_require(create_ext_ioctl(i915, &create) == 0);
+	gem_context_destroy(i915, create.ctx_id);
+
+	create.extensions = -1ull;
+	igt_assert_eq(create_ext_ioctl(i915, &create), -EFAULT);
+
+	create.extensions = to_user_pointer(&ext);
+	igt_assert_eq(create_ext_ioctl(i915, &create), -EINVAL);
+
+	ext.param.param = I915_CONTEXT_PARAM_PRIORITY;
+	if (create_ext_ioctl(i915, &create) != -ENODEV) {
+		gem_context_destroy(i915, create.ctx_id);
+
+		ext.base.next_extension = -1ull;
+		igt_assert_eq(create_ext_ioctl(i915, &create), -EFAULT);
+		ext.base.next_extension = to_user_pointer(&ext);
+		igt_assert_eq(create_ext_ioctl(i915, &create), -E2BIG);
+		ext.base.next_extension = 0;
+
+		ext.param.value = 32;
+		igt_assert_eq(create_ext_ioctl(i915, &create), 0);
+
+		memset(&get, 0, sizeof(get));
+		get.ctx_id = create.ctx_id;
+		get.param = I915_CONTEXT_PARAM_PRIORITY;
+		gem_context_get_param(i915, &get);
+		igt_assert_eq(get.value, ext.param.value);
+
+		gem_context_destroy(i915, create.ctx_id);
+
+		/* Having demonstrated a valid setup, check a few invalids */
+		ext.ctx_id = 1;
+		igt_assert_eq(create_ext_ioctl(i915, &create), -EINVAL);
+		ext.ctx_id = create.ctx_id;
+		igt_assert_eq(create_ext_ioctl(i915, &create), -EINVAL);
+		ext.ctx_id = -1;
+		igt_assert_eq(create_ext_ioctl(i915, &create), -EINVAL);
+		ext.ctx_id = 0;
+	}
+}
+
+static void check_single_timeline(int i915, uint32_t ctx, int num_engines)
+{
+#define RCS_TIMESTAMP (0x2000 + 0x358)
+	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const int has_64bit_reloc = gen >= 8;
+	struct drm_i915_gem_exec_object2 results = { .handle = gem_create(i915, 4096) };
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	int timeline = sw_sync_timeline_create();
+	uint32_t last, *map;
+
+	{
+		struct drm_i915_gem_execbuffer2 execbuf = {
+			.buffers_ptr = to_user_pointer(&results),
+			.buffer_count = 1,
+			.rsvd1 = ctx,
+		};
+		gem_write(i915, results.handle, 0, &bbe, sizeof(bbe));
+		gem_execbuf(i915, &execbuf);
+		results.flags = EXEC_OBJECT_PINNED;
+	}
+
+	for (int i = 0; i < num_engines; i++) {
+		struct drm_i915_gem_exec_object2 obj[2] = {
+			results, /* write hazard lies! */
+			{ .handle = gem_create(i915, 4096) },
+		};
+		struct drm_i915_gem_execbuffer2 execbuf = {
+			.buffers_ptr = to_user_pointer(obj),
+			.buffer_count = 2,
+			.rsvd1 = ctx,
+			.rsvd2 = sw_sync_timeline_create_fence(timeline, num_engines - i),
+			.flags = i | I915_EXEC_FENCE_IN,
+		};
+		uint64_t offset = results.offset + 4 * i;
+		uint32_t *cs;
+		int j = 0;
+
+		cs = gem_mmap__cpu(i915, obj[1].handle, 0, 4096, PROT_WRITE);
+
+		cs[j] = 0x24 << 23 | 1; /* SRM */
+		if (has_64bit_reloc)
+			cs[j]++;
+		j++;
+		cs[j++] = RCS_TIMESTAMP;
+		cs[j++] = offset;
+		if (has_64bit_reloc)
+			cs[j++] = offset >> 32;
+		cs[j++] = MI_BATCH_BUFFER_END;
+
+		munmap(cs, 4096);
+
+		gem_execbuf(i915, &execbuf);
+		gem_close(i915, obj[1].handle);
+		close(execbuf.rsvd2);
+	}
+	close(timeline);
+	gem_sync(i915, results.handle);
+
+	map = gem_mmap__cpu(i915, results.handle, 0, 4096, PROT_READ);
+	gem_set_domain(i915, results.handle, I915_GEM_DOMAIN_CPU, 0);
+	gem_close(i915, results.handle);
+
+	last = map[0];
+	for (int i = 1; i < num_engines; i++) {
+		igt_assert_f((map[i] - last) > 0,
+			     "Engine instance [%d] executed too early: this:%x, last:%x\n",
+			     i, map[i], last);
+		last = map[i];
+	}
+	munmap(map, 4096);
+}
+
+static void iris_pipeline(int i915)
+{
+#ifdef I915_DEFINE_CONTEXT_PARAM_ENGINES
+#define RCS0 {0, 0}
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 2) = {
+		.engines = { RCS0, RCS0 }
+	};
+	struct drm_i915_gem_context_create_ext_setparam p_engines = {
+		.base = {
+			.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
+			.next_extension = 0, /* end of chain */
+		},
+		.param = {
+			.param = I915_CONTEXT_PARAM_ENGINES,
+			.value = to_user_pointer(&engines),
+			.size = sizeof(engines),
+		},
+	};
+	struct drm_i915_gem_context_create_ext_setparam p_recover = {
+		.base = {
+			.name =I915_CONTEXT_CREATE_EXT_SETPARAM,
+			.next_extension = to_user_pointer(&p_engines),
+		},
+		.param = {
+			.param = I915_CONTEXT_PARAM_RECOVERABLE,
+			.value = 0,
+		},
+	};
+	struct drm_i915_gem_context_create_ext_setparam p_prio = {
+		.base = {
+			.name =I915_CONTEXT_CREATE_EXT_SETPARAM,
+			.next_extension = to_user_pointer(&p_recover),
+		},
+		.param = {
+			.param = I915_CONTEXT_PARAM_PRIORITY,
+			.value = 768,
+		},
+	};
+	struct drm_i915_gem_context_create_ext create = {
+		.flags = (I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE |
+			  I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS),
+	};
+	struct drm_i915_gem_context_param get;
+
+	igt_require(create_ext_ioctl(i915, &create) == 0);
+
+	create.extensions = to_user_pointer(&p_prio);
+	igt_assert_eq(create_ext_ioctl(i915, &create), 0);
+
+	memset(&get, 0, sizeof(get));
+	get.ctx_id = create.ctx_id;
+	get.param = I915_CONTEXT_PARAM_PRIORITY;
+	gem_context_get_param(i915, &get);
+	igt_assert_eq(get.value, p_prio.param.value);
+
+	memset(&get, 0, sizeof(get));
+	get.ctx_id = create.ctx_id;
+	get.param = I915_CONTEXT_PARAM_RECOVERABLE;
+	gem_context_get_param(i915, &get);
+	igt_assert_eq(get.value, 0);
+
+	check_single_timeline(i915, create.ctx_id, 2);
+
+	gem_context_destroy(i915, create.ctx_id);
+#endif /* I915_DEFINE_CONTEXT_PARAM_ENGINES */
+}
+
 igt_main
 {
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
@@ -340,17 +552,15 @@ igt_main
 		memset(&create, 0, sizeof(create));
 		create.ctx_id = rand();
 		create.pad = 0;
-		igt_assert_eq(__gem_context_create_local(fd, &create), 0);
+		igt_assert_eq(create_ioctl(fd, &create), 0);
 		igt_assert(create.ctx_id != 0);
 		gem_context_destroy(fd, create.ctx_id);
 	}
 
-	igt_subtest("invalid-pad") {
-		memset(&create, 0, sizeof(create));
-		create.ctx_id = rand();
-		create.pad = 1;
-		igt_assert_eq(__gem_context_create_local(fd, &create), -EINVAL);
-	}
+	igt_subtest("ext-param")
+		basic_ext_param(fd);
+	igt_subtest("iris-pipeline")
+		iris_pipeline(fd);
 
 	igt_subtest("maximum-mem")
 		maximum(fd, ncpus, CHECK_RAM);
