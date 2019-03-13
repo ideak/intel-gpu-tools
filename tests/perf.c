@@ -185,7 +185,6 @@ static int sysfs = -1;
 static int pm_fd = -1;
 static int stream_fd = -1;
 static uint32_t devid;
-static int card = -1;
 static int n_eus;
 
 static uint64_t test_metric_set_id = UINT64_MAX;
@@ -259,63 +258,47 @@ lookup_format(int i915_perf_fmt_id)
 	return i915_perf_fmt_id;
 }
 
-static bool
-try_read_u64_file(const char *file, uint64_t *val)
-{
-	char buf[32];
-	int fd, n;
-
-	fd = open(file, O_RDONLY);
-	if (fd < 0)
-		return false;
-
-	while ((n = read(fd, buf, sizeof(buf) - 1)) < 0 && errno == EINTR)
-		;
-	igt_assert(n >= 0);
-
-	close(fd);
-
-	buf[n] = '\0';
-	*val = strtoull(buf, NULL, 0);
-
-	return true;
-}
-
 static uint64_t
-read_u64_file(const char *file)
+read_u64_file(const char *path)
 {
+	FILE *f;
 	uint64_t val;
 
-	igt_assert_eq(try_read_u64_file(file, &val), true);
+	f = fopen(path, "r");
+	igt_assert(f);
+
+	igt_assert_eq(fscanf(f, "%"PRIu64, &val), 1);
+
+	fclose(f);
 
 	return val;
 }
 
 static void
-write_u64_file(const char *file, uint64_t val)
+write_u64_file(const char *path, uint64_t val)
 {
-	char buf[32];
-	int fd, len, ret;
+	FILE *f;
 
-	fd = open(file, O_WRONLY);
-	igt_assert(fd >= 0);
+	f = fopen(path, "w");
+	igt_assert(f);
 
-	len = snprintf(buf, sizeof(buf), "%"PRIu64, val);
-	igt_assert(len > 0);
+	igt_assert(fprintf(f, "%"PRIu64, val) > 0);
 
-	while ((ret = write(fd, buf, len)) < 0 && errno == EINTR)
-		;
-	igt_assert_eq(ret, len);
+	fclose(f);
+}
 
-	close(fd);
+static bool
+try_sysfs_read_u64(const char *path, uint64_t *val)
+{
+	return igt_sysfs_scanf(sysfs, path, "%"PRIu64, val) == 1;
 }
 
 static unsigned long
-sysfs_read(const char *file)
+sysfs_read(const char *path)
 {
 	unsigned long value;
 
-	igt_assert(igt_sysfs_scanf(sysfs, file, "%lu", &value) == 1);
+	igt_assert(igt_sysfs_scanf(sysfs, path, "%lu", &value) == 1);
 
 	return value;
 }
@@ -876,7 +859,6 @@ init_sys_info(void)
 	const char *test_set_uuid = NULL;
 	char buf[256];
 
-	igt_assert_neq(card, -1);
 	igt_assert_neq(devid, 0);
 
 	timestamp_frequency = get_cs_timestamp_frequency();
@@ -979,12 +961,9 @@ init_sys_info(void)
 
 	oa_exp_1_millisec = max_oa_exponent_for_period_lte(1000000);
 
-	snprintf(buf, sizeof(buf),
-		 "/sys/class/drm/card%d/metrics/%s/id",
-		 card,
-		 test_set_uuid);
+	snprintf(buf, sizeof(buf), "metrics/%s/id", test_set_uuid);
 
-	return try_read_u64_file(buf, &test_metric_set_id);
+	return try_sysfs_read_u64(buf, &test_metric_set_id);
 }
 
 static int
@@ -3739,10 +3718,10 @@ test_invalid_remove_userspace_config(void)
 
 	igt_require(has_i915_perf_userspace_config(drm_fd));
 
-	snprintf(path, sizeof(path), "/sys/class/drm/card%d/metrics/%s/id", card, uuid);
+	snprintf(path, sizeof(path), "metrics/%s/id", uuid);
 
 	/* Destroy previous configuration if present */
-	if (try_read_u64_file(path, &config_id))
+	if (try_sysfs_read_u64(path, &config_id))
 		i915_perf_remove_config(drm_fd, config_id);
 
 	memset(&config, 0, sizeof(config));
@@ -3799,10 +3778,10 @@ test_create_destroy_userspace_config(void)
 
 	igt_require(has_i915_perf_userspace_config(drm_fd));
 
-	snprintf(path, sizeof(path), "/sys/class/drm/card%d/metrics/%s/id", card, uuid);
+	snprintf(path, sizeof(path), "metrics/%s/id", uuid);
 
 	/* Destroy previous configuration if present */
-	if (try_read_u64_file(path, &config_id))
+	if (try_sysfs_read_u64(path, &config_id))
 		i915_perf_remove_config(drm_fd, config_id);
 
 	memset(&config, 0, sizeof(config));
@@ -3881,9 +3860,9 @@ test_whitelisted_registers_userspace_config(void)
 
 	igt_require(has_i915_perf_userspace_config(drm_fd));
 
-	snprintf(path, sizeof(path), "/sys/class/drm/card%d/metrics/%s/id", card, uuid);
+	snprintf(path, sizeof(path), "metrics/%s/id", uuid);
 
-	if (try_read_u64_file(path, &config_id))
+	if (try_sysfs_read_u64(path, &config_id))
 		i915_perf_remove_config(drm_fd, config_id);
 
 	memset(&config, 0, sizeof(config));
@@ -4034,7 +4013,7 @@ test_i915_ref_count(void)
 
 	drm_fd = __drm_open_driver(DRIVER_INTEL);
 	devid = intel_get_drm_devid(drm_fd);
-	card = drm_get_card();
+	sysfs = igt_sysfs_open(drm_fd);
 
 	/* Note: these global variables are only initialized after calling
 	 * init_sys_info()...
@@ -4054,7 +4033,9 @@ test_i915_ref_count(void)
 	igt_assert(ref_count1 > ref_count0);
 
 	close(drm_fd);
+	close(sysfs);
 	drm_fd = -1;
+	sysfs = -1;
 	ref_count0 = read_i915_module_ref();
 	igt_debug("ref count after closing drm fd = %u\n", ref_count0);
 
@@ -4111,7 +4092,7 @@ igt_main
 		igt_require_gem(drm_fd);
 
 		devid = intel_get_drm_devid(drm_fd);
-		sysfs = igt_sysfs_open(drm_fd, &card);
+		sysfs = igt_sysfs_open(drm_fd, NULL);
 
 		igt_require(init_sys_info());
 
