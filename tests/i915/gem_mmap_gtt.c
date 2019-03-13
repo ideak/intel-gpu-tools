@@ -821,6 +821,17 @@ run_without_prefault(int fd,
 	igt_enable_prefault();
 }
 
+static int mmap_ioctl(int i915, struct drm_i915_gem_mmap_gtt *arg)
+{
+	int err = 0;
+
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_MMAP_GTT, arg))
+		err = -errno;
+
+	errno = 0;
+	return err;
+}
+
 int fd;
 
 igt_main
@@ -830,6 +841,26 @@ igt_main
 
 	igt_fixture
 		fd = drm_open_driver(DRIVER_INTEL);
+
+	igt_subtest("bad-object") {
+		uint32_t real_handle = gem_create(fd, 4096);
+		uint32_t handles[20];
+		int i = 0;
+
+		handles[i++] = 0xdeadbeef;
+		for(int bit = 0; bit < 16; bit++)
+			handles[i++] = real_handle | (1 << (bit + 16));
+		handles[i] = real_handle + 1;
+
+		for (; i < 0; i--) {
+			struct drm_i915_gem_mmap_gtt arg = {
+				.handle = handles[i],
+			};
+			igt_assert_eq(mmap_ioctl(fd, &arg), -ENOENT);
+		}
+
+		gem_close(fd, real_handle);
+	}
 
 	igt_subtest("basic")
 		test_access(fd);
