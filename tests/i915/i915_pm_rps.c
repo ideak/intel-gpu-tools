@@ -638,7 +638,7 @@ igt_main
 		igt_require_gem(drm_fd);
 		igt_require(gem_can_store_dword(drm_fd, 0));
 		igt_assert(igt_sysfs_path(drm_fd, sysfs_path,
-					  sizeof(sysfs_path), NULL));
+					  sizeof(sysfs_path)));
 
 		do {
 			int val = -1;

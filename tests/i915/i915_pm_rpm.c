@@ -962,7 +962,7 @@ static void sysfs_read_subtest(void)
 {
 	char path[80];
 
-	igt_require_f(igt_sysfs_path(drm_fd, path, sizeof(path), NULL),
+	igt_require_f(igt_sysfs_path(drm_fd, path, sizeof(path)),
 		      "Can't find the sysfs directory\n");
 	walk_fs(path);
 }

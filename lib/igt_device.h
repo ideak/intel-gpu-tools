@@ -31,4 +31,6 @@ void igt_device_set_master(int fd);
 int __igt_device_drop_master(int fd);
 void igt_device_drop_master(int fd);
 
+int igt_device_get_card_index(int fd);
+
 #endif /* __IGT_DEVICE_H__ */

@@ -22,6 +22,8 @@
  *
  */
 
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include "igt.h"
 #include "igt_device.h"
 
@@ -83,4 +85,21 @@ void igt_device_drop_master(int fd)
 		igt_assert_f(__igt_device_drop_master(fd) == 0,
 			      "Failed to drop DRM master.\n");
 	}
+}
+
+/**
+ * igt_device_get_card_index:
+ * @fd: the device
+ *
+ * Returns:
+ * Index (N) of /dev/dri/cardN or /dev/dri/renderDN corresponding with fd.
+ *
+ */
+int igt_device_get_card_index(int fd)
+{
+	struct stat st;
+
+	igt_fail_on(fstat(fd, &st) || !S_ISCHR(st.st_mode));
+
+	return minor(st.st_rdev);
 }

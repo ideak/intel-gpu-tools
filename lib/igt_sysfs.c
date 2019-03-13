@@ -41,6 +41,7 @@
 
 #include "igt_core.h"
 #include "igt_sysfs.h"
+#include "igt_device.h"
 
 /**
  * SECTION:igt_sysfs
@@ -89,14 +90,13 @@ static int writeN(int fd, const char *buf, int len)
  * @device: fd of the device
  * @path: buffer to fill with the sysfs path to the device
  * @pathlen: length of @path buffer
- * @idx: optional pointer to store the card index of the opened device
  *
  * This finds the sysfs directory corresponding to @device.
  *
  * Returns:
  * The directory path, or NULL on failure.
  */
-char *igt_sysfs_path(int device, char *path, int pathlen, int *idx)
+char *igt_sysfs_path(int device, char *path, int pathlen)
 {
 	struct stat st;
 
@@ -125,8 +125,7 @@ char *igt_sysfs_path(int device, char *path, int pathlen, int *idx)
 			continue;
 
 		path[len] = '\0';
-		if (idx)
-			*idx = n;
+
 		return path;
 	}
 
@@ -148,8 +147,11 @@ int igt_sysfs_open(int device, int *idx)
 {
 	char path[80];
 
-	if (!igt_sysfs_path(device, path, sizeof(path), idx))
+	if (!igt_sysfs_path(device, path, sizeof(path)))
 		return -1;
+
+	if (idx)
+		*idx = igt_device_get_card_index(device);
 
 	return open(path, O_RDONLY);
 }
