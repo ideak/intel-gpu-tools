@@ -602,6 +602,7 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 
 		igt_stats_init_with_size(&stats, NPASS);
 
+		variance = 0;
 		for (unsigned int pass = 2; pass < NPASS; pass++) {
 			struct rt_pkt *rt = &results[NPASS * child + pass];
 
