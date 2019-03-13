@@ -586,6 +586,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 
 	igt_plane_set_fb(primary, NULL);
 	igt_plane_set_fb(plane, NULL);
+	igt_output_set_pipe(output, PIPE_NONE);
 	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	igt_remove_fb(data->drm_fd, &fb);
