@@ -282,6 +282,7 @@ static void
 test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 {
 	igt_display_t *display = &d->display;
+	igt_pipe_t *pipe_obj = &display->pipes[pipe];
 	drmModeModeInfo *mode;
 	int primary_plane_scaling = 0; /* For now */
 	uint64_t tiling = is_i915_device(display->drm_fd) ?
@@ -293,7 +294,7 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	mode = igt_output_get_mode(output);
 
 	/* Set up display with plane 1 */
-	d->plane1 = &display->pipes[pipe].planes[0];
+	d->plane1 = igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_PRIMARY);
 	prepare_crtc(d, output, pipe, d->plane1, mode);
 
 	igt_create_color_pattern_fb(display->drm_fd, 600, 600,
@@ -324,7 +325,14 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	}
 
 	/* Set up fb[1]->plane2 mapping. */
-	d->plane2 = igt_output_get_plane(output, 1);
+	d->plane2 = igt_pipe_get_plane_type_index(pipe_obj,
+						  DRM_PLANE_TYPE_OVERLAY, 0);
+
+	if (!d->plane2) {
+		igt_debug("Plane-2 doesnt exist on pipe %s\n", kmstest_pipe_name(pipe));
+		return;
+	}
+
 	igt_plane_set_fb(d->plane2, &d->fb[1]);
 
 	/* 2nd plane windowed */
@@ -362,13 +370,14 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	}
 
 	/* Set up fb[2]->plane3 mapping. */
-	d->plane3 = igt_output_get_plane(output, 2);
-	igt_plane_set_fb(d->plane3, &d->fb[2]);
-
-	if(d->plane3->type == DRM_PLANE_TYPE_CURSOR) {
+	d->plane3 = igt_pipe_get_plane_type_index(pipe_obj,
+						  DRM_PLANE_TYPE_OVERLAY, 1);
+	if(!d->plane3) {
 		igt_debug("Plane-3 doesnt exist on pipe %s\n", kmstest_pipe_name(pipe));
 		return;
 	}
+
+	igt_plane_set_fb(d->plane3, &d->fb[2]);
 
 	/* 3rd plane windowed - no scaling */
 	igt_fb_set_position(&d->fb[2], d->plane3, 100, 100);
@@ -448,13 +457,14 @@ __test_scaler_with_clipping_clamping_scenario(data_t *d, drmModeModeInfo *mode,
 static void
 test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_output_t *output)
 {
+	igt_pipe_t *pipe_obj = &d->display.pipes[pipe];
 	drmModeModeInfo *mode;
 
 	igt_require(get_num_scalers(d, pipe) >= 2);
 
 	mode = igt_output_get_mode(output);
-	d->plane1 = &d->display.pipes[pipe].planes[0];
-	d->plane2 = &d->display.pipes[pipe].planes[1];
+	d->plane1 = igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_PRIMARY);
+	d->plane2 = igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_OVERLAY);
 	prepare_crtc(d, output, pipe, d->plane1, mode);
 
 	for (int i = 0; i < d->plane1->drm_plane->count_formats; i++) {
