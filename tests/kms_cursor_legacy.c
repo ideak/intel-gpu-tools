@@ -859,7 +859,7 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 	enum pipe pipe = find_connected_pipe(display, false);
 	enum pipe pipe2 = find_connected_pipe(display, true);
 	igt_output_t *output, *output2;
-	bool vblank_matches, enabled = false;
+	bool enabled = false;
 	volatile unsigned long *shared;
 	unsigned flags = 0, vblank_start;
 	struct drm_event_vblank vbl;
@@ -963,7 +963,6 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 		flip_nonblocking(display, pipe2, atomic, &fb2_info, (void*)(ptrdiff_t)vblank_start);
 	}
 
-	vblank_matches = false;
 	while (nloops) {
 		shared[1] = nloops & 1;
 
@@ -977,9 +976,6 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 		vblank_start = vbl.user_data;
 		if (!modeset)
 			igt_assert_eq(vbl.sequence, vblank_start + 1);
-
-		if (vblank_start && vbl.sequence == vblank_start + 1)
-			vblank_matches = true;
 
 		/* Do not requeue on the last 2 events. */
 		if (nloops <= 2) {
@@ -1012,8 +1008,6 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 			}
 		}
 	}
-
-	igt_assert_f(vblank_matches, "During modeset at least 1 page flip needs to match!\n");
 
 done:
 	shared[0] = 1;
