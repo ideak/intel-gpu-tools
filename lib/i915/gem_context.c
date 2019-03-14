@@ -113,16 +113,16 @@ uint32_t gem_context_create(int fd)
 
 int __gem_context_destroy(int fd, uint32_t ctx_id)
 {
-	struct drm_i915_gem_context_destroy destroy;
-	int ret;
+	struct drm_i915_gem_context_destroy destroy = { ctx_id };
+	int err = 0;
 
-	memset(&destroy, 0, sizeof(destroy));
-	destroy.ctx_id = ctx_id;
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_DESTROY, &destroy)) {
+		err = -errno;
+		igt_assume(err);
+	}
 
-	ret = igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_DESTROY, &destroy);
-	if (ret)
-		return -errno;
-	return 0;
+	errno = 0;
+	return err;
 }
 
 /**
@@ -134,21 +134,20 @@ int __gem_context_destroy(int fd, uint32_t ctx_id)
  */
 void gem_context_destroy(int fd, uint32_t ctx_id)
 {
-	struct drm_i915_gem_context_destroy destroy;
-
-	memset(&destroy, 0, sizeof(destroy));
-	destroy.ctx_id = ctx_id;
-
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_DESTROY, &destroy);
+	igt_assert_eq(__gem_context_destroy(fd, ctx_id), 0);
 }
 
 int __gem_context_get_param(int fd, struct drm_i915_gem_context_param *p)
 {
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_GETPARAM, p))
-		return -errno;
+	int err = 0;
+
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_GETPARAM, p)) {
+		err = -errno;
+		igt_assume(err);
+	}
 
 	errno = 0;
-	return 0;
+	return err;
 }
 
 /**
@@ -161,18 +160,22 @@ int __gem_context_get_param(int fd, struct drm_i915_gem_context_param *p)
  */
 void gem_context_get_param(int fd, struct drm_i915_gem_context_param *p)
 {
-	igt_assert(__gem_context_get_param(fd, p) == 0);
+	igt_assert_eq(__gem_context_get_param(fd, p), 0);
 }
-
 
 int __gem_context_set_param(int fd, struct drm_i915_gem_context_param *p)
 {
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_SETPARAM, p))
-		return -errno;
+	int err = 0;
+
+	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_SETPARAM, p)) {
+		err = -errno;
+		igt_assume(err);
+	}
 
 	errno = 0;
-	return 0;
+	return err;
 }
+
 /**
  * gem_context_set_param:
  * @fd: open i915 drm file descriptor
@@ -183,7 +186,7 @@ int __gem_context_set_param(int fd, struct drm_i915_gem_context_param *p)
  */
 void gem_context_set_param(int fd, struct drm_i915_gem_context_param *p)
 {
-	igt_assert(__gem_context_set_param(fd, p) == 0);
+	igt_assert_eq(__gem_context_set_param(fd, p), 0);
 }
 
 /**
@@ -196,14 +199,9 @@ void gem_context_set_param(int fd, struct drm_i915_gem_context_param *p)
  */
 void gem_context_require_param(int fd, uint64_t param)
 {
-	struct drm_i915_gem_context_param p;
+	struct drm_i915_gem_context_param p = { .param = param };
 
-	p.ctx_id = 0;
-	p.param = param;
-	p.value = 0;
-	p.size = 0;
-
-	igt_require(igt_ioctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_GETPARAM, &p) == 0);
+	igt_require(__gem_context_get_param(fd, &p) == 0);
 }
 
 void gem_context_require_bannable(int fd)
@@ -252,13 +250,11 @@ void gem_context_require_bannable(int fd)
  */
 int __gem_context_set_priority(int fd, uint32_t ctx_id, int prio)
 {
-	struct drm_i915_gem_context_param p;
-
-	memset(&p, 0, sizeof(p));
-	p.ctx_id = ctx_id;
-	p.size = 0;
-	p.param = DRM_I915_CONTEXT_PARAM_PRIORITY;
-	p.value = prio;
+	struct drm_i915_gem_context_param p = {
+		.ctx_id = ctx_id,
+		.param = DRM_I915_CONTEXT_PARAM_PRIORITY,
+		.value = prio,
+	};
 
 	return __gem_context_set_param(fd, &p);
 }
@@ -273,5 +269,5 @@ int __gem_context_set_priority(int fd, uint32_t ctx_id, int prio)
  */
 void gem_context_set_priority(int fd, uint32_t ctx_id, int prio)
 {
-	igt_assert(__gem_context_set_priority(fd, ctx_id, prio) == 0);
+	igt_assert_eq(__gem_context_set_priority(fd, ctx_id, prio), 0);
 }
