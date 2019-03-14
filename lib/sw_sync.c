@@ -206,19 +206,12 @@ int sync_fence_count_status(int fd, int status)
 
 int sync_fence_status(int fence)
 {
-	struct sync_fence_info fence_info;
-	struct sync_file_info file_info = {
-		.sync_fence_info = to_user_pointer(&fence_info),
-		.num_fences = 1,
-	};
+	struct sync_file_info info = { };
 
-	if (ioctl(fence, SYNC_IOC_FILE_INFO, &file_info))
+	if (ioctl(fence, SYNC_IOC_FILE_INFO, &info))
 		return -errno;
 
-	if (file_info.num_fences != 1)
-		return -EINVAL;
-
-	return fence_info.status;
+	return info.status;
 }
 
 static void modprobe(const char *driver)
