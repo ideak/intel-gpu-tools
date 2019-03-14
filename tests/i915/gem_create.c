@@ -149,7 +149,7 @@ static uint64_t get_npages(uint64_t *global, uint64_t npages)
 	max = *global;
 	do {
 		old = max;
-		try = npages % (max / 2);
+		try = 1 + npages % (max / 2);
 		max -= try;
 	} while ((max = __sync_val_compare_and_swap(global, old, max)) != old);
 
