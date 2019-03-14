@@ -1,11 +1,12 @@
 lib_sources = [
 	'drmtest.c',
 	'i915/gem_context.c',
+	'i915/gem_engine_topology.c',
 	'i915/gem_scheduler.c',
 	'i915/gem_submission.c',
 	'i915/gem_ring.c',
 	'i915/gem_mman.c',
-	'i915/gem_engine_topology.c',
+	'i915/gem_vm.c',
 	'igt_color_encoding.c',
 	'igt_debugfs.c',
 	'igt_device.c',

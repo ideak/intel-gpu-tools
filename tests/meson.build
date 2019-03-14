@@ -215,6 +215,7 @@ i915_progs = [
 	'gem_unfence_active_buffers',
 	'gem_unref_active_buffers',
 	'gem_userptr_blits',
+	'gem_vm_create',
 	'gem_wait',
 	'gem_workarounds',
 	'gem_write_read_ring_switch',
