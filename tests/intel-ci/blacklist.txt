@@ -117,3 +117,7 @@ igt@.*@.*pipe-f($|-.*)
 # Since 5.7-rc1, this test has produced tens of megabytes of kernel
 # logs.
 igt@perf_pmu@cpu-hotplug
+
+# Currently fails and leaves the machine in a very bad state, and
+# causes coverage loss for other tests.
+igt@core_hotunplug@.*
