@@ -274,7 +274,7 @@ static void test_fence_busy_all(int fd, unsigned flags)
 
 		if (all < 0) {
 			all = fence;
-			break;
+			continue;
 		}
 
 		new = sync_fence_merge(all, fence);
