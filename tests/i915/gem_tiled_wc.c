@@ -149,8 +149,8 @@ igt_simple_main
 			len = size;
 		}
 
-		first_page = offset & ~(PAGE_SIZE-1);
-		last_page = (offset + len + PAGE_SIZE) & ~(PAGE_SIZE-1);
+		first_page = offset & -PAGE_SIZE;
+		last_page = (offset + len + PAGE_SIZE - 1) & -PAGE_SIZE;
 
 		linear = gem_mmap__wc(fd, handle, first_page, last_page - first_page, PROT_READ);
 
