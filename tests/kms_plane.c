@@ -547,6 +547,8 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 	}
 
 	for (int i = 0; i < plane->drm_plane->count_formats; i++) {
+		int crc_mismatch_count = 0;
+		int crc_mismatch_mask = 0;
 		igt_crc_t crc;
 
 		format = plane->drm_plane->formats[i];
@@ -562,21 +564,22 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 			 kmstest_pipe_name(pipe), plane->index);
 
 		for (int j = 0; j < ARRAY_SIZE(colors); j++) {
-			bool crc_equal;
-
 			test_format_plane_color(data, pipe, plane,
 						format, width, height,
 						dst_w, dst_h,
 						j, &crc, &fb);
 
-			crc_equal = igt_check_crc_equal(&crc, &ref_crc[j]);
-			result &= crc_equal;
-
-			if (!crc_equal)
-				igt_warn("CRC mismatch with format " IGT_FORMAT_FMT " on %s.%u\n",
-					 IGT_FORMAT_ARGS(format),
-					 kmstest_pipe_name(pipe), plane->index);
+			if (!igt_check_crc_equal(&crc, &ref_crc[j])) {
+				crc_mismatch_count++;
+				crc_mismatch_mask |= (1 << j);
+				result = false;
+			}
 		}
+
+		if (crc_mismatch_count)
+			igt_warn("CRC mismatches with format " IGT_FORMAT_FMT " on %s.%u with %d/%d solid colors tested (0x%X)\n",
+				 IGT_FORMAT_ARGS(format), kmstest_pipe_name(pipe),
+				 plane->index, crc_mismatch_count, (int)ARRAY_SIZE(colors), crc_mismatch_mask);
 	}
 
 	igt_pipe_crc_stop(data->pipe_crc);
