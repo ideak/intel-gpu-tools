@@ -32,7 +32,9 @@
 #include "igt_perf.h"
 #include "igt_sysfs.h"
 
-#define MAX_NUMBER_MOCS_REGISTERS	(64)
+#define GEN9_NUM_MOCS_ENTRIES   62  /* 62 out of 64 - 63 & 64 are reserved. */
+#define GEN11_NUM_MOCS_ENTRIES  64  /* 63-64 are reserved, but configured. */
+
 enum {
 	NONE,
 	RESET,
@@ -61,10 +63,13 @@ static const char * const test_modes[] = {
 #define GEN9_MFX1_MOCS_0	(0xcA00)	/* Media 1 MOCS base register*/
 #define GEN9_VEBOX_MOCS_0	(0xcB00)	/* Video MOCS base register*/
 #define GEN9_BLT_MOCS_0		(0xcc00)	/* Blitter MOCS base register*/
+#define ICELAKE_MOCS_PTE	{0x00000004, 0x0030, 0x1}
+#define MOCS_PTE		{0x00000038, 0x0030, 0x1}
 
 struct mocs_entry {
 	uint32_t	control_value;
 	uint16_t	l3cc_value;
+	uint8_t 	used;
 };
 
 struct mocs_table {
@@ -73,35 +78,58 @@ struct mocs_table {
 };
 
 /* The first entries in the MOCS tables are defined by uABI */
-static const struct mocs_entry skylake_mocs_table[] = {
-	{ 0x00000009, 0x0010 },
-	{ 0x00000038, 0x0030 },
-	{ 0x0000003b, 0x0030 },
+static const struct mocs_entry icelake_mocs_table[GEN11_NUM_MOCS_ENTRIES] = {
+	[0]  = { 0x00000005, 0x0010, 0x1},
+	[1]  = ICELAKE_MOCS_PTE,
+	[2]  = { 0x00000037, 0x0030, 0x1},
+	[3]  = { 0x00000005, 0x0010, 0x1},
+	[4]  = { 0x00000005, 0x0030, 0x1},
+	[5]  = { 0x00000037, 0x0010, 0x1},
+	[6]  = { 0x00000017, 0x0010, 0x1},
+	[7]  = { 0x00000017, 0x0030, 0x1},
+	[8]  = { 0x00000027, 0x0010, 0x1},
+	[9]  = { 0x00000027, 0x0030, 0x1},
+	[10] = { 0x00000077, 0x0010, 0x1},
+	[11] = { 0x00000077, 0x0030, 0x1},
+	[12] = { 0x00000057, 0x0010, 0x1},
+	[13] = { 0x00000057, 0x0030, 0x1},
+	[14] = { 0x00000067, 0x0010, 0x1},
+	[15] = { 0x00000067, 0x0030, 0x1},
+	[18] = { 0x00060037, 0x0030, 0x1},
+	[19] = { 0x00000737, 0x0030, 0x1},
+	[20] = { 0x00000337, 0x0030, 0x1},
+	[21] = { 0x00000137, 0x0030, 0x1},
+	[22] = { 0x000003b7, 0x0030, 0x1},
+	[23] = { 0x000007b7, 0x0030, 0x1},
+	[24 ... 61] = ICELAKE_MOCS_PTE,
+	[62] = { 0x00000037, 0x0010, 0x1},
+	[63] = { 0x00000037, 0x0010, 0x1},
 };
 
-static const struct mocs_entry dirty_skylake_mocs_table[] = {
-	{ 0x00003FFF, 0x003F }, /* no snoop bit */
-	{ 0x00003FFF, 0x003F },
-	{ 0x00003FFF, 0x003F },
+static const struct mocs_entry skylake_mocs_table[GEN9_NUM_MOCS_ENTRIES] = {
+	[0] = { 0x00000009, 0x0010, 0x1},
+	[1] = MOCS_PTE,
+	[2] = { 0x0000003b, 0x0030, 0x1},
+	[3 ... GEN9_NUM_MOCS_ENTRIES - 1] = MOCS_PTE,
 };
 
-static const struct mocs_entry broxton_mocs_table[] = {
-	{ 0x00000009, 0x0010 },
-	{ 0x00000038, 0x0030 },
-	{ 0x00000039, 0x0030 },
+static const struct mocs_entry dirty_skylake_mocs_table[GEN9_NUM_MOCS_ENTRIES] = {
+	[0 ... GEN9_NUM_MOCS_ENTRIES - 1] = { 0x00003FFF, 0x003F, 0x1 },
 };
 
-static const struct mocs_entry dirty_broxton_mocs_table[] = {
-	{ 0x00007FFF, 0x003F },
-	{ 0x00007FFF, 0x003F },
-	{ 0x00007FFF, 0x003F },
+static const struct mocs_entry broxton_mocs_table[GEN9_NUM_MOCS_ENTRIES] = {
+	[0] = { 0x00000009, 0x0010, 0x1},
+	[1] = MOCS_PTE,
+	[2] = { 0x00000039, 0x0030, 0x1},
+	[3 ... GEN9_NUM_MOCS_ENTRIES - 1] = MOCS_PTE,
 };
 
-static const uint32_t write_values[] = {
-	0xFFFFFFFF,
-	0xFFFFFFFF,
-	0xFFFFFFFF,
-	0xFFFFFFFF
+static const struct mocs_entry dirty_broxton_mocs_table[GEN9_NUM_MOCS_ENTRIES] = {
+	[0 ... GEN9_NUM_MOCS_ENTRIES - 1] = { 0x00007FFF, 0x003F, 0x1 },
+};
+
+static const uint32_t write_values[GEN9_NUM_MOCS_ENTRIES] = {
+	[0 ... GEN9_NUM_MOCS_ENTRIES - 1] = 0xFFFFFFFF,
 };
 
 static bool get_mocs_settings(int fd, struct mocs_table *table, bool dirty)
@@ -126,6 +154,10 @@ static bool get_mocs_settings(int fd, struct mocs_table *table, bool dirty)
 			table->size  = ARRAY_SIZE(broxton_mocs_table);
 			table->table = broxton_mocs_table;
 		}
+		result = true;
+	} else if (IS_ICELAKE(devid)) {
+		table->size  = ARRAY_SIZE(icelake_mocs_table);
+		table->table = icelake_mocs_table;
 		result = true;
 	}
 
@@ -238,7 +270,8 @@ static void write_registers(int fd,
 			    uint32_t reg_base,
 			    const uint32_t *values,
 			    uint32_t size,
-			    uint32_t engine_id)
+			    uint32_t engine_id,
+			    bool privileged)
 {
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -254,7 +287,10 @@ static void write_registers(int fd,
 	execbuf.buffer_count = 1;
 	execbuf.batch_len = create_write_batch(batch, values, size, reg_base);
 	i915_execbuffer2_set_context_id(execbuf, ctx_id);
-	execbuf.flags = I915_EXEC_SECURE | engine_id;
+	if (privileged)
+		execbuf.flags = I915_EXEC_SECURE | engine_id;
+	else
+		execbuf.flags = engine_id;
 
 	gem_write(fd, handle, 0, batch, execbuf.batch_len);
 	gem_execbuf(fd, &execbuf);
@@ -283,9 +319,12 @@ static void check_control_registers(int fd,
 	read_regs = gem_mmap__cpu(fd, dst_handle, 0, 4096, PROT_READ);
 
 	gem_set_domain(fd, dst_handle, I915_GEM_DOMAIN_CPU, 0);
-	for (int index = 0; index < table.size; index++)
+	for (int index = 0; index < table.size; index++) {
+		if (!table.table[index].used)
+			continue;
 		igt_assert_eq_u32(read_regs[index],
 				  table.table[index].control_value);
+	}
 
 	munmap(read_regs, 4096);
 	gem_close(fd, dst_handle);
@@ -315,10 +354,14 @@ static void check_l3cc_registers(int fd,
 	gem_set_domain(fd, dst_handle, I915_GEM_DOMAIN_CPU, 0);
 
 	for (index = 0; index < table.size / 2; index++) {
-		igt_assert_eq_u32(read_regs[index] & 0xffff,
-				  table.table[index * 2].l3cc_value);
-		igt_assert_eq_u32(read_regs[index] >> 16,
-				  table.table[index * 2 + 1].l3cc_value);
+		if (table.table[index * 2].used) {
+			igt_assert_eq_u32(read_regs[index] & 0xffff,
+					  table.table[index * 2].l3cc_value);
+		}
+		if (table.table[index * 2 + 1].used) {
+			igt_assert_eq_u32(read_regs[index] >> 16,
+					  table.table[index * 2 + 1].l3cc_value);
+		}
 	}
 
 	if (table.size & 1)
@@ -364,7 +407,9 @@ static void rc6_wait(int i915)
 	igt_require(rc6);
 }
 
-static void check_mocs_values(int fd, unsigned engine, uint32_t ctx_id, bool dirty)
+static void check_mocs_values(int fd,
+			      unsigned engine, uint32_t ctx_id,
+			      bool dirty)
 {
 	check_control_registers(fd, engine, ctx_id, dirty);
 
@@ -372,16 +417,25 @@ static void check_mocs_values(int fd, unsigned engine, uint32_t ctx_id, bool dir
 		check_l3cc_registers(fd, engine, ctx_id, dirty);
 }
 
-static void write_dirty_mocs(int fd, unsigned engine, uint32_t ctx_id)
+static void write_dirty_mocs(int fd,
+			     unsigned engine, uint32_t ctx_id,
+			     bool privileged)
 {
+	int num_of_mocs_entries;
+
+	if (intel_gen(intel_get_drm_devid(fd)) >= 11)
+		num_of_mocs_entries = GEN11_NUM_MOCS_ENTRIES;
+	else
+		num_of_mocs_entries = GEN9_NUM_MOCS_ENTRIES;
+
 	write_registers(fd, ctx_id, get_engine_base(engine),
-			write_values, ARRAY_SIZE(write_values),
-			engine);
+			write_values, num_of_mocs_entries,
+			engine, privileged);
 
 	if (engine == I915_EXEC_RENDER)
 		write_registers(fd, ctx_id, GEN9_LNCFCMOCS0,
-				write_values, ARRAY_SIZE(write_values),
-				engine);
+				write_values, num_of_mocs_entries/2,
+				engine, privileged);
 }
 
 static void run_test(int fd, unsigned engine, unsigned flags, unsigned mode)
@@ -389,6 +443,13 @@ static void run_test(int fd, unsigned engine, unsigned flags, unsigned mode)
 	uint32_t ctx_id = 0;
 	uint32_t ctx_clean_id;
 	uint32_t ctx_dirty_id;
+
+	/* As mocs is global for GEN11+, trying privileged write to dirty
+	 * the mocs and testing context save and restore of mocs between
+	 * contexts is bound to fail.
+	 */
+	if (flags & MOCS_DIRTY_VALUES)
+		igt_skip_on(intel_gen(intel_get_drm_devid(fd)) >= 11);
 
 	gem_require_ring(fd, engine);
 
@@ -400,7 +461,7 @@ static void run_test(int fd, unsigned engine, unsigned flags, unsigned mode)
 
 	if (flags & MOCS_DIRTY_VALUES) {
 		ctx_dirty_id = gem_context_create(fd);
-		write_dirty_mocs(fd, engine, ctx_dirty_id);
+		write_dirty_mocs(fd, engine, ctx_dirty_id, true);
 		check_mocs_values(fd, engine, ctx_dirty_id, true);
 	}
 
@@ -428,6 +489,18 @@ static void run_test(int fd, unsigned engine, unsigned flags, unsigned mode)
 
 	if (ctx_id)
 		gem_context_destroy(fd, ctx_id);
+}
+
+static void isolation_test(int fd, unsigned engine)
+{
+	uint32_t ctx[2] = { gem_context_create(fd), gem_context_create(fd) };
+
+	/* Any writes by one normal client should not affect a second client */
+	write_dirty_mocs(fd, engine, ctx[0], false);
+	check_mocs_values(fd, engine, ctx[1], false);
+
+	for (int i = 0; i < ARRAY_SIZE(ctx); i++)
+		gem_context_destroy(fd, ctx[i]);
 }
 
 igt_main
@@ -489,6 +562,13 @@ igt_main
 						igt_disallow_hang(fd, hang);
 				}
 			}
+		}
+
+		igt_subtest_f("mocs-isolation-%s",
+			      e->name) {
+			gem_require_contexts(fd);
+
+			isolation_test(fd, e->exec_id | e->flags);
 		}
 	}
 
