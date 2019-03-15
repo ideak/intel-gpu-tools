@@ -93,12 +93,17 @@ static int __get_drm_device_name(int fd, char *name, int name_size)
 
 static bool __is_device(int fd, const char *expect)
 {
-	char name[5] = "";
+	char name[12] = "";
 
 	if (__get_drm_device_name(fd, name, sizeof(name) - 1))
 		return false;
 
 	return strcmp(expect, name) == 0;
+}
+
+bool is_amdgpu_device(int fd)
+{
+	return __is_device(fd, "amdgpu");
 }
 
 bool is_i915_device(int fd)
@@ -443,6 +448,11 @@ int drm_open_driver_render(int chipset)
 	}
 
 	return fd;
+}
+
+void igt_require_amdgpu(int fd)
+{
+	igt_require(is_amdgpu_device(fd));
 }
 
 void igt_require_intel(int fd)
