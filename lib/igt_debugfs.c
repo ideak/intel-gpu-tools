@@ -872,10 +872,14 @@ igt_pipe_crc_get_crcs(igt_pipe_crc_t *pipe_crc, int n_crcs,
 	return n;
 }
 
-static void crc_sanity_checks(igt_crc_t *crc)
+static void crc_sanity_checks(igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
 {
 	int i;
 	bool all_zero = true;
+
+	/* Any CRC value can be considered valid on amdgpu hardware. */
+	if (is_amdgpu_device(pipe_crc->fd))
+		return;
 
 	for (i = 0; i < crc->n_words; i++) {
 		igt_warn_on_f(crc->crc[i] == 0xffffffff,
@@ -930,7 +934,7 @@ void igt_pipe_crc_get_single(igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
 {
 	read_one_crc(pipe_crc, crc);
 
-	crc_sanity_checks(crc);
+	crc_sanity_checks(pipe_crc, crc);
 }
 
 /**
@@ -959,7 +963,7 @@ igt_pipe_crc_get_current(int drm_fd, igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
 		}
 	} while (igt_vblank_before_eq(crc->frame, vblank));
 
-	crc_sanity_checks(crc);
+	crc_sanity_checks(pipe_crc, crc);
 }
 
 /**
