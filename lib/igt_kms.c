@@ -1781,6 +1781,13 @@ static void igt_plane_reset(igt_plane_t *plane)
 	if (igt_plane_has_prop(plane, IGT_PLANE_ROTATION))
 		igt_plane_set_prop_value(plane, IGT_PLANE_ROTATION, IGT_ROTATION_0);
 
+	if (igt_plane_has_prop(plane, IGT_PLANE_PIXEL_BLEND_MODE))
+		igt_plane_set_prop_enum(plane, IGT_PLANE_PIXEL_BLEND_MODE, "Pre-multiplied");
+
+	if (igt_plane_has_prop(plane, IGT_PLANE_ALPHA))
+		igt_plane_set_prop_value(plane, IGT_PLANE_ALPHA, 0xffff);
+
+
 	igt_plane_clear_prop_changed(plane, IGT_PLANE_IN_FENCE_FD);
 	plane->values[IGT_PLANE_IN_FENCE_FD] = ~0ULL;
 	plane->gem_handle = 0;
