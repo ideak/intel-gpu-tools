@@ -467,6 +467,12 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		stride = roundup_power_of_two(stride);
 
 		return stride;
+	} else if (igt_format_is_yuv(fb->drm_format) && is_amdgpu_device(fb->fd)) {
+		/*
+		 * Chroma address needs to be aligned to 256 bytes on AMDGPU
+		 * so the easiest way is to align the luma stride to 256.
+		 */
+		return ALIGN(min_stride, 256);
 	} else {
 		unsigned int tile_width, tile_height;
 
