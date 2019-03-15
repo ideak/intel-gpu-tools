@@ -219,28 +219,23 @@ test_plane_position_with_output(data_t *data,
 static void
 test_plane_position(data_t *data, enum pipe pipe, unsigned int flags)
 {
+	int n_planes = data->display.pipes[pipe].n_planes;
 	igt_output_t *output;
-	int connected_outs = 0;
+	igt_crc_t reference_crc;
 
-	for_each_valid_output_on_pipe(&data->display, pipe, output) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		igt_crc_t reference_crc;
+	output = igt_get_single_output_for_pipe(&data->display, pipe);
+	igt_require(output);
 
-		test_init(data, pipe);
+	test_init(data, pipe);
 
-		test_grab_crc(data, output, pipe, &green, &reference_crc);
+	test_grab_crc(data, output, pipe, &green, &reference_crc);
 
-		for (int plane = 1; plane < n_planes; plane++)
-			test_plane_position_with_output(data, pipe, plane,
-							output, &reference_crc,
-							flags);
+	for (int plane = 1; plane < n_planes; plane++)
+		test_plane_position_with_output(data, pipe, plane,
+						output, &reference_crc,
+						flags);
 
-		test_fini(data);
-
-		connected_outs++;
-	}
-
-	igt_skip_on(connected_outs == 0);
+	test_fini(data);
 }
 
 /*
@@ -340,31 +335,24 @@ test_plane_panning_with_output(data_t *data,
 static void
 test_plane_panning(data_t *data, enum pipe pipe, unsigned int flags)
 {
+	int n_planes = data->display.pipes[pipe].n_planes;
 	igt_output_t *output;
-	int connected_outs = 0;
+	igt_crc_t red_crc;
+	igt_crc_t blue_crc;
 
-	for_each_valid_output_on_pipe(&data->display, pipe, output) {
-		int n_planes = data->display.pipes[pipe].n_planes;
-		igt_crc_t red_crc;
-		igt_crc_t blue_crc;
+	output = igt_get_single_output_for_pipe(&data->display, pipe);
+	igt_require(output);
 
-		test_init(data, pipe);
+	test_init(data, pipe);
 
-		test_grab_crc(data, output, pipe, &red, &red_crc);
-		test_grab_crc(data, output, pipe, &blue, &blue_crc);
+	test_grab_crc(data, output, pipe, &red, &red_crc);
+	test_grab_crc(data, output, pipe, &blue, &blue_crc);
 
-		for (int plane = 1; plane < n_planes; plane++)
-			test_plane_panning_with_output(data, pipe, plane,
-						       output,
-						       &red_crc, &blue_crc,
-						       flags);
+	for (int plane = 1; plane < n_planes; plane++)
+		test_plane_panning_with_output(data, pipe, plane, output,
+					       &red_crc, &blue_crc, flags);
 
-		test_fini(data);
-
-		connected_outs++;
-	}
-
-	igt_skip_on(connected_outs == 0);
+	test_fini(data);
 }
 
 static const color_t colors[] = {
@@ -601,22 +589,20 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 static void
 test_pixel_formats(data_t *data, enum pipe pipe)
 {
+	bool result;
 	igt_output_t *output;
+	igt_plane_t *plane;
 
-	igt_display_require_output_on_pipe(&data->display, pipe);
+	output = igt_get_single_output_for_pipe(&data->display, pipe);
+	igt_require(output);
 
-	for_each_valid_output_on_pipe(&data->display, pipe, output) {
-		bool result = true;
-		igt_plane_t *plane;
+	result = true;
+	for_each_plane_on_pipe(&data->display, pipe, plane)
+		result &= test_format_plane(data, pipe, output, plane);
 
-		for_each_plane_on_pipe(&data->display, pipe, plane)
-			result &= test_format_plane(data, pipe, output, plane);
+	igt_assert_f(result, "At least one CRC mismatch happened\n");
 
-		igt_assert_f(result, "At least one CRC mismatch happened\n");
-
-
-		igt_output_set_pipe(output, PIPE_ANY);
-	}
+	igt_output_set_pipe(output, PIPE_ANY);
 }
 
 static void
