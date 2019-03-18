@@ -197,7 +197,7 @@ static void test_sync_busy_fork_unixsocket(void)
 		msg.msg_control = c_buffer;
 		msg.msg_controllen = sizeof(c_buffer);
 
-		igt_assert(recvmsg(socket, &msg, 0) == 0);
+		igt_assert(recvmsg(socket, &msg, 0) > 0);
 
 		cmsg = CMSG_FIRSTHDR(&msg);
 		data = CMSG_DATA(cmsg);
@@ -233,7 +233,7 @@ static void test_sync_busy_fork_unixsocket(void)
 		igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
 			     "Fence signaled (it should not have been signalled yet)\n");
 
-		igt_assert(sendmsg(socket, &msg, 0) == 0);
+		igt_assert(sendmsg(socket, &msg, 0) > 0);
 
 		igt_assert_f(sync_fence_wait(fence, 2*1000) == 0,
 			     "Fence not signaled (timeline value 1 fence seqno 1)\n");
