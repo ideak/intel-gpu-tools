@@ -287,6 +287,39 @@ test_wc(int fd)
 		     5*gtt_writes/256., 5*cpu_writes/256.);
 }
 
+static int mmap_gtt_version(int i915)
+{
+	int val = 0;
+	struct drm_i915_getparam gp = {
+		gp.param = 40, /* MMAP_GTT_VERSION */
+		gp.value = &val,
+	};
+
+	ioctl(i915, DRM_IOCTL_I915_GETPARAM, &gp);
+	return val;
+}
+
+static void
+test_pf_nonblock(int i915)
+{
+	igt_spin_t *spin;
+	uint32_t *ptr;
+
+	igt_require(mmap_gtt_version(i915) >= 3);
+
+	spin = igt_spin_batch_new(i915);
+
+	igt_set_timeout(1, "initial pagefaulting did not complete within 1s");
+
+	ptr = gem_mmap__gtt(i915, spin->handle, 4096, PROT_WRITE);
+	ptr[256] = 0;
+	munmap(ptr, 4096);
+
+	igt_reset_timeout();
+
+	igt_spin_batch_free(i915, spin);
+}
+
 static void
 test_write_gtt(int fd)
 {
@@ -900,6 +933,8 @@ igt_main
 		test_write_cpu_read_gtt(fd);
 	igt_subtest("basic-wc")
 		test_wc(fd);
+	igt_subtest("pf-nonblock")
+		test_pf_nonblock(fd);
 
 	igt_subtest("basic-small-bo")
 		test_huge_bo(fd, -1, I915_TILING_NONE);

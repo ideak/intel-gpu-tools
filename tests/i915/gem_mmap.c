@@ -116,6 +116,25 @@ test_huge_bo(int huge)
 	free(cpu_pattern);
 }
 
+static void
+test_pf_nonblock(int i915)
+{
+	igt_spin_t *spin;
+	uint32_t *ptr;
+
+	spin = igt_spin_batch_new(i915);
+
+	igt_set_timeout(1, "initial pagefaulting did not complete within 1s");
+
+	ptr = gem_mmap__cpu(i915, spin->handle, 0, 4096, PROT_WRITE);
+	ptr[256] = 0;
+	munmap(ptr, 4096);
+
+	igt_reset_timeout();
+
+	igt_spin_batch_free(i915, spin);
+}
+
 static int mmap_ioctl(int i915, struct drm_i915_gem_mmap *arg)
 {
 	int err = 0;
@@ -247,6 +266,9 @@ igt_main
 
 		gem_close(fd, handle);
 	}
+
+	igt_subtest("pf-nonblock")
+		test_pf_nonblock(fd);
 
 	igt_subtest("basic-small-bo")
 		test_huge_bo(-1);

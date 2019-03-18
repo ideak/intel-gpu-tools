@@ -443,6 +443,25 @@ test_fault_concurrent(int fd)
 }
 
 static void
+test_pf_nonblock(int i915)
+{
+	igt_spin_t *spin;
+	uint32_t *ptr;
+
+	spin = igt_spin_batch_new(i915);
+
+	igt_set_timeout(1, "initial pagefaulting did not complete within 1s");
+
+	ptr = gem_mmap__wc(i915, spin->handle, 0, 4096, PROT_WRITE);
+	ptr[256] = 0;
+	munmap(ptr, 4096);
+
+	igt_reset_timeout();
+
+	igt_spin_batch_free(i915, spin);
+}
+
+static void
 run_without_prefault(int fd,
 			void (*func)(int fd))
 {
@@ -581,6 +600,8 @@ igt_main
 		test_write_cpu_read_wc(fd, 0);
 	igt_subtest("write-gtt-read-wc")
 		test_write_gtt_read_wc(fd);
+	igt_subtest("pf-nonblock")
+		test_pf_nonblock(fd);
 	igt_subtest("set-cache-level")
 		test_set_cache_level(fd);
 
