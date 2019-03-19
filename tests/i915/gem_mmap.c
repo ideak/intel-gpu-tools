@@ -116,32 +116,105 @@ test_huge_bo(int huge)
 	free(cpu_pattern);
 }
 
+static int mmap_ioctl(int i915, struct drm_i915_gem_mmap *arg)
+{
+	int err = 0;
+
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_MMAP, arg))
+		err = -errno;
+
+	errno = 0;
+	return err;
+}
+
 igt_main
 {
-	struct drm_i915_gem_mmap arg;
 	uint8_t expected[OBJECT_SIZE];
 	uint8_t buf[OBJECT_SIZE];
 	uint8_t *addr;
-	int ret;
 
 	igt_fixture
 		fd = drm_open_driver(DRIVER_INTEL);
 
 	igt_subtest("bad-object") {
-		memset(&arg, 0, sizeof(arg));
-		arg.handle = 0x10101010;
-		arg.offset = 0;
-		arg.size = 4096;
-		ret = ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg);
-		igt_assert(ret == -1 && errno == ENOENT);
+		uint32_t real_handle = gem_create(fd, 4096);
+		uint32_t handles[20];
+		int i = 0;
+
+		handles[i++] = 0xdeadbeef;
+		for(int bit = 0; bit < 16; bit++)
+			handles[i++] = real_handle | (1 << (bit + 16));
+		handles[i] = real_handle + 1;
+
+		for (; i < 0; i--) {
+			struct drm_i915_gem_mmap arg = {
+				.handle = handles[i],
+				.size = 4096,
+			};
+
+			igt_debug("Trying MMAP IOCTL with handle %x\n", handles[i]);
+			igt_assert_eq(mmap_ioctl(fd, &arg), -EINVAL);
+		}
+
+		gem_close(fd, real_handle);
+	}
+
+	igt_subtest("bad-offset") {
+		struct bad_offset {
+			uint64_t size;
+			uint64_t offset;
+		} bad_offsets[] = {
+				{4096, 4096 + 1},
+				{4096, -4096},
+				{ 2 * 4096, -4096},
+				{ 4096, ~0},
+				{}
+		};
+
+		for (int i = 0; i < ARRAY_SIZE(bad_offsets); i++) {
+			struct drm_i915_gem_mmap arg = {
+				.handle = gem_create(fd, 4096),
+				.offset = bad_offsets[i].offset,
+				.size = bad_offsets[i].size,
+			};
+
+			igt_debug("Trying to mmap bad offset; size: %'"PRIu64", offset: %'"PRIu64"\n",
+				  bad_offsets[i].size, bad_offsets[i].offset);
+
+			igt_assert_eq(mmap_ioctl(fd, &arg), -EINVAL);
+			gem_close(fd, arg.handle);
+		}
+	}
+
+	igt_subtest("bad-size") {
+		uint64_t bad_size[] = {
+			0,
+			-4096,
+			4096 + 1,
+			2 * 4096,
+			~0,
+		};
+
+		for (int i = 0; i < ARRAY_SIZE(bad_size); i++) {
+			struct drm_i915_gem_mmap arg = {
+				.handle = gem_create(fd, 4096),
+				.offset = 4096,
+				.size = bad_size[i],
+			};
+
+			igt_debug("Trying to mmap bad size; size: %'"PRIu64"\n", bad_size[i]);
+			igt_assert_eq(mmap_ioctl(fd, &arg), -EINVAL);
+
+			gem_close(fd, arg.handle);
+		}
 	}
 
 	igt_subtest("basic") {
-		arg.handle = gem_create(fd, OBJECT_SIZE);
-		arg.offset = 0;
-		arg.size = OBJECT_SIZE;
-		ret = ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg);
-		igt_assert(ret == 0);
+		struct drm_i915_gem_mmap arg = {
+			.handle = gem_create(fd, OBJECT_SIZE),
+			.size = OBJECT_SIZE,
+		};
+		igt_assert_eq(mmap_ioctl(fd, &arg), 0);
 		addr = from_user_pointer(arg.addr_ptr);
 
 		igt_info("Testing contents of newly created object.\n");
@@ -164,12 +237,15 @@ igt_main
 	}
 
 	igt_subtest("short-mmap") {
+		uint32_t handle = gem_create(fd, OBJECT_SIZE);
+
 		igt_assert(OBJECT_SIZE > 4096);
-		arg.handle = gem_create(fd, OBJECT_SIZE);
-		addr = gem_mmap__cpu(fd, arg.handle, 0, 4096, PROT_WRITE);
+
+		addr = gem_mmap__cpu(fd, handle, 0, 4096, PROT_WRITE);
 		memset(addr, 0, 4096);
 		munmap(addr, 4096);
-		gem_close(fd, arg.handle);
+
+		gem_close(fd, handle);
 	}
 
 	igt_subtest("basic-small-bo")
