@@ -564,8 +564,8 @@ igt_main
 			}
 		}
 
-		igt_subtest_f("mocs-isolation-%s",
-			      e->name) {
+		igt_subtest_f("mocs-isolation-%s", e->name) {
+			gem_require_ring(fd, e->exec_id | e->flags);
 			gem_require_contexts(fd);
 
 			isolation_test(fd, e->exec_id | e->flags);
