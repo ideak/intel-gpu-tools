@@ -403,7 +403,11 @@ igt_main
 		unsigned int engine;
 		int fd;
 
-		/* Spawn enough processes to use all memory, but each only
+		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(fd);
+
+		/*
+		 * Spawn enough processes to use all memory, but each only
 		 * uses half the available mappable aperture ~128MiB.
 		 * Individually the processes would be ok, but en masse
 		 * we expect the shrinker to start purging objects,
@@ -417,9 +421,6 @@ igt_main
 
 		intel_require_memory(num_processes, alloc_size,
 				     CHECK_SWAP | CHECK_RAM);
-
-		fd = drm_open_driver(DRIVER_INTEL);
-		igt_require_gem(fd);
 
 		nengine = 0;
 		for_each_engine(fd, engine)
