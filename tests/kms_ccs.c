@@ -71,7 +71,8 @@ static const struct {
 };
 
 static const uint64_t ccs_modifiers[] = {
-	LOCAL_I915_FORMAT_MOD_Y_TILED_CCS
+	LOCAL_I915_FORMAT_MOD_Y_TILED_CCS,
+	LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS,
 };
 
 /*
