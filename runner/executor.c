@@ -753,9 +753,10 @@ static int monitor_output(pid_t child,
 	return killed;
 }
 
-static void execute_test_process(int outfd, int errfd,
-				 struct settings *settings,
-				 struct job_list_entry *entry)
+static void __attribute__((noreturn))
+execute_test_process(int outfd, int errfd,
+		     struct settings *settings,
+		     struct job_list_entry *entry)
 {
 	char *argv[4] = {};
 	size_t rootlen;
@@ -871,6 +872,7 @@ static int execute_next_entry(struct execute_state *state,
 	sigset_t mask;
 	int outpipe[2] = { -1, -1 };
 	int errpipe[2] = { -1, -1 };
+	int outfd, errfd;
 	char name[32];
 	pid_t child;
 	int result;
@@ -884,9 +886,9 @@ static int execute_next_entry(struct execute_state *state,
 	}
 
 	if (!open_output_files(dirfd, outputs, true)) {
-		close(dirfd);
 		fprintf(stderr, "Error opening output files\n");
-		return -1;
+		result = -1;
+		goto out_dirfd;
 	}
 
 	if (settings->sync) {
@@ -895,14 +897,9 @@ static int execute_next_entry(struct execute_state *state,
 	}
 
 	if (pipe(outpipe) || pipe(errpipe)) {
-		close_outputs(outputs);
-		close(dirfd);
-		close(outpipe[0]);
-		close(outpipe[1]);
-		close(errpipe[0]);
-		close(errpipe[1]);
 		fprintf(stderr, "Error creating pipes: %s\n", strerror(errno));
-		return -1;
+		result = -1;
+		goto out_pipe;
 	}
 
 	if ((kmsgfd = open("/dev/kmsg", O_RDONLY | O_CLOEXEC)) < 0) {
@@ -923,14 +920,8 @@ static int execute_next_entry(struct execute_state *state,
 	if (sigfd < 0) {
 		/* TODO: Handle better */
 		fprintf(stderr, "Cannot monitor child process with signalfd\n");
-		close(outpipe[0]);
-		close(errpipe[0]);
-		close(outpipe[1]);
-		close(errpipe[1]);
-		close(kmsgfd);
-		close_outputs(outputs);
-		close(dirfd);
-		return -1;
+		result = -1;
+		goto out_kmsgfd;
 	}
 
 	if (settings->log_level >= LOG_LEVEL_NORMAL) {
@@ -951,21 +942,17 @@ static int execute_next_entry(struct execute_state *state,
 	 * Flush outputs before forking so our (buffered) output won't
 	 * end up in the test outputs.
 	 */
-
 	fflush(stdout);
 	fflush(stderr);
 
-	if ((child = fork())) {
-		int outfd = outpipe[0];
-		int errfd = errpipe[0];
-		close(outpipe[1]);
-		close(errpipe[1]);
-
-		result = monitor_output(child, outfd, errfd, kmsgfd, sigfd,
-					outputs, time_spent, settings);
-	} else {
-		int outfd = outpipe[1];
-		int errfd = errpipe[1];
+	child = fork();
+	if (child < 0) {
+		fprintf(stderr, "Failed to fork: %s\n", strerror(errno));
+		result = -1;
+		goto out_kmsgfd;
+	} else if (child == 0) {
+		outfd = outpipe[1];
+		errfd = errpipe[1];
 		close(outpipe[0]);
 		close(errpipe[0]);
 
@@ -974,13 +961,28 @@ static int execute_next_entry(struct execute_state *state,
 		setenv("IGT_SENTINEL_ON_STDERR", "1", 1);
 
 		execute_test_process(outfd, errfd, settings, entry);
+		/* unreachable */
 	}
 
-	/* TODO: Refactor this whole function to use onion teardown */
+	outfd = outpipe[0];
+	errfd = errpipe[0];
 	close(outpipe[1]);
 	close(errpipe[1]);
+	outpipe[1] = errpipe[1] = -1;
+
+	result = monitor_output(child, outfd, errfd, kmsgfd, sigfd,
+				outputs, time_spent, settings);
+
+out_kmsgfd:
 	close(kmsgfd);
+out_pipe:
 	close_outputs(outputs);
+	close(outpipe[0]);
+	close(outpipe[1]);
+	close(errpipe[0]);
+	close(errpipe[1]);
+	close_outputs(outputs);
+out_dirfd:
 	close(dirfd);
 
 	return result;
