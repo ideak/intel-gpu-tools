@@ -2519,8 +2519,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 
 	if (fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED ||
 	    fb->modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED ||
-	    fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_CCS ||
-	    fb->modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS) {
+	    is_ccs_modifier(fb->modifier)) {
 		setup_linear_mapping(&blit->base);
 	} else {
 		blit->base.linear.fb = *fb;
