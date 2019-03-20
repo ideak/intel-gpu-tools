@@ -60,6 +60,19 @@ static int get_num_scalers(data_t* d, enum pipe pipe)
 		return 1;
 }
 
+static bool is_planar_yuv_format(uint32_t pixelformat)
+{
+	switch (pixelformat) {
+	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static void cleanup_fbs(data_t *data)
 {
 	int i;
@@ -136,7 +149,7 @@ static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 
 	/* create buffer in the range of  min and max source side limit.*/
 	width = height = 8;
-	if (pixel_format == DRM_FORMAT_NV12)
+	if (is_planar_yuv_format(pixel_format))
 		width = height = 16;
 	igt_create_color_fb(display->drm_fd, width, height,
 		       pixel_format, tiling, 0.0, 1.0, 0.0, &d->fb[0]);
