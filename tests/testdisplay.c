@@ -51,6 +51,7 @@
 #include <cairo.h>
 #include <errno.h>
 #include <getopt.h>
+#include <libgen.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -563,24 +564,17 @@ static gboolean input_event(GIOChannel *source, GIOCondition condition,
 	return TRUE;
 }
 
-static void enter_exec_path( char **argv )
+static void enter_exec_path(const char **argv)
 {
-	char *exec_path = NULL;
-	char *pos = NULL;
-	short len_path = 0;
+	char *argv0, *exec_path;
 	int ret;
 
-	len_path = strlen( argv[0] );
-	exec_path = (char*) malloc(len_path);
-
-	memcpy(exec_path, argv[0], len_path);
-	pos = strrchr(exec_path, '/');
-	if (pos != NULL)
-		*(pos+1) = '\0';
-
+	argv0 = strdup(argv[0]);
+	igt_assert(argv0);
+	exec_path = dirname(argv0);
 	ret = chdir(exec_path);
 	igt_assert_eq(ret, 0);
-	free(exec_path);
+	free(argv0);
 }
 
 static void restore_termio_mode(int sig)
@@ -626,7 +620,7 @@ int main(int argc, char **argv)
 
 	igt_skip_on_simulation();
 
-	enter_exec_path( argv );
+	enter_exec_path((const char **) argv);
 
 	while ((c = getopt_long(argc, argv, optstr, long_opts, NULL)) != -1) {
 		switch (c) {
