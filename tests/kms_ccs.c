@@ -58,6 +58,7 @@ typedef struct {
 	enum test_flags flags;
 	igt_plane_t *plane;
 	igt_pipe_crc_t *pipe_crc;
+	uint64_t ccs_modifier;
 } data_t;
 
 static const struct {
@@ -67,6 +68,10 @@ static const struct {
 } colors[2] = {
 	{1.0, 0.0, 0.0},
 	{0.0, 1.0, 0.0}
+};
+
+static const uint64_t ccs_modifiers[] = {
+	LOCAL_I915_FORMAT_MOD_Y_TILED_CCS
 };
 
 /*
@@ -140,7 +145,8 @@ modifiers_ptr(struct local_drm_format_modifier_blob *blob)
 	return (struct local_drm_format_modifier *)(((char *)blob) + blob->modifiers_offset);
 }
 
-static bool plane_has_format_with_ccs(data_t *data, igt_plane_t *plane, uint32_t format)
+static bool plane_has_format_with_ccs(data_t *data, igt_plane_t *plane,
+				      uint32_t format)
 {
 	drmModePropertyBlobPtr blob;
 	struct local_drm_format_modifier_blob *blob_data;
@@ -178,7 +184,7 @@ static bool plane_has_format_with_ccs(data_t *data, igt_plane_t *plane, uint32_t
 	last_mod = &modifiers[blob_data->count_modifiers];
 	igt_assert_lte(((char *) last_mod - (char *) blob_data), blob->length);
 	for (int i = 0; i < blob_data->count_modifiers; i++) {
-		if (modifiers[i].modifier != LOCAL_I915_FORMAT_MOD_Y_TILED_CCS)
+		if (modifiers[i].modifier != data->ccs_modifier)
 			continue;
 
 		if (modifiers[i].offset > fmt_idx ||
@@ -226,7 +232,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	 * available FIFO configurations.
 	 */
 	if (fb_flags & FB_COMPRESSED)
-		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED_CCS;
+		modifier = data->ccs_modifier;
 	else if (!(fb_flags & FB_HAS_PLANE))
 		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED;
 	else
@@ -313,6 +319,7 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 	if (data->plane && fb_flags & FB_COMPRESSED) {
 		if (!plane_has_format_with_ccs(data, data->plane, DRM_FORMAT_XRGB8888))
 			return false;
+
 		generate_fb(data, &fb, min(MAX_SPRITE_PLANE_WIDTH, drm_mode->hdisplay),
 			    drm_mode->vdisplay,
 			    (fb_flags & ~FB_COMPRESSED) | FB_HAS_PLANE);
@@ -369,21 +376,10 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 	return true;
 }
 
-static int test_output(data_t *data)
-{
-	igt_display_t *display = &data->display;
+static int test_ccs(data_t *data)
+{	int valid_tests = 0;
 	igt_crc_t crc, ref_crc;
 	enum test_fb_flags fb_flags = 0;
-	int valid_tests = 0;
-
-	igt_display_require_output_on_pipe(display, data->pipe);
-
-	/* Sets data->output with a valid output. */
-	for_each_valid_output_on_pipe(display, data->pipe, data->output) {
-		break;
-	}
-
-	igt_output_set_pipe(data->output, data->pipe);
 
 	if (data->flags & TEST_CRC) {
 		data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
@@ -411,7 +407,29 @@ static int test_output(data_t *data)
 		valid_tests += try_config(data, fb_flags | FB_COMPRESSED | FB_ZERO_AUX_STRIDE , NULL);
 	}
 
-	igt_output_set_pipe(data->output, PIPE_ANY);
+	return valid_tests;
+}
+
+static int test_output(data_t *data)
+{
+	igt_display_t *display = &data->display;
+	int i, valid_tests = 0;
+
+	igt_display_require_output_on_pipe(display, data->pipe);
+
+	/* Sets data->output with a valid output. */
+	for_each_valid_output_on_pipe(display, data->pipe, data->output) {
+		break;
+	}
+
+	igt_output_set_pipe(data->output, data->pipe);
+
+	for (i = 0; i < ARRAY_SIZE(ccs_modifiers); i++) {
+		data->ccs_modifier = ccs_modifiers[i];
+		valid_tests += test_ccs(data);
+	}
+
+	igt_output_set_pipe(data->output, PIPE_NONE);
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	return valid_tests;
