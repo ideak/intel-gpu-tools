@@ -149,7 +149,7 @@ static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 
 	/* create buffer in the range of  min and max source side limit.*/
 	width = height = 8;
-	if (is_planar_yuv_format(pixel_format))
+	if (is_i915_device(d->drm_fd) && is_planar_yuv_format(pixel_format))
 		width = height = 16;
 	igt_create_color_fb(display->drm_fd, width, height,
 		       pixel_format, tiling, 0.0, 1.0, 0.0, &d->fb[0]);
