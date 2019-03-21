@@ -133,6 +133,7 @@ static bool filtered_job_list(struct job_list *job_list,
 {
 	FILE *f;
 	char buf[128];
+	bool ok;
 
 	if (job_list->entries != NULL) {
 		fprintf(stderr, "Caller didn't clear the job list, this shouldn't happen\n");
@@ -179,7 +180,11 @@ static bool filtered_job_list(struct job_list *job_list,
 			     &settings->exclude_regexes);
 	}
 
-	return job_list->size != 0;
+	ok = job_list->size != 0;
+	if (!ok)
+		fprintf(stderr, "Filter didn't match any job name\n");
+
+	return ok;
 }
 
 static bool job_list_from_test_list(struct job_list *job_list,
