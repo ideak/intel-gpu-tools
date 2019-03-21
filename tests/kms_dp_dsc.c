@@ -157,14 +157,16 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 
 	if (data->connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort &&
 	    data->pipe == PIPE_A) {
-		igt_debug ("DSC not supported on Pipe A on external DP\n");
+		igt_debug("DSC not supported on Pipe A on external DP\n");
 		return;
 	}
 
 	if (test_type == test_basic_dsc_enable) {
-		igt_debug ("DSC is supported on %s\n",
-			   data->conn_name);
+		bool enabled;
+
+		igt_debug("DSC is supported on %s\n", data->conn_name);
 		force_dp_dsc_enable(data);
+
 		igt_create_pattern_fb(data->drm_fd, data->mode->hdisplay,
 				      data->mode->vdisplay,
 				      DRM_FORMAT_XRGB8888,
@@ -174,13 +176,20 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 						    DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, &data->fb_test_pattern);
 		igt_display_commit(&data->display);
-		/* Until we have CRC check support, manually check if RGB test pattern has no corruption */
-		manual ("RGB test pattern without corruption");
-		igt_assert_f(is_dp_dsc_enabled(data),
+
+		/*
+		 * Until we have CRC check support, manually check if RGB test
+		 * pattern has no corruption.
+		 */
+		manual("RGB test pattern without corruption");
+
+		enabled = is_dp_dsc_enabled(data);
+		clear_dp_dsc_enable(data);
+
+		igt_assert_f(enabled,
 			     "Default DSC enable failed on Connector: %s Pipe: %s",
 			     data->conn_name,
 			     kmstest_pipe_name(data->pipe));
-		clear_dp_dsc_enable(data);
 	} else {
 		igt_assert(!"Unknown test type\n");
 	}
