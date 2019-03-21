@@ -223,7 +223,7 @@ syncobj_wait(int fd, uint32_t *handles, uint32_t count,
 	wait.pad = 0;
 
 	ret = __syncobj_wait(fd, &wait);
-	if (ret == ETIME)
+	if (ret == -ETIME)
 		return false;
 
 	igt_assert_eq(ret, 0);
