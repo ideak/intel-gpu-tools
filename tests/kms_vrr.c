@@ -200,7 +200,7 @@ static void prepare_test(data_t *data, igt_output_t *output, enum pipe pipe)
 static uint64_t
 wait_for_vblank(data_t *data, enum pipe pipe)
 {
-	drmVBlank vbl = { 0 };
+	drmVBlank vbl = {};
 
 	vbl.request.type = kmstest_get_vbl_flag(pipe);
 	vbl.request.type |= DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT;
