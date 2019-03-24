@@ -58,17 +58,21 @@ test_fence_restore(int fd, bool tiled2untiled, bool hibernate)
 
 	/* Access the buffer objects in the order we want to have the laid out. */
 	ptr1 = gem_mmap__gtt(fd, handle1, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	gem_set_domain(fd, handle1, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	for (i = 0; i < OBJECT_SIZE/sizeof(uint32_t); i++)
 		ptr1[i] = i;
 
 	ptr_tiled = gem_mmap__gtt(fd, handle_tiled, OBJECT_SIZE,
 				  PROT_READ | PROT_WRITE);
+	gem_set_domain(fd, handle_tiled,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	if (tiled2untiled)
 		gem_set_tiling(fd, handle_tiled, I915_TILING_X, 2048);
 	for (i = 0; i < OBJECT_SIZE/sizeof(uint32_t); i++)
 		ptr_tiled[i] = i;
 
 	ptr2 = gem_mmap__gtt(fd, handle2, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	gem_set_domain(fd, handle2, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	for (i = 0; i < OBJECT_SIZE/sizeof(uint32_t); i++)
 		ptr2[i] = i;
 

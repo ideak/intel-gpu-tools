@@ -179,6 +179,7 @@ test_read_write(int fd, enum test_read_write order)
 	handle = gem_create(fd, OBJECT_SIZE);
 
 	ptr = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 	if (order == READ_BEFORE_WRITE) {
 		val = *(uint32_t *)ptr;
@@ -202,8 +203,9 @@ test_read_write2(int fd, enum test_read_write order)
 	handle = gem_create(fd, OBJECT_SIZE);
 
 	r = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_READ);
-
 	w = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 	if (order == READ_BEFORE_WRITE) {
 		val = *(uint32_t *)r;

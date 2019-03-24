@@ -310,6 +310,7 @@ create_bo(int fd, uint32_t val, int tiling)
 	/* Fill the BO with dwords starting at val */
 	v = gem_mmap__gtt(fd, handle, WIDTH * HEIGHT * 4,
 			  PROT_READ | PROT_WRITE);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	for (i = 0; i < WIDTH*HEIGHT; i++)
 		v[i] = val++;
 	munmap(v, WIDTH*HEIGHT*4);
@@ -324,6 +325,7 @@ check_bo(int fd, uint32_t handle, uint32_t val)
 	int i;
 
 	v = gem_mmap__gtt(fd, handle, WIDTH * HEIGHT * 4, PROT_READ);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, 0);
 	for (i = 0; i < WIDTH*HEIGHT; i++) {
 		igt_assert_f(v[i] == val,
 			     "Expected 0x%08x, found 0x%08x "

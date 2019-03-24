@@ -74,6 +74,7 @@ create_bo(int fd)
 	/* Fill the BO with dwords starting at start_val */
 	data = gem_mmap__gtt(fd, handle, sizeof(linear),
 			     PROT_READ | PROT_WRITE);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	for (i = 0; i < WIDTH*HEIGHT; i++)
 		data[i] = i;
 	munmap(data, sizeof(linear));

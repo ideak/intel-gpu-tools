@@ -58,6 +58,7 @@ static uint32_t create_bo(int fd, uint32_t start_val)
 
 	/* Fill the BO with dwords starting at start_val */
 	ptr = gem_mmap__gtt(fd, handle, bo_size, PROT_WRITE);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	for (int i = 0; i < width * height; i++)
 		ptr[i] = start_val++;
 	munmap(ptr, bo_size);
@@ -70,6 +71,7 @@ static void check_bo(int fd, uint32_t handle, uint32_t start_val)
 	uint32_t *ptr;
 
 	ptr = gem_mmap__gtt(fd, handle, bo_size, PROT_READ);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, 0);
 	igt_memcpy_from_wc(linear, ptr, bo_size);
 	munmap(ptr, bo_size);
 
