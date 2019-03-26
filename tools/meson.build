@@ -98,7 +98,7 @@ shared_library('intel_aubdump', 'aubdump.c',
 executable('intel_gpu_top', 'intel_gpu_top.c',
 	   install : true,
 	   install_rpath : bindir_rpathdir,
-	   dependencies : tool_deps + [ lib_igt_perf ])
+	   dependencies : lib_igt_perf)
 
 conf_data = configuration_data()
 conf_data.set('prefix', prefix)
