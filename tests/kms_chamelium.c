@@ -199,7 +199,7 @@ check_analog_bridge(data_t *data, struct chamelium_port *port)
 
 	/* Analog bridges provide their own EDID */
 	if (edid_vendor[0] != 'I' || edid_vendor[1] != 'G' ||
-	    edid_vendor[0] != 'T')
+	    edid_vendor[2] != 'T')
 		return true;
 
 	return false;
