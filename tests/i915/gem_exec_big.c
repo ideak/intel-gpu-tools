@@ -260,7 +260,7 @@ static void single(int i915)
 	uint32_t handle;
 	void *ptr;
 
-	batch_size = (intel_get_avail_ram_mb() - 128) << 20; /* CI slack */
+	batch_size = (intel_get_avail_ram_mb() / 2) << 20; /* XXX CI slack? */
 	limit = gem_aperture_size(i915) - (256 << 10); /* low pages reserved */
 	if (!gem_uses_full_ppgtt(i915))
 		limit = 3 * limit / 4;
