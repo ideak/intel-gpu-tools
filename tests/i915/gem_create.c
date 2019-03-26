@@ -71,7 +71,7 @@ struct local_i915_gem_create_v2 {
 	uint32_t pad;
 #define I915_CREATE_PLACEMENT_STOLEN (1<<0)
 	uint32_t flags;
-} create;
+} create_v2;
 
 #define LOCAL_IOCTL_I915_GEM_CREATE       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_CREATE, struct local_i915_gem_create_v2)
 
@@ -81,24 +81,39 @@ static void invalid_flag_test(int fd)
 
 	gem_require_stolen_support(fd);
 
-	create.handle = 0;
-	create.size = PAGE_SIZE;
-	create.flags = ~I915_CREATE_PLACEMENT_STOLEN;
-	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_CREATE, &create);
+	create_v2.handle = 0;
+	create_v2.size = PAGE_SIZE;
+	create_v2.flags = ~I915_CREATE_PLACEMENT_STOLEN;
+	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_CREATE, &create_v2);
 
 	igt_assert(ret <= 0);
 
-	create.flags = ~0;
-	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_CREATE, &create);
+	create_v2.flags = ~0;
+	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_CREATE, &create_v2);
 
 	igt_assert(ret <= 0);
 }
 
+static int create_ioctl(int fd, struct drm_i915_gem_create *create)
+{
+        int err = 0;
+
+        if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_CREATE, create)) {
+                err = -errno;
+                igt_assume(err != 0);
+        }
+
+        errno = 0;
+        return err;
+}
+
 static void invalid_size_test(int fd)
 {
-	uint32_t handle;
+	struct drm_i915_gem_create create = {
+		.size = 0,
+	};
 
-	igt_assert_eq(__gem_create(fd, 0, &handle), -EINVAL);
+	igt_assert_eq(create_ioctl(fd, &create), -EINVAL);
 }
 
 /*
@@ -108,14 +123,16 @@ static void invalid_size_test(int fd)
  */
 static void valid_nonaligned_size(int fd)
 {
-	int handle;
+	struct drm_i915_gem_create create = {
+		.size = PAGE_SIZE / 2,
+	};
 	char buf[PAGE_SIZE];
 
-	handle = gem_create(fd, PAGE_SIZE / 2);
+	igt_assert_eq(create_ioctl(fd, &create), 0);
 
-	gem_write(fd, handle, PAGE_SIZE / 2, buf, PAGE_SIZE / 2);
+	gem_write(fd, create.handle, PAGE_SIZE / 2, buf, PAGE_SIZE / 2);
 
-	gem_close(fd, handle);
+	gem_close(fd, create.handle);
 }
 
 /*
@@ -125,21 +142,18 @@ static void valid_nonaligned_size(int fd)
  */
 static void invalid_nonaligned_size(int fd)
 {
-	int handle;
+	struct drm_i915_gem_create create = {
+		.size = PAGE_SIZE / 2,
+	};
 	char buf[PAGE_SIZE];
-	struct drm_i915_gem_pwrite gem_pwrite;
 
-	handle = gem_create(fd, PAGE_SIZE / 2);
+	igt_assert_eq(create_ioctl(fd, &create), 0);
 
-	CLEAR(gem_pwrite);
-	gem_pwrite.handle = handle;
-	gem_pwrite.offset = PAGE_SIZE / 2;
-	gem_pwrite.size = PAGE_SIZE;
-	gem_pwrite.data_ptr = to_user_pointer(buf);
 	/* This should fail. Hence cannot use gem_write. */
-	igt_assert(drmIoctl(fd, DRM_IOCTL_I915_GEM_PWRITE, &gem_pwrite));
+	igt_assert(__gem_write(fd, create.handle,
+			       PAGE_SIZE / 2, buf, PAGE_SIZE));
 
-	gem_close(fd, handle);
+	gem_close(fd, create.handle);
 }
 
 static uint64_t get_npages(uint64_t *global, uint64_t npages)
@@ -168,24 +182,25 @@ static void *thread_clear(void *data)
 	int i915 = arg->i915;
 
 	igt_until_timeout(arg->timeout) {
-		uint32_t handle;
+		struct drm_i915_gem_create create = {};
 		uint64_t npages;
 
 		npages = random();
 		npages <<= 32;
 		npages |= random();
 		npages = get_npages(&arg->max, npages);
+		create.size = npages << 12;
 
-		handle = gem_create(i915, npages << 12);
+		create_ioctl(i915, &create);
 		for (uint64_t page = 0; page < npages; page++) {
 			uint64_t x;
 
-			gem_read(i915, handle,
+			gem_read(i915, create.handle,
 				 page * 4096 + (page % (4096 - sizeof(x))),
 				 &x, sizeof(x));
 			igt_assert_eq_u64(x, 0);
 		}
-		gem_close(i915, handle);
+		gem_close(i915, create.handle);
 
 		__sync_add_and_fetch(&arg->max, npages);
 	}
@@ -209,6 +224,18 @@ static void always_clear(int i915, int timeout)
 		pthread_join(thread[i], NULL);
 }
 
+static void size_update(int fd)
+{
+	int size_initial_nonaligned = 15;
+
+	struct drm_i915_gem_create create = {
+		.size = size_initial_nonaligned,
+	};
+
+	igt_assert_eq(create_ioctl(fd, &create), 0);
+	igt_assert_neq(create.size, size_initial_nonaligned);
+}
+
 igt_main
 {
 	int fd = -1;
@@ -230,6 +257,9 @@ igt_main
 
 	igt_subtest("create-invalid-nonaligned")
 		invalid_nonaligned_size(fd);
+
+	igt_subtest("create-size-update")
+		size_update(fd);
 
 	igt_subtest("create-clear")
 		always_clear(fd, 30);
