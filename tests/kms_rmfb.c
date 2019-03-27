@@ -58,6 +58,7 @@ test_rmfb(struct rmfb_data *data, igt_output_t *output, enum pipe pipe, bool reo
 	igt_plane_t *plane;
 	drmModeCrtc *crtc;
 	uint64_t cursor_width, cursor_height;
+	int num_active_planes = 0;
 
 	igt_output_set_pipe(output, pipe);
 
@@ -85,7 +86,24 @@ test_rmfb(struct rmfb_data *data, igt_output_t *output, enum pipe pipe, bool reo
 		} else {
 			igt_plane_set_fb(plane, &fb);
 		}
+
+		if (igt_display_try_commit2(&data->display, data->display.is_atomic ?
+					    COMMIT_ATOMIC : COMMIT_LEGACY)) {
+			/*
+			 * Disable any plane that fails (presumably
+			 * due to exceeding some hardware limit).
+			 */
+			igt_plane_set_fb(plane, NULL);
+		} else {
+			num_active_planes++;
+		}
 	}
+
+	/*
+	 * Make sure we were able to enable at least one
+	 * plane so that we actually test something.
+	 */
+	igt_assert_lt(0, num_active_planes);
 
 	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
