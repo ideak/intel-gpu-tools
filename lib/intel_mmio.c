@@ -112,7 +112,7 @@ intel_mmio_use_dump_file(char *file)
  *
  * Sets up #igt_global_mmio to point at the mmio bar.
  *
- * @pci_dev can be obtained from igt_device_get_pci_device().
+ * @pci_dev can be obtained from intel_get_pci_device().
  */
 void
 intel_mmio_use_pci_bar(struct pci_device *pci_dev)
@@ -162,7 +162,7 @@ release_forcewake_lock(int fd)
  *
  * It also initializes #igt_global_mmio like intel_mmio_use_pci_bar().
  *
- * @pci_dev can be obtained from igt_device_get_pci_device().
+ * @pci_dev can be obtained from intel_get_pci_device().
  */
 int
 intel_register_access_init(struct pci_device *pci_dev, int safe, int fd)

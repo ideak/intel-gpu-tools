@@ -30,7 +30,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "igt_device.h"
 
 static bool supports_lpsp(uint32_t devid)
 {
@@ -211,7 +210,7 @@ igt_main
 
 		igt_require(supports_lpsp(devid));
 
-		intel_register_access_init(igt_device_get_pci_device(drm_fd), 0, drm_fd);
+		intel_register_access_init(intel_get_pci_device(), 0, drm_fd);
 
 		kmstest_set_vt_graphics_mode();
 	}

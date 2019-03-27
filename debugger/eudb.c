@@ -42,6 +42,7 @@
 #include "drm.h"
 #include "i915_drm.h"
 #include "drmtest.h"
+#include "intel_chipset.h"
 #include "intel_bufmgr.h"
 #include "intel_io.h"
 #include "intel_batchbuffer.h"
@@ -505,7 +506,7 @@ int main(int argc, char* argv[]) {
 	struct pci_device *pci_dev;
 	volatile uint8_t *scratch = NULL;
 	int bits[64];
-	int devid = -1, opt, fd;
+	int devid = -1, opt;
 
 	while ((opt = getopt(argc, argv, "cdr:pf?h")) != -1) {
 		switch (opt) {
@@ -532,10 +533,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	pci_dev = igt_device_get_pci_device(fd);
-	close(fd);
-
+	pci_dev = intel_get_pci_device();
 	if (devid == -1)
 		devid = pci_dev->device_id;
 	if (identify_device(devid)) {

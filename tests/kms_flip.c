@@ -1224,7 +1224,7 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	/* 256 MB is usually the maximum mappable aperture,
 	 * (make it 4x times that to ensure failure) */
 	if (o->flags & TEST_BO_TOOBIG) {
-		bo_size = 4*gem_mappable_aperture_size(drm_fd);
+		bo_size = 4*gem_mappable_aperture_size();
 		igt_require(bo_size < gem_global_aperture_size(drm_fd));
 	}
 

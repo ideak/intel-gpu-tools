@@ -62,6 +62,57 @@
 enum pch_type intel_pch;
 
 /**
+ * intel_get_pci_device:
+ *
+ * Looks up the main graphics pci device using libpciaccess.
+ *
+ * Returns:
+ * The pci_device, exits the program on any failures.
+ */
+struct pci_device *
+intel_get_pci_device(void)
+{
+	struct pci_device *pci_dev;
+	int error;
+
+	error = pci_system_init();
+	igt_fail_on_f(error != 0,
+		      "Couldn't initialize PCI system\n");
+
+	/* Grab the graphics card. Try the canonical slot first, then
+	 * walk the entire PCI bus for a matching device. */
+	pci_dev = pci_device_find_by_slot(0, 0, 2, 0);
+	if (pci_dev == NULL || pci_dev->vendor_id != 0x8086) {
+		struct pci_device_iterator *iter;
+		struct pci_id_match match;
+
+		match.vendor_id = 0x8086; /* Intel */
+		match.device_id = PCI_MATCH_ANY;
+		match.subvendor_id = PCI_MATCH_ANY;
+		match.subdevice_id = PCI_MATCH_ANY;
+
+		match.device_class = 0x3 << 16;
+		match.device_class_mask = 0xff << 16;
+
+		match.match_data = 0;
+
+		iter = pci_id_match_iterator_create(&match);
+		pci_dev = pci_device_next(iter);
+		pci_iterator_destroy(iter);
+	}
+	igt_require_f(pci_dev, "Couldn't find Intel graphics card\n");
+
+	error = pci_device_probe(pci_dev);
+	igt_fail_on_f(error != 0,
+		      "Couldn't probe graphics card\n");
+
+	if (pci_dev->vendor_id != 0x8086)
+		errx(1, "Graphics card is non-intel");
+
+	return pci_dev;
+}
+
+/**
  * intel_get_drm_devid:
  * @fd: open i915 drm file descriptor
  *

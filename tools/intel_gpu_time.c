@@ -34,9 +34,8 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 
-#include "drmtest.h"
-#include "igt_device.h"
 #include "intel_io.h"
+#include "intel_chipset.h"
 #include "intel_reg.h"
 
 #define SAMPLES_PER_SEC             10000
@@ -67,11 +66,8 @@ int main(int argc, char **argv)
 	struct timeval start, end;
 	static struct rusage rusage;
 	int status;
-	int fd;
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	intel_mmio_use_pci_bar(igt_device_get_pci_device(fd));
-	close(fd);
+	intel_mmio_use_pci_bar(intel_get_pci_device());
 
 	if (argc == 1) {
 		fprintf(stderr, "usage: %s cmd [args...]\n", argv[0]);

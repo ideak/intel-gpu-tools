@@ -53,10 +53,10 @@ test_huge_bo(int huge)
 
 	switch (huge) {
 	case -1:
-		huge_object_size = gem_mappable_aperture_size(fd) / 2;
+		huge_object_size = gem_mappable_aperture_size() / 2;
 		break;
 	case 0:
-		huge_object_size = gem_mappable_aperture_size(fd) + PAGE_SIZE;
+		huge_object_size = gem_mappable_aperture_size() + PAGE_SIZE;
 		break;
 	case 1:
 		huge_object_size = gem_aperture_size(fd) + PAGE_SIZE;

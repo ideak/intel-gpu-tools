@@ -31,6 +31,7 @@
 #include <pciaccess.h>
 #include <stdbool.h>
 
+struct pci_device *intel_get_pci_device(void);
 uint32_t intel_get_drm_devid(int fd);
 
 struct intel_device_info {

@@ -29,14 +29,12 @@
 #include <stdbool.h>
 #include <err.h>
 #include <string.h>
-#include "igt_device.h"
 #include "intel_io.h"
 #include "intel_chipset.h"
 #include "drmtest.h"
 
 static uint32_t display_base;
 static uint32_t devid;
-static int fd;
 
 static uint32_t read_reg(uint32_t addr)
 {
@@ -251,7 +249,7 @@ static void skl_wm_dump(void)
 	uint32_t plane_ctl[num_pipes][max_planes];
 	uint32_t wm_linetime[num_pipes];
 
-	intel_register_access_init(igt_device_get_pci_device(fd), 0, -1);
+	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	for (pipe = 0; pipe < num_pipes; pipe++) {
 		int num_planes = skl_num_planes(devid, pipe);
@@ -471,7 +469,7 @@ static void ilk_wm_dump(void)
 	int num_pipes = intel_gen(devid) >= 7 ? 3 : 2;
 	struct ilk_wm wm = {};
 
-	intel_register_access_init(igt_device_get_pci_device(fd), 0, -1);
+	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	for (i = 0; i < num_pipes; i++) {
 		dspcntr[i] = read_reg(0x70180 + i * 0x1000);
@@ -621,7 +619,7 @@ static void vlv_wm_dump(void)
 	uint32_t dsp_ss_pm, ddr_setup2;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(igt_device_get_pci_device(fd), 0, -1);
+	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	dsparb2 = read_reg(0x70060);
@@ -837,7 +835,7 @@ static void g4x_wm_dump(void)
 	uint32_t mi_arb_state;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(igt_device_get_pci_device(fd), 0, -1);
+	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	dspacntr = read_reg(0x70180);
 	dspbcntr = read_reg(0x71180);
@@ -923,7 +921,7 @@ static void gen4_wm_dump(void)
 	uint32_t mi_arb_state;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(igt_device_get_pci_device(fd), 0, -1);
+	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	fw1 = read_reg(0x70034);
@@ -994,7 +992,7 @@ static void pnv_wm_dump(void)
 	uint32_t cbr;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(igt_device_get_pci_device(fd), 0, -1);
+	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	fw1 = read_reg(0x70034);
@@ -1084,7 +1082,7 @@ static void gen3_wm_dump(void)
 	uint32_t mi_arb_state;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(igt_device_get_pci_device(fd), 0, -1);
+	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	instpm = read_reg(0x20c0);
@@ -1153,7 +1151,7 @@ static void gen2_wm_dump(void)
 	uint32_t mi_state;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(igt_device_get_pci_device(fd), 0, -1);
+	intel_register_access_init(intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	mem_mode = read_reg(0x20cc);
@@ -1228,8 +1226,7 @@ static void gen2_wm_dump(void)
 
 int main(int argc, char *argv[])
 {
-	fd = drm_open_driver(DRIVER_INTEL);
-	devid = igt_device_get_pci_device(fd)->device_id;
+	devid = intel_get_pci_device()->device_id;
 
 	if (intel_gen(devid) >= 9) {
 		skl_wm_dump();
@@ -1252,8 +1249,6 @@ int main(int argc, char *argv[])
 		printf("unknown chip 0x%x\n", devid);
 		return 1;
 	}
-
-	close(fd);
 
 	return 0;
 }

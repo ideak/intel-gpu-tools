@@ -30,9 +30,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "drmtest.h"
-#include "igt_device.h"
 #include "intel_io.h"
+#include "intel_chipset.h"
 #include "intel_reg.h"
 
 /* XXX PCH only today */
@@ -40,11 +39,8 @@
 int main(int argc, char** argv)
 {
 	uint32_t current, max;
-	int fd;
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	intel_mmio_use_pci_bar(igt_device_get_pci_device(fd));
-	close(fd);
+	intel_mmio_use_pci_bar(intel_get_pci_device());
 
 	current = INREG(BLC_PWM_CPU_CTL) & BACKLIGHT_DUTY_CYCLE_MASK;
 	max = INREG(BLC_PWM_PCH_CTL2) >> 16;

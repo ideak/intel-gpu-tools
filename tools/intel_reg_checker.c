@@ -26,8 +26,6 @@
 #include <err.h>
 #include <string.h>
 #include <stdbool.h>
-#include "drmtest.h"
-#include "igt_device.h"
 #include "intel_io.h"
 #include "intel_chipset.h"
 
@@ -344,12 +342,8 @@ check_dpfc_control_sa(void)
 int main(int argc, char** argv)
 {
 	struct pci_device *dev;
-	int fd;
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	dev = igt_device_get_pci_device(fd);
-	close(fd);
-
+	dev = intel_get_pci_device();
 	devid = dev->device_id;
 	intel_mmio_use_pci_bar(dev);
 

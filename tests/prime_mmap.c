@@ -447,8 +447,8 @@ test_aperture_limit(void)
 	char *ptr1, *ptr2;
 	uint32_t handle1, handle2;
 	/* Two buffers the sum of which > mappable aperture */
-	uint64_t size1 = (gem_mappable_aperture_size(fd) * 7) / 8;
-	uint64_t size2 = (gem_mappable_aperture_size(fd) * 3) / 8;
+	uint64_t size1 = (gem_mappable_aperture_size() * 7) / 8;
+	uint64_t size2 = (gem_mappable_aperture_size() * 3) / 8;
 
 	handle1 = gem_create(fd, size1);
 	fill_bo(handle1, BO_SIZE);

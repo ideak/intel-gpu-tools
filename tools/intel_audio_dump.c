@@ -32,7 +32,6 @@
 #include <string.h>
 #include <err.h>
 #include <arpa/inet.h>
-#include "igt_device.h"
 #include "intel_io.h"
 #include "intel_reg.h"
 #include "intel_chipset.h"
@@ -2465,12 +2464,8 @@ static void dump_braswell(void)
 int main(int argc, char **argv)
 {
 	struct pci_device *pci_dev;
-	int fd;
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	pci_dev = igt_device_get_pci_device(fd);
-	close(fd);
-
+	pci_dev = intel_get_pci_device();
 	devid = pci_dev->device_id; /* XXX not true when mapping! */
 
 	do_self_tests();
@@ -2497,8 +2492,6 @@ int main(int argc, char **argv)
 	} else if (IS_G4X(devid)) {
 		dump_eaglelake();
 	}
-
-	close(fd);
 
 	return 0;
 }

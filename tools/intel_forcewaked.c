@@ -34,8 +34,8 @@
 #include <stdlib.h>
 #include <syslog.h>
 #include <unistd.h>
-#include "igt_device.h"
 #include "intel_io.h"
+#include "intel_chipset.h"
 #include "drmtest.h"
 
 bool daemonized;
@@ -65,7 +65,6 @@ is_alive(void) {
 int main(int argc, char *argv[])
 {
 	int ret;
-	int fd;
 
 	if (argc > 2 || (argc == 2 && !strncmp(argv[1], "-h", 2))) {
 		help(argv[1]);
@@ -81,27 +80,24 @@ int main(int argc, char *argv[])
 		INFO_PRINT("started daemon");
 	}
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	ret = intel_register_access_init(igt_device_get_pci_device(fd), 1, -1);
+	ret = intel_register_access_init(intel_get_pci_device(), 1, -1);
 	if (ret) {
 		INFO_PRINT("Couldn't init register access\n");
 		exit(1);
 	} else {
 		INFO_PRINT("Forcewake locked\n");
 	}
-
 	while(1) {
 		if (!is_alive()) {
 			INFO_PRINT("gpu reset? restarting daemon\n");
 			intel_register_access_fini();
-			ret = intel_register_access_init(igt_device_get_pci_device(fd), 1, -1);
+			ret = intel_register_access_init(intel_get_pci_device(), 1, -1);
 			if (ret)
 				INFO_PRINT("Reg access init fail\n");
 		}
 		sleep(1);
 	}
 	intel_register_access_fini();
-	close(fd);
 	INFO_PRINT("Forcewake unlock\n");
 
 	if (daemonized) {

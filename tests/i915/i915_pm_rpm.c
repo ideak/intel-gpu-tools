@@ -1368,7 +1368,7 @@ static void gem_evict_pwrite_subtest(void)
 	unsigned int num_trash_bos, n;
 	uint32_t buf;
 
-	num_trash_bos = gem_mappable_aperture_size(drm_fd) / (1024*1024) + 1;
+	num_trash_bos = gem_mappable_aperture_size() / (1024*1024) + 1;
 	trash_bos = malloc(num_trash_bos * sizeof(*trash_bos));
 	igt_assert(trash_bos);
 
@@ -1412,7 +1412,7 @@ static bool device_in_pci_d3(void)
 	uint16_t val;
 	int rc;
 
-	rc = pci_device_cfg_read_u16(igt_device_get_pci_device(drm_fd), &val, 0xd4);
+	rc = pci_device_cfg_read_u16(intel_get_pci_device(), &val, 0xd4);
 	igt_assert_eq(rc, 0);
 
 	igt_debug("%s: PCI D3 state=%d\n", __func__, val & 0x3);

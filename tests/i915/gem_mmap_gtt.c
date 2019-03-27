@@ -562,7 +562,7 @@ test_huge_bo(int fd, int huge, int tiling)
 
 	switch (huge) {
 	case -1:
-		size = gem_mappable_aperture_size(fd) / 2;
+		size = gem_mappable_aperture_size() / 2;
 
 		/* Power of two fence size, natural fence
 		 * alignment, and the guard page at the end
@@ -577,7 +577,7 @@ test_huge_bo(int fd, int huge, int tiling)
 			size /= 2;
 		break;
 	case 0:
-		size = gem_mappable_aperture_size(fd) + PAGE_SIZE;
+		size = gem_mappable_aperture_size() + PAGE_SIZE;
 		break;
 	default:
 		size = gem_global_aperture_size(fd) + PAGE_SIZE;
@@ -658,13 +658,13 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 
 	switch (huge) {
 	case -2:
-		huge_object_size = gem_mappable_aperture_size(fd) / 4;
+		huge_object_size = gem_mappable_aperture_size() / 4;
 		break;
 	case -1:
-		huge_object_size = gem_mappable_aperture_size(fd) / 2;
+		huge_object_size = gem_mappable_aperture_size() / 2;
 		break;
 	case 0:
-		huge_object_size = gem_mappable_aperture_size(fd) + PAGE_SIZE;
+		huge_object_size = gem_mappable_aperture_size() + PAGE_SIZE;
 		break;
 	case 1:
 		huge_object_size = gem_global_aperture_size(fd) + PAGE_SIZE;

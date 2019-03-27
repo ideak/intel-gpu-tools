@@ -30,8 +30,6 @@
 
 #include <drm.h>
 
-#include "igt_device.h"
-
 #ifndef I915_PARAM_CMD_PARSER_VERSION
 #define I915_PARAM_CMD_PARSER_VERSION       28
 #endif
@@ -532,7 +530,7 @@ igt_main
 #undef REG
 
 		igt_fixture {
-			intel_register_access_init(igt_device_get_pci_device(fd), 0, fd);
+			intel_register_access_init(intel_get_pci_device(), 0, fd);
 		}
 
 		for (int i = 0; i < ARRAY_SIZE(lris); i++) {

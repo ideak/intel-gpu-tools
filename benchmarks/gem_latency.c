@@ -44,8 +44,6 @@
 #include <sys/resource.h>
 #include "drm.h"
 
-#include "igt_device.h"
-
 #define LOCAL_I915_EXEC_FENCE_IN              (1<<16)
 #define LOCAL_I915_EXEC_FENCE_OUT             (1<<17)
 
@@ -458,7 +456,7 @@ static int run(int seconds,
 	if (gen < 6)
 		return IGT_EXIT_SKIP; /* Needs BCS timestamp */
 
-	intel_register_access_init(igt_device_get_pci_device(fd), false, fd);
+	intel_register_access_init(intel_get_pci_device(), false, fd);
 
 	if (gen == 6)
 		timestamp_reg = REG(RCS_TIMESTAMP);
