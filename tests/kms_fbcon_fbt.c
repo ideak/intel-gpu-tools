@@ -64,7 +64,6 @@ static void setup_drm(struct drm_info *drm)
 		return;
 
 	drm->fd = drm_open_driver_master(DRIVER_INTEL);
-	drm->debugfs_fd = igt_debugfs_dir(drm->fd);
 
 	drm->res = drmModeGetResources(drm->fd);
 	igt_require(drm->res);
@@ -299,12 +298,14 @@ static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 	}
 }
 
-static void setup_environment(void)
+static void setup_environment(struct drm_info *drm)
 {
 	int drm_fd;
 
 	drm_fd = drm_open_driver_master(DRIVER_INTEL);
 	igt_require(drm_fd >= 0);
+	drm->debugfs_fd = igt_debugfs_dir(drm_fd);
+	igt_require(drm->debugfs_fd >= 0);
 	igt_assert(close(drm_fd) == 0);
 
 	/*
@@ -319,6 +320,8 @@ static void teardown_environment(struct drm_info *drm)
 {
 	if (drm->fd >= 0)
 		teardown_drm(drm);
+
+	close(drm->debugfs_fd);
 }
 
 igt_main
@@ -326,7 +329,7 @@ igt_main
 	struct drm_info drm = { .fd = -1 };
 
 	igt_fixture
-		setup_environment();
+		setup_environment(&drm);
 
 	igt_subtest("fbc")
 		subtest(&drm, &fbc, false);
