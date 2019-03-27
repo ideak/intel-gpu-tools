@@ -60,6 +60,9 @@ static void setup_drm(struct drm_info *drm)
 {
 	int i;
 
+	if (drm->fd >= 0)
+		return;
+
 	drm->fd = drm_open_driver_master(DRIVER_INTEL);
 	drm->debugfs_fd = igt_debugfs_dir(drm->fd);
 
@@ -85,6 +88,7 @@ static void teardown_drm(struct drm_info *drm)
 
 	drmModeFreeResources(drm->res);
 	igt_assert(close(drm->fd) == 0);
+	drm->fd = -1;
 }
 
 static bool fbc_supported_on_chipset(int debugfs_fd)
@@ -252,47 +256,46 @@ struct feature {
 	.enable = psr_debugfs_enable,
 };
 
-static void subtest(struct feature *feature, bool suspend)
+static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 {
-	struct drm_info drm;
 	struct igt_fb fb;
 
-	setup_drm(&drm);
+	setup_drm(drm);
 
-	igt_require(feature->supported_on_chipset(drm.debugfs_fd));
+	igt_require(feature->supported_on_chipset(drm->debugfs_fd));
 
-	disable_features(drm.debugfs_fd);
-	feature->enable(drm.debugfs_fd);
+	disable_features(drm->debugfs_fd);
+	feature->enable(drm->debugfs_fd);
 
-	kmstest_unset_all_crtcs(drm.fd, drm.res);
+	kmstest_unset_all_crtcs(drm->fd, drm->res);
 	wait_user("Modes unset.");
-	igt_assert(!feature->wait_until_enabled(drm.debugfs_fd));
+	igt_assert(!feature->wait_until_enabled(drm->debugfs_fd));
 
-	set_mode_for_one_screen(&drm, &fb, feature->connector_possible_fn);
+	set_mode_for_one_screen(drm, &fb, feature->connector_possible_fn);
 	wait_user("Screen set.");
-	igt_assert(feature->wait_until_enabled(drm.debugfs_fd));
+	igt_assert(feature->wait_until_enabled(drm->debugfs_fd));
 
 	if (suspend) {
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 					      SUSPEND_TEST_NONE);
 		sleep(5);
-		igt_assert(feature->wait_until_enabled(drm.debugfs_fd));
+		igt_assert(feature->wait_until_enabled(drm->debugfs_fd));
 	}
 
-	igt_remove_fb(drm.fd, &fb);
-	teardown_drm(&drm);
+	igt_remove_fb(drm->fd, &fb);
+	teardown_drm(drm);
 
 	/* Wait for fbcon to restore itself. */
 	sleep(3);
 
 	wait_user("Back to fbcon.");
-	igt_assert(feature->wait_until_update(drm.debugfs_fd));
+	igt_assert(feature->wait_until_update(drm->debugfs_fd));
 
 	if (suspend) {
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 					      SUSPEND_TEST_NONE);
 		sleep(5);
-		igt_assert(feature->wait_until_update(drm.debugfs_fd));
+		igt_assert(feature->wait_until_update(drm->debugfs_fd));
 	}
 }
 
@@ -312,24 +315,28 @@ static void setup_environment(void)
 	fbcon_blink_enable(true);
 }
 
-static void teardown_environment(void)
+static void teardown_environment(struct drm_info *drm)
 {
+	if (drm->fd >= 0)
+		teardown_drm(drm);
 }
 
 igt_main
 {
+	struct drm_info drm = { .fd = -1 };
+
 	igt_fixture
 		setup_environment();
 
 	igt_subtest("fbc")
-		subtest(&fbc, false);
+		subtest(&drm, &fbc, false);
 	igt_subtest("psr")
-		subtest(&psr, false);
+		subtest(&drm, &psr, false);
 	igt_subtest("fbc-suspend")
-		subtest(&fbc, true);
+		subtest(&drm, &fbc, true);
 	igt_subtest("psr-suspend")
-		subtest(&psr, true);
+		subtest(&drm, &psr, true);
 
 	igt_fixture
-		teardown_environment();
+		teardown_environment(&drm);
 }
