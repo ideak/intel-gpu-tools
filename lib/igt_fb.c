@@ -1580,6 +1580,31 @@ struct fb_blit_upload {
 	struct intel_batchbuffer *batch;
 };
 
+static int max_blitter_stride(int fd, uint64_t modifier)
+{
+	int stride = 32768;
+
+	if (intel_gen(intel_get_drm_devid(fd)) >= 4 &&
+	    modifier != DRM_FORMAT_MOD_NONE)
+		stride *= 4;
+
+	return stride;
+}
+
+static bool use_rendercopy(const struct igt_fb *fb)
+{
+	return is_ccs_modifier(fb->modifier) ||
+		(fb->modifier == I915_FORMAT_MOD_Yf_TILED &&
+		 fb->strides[0] >= max_blitter_stride(fb->fd, fb->modifier));
+}
+
+static bool use_blitter(const struct igt_fb *fb)
+{
+	return (fb->modifier == I915_FORMAT_MOD_Y_TILED ||
+		fb->modifier == I915_FORMAT_MOD_Yf_TILED) &&
+		fb->strides[0] < max_blitter_stride(fb->fd, fb->modifier);
+}
+
 static void init_buf(struct fb_blit_upload *blit,
 		     struct igt_buf *buf,
 		     const struct igt_fb *fb,
@@ -2762,7 +2787,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	blit->base.fd = fd;
 	blit->base.fb = fb;
 
-	if (is_ccs_modifier(fb->modifier)) {
+	if (use_rendercopy(fb)) {
 		blit->base.bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
 		blit->base.batch = intel_batchbuffer_alloc(blit->base.bufmgr,
 						   intel_get_drm_devid(fd));
@@ -2774,9 +2799,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 							     &blit->shadow_fb);
 	igt_assert(blit->shadow_ptr);
 
-	if (fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-	    fb->modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED ||
-	    is_ccs_modifier(fb->modifier)) {
+	if (use_rendercopy(fb) || use_blitter(fb)) {
 		setup_linear_mapping(&blit->base);
 	} else {
 		blit->base.linear.fb = *fb;
@@ -2856,10 +2879,9 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 		    ((f->cairo_id == CAIRO_FORMAT_INVALID) &&
 		     (f->pixman_id != PIXMAN_invalid)))
 			create_cairo_surface__convert(fd, fb);
-		else if (is_ccs_modifier(fb->modifier))
+		else if (use_rendercopy(fb))
 			create_cairo_surface__rendercopy(fd, fb);
-		else if (fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-			 fb->modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED)
+		else if (use_blitter(fb))
 			create_cairo_surface__blit(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);
