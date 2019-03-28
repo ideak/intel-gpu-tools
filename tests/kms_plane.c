@@ -392,40 +392,39 @@ static void set_legacy_lut(data_t *data, enum pipe pipe,
 
 static void test_format_plane_color(data_t *data, enum pipe pipe,
 				    igt_plane_t *plane,
-				    uint32_t format, int src_w, int src_h,
-				    int dst_w, int dst_h,
+				    uint32_t format, int width, int height,
 				    int color, igt_crc_t *crc, struct igt_fb *fb)
 {
 	const color_t *c = &colors[color];
 	struct igt_fb old_fb = *fb;
 
 	if (data->crop == 0 || format == DRM_FORMAT_XRGB8888) {
-		igt_create_color_fb(data->drm_fd, src_w, src_h, format,
-				    LOCAL_DRM_FORMAT_MOD_NONE,
+		igt_create_color_fb(data->drm_fd, width, height,
+				    format, DRM_FORMAT_MOD_NONE,
 				    c->red, c->green, c->blue, fb);
 	} else {
-	/*
-	 * paint border in inverted color, then visible area in middle
-	 * with correct color for clamping test
-	 */
+		/*
+		 * paint border in inverted color, then visible area in middle
+		 * with correct color for clamping test
+		 */
 		cairo_t *cr;
 
-		igt_create_fb(data->drm_fd, src_w + data->crop * 2,
-				    src_h + data->crop * 2, format,
-				    LOCAL_DRM_FORMAT_MOD_NONE,
-				    fb);
+		igt_create_fb(data->drm_fd,
+			      width + data->crop * 2,
+			      height + data->crop * 2,
+			      format, DRM_FORMAT_MOD_NONE, fb);
 
 		cr = igt_get_cairo_ctx(data->drm_fd, fb);
 
 		igt_paint_color(cr, 0, 0,
-				src_w+data->crop * 2,
-				src_h+data->crop * 2,
+				width + data->crop * 2,
+				height + data->crop * 2,
 				1.0f - c->red,
 				1.0f - c->green,
 				1.0f - c->blue);
 
 		igt_paint_color(cr, data->crop, data->crop,
-				src_w, src_h,
+				width, height,
 				c->red, c->green, c->blue);
 
 		igt_put_cairo_ctx(data->drm_fd, fb, cr);
@@ -436,11 +435,8 @@ static void test_format_plane_color(data_t *data, enum pipe pipe,
 	/*
 	 * if clamping test. DRM_FORMAT_XRGB8888 is used for reference color.
 	 */
-	if (data->crop != 0  && format != DRM_FORMAT_XRGB8888) {
+	if (data->crop != 0 && format != DRM_FORMAT_XRGB8888)
 		igt_fb_set_position(fb, plane, data->crop, data->crop);
-		igt_fb_set_size(fb, plane, src_w, src_h);
-	}
-	igt_plane_set_size(plane, dst_w, dst_h);
 
 	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
 	igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, crc);
@@ -456,7 +452,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 	struct igt_fb fb = {};
 	drmModeModeInfo *mode;
 	uint32_t format, ref_format;
-	uint64_t width, height, dst_w, dst_h;
+	uint64_t width, height;
 	igt_crc_t ref_crc[ARRAY_SIZE(colors)];
 	bool result = true;
 
@@ -480,8 +476,6 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_HEIGHT, &height));
 		ref_format = format = DRM_FORMAT_ARGB8888;
 	}
-	dst_w = width;
-	dst_h = height;
 
 	igt_debug("Testing connector %s on %s plane %s.%u\n",
 		  igt_output_name(output), kmstest_plane_type_name(plane->type),
@@ -506,31 +500,29 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		 kmstest_pipe_name(pipe), plane->index);
 
 	if (plane->type != DRM_PLANE_TYPE_CURSOR && data->display.is_atomic) {
+		struct igt_fb test_fb;
 		int ret;
 
 		igt_create_fb(data->drm_fd, 256, 256, format,
-				    LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+				    LOCAL_DRM_FORMAT_MOD_NONE, &test_fb);
 
-		igt_plane_set_fb(plane, &fb);
-		/* Upscale to max size */
-		igt_plane_set_size(plane, dst_w, dst_h);
+		igt_plane_set_fb(plane, &test_fb);
 
 		ret = igt_display_try_commit_atomic(&data->display, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
 
 		if (!ret) {
-			width = fb.width;
-			height = fb.height;
+			width = test_fb.width;
+			height = test_fb.height;
 		}
 
-		igt_remove_fb(data->drm_fd, &fb);
-
 		igt_plane_set_fb(plane, NULL);
+
+		igt_remove_fb(data->drm_fd, &test_fb);
 	}
 
 	for (int i = 0; i < ARRAY_SIZE(colors); i++) {
 		test_format_plane_color(data, pipe, plane,
 					format, width, height,
-					dst_w, dst_h,
 					i, &ref_crc[i], &fb);
 	}
 
@@ -554,7 +546,6 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		for (int j = 0; j < ARRAY_SIZE(colors); j++) {
 			test_format_plane_color(data, pipe, plane,
 						format, width, height,
-						dst_w, dst_h,
 						j, &crc, &fb);
 
 			if (!igt_check_crc_equal(&crc, &ref_crc[j])) {
