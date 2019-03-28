@@ -169,8 +169,10 @@ static void execN(int fd, uint32_t handle, uint64_t batch_size, unsigned flags, 
 	igt_permute_array(gem_reloc, nreloc, xchg_reloc);
 
 	gem_execbuf(fd, &execbuf);
-	for (n = 0; n < nreloc; n++)
-		igt_warn_on(gem_reloc[n].presumed_offset == -1);
+	for (n = 0; n < nreloc; n++) {
+		if (igt_warn_on(gem_reloc[n].presumed_offset == -1))
+			break;
+	}
 
 	if (use_64bit_relocs) {
 		for (n = 0; n < nreloc; n++) {
