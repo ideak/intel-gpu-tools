@@ -1693,6 +1693,11 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 
 	gem_sync(fd, linear->fb.gem_handle);
 	gem_close(fd, linear->fb.gem_handle);
+
+	if (blit->batch) {
+		intel_batchbuffer_free(blit->batch);
+		drm_intel_bufmgr_destroy(blit->bufmgr);
+	}
 }
 
 static void destroy_cairo_surface__blit(void *arg)
@@ -1714,9 +1719,6 @@ static void destroy_cairo_surface__rendercopy(void *arg)
 
 	free_linear_mapping(blit);
 
-	intel_batchbuffer_free(blit->batch);
-	drm_intel_bufmgr_destroy(blit->bufmgr);
-
 	free(blit);
 }
 
@@ -1725,6 +1727,12 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 	int fd = blit->fd;
 	struct igt_fb *fb = blit->fb;
 	struct fb_blit_linear *linear = &blit->linear;
+
+	if (use_rendercopy(fb)) {
+		blit->bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
+		blit->batch = intel_batchbuffer_alloc(blit->bufmgr,
+						      intel_get_drm_devid(fd));
+	}
 
 	/*
 	 * We create a linear BO that we'll map for the CPU to write to (using
@@ -1794,10 +1802,6 @@ static void create_cairo_surface__rendercopy(int fd, struct igt_fb *fb)
 
 	blit->fd = fd;
 	blit->fb = fb;
-
-	blit->bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-	blit->batch = intel_batchbuffer_alloc(blit->bufmgr,
-					      intel_get_drm_devid(fd));
 
 	setup_linear_mapping(blit);
 
@@ -2786,12 +2790,6 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 
 	blit->base.fd = fd;
 	blit->base.fb = fb;
-
-	if (use_rendercopy(fb)) {
-		blit->base.bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		blit->base.batch = intel_batchbuffer_alloc(blit->base.bufmgr,
-						   intel_get_drm_devid(fd));
-	}
 
 	blit->shadow_ptr = igt_fb_create_cairo_shadow_buffer(fd, drm_format,
 							     fb->width,
