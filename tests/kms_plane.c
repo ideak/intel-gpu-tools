@@ -499,12 +499,12 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		 IGT_FORMAT_ARGS(format),
 		 kmstest_pipe_name(pipe), plane->index);
 
-	if (plane->type != DRM_PLANE_TYPE_CURSOR && data->display.is_atomic) {
+	if (data->display.is_atomic) {
 		struct igt_fb test_fb;
 		int ret;
 
-		igt_create_fb(data->drm_fd, 256, 256, format,
-				    LOCAL_DRM_FORMAT_MOD_NONE, &test_fb);
+		igt_create_fb(data->drm_fd, 64, 64, format,
+			      LOCAL_DRM_FORMAT_MOD_NONE, &test_fb);
 
 		igt_plane_set_fb(plane, &test_fb);
 
