@@ -295,28 +295,10 @@ struct {
 	.stop = true,
 };
 
-drmModeModeInfo std_1024_mode = {
-	.clock = 65000,
-	.hdisplay = 1024,
-	.hsync_start = 1048,
-	.hsync_end = 1184,
-	.htotal = 1344,
-	.hskew = 0,
-	.vdisplay = 768,
-	.vsync_start = 771,
-	.vsync_end = 777,
-	.vtotal = 806,
-	.vscan = 0,
-	.vrefresh = 60,
-	.flags = 0xA,
-	.type = 0x40,
-	.name = "Custom 1024x768",
-};
-
-static drmModeModeInfo *get_connector_smallest_mode(igt_output_t *output)
+static const drmModeModeInfo *get_connector_smallest_mode(igt_output_t *output)
 {
 	drmModeConnector *c = output->config.connector;
-	drmModeModeInfo *smallest = NULL;
+	const drmModeModeInfo *smallest = NULL;
 	int i;
 
 	for (i = 0; i < c->count_modes; i++) {
@@ -331,14 +313,14 @@ static drmModeModeInfo *get_connector_smallest_mode(igt_output_t *output)
 	}
 
 	if (c->connector_type == DRM_MODE_CONNECTOR_eDP)
-		smallest = &std_1024_mode;
+		smallest = igt_std_1024_mode_get();
 
 	return smallest;
 }
 
-static drmModeModeInfo *connector_get_mode(igt_output_t *output)
+static const drmModeModeInfo *connector_get_mode(igt_output_t *output)
 {
-	drmModeModeInfo *mode = NULL;
+	const drmModeModeInfo *mode = NULL;
 
 	if (opt.small_modes)
 		mode = get_connector_smallest_mode(output);
@@ -349,7 +331,7 @@ static drmModeModeInfo *connector_get_mode(igt_output_t *output)
 	  * bugged. */
 	if (IS_HASWELL(intel_get_drm_devid(drm.fd)) &&
 	    output->config.connector->connector_type == DRM_MODE_CONNECTOR_eDP)
-		mode = &std_1024_mode;
+		mode = igt_std_1024_mode_get();
 
 	return mode;
 }
@@ -357,7 +339,7 @@ static drmModeModeInfo *connector_get_mode(igt_output_t *output)
 static void init_mode_params(struct modeset_params *params,
 			     igt_output_t *output, enum pipe pipe)
 {
-	drmModeModeInfo *mode;
+	const drmModeModeInfo *mode;
 
 	igt_output_override_mode(output, NULL);
 	mode = connector_get_mode(output);

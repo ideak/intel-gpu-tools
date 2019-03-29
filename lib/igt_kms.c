@@ -2155,6 +2155,29 @@ igt_output_t *igt_output_from_connector(igt_display_t *display,
 	return found;
 }
 
+const drmModeModeInfo *igt_std_1024_mode_get(void)
+{
+	static const drmModeModeInfo std_1024_mode = {
+		.clock = 65000,
+		.hdisplay = 1024,
+		.hsync_start = 1048,
+		.hsync_end = 1184,
+		.htotal = 1344,
+		.hskew = 0,
+		.vdisplay = 768,
+		.vsync_start = 771,
+		.vsync_end = 777,
+		.vtotal = 806,
+		.vscan = 0,
+		.vrefresh = 60,
+		.flags = 0xA,
+		.type = 0x40,
+		.name = "Custom 1024x768",
+	};
+
+	return &std_1024_mode;
+}
+
 static void igt_pipe_fini(igt_pipe_t *pipe)
 {
 	free(pipe->planes);
@@ -3627,7 +3650,7 @@ drmModeModeInfo *igt_output_get_mode(igt_output_t *output)
  * mode obtained with get connectors. Note that the mode is used without
  * checking if the output supports it, so this might lead to unexpected results.
  */
-void igt_output_override_mode(igt_output_t *output, drmModeModeInfo *mode)
+void igt_output_override_mode(igt_output_t *output, const drmModeModeInfo *mode)
 {
 	igt_pipe_t *pipe = igt_output_get_driving_pipe(output);
 

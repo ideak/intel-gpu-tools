@@ -236,29 +236,11 @@ test_plane_position_with_output(data_t *data, enum pipe pipe, igt_output_t *outp
 	}
 }
 
-static drmModeModeInfo std_1024_mode = {
-	.clock = 65000,
-	.hdisplay = 1024,
-	.hsync_start = 1048,
-	.hsync_end = 1184,
-	.htotal = 1344,
-	.hskew = 0,
-	.vdisplay = 768,
-	.vsync_start = 771,
-	.vsync_end = 777,
-	.vtotal = 806,
-	.vscan = 0,
-	.vrefresh = 60,
-	.flags = 0xA,
-	.type = 0x40,
-	.name = "Custom 1024x768",
-};
-
-static drmModeModeInfo *
-get_lowres_mode(data_t *data, drmModeModeInfo *mode_default,
+static const drmModeModeInfo *
+get_lowres_mode(data_t *data, const drmModeModeInfo *mode_default,
 		igt_output_t *output)
 {
-	drmModeModeInfo *mode = &std_1024_mode;
+	const drmModeModeInfo *mode = igt_std_1024_mode_get();
 	drmModeConnector *connector = output->config.connector;
 	int limit = mode_default->vdisplay - SIZE_PLANE;
 	bool found;
@@ -277,7 +259,7 @@ get_lowres_mode(data_t *data, drmModeModeInfo *mode_default,
 	}
 
 	if (!found)
-		mode = &std_1024_mode;
+		mode = igt_std_1024_mode_get();
 
 	return mode;
 }
@@ -285,7 +267,7 @@ get_lowres_mode(data_t *data, drmModeModeInfo *mode_default,
 static void
 test_resolution_with_output(data_t *data, enum pipe pipe, igt_output_t *output)
 {
-	drmModeModeInfo *mode_hi, *mode_lo;
+	const drmModeModeInfo *mode_hi, *mode_lo;
 	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
 	bool loop_forever = opt.iterations == LOOP_FOREVER ? true : false;
 	int i;

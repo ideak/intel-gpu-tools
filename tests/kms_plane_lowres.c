@@ -46,23 +46,6 @@ static drmModeModeInfo
 get_lowres_mode(int drmfd, igt_output_t *output, drmModeModeInfo *mode_default)
 {
 	drmModeModeInfo mode;
-	drmModeModeInfo std_1024_mode = {
-		.clock = 65000,
-		.hdisplay = 1024,
-		.hsync_start = 1048,
-		.hsync_end = 1184,
-		.htotal = 1344,
-		.hskew = 0,
-		.vdisplay = 768,
-		.vsync_start = 771,
-		.vsync_end = 777,
-		.vtotal = 806,
-		.vscan = 0,
-		.vrefresh = 60,
-		.flags = 0xA,
-		.type = 0x40,
-		.name = "Custom 1024x768",
-	};
 	bool found = false;
 	int limit = mode_default->vdisplay - SIZE;
 	int j;
@@ -76,7 +59,7 @@ get_lowres_mode(int drmfd, igt_output_t *output, drmModeModeInfo *mode_default)
 	}
 
 	if (!found)
-		return std_1024_mode;
+		return *igt_std_1024_mode_get();
 
 	return mode;
 }
