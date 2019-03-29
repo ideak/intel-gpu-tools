@@ -1634,27 +1634,18 @@ static void kmstest_get_crtc(int device, enum pipe pipe, struct kmstest_crtc *cr
  *
  * Asserts only if the plane's visibility state matches the status being passed by @visibility
  */
-void igt_assert_plane_visible(int fd, enum pipe pipe, bool visibility)
+void igt_assert_plane_visible(int fd, enum pipe pipe, int plane_index, bool visibility)
 {
 	struct kmstest_crtc crtc;
-	int i;
-	bool visible;
+	bool visible = true;
 
 	kmstest_get_crtc(fd, pipe, &crtc);
 
-	visible = true;
-	for (i = 0; i < crtc.n_planes; i++) {
-		if (crtc.planes[i].type == DRM_PLANE_TYPE_PRIMARY)
-			continue;
+	igt_assert(plane_index < crtc.n_planes);
 
-		if (crtc.planes[i].pos_x > crtc.width) {
-			visible = false;
-			break;
-		} else if (crtc.planes[i].pos_y > crtc.height) {
-			visible = false;
-			break;
-		}
-	}
+	if (crtc.planes[plane_index].pos_x > crtc.width ||
+	    crtc.planes[plane_index].pos_y > crtc.height)
+		visible = false;
 
 	free(crtc.planes);
 	igt_assert_eq(visible, visibility);

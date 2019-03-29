@@ -39,7 +39,8 @@ IGT_TEST_DESCRIPTION("Test atomic mode setting with a plane by switching between
 typedef struct {
 	int drm_fd;
 	igt_display_t display;
-	struct igt_fb *fb;
+	struct igt_fb fb_primary;
+	struct igt_fb fb_plane;
 } data_t;
 
 static drmModeModeInfo
@@ -65,24 +66,6 @@ get_lowres_mode(int drmfd, igt_output_t *output, drmModeModeInfo *mode_default)
 }
 
 static void
-test_fini(data_t *data, igt_output_t *output, enum pipe pipe)
-{
-	igt_plane_t *plane;
-
-	/* restore original mode */
-	igt_output_override_mode(output, NULL);
-
-	for_each_plane_on_pipe(&data->display, pipe, plane)
-		igt_plane_set_fb(plane, NULL);
-
-	/* reset the constraint on the pipe */
-	igt_output_set_pipe(output, PIPE_ANY);
-
-	free(data->fb);
-	data->fb = NULL;
-}
-
-static void
 check_mode(drmModeModeInfo *mode1, drmModeModeInfo *mode2)
 {
 	igt_assert_eq(mode1->hdisplay, mode2->hdisplay);
@@ -90,175 +73,160 @@ check_mode(drmModeModeInfo *mode1, drmModeModeInfo *mode2)
 	igt_assert_eq(mode1->vrefresh, mode2->vrefresh);
 }
 
-static drmModeModeInfo *
-test_setup(data_t *data, enum pipe pipe, uint64_t modifier,
-	   igt_output_t *output)
+/*
+ * Return false if test on this plane should be skipped
+ */
+static bool
+setup_plane(data_t *data, igt_plane_t *plane, drmModeModeInfo *mode,
+	    uint64_t modifier)
 {
-	drmModeModeInfo *mode;
-	int size;
-	int i = 1, x, y;
-	igt_plane_t *plane;
+	uint64_t plane_modifier;
+	uint32_t plane_format;
+	int size, x, y;
 
-	igt_skip_on(!igt_display_has_format_mod(&data->display,
-						DRM_FORMAT_XRGB8888,
-						modifier));
+	if (plane->type == DRM_PLANE_TYPE_PRIMARY)
+		return false;
 
-	igt_output_set_pipe(output, pipe);
+	if (plane->type == DRM_PLANE_TYPE_CURSOR)
+		size = 64;
+	else
+		size = SIZE;
 
-	mode = igt_output_get_mode(output);
+	x = 0;
+	y = mode->vdisplay - size;
 
-	data->fb = calloc(data->display.pipes[pipe].n_planes, sizeof(struct igt_fb));
-	igt_assert_f(data->fb, "Failed to allocate memory for %d FBs\n",
-	             data->display.pipes[pipe].n_planes);
-
-	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-			    DRM_FORMAT_XRGB8888,
-			    modifier,
-			    0.0, 0.0, 1.0,
-			    &data->fb[0]);
-
-	/* yellow sprite plane in lower left corner */
-	for_each_plane_on_pipe(&data->display, pipe, plane) {
-		uint64_t plane_modifier;
-		uint32_t plane_format;
-
-		if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
-			igt_plane_set_fb(plane, &data->fb[0]);
-			continue;
-		}
-
-		if (plane->type == DRM_PLANE_TYPE_CURSOR)
-			size = 64;
-		else
-			size = SIZE;
-
-		x = 0;
-		y = mode->vdisplay - size;
-
-		plane_format = plane->type == DRM_PLANE_TYPE_CURSOR ?
-			DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888;
-
-		plane_modifier = plane->type == DRM_PLANE_TYPE_CURSOR ?
-			LOCAL_DRM_FORMAT_MOD_NONE : modifier;
-
-		igt_skip_on(!igt_plane_has_format_mod(plane, plane_format,
-						      plane_modifier));
-
-		igt_create_color_fb(data->drm_fd,
-				    size, size,
-				    plane_format,
-				    plane_modifier,
-				    1.0, 1.0, 0.0,
-				    &data->fb[i]);
-
-		igt_plane_set_position(plane, x, y);
-		igt_plane_set_fb(plane, &data->fb[i++]);
+	if (plane->type == DRM_PLANE_TYPE_CURSOR) {
+		plane_format = DRM_FORMAT_ARGB8888;
+		plane_modifier = LOCAL_DRM_FORMAT_MOD_NONE;
+	} else {
+		plane_format = DRM_FORMAT_XRGB8888;
+		plane_modifier = modifier;
 	}
 
-	return mode;
+	if (!igt_plane_has_format_mod(plane, plane_format, plane_modifier))
+		return false;
+
+	igt_create_color_fb(data->drm_fd, size, size, plane_format,
+			    plane_modifier, 1.0, 1.0, 0.0, &data->fb_plane);
+	igt_plane_set_position(plane, x, y);
+	igt_plane_set_fb(plane, &data->fb_plane);
+
+	return true;
 }
 
-static void
-test_plane_position_with_output(data_t *data, enum pipe pipe,
+static igt_plane_t *
+primary_plane_get(igt_display_t *display, enum pipe pipe)
+{
+	unsigned plane_primary_id = display->pipes[pipe].plane_primary;
+	return &display->pipes[pipe].planes[plane_primary_id];
+}
+
+static unsigned
+test_planes_on_pipe_with_output(data_t *data, enum pipe pipe,
 				igt_output_t *output, uint64_t modifier)
 {
-	igt_crc_t crc_hires1, crc_hires2;
-	igt_crc_t crc_lowres;
-	drmModeModeInfo mode_lowres;
-	drmModeModeInfo *mode1, *mode2, *mode3;
-	int ret;
+	drmModeModeInfo *mode, mode_lowres;
 	igt_pipe_crc_t *pipe_crc;
+	unsigned tested = 0;
+	igt_plane_t *plane;
 
 	igt_info("Testing connector %s using pipe %s\n",
 		 igt_output_name(output), kmstest_pipe_name(pipe));
 
-	mode1 = test_setup(data, pipe, modifier, output);
-
-	mode_lowres = get_lowres_mode(data->drm_fd, output, mode1);
-
-	ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
-	igt_skip_on(ret != 0);
-
-	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
-	igt_pipe_crc_start(pipe_crc);
-	igt_pipe_crc_get_single(pipe_crc, &crc_hires1);
-
-	igt_assert_plane_visible(data->drm_fd, pipe, true);
-
-	/* switch to lower resolution */
-	igt_output_override_mode(output, &mode_lowres);
 	igt_output_set_pipe(output, pipe);
+	mode = igt_output_get_mode(output);
+	mode_lowres = get_lowres_mode(data->drm_fd, output, mode);
 
-	mode2 = igt_output_get_mode(output);
+	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
+			    DRM_FORMAT_XRGB8888, modifier, 0.0, 0.0, 1.0,
+			    &data->fb_primary);
+	igt_plane_set_fb(primary_plane_get(&data->display, pipe),
+			 &data->fb_primary);
 
-	check_mode(&mode_lowres, mode2);
+	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe,
+				    INTEL_PIPE_CRC_SOURCE_AUTO);
 
-	igt_display_commit2(&data->display, COMMIT_ATOMIC);
-	igt_pipe_crc_get_current(data->display.drm_fd, pipe_crc, &crc_lowres);
+	/* yellow sprite plane in lower left corner */
+	for_each_plane_on_pipe(&data->display, pipe, plane) {
+		igt_crc_t crc_hires1, crc_hires2;
+		int r;
 
-	igt_assert_plane_visible(data->drm_fd, pipe, false);
+		if (!setup_plane(data, plane, mode, modifier))
+			continue;
 
-	/* switch back to higher resolution */
-	igt_output_override_mode(output, NULL);
-	igt_output_set_pipe(output, pipe);
+		r = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
+		if (r) {
+			igt_debug("Commit failed %i", r);
+			continue;
+		}
 
-	mode3 = igt_output_get_mode(output);
+		igt_pipe_crc_start(pipe_crc);
+		igt_pipe_crc_get_single(pipe_crc, &crc_hires1);
 
-	check_mode(mode1, mode3);
+		igt_assert_plane_visible(data->drm_fd, pipe, plane->index,
+					 true);
 
-	igt_display_commit2(&data->display, COMMIT_ATOMIC);
+		/* switch to lower resolution */
+		igt_output_override_mode(output, &mode_lowres);
+		igt_output_set_pipe(output, pipe);
+		check_mode(&mode_lowres, igt_output_get_mode(output));
 
-	igt_pipe_crc_get_current(data->display.drm_fd, pipe_crc, &crc_hires2);
+		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-	igt_assert_plane_visible(data->drm_fd, pipe, true);
+		igt_assert_plane_visible(data->drm_fd, pipe, plane->index,
+					 false);
 
-	igt_assert_crc_equal(&crc_hires1, &crc_hires2);
+		/* switch back to higher resolution */
+		igt_output_override_mode(output, NULL);
+		igt_output_set_pipe(output, pipe);
+		check_mode(mode, igt_output_get_mode(output));
 
-	igt_pipe_crc_stop(pipe_crc);
-	igt_pipe_crc_free(pipe_crc);
+		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-	test_fini(data, output, pipe);
-}
+		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc_hires2);
 
-static void
-test_plane_position(data_t *data, enum pipe pipe, uint64_t modifier)
-{
-	igt_output_t *output;
+		igt_assert_plane_visible(data->drm_fd, pipe, plane->index,
+					 true);
 
-	for_each_valid_output_on_pipe(&data->display, pipe, output)
-		test_plane_position_with_output(data, pipe, output, modifier);
-}
+		igt_assert_crc_equal(&crc_hires1, &crc_hires2);
 
-static void
-run_tests_for_pipe(data_t *data, enum pipe pipe)
-{
-	igt_fixture {
-		igt_skip_on(pipe >= data->display.n_pipes);
+		igt_pipe_crc_stop(pipe_crc);
 
-		igt_display_require_output_on_pipe(&data->display, pipe);
+		igt_plane_set_fb(plane, NULL);
+		igt_remove_fb(data->drm_fd, &data->fb_plane);
+		tested++;
 	}
 
-	igt_subtest_f("pipe-%s-tiling-none",
-		      kmstest_pipe_name(pipe))
-		test_plane_position(data, pipe, LOCAL_DRM_FORMAT_MOD_NONE);
+	igt_pipe_crc_free(pipe_crc);
 
-	igt_subtest_f("pipe-%s-tiling-x",
-		      kmstest_pipe_name(pipe))
-		test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_X_TILED);
+	igt_plane_set_fb(primary_plane_get(&data->display, pipe), NULL);
+	igt_remove_fb(data->drm_fd, &data->fb_primary);
+	igt_output_set_pipe(output, PIPE_NONE);
 
-	igt_subtest_f("pipe-%s-tiling-y",
-		      kmstest_pipe_name(pipe))
-		test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_Y_TILED);
-
-	igt_subtest_f("pipe-%s-tiling-yf",
-		      kmstest_pipe_name(pipe))
-		test_plane_position(data, pipe, LOCAL_I915_FORMAT_MOD_Yf_TILED);
+	return tested;
 }
 
-static data_t data;
+static void
+test_planes_on_pipe(data_t *data, enum pipe pipe, uint64_t modifier)
+{
+	igt_output_t *output;
+	unsigned tested = 0;
+
+	igt_skip_on(pipe >= data->display.n_pipes);
+	igt_display_require_output_on_pipe(&data->display, pipe);
+	igt_skip_on(!igt_display_has_format_mod(&data->display,
+						DRM_FORMAT_XRGB8888, modifier));
+
+	for_each_valid_output_on_pipe(&data->display, pipe, output)
+		tested += test_planes_on_pipe_with_output(data, pipe, output,
+							  modifier);
+
+	igt_assert(tested > 0);
+}
 
 igt_main
 {
+	data_t data = {};
 	enum pipe pipe;
 
 	igt_skip_on_simulation();
@@ -273,9 +241,23 @@ igt_main
 		igt_require(data.display.is_atomic);
 	}
 
-	for_each_pipe_static(pipe)
-		igt_subtest_group
-			run_tests_for_pipe(&data, pipe);
+	for_each_pipe_static(pipe) {
+		igt_subtest_f("pipe-%s-tiling-none", kmstest_pipe_name(pipe))
+			test_planes_on_pipe(&data, pipe,
+					    LOCAL_DRM_FORMAT_MOD_NONE);
+
+		igt_subtest_f("pipe-%s-tiling-x", kmstest_pipe_name(pipe))
+			test_planes_on_pipe(&data, pipe,
+					    LOCAL_I915_FORMAT_MOD_X_TILED);
+
+		igt_subtest_f("pipe-%s-tiling-y", kmstest_pipe_name(pipe))
+			test_planes_on_pipe(&data, pipe,
+					    LOCAL_I915_FORMAT_MOD_Y_TILED);
+
+		igt_subtest_f("pipe-%s-tiling-yf", kmstest_pipe_name(pipe))
+			test_planes_on_pipe(&data, pipe,
+					    LOCAL_I915_FORMAT_MOD_Yf_TILED);
+	}
 
 	igt_fixture {
 		igt_display_fini(&data.display);
