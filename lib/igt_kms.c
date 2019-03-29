@@ -1795,6 +1795,15 @@ static void igt_pipe_reset(igt_pipe_t *pipe)
 	igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_ACTIVE, 0);
 	igt_pipe_obj_clear_prop_changed(pipe, IGT_CRTC_OUT_FENCE_PTR);
 
+	if (igt_pipe_obj_has_prop(pipe, IGT_CRTC_CTM))
+		igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_CTM, 0);
+
+	if (igt_pipe_obj_has_prop(pipe, IGT_CRTC_GAMMA_LUT))
+		igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_GAMMA_LUT, 0);
+
+	if (igt_pipe_obj_has_prop(pipe, IGT_CRTC_DEGAMMA_LUT))
+		igt_pipe_obj_set_prop_value(pipe, IGT_CRTC_DEGAMMA_LUT, 0);
+
 	pipe->out_fence_fd = -1;
 }
 
