@@ -43,9 +43,8 @@ typedef struct {
 } data_t;
 
 static drmModeModeInfo
-get_lowres_mode(int drmfd, drmModeModeInfo *mode_default)
+get_lowres_mode(int drmfd, igt_output_t *output, drmModeModeInfo *mode_default)
 {
-	drmModeRes *mode_resources = drmModeGetResources(drmfd);
 	drmModeModeInfo mode;
 	drmModeModeInfo std_1024_mode = {
 		.clock = 65000,
@@ -64,42 +63,17 @@ get_lowres_mode(int drmfd, drmModeModeInfo *mode_default)
 		.type = 0x40,
 		.name = "Custom 1024x768",
 	};
-	bool found;
-	int limit = mode_default->vdisplay-SIZE;
-	int i, j;
+	bool found = false;
+	int limit = mode_default->vdisplay - SIZE;
+	int j;
 
-	if (!mode_resources) {
-		igt_warn("drmModeGetResources failed: %s\n", strerror(errno));
-		return std_1024_mode;
-	}
-
-	found = false;
-	for (i = 0; i < mode_resources->count_connectors; i++) {
-		drmModeConnector *connector;
-
-		connector = drmModeGetConnectorCurrent(drmfd,
-						       mode_resources->connectors[i]);
-		if (!connector) {
-			igt_warn("could not get connector %i: %s\n",
-				 mode_resources->connectors[i], strerror(errno));
-			continue;
+	for (j = 0; j < output->config.connector->count_modes; j++) {
+		mode = output->config.connector->modes[j];
+		if (mode.vdisplay < limit) {
+			found = true;
+			break;
 		}
-
-		if (!connector->count_modes)
-			continue;
-
-		for (j = 0; j < connector->count_modes; j++) {
-			mode = connector->modes[j];
-			if (mode.vdisplay < limit) {
-				found = true;
-				break;
-			}
-		}
-
-		drmModeFreeConnector(connector);
 	}
-
-	drmModeFreeResources(mode_resources);
 
 	if (!found)
 		return std_1024_mode;
@@ -217,7 +191,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	mode1 = test_setup(data, pipe, modifier, output);
 
-	mode_lowres = get_lowres_mode(data->drm_fd, mode1);
+	mode_lowres = get_lowres_mode(data->drm_fd, output, mode1);
 
 	ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
 	igt_skip_on(ret != 0);
