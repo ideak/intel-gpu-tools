@@ -1338,8 +1338,11 @@ static void gem_execbuf_stress_subtest(int rounds, int wait_flags)
 	for (i = 0; i < rounds; i++) {
 		gem_execbuf(drm_fd, &execbuf);
 
-		if (wait_flags & WAIT_STATUS)
+		if (wait_flags & WAIT_STATUS) {
+			/* clean up idle work */
+			igt_drop_caches_set(drm_fd, DROP_IDLE);
 			igt_assert(wait_for_suspended());
+		}
 		if (wait_flags & WAIT_PC8_RES)
 			igt_assert(pc8_plus_residency_changed(30));
 		if (wait_flags & WAIT_EXTRA)
