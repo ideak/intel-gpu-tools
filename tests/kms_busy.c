@@ -29,9 +29,6 @@
 
 IGT_TEST_DESCRIPTION("Basic check of KMS ABI with busy framebuffers.");
 
-#define FRAME_TIME 16 /* milleseconds */
-#define TIMEOUT (6*16)
-
 static igt_output_t *
 set_fb_on_crtc(igt_display_t *dpy, int pipe, struct igt_fb *fb)
 {
@@ -70,17 +67,13 @@ static void do_cleanup_display(igt_display_t *dpy)
 	igt_display_commit2(dpy, dpy->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 }
 
-static void sighandler(int sig)
-{
-}
-
 static void flip_to_fb(igt_display_t *dpy, int pipe,
 		       igt_output_t *output,
 		       struct igt_fb *fb, unsigned ring,
 		       const char *name, bool modeset)
 {
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
-	struct timespec tv = { 1, 0 };
+	const int timeout = modeset ? 8500 : 100;
 	struct drm_event_vblank ev;
 
 	igt_spin_t *t = igt_spin_batch_new(dpy->drm_fd,
@@ -114,24 +107,14 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 						  DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 		}
 
-		kill(getppid(), SIGALRM);
-		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
-		igt_assert_f(poll(&pfd, 1, modeset ? 8500 : TIMEOUT) == 0,
+		igt_assert_f(poll(&pfd, 1, timeout) == 0,
 			     "flip completed whilst %s was busy [%d]\n",
 			     name, gem_bo_busy(dpy->drm_fd, fb->gem_handle));
+		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
 	}
 
-	igt_assert_f(nanosleep(&tv, NULL) == -1,
-		     "flip to %s blocked waiting for busy fb", name);
-
-	igt_waitchildren();
-
-	if (!modeset) {
-		tv.tv_sec = 0;
-		tv.tv_nsec = (2 * TIMEOUT) * 1000000ULL;
-		nanosleep(&tv, NULL);
-	}
-
+	igt_waitchildren_timeout(5 * timeout,
+				 "flip blocked waiting for busy bo\n");
 	igt_spin_batch_end(t);
 
 	igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
@@ -159,8 +142,6 @@ static void test_flip(igt_display_t *dpy, unsigned ring, int pipe, bool modeset)
 
 	if (modeset)
 		igt_require(dpy->is_atomic);
-
-	signal(SIGALRM, sighandler);
 
 	output = set_fb_on_crtc(dpy, pipe, &fb[0]);
 	igt_display_commit2(dpy, COMMIT_LEGACY);
@@ -194,8 +175,6 @@ static void test_flip(igt_display_t *dpy, unsigned ring, int pipe, bool modeset)
 	do_cleanup_display(dpy);
 	igt_remove_fb(dpy->drm_fd, &fb[1]);
 	igt_remove_fb(dpy->drm_fd, &fb[0]);
-
-	signal(SIGALRM, SIG_DFL);
 }
 
 static void test_atomic_commit_hang(igt_display_t *dpy, igt_plane_t *primary,
