@@ -155,6 +155,7 @@ static void assert_settings_equal(struct settings *one, struct settings *two)
 	igt_assert_eqstr(one->test_root, two->test_root);
 	igt_assert_eqstr(one->results_path, two->results_path);
 	igt_assert_eq(one->piglit_style_dmesg, two->piglit_style_dmesg);
+	igt_assert_eq(one->dmesg_warn_level, two->dmesg_warn_level);
 }
 
 static void assert_job_list_equal(struct job_list *one, struct job_list *two)
@@ -223,7 +224,9 @@ igt_main
 		igt_assert(!settings.use_watchdog);
 		igt_assert(strstr(settings.test_root, "test-root-dir") != NULL);
 		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
+
 		igt_assert(!settings.piglit_style_dmesg);
+		igt_assert_eq(settings.dmesg_warn_level, 4);
 	}
 
 	igt_subtest_group {
@@ -364,6 +367,7 @@ igt_main
 				       "--overall-timeout", "360",
 				       "--use-watchdog",
 				       "--piglit-style-dmesg",
+				       "--dmesg-warn-level=3",
 				       "test-root-dir",
 				       "path-to-results",
 		};
@@ -389,7 +393,48 @@ igt_main
 		igt_assert(settings.use_watchdog);
 		igt_assert(strstr(settings.test_root, "test-root-dir") != NULL);
 		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
+
 		igt_assert(settings.piglit_style_dmesg);
+		igt_assert_eq(settings.dmesg_warn_level, 3);
+	}
+
+	igt_subtest("dmesg-warn-level-inferred") {
+		const char *argv[] = { "runner",
+				       "test-root-dir",
+				       "path-to-results",
+		};
+
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+
+		igt_assert(!settings.piglit_style_dmesg);
+		igt_assert_eq(settings.dmesg_warn_level, 4);
+	}
+
+	igt_subtest("dmesg-warn-level-inferred-with-piglit-style") {
+		const char *argv[] = { "runner",
+				       "--piglit-style-dmesg",
+				       "test-root-dir",
+				       "path-to-results",
+		};
+
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+
+		igt_assert(settings.piglit_style_dmesg);
+		igt_assert_eq(settings.dmesg_warn_level, 5);
+	}
+
+	igt_subtest("dmesg-warn-level-overridable-with-piglit-style") {
+		const char *argv[] = { "runner",
+				       "--piglit-style-dmesg",
+				       "--dmesg-warn-level=3",
+				       "test-root-dir",
+				       "path-to-results",
+		};
+
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+
+		igt_assert(settings.piglit_style_dmesg);
+		igt_assert_eq(settings.dmesg_warn_level, 3);
 	}
 
 	igt_subtest("invalid-option") {
@@ -1089,6 +1134,60 @@ igt_main
 				clear_directory(dirname);
 				free_job_list(&list);
 			}
+		}
+	}
+
+	igt_subtest_group {
+		igt_subtest("metadata-read-old-style-infer-dmesg-warn-piglit-style") {
+			char metadata[] = "piglit_style_dmesg : 1\n";
+			FILE *f = fmemopen(metadata, strlen(metadata), "r");
+			igt_assert(f);
+
+			igt_assert(read_settings_from_file(&settings, f));
+
+			igt_assert(settings.piglit_style_dmesg);
+			igt_assert_eq(settings.dmesg_warn_level, 5);
+
+			fclose(f);
+		}
+
+		igt_subtest("metadata-read-overrides-dmesg-warn-piglit-style") {
+			char metadata[] = "piglit_style_dmesg : 1\ndmesg_warn_level : 3";
+			FILE *f = fmemopen(metadata, strlen(metadata), "r");
+			igt_assert(f);
+
+			igt_assert(read_settings_from_file(&settings, f));
+
+			igt_assert(settings.piglit_style_dmesg);
+			igt_assert_eq(settings.dmesg_warn_level, 3);
+
+			fclose(f);
+		}
+
+		igt_subtest("metadata-read-old-style-infer-dmesg-warn-default") {
+			char metadata[] = "piglit_style_dmesg : 0\n";
+			FILE *f = fmemopen(metadata, strlen(metadata), "r");
+			igt_assert(f);
+
+			igt_assert(read_settings_from_file(&settings, f));
+
+			igt_assert(!settings.piglit_style_dmesg);
+			igt_assert_eq(settings.dmesg_warn_level, 4);
+
+			fclose(f);
+		}
+
+		igt_subtest("metadata-read-overrides-dmesg-warn-default") {
+			char metadata[] = "piglit_style_dmesg : 0\ndmesg_warn_level : 3";
+			FILE *f = fmemopen(metadata, strlen(metadata), "r");
+			igt_assert(f);
+
+			igt_assert(read_settings_from_file(&settings, f));
+
+			igt_assert(!settings.piglit_style_dmesg);
+			igt_assert_eq(settings.dmesg_warn_level, 3);
+
+			fclose(f);
 		}
 	}
 

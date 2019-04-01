@@ -17,6 +17,7 @@ enum {
 	OPT_TEST_LIST,
 	OPT_IGNORE_MISSING,
 	OPT_PIGLIT_DMESG,
+	OPT_DMESG_WARN_LEVEL,
 	OPT_OVERALL_TIMEOUT,
 	OPT_HELP = 'h',
 	OPT_NAME = 'n',
@@ -159,12 +160,18 @@ static const char *usage_str =
 	"  --use-watchdog        Use hardware watchdog for lethal enforcement of the\n"
 	"                        above timeout. Killing the test process is still\n"
 	"                        attempted at timeout trigger.\n"
+	"  --dmesg-warn-level <level>\n"
+	"                        Messages with log level equal or lower (more serious)\n"
+	"                        to the given one will override the test result to\n"
+	"                        dmesg-warn/dmesg-fail, assuming they go through filtering.\n"
+	"                        Defaults to 4 (KERN_WARNING).\n"
 	"  --piglit-style-dmesg  Filter dmesg like piglit does. Piglit considers matches\n"
 	"                        against a short filter list to mean the test result\n"
 	"                        should be changed to dmesg-warn/dmesg-fail. Without\n"
 	"                        this option everything except matches against a\n"
 	"                        (longer) filter list means the test result should\n"
-	"                        change.\n"
+	"                        change. KERN_NOTICE dmesg level is treated as warn,\n"
+	"                        unless overridden with --dmesg-warn-level.\n"
 	"  [test_root]           Directory that contains the IGT tests. The environment\n"
 	"                        variable IGT_TEST_ROOT will be used if set, overriding\n"
 	"                        this option if given.\n"
@@ -270,12 +277,15 @@ bool parse_options(int argc, char **argv,
 		{"overall-timeout", required_argument, NULL, OPT_OVERALL_TIMEOUT},
 		{"use-watchdog", no_argument, NULL, OPT_WATCHDOG},
 		{"piglit-style-dmesg", no_argument, NULL, OPT_PIGLIT_DMESG},
+		{"dmesg-warn-level", required_argument, NULL, OPT_DMESG_WARN_LEVEL},
 		{ 0, 0, 0, 0},
 	};
 
 	free_settings(settings);
 
 	optind = 1;
+
+	settings->dmesg_warn_level = -1;
 
 	while ((c = getopt_long(argc, argv, "hn:dt:x:sl:om", long_options, NULL)) != -1) {
 		switch (c) {
@@ -332,6 +342,11 @@ bool parse_options(int argc, char **argv,
 			break;
 		case OPT_PIGLIT_DMESG:
 			settings->piglit_style_dmesg = true;
+			if (settings->dmesg_warn_level < 0)
+				settings->dmesg_warn_level = 5; /* KERN_NOTICE */
+			break;
+		case OPT_DMESG_WARN_LEVEL:
+			settings->dmesg_warn_level = atoi(optarg);
 			break;
 		case '?':
 			usage(NULL, stderr);
@@ -341,6 +356,9 @@ bool parse_options(int argc, char **argv,
 			goto error;
 		}
 	}
+
+	if (settings->dmesg_warn_level < 0)
+		settings->dmesg_warn_level = 4; /* KERN_WARN */
 
 	switch (argc - optind) {
 	case 2:
@@ -525,6 +543,7 @@ bool serialize_settings(struct settings *settings)
 	SERIALIZE_LINE(f, settings, overall_timeout, "%d");
 	SERIALIZE_LINE(f, settings, use_watchdog, "%d");
 	SERIALIZE_LINE(f, settings, piglit_style_dmesg, "%d");
+	SERIALIZE_LINE(f, settings, dmesg_warn_level, "%d");
 	SERIALIZE_LINE(f, settings, test_root, "%s");
 	SERIALIZE_LINE(f, settings, results_path, "%s");
 
@@ -553,6 +572,7 @@ bool read_settings_from_file(struct settings *settings, FILE *f)
 
 	char *name = NULL, *val = NULL;
 
+	settings->dmesg_warn_level = -1;
 
 	while (fscanf(f, "%ms : %ms", &name, &val) == 2) {
 		int numval = atoi(val);
@@ -568,6 +588,7 @@ bool read_settings_from_file(struct settings *settings, FILE *f)
 		PARSE_LINE(settings, name, val, overall_timeout, numval);
 		PARSE_LINE(settings, name, val, use_watchdog, numval);
 		PARSE_LINE(settings, name, val, piglit_style_dmesg, numval);
+		PARSE_LINE(settings, name, val, dmesg_warn_level, numval);
 		PARSE_LINE(settings, name, val, test_root, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, results_path, val ? strdup(val) : NULL);
 
@@ -576,6 +597,13 @@ bool read_settings_from_file(struct settings *settings, FILE *f)
 		free(name);
 		free(val);
 		name = val = NULL;
+	}
+
+	if (settings->dmesg_warn_level < 0) {
+		if (settings->piglit_style_dmesg)
+			settings->dmesg_warn_level = 5;
+		else
+			settings->dmesg_warn_level = 4;
 	}
 
 	free(name);

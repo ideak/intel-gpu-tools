@@ -42,6 +42,7 @@ struct settings {
 	char *test_root;
 	char *results_path;
 	bool piglit_style_dmesg;
+	int dmesg_warn_level;
 };
 
 /**

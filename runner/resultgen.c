@@ -670,12 +670,12 @@ static bool fill_from_dmesg(int fd,
 		}
 
 		if (settings->piglit_style_dmesg) {
-			if ((flags & 0x07) <= 5 && continuation != 'c' &&
+			if ((flags & 0x07) <= settings->dmesg_warn_level && continuation != 'c' &&
 			    regexec(&re, message, (size_t)0, NULL, 0) != REG_NOMATCH) {
 				append_line(&warnings, &warningslen, formatted);
 			}
 		} else {
-			if ((flags & 0x07) <= 4 && continuation != 'c' &&
+			if ((flags & 0x07) <= settings->dmesg_warn_level && continuation != 'c' &&
 			    regexec(&re, message, (size_t)0, NULL, 0) == REG_NOMATCH) {
 				append_line(&warnings, &warningslen, formatted);
 			}

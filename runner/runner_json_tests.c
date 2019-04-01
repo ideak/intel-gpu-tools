@@ -159,6 +159,9 @@ static const char *dirnames[] = {
 	"dmesg-escapes",
 	"notrun-results",
 	"notrun-results-multiple-mode",
+	"dmesg-warn-level",
+	"dmesg-warn-level-piglit-style",
+	"dmesg-warn-level-one-piglit-style"
 };
 
 igt_main
