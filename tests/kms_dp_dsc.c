@@ -187,7 +187,7 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 		clear_dp_dsc_enable(data);
 
 		igt_assert_f(enabled,
-			     "Default DSC enable failed on Connector: %s Pipe: %s",
+			     "Default DSC enable failed on Connector: %s Pipe: %s\n",
 			     data->conn_name,
 			     kmstest_pipe_name(data->pipe));
 	} else {
