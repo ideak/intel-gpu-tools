@@ -540,7 +540,7 @@ bool serialize_settings(struct settings *settings)
 #undef SERIALIZE_LINE
 }
 
-bool read_settings(struct settings *settings, int dirfd)
+bool read_settings_from_file(struct settings *settings, FILE *f)
 {
 #define PARSE_LINE(s, name, val, field, write) \
 	if (!strcmp(name, #field)) {	       \
@@ -551,20 +551,8 @@ bool read_settings(struct settings *settings, int dirfd)
 		continue;		       \
 	}
 
-	int fd;
-	FILE *f;
 	char *name = NULL, *val = NULL;
 
-	free_settings(settings);
-
-	if ((fd = openat(dirfd, settings_filename, O_RDONLY)) < 0)
-		return false;
-
-	f = fdopen(fd, "r");
-	if (!f) {
-		close(fd);
-		return false;
-	}
 
 	while (fscanf(f, "%ms : %ms", &name, &val) == 2) {
 		int numval = atoi(val);
@@ -592,9 +580,34 @@ bool read_settings(struct settings *settings, int dirfd)
 
 	free(name);
 	free(val);
-	fclose(f);
 
 	return true;
 
 #undef PARSE_LINE
+}
+
+bool read_settings_from_dir(struct settings *settings, int dirfd)
+{
+	int fd;
+	FILE *f;
+
+	free_settings(settings);
+
+	if ((fd = openat(dirfd, settings_filename, O_RDONLY)) < 0)
+		return false;
+
+	f = fdopen(fd, "r");
+	if (!f) {
+		close(fd);
+		return false;
+	}
+
+	if (!read_settings_from_file(settings, f)) {
+		fclose(f);
+		return false;
+	}
+
+	fclose(f);
+
+	return true;
 }

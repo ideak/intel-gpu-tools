@@ -1085,7 +1085,7 @@ struct json_object *generate_results_json(int dirfd)
 	init_settings(&settings);
 	init_job_list(&job_list);
 
-	if (!read_settings(&settings, dirfd)) {
+	if (!read_settings_from_dir(&settings, dirfd)) {
 		fprintf(stderr, "resultgen: Cannot parse settings\n");
 		return NULL;
 	}

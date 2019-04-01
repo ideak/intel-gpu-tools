@@ -680,7 +680,7 @@ igt_main
 				     "Opening %s/metadata.txt failed\n", dirname);
 			close(fd);
 
-			igt_assert_f(read_settings(&cmp_settings, dirfd), "Reading settings failed\n");
+			igt_assert_f(read_settings_from_dir(&cmp_settings, dirfd), "Reading settings failed\n");
 			assert_settings_equal(&settings, &cmp_settings);
 		}
 

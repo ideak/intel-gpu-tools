@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <sys/types.h>
 #include <regex.h>
+#include <stdio.h>
 
 enum {
 	LOG_LEVEL_NORMAL = 0,
@@ -114,6 +115,7 @@ char *absolute_path(char *path);
  */
 bool serialize_settings(struct settings *settings);
 
-bool read_settings(struct settings *settings, int dirfd);
+bool read_settings_from_file(struct settings *settings, FILE* f);
+bool read_settings_from_dir(struct settings *settings, int dirfd);
 
 #endif

@@ -1112,7 +1112,7 @@ bool initialize_execute_state_from_resume(int dirfd,
 	memset(state, 0, sizeof(*state));
 	state->resuming = true;
 
-	if (!read_settings(settings, dirfd) ||
+	if (!read_settings_from_dir(settings, dirfd) ||
 	    !read_job_list(list, dirfd)) {
 		close(dirfd);
 		return false;
