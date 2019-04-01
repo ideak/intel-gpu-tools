@@ -436,8 +436,11 @@ static void test_format_plane_color(data_t *data, enum pipe pipe,
 	/*
 	 * if clamping test. DRM_FORMAT_XRGB8888 is used for reference color.
 	 */
-	if (data->crop != 0 && format != DRM_FORMAT_XRGB8888)
+	if (data->crop != 0 && format != DRM_FORMAT_XRGB8888) {
 		igt_fb_set_position(fb, plane, data->crop, data->crop);
+		igt_fb_set_size(fb, plane, width, height);
+		igt_plane_set_size(plane, width, height);
+	}
 
 	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
 	igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, crc);
