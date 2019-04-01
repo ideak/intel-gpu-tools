@@ -499,27 +499,18 @@ static const char igt_dmesg_whitelist[] =
 static const char igt_piglit_style_dmesg_blacklist[] =
 	"(\\[drm:|drm_|intel_|i915_)";
 
-static regex_t re;
-
-static int init_regex_whitelist(struct settings *settings)
+static bool init_regex_whitelist(struct settings* settings, regex_t* re)
 {
-	static int status = -1;
+	const char *regex = settings->piglit_style_dmesg ?
+		igt_piglit_style_dmesg_blacklist :
+		igt_dmesg_whitelist;
 
-	if (status == -1) {
-		const char *regex = settings->piglit_style_dmesg ?
-			igt_piglit_style_dmesg_blacklist :
-			igt_dmesg_whitelist;
-
-		if (regcomp(&re, regex, REG_EXTENDED | REG_NOSUB) != 0) {
-			fprintf(stderr, "Cannot compile dmesg regexp\n");
-			status = 1;
-			return false;
-		}
-
-		status = 0;
+	if (regcomp(re, regex, REG_EXTENDED | REG_NOSUB) != 0) {
+		fprintf(stderr, "Cannot compile dmesg regexp\n");
+		return false;
 	}
 
-	return status;
+	return true;
 }
 
 static bool parse_dmesg_line(char* line,
@@ -639,12 +630,13 @@ static bool fill_from_dmesg(int fd,
 	char piglit_name[256];
 	ssize_t read;
 	size_t i;
+	regex_t re;
 
 	if (!f) {
 		return false;
 	}
 
-	if (init_regex_whitelist(settings)) {
+	if (!init_regex_whitelist(settings, &re)) {
 		fclose(f);
 		return false;
 	}
@@ -723,6 +715,7 @@ static bool fill_from_dmesg(int fd,
 
 	free(dmesg);
 	free(warnings);
+	regfree(&re);
 	fclose(f);
 	return true;
 }
