@@ -39,6 +39,38 @@
 #include <sys/time.h>
 #include "drm.h"
 
+#define MiB(x) ((x) * 1024 * 1024)
+
+typedef void *(*mmap_fn_t)(int, uint32_t, uint64_t, uint64_t, unsigned int);
+
+static void *wrap_gem_mmap__gtt(int i915, uint32_t handle,
+				uint64_t offset, uint64_t length,
+				unsigned int prot)
+{
+	return gem_mmap__gtt(i915, handle, length, prot);
+}
+
+static void pwrite_self(int i915)
+{
+	static const mmap_fn_t mmap_fn[] = {
+		wrap_gem_mmap__gtt,
+		gem_mmap__cpu,
+		gem_mmap__wc,
+		NULL
+	};
+	for (const mmap_fn_t *fn = mmap_fn; *fn; fn++) {
+		uint32_t handle = gem_create(i915, MiB(4));
+		void *ptr = (*fn)(i915, handle, 0, MiB(4), PROT_READ);
+
+		gem_write(i915, handle, 0, ptr + MiB(3), MiB(1));
+		gem_write(i915, handle, MiB(3), ptr, MiB(1));
+		gem_write(i915, handle, MiB(1), ptr + MiB(1), MiB(2));
+
+		munmap(ptr, MiB(4));
+		gem_close(i915, handle);
+	}
+}
+
 #define OBJECT_SIZE 16384
 
 #define COPY_BLT_CMD		(2<<29|0x53<<22|0x6)
@@ -257,6 +289,9 @@ int main(int argc, char **argv)
 			fflush(stdout);
 		}
 	}
+
+	igt_subtest("self")
+		pwrite_self(fd);
 
 	for (c = cache; c->level != -1; c++) {
 		igt_subtest(c->name) {
