@@ -26,7 +26,6 @@
 
 #include <sys/ioctl.h>
 #include <sys/poll.h>
-#include <signal.h>
 #include <time.h>
 
 IGT_TEST_DESCRIPTION("Basic check of polling for prime/vgem fences.");
@@ -686,10 +685,6 @@ static unsigned get_vblank(int fd, int pipe, unsigned flags)
 	return vbl.reply.sequence;
 }
 
-static void sighandler(int sig)
-{
-}
-
 static void flip_to_vgem(int i915, int vgem,
 			 struct vgem_bo *bo,
 			 uint32_t fb_id,
@@ -697,29 +692,24 @@ static void flip_to_vgem(int i915, int vgem,
 			 unsigned hang,
 			 const char *name)
 {
-	const struct timespec tv = { 1, 0 };
 	struct pollfd pfd = { i915, POLLIN };
 	struct drm_event_vblank vbl;
 	uint32_t fence;
 
 	fence = vgem_fence_attach(vgem, bo, VGEM_FENCE_WRITE | hang);
 
-	igt_fork(child, 1) {
+	igt_fork(child, 1) { /* Use a child in case we block uninterruptibly */
+		/* Check we don't block nor flip before the fence is ready */
 		do_or_die(drmModePageFlip(i915, crtc_id, fb_id,
 					  DRM_MODE_PAGE_FLIP_EVENT, &fb_id));
-		kill(getppid(), SIGHUP);
-
-		/* Check we don't flip before the fence is ready */
-		for (int n = 0; n < 5; n++) {
+		for (int n = 0; n < 5; n++) { /* 5 frames should be <100ms */
 			igt_assert_f(poll(&pfd, 1, 0) == 0,
 				     "flip to %s completed whilst busy\n",
-				      name);
+				     name);
 			get_vblank(i915, 0, DRM_VBLANK_NEXTONMISS);
 		}
 	}
-
-	igt_assert_f(nanosleep(&tv, NULL) == -1,
-		     "flip to busy %s blocked\n", name);
+	igt_waitchildren_timeout(2, "flip blocked by waiting for busy vgem fence");
 
 	/* And then the flip is completed as soon as it is ready */
 	if (!hang) {
@@ -734,20 +724,17 @@ static void flip_to_vgem(int i915, int vgem,
 		get_vblank(i915, 0, DRM_VBLANK_NEXTONMISS);
 		igt_assert_eq(poll(&pfd, 1, 0), 1);
 	}
+
 	/* Even if hung, the flip must complete *eventually* */
-	igt_set_timeout(20, "Ignored hang"); /* XXX lower fail threshold? */
+	igt_set_timeout(20, "flip blocked by hanging vgem fence"); /* XXX lower fail threshold? */
 	igt_assert_eq(read(i915, &vbl, sizeof(vbl)), sizeof(vbl));
 	igt_reset_timeout();
-
-	igt_waitchildren();
 }
 
 static void test_flip(int i915, int vgem, unsigned hang)
 {
 	struct vgem_bo bo[2];
 	uint32_t fb_id[2], handle[2], crtc_id;
-
-	signal(SIGHUP, sighandler);
 
 	for (int i = 0; i < 2; i++) {
 		uint32_t strides[4] = {};
@@ -798,8 +785,6 @@ static void test_flip(int i915, int vgem, unsigned hang)
 		gem_close(i915, handle[i]);
 		gem_close(vgem, bo[i].handle);
 	}
-
-	signal(SIGHUP, SIG_DFL);
 }
 
 igt_main
