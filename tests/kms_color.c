@@ -1080,8 +1080,8 @@ invalid_lut_sizes(data_t *data)
 	size_t degamma_lut_size = data->degamma_lut_size * sizeof(struct drm_color_lut);
 	size_t gamma_lut_size = data->gamma_lut_size * sizeof(struct drm_color_lut);
 
-	struct drm_color_lut *degamma_lut = malloc(data->degamma_lut_size * sizeof(struct drm_color_lut) * 2);
-	struct drm_color_lut *gamma_lut = malloc(data->gamma_lut_size * sizeof(struct drm_color_lut) * 2);
+	struct drm_color_lut *degamma_lut = malloc(degamma_lut_size * 2);
+	struct drm_color_lut *gamma_lut = malloc(gamma_lut_size * 2);
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
