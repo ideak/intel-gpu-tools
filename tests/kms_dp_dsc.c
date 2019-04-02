@@ -161,12 +161,17 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 		return;
 	}
 
+	/* Disable the output first */
+	igt_output_set_pipe(data->output, PIPE_NONE);
+	igt_display_commit(&data->display);
+
 	if (test_type == test_basic_dsc_enable) {
 		bool enabled;
 
 		igt_debug("DSC is supported on %s\n", data->conn_name);
 		force_dp_dsc_enable(data);
 
+		igt_output_set_pipe(data->output, data->pipe);
 		igt_create_pattern_fb(data->drm_fd, data->mode->hdisplay,
 				      data->mode->vdisplay,
 				      DRM_FORMAT_XRGB8888,
@@ -174,6 +179,8 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 				      &data->fb_test_pattern);
 		primary = igt_output_get_plane_type(data->output,
 						    DRM_PLANE_TYPE_PRIMARY);
+
+		/* Now set the output to the desired mode */
 		igt_plane_set_fb(primary, &data->fb_test_pattern);
 		igt_display_commit(&data->display);
 
@@ -203,7 +210,6 @@ static void run_test(data_t *data, igt_output_t *output,
 	for_each_pipe(&data->display, pipe) {
 
 		if (igt_pipe_connector_valid(pipe, output)) {
-			igt_output_set_pipe(output, pipe);
 			data->pipe = pipe;
 			data->output = output;
 			update_display(data, test_type);
