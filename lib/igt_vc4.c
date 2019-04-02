@@ -56,6 +56,23 @@
  * tests.
  */
 
+bool igt_vc4_is_tiled(uint64_t modifier)
+{
+	if (modifier >> 56ULL != DRM_FORMAT_MOD_VENDOR_BROADCOM)
+		return false;
+
+	switch (fourcc_mod_broadcom_mod(modifier)) {
+	case DRM_FORMAT_MOD_BROADCOM_SAND32:
+	case DRM_FORMAT_MOD_BROADCOM_SAND64:
+	case DRM_FORMAT_MOD_BROADCOM_SAND128:
+	case DRM_FORMAT_MOD_BROADCOM_SAND256:
+	case DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED:
+		return true;
+	default:
+		return false;
+	}
+}
+
 /**
  * igt_vc4_get_cleared_bo:
  * @fd: device file descriptor
@@ -178,63 +195,12 @@ bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable)
 	return arg.retained;
 }
 
-unsigned int igt_vc4_fb_t_tiled_convert(struct igt_fb *dst, struct igt_fb *src)
-{
-	unsigned int fb_id;
-	unsigned int i, j;
-	void *src_buf;
-	void *dst_buf;
-	size_t bpp = src->plane_bpp[0];
-	size_t dst_stride = ALIGN(src->strides[0], 128);
-
-	fb_id = igt_create_fb_with_bo_size(src->fd, src->width, src->height,
-					   src->drm_format,
-					   DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED,
-					   dst, 0, dst_stride);
-	igt_assert(fb_id > 0);
-
-	igt_assert(bpp == 16 || bpp == 32);
-
-	src_buf = igt_fb_map_buffer(src->fd, src);
-	igt_assert(src_buf);
-
-	dst_buf = igt_fb_map_buffer(dst->fd, dst);
-	igt_assert(dst_buf);
-
-	for (i = 0; i < src->height; i++) {
-		for (j = 0; j < src->width; j++) {
-			size_t src_offset = src->offsets[0];
-			size_t dst_offset = dst->offsets[0];
-
-			src_offset += src->strides[0] * i + j * bpp / 8;
-			dst_offset += igt_vc4_t_tiled_offset(dst_stride,
-							     src->height,
-							     bpp, j, i);
-
-			switch (bpp) {
-			case 16:
-				*(uint16_t *)(dst_buf + dst_offset) =
-					*(uint16_t *)(src_buf + src_offset);
-				break;
-			case 32:
-				*(uint32_t *)(dst_buf + dst_offset) =
-					*(uint32_t *)(src_buf + src_offset);
-				break;
-			}
-		}
-	}
-
-	igt_fb_unmap_buffer(src, src_buf);
-	igt_fb_unmap_buffer(dst, dst_buf);
-
-	return fb_id;
-}
 
 /* Calculate the t-tile width so that size = width * height * bpp / 8. */
 #define VC4_T_TILE_W(size, height, bpp) ((size) / (height) / ((bpp) / 8))
 
-size_t igt_vc4_t_tiled_offset(size_t stride, size_t height, size_t bpp,
-			      size_t x, size_t y)
+static size_t igt_vc4_t_tiled_offset(size_t stride, size_t height, size_t bpp,
+				     size_t x, size_t y)
 {
 	const size_t t1k_map_even[] = { 0, 3, 1, 2 };
 	const size_t t1k_map_odd[] = { 2, 1, 3, 0 };
@@ -308,17 +274,115 @@ size_t igt_vc4_t_tiled_offset(size_t stride, size_t height, size_t bpp,
 	return offset;
 }
 
-static void vc4_fb_sand_tiled_convert_plane(struct igt_fb *dst, void *dst_buf,
+static void vc4_fb_convert_plane_to_t_tiled(struct igt_fb *dst, void *dst_buf,
 					    struct igt_fb *src, void *src_buf,
-					    size_t column_width_bytes,
-					    size_t column_height,
 					    unsigned int plane)
 {
-	size_t bpp = dst->plane_bpp[plane];
-	size_t column_width = column_width_bytes * dst->plane_width[plane] /
-			      dst->width;
-	size_t column_size = column_width_bytes * column_height;
+	size_t bpp = src->plane_bpp[plane];
 	unsigned int i, j;
+
+	for (i = 0; i < src->height; i++) {
+		for (j = 0; j < src->width; j++) {
+			size_t src_offset = src->offsets[plane];
+			size_t dst_offset = dst->offsets[plane];
+
+			src_offset += src->strides[plane] * i + j * bpp / 8;
+			dst_offset += igt_vc4_t_tiled_offset(dst->strides[plane],
+							     dst->height,
+							     bpp, j, i);
+
+			switch (bpp) {
+			case 16:
+				*(uint16_t *)(dst_buf + dst_offset) =
+					*(uint16_t *)(src_buf + src_offset);
+				break;
+			case 32:
+				*(uint32_t *)(dst_buf + dst_offset) =
+					*(uint32_t *)(src_buf + src_offset);
+				break;
+			}
+		}
+	}
+}
+
+static void vc4_fb_convert_plane_from_t_tiled(struct igt_fb *dst, void *dst_buf,
+					      struct igt_fb *src, void *src_buf,
+					      unsigned int plane)
+{
+	size_t bpp = src->plane_bpp[plane];
+	unsigned int i, j;
+
+	for (i = 0; i < src->height; i++) {
+		for (j = 0; j < src->width; j++) {
+			size_t src_offset = src->offsets[plane];
+			size_t dst_offset = dst->offsets[plane];
+
+			src_offset += igt_vc4_t_tiled_offset(src->strides[plane],
+							     src->height,
+							     bpp, j, i);
+			src_offset += dst->strides[plane] * i + j * bpp / 8;
+
+			switch (bpp) {
+			case 16:
+				*(uint16_t *)(dst_buf + dst_offset) =
+					*(uint16_t *)(src_buf + src_offset);
+				break;
+			case 32:
+				*(uint32_t *)(dst_buf + dst_offset) =
+					*(uint32_t *)(src_buf + src_offset);
+				break;
+			}
+		}
+	}
+}
+
+static size_t vc4_sand_tiled_offset(size_t column_width, size_t column_size, size_t x,
+				    size_t y, size_t bpp)
+{
+	size_t offset = 0;
+	size_t cols_x;
+	size_t pix_x;
+
+	/* Offset to the beginning of the relevant column. */
+	cols_x = x / column_width;
+	offset += cols_x * column_size;
+
+	/* Offset to the relevant pixel. */
+	pix_x = x % column_width;
+	offset += (column_width * y + pix_x) * bpp / 8;
+
+	return offset;
+}
+
+static void vc4_fb_convert_plane_to_sand_tiled(struct igt_fb *dst, void *dst_buf,
+					       struct igt_fb *src, void *src_buf,
+					       unsigned int plane)
+{
+	uint64_t modifier_base = fourcc_mod_broadcom_mod(dst->modifier);
+	uint32_t column_height = fourcc_mod_broadcom_param(dst->modifier);
+	uint32_t column_width_bytes, column_width, column_size;
+	size_t bpp = dst->plane_bpp[plane];
+	unsigned int i, j;
+
+	switch (modifier_base) {
+	case DRM_FORMAT_MOD_BROADCOM_SAND32:
+		column_width_bytes = 32;
+		break;
+	case DRM_FORMAT_MOD_BROADCOM_SAND64:
+		column_width_bytes = 64;
+		break;
+	case DRM_FORMAT_MOD_BROADCOM_SAND128:
+		column_width_bytes = 128;
+		break;
+	case DRM_FORMAT_MOD_BROADCOM_SAND256:
+		column_width_bytes = 256;
+		break;
+	default:
+		igt_assert(false);
+	}
+
+	column_width = column_width_bytes * dst->plane_width[plane] / dst->width;
+	column_size = column_width_bytes * column_height;
 
 	for (i = 0; i < dst->plane_height[plane]; i++) {
 		for (j = 0; j < src->plane_width[plane]; j++) {
@@ -346,19 +410,15 @@ static void vc4_fb_sand_tiled_convert_plane(struct igt_fb *dst, void *dst_buf,
 	}
 }
 
-unsigned int vc4_fb_sand_tiled_convert(struct igt_fb *dst, struct igt_fb *src,
-				       uint64_t modifier)
+static void vc4_fb_convert_plane_from_sand_tiled(struct igt_fb *dst, void *dst_buf,
+						 struct igt_fb *src, void *src_buf,
+						 unsigned int plane)
 {
-	uint64_t modifier_base;
-	size_t column_width_bytes;
-	size_t column_height;
-	unsigned int fb_id;
-	unsigned int i;
-	void *src_buf;
-	void *dst_buf;
-
-	modifier_base = fourcc_mod_broadcom_mod(modifier);
-	column_height = fourcc_mod_broadcom_param(modifier);
+	uint64_t modifier_base = fourcc_mod_broadcom_mod(src->modifier);
+	uint32_t column_height = fourcc_mod_broadcom_param(src->modifier);
+	uint32_t column_width_bytes, column_width, column_size;
+	size_t bpp = src->plane_bpp[plane];
+	unsigned int i, j;
 
 	switch (modifier_base) {
 	case DRM_FORMAT_MOD_BROADCOM_SAND32:
@@ -377,41 +437,63 @@ unsigned int vc4_fb_sand_tiled_convert(struct igt_fb *dst, struct igt_fb *src,
 		igt_assert(false);
 	}
 
-	fb_id = igt_create_fb(src->fd, src->width, src->height, src->drm_format,
-			      modifier, dst);
-	igt_assert(fb_id > 0);
+	column_width = column_width_bytes * src->plane_width[plane] / src->width;
+	column_size = column_width_bytes * column_height;
 
-	src_buf = igt_fb_map_buffer(src->fd, src);
-	igt_assert(src_buf);
+	for (i = 0; i < dst->plane_height[plane]; i++) {
+		for (j = 0; j < src->plane_width[plane]; j++) {
+			size_t src_offset = src->offsets[plane];
+			size_t dst_offset = dst->offsets[plane];
 
-	dst_buf = igt_fb_map_buffer(dst->fd, dst);
-	igt_assert(dst_buf);
+			src_offset += vc4_sand_tiled_offset(column_width,
+							    column_size, j, i,
+							    bpp);
+			dst_offset += dst->strides[plane] * i + j * bpp / 8;
 
-	for (i = 0; i < dst->num_planes; i++)
-		vc4_fb_sand_tiled_convert_plane(dst, dst_buf, src, src_buf,
-						column_width_bytes,
-						column_height, i);
-
-	igt_fb_unmap_buffer(src, src_buf);
-	igt_fb_unmap_buffer(dst, dst_buf);
-
-	return fb_id;
+			switch (bpp) {
+			case 8:
+				*(uint8_t *)(dst_buf + dst_offset) =
+					*(uint8_t *)(src_buf + src_offset);
+				break;
+			case 16:
+				*(uint16_t *)(dst_buf + dst_offset) =
+					*(uint16_t *)(src_buf + src_offset);
+				break;
+			default:
+				igt_assert(false);
+			}
+		}
+	}
 }
 
-size_t vc4_sand_tiled_offset(size_t column_width, size_t column_size, size_t x,
-			     size_t y, size_t bpp)
+void vc4_fb_convert_plane_to_tiled(struct igt_fb *dst, void *dst_buf,
+				     struct igt_fb *src, void *src_buf)
 {
-	size_t offset = 0;
-	size_t cols_x;
-	size_t pix_x;
+	unsigned int plane;
 
-	/* Offset to the beginning of the relevant column. */
-	cols_x = x / column_width;
-	offset += cols_x * column_size;
+	igt_assert(src->modifier == DRM_FORMAT_MOD_LINEAR);
+	igt_assert(igt_vc4_is_tiled(dst->modifier));
 
-	/* Offset to the relevant pixel. */
-	pix_x = x % column_width;
-	offset += (column_width * y + pix_x) * bpp / 8;
+	for (plane = 0; plane < src->num_planes; plane++) {
+		if (dst->modifier == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED)
+			vc4_fb_convert_plane_to_t_tiled(dst, dst_buf, src, src_buf, plane);
+		else
+			vc4_fb_convert_plane_to_sand_tiled(dst, dst_buf, src, src_buf, plane);
+	}
+}
 
-	return offset;
+void vc4_fb_convert_plane_from_tiled(struct igt_fb *dst, void *dst_buf,
+				       struct igt_fb *src, void *src_buf)
+{
+	unsigned int plane;
+
+	igt_assert(igt_vc4_is_tiled(src->modifier));
+	igt_assert(dst->modifier == DRM_FORMAT_MOD_LINEAR);
+
+	for (plane = 0; plane < src->num_planes; plane++) {
+		if (src->modifier == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED)
+			vc4_fb_convert_plane_from_t_tiled(dst, dst_buf, src, src_buf, plane);
+		else
+			vc4_fb_convert_plane_from_sand_tiled(dst, dst_buf, src, src_buf, plane);
+	}
 }

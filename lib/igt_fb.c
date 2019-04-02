@@ -1716,17 +1716,25 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 	struct igt_fb *fb = blit->fb;
 	struct fb_blit_linear *linear = &blit->linear;
 
-	gem_munmap(linear->map, linear->fb.size);
-	gem_set_domain(fd, linear->fb.gem_handle,
-		       I915_GEM_DOMAIN_GTT, 0);
+	if (igt_vc4_is_tiled(fb->modifier)) {
+		void *map = igt_vc4_mmap_bo(fd, fb->gem_handle, fb->size, PROT_WRITE);
 
-	if (blit->batch)
-		rendercopy(blit, fb, &linear->fb);
-	else
-		blitcopy(fb, &linear->fb);
+		vc4_fb_convert_plane_to_tiled(fb, map, &linear->fb, &linear->map);
 
-	gem_sync(fd, linear->fb.gem_handle);
-	gem_close(fd, linear->fb.gem_handle);
+		munmap(map, fb->size);
+	} else {
+		gem_munmap(linear->map, linear->fb.size);
+		gem_set_domain(fd, linear->fb.gem_handle,
+			I915_GEM_DOMAIN_GTT, 0);
+
+		if (blit->batch)
+			rendercopy(blit, fb, &linear->fb);
+		else
+			blitcopy(fb, &linear->fb);
+
+		gem_sync(fd, linear->fb.gem_handle);
+		gem_close(fd, linear->fb.gem_handle);
+	}
 
 	if (blit->batch) {
 		intel_batchbuffer_free(blit->batch);
@@ -1751,7 +1759,7 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 	struct igt_fb *fb = blit->fb;
 	struct fb_blit_linear *linear = &blit->linear;
 
-	if (use_rendercopy(fb)) {
+	if (!igt_vc4_is_tiled(fb->modifier) && use_rendercopy(fb)) {
 		blit->bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
 		blit->batch = intel_batchbuffer_alloc(blit->bufmgr,
 						      intel_get_drm_devid(fd));
@@ -1771,23 +1779,35 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 
 	igt_assert(linear->fb.gem_handle > 0);
 
-	/* Copy fb content to linear BO */
-	gem_set_domain(fd, linear->fb.gem_handle,
-			I915_GEM_DOMAIN_GTT, 0);
+	if (igt_vc4_is_tiled(fb->modifier)) {
+		void *map = igt_vc4_mmap_bo(fd, fb->gem_handle, fb->size, PROT_READ);
 
-	if (blit->batch)
-		rendercopy(blit, &linear->fb, fb);
-	else
-		blitcopy(&linear->fb, fb);
+		linear->map = igt_vc4_mmap_bo(fd, linear->fb.gem_handle,
+					      linear->fb.size,
+					      PROT_READ | PROT_WRITE);
 
-	gem_sync(fd, linear->fb.gem_handle);
+		vc4_fb_convert_plane_from_tiled(&linear->fb, &linear->map, fb, map);
 
-	gem_set_domain(fd, linear->fb.gem_handle,
-		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+		munmap(map, fb->size);
+	} else {
+		/* Copy fb content to linear BO */
+		gem_set_domain(fd, linear->fb.gem_handle,
+				I915_GEM_DOMAIN_GTT, 0);
 
-	/* Setup cairo context */
-	linear->map = gem_mmap__cpu(fd, linear->fb.gem_handle,
-				    0, linear->fb.size, PROT_READ | PROT_WRITE);
+		if (blit->batch)
+			rendercopy(blit, &linear->fb, fb);
+		else
+			blitcopy(&linear->fb, fb);
+
+		gem_sync(fd, linear->fb.gem_handle);
+
+		gem_set_domain(fd, linear->fb.gem_handle,
+			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+
+		/* Setup cairo context */
+		linear->map = gem_mmap__cpu(fd, linear->fb.gem_handle,
+					0, linear->fb.size, PROT_READ | PROT_WRITE);
+	}
 }
 
 static void create_cairo_surface__gpu(int fd, struct igt_fb *fb)
@@ -2902,7 +2922,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 							     &blit->shadow_fb);
 	igt_assert(blit->shadow_ptr);
 
-	if (use_rendercopy(fb) || use_blitter(fb)) {
+	if (use_rendercopy(fb) || use_blitter(fb) || igt_vc4_is_tiled(fb->modifier)) {
 		setup_linear_mapping(&blit->base);
 	} else {
 		blit->base.linear.fb = *fb;
@@ -2983,7 +3003,7 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 		    ((f->cairo_id == CAIRO_FORMAT_INVALID) &&
 		     (f->pixman_id != PIXMAN_invalid)))
 			create_cairo_surface__convert(fd, fb);
-		else if (use_blitter(fb) || use_rendercopy(fb))
+		else if (use_blitter(fb) || use_rendercopy(fb) || igt_vc4_is_tiled(fb->modifier))
 			create_cairo_surface__gpu(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);
@@ -3102,58 +3122,23 @@ unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
 					uint64_t dst_modifier,
 					unsigned int dst_stride)
 {
-	struct fb_convert cvt = { };
-	struct igt_fb linear;
-	void *dst_ptr, *src_ptr;
-	uint64_t base_modifier;
+	/* Use the cairo api to convert */
+	cairo_surface_t *surf = igt_get_cairo_surface(src->fd, src);
+	cairo_t *cr;
 	int fb_id;
 
-	if (is_vc4_device(src->fd))
-		base_modifier = fourcc_mod_broadcom_mod(dst_modifier);
-	else
-		base_modifier = dst_modifier;
-
-	fb_id = igt_create_fb_with_bo_size(src->fd, src->width, src->height,
-					   dst_fourcc,
-					   LOCAL_DRM_FORMAT_MOD_NONE, &linear,
-					   0, dst_stride);
+	fb_id = igt_create_fb_with_bo_size(src->fd, src->width,
+					   src->height, dst_fourcc,
+					   dst_modifier, dst, 0,
+					   dst_stride);
 	igt_assert(fb_id > 0);
 
-	src_ptr = igt_fb_map_buffer(src->fd, src);
-	igt_assert(src_ptr);
+	cr = igt_get_cairo_ctx(dst->fd, dst);
+	cairo_set_source_surface(cr, surf, 0, 0);
+	cairo_paint(cr);
+	igt_put_cairo_ctx(dst->fd, dst, cr);
 
-	dst_ptr = igt_fb_map_buffer(linear.fd, &linear);
-	igt_assert(dst_ptr);
-
-	cvt.dst.ptr = dst_ptr;
-	cvt.dst.fb = &linear;
-	cvt.src.ptr = src_ptr;
-	cvt.src.fb = src;
-	fb_convert(&cvt);
-
-	igt_fb_unmap_buffer(dst, dst_ptr);
-	igt_fb_unmap_buffer(src, src_ptr);
-
-	switch (base_modifier) {
-	case DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED:
-		fb_id = igt_vc4_fb_t_tiled_convert(dst, &linear);
-		break;
-	case DRM_FORMAT_MOD_BROADCOM_SAND32:
-	case DRM_FORMAT_MOD_BROADCOM_SAND64:
-	case DRM_FORMAT_MOD_BROADCOM_SAND128:
-	case DRM_FORMAT_MOD_BROADCOM_SAND256:
-		fb_id = vc4_fb_sand_tiled_convert(dst, &linear, dst_modifier);
-		break;
-	default:
-		igt_assert(dst_modifier == LOCAL_DRM_FORMAT_MOD_NONE);
-	}
-
-	igt_assert(fb_id > 0);
-
-	if (dst_modifier == LOCAL_DRM_FORMAT_MOD_NONE)
-		*dst = linear;
-	else
-		igt_remove_fb(linear.fd, &linear);
+	cairo_surface_destroy(surf);
 
 	return fb_id;
 }

@@ -29,16 +29,14 @@ int igt_vc4_create_bo(int fd, size_t size);
 void *igt_vc4_mmap_bo(int fd, uint32_t handle, uint32_t size, unsigned prot);
 int igt_vc4_get_param(int fd, uint32_t param, uint64_t *val);
 bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable);
+bool igt_vc4_is_tiled(uint64_t modifier);
 
 void igt_vc4_set_tiling(int fd, uint32_t handle, uint64_t modifier);
 uint64_t igt_vc4_get_tiling(int fd, uint32_t handle);
 
-unsigned int igt_vc4_fb_t_tiled_convert(struct igt_fb *dst, struct igt_fb *src);
-size_t igt_vc4_t_tiled_offset(size_t stride, size_t height, size_t bpp,
-			      size_t x, size_t y);
-unsigned int vc4_fb_sand_tiled_convert(struct igt_fb *dst, struct igt_fb *src,
-				       uint64_t modifier);
-size_t vc4_sand_tiled_offset(size_t column_width, size_t column_size, size_t x,
-			     size_t y, size_t bpp);
+void vc4_fb_convert_plane_to_tiled(struct igt_fb *dst, void *dst_buf,
+				     struct igt_fb *src, void *src_buf);
+void vc4_fb_convert_plane_from_tiled(struct igt_fb *dst, void *dst_buf,
+				       struct igt_fb *src, void *src_buf);
 
 #endif /* IGT_VC4_H */
