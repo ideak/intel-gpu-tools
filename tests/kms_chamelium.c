@@ -1107,17 +1107,47 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 }
 
 
-static void select_tiled_modifier(igt_plane_t *plane, uint32_t width,
+static void randomize_plane_stride(data_t *data,
+				   uint32_t width, uint32_t height,
+				   uint32_t format, uint64_t modifier,
+				   size_t *stride)
+{
+	size_t stride_min;
+	uint32_t max_tile_w = 4, tile_w, tile_h;
+	int i;
+	struct igt_fb dummy;
+
+	stride_min = width * igt_format_plane_bpp(format, 0) / 8;
+
+	/* Randomize the stride to less than twice the minimum. */
+	*stride = (rand() % stride_min) + stride_min;
+
+	/*
+	 * Create a dummy FB to determine bpp for each plane, and calculate
+	 * the maximum tile width from that.
+	 */
+	igt_create_fb(data->drm_fd, 64, 64, format, modifier, &dummy);
+	for (i = 0; i < dummy.num_planes; i++) {
+		igt_get_fb_tile_size(data->drm_fd, modifier, dummy.plane_bpp[i], &tile_w, &tile_h);
+
+		if (tile_w > max_tile_w)
+			max_tile_w = tile_w;
+	}
+	igt_remove_fb(data->drm_fd, &dummy);
+
+	/*
+	 * Pixman requires the stride to be aligned to 32-bits, which is
+	 * reflected in the initial value of max_tile_w and the hw
+	 * may require a multiple of tile width, choose biggest of the 2.
+	 */
+	*stride = ALIGN(*stride, max_tile_w);
+}
+
+static void update_tiled_modifier(igt_plane_t *plane, uint32_t width,
 				  uint32_t height, uint32_t format,
 				  uint64_t *modifier)
 {
-	if (igt_plane_has_format_mod(plane, format,
-				     DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED)) {
-		igt_debug("Selecting VC4 T-tiling\n");
-
-		*modifier = DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED;
-	} else if (igt_plane_has_format_mod(plane, format,
-					    DRM_FORMAT_MOD_BROADCOM_SAND256)) {
+	if (*modifier == DRM_FORMAT_MOD_BROADCOM_SAND256) {
 		/* Randomize the column height to less than twice the minimum. */
 		size_t column_height = (rand() % height) + height;
 
@@ -1125,90 +1155,84 @@ static void select_tiled_modifier(igt_plane_t *plane, uint32_t width,
 			  column_height);
 
 		*modifier = DRM_FORMAT_MOD_BROADCOM_SAND256_COL_HEIGHT(column_height);
-	} else {
-		*modifier = DRM_FORMAT_MOD_LINEAR;
 	}
 }
 
-static void randomize_plane_format_stride(igt_plane_t *plane,
-					  uint32_t width, uint32_t height,
-					  uint32_t *format, uint64_t *modifier,
-					  size_t *stride, bool allow_yuv)
+static void randomize_plane_setup(data_t *data, igt_plane_t *plane,
+				  drmModeModeInfo *mode,
+				  uint32_t *width, uint32_t *height,
+				  uint32_t *format, uint64_t *modifier,
+				  bool allow_yuv)
 {
-	size_t stride_min;
-	uint32_t *formats_array;
-	unsigned int formats_count;
+	int min_dim;
+	uint32_t idx[plane->format_mod_count];
 	unsigned int count = 0;
 	unsigned int i;
-	bool tiled;
-	int index;
-
-	igt_format_array_fill(&formats_array, &formats_count, allow_yuv);
 
 	/* First pass to count the supported formats. */
-	for (i = 0; i < formats_count; i++)
-		if (igt_plane_has_format_mod(plane, formats_array[i],
-					     DRM_FORMAT_MOD_LINEAR))
-			count++;
+	for (i = 0; i < plane->format_mod_count; i++)
+		if (igt_fb_supported_format(plane->formats[i]) &&
+		    (allow_yuv || !igt_format_is_yuv(plane->formats[i])))
+			idx[count++] = i;
 
 	igt_assert(count > 0);
 
-	index = rand() % count;
+	i = idx[rand() % count];
+	*format = plane->formats[i];
+	*modifier = plane->modifiers[i];
 
-	/* Second pass to get the index-th supported format. */
-	for (i = 0; i < formats_count; i++) {
-		if (!igt_plane_has_format_mod(plane, formats_array[i],
-					      DRM_FORMAT_MOD_LINEAR))
-			continue;
+	update_tiled_modifier(plane, *width, *height, *format, modifier);
 
-		if (!index--) {
-			*format = formats_array[i];
-			break;
-		}
-	}
+	/*
+	 * Randomize width and height in the mode dimensions range.
+	 *
+	 * Restrict to a min of 2 * min_dim, this way src_w/h are always at
+	 * least min_dim, because src_w = width - (rand % w / 2).
+	 *
+	 * Use a minimum dimension of 16 for YUV, because planar YUV
+	 * subsamples the UV plane.
+	 */
+	min_dim = igt_format_is_yuv(*format) ? 16 : 8;
 
-	free(formats_array);
-
-	igt_assert(index < 0);
-
-	stride_min = width * igt_format_plane_bpp(*format, 0) / 8;
-
-	/* Randomize the stride to less than twice the minimum. */
-	*stride = (rand() % stride_min) + stride_min;
-
-	/* Pixman requires the stride to be aligned to 32-byte words. */
-	*stride = ALIGN(*stride, sizeof(uint32_t));
-
-	/* Randomize the use of a tiled mode with a 1/4 probability. */
-	tiled = ((rand() % 4) == 0);
-
-	if (tiled)
-		select_tiled_modifier(plane, width, height, *format, modifier);
-	else
-		*modifier = DRM_FORMAT_MOD_LINEAR;
+	*width = max((rand() % mode->hdisplay) + 1, 2 * min_dim);
+	*height = max((rand() % mode->vdisplay) + 1, 2 * min_dim);
 }
 
-static void randomize_plane_dimensions(drmModeModeInfo *mode,
-				       uint32_t *width, uint32_t *height,
-				       uint32_t *src_w, uint32_t *src_h,
-				       uint32_t *src_x, uint32_t *src_y,
-				       uint32_t *crtc_w, uint32_t *crtc_h,
-				       int32_t *crtc_x, int32_t *crtc_y,
-				       bool allow_scaling)
+static void configure_plane(igt_plane_t *plane, uint32_t src_w, uint32_t src_h,
+			    uint32_t src_x, uint32_t src_y, uint32_t crtc_w,
+			    uint32_t crtc_h, int32_t crtc_x, int32_t crtc_y,
+			    struct igt_fb *fb)
 {
-	double ratio;
+	igt_plane_set_fb(plane, fb);
 
-	/* Randomize width and height in the mode dimensions range. */
-	*width = (rand() % mode->hdisplay) + 1;
-	*height = (rand() % mode->vdisplay) + 1;
+	igt_plane_set_position(plane, crtc_x, crtc_y);
+	igt_plane_set_size(plane, crtc_w, crtc_h);
+
+	igt_fb_set_position(fb, plane, src_x, src_y);
+	igt_fb_set_size(fb, plane, src_w, src_h);
+}
+
+static void randomize_plane_coordinates(data_t *data, igt_plane_t *plane,
+					drmModeModeInfo *mode,
+					struct igt_fb *fb,
+					uint32_t *src_w, uint32_t *src_h,
+					uint32_t *src_x, uint32_t *src_y,
+					uint32_t *crtc_w, uint32_t *crtc_h,
+					int32_t *crtc_x, int32_t *crtc_y,
+					bool allow_scaling)
+{
+	bool is_yuv = igt_format_is_yuv(fb->drm_format);
+	uint32_t width = fb->width, height = fb->height;
+	double ratio;
+	int ret;
 
 	/* Randomize source offset in the first half of the original size. */
-	*src_x = rand() % (*width / 2);
-	*src_y = rand() % (*height / 2);
+	*src_x = rand() % (width / 2);
+	*src_y = rand() % (height / 2);
 
 	/* The source size only includes the active source area. */
-	*src_w = *width - *src_x;
-	*src_h = *height - *src_y;
+	*src_w = width - *src_x;
+	*src_h = height - *src_y;
 
 	if (allow_scaling) {
 		*crtc_w = (rand() % mode->hdisplay) + 1;
@@ -1218,17 +1242,22 @@ static void randomize_plane_dimensions(drmModeModeInfo *mode,
 		 * Don't bother with scaling if dimensions are quite close in
 		 * order to get non-scaling cases more frequently. Also limit
 		 * scaling to 3x to avoid agressive filtering that makes
-		 * comparison less reliable.
+		 * comparison less reliable, and don't go above 2x downsampling
+		 * to avoid possible hw limitations.
 		 */
 
 		ratio = ((double) *crtc_w / *src_w);
-		if (ratio > 0.8 && ratio < 1.2)
+		if (ratio < 0.5)
+			*src_w = *crtc_w * 2;
+		else if (ratio > 0.8 && ratio < 1.2)
 			*crtc_w = *src_w;
 		else if (ratio > 3.0)
 			*crtc_w = *src_w * 3;
 
 		ratio = ((double) *crtc_h / *src_h);
-		if (ratio > 0.8 && ratio < 1.2)
+		if (ratio < 0.5)
+			*src_h = *crtc_h * 2;
+		else if (ratio > 0.8 && ratio < 1.2)
 			*crtc_h = *src_h;
 		else if (ratio > 3.0)
 			*crtc_h = *src_h * 3;
@@ -1243,8 +1272,15 @@ static void randomize_plane_dimensions(drmModeModeInfo *mode,
 		 * scaled clipping may result in decimal dimensions, that most
 		 * drivers don't support.
 		 */
-		*crtc_x = rand() % (mode->hdisplay - *crtc_w);
-		*crtc_y = rand() % (mode->vdisplay - *crtc_h);
+		if (*crtc_w < mode->hdisplay)
+			*crtc_x = rand() % (mode->hdisplay - *crtc_w);
+		else
+			*crtc_x = 0;
+
+		if (*crtc_h < mode->vdisplay)
+			*crtc_y = rand() % (mode->vdisplay - *crtc_h);
+		else
+			*crtc_y = 0;
 	} else {
 		/*
 		 * Randomize the on-crtc position and allow the plane to go
@@ -1253,6 +1289,62 @@ static void randomize_plane_dimensions(drmModeModeInfo *mode,
 		*crtc_x = (rand() % mode->hdisplay) - *crtc_w / 2;
 		*crtc_y = (rand() % mode->vdisplay) - *crtc_h / 2;
 	}
+
+	configure_plane(plane, *src_w, *src_h, *src_x, *src_y,
+			*crtc_w, *crtc_h, *crtc_x, *crtc_y, fb);
+	ret = igt_display_try_commit_atomic(&data->display,
+					    DRM_MODE_ATOMIC_TEST_ONLY |
+					    DRM_MODE_ATOMIC_ALLOW_MODESET,
+					    NULL);
+	if (!ret)
+		return;
+
+	/* Coordinates are logged in the dumped debug log, so only report w/h on failure here. */
+	igt_assert_f(ret != -ENOSPC,"Failure in testcase, invalid coordinates on a %ux%u fb\n", width, height);
+
+	/* Make YUV coordinates a multiple of 2 and retry the math. */
+	if (is_yuv) {
+		*src_x &= ~1;
+		*src_y &= ~1;
+		*src_w &= ~1;
+		*src_h &= ~1;
+		/* To handle 1:1 scaling, clear crtc_w/h too. */
+		*crtc_w &= ~1;
+		*crtc_h &= ~1;
+
+		if (*crtc_x < 0 && (*crtc_x & 1))
+			(*crtc_x)++;
+		else
+			*crtc_x &= ~1;
+
+		/* If negative, round up to 0 instead of down */
+		if (*crtc_y < 0 && (*crtc_y & 1))
+			(*crtc_y)++;
+		else
+			*crtc_y &= ~1;
+
+		configure_plane(plane, *src_w, *src_h, *src_x, *src_y, *crtc_w,
+				*crtc_h, *crtc_x, *crtc_y, fb);
+		ret = igt_display_try_commit_atomic(&data->display,
+						DRM_MODE_ATOMIC_TEST_ONLY |
+						DRM_MODE_ATOMIC_ALLOW_MODESET,
+						NULL);
+		if (!ret)
+			return;
+	}
+
+	igt_assert(!ret || allow_scaling);
+	igt_info("Scaling ratio %g / %g failed, trying without scaling.\n",
+		  ((double) *crtc_w / *src_w), ((double) *crtc_h / *src_h));
+
+	*crtc_w = *src_w;
+	*crtc_h = *src_h;
+
+	configure_plane(plane, *src_w, *src_h, *src_x, *src_y, *crtc_w,
+			*crtc_h, *crtc_x, *crtc_y, fb);
+	igt_display_commit_atomic(&data->display,
+				  DRM_MODE_ATOMIC_TEST_ONLY |
+				  DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 }
 
 static void blit_plane_cairo(data_t *data, cairo_surface_t *result,
@@ -1311,20 +1403,6 @@ static void blit_plane_cairo(data_t *data, cairo_surface_t *result,
 	cairo_destroy(cr);
 }
 
-static void configure_plane(igt_plane_t *plane, uint32_t src_w, uint32_t src_h,
-			    uint32_t src_x, uint32_t src_y, uint32_t crtc_w,
-			    uint32_t crtc_h, int32_t crtc_x, int32_t crtc_y,
-			    struct igt_fb *fb)
-{
-	igt_plane_set_fb(plane, fb);
-
-	igt_plane_set_position(plane, crtc_x, crtc_y);
-	igt_plane_set_size(plane, crtc_w, crtc_h);
-
-	igt_fb_set_position(fb, plane, src_x, src_y);
-	igt_fb_set_size(fb, plane, src_w, src_h);
-}
-
 static void prepare_randomized_plane(data_t *data,
 				     drmModeModeInfo *mode,
 				     igt_plane_t *plane,
@@ -1345,50 +1423,48 @@ static void prepare_randomized_plane(data_t *data,
 	bool tiled;
 	int fb_id;
 
-	randomize_plane_dimensions(mode, &overlay_fb_w, &overlay_fb_h,
-				   &overlay_src_w, &overlay_src_h,
-				   &overlay_src_x, &overlay_src_y,
-				   &overlay_crtc_w, &overlay_crtc_h,
-				   &overlay_crtc_x, &overlay_crtc_y,
-				   allow_scaling);
+	randomize_plane_setup(data, plane, mode, &overlay_fb_w, &overlay_fb_h,
+			      &format, &modifier, allow_yuv);
 
-	igt_debug("Plane %d: framebuffer size %dx%d\n", index,
-		  overlay_fb_w, overlay_fb_h);
-	igt_debug("Plane %d: on-crtc size %dx%d\n", index,
-		  overlay_crtc_w, overlay_crtc_h);
-	igt_debug("Plane %d: on-crtc position %dx%d\n", index,
-		  overlay_crtc_x, overlay_crtc_y);
-	igt_debug("Plane %d: in-framebuffer size %dx%d\n", index,
-		  overlay_src_w, overlay_src_h);
-	igt_debug("Plane %d: in-framebuffer position %dx%d\n", index,
-		  overlay_src_x, overlay_src_y);
+	tiled = (modifier != LOCAL_DRM_FORMAT_MOD_NONE);
+	igt_debug("Plane %d: framebuffer size %dx%d %s format (%s)\n",
+		  index, overlay_fb_w, overlay_fb_h,
+		  igt_format_str(format), tiled ? "tiled" : "linear");
 
 	/* Get a pattern framebuffer for the overlay plane. */
 	fb_id = chamelium_get_pattern_fb(data, overlay_fb_w, overlay_fb_h,
 					 DRM_FORMAT_XRGB8888, 32, &pattern_fb);
 	igt_assert(fb_id > 0);
 
-	randomize_plane_format_stride(plane, overlay_fb_w, overlay_fb_h,
-				      &format, &modifier, &stride, allow_yuv);
+	randomize_plane_stride(data, overlay_fb_w, overlay_fb_h,
+			       format, modifier, &stride);
 
-	tiled = (modifier != LOCAL_DRM_FORMAT_MOD_NONE);
-
-	igt_debug("Plane %d: %s format (%s) with stride %ld\n", index,
-		  igt_format_str(format), tiled ? "tiled" : "linear", stride);
+	igt_debug("Plane %d: stride %ld\n", index, stride);
 
 	fb_id = igt_fb_convert_with_stride(overlay_fb, &pattern_fb, format,
 					   modifier, stride);
 	igt_assert(fb_id > 0);
 
+	randomize_plane_coordinates(data, plane, mode, overlay_fb,
+				    &overlay_src_w, &overlay_src_h,
+				    &overlay_src_x, &overlay_src_y,
+				    &overlay_crtc_w, &overlay_crtc_h,
+				    &overlay_crtc_x, &overlay_crtc_y,
+				    allow_scaling);
+
+	igt_debug("Plane %d: in-framebuffer size %dx%d\n", index,
+		  overlay_src_w, overlay_src_h);
+	igt_debug("Plane %d: in-framebuffer position %dx%d\n", index,
+		  overlay_src_x, overlay_src_y);
+	igt_debug("Plane %d: on-crtc size %dx%d\n", index,
+		  overlay_crtc_w, overlay_crtc_h);
+	igt_debug("Plane %d: on-crtc position %dx%d\n", index,
+		  overlay_crtc_x, overlay_crtc_y);
+
 	blit_plane_cairo(data, result_surface, overlay_src_w, overlay_src_h,
 			 overlay_src_x, overlay_src_y,
 			 overlay_crtc_w, overlay_crtc_h,
 			 overlay_crtc_x, overlay_crtc_y, &pattern_fb);
-
-	configure_plane(plane, overlay_src_w, overlay_src_h,
-			overlay_src_x, overlay_src_y,
-			overlay_crtc_w, overlay_crtc_h,
-			overlay_crtc_x, overlay_crtc_y, overlay_fb);
 
 	/* Remove the original pattern framebuffer. */
 	igt_remove_fb(data->drm_fd, &pattern_fb);
@@ -1465,7 +1541,7 @@ static void test_display_planes_random(data_t *data,
 		igt_output_count_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
 
 	/* Limit the number of planes to a reasonable scene. */
-	overlay_planes_max = max(overlay_planes_max, 4);
+	overlay_planes_max = min(overlay_planes_max, 4);
 
 	overlay_planes_count = (rand() % overlay_planes_max) + 1;
 	igt_debug("Using %d overlay planes\n", overlay_planes_count);
@@ -1518,17 +1594,8 @@ static void test_display_planes_random(data_t *data,
 		chamelium_destroy_frame_dump(dump);
 	}
 
-	for (i = 0; i < overlay_planes_count; i++) {
-		struct igt_fb *overlay_fb = &overlay_fbs[i];
-		igt_plane_t *plane;
-
-		plane = igt_output_get_plane_type_index(output,
-							DRM_PLANE_TYPE_OVERLAY,
-							i);
-		igt_assert(plane);
-
-		igt_remove_fb(data->drm_fd, overlay_fb);
-	}
+	for (i = 0; i < overlay_planes_count; i++)
+		igt_remove_fb(data->drm_fd, &overlay_fbs[i]);
 
 	free(overlay_fbs);
 
