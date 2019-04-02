@@ -558,19 +558,17 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 		0.0, 0.0, 1.0
 	};
 	drmModeCrtc *kms_crtc;
-	gamma_lut_t *degamma_linear, *gamma_zero;
+	gamma_lut_t *degamma_linear = NULL, *gamma_zero;
 	uint32_t i, legacy_lut_size;
 	uint16_t *red_lut, *green_lut, *blue_lut;
 	struct drm_color_lut *lut;
 	drmModePropertyBlobPtr blob;
 	igt_output_t *output;
 
-	/* FIXME accept any one of these */
-	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT));
 	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_GAMMA_LUT));
-	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_CTM));
 
-	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
+	if (igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT))
+		degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	gamma_zero = generate_table_zero(data->gamma_lut_size);
 
 	for_each_valid_output_on_pipe(&data->display, primary->pipe->pipe, output) {
@@ -585,21 +583,27 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 		/* Set a degama & gamma LUT and a CTM using the
 		 * properties and verify the content of the
 		 * properties. */
-		set_degamma(data, primary->pipe, degamma_linear);
-		set_ctm(primary->pipe, ctm_identity);
+		if (igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT))
+			set_degamma(data, primary->pipe, degamma_linear);
+		if (igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_CTM))
+			set_ctm(primary->pipe, ctm_identity);
 		set_gamma(data, primary->pipe, gamma_zero);
 		igt_display_commit(&data->display);
 
-		blob = get_blob(data, primary->pipe, IGT_CRTC_DEGAMMA_LUT);
-		igt_assert(blob &&
-			   blob->length == (sizeof(struct drm_color_lut) *
-					    data->degamma_lut_size));
-		drmModeFreePropertyBlob(blob);
+		if (igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT)) {
+			blob = get_blob(data, primary->pipe, IGT_CRTC_DEGAMMA_LUT);
+			igt_assert(blob &&
+				   blob->length == (sizeof(struct drm_color_lut) *
+						    data->degamma_lut_size));
+			drmModeFreePropertyBlob(blob);
+		}
 
-		blob = get_blob(data, primary->pipe, IGT_CRTC_CTM);
-		igt_assert(blob &&
-			   blob->length == sizeof(struct drm_color_ctm));
-		drmModeFreePropertyBlob(blob);
+		if (igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_CTM)) {
+			blob = get_blob(data, primary->pipe, IGT_CRTC_CTM);
+			igt_assert(blob &&
+				   blob->length == sizeof(struct drm_color_ctm));
+			drmModeFreePropertyBlob(blob);
+		}
 
 		blob = get_blob(data, primary->pipe, IGT_CRTC_GAMMA_LUT);
 		igt_assert(blob &&
@@ -633,9 +637,12 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 			      0);
 		igt_display_commit(&data->display);
 
-		igt_assert(get_blob(data, primary->pipe,
-				    IGT_CRTC_DEGAMMA_LUT) == NULL);
-		igt_assert(get_blob(data, primary->pipe, IGT_CRTC_CTM) == NULL);
+		if (igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT))
+			igt_assert(get_blob(data, primary->pipe,
+					    IGT_CRTC_DEGAMMA_LUT) == NULL);
+
+		if (igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_CTM))
+			igt_assert(get_blob(data, primary->pipe, IGT_CRTC_CTM) == NULL);
 
 		blob = get_blob(data, primary->pipe, IGT_CRTC_GAMMA_LUT);
 		igt_assert(blob &&
