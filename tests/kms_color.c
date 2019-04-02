@@ -253,9 +253,15 @@ static void set_ctm(igt_pipe_t *pipe, const double *coefficients)
 	igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_CTM, &ctm, sizeof(ctm));
 }
 
-#define disable_degamma(pipe) igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_DEGAMMA_LUT, NULL, 0)
-#define disable_gamma(pipe) igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_GAMMA_LUT, NULL, 0)
-#define disable_ctm(pipe) igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_CTM, NULL, 0)
+static void disable_prop(igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop)
+{
+	if (igt_pipe_obj_has_prop(pipe, prop))
+		igt_pipe_obj_replace_prop_blob(pipe, prop, NULL, 0);
+}
+
+#define disable_degamma(pipe) disable_prop(pipe, IGT_CRTC_DEGAMMA_LUT)
+#define disable_gamma(pipe) disable_prop(pipe, IGT_CRTC_GAMMA_LUT)
+#define disable_ctm(pipe) disable_prop(pipe, IGT_CRTC_CTM)
 
 /*
  * Draw 3 gradient rectangles in red, green and blue, with a maxed out
@@ -273,6 +279,9 @@ static void test_pipe_degamma(data_t *data,
 		{ 0.0, 1.0, 0.0 },
 		{ 0.0, 0.0, 1.0 }
 	};
+
+	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT));
+	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_GAMMA_LUT));
 
 	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	degamma_full = generate_table_max(data->degamma_lut_size);
@@ -356,6 +365,8 @@ static void test_pipe_gamma(data_t *data,
 		{ 0.0, 1.0, 0.0 },
 		{ 0.0, 0.0, 1.0 }
 	};
+
+	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_GAMMA_LUT));
 
 	gamma_full = generate_table_max(data->gamma_lut_size);
 
@@ -554,6 +565,11 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 	drmModePropertyBlobPtr blob;
 	igt_output_t *output;
 
+	/* FIXME accept any one of these */
+	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT));
+	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_GAMMA_LUT));
+	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_CTM));
+
 	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	gamma_zero = generate_table_zero(data->gamma_lut_size);
 
@@ -663,6 +679,8 @@ static bool test_pipe_ctm(data_t *data,
 	gamma_lut_t *degamma_linear, *gamma_linear;
 	igt_output_t *output;
 	bool ret = true;
+
+	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_CTM));
 
 	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	gamma_linear = generate_table(data->gamma_lut_size, 1.0);
@@ -862,19 +880,20 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 						  primary->pipe->pipe,
 						  INTEL_PIPE_CRC_SOURCE_AUTO);
 
-		igt_require(igt_pipe_obj_has_prop(&data->display.pipes[p], IGT_CRTC_DEGAMMA_LUT_SIZE));
-		igt_require(igt_pipe_obj_has_prop(&data->display.pipes[p], IGT_CRTC_GAMMA_LUT_SIZE));
+		if (igt_pipe_obj_has_prop(&data->display.pipes[p], IGT_CRTC_DEGAMMA_LUT_SIZE)) {
+			data->degamma_lut_size =
+				igt_pipe_obj_get_prop(&data->display.pipes[p],
+						      IGT_CRTC_DEGAMMA_LUT_SIZE);
+			igt_assert_lt(0, data->degamma_lut_size);
+		}
 
-		data->degamma_lut_size =
-			igt_pipe_obj_get_prop(&data->display.pipes[p],
-					      IGT_CRTC_DEGAMMA_LUT_SIZE);
+		if (igt_pipe_obj_has_prop(&data->display.pipes[p], IGT_CRTC_GAMMA_LUT_SIZE)) {
+			data->gamma_lut_size =
+				igt_pipe_obj_get_prop(&data->display.pipes[p],
+						      IGT_CRTC_GAMMA_LUT_SIZE);
+			igt_assert_lt(0, data->gamma_lut_size);
+		}
 
-		data->gamma_lut_size =
-			igt_pipe_obj_get_prop(&data->display.pipes[p],
-					      IGT_CRTC_GAMMA_LUT_SIZE);
-
-		igt_assert_lt(0, data->degamma_lut_size);
-		igt_assert_lt(0, data->gamma_lut_size);
 		igt_display_require_output_on_pipe(&data->display, p);
 	}
 
