@@ -31,22 +31,6 @@
 
 IGT_TEST_DESCRIPTION("Test Color Features at Pipe level");
 
-/* Data structures for gamma/degamma ramps & ctm matrix. */
-struct _drm_color_ctm {
-	/* Transformation matrix in S31.32 format. */
-	__s64 matrix[9];
-};
-
-struct _drm_color_lut {
-	/*
-	 * Data is U0.16 fixed point format.
-	 */
-	__u16 red;
-	__u16 green;
-	__u16 blue;
-	__u16 reserved;
-};
-
 /* Internal */
 typedef struct {
 	double r, g, b;
@@ -163,13 +147,13 @@ static double *generate_table_zero(uint32_t lut_size)
 	return coeffs;
 }
 
-static struct _drm_color_lut *coeffs_to_lut(data_t *data,
-					    const double *coefficients,
-					    uint32_t lut_size,
-					    uint32_t color_depth,
-					    int off)
+static struct drm_color_lut *coeffs_to_lut(data_t *data,
+					   const double *coefficients,
+					   uint32_t lut_size,
+					   uint32_t color_depth,
+					   int off)
 {
-	struct _drm_color_lut *lut;
+	struct drm_color_lut *lut;
 	uint32_t i;
 	uint32_t max_value = (1 << 16) - 1;
 	uint32_t mask;
@@ -179,7 +163,7 @@ static struct _drm_color_lut *coeffs_to_lut(data_t *data,
 	else
 		mask = max_value;
 
-	lut = malloc(sizeof(struct _drm_color_lut) * lut_size);
+	lut = malloc(sizeof(struct drm_color_lut) * lut_size);
 
 	if (IS_CHERRYVIEW(data->devid))
 		lut_size -= 1;
@@ -211,8 +195,8 @@ static void set_degamma(data_t *data,
 			igt_pipe_t *pipe,
 			const double *coefficients)
 {
-	size_t size = sizeof(struct _drm_color_lut) * data->degamma_lut_size;
-	struct _drm_color_lut *lut = coeffs_to_lut(data,
+	size_t size = sizeof(struct drm_color_lut) * data->degamma_lut_size;
+	struct drm_color_lut *lut = coeffs_to_lut(data,
 						   coefficients,
 						   data->degamma_lut_size,
 						   data->color_depth, 0);
@@ -226,8 +210,8 @@ static void set_gamma(data_t *data,
 		      igt_pipe_t *pipe,
 		      const double *coefficients)
 {
-	size_t size = sizeof(struct _drm_color_lut) * data->gamma_lut_size;
-	struct _drm_color_lut *lut = coeffs_to_lut(data,
+	size_t size = sizeof(struct drm_color_lut) * data->gamma_lut_size;
+	struct drm_color_lut *lut = coeffs_to_lut(data,
 						   coefficients,
 						   data->gamma_lut_size,
 						   data->color_depth, 0);
@@ -239,7 +223,7 @@ static void set_gamma(data_t *data,
 
 static void set_ctm(igt_pipe_t *pipe, const double *coefficients)
 {
-	struct _drm_color_ctm ctm;
+	struct drm_color_ctm ctm;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(ctm.matrix); i++) {
@@ -552,7 +536,7 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 	double *degamma_linear, *gamma_zero;
 	uint32_t i, legacy_lut_size;
 	uint16_t *red_lut, *green_lut, *blue_lut;
-	struct _drm_color_lut *lut;
+	struct drm_color_lut *lut;
 	drmModePropertyBlobPtr blob;
 	igt_output_t *output;
 
@@ -578,20 +562,20 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 
 		blob = get_blob(data, primary->pipe, IGT_CRTC_DEGAMMA_LUT);
 		igt_assert(blob &&
-			   blob->length == (sizeof(struct _drm_color_lut) *
+			   blob->length == (sizeof(struct drm_color_lut) *
 					    data->degamma_lut_size));
 		drmModeFreePropertyBlob(blob);
 
 		blob = get_blob(data, primary->pipe, IGT_CRTC_CTM);
 		igt_assert(blob &&
-			   blob->length == sizeof(struct _drm_color_ctm));
+			   blob->length == sizeof(struct drm_color_ctm));
 		drmModeFreePropertyBlob(blob);
 
 		blob = get_blob(data, primary->pipe, IGT_CRTC_GAMMA_LUT);
 		igt_assert(blob &&
-			   blob->length == (sizeof(struct _drm_color_lut) *
+			   blob->length == (sizeof(struct drm_color_lut) *
 					    data->gamma_lut_size));
-		lut = (struct _drm_color_lut *) blob->data;
+		lut = (struct drm_color_lut *) blob->data;
 		for (i = 0; i < data->gamma_lut_size; i++)
 			igt_assert(lut[i].red == 0 &&
 				   lut[i].green == 0 &&
@@ -625,9 +609,9 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 
 		blob = get_blob(data, primary->pipe, IGT_CRTC_GAMMA_LUT);
 		igt_assert(blob &&
-			   blob->length == (sizeof(struct _drm_color_lut) *
+			   blob->length == (sizeof(struct drm_color_lut) *
 					    legacy_lut_size));
-		lut = (struct _drm_color_lut *) blob->data;
+		lut = (struct drm_color_lut *) blob->data;
 		for (i = 0; i < legacy_lut_size; i++)
 			igt_assert(lut[i].red == 0xffff &&
 				   lut[i].green == 0xffff &&
@@ -1079,11 +1063,11 @@ invalid_lut_sizes(data_t *data)
 {
 	igt_display_t *display = &data->display;
 	igt_pipe_t *pipe = &display->pipes[0];
-	size_t degamma_lut_size = data->degamma_lut_size * sizeof(struct _drm_color_lut);
-	size_t gamma_lut_size = data->gamma_lut_size * sizeof(struct _drm_color_lut);
+	size_t degamma_lut_size = data->degamma_lut_size * sizeof(struct drm_color_lut);
+	size_t gamma_lut_size = data->gamma_lut_size * sizeof(struct drm_color_lut);
 
-	struct _drm_color_lut *degamma_lut = malloc(data->degamma_lut_size * sizeof(struct _drm_color_lut) * 2);
-	struct _drm_color_lut *gamma_lut = malloc(data->gamma_lut_size * sizeof(struct _drm_color_lut) * 2);
+	struct drm_color_lut *degamma_lut = malloc(data->degamma_lut_size * sizeof(struct drm_color_lut) * 2);
+	struct drm_color_lut *gamma_lut = malloc(data->gamma_lut_size * sizeof(struct drm_color_lut) * 2);
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
@@ -1097,7 +1081,7 @@ invalid_lut_sizes(data_t *data)
 						     degamma_lut, degamma_lut_size - 1),
 			      -EINVAL);
 		igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_DEGAMMA_LUT,
-						     degamma_lut, degamma_lut_size + sizeof(struct _drm_color_lut)),
+						     degamma_lut, degamma_lut_size + sizeof(struct drm_color_lut)),
 			      -EINVAL);
 		igt_assert_eq(pipe_set_property_blob_id(pipe, IGT_CRTC_DEGAMMA_LUT, pipe->crtc_id),
 			      -EINVAL);
@@ -1116,7 +1100,7 @@ invalid_lut_sizes(data_t *data)
 						     gamma_lut, gamma_lut_size - 1),
 			      -EINVAL);
 		igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_GAMMA_LUT,
-						     gamma_lut, gamma_lut_size + sizeof(struct _drm_color_lut)),
+						     gamma_lut, gamma_lut_size + sizeof(struct drm_color_lut)),
 			      -EINVAL);
 		igt_assert_eq(pipe_set_property_blob_id(pipe, IGT_CRTC_GAMMA_LUT, pipe->crtc_id),
 			      -EINVAL);
@@ -1138,18 +1122,18 @@ invalid_ctm_matrix_sizes(data_t *data)
 	if (!igt_pipe_obj_has_prop(pipe, IGT_CRTC_CTM))
 		return;
 
-	ptr = malloc(sizeof(struct _drm_color_ctm) * 4);
+	ptr = malloc(sizeof(struct drm_color_ctm) * 4);
 
 	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_CTM, ptr, 1),
 		      -EINVAL);
 	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_CTM, ptr,
-					     sizeof(struct _drm_color_ctm) + 1),
+					     sizeof(struct drm_color_ctm) + 1),
 		      -EINVAL);
 	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_CTM, ptr,
-					     sizeof(struct _drm_color_ctm) - 1),
+					     sizeof(struct drm_color_ctm) - 1),
 		      -EINVAL);
 	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_CTM, ptr,
-					     sizeof(struct _drm_color_ctm) * 2),
+					     sizeof(struct drm_color_ctm) * 2),
 		      -EINVAL);
 	igt_assert_eq(pipe_set_property_blob_id(pipe, IGT_CRTC_CTM, pipe->crtc_id),
 		      -EINVAL);
