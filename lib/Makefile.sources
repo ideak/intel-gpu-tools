@@ -115,6 +115,8 @@ lib_source_list =	 	\
 	igt_v3d.h		\
 	igt_vc4.c		\
 	igt_vc4.h		\
+	igt_amd.c		\
+	igt_amd.h		\
 	$(NULL)
 
 .PHONY: version.h.tmp

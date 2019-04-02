@@ -38,6 +38,7 @@
 #include "igt_kms.h"
 #include "igt_matrix.h"
 #include "igt_vc4.h"
+#include "igt_amd.h"
 #include "igt_x86.h"
 #include "ioctl_wrappers.h"
 #include "intel_batchbuffer.h"
@@ -763,7 +764,8 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	 * them, so we need to make sure to use a device BO then.
 	 */
 	if (fb->modifier || fb->size || fb->strides[0] ||
-	    (is_i915_device(fd) && igt_format_is_yuv(fb->drm_format)))
+	    (is_i915_device(fd) && igt_format_is_yuv(fb->drm_format)) ||
+	    (is_amdgpu_device(fd) && igt_format_is_yuv(fb->drm_format)))
 		device_bo = true;
 
 	/* Sets offets and stride if necessary. */
@@ -787,6 +789,8 @@ static int create_bo_for_fb(struct igt_fb *fb)
 			if (fb->modifier == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED)
 				igt_vc4_set_tiling(fd, fb->gem_handle,
 						   fb->modifier);
+		} else if (is_amdgpu_device(fd)) {
+			fb->gem_handle = igt_amd_create_bo(fd, fb->size);
 		} else {
 			igt_assert(false);
 		}
@@ -1831,6 +1835,9 @@ static void *map_bo(int fd, struct igt_fb *fb)
 				    PROT_READ | PROT_WRITE);
 	else if (is_vc4_device(fd))
 		ptr = igt_vc4_mmap_bo(fd, fb->gem_handle, fb->size,
+				      PROT_READ | PROT_WRITE);
+	else if (is_amdgpu_device(fd))
+		ptr = igt_amd_mmap_bo(fd, fb->gem_handle, fb->size,
 				      PROT_READ | PROT_WRITE);
 	else
 		igt_assert(false);
