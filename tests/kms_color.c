@@ -47,6 +47,10 @@ typedef struct {
 	uint64_t gamma_lut_size;
 } data_t;
 
+typedef struct {
+	int size;
+	double coeffs[];
+} gamma_lut_t;
 
 static void paint_gradient_rectangles(data_t *data,
 				      drmModeModeInfo *mode,
@@ -106,55 +110,69 @@ static void paint_rectangles(data_t *data,
 	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 }
 
-static double *generate_table(uint32_t lut_size, double exp)
+static gamma_lut_t *alloc_lut(int lut_size)
 {
-	double *coeffs;
-	uint32_t i;
+	gamma_lut_t *gamma;
 
 	igt_assert_lt(0, lut_size);
 
-	coeffs = malloc(sizeof(double) * lut_size);
+	gamma = malloc(sizeof(*gamma) + lut_size * sizeof(gamma->coeffs[0]));
+	igt_assert(gamma);
+	gamma->size = lut_size;
 
-	for (i = 0; i < lut_size; i++)
-		coeffs[i] = powf((double) i * 1.0 / (double) (lut_size - 1), exp);
-
-	return coeffs;
+	return gamma;
 }
 
-static double *generate_table_max(uint32_t lut_size)
+static void free_lut(gamma_lut_t *gamma)
 {
-	double *coeffs;
-	uint32_t i;
+	if (!gamma)
+		return;
 
-	igt_assert_lt(0, lut_size);
+	free(gamma);
+}
 
-	coeffs = malloc(sizeof(double) * lut_size);
-	coeffs[0] = 0.0;
+static gamma_lut_t *generate_table(int lut_size, double exp)
+{
+	gamma_lut_t *gamma = alloc_lut(lut_size);
+	int i;
+
+	gamma->coeffs[0] = 0.0;
 	for (i = 1; i < lut_size; i++)
-		coeffs[i] = 1.0;
+		gamma->coeffs[i] = pow(i * 1.0 / (lut_size - 1), exp);
 
-	return coeffs;
+	return gamma;
 }
 
-static double *generate_table_zero(uint32_t lut_size)
+static gamma_lut_t *generate_table_max(int lut_size)
 {
-	double *coeffs = malloc(sizeof(double) * lut_size);
-	uint32_t i;
+	gamma_lut_t *gamma = alloc_lut(lut_size);
+	int i;
+
+	gamma->coeffs[0] = 0.0;
+	for (i = 1; i < lut_size; i++)
+		gamma->coeffs[i] = 1.0;
+
+	return gamma;
+}
+
+static gamma_lut_t *generate_table_zero(int lut_size)
+{
+	gamma_lut_t *gamma = alloc_lut(lut_size);
+	int i;
 
 	for (i = 0; i < lut_size; i++)
-		coeffs[i] = 0.0;
+		gamma->coeffs[i] = 0.0;
 
-	return coeffs;
+	return gamma;
 }
 
 static struct drm_color_lut *coeffs_to_lut(data_t *data,
-					   const double *coefficients,
-					   uint32_t lut_size,
+					   const gamma_lut_t *gamma,
 					   uint32_t color_depth,
 					   int off)
 {
 	struct drm_color_lut *lut;
-	uint32_t i;
+	int i, lut_size = gamma->size;
 	uint32_t max_value = (1 << 16) - 1;
 	uint32_t mask;
 
@@ -168,7 +186,7 @@ static struct drm_color_lut *coeffs_to_lut(data_t *data,
 	if (IS_CHERRYVIEW(data->devid))
 		lut_size -= 1;
 	for (i = 0; i < lut_size; i++) {
-		uint32_t v = (coefficients[i] * max_value);
+		uint32_t v = (gamma->coeffs[i] * max_value);
 
 		/*
 		 * Hardware might encode colors on a different number of bits
@@ -193,13 +211,11 @@ static struct drm_color_lut *coeffs_to_lut(data_t *data,
 
 static void set_degamma(data_t *data,
 			igt_pipe_t *pipe,
-			const double *coefficients)
+			const gamma_lut_t *gamma)
 {
-	size_t size = sizeof(struct drm_color_lut) * data->degamma_lut_size;
-	struct drm_color_lut *lut = coeffs_to_lut(data,
-						   coefficients,
-						   data->degamma_lut_size,
-						   data->color_depth, 0);
+	size_t size = sizeof(struct drm_color_lut) * gamma->size;
+	struct drm_color_lut *lut = coeffs_to_lut(data, gamma,
+						  data->color_depth, 0);
 
 	igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_DEGAMMA_LUT, lut, size);
 
@@ -208,15 +224,13 @@ static void set_degamma(data_t *data,
 
 static void set_gamma(data_t *data,
 		      igt_pipe_t *pipe,
-		      const double *coefficients)
+		      const gamma_lut_t *gamma)
 {
-	size_t size = sizeof(struct drm_color_lut) * data->gamma_lut_size;
-	struct drm_color_lut *lut = coeffs_to_lut(data,
-						   coefficients,
-						   data->gamma_lut_size,
-						   data->color_depth, 0);
+	size_t size = sizeof(struct drm_color_lut) * gamma->size;
+	struct drm_color_lut *lut = coeffs_to_lut(data, gamma,
+						  data->color_depth, 0);
 
-		igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_GAMMA_LUT, lut, size);
+	igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_GAMMA_LUT, lut, size);
 
 	free(lut);
 }
@@ -252,8 +266,8 @@ static void test_pipe_degamma(data_t *data,
 			      igt_plane_t *primary)
 {
 	igt_output_t *output;
-	double *degamma_linear, *degamma_full;
-	double *gamma_linear;
+	gamma_lut_t *degamma_linear, *degamma_full;
+	gamma_lut_t *gamma_linear;
 	color_t red_green_blue[] = {
 		{ 1.0, 0.0, 0.0 },
 		{ 0.0, 1.0, 0.0 },
@@ -323,9 +337,9 @@ static void test_pipe_degamma(data_t *data,
 		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
-	free(degamma_linear);
-	free(degamma_full);
-	free(gamma_linear);
+	free_lut(degamma_linear);
+	free_lut(degamma_full);
+	free_lut(gamma_linear);
 }
 
 /*
@@ -336,7 +350,7 @@ static void test_pipe_gamma(data_t *data,
 			    igt_plane_t *primary)
 {
 	igt_output_t *output;
-	double *gamma_full;
+	gamma_lut_t *gamma_full;
 	color_t red_green_blue[] = {
 		{ 1.0, 0.0, 0.0 },
 		{ 0.0, 1.0, 0.0 },
@@ -402,7 +416,7 @@ static void test_pipe_gamma(data_t *data,
 		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
-	free(gamma_full);
+	free_lut(gamma_full);
 }
 
 /*
@@ -533,7 +547,7 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 		0.0, 0.0, 1.0
 	};
 	drmModeCrtc *kms_crtc;
-	double *degamma_linear, *gamma_zero;
+	gamma_lut_t *degamma_linear, *gamma_zero;
 	uint32_t i, legacy_lut_size;
 	uint16_t *red_lut, *green_lut, *blue_lut;
 	struct drm_color_lut *lut;
@@ -622,8 +636,8 @@ static void test_pipe_legacy_gamma_reset(data_t *data,
 		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
-	free(degamma_linear);
-	free(gamma_zero);
+	free_lut(degamma_linear);
+	free_lut(gamma_zero);
 }
 
 static bool crc_equal(igt_crc_t *a, igt_crc_t *b)
@@ -646,7 +660,7 @@ static bool test_pipe_ctm(data_t *data,
 		0.0, 1.0, 0.0,
 		0.0, 0.0, 1.0
 	};
-	double *degamma_linear, *gamma_linear;
+	gamma_lut_t *degamma_linear, *gamma_linear;
 	igt_output_t *output;
 	bool ret = true;
 
@@ -709,8 +723,8 @@ static bool test_pipe_ctm(data_t *data,
 		igt_output_set_pipe(output, PIPE_NONE);
 	}
 
-	free(degamma_linear);
-	free(gamma_linear);
+	free_lut(degamma_linear);
+	free_lut(gamma_linear);
 
 	return ret;
 }
@@ -745,7 +759,7 @@ static void test_pipe_limited_range_ctm(data_t *data,
 	double ctm[] = { 1.0, 0.0, 0.0,
 			0.0, 1.0, 0.0,
 			0.0, 0.0, 1.0 };
-	double *degamma_linear, *gamma_linear;
+	gamma_lut_t *degamma_linear, *gamma_linear;
 	igt_output_t *output;
 	bool has_broadcast_rgb_output = false;
 
@@ -814,8 +828,8 @@ static void test_pipe_limited_range_ctm(data_t *data,
 		igt_assert_crc_equal(&crc_full, &crc_limited);
 	}
 
-	free(gamma_linear);
-	free(degamma_linear);
+	free_lut(gamma_linear);
+	free_lut(degamma_linear);
 
 	igt_require(has_broadcast_rgb_output);
 }
