@@ -184,6 +184,7 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 	y[primary->index] = 0;
 	for (i = 0; i < max_planes; i++) {
 		igt_plane_t *plane = igt_output_get_plane(output, i);
+		int ret;
 
 		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
 			continue;
@@ -206,7 +207,18 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 
 		igt_plane_set_position(data->plane[i], x[i], y[i]);
 		igt_plane_set_fb(data->plane[i], &data->fb[i]);
+
+		ret = igt_display_try_commit_atomic(&data->display, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
+		if (ret) {
+			igt_plane_set_fb(data->plane[i], NULL);
+			igt_remove_fb(data->drm_fd, &data->fb[i]);
+			data->plane[i] = NULL;
+			break;
+		}
 	}
+	max_planes = i;
+
+	igt_assert_lt(0, max_planes);
 
 	/* primary plane */
 	data->plane[primary->index] = primary;
