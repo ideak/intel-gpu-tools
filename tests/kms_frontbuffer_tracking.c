@@ -1509,6 +1509,7 @@ static void do_flush(const struct test_mode *t)
 
 #define DONT_ASSERT_CRC			(1 << 0)
 #define DONT_ASSERT_FEATURE_STATUS	(1 << 1)
+#define DONT_ASSERT_FBC_STATUS		(1 << 12)
 
 #define FBC_ASSERT_FLAGS		(0xF << 2)
 #define ASSERT_FBC_ENABLED		(1 << 2)
@@ -1539,7 +1540,7 @@ static int adjust_assertion_flags(const struct test_mode *t, int flags)
 			flags |= ASSERT_DRRS_HIGH;
 	}
 
-	if ((t->feature & FEATURE_FBC) == 0)
+	if ((t->feature & FEATURE_FBC) == 0 || (flags & DONT_ASSERT_FBC_STATUS))
 		flags &= ~FBC_ASSERT_FLAGS;
 	if ((t->feature & FEATURE_PSR) == 0)
 		flags &= ~PSR_ASSERT_FLAGS;
@@ -2910,7 +2911,7 @@ static void stridechange_subtest(const struct test_mode *t)
 	fill_fb_region(&params->primary, COLOR_PRIM_BG);
 
 	set_mode_for_params(params);
-	do_assertions(DONT_ASSERT_FEATURE_STATUS);
+	do_assertions(DONT_ASSERT_FBC_STATUS);
 
 	/* Go back to the fb that can have FBC. */
 	params->primary.fb = old_fb;
@@ -2920,7 +2921,7 @@ static void stridechange_subtest(const struct test_mode *t)
 	/* This operation is the same as above, but with the planes API. */
 	params->primary.fb = new_fb;
 	set_prim_plane_for_params(params);
-	do_assertions(DONT_ASSERT_FEATURE_STATUS);
+	do_assertions(DONT_ASSERT_FBC_STATUS);
 
 	params->primary.fb = old_fb;
 	set_prim_plane_for_params(params);
@@ -2932,7 +2933,7 @@ static void stridechange_subtest(const struct test_mode *t)
 	 */
 	rc = drmModePageFlip(drm.fd, drm.display.pipes[params->pipe].crtc_id, new_fb->fb_id, 0, NULL);
 	igt_assert(rc == -EINVAL || rc == 0);
-	do_assertions(rc ? 0 : DONT_ASSERT_FEATURE_STATUS);
+	do_assertions(rc ? 0 : DONT_ASSERT_FBC_STATUS);
 }
 
 /**
