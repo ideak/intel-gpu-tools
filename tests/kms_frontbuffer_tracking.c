@@ -2932,7 +2932,7 @@ static void stridechange_subtest(const struct test_mode *t)
 	 */
 	rc = drmModePageFlip(drm.fd, drm.display.pipes[params->pipe].crtc_id, new_fb->fb_id, 0, NULL);
 	igt_assert(rc == -EINVAL || rc == 0);
-	do_assertions(0);
+	do_assertions(rc ? 0 : DONT_ASSERT_FEATURE_STATUS);
 }
 
 /**
