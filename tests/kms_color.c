@@ -719,8 +719,20 @@ static bool test_pipe_ctm(data_t *data,
 		igt_assert(fb_modeset_id);
 		igt_plane_set_fb(primary, &fb_modeset);
 
-		set_degamma(data, primary->pipe, degamma_linear);
-		set_gamma(data, primary->pipe, gamma_linear);
+		/*
+		 * Don't program LUT's for max CTM cases, as limitation of
+		 * representing intermediate values between 0 and 1.0 causes
+		 * rounding issues and inaccuracies leading to crc mismatch.
+		 */
+		if (memcmp(before, after, sizeof(color_t))) {
+			set_degamma(data, primary->pipe, degamma_linear);
+			set_gamma(data, primary->pipe, gamma_linear);
+		} else {
+			/* Disable Degamma and Gamma for ctm max test */
+			disable_degamma(primary->pipe);
+			disable_gamma(primary->pipe);
+		}
+
 		disable_ctm(primary->pipe);
 		igt_display_commit(&data->display);
 
