@@ -332,14 +332,21 @@ static int get_vblank(int fd, enum pipe pipe, unsigned flags)
 	return vbl.reply.sequence;
 }
 
+#define VBLANK_ERR 5
+
 static void vblank_ts_cont(data_t *data, int fd, int nchildren)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output = data->output;
 	int seq1, seq2;
 	union drm_wait_vblank vbl;
+	struct timespec start, end;
+	int estimated_vblanks = 0;
+	int vrefresh = igt_output_get_mode(output)->vrefresh;
+	double time_elapsed;
 
 	seq1 = get_vblank(fd, data->pipe, 0);
+	clock_gettime(CLOCK_MONOTONIC, &start);
 
 	if (data->flags & DPMS) {
 		igt_output_set_prop_value(output, IGT_CONNECTOR_DPMS, DRM_MODE_DPMS_OFF);
@@ -377,11 +384,17 @@ static void vblank_ts_cont(data_t *data, int fd, int nchildren)
 	}
 
 	seq2 = get_vblank(fd, data->pipe, 0);
+	clock_gettime(CLOCK_MONOTONIC, &end);
+
+	time_elapsed = igt_time_elapsed(&start, &end);
+	estimated_vblanks = (int)(time_elapsed * vrefresh);
 
 	igt_debug("testing ts continuity: Current frame %u, old frame %u\n", seq2, seq1);
 
-	igt_assert_f(seq2 - seq1 >= 0, "unexpected vblank seq %u, should be >= %u\n", seq2, seq1);
-	igt_assert_f(seq2 - seq1 <= 150, "unexpected vblank seq %u, should be < %u\n", seq2, seq1 + 150);
+	igt_assert_f(seq2 - seq1 >= 0, "elapsed %f(%d vblanks) unexpected vblank seq %u, should be > %u\n", time_elapsed,
+			estimated_vblanks, seq2, seq1);
+	igt_assert_f(seq2 - seq1 <= estimated_vblanks + VBLANK_ERR, "elapsed %f(%d vblanks) unexpected vblank seq %u, should be <= %u\n", time_elapsed,
+			estimated_vblanks, seq2, seq1 + estimated_vblanks);
 }
 
 static void run_subtests_for_pipe(data_t *data)
