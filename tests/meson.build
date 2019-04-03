@@ -215,7 +215,6 @@ i915_progs = [
 	'i915_fb_tiling',
 	'i915_getparams_basic',
 	'i915_hangman',
-	'i915_missed_irq',
 	'i915_module_load',
 	'i915_pm_backlight',
 	'i915_pm_lpsp',

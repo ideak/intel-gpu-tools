@@ -474,9 +474,6 @@ i915_getparams_basic_SOURCES = i915/i915_getparams_basic.c
 TESTS_progs += i915_hangman
 i915_hangman_SOURCES = i915/i915_hangman.c
 
-TESTS_progs += i915_missed_irq
-i915_missed_irq_SOURCES = i915/i915_missed_irq.c
-
 TESTS_progs += i915_module_load
 i915_module_load_SOURCES = i915/i915_module_load.c
 
