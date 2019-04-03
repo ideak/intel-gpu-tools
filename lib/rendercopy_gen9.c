@@ -180,6 +180,10 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	uint32_t write_domain, read_domain, offset;
 	int ret;
 
+	igt_assert_lte(buf->stride, 256*1024);
+	igt_assert_lte(igt_buf_width(buf), 16384);
+	igt_assert_lte(igt_buf_height(buf), 16384);
+
 	if (is_dst) {
 		write_domain = read_domain = I915_GEM_DOMAIN_RENDER;
 	} else {

@@ -65,6 +65,10 @@ gen7_bind_buf(struct intel_batchbuffer *batch,
 	uint32_t write_domain, read_domain;
 	int ret;
 
+	igt_assert_lte(buf->stride, 256*1024);
+	igt_assert_lte(igt_buf_width(buf), 16384);
+	igt_assert_lte(igt_buf_height(buf), 16384);
+
 	switch (buf->bpp) {
 		case 8: format = SURFACEFORMAT_R8_UNORM; break;
 		case 16: format = SURFACEFORMAT_R8G8_UNORM; break;

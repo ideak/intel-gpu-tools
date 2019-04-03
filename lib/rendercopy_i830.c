@@ -138,6 +138,10 @@ static void gen2_emit_target(struct intel_batchbuffer *batch,
 	uint32_t tiling;
 	uint32_t format;
 
+	igt_assert_lte(dst->stride, 8192);
+	igt_assert_lte(igt_buf_width(dst), 2048);
+	igt_assert_lte(igt_buf_height(dst), 2048);
+
 	switch (dst->bpp) {
 		case 8: format = COLR_BUF_8BIT; break;
 		case 16: format = COLR_BUF_RGB565; break;
@@ -174,6 +178,10 @@ static void gen2_emit_texture(struct intel_batchbuffer *batch,
 {
 	uint32_t tiling;
 	uint32_t format;
+
+	igt_assert_lte(src->stride, 8192);
+	igt_assert_lte(igt_buf_width(src), 2048);
+	igt_assert_lte(igt_buf_height(src), 2048);
 
 	switch (src->bpp) {
 		case 8: format = MAPSURF_8BIT | MT_8BIT_L8; break;
