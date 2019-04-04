@@ -1504,9 +1504,17 @@ void kmstest_wait_for_pageflip(int fd)
 	FD_ZERO(&fds);
 	FD_SET(fd, &fds);
 	do {
+		errno = 0;
 		ret = select(fd + 1, &fds, NULL, NULL, &timeout);
 	} while (ret < 0 && errno == EINTR);
-	igt_assert_eq(ret, 1);
+
+	igt_fail_on_f(ret == 0,
+		     "Exceeded timeout (50ms) while waiting for a pageflip\n");
+
+	igt_assert_f(ret == 1,
+		     "Waiting for pageflip failed with %d from select(drmfd)\n",
+		     ret);
+
 	igt_assert(drmHandleEvent(fd, &evctx) == 0);
 }
 
