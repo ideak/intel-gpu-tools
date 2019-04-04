@@ -175,13 +175,6 @@ test_fade_with_dpms(struct context *context, igt_output_t *output)
 static void
 test_fade_with_suspend(struct context *context, igt_output_t *output)
 {
-	igt_require(igt_setup_runtime_pm());
-
-	kmstest_set_connector_dpms(output->display->drm_fd,
-				   output->config.connector,
-				   DRM_MODE_DPMS_OFF);
-	igt_require(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
-
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 
 	test_fade(context);
