@@ -164,8 +164,10 @@ static void all(int fd, unsigned engine, unsigned flags)
 	if (flags & CONTEXTS)
 		gem_require_contexts(fd);
 
-	if (flags & FDS)
+	if (flags & FDS) {
 		igt_require(gen > 5);
+		igt_require(igt_allow_unlimited_files());
+	}
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
