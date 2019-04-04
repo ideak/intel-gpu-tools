@@ -681,7 +681,7 @@ static unsigned int run_test_step(struct test_output *o)
 					    TEST_VBLANK_BLOCK, o->pipe, exp_seq,
 					    0, &reply));
 		igt_assert(gettime_us() - start < 500);
-		igt_assert(reply.sequence == exp_seq);
+		igt_assert_eq(reply.sequence, exp_seq);
 		igt_assert(timercmp(&reply.ts, &o->flip_state.last_ts, ==));
 	}
 
