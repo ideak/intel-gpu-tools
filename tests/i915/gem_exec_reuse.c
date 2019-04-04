@@ -56,29 +56,6 @@ static void noop(struct noop *n,
 	gem_execbuf(n->fd, &execbuf);
 }
 
-static bool allow_unlimited_files(void)
-{
-	struct rlimit rlim;
-	unsigned nofile_rlim = 1024*1024;
-
-	FILE *file = fopen("/proc/sys/fs/file-max", "r");
-	if (file) {
-		igt_assert(fscanf(file, "%u", &nofile_rlim) == 1);
-		fclose(file);
-	}
-
-	if (getrlimit(RLIMIT_NOFILE, &rlim))
-		return false;
-
-	rlim.rlim_cur = rlim.rlim_max;
-	if (setrlimit(RLIMIT_NOFILE, &rlim))
-		return false;
-
-	rlim.rlim_cur = nofile_rlim;
-	rlim.rlim_max = nofile_rlim;
-	return setrlimit(RLIMIT_NOFILE, &rlim) == 0;
-}
-
 static uint64_t vfs_file_max(void)
 {
 	long long unsigned max = 80000;
@@ -126,7 +103,7 @@ igt_main
 		uint32_t bbe = MI_BATCH_BUFFER_END;
 		unsigned engine;
 
-		allow_unlimited_files();
+		igt_allow_unlimited_files();
 
 		no.fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(no.fd);

@@ -274,6 +274,8 @@ struct igt_mean;
 void igt_start_siglatency(int sig); /* 0 => SIGRTMIN (default) */
 double igt_stop_siglatency(struct igt_mean *result);
 
+bool igt_allow_unlimited_files(void);
+
 void igt_set_module_param(const char *name, const char *val);
 void igt_set_module_param_int(const char *name, int val);
 

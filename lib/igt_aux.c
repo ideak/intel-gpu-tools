@@ -42,6 +42,7 @@
 #include <unistd.h>
 #include <sys/poll.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
@@ -1587,4 +1588,24 @@ double igt_stop_siglatency(struct igt_mean *result)
 	memset(&igt_siglatency, 0, sizeof(igt_siglatency));
 
 	return mean;
+}
+
+bool igt_allow_unlimited_files(void)
+{
+	struct rlimit rlim;
+	unsigned nofile_rlim = 1024*1024;
+
+	FILE *file = fopen("/proc/sys/fs/file-max", "r");
+	if (file) {
+		igt_assert(fscanf(file, "%u", &nofile_rlim) == 1);
+		igt_info("System limit for open files is %u\n", nofile_rlim);
+		fclose(file);
+	}
+
+	if (getrlimit(RLIMIT_NOFILE, &rlim))
+		return false;
+
+	rlim.rlim_cur = nofile_rlim;
+	rlim.rlim_max = nofile_rlim;
+	return setrlimit(RLIMIT_NOFILE, &rlim) == 0;
 }

@@ -60,26 +60,6 @@ static int write_sysctl(const char *path, unsigned int val)
 	return -errno;
 }
 
-static bool allow_unlimited_files(void)
-{
-	unsigned int nofile_rlim = 1024*1024;
-	struct rlimit rlim;
-	unsigned int buf;
-
-	buf = read_sysctl("/proc/sys/fs/file-max");
-	if (buf > 0)
-		nofile_rlim = buf;
-	original_nr_open = read_sysctl("/proc/sys/fs/nr_open");
-	igt_assert(write_sysctl("/proc/sys/fs/nr_open", nofile_rlim) == 0);
-
-	if (getrlimit(RLIMIT_NOFILE, &rlim))
-		return false;
-
-	rlim.rlim_cur = nofile_rlim;
-	rlim.rlim_max = nofile_rlim;
-	return setrlimit(RLIMIT_NOFILE, &rlim) == 0;
-}
-
 static void restore_original_sysctl(int sig)
 {
 	if (original_nr_open > 0)
@@ -90,7 +70,7 @@ igt_simple_main
 {
 	int fd;
 
-	igt_require(allow_unlimited_files());
+	igt_require(igt_allow_unlimited_files());
 
 	fd = drm_open_driver(DRIVER_INTEL);
 
