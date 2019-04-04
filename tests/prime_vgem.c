@@ -713,15 +713,23 @@ static void flip_to_vgem(int i915, int vgem,
 
 	/* And then the flip is completed as soon as it is ready */
 	if (!hang) {
-		union drm_wait_vblank wait;
+		unsigned long miss;
 
-		memset(&wait, 0, sizeof(wait));
-		wait.request.type = DRM_VBLANK_RELATIVE | pipe_select(0);
-		wait.request.sequence = 10;
-		do_or_die(drmIoctl(i915, DRM_IOCTL_WAIT_VBLANK, &wait));
-
-		vgem_fence_signal(vgem, fence);
+		/* Signal fence at the start of the next vblank */
 		get_vblank(i915, 0, DRM_VBLANK_NEXTONMISS);
+		vgem_fence_signal(vgem, fence);
+
+		miss = 0;
+		igt_until_timeout(5) {
+			get_vblank(i915, 0, DRM_VBLANK_NEXTONMISS);
+			if (poll(&pfd, 1, 0))
+				break;
+			miss++;
+		}
+		if (miss > 1) {
+			igt_warn("Missed %lu vblanks after signaling before flip was completed\n",
+				 miss);
+		}
 		igt_assert_eq(poll(&pfd, 1, 0), 1);
 	}
 
