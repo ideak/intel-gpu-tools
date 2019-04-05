@@ -45,4 +45,6 @@ int __gem_context_get_param(int fd, struct drm_i915_gem_context_param *p);
 int __gem_context_set_priority(int fd, uint32_t ctx, int prio);
 void gem_context_set_priority(int fd, uint32_t ctx, int prio);
 
+bool gem_context_has_engine(int fd, uint32_t ctx, uint64_t engine);
+
 #endif /* GEM_CONTEXT_H */

@@ -1252,25 +1252,6 @@ void igt_require_gem(int fd)
 	igt_require_f(err == 0, "Unresponsive i915/GEM device\n");
 }
 
-bool gem_has_ring(int fd, unsigned ring)
-{
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 exec;
-
-	/* silly ABI, the kernel thinks everyone who has BSD also has BSD2 */
-	if ((ring & ~(3<<13)) == I915_EXEC_BSD) {
-		if (ring & (3 << 13) && !gem_has_bsd2(fd))
-			return false;
-	}
-
-	memset(&exec, 0, sizeof(exec));
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&exec);
-	execbuf.buffer_count = 1;
-	execbuf.flags = ring;
-	return __gem_execbuf(fd, &execbuf) == -ENOENT;
-}
-
 /**
  * gem_require_ring:
  * @fd: open i915 drm file descriptor

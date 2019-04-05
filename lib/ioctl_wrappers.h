@@ -142,10 +142,11 @@ bool gem_has_exec_fence(int fd);
 
 /* check functions which auto-skip tests by calling igt_skip() */
 void gem_require_caching(int fd);
-bool gem_has_ring(int fd, unsigned ring);
 void gem_require_ring(int fd, unsigned ring);
 bool gem_has_mocs_registers(int fd);
 void gem_require_mocs_registers(int fd);
+
+#define gem_has_ring(f, r) gem_context_has_engine(f, 0, r)
 
 /* prime */
 struct local_dma_buf_sync {

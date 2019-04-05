@@ -271,3 +271,28 @@ void gem_context_set_priority(int fd, uint32_t ctx_id, int prio)
 {
 	igt_assert_eq(__gem_context_set_priority(fd, ctx_id, prio), 0);
 }
+
+bool gem_context_has_engine(int fd, uint32_t ctx, uint64_t engine)
+{
+	struct drm_i915_gem_exec_object2 exec = {};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&exec),
+		.buffer_count = 1,
+		.flags = engine,
+		.rsvd1 = ctx,
+	};
+
+	/*
+	 * 'engine' value can either store an execbuf engine selector
+	 * or a context map index; for the latter case we do not expect
+	 * to have any value at bit 13 and 14 (BSD1/2 selector),
+	 * therefore, we assume that the following check is safe and it
+	 * wouldn't produce any result.
+	 */
+	if ((engine & ~(3<<13)) == I915_EXEC_BSD) {
+		if (engine & (3 << 13) && !gem_has_bsd2(fd))
+			return false;
+	}
+
+	return __gem_execbuf(fd, &execbuf) == -ENOENT;
+}
