@@ -80,16 +80,6 @@ static void test_fini(data_t *data, igt_output_t *output, int n_planes)
 {
 	igt_pipe_crc_stop(data->pipe_crc);
 
-	for (int i = 0; i < n_planes; i++) {
-		igt_plane_t *plane = data->plane[i];
-		if (!plane)
-			continue;
-		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
-			continue;
-		igt_plane_set_fb(plane, NULL);
-		data->plane[i] = NULL;
-	}
-
 	/* reset the constraint on the pipe */
 	igt_output_set_pipe(output, PIPE_ANY);
 
@@ -99,7 +89,8 @@ static void test_fini(data_t *data, igt_output_t *output, int n_planes)
 	free(data->plane);
 	data->plane = NULL;
 
-	igt_remove_fb(data->drm_fd, data->fb);
+	free(data->fb);
+	data->fb = NULL;
 
 	igt_display_reset(&data->display);
 }
@@ -195,6 +186,7 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 	int *y;
 	int *size;
 	int i;
+	int* suffle;
 
 	igt_output_set_pipe(output, pipe_id);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
@@ -206,6 +198,34 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 	igt_assert_f(y, "Failed to allocate %ld bytes for variable y\n", (long int) (pipe->n_planes * sizeof(*y)));
 	size = malloc(pipe->n_planes * sizeof(*size));
 	igt_assert_f(size, "Failed to allocate %ld bytes for variable size\n", (long int) (pipe->n_planes * sizeof(*size)));
+	suffle = malloc(pipe->n_planes * sizeof(*suffle));
+	igt_assert_f(suffle, "Failed to allocate %ld bytes for variable size\n", (long int) (pipe->n_planes * sizeof(*suffle)));
+
+	for (i = 0; i < pipe->n_planes; i++)
+		suffle[i] = i;
+
+	/*
+	 * suffle table for planes. using rand() should keep it
+	 * 'randomized in expected way'
+	 */
+	for (i = 0; i < 256; i++) {
+		int n, m;
+		int a, b;
+
+		n = rand() % (pipe->n_planes-1);
+		m = rand() % (pipe->n_planes-1);
+
+		/*
+		 * keep primary plane at its place for test's sake.
+		 */
+		if(n == primary->index || m == primary->index)
+			continue;
+
+		a = suffle[n];
+		b = suffle[m];
+		suffle[n] = b;
+		suffle[m] = a;
+	}
 
 	mode = igt_output_get_mode(output);
 
@@ -213,7 +233,11 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 	x[primary->index] = 0;
 	y[primary->index] = 0;
 	for (i = 0; i < max_planes; i++) {
-		igt_plane_t *plane = igt_output_get_plane(output, i);
+		/*
+		 * Here is made assumption primary plane will have
+		 * index zero.
+		 */
+		igt_plane_t *plane = igt_output_get_plane(output, suffle[i]);
 		uint32_t plane_format;
 		uint64_t plane_tiling;
 
@@ -251,6 +275,10 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 	create_fb_for_mode_position(data, output, mode, color, x, y,
 				    size, size, tiling, max_planes);
 	igt_plane_set_fb(data->plane[primary->index], &data->fb[primary->index]);
+	free((void*)x);
+	free((void*)y);
+	free((void*)size);
+	free((void*)suffle);
 }
 
 static void
@@ -260,7 +288,9 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 {
 	color_t blue  = { 0.0f, 0.0f, 1.0f };
 	igt_crc_t crc;
+	igt_plane_t *plane;
 	int i;
+	int err, c = 0;
 	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
 	bool loop_forever;
 	char info[256];
@@ -274,21 +304,45 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 			iterations, iterations > 1 ? "iterations" : "iteration");
 	}
 
-	igt_info("Testing connector %s using pipe %s with %d planes %s with seed %d\n",
-		 igt_output_name(output), kmstest_pipe_name(pipe), n_planes,
-		 info, opt.seed);
-
 	test_init(data, pipe, n_planes);
 
 	test_grab_crc(data, output, pipe, &blue, tiling);
 
+	/*
+	 * Find out how many planes are allowed simultaneously
+	 */
+	do {
+		c++;
+		prepare_planes(data, pipe, &blue, tiling, c, output);
+		err = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
+
+		for_each_plane_on_pipe(&data->display, pipe, plane)
+			igt_plane_set_fb(plane, NULL);
+
+		for (int x = 0; x < c; x++)
+			igt_remove_fb(data->drm_fd, &data->fb[x]);
+	} while (!err && c < n_planes);
+
+	if(err)
+		c--;
+
+	igt_info("Testing connector %s using pipe %s with %d planes %s with seed %d\n",
+		 igt_output_name(output), kmstest_pipe_name(pipe), c,
+		 info, opt.seed);
+
 	i = 0;
 	while (i < iterations || loop_forever) {
-		prepare_planes(data, pipe, &blue, tiling, n_planes, output);
+		prepare_planes(data, pipe, &blue, tiling, c, output);
 
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 		igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, &crc);
+
+		for_each_plane_on_pipe(&data->display, pipe, plane)
+			igt_plane_set_fb(plane, NULL);
+
+		for (int x = 0; x < c; x++)
+			igt_remove_fb(data->drm_fd, &data->fb[x]);
 
 		igt_assert_crc_equal(&data->ref_crc, &crc);
 
