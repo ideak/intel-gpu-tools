@@ -12,6 +12,7 @@ lib_sources = [
 	'igt_gpu_power.c',
 	'igt_gt.c',
 	'igt_gvt.c',
+	'igt_halffloat.c',
 	'igt_matrix.c',
 	'igt_perf.c',
 	'igt_primes.c',

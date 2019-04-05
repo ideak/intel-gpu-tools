@@ -88,6 +88,10 @@
 #define bit_AVX		(1 << 28)
 #endif
 
+#ifndef bit_F16C
+#define bit_F16C	(1 << 29)
+#endif
+
 #ifndef bit_AVX2
 #define bit_AVX2	(1<<5)
 #endif
@@ -138,6 +142,9 @@ unsigned igt_x86_features(void)
 
 		if (edx & bit_SSE2)
 			features |= SSE2;
+
+		if (ecx & bit_F16C)
+			features |= F16C;
 	}
 
 	if (max >= 7) {
@@ -174,6 +181,8 @@ char *igt_x86_features_to_string(unsigned features, char *line)
 		line += sprintf(line, ", avx");
 	if (features & AVX2)
 		line += sprintf(line, ", avx2");
+	if (features & F16C)
+		line += sprintf(line, ", f16c");
 
 	(void)line;
 

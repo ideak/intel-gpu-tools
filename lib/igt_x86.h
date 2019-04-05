@@ -39,6 +39,7 @@
 #define SSE4_2	0x40
 #define AVX	0x80
 #define AVX2	0x100
+#define F16C	0x200
 
 #if defined(__x86_64__) || defined(__i386__)
 unsigned igt_x86_features(void);
