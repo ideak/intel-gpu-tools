@@ -394,8 +394,9 @@ static void init_mode_set_data(struct mode_set_data *data)
 	if (data->res) {
 		igt_assert(data->res->count_connectors <= MAX_CONNECTORS);
 		for (int i = 0; i < data->res->count_connectors; i++) {
-			data->connectors[i] = drmModeGetConnectorCurrent(drm_fd,
-									 data->res->connectors[i]);
+			data->connectors[i] =
+				drmModeGetConnector(drm_fd,
+						    data->res->connectors[i]);
 			data->edids[i] = get_connector_edid(data->connectors[i], i);
 		}
 
