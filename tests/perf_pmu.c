@@ -1693,7 +1693,7 @@ igt_main
 	igt_subtest("invalid-init")
 		invalid_init();
 
-	__for_each_engine_class_instance(fd, e) {
+	__for_each_engine_class_instance(e) {
 		const unsigned int pct[] = { 2, 50, 98 };
 
 		/**
@@ -1897,7 +1897,7 @@ igt_main
 			gem_quiescent_gpu(fd);
 		}
 
-		__for_each_engine_class_instance(render_fd, e) {
+		__for_each_engine_class_instance(e) {
 			igt_subtest_group {
 				igt_fixture {
 					gem_require_engine(render_fd,
