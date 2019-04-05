@@ -35,6 +35,7 @@
 #include "igt_aux.h"
 #include "igt_color_encoding.h"
 #include "igt_fb.h"
+#include "igt_halffloat.h"
 #include "igt_kms.h"
 #include "igt_matrix.h"
 #include "igt_vc4.h"
@@ -161,6 +162,22 @@ static const struct format_desc_struct {
 	  .pixman_id = PIXMAN_a8b8g8r8,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
+	},
+	{ .name = "XRGB16161616F", .depth = -1, .drm_id = DRM_FORMAT_XRGB16161616F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	},
+	{ .name = "ARGB16161616F", .depth = -1, .drm_id = DRM_FORMAT_ARGB16161616F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	},
+	{ .name = "XBGR16161616F", .depth = -1, .drm_id = DRM_FORMAT_XBGR16161616F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	},
+	{ .name = "ABGR16161616F", .depth = -1, .drm_id = DRM_FORMAT_ABGR16161616F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .num_planes = 1, .plane_bpp = { 64, },
 	},
 	{ .name = "NV12", .depth = -1, .drm_id = DRM_FORMAT_NV12,
 	  .cairo_id = CAIRO_FORMAT_RGB24,
@@ -765,6 +782,7 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	 */
 	if (fb->modifier || fb->size || fb->strides[0] ||
 	    (is_i915_device(fd) && igt_format_is_yuv(fb->drm_format)) ||
+	    (is_i915_device(fd) && igt_format_is_fp16(fb->drm_format)) ||
 	    (is_amdgpu_device(fd) && igt_format_is_yuv(fb->drm_format)))
 		device_bo = true;
 
@@ -2572,6 +2590,102 @@ static void convert_float_to_Y410(struct fb_convert *cvt, bool alpha)
 	}
 }
 
+/* { R, G, B, X } */
+static const unsigned char swizzle_rgbx[] = { 0, 1, 2, 3 };
+static const unsigned char swizzle_bgrx[] = { 2, 1, 0, 3 };
+
+static const unsigned char *rgbx_swizzle(uint32_t format)
+{
+	switch (format) {
+	default:
+	case DRM_FORMAT_XRGB16161616F:
+	case DRM_FORMAT_ARGB16161616F:
+		return swizzle_bgrx;
+	case DRM_FORMAT_XBGR16161616F:
+	case DRM_FORMAT_ABGR16161616F:
+		return swizzle_rgbx;
+	}
+}
+
+static void convert_fp16_to_float(struct fb_convert *cvt)
+{
+	int i, j;
+	uint16_t *fp16;
+	float *ptr = cvt->dst.ptr;
+	unsigned int float_stride = cvt->dst.fb->strides[0] / sizeof(*ptr);
+	unsigned int fp16_stride = cvt->src.fb->strides[0] / sizeof(*fp16);
+	const unsigned char *swz = rgbx_swizzle(cvt->src.fb->drm_format);
+	bool needs_reswizzle = swz != swizzle_rgbx;
+
+	uint16_t *buf = convert_src_get(cvt);
+	fp16 = buf + cvt->src.fb->offsets[0] / sizeof(*buf);
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		if (needs_reswizzle) {
+			const uint16_t *fp16_tmp = fp16;
+			float *rgb_tmp = ptr;
+
+			for (j = 0; j < cvt->dst.fb->width; j++) {
+				struct igt_vec4 rgb;
+
+				igt_half_to_float(fp16_tmp, rgb.d, 4);
+
+				rgb_tmp[0] = rgb.d[swz[0]];
+				rgb_tmp[1] = rgb.d[swz[1]];
+				rgb_tmp[2] = rgb.d[swz[2]];
+				rgb_tmp[3] = rgb.d[swz[3]];
+
+				rgb_tmp += 4;
+				fp16_tmp += 4;
+			}
+		} else {
+			igt_half_to_float(fp16, ptr, cvt->dst.fb->width * 4);
+		}
+
+		ptr += float_stride;
+		fp16 += fp16_stride;
+	}
+
+	convert_src_put(cvt, buf);
+}
+
+static void convert_float_to_fp16(struct fb_convert *cvt)
+{
+	int i, j;
+	uint16_t *fp16 = cvt->dst.ptr + cvt->dst.fb->offsets[0];
+	const float *ptr = cvt->src.ptr;
+	unsigned float_stride = cvt->src.fb->strides[0] / sizeof(*ptr);
+	unsigned fp16_stride = cvt->dst.fb->strides[0] / sizeof(*fp16);
+	const unsigned char *swz = rgbx_swizzle(cvt->dst.fb->drm_format);
+	bool needs_reswizzle = swz != swizzle_rgbx;
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		if (needs_reswizzle) {
+			const float *rgb_tmp = ptr;
+			uint16_t *fp16_tmp = fp16;
+
+			for (j = 0; j < cvt->dst.fb->width; j++) {
+				struct igt_vec4 rgb;
+
+				rgb.d[0] = rgb_tmp[swz[0]];
+				rgb.d[1] = rgb_tmp[swz[1]];
+				rgb.d[2] = rgb_tmp[swz[2]];
+				rgb.d[3] = rgb_tmp[swz[3]];
+
+				igt_float_to_half(rgb.d, fp16_tmp, 4);
+
+				rgb_tmp += 4;
+				fp16_tmp += 4;
+			}
+		} else {
+			igt_float_to_half(ptr, fp16, cvt->dst.fb->width * 4);
+		}
+
+		ptr += float_stride;
+		fp16 += fp16_stride;
+	}
+}
+
 static void convert_pixman(struct fb_convert *cvt)
 {
 	pixman_format_code_t src_pixman = drm_format_to_pixman(cvt->src.fb->drm_format);
@@ -2675,6 +2789,12 @@ static void fb_convert(struct fb_convert *cvt)
 		case DRM_FORMAT_Y416:
 			convert_yuv16_to_float(cvt, true);
 			return;
+		case DRM_FORMAT_XRGB16161616F:
+		case DRM_FORMAT_XBGR16161616F:
+		case DRM_FORMAT_ARGB16161616F:
+		case DRM_FORMAT_ABGR16161616F:
+			convert_fp16_to_float(cvt);
+			return;
 		}
 	} else if (cvt->src.fb->drm_format == IGT_FORMAT_FLOAT) {
 		switch (cvt->dst.fb->drm_format) {
@@ -2697,6 +2817,12 @@ static void fb_convert(struct fb_convert *cvt)
 		case DRM_FORMAT_Y412:
 		case DRM_FORMAT_Y416:
 			convert_float_to_yuv16(cvt, true);
+			return;
+		case DRM_FORMAT_XRGB16161616F:
+		case DRM_FORMAT_XBGR16161616F:
+		case DRM_FORMAT_ARGB16161616F:
+		case DRM_FORMAT_ABGR16161616F:
+			convert_float_to_fp16(cvt);
 			return;
 		}
 	}
@@ -2853,6 +2979,7 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 
 	if (fb->cairo_surface == NULL) {
 		if (igt_format_is_yuv(fb->drm_format) ||
+		    igt_format_is_fp16(fb->drm_format) ||
 		    ((f->cairo_id == CAIRO_FORMAT_INVALID) &&
 		     (f->pixman_id != PIXMAN_invalid)))
 			create_cairo_surface__convert(fd, fb);
@@ -3163,6 +3290,25 @@ bool igt_format_is_yuv(uint32_t drm_format)
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
 	case DRM_FORMAT_XYUV8888:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/**
+ * igt_format_is_fp16
+ * @drm_format: drm fourcc
+ *
+ * Check if the format is fp16.
+ */
+bool igt_format_is_fp16(uint32_t drm_format)
+{
+	switch (drm_format) {
+	case DRM_FORMAT_XRGB16161616F:
+	case DRM_FORMAT_ARGB16161616F:
+	case DRM_FORMAT_XBGR16161616F:
+	case DRM_FORMAT_ABGR16161616F:
 		return true;
 	default:
 		return false;
