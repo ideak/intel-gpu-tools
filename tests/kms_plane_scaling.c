@@ -171,10 +171,16 @@ static const igt_rotation_t rotations[] = {
 	IGT_ROTATION_270,
 };
 
-static bool can_rotate(data_t *d, unsigned format)
+static bool can_rotate(data_t *d, unsigned format, uint64_t tiling,
+		       igt_rotation_t rot)
 {
 	if (format == DRM_FORMAT_C8 ||
 	    (intel_gen(d->devid) < 11 && format == DRM_FORMAT_RGB565))
+		return false;
+
+	// Y-tiled 90/270 rotation isn't supported for fp16 on Intel
+	if (is_i915_device(d->drm_fd) && igt_format_is_fp16(format) &&
+	    (rot == IGT_ROTATION_90 || rot == IGT_ROTATION_270))
 		return false;
 
 	return true;
@@ -197,9 +203,10 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 			igt_rotation_t rot = rotations[i];
 			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
 				unsigned format = plane->drm_plane->formats[j];
+
 				if (igt_fb_supported_format(format) &&
 				    igt_plane_has_format_mod(plane, format, tiling) &&
-				    can_rotate(d, format))
+				    can_rotate(d, format, tiling, rot))
 					check_scaling_pipe_plane_rot(d, plane, format,
 								     tiling, pipe,
 								     output, rot);
