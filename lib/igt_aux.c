@@ -1595,7 +1595,7 @@ bool igt_allow_unlimited_files(void)
 	struct rlimit rlim;
 	unsigned nofile_rlim = 1024*1024;
 
-	FILE *file = fopen("/proc/sys/fs/file-max", "r");
+	FILE *file = fopen("/proc/sys/fs/nr_open", "r");
 	if (file) {
 		igt_assert(fscanf(file, "%u", &nofile_rlim) == 1);
 		igt_info("System limit for open files is %u\n", nofile_rlim);
