@@ -107,16 +107,6 @@ people debugging the driver.
 These tools generally must be run as root, except for the ones that just
 decode dumps.
 
-**debugger/**
-
-This tool is to be used to do shader debugging. It acts like a
-debug server accepting connections from debug clients such as
-mesa. The connections is made with unix domain sockets, and at some
-point it would be nice if this directory contained a library for
-initiating connections with debug clients..
-
-The debugger must be run as root: "sudo debugger/eudb"
-
 **docs/**
 
 Contains the automatically generated igt-gpu-tools libraries
