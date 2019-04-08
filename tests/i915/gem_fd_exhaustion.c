@@ -33,39 +33,6 @@
 #include <fcntl.h>
 #include <limits.h>
 
-unsigned int original_nr_open;
-
-static int read_sysctl(const char *path)
-{
-	unsigned int val;
-	FILE *f = fopen(path, "r");
-
-	if (f) {
-		igt_assert(fscanf(f, "%u", &val) == 1);
-		fclose(f);
-		return val;
-	}
-	return -errno;
-}
-
-static int write_sysctl(const char *path, unsigned int val)
-{
-	FILE *f = fopen(path, "w");
-
-	if (f) {
-		igt_assert(fprintf(f, "%u", val));
-		fclose(f);
-		return 0;
-	}
-	return -errno;
-}
-
-static void restore_original_sysctl(int sig)
-{
-	if (original_nr_open > 0)
-		write_sysctl("/proc/sys/fs/nr_open", original_nr_open);
-}
-
 igt_simple_main
 {
 	int fd;
@@ -73,8 +40,6 @@ igt_simple_main
 	igt_require(igt_allow_unlimited_files());
 
 	fd = drm_open_driver(DRIVER_INTEL);
-
-	igt_install_exit_handler(restore_original_sysctl);
 
 	igt_fork(n, 1) {
 		igt_drop_root();
