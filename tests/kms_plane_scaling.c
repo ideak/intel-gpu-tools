@@ -144,9 +144,6 @@ static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
 
-	igt_skip_on(!igt_plane_has_format_mod(plane, pixel_format,
-					      tiling));
-
 	/* create buffer in the range of  min and max source side limit.*/
 	width = height = 8;
 	if (is_i915_device(d->drm_fd) && is_planar_yuv_format(pixel_format))
@@ -201,6 +198,7 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
 				unsigned format = plane->drm_plane->formats[j];
 				if (igt_fb_supported_format(format) &&
+				    igt_plane_has_format_mod(plane, format, tiling) &&
 				    can_rotate(d, format))
 					check_scaling_pipe_plane_rot(d, plane, format,
 								     tiling, pipe,
