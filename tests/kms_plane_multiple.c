@@ -302,41 +302,25 @@ static void
 test_plane_position(data_t *data, enum pipe pipe, uint64_t tiling)
 {
 	igt_output_t *output;
-	int connected_outs;
 	int n_planes = data->display.pipes[pipe].n_planes;
+
+	output = igt_get_single_output_for_pipe(&data->display, pipe);
+	igt_require(output);
 
 	if (!opt.user_seed)
 		opt.seed = time(NULL);
 
 	srand(opt.seed);
 
-	connected_outs = 0;
-	for_each_valid_output_on_pipe(&data->display, pipe, output) {
-		test_plane_position_with_output(data, pipe,
-						output,
-						n_planes,
-						tiling);
-		connected_outs++;
-	}
-
-	igt_skip_on(connected_outs == 0);
-
+	test_plane_position_with_output(data, pipe, output,
+					n_planes, tiling);
 }
 
 static void
 run_tests_for_pipe(data_t *data, enum pipe pipe)
 {
-	igt_output_t *output;
-
 	igt_fixture {
-		int valid_tests = 0;
-
 		igt_skip_on(pipe >= data->display.n_pipes);
-
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			valid_tests++;
-
-		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 		igt_require(data->display.pipes[pipe].n_planes > 0);
 	}
 
