@@ -65,6 +65,9 @@ typedef struct {
 	char conn_name[128];
 } data_t;
 
+bool force_dsc_en_orig;
+int force_dsc_restore_fd = -1;
+
 static inline void manual(const char *expected)
 {
 	igt_debug_manual_check("all", expected);
@@ -120,19 +123,44 @@ static void force_dp_dsc_enable(data_t *data)
 	igt_assert_f(ret > 0, "debugfs_write failed");
 }
 
-static void clear_dp_dsc_enable(data_t *data)
+static bool is_force_dsc_enabled(data_t *data)
 {
 	char file_name[128] = {0};
-	int ret;
+	char buf[512];
 
 	strcpy(file_name, data->conn_name);
 	strcat(file_name, "/i915_dsc_fec_support");
-	igt_debug ("Clearing DSC enable on %s\n", data->conn_name);
-	ret = igt_sysfs_write(data->debugfs_fd, file_name, "0", 1);
-	igt_assert_f(ret > 0, "debugfs_write failed");
+	igt_debugfs_read(data->drm_fd, file_name, buf);
+
+	return strstr(buf, "Force_DSC_Enable: yes");
 }
 
-static void test_cleanup(data_t *data) {
+static void save_force_dsc_en(data_t *data)
+{
+	char file_name[128] = {0};
+
+	force_dsc_en_orig = is_force_dsc_enabled(data);
+	strcpy(file_name, data->conn_name);
+	strcat(file_name, "/i915_dsc_fec_support");
+	force_dsc_restore_fd = openat(igt_debugfs_dir(data->drm_fd),
+				      file_name, O_WRONLY);
+	igt_assert(force_dsc_restore_fd >= 0);
+}
+
+static void restore_force_dsc_en(void)
+{
+	if (force_dsc_restore_fd < 0)
+		return;
+
+	igt_debug("Restoring DSC enable\n");
+	igt_assert(write(force_dsc_restore_fd, force_dsc_en_orig ? "1" : "0", 1) == 1);
+
+	close(force_dsc_restore_fd);
+	force_dsc_restore_fd = -1;
+}
+
+static void test_cleanup(data_t *data)
+{
 	igt_plane_t *primary;
 
 	if (data->output) {
@@ -142,6 +170,11 @@ static void test_cleanup(data_t *data) {
 		igt_display_commit(&data->display);
 		igt_remove_fb(data->drm_fd, &data->fb_test_pattern);
 	}
+}
+
+static void kms_dp_dsc_exit_handler(int sig)
+{
+	restore_force_dsc_en();
 }
 
 
@@ -169,6 +202,7 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 		bool enabled;
 
 		igt_debug("DSC is supported on %s\n", data->conn_name);
+		save_force_dsc_en(data);
 		force_dp_dsc_enable(data);
 
 		igt_output_set_pipe(data->output, data->pipe);
@@ -191,7 +225,7 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 		manual("RGB test pattern without corruption");
 
 		enabled = is_dp_dsc_enabled(data);
-		clear_dp_dsc_enable(data);
+		restore_force_dsc_en();
 
 		igt_assert_f(enabled,
 			     "Default DSC enable failed on Connector: %s Pipe: %s\n",
@@ -231,6 +265,7 @@ igt_main
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 		data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
+		igt_install_exit_handler(kms_dp_dsc_exit_handler);
 		igt_display_require(&data.display, data.drm_fd);
 		igt_require(res = drmModeGetResources(data.drm_fd));
 	}
