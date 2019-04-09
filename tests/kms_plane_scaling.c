@@ -232,7 +232,8 @@ static void test_scaler_with_pixel_format_pipe(data_t *d, enum pipe pipe, igt_ou
 			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
 				uint32_t format = plane->drm_plane->formats[j];
 
-				if (igt_fb_supported_format(format))
+				if (igt_fb_supported_format(format) &&
+				    igt_plane_has_format_mod(plane, format, tiling))
 					check_scaling_pipe_plane_rot(d, plane,
 								     format, tiling,
 								     pipe, output, IGT_ROTATION_0);
