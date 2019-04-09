@@ -631,8 +631,10 @@ static void igt_interactive_info(const char *format, ...)
 {
 	va_list args;
 
-	if (!isatty(STDERR_FILENO) || __igt_plain_output)
+	if (!isatty(STDERR_FILENO) || __igt_plain_output) {
+		errno = 0; /* otherwise would be either ENOTTY or EBADF */
 		return;
+	}
 
 	if (igt_log_level > IGT_LOG_INFO)
 		return;
@@ -984,8 +986,10 @@ void igt_debug_wait_for_keypress(const char *var)
 {
 	struct termios oldt, newt;
 
-	if (!isatty(STDIN_FILENO))
+	if (!isatty(STDIN_FILENO)) {
+		errno = 0; /* otherwise would be either ENOTTY or EBADF */
 		return;
+	}
 
 	if (!igt_interactive_debug)
 		return;
@@ -1030,8 +1034,10 @@ void igt_debug_manual_check(const char *var, const char *expected)
 	struct termios oldt, newt;
 	char key;
 
-	if (!isatty(STDIN_FILENO))
+	if (!isatty(STDIN_FILENO)) {
+		errno = 0; /* otherwise would be either ENOTTY or EBADF */
 		return;
+	}
 
 	if (!igt_interactive_debug)
 		return;

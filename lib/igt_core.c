@@ -630,6 +630,8 @@ static void common_init_env(void)
 	if (!isatty(STDOUT_FILENO) || getenv("IGT_PLAIN_OUTPUT"))
 		__igt_plain_output = true;
 
+	errno = 0; /* otherwise may be either ENOTTY or EBADF because of isatty */
+
 	if (!__igt_plain_output)
 		setlocale(LC_ALL, "");
 
