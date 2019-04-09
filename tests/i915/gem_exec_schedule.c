@@ -404,6 +404,68 @@ static void semaphore_userlock(int i915)
 	igt_spin_batch_free(i915, spin);
 }
 
+static void semaphore_codependency(int i915)
+{
+	struct {
+		igt_spin_t *xcs, *rcs;
+	} task[2];
+	unsigned int engine;
+	int i;
+
+	/*
+	 * Consider two tasks, task A runs on (xcs0, rcs0) and task B
+	 * on (xcs1, rcs0). That is they must both run a dependent
+	 * batch on rcs0, after first running in parallel on separate
+	 * engines. To maximise throughput, we want the shorter xcs task
+	 * to start on rcs first. However, if we insert semaphores we may
+	 * pick wrongly and end up running the requests in the least
+	 * optimal order.
+	 */
+
+	i = 0;
+	for_each_physical_engine(i915, engine) {
+		uint32_t ctx;
+
+		if (engine == I915_EXEC_RENDER)
+			continue;
+
+		if (!gem_can_store_dword(i915, engine))
+			continue;
+
+		ctx = gem_context_create(i915);
+
+		task[i].xcs =
+			__igt_spin_batch_new(i915,
+					     .ctx = ctx,
+					     .engine = engine,
+					     .flags = IGT_SPIN_POLL_RUN);
+		igt_spin_busywait_until_running(task[i].xcs);
+
+		/* Common rcs tasks will be queued in FIFO */
+		task[i].rcs =
+			__igt_spin_batch_new(i915,
+					     .ctx = ctx,
+					     .engine = I915_EXEC_RENDER,
+					     .dependency = task[i].xcs->handle);
+
+		gem_context_destroy(i915, ctx);
+
+		if (++i == ARRAY_SIZE(task))
+			break;
+	}
+	igt_require(i == ARRAY_SIZE(task));
+
+	/* Since task[0] was queued first, it will be first in queue for rcs */
+	igt_spin_batch_end(task[1].xcs);
+	igt_spin_batch_end(task[1].rcs);
+	gem_sync(i915, task[1].rcs->handle); /* to hang if task[0] hogs rcs */
+
+	for (i = 0; i < ARRAY_SIZE(task); i++) {
+		igt_spin_batch_free(i915, task[i].xcs);
+		igt_spin_batch_free(i915, task[i].rcs);
+	}
+}
+
 static void reorder(int fd, unsigned ring, unsigned flags)
 #define EQUAL 1
 {
@@ -1393,6 +1455,8 @@ igt_main
 
 		igt_subtest("semaphore-user")
 			semaphore_userlock(fd);
+		igt_subtest("semaphore-codependency")
+			semaphore_codependency(fd);
 
 		igt_subtest("smoketest-all")
 			smoketest(fd, ALL_ENGINES, 30);
