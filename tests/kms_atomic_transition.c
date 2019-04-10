@@ -232,6 +232,9 @@ static void setup_parms(igt_display_t *display, enum pipe pipe,
 			parms[i].height = cursor_height;
 			parms[i].mask = 1 << 1;
 		} else {
+			if (!n_overlays)
+				alpha = igt_plane_has_format_mod(plane,
+					DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE);
 			parms[i].fb = sprite_fb;
 			parms[i].mask = 1 << 2;
 
@@ -272,7 +275,6 @@ static void setup_parms(igt_display_t *display, enum pipe pipe,
 	 * Pre gen9 not all sizes are supported, find the biggest possible
 	 * size that can be enabled on all sprite planes.
 	 */
-retry:
 	prev_w = sprite_width = cursor_width;
 	prev_h = sprite_height = cursor_height;
 
@@ -290,16 +292,6 @@ retry:
 		igt_assert(!is_atomic_check_failure_errno(ret));
 
 		if (is_atomic_check_plane_size_errno(ret)) {
-			if (cursor_width == sprite_width &&
-			    cursor_height == sprite_height) {
-				igt_assert_f(alpha,
-					      "Cannot configure the test with all sprite planes enabled\n");
-
-				/* retry once with XRGB format. */
-				alpha = false;
-				goto retry;
-			}
-
 			sprite_width = prev_w;
 			sprite_height = prev_h;
 
