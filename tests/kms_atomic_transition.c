@@ -184,6 +184,9 @@ static void set_sprite_wh(igt_display_t *display, enum pipe pipe,
 		    plane->type == DRM_PLANE_TYPE_CURSOR)
 			continue;
 
+		if (!parms[i].mask)
+			continue;
+
 		parms[i].width = w;
 		parms[i].height = h;
 	}
@@ -287,7 +290,7 @@ static void setup_parms(igt_display_t *display, enum pipe pipe,
 	max_sprite_width = (sprite_width == mode->hdisplay);
 	max_sprite_height = (sprite_height == mode->vdisplay);
 
-	while (1) {
+	while (!max_sprite_width && !max_sprite_height) {
 		int ret;
 
 		set_sprite_wh(display, pipe, parms, sprite_fb,
@@ -297,45 +300,59 @@ static void setup_parms(igt_display_t *display, enum pipe pipe,
 		ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 		igt_assert(!is_atomic_check_failure_errno(ret));
 
-		if (is_atomic_check_plane_size_errno(ret)) {
-			sprite_width = prev_w;
-			sprite_height = prev_h;
-
-			if (max_sprite_width && max_sprite_height) {
-				set_sprite_wh(display, pipe, parms, sprite_fb,
-					      alpha, sprite_width, sprite_height);
-				break;
-			}
-
-			if (!max_sprite_width)
-				max_sprite_width = true;
-			else
-				max_sprite_height = true;
-		} else {
+		if (!is_atomic_check_plane_size_errno(ret)) {
 			prev_w = sprite_width;
 			prev_h = sprite_height;
-		}
-
-		if (!max_sprite_width) {
-			sprite_width *= 2;
-
+			sprite_width *= max_sprite_width ? 1 : 2;
 			if (sprite_width >= mode->hdisplay) {
 				max_sprite_width = true;
 
 				sprite_width = mode->hdisplay;
 			}
-		} else if (!max_sprite_height) {
-			sprite_height *= 2;
 
+			sprite_height *= max_sprite_height ? 1 : 2;
 			if (sprite_height >= mode->vdisplay) {
 				max_sprite_height = true;
 
 				sprite_height = mode->vdisplay;
 			}
-		} else
-			/* Max sized sprites for all! */
-			break;
+			continue;
+		}
+
+		if (cursor_width == sprite_width &&
+		    cursor_height == sprite_height) {
+			igt_plane_t *removed_plane = NULL;
+			igt_assert_f(n_planes >= 3, "No planes left to proceed with!");
+			if (n_overlays > 0) {
+				uint32_t plane_to_remove = hars_petruska_f54_1_random_unsafe_max(n_overlays);
+				removed_plane = &display->pipes[pipe].planes[overlays[plane_to_remove]];
+				igt_plane_set_fb(removed_plane, NULL);
+				while (plane_to_remove < (n_overlays - 1)) {
+					overlays[plane_to_remove] = overlays[plane_to_remove + 1];
+					plane_to_remove++;
+				}
+				n_overlays--;
+			}
+			if (removed_plane) {
+				parms[removed_plane->index].mask = 0;
+				igt_info("Removed plane %d\n", removed_plane->index);
+			}
+			n_planes--;
+			igt_info("Reduced available planes to %d\n", n_planes);
+			continue;
+		}
+
+		sprite_width = prev_w;
+		sprite_height = prev_h;
+
+		if (!max_sprite_width)
+			max_sprite_width = true;
+		else
+			max_sprite_height = true;
 	}
+
+	set_sprite_wh(display, pipe, parms, sprite_fb,
+			alpha, sprite_width, sprite_height);
 
 	igt_info("Running test on pipe %s with resolution %dx%d and sprite size %dx%d alpha %i\n",
 		 kmstest_pipe_name(pipe), mode->hdisplay, mode->vdisplay,
@@ -490,9 +507,6 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 			    plane->type == DRM_PLANE_TYPE_CURSOR)
 				continue;
 
-			if (parms[i].width <= 512)
-				continue;
-
 			parms[i].width /= 2;
 			ret = 1;
 			igt_info("Reducing sprite %i to %ux%u\n", i - 1, parms[i].width, parms[i].height);
@@ -517,8 +531,10 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 		}
 
 		/* force planes to be part of commit */
-		for_each_plane_on_pipe(display, pipe, plane)
-			igt_plane_set_position(plane, 0, 0);
+		for_each_plane_on_pipe(display, pipe, plane) {
+			if (parms[plane->index].mask)
+				igt_plane_set_position(plane, 0, 0);
+		}
 
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
