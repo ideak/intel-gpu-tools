@@ -687,16 +687,15 @@ static unsigned int run_test_step(struct test_output *o)
 
 	if (o->flags & TEST_ENOENT) {
 		/* hope that fb 0xfffffff0 does not exist */
-		igt_assert(do_page_flip(o, 0xfffffff0, false) == -ENOENT);
-		igt_assert(set_mode(o, 0xfffffff0, 0, 0) == -ENOENT);
+		igt_assert_eq(do_page_flip(o, 0xfffffff0, false), -ENOENT);
+		igt_assert_eq(set_mode(o, 0xfffffff0, 0, 0), -ENOENT);
 	}
 
 	if (do_flip && (o->flags & TEST_EINVAL) && o->flip_state.count > 0)
-		igt_assert(do_page_flip(o, new_fb_id, true) == expected_einval);
+		igt_assert_eq(do_page_flip(o, new_fb_id, false), expected_einval);
 
 	if (do_vblank && (o->flags & TEST_EINVAL) && o->vblank_state.count > 0)
-		igt_assert(do_wait_for_vblank(o, o->pipe, target_seq, &vbl_reply)
-		       == -EINVAL);
+		igt_assert_eq(do_wait_for_vblank(o, o->pipe, target_seq, &vbl_reply), -EINVAL);
 
 	if (o->flags & TEST_VBLANK_RACE) {
 		spawn_vblank_wait_thread(o);
@@ -765,7 +764,7 @@ static unsigned int run_test_step(struct test_output *o)
 	}
 
 	if (do_flip && (o->flags & TEST_EBUSY))
-		igt_assert(do_page_flip(o, new_fb_id, true) == -EBUSY);
+		igt_assert_eq(do_page_flip(o, new_fb_id, false), -EBUSY);
 
 	if (do_flip && (o->flags & TEST_RMFB))
 		recreate_fb(o);
@@ -806,7 +805,7 @@ static unsigned int run_test_step(struct test_output *o)
 			   == -EINVAL);
 
 	if (do_flip && (o->flags & TEST_EINVAL))
-		igt_assert(do_page_flip(o, new_fb_id, true) == expected_einval);
+		igt_assert(do_page_flip(o, new_fb_id, false) == expected_einval);
 
 	unhang_gpu(drm_fd, hang);
 
