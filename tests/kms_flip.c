@@ -1575,6 +1575,13 @@ int main(int argc, char **argv)
 		    !(tests[i].flags & TEST_VBLANK_ABSOLUTE))
 			continue;
 
+		/*
+		 * -EBUSY needs to complete in a single vblank, skip them for
+		 * interruptible tests
+		 */
+		if (tests[i].flags & TEST_EBUSY)
+			continue;
+
 		igt_subtest_f( "%s-interruptible", tests[i].name)
 			run_test(tests[i].duration, tests[i].flags);
 
