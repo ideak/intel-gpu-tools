@@ -1497,7 +1497,7 @@ int main(int argc, char **argv)
 		{ 30,  TEST_VBLANK | TEST_VBLANK_BLOCK | TEST_VBLANK_ABSOLUTE,
 					"blocking-absolute-wf_vblank" },
 		{ 10, TEST_FLIP | TEST_BASIC, "plain-flip" },
-		{ 30, TEST_FLIP | TEST_EBUSY , "busy-flip" },
+		{ 1, TEST_FLIP | TEST_EBUSY, "busy-flip" },
 		{ 30, TEST_FLIP | TEST_FENCE_STRESS , "flip-vs-fences" },
 		{ 30, TEST_FLIP | TEST_CHECK_TS, "plain-flip-ts-check" },
 		{ 30, TEST_FLIP | TEST_CHECK_TS | TEST_FB_RECREATE,
