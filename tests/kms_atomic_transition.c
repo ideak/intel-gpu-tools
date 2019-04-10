@@ -118,11 +118,12 @@ static void configure_fencing(igt_plane_t *plane)
 	igt_assert_eq(ret, 0);
 }
 
-static void
+static int
 wm_setup_plane(igt_display_t *display, enum pipe pipe,
 	       uint32_t mask, struct plane_parms *parms, bool fencing)
 {
 	igt_plane_t *plane;
+	int planes_set_up = 0;
 
 	/*
 	* Make sure these buffers are suited for display use
@@ -133,8 +134,10 @@ wm_setup_plane(igt_display_t *display, enum pipe pipe,
 		int i = plane->index;
 
 		if (!mask || !(parms[i].mask & mask)) {
-			if (plane->values[IGT_PLANE_FB_ID])
+			if (plane->values[IGT_PLANE_FB_ID]) {
 				igt_plane_set_fb(plane, NULL);
+				planes_set_up++;
+			}
 			continue;
 		}
 
@@ -144,7 +147,10 @@ wm_setup_plane(igt_display_t *display, enum pipe pipe,
 		igt_plane_set_fb(plane, parms[i].fb);
 		igt_fb_set_size(parms[i].fb, plane, parms[i].width, parms[i].height);
 		igt_plane_set_size(plane, parms[i].width, parms[i].height);
+
+		planes_set_up++;
 	}
+	return planes_set_up;
 }
 
 static void ev_page_flip(int fd, unsigned seq, unsigned tv_sec, unsigned tv_usec, void *user_data)
@@ -536,7 +542,8 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 
 		igt_output_set_pipe(output, pipe);
 
-		wm_setup_plane(display, pipe, i, parms, fencing);
+		if (!wm_setup_plane(display, pipe, i, parms, fencing))
+			continue;
 
 		atomic_commit(display, pipe, flags, (void *)(unsigned long)i, fencing);
 		wait_for_transition(display, pipe, nonblocking, fencing);
@@ -544,7 +551,8 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 		if (type == TRANSITION_MODESET_DISABLE) {
 			igt_output_set_pipe(output, PIPE_NONE);
 
-			wm_setup_plane(display, pipe, 0, parms, fencing);
+			if (!wm_setup_plane(display, pipe, 0, parms, fencing))
+				continue;
 
 			atomic_commit(display, pipe, flags, (void *) 0UL, fencing);
 			wait_for_transition(display, pipe, nonblocking, fencing);
@@ -560,7 +568,8 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 				    n_enable_planes < pipe_obj->n_planes)
 					continue;
 
-				wm_setup_plane(display, pipe, j, parms, fencing);
+				if (!wm_setup_plane(display, pipe, j, parms, fencing))
+					continue;
 
 				if (type >= TRANSITION_MODESET)
 					igt_output_override_mode(output, &override_mode);
@@ -568,7 +577,9 @@ run_transition_test(igt_display_t *display, enum pipe pipe, igt_output_t *output
 				atomic_commit(display, pipe, flags, (void *)(unsigned long) j, fencing);
 				wait_for_transition(display, pipe, nonblocking, fencing);
 
-				wm_setup_plane(display, pipe, i, parms, fencing);
+				if (!wm_setup_plane(display, pipe, i, parms, fencing))
+					continue;
+
 				if (type >= TRANSITION_MODESET)
 					igt_output_override_mode(output, NULL);
 
