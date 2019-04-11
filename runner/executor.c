@@ -1221,6 +1221,22 @@ static void write_abort_file(int resdirfd,
 	}
 }
 
+static void oom_immortal(void)
+{
+	int fd;
+	const char never_kill[] = "-1000";
+
+	fd = open("/proc/self/oom_score_adj", O_WRONLY);
+	if (fd < 0) {
+		fprintf(stderr, "Warning: Cannot adjust oom score.\n");
+		return;
+	}
+	if (write(fd, never_kill, sizeof(never_kill)) != sizeof(never_kill))
+		fprintf(stderr, "Warning: Adjusting oom score failed.\n");
+
+	close(fd);
+}
+
 bool execute(struct execute_state *state,
 	     struct settings *settings,
 	     struct job_list *job_list)
@@ -1267,6 +1283,8 @@ bool execute(struct execute_state *state,
 		dprintf(timefd, "%f\n", timeofday_double());
 		close(timefd);
 	}
+
+	oom_immortal();
 
 	init_watchdogs(settings);
 
