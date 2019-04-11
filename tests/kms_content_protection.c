@@ -212,6 +212,10 @@ static void test_cp_enable_with_retry(igt_output_t *output,
 		if (!ret && --retry)
 			igt_debug("Retry (%d/2) ...\n", 3 - retry);
 	} while (retry && !ret);
+
+	if (!ret)
+		test_cp_disable(output, s);
+
 	igt_assert_f(ret, "Content Protection not enabled\n");
 }
 
