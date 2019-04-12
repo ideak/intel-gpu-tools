@@ -1,30 +1,28 @@
 FROM fedora:28
 
-RUN dnf install -y gcc \
-		flex \
-		meson \
-		bison  \
-		gtk-doc \
-		xdotool \
-		gsl-devel \
-		kmod-devel \
-		glib2-devel \
-		cairo-devel \
-		ninja-build \
-		procps-devel \
-		pixman-devel \
-		json-c-devel \
-		libdrm-devel \
-		libudev-devel \
-		xmlrpc-c-devel \
-		elfutils-devel \
-		libunwind-devel \
-		python-docutils \
-		libpciaccess-devel \
-		alsa-lib-devel \
-		valgrind-devel \
-		libXrandr-devel \
-		libXv-devel
+RUN dnf install -y \
+	gcc flex bison meson ninja-build xdotool \
+	'pkgconfig(libdrm)' \
+	'pkgconfig(pciaccess)' \
+	'pkgconfig(libkmod)' \
+	'pkgconfig(libprocps)' \
+	'pkgconfig(libunwind)' \
+	'pkgconfig(libdw)' \
+	'pkgconfig(pixman-1)' \
+	'pkgconfig(valgrind)' \
+	'pkgconfig(cairo)' \
+	'pkgconfig(libudev)' \
+	'pkgconfig(glib-2.0)' \
+	'pkgconfig(gsl)' \
+	'pkgconfig(alsa)' \
+	'pkgconfig(xmlrpc)' \
+	'pkgconfig(xmlrpc_util)' \
+	'pkgconfig(xmlrpc_client)' \
+	'pkgconfig(json-c)' \
+	'pkgconfig(gtk-doc)' \
+	'pkgconfig(xv)' \
+	'pkgconfig(xrandr)' \
+	python3-docutils
 
 # We need peg to build overlay
 RUN dnf install -y make
