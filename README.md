@@ -147,6 +147,7 @@ the default configuration (package names may vary):
 	libpciaccess-dev
 	libprocps-dev
 	libunwind-dev
+	liblzma-dev
 	libdw-dev
 	python-docutils
 	x11proto-dri2-dev
