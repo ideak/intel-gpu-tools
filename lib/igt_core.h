@@ -119,7 +119,7 @@ extern char *igt_frame_dump_path;
  *
  * Exit status indicating a test failure
  */
-#define IGT_EXIT_FAILURE 99
+#define IGT_EXIT_FAILURE 98
 
 bool __igt_fixture(void);
 void __igt_fixture_complete(void);
