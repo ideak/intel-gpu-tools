@@ -678,27 +678,26 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 
 	igt_fork(child, ncpus) {
 		uint64_t valid_size = huge_object_size;
-		uint32_t bo;
+		uint32_t bo[2];
 		char *a, *b;
 
-		bo = gem_create(fd, huge_object_size);
+		bo[0] = gem_create(fd, huge_object_size);
 		if (tiling_a) {
-			igt_require(__gem_set_tiling(fd, bo, abs(tiling_a), min_tile_width(devid, tiling_a)) == 0);
+			igt_require(__gem_set_tiling(fd, bo[0], abs(tiling_a), min_tile_width(devid, tiling_a)) == 0);
 			valid_size = rounddown(valid_size, tile_row_size(tiling_a, min_tile_width(devid, tiling_a)));
 		}
-		a = __gem_mmap__gtt(fd, bo, huge_object_size, PROT_READ | PROT_WRITE);
+		a = __gem_mmap__gtt(fd, bo[0], huge_object_size, PROT_READ | PROT_WRITE);
 		igt_require(a);
-		gem_close(fd, bo);
 
-		bo = gem_create(fd, huge_object_size);
+		bo[1] = gem_create(fd, huge_object_size);
 		if (tiling_b) {
-			igt_require(__gem_set_tiling(fd, bo, abs(tiling_b), max_tile_width(devid, tiling_b)) == 0);
+			igt_require(__gem_set_tiling(fd, bo[1], abs(tiling_b), max_tile_width(devid, tiling_b)) == 0);
 			valid_size = rounddown(valid_size, tile_row_size(tiling_b, max_tile_width(devid, tiling_b)));
 		}
-		b = __gem_mmap__gtt(fd, bo, huge_object_size, PROT_READ | PROT_WRITE);
+		b = __gem_mmap__gtt(fd, bo[1], huge_object_size, PROT_READ | PROT_WRITE);
 		igt_require(b);
-		gem_close(fd, bo);
 
+		gem_set_domain(fd, bo[0], I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 		for (i = 0; i < valid_size / PAGE_SIZE; i++) {
 			uint32_t *ptr = (uint32_t *)(a + PAGE_SIZE*i);
 			for (int j = 0; j < PAGE_SIZE/4; j++)
@@ -706,7 +705,7 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 			igt_progress("Writing a ", i, valid_size / PAGE_SIZE);
 		}
 
-
+		gem_set_domain(fd, bo[1], I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 		for (i = 0; i < valid_size / PAGE_SIZE; i++) {
 			uint32_t *ptr = (uint32_t *)(b + PAGE_SIZE*i);
 			for (int j = 0; j < PAGE_SIZE/4; j++)
@@ -727,11 +726,18 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 					A_tmp[j] = B_tmp[j];
 				else
 					B_tmp[j] = A_tmp[j];
+
+			gem_set_domain(fd, bo[0], I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 			memcpy(A, A_tmp, PAGE_SIZE);
+
+			gem_set_domain(fd, bo[1], I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 			memcpy(B, B_tmp, PAGE_SIZE);
 
 			igt_progress("Copying a<->b ", i, valid_size / PAGE_SIZE);
 		}
+
+		gem_close(fd, bo[0]);
+		gem_close(fd, bo[1]);
 
 		for (i = 0; i < valid_size / PAGE_SIZE; i++) {
 			uint32_t page[PAGE_SIZE/sizeof(uint32_t)];
