@@ -93,7 +93,8 @@ install_subdir('registers', install_dir : datadir,
 shared_library('intel_aubdump', 'aubdump.c',
 	       dependencies : [ lib_igt_chipset, dlsym ],
 	       name_prefix : '',
-	       install : true)
+	       install : true,
+	       soversion : '0')
 
 executable('intel_gpu_top', 'intel_gpu_top.c',
 	   install : true,

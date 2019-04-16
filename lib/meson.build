@@ -135,7 +135,8 @@ lib_igt_build = shared_library('igt',
     ['dummy.c'],
     link_whole: lib_intermediates,
     dependencies: lib_deps,
-    install : true
+    install : true,
+    soversion : '0',
 )
 
 lib_igt = declare_dependency(link_with : lib_igt_build,
