@@ -66,6 +66,48 @@ static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 	assert_within_epsilon(timeout_100ms * loops, elapsed, MAX_ERROR);
 }
 
+#define RESUBMIT_NEW_CTX     (1 << 0)
+#define RESUBMIT_ALL_ENGINES (1 << 1)
+
+static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
+{
+	const uint32_t ctx0 = gem_context_create(fd);
+	const uint32_t ctx1 = (flags & RESUBMIT_NEW_CTX) ?
+		gem_context_create(fd) : ctx0;
+	igt_spin_t *spin = __igt_spin_batch_new(fd, .ctx = ctx0, .engine = engine);
+	unsigned int other;
+
+	struct drm_i915_gem_execbuffer2 eb = {
+		.buffer_count = 1,
+		.buffers_ptr = to_user_pointer(&spin->obj[1]),
+		.rsvd1 = ctx1,
+	};
+
+	if (flags & RESUBMIT_ALL_ENGINES) {
+		for_each_physical_engine(fd, other) {
+			if  (other == engine)
+				continue;
+
+			eb.flags = other;
+			gem_execbuf(fd, &eb);
+		}
+	} else {
+		eb.flags = engine;
+		gem_execbuf(fd, &eb);
+	}
+
+	igt_spin_batch_end(spin);
+
+	gem_sync(fd, spin->obj[1].handle);
+
+	igt_spin_batch_free(fd, spin);
+
+	if (ctx1 != ctx0)
+		gem_context_destroy(fd, ctx1);
+
+	gem_context_destroy(fd, ctx0);
+}
+
 static void spin_exit_handler(int sig)
 {
 	igt_terminate_spin_batches();
@@ -96,22 +138,29 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 		igt_fork_hang_detector(fd);
-		intel_detect_and_clear_missed_interrupts(fd);
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("basic-%s", e->name) {
-			intel_detect_and_clear_missed_interrupts(fd);
+		igt_subtest_f("basic-%s", e->name)
 			spin(fd, e->exec_id, 3);
-			igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
-		}
+
+		igt_subtest_f("resubmit-%s", e->name)
+			spin_resubmit(fd, e->exec_id, 0);
+
+		igt_subtest_f("resubmit-new-%s", e->name)
+			spin_resubmit(fd, e->exec_id, RESUBMIT_NEW_CTX);
+
+		igt_subtest_f("resubmit-all-%s", e->name)
+			spin_resubmit(fd, e->exec_id, RESUBMIT_ALL_ENGINES);
+
+		igt_subtest_f("resubmit-new-all-%s", e->name)
+			spin_resubmit(fd, e->exec_id,
+				      RESUBMIT_NEW_CTX |
+				      RESUBMIT_ALL_ENGINES);
 	}
 
-	igt_subtest("spin-each") {
-		intel_detect_and_clear_missed_interrupts(fd);
+	igt_subtest("spin-each")
 		spin_on_all_engines(fd, 3);
-		igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
-	}
 
 	igt_fixture {
 		igt_stop_hang_detector();
