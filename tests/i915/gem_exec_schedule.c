@@ -223,12 +223,9 @@ static void independent(int fd, unsigned int engine)
 		if (spin == NULL) {
 			spin = __igt_spin_batch_new(fd, .engine = other);
 		} else {
-			struct drm_i915_gem_exec_object2 obj = {
-				.handle = spin->handle,
-			};
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
-				.buffers_ptr = to_user_pointer(&obj),
+				.buffers_ptr = to_user_pointer(&spin->obj[1]),
 				.flags = other,
 			};
 			gem_execbuf(fd, &eb);
@@ -621,12 +618,9 @@ static igt_spin_t *__noise(int fd, uint32_t ctx, int prio, igt_spin_t *spin)
 						    .ctx = ctx,
 						    .engine = other);
 		} else {
-			struct drm_i915_gem_exec_object2 obj = {
-				.handle = spin->handle,
-			};
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
-				.buffers_ptr = to_user_pointer(&obj),
+				.buffers_ptr = to_user_pointer(&spin->obj[1]),
 				.rsvd1 = ctx,
 				.flags = other,
 			};
