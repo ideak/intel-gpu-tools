@@ -50,6 +50,7 @@
 #include "drmtest.h"
 #include "igt_kms.h"
 #include "igt_aux.h"
+#include "igt_edid.h"
 #include "intel_chipset.h"
 #include "igt_debugfs.h"
 #include "igt_device.h"
@@ -102,23 +103,6 @@ static void update_edid_csum(unsigned char *edid, int cea_pos)
 	edid[cea_pos + 127] = 256 - sum;
 }
 
-#define VFREQ 60
-#define CLOCK 148500
-#define HACTIVE 1920
-#define HBLANK 280
-#define VACTIVE 1080
-#define VBLANK 45
-#define HOFFSET 88
-#define HPULSE 44
-#define VOFFSET 4
-#define VPULSE 5
-
-#define HSIZE 52
-#define VSIZE 30
-
-#define EDID_NAME base_edid
-#include "igt_edid_template.h"
-
 /**
  * igt_kms_get_base_edid:
  *
@@ -135,29 +119,66 @@ static void update_edid_csum(unsigned char *edid, int cea_pos)
  *
  * Returns: a basic edid block
  */
-const unsigned char* igt_kms_get_base_edid(void)
+const unsigned char *igt_kms_get_base_edid(void)
 {
-	update_edid_csum(base_edid, 0);
+	static struct edid edid;
+	drmModeModeInfo mode = {};
 
-	return base_edid;
+	mode.clock = 148500;
+	mode.hdisplay = 1920;
+	mode.hsync_start = 2008;
+	mode.hsync_end = 2052;
+	mode.htotal = 2200;
+	mode.vdisplay = 1080;
+	mode.vsync_start = 1084;
+	mode.vsync_end = 1089;
+	mode.vtotal = 1125;
+	mode.vrefresh = 60;
+
+	edid_init_with_mode(&edid, &mode);
+	edid_update_checksum(&edid);
+
+	return (unsigned char *) &edid;
 }
 
-#define VFREQ 60
-#define CLOCK 101000
-#define HACTIVE 1400
-#define HBLANK 160
-#define VACTIVE 1050
-#define VBLANK 30
-#define HOFFSET 48
-#define HPULSE 32
-#define VOFFSET 3
-#define VPULSE 4
+/**
+ * igt_kms_get_alt_edid:
+ *
+ * Get an alternate edid block, which includes the following modes:
+ *
+ *  - 1400x1050 60Hz
+ *  - 1920x1080 60Hz
+ *  - 1280x720 60Hz
+ *  - 1024x768 60Hz
+ *  - 800x600 60Hz
+ *  - 640x480 60Hz
+ *
+ * This can be extended with further features using functions such as
+ * #kmstest_edid_add_3d.
+ *
+ * Returns: an alternate edid block
+ */
+const unsigned char *igt_kms_get_alt_edid(void)
+{
+	static struct edid edid;
+	drmModeModeInfo mode = {};
 
-#define HSIZE 52
-#define VSIZE 30
+	mode.clock = 101000;
+	mode.hdisplay = 1400;
+	mode.hsync_start = 1448;
+	mode.hsync_end = 1480;
+	mode.htotal = 1560;
+	mode.vdisplay = 1050;
+	mode.vsync_start = 1053;
+	mode.vsync_end = 1057;
+	mode.vtotal = 1080;
+	mode.vrefresh = 60;
 
-#define EDID_NAME alt_edid
-#include "igt_edid_template.h"
+	edid_init_with_mode(&edid, &mode);
+	edid_update_checksum(&edid);
+
+	return (unsigned char *) &edid;
+}
 
 const char * const igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	[IGT_PLANE_SRC_X] = "SRC_X",
@@ -299,30 +320,6 @@ igt_fill_pipe_props(igt_display_t *display, igt_pipe_t *pipe,
 	}
 
 	drmModeFreeObjectProperties(props);
-}
-
-/**
- * igt_kms_get_alt_edid:
- *
- * Get an alternate edid block, which includes the following modes:
- *
- *  - 1400x1050 60Hz
- *  - 1920x1080 60Hz
- *  - 1280x720 60Hz
- *  - 1024x768 60Hz
- *  - 800x600 60Hz
- *  - 640x480 60Hz
- *
- * This can be extended with further features using functions such as
- * #kmstest_edid_add_3d.
- *
- * Returns: an alternate edid block
- */
-const unsigned char* igt_kms_get_alt_edid(void)
-{
-	update_edid_csum(alt_edid, 0);
-
-	return alt_edid;
 }
 
 /**

@@ -54,7 +54,8 @@ lib_sources = [
 	'igt_v3d.c',
 	'igt_vc4.c',
 	'igt_psr.c',
-	'igt_amd.c'
+	'igt_amd.c',
+	'igt_edid.c',
 ]
 
 lib_deps = [
