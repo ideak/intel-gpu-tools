@@ -3604,6 +3604,7 @@ test_rc6_disable(void)
 	igt_assert_eq(n_events_end - n_events_start, 0);
 
 	__perf_close(stream_fd);
+	gem_quiescent_gpu(drm_fd);
 
 	n_events_start = rc6_residency_ms();
 	nanosleep(&(struct timespec){ .tv_sec = 1, .tv_nsec = 0 }, NULL);
