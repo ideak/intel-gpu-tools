@@ -903,9 +903,7 @@ bool __igt_run_subtest(const char *subtest_name)
 {
 	int i;
 
-	assert(!in_subtest);
-	assert(!in_fixture);
-	assert(test_with_subtests);
+	assert(!igt_can_fail());
 
 	/* check the subtest name only contains a-z, A-Z, 0-9, '-' and '_' */
 	for (i = 0; subtest_name[i] != '\0'; i++)
