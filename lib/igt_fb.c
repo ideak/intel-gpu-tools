@@ -1708,18 +1708,7 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 	}
 }
 
-static void destroy_cairo_surface__blit(void *arg)
-{
-	struct fb_blit_upload *blit = arg;
-
-	blit->fb->cairo_surface = NULL;
-
-	free_linear_mapping(blit);
-
-	free(blit);
-}
-
-static void destroy_cairo_surface__rendercopy(void *arg)
+static void destroy_cairo_surface__gpu(void *arg)
 {
 	struct fb_blit_upload *blit = arg;
 
@@ -1775,7 +1764,7 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 				    0, linear->fb.size, PROT_READ | PROT_WRITE);
 }
 
-static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
+static void create_cairo_surface__gpu(int fd, struct igt_fb *fb)
 {
 	struct fb_blit_upload *blit;
 	cairo_format_t cairo_format;
@@ -1796,34 +1785,8 @@ static void create_cairo_surface__blit(int fd, struct igt_fb *fb)
 	fb->domain = I915_GEM_DOMAIN_GTT;
 
 	cairo_surface_set_user_data(fb->cairo_surface,
-				    (cairo_user_data_key_t *)create_cairo_surface__blit,
-				    blit, destroy_cairo_surface__blit);
-}
-
-static void create_cairo_surface__rendercopy(int fd, struct igt_fb *fb)
-{
-	struct fb_blit_upload *blit;
-	cairo_format_t cairo_format;
-
-	blit = calloc(1, sizeof(*blit));
-	igt_assert(blit);
-
-	blit->fd = fd;
-	blit->fb = fb;
-
-	setup_linear_mapping(blit);
-
-	cairo_format = drm_format_to_cairo(fb->drm_format);
-	fb->cairo_surface =
-		cairo_image_surface_create_for_data(blit->linear.map,
-						    cairo_format,
-						    fb->width, fb->height,
-						    blit->linear.fb.strides[0]);
-	fb->domain = I915_GEM_DOMAIN_GTT;
-
-	cairo_surface_set_user_data(fb->cairo_surface,
-				    (cairo_user_data_key_t *)create_cairo_surface__rendercopy,
-				    blit, destroy_cairo_surface__rendercopy);
+				    (cairo_user_data_key_t *)create_cairo_surface__gpu,
+				    blit, destroy_cairo_surface__gpu);
 }
 
 /**
@@ -2885,10 +2848,8 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 		    ((f->cairo_id == CAIRO_FORMAT_INVALID) &&
 		     (f->pixman_id != PIXMAN_invalid)))
 			create_cairo_surface__convert(fd, fb);
-		else if (use_rendercopy(fb))
-			create_cairo_surface__rendercopy(fd, fb);
-		else if (use_blitter(fb))
-			create_cairo_surface__blit(fd, fb);
+		else if (use_blitter(fb) || use_rendercopy(fb))
+			create_cairo_surface__gpu(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);
 
