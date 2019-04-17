@@ -189,7 +189,7 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 	}
 
 	if (flags & HANG)
-		spin = igt_spin_batch_new(fd, .engine = engine);
+		spin = igt_spin_new(fd, .engine = engine);
 
 	switch (mode(flags)) {
 	case NOSLEEP:
@@ -216,7 +216,7 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 		break;
 	}
 
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 
 	check_bo(fd, obj[0].handle);
 	gem_close(fd, obj[0].handle);

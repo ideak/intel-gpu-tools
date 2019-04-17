@@ -221,16 +221,16 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 		execbuf.buffer_count = 1;
 		execbuf.flags = engines[child % num_engines];
 
-		spin = __igt_spin_batch_new(fd,
-					    .engine = execbuf.flags,
-					    .flags = (IGT_SPIN_POLL_RUN |
-						      IGT_SPIN_FAST));
+		spin = __igt_spin_new(fd,
+				      .engine = execbuf.flags,
+				      .flags = (IGT_SPIN_POLL_RUN |
+						IGT_SPIN_FAST));
 		igt_assert(igt_spin_has_poll(spin));
 		cmd = *spin->batch;
 
 		gem_execbuf(fd, &execbuf);
 
-		igt_spin_batch_end(spin);
+		igt_spin_end(spin);
 		gem_sync(fd, object.handle);
 
 		for (int warmup = 0; warmup <= 1; warmup++) {
@@ -244,7 +244,7 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 				igt_spin_busywait_until_started(spin);
 
 				this = gettime();
-				igt_spin_batch_end(spin);
+				igt_spin_end(spin);
 				gem_sync(fd, spin->handle);
 				now = gettime();
 
@@ -271,7 +271,7 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 				gem_execbuf(fd, &execbuf);
 
 			this = gettime();
-			igt_spin_batch_end(spin);
+			igt_spin_end(spin);
 			gem_sync(fd, object.handle);
 			now = gettime();
 
@@ -285,7 +285,7 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 			 names[child % num_engines] ? " c" : "C",
 			 cycles, 1e6*baseline, elapsed*1e6/cycles);
 
-		igt_spin_batch_free(fd, spin);
+		igt_spin_free(fd, spin);
 		gem_close(fd, object.handle);
 	}
 	igt_waitchildren_timeout(2*timeout, NULL);
@@ -323,14 +323,14 @@ static void active_ring(int fd, unsigned ring, int timeout)
 		igt_spin_t *spin[2];
 		uint32_t cmd;
 
-		spin[0] = __igt_spin_batch_new(fd,
-					       .engine = ring,
-					       .flags = IGT_SPIN_FAST);
+		spin[0] = __igt_spin_new(fd,
+					 .engine = ring,
+					 .flags = IGT_SPIN_FAST);
 		cmd = *spin[0]->batch;
 
-		spin[1] = __igt_spin_batch_new(fd,
-					       .engine = ring,
-					       .flags = IGT_SPIN_FAST);
+		spin[1] = __igt_spin_new(fd,
+					 .engine = ring,
+					 .flags = IGT_SPIN_FAST);
 		igt_assert(*spin[1]->batch == cmd);
 
 		start = gettime();
@@ -340,7 +340,7 @@ static void active_ring(int fd, unsigned ring, int timeout)
 			for (int loop = 0; loop < 1024; loop++) {
 				igt_spin_t *s = spin[loop & 1];
 
-				igt_spin_batch_end(s);
+				igt_spin_end(s);
 				gem_sync(fd, s->handle);
 
 				*s->batch = cmd;
@@ -348,8 +348,8 @@ static void active_ring(int fd, unsigned ring, int timeout)
 			}
 			cycles += 1024;
 		} while ((elapsed = gettime()) < end);
-		igt_spin_batch_free(fd, spin[1]);
-		igt_spin_batch_free(fd, spin[0]);
+		igt_spin_free(fd, spin[1]);
+		igt_spin_free(fd, spin[0]);
 
 		igt_info("%s%sompleted %ld cycles: %.3f us\n",
 			 names[child % num_engines] ?: "",
@@ -404,22 +404,22 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 		execbuf.buffer_count = 1;
 		execbuf.flags = engines[child % num_engines];
 
-		spin[0] = __igt_spin_batch_new(fd,
-					       .engine = execbuf.flags,
-					       .flags = (IGT_SPIN_POLL_RUN |
-							 IGT_SPIN_FAST));
+		spin[0] = __igt_spin_new(fd,
+					 .engine = execbuf.flags,
+					 .flags = (IGT_SPIN_POLL_RUN |
+						   IGT_SPIN_FAST));
 		igt_assert(igt_spin_has_poll(spin[0]));
 		cmd = *spin[0]->batch;
 
-		spin[1] = __igt_spin_batch_new(fd,
-					       .engine = execbuf.flags,
-					       .flags = (IGT_SPIN_POLL_RUN |
-							 IGT_SPIN_FAST));
+		spin[1] = __igt_spin_new(fd,
+					 .engine = execbuf.flags,
+					 .flags = (IGT_SPIN_POLL_RUN |
+						   IGT_SPIN_FAST));
 
 		gem_execbuf(fd, &execbuf);
 
-		igt_spin_batch_end(spin[1]);
-		igt_spin_batch_end(spin[0]);
+		igt_spin_end(spin[1]);
+		igt_spin_end(spin[0]);
 		gem_sync(fd, object.handle);
 
 		for (int warmup = 0; warmup <= 1; warmup++) {
@@ -438,7 +438,7 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 				gem_execbuf(fd, &spin[1]->execbuf);
 
 				this = gettime();
-				igt_spin_batch_end(spin[0]);
+				igt_spin_end(spin[0]);
 				gem_sync(fd, spin[0]->handle);
 				now = gettime();
 
@@ -446,7 +446,7 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 				cycles++;
 				igt_swap(spin[0], spin[1]);
 			} while (now < end);
-			igt_spin_batch_end(spin[0]);
+			igt_spin_end(spin[0]);
 			baseline = elapsed / cycles;
 		}
 		igt_info("%s%saseline %ld cycles: %.3f us\n",
@@ -472,7 +472,7 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 			gem_execbuf(fd, &spin[1]->execbuf);
 
 			this = gettime();
-			igt_spin_batch_end(spin[0]);
+			igt_spin_end(spin[0]);
 			gem_sync(fd, object.handle);
 			now = gettime();
 
@@ -480,7 +480,7 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 			cycles++;
 			igt_swap(spin[0], spin[1]);
 		} while (now < end);
-		igt_spin_batch_end(spin[0]);
+		igt_spin_end(spin[0]);
 		elapsed -= cycles * baseline;
 
 		igt_info("%s%sompleted %ld cycles: %.3f + %.3f us\n",
@@ -488,8 +488,8 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 			 names[child % num_engines] ? " c" : "C",
 			 cycles, 1e6*baseline, elapsed*1e6/cycles);
 
-		igt_spin_batch_free(fd, spin[1]);
-		igt_spin_batch_free(fd, spin[0]);
+		igt_spin_free(fd, spin[1]);
+		igt_spin_free(fd, spin[0]);
 		gem_close(fd, object.handle);
 	}
 	igt_waitchildren_timeout(2*timeout, NULL);
@@ -1189,16 +1189,16 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 		cycles = 0;
 		do {
 			igt_spin_t *spin =
-				__igt_spin_batch_new(fd,
-						     .ctx = ctx[0],
-						     .engine = execbuf.flags);
+				__igt_spin_new(fd,
+					       .ctx = ctx[0],
+					       .engine = execbuf.flags);
 
 			do {
 				gem_execbuf(fd, &execbuf);
 				gem_sync(fd, object.handle);
 			} while (++cycles & 1023);
 
-			igt_spin_batch_free(fd, spin);
+			igt_spin_free(fd, spin);
 		} while ((elapsed = gettime() - start) < timeout);
 		igt_info("%s%sompleted %ld cycles: %.3f us\n",
 			 names[child % num_engines] ?: "",

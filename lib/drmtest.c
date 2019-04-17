@@ -176,7 +176,7 @@ static const char *forced_driver(void)
  */
 void gem_quiescent_gpu(int fd)
 {
-	igt_terminate_spin_batches();
+	igt_terminate_spins();
 
 	igt_drop_caches_set(fd,
 			    DROP_ACTIVE | DROP_RETIRE | DROP_IDLE | DROP_FREED);
@@ -314,7 +314,7 @@ static int at_exit_drm_render_fd = -1;
 
 static void __cancel_work_at_exit(int fd)
 {
-	igt_terminate_spin_batches(); /* for older kernels */
+	igt_terminate_spins(); /* for older kernels */
 
 	igt_sysfs_set_parameter(fd, "reset", "%x", -1u /* any method */);
 	igt_drop_caches_set(fd,

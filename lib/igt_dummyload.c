@@ -264,7 +264,7 @@ emit_recursive_batch(igt_spin_t *spin,
 }
 
 static igt_spin_t *
-spin_batch_create(int fd, const struct igt_spin_factory *opts)
+spin_create(int fd, const struct igt_spin_factory *opts)
 {
 	igt_spin_t *spin;
 
@@ -281,25 +281,25 @@ spin_batch_create(int fd, const struct igt_spin_factory *opts)
 }
 
 igt_spin_t *
-__igt_spin_batch_factory(int fd, const struct igt_spin_factory *opts)
+__igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 {
-	return spin_batch_create(fd, opts);
+	return spin_create(fd, opts);
 }
 
 /**
- * igt_spin_batch_factory:
+ * igt_spin_factory:
  * @fd: open i915 drm file descriptor
  * @opts: controlling options such as context, engine, dependencies etc
  *
  * Start a recursive batch on a ring. Immediately returns a #igt_spin_t that
  * contains the batch's handle that can be waited upon. The returned structure
- * must be passed to igt_spin_batch_free() for post-processing.
+ * must be passed to igt_spin_free() for post-processing.
  *
  * Returns:
- * Structure with helper internal state for igt_spin_batch_free().
+ * Structure with helper internal state for igt_spin_free().
  */
 igt_spin_t *
-igt_spin_batch_factory(int fd, const struct igt_spin_factory *opts)
+igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 {
 	igt_spin_t *spin;
 
@@ -311,7 +311,7 @@ igt_spin_batch_factory(int fd, const struct igt_spin_factory *opts)
 			igt_require(gem_can_store_dword(fd, opts->engine));
 	}
 
-	spin = spin_batch_create(fd, opts);
+	spin = spin_create(fd, opts);
 
 	igt_assert(gem_bo_busy(fd, spin->handle));
 	if (opts->flags & IGT_SPIN_FENCE_OUT) {
@@ -327,19 +327,19 @@ static void notify(union sigval arg)
 {
 	igt_spin_t *spin = arg.sival_ptr;
 
-	igt_spin_batch_end(spin);
+	igt_spin_end(spin);
 }
 
 /**
- * igt_spin_batch_set_timeout:
- * @spin: spin batch state from igt_spin_batch_new()
+ * igt_spin_set_timeout:
+ * @spin: spin state from igt_spin_new()
  * @ns: amount of time in nanoseconds the batch continues to execute
  *      before finishing.
  *
  * Specify a timeout. This ends the recursive batch associated with @spin after
  * the timeout has elapsed.
  */
-void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns)
+void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 {
 	timer_t timer;
 	struct sigevent sev;
@@ -367,12 +367,12 @@ void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns)
 }
 
 /**
- * igt_spin_batch_end:
- * @spin: spin batch state from igt_spin_batch_new()
+ * igt_spin_end:
+ * @spin: spin state from igt_spin_new()
  *
- * End the recursive batch associated with @spin manually.
+ * End the spinner associated with @spin manually.
  */
-void igt_spin_batch_end(igt_spin_t *spin)
+void igt_spin_end(igt_spin_t *spin)
 {
 	if (!spin)
 		return;
@@ -382,14 +382,14 @@ void igt_spin_batch_end(igt_spin_t *spin)
 }
 
 /**
- * igt_spin_batch_free:
+ * igt_spin_free:
  * @fd: open i915 drm file descriptor
- * @spin: spin batch state from igt_spin_batch_new()
+ * @spin: spin state from igt_spin_new()
  *
- * This function does the necessary post-processing after starting a recursive
- * batch with igt_spin_batch_new().
+ * This function does the necessary post-processing after starting a
+ * spin with igt_spin_new() and then frees it.
  */
-void igt_spin_batch_free(int fd, igt_spin_t *spin)
+void igt_spin_free(int fd, igt_spin_t *spin)
 {
 	if (!spin)
 		return;
@@ -401,7 +401,7 @@ void igt_spin_batch_free(int fd, igt_spin_t *spin)
 	if (spin->timer)
 		timer_delete(spin->timer);
 
-	igt_spin_batch_end(spin);
+	igt_spin_end(spin);
 	gem_munmap((void *)((unsigned long)spin->batch & (~4095UL)),
 		   BATCH_SIZE);
 
@@ -418,13 +418,13 @@ void igt_spin_batch_free(int fd, igt_spin_t *spin)
 	free(spin);
 }
 
-void igt_terminate_spin_batches(void)
+void igt_terminate_spins(void)
 {
 	struct igt_spin *iter;
 
 	pthread_mutex_lock(&list_lock);
 	igt_list_for_each(iter, &spin_list, link)
-		igt_spin_batch_end(iter);
+		igt_spin_end(iter);
 	pthread_mutex_unlock(&list_lock);
 }
 

@@ -78,16 +78,16 @@ poll_ring(int fd, unsigned ring, const char *name)
 	gem_require_ring(fd, ring);
 	igt_require(gem_can_store_dword(fd, ring));
 
-	spin[0] = __igt_spin_batch_factory(fd, &opts);
+	spin[0] = __igt_spin_factory(fd, &opts);
 	igt_assert(igt_spin_has_poll(spin[0]));
 	cmd = *spin[0]->batch;
 
-	spin[1] = __igt_spin_batch_factory(fd, &opts);
+	spin[1] = __igt_spin_factory(fd, &opts);
 	igt_assert(igt_spin_has_poll(spin[1]));
 
 	igt_assert(cmd == *spin[1]->batch);
 
-	igt_spin_batch_end(spin[0]);
+	igt_spin_end(spin[0]);
 	igt_spin_busywait_until_started(spin[1]);
 
 	igt_assert(!gem_bo_busy(fd, spin[0]->handle));
@@ -100,15 +100,15 @@ poll_ring(int fd, unsigned ring, const char *name)
 		spin[idx]->poll[SPIN_POLL_START_IDX] = 0;
 		gem_execbuf(fd, &spin[idx]->execbuf);
 
-		igt_spin_batch_end(spin[!idx]);
+		igt_spin_end(spin[!idx]);
 		igt_spin_busywait_until_started(spin[idx]);
 	}
 
 	igt_info("%s completed %ld cycles: %.3f us\n",
 		 name, cycles, elapsed*1e-3/cycles);
 
-	igt_spin_batch_free(fd, spin[1]);
-	igt_spin_batch_free(fd, spin[0]);
+	igt_spin_free(fd, spin[1]);
+	igt_spin_free(fd, spin[0]);
 }
 
 #define RCS_TIMESTAMP (0x2000 + 0x358)
@@ -192,7 +192,7 @@ static void latency_on_ring(int fd,
 	}
 
 	if (flags & LIVE)
-		spin = igt_spin_batch_new(fd, .engine = ring);
+		spin = igt_spin_new(fd, .engine = ring);
 
 	start = *reg;
 	for (j = 0; j < repeats; j++) {
@@ -209,7 +209,7 @@ static void latency_on_ring(int fd,
 	end = *reg;
 	igt_assert(reloc.presumed_offset == obj[1].offset);
 
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 	if (flags & CORK)
 		igt_cork_unplug(&c);
 
@@ -324,9 +324,9 @@ static void latency_from_ring(int fd,
 			       I915_GEM_DOMAIN_GTT);
 
 		if (flags & PREEMPT)
-			spin = __igt_spin_batch_new(fd,
-						    .ctx = ctx[0],
-						    .engine = ring);
+			spin = __igt_spin_new(fd,
+					      .ctx = ctx[0],
+					      .engine = ring);
 
 		if (flags & CORK) {
 			obj[0].handle = igt_cork_plug(&c, fd);
@@ -393,7 +393,7 @@ static void latency_from_ring(int fd,
 		gem_set_domain(fd, obj[1].handle,
 			       I915_GEM_DOMAIN_GTT,
 			       I915_GEM_DOMAIN_GTT);
-		igt_spin_batch_free(fd, spin);
+		igt_spin_free(fd, spin);
 
 		igt_info("%s-%s delay: %.2fns\n",
 			 name, e__->name,
@@ -414,7 +414,7 @@ static void latency_from_ring(int fd,
 	}
 }
 
-static void __rearm_spin_batch(igt_spin_t *spin)
+static void __rearm_spin(igt_spin_t *spin)
 {
 	const uint32_t mi_arb_chk = 0x5 << 23;
 
@@ -424,7 +424,7 @@ static void __rearm_spin_batch(igt_spin_t *spin)
 }
 
 static void
-__submit_spin_batch(int fd, igt_spin_t *spin, unsigned int flags)
+__submit_spin(int fd, igt_spin_t *spin, unsigned int flags)
 {
 	struct drm_i915_gem_execbuffer2 eb = spin->execbuf;
 
@@ -531,7 +531,7 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 
 			usleep(250);
 
-			spin = __igt_spin_batch_factory(fd, &opts);
+			spin = __igt_spin_factory(fd, &opts);
 			if (!spin) {
 				igt_warn("Failed to create spinner! (%s)\n",
 					 passname[pass]);
@@ -543,7 +543,7 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 				struct timespec ts = { };
 				double t;
 
-				igt_spin_batch_end(spin);
+				igt_spin_end(spin);
 				gem_sync(fd, spin->handle);
 				if (flags & RTIDLE)
 					igt_drop_caches_set(fd, DROP_IDLE);
@@ -557,10 +557,10 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 				if (nengine > 1)
 					usleep(10*nengine);
 
-				__rearm_spin_batch(spin);
+				__rearm_spin(spin);
 
 				igt_nsec_elapsed(&ts);
-				__submit_spin_batch(fd, spin, engine);
+				__submit_spin(fd, spin, engine);
 				if (!__spin_wait(fd, spin)) {
 					igt_warn("Wait timeout! (%s)\n",
 						 passname[pass]);
@@ -576,7 +576,7 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 				igt_mean_add(&mean, t);
 			}
 
-			igt_spin_batch_free(fd, spin);
+			igt_spin_free(fd, spin);
 
 			igt_info("%8s %10s: mean=%.2fus stddev=%.3fus [%.2fus, %.2fus] (n=%lu)\n",
 				 names[child],

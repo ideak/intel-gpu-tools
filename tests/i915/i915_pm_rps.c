@@ -254,29 +254,29 @@ static void load_helper_run(enum load load)
 		igt_debug("Applying %s load...\n", lh.load ? "high" : "low");
 
 		prev_load = lh.load == HIGH;
-		spin[0] = __igt_spin_batch_new(drm_fd);
+		spin[0] = __igt_spin_new(drm_fd);
 		if (prev_load)
-			spin[1] = __igt_spin_batch_new(drm_fd);
+			spin[1] = __igt_spin_new(drm_fd);
 		prev_load = !prev_load; /* send the initial signal */
 		while (!lh.exit) {
 			bool high_load;
 
 			handle = spin[0]->handle;
-			igt_spin_batch_end(spin[0]);
+			igt_spin_end(spin[0]);
 			while (gem_bo_busy(drm_fd, handle))
 				usleep(100);
 
-			igt_spin_batch_free(drm_fd, spin[0]);
+			igt_spin_free(drm_fd, spin[0]);
 			usleep(100);
 
 			high_load = lh.load == HIGH;
 			if (!high_load && spin[1]) {
-				igt_spin_batch_free(drm_fd, spin[1]);
+				igt_spin_free(drm_fd, spin[1]);
 				spin[1] = NULL;
 			} else {
 				spin[0] = spin[1];
 			}
-			spin[high_load] = __igt_spin_batch_new(drm_fd);
+			spin[high_load] = __igt_spin_new(drm_fd);
 
 			if (lh.signal && high_load != prev_load) {
 				write(lh.link, &lh.signal, sizeof(lh.signal));
@@ -286,11 +286,11 @@ static void load_helper_run(enum load load)
 		}
 
 		handle = spin[0]->handle;
-		igt_spin_batch_end(spin[0]);
+		igt_spin_end(spin[0]);
 
 		if (spin[1]) {
 			handle = spin[1]->handle;
-			igt_spin_batch_end(spin[1]);
+			igt_spin_end(spin[1]);
 		}
 
 		/* Wait for completion without boosting */
@@ -305,8 +305,8 @@ static void load_helper_run(enum load load)
 		 */
 		igt_drop_caches_set(drm_fd, DROP_RETIRE);
 
-		igt_spin_batch_free(drm_fd, spin[1]);
-		igt_spin_batch_free(drm_fd, spin[0]);
+		igt_spin_free(drm_fd, spin[1]);
+		igt_spin_free(drm_fd, spin[0]);
 	}
 
 	close(lh.link);
@@ -549,7 +549,7 @@ static void boost_freq(int fd, int *boost_freqs)
 	int64_t timeout = 1;
 	igt_spin_t *load;
 
-	load = igt_spin_batch_new(fd);
+	load = igt_spin_new(fd);
 	resubmit_batch(fd, load->handle, 16);
 
 	/* Waiting will grant us a boost to maximum */
@@ -559,9 +559,9 @@ static void boost_freq(int fd, int *boost_freqs)
 	dump(boost_freqs);
 
 	/* Avoid downlocking till boost request is pending */
-	igt_spin_batch_end(load);
+	igt_spin_end(load);
 	gem_sync(fd, load->handle);
-	igt_spin_batch_free(fd, load);
+	igt_spin_free(fd, load);
 }
 
 static void waitboost(int fd, bool reset)

@@ -1007,7 +1007,7 @@ static void exit_subtest(const char *result)
 		fprintf(stderr, "Subtest %s: %s (%.3fs)\n",
 			in_subtest, result, igt_time_elapsed(&subtest_time, &now));
 
-	igt_terminate_spin_batches();
+	igt_terminate_spins();
 
 	in_subtest = NULL;
 	siglongjmp(igt_subtest_jmpbuf, 1);
@@ -1915,7 +1915,7 @@ static void call_exit_handlers(int sig)
 {
 	int i;
 
-	igt_terminate_spin_batches();
+	igt_terminate_spins();
 
 	if (!exit_handler_count) {
 		return;

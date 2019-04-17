@@ -578,7 +578,7 @@ static void nonpriv(int fd,
 
 		tmpl_regs(fd, ctx, e, tmpl, values[v]);
 
-		spin = igt_spin_batch_new(fd, .ctx = ctx, .engine = engine);
+		spin = igt_spin_new(fd, .ctx = ctx, .engine = engine);
 
 		igt_debug("%s[%d]: Setting all registers to 0x%08x\n",
 			  __func__, v, values[v]);
@@ -592,7 +592,7 @@ static void nonpriv(int fd,
 		 */
 		restore_regs(fd, ctx, e, flags, regs[0]);
 
-		igt_spin_batch_free(fd, spin);
+		igt_spin_free(fd, spin);
 
 		compare_regs(fd, tmpl, regs[1], "nonpriv read/writes");
 
@@ -631,7 +631,7 @@ static void isolation(int fd,
 		ctx[0] = gem_context_create(fd);
 		regs[0] = read_regs(fd, ctx[0], e, flags);
 
-		spin = igt_spin_batch_new(fd, .ctx = ctx[0], .engine = engine);
+		spin = igt_spin_new(fd, .ctx = ctx[0], .engine = engine);
 
 		if (flags & DIRTY1) {
 			igt_debug("%s[%d]: Setting all registers of ctx 0 to 0x%08x\n",
@@ -663,7 +663,7 @@ static void isolation(int fd,
 		tmp = read_regs(fd, ctx[0], e, flags);
 		restore_regs(fd, ctx[0], e, flags, regs[0]);
 
-		igt_spin_batch_free(fd, spin);
+		igt_spin_free(fd, spin);
 
 		if (!(flags & DIRTY1))
 			compare_regs(fd, regs[0], tmp, "two reads of the same ctx");
@@ -702,7 +702,7 @@ static void inject_reset_context(int fd, unsigned int engine)
 	if (gem_can_store_dword(fd, engine))
 		opts.flags |= IGT_SPIN_POLL_RUN;
 
-	spin = __igt_spin_batch_factory(fd, &opts);
+	spin = __igt_spin_factory(fd, &opts);
 
 	if (igt_spin_has_poll(spin))
 		igt_spin_busywait_until_started(spin);
@@ -711,7 +711,7 @@ static void inject_reset_context(int fd, unsigned int engine)
 
 	igt_force_gpu_reset(fd);
 
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 	gem_context_destroy(fd, opts.ctx);
 }
 
@@ -738,7 +738,7 @@ static void preservation(int fd,
 	gem_quiescent_gpu(fd);
 
 	ctx[num_values] = gem_context_create(fd);
-	spin = igt_spin_batch_new(fd, .ctx = ctx[num_values], .engine = engine);
+	spin = igt_spin_new(fd, .ctx = ctx[num_values], .engine = engine);
 	regs[num_values][0] = read_regs(fd, ctx[num_values], e, flags);
 	for (int v = 0; v < num_values; v++) {
 		ctx[v] = gem_context_create(fd);
@@ -748,7 +748,7 @@ static void preservation(int fd,
 
 	}
 	gem_close(fd, read_regs(fd, ctx[num_values], e, flags));
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 
 	if (flags & RESET)
 		inject_reset_context(fd, engine);
@@ -778,11 +778,11 @@ static void preservation(int fd,
 		break;
 	}
 
-	spin = igt_spin_batch_new(fd, .ctx = ctx[num_values], .engine = engine);
+	spin = igt_spin_new(fd, .ctx = ctx[num_values], .engine = engine);
 	for (int v = 0; v < num_values; v++)
 		regs[v][1] = read_regs(fd, ctx[v], e, flags);
 	regs[num_values][1] = read_regs(fd, ctx[num_values], e, flags);
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 
 	for (int v = 0; v < num_values; v++) {
 		char buf[80];

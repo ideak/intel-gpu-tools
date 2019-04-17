@@ -58,18 +58,18 @@ struct igt_spin_factory {
 #define IGT_SPIN_NO_PREEMPTION (1 << 3)
 
 igt_spin_t *
-__igt_spin_batch_factory(int fd, const struct igt_spin_factory *opts);
+__igt_spin_factory(int fd, const struct igt_spin_factory *opts);
 igt_spin_t *
-igt_spin_batch_factory(int fd, const struct igt_spin_factory *opts);
+igt_spin_factory(int fd, const struct igt_spin_factory *opts);
 
-#define __igt_spin_batch_new(fd, ...) \
-	__igt_spin_batch_factory(fd, &((struct igt_spin_factory){__VA_ARGS__}))
-#define igt_spin_batch_new(fd, ...) \
-	igt_spin_batch_factory(fd, &((struct igt_spin_factory){__VA_ARGS__}))
+#define __igt_spin_new(fd, ...) \
+	__igt_spin_factory(fd, &((struct igt_spin_factory){__VA_ARGS__}))
+#define igt_spin_new(fd, ...) \
+	igt_spin_factory(fd, &((struct igt_spin_factory){__VA_ARGS__}))
 
-void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns);
-void igt_spin_batch_end(igt_spin_t *spin);
-void igt_spin_batch_free(int fd, igt_spin_t *spin);
+void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns);
+void igt_spin_end(igt_spin_t *spin);
+void igt_spin_free(int fd, igt_spin_t *spin);
 
 static inline bool igt_spin_has_poll(const igt_spin_t *spin)
 {
@@ -87,7 +87,7 @@ static inline void igt_spin_busywait_until_started(igt_spin_t *spin)
 		;
 }
 
-void igt_terminate_spin_batches(void);
+void igt_terminate_spins(void);
 
 enum igt_cork_type {
 	CORK_SYNC_FD = 1,

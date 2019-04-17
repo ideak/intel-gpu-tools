@@ -294,10 +294,10 @@ igt_hang_t igt_hang_ctx(int fd, uint32_t ctx, int ring, unsigned flags)
 	if ((flags & HANG_ALLOW_BAN) == 0)
 		context_set_ban(fd, ctx, 0);
 
-	spin = __igt_spin_batch_new(fd,
-				    .ctx = ctx,
-				    .engine = ring,
-				    .flags = IGT_SPIN_NO_PREEMPTION);
+	spin = __igt_spin_new(fd,
+			      .ctx = ctx,
+			      .engine = ring,
+			      .flags = IGT_SPIN_NO_PREEMPTION);
 
 	return (igt_hang_t){ spin, ctx, ban, flags };
 }
@@ -333,7 +333,7 @@ void igt_post_hang_ring(int fd, igt_hang_t arg)
 		return;
 
 	gem_sync(fd, arg.spin->handle); /* Wait until it hangs */
-	igt_spin_batch_free(fd, arg.spin);
+	igt_spin_free(fd, arg.spin);
 
 	context_set_ban(fd, arg.ctx, arg.ban);
 

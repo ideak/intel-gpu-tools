@@ -346,17 +346,17 @@ static void reclaim(unsigned engine, int timeout)
 		} while (!*shared);
 	}
 
-	spin = igt_spin_batch_new(fd, .engine = engine);
+	spin = igt_spin_new(fd, .engine = engine);
 	igt_until_timeout(timeout) {
-		igt_spin_t *next = __igt_spin_batch_new(fd, .engine = engine);
+		igt_spin_t *next = __igt_spin_new(fd, .engine = engine);
 
-		igt_spin_batch_set_timeout(spin, timeout_100ms);
+		igt_spin_set_timeout(spin, timeout_100ms);
 		gem_sync(fd, spin->handle);
 
-		igt_spin_batch_free(fd, spin);
+		igt_spin_free(fd, spin);
 		spin = next;
 	}
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 
 	*shared = 1;
 	igt_waitchildren();

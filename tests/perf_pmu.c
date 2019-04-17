@@ -180,7 +180,7 @@ static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 	if (gem_can_store_dword(fd, flags))
 		opts.flags |= IGT_SPIN_POLL_RUN;
 
-	return __igt_spin_batch_factory(fd, &opts);
+	return __igt_spin_factory(fd, &opts);
 }
 
 static unsigned long __spin_wait(int fd, igt_spin_t *spin)
@@ -230,7 +230,7 @@ static void end_spin(int fd, igt_spin_t *spin, unsigned int flags)
 	if (!spin)
 		return;
 
-	igt_spin_batch_end(spin);
+	igt_spin_end(spin);
 
 	if (flags & FLAG_SYNC)
 		gem_sync(fd, spin->handle);
@@ -296,7 +296,7 @@ single(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 		assert_within_epsilon(val, 0, tolerance);
 	}
 
-	igt_spin_batch_free(gem_fd, spin);
+	igt_spin_free(gem_fd, spin);
 	close(fd);
 
 	gem_quiescent_gpu(gem_fd);
@@ -325,7 +325,7 @@ busy_start(int gem_fd, const struct intel_execution_engine2 *e)
 	val = __pmu_read_single(fd, &ts[1]) - val;
 	igt_debug("slept=%lu perf=%"PRIu64"\n", slept, ts[1] - ts[0]);
 
-	igt_spin_batch_free(gem_fd, spin);
+	igt_spin_free(gem_fd, spin);
 	close(fd);
 
 	assert_within_epsilon(val, ts[1] - ts[0], tolerance);
@@ -361,9 +361,9 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	 */
 	spin[0] = __spin_sync(gem_fd, 0, e2ring(gem_fd, e));
 	usleep(500e3);
-	spin[1] = __igt_spin_batch_new(gem_fd,
-				       .ctx = ctx,
-				       .engine = e2ring(gem_fd, e));
+	spin[1] = __igt_spin_new(gem_fd,
+				 .ctx = ctx,
+				 .engine = e2ring(gem_fd, e));
 
 	/*
 	 * Open PMU as fast as possible after the second spin batch in attempt
@@ -376,8 +376,8 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	val = __pmu_read_single(fd, &ts[1]) - val;
 	igt_debug("slept=%lu perf=%"PRIu64"\n", slept, ts[1] - ts[0]);
 
-	igt_spin_batch_end(spin[0]);
-	igt_spin_batch_end(spin[1]);
+	igt_spin_end(spin[0]);
+	igt_spin_end(spin[1]);
 
 	/* Wait for GPU idle to verify PMU reports idle. */
 	gem_quiescent_gpu(gem_fd);
@@ -388,8 +388,8 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 
 	igt_info("busy=%"PRIu64" idle=%"PRIu64"\n", val, val2);
 
-	igt_spin_batch_free(gem_fd, spin[0]);
-	igt_spin_batch_free(gem_fd, spin[1]);
+	igt_spin_free(gem_fd, spin[0]);
+	igt_spin_free(gem_fd, spin[1]);
 
 	close(fd);
 
@@ -453,7 +453,7 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	pmu_read_multi(fd[0], num_engines, tval[1]);
 
 	end_spin(gem_fd, spin, FLAG_SYNC);
-	igt_spin_batch_free(gem_fd, spin);
+	igt_spin_free(gem_fd, spin);
 	close(fd[0]);
 
 	for (i = 0; i < num_engines; i++)
@@ -471,9 +471,9 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 }
 
 static void
-__submit_spin_batch(int gem_fd, igt_spin_t *spin,
-		    const struct intel_execution_engine2 *e,
-		    int offset)
+__submit_spin(int gem_fd, igt_spin_t *spin,
+	      const struct intel_execution_engine2 *e,
+	      int offset)
 {
 	struct drm_i915_gem_execbuffer2 eb = spin->execbuf;
 
@@ -501,7 +501,7 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 		if (e == e_)
 			idle_idx = i;
 		else if (spin)
-			__submit_spin_batch(gem_fd, spin, e_, 64);
+			__submit_spin(gem_fd, spin, e_, 64);
 		else
 			spin = __spin_poll(gem_fd, 0, e2ring(gem_fd, e_));
 
@@ -524,7 +524,7 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 	pmu_read_multi(fd[0], num_engines, tval[1]);
 
 	end_spin(gem_fd, spin, FLAG_SYNC);
-	igt_spin_batch_free(gem_fd, spin);
+	igt_spin_free(gem_fd, spin);
 	close(fd[0]);
 
 	for (i = 0; i < num_engines; i++)
@@ -556,7 +556,7 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines,
 	i = 0;
 	for_each_engine_class_instance(gem_fd, e) {
 		if (spin)
-			__submit_spin_batch(gem_fd, spin, e, 64);
+			__submit_spin(gem_fd, spin, e, 64);
 		else
 			spin = __spin_poll(gem_fd, 0, e2ring(gem_fd, e));
 
@@ -578,7 +578,7 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines,
 	pmu_read_multi(fd[0], num_engines, tval[1]);
 
 	end_spin(gem_fd, spin, FLAG_SYNC);
-	igt_spin_batch_free(gem_fd, spin);
+	igt_spin_free(gem_fd, spin);
 	close(fd[0]);
 
 	for (i = 0; i < num_engines; i++)
@@ -617,7 +617,7 @@ no_sema(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 
 	if (spin) {
 		end_spin(gem_fd, spin, FLAG_SYNC);
-		igt_spin_batch_free(gem_fd, spin);
+		igt_spin_free(gem_fd, spin);
 	}
 	close(fd);
 
@@ -950,9 +950,9 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 	perf_slept[0] = ts[1] - ts[0];
 	igt_debug("slept=%lu perf=%"PRIu64"\n", slept[0], perf_slept[0]);
 
-	igt_spin_batch_end(spin);
+	igt_spin_end(spin);
 	gem_sync(gem_fd, spin->handle);
-	igt_spin_batch_free(gem_fd, spin);
+	igt_spin_free(gem_fd, spin);
 	close(fd[0]);
 
 	assert_within_epsilon(val[0], perf_slept[0], tolerance);
@@ -1052,8 +1052,8 @@ static void cpu_hotplug(int gem_fd)
 	 * Create two spinners so test can ensure shorter gaps in engine
 	 * busyness as it is terminating one and re-starting the other.
 	 */
-	spin[0] = igt_spin_batch_new(gem_fd, .engine = I915_EXEC_RENDER);
-	spin[1] = __igt_spin_batch_new(gem_fd, .engine = I915_EXEC_RENDER);
+	spin[0] = igt_spin_new(gem_fd, .engine = I915_EXEC_RENDER);
+	spin[1] = __igt_spin_new(gem_fd, .engine = I915_EXEC_RENDER);
 
 	val = __pmu_read_single(fd, &ts[0]);
 
@@ -1135,9 +1135,9 @@ static void cpu_hotplug(int gem_fd)
 		if ( ret == 1 || (ret < 0 && errno != EAGAIN))
 			break;
 
-		igt_spin_batch_free(gem_fd, spin[cur]);
-		spin[cur] = __igt_spin_batch_new(gem_fd,
-						 .engine = I915_EXEC_RENDER);
+		igt_spin_free(gem_fd, spin[cur]);
+		spin[cur] = __igt_spin_new(gem_fd,
+					   .engine = I915_EXEC_RENDER);
 		cur ^= 1;
 	}
 
@@ -1145,8 +1145,8 @@ static void cpu_hotplug(int gem_fd)
 
 	end_spin(gem_fd, spin[0], FLAG_SYNC);
 	end_spin(gem_fd, spin[1], FLAG_SYNC);
-	igt_spin_batch_free(gem_fd, spin[0]);
-	igt_spin_batch_free(gem_fd, spin[1]);
+	igt_spin_free(gem_fd, spin[0]);
+	igt_spin_free(gem_fd, spin[1]);
 	igt_waitchildren();
 	close(fd);
 	close(link[0]);
@@ -1174,9 +1174,9 @@ test_interrupts(int gem_fd)
 
 	/* Queue spinning batches. */
 	for (int i = 0; i < target; i++) {
-		spin[i] = __igt_spin_batch_new(gem_fd,
-					       .engine = I915_EXEC_RENDER,
-					       .flags = IGT_SPIN_FENCE_OUT);
+		spin[i] = __igt_spin_new(gem_fd,
+					 .engine = I915_EXEC_RENDER,
+					 .flags = IGT_SPIN_FENCE_OUT);
 		if (i == 0) {
 			fence_fd = spin[i]->out_fence;
 		} else {
@@ -1200,9 +1200,9 @@ test_interrupts(int gem_fd)
 
 	/* Arm batch expiration. */
 	for (int i = 0; i < target; i++)
-		igt_spin_batch_set_timeout(spin[i],
-					   (i + 1) * test_duration_ms * 1e6
-					   / target);
+		igt_spin_set_timeout(spin[i],
+				     (i + 1) * test_duration_ms * 1e6
+				     / target);
 
 	/* Wait for last batch to finish. */
 	pfd.events = POLLIN;
@@ -1212,7 +1212,7 @@ test_interrupts(int gem_fd)
 
 	/* Free batches. */
 	for (int i = 0; i < target; i++)
-		igt_spin_batch_free(gem_fd, spin[i]);
+		igt_spin_free(gem_fd, spin[i]);
 
 	/* Check at least as many interrupts has been generated. */
 	busy = pmu_read_single(fd) - idle;
@@ -1237,8 +1237,8 @@ test_interrupts_sync(int gem_fd)
 
 	/* Queue spinning batches. */
 	for (int i = 0; i < target; i++)
-		spin[i] = __igt_spin_batch_new(gem_fd,
-					       .flags = IGT_SPIN_FENCE_OUT);
+		spin[i] = __igt_spin_new(gem_fd,
+					 .flags = IGT_SPIN_FENCE_OUT);
 
 	/* Wait for idle state. */
 	idle = pmu_read_single(fd);
@@ -1254,9 +1254,9 @@ test_interrupts_sync(int gem_fd)
 		const unsigned int timeout_ms = test_duration_ms / target;
 
 		pfd.fd = spin[i]->out_fence;
-		igt_spin_batch_set_timeout(spin[i], timeout_ms * 1e6);
+		igt_spin_set_timeout(spin[i], timeout_ms * 1e6);
 		igt_assert_eq(poll(&pfd, 1, 2 * timeout_ms), 1);
-		igt_spin_batch_free(gem_fd, spin[i]);
+		igt_spin_free(gem_fd, spin[i]);
 	}
 
 	/* Check at least as many interrupts has been generated. */
@@ -1310,7 +1310,7 @@ test_frequency(int gem_fd)
 	min[0] = 1e9*(val[0] - start[0]) / slept;
 	min[1] = 1e9*(val[1] - start[1]) / slept;
 
-	igt_spin_batch_free(gem_fd, spin);
+	igt_spin_free(gem_fd, spin);
 	gem_quiescent_gpu(gem_fd); /* Don't leak busy bo into the next phase */
 
 	usleep(1e6);
@@ -1336,7 +1336,7 @@ test_frequency(int gem_fd)
 	max[0] = 1e9*(val[0] - start[0]) / slept;
 	max[1] = 1e9*(val[1] - start[1]) / slept;
 
-	igt_spin_batch_free(gem_fd, spin);
+	igt_spin_free(gem_fd, spin);
 	gem_quiescent_gpu(gem_fd);
 
 	/*
@@ -1501,7 +1501,7 @@ test_enable_race(int gem_fd, const struct intel_execution_engine2 *e)
 	gem_quiescent_gpu(gem_fd);
 }
 
-static void __rearm_spin_batch(igt_spin_t *spin)
+static void __rearm_spin(igt_spin_t *spin)
 {
 	const uint32_t mi_arb_chk = 0x5 << 23;
 
@@ -1570,8 +1570,8 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 		igt_spin_t *spin;
 
 		/* Allocate our spin batch and idle it. */
-		spin = igt_spin_batch_new(gem_fd, .engine = e2ring(gem_fd, e));
-		igt_spin_batch_end(spin);
+		spin = igt_spin_new(gem_fd, .engine = e2ring(gem_fd, e));
+		igt_spin_end(spin);
 		gem_sync(gem_fd, spin->handle);
 
 		/* 1st pass is calibration, second pass is the test. */
@@ -1596,14 +1596,14 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 				nanosleep(&_ts, NULL);
 
 				/* Restart the spinbatch. */
-				__rearm_spin_batch(spin);
-				__submit_spin_batch(gem_fd, spin, e, 0);
+				__rearm_spin(spin);
+				__submit_spin(gem_fd, spin, e, 0);
 
 				/* PWM busy sleep. */
 				loop_busy = igt_nsec_elapsed(&start);
 				_ts.tv_nsec = busy_us * 1000;
 				nanosleep(&_ts, NULL);
-				igt_spin_batch_end(spin);
+				igt_spin_end(spin);
 
 				/* Time accounting. */
 				now = igt_nsec_elapsed(&start);
@@ -1640,7 +1640,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 			write(link[1], &expected, sizeof(expected));
 		}
 
-		igt_spin_batch_free(gem_fd, spin);
+		igt_spin_free(gem_fd, spin);
 	}
 
 	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));

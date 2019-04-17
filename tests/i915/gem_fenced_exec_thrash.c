@@ -132,14 +132,14 @@ static void run_test(int fd, int num_fences, int expected_errno,
 			igt_spin_t *spin = NULL;
 
 			if (flags & BUSY_LOAD)
-				spin = __igt_spin_batch_new(fd);
+				spin = __igt_spin_new(fd);
 
 			igt_while_interruptible(flags & INTERRUPTIBLE) {
 				igt_assert_eq(__gem_execbuf(fd, &execbuf[i]),
 					      -expected_errno);
 			}
 
-			igt_spin_batch_free(fd, spin);
+			igt_spin_free(fd, spin);
 			gem_quiescent_gpu(fd);
 		}
 		count++;

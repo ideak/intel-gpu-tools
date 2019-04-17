@@ -181,7 +181,7 @@ static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 	if (gem_can_store_dword(fd, opts.engine))
 		opts.flags |= IGT_SPIN_POLL_RUN;
 
-	return __igt_spin_batch_factory(fd, &opts);
+	return __igt_spin_factory(fd, &opts);
 }
 
 static void __spin_wait(int fd, igt_spin_t *spin)
@@ -346,7 +346,7 @@ static void __test_banned(int fd)
 		/* Trigger a reset, making sure we are detected as guilty */
 		hang = spin_sync(fd, 0, 0);
 		trigger_reset(fd);
-		igt_spin_batch_free(fd, hang);
+		igt_spin_free(fd, hang);
 
 		count++;
 	}
@@ -386,7 +386,7 @@ static void test_wait(int fd, unsigned int flags, unsigned int wait)
 
 	check_wait(fd, hang->handle, wait, NULL);
 
-	igt_spin_batch_free(fd, hang);
+	igt_spin_free(fd, hang);
 
 	igt_require(i915_reset_control(true));
 
@@ -466,7 +466,7 @@ static void test_inflight(int fd, unsigned int wait)
 			close(fence[n]);
 		}
 
-		igt_spin_batch_free(fd, hang);
+		igt_spin_free(fd, hang);
 		igt_assert(i915_reset_control(true));
 		trigger_reset(fd);
 
@@ -522,7 +522,7 @@ static void test_inflight_suspend(int fd)
 		close(fence[n]);
 	}
 
-	igt_spin_batch_free(fd, hang);
+	igt_spin_free(fd, hang);
 	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
 	close(fd);
@@ -600,7 +600,7 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 			close(fence[n]);
 		}
 
-		igt_spin_batch_free(fd, hang);
+		igt_spin_free(fd, hang);
 		gem_close(fd, obj[1].handle);
 		igt_assert(i915_reset_control(true));
 		trigger_reset(fd);
@@ -660,7 +660,7 @@ static void test_inflight_external(int fd)
 	igt_assert_eq(sync_fence_status(fence), -EIO);
 	close(fence);
 
-	igt_spin_batch_free(fd, hang);
+	igt_spin_free(fd, hang);
 	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
 	close(fd);
@@ -709,7 +709,7 @@ static void test_inflight_internal(int fd, unsigned int wait)
 		close(fences[nfence]);
 	}
 
-	igt_spin_batch_free(fd, hang);
+	igt_spin_free(fd, hang);
 	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
 	close(fd);
@@ -779,7 +779,7 @@ static void reset_stress(int fd,
 			gem_execbuf(fd, &execbuf);
 
 		gem_sync(fd, obj.handle);
-		igt_spin_batch_free(fd, hang);
+		igt_spin_free(fd, hang);
 		gem_context_destroy(fd, ctx);
 	}
 	check_wait_elapsed(fd, &stats);

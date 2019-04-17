@@ -178,16 +178,16 @@ static void norecovery(int i915)
 		gem_context_get_param(i915, &param);
 		igt_assert_eq(param.value, pass);
 
-		spin = __igt_spin_batch_new(i915,
-					    .ctx = param.ctx_id,
-					    .flags = IGT_SPIN_POLL_RUN);
+		spin = __igt_spin_new(i915,
+				      .ctx = param.ctx_id,
+				      .flags = IGT_SPIN_POLL_RUN);
 		igt_spin_busywait_until_started(spin);
 
 		igt_force_gpu_reset(i915);
 
-		igt_spin_batch_end(spin);
+		igt_spin_end(spin);
 		igt_assert_eq(__gem_execbuf(i915, &spin->execbuf), expect);
-		igt_spin_batch_free(i915, spin);
+		igt_spin_free(i915, spin);
 
 		gem_context_destroy(i915, param.ctx_id);
 	}

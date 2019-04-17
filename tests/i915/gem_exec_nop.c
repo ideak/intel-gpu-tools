@@ -823,14 +823,14 @@ static void preempt(int fd, uint32_t handle,
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do {
 		igt_spin_t *spin =
-			__igt_spin_batch_new(fd,
-					     .ctx = ctx[0],
-					     .engine = ring_id);
+			__igt_spin_new(fd,
+				       .ctx = ctx[0],
+				       .engine = ring_id);
 
 		for (int loop = 0; loop < 1024; loop++)
 			gem_execbuf(fd, &execbuf);
 
-		igt_spin_batch_free(fd, spin);
+		igt_spin_free(fd, spin);
 
 		count += 1024;
 		clock_gettime(CLOCK_MONOTONIC, &now);

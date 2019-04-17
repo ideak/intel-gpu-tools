@@ -448,7 +448,7 @@ test_pf_nonblock(int i915)
 	igt_spin_t *spin;
 	uint32_t *ptr;
 
-	spin = igt_spin_batch_new(i915);
+	spin = igt_spin_new(i915);
 
 	igt_set_timeout(1, "initial pagefaulting did not complete within 1s");
 
@@ -458,7 +458,7 @@ test_pf_nonblock(int i915)
 
 	igt_reset_timeout();
 
-	igt_spin_batch_free(i915, spin);
+	igt_spin_free(i915, spin);
 }
 
 static void

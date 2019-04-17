@@ -74,9 +74,9 @@ static void basic(int fd, unsigned engine, unsigned flags)
 	IGT_CORK_HANDLE(cork);
 	uint32_t plug =
 		flags & (WRITE | AWAIT) ? igt_cork_plug(&cork, fd) : 0;
-	igt_spin_t *spin = igt_spin_batch_new(fd,
-					      .engine = engine,
-					      .dependency = plug);
+	igt_spin_t *spin = igt_spin_new(fd,
+					.engine = engine,
+					.dependency = plug);
 	struct drm_i915_gem_wait wait = {
 		flags & WRITE ? plug : spin->handle
 	};
@@ -89,7 +89,7 @@ static void basic(int fd, unsigned engine, unsigned flags)
 
 		timeout = 120;
 		if ((flags & HANG) == 0) {
-			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/2);
+			igt_spin_set_timeout(spin, NSEC_PER_SEC/2);
 			timeout = 1;
 		}
 
@@ -112,7 +112,7 @@ static void basic(int fd, unsigned engine, unsigned flags)
 		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 
 		if ((flags & HANG) == 0) {
-			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/2);
+			igt_spin_set_timeout(spin, NSEC_PER_SEC/2);
 			wait.timeout_ns = NSEC_PER_SEC; /* 1.0s */
 			igt_assert_eq(__gem_wait(fd, &wait), 0);
 			igt_assert(wait.timeout_ns >= 0);
@@ -129,7 +129,7 @@ static void basic(int fd, unsigned engine, unsigned flags)
 
 	if (plug)
 		gem_close(fd, plug);
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 }
 
 igt_main

@@ -161,7 +161,7 @@ static void unplug_show_queue(int fd, struct igt_cork *c, unsigned int engine)
 			.ctx = create_highest_priority(fd),
 			.engine = engine,
 		};
-		spin[n] = __igt_spin_batch_factory(fd, &opts);
+		spin[n] = __igt_spin_factory(fd, &opts);
 		gem_context_destroy(fd, opts.ctx);
 	}
 
@@ -169,7 +169,7 @@ static void unplug_show_queue(int fd, struct igt_cork *c, unsigned int engine)
 	igt_debugfs_dump(fd, "i915_engine_info");
 
 	for (int n = 0; n < ARRAY_SIZE(spin); n++)
-		igt_spin_batch_free(fd, spin[n]);
+		igt_spin_free(fd, spin[n]);
 
 }
 
@@ -221,7 +221,7 @@ static void independent(int fd, unsigned int engine)
 			continue;
 
 		if (spin == NULL) {
-			spin = __igt_spin_batch_new(fd, .engine = other);
+			spin = __igt_spin_new(fd, .engine = other);
 		} else {
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
@@ -250,7 +250,7 @@ static void independent(int fd, unsigned int engine)
 	igt_assert(gem_bo_busy(fd, scratch));
 	igt_assert_eq(ptr[0], engine);
 
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 	gem_quiescent_gpu(fd);
 
 	/* And we expect the others to have overwritten us, order unspecified */
@@ -358,9 +358,9 @@ static void semaphore_userlock(int i915)
 	scratch = gem_create(i915, 4096);
 	for_each_physical_engine(i915, engine) {
 		if (!spin) {
-			spin = igt_spin_batch_new(i915,
-						  .dependency = scratch,
-						  .engine = engine);
+			spin = igt_spin_new(i915,
+					    .dependency = scratch,
+					    .engine = engine);
 		} else {
 			uint64_t saved = spin->execbuf.flags;
 
@@ -398,7 +398,7 @@ static void semaphore_userlock(int i915)
 	gem_sync(i915, obj.handle); /* to hang unless we can preempt */
 	gem_close(i915, obj.handle);
 
-	igt_spin_batch_free(i915, spin);
+	igt_spin_free(i915, spin);
 }
 
 static void semaphore_codependency(int i915)
@@ -432,18 +432,18 @@ static void semaphore_codependency(int i915)
 		ctx = gem_context_create(i915);
 
 		task[i].xcs =
-			__igt_spin_batch_new(i915,
-					     .ctx = ctx,
-					     .engine = engine,
-					     .flags = IGT_SPIN_POLL_RUN);
+			__igt_spin_new(i915,
+				       .ctx = ctx,
+				       .engine = engine,
+				       .flags = IGT_SPIN_POLL_RUN);
 		igt_spin_busywait_until_started(task[i].xcs);
 
 		/* Common rcs tasks will be queued in FIFO */
 		task[i].rcs =
-			__igt_spin_batch_new(i915,
-					     .ctx = ctx,
-					     .engine = I915_EXEC_RENDER,
-					     .dependency = task[i].xcs->handle);
+			__igt_spin_new(i915,
+				       .ctx = ctx,
+				       .engine = I915_EXEC_RENDER,
+				       .dependency = task[i].xcs->handle);
 
 		gem_context_destroy(i915, ctx);
 
@@ -453,13 +453,13 @@ static void semaphore_codependency(int i915)
 	igt_require(i == ARRAY_SIZE(task));
 
 	/* Since task[0] was queued first, it will be first in queue for rcs */
-	igt_spin_batch_end(task[1].xcs);
-	igt_spin_batch_end(task[1].rcs);
+	igt_spin_end(task[1].xcs);
+	igt_spin_end(task[1].rcs);
 	gem_sync(i915, task[1].rcs->handle); /* to hang if task[0] hogs rcs */
 
 	for (i = 0; i < ARRAY_SIZE(task); i++) {
-		igt_spin_batch_free(i915, task[i].xcs);
-		igt_spin_batch_free(i915, task[i].rcs);
+		igt_spin_free(i915, task[i].xcs);
+		igt_spin_free(i915, task[i].rcs);
 	}
 }
 
@@ -579,9 +579,9 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 			ctx[LO] = gem_context_create(fd);
 			gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
 		}
-		spin[n] = __igt_spin_batch_new(fd,
-					       .ctx = ctx[LO],
-					       .engine = ring);
+		spin[n] = __igt_spin_new(fd,
+					 .ctx = ctx[LO],
+					 .engine = ring);
 		igt_debug("spin[%d].handle=%d\n", n, spin[n]->handle);
 
 		store_dword(fd, ctx[HI], ring, result, 0, n + 1, 0, I915_GEM_DOMAIN_RENDER);
@@ -592,7 +592,7 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 	}
 
 	for (int n = 0; n < ARRAY_SIZE(spin); n++)
-		igt_spin_batch_free(fd, spin[n]);
+		igt_spin_free(fd, spin[n]);
 
 	if (flags & HANG_LP)
 		igt_post_hang_ring(fd, hang);
@@ -614,9 +614,9 @@ static igt_spin_t *__noise(int fd, uint32_t ctx, int prio, igt_spin_t *spin)
 
 	for_each_physical_engine(fd, other) {
 		if (spin == NULL) {
-			spin = __igt_spin_batch_new(fd,
-						    .ctx = ctx,
-						    .engine = other);
+			spin = __igt_spin_new(fd,
+					      .ctx = ctx,
+					      .engine = other);
 		} else {
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
@@ -703,7 +703,7 @@ static void preempt_other(int fd, unsigned ring, unsigned int flags)
 	}
 
 	igt_assert(gem_bo_busy(fd, spin->handle));
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 
 	gem_context_destroy(fd, ctx[LO]);
 	gem_context_destroy(fd, ctx[NOISE]);
@@ -768,7 +768,7 @@ static void __preempt_queue(int fd,
 
 	if (above) {
 		igt_assert(gem_bo_busy(fd, above->handle));
-		igt_spin_batch_free(fd, above);
+		igt_spin_free(fd, above);
 	}
 
 	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
@@ -781,7 +781,7 @@ static void __preempt_queue(int fd,
 
 	if (below) {
 		igt_assert(gem_bo_busy(fd, below->handle));
-		igt_spin_batch_free(fd, below);
+		igt_spin_free(fd, below);
 	}
 
 	gem_context_destroy(fd, ctx[LO]);
@@ -825,9 +825,9 @@ static void preempt_self(int fd, unsigned ring)
 	n = 0;
 	gem_context_set_priority(fd, ctx[HI], MIN_PRIO);
 	for_each_physical_engine(fd, other) {
-		spin[n] = __igt_spin_batch_new(fd,
-					       .ctx = ctx[NOISE],
-					       .engine = other);
+		spin[n] = __igt_spin_new(fd,
+					 .ctx = ctx[NOISE],
+					 .engine = other);
 		store_dword(fd, ctx[HI], other,
 			    result, (n + 1)*sizeof(uint32_t), n + 1,
 			    0, I915_GEM_DOMAIN_RENDER);
@@ -842,7 +842,7 @@ static void preempt_self(int fd, unsigned ring)
 
 	for (i = 0; i < n; i++) {
 		igt_assert(gem_bo_busy(fd, spin[i]->handle));
-		igt_spin_batch_free(fd, spin[i]);
+		igt_spin_free(fd, spin[i]);
 	}
 
 	__sync_read_u32_count(fd, result, result_read, sizeof(result_read));
@@ -870,9 +870,9 @@ static void preemptive_hang(int fd, unsigned ring)
 		ctx[LO] = gem_context_create(fd);
 		gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
 
-		spin[n] = __igt_spin_batch_new(fd,
-					       .ctx = ctx[LO],
-					       .engine = ring);
+		spin[n] = __igt_spin_new(fd,
+					 .ctx = ctx[LO],
+					 .engine = ring);
 
 		gem_context_destroy(fd, ctx[LO]);
 	}
@@ -886,7 +886,7 @@ static void preemptive_hang(int fd, unsigned ring)
 		 * be updated to reflect such changes.
 		 */
 		igt_assert(gem_bo_busy(fd, spin[n]->handle));
-		igt_spin_batch_free(fd, spin[n]);
+		igt_spin_free(fd, spin[n]);
 	}
 
 	gem_context_destroy(fd, ctx[HI]);
@@ -1357,9 +1357,9 @@ static void measure_semaphore_power(int i915)
 		int64_t jiffie = 1;
 		igt_spin_t *spin;
 
-		spin = __igt_spin_batch_new(i915,
-					    .engine = signaler,
-					    .flags = IGT_SPIN_POLL_RUN);
+		spin = __igt_spin_new(i915,
+				      .engine = signaler,
+				      .flags = IGT_SPIN_POLL_RUN);
 		gem_wait(i915, spin->handle, &jiffie); /* waitboost */
 		igt_spin_busywait_until_started(spin);
 
@@ -1374,11 +1374,11 @@ static void measure_semaphore_power(int i915)
 			if (engine == signaler)
 				continue;
 
-			sema = __igt_spin_batch_new(i915,
-						    .engine = engine,
-						    .dependency = spin->handle);
+			sema = __igt_spin_new(i915,
+					      .engine = engine,
+					      .dependency = spin->handle);
 
-			igt_spin_batch_free(i915, sema);
+			igt_spin_free(i915, sema);
 		}
 		usleep(10); /* just give the tasklets a chance to run */
 
@@ -1386,7 +1386,7 @@ static void measure_semaphore_power(int i915)
 		usleep(100*1000);
 		gpu_power_read(&power, &s_sema[1]);
 
-		igt_spin_batch_free(i915, spin);
+		igt_spin_free(i915, spin);
 
 		baseline = gpu_power_W(&power, &s_spin[0], &s_spin[1]);
 		total = gpu_power_W(&power, &s_sema[0], &s_sema[1]);

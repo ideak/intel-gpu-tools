@@ -41,12 +41,12 @@ static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 	struct timespec itv = { };
 	uint64_t elapsed;
 
-	spin = __igt_spin_batch_new(fd, .engine = engine);
+	spin = __igt_spin_new(fd, .engine = engine);
 	while ((elapsed = igt_nsec_elapsed(&tv)) >> 30 < timeout_sec) {
-		igt_spin_t *next = __igt_spin_batch_new(fd, .engine = engine);
+		igt_spin_t *next = __igt_spin_new(fd, .engine = engine);
 
-		igt_spin_batch_set_timeout(spin,
-					   timeout_100ms - igt_nsec_elapsed(&itv));
+		igt_spin_set_timeout(spin,
+				     timeout_100ms - igt_nsec_elapsed(&itv));
 		gem_sync(fd, spin->handle);
 		igt_debug("loop %lu: interval=%fms (target 100ms), elapsed %fms\n",
 			  loops,
@@ -54,11 +54,11 @@ static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 			  igt_nsec_elapsed(&tv) * 1e-6);
 		memset(&itv, 0, sizeof(itv));
 
-		igt_spin_batch_free(fd, spin);
+		igt_spin_free(fd, spin);
 		spin = next;
 		loops++;
 	}
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 
 	igt_info("Completed %ld loops in %lld ns, target %ld\n",
 		 loops, (long long)elapsed, (long)(elapsed / timeout_100ms));
@@ -74,7 +74,7 @@ static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
 	const uint32_t ctx0 = gem_context_create(fd);
 	const uint32_t ctx1 = (flags & RESUBMIT_NEW_CTX) ?
 		gem_context_create(fd) : ctx0;
-	igt_spin_t *spin = __igt_spin_batch_new(fd, .ctx = ctx0, .engine = engine);
+	igt_spin_t *spin = __igt_spin_new(fd, .ctx = ctx0, .engine = engine);
 	unsigned int other;
 
 	struct drm_i915_gem_execbuffer2 eb = {
@@ -96,11 +96,11 @@ static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
 		gem_execbuf(fd, &eb);
 	}
 
-	igt_spin_batch_end(spin);
+	igt_spin_end(spin);
 
 	gem_sync(fd, spin->obj[1].handle);
 
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 
 	if (ctx1 != ctx0)
 		gem_context_destroy(fd, ctx1);
@@ -110,7 +110,7 @@ static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
 
 static void spin_exit_handler(int sig)
 {
-	igt_terminate_spin_batches();
+	igt_terminate_spins();
 }
 
 static void spin_on_all_engines(int fd, unsigned int timeout_sec)

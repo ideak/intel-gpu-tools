@@ -388,11 +388,11 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 		}
 
 		if (flags & ACTIVE) {
-			spin = igt_spin_batch_new(fd,
-						  .engine = I915_EXEC_DEFAULT,
-						  .dependency = obj.handle);
+			spin = igt_spin_new(fd,
+					    .engine = I915_EXEC_DEFAULT,
+					    .dependency = obj.handle);
 			if (!(flags & HANG))
-				igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
+				igt_spin_set_timeout(spin, NSEC_PER_SEC/100);
 			igt_assert(gem_bo_busy(fd, obj.handle));
 		}
 
@@ -424,7 +424,7 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 			igt_assert_eq_u64(reloc.presumed_offset, offset);
 		igt_assert_eq_u64(obj.offset, offset);
 
-		igt_spin_batch_free(fd, spin);
+		igt_spin_free(fd, spin);
 
 		/* Simulate relocation */
 		if (flags & NORELOC) {
@@ -456,11 +456,11 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 		}
 
 		if (flags & ACTIVE) {
-			spin = igt_spin_batch_new(fd,
-						  .engine = I915_EXEC_DEFAULT,
-						  .dependency = obj.handle);
+			spin = igt_spin_new(fd,
+					    .engine = I915_EXEC_DEFAULT,
+					    .dependency = obj.handle);
 			if (!(flags & HANG))
-				igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
+				igt_spin_set_timeout(spin, NSEC_PER_SEC/100);
 			igt_assert(gem_bo_busy(fd, obj.handle));
 		}
 
@@ -492,7 +492,7 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 			igt_assert_eq_u64(reloc.presumed_offset, offset);
 		igt_assert_eq_u64(obj.offset, offset);
 
-		igt_spin_batch_free(fd, spin);
+		igt_spin_free(fd, spin);
 		if (trash)
 			gem_close(fd, trash);
 	}
@@ -585,14 +585,14 @@ static void basic_range(int fd, unsigned flags)
 	execbuf.buffer_count = n + 1;
 
 	if (flags & ACTIVE) {
-		spin = igt_spin_batch_new(fd, .dependency = obj[n].handle);
+		spin = igt_spin_new(fd, .dependency = obj[n].handle);
 		if (!(flags & HANG))
-			igt_spin_batch_set_timeout(spin, NSEC_PER_SEC/100);
+			igt_spin_set_timeout(spin, NSEC_PER_SEC/100);
 		igt_assert(gem_bo_busy(fd, obj[n].handle));
 	}
 
 	gem_execbuf(fd, &execbuf);
-	igt_spin_batch_free(fd, spin);
+	igt_spin_free(fd, spin);
 
 	for (int i = 0; i < n; i++) {
 		uint64_t offset;
