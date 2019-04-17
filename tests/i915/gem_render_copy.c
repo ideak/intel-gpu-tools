@@ -459,6 +459,11 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 	igt_assert(igt_buf_height(buf) == height);
 }
 
+static void scratch_buf_fini(struct igt_buf *buf)
+{
+	drm_intel_bo_unreference(buf->bo);
+}
+
 static void
 scratch_buf_check(data_t *data,
 		  struct igt_buf *buf,
@@ -662,6 +667,13 @@ static void test(data_t *data, uint32_t tiling, uint64_t ccs_modifier)
 
 	if (ccs_modifier)
 		scratch_buf_aux_check(data, &ccs);
+
+	scratch_buf_fini(&ref);
+	if (ccs_modifier)
+		scratch_buf_fini(&ccs);
+	scratch_buf_fini(&dst);
+	for (int i = 0; i < num_src; i++)
+		scratch_buf_fini(&src[i].buf);
 }
 
 static int opt_handler(int opt, int opt_index, void *data)
