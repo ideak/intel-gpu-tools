@@ -644,7 +644,7 @@ get_cursor_updates_per_vblank(igt_display_t *display, enum pipe pipe,
 	target /= 4;
 	igt_require(target > 1);
 
-	igt_debug("Using a target of %d cursor updates per quarter-vblank\n", target);
+	igt_info("Using a target of %d cursor updates per quarter-vblank\n", target);
 
 	return target;
 }
@@ -1030,6 +1030,7 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 	enum pipe pipe = find_connected_pipe(display, false);
 	igt_output_t *output;
 	uint32_t vrefresh;
+	int fail_count;
 
 	if (mode >= flip_test_atomic)
 		igt_require(display->is_atomic);
@@ -1049,6 +1050,8 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	target = get_cursor_updates_per_vblank(display, pipe, &arg[0]);
+
+	fail_count = 0;
 
 	for (int i = 0; i < nloops; i++) {
 		shared[0] = 0;
@@ -1090,13 +1093,19 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 
 		shared[0] = 1;
 		igt_waitchildren();
-		igt_assert_f(shared[0] > vrefresh*target / 2,
-			     "completed %lu cursor updated in a period of %u flips, "
-			     "we expect to complete approximately %lu updates, "
-			     "with the threshold set at %lu\n",
-			     shared[0], vrefresh / 2,
-			     vrefresh*target, vrefresh*target / 2);
+		if (shared[0] <= vrefresh*target / 2) {
+			fail_count++;
+			igt_critical("completed %lu cursor updated in a period of %u flips, "
+				     "we expect to complete approximately %lu updates, "
+				     "with the threshold set at %lu\n",
+				     shared[0], vrefresh / 2,
+				     vrefresh*target, vrefresh*target / 2);
+		}
 	}
+
+	igt_assert_f(fail_count == 0,
+		     "Failed to meet cursor update expectations in %d out of %d iterations\n",
+		     fail_count, nloops);
 
 	igt_remove_fb(display->drm_fd, &fb_info);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
