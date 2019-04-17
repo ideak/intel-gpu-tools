@@ -1580,29 +1580,37 @@ struct fb_blit_upload {
 	struct intel_batchbuffer *batch;
 };
 
-static int max_blitter_stride(int fd, uint64_t modifier)
+static bool blitter_ok(const struct igt_fb *fb)
 {
-	int stride = 32768;
+	for (int i = 0; i < fb->num_planes; i++) {
+		/*
+		 * gen4+ stride limit is 4x this with tiling,
+		 * but since our blits are always between tiled
+		 * and linear surfaces (and we do this check just
+		 * for the tiled surface) we must use the lower
+		 * linear stride limit here.
+		 */
+		if (fb->plane_width[i] > 32767 ||
+		    fb->plane_height[i] > 32767 ||
+		    fb->strides[i] > 32767)
+			return false;
+	}
 
-	if (intel_gen(intel_get_drm_devid(fd)) >= 4 &&
-	    modifier != DRM_FORMAT_MOD_NONE)
-		stride *= 4;
-
-	return stride;
+	return true;
 }
 
 static bool use_rendercopy(const struct igt_fb *fb)
 {
 	return is_ccs_modifier(fb->modifier) ||
 		(fb->modifier == I915_FORMAT_MOD_Yf_TILED &&
-		 fb->strides[0] >= max_blitter_stride(fb->fd, fb->modifier));
+		 !blitter_ok(fb));
 }
 
 static bool use_blitter(const struct igt_fb *fb)
 {
 	return (fb->modifier == I915_FORMAT_MOD_Y_TILED ||
 		fb->modifier == I915_FORMAT_MOD_Yf_TILED) &&
-		fb->strides[0] < max_blitter_stride(fb->fd, fb->modifier);
+		blitter_ok(fb);
 }
 
 static void init_buf(struct fb_blit_upload *blit,
