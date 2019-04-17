@@ -1628,6 +1628,11 @@ static void init_buf(struct fb_blit_upload *blit,
 	}
 }
 
+static void fini_buf(struct igt_buf *buf)
+{
+	drm_intel_bo_unreference(buf->bo);
+}
+
 static void rendercopy(struct fb_blit_upload *blit,
 		       const struct igt_fb *dst_fb,
 		       const struct igt_fb *src_fb)
@@ -1647,6 +1652,9 @@ static void rendercopy(struct fb_blit_upload *blit,
 	render_copy(blit->batch, NULL,
 		    &src, 0, 0, dst_fb->plane_width[0], dst_fb->plane_height[0],
 		    &dst, 0, 0);
+
+	fini_buf(&dst);
+	fini_buf(&src);
 }
 
 static void blitcopy(const struct igt_fb *dst_fb,
