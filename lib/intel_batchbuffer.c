@@ -370,6 +370,11 @@ intel_batchbuffer_copy_data(struct intel_batchbuffer *batch,
 	return intel_batchbuffer_subdata_offset(batch, subdata);
 }
 
+#define CHECK_RANGE(x)	do { \
+	igt_assert_lte(0, (x)); \
+	igt_assert_lt((x), (1 << 15)); \
+} while (0)
+
 /**
  * intel_blt_copy:
  * @batch: batchbuffer object
@@ -417,17 +422,12 @@ intel_blt_copy(struct intel_batchbuffer *batch,
 		cmd_bits |= XY_SRC_COPY_BLT_DST_TILED;
 	}
 
-#define CHECK_RANGE(x)	((x) >= 0 && (x) < (1 << 15))
-	igt_assert(CHECK_RANGE(src_x1) && CHECK_RANGE(src_y1) &&
-		   CHECK_RANGE(dst_x1) && CHECK_RANGE(dst_y1) &&
-		   CHECK_RANGE(width) && CHECK_RANGE(height) &&
-		   CHECK_RANGE(src_x1 + width) &&
-		   CHECK_RANGE(src_y1 + height) &&
-		   CHECK_RANGE(dst_x1 + width) &&
-		   CHECK_RANGE(dst_y1 + height) &&
-		   CHECK_RANGE(src_pitch) &&
-		   CHECK_RANGE(dst_pitch));
-#undef CHECK_RANGE
+	CHECK_RANGE(src_x1); CHECK_RANGE(src_y1);
+	CHECK_RANGE(dst_x1); CHECK_RANGE(dst_y1);
+	CHECK_RANGE(width); CHECK_RANGE(height);
+	CHECK_RANGE(src_x1 + width); CHECK_RANGE(src_y1 + height);
+	CHECK_RANGE(dst_x1 + width); CHECK_RANGE(dst_y1 + height);
+	CHECK_RANGE(src_pitch); CHECK_RANGE(dst_pitch);
 
 	br13_bits = 0;
 	switch (bpp) {
@@ -715,14 +715,12 @@ void igt_blitter_fast_copy__raw(int fd,
 	dword0 = fast_copy_dword0(src_tiling, dst_tiling);
 	dword1 = fast_copy_dword1(src_tiling, dst_tiling, bpp);
 
-#define CHECK_RANGE(x)	((x) >= 0 && (x) < (1 << 15))
-	assert(CHECK_RANGE(src_x) && CHECK_RANGE(src_y) &&
-	       CHECK_RANGE(dst_x) && CHECK_RANGE(dst_y) &&
-	       CHECK_RANGE(width) && CHECK_RANGE(height) &&
-	       CHECK_RANGE(src_x + width) && CHECK_RANGE(src_y + height) &&
-	       CHECK_RANGE(dst_x + width) && CHECK_RANGE(dst_y + height) &&
-	       CHECK_RANGE(src_pitch) && CHECK_RANGE(dst_pitch));
-#undef CHECK_RANGE
+	CHECK_RANGE(src_x); CHECK_RANGE(src_y);
+	CHECK_RANGE(dst_x); CHECK_RANGE(dst_y);
+	CHECK_RANGE(width); CHECK_RANGE(height);
+	CHECK_RANGE(src_x + width); CHECK_RANGE(src_y + height);
+	CHECK_RANGE(dst_x + width); CHECK_RANGE(dst_y + height);
+	CHECK_RANGE(src_pitch); CHECK_RANGE(dst_pitch);
 
 	batch[i++] = dword0;
 	batch[i++] = dword1 | dst_pitch;
@@ -791,14 +789,12 @@ void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 	dword0 = fast_copy_dword0(src->tiling, dst->tiling);
 	dword1 = fast_copy_dword1(src->tiling, dst->tiling, dst->bpp);
 
-#define CHECK_RANGE(x)	((x) >= 0 && (x) < (1 << 15))
-	assert(CHECK_RANGE(src_x) && CHECK_RANGE(src_y) &&
-	       CHECK_RANGE(dst_x) && CHECK_RANGE(dst_y) &&
-	       CHECK_RANGE(width) && CHECK_RANGE(height) &&
-	       CHECK_RANGE(src_x + width) && CHECK_RANGE(src_y + height) &&
-	       CHECK_RANGE(dst_x + width) && CHECK_RANGE(dst_y + height) &&
-	       CHECK_RANGE(src_pitch) && CHECK_RANGE(dst_pitch));
-#undef CHECK_RANGE
+	CHECK_RANGE(src_x); CHECK_RANGE(src_y);
+	CHECK_RANGE(dst_x); CHECK_RANGE(dst_y);
+	CHECK_RANGE(width); CHECK_RANGE(height);
+	CHECK_RANGE(src_x + width); CHECK_RANGE(src_y + height);
+	CHECK_RANGE(dst_x + width); CHECK_RANGE(dst_y + height);
+	CHECK_RANGE(src_pitch); CHECK_RANGE(dst_pitch);
 
 	BEGIN_BATCH(10, 2);
 	OUT_BATCH(dword0);
@@ -815,6 +811,8 @@ void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 
 	intel_batchbuffer_flush(batch);
 }
+
+#undef CHECK_RANGE
 
 /**
  * igt_get_render_copyfunc:
