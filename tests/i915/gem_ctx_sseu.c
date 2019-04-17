@@ -144,23 +144,23 @@ static void test_engines(int fd)
 
 	/* get_param */
 
-	sseu.engine_instance = -1; /* Assumed invalid. */
+	sseu.engine.engine_instance = -1; /* Assumed invalid. */
 	igt_assert_eq(__gem_context_get_param(fd, &arg), -EINVAL);
 
-	sseu.engine_class = I915_ENGINE_CLASS_INVALID; /* Both invalid. */
+	sseu.engine.engine_class = I915_ENGINE_CLASS_INVALID; /* Both invalid. */
 	igt_assert_eq(__gem_context_get_param(fd, &arg), -EINVAL);
 
-	sseu.engine_instance = 0; /* Class invalid. */
+	sseu.engine.engine_instance = 0; /* Class invalid. */
 	igt_assert_eq(__gem_context_get_param(fd, &arg), -EINVAL);
-	sseu.engine_class = I915_ENGINE_CLASS_RENDER;
+	sseu.engine.engine_class = I915_ENGINE_CLASS_RENDER;
 
 	last_with_engines = -1;
 	for (class = 0; class < ~0; class++) {
 		for (instance = 0; instance < ~0; instance++) {
 			int ret;
 
-			sseu.engine_class = class;
-			sseu.engine_instance = instance;
+			sseu.engine.engine_class = class;
+			sseu.engine.engine_instance = instance;
 
 			ret = __gem_context_get_param(fd, &arg);
 
@@ -182,19 +182,19 @@ static void test_engines(int fd)
 	 * Get some proper values before trying to reprogram them onto
 	 * an invalid engine.
 	 */
-	sseu.engine_class = 0;
-	sseu.engine_instance = 0;
+	sseu.engine.engine_class = 0;
+	sseu.engine.engine_instance = 0;
 	gem_context_get_param(fd, &arg);
 
 	/* set_param */
 
-	sseu.engine_instance = -1; /* Assumed invalid. */
+	sseu.engine.engine_instance = -1; /* Assumed invalid. */
 	igt_assert_eq(__gem_context_set_param(fd, &arg), -EINVAL);
 
-	sseu.engine_class = I915_ENGINE_CLASS_INVALID; /* Both invalid. */
+	sseu.engine.engine_class = I915_ENGINE_CLASS_INVALID; /* Both invalid. */
 	igt_assert_eq(__gem_context_set_param(fd, &arg), -EINVAL);
 
-	sseu.engine_instance = 0; /* Class invalid. */
+	sseu.engine.engine_instance = 0; /* Class invalid. */
 	igt_assert_eq(__gem_context_set_param(fd, &arg), -EINVAL);
 
 	last_with_engines = -1;
@@ -202,8 +202,8 @@ static void test_engines(int fd)
 		for (instance = 0; instance < ~0; instance++) {
 			int ret;
 
-			sseu.engine_class = class;
-			sseu.engine_instance = instance;
+			sseu.engine.engine_class = class;
+			sseu.engine.engine_instance = instance;
 
 			ret = __gem_context_set_param(fd, &arg);
 
