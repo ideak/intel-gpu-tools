@@ -160,6 +160,7 @@ gen4_bind_buf(struct intel_batchbuffer *batch,
 		case 8: ss->ss0.surface_format = SURFACEFORMAT_R8_UNORM; break;
 		case 16: ss->ss0.surface_format = SURFACEFORMAT_R8G8_UNORM; break;
 		case 32: ss->ss0.surface_format = SURFACEFORMAT_B8G8R8A8_UNORM; break;
+		case 64: ss->ss0.surface_format = SURFACEFORMAT_R16G16B16A16_FLOAT; break;
 		default: igt_assert(0);
 	}
 

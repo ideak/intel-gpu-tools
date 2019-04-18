@@ -73,6 +73,7 @@ gen7_bind_buf(struct intel_batchbuffer *batch,
 		case 8: format = SURFACEFORMAT_R8_UNORM; break;
 		case 16: format = SURFACEFORMAT_R8G8_UNORM; break;
 		case 32: format = SURFACEFORMAT_B8G8R8A8_UNORM; break;
+		case 64: format = SURFACEFORMAT_R16G16B16A16_FLOAT; break;
 		default: igt_assert(0);
 	}
 
