@@ -181,10 +181,8 @@ static void norecovery(int i915)
 		spin = __igt_spin_batch_new(i915,
 					    .ctx = param.ctx_id,
 					    .flags = IGT_SPIN_POLL_RUN);
-		igt_assert(spin->running);
+		igt_spin_busywait_until_started(spin);
 
-		while (!READ_ONCE(*spin->running))
-			;
 		igt_force_gpu_reset(i915);
 
 		igt_spin_batch_end(spin);

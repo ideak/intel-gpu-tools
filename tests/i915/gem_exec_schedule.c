@@ -436,7 +436,7 @@ static void semaphore_codependency(int i915)
 					     .ctx = ctx,
 					     .engine = engine,
 					     .flags = IGT_SPIN_POLL_RUN);
-		igt_spin_busywait_until_running(task[i].xcs);
+		igt_spin_busywait_until_started(task[i].xcs);
 
 		/* Common rcs tasks will be queued in FIFO */
 		task[i].rcs =
@@ -1361,8 +1361,7 @@ static void measure_semaphore_power(int i915)
 					    .engine = signaler,
 					    .flags = IGT_SPIN_POLL_RUN);
 		gem_wait(i915, spin->handle, &jiffie); /* waitboost */
-		igt_assert(spin->running);
-		igt_spin_busywait_until_running(spin);
+		igt_spin_busywait_until_started(spin);
 
 		gpu_power_read(&power, &s_spin[0]);
 		usleep(100*1000);

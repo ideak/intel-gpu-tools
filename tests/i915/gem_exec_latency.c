@@ -79,29 +79,29 @@ poll_ring(int fd, unsigned ring, const char *name)
 	igt_require(gem_can_store_dword(fd, ring));
 
 	spin[0] = __igt_spin_batch_factory(fd, &opts);
-	igt_assert(spin[0]->running);
+	igt_assert(igt_spin_has_poll(spin[0]));
 	cmd = *spin[0]->batch;
 
 	spin[1] = __igt_spin_batch_factory(fd, &opts);
-	igt_assert(spin[1]->running);
+	igt_assert(igt_spin_has_poll(spin[1]));
+
 	igt_assert(cmd == *spin[1]->batch);
 
 	igt_spin_batch_end(spin[0]);
-	while (!READ_ONCE(*spin[1]->running))
-		;
+	igt_spin_busywait_until_started(spin[1]);
+
 	igt_assert(!gem_bo_busy(fd, spin[0]->handle));
 
 	cycles = 0;
 	while ((elapsed = igt_nsec_elapsed(&tv)) < 2ull << 30) {
-		unsigned int idx = cycles++ & 1;
+		const unsigned int idx = cycles++ & 1;
 
 		*spin[idx]->batch = cmd;
-		*spin[idx]->running = 0;
+		spin[idx]->poll[SPIN_POLL_START_IDX] = 0;
 		gem_execbuf(fd, &spin[idx]->execbuf);
 
 		igt_spin_batch_end(spin[!idx]);
-		while (!READ_ONCE(*spin[idx]->running))
-			;
+		igt_spin_busywait_until_started(spin[idx]);
 	}
 
 	igt_info("%s completed %ld cycles: %.3f us\n",
@@ -419,7 +419,7 @@ static void __rearm_spin_batch(igt_spin_t *spin)
 	const uint32_t mi_arb_chk = 0x5 << 23;
 
        *spin->batch = mi_arb_chk;
-       *spin->running = 0;
+       spin->poll[SPIN_POLL_START_IDX] = 0;
        __sync_synchronize();
 }
 
@@ -441,7 +441,7 @@ struct rt_pkt {
 
 static bool __spin_wait(int fd, igt_spin_t *spin)
 {
-	while (!READ_ONCE(*spin->running)) {
+	while (!igt_spin_has_started(spin)) {
 		if (!gem_bo_busy(fd, spin->handle))
 			return false;
 	}
@@ -537,7 +537,7 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 					 passname[pass]);
 				break;
 			}
-			igt_spin_busywait_until_running(spin);
+			igt_spin_busywait_until_started(spin);
 
 			igt_until_timeout(pass > 0 ? 5 : 2) {
 				struct timespec ts = { };

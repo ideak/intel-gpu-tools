@@ -189,10 +189,10 @@ static unsigned long __spin_wait(int fd, igt_spin_t *spin)
 
 	igt_nsec_elapsed(&start);
 
-	if (spin->running) {
+	if (igt_spin_has_poll(spin)) {
 		unsigned long timeout = 0;
 
-		while (!READ_ONCE(*spin->running)) {
+		while (!igt_spin_has_started(spin)) {
 			unsigned long t = igt_nsec_elapsed(&start);
 
 			if ((t - timeout) > 250e6) {

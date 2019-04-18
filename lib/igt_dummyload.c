@@ -65,17 +65,6 @@ static const int BATCH_SIZE = 4096;
 static IGT_LIST(spin_list);
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static void
-fill_reloc(struct drm_i915_gem_relocation_entry *reloc,
-	   uint32_t gem_handle, uint32_t offset,
-	   uint32_t read_domains, uint32_t write_domains)
-{
-	reloc->target_handle = gem_handle;
-	reloc->offset = offset * sizeof(uint32_t);
-	reloc->read_domains = read_domains;
-	reloc->write_domain = write_domains;
-}
-
 static int
 emit_recursive_batch(igt_spin_t *spin,
 		     int fd, const struct igt_spin_factory *opts)
@@ -128,15 +117,20 @@ emit_recursive_batch(igt_spin_t *spin,
 	if (opts->dependency) {
 		igt_assert(!(opts->flags & IGT_SPIN_POLL_RUN));
 
+		r = &relocs[obj[BATCH].relocation_count++];
+
 		/* dummy write to dependency */
 		obj[SCRATCH].handle = opts->dependency;
-		fill_reloc(&relocs[obj[BATCH].relocation_count++],
-			   opts->dependency, 1020,
-			   I915_GEM_DOMAIN_RENDER,
-			   I915_GEM_DOMAIN_RENDER);
+		r->presumed_offset = 0;
+		r->target_handle = obj[SCRATCH].handle;
+		r->offset = sizeof(uint32_t) * 1020;
+		r->delta = 0;
+		r->read_domains = I915_GEM_DOMAIN_RENDER;
+		r->write_domain = I915_GEM_DOMAIN_RENDER;
+
 		execbuf->buffer_count++;
 	} else if (opts->flags & IGT_SPIN_POLL_RUN) {
-		unsigned int offset;
+		r = &relocs[obj[BATCH].relocation_count++];
 
 		igt_assert(!opts->dependency);
 
@@ -146,39 +140,42 @@ emit_recursive_batch(igt_spin_t *spin,
 		}
 
 		spin->poll_handle = gem_create(fd, 4096);
+		obj[SCRATCH].handle = spin->poll_handle;
 
 		if (__gem_set_caching(fd, spin->poll_handle,
 				      I915_CACHING_CACHED) == 0)
-			spin->running = gem_mmap__cpu(fd, spin->poll_handle,
-						      0, 4096,
-						      PROT_READ | PROT_WRITE);
+			spin->poll = gem_mmap__cpu(fd, spin->poll_handle,
+						   0, 4096,
+						   PROT_READ | PROT_WRITE);
 		else
-			spin->running = gem_mmap__wc(fd, spin->poll_handle,
-						     0, 4096,
-						     PROT_READ | PROT_WRITE);
-		igt_assert_eq(*spin->running, 0);
+			spin->poll = gem_mmap__wc(fd, spin->poll_handle,
+						  0, 4096,
+						  PROT_READ | PROT_WRITE);
+
+		igt_assert_eq(spin->poll[SPIN_POLL_START_IDX], 0);
+
+		/* batch is first */
+		r->presumed_offset = 4096;
+		r->target_handle = obj[SCRATCH].handle;
+		r->offset = sizeof(uint32_t) * 1;
+		r->delta = sizeof(uint32_t) * SPIN_POLL_START_IDX;
 
 		*batch++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
 
 		if (gen >= 8) {
-			offset = 1;
-			*batch++ = 0;
+			*batch++ = r->presumed_offset + r->delta;
 			*batch++ = 0;
 		} else if (gen >= 4) {
-			offset = 2;
 			*batch++ = 0;
-			*batch++ = 0;
+			*batch++ = r->presumed_offset + r->delta;
+			r->offset += sizeof(uint32_t);
 		} else {
-			offset = 1;
 			batch[-1]--;
-			*batch++ = 0;
+			*batch++ = r->presumed_offset + r->delta;
 		}
 
 		*batch++ = 1;
 
-		obj[SCRATCH].handle = spin->poll_handle;
-		fill_reloc(&relocs[obj[BATCH].relocation_count++],
-			   spin->poll_handle, offset, 0, 0);
 		execbuf->buffer_count++;
 	}
 
@@ -408,8 +405,8 @@ void igt_spin_batch_free(int fd, igt_spin_t *spin)
 	gem_munmap((void *)((unsigned long)spin->batch & (~4095UL)),
 		   BATCH_SIZE);
 
-	if (spin->running) {
-		gem_munmap(spin->running, 4096);
+	if (spin->poll) {
+		gem_munmap(spin->poll, 4096);
 		gem_close(fd, spin->poll_handle);
 	}
 

@@ -41,7 +41,8 @@ typedef struct igt_spin {
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint32_t poll_handle;
-	bool *running;
+	uint32_t *poll;
+#define SPIN_POLL_START_IDX 0
 } igt_spin_t;
 
 struct igt_spin_factory {
@@ -70,9 +71,19 @@ void igt_spin_batch_set_timeout(igt_spin_t *spin, int64_t ns);
 void igt_spin_batch_end(igt_spin_t *spin);
 void igt_spin_batch_free(int fd, igt_spin_t *spin);
 
-static inline void igt_spin_busywait_until_running(igt_spin_t *spin)
+static inline bool igt_spin_has_poll(const igt_spin_t *spin)
 {
-	while (!READ_ONCE(*spin->running))
+	return spin->poll;
+}
+
+static inline bool igt_spin_has_started(igt_spin_t *spin)
+{
+	return READ_ONCE(spin->poll[SPIN_POLL_START_IDX]);
+}
+
+static inline void igt_spin_busywait_until_started(igt_spin_t *spin)
+{
+	while (!igt_spin_has_started(spin))
 		;
 }
 

@@ -704,8 +704,8 @@ static void inject_reset_context(int fd, unsigned int engine)
 
 	spin = __igt_spin_batch_factory(fd, &opts);
 
-	if (spin->running)
-		igt_spin_busywait_until_running(spin);
+	if (igt_spin_has_poll(spin))
+		igt_spin_busywait_until_started(spin);
 	else
 		usleep(1000); /* better than nothing */
 

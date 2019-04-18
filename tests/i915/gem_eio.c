@@ -186,8 +186,8 @@ static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 
 static void __spin_wait(int fd, igt_spin_t *spin)
 {
-	if (spin->running) {
-		igt_spin_busywait_until_running(spin);
+	if (igt_spin_has_poll(spin)) {
+		igt_spin_busywait_until_started(spin);
 	} else {
 		igt_debug("__spin_wait - usleep mode\n");
 		usleep(500e3); /* Better than nothing! */

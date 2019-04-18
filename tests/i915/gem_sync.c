@@ -225,7 +225,7 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 					    .engine = execbuf.flags,
 					    .flags = (IGT_SPIN_POLL_RUN |
 						      IGT_SPIN_FAST));
-		igt_assert(spin->running);
+		igt_assert(igt_spin_has_poll(spin));
 		cmd = *spin->batch;
 
 		gem_execbuf(fd, &execbuf);
@@ -239,10 +239,9 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 			cycles = 0;
 			do {
 				*spin->batch = cmd;
-				*spin->running = 0;
+				spin->poll[SPIN_POLL_START_IDX] = 0;
 				gem_execbuf(fd, &spin->execbuf);
-				while (!READ_ONCE(*spin->running))
-					;
+				igt_spin_busywait_until_started(spin);
 
 				this = gettime();
 				igt_spin_batch_end(spin);
@@ -264,10 +263,9 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 		cycles = 0;
 		do {
 			*spin->batch = cmd;
-			*spin->running = 0;
+			spin->poll[SPIN_POLL_START_IDX] = 0;
 			gem_execbuf(fd, &spin->execbuf);
-			while (!READ_ONCE(*spin->running))
-				;
+			igt_spin_busywait_until_started(spin);
 
 			for (int n = 0; n < wlen; n++)
 				gem_execbuf(fd, &execbuf);
@@ -410,7 +408,7 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 					       .engine = execbuf.flags,
 					       .flags = (IGT_SPIN_POLL_RUN |
 							 IGT_SPIN_FAST));
-		igt_assert(spin[0]->running);
+		igt_assert(igt_spin_has_poll(spin[0]));
 		cmd = *spin[0]->batch;
 
 		spin[1] = __igt_spin_batch_new(fd,
@@ -426,18 +424,17 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 
 		for (int warmup = 0; warmup <= 1; warmup++) {
 			*spin[0]->batch = cmd;
-			*spin[0]->running = 0;
+			spin[0]->poll[SPIN_POLL_START_IDX] = 0;
 			gem_execbuf(fd, &spin[0]->execbuf);
 
 			end = gettime() + timeout/10.;
 			elapsed = 0;
 			cycles = 0;
 			do {
-				while (!READ_ONCE(*spin[0]->running))
-					;
+				igt_spin_busywait_until_started(spin[0]);
 
 				*spin[1]->batch = cmd;
-				*spin[1]->running = 0;
+				spin[1]->poll[SPIN_POLL_START_IDX] = 0;
 				gem_execbuf(fd, &spin[1]->execbuf);
 
 				this = gettime();
@@ -458,21 +455,20 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 			 cycles, elapsed*1e6/cycles);
 
 		*spin[0]->batch = cmd;
-		*spin[0]->running = 0;
+		spin[0]->poll[SPIN_POLL_START_IDX] = 0;
 		gem_execbuf(fd, &spin[0]->execbuf);
 
 		end = gettime() + timeout;
 		elapsed = 0;
 		cycles = 0;
 		do {
-			while (!READ_ONCE(*spin[0]->running))
-				;
+			igt_spin_busywait_until_started(spin[0]);
 
 			for (int n = 0; n < wlen; n++)
 				gem_execbuf(fd, &execbuf);
 
 			*spin[1]->batch = cmd;
-			*spin[1]->running = 0;
+			spin[1]->poll[SPIN_POLL_START_IDX] = 0;
 			gem_execbuf(fd, &spin[1]->execbuf);
 
 			this = gettime();
