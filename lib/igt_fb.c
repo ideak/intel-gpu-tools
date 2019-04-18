@@ -1911,7 +1911,7 @@ static void *igt_fb_create_cairo_shadow_buffer(int fd,
 		drm_format, LOCAL_DRM_FORMAT_MOD_NONE,
 		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
-	shadow->strides[0] = ALIGN(width * shadow->plane_bpp[0], 16);
+	shadow->strides[0] = ALIGN(width * (shadow->plane_bpp[0] / 8), 16);
 	shadow->size = ALIGN(shadow->strides[0] * height,
 			     sysconf(_SC_PAGESIZE));
 	ptr = mmap(NULL, shadow->size, PROT_READ | PROT_WRITE,
