@@ -186,6 +186,14 @@
 
 #define GEN7_ARF_IP                    0xA0
 
+#define VLV_MOCS_SNOOP		(2 << 1)
+#define VLV_MOCS_L3		(1 << 0)
+
+#define IVB_MOCS_GFDT		(1 << 2)
+#define IVB_MOCS_PTE		(0 << 1)
+#define IVB_MOCS_LLC		(1 << 1)
+#define IVB_MOCS_L3		(1 << 0)
+
 /* The hardware supports two different modes for border color. The
  * default (OpenGL) mode uses floating-point color channels, while the
  * legacy mode uses 4 bytes.
@@ -252,7 +260,8 @@ struct gen7_surface_state {
 	struct {
 		unsigned int mip_count:4;
 		unsigned int min_lod:4;
-		unsigned int pad1:12;
+		unsigned int pad1:8;
+		unsigned int memory_object_control:4;
 		unsigned int y_offset:4;
 		unsigned int pad0:1;
 		unsigned int x_offset:7;

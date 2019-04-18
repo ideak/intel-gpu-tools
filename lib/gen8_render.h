@@ -67,6 +67,21 @@
 /* STATE_BASE_ADDRESS state size in pages*/
 #define GEN8_STATE_SIZE_PAGES(x) ((x) << 12)
 
+#define BDW_MOCS_PTE		(0 << 5)
+#define BDW_MOCS_UC		(1 << 5)
+#define BDW_MOCS_WT		(2 << 5)
+#define BDW_MOCS_WB		(3 << 5)
+#define BDW_MOCS_TC_ELLC	(0 << 3)
+#define BDW_MOCS_TC_LLC		(1 << 3)
+#define BDW_MOCS_TC_LLC_ELLC	(2 << 3)
+#define BDW_MOCS_TC_L3_PTE	(3 << 3)
+#define BDW_MOCS_AGE(x)		((x) << 0)
+
+#define CHV_MOCS_UC		(0 << 5)
+#define CHV_MOCS_WB		(3 << 5)
+#define CHV_MOCS_NO_CACHING	(0 << 3)
+#define CHV_MOCS_L3		(3 << 3)
+
 /* Shamelessly ripped from mesa */
 struct gen8_surface_state
 {

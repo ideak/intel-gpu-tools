@@ -735,6 +735,12 @@
 #define GEN6_SCRATCH_SPACE_SIZE_1M	10
 #define GEN6_SCRATCH_SPACE_SIZE_2M	11
 
+#define GEN6_MOCS_GFDT		(1 << 2)
+#define GEN6_MOCS_PTE		(0 << 0)
+#define GEN6_MOCS_UC		(1 << 0)
+#define GEN6_MOCS_LLC		(2 << 0)
+#define GEN6_MOCS_LLC_MLC	(3 << 0)
+
 /* The hardware supports two different modes for border color. The
  * default (OpenGL) mode uses floating-point color channels, while the
  * legacy mode uses 4 bytes.
@@ -933,7 +939,8 @@ struct gen6_surface_state {
 	} ss4;
 
 	struct {
-		uint32_t pad:20;
+		uint32_t pad:16;
+		uint32_t memory_object_control:4;
 		uint32_t y_offset:4;
 		uint32_t pad2:1;
 		uint32_t x_offset:7;

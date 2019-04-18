@@ -94,7 +94,10 @@ gen7_bind_buf(struct intel_batchbuffer *batch,
 		 (igt_buf_height(buf) - 1) << GEN7_SURFACE_HEIGHT_SHIFT);
 	ss[3] = (buf->stride - 1) << GEN7_SURFACE_PITCH_SHIFT;
 	ss[4] = 0;
-	ss[5] = 0;
+	if (IS_VALLEYVIEW(batch->devid))
+		ss[5] = VLV_MOCS_L3 << 16;
+	else
+		ss[5] = (IVB_MOCS_L3 | IVB_MOCS_PTE) << 16;
 	ss[6] = 0;
 	ss[7] = 0;
 	if (IS_HASWELL(batch->devid))

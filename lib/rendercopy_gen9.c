@@ -212,6 +212,8 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	else if (buf->tiling != I915_TILING_NONE)
 		ss->ss0.tiled_mode = 3;
 
+	ss->ss1.memory_object_control = I915_MOCS_PTE << 1;
+
 	if (buf->tiling == I915_TILING_Yf)
 		ss->ss5.trmode = 1;
 	else if (buf->tiling == I915_TILING_Ys)

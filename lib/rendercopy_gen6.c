@@ -117,6 +117,8 @@ gen6_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	ss->ss3.tiled_surface = buf->tiling != I915_TILING_NONE;
 	ss->ss3.tile_walk     = buf->tiling == I915_TILING_Y;
 
+	ss->ss5.memory_object_control = GEN6_MOCS_PTE;
+
 	return intel_batchbuffer_subdata_offset(batch, ss);
 }
 

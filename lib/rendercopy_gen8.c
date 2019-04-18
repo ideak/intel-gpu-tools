@@ -16,6 +16,7 @@
 #include "drmtest.h"
 #include "intel_bufmgr.h"
 #include "intel_batchbuffer.h"
+#include "intel_chipset.h"
 #include "intel_io.h"
 #include "rendercopy.h"
 #include "gen8_render.h"
@@ -180,6 +181,12 @@ gen8_bind_buf(struct intel_batchbuffer *batch,
 		ss->ss0.tiled_mode = 2;
 	else if (buf->tiling == I915_TILING_Y)
 		ss->ss0.tiled_mode = 3;
+
+	if (IS_CHERRYVIEW(batch->devid))
+		ss->ss1.memory_object_control = CHV_MOCS_WB | CHV_MOCS_L3;
+	else
+		ss->ss1.memory_object_control = BDW_MOCS_PTE |
+			BDW_MOCS_TC_L3_PTE | BDW_MOCS_AGE(0);
 
 	ss->ss8.base_addr = buf->bo->offset64;
 	ss->ss9.base_addr_hi = buf->bo->offset64 >> 32;
