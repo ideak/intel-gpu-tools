@@ -426,13 +426,16 @@ void alsa_configure_output(struct alsa *alsa, int channels,
 	snd_pcm_t *handle;
 	int ret;
 	int i;
+	int soft_resample = 0; /* Don't allow ALSA to resample */
+	unsigned int latency = 0;
 
 	for (i = 0; i < alsa->output_handles_count; i++) {
 		handle = alsa->output_handles[i];
 
 		ret = snd_pcm_set_params(handle, SND_PCM_FORMAT_S16_LE,
 					 SND_PCM_ACCESS_RW_INTERLEAVED,
-					 channels, sampling_rate, 0, 0);
+					 channels, sampling_rate,
+					 soft_resample, latency);
 		igt_assert(ret >= 0);
 	}
 
