@@ -777,7 +777,7 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 		      struct alsa *alsa, int playback_channels,
 		      int playback_rate)
 {
-	int ret, capture_rate, capture_channels, msec, freq;
+	int ret, capture_rate, capture_channels, msec, freq, step;
 	struct chamelium_audio_file *audio_file;
 	struct chamelium_stream *stream;
 	enum chamelium_stream_realtime_mode stream_mode;
@@ -792,16 +792,18 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	int dump_fd = -1;
 	pthread_t thread;
 	struct audio_state state = {};
+	int channel_mapping[8], capture_chan;
 
 	if (!alsa_test_output_configuration(alsa, playback_channels,
 					    playback_rate)) {
-		igt_debug("Skipping test with sample rate %d and %d channels "
-			  "because selected output devices don't support this "
-			  "configuration\n", playback_rate, playback_channels);
+		igt_debug("Skipping test with sample rate %d Hz and %d channels "
+			  "because at least one of the selected output devices "
+			  "doesn't support this configuration\n",
+			  playback_rate, playback_channels);
 		return false;
 	}
 
-	igt_debug("Testing with playback sampling rate %d and %d channels\n",
+	igt_debug("Testing with playback sampling rate %d Hz and %d channels\n",
 		  playback_rate, playback_channels);
 	alsa_configure_output(alsa, playback_channels, playback_rate);
 
@@ -830,9 +832,17 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	signal = audio_signal_init(playback_channels, playback_rate);
 	igt_assert(signal);
 
+	/* We'll choose different frequencies per channel to make sure they are
+	 * independent from each other. To do so, we'll add a different offset
+	 * to the base frequencies for each channel. We need to choose a big
+	 * enough offset so that we're sure to detect mixed up channels. We
+	 * choose an offset of two 2 bins in the final FFT to enforce a clear
+	 * difference.
+	 */
+	step = 2 * capture_rate / CAPTURE_SAMPLES;
 	for (i = 0; i < test_frequencies_count; i++) {
 		for (j = 0; j < playback_channels; j++) {
-			freq = test_frequencies[i];
+			freq = test_frequencies[i] + j * step;
 			audio_signal_add_frequency(signal, freq, j);
 		}
 	}
@@ -846,6 +856,20 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	/* Start playing audio */
 	ret = pthread_create(&thread, NULL, run_audio_thread, alsa);
 	igt_assert(ret == 0);
+
+	chamelium_get_audio_channel_mapping(data->chamelium, port,
+					    channel_mapping);
+	/* Make sure we can capture all channels we send. */
+	for (i = 0; i < playback_channels; i++) {
+		ok = false;
+		for (j = 0; j < capture_channels; j++) {
+			if (channel_mapping[j] == i) {
+				ok = true;
+				break;
+			}
+		}
+		igt_assert(ok);
+	}
 
 	/* Needs to be a multiple of 128, because that's the number of samples
 	 * we get per channel each time we receive an audio page from the
@@ -886,11 +910,15 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 		igt_debug("Detecting audio signal, t=%d msec\n", msec);
 
 		for (j = 0; j < playback_channels; j++) {
-			igt_debug("Processing channel %zu\n", j);
+			capture_chan = channel_mapping[j];
+			igt_assert(capture_chan >= 0);
+			igt_debug("Processing channel %zu (captured as "
+				  "channel %d)\n", j, capture_chan);
 
 			audio_extract_channel_s32_le(channel, channel_len,
 						     buf, buf_len,
-						     capture_channels, j);
+						     capture_channels,
+						     capture_chan);
 
 			if (audio_signal_detect(signal, capture_rate, j,
 						channel, channel_len))

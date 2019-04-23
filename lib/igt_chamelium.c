@@ -931,6 +931,40 @@ int chamelium_get_captured_frame_count(struct chamelium *chamelium)
 }
 
 /**
+ * chamelium_get_audio_channel_mapping:
+ * @chamelium: the Chamelium instance
+ * @port: the audio port
+ * @mapping: will be filled with the channel mapping
+ *
+ * Obtains the channel mapping for an audio port.
+ *
+ * Audio channels are not guaranteed not to be swapped. Users can use the
+ * channel mapping to match an input channel to a capture channel.
+ *
+ * The mapping contains one element per capture channel. Each element indicates
+ * which input channel the capture channel is mapped to. As a special case, -1
+ * means that the channel isn't mapped.
+ */
+void chamelium_get_audio_channel_mapping(struct chamelium *chamelium,
+					 struct chamelium_port *port,
+					 int mapping[static 8])
+{
+	xmlrpc_value *res, *res_channel;
+	int res_len, i;
+
+	res = chamelium_rpc(chamelium, port, "GetAudioChannelMapping", "(i)",
+			    port->id);
+	res_len = xmlrpc_array_size(&chamelium->env, res);
+	igt_assert(res_len == 8);
+	for (i = 0; i < res_len; i++) {
+		xmlrpc_array_read_item(&chamelium->env, res, i, &res_channel);
+		xmlrpc_read_int(&chamelium->env, res_channel, &mapping[i]);
+		xmlrpc_DECREF(res_channel);
+	}
+	xmlrpc_DECREF(res);
+}
+
+/**
  * chamelium_start_capturing_audio:
  * @chamelium: the Chamelium instance
  * @port: the port to capture audio from (it must support audio)
