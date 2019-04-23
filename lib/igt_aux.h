@@ -32,11 +32,16 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <sys/time.h>
+#ifdef __linux__
+# include <sys/syscall.h>
+#endif
 
 #include <i915/gem_submission.h>
 
 /* signal interrupt helpers */
-#define gettid() syscall(__NR_gettid)
+#ifdef __linux__
+# define gettid() syscall(__NR_gettid)
+#endif
 #define sigev_notify_thread_id _sigev_un._tid
 
 /* auxialiary igt helpers from igt_aux.c */

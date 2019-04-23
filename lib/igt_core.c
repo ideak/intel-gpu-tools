@@ -1992,7 +1992,7 @@ static void fatal_sig_handler(int sig)
 #ifdef __linux__
 	/* Workaround cached PID and TID races on glibc and Bionic libc. */
 		pid_t pid = syscall(SYS_getpid);
-		pid_t tid = syscall(SYS_gettid);
+		pid_t tid = gettid();
 
 		syscall(SYS_tgkill, pid, tid, sig);
 #else

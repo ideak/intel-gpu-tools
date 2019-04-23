@@ -51,7 +51,6 @@
 static uint32_t devid;
 static bool has_64bit_relocations;
 
-#define gettid() syscall(__NR_gettid)
 #define sigev_notify_thread_id _sigev_un._tid
 
 static void selfcopy(int fd, uint32_t handle, int loops)

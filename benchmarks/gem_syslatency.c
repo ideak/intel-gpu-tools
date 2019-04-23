@@ -44,7 +44,6 @@
 
 #include <linux/unistd.h>
 
-#define gettid() syscall(__NR_gettid)
 #define sigev_notify_thread_id _sigev_un._tid
 
 static volatile int done;

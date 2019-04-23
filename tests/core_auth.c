@@ -46,9 +46,7 @@
 #include <sys/sysmacros.h>
 #include "drm.h"
 
-#ifdef __linux__
-# include <sys/syscall.h>
-#else
+#ifndef __linux__
 # include <pthread.h>
 #endif
 
@@ -62,7 +60,7 @@ is_local_tid(pid_t tid)
 #else
 	/* On Linux systems, drmGetClient() would return the thread ID
 	   instead of the actual process ID */
-	return syscall(SYS_gettid) == tid;
+	return gettid() == tid;
 #endif
 }
 
