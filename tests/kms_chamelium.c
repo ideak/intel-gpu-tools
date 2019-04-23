@@ -777,16 +777,16 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 		      struct alsa *alsa, int playback_channels,
 		      int playback_rate)
 {
-	int ret, capture_rate, capture_channels, msec;
+	int ret, capture_rate, capture_channels, msec, freq;
 	struct chamelium_audio_file *audio_file;
 	struct chamelium_stream *stream;
 	enum chamelium_stream_realtime_mode stream_mode;
 	struct audio_signal *signal;
 	int32_t *recv, *buf;
 	double *channel;
-	size_t i, streak, page_count;
+	size_t i, j, streak, page_count;
 	size_t recv_len, buf_len, buf_cap, buf_size, channel_len;
-	bool ok;
+	bool ok, success;
 	char dump_suffix[64];
 	char *dump_path = NULL;
 	int dump_fd = -1;
@@ -794,10 +794,15 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	struct audio_state state = {};
 
 	if (!alsa_test_output_configuration(alsa, playback_channels,
-					    playback_rate))
+					    playback_rate)) {
+		igt_debug("Skipping test with sample rate %d and %d channels "
+			  "because selected output devices don't support this "
+			  "configuration\n", playback_rate, playback_channels);
 		return false;
+	}
 
-	igt_debug("Testing with playback sampling rate %d\n", playback_rate);
+	igt_debug("Testing with playback sampling rate %d and %d channels\n",
+		  playback_rate, playback_channels);
 	alsa_configure_output(alsa, playback_channels, playback_rate);
 
 	chamelium_start_capturing_audio(data->chamelium, port, false);
@@ -825,8 +830,12 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	signal = audio_signal_init(playback_channels, playback_rate);
 	igt_assert(signal);
 
-	for (i = 0; i < test_frequencies_count; i++)
-		audio_signal_add_frequency(signal, test_frequencies[i]);
+	for (i = 0; i < test_frequencies_count; i++) {
+		for (j = 0; j < playback_channels; j++) {
+			freq = test_frequencies[i];
+			audio_signal_add_frequency(signal, freq, j);
+		}
+	}
 	audio_signal_synthesize(signal);
 
 	state.signal = signal;
@@ -851,10 +860,11 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	recv = NULL;
 	recv_len = 0;
 
+	success = false;
 	streak = 0;
 	msec = 0;
 	i = 0;
-	while (streak < MIN_STREAK && msec < AUDIO_TIMEOUT) {
+	while (!success && msec < AUDIO_TIMEOUT) {
 		ok = chamelium_stream_receive_realtime_audio(stream,
 							     &page_count,
 							     &recv, &recv_len);
@@ -872,21 +882,27 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 			igt_assert(write(dump_fd, buf, buf_size) == buf_size);
 		}
 
-		/* TODO: check other channels too, not just the first one */
-		audio_extract_channel_s32_le(channel, channel_len, buf, buf_len,
-					     capture_channels, 0);
-
 		msec = i * channel_len / (double) capture_rate * 1000;
 		igt_debug("Detecting audio signal, t=%d msec\n", msec);
 
-		if (audio_signal_detect(signal, capture_rate, channel,
-					channel_len))
-			streak++;
-		else
-			streak = 0;
+		for (j = 0; j < playback_channels; j++) {
+			igt_debug("Processing channel %zu\n", j);
+
+			audio_extract_channel_s32_le(channel, channel_len,
+						     buf, buf_len,
+						     capture_channels, j);
+
+			if (audio_signal_detect(signal, capture_rate, j,
+						channel, channel_len))
+				streak++;
+			else
+				streak = 0;
+		}
 
 		buf_len = 0;
 		i++;
+
+		success = streak == MIN_STREAK * playback_channels;
 	}
 
 	igt_debug("Stopping audio playback\n");
@@ -898,7 +914,7 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 
 	if (dump_fd >= 0) {
 		close(dump_fd);
-		if (streak == MIN_STREAK) {
+		if (success) {
 			/* Test succeeded, no need to keep the captured data */
 			unlink(dump_path);
 		} else
@@ -921,12 +937,10 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 		chamelium_destroy_audio_file(audio_file);
 	}
 
-	audio_signal_clean(signal);
-	free(signal);
-
+	audio_signal_fini(signal);
 	chamelium_stream_deinit(stream);
 
-	igt_assert(streak == MIN_STREAK);
+	igt_assert(success);
 	return true;
 }
 

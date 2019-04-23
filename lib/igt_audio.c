@@ -35,7 +35,7 @@
 #include "igt_audio.h"
 #include "igt_core.h"
 
-#define FREQS_MAX	8
+#define FREQS_MAX 64
 
 /**
  * SECTION:igt_audio
@@ -49,9 +49,10 @@
 
 struct audio_signal_freq {
 	int freq;
+	int channel;
 
-	short *period;
-	int frames;
+	int16_t *period;
+	size_t period_len;
 	int offset;
 };
 
@@ -60,7 +61,7 @@ struct audio_signal {
 	int sampling_rate;
 
 	struct audio_signal_freq freqs[FREQS_MAX];
-	int freqs_count;
+	size_t freqs_count;
 };
 
 /**
@@ -89,17 +90,21 @@ struct audio_signal *audio_signal_init(int channels, int sampling_rate)
  * audio_signal_add_frequency:
  * @signal: The target signal structure
  * @frequency: The frequency to add to the signal
+ * @channel: The channel to add this frequency to, or -1 to add it to all
+ * channels
  *
  * Add a frequency to the signal.
  *
  * Returns: An integer equal to zero for success and negative for failure
  */
-int audio_signal_add_frequency(struct audio_signal *signal, int frequency)
+int audio_signal_add_frequency(struct audio_signal *signal, int frequency,
+				int channel)
 {
-	int index = signal->freqs_count;
+	size_t index = signal->freqs_count;
+	struct audio_signal_freq *freq;
 
-	if (index == FREQS_MAX)
-		return -1;
+	igt_assert(index < FREQS_MAX);
+	igt_assert(channel < signal->channels);
 
 	/* Stay within the Nyquist–Shannon sampling theorem. */
 	if (frequency > signal->sampling_rate / 2) {
@@ -114,11 +119,14 @@ int audio_signal_add_frequency(struct audio_signal *signal, int frequency)
 	 */
 	frequency = signal->sampling_rate / (signal->sampling_rate / frequency);
 
-	igt_debug("Adding test frequency %d\n", frequency);
+	igt_debug("Adding test frequency %d to channel %d\n",
+		  frequency, channel);
 
-	signal->freqs[index].freq = frequency;
-	signal->freqs[index].frames = 0;
-	signal->freqs[index].offset = 0;
+	freq = &signal->freqs[index];
+	memset(freq, 0, sizeof(*freq));
+	freq->freq = frequency;
+	freq->channel = channel;
+
 	signal->freqs_count++;
 
 	return 0;
@@ -136,20 +144,17 @@ void audio_signal_synthesize(struct audio_signal *signal)
 {
 	int16_t *period;
 	double value;
-	int frames;
+	size_t period_len;
 	int freq;
 	int i, j;
 
-	if (signal->freqs_count == 0)
-		return;
-
 	for (i = 0; i < signal->freqs_count; i++) {
 		freq = signal->freqs[i].freq;
-		frames = signal->sampling_rate / freq;
+		period_len = signal->sampling_rate / freq;
 
-		period = calloc(1, frames * sizeof(short));
+		period = calloc(1, period_len * sizeof(int16_t));
 
-		for (j = 0; j < frames; j++) {
+		for (j = 0; j < period_len; j++) {
 			value = 2.0 * M_PI * freq / signal->sampling_rate * j;
 			value = sin(value) * INT16_MAX / signal->freqs_count;
 
@@ -157,26 +162,34 @@ void audio_signal_synthesize(struct audio_signal *signal)
 		}
 
 		signal->freqs[i].period = period;
-		signal->freqs[i].frames = frames;
+		signal->freqs[i].period_len = period_len;
 	}
 }
 
 /**
- * audio_signal_synthesize:
+ * audio_signal_fini:
+ *
+ * Release the signal.
+ */
+void audio_signal_fini(struct audio_signal *signal)
+{
+	audio_signal_reset(signal);
+	free(signal);
+}
+
+/**
+ * audio_signal_reset:
  * @signal: The target signal structure
  *
  * Free the resources allocated by audio_signal_synthesize and remove
  * the previously-added frequencies.
  */
-void audio_signal_clean(struct audio_signal *signal)
+void audio_signal_reset(struct audio_signal *signal)
 {
-	int i;
+	size_t i;
 
 	for (i = 0; i < signal->freqs_count; i++) {
-		if (signal->freqs[i].period)
-			free(signal->freqs[i].period);
-
-		memset(&signal->freqs[i], 0, sizeof(struct audio_signal_freq));
+		free(signal->freqs[i].period);
 	}
 
 	signal->freqs_count = 0;
@@ -186,44 +199,45 @@ void audio_signal_clean(struct audio_signal *signal)
  * audio_signal_fill:
  * @signal: The target signal structure
  * @buffer: The target buffer to fill
- * @frames: The number of frames to fill
+ * @samples: The number of samples to fill
  *
- * Fill the requested number of frames to the target buffer with the audio
+ * Fill the requested number of samples to the target buffer with the audio
  * signal data (in interleaved S16_LE format), at the requested sampling rate
  * and number of channels.
  */
-void audio_signal_fill(struct audio_signal *signal, int16_t *buffer, int frames)
+void audio_signal_fill(struct audio_signal *signal, int16_t *buffer,
+		       size_t buffer_len)
 {
 	int16_t *destination, *source;
+	struct audio_signal_freq *freq;
 	int total;
-	int freq_frames;
-	int freq_offset;
 	int count;
 	int i, j, k;
 
-	memset(buffer, 0, sizeof(int16_t) * signal->channels * frames);
+	memset(buffer, 0, sizeof(int16_t) * signal->channels * buffer_len);
 
 	for (i = 0; i < signal->freqs_count; i++) {
+		freq = &signal->freqs[i];
 		total = 0;
 
-		while (total < frames) {
-			freq_frames = signal->freqs[i].frames;
-			freq_offset = signal->freqs[i].offset;
+		igt_assert(freq->period);
 
-			source = signal->freqs[i].period + freq_offset;
+		while (total < buffer_len) {
+			source = freq->period + freq->offset;
 			destination = buffer + total * signal->channels;
 
-			count = freq_frames - freq_offset;
-			if (count > (frames - total))
-				count = frames - total;
+			count = freq->period_len - freq->offset;
+			if (count > buffer_len - total)
+				count = buffer_len - total;
 
-			freq_offset += count;
-			freq_offset %= freq_frames;
-
-			signal->freqs[i].offset = freq_offset;
+			freq->offset += count;
+			freq->offset %= freq->period_len;
 
 			for (j = 0; j < count; j++) {
 				for (k = 0; k < signal->channels; k++) {
+					if (freq->channel >= 0 &&
+					    freq->channel != k)
+						continue;
 					destination[j * signal->channels + k] += source[j];
 				}
 			}
@@ -240,11 +254,11 @@ void audio_signal_fill(struct audio_signal *signal, int16_t *buffer, int frames)
  * sampling_rate is given in Hz. data_len is the number of elements in data.
  */
 bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
-			 double *data, size_t data_len)
+			 int channel, double *data, size_t data_len)
 {
 	size_t bin_power_len = data_len / 2 + 1;
 	double bin_power[bin_power_len];
-	bool detected[signal->freqs_count];
+	bool detected[FREQS_MAX];
 	int ret, freq_accuracy, freq, local_max_freq;
 	double max, local_max, threshold;
 	size_t i, j;
@@ -311,6 +325,10 @@ bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
 		 * invalid. */
 		if (bin_power[i] < threshold) {
 			for (j = 0; j < signal->freqs_count; j++) {
+				if (signal->freqs[j].channel >= 0 &&
+				    signal->freqs[j].channel != channel)
+					continue;
+
 				if (signal->freqs[j].freq >
 				    local_max_freq - freq_accuracy &&
 				    signal->freqs[j].freq <
@@ -343,6 +361,10 @@ bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
 
 	/* Check that all frequencies we generated have been detected. */
 	for (i = 0; i < signal->freqs_count; i++) {
+		if (signal->freqs[i].channel >= 0 &&
+		    signal->freqs[i].channel != channel)
+			continue;
+
 		if (!detected[i]) {
 			igt_debug("Missing frequency: %d\n",
 				  signal->freqs[i].freq);
