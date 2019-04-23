@@ -1260,6 +1260,37 @@ void igt_set_module_param_int(const char *name, int val)
 }
 
 /**
+ * igt_is_process_running:
+ * @comm: Name of process in the form found in /proc/pid/comm (limited to 15
+ * chars)
+ *
+ * Returns: true in case the process has been found, false otherwise.
+ *
+ * This function checks in the process table for an entry with the name @comm.
+ */
+int igt_is_process_running(const char *comm)
+{
+	PROCTAB *proc;
+	proc_t *proc_info;
+	bool found = false;
+
+	proc = openproc(PROC_FILLCOM | PROC_FILLSTAT);
+	igt_assert(proc != NULL);
+
+	while ((proc_info = readproc(proc, NULL))) {
+		if (!strncasecmp(proc_info->cmd, comm, sizeof(proc_info->cmd))) {
+			freeproc(proc_info);
+			found = true;
+			break;
+		}
+		freeproc(proc_info);
+	}
+
+	closeproc(proc);
+	return found;
+}
+
+/**
  * igt_terminate_process:
  * @sig: Signal to send
  * @comm: Name of process in the form found in /proc/pid/comm (limited to 15

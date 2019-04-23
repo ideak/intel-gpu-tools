@@ -218,6 +218,12 @@ void chamelium_destroy_frame_dump(struct chamelium_frame_dump *dump)
 	free(dump);
 }
 
+void chamelium_destroy_audio_file(struct chamelium_audio_file *audio_file)
+{
+	free(audio_file->path);
+	free(audio_file);
+}
+
 struct fsm_monitor_args {
 	struct chamelium *chamelium;
 	struct chamelium_port *port;
@@ -922,6 +928,101 @@ int chamelium_get_captured_frame_count(struct chamelium *chamelium)
 
 	xmlrpc_DECREF(res);
 	return ret;
+}
+
+/**
+ * chamelium_start_capturing_audio:
+ * @chamelium: the Chamelium instance
+ * @port: the port to capture audio from (it must support audio)
+ * @save_to_file: whether the captured audio data should be saved to a file on
+ * the Chamelium device
+ *
+ * Starts capturing audio from a Chamelium port. To stop the capture, use
+ * #chamelium_stop_capturing_audio. To retrieve the audio data, either use the
+ * stream server or enable @save_to_file (the latter is mainly useful for
+ * debugging purposes).
+ *
+ * It isn't possible to capture audio from multiple ports at the same time.
+ */
+void chamelium_start_capturing_audio(struct chamelium *chamelium,
+				    struct chamelium_port *port,
+				    bool save_to_file)
+{
+	xmlrpc_value *res;
+
+	res = chamelium_rpc(chamelium, port, "StartCapturingAudio", "(ib)",
+			    port->id, save_to_file);
+	xmlrpc_DECREF(res);
+}
+
+static void audio_format_from_xml(struct chamelium *chamelium,
+				  xmlrpc_value *res, int *rate, int *channels)
+{
+	xmlrpc_value *res_type, *res_rate, *res_sample_format, *res_channel;
+	char *type, *sample_format;
+
+	xmlrpc_struct_find_value(&chamelium->env, res, "file_type", &res_type);
+	xmlrpc_struct_find_value(&chamelium->env, res, "rate", &res_rate);
+	xmlrpc_struct_find_value(&chamelium->env, res, "sample_format", &res_sample_format);
+	xmlrpc_struct_find_value(&chamelium->env, res, "channel", &res_channel);
+
+	xmlrpc_read_string(&chamelium->env, res_type, (const char **) &type);
+	igt_assert(strcmp(type, "raw") == 0);
+	free(type);
+
+	xmlrpc_read_string(&chamelium->env, res_sample_format, (const char **) &sample_format);
+	igt_assert(strcmp(sample_format, "S32_LE") == 0);
+	free(sample_format);
+
+	xmlrpc_read_int(&chamelium->env, res_rate, rate);
+	xmlrpc_read_int(&chamelium->env, res_channel, channels);
+
+	xmlrpc_DECREF(res_channel);
+	xmlrpc_DECREF(res_sample_format);
+	xmlrpc_DECREF(res_rate);
+	xmlrpc_DECREF(res_type);
+}
+
+/**
+ * chamelium_stop_capturing_audio:
+ * @chamelium: the Chamelium instance
+ * @port: the port from which audio is being captured
+ *
+ * Stops capturing audio from a Chamelium port. If
+ * #chamelium_start_capturing_audio has been called with @save_to_file enabled,
+ * this function will return a #chamelium_audio_file struct containing details
+ * about the audio file. Once the caller is done with the struct, they should
+ * release it with #chamelium_destroy_audio_file.
+ */
+struct chamelium_audio_file *chamelium_stop_capturing_audio(struct chamelium *chamelium,
+							    struct chamelium_port *port)
+{
+	xmlrpc_value *res, *res_path, *res_props;
+	struct chamelium_audio_file *file = NULL;
+	char *path;
+
+	res = chamelium_rpc(chamelium, NULL, "StopCapturingAudio", "(i)",
+			    port->id);
+	xmlrpc_array_read_item(&chamelium->env, res, 0, &res_path);
+	xmlrpc_array_read_item(&chamelium->env, res, 1, &res_props);
+
+	xmlrpc_read_string(&chamelium->env, res_path, (const char **) &path);
+
+	if (strlen(path) > 0) {
+		file = calloc(1, sizeof(*file));
+		file->path = path;
+
+		audio_format_from_xml(chamelium, res_props,
+				      &file->rate, &file->channels);
+	} else {
+		free(path);
+	}
+
+	xmlrpc_DECREF(res_props);
+	xmlrpc_DECREF(res_path);
+	xmlrpc_DECREF(res);
+
+	return file;
 }
 
 static pixman_image_t *convert_frame_format(pixman_image_t *src,

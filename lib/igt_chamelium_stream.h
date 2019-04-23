@@ -1,5 +1,5 @@
 /*
- * Copyright © 2017 Intel Corporation
+ * Copyright © 2019 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -20,31 +20,33 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  *
- * Authors:
- *  Paul Kocialkowski <paul.kocialkowski@linux.intel.com>
+ * Authors: Simon Ser <simon.ser@intel.com>
  */
 
-#ifndef IGT_AUDIO_H
-#define IGT_AUDIO_H
+#ifndef IGT_CHAMELIUM_STREAM_H
+#define IGT_CHAMELIUM_STREAM_H
 
 #include "config.h"
 
-#include <stdbool.h>
-#include <stdint.h>
+enum chamelium_stream_realtime_mode {
+	CHAMELIUM_STREAM_REALTIME_NONE = 0,
+	/* stop dumping when overflow */
+	CHAMELIUM_STREAM_REALTIME_STOP_WHEN_OVERFLOW = 1,
+	/* drop data on overflow */
+	CHAMELIUM_STREAM_REALTIME_BEST_EFFORT = 2,
+};
 
-struct audio_signal;
+struct chamelium_stream;
 
-struct audio_signal *audio_signal_init(int channels, int sampling_rate);
-int audio_signal_add_frequency(struct audio_signal *signal, int frequency);
-void audio_signal_synthesize(struct audio_signal *signal);
-void audio_signal_clean(struct audio_signal *signal);
-void audio_signal_fill(struct audio_signal *signal, int16_t *buffer, int frames);
-bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
-			 double *data, size_t data_len);
-size_t audio_extract_channel_s32_le(double *dst, size_t dst_cap,
-				    int32_t *src, size_t src_len,
-				    int n_channels, int channel);
-int audio_create_wav_file_s32_le(const char *qualifier, uint32_t sample_rate,
-				 uint16_t channels, char **path);
+struct chamelium_stream *chamelium_stream_init(void);
+void chamelium_stream_deinit(struct chamelium_stream *client);
+bool chamelium_stream_dump_realtime_audio(struct chamelium_stream *client,
+					  enum chamelium_stream_realtime_mode mode);
+void chamelium_stream_audio_format(struct chamelium_stream *stream,
+				   int *rate, int *channels);
+bool chamelium_stream_receive_realtime_audio(struct chamelium_stream *client,
+					     size_t *page_count,
+					     int32_t **buf, size_t *buf_len);
+bool chamelium_stream_stop_realtime_audio(struct chamelium_stream *client);
 
 #endif

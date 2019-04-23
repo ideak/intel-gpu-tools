@@ -43,6 +43,7 @@
 #include "igt_stats.h"
 #ifdef HAVE_CHAMELIUM
 #include "igt_chamelium.h"
+#include "igt_chamelium_stream.h"
 #endif
 #include "instdone.h"
 #include "intel_batchbuffer.h"

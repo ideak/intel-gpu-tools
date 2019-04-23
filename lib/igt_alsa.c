@@ -26,9 +26,11 @@
 
 #include "config.h"
 
+#include <limits.h>
 #include <alsa/asoundlib.h>
 
 #include "igt_alsa.h"
+#include "igt_aux.h"
 #include "igt_core.h"
 
 #define HANDLES_MAX	8
@@ -61,6 +63,26 @@ struct alsa {
 	int input_samples_trigger;
 };
 
+/**
+ * alsa_has_exclusive_access:
+ * Check whether ALSA has exclusive access to audio devices. Fails if
+ * PulseAudio is running.
+ */
+bool alsa_has_exclusive_access(void)
+{
+	if (igt_is_process_running("pulseaudio")) {
+		igt_warn("alsa doesn't have exclusive access to audio devices\n");
+		igt_warn("It seems that PulseAudio is running. Audio tests "
+			 "need direct access to audio devices, so PulseAudio "
+			 "needs to be stopped. You can do so by running "
+			 "`pulseaudio --kill`. Also make sure to add "
+			 "autospawn=no to /etc/pulse/client.conf\n");
+		return false;
+	}
+
+	return true;
+}
+
 static void alsa_error_handler(const char *file, int line, const char *function,
 			       int err, const char *fmt, ...)
 {
@@ -77,6 +99,10 @@ static void alsa_error_handler(const char *file, int line, const char *function,
 struct alsa *alsa_init(void)
 {
 	struct alsa *alsa;
+
+	if (!alsa_has_exclusive_access()) {
+		return NULL;
+	}
 
 	alsa = malloc(sizeof(struct alsa));
 	memset(alsa, 0, sizeof(struct alsa));
@@ -553,16 +579,20 @@ int alsa_run(struct alsa *alsa, int duration_ms)
 					if (ret < 0) {
 						ret = snd_pcm_recover(handle,
 								      ret, 0);
-						if (ret < 0)
+						if (ret < 0) {
+							igt_debug("snd_pcm_recover after snd_pcm_writei failed");
 							goto complete;
+						}
 					}
 
 					output_counts[i] += ret;
 				} else if (output_counts[i] < output_trigger &&
 					   ret < 0) {
 					ret = snd_pcm_recover(handle, ret, 0);
-					if (ret < 0)
+					if (ret < 0) {
+						igt_debug("snd_pcm_recover failed");
 						goto complete;
+					}
 				}
 			}
 
@@ -609,16 +639,20 @@ int alsa_run(struct alsa *alsa, int duration_ms)
 					ret = 0;
 				} else if (ret < 0) {
 					ret = snd_pcm_recover(handle, ret, 0);
-					if (ret < 0)
+					if (ret < 0) {
+						igt_debug("snd_pcm_recover after snd_pcm_readi failed");
 						goto complete;
+					}
 				}
 
 				input_count += ret;
 				input_total += ret;
 			} else if (input_count < input_trigger && ret < 0) {
 				ret = snd_pcm_recover(handle, ret, 0);
-				if (ret < 0)
+				if (ret < 0) {
+					igt_debug("snd_pcm_recover failed");
 					goto complete;
+				}
 			}
 		}
 	} while (!reached);

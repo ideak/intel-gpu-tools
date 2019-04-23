@@ -53,6 +53,12 @@ enum chamelium_check {
 	CHAMELIUM_CHECK_CRC,
 };
 
+struct chamelium_audio_file {
+	char *path;
+	int rate; /* Hz */
+	int channels;
+};
+
 struct chamelium *chamelium_init(int drm_fd);
 void chamelium_deinit(struct chamelium *chamelium);
 void chamelium_reset(struct chamelium *chamelium);
@@ -100,6 +106,10 @@ void chamelium_start_capture(struct chamelium *chamelium,
 void chamelium_stop_capture(struct chamelium *chamelium, int frame_count);
 void chamelium_capture(struct chamelium *chamelium, struct chamelium_port *port,
 		       int x, int y, int w, int h, int frame_count);
+void chamelium_start_capturing_audio(struct chamelium *chamelium,
+				    struct chamelium_port *port, bool save_to_file);
+struct chamelium_audio_file *chamelium_stop_capturing_audio(struct chamelium *chamelium,
+							    struct chamelium_port *port);
 igt_crc_t *chamelium_read_captured_crcs(struct chamelium *chamelium,
 					int *frame_count);
 struct chamelium_frame_dump *chamelium_read_captured_frame(struct chamelium *chamelium,
@@ -131,5 +141,6 @@ void chamelium_assert_frame_match_or_dump(struct chamelium *chamelium,
 void chamelium_crop_analog_frame(struct chamelium_frame_dump *dump, int width,
 				 int height);
 void chamelium_destroy_frame_dump(struct chamelium_frame_dump *dump);
+void chamelium_destroy_audio_file(struct chamelium_audio_file *audio_file);
 
 #endif /* IGT_CHAMELIUM_H */

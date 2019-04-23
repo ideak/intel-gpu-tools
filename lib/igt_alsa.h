@@ -33,6 +33,7 @@
 
 struct alsa;
 
+bool alsa_has_exclusive_access(void);
 struct alsa *alsa_init(void);
 int alsa_open_output(struct alsa *alsa, const char *device_name);
 int alsa_open_input(struct alsa *alsa, const char *device_name);

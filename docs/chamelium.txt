@@ -139,6 +139,23 @@ $ make remote-install CHAMELEON_HOST=192.168.72.1
 
 The process requires the Chamelium to be connected to the Internet to succeed.
 
+Audio Capture
+-------------
+
+The Chamelium supports audio capture. IGT tests take advantage of the
+Chamelium streaming server to download audio samples from the Chamelium.
+
+IGT needs direct access to audio devices through ALSA, so PulseAudio needs to
+be stopped (otherwise audio tests will automatically get skipped). To make sure
+PulseAudio isn't running:
+
+- Edit /etc/pulse/client.conf and add autospawn=no
+- Run `pulseaudio --kill` (if it succeeds, it means PulseAudio was running)
+- Make sure a DE that automatically spawns PulseAudio isn't running
+
+In case a test fails, the raw captured audio files will be dumped in a WAV
+file.
+
 Contributing Changes to the Daemon
 ----------------------------------
 
@@ -146,10 +163,11 @@ Contributions to the Chamelium daemon, just like any contribution to ChromiumOS,
 are submitted and reviewed at: https://chromium-review.googlesource.com/
 
 The ChromiumOS project provides an extensive developer guide:
-https://www.chromium.org/chromium-os/developer-guide that assumes running within
-the ChromiumOS build system. Since this is likely not the case for contributing
-to the Chamelium daemon, only the part about uploading changes is relevant:
-https://www.chromium.org/chromium-os/developer-guide#TOC-Upload-your-changes-and-get-a-code-review
+https://chromium.googlesource.com/chromiumos/docs/+/master/developer_guide.md
+It assumes running within the ChromiumOS build system. Since this is likely not
+the case for contributing to the Chamelium daemon, only the part about
+uploading changes is relevant:
+https://chromium.googlesource.com/chromiumos/docs/+/master/developer_guide.md#Upload-your-changes-and-get-a-code-review
 
 Most of the process is about using the Gerrit web interface for submitting and
 having the change reviewed and not forgetting the Change-Id, TEST= and BUG=
@@ -162,7 +180,7 @@ Support for the Chamelium platform in IGT is found in the following places:
 * lib/igt_chamelium.c: library with Chamelium-related helpers
 * tests/kms_chamelium.c: sub-tests using the Chamelium
 
-As of late August 2017, the following features are tested by IGT:
+As of early April 2019, the following features are tested by IGT:
 * Pixel-by-pixel frame integrity tests for DP and HDMI
 * Error-trend-based frame integrity tests for VGA
 * CRC-based frame integrity tests for DP and HDMI
@@ -173,6 +191,7 @@ As of late August 2017, the following features are tested by IGT:
   each interface or combined
 * EDID display identifier integrity check for all interfaces
 * EDID display identifier change during suspend for all interfaces
+* Audio Fourier-based tests for DP at 48KHz
 
 Future Developments
 -------------------
@@ -180,7 +199,10 @@ Future Developments
 With the current generation of the hardware platform, support for testing a
 number of additional display features could be included as future developments,
 including:
-* Audio capture from HDMI and DP
+* Audio capture from HDMI
+* Check all channels are independent from each other
+* Playback using more than 2 channels, different sampling rates and different
+  sample sizes
 * High-bandwidth Digital Content Protection (HDCP) streaming to the display
 * Remote control forwarding (CEC) sent from the display
 * YUV colorspace for HDMI, instead of RGB

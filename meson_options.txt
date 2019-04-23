@@ -10,12 +10,6 @@ option('overlay_backends',
        choices : [ 'auto', 'x', 'xv' ],
        description : 'Overlay backends to enable')
 
-option('build_audio',
-       type : 'combo',
-       value : 'auto',
-       choices : ['auto', 'true', 'false'],
-       description : 'Build audio test')
-
 option('build_chamelium',
        type : 'combo',
        value : 'auto',

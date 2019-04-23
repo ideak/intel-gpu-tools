@@ -64,8 +64,6 @@ _build_overlay = false
 _overlay_required = false
 _build_man = false
 _man_required = false
-_build_audio = false
-_audio_required = false
 _build_chamelium = false
 _chamelium_required = false
 _build_docs = false
@@ -79,7 +77,6 @@ build_overlay = get_option('build_overlay')
 overlay_backends = get_option('overlay_backends')
 build_man = get_option('build_man')
 with_valgrind = get_option('with_valgrind')
-build_audio = get_option('build_audio')
 build_chamelium = get_option('build_chamelium')
 build_docs = get_option('build_docs')
 build_tests = get_option('build_tests')
@@ -91,8 +88,6 @@ _build_overlay = build_overlay != 'false'
 _overlay_required = build_overlay == 'true'
 _build_man = build_man != 'false'
 _man_required = build_man == 'true'
-_build_audio = build_audio != 'false'
-_audio_required = build_audio == 'true'
 _build_chamelium = build_chamelium != 'false'
 _chamelium_required = build_chamelium == 'true'
 _build_docs = build_docs != 'false'
@@ -166,26 +161,6 @@ cairo = dependency('cairo', version : '>1.12.0', required : true)
 libudev = dependency('libudev', required : true)
 glib = dependency('glib-2.0', required : true)
 
-gsl = null_dep
-alsa = null_dep
-if _build_audio or _build_chamelium
-	gsl = dependency('gsl', required : _audio_required or _chamelium_required)
-endif
-if _build_audio
-	alsa = dependency('alsa', required : _audio_required)
-endif
-
-audioinfo = 'No'
-if _build_audio and alsa.found() and gsl.found()
-	audioinfo = 'Yes'
-else
-	if _audio_required
-		error('Cannot build audio test due to missing dependencies')
-	endif
-	_build_audio = false
-endif
-build_info += 'Build audio test: ' + audioinfo
-
 xmlrpc = dependency('xmlrpc', required : false)
 xmlrpc_util = dependency('xmlrpc_util', required : false)
 xmlrpc_client = dependency('xmlrpc_client', required : false)
@@ -197,21 +172,32 @@ if not xmlrpc.found() and xmlrpc_cmd.found()
 
 	if libs_cmd.returncode() == 0 and cflags_cmd.returncode() == 0
 		xmlrpc = declare_dependency(compile_args: cflags_cmd.stdout().strip().split(),
-					   link_args : libs_cmd.stdout().strip().split())
+					    link_args : libs_cmd.stdout().strip().split())
 		xmlrpc_util = declare_dependency()
 		xmlrpc_client = declare_dependency()
 	endif
 endif
 
+gsl = null_dep
+alsa = null_dep
 chamelium = null_dep
+chamelium_found = false # TODO: use a disabler object instead
 chameliuminfo = 'No'
-if _build_chamelium and gsl.found() and xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found()
-	chamelium = declare_dependency(dependencies : [ xmlrpc,
-							xmlrpc_util, xmlrpc_client])
-	config.set('HAVE_CHAMELIUM', 1)
-	chameliuminfo = 'Yes'
-elif _chamelium_required
-	error('Cannot build chamelium test due to missing dependencies')
+if _build_chamelium
+	gsl = dependency('gsl', required : _chamelium_required)
+	alsa = dependency('alsa', required : _chamelium_required)
+	chamelium = declare_dependency(dependencies : [
+		xmlrpc,
+		xmlrpc_util,
+		xmlrpc_client,
+		gsl,
+		alsa,
+	], required : _chamelium_required)
+	if xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found() and gsl.found() and alsa.found()
+		config.set('HAVE_CHAMELIUM', 1)
+		chameliuminfo = 'Yes'
+		chamelium_found = true
+	endif
 endif
 build_info += 'Build Chamelium test: ' + chameliuminfo
 

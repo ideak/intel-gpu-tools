@@ -94,7 +94,7 @@ if valgrind.found()
 endif
 
 if gsl.found()
-	lib_deps += [ gsl ]
+	lib_deps += gsl
 	lib_sources += [ 'igt_frame.c', 'igt_audio.c' ]
 endif
 
@@ -103,9 +103,10 @@ if alsa.found()
 	lib_sources += 'igt_alsa.c'
 endif
 
-if chamelium.found()
+if chamelium_found
 	lib_deps += chamelium
 	lib_sources += 'igt_chamelium.c'
+	lib_sources += 'igt_chamelium_stream.c'
 endif
 
 srcdir = join_paths(meson.source_root(), 'tests')

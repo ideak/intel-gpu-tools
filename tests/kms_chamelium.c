@@ -413,7 +413,7 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 
 static igt_output_t *
 prepare_output(data_t *data,
-	       struct chamelium_port *port)
+	       struct chamelium_port *port, bool set_edid)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
@@ -428,7 +428,8 @@ prepare_output(data_t *data,
 	/* The chamelium's default EDID has a lot of resolutions, way more then
 	 * we need to test
 	 */
-	chamelium_port_set_edid(data->chamelium, port, data->edid_id);
+	if (set_edid)
+		chamelium_port_set_edid(data->chamelium, port, data->edid_id);
 
 	chamelium_plug(data->chamelium, port);
 	wait_for_connector(data, port, DRM_MODE_CONNECTED);
@@ -613,7 +614,7 @@ static void test_display_one_mode(data_t *data, struct chamelium_port *port,
 
 	reset_state(data, port);
 
-	output = prepare_output(data, port);
+	output = prepare_output(data, port, true);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -644,7 +645,7 @@ static void test_display_all_modes(data_t *data, struct chamelium_port *port,
 
 	reset_state(data, port);
 
-	output = prepare_output(data, port);
+	output = prepare_output(data, port, true);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -679,7 +680,7 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 
 	reset_state(data, port);
 
-	output = prepare_output(data, port);
+	output = prepare_output(data, port, true);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -709,6 +710,266 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 
 	drmModeFreeConnector(connector);
 }
+
+
+/* Playback parameters control the audio signal we synthesize and send */
+#define PLAYBACK_CHANNELS 2
+#define PLAYBACK_SAMPLES 1024
+
+/* Capture paremeters control the audio signal we receive */
+#define CAPTURE_SAMPLES 2048
+
+#define AUDIO_DURATION 2000 /* ms */
+/* A streak of 3 gives confidence that the signal is good. */
+#define MIN_STREAK 3
+
+/* TODO: Chamelium only supports 48KHz for now */
+static int sampling_rates[] = {
+/*	32000, */
+/*	44100, */
+	48000,
+/*	88200, */
+/*	96000, */
+/*	176400, */
+/*	192000, */
+};
+
+static int sampling_rates_count = sizeof(sampling_rates) / sizeof(int);
+
+static int test_frequencies[] = {
+	300,
+	600,
+	1200,
+	80000,
+	10000,
+};
+
+static int test_frequencies_count = sizeof(test_frequencies) / sizeof(int);
+
+static int
+output_callback(void *data, short *buffer, int frames)
+{
+	struct audio_signal *signal = (struct audio_signal *) data;
+
+	audio_signal_fill(signal, buffer, frames);
+
+	return 0;
+}
+
+static bool
+do_test_display_audio(data_t *data, struct chamelium_port *port,
+		      struct alsa *alsa, int playback_channels,
+		      int playback_rate)
+{
+	int ret, capture_rate, capture_channels, msec;
+	struct chamelium_audio_file *audio_file;
+	struct chamelium_stream *stream;
+	enum chamelium_stream_realtime_mode stream_mode;
+	struct audio_signal *signal;
+	int32_t *recv, *buf;
+	double *channel;
+	size_t i, streak, page_count;
+	size_t recv_len, buf_len, buf_cap, buf_size, channel_len;
+	bool ok;
+	char dump_suffix[64];
+	char *dump_path = NULL;
+	int dump_fd = -1;
+
+	if (!alsa_test_output_configuration(alsa, playback_channels,
+					    playback_rate))
+		return false;
+
+	igt_debug("Testing with playback sampling rate %d\n", playback_rate);
+	alsa_configure_output(alsa, playback_channels, playback_rate);
+
+	chamelium_start_capturing_audio(data->chamelium, port, false);
+
+	stream = chamelium_stream_init();
+	igt_assert(stream);
+
+	stream_mode = CHAMELIUM_STREAM_REALTIME_STOP_WHEN_OVERFLOW;
+	ok = chamelium_stream_dump_realtime_audio(stream, stream_mode);
+	igt_assert(ok);
+
+	chamelium_stream_audio_format(stream, &capture_rate, &capture_channels);
+
+	if (igt_frame_dump_is_enabled()) {
+		snprintf(dump_suffix, sizeof(dump_suffix), "capture-%dch-%d",
+			 playback_channels, playback_rate);
+
+		dump_fd = audio_create_wav_file_s32_le(dump_suffix,
+						       capture_rate,
+						       capture_channels,
+						       &dump_path);
+		igt_assert(dump_fd >= 0);
+	}
+
+	signal = audio_signal_init(playback_channels, playback_rate);
+	igt_assert(signal);
+
+	for (i = 0; i < test_frequencies_count; i++)
+		audio_signal_add_frequency(signal, test_frequencies[i]);
+	audio_signal_synthesize(signal);
+
+	alsa_register_output_callback(alsa, output_callback, signal,
+				      PLAYBACK_SAMPLES);
+
+	/* TODO: detect signal in real-time */
+	ret = alsa_run(alsa, AUDIO_DURATION);
+	igt_assert(ret == 0);
+
+	alsa_close_output(alsa);
+
+	/* Needs to be a multiple of 128, because that's the number of samples
+	 * we get per channel each time we receive an audio page from the
+	 * Chamelium device. */
+	channel_len = CAPTURE_SAMPLES;
+	channel = malloc(sizeof(double) * channel_len);
+
+	buf_cap = capture_channels * channel_len;
+	buf = malloc(sizeof(int32_t) * buf_cap);
+	buf_len = 0;
+
+	recv = NULL;
+	recv_len = 0;
+
+	streak = 0;
+	msec = 0;
+	i = 0;
+	while (streak < MIN_STREAK && msec < AUDIO_DURATION) {
+		ok = chamelium_stream_receive_realtime_audio(stream,
+							     &page_count,
+							     &recv, &recv_len);
+		igt_assert(ok);
+
+		memcpy(&buf[buf_len], recv, recv_len * sizeof(int32_t));
+		buf_len += recv_len;
+
+		if (buf_len < buf_cap)
+			continue;
+		igt_assert(buf_len == buf_cap);
+
+		if (dump_fd >= 0) {
+			buf_size = buf_len * sizeof(int32_t);
+			igt_assert(write(dump_fd, buf, buf_size) == buf_size);
+		}
+
+		/* TODO: check other channels too, not just the first one */
+		audio_extract_channel_s32_le(channel, channel_len, buf, buf_len,
+					     capture_channels, 0);
+
+		msec = i * channel_len / (double) capture_rate * 1000;
+		igt_debug("Detecting audio signal, t=%d msec\n", msec);
+
+		if (audio_signal_detect(signal, capture_rate, channel,
+					channel_len))
+			streak++;
+		else
+			streak = 0;
+
+		buf_len = 0;
+		i++;
+	}
+
+	if (dump_fd >= 0) {
+		close(dump_fd);
+		if (streak == MIN_STREAK) {
+			/* Test succeeded, no need to keep the captured data */
+			unlink(dump_path);
+		} else
+			igt_debug("Saved captured audio data to %s\n", dump_path);
+		free(dump_path);
+	}
+
+	free(recv);
+	free(buf);
+	free(channel);
+
+	ok = chamelium_stream_stop_realtime_audio(stream);
+	igt_assert(ok);
+
+	audio_file = chamelium_stop_capturing_audio(data->chamelium,
+						    port);
+	if (audio_file) {
+		igt_debug("Audio file saved on the Chamelium in %s\n",
+			  audio_file->path);
+		chamelium_destroy_audio_file(audio_file);
+	}
+
+	audio_signal_clean(signal);
+	free(signal);
+
+	chamelium_stream_deinit(stream);
+
+	igt_assert(streak == MIN_STREAK);
+	return true;
+}
+
+static void
+test_display_audio(data_t *data, struct chamelium_port *port,
+		   const char *audio_device)
+{
+	bool run = false;
+	struct alsa *alsa;
+	int ret;
+	igt_output_t *output;
+	igt_plane_t *primary;
+	struct igt_fb fb;
+	drmModeModeInfo *mode;
+	drmModeConnector *connector;
+	int fb_id, i;
+
+	igt_require(alsa_has_exclusive_access());
+
+	alsa = alsa_init();
+	igt_assert(alsa);
+
+	reset_state(data, port);
+
+	/* Use the default Chamelium EDID for this test, as the base IGT EDID
+	 * doesn't advertise audio support (see drm_detect_monitor_audio in
+	 * the kernel tree). */
+	output = prepare_output(data, port, false);
+	connector = chamelium_port_get_connector(data->chamelium, port, false);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_assert(primary);
+
+	/* Enable the output because the receiver won't try to receive audio if
+	 * it doesn't receive video. */
+	igt_assert(connector->count_modes > 0);
+	mode = &connector->modes[0];
+
+	fb_id = igt_create_color_pattern_fb(data->drm_fd,
+					    mode->hdisplay, mode->vdisplay,
+					    DRM_FORMAT_XRGB8888,
+					    LOCAL_DRM_FORMAT_MOD_NONE,
+					    0, 0, 0, &fb);
+	igt_assert(fb_id > 0);
+
+	enable_output(data, port, output, mode, &fb);
+
+	for (i = 0; i < sampling_rates_count; i++) {
+		ret = alsa_open_output(alsa, audio_device);
+		igt_assert(ret >= 0);
+
+		/* TODO: playback on all 8 available channels */
+		run |= do_test_display_audio(data, port, alsa,
+					     PLAYBACK_CHANNELS,
+					     sampling_rates[i]);
+
+		alsa_close_output(alsa);
+	}
+
+	/* Make sure we tested at least one frequency. */
+	igt_assert(run);
+
+	igt_remove_fb(data->drm_fd, &fb);
+
+	drmModeFreeConnector(connector);
+
+	free(alsa);
+}
+
 
 static void select_tiled_modifier(igt_plane_t *plane, uint32_t width,
 				  uint32_t height, uint32_t format,
@@ -1037,7 +1298,7 @@ static void test_display_planes_random(data_t *data,
 	reset_state(data, port);
 
 	/* Find the connector and pipe. */
-	output = prepare_output(data, port);
+	output = prepare_output(data, port, true);
 
 	mode = igt_output_get_mode(output);
 
@@ -1308,6 +1569,9 @@ igt_main
 
 		connector_subtest("dp-frame-dump", DisplayPort)
 			test_display_frame_dump(&data, port);
+
+		connector_subtest("dp-audio", DisplayPort)
+			test_display_audio(&data, port, "HDMI");
 	}
 
 	igt_subtest_group {
