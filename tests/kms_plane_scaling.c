@@ -174,14 +174,29 @@ static const igt_rotation_t rotations[] = {
 static bool can_rotate(data_t *d, unsigned format, uint64_t tiling,
 		       igt_rotation_t rot)
 {
-	if (format == DRM_FORMAT_C8 ||
-	    (intel_gen(d->devid) < 11 && format == DRM_FORMAT_RGB565))
-		return false;
 
-	// Y-tiled 90/270 rotation isn't supported for fp16 on Intel
-	if (is_i915_device(d->drm_fd) && igt_format_is_fp16(format) &&
-	    (rot == IGT_ROTATION_90 || rot == IGT_ROTATION_270))
+	if (!is_i915_device(d->drm_fd))
+		return true;
+
+	switch (format) {
+	case DRM_FORMAT_RGB565:
+		if (intel_gen(d->devid) >= 11)
+			break;
+		/* fall through */
+	case DRM_FORMAT_C8:
+	case DRM_FORMAT_XRGB16161616F:
+	case DRM_FORMAT_XBGR16161616F:
+	case DRM_FORMAT_ARGB16161616F:
+	case DRM_FORMAT_ABGR16161616F:
+	case DRM_FORMAT_Y210:
+	case DRM_FORMAT_Y212:
+	case DRM_FORMAT_Y216:
+	case DRM_FORMAT_XVYU12_16161616:
+	case DRM_FORMAT_XVYU16161616:
 		return false;
+	default:
+		break;
+	}
 
 	return true;
 }
