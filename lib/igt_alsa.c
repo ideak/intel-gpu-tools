@@ -182,6 +182,8 @@ static char *alsa_resolve_indentifier(const char *device_name, int skip)
 					continue;
 				}
 
+				igt_debug("Matched device \"%s\"\n", pcm_name);
+
 				snprintf(name, sizeof(name), "hw:%d,%d", card,
 					 dev);
 
@@ -329,6 +331,9 @@ static bool alsa_test_configuration(snd_pcm_t *handle, int channels,
 {
 	snd_pcm_hw_params_t *params;
 	int ret;
+	unsigned int min_channels, max_channels;
+	unsigned int min_rate, max_rate;
+	int min_rate_dir, max_rate_dir;
 
 	snd_pcm_hw_params_alloca(&params);
 
@@ -337,12 +342,24 @@ static bool alsa_test_configuration(snd_pcm_t *handle, int channels,
 		return false;
 
 	ret = snd_pcm_hw_params_test_rate(handle, params, sampling_rate, 0);
-	if (ret < 0)
+	if (ret < 0) {
+		snd_pcm_hw_params_get_rate_min(params, &min_rate, &min_rate_dir);
+		snd_pcm_hw_params_get_rate_max(params, &max_rate, &max_rate_dir);
+		igt_debug("Output device supports rates between %u and %u, "
+			  "requested %d\n",
+			  min_rate, max_rate, sampling_rate);
 		return false;
+	}
 
 	ret = snd_pcm_hw_params_test_channels(handle, params, channels);
-	if (ret < 0)
+	if (ret < 0) {
+		snd_pcm_hw_params_get_channels_min(params, &min_channels);
+		snd_pcm_hw_params_get_channels_max(params, &max_channels);
+		igt_debug("Output device supports between %u and "
+			  "%u channels, requested %d\n",
+			  min_channels, max_channels, channels);
 		return false;
+	}
 
 	return true;
 }

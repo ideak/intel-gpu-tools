@@ -102,8 +102,11 @@ int audio_signal_add_frequency(struct audio_signal *signal, int frequency)
 		return -1;
 
 	/* Stay within the Nyquist–Shannon sampling theorem. */
-	if (frequency > signal->sampling_rate / 2)
+	if (frequency > signal->sampling_rate / 2) {
+		igt_debug("Skipping frequency %d: too high for a %d Hz "
+			  "sampling rate\n", frequency, signal->sampling_rate);
 		return -1;
+	}
 
 	/* Clip the frequency to an integer multiple of the sampling rate.
 	 * This to be able to store a full period of it and use that for
