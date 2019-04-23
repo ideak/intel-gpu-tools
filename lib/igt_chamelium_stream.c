@@ -538,23 +538,6 @@ bool chamelium_stream_stop_realtime_audio(struct chamelium_stream *client)
 }
 
 /**
- * chamelium_stream_audio_format:
- *
- * Gets the format used for audio pages.
- *
- * Data will always be captured in raw pages of S32_LE elements. This function
- * exposes the sampling rate and the number of channels.
- */
-void chamelium_stream_audio_format(struct chamelium_stream *stream,
-				   int *rate, int *channels)
-{
-	/* TODO: the Chamelium streaming server doesn't expose those yet.
-	 * Just hardcode the values for now. */
-	*rate = 48000;
-	*channels = 8;
-}
-
-/**
  * chamelium_stream_init:
  *
  * Connects to the Chamelium streaming server.

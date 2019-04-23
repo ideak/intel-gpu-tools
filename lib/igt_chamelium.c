@@ -964,6 +964,60 @@ void chamelium_get_audio_channel_mapping(struct chamelium *chamelium,
 	xmlrpc_DECREF(res);
 }
 
+static void audio_format_from_xml(struct chamelium *chamelium,
+				  xmlrpc_value *res, int *rate, int *channels)
+{
+	xmlrpc_value *res_type, *res_rate, *res_sample_format, *res_channel;
+	char *type, *sample_format;
+
+	xmlrpc_struct_find_value(&chamelium->env, res, "file_type", &res_type);
+	xmlrpc_struct_find_value(&chamelium->env, res, "rate", &res_rate);
+	xmlrpc_struct_find_value(&chamelium->env, res, "sample_format", &res_sample_format);
+	xmlrpc_struct_find_value(&chamelium->env, res, "channel", &res_channel);
+
+	xmlrpc_read_string(&chamelium->env, res_type, (const char **) &type);
+	igt_assert(strcmp(type, "raw") == 0);
+	free(type);
+
+	xmlrpc_read_string(&chamelium->env, res_sample_format, (const char **) &sample_format);
+	igt_assert(strcmp(sample_format, "S32_LE") == 0);
+	free(sample_format);
+
+	if (rate)
+		xmlrpc_read_int(&chamelium->env, res_rate, rate);
+	if (channels)
+		xmlrpc_read_int(&chamelium->env, res_channel, channels);
+
+	xmlrpc_DECREF(res_channel);
+	xmlrpc_DECREF(res_sample_format);
+	xmlrpc_DECREF(res_rate);
+	xmlrpc_DECREF(res_type);
+}
+
+/**
+ * chamelium_get_audio_format:
+ * @chamelium: the Chamelium instance
+ * @port: the audio port
+ * @rate: if non-NULL, will be set to the sample rate in Hz
+ * @channels: if non-NULL, will be set to the number of channels
+ *
+ * Obtains the audio format of the captured data. Users should start sending an
+ * audio signal to the Chamelium device prior to calling this function.
+ *
+ * The captured data is guaranteed to be in the S32_LE format.
+ */
+void chamelium_get_audio_format(struct chamelium *chamelium,
+				struct chamelium_port *port,
+				int *rate, int *channels)
+{
+	xmlrpc_value *res;
+
+	res = chamelium_rpc(chamelium, port, "GetAudioFormat", "(i)",
+			    port->id);
+	audio_format_from_xml(chamelium, res, rate, channels);
+	xmlrpc_DECREF(res);
+}
+
 /**
  * chamelium_start_capturing_audio:
  * @chamelium: the Chamelium instance
@@ -987,34 +1041,6 @@ void chamelium_start_capturing_audio(struct chamelium *chamelium,
 	res = chamelium_rpc(chamelium, port, "StartCapturingAudio", "(ib)",
 			    port->id, save_to_file);
 	xmlrpc_DECREF(res);
-}
-
-static void audio_format_from_xml(struct chamelium *chamelium,
-				  xmlrpc_value *res, int *rate, int *channels)
-{
-	xmlrpc_value *res_type, *res_rate, *res_sample_format, *res_channel;
-	char *type, *sample_format;
-
-	xmlrpc_struct_find_value(&chamelium->env, res, "file_type", &res_type);
-	xmlrpc_struct_find_value(&chamelium->env, res, "rate", &res_rate);
-	xmlrpc_struct_find_value(&chamelium->env, res, "sample_format", &res_sample_format);
-	xmlrpc_struct_find_value(&chamelium->env, res, "channel", &res_channel);
-
-	xmlrpc_read_string(&chamelium->env, res_type, (const char **) &type);
-	igt_assert(strcmp(type, "raw") == 0);
-	free(type);
-
-	xmlrpc_read_string(&chamelium->env, res_sample_format, (const char **) &sample_format);
-	igt_assert(strcmp(sample_format, "S32_LE") == 0);
-	free(sample_format);
-
-	xmlrpc_read_int(&chamelium->env, res_rate, rate);
-	xmlrpc_read_int(&chamelium->env, res_channel, channels);
-
-	xmlrpc_DECREF(res_channel);
-	xmlrpc_DECREF(res_sample_format);
-	xmlrpc_DECREF(res_rate);
-	xmlrpc_DECREF(res_type);
 }
 
 /**

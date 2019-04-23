@@ -42,8 +42,6 @@ struct chamelium_stream *chamelium_stream_init(void);
 void chamelium_stream_deinit(struct chamelium_stream *client);
 bool chamelium_stream_dump_realtime_audio(struct chamelium_stream *client,
 					  enum chamelium_stream_realtime_mode mode);
-void chamelium_stream_audio_format(struct chamelium_stream *stream,
-				   int *rate, int *channels);
 bool chamelium_stream_receive_realtime_audio(struct chamelium_stream *client,
 					     size_t *page_count,
 					     int32_t **buf, size_t *buf_len);

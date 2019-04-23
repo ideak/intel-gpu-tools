@@ -725,15 +725,14 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 /* A streak of 3 gives confidence that the signal is good. */
 #define MIN_STREAK 3
 
-/* TODO: Chamelium only supports 48KHz for now */
 static int sampling_rates[] = {
-/*	32000, */
-/*	44100, */
+	32000,
+	44100,
 	48000,
-/*	88200, */
-/*	96000, */
-/*	176400, */
-/*	192000, */
+	88200,
+	96000,
+	176400,
+	192000,
 };
 
 static int sampling_rates_count = sizeof(sampling_rates) / sizeof(int);
@@ -816,19 +815,6 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	ok = chamelium_stream_dump_realtime_audio(stream, stream_mode);
 	igt_assert(ok);
 
-	chamelium_stream_audio_format(stream, &capture_rate, &capture_channels);
-
-	if (igt_frame_dump_is_enabled()) {
-		snprintf(dump_suffix, sizeof(dump_suffix), "capture-%dch-%d",
-			 playback_channels, playback_rate);
-
-		dump_fd = audio_create_wav_file_s32_le(dump_suffix,
-						       capture_rate,
-						       capture_channels,
-						       &dump_path);
-		igt_assert(dump_fd >= 0);
-	}
-
 	signal = audio_signal_init(playback_channels, playback_rate);
 	igt_assert(signal);
 
@@ -838,8 +824,12 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	 * enough offset so that we're sure to detect mixed up channels. We
 	 * choose an offset of two 2 bins in the final FFT to enforce a clear
 	 * difference.
+	 *
+	 * Note that we assume capture_rate == playback_rate. We'll assert this
+	 * later on. We cannot retrieve the capture rate before starting
+	 * playing audio, so we don't really have the choice.
 	 */
-	step = 2 * capture_rate / CAPTURE_SAMPLES;
+	step = 2 * playback_rate / CAPTURE_SAMPLES;
 	for (i = 0; i < test_frequencies_count; i++) {
 		for (j = 0; j < playback_channels; j++) {
 			freq = test_frequencies[i] + j * step;
@@ -857,6 +847,17 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	ret = pthread_create(&thread, NULL, run_audio_thread, alsa);
 	igt_assert(ret == 0);
 
+	/* Only after we've started playing audio, we can retrieve the capture
+	 * format used by the Chamelium device. */
+	chamelium_get_audio_format(data->chamelium, port,
+				   &capture_rate, &capture_channels);
+	if (capture_rate == 0) {
+		igt_debug("Audio receiver doesn't indicate the capture "
+			 "sampling rate, assuming it's %d Hz\n", playback_rate);
+		capture_rate = playback_rate;
+	} else
+		igt_assert(capture_rate == playback_rate);
+
 	chamelium_get_audio_channel_mapping(data->chamelium, port,
 					    channel_mapping);
 	/* Make sure we can capture all channels we send. */
@@ -869,6 +870,17 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 			}
 		}
 		igt_assert(ok);
+	}
+
+	if (igt_frame_dump_is_enabled()) {
+		snprintf(dump_suffix, sizeof(dump_suffix), "capture-%dch-%d",
+			 playback_channels, playback_rate);
+
+		dump_fd = audio_create_wav_file_s32_le(dump_suffix,
+						       capture_rate,
+						       capture_channels,
+						       &dump_path);
+		igt_assert(dump_fd >= 0);
 	}
 
 	/* Needs to be a multiple of 128, because that's the number of samples
