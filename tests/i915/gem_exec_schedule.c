@@ -52,6 +52,15 @@
 #define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
 #define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
+#define MI_SEMAPHORE_WAIT		(0x1c << 23)
+#define   MI_SEMAPHORE_POLL             (1 << 15)
+#define   MI_SEMAPHORE_SAD_GT_SDD       (0 << 12)
+#define   MI_SEMAPHORE_SAD_GTE_SDD      (1 << 12)
+#define   MI_SEMAPHORE_SAD_LT_SDD       (2 << 12)
+#define   MI_SEMAPHORE_SAD_LTE_SDD      (3 << 12)
+#define   MI_SEMAPHORE_SAD_EQ_SDD       (4 << 12)
+#define   MI_SEMAPHORE_SAD_NEQ_SDD      (5 << 12)
+
 IGT_TEST_DESCRIPTION("Check that we can control the order of execution");
 
 static inline
@@ -461,6 +470,137 @@ static void semaphore_codependency(int i915)
 		igt_spin_free(i915, task[i].xcs);
 		igt_spin_free(i915, task[i].rcs);
 	}
+}
+
+static unsigned int offset_in_page(void *addr)
+{
+	return (uintptr_t)addr & 4095;
+}
+
+static void semaphore_resolve(int i915)
+{
+	const uint32_t SEMAPHORE_ADDR = 64 << 10;
+	uint32_t semaphore, outer, inner, *sema;
+	unsigned int engine;
+
+	/*
+	 * Userspace may submit batches that wait upon unresolved
+	 * semaphores. Ideally, we want to put those blocking batches
+	 * to the back of the execution queue if we have something else
+	 * that is ready to run right away. This test exploits a failure
+	 * to reorder batches around a blocking semaphore by submitting
+	 * the release of that semaphore from a later context.
+	 */
+
+	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(intel_get_drm_devid(i915) >= 8); /* for MI_SEMAPHORE_WAIT */
+
+	outer = gem_context_create(i915);
+	inner = gem_context_create(i915);
+
+	semaphore = gem_create(i915, 4096);
+	sema = gem_mmap__wc(i915, semaphore, 0, 4096, PROT_WRITE);
+
+	for_each_physical_engine(i915, engine) {
+		struct drm_i915_gem_exec_object2 obj[3];
+		struct drm_i915_gem_execbuffer2 eb;
+		uint32_t handle, cancel;
+		uint32_t *cs, *map;
+		igt_spin_t *spin;
+
+		if (!gem_can_store_dword(i915, engine))
+			continue;
+
+		spin = __igt_spin_new(i915, .engine = engine);
+		igt_spin_end(spin); /* we just want its address for later */
+		gem_sync(i915, spin->handle);
+		igt_spin_reset(spin);
+
+		handle = gem_create(i915, 4096);
+		cs = map = gem_mmap__cpu(i915, handle, 0, 4096, PROT_WRITE);
+
+		/* Set semaphore initially to 1 for polling and signaling */
+		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = SEMAPHORE_ADDR;
+		*cs++ = 0;
+		*cs++ = 1;
+
+		/* Wait until another batch writes to our semaphore */
+		*cs++ = MI_SEMAPHORE_WAIT |
+			MI_SEMAPHORE_POLL |
+			MI_SEMAPHORE_SAD_EQ_SDD |
+			(4 - 2);
+		*cs++ = 0;
+		*cs++ = SEMAPHORE_ADDR;
+		*cs++ = 0;
+
+		/* Then cancel the spinner */
+		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = spin->obj[1].offset + offset_in_page(spin->condition);
+		*cs++ = 0;
+		*cs++ = MI_BATCH_BUFFER_END;
+
+		*cs++ = MI_BATCH_BUFFER_END;
+		munmap(map, 4096);
+
+		memset(&eb, 0, sizeof(eb));
+
+		/* First up is our spinning semaphore */
+		memset(obj, 0, sizeof(obj));
+		obj[0] = spin->obj[1];
+		obj[1].handle = semaphore;
+		obj[1].offset = SEMAPHORE_ADDR;
+		obj[1].flags = EXEC_OBJECT_PINNED;
+		obj[2].handle = handle;
+		eb.buffer_count = 3;
+		eb.buffers_ptr = to_user_pointer(obj);
+		eb.rsvd1 = outer;
+		gem_execbuf(i915, &eb);
+
+		/* Then add the GPU hang intermediatory */
+		memset(obj, 0, sizeof(obj));
+		obj[0].handle = handle;
+		obj[0].flags = EXEC_OBJECT_WRITE; /* always after semaphore */
+		obj[1] = spin->obj[1];
+		eb.buffer_count = 2;
+		eb.rsvd1 = 0;
+		gem_execbuf(i915, &eb);
+
+		while (READ_ONCE(*sema) == 0)
+			;
+
+		/* Now the semaphore is spinning, cancel it */
+		cancel = gem_create(i915, 4096);
+		cs = map = gem_mmap__cpu(i915, cancel, 0, 4096, PROT_WRITE);
+		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = SEMAPHORE_ADDR;
+		*cs++ = 0;
+		*cs++ = 0;
+		*cs++ = MI_BATCH_BUFFER_END;
+		munmap(map, 4096);
+
+		memset(obj, 0, sizeof(obj));
+		obj[0].handle = semaphore;
+		obj[0].offset = SEMAPHORE_ADDR;
+		obj[0].flags = EXEC_OBJECT_PINNED;
+		obj[1].handle = cancel;
+		eb.buffer_count = 2;
+		eb.rsvd1 = inner;
+		gem_execbuf(i915, &eb);
+		gem_close(i915, cancel);
+
+		gem_sync(i915, handle); /* To hang unless cancel runs! */
+		gem_close(i915, handle);
+		igt_spin_free(i915, spin);
+
+		igt_assert_eq(*sema, 0);
+	}
+
+	munmap(sema, 4096);
+	gem_close(i915, semaphore);
+
+	gem_context_destroy(i915, inner);
+	gem_context_destroy(i915, outer);
 }
 
 static void reorder(int fd, unsigned ring, unsigned flags)
@@ -1450,6 +1590,8 @@ igt_main
 			semaphore_userlock(fd);
 		igt_subtest("semaphore-codependency")
 			semaphore_codependency(fd);
+		igt_subtest("semaphore-resolve")
+			semaphore_resolve(fd);
 
 		igt_subtest("smoketest-all")
 			smoketest(fd, ALL_ENGINES, 30);
