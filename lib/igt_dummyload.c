@@ -260,6 +260,8 @@ emit_recursive_batch(igt_spin_t *spin,
 	obj[SCRATCH].flags = EXEC_OBJECT_PINNED;
 	obj[BATCH].flags = EXEC_OBJECT_PINNED;
 
+	spin->cmd_precondition = *spin->batch;
+
 	return fence_fd;
 }
 
@@ -364,6 +366,21 @@ void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 	igt_assert(timer_settime(timer, 0, &its, NULL) == 0);
 
 	spin->timer = timer;
+}
+
+/**
+ * igt_spin_reset:
+ * @spin: spin state from igt_spin_new()
+ *
+ * Reset the state of spin, allowing its reuse.
+ */
+void igt_spin_reset(igt_spin_t *spin)
+{
+	if (igt_spin_has_poll(spin))
+		spin->poll[SPIN_POLL_START_IDX] = 0;
+
+	*spin->batch = spin->cmd_precondition;
+	__sync_synchronize();
 }
 
 /**

@@ -1501,14 +1501,6 @@ test_enable_race(int gem_fd, const struct intel_execution_engine2 *e)
 	gem_quiescent_gpu(gem_fd);
 }
 
-static void __rearm_spin(igt_spin_t *spin)
-{
-	const uint32_t mi_arb_chk = 0x5 << 23;
-
-       *spin->batch = mi_arb_chk;
-       __sync_synchronize();
-}
-
 #define __assert_within(x, ref, tol_up, tol_down) \
 	igt_assert_f((double)(x) <= ((double)(ref) + (tol_up)) && \
 		     (double)(x) >= ((double)(ref) - (tol_down)), \
@@ -1596,7 +1588,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 				nanosleep(&_ts, NULL);
 
 				/* Restart the spinbatch. */
-				__rearm_spin(spin);
+				igt_spin_reset(spin);
 				__submit_spin(gem_fd, spin, e, 0);
 
 				/* PWM busy sleep. */

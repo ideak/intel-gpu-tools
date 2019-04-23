@@ -37,6 +37,7 @@ typedef struct igt_spin {
 	timer_t timer;
 	struct igt_list link;
 	uint32_t *batch;
+	uint32_t cmd_precondition;
 	int out_fence;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -68,6 +69,7 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts);
 	igt_spin_factory(fd, &((struct igt_spin_factory){__VA_ARGS__}))
 
 void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns);
+void igt_spin_reset(igt_spin_t *spin);
 void igt_spin_end(igt_spin_t *spin);
 void igt_spin_free(int fd, igt_spin_t *spin);
 

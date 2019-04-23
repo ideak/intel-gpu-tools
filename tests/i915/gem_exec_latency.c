@@ -73,19 +73,17 @@ poll_ring(int fd, unsigned ring, const char *name)
 	unsigned long cycles;
 	igt_spin_t *spin[2];
 	uint64_t elapsed;
-	uint32_t cmd;
 
 	gem_require_ring(fd, ring);
 	igt_require(gem_can_store_dword(fd, ring));
 
 	spin[0] = __igt_spin_factory(fd, &opts);
 	igt_assert(igt_spin_has_poll(spin[0]));
-	cmd = *spin[0]->batch;
 
 	spin[1] = __igt_spin_factory(fd, &opts);
 	igt_assert(igt_spin_has_poll(spin[1]));
 
-	igt_assert(cmd == *spin[1]->batch);
+	igt_assert(*spin[0]->batch == *spin[1]->batch);
 
 	igt_spin_end(spin[0]);
 	igt_spin_busywait_until_started(spin[1]);
@@ -96,8 +94,8 @@ poll_ring(int fd, unsigned ring, const char *name)
 	while ((elapsed = igt_nsec_elapsed(&tv)) < 2ull << 30) {
 		const unsigned int idx = cycles++ & 1;
 
-		*spin[idx]->batch = cmd;
-		spin[idx]->poll[SPIN_POLL_START_IDX] = 0;
+		igt_spin_reset(spin[idx]);
+
 		gem_execbuf(fd, &spin[idx]->execbuf);
 
 		igt_spin_end(spin[!idx]);
@@ -414,15 +412,6 @@ static void latency_from_ring(int fd,
 	}
 }
 
-static void __rearm_spin(igt_spin_t *spin)
-{
-	const uint32_t mi_arb_chk = 0x5 << 23;
-
-       *spin->batch = mi_arb_chk;
-       spin->poll[SPIN_POLL_START_IDX] = 0;
-       __sync_synchronize();
-}
-
 static void
 __submit_spin(int fd, igt_spin_t *spin, unsigned int flags)
 {
@@ -557,7 +546,7 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 				if (nengine > 1)
 					usleep(10*nengine);
 
-				__rearm_spin(spin);
+				igt_spin_reset(spin);
 
 				igt_nsec_elapsed(&ts);
 				__submit_spin(fd, spin, engine);
