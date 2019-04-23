@@ -497,7 +497,8 @@ void alsa_register_input_callback(struct alsa *alsa,
 /**
  * alsa_run:
  * @alsa: The target alsa structure
- * @duration_ms: The maximum duration of the run in milliseconds
+ * @duration_ms: The maximum duration of the run in milliseconds, or -1 for an
+ * infinite duration.
  *
  * Run ALSA playback and capture on the input and output devices for at
  * most @duration_ms milliseconds, calling the registered callbacks when needed.
@@ -545,7 +546,7 @@ int alsa_run(struct alsa *alsa, int duration_ms)
 	do {
 		reached = true;
 
-		if (output_total < output_limit) {
+		if (output_limit < 0 || output_total < output_limit) {
 			reached = false;
 
 			if (!output_ready) {
@@ -607,7 +608,8 @@ int alsa_run(struct alsa *alsa, int duration_ms)
 
 		}
 
-		if (alsa->input_callback && input_total < input_limit) {
+		if (alsa->input_callback &&
+		    (input_limit < 0 || input_total < input_limit)) {
 			reached = false;
 
 			if (input_count == input_trigger) {
@@ -660,11 +662,8 @@ int alsa_run(struct alsa *alsa, int duration_ms)
 	ret = 0;
 
 complete:
-	if (output_buffer)
-		free(output_buffer);
-
-	if (input_buffer)
-		free(input_buffer);
+	free(output_buffer);
+	free(input_buffer);
 
 	return ret;
 }

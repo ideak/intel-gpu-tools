@@ -29,7 +29,9 @@
 #include "igt_vc4.h"
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <string.h>
+#include <stdatomic.h>
 
 typedef struct {
 	struct chamelium *chamelium;
@@ -719,7 +721,7 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 /* Capture paremeters control the audio signal we receive */
 #define CAPTURE_SAMPLES 2048
 
-#define AUDIO_DURATION 2000 /* ms */
+#define AUDIO_TIMEOUT 2000 /* ms */
 /* A streak of 3 gives confidence that the signal is good. */
 #define MIN_STREAK 3
 
@@ -746,14 +748,28 @@ static int test_frequencies[] = {
 
 static int test_frequencies_count = sizeof(test_frequencies) / sizeof(int);
 
+struct audio_state {
+	struct audio_signal *signal;
+	atomic_bool run;
+};
+
 static int
-output_callback(void *data, short *buffer, int frames)
+audio_output_callback(void *data, short *buffer, int frames)
 {
-	struct audio_signal *signal = (struct audio_signal *) data;
+	struct audio_state *state = data;
 
-	audio_signal_fill(signal, buffer, frames);
+	audio_signal_fill(state->signal, buffer, frames);
 
-	return 0;
+	return state->run ? 0 : -1;
+}
+
+static void *
+run_audio_thread(void *data)
+{
+	struct alsa *alsa = data;
+
+	alsa_run(alsa, -1);
+	return NULL;
 }
 
 static bool
@@ -774,6 +790,8 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	char dump_suffix[64];
 	char *dump_path = NULL;
 	int dump_fd = -1;
+	pthread_t thread;
+	struct audio_state state = {};
 
 	if (!alsa_test_output_configuration(alsa, playback_channels,
 					    playback_rate))
@@ -811,14 +829,14 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 		audio_signal_add_frequency(signal, test_frequencies[i]);
 	audio_signal_synthesize(signal);
 
-	alsa_register_output_callback(alsa, output_callback, signal,
+	state.signal = signal;
+	state.run = true;
+	alsa_register_output_callback(alsa, audio_output_callback, &state,
 				      PLAYBACK_SAMPLES);
 
-	/* TODO: detect signal in real-time */
-	ret = alsa_run(alsa, AUDIO_DURATION);
+	/* Start playing audio */
+	ret = pthread_create(&thread, NULL, run_audio_thread, alsa);
 	igt_assert(ret == 0);
-
-	alsa_close_output(alsa);
 
 	/* Needs to be a multiple of 128, because that's the number of samples
 	 * we get per channel each time we receive an audio page from the
@@ -836,7 +854,7 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	streak = 0;
 	msec = 0;
 	i = 0;
-	while (streak < MIN_STREAK && msec < AUDIO_DURATION) {
+	while (streak < MIN_STREAK && msec < AUDIO_TIMEOUT) {
 		ok = chamelium_stream_receive_realtime_audio(stream,
 							     &page_count,
 							     &recv, &recv_len);
@@ -870,6 +888,13 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 		buf_len = 0;
 		i++;
 	}
+
+	igt_debug("Stopping audio playback\n");
+	state.run = false;
+	ret = pthread_join(thread, NULL);
+	igt_assert(ret == 0);
+
+	alsa_close_output(alsa);
 
 	if (dump_fd >= 0) {
 		close(dump_fd);
