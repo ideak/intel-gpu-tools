@@ -36,8 +36,10 @@ typedef struct igt_spin {
 	unsigned int handle;
 	timer_t timer;
 	struct igt_list link;
-	uint32_t *batch;
+
+	uint32_t *condition;
 	uint32_t cmd_precondition;
+
 	int out_fence;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;

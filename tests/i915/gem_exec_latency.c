@@ -83,8 +83,6 @@ poll_ring(int fd, unsigned ring, const char *name)
 	spin[1] = __igt_spin_factory(fd, &opts);
 	igt_assert(igt_spin_has_poll(spin[1]));
 
-	igt_assert(*spin[0]->batch == *spin[1]->batch);
-
 	igt_spin_end(spin[0]);
 	igt_spin_busywait_until_started(spin[1]);
 

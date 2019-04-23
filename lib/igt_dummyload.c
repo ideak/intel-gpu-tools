@@ -62,6 +62,8 @@
 #define MI_ARB_CHK (0x5 << 23)
 
 static const int BATCH_SIZE = 4096;
+static const int LOOP_START_OFFSET = 64;
+
 static IGT_LIST(spin_list);
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -78,7 +80,7 @@ emit_recursive_batch(igt_spin_t *spin,
 	unsigned int engines[16];
 	unsigned int nengine;
 	int fence_fd = -1;
-	uint32_t *batch, *batch_start;
+	uint32_t *cs, *batch;
 	int i;
 
 	nengine = 0;
@@ -108,11 +110,12 @@ emit_recursive_batch(igt_spin_t *spin,
 			       0, BATCH_SIZE, PROT_WRITE);
 	if (!batch)
 		batch = gem_mmap__gtt(fd, obj[BATCH].handle,
-				       	BATCH_SIZE, PROT_WRITE);
+				      BATCH_SIZE, PROT_WRITE);
+
 	gem_set_domain(fd, obj[BATCH].handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	execbuf->buffer_count++;
-	batch_start = batch;
+	cs = batch;
 
 	if (opts->dependency) {
 		igt_assert(!(opts->flags & IGT_SPIN_POLL_RUN));
@@ -160,31 +163,34 @@ emit_recursive_batch(igt_spin_t *spin,
 		r->offset = sizeof(uint32_t) * 1;
 		r->delta = sizeof(uint32_t) * SPIN_POLL_START_IDX;
 
-		*batch++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		*cs++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
 
 		if (gen >= 8) {
-			*batch++ = r->presumed_offset + r->delta;
-			*batch++ = 0;
+			*cs++ = r->presumed_offset + r->delta;
+			*cs++ = 0;
 		} else if (gen >= 4) {
-			*batch++ = 0;
-			*batch++ = r->presumed_offset + r->delta;
+			*cs++ = 0;
+			*cs++ = r->presumed_offset + r->delta;
 			r->offset += sizeof(uint32_t);
 		} else {
-			batch[-1]--;
-			*batch++ = r->presumed_offset + r->delta;
+			cs[-1]--;
+			*cs++ = r->presumed_offset + r->delta;
 		}
 
-		*batch++ = 1;
+		*cs++ = 1;
 
 		execbuf->buffer_count++;
 	}
 
-	spin->batch = batch = batch_start + 64 / sizeof(*batch);
 	spin->handle = obj[BATCH].handle;
+
+	igt_assert_lt(cs - batch, LOOP_START_OFFSET / sizeof(*cs));
+	spin->condition = batch + LOOP_START_OFFSET / sizeof(*cs);
+	cs = spin->condition;
 
 	/* Allow ourselves to be preempted */
 	if (!(opts->flags & IGT_SPIN_NO_PREEMPTION))
-		*batch++ = MI_ARB_CHK;
+		*cs++ = MI_ARB_CHK;
 
 	/* Pad with a few nops so that we do not completely hog the system.
 	 *
@@ -198,27 +204,27 @@ emit_recursive_batch(igt_spin_t *spin,
 	 * trouble. See https://bugs.freedesktop.org/show_bug.cgi?id=102262
 	 */
 	if (!(opts->flags & IGT_SPIN_FAST))
-		batch += 1000;
+		cs += 1000;
 
 	/* recurse */
 	r = &relocs[obj[BATCH].relocation_count++];
 	r->target_handle = obj[BATCH].handle;
-	r->offset = (batch + 1 - batch_start) * sizeof(*batch);
+	r->offset = (cs + 1 - batch) * sizeof(*cs);
 	r->read_domains = I915_GEM_DOMAIN_COMMAND;
-	r->delta = 64;
+	r->delta = LOOP_START_OFFSET;
 	if (gen >= 8) {
-		*batch++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
-		*batch++ = r->delta;
-		*batch++ = 0;
+		*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
+		*cs++ = r->delta;
+		*cs++ = 0;
 	} else if (gen >= 6) {
-		*batch++ = MI_BATCH_BUFFER_START | 1 << 8;
-		*batch++ = r->delta;
+		*cs++ = MI_BATCH_BUFFER_START | 1 << 8;
+		*cs++ = r->delta;
 	} else {
-		*batch++ = MI_BATCH_BUFFER_START | 2 << 6;
+		*cs++ = MI_BATCH_BUFFER_START | 2 << 6;
 		if (gen < 4)
 			r->delta |= 1;
-		*batch = r->delta;
-		batch++;
+		*cs = r->delta;
+		cs++;
 	}
 	obj[BATCH].relocs_ptr = to_user_pointer(relocs);
 
@@ -252,6 +258,8 @@ emit_recursive_batch(igt_spin_t *spin,
 		}
 	}
 
+	igt_assert_lt(cs - batch, BATCH_SIZE / sizeof(*cs));
+
 	/* Make it easier for callers to resubmit. */
 
 	obj[BATCH].relocation_count = 0;
@@ -260,7 +268,7 @@ emit_recursive_batch(igt_spin_t *spin,
 	obj[SCRATCH].flags = EXEC_OBJECT_PINNED;
 	obj[BATCH].flags = EXEC_OBJECT_PINNED;
 
-	spin->cmd_precondition = *spin->batch;
+	spin->cmd_precondition = *spin->condition;
 
 	return fence_fd;
 }
@@ -379,7 +387,7 @@ void igt_spin_reset(igt_spin_t *spin)
 	if (igt_spin_has_poll(spin))
 		spin->poll[SPIN_POLL_START_IDX] = 0;
 
-	*spin->batch = spin->cmd_precondition;
+	*spin->condition = spin->cmd_precondition;
 	__sync_synchronize();
 }
 
@@ -394,7 +402,7 @@ void igt_spin_end(igt_spin_t *spin)
 	if (!spin)
 		return;
 
-	*spin->batch = MI_BATCH_BUFFER_END;
+	*spin->condition = MI_BATCH_BUFFER_END;
 	__sync_synchronize();
 }
 
@@ -419,7 +427,7 @@ void igt_spin_free(int fd, igt_spin_t *spin)
 		timer_delete(spin->timer);
 
 	igt_spin_end(spin);
-	gem_munmap((void *)((unsigned long)spin->batch & (~4095UL)),
+	gem_munmap((void *)((unsigned long)spin->condition & (~4095UL)),
 		   BATCH_SIZE);
 
 	if (spin->poll) {
