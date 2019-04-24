@@ -35,6 +35,9 @@ RUN tar xf peg-0.1.18.tar.gz
 RUN cd peg-0.1.18 && make PREFIX=/usr install
 RUN rm -fr /tmp/peg
 
+# For compile-testing on clang
+RUN dnf install -y clang
+
 # Meson version switching shenanigans
 WORKDIR /usr/src
 RUN curl -O https://files.pythonhosted.org/packages/17/d0/0fe98a9557a2f07dbe6f99ef57f2bc37450b641e1f6ceae9ce04c3c845dd/meson-0.46.0.tar.gz

@@ -47,6 +47,17 @@ build:tests-fedora-oldest-meson:
     - ninja -C build
     - ninja -C build igt-gpu-tools-doc
 
+build:tests-fedora-clang:
+  stage: build
+  variables:
+    CC: clang
+  script:
+    - meson $MESON_OPTIONS build
+    - ninja -C build
+  artifacts:
+    paths:
+      - build
+
 build:tests-debian-meson:
   image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian:latest
   stage: build
@@ -96,6 +107,14 @@ build:tests-debian-autotools:
 test:ninja-test:
   dependencies:
     - build:tests-fedora
+  stage: test
+  script: ninja -C build test
+
+test:ninja-test-clang:
+  dependencies:
+    - build:tests-fedora-clang
+  variables:
+    CC: clang
   stage: test
   script: ninja -C build test
 
