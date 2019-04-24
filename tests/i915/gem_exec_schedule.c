@@ -603,6 +603,86 @@ static void semaphore_resolve(int i915)
 	gem_context_destroy(i915, outer);
 }
 
+static void semaphore_noskip(int i915)
+{
+	const int gen = intel_gen(intel_get_drm_devid(i915));
+	unsigned int engine, other;
+	uint32_t ctx;
+
+	igt_require(gen >= 6); /* MI_STORE_DWORD_IMM convenience */
+
+	ctx = gem_context_create(i915);
+
+	for_each_physical_engine(i915, engine) {
+	for_each_physical_engine(i915, other) {
+		struct drm_i915_gem_exec_object2 obj[3];
+		struct drm_i915_gem_execbuffer2 eb;
+		uint32_t handle, *cs, *map;
+		igt_spin_t *chain, *spin;
+
+		if (other == engine || !gem_can_store_dword(i915, other))
+			continue;
+
+		chain = __igt_spin_new(i915, .engine = engine);
+
+		spin = __igt_spin_new(i915, .engine = other);
+		igt_spin_end(spin); /* we just want its address for later */
+		gem_sync(i915, spin->handle);
+		igt_spin_reset(spin);
+
+		handle = gem_create(i915, 4096);
+		cs = map = gem_mmap__cpu(i915, handle, 0, 4096, PROT_WRITE);
+
+		/* Cancel the following spinner */
+		*cs++ = MI_STORE_DWORD_IMM;
+		if (gen >= 8) {
+			*cs++ = spin->obj[1].offset + offset_in_page(spin->condition);
+			*cs++ = 0;
+		} else {
+			*cs++ = 0;
+			*cs++ = spin->obj[1].offset + offset_in_page(spin->condition);
+		}
+		*cs++ = MI_BATCH_BUFFER_END;
+
+		*cs++ = MI_BATCH_BUFFER_END;
+		munmap(map, 4096);
+
+		/* port0: implicit semaphore from engine */
+		memset(obj, 0, sizeof(obj));
+		obj[0] = chain->obj[1];
+		obj[0].flags |= EXEC_OBJECT_WRITE;
+		obj[1] = spin->obj[1];
+		obj[2].handle = handle;
+		memset(&eb, 0, sizeof(eb));
+		eb.buffer_count = 3;
+		eb.buffers_ptr = to_user_pointer(obj);
+		eb.rsvd1 = ctx;
+		eb.flags = other;
+		gem_execbuf(i915, &eb);
+
+		/* port1: dependency chain from port0 */
+		memset(obj, 0, sizeof(obj));
+		obj[0].handle = handle;
+		obj[0].flags = EXEC_OBJECT_WRITE;
+		obj[1] = spin->obj[1];
+		memset(&eb, 0, sizeof(eb));
+		eb.buffer_count = 2;
+		eb.buffers_ptr = to_user_pointer(obj);
+		eb.flags = other;
+		gem_execbuf(i915, &eb);
+
+		igt_spin_set_timeout(chain, NSEC_PER_SEC / 100);
+		gem_sync(i915, spin->handle); /* To hang unless cancel runs! */
+
+		gem_close(i915, handle);
+		igt_spin_free(i915, spin);
+		igt_spin_free(i915, chain);
+	}
+	}
+
+	gem_context_destroy(i915, ctx);
+}
+
 static void reorder(int fd, unsigned ring, unsigned flags)
 #define EQUAL 1
 {
@@ -1592,6 +1672,8 @@ igt_main
 			semaphore_codependency(fd);
 		igt_subtest("semaphore-resolve")
 			semaphore_resolve(fd);
+		igt_subtest("semaphore-noskip")
+			semaphore_noskip(fd);
 
 		igt_subtest("smoketest-all")
 			smoketest(fd, ALL_ENGINES, 30);
