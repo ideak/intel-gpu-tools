@@ -120,7 +120,7 @@ static void start_test(void)
 static void * test_thread(void * par)
 {
 #ifdef __linux__
-	igt_debug("start %ld\n", gettid());
+	igt_debug("start %ld\n", (long) gettid());
 #else
 	igt_debug("start %ld\n", (long) pthread_self());
 #endif
