@@ -3,11 +3,21 @@ project('igt-gpu-tools', 'c',
         default_options: [
           'warning_level=2',
           'c_std=gnu11',
+	  'b_ndebug=false',
         ],
 	license : 'MIT',
 	meson_version : '>=0.46.0')
 
+if get_option('b_ndebug') != 'false'
+	error('Building without -Db_ndebug=false is not supported')
+endif
+
 cc = meson.get_compiler('c')
+
+# Also make sure that the user doesn't have -DNDEBUG defined in their config
+if not cc.compiles(files('lib/check-ndebug.h'), args: get_option('c_args'))
+	error('Building with NDEBUG defined is not supported')
+endif
 
 cc_args = [
 	'-Wbad-function-cast',
