@@ -224,7 +224,7 @@ void igt_float_to_half(const float *f, uint16_t *h, unsigned int num)
 		h[i] = _float_to_half(f[i]);
 }
 
-float igt_half_to_float(const uint16_t *h, float *f, unsigned int num)
+void igt_half_to_float(const uint16_t *h, float *f, unsigned int num)
 {
 	for (int i = 0; i < num; i++)
 		f[i] = _half_to_float(h[i]);
