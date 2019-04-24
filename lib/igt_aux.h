@@ -33,6 +33,7 @@
 #include <stddef.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <unistd.h>
 #ifdef __linux__
 # include <sys/syscall.h>
 #endif
@@ -41,7 +42,9 @@
 
 /* signal interrupt helpers */
 #ifdef __linux__
-# define gettid() (pid_t)(syscall(__NR_gettid))
+# ifndef HAVE_GETTID
+#  define gettid() (pid_t)(syscall(__NR_gettid))
+# endif
 #endif
 #define sigev_notify_thread_id _sigev_un._tid
 

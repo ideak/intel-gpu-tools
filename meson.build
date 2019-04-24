@@ -223,6 +223,9 @@ if cc.has_header('cpuid.h')
 	# FIXME: Do we need the example link test from configure.ac?
 	config.set('HAVE_CPUID_H', 1)
 endif
+if cc.has_header_symbol('unistd.h', 'gettid', args : '-D_GNU_SOURCE')
+	config.set('HAVE_GETTID', 1)
+endif
 
 if cc.has_member('struct sysinfo', 'totalram',
 		prefix : '#include <sys/sysinfo.h>')
