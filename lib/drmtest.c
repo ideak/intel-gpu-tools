@@ -206,6 +206,7 @@ static const struct module {
 } modules[] = {
 	{ DRIVER_AMDGPU, "amdgpu" },
 	{ DRIVER_INTEL, "i915", modprobe_i915 },
+	{ DRIVER_PANFROST, "panfrost" },
 	{ DRIVER_V3D, "v3d" },
 	{ DRIVER_VC4, "vc4" },
 	{ DRIVER_VGEM, "vgem" },
@@ -366,6 +367,8 @@ static const char *chipset_to_str(int chipset)
 		return "virtio";
 	case DRIVER_AMDGPU:
 		return "amdgpu";
+	case DRIVER_PANFROST:
+		return "panfrost";
 	case DRIVER_ANY:
 		return "any";
 	default:

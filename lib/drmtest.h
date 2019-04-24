@@ -44,6 +44,7 @@
 #define DRIVER_VIRTIO	(1 << 3)
 #define DRIVER_AMDGPU	(1 << 4)
 #define DRIVER_V3D	(1 << 5)
+#define DRIVER_PANFROST	(1 << 6)
 /*
  * Exclude DRVER_VGEM from DRIVER_ANY since if you run on a system
  * with vgem as well as a supported driver, you can end up with a
