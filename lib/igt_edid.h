@@ -195,6 +195,21 @@ struct cea_vsd {
 	char data[];
 };
 
+enum cea_speaker_alloc_item {
+	CEA_SPEAKER_FRONT_LEFT_RIGHT = 1 << 0,
+	CEA_SPEAKER_LFE = 1 << 1,
+	CEA_SPEAKER_FRONT_CENTER = 1 << 2,
+	CEA_SPEAKER_REAR_LEFT_RIGHT = 1 << 3,
+	CEA_SPEAKER_REAR_CENTER = 1 << 4,
+	CEA_SPEAKER_FRONT_LEFT_RIGHT_CENTER = 1 << 5,
+	CEA_SPEAKER_REAR_LEFT_RIGHT_CENTER = 1 << 6,
+};
+
+struct cea_speaker_alloc {
+	uint8_t speakers; /* enum cea_speaker_alloc_item */
+	uint8_t reserved[2];
+} __attribute__((packed));
+
 enum edid_cea_data_type {
 	EDID_CEA_DATA_AUDIO = 1,
 	EDID_CEA_DATA_VIDEO = 2,
@@ -207,6 +222,7 @@ struct edid_cea_data_block {
 	union {
 		struct cea_sad sads[0];
 		struct cea_vsd vsds[0];
+		struct cea_speaker_alloc speakers[0];
 	} data;
 } __attribute__((packed));
 
@@ -295,6 +311,8 @@ size_t edid_cea_data_block_set_sad(struct edid_cea_data_block *block,
 				   const struct cea_sad *sads, size_t sads_len);
 size_t edid_cea_data_block_set_vsd(struct edid_cea_data_block *block,
 				   const struct cea_vsd *vsd, size_t vsd_size);
+size_t edid_cea_data_block_set_speaker_alloc(struct edid_cea_data_block *block,
+					     const struct cea_speaker_alloc *speakers);
 void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
 		      uint8_t flags);
 

@@ -348,6 +348,18 @@ size_t edid_cea_data_block_set_vsd(struct edid_cea_data_block *block,
 	return sizeof(struct edid_cea_data_block) + vsd_size;
 }
 
+size_t edid_cea_data_block_set_speaker_alloc(struct edid_cea_data_block *block,
+					     const struct cea_speaker_alloc *speakers)
+{
+	size_t size;
+
+	size = sizeof(struct cea_speaker_alloc);
+	edid_cea_data_block_init(block, EDID_CEA_DATA_SPEAKER_ALLOC, size);
+	memcpy(block->data.speakers, speakers, size);
+
+	return sizeof(struct edid_cea_data_block) + size;
+}
+
 void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
 		      uint8_t flags)
 {
