@@ -186,7 +186,7 @@ static void create_fb_for_crtc(struct crtc_config *crtc,
 static void get_mode_for_crtc(struct crtc_config *crtc,
 			      drmModeModeInfo *mode_ret)
 {
-	drmModeModeInfo mode;
+	drmModeModeInfo *mode;
 	int i;
 
 	/*
@@ -194,8 +194,8 @@ static void get_mode_for_crtc(struct crtc_config *crtc,
 	 * connectors.
 	 */
 	for (i = 0; i < crtc->connector_count; i++) {
-		mode = crtc->cconfs[i].default_mode;
-		if (crtc_supports_mode(crtc, &mode))
+		mode = &crtc->cconfs[i].default_mode;
+		if (crtc_supports_mode(crtc, mode))
 			goto found;
 	}
 
@@ -204,19 +204,22 @@ static void get_mode_for_crtc(struct crtc_config *crtc,
 	 * connectors.
 	 */
 	for (i = 0; i < crtc->cconfs[0].connector->count_modes; i++) {
-		mode = crtc->cconfs[0].connector->modes[i];
-		if (crtc_supports_mode(crtc, &mode))
+		mode = &crtc->cconfs[0].connector->modes[i];
+		if (crtc_supports_mode(crtc, mode))
 			goto found;
 	}
 
 	/*
-	 * If none is found then just pick the default mode of the first
-	 * connector and hope the other connectors can support it by scaling
-	 * etc.
+	 * If none is found then just pick the default mode from all connectors
+	 * with the smallest clock, hope the other connectors can support it by
+	 * scaling etc.
 	 */
-	mode = crtc->cconfs[0].default_mode;
+	mode = &crtc->cconfs[0].default_mode;
+	for (i = 1; i < crtc->connector_count; i++)
+		if (crtc->cconfs[i].default_mode.clock < mode->clock)
+			mode = &crtc->cconfs[i].default_mode;
 found:
-	*mode_ret = mode;
+	*mode_ret = *mode;
 }
 
 static int get_encoder_idx(drmModeRes *resources, drmModeEncoder *encoder)
