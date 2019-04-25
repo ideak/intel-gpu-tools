@@ -150,6 +150,9 @@ PKG_CHECK_MODULES(PIXMAN, [pixman-1 >= 0.36.0], [], [
 PKG_CHECK_MODULES(GSL, [gsl], [gsl=yes], [gsl=no])
 AM_CONDITIONAL(HAVE_GSL, [test "x$gsl" = xyes])
 
+PKG_CHECK_MODULES(ALSA, [alsa], [alsa=yes], [alsa=no])
+AM_CONDITIONAL(HAVE_ALSA, [test "x$alsa" = xyes])
+
 # for chamelium
 AC_ARG_ENABLE(chamelium, AS_HELP_STRING([--enable-chamelium],
 	      [Enable building of chamelium libraries and tests (default: no)]),
@@ -173,28 +176,11 @@ if test "x$enable_chamelium" = xyes; then
 	if test x"$gsl" != xyes; then
 		AC_MSG_ERROR([Failed to find gsl, required by chamelium.])
 	fi
+	if test x"$alsa" != xyes; then
+		AC_MSG_ERROR([Failed to find alsa, required by chamelium.])
+	fi
 
 	AC_DEFINE(HAVE_CHAMELIUM, 1, [Enable Chamelium support])
-fi
-
-PKG_CHECK_MODULES(ALSA, [alsa], [alsa=yes], [alsa=no])
-AM_CONDITIONAL(HAVE_ALSA, [test "x$alsa" = xyes])
-
-# for audio
-AC_ARG_ENABLE(audio, AS_HELP_STRING([--enable-audio],
-	      [Enable building of audio tests (default: no)]),
-	      [if test x$enableval = xyes; then enable_audio=yes; fi],
-	      [enable_audio=no])
-AM_CONDITIONAL(HAVE_AUDIO, [test "x$enable_audio" = xyes])
-if test "x$enable_audio" = xyes; then
-	if test x"$alsa" != xyes; then
-		AC_MSG_ERROR([Failed to find ALSA, required by audio.])
-	fi
-	if test x"$gsl" != xyes; then
-		AC_MSG_ERROR([Failed to find gsl, required by audio.])
-	fi
-
-	AC_DEFINE(HAVE_AUDIO, 1, [Enable Audio support])
 fi
 
 # -----------------------------------------------------------------------------
@@ -325,7 +311,6 @@ echo ""
 echo " • Tests:"
 echo "       Build tests        : ${BUILD_TESTS}"
 echo "       Chamelium tests    : ${enable_chamelium}"
-echo "       Audio tests        : ${enable_audio}"
 echo "       Compile prime tests: ${NOUVEAU}"
 echo "       Debug flags        : ${DEBUG_CFLAGS}"
 echo ""

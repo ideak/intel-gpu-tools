@@ -22,6 +22,8 @@ if HAVE_CHAMELIUM
 lib_source_list +=	 	\
 	igt_chamelium.h		\
 	igt_chamelium.c		\
+	igt_chamelium_stream.h	\
+	igt_chamelium_stream.c	\
 	$(NULL)
 endif
 

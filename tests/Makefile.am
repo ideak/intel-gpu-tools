@@ -16,12 +16,6 @@ TESTS_progs += \
 	$(NULL)
 endif
 
-if HAVE_AUDIO
-TESTS_progs += \
-	audio \
-	$(NULL)
-endif
-
 TESTS_progs += testdisplay
 
 if BUILD_TESTS
@@ -137,11 +131,8 @@ prime_nv_api_LDADD = $(LDADD) $(DRM_NOUVEAU_LIBS)
 prime_nv_pcopy_CFLAGS = $(AM_CFLAGS) $(DRM_NOUVEAU_CFLAGS)
 prime_nv_pcopy_LDADD = $(LDADD) $(DRM_NOUVEAU_LIBS)
 
-kms_chamelium_CFLAGS = $(AM_CFLAGS) $(XMLRPC_CFLAGS) $(LIBUDEV_CFLAGS)
-kms_chamelium_LDADD = $(LDADD) $(XMLRPC_LIBS) $(LIBUDEV_LIBS)
-
-audio_CFLAGS = $(AM_CFLAGS) $(ALSA_CFLAGS)
-audio_LDADD = $(LDADD) $(ALSA_LIBS)
+kms_chamelium_CFLAGS = $(AM_CFLAGS) $(XMLRPC_CFLAGS) $(LIBUDEV_CFLAGS) $(ALSA_CFLAGS)
+kms_chamelium_LDADD = $(LDADD) $(XMLRPC_LIBS) $(LIBUDEV_LIBS) $(ALSA_LIBS)
 
 testdisplay_CFLAGS = $(AM_CFLAGS) $(GLIB_CFLAGS)
 
