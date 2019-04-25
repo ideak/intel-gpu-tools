@@ -1646,3 +1646,27 @@ bool igt_allow_unlimited_files(void)
 	rlim.rlim_max = nofile_rlim;
 	return setrlimit(RLIMIT_NOFILE, &rlim) == 0;
 }
+
+/**
+ * vfs_file_max: report maximum number of files
+ *
+ * Get the global system-wide maximum of open files the kernel allows,
+ * by reading /proc/sys/fs/file-max. Fails the current subtest if
+ * reading the file fails, and returns a suitable best guess if it
+ * cannot be opened.
+ *
+ * Returns: System-wide maximum of open files, or a best effort guess.
+ */
+uint64_t vfs_file_max(void)
+{
+	static long long unsigned max;
+	if (max == 0) {
+		FILE *file = fopen("/proc/sys/fs/file-max", "r");
+		max = 80000;
+		if (file) {
+			igt_assert(fscanf(file, "%llu", &max) == 1);
+			fclose(file);
+		}
+	}
+	return max;
+}

@@ -298,4 +298,6 @@ void igt_lsof(const char *dpath);
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
+uint64_t vfs_file_max(void);
+
 #endif /* IGT_AUX_H */

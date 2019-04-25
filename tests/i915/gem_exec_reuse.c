@@ -25,6 +25,7 @@
 #include <sys/resource.h>
 
 #include "igt.h"
+#include "igt_aux.h"
 
 IGT_TEST_DESCRIPTION("Inspect scaling with large number of reused objects");
 
@@ -54,19 +55,6 @@ static void noop(struct noop *n,
 	execbuf.flags = ring | 1 << 12;
 	execbuf.rsvd1 = ctx;
 	gem_execbuf(n->fd, &execbuf);
-}
-
-static uint64_t vfs_file_max(void)
-{
-	long long unsigned max = 80000;
-	FILE *file = fopen("/proc/sys/fs/file-max", "r");
-	if (file) {
-		igt_assert(fscanf(file, "%llu", &max) == 1);
-		fclose(file);
-	}
-
-	igt_info("System limit for open files is %llu\n", max);
-	return max;
 }
 
 static uint64_t max_open_files(void)

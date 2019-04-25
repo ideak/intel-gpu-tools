@@ -279,20 +279,6 @@ void *intel_get_total_pinnable_mem(size_t *total)
 	return can_mlock;
 }
 
-static uint64_t vfs_file_max(void)
-{
-	static long long unsigned max;
-	if (max == 0) {
-		FILE *file = fopen("/proc/sys/fs/file-max", "r");
-		max = 80000;
-		if (file) {
-			igt_assert(fscanf(file, "%llu", &max) == 1);
-			fclose(file);
-		}
-	}
-	return max;
-}
-
 static unsigned max_open_files(void)
 {
 	struct rlimit rlim;
