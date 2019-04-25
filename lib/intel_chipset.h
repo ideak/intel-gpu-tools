@@ -66,6 +66,7 @@ struct intel_device_info {
 	bool is_kabylake : 1;
 	bool is_geminilake : 1;
 	bool is_coffeelake : 1;
+	bool is_cometlake : 1;
 	bool is_cannonlake : 1;
 	bool is_icelake : 1;
 	const char *codename;

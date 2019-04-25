@@ -277,6 +277,21 @@ static const struct intel_device_info intel_coffeelake_gt3_info = {
 	.gt = 3,
 };
 
+#define COMETLAKE_FIELDS \
+	.gen = BIT(8), \
+	.is_cometlake = true, \
+	.codename = "cometlake"
+
+static const struct intel_device_info intel_cometlake_gt1_info = {
+	COMETLAKE_FIELDS,
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_cometlake_gt2_info = {
+	COMETLAKE_FIELDS,
+	.gt = 2,
+};
+
 static const struct intel_device_info intel_cannonlake_info = {
 	.gen = BIT(9),
 	.is_cannonlake = true,
@@ -359,6 +374,9 @@ static const struct pci_id_match intel_device_match[] = {
 	INTEL_WHL_U_GT2_IDS(&intel_coffeelake_gt2_info),
 	INTEL_WHL_U_GT3_IDS(&intel_coffeelake_gt3_info),
 	INTEL_AML_CFL_GT2_IDS(&intel_coffeelake_gt2_info),
+
+	INTEL_CML_GT1_IDS(&intel_cometlake_gt1_info),
+	INTEL_CML_GT2_IDS(&intel_cometlake_gt2_info),
 
 	INTEL_CNL_IDS(&intel_cannonlake_info),
 
