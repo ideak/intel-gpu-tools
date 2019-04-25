@@ -3276,7 +3276,6 @@ static int igt_atomic_commit(igt_display_t *display, uint32_t flags, void *user_
 	if (display->is_atomic != 1)
 		return -1;
 	req = drmModeAtomicAlloc();
-	drmModeAtomicSetCursor(req, 0);
 
 	for_each_pipe(display, pipe) {
 		igt_pipe_t *pipe_obj = &display->pipes[pipe];
