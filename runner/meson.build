@@ -12,7 +12,11 @@ results_sources = [ 'results.c' ]
 runner_test_sources = [ 'runner_tests.c' ]
 runner_json_test_sources = [ 'runner_json_tests.c' ]
 
-if _build_runner and jsonc.found()
+if not _build_tests and _runner_required
+	error('Building test runner requires building tests')
+endif
+
+if _build_runner and _build_tests and jsonc.found()
 	subdir('testdata')
 
 	runnerlib = static_library('igt_runner', runnerlib_sources,
