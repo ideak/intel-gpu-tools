@@ -447,7 +447,7 @@ int audio_create_wav_file_s32_le(const char *qualifier, uint32_t sample_rate,
 		*path = strdup(_path);
 
 	igt_debug("Dumping %s audio to %s\n", qualifier, _path);
-	fd = open(_path, O_WRONLY | O_CREAT | O_TRUNC);
+	fd = open(_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd < 0) {
 		igt_warn("open failed: %s\n", strerror(errno));
 		return -1;
