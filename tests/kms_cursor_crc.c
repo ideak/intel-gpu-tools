@@ -337,6 +337,18 @@ static void test_crc_random(data_t *data)
 	}
 }
 
+static void cleanup_crtc(data_t *data)
+{
+	igt_display_t *display = &data->display;
+
+	igt_pipe_crc_free(data->pipe_crc);
+	data->pipe_crc = NULL;
+
+	igt_remove_fb(data->drm_fd, &data->primary_fb);
+
+	igt_display_reset(display);
+}
+
 static void prepare_crtc(data_t *data, igt_output_t *output,
 			 int cursor_w, int cursor_h)
 {
@@ -344,9 +356,10 @@ static void prepare_crtc(data_t *data, igt_output_t *output,
 	igt_display_t *display = &data->display;
 	igt_plane_t *primary;
 
+	cleanup_crtc(data);
+
 	/* select the pipe we want to use */
 	igt_output_set_pipe(output, data->pipe);
-	cursor_disable(data);
 
 	/* create and set the primary plane fb */
 	mode = igt_output_get_mode(output);
@@ -362,9 +375,6 @@ static void prepare_crtc(data_t *data, igt_output_t *output,
 	igt_display_commit(display);
 
 	/* create the pipe_crc object for this pipe */
-	if (data->pipe_crc)
-		igt_pipe_crc_free(data->pipe_crc);
-
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
 					  INTEL_PIPE_CRC_SOURCE_AUTO);
 
@@ -379,29 +389,8 @@ static void prepare_crtc(data_t *data, igt_output_t *output,
 	data->curh = cursor_h;
 	data->refresh = mode->vrefresh;
 
-	/* make sure cursor is disabled */
-	cursor_disable(data);
-	igt_wait_for_vblank(data->drm_fd, data->pipe);
-
 	/* get reference crc w/o cursor */
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
-}
-
-static void cleanup_crtc(data_t *data, igt_output_t *output)
-{
-	igt_display_t *display = &data->display;
-	igt_plane_t *primary;
-
-	igt_pipe_crc_free(data->pipe_crc);
-	data->pipe_crc = NULL;
-
-	igt_remove_fb(data->drm_fd, &data->primary_fb);
-
-	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-	igt_plane_set_fb(primary, NULL);
-
-	igt_output_set_pipe(output, PIPE_ANY);
-	igt_display_commit(display);
 }
 
 static void test_cursor_alpha(data_t *data, double a)
@@ -466,7 +455,6 @@ static void run_test(data_t *data, void (*testfunc)(data_t *), int cursor_w, int
 {
 	prepare_crtc(data, data->output, cursor_w, cursor_h);
 	testfunc(data);
-	cleanup_crtc(data, data->output);
 }
 
 static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
@@ -602,10 +590,6 @@ static void test_rapid_movement(data_t *data)
 	timersub(&end, &start, &delta);
 	usec = delta.tv_usec + 1000000 * delta.tv_sec;
 	igt_assert_lt(usec, 0.9 * 400 * 1000000 / data->refresh);
-
-	igt_assert_eq(drmModeSetCursor(data->drm_fd, crtc_id,
-			       0, data->curw, data->curh), 0);
-
 }
 
 static void run_tests_on_pipe(data_t *data, enum pipe pipe)
