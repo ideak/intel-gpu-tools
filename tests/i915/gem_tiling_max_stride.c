@@ -72,16 +72,18 @@ igt_simple_main
 
 	devid = intel_get_drm_devid(fd);
 
-	if (intel_gen(devid) >= 7)
+	if (intel_gen(devid) >= 7) {
 		stride = 256 * 1024;
-	else if (intel_gen(devid) >= 4)
+	} else if (intel_gen(devid) >= 4) {
 		stride = 128 * 1024;
-	else {
-		if (IS_GEN2(devid)) {
-			tile_width = 128;
-			tile_height = 16;
-		}
+	} else if (intel_gen(devid) >= 3) {
 		stride = 8 * 1024;
+	} else if (intel_gen(devid) >= 2) {
+		tile_width = 128;
+		tile_height = 16;
+		stride = 8 * 1024;
+	} else {
+		igt_skip("Unknown Intel chipset, devid=%04x\n", devid);
 	}
 
 	size = stride * tile_height;
