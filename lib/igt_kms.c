@@ -2674,7 +2674,9 @@ static int igt_cursor_commit_legacy(igt_plane_t *cursor,
 	uint32_t crtc_id = pipe->crtc_id;
 	int ret;
 
-	if (igt_plane_is_prop_changed(cursor, IGT_PLANE_FB_ID)) {
+	if (igt_plane_is_prop_changed(cursor, IGT_PLANE_FB_ID) ||
+	    igt_plane_is_prop_changed(cursor, IGT_PLANE_CRTC_W) ||
+	    igt_plane_is_prop_changed(cursor, IGT_PLANE_CRTC_H)) {
 		if (cursor->gem_handle)
 			LOG(display,
 			    "SetCursor pipe %s, fb %u %dx%d\n",
