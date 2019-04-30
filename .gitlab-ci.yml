@@ -3,7 +3,6 @@ variables:
   MESON_OPTIONS: >
     -Dwith_libdrm=intel,nouveau,amdgpu
     -Dbuild_overlay=true
-    -Dbuild_audio=true
     -Dbuild_chamelium=true
     -Dwith_valgrind=true
     -Dbuild_man=true
