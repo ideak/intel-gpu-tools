@@ -137,6 +137,7 @@ test:test-list-diff:
 ################### DEPLOY #########################
 
 pages:
+  when: manual
   dependencies:
     - build:tests-fedora
   stage: deploy
