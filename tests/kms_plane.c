@@ -481,6 +481,25 @@ static void test_format_plane_color(data_t *data, enum pipe pipe,
 	igt_remove_fb(data->drm_fd, &old_fb);
 }
 
+static int num_unique_crcs(const igt_crc_t crc[], int num_crc)
+{
+	int num_unique_crc = 0;
+
+	for (int i = 0; i < num_crc; i++) {
+		int j;
+
+		for (j = i + 1; j < num_crc; j++) {
+			if (igt_check_crc_equal(&crc[i], &crc[j]))
+				break;
+		}
+
+		if (j == num_crc)
+			num_unique_crc++;
+	}
+
+	return num_unique_crc;
+}
+
 static bool test_format_plane(data_t *data, enum pipe pipe,
 			      igt_output_t *output, igt_plane_t *plane)
 {
@@ -552,6 +571,13 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 					width, height,
 					i, &ref_crc[i], &fb);
 	}
+
+	/*
+	 * Make sure we have some difference between the colors. This
+	 * at least avoids claiming success when everything is just
+	 * black all the time (eg. if the plane is never even on).
+	 */
+	igt_require(num_unique_crcs(ref_crc, ARRAY_SIZE(colors)) > 1);
 
 	for (int i = 0; i < plane->format_mod_count; i++) {
 		int crc_mismatch_count = 0;
