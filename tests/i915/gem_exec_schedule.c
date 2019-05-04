@@ -507,6 +507,7 @@ static void semaphore_resolve(int i915)
 		uint32_t handle, cancel;
 		uint32_t *cs, *map;
 		igt_spin_t *spin;
+		int64_t poke = 1;
 
 		if (!gem_can_store_dword(i915, engine))
 			continue;
@@ -587,6 +588,7 @@ static void semaphore_resolve(int i915)
 		eb.buffer_count = 2;
 		eb.rsvd1 = inner;
 		gem_execbuf(i915, &eb);
+		gem_wait(i915, cancel, &poke); /* match sync's WAIT_PRIORITY */
 		gem_close(i915, cancel);
 
 		gem_sync(i915, handle); /* To hang unless cancel runs! */
