@@ -284,11 +284,32 @@ test_edid_read(data_t *data, struct chamelium_port *port,
 	drmModeFreeConnector(connector);
 }
 
+/* Wait for hotplug and return the remaining time left from timeout */
+static bool wait_for_hotplug(struct udev_monitor *mon, int *timeout)
+{
+	struct timespec start, end;
+	int elapsed;
+	bool detected;
+
+	igt_assert_eq(igt_gettime(&start), 0);
+	detected = igt_hotplug_detected(mon, *timeout);
+	igt_assert_eq(igt_gettime(&end), 0);
+
+	elapsed = igt_time_elapsed(&start, &end);
+	igt_assert_lte(0, elapsed);
+	*timeout = max(0, *timeout - elapsed);
+
+	return detected;
+}
+
 static void
 try_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 		       enum igt_suspend_state state, enum igt_suspend_test test,
 		       struct udev_monitor *mon, bool connected)
 {
+	drmModeConnection target_state = connected ? DRM_MODE_DISCONNECTED :
+						     DRM_MODE_CONNECTED;
+	int timeout = HOTPLUG_TIMEOUT;
 	int delay;
 	int p;
 
@@ -310,17 +331,29 @@ try_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 	}
 
 	igt_system_suspend_autoresume(state, test);
+	igt_assert(wait_for_hotplug(mon, &timeout));
 
-	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
 	if (port) {
-		igt_assert_eq(reprobe_connector(data, port), connected ?
-			      DRM_MODE_DISCONNECTED : DRM_MODE_CONNECTED);
+		igt_assert_eq(reprobe_connector(data, port), target_state);
 	} else {
 		for (p = 0; p < data->port_count; p++) {
+			drmModeConnection current_state;
+
 			port = data->ports[p];
-			igt_assert_eq(reprobe_connector(data, port), connected ?
-				      DRM_MODE_DISCONNECTED :
-				      DRM_MODE_CONNECTED);
+			/*
+			 * There could be as many hotplug events sent by
+			 * driver as connectors we scheduled an HPD toggle on
+			 * above, depending on timing. So if we're not seeing
+			 * the expected connector state try to wait for an HPD
+			 * event for each connector/port.
+			 */
+			current_state = reprobe_connector(data, port);
+			if (p > 0 && current_state != target_state) {
+				igt_assert(wait_for_hotplug(mon, &timeout));
+				current_state = reprobe_connector(data, port);
+			}
+
+			igt_assert_eq(current_state, target_state);
 		}
 
 		port = NULL;
