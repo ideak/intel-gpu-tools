@@ -110,7 +110,7 @@ void detailed_timing_set_mode(struct detailed_timing *dt, drmModeModeInfo *mode,
 	pt->width_height_mm_hi = (width_mm & 0xF00) >> 4
 				 | (height_mm & 0xF00) >> 8;
 
-	pt->misc = 0;
+	pt->misc = EDID_PT_SYNC_DIGITAL_SEPARATE;
 	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
 		pt->misc |= EDID_PT_HSYNC_POSITIVE;
 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)

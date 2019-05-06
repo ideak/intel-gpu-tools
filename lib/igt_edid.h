@@ -52,11 +52,17 @@ struct std_timing {
 
 #define DETAILED_TIMINGS_LEN 4
 
-#define EDID_PT_HSYNC_POSITIVE (1 << 1)
+#define EDID_PT_INTERLACED (1 << 7)
+#define EDID_PT_STEREO (1 << 5)
+
+/* Sync type */
+#define EDID_PT_SYNC_ANALOG (0b00 << 3)
+#define EDID_PT_SYNC_DIGITAL_COMPOSITE (0b10 << 3)
+#define EDID_PT_SYNC_DIGITAL_SEPARATE (0b11 << 3)
+
+/* Applies to EDID_PT_SYNC_DIGITAL_SEPARATE only */
 #define EDID_PT_VSYNC_POSITIVE (1 << 2)
-#define EDID_PT_SEPARATE_SYNC  (3 << 3)
-#define EDID_PT_STEREO         (1 << 5)
-#define EDID_PT_INTERLACED     (1 << 7)
+#define EDID_PT_HSYNC_POSITIVE (1 << 1)
 
 struct detailed_pixel_timing {
 	uint8_t hactive_lo;
@@ -74,7 +80,7 @@ struct detailed_pixel_timing {
 	uint8_t width_height_mm_hi;
 	uint8_t hborder;
 	uint8_t vborder;
-	uint8_t misc;
+	uint8_t misc; /* EDID_PT_* */
 } __attribute__((packed));
 
 struct detailed_data_string {
