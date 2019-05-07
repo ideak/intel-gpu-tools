@@ -957,13 +957,13 @@ int igt_get_autoresume_delay(enum igt_suspend_state state)
  */
 void igt_drop_root(void)
 {
-	igt_assert(getuid() == 0);
+	igt_assert_eq(getuid(), 0);
 
-	igt_assert(setgid(2) == 0);
-	igt_assert(setuid(2) == 0);
+	igt_assert_eq(setgid(2), 0);
+	igt_assert_eq(setuid(2), 0);
 
-	igt_assert(getgid() == 2);
-	igt_assert(getuid() == 2);
+	igt_assert_eq(getgid(), 2);
+	igt_assert_eq(getuid(), 2);
 }
 
 /**
