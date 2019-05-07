@@ -158,14 +158,15 @@ igt_main
 	igt_subtest("bad-object") {
 		uint32_t real_handle = gem_create(fd, 4096);
 		uint32_t handles[20];
-		int i = 0;
+		size_t i = 0, len;
 
 		handles[i++] = 0xdeadbeef;
 		for(int bit = 0; bit < 16; bit++)
 			handles[i++] = real_handle | (1 << (bit + 16));
-		handles[i] = real_handle + 1;
+		handles[i++] = real_handle + 1;
+		len = i;
 
-		for (; i < 0; i--) {
+		for (i = 0; i < len; ++i) {
 			struct drm_i915_gem_mmap arg = {
 				.handle = handles[i],
 				.size = 4096,
