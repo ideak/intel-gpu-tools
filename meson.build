@@ -256,6 +256,13 @@ config.set10('HAVE_MEMFD_CREATE', have)
 add_project_arguments('-D_GNU_SOURCE', language : 'c')
 add_project_arguments('-include', 'config.h', language : 'c')
 
+# FEATURE_TEST_MACROS(7)
+# performs lightweight overflow checks on quite a few libc functions
+# requires -O optimizations
+if  ['debugoptimized', 'release', 'minsize'].contains(get_option('buildtype'))
+	add_project_arguments('-D_FORTIFY_SOURCE=2', language : 'c')
+endif
+
 config.set('PACKAGE_NAME', meson.project_name())
 config.set_quoted('PACKAGE_VERSION', meson.project_version())
 config.set_quoted('PACKAGE', meson.project_name())
