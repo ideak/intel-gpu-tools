@@ -49,6 +49,7 @@
 #include <sys/utsname.h>
 #include <termios.h>
 #include <assert.h>
+#include <grp.h>
 
 #include <proc/readproc.h>
 #include <libudev.h>
@@ -959,9 +960,11 @@ void igt_drop_root(void)
 {
 	igt_assert_eq(getuid(), 0);
 
+	igt_assert_eq(setgroups(0, NULL), 0);
 	igt_assert_eq(setgid(2), 0);
 	igt_assert_eq(setuid(2), 0);
 
+	igt_assert_eq(getgroups(0, NULL), 0);
 	igt_assert_eq(getgid(), 2);
 	igt_assert_eq(getuid(), 2);
 }
