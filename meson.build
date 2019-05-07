@@ -3,7 +3,8 @@ project('igt-gpu-tools', 'c',
         default_options: [
           'warning_level=2',
           'c_std=gnu11',
-	  'b_ndebug=false',
+          'b_ndebug=false',
+          'buildtype=debugoptimized',
         ],
 	license : 'MIT',
 	meson_version : '>=0.46.0')
@@ -113,7 +114,7 @@ _tests_required = build_tests == 'true'
 _build_runner = build_runner != 'false'
 _runner_required = build_runner == 'true'
 
-build_info = []
+build_info = ['Build type: ' + get_option('buildtype')]
 
 inc = include_directories('include/drm-uapi', 'lib', 'lib/stubs/syscalls', '.')
 
