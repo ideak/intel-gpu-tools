@@ -62,6 +62,12 @@ cc_args = [
 	'-Werror=sequence-point',
 	'-Werror=trigraphs',
 	'-Werror=write-strings',
+# Disable the memory allocating builtins as they may cause unexpected behavior
+# with our framework. They *may* get optimized out in favor of a register or
+# stack variable, making them effectively local. Local variables do not play
+# well with longjmp which is heavily used by IGT framework.
+	'-fno-builtin-malloc',
+	'-fno-builtin-calloc',
 ]
 
 foreach cc_arg : cc_args
