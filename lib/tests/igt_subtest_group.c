@@ -28,8 +28,13 @@
 
 igt_main
 {
-	bool t1 = false;
-	int t2 = 0;
+	/*
+	 * local variables have to be volatile here otherwise they end up being
+	 * undefined when modified in igt_subtest, fixture, etc. because of
+	 * longjmps
+	 */
+	volatile bool t1 = false;
+	volatile int t2 = 0;
 
 	igt_subtest_group {
 		igt_fixture {
