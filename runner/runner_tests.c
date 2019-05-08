@@ -10,7 +10,15 @@
 #include "job_list.h"
 #include "executor.h"
 
-static char testdatadir[] = TESTDATA_DIRECTORY;
+/*
+ * NOTE: this test is using a lot of variables that are changed in igt_fixture,
+ * igt_subtest_group and igt_subtests blocks but defined outside of them.
+ *
+ * Such variables have to be either non-local or volatile, otherwise their
+ * contents is undefined due to longjmps the framework performs.
+ */
+
+static const char testdatadir[] = TESTDATA_DIRECTORY;
 
 static void igt_assert_eqstr(const char *one, const char *two)
 {
@@ -65,10 +73,10 @@ static void job_list_filter_test(const char *name, const char *filterarg1, const
 				 size_t expected_normal, size_t expected_multiple)
 {
 	int multiple;
-	struct settings settings;
+	struct settings *settings = malloc(sizeof(*settings));
 
 	igt_fixture
-		init_settings(&settings);
+		init_settings(settings);
 
 	for (multiple = 0; multiple < 2; multiple++) {
 		igt_subtest_f("job-list-filters-%s-%s", name, multiple ? "multiple" : "normal") {
@@ -84,9 +92,9 @@ static void job_list_filter_test(const char *name, const char *filterarg1, const
 			size_t size;
 
 			init_job_list(&list);
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-			success = create_job_list(&list, &settings);
+			success = create_job_list(&list, settings);
 			size = list.size;
 
 			if (success)
@@ -99,8 +107,10 @@ static void job_list_filter_test(const char *name, const char *filterarg1, const
 		}
 	}
 
-	igt_fixture
-		free_settings(&settings);
+	igt_fixture {
+		free_settings(settings);
+		free(settings);
+	}
 }
 
 static void clear_directory_fd(int dirfd)
@@ -196,10 +206,10 @@ static void assert_execution_results_exist(int dirfd)
 
 igt_main
 {
-	struct settings settings;
+	struct settings *settings = malloc(sizeof(*settings));
 
 	igt_fixture
-		init_settings(&settings);
+		init_settings(settings);
 
 	igt_subtest("default-settings") {
 		const char *argv[] = { "runner",
@@ -207,26 +217,26 @@ igt_main
 				       "path-to-results",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-		igt_assert_eq(settings.abort_mask, 0);
-		igt_assert(!settings.test_list);
-		igt_assert_eqstr(settings.name, "path-to-results");
-		igt_assert(!settings.dry_run);
-		igt_assert_eq(settings.include_regexes.size, 0);
-		igt_assert_eq(settings.exclude_regexes.size, 0);
-		igt_assert(!settings.sync);
-		igt_assert_eq(settings.log_level, LOG_LEVEL_NORMAL);
-		igt_assert(!settings.overwrite);
-		igt_assert(!settings.multiple_mode);
-		igt_assert_eq(settings.inactivity_timeout, 0);
-		igt_assert_eq(settings.overall_timeout, 0);
-		igt_assert(!settings.use_watchdog);
-		igt_assert(strstr(settings.test_root, "test-root-dir") != NULL);
-		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
+		igt_assert_eq(settings->abort_mask, 0);
+		igt_assert(!settings->test_list);
+		igt_assert_eqstr(settings->name, "path-to-results");
+		igt_assert(!settings->dry_run);
+		igt_assert_eq(settings->include_regexes.size, 0);
+		igt_assert_eq(settings->exclude_regexes.size, 0);
+		igt_assert(!settings->sync);
+		igt_assert_eq(settings->log_level, LOG_LEVEL_NORMAL);
+		igt_assert(!settings->overwrite);
+		igt_assert(!settings->multiple_mode);
+		igt_assert_eq(settings->inactivity_timeout, 0);
+		igt_assert_eq(settings->overall_timeout, 0);
+		igt_assert(!settings->use_watchdog);
+		igt_assert(strstr(settings->test_root, "test-root-dir") != NULL);
+		igt_assert(strstr(settings->results_path, "path-to-results") != NULL);
 
-		igt_assert(!settings.piglit_style_dmesg);
-		igt_assert_eq(settings.dmesg_warn_level, 4);
+		igt_assert(!settings->piglit_style_dmesg);
+		igt_assert_eq(settings->dmesg_warn_level, 4);
 	}
 
 	igt_subtest_group {
@@ -262,10 +272,10 @@ igt_main
 	}
 
 	igt_subtest_group {
+		const char tmptestlist[] = "tmp.testlist";
 		char dirname[] = "tmpdirXXXXXX";
-		char tmptestlist[] = "tmp.testlist";
 		char pathtotestlist[64];
-		char *path;
+		volatile char *path;
 
 		igt_fixture {
 			int dirfd, fd;
@@ -290,19 +300,19 @@ igt_main
 					       dirname,
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
 			path = realpath(testdatadir, NULL);
 			igt_assert(path != NULL);
-			igt_assert_eqstr(settings.test_root, path);
-			free(path);
+			igt_assert_eqstr(settings->test_root, (char*)path);
+			free((void*)path);
 			path = realpath(dirname, NULL);
 			igt_assert(path != NULL);
-			igt_assert_eqstr(settings.results_path, path);
-			free(path);
+			igt_assert_eqstr(settings->results_path, (char*)path);
+			free((void*)path);
 			path = realpath(pathtotestlist, NULL);
 			igt_assert(path != NULL);
-			igt_assert_eqstr(settings.test_list, path);
+			igt_assert_eqstr(settings->test_list, (char*)path);
 		}
 
 		igt_fixture {
@@ -313,7 +323,7 @@ igt_main
 			close(dirfd);
 			rmdir(dirname);
 
-			free(path);
+			free((void*)path);
 		}
 	}
 
@@ -324,24 +334,24 @@ igt_main
 		};
 
 		setenv("IGT_TEST_ROOT", testdatadir, 1);
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-		igt_assert_eq(settings.abort_mask, 0);
-		igt_assert(!settings.test_list);
-		igt_assert_eqstr(settings.name, "path-to-results");
-		igt_assert(!settings.dry_run);
-		igt_assert_eq(settings.include_regexes.size, 0);
-		igt_assert_eq(settings.exclude_regexes.size, 0);
-		igt_assert(!settings.sync);
-		igt_assert_eq(settings.log_level, LOG_LEVEL_NORMAL);
-		igt_assert(!settings.overwrite);
-		igt_assert(!settings.multiple_mode);
-		igt_assert_eq(settings.inactivity_timeout, 0);
-		igt_assert_eq(settings.overall_timeout, 0);
-		igt_assert(!settings.use_watchdog);
-		igt_assert(strstr(settings.test_root, testdatadir) != NULL);
-		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
-		igt_assert(!settings.piglit_style_dmesg);
+		igt_assert_eq(settings->abort_mask, 0);
+		igt_assert(!settings->test_list);
+		igt_assert_eqstr(settings->name, "path-to-results");
+		igt_assert(!settings->dry_run);
+		igt_assert_eq(settings->include_regexes.size, 0);
+		igt_assert_eq(settings->exclude_regexes.size, 0);
+		igt_assert(!settings->sync);
+		igt_assert_eq(settings->log_level, LOG_LEVEL_NORMAL);
+		igt_assert(!settings->overwrite);
+		igt_assert(!settings->multiple_mode);
+		igt_assert_eq(settings->inactivity_timeout, 0);
+		igt_assert_eq(settings->overall_timeout, 0);
+		igt_assert(!settings->use_watchdog);
+		igt_assert(strstr(settings->test_root, testdatadir) != NULL);
+		igt_assert(strstr(settings->results_path, "path-to-results") != NULL);
+		igt_assert(!settings->piglit_style_dmesg);
 	}
 
 	igt_fixture {
@@ -372,30 +382,30 @@ igt_main
 				       "path-to-results",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-		igt_assert_eq(settings.abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
-		igt_assert(strstr(settings.test_list, "path-to-test-list") != NULL);
-		igt_assert_eqstr(settings.name, "foo");
-		igt_assert(settings.dry_run);
-		igt_assert_eq(settings.include_regexes.size, 2);
-		igt_assert_eqstr(settings.include_regexes.regex_strings[0], "pattern1");
-		igt_assert_eqstr(settings.include_regexes.regex_strings[1], "pattern2");
-		igt_assert_eq(settings.exclude_regexes.size, 2);
-		igt_assert_eqstr(settings.exclude_regexes.regex_strings[0], "xpattern1");
-		igt_assert_eqstr(settings.exclude_regexes.regex_strings[1], "xpattern2");
-		igt_assert(settings.sync);
-		igt_assert_eq(settings.log_level, LOG_LEVEL_VERBOSE);
-		igt_assert(settings.overwrite);
-		igt_assert(settings.multiple_mode);
-		igt_assert_eq(settings.inactivity_timeout, 27);
-		igt_assert_eq(settings.overall_timeout, 360);
-		igt_assert(settings.use_watchdog);
-		igt_assert(strstr(settings.test_root, "test-root-dir") != NULL);
-		igt_assert(strstr(settings.results_path, "path-to-results") != NULL);
+		igt_assert_eq(settings->abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
+		igt_assert(strstr(settings->test_list, "path-to-test-list") != NULL);
+		igt_assert_eqstr(settings->name, "foo");
+		igt_assert(settings->dry_run);
+		igt_assert_eq(settings->include_regexes.size, 2);
+		igt_assert_eqstr(settings->include_regexes.regex_strings[0], "pattern1");
+		igt_assert_eqstr(settings->include_regexes.regex_strings[1], "pattern2");
+		igt_assert_eq(settings->exclude_regexes.size, 2);
+		igt_assert_eqstr(settings->exclude_regexes.regex_strings[0], "xpattern1");
+		igt_assert_eqstr(settings->exclude_regexes.regex_strings[1], "xpattern2");
+		igt_assert(settings->sync);
+		igt_assert_eq(settings->log_level, LOG_LEVEL_VERBOSE);
+		igt_assert(settings->overwrite);
+		igt_assert(settings->multiple_mode);
+		igt_assert_eq(settings->inactivity_timeout, 27);
+		igt_assert_eq(settings->overall_timeout, 360);
+		igt_assert(settings->use_watchdog);
+		igt_assert(strstr(settings->test_root, "test-root-dir") != NULL);
+		igt_assert(strstr(settings->results_path, "path-to-results") != NULL);
 
-		igt_assert(settings.piglit_style_dmesg);
-		igt_assert_eq(settings.dmesg_warn_level, 3);
+		igt_assert(settings->piglit_style_dmesg);
+		igt_assert_eq(settings->dmesg_warn_level, 3);
 	}
 
 	igt_subtest("dmesg-warn-level-inferred") {
@@ -404,10 +414,10 @@ igt_main
 				       "path-to-results",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-		igt_assert(!settings.piglit_style_dmesg);
-		igt_assert_eq(settings.dmesg_warn_level, 4);
+		igt_assert(!settings->piglit_style_dmesg);
+		igt_assert_eq(settings->dmesg_warn_level, 4);
 	}
 
 	igt_subtest("dmesg-warn-level-inferred-with-piglit-style") {
@@ -417,10 +427,10 @@ igt_main
 				       "path-to-results",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-		igt_assert(settings.piglit_style_dmesg);
-		igt_assert_eq(settings.dmesg_warn_level, 5);
+		igt_assert(settings->piglit_style_dmesg);
+		igt_assert_eq(settings->dmesg_warn_level, 5);
 	}
 
 	igt_subtest("dmesg-warn-level-overridable-with-piglit-style") {
@@ -431,10 +441,10 @@ igt_main
 				       "path-to-results",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-		igt_assert(settings.piglit_style_dmesg);
-		igt_assert_eq(settings.dmesg_warn_level, 3);
+		igt_assert(settings->piglit_style_dmesg);
+		igt_assert_eq(settings->dmesg_warn_level, 3);
 	}
 
 	igt_subtest("invalid-option") {
@@ -444,14 +454,14 @@ igt_main
 				       "results-path",
 		};
 
-		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 	}
 
 	igt_subtest("paths-missing") {
 		const char *argv[] = { "runner",
 				       "-o",
 		};
-		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 	}
 
 	igt_subtest("log-levels") {
@@ -461,16 +471,16 @@ igt_main
 				       "results-path",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.log_level, LOG_LEVEL_NORMAL);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->log_level, LOG_LEVEL_NORMAL);
 
 		argv[2] = "quiet";
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.log_level, LOG_LEVEL_QUIET);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->log_level, LOG_LEVEL_QUIET);
 
 		argv[2] = "verbose";
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.log_level, LOG_LEVEL_VERBOSE);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->log_level, LOG_LEVEL_VERBOSE);
 	}
 
 	igt_subtest("abort-conditions") {
@@ -480,35 +490,35 @@ igt_main
 				       "results-path",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.abort_mask, ABORT_TAINT);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->abort_mask, ABORT_TAINT);
 
 		argv[1] = "--abort-on-monitored-error=lockdep";
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.abort_mask, ABORT_LOCKDEP);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->abort_mask, ABORT_LOCKDEP);
 
 		argv[1] = "--abort-on-monitored-error=taint";
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.abort_mask, ABORT_TAINT);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->abort_mask, ABORT_TAINT);
 
 		argv[1] = "--abort-on-monitored-error=lockdep,taint";
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
 
 		argv[1] = "--abort-on-monitored-error=taint,lockdep";
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
 
 		argv[1] = "--abort-on-monitored-error=all";
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.abort_mask, ABORT_ALL);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->abort_mask, ABORT_ALL);
 
 		argv[1] = "--abort-on-monitored-error=";
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-		igt_assert_eq(settings.abort_mask, 0);
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->abort_mask, 0);
 
 		argv[1] = "--abort-on-monitored-error=doesnotexist";
-		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
 	}
 
@@ -520,29 +530,29 @@ igt_main
 				       "results-path",
 		};
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-		igt_assert_eqstr(settings.name, "foo");
-		igt_assert(settings.dry_run);
-		igt_assert(!settings.test_list);
-		igt_assert(!settings.sync);
+		igt_assert_eqstr(settings->name, "foo");
+		igt_assert(settings->dry_run);
+		igt_assert(!settings->test_list);
+		igt_assert(!settings->sync);
 
 		argv[1] = "--test-list";
 		argv[3] = "--sync";
 
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-		igt_assert_eqstr(settings.name, "results-path");
-		igt_assert(!settings.dry_run);
-		igt_assert(strstr(settings.test_list, "foo") != NULL);
-		igt_assert(settings.sync);
+		igt_assert_eqstr(settings->name, "results-path");
+		igt_assert(!settings->dry_run);
+		igt_assert(strstr(settings->test_list, "foo") != NULL);
+		igt_assert(settings->sync);
 	}
 
 	igt_subtest_group {
 		char filename[] = "tmplistXXXXXX";
-		int fd = -1;
 
 		igt_fixture {
+			int fd;
 			igt_require((fd = mkstemp(filename)) >= 0);
 			close(fd);
 		}
@@ -554,9 +564,9 @@ igt_main
 					       "path-to-results",
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-			igt_assert(validate_settings(&settings));
+			igt_assert(validate_settings(settings));
 		}
 
 		igt_fixture {
@@ -573,18 +583,18 @@ igt_main
 		};
 
 		igt_assert_lt(open(nosuchfile, O_RDONLY), 0);
-		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-		igt_assert(!validate_settings(&settings));
+		igt_assert(!validate_settings(settings));
 	}
 
 	igt_subtest_group {
 		char dirname[] = "tmpdirXXXXXX";
-		struct job_list list;
+		struct job_list *list = malloc(sizeof(*list));
 
 		igt_fixture {
 			igt_require(mkdtemp(dirname) != NULL);
-			init_job_list(&list);
+			init_job_list(list);
 		}
 
 		igt_subtest("job-list-no-test-list-txt") {
@@ -593,14 +603,15 @@ igt_main
 					       "path-to-results",
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-			igt_assert(!create_job_list(&list, &settings));
+			igt_assert(!create_job_list(list, settings));
 		}
 
 		igt_fixture {
 			rmdir(dirname);
-			free_job_list(&list);
+			free_job_list(list);
+			free(list);
 		}
 	}
 
@@ -614,17 +625,18 @@ igt_main
 
 	igt_subtest_group {
 		char filename[] = "tmplistXXXXXX";
-		char testlisttext[] = "igt@successtest@first-subtest\n"
+		const char testlisttext[] = "igt@successtest@first-subtest\n"
 			"igt@successtest@second-subtest\n"
 			"igt@nosubtests\n";
-		int fd = -1, multiple;
-		struct job_list list;
+		int multiple;
+		struct job_list *list = malloc(sizeof(*list));
 
 		igt_fixture {
+			int fd;
 			igt_require((fd = mkstemp(filename)) >= 0);
 			igt_require(write(fd, testlisttext, strlen(testlisttext)) == strlen(testlisttext));
 			close(fd);
-			init_job_list(&list);
+			init_job_list(list);
 		}
 
 		for (multiple = 0; multiple < 2; multiple++) {
@@ -636,21 +648,21 @@ igt_main
 						       "path-to-results",
 				};
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-				igt_assert(create_job_list(&list, &settings));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+				igt_assert(create_job_list(list, settings));
 
-				igt_assert_eq(list.size, multiple ? 2 : 3);
+				igt_assert_eq(list->size, multiple ? 2 : 3);
 
-				igt_assert_eqstr(list.entries[0].binary, "successtest");
-				if (!multiple) igt_assert_eqstr(list.entries[1].binary, "successtest");
-				igt_assert_eqstr(list.entries[multiple ? 1 : 2].binary, "nosubtests");
+				igt_assert_eqstr(list->entries[0].binary, "successtest");
+				if (!multiple) igt_assert_eqstr(list->entries[1].binary, "successtest");
+				igt_assert_eqstr(list->entries[multiple ? 1 : 2].binary, "nosubtests");
 
-				igt_assert_eq(list.entries[0].subtest_count, multiple ? 2 : 1);
-				igt_assert_eq(list.entries[1].subtest_count, multiple ? 0 : 1);
-				if (!multiple) igt_assert_eq(list.entries[2].subtest_count, 0);
+				igt_assert_eq(list->entries[0].subtest_count, multiple ? 2 : 1);
+				igt_assert_eq(list->entries[1].subtest_count, multiple ? 0 : 1);
+				if (!multiple) igt_assert_eq(list->entries[2].subtest_count, 0);
 
-				igt_assert_eqstr(list.entries[0].subtests[0], "first-subtest");
-				igt_assert_eqstr(list.entries[multiple ? 0 : 1].subtests[multiple ? 1 : 0], "second-subtest");
+				igt_assert_eqstr(list->entries[0].subtests[0], "first-subtest");
+				igt_assert_eqstr(list->entries[multiple ? 0 : 1].subtests[multiple ? 1 : 0], "second-subtest");
 			}
 
 			igt_subtest_f("job-list-testlist-filtered-%s", multiple ? "multiple" : "normal") {
@@ -663,32 +675,33 @@ igt_main
 						       "path-to-results",
 				};
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-				igt_assert(create_job_list(&list, &settings));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+				igt_assert(create_job_list(list, settings));
 
-				igt_assert_eq(list.size, 1);
-				igt_assert_eqstr(list.entries[0].binary, "successtest");
+				igt_assert_eq(list->size, 1);
+				igt_assert_eqstr(list->entries[0].binary, "successtest");
 
-				igt_assert_eq(list.entries[0].subtest_count, 1);
-				igt_assert_eqstr(list.entries[0].subtests[0], "second-subtest");
+				igt_assert_eq(list->entries[0].subtest_count, 1);
+				igt_assert_eqstr(list->entries[0].subtests[0], "second-subtest");
 			}
 		}
 
 		igt_fixture {
 			unlink(filename);
-			free_job_list(&list);
+			free_job_list(list);
+			free(list);
 		}
 	}
 
 	igt_subtest_group {
 		char dirname[] = "tmpdirXXXXXX";
-		int dirfd = -1, fd = -1;
-		struct settings cmp_settings;
+		volatile int dirfd = -1, fd = -1;
+		struct settings *cmp_settings = malloc(sizeof(*cmp_settings));
 
 		igt_fixture {
 			igt_require(mkdtemp(dirname) != NULL);
 			rmdir(dirname);
-			init_settings(&cmp_settings);
+			init_settings(cmp_settings);
 		}
 
 		igt_subtest("settings-serialize") {
@@ -714,9 +727,9 @@ igt_main
 					       dirname,
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
-			igt_assert(serialize_settings(&settings));
+			igt_assert(serialize_settings(settings));
 
 			dirfd = open(dirname, O_DIRECTORY, O_RDONLY);
 			igt_assert_f(dirfd >= 0, "Serialization did not create the results directory\n");
@@ -725,27 +738,31 @@ igt_main
 				     "Opening %s/metadata.txt failed\n", dirname);
 			close(fd);
 
-			igt_assert_f(read_settings_from_dir(&cmp_settings, dirfd), "Reading settings failed\n");
-			assert_settings_equal(&settings, &cmp_settings);
+			igt_assert_f(read_settings_from_dir(cmp_settings, dirfd), "Reading settings failed\n");
+			assert_settings_equal(settings, cmp_settings);
 		}
 
 		igt_fixture {
 			close(fd);
 			close(dirfd);
 			clear_directory(dirname);
-			free_settings(&cmp_settings);
+			free_settings(cmp_settings);
+			free(cmp_settings);
 		}
 	}
 
 	igt_subtest_group {
 		char dirname[] = "tmpdirXXXXXX";
-		int dirfd = -1, fd = -1;
-		struct job_list list, cmp_list;
+		volatile int dirfd = -1, fd = -1;
+		struct job_list *list, *cmp_list;
 		int multiple;
 
+		list = malloc(sizeof(*list));
+		cmp_list = malloc(sizeof(*cmp_list));
+
 		igt_fixture {
-			init_job_list(&list);
-			init_job_list(&cmp_list);
+			init_job_list(list);
+			init_job_list(cmp_list);
 			igt_require(mkdtemp(dirname) != NULL);
 			rmdir(dirname);
 		}
@@ -759,11 +776,11 @@ igt_main
 						       dirname,
 				};
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-				igt_assert(create_job_list(&list, &settings));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+				igt_assert(create_job_list(list, settings));
 
-				igt_assert(serialize_settings(&settings));
-				igt_assert(serialize_job_list(&list, &settings));
+				igt_assert(serialize_settings(settings));
+				igt_assert(serialize_job_list(list, settings));
 
 				dirfd = open(dirname, O_DIRECTORY, O_RDONLY);
 				igt_assert_f(dirfd >= 0, "Serialization did not create the results directory\n");
@@ -773,27 +790,32 @@ igt_main
 				close(fd);
 				fd = -1;
 
-				igt_assert_f(read_job_list(&cmp_list, dirfd), "Reading job list failed\n");
-				assert_job_list_equal(&list, &cmp_list);
+				igt_assert_f(read_job_list(cmp_list, dirfd), "Reading job list failed\n");
+				assert_job_list_equal(list, cmp_list);
 			}
 
 			igt_fixture {
 				close(fd);
 				close(dirfd);
 				clear_directory(dirname);
-				free_job_list(&cmp_list);
-				free_job_list(&list);
+				free_job_list(cmp_list);
+				free_job_list(list);
 			}
+		}
+
+		igt_fixture {
+			free(cmp_list);
+			free(list);
 		}
 	}
 
 	igt_subtest_group {
 		char dirname[] = "tmpdirXXXXXX";
-		struct job_list list;
-		int dirfd = -1, subdirfd = -1, fd = -1;
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1, subdirfd = -1, fd = -1;
 
 		igt_fixture {
-			init_job_list(&list);
+			init_job_list(list);
 			igt_require(mkdtemp(dirname) != NULL);
 			rmdir(dirname);
 		}
@@ -806,19 +828,19 @@ igt_main
 					       dirname,
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-			igt_assert(create_job_list(&list, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+			igt_assert(create_job_list(list, settings));
 
-			igt_assert(initialize_execute_state(&state, &settings, &list));
+			igt_assert(initialize_execute_state(&state, settings, list));
 			igt_assert_eq(state.next, 0);
 			igt_assert(state.dry);
-			igt_assert_eq(list.size, 5);
+			igt_assert_eq(list->size, 5);
 
 			igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
 				     "Dry run initialization didn't create the results directory.\n");
 
 			/* Execute from just initialize_execute_state should fail */
-			igt_assert(execute(&state, &settings, &list));
+			igt_assert(execute(&state, settings, list));
 			igt_assert_f(openat(dirfd, "0", O_DIRECTORY | O_RDONLY) < 0,
 				     "Dry run executed when it should not have.\n");
 			igt_assert_f((fd = openat(dirfd, "metadata.txt", O_RDONLY)) >= 0,
@@ -830,16 +852,16 @@ igt_main
 			igt_assert_f((fd = openat(dirfd, "uname.txt", O_RDONLY)) < 0,
 				     "Dry run initialization created uname.txt.\n");
 
-			igt_assert(initialize_execute_state_from_resume(dirfd, &state, &settings, &list));
+			igt_assert(initialize_execute_state_from_resume(dirfd, &state, settings, list));
 			igt_assert_eq(state.next, 0);
 			igt_assert(!state.dry);
-			igt_assert_eq(list.size, 5);
+			igt_assert_eq(list->size, 5);
 			/* initialize_execute_state_from_resume() closes the dirfd */
 			igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
 				     "Dry run resume somehow deleted the results directory.\n");
 
 			/* Execute from resume should work */
-			igt_assert(execute(&state, &settings, &list));
+			igt_assert(execute(&state, settings, list));
 			igt_assert_f((fd = openat(dirfd, "uname.txt", O_RDONLY)) >= 0,
 				     "Dry run resume didn't create uname.txt.\n");
 			close(fd);
@@ -854,17 +876,18 @@ igt_main
 			close(dirfd);
 			close(subdirfd);
 			clear_directory(dirname);
-			free_job_list(&list);
+			free_job_list(list);
+			free(list);
 		}
 	}
 
 	igt_subtest_group {
 		char dirname[] = "tmpdirXXXXXX";
-		struct job_list list;
-		int dirfd = -1, fd = -1;
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1, fd = -1;
 
 		igt_fixture {
-			init_job_list(&list);
+			init_job_list(list);
 			igt_require(mkdtemp(dirname) != NULL);
 			rmdir(dirname);
 		}
@@ -876,13 +899,13 @@ igt_main
 					       dirname,
 			};
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-			igt_assert(create_job_list(&list, &settings));
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+			igt_assert(create_job_list(list, settings));
 
-			igt_assert(initialize_execute_state(&state, &settings, &list));
+			igt_assert(initialize_execute_state(&state, settings, list));
 
 			igt_assert_eq(state.next, 0);
-			igt_assert_eq(list.size, 5);
+			igt_assert_eq(list->size, 5);
 			igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
 				     "Execute state initialization didn't create the results directory.\n");
 			igt_assert_f((fd = openat(dirfd, "metadata.txt", O_RDONLY)) >= 0,
@@ -901,17 +924,18 @@ igt_main
 			close(fd);
 			close(dirfd);
 			clear_directory(dirname);
-			free_job_list(&list);
+			free_job_list(list);
+			free(list);
 		}
 	}
 
 	igt_subtest_group {
 		char dirname[] = "tmpdirXXXXXX";
-		struct job_list list;
-		int dirfd = -1, subdirfd = -1, fd = -1;
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1, subdirfd = -1, fd = -1;
 
 		igt_fixture {
-			init_job_list(&list);
+			init_job_list(list);
 			igt_require(mkdtemp(dirname) != NULL);
 		}
 
@@ -923,16 +947,16 @@ igt_main
 					       testdatadir,
 					       dirname,
 			};
-			char journaltext[] = "first-subtest\n";
-			char excludestring[] = "!first-subtest";
+			const char journaltext[] = "first-subtest\n";
+			const char excludestring[] = "!first-subtest";
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-			igt_assert(create_job_list(&list, &settings));
-			igt_assert(list.size == 1);
-			igt_assert(list.entries[0].subtest_count == 0);
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+			igt_assert(create_job_list(list, settings));
+			igt_assert(list->size == 1);
+			igt_assert(list->entries[0].subtest_count == 0);
 
-			igt_assert(serialize_settings(&settings));
-			igt_assert(serialize_job_list(&list, &settings));
+			igt_assert(serialize_settings(settings));
+			igt_assert(serialize_job_list(list, settings));
 
 			igt_assert((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0);
 			igt_assert(mkdirat(dirfd, "0", 0770) == 0);
@@ -940,15 +964,15 @@ igt_main
 			igt_assert((fd = openat(subdirfd, "journal.txt", O_CREAT | O_WRONLY | O_EXCL, 0660)) >= 0);
 			igt_assert(write(fd, journaltext, strlen(journaltext)) == strlen(journaltext));
 
-			free_job_list(&list);
-			free_settings(&settings);
-			igt_assert(initialize_execute_state_from_resume(dirfd, &state, &settings, &list));
+			free_job_list(list);
+			free_settings(settings);
+			igt_assert(initialize_execute_state_from_resume(dirfd, &state, settings, list));
 
 			igt_assert_eq(state.next, 0);
-			igt_assert_eq(list.size, 1);
-			igt_assert_eq(list.entries[0].subtest_count, 2);
-			igt_assert_eqstr(list.entries[0].subtests[0], "*");
-			igt_assert_eqstr(list.entries[0].subtests[1], excludestring);
+			igt_assert_eq(list->size, 1);
+			igt_assert_eq(list->entries[0].subtest_count, 2);
+			igt_assert_eqstr(list->entries[0].subtests[0], "*");
+			igt_assert_eqstr(list->entries[0].subtests[1], excludestring);
 		}
 
 		igt_fixture {
@@ -956,17 +980,18 @@ igt_main
 			close(subdirfd);
 			close(dirfd);
 			clear_directory(dirname);
-			free_job_list(&list);
+			free_job_list(list);
+			free(list);
 		}
 	}
 
 	igt_subtest_group {
 		char dirname[] = "tmpdirXXXXXX";
-		struct job_list list;
-		int dirfd = -1, subdirfd = -1, fd = -1;
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1, subdirfd = -1, fd = -1;
 
 		igt_fixture {
-			init_job_list(&list);
+			init_job_list(list);
 			igt_require(mkdtemp(dirname) != NULL);
 		}
 
@@ -979,15 +1004,15 @@ igt_main
 					       testdatadir,
 					       dirname,
 			};
-			char journaltext[] = "first-subtest\nsecond-subtest\n";
+			const char journaltext[] = "first-subtest\nsecond-subtest\n";
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-			igt_assert(create_job_list(&list, &settings));
-			igt_assert(list.size == 1);
-			igt_assert(list.entries[0].subtest_count == 2);
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+			igt_assert(create_job_list(list, settings));
+			igt_assert(list->size == 1);
+			igt_assert(list->entries[0].subtest_count == 2);
 
-			igt_assert(serialize_settings(&settings));
-			igt_assert(serialize_job_list(&list, &settings));
+			igt_assert(serialize_settings(settings));
+			igt_assert(serialize_job_list(list, settings));
 
 			igt_assert((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0);
 			igt_assert(mkdirat(dirfd, "0", 0770) == 0);
@@ -995,14 +1020,14 @@ igt_main
 			igt_assert((fd = openat(subdirfd, "journal.txt", O_CREAT | O_WRONLY | O_EXCL, 0660)) >= 0);
 			igt_assert(write(fd, journaltext, strlen(journaltext)) == strlen(journaltext));
 
-			free_job_list(&list);
-			free_settings(&settings);
-			igt_assert(initialize_execute_state_from_resume(dirfd, &state, &settings, &list));
+			free_job_list(list);
+			free_settings(settings);
+			igt_assert(initialize_execute_state_from_resume(dirfd, &state, settings, list));
 
 			/* All subtests are in journal, the entry should be considered completed */
 			igt_assert_eq(state.next, 1);
-			igt_assert_eq(list.size, 1);
-			igt_assert_eq(list.entries[0].subtest_count, 4);
+			igt_assert_eq(list->size, 1);
+			igt_assert_eq(list->entries[0].subtest_count, 4);
 		}
 
 		igt_fixture {
@@ -1010,17 +1035,18 @@ igt_main
 			close(subdirfd);
 			close(dirfd);
 			clear_directory(dirname);
-			free_job_list(&list);
+			free_job_list(list);
+			free(list);
 		}
 	}
 
 	igt_subtest_group {
 		char dirname[] = "tmpdirXXXXXX";
-		struct job_list list;
-		int dirfd = -1, subdirfd = -1, fd = -1;
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1, subdirfd = -1, fd = -1;
 
 		igt_fixture {
-			init_job_list(&list);
+			init_job_list(list);
 			igt_require(mkdtemp(dirname) != NULL);
 		}
 
@@ -1031,22 +1057,22 @@ igt_main
 					       testdatadir,
 					       dirname,
 			};
-			char journaltext[] = "first-subtest\nsecond-subtest\nexit:0\n";
+			const char journaltext[] = "first-subtest\nsecond-subtest\nexit:0\n";
 
-			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-			igt_assert(create_job_list(&list, &settings));
-			igt_assert(list.size == 3);
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+			igt_assert(create_job_list(list, settings));
+			igt_assert(list->size == 3);
 
-			if (!strcmp(list.entries[0].binary, "no-subtests")) {
-				struct job_list_entry tmp = list.entries[0];
-				list.entries[0] = list.entries[1];
-				list.entries[1] = tmp;
+			if (!strcmp(list->entries[0].binary, "no-subtests")) {
+				struct job_list_entry tmp = list->entries[0];
+				list->entries[0] = list->entries[1];
+				list->entries[1] = tmp;
 			}
 
-			igt_assert(list.entries[0].subtest_count == 0);
+			igt_assert(list->entries[0].subtest_count == 0);
 
-			igt_assert(serialize_settings(&settings));
-			igt_assert(serialize_job_list(&list, &settings));
+			igt_assert(serialize_settings(settings));
+			igt_assert(serialize_job_list(list, settings));
 
 			igt_assert_lte(0, dirfd = open(dirname, O_DIRECTORY | O_RDONLY));
 			igt_assert_eq(mkdirat(dirfd, "0", 0770), 0);
@@ -1054,12 +1080,12 @@ igt_main
 			igt_assert_lte(0, fd = openat(subdirfd, "journal.txt", O_CREAT | O_WRONLY | O_EXCL, 0660));
 			igt_assert_eq(write(fd, journaltext, sizeof(journaltext)), sizeof(journaltext));
 
-			free_job_list(&list);
-			free_settings(&settings);
-			igt_assert(initialize_execute_state_from_resume(dirfd, &state, &settings, &list));
+			free_job_list(list);
+			free_settings(settings);
+			igt_assert(initialize_execute_state_from_resume(dirfd, &state, settings, list));
 
 			igt_assert_eq(state.next, 1);
-			igt_assert_eq(list.size, 3);
+			igt_assert_eq(list->size, 3);
 		}
 
 		igt_fixture {
@@ -1067,17 +1093,18 @@ igt_main
 			close(subdirfd);
 			close(dirfd);
 			clear_directory(dirname);
-			free_job_list(&list);
+			free_job_list(list);
+			free(list);
 		}
 	}
 
 	igt_subtest_group {
-		struct job_list list;
-		int dirfd = -1, subdirfd = -1, fd = -1;
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1, subdirfd = -1, fd = -1;
 		int multiple;
 
 		igt_fixture {
-			init_job_list(&list);
+			init_job_list(list);
 		}
 
 		for (multiple = 0; multiple < 2; multiple++) {
@@ -1100,11 +1127,11 @@ igt_main
 				size_t expected_tests = multiple ? 2 : 3;
 				size_t i;
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-				igt_assert(create_job_list(&list, &settings));
-				igt_assert(initialize_execute_state(&state, &settings, &list));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+				igt_assert(create_job_list(list, settings));
+				igt_assert(initialize_execute_state(&state, settings, list));
 
-				igt_assert(execute(&state, &settings, &list));
+				igt_assert(execute(&state, settings, list));
 				igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
 					     "Execute didn't create the results directory\n");
 
@@ -1132,9 +1159,12 @@ igt_main
 				close(subdirfd);
 				close(dirfd);
 				clear_directory(dirname);
-				free_job_list(&list);
+				free_job_list(list);
 			}
 		}
+
+		igt_fixture
+			free(list);
 	}
 
 	igt_subtest_group {
@@ -1143,10 +1173,10 @@ igt_main
 			FILE *f = fmemopen(metadata, strlen(metadata), "r");
 			igt_assert(f);
 
-			igt_assert(read_settings_from_file(&settings, f));
+			igt_assert(read_settings_from_file(settings, f));
 
-			igt_assert(settings.piglit_style_dmesg);
-			igt_assert_eq(settings.dmesg_warn_level, 5);
+			igt_assert(settings->piglit_style_dmesg);
+			igt_assert_eq(settings->dmesg_warn_level, 5);
 
 			fclose(f);
 		}
@@ -1156,10 +1186,10 @@ igt_main
 			FILE *f = fmemopen(metadata, strlen(metadata), "r");
 			igt_assert(f);
 
-			igt_assert(read_settings_from_file(&settings, f));
+			igt_assert(read_settings_from_file(settings, f));
 
-			igt_assert(settings.piglit_style_dmesg);
-			igt_assert_eq(settings.dmesg_warn_level, 3);
+			igt_assert(settings->piglit_style_dmesg);
+			igt_assert_eq(settings->dmesg_warn_level, 3);
 
 			fclose(f);
 		}
@@ -1169,10 +1199,10 @@ igt_main
 			FILE *f = fmemopen(metadata, strlen(metadata), "r");
 			igt_assert(f);
 
-			igt_assert(read_settings_from_file(&settings, f));
+			igt_assert(read_settings_from_file(settings, f));
 
-			igt_assert(!settings.piglit_style_dmesg);
-			igt_assert_eq(settings.dmesg_warn_level, 4);
+			igt_assert(!settings->piglit_style_dmesg);
+			igt_assert_eq(settings->dmesg_warn_level, 4);
 
 			fclose(f);
 		}
@@ -1182,22 +1212,22 @@ igt_main
 			FILE *f = fmemopen(metadata, strlen(metadata), "r");
 			igt_assert(f);
 
-			igt_assert(read_settings_from_file(&settings, f));
+			igt_assert(read_settings_from_file(settings, f));
 
-			igt_assert(!settings.piglit_style_dmesg);
-			igt_assert_eq(settings.dmesg_warn_level, 3);
+			igt_assert(!settings->piglit_style_dmesg);
+			igt_assert_eq(settings->dmesg_warn_level, 3);
 
 			fclose(f);
 		}
 	}
 
 	igt_subtest_group {
-		struct job_list list;
-		int dirfd = -1, subdirfd = -1, fd = -1;
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1, subdirfd = -1, fd = -1;
 		int multiple;
 
 		igt_fixture {
-			init_job_list(&list);
+			init_job_list(list);
 		}
 
 		for (multiple = 0; multiple < 2; multiple++) {
@@ -1222,11 +1252,11 @@ igt_main
 					"skip-one\nexit:77 (";
 				const char *expected_1 = "skip-two\nexit:77 (";
 
-				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, &settings));
-				igt_assert(create_job_list(&list, &settings));
-				igt_assert(initialize_execute_state(&state, &settings, &list));
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+				igt_assert(create_job_list(list, settings));
+				igt_assert(initialize_execute_state(&state, settings, list));
 
-				igt_assert(execute(&state, &settings, &list));
+				igt_assert(execute(&state, settings, list));
 				igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
 					     "Execute didn't create the results directory\n");
 
@@ -1266,9 +1296,12 @@ igt_main
 				close(subdirfd);
 				close(dirfd);
 				clear_directory(dirname);
-				free_job_list(&list);
+				free_job_list(list);
 			}
 		}
+
+		igt_fixture
+			free(list);
 	}
 
 	igt_subtest("file-descriptor-leakage") {
@@ -1289,6 +1322,8 @@ igt_main
 		}
 	}
 
-	igt_fixture
-		free_settings(&settings);
+	igt_fixture {
+		free_settings(settings);
+		free(settings);
+	}
 }
