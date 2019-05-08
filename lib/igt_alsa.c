@@ -266,8 +266,8 @@ void alsa_close_output(struct alsa *alsa)
 	alsa->output_callback = NULL;
 }
 
-static bool alsa_test_configuration(snd_pcm_t *handle, int channels,
-			     int sampling_rate)
+static bool alsa_test_configuration(snd_pcm_t *handle, snd_pcm_format_t fmt,
+				    int channels, int sampling_rate)
 {
 	snd_pcm_hw_params_t *params;
 	int ret;
@@ -280,6 +280,13 @@ static bool alsa_test_configuration(snd_pcm_t *handle, int channels,
 	ret = snd_pcm_hw_params_any(handle, params);
 	if (ret < 0)
 		return false;
+
+	ret = snd_pcm_hw_params_test_format(handle, params, fmt);
+	if (ret < 0) {
+		igt_debug("Output device doesn't support the format %s\n",
+			  snd_pcm_format_name(fmt));
+		return false;
+	}
 
 	ret = snd_pcm_hw_params_test_rate(handle, params, sampling_rate, 0);
 	if (ret < 0) {
@@ -307,6 +314,7 @@ static bool alsa_test_configuration(snd_pcm_t *handle, int channels,
 /**
  * alsa_test_output_configuration:
  * @alsa: The target alsa structure
+ * @fmt: The format to test
  * @channels: The number of channels to test
  * @sampling_rate: The sampling rate to test
  *
@@ -315,8 +323,8 @@ static bool alsa_test_configuration(snd_pcm_t *handle, int channels,
  *
  * Returns: A boolean indicating whether the test succeeded
  */
-bool alsa_test_output_configuration(struct alsa *alsa, int channels,
-				    int sampling_rate)
+bool alsa_test_output_configuration(struct alsa *alsa, snd_pcm_format_t fmt,
+				    int channels, int sampling_rate)
 {
 	snd_pcm_t *handle;
 	bool ret;
@@ -325,7 +333,7 @@ bool alsa_test_output_configuration(struct alsa *alsa, int channels,
 	for (i = 0; i < alsa->output_handles_count; i++) {
 		handle = alsa->output_handles[i];
 
-		ret = alsa_test_configuration(handle, channels, sampling_rate);
+		ret = alsa_test_configuration(handle, fmt, channels, sampling_rate);
 		if (!ret)
 			return false;
 	}

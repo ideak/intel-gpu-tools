@@ -38,8 +38,8 @@ bool alsa_has_exclusive_access(void);
 struct alsa *alsa_init(void);
 int alsa_open_output(struct alsa *alsa, const char *device_name);
 void alsa_close_output(struct alsa *alsa);
-bool alsa_test_output_configuration(struct alsa *alsa, int channels,
-				    int sampling_rate);
+bool alsa_test_output_configuration(struct alsa *alsa, snd_pcm_format_t dmt,
+				    int channels, int sampling_rate);
 void alsa_configure_output(struct alsa *alsa, snd_pcm_format_t fmt,
 			   int channels, int sampling_rate);
 void alsa_register_output_callback(struct alsa *alsa,

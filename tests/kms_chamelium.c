@@ -829,8 +829,8 @@ run_audio_thread(void *data)
 
 static bool
 do_test_display_audio(data_t *data, struct chamelium_port *port,
-		      struct alsa *alsa, int playback_channels,
-		      int playback_rate)
+		      struct alsa *alsa, snd_pcm_format_t playback_format,
+		      int playback_channels, int playback_rate)
 {
 	int ret, capture_rate, capture_channels, msec, freq, step;
 	struct chamelium_audio_file *audio_file;
@@ -849,9 +849,11 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	struct audio_state state = {};
 	int channel_mapping[8], capture_chan;
 
-	igt_debug("Testing with playback sampling rate %d Hz and %d channels\n",
+	igt_debug("Testing with playback format %s, sampling rate %d Hz and "
+		  "%d channels\n",
+		  snd_pcm_format_name(playback_format),
 		  playback_rate, playback_channels);
-	alsa_configure_output(alsa, SND_PCM_FORMAT_S16_LE,
+	alsa_configure_output(alsa, playback_format,
 			      playback_channels, playback_rate);
 
 	chamelium_start_capturing_audio(data->chamelium, port, false);
@@ -921,7 +923,9 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	}
 
 	if (igt_frame_dump_is_enabled()) {
-		snprintf(dump_suffix, sizeof(dump_suffix), "capture-%dch-%d",
+		snprintf(dump_suffix, sizeof(dump_suffix),
+			 "capture-%s-%dch-%dHz",
+			 snd_pcm_format_name(playback_format),
 			 playback_channels, playback_rate);
 
 		dump_fd = audio_create_wav_file_s32_le(dump_suffix,
@@ -1052,6 +1056,7 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 	drmModeConnector *connector;
 	int fb_id, i;
 	int channels, sampling_rate;
+	snd_pcm_format_t format;
 
 	igt_require(alsa_has_exclusive_access());
 
@@ -1089,23 +1094,27 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 		ret = alsa_open_output(alsa, audio_device);
 		igt_assert(ret >= 0);
 
+		/* TODO: playback with different formats */
 		/* TODO: playback on all 8 available channels */
+		format = SND_PCM_FORMAT_S16_LE;
 		channels = PLAYBACK_CHANNELS;
 		sampling_rate = test_sampling_rates[i];
 
-		if (!alsa_test_output_configuration(alsa, channels,
+		if (!alsa_test_output_configuration(alsa, format, channels,
 						    sampling_rate)) {
-			igt_debug("Skipping test with sample rate %d Hz and %d channels "
-				  "because at least one of the selected output devices "
-				  "doesn't support this configuration\n",
+			igt_debug("Skipping test with format %s, sample rate "
+				  "%d Hz and %d channels because at least one "
+				  "of the selected output devices doesn't "
+				  "support this configuration\n",
+				  snd_pcm_format_name(format),
 				  channels, sampling_rate);
 			continue;
 		}
 
 		run = true;
 
-		success &= do_test_display_audio(data, port, alsa, channels,
-						 sampling_rate);
+		success &= do_test_display_audio(data, port, alsa, format,
+						 channels, sampling_rate);
 
 		alsa_close_output(alsa);
 	}
