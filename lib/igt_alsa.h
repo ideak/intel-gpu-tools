@@ -29,6 +29,7 @@
 
 #include "config.h"
 
+#include <alsa/asoundlib.h>
 #include <stdbool.h>
 
 struct alsa;
@@ -39,10 +40,10 @@ int alsa_open_output(struct alsa *alsa, const char *device_name);
 void alsa_close_output(struct alsa *alsa);
 bool alsa_test_output_configuration(struct alsa *alsa, int channels,
 				    int sampling_rate);
-void alsa_configure_output(struct alsa *alsa, int channels,
-			   int sampling_rate);
+void alsa_configure_output(struct alsa *alsa, snd_pcm_format_t fmt,
+			   int channels, int sampling_rate);
 void alsa_register_output_callback(struct alsa *alsa,
-				   int (*callback)(void *data, short *buffer, int samples),
+				   int (*callback)(void *data, void *buffer, int samples),
 				   void *callback_data, int samples_trigger);
 int alsa_run(struct alsa *alsa, int duration_ms);
 

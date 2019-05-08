@@ -27,7 +27,6 @@
 #include "config.h"
 
 #include <limits.h>
-#include <alsa/asoundlib.h>
 
 #include "igt_alsa.h"
 #include "igt_aux.h"
@@ -47,10 +46,11 @@
 struct alsa {
 	snd_pcm_t *output_handles[HANDLES_MAX];
 	int output_handles_count;
+	snd_pcm_format_t output_format;
 	int output_sampling_rate;
 	int output_channels;
 
-	int (*output_callback)(void *data, short *buffer, int samples);
+	int (*output_callback)(void *data, void *buffer, int samples);
 	void *output_callback_data;
 	int output_samples_trigger;
 };
@@ -342,8 +342,8 @@ bool alsa_test_output_configuration(struct alsa *alsa, int channels,
  * Configure the output devices with the configuration specified by @channels
  * and @sampling_rate.
  */
-void alsa_configure_output(struct alsa *alsa, int channels,
-			   int sampling_rate)
+void alsa_configure_output(struct alsa *alsa, snd_pcm_format_t fmt,
+			   int channels, int sampling_rate)
 {
 	snd_pcm_t *handle;
 	int ret;
@@ -354,13 +354,14 @@ void alsa_configure_output(struct alsa *alsa, int channels,
 	for (i = 0; i < alsa->output_handles_count; i++) {
 		handle = alsa->output_handles[i];
 
-		ret = snd_pcm_set_params(handle, SND_PCM_FORMAT_S16_LE,
+		ret = snd_pcm_set_params(handle, fmt,
 					 SND_PCM_ACCESS_RW_INTERLEAVED,
 					 channels, sampling_rate,
 					 soft_resample, latency);
 		igt_assert(ret >= 0);
 	}
 
+	alsa->output_format = fmt;
 	alsa->output_channels = channels;
 	alsa->output_sampling_rate = sampling_rate;
 }
@@ -379,7 +380,7 @@ void alsa_configure_output(struct alsa *alsa, int channels,
  * for failure.
  */
 void alsa_register_output_callback(struct alsa *alsa,
-				   int (*callback)(void *data, short *buffer, int samples),
+				   int (*callback)(void *data, void *buffer, int samples),
 				   void *callback_data, int samples_trigger)
 {
 	alsa->output_callback = callback;
@@ -402,12 +403,13 @@ void alsa_register_output_callback(struct alsa *alsa,
 int alsa_run(struct alsa *alsa, int duration_ms)
 {
 	snd_pcm_t *handle;
-	short *output_buffer = NULL;
+	char *output_buffer = NULL;
 	int output_limit;
 	int output_total = 0;
 	int output_counts[alsa->output_handles_count];
 	bool output_ready = false;
 	int output_channels;
+	int bytes_per_sample;
 	int output_trigger;
 	bool reached;
 	int index;
@@ -418,9 +420,10 @@ int alsa_run(struct alsa *alsa, int duration_ms)
 
 	output_limit = alsa->output_sampling_rate * duration_ms / 1000;
 	output_channels = alsa->output_channels;
+	bytes_per_sample = snd_pcm_format_physical_width(alsa->output_format) / 8;
 	output_trigger = alsa->output_samples_trigger;
-	output_buffer = malloc(sizeof(short) * output_channels *
-			       output_trigger);
+	output_buffer = malloc(output_channels * output_trigger *
+			       bytes_per_sample);
 
 	do {
 		reached = true;
@@ -454,7 +457,7 @@ int alsa_run(struct alsa *alsa, int duration_ms)
 					count = avail < count ? avail : count;
 
 					ret = snd_pcm_writei(handle,
-							     &output_buffer[index],
+							     &output_buffer[index * bytes_per_sample],
 							     count);
 					if (ret < 0) {
 						ret = snd_pcm_recover(handle,

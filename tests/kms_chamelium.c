@@ -809,11 +809,11 @@ struct audio_state {
 };
 
 static int
-audio_output_callback(void *data, short *buffer, int frames)
+audio_output_callback(void *data, void *buffer, int samples)
 {
 	struct audio_state *state = data;
 
-	audio_signal_fill_s16_le(state->signal, buffer, frames);
+	audio_signal_fill_s16_le(state->signal, buffer, samples);
 
 	return state->run ? 0 : -1;
 }
@@ -851,7 +851,8 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 
 	igt_debug("Testing with playback sampling rate %d Hz and %d channels\n",
 		  playback_rate, playback_channels);
-	alsa_configure_output(alsa, playback_channels, playback_rate);
+	alsa_configure_output(alsa, SND_PCM_FORMAT_S16_LE,
+			      playback_channels, playback_rate);
 
 	chamelium_start_capturing_audio(data->chamelium, port, false);
 
