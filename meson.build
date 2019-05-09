@@ -196,6 +196,7 @@ chameliuminfo = 'No'
 if _build_chamelium
 	gsl = dependency('gsl', required : _chamelium_required)
 	alsa = dependency('alsa', required : _chamelium_required)
+	libcurl = dependency('libcurl', required : _chamelium_required)
 	chamelium = declare_dependency(dependencies : [
 		xmlrpc,
 		xmlrpc_util,
@@ -203,7 +204,7 @@ if _build_chamelium
 		gsl,
 		alsa,
 	], required : _chamelium_required)
-	if xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found() and gsl.found() and alsa.found()
+	if xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found() and gsl.found() and alsa.found() and libcurl.found()
 		config.set('HAVE_CHAMELIUM', 1)
 		chameliuminfo = 'Yes'
 		chamelium_found = true
