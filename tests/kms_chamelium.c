@@ -803,8 +803,17 @@ static int test_frequencies[] = {
 
 static int test_frequencies_count = sizeof(test_frequencies) / sizeof(int);
 
+static const snd_pcm_format_t test_formats[] = {
+	SND_PCM_FORMAT_S16_LE,
+	SND_PCM_FORMAT_S24_LE,
+	SND_PCM_FORMAT_S32_LE,
+};
+
+static const size_t test_formats_count = sizeof(test_formats) / sizeof(test_formats[0]);
+
 struct audio_state {
 	struct audio_signal *signal;
+	snd_pcm_format_t format;
 	atomic_bool run;
 };
 
@@ -813,7 +822,19 @@ audio_output_callback(void *data, void *buffer, int samples)
 {
 	struct audio_state *state = data;
 
-	audio_signal_fill_s16_le(state->signal, buffer, samples);
+	switch (state->format) {
+	case SND_PCM_FORMAT_S16_LE:
+		audio_signal_fill_s16_le(state->signal, buffer, samples);
+		break;
+	case SND_PCM_FORMAT_S24_LE:
+		audio_signal_fill_s24_le(state->signal, buffer, samples);
+		break;
+	case SND_PCM_FORMAT_S32_LE:
+		audio_signal_fill_s32_le(state->signal, buffer, samples);
+		break;
+	default:
+		assert(false); /* unreachable */
+	}
 
 	return state->run ? 0 : -1;
 }
@@ -889,6 +910,7 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	audio_signal_synthesize(signal);
 
 	state.signal = signal;
+	state.format = playback_format;
 	state.run = true;
 	alsa_register_output_callback(alsa, audio_output_callback, &state,
 				      PLAYBACK_SAMPLES);
@@ -1042,6 +1064,22 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	return success;
 }
 
+static bool test_audio_configuration(struct alsa *alsa, snd_pcm_format_t format,
+				     int channels, int sampling_rate)
+{
+	if (!alsa_test_output_configuration(alsa, format, channels,
+					    sampling_rate)) {
+		igt_debug("Skipping test with format %s, sampling rate %d Hz "
+			  "and %d channels because at least one of the "
+			  "selected output devices doesn't support this "
+			  "configuration\n",
+			  snd_pcm_format_name(format),
+			  sampling_rate, channels);
+		return false;
+	}
+	return true;
+}
+
 static void
 test_display_audio(data_t *data, struct chamelium_port *port,
 		   const char *audio_device, enum test_edid edid)
@@ -1054,7 +1092,7 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 	struct igt_fb fb;
 	drmModeModeInfo *mode;
 	drmModeConnector *connector;
-	int fb_id, i;
+	int fb_id, i, j;
 	int channels, sampling_rate;
 	snd_pcm_format_t format;
 
@@ -1091,35 +1129,30 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 	run = false;
 	success = true;
 	for (i = 0; i < test_sampling_rates_count; i++) {
-		ret = alsa_open_output(alsa, audio_device);
-		igt_assert(ret >= 0);
+		for (j = 0; j < test_formats_count; j++) {
+			ret = alsa_open_output(alsa, audio_device);
+			igt_assert(ret >= 0);
 
-		/* TODO: playback with different formats */
-		/* TODO: playback on all 8 available channels */
-		format = SND_PCM_FORMAT_S16_LE;
-		channels = PLAYBACK_CHANNELS;
-		sampling_rate = test_sampling_rates[i];
+			/* TODO: playback on all 8 available channels */
+			format = test_formats[j];
+			channels = PLAYBACK_CHANNELS;
+			sampling_rate = test_sampling_rates[i];
 
-		if (!alsa_test_output_configuration(alsa, format, channels,
-						    sampling_rate)) {
-			igt_debug("Skipping test with format %s, sample rate "
-				  "%d Hz and %d channels because at least one "
-				  "of the selected output devices doesn't "
-				  "support this configuration\n",
-				  snd_pcm_format_name(format),
-				  channels, sampling_rate);
-			continue;
+			if (!test_audio_configuration(alsa, format, channels,
+						      sampling_rate))
+				continue;
+
+			run = true;
+
+			success &= do_test_display_audio(data, port, alsa,
+							 format, channels,
+							 sampling_rate);
+
+			alsa_close_output(alsa);
 		}
-
-		run = true;
-
-		success &= do_test_display_audio(data, port, alsa, format,
-						 channels, sampling_rate);
-
-		alsa_close_output(alsa);
 	}
 
-	/* Make sure we tested at least one frequency. */
+	/* Make sure we tested at least one frequency and format. */
 	igt_assert(run);
 	/* Make sure all runs were successful. */
 	igt_assert(success);
