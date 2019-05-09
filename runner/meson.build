@@ -21,7 +21,7 @@ if _build_runner and _build_tests and jsonc.found()
 
 	runnerlib = static_library('igt_runner', runnerlib_sources,
 				   include_directories : inc,
-				   dependencies : jsonc)
+				   dependencies : [jsonc, glib])
 
 	runner = executable('igt_runner', runner_sources,
 			    link_with : runnerlib,

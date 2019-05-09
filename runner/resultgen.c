@@ -499,14 +499,17 @@ static const char igt_dmesg_whitelist[] =
 static const char igt_piglit_style_dmesg_blacklist[] =
 	"(\\[drm:|drm_|intel_|i915_)";
 
-static bool init_regex_whitelist(struct settings* settings, regex_t* re)
+static bool init_regex_whitelist(struct settings* settings, GRegex **re)
 {
+	GError *err = NULL;
 	const char *regex = settings->piglit_style_dmesg ?
 		igt_piglit_style_dmesg_blacklist :
 		igt_dmesg_whitelist;
 
-	if (regcomp(re, regex, REG_EXTENDED | REG_NOSUB) != 0) {
+	*re = g_regex_new(regex, G_REGEX_OPTIMIZE, 0, &err);
+	if (err) {
 		fprintf(stderr, "Cannot compile dmesg regexp\n");
+		g_error_free(err);
 		return false;
 	}
 
@@ -630,7 +633,7 @@ static bool fill_from_dmesg(int fd,
 	char piglit_name[256];
 	ssize_t read;
 	size_t i;
-	regex_t re;
+	GRegex *re;
 
 	if (!f) {
 		return false;
@@ -671,12 +674,12 @@ static bool fill_from_dmesg(int fd,
 
 		if (settings->piglit_style_dmesg) {
 			if ((flags & 0x07) <= settings->dmesg_warn_level && continuation != 'c' &&
-			    regexec(&re, message, (size_t)0, NULL, 0) != REG_NOMATCH) {
+			    g_regex_match(re, message, 0, NULL)) {
 				append_line(&warnings, &warningslen, formatted);
 			}
 		} else {
 			if ((flags & 0x07) <= settings->dmesg_warn_level && continuation != 'c' &&
-			    regexec(&re, message, (size_t)0, NULL, 0) == REG_NOMATCH) {
+			    !g_regex_match(re, message, 0, NULL)) {
 				append_line(&warnings, &warningslen, formatted);
 			}
 		}
@@ -715,7 +718,7 @@ static bool fill_from_dmesg(int fd,
 
 	free(dmesg);
 	free(warnings);
-	regfree(&re);
+	g_regex_unref(re);
 	fclose(f);
 	return true;
 }

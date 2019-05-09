@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <sys/types.h>
-#include <regex.h>
 #include <stdio.h>
+#include <glib.h>
 
 enum {
 	LOG_LEVEL_NORMAL = 0,
@@ -21,7 +21,7 @@ _Static_assert(ABORT_ALL == (ABORT_TAINT | ABORT_LOCKDEP), "ABORT_ALL must be al
 
 struct regex_list {
 	char **regex_strings;
-	regex_t** regexes;
+	GRegex **regexes;
 	size_t size;
 };
 

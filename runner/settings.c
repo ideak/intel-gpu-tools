@@ -187,23 +187,18 @@ static void usage(const char *extra_message, FILE *f)
 
 static bool add_regex(struct regex_list *list, char *new)
 {
-	regex_t *regex;
-	size_t buflen;
-	char *buf;
-	int s;
+	GRegex *regex;
+	GError *error = NULL;
 
-	regex = malloc(sizeof(*regex));
+	regex = g_regex_new(new, G_REGEX_OPTIMIZE, 0, &error);
+	if (error) {
+		char *buf = malloc(snprintf(NULL, 0, "Invalid regex '%s': %s", new, error->message) + 1);
 
-	if ((s = regcomp(regex, new,
-			 REG_EXTENDED | REG_NOSUB)) != 0) {
-		buflen = regerror(s, regex, NULL, 0);
-		buf = malloc(buflen);
-		regerror(s, regex, buf, buflen);
+		sprintf(buf, "Invalid regex '%s': %s", new, error->message);
 		usage(buf, stderr);
 
 		free(buf);
-		regfree(regex);
-		free(regex);
+		g_error_free(error);
 		return false;
 	}
 
@@ -224,8 +219,7 @@ static void free_regexes(struct regex_list *regexes)
 
 	for (i = 0; i < regexes->size; i++) {
 		free(regexes->regex_strings[i]);
-		regfree(regexes->regexes[i]);
-		free(regexes->regexes[i]);
+		g_regex_unref(regexes->regexes[i]);
 	}
 	free(regexes->regex_strings);
 	free(regexes->regexes);

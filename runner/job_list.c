@@ -17,10 +17,8 @@ static bool matches_any(const char *str, struct regex_list *list)
 	size_t i;
 
 	for (i = 0; i < list->size; i++) {
-		if (regexec(list->regexes[i], str,
-			    (size_t)0, NULL, 0) == 0) {
+		if (g_regex_match(list->regexes[i], str, 0, NULL))
 			return true;
-		}
 	}
 
 	return false;
