@@ -251,6 +251,8 @@ static void audio_sanity_check(double *samples, size_t samples_len)
  * Fill the requested number of samples to the target buffer with the audio
  * signal data (in interleaved double format), at the requested sampling rate
  * and number of channels.
+ *
+ * Each sample is normalized (ie. between 0 and 1).
  */
 void audio_signal_fill(struct audio_signal *signal, double *buffer,
 		       size_t samples)
@@ -312,6 +314,36 @@ void audio_signal_fill_s16_le(struct audio_signal *signal, int16_t *buffer,
 
 	for (i = 0; i < signal->channels * samples; ++i)
 		buffer[i] = INT16_MAX * tmp[i];
+
+	free(tmp);
+}
+
+void audio_signal_fill_s24_le(struct audio_signal *signal, int32_t *buffer,
+			      size_t samples)
+{
+	double *tmp;
+	size_t i;
+
+	tmp = malloc(sizeof(double) * signal->channels * samples);
+	audio_signal_fill(signal, tmp, samples);
+
+	for (i = 0; i < signal->channels * samples; ++i)
+		buffer[i] = 0xFFFFFF * tmp[i];
+
+	free(tmp);
+}
+
+void audio_signal_fill_s32_le(struct audio_signal *signal, int32_t *buffer,
+			      size_t samples)
+{
+	double *tmp;
+	size_t i;
+
+	tmp = malloc(sizeof(double) * signal->channels * samples);
+	audio_signal_fill(signal, tmp, samples);
+
+	for (i = 0; i < signal->channels * samples; ++i)
+		buffer[i] = UINT32_MAX * tmp[i];
 
 	free(tmp);
 }
