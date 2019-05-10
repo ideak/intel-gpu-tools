@@ -150,7 +150,7 @@ test:test-list-diff:
     - build:tests-debian-autotools
     - build:tests-debian-meson
   stage: test
-  script: diff <(sed "s/ /\n/g" meson-test-list.txt| grep -v 'vc4\|v3d' | sort) <(sed "s/ /\n/g" autotools-test-list.txt | sort)
+  script: diff <(sed "s/ /\n/g" meson-test-list.txt| grep -v 'vc4\|v3d\|panfrost' | sort) <(sed "s/ /\n/g" autotools-test-list.txt | sort)
 
 ################### DEPLOY #########################
 
