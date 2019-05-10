@@ -206,6 +206,34 @@ static void cleanup_fb(data_t *data)
 	data->big_fb.fb_id = 0;
 }
 
+static void set_c8_lut(data_t *data)
+{
+	igt_pipe_t *pipe = &data->display.pipes[data->pipe];
+	struct drm_color_lut *lut;
+	int i, lut_size = 256;
+
+	lut = calloc(lut_size, sizeof(lut[0]));
+
+	/* igt_fb uses RGB332 for C8 */
+	for (i = 0; i < lut_size; i++) {
+		lut[i].red = ((i & 0xe0) >> 5) * 0xffff / 0x7;
+		lut[i].green = ((i & 0x1c) >> 2) * 0xffff / 0x7;
+		lut[i].blue = ((i & 0x03) >> 0) * 0xffff / 0x3;
+	}
+
+	igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_GAMMA_LUT, lut,
+				       lut_size * sizeof(lut[0]));
+
+	free(lut);
+}
+
+static void unset_lut(data_t *data)
+{
+	igt_pipe_t *pipe = &data->display.pipes[data->pipe];
+
+	igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_GAMMA_LUT, NULL, 0);
+}
+
 static bool test_plane(data_t *data)
 {
 	igt_plane_t *plane = data->plane;
@@ -318,6 +346,11 @@ static bool test_pipe(data_t *data)
 	int width, height;
 	bool ret = false;
 
+	if (data->format == DRM_FORMAT_C8 &&
+	    !igt_pipe_obj_has_prop(&data->display.pipes[data->pipe],
+				   IGT_CRTC_GAMMA_LUT))
+		return false;
+
 	mode = igt_output_get_mode(data->output);
 
 	data->width = mode->hdisplay;
@@ -355,6 +388,9 @@ static bool test_pipe(data_t *data)
 		igt_remove_fb(data->drm_fd, &fb);
 	}
 
+	if (data->format == DRM_FORMAT_C8)
+		set_c8_lut(data);
+
 	igt_display_commit2(&data->display, data->display.is_atomic ?
 			    COMMIT_ATOMIC : COMMIT_UNIVERSAL);
 
@@ -366,6 +402,9 @@ static bool test_pipe(data_t *data)
 		if (ret)
 			break;
 	}
+
+	if (data->format == DRM_FORMAT_C8)
+		unset_lut(data);
 
 	igt_pipe_crc_free(data->pipe_crc);
 
@@ -545,7 +584,6 @@ static const struct {
 	uint32_t format;
 	uint8_t bpp;
 } formats[] = {
-	/* FIXME igt_fb doesn't support C8 currently */
 	{ DRM_FORMAT_C8, 8, },
 	{ DRM_FORMAT_RGB565, 16, },
 	{ DRM_FORMAT_XRGB8888, 32, },
@@ -654,7 +692,8 @@ igt_main
 
 				igt_subtest_f("%s-%dbpp-rotate-%d", modifiers[i].name,
 					      formats[j].bpp, rotations[k].angle) {
-					igt_require(igt_fb_supported_format(data.format));
+					igt_require(data.format == DRM_FORMAT_C8 ||
+						    igt_fb_supported_format(data.format));
 					igt_require(igt_display_has_format_mod(&data.display, data.format, data.modifier));
 					test_scanout(&data);
 				}
