@@ -98,6 +98,12 @@ static const struct format_desc_struct {
 	  .num_planes = 1, .plane_bpp = { 16, },
 	  .hsub = 1, .vsub = 1,
 	},
+	{ .name = "C8", .depth = -1, .drm_id = DRM_FORMAT_C8,
+	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .pixman_id = PIXMAN_r3g3b2,
+	  .num_planes = 1, .plane_bpp = { 8, },
+	  .hsub = 1, .vsub = 1,
+	},
 	{ .name = "XRGB1555", .depth = -1, .drm_id = DRM_FORMAT_XRGB1555,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_x1r5g5b5,
@@ -3232,6 +3238,15 @@ const char *igt_format_str(uint32_t drm_format)
 bool igt_fb_supported_format(uint32_t drm_format)
 {
 	const struct format_desc_struct *f;
+
+	/*
+	 * C8 needs a LUT which (at least for the time being)
+	 * is the responsibility of each test. Not all tests
+	 * have the required code so let's keep C8 hidden from
+	 * most eyes.
+	 */
+	if (drm_format == DRM_FORMAT_C8)
+		return false;
 
 	for_each_format(f)
 		if (f->drm_id == drm_format)
