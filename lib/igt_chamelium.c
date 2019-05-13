@@ -930,6 +930,19 @@ int chamelium_get_captured_frame_count(struct chamelium *chamelium)
 	return ret;
 }
 
+bool chamelium_has_audio_support(struct chamelium *chamelium,
+				 struct chamelium_port *port)
+{
+	xmlrpc_value *res;
+	xmlrpc_bool has_support;
+
+	res = chamelium_rpc(chamelium, port, "HasAudioSupport", "(i)", port->id);
+	xmlrpc_read_bool(&chamelium->env, res, &has_support);
+	xmlrpc_DECREF(res);
+
+	return has_support;
+}
+
 /**
  * chamelium_get_audio_channel_mapping:
  * @chamelium: the Chamelium instance

@@ -106,6 +106,8 @@ void chamelium_start_capture(struct chamelium *chamelium,
 void chamelium_stop_capture(struct chamelium *chamelium, int frame_count);
 void chamelium_capture(struct chamelium *chamelium, struct chamelium_port *port,
 		       int x, int y, int w, int h, int frame_count);
+bool chamelium_has_audio_support(struct chamelium *chamelium,
+				 struct chamelium_port *port);
 void chamelium_get_audio_channel_mapping(struct chamelium *chamelium,
 					 struct chamelium_port *port,
 					 int mapping[static 8]);

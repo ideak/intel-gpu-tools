@@ -1033,6 +1033,10 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 
 	igt_require(alsa_has_exclusive_access());
 
+	/* Old Chamelium devices need an update for DisplayPort audio
+	 * support. */
+	igt_require(chamelium_has_audio_support(data->chamelium, port));
+
 	alsa = alsa_init();
 	igt_assert(alsa);
 
