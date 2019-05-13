@@ -117,6 +117,16 @@ $ ./scripts/run-tests.sh -t chamelium
 Debugging the Chamelium
 -----------------------
 
+It is possible to manually send Chamelium RPC calls with the xmlrpc utility
+(from xmlrpc-c). For instance, to plug the DisplayPort port:
+$ xmlrpc http://192.168.1.2:9992 Plug i/1
+
+The xmlrpc utility documentation is available at:
+http://xmlrpc-c.sourceforge.net/doc/xmlrpc.html
+
+The XML-RPC Chamelium interface is described here:
+https://chromium.googlesource.com/chromiumos/platform/chameleon/+/refs/heads/master/chameleond/interface.py
+
 Logs that may be useful for debugging can be obtained either by connecting to
 the board via SSH or serial console and looking at the daemon logs from
 /var/log, such as:
