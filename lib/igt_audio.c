@@ -389,7 +389,7 @@ size_t audio_extract_channel_s32_le(double *dst, size_t dst_cap,
 	dst_len = src_len / n_channels;
 	igt_assert(dst_len <= dst_cap);
 	for (i = 0; i < dst_len; i++)
-		dst[i] = (double) src[i * n_channels + channel];
+		dst[i] = (double) src[i * n_channels + channel] / INT32_MAX;
 
 	return dst_len;
 }
