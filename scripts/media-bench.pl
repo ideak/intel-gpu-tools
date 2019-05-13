@@ -52,7 +52,7 @@ my @balancers = ( 'rr', 'rand', 'qd', 'qdr', 'qdavg', 'rt', 'rtr', 'rtavg',
 		  'context', 'busy', 'busy-avg' );
 my %bal_skip_H = ( 'rr' => 1, 'rand' => 1, 'context' => 1, , 'busy' => 1,
 		   'busy-avg' => 1 );
-my %bal_skip_R = ( 'context' => 1 );
+my %bal_skip_R = ();
 
 my @workloads = (
 	'media_load_balance_17i7.wsim',

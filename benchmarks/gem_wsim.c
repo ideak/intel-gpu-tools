@@ -939,7 +939,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 static void
 prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 {
-	unsigned int ctx_vcs = 0;
+	unsigned int ctx_vcs;
 	int max_ctx = -1;
 	struct w_step *w;
 	int i;
@@ -948,8 +948,10 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	wrk->prng = rand();
 	wrk->run = true;
 
+	ctx_vcs =  0;
 	if (flags & INITVCSRR)
-		wrk->vcs_rr = id & 1;
+		ctx_vcs = id & 1;
+	wrk->vcs_rr = ctx_vcs;
 
 	if (flags & GLOBAL_BALANCE) {
 		int ret = pthread_mutex_init(&wrk->mutex, NULL);
