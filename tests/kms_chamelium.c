@@ -805,7 +805,7 @@ audio_output_callback(void *data, short *buffer, int frames)
 {
 	struct audio_state *state = data;
 
-	audio_signal_fill(state->signal, buffer, frames);
+	audio_signal_fill_s16_le(state->signal, buffer, frames);
 
 	return state->run ? 0 : -1;
 }

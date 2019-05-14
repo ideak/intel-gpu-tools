@@ -51,7 +51,7 @@ struct audio_signal_freq {
 	int freq;
 	int channel;
 
-	int16_t *period;
+	double *period;
 	size_t period_len;
 	int offset;
 };
@@ -142,7 +142,7 @@ int audio_signal_add_frequency(struct audio_signal *signal, int frequency,
  */
 void audio_signal_synthesize(struct audio_signal *signal)
 {
-	int16_t *period;
+	double *period;
 	double value;
 	size_t period_len;
 	int freq;
@@ -152,13 +152,13 @@ void audio_signal_synthesize(struct audio_signal *signal)
 		freq = signal->freqs[i].freq;
 		period_len = signal->sampling_rate / freq;
 
-		period = calloc(1, period_len * sizeof(int16_t));
+		period = calloc(period_len, sizeof(double));
 
 		for (j = 0; j < period_len; j++) {
 			value = 2.0 * M_PI * freq / signal->sampling_rate * j;
-			value = sin(value) * INT16_MAX / signal->freqs_count;
+			value = sin(value) / signal->freqs_count;
 
-			period[j] = (int16_t) value;
+			period[j] = value;
 		}
 
 		signal->freqs[i].period = period;
@@ -202,19 +202,19 @@ void audio_signal_reset(struct audio_signal *signal)
  * @samples: The number of samples to fill
  *
  * Fill the requested number of samples to the target buffer with the audio
- * signal data (in interleaved S16_LE format), at the requested sampling rate
+ * signal data (in interleaved double format), at the requested sampling rate
  * and number of channels.
  */
-void audio_signal_fill(struct audio_signal *signal, int16_t *buffer,
-		       size_t buffer_len)
+void audio_signal_fill(struct audio_signal *signal, double *buffer,
+		       size_t samples)
 {
-	int16_t *destination, *source;
+	double *destination, *source;
 	struct audio_signal_freq *freq;
 	int total;
 	int count;
 	int i, j, k;
 
-	memset(buffer, 0, sizeof(int16_t) * signal->channels * buffer_len);
+	memset(buffer, 0, sizeof(double) * signal->channels * samples);
 
 	for (i = 0; i < signal->freqs_count; i++) {
 		freq = &signal->freqs[i];
@@ -222,13 +222,13 @@ void audio_signal_fill(struct audio_signal *signal, int16_t *buffer,
 
 		igt_assert(freq->period);
 
-		while (total < buffer_len) {
+		while (total < samples) {
 			source = freq->period + freq->offset;
 			destination = buffer + total * signal->channels;
 
 			count = freq->period_len - freq->offset;
-			if (count > buffer_len - total)
-				count = buffer_len - total;
+			if (count > samples - total)
+				count = samples - total;
 
 			freq->offset += count;
 			freq->offset %= freq->period_len;
@@ -245,6 +245,21 @@ void audio_signal_fill(struct audio_signal *signal, int16_t *buffer,
 			total += count;
 		}
 	}
+}
+
+void audio_signal_fill_s16_le(struct audio_signal *signal, int16_t *buffer,
+			      size_t samples)
+{
+	double *tmp;
+	size_t i;
+
+	tmp = malloc(sizeof(double) * signal->channels * samples);
+	audio_signal_fill(signal, tmp, samples);
+
+	for (i = 0; i < signal->channels * samples; ++i)
+		buffer[i] = INT16_MAX * tmp[i];
+
+	free(tmp);
 }
 
 /**

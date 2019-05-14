@@ -40,8 +40,10 @@ int audio_signal_add_frequency(struct audio_signal *signal, int frequency,
 			       int channel);
 void audio_signal_synthesize(struct audio_signal *signal);
 void audio_signal_reset(struct audio_signal *signal);
-void audio_signal_fill(struct audio_signal *signal, int16_t *buffer,
+void audio_signal_fill(struct audio_signal *signal, double *buffer,
 		       size_t buffer_len);
+void audio_signal_fill_s16_le(struct audio_signal *signal, int16_t *buffer,
+			      size_t buffer_len);
 bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
 			 int channel, const double *samples, size_t samples_len);
 size_t audio_extract_channel_s32_le(double *dst, size_t dst_cap,
