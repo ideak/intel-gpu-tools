@@ -251,11 +251,14 @@ void audio_signal_fill(struct audio_signal *signal, int16_t *buffer,
  * Checks that frequencies specified in signal, and only those, are included
  * in the input data.
  *
- * sampling_rate is given in Hz. data_len is the number of elements in data.
+ * sampling_rate is given in Hz. samples_len is the number of elements in
+ * samples.
  */
 bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
-			 int channel, double *data, size_t data_len)
+			 int channel, const double *samples, size_t samples_len)
 {
+	double *data;
+	size_t data_len = samples_len;
 	size_t bin_power_len = data_len / 2 + 1;
 	double bin_power[bin_power_len];
 	bool detected[FREQS_MAX];
@@ -264,12 +267,19 @@ bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
 	size_t i, j;
 	bool above, success;
 
+	/* gsl will mutate the array in-place, so make a copy */
+	data = malloc(samples_len * sizeof(double));
+	memcpy(data, samples, samples_len * sizeof(double));
+
 	/* Allowed error in Hz due to FFT step */
 	freq_accuracy = sampling_rate / data_len;
 	igt_debug("Allowed freq. error: %d Hz\n", freq_accuracy);
 
 	ret = gsl_fft_real_radix2_transform(data, 1, data_len);
-	igt_assert(ret == 0);
+	if (ret != 0) {
+		free(data);
+		igt_assert(0);
+	}
 
 	/* Compute the power received by every bin of the FFT, and record the
 	 * maximum power received as a way to normalize all the others.
@@ -371,6 +381,8 @@ bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
 			success = false;
 		}
 	}
+
+	free(data);
 
 	return success;
 }
