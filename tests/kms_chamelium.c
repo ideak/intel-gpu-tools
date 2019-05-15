@@ -1926,6 +1926,10 @@ igt_main
 
 		connector_subtest("hdmi-frame-dump", HDMIA)
 			test_display_frame_dump(&data, port);
+
+		connector_subtest("hdmi-audio", HDMIA)
+			test_display_audio(&data, port, "HDMI",
+					   TEST_EDID_HDMI_AUDIO);
 	}
 
 	igt_subtest_group {
