@@ -32,11 +32,18 @@ int __igt_device_set_master(int fd)
 	int err;
 
 	err = 0;
-	if (drmIoctl(fd, DRM_IOCTL_SET_MASTER, NULL))
+	if (drmIoctl(fd, DRM_IOCTL_SET_MASTER, NULL)) {
 		err = -errno;
+		igt_assume(err);
+	}
 
 	errno = 0;
 	return err;
+}
+
+static void show_clients(int fd)
+{
+	__igt_debugfs_dump(fd, "clients", IGT_LOG_WARN);
 }
 
 /**
@@ -48,7 +55,7 @@ int __igt_device_set_master(int fd)
 void igt_device_set_master(int fd)
 {
 	if (__igt_device_set_master(fd)) {
-		igt_debugfs_dump(fd, "clients");
+		show_clients(fd);
 		igt_require_f(__igt_device_set_master(fd) == 0,
 			      "Can't become DRM master, "
 			      "please check if no other DRM client is running.\n");
@@ -60,8 +67,10 @@ int __igt_device_drop_master(int fd)
 	int err;
 
 	err = 0;
-	if (drmIoctl(fd, DRM_IOCTL_DROP_MASTER, NULL))
+	if (drmIoctl(fd, DRM_IOCTL_DROP_MASTER, NULL)) {
 		err = -errno;
+		igt_assume(err);
+	}
 
 	errno = 0;
 	return err;
@@ -81,7 +90,7 @@ void igt_device_drop_master(int fd)
 		return;
 
 	if (__igt_device_drop_master(fd)) {
-		igt_debugfs_dump(fd, "clients");
+		show_clients(fd);
 		igt_assert_f(__igt_device_drop_master(fd) == 0,
 			      "Failed to drop DRM master.\n");
 	}

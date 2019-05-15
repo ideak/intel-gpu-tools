@@ -201,6 +201,7 @@ void igt_enable_prefault(void);
  * gem buffer objects
  */
 int igt_get_stable_obj_count(int driver);
-void igt_debugfs_dump(int device, const char *filename);
+void __igt_debugfs_dump(int device, const char *filename, int level);
+#define igt_debugfs_dump(d, f) __igt_debugfs_dump(d, f, IGT_LOG_DEBUG)
 
 #endif /* __IGT_DEBUGFS_H__ */

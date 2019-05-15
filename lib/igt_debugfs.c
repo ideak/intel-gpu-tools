@@ -1145,7 +1145,7 @@ int igt_get_stable_obj_count(int driver)
 	return obj_count;
 }
 
-void igt_debugfs_dump(int device, const char *filename)
+void __igt_debugfs_dump(int device, const char *filename, int level)
 {
 	char *contents;
 	int dir;
@@ -1154,6 +1154,6 @@ void igt_debugfs_dump(int device, const char *filename)
 	contents = igt_sysfs_get(dir, filename);
 	close(dir);
 
-	igt_debug("%s:\n%s\n", filename, contents);
+	igt_log(IGT_LOG_DOMAIN, level, "%s:\n%s\n", filename, contents);
 	free(contents);
 }
