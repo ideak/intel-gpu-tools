@@ -841,15 +841,6 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	struct audio_state state = {};
 	int channel_mapping[8], capture_chan;
 
-	if (!alsa_test_output_configuration(alsa, playback_channels,
-					    playback_rate)) {
-		igt_debug("Skipping test with sample rate %d Hz and %d channels "
-			  "because at least one of the selected output devices "
-			  "doesn't support this configuration\n",
-			  playback_rate, playback_channels);
-		return false;
-	}
-
 	igt_debug("Testing with playback sampling rate %d Hz and %d channels\n",
 		  playback_rate, playback_channels);
 	alsa_configure_output(alsa, playback_channels, playback_rate);
@@ -1028,15 +1019,14 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	audio_signal_fini(signal);
 	chamelium_stream_deinit(stream);
 
-	igt_assert(success);
-	return true;
+	return success;
 }
 
 static void
 test_display_audio(data_t *data, struct chamelium_port *port,
 		   const char *audio_device, enum test_edid edid)
 {
-	bool run = false;
+	bool run, success;
 	struct alsa *alsa;
 	int ret;
 	igt_output_t *output;
@@ -1045,6 +1035,7 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 	drmModeModeInfo *mode;
 	drmModeConnector *connector;
 	int fb_id, i;
+	int channels, sampling_rate;
 
 	igt_require(alsa_has_exclusive_access());
 
@@ -1076,20 +1067,37 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 
 	enable_output(data, port, output, mode, &fb);
 
+	run = false;
+	success = true;
 	for (i = 0; i < test_sampling_rates_count; i++) {
 		ret = alsa_open_output(alsa, audio_device);
 		igt_assert(ret >= 0);
 
 		/* TODO: playback on all 8 available channels */
-		run |= do_test_display_audio(data, port, alsa,
-					     PLAYBACK_CHANNELS,
-					     test_sampling_rates[i]);
+		channels = PLAYBACK_CHANNELS;
+		sampling_rate = test_sampling_rates[i];
+
+		if (!alsa_test_output_configuration(alsa, channels,
+						    sampling_rate)) {
+			igt_debug("Skipping test with sample rate %d Hz and %d channels "
+				  "because at least one of the selected output devices "
+				  "doesn't support this configuration\n",
+				  channels, sampling_rate);
+			continue;
+		}
+
+		run = true;
+
+		success &= do_test_display_audio(data, port, alsa, channels,
+						 sampling_rate);
 
 		alsa_close_output(alsa);
 	}
 
 	/* Make sure we tested at least one frequency. */
 	igt_assert(run);
+	/* Make sure all runs were successful. */
+	igt_assert(success);
 
 	igt_remove_fb(data->drm_fd, &fb);
 
