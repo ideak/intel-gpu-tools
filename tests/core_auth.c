@@ -1,6 +1,5 @@
 /*
  * Copyright 2015 David Herrmann <dh.herrmann@gmail.com>
- * Copyright 2018 Collabora, Ltd
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -43,7 +42,6 @@
 #include <sys/time.h>
 #include <sys/poll.h>
 #include <sys/resource.h>
-#include <sys/sysmacros.h>
 #include "drm.h"
 
 #ifndef __linux__
@@ -192,105 +190,6 @@ static void test_basic_auth(int master)
 	close(slave);
 }
 
-static bool has_prime_import(int fd)
-{
-	uint64_t value;
-
-	if (drmGetCap(fd, DRM_CAP_PRIME, &value))
-		return false;
-
-	return value & DRM_PRIME_CAP_IMPORT;
-}
-
-static void check_auth_sanity(int master)
-{
-	uint32_t handle;
-
-	igt_assert(check_auth(master) == true);
-	igt_require(has_prime_import(master));
-
-	igt_assert(drmPrimeFDToHandle(master, -1, &handle) < 0);
-
-	/* IOCTL requires authenticated master as done in drm_permit.
-	 * As we get past that, we'll fail due to the invalid FD.
-	 *
-	 * Note: strictly speaking this is unrelated to the goal of
-	 * the test, although danvet requested it.
-	 */
-	igt_assert(errno == EBADF);
-}
-
-static bool has_render_node(int fd)
-{
-	char node_name[80];
-	struct stat sbuf;
-
-	if (fstat(fd, &sbuf))
-		return false;
-
-	sprintf(node_name, "/dev/dri/renderD%d", minor(sbuf.st_rdev) | 0x80);
-	if (stat(node_name, &sbuf))
-		return false;
-
-	return true;
-}
-
-/*
- * Testcase: Render capable, unauthenticated master doesn't throw -EACCES for
- * DRM_RENDER_ALLOW ioctls.
- */
-static void test_unauth_vs_render(int master)
-{
-	int slave;
-	uint32_t handle;
-	struct stat statbuf;
-	bool has_render;
-
-	/* need to check for render nodes before we wreak the filesystem */
-	has_render = has_render_node(master);
-
-	/* create a card node matching master which (only) we can access as
-	 * non-root */
-	do_or_die(fstat(master, &statbuf));
-	do_or_die(unshare(CLONE_NEWNS));
-	do_or_die(mount(NULL, "/", NULL, MS_PRIVATE | MS_REC, NULL));
-	do_or_die(mount("none", "/dev/dri", "tmpfs", 0, NULL));
-	umask(0);
-	do_or_die(mknod("/dev/dri/card", S_IFCHR | 0666, statbuf.st_rdev));
-
-	igt_drop_root();
-
-	slave = open("/dev/dri/card", O_RDWR);
-
-	igt_assert(slave >= 0);
-
-	/*
-	 * The second open() happens without CAP_SYS_ADMIN, thus it will NOT
-	 * be authenticated.
-	 */
-	igt_assert(check_auth(slave) == false);
-
-	/* Issuing the following ioctl will fail, no doubt about it. */
-	igt_assert(drmPrimeFDToHandle(slave, -1, &handle) < 0);
-
-	/*
-	 * Updated kernels allow render capable, unauthenticated master to
-	 * issue DRM_AUTH ioctls (like FD2HANDLE above), as long as they are
-	 * annotated as DRM_RENDER_ALLOW.
-	 *
-	 * Otherwise, errno is set to -EACCES
-	 *
-	 * Note: We are _not_ interested in the FD2HANDLE specific errno,
-	 * yet the EBADF check is added on the explicit request by danvet.
-	 */
-	if (has_render)
-		igt_assert(errno == EBADF);
-	else
-		igt_assert(errno == EACCES);
-
-	close(slave);
-}
-
 igt_main
 {
 	int master;
@@ -328,18 +227,5 @@ igt_main
 		/* this must be last, we adjust the rlimit */
 		igt_subtest("many-magics")
 			test_many_magics(master);
-	}
-
-	igt_subtest_group {
-		igt_fixture
-			master = drm_open_driver(DRIVER_ANY);
-
-		igt_subtest("unauth-vs-render") {
-			check_auth_sanity(master);
-
-			igt_fork(child, 1)
-				test_unauth_vs_render(master);
-			igt_waitchildren();
-		}
 	}
 }
