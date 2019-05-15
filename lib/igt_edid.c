@@ -292,30 +292,72 @@ void cea_sad_init_pcm(struct cea_sad *sad, int channels,
 }
 
 /**
- * edid_ext_set_cea_sad: set an extension block to be CEA SAD
+ * cea_vsd_get_hdmi_default:
+ *
+ * Returns the default Vendor Specific Data block for HDMI.
  */
-void edid_ext_set_cea_sad(struct edid_ext *ext, const struct cea_sad *sads,
-			  size_t sads_len)
+const struct cea_vsd *cea_vsd_get_hdmi_default(size_t *size)
 {
-	struct edid_cea *cea = &ext->data.cea;
-	struct edid_cea_data_block *data_block;
-	size_t sads_size, data_block_size;
+	static char raw[sizeof(struct cea_vsd) + 4] = {0};
+	struct cea_vsd *vsd;
 
-	memset(ext, 0, sizeof(struct edid_ext));
+	*size = sizeof(raw);
+
+	/* Magic incantation. Works better if you orient your screen in the
+	 * direction of the VESA headquarters. */
+	vsd = (struct cea_vsd *) raw;
+	vsd->ieee_oui[0] = 0x03;
+	vsd->ieee_oui[1] = 0x0C;
+	vsd->ieee_oui[2] = 0x00;
+	vsd->data[0] = 0x10;
+	vsd->data[1] = 0x00;
+	vsd->data[2] = 0x38;
+	vsd->data[3] = 0x2D;
+
+	return vsd;
+}
+
+static void edid_cea_data_block_init(struct edid_cea_data_block *block,
+				     enum edid_cea_data_type type, size_t size)
+{
+	assert(size <= 0xFF);
+	block->type_len = type << 5 | size;
+}
+
+size_t edid_cea_data_block_set_sad(struct edid_cea_data_block *block,
+				   const struct cea_sad *sads, size_t sads_len)
+{
+	size_t sads_size;
 
 	sads_size = sizeof(struct cea_sad) * sads_len;
-	data_block_size = sizeof(struct edid_cea_data_block) + sads_size;
+	edid_cea_data_block_init(block, EDID_CEA_DATA_AUDIO, sads_size);
+
+	memcpy(block->data.sads, sads, sads_size);
+
+	return sizeof(struct edid_cea_data_block) + sads_size;
+}
+
+size_t edid_cea_data_block_set_vsd(struct edid_cea_data_block *block,
+				   const struct cea_vsd *vsd, size_t vsd_size)
+{
+	edid_cea_data_block_init(block, EDID_CEA_DATA_VENDOR_SPECIFIC,
+				 vsd_size);
+
+	memcpy(block->data.vsds, vsd, vsd_size);
+
+	return sizeof(struct edid_cea_data_block) + vsd_size;
+}
+
+void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
+		      uint8_t flags)
+{
+	struct edid_cea *cea = &ext->data.cea;
 
 	ext->tag = EDID_EXT_CEA;
 
 	cea->revision = 3;
-	cea->dtd_start = 4 + data_block_size;
-	cea->misc = 1 << 6; /* basic audio, no DTD */
-
-	assert(sads_size <= 0xFF);
-	data_block = (struct edid_cea_data_block *) cea->data;
-	data_block->type_len = EDID_CEA_DATA_AUDIO << 5 | sads_size;
-	memcpy(data_block->data.sads, sads, sads_size);
+	cea->dtd_start = 4 + data_blocks_size;
+	cea->misc = flags; /* just flags, no DTD */
 }
 
 void edid_ext_update_cea_checksum(struct edid_ext *ext)

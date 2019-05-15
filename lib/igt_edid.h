@@ -189,6 +189,12 @@ struct cea_sad {
 	uint8_t bitrate;
 } __attribute__((packed));
 
+/* Vendor Specific Data */
+struct cea_vsd {
+	uint8_t ieee_oui[3];
+	char data[];
+};
+
 enum edid_cea_data_type {
 	EDID_CEA_DATA_AUDIO = 1,
 	EDID_CEA_DATA_VIDEO = 2,
@@ -200,8 +206,16 @@ struct edid_cea_data_block {
 	uint8_t type_len; /* type is from enum edid_cea_data_type */
 	union {
 		struct cea_sad sads[0];
+		struct cea_vsd vsds[0];
 	} data;
 } __attribute__((packed));
+
+enum edid_cea_flag {
+	EDID_CEA_YCBCR422 = 1 << 4,
+	EDID_CEA_YCBCR444 = 1 << 5,
+	EDID_CEA_BASIC_AUDIO = 1 << 6,
+	EDID_CEA_UNDERSCAN = 1 << 7,
+};
 
 struct edid_cea {
 	uint8_t revision;
@@ -275,8 +289,13 @@ void detailed_timing_set_string(struct detailed_timing *dt,
 
 void cea_sad_init_pcm(struct cea_sad *sad, int channels,
 		      uint8_t sampling_rates, uint8_t sample_sizes);
-void edid_ext_set_cea_sad(struct edid_ext *ext, const struct cea_sad *sads,
-			  size_t sads_len);
 void edid_ext_update_cea_checksum(struct edid_ext *ext);
+const struct cea_vsd *cea_vsd_get_hdmi_default(size_t *size);
+size_t edid_cea_data_block_set_sad(struct edid_cea_data_block *block,
+				   const struct cea_sad *sads, size_t sads_len);
+size_t edid_cea_data_block_set_vsd(struct edid_cea_data_block *block,
+				   const struct cea_vsd *vsd, size_t vsd_size);
+void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
+		      uint8_t flags);
 
 #endif
