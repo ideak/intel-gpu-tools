@@ -148,6 +148,80 @@ struct detailed_timing {
 	} data;
 } __attribute__((packed));
 
+enum cea_sad_format {
+	CEA_SAD_FORMAT_PCM = 1,
+	CEA_SAD_FORMAT_AC3 = 2,
+	CEA_SAD_FORMAT_MPEG1 = 3, /* Layers 1 & 2 */
+	CEA_SAD_FORMAT_MP3 = 4,
+	CEA_SAD_FORMAT_MPEG2 = 5,
+	CEA_SAD_FORMAT_AAC = 6,
+	CEA_SAD_FORMAT_DTS = 7,
+	CEA_SAD_FORMAT_ATRAC = 8,
+	CEA_SAD_FORMAT_SACD = 9, /* One-bit audio */
+	CEA_SAD_FORMAT_DD_PLUS = 10,
+	CEA_SAD_FORMAT_DTS_HD = 11,
+	CEA_SAD_FORMAT_DOLBY = 12, /* MLP/Dolby TrueHD */
+	CEA_SAD_FORMAT_DST = 13,
+	CEA_SAD_FORMAT_WMA = 14, /* Microsoft WMA Pro */
+};
+
+enum cea_sad_sampling_rate {
+	CEA_SAD_SAMPLING_RATE_32KHZ = 1 << 0,
+	CEA_SAD_SAMPLING_RATE_44KHZ = 1 << 1,
+	CEA_SAD_SAMPLING_RATE_48KHZ = 1 << 2,
+	CEA_SAD_SAMPLING_RATE_88KHZ = 1 << 3,
+	CEA_SAD_SAMPLING_RATE_96KHZ = 1 << 4,
+	CEA_SAD_SAMPLING_RATE_176KHZ = 1 << 5,
+	CEA_SAD_SAMPLING_RATE_192KHZ = 1 << 6,
+};
+
+/* for PCM only */
+enum cea_sad_pcm_sample_size {
+	CEA_SAD_SAMPLE_SIZE_16 = 1 << 0,
+	CEA_SAD_SAMPLE_SIZE_20 = 1 << 1,
+	CEA_SAD_SAMPLE_SIZE_24 = 1 << 2,
+};
+
+/* Short Audio Descriptor */
+struct cea_sad {
+	uint8_t format_channels;
+	uint8_t sampling_rates;
+	uint8_t bitrate;
+} __attribute__((packed));
+
+enum edid_cea_data_type {
+	EDID_CEA_DATA_AUDIO = 1,
+	EDID_CEA_DATA_VIDEO = 2,
+	EDID_CEA_DATA_VENDOR_SPECIFIC = 3,
+	EDID_CEA_DATA_SPEAKER_ALLOC = 4,
+};
+
+struct edid_cea_data_block {
+	uint8_t type_len; /* type is from enum edid_cea_data_type */
+	union {
+		struct cea_sad sads[0];
+	} data;
+} __attribute__((packed));
+
+struct edid_cea {
+	uint8_t revision;
+	uint8_t dtd_start;
+	uint8_t misc;
+	char data[123]; /* DBC & DTD collection, padded with zeros */
+	uint8_t checksum;
+} __attribute__((packed));
+
+enum edid_ext_tag {
+	EDID_EXT_CEA = 0x02,
+};
+
+struct edid_ext {
+	uint8_t tag; /* enum edid_ext_tag */
+	union {
+		struct edid_cea cea;
+	} data;
+} __attribute__((packed));
+
 struct edid {
 	char header[8];
 	/* Vendor & product info */
@@ -183,9 +257,9 @@ struct edid {
 	/* Detailing timings 1-4 */
 	struct detailed_timing detailed_timings[DETAILED_TIMINGS_LEN];
 	/* Number of 128 byte ext. blocks */
-	uint8_t extensions;
-	/* Checksum */
+	uint8_t extensions_len;
 	uint8_t checksum;
+	struct edid_ext extensions[];
 } __attribute__((packed));
 
 void edid_init(struct edid *edid);
@@ -198,5 +272,11 @@ void detailed_timing_set_monitor_range_mode(struct detailed_timing *dt,
 void detailed_timing_set_string(struct detailed_timing *dt,
 				enum detailed_non_pixel_type type,
 				const char *str);
+
+void cea_sad_init_pcm(struct cea_sad *sad, int channels,
+		      uint8_t sampling_rates, uint8_t sample_sizes);
+void edid_ext_set_cea_sad(struct edid_ext *ext, const struct cea_sad *sads,
+			  size_t sads_len);
+void edid_ext_update_cea_checksum(struct edid_ext *ext);
 
 #endif

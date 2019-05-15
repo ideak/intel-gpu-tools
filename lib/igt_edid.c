@@ -252,19 +252,74 @@ void edid_init_with_mode(struct edid *edid, drmModeModeInfo *mode)
 				   EDID_DETAIL_MONITOR_NAME, "IGT");
 }
 
+static uint8_t compute_checksum(const uint8_t *buf, size_t size)
+{
+	size_t i;
+	uint8_t sum = 0;
+
+	assert(size > 0);
+	for (i = 0; i < size - 1; i++) {
+		sum += buf[i];
+	}
+
+	return 256 - sum;
+}
+
 /**
  * edid_update_checksum: compute and update the EDID checksum
  */
 void edid_update_checksum(struct edid *edid)
 {
-	size_t i;
-	const uint8_t *buf = (const uint8_t *) edid;
-	uint8_t sum = 0;
+	edid->checksum = compute_checksum((uint8_t *) edid,
+					  sizeof(struct edid));
+}
 
-	/* calculate checksum */
-	for (i = 0; i < sizeof(struct edid) - 1; i++) {
-		sum = sum + buf[i];
-	}
+/**
+ * cea_sad_init_pcm:
+ * @channels: the number of supported channels (max. 8)
+ * @sampling_rates: bitfield of enum cea_sad_sampling_rate
+ * @sample_sizes: bitfield of enum cea_sad_pcm_sample_size
+ *
+ * Initialize a Short Audio Descriptor to advertise PCM support.
+ */
+void cea_sad_init_pcm(struct cea_sad *sad, int channels,
+		      uint8_t sampling_rates, uint8_t sample_sizes)
+{
+	assert(channels <= 8);
+	sad->format_channels = CEA_SAD_FORMAT_PCM << 3 | (channels - 1);
+	sad->sampling_rates = sampling_rates;
+	sad->bitrate = sample_sizes;
+}
 
-	edid->checksum = 256 - sum;
+/**
+ * edid_ext_set_cea_sad: set an extension block to be CEA SAD
+ */
+void edid_ext_set_cea_sad(struct edid_ext *ext, const struct cea_sad *sads,
+			  size_t sads_len)
+{
+	struct edid_cea *cea = &ext->data.cea;
+	struct edid_cea_data_block *data_block;
+	size_t sads_size, data_block_size;
+
+	memset(ext, 0, sizeof(struct edid_ext));
+
+	sads_size = sizeof(struct cea_sad) * sads_len;
+	data_block_size = sizeof(struct edid_cea_data_block) + sads_size;
+
+	ext->tag = EDID_EXT_CEA;
+
+	cea->revision = 3;
+	cea->dtd_start = 4 + data_block_size;
+	cea->misc = 1 << 6; /* basic audio, no DTD */
+
+	assert(sads_size <= 0xFF);
+	data_block = (struct edid_cea_data_block *) cea->data;
+	data_block->type_len = EDID_CEA_DATA_AUDIO << 5 | sads_size;
+	memcpy(data_block->data.sads, sads, sads_size);
+}
+
+void edid_ext_update_cea_checksum(struct edid_ext *ext)
+{
+	ext->data.cea.checksum = compute_checksum((uint8_t *) ext,
+						  sizeof(struct edid_ext));
 }
