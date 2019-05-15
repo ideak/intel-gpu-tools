@@ -772,14 +772,15 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 /* A streak of 3 gives confidence that the signal is good. */
 #define MIN_STREAK 3
 
+/* TODO: enable >48KHz rates, these are not reliable */
 static int test_sampling_rates[] = {
 	32000,
 	44100,
 	48000,
-	88200,
-	96000,
-	176400,
-	192000,
+	/* 88200, */
+	/* 96000, */
+	/* 176400, */
+	/* 192000, */
 };
 
 static int test_sampling_rates_count = sizeof(test_sampling_rates) / sizeof(int);
