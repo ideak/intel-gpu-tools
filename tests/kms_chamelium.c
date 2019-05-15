@@ -27,11 +27,19 @@
 #include "config.h"
 #include "igt.h"
 #include "igt_vc4.h"
+#include "igt_edid.h"
 
 #include <fcntl.h>
 #include <pthread.h>
 #include <string.h>
 #include <stdatomic.h>
+
+enum test_edid {
+	TEST_EDID_CHAMELIUM_DEFAULT,
+	TEST_EDID_BASE,
+	TEST_EDID_ALT,
+	TEST_EDID_HDMI_AUDIO,
+};
 
 typedef struct {
 	struct chamelium *chamelium;
@@ -41,8 +49,7 @@ typedef struct {
 
 	int drm_fd;
 
-	int edid_id;
-	int alt_edid_id;
+	int edids[4];
 } data_t;
 
 #define HOTPLUG_TIMEOUT 20 /* seconds */
@@ -255,18 +262,26 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port, int toggle_count)
 	igt_hpd_storm_reset(data->drm_fd);
 }
 
+static const unsigned char *get_edid(enum test_edid edid);
+
+static void set_edid(data_t *data, struct chamelium_port *port,
+		     enum test_edid edid)
+{
+	chamelium_port_set_edid(data->chamelium, port, data->edids[edid]);
+}
+
 static void
-test_edid_read(data_t *data, struct chamelium_port *port,
-	       int edid_id, const unsigned char *edid)
+test_edid_read(data_t *data, struct chamelium_port *port, enum test_edid edid)
 {
 	drmModePropertyBlobPtr edid_blob = NULL;
+	const unsigned char *raw_edid = get_edid(edid);
 	drmModeConnector *connector = chamelium_port_get_connector(
 	    data->chamelium, port, false);
 	uint64_t edid_blob_id;
 
 	reset_state(data, port);
 
-	chamelium_port_set_edid(data->chamelium, port, edid_id);
+	set_edid(data, port, edid);
 	chamelium_plug(data->chamelium, port);
 	wait_for_connector(data, port, DRM_MODE_CONNECTED);
 
@@ -278,7 +293,7 @@ test_edid_read(data_t *data, struct chamelium_port *port,
 	igt_assert(edid_blob = drmModeGetPropertyBlob(data->drm_fd,
 						      edid_blob_id));
 
-	igt_assert(memcmp(edid, edid_blob->data, EDID_LENGTH) == 0);
+	igt_assert(memcmp(raw_edid, edid_blob->data, EDID_LENGTH) == 0);
 
 	drmModeFreePropertyBlob(edid_blob);
 	drmModeFreeConnector(connector);
@@ -406,8 +421,8 @@ static void
 test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 				enum igt_suspend_state state,
 				enum igt_suspend_test test,
-				int edid_id,
-				int alt_edid_id)
+				enum test_edid edid,
+				enum test_edid alt_edid)
 {
 	struct udev_monitor *mon = igt_watch_hotplug();
 	bool link_status_failed[2][data->port_count];
@@ -420,7 +435,7 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 	igt_flush_hotplugs(mon);
 
 	/* First plug in the port */
-	chamelium_port_set_edid(data->chamelium, port, edid_id);
+	set_edid(data, port, edid);
 	chamelium_plug(data->chamelium, port);
 	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
 
@@ -430,7 +445,7 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 	 * Change the edid before we suspend. On resume, the machine should
 	 * notice the EDID change and fire a hotplug event.
 	 */
-	chamelium_port_set_edid(data->chamelium, port, alt_edid_id);
+	set_edid(data, port, alt_edid);
 
 	get_connectors_link_status_failed(data, link_status_failed[0]);
 
@@ -447,8 +462,7 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 }
 
 static igt_output_t *
-prepare_output(data_t *data,
-	       struct chamelium_port *port, bool set_edid)
+prepare_output(data_t *data, struct chamelium_port *port, enum test_edid edid)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
@@ -461,10 +475,10 @@ prepare_output(data_t *data,
 	igt_require(res = drmModeGetResources(data->drm_fd));
 
 	/* The chamelium's default EDID has a lot of resolutions, way more then
-	 * we need to test
+	 * we need to test. Additionally the default EDID doesn't support HDMI
+	 * audio.
 	 */
-	if (set_edid)
-		chamelium_port_set_edid(data->chamelium, port, data->edid_id);
+	set_edid(data, port, edid);
 
 	chamelium_plug(data->chamelium, port);
 	wait_for_connector(data, port, DRM_MODE_CONNECTED);
@@ -649,7 +663,7 @@ static void test_display_one_mode(data_t *data, struct chamelium_port *port,
 
 	reset_state(data, port);
 
-	output = prepare_output(data, port, true);
+	output = prepare_output(data, port, TEST_EDID_BASE);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -680,7 +694,7 @@ static void test_display_all_modes(data_t *data, struct chamelium_port *port,
 
 	reset_state(data, port);
 
-	output = prepare_output(data, port, true);
+	output = prepare_output(data, port, TEST_EDID_BASE);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -715,7 +729,7 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 
 	reset_state(data, port);
 
-	output = prepare_output(data, port, true);
+	output = prepare_output(data, port, TEST_EDID_BASE);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -758,7 +772,7 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 /* A streak of 3 gives confidence that the signal is good. */
 #define MIN_STREAK 3
 
-static int sampling_rates[] = {
+static int test_sampling_rates[] = {
 	32000,
 	44100,
 	48000,
@@ -768,7 +782,7 @@ static int sampling_rates[] = {
 	192000,
 };
 
-static int sampling_rates_count = sizeof(sampling_rates) / sizeof(int);
+static int test_sampling_rates_count = sizeof(test_sampling_rates) / sizeof(int);
 
 static int test_frequencies[] = {
 	300,
@@ -1019,7 +1033,7 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 
 static void
 test_display_audio(data_t *data, struct chamelium_port *port,
-		   const char *audio_device)
+		   const char *audio_device, enum test_edid edid)
 {
 	bool run = false;
 	struct alsa *alsa;
@@ -1042,10 +1056,7 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 
 	reset_state(data, port);
 
-	/* Use the default Chamelium EDID for this test, as the base IGT EDID
-	 * doesn't advertise audio support (see drm_detect_monitor_audio in
-	 * the kernel tree). */
-	output = prepare_output(data, port, false);
+	output = prepare_output(data, port, edid);
 	connector = chamelium_port_get_connector(data->chamelium, port, false);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
@@ -1064,14 +1075,14 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 
 	enable_output(data, port, output, mode, &fb);
 
-	for (i = 0; i < sampling_rates_count; i++) {
+	for (i = 0; i < test_sampling_rates_count; i++) {
 		ret = alsa_open_output(alsa, audio_device);
 		igt_assert(ret >= 0);
 
 		/* TODO: playback on all 8 available channels */
 		run |= do_test_display_audio(data, port, alsa,
 					     PLAYBACK_CHANNELS,
-					     sampling_rates[i]);
+					     test_sampling_rates[i]);
 
 		alsa_close_output(alsa);
 	}
@@ -1414,7 +1425,7 @@ static void test_display_planes_random(data_t *data,
 	reset_state(data, port);
 
 	/* Find the connector and pipe. */
-	output = prepare_output(data, port, true);
+	output = prepare_output(data, port, TEST_EDID_BASE);
 
 	mode = igt_output_get_mode(output);
 
@@ -1578,6 +1589,82 @@ test_hpd_storm_disable(data_t *data, struct chamelium_port *port, int width)
 	igt_hpd_storm_reset(data->drm_fd);
 }
 
+#define HDMI_AUDIO_EDID_SIZE (sizeof(struct edid) + sizeof(struct edid_ext))
+
+static unsigned const char *get_hdmi_audio_edid(void)
+{
+	int channels;
+	uint8_t sampling_rates, sample_sizes;
+	static unsigned char raw_edid[HDMI_AUDIO_EDID_SIZE] = {0};
+	struct edid *edid;
+	struct edid_ext *edid_ext;
+	struct edid_cea *edid_cea;
+	char *cea_data;
+	struct edid_cea_data_block *block;
+	struct cea_sad sad = {0};
+	const struct cea_vsd *vsd;
+	size_t cea_data_size, vsd_size;
+
+	/* Initialize the Short Audio Descriptor for PCM */
+	channels = 2; /* TODO: speaker alloc blocks for > 2 channels */
+	sampling_rates = CEA_SAD_SAMPLING_RATE_32KHZ |
+			 CEA_SAD_SAMPLING_RATE_44KHZ |
+			 CEA_SAD_SAMPLING_RATE_48KHZ |
+			 CEA_SAD_SAMPLING_RATE_88KHZ |
+			 CEA_SAD_SAMPLING_RATE_96KHZ |
+			 CEA_SAD_SAMPLING_RATE_176KHZ |
+			 CEA_SAD_SAMPLING_RATE_192KHZ;
+	sample_sizes = CEA_SAD_SAMPLE_SIZE_16 |
+		       CEA_SAD_SAMPLE_SIZE_20 |
+		       CEA_SAD_SAMPLE_SIZE_24;
+	cea_sad_init_pcm(&sad, channels, sampling_rates, sample_sizes);
+
+	/* Create a new EDID from the base IGT EDID, and add an
+	 * extension that advertises audio support. */
+	edid = (struct edid *) raw_edid;
+	memcpy(edid, igt_kms_get_base_edid(), sizeof(struct edid));
+	edid->extensions_len = 1;
+	edid_ext = &edid->extensions[0];
+	edid_cea = &edid_ext->data.cea;
+	cea_data = edid_cea->data;
+	cea_data_size = 0;
+
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	cea_data_size += edid_cea_data_block_set_sad(block, &sad, 1);
+
+	/* A Vendor Specific Data block is needed for HDMI audio */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	vsd = cea_vsd_get_hdmi_default(&vsd_size);
+	cea_data_size += edid_cea_data_block_set_vsd(block, vsd,
+						     vsd_size);
+
+	igt_assert(cea_data_size <= sizeof(edid_cea->data));
+
+	edid_ext_set_cea(edid_ext, cea_data_size,
+			 EDID_CEA_BASIC_AUDIO);
+
+	edid_update_checksum(edid);
+	edid_ext_update_cea_checksum(edid_ext);
+
+	return raw_edid;
+}
+
+static const unsigned char *get_edid(enum test_edid edid)
+{
+	switch (edid) {
+	case TEST_EDID_CHAMELIUM_DEFAULT:
+		igt_assert(0); /* we don't have the raw data for this one */
+		return NULL;
+	case TEST_EDID_BASE:
+		return igt_kms_get_base_edid();
+	case TEST_EDID_ALT:
+		return igt_kms_get_alt_edid();
+	case TEST_EDID_HDMI_AUDIO:
+		return get_hdmi_audio_edid();
+	}
+	assert(0); /* unreachable */
+}
+
 #define for_each_port(p, port)            \
 	for (p = 0, port = data.ports[p]; \
 	     p < data.port_count;         \
@@ -1594,7 +1681,8 @@ static data_t data;
 igt_main
 {
 	struct chamelium_port *port;
-	int edid_id, alt_edid_id, p;
+	int p;
+	size_t i;
 
 	igt_fixture {
 		igt_skip_on_simulation();
@@ -1606,12 +1694,11 @@ igt_main
 		data.ports = chamelium_get_ports(data.chamelium,
 						 &data.port_count);
 
-		edid_id = chamelium_new_edid(data.chamelium,
-					     igt_kms_get_base_edid());
-		alt_edid_id = chamelium_new_edid(data.chamelium,
-						 igt_kms_get_alt_edid());
-		data.edid_id = edid_id;
-		data.alt_edid_id = alt_edid_id;
+		data.edids[TEST_EDID_CHAMELIUM_DEFAULT] = CHAMELIUM_DEFAULT_EDID;
+		for (i = 1; i < sizeof(data.edids) / sizeof(data.edids[0]); ++i) {
+			data.edids[i] = chamelium_new_edid(data.chamelium,
+							   get_edid(i));
+		}
 
 		/* So fbcon doesn't try to reprobe things itself */
 		kmstest_set_vt_graphics_mode();
@@ -1635,10 +1722,8 @@ igt_main
 					   HPD_TOGGLE_COUNT_FAST);
 
 		connector_subtest("dp-edid-read", DisplayPort) {
-			test_edid_read(&data, port, edid_id,
-				       igt_kms_get_base_edid());
-			test_edid_read(&data, port, alt_edid_id,
-				       igt_kms_get_alt_edid());
+			test_edid_read(&data, port, TEST_EDID_BASE);
+			test_edid_read(&data, port, TEST_EDID_ALT);
 		}
 
 		connector_subtest("dp-hpd-after-suspend", DisplayPort)
@@ -1663,13 +1748,15 @@ igt_main
 			test_suspend_resume_edid_change(&data, port,
 							SUSPEND_STATE_MEM,
 							SUSPEND_TEST_NONE,
-							edid_id, alt_edid_id);
+							TEST_EDID_BASE,
+							TEST_EDID_ALT);
 
 		connector_subtest("dp-edid-change-during-hibernate", DisplayPort)
 			test_suspend_resume_edid_change(&data, port,
 							SUSPEND_STATE_DISK,
 							SUSPEND_TEST_DEVICES,
-							edid_id, alt_edid_id);
+							TEST_EDID_BASE,
+							TEST_EDID_ALT);
 
 		connector_subtest("dp-crc-single", DisplayPort)
 			test_display_all_modes(&data, port, DRM_FORMAT_XRGB8888,
@@ -1686,8 +1773,11 @@ igt_main
 		connector_subtest("dp-frame-dump", DisplayPort)
 			test_display_frame_dump(&data, port);
 
+		/* The EDID we generate advertises HDMI audio, not DP audio.
+		 * Use the Chamelium's default EDID for DP audio. */
 		connector_subtest("dp-audio", DisplayPort)
-			test_display_audio(&data, port, "HDMI");
+			test_display_audio(&data, port, "HDMI",
+					   TEST_EDID_CHAMELIUM_DEFAULT);
 	}
 
 	igt_subtest_group {
@@ -1705,10 +1795,8 @@ igt_main
 					   HPD_TOGGLE_COUNT_FAST);
 
 		connector_subtest("hdmi-edid-read", HDMIA) {
-			test_edid_read(&data, port, edid_id,
-				       igt_kms_get_base_edid());
-			test_edid_read(&data, port, alt_edid_id,
-				       igt_kms_get_alt_edid());
+			test_edid_read(&data, port, TEST_EDID_BASE);
+			test_edid_read(&data, port, TEST_EDID_ALT);
 		}
 
 		connector_subtest("hdmi-hpd-after-suspend", HDMIA)
@@ -1733,13 +1821,15 @@ igt_main
 			test_suspend_resume_edid_change(&data, port,
 							SUSPEND_STATE_MEM,
 							SUSPEND_TEST_NONE,
-							edid_id, alt_edid_id);
+							TEST_EDID_BASE,
+							TEST_EDID_ALT);
 
 		connector_subtest("hdmi-edid-change-during-hibernate", HDMIA)
 			test_suspend_resume_edid_change(&data, port,
 							SUSPEND_STATE_DISK,
 							SUSPEND_TEST_DEVICES,
-							edid_id, alt_edid_id);
+							TEST_EDID_BASE,
+							TEST_EDID_ALT);
 
 		connector_subtest("hdmi-crc-single", HDMIA)
 			test_display_all_modes(&data, port, DRM_FORMAT_XRGB8888,
@@ -1850,10 +1940,8 @@ igt_main
 			test_basic_hotplug(&data, port, HPD_TOGGLE_COUNT_FAST);
 
 		connector_subtest("vga-edid-read", VGA) {
-			test_edid_read(&data, port, edid_id,
-				       igt_kms_get_base_edid());
-			test_edid_read(&data, port, alt_edid_id,
-				       igt_kms_get_alt_edid());
+			test_edid_read(&data, port, TEST_EDID_BASE);
+			test_edid_read(&data, port, TEST_EDID_ALT);
 		}
 
 		connector_subtest("vga-hpd-after-suspend", VGA)

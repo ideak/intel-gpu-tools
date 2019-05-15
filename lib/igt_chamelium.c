@@ -38,6 +38,7 @@
 #include "igt_chamelium.h"
 #include "igt_core.h"
 #include "igt_aux.h"
+#include "igt_edid.h"
 #include "igt_frame.h"
 #include "igt_list.h"
 #include "igt_kms.h"
@@ -530,14 +531,18 @@ void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
  *
  * Returns: The ID of the EDID uploaded to the chamelium.
  */
-int chamelium_new_edid(struct chamelium *chamelium, const unsigned char *edid)
+int chamelium_new_edid(struct chamelium *chamelium,
+		       const unsigned char *raw_edid)
 {
 	xmlrpc_value *res;
 	struct chamelium_edid *allocated_edid;
 	int edid_id;
+	struct edid *edid = (struct edid *) raw_edid;
+	size_t edid_size = sizeof(struct edid) +
+			   edid->extensions_len * sizeof(struct edid_ext);
 
 	res = chamelium_rpc(chamelium, NULL, "CreateEdid", "(6)",
-			    edid, EDID_LENGTH);
+			    raw_edid, edid_size);
 
 	xmlrpc_read_int(&chamelium->env, res, &edid_id);
 	xmlrpc_DECREF(res);
