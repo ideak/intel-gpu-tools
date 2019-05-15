@@ -59,6 +59,12 @@ struct chamelium_audio_file {
 	int channels;
 };
 
+/**
+ * CHAMELIUM_DEFAULT_EDID: provide this ID to #chamelium_port_set_edid to use
+ * the default EDID.
+ */
+#define CHAMELIUM_DEFAULT_EDID 0
+
 struct chamelium *chamelium_init(int drm_fd);
 void chamelium_deinit(struct chamelium *chamelium);
 void chamelium_reset(struct chamelium *chamelium);
