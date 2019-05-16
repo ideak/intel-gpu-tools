@@ -3670,7 +3670,7 @@ test_invalid_create_userspace_config(void)
 	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EINVAL);
 
 	/* invalid mux_regs */
-	strncpy(config.uuid, uuid, sizeof(config.uuid));
+	memcpy(config.uuid, uuid, sizeof(config.uuid));
 	config.n_mux_regs = 1;
 	config.mux_regs_ptr = to_user_pointer(invalid_mux_regs);
 	config.n_boolean_regs = 0;
@@ -3679,7 +3679,7 @@ test_invalid_create_userspace_config(void)
 	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EINVAL);
 
 	/* empty config */
-	strncpy(config.uuid, uuid, sizeof(config.uuid));
+	memcpy(config.uuid, uuid, sizeof(config.uuid));
 	config.n_mux_regs = 0;
 	config.mux_regs_ptr = to_user_pointer(mux_regs);
 	config.n_boolean_regs = 0;
@@ -3688,7 +3688,7 @@ test_invalid_create_userspace_config(void)
 	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EINVAL);
 
 	/* empty config with null pointers */
-	strncpy(config.uuid, uuid, sizeof(config.uuid));
+	memcpy(config.uuid, uuid, sizeof(config.uuid));
 	config.n_mux_regs = 1;
 	config.mux_regs_ptr = to_user_pointer(NULL);
 	config.n_boolean_regs = 2;
@@ -3699,7 +3699,7 @@ test_invalid_create_userspace_config(void)
 	igt_assert_eq(__i915_perf_add_config(drm_fd, &config), -EINVAL);
 
 	/* invalid pointers */
-	strncpy(config.uuid, uuid, sizeof(config.uuid));
+	memcpy(config.uuid, uuid, sizeof(config.uuid));
 	config.n_mux_regs = 42;
 	config.mux_regs_ptr = to_user_pointer((void *) 0xDEADBEEF);
 	config.n_boolean_regs = 0;
@@ -3786,7 +3786,7 @@ test_create_destroy_userspace_config(void)
 		i915_perf_remove_config(drm_fd, config_id);
 
 	memset(&config, 0, sizeof(config));
-	strncpy(config.uuid, uuid, sizeof(config.uuid));
+	memcpy(config.uuid, uuid, sizeof(config.uuid));
 
 	config.n_mux_regs = 1;
 	config.mux_regs_ptr = to_user_pointer(mux_regs);
