@@ -666,12 +666,12 @@ static int common_init(int *argc, char **argv,
 {
 	int c, option_index = 0, i, x;
 	static struct option long_options[] = {
-		{"list-subtests", 0, 0, OPT_LIST_SUBTESTS},
-		{"run-subtest", 1, 0, OPT_RUN_SUBTEST},
-		{"help-description", 0, 0, OPT_DESCRIPTION},
-		{"debug", optional_argument, 0, OPT_DEBUG},
-		{"interactive-debug", optional_argument, 0, OPT_INTERACTIVE_DEBUG},
-		{"help", 0, 0, OPT_HELP},
+		{"list-subtests",     no_argument,       NULL, OPT_LIST_SUBTESTS},
+		{"run-subtest",       required_argument, NULL, OPT_RUN_SUBTEST},
+		{"help-description",  no_argument,       NULL, OPT_DESCRIPTION},
+		{"debug",             optional_argument, NULL, OPT_DEBUG},
+		{"interactive-debug", optional_argument, NULL, OPT_INTERACTIVE_DEBUG},
+		{"help",              no_argument,       NULL, OPT_HELP},
 		{0, 0, 0, 0}
 	};
 	char *short_opts;
@@ -687,48 +687,58 @@ static int common_init(int *argc, char **argv,
 	if (strrchr(command_str, '/'))
 		command_str = strrchr(command_str, '/') + 1;
 
-	/* First calculate space for all passed-in extra long options */
-	all_opt_count = 0;
-	while (extra_long_opts && extra_long_opts[all_opt_count].name) {
+	/* Check for conflicts and calculate space for passed-in extra long options */
+	for  (extra_opt_count = 0; extra_long_opts && extra_long_opts[extra_opt_count].name; extra_opt_count++) {
+		char *conflicting_char;
 
 		/* check for conflicts with standard long option values */
-		for (i = 0; long_options[i].name; i++)
-			if (extra_long_opts[all_opt_count].val == long_options[i].val)
-				igt_warn("Conflicting long option values between --%s and --%s\n",
-					 extra_long_opts[all_opt_count].name,
-					 long_options[i].name);
+		for (i = 0; long_options[i].name; i++) {
+			if (0 == strcmp(extra_long_opts[extra_opt_count].name, long_options[i].name)) {
+				igt_critical("Conflicting extra long option defined --%s\n", long_options[i].name);
+				assert(0);
 
-		/* check for conflicts with short options */
-		if (extra_long_opts[all_opt_count].val != ':'
-		    && strchr(std_short_opts, extra_long_opts[all_opt_count].val)) {
-			igt_warn("Conflicting long and short option values between --%s and -%s\n",
-				 extra_long_opts[all_opt_count].name,
-				 long_options[i].name);
+			}
+
+			if (extra_long_opts[extra_opt_count].val == long_options[i].val) {
+				igt_critical("Conflicting long option 'val' representation between --%s and --%s\n",
+					     extra_long_opts[extra_opt_count].name,
+					     long_options[i].name);
+				assert(0);
+			}
 		}
 
-
-		all_opt_count++;
+		/* check for conflicts with standard short options */
+		if (extra_long_opts[extra_opt_count].val != ':'
+		    && (conflicting_char = strchr(std_short_opts, extra_long_opts[extra_opt_count].val))) {
+			igt_critical("Conflicting long and short option 'val' representation between --%s and -%c\n",
+				     extra_long_opts[extra_opt_count].name,
+				     *conflicting_char);
+			assert(0);
+		}
 	}
-	extra_opt_count = all_opt_count;
 
 	/* check for conflicts in extra short options*/
 	for (i = 0; extra_short_opts && extra_short_opts[i]; i++) {
-
 		if (extra_short_opts[i] == ':')
 			continue;
 
 		/* check for conflicts with standard short options */
-		if (strchr(std_short_opts, extra_short_opts[i]))
-			igt_warn("Conflicting short option: -%c\n", std_short_opts[i]);
+		if (strchr(std_short_opts, extra_short_opts[i])) {
+			igt_critical("Conflicting short option: -%c\n", std_short_opts[i]);
+			assert(0);
+		}
 
 		/* check for conflicts with standard long option values */
-		for (x = 0; long_options[x].name; x++)
-			if (long_options[x].val == extra_short_opts[i])
-				igt_warn("Conflicting short option and long option value: --%s and -%c\n",
-					 long_options[x].name, extra_short_opts[i]);
+		for (x = 0; long_options[x].name; x++) {
+			if (long_options[x].val == extra_short_opts[i]) {
+				igt_critical("Conflicting short option and long option 'val' representation: --%s and -%c\n",
+					     long_options[x].name, extra_short_opts[i]);
+				assert(0);
+			}
+		}
 	}
 
-	all_opt_count += ARRAY_SIZE(long_options);
+	all_opt_count = extra_opt_count + ARRAY_SIZE(long_options);
 
 	combined_opts = malloc(all_opt_count * sizeof(*combined_opts));
 	if (extra_opt_count > 0)
