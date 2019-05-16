@@ -265,14 +265,13 @@ static void *chamelium_fsm_mon(void *data)
 	return NULL;
 }
 
-static xmlrpc_value *chamelium_rpc(struct chamelium *chamelium,
-				   struct chamelium_port *fsm_port,
-				   const char *method_name,
-				   const char *format_str,
-				   ...)
+static xmlrpc_value *__chamelium_rpc_va(struct chamelium *chamelium,
+					struct chamelium_port *fsm_port,
+					const char *method_name,
+					const char *format_str,
+					va_list va_args)
 {
-	xmlrpc_value *res;
-	va_list va_args;
+	xmlrpc_value *res = NULL;
 	struct fsm_monitor_args monitor_args;
 	pthread_t fsm_thread_id;
 
@@ -296,16 +295,48 @@ static xmlrpc_value *chamelium_rpc(struct chamelium *chamelium,
 			       &monitor_args);
 	}
 
-	va_start(va_args, format_str);
 	xmlrpc_client_call2f_va(&chamelium->env, chamelium->client,
 				chamelium->url, method_name, format_str, &res,
 				va_args);
-	va_end(va_args);
 
 	if (fsm_port) {
 		pthread_cancel(fsm_thread_id);
 		igt_cleanup_hotplug(monitor_args.mon);
 	}
+
+	return res;
+}
+
+static xmlrpc_value *__chamelium_rpc(struct chamelium *chamelium,
+				     struct chamelium_port *fsm_port,
+				     const char *method_name,
+				     const char *format_str,
+				     ...)
+{
+	xmlrpc_value *res;
+	va_list va_args;
+
+	va_start(va_args, format_str);
+	res = __chamelium_rpc_va(chamelium, fsm_port, method_name,
+				 format_str, va_args);
+	va_end(va_args);
+
+	return res;
+}
+
+static xmlrpc_value *chamelium_rpc(struct chamelium *chamelium,
+				   struct chamelium_port *fsm_port,
+				   const char *method_name,
+				   const char *format_str,
+				   ...)
+{
+	xmlrpc_value *res;
+	va_list va_args;
+
+	va_start(va_args, format_str);
+	res = __chamelium_rpc_va(chamelium, fsm_port, method_name,
+				 format_str, va_args);
+	va_end(va_args);
 
 	igt_assert_f(!chamelium->env.fault_occurred,
 		     "Chamelium RPC call failed: %s\n",
@@ -930,11 +961,35 @@ int chamelium_get_captured_frame_count(struct chamelium *chamelium)
 	return ret;
 }
 
+/**
+ * chamelium_supports_get_audio_format: check the Chamelium device supports
+ * retrieving the capture audio format.
+ */
+static bool chamelium_supports_get_audio_format(struct chamelium *chamelium)
+{
+	xmlrpc_value *res;
+
+	res = __chamelium_rpc(chamelium, NULL, "GetAudioFormat", "(i)", 3);
+	if (res)
+		xmlrpc_DECREF(res);
+
+	/* XML-RPC has a special code for unsupported methods
+	 * (XMLRPC_NO_SUCH_METHOD_ERROR) however the Chamelium implementation
+	 * doesn't return it. */
+	return (!chamelium->env.fault_occurred ||
+		strstr(chamelium->env.fault_string, "not supported") == NULL);
+}
+
 bool chamelium_has_audio_support(struct chamelium *chamelium,
 				 struct chamelium_port *port)
 {
 	xmlrpc_value *res;
 	xmlrpc_bool has_support;
+
+	if (!chamelium_supports_get_audio_format(chamelium)) {
+		igt_debug("The Chamelium device doesn't support GetAudioFormat\n");
+		return false;
+	}
 
 	res = chamelium_rpc(chamelium, port, "HasAudioSupport", "(i)", port->id);
 	xmlrpc_read_bool(&chamelium->env, res, &has_support);
