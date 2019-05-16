@@ -127,7 +127,6 @@ static const struct {
 				BYTES_PP_4 = 4} bpp;
 	uint32_t	value;
 } fillers[] = {
-	{ DRM_FORMAT_C8, 0, BYTES_PP_1, 0xff},
 	{ DRM_FORMAT_XBGR2101010, 0, BYTES_PP_4, 0xffffffff},
 	{ 0, 0, 0, 0 }
 };
