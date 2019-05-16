@@ -443,6 +443,9 @@ while (<>) {
 	} elsif ($tp_name eq 'dma_fence:dma_fence_signaled:') {
 		my $nkey;
 
+		next unless $tp{'driver'} eq 'i915' and
+			    $tp{'timeline'} eq 'signaled';
+
 		$nkey = notify_key($tp{'context'}, $tp{'seqno'});
 
 		die if exists $notify{$nkey};
