@@ -36,6 +36,8 @@
 #include "igt_core.h"
 
 #define FREQS_MAX 64
+#define CHANNELS_MAX 8
+#define SYNTHESIZE_AMPLITUDE 0.9
 
 /**
  * SECTION:igt_audio
@@ -76,6 +78,8 @@ struct audio_signal {
 struct audio_signal *audio_signal_init(int channels, int sampling_rate)
 {
 	struct audio_signal *signal;
+
+	igt_assert(channels <= CHANNELS_MAX);
 
 	signal = malloc(sizeof(struct audio_signal));
 	memset(signal, 0, sizeof(struct audio_signal));
@@ -156,7 +160,7 @@ void audio_signal_synthesize(struct audio_signal *signal)
 
 		for (j = 0; j < period_len; j++) {
 			value = 2.0 * M_PI * freq / signal->sampling_rate * j;
-			value = sin(value) / signal->freqs_count;
+			value = sin(value) * SYNTHESIZE_AMPLITUDE;
 
 			period[j] = value;
 		}
@@ -195,6 +199,20 @@ void audio_signal_reset(struct audio_signal *signal)
 	signal->freqs_count = 0;
 }
 
+static size_t audio_signal_count_freqs(struct audio_signal *signal, int channel)
+{
+	size_t n, i;
+	struct audio_signal_freq *freq;
+
+	for (i = 0; i < signal->freqs_count; i++) {
+		freq = &signal->freqs[i];
+		if (freq->channel < 0 || freq->channel == channel)
+			n++;
+	}
+
+	return n;
+}
+
 /**
  * audio_signal_fill:
  * @signal: The target signal structure
@@ -208,13 +226,17 @@ void audio_signal_reset(struct audio_signal *signal)
 void audio_signal_fill(struct audio_signal *signal, double *buffer,
 		       size_t samples)
 {
-	double *destination, *source;
+	double *dst, *src;
 	struct audio_signal_freq *freq;
 	int total;
 	int count;
 	int i, j, k;
+	size_t freqs_per_channel[CHANNELS_MAX];
 
 	memset(buffer, 0, sizeof(double) * signal->channels * samples);
+
+	for (i = 0; i < signal->channels; i++)
+		freqs_per_channel[i] = audio_signal_count_freqs(signal, i);
 
 	for (i = 0; i < signal->freqs_count; i++) {
 		freq = &signal->freqs[i];
@@ -223,8 +245,8 @@ void audio_signal_fill(struct audio_signal *signal, double *buffer,
 		igt_assert(freq->period);
 
 		while (total < samples) {
-			source = freq->period + freq->offset;
-			destination = buffer + total * signal->channels;
+			src = freq->period + freq->offset;
+			dst = buffer + total * signal->channels;
 
 			count = freq->period_len - freq->offset;
 			if (count > samples - total)
@@ -238,7 +260,8 @@ void audio_signal_fill(struct audio_signal *signal, double *buffer,
 					if (freq->channel >= 0 &&
 					    freq->channel != k)
 						continue;
-					destination[j * signal->channels + k] += source[j];
+					dst[j * signal->channels + k] +=
+						src[j] / freqs_per_channel[k];
 				}
 			}
 
