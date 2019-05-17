@@ -38,6 +38,7 @@
 #define FREQS_MAX 64
 #define CHANNELS_MAX 8
 #define SYNTHESIZE_AMPLITUDE 0.9
+#define SYNTHESIZE_ACCURACY 0.2
 
 /**
  * SECTION:igt_audio
@@ -213,6 +214,34 @@ static size_t audio_signal_count_freqs(struct audio_signal *signal, int channel)
 	return n;
 }
 
+/** audio_sanity_check:
+ *
+ * Make sure our generated signal is not messed up. In particular, make sure
+ * the maximum reaches a reasonable value but doesn't exceed our
+ * SYNTHESIZE_AMPLITUDE limit. Same for the minimum.
+ *
+ * We want the signal to be powerful enough to be able to hear something. We
+ * want the signal not to reach 1.0 so that we're sure it won't get capped by
+ * the audio card or the receiver.
+ */
+static void audio_sanity_check(double *samples, size_t samples_len)
+{
+	size_t i;
+	double min = 0, max = 0;
+
+	for (i = 0; i < samples_len; i++) {
+		if (samples[i] < min)
+			min = samples[i];
+		if (samples[i] > max)
+			max = samples[i];
+	}
+
+	igt_assert(-SYNTHESIZE_AMPLITUDE <= min);
+	igt_assert(min <= -SYNTHESIZE_AMPLITUDE + SYNTHESIZE_ACCURACY);
+	igt_assert(SYNTHESIZE_AMPLITUDE - SYNTHESIZE_ACCURACY <= max);
+	igt_assert(max <= SYNTHESIZE_AMPLITUDE);
+}
+
 /**
  * audio_signal_fill:
  * @signal: The target signal structure
@@ -268,6 +297,8 @@ void audio_signal_fill(struct audio_signal *signal, double *buffer,
 			total += count;
 		}
 	}
+
+	audio_sanity_check(buffer, signal->channels * samples);
 }
 
 void audio_signal_fill_s16_le(struct audio_signal *signal, int16_t *buffer,
