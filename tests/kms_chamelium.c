@@ -785,12 +785,20 @@ static int test_sampling_rates[] = {
 
 static int test_sampling_rates_count = sizeof(test_sampling_rates) / sizeof(int);
 
+/* Test frequencies (Hz): a sine signal will be generated for each.
+ *
+ * Depending on the sampling rate chosen, it might not be possible to properly
+ * detect the generated sine (see Nyquist–Shannon sampling theorem).
+ * Frequencies that can't be reliably detected will be automatically pruned in
+ * #audio_signal_add_frequency. For instance, the 80KHz frequency can only be
+ * tested with a 192KHz sampling rate.
+ */
 static int test_frequencies[] = {
 	300,
 	600,
 	1200,
-	80000,
 	10000,
+	80000,
 };
 
 static int test_frequencies_count = sizeof(test_frequencies) / sizeof(int);
