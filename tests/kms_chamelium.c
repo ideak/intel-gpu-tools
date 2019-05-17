@@ -1077,6 +1077,17 @@ static bool test_audio_configuration(struct alsa *alsa, snd_pcm_format_t format,
 			  sampling_rate, channels);
 		return false;
 	}
+	/* TODO: the Chamelium device sends a malformed signal for some audio
+	 * configurations. See crbug.com/950917 */
+	if ((format != SND_PCM_FORMAT_S16_LE && sampling_rate >= 44100) ||
+			channels > 2) {
+		igt_debug("Skipping test with format %s, sampling rate %d Hz "
+			  "and %d channels because the Chamelium device "
+			  "doesn't support this configuration\n",
+			  snd_pcm_format_name(format),
+			  sampling_rate, channels);
+		return false;
+	}
 	return true;
 }
 
