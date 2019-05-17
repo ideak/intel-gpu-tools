@@ -924,7 +924,14 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 
 	/* Needs to be a multiple of 128, because that's the number of samples
 	 * we get per channel each time we receive an audio page from the
-	 * Chamelium device. */
+	 * Chamelium device.
+	 *
+	 * Additionally, this value needs to be high enough to guarantee we
+	 * capture a full period of each sine we generate. If we capture 2048
+	 * samples at a 192KHz sampling rate, we get a full period for a >94Hz
+	 * sines. For lower sampling rates, the capture duration will be
+	 * longer.
+	 */
 	channel_len = CAPTURE_SAMPLES;
 	channel = malloc(sizeof(double) * channel_len);
 
