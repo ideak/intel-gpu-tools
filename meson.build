@@ -210,7 +210,7 @@ if _build_chamelium
 		xmlrpc_client,
 		gsl,
 		alsa,
-	], required : _chamelium_required)
+	])
 	if xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found() and gsl.found() and alsa.found() and libcurl.found()
 		config.set('HAVE_CHAMELIUM', 1)
 		chameliuminfo = 'Yes'
