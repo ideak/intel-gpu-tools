@@ -30,6 +30,22 @@
 
 IGT_TEST_DESCRIPTION("Tests 4K and audio HDMI injection.");
 
+/**
+ * This collection of tests performs EDID and status injection tests. Injection
+ * forces a given EDID and status on a connector. The kernel will parse the
+ * forced EDID and we will check whether correct metadata is exposed to
+ * userspace.
+ *
+ * Currently, this can be used to test:
+ *
+ * - 4K modes exposed via KMS
+ * - Audio capabilities of the monitor exposed via ALSA. EDID-Like Data (ELD)
+ *   entries in /proc/asound are verified.
+ *
+ * Injection is performed on a disconnected connector.
+ */
+
+/** get_connector: get the first disconnected HDMI connector */
 static drmModeConnector *
 get_connector(int drm_fd, drmModeRes *res)
 {
@@ -118,6 +134,7 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 	free(edid);
 }
 
+/** eld_entry_is_igt: checks whether an ELD entry is mapped to the IGT EDID */
 static bool
 eld_entry_is_igt(const char* path)
 {
@@ -154,6 +171,8 @@ eld_entry_is_igt(const char* path)
 	return false;
 }
 
+/** eld_is_valid: check whether ALSA has detected the audio-capable IGT EDID by
+ * parsing ELD entries */
 static bool
 eld_is_valid(void)
 {
