@@ -1033,6 +1033,12 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 
 	alsa_close_output(alsa);
 
+	igt_debug("Audio test result for format %s, sampling rate %d Hz and "
+		  "%d channels: %s\n",
+		  snd_pcm_format_name(playback_format),
+		  playback_rate, playback_channels,
+		  success ? "ALL GREEN" : "FAILED");
+
 	if (dump_fd >= 0) {
 		close(dump_fd);
 		if (success) {
