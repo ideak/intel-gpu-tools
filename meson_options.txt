@@ -1,7 +1,5 @@
 option('build_overlay',
-       type : 'combo',
-       value : 'auto',
-       choices : ['auto', 'true', 'false'],
+       type : 'feature',
        description : 'Build overlay')
 
 option('overlay_backends',
@@ -11,33 +9,23 @@ option('overlay_backends',
        description : 'Overlay backends to enable')
 
 option('build_chamelium',
-       type : 'combo',
-       value : 'auto',
-       choices : ['auto', 'true', 'false'],
+       type : 'feature',
        description : 'Build chamelium test')
 
 option('with_valgrind',
-       type : 'combo',
-       value : 'auto',
-       choices : ['auto', 'true', 'false'],
+       type : 'feature',
        description : 'Build with support for valgrind annotations')
 
 option('build_man',
-       type : 'combo',
-       value : 'auto',
-       choices : ['auto', 'true', 'false'],
+       type : 'feature',
        description : 'Build man pages')
 
 option('build_docs',
-       type : 'combo',
-       value : 'auto',
-       choices : ['auto', 'true', 'false'],
+       type : 'feature',
        description : 'Build documentation')
 
 option('build_tests',
-       type : 'combo',
-       value : 'auto',
-       choices : ['auto', 'true', 'false'],
+       type : 'feature',
        description : 'Build tests')
 
 option('with_libdrm',
@@ -47,15 +35,11 @@ option('with_libdrm',
        description : 'libdrm libraries to be used')
 
 option('with_libunwind',
-       type : 'combo',
-       value : 'auto',
-       choices : ['auto', 'true', 'false'],
+       type : 'feature',
        description : 'Use libunwind')
 
 option('build_runner',
-       type : 'combo',
-       value : 'auto',
-       choices : ['auto', 'true', 'false'],
+       type : 'feature',
        description : 'Build test runner')
 
 option('use_rpath',

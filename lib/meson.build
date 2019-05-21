@@ -105,7 +105,7 @@ if alsa.found()
 	lib_sources += 'igt_alsa.c'
 endif
 
-if chamelium_found
+if chamelium.found()
 	lib_deps += chamelium
 	lib_sources += 'igt_chamelium.c'
 	lib_sources += 'igt_chamelium_stream.c'

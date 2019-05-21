@@ -38,7 +38,7 @@ RUN dnf install -y clang
 
 # Meson version switching shenanigans
 WORKDIR /usr/src
-RUN curl -O https://files.pythonhosted.org/packages/17/d0/0fe98a9557a2f07dbe6f99ef57f2bc37450b641e1f6ceae9ce04c3c845dd/meson-0.46.0.tar.gz
+RUN curl -O https://files.pythonhosted.org/packages/c0/9b/44cdb8adcbb186be6cba5c93718d0c68f177b0e8082ae00cafa63a1d3535/meson-0.47.0.tar.gz
 
 # Cleanup workdir
 WORKDIR /

@@ -7,7 +7,7 @@ project('igt-gpu-tools', 'c',
           'buildtype=debugoptimized',
         ],
 	license : 'MIT',
-	meson_version : '>=0.46.0')
+	meson_version : '>=0.47.0')
 
 if get_option('b_ndebug') != 'false'
 	error('Building without -Db_ndebug=false is not supported')
@@ -77,42 +77,10 @@ foreach cc_arg : cc_args
   endif
 endforeach
 
-_build_overlay = false
-_overlay_required = false
-_build_man = false
-_man_required = false
-_build_chamelium = false
-_chamelium_required = false
-_build_docs = false
-_docs_required = false
-_build_tests = false
-_tests_required = false
-_build_runner = false
-_runner_required = false
-
-build_overlay = get_option('build_overlay')
-overlay_backends = get_option('overlay_backends')
-build_man = get_option('build_man')
-with_valgrind = get_option('with_valgrind')
 build_chamelium = get_option('build_chamelium')
 build_docs = get_option('build_docs')
-build_tests = get_option('build_tests')
+build_tests = not get_option('build_tests').disabled()
 with_libdrm = get_option('with_libdrm')
-with_libunwind = get_option('with_libunwind')
-build_runner = get_option('build_runner')
-
-_build_overlay = build_overlay != 'false'
-_overlay_required = build_overlay == 'true'
-_build_man = build_man != 'false'
-_man_required = build_man == 'true'
-_build_chamelium = build_chamelium != 'false'
-_chamelium_required = build_chamelium == 'true'
-_build_docs = build_docs != 'false'
-_docs_required = build_docs == 'true'
-_build_tests = build_tests != 'false'
-_tests_required = build_tests == 'true'
-_build_runner = build_runner != 'false'
-_runner_required = build_runner == 'true'
 
 build_info = ['Build type: ' + get_option('buildtype')]
 
@@ -150,29 +118,17 @@ pciaccess = dependency('pciaccess', version : '>=0.10')
 libkmod = dependency('libkmod')
 libprocps = dependency('libprocps', required : true)
 
-libunwind = null_dep
-libunwindinfo = 'No'
-if with_libunwind != 'false'
-	libunwind = dependency('libunwind', required : with_libunwind == 'true')
-	if libunwind.found()
-		libunwindinfo = 'Yes'
-	endif
-endif
-build_info += 'With libunwind: ' + libunwindinfo
+libunwind = dependency('libunwind', required : get_option('with_libunwind'))
+build_info += 'With libunwind: @0@'.format(libunwind.found())
 
 libdw = dependency('libdw', required : true)
 pixman = dependency('pixman-1', required : true)
 
-valgrind = null_dep
-valgrindinfo = 'No'
-if with_valgrind != 'false'
-	valgrind = dependency('valgrind', required : with_valgrind == 'true')
-	if valgrind.found()
-		config.set('HAVE_VALGRIND', 1)
-		valgrindinfo = 'Yes'
-	endif
+valgrind = dependency('valgrind', required : get_option('with_valgrind'))
+if valgrind.found()
+	config.set('HAVE_VALGRIND', 1)
 endif
-build_info += 'Valgrind annotations: ' + valgrindinfo
+build_info += 'Valgrind annotations: @0@'.format(valgrind.found())
 
 cairo = dependency('cairo', version : '>1.12.0', required : true)
 libudev = dependency('libudev', required : true)
@@ -195,15 +151,16 @@ if not xmlrpc.found() and xmlrpc_cmd.found()
 	endif
 endif
 
-gsl = null_dep
-alsa = null_dep
-chamelium = null_dep
-chamelium_found = false # TODO: use a disabler object instead
-chameliuminfo = 'No'
-if _build_chamelium
-	gsl = dependency('gsl', required : _chamelium_required)
-	alsa = dependency('alsa', required : _chamelium_required)
-	libcurl = dependency('libcurl', required : _chamelium_required)
+if build_chamelium.enabled() and not (xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found())
+	error('Chamelium build forced and required dependency xmlrpc not found')
+endif
+
+gsl = dependency('gsl', required : build_chamelium)
+alsa = dependency('alsa', required : build_chamelium)
+libcurl = dependency('libcurl', required : build_chamelium)
+
+if xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found() and gsl.found() and alsa.found() and libcurl.found()
+	config.set('HAVE_CHAMELIUM', 1)
 	chamelium = declare_dependency(dependencies : [
 		xmlrpc,
 		xmlrpc_util,
@@ -211,13 +168,11 @@ if _build_chamelium
 		gsl,
 		alsa,
 	])
-	if xmlrpc.found() and xmlrpc_util.found() and xmlrpc_client.found() and gsl.found() and alsa.found() and libcurl.found()
-		config.set('HAVE_CHAMELIUM', 1)
-		chameliuminfo = 'Yes'
-		chamelium_found = true
-	endif
+else
+	chamelium = disabler()
 endif
-build_info += 'Build Chamelium test: ' + chameliuminfo
+
+build_info += 'Build Chamelium test: @0@'.format(chamelium.found())
 
 pthreads = dependency('threads')
 math = cc.find_library('m')
@@ -319,12 +274,11 @@ else
 endif
 
 subdir('lib')
-if _build_tests
+if build_tests
 	subdir('tests')
-	build_info += 'Build tests: Yes'
-else
-	build_info += 'Build tests: No'
 endif
+build_info += 'Build tests: @0@'.format(build_tests)
+
 subdir('benchmarks')
 subdir('tools')
 subdir('runner')
@@ -334,18 +288,13 @@ endif
 subdir('overlay')
 subdir('man')
 
-gtk_doc = dependency('gtk-doc', required : _docs_required)
-
-docs_info = 'No'
-if _build_docs
-	if _build_tests and gtk_doc.found()
-		subdir('docs')
-		docs_info = 'Yes'
-	elif _docs_required
-		error('Documentation requires building tests')
-	endif
+gtk_doc = dependency('gtk-doc', required : build_docs)
+if build_tests and gtk_doc.found()
+	subdir('docs')
+elif build_docs.enabled()
+	error('Documentation requires building tests')
 endif
-build_info += 'Build documentation: ' + docs_info
+build_info += 'Build documentation: @0@'.format(build_tests and gtk_doc.found())
 
 message('Build options')
 message('=============')

@@ -1,3 +1,6 @@
+build_overlay = get_option('build_overlay')
+overlay_backends = get_option('overlay_backends')
+
 gpu_overlay_src = [
 	'chart.c',
 	'config.c',
@@ -18,7 +21,7 @@ xv_backend_required = false
 xlib_backend_required = false
 build_xv_backend = overlay_backends.contains('xv') or overlay_backends.contains('auto')
 build_xlib_backend = overlay_backends.contains('x') or overlay_backends.contains('auto')
-if _overlay_required
+if build_overlay.enabled()
 	xv_backend_required = overlay_backends.contains('xv')
 	xlib_backend_required = overlay_backends.contains('x')
 endif
@@ -30,7 +33,7 @@ dri2proto = dependency('dri2proto',
 		       version : '>= 2.6',
 		       required : xv_backend_required or xlib_backend_required)
 cairo_xlib = dependency('cairo-xlib', required : xlib_backend_required)
-xrandr = dependency('xrandr', version : '>=1.3', required : _overlay_required)
+xrandr = dependency('xrandr', version : '>=1.3', required : build_overlay)
 
 gpu_overlay_deps = [ realtime, math, cairo, pciaccess, libdrm,
 	libdrm_intel, lib_igt_perf ]
@@ -70,7 +73,7 @@ gpu_overlay_src += both_x11_src
 
 gpu_overlay_src += 'kms/kms-overlay.c'
 
-leg = find_program('leg', required : _overlay_required)
+leg = find_program('leg', required : build_overlay)
 if leg.found()
 	leg_file = custom_target('tracepoint_format',
 		output: 'tracepoint_format.h',
@@ -81,17 +84,17 @@ else
 	message('WARNING: leg command not found, disabling overlay; try : apt-get install peg')
 endif
 
-if _build_overlay and ['x86', 'x86_64'].contains(host_machine.cpu_family()) and libdrm_intel.found() and leg.found() and xrandr.found() and cairo.found() and (with_xlib_backend or with_xv_backend)
+if not build_overlay.disabled() and ['x86', 'x86_64'].contains(host_machine.cpu_family()) and libdrm_intel.found() and leg.found() and xrandr.found() and cairo.found() and (with_xlib_backend or with_xv_backend)
 	executable('intel-gpu-overlay', gpu_overlay_src,
 			include_directories : inc,
 			c_args : gpu_overlay_cflags,
 			dependencies : gpu_overlay_deps,
 			install : true)
-	build_info += 'Build overlay: Yes'
+	build_info += 'Build overlay: true'
 	build_info += 'Overlay backends: ' + ','.join(backends_strings)
 else
-	if _overlay_required
+	if build_overlay.enabled()
 		error('Cannot build overlay due to missing dependencies')
 	endif
-	build_info += 'Build overlay: No'
+	build_info += 'Build overlay: false'
 endif

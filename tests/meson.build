@@ -244,7 +244,7 @@ if libdrm_nouveau.found()
 	test_deps += libdrm_nouveau
 endif
 
-if chamelium_found
+if chamelium.found()
 	test_progs += [
 		'kms_chamelium',
 	]

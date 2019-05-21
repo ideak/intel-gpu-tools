@@ -1,3 +1,5 @@
+build_man = get_option('build_man')
+
 manpages = [
 	'intel_aubdump',
 	'intel_audio_dump',
@@ -22,10 +24,10 @@ defs_rst = configure_file(input : 'defs.rst.in',
 		output : 'defs.rst',
 		configuration : config)
 
-rst2man = find_program('rst2man-3', 'rst2man', required : _man_required)
+rst2man = find_program('rst2man-3', 'rst2man', required : build_man)
 rst2man_script = find_program('rst2man.sh')
 
-if _build_man and rst2man.found()
+if rst2man.found()
 	foreach manpage : manpages
 		custom_target(manpage + '.1',
 				build_by_default : true,
@@ -36,10 +38,10 @@ if _build_man and rst2man.found()
 				install : true,
 				install_dir : join_paths(mandir, 'man1'))
 	endforeach
-	build_info += 'Build man pages: Yes'
+	build_info += 'Build man pages: true'
 else
 	if _man_required
 		error('Cannot build man pages due to missing dependencies')
 	endif
-	build_info += 'Build man pages: No'
+	build_info += 'Build man pages: false'
 endif
