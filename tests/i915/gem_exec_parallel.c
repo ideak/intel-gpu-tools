@@ -149,7 +149,7 @@ static void *thread(void *data)
 	return NULL;
 }
 
-static void all(int fd, unsigned engine, unsigned flags)
+static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	pthread_mutex_t mutex;
@@ -170,15 +170,15 @@ static void all(int fd, unsigned engine, unsigned flags)
 	}
 
 	nengine = 0;
-	if (engine == ALL_ENGINES) {
-		for_each_physical_engine(fd, engine) {
-			if (gem_can_store_dword(fd, engine))
-				engines[nengine++] = engine;
+	if (!engine) {
+		struct intel_execution_engine2 *e;
+		__for_each_physical_engine(fd, e) {
+			if (gem_class_can_store_dword(fd, e->class))
+				engines[nengine++] = e->flags;
 		}
 	} else {
-		igt_require(gem_has_ring(fd, engine));
-		igt_require(gem_can_store_dword(fd, engine));
-		engines[nengine++] = engine;
+		igt_require(gem_class_can_store_dword(fd, engine->class));
+		engines[nengine++] = engine->flags;
 	}
 	igt_require(nengine);
 
@@ -229,6 +229,8 @@ static void all(int fd, unsigned engine, unsigned flags)
 
 igt_main
 {
+	struct intel_execution_engine2 *e;
+
 	const struct mode {
 		const char *name;
 		unsigned flags;
@@ -249,16 +251,16 @@ igt_main
 
 	for (const struct mode *m = modes; m->name; m++)
 		igt_subtest_f("%s", *m->name ? m->name : "basic")
-			all(fd, ALL_ENGINES, m->flags);
+			/* NULL value means all engines */
+			all(fd, NULL, m->flags);
 
-	for (const struct intel_execution_engine *e = intel_execution_engines;
-	     e->name; e++) {
+	__for_each_physical_engine(fd, e) {
 		for (const struct mode *m = modes; m->name; m++)
 			igt_subtest_f("%s%s%s",
 				      e->name,
 				      *m->name ? "-" : "",
 				      m->name)
-				all(fd, e->exec_id | e->flags, m->flags);
+				all(fd, e, m->flags);
 	}
 
 	igt_fixture {
