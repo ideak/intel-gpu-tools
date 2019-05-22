@@ -552,6 +552,26 @@ fill_engines_id_class(enum intel_engine_id *list,
 	}
 }
 
+static unsigned int
+find_physical_instance(enum intel_engine_id class, unsigned int logical)
+{
+	unsigned int i, j = 0;
+
+	igt_assert(class == VCS);
+
+	for (i = 0; i < __num_engines; i++) {
+		if (__engines[i].engine_class != I915_ENGINE_CLASS_VIDEO)
+			continue;
+
+		/* Map logical to physical instances. */
+		if (logical == j++)
+			return __engines[i].engine_instance;
+	}
+
+	igt_assert(0);
+	return 0;
+}
+
 static struct i915_engine_class_instance
 get_engine(enum intel_engine_id engine)
 {
@@ -571,7 +591,7 @@ get_engine(enum intel_engine_id engine)
 	case VCS1:
 	case VCS2:
 		ci.engine_class = I915_ENGINE_CLASS_VIDEO;
-		ci.engine_instance = engine - VCS1;
+		ci.engine_instance = find_physical_instance(VCS, engine - VCS1);
 		break;
 	case VECS:
 		ci.engine_class = I915_ENGINE_CLASS_VIDEO_ENHANCE;
