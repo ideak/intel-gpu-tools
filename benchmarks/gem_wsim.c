@@ -87,6 +87,7 @@ enum w_type
 	LOAD_BALANCE,
 	BOND,
 	TERMINATE,
+	SSEU
 };
 
 struct deps
@@ -136,6 +137,7 @@ struct w_step
 			uint64_t bond_mask;
 			enum intel_engine_id bond_master;
 		};
+		int sseu;
 	};
 
 	/* Implementation details */
@@ -171,6 +173,7 @@ struct ctx {
 	bool targets_instance;
 	bool wants_balance;
 	unsigned int static_vcs;
+	uint64_t sseu;
 };
 
 struct workload
@@ -241,6 +244,9 @@ static unsigned int context_vcs_rr;
 
 static int verbose = 1;
 static int fd;
+static struct drm_i915_gem_context_param_sseu device_sseu = {
+	.slice_mask = -1 /* Force read on first use. */
+};
 
 #define SWAPVCS		(1<<0)
 #define SEQNO		(1<<1)
@@ -482,6 +488,27 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				int_field(SYNC, target,
 					  tmp >= 0 || ((int)nr_steps + tmp) < 0,
 					  "Invalid sync target at step %u!\n");
+			} else if (!strcmp(field, "S")) {
+				unsigned int nr = 0;
+				while ((field = strtok_r(fstart, ".", &fctx))) {
+					tmp = atoi(field);
+					check_arg(tmp <= 0 && nr == 0,
+						  "Invalid context at step %u!\n",
+						  nr_steps);
+					check_arg(nr > 1,
+						  "Invalid SSEU format at step %u!\n",
+						  nr_steps);
+
+					if (nr == 0)
+						step.context = tmp;
+					else if (nr == 1)
+						step.sseu = tmp;
+
+					nr++;
+				}
+
+				step.type = SSEU;
+				goto add_step;
 			} else if (!strcmp(field, "t")) {
 				int_field(THROTTLE, throttle,
 					  tmp < 0,
@@ -1141,24 +1168,38 @@ find_engine(struct i915_engine_class_instance *ci, unsigned int count,
 	return 0;
 }
 
-static void
-set_ctx_sseu(uint32_t ctx)
+static struct drm_i915_gem_context_param_sseu get_device_sseu(void)
 {
-	struct drm_i915_gem_context_param_sseu sseu = { };
 	struct drm_i915_gem_context_param param = { };
 
-	sseu.class = I915_ENGINE_CLASS_RENDER;
-	sseu.instance = 0;
+	if (device_sseu.slice_mask == -1) {
+		param.param = I915_CONTEXT_PARAM_SSEU;
+		param.value = (uintptr_t)&device_sseu;
+
+		gem_context_get_param(fd, &param);
+	}
+
+	return device_sseu;
+}
+
+static uint64_t
+set_ctx_sseu(uint32_t ctx, uint64_t slice_mask)
+{
+	struct drm_i915_gem_context_param_sseu sseu = get_device_sseu();
+	struct drm_i915_gem_context_param param = { };
+
+	if (slice_mask == -1)
+		slice_mask = device_sseu.slice_mask;
+
+	sseu.slice_mask = slice_mask;
 
 	param.ctx_id = ctx;
 	param.param = I915_CONTEXT_PARAM_SSEU;
 	param.value = (uintptr_t)&sseu;
 
-	gem_context_get_param(fd, &param);
-
-	sseu.slice_mask = 1;
-
 	gem_context_set_param(fd, &param);
+
+	return slice_mask;
 }
 
 static int
@@ -1352,6 +1393,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 
 		igt_assert(ctx_id);
 		ctx->id = ctx_id;
+		ctx->sseu = device_sseu.slice_mask;
 
 		if (flags & GLOBAL_BALANCE) {
 			ctx->static_vcs = context_vcs_rr;
@@ -1512,8 +1554,10 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			gem_context_set_param(fd, &param);
 		}
 
-		if (wrk->sseu)
-			set_ctx_sseu(arg.ctx_id);
+		if (wrk->sseu) {
+			/* Set to slice 0 only, one slice. */
+			ctx->sseu = set_ctx_sseu(ctx_id, 1);
+		}
 
 		if (share_vm)
 			vm_destroy(fd, share_vm);
@@ -1547,6 +1591,16 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 				continue;
 
 			w2->preempt_us = w->period;
+		}
+	}
+
+	/*
+	 * Scan for SSEU control steps.
+	 */
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		if (w->type == SSEU) {
+			get_device_sseu();
+			break;
 		}
 	}
 
@@ -2484,6 +2538,13 @@ static void *run_workload(void *data)
 				   w->type == ENGINE_MAP ||
 				   w->type == LOAD_BALANCE ||
 				   w->type == BOND) {
+				continue;
+			} else if (w->type == SSEU) {
+				if (w->sseu != wrk->ctx_list[w->context].sseu) {
+					wrk->ctx_list[w->context].sseu =
+						set_ctx_sseu(wrk->ctx_list[w->context].id,
+							     w->sseu);
+				}
 				continue;
 			}
 

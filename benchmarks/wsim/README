@@ -5,7 +5,7 @@ ctx.engine.duration_us.dependency.wait,...
 <uint>.<str>.<uint>[-<uint>]|*.<int <= 0>[/<int <= 0>][...].<0|1>,...
 B.<uint>
 M.<uint>.<str>[|<str>]...
-P|X.<uint>.<int>
+P|S|X.<uint>.<int>
 d|p|s|t|q|a|T.<int>,...
 b.<uint>.<str>[|<str>].<str>
 f
@@ -30,6 +30,7 @@ Additional workload steps are also supported:
  'b' - Set up engine bonds.
  'M' - Set up engine map.
  'P' - Context priority.
+ 'S' - Context SSEU configuration.
  'T' - Terminate an infinite batch.
  'X' - Context preemption control.
 
@@ -254,3 +255,23 @@ then look like:
   1.DEFAULT.1000.f-1.0
   2.DEFAULT.1000.s-1.0
   a.-3
+
+Context SSEU configuration
+--------------------------
+
+  S.1.1
+  1.RCS.1000.0.0
+  S.2.-1
+  2.RCS.1000.0.0
+
+Context 1 is configured to run with one enabled slice (slice mask 1) and a batch
+is sumitted against it. Context 2 is configured to run with all slices (this is
+the default so the command could also be omitted) and a batch submitted against
+it.
+
+This shows the dynamic SSEU reconfiguration cost beween two contexts competing
+for the render engine.
+
+Slice mask of -1 has a special meaning of "all slices". Otherwise any integer
+can be specifying as the slice mask, but beware any apart from 1 and -1 can make
+the workload not portable between different GPUs.
