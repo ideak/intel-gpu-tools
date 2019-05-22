@@ -365,6 +365,66 @@ static int str_to_engine(const char *str)
 	return -1;
 }
 
+static unsigned int num_engines_in_class(enum intel_engine_id class)
+{
+	igt_assert(class == VCS);
+
+	return 2;
+}
+
+static void
+fill_engines_class(struct i915_engine_class_instance *ci,
+		   enum intel_engine_id class)
+{
+	igt_assert(class == VCS);
+
+	ci[0].engine_class = I915_ENGINE_CLASS_VIDEO;
+	ci[0].engine_instance = 0;
+
+	ci[1].engine_class = I915_ENGINE_CLASS_VIDEO;
+	ci[1].engine_instance = 1;
+}
+
+static void
+fill_engines_id_class(enum intel_engine_id *list,
+		      enum intel_engine_id class)
+{
+	igt_assert(class == VCS);
+
+	list[0] = VCS1;
+	list[1] = VCS2;
+}
+
+static struct i915_engine_class_instance
+get_engine(enum intel_engine_id engine)
+{
+	struct i915_engine_class_instance ci;
+
+	switch (engine) {
+	case RCS:
+		ci.engine_class = I915_ENGINE_CLASS_RENDER;
+		ci.engine_instance = 0;
+		break;
+	case BCS:
+		ci.engine_class = I915_ENGINE_CLASS_COPY;
+		ci.engine_instance = 0;
+		break;
+	case VCS1:
+	case VCS2:
+		ci.engine_class = I915_ENGINE_CLASS_VIDEO;
+		ci.engine_instance = engine - VCS1;
+		break;
+	case VECS:
+		ci.engine_class = I915_ENGINE_CLASS_VIDEO_ENHANCE;
+		ci.engine_instance = 0;
+		break;
+	default:
+		igt_assert(0);
+	};
+
+	return ci;
+}
+
 static int parse_engine_map(struct w_step *step, const char *_str)
 {
 	char *token, *tctx = NULL, *tstart = (char *)_str;
@@ -386,18 +446,16 @@ static int parse_engine_map(struct w_step *step, const char *_str)
 		    engine != RCS)
 			return -1; /* TODO */
 
-		add = engine == VCS ? 2 : 1;
+		add = engine == VCS ? num_engines_in_class(VCS) : 1;
 		step->engine_map_count += add;
 		step->engine_map = realloc(step->engine_map,
 					   step->engine_map_count *
 					   sizeof(step->engine_map[0]));
 
-		if (engine != VCS) {
-			step->engine_map[step->engine_map_count - 1] = engine;
-		} else {
-			step->engine_map[step->engine_map_count - 2] = VCS1;
-			step->engine_map[step->engine_map_count - 1] = VCS2;
-		}
+		if (engine != VCS)
+			step->engine_map[step->engine_map_count - add] = engine;
+		else
+			fill_engines_id_class(&step->engine_map[step->engine_map_count - add], VCS);
 	}
 
 	return 0;
@@ -1148,20 +1206,11 @@ static unsigned int
 find_engine(struct i915_engine_class_instance *ci, unsigned int count,
 	    enum intel_engine_id engine)
 {
-	static struct i915_engine_class_instance map[] = {
-		[RCS] = { I915_ENGINE_CLASS_RENDER, 0 },
-		[BCS] = { I915_ENGINE_CLASS_COPY, 0 },
-		[VCS1] = { I915_ENGINE_CLASS_VIDEO, 0 },
-		[VCS2] = { I915_ENGINE_CLASS_VIDEO, 1 },
-		[VECS] = { I915_ENGINE_CLASS_VIDEO_ENHANCE, 0 },
-	};
+	struct i915_engine_class_instance e = get_engine(engine);
 	unsigned int i;
 
-	igt_assert(engine < ARRAY_SIZE(map));
-	igt_assert(engine == RCS || map[engine].engine_class);
-
 	for (i = 0; i < count; i++, ci++) {
-		if (!memcmp(&map[engine], ci, sizeof(*ci)))
+		if (!memcmp(&e, ci, sizeof(*ci)))
 			return i;
 	}
 
@@ -1465,19 +1514,9 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 				load_balance.num_siblings =
 					ctx->engine_map_count;
 
-				for (j = 0; j < ctx->engine_map_count; j++) {
-					if (ctx->engine_map[j] == RCS) {
-						load_balance.engines[j].engine_class =
-							I915_ENGINE_CLASS_RENDER;
-						load_balance.engines[j].engine_instance =
-							0; /* FIXME */
-					} else {
-						load_balance.engines[j].engine_class =
-							I915_ENGINE_CLASS_VIDEO; /* FIXME */
-						load_balance.engines[j].engine_instance =
-							ctx->engine_map[j] - VCS1; /* FIXME */
-					}
-				}
+				for (j = 0; j < ctx->engine_map_count; j++)
+					load_balance.engines[j] =
+						get_engine(ctx->engine_map[j]);
 			} else {
 				set_engines.extensions = 0;
 			}
@@ -1488,18 +1527,9 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			set_engines.engines[0].engine_instance =
 				I915_ENGINE_CLASS_INVALID_NONE;
 
-			for (j = 1; j <= ctx->engine_map_count; j++) {
-				if (ctx->engine_map[j - 1] == RCS) {
-					set_engines.engines[j].engine_class =
-						I915_ENGINE_CLASS_RENDER;
-					set_engines.engines[j].engine_instance = 0; /* FIXME */
-				} else {
-					set_engines.engines[j].engine_class =
-						I915_ENGINE_CLASS_VIDEO; /* FIXME */
-					set_engines.engines[j].engine_instance =
-						ctx->engine_map[j - 1] - VCS1; /* FIXME */
-				}
-			}
+			for (j = 1; j <= ctx->engine_map_count; j++)
+				set_engines.engines[j] =
+					get_engine(ctx->engine_map[j - 1]);
 
 			for (j = 0; j < ctx->bond_count; j++) {
 				unsigned long mask = ctx->bonds[j].mask;
@@ -1522,10 +1552,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 
 				p->base.name = I915_CONTEXT_ENGINES_EXT_BOND;
 				p->virtual_index = 0;
-				p->master.engine_class =
-					I915_ENGINE_CLASS_VIDEO;
-				p->master.engine_instance =
-					ctx->bonds[j].master - VCS1;
+				p->master = get_engine(ctx->bonds[j].master);
 
 				for (b = 0, e = 0; mask; e++, mask >>= 1) {
 					unsigned int idx;
@@ -1543,34 +1570,32 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 
 			gem_context_set_param(fd, &param);
 		} else if (ctx->wants_balance) {
-			I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(load_balance, 2) = {
-				.base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE,
-				.num_siblings = 2,
-				.engines = {
-					{ .engine_class = I915_ENGINE_CLASS_VIDEO,
-					  .engine_instance = 0 },
-					{ .engine_class = I915_ENGINE_CLASS_VIDEO,
-					  .engine_instance = 1 },
-				},
-			};
-			I915_DEFINE_CONTEXT_PARAM_ENGINES(set_engines, 3) = {
-				.extensions = to_user_pointer(&load_balance),
-				.engines = {
-					{ .engine_class = I915_ENGINE_CLASS_INVALID,
-					  .engine_instance = I915_ENGINE_CLASS_INVALID_NONE },
-					{ .engine_class = I915_ENGINE_CLASS_VIDEO,
-					  .engine_instance = 0 },
-					{ .engine_class = I915_ENGINE_CLASS_VIDEO,
-					  .engine_instance = 1 },
-				},
-			};
-
+			const unsigned int count = num_engines_in_class(VCS);
+			I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(load_balance,
+								 count);
+			I915_DEFINE_CONTEXT_PARAM_ENGINES(set_engines,
+							  count + 1);
 			struct drm_i915_gem_context_param param = {
 				.ctx_id = ctx_id,
 				.param = I915_CONTEXT_PARAM_ENGINES,
 				.size = sizeof(set_engines),
 				.value = to_user_pointer(&set_engines),
 			};
+
+			set_engines.extensions = to_user_pointer(&load_balance);
+
+			set_engines.engines[0].engine_class =
+				I915_ENGINE_CLASS_INVALID;
+			set_engines.engines[0].engine_instance =
+				I915_ENGINE_CLASS_INVALID_NONE;
+			fill_engines_class(&set_engines.engines[1], VCS);
+
+			memset(&load_balance, 0, sizeof(load_balance));
+			load_balance.base.name =
+				I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
+			load_balance.num_siblings = count;
+
+			fill_engines_class(&load_balance.engines[0], VCS);
 
 			gem_context_set_param(fd, &param);
 		}
