@@ -73,7 +73,7 @@ emit_recursive_batch(igt_spin_t *spin,
 		     int fd, const struct igt_spin_factory *opts)
 {
 #define SCRATCH 0
-#define BATCH 1
+#define BATCH IGT_SPIN_BATCH
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_relocation_entry relocs[2], *r;
 	struct drm_i915_gem_execbuffer2 *execbuf;
@@ -262,12 +262,11 @@ emit_recursive_batch(igt_spin_t *spin,
 	igt_assert_lt(cs - batch, BATCH_SIZE / sizeof(*cs));
 
 	/* Make it easier for callers to resubmit. */
-
-	obj[BATCH].relocation_count = 0;
-	obj[BATCH].relocs_ptr = 0;
-
-	obj[SCRATCH].flags = EXEC_OBJECT_PINNED;
-	obj[BATCH].flags = EXEC_OBJECT_PINNED;
+	for (i = 0; i < ARRAY_SIZE(spin->obj); i++) {
+		spin->obj[i].relocation_count = 0;
+		spin->obj[i].relocs_ptr = 0;
+		spin->obj[i].flags = EXEC_OBJECT_PINNED;
+	}
 
 	spin->cmd_precondition = *spin->condition;
 

@@ -234,7 +234,7 @@ static void independent(int fd, unsigned int engine)
 		} else {
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
-				.buffers_ptr = to_user_pointer(&spin->obj[1]),
+				.buffers_ptr = to_user_pointer(&spin->obj[IGT_SPIN_BATCH]),
 				.flags = other,
 			};
 			gem_execbuf(fd, &eb);
@@ -537,7 +537,8 @@ static void semaphore_resolve(int i915)
 
 		/* Then cancel the spinner */
 		*cs++ = MI_STORE_DWORD_IMM;
-		*cs++ = spin->obj[1].offset + offset_in_page(spin->condition);
+		*cs++ = spin->obj[IGT_SPIN_BATCH].offset +
+			offset_in_page(spin->condition);
 		*cs++ = 0;
 		*cs++ = MI_BATCH_BUFFER_END;
 
@@ -548,7 +549,7 @@ static void semaphore_resolve(int i915)
 
 		/* First up is our spinning semaphore */
 		memset(obj, 0, sizeof(obj));
-		obj[0] = spin->obj[1];
+		obj[0] = spin->obj[IGT_SPIN_BATCH];
 		obj[1].handle = semaphore;
 		obj[1].offset = SEMAPHORE_ADDR;
 		obj[1].flags = EXEC_OBJECT_PINNED;
@@ -562,7 +563,7 @@ static void semaphore_resolve(int i915)
 		memset(obj, 0, sizeof(obj));
 		obj[0].handle = handle;
 		obj[0].flags = EXEC_OBJECT_WRITE; /* always after semaphore */
-		obj[1] = spin->obj[1];
+		obj[1] = spin->obj[IGT_SPIN_BATCH];
 		eb.buffer_count = 2;
 		eb.rsvd1 = 0;
 		gem_execbuf(i915, &eb);
@@ -638,11 +639,13 @@ static void semaphore_noskip(int i915)
 		/* Cancel the following spinner */
 		*cs++ = MI_STORE_DWORD_IMM;
 		if (gen >= 8) {
-			*cs++ = spin->obj[1].offset + offset_in_page(spin->condition);
+			*cs++ = spin->obj[IGT_SPIN_BATCH].offset +
+				offset_in_page(spin->condition);
 			*cs++ = 0;
 		} else {
 			*cs++ = 0;
-			*cs++ = spin->obj[1].offset + offset_in_page(spin->condition);
+			*cs++ = spin->obj[IGT_SPIN_BATCH].offset +
+				offset_in_page(spin->condition);
 		}
 		*cs++ = MI_BATCH_BUFFER_END;
 
@@ -651,9 +654,9 @@ static void semaphore_noskip(int i915)
 
 		/* port0: implicit semaphore from engine */
 		memset(obj, 0, sizeof(obj));
-		obj[0] = chain->obj[1];
+		obj[0] = chain->obj[IGT_SPIN_BATCH];
 		obj[0].flags |= EXEC_OBJECT_WRITE;
-		obj[1] = spin->obj[1];
+		obj[1] = spin->obj[IGT_SPIN_BATCH];
 		obj[2].handle = handle;
 		memset(&eb, 0, sizeof(eb));
 		eb.buffer_count = 3;
@@ -666,7 +669,7 @@ static void semaphore_noskip(int i915)
 		memset(obj, 0, sizeof(obj));
 		obj[0].handle = handle;
 		obj[0].flags = EXEC_OBJECT_WRITE;
-		obj[1] = spin->obj[1];
+		obj[1] = spin->obj[IGT_SPIN_BATCH];
 		memset(&eb, 0, sizeof(eb));
 		eb.buffer_count = 2;
 		eb.buffers_ptr = to_user_pointer(obj);
@@ -842,7 +845,7 @@ static igt_spin_t *__noise(int fd, uint32_t ctx, int prio, igt_spin_t *spin)
 		} else {
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
-				.buffers_ptr = to_user_pointer(&spin->obj[1]),
+				.buffers_ptr = to_user_pointer(&spin->obj[IGT_SPIN_BATCH]),
 				.rsvd1 = ctx,
 				.flags = other,
 			};

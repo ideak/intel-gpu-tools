@@ -42,6 +42,7 @@ typedef struct igt_spin {
 
 	int out_fence;
 	struct drm_i915_gem_exec_object2 obj[2];
+#define IGT_SPIN_BATCH   1
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint32_t poll_handle;
 	uint32_t *poll;

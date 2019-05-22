@@ -209,7 +209,7 @@ static void test_error_state_capture(unsigned ring_id,
 	clear_error_state();
 
 	hang = igt_hang_ctx(device, 0, ring_id, HANG_ALLOW_CAPTURE);
-	offset = hang.spin->obj[1].offset;
+	offset = hang.spin->obj[IGT_SPIN_BATCH].offset;
 
 	batch = gem_mmap__cpu(device, hang.spin->handle, 0, 4096, PROT_READ);
 	gem_set_domain(device, hang.spin->handle, I915_GEM_DOMAIN_CPU, 0);

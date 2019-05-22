@@ -360,7 +360,7 @@ static void test_evict_hang(int fd)
 	execbuf.buffer_count = 1;
 
 	hang = igt_hang_ctx(fd, 0, 0, 0);
-	expected = hang.spin->obj[1].offset;
+	expected = hang.spin->obj[IGT_SPIN_BATCH].offset;
 
 	/* Replace the hung batch with ourselves, forcing an eviction */
 	object.offset = expected;

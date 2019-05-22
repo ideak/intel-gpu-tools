@@ -79,7 +79,7 @@ static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
 
 	struct drm_i915_gem_execbuffer2 eb = {
 		.buffer_count = 1,
-		.buffers_ptr = to_user_pointer(&spin->obj[1]),
+		.buffers_ptr = to_user_pointer(&spin->obj[IGT_SPIN_BATCH]),
 		.rsvd1 = ctx1,
 	};
 
@@ -98,7 +98,7 @@ static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
 
 	igt_spin_end(spin);
 
-	gem_sync(fd, spin->obj[1].handle);
+	gem_sync(fd, spin->handle);
 
 	igt_spin_free(fd, spin);
 
