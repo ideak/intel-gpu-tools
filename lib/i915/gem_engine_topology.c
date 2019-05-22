@@ -81,7 +81,7 @@ static void ctx_map_engines(int fd, struct intel_engine_data *ed,
 			    struct drm_i915_gem_context_param *param)
 {
 	struct i915_context_param_engines *engines =
-			(struct i915_context_param_engines *) param->value;
+			from_user_pointer(param->value);
 	int i = 0;
 
 	for (typeof(engines->engines[0]) *p =
