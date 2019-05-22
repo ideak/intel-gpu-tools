@@ -589,6 +589,7 @@ const struct intel_execution_engine2 intel_execution_engines2[] = {
 	{ "bcs0", I915_ENGINE_CLASS_COPY, 0 },
 	{ "vcs0", I915_ENGINE_CLASS_VIDEO, 0 },
 	{ "vcs1", I915_ENGINE_CLASS_VIDEO, 1 },
+	{ "vcs2", I915_ENGINE_CLASS_VIDEO, 2 },
 	{ "vecs0", I915_ENGINE_CLASS_VIDEO_ENHANCE, 0 },
 	{ }
 };
