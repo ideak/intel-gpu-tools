@@ -483,7 +483,7 @@ igt_main
 					      e->class == I915_ENGINE_CLASS_RENDER
 					      ? "basic-" : "", e->name) {
 					gem_quiescent_gpu(fd);
-					basic(fd, e, false);
+					basic(fd, e, 0);
 				}
 			}
 		}
@@ -548,7 +548,7 @@ igt_main
 				      ? "basic-" : "", e->name) {
 				igt_skip_on_simulation();
 				gem_quiescent_gpu(fd);
-				basic(fd, e, true);
+				basic(fd, e, HANG);
 			}
 		}
 
