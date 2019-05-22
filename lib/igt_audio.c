@@ -328,7 +328,7 @@ void audio_signal_fill_s24_le(struct audio_signal *signal, int32_t *buffer,
 	audio_signal_fill(signal, tmp, samples);
 
 	for (i = 0; i < signal->channels * samples; ++i)
-		buffer[i] = 0xFFFFFF * tmp[i];
+		buffer[i] = 0x7FFFFF * tmp[i];
 
 	free(tmp);
 }
@@ -343,7 +343,7 @@ void audio_signal_fill_s32_le(struct audio_signal *signal, int32_t *buffer,
 	audio_signal_fill(signal, tmp, samples);
 
 	for (i = 0; i < signal->channels * samples; ++i)
-		buffer[i] = UINT32_MAX * tmp[i];
+		buffer[i] = INT32_MAX * tmp[i];
 
 	free(tmp);
 }
