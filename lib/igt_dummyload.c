@@ -39,6 +39,7 @@
 #include "ioctl_wrappers.h"
 #include "sw_sync.h"
 #include "igt_vgem.h"
+#include "i915/gem_engine_topology.h"
 #include "i915/gem_mman.h"
 
 /**
@@ -77,7 +78,7 @@ emit_recursive_batch(igt_spin_t *spin,
 	struct drm_i915_gem_relocation_entry relocs[2], *r;
 	struct drm_i915_gem_execbuffer2 *execbuf;
 	struct drm_i915_gem_exec_object2 *obj;
-	unsigned int engines[16];
+	unsigned int flags[GEM_MAX_ENGINES];
 	unsigned int nengine;
 	int fence_fd = -1;
 	uint32_t *cs, *batch;
@@ -85,17 +86,17 @@ emit_recursive_batch(igt_spin_t *spin,
 
 	nengine = 0;
 	if (opts->engine == ALL_ENGINES) {
-		unsigned int engine;
+		struct intel_execution_engine2 *engine;
 
-		for_each_physical_engine(fd, engine) {
+		for_each_context_engine(fd, opts->ctx, engine) {
 			if (opts->flags & IGT_SPIN_POLL_RUN &&
-			    !gem_can_store_dword(fd, engine))
+			    !gem_class_can_store_dword(fd, engine->class))
 				continue;
 
-			engines[nengine++] = engine;
+			flags[nengine++] = engine->flags;
 		}
 	} else {
-		engines[nengine++] = opts->engine;
+		flags[nengine++] = opts->engine;
 	}
 	igt_require(nengine);
 
@@ -237,7 +238,7 @@ emit_recursive_batch(igt_spin_t *spin,
 
 	for (i = 0; i < nengine; i++) {
 		execbuf->flags &= ~ENGINE_MASK;
-		execbuf->flags |= engines[i];
+		execbuf->flags |= flags[i];
 
 		gem_execbuf_wr(fd, execbuf);
 
@@ -316,9 +317,19 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 	igt_require_gem(fd);
 
 	if (opts->engine != ALL_ENGINES) {
-		gem_require_ring(fd, opts->engine);
+		struct intel_execution_engine2 e;
+		int class;
+
+		if (!gem_context_lookup_engine(fd, opts->engine,
+					       opts->ctx, &e)) {
+			class = e.class;
+		} else {
+			gem_require_ring(fd, opts->engine);
+			class = gem_execbuf_flags_to_engine_class(opts->engine);
+		}
+
 		if (opts->flags & IGT_SPIN_POLL_RUN)
-			igt_require(gem_can_store_dword(fd, opts->engine));
+			igt_require(gem_class_can_store_dword(fd, class));
 	}
 
 	spin = spin_create(fd, opts);
