@@ -3,6 +3,7 @@ Workload descriptor format
 
 ctx.engine.duration_us.dependency.wait,...
 <uint>.<str>.<uint>[-<uint>].<int <= 0>[/<int <= 0>][...].<0|1>,...
+M.<uint>.<str>[|<str>]...
 P|X.<uint>.<int>
 d|p|s|t|q|a.<int>,...
 f
@@ -23,10 +24,11 @@ Additional workload steps are also supported:
  'q' - Throttle to n max queue depth.
  'f' - Create a sync fence.
  'a' - Advance the previously created sync fence.
+ 'M' - Set up engine map.
  'P' - Context priority.
  'X' - Context preemption control.
 
-Engine ids: RCS, BCS, VCS, VCS1, VCS2, VECS
+Engine ids: DEFAULT, RCS, BCS, VCS, VCS1, VCS2, VECS
 
 Example (leading spaces must not be present in the actual file):
 ----------------------------------------------------------------
@@ -161,3 +163,24 @@ The same context is then marked to have batches which can be preempted every
 
 Same as with context priority, context preemption commands are valid until
 optionally overriden by another preemption control change on the same context.
+
+Engine maps
+-----------
+
+Engine maps are a per context feature which changes the way engine selection is
+done in the driver.
+
+Example:
+
+  M.1.VCS1|VCS2
+
+This sets up context 1 with an engine map containing VCS1 and VCS2 engine.
+Submission to this context can now only reference these two engines.
+
+Engine maps can also be defined based on class like VCS.
+
+Example:
+
+M.1.VCS
+
+This sets up the engine map to all available VCS class engines.

@@ -57,6 +57,7 @@
 #include "ewma.h"
 
 enum intel_engine_id {
+	DEFAULT,
 	RCS,
 	BCS,
 	VCS,
@@ -81,7 +82,8 @@ enum w_type
 	SW_FENCE,
 	SW_FENCE_SIGNAL,
 	CTX_PRIORITY,
-	PREEMPTION
+	PREEMPTION,
+	ENGINE_MAP
 };
 
 struct deps
@@ -115,6 +117,10 @@ struct w_step
 		int throttle;
 		int fence_signal;
 		int priority;
+		struct {
+			unsigned int engine_map_count;
+			enum intel_engine_id *engine_map;
+		};
 	};
 
 	/* Implementation details */
@@ -142,6 +148,8 @@ DECLARE_EWMA(uint64_t, rt, 4, 2)
 struct ctx {
 	uint32_t id;
 	int priority;
+	unsigned int engine_map_count;
+	enum intel_engine_id *engine_map;
 	bool targets_instance;
 	bool wants_balance;
 	unsigned int static_vcs;
@@ -200,10 +208,10 @@ struct workload
 		int fd;
 		bool first;
 		unsigned int num_engines;
-		unsigned int engine_map[5];
+		unsigned int engine_map[NUM_ENGINES];
 		uint64_t t_prev;
-		uint64_t prev[5];
-		double busy[5];
+		uint64_t prev[NUM_ENGINES];
+		double busy[NUM_ENGINES];
 	} busy_balancer;
 };
 
@@ -234,6 +242,7 @@ static int fd;
 #define REG(x) (volatile uint32_t *)((volatile char *)igt_global_mmio + x)
 
 static const char *ring_str_map[NUM_ENGINES] = {
+	[DEFAULT] = "DEFAULT",
 	[RCS] = "RCS",
 	[BCS] = "BCS",
 	[VCS] = "VCS",
@@ -328,6 +337,43 @@ static int str_to_engine(const char *str)
 	}
 
 	return -1;
+}
+
+static int parse_engine_map(struct w_step *step, const char *_str)
+{
+	char *token, *tctx = NULL, *tstart = (char *)_str;
+
+	while ((token = strtok_r(tstart, "|", &tctx))) {
+		enum intel_engine_id engine;
+		unsigned int add;
+
+		tstart = NULL;
+
+		if (!strcmp(token, "DEFAULT"))
+			return -1;
+
+		engine = str_to_engine(token);
+		if ((int)engine < 0)
+			return -1;
+
+		if (engine != VCS && engine != VCS1 && engine != VCS2)
+			return -1; /* TODO */
+
+		add = engine == VCS ? 2 : 1;
+		step->engine_map_count += add;
+		step->engine_map = realloc(step->engine_map,
+					   step->engine_map_count *
+					   sizeof(step->engine_map[0]));
+
+		if (engine != VCS) {
+			step->engine_map[step->engine_map_count - 1] = engine;
+		} else {
+			step->engine_map[step->engine_map_count - 2] = VCS1;
+			step->engine_map[step->engine_map_count - 1] = VCS2;
+		}
+	}
+
+	return 0;
 }
 
 static struct workload *
@@ -447,6 +493,33 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				}
 			} else if (!strcmp(field, "f")) {
 				step.type = SW_FENCE;
+				goto add_step;
+			} else if (!strcmp(field, "M")) {
+				unsigned int nr = 0;
+				while ((field = strtok_r(fstart, ".", &fctx)) !=
+				    NULL) {
+					tmp = atoi(field);
+					check_arg(nr == 0 && tmp <= 0,
+						  "Invalid context at step %u!\n",
+						  nr_steps);
+					check_arg(nr > 1,
+						  "Invalid engine map format at step %u!\n",
+						  nr_steps);
+
+					if (nr == 0) {
+						step.context = tmp;
+					} else {
+						tmp = parse_engine_map(&step,
+								       field);
+						check_arg(tmp < 0,
+							  "Invalid engine map list at step %u!\n",
+							  nr_steps);
+					}
+
+					nr++;
+				}
+
+				step.type = ENGINE_MAP;
 				goto add_step;
 			} else if (!strcmp(field, "X")) {
 				unsigned int nr = 0;
@@ -774,6 +847,7 @@ terminate_bb(struct w_step *w, unsigned int flags)
 }
 
 static const unsigned int eb_engine_map[NUM_ENGINES] = {
+	[DEFAULT] = I915_EXEC_DEFAULT,
 	[RCS] = I915_EXEC_RENDER,
 	[BCS] = I915_EXEC_BLT,
 	[VCS] = I915_EXEC_BSD,
@@ -796,11 +870,36 @@ eb_set_engine(struct drm_i915_gem_execbuffer2 *eb,
 		eb->flags = eb_engine_map[engine];
 }
 
-static void
-eb_update_flags(struct w_step *w, enum intel_engine_id engine,
-		unsigned int flags)
+static unsigned int
+find_engine_in_map(struct ctx *ctx, enum intel_engine_id engine)
 {
-	eb_set_engine(&w->eb, engine, flags);
+	unsigned int i;
+
+	for (i = 0; i < ctx->engine_map_count; i++) {
+		if (ctx->engine_map[i] == engine)
+			return i + 1;
+	}
+
+	igt_assert(0);
+	return 0;
+}
+
+static struct ctx *
+__get_ctx(struct workload *wrk, struct w_step *w)
+{
+	return &wrk->ctx_list[w->context * 2];
+}
+
+static void
+eb_update_flags(struct workload *wrk, struct w_step *w,
+		enum intel_engine_id engine, unsigned int flags)
+{
+	struct ctx *ctx = __get_ctx(wrk, w);
+
+	if (ctx->engine_map)
+		w->eb.flags = find_engine_in_map(ctx, engine);
+	else
+		eb_set_engine(&w->eb, engine, flags);
 
 	w->eb.flags |= I915_EXEC_HANDLE_LUT;
 	w->eb.flags |= I915_EXEC_NO_RELOC;
@@ -817,12 +916,6 @@ get_status_objects(struct workload *wrk)
 		return wrk->global_wrk->status_object;
 	else
 		return wrk->status_object;
-}
-
-static struct ctx *
-__get_ctx(struct workload *wrk, struct w_step *w)
-{
-	return &wrk->ctx_list[w->context * 2];
 }
 
 static uint32_t
@@ -894,7 +987,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		engine = VCS2;
 	else if (flags & SWAPVCS && engine == VCS2)
 		engine = VCS1;
-	eb_update_flags(w, engine, flags);
+	eb_update_flags(wrk, w, engine, flags);
 #ifdef DEBUG
 	printf("%u: %u:|", w->idx, w->eb.buffer_count);
 	for (i = 0; i <= j; i++)
@@ -936,7 +1029,7 @@ static void vm_destroy(int i915, uint32_t vm_id)
 	igt_assert_eq(__vm_destroy(i915, vm_id), 0);
 }
 
-static void
+static int
 prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 {
 	unsigned int ctx_vcs;
@@ -999,29 +1092,52 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	/*
 	 * Identify if contexts target specific engine instances and if they
 	 * want to be balanced.
+	 *
+	 * Transfer over engine map configuration from the workload step.
 	 */
 	for (j = 0; j < wrk->nr_ctxs; j += 2) {
 		bool targets = false;
 		bool balance = false;
 
 		for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
-			if (w->type != BATCH)
-				continue;
-
 			if (w->context != (j / 2))
 				continue;
 
-			if (w->engine == VCS)
-				balance = true;
-			else
-				targets = true;
+			if (w->type == BATCH) {
+				if (w->engine == VCS)
+					balance = true;
+				else
+					targets = true;
+			} else if (w->type == ENGINE_MAP) {
+				wrk->ctx_list[j].engine_map = w->engine_map;
+				wrk->ctx_list[j].engine_map_count =
+					w->engine_map_count;
+			}
 		}
 
-		if (flags & I915) {
-			wrk->ctx_list[j].targets_instance = targets;
+		wrk->ctx_list[j].targets_instance = targets;
+		if (flags & I915)
 			wrk->ctx_list[j].wants_balance = balance;
+	}
+
+	/*
+	 * Ensure VCS is not allowed with engine map contexts.
+	 */
+	for (j = 0; j < wrk->nr_ctxs; j += 2) {
+		for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+			if (w->context != (j / 2))
+				continue;
+
+			if (w->type != BATCH)
+				continue;
+
+			if (wrk->ctx_list[j].engine_map && w->engine == VCS) {
+				wsim_err("Batches targetting engine maps must use explicit engines!\n");
+				return -1;
+			}
 		}
 	}
+
 
 	/*
 	 * Create and configure contexts.
@@ -1033,7 +1149,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 		if (ctx->id)
 			continue;
 
-		if (flags & I915) {
+		if ((flags & I915) || ctx->engine_map) {
 			struct drm_i915_gem_context_create_ext_setparam ext = {
 				.base.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
 				.param.param = I915_CONTEXT_PARAM_VM,
@@ -1063,7 +1179,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 				break;
 			}
 
-			if (!ctx->targets_instance)
+			if (!ctx->engine_map && !ctx->targets_instance)
 				args.flags |=
 				     I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE;
 
@@ -1096,7 +1212,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 		 * both want to target specific engines and be balanced by i915?
 		 */
 		if ((flags & I915) && ctx->wants_balance &&
-		    ctx->targets_instance) {
+		    ctx->targets_instance && !ctx->engine_map) {
 			struct drm_i915_gem_context_create_ext_setparam ext = {
 				.base.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
 				.param.param = I915_CONTEXT_PARAM_VM,
@@ -1121,7 +1237,33 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			__ctx_set_prio(ctx_id, wrk->prio);
 		}
 
-		if (ctx->wants_balance) {
+		if (ctx->engine_map) {
+			I915_DEFINE_CONTEXT_PARAM_ENGINES(set_engines,
+							  ctx->engine_map_count + 1);
+			struct drm_i915_gem_context_param param = {
+				.ctx_id = ctx_id,
+				.param = I915_CONTEXT_PARAM_ENGINES,
+				.size = sizeof(set_engines),
+				.value = to_user_pointer(&set_engines),
+			};
+
+			set_engines.extensions = 0;
+
+			/* Reserve slot for virtual engine. */
+			set_engines.engines[0].engine_class =
+				I915_ENGINE_CLASS_INVALID;
+			set_engines.engines[0].engine_instance =
+				I915_ENGINE_CLASS_INVALID_NONE;
+
+			for (j = 1; j <= ctx->engine_map_count; j++) {
+				set_engines.engines[j].engine_class =
+					I915_ENGINE_CLASS_VIDEO; /* FIXME */
+				set_engines.engines[j].engine_instance =
+					ctx->engine_map[j - 1] - VCS1; /* FIXME */
+			}
+
+			gem_context_set_param(fd, &param);
+		} else if (ctx->wants_balance) {
 			I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(load_balance, 2) = {
 				.base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE,
 				.num_siblings = 2,
@@ -1204,6 +1346,8 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 
 		alloc_step_batch(wrk, w, _flags);
 	}
+
+	return 0;
 }
 
 static double elapsed(const struct timespec *start, const struct timespec *end)
@@ -1941,7 +2085,7 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
 	uint32_t seqno = new_seqno(wrk, engine);
 	unsigned int i;
 
-	eb_update_flags(w, engine, flags);
+	eb_update_flags(wrk, w, engine, flags);
 
 	if (flags & SEQNO)
 		update_bb_seqno(w, engine, seqno);
@@ -2090,7 +2234,8 @@ static void *run_workload(void *data)
 								    w->priority;
 				}
 				continue;
-			} else if (w->type == PREEMPTION) {
+			} else if (w->type == PREEMPTION ||
+				   w->type == ENGINE_MAP) {
 				continue;
 			}
 
@@ -2648,7 +2793,11 @@ int main(int argc, char **argv)
 		w[i]->print_stats = verbose > 1 ||
 				    (verbose > 0 && master_workload == i);
 
-		prepare_workload(i, w[i], flags_);
+		if (prepare_workload(i, w[i], flags_)) {
+			wsim_err("Failed to prepare workload %u!\n", i);
+			return 1;
+		}
+
 
 		if (balancer && balancer->init) {
 			int ret = balancer->init(balancer, w[i]);
