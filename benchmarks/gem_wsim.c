@@ -83,7 +83,8 @@ enum w_type
 	SW_FENCE_SIGNAL,
 	CTX_PRIORITY,
 	PREEMPTION,
-	ENGINE_MAP
+	ENGINE_MAP,
+	LOAD_BALANCE,
 };
 
 struct deps
@@ -121,6 +122,7 @@ struct w_step
 			unsigned int engine_map_count;
 			enum intel_engine_id *engine_map;
 		};
+		bool load_balance;
 	};
 
 	/* Implementation details */
@@ -507,6 +509,25 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 
 				step.type = PREEMPTION;
 				goto add_step;
+			} else if (!strcmp(field, "B")) {
+				unsigned int nr = 0;
+				while ((field = strtok_r(fstart, ".", &fctx))) {
+					tmp = atoi(field);
+					check_arg(nr == 0 && tmp <= 0,
+						  "Invalid context at step %u!\n",
+						  nr_steps);
+					check_arg(nr > 0,
+						  "Invalid load balance format at step %u!\n",
+						  nr_steps);
+
+					step.context = tmp;
+					step.load_balance = true;
+
+					nr++;
+				}
+
+				step.type = LOAD_BALANCE;
+				goto add_step;
 			}
 
 			if (!field) {
@@ -841,7 +862,7 @@ find_engine_in_map(struct ctx *ctx, enum intel_engine_id engine)
 			return i + 1;
 	}
 
-	igt_assert(0);
+	igt_assert(ctx->wants_balance);
 	return 0;
 }
 
@@ -1073,12 +1094,19 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 				wrk->ctx_list[j].engine_map = w->engine_map;
 				wrk->ctx_list[j].engine_map_count =
 					w->engine_map_count;
+			} else if (w->type == LOAD_BALANCE) {
+				if (!wrk->ctx_list[j].engine_map) {
+					wsim_err("Load balancing needs an engine map!\n");
+					return 1;
+				}
+				wrk->ctx_list[j].wants_balance =
+					w->load_balance;
 			}
 		}
 
 		wrk->ctx_list[j].targets_instance = targets;
 		if (flags & I915)
-			wrk->ctx_list[j].wants_balance = balance;
+			wrk->ctx_list[j].wants_balance |= balance;
 	}
 
 	/*
@@ -1092,7 +1120,9 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			if (w->type != BATCH)
 				continue;
 
-			if (wrk->ctx_list[j].engine_map && w->engine == VCS) {
+			if (wrk->ctx_list[j].engine_map &&
+			    !wrk->ctx_list[j].wants_balance &&
+			    (w->engine == VCS || w->engine == DEFAULT)) {
 				wsim_err("Batches targetting engine maps must use explicit engines!\n");
 				return -1;
 			}
@@ -1140,7 +1170,8 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 				break;
 			}
 
-			if (!ctx->engine_map && !ctx->targets_instance)
+			if ((!ctx->engine_map && !ctx->targets_instance) ||
+			    (ctx->engine_map && ctx->wants_balance))
 				args.flags |=
 				     I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE;
 
@@ -1201,6 +1232,8 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 		if (ctx->engine_map) {
 			I915_DEFINE_CONTEXT_PARAM_ENGINES(set_engines,
 							  ctx->engine_map_count + 1);
+			I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(load_balance,
+								 ctx->engine_map_count);
 			struct drm_i915_gem_context_param param = {
 				.ctx_id = ctx_id,
 				.param = I915_CONTEXT_PARAM_ENGINES,
@@ -1208,7 +1241,25 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 				.value = to_user_pointer(&set_engines),
 			};
 
-			set_engines.extensions = 0;
+			if (ctx->wants_balance) {
+				set_engines.extensions =
+					to_user_pointer(&load_balance);
+
+				memset(&load_balance, 0, sizeof(load_balance));
+				load_balance.base.name =
+					I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
+				load_balance.num_siblings =
+					ctx->engine_map_count;
+
+				for (j = 0; j < ctx->engine_map_count; j++) {
+					load_balance.engines[j].engine_class =
+						I915_ENGINE_CLASS_VIDEO; /* FIXME */
+					load_balance.engines[j].engine_instance =
+						ctx->engine_map[j] - VCS1; /* FIXME */
+				}
+			} else {
+				set_engines.extensions = 0;
+			}
 
 			/* Reserve slot for virtual engine. */
 			set_engines.engines[0].engine_class =
@@ -2196,7 +2247,8 @@ static void *run_workload(void *data)
 				}
 				continue;
 			} else if (w->type == PREEMPTION ||
-				   w->type == ENGINE_MAP) {
+				   w->type == ENGINE_MAP ||
+				   w->type == LOAD_BALANCE) {
 				continue;
 			}
 

@@ -3,6 +3,7 @@ Workload descriptor format
 
 ctx.engine.duration_us.dependency.wait,...
 <uint>.<str>.<uint>[-<uint>].<int <= 0>[/<int <= 0>][...].<0|1>,...
+B.<uint>
 M.<uint>.<str>[|<str>]...
 P|X.<uint>.<int>
 d|p|s|t|q|a.<int>,...
@@ -24,6 +25,7 @@ Additional workload steps are also supported:
  'q' - Throttle to n max queue depth.
  'f' - Create a sync fence.
  'a' - Advance the previously created sync fence.
+ 'B' - Turn on context load balancing.
  'M' - Set up engine map.
  'P' - Context priority.
  'X' - Context preemption control.
@@ -184,3 +186,16 @@ Example:
 M.1.VCS
 
 This sets up the engine map to all available VCS class engines.
+
+Context load balancing
+----------------------
+
+Context load balancing (aka Virtual Engine) is an i915 feature where the driver
+will pick the best engine (most idle) to submit to given previously configured
+engine map.
+
+Example:
+
+  B.1
+
+This enables load balancing for context number one.
