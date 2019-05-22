@@ -193,6 +193,7 @@ struct workload
 	unsigned int flags;
 	bool print_stats;
 
+	uint32_t bb_prng;
 	uint32_t prng;
 
 	struct timespec repeat_start;
@@ -239,6 +240,8 @@ struct workload
 
 static const unsigned int nop_calibration_us = 1000;
 static unsigned long nop_calibration;
+
+static unsigned int master_prng;
 
 static unsigned int context_vcs_rr;
 
@@ -1067,14 +1070,14 @@ clone_workload(struct workload *_wrk)
 #define PAGE_SIZE (4096)
 #endif
 
-static unsigned int get_duration(struct w_step *w)
+static unsigned int get_duration(struct workload *wrk, struct w_step *w)
 {
 	struct duration *dur = &w->duration;
 
 	if (dur->min == dur->max)
 		return dur->min;
 	else
-		return dur->min + hars_petruska_f54_1_random_unsafe() %
+		return dur->min + hars_petruska_f54_1_random(&wrk->bb_prng) %
 		       (dur->max + 1 - dur->min);
 }
 
@@ -1448,6 +1451,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 
 	wrk->id = id;
 	wrk->prng = rand();
+	wrk->bb_prng = (wrk->flags & SYNCEDCLIENTS) ? master_prng : rand();
 	wrk->run = true;
 
 	ctx_vcs =  0;
@@ -2607,7 +2611,7 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
 	w->eb.batch_start_offset =
 		w->unbound_duration ?
 		0 :
-		ALIGN(w->bb_sz - get_bb_sz(get_duration(w)),
+		ALIGN(w->bb_sz - get_bb_sz(get_duration(wrk, w)),
 		      2 * sizeof(uint32_t));
 
 	for (i = 0; i < w->fence_deps.nr; i++) {
@@ -2675,9 +2679,6 @@ static void *run_workload(void *data)
 	int i;
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
-
-	hars_petruska_f54_1_random_seed((wrk->flags & SYNCEDCLIENTS) ?
-					0 : wrk->id);
 
 	init_status_page(wrk, INIT_ALL);
 	for (count = 0; wrk->run && (wrk->background || count < wrk->repeat);
@@ -3116,6 +3117,10 @@ int main(int argc, char **argv)
 	igt_require(fd);
 
 	init_clocks();
+
+	master_prng = time(NULL);
+	srand(master_prng);
+	master_prng = rand();
 
 	while ((c = getopt(argc, argv,
 			   "hqv2RsSHxGdc:n:r:w:W:a:t:b:p:")) != -1) {
