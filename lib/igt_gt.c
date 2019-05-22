@@ -41,6 +41,7 @@
 #include "intel_reg.h"
 #include "intel_chipset.h"
 #include "igt_dummyload.h"
+#include "i915/gem_engine_topology.h"
 
 /**
  * SECTION:igt_gt
@@ -585,6 +586,23 @@ const struct intel_execution_engine2 intel_execution_engines2[] = {
 	{ "vecs0", I915_ENGINE_CLASS_VIDEO_ENHANCE, 0 },
 	{ }
 };
+
+int gem_execbuf_flags_to_engine_class(unsigned int flags)
+{
+	switch (flags & 0x3f) {
+	case I915_EXEC_DEFAULT:
+	case I915_EXEC_RENDER:
+		return I915_ENGINE_CLASS_RENDER;
+	case I915_EXEC_BLT:
+		return I915_ENGINE_CLASS_COPY;
+	case I915_EXEC_BSD:
+		return I915_ENGINE_CLASS_VIDEO;
+	case I915_EXEC_VEBOX:
+		return I915_ENGINE_CLASS_VIDEO_ENHANCE;
+	default:
+		igt_assert(0);
+	}
+}
 
 unsigned int
 gem_class_instance_to_eb_flags(int gem_fd,

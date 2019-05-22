@@ -99,6 +99,8 @@ extern const struct intel_execution_engine2 {
 	bool is_virtual;
 } intel_execution_engines2[];
 
+int gem_execbuf_flags_to_engine_class(unsigned int flags);
+
 unsigned int
 gem_class_instance_to_eb_flags(int gem_fd,
 			       enum drm_i915_gem_engine_class class,
