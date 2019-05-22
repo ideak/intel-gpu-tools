@@ -123,7 +123,7 @@ static void init_engine(struct intel_execution_engine2 *e2,
 	if (__e2->name) {
 		e2->name = __e2->name;
 	} else {
-		igt_warn("found unknown engine (%d, %d)", class, instance);
+		igt_warn("found unknown engine (%d, %d)\n", class, instance);
 		e2->name = unknown_name;
 		e2->flags = -1;
 	}
