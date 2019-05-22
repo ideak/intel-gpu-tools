@@ -54,5 +54,6 @@
 #include "media_spin.h"
 #include "rendercopy.h"
 #include "i915/gem_mman.h"
+#include "i915/gem_engine_topology.h"
 
 #endif /* IGT_H */

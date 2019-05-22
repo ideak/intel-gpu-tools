@@ -95,6 +95,8 @@ extern const struct intel_execution_engine2 {
 	const char *name;
 	int class;
 	int instance;
+	uint64_t flags;
+	bool is_virtual;
 } intel_execution_engines2[];
 
 unsigned int
