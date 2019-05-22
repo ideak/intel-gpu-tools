@@ -256,7 +256,7 @@ static void hangcheck_unterminated(void)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_engine2 *e;
 	igt_hang_t hang = {};
 
 	igt_skip_on_simulation();
@@ -276,16 +276,9 @@ igt_main
 	igt_subtest("error-state-basic")
 		test_error_state_basic();
 
-	for (e = intel_execution_engines; e->name; e++) {
-		if (e->exec_id == 0)
-			continue;
-
-		igt_subtest_f("error-state-capture-%s", e->name) {
-			igt_require(gem_ring_has_physical_engine(device, e->exec_id | e->flags));
-			test_error_state_capture(e->exec_id | e->flags,
-						 e->full_name);
-		}
-	}
+	__for_each_physical_engine(device, e)
+		igt_subtest_f("error-state-capture-%s", e->name)
+			test_error_state_capture(e->flags, e->name);
 
 	igt_subtest("hangcheck-unterminated")
 		hangcheck_unterminated();
