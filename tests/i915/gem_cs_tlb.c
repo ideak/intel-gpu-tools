@@ -140,7 +140,7 @@ static void run_on_ring(int fd, unsigned ring_id, const char *ring_name)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_engine2 *e;
 	int fd = -1;
 
 	igt_skip_on_simulation();
@@ -150,9 +150,9 @@ igt_main
 		igt_require_gem(fd);
 	}
 
-	for (e = intel_execution_engines; e->name; e++)
-		igt_subtest_f("%s%s", e->exec_id ? "" : "basic-", e->name)
-			run_on_ring(fd, e->exec_id | e->flags, e->name);
+	__for_each_physical_engine(fd, e)
+		igt_subtest_f("%s", e->name)
+			run_on_ring(fd, e->flags, e->name);
 
 	igt_fixture
 		close(fd);
