@@ -376,6 +376,15 @@ static int parse_engine_map(struct w_step *step, const char *_str)
 	return 0;
 }
 
+#define int_field(_STEP_, _FIELD_, _COND_, _ERR_) \
+	if ((field = strtok_r(fstart, ".", &fctx))) { \
+		tmp = atoi(field); \
+		check_arg(_COND_, _ERR_, nr_steps); \
+		step.type = _STEP_; \
+		step._FIELD_ = tmp; \
+		goto add_step; \
+	} \
+
 static struct workload *
 parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 {
@@ -403,25 +412,11 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			fstart = NULL;
 
 			if (!strcmp(field, "d")) {
-				if ((field = strtok_r(fstart, ".", &fctx))) {
-					tmp = atoi(field);
-					check_arg(tmp <= 0,
-						  "Invalid delay at step %u!\n",
-						  nr_steps);
-					step.type = DELAY;
-					step.delay = tmp;
-					goto add_step;
-				}
+				int_field(DELAY, delay, tmp <= 0,
+					  "Invalid delay at step %u!\n");
 			} else if (!strcmp(field, "p")) {
-				if ((field = strtok_r(fstart, ".", &fctx))) {
-					tmp = atoi(field);
-					check_arg(tmp <= 0,
-						  "Invalid period at step %u!\n",
-						  nr_steps);
-					step.type = PERIOD;
-					step.period = tmp;
-					goto add_step;
-				}
+				int_field(PERIOD, period, tmp <= 0,
+					  "Invalid period at step %u!\n");
 			} else if (!strcmp(field, "P")) {
 				unsigned int nr = 0;
 				while ((field = strtok_r(fstart, ".", &fctx))) {
@@ -444,46 +439,21 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				step.type = CTX_PRIORITY;
 				goto add_step;
 			} else if (!strcmp(field, "s")) {
-				if ((field = strtok_r(fstart, ".", &fctx))) {
-					tmp = atoi(field);
-					check_arg(tmp >= 0 ||
-						  ((int)nr_steps + tmp) < 0,
-						  "Invalid sync target at step %u!\n",
-						  nr_steps);
-					step.type = SYNC;
-					step.target = tmp;
-					goto add_step;
-				}
+				int_field(SYNC, target,
+					  tmp >= 0 || ((int)nr_steps + tmp) < 0,
+					  "Invalid sync target at step %u!\n");
 			} else if (!strcmp(field, "t")) {
-				if ((field = strtok_r(fstart, ".", &fctx))) {
-					tmp = atoi(field);
-					check_arg(tmp < 0,
-						  "Invalid throttle at step %u!\n",
-						  nr_steps);
-					step.type = THROTTLE;
-					step.throttle = tmp;
-					goto add_step;
-				}
+				int_field(THROTTLE, throttle,
+					  tmp < 0,
+					  "Invalid throttle at step %u!\n");
 			} else if (!strcmp(field, "q")) {
-				if ((field = strtok_r(fstart, ".", &fctx))) {
-					tmp = atoi(field);
-					check_arg(tmp < 0,
-						  "Invalid qd throttle at step %u!\n",
-						  nr_steps);
-					step.type = QD_THROTTLE;
-					step.throttle = tmp;
-					goto add_step;
-				}
+				int_field(QD_THROTTLE, throttle,
+					  tmp < 0,
+					  "Invalid qd throttle at step %u!\n");
 			} else if (!strcmp(field, "a")) {
-				if ((field = strtok_r(fstart, ".", &fctx))) {
-					tmp = atoi(field);
-					check_arg(tmp >= 0,
-						  "Invalid sw fence signal at step %u!\n",
-						  nr_steps);
-					step.type = SW_FENCE_SIGNAL;
-					step.target = tmp;
-					goto add_step;
-				}
+				int_field(SW_FENCE_SIGNAL, target,
+					  tmp >= 0,
+					  "Invalid sw fence signal at step %u!\n");
 			} else if (!strcmp(field, "f")) {
 				step.type = SW_FENCE;
 				goto add_step;
