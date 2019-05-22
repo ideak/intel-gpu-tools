@@ -119,11 +119,4 @@ void gem_require_engine(int gem_fd,
 	igt_require(gem_has_engine(gem_fd, class, instance));
 }
 
-#define __for_each_engine_class_instance(e__) \
-	for ((e__) = intel_execution_engines2; (e__)->name; (e__)++)
-
-#define for_each_engine_class_instance(fd__, e__) \
-	for ((e__) = intel_execution_engines2; (e__)->name; (e__)++) \
-		for_if (gem_has_engine((fd__), (e__)->class, (e__)->instance))
-
 #endif /* IGT_GT_H */
