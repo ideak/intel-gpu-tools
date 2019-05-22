@@ -7,6 +7,7 @@ B.<uint>
 M.<uint>.<str>[|<str>]...
 P|X.<uint>.<int>
 d|p|s|t|q|a.<int>,...
+b.<uint>.<str>[|<str>].<str>
 f
 
 For duration a range can be given from which a random value will be picked
@@ -26,6 +27,7 @@ Additional workload steps are also supported:
  'f' - Create a sync fence.
  'a' - Advance the previously created sync fence.
  'B' - Turn on context load balancing.
+ 'b' - Set up engine bonds.
  'M' - Set up engine map.
  'P' - Context priority.
  'X' - Context preemption control.
@@ -199,3 +201,51 @@ Example:
   B.1
 
 This enables load balancing for context number one.
+
+Engine bonds
+------------
+
+Engine bonds are extensions on load balanced contexts. They allow expressing
+rules of engine selection between two co-operating contexts tied with submit
+fences. In other words, the rule expression is telling the driver: "If you pick
+this engine for context one, then you have to pick that engine for context two".
+
+Syntax is:
+  b.<context>.<engine_list>.<master_engine>
+
+Engine list is a list of one or more sibling engines separated by a pipe
+character (eg. "VCS1|VCS2").
+
+There can be multiple bonds tied to the same context.
+
+Example:
+
+  M.1.RCS|VECS
+  B.1
+  M.2.VCS1|VCS2
+  B.2
+  b.2.VCS1.RCS
+  b.2.VCS2.VECS
+
+This tells the driver that if it picked RCS for context one, it has to pick VCS1
+for context two. And if it picked VECS for context one, it has to pick VCS1 for
+context two.
+
+If we extend the above example with more workload directives:
+
+  1.DEFAULT.1000.0.0
+  2.DEFAULT.1000.s-1.0
+
+We get to a fully functional example where two batch buffers are submitted in a
+load balanced fashion, telling the driver they should run simultaneously and
+that valid engine pairs are either RCS + VCS1 (for two contexts respectively),
+or VECS + VCS2.
+
+This can also be extended using sync fences to improve chances of the first
+submission not getting on the hardware after the second one. Second block would
+then look like:
+
+  f
+  1.DEFAULT.1000.f-1.0
+  2.DEFAULT.1000.s-1.0
+  a.-3

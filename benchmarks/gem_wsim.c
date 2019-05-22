@@ -85,6 +85,7 @@ enum w_type
 	PREEMPTION,
 	ENGINE_MAP,
 	LOAD_BALANCE,
+	BOND,
 };
 
 struct deps
@@ -98,6 +99,11 @@ struct w_arg {
 	char *filename;
 	char *desc;
 	int prio;
+};
+
+struct bond {
+	uint64_t mask;
+	enum intel_engine_id master;
 };
 
 struct w_step
@@ -123,6 +129,10 @@ struct w_step
 			enum intel_engine_id *engine_map;
 		};
 		bool load_balance;
+		struct {
+			uint64_t bond_mask;
+			enum intel_engine_id bond_master;
+		};
 	};
 
 	/* Implementation details */
@@ -152,6 +162,8 @@ struct ctx {
 	int priority;
 	unsigned int engine_map_count;
 	enum intel_engine_id *engine_map;
+	unsigned int bond_count;
+	struct bond *bonds;
 	bool targets_instance;
 	bool wants_balance;
 	unsigned int static_vcs;
@@ -378,6 +390,26 @@ static int parse_engine_map(struct w_step *step, const char *_str)
 	return 0;
 }
 
+static uint64_t engine_list_mask(const char *_str)
+{
+	uint64_t mask = 0;
+
+	char *token, *tctx = NULL, *tstart = (char *)_str;
+
+	while ((token = strtok_r(tstart, "|", &tctx))) {
+		enum intel_engine_id engine = str_to_engine(token);
+
+		if ((int)engine < 0 || engine == DEFAULT || engine == VCS)
+			return 0;
+
+		mask |= 1 << engine;
+
+		tstart = NULL;
+	}
+
+	return mask;
+}
+
 #define int_field(_STEP_, _FIELD_, _COND_, _ERR_) \
 	if ((field = strtok_r(fstart, ".", &fctx))) { \
 		tmp = atoi(field); \
@@ -527,6 +559,39 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				}
 
 				step.type = LOAD_BALANCE;
+				goto add_step;
+			} else if (!strcmp(field, "b")) {
+				unsigned int nr = 0;
+				while ((field = strtok_r(fstart, ".", &fctx))) {
+					check_arg(nr > 2,
+						  "Invalid bond format at step %u!\n",
+						  nr_steps);
+
+					if (nr == 0) {
+						tmp = atoi(field);
+						step.context = tmp;
+						check_arg(tmp <= 0,
+							  "Invalid context at step %u!\n",
+							  nr_steps);
+					} else if (nr == 1) {
+						step.bond_mask = engine_list_mask(field);
+						check_arg(step.bond_mask == 0,
+							"Invalid siblings list at step %u!\n",
+							nr_steps);
+					} else if (nr == 2) {
+						tmp = str_to_engine(field);
+						check_arg(tmp <= 0 ||
+							  tmp == VCS ||
+							  tmp == DEFAULT,
+							  "Invalid master engine at step %u!\n",
+							  nr_steps);
+						step.bond_master = tmp;
+					}
+
+					nr++;
+				}
+
+				step.type = BOND;
 				goto add_step;
 			}
 
@@ -1011,6 +1076,31 @@ static void vm_destroy(int i915, uint32_t vm_id)
 	igt_assert_eq(__vm_destroy(i915, vm_id), 0);
 }
 
+static unsigned int
+find_engine(struct i915_engine_class_instance *ci, unsigned int count,
+	    enum intel_engine_id engine)
+{
+	static struct i915_engine_class_instance map[] = {
+		[RCS] = { I915_ENGINE_CLASS_RENDER, 0 },
+		[BCS] = { I915_ENGINE_CLASS_COPY, 0 },
+		[VCS1] = { I915_ENGINE_CLASS_VIDEO, 0 },
+		[VCS2] = { I915_ENGINE_CLASS_VIDEO, 1 },
+		[VECS] = { I915_ENGINE_CLASS_VIDEO_ENHANCE, 0 },
+	};
+	unsigned int i;
+
+	igt_assert(engine < ARRAY_SIZE(map));
+	igt_assert(engine == RCS || map[engine].engine_class);
+
+	for (i = 0; i < count; i++, ci++) {
+		if (!memcmp(&map[engine], ci, sizeof(*ci)))
+			return i;
+	}
+
+	igt_assert(0);
+	return 0;
+}
+
 static int
 prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 {
@@ -1078,6 +1168,8 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	 * Transfer over engine map configuration from the workload step.
 	 */
 	for (j = 0; j < wrk->nr_ctxs; j += 2) {
+		struct ctx *ctx = &wrk->ctx_list[j];
+
 		bool targets = false;
 		bool balance = false;
 
@@ -1091,16 +1183,28 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 				else
 					targets = true;
 			} else if (w->type == ENGINE_MAP) {
-				wrk->ctx_list[j].engine_map = w->engine_map;
-				wrk->ctx_list[j].engine_map_count =
-					w->engine_map_count;
+				ctx->engine_map = w->engine_map;
+				ctx->engine_map_count = w->engine_map_count;
 			} else if (w->type == LOAD_BALANCE) {
-				if (!wrk->ctx_list[j].engine_map) {
+				if (!ctx->engine_map) {
 					wsim_err("Load balancing needs an engine map!\n");
 					return 1;
 				}
-				wrk->ctx_list[j].wants_balance =
-					w->load_balance;
+				ctx->wants_balance = w->load_balance;
+			} else if (w->type == BOND) {
+				if (!ctx->wants_balance) {
+					wsim_err("Engine bonds need load balancing engine map!\n");
+					return 1;
+				}
+				ctx->bond_count++;
+				ctx->bonds = realloc(ctx->bonds,
+						     ctx->bond_count *
+						     sizeof(struct bond));
+				igt_assert(ctx->bonds);
+				ctx->bonds[ctx->bond_count - 1].mask =
+					w->bond_mask;
+				ctx->bonds[ctx->bond_count - 1].master =
+					w->bond_master;
 			}
 		}
 
@@ -1272,6 +1376,46 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 					I915_ENGINE_CLASS_VIDEO; /* FIXME */
 				set_engines.engines[j].engine_instance =
 					ctx->engine_map[j - 1] - VCS1; /* FIXME */
+			}
+
+			for (j = 0; j < ctx->bond_count; j++) {
+				unsigned long mask = ctx->bonds[j].mask;
+				I915_DEFINE_CONTEXT_ENGINES_BOND(bond,
+								 __builtin_popcount(mask));
+				struct i915_context_engines_bond *p = NULL, *prev;
+				unsigned int b, e;
+
+				prev = p;
+				p = alloca(sizeof(bond));
+				assert(p);
+				memset(p, 0, sizeof(bond));
+
+				if (j == 0)
+					load_balance.base.next_extension =
+						to_user_pointer(p);
+				else if (j < (ctx->bond_count - 1))
+					prev->base.next_extension =
+						to_user_pointer(p);
+
+				p->base.name = I915_CONTEXT_ENGINES_EXT_BOND;
+				p->virtual_index = 0;
+				p->master.engine_class =
+					I915_ENGINE_CLASS_VIDEO;
+				p->master.engine_instance =
+					ctx->bonds[j].master - VCS1;
+
+				for (b = 0, e = 0; mask; e++, mask >>= 1) {
+					unsigned int idx;
+
+					if (!(mask & 1))
+						continue;
+
+					idx = find_engine(&set_engines.engines[1],
+							  ctx->engine_map_count,
+							  e);
+					p->engines[b++] =
+						set_engines.engines[1 + idx];
+				}
 			}
 
 			gem_context_set_param(fd, &param);
@@ -2248,7 +2392,8 @@ static void *run_workload(void *data)
 				continue;
 			} else if (w->type == PREEMPTION ||
 				   w->type == ENGINE_MAP ||
-				   w->type == LOAD_BALANCE) {
+				   w->type == LOAD_BALANCE ||
+				   w->type == BOND) {
 				continue;
 			}
 
