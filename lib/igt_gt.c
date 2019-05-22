@@ -557,7 +557,7 @@ const struct intel_execution_engine intel_execution_engines[] = {
 	{ NULL, 0, 0 }
 };
 
-bool gem_can_store_dword(int fd, unsigned int engine)
+bool gem_class_can_store_dword(int fd, int class)
 {
 	uint16_t devid = intel_get_drm_devid(fd);
 	const struct intel_device_info *info = intel_get_device_info(devid);
@@ -569,13 +569,19 @@ bool gem_can_store_dword(int fd, unsigned int engine)
 	if (gen == 3 && (info->is_grantsdale || info->is_alviso))
 		return false; /* only supports physical addresses */
 
-	if (gen == 6 && ((engine & 0x3f) == I915_EXEC_BSD))
-		return false; /* kills the machine! */
+	if (gen == 6 && class == I915_ENGINE_CLASS_VIDEO)
+		return false;
 
 	if (info->is_broadwater)
 		return false; /* Not sure yet... */
 
 	return true;
+}
+
+bool gem_can_store_dword(int fd, unsigned int engine)
+{
+	return gem_class_can_store_dword(fd,
+				gem_execbuf_flags_to_engine_class(engine));
 }
 
 const struct intel_execution_engine2 intel_execution_engines2[] = {
