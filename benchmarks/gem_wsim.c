@@ -86,6 +86,7 @@ enum w_type
 	ENGINE_MAP,
 	LOAD_BALANCE,
 	BOND,
+	TERMINATE,
 };
 
 struct deps
@@ -113,6 +114,7 @@ struct w_step
 	unsigned int context;
 	unsigned int engine;
 	struct duration duration;
+	bool unbound_duration;
 	struct deps data_deps;
 	struct deps fence_deps;
 	int emit_fence;
@@ -143,7 +145,7 @@ struct w_step
 
 	struct drm_i915_gem_execbuffer2 eb;
 	struct drm_i915_gem_exec_object2 *obj;
-	struct drm_i915_gem_relocation_entry reloc[4];
+	struct drm_i915_gem_relocation_entry reloc[5];
 	unsigned long bb_sz;
 	uint32_t bb_handle;
 	uint32_t *seqno_value;
@@ -153,6 +155,7 @@ struct w_step
 	uint32_t *rt1_address;
 	uint32_t *latch_value;
 	uint32_t *latch_address;
+	uint32_t *recursive_bb_start;
 };
 
 DECLARE_EWMA(uint64_t, rt, 4, 2)
@@ -517,6 +520,10 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 
 				step.type = ENGINE_MAP;
 				goto add_step;
+			} else if (!strcmp(field, "T")) {
+				int_field(TERMINATE, target,
+					  tmp >= 0 || ((int)nr_steps + tmp) < 0,
+					  "Invalid terminate target at step %u!\n");
 			} else if (!strcmp(field, "X")) {
 				unsigned int nr = 0;
 				while ((field = strtok_r(fstart, ".", &fctx))) {
@@ -632,23 +639,31 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 
 			fstart = NULL;
 
-			tmpl = strtol(field, &sep, 10);
-			check_arg(tmpl <= 0 || tmpl == LONG_MIN ||
-				  tmpl == LONG_MAX,
-				  "Invalid duration at step %u!\n", nr_steps);
-			step.duration.min = tmpl;
-
-			if (sep && *sep == '-') {
-				tmpl = strtol(sep + 1, NULL, 10);
-				check_arg(tmpl <= 0 ||
-					  tmpl <= step.duration.min ||
-					  tmpl == LONG_MIN ||
-					  tmpl == LONG_MAX,
-					  "Invalid duration range at step %u!\n",
+			if (field[0] == '*') {
+				check_arg(intel_gen(intel_get_drm_devid(fd)) < 8,
+					  "Infinite batch at step %u needs Gen8+!\n",
 					  nr_steps);
-				step.duration.max = tmpl;
+				step.unbound_duration = true;
 			} else {
-				step.duration.max = step.duration.min;
+				tmpl = strtol(field, &sep, 10);
+				check_arg(tmpl <= 0 || tmpl == LONG_MIN ||
+					  tmpl == LONG_MAX,
+					  "Invalid duration at step %u!\n",
+					  nr_steps);
+				step.duration.min = tmpl;
+
+				if (sep && *sep == '-') {
+					tmpl = strtol(sep + 1, NULL, 10);
+					check_arg(tmpl <= 0 ||
+						tmpl <= step.duration.min ||
+						tmpl == LONG_MIN ||
+						tmpl == LONG_MAX,
+						"Invalid duration range at step %u!\n",
+						nr_steps);
+					step.duration.max = tmpl;
+				} else {
+					step.duration.max = step.duration.min;
+				}
 			}
 
 			valid++;
@@ -808,7 +823,7 @@ init_bb(struct w_step *w, unsigned int flags)
 	unsigned int i;
 	uint32_t *ptr;
 
-	if (!arb_period)
+	if (w->unbound_duration || !arb_period)
 		return;
 
 	gem_set_domain(fd, w->bb_handle,
@@ -822,12 +837,13 @@ init_bb(struct w_step *w, unsigned int flags)
 	munmap(ptr, mmap_len);
 }
 
-static void
+static unsigned int
 terminate_bb(struct w_step *w, unsigned int flags)
 {
 	const uint32_t bbe = 0xa << 23;
 	unsigned long mmap_start, mmap_len;
 	unsigned long batch_start = w->bb_sz;
+	unsigned int r = 0;
 	uint32_t *ptr, *cs;
 
 	igt_assert(((flags & RT) && (flags & SEQNO)) || !(flags & RT));
@@ -838,6 +854,9 @@ terminate_bb(struct w_step *w, unsigned int flags)
 	if (flags & RT)
 		batch_start -= 12 * sizeof(uint32_t);
 
+	if (w->unbound_duration)
+		batch_start -= 4 * sizeof(uint32_t); /* MI_ARB_CHK + MI_BATCH_BUFFER_START */
+
 	mmap_start = rounddown(batch_start, PAGE_SIZE);
 	mmap_len = ALIGN(w->bb_sz - mmap_start, PAGE_SIZE);
 
@@ -847,8 +866,19 @@ terminate_bb(struct w_step *w, unsigned int flags)
 	ptr = gem_mmap__wc(fd, w->bb_handle, mmap_start, mmap_len, PROT_WRITE);
 	cs = (uint32_t *)((char *)ptr + batch_start - mmap_start);
 
+	if (w->unbound_duration) {
+		w->reloc[r++].offset = batch_start + 2 * sizeof(uint32_t);
+		batch_start += 4 * sizeof(uint32_t);
+
+		*cs++ = w->preempt_us ? 0x5 << 23 /* MI_ARB_CHK; */ : MI_NOOP;
+		w->recursive_bb_start = cs;
+		*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
+		*cs++ = 0;
+		*cs++ = 0;
+	}
+
 	if (flags & SEQNO) {
-		w->reloc[0].offset = batch_start + sizeof(uint32_t);
+		w->reloc[r++].offset = batch_start + sizeof(uint32_t);
 		batch_start += 4 * sizeof(uint32_t);
 
 		*cs++ = MI_STORE_DWORD_IMM;
@@ -860,7 +890,7 @@ terminate_bb(struct w_step *w, unsigned int flags)
 	}
 
 	if (flags & RT) {
-		w->reloc[1].offset = batch_start + sizeof(uint32_t);
+		w->reloc[r++].offset = batch_start + sizeof(uint32_t);
 		batch_start += 4 * sizeof(uint32_t);
 
 		*cs++ = MI_STORE_DWORD_IMM;
@@ -870,7 +900,7 @@ terminate_bb(struct w_step *w, unsigned int flags)
 		w->rt0_value = cs;
 		*cs++ = 0;
 
-		w->reloc[2].offset = batch_start + 2 * sizeof(uint32_t);
+		w->reloc[r++].offset = batch_start + 2 * sizeof(uint32_t);
 		batch_start += 4 * sizeof(uint32_t);
 
 		*cs++ = 0x24 << 23 | 2; /* MI_STORE_REG_MEM */
@@ -879,7 +909,7 @@ terminate_bb(struct w_step *w, unsigned int flags)
 		*cs++ = 0;
 		*cs++ = 0;
 
-		w->reloc[3].offset = batch_start + sizeof(uint32_t);
+		w->reloc[r++].offset = batch_start + sizeof(uint32_t);
 		batch_start += 4 * sizeof(uint32_t);
 
 		*cs++ = MI_STORE_DWORD_IMM;
@@ -891,6 +921,8 @@ terminate_bb(struct w_step *w, unsigned int flags)
 	}
 
 	*cs = bbe;
+
+	return r;
 }
 
 static const unsigned int eb_engine_map[NUM_ENGINES] = {
@@ -1011,19 +1043,22 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		}
 	}
 
-	w->bb_sz = get_bb_sz(w->duration.max);
-	w->bb_handle = w->obj[j].handle = gem_create(fd, w->bb_sz);
+	if (w->unbound_duration)
+		/* nops + MI_ARB_CHK + MI_BATCH_BUFFER_START */
+		w->bb_sz = max(PAGE_SIZE, get_bb_sz(w->preempt_us)) +
+			   (1 + 3) * sizeof(uint32_t);
+	else
+		w->bb_sz = get_bb_sz(w->duration.max);
+	w->bb_handle = w->obj[j].handle = gem_create(fd, w->bb_sz + (w->unbound_duration ? 4096 : 0));
 	init_bb(w, flags);
-	terminate_bb(w, flags);
+	w->obj[j].relocation_count = terminate_bb(w, flags);
 
-	if (flags & SEQNO) {
+	if (w->obj[j].relocation_count) {
 		w->obj[j].relocs_ptr = to_user_pointer(&w->reloc);
-		if (flags & RT)
-			w->obj[j].relocation_count = 4;
-		else
-			w->obj[j].relocation_count = 1;
 		for (i = 0; i < w->obj[j].relocation_count; i++)
 			w->reloc[i].target_handle = 1;
+		if (w->unbound_duration)
+			w->reloc[0].target_handle = j;
 	}
 
 	w->eb.buffers_ptr = to_user_pointer(w->obj);
@@ -2113,6 +2148,18 @@ update_bb_rt(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
 	}
 }
 
+static void
+update_bb_start(struct w_step *w)
+{
+	if (!w->unbound_duration)
+		return;
+
+	gem_set_domain(fd, w->bb_handle,
+		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
+
+	*w->recursive_bb_start = MI_BATCH_BUFFER_START | (1 << 8) | 1;
+}
+
 static void w_sync_to(struct workload *wrk, struct w_step *w, int target)
 {
 	if (target < 0)
@@ -2248,9 +2295,13 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
 	if (flags & RT)
 		update_bb_rt(w, engine, seqno);
 
+	update_bb_start(w);
+
 	w->eb.batch_start_offset =
+		w->unbound_duration ?
+		0 :
 		ALIGN(w->bb_sz - get_bb_sz(get_duration(w)),
-			2 * sizeof(uint32_t));
+		      2 * sizeof(uint32_t));
 
 	for (i = 0; i < w->fence_deps.nr; i++) {
 		int tgt = w->idx + w->fence_deps.list[i];
@@ -2389,6 +2440,17 @@ static void *run_workload(void *data)
 					wrk->ctx_list[w->context].priority =
 								    w->priority;
 				}
+				continue;
+			} else if (w->type == TERMINATE) {
+				unsigned int t_idx = i + w->target;
+
+				igt_assert(t_idx >= 0 && t_idx < i);
+				igt_assert(wrk->steps[t_idx].type == BATCH);
+				igt_assert(wrk->steps[t_idx].unbound_duration);
+
+				*wrk->steps[t_idx].recursive_bb_start =
+					MI_BATCH_BUFFER_END;
+				__sync_synchronize();
 				continue;
 			} else if (w->type == PREEMPTION ||
 				   w->type == ENGINE_MAP ||

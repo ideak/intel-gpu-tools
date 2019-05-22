@@ -2,11 +2,11 @@ Workload descriptor format
 ==========================
 
 ctx.engine.duration_us.dependency.wait,...
-<uint>.<str>.<uint>[-<uint>].<int <= 0>[/<int <= 0>][...].<0|1>,...
+<uint>.<str>.<uint>[-<uint>]|*.<int <= 0>[/<int <= 0>][...].<0|1>,...
 B.<uint>
 M.<uint>.<str>[|<str>]...
 P|X.<uint>.<int>
-d|p|s|t|q|a.<int>,...
+d|p|s|t|q|a|T.<int>,...
 b.<uint>.<str>[|<str>].<str>
 f
 
@@ -30,6 +30,7 @@ Additional workload steps are also supported:
  'b' - Set up engine bonds.
  'M' - Set up engine map.
  'P' - Context priority.
+ 'T' - Terminate an infinite batch.
  'X' - Context preemption control.
 
 Engine ids: DEFAULT, RCS, BCS, VCS, VCS1, VCS2, VECS
@@ -76,6 +77,10 @@ Example:
   1.VCS2.2300.-1/-2.0
 
 I this case the last step has a data dependency on both first and second steps.
+
+Batch durations can also be specified as infinite by using the '*' in the
+duration field. Such batches must be ended by the terminate command ('T')
+otherwise they will cause a GPU hang to be reported.
 
 Sync (fd) fences
 ----------------
