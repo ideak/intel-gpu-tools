@@ -100,6 +100,7 @@ struct w_arg {
 	char *filename;
 	char *desc;
 	int prio;
+	bool sseu;
 };
 
 struct bond {
@@ -179,6 +180,7 @@ struct workload
 	unsigned int nr_steps;
 	struct w_step *steps;
 	int prio;
+	bool sseu;
 
 	pthread_t thread;
 	bool run;
@@ -251,6 +253,7 @@ static int fd;
 #define GLOBAL_BALANCE	(1<<8)
 #define DEPSYNC		(1<<9)
 #define I915		(1<<10)
+#define SSEU		(1<<11)
 
 #define SEQNO_IDX(engine) ((engine) * 16)
 #define SEQNO_OFFSET(engine) (SEQNO_IDX(engine) * sizeof(uint32_t))
@@ -726,6 +729,7 @@ add_step:
 	wrk->nr_steps = nr_steps;
 	wrk->steps = steps;
 	wrk->prio = arg->prio;
+	wrk->sseu = arg->sseu;
 
 	free(desc);
 
@@ -771,6 +775,7 @@ clone_workload(struct workload *_wrk)
 	memset(wrk, 0, sizeof(*wrk));
 
 	wrk->prio = _wrk->prio;
+	wrk->sseu = _wrk->sseu;
 	wrk->nr_steps = _wrk->nr_steps;
 	wrk->steps = calloc(wrk->nr_steps, sizeof(struct w_step));
 	igt_assert(wrk->steps);
@@ -1136,6 +1141,26 @@ find_engine(struct i915_engine_class_instance *ci, unsigned int count,
 	return 0;
 }
 
+static void
+set_ctx_sseu(uint32_t ctx)
+{
+	struct drm_i915_gem_context_param_sseu sseu = { };
+	struct drm_i915_gem_context_param param = { };
+
+	sseu.class = I915_ENGINE_CLASS_RENDER;
+	sseu.instance = 0;
+
+	param.ctx_id = ctx;
+	param.param = I915_CONTEXT_PARAM_SSEU;
+	param.value = (uintptr_t)&sseu;
+
+	gem_context_get_param(fd, &param);
+
+	sseu.slice_mask = 1;
+
+	gem_context_set_param(fd, &param);
+}
+
 static int
 prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 {
@@ -1486,6 +1511,9 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 
 			gem_context_set_param(fd, &param);
 		}
+
+		if (wrk->sseu)
+			set_ctx_sseu(arg.ctx_id);
 
 		if (share_vm)
 			vm_destroy(fd, share_vm);
@@ -2661,6 +2689,8 @@ static void print_help(void)
 "  -R              Round-robin initial VCS assignment per client.\n"
 "  -H              Send heartbeat on synchronisation points with seqno based\n"
 "                  balancers. Gives better engine busyness view in some cases.\n"
+"  -s              Turn on small SSEU config for the next workload on the\n"
+"                  command line. Subsequent -s switches it off.\n"
 "  -S              Synchronize the sequence of random batch durations between\n"
 "                  clients.\n"
 "  -G              Global load balancing - a single load balancer will be shared\n"
@@ -2703,11 +2733,12 @@ static char *load_workload_descriptor(char *filename)
 }
 
 static struct w_arg *
-add_workload_arg(struct w_arg *w_args, unsigned int nr_args, char *w_arg, int prio)
+add_workload_arg(struct w_arg *w_args, unsigned int nr_args, char *w_arg,
+		 int prio, bool sseu)
 {
 	w_args = realloc(w_args, sizeof(*w_args) * nr_args);
 	igt_assert(w_args);
-	w_args[nr_args - 1] = (struct w_arg) { w_arg, NULL, prio };
+	w_args[nr_args - 1] = (struct w_arg) { w_arg, NULL, prio, sseu };
 
 	return w_args;
 }
@@ -2800,7 +2831,8 @@ int main(int argc, char **argv)
 
 	init_clocks();
 
-	while ((c = getopt(argc, argv, "hqv2RSHxGdc:n:r:w:W:a:t:b:p:")) != -1) {
+	while ((c = getopt(argc, argv,
+			   "hqv2RsSHxGdc:n:r:w:W:a:t:b:p:")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -2810,7 +2842,8 @@ int main(int argc, char **argv)
 			master_workload = nr_w_args;
 			/* Fall through */
 		case 'w':
-			w_args = add_workload_arg(w_args, ++nr_w_args, optarg, prio);
+			w_args = add_workload_arg(w_args, ++nr_w_args, optarg,
+						  prio, flags & SSEU);
 			break;
 		case 'p':
 			prio = atoi(optarg);
@@ -2851,6 +2884,9 @@ int main(int argc, char **argv)
 			break;
 		case 'S':
 			flags |= SYNCEDCLIENTS;
+			break;
+		case 's':
+			flags ^= SSEU;
 			break;
 		case 'H':
 			flags |= HEARTBEAT;
