@@ -2946,6 +2946,7 @@ static void print_help(void)
 "  -t <n>          Nop calibration tolerance percentage.\n"
 "                  Use when there is a difficulty obtaining calibration with the\n"
 "                  default settings.\n"
+"  -I <n>          Initial randomness seed.\n"
 "  -p <n>          Context priority to use for the following workload on the\n"
 "                  command line.\n"
 "  -w <desc|path>  Filename or a workload descriptor.\n"
@@ -3119,11 +3120,9 @@ int main(int argc, char **argv)
 	init_clocks();
 
 	master_prng = time(NULL);
-	srand(master_prng);
-	master_prng = rand();
 
 	while ((c = getopt(argc, argv,
-			   "hqv2RsSHxGdc:n:r:w:W:a:t:b:p:")) != -1) {
+			   "hqv2RsSHxGdc:n:r:w:W:a:t:b:p:I:")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -3210,6 +3209,9 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			break;
+		case 'I':
+			master_prng = strtol(optarg, NULL, 0);
+			break;
 		case 'h':
 			print_help();
 			return 0;
@@ -3294,6 +3296,7 @@ int main(int argc, char **argv)
 		clients = nr_w_args;
 
 	if (verbose > 1) {
+		printf("Random seed is %u.\n", master_prng);
 		printf("Using %lu nop calibration for %uus delay.\n",
 		       nop_calibration, nop_calibration_us);
 		printf("%u client%s.\n", clients, clients > 1 ? "s" : "");
@@ -3311,6 +3314,9 @@ int main(int argc, char **argv)
 			printf("Using %s balancer.\n", balancer->name);
 		}
 	}
+
+	srand(master_prng);
+	master_prng = rand();
 
 	if (master_workload >= 0 && clients == 1)
 		master_workload = -1;
