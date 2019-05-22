@@ -134,7 +134,7 @@ static void basic(int fd, unsigned engine, unsigned flags)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_engine2 *e;
 	int fd = -1;
 
 	igt_skip_on_simulation();
@@ -177,27 +177,27 @@ igt_main
 			basic(fd, ALL_ENGINES, WRITE);
 		}
 
-		for (e = intel_execution_engines; e->name; e++) {
+		__for_each_physical_engine(fd, e) {
 			igt_subtest_group {
 				igt_subtest_f("busy-%s", e->name) {
 					gem_quiescent_gpu(fd);
-					basic(fd, e->exec_id | e->flags, BUSY);
+					basic(fd, e->flags, BUSY);
 				}
 				igt_subtest_f("wait-%s", e->name) {
 					gem_quiescent_gpu(fd);
-					basic(fd, e->exec_id | e->flags, 0);
+					basic(fd, e->flags, 0);
 				}
 				igt_subtest_f("await-%s", e->name) {
 					gem_quiescent_gpu(fd);
-					basic(fd, e->exec_id | e->flags, AWAIT);
+					basic(fd, e->flags, AWAIT);
 				}
 				igt_subtest_f("write-busy-%s", e->name) {
 					gem_quiescent_gpu(fd);
-					basic(fd, e->exec_id | e->flags, BUSY | WRITE);
+					basic(fd, e->flags, BUSY | WRITE);
 				}
 				igt_subtest_f("write-wait-%s", e->name) {
 					gem_quiescent_gpu(fd);
-					basic(fd, e->exec_id | e->flags, WRITE);
+					basic(fd, e->flags, WRITE);
 				}
 			}
 		}
@@ -234,22 +234,22 @@ igt_main
 			basic(fd, ALL_ENGINES, WRITE | HANG);
 		}
 
-		for (e = intel_execution_engines; e->name; e++) {
+		__for_each_physical_engine(fd, e) {
 			igt_subtest_f("hang-busy-%s", e->name) {
 				gem_quiescent_gpu(fd);
-				basic(fd, e->exec_id | e->flags, HANG | BUSY);
+				basic(fd, e->flags, HANG | BUSY);
 			}
 			igt_subtest_f("hang-wait-%s", e->name) {
 				gem_quiescent_gpu(fd);
-				basic(fd, e->exec_id | e->flags, HANG);
+				basic(fd, e->flags, HANG);
 			}
 			igt_subtest_f("hang-busy-write-%s", e->name) {
 				gem_quiescent_gpu(fd);
-				basic(fd, e->exec_id | e->flags, HANG | WRITE | BUSY);
+				basic(fd, e->flags, HANG | WRITE | BUSY);
 			}
 			igt_subtest_f("hang-wait-write-%s", e->name) {
 				gem_quiescent_gpu(fd);
-				basic(fd, e->exec_id | e->flags, HANG | WRITE);
+				basic(fd, e->flags, HANG | WRITE);
 			}
 		}
 
