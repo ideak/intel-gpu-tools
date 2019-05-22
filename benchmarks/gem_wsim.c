@@ -391,7 +391,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 
 	igt_assert(desc);
 
-	while ((_token = strtok_r(tstart, ",", &tctx)) != NULL) {
+	while ((_token = strtok_r(tstart, ",", &tctx))) {
 		tstart = NULL;
 		token = strdup(_token);
 		igt_assert(token);
@@ -399,12 +399,11 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 		valid = 0;
 		memset(&step, 0, sizeof(step));
 
-		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
+		if ((field = strtok_r(fstart, ".", &fctx))) {
 			fstart = NULL;
 
 			if (!strcmp(field, "d")) {
-				if ((field = strtok_r(fstart, ".", &fctx)) !=
-				    NULL) {
+				if ((field = strtok_r(fstart, ".", &fctx))) {
 					tmp = atoi(field);
 					check_arg(tmp <= 0,
 						  "Invalid delay at step %u!\n",
@@ -414,8 +413,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					goto add_step;
 				}
 			} else if (!strcmp(field, "p")) {
-				if ((field = strtok_r(fstart, ".", &fctx)) !=
-				    NULL) {
+				if ((field = strtok_r(fstart, ".", &fctx))) {
 					tmp = atoi(field);
 					check_arg(tmp <= 0,
 						  "Invalid period at step %u!\n",
@@ -426,8 +424,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				}
 			} else if (!strcmp(field, "P")) {
 				unsigned int nr = 0;
-				while ((field = strtok_r(fstart, ".", &fctx)) !=
-				    NULL) {
+				while ((field = strtok_r(fstart, ".", &fctx))) {
 					tmp = atoi(field);
 					check_arg(nr == 0 && tmp <= 0,
 						  "Invalid context at step %u!\n",
@@ -447,8 +444,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				step.type = CTX_PRIORITY;
 				goto add_step;
 			} else if (!strcmp(field, "s")) {
-				if ((field = strtok_r(fstart, ".", &fctx)) !=
-				    NULL) {
+				if ((field = strtok_r(fstart, ".", &fctx))) {
 					tmp = atoi(field);
 					check_arg(tmp >= 0 ||
 						  ((int)nr_steps + tmp) < 0,
@@ -459,8 +455,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					goto add_step;
 				}
 			} else if (!strcmp(field, "t")) {
-				if ((field = strtok_r(fstart, ".", &fctx)) !=
-				    NULL) {
+				if ((field = strtok_r(fstart, ".", &fctx))) {
 					tmp = atoi(field);
 					check_arg(tmp < 0,
 						  "Invalid throttle at step %u!\n",
@@ -470,8 +465,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					goto add_step;
 				}
 			} else if (!strcmp(field, "q")) {
-				if ((field = strtok_r(fstart, ".", &fctx)) !=
-				    NULL) {
+				if ((field = strtok_r(fstart, ".", &fctx))) {
 					tmp = atoi(field);
 					check_arg(tmp < 0,
 						  "Invalid qd throttle at step %u!\n",
@@ -481,8 +475,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 					goto add_step;
 				}
 			} else if (!strcmp(field, "a")) {
-				if ((field = strtok_r(fstart, ".", &fctx)) !=
-				    NULL) {
+				if ((field = strtok_r(fstart, ".", &fctx))) {
 					tmp = atoi(field);
 					check_arg(tmp >= 0,
 						  "Invalid sw fence signal at step %u!\n",
@@ -496,8 +489,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				goto add_step;
 			} else if (!strcmp(field, "M")) {
 				unsigned int nr = 0;
-				while ((field = strtok_r(fstart, ".", &fctx)) !=
-				    NULL) {
+				while ((field = strtok_r(fstart, ".", &fctx))) {
 					tmp = atoi(field);
 					check_arg(nr == 0 && tmp <= 0,
 						  "Invalid context at step %u!\n",
@@ -523,8 +515,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				goto add_step;
 			} else if (!strcmp(field, "X")) {
 				unsigned int nr = 0;
-				while ((field = strtok_r(fstart, ".", &fctx)) !=
-				    NULL) {
+				while ((field = strtok_r(fstart, ".", &fctx))) {
 					tmp = atoi(field);
 					check_arg(nr == 0 && tmp <= 0,
 						  "Invalid context at step %u!\n",
@@ -564,7 +555,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			valid++;
 		}
 
-		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
+		if ((field = strtok_r(fstart, ".", &fctx))) {
 			fstart = NULL;
 
 			i = str_to_engine(field);
@@ -579,7 +570,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 				bcs_used = true;
 		}
 
-		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
+		if ((field = strtok_r(fstart, ".", &fctx))) {
 			char *sep = NULL;
 			long int tmpl;
 
@@ -607,7 +598,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			valid++;
 		}
 
-		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
+		if ((field = strtok_r(fstart, ".", &fctx))) {
 			fstart = NULL;
 
 			tmp = parse_dependencies(nr_steps, &step, field);
@@ -617,7 +608,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			valid++;
 		}
 
-		if ((field = strtok_r(fstart, ".", &fctx)) != NULL) {
+		if ((field = strtok_r(fstart, ".", &fctx))) {
 			fstart = NULL;
 
 			check_arg(strlen(field) != 1 ||
