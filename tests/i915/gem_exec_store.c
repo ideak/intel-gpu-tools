@@ -37,7 +37,7 @@
 
 #define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
-static void store_dword(int fd, unsigned ring)
+static void store_dword(int fd, const struct intel_execution_engine2 *e)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -46,14 +46,13 @@ static void store_dword(int fd, unsigned ring)
 	uint32_t batch[16];
 	int i;
 
-	gem_require_ring(fd, ring);
-	igt_require(gem_can_store_dword(fd, ring));
+	igt_require(gem_class_can_store_dword(fd, e->class));
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
-	execbuf.flags = ring;
+	execbuf.flags = e->flags;
 	if (gen > 3 && gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
@@ -97,7 +96,8 @@ static void store_dword(int fd, unsigned ring)
 }
 
 #define PAGES 1
-static void store_cachelines(int fd, unsigned ring, unsigned int flags)
+static void store_cachelines(int fd, const struct intel_execution_engine2 *e,
+			     unsigned int flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 *obj;
@@ -110,13 +110,12 @@ static void store_cachelines(int fd, unsigned ring, unsigned int flags)
 	reloc = calloc(NCACHELINES, sizeof(*reloc));
 	igt_assert(reloc);
 
-	gem_require_ring(fd, ring);
-	igt_require(gem_can_store_dword(fd, ring));
+	igt_require(gem_class_can_store_dword(fd, e->class));
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffer_count = flags & PAGES ? NCACHELINES + 1 : 2;
-	execbuf.flags = ring;
+	execbuf.flags = e->flags;
 	if (gen > 3 && gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
@@ -180,12 +179,13 @@ static void store_all(int fd)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
+	struct intel_execution_engine2 *engine;
 	struct drm_i915_gem_relocation_entry reloc[32];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	unsigned engines[16], permuted[16];
 	uint32_t batch[16];
 	uint64_t offset;
-	unsigned engine, nengine;
+	unsigned nengine;
 	int value;
 	int i, j;
 
@@ -220,14 +220,14 @@ static void store_all(int fd)
 
 	nengine = 0;
 	intel_detect_and_clear_missed_interrupts(fd);
-	for_each_physical_engine(fd, engine) {
-		if (!gem_can_store_dword(fd, engine))
+	__for_each_physical_engine(fd, engine) {
+		if (!gem_class_can_store_dword(fd, engine->class))
 			continue;
 
 		igt_assert(2*(nengine+1)*sizeof(batch) <= 4096);
 
 		execbuf.flags &= ~ENGINE_MASK;
-		execbuf.flags |= engine;
+		execbuf.flags |= engine->flags;
 
 		j = 2*nengine;
 		reloc[j].target_handle = obj[0].handle;
@@ -259,7 +259,7 @@ static void store_all(int fd)
 		execbuf.batch_start_offset = j*sizeof(batch);
 		gem_execbuf(fd, &execbuf);
 
-		engines[nengine++] = engine;
+		engines[nengine++] = engine->flags;
 	}
 	gem_sync(fd, obj[1].handle);
 
@@ -311,7 +311,7 @@ static int print_welcome(int fd)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_engine2 *e;
 	int fd;
 
 	igt_fixture {
@@ -329,15 +329,15 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	for (e = intel_execution_engines; e->name; e++) {
+	__for_each_physical_engine(fd, e) {
 		igt_subtest_f("basic-%s", e->name)
-			store_dword(fd, e->exec_id | e->flags);
+			store_dword(fd, e);
 
 		igt_subtest_f("cachelines-%s", e->name)
-			store_cachelines(fd, e->exec_id | e->flags, 0);
+			store_cachelines(fd, e, 0);
 
 		igt_subtest_f("pages-%s", e->name)
-			store_cachelines(fd, e->exec_id | e->flags, PAGES);
+			store_cachelines(fd, e, PAGES);
 	}
 
 	igt_subtest("basic-all")
