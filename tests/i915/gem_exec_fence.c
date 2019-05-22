@@ -317,68 +317,22 @@ static void test_fence_busy_all(int fd, unsigned flags)
 
 static void test_fence_await(int fd, unsigned ring, unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj;
-	struct drm_i915_gem_relocation_entry reloc;
-	struct drm_i915_gem_execbuffer2 execbuf;
 	uint32_t scratch = gem_create(fd, 4096);
-	uint32_t *batch, *out;
+	igt_spin_t *spin;
 	unsigned engine;
-	int fence, i;
+	uint32_t *out;
+	int i;
 
 	igt_require(gem_can_store_dword(fd, 0));
 
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&obj);
-	execbuf.buffer_count = 1;
-	execbuf.flags = ring | LOCAL_EXEC_FENCE_OUT;
-
-	memset(&obj, 0, sizeof(obj));
-	obj.handle = gem_create(fd, 4096);
-
-	obj.relocs_ptr = to_user_pointer(&reloc);
-	obj.relocation_count = 1;
-	memset(&reloc, 0, sizeof(reloc));
-
 	out = gem_mmap__wc(fd, scratch, 0, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj.handle,
+	gem_set_domain(fd, scratch,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
-	batch = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj.handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	reloc.target_handle = obj.handle; /* recurse */
-	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
-	reloc.delta = 0;
-	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc.write_domain = 0;
-
-	i = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc.delta = 1;
-		}
-	}
-	i++;
-
-	execbuf.rsvd2 = -1;
-	gem_execbuf_wr(fd, &execbuf);
-	gem_close(fd, obj.handle);
-	fence = execbuf.rsvd2 >> 32;
-	igt_assert(fence != -1);
+	spin = igt_spin_new(fd,
+			    .engine = ring,
+			    .flags = IGT_SPIN_FENCE_OUT);
+	igt_assert(spin->out_fence != -1);
 
 	i = 0;
 	for_each_physical_engine(fd, engine) {
@@ -386,27 +340,24 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 			continue;
 
 		if (flags & NONBLOCK) {
-			store(fd, engine, fence, scratch, i);
+			store(fd, engine, spin->out_fence, scratch, i);
 		} else {
 			igt_fork(child, 1)
-				store(fd, engine, fence, scratch, i);
+				store(fd, engine, spin->out_fence, scratch, i);
 		}
 
 		i++;
 	}
-	close(fence);
 
 	sleep(1);
 
 	/* Check for invalidly completing the task early */
+	igt_assert(fence_busy(spin->out_fence));
 	for (int n = 0; n < i; n++)
 		igt_assert_eq_u32(out[n], 0);
 
-	if ((flags & HANG) == 0) {
-		*batch = MI_BATCH_BUFFER_END;
-		__sync_synchronize();
-	}
-	munmap(batch, 4096);
+	if ((flags & HANG) == 0)
+		igt_spin_end(spin);
 
 	igt_waitchildren();
 
@@ -414,6 +365,8 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 	while (i--)
 		igt_assert_eq_u32(out[i], i);
 	munmap(out, 4096);
+
+	igt_spin_free(fd, spin);
 	gem_close(fd, scratch);
 }
 

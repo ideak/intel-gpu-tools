@@ -1741,6 +1741,7 @@ bool __igt_fork(void)
 		exit_handler_count = 0;
 		reset_helper_process_list();
 		oom_adjust_for_doom();
+		igt_unshare_spins();
 
 		return true;
 	default:

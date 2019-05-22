@@ -463,6 +463,16 @@ void igt_terminate_spins(void)
 	pthread_mutex_unlock(&list_lock);
 }
 
+void igt_unshare_spins(void)
+{
+	struct igt_spin *it, *n;
+
+	/* Disable the automatic termination on inherited spinners */
+	igt_list_for_each_safe(it, n, &spin_list, link)
+		igt_list_init(&it->link);
+	igt_list_init(&spin_list);
+}
+
 static uint32_t plug_vgem_handle(struct igt_cork *cork, int fd)
 {
 	struct vgem_bo bo;
