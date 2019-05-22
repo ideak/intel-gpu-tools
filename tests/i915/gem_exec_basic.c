@@ -42,12 +42,12 @@ static void batch_fini(int fd, uint32_t handle)
 	gem_close(fd, handle);
 }
 
-static void noop(int fd, unsigned ring)
+static void noop(int fd, uint64_t flags)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 exec;
 
-	gem_require_ring(fd, ring);
+	gem_require_ring(fd, flags);
 
 	memset(&exec, 0, sizeof(exec));
 
@@ -56,18 +56,18 @@ static void noop(int fd, unsigned ring)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&exec);
 	execbuf.buffer_count = 1;
-	execbuf.flags = ring;
+	execbuf.flags = flags;
 	gem_execbuf(fd, &execbuf);
 
 	batch_fini(fd, exec.handle);
 }
 
-static void readonly(int fd, unsigned ring)
+static void readonly(int fd, uint64_t flags)
 {
 	struct drm_i915_gem_execbuffer2 *execbuf;
 	struct drm_i915_gem_exec_object2 exec;
 
-	gem_require_ring(fd, ring);
+	gem_require_ring(fd, flags);
 
 	memset(&exec, 0, sizeof(exec));
 	exec.handle = batch_create(fd);
@@ -77,7 +77,7 @@ static void readonly(int fd, unsigned ring)
 
 	execbuf->buffers_ptr = to_user_pointer(&exec);
 	execbuf->buffer_count = 1;
-	execbuf->flags = ring;
+	execbuf->flags = flags;
 	igt_assert(mprotect(execbuf, 4096, PROT_READ) == 0);
 
 	gem_execbuf(fd, execbuf);
@@ -87,13 +87,13 @@ static void readonly(int fd, unsigned ring)
 	batch_fini(fd, exec.handle);
 }
 
-static void gtt(int fd, unsigned ring)
+static void gtt(int fd, uint64_t flags)
 {
 	struct drm_i915_gem_execbuffer2 *execbuf;
 	struct drm_i915_gem_exec_object2 *exec;
 	uint32_t handle;
 
-	gem_require_ring(fd, ring);
+	gem_require_ring(fd, flags);
 
 	handle = gem_create(fd, 4096);
 
@@ -106,7 +106,7 @@ static void gtt(int fd, unsigned ring)
 
 	execbuf->buffers_ptr = to_user_pointer(exec);
 	execbuf->buffer_count = 1;
-	execbuf->flags = ring;
+	execbuf->flags = flags;
 
 	gem_execbuf(fd, execbuf);
 
@@ -116,7 +116,7 @@ static void gtt(int fd, unsigned ring)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_engine2 *e;
 	int fd = -1;
 
 	igt_fixture {
@@ -126,13 +126,13 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	for (e = intel_execution_engines; e->name; e++) {
+	__for_each_physical_engine(fd, e) {
 		igt_subtest_f("basic-%s", e->name)
-			noop(fd, e->exec_id | e->flags);
+			noop(fd, e->flags);
 		igt_subtest_f("readonly-%s", e->name)
-			readonly(fd, e->exec_id | e->flags);
+			readonly(fd, e->flags);
 		igt_subtest_f("gtt-%s", e->name)
-			gtt(fd, e->exec_id | e->flags);
+			gtt(fd, e->flags);
 	}
 
 	igt_fixture {
