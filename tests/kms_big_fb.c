@@ -43,6 +43,7 @@ typedef struct {
 	int width, height;
 	igt_rotation_t rotation;
 	int max_fb_width, max_fb_height;
+	int big_fb_width, big_fb_height;
 	uint64_t ram_size, aper_size, mappable_size;
 	igt_render_copyfunc_t render_copy;
 	drm_intel_bufmgr *bufmgr;
@@ -186,13 +187,32 @@ static void max_fb_size(data_t *data, int *width, int *height,
 		 *width, *height);
 }
 
+static void prep_fb(data_t *data)
+{
+	if (data->big_fb.fb_id)
+		return;
+
+	igt_create_fb(data->drm_fd,
+		      data->big_fb_width, data->big_fb_height,
+		      data->format, data->modifier,
+		      &data->big_fb);
+
+	generate_pattern(data, &data->big_fb, 640, 480);
+}
+
+static void cleanup_fb(data_t *data)
+{
+	igt_remove_fb(data->drm_fd, &data->big_fb);
+	data->big_fb.fb_id = 0;
+}
+
 static bool test_plane(data_t *data)
 {
 	igt_plane_t *plane = data->plane;
 	struct igt_fb *small_fb = &data->small_fb;
 	struct igt_fb *big_fb = &data->big_fb;
-	int w = big_fb->width - small_fb->width;
-	int h = big_fb->height - small_fb->height;
+	int w = data->big_fb_width - small_fb->width;
+	int h = data->big_fb_height - small_fb->height;
 	struct {
 		int x, y;
 	} coords[] = {
@@ -235,16 +255,6 @@ static bool test_plane(data_t *data)
 			y &= ~1;
 		}
 
-		/*
-		 * Make a 1:1 copy of the desired part of the big fb
-		 * rather than try to render the same pattern (translated
-		 * accordinly) again via cairo. Something in cairo's
-		 * rendering pipeline introduces slight differences into
-		 * the result if we try that, and so the crc will not match.
-		 */
-		copy_pattern(data, small_fb, 0, 0, big_fb, x, y,
-			     small_fb->width, small_fb->height);
-
 		igt_plane_set_fb(plane, small_fb);
 		igt_plane_set_size(plane, data->width, data->height);
 
@@ -261,6 +271,22 @@ static bool test_plane(data_t *data)
 			igt_plane_set_fb(plane, NULL);
 			return false;
 		}
+
+		/*
+		 * To speed up skips we delay the big fb creation until
+		 * the above rotation related check has been performed.
+		 */
+		prep_fb(data);
+
+		/*
+		 * Make a 1:1 copy of the desired part of the big fb
+		 * rather than try to render the same pattern (translated
+		 * accordinly) again via cairo. Something in cairo's
+		 * rendering pipeline introduces slight differences into
+		 * the result if we try that, and so the crc will not match.
+		 */
+		copy_pattern(data, small_fb, 0, 0, big_fb, x, y,
+			     small_fb->width, small_fb->height);
 
 		igt_display_commit2(&data->display, data->display.is_atomic ?
 				    COMMIT_ATOMIC : COMMIT_UNIVERSAL);
@@ -352,6 +378,9 @@ static bool test_pipe(data_t *data)
 
 static void test_scanout(data_t *data)
 {
+	max_fb_size(data, &data->big_fb_width, &data->big_fb_height,
+		    data->format, data->modifier);
+
 	for_each_pipe_with_valid_output(&data->display, data->pipe, data->output) {
 		if (test_pipe(data))
 			return;
@@ -359,29 +388,6 @@ static void test_scanout(data_t *data)
 	}
 
 	igt_skip("unsupported configuration\n");
-}
-
-static void prep_fb(data_t *data)
-{
-	int width, height;
-
-	if (data->big_fb.fb_id)
-		return;
-
-	max_fb_size(data, &width, &height,
-		    data->format, data->modifier);
-
-	igt_create_fb(data->drm_fd, width, height,
-		      data->format, data->modifier,
-		      &data->big_fb);
-
-	generate_pattern(data, &data->big_fb, 640, 480);
-}
-
-static void cleanup_fb(data_t *data)
-{
-	igt_remove_fb(data->drm_fd, &data->big_fb);
-	data->big_fb.fb_id = 0;
 }
 
 static void
@@ -650,7 +656,6 @@ igt_main
 					      formats[j].bpp, rotations[k].angle) {
 					igt_require(igt_fb_supported_format(data.format));
 					igt_require(igt_display_has_format_mod(&data.display, data.format, data.modifier));
-					prep_fb(&data);
 					test_scanout(&data);
 				}
 			}
