@@ -382,7 +382,8 @@ static int parse_engine_map(struct w_step *step, const char *_str)
 		if ((int)engine < 0)
 			return -1;
 
-		if (engine != VCS && engine != VCS1 && engine != VCS2)
+		if (engine != VCS && engine != VCS1 && engine != VCS2 &&
+		    engine != RCS)
 			return -1; /* TODO */
 
 		add = engine == VCS ? 2 : 1;
@@ -1183,7 +1184,7 @@ static struct drm_i915_gem_context_param_sseu get_device_sseu(void)
 }
 
 static uint64_t
-set_ctx_sseu(uint32_t ctx, uint64_t slice_mask)
+set_ctx_sseu(struct ctx *ctx, uint64_t slice_mask)
 {
 	struct drm_i915_gem_context_param_sseu sseu = get_device_sseu();
 	struct drm_i915_gem_context_param param = { };
@@ -1191,10 +1192,17 @@ set_ctx_sseu(uint32_t ctx, uint64_t slice_mask)
 	if (slice_mask == -1)
 		slice_mask = device_sseu.slice_mask;
 
+	if (ctx->engine_map && ctx->wants_balance) {
+		sseu.flags = I915_CONTEXT_SSEU_FLAG_ENGINE_INDEX;
+		sseu.engine.engine_class = I915_ENGINE_CLASS_INVALID;
+		sseu.engine.engine_instance = 0;
+	}
+
 	sseu.slice_mask = slice_mask;
 
-	param.ctx_id = ctx;
+	param.ctx_id = ctx->id;
 	param.param = I915_CONTEXT_PARAM_SSEU;
+	param.size = sizeof(sseu);
 	param.value = (uintptr_t)&sseu;
 
 	gem_context_set_param(fd, &param);
@@ -1458,10 +1466,17 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 					ctx->engine_map_count;
 
 				for (j = 0; j < ctx->engine_map_count; j++) {
-					load_balance.engines[j].engine_class =
-						I915_ENGINE_CLASS_VIDEO; /* FIXME */
-					load_balance.engines[j].engine_instance =
-						ctx->engine_map[j] - VCS1; /* FIXME */
+					if (ctx->engine_map[j] == RCS) {
+						load_balance.engines[j].engine_class =
+							I915_ENGINE_CLASS_RENDER;
+						load_balance.engines[j].engine_instance =
+							0; /* FIXME */
+					} else {
+						load_balance.engines[j].engine_class =
+							I915_ENGINE_CLASS_VIDEO; /* FIXME */
+						load_balance.engines[j].engine_instance =
+							ctx->engine_map[j] - VCS1; /* FIXME */
+					}
 				}
 			} else {
 				set_engines.extensions = 0;
@@ -1474,10 +1489,16 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 				I915_ENGINE_CLASS_INVALID_NONE;
 
 			for (j = 1; j <= ctx->engine_map_count; j++) {
-				set_engines.engines[j].engine_class =
-					I915_ENGINE_CLASS_VIDEO; /* FIXME */
-				set_engines.engines[j].engine_instance =
-					ctx->engine_map[j - 1] - VCS1; /* FIXME */
+				if (ctx->engine_map[j - 1] == RCS) {
+					set_engines.engines[j].engine_class =
+						I915_ENGINE_CLASS_RENDER;
+					set_engines.engines[j].engine_instance = 0; /* FIXME */
+				} else {
+					set_engines.engines[j].engine_class =
+						I915_ENGINE_CLASS_VIDEO; /* FIXME */
+					set_engines.engines[j].engine_instance =
+						ctx->engine_map[j - 1] - VCS1; /* FIXME */
+				}
 			}
 
 			for (j = 0; j < ctx->bond_count; j++) {
@@ -1556,7 +1577,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 
 		if (wrk->sseu) {
 			/* Set to slice 0 only, one slice. */
-			ctx->sseu = set_ctx_sseu(ctx_id, 1);
+			ctx->sseu = set_ctx_sseu(ctx, 1);
 		}
 
 		if (share_vm)
@@ -2540,9 +2561,9 @@ static void *run_workload(void *data)
 				   w->type == BOND) {
 				continue;
 			} else if (w->type == SSEU) {
-				if (w->sseu != wrk->ctx_list[w->context].sseu) {
-					wrk->ctx_list[w->context].sseu =
-						set_ctx_sseu(wrk->ctx_list[w->context].id,
+				if (w->sseu != wrk->ctx_list[w->context * 2].sseu) {
+					wrk->ctx_list[w->context * 2].sseu =
+						set_ctx_sseu(&wrk->ctx_list[w->context * 2],
 							     w->sseu);
 				}
 				continue;
