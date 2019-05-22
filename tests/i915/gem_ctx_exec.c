@@ -111,7 +111,8 @@ static void big_exec(int fd, uint32_t handle, int ring)
 	gem_sync(fd, handle);
 }
 
-static void invalid_context(int fd, unsigned ring, uint32_t handle)
+static void invalid_context(int fd, const struct intel_execution_engine2 *e,
+			    uint32_t handle)
 {
 	struct drm_i915_gem_exec_object2 obj = {
 		.handle = handle,
@@ -119,7 +120,7 @@ static void invalid_context(int fd, unsigned ring, uint32_t handle)
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(&obj),
 		.buffer_count = 1,
-		.flags = ring,
+		.flags = e->flags,
 	};
 	unsigned int i;
 	uint32_t ctx;
@@ -198,7 +199,7 @@ static void norecovery(int i915)
 igt_main
 {
 	const uint32_t batch[2] = { 0, MI_BATCH_BUFFER_END };
-	const struct intel_execution_engine *e;
+	const struct intel_execution_engine2 *e;
 	uint32_t handle;
 	uint32_t ctx_id;
 	int fd;
@@ -228,12 +229,9 @@ igt_main
 		gem_sync(fd, handle);
 	}
 
-	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("basic-invalid-context-%s", e->name) {
-			gem_require_ring(fd, e->exec_id | e->flags);
-			invalid_context(fd, e->exec_id | e->flags, handle);
-		}
-	}
+	__for_each_physical_engine(fd, e)
+		igt_subtest_f("basic-invalid-context-%s", e->name)
+			invalid_context(fd, e, handle);
 
 	igt_subtest("eviction")
 		big_exec(fd, handle, 0);
