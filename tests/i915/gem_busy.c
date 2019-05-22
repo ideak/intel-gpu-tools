@@ -66,22 +66,9 @@ static void __gem_busy(int fd,
 	*read = busy.busy >> 16;
 }
 
-static uint32_t ring_to_class(unsigned int ring)
-{
-	uint32_t class[] = {
-		[I915_EXEC_DEFAULT] = I915_ENGINE_CLASS_RENDER,
-		[I915_EXEC_RENDER]  = I915_ENGINE_CLASS_RENDER,
-		[I915_EXEC_BLT]     = I915_ENGINE_CLASS_COPY,
-		[I915_EXEC_BSD]     = I915_ENGINE_CLASS_VIDEO,
-		[I915_EXEC_VEBOX]   = I915_ENGINE_CLASS_VIDEO_ENHANCE,
-	};
-	igt_assert(ring < ARRAY_SIZE(class));
-	return class[ring];
-}
-
 static bool exec_noop(int fd,
 		      uint32_t *handles,
-		      unsigned ring,
+		      unsigned flags,
 		      bool write)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -97,9 +84,9 @@ static bool exec_noop(int fd,
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = 3;
-	execbuf.flags = ring;
-	igt_debug("Queuing handle for %s on ring %d\n",
-		  write ? "writing" : "reading", ring & 0x7);
+	execbuf.flags = flags;
+	igt_debug("Queuing handle for %s on engine %d\n",
+		  write ? "writing" : "reading", flags);
 	return __gem_execbuf(fd, &execbuf) == 0;
 }
 
@@ -110,17 +97,16 @@ static bool still_busy(int fd, uint32_t handle)
 	return write;
 }
 
-static void semaphore(int fd, unsigned ring, uint32_t flags)
+static void semaphore(int fd, const struct intel_execution_engine2 *e)
 {
+	struct intel_execution_engine2 *__e;
 	uint32_t bbe = MI_BATCH_BUFFER_END;
-	const unsigned uabi = ring_to_class(ring & 63);
+	const unsigned uabi = e->class;
 	igt_spin_t *spin;
 	uint32_t handle[3];
 	uint32_t read, write;
 	uint32_t active;
 	unsigned i;
-
-	gem_require_ring(fd, ring | flags);
 
 	handle[TEST] = gem_create(fd, 4096);
 	handle[BATCH] = gem_create(fd, 4096);
@@ -129,18 +115,18 @@ static void semaphore(int fd, unsigned ring, uint32_t flags)
 	/* Create a long running batch which we can use to hog the GPU */
 	handle[BUSY] = gem_create(fd, 4096);
 	spin = igt_spin_new(fd,
-			    .engine = ring,
+			    .engine = e->flags,
 			    .dependency = handle[BUSY]);
 
 	/* Queue a batch after the busy, it should block and remain "busy" */
-	igt_assert(exec_noop(fd, handle, ring | flags, false));
+	igt_assert(exec_noop(fd, handle, e->flags, false));
 	igt_assert(still_busy(fd, handle[BUSY]));
 	__gem_busy(fd, handle[TEST], &read, &write);
 	igt_assert_eq(read, 1 << uabi);
 	igt_assert_eq(write, 0);
 
 	/* Requeue with a write */
-	igt_assert(exec_noop(fd, handle, ring | flags, true));
+	igt_assert(exec_noop(fd, handle, e->flags, true));
 	igt_assert(still_busy(fd, handle[BUSY]));
 	__gem_busy(fd, handle[TEST], &read, &write);
 	igt_assert_eq(read, 1 << uabi);
@@ -148,9 +134,9 @@ static void semaphore(int fd, unsigned ring, uint32_t flags)
 
 	/* Now queue it for a read across all available rings */
 	active = 0;
-	for (i = I915_EXEC_RENDER; i <= I915_EXEC_VEBOX; i++) {
-		if (exec_noop(fd, handle, i | flags, false))
-			active |= 1 << ring_to_class(i);
+	__for_each_physical_engine(fd, __e) {
+		if (exec_noop(fd, handle, __e->flags, false))
+			active |= 1 << __e->class;
 	}
 	igt_assert(still_busy(fd, handle[BUSY]));
 	__gem_busy(fd, handle[TEST], &read, &write);
@@ -173,7 +159,7 @@ static void semaphore(int fd, unsigned ring, uint32_t flags)
 
 #define PARALLEL 1
 #define HANG 2
-static void one(int fd, unsigned ring, unsigned test_flags)
+static void one(int fd, const struct intel_execution_engine2 *e, unsigned test_flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -182,7 +168,7 @@ static void one(int fd, unsigned ring, unsigned test_flags)
 	struct drm_i915_gem_relocation_entry store[1024+1];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	unsigned size = ALIGN(ARRAY_SIZE(store)*16 + 4, 4096);
-	const unsigned uabi = ring_to_class(ring & 63);
+	const unsigned uabi = e->class;
 	uint32_t read[2], write[2];
 	struct timespec tv;
 	uint32_t *batch, *bbe;
@@ -191,7 +177,7 @@ static void one(int fd, unsigned ring, unsigned test_flags)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
-	execbuf.flags = ring;
+	execbuf.flags = e->flags;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
@@ -263,17 +249,18 @@ static void one(int fd, unsigned ring, unsigned test_flags)
 	__gem_busy(fd, obj[BATCH].handle, &read[BATCH], &write[BATCH]);
 
 	if (test_flags & PARALLEL) {
-		unsigned other;
+		struct intel_execution_engine2 *e2;
 
-		for_each_physical_engine(fd, other) {
-			if (other == ring)
+		__for_each_physical_engine(fd, e2) {
+			if (e2->class == e->class &&
+			    e2->instance == e->instance)
 				continue;
 
-			if (!gem_can_store_dword(fd, other))
+			if (!gem_class_can_store_dword(fd, e->class))
 				continue;
 
-			igt_debug("Testing %s in parallel\n", e__->name);
-			one(fd, other, 0);
+			igt_debug("Testing %s in parallel\n", e2->name);
+			one(fd, e2, 0);
 		}
 	}
 
@@ -439,11 +426,11 @@ static bool has_extended_busy_ioctl(int fd)
 	return read != 0;
 }
 
-static void basic(int fd, unsigned ring, unsigned flags)
+static void basic(int fd, const struct intel_execution_engine2 *e, unsigned flags)
 {
 	igt_spin_t *spin =
 		igt_spin_new(fd,
-			     .engine = ring,
+			     .engine = e->flags,
 			     .flags = IGT_SPIN_NO_PREEMPTION);
 	struct timespec tv;
 	int timeout;
@@ -475,13 +462,14 @@ static void basic(int fd, unsigned ring, unsigned flags)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_engine2 *e;
 	int fd = -1;
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
-		igt_require(gem_can_store_dword(fd, 0));
+		igt_require(gem_class_can_store_dword(fd,
+						     I915_ENGINE_CLASS_RENDER));
 	}
 
 	igt_subtest_group {
@@ -489,14 +477,13 @@ igt_main
 			igt_fork_hang_detector(fd);
 		}
 
-		for (e = intel_execution_engines; e->name; e++) {
+		__for_each_physical_engine(fd, e) {
 			igt_subtest_group {
 				igt_subtest_f("%sbusy-%s",
-					      e->exec_id == 0 ? "basic-" : "",
-					      e->name) {
-					igt_require(gem_has_ring(fd, e->exec_id | e->flags));
+					      e->class == I915_ENGINE_CLASS_RENDER
+					      ? "basic-" : "", e->name) {
 					gem_quiescent_gpu(fd);
-					basic(fd, e->exec_id | e->flags, 0);
+					basic(fd, e, false);
 				}
 			}
 		}
@@ -507,31 +494,22 @@ igt_main
 				gem_require_mmap_wc(fd);
 			}
 
-			for (e = intel_execution_engines; e->name; e++) {
-				/* default exec-id is purely symbolic */
-				if (e->exec_id == 0)
-					continue;
-
+			__for_each_physical_engine(fd, e) {
 				igt_subtest_f("extended-%s", e->name) {
-					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
-					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
+					igt_require(gem_class_can_store_dword(fd,
+						     e->class));
 					gem_quiescent_gpu(fd);
-					one(fd, e->exec_id | e->flags, 0);
+					one(fd, e, 0);
 					gem_quiescent_gpu(fd);
 				}
 			}
 
-			for (e = intel_execution_engines; e->name; e++) {
-				/* default exec-id is purely symbolic */
-				if (e->exec_id == 0)
-					continue;
-
+			__for_each_physical_engine(fd, e) {
 				igt_subtest_f("extended-parallel-%s", e->name) {
-					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
-					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
+					igt_require(gem_class_can_store_dword(fd, e->class));
 
 					gem_quiescent_gpu(fd);
-					one(fd, e->exec_id | e->flags, PARALLEL);
+					one(fd, e, PARALLEL);
 					gem_quiescent_gpu(fd);
 				}
 			}
@@ -543,13 +521,9 @@ igt_main
 				igt_require(has_semaphores(fd));
 			}
 
-			for (e = intel_execution_engines; e->name; e++) {
-				/* default exec-id is purely symbolic */
-				if (e->exec_id == 0)
-					continue;
-
+			__for_each_physical_engine(fd, e) {
 				igt_subtest_f("extended-semaphore-%s", e->name)
-					semaphore(fd, e->exec_id, e->flags);
+					semaphore(fd, e);
 			}
 		}
 
@@ -568,14 +542,13 @@ igt_main
 			hang = igt_allow_hang(fd, 0, 0);
 		}
 
-		for (e = intel_execution_engines; e->name; e++) {
+		__for_each_physical_engine(fd, e) {
 			igt_subtest_f("%shang-%s",
-				      e->exec_id == 0 ? "basic-" : "",
-				      e->name) {
+				      e->class == I915_ENGINE_CLASS_RENDER
+				      ? "basic-" : "", e->name) {
 				igt_skip_on_simulation();
-				igt_require(gem_has_ring(fd, e->exec_id | e->flags));
 				gem_quiescent_gpu(fd);
-				basic(fd, e->exec_id | e->flags, HANG);
+				basic(fd, e, true);
 			}
 		}
 
@@ -585,18 +558,13 @@ igt_main
 				gem_require_mmap_wc(fd);
 			}
 
-			for (e = intel_execution_engines; e->name; e++) {
-				/* default exec-id is purely symbolic */
-				if (e->exec_id == 0)
-					continue;
-
+			__for_each_physical_engine(fd, e) {
 				igt_subtest_f("extended-hang-%s", e->name) {
 					igt_skip_on_simulation();
-					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
-					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
+					igt_require(gem_class_can_store_dword(fd, e->class));
 
 					gem_quiescent_gpu(fd);
-					one(fd, e->exec_id | e->flags, HANG);
+					one(fd, e, HANG);
 					gem_quiescent_gpu(fd);
 				}
 			}
