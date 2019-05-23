@@ -3070,19 +3070,23 @@ static int opt_handler(int option, int option_index, void *data)
 	case 'x':
 		errno = 0;
 		opt.shared_fb_x_offset = strtol(optarg, NULL, 0);
-		igt_assert(errno == 0);
+		if (errno != 0)
+			return IGT_OPT_HANDLER_ERROR;
 		break;
 	case 'y':
 		errno = 0;
 		opt.shared_fb_y_offset = strtol(optarg, NULL, 0);
-		igt_assert(errno == 0);
+		if (errno != 0)
+			return IGT_OPT_HANDLER_ERROR;
 		break;
 	case '1':
-		igt_assert_eq(opt.only_pipes, PIPE_COUNT);
+		if (opt.only_pipes != PIPE_COUNT)
+			return IGT_OPT_HANDLER_ERROR;
 		opt.only_pipes = PIPE_SINGLE;
 		break;
 	case '2':
-		igt_assert_eq(opt.only_pipes, PIPE_COUNT);
+		if (opt.only_pipes != PIPE_COUNT)
+			return IGT_OPT_HANDLER_ERROR;
 		opt.only_pipes = PIPE_DUAL;
 		break;
 	case 'l':
@@ -3090,14 +3094,16 @@ static int opt_handler(int option, int option_index, void *data)
 			opt.tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
 		else if (!strcmp(optarg, "y"))
 			opt.tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
-		else
-			igt_assert_f(false, "Bad tiling value: %s\n", optarg);
+		else {
+			igt_warn("Bad tiling value: %s\n", optarg);
+			return IGT_OPT_HANDLER_ERROR;
+		}
 		break;
 	default:
-		igt_assert(false);
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
 const char *help_str =
@@ -3245,28 +3251,26 @@ static const char *flip_str(enum flip_type flip)
 
 #define TEST_MODE_ITER_END } } } } } }
 
-int main(int argc, char *argv[])
+struct option long_options[] = {
+	{ "no-status-check",          0, 0, 's'},
+	{ "no-crc-check",             0, 0, 'c'},
+	{ "no-fbc-compression-check", 0, 0, 'o'},
+	{ "no-fbc-action-check",      0, 0, 'a'},
+	{ "no-edp",                   0, 0, 'e'},
+	{ "use-small-modes",          0, 0, 'm'},
+	{ "show-hidden",              0, 0, 'i'},
+	{ "step",                     0, 0, 't'},
+	{ "shared-fb-x",              1, 0, 'x'},
+	{ "shared-fb-y",              1, 0, 'y'},
+	{ "1p-only",                  0, 0, '1'},
+	{ "2p-only",                  0, 0, '2'},
+	{ "tiling",                   1, 0, 'l'},
+	{ 0, 0, 0, 0 }
+};
+
+igt_main_args("", long_options, help_str, opt_handler, NULL)
 {
 	struct test_mode t;
-	struct option long_options[] = {
-		{ "no-status-check",          0, 0, 's'},
-		{ "no-crc-check",             0, 0, 'c'},
-		{ "no-fbc-compression-check", 0, 0, 'o'},
-		{ "no-fbc-action-check",      0, 0, 'a'},
-		{ "no-edp",                   0, 0, 'e'},
-		{ "use-small-modes",          0, 0, 'm'},
-		{ "show-hidden",              0, 0, 'i'},
-		{ "step",                     0, 0, 't'},
-		{ "shared-fb-x",              1, 0, 'x'},
-		{ "shared-fb-y",              1, 0, 'y'},
-		{ "1p-only",                  0, 0, '1'},
-		{ "2p-only",                  0, 0, '2'},
-		{ "tiling",                   1, 0, 'l'},
-		{ 0, 0, 0, 0 }
-	};
-
-	igt_subtest_init_parse_opts(&argc, argv, "", long_options, help_str,
-				    opt_handler, NULL);
 
 	igt_fixture
 		setup_environment();
@@ -3473,6 +3477,4 @@ int main(int argc, char *argv[])
 
 	igt_fixture
 		teardown_environment();
-
-	igt_exit();
 }
