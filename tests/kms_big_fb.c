@@ -344,8 +344,6 @@ static bool test_pipe(data_t *data)
 	igt_pipe_crc_free(data->pipe_crc);
 
 	igt_output_set_pipe(data->output, PIPE_ANY);
-	igt_display_commit2(&data->display, data->display.is_atomic ?
-			    COMMIT_ATOMIC : COMMIT_UNIVERSAL);
 
 	igt_remove_fb(data->drm_fd, &data->small_fb);
 
@@ -357,6 +355,7 @@ static void test_scanout(data_t *data)
 	for_each_pipe_with_valid_output(&data->display, data->pipe, data->output) {
 		if (test_pipe(data))
 			return;
+		break;
 	}
 
 	igt_skip("unsupported configuration\n");
