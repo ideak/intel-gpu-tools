@@ -857,8 +857,18 @@ out:
  * additional knobs to tune when run manually like the number of rounds execute
  * or the size of the allocated buffer objects.
  *
- * Tests without special needs should just use igt_subtest_init() or use
- * #igt_main directly instead of their own main() function.
+ * Tests should use #igt_main_args instead of their own main()
+ * function and calling this function.
+ *
+ * The @help_str parameter is printed directly after the help text of
+ * standard arguments. The formatting of the string should be:
+ * - One line per option
+ * - Two spaces, option flag, tab character, help text, newline character
+ *
+ * Example: "  -s\tBuffer size\n"
+ *
+ * The opt handler function must return #IGT_OPT_HANDLER_SUCCESS on
+ * successful handling, #IGT_OPT_HANDLER_ERROR on errors.
  *
  * Returns: Forwards any option parsing errors from getopt_long.
  */
@@ -891,7 +901,22 @@ enum igt_log_level igt_log_level = IGT_LOG_INFO;
  * @handler_data: user data given to @extra_opt_handler when invoked
  *
  * This initializes a simple test without any support for subtests and allows
- * an arbitrary set of additional options.
+ * an arbitrary set of additional options. This is useful for tests which have
+ * additional knobs to tune when run manually like the number of rounds execute
+ * or the size of the allocated buffer objects.
+ *
+ * Tests should use #igt_simple_main_args instead of their own main()
+ * function and calling this function.
+ *
+ * The @help_str parameter is printed directly after the help text of
+ * standard arguments. The formatting of the string should be:
+ * - One line per option
+ * - Two spaces, option flag, tab character, help text, newline character
+ *
+ * Example: "  -s\tBuffer size\n"
+ *
+ * The opt handler function must return #IGT_OPT_HANDLER_SUCCESS on
+ * successful handling, #IGT_OPT_HANDLER_ERROR on errors.
  */
 void igt_simple_init_parse_opts(int *argc, char **argv,
 				const char *extra_short_opts,

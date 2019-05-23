@@ -145,6 +145,8 @@ void __igt_fixture_end(void) __attribute__((noreturn));
 /* subtest infrastructure */
 jmp_buf igt_subtest_jmpbuf;
 typedef int (*igt_opt_handler_t)(int opt, int opt_index, void *data);
+#define IGT_OPT_HANDLER_SUCCESS 0
+#define IGT_OPT_HANDLER_ERROR -2
 #ifndef __GTK_DOC_IGNORE__ /* gtkdoc wants to document this forward decl */
 struct option;
 #endif
