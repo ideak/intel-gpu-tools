@@ -65,25 +65,23 @@ static int opt_handler(int opt, int opt_index, void *data)
 		break;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
-int main(int argc, char **argv)
+struct option long_opts[] = {
+	{"reset", 0, 0, 'r'},
+	{0, 0, 0, 0}
+};
+const char *help_str =
+	"  --reset\t\tReset all connector force states and edid.\n";
+
+igt_main_args("", long_opts, help_str, opt_handler, NULL)
 {
 	/* force the VGA output and test that it worked */
 	int drm_fd = 0;
 	drmModeRes *res;
 	drmModeConnector *vga_connector = NULL, *temp;
 	int start_n_modes, start_connection;
-	struct option long_opts[] = {
-		{"reset", 0, 0, 'r'},
-		{0, 0, 0, 0}
-	};
-	const char *help_str =
-	       "  --reset\t\tReset all connector force states and edid.\n";
-
-	igt_subtest_init_parse_opts(&argc, argv, "", long_opts, help_str,
-				    opt_handler, NULL);
 
 	igt_fixture {
 		unsigned vga_connector_id = 0;
@@ -320,6 +318,4 @@ int main(int argc, char **argv)
 
 		reset_connectors();
 	}
-
-	igt_exit();
 }
