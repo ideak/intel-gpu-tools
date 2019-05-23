@@ -812,17 +812,179 @@ static const snd_pcm_format_t test_formats[] = {
 static const size_t test_formats_count = sizeof(test_formats) / sizeof(test_formats[0]);
 
 struct audio_state {
+	struct alsa *alsa;
+	struct chamelium *chamelium;
+	struct chamelium_port *port;
+	struct chamelium_stream *stream;
+
+	/* The capture format is only available after capture has started. */
+	struct {
+		snd_pcm_format_t format;
+		int channels;
+		int rate;
+	} playback, capture;
+
 	struct audio_signal *signal;
-	snd_pcm_format_t format;
+	int channel_mapping[CHAMELIUM_MAX_AUDIO_CHANNELS];
+
+	int dump_fd;
+	char *dump_path;
+
+	pthread_t thread;
 	atomic_bool run;
 };
+
+static void audio_state_init(struct audio_state *state, data_t *data,
+			     struct alsa *alsa, struct chamelium_port *port,
+			     snd_pcm_format_t format, int channels, int rate)
+{
+	memset(state, 0, sizeof(*state));
+	state->dump_fd = -1;
+
+	state->alsa = alsa;
+	state->chamelium = data->chamelium;
+	state->port = port;
+
+	state->playback.format = format;
+	state->playback.channels = channels;
+	state->playback.rate = rate;
+
+	alsa_configure_output(alsa, format, channels, rate);
+
+	state->stream = chamelium_stream_init();
+	igt_assert(state->stream);
+}
+
+static void audio_state_fini(struct audio_state *state)
+{
+	chamelium_stream_deinit(state->stream);
+}
+
+static void *run_audio_thread(void *data)
+{
+	struct alsa *alsa = data;
+
+	alsa_run(alsa, -1);
+	return NULL;
+}
+
+static void audio_state_start(struct audio_state *state)
+{
+	int ret;
+	bool ok;
+	size_t i, j;
+	enum chamelium_stream_realtime_mode stream_mode;
+	char dump_suffix[64];
+
+	igt_debug("Starting test with playback format %s, sampling rate %d Hz "
+		  "and %d channels\n",
+		  snd_pcm_format_name(state->playback.format),
+		  state->playback.rate, state->playback.channels);
+
+	chamelium_start_capturing_audio(state->chamelium, state->port, false);
+
+	stream_mode = CHAMELIUM_STREAM_REALTIME_STOP_WHEN_OVERFLOW;
+	ok = chamelium_stream_dump_realtime_audio(state->stream, stream_mode);
+	igt_assert(ok);
+
+	/* Start playing audio */
+	state->run = true;
+	ret = pthread_create(&state->thread, NULL,
+			     run_audio_thread, state->alsa);
+	igt_assert(ret == 0);
+
+	/* The Chamelium device only supports this PCM format. */
+	state->capture.format = SND_PCM_FORMAT_S32_LE;
+
+	/* Only after we've started playing audio, we can retrieve the capture
+	 * format used by the Chamelium device. */
+	chamelium_get_audio_format(state->chamelium, state->port,
+				   &state->capture.rate,
+				   &state->capture.channels);
+	if (state->capture.rate == 0) {
+		igt_debug("Audio receiver doesn't indicate the capture "
+			 "sampling rate, assuming it's %d Hz\n",
+			 state->playback.rate);
+		state->capture.rate = state->playback.rate;
+	}
+
+	chamelium_get_audio_channel_mapping(state->chamelium, state->port,
+					    state->channel_mapping);
+	/* Make sure we can capture all channels we send. */
+	for (i = 0; i < state->playback.channels; i++) {
+		ok = false;
+		for (j = 0; j < state->capture.channels; j++) {
+			if (state->channel_mapping[j] == i) {
+				ok = true;
+				break;
+			}
+		}
+		igt_assert(ok);
+	}
+
+	if (igt_frame_dump_is_enabled()) {
+		snprintf(dump_suffix, sizeof(dump_suffix),
+			 "capture-%s-%dch-%dHz",
+			 snd_pcm_format_name(state->playback.format),
+			 state->playback.channels, state->playback.rate);
+
+		state->dump_fd = audio_create_wav_file_s32_le(dump_suffix,
+							      state->capture.rate,
+							      state->capture.channels,
+							      &state->dump_path);
+		igt_assert(state->dump_fd >= 0);
+	}
+}
+
+static void audio_state_stop(struct audio_state *state, bool success)
+{
+	bool ok;
+	int ret;
+	struct chamelium_audio_file *audio_file;
+
+	igt_debug("Stopping audio playback\n");
+	state->run = false;
+	ret = pthread_join(state->thread, NULL);
+	igt_assert(ret == 0);
+
+	ok = chamelium_stream_stop_realtime_audio(state->stream);
+	igt_assert(ok);
+
+	audio_file = chamelium_stop_capturing_audio(state->chamelium,
+						    state->port);
+	if (audio_file) {
+		igt_debug("Audio file saved on the Chamelium in %s\n",
+			  audio_file->path);
+		chamelium_destroy_audio_file(audio_file);
+	}
+
+	if (state->dump_fd >= 0) {
+		close(state->dump_fd);
+		state->dump_fd = -1;
+
+		if (success) {
+			/* Test succeeded, no need to keep the captured data */
+			unlink(state->dump_path);
+		} else
+			igt_debug("Saved captured audio data to %s\n",
+				  state->dump_path);
+		free(state->dump_path);
+		state->dump_path = NULL;
+	}
+
+	igt_debug("Audio test result for format %s, sampling rate %d Hz and "
+		  "%d channels: %s\n",
+		  snd_pcm_format_name(state->playback.format),
+		  state->playback.rate, state->playback.channels,
+		  success ? "ALL GREEN" : "FAILED");
+}
 
 static int
 audio_output_callback(void *data, void *buffer, int samples)
 {
 	struct audio_state *state = data;
 
-	switch (state->format) {
+	switch (state->playback.format) {
 	case SND_PCM_FORMAT_S16_LE:
 		audio_signal_fill_s16_le(state->signal, buffer, samples);
 		break;
@@ -839,55 +1001,19 @@ audio_output_callback(void *data, void *buffer, int samples)
 	return state->run ? 0 : -1;
 }
 
-static void *
-run_audio_thread(void *data)
+static bool do_test_display_audio(struct audio_state *state)
 {
-	struct alsa *alsa = data;
-
-	alsa_run(alsa, -1);
-	return NULL;
-}
-
-static bool
-do_test_display_audio(data_t *data, struct chamelium_port *port,
-		      struct alsa *alsa, snd_pcm_format_t playback_format,
-		      int playback_channels, int playback_rate)
-{
-	int ret, capture_rate, capture_channels, msec, freq, step;
-	struct chamelium_audio_file *audio_file;
-	struct chamelium_stream *stream;
-	enum chamelium_stream_realtime_mode stream_mode;
-	struct audio_signal *signal;
+	int msec, freq, step;
 	int32_t *recv, *buf;
 	double *channel;
 	size_t i, j, streak, page_count;
 	size_t recv_len, buf_len, buf_cap, buf_size, channel_len;
 	bool ok, success;
-	char dump_suffix[64];
-	char *dump_path = NULL;
-	int dump_fd = -1;
-	pthread_t thread;
-	struct audio_state state = {};
-	int channel_mapping[8], capture_chan;
+	int capture_chan;
 
-	igt_debug("Testing with playback format %s, sampling rate %d Hz and "
-		  "%d channels\n",
-		  snd_pcm_format_name(playback_format),
-		  playback_rate, playback_channels);
-	alsa_configure_output(alsa, playback_format,
-			      playback_channels, playback_rate);
-
-	chamelium_start_capturing_audio(data->chamelium, port, false);
-
-	stream = chamelium_stream_init();
-	igt_assert(stream);
-
-	stream_mode = CHAMELIUM_STREAM_REALTIME_STOP_WHEN_OVERFLOW;
-	ok = chamelium_stream_dump_realtime_audio(stream, stream_mode);
-	igt_assert(ok);
-
-	signal = audio_signal_init(playback_channels, playback_rate);
-	igt_assert(signal);
+	state->signal = audio_signal_init(state->playback.channels,
+					  state->playback.rate);
+	igt_assert(state->signal);
 
 	/* We'll choose different frequencies per channel to make sure they are
 	 * independent from each other. To do so, we'll add a different offset
@@ -900,62 +1026,21 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	 * later on. We cannot retrieve the capture rate before starting
 	 * playing audio, so we don't really have the choice.
 	 */
-	step = 2 * playback_rate / CAPTURE_SAMPLES;
+	step = 2 * state->playback.rate / CAPTURE_SAMPLES;
 	for (i = 0; i < test_frequencies_count; i++) {
-		for (j = 0; j < playback_channels; j++) {
+		for (j = 0; j < state->playback.channels; j++) {
 			freq = test_frequencies[i] + j * step;
-			audio_signal_add_frequency(signal, freq, j);
+			audio_signal_add_frequency(state->signal, freq, j);
 		}
 	}
-	audio_signal_synthesize(signal);
+	audio_signal_synthesize(state->signal);
 
-	state.signal = signal;
-	state.format = playback_format;
-	state.run = true;
-	alsa_register_output_callback(alsa, audio_output_callback, &state,
+	alsa_register_output_callback(state->alsa, audio_output_callback, state,
 				      PLAYBACK_SAMPLES);
 
-	/* Start playing audio */
-	ret = pthread_create(&thread, NULL, run_audio_thread, alsa);
-	igt_assert(ret == 0);
+	audio_state_start(state);
 
-	/* Only after we've started playing audio, we can retrieve the capture
-	 * format used by the Chamelium device. */
-	chamelium_get_audio_format(data->chamelium, port,
-				   &capture_rate, &capture_channels);
-	if (capture_rate == 0) {
-		igt_debug("Audio receiver doesn't indicate the capture "
-			 "sampling rate, assuming it's %d Hz\n", playback_rate);
-		capture_rate = playback_rate;
-	} else
-		igt_assert(capture_rate == playback_rate);
-
-	chamelium_get_audio_channel_mapping(data->chamelium, port,
-					    channel_mapping);
-	/* Make sure we can capture all channels we send. */
-	for (i = 0; i < playback_channels; i++) {
-		ok = false;
-		for (j = 0; j < capture_channels; j++) {
-			if (channel_mapping[j] == i) {
-				ok = true;
-				break;
-			}
-		}
-		igt_assert(ok);
-	}
-
-	if (igt_frame_dump_is_enabled()) {
-		snprintf(dump_suffix, sizeof(dump_suffix),
-			 "capture-%s-%dch-%dHz",
-			 snd_pcm_format_name(playback_format),
-			 playback_channels, playback_rate);
-
-		dump_fd = audio_create_wav_file_s32_le(dump_suffix,
-						       capture_rate,
-						       capture_channels,
-						       &dump_path);
-		igt_assert(dump_fd >= 0);
-	}
+	igt_assert(state->capture.rate == state->playback.rate);
 
 	/* Needs to be a multiple of 128, because that's the number of samples
 	 * we get per channel each time we receive an audio page from the
@@ -970,7 +1055,7 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	channel_len = CAPTURE_SAMPLES;
 	channel = malloc(sizeof(double) * channel_len);
 
-	buf_cap = capture_channels * channel_len;
+	buf_cap = state->capture.channels * channel_len;
 	buf = malloc(sizeof(int32_t) * buf_cap);
 	buf_len = 0;
 
@@ -982,7 +1067,7 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 	msec = 0;
 	i = 0;
 	while (!success && msec < AUDIO_TIMEOUT) {
-		ok = chamelium_stream_receive_realtime_audio(stream,
+		ok = chamelium_stream_receive_realtime_audio(state->stream,
 							     &page_count,
 							     &recv, &recv_len);
 		igt_assert(ok);
@@ -994,26 +1079,27 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 			continue;
 		igt_assert(buf_len == buf_cap);
 
-		if (dump_fd >= 0) {
+		if (state->dump_fd >= 0) {
 			buf_size = buf_len * sizeof(int32_t);
-			igt_assert(write(dump_fd, buf, buf_size) == buf_size);
+			igt_assert(write(state->dump_fd, buf, buf_size) == buf_size);
 		}
 
-		msec = i * channel_len / (double) capture_rate * 1000;
+		msec = i * channel_len / (double) state->capture.rate * 1000;
 		igt_debug("Detecting audio signal, t=%d msec\n", msec);
 
-		for (j = 0; j < playback_channels; j++) {
-			capture_chan = channel_mapping[j];
+		for (j = 0; j < state->playback.channels; j++) {
+			capture_chan = state->channel_mapping[j];
 			igt_assert(capture_chan >= 0);
 			igt_debug("Processing channel %zu (captured as "
 				  "channel %d)\n", j, capture_chan);
 
 			audio_extract_channel_s32_le(channel, channel_len,
 						     buf, buf_len,
-						     capture_channels,
+						     state->capture.channels,
 						     capture_chan);
 
-			if (audio_signal_detect(signal, capture_rate, j,
+			if (audio_signal_detect(state->signal,
+						state->capture.rate, j,
 						channel, channel_len))
 				streak++;
 			else
@@ -1023,49 +1109,15 @@ do_test_display_audio(data_t *data, struct chamelium_port *port,
 		buf_len = 0;
 		i++;
 
-		success = streak == MIN_STREAK * playback_channels;
+		success = streak == MIN_STREAK * state->playback.channels;
 	}
 
-	igt_debug("Stopping audio playback\n");
-	state.run = false;
-	ret = pthread_join(thread, NULL);
-	igt_assert(ret == 0);
-
-	alsa_close_output(alsa);
-
-	igt_debug("Audio test result for format %s, sampling rate %d Hz and "
-		  "%d channels: %s\n",
-		  snd_pcm_format_name(playback_format),
-		  playback_rate, playback_channels,
-		  success ? "ALL GREEN" : "FAILED");
-
-	if (dump_fd >= 0) {
-		close(dump_fd);
-		if (success) {
-			/* Test succeeded, no need to keep the captured data */
-			unlink(dump_path);
-		} else
-			igt_debug("Saved captured audio data to %s\n", dump_path);
-		free(dump_path);
-	}
+	audio_state_stop(state, success);
 
 	free(recv);
 	free(buf);
 	free(channel);
-
-	ok = chamelium_stream_stop_realtime_audio(stream);
-	igt_assert(ok);
-
-	audio_file = chamelium_stop_capturing_audio(data->chamelium,
-						    port);
-	if (audio_file) {
-		igt_debug("Audio file saved on the Chamelium in %s\n",
-			  audio_file->path);
-		chamelium_destroy_audio_file(audio_file);
-	}
-
-	audio_signal_fini(signal);
-	chamelium_stream_deinit(stream);
+	audio_signal_fini(state->signal);
 
 	return success;
 }
@@ -1112,6 +1164,7 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 	int fb_id, i, j;
 	int channels, sampling_rate;
 	snd_pcm_format_t format;
+	struct audio_state state;
 
 	igt_require(alsa_has_exclusive_access());
 
@@ -1161,9 +1214,10 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 
 			run = true;
 
-			success &= do_test_display_audio(data, port, alsa,
-							 format, channels,
-							 sampling_rate);
+			audio_state_init(&state, data, alsa, port,
+					 format, channels, sampling_rate);
+			success &= do_test_display_audio(&state);
+			audio_state_fini(&state);
 
 			alsa_close_output(alsa);
 		}
