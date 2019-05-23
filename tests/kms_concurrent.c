@@ -372,29 +372,26 @@ static int opt_handler(int option, int option_index, void *input)
 		opt.seed = strtol(optarg, NULL, 0);
 		break;
 	default:
-		igt_assert(false);
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
 const char *help_str =
 	"  --iterations Number of iterations for test coverage. -1 loop forever, default 1 iteration\n"
 	"  --seed       Seed for random number generator\n";
+struct option long_options[] = {
+	{ "iterations", required_argument, NULL, 'i'},
+	{ "seed",    required_argument, NULL, 's'},
+	{ 0, 0, 0, 0 }
+};
 
 static data_t data;
 
-int main(int argc, char *argv[])
+igt_main_args("", long_options, help_str, opt_handler, NULL)
 {
-	struct option long_options[] = {
-		{ "iterations", required_argument, NULL, 'i'},
-		{ "seed",    required_argument, NULL, 's'},
-		{ 0, 0, 0, 0 }
-	};
 	enum pipe pipe;
-
-	igt_subtest_init_parse_opts(&argc, argv, "", long_options, help_str,
-				    opt_handler, NULL);
 
 	igt_skip_on_simulation();
 
@@ -414,6 +411,4 @@ int main(int argc, char *argv[])
 		igt_display_fini(&data.display);
 		close(data.drm_fd);
 	}
-
-	igt_exit();
 }
