@@ -1950,26 +1950,23 @@ static int opt_handler(int opt, int opt_index, void *data)
 		stay = true;
 		break;
 	default:
-		igt_assert(0);
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
-int main(int argc, char *argv[])
+const char *help_str =
+	"  --stress\t\tMake the stress-tests more stressful.\n"
+	"  --stay\t\tDisable all screen and try to go into runtime pm. Useful for debugging.";
+static struct option long_options[] = {
+	{"stress", 0, 0, 'l'},
+	{"stay", 0, 0, 's'},
+	{ 0, 0, 0, 0 }
+};
+
+igt_main_args("", long_options, help_str, opt_handler, NULL)
 {
-	const char *help_str =
-	       "  --stress\t\tMake the stress-tests more stressful.\n"
-	       "  --stay\t\tDisable all screen and try to go into runtime pm. Useful for debugging.";
-	static struct option long_options[] = {
-		{"stress", 0, 0, 'l'},
-		{"stay", 0, 0, 's'},
-		{ 0, 0, 0, 0 }
-	};
-
-	igt_subtest_init_parse_opts(&argc, argv, "", long_options,
-				    help_str, opt_handler, NULL);
-
 	igt_subtest("basic-rte") {
 		igt_assert(setup_environment());
 		basic_subtest();
@@ -2120,6 +2117,4 @@ int main(int argc, char *argv[])
 		/* Remove our mmio_debugging module */
 		igt_i915_driver_unload();
 	}
-
-	igt_exit();
 }
