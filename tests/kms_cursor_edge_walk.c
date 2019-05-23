@@ -285,31 +285,27 @@ static int opt_handler(int opt, int opt_index, void *_data)
 		data->jump = true;
 		break;
 	default:
-		break;
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
 static data_t data;
 static uint64_t max_curw = 64, max_curh = 64;
+static const struct option long_opts[] = {
+	{ .name = "colored", .val = 'c' },
+	{ .name = "disable", .val = 'd'},
+	{ .name = "jump", .val = 'j' },
+	{}
+};
+static const char *help_str =
+	"  --colored\t\tUse a colored cursor (disables CRC checks)\n"
+	"  --disable\t\tDisable the cursor between each step\n"
+	"  --jump\t\tJump the cursor to middle of the screen between each step)\n";
 
-int main(int argc, char **argv)
+igt_main_args("", long_opts, help_str, opt_handler, &data)
 {
-	static const struct option long_opts[] = {
-                { .name = "colored", .val = 'c' },
-                { .name = "disable", .val = 'd'},
-                { .name = "jump", .val = 'j' },
-                {}
-        };
-        static const char *help_str =
-		"  --colored\t\tUse a colored cursor (disables CRC checks)\n"
-		"  --disable\t\tDisable the cursor between each step\n"
-		"  --jump\t\tJump the cursor to middle of the screen between each step)\n";
-
-	igt_subtest_init_parse_opts(&argc, argv, "", long_opts, help_str,
-                                    opt_handler, &data);
-
 	igt_skip_on_simulation();
 
 	igt_fixture {
@@ -370,6 +366,4 @@ int main(int argc, char **argv)
 
 	igt_fixture
 		igt_display_fini(&data.display);
-
-	igt_exit();
 }
