@@ -205,6 +205,7 @@ static size_t audio_signal_count_freqs(struct audio_signal *signal, int channel)
 	size_t n, i;
 	struct audio_signal_freq *freq;
 
+	n = 0;
 	for (i = 0; i < signal->freqs_count; i++) {
 		freq = &signal->freqs[i];
 		if (freq->channel < 0 || freq->channel == channel)
