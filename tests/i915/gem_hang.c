@@ -64,17 +64,24 @@ gpu_hang(void)
 	intel_batchbuffer_flush(batch);
 }
 
-int main(int argc, char **argv)
+static int opt_handler(int opt, int opt_index, void *data)
+{
+	switch (opt) {
+	case 'p':
+		bad_pipe = atoi(optarg);
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str = "  -p\tDisabled pipe number\n";
+
+igt_simple_main_args("p:", NULL, help_str, opt_handler, NULL)
 {
 	int fd;
-
-	igt_simple_init(argc, argv);
-
-	igt_assert_f(argc == 2,
-		     "usage: %s <disabled pipe number>\n",
-		     argv[0]);
-
-	bad_pipe = atoi(argv[1]);
 
 	fd = drm_open_driver(DRIVER_INTEL);
 
@@ -88,6 +95,4 @@ int main(int argc, char **argv)
 	drm_intel_bufmgr_destroy(bufmgr);
 
 	close(fd);
-
-	igt_exit();
 }
