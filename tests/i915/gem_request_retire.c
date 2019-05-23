@@ -220,10 +220,8 @@ test_retire_vma_not_inactive(int fd)
 
 int fd;
 
-int main(int argc, char **argv)
+igt_main
 {
-	igt_subtest_init(argc, argv);
-
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
@@ -233,6 +231,4 @@ int main(int argc, char **argv)
 
 	igt_subtest("retire-vma-not-inactive")
 		test_retire_vma_not_inactive(fd);
-
-	igt_exit();
 }
