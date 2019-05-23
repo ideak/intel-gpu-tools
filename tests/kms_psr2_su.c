@@ -228,12 +228,10 @@ static void cleanup(data_t *data)
 	igt_remove_fb(data->drm_fd, &data->fb[0]);
 }
 
-int main(int argc, char *argv[])
+igt_main
 {
 	data_t data = {};
 
-	igt_subtest_init_parse_opts(&argc, argv, "", NULL,
-				    NULL, NULL, NULL);
 	igt_skip_on_simulation();
 
 	igt_fixture {
@@ -287,6 +285,4 @@ int main(int argc, char *argv[])
 		drm_intel_bufmgr_destroy(data.bufmgr);
 		display_fini(&data);
 	}
-
-	igt_exit();
 }
