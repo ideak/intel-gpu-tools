@@ -417,7 +417,7 @@ static bool has_semaphores(int fd)
 
 static bool has_extended_busy_ioctl(int fd)
 {
-	igt_spin_t *spin = igt_spin_new(fd, .engine = I915_EXEC_RENDER);
+	igt_spin_t *spin = igt_spin_new(fd, .engine = I915_EXEC_DEFAULT);
 	uint32_t read, write;
 
 	__gem_busy(fd, spin->handle, &read, &write);
@@ -460,6 +460,14 @@ static void basic(int fd, const struct intel_execution_engine2 *e, unsigned flag
 	igt_spin_free(fd, spin);
 }
 
+static void all(int i915)
+{
+	const struct intel_execution_engine2 *e;
+
+	__for_each_physical_engine(i915, e)
+		basic(i915, e, 0);
+}
+
 igt_main
 {
 	const struct intel_execution_engine2 *e;
@@ -477,11 +485,14 @@ igt_main
 			igt_fork_hang_detector(fd);
 		}
 
+		igt_subtest("busy-all") {
+			gem_quiescent_gpu(fd);
+			all(fd);
+		}
+
 		__for_each_physical_engine(fd, e) {
 			igt_subtest_group {
-				igt_subtest_f("%sbusy-%s",
-					      e->class == I915_ENGINE_CLASS_RENDER
-					      ? "basic-" : "", e->name) {
+				igt_subtest_f("busy-%s", e->name) {
 					gem_quiescent_gpu(fd);
 					basic(fd, e, 0);
 				}
