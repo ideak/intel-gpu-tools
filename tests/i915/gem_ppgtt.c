@@ -330,10 +330,8 @@ static void flink_and_exit(void)
 }
 
 #define N_CHILD 8
-int main(int argc, char **argv)
+igt_main
 {
-	igt_subtest_init(argc, argv);
-
 	igt_fixture {
 		int fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
@@ -369,6 +367,4 @@ int main(int argc, char **argv)
 
 	igt_subtest("flink-and-exit-vma-leak")
 		flink_and_exit();
-
-	igt_exit();
 }
