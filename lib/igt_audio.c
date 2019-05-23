@@ -80,6 +80,7 @@ struct audio_signal *audio_signal_init(int channels, int sampling_rate)
 {
 	struct audio_signal *signal;
 
+	igt_assert(channels > 0);
 	igt_assert(channels <= CHANNELS_MAX);
 
 	signal = malloc(sizeof(struct audio_signal));
@@ -267,8 +268,10 @@ void audio_signal_fill(struct audio_signal *signal, double *buffer,
 
 	memset(buffer, 0, sizeof(double) * signal->channels * samples);
 
-	for (i = 0; i < signal->channels; i++)
+	for (i = 0; i < signal->channels; i++) {
 		freqs_per_channel[i] = audio_signal_count_freqs(signal, i);
+		igt_assert(freqs_per_channel[i] > 0);
+	}
 
 	for (i = 0; i < signal->freqs_count; i++) {
 		freq = &signal->freqs[i];
