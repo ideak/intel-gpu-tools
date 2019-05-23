@@ -40,7 +40,7 @@ if rst2man.found()
 	endforeach
 	build_info += 'Build man pages: true'
 else
-	if _man_required
+	if build_man == 'yes'
 		error('Cannot build man pages due to missing dependencies')
 	endif
 	build_info += 'Build man pages: false'
