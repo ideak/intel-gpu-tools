@@ -258,18 +258,18 @@ static int opt_handler(int opt, int opt_index, void *data)
 	if (opt == 'n') {
 		ioctl_sync = false;
 		igt_info("set via cmd line to not use sync ioctls\n");
+	} else {
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
 static data_t data;
 
-int main(int argc, char **argv)
+igt_main_args("n", NULL, NULL, opt_handler, NULL)
 {
 	int i;
-	igt_subtest_init_parse_opts(&argc, argv, "n", NULL, NULL,
-				    opt_handler, NULL);
 
 	igt_skip_on_simulation();
 
@@ -299,6 +299,4 @@ int main(int argc, char **argv)
 
 		igt_stop_helper(&hog);
 	}
-
-	igt_exit();
 }
