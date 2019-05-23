@@ -223,22 +223,15 @@ struct intel_engine_data intel_init_engine_list(int fd, uint32_t ctx_id)
 			struct intel_execution_engine2 *__e2 =
 				&engine_data.engines[engine_data.nengines];
 
-			if (!igt_only_list_subtests()) {
-				__e2->flags = gem_class_instance_to_eb_flags(fd,
-						e2->class, e2->instance);
-
-				if (!gem_has_ring(fd, __e2->flags))
-					continue;
-			} else {
-				__e2->flags = -1; /* 0xfff... */
-			}
-
 			__e2->name       = e2->name;
 			__e2->instance   = e2->instance;
 			__e2->class      = e2->class;
+			__e2->flags      = e2->flags;
 			__e2->is_virtual = false;
 
-			engine_data.nengines++;
+			if (igt_only_list_subtests() ||
+			    gem_has_ring(fd, e2->flags))
+				engine_data.nengines++;
 		}
 		return engine_data;
 	}

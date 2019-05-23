@@ -290,7 +290,7 @@ bool gem_context_has_engine(int fd, uint32_t ctx, uint64_t engine)
 	 * wouldn't produce any result.
 	 */
 	if ((engine & ~(3<<13)) == I915_EXEC_BSD) {
-		if (engine & (3 << 13) && !gem_has_bsd2(fd))
+		if (engine & (2 << 13) && !gem_has_bsd2(fd))
 			return false;
 	}
 

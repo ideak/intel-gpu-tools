@@ -102,21 +102,4 @@ extern const struct intel_execution_engine2 {
 
 int gem_execbuf_flags_to_engine_class(unsigned int flags);
 
-unsigned int
-gem_class_instance_to_eb_flags(int gem_fd,
-			       enum drm_i915_gem_engine_class class,
-			       unsigned int instance);
-
-bool gem_has_engine(int gem_fd,
-		    enum drm_i915_gem_engine_class class,
-		    unsigned int instance);
-
-static inline
-void gem_require_engine(int gem_fd,
-			enum drm_i915_gem_engine_class class,
-			unsigned int instance)
-{
-	igt_require(gem_has_engine(gem_fd, class, instance));
-}
-
 #endif /* IGT_GT_H */

@@ -329,9 +329,7 @@ static int register_srm(struct config *config, struct reg *reg,
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
-	execbuf.flags = gem_class_instance_to_eb_flags(fd,
-						       engine->class,
-						       engine->instance);
+	execbuf.flags = engine->flags;
 	if (secure)
 		execbuf.flags |= I915_EXEC_SECURE;
 
