@@ -112,12 +112,29 @@ struct option_struct {
     int use_signal_helper;
 };
 
-struct option_struct options;
-
 #define MAX_BUFS		4096
 #define SCRATCH_BUF_SIZE	1024*1024
 #define BUSY_BUF_SIZE		(256*4096)
 #define TILE_BYTES(size)	((size)*(size)*sizeof(uint32_t))
+
+struct option_struct options = {
+	.scratch_buf_size = BUSY_BUF_SIZE,
+	.no_hw = 0,
+	.use_signal_helper = 1,
+	.gpu_busy_load = 0,
+	.num_buffers = 0,
+	.trace_tile = -1,
+	.use_render = 1,
+	.use_blt = 1,
+	.forced_tiling = -1,
+	.use_cpu_maps = 0,
+	.total_rounds = 512,
+	.fail = 1,
+	.ducttape = 1,
+	.tile_size = 16,
+	.tiles_per_buf = BUSY_BUF_SIZE / TILE_BYTES(16),
+	.check_render_cpyfn = 0,
+};
 
 static struct igt_buf buffers[2][MAX_BUFS];
 /* tile i is at logical position tile_permutation[i] */
@@ -627,93 +644,95 @@ static int parse_options(int opt, int opt_index, void *data)
 	int tmp;
 
 	switch(opt) {
-		case 'd':
-			options.no_hw = 1;
-			igt_info("no-hw debug mode\n");
-			break;
-		case 'S':
-			options.use_signal_helper = 0;
-			igt_info("disabling that pesky nuisance who keeps interrupting us\n");
-			break;
-		case 's':
-			tmp = atoi(optarg);
-			if (tmp < options.tile_size*8192)
-				igt_info("scratch buffer size needs to be at least %i\n", options.tile_size * 8192);
-			else if (tmp & (tmp - 1)) {
-				igt_info("scratch buffer size needs to be a power-of-two\n");
-			} else {
-				igt_info("fixed scratch buffer size to %u\n", tmp);
-				options.scratch_buf_size = tmp;
-				sanitize_tiles_per_buf();
-			}
-			break;
-		case 'g':
-			tmp = atoi(optarg);
-			if (tmp < 0 || tmp > 10)
-				igt_info("gpu busy load needs to be bigger than 0 and smaller than 10\n");
-			else {
-				igt_info("gpu busy load factor set to %i\n", tmp);
-				gpu_busy_load = options.gpu_busy_load = tmp;
-			}
-			break;
-		case 'c':
-			options.num_buffers = atoi(optarg);
-			igt_info("buffer count set to %i\n", options.num_buffers);
-			break;
-		case 't':
-			options.trace_tile = atoi(optarg);
-			igt_info("tracing tile %i\n", options.trace_tile);
-			break;
-		case 'r':
-			options.use_render = 0;
-			igt_info("disabling render copy\n");
-			break;
-		case 'b':
-			options.use_blt = 0;
-			igt_info("disabling blt copy\n");
-			break;
-		case 'u':
-			options.forced_tiling = I915_TILING_NONE;
-			igt_info("disabling tiling\n");
-			break;
-		case 'x':
-			if (options.use_cpu_maps) {
-				igt_info("tiling not possible with cpu maps\n");
-			} else {
-				options.forced_tiling = I915_TILING_X;
-				igt_info("using only X-tiling\n");
-			}
-			break;
-		case 'm':
-			options.use_cpu_maps = 1;
-			options.forced_tiling = I915_TILING_NONE;
-			igt_info("disabling tiling\n");
-			break;
-		case 'o':
-			options.total_rounds = atoi(optarg);
-			igt_info("total rounds %i\n", options.total_rounds);
-			break;
-		case 'f':
-			options.fail = 0;
-			igt_info("not failing when detecting errors\n");
-			break;
-		case 'p':
-			options.tiles_per_buf = atoi(optarg);
-			igt_info("tiles per buffer %i\n", options.tiles_per_buf);
-			break;
-		case DUCTAPE:
-			options.ducttape = 0;
-			igt_info("applying duct-tape\n");
-			break;
-		case TILESZ:
-			options.tile_size = atoi(optarg);
+	case 'd':
+		options.no_hw = 1;
+		igt_info("no-hw debug mode\n");
+		break;
+	case 'S':
+		options.use_signal_helper = 0;
+		igt_info("disabling that pesky nuisance who keeps interrupting us\n");
+		break;
+	case 's':
+		tmp = atoi(optarg);
+		if (tmp < options.tile_size*8192)
+			igt_info("scratch buffer size needs to be at least %i\n", options.tile_size * 8192);
+		else if (tmp & (tmp - 1)) {
+			igt_info("scratch buffer size needs to be a power-of-two\n");
+		} else {
+			igt_info("fixed scratch buffer size to %u\n", tmp);
+			options.scratch_buf_size = tmp;
 			sanitize_tiles_per_buf();
-			igt_info("til size %i\n", options.tile_size);
-			break;
-		case CHCK_RENDER:
-			options.check_render_cpyfn = 1;
-			igt_info("checking render copy function\n");
-			break;
+		}
+		break;
+	case 'g':
+		tmp = atoi(optarg);
+		if (tmp < 0 || tmp > 10)
+			igt_info("gpu busy load needs to be bigger than 0 and smaller than 10\n");
+		else {
+			igt_info("gpu busy load factor set to %i\n", tmp);
+			gpu_busy_load = options.gpu_busy_load = tmp;
+		}
+		break;
+	case 'c':
+		options.num_buffers = atoi(optarg);
+		igt_info("buffer count set to %i\n", options.num_buffers);
+		break;
+	case 't':
+		options.trace_tile = atoi(optarg);
+		igt_info("tracing tile %i\n", options.trace_tile);
+		break;
+	case 'r':
+		options.use_render = 0;
+		igt_info("disabling render copy\n");
+		break;
+	case 'b':
+		options.use_blt = 0;
+		igt_info("disabling blt copy\n");
+		break;
+	case 'u':
+		options.forced_tiling = I915_TILING_NONE;
+		igt_info("disabling tiling\n");
+		break;
+	case 'x':
+		if (options.use_cpu_maps) {
+			igt_info("tiling not possible with cpu maps\n");
+		} else {
+			options.forced_tiling = I915_TILING_X;
+			igt_info("using only X-tiling\n");
+		}
+		break;
+	case 'm':
+		options.use_cpu_maps = 1;
+		options.forced_tiling = I915_TILING_NONE;
+		igt_info("disabling tiling\n");
+		break;
+	case 'o':
+		options.total_rounds = atoi(optarg);
+		igt_info("total rounds %i\n", options.total_rounds);
+		break;
+	case 'f':
+		options.fail = 0;
+		igt_info("not failing when detecting errors\n");
+		break;
+	case 'p':
+		options.tiles_per_buf = atoi(optarg);
+		igt_info("tiles per buffer %i\n", options.tiles_per_buf);
+		break;
+	case DUCTAPE:
+		options.ducttape = 0;
+		igt_info("applying duct-tape\n");
+		break;
+	case TILESZ:
+		options.tile_size = atoi(optarg);
+		sanitize_tiles_per_buf();
+		igt_info("til size %i\n", options.tile_size);
+		break;
+	case CHCK_RENDER:
+		options.check_render_cpyfn = 1;
+		igt_info("checking render copy function\n");
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
 	/* actually 32767, according to docs, but that kills our nice pot calculations. */
@@ -726,7 +745,7 @@ static int parse_options(int opt, int opt_index, void *data)
 	}
 	igt_info("Limiting buffer to %dx%d\n", options.max_dimension, options.max_dimension);
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
 static void init(void)
@@ -809,51 +828,32 @@ static void check_render_copyfunc(void)
 	}
 }
 
+static struct option long_options[] = {
+	{"no-hw", 0, 0, 'd'},
+	{"buf-size", 1, 0, 's'},
+	{"gpu-busy-load", 1, 0, 'g'},
+	{"no-signals", 0, 0, 'S'},
+	{"buffer-count", 1, 0, 'c'},
+	{"trace-tile", 1, 0, 't'},
+	{"disable-blt", 0, 0, 'b'},
+	{"disable-render", 0, 0, 'r'},
+	{"untiled", 0, 0, 'u'},
+	{"x-tiled", 0, 0, 'x'},
+	{"use-cpu-maps", 0, 0, 'm'},
+	{"rounds", 1, 0, 'o'},
+	{"no-fail", 0, 0, 'f'},
+	{"tiles-per-buf", 0, 0, 'p'},
+	{"remove-duct-tape", 0, 0, DUCTAPE},
+	{"tile-size", 1, 0, TILESZ},
+	{"check-render-cpyfn", 0, 0, CHCK_RENDER},
+	{NULL, 0, 0, 0},
+};
 
-int main(int argc, char **argv)
+igt_simple_main_args("ds:g:c:t:rbuxmo:fp:",
+		     long_options, NULL, parse_options, NULL)
 {
 	int i, j;
 	unsigned *current_permutation, *tmp_permutation;
-	static struct option long_options[] = {
-		{"no-hw", 0, 0, 'd'},
-		{"buf-size", 1, 0, 's'},
-		{"gpu-busy-load", 1, 0, 'g'},
-		{"no-signals", 0, 0, 'S'},
-		{"buffer-count", 1, 0, 'c'},
-		{"trace-tile", 1, 0, 't'},
-		{"disable-blt", 0, 0, 'b'},
-		{"disable-render", 0, 0, 'r'},
-		{"untiled", 0, 0, 'u'},
-		{"x-tiled", 0, 0, 'x'},
-		{"use-cpu-maps", 0, 0, 'm'},
-		{"rounds", 1, 0, 'o'},
-		{"no-fail", 0, 0, 'f'},
-		{"tiles-per-buf", 0, 0, 'p'},
-		{"remove-duct-tape", 0, 0, DUCTAPE},
-		{"tile-size", 1, 0, TILESZ},
-		{"check-render-cpyfn", 0, 0, CHCK_RENDER},
-		{NULL, 0, 0, 0},
-	};
-
-	options.scratch_buf_size = 256*4096;
-	options.no_hw = 0;
-	options.use_signal_helper = 1;
-	options.gpu_busy_load = 0;
-	options.num_buffers = 0;
-	options.trace_tile = -1;
-	options.use_render = 1;
-	options.use_blt = 1;
-	options.forced_tiling = -1;
-	options.use_cpu_maps = 0;
-	options.total_rounds = 512;
-	options.fail = 1;
-	options.ducttape = 1;
-	options.tile_size = 16;
-	options.tiles_per_buf = options.scratch_buf_size / TILE_BYTES(options.tile_size);
-	options.check_render_cpyfn = 0;
-
-	igt_simple_init_parse_opts(&argc, argv,"ds:g:c:t:rbuxmo:fp:",
-				   long_options, NULL, parse_options, NULL);
 
 	drm_fd = drm_open_driver(DRIVER_INTEL);
 	devid = intel_get_drm_devid(drm_fd);
@@ -910,6 +910,4 @@ int main(int argc, char **argv)
 	close(drm_fd);
 
 	igt_stop_signal_helper();
-
-	igt_exit();
 }
