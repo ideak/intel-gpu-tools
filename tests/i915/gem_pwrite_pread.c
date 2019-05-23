@@ -252,18 +252,30 @@ static const char *bytes_per_sec(char *buf, double v)
 
 uint32_t *tmp, src, dst;
 int fd;
+int object_size = 0;
 
-int main(int argc, char **argv)
+static int opt_handler(int opt, int opt_index, void *data)
 {
-	int object_size = 0;
+	switch (opt) {
+	case 's':
+		object_size = atoi(optarg);
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str = "  -s\tObject size in bytes\n";
+
+igt_main_args("s:", NULL, help_str, opt_handler, NULL)
+{
 	uint32_t buf[20];
 	int count;
 
-	igt_subtest_init(argc, argv);
 	igt_skip_on_simulation();
 
-	if (argc > 1)
-		object_size = atoi(argv[1]);
 	if (object_size == 0)
 		object_size = OBJECT_SIZE;
 	object_size = (object_size + 3) & -4;
@@ -405,6 +417,4 @@ int main(int argc, char **argv)
 
 		close(fd);
 	}
-
-	igt_exit();
 }
