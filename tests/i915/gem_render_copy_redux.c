@@ -202,11 +202,9 @@ static void copy_flink(data_t *data)
 	data_fini(&local);
 }
 
-int main(int argc, char **argv)
+igt_main
 {
 	data_t data = {0, };
-
-	igt_subtest_init(argc, argv);
 
 	igt_fixture {
 		data_init(&data);
@@ -240,6 +238,4 @@ int main(int argc, char **argv)
 			copy_flink(&data);
 		igt_stop_signal_helper();
 	}
-
-	igt_exit();
 }
