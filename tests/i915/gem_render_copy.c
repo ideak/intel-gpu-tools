@@ -678,23 +678,28 @@ static void test(data_t *data, uint32_t tiling, uint64_t ccs_modifier)
 
 static int opt_handler(int opt, int opt_index, void *data)
 {
-	if (opt == 'd') {
+	switch (opt) {
+	case 'd':
 		opt_dump_png = true;
-	}
-
-	if (opt == 'a') {
+		break;
+	case 'a':
 		check_all_pixels = true;
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
-int main(int argc, char **argv)
+const char *help_str =
+	"  -d\tDump PNG\n"
+	"  -a\tCheck all pixels\n"
+	;
+
+igt_main_args("da", NULL, help_str, opt_handler, NULL)
 {
 	data_t data = {0, };
-
-	igt_subtest_init_parse_opts(&argc, argv, "da", NULL, NULL,
-				    opt_handler, NULL);
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_render(DRIVER_INTEL);
@@ -743,6 +748,4 @@ int main(int argc, char **argv)
 		intel_batchbuffer_free(data.batch);
 		drm_intel_bufmgr_destroy(data.bufmgr);
 	}
-
-	igt_exit();
 }
