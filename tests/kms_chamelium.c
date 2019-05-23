@@ -827,6 +827,9 @@ struct audio_state {
 	struct audio_signal *signal;
 	int channel_mapping[CHAMELIUM_MAX_AUDIO_CHANNELS];
 
+	size_t recv_pages;
+	int msec;
+
 	int dump_fd;
 	char *dump_path;
 
@@ -875,6 +878,9 @@ static void audio_state_start(struct audio_state *state)
 	size_t i, j;
 	enum chamelium_stream_realtime_mode stream_mode;
 	char dump_suffix[64];
+
+	state->recv_pages = 0;
+	state->msec = 0;
 
 	igt_debug("Starting test with playback format %s, sampling rate %d Hz "
 		  "and %d channels\n",
@@ -933,6 +939,29 @@ static void audio_state_start(struct audio_state *state)
 							      state->capture.channels,
 							      &state->dump_path);
 		igt_assert(state->dump_fd >= 0);
+	}
+}
+
+static void audio_state_receive(struct audio_state *state,
+				int32_t **recv, size_t *recv_len)
+{
+	bool ok;
+	size_t page_count;
+	size_t recv_size;
+
+	ok = chamelium_stream_receive_realtime_audio(state->stream,
+						     &page_count,
+						     recv, recv_len);
+	igt_assert(ok);
+
+	state->msec = state->recv_pages * *recv_len
+		      / (double) state->capture.channels
+		      / (double) state->capture.rate * 1000;
+	state->recv_pages++;
+
+	if (state->dump_fd >= 0) {
+		recv_size = *recv_len * sizeof(int32_t);
+		igt_assert(write(state->dump_fd, *recv, recv_size) == recv_size);
 	}
 }
 
@@ -1003,12 +1032,12 @@ audio_output_callback(void *data, void *buffer, int samples)
 
 static bool do_test_display_audio(struct audio_state *state)
 {
-	int msec, freq, step;
+	int freq, step;
 	int32_t *recv, *buf;
 	double *channel;
-	size_t i, j, streak, page_count;
-	size_t recv_len, buf_len, buf_cap, buf_size, channel_len;
-	bool ok, success;
+	size_t i, j, streak;
+	size_t recv_len, buf_len, buf_cap, channel_len;
+	bool success;
 	int capture_chan;
 
 	state->signal = audio_signal_init(state->playback.channels,
@@ -1064,13 +1093,8 @@ static bool do_test_display_audio(struct audio_state *state)
 
 	success = false;
 	streak = 0;
-	msec = 0;
-	i = 0;
-	while (!success && msec < AUDIO_TIMEOUT) {
-		ok = chamelium_stream_receive_realtime_audio(state->stream,
-							     &page_count,
-							     &recv, &recv_len);
-		igt_assert(ok);
+	while (!success && state->msec < AUDIO_TIMEOUT) {
+		audio_state_receive(state, &recv, &recv_len);
 
 		memcpy(&buf[buf_len], recv, recv_len * sizeof(int32_t));
 		buf_len += recv_len;
@@ -1079,13 +1103,7 @@ static bool do_test_display_audio(struct audio_state *state)
 			continue;
 		igt_assert(buf_len == buf_cap);
 
-		if (state->dump_fd >= 0) {
-			buf_size = buf_len * sizeof(int32_t);
-			igt_assert(write(state->dump_fd, buf, buf_size) == buf_size);
-		}
-
-		msec = i * channel_len / (double) state->capture.rate * 1000;
-		igt_debug("Detecting audio signal, t=%d msec\n", msec);
+		igt_debug("Detecting audio signal, t=%d msec\n", state->msec);
 
 		for (j = 0; j < state->playback.channels; j++) {
 			capture_chan = state->channel_mapping[j];
@@ -1107,7 +1125,6 @@ static bool do_test_display_audio(struct audio_state *state)
 		}
 
 		buf_len = 0;
-		i++;
 
 		success = streak == MIN_STREAK * state->playback.channels;
 	}
