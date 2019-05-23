@@ -293,7 +293,7 @@ static void set_max_freq(int sysfs)
 }
 
 
-int main(int argc, char **argv)
+igt_main
 {
 	const struct {
 		const char *suffix;
@@ -306,8 +306,6 @@ int main(int argc, char **argv)
 	}, *r;
 	int min = -1, max = -1;
 	int fd, sysfs;
-
-	igt_subtest_init(argc, argv);
 
 	igt_skip_on_simulation();
 
@@ -344,6 +342,4 @@ int main(int argc, char **argv)
 		close(sysfs);
 		close(fd);
 	}
-
-	igt_exit();
 }
