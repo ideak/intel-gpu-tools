@@ -411,29 +411,28 @@ static int opt_handler(int opt, int opt_index, void *_data)
 		data->with_psr_disabled = true;
 		break;
 	default:
-		igt_assert(0);
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
-int main(int argc, char *argv[])
+const char *help_str =
+	"  --no-psr\tRun test without PSR/PSR2.";
+static struct option long_options[] = {
+	{"no-psr", 0, 0, 'n'},
+	{ 0, 0, 0, 0 }
+};
+data_t data = {};
+
+igt_main_args("", long_options, help_str, opt_handler, &data)
 {
-	const char *help_str =
-	       "  --no-psr\tRun test without PSR/PSR2.";
-	static struct option long_options[] = {
-		{"no-psr", 0, 0, 'n'},
-		{ 0, 0, 0, 0 }
-	};
-	data_t data = {};
 	enum operations op;
 	const char *append_subtest_name[2] = {
 		"",
 		"psr2_"
 	};
 
-	igt_subtest_init_parse_opts(&argc, argv, "", long_options,
-				    help_str, opt_handler, &data);
 	igt_skip_on_simulation();
 
 	igt_fixture {
@@ -533,6 +532,4 @@ int main(int argc, char *argv[])
 		drm_intel_bufmgr_destroy(data.bufmgr);
 		display_fini(&data);
 	}
-
-	igt_exit();
 }
