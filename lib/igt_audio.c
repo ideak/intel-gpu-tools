@@ -83,12 +83,9 @@ struct audio_signal *audio_signal_init(int channels, int sampling_rate)
 	igt_assert(channels > 0);
 	igt_assert(channels <= CHANNELS_MAX);
 
-	signal = malloc(sizeof(struct audio_signal));
-	memset(signal, 0, sizeof(struct audio_signal));
-
+	signal = calloc(1, sizeof(struct audio_signal));
 	signal->sampling_rate = sampling_rate;
 	signal->channels = channels;
-
 	return signal;
 }
 
