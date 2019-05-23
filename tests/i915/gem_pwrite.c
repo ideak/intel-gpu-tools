@@ -240,10 +240,25 @@ static void test_big_gtt(int fd, int scale, unsigned flags)
 uint32_t *src, dst;
 uint32_t *src_user, dst_stolen;
 int fd;
+int object_size = 0;
 
-int main(int argc, char **argv)
+static int opt_handler(int opt, int opt_index, void *data)
 {
-	int object_size = 0;
+	switch (opt) {
+	case 's':
+		object_size = atoi(optarg);
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str = "  -s\tObject size in bytes\n";
+
+igt_main_args("s:", NULL, help_str, opt_handler, NULL)
+{
 	double usecs;
 	const char* bps;
 	char buf[100];
@@ -258,10 +273,6 @@ int main(int argc, char **argv)
 		{ -1 },
 	}, *c;
 
-	igt_subtest_init(argc, argv);
-
-	if (argc > 1 && atoi(argv[1]))
-		object_size = atoi(argv[1]);
 	if (object_size == 0)
 		object_size = OBJECT_SIZE;
 	object_size = (object_size + 3) & -4;
@@ -388,6 +399,4 @@ int main(int argc, char **argv)
 
 	igt_fixture
 		close(fd);
-
-	igt_exit();
 }
