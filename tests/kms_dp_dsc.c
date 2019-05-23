@@ -311,5 +311,4 @@ igt_main
 		close(data.drm_fd);
 		igt_display_fini(&data.display);
 	}
-	igt_exit();
 }

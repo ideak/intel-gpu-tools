@@ -258,6 +258,4 @@ igt_main
 		igt_display_fini(&gpu.display);
 		close(gpu.drm_fd);
 	}
-
-	igt_exit();
 }
