@@ -220,11 +220,9 @@ static void run_test(int fd, int count)
 
 #define MAX_32b ((1ull << 32) - 4096)
 
-int main(int argc, char **argv)
+igt_main
 {
 	int fd = 0;
-
-	igt_subtest_init(argc, argv);
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
@@ -261,6 +259,4 @@ int main(int argc, char **argv)
 		run_test(fd, count);
 		igt_stop_signal_helper();
 	}
-
-	igt_exit();
 }
