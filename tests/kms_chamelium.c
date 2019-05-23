@@ -1009,7 +1009,7 @@ static void audio_state_stop(struct audio_state *state, bool success)
 }
 
 static int
-audio_output_callback(void *data, void *buffer, int samples)
+audio_output_frequencies_callback(void *data, void *buffer, int samples)
 {
 	struct audio_state *state = data;
 
@@ -1030,7 +1030,7 @@ audio_output_callback(void *data, void *buffer, int samples)
 	return state->run ? 0 : -1;
 }
 
-static bool do_test_display_audio(struct audio_state *state)
+static bool test_audio_frequencies(struct audio_state *state)
 {
 	int freq, step;
 	int32_t *recv, *buf;
@@ -1064,7 +1064,8 @@ static bool do_test_display_audio(struct audio_state *state)
 	}
 	audio_signal_synthesize(state->signal);
 
-	alsa_register_output_callback(state->alsa, audio_output_callback, state,
+	alsa_register_output_callback(state->alsa,
+				      audio_output_frequencies_callback, state,
 				      PLAYBACK_SAMPLES);
 
 	audio_state_start(state);
@@ -1139,8 +1140,8 @@ static bool do_test_display_audio(struct audio_state *state)
 	return success;
 }
 
-static bool test_audio_configuration(struct alsa *alsa, snd_pcm_format_t format,
-				     int channels, int sampling_rate)
+static bool check_audio_configuration(struct alsa *alsa, snd_pcm_format_t format,
+				      int channels, int sampling_rate)
 {
 	if (!alsa_test_output_configuration(alsa, format, channels,
 					    sampling_rate)) {
@@ -1225,15 +1226,15 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 			channels = PLAYBACK_CHANNELS;
 			sampling_rate = test_sampling_rates[i];
 
-			if (!test_audio_configuration(alsa, format, channels,
-						      sampling_rate))
+			if (!check_audio_configuration(alsa, format, channels,
+						       sampling_rate))
 				continue;
 
 			run = true;
 
 			audio_state_init(&state, data, alsa, port,
 					 format, channels, sampling_rate);
-			success &= do_test_display_audio(&state);
+			success &= test_audio_frequencies(&state);
 			audio_state_fini(&state);
 
 			alsa_close_output(alsa);
