@@ -1481,7 +1481,7 @@ static void test_nonblocking_read(int in)
 	close(fd);
 }
 
-int main(int argc, char **argv)
+igt_main
 {
 	struct {
 		int duration;
@@ -1529,8 +1529,6 @@ int main(int argc, char **argv)
 		{ 10, TEST_FLIP | TEST_SUSPEND, "flip-vs-suspend" },
 	};
 	int i;
-
-	igt_subtest_init(argc, argv);
 
 	igt_fixture {
 		drm_fd = drm_open_driver_master(DRIVER_ANY);
@@ -1591,11 +1589,4 @@ int main(int argc, char **argv)
 			run_pair(tests[i].duration, tests[i].flags);
 	}
 	igt_stop_signal_helper();
-
-	/*
-	 * Let drm_fd leak, since it's needed by the dpms restore
-	 * exit_handler and igt_exit() won't return.
-	 */
-
-	igt_exit();
 }
