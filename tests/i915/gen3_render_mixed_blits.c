@@ -336,21 +336,33 @@ check_bo(int fd, uint32_t handle, uint32_t val)
 	munmap(v, WIDTH*HEIGHT*4);
 }
 
-int main(int argc, char **argv)
+int count;
+
+static int opt_handler(int opt, int opt_index, void *data)
+{
+	switch (opt) {
+	case 'c':
+		count = atoi(optarg);
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str = "  -c\tBuffer count\n";
+
+igt_simple_main_args("c:", NULL, help_str, opt_handler, NULL)
 {
 	uint32_t *handle, *tiling, *start_val;
 	uint32_t start = 0;
-	int i, fd, count;
-
-	igt_simple_init(argc, argv);
+	int i, fd;
 
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	igt_require(IS_GEN3(intel_get_drm_devid(fd)));
 
-	count = 0;
-	if (argc > 1)
-		count = atoi(argv[1]);
 	if (count == 0)
 		count = 3 * gem_aperture_size(fd) / (1024*1024) / 2;
 	igt_info("Using %d 1MiB buffers\n", count);
@@ -412,6 +424,4 @@ int main(int argc, char **argv)
 	for (i = 0; i < count; i++)
 		check_bo(fd, handle[i], start_val[i]);
 	igt_info("done\n");
-
-	igt_exit();
 }
