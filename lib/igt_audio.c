@@ -304,51 +304,6 @@ void audio_signal_fill(struct audio_signal *signal, double *buffer,
 	audio_sanity_check(buffer, signal->channels * samples);
 }
 
-void audio_signal_fill_s16_le(struct audio_signal *signal, int16_t *buffer,
-			      size_t samples)
-{
-	double *tmp;
-	size_t i;
-
-	tmp = malloc(sizeof(double) * signal->channels * samples);
-	audio_signal_fill(signal, tmp, samples);
-
-	for (i = 0; i < signal->channels * samples; ++i)
-		buffer[i] = INT16_MAX * tmp[i];
-
-	free(tmp);
-}
-
-void audio_signal_fill_s24_le(struct audio_signal *signal, int32_t *buffer,
-			      size_t samples)
-{
-	double *tmp;
-	size_t i;
-
-	tmp = malloc(sizeof(double) * signal->channels * samples);
-	audio_signal_fill(signal, tmp, samples);
-
-	for (i = 0; i < signal->channels * samples; ++i)
-		buffer[i] = 0x7FFFFF * tmp[i];
-
-	free(tmp);
-}
-
-void audio_signal_fill_s32_le(struct audio_signal *signal, int32_t *buffer,
-			      size_t samples)
-{
-	double *tmp;
-	size_t i;
-
-	tmp = malloc(sizeof(double) * signal->channels * samples);
-	audio_signal_fill(signal, tmp, samples);
-
-	for (i = 0; i < signal->channels * samples; ++i)
-		buffer[i] = INT32_MAX * tmp[i];
-
-	free(tmp);
-}
-
 /**
  * Checks that frequencies specified in signal, and only those, are included
  * in the input data.
@@ -506,6 +461,48 @@ size_t audio_extract_channel_s32_le(double *dst, size_t dst_cap,
 		dst[i] = (double) src[i * n_channels + channel] / INT32_MAX;
 
 	return dst_len;
+}
+
+static void audio_convert_to_s16_le(int16_t *dst, double *src, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; ++i)
+		dst[i] = INT16_MAX * src[i];
+}
+
+static void audio_convert_to_s24_le(int32_t *dst, double *src, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; ++i)
+		dst[i] = 0x7FFFFF * src[i];
+}
+
+static void audio_convert_to_s32_le(int32_t *dst, double *src, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; ++i)
+		dst[i] = INT32_MAX * src[i];
+}
+
+void audio_convert_to(void *dst, double *src, size_t len,
+		      snd_pcm_format_t format)
+{
+	switch (format) {
+	case SND_PCM_FORMAT_S16_LE:
+		audio_convert_to_s16_le(dst, src, len);
+		break;
+	case SND_PCM_FORMAT_S24_LE:
+		audio_convert_to_s24_le(dst, src, len);
+		break;
+	case SND_PCM_FORMAT_S32_LE:
+		audio_convert_to_s32_le(dst, src, len);
+		break;
+	default:
+		assert(false); /* unreachable */
+	}
 }
 
 #define RIFF_TAG "RIFF"

@@ -1012,20 +1012,14 @@ static int
 audio_output_frequencies_callback(void *data, void *buffer, int samples)
 {
 	struct audio_state *state = data;
+	double *tmp;
+	size_t len;
 
-	switch (state->playback.format) {
-	case SND_PCM_FORMAT_S16_LE:
-		audio_signal_fill_s16_le(state->signal, buffer, samples);
-		break;
-	case SND_PCM_FORMAT_S24_LE:
-		audio_signal_fill_s24_le(state->signal, buffer, samples);
-		break;
-	case SND_PCM_FORMAT_S32_LE:
-		audio_signal_fill_s32_le(state->signal, buffer, samples);
-		break;
-	default:
-		assert(false); /* unreachable */
-	}
+	len = samples * state->playback.channels;
+	tmp = malloc(len * sizeof(double));
+	audio_signal_fill(state->signal, tmp, samples);
+	audio_convert_to(buffer, tmp, len, state->playback.format);
+	free(tmp);
 
 	return state->run ? 0 : -1;
 }
