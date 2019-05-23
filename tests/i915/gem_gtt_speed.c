@@ -86,26 +86,35 @@ static void streaming_load(void *src, int len)
 }
 #endif
 
-int main(int argc, char **argv)
+int size = OBJECT_SIZE;
+
+static int opt_handler(int opt, int opt_index, void *data)
+{
+	switch (opt) {
+	case 's':
+		size = atoi(optarg);
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str = "  -s\tObject size in bytes\n";
+
+igt_simple_main_args("s:", NULL, help_str, opt_handler, NULL)
 {
 	struct timeval start, end;
 	uint8_t *buf;
 	uint32_t handle;
 	unsigned cpu = x86_64_features();
-	int size = OBJECT_SIZE;
 	int loop, i, tiling;
 	int fd;
 
-	igt_simple_init(argc, argv);
-
 	igt_skip_on_simulation();
 
-	if (argc > 1)
-		size = atoi(argv[1]);
-	if (size == 0) {
-		igt_warn("Invalid object size specified\n");
-		return 1;
-	}
+	igt_assert_f(size != 0, "Invalid object size specified\n");
 
 	if (cpu) {
 		char str[1024];
@@ -505,6 +514,4 @@ int main(int argc, char **argv)
 
 	gem_close(fd, handle);
 	close(fd);
-
-	igt_exit();
 }
