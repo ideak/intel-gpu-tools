@@ -1221,7 +1221,9 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 			ret = alsa_open_output(alsa, audio_device);
 			igt_assert(ret >= 0);
 
-			/* TODO: playback on all 8 available channels */
+			/* TODO: playback on all 8 available channels (this
+			 * isn't supported by Chamelium devices yet, see
+			 * https://crbug.com/950917) */
 			format = test_formats[j];
 			channels = PLAYBACK_CHANNELS;
 			sampling_rate = test_sampling_rates[i];
