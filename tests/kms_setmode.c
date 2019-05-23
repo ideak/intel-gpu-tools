@@ -821,13 +821,17 @@ static int opt_handler(int opt, int opt_index, void *data)
 		filter_test_id = atoi(optarg);
 		break;
 	default:
-		igt_assert(0);
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
-int main(int argc, char **argv)
+const char *help_str =
+	"  -d\t\tDon't run any test, only print what would be done. (still needs DRM access)\n"
+	"  -t <test id>\tRun only the test with this id.";
+
+igt_main_args("dt:", NULL, help_str, opt_handler, NULL)
 {
 	const struct {
 		enum test_flags flags;
@@ -845,16 +849,7 @@ int main(int argc, char **argv)
 		{ TEST_INVALID | TEST_CLONE | TEST_SINGLE_CRTC_CLONE | TEST_STEALING,
 					"invalid-clone-single-crtc-stealing" }
 	};
-	const char *help_str =
-	       "  -d\t\tDon't run any test, only print what would be done. (still needs DRM access)\n"
-	       "  -t <test id>\tRun only the test with this id.";
 	int i;
-	int ret;
-
-	ret = igt_subtest_init_parse_opts(&argc, argv, "dt:", NULL, help_str,
-					  opt_handler, NULL);
-	if (ret < 0)
-		return ret == -1 ? 0 : ret;
 
 	igt_skip_on_simulation();
 
@@ -886,6 +881,4 @@ int main(int argc, char **argv)
 
 		close(drm_fd);
 	}
-
-	igt_exit();
 }
