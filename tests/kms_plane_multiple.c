@@ -346,8 +346,8 @@ static int opt_handler(int option, int option_index, void *input)
 		opt.iterations = strtol(optarg, NULL, 0);
 
 		if (opt.iterations < LOOP_FOREVER || opt.iterations == 0) {
-			igt_info("incorrect number of iterations\n");
-			igt_assert(false);
+			igt_info("incorrect number of iterations: %d\n", opt.iterations);
+			return IGT_OPT_HANDLER_ERROR;
 		}
 
 		break;
@@ -356,27 +356,25 @@ static int opt_handler(int option, int option_index, void *input)
 		opt.seed = strtol(optarg, NULL, 0);
 		break;
 	default:
-		igt_assert(false);
+		return IGT_OPT_HANDLER_ERROR;
 	}
 
-	return 0;
+	return IGT_OPT_HANDLER_SUCCESS;
 }
 
 const char *help_str =
 	"  --iterations Number of iterations for test coverage. -1 loop forever, default 64 iterations\n"
 	"  --seed       Seed for random number generator\n";
 
-int main(int argc, char *argv[])
-{
-	struct option long_options[] = {
-		{ "iterations", required_argument, NULL, 'i'},
-		{ "seed",    required_argument, NULL, 's'},
-		{ 0, 0, 0, 0 }
-	};
-	enum pipe pipe;
+struct option long_options[] = {
+	{ "iterations", required_argument, NULL, 'i'},
+	{ "seed",    required_argument, NULL, 's'},
+	{ 0, 0, 0, 0 }
+};
 
-	igt_subtest_init_parse_opts(&argc, argv, "", long_options, help_str,
-				    opt_handler, NULL);
+igt_main_args("", long_options, help_str, opt_handler, NULL)
+{
+	enum pipe pipe;
 
 	igt_skip_on_simulation();
 
@@ -396,6 +394,4 @@ int main(int argc, char *argv[])
 	igt_fixture {
 		igt_display_fini(&data.display);
 	}
-
-	igt_exit();
 }
