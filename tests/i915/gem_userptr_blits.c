@@ -1776,12 +1776,24 @@ uint64_t total_ram;
 uint64_t aperture_size;
 int fd, count;
 
+static int opt_handler(int opt, int opt_index, void *data)
+{
+	switch (opt) {
+	case 'c':
+		count = atoi(optarg);
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
 
-int main(int argc, char **argv)
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str = "  -c\tBuffer count\n";
+
+igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 {
 	int size = sizeof(linear);
-
-	igt_subtest_init(argc, argv);
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
@@ -1793,8 +1805,6 @@ int main(int argc, char **argv)
 		aperture_size = gem_aperture_size(fd);
 		igt_info("Aperture size is %lu MiB\n", (long)(aperture_size / (1024*1024)));
 
-		if (argc > 1)
-			count = atoi(argv[1]);
 		if (count == 0)
 			count = 2 * aperture_size / (1024*1024) / 3;
 
@@ -2044,6 +2054,4 @@ int main(int argc, char **argv)
 
 	igt_subtest("access-control")
 		test_access_control(fd);
-
-	igt_exit();
 }
