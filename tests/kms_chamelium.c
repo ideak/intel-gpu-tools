@@ -824,6 +824,7 @@ struct audio_state {
 		int rate;
 	} playback, capture;
 
+	char *name;
 	struct audio_signal *signal;
 	int channel_mapping[CHAMELIUM_MAX_AUDIO_CHANNELS];
 
@@ -861,6 +862,7 @@ static void audio_state_init(struct audio_state *state, data_t *data,
 static void audio_state_fini(struct audio_state *state)
 {
 	chamelium_stream_deinit(state->stream);
+	free(state->name);
 }
 
 static void *run_audio_thread(void *data)
@@ -871,7 +873,7 @@ static void *run_audio_thread(void *data)
 	return NULL;
 }
 
-static void audio_state_start(struct audio_state *state)
+static void audio_state_start(struct audio_state *state, const char *name)
 {
 	int ret;
 	bool ok;
@@ -879,12 +881,14 @@ static void audio_state_start(struct audio_state *state)
 	enum chamelium_stream_realtime_mode stream_mode;
 	char dump_suffix[64];
 
+	free(state->name);
+	state->name = strdup(name);
 	state->recv_pages = 0;
 	state->msec = 0;
 
-	igt_debug("Starting test with playback format %s, sampling rate %d Hz "
-		  "and %d channels\n",
-		  snd_pcm_format_name(state->playback.format),
+	igt_debug("Starting %s test with playback format %s, "
+		  "sampling rate %d Hz and %d channels\n",
+		  name, snd_pcm_format_name(state->playback.format),
 		  state->playback.rate, state->playback.channels);
 
 	chamelium_start_capturing_audio(state->chamelium, state->port, false);
@@ -930,8 +934,8 @@ static void audio_state_start(struct audio_state *state)
 
 	if (igt_frame_dump_is_enabled()) {
 		snprintf(dump_suffix, sizeof(dump_suffix),
-			 "capture-%s-%dch-%dHz",
-			 snd_pcm_format_name(state->playback.format),
+			 "capture-%s-%s-%dch-%dHz",
+			 name, snd_pcm_format_name(state->playback.format),
 			 state->playback.channels, state->playback.rate);
 
 		state->dump_fd = audio_create_wav_file_s32_le(dump_suffix,
@@ -1001,9 +1005,9 @@ static void audio_state_stop(struct audio_state *state, bool success)
 		state->dump_path = NULL;
 	}
 
-	igt_debug("Audio test result for format %s, sampling rate %d Hz and "
-		  "%d channels: %s\n",
-		  snd_pcm_format_name(state->playback.format),
+	igt_debug("Audio %s test result for format %s, sampling rate %d Hz "
+		  "and %d channels: %s\n",
+		  state->name, snd_pcm_format_name(state->playback.format),
 		  state->playback.rate, state->playback.channels,
 		  success ? "ALL GREEN" : "FAILED");
 }
@@ -1062,7 +1066,7 @@ static bool test_audio_frequencies(struct audio_state *state)
 				      audio_output_frequencies_callback, state,
 				      PLAYBACK_SAMPLES);
 
-	audio_state_start(state);
+	audio_state_start(state, "frequencies");
 
 	igt_assert(state->capture.rate == state->playback.rate);
 
