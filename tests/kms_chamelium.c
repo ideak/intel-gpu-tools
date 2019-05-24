@@ -772,6 +772,9 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 /* A streak of 3 gives confidence that the signal is good. */
 #define MIN_STREAK 3
 
+#define FLATLINE_AMPLITUDE 0.9 /* normalized, ie. in [0, 1] */
+#define FLATLINE_ACCURACY 0.001 /* ± 0.1% of the full amplitude */
+
 /* TODO: enable >48KHz rates, these are not reliable */
 static int test_sampling_rates[] = {
 	32000,
@@ -1138,6 +1141,103 @@ static bool test_audio_frequencies(struct audio_state *state)
 	return success;
 }
 
+static int audio_output_flatline_callback(void *data, void *buffer,
+					     int samples)
+{
+	struct audio_state *state = data;
+	double *tmp;
+	size_t len, i;
+
+	len = samples * state->playback.channels;
+	tmp = malloc(len * sizeof(double));
+	for (i = 0; i < len; i++)
+		tmp[i] = FLATLINE_AMPLITUDE;
+	audio_convert_to(buffer, tmp, len, state->playback.format);
+	free(tmp);
+
+	return state->run ? 0 : -1;
+}
+
+static bool detect_flatline_amplitude(double *buf, size_t buf_len)
+{
+	double min, max;
+	size_t i;
+	bool ok;
+
+	min = max = NAN;
+	for (i = 0; i < buf_len; i++) {
+		if (isnan(min) || buf[i] < min)
+			min = buf[i];
+		if (isnan(max) || buf[i] > max)
+			max = buf[i];
+	}
+
+	ok = (min >= FLATLINE_AMPLITUDE - FLATLINE_ACCURACY &&
+	      max <= FLATLINE_AMPLITUDE + FLATLINE_ACCURACY);
+	if (ok)
+		igt_debug("Flatline detected\n");
+	else
+		igt_debug("Flatline not detected (min=%f, max=%f)\n",
+			  min, max);
+	return ok;
+}
+
+static bool test_audio_flatline(struct audio_state *state)
+{
+	bool success;
+	int32_t *recv;
+	size_t recv_len, i, channel_len;
+	int streak, capture_chan;
+	double *channel;
+
+	alsa_register_output_callback(state->alsa,
+				      audio_output_flatline_callback, state,
+				      PLAYBACK_SAMPLES);
+
+	audio_state_start(state, "flatline");
+
+	recv = NULL;
+	recv_len = 0;
+	success = false;
+	while (!success && state->msec < AUDIO_TIMEOUT) {
+		audio_state_receive(state, &recv, &recv_len);
+
+		igt_debug("Detecting audio signal, t=%d msec\n", state->msec);
+
+		for (i = 0; i < state->playback.channels; i++) {
+			capture_chan = state->channel_mapping[i];
+			igt_assert(capture_chan >= 0);
+			igt_debug("Processing channel %zu (captured as "
+				  "channel %d)\n", i, capture_chan);
+
+			channel_len = audio_extract_channel_s32_le(NULL, 0,
+								   recv, recv_len,
+								   state->capture.channels,
+								   capture_chan);
+			channel = malloc(channel_len * sizeof(double));
+			audio_extract_channel_s32_le(channel, channel_len,
+						     recv, recv_len,
+						     state->capture.channels,
+						     capture_chan);
+
+			if (detect_flatline_amplitude(channel, channel_len))
+				streak++;
+			else
+				streak = 0;
+
+			free(channel);
+		}
+
+		success = streak == MIN_STREAK * state->playback.channels;
+	}
+
+	audio_state_stop(state, success);
+
+	free(recv);
+
+	return success;
+}
+
 static bool check_audio_configuration(struct alsa *alsa, snd_pcm_format_t format,
 				      int channels, int sampling_rate)
 {
@@ -1235,6 +1335,7 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 			audio_state_init(&state, data, alsa, port,
 					 format, channels, sampling_rate);
 			success &= test_audio_frequencies(&state);
+			success &= test_audio_flatline(&state);
 			audio_state_fini(&state);
 
 			alsa_close_output(alsa);
