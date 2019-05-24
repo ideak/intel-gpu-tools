@@ -122,6 +122,20 @@ case "$target_cpu" in
 		;;
 esac
 
+if test x"$build_x86" = xyes; then
+	PKG_CHECK_MODULES(OVERLAY_XVLIB, [xv x11 xext dri2proto >= 2.6], enable_overlay_xvlib=yes, enable_overlay_xvlib=no)
+	PKG_CHECK_MODULES(OVERLAY_XLIB, [cairo-xlib dri2proto >= 2.6], enable_overlay_xlib=yes, enable_overlay_xlib=no)
+
+	AC_CHECK_TOOL([LEG], [leg])
+	if test x"$LEG" != xleg; then
+		enable_overlay_xvlib="no"
+		enable_overlay_xlib="no"
+		AC_MSG_NOTICE([Failed to find leg, required for overlay, try : apt-get install peg])
+	fi
+else
+	enable_overlay_xvlib="no"
+	enable_overlay_xlib="no"
+fi
 AM_CONDITIONAL(BUILD_X86, [test "x$build_x86" = xyes])
 
 AM_CONDITIONAL(BUILD_OVERLAY_XVLIB, [test "x$enable_overlay_xvlib" = xyes])
