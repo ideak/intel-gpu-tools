@@ -445,7 +445,13 @@ bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
 }
 
 /**
- * Extracts a single channel from a multi-channel S32_LE input buffer.
+ * audio_extract_channel_s32_le: extracts a single channel from a multi-channel
+ * S32_LE input buffer.
+ *
+ * If dst_cap is zero, no copy is performed. This can be used to compute the
+ * minimum required capacity.
+ *
+ * Returns: the number of samples extracted.
  */
 size_t audio_extract_channel_s32_le(double *dst, size_t dst_cap,
 				    int32_t *src, size_t src_len,
@@ -456,6 +462,9 @@ size_t audio_extract_channel_s32_le(double *dst, size_t dst_cap,
 	igt_assert(channel < n_channels);
 	igt_assert(src_len % n_channels == 0);
 	dst_len = src_len / n_channels;
+	if (dst_cap == 0)
+		return dst_len;
+
 	igt_assert(dst_len <= dst_cap);
 	for (i = 0; i < dst_len; i++)
 		dst[i] = (double) src[i * n_channels + channel] / INT32_MAX;
