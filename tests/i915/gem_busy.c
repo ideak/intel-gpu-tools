@@ -256,7 +256,7 @@ static void one(int fd, const struct intel_execution_engine2 *e, unsigned test_f
 			    e2->instance == e->instance)
 				continue;
 
-			if (!gem_class_can_store_dword(fd, e->class))
+			if (!gem_class_can_store_dword(fd, e2->class))
 				continue;
 
 			igt_debug("Testing %s in parallel\n", e2->name);
