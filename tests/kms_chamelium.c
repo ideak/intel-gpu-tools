@@ -773,7 +773,8 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 #define MIN_STREAK 3
 
 #define FLATLINE_AMPLITUDE 0.9 /* normalized, ie. in [0, 1] */
-#define FLATLINE_ACCURACY 0.001 /* ± 0.1% of the full amplitude */
+#define FLATLINE_AMPLITUDE_ACCURACY 0.001 /* ± 0.1 % of the full amplitude */
+#define FLATLINE_ALIGN_ACCURACY 0 /* number of samples */
 
 /* TODO: enable >48KHz rates, these are not reliable */
 static int test_sampling_rates[] = {
@@ -828,7 +829,7 @@ struct audio_state {
 	} playback, capture;
 
 	char *name;
-	struct audio_signal *signal;
+	struct audio_signal *signal; /* for frequencies test only */
 	int channel_mapping[CHAMELIUM_MAX_AUDIO_CHANNELS];
 
 	size_t recv_pages;
@@ -839,6 +840,7 @@ struct audio_state {
 
 	pthread_t thread;
 	atomic_bool run;
+	atomic_bool positive; /* for pulse test only */
 };
 
 static void audio_state_init(struct audio_state *state, data_t *data,
@@ -1151,16 +1153,16 @@ static int audio_output_flatline_callback(void *data, void *buffer,
 	len = samples * state->playback.channels;
 	tmp = malloc(len * sizeof(double));
 	for (i = 0; i < len; i++)
-		tmp[i] = FLATLINE_AMPLITUDE;
+		tmp[i] = (state->positive ? 1 : -1) * FLATLINE_AMPLITUDE;
 	audio_convert_to(buffer, tmp, len, state->playback.format);
 	free(tmp);
 
 	return state->run ? 0 : -1;
 }
 
-static bool detect_flatline_amplitude(double *buf, size_t buf_len)
+static bool detect_flatline_amplitude(double *buf, size_t buf_len, bool pos)
 {
-	double min, max;
+	double expected, min, max;
 	size_t i;
 	bool ok;
 
@@ -1172,34 +1174,63 @@ static bool detect_flatline_amplitude(double *buf, size_t buf_len)
 			max = buf[i];
 	}
 
-	ok = (min >= FLATLINE_AMPLITUDE - FLATLINE_ACCURACY &&
-	      max <= FLATLINE_AMPLITUDE + FLATLINE_ACCURACY);
+	expected = (pos ? 1 : -1) * FLATLINE_AMPLITUDE;
+	ok = (min >= expected - FLATLINE_AMPLITUDE_ACCURACY &&
+	      max <= expected + FLATLINE_AMPLITUDE_ACCURACY);
 	if (ok)
-		igt_debug("Flatline detected\n");
+		igt_debug("Flatline wave amplitude detected\n");
 	else
-		igt_debug("Flatline not detected (min=%f, max=%f)\n",
+		igt_debug("Flatline amplitude not detected (min=%f, max=%f)\n",
 			  min, max);
 	return ok;
 }
 
+static ssize_t detect_falling_edge(double *buf, size_t buf_len)
+{
+	size_t i;
+
+	for (i = 0; i < buf_len; i++) {
+		if (buf[i] < 0)
+			return i;
+	}
+
+	return -1;
+}
+
+/** test_audio_flatline:
+ *
+ * Send a constant value (one positive, then a negative one) and check that:
+ *
+ * - The amplitude of the flatline is correct
+ * - All channels switch from a positive signal to a negative one at the same
+ *   time (ie. all channels are aligned)
+ */
 static bool test_audio_flatline(struct audio_state *state)
 {
-	bool success;
+	bool success, amp_success, align_success;
 	int32_t *recv;
 	size_t recv_len, i, channel_len;
+	ssize_t j;
 	int streak, capture_chan;
 	double *channel;
+	int falling_edges[CHAMELIUM_MAX_AUDIO_CHANNELS];
 
 	alsa_register_output_callback(state->alsa,
 				      audio_output_flatline_callback, state,
 				      PLAYBACK_SAMPLES);
 
+	/* Start by sending a positive signal */
+	state->positive = true;
+
 	audio_state_start(state, "flatline");
+
+	for (i = 0; i < state->playback.channels; i++)
+		falling_edges[i] = -1;
 
 	recv = NULL;
 	recv_len = 0;
-	success = false;
-	while (!success && state->msec < AUDIO_TIMEOUT) {
+	amp_success = false;
+	while (!amp_success && state->msec < AUDIO_TIMEOUT) {
 		audio_state_receive(state, &recv, &recv_len);
 
 		igt_debug("Detecting audio signal, t=%d msec\n", state->msec);
@@ -1220,17 +1251,58 @@ static bool test_audio_flatline(struct audio_state *state)
 						     state->capture.channels,
 						     capture_chan);
 
-			if (detect_flatline_amplitude(channel, channel_len))
+			/* Check whether the amplitude is fine */
+			if (detect_flatline_amplitude(channel, channel_len,
+						      state->positive))
 				streak++;
 			else
 				streak = 0;
 
+			/* If we're now sending a negative signal, detect the
+			 * falling edge */
+			j = detect_falling_edge(channel, channel_len);
+			if (!state->positive && j >= 0) {
+				falling_edges[i] = recv_len * state->recv_pages
+						   + j;
+			}
+
 			free(channel);
 		}
 
-		success = streak == MIN_STREAK * state->playback.channels;
+		amp_success = streak == MIN_STREAK * state->playback.channels;
+
+		if (amp_success && state->positive) {
+			/* Switch to a negative signal after we've detected the
+			 * positive one. */
+			state->positive = false;
+			amp_success = false;
+			streak = 0;
+			igt_debug("Switching to negative square wave\n");
+		}
 	}
 
+	/* Check alignment between all channels by comparing the index of the
+	 * falling edge. */
+	align_success = true;
+	for (i = 0; i < state->playback.channels; i++) {
+		if (falling_edges[i] < 0) {
+			igt_debug("Falling edge not detected for channel %zu\n",
+				  i);
+			align_success = false;
+			continue;
+		}
+
+		if (abs(falling_edges[0] - falling_edges[i]) >
+		    FLATLINE_ALIGN_ACCURACY) {
+			igt_debug("Channel alignment mismatch: "
+				  "channel 0 has a falling edge at index %d "
+				  "while channel %zu has index %d\n",
+				  falling_edges[0], i, falling_edges[i]);
+			align_success = false;
+		}
+	}
+
+	success = amp_success && align_success;
 	audio_state_stop(state, success);
 
 	free(recv);
