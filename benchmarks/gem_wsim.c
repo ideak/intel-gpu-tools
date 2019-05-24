@@ -1441,6 +1441,29 @@ set_ctx_sseu(struct ctx *ctx, uint64_t slice_mask)
 	return slice_mask;
 }
 
+static size_t sizeof_load_balance(int count)
+{
+	struct i915_context_engines_load_balance *ptr;
+
+	return sizeof(*ptr) + count * sizeof(ptr->engines[0]);
+}
+
+static size_t sizeof_param_engines(int count)
+{
+	struct i915_context_param_engines *ptr;
+
+	return sizeof(*ptr) + count * sizeof(ptr->engines[0]);
+}
+
+static size_t sizeof_engines_bond(int count)
+{
+	struct i915_context_engines_bond *ptr;
+
+	return sizeof(*ptr) + count * sizeof(ptr->engines[0]);
+}
+
+#define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
+
 static int
 prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 {
@@ -1676,66 +1699,54 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 		}
 
 		if (ctx->engine_map) {
-			I915_DEFINE_CONTEXT_PARAM_ENGINES(set_engines,
-							  ctx->engine_map_count + 1);
-			I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(load_balance,
-								 ctx->engine_map_count);
+			struct i915_context_param_engines *set_engines =
+				alloca0(sizeof_param_engines(ctx->engine_map_count + 1));
+			struct i915_context_engines_load_balance *load_balance =
+				alloca0(sizeof_load_balance(ctx->engine_map_count));
 			struct drm_i915_gem_context_param param = {
 				.ctx_id = ctx_id,
 				.param = I915_CONTEXT_PARAM_ENGINES,
-				.size = sizeof(set_engines),
-				.value = to_user_pointer(&set_engines),
+				.size = sizeof_param_engines(ctx->engine_map_count + 1),
+				.value = to_user_pointer(set_engines),
 			};
+			struct i915_context_engines_bond *last = NULL;
 
 			if (ctx->wants_balance) {
-				set_engines.extensions =
-					to_user_pointer(&load_balance);
+				set_engines->extensions =
+					to_user_pointer(load_balance);
 
-				memset(&load_balance, 0, sizeof(load_balance));
-				load_balance.base.name =
+				load_balance->base.name =
 					I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
-				load_balance.num_siblings =
+				load_balance->num_siblings =
 					ctx->engine_map_count;
 
 				for (j = 0; j < ctx->engine_map_count; j++)
-					load_balance.engines[j] =
+					load_balance->engines[j] =
 						get_engine(ctx->engine_map[j]);
-			} else {
-				set_engines.extensions = 0;
 			}
 
 			/* Reserve slot for virtual engine. */
-			set_engines.engines[0].engine_class =
+			set_engines->engines[0].engine_class =
 				I915_ENGINE_CLASS_INVALID;
-			set_engines.engines[0].engine_instance =
+			set_engines->engines[0].engine_instance =
 				I915_ENGINE_CLASS_INVALID_NONE;
 
 			for (j = 1; j <= ctx->engine_map_count; j++)
-				set_engines.engines[j] =
+				set_engines->engines[j] =
 					get_engine(ctx->engine_map[j - 1]);
 
+			last = NULL;
 			for (j = 0; j < ctx->bond_count; j++) {
 				unsigned long mask = ctx->bonds[j].mask;
-				I915_DEFINE_CONTEXT_ENGINES_BOND(bond,
-								 __builtin_popcount(mask));
-				struct i915_context_engines_bond *p = NULL, *prev;
+				struct i915_context_engines_bond *bond =
+					alloca0(sizeof_engines_bond(__builtin_popcount(mask)));
 				unsigned int b, e;
 
-				prev = p;
-				p = alloca(sizeof(bond));
-				assert(p);
-				memset(p, 0, sizeof(bond));
+				bond->base.next_extension = to_user_pointer(last);
+				bond->base.name = I915_CONTEXT_ENGINES_EXT_BOND;
 
-				if (j == 0)
-					load_balance.base.next_extension =
-						to_user_pointer(p);
-				else if (j < (ctx->bond_count - 1))
-					prev->base.next_extension =
-						to_user_pointer(p);
-
-				p->base.name = I915_CONTEXT_ENGINES_EXT_BOND;
-				p->virtual_index = 0;
-				p->master = get_engine(ctx->bonds[j].master);
+				bond->virtual_index = 0;
+				bond->master = get_engine(ctx->bonds[j].master);
 
 				for (b = 0, e = 0; mask; e++, mask >>= 1) {
 					unsigned int idx;
@@ -1743,42 +1754,44 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 					if (!(mask & 1))
 						continue;
 
-					idx = find_engine(&set_engines.engines[1],
+					idx = find_engine(&set_engines->engines[1],
 							  ctx->engine_map_count,
 							  e);
-					p->engines[b++] =
-						set_engines.engines[1 + idx];
+					bond->engines[b++] =
+						set_engines->engines[1 + idx];
 				}
+
+				last = bond;
 			}
+			load_balance->base.next_extension = to_user_pointer(last);
 
 			gem_context_set_param(fd, &param);
 		} else if (ctx->wants_balance) {
 			const unsigned int count = num_engines_in_class(VCS);
-			I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(load_balance,
-								 count);
-			I915_DEFINE_CONTEXT_PARAM_ENGINES(set_engines,
-							  count + 1);
+			struct i915_context_engines_load_balance *load_balance =
+				alloca0(sizeof_load_balance(count));
+			struct i915_context_param_engines *set_engines =
+				alloca0(sizeof_param_engines(count + 1));
 			struct drm_i915_gem_context_param param = {
 				.ctx_id = ctx_id,
 				.param = I915_CONTEXT_PARAM_ENGINES,
-				.size = sizeof(set_engines),
-				.value = to_user_pointer(&set_engines),
+				.size = sizeof_param_engines(count + 1),
+				.value = to_user_pointer(set_engines),
 			};
 
-			set_engines.extensions = to_user_pointer(&load_balance);
+			set_engines->extensions = to_user_pointer(load_balance);
 
-			set_engines.engines[0].engine_class =
+			set_engines->engines[0].engine_class =
 				I915_ENGINE_CLASS_INVALID;
-			set_engines.engines[0].engine_instance =
+			set_engines->engines[0].engine_instance =
 				I915_ENGINE_CLASS_INVALID_NONE;
-			fill_engines_class(&set_engines.engines[1], VCS);
+			fill_engines_class(&set_engines->engines[1], VCS);
 
-			memset(&load_balance, 0, sizeof(load_balance));
-			load_balance.base.name =
+			load_balance->base.name =
 				I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
-			load_balance.num_siblings = count;
+			load_balance->num_siblings = count;
 
-			fill_engines_class(&load_balance.engines[0], VCS);
+			fill_engines_class(&load_balance->engines[0], VCS);
 
 			gem_context_set_param(fd, &param);
 		}
