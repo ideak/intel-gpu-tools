@@ -38,10 +38,6 @@ if rst2man.found()
 				install : true,
 				install_dir : join_paths(mandir, 'man1'))
 	endforeach
-	build_info += 'Build man pages: true'
-else
-	if build_man == 'yes'
-		error('Cannot build man pages due to missing dependencies')
-	endif
-	build_info += 'Build man pages: false'
 endif
+
+build_info += 'Build man pages: @0@'.format(rst2man.found())
