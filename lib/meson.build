@@ -60,6 +60,7 @@ lib_sources = [
 	'igt_psr.c',
 	'igt_amd.c',
 	'igt_edid.c',
+	'igt_eld.c',
 ]
 
 lib_deps = [

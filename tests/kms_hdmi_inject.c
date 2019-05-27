@@ -22,9 +22,13 @@
  *
  */
 
+#include "config.h"
+
 #include <dirent.h>
+
 #include "igt.h"
 #include "igt_edid.h"
+#include "igt_eld.h"
 
 #define HDISPLAY_4K	3840
 #define VDISPLAY_4K	2160
@@ -135,80 +139,6 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 	free(edid);
 }
 
-/** eld_entry_is_igt: checks whether an ELD entry is mapped to the IGT EDID */
-static bool
-eld_entry_is_igt(const char* path)
-{
-	FILE *in;
-	char buf[1024];
-	uint8_t eld_valid = 0;
-	uint8_t mon_valid = 0;
-
-	in = fopen(path, "r");
-	if (!in)
-		return false;
-
-	memset(buf, 0, 1024);
-
-	while ((fgets(buf, 1024, in)) != NULL) {
-
-		char *line = buf;
-
-		if (!strncasecmp(line, "eld_valid", 9) &&
-				strstr(line, "1")) {
-			eld_valid++;
-		}
-
-		if (!strncasecmp(line, "monitor_name", 12) &&
-				strstr(line, "IGT")) {
-			mon_valid++;
-		}
-	}
-
-	fclose(in);
-	if (mon_valid && eld_valid)
-		return true;
-
-	return false;
-}
-
-/** eld_is_valid: check whether ALSA has detected the audio-capable IGT EDID by
- * parsing ELD entries */
-static bool
-eld_is_valid(void)
-{
-	DIR *dir;
-	struct dirent *snd_hda;
-	int i;
-
-	for (i = 0; i < 8; i++) {
-		char cards[128];
-
-		snprintf(cards, sizeof(cards), "/proc/asound/card%d", i);
-		dir = opendir(cards);
-		if (!dir)
-			continue;
-
-		while ((snd_hda = readdir(dir))) {
-			char fpath[PATH_MAX];
-
-			if (*snd_hda->d_name == '.' ||
-			    strstr(snd_hda->d_name, "eld") == 0)
-				continue;
-
-			snprintf(fpath, sizeof(fpath), "%s/%s", cards,
-				 snd_hda->d_name);
-			if (eld_entry_is_igt(fpath)) {
-				closedir(dir);
-				return true;
-			}
-		}
-		closedir(dir);
-	}
-
-	return false;
-}
-
 static void
 hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 {
@@ -253,7 +183,7 @@ hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 	 * Test if we have /proc/asound/HDMI/eld#0.0 and is its contents are
 	 * valid.
 	 */
-	igt_assert(eld_is_valid());
+	igt_assert(eld_has_igt());
 
 	igt_remove_fb(drm_fd, &fb);
 
