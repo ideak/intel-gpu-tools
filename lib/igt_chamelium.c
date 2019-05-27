@@ -1020,7 +1020,7 @@ bool chamelium_has_audio_support(struct chamelium *chamelium,
  */
 void chamelium_get_audio_channel_mapping(struct chamelium *chamelium,
 					 struct chamelium_port *port,
-					 int mapping[static 8])
+					 int mapping[static CHAMELIUM_MAX_AUDIO_CHANNELS])
 {
 	xmlrpc_value *res, *res_channel;
 	int res_len, i;
@@ -1028,7 +1028,7 @@ void chamelium_get_audio_channel_mapping(struct chamelium *chamelium,
 	res = chamelium_rpc(chamelium, port, "GetAudioChannelMapping", "(i)",
 			    port->id);
 	res_len = xmlrpc_array_size(&chamelium->env, res);
-	igt_assert(res_len == 8);
+	igt_assert(res_len == CHAMELIUM_MAX_AUDIO_CHANNELS);
 	for (i = 0; i < res_len; i++) {
 		xmlrpc_array_read_item(&chamelium->env, res, i, &res_channel);
 		xmlrpc_read_int(&chamelium->env, res_channel, &mapping[i]);
@@ -1058,8 +1058,10 @@ static void audio_format_from_xml(struct chamelium *chamelium,
 
 	if (rate)
 		xmlrpc_read_int(&chamelium->env, res_rate, rate);
-	if (channels)
+	if (channels) {
 		xmlrpc_read_int(&chamelium->env, res_channel, channels);
+		igt_assert(*channels <= CHAMELIUM_MAX_AUDIO_CHANNELS);
+	}
 
 	xmlrpc_DECREF(res_channel);
 	xmlrpc_DECREF(res_sample_format);

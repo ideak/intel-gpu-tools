@@ -65,6 +65,12 @@ struct chamelium_audio_file {
  */
 #define CHAMELIUM_DEFAULT_EDID 0
 
+/**
+ * CHAMELIUM_MAX_AUDIO_CHANNELS: the maximum number of audio capture channels
+ * supported by Chamelium.
+ */
+#define CHAMELIUM_MAX_AUDIO_CHANNELS 8
+
 struct chamelium *chamelium_init(int drm_fd);
 void chamelium_deinit(struct chamelium *chamelium);
 void chamelium_reset(struct chamelium *chamelium);
@@ -116,7 +122,7 @@ bool chamelium_has_audio_support(struct chamelium *chamelium,
 				 struct chamelium_port *port);
 void chamelium_get_audio_channel_mapping(struct chamelium *chamelium,
 					 struct chamelium_port *port,
-					 int mapping[static 8]);
+					 int mapping[static CHAMELIUM_MAX_AUDIO_CHANNELS]);
 void chamelium_get_audio_format(struct chamelium *chamelium,
 				struct chamelium_port *port,
 				int *rate, int *channels);
