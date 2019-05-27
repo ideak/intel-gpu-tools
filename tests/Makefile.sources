@@ -6,6 +6,7 @@ NOUVEAU_TESTS = \
 
 AMDGPU_TESTS = \
 	amdgpu/amd_basic \
+	amdgpu/amd_color \
 	amdgpu/amd_cs_nop \
 	amdgpu/amd_prime \
 	amdgpu/amd_abm \
