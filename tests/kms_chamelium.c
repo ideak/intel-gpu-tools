@@ -1985,66 +1985,6 @@ test_hpd_storm_disable(data_t *data, struct chamelium_port *port, int width)
 	igt_hpd_storm_reset(data->drm_fd);
 }
 
-#define HDMI_AUDIO_EDID_SIZE (sizeof(struct edid) + sizeof(struct edid_ext))
-
-static unsigned const char *get_hdmi_audio_edid(void)
-{
-	int channels;
-	uint8_t sampling_rates, sample_sizes;
-	static unsigned char raw_edid[HDMI_AUDIO_EDID_SIZE] = {0};
-	struct edid *edid;
-	struct edid_ext *edid_ext;
-	struct edid_cea *edid_cea;
-	char *cea_data;
-	struct edid_cea_data_block *block;
-	struct cea_sad sad = {0};
-	const struct cea_vsd *vsd;
-	size_t cea_data_size, vsd_size;
-
-	/* Initialize the Short Audio Descriptor for PCM */
-	channels = 2; /* TODO: speaker alloc blocks for > 2 channels */
-	sampling_rates = CEA_SAD_SAMPLING_RATE_32KHZ |
-			 CEA_SAD_SAMPLING_RATE_44KHZ |
-			 CEA_SAD_SAMPLING_RATE_48KHZ |
-			 CEA_SAD_SAMPLING_RATE_88KHZ |
-			 CEA_SAD_SAMPLING_RATE_96KHZ |
-			 CEA_SAD_SAMPLING_RATE_176KHZ |
-			 CEA_SAD_SAMPLING_RATE_192KHZ;
-	sample_sizes = CEA_SAD_SAMPLE_SIZE_16 |
-		       CEA_SAD_SAMPLE_SIZE_20 |
-		       CEA_SAD_SAMPLE_SIZE_24;
-	cea_sad_init_pcm(&sad, channels, sampling_rates, sample_sizes);
-
-	/* Create a new EDID from the base IGT EDID, and add an
-	 * extension that advertises audio support. */
-	edid = (struct edid *) raw_edid;
-	memcpy(edid, igt_kms_get_base_edid(), sizeof(struct edid));
-	edid->extensions_len = 1;
-	edid_ext = &edid->extensions[0];
-	edid_cea = &edid_ext->data.cea;
-	cea_data = edid_cea->data;
-	cea_data_size = 0;
-
-	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
-	cea_data_size += edid_cea_data_block_set_sad(block, &sad, 1);
-
-	/* A Vendor Specific Data block is needed for HDMI audio */
-	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
-	vsd = cea_vsd_get_hdmi_default(&vsd_size);
-	cea_data_size += edid_cea_data_block_set_vsd(block, vsd,
-						     vsd_size);
-
-	igt_assert(cea_data_size <= sizeof(edid_cea->data));
-
-	edid_ext_set_cea(edid_ext, cea_data_size,
-			 EDID_CEA_BASIC_AUDIO);
-
-	edid_update_checksum(edid);
-	edid_ext_update_cea_checksum(edid_ext);
-
-	return raw_edid;
-}
-
 static const unsigned char *get_edid(enum test_edid edid)
 {
 	switch (edid) {
@@ -2056,7 +1996,7 @@ static const unsigned char *get_edid(enum test_edid edid)
 	case TEST_EDID_ALT:
 		return igt_kms_get_alt_edid();
 	case TEST_EDID_HDMI_AUDIO:
-		return get_hdmi_audio_edid();
+		return igt_kms_get_hdmi_audio_edid();
 	}
 	assert(0); /* unreachable */
 }

@@ -26,6 +26,8 @@
  */
 
 #include "config.h"
+
+#include <assert.h>
 #include <inttypes.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -178,6 +180,79 @@ const unsigned char *igt_kms_get_alt_edid(void)
 	edid_update_checksum(&edid);
 
 	return (unsigned char *) &edid;
+}
+
+static void
+generate_hdmi_audio_edid(unsigned char raw_edid[static HDMI_AUDIO_EDID_LENGTH],
+			 struct cea_sad *sad,
+			 struct cea_speaker_alloc *speaker_alloc)
+{
+	struct edid *edid;
+	struct edid_ext *edid_ext;
+	struct edid_cea *edid_cea;
+	char *cea_data;
+	struct edid_cea_data_block *block;
+	const struct cea_vsd *vsd;
+	size_t cea_data_size, vsd_size;
+
+	/* Create a new EDID from the base IGT EDID, and add an
+	 * extension that advertises audio support. */
+	edid = (struct edid *) raw_edid;
+	memcpy(edid, igt_kms_get_base_edid(), sizeof(struct edid));
+	edid->extensions_len = 1;
+	edid_ext = &edid->extensions[0];
+	edid_cea = &edid_ext->data.cea;
+	cea_data = edid_cea->data;
+	cea_data_size = 0;
+
+	/* Short Audio Descriptor block */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	cea_data_size += edid_cea_data_block_set_sad(block, sad, 1);
+
+	/* A Vendor Specific Data block is needed for HDMI audio */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	vsd = cea_vsd_get_hdmi_default(&vsd_size);
+	cea_data_size += edid_cea_data_block_set_vsd(block, vsd,
+						     vsd_size);
+
+	/* Speaker Allocation Data block */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	cea_data_size += edid_cea_data_block_set_speaker_alloc(block,
+							       speaker_alloc);
+
+	assert(cea_data_size <= sizeof(edid_cea->data));
+
+	edid_ext_set_cea(edid_ext, cea_data_size,
+			 EDID_CEA_BASIC_AUDIO);
+
+	edid_update_checksum(edid);
+	edid_ext_update_cea_checksum(edid_ext);
+}
+
+const unsigned char *igt_kms_get_hdmi_audio_edid(void)
+{
+	int channels;
+	uint8_t sampling_rates, sample_sizes;
+	static unsigned char raw_edid[HDMI_AUDIO_EDID_LENGTH] = {0};
+	struct cea_sad sad = {0};
+	struct cea_speaker_alloc speaker_alloc = {0};
+
+	/* Initialize the Short Audio Descriptor for PCM */
+	channels = 2;
+	sampling_rates = CEA_SAD_SAMPLING_RATE_32KHZ |
+			 CEA_SAD_SAMPLING_RATE_44KHZ |
+			 CEA_SAD_SAMPLING_RATE_48KHZ;
+	sample_sizes = CEA_SAD_SAMPLE_SIZE_16 |
+		       CEA_SAD_SAMPLE_SIZE_20 |
+		       CEA_SAD_SAMPLE_SIZE_24;
+	cea_sad_init_pcm(&sad, channels, sampling_rates, sample_sizes);
+
+	/* Initialize the Speaker Allocation Data */
+	speaker_alloc.speakers = CEA_SPEAKER_FRONT_LEFT_RIGHT_CENTER;
+
+	generate_hdmi_audio_edid(raw_edid, &sad, &speaker_alloc);
+
+	return raw_edid;
 }
 
 const char * const igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
@@ -1352,64 +1427,6 @@ void kmstest_edid_add_4k(const unsigned char *edid, size_t length,
 	new_edid.data[pos++] = 0x20;
 	/* 2160p, specified as short descriptor */
 	new_edid.data[pos++] = 0x01;
-
-	update_edid_csum(new_edid.data, length);
-}
-
-/**
- * kmstest_edid_add_audio:
- * @edid: an existing valid edid block
- * @length: length of @edid
- * @new_edid_ptr: pointer to where the new edid will be placed
- * @new_length: pointer to the size of the new edid
- *
- * Makes a copy of an existing edid block and adds an extension indicating
- * basic audio support and speaker data block.
- *
- */
-void kmstest_edid_add_audio(const unsigned char *edid, size_t length,
-			    unsigned char *new_edid_ptr[], size_t *new_length)
-{
-	char vsdb_block_len = 10, audio_block_len = 4, spkr_block_len = 4;
-	struct edid_block new_edid = init_cea_block(edid, length, new_edid_ptr,
-						    new_length,
-						    vsdb_block_len +
-						    audio_block_len +
-						    spkr_block_len,
-						    DTD_SUPPORTS_AUDIO);
-	int pos = new_edid.pos;
-
-	/* audio block, short audio block descriptors  */
-	new_edid.data[pos++] = (1 << 5) | (audio_block_len - 1);
-	new_edid.data[pos++] = 0x09; /* Audio Format, PCM */
-	new_edid.data[pos++] = 0x07; /* Frequency, 32, 44.1, 48kHz  */
-	new_edid.data[pos++] = 0x07; /* Bit Rate 16, 20, 24 bit */
-
-
-	/* vsdb block ( id | length ) -- need vsdb as well
-	 * otherwise the kernel will fallback to lower clock modes */
-	new_edid.data[pos++] = 3 << 5 | (vsdb_block_len - 1);
-	/* registration id */
-	new_edid.data[pos++] = 0x3;
-	new_edid.data[pos++] = 0xc;
-	new_edid.data[pos++] = 0x0;
-	/* source physical address */
-	new_edid.data[pos++] = 0x10;
-	new_edid.data[pos++] = 0x00;
-	/* Supports_AI ... etc */
-	new_edid.data[pos++] = 0x00;
-	/* Max TMDS Clock */
-	new_edid.data[pos++] = 0x00;
-	/* Latency present, HDMI Video Present */
-	new_edid.data[pos++] = 0x20;
-	/* HDMI Video */
-	new_edid.data[pos++] = 0x00; /* 3D present */
-
-	/* speaker data block */
-	new_edid.data[pos++] = (4 << 5) | (spkr_block_len - 1);
-	new_edid.data[pos++] = (1 << 5);
-	new_edid.data[pos++] = 0x00;
-	new_edid.data[pos++] = 0x00;
 
 	update_edid_csum(new_edid.data, length);
 }

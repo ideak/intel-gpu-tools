@@ -196,7 +196,6 @@ bool kmstest_force_connector(int fd, drmModeConnector *connector,
 			     enum kmstest_force_connector_state state);
 void kmstest_edid_add_3d(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
 void kmstest_edid_add_4k(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
-void kmstest_edid_add_audio(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
 void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
 			const unsigned char *edid, size_t length);
 
@@ -754,9 +753,14 @@ void igt_reset_connectors(void);
 
 uint32_t kmstest_get_vbl_flag(uint32_t pipe_id);
 
+struct cea_sad;
+struct cea_speaker_alloc;
+
 #define EDID_LENGTH 128
-const unsigned char* igt_kms_get_base_edid(void);
-const unsigned char* igt_kms_get_alt_edid(void);
+#define HDMI_AUDIO_EDID_LENGTH (2 * EDID_LENGTH)
+const unsigned char *igt_kms_get_base_edid(void);
+const unsigned char *igt_kms_get_alt_edid(void);
+const unsigned char *igt_kms_get_hdmi_audio_edid(void);
 
 struct udev_monitor *igt_watch_hotplug(void);
 bool igt_hotplug_detected(struct udev_monitor *mon,

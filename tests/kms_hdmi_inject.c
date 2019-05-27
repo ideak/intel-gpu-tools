@@ -24,6 +24,7 @@
 
 #include <dirent.h>
 #include "igt.h"
+#include "igt_edid.h"
 
 #define HDISPLAY_4K	3840
 #define VDISPLAY_4K	2160
@@ -211,14 +212,14 @@ eld_is_valid(void)
 static void
 hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 {
-	unsigned char *edid;
+	const unsigned char *edid;
 	size_t length;
 	int fb_id, cid, ret, crtc_mask = -1;
 	struct igt_fb fb;
 	struct kmstest_connector_config config;
 
-	kmstest_edid_add_audio(igt_kms_get_base_edid(), EDID_LENGTH, &edid,
-			       &length);
+	edid = igt_kms_get_hdmi_audio_edid();
+	length = HDMI_AUDIO_EDID_LENGTH;
 
 	kmstest_force_edid(drm_fd, connector, edid, length);
 
@@ -261,8 +262,6 @@ hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 
 	kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_UNSPECIFIED);
 	kmstest_force_edid(drm_fd, connector, NULL, 0);
-
-	free(edid);
 }
 
 igt_main

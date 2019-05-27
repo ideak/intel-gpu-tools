@@ -73,7 +73,6 @@ igt_simple_main
 	} funcs[] = {
 		{ "3D", kmstest_edid_add_3d },
 		{ "4k", kmstest_edid_add_4k },
-		{ "audio", kmstest_edid_add_audio },
 		{ NULL, NULL },
 	}, *f;
 
