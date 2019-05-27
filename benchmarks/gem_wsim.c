@@ -1443,23 +1443,20 @@ set_ctx_sseu(struct ctx *ctx, uint64_t slice_mask)
 
 static size_t sizeof_load_balance(int count)
 {
-	struct i915_context_engines_load_balance *ptr;
-
-	return sizeof(*ptr) + count * sizeof(ptr->engines[0]);
+	return offsetof(struct i915_context_engines_load_balance,
+			engines[count]);
 }
 
 static size_t sizeof_param_engines(int count)
 {
-	struct i915_context_param_engines *ptr;
-
-	return sizeof(*ptr) + count * sizeof(ptr->engines[0]);
+	return offsetof(struct i915_context_param_engines,
+			engines[count]);
 }
 
 static size_t sizeof_engines_bond(int count)
 {
-	struct i915_context_engines_bond *ptr;
-
-	return sizeof(*ptr) + count * sizeof(ptr->engines[0]);
+	return offsetof(struct i915_context_engines_bond,
+			engines[count]);
 }
 
 #define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
