@@ -30,6 +30,11 @@
 
 #include <stdbool.h>
 
+struct eld_entry {
+	bool valid;
+	char monitor_name[16];
+};
+
 bool eld_has_igt(void);
 
 #endif

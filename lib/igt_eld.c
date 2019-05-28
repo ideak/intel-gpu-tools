@@ -30,7 +30,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "igt_core.h"
 #include "igt_eld.h"
+
+#define ELD_PREFIX "eld#"
+#define ELD_DELIM " \t"
 
 /**
  * EDID-Like Data (ELD) is metadata parsed and exposed by ALSA for HDMI and
@@ -39,39 +43,73 @@
  * on).
  */
 
-/** eld_entry_is_igt: checks whether an ELD entry is mapped to the IGT EDID */
-static bool eld_entry_is_igt(const char *path)
+/** eld_parse_entry: parse an ELD entry
+ *
+ * Here is an example of an ELD entry:
+ *
+ *     $ cat /proc/asound/card0/eld#0.2
+ *     monitor_present         1
+ *     eld_valid               1
+ *     monitor_name            U2879G6
+ *     connection_type         DisplayPort
+ *     eld_version             [0x2] CEA-861D or below
+ *     edid_version            [0x3] CEA-861-B, C or D
+ *     manufacture_id          0xe305
+ *     product_id              0x2879
+ *     port_id                 0x800
+ *     support_hdcp            0
+ *     support_ai              0
+ *     audio_sync_delay        0
+ *     speakers                [0x1] FL/FR
+ *     sad_count               1
+ *     sad0_coding_type        [0x1] LPCM
+ *     sad0_channels           2
+ *     sad0_rates              [0xe0] 32000 44100 48000
+ *     sad0_bits               [0xe0000] 16 20 24
+ */
+static bool eld_parse_entry(const char *path, struct eld_entry *eld)
 {
-	FILE *in;
+	FILE *f;
 	char buf[1024];
-	uint8_t eld_valid = 0;
-	uint8_t mon_valid = 0;
+	char *key, *value;
+	size_t len;
+	bool monitor_present;
 
-	in = fopen(path, "r");
-	if (!in)
+	memset(eld, 0, sizeof(*eld));
+
+	f = fopen(path, "r");
+	if (!f) {
+		igt_debug("Failed to open ELD file: %s\n", path);
 		return false;
-
-	memset(buf, 0, 1024);
-
-	while ((fgets(buf, 1024, in)) != NULL) {
-		char *line = buf;
-
-		if (!strncasecmp(line, "eld_valid", 9) &&
-				strstr(line, "1")) {
-			eld_valid++;
-		}
-
-		if (!strncasecmp(line, "monitor_name", 12) &&
-				strstr(line, "IGT")) {
-			mon_valid++;
-		}
 	}
 
-	fclose(in);
-	if (mon_valid && eld_valid)
-		return true;
+	while ((fgets(buf, sizeof(buf), f)) != NULL) {
+		len = strlen(buf);
+		if (buf[len - 1] == '\n')
+			buf[len - 1] = '\0';
 
-	return false;
+		key = strtok(buf, ELD_DELIM);
+		value = strtok(NULL, "");
+		/* Skip whitespace at the beginning */
+		value += strspn(value, ELD_DELIM);
+
+		if (strcmp(key, "monitor_present") == 0)
+			monitor_present = strcmp(value, "1") == 0;
+		else if (strcmp(key, "eld_valid") == 0)
+			eld->valid = strcmp(value, "1") == 0;
+		else if (strcmp(key, "monitor_name") == 0)
+			snprintf(eld->monitor_name, sizeof(eld->monitor_name),
+				 "%s", value);
+	}
+
+	if (ferror(f) != 0) {
+		igt_debug("Failed to read ELD file: %d\n", ferror(f));
+		return false;
+	}
+
+	fclose(f);
+
+	return monitor_present;
 }
 
 /** eld_has_igt: check whether ALSA has detected the audio-capable IGT EDID by
@@ -79,27 +117,35 @@ static bool eld_entry_is_igt(const char *path)
 bool eld_has_igt(void)
 {
 	DIR *dir;
-	struct dirent *snd_hda;
+	struct dirent *dirent;
 	int i;
+	char card[64];
+	char path[PATH_MAX];
+	struct eld_entry eld;
 
 	for (i = 0; i < 8; i++) {
-		char cards[128];
-
-		snprintf(cards, sizeof(cards), "/proc/asound/card%d", i);
-		dir = opendir(cards);
+		snprintf(card, sizeof(card), "/proc/asound/card%d", i);
+		dir = opendir(card);
 		if (!dir)
 			continue;
 
-		while ((snd_hda = readdir(dir))) {
-			char fpath[PATH_MAX];
-
-			if (*snd_hda->d_name == '.' ||
-			    strstr(snd_hda->d_name, "eld") == 0)
+		while ((dirent = readdir(dir))) {
+			if (strncmp(dirent->d_name, ELD_PREFIX,
+				    strlen(ELD_PREFIX)) != 0)
 				continue;
 
-			snprintf(fpath, sizeof(fpath), "%s/%s", cards,
-				 snd_hda->d_name);
-			if (eld_entry_is_igt(fpath)) {
+			snprintf(path, sizeof(path), "%s/%s", card,
+				 dirent->d_name);
+			if (!eld_parse_entry(path, &eld)) {
+				continue;
+			}
+
+			if (!eld.valid) {
+				igt_debug("Skipping invalid ELD: %s\n", path);
+				continue;
+			}
+
+			if (strcmp(eld.monitor_name, "IGT") == 0) {
 				closedir(dir);
 				return true;
 			}
