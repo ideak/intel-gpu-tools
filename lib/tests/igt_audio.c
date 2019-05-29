@@ -38,6 +38,8 @@ static const int test_freqs[] = { 300, 700, 5000 };
 
 static const size_t test_freqs_len = sizeof(test_freqs) / sizeof(test_freqs[0]);
 
+#define TEST_EXTRA_FREQ 500
+
 static void test_signal_detect_untampered(struct audio_signal *signal)
 {
 	double buf[BUFFER_LEN];
@@ -94,6 +96,26 @@ static void test_signal_detect_with_missing_freq(struct audio_signal *signal)
 	igt_assert(!ok);
 }
 
+static void test_signal_detect_with_unexpected_freq(struct audio_signal *signal)
+{
+	double buf[BUFFER_LEN];
+	struct audio_signal *extra;
+	bool ok;
+	size_t i;
+
+	/* Add an extra, unexpected frequency */
+	extra = audio_signal_init(CHANNELS, SAMPLING_RATE);
+	for (i = 0; i < test_freqs_len; i++) {
+		audio_signal_add_frequency(extra, test_freqs[i], 0);
+	}
+	audio_signal_add_frequency(extra, TEST_EXTRA_FREQ, 0);
+	audio_signal_synthesize(extra);
+
+	audio_signal_fill(extra, buf, BUFFER_LEN / CHANNELS);
+	ok = audio_signal_detect(signal, SAMPLING_RATE, 0, buf, BUFFER_LEN);
+	igt_assert(!ok);
+}
+
 igt_main
 {
 	struct audio_signal *signal;
@@ -125,6 +147,9 @@ igt_main
 
 		igt_subtest("signal-detect-with-missing-freq")
 			test_signal_detect_with_missing_freq(signal);
+
+		igt_subtest("signal-detect-with-unexpected-freq")
+			test_signal_detect_with_unexpected_freq(signal);
 
 		igt_fixture {
 			audio_signal_fini(signal);
