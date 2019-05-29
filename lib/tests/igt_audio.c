@@ -34,6 +34,10 @@
 #define CHANNELS 1
 #define BUFFER_LEN 2048
 
+static const int test_freqs[] = { 300, 700, 5000 };
+
+static const size_t test_freqs_len = sizeof(test_freqs) / sizeof(test_freqs[0]);
+
 static void test_signal_detect_untampered(struct audio_signal *signal)
 {
 	double buf[BUFFER_LEN];
@@ -70,21 +74,42 @@ static void test_signal_detect_noise(struct audio_signal *signal)
 	igt_assert(!ok);
 }
 
+static void test_signal_detect_with_missing_freq(struct audio_signal *signal)
+{
+	double buf[BUFFER_LEN];
+	struct audio_signal *missing;
+	bool ok;
+	size_t i;
+
+	/* Generate a signal with all the expected frequencies but the first
+	 * one */
+	missing = audio_signal_init(CHANNELS, SAMPLING_RATE);
+	for (i = 1; i < test_freqs_len; i++) {
+		audio_signal_add_frequency(missing, test_freqs[i], 0);
+	}
+	audio_signal_synthesize(missing);
+
+	audio_signal_fill(missing, buf, BUFFER_LEN / CHANNELS);
+	ok = audio_signal_detect(signal, SAMPLING_RATE, 0, buf, BUFFER_LEN);
+	igt_assert(!ok);
+}
+
 igt_main
 {
 	struct audio_signal *signal;
 	int ret;
+	size_t i;
 
 	igt_subtest_group {
 		igt_fixture {
 			signal = audio_signal_init(CHANNELS, SAMPLING_RATE);
 
-			ret = audio_signal_add_frequency(signal, 300, 0);
-			igt_assert(ret == 0);
-			ret = audio_signal_add_frequency(signal, 700, 0);
-			igt_assert(ret == 0);
-			ret = audio_signal_add_frequency(signal, 5000, 0);
-			igt_assert(ret == 0);
+			for (i = 0; i < test_freqs_len; i++) {
+				ret = audio_signal_add_frequency(signal,
+								 test_freqs[i],
+								 0);
+				igt_assert(ret == 0);
+			}
 
 			audio_signal_synthesize(signal);
 		}
@@ -97,6 +122,9 @@ igt_main
 
 		igt_subtest("signal-detect-noise")
 			test_signal_detect_noise(signal);
+
+		igt_subtest("signal-detect-with-missing-freq")
+			test_signal_detect_with_missing_freq(signal);
 
 		igt_fixture {
 			audio_signal_fini(signal);
