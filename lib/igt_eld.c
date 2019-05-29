@@ -41,7 +41,83 @@
  * DisplayPort connectors supporting audio. This includes the monitor name and
  * the supported audio parameters (formats, sampling rates, sample sizes and so
  * on).
+ *
+ * Audio parameters come from Short Audio Descriptors (SAD) blocks in the
+ * EDID. Enumerations from igt_edid are used since they are the same.
  */
+
+static enum cea_sad_format parse_sad_coding_type(const char *value)
+{
+	if (strcmp(value, "LPCM") == 0)
+		return CEA_SAD_FORMAT_PCM;
+	else
+		return 0;
+}
+
+static enum cea_sad_sampling_rate parse_sad_rate(const char *value)
+{
+	switch (atoi(value)) {
+	case 32000:
+		return CEA_SAD_SAMPLING_RATE_32KHZ;
+	case 44100:
+		return CEA_SAD_SAMPLING_RATE_44KHZ;
+	case 48000:
+		return CEA_SAD_SAMPLING_RATE_48KHZ;
+	case 88000:
+		return CEA_SAD_SAMPLING_RATE_88KHZ;
+	case 96000:
+		return CEA_SAD_SAMPLING_RATE_96KHZ;
+	case 176000:
+		return CEA_SAD_SAMPLING_RATE_176KHZ;
+	case 192000:
+		return CEA_SAD_SAMPLING_RATE_192KHZ;
+	default:
+		return 0;
+	}
+}
+
+static enum cea_sad_pcm_sample_size parse_sad_bit(const char *value)
+{
+	switch (atoi(value)) {
+	case 16:
+		return CEA_SAD_SAMPLE_SIZE_16;
+	case 20:
+		return CEA_SAD_SAMPLE_SIZE_20;
+	case 24:
+		return CEA_SAD_SAMPLE_SIZE_24;
+	default:
+		return 0;
+	}
+}
+
+static void parse_sad_field(struct eld_sad *sad, const char *key, char *value)
+{
+	char *tok;
+
+	/* Some fields are prefixed with the raw hex value, strip it */
+	if (value[0] == '[') {
+		value = strchr(value, ' ');
+		igt_assert(value != NULL);
+		value++; /* skip the space */
+	}
+
+	/* Single-value fields */
+	if (strcmp(key, "coding_type") == 0)
+		sad->coding_type = parse_sad_coding_type(value);
+	else if (strcmp(key, "channels") == 0)
+		sad->channels = atoi(value);
+
+	/* Multiple-value fields */
+	tok = strtok(value, " ");
+	while (tok) {
+		if (strcmp(key, "rates") == 0)
+			sad->rates |= parse_sad_rate(tok);
+		else if (strcmp(key, "bits") == 0)
+			sad->bits |= parse_sad_bit(tok);
+
+		tok = strtok(NULL, " ");
+	}
+}
 
 /** eld_parse_entry: parse an ELD entry
  *
@@ -66,14 +142,18 @@
  *     sad0_channels           2
  *     sad0_rates              [0xe0] 32000 44100 48000
  *     sad0_bits               [0xe0000] 16 20 24
+ *
+ * Each entry contains one or more SAD blocks. Their contents is exposed in
+ * sadN_* fields.
  */
 static bool eld_parse_entry(const char *path, struct eld_entry *eld)
 {
 	FILE *f;
 	char buf[1024];
-	char *key, *value;
+	char *key, *value, *sad_key;
 	size_t len;
 	bool monitor_present;
+	int sad_index;
 
 	memset(eld, 0, sizeof(*eld));
 
@@ -100,6 +180,14 @@ static bool eld_parse_entry(const char *path, struct eld_entry *eld)
 		else if (strcmp(key, "monitor_name") == 0)
 			snprintf(eld->monitor_name, sizeof(eld->monitor_name),
 				 "%s", value);
+		else if (strcmp(key, "sad_count") == 0)
+			eld->sads_len = atoi(value);
+		else if (sscanf(key, "sad%d_%ms", &sad_index, &sad_key) == 2) {
+			igt_assert(sad_index < ELD_SADS_CAP);
+			igt_assert(sad_index < eld->sads_len);
+			parse_sad_field(&eld->sads[sad_index], sad_key, value);
+			free(sad_key);
+		}
 	}
 
 	if (ferror(f) != 0) {

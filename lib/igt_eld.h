@@ -30,9 +30,23 @@
 
 #include <stdbool.h>
 
+#include "igt_edid.h"
+
+#define ELD_SADS_CAP 4
+
+/** eld_sad: Short Audio Descriptor */
+struct eld_sad {
+	enum cea_sad_format coding_type;
+	int channels;
+	unsigned int rates; /* enum cea_sad_sampling_rate */
+	unsigned int bits; /* enum cea_sad_pcm_sample_size */
+};
+
 struct eld_entry {
 	bool valid;
 	char monitor_name[16];
+	size_t sads_len;
+	struct eld_sad sads[ELD_SADS_CAP];
 };
 
 bool eld_has_igt(void);
