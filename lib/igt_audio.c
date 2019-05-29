@@ -39,6 +39,17 @@
 #define CHANNELS_MAX 8
 #define SYNTHESIZE_AMPLITUDE 0.9
 #define SYNTHESIZE_ACCURACY 0.2
+/** MIN_FREQ: minimum frequency that audio_signal can generate.
+ *
+ * To make sure the audio signal doesn't contain noise, #audio_signal_detect
+ * checks that low frequencies have a power lower than #NOISE_THRESHOLD.
+ * However if too-low frequencies are generated, noise detection can fail.
+ *
+ * This value should be at least 100Hz plus one bin. Best is not to change this
+ * value.
+ */
+#define MIN_FREQ 200 /* Hz */
+#define NOISE_THRESHOLD 0.0005
 
 /**
  * SECTION:igt_audio
@@ -108,6 +119,7 @@ int audio_signal_add_frequency(struct audio_signal *signal, int frequency,
 
 	igt_assert(index < FREQS_MAX);
 	igt_assert(channel < signal->channels);
+	igt_assert(frequency >= MIN_FREQ);
 
 	/* Stay within the Nyquist–Shannon sampling theorem. */
 	if (frequency > signal->sampling_rate / 2) {
@@ -304,6 +316,12 @@ void audio_signal_fill(struct audio_signal *signal, double *buffer,
 	audio_sanity_check(buffer, signal->channels * samples);
 }
 
+/* See https://en.wikipedia.org/wiki/Window_function#Hann_and_Hamming_windows */
+static double hann_window(double v, size_t i, size_t N)
+{
+	return v * 0.5 * (1 - cos(2.0 * M_PI * (double) i / (double) N));
+}
+
 /**
  * Checks that frequencies specified in signal, and only those, are included
  * in the input data.
@@ -328,6 +346,16 @@ bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
 	data = malloc(samples_len * sizeof(double));
 	memcpy(data, samples, samples_len * sizeof(double));
 
+	/* Apply a Hann window to the input signal, to reduce frequency leaks
+	 * due to the endpoints of the signal being discontinuous.
+	 *
+	 * For more info:
+	 * - https://download.ni.com/evaluation/pxi/Understanding%20FFTs%20and%20Windowing.pdf
+	 * - https://en.wikipedia.org/wiki/Window_function
+	 */
+	for (i = 0; i < data_len; i++)
+		data[i] = hann_window(data[i], i, data_len);
+
 	/* Allowed error in Hz due to FFT step */
 	freq_accuracy = sampling_rate / data_len;
 	igt_debug("Allowed freq. error: %d Hz\n", freq_accuracy);
@@ -338,8 +366,7 @@ bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
 		igt_assert(0);
 	}
 
-	/* Compute the power received by every bin of the FFT, and record the
-	 * maximum power received as a way to normalize all the others.
+	/* Compute the power received by every bin of the FFT.
 	 *
 	 * For i < data_len / 2, the real part of the i-th term is stored at
 	 * data[i] and its imaginary part is stored at data[data_len - i].
@@ -349,14 +376,35 @@ bool audio_signal_detect(struct audio_signal *signal, int sampling_rate,
 	 * The power is encoded as the magnitude of the complex number and the
 	 * phase is encoded as its angle.
 	 */
-	max = 0;
 	bin_power[0] = data[0];
 	for (i = 1; i < bin_power_len - 1; i++) {
 		bin_power[i] = hypot(data[i], data[data_len - i]);
-		if (bin_power[i] > max)
-			max = bin_power[i];
 	}
 	bin_power[bin_power_len - 1] = data[data_len / 2];
+
+	/* Normalize the power */
+	for (i = 0; i < bin_power_len; i++)
+		bin_power[i] = 2 * bin_power[i] / data_len;
+
+	/* Detect noise with a threshold on the power of low frequencies */
+	for (i = 0; i < bin_power_len; i++) {
+		freq = sampling_rate * i / data_len;
+		if (freq > MIN_FREQ - 100)
+			break;
+		if (bin_power[i] > NOISE_THRESHOLD) {
+			igt_debug("Noise level too high: freq=%d power=%f\n",
+				  freq, bin_power[i]);
+			return false;
+		}
+	}
+
+	/* Record the maximum power received as a way to normalize all the
+	 * others. */
+	max = NAN;
+	for (i = 0; i < bin_power_len; i++) {
+		if (isnan(max) || bin_power[i] > max)
+			max = bin_power[i];
+	}
 
 	for (i = 0; i < signal->freqs_count; i++)
 		detected[i] = false;
