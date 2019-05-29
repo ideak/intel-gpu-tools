@@ -80,10 +80,58 @@ static bool write_only(const uint32_t addr)
 	return false;
 }
 
+#define MI_STORE_REGISTER_MEM (0x24 << 23)
+
 static int workaround_fail_count(int i915, uint32_t ctx)
 {
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_relocation_entry *reloc;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	uint32_t result_sz, batch_sz;
+	uint32_t *base, *out;
 	igt_spin_t *spin;
 	int fw, fail = 0;
+
+	reloc = calloc(num_wa_regs, sizeof(*reloc));
+	igt_assert(reloc);
+
+	result_sz = 4 * num_wa_regs;
+	result_sz = PAGE_ALIGN(result_sz);
+
+	batch_sz = 16 * num_wa_regs + 4;
+	batch_sz = PAGE_ALIGN(batch_sz);
+
+	memset(obj, 0, sizeof(obj));
+	obj[0].handle = gem_create(i915, result_sz);
+	gem_set_caching(i915, obj[0].handle, I915_CACHING_CACHED);
+	obj[1].handle = gem_create(i915, batch_sz);
+	obj[1].relocs_ptr = to_user_pointer(reloc);
+	obj[1].relocation_count = num_wa_regs;
+
+	out = base =
+		gem_mmap__cpu(i915, obj[1].handle, 0, batch_sz, PROT_WRITE);
+	for (int i = 0; i < num_wa_regs; i++) {
+		*out++ = MI_STORE_REGISTER_MEM | ((gen >= 8 ? 4 : 2) - 2);
+		*out++ = wa_regs[i].addr;
+		reloc[i].target_handle = obj[0].handle;
+		reloc[i].offset = (out - base) * sizeof(*out);
+		reloc[i].delta = i * sizeof(uint32_t);
+		reloc[i].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		reloc[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
+		*out++ = reloc[i].delta;
+		if (gen >= 8)
+			*out++ = 0;
+	}
+	*out++ = MI_BATCH_BUFFER_END;
+	munmap(base, batch_sz);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+	execbuf.rsvd1 = ctx;
+	gem_execbuf(i915, &execbuf);
+
+	gem_set_domain(i915, obj[0].handle, I915_GEM_DOMAIN_CPU, 0);
 
 	spin = igt_spin_new(i915, .ctx = ctx, .flags = IGT_SPIN_POLL_RUN);
 	igt_spin_busywait_until_started(spin);
@@ -92,20 +140,23 @@ static int workaround_fail_count(int i915, uint32_t ctx)
 	if (fw < 0)
 		igt_debug("Unable to obtain i915_user_forcewake!\n");
 
+	igt_debug("Address\tval\t\tmask\t\tread\t\tresult\n");
+
+	out = gem_mmap__cpu(i915, obj[0].handle, 0, result_sz, PROT_READ);
 	for (int i = 0; i < num_wa_regs; i++) {
-		const uint32_t value =
-			*(uint32_t *)(igt_global_mmio + wa_regs[i].addr);
-		const bool ok =
-			(wa_regs[i].value & wa_regs[i].mask) ==
-			(value & wa_regs[i].mask);
 		char buf[80];
 
 		snprintf(buf, sizeof(buf),
 			 "0x%05X\t0x%08X\t0x%08X\t0x%08X",
 			 wa_regs[i].addr, wa_regs[i].value, wa_regs[i].mask,
-			 value);
+			 out[i]);
 
-		if (ok) {
+		/* If the SRM failed, fill in the result using mmio */
+		if (out[i] == 0)
+			out[i] = *(volatile uint32_t *)(igt_global_mmio + wa_regs[i].addr);
+
+		if ((wa_regs[i].value & wa_regs[i].mask) ==
+		    (out[i] & wa_regs[i].mask)) {
 			igt_debug("%s\tOK\n", buf);
 		} else if (write_only(wa_regs[i].addr)) {
 			igt_debug("%s\tIGNORED (w/o)\n", buf);
@@ -114,9 +165,14 @@ static int workaround_fail_count(int i915, uint32_t ctx)
 			fail++;
 		}
 	}
+	munmap(out, result_sz);
 
 	close(fw);
 	igt_spin_free(i915, spin);
+
+	gem_close(i915, obj[1].handle);
+	gem_close(i915, obj[0].handle);
+	free(reloc);
 
 	return fail;
 }
