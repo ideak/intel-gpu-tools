@@ -116,6 +116,28 @@ static void test_signal_detect_with_unexpected_freq(struct audio_signal *signal)
 	igt_assert(!ok);
 }
 
+static void test_signal_detect_held_sample(struct audio_signal *signal)
+{
+	double *buf;
+	bool ok;
+	size_t i;
+	double value;
+
+	buf = malloc(BUFFER_LEN * sizeof(double));
+	audio_signal_fill(signal, buf, BUFFER_LEN / CHANNELS);
+
+	/* Repeat a sample in the middle of the signal */
+	value = buf[BUFFER_LEN / 3];
+	for (i = 0; i < 5; i++)
+		buf[BUFFER_LEN / 3 + i] = value;
+
+	ok = audio_signal_detect(signal, SAMPLING_RATE, 0, buf, BUFFER_LEN);
+
+	free(buf);
+
+	igt_assert_f(!ok, "Expected audio signal not to be detected\n");
+}
+
 igt_main
 {
 	struct audio_signal *signal;
@@ -150,6 +172,9 @@ igt_main
 
 		igt_subtest("signal-detect-with-unexpected-freq")
 			test_signal_detect_with_unexpected_freq(signal);
+
+		igt_subtest("signal-detect-held-sample")
+			test_signal_detect_held_sample(signal);
 
 		igt_fixture {
 			audio_signal_fini(signal);
