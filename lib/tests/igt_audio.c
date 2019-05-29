@@ -1,0 +1,105 @@
+/*
+ * Copyright © 2019 Intel Corporation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ * Author: Simon Ser <simon.ser@intel.com>
+ */
+
+#include "config.h"
+
+#include <stdlib.h>
+
+#include "igt_core.h"
+#include "igt_audio.h"
+
+#define SAMPLING_RATE 44100
+#define CHANNELS 1
+#define BUFFER_LEN 2048
+
+static void test_signal_detect_untampered(struct audio_signal *signal)
+{
+	double buf[BUFFER_LEN];
+	bool ok;
+
+	audio_signal_fill(signal, buf, BUFFER_LEN / CHANNELS);
+	ok = audio_signal_detect(signal, SAMPLING_RATE, 0, buf, BUFFER_LEN);
+	igt_assert(ok);
+}
+
+static void test_signal_detect_silence(struct audio_signal *signal)
+{
+	double buf[BUFFER_LEN] = {0};
+	bool ok;
+
+	ok = audio_signal_detect(signal, SAMPLING_RATE, 0, buf, BUFFER_LEN);
+
+	igt_assert(!ok);
+}
+
+static void test_signal_detect_noise(struct audio_signal *signal)
+{
+	double buf[BUFFER_LEN];
+	bool ok;
+	size_t i;
+
+	/* Generate random samples between -1 and 1 */
+	srand(42);
+	for (i = 0; i < BUFFER_LEN; i++)
+		buf[i] = (double) random() / RAND_MAX * 2 - 1;
+
+	ok = audio_signal_detect(signal, SAMPLING_RATE, 0, buf, BUFFER_LEN);
+
+	igt_assert(!ok);
+}
+
+igt_main
+{
+	struct audio_signal *signal;
+	int ret;
+
+	igt_subtest_group {
+		igt_fixture {
+			signal = audio_signal_init(CHANNELS, SAMPLING_RATE);
+
+			ret = audio_signal_add_frequency(signal, 300, 0);
+			igt_assert(ret == 0);
+			ret = audio_signal_add_frequency(signal, 700, 0);
+			igt_assert(ret == 0);
+			ret = audio_signal_add_frequency(signal, 5000, 0);
+			igt_assert(ret == 0);
+
+			audio_signal_synthesize(signal);
+		}
+
+		igt_subtest("signal-detect-untampered")
+			test_signal_detect_untampered(signal);
+
+		igt_subtest("signal-detect-silence")
+			test_signal_detect_silence(signal);
+
+		igt_subtest("signal-detect-noise")
+			test_signal_detect_noise(signal);
+
+		igt_fixture {
+			audio_signal_fini(signal);
+		}
+	}
+}

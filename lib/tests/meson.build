@@ -22,6 +22,13 @@ lib_fail_tests = [
 	'igt_timeout',
 ]
 
+lib_tests_deps = igt_deps
+
+if chamelium.found()
+	lib_deps += chamelium
+	lib_tests += 'igt_audio'
+endif
+
 foreach lib_test : lib_tests
 	exec = executable(lib_test, lib_test + '.c', install : false,
 			dependencies : igt_deps)
