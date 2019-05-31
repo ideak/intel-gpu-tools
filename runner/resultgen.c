@@ -742,12 +742,18 @@ static const char *result_from_exitcode(int exitcode)
 static void add_subtest(struct subtests *subtests, char *subtest)
 {
 	size_t len = strlen(subtest);
+	size_t i;
 
 	if (len == 0)
 		return;
 
 	if (subtest[len - 1] == '\n')
 		subtest[len - 1] = '\0';
+
+	/* Don't add if we already have this subtest */
+	for (i = 0; i < subtests->size; i++)
+		if (!strcmp(subtest, subtests->names[i]))
+			return;
 
 	subtests->size++;
 	subtests->names = realloc(subtests->names, sizeof(*subtests->names) * subtests->size);
