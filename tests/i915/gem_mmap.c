@@ -173,7 +173,7 @@ igt_main
 			};
 
 			igt_debug("Trying MMAP IOCTL with handle %x\n", handles[i]);
-			igt_assert_eq(mmap_ioctl(fd, &arg), -EINVAL);
+			igt_assert_eq(mmap_ioctl(fd, &arg), -ENOENT);
 		}
 
 		gem_close(fd, real_handle);
