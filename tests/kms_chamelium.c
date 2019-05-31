@@ -28,6 +28,7 @@
 #include "igt.h"
 #include "igt_vc4.h"
 #include "igt_edid.h"
+#include "igt_eld.h"
 
 #include <fcntl.h>
 #include <pthread.h>
@@ -1433,6 +1434,55 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 	free(alsa);
 }
 
+static void
+test_display_audio_edid(data_t *data, struct chamelium_port *port,
+			enum test_edid edid)
+{
+	igt_output_t *output;
+	igt_plane_t *primary;
+	struct igt_fb fb;
+	drmModeModeInfo *mode;
+	drmModeConnector *connector;
+	int fb_id;
+	struct eld_entry eld;
+	struct eld_sad *sad;
+
+	reset_state(data, port);
+
+	output = prepare_output(data, port, edid);
+	connector = chamelium_port_get_connector(data->chamelium, port, false);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_assert(primary);
+
+	/* Enable the output because audio cannot be played on inactive
+	 * connectors. */
+	igt_assert(connector->count_modes > 0);
+	mode = &connector->modes[0];
+
+	fb_id = igt_create_color_pattern_fb(data->drm_fd,
+					    mode->hdisplay, mode->vdisplay,
+					    DRM_FORMAT_XRGB8888,
+					    LOCAL_DRM_FORMAT_MOD_NONE,
+					    0, 0, 0, &fb);
+	igt_assert(fb_id > 0);
+
+	enable_output(data, port, output, mode, &fb);
+
+	igt_assert(eld_get_igt(&eld));
+	igt_assert(eld.sads_len == 1);
+
+	sad = &eld.sads[0];
+	igt_assert(sad->coding_type == CEA_SAD_FORMAT_PCM);
+	igt_assert(sad->channels == 2);
+	igt_assert(sad->rates == (CEA_SAD_SAMPLING_RATE_32KHZ |
+		   CEA_SAD_SAMPLING_RATE_44KHZ | CEA_SAD_SAMPLING_RATE_48KHZ));
+	igt_assert(sad->bits == (CEA_SAD_SAMPLE_SIZE_16 |
+		   CEA_SAD_SAMPLE_SIZE_20 | CEA_SAD_SAMPLE_SIZE_24));
+
+	igt_remove_fb(data->drm_fd, &fb);
+
+	drmModeFreeConnector(connector);
+}
 
 static void randomize_plane_stride(data_t *data,
 				   uint32_t width, uint32_t height,
@@ -2123,6 +2173,10 @@ igt_main
 		connector_subtest("dp-audio", DisplayPort)
 			test_display_audio(&data, port, "HDMI",
 					   TEST_EDID_DP_AUDIO);
+
+		connector_subtest("dp-audio-edid", DisplayPort)
+			test_display_audio_edid(&data, port,
+						TEST_EDID_DP_AUDIO);
 	}
 
 	igt_subtest_group {
@@ -2274,6 +2328,10 @@ igt_main
 		connector_subtest("hdmi-audio", HDMIA)
 			test_display_audio(&data, port, "HDMI",
 					   TEST_EDID_HDMI_AUDIO);
+
+		connector_subtest("hdmi-audio-edid", HDMIA)
+			test_display_audio_edid(&data, port,
+						TEST_EDID_HDMI_AUDIO);
 	}
 
 	igt_subtest_group {
