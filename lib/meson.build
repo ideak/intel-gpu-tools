@@ -69,7 +69,6 @@ lib_deps = [
 	libkmod,
 	libprocps,
 	libudev,
-	libdw,
 	math,
 	pciaccess,
 	pixman,
