@@ -289,46 +289,6 @@ static void flink_and_close(void)
 	close(fd2);
 }
 
-static void flink_and_exit(void)
-{
-	uint32_t fd, fd2, fd3;
-	uint32_t bo, flinked_bo, name;
-	char match[20];
-
-	fd = drm_open_driver(DRIVER_INTEL);
-	igt_require(gem_uses_full_ppgtt(fd));
-
-	bo = gem_create(fd, 4096);
-	name = gem_flink(fd, bo);
-	snprintf(match, sizeof(match), "(name: %u)", name);
-
-	fd2 = drm_open_driver(DRIVER_INTEL);
-	flinked_bo = gem_open(fd2, name);
-
-	/* Verify VMA is not there yet. */
-	igt_assert(!igt_debugfs_search(fd, "i915_gem_gtt", match));
-
-	exec_and_get_offset(fd2, flinked_bo);
-
-	/* Verify VMA has been created. */
-	igt_assert(igt_debugfs_search(fd, "i915_gem_gtt", match));
-
-	/* Close the context. */
-	close(fd2);
-
-	/* Execute a different and unrelated (wrt object sharing) context to
-	 * ensure engine drops its last context reference.
-	 */
-	fd3 = drm_open_driver(DRIVER_INTEL);
-	exec_and_get_offset(fd3, gem_create(fd3, 4096));
-	close(fd3);
-
-	igt_drop_caches_set(fd, DROP_ACTIVE | DROP_RETIRE | DROP_IDLE);
-	igt_assert(!igt_debugfs_search(fd, "i915_gem_gtt", match));
-
-	close(fd);
-}
-
 #define N_CHILD 8
 igt_main
 {
@@ -364,7 +324,4 @@ igt_main
 
 	igt_subtest("flink-and-close-vma-leak")
 		flink_and_close();
-
-	igt_subtest("flink-and-exit-vma-leak")
-		flink_and_exit();
 }
