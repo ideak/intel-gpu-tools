@@ -68,6 +68,16 @@ build:tests-debian-meson:
     paths:
       - meson-test-list.txt
 
+build:tests-debian-minimal:
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-minimal:latest
+  stage: build
+  script:
+    - meson -Dbuild_tests=disabled -Dwith_libdrm="" build
+    - ninja -C build
+  artifacts:
+    paths:
+      - build
+
 build:tests-debian-meson-armhf:
   image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-armhf:latest
   stage: build
@@ -114,6 +124,13 @@ test:ninja-test-clang:
     - build:tests-fedora-clang
   variables:
     CC: clang
+  stage: test
+  script: ninja -C build test
+
+test:ninja-test-minimal:
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-minimal:latest
+  dependencies:
+    - build:tests-debian-minimal
   stage: test
   script: ninja -C build test
 
@@ -175,6 +192,7 @@ containers:igt-debian:
   image: docker:stable
   only:
     changes:
+      - Dockerfile.debian-minimal
       - Dockerfile.debian
       - .gitlab-ci.yml
   services:
@@ -184,7 +202,9 @@ containers:igt-debian:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-minimal -t igt-debian-minimal -f Dockerfile.debian-minimal .
     - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian -f Dockerfile.debian .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-minimal
     - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian
 
 containers:igt-debian-armhf:
