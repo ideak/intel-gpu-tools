@@ -183,9 +183,9 @@ const unsigned char *igt_kms_get_alt_edid(void)
 }
 
 static void
-generate_hdmi_audio_edid(unsigned char raw_edid[static HDMI_AUDIO_EDID_LENGTH],
-			 struct cea_sad *sad,
-			 struct cea_speaker_alloc *speaker_alloc)
+generate_audio_edid(unsigned char raw_edid[static AUDIO_EDID_LENGTH],
+		    bool with_vsd, struct cea_sad *sad,
+		    struct cea_speaker_alloc *speaker_alloc)
 {
 	struct edid *edid;
 	struct edid_ext *edid_ext;
@@ -210,10 +210,12 @@ generate_hdmi_audio_edid(unsigned char raw_edid[static HDMI_AUDIO_EDID_LENGTH],
 	cea_data_size += edid_cea_data_block_set_sad(block, sad, 1);
 
 	/* A Vendor Specific Data block is needed for HDMI audio */
-	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
-	vsd = cea_vsd_get_hdmi_default(&vsd_size);
-	cea_data_size += edid_cea_data_block_set_vsd(block, vsd,
-						     vsd_size);
+	if (with_vsd) {
+		block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+		vsd = cea_vsd_get_hdmi_default(&vsd_size);
+		cea_data_size += edid_cea_data_block_set_vsd(block, vsd,
+							     vsd_size);
+	}
 
 	/* Speaker Allocation Data block */
 	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
@@ -233,7 +235,7 @@ const unsigned char *igt_kms_get_hdmi_audio_edid(void)
 {
 	int channels;
 	uint8_t sampling_rates, sample_sizes;
-	static unsigned char raw_edid[HDMI_AUDIO_EDID_LENGTH] = {0};
+	static unsigned char raw_edid[AUDIO_EDID_LENGTH] = {0};
 	struct cea_sad sad = {0};
 	struct cea_speaker_alloc speaker_alloc = {0};
 
@@ -250,7 +252,33 @@ const unsigned char *igt_kms_get_hdmi_audio_edid(void)
 	/* Initialize the Speaker Allocation Data */
 	speaker_alloc.speakers = CEA_SPEAKER_FRONT_LEFT_RIGHT_CENTER;
 
-	generate_hdmi_audio_edid(raw_edid, &sad, &speaker_alloc);
+	generate_audio_edid(raw_edid, true, &sad, &speaker_alloc);
+
+	return raw_edid;
+}
+
+const unsigned char *igt_kms_get_dp_audio_edid(void)
+{
+	int channels;
+	uint8_t sampling_rates, sample_sizes;
+	static unsigned char raw_edid[AUDIO_EDID_LENGTH] = {0};
+	struct cea_sad sad = {0};
+	struct cea_speaker_alloc speaker_alloc = {0};
+
+	/* Initialize the Short Audio Descriptor for PCM */
+	channels = 2;
+	sampling_rates = CEA_SAD_SAMPLING_RATE_32KHZ |
+			 CEA_SAD_SAMPLING_RATE_44KHZ |
+			 CEA_SAD_SAMPLING_RATE_48KHZ;
+	sample_sizes = CEA_SAD_SAMPLE_SIZE_16 |
+		       CEA_SAD_SAMPLE_SIZE_20 |
+		       CEA_SAD_SAMPLE_SIZE_24;
+	cea_sad_init_pcm(&sad, channels, sampling_rates, sample_sizes);
+
+	/* Initialize the Speaker Allocation Data */
+	speaker_alloc.speakers = CEA_SPEAKER_FRONT_LEFT_RIGHT_CENTER;
+
+	generate_audio_edid(raw_edid, false, &sad, &speaker_alloc);
 
 	return raw_edid;
 }

@@ -759,10 +759,11 @@ struct cea_sad;
 struct cea_speaker_alloc;
 
 #define EDID_LENGTH 128
-#define HDMI_AUDIO_EDID_LENGTH (2 * EDID_LENGTH)
+#define AUDIO_EDID_LENGTH (2 * EDID_LENGTH)
 const unsigned char *igt_kms_get_base_edid(void);
 const unsigned char *igt_kms_get_alt_edid(void);
 const unsigned char *igt_kms_get_hdmi_audio_edid(void);
+const unsigned char *igt_kms_get_dp_audio_edid(void);
 
 struct udev_monitor *igt_watch_hotplug(void);
 bool igt_hotplug_detected(struct udev_monitor *mon,

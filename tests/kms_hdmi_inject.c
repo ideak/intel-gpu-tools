@@ -149,7 +149,7 @@ hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 	struct kmstest_connector_config config;
 
 	edid = igt_kms_get_hdmi_audio_edid();
-	length = HDMI_AUDIO_EDID_LENGTH;
+	length = AUDIO_EDID_LENGTH;
 
 	kmstest_force_edid(drm_fd, connector, edid, length);
 

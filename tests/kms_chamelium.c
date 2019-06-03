@@ -39,7 +39,9 @@ enum test_edid {
 	TEST_EDID_BASE,
 	TEST_EDID_ALT,
 	TEST_EDID_HDMI_AUDIO,
+	TEST_EDID_DP_AUDIO,
 };
+#define TEST_EDID_COUNT 5
 
 typedef struct {
 	struct chamelium *chamelium;
@@ -49,7 +51,7 @@ typedef struct {
 
 	int drm_fd;
 
-	int edids[4];
+	int edids[TEST_EDID_COUNT];
 } data_t;
 
 #define HOTPLUG_TIMEOUT 20 /* seconds */
@@ -1997,6 +1999,8 @@ static const unsigned char *get_edid(enum test_edid edid)
 		return igt_kms_get_alt_edid();
 	case TEST_EDID_HDMI_AUDIO:
 		return igt_kms_get_hdmi_audio_edid();
+	case TEST_EDID_DP_AUDIO:
+		return igt_kms_get_dp_audio_edid();
 	}
 	assert(0); /* unreachable */
 }
@@ -2031,7 +2035,7 @@ igt_main
 						 &data.port_count);
 
 		data.edids[TEST_EDID_CHAMELIUM_DEFAULT] = CHAMELIUM_DEFAULT_EDID;
-		for (i = 1; i < sizeof(data.edids) / sizeof(data.edids[0]); ++i) {
+		for (i = 1; i < TEST_EDID_COUNT; ++i) {
 			data.edids[i] = chamelium_new_edid(data.chamelium,
 							   get_edid(i));
 		}
@@ -2113,7 +2117,7 @@ igt_main
 		 * Use the Chamelium's default EDID for DP audio. */
 		connector_subtest("dp-audio", DisplayPort)
 			test_display_audio(&data, port, "HDMI",
-					   TEST_EDID_CHAMELIUM_DEFAULT);
+					   TEST_EDID_DP_AUDIO);
 	}
 
 	igt_subtest_group {
