@@ -30,6 +30,8 @@
 
 #include <stdint.h>
 
+#include <xf86drmMode.h>
+
 struct est_timings {
 	uint8_t t1;
 	uint8_t t2;
