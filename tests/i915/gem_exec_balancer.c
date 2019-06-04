@@ -32,6 +32,26 @@ IGT_TEST_DESCRIPTION("Exercise in-kernel load-balancing");
 
 #define INSTANCE_COUNT (1 << I915_PMU_SAMPLE_INSTANCE_BITS)
 
+static size_t sizeof_load_balance(int count)
+{
+	return offsetof(struct i915_context_engines_load_balance,
+			engines[count]);
+}
+
+static size_t sizeof_param_engines(int count)
+{
+	return offsetof(struct i915_context_param_engines,
+			engines[count]);
+}
+
+static size_t sizeof_engines_bond(int count)
+{
+	return offsetof(struct i915_context_engines_bond,
+			engines[count]);
+}
+
+#define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
+
 static bool has_class_instance(int i915, uint16_t class, uint16_t instance)
 {
 	int fd;
@@ -93,16 +113,17 @@ static int __set_engines(int i915, uint32_t ctx,
 			 const struct i915_engine_class_instance *ci,
 			 unsigned int count)
 {
-	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, count);
+	struct i915_context_param_engines *engines =
+		alloca0(sizeof_param_engines(count));
 	struct drm_i915_gem_context_param p = {
 		.ctx_id = ctx,
 		.param = I915_CONTEXT_PARAM_ENGINES,
-		.size = sizeof(engines),
-		.value = to_user_pointer(&engines)
+		.size = sizeof_param_engines(count),
+		.value = to_user_pointer(engines)
 	};
 
-	engines.extensions = 0;
-	memcpy(engines.engines, ci, sizeof(engines.engines));
+	engines->extensions = 0;
+	memcpy(engines->engines, ci, sizeof(*ci));
 
 	return __gem_context_set_param(i915, &p);
 }
@@ -119,30 +140,30 @@ static int __set_load_balancer(int i915, uint32_t ctx,
 			       unsigned int count,
 			       void *ext)
 {
-	I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(balancer, count);
-	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 1 + count);
+	struct i915_context_engines_load_balance *balancer =
+		alloca0(sizeof_load_balance(count));
+	struct i915_context_param_engines *engines =
+		alloca0(sizeof_param_engines(count + 1));
 	struct drm_i915_gem_context_param p = {
 		.ctx_id = ctx,
 		.param = I915_CONTEXT_PARAM_ENGINES,
-		.size = sizeof(engines),
-		.value = to_user_pointer(&engines)
+		.size = sizeof_param_engines(count + 1),
+		.value = to_user_pointer(engines)
 	};
 
-	memset(&balancer, 0, sizeof(balancer));
-	balancer.base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
-	balancer.base.next_extension = to_user_pointer(ext);
+	balancer->base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
+	balancer->base.next_extension = to_user_pointer(ext);
 
 	igt_assert(count);
-	balancer.num_siblings = count;
-	memcpy(balancer.engines, ci, count * sizeof(*ci));
+	balancer->num_siblings = count;
+	memcpy(balancer->engines, ci, count * sizeof(*ci));
 
-	memset(&engines, 0, sizeof(engines));
-	engines.extensions = to_user_pointer(&balancer);
-	engines.engines[0].engine_class =
+	engines->extensions = to_user_pointer(balancer);
+	engines->engines[0].engine_class =
 		I915_ENGINE_CLASS_INVALID;
-	engines.engines[0].engine_instance =
+	engines->engines[0].engine_instance =
 		I915_ENGINE_CLASS_INVALID_NONE;
-	memcpy(engines.engines + 1, ci, count * sizeof(*ci));
+	memcpy(engines->engines + 1, ci, count * sizeof(*ci));
 
 	return __gem_context_set_param(i915, &p);
 }
@@ -709,15 +730,14 @@ static void indices(int i915)
 			continue;
 
 		for (int n = 0; n < count; n++) {
-			I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(*balancer,
-								 count);
+			struct i915_context_engines_load_balance *balancer;
 
 			engines.engines[nengines].engine_class =
 				I915_ENGINE_CLASS_INVALID;
 			engines.engines[nengines].engine_instance =
 				I915_ENGINE_CLASS_INVALID_NONE;
 
-			balancer = calloc(sizeof(*balancer), 1);
+			balancer = calloc(sizeof_load_balance(count), 1);
 			igt_assert(balancer);
 
 			balancer->base.name =
