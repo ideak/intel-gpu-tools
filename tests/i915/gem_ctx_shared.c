@@ -544,9 +544,11 @@ static void independent(int i915, unsigned ring, unsigned flags)
 		mmio_base = 0x22000;
 		break;
 
+#define GEN11_VECS0_BASE 0x1c8000
+#define GEN11_VECS1_BASE 0x1d8000
 	case I915_EXEC_VEBOX:
 		if (intel_gen(intel_get_drm_devid(i915)) >= 11)
-			mmio_base = 0x1d8000;
+			mmio_base = GEN11_VECS0_BASE;
 		else
 			mmio_base = 0x1a000;
 		break;
