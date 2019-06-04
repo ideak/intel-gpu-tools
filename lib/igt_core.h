@@ -1369,6 +1369,7 @@ void igt_kmsg(const char *format, ...);
 #define KMSG_DEBUG	"<7>[IGT] "
 
 #define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
+#define WRITE_ONCE(x, v) do *(volatile typeof(x) *)(&(x)) = (v); while (0)
 
 #define MSEC_PER_SEC (1000)
 #define USEC_PER_SEC (1000*MSEC_PER_SEC)
