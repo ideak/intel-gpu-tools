@@ -298,7 +298,7 @@ test_executables += executable('gem_exec_balancer', 'i915/gem_exec_balancer.c',
 	   install_dir : libexecdir,
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
-test_progs += 'gem_exec_balancer'
+test_list += 'gem_exec_balancer'
 
 test_executables += executable('gem_mocs_settings',
 	   join_paths('i915', 'gem_mocs_settings.c'),
