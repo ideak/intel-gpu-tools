@@ -22,11 +22,6 @@ TESTS_progs = \
 	drm_import_export \
 	drm_mm \
 	drm_read \
-	i915/gem_ctx_clone \
-	i915/gem_ctx_engines \
-	i915/gem_ctx_shared \
-	i915/gem_exec_balancer \
-	i915/gem_vm_create \
 	kms_3d \
 	kms_addfb_basic \
 	kms_atomic \
@@ -137,8 +132,14 @@ gem_cs_tlb_SOURCES = i915/gem_cs_tlb.c
 TESTS_progs += gem_ctx_bad_destroy
 gem_ctx_bad_destroy_SOURCES = i915/gem_ctx_bad_destroy.c
 
+TESTS_progs += gem_ctx_clone
+gem_ctx_clone_SOURCES = i915/gem_ctx_clone.c
+
 TESTS_progs += gem_ctx_create
 gem_ctx_create_SOURCES = i915/gem_ctx_create.c
+
+TESTS_progs += gem_ctx_engines
+gem_ctx_engines_SOURCES = i915/gem_ctx_engines.c
 
 TESTS_progs += gem_ctx_exec
 gem_ctx_exec_SOURCES = i915/gem_ctx_exec.c
@@ -148,6 +149,9 @@ gem_ctx_isolation_SOURCES = i915/gem_ctx_isolation.c
 
 TESTS_progs += gem_ctx_param
 gem_ctx_param_SOURCES = i915/gem_ctx_param.c
+
+TESTS_progs += gem_ctx_shared
+gem_ctx_shared_SOURCES = i915/gem_ctx_shared.c
 
 TESTS_progs += gem_ctx_sseu
 gem_ctx_sseu_SOURCES = i915/gem_ctx_sseu.c
@@ -181,6 +185,9 @@ gem_exec_await_SOURCES = i915/gem_exec_await.c
 
 TESTS_progs += gem_exec_bad_domains
 gem_exec_bad_domains_SOURCES = i915/gem_exec_bad_domains.c
+
+TESTS_progs += gem_exec_balancer
+gem_exec_balancer_SOURCES = i915/gem_exec_balancer.c
 
 TESTS_progs += gem_exec_basic
 gem_exec_basic_SOURCES = i915/gem_exec_basic.c
@@ -511,6 +518,9 @@ i915_selftest_SOURCES = i915/i915_selftest.c
 
 TESTS_progs += i915_suspend
 i915_suspend_SOURCES = i915/i915_suspend.c
+
+TESTS_progs += gem_vm_create
+gem_vm_create_SOURCES = i915/gem_vm_create.c
 
 TESTS_progs_X = gem_concurrent_all
 gem_concurrent_all_SOURCES = i915/gem_concurrent_all.c
