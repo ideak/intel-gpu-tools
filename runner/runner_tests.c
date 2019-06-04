@@ -208,8 +208,27 @@ igt_main
 {
 	struct settings *settings = malloc(sizeof(*settings));
 
-	igt_fixture
+	igt_fixture {
+		int i;
+
+		/*
+		 * Let's close all the non-standard fds ahead of executing
+		 * anything, so we can test for descriptor leakage caused by
+		 * any of the igt_runner code-paths exercised here.
+		 *
+		 * See file-descriptor-leakage subtest at the end.
+		 *
+		 * Some libraries (looking at you, GnuTLS) may leave fds opened
+		 * after the implicitly called library constructor. We don't
+		 * have full control over them as they may be dependencies of
+		 * our dependencies and may get pulled in if the user's and
+		 * distribution's compile/configure/USE are just right.
+		 */
+		for (i = 3; i < 400; i++)
+			close(i);
+
 		init_settings(settings);
+	}
 
 	igt_subtest("default-settings") {
 		const char *argv[] = { "runner",
