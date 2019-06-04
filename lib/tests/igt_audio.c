@@ -33,6 +33,8 @@
 #define SAMPLING_RATE 44100
 #define CHANNELS 1
 #define BUFFER_LEN 2048
+/** PHASESHIFT_LEN: how many samples will be truncated from the signal */
+#define PHASESHIFT_LEN 8
 
 static const int test_freqs[] = { 300, 700, 5000 };
 
@@ -138,6 +140,37 @@ static void test_signal_detect_held_sample(struct audio_signal *signal)
 	igt_assert_f(!ok, "Expected audio signal not to be detected\n");
 }
 
+static void test_signal_detect_phaseshift(struct audio_signal *signal)
+{
+	double *buf;
+	bool ok;
+
+	buf = malloc((BUFFER_LEN + PHASESHIFT_LEN) * sizeof(double));
+	audio_signal_fill(signal, buf, (BUFFER_LEN + PHASESHIFT_LEN) / CHANNELS);
+
+	/* Perform a phaseshift (this isn't related to sirens).
+	 *
+	 * The idea is to remove a part of the signal in the middle of the
+	 * buffer:
+	 *
+	 *   BUFFER_LEN/3   PHASESHIFT_LEN            2*BUFFER_LEN/3
+	 * [--------------|################|---------------------------------]
+	 *
+	 *                           |
+	 *                           V
+	 *
+	 * [--------------|---------------------------------]
+	 */
+	memmove(&buf[BUFFER_LEN / 3], &buf[BUFFER_LEN / 3 + PHASESHIFT_LEN],
+		(2 * BUFFER_LEN / 3) * sizeof(double));
+
+	ok = audio_signal_detect(signal, SAMPLING_RATE, 0, buf, BUFFER_LEN);
+
+	free(buf);
+
+	igt_assert(!ok);
+}
+
 igt_main
 {
 	struct audio_signal *signal;
@@ -175,6 +208,9 @@ igt_main
 
 		igt_subtest("signal-detect-held-sample")
 			test_signal_detect_held_sample(signal);
+
+		igt_subtest("signal-detect-phaseshift")
+			test_signal_detect_phaseshift(signal);
 
 		igt_fixture {
 			audio_signal_fini(signal);
