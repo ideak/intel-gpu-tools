@@ -12,8 +12,7 @@ foreach prog : tools_progs_noisnt
 endforeach
 
 tools_progs = [
-	# FIXME we already have a libtestcase with this name as target
-	#'igt_stats',
+	'igt_stats',
 	'intel_audio_dump',
 	'intel_backlight',
 	'intel_bios_dumper',
