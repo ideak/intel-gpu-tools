@@ -229,6 +229,8 @@ void kmstest_wait_for_pageflip(int fd);
 unsigned int kmstest_get_vblank(int fd, int pipe, unsigned int flags);
 void igt_assert_plane_visible(int fd, enum pipe pipe, int plane_index, bool visibility);
 
+bool kms_has_vblank(int fd);
+
 /*
  * A small modeset API
  */

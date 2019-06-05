@@ -71,6 +71,7 @@
 #define TEST_SUSPEND		(1 << 26)
 #define TEST_BO_TOOBIG		(1 << 28)
 
+#define TEST_NO_VBLANK		(1 << 29)
 #define TEST_BASIC		(1 << 30)
 
 #define EVENT_FLIP		(1 << 0)
@@ -125,6 +126,18 @@ struct event_state {
 	/* Step between the current and next 'target' sequence number. */
 	int seq_step;
 };
+
+static bool vblank_dependence(int flags)
+{
+	int vblank_flags = TEST_VBLANK | TEST_VBLANK_BLOCK |
+			   TEST_VBLANK_ABSOLUTE | TEST_VBLANK_EXPIRED_SEQ |
+			   TEST_CHECK_TS | TEST_VBLANK_RACE | TEST_EBUSY;
+
+	if (flags & vblank_flags)
+		return true;
+
+	return false;
+}
 
 static float timeval_float(const struct timeval *tv)
 {
@@ -494,7 +507,7 @@ static void check_state(const struct test_output *o, const struct event_state *e
 	/* check only valid if no modeset happens in between, that increments by
 	 * (1 << 23) on each step. This bounding matches the one in
 	 * DRM_IOCTL_WAIT_VBLANK. */
-	if (!(o->flags & (TEST_DPMS | TEST_MODESET)))
+	if (!(o->flags & (TEST_DPMS | TEST_MODESET | TEST_NO_VBLANK)))
 		igt_assert_f(es->current_seq - (es->last_seq + o->seq_step) <= 1UL << 23,
 			     "unexpected %s seq %u, should be >= %u\n",
 			     es->name, es->current_seq, es->last_seq + o->seq_step);
@@ -1176,6 +1189,7 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	unsigned bo_size = 0;
 	uint64_t tiling;
 	int i;
+	bool vblank = true;
 
 	switch (crtc_count) {
 	case RUN_TEST:
@@ -1258,6 +1272,14 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 		goto out;
 	}
 	igt_assert(fb_is_bound(o, o->fb_ids[0]));
+
+	vblank = kms_has_vblank(drm_fd);
+	if (!vblank) {
+		if (vblank_dependence(o->flags))
+			igt_require_f(vblank, "There is no VBlank\n");
+		else
+			o->flags |= TEST_NO_VBLANK;
+	}
 
 	/* quiescent the hw a bit so ensure we don't miss a single frame */
 	if (o->flags & TEST_CHECK_TS)

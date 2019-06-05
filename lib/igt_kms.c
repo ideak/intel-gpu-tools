@@ -1673,6 +1673,27 @@ void igt_assert_plane_visible(int fd, enum pipe pipe, int plane_index, bool visi
 	igt_assert_eq(visible, visibility);
 }
 
+/**
+ * kms_has_vblank:
+ * @fd: DRM fd
+ *
+ * Get the VBlank errno after an attempt to call drmWaitVBlank(). This
+ * function is useful for checking if a driver has support or not for VBlank.
+ *
+ * Returns: true if target driver has VBlank support, otherwise return false.
+ */
+bool kms_has_vblank(int fd)
+{
+	drmVBlank dummy_vbl;
+
+	memset(&dummy_vbl, 0, sizeof(drmVBlank));
+	dummy_vbl.request.type = DRM_VBLANK_RELATIVE;
+
+	errno = 0;
+	drmWaitVBlank(fd, &dummy_vbl);
+	return (errno != EOPNOTSUPP);
+}
+
 /*
  * A small modeset API
  */
