@@ -191,12 +191,14 @@ static bool eld_parse_entry(const char *path, struct eld_entry *eld)
 	}
 
 	if (ferror(f) != 0) {
-		igt_debug("Failed to read ELD file: %d\n", ferror(f));
+		igt_debug("Failed to read ELD file %s: %d\n", path, ferror(f));
 		return false;
 	}
 
 	fclose(f);
 
+	if (!monitor_present)
+		igt_debug("Monitor not present in ELD: %s\n", path);
 	return monitor_present;
 }
 
@@ -233,10 +235,15 @@ bool eld_has_igt(void)
 				continue;
 			}
 
-			if (strcmp(eld.monitor_name, "IGT") == 0) {
-				closedir(dir);
-				return true;
+			if (strcmp(eld.monitor_name, "IGT") != 0) {
+				igt_debug("Skipping non-IGT ELD: %s "
+					  "(monitor name: %s)\n",
+					  path, eld.monitor_name);
+				continue;
 			}
+
+			closedir(dir);
+			return true;
 		}
 		closedir(dir);
 	}
