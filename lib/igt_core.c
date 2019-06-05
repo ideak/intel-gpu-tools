@@ -558,7 +558,7 @@ static void print_usage(const char *help_str, bool output_on_stderr)
 		   "  --debug[=log-domain]\n"
 		   "  --interactive-debug[=domain]\n"
 		   "  --help-description\n"
-		   "  --help\n");
+		   "  --help|-h\n");
 	if (help_str)
 		fprintf(f, "%s\n", help_str);
 }
