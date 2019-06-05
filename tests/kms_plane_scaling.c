@@ -201,6 +201,26 @@ static bool can_rotate(data_t *d, unsigned format, uint64_t tiling,
 	return true;
 }
 
+static bool can_scale(data_t *d, unsigned format)
+{
+	if (!is_i915_device(d->drm_fd))
+		return true;
+
+	switch (format) {
+	case DRM_FORMAT_XRGB16161616F:
+	case DRM_FORMAT_XBGR16161616F:
+	case DRM_FORMAT_ARGB16161616F:
+	case DRM_FORMAT_ABGR16161616F:
+		if (intel_gen(d->devid) >= 11)
+			return true;
+		/* fall through */
+	case DRM_FORMAT_C8:
+		return false;
+	default:
+		return true;
+	}
+}
+
 static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 					   igt_output_t *output)
 {
@@ -221,7 +241,8 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 
 				if (igt_fb_supported_format(format) &&
 				    igt_plane_has_format_mod(plane, format, tiling) &&
-				    can_rotate(d, format, tiling, rot))
+				    can_rotate(d, format, tiling, rot) &&
+				    can_scale(d, format))
 					check_scaling_pipe_plane_rot(d, plane, format,
 								     tiling, pipe,
 								     output, rot);
@@ -255,7 +276,8 @@ static void test_scaler_with_pixel_format_pipe(data_t *d, enum pipe pipe, igt_ou
 				uint32_t format = plane->drm_plane->formats[j];
 
 				if (igt_fb_supported_format(format) &&
-				    igt_plane_has_format_mod(plane, format, tiling))
+				    igt_plane_has_format_mod(plane, format, tiling) &&
+				    can_scale(d, format))
 					check_scaling_pipe_plane_rot(d, plane,
 								     format, tiling,
 								     pipe, output, IGT_ROTATION_0);
@@ -490,13 +512,15 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 
 	for (int i = 0; i < d->plane1->drm_plane->count_formats; i++) {
 		unsigned f1 = d->plane1->drm_plane->formats[i];
-		if (!igt_fb_supported_format(f1))
+		if (!igt_fb_supported_format(f1) ||
+		    !can_scale(d, f1))
 			continue;
 
 		for (int j = 0; j < d->plane2->drm_plane->count_formats; j++) {
 			unsigned f2 = d->plane2->drm_plane->formats[j];
 
-			if (!igt_fb_supported_format(f2))
+			if (!igt_fb_supported_format(f2) ||
+			    !can_scale(d, f2))
 				continue;
 
 			__test_scaler_with_clipping_clamping_scenario(d, mode, f1, f2);
