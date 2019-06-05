@@ -69,8 +69,10 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#define Yb_OPT		 5
-#define Yf_OPT		 6
+enum {
+	OPT_YB,
+	OPT_YF,
+};
 
 static int tio_fd;
 struct termios saved_tio;
@@ -573,8 +575,8 @@ static void set_termio_mode(void)
 
 static char optstr[] = "3iaf:s:d:p:mrto:j:y";
 static struct option long_opts[] = {
-	{"yb", 0, 0, Yb_OPT},
-	{"yf", 0, 0, Yf_OPT},
+	{"yb", 0, 0, OPT_YB},
+	{"yf", 0, 0, OPT_YF},
 	{ 0, 0, 0, 0 }
 };
 
@@ -648,10 +650,10 @@ static int opt_handler(int opt, int opt_index, void *data)
 		tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
 		break;
 	case 'y':
-	case Yb_OPT:
+	case OPT_YB:
 		tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
 		break;
-	case Yf_OPT:
+	case OPT_YF:
 		tiling = LOCAL_I915_FORMAT_MOD_Yf_TILED;
 		break;
 	case 'r':
