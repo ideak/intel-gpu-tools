@@ -228,7 +228,7 @@ static void dump_backlight_info(struct context *context,
 				const struct bdb_block *block)
 {
 	const struct bdb_lfp_backlight_data *backlight = block->data;
-	const struct bdb_lfp_backlight_data_entry *blc;
+	const struct lfp_backlight_data_entry *blc;
 
 	if (sizeof(*blc) != backlight->entry_size) {
 		printf("\tBacklight struct sizes don't match (expected %zu, got %u), skipping\n",
@@ -629,8 +629,8 @@ static void dump_lvds_data(struct context *context,
 		const uint8_t *lfp_data_ptr =
 		    (const uint8_t *) lvds_data->data + lfp_data_size * i;
 		const uint8_t *timing_data = lfp_data_ptr + dvo_offset;
-		const struct bdb_lvds_lfp_data_entry *lfp_data =
-		    (const struct bdb_lvds_lfp_data_entry *)lfp_data_ptr;
+		const struct lvds_lfp_data_entry *lfp_data =
+		    (const struct lvds_lfp_data_entry *)lfp_data_ptr;
 		char marker;
 
 		if (i != context->panel_type && !context->dump_all_panel_types)
