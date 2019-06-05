@@ -31,6 +31,8 @@ lib_source_list =	 	\
 	igt_color_encoding.h	\
 	igt_edid.c		\
 	igt_edid.h		\
+	igt_eld.c		\
+	igt_eld.h		\
 	igt_gpu_power.c		\
 	igt_gpu_power.h		\
 	igt_gt.c		\
