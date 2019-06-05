@@ -680,6 +680,7 @@ static int common_init(int *argc, char **argv,
 	};
 	char *short_opts;
 	const char *std_short_opts = "h";
+	size_t std_short_opts_len = strlen(std_short_opts);
 	struct option *combined_opts;
 	int extra_opt_count;
 	int all_opt_count;
@@ -713,7 +714,7 @@ static int common_init(int *argc, char **argv,
 
 		/* check for conflicts with standard short options */
 		if (extra_long_opts[extra_opt_count].val != ':'
-		    && (conflicting_char = strchr(std_short_opts, extra_long_opts[extra_opt_count].val))) {
+		    && (conflicting_char = memchr(std_short_opts, extra_long_opts[extra_opt_count].val, std_short_opts_len))) {
 			igt_critical("Conflicting long and short option 'val' representation between --%s and -%c\n",
 				     extra_long_opts[extra_opt_count].name,
 				     *conflicting_char);
@@ -727,7 +728,7 @@ static int common_init(int *argc, char **argv,
 			continue;
 
 		/* check for conflicts with standard short options */
-		if (strchr(std_short_opts, extra_short_opts[i])) {
+		if (memchr(std_short_opts, extra_short_opts[i], std_short_opts_len)) {
 			igt_critical("Conflicting short option: -%c\n", std_short_opts[i]);
 			assert(0);
 		}
