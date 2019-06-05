@@ -280,12 +280,16 @@ int test_children_sz;
 bool test_child;
 
 enum {
- OPT_LIST_SUBTESTS,
- OPT_RUN_SUBTEST,
- OPT_DESCRIPTION,
- OPT_DEBUG,
- OPT_INTERACTIVE_DEBUG,
- OPT_HELP = 'h'
+	/*
+	 * Let the first values be used by individual tests so options don't
+	 * conflict with core ones
+	 */
+	OPT_LIST_SUBTESTS = 500,
+	OPT_RUN_SUBTEST,
+	OPT_DESCRIPTION,
+	OPT_DEBUG,
+	OPT_INTERACTIVE_DEBUG,
+	OPT_HELP = 'h'
 };
 
 static int igt_exitcode = IGT_EXIT_SUCCESS;

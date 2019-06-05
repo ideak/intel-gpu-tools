@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 	internal_assert_wsignaled(do_fork(), SIGABRT);
 
 	/* conflict on long option 'val' representations */
-	long_options[0] = (struct option) { "iterations", required_argument, NULL, 0};
+	long_options[0] = (struct option) { "iterations", required_argument, NULL, 500};
 	short_options = "";
 	internal_assert_wsignaled(do_fork(), SIGABRT);
 
