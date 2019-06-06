@@ -202,16 +202,14 @@ static bool eld_parse_entry(const char *path, struct eld_entry *eld)
 	return monitor_present;
 }
 
-/** eld_has_igt: check whether ALSA has detected the audio-capable IGT EDID by
- * parsing ELD entries */
-bool eld_has_igt(void)
+/** eld_get_igt: retrieve the ALSA ELD entry matching the IGT EDID */
+bool eld_get_igt(struct eld_entry *eld)
 {
 	DIR *dir;
 	struct dirent *dirent;
 	int i;
 	char card[64];
 	char path[PATH_MAX];
-	struct eld_entry eld;
 
 	for (i = 0; i < 8; i++) {
 		snprintf(card, sizeof(card), "/proc/asound/card%d", i);
@@ -226,19 +224,19 @@ bool eld_has_igt(void)
 
 			snprintf(path, sizeof(path), "%s/%s", card,
 				 dirent->d_name);
-			if (!eld_parse_entry(path, &eld)) {
+			if (!eld_parse_entry(path, eld)) {
 				continue;
 			}
 
-			if (!eld.valid) {
+			if (!eld->valid) {
 				igt_debug("Skipping invalid ELD: %s\n", path);
 				continue;
 			}
 
-			if (strcmp(eld.monitor_name, "IGT") != 0) {
+			if (strcmp(eld->monitor_name, "IGT") != 0) {
 				igt_debug("Skipping non-IGT ELD: %s "
 					  "(monitor name: %s)\n",
-					  path, eld.monitor_name);
+					  path, eld->monitor_name);
 				continue;
 			}
 
@@ -249,4 +247,12 @@ bool eld_has_igt(void)
 	}
 
 	return false;
+}
+
+/** eld_has_igt: check whether ALSA has detected the audio-capable IGT EDID by
+ * parsing ELD entries */
+bool eld_has_igt(void)
+{
+	struct eld_entry eld;
+	return eld_get_igt(&eld);
 }
