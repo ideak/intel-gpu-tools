@@ -123,7 +123,7 @@ static int __set_engines(int i915, uint32_t ctx,
 	};
 
 	engines->extensions = 0;
-	memcpy(engines->engines, ci, sizeof(*ci));
+	memcpy(engines->engines, ci, count * sizeof(*ci));
 
 	return __gem_context_set_param(i915, &p);
 }
