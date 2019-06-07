@@ -67,11 +67,14 @@ static void test_signal_detect_noise(struct audio_signal *signal)
 	double buf[BUFFER_LEN];
 	bool ok;
 	size_t i;
+	long r;
 
 	/* Generate random samples between -1 and 1 */
 	srand(42);
-	for (i = 0; i < BUFFER_LEN; i++)
-		buf[i] = (double) random() / RAND_MAX * 2 - 1;
+	for (i = 0; i < BUFFER_LEN; i++) {
+		r = random();
+		buf[i] = (double) r / RAND_MAX * 2 - 1;
+	}
 
 	ok = audio_signal_detect(signal, SAMPLING_RATE, 0, buf, BUFFER_LEN);
 
