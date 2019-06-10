@@ -656,6 +656,9 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 	uint64_t huge_object_size, i;
 	unsigned mode = CHECK_RAM;
 
+	igt_fail_on_f(intel_gen(devid) >= 11 && ncpus > 1,
+		      "Please adjust your expectations, https://bugs.freedesktop.org/show_bug.cgi?id=110882\n");
+
 	switch (huge) {
 	case -2:
 		huge_object_size = gem_mappable_aperture_size() / 4;
