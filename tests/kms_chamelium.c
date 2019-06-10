@@ -863,7 +863,8 @@ static void audio_state_init(struct audio_state *state, data_t *data,
 	alsa_configure_output(alsa, format, channels, rate);
 
 	state->stream = chamelium_stream_init();
-	igt_assert(state->stream);
+	igt_assert_f(state->stream,
+		     "Failed to initialize Chamelium stream client\n");
 }
 
 static void audio_state_fini(struct audio_state *state)
@@ -902,13 +903,13 @@ static void audio_state_start(struct audio_state *state, const char *name)
 
 	stream_mode = CHAMELIUM_STREAM_REALTIME_STOP_WHEN_OVERFLOW;
 	ok = chamelium_stream_dump_realtime_audio(state->stream, stream_mode);
-	igt_assert(ok);
+	igt_assert_f(ok, "Failed to start streaming audio capture\n");
 
 	/* Start playing audio */
 	state->run = true;
 	ret = pthread_create(&state->thread, NULL,
 			     run_audio_thread, state->alsa);
-	igt_assert(ret == 0);
+	igt_assert_f(ret == 0, "Failed to start audio playback thread\n");
 
 	/* The Chamelium device only supports this PCM format. */
 	state->capture.format = SND_PCM_FORMAT_S32_LE;
@@ -936,7 +937,7 @@ static void audio_state_start(struct audio_state *state, const char *name)
 				break;
 			}
 		}
-		igt_assert(ok);
+		igt_assert_f(ok, "Cannot capture all channels\n");
 	}
 
 	if (igt_frame_dump_is_enabled()) {
@@ -949,7 +950,8 @@ static void audio_state_start(struct audio_state *state, const char *name)
 							      state->capture.rate,
 							      state->capture.channels,
 							      &state->dump_path);
-		igt_assert(state->dump_fd >= 0);
+		igt_assert_f(state->dump_fd >= 0,
+			     "Failed to create audio dump file\n");
 	}
 }
 
@@ -963,7 +965,7 @@ static void audio_state_receive(struct audio_state *state,
 	ok = chamelium_stream_receive_realtime_audio(state->stream,
 						     &page_count,
 						     recv, recv_len);
-	igt_assert(ok);
+	igt_assert_f(ok, "Failed to receive audio from stream server\n");
 
 	state->msec = state->recv_pages * *recv_len
 		      / (double) state->capture.channels
@@ -972,7 +974,8 @@ static void audio_state_receive(struct audio_state *state,
 
 	if (state->dump_fd >= 0) {
 		recv_size = *recv_len * sizeof(int32_t);
-		igt_assert(write(state->dump_fd, *recv, recv_size) == recv_size);
+		igt_assert_f(write(state->dump_fd, *recv, recv_size) == recv_size,
+			     "Failed to write to audio dump file\n");
 	}
 }
 
@@ -985,10 +988,10 @@ static void audio_state_stop(struct audio_state *state, bool success)
 	igt_debug("Stopping audio playback\n");
 	state->run = false;
 	ret = pthread_join(state->thread, NULL);
-	igt_assert(ret == 0);
+	igt_assert_f(ret == 0, "Failed to join audio playback thread\n");
 
 	ok = chamelium_stream_stop_realtime_audio(state->stream);
-	igt_assert(ok);
+	igt_assert_f(ok, "Failed to stop streaming audio capture\n");
 
 	audio_file = chamelium_stop_capturing_audio(state->chamelium,
 						    state->port);
@@ -1047,7 +1050,7 @@ static bool test_audio_frequencies(struct audio_state *state)
 
 	state->signal = audio_signal_init(state->playback.channels,
 					  state->playback.rate);
-	igt_assert(state->signal);
+	igt_assert_f(state->signal, "Failed to initialize audio signal\n");
 
 	/* We'll choose different frequencies per channel to make sure they are
 	 * independent from each other. To do so, we'll add a different offset
@@ -1075,7 +1078,9 @@ static bool test_audio_frequencies(struct audio_state *state)
 
 	audio_state_start(state, "frequencies");
 
-	igt_assert(state->capture.rate == state->playback.rate);
+	igt_assert_f(state->capture.rate == state->playback.rate,
+		     "Capture rate (%dHz) doesn't match playback rate (%dHz)\n",
+		     state->capture.rate, state->playback.rate);
 
 	/* Needs to be a multiple of 128, because that's the number of samples
 	 * we get per channel each time we receive an audio page from the
@@ -1391,7 +1396,7 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 	for (i = 0; i < test_sampling_rates_count; i++) {
 		for (j = 0; j < test_formats_count; j++) {
 			ret = alsa_open_output(alsa, audio_device);
-			igt_assert(ret >= 0);
+			igt_assert_f(ret >= 0, "Failed to open ALSA output\n");
 
 			/* TODO: playback on all 8 available channels (this
 			 * isn't supported by Chamelium devices yet, see
