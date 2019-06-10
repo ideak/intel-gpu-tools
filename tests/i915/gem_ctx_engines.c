@@ -419,6 +419,8 @@ static void independent(int i915)
 	int timeline = sw_sync_timeline_create();
 	uint32_t last, *map;
 
+	igt_require(gen >= 6); /* No per-engine TIMESTAMP on older gen */
+
 	{
 		struct drm_i915_gem_execbuffer2 execbuf = {
 			.buffers_ptr = to_user_pointer(&results),
