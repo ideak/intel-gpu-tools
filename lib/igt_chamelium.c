@@ -28,6 +28,7 @@
 
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 #include <xmlrpc-c/base.h>
 #include <xmlrpc-c/client.h>
 #include <pthread.h>
@@ -654,6 +655,63 @@ void chamelium_port_get_resolution(struct chamelium *chamelium,
 
 	xmlrpc_DECREF(res_x);
 	xmlrpc_DECREF(res_y);
+	xmlrpc_DECREF(res);
+}
+
+static void read_int_from_xml_struct(struct chamelium *chamelium,
+				     xmlrpc_value *struct_val, const char *key,
+				     int *dst)
+{
+	xmlrpc_value *val = NULL;
+
+	xmlrpc_struct_find_value(&chamelium->env, struct_val, key, &val);
+	if (val) {
+		xmlrpc_read_int(&chamelium->env, val, dst);
+		xmlrpc_DECREF(val);
+	} else
+		*dst = -1;
+}
+
+static void video_params_from_xml(struct chamelium *chamelium,
+				  xmlrpc_value *res,
+				  struct chamelium_video_params *params)
+{
+	xmlrpc_value *val = NULL;
+
+	xmlrpc_struct_find_value(&chamelium->env, res, "clock", &val);
+	if (val) {
+		xmlrpc_read_double(&chamelium->env, val, &params->clock);
+		xmlrpc_DECREF(val);
+	} else
+		params->clock = NAN;
+
+	read_int_from_xml_struct(chamelium, res, "htotal", &params->htotal);
+	read_int_from_xml_struct(chamelium, res, "hactive", &params->hactive);
+	read_int_from_xml_struct(chamelium, res, "hsync_offset",
+				 &params->hsync_offset);
+	read_int_from_xml_struct(chamelium, res, "hsync_width",
+				 &params->hsync_width);
+	read_int_from_xml_struct(chamelium, res, "hsync_polarity",
+				 &params->hsync_polarity);
+	read_int_from_xml_struct(chamelium, res, "vtotal", &params->vtotal);
+	read_int_from_xml_struct(chamelium, res, "vactive", &params->vactive);
+	read_int_from_xml_struct(chamelium, res, "vsync_offset",
+				 &params->vsync_offset);
+	read_int_from_xml_struct(chamelium, res, "vsync_width",
+				 &params->vsync_width);
+	read_int_from_xml_struct(chamelium, res, "vsync_polarity",
+				 &params->vsync_polarity);
+}
+
+void chamelium_port_get_video_params(struct chamelium *chamelium,
+				     struct chamelium_port *port,
+				     struct chamelium_video_params *params)
+{
+	xmlrpc_value *res;
+
+	res = chamelium_rpc(chamelium, NULL, "GetVideoParams", "(i)", port->id);
+	video_params_from_xml(chamelium, res, params);
+
 	xmlrpc_DECREF(res);
 }
 

@@ -53,6 +53,12 @@ enum chamelium_check {
 	CHAMELIUM_CHECK_CRC,
 };
 
+struct chamelium_video_params {
+	double clock;
+	int htotal, hactive, hsync_offset, hsync_width, hsync_polarity;
+	int vtotal, vactive, vsync_offset, vsync_width, vsync_polarity;
+};
+
 struct chamelium_audio_file {
 	char *path;
 	int rate; /* Hz */
@@ -113,6 +119,9 @@ void chamelium_port_set_ddc_state(struct chamelium *chamelium,
 void chamelium_port_get_resolution(struct chamelium *chamelium,
 				   struct chamelium_port *port,
 				   int *x, int *y);
+void chamelium_port_get_video_params(struct chamelium *chamelium,
+				     struct chamelium_port *port,
+				     struct chamelium_video_params *params);
 igt_crc_t *chamelium_get_crc_for_area(struct chamelium *chamelium,
 				      struct chamelium_port *port,
 				      int x, int y, int w, int h);
