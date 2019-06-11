@@ -184,27 +184,30 @@ static void exhaust_shared_gtt(int i915, unsigned int flags)
 static void exec_shared_gtt(int i915, unsigned int ring)
 {
 	const int gen = intel_gen(intel_get_drm_devid(i915));
-	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct drm_i915_gem_exec_object2 obj = {
-		.handle = gem_create(i915, 4096)
-	};
+	struct drm_i915_gem_exec_object2 obj = {};
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(&obj),
 		.buffer_count = 1,
 		.flags = ring,
 	};
-	uint32_t scratch = obj.handle;
+	uint32_t scratch, *s;
 	uint32_t batch[16];
 	int i;
 
 	gem_require_ring(i915, ring);
 	igt_require(gem_can_store_dword(i915, ring));
 
+	scratch = gem_create(i915, 4096);
+	s = gem_mmap__cpu(i915, scratch, 0, 4096, PROT_WRITE);
+
+	gem_set_domain(i915, scratch, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	*s = MI_BATCH_BUFFER_END;
+
 	/* Load object into place in the GTT */
-	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
+	obj.handle = scratch;
 	gem_execbuf(i915, &execbuf);
 
-	/* Presume nothing causes an eviction in the meantime */
+	/* Presume nothing causes an eviction in the meantime! */
 
 	obj.handle = gem_create(i915, 4096);
 
@@ -235,10 +238,19 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 	gem_sync(i915, obj.handle); /* write hazard lies */
 	gem_close(i915, obj.handle);
 
-	gem_read(i915, scratch, 0, batch, sizeof(uint32_t));
-	gem_close(i915, scratch);
+	/*
+	 * If we created the new context with the old GTT, the write
+	 * into the stale location of scratch will have landed in the right
+	 * object. Otherwise, it should read the previous value of
+	 * MI_BATCH_BUFFER_END.
+	 *
+	 * Setting .write = CPU to paper over our write hazard lies above.
+	 */
+	gem_set_domain(i915, scratch, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	igt_assert_eq_u32(*s, 0xc0ffee);
 
-	igt_assert_eq_u32(*batch, 0xc0ffee);
+	munmap(s, 4096);
+	gem_close(i915, scratch);
 }
 
 static int nop_sync(int i915, uint32_t ctx, unsigned int ring, int64_t timeout)
