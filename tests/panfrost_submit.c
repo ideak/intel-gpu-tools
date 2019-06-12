@@ -34,10 +34,11 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include "panfrost-job.h"
 #include "panfrost_drm.h"
 
-#define WIDTH          1366
-#define HEIGHT         768
+#define WIDTH          1920
+#define HEIGHT         1080
 #define CLEAR_COLOR    0xff7f7f7f
 
 /* One tenth of a second */
@@ -56,14 +57,30 @@ abs_timeout(uint64_t duration)
         return (uint64_t)current.tv_sec * NSECS_PER_SEC + current.tv_nsec + duration;
 }
 
+static void check_error(int fd, struct panfrost_submit *submit)
+{
+	struct mali_job_descriptor_header *header;
+
+        header = submit->submit_bo->map;
+        igt_assert_eq_u64(header->fault_pointer, 0);
+}
+
 static void check_fb(int fd, struct panfrost_bo *bo)
 {
+        int gpu_prod_id = igt_panfrost_get_param(fd, DRM_PANFROST_PARAM_GPU_PROD_ID);
         __uint32_t *fbo;
         int i;
 
         fbo = bo->map;
-        for (i = 0; i < ALIGN(WIDTH, 16) * HEIGHT; i++)
-                igt_assert_eq_u32(fbo[i], CLEAR_COLOR);
+
+        if (gpu_prod_id >= 0x0750) {
+                for (i = 0; i < ALIGN(WIDTH, 16) * HEIGHT; i++)
+                        igt_assert_eq_u32(fbo[i], CLEAR_COLOR);
+        } else {
+                // Mask the alpha away because on <=T720 we don't know how to have it
+                for (i = 0; i < ALIGN(WIDTH, 16) * HEIGHT; i++)
+                        igt_assert_eq_u32(fbo[i], CLEAR_COLOR & 0x00ffffff);
+        }
 }
 
 igt_main
@@ -84,6 +101,7 @@ igt_main
                 do_ioctl(fd, DRM_IOCTL_PANFROST_SUBMIT, submit->args);
                 igt_assert(syncobj_wait(fd, &submit->args->out_sync, 1,
                                         abs_timeout(SHORT_TIME_NSEC), 0, NULL));
+                check_error(fd, submit);
                 check_fb(fd, submit->fbo);
                 igt_panfrost_free_job(fd, submit);
         }
