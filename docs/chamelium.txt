@@ -42,7 +42,17 @@ section. At this point, IGT has to be configured to connect to the Chamelium.
 
 It may be necessary to give the Chamelium a static IP address, depending on
 the network setup. This can be configured (via the serial console) by editing
-the Debian-styled /etc/network/interfaces configuration file.
+the Debian-styled /etc/network/interfaces configuration file. Example setup:
+
+    sudo screen /dev/ttyUSB0 115200
+    sudo vi /etc/network/interfaces
+
+and then configure eth0 like so:
+
+    iface eth0 inet static
+        address 192.168.1.2
+        netmask 255.255.255.0
+        gateway 192.168.1.1
 
 This document supposes that target PC's network IP has "192.168.1.1/24" and
 the Chamelium's network IP has "192.168.1.2/24".
