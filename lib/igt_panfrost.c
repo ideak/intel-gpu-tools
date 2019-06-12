@@ -127,22 +127,19 @@ void igt_panfrost_bo_mmap(int fd, struct panfrost_bo *bo)
         igt_assert(bo->map);
 }
 
-/* TODO: Make this more generic so it works on GPUs other than T760 */
 struct panfrost_submit *igt_panfrost_trivial_job(int fd, bool do_crash, int width, int height, uint32_t color)
 {
         struct panfrost_submit *submit;
         struct mali_job_descriptor_header header = {
                 .job_type = JOB_TYPE_FRAGMENT,
                 .job_index = 1,
-#ifdef __LP64__
                 .job_descriptor_size = 1,
-#endif
         };
         struct mali_payload_fragment payload = {
                 .min_tile_coord = MALI_COORDINATE_TO_TILE_MIN(0, 0),
                 .max_tile_coord = MALI_COORDINATE_TO_TILE_MAX(ALIGN(width, 16), height),
         };
-        struct bifrost_framebuffer framebuffer = {
+        struct bifrost_framebuffer mfbd_framebuffer = {
             .unk0 = 0x0,
             .unknown1 = 0x0,
             .tiler_meta = 0xff00000000,
@@ -158,6 +155,20 @@ struct panfrost_submit *igt_panfrost_trivial_job(int fd, bool do_crash, int widt
             .clear_stencil = 0x0,
             .clear_depth = 0.000000,
             .unknown2 = 0x1f,
+        };
+        struct mali_single_framebuffer sfbd_framebuffer = {
+            .unknown2 = 0x1f,
+            .width = MALI_POSITIVE(width),
+            .height = MALI_POSITIVE(height),
+            .stride = width * 4,
+            .resolution_check = ((width + height) / 3) << 4,
+            .tiler_flags = 0xfff,
+            .clear_color_1 = color,
+            .clear_color_2 = color,
+            .clear_color_3 = color,
+            .clear_color_4 = color,
+            .clear_flags = 0x101100 | MALI_CLEAR_SLOW,
+            .format = 0xb84e0281,
         };
         struct mali_rt_format fmt = {
                 .unk1 = 0x4000000,
@@ -179,31 +190,53 @@ struct panfrost_submit *igt_panfrost_trivial_job(int fd, bool do_crash, int widt
                 .clear_color_3 = color,
                 .clear_color_4 = color,
         };
+        int gpu_prod_id = igt_panfrost_get_param(fd, DRM_PANFROST_PARAM_GPU_PROD_ID);
+        uint32_t *known_unknown;
         uint32_t *bos;
 
         submit = malloc(sizeof(*submit));
 
         submit->fbo = igt_panfrost_gem_new(fd, ALIGN(width, 16) * height * 4);
         rts.framebuffer = submit->fbo->offset;
+        sfbd_framebuffer.framebuffer = submit->fbo->offset;
 
-        submit->tiler_heap_bo = igt_panfrost_gem_new(fd, 32768 * 4096);
-        framebuffer.tiler_heap_start = submit->tiler_heap_bo->offset;
-        framebuffer.tiler_heap_end = submit->tiler_heap_bo->offset + 32768 * 4096;
+        submit->tiler_heap_bo = igt_panfrost_gem_new(fd, 32768 * 128);
+        mfbd_framebuffer.tiler_heap_start = submit->tiler_heap_bo->offset;
+        mfbd_framebuffer.tiler_heap_end = submit->tiler_heap_bo->offset + 32768 * 128;
+        sfbd_framebuffer.tiler_heap_free = mfbd_framebuffer.tiler_heap_start;
+        sfbd_framebuffer.tiler_heap_end = mfbd_framebuffer.tiler_heap_end;
 
-        submit->tiler_scratch_bo = igt_panfrost_gem_new(fd, 128 * 128 * 4096);
-        framebuffer.tiler_scratch_start = submit->tiler_scratch_bo->offset;
-        framebuffer.tiler_scratch_middle = submit->tiler_scratch_bo->offset + 0xf0000;
+        submit->tiler_scratch_bo = igt_panfrost_gem_new(fd, 128 * 128 * 128);
+        mfbd_framebuffer.tiler_scratch_start = submit->tiler_scratch_bo->offset;
+        mfbd_framebuffer.tiler_scratch_middle = submit->tiler_scratch_bo->offset + 0xf0000;
+        sfbd_framebuffer.unknown_address_0 = mfbd_framebuffer.tiler_scratch_start;
 
         submit->scratchpad_bo = igt_panfrost_gem_new(fd, 64 * 4096);
-        framebuffer.scratchpad = submit->scratchpad_bo->offset;
+        igt_panfrost_bo_mmap(fd, submit->scratchpad_bo);
+        mfbd_framebuffer.scratchpad = submit->scratchpad_bo->offset;
+        sfbd_framebuffer.unknown_address_1 = submit->scratchpad_bo->offset;
+        sfbd_framebuffer.unknown_address_2 = submit->scratchpad_bo->offset + 512;
 
-        submit->fb_bo = igt_panfrost_gem_new(fd, sizeof(framebuffer) + sizeof(struct bifrost_render_target));
-        igt_panfrost_bo_mmap(fd, submit->fb_bo);
-        memcpy(submit->fb_bo->map, &framebuffer, sizeof(framebuffer));
-        memcpy(submit->fb_bo->map + sizeof(framebuffer), &rts, sizeof(struct bifrost_render_target));
-        payload.framebuffer = submit->fb_bo->offset | MALI_MFBD;
+        known_unknown = ((void*)submit->scratchpad_bo->map) + 512;
+        *known_unknown = 0xa0000000;
 
-        submit->submit_bo = igt_panfrost_gem_new(fd, sizeof(header) + sizeof(payload));
+        if (gpu_prod_id >= 0x0750) {
+            submit->fb_bo = igt_panfrost_gem_new(fd, sizeof(mfbd_framebuffer) + sizeof(struct bifrost_render_target));
+            igt_panfrost_bo_mmap(fd, submit->fb_bo);
+            memcpy(submit->fb_bo->map, &mfbd_framebuffer, sizeof(mfbd_framebuffer));
+            memcpy(submit->fb_bo->map + sizeof(mfbd_framebuffer), &rts, sizeof(struct bifrost_render_target));
+            payload.framebuffer = submit->fb_bo->offset | MALI_MFBD;
+        } else {
+            // We don't know yet how to cause a hang on <=T720
+            // Should probably use an infinite loop to hang the GPU
+            igt_require(!do_crash);
+            submit->fb_bo = igt_panfrost_gem_new(fd, sizeof(sfbd_framebuffer));
+            igt_panfrost_bo_mmap(fd, submit->fb_bo);
+            memcpy(submit->fb_bo->map, &sfbd_framebuffer, sizeof(sfbd_framebuffer));
+            payload.framebuffer = submit->fb_bo->offset | MALI_SFBD;
+        }
+
+        submit->submit_bo = igt_panfrost_gem_new(fd, sizeof(header) + sizeof(payload) + 1024000);
         igt_panfrost_bo_mmap(fd, submit->submit_bo);
 
         memcpy(submit->submit_bo->map, &header, sizeof(header));

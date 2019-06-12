@@ -29,7 +29,7 @@
 
 struct panfrost_bo {
 	int handle;
-	uint32_t offset;
+	uint64_t offset;
 	uint32_t size;
 	void *map;
 };
