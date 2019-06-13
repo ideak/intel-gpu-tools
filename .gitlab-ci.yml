@@ -100,6 +100,17 @@ build:tests-debian-meson-arm64:
     paths:
       - build
 
+build:tests-debian-meson-mips:
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-mips:latest
+  stage: build
+  script:
+    - export PKG_CONFIG_PATH=/usr/lib/mips-linux-gnu/pkgconfig/
+    - meson --cross-file meson-cross-mips.txt build
+    - ninja -C build
+  artifacts:
+    paths:
+      - build
+
 build:tests-debian-autotools:
   image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian:latest
   stage: build
@@ -240,6 +251,23 @@ containers:igt-debian-arm64:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64 -f Dockerfile.debian-arm64 .
     - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64
+
+containers:igt-debian-mips:
+  stage: containers
+  image: docker:stable
+  only:
+    changes:
+      - Dockerfile.debian-mips
+      - .gitlab-ci.yml
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-mips -f Dockerfile.debian-mips .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-mips
 
 containers:igt-fedora:
   stage: containers
