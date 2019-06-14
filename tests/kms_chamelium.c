@@ -775,7 +775,7 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 /* A streak of 3 gives confidence that the signal is good. */
 #define MIN_STREAK 3
 
-#define FLATLINE_AMPLITUDE 0.9 /* normalized, ie. in [0, 1] */
+#define FLATLINE_AMPLITUDE 0.1 /* normalized, ie. in [0, 1] */
 #define FLATLINE_AMPLITUDE_ACCURACY 0.001 /* ± 0.1 % of the full amplitude */
 #define FLATLINE_ALIGN_ACCURACY 0 /* number of samples */
 
