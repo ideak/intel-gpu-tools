@@ -36,13 +36,12 @@
 #include <stdatomic.h>
 
 enum test_edid {
-	TEST_EDID_CHAMELIUM_DEFAULT,
 	TEST_EDID_BASE,
 	TEST_EDID_ALT,
 	TEST_EDID_HDMI_AUDIO,
 	TEST_EDID_DP_AUDIO,
 };
-#define TEST_EDID_COUNT 5
+#define TEST_EDID_COUNT 4
 
 typedef struct {
 	struct chamelium *chamelium;
@@ -2045,9 +2044,6 @@ test_hpd_storm_disable(data_t *data, struct chamelium_port *port, int width)
 static const unsigned char *get_edid(enum test_edid edid)
 {
 	switch (edid) {
-	case TEST_EDID_CHAMELIUM_DEFAULT:
-		igt_assert(0); /* we don't have the raw data for this one */
-		return NULL;
 	case TEST_EDID_BASE:
 		return igt_kms_get_base_edid();
 	case TEST_EDID_ALT:
@@ -2089,8 +2085,7 @@ igt_main
 		data.ports = chamelium_get_ports(data.chamelium,
 						 &data.port_count);
 
-		data.edids[TEST_EDID_CHAMELIUM_DEFAULT] = CHAMELIUM_DEFAULT_EDID;
-		for (i = 1; i < TEST_EDID_COUNT; ++i) {
+		for (i = 0; i < TEST_EDID_COUNT; ++i) {
 			data.edids[i] = chamelium_new_edid(data.chamelium,
 							   get_edid(i));
 		}
