@@ -118,7 +118,7 @@ struct chamelium {
 
 	int drm_fd;
 
-	struct chamelium_edid *edids;
+	struct igt_list edids;
 	struct chamelium_port *ports;
 	int port_count;
 };
@@ -552,12 +552,8 @@ int chamelium_new_edid(struct chamelium *chamelium,
 	memset(allocated_edid, 0, sizeof(*allocated_edid));
 
 	allocated_edid->id = edid_id;
-	igt_list_init(&allocated_edid->link);
 
-	if (chamelium->edids)
-		igt_list_add(&chamelium->edids->link, &allocated_edid->link);
-	else
-		chamelium->edids = allocated_edid;
+	igt_list_add(&allocated_edid->link, &chamelium->edids);
 
 	return edid_id;
 }
@@ -1850,6 +1846,7 @@ struct chamelium *chamelium_init(int drm_fd)
 
 	memset(chamelium, 0, sizeof(*chamelium));
 	chamelium->drm_fd = drm_fd;
+	igt_list_init(&chamelium->edids);
 
 	/* Setup the libxmlrpc context */
 	xmlrpc_env_init(&chamelium->env);
@@ -1901,7 +1898,7 @@ void chamelium_deinit(struct chamelium *chamelium)
 		chamelium_plug(chamelium, &chamelium->ports[i]);
 
 	/* Destroy any EDIDs we created to make sure we don't leak them */
-	igt_list_for_each_safe(pos, tmp, &chamelium->edids->link, link) {
+	igt_list_for_each_safe(pos, tmp, &chamelium->edids, link) {
 		chamelium_destroy_edid(chamelium, pos->id);
 		free(pos);
 	}
