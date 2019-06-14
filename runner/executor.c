@@ -738,7 +738,8 @@ static int monitor_output(pid_t child,
 			} else {
 				/* We're dying, so we're taking them with us */
 				if (settings->log_level >= LOG_LEVEL_NORMAL)
-					printf("Abort requested, terminating children\n");
+					printf("Abort requested via %s, terminating children\n",
+					       strsignal(siginfo.ssi_signo));
 
 				aborting = true;
 				timeout = 2;
