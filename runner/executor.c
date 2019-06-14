@@ -25,6 +25,17 @@ static struct {
 	size_t num_dogs;
 } watchdogs;
 
+static void __close_watchdog(int fd)
+{
+	ssize_t ret = write(fd, "V", 1);
+
+	if (ret == -1)
+		fprintf(stderr, "Failed to stop a watchdog: %s\n",
+			strerror(errno));
+
+	close(fd);
+}
+
 static void close_watchdogs(struct settings *settings)
 {
 	size_t i;
@@ -33,8 +44,7 @@ static void close_watchdogs(struct settings *settings)
 		printf("Closing watchdogs\n");
 
 	for (i = 0; i < watchdogs.num_dogs; i++) {
-		write(watchdogs.fds[i], "V", 1);
-		close(watchdogs.fds[i]);
+		__close_watchdog(watchdogs.fds[i]);
 	}
 }
 
@@ -81,8 +91,7 @@ static int watchdogs_set_timeout(int timeout)
 
 	for (i = 0; i < watchdogs.num_dogs; i++) {
 		if (ioctl(watchdogs.fds[i], WDIOC_SETTIMEOUT, &timeout)) {
-			write(watchdogs.fds[i], "V", 1);
-			close(watchdogs.fds[i]);
+			__close_watchdog(watchdogs.fds[i]);
 			watchdogs.fds[i] = -1;
 			continue;
 		}
@@ -102,9 +111,14 @@ static int watchdogs_set_timeout(int timeout)
 static void ping_watchdogs(void)
 {
 	size_t i;
+	int ret;
 
 	for (i = 0; i < watchdogs.num_dogs; i++) {
-		ioctl(watchdogs.fds[i], WDIOC_KEEPALIVE, 0);
+		ret = ioctl(watchdogs.fds[i], WDIOC_KEEPALIVE, NULL);
+
+		if (ret == -1)
+			fprintf(stderr, "Failed to ping a watchdog: %s\n",
+				strerror(errno));
 	}
 }
 
