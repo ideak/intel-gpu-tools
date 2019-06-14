@@ -686,14 +686,16 @@ static unsigned int run_test_step(struct test_output *o)
 	    !(o->pending_events & EVENT_VBLANK) && o->flip_state.count > 0) {
 		struct vblank_reply reply;
 		unsigned int exp_seq;
-		unsigned long start;
+		unsigned long start, end;
 
 		exp_seq = o->flip_state.current_seq;
 		start = gettime_us();
 		do_or_die(__wait_for_vblank(TEST_VBLANK_ABSOLUTE |
 					    TEST_VBLANK_BLOCK, o->pipe, exp_seq,
 					    0, &reply));
-		igt_assert(gettime_us() - start < 500);
+		end = gettime_us();
+		igt_debug("Vblank took %luus\n", end - start);
+		igt_assert(end - start < 500);
 		igt_assert_eq(reply.sequence, exp_seq);
 		igt_assert(timercmp(&reply.ts, &o->flip_state.last_ts, ==));
 	}
