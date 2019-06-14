@@ -51,7 +51,7 @@ typedef struct {
 
 	int drm_fd;
 
-	int edids[TEST_EDID_COUNT];
+	struct chamelium_edid *edids[TEST_EDID_COUNT];
 } data_t;
 
 #define HOTPLUG_TIMEOUT 20 /* seconds */

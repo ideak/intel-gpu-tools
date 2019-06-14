@@ -59,6 +59,8 @@ struct chamelium_audio_file {
 	int channels;
 };
 
+struct chamelium_edid;
+
 /**
  * CHAMELIUM_DEFAULT_EDID: provide this ID to #chamelium_port_set_edid to use
  * the default EDID.
@@ -98,9 +100,11 @@ void chamelium_fire_hpd_pulses(struct chamelium *chamelium,
 void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
 				   struct chamelium_port *port, int delay_ms,
 				   bool rising_edge);
-int chamelium_new_edid(struct chamelium *chamelium, const unsigned char *edid);
+struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
+					  const unsigned char *edid);
 void chamelium_port_set_edid(struct chamelium *chamelium,
-			     struct chamelium_port *port, int edid_id);
+			     struct chamelium_port *port,
+			     struct chamelium_edid *edid);
 bool chamelium_port_get_ddc_state(struct chamelium *chamelium,
 				  struct chamelium_port *port);
 void chamelium_port_set_ddc_state(struct chamelium *chamelium,

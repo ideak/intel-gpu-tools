@@ -530,13 +530,13 @@ void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
  * Uploads and registers a new EDID with the chamelium. The EDID will be
  * destroyed automatically when #chamelium_deinit is called.
  *
- * Returns: The ID of the EDID uploaded to the chamelium.
+ * Returns: An opaque pointer to the Chamelium EDID
  */
-int chamelium_new_edid(struct chamelium *chamelium,
-		       const unsigned char *raw_edid)
+struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
+					  const unsigned char *raw_edid)
 {
 	xmlrpc_value *res;
-	struct chamelium_edid *allocated_edid;
+	struct chamelium_edid *chamelium_edid;
 	int edid_id;
 	struct edid *edid = (struct edid *) raw_edid;
 	size_t edid_size = sizeof(struct edid) +
@@ -548,14 +548,12 @@ int chamelium_new_edid(struct chamelium *chamelium,
 	xmlrpc_read_int(&chamelium->env, res, &edid_id);
 	xmlrpc_DECREF(res);
 
-	allocated_edid = malloc(sizeof(struct chamelium_edid));
-	memset(allocated_edid, 0, sizeof(*allocated_edid));
+	chamelium_edid = calloc(1, sizeof(struct chamelium_edid));
+	chamelium_edid->id = edid_id;
 
-	allocated_edid->id = edid_id;
+	igt_list_add(&chamelium_edid->link, &chamelium->edids);
 
-	igt_list_add(&allocated_edid->link, &chamelium->edids);
-
-	return edid_id;
+	return chamelium_edid;
 }
 
 static void chamelium_destroy_edid(struct chamelium *chamelium, int edid_id)
@@ -568,7 +566,7 @@ static void chamelium_destroy_edid(struct chamelium *chamelium, int edid_id)
  * chamelium_port_set_edid:
  * @chamelium: The Chamelium instance to use
  * @port: The port on the Chamelium to set the EDID on
- * @edid_id: The ID of an EDID on the chamelium created with
+ * @edid: The Chamelium EDID to set
  * #chamelium_new_edid, or 0 to disable the EDID on the port
  *
  * Sets a port on the chamelium to use the specified EDID. This does not fire a
@@ -578,10 +576,11 @@ static void chamelium_destroy_edid(struct chamelium *chamelium, int edid_id)
  * change.
  */
 void chamelium_port_set_edid(struct chamelium *chamelium,
-			     struct chamelium_port *port, int edid_id)
+			     struct chamelium_port *port,
+			     struct chamelium_edid *edid)
 {
 	xmlrpc_DECREF(chamelium_rpc(chamelium, NULL, "ApplyEdid", "(ii)",
-				    port->id, edid_id));
+				    port->id, edid->id));
 }
 
 /**
