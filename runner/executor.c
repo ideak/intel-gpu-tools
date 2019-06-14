@@ -950,6 +950,7 @@ static int execute_next_entry(struct execute_state *state,
 	sigaddset(&mask, SIGINT);
 	sigaddset(&mask, SIGTERM);
 	sigaddset(&mask, SIGQUIT);
+	sigaddset(&mask, SIGHUP);
 	sigprocmask(SIG_BLOCK, &mask, NULL);
 	sigfd = signalfd(-1, &mask, O_CLOEXEC);
 
