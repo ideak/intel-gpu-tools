@@ -84,6 +84,7 @@
 
 struct chamelium_edid {
 	int id;
+	struct edid *raw;
 	struct igt_list link;
 };
 
@@ -531,6 +532,11 @@ void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
  * Uploads and registers a new EDID with the chamelium. The EDID will be
  * destroyed automatically when #chamelium_deinit is called.
  *
+ * Callers shouldn't assume that the raw EDID they provide is uploaded as-is to
+ * the Chamelium. The EDID may be mutated (e.g. a serial number can be appended
+ * to be able to uniquely identify the EDID). To retrieve the exact EDID that
+ * will be applied to a particular port, use #chamelium_edid_get_raw.
+ *
  * Returns: An opaque pointer to the Chamelium EDID
  */
 struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
@@ -540,16 +546,18 @@ struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
 	struct chamelium_edid *chamelium_edid;
 	int edid_id;
 	const struct edid *edid = (struct edid *) raw_edid;
+	size_t edid_size = edid_get_size(edid);
 
 	res = chamelium_rpc(chamelium, NULL, "CreateEdid", "(6)",
-			    raw_edid, edid_get_size(edid));
+			    raw_edid, edid_size);
 
 	xmlrpc_read_int(&chamelium->env, res, &edid_id);
 	xmlrpc_DECREF(res);
 
 	chamelium_edid = calloc(1, sizeof(struct chamelium_edid));
 	chamelium_edid->id = edid_id;
-
+	chamelium_edid->raw = malloc(edid_size);
+	memcpy(chamelium_edid->raw, raw_edid, edid_size);
 	igt_list_add(&chamelium_edid->link, &chamelium->edids);
 
 	return chamelium_edid;
@@ -559,6 +567,23 @@ static void chamelium_destroy_edid(struct chamelium *chamelium, int edid_id)
 {
 	xmlrpc_DECREF(chamelium_rpc(chamelium, NULL, "DestroyEdid", "(i)",
 				    edid_id));
+}
+
+/**
+ * chamelium_edid_get_raw: get the raw EDID
+ * @edid: the Chamelium EDID
+ * @port: the Chamelium port
+ *
+ * The EDID provided to #chamelium_new_edid may be mutated for identification
+ * purposes. This function allows to retrieve the exact EDID that will be set
+ * for a given port.
+ *
+ * The returned raw EDID is only valid until the next call to this function.
+ */
+const struct edid *chamelium_edid_get_raw(struct chamelium_edid *edid,
+					  struct chamelium_port *port)
+{
+	return edid->raw;
 }
 
 /**
@@ -1964,6 +1989,7 @@ void chamelium_deinit(struct chamelium *chamelium)
 	/* Destroy any EDIDs we created to make sure we don't leak them */
 	igt_list_for_each_safe(pos, tmp, &chamelium->edids, link) {
 		chamelium_destroy_edid(chamelium, pos->id);
+		free(pos->raw);
 		free(pos);
 	}
 

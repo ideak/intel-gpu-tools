@@ -108,6 +108,8 @@ void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
 				   bool rising_edge);
 struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
 					  const unsigned char *edid);
+const struct edid *chamelium_edid_get_raw(struct chamelium_edid *edid,
+					  struct chamelium_port *port);
 void chamelium_port_set_edid(struct chamelium *chamelium,
 			     struct chamelium_port *port,
 			     struct chamelium_edid *edid);

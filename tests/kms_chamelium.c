@@ -272,9 +272,10 @@ static void
 test_edid_read(data_t *data, struct chamelium_port *port, enum test_edid edid)
 {
 	drmModePropertyBlobPtr edid_blob = NULL;
-	const unsigned char *raw_edid = get_edid(edid);
 	drmModeConnector *connector = chamelium_port_get_connector(
 	    data->chamelium, port, false);
+	size_t raw_edid_size;
+	const struct edid *raw_edid;
 	uint64_t edid_blob_id;
 
 	reset_state(data, port);
@@ -291,7 +292,9 @@ test_edid_read(data_t *data, struct chamelium_port *port, enum test_edid edid)
 	igt_assert(edid_blob = drmModeGetPropertyBlob(data->drm_fd,
 						      edid_blob_id));
 
-	igt_assert(memcmp(raw_edid, edid_blob->data, EDID_LENGTH) == 0);
+	raw_edid = chamelium_edid_get_raw(data->edids[edid], port);
+	raw_edid_size = edid_get_size(raw_edid);
+	igt_assert(memcmp(raw_edid, edid_blob->data, raw_edid_size) == 0);
 
 	drmModeFreePropertyBlob(edid_blob);
 	drmModeFreeConnector(connector);
