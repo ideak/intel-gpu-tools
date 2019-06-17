@@ -184,6 +184,7 @@ static void exhaust_shared_gtt(int i915, unsigned int flags)
 static void exec_shared_gtt(int i915, unsigned int ring)
 {
 	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj = {};
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(&obj),
@@ -197,11 +198,19 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 	gem_require_ring(i915, ring);
 	igt_require(gem_can_store_dword(i915, ring));
 
+	/* Find a hole big enough for both objects later */
+	scratch = gem_create(i915, 16384);
+	gem_write(i915, scratch, 0, &bbe, sizeof(bbe));
+	obj.handle = scratch;
+	gem_execbuf(i915, &execbuf);
+	gem_close(i915, scratch);
+	obj.flags |= EXEC_OBJECT_PINNED; /* reuse this address */
+
 	scratch = gem_create(i915, 4096);
 	s = gem_mmap__cpu(i915, scratch, 0, 4096, PROT_WRITE);
 
 	gem_set_domain(i915, scratch, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
-	*s = MI_BATCH_BUFFER_END;
+	*s = bbe;
 
 	/* Load object into place in the GTT */
 	obj.handle = scratch;
@@ -224,11 +233,10 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 		batch[++i] = obj.offset;
 	}
 	batch[++i] = 0xc0ffee;
-	batch[++i] = MI_BATCH_BUFFER_END;
+	batch[++i] = bbe;
 	gem_write(i915, obj.handle, 0, batch, sizeof(batch));
 
-	obj.offset += 4096; /* make sure we don't cause an eviction! */
-	obj.flags |= EXEC_OBJECT_PINNED;
+	obj.offset += 8192; /* make sure we don't cause an eviction! */
 	execbuf.rsvd1 = gem_context_clone(i915, 0, I915_CONTEXT_CLONE_VM, 0);
 	if (gen > 3 && gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
