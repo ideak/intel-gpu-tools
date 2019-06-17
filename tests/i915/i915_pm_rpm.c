@@ -572,33 +572,53 @@ static void assert_drm_infos_equal(struct compare_data *d1,
 		assert_drm_crtcs_equal(d1->crtcs[i], d2->crtcs[i]);
 }
 
-/* We could check the checksum too, but just the header is probably enough. */
-static bool edid_is_valid(const unsigned char *edid)
+static bool find_i2c_path(const char *connector_name, char *i2c_path)
 {
-	char edid_header[] = {
-		0x0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0,
-	};
+	struct dirent *dirent;
+	DIR *dir;
+	int sysfs_card_fd = igt_sysfs_open(drm_fd);
+	int connector_fd = -1;
+	bool found_i2c_file = false;
 
-	return (memcmp(edid, edid_header, sizeof(edid_header)) == 0);
+	dir = fdopendir(sysfs_card_fd);
+	igt_assert(dir);
+
+	while ((dirent = readdir(dir))) {
+		/* Skip "cardx-" prefix */
+		char *dirname = strchr(dirent->d_name, '-');
+		if (dirname==NULL)
+			continue;
+		++dirname;
+
+		if (strcmp(dirname, connector_name) == 0) {
+			connector_fd = openat(sysfs_card_fd, dirent->d_name, O_RDONLY);
+			break;
+		}
+	}
+	closedir(dir);
+
+	if (connector_fd < 0)
+		return false;
+
+	dir = fdopendir(connector_fd);
+	igt_assert(dir);
+
+	while ((dirent = readdir(dir))) {
+		if (strncmp(dirent->d_name, "i2c-", 4) == 0) {
+			sprintf(i2c_path, "/dev/%s", dirent->d_name);
+			found_i2c_file = true;
+		}
+	}
+	closedir(dir);
+	return found_i2c_file;
 }
 
-static int count_drm_valid_edids(struct mode_set_data *data)
+
+static bool i2c_read_edid(const char *connector_name, unsigned char *edid)
 {
-	int ret = 0;
-
-	if (!data->res)
-		return 0;
-
-	for (int i = 0; i < data->res->count_connectors; i++)
-		if (data->edids[i] && edid_is_valid(data->edids[i]->data))
-			ret++;
-	return ret;
-}
-
-static bool i2c_edid_is_valid(int fd)
-{
-	int rc;
-	unsigned char edid[128] = {};
+	char i2c_path[PATH_MAX];
+	bool result;
+	int rc, fd;
 	struct i2c_msg msgs[] = {
 		{ /* Start at 0. */
 			.addr = 0x50,
@@ -617,69 +637,92 @@ static bool i2c_edid_is_valid(int fd)
 		.nmsgs = 2,
 	};
 
+	result = find_i2c_path(connector_name, i2c_path);
+	if (!result)
+		return false;
+
+	fd = open(i2c_path, O_RDWR);
+	igt_assert_neq(fd, -1);
+
 	rc = ioctl(fd, I2C_RDWR, &msgset);
-	return (rc >= 0) ? edid_is_valid(edid) : false;
-}
-
-static int count_i2c_valid_edids(void)
-{
-	int fd, ret = 0;
-	DIR *dir;
-
-	struct dirent *dirent;
-	char full_name[PATH_MAX];
-
-	dir = opendir("/dev/");
-	igt_assert(dir);
-
-	while ((dirent = readdir(dir))) {
-		if (strncmp(dirent->d_name, "i2c-", 4) == 0) {
-			sprintf(full_name, "/dev/%s", dirent->d_name);
-			fd = open(full_name, O_RDWR);
-			igt_assert_neq(fd, -1);
-			if (i2c_edid_is_valid(fd))
-				ret++;
-			close(fd);
-		}
+	if (rc==-1) {
+		igt_debug("I2C access failed with errno %d, %s\n",
+				errno, strerror(errno));
+		errno = 0;
 	}
 
-	closedir(dir);
-
-	return ret;
+	close(fd);
+	return rc >= 0;
 }
 
-static int count_vga_outputs(struct mode_set_data *data)
+static void format_hex_string(const unsigned char edid[static EDID_LENGTH],
+			      char buf[static EDID_LENGTH * 5 + 1])
 {
-	int count = 0;
-
-	if (!data->res)
-		return 0;
-
-	for (int i = 0; i < data->res->count_connectors; i++)
-		if (data->connectors[i]->connector_type ==
-		    DRM_MODE_CONNECTOR_VGA)
-			count++;
-
-	return count;
+	for (int i = 0; i < EDID_LENGTH; ++i)
+		sprintf(buf+i*5, "0x%02x ", edid[i]);
 }
 
 static void test_i2c(struct mode_set_data *data)
 {
-	int i2c_edids = count_i2c_valid_edids();
-	int drm_edids = count_drm_valid_edids(data);
-	int vga_outputs = count_vga_outputs(data);
-	int diff;
+	bool edid_mistmach_i2c_vs_drm = false;
+	igt_display_t display;
+	igt_display_require(&display, drm_fd);
 
-	igt_debug("i2c edids:%d drm edids:%d vga outputs:%d\n",
-		  i2c_edids, drm_edids, vga_outputs);
+	for (int i = 0; i < data->res->count_connectors; i++) {
+		unsigned char *drm_edid = data->edids[i] ? data->edids[i]->data : NULL;
+		unsigned char i2c_edid[EDID_LENGTH] = {};
 
-	/* We fail to detect some VGA monitors using our i2c method. If you look
-	 * at the dmesg of these cases, you'll see the Kernel complaining about
-	 * the EDID reading mostly FFs and then disabling bit-banging. Since we
-	 * don't want to reimplement everything the Kernel does, let's just
-	 * accept the fact that some VGA outputs won't be properly detected. */
-	diff = drm_edids - i2c_edids;
-	igt_assert(diff <= vga_outputs && diff >= 0);
+		igt_output_t *output = igt_output_from_connector(&display,
+								 data->connectors[i]);
+		char *connector_name = (char *) igt_output_name(output);
+
+		bool got_i2c_edid = i2c_read_edid(connector_name, i2c_edid);
+		bool got_drm_edid = drm_edid != NULL;
+		bool is_vga = data->connectors[i]->connector_type == DRM_MODE_CONNECTOR_VGA;
+
+		bool edids_equal;
+
+		/* We fail to detect some VGA monitors using our i2c method. If you look
+		 * at the dmesg of these cases, you'll see the Kernel complaining about
+		 * the EDID reading mostly FFs and then disabling bit-banging. Since we
+		 * don't want to reimplement everything the Kernel does, let's just
+		 * accept the fact that some VGA outputs won't be properly detected. */
+		if (is_vga)
+			continue;
+
+		if (!got_i2c_edid && !got_drm_edid)
+			continue;
+
+		if (got_i2c_edid && got_drm_edid)
+			edids_equal = (0 == memcmp(drm_edid, i2c_edid, EDID_LENGTH));
+		else
+			edids_equal = false;
+
+
+		if (!edids_equal) {
+			char buf[5 * EDID_LENGTH + 1];
+			igt_critical("Detected EDID mismatch on connector %s\n",
+				     connector_name);
+
+			if(got_i2c_edid)
+				format_hex_string(i2c_edid, buf);
+			else
+				sprintf(buf, "NULL");
+
+			igt_critical("i2c: %s\n", buf);
+
+			if(got_drm_edid)
+				format_hex_string(drm_edid, buf);
+			else
+				sprintf(buf, "NULL");
+
+			igt_critical("drm: %s\n", buf);
+
+			edid_mistmach_i2c_vs_drm = true;
+		}
+	}
+	igt_fail_on_f(edid_mistmach_i2c_vs_drm,
+			"There is an EDID mismatch between i2c and DRM!\n");
 }
 
 static void setup_pc8(void)
