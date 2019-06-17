@@ -538,12 +538,10 @@ struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
 	xmlrpc_value *res;
 	struct chamelium_edid *chamelium_edid;
 	int edid_id;
-	struct edid *edid = (struct edid *) raw_edid;
-	size_t edid_size = sizeof(struct edid) +
-			   edid->extensions_len * sizeof(struct edid_ext);
+	const struct edid *edid = (struct edid *) raw_edid;
 
 	res = chamelium_rpc(chamelium, NULL, "CreateEdid", "(6)",
-			    raw_edid, edid_size);
+			    raw_edid, edid_get_size(edid));
 
 	xmlrpc_read_int(&chamelium->env, res, &edid_id);
 	xmlrpc_DECREF(res);

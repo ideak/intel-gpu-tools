@@ -275,6 +275,16 @@ void edid_update_checksum(struct edid *edid)
 }
 
 /**
+ * edid_get_size: return the size of the EDID block in bytes including EDID
+ * extensions, if any.
+ */
+size_t edid_get_size(const struct edid *edid)
+{
+	return sizeof(struct edid) +
+	       edid->extensions_len * sizeof(struct edid_ext);
+}
+
+/**
  * cea_sad_init_pcm:
  * @channels: the number of supported channels (max. 8)
  * @sampling_rates: bitfield of enum cea_sad_sampling_rate

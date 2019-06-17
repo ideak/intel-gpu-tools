@@ -297,6 +297,7 @@ struct edid {
 void edid_init(struct edid *edid);
 void edid_init_with_mode(struct edid *edid, drmModeModeInfo *mode);
 void edid_update_checksum(struct edid *edid);
+size_t edid_get_size(const struct edid *edid);
 void detailed_timing_set_mode(struct detailed_timing *dt, drmModeModeInfo *mode,
 			      int width_mm, int height_mm);
 void detailed_timing_set_monitor_range_mode(struct detailed_timing *dt,
