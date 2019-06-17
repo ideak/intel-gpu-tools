@@ -565,21 +565,22 @@ static void chamelium_destroy_edid(struct chamelium *chamelium, int edid_id)
  * chamelium_port_set_edid:
  * @chamelium: The Chamelium instance to use
  * @port: The port on the Chamelium to set the EDID on
- * @edid: The Chamelium EDID to set
- * #chamelium_new_edid, or 0 to disable the EDID on the port
+ * @edid: The Chamelium EDID to set or NULL to use the default Chamelium EDID
  *
  * Sets a port on the chamelium to use the specified EDID. This does not fire a
  * hotplug pulse on it's own, and merely changes what EDID the chamelium port
  * will report to us the next time we probe it. Users will need to reprobe the
  * connectors themselves if they want to see the EDID reported by the port
  * change.
+ *
+ * To create an EDID, see #chamelium_new_edid.
  */
 void chamelium_port_set_edid(struct chamelium *chamelium,
 			     struct chamelium_port *port,
 			     struct chamelium_edid *edid)
 {
 	xmlrpc_DECREF(chamelium_rpc(chamelium, NULL, "ApplyEdid", "(ii)",
-				    port->id, edid->id));
+				    port->id, edid ? edid->id : 0));
 }
 
 /**
