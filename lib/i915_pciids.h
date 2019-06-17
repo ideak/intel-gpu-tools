@@ -496,7 +496,8 @@
 	INTEL_VGA_DEVICE(0x8A56, info), \
 	INTEL_VGA_DEVICE(0x8A71, info), \
 	INTEL_VGA_DEVICE(0x8A70, info), \
-	INTEL_VGA_DEVICE(0x8A53, info)
+	INTEL_VGA_DEVICE(0x8A53, info), \
+	INTEL_VGA_DEVICE(0x8A54, info)
 
 /* EHL */
 #define INTEL_EHL_IDS(info) \
