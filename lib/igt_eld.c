@@ -152,7 +152,7 @@ static bool eld_parse_entry(const char *path, struct eld_entry *eld)
 	char buf[1024];
 	char *key, *value, *sad_key;
 	size_t len;
-	bool monitor_present;
+	bool monitor_present = false;
 	int sad_index;
 
 	memset(eld, 0, sizeof(*eld));
