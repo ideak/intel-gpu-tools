@@ -111,11 +111,17 @@ static void add_subtests(struct job_list *job_list, struct settings *settings,
 		fprintf(stderr, "popen error when executing %s: %s\n", binary, strerror(errno));
 	} else if (WIFEXITED(s)) {
 		if (WEXITSTATUS(s) == IGT_EXIT_INVALID) {
+			char piglitname[256];
+
+			generate_piglit_name(binary, NULL,
+					     piglitname, sizeof(piglitname));
 			/* No subtests on this one */
-			if (exclude && exclude->size && matches_any(binary, exclude)) {
+			if (exclude && exclude->size &&
+			    matches_any(piglitname, exclude)) {
 				return;
 			}
-			if (!include || !include->size || matches_any(binary, include)) {
+			if (!include || !include->size ||
+			    matches_any(piglitname, include)) {
 				add_job_list_entry(job_list, strdup(binary), NULL, 0);
 				return;
 			}
@@ -289,6 +295,30 @@ static bool job_list_from_test_list(struct job_list *job_list,
 	free(line);
 	fclose(f);
 	return any;
+}
+
+void list_all_tests(struct job_list *lst)
+{
+	char piglit_name[256];
+
+	for (size_t test_idx = 0; test_idx < lst->size; ++test_idx) {
+		struct job_list_entry *current_entry = lst->entries + test_idx;
+		char *binary = current_entry->binary;
+
+		if (current_entry->subtest_count == 0) {
+			generate_piglit_name(binary, NULL,
+					     piglit_name, sizeof(piglit_name));
+			printf("%s\n", piglit_name);
+			continue;
+		}
+		for (size_t subtest_idx = 0;
+		    subtest_idx < current_entry->subtest_count;
+		    ++subtest_idx) {
+			generate_piglit_name(binary, current_entry->subtests[subtest_idx],
+					     piglit_name, sizeof(piglit_name));
+			printf("%s\n", piglit_name);
+		}
+	}
 }
 
 static char *lowercase(const char *str)

@@ -24,6 +24,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (settings.list_all) {
+		list_all_tests(&job_list);
+		return 0;
+	}
+
 	if (!initialize_execute_state(&state, &settings, &job_list)) {
 		return 1;
 	}

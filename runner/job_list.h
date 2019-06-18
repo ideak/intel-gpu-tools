@@ -36,5 +36,6 @@ bool create_job_list(struct job_list *job_list, struct settings *settings);
 
 bool serialize_job_list(struct job_list *job_list, struct settings *settings);
 bool read_job_list(struct job_list *job_list, int dirfd);
+void list_all_tests(struct job_list *lst);
 
 #endif

@@ -43,6 +43,7 @@ struct settings {
 	char *results_path;
 	bool piglit_style_dmesg;
 	int dmesg_warn_level;
+	bool list_all;
 };
 
 /**

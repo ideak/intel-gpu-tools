@@ -1,5 +1,6 @@
 #include "settings.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -30,6 +31,8 @@ enum {
 	OPT_MULTIPLE = 'm',
 	OPT_TIMEOUT = 'c',
 	OPT_WATCHDOG = 'g',
+	OPT_BLACKLIST = 'b',
+	OPT_LIST_ALL = 'L',
 };
 
 static struct {
@@ -117,7 +120,8 @@ static bool parse_abort_conditions(struct settings *settings, const char *optarg
 }
 
 static const char *usage_str =
-	"usage: runner [options] [test_root] results-path\n\n"
+	"usage: runner [options] [test_root] results-path\n"
+	"   or: runner --list-all [options] [test_root]\n\n"
 	"Options:\n"
 	" Piglit compatible:\n"
 	"  -h, --help            Show this help message and exit\n"
@@ -172,6 +176,10 @@ static const char *usage_str =
 	"                        (longer) filter list means the test result should\n"
 	"                        change. KERN_NOTICE dmesg level is treated as warn,\n"
 	"                        unless overridden with --dmesg-warn-level.\n"
+	"  -b, --blacklist FILENAME\n"
+	"                        Exclude all test matching to regexes from FILENAME\n"
+	"                        (can be used more than once)\n"
+	"  -L, --list-all        List all matching subtests instead of running\n"
 	"  [test_root]           Directory that contains the IGT tests. The environment\n"
 	"                        variable IGT_TEST_ROOT will be used if set, overriding\n"
 	"                        this option if given.\n"
@@ -211,6 +219,51 @@ static bool add_regex(struct regex_list *list, char *new)
 	list->size++;
 
 	return true;
+}
+
+static bool parse_blacklist(struct regex_list *exclude_regexes,
+			    char *blacklist_filename)
+{
+	FILE *f;
+	char *line = NULL;
+	size_t line_len = 0;
+	bool status;
+
+	if ((f = fopen(blacklist_filename, "r")) == NULL) {
+		fprintf(stderr, "Cannot open blacklist file %s\n", blacklist_filename);
+		return false;
+	}
+	while (1) {
+		size_t str_size = 0, idx = 0;
+
+		if (getline(&line, &line_len, f) == -1) {
+			if (errno == EINTR)
+				continue;
+			else
+				break;
+		}
+
+		while (true) {
+			if (line[idx] == '\n' ||
+			    line[idx] == '\0' ||
+			    line[idx] == '#')   /* # starts a comment */
+				break;
+			if (!isspace(line[idx]))
+				str_size = idx + 1;
+			idx++;
+		}
+		if (str_size > 0) {
+			char *test_regex = strndup(line, str_size);
+
+			status = add_regex(exclude_regexes, test_regex);
+			if (!status)
+				break;
+		}
+	}
+
+	free(line);
+	fclose(f);
+	return status;
 }
 
 static void free_regexes(struct regex_list *regexes)
@@ -272,6 +325,8 @@ bool parse_options(int argc, char **argv,
 		{"use-watchdog", no_argument, NULL, OPT_WATCHDOG},
 		{"piglit-style-dmesg", no_argument, NULL, OPT_PIGLIT_DMESG},
 		{"dmesg-warn-level", required_argument, NULL, OPT_DMESG_WARN_LEVEL},
+		{"blacklist", required_argument, NULL, OPT_BLACKLIST},
+		{"list-all", no_argument, NULL, OPT_LIST_ALL},
 		{ 0, 0, 0, 0},
 	};
 
@@ -281,7 +336,8 @@ bool parse_options(int argc, char **argv,
 
 	settings->dmesg_warn_level = -1;
 
-	while ((c = getopt_long(argc, argv, "hn:dt:x:sl:om", long_options, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, "hn:dt:x:sl:omb:L",
+				long_options, NULL)) != -1) {
 		switch (c) {
 		case OPT_HELP:
 			usage(NULL, stdout);
@@ -342,6 +398,14 @@ bool parse_options(int argc, char **argv,
 		case OPT_DMESG_WARN_LEVEL:
 			settings->dmesg_warn_level = atoi(optarg);
 			break;
+		case OPT_BLACKLIST:
+			if (!parse_blacklist(&settings->exclude_regexes,
+					     absolute_path(optarg)))
+				goto error;
+			break;
+		case OPT_LIST_ALL:
+			settings->list_all = true;
+			break;
 		case '?':
 			usage(NULL, stderr);
 			goto error;
@@ -354,20 +418,40 @@ bool parse_options(int argc, char **argv,
 	if (settings->dmesg_warn_level < 0)
 		settings->dmesg_warn_level = 4; /* KERN_WARN */
 
-	switch (argc - optind) {
-	case 2:
-		settings->test_root = absolute_path(argv[optind]);
-		++optind;
-		/* fallthrough */
-	case 1:
-		settings->results_path = absolute_path(argv[optind]);
-		break;
-	case 0:
-		usage("Results-path missing", stderr);
-		goto error;
-	default:
-		usage("Extra arguments after results-path", stderr);
-		goto error;
+	if (settings->list_all) { /* --list-all doesn't require results path */
+		switch (argc - optind) {
+		case 1:
+			settings->test_root = absolute_path(argv[optind]);
+			++optind;
+			/* fallthrough */
+		case 0:
+			break;
+		default:
+			usage("Too many arguments for --list-all", stderr);
+			goto error;
+		}
+	} else {
+		switch (argc - optind) {
+		case 2:
+			settings->test_root = absolute_path(argv[optind]);
+			++optind;
+			/* fallthrough */
+		case 1:
+			settings->results_path = absolute_path(argv[optind]);
+			break;
+		case 0:
+			usage("Results-path missing", stderr);
+			goto error;
+		default:
+			usage("Extra arguments after results-path", stderr);
+			goto error;
+		}
+		if (!settings->name) {
+			char *name = strdup(settings->results_path);
+
+			settings->name = strdup(basename(name));
+			free(name);
+		}
 	}
 
 	if ((env_test_root = getenv("IGT_TEST_ROOT")) != NULL) {
@@ -380,11 +464,6 @@ bool parse_options(int argc, char **argv,
 		goto error;
 	}
 
-	if (!settings->name) {
-		char *name = strdup(settings->results_path);
-		settings->name = strdup(basename(name));
-		free(name);
-	}
 
 	return true;
 

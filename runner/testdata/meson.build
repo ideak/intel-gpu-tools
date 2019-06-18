@@ -12,6 +12,11 @@ foreach prog : testdata_progs
 					   install : false)
 endforeach
 
+configure_file(input : 'test-blacklist.txt',
+	       output : 'test-blacklist.txt', copy : true)
+configure_file(input : 'test-blacklist2.txt',
+	       output : 'test-blacklist2.txt', copy : true)
+
 testdata_list = custom_target('testdata_testlist',
 			      output : 'test-list.txt',
 			      command : [ gen_testlist, '@OUTPUT@', testdata_progs ],

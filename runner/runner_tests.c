@@ -378,6 +378,7 @@ igt_main
 	}
 
 	igt_subtest("parse-all-settings") {
+		char blacklist_name[PATH_MAX], blacklist2_name[PATH_MAX];
 		const char *argv[] = { "runner",
 				       "-n", "foo",
 				       "--abort-on-monitored-error=taint,lockdep",
@@ -388,6 +389,8 @@ igt_main
 				       "-t", "pattern2",
 				       "-x", "xpattern1",
 				       "-x", "xpattern2",
+				       "-b", blacklist_name,
+				       "--blacklist", blacklist2_name,
 				       "-s",
 				       "-l", "verbose",
 				       "--overwrite",
@@ -401,6 +404,9 @@ igt_main
 				       "path-to-results",
 		};
 
+		sprintf(blacklist_name, "%s/test-blacklist.txt", testdatadir);
+		sprintf(blacklist2_name, "%s/test-blacklist2.txt", testdatadir);
+
 		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
 		igt_assert_eq(settings->abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
@@ -410,9 +416,11 @@ igt_main
 		igt_assert_eq(settings->include_regexes.size, 2);
 		igt_assert_eqstr(settings->include_regexes.regex_strings[0], "pattern1");
 		igt_assert_eqstr(settings->include_regexes.regex_strings[1], "pattern2");
-		igt_assert_eq(settings->exclude_regexes.size, 2);
+		igt_assert_eq(settings->exclude_regexes.size, 4);
 		igt_assert_eqstr(settings->exclude_regexes.regex_strings[0], "xpattern1");
 		igt_assert_eqstr(settings->exclude_regexes.regex_strings[1], "xpattern2");
+		igt_assert_eqstr(settings->exclude_regexes.regex_strings[2], "xpattern3"); /* From blacklist */
+		igt_assert_eqstr(settings->exclude_regexes.regex_strings[3], "xpattern4"); /* From blacklist2 */
 		igt_assert(settings->sync);
 		igt_assert_eq(settings->log_level, LOG_LEVEL_VERBOSE);
 		igt_assert(settings->overwrite);
@@ -425,6 +433,14 @@ igt_main
 
 		igt_assert(settings->piglit_style_dmesg);
 		igt_assert_eq(settings->dmesg_warn_level, 3);
+	}
+	igt_subtest("parse-list-all") {
+		const char *argv[] = { "runner",
+				       "--list-all",
+				       "test-root-dir"};
+
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->list_all, 1);
 	}
 
 	igt_subtest("dmesg-warn-level-inferred") {
