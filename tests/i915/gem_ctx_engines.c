@@ -283,7 +283,9 @@ static void execute_one(int i915)
 
 			spin = igt_spin_new(i915,
 					    .ctx = param.ctx_id,
-					    .engine = 0);
+					    .engine = 0,
+					    .flags = (IGT_SPIN_NO_PREEMPTION |
+						      IGT_SPIN_POLL_RUN));
 
 			igt_debug("Testing with map of %d engines\n", i + 1);
 			memset(&engines.engines, -1, sizeof(engines.engines));
@@ -294,6 +296,7 @@ static void execute_one(int i915)
 			param.size = sizeof(uint64_t) + (i + 1) * sizeof(uint32_t);
 			gem_context_set_param(i915, &param);
 
+			igt_spin_busywait_until_started(spin);
 			for (int j = 0; j <= I915_EXEC_RING_MASK; j++) {
 				int expected = j == i ? 0 : -EINVAL;
 
