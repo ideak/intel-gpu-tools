@@ -524,6 +524,26 @@ void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
 				    "(iii)", port->id, delay_ms, rising_edge));
 }
 
+static int chamelium_upload_edid(struct chamelium *chamelium,
+				 const struct edid *edid)
+{
+	xmlrpc_value *res;
+	int edid_id;
+
+	res = chamelium_rpc(chamelium, NULL, "CreateEdid", "(6)",
+			    edid, edid_get_size(edid));
+	xmlrpc_read_int(&chamelium->env, res, &edid_id);
+	xmlrpc_DECREF(res);
+
+	return edid_id;
+}
+
+static void chamelium_destroy_edid(struct chamelium *chamelium, int edid_id)
+{
+	xmlrpc_DECREF(chamelium_rpc(chamelium, NULL, "DestroyEdid", "(i)",
+				    edid_id));
+}
+
 /**
  * chamelium_new_edid:
  * @chamelium: The Chamelium instance to use
@@ -542,31 +562,20 @@ void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
 struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
 					  const unsigned char *raw_edid)
 {
-	xmlrpc_value *res;
 	struct chamelium_edid *chamelium_edid;
 	int edid_id;
 	const struct edid *edid = (struct edid *) raw_edid;
 	size_t edid_size = edid_get_size(edid);
 
-	res = chamelium_rpc(chamelium, NULL, "CreateEdid", "(6)",
-			    raw_edid, edid_size);
-
-	xmlrpc_read_int(&chamelium->env, res, &edid_id);
-	xmlrpc_DECREF(res);
+	edid_id = chamelium_upload_edid(chamelium, edid);
 
 	chamelium_edid = calloc(1, sizeof(struct chamelium_edid));
 	chamelium_edid->id = edid_id;
 	chamelium_edid->raw = malloc(edid_size);
-	memcpy(chamelium_edid->raw, raw_edid, edid_size);
+	memcpy(chamelium_edid->raw, edid, edid_size);
 	igt_list_add(&chamelium_edid->link, &chamelium->edids);
 
 	return chamelium_edid;
-}
-
-static void chamelium_destroy_edid(struct chamelium *chamelium, int edid_id)
-{
-	xmlrpc_DECREF(chamelium_rpc(chamelium, NULL, "DestroyEdid", "(i)",
-				    edid_id));
 }
 
 /**
