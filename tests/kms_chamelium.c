@@ -1237,6 +1237,7 @@ static bool test_audio_flatline(struct audio_state *state)
 	recv = NULL;
 	recv_len = 0;
 	amp_success = false;
+	streak = 0;
 	while (!amp_success && state->msec < AUDIO_TIMEOUT) {
 		audio_state_receive(state, &recv, &recv_len);
 
