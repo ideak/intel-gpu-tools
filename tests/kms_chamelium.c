@@ -184,7 +184,7 @@ check_analog_bridge(data_t *data, struct chamelium_port *port)
 	drmModeConnector *connector = chamelium_port_get_connector(
 	    data->chamelium, port, false);
 	uint64_t edid_blob_id;
-	unsigned char *edid;
+	const struct edid *edid;
 	char edid_vendor[3];
 
 	if (chamelium_port_get_type(port) != DRM_MODE_CONNECTOR_VGA) {
@@ -198,12 +198,8 @@ check_analog_bridge(data_t *data, struct chamelium_port *port)
 	igt_assert(edid_blob = drmModeGetPropertyBlob(data->drm_fd,
 						      edid_blob_id));
 
-	edid = (unsigned char *) edid_blob->data;
-
-	edid_vendor[0] = ((edid[8] & 0x7c) >> 2) + '@';
-	edid_vendor[1] = (((edid[8] & 0x03) << 3) |
-			  ((edid[9] & 0xe0) >> 5)) + '@';
-	edid_vendor[2] = (edid[9] & 0x1f) + '@';
+	edid = (const struct edid *) edid_blob->data;
+	edid_get_mfg(edid, edid_vendor);
 
 	drmModeFreePropertyBlob(edid_blob);
 	drmModeFreeConnector(connector);

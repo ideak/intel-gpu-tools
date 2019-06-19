@@ -172,6 +172,19 @@ void detailed_timing_set_string(struct detailed_timing *dt,
 		ds->str[len] = '\n';
 }
 
+/**
+ * edid_get_mfg: reads the 3-letter manufacturer identifier
+ *
+ * The string is *not* NULL-terminated.
+ */
+void edid_get_mfg(const struct edid *edid, char out[static 3])
+{
+	out[0] = ((edid->mfg_id[0] & 0x7C) >> 2) + '@';
+	out[1] = (((edid->mfg_id[0] & 0x03) << 3) |
+		 ((edid->mfg_id[1] & 0xE0) >> 5)) + '@';
+	out[2] = (edid->mfg_id[1] & 0x1F) + '@';
+}
+
 static void edid_set_mfg(struct edid *edid, const char mfg[static 3])
 {
 	edid->mfg_id[0] = (mfg[0] - '@') << 2 | (mfg[1] - '@') >> 3;
