@@ -83,8 +83,8 @@
  */
 
 struct chamelium_edid {
-	int id;
 	struct edid *raw;
+	int ids[CHAMELIUM_MAX_PORTS];
 	struct igt_list link;
 };
 
@@ -563,14 +563,10 @@ struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
 					  const unsigned char *raw_edid)
 {
 	struct chamelium_edid *chamelium_edid;
-	int edid_id;
 	const struct edid *edid = (struct edid *) raw_edid;
 	size_t edid_size = edid_get_size(edid);
 
-	edid_id = chamelium_upload_edid(chamelium, edid);
-
 	chamelium_edid = calloc(1, sizeof(struct chamelium_edid));
-	chamelium_edid->id = edid_id;
 	chamelium_edid->raw = malloc(edid_size);
 	memcpy(chamelium_edid->raw, edid, edid_size);
 	igt_list_add(&chamelium_edid->link, &chamelium->edids);
@@ -613,8 +609,24 @@ void chamelium_port_set_edid(struct chamelium *chamelium,
 			     struct chamelium_port *port,
 			     struct chamelium_edid *edid)
 {
+	int edid_id;
+	size_t port_index;
+	const struct edid *raw_edid;
+
+	if (edid) {
+		port_index = port - chamelium->ports;
+		edid_id = edid->ids[port_index];
+		if (edid_id == 0) {
+			raw_edid = chamelium_edid_get_raw(edid, port);
+			edid_id = chamelium_upload_edid(chamelium, raw_edid);
+			edid->ids[port_index] = edid_id;
+		}
+	} else {
+		edid_id = 0;
+	}
+
 	xmlrpc_DECREF(chamelium_rpc(chamelium, NULL, "ApplyEdid", "(ii)",
-				    port->id, edid ? edid->id : 0));
+				    port->id, edid_id));
 }
 
 /**
@@ -1995,7 +2007,10 @@ void chamelium_deinit(struct chamelium *chamelium)
 
 	/* Destroy any EDIDs we created to make sure we don't leak them */
 	igt_list_for_each_safe(pos, tmp, &chamelium->edids, link) {
-		chamelium_destroy_edid(chamelium, pos->id);
+		for (i = 0; i < CHAMELIUM_MAX_PORTS; i++) {
+			if (pos->ids[i])
+				chamelium_destroy_edid(chamelium, pos->ids[i]);
+		}
 		free(pos->raw);
 		free(pos);
 	}
