@@ -83,7 +83,9 @@
  */
 
 struct chamelium_edid {
-	struct edid *raw;
+	struct chamelium *chamelium;
+	struct edid *base;
+	struct edid *raw[CHAMELIUM_MAX_PORTS];
 	int ids[CHAMELIUM_MAX_PORTS];
 	struct igt_list link;
 };
@@ -567,11 +569,31 @@ struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
 	size_t edid_size = edid_get_size(edid);
 
 	chamelium_edid = calloc(1, sizeof(struct chamelium_edid));
-	chamelium_edid->raw = malloc(edid_size);
-	memcpy(chamelium_edid->raw, edid, edid_size);
+	chamelium_edid->chamelium = chamelium;
+	chamelium_edid->base = malloc(edid_size);
+	memcpy(chamelium_edid->base, edid, edid_size);
 	igt_list_add(&chamelium_edid->link, &chamelium->edids);
 
 	return chamelium_edid;
+}
+
+/**
+ * chamelium_port_tag_edid: tag the EDID with the provided Chamelium port.
+ */
+static void chamelium_port_tag_edid(struct chamelium_port *port,
+				    struct edid *edid)
+{
+	uint32_t *serial;
+
+	/* Product code: Chamelium */
+	edid->prod_code[0] = 'C';
+	edid->prod_code[1] = 'H';
+
+	/* Serial: Chamelium port ID */
+	serial = (uint32_t *) &edid->serial;
+	*serial = port->id;
+
+	edid_update_checksum(edid);
 }
 
 /**
@@ -588,7 +610,17 @@ struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
 const struct edid *chamelium_edid_get_raw(struct chamelium_edid *edid,
 					  struct chamelium_port *port)
 {
-	return edid->raw;
+	size_t port_index = port - edid->chamelium->ports;
+	size_t edid_size;
+
+	if (!edid->raw[port_index]) {
+		edid_size = edid_get_size(edid->base);
+		edid->raw[port_index] = malloc(edid_size);
+		memcpy(edid->raw[port_index], edid->base, edid_size);
+		chamelium_port_tag_edid(port, edid->raw[port_index]);
+	}
+
+	return edid->raw[port_index];
 }
 
 /**
@@ -2010,8 +2042,9 @@ void chamelium_deinit(struct chamelium *chamelium)
 		for (i = 0; i < CHAMELIUM_MAX_PORTS; i++) {
 			if (pos->ids[i])
 				chamelium_destroy_edid(chamelium, pos->ids[i]);
+			free(pos->raw[i]);
 		}
-		free(pos->raw);
+		free(pos->base);
 		free(pos);
 	}
 
