@@ -68,6 +68,13 @@ struct chamelium_audio_file {
 struct chamelium_edid;
 
 /**
+ * CHAMELIUM_MAX_PORTS: the maximum number of ports supported by igt_chamelium.
+ *
+ * For now, we have 1 VGA, 1 HDMI and 2 DisplayPort ports.
+ */
+#define CHAMELIUM_MAX_PORTS 4
+
+/**
  * CHAMELIUM_DEFAULT_EDID: provide this ID to #chamelium_port_set_edid to use
  * the default EDID.
  */

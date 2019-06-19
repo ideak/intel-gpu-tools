@@ -121,7 +121,7 @@ struct chamelium {
 	int drm_fd;
 
 	struct igt_list edids;
-	struct chamelium_port *ports;
+	struct chamelium_port ports[CHAMELIUM_MAX_PORTS];
 	int port_count;
 };
 
@@ -1804,11 +1804,9 @@ static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 		if (strstr(group_list[i], "Chamelium:"))
 			chamelium->port_count++;
 	}
+	igt_assert(chamelium->port_count <= CHAMELIUM_MAX_PORTS);
 
-	chamelium->ports = calloc(sizeof(struct chamelium_port),
-				  chamelium->port_count);
 	port_i = 0;
-
 	for (i = 0; group_list[i] != NULL; i++) {
 		group = group_list[i];
 
@@ -2008,7 +2006,6 @@ void chamelium_deinit(struct chamelium *chamelium)
 	for (i = 0; i < chamelium->port_count; i++)
 		free(chamelium->ports[i].name);
 
-	free(chamelium->ports);
 	free(chamelium);
 }
 
