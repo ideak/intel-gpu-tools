@@ -866,7 +866,7 @@ static void fill_from_journal(int fd,
 
 static void override_result_single(struct json_object *obj)
 {
-	const char *errtext = NULL, *result = NULL;
+	const char *errtext = "", *result = "";
 	struct json_object *textobj;
 	bool dmesgwarns = false;
 
