@@ -595,6 +595,24 @@ static const char *mode_stereo_name(const drmModeModeInfo *mode)
 	}
 }
 
+static const char *mode_picture_aspect_name(const drmModeModeInfo *mode)
+{
+	switch (mode->flags & DRM_MODE_FLAG_PIC_AR_MASK) {
+	case DRM_MODE_FLAG_PIC_AR_NONE:
+		return NULL;
+	case DRM_MODE_FLAG_PIC_AR_4_3:
+		return "4:3";
+	case DRM_MODE_FLAG_PIC_AR_16_9:
+		return "16:9";
+	case DRM_MODE_FLAG_PIC_AR_64_27:
+		return "64:27";
+	case DRM_MODE_FLAG_PIC_AR_256_135:
+		return "256:135";
+	default:
+		return "invalid";
+	}
+}
+
 /**
  * kmstest_dump_mode:
  * @mode: libdrm mode structure
@@ -604,8 +622,9 @@ static const char *mode_stereo_name(const drmModeModeInfo *mode)
 void kmstest_dump_mode(drmModeModeInfo *mode)
 {
 	const char *stereo = mode_stereo_name(mode);
+	const char *aspect = mode_picture_aspect_name(mode);
 
-	igt_info("  %s %d %d %d %d %d %d %d %d %d 0x%x 0x%x %d%s%s%s\n",
+	igt_info("  %s %d %d %d %d %d %d %d %d %d 0x%x 0x%x %d%s%s%s%s%s%s\n",
 		 mode->name, mode->vrefresh,
 		 mode->hdisplay, mode->hsync_start,
 		 mode->hsync_end, mode->htotal,
@@ -613,7 +632,9 @@ void kmstest_dump_mode(drmModeModeInfo *mode)
 		 mode->vsync_end, mode->vtotal,
 		 mode->flags, mode->type, mode->clock,
 		 stereo ? " (3D:" : "",
-		 stereo ? stereo : "", stereo ? ")" : "");
+		 stereo ? stereo : "", stereo ? ")" : "",
+		 aspect ? " (PAR:" : "",
+		 aspect ? aspect : "", aspect ? ")" : "");
 }
 
 /**
