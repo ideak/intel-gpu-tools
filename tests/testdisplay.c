@@ -80,7 +80,7 @@ struct termios saved_tio;
 drmModeRes *resources;
 int drm_fd, modes;
 int test_all_modes = 0, test_preferred_mode = 0, force_mode = 0, test_plane,
-    test_stereo_modes;
+    test_stereo_modes, test_aspect_ratio;
 uint64_t tiling = LOCAL_DRM_FORMAT_MOD_NONE;
 int sleep_between_modes = 0;
 int do_dpms = 0; /* This aliases to DPMS_ON */
@@ -248,6 +248,24 @@ static void paint_image(cairo_t *cr, const char *file)
 	igt_paint_image(cr, file, img_x, img_y, img_h, img_w);
 }
 
+static const char *picture_aspect_ratio_str(uint32_t flags)
+{
+	switch (flags & DRM_MODE_FLAG_PIC_AR_MASK) {
+	case DRM_MODE_FLAG_PIC_AR_NONE:
+		return "";
+	case DRM_MODE_FLAG_PIC_AR_4_3:
+		return "(4:3) ";
+	case DRM_MODE_FLAG_PIC_AR_16_9:
+		return "(16:9) ";
+	case DRM_MODE_FLAG_PIC_AR_64_27:
+		return "(64:27) ";
+	case DRM_MODE_FLAG_PIC_AR_256_135:
+		return "(256:135) ";
+	default:
+		return "(invalid) ";
+	}
+}
+
 static void paint_output_info(struct connector *c, struct igt_fb *fb)
 {
 	cairo_t *cr = igt_get_cairo_ctx(drm_fd, fb);
@@ -288,8 +306,10 @@ static void paint_output_info(struct connector *c, struct igt_fb *fb)
 			cairo_move_to(cr, x, top_y);
 		}
 		str_width = igt_cairo_printf_line(cr, align_right, 10,
-			"%s @ %dHz", c->connector->modes[i].name,
-			 c->connector->modes[i].vrefresh);
+						  "%s%s @ %dHz",
+						  picture_aspect_ratio_str(c->connector->modes[i].flags),
+						  c->connector->modes[i].name,
+						  c->connector->modes[i].vrefresh);
 		if (str_width > max_width)
 			max_width = str_width;
 	}
@@ -573,7 +593,7 @@ static void set_termio_mode(void)
 	tcsetattr(tio_fd, TCSANOW, &tio);
 }
 
-static char optstr[] = "3iaf:s:d:p:mrto:j:y";
+static char optstr[] = "3Aiaf:s:d:p:mrto:j:y";
 static struct option long_opts[] = {
 	{"yb", 0, 0, OPT_YB},
 	{"yf", 0, 0, OPT_YF},
@@ -588,6 +608,7 @@ static const char *help_str =
 	"  -p\t<planew,h>,<crtcx,y>,<crtcw,h> test overlay plane\n"
 	"  -m\ttest the preferred mode\n"
 	"  -3\ttest all 3D modes\n"
+	"  -A\ttest all aspect ratios\n"
 	"  -t\tuse an X-tiled framebuffer\n"
 	"  -y, --yb\n"
 	"  \tuse a Y-tiled framebuffer\n"
@@ -608,6 +629,9 @@ static int opt_handler(int opt, int opt_index, void *data)
 	switch (opt) {
 	case '3':
 		test_stereo_modes = 1;
+		break;
+	case 'A':
+		test_aspect_ratio = 1;
 		break;
 	case 'i':
 		opt_dump_info = true;
@@ -694,6 +718,12 @@ igt_simple_main_args(optstr, long_opts, help_str, opt_handler, NULL)
 	if (test_stereo_modes &&
 	    drmSetClientCap(drm_fd, DRM_CLIENT_CAP_STEREO_3D, 1) < 0) {
 		igt_warn("DRM_CLIENT_CAP_STEREO_3D failed\n");
+		goto out_close;
+	}
+
+	if (test_aspect_ratio &&
+	    drmSetClientCap(drm_fd, DRM_CLIENT_CAP_ASPECT_RATIO, 1) < 0) {
+		igt_warn("DRM_CLIENT_CAP_ASPECT_RATIO failed\n");
 		goto out_close;
 	}
 
