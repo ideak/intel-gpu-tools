@@ -227,7 +227,7 @@ static bool parse_blacklist(struct regex_list *exclude_regexes,
 	FILE *f;
 	char *line = NULL;
 	size_t line_len = 0;
-	bool status;
+	bool status = false;
 
 	if ((f = fopen(blacklist_filename, "r")) == NULL) {
 		fprintf(stderr, "Cannot open blacklist file %s\n", blacklist_filename);
