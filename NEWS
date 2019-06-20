@@ -1,11 +1,39 @@
-Unreleased
-----------
+Release 1.24 (2019-06-20)
+-------------------------
 
-General changes:
+- Bumped required meson version to 0.47. (Arkadiusz Hiler)
 
- - Bumped required meson version to 0.47. (Arkadiusz Hiler)
- - All the meson build options that used auto, true and false are now first
-   class 'feature' options taking auto, enabled and disabled  (Arkadiusz Hiler)
+- All the meson build options that used auto, true and false are now first
+  class 'feature' options taking auto, enabled and disabled. (Arkadiusz Hiler)
+
+- Piglit as the primary test executor replaced by mostly drop-in
+  compatible igt_runner. (Petri Latvala)
+
+- Stack traces now contain source file names and line numbers, using
+  libdw. (Maarten Lankhorst)
+
+- Pixman dependency is now mandatory. (Maxime Ripard)
+
+- The project has moved to gitlab, and uses gitlab's CI to build test
+  and sanity test each commit on various distributions and
+  architectures. (Arkadiusz Hiler et al)
+
+- Shader debugger removed due to lack of use and accumulation of
+  bitrot. (Arkadiusz Hiler)
+
+- Added support for testing DP/HDMI audio with the Chamelium device,
+  dropping the audio tests that required exotic custom hardware to
+  execute. (Simon Ser)
+
+- Autotools support dropped for various parts of IGT (assembler,
+  documentation, etc). (Daniel Vetter)
+
+- intel-gpu-top can now output data to stdout or a log file for
+  noninteractive use. (Tvrtko Ursulin)
+
+
+And many other bug fixes, improvements, cleanups and new tests.
+
 
 Release 1.23 (2018-07-18)
 -------------------------
