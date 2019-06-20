@@ -507,7 +507,6 @@ static int monitor_output(pid_t child,
 			if (wd_timeout - wd_extra < 0)
 				wd_extra = wd_timeout / 2;
 			timeout_intervals = timeout / (wd_timeout - wd_extra);
-			intervals_left = timeout_intervals;
 			timeout /= timeout_intervals;
 
 			if (settings->log_level >= LOG_LEVEL_VERBOSE) {
@@ -517,6 +516,8 @@ static int monitor_output(pid_t child,
 			}
 		}
 	}
+
+	intervals_left = timeout_intervals;
 
 	while (outfd >= 0 || errfd >= 0 || sigfd >= 0) {
 		struct timeval tv = { .tv_sec = timeout };
