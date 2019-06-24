@@ -1,7 +1,7 @@
 FROM fedora:30
 
 RUN dnf install -y \
-	gcc flex bison meson ninja-build xdotool \
+	gcc flex bison libatomic meson ninja-build xdotool \
 	'pkgconfig(libdrm)' \
 	'pkgconfig(pciaccess)' \
 	'pkgconfig(libkmod)' \

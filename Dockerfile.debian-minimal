@@ -6,6 +6,7 @@ RUN apt-get install -y \
 			flex \
 			bison \
 			pkg-config \
+			libatomic1 \
 			libpciaccess-dev \
 			libkmod-dev \
 			libprocps-dev \

@@ -14,6 +14,7 @@ RUN dpkg --add-architecture armhf
 RUN apt-get update
 RUN apt-get install -y \
 			gcc-arm-linux-gnueabihf \
+			libatomic1:armhf \
 			libpciaccess-dev:armhf \
 			libkmod-dev:armhf \
 			libprocps-dev:armhf \
