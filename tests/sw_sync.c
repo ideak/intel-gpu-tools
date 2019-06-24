@@ -26,6 +26,7 @@
 
 #include <pthread.h>
 #include <semaphore.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -43,7 +44,7 @@ IGT_TEST_DESCRIPTION("Test SW Sync Framework");
 typedef struct {
 	int timeline;
 	uint32_t thread_id;
-	uint32_t *counter;
+	_Atomic(uint32_t) *counter;
 	sem_t *sem;
 } data_t;
 
@@ -489,7 +490,7 @@ static void test_sync_multi_consumer(void)
 	pthread_t thread_arr[MULTI_CONSUMER_THREADS];
 	sem_t sem;
 	int timeline;
-	uint32_t counter = 0;
+	_Atomic(uint32_t) counter = 0;
 	uintptr_t thread_ret = 0;
 	data_t data;
 	int i, ret;
@@ -517,7 +518,7 @@ static void test_sync_multi_consumer(void)
 	{
 		sem_wait(&sem);
 
-		__sync_fetch_and_add(&counter, 1);
+		atomic_fetch_add(&counter, 1);
 		sw_sync_timeline_inc(timeline, 1);
 	}
 
@@ -554,7 +555,7 @@ static void * test_sync_multi_consumer_producer_thread(void *arg)
 		if (sync_fence_wait(fence, 1000) < 0)
 			return (void *) 1;
 
-		if (__sync_fetch_and_add(data->counter, 1) != next_point)
+		if (atomic_fetch_add(data->counter, 1) != next_point)
 			return (void *) 1;
 
 		/* Kick off the next thread. */
@@ -570,7 +571,7 @@ static void test_sync_multi_consumer_producer(void)
 	data_t data_arr[MULTI_CONSUMER_PRODUCER_THREADS];
 	pthread_t thread_arr[MULTI_CONSUMER_PRODUCER_THREADS];
 	int timeline;
-	uint32_t counter = 0;
+	_Atomic(uint32_t) counter = 0;
 	uintptr_t thread_ret = 0;
 	data_t data;
 	int i, ret;
@@ -900,4 +901,3 @@ igt_main
 	igt_subtest("sync_random_merge")
 		test_sync_random_merge();
 }
-

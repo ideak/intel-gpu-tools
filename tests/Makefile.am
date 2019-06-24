@@ -122,6 +122,7 @@ prime_self_import_LDADD = $(LDADD) -lpthread
 gem_userptr_blits_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_userptr_blits_LDADD = $(LDADD) -lpthread
 perf_pmu_LDADD = $(LDADD) $(top_builddir)/lib/libigt_perf.la
+sw_sync_LDADD = $(LDADD) -latomic
 
 kms_flip_LDADD = $(LDADD) -lpthread
 

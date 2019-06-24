@@ -76,7 +76,6 @@ test_progs = [
 	'prime_self_import',
 	'prime_udl',
 	'prime_vgem',
-	'sw_sync',
 	'syncobj_basic',
 	'syncobj_wait',
 	'template',
@@ -328,6 +327,13 @@ executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_list += 'testdisplay'
+
+test_executables += executable('sw_sync', 'sw_sync.c',
+	   dependencies : test_deps + [ libatomic ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'sw_sync'
 
 subdir('amdgpu')
 
