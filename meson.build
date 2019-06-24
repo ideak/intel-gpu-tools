@@ -180,6 +180,20 @@ realtime = cc.find_library('rt')
 dlsym = cc.find_library('dl')
 zlib = cc.find_library('z')
 
+if cc.links('''
+#include <stdint.h>
+int main(void) {
+  uint32_t x32 = 0;
+  uint64_t x64 = 0;
+  __atomic_load_n(&x32, __ATOMIC_SEQ_CST);
+  __atomic_load_n(&x64, __ATOMIC_SEQ_CST);
+  return 0;
+}''', name : 'built-in atomics')
+	libatomic = null_dep
+else
+	libatomic = cc.find_library('atomic')
+endif
+
 if cc.has_header('linux/kd.h')
 	config.set('HAVE_LINUX_KD_H', 1)
 endif
