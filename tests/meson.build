@@ -110,7 +110,6 @@ i915_progs = [
 	'gem_close_race',
 	'gem_concurrent_blit',
 	'gem_cpu_reloc',
-	'gem_create',
 	'gem_cs_prefetch',
 	'gem_cs_tlb',
 	'gem_ctx_bad_destroy',
@@ -276,6 +275,14 @@ foreach prog : i915_progs
 		   install : true)
 	test_list += prog
 endforeach
+
+test_executables += executable('gem_create',
+	   join_paths('i915', 'gem_create.c'),
+	   dependencies : test_deps + [ libatomic ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'gem_create'
 
 test_executables += executable('gem_ctx_sseu',
 	   join_paths('i915', 'gem_ctx_sseu.c'),

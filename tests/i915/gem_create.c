@@ -45,6 +45,7 @@
 #include <sys/time.h>
 #include <getopt.h>
 #include <pthread.h>
+#include <stdatomic.h>
 
 #include <drm.h>
 
@@ -156,7 +157,14 @@ static void invalid_nonaligned_size(int fd)
 	gem_close(fd, create.handle);
 }
 
-static uint64_t get_npages(uint64_t *global, uint64_t npages)
+static uint64_t atomic_compare_swap_u64(_Atomic(uint64_t) *ptr,
+					uint64_t oldval, uint64_t newval)
+{
+	atomic_compare_exchange_strong(ptr, &oldval, newval);
+	return oldval;
+}
+
+static uint64_t get_npages(_Atomic(uint64_t) *global, uint64_t npages)
 {
 	uint64_t try, old, max;
 
@@ -165,13 +173,13 @@ static uint64_t get_npages(uint64_t *global, uint64_t npages)
 		old = max;
 		try = 1 + npages % (max / 2);
 		max -= try;
-	} while ((max = __sync_val_compare_and_swap(global, old, max)) != old);
+	} while ((max = atomic_compare_swap_u64(global, old, max)) != old);
 
 	return try;
 }
 
 struct thread_clear {
-	uint64_t max;
+	_Atomic(uint64_t) max;
 	int timeout;
 	int i915;
 };
@@ -202,7 +210,7 @@ static void *thread_clear(void *data)
 		}
 		gem_close(i915, create.handle);
 
-		__sync_add_and_fetch(&arg->max, npages);
+		atomic_fetch_add(&arg->max, npages);
 	}
 
 	return NULL;
