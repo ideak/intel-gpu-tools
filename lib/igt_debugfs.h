@@ -83,6 +83,7 @@ typedef struct {
 } igt_crc_t;
 
 #define INTEL_PIPE_CRC_SOURCE_AUTO "auto"
+#define AMDGPU_PIPE_CRC_SOURCE_DPRX "dprx"
 
 void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
 bool igt_check_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
