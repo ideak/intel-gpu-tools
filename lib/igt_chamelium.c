@@ -1825,6 +1825,50 @@ static unsigned int chamelium_get_port_type(struct chamelium *chamelium,
 	return port_type;
 }
 
+static bool chamelium_has_video_support(struct chamelium *chamelium,
+					int port_id)
+{
+	xmlrpc_value *res;
+	int has_video_support;
+
+	res = chamelium_rpc(chamelium, NULL, "HasVideoSupport", "(i)", port_id);
+	xmlrpc_read_bool(&chamelium->env, res, &has_video_support);
+	xmlrpc_DECREF(res);
+
+	return has_video_support;
+}
+
+/**
+ * chamelium_get_video_ports: retrieve a list of video port IDs
+ *
+ * Returns: the number of video port IDs
+ */
+static size_t chamelium_get_video_ports(struct chamelium *chamelium,
+					int port_ids[static CHAMELIUM_MAX_PORTS])
+{
+	xmlrpc_value *res, *res_port;
+	int res_len, i, port_id;
+	size_t port_ids_len = 0;
+
+	res = chamelium_rpc(chamelium, NULL, "GetSupportedInputs", "()");
+	res_len = xmlrpc_array_size(&chamelium->env, res);
+	for (i = 0; i < res_len; i++) {
+		xmlrpc_array_read_item(&chamelium->env, res, i, &res_port);
+		xmlrpc_read_int(&chamelium->env, res_port, &port_id);
+		xmlrpc_DECREF(res_port);
+
+		if (!chamelium_has_video_support(chamelium, port_id))
+			continue;
+
+		igt_assert(port_ids_len < CHAMELIUM_MAX_PORTS);
+		port_ids[port_ids_len] = port_id;
+		port_ids_len++;
+	}
+	xmlrpc_DECREF(res);
+
+	return port_ids_len;
+}
+
 static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 					 int drm_fd)
 {
