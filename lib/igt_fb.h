@@ -37,6 +37,7 @@
 #include <i915_drm.h>
 
 #include "igt_color_encoding.h"
+#include "igt_debugfs.h"
 
 /*
  * Internal format to denote a buffer compatible with pixman's
@@ -158,6 +159,7 @@ int igt_create_bo_with_dimensions(int fd, int width, int height, uint32_t format
 				  uint64_t modifier, unsigned stride,
 				  uint64_t *size_ret, unsigned *stride_ret,
 				  bool *is_dumb);
+void igt_fb_calc_crc(struct igt_fb *fb, igt_crc_t *crc);
 
 uint64_t igt_fb_mod_to_tiling(uint64_t modifier);
 uint64_t igt_fb_tiling_to_mod(uint64_t tiling);

@@ -903,6 +903,200 @@ int igt_create_bo_with_dimensions(int fd, int width, int height,
 	return fb.gem_handle;
 }
 
+#define get_u16_bit(x, n) 	((x & (1 << n)) >> n )
+#define set_u16_bit(x, n, val)	((x & ~(1 << n)) | (val << n))
+/*
+ * update_crc16_dp:
+ * @crc_old: old 16-bit CRC value to be updated
+ * @d: input 16-bit data on which to calculate 16-bit CRC
+ *
+ * CRC algorithm implementation described in DP 1.4 spec Appendix J
+ * the 16-bit CRC IBM is applied, with the following polynomial:
+ *
+ *       f(x) = x ^ 16 + x ^ 15 + x ^ 2 + 1
+ *
+ * the MSB is shifted in first, for any color format that is less than 16 bits
+ * per component, the LSB is zero-padded.
+ *
+ * The following implementation is based on the hardware parallel 16-bit CRC
+ * generation and ported to C code.
+ *
+ * Reference: VESA DisplayPort Standard v1.4, appendix J
+ *
+ * Returns:
+ * updated 16-bit CRC value.
+ */
+static uint16_t update_crc16_dp(uint16_t crc_old, uint16_t d)
+{
+	uint16_t crc_new = 0;	/* 16-bit CRC output */
+
+	/* internal use */
+	uint16_t b = crc_old;
+	uint8_t val;
+
+	/* b[15] */
+	val = get_u16_bit(b, 0) ^ get_u16_bit(b, 1) ^ get_u16_bit(b, 2) ^
+	      get_u16_bit(b, 3) ^ get_u16_bit(b, 4) ^ get_u16_bit(b, 5) ^
+	      get_u16_bit(b, 6) ^ get_u16_bit(b, 7) ^ get_u16_bit(b, 8) ^
+	      get_u16_bit(b, 9) ^ get_u16_bit(b, 10) ^ get_u16_bit(b, 11) ^
+	      get_u16_bit(b, 12) ^ get_u16_bit(b, 14) ^ get_u16_bit(b, 15) ^
+	      get_u16_bit(d, 0) ^ get_u16_bit(d, 1) ^ get_u16_bit(d, 2) ^
+	      get_u16_bit(d, 3) ^ get_u16_bit(d, 4) ^ get_u16_bit(d, 5) ^
+	      get_u16_bit(d, 6) ^ get_u16_bit(d, 7) ^ get_u16_bit(d, 8) ^
+	      get_u16_bit(d, 9) ^ get_u16_bit(d, 10) ^ get_u16_bit(d, 11) ^
+	      get_u16_bit(d, 12) ^ get_u16_bit(d, 14) ^ get_u16_bit(d, 15);
+	crc_new = set_u16_bit(crc_new, 15, val);
+
+	/* b[14] */
+	val = get_u16_bit(b, 12) ^ get_u16_bit(b, 13) ^
+	      get_u16_bit(d, 12) ^ get_u16_bit(d, 13);
+	crc_new = set_u16_bit(crc_new, 14, val);
+
+	/* b[13] */
+	val = get_u16_bit(b, 11) ^ get_u16_bit(b, 12) ^
+	      get_u16_bit(d, 11) ^ get_u16_bit(d, 12);
+	crc_new = set_u16_bit(crc_new, 13, val);
+
+	/* b[12] */
+	val = get_u16_bit(b, 10) ^ get_u16_bit(b, 11) ^
+	      get_u16_bit(d, 10) ^ get_u16_bit(d, 11);
+	crc_new = set_u16_bit(crc_new, 12, val);
+
+	/* b[11] */
+	val = get_u16_bit(b, 9) ^ get_u16_bit(b, 10) ^
+	      get_u16_bit(d, 9) ^ get_u16_bit(d, 10);
+	crc_new = set_u16_bit(crc_new, 11, val);
+
+	/* b[10] */
+	val = get_u16_bit(b, 8) ^ get_u16_bit(b, 9) ^
+	      get_u16_bit(d, 8) ^ get_u16_bit(d, 9);
+	crc_new = set_u16_bit(crc_new, 10, val);
+
+	/* b[9] */
+	val = get_u16_bit(b, 7) ^ get_u16_bit(b, 8) ^
+	      get_u16_bit(d, 7) ^ get_u16_bit(d, 8);
+	crc_new = set_u16_bit(crc_new, 9, val);
+
+	/* b[8] */
+	val = get_u16_bit(b, 6) ^ get_u16_bit(b, 7) ^
+	      get_u16_bit(d, 6) ^ get_u16_bit(d, 7);
+	crc_new = set_u16_bit(crc_new, 8, val);
+
+	/* b[7] */
+	val = get_u16_bit(b, 5) ^ get_u16_bit(b, 6) ^
+	      get_u16_bit(d, 5) ^ get_u16_bit(d, 6);
+	crc_new = set_u16_bit(crc_new, 7, val);
+
+	/* b[6] */
+	val = get_u16_bit(b, 4) ^ get_u16_bit(b, 5) ^
+	      get_u16_bit(d, 4) ^ get_u16_bit(d, 5);
+	crc_new = set_u16_bit(crc_new, 6, val);
+
+	/* b[5] */
+	val = get_u16_bit(b, 3) ^ get_u16_bit(b, 4) ^
+	      get_u16_bit(d, 3) ^ get_u16_bit(d, 4);
+	crc_new = set_u16_bit(crc_new, 5, val);
+
+	/* b[4] */
+	val = get_u16_bit(b, 2) ^ get_u16_bit(b, 3) ^
+	      get_u16_bit(d, 2) ^ get_u16_bit(d, 3);
+	crc_new = set_u16_bit(crc_new, 4, val);
+
+	/* b[3] */
+	val = get_u16_bit(b, 1) ^ get_u16_bit(b, 2) ^ get_u16_bit(b, 15) ^
+	      get_u16_bit(d, 1) ^ get_u16_bit(d, 2) ^ get_u16_bit(d, 15);
+	crc_new = set_u16_bit(crc_new, 3, val);
+
+	/* b[2] */
+	val = get_u16_bit(b, 0) ^ get_u16_bit(b, 1) ^ get_u16_bit(b, 14) ^
+	      get_u16_bit(d, 0) ^ get_u16_bit(d, 1) ^ get_u16_bit(d, 14);
+	crc_new = set_u16_bit(crc_new, 2, val);
+
+	/* b[1] */
+	val = get_u16_bit(b, 1) ^ get_u16_bit(b, 2) ^ get_u16_bit(b, 3) ^
+	      get_u16_bit(b, 4) ^ get_u16_bit(b, 5) ^ get_u16_bit(b, 6) ^
+	      get_u16_bit(b, 7) ^ get_u16_bit(b, 8) ^ get_u16_bit(b, 9) ^
+	      get_u16_bit(b, 10) ^ get_u16_bit(b, 11) ^ get_u16_bit(b, 12) ^
+	      get_u16_bit(b, 13) ^ get_u16_bit(b, 14) ^
+	      get_u16_bit(d, 1) ^ get_u16_bit(d, 2) ^ get_u16_bit(d, 3) ^
+	      get_u16_bit(d, 4) ^ get_u16_bit(d, 5) ^ get_u16_bit(d, 6) ^
+	      get_u16_bit(d, 7) ^ get_u16_bit(d, 8) ^ get_u16_bit(d, 9) ^
+	      get_u16_bit(d, 10) ^ get_u16_bit(d, 11) ^ get_u16_bit(d, 12) ^
+	      get_u16_bit(d, 13) ^ get_u16_bit(d, 14);
+	crc_new = set_u16_bit(crc_new, 1, val);
+
+	/* b[0] */
+	val = get_u16_bit(b, 0) ^ get_u16_bit(b, 1) ^ get_u16_bit(b, 2) ^
+	      get_u16_bit(b, 3) ^ get_u16_bit(b, 4) ^ get_u16_bit(b, 5) ^
+	      get_u16_bit(b, 6) ^ get_u16_bit(b, 7) ^ get_u16_bit(b, 8) ^
+	      get_u16_bit(b, 9) ^ get_u16_bit(b, 10) ^ get_u16_bit(b, 11) ^
+	      get_u16_bit(b, 12) ^ get_u16_bit(b, 13) ^ get_u16_bit(b, 15) ^
+	      get_u16_bit(d, 0) ^ get_u16_bit(d, 1) ^ get_u16_bit(d, 2) ^
+	      get_u16_bit(d, 3) ^ get_u16_bit(d, 4) ^ get_u16_bit(d, 5) ^
+	      get_u16_bit(d, 6) ^ get_u16_bit(d, 7) ^ get_u16_bit(d, 8) ^
+	      get_u16_bit(d, 9) ^ get_u16_bit(d, 10) ^ get_u16_bit(d, 11) ^
+	      get_u16_bit(d, 12) ^ get_u16_bit(d, 13) ^ get_u16_bit(d, 15);
+	crc_new = set_u16_bit(crc_new, 0, val);
+
+	return crc_new;
+}
+
+/**
+ * igt_fb_calc_crc:
+ * @fb: pointer to an #igt_fb structure
+ * @crc: pointer to an #igt_crc_t structure
+ *
+ * This function calculate the 16-bit frame CRC of RGB components over all
+ * the active pixels.
+ */
+void igt_fb_calc_crc(struct igt_fb *fb, igt_crc_t *crc)
+{
+	int x, y, i;
+	void *ptr;
+	uint8_t *data;
+	uint16_t din;
+
+	igt_assert(fb && crc);
+
+	ptr = igt_fb_map_buffer(fb->fd, fb);
+	igt_assert(ptr);
+
+	/* set for later CRC comparison */
+	crc->has_valid_frame = true;
+	crc->frame = 0;
+	crc->n_words = 3;
+	crc->crc[0] = 0;	/* R */
+	crc->crc[1] = 0;	/* G */
+	crc->crc[2] = 0;	/* B */
+
+	data = ptr + fb->offsets[0];
+	for (y = 0; y < fb->height; ++y) {
+		for (x = 0; x < fb->width; ++x) {
+			switch (fb->drm_format) {
+			case DRM_FORMAT_XRGB8888:
+				i = x * 4 + y * fb->strides[0];
+
+				din = data[i + 2] << 8; /* padding-zeros */
+				crc->crc[0] = update_crc16_dp(crc->crc[0], din);
+
+				/* Green-component */
+				din = data[i + 1] << 8;
+				crc->crc[1] = update_crc16_dp(crc->crc[1], din);
+
+				/* Blue-component */
+				din = data[i] << 8;
+				crc->crc[2] = update_crc16_dp(crc->crc[2], din);
+				break;
+			default:
+				igt_assert_f(0, "DRM Format Invalid");
+				break;
+			}
+		}
+	}
+
+	igt_fb_unmap_buffer(fb, ptr);
+}
+
 /**
  * igt_paint_color:
  * @cr: cairo drawing context
