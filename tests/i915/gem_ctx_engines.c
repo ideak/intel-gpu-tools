@@ -405,6 +405,14 @@ static void execute_allforone(int i915)
 	gem_context_destroy(i915, param.ctx_id);
 }
 
+static uint32_t read_result(int timeline, uint32_t *map, int idx)
+{
+	sw_sync_timeline_inc(timeline, 1);
+	while (!READ_ONCE(map[idx]))
+		;
+	return map[idx];
+}
+
 static void independent(int i915)
 {
 #define RCS_TIMESTAMP (0x2000 + 0x358)
@@ -437,6 +445,12 @@ static void independent(int i915)
 
 	memset(&engines, 0, sizeof(engines)); /* All rcs0 */
 	gem_context_set_param(i915, &param);
+
+	gem_set_caching(i915, results.handle, I915_CACHING_CACHED);
+	map = gem_mmap__cpu(i915, results.handle, 0, 4096, PROT_READ);
+	gem_set_domain(i915, results.handle,
+		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	memset(map, 0, 4096);
 
 	for (int i = 0; i < I915_EXEC_RING_MASK + 1; i++) {
 		struct drm_i915_gem_exec_object2 obj[2] = {
@@ -472,20 +486,20 @@ static void independent(int i915)
 		gem_close(i915, obj[1].handle);
 		close(execbuf.rsvd2);
 	}
-	close(timeline);
-	gem_sync(i915, results.handle);
 
-	map = gem_mmap__cpu(i915, results.handle, 0, 4096, PROT_READ);
-	gem_set_domain(i915, results.handle, I915_GEM_DOMAIN_CPU, 0);
-	gem_close(i915, results.handle);
-
-	last = map[0];
+	last = read_result(timeline, map, 0);
 	for (int i = 1; i < I915_EXEC_RING_MASK + 1; i++) {
-		igt_assert_f((map[i] - last) > 0,
-			     "Engine instance [%d] executed too late\n", i);
-		last = map[i];
+		uint32_t t = read_result(timeline, map, i);
+		igt_assert_f(t - last > 0,
+			     "Engine instance [%d] executed too late, previous timestamp %08x, now %08x\n",
+			     i, last, t);
+		last = t;
 	}
 	munmap(map, 4096);
+
+	close(timeline);
+	gem_sync(i915, results.handle);
+	gem_close(i915, results.handle);
 
 	gem_context_destroy(i915, param.ctx_id);
 }
@@ -500,6 +514,8 @@ igt_main
 
 		gem_require_contexts(i915);
 		igt_require(has_context_engines(i915));
+
+		igt_fork_hang_detector(i915);
 	}
 
 	igt_subtest("invalid-engines")
@@ -519,4 +535,7 @@ igt_main
 
 	igt_subtest("independent")
 		independent(i915);
+
+	igt_fixture
+		igt_stop_hang_detector();
 }
