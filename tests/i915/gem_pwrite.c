@@ -286,7 +286,7 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 		src_user = malloc(object_size);
 	}
 
-	igt_subtest("basic") {
+	igt_subtest("bench") {
 		for (count = 1; count <= 1<<17; count <<= 1) {
 			struct timeval start, end;
 
