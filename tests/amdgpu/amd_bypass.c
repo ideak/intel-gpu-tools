@@ -20,12 +20,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-#include "drm.h"
-#include "drmtest.h"
 #include "igt.h"
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include "signal.h"
 
 /*
  * internal use
