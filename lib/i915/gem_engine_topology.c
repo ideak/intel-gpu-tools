@@ -289,3 +289,30 @@ bool gem_has_engine_topology(int fd)
 
 	return !__gem_context_get_param(fd, &param);
 }
+
+const struct intel_execution_engine2 *
+gem_eb_flags_to_engine(unsigned int flags)
+{
+	const struct intel_execution_engine2 *e2;
+
+	__for_each_static_engine(e2) {
+		if (e2->flags == flags)
+			return e2;
+	}
+
+	return NULL;
+}
+
+bool gem_context_has_engine_map(int fd, uint32_t ctx)
+{
+	struct drm_i915_gem_context_param param = {
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.ctx_id = ctx
+	};
+	int ret;
+
+	ret = __gem_context_get_param(fd, &param);
+	igt_assert_eq(ret, 0);
+
+	return param.size;
+}

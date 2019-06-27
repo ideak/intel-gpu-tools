@@ -53,6 +53,11 @@ int gem_context_lookup_engine(int fd, uint64_t engine, uint32_t ctx_id,
 
 void gem_context_set_all_engines(int fd, uint32_t ctx);
 
+bool gem_context_has_engine_map(int fd, uint32_t ctx);
+
+const struct intel_execution_engine2 *
+gem_eb_flags_to_engine(unsigned int flags);
+
 #define __for_each_static_engine(e__) \
 	for ((e__) = intel_execution_engines2; (e__)->name; (e__)++)
 
