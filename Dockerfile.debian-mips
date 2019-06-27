@@ -5,7 +5,6 @@ RUN apt-get install -y \
 			flex \
 			bison \
 			pkg-config \
-			libatomic1 \
 			x11proto-dri2-dev \
 			python-docutils \
 			valgrind \
@@ -15,6 +14,7 @@ RUN dpkg --add-architecture mips
 RUN apt-get update
 RUN apt-get install -y \
 			gcc-mips-linux-gnu \
+			libatomic1:mips \
 			libpciaccess-dev:mips \
 			libkmod-dev:mips \
 			libprocps-dev:mips \

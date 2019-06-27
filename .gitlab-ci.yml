@@ -173,6 +173,20 @@ test:ninja-test-armhf:
       - build
     when: on_failure
 
+test:ninja-test-mips:
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-mips:latest
+  dependencies:
+    - build:tests-debian-meson-mips
+  stage: test
+  script:
+    - export PKG_CONFIG_PATH=/usr/lib/mips-linux-gnu/pkgconfig/
+    - env > build/envdump.txt
+    - ninja -C build test
+  artifacts:
+    paths:
+      - build
+    when: on_failure
+
 test:test-list-diff:
   dependencies:
     - build:tests-debian-autotools
