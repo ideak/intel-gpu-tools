@@ -28,6 +28,8 @@
 
 #include <i915_drm.h>
 
+#include "i915/gem_engine_topology.h"
+
 #include "igt_core.h"
 #include "igt_gt.h"
 #include "igt_sysfs.h"
@@ -215,8 +217,10 @@ void gem_test_engine(int i915, unsigned int engine)
 	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
 
 	if (engine == ALL_ENGINES) {
-		for_each_physical_engine(i915, engine) {
-			execbuf.flags = engine;
+		const struct intel_execution_engine2 *e2;
+
+		__for_each_physical_engine(i915, e2) {
+			execbuf.flags = e2->flags;
 			gem_execbuf(i915, &execbuf);
 		}
 	} else {
