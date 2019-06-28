@@ -491,8 +491,10 @@ static void create_fb(enum pixel_format pformat, int width, int height,
 	igt_calc_fb_size(drm.fd, width, height, format, tiling_for_size, &size,
 			 &stride);
 
-	igt_create_fb_with_bo_size(drm.fd, width, height, format, tiling, fb,
-				   size, stride);
+	igt_create_fb_with_bo_size(drm.fd, width, height, format, tiling,
+				   IGT_COLOR_YCBCR_BT709,
+				   IGT_COLOR_YCBCR_LIMITED_RANGE,
+				   fb, size, stride);
 }
 
 static uint32_t pick_color(struct igt_fb *fb, enum color ecolor)

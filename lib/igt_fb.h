@@ -120,6 +120,8 @@ void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t m
 unsigned int
 igt_create_fb_with_bo_size(int fd, int width, int height,
 			   uint32_t format, uint64_t modifier,
+			   enum igt_color_encoding color_encoding,
+			   enum igt_color_range color_range,
 			   struct igt_fb *fb, uint64_t bo_size,
 			   unsigned bo_stride);
 unsigned int igt_create_fb(int fd, int width, int height, uint32_t format,

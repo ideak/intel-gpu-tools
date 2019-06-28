@@ -1415,6 +1415,8 @@ void igt_paint_image(cairo_t *cr, const char *filename,
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
  * @modifier: tiling layout of the framebuffer (as framebuffer modifier)
+ * @color_encoding: color encoding for YCbCr formats (ignored otherwise)
+ * @color_range: color range for YCbCr formats (ignored otherwise)
  * @fb: pointer to an #igt_fb structure
  * @bo_size: size of the backing bo (0 for automatic size)
  * @bo_stride: stride of the backing bo (0 for automatic stride)
@@ -1432,12 +1434,11 @@ void igt_paint_image(cairo_t *cr, const char *filename,
 unsigned int
 igt_create_fb_with_bo_size(int fd, int width, int height,
 			   uint32_t format, uint64_t modifier,
+			   enum igt_color_encoding color_encoding,
+			   enum igt_color_range color_range,
 			   struct igt_fb *fb, uint64_t bo_size,
 			   unsigned bo_stride)
 {
-	/* FIXME allow the caller to pass these in */
-	enum igt_color_encoding color_encoding = IGT_COLOR_YCBCR_BT709;
-	enum igt_color_range color_range = IGT_COLOR_YCBCR_LIMITED_RANGE;
 	uint32_t flags = 0;
 
 	fb_init(fb, fd, width, height, format, modifier,
@@ -1493,8 +1494,10 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 unsigned int igt_create_fb(int fd, int width, int height, uint32_t format,
 			   uint64_t modifier, struct igt_fb *fb)
 {
-	return igt_create_fb_with_bo_size(fd, width, height, format, modifier, fb,
-					  0, 0);
+	return igt_create_fb_with_bo_size(fd, width, height, format, modifier,
+					  IGT_COLOR_YCBCR_BT709,
+					  IGT_COLOR_YCBCR_LIMITED_RANGE,
+					  fb, 0, 0);
 }
 
 /**
@@ -3329,7 +3332,10 @@ unsigned int igt_fb_convert_with_stride(struct igt_fb *dst, struct igt_fb *src,
 
 	fb_id = igt_create_fb_with_bo_size(src->fd, src->width,
 					   src->height, dst_fourcc,
-					   dst_modifier, dst, 0,
+					   dst_modifier,
+					   IGT_COLOR_YCBCR_BT709,
+					   IGT_COLOR_YCBCR_LIMITED_RANGE,
+					   dst, 0,
 					   dst_stride);
 	igt_assert(fb_id > 0);
 
