@@ -417,7 +417,6 @@ static double mode_frame_time(const struct test_output *o)
 
 static double actual_frame_time(const struct test_output *o)
 {
-	igt_assert(o->flags & TEST_CHECK_TS);
 	return o->vblank_interval;
 }
 
@@ -742,8 +741,8 @@ static unsigned int run_test_step(struct test_output *o)
 		 * we waited for two vblanks, so verify that
 		 * we were blocked for ~1-2 frames.
 		 */
-		igt_assert_f(end - start > 0.9 * mode_frame_time(o) &&
-			     end - start < 2.1 * mode_frame_time(o),
+		igt_assert_f(end - start > 0.9 * actual_frame_time(o) &&
+			     end - start < 2.1 * actual_frame_time(o),
 			     "wait for two vblanks took %lu usec (frame time %f usec)\n",
 			     end - start, mode_frame_time(o));
 		join_vblank_wait_thread();
@@ -1549,8 +1548,8 @@ igt_main
 					"single-buffer-flip-vs-dpms-off-vs-modeset" },
 		{ 30, TEST_FLIP | TEST_NO_2X_OUTPUT | TEST_DPMS_OFF_OTHERS , "dpms-off-confusion" },
 		{ 0, TEST_ENOENT | TEST_NOEVENT, "nonexisting-fb" },
-		{ 10, TEST_DPMS_OFF | TEST_DPMS | TEST_VBLANK_RACE, "dpms-vs-vblank-race" },
-		{ 10, TEST_MODESET | TEST_VBLANK_RACE, "modeset-vs-vblank-race" },
+		{ 10, TEST_DPMS_OFF | TEST_DPMS | TEST_VBLANK_RACE | TEST_CHECK_TS, "dpms-vs-vblank-race" },
+		{ 10, TEST_MODESET | TEST_VBLANK_RACE | TEST_CHECK_TS, "modeset-vs-vblank-race" },
 		{ 0, TEST_BO_TOOBIG | TEST_NO_2X_OUTPUT, "bo-too-big" },
 		{ 10, TEST_FLIP | TEST_SUSPEND, "flip-vs-suspend" },
 	};
