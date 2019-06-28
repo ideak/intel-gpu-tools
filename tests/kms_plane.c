@@ -30,6 +30,13 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * Throw away enough lsbs in pixel formats tests
+ * to get a match despite some differences between
+ * the software and hardware YCbCr<->RGB conversion
+ * routines.
+ */
+#define LUT_MASK 0xf800
 
 typedef struct {
 	float red;
@@ -697,7 +704,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 			continue;
 
 		if (format == DRM_FORMAT_C8) {
-			if (!set_c8_legacy_lut(data, pipe, 0xfc00))
+			if (!set_c8_legacy_lut(data, pipe, LUT_MASK))
 				continue;
 		} else {
 			if (!igt_fb_supported_format(format))
@@ -716,7 +723,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 							ref_crc, &fb);
 
 		if (format == DRM_FORMAT_C8)
-			set_legacy_lut(data, pipe, 0xfc00);
+			set_legacy_lut(data, pipe, LUT_MASK);
 	}
 
 	igt_pipe_crc_stop(data->pipe_crc);
@@ -751,7 +758,7 @@ test_pixel_formats(data_t *data, enum pipe pipe)
 
 	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	set_legacy_lut(data, pipe, 0xfc00);
+	set_legacy_lut(data, pipe, LUT_MASK);
 
 	test_init(data, pipe);
 
