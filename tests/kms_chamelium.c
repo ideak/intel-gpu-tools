@@ -2160,8 +2160,6 @@ igt_main
 		connector_subtest("dp-frame-dump", DisplayPort)
 			test_display_frame_dump(&data, port);
 
-		/* The EDID we generate advertises HDMI audio, not DP audio.
-		 * Use the Chamelium's default EDID for DP audio. */
 		connector_subtest("dp-audio", DisplayPort)
 			test_display_audio(&data, port, "HDMI",
 					   TEST_EDID_DP_AUDIO);
