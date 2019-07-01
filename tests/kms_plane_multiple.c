@@ -30,7 +30,7 @@
 #include <string.h>
 #include <time.h>
 
-IGT_TEST_DESCRIPTION("Test atomic mode setting with multiple planes ");
+IGT_TEST_DESCRIPTION("Test atomic mode setting with multiple planes.");
 
 #define SIZE_PLANE      256
 #define SIZE_CURSOR     128
@@ -96,7 +96,7 @@ static void test_fini(data_t *data, igt_output_t *output, int n_planes)
 }
 
 static void
-test_grab_crc(data_t *data, igt_output_t *output, enum pipe pipe,
+get_reference_crc(data_t *data, igt_output_t *output, enum pipe pipe,
 	      color_t *color, uint64_t tiling)
 {
 	drmModeModeInfo *mode;
@@ -124,17 +124,6 @@ test_grab_crc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_pipe_crc_start(data->pipe_crc);
 	igt_pipe_crc_get_single(data->pipe_crc, &data->ref_crc);
 }
-
-/*
- * Multiple plane position test.
- *   - We start by grabbing a reference CRC of a full blue fb being scanned
- *     out on the primary plane
- *   - Then we scannout number of planes:
- *      * the primary plane uses a blue fb with a black rectangle hole
- *      * planes, on top of the primary plane, with a blue fb that is set-up
- *        to cover the black rectangles of the primary plane fb
- *     The resulting CRC should be identical to the reference CRC
- */
 
 static void
 create_fb_for_mode_position(data_t *data, igt_output_t *output, drmModeModeInfo *mode,
@@ -281,6 +270,17 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 	free((void*)suffle);
 }
 
+/*
+ * Multiple plane position test.
+ *   - We start by grabbing a reference CRC of a full blue fb being scanned
+ *     out on the primary plane
+ *   - Then we scannout number of planes:
+ *      * the primary plane uses a blue fb with a black rectangle holes
+ *      * planes, on top of the primary plane, with a blue fb that is set-up
+ *        to cover the black rectangles of the primary plane
+ *     The resulting CRC should be identical to the reference CRC
+ */
+
 static void
 test_plane_position_with_output(data_t *data, enum pipe pipe,
 				igt_output_t *output, int n_planes,
@@ -306,11 +306,9 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	test_init(data, pipe, n_planes);
 
-	test_grab_crc(data, output, pipe, &blue, tiling);
+	get_reference_crc(data, output, pipe, &blue, tiling);
 
-	/*
-	 * Find out how many planes are allowed simultaneously
-	 */
+	/* Find out how many planes are allowed simultaneously */
 	do {
 		c++;
 		prepare_planes(data, pipe, &blue, tiling, c, output);
@@ -323,7 +321,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 			igt_remove_fb(data->drm_fd, &data->fb[x]);
 	} while (!err && c < n_planes);
 
-	if(err)
+	if (err)
 		c--;
 
 	igt_info("Testing connector %s using pipe %s with %d planes %s with seed %d\n",
@@ -332,6 +330,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	i = 0;
 	while (i < iterations || loop_forever) {
+		/* randomize planes and set up the holes */
 		prepare_planes(data, pipe, &blue, tiling, c, output);
 
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
@@ -441,6 +440,10 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 	}
 
 	for_each_pipe_static(pipe) {
+		igt_describe("Check that the kernel handles atomic updates of "
+			     "multiple planes correctly by changing their "
+			     "geometry and making sure the changes are "
+			     "reflected immediately after each commit.");
 		igt_subtest_group
 			run_tests_for_pipe(&data, pipe);
 	}
