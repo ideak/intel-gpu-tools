@@ -45,7 +45,7 @@ test_groups = [
 	'vgem',
 ]
 
-gen_description = find_program('generate_description_xml.sh')
+gen_description = find_program('generate_description_xml.py')
 gen_programs = find_program('generate_programs_xml.sh')
 
 generated_docs = []
