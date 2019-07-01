@@ -1,9 +1,43 @@
+CONTRIBUTING
+============
+
 Patches to igt-gpu-tools are very much welcome, we really want this to be the
 universal set of low-level tools and testcases for kernel graphics drivers
 on Linux and similar platforms. So please bring on porting patches, bugfixes,
 improvements for documentation and new tools and testcases.
 
-A short list of contribution guidelines:
+
+The Code
+--------
+
+- The code should follow kernel coding style:
+  https://www.kernel.org/doc/html/latest/process/coding-style.html
+
+- Testcases (subtests) have to use minus signs (-) as a word separator.
+  The generated documentation contains glossary of commonly used terms.
+
+- All new test have to be described using `igt_describe()` family of
+  functions. The description should contain the spirit of the test (what is
+  the general idea behind the test) and *not* the letter (C to English
+  translation of the test). Refer to [`igt_describe()`
+  documentation][igt-describe] for more details.
+
+- The generated documentation contains explanation of magic control blocks like
+  `igt_subtest` and `igt_fixture`. Please make sure that you understand their
+  roles and limitation before using/altering them.
+
+- Also please make full use of all the helpers and convenience macros
+  provided by the igt library. The semantic patch lib/igt.cocci can help with
+  more automatic conversions.
+
+[igt-describe]: https://drm.pages.freedesktop.org/igt-gpu-tools/igt-gpu-tools-Core.html#igt-describe
+
+
+Sending Patches
+---------------
+
+- igt-gpu-tools is MIT licensed and we require contributions to follow the
+  developer's certificate of origin: http://developercertificate.org/
 
 - Please submit patches formatted with git send-email/git format-patch or
   equivalent to:
@@ -23,14 +57,6 @@ A short list of contribution guidelines:
 
   on its first invocation.
 
-- igt-gpu-tools is MIT licensed and we require contributions to follow the
-  developer's certificate of origin: http://developercertificate.org/
-
-- When submitting new testcases please follow the naming conventions documented
-  in the generated documentation. Also please make full use of all the helpers
-  and convenience macros provided by the igt library. The semantic patch
-  lib/igt.cocci can help with the more automatic conversions.
-
 - Patches need to be reviewed on the mailing list. Exceptions only apply for
   testcases and tooling for drivers with just a single contributor (e.g. vc4).
   In this case patches must still be submitted to the mailing list first.
@@ -46,7 +72,8 @@ A short list of contribution guidelines:
 - Changes to the testcases are automatically tested. Take the results into
   account before merging.
 
-Commit rights
+
+Commit Rights
 -------------
 
 Commit rights will be granted to anyone who requests them and fulfills the
@@ -79,6 +106,7 @@ come back to the project.
 
 Maintainers and committers should encourage contributors to request commit
 rights, especially junior contributors tend to underestimate their skills.
+
 
 Code of Conduct
 ---------------
