@@ -55,6 +55,9 @@ void gem_context_set_all_engines(int fd, uint32_t ctx);
 
 bool gem_context_has_engine_map(int fd, uint32_t ctx);
 
+bool gem_engine_is_equal(const struct intel_execution_engine2 *e1,
+			 const struct intel_execution_engine2 *e2);
+
 struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
 
 #define __for_each_static_engine(e__) \

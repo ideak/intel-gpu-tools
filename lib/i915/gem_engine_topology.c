@@ -331,3 +331,9 @@ bool gem_context_has_engine_map(int fd, uint32_t ctx)
 
 	return param.size;
 }
+
+bool gem_engine_is_equal(const struct intel_execution_engine2 *e1,
+			 const struct intel_execution_engine2 *e2)
+{
+	return e1->class == e2->class && e1->instance == e2->instance;
+}

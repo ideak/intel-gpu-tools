@@ -32,7 +32,8 @@
 		     "'%s' != '%s' (%lld not within %d%% tolerance of %lld)\n",\
 		     #x, #ref, (long long)x, tolerance, (long long)ref)
 
-static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
+static void spin(int fd, const struct intel_execution_engine2 *e2,
+		 unsigned int timeout_sec)
 {
 	const uint64_t timeout_100ms = 100000000LL;
 	unsigned long loops = 0;
@@ -41,9 +42,9 @@ static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 	struct timespec itv = { };
 	uint64_t elapsed;
 
-	spin = __igt_spin_new(fd, .engine = engine);
+	spin = __igt_spin_new(fd, .engine = e2->flags);
 	while ((elapsed = igt_nsec_elapsed(&tv)) >> 30 < timeout_sec) {
-		igt_spin_t *next = __igt_spin_new(fd, .engine = engine);
+		igt_spin_t *next = __igt_spin_new(fd, .engine = e2->flags);
 
 		igt_spin_set_timeout(spin,
 				     timeout_100ms - igt_nsec_elapsed(&itv));
@@ -69,13 +70,14 @@ static void spin(int fd, unsigned int engine, unsigned int timeout_sec)
 #define RESUBMIT_NEW_CTX     (1 << 0)
 #define RESUBMIT_ALL_ENGINES (1 << 1)
 
-static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
+static void spin_resubmit(int fd, const struct intel_execution_engine2 *e2,
+			  unsigned int flags)
 {
 	const uint32_t ctx0 = gem_context_create(fd);
 	const uint32_t ctx1 = (flags & RESUBMIT_NEW_CTX) ?
 		gem_context_create(fd) : ctx0;
-	igt_spin_t *spin = __igt_spin_new(fd, .ctx = ctx0, .engine = engine);
-	unsigned int other;
+	igt_spin_t *spin = __igt_spin_new(fd, .ctx = ctx0, .engine = e2->flags);
+	const struct intel_execution_engine2 *other;
 
 	struct drm_i915_gem_execbuffer2 eb = {
 		.buffer_count = 1,
@@ -83,16 +85,23 @@ static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
 		.rsvd1 = ctx1,
 	};
 
+	igt_assert(gem_context_has_engine_map(fd, 0) ||
+		   !(flags & RESUBMIT_ALL_ENGINES));
+
 	if (flags & RESUBMIT_ALL_ENGINES) {
-		for_each_physical_engine(fd, other) {
-			if  (other == engine)
+		gem_context_set_all_engines(fd, ctx0);
+		if (ctx0 != ctx1)
+			gem_context_set_all_engines(fd, ctx1);
+
+		for_each_context_engine(fd, ctx1, other) {
+			if (gem_engine_is_equal(other, e2))
 				continue;
 
-			eb.flags = other;
+			eb.flags = other->flags;
 			gem_execbuf(fd, &eb);
 		}
 	} else {
-		eb.flags = engine;
+		eb.flags = e2->flags;
 		gem_execbuf(fd, &eb);
 	}
 
@@ -115,12 +124,12 @@ static void spin_exit_handler(int sig)
 
 static void spin_on_all_engines(int fd, unsigned int timeout_sec)
 {
-	unsigned engine;
+	const struct intel_execution_engine2 *e2;
 
-	for_each_physical_engine(fd, engine) {
+	__for_each_physical_engine(fd, e2) {
 		igt_fork(child, 1) {
 			igt_install_exit_handler(spin_exit_handler);
-			spin(fd, engine, timeout_sec);
+			spin(fd, e2, timeout_sec);
 		}
 	}
 
@@ -129,7 +138,9 @@ static void spin_on_all_engines(int fd, unsigned int timeout_sec)
 
 igt_main
 {
+	const struct intel_execution_engine2 *e2;
 	const struct intel_execution_engine *e;
+	struct intel_execution_engine2 e2__;
 	int fd = -1;
 
 	igt_skip_on_simulation();
@@ -141,20 +152,36 @@ igt_main
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("basic-%s", e->name)
-			spin(fd, e->exec_id, 3);
+		e2__ = gem_eb_flags_to_engine(e->exec_id | e->flags);
+		if (e2__.flags == -1)
+			continue;
+		e2 = &e2__;
 
-		igt_subtest_f("resubmit-%s", e->name)
-			spin_resubmit(fd, e->exec_id, 0);
+		igt_subtest_f("legacy-%s", e->name)
+			spin(fd, e2, 3);
 
-		igt_subtest_f("resubmit-new-%s", e->name)
-			spin_resubmit(fd, e->exec_id, RESUBMIT_NEW_CTX);
+		igt_subtest_f("legacy-resubmit-%s", e->name)
+			spin_resubmit(fd, e2, 0);
 
-		igt_subtest_f("resubmit-all-%s", e->name)
-			spin_resubmit(fd, e->exec_id, RESUBMIT_ALL_ENGINES);
+		igt_subtest_f("legacy-resubmit-new-%s", e->name)
+			spin_resubmit(fd, e2, RESUBMIT_NEW_CTX);
+	}
 
-		igt_subtest_f("resubmit-new-all-%s", e->name)
-			spin_resubmit(fd, e->exec_id,
+	__for_each_physical_engine(fd, e2) {
+		igt_subtest_f("%s", e2->name)
+			spin(fd, e2, 3);
+
+		igt_subtest_f("resubmit-%s", e2->name)
+			spin_resubmit(fd, e2, 0);
+
+		igt_subtest_f("resubmit-new-%s", e2->name)
+			spin_resubmit(fd, e2, RESUBMIT_NEW_CTX);
+
+		igt_subtest_f("resubmit-all-%s", e2->name)
+			spin_resubmit(fd, e2, RESUBMIT_ALL_ENGINES);
+
+		igt_subtest_f("resubmit-new-all-%s", e2->name)
+			spin_resubmit(fd, e2,
 				      RESUBMIT_NEW_CTX |
 				      RESUBMIT_ALL_ENGINES);
 	}
