@@ -33,7 +33,10 @@
 #define HDISPLAY_4K	3840
 #define VDISPLAY_4K	2160
 
-IGT_TEST_DESCRIPTION("Tests 4K and audio HDMI injection.");
+IGT_TEST_DESCRIPTION("Test that in-kernel EDID parsing is producing "
+		     "expected results by forcing a disconnected HDMI "
+		     "connector with a known EDID and checking that the "
+		     "metadata exposed to user space matches.");
 
 /**
  * This collection of tests performs EDID and status injection tests. Injection
@@ -202,9 +205,13 @@ igt_main
 		igt_require(connector);
 	}
 
+	igt_describe("Make sure that 4K modes exposed by DRM match the "
+                     "forced EDID and modesetting using it succeed.");
 	igt_subtest("inject-4k")
 		hdmi_inject_4k(drm_fd, connector);
 
+	igt_describe("Make sure that audio information exposed by ALSA "
+		     "match the forced EDID.");
 	igt_subtest("inject-audio")
 		hdmi_inject_audio(drm_fd, connector);
 
