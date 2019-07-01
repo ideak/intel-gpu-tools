@@ -290,17 +290,29 @@ bool gem_has_engine_topology(int fd)
 	return !__gem_context_get_param(fd, &param);
 }
 
-const struct intel_execution_engine2 *
-gem_eb_flags_to_engine(unsigned int flags)
+struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags)
 {
-	const struct intel_execution_engine2 *e2;
+	const unsigned int ring = flags & (I915_EXEC_RING_MASK | 3 << 13);
+	struct intel_execution_engine2 e2__ = {
+		.class = -1,
+		.instance = -1,
+		.flags = -1,
+		.name = "invalid"
+	};
 
-	__for_each_static_engine(e2) {
-		if (e2->flags == flags)
-			return e2;
+	if (ring == I915_EXEC_DEFAULT) {
+		e2__.flags = I915_EXEC_DEFAULT;
+		e2__.name = "default";
+	} else {
+		const struct intel_execution_engine2 *e2;
+
+		__for_each_static_engine(e2) {
+			if (e2->flags == ring)
+				return *e2;
+		}
 	}
 
-	return NULL;
+	return e2__;
 }
 
 bool gem_context_has_engine_map(int fd, uint32_t ctx)

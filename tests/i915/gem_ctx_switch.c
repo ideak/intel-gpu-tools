@@ -347,9 +347,13 @@ igt_main
 
 	/* Legacy testing must be first. */
 	for (e = intel_execution_engines; e->name; e++) {
-		e2 = gem_eb_flags_to_engine(e->exec_id | e->flags);
-		if (!e2)
+		struct intel_execution_engine2 e2__;
+
+		e2__ = gem_eb_flags_to_engine(e->exec_id | e->flags);
+		if (e2__.flags == -1)
 			continue; /* I915_EXEC_BSD with no ring selectors */
+
+		e2 = &e2__;
 
 		for (typeof(*phases) *p = phases; p->name; p++) {
 			igt_subtest_group {
