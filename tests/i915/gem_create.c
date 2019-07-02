@@ -187,6 +187,7 @@ struct thread_clear {
 static void *thread_clear(void *data)
 {
 	struct thread_clear *arg = data;
+	unsigned long checked = 0;
 	int i915 = arg->i915;
 
 	igt_until_timeout(arg->timeout) {
@@ -209,11 +210,12 @@ static void *thread_clear(void *data)
 			igt_assert_eq_u64(x, 0);
 		}
 		gem_close(i915, create.handle);
+		checked += npages;
 
 		atomic_fetch_add(&arg->max, npages);
 	}
 
-	return NULL;
+	return (void *)(uintptr_t)checked;
 }
 
 static void always_clear(int i915, int timeout)
@@ -224,12 +226,19 @@ static void always_clear(int i915, int timeout)
 		.max = intel_get_avail_ram_mb() << (20 - 12), /* in pages */
 	};
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	unsigned long checked;
 	pthread_t thread[ncpus];
+	void *result;
 
 	for (int i = 0; i < ncpus; i++)
 		pthread_create(&thread[i], NULL, thread_clear, &arg);
-	for (int i = 0; i < ncpus; i++)
-		pthread_join(thread[i], NULL);
+
+	checked = 0;
+	for (int i = 0; i < ncpus; i++) {
+		pthread_join(thread[i], &result);
+		checked += (uintptr_t)result;
+	}
+	igt_info("Checked %'lu page allocations\n", checked);
 }
 
 static void size_update(int fd)
