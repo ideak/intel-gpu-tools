@@ -48,7 +48,7 @@ static void reset_connectors(void)
 		kmstest_force_connector(drm_fd, connector,
 					FORCE_CONNECTOR_UNSPECIFIED);
 
-		kmstest_force_edid(drm_fd, connector, NULL, 0);
+		kmstest_force_edid(drm_fd, connector, NULL);
 
 		drmModeFreeConnector(connector);
 	}
@@ -247,7 +247,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 
 		/* test edid forcing */
 		kmstest_force_edid(drm_fd, vga_connector,
-				   igt_kms_get_base_edid(), EDID_LENGTH);
+				   igt_kms_get_base_edid());
 		temp = drmModeGetConnectorCurrent(drm_fd,
 						  vga_connector->connector_id);
 
@@ -260,7 +260,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		drmModeFreeConnector(temp);
 
 		/* remove edid */
-		kmstest_force_edid(drm_fd, vga_connector, NULL, 0);
+		kmstest_force_edid(drm_fd, vga_connector, NULL);
 		kmstest_force_connector(drm_fd, vga_connector,
 					FORCE_CONNECTOR_UNSPECIFIED);
 		temp = drmModeGetConnectorCurrent(drm_fd,
@@ -280,7 +280,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 
 		/* test pruning of stale modes */
 		kmstest_force_edid(drm_fd, vga_connector,
-				   igt_kms_get_alt_edid(), EDID_LENGTH);
+				   igt_kms_get_alt_edid());
 		temp = drmModeGetConnectorCurrent(drm_fd,
 						  vga_connector->connector_id);
 
@@ -294,7 +294,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		drmModeFreeConnector(temp);
 
 		kmstest_force_edid(drm_fd, vga_connector,
-				   igt_kms_get_base_edid(), EDID_LENGTH);
+				   igt_kms_get_base_edid());
 		temp = drmModeGetConnectorCurrent(drm_fd,
 						  vga_connector->connector_id);
 
@@ -307,7 +307,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 
 		drmModeFreeConnector(temp);
 
-		kmstest_force_edid(drm_fd, vga_connector, NULL, 0);
+		kmstest_force_edid(drm_fd, vga_connector, NULL);
 		kmstest_force_connector(drm_fd, vga_connector,
 					FORCE_CONNECTOR_UNSPECIFIED);
 	}

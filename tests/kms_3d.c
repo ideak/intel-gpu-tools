@@ -60,7 +60,7 @@ igt_simple_main
 	kmstest_edid_add_3d(igt_kms_get_base_edid(), EDID_LENGTH, &edid,
 			    &length);
 
-	kmstest_force_edid(drm_fd, connector, edid, length);
+	kmstest_force_edid(drm_fd, connector, edid);
 	if (!kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_ON))
 		igt_skip("Could not force connector on\n");
 
@@ -113,7 +113,7 @@ igt_simple_main
 	}
 
 	kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_UNSPECIFIED);
-	kmstest_force_edid(drm_fd, connector, NULL, 0);
+	kmstest_force_edid(drm_fd, connector, NULL);
 
 	drmModeFreeConnector(connector);
 	free(edid);

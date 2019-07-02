@@ -93,7 +93,7 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 	kmstest_edid_add_4k(igt_kms_get_base_edid(), EDID_LENGTH, &edid,
 			    &length);
 
-	kmstest_force_edid(drm_fd, connector, edid, length);
+	kmstest_force_edid(drm_fd, connector, edid);
 
 	if (!kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_ON))
 		igt_skip("Could not force connector on\n");
@@ -134,7 +134,7 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 	igt_remove_fb(drm_fd, &fb);
 
 	kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_UNSPECIFIED);
-	kmstest_force_edid(drm_fd, connector, NULL, 0);
+	kmstest_force_edid(drm_fd, connector, NULL);
 
 	free(edid);
 }
@@ -143,15 +143,12 @@ static void
 hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 {
 	const unsigned char *edid;
-	size_t length;
 	int fb_id, cid, ret, crtc_mask = -1;
 	struct igt_fb fb;
 	struct kmstest_connector_config config;
 
 	edid = igt_kms_get_hdmi_audio_edid();
-	length = AUDIO_EDID_LENGTH;
-
-	kmstest_force_edid(drm_fd, connector, edid, length);
+	kmstest_force_edid(drm_fd, connector, edid);
 
 	if (!kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_ON))
 		igt_skip("Could not force connector on\n");
@@ -191,7 +188,7 @@ hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 	kmstest_dump_mode(&connector->modes[0]);
 
 	kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_UNSPECIFIED);
-	kmstest_force_edid(drm_fd, connector, NULL, 0);
+	kmstest_force_edid(drm_fd, connector, NULL);
 }
 
 igt_main

@@ -197,7 +197,7 @@ bool kmstest_force_connector(int fd, drmModeConnector *connector,
 void kmstest_edid_add_3d(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
 void kmstest_edid_add_4k(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
 void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
-			const unsigned char *edid, size_t length);
+			const unsigned char *edid);
 
 bool kmstest_get_connector_default_mode(int drm_fd, drmModeConnector *connector,
 					drmModeModeInfo *mode);
@@ -759,7 +759,6 @@ struct cea_sad;
 struct cea_speaker_alloc;
 
 #define EDID_LENGTH 128
-#define AUDIO_EDID_LENGTH (2 * EDID_LENGTH)
 const unsigned char *igt_kms_get_base_edid(void);
 const unsigned char *igt_kms_get_alt_edid(void);
 const unsigned char *igt_kms_get_hdmi_audio_edid(void);

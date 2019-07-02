@@ -182,6 +182,8 @@ const unsigned char *igt_kms_get_alt_edid(void)
 	return (unsigned char *) &edid;
 }
 
+#define AUDIO_EDID_LENGTH (2 * EDID_LENGTH)
+
 static void
 generate_audio_edid(unsigned char raw_edid[static AUDIO_EDID_LENGTH],
 		    bool with_vsd, struct cea_sad *sad,
@@ -990,15 +992,13 @@ bool kmstest_force_connector(int drm_fd, drmModeConnector *connector,
  * @drm_fd: drm file descriptor
  * @connector: connector to set @edid on
  * @edid: An EDID data block
- * @length: length of the EDID data. #EDID_LENGTH defines the standard EDID
- * length
  *
  * Set the EDID data on @connector to @edid. See also #igt_kms_get_base_edid.
  *
- * If @length is zero, the forced EDID will be removed.
+ * If @edid is NULL, the forced EDID will be removed.
  */
 void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
-			const unsigned char *edid, size_t length)
+			const unsigned char *edid)
 {
 	char *path;
 	int debugfs_fd, ret;
@@ -1011,10 +1011,11 @@ void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
 
 	igt_require(debugfs_fd != -1);
 
-	if (length == 0)
+	if (edid == NULL)
 		ret = write(debugfs_fd, "reset", 5);
 	else
-		ret = write(debugfs_fd, edid, length);
+		ret = write(debugfs_fd, edid,
+			    edid_get_size((struct edid *) edid));
 	close(debugfs_fd);
 
 	/* To allow callers to always use GetConnectorCurrent we need to force a
