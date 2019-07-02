@@ -207,10 +207,11 @@ bool eld_get_igt(struct eld_entry *eld)
 {
 	DIR *dir;
 	struct dirent *dirent;
-	int i;
+	int i, n_elds;
 	char card[64];
 	char path[PATH_MAX];
 
+	n_elds = 0;
 	for (i = 0; i < 8; i++) {
 		snprintf(card, sizeof(card), "/proc/asound/card%d", i);
 		dir = opendir(card);
@@ -221,6 +222,8 @@ bool eld_get_igt(struct eld_entry *eld)
 			if (strncmp(dirent->d_name, ELD_PREFIX,
 				    strlen(ELD_PREFIX)) != 0)
 				continue;
+
+			n_elds++;
 
 			snprintf(path, sizeof(path), "%s/%s", card,
 				 dirent->d_name);
@@ -245,6 +248,9 @@ bool eld_get_igt(struct eld_entry *eld)
 		}
 		closedir(dir);
 	}
+
+	if (n_elds == 0)
+		igt_debug("Found zero ELDs\n");
 
 	return false;
 }
