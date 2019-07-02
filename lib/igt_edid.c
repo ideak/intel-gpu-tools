@@ -364,6 +364,14 @@ size_t edid_cea_data_block_set_sad(struct edid_cea_data_block *block,
 	return sizeof(struct edid_cea_data_block) + sads_size;
 }
 
+size_t edid_cea_data_block_set_svd(struct edid_cea_data_block *block,
+				   const uint8_t *svds, size_t svds_len)
+{
+	edid_cea_data_block_init(block, EDID_CEA_DATA_VIDEO, svds_len);
+	memcpy(block->data.svds, svds, svds_len);
+	return sizeof(struct edid_cea_data_block) + svds_len;
+}
+
 size_t edid_cea_data_block_set_vsdb(struct edid_cea_data_block *block,
 				    const struct cea_vsdb *vsdb, size_t vsdb_size)
 {

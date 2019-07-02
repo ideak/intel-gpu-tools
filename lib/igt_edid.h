@@ -191,6 +191,9 @@ struct cea_sad {
 	uint8_t bitrate;
 } __attribute__((packed));
 
+/* Indicates that a Short Video Descriptor is native */
+#define CEA_SVD_NATIVE (1 << 7)
+
 enum hdmi_vsdb_flags1 {
 	HDMI_VSDB_DVI_DUAL = 1 << 0,
 	HDMI_VSDB_DC_Y444 = 1 << 3, /* supports YCbCr 4:4:4 */
@@ -264,6 +267,7 @@ struct edid_cea_data_block {
 	uint8_t type_len; /* type is from enum edid_cea_data_type */
 	union {
 		struct cea_sad sads[0];
+		uint8_t svds[0]; /* Short Video Descriptors */
 		struct cea_vsdb vsdbs[0];
 		struct cea_speaker_alloc speakers[0];
 	} data;
@@ -354,6 +358,8 @@ void edid_ext_update_cea_checksum(struct edid_ext *ext);
 const struct cea_vsdb *cea_vsdb_get_hdmi_default(size_t *size);
 size_t edid_cea_data_block_set_sad(struct edid_cea_data_block *block,
 				   const struct cea_sad *sads, size_t sads_len);
+size_t edid_cea_data_block_set_svd(struct edid_cea_data_block *block,
+				   const uint8_t *svds, size_t svds_len);
 size_t edid_cea_data_block_set_vsdb(struct edid_cea_data_block *block,
 				   const struct cea_vsdb *vsdb, size_t vsdb_size);
 size_t edid_cea_data_block_set_hdmi_vsdb(struct edid_cea_data_block *block,
