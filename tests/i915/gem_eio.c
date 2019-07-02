@@ -175,7 +175,7 @@ static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 	struct igt_spin_factory opts = {
 		.ctx = ctx,
 		.engine = flags,
-		.flags = IGT_SPIN_FAST,
+		.flags = IGT_SPIN_FAST | IGT_SPIN_FENCE_OUT,
 	};
 
 	if (gem_can_store_dword(fd, opts.engine))
@@ -270,12 +270,12 @@ static void check_wait(int fd, uint32_t bo, unsigned int wait, igt_stats_t *st)
 		igt_stats_push(st, igt_nsec_elapsed(&ts));
 }
 
-static void check_wait_elapsed(int fd, igt_stats_t *st)
+static void check_wait_elapsed(const char *prefix, int fd, igt_stats_t *st)
 {
 	double med, max, limit;
 
-	igt_info("Completed %d resets, wakeups took %.3f+-%.3fms (min:%.3fms, median:%.3fms, max:%.3fms)\n",
-		 st->n_values,
+	igt_info("%s: completed %d resets, wakeups took %.3f+-%.3fms (min:%.3fms, median:%.3fms, max:%.3fms)\n",
+		 prefix, st->n_values,
 		 igt_stats_get_mean(st)*1e-6,
 		 igt_stats_get_std_deviation(st)*1e-6,
 		 igt_stats_get_min(st)*1e-6,
@@ -715,8 +715,8 @@ static void test_inflight_internal(int fd, unsigned int wait)
 	close(fd);
 }
 
-static void reset_stress(int fd,
-			 uint32_t ctx0, unsigned int engine,
+static void reset_stress(int fd, uint32_t ctx0,
+			 const char *name, unsigned int engine,
 			 unsigned int flags)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -759,6 +759,7 @@ static void reset_stress(int fd,
 
 		/* Wedge after a small delay. */
 		check_wait(fd, obj.handle, 100e3, &stats);
+		igt_assert_eq(sync_fence_status(hang->out_fence), -EIO);
 
 		/* Unwedge by forcing a reset. */
 		igt_assert(i915_reset_control(true));
@@ -782,7 +783,7 @@ static void reset_stress(int fd,
 		igt_spin_free(fd, hang);
 		gem_context_destroy(fd, ctx);
 	}
-	check_wait_elapsed(fd, &stats);
+	check_wait_elapsed(name, fd, &stats);
 	igt_stats_fini(&stats);
 
 	gem_close(fd, obj.handle);
@@ -797,7 +798,7 @@ static void test_reset_stress(int fd, unsigned int flags)
 	unsigned int engine;
 
 	for_each_engine(fd, engine)
-		reset_stress(fd, ctx0, engine, flags);
+		reset_stress(fd, ctx0, e__->name, engine, flags);
 
 	gem_context_destroy(fd, ctx0);
 }
