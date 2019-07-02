@@ -321,10 +321,13 @@ bool gem_context_has_engine_map(int fd, uint32_t ctx)
 		.param = I915_CONTEXT_PARAM_ENGINES,
 		.ctx_id = ctx
 	};
-	int ret;
 
-	ret = __gem_context_get_param(fd, &param);
-	igt_assert_eq(ret, 0);
+	/*
+	 * If the kernel is too old to support PARAM_ENGINES,
+	 * then naturally the context has no engine map.
+	 */
+	if (__gem_context_get_param(fd, &param))
+		return false;
 
 	return param.size;
 }
