@@ -42,6 +42,8 @@ static const char monitor_range_padding[] = {
 	0x0a, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
 };
 
+const uint8_t hdmi_ieee_oui[3] = {0x03, 0x0C, 0x00};
+
 /* vfreq is in Hz */
 static void std_timing_set(struct std_timing *st, int hsize, int vfreq,
 			   enum std_timing_aspect aspect)
@@ -321,21 +323,23 @@ void cea_sad_init_pcm(struct cea_sad *sad, int channels,
  */
 const struct cea_vsdb *cea_vsdb_get_hdmi_default(size_t *size)
 {
-	static char raw[sizeof(struct cea_vsdb) + 4] = {0};
+	/* We'll generate a VSDB with 2 extension fields. */
+	static char raw[CEA_VSDB_HDMI_MIN_SIZE + 2] = {0};
 	struct cea_vsdb *vsdb;
+	struct hdmi_vsdb *hdmi;
 
 	*size = sizeof(raw);
 
 	/* Magic incantation. Works better if you orient your screen in the
 	 * direction of the VESA headquarters. */
 	vsdb = (struct cea_vsdb *) raw;
-	vsdb->ieee_oui[0] = 0x03;
-	vsdb->ieee_oui[1] = 0x0C;
-	vsdb->ieee_oui[2] = 0x00;
-	vsdb->data[0] = 0x10;
-	vsdb->data[1] = 0x00;
-	vsdb->data[2] = 0x38;
-	vsdb->data[3] = 0x2D;
+	memcpy(vsdb->ieee_oui, hdmi_ieee_oui, sizeof(hdmi_ieee_oui));
+	hdmi = &vsdb->data.hdmi;
+	hdmi->src_phy_addr[0] = 0x10;
+	hdmi->src_phy_addr[1] = 0x00;
+	/* 2 VSDB extension fields */
+	hdmi->flags1 = 0x38;
+	hdmi->max_tdms_clock = 0x2D;
 
 	return vsdb;
 }
@@ -369,6 +373,22 @@ size_t edid_cea_data_block_set_vsdb(struct edid_cea_data_block *block,
 	memcpy(block->data.vsdbs, vsdb, vsdb_size);
 
 	return sizeof(struct edid_cea_data_block) + vsdb_size;
+}
+
+size_t edid_cea_data_block_set_hdmi_vsdb(struct edid_cea_data_block *block,
+					 const struct hdmi_vsdb *hdmi,
+					 size_t hdmi_size)
+{
+	char raw_vsdb[CEA_VSDB_HDMI_MAX_SIZE] = {0};
+	struct cea_vsdb *vsdb = (struct cea_vsdb *) raw_vsdb;
+
+	assert(hdmi_size >= HDMI_VSDB_MIN_SIZE &&
+	       hdmi_size <= HDMI_VSDB_MAX_SIZE);
+	memcpy(vsdb->ieee_oui, hdmi_ieee_oui, sizeof(hdmi_ieee_oui));
+	memcpy(&vsdb->data.hdmi, hdmi, hdmi_size);
+
+	return edid_cea_data_block_set_vsdb(block, vsdb,
+					    CEA_VSDB_HEADER_SIZE + hdmi_size);
 }
 
 size_t edid_cea_data_block_set_speaker_alloc(struct edid_cea_data_block *block,
