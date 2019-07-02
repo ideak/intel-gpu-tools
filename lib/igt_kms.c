@@ -284,6 +284,66 @@ const unsigned char *igt_kms_get_dp_audio_edid(void)
 	return raw_edid;
 }
 
+static const uint8_t edid_4k_svds[] = {
+	32 | CEA_SVD_NATIVE, /* 1080p @ 24Hz (native) */
+	5,                   /* 1080i @ 60Hz */
+	20,                  /* 1080i @ 50Hz */
+	4,                   /* 720p @ 60Hz */
+	19,                  /* 720p @ 50Hz */
+};
+
+const unsigned char *igt_kms_get_4k_edid(void)
+{
+	static unsigned char raw_edid[256] = {0};
+	struct edid *edid;
+	struct edid_ext *edid_ext;
+	struct edid_cea *edid_cea;
+	char *cea_data;
+	struct edid_cea_data_block *block;
+	/* We'll add 6 extension fields to the HDMI VSDB. */
+	char raw_hdmi[HDMI_VSDB_MIN_SIZE + 6] = {0};
+	struct hdmi_vsdb *hdmi;
+	size_t cea_data_size = 0;
+
+	/* Create a new EDID from the base IGT EDID, and add an
+	 * extension that advertises 4K support. */
+	edid = (struct edid *) raw_edid;
+	memcpy(edid, igt_kms_get_base_edid(), sizeof(struct edid));
+	edid->extensions_len = 1;
+	edid_ext = &edid->extensions[0];
+	edid_cea = &edid_ext->data.cea;
+	cea_data = edid_cea->data;
+
+	/* Short Video Descriptor */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	cea_data_size += edid_cea_data_block_set_svd(block, edid_4k_svds,
+						     sizeof(edid_4k_svds));
+
+	/* Vendor-Specific Data Block */
+	hdmi = (struct hdmi_vsdb *) raw_hdmi;
+	hdmi->src_phy_addr[0] = 0x10;
+	hdmi->src_phy_addr[1] = 0x00;
+	/* 6 extension fields */
+	hdmi->flags1 = 0;
+	hdmi->max_tdms_clock = 0;
+	hdmi->flags2 = HDMI_VSDB_VIDEO_PRESENT;
+	hdmi->data[0] = 0x00; /* HDMI video flags */
+	hdmi->data[1] = 1 << 5; /* 1 VIC entry, 0 3D entries */
+	hdmi->data[2] = 0x01; /* 2160p, specified as short descriptor */
+
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	cea_data_size += edid_cea_data_block_set_hdmi_vsdb(block, hdmi,
+							   sizeof(raw_hdmi));
+
+	assert(cea_data_size <= sizeof(edid_cea->data));
+
+	edid_ext_set_cea(edid_ext, cea_data_size, 0, 0);
+
+	edid_update_checksum(edid);
+	edid_ext_update_cea_checksum(edid_ext);
+	return raw_edid;
+}
+
 const char * const igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	[IGT_PLANE_SRC_X] = "SRC_X",
 	[IGT_PLANE_SRC_Y] = "SRC_Y",
@@ -1346,8 +1406,6 @@ struct edid_block {
     unsigned char *data;
 };
 
-#define DTD_SUPPORTS_AUDIO 1<<6
-
 static struct edid_block
 init_cea_block(const unsigned char *edid, size_t length,
 	       unsigned char *new_edid_ptr[], size_t *new_length,
@@ -1431,51 +1489,6 @@ void kmstest_edid_add_3d(const unsigned char *edid, size_t length,
 	/* HDMI Video */
 	new_edid.data[pos++] = 0x80;
 	new_edid.data[pos++] = 0x00;
-
-	update_edid_csum(new_edid.data, length);
-}
-
-/**
- * kmstest_edid_add_4k:
- * @edid: an existing valid edid block
- * @length: length of @edid
- * @new_edid_ptr: pointer to where the new edid will be placed
- * @new_length: pointer to the size of the new edid
- *
- * Makes a copy of an existing edid block and adds an extension indicating
- * a HDMI 4K mode in vsdb.
- */
-void kmstest_edid_add_4k(const unsigned char *edid, size_t length,
-			 unsigned char *new_edid_ptr[], size_t *new_length)
-{
-	char vsdb_block_len = 12;
-	struct edid_block new_edid = init_cea_block(edid, length, new_edid_ptr,
-						    new_length, vsdb_block_len,
-						    0);
-	int pos = new_edid.pos;
-
-	/* vsdb block ( id | length ) */
-	new_edid.data[pos++] = 3 << 5 | (vsdb_block_len - 1);
-	/* registration id */
-	new_edid.data[pos++] = 0x3;
-	new_edid.data[pos++] = 0xc;
-	new_edid.data[pos++] = 0x0;
-	/* source physical address */
-	new_edid.data[pos++] = 0x10;
-	new_edid.data[pos++] = 0x00;
-	/* Supports_AI ... etc */
-	new_edid.data[pos++] = 0x00;
-	/* Max TMDS Clock */
-	new_edid.data[pos++] = 0x00;
-	/* Latency present, HDMI Video Present */
-	new_edid.data[pos++] = 0x20;
-	/* HDMI Video */
-	new_edid.data[pos++] = 0x00; /* 3D present */
-
-	/* HDMI MODE LEN -- how many entries */
-	new_edid.data[pos++] = 0x20;
-	/* 2160p, specified as short descriptor */
-	new_edid.data[pos++] = 0x01;
 
 	update_edid_csum(new_edid.data, length);
 }

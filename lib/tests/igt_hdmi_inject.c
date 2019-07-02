@@ -72,7 +72,6 @@ igt_simple_main
 		hdmi_inject_func inject;
 	} funcs[] = {
 		{ "3D", kmstest_edid_add_3d },
-		{ "4k", kmstest_edid_add_4k },
 		{ NULL, NULL },
 	}, *f;
 

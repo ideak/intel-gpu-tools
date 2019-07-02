@@ -76,6 +76,7 @@ igt_simple_main
 		{ "base", igt_kms_get_base_edid, 0 },
 		{ "alt", igt_kms_get_alt_edid, 0 },
 		{ "hdmi_audio", igt_kms_get_hdmi_audio_edid, 1 },
+		{ "4k", igt_kms_get_4k_edid, 1 },
 		{0},
 	}, *f;
 	const unsigned char *edid;

@@ -76,8 +76,7 @@ get_connector(int drm_fd, drmModeRes *res)
 static void
 hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 {
-	unsigned char *edid;
-	size_t length;
+	const unsigned char *edid;
 	struct kmstest_connector_config config;
 	int ret, cid, i, crtc_mask = -1;
 	int fb_id;
@@ -90,9 +89,7 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 	/* 4K requires at least HSW */
 	igt_require(IS_HASWELL(devid) || intel_gen(devid) >= 8);
 
-	kmstest_edid_add_4k(igt_kms_get_base_edid(), EDID_LENGTH, &edid,
-			    &length);
-
+	edid = igt_kms_get_4k_edid();
 	kmstest_force_edid(drm_fd, connector, edid);
 
 	if (!kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_ON))
@@ -135,8 +132,6 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 
 	kmstest_force_connector(drm_fd, connector, FORCE_CONNECTOR_UNSPECIFIED);
 	kmstest_force_edid(drm_fd, connector, NULL);
-
-	free(edid);
 }
 
 static void
