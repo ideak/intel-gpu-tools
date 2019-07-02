@@ -362,6 +362,6 @@ size_t edid_cea_data_block_set_hdmi_vsdb(struct edid_cea_data_block *block,
 size_t edid_cea_data_block_set_speaker_alloc(struct edid_cea_data_block *block,
 					     const struct cea_speaker_alloc *speakers);
 void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
-		      uint8_t flags);
+		      uint8_t num_native_dtds, uint8_t flags);
 
 #endif

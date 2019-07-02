@@ -404,15 +404,17 @@ size_t edid_cea_data_block_set_speaker_alloc(struct edid_cea_data_block *block,
 }
 
 void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
-		      uint8_t flags)
+		      uint8_t num_native_dtds, uint8_t flags)
 {
 	struct edid_cea *cea = &ext->data.cea;
 
 	ext->tag = EDID_EXT_CEA;
 
+	assert(num_native_dtds <= 0x0F);
+	assert((flags & 0x0F) == 0);
 	cea->revision = 3;
 	cea->dtd_start = 4 + data_blocks_size;
-	cea->misc = flags; /* just flags, no DTD */
+	cea->misc = flags | num_native_dtds;
 }
 
 void edid_ext_update_cea_checksum(struct edid_ext *ext)

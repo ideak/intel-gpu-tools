@@ -226,8 +226,7 @@ generate_audio_edid(unsigned char raw_edid[static AUDIO_EDID_LENGTH],
 
 	assert(cea_data_size <= sizeof(edid_cea->data));
 
-	edid_ext_set_cea(edid_ext, cea_data_size,
-			 EDID_CEA_BASIC_AUDIO);
+	edid_ext_set_cea(edid_ext, cea_data_size, 0, EDID_CEA_BASIC_AUDIO);
 
 	edid_update_checksum(edid);
 	edid_ext_update_cea_checksum(edid_ext);
