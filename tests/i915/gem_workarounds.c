@@ -249,6 +249,7 @@ igt_main
 	igt_fixture {
 		FILE *file;
 		char *line = NULL;
+		char *str;
 		size_t line_size;
 		int i, fd;
 
@@ -261,9 +262,13 @@ igt_main
 
 		fd = igt_debugfs_open(device, "i915_wa_registers", O_RDONLY);
 		file = fdopen(fd, "r");
-		igt_assert(getline(&line, &line_size, file) > 0);
+		igt_require(getline(&line, &line_size, file) > 0);
 		igt_debug("i915_wa_registers: %s", line);
-		sscanf(line, "Workarounds applied: %d", &num_wa_regs);
+
+		/* We assume that the first batch is for rcs */
+		str = strstr(line, "Workarounds applied:");
+		igt_assert(str);
+		sscanf(str, "Workarounds applied: %d", &num_wa_regs);
 		igt_require(num_wa_regs > 0);
 
 		wa_regs = malloc(num_wa_regs * sizeof(*wa_regs));
@@ -271,6 +276,9 @@ igt_main
 
 		i = 0;
 		while (getline(&line, &line_size, file) > 0) {
+			if (strstr(line, "Workarounds applied:"))
+				break;
+
 			igt_debug("%s", line);
 			if (sscanf(line, "0x%X: 0x%08X, mask: 0x%08X",
 				   &wa_regs[i].addr,
