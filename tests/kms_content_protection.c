@@ -65,6 +65,12 @@ struct data {
 #define KERNEL_DISABLE_TIME_ALLOWED_MSEC	(1 * 1000)
 #define FLIP_EVENT_POLLING_TIMEOUT_MSEC		1000
 
+__u8 facsimile_srm[] = {
+	0x80, 0x0, 0x0, 0x05, 0x01, 0x0, 0x0, 0x36, 0x02, 0x51, 0x1E, 0xF2,
+	0x1A, 0xCD, 0xE7, 0x26, 0x97, 0xF4, 0x01, 0x97, 0x10, 0x19, 0x92, 0x53,
+	0xE9, 0xF0, 0x59, 0x95, 0xA3, 0x7A, 0x3B, 0xFE, 0xE0, 0x9C, 0x76, 0xDD,
+	0x83, 0xAA, 0xC2, 0x5B, 0x24, 0xB3, 0x36, 0x84, 0x94, 0x75, 0x34, 0xDB,
+	0x10, 0x9E, 0x3B, 0x23, 0x13, 0xD8, 0x7A, 0xC2, 0x30, 0x79, 0x84};
 
 static void flip_handler(int fd, unsigned int sequence, unsigned int tv_sec,
 			 unsigned int tv_usec, void *_data)
@@ -419,6 +425,27 @@ static void test_cp_lic(igt_output_t *output)
 	igt_assert_f(!ret, "Content Protection LIC Failed\n");
 }
 
+static bool write_srm_as_fw(const __u8 *srm, int len)
+{
+	int fd, ret, total = 0;
+
+	fd = open("/lib/firmware/display_hdcp_srm.bin",
+		  O_WRONLY | O_CREAT, S_IRWXU);
+	do {
+		ret = write(fd, srm + total, len - total);
+		if (ret < 0)
+			ret = -errno;
+		if (ret == -EINTR || ret == -EAGAIN)
+			continue;
+		if (ret <= 0)
+			break;
+		total += ret;
+	} while (total != len);
+	close(fd);
+
+	return total < len ? false : true;
+}
+
 static void test_content_protection_on_output(igt_output_t *output,
 					      enum igt_commit_style s,
 					      int content_type)
@@ -643,6 +670,25 @@ igt_main
 	igt_subtest("uevent") {
 		igt_require(data.display.is_atomic);
 		data.cp_tests = CP_UEVENT;
+		test_content_protection(COMMIT_ATOMIC, HDCP_CONTENT_TYPE_0);
+	}
+
+	/*
+	 *  Testing the revocation check through SRM needs a HDCP sink with
+	 *  programmable Ksvs or we need a uAPI from kernel to read the
+	 *  connected HDCP sink's Ksv. With that we would be able to add that
+	 *  Ksv into a SRM and send in for revocation check. Since we dont have
+	 *  either of these options, we test SRM writing from userspace and
+	 *  validation of the same at kernel. Something is better than nothing.
+	 */
+	igt_subtest("srm") {
+		bool ret;
+
+		igt_require(data.display.is_atomic);
+		data.cp_tests = 0;
+		ret = write_srm_as_fw((const __u8 *)facsimile_srm,
+				      sizeof(facsimile_srm));
+		igt_assert_f(ret, "SRM update failed");
 		test_content_protection(COMMIT_ATOMIC, HDCP_CONTENT_TYPE_0);
 	}
 
