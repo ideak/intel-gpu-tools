@@ -186,7 +186,7 @@ const unsigned char *igt_kms_get_alt_edid(void)
 
 static void
 generate_audio_edid(unsigned char raw_edid[static AUDIO_EDID_LENGTH],
-		    bool with_vsd, struct cea_sad *sad,
+		    bool with_vsdb, struct cea_sad *sad,
 		    struct cea_speaker_alloc *speaker_alloc)
 {
 	struct edid *edid;
@@ -194,8 +194,8 @@ generate_audio_edid(unsigned char raw_edid[static AUDIO_EDID_LENGTH],
 	struct edid_cea *edid_cea;
 	char *cea_data;
 	struct edid_cea_data_block *block;
-	const struct cea_vsd *vsd;
-	size_t cea_data_size, vsd_size;
+	const struct cea_vsdb *vsdb;
+	size_t cea_data_size, vsdb_size;
 
 	/* Create a new EDID from the base IGT EDID, and add an
 	 * extension that advertises audio support. */
@@ -212,11 +212,11 @@ generate_audio_edid(unsigned char raw_edid[static AUDIO_EDID_LENGTH],
 	cea_data_size += edid_cea_data_block_set_sad(block, sad, 1);
 
 	/* A Vendor Specific Data block is needed for HDMI audio */
-	if (with_vsd) {
+	if (with_vsdb) {
 		block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
-		vsd = cea_vsd_get_hdmi_default(&vsd_size);
-		cea_data_size += edid_cea_data_block_set_vsd(block, vsd,
-							     vsd_size);
+		vsdb = cea_vsdb_get_hdmi_default(&vsdb_size);
+		cea_data_size += edid_cea_data_block_set_vsdb(block, vsdb,
+							      vsdb_size);
 	}
 
 	/* Speaker Allocation Data block */

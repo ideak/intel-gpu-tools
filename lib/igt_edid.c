@@ -315,29 +315,29 @@ void cea_sad_init_pcm(struct cea_sad *sad, int channels,
 }
 
 /**
- * cea_vsd_get_hdmi_default:
+ * cea_vsdb_get_hdmi_default:
  *
  * Returns the default Vendor Specific Data block for HDMI.
  */
-const struct cea_vsd *cea_vsd_get_hdmi_default(size_t *size)
+const struct cea_vsdb *cea_vsdb_get_hdmi_default(size_t *size)
 {
-	static char raw[sizeof(struct cea_vsd) + 4] = {0};
-	struct cea_vsd *vsd;
+	static char raw[sizeof(struct cea_vsdb) + 4] = {0};
+	struct cea_vsdb *vsdb;
 
 	*size = sizeof(raw);
 
 	/* Magic incantation. Works better if you orient your screen in the
 	 * direction of the VESA headquarters. */
-	vsd = (struct cea_vsd *) raw;
-	vsd->ieee_oui[0] = 0x03;
-	vsd->ieee_oui[1] = 0x0C;
-	vsd->ieee_oui[2] = 0x00;
-	vsd->data[0] = 0x10;
-	vsd->data[1] = 0x00;
-	vsd->data[2] = 0x38;
-	vsd->data[3] = 0x2D;
+	vsdb = (struct cea_vsdb *) raw;
+	vsdb->ieee_oui[0] = 0x03;
+	vsdb->ieee_oui[1] = 0x0C;
+	vsdb->ieee_oui[2] = 0x00;
+	vsdb->data[0] = 0x10;
+	vsdb->data[1] = 0x00;
+	vsdb->data[2] = 0x38;
+	vsdb->data[3] = 0x2D;
 
-	return vsd;
+	return vsdb;
 }
 
 static void edid_cea_data_block_init(struct edid_cea_data_block *block,
@@ -360,15 +360,15 @@ size_t edid_cea_data_block_set_sad(struct edid_cea_data_block *block,
 	return sizeof(struct edid_cea_data_block) + sads_size;
 }
 
-size_t edid_cea_data_block_set_vsd(struct edid_cea_data_block *block,
-				   const struct cea_vsd *vsd, size_t vsd_size)
+size_t edid_cea_data_block_set_vsdb(struct edid_cea_data_block *block,
+				    const struct cea_vsdb *vsdb, size_t vsdb_size)
 {
 	edid_cea_data_block_init(block, EDID_CEA_DATA_VENDOR_SPECIFIC,
-				 vsd_size);
+				 vsdb_size);
 
-	memcpy(block->data.vsds, vsd, vsd_size);
+	memcpy(block->data.vsdbs, vsdb, vsdb_size);
 
-	return sizeof(struct edid_cea_data_block) + vsd_size;
+	return sizeof(struct edid_cea_data_block) + vsdb_size;
 }
 
 size_t edid_cea_data_block_set_speaker_alloc(struct edid_cea_data_block *block,
