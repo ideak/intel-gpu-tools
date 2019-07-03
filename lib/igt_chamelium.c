@@ -658,6 +658,33 @@ void chamelium_port_get_resolution(struct chamelium *chamelium,
 	xmlrpc_DECREF(res);
 }
 
+/** chamelium_supports_method: checks if the Chamelium board supports a method.
+ *
+ * Note: this actually tries to call the method.
+ *
+ * See https://crbug.com/977995 for a discussion about a better solution.
+ */
+static bool chamelium_supports_method(struct chamelium *chamelium,
+				      const char *name)
+{
+	xmlrpc_value *res;
+
+	res = __chamelium_rpc(chamelium, NULL, name, "()");
+	if (res)
+		xmlrpc_DECREF(res);
+
+	/* XML-RPC has a special code for unsupported methods
+	 * (XMLRPC_NO_SUCH_METHOD_ERROR) however the Chamelium implementation
+	 * doesn't return it. */
+	return (!chamelium->env.fault_occurred ||
+		strstr(chamelium->env.fault_string, "not supported") == NULL);
+}
+
+bool chamelium_supports_get_video_params(struct chamelium *chamelium)
+{
+	return chamelium_supports_method(chamelium, "GetVideoParams");
+}
+
 static void read_int_from_xml_struct(struct chamelium *chamelium,
 				     xmlrpc_value *struct_val, const char *key,
 				     int *dst)
@@ -1018,32 +1045,13 @@ int chamelium_get_captured_frame_count(struct chamelium *chamelium)
 	return ret;
 }
 
-/**
- * chamelium_supports_get_audio_format: check the Chamelium device supports
- * retrieving the capture audio format.
- */
-static bool chamelium_supports_get_audio_format(struct chamelium *chamelium)
-{
-	xmlrpc_value *res;
-
-	res = __chamelium_rpc(chamelium, NULL, "GetAudioFormat", "(i)", 3);
-	if (res)
-		xmlrpc_DECREF(res);
-
-	/* XML-RPC has a special code for unsupported methods
-	 * (XMLRPC_NO_SUCH_METHOD_ERROR) however the Chamelium implementation
-	 * doesn't return it. */
-	return (!chamelium->env.fault_occurred ||
-		strstr(chamelium->env.fault_string, "not supported") == NULL);
-}
-
 bool chamelium_has_audio_support(struct chamelium *chamelium,
 				 struct chamelium_port *port)
 {
 	xmlrpc_value *res;
 	xmlrpc_bool has_support;
 
-	if (!chamelium_supports_get_audio_format(chamelium)) {
+	if (!chamelium_supports_method(chamelium, "GetAudioFormat")) {
 		igt_debug("The Chamelium device doesn't support GetAudioFormat\n");
 		return false;
 	}

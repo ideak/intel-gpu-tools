@@ -119,6 +119,7 @@ void chamelium_port_set_ddc_state(struct chamelium *chamelium,
 void chamelium_port_get_resolution(struct chamelium *chamelium,
 				   struct chamelium_port *port,
 				   int *x, int *y);
+bool chamelium_supports_get_video_params(struct chamelium *chamelium);
 void chamelium_port_get_video_params(struct chamelium *chamelium,
 				     struct chamelium_port *port,
 				     struct chamelium_video_params *params);
