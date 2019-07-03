@@ -32,8 +32,6 @@
 
 IGT_TEST_DESCRIPTION("Basic test for context set/get param input validation.");
 
-#define BIT(x) (1ul << (x))
-
 #define NEW_CTX	BIT(0)
 #define USER BIT(1)
 

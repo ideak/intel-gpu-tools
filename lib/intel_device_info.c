@@ -3,8 +3,6 @@
 
 #include <strings.h> /* ffs() */
 
-#define BIT(x) (1<<(x))
-
 static const struct intel_device_info intel_generic_info = {
 	.gen = 0,
 };

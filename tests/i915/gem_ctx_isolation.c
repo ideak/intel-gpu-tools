@@ -33,7 +33,6 @@
 #define DIRTY2 0x2
 #define RESET 0x4
 
-#define BIT(x) (1ul << (x))
 #define ENGINE(x, y) BIT(4*(x) + (y))
 
 enum {
