@@ -38,6 +38,7 @@ struct data {
 } data;
 
 #define CP_DPMS					(1 << 0)
+#define CP_LIC					(1 << 1)
 
 #define CP_UNDESIRED				0
 #define CP_DESIRED				1
@@ -265,7 +266,9 @@ static void test_content_protection_on_output(igt_output_t *output,
 
 		modeset_with_fb(pipe, output, s);
 		test_cp_enable_with_retry(output, s, 3);
-		test_cp_lic(output);
+
+		if (data.cp_tests & CP_LIC)
+			test_cp_lic(output);
 
 		if (data.cp_tests & CP_DPMS) {
 			igt_pipe_set_prop_value(display, pipe,
@@ -374,6 +377,12 @@ igt_main
 	igt_subtest("atomic-dpms") {
 		igt_require(data.display.is_atomic);
 		data.cp_tests = CP_DPMS;
+		test_content_protection(COMMIT_ATOMIC);
+	}
+
+	igt_subtest("LIC") {
+		igt_require(data.display.is_atomic);
+		data.cp_tests = CP_LIC;
 		test_content_protection(COMMIT_ATOMIC);
 	}
 
