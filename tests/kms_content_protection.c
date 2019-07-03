@@ -34,7 +34,10 @@ struct data {
 	int drm_fd;
 	igt_display_t display;
 	struct igt_fb red, green;
+	unsigned int cp_tests;
 } data;
+
+#define CP_DPMS					(1 << 0)
 
 #define CP_UNDESIRED				0
 #define CP_DESIRED				1
@@ -240,8 +243,7 @@ static void test_cp_lic(igt_output_t *output)
 }
 
 static void test_content_protection_on_output(igt_output_t *output,
-					      enum igt_commit_style s,
-					      bool dpms_test)
+					      enum igt_commit_style s)
 {
 	igt_display_t *display = &data.display;
 	igt_plane_t *primary;
@@ -265,7 +267,7 @@ static void test_content_protection_on_output(igt_output_t *output,
 		test_cp_enable_with_retry(output, s, 3);
 		test_cp_lic(output);
 
-		if (dpms_test) {
+		if (data.cp_tests & CP_DPMS) {
 			igt_pipe_set_prop_value(display, pipe,
 						IGT_CRTC_ACTIVE, 0);
 			igt_display_commit2(display, s);
@@ -324,7 +326,7 @@ static bool sink_hdcp_capable(igt_output_t *output)
 
 
 static void
-test_content_protection(enum igt_commit_style s, bool dpms_test)
+test_content_protection(enum igt_commit_style s)
 {
 	igt_display_t *display = &data.display;
 	igt_output_t *output;
@@ -341,7 +343,7 @@ test_content_protection(enum igt_commit_style s, bool dpms_test)
 			continue;
 		}
 
-		test_content_protection_on_output(output, s, dpms_test);
+		test_content_protection_on_output(output, s);
 		valid_tests++;
 	}
 
@@ -358,17 +360,21 @@ igt_main
 		igt_display_require(&data.display, data.drm_fd);
 	}
 
-	igt_subtest("legacy")
-		test_content_protection(COMMIT_LEGACY, false);
+	igt_subtest("legacy") {
+		data.cp_tests = 0;
+		test_content_protection(COMMIT_LEGACY);
+	}
 
 	igt_subtest("atomic") {
 		igt_require(data.display.is_atomic);
-		test_content_protection(COMMIT_ATOMIC, false);
+		data.cp_tests = 0;
+		test_content_protection(COMMIT_ATOMIC);
 	}
 
 	igt_subtest("atomic-dpms") {
 		igt_require(data.display.is_atomic);
-		test_content_protection(COMMIT_ATOMIC, true);
+		data.cp_tests = CP_DPMS;
+		test_content_protection(COMMIT_ATOMIC);
 	}
 
 	igt_fixture
