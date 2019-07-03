@@ -27,6 +27,7 @@
 #include "igt.h"
 #include "igt_sysfs.h"
 #include "igt_kms.h"
+#include "igt_kmod.h"
 
 IGT_TEST_DESCRIPTION("Test content protection (HDCP)");
 
@@ -37,8 +38,10 @@ struct data {
 	unsigned int cp_tests;
 } data;
 
+/* Test flags */
 #define CP_DPMS					(1 << 0)
 #define CP_LIC					(1 << 1)
+#define CP_MEI_RELOAD				(1 << 2)
 
 #define CP_UNDESIRED				0
 #define CP_DESIRED				1
@@ -218,7 +221,7 @@ static void test_cp_disable(igt_output_t *output, enum igt_commit_style s)
 
 static void test_cp_enable_with_retry(igt_output_t *output,
 				      enum igt_commit_style s, int retry,
-				      int content_type)
+				      int content_type, bool expect_failure)
 {
 	bool ret;
 
@@ -233,7 +236,12 @@ static void test_cp_enable_with_retry(igt_output_t *output,
 	if (!ret)
 		test_cp_disable(output, s);
 
-	igt_assert_f(ret, "Content Protection not enabled\n");
+	if (expect_failure)
+		igt_assert_f(!ret,
+			     "CP Enabled. Though it is expected to fail\n");
+	else
+		igt_assert_f(ret, "Content Protection not enabled\n");
+
 }
 
 static bool igt_pipe_is_free(igt_display_t *display, enum pipe pipe)
@@ -279,7 +287,23 @@ static void test_content_protection_on_output(igt_output_t *output,
 			continue;
 
 		modeset_with_fb(pipe, output, s);
-		test_cp_enable_with_retry(output, s, 3, content_type);
+		test_cp_enable_with_retry(output, s, 3, content_type, false);
+
+		if (data.cp_tests & CP_MEI_RELOAD) {
+			igt_assert_f(!igt_kmod_unload("mei_hdcp", 0),
+				     "mei_hdcp unload failed");
+
+			/* Expected to fail */
+			test_cp_enable_with_retry(output, s, 3,
+						  content_type, true);
+
+			igt_assert_f(!igt_kmod_load("mei_hdcp", NULL),
+				     "mei_hdcp load failed");
+
+			/* Expected to pass */
+			test_cp_enable_with_retry(output, s, 3,
+						  content_type, false);
+		}
 
 		if (data.cp_tests & CP_LIC)
 			test_cp_lic(output);
@@ -296,8 +320,8 @@ static void test_content_protection_on_output(igt_output_t *output,
 			ret = wait_for_prop_value(output, CP_ENABLED,
 						  KERNEL_AUTH_TIME_ALLOWED_MSEC);
 			if (!ret)
-				test_cp_enable_with_retry(output, s,
-							  2, content_type);
+				test_cp_enable_with_retry(output, s, 2,
+							  content_type, false);
 		}
 
 		test_cp_disable(output, s);
@@ -367,6 +391,10 @@ test_content_protection(enum igt_commit_style s, int content_type)
 	igt_output_t *output;
 	int valid_tests = 0;
 
+	if (data.cp_tests & CP_MEI_RELOAD)
+		igt_require_f(igt_kmod_is_loaded("mei_hdcp"),
+			      "mei_hdcp module is not loaded\n");
+
 	for_each_connected_output(display, output) {
 		if (!output->props[IGT_CONNECTOR_CONTENT_PROTECTION])
 			continue;
@@ -429,6 +457,12 @@ igt_main
 
 	igt_subtest("type1") {
 		igt_require(data.display.is_atomic);
+		test_content_protection(COMMIT_ATOMIC, HDCP_CONTENT_TYPE_1);
+	}
+
+	igt_subtest("mei_interface") {
+		igt_require(data.display.is_atomic);
+		data.cp_tests = CP_MEI_RELOAD;
 		test_content_protection(COMMIT_ATOMIC, HDCP_CONTENT_TYPE_1);
 	}
 
