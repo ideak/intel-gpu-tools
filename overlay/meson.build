@@ -11,7 +11,6 @@ gpu_overlay_src = [
 	'gpu-top.c',
 	'gpu-perf.c',
 	'gpu-freq.c',
-	'igfx.c',
 	'overlay.c',
 	'power.c',
 	'rc6.c',

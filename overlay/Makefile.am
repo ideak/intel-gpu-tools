@@ -31,8 +31,6 @@ intel_gpu_overlay_SOURCES = \
 	gpu-perf.c \
 	gpu-freq.h \
 	gpu-freq.c \
-	igfx.h \
-	igfx.c \
 	overlay.h \
 	overlay.c \
 	power.h \
