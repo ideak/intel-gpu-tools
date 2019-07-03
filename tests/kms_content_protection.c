@@ -42,6 +42,7 @@ struct data {
 #define CP_DPMS					(1 << 0)
 #define CP_LIC					(1 << 1)
 #define CP_MEI_RELOAD				(1 << 2)
+#define CP_TYPE_CHANGE				(1 << 3)
 
 #define CP_UNDESIRED				0
 #define CP_DESIRED				1
@@ -170,7 +171,7 @@ static void modeset_with_fb(const enum pipe pipe, igt_output_t *output,
 }
 
 static bool test_cp_enable(igt_output_t *output, enum igt_commit_style s,
-			   int content_type)
+			   int content_type, bool type_change)
 {
 	igt_display_t *display = &data.display;
 	igt_plane_t *primary;
@@ -178,8 +179,11 @@ static bool test_cp_enable(igt_output_t *output, enum igt_commit_style s,
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
-	igt_output_set_prop_value(output,
-				  IGT_CONNECTOR_CONTENT_PROTECTION, CP_DESIRED);
+	if (!type_change)
+		igt_output_set_prop_value(output,
+					  IGT_CONNECTOR_CONTENT_PROTECTION,
+					  CP_DESIRED);
+
 	if (output->props[IGT_CONNECTOR_HDCP_CONTENT_TYPE])
 		igt_output_set_prop_value(output,
 					  IGT_CONNECTOR_HDCP_CONTENT_TYPE,
@@ -221,13 +225,17 @@ static void test_cp_disable(igt_output_t *output, enum igt_commit_style s)
 
 static void test_cp_enable_with_retry(igt_output_t *output,
 				      enum igt_commit_style s, int retry,
-				      int content_type, bool expect_failure)
+				      int content_type, bool expect_failure,
+				      bool type_change)
 {
+	int retry_orig = retry;
 	bool ret;
 
 	do {
-		test_cp_disable(output, s);
-		ret = test_cp_enable(output, s, content_type);
+		if (!type_change || retry_orig != retry)
+			test_cp_disable(output, s);
+
+		ret = test_cp_enable(output, s, content_type, type_change);
 
 		if (!ret && --retry)
 			igt_debug("Retry (%d/2) ...\n", 3 - retry);
@@ -287,7 +295,19 @@ static void test_content_protection_on_output(igt_output_t *output,
 			continue;
 
 		modeset_with_fb(pipe, output, s);
-		test_cp_enable_with_retry(output, s, 3, content_type, false);
+		test_cp_enable_with_retry(output, s, 3, content_type, false,
+					  false);
+
+		if (data.cp_tests & CP_TYPE_CHANGE) {
+			/* Type 1 -> Type 0 */
+			test_cp_enable_with_retry(output, s, 3,
+						  HDCP_CONTENT_TYPE_0, false,
+						  true);
+			/* Type 0 -> Type 1 */
+			test_cp_enable_with_retry(output, s, 3,
+						  content_type, false,
+						  true);
+		}
 
 		if (data.cp_tests & CP_MEI_RELOAD) {
 			igt_assert_f(!igt_kmod_unload("mei_hdcp", 0),
@@ -295,14 +315,14 @@ static void test_content_protection_on_output(igt_output_t *output,
 
 			/* Expected to fail */
 			test_cp_enable_with_retry(output, s, 3,
-						  content_type, true);
+						  content_type, true, false);
 
 			igt_assert_f(!igt_kmod_load("mei_hdcp", NULL),
 				     "mei_hdcp load failed");
 
 			/* Expected to pass */
 			test_cp_enable_with_retry(output, s, 3,
-						  content_type, false);
+						  content_type, false, false);
 		}
 
 		if (data.cp_tests & CP_LIC)
@@ -321,7 +341,8 @@ static void test_content_protection_on_output(igt_output_t *output,
 						  KERNEL_AUTH_TIME_ALLOWED_MSEC);
 			if (!ret)
 				test_cp_enable_with_retry(output, s, 2,
-							  content_type, false);
+							  content_type, false,
+							  false);
 		}
 
 		test_cp_disable(output, s);
@@ -463,6 +484,12 @@ igt_main
 	igt_subtest("mei_interface") {
 		igt_require(data.display.is_atomic);
 		data.cp_tests = CP_MEI_RELOAD;
+		test_content_protection(COMMIT_ATOMIC, HDCP_CONTENT_TYPE_1);
+	}
+
+	igt_subtest("content_type_change") {
+		igt_require(data.display.is_atomic);
+		data.cp_tests = CP_TYPE_CHANGE;
 		test_content_protection(COMMIT_ATOMIC, HDCP_CONTENT_TYPE_1);
 	}
 
