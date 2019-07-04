@@ -3,6 +3,7 @@ lib_tests = [
 	'igt_can_fail',
 	'igt_can_fail_simple',
 	'igt_conflicting_args',
+	'igt_describe',
 	'igt_edid',
 	'igt_exit_handler',
 	'igt_fork',

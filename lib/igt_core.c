@@ -70,6 +70,7 @@
 #include "igt_sysfs.h"
 #include "igt_sysrq.h"
 #include "igt_rc.h"
+#include "igt_list.h"
 
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
@@ -260,6 +261,7 @@ bool igt_skip_crc_compare;
 
 /* subtests helpers */
 static bool list_subtests = false;
+static bool describe_subtests = false;
 static char *run_single_subtest = NULL;
 static bool run_single_subtest_found = false;
 static const char *in_subtest = NULL;
@@ -271,6 +273,16 @@ static bool in_atexit_handler = false;
 static enum {
 	CONT = 0, SKIP, FAIL
 } skip_subtests_henceforth = CONT;
+
+static char __current_description[512];
+
+struct description_node {
+	char desc[sizeof(__current_description)];
+	struct igt_list link;
+};
+
+static struct igt_list subgroup_descriptions;
+
 
 bool __igt_plain_output = false;
 
@@ -286,6 +298,7 @@ enum {
 	 * conflict with core ones
 	 */
 	OPT_LIST_SUBTESTS = 500,
+	OPT_DESCRIBE_SUBTESTS,
 	OPT_RUN_SUBTEST,
 	OPT_DESCRIPTION,
 	OPT_DEBUG,
@@ -530,10 +543,59 @@ static void common_exit_handler(int sig)
 	assert(sig != 0 || igt_exit_called);
 }
 
+static void print_line_wrapping(const char *indent, const char *text)
+{
+	char *copy, *curr, *next_space;
+	int current_line_length = 0;
+	bool done = false;
+
+	const int total_line_length = 80;
+	const int line_length = total_line_length - strlen(indent);
+
+	copy = malloc(strlen(text) + 1);
+	memcpy(copy, text, strlen(text) + 1);
+
+	curr = copy;
+
+	printf("%s", indent);
+
+	while (!done) {
+		next_space = strchr(curr, ' ');
+
+		if (!next_space) { /* no more spaces, print everything that is left */
+			done = true;
+			next_space = strchr(curr, '\0');
+		}
+
+		*next_space = '\0';
+
+		if ((next_space - curr) + current_line_length > line_length && curr != copy) {
+			printf("\n%s", indent);
+			current_line_length = 0;
+		}
+
+		if (current_line_length == 0)
+			printf("%s", curr); /* first word in a line, don't space out */
+		else
+			printf(" %s", curr);
+
+		current_line_length += next_space - curr;
+		curr = next_space + 1;
+	}
+
+	printf("\n");
+
+	free(copy);
+}
+
+
 static void print_test_description(void)
 {
-	if (&__igt_test_description)
-		printf("%s\n", __igt_test_description);
+	if (&__igt_test_description) {
+		print_line_wrapping("", __igt_test_description);
+		if (describe_subtests)
+			printf("\n");
+	}
 }
 
 static void print_version(void)
@@ -561,6 +623,7 @@ static void print_usage(const char *help_str, bool output_on_stderr)
 		   "  --interactive-debug[=domain]\n"
 		   "  --skip-crc-compare\n"
 		   "  --help-description\n"
+		   "  --describe\n"
 		   "  --help|-h\n");
 	if (help_str)
 		fprintf(f, "%s\n", help_str);
@@ -674,6 +737,7 @@ static int common_init(int *argc, char **argv,
 	int c, option_index = 0, i, x;
 	static struct option long_options[] = {
 		{"list-subtests",     no_argument,       NULL, OPT_LIST_SUBTESTS},
+		{"describe",          optional_argument, NULL, OPT_DESCRIBE_SUBTESTS},
 		{"run-subtest",       required_argument, NULL, OPT_RUN_SUBTEST},
 		{"help-description",  no_argument,       NULL, OPT_DESCRIPTION},
 		{"debug",             optional_argument, NULL, OPT_DEBUG},
@@ -691,6 +755,7 @@ static int common_init(int *argc, char **argv,
 	int ret = 0;
 
 	common_init_env();
+	igt_list_init(&subgroup_descriptions);
 
 	command_str = argv[0];
 	if (strrchr(command_str, '/'))
@@ -780,6 +845,13 @@ static int common_init(int *argc, char **argv,
 		case OPT_LIST_SUBTESTS:
 			if (!run_single_subtest)
 				list_subtests = true;
+			break;
+		case OPT_DESCRIBE_SUBTESTS:
+			if (optarg)
+				run_single_subtest = strdup(optarg);
+			list_subtests = true;
+			describe_subtests = true;
+			print_test_description();
 			break;
 		case OPT_RUN_SUBTEST:
 			assert(optarg);
@@ -941,12 +1013,41 @@ void igt_simple_init_parse_opts(int *argc, char **argv,
 		    extra_opt_handler, handler_data);
 }
 
+static void _clear_current_description(void) {
+	__current_description[0] = '\0';
+}
+
+static void __igt_print_description(const char *subtest_name, const char *file, int line)
+{
+	struct description_node *desc;
+	const char indent[] = "  ";
+	bool has_doc = false;
+
+
+	printf("SUB %s %s:%d:\n", subtest_name, file, line);
+
+	igt_list_for_each(desc, &subgroup_descriptions, link) {
+		print_line_wrapping(indent, desc->desc);
+		printf("\n");
+		has_doc = true;
+	}
+
+	if (__current_description[0] != '\0') {
+		print_line_wrapping(indent, __current_description);
+		printf("\n");
+		has_doc = true;
+	}
+
+	if (!has_doc)
+		printf("%sNO DOCUMENTATION!\n\n", indent);
+}
+
 /*
  * Note: Testcases which use these helpers MUST NOT output anything to stdout
  * outside of places protected by igt_run_subtest checks - the piglit
  * runner adds every line to the subtest list.
  */
-bool __igt_run_subtest(const char *subtest_name)
+bool __igt_run_subtest(const char *subtest_name, const char *file, const int line)
 {
 	int i;
 
@@ -961,17 +1062,24 @@ bool __igt_run_subtest(const char *subtest_name)
 			igt_exit();
 		}
 
-	if (list_subtests) {
+	if (run_single_subtest) {
+		if (uwildmat(subtest_name, run_single_subtest) == 0) {
+			_clear_current_description();
+			return false;
+		} else {
+			run_single_subtest_found = true;
+		}
+	}
+
+	if (describe_subtests) {
+		__igt_print_description(subtest_name, file, line);
+		_clear_current_description();
+		return false;
+	} else if (list_subtests) {
 		printf("%s\n", subtest_name);
 		return false;
 	}
 
-	if (run_single_subtest) {
-		if (uwildmat(subtest_name, run_single_subtest) == 0)
-			return false;
-		else
-			run_single_subtest_found = true;
-	}
 
 	if (skip_subtests_henceforth) {
 		printf("%sSubtest %s: %s%s\n",
@@ -1021,15 +1129,32 @@ bool igt_only_list_subtests(void)
 	return list_subtests;
 }
 
-void __igt_subtest_group_save(int *save)
+
+
+void __igt_subtest_group_save(int *save, int *desc)
 {
 	assert(test_with_subtests);
+
+	if (__current_description[0] != '\0') {
+		struct description_node *new = calloc(1, sizeof(*new));
+		memcpy(new->desc, __current_description, sizeof(__current_description));
+		igt_list_add_tail(&new->link, &subgroup_descriptions);
+		_clear_current_description();
+		*desc = true;
+	}
 
 	*save = skip_subtests_henceforth;
 }
 
-void __igt_subtest_group_restore(int save)
+void __igt_subtest_group_restore(int save, int desc)
 {
+	if (desc) {
+		struct description_node *last =
+			igt_list_last_entry(&subgroup_descriptions, last, link);
+		igt_list_del(&last->link);
+		free(last);
+	}
+
 	skip_subtests_henceforth = save;
 }
 
@@ -1234,6 +1359,34 @@ void  __attribute__((noreturn)) igt_fatal_error(void)
 bool igt_can_fail(void)
 {
 	return !test_with_subtests || in_fixture || in_subtest;
+}
+
+/**
+ * igt_describe_f:
+ * @fmt: format string containing description
+ * @...: argument used by the format string
+ *
+ * Attach a description to the following #igt_subtest or #igt_subtest_group
+ * block.
+ *
+ * Check #igt_describe for more details.
+ *
+ */
+void igt_describe_f(const char *fmt, ...)
+{
+	int ret;
+	va_list args;
+
+	if (!describe_subtests)
+		return;
+
+	va_start(args, fmt);
+
+	ret = vsnprintf(__current_description, sizeof(__current_description), fmt, args);
+
+	va_end(args);
+
+	assert(ret < sizeof(__current_description));
 }
 
 static bool running_under_gdb(void)
@@ -1547,7 +1700,7 @@ void igt_exit(void)
 		g_key_file_free(igt_key_file);
 
 	if (run_single_subtest && !run_single_subtest_found) {
-		igt_warn("Unknown subtest: %s\n", run_single_subtest);
+		igt_critical("Unknown subtest: %s\n", run_single_subtest);
 		exit(IGT_EXIT_INVALID);
 	}
 
