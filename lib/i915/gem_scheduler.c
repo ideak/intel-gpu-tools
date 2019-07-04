@@ -119,6 +119,19 @@ bool gem_scheduler_has_semaphores(int fd)
 }
 
 /**
+ * gem_scheduler_has_engine_busy_stats:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether the driver supports reporting accurate
+ * per-engine utilisation.
+ */
+bool gem_scheduler_has_engine_busy_stats(int fd)
+{
+	return gem_scheduler_capability(fd) &
+		I915_SCHEDULER_CAP_ENGINE_BUSY_STATS;
+}
+
+/**
  * gem_scheduler_print_capability:
  * @fd: open i915 drm file descriptor
  *
@@ -138,4 +151,6 @@ void gem_scheduler_print_capability(int fd)
 		igt_info(" - With preemption enabled\n");
 	if (caps & I915_SCHEDULER_CAP_SEMAPHORES)
 		igt_info(" - With HW semaphores enabled\n");
+	if (caps & I915_SCHEDULER_CAP_ENGINE_BUSY_STATS)
+		igt_info(" - With engine busy statistics\n");
 }

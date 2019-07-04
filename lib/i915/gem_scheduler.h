@@ -31,6 +31,7 @@ bool gem_scheduler_enabled(int fd);
 bool gem_scheduler_has_ctx_priority(int fd);
 bool gem_scheduler_has_preemption(int fd);
 bool gem_scheduler_has_semaphores(int fd);
+bool gem_scheduler_has_engine_busy_stats(int fd);
 void gem_scheduler_print_capability(int fd);
 
 #endif /* GEM_SCHEDULER_H */
