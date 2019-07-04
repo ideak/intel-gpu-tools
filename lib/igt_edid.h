@@ -213,6 +213,12 @@ enum hdmi_vsdb_flags2 {
 	HDMI_VSDB_LATENCY_PRESENT = 1 << 7,
 };
 
+enum hdmi_vsdb_video_flags {
+	HDMI_VSDB_VIDEO_3D_STRUCT_PRESENT = 0b01 << 5,
+	HDMI_VSDB_VIDEO_3D_STRUCT_MASK_PRESENT = 0b10 << 5,
+	HDMI_VSDB_VIDEO_3D_PRESENT = 1 << 7,
+};
+
 /* HDMI's IEEE Registration Identifier */
 extern const uint8_t hdmi_ieee_oui[3];
 
