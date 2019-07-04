@@ -194,7 +194,6 @@ enum intel_broadcast_rgb_mode {
 
 bool kmstest_force_connector(int fd, drmModeConnector *connector,
 			     enum kmstest_force_connector_state state);
-void kmstest_edid_add_3d(const unsigned char *edid, size_t length, unsigned char *new_edid_ptr[], size_t *new_length);
 void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
 			const unsigned char *edid);
 
@@ -763,6 +762,7 @@ const unsigned char *igt_kms_get_alt_edid(void);
 const unsigned char *igt_kms_get_hdmi_audio_edid(void);
 const unsigned char *igt_kms_get_dp_audio_edid(void);
 const unsigned char *igt_kms_get_4k_edid(void);
+const unsigned char *igt_kms_get_3d_edid(void);
 
 struct udev_monitor *igt_watch_hotplug(void);
 bool igt_hotplug_detected(struct udev_monitor *mon,

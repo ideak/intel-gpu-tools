@@ -8,7 +8,6 @@ lib_tests = [
 	'igt_exit_handler',
 	'igt_fork',
 	'igt_fork_helper',
-	'igt_hdmi_inject',
 	'igt_list_only',
 	'igt_invalid_subtest_name',
 	'igt_no_exit',

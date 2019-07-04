@@ -116,9 +116,6 @@ static void update_edid_csum(unsigned char *edid, int cea_pos)
  *  - 800x600 60Hz
  *  - 640x480 60Hz
  *
- * This can be extended with further features using functions such as
- * #kmstest_edid_add_3d.
- *
  * Returns: a basic edid block
  */
 const unsigned char *igt_kms_get_base_edid(void)
@@ -154,9 +151,6 @@ const unsigned char *igt_kms_get_base_edid(void)
  *  - 1024x768 60Hz
  *  - 800x600 60Hz
  *  - 640x480 60Hz
- *
- * This can be extended with further features using functions such as
- * #kmstest_edid_add_3d.
  *
  * Returns: an alternate edid block
  */
@@ -330,6 +324,57 @@ const unsigned char *igt_kms_get_4k_edid(void)
 	hdmi->data[0] = 0x00; /* HDMI video flags */
 	hdmi->data[1] = 1 << 5; /* 1 VIC entry, 0 3D entries */
 	hdmi->data[2] = 0x01; /* 2160p, specified as short descriptor */
+
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	cea_data_size += edid_cea_data_block_set_hdmi_vsdb(block, hdmi,
+							   sizeof(raw_hdmi));
+
+	assert(cea_data_size <= sizeof(edid_cea->data));
+
+	edid_ext_set_cea(edid_ext, cea_data_size, 0, 0);
+
+	edid_update_checksum(edid);
+	edid_ext_update_cea_checksum(edid_ext);
+	return raw_edid;
+}
+
+const unsigned char *igt_kms_get_3d_edid(void)
+{
+	static unsigned char raw_edid[256] = {0};
+	struct edid *edid;
+	struct edid_ext *edid_ext;
+	struct edid_cea *edid_cea;
+	char *cea_data;
+	struct edid_cea_data_block *block;
+	/* We'll add 5 extension fields to the HDMI VSDB. */
+	char raw_hdmi[HDMI_VSDB_MIN_SIZE + 5] = {0};
+	struct hdmi_vsdb *hdmi;
+	size_t cea_data_size = 0;
+
+	/* Create a new EDID from the base IGT EDID, and add an
+	 * extension that advertises 3D support. */
+	edid = (struct edid *) raw_edid;
+	memcpy(edid, igt_kms_get_base_edid(), sizeof(struct edid));
+	edid->extensions_len = 1;
+	edid_ext = &edid->extensions[0];
+	edid_cea = &edid_ext->data.cea;
+	cea_data = edid_cea->data;
+
+	/* Short Video Descriptor */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	cea_data_size += edid_cea_data_block_set_svd(block, edid_4k_svds,
+						     sizeof(edid_4k_svds));
+
+	/* Vendor-Specific Data Block */
+	hdmi = (struct hdmi_vsdb *) raw_hdmi;
+	hdmi->src_phy_addr[0] = 0x10;
+	hdmi->src_phy_addr[1] = 0x00;
+	/* 5 extension fields */
+	hdmi->flags1 = 0;
+	hdmi->max_tdms_clock = 0;
+	hdmi->flags2 = HDMI_VSDB_VIDEO_PRESENT;
+	hdmi->data[0] = HDMI_VSDB_VIDEO_3D_PRESENT; /* HDMI video flags */
+	hdmi->data[1] = 0; /* 0 VIC entries, 0 3D entries */
 
 	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
 	cea_data_size += edid_cea_data_block_set_hdmi_vsdb(block, hdmi,
@@ -1399,98 +1444,6 @@ kmstest_get_property(int drm_fd, uint32_t object_id, uint32_t object_type,
 
 	drmModeFreeObjectProperties(proplist);
 	return found;
-}
-
-struct edid_block {
-    int pos;
-    unsigned char *data;
-};
-
-static struct edid_block
-init_cea_block(const unsigned char *edid, size_t length,
-	       unsigned char *new_edid_ptr[], size_t *new_length,
-	       char extra_extensions_length,
-	       uint32_t dtd_support)
-{
-	struct edid_block new_edid;
-	int n_extensions;
-	int pos;
-	static const char cea_header_len = 4, video_block_len = 6;
-
-	igt_assert(new_edid_ptr != NULL && new_length != NULL);
-
-	*new_length = length + 128;
-
-	new_edid.data = calloc(*new_length, sizeof(*new_edid.data));
-	igt_assert_f(new_edid.data, "Failed to allocate %zu bytes for edid\n", sizeof(new_length));
-	memcpy(new_edid.data, edid, length);
-	*new_edid_ptr = new_edid.data;
-
-	n_extensions = new_edid.data[126];
-	n_extensions++;
-	new_edid.data[126] = n_extensions;
-
-	update_edid_csum(new_edid.data, 0);
-
-	/* add a cea-861 extension block */
-	pos = length;
-	new_edid.data[pos++] = 0x2;
-	new_edid.data[pos++] = 0x3;
-	new_edid.data[pos++] = cea_header_len + video_block_len +
-		extra_extensions_length;
-	new_edid.data[pos++] = dtd_support;
-
-	/* video block (id | length) */
-	new_edid.data[pos++] = 2 << 5 | (video_block_len - 1);
-	new_edid.data[pos++] = 32 | 0x80; /* 1080p @ 24Hz | (native)*/
-	new_edid.data[pos++] = 5;         /* 1080i @ 60Hz */
-	new_edid.data[pos++] = 20;        /* 1080i @ 50Hz */
-	new_edid.data[pos++] = 4;         /* 720p @ 60Hz*/
-	new_edid.data[pos++] = 19;        /* 720p @ 50Hz*/
-	new_edid.pos = pos;
-
-	return new_edid;
-}
-
-/**
- * kmstest_edid_add_3d:
- * @edid: an existing valid edid block
- * @length: length of @edid
- * @new_edid_ptr: pointer to where the new edid will be placed
- * @new_length: pointer to the size of the new edid
- *
- * Makes a copy of an existing edid block and adds an extension indicating
- * stereo 3D capabilities.
- */
-void kmstest_edid_add_3d(const unsigned char *edid, size_t length,
-			 unsigned char *new_edid_ptr[], size_t *new_length)
-{
-	char vsdb_block_len = 11;
-	struct edid_block new_edid = init_cea_block(edid, length, new_edid_ptr,
-						    new_length, vsdb_block_len,
-						    0);
-	int pos = new_edid.pos;
-
-	/* vsdb block ( id | length ) */
-	new_edid.data[pos++] = 3 << 5 | (vsdb_block_len - 1);
-	/* registration id */
-	new_edid.data[pos++] = 0x3;
-	new_edid.data[pos++] = 0xc;
-	new_edid.data[pos++] = 0x0;
-	/* source physical address */
-	new_edid.data[pos++] = 0x10;
-	new_edid.data[pos++] = 0x00;
-	/* Supports_AI ... etc */
-	new_edid.data[pos++] = 0x00;
-	/* Max TMDS Clock */
-	new_edid.data[pos++] = 0x00;
-	/* Latency present, HDMI Video Present */
-	new_edid.data[pos++] = 0x20;
-	/* HDMI Video */
-	new_edid.data[pos++] = 0x80;
-	new_edid.data[pos++] = 0x00;
-
-	update_edid_csum(new_edid.data, length);
 }
 
 /**
