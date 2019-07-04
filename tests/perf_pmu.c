@@ -1624,7 +1624,7 @@ test_enable_race(int gem_fd, const struct intel_execution_engine2 *e)
 	struct drm_i915_gem_execbuffer2 eb = { };
 	int fd;
 
-	igt_require(gem_has_execlists(gem_fd));
+	igt_require(gem_scheduler_has_engine_busy_stats(gem_fd));
 	igt_require(gem_context_has_engine(gem_fd, 0, e->flags));
 
 	obj.handle = gem_create(gem_fd, 4096);
@@ -1694,7 +1694,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	int fd;
 
 	/* Sampling platforms cannot reach the high accuracy criteria. */
-	igt_require(gem_has_execlists(gem_fd));
+	igt_require(gem_scheduler_has_engine_busy_stats(gem_fd));
 
 	/* Aim for approximately 100 iterations for calibration */
 	cycle_us = min_test_us / target_iters;
