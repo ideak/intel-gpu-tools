@@ -302,12 +302,8 @@ static int __test_output(data_t *data)
 	igt_display_t *display = &data->display;
 	int i, valid_tests = 0;
 
-	igt_display_require_output_on_pipe(display, data->pipe);
-
-	/* Sets data->output with a valid output. */
-	for_each_valid_output_on_pipe(display, data->pipe, data->output) {
-		break;
-	}
+	data->output = igt_get_single_output_for_pipe(display, data->pipe);
+	igt_require(data->output);
 
 	igt_output_set_pipe(data->output, data->pipe);
 
