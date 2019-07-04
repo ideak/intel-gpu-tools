@@ -92,6 +92,9 @@ igt_simple_main
 		igt_assert_f(edid_block_checksum(edid),
 			     "checksum failed on %s EDID", f->desc);
 		/* check extension blocks, if any */
+		igt_assert_f(edid[126] == f->exts,
+			     "unexpected number of extensions on %s EDID",
+			     f->desc);
 		for (i = 0; i < f->exts; i++)
 			igt_assert_f(edid_block_checksum(edid + (i + 1) * EDID_LENGTH),
 				     "CEA block checksum failed on %s EDID", f->desc);
