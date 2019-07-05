@@ -1,4 +1,4 @@
-build_man = get_option('build_man')
+build_man = get_option('man')
 
 manpages = [
 	'intel_aubdump',

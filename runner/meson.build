@@ -1,4 +1,4 @@
-build_runner = get_option('build_runner')
+build_runner = get_option('runner')
 
 runnerlib_sources = [ 'settings.c',
 		      'job_list.c',

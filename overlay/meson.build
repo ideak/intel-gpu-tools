@@ -1,4 +1,4 @@
-build_overlay = get_option('build_overlay')
+build_overlay = get_option('overlay')
 overlay_backends = get_option('overlay_backends')
 
 gpu_overlay_src = [

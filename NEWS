@@ -1,3 +1,10 @@
+Unreleased
+----------
+
+Meson build options have been renamed. Please check the news options in
+meson_options.txt and make sure you don't get any warnings when configuring the
+project.
+
 Release 1.24 (2019-06-20)
 -------------------------
 
