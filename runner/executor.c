@@ -46,6 +46,10 @@ static void close_watchdogs(struct settings *settings)
 	for (i = 0; i < watchdogs.num_dogs; i++) {
 		__close_watchdog(watchdogs.fds[i]);
 	}
+
+	free(watchdogs.fds);
+	watchdogs.num_dogs = 0;
+	watchdogs.fds = NULL;
 }
 
 static void close_watchdogs_atexit(void)
