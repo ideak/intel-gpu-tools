@@ -43,6 +43,9 @@ static void close_watchdogs(struct settings *settings)
 	if (settings && settings->log_level >= LOG_LEVEL_VERBOSE)
 		printf("Closing watchdogs\n");
 
+	if (settings == NULL && watchdogs.num_dogs != 0)
+		fprintf(stderr, "Closing watchdogs from exit handler!\n");
+
 	for (i = 0; i < watchdogs.num_dogs; i++) {
 		__close_watchdog(watchdogs.fds[i]);
 	}
