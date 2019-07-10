@@ -297,7 +297,7 @@ static int test_ccs(data_t *data)
 	return valid_tests;
 }
 
-static int test_output(data_t *data)
+static int __test_output(data_t *data)
 {
 	igt_display_t *display = &data->display;
 	int i, valid_tests = 0;
@@ -320,6 +320,12 @@ static int test_output(data_t *data)
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	return valid_tests;
+}
+
+static void test_output(data_t *data)
+{
+	int valid_tests = __test_output(data);
+	igt_require_f(valid_tests > 0, "CCS not supported, skipping");
 }
 
 static data_t data;
@@ -345,19 +351,19 @@ igt_main
 
 		data.flags = TEST_BAD_PIXEL_FORMAT;
 		igt_subtest_f("pipe-%s-bad-pixel-format", pipe_name)
-			igt_require(test_output(&data));
+			test_output(&data);
 
 		data.flags = TEST_BAD_ROTATION_90;
 		igt_subtest_f("pipe-%s-bad-rotation-90", pipe_name)
-			igt_require(test_output(&data));
+			test_output(&data);
 
 		data.flags = TEST_CRC;
 		igt_subtest_f("pipe-%s-crc-primary-basic", pipe_name)
-			igt_require(test_output(&data));
+			test_output(&data);
 
 		data.flags = TEST_CRC | TEST_ROTATE_180;
 		igt_subtest_f("pipe-%s-crc-primary-rotation-180", pipe_name)
-			igt_require(test_output(&data));
+			test_output(&data);
 
 		data.flags = TEST_CRC;
 		igt_subtest_f("pipe-%s-crc-sprite-planes-basic", pipe_name) {
@@ -368,25 +374,25 @@ igt_main
 			for_each_plane_on_pipe(&data.display, data.pipe, data.plane) {
 				if (data.plane->type == DRM_PLANE_TYPE_PRIMARY)
 					continue;
-				valid_tests += test_output(&data);
+				valid_tests += __test_output(&data);
 			}
 
-			igt_require(valid_tests);
+			igt_require_f(valid_tests > 0, "CCS not supported, skipping");
 		}
 
 		data.plane = NULL;
 
 		data.flags = TEST_NO_AUX_BUFFER;
 		igt_subtest_f("pipe-%s-missing-ccs-buffer", pipe_name)
-			igt_require(test_output(&data));
+			test_output(&data);
 
 		data.flags = TEST_BAD_CCS_HANDLE;
 		igt_subtest_f("pipe-%s-ccs-on-another-bo", pipe_name)
-			igt_require(test_output(&data));
+			test_output(&data);
 
 		data.flags = TEST_BAD_AUX_STRIDE;
 		igt_subtest_f("pipe-%s-bad-aux-stride", pipe_name)
-			igt_require(test_output(&data));
+			test_output(&data);
 	}
 
 	igt_fixture
