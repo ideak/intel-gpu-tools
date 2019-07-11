@@ -38,13 +38,18 @@
 
 #include "igt_core.h"
 
+/*
+ * NOTE: Theser are _only_ for testcases exercising driver specific rendering
+ * ioctls and uapi (and a bunch of historical reasons). And KMS testcase should
+ * be build on top of DRIVER_ANY. Do _NOT_ add your driver here for enabling KMS
+ * tests.
+ */
 #define DRIVER_INTEL	(1 << 0)
 #define DRIVER_VC4	(1 << 1)
 #define DRIVER_VGEM	(1 << 2)
-#define DRIVER_VIRTIO	(1 << 3)
-#define DRIVER_AMDGPU	(1 << 4)
-#define DRIVER_V3D	(1 << 5)
-#define DRIVER_PANFROST	(1 << 6)
+#define DRIVER_AMDGPU	(1 << 3)
+#define DRIVER_V3D	(1 << 4)
+#define DRIVER_PANFROST	(1 << 5)
 /*
  * Exclude DRVER_VGEM from DRIVER_ANY since if you run on a system
  * with vgem as well as a supported driver, you can end up with a
