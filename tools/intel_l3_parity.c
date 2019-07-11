@@ -195,6 +195,12 @@ int main(int argc, char *argv[])
 
 	for_each_slice(i) {
 		fd[i] = openat(dir, path[i], O_RDWR);
+		if (fd[i] < 0) {
+			if (i == 0) /* at least one slice must be supported */
+				exit(77);
+			continue;
+		}
+
 		if (read(fd[i], l3logs[i], NUM_REGS * sizeof(uint32_t)) < 0) {
 			perror(path[i]);
 			exit(77);
@@ -333,6 +339,9 @@ int main(int argc, char *argv[])
 
 	/* Per slice operations */
 	for_each_slice(i) {
+		if (fd[i] < 0)
+			continue;
+
 		switch (action) {
 			case 'l':
 				dumpit(i);
@@ -374,6 +383,9 @@ int main(int argc, char *argv[])
 		exit(EXIT_SUCCESS);
 
 	for_each_slice(i) {
+		if (fd[i] < 0)
+			continue;
+
 		ret = write(fd[i], l3logs[i], NUM_REGS * sizeof(uint32_t));
 		if (ret == -1) {
 			perror("Writing sysfs");
