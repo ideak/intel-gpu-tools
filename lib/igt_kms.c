@@ -87,24 +87,6 @@
 static char *forced_connectors[MAX_CONNECTORS + 1];
 static int forced_connectors_device[MAX_CONNECTORS + 1];
 
-static void update_edid_csum(unsigned char *edid, int cea_pos)
-{
-	int i, sum = 0;
-	struct tm *tm;
-	time_t t;
-
-	/* year of manufacture */
-	t = time(NULL);
-	tm = localtime(&t);
-	edid[17] = tm->tm_year - 90;
-
-	/* calculate checksum */
-	for (i = 0; i < 127; i++) {
-		sum = sum + edid[cea_pos + i];
-	}
-	edid[cea_pos + 127] = 256 - sum;
-}
-
 /**
  * igt_kms_get_base_edid:
  *
