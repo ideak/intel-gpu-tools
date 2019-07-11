@@ -464,13 +464,10 @@ prepare_output(data_t *data, struct chamelium_port *port, enum test_edid edid)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
-	drmModeRes *res;
 	drmModeConnector *connector =
 		chamelium_port_get_connector(data->chamelium, port, false);
 	enum pipe pipe;
 	bool found = false;
-
-	igt_require(res = drmModeGetResources(data->drm_fd));
 
 	/* The chamelium's default EDID has a lot of resolutions, way more then
 	 * we need to test. Additionally the default EDID doesn't support HDMI
@@ -501,7 +498,6 @@ prepare_output(data_t *data, struct chamelium_port *port, enum test_edid edid)
 	igt_output_set_pipe(output, pipe);
 
 	drmModeFreeConnector(connector);
-	drmModeFreeResources(res);
 
 	return output;
 }
