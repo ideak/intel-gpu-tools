@@ -193,6 +193,19 @@ static void test_batch_first(int fd)
 	gem_close(fd, obj[0].handle);
 }
 
+static int has_secure_batches(const int fd)
+{
+	int v = -1;
+	drm_i915_getparam_t gp = {
+		.param = I915_PARAM_HAS_SECURE_BATCHES,
+		.value = &v,
+	};
+
+	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	return v > 0;
+}
+
 struct drm_i915_gem_execbuffer2 execbuf;
 struct drm_i915_gem_exec_object2 gem_exec[1];
 uint32_t batch[2] = {MI_BATCH_BUFFER_END};
@@ -340,6 +353,8 @@ igt_main
 	}
 
 	igt_subtest("secure-non-root") {
+		igt_require(has_secure_batches(fd));
+
 		igt_fork(child, 1) {
 			igt_drop_root();
 
@@ -351,9 +366,12 @@ igt_main
 	}
 
 	igt_subtest("secure-non-master") {
-		igt_require(__igt_device_set_master(fd) == 0); /* Requires root privilege */
+		igt_require(has_secure_batches(fd));
 
-		igt_device_drop_master(fd);
+		/* Requires root privilege... */
+		igt_require(__igt_device_set_master(fd) == 0);
+		igt_device_drop_master(fd); /* ... to drop master! */
+
 		execbuf.flags = I915_EXEC_RENDER | I915_EXEC_SECURE;
 		RUN_FAIL(EPERM);
 

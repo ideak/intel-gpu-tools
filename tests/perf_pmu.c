@@ -893,6 +893,19 @@ static int wait_vblank(int fd, union drm_wait_vblank *vbl)
 	return err;
 }
 
+static int has_secure_batches(const int fd)
+{
+	int v = -1;
+	drm_i915_getparam_t gp = {
+		.param = I915_PARAM_HAS_SECURE_BATCHES,
+		.value = &v,
+	};
+
+	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	return v > 0;
+}
+
 static void
 event_wait(int gem_fd, const struct intel_execution_engine2 *e)
 {
@@ -910,6 +923,7 @@ event_wait(int gem_fd, const struct intel_execution_engine2 *e)
 
 	devid = intel_get_drm_devid(gem_fd);
 	igt_require(intel_gen(devid) >= 7);
+	igt_require(has_secure_batches(fd));
 	igt_skip_on(IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid));
 
 	kmstest_set_vt_graphics_mode();

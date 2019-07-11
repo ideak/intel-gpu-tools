@@ -225,6 +225,19 @@ static uint32_t get_engine_base(int fd, uint32_t engine)
 	}
 }
 
+static int has_secure_batches(const int fd)
+{
+	int v = -1;
+	drm_i915_getparam_t gp = {
+		.param = I915_PARAM_HAS_SECURE_BATCHES,
+		.value = &v,
+	};
+
+	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	return v > 0;
+}
+
 #define MI_STORE_REGISTER_MEM_64_BIT_ADDR	((0x24 << 23) | 2)
 
 static int create_read_batch(struct drm_i915_gem_relocation_entry *reloc,
@@ -566,6 +579,7 @@ igt_main
 		igt_require_gem(fd);
 		gem_require_mocs_registers(fd);
 		igt_require(get_mocs_settings(fd, &table, false));
+		igt_require(has_secure_batches(fd));
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
