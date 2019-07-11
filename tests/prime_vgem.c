@@ -82,6 +82,8 @@ static void test_fence_read(int i915, int vgem)
 	close(dmabuf);
 
 	igt_fork(child, 1) {
+		close(master[0]);
+		close(slave[1]);
 		for (i = 0; i < 1024; i++) {
 			uint32_t tmp;
 			gem_read(i915, handle, 4096*i, &tmp, sizeof(tmp));
@@ -97,6 +99,8 @@ static void test_fence_read(int i915, int vgem)
 		gem_close(i915, handle);
 	}
 
+	close(master[1]);
+	close(slave[0]);
 	read(master[0], &i, sizeof(i));
 	fence = vgem_fence_attach(vgem, &scratch, VGEM_FENCE_WRITE);
 	write(slave[1], &i, sizeof(i));
@@ -110,8 +114,6 @@ static void test_fence_read(int i915, int vgem)
 
 	igt_waitchildren();
 	close(master[0]);
-	close(master[1]);
-	close(slave[0]);
 	close(slave[1]);
 }
 
@@ -137,6 +139,8 @@ static void test_fence_mmap(int i915, int vgem)
 	close(dmabuf);
 
 	igt_fork(child, 1) {
+		close(master[0]);
+		close(slave[1]);
 		ptr = gem_mmap__gtt(i915, handle, 4096*1024, PROT_READ);
 
 		gem_set_domain(i915, handle, I915_GEM_DOMAIN_GTT, 0);
@@ -153,6 +157,8 @@ static void test_fence_mmap(int i915, int vgem)
 		gem_close(i915, handle);
 	}
 
+	close(master[1]);
+	close(slave[0]);
 	read(master[0], &i, sizeof(i));
 	fence = vgem_fence_attach(vgem, &scratch, VGEM_FENCE_WRITE);
 	write(slave[1], &i, sizeof(i));
@@ -166,8 +172,6 @@ static void test_fence_mmap(int i915, int vgem)
 
 	igt_waitchildren();
 	close(master[0]);
-	close(master[1]);
-	close(slave[0]);
 	close(slave[1]);
 }
 
