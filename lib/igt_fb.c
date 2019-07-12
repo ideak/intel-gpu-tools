@@ -485,12 +485,10 @@ static int fb_num_planes(const struct igt_fb *fb)
 		return format->num_planes;
 }
 
-static void fb_init(struct igt_fb *fb,
-		    int fd, int width, int height,
-		    uint32_t drm_format,
-		    uint64_t modifier,
-		    enum igt_color_encoding color_encoding,
-		    enum igt_color_range color_range)
+void igt_init_fb(struct igt_fb *fb, int fd, int width, int height,
+		 uint32_t drm_format, uint64_t modifier,
+		 enum igt_color_encoding color_encoding,
+		 enum igt_color_range color_range)
 {
 	const struct format_desc_struct *f = lookup_drm_format(drm_format);
 
@@ -627,8 +625,8 @@ void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64
 {
 	struct igt_fb fb;
 
-	fb_init(&fb, fd, width, height, drm_format, modifier,
-		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
+	igt_init_fb(&fb, fd, width, height, drm_format, modifier,
+		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
 	fb.size = calc_fb_size(&fb);
 
@@ -855,8 +853,8 @@ void igt_create_bo_for_fb(int fd, int width, int height,
 			  uint32_t format, uint64_t modifier,
 			  struct igt_fb *fb /* out */)
 {
-	fb_init(fb, fd, width, height, format, modifier,
-		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
+	igt_init_fb(fb, fd, width, height, format, modifier,
+		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 	create_bo_for_fb(fb);
 }
 
@@ -885,8 +883,8 @@ int igt_create_bo_with_dimensions(int fd, int width, int height,
 {
 	struct igt_fb fb;
 
-	fb_init(&fb, fd, width, height, format, modifier,
-		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
+	igt_init_fb(&fb, fd, width, height, format, modifier,
+		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
 	for (int i = 0; i < fb.num_planes; i++)
 		fb.strides[i] = stride;
@@ -1441,8 +1439,8 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 {
 	uint32_t flags = 0;
 
-	fb_init(fb, fd, width, height, format, modifier,
-		color_encoding, color_range);
+	igt_init_fb(fb, fd, width, height, format, modifier,
+		    color_encoding, color_range);
 
 	for (int i = 0; i < fb->num_planes; i++)
 		fb->strides[i] = bo_stride;
@@ -1974,9 +1972,9 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 	 * destination, tiling it at the same time.
 	 */
 
-	fb_init(&linear->fb, fb->fd, fb->width, fb->height,
-		fb->drm_format, LOCAL_DRM_FORMAT_MOD_NONE,
-		fb->color_encoding, fb->color_range);
+	igt_init_fb(&linear->fb, fb->fd, fb->width, fb->height,
+		    fb->drm_format, LOCAL_DRM_FORMAT_MOD_NONE,
+		    fb->color_encoding, fb->color_range);
 
 	create_bo_for_fb(&linear->fb);
 
@@ -2130,9 +2128,9 @@ static void *igt_fb_create_cairo_shadow_buffer(int fd,
 
 	igt_assert(shadow);
 
-	fb_init(shadow, fd, width, height,
-		drm_format, LOCAL_DRM_FORMAT_MOD_NONE,
-		IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
+	igt_init_fb(shadow, fd, width, height,
+		    drm_format, LOCAL_DRM_FORMAT_MOD_NONE,
+		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
 	shadow->strides[0] = ALIGN(width * (shadow->plane_bpp[0] / 8), 16);
 	shadow->size = ALIGN((uint64_t)shadow->strides[0] * height,

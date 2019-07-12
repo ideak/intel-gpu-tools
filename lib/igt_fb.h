@@ -117,6 +117,10 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 			  unsigned *width_ret, unsigned *height_ret);
 void igt_calc_fb_size(int fd, int width, int height, uint32_t format, uint64_t modifier,
 		      uint64_t *size_ret, unsigned *stride_ret);
+void igt_init_fb(struct igt_fb *fb, int fd, int width, int height,
+		 uint32_t drm_format, uint64_t modifier,
+		 enum igt_color_encoding color_encoding,
+		 enum igt_color_range color_range);
 unsigned int
 igt_create_fb_with_bo_size(int fd, int width, int height,
 			   uint32_t format, uint64_t modifier,
