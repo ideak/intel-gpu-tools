@@ -32,6 +32,9 @@
 
 #include <xf86drmMode.h>
 
+/**
+ * est_timings: set of established timings
+ */
 struct est_timings {
 	uint8_t t1;
 	uint8_t t2;
@@ -47,6 +50,9 @@ enum std_timing_aspect {
 	STD_TIMING_16_9 = 0b11,
 };
 
+/**
+ * std_timing: a standard timing
+ */
 struct std_timing {
 	uint8_t hsize;
 	uint8_t vfreq_aspect;

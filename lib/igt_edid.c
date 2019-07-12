@@ -34,6 +34,21 @@
 #include "igt_core.h"
 #include "igt_edid.h"
 
+/**
+ * SECTION:igt_edid
+ * @short_description: EDID generation library
+ * @title: EDID
+ * @include: igt_edid.h
+ *
+ * This library contains helpers to generate custom EDIDs.
+
+ * The E-EDID specification is available at:
+ * https://glenwing.github.io/docs/VESA-EEDID-A2.pdf
+ *
+ * The EDID CEA extension is defined in CEA-861-D section 7. The HDMI VSDB is
+ * defined in the HDMI spec.
+ */
+
 static const char edid_header[] = {
 	0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00
 };
@@ -351,6 +366,10 @@ static void edid_cea_data_block_init(struct edid_cea_data_block *block,
 	block->type_len = type << 5 | size;
 }
 
+/**
+ * edid_cea_data_block_set_sad: initialize a CEA data block to contain Short
+ * Audio Descriptors
+ */
 size_t edid_cea_data_block_set_sad(struct edid_cea_data_block *block,
 				   const struct cea_sad *sads, size_t sads_len)
 {
@@ -364,6 +383,10 @@ size_t edid_cea_data_block_set_sad(struct edid_cea_data_block *block,
 	return sizeof(struct edid_cea_data_block) + sads_size;
 }
 
+/**
+ * edid_cea_data_block_set_svd: initialize a CEA data block to contain Short
+ * Video Descriptors
+ */
 size_t edid_cea_data_block_set_svd(struct edid_cea_data_block *block,
 				   const uint8_t *svds, size_t svds_len)
 {
@@ -372,6 +395,10 @@ size_t edid_cea_data_block_set_svd(struct edid_cea_data_block *block,
 	return sizeof(struct edid_cea_data_block) + svds_len;
 }
 
+/**
+ * edid_cea_data_block_set_vsdb: initialize a CEA data block to contain a
+ * Vendor Specific Data Block
+ */
 size_t edid_cea_data_block_set_vsdb(struct edid_cea_data_block *block,
 				    const struct cea_vsdb *vsdb, size_t vsdb_size)
 {
@@ -383,6 +410,10 @@ size_t edid_cea_data_block_set_vsdb(struct edid_cea_data_block *block,
 	return sizeof(struct edid_cea_data_block) + vsdb_size;
 }
 
+/**
+ * edid_cea_data_block_set_hdmi_vsdb: initialize a CEA data block to contain an
+ * HDMI VSDB
+ */
 size_t edid_cea_data_block_set_hdmi_vsdb(struct edid_cea_data_block *block,
 					 const struct hdmi_vsdb *hdmi,
 					 size_t hdmi_size)
@@ -399,6 +430,10 @@ size_t edid_cea_data_block_set_hdmi_vsdb(struct edid_cea_data_block *block,
 					    CEA_VSDB_HEADER_SIZE + hdmi_size);
 }
 
+/**
+ * edid_cea_data_block_set_speaker_alloc: initialize a CEA data block to
+ * contain a Speaker Allocation Data block
+ */
 size_t edid_cea_data_block_set_speaker_alloc(struct edid_cea_data_block *block,
 					     const struct cea_speaker_alloc *speakers)
 {
@@ -411,6 +446,11 @@ size_t edid_cea_data_block_set_speaker_alloc(struct edid_cea_data_block *block,
 	return sizeof(struct edid_cea_data_block) + size;
 }
 
+/**
+ * edid_ext_set_cea: initialize an EDID extension block to contain a CEA
+ * extension. CEA extensions contain a Data Block Collection (with multiple
+ * CEA data blocks) followed by multiple Detailed Timing Descriptors.
+ */
 void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
 		      uint8_t num_native_dtds, uint8_t flags)
 {
