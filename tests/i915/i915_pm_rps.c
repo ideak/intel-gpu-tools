@@ -45,6 +45,7 @@ IGT_TEST_DESCRIPTION("Render P-States tests - verify GPU frequency changes");
 static int drm_fd;
 
 enum {
+	ACT,
 	CUR,
 	MIN,
 	MAX,
@@ -62,6 +63,7 @@ struct sysfs_file {
 	const char *mode;
 	FILE *filp;
 } sysfs_files[] = {
+	{ "act", "r", NULL },
 	{ "cur", "r", NULL },
 	{ "min", "rb+", NULL },
 	{ "max", "rb+", NULL },
@@ -469,14 +471,14 @@ static void idle_check(void)
 		read_freqs(freqs);
 		dump(freqs);
 		check_freq_constraints(freqs);
-		if (freqs[CUR] == freqs[RPn])
+		if (freqs[ACT] == freqs[RPn])
 			break;
 		usleep(1000 * IDLE_WAIT_TIMESTEP_MSEC);
 		wait += IDLE_WAIT_TIMESTEP_MSEC;
 	} while (wait < IDLE_WAIT_TIMEOUT_MSEC);
 
 	igt_debugfs_dump(drm_fd, "i915_rps_boost_info");
-	igt_assert_eq(freqs[CUR], freqs[RPn]);
+	igt_assert_eq(freqs[ACT], freqs[RPn]);
 	igt_debug("Required %d msec to reach cur=idle\n", wait);
 }
 
