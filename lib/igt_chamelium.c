@@ -1124,6 +1124,63 @@ int chamelium_get_captured_frame_count(struct chamelium *chamelium)
 	return ret;
 }
 
+bool chamelium_supports_get_last_infoframe(struct chamelium *chamelium)
+{
+	return chamelium_supports_method(chamelium, "GetLastInfoFrame");
+}
+
+static const char *
+chamelium_infoframe_type_str(enum chamelium_infoframe_type type)
+{
+	switch (type) {
+	case CHAMELIUM_INFOFRAME_AVI:
+		return "avi";
+	case CHAMELIUM_INFOFRAME_AUDIO:
+		return "audio";
+	case CHAMELIUM_INFOFRAME_MPEG:
+		return "mpeg";
+	case CHAMELIUM_INFOFRAME_VENDOR:
+		return "vendor";
+	}
+	assert(0); /* unreachable */
+}
+
+struct chamelium_infoframe *
+chamelium_get_last_infoframe(struct chamelium *chamelium,
+			     struct chamelium_port *port,
+			     enum chamelium_infoframe_type type)
+{
+	xmlrpc_value *res, *res_version, *res_payload;
+	struct chamelium_infoframe *infoframe;
+	const unsigned char *payload;
+
+	res = chamelium_rpc(chamelium, NULL, "GetLastInfoFrame", "(is)",
+			    port->id, chamelium_infoframe_type_str(type));
+	xmlrpc_struct_find_value(&chamelium->env, res, "version", &res_version);
+	xmlrpc_struct_find_value(&chamelium->env, res, "payload", &res_payload);
+	infoframe = calloc(1, sizeof(*infoframe));
+	xmlrpc_read_int(&chamelium->env, res_version, &infoframe->version);
+	xmlrpc_read_base64(&chamelium->env, res_payload,
+			   &infoframe->payload_size, &payload);
+	/* xmlrpc-c's docs say payload is actually not constant */
+	infoframe->payload = (uint8_t *) payload;
+	xmlrpc_DECREF(res_version);
+	xmlrpc_DECREF(res_payload);
+	xmlrpc_DECREF(res);
+
+	if (infoframe->payload_size == 0) {
+		chamelium_infoframe_destroy(infoframe);
+		return NULL;
+	}
+	return infoframe;
+}
+
+void chamelium_infoframe_destroy(struct chamelium_infoframe *infoframe)
+{
+	free(infoframe->payload);
+	free(infoframe);
+}
+
 bool chamelium_has_audio_support(struct chamelium *chamelium,
 				 struct chamelium_port *port)
 {

@@ -65,6 +65,19 @@ struct chamelium_audio_file {
 	int channels;
 };
 
+enum chamelium_infoframe_type {
+	CHAMELIUM_INFOFRAME_AVI,
+	CHAMELIUM_INFOFRAME_AUDIO,
+	CHAMELIUM_INFOFRAME_MPEG,
+	CHAMELIUM_INFOFRAME_VENDOR,
+};
+
+struct chamelium_infoframe {
+	int version;
+	size_t payload_size;
+	uint8_t *payload;
+};
+
 struct chamelium_edid;
 
 /**
@@ -141,6 +154,11 @@ void chamelium_start_capture(struct chamelium *chamelium,
 void chamelium_stop_capture(struct chamelium *chamelium, int frame_count);
 void chamelium_capture(struct chamelium *chamelium, struct chamelium_port *port,
 		       int x, int y, int w, int h, int frame_count);
+bool chamelium_supports_get_last_infoframe(struct chamelium *chamelium);
+struct chamelium_infoframe *
+chamelium_get_last_infoframe(struct chamelium *chamelium,
+			     struct chamelium_port *port,
+			     enum chamelium_infoframe_type type);
 bool chamelium_has_audio_support(struct chamelium *chamelium,
 				 struct chamelium_port *port);
 void chamelium_get_audio_channel_mapping(struct chamelium *chamelium,
@@ -185,5 +203,6 @@ void chamelium_crop_analog_frame(struct chamelium_frame_dump *dump, int width,
 				 int height);
 void chamelium_destroy_frame_dump(struct chamelium_frame_dump *dump);
 void chamelium_destroy_audio_file(struct chamelium_audio_file *audio_file);
+void chamelium_infoframe_destroy(struct chamelium_infoframe *infoframe);
 
 #endif /* IGT_CHAMELIUM_H */
