@@ -300,8 +300,8 @@ test_close(int fd)
 
 	memset(ptr, 0xcc, OBJECT_SIZE);
 	gem_close(fd, handle);
-	for (i = 0; i < 4096; i++)
-		igt_assert(ptr[i*4096+i] == 0xcc);
+	for (i = 0; i < OBJECT_SIZE / 4096; i++)
+		igt_assert(ptr[i * 4096 + i] == 0xcc);
 
 	munmap(ptr, OBJECT_SIZE);
 }
