@@ -61,6 +61,7 @@ lib_sources = [
 	'igt_amd.c',
 	'igt_edid.c',
 	'igt_eld.c',
+	'igt_infoframe.c',
 ]
 
 lib_deps = [
