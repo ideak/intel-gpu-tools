@@ -101,6 +101,20 @@ static const uint32_t gen11_media_vme_kernel[][4] = {
 	{ 0x00000000, 0x00000000,  0x00000000,  0x00000000 },
 };
 
+static const uint32_t gen12_media_kernel[][4] = {
+	{ 0x00020061, 0x01050000, 0x00000104, 0x00000000 },
+	{ 0x00030061, 0x04050220, 0x00460005, 0x00000000 },
+	{ 0x00030061, 0x04050220, 0x00220205, 0x00000000 },
+	{ 0x00000061, 0x04454220, 0x00000000, 0x000f000f },
+	{ 0x00040461, 0x05050220, 0x00000104, 0x00000000 },
+	{ 0x00040561, 0x07050220, 0x00000104, 0x00000000 },
+	{ 0x00040661, 0x09050220, 0x00000104, 0x00000000 },
+	{ 0x00040761, 0x0b050220, 0x00000104, 0x00000000 },
+	{ 0x00049031, 0x00000000, 0xc000044c, 0x12a00000 },
+	{ 0x00030061, 0x70050220, 0x00460005, 0x00000000 },
+	{ 0x00040131, 0x00000004, 0x7020700c, 0x10000000 },
+};
+
 /*
  * This sets up the media pipeline,
  *
@@ -354,4 +368,15 @@ gen11_media_vme_func(struct intel_batchbuffer *batch,
 			       dst,
 			       gen11_media_vme_kernel,
 			       sizeof(gen11_media_vme_kernel));
+}
+
+void
+gen12_media_fillfunc(struct intel_batchbuffer *batch,
+		     const struct igt_buf *dst,
+		     unsigned int x, unsigned int y,
+		     unsigned int width, unsigned int height,
+		     uint8_t color)
+{
+	__gen9_media_fillfunc(batch, dst, x, y, width, height, color,
+			      gen12_media_kernel, sizeof(gen12_media_kernel));
 }
