@@ -29,6 +29,7 @@
 #include "igt_vc4.h"
 #include "igt_edid.h"
 #include "igt_eld.h"
+#include "igt_infoframe.h"
 
 #include <fcntl.h>
 #include <pthread.h>
@@ -1121,6 +1122,59 @@ static void audio_state_stop(struct audio_state *state, bool success)
 		  success ? "ALL GREEN" : "FAILED");
 }
 
+static void check_audio_infoframe(struct audio_state *state)
+{
+	struct chamelium_infoframe *infoframe;
+	struct infoframe_audio infoframe_audio;
+	struct infoframe_audio expected = {0};
+	bool ok;
+
+	if (!chamelium_supports_get_last_infoframe(state->chamelium)) {
+		igt_debug("Skipping audio InfoFrame check: "
+			  "Chamelium board doesn't support GetLastInfoFrame\n");
+		return;
+	}
+
+	expected.coding_type = INFOFRAME_AUDIO_CT_PCM;
+	expected.channel_count = state->playback.channels;
+	expected.sampling_freq = state->playback.rate;
+	expected.sample_size = snd_pcm_format_width(state->playback.format);
+
+	infoframe = chamelium_get_last_infoframe(state->chamelium, state->port,
+						 CHAMELIUM_INFOFRAME_AUDIO);
+	if (infoframe == NULL && state->playback.channels <= 2) {
+		/* Audio InfoFrames are optional for mono and stereo audio */
+		igt_debug("Skipping audio InfoFrame check: "
+			  "no InfoFrame received\n");
+		return;
+	}
+	igt_assert_f(infoframe != NULL, "no audio InfoFrame received\n");
+
+	ok = infoframe_audio_parse(&infoframe_audio, infoframe->version,
+				   infoframe->payload, infoframe->payload_size);
+	chamelium_infoframe_destroy(infoframe);
+	igt_assert_f(ok, "failed to parse audio InfoFrame\n");
+
+	igt_debug("Checking audio InfoFrame:\n");
+	igt_debug("coding_type: got %d, expected %d\n",
+		  infoframe_audio.coding_type, expected.coding_type);
+	igt_debug("channel_count: got %d, expected %d\n",
+		  infoframe_audio.channel_count, expected.channel_count);
+	igt_debug("sampling_freq: got %d, expected %d\n",
+		  infoframe_audio.sampling_freq, expected.sampling_freq);
+	igt_debug("sample_size: got %d, expected %d\n",
+		  infoframe_audio.sample_size, expected.sample_size);
+
+	if (infoframe_audio.coding_type != INFOFRAME_AUDIO_CT_UNSPECIFIED)
+		igt_assert(infoframe_audio.coding_type == expected.coding_type);
+	if (infoframe_audio.channel_count >= 0)
+		igt_assert(infoframe_audio.channel_count == expected.channel_count);
+	if (infoframe_audio.sampling_freq >= 0)
+		igt_assert(infoframe_audio.sampling_freq == expected.sampling_freq);
+	if (infoframe_audio.sample_size >= 0)
+		igt_assert(infoframe_audio.sample_size == expected.sample_size);
+}
+
 static int
 audio_output_frequencies_callback(void *data, void *buffer, int samples)
 {
@@ -1245,6 +1299,8 @@ static bool test_audio_frequencies(struct audio_state *state)
 	free(buf);
 	free(channel);
 	audio_signal_fini(state->signal);
+
+	check_audio_infoframe(state);
 
 	return success;
 }
