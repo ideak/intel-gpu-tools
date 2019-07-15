@@ -903,6 +903,8 @@ igt_fillfunc_t igt_get_gpgpu_fillfunc(int devid)
 		fill = gen9_gpgpu_fillfunc;
 	else if (IS_GEN11(devid))
 		fill = gen11_gpgpu_fillfunc;
+	else if (IS_GEN12(devid))
+		fill = gen12_gpgpu_fillfunc;
 
 	return fill;
 }
