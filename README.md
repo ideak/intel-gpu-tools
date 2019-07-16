@@ -139,13 +139,16 @@ Requirements
 This is a non-exhaustive list of package dependencies required for building
 the default configuration (package names may vary):
 
+	bison
 	gtk-doc-tools
+	flex
 	libcairo2-dev
 	libdrm-dev
 	libkmod-dev
 	libpixman-1-dev
 	libpciaccess-dev
 	libprocps-dev
+	libudev-dev
 	libunwind-dev
 	liblzma-dev
 	libdw-dev
