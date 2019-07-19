@@ -41,8 +41,9 @@ enum test_edid {
 	TEST_EDID_ALT,
 	TEST_EDID_HDMI_AUDIO,
 	TEST_EDID_DP_AUDIO,
+	TEST_EDID_ASPECT_RATIO,
 };
-#define TEST_EDID_COUNT 4
+#define TEST_EDID_COUNT 5
 
 typedef struct {
 	struct chamelium *chamelium;
@@ -1016,6 +1017,169 @@ static void test_mode_timings(data_t *data, struct chamelium_port *port)
 		igt_remove_fb(data->drm_fd, &fb);
 	}
 
+	drmModeFreeConnector(connector);
+}
+
+/* Set of Video Identification Codes advertised in the EDID */
+static const uint8_t edid_ar_svds[] = {
+	16, /* 1080p @ 60Hz, 16:9 */
+};
+
+struct vic_mode {
+	int hactive, vactive;
+	int vrefresh; /* Hz */
+	uint32_t picture_ar;
+};
+
+/* Maps Video Identification Codes to a mode */
+static const struct vic_mode vic_modes[] = {
+	[16] = {
+		.hactive = 1920,
+		.vactive = 1080,
+		.vrefresh = 60,
+		.picture_ar = DRM_MODE_PICTURE_ASPECT_16_9,
+	},
+};
+
+/* Maps aspect ratios to their mode flag */
+static const uint32_t mode_ar_flags[] = {
+	[DRM_MODE_PICTURE_ASPECT_16_9] = DRM_MODE_FLAG_PIC_AR_16_9,
+};
+
+static enum infoframe_avi_picture_aspect_ratio
+get_infoframe_avi_picture_ar(uint32_t aspect_ratio)
+{
+	/* The AVI picture aspect ratio field only supports 4:3 and 16:9 */
+	switch (aspect_ratio) {
+	case DRM_MODE_PICTURE_ASPECT_4_3:
+		return INFOFRAME_AVI_PIC_AR_4_3;
+	case DRM_MODE_PICTURE_ASPECT_16_9:
+		return INFOFRAME_AVI_PIC_AR_16_9;
+	default:
+		return INFOFRAME_AVI_PIC_AR_UNSPECIFIED;
+	}
+}
+
+static bool vic_mode_matches_drm(const struct vic_mode *vic_mode,
+				 drmModeModeInfo *drm_mode)
+{
+	uint32_t ar_flag = mode_ar_flags[vic_mode->picture_ar];
+
+	return vic_mode->hactive == drm_mode->hdisplay &&
+	       vic_mode->vactive == drm_mode->vdisplay &&
+	       vic_mode->vrefresh == drm_mode->vrefresh &&
+	       ar_flag == (drm_mode->flags & DRM_MODE_FLAG_PIC_AR_MASK);
+}
+
+static const struct edid *get_aspect_ratio_edid(void)
+{
+	static unsigned char raw_edid[2 * EDID_BLOCK_SIZE] = {0};
+	struct edid *edid;
+	struct edid_ext *edid_ext;
+	struct edid_cea *edid_cea;
+	char *cea_data;
+	struct edid_cea_data_block *block;
+	size_t cea_data_size = 0, vsdb_size;
+	const struct cea_vsdb *vsdb;
+
+	edid = (struct edid *) raw_edid;
+	memcpy(edid, igt_kms_get_base_edid(), sizeof(struct edid));
+	edid->extensions_len = 1;
+	edid_ext = &edid->extensions[0];
+	edid_cea = &edid_ext->data.cea;
+	cea_data = edid_cea->data;
+
+	/* The HDMI VSDB advertises support for InfoFrames */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	vsdb = cea_vsdb_get_hdmi_default(&vsdb_size);
+	cea_data_size += edid_cea_data_block_set_vsdb(block, vsdb,
+						      vsdb_size);
+
+	/* Short Video Descriptor */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	cea_data_size += edid_cea_data_block_set_svd(block, edid_ar_svds,
+						     sizeof(edid_ar_svds));
+
+	assert(cea_data_size <= sizeof(edid_cea->data));
+
+	edid_ext_set_cea(edid_ext, cea_data_size, 0, 0);
+
+	edid_update_checksum(edid);
+
+	return edid;
+}
+
+static void test_display_aspect_ratio(data_t *data, struct chamelium_port *port)
+{
+	igt_output_t *output;
+	igt_plane_t *primary;
+	drmModeConnector *connector;
+	drmModeModeInfo *mode;
+	int fb_id, i;
+	struct igt_fb fb;
+	bool found, ok;
+	struct chamelium_infoframe *infoframe;
+	struct infoframe_avi infoframe_avi;
+	uint8_t vic = 16; /* TODO: test more VICs */
+	const struct vic_mode *vic_mode;
+	uint32_t aspect_ratio;
+	enum infoframe_avi_picture_aspect_ratio frame_ar;
+
+	igt_require(chamelium_supports_get_last_infoframe(data->chamelium));
+
+	reset_state(data, port);
+
+	output = prepare_output(data, port, TEST_EDID_ASPECT_RATIO);
+	connector = chamelium_port_get_connector(data->chamelium, port, false);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_assert(primary);
+
+	vic_mode = &vic_modes[vic];
+	aspect_ratio = vic_mode->picture_ar;
+
+	found = false;
+	igt_assert(connector->count_modes > 0);
+	for (i = 0; i < connector->count_modes; i++) {
+		mode = &connector->modes[i];
+
+		if (vic_mode_matches_drm(vic_mode, mode)) {
+			found = true;
+			break;
+		}
+	}
+	igt_assert_f(found,
+		     "Failed to find mode with the correct aspect ratio\n");
+
+	fb_id = igt_create_color_pattern_fb(data->drm_fd,
+					    mode->hdisplay, mode->vdisplay,
+					    DRM_FORMAT_XRGB8888,
+					    LOCAL_DRM_FORMAT_MOD_NONE,
+					    0, 0, 0, &fb);
+	igt_assert(fb_id > 0);
+
+	enable_output(data, port, output, mode, &fb);
+
+	infoframe = chamelium_get_last_infoframe(data->chamelium, port,
+						 CHAMELIUM_INFOFRAME_AVI);
+	igt_assert_f(infoframe, "AVI InfoFrame not received\n");
+
+	ok = infoframe_avi_parse(&infoframe_avi, infoframe->version,
+				 infoframe->payload, infoframe->payload_size);
+	igt_assert_f(ok, "Failed to parse AVI InfoFrame\n");
+
+	frame_ar = get_infoframe_avi_picture_ar(aspect_ratio);
+
+	igt_debug("Checking AVI InfoFrame\n");
+	igt_debug("Picture aspect ratio: got %d, expected %d\n",
+		  infoframe_avi.picture_aspect_ratio, frame_ar);
+	igt_debug("Video Identification Code (VIC): got %d, expected %d\n",
+		  infoframe_avi.vic, vic);
+
+	igt_assert(infoframe_avi.picture_aspect_ratio == frame_ar);
+	igt_assert(infoframe_avi.vic == vic);
+
+	chamelium_infoframe_destroy(infoframe);
+	igt_remove_fb(data->drm_fd, &fb);
 	drmModeFreeConnector(connector);
 }
 
@@ -2365,6 +2529,8 @@ static const struct edid *get_edid(enum test_edid edid)
 		return igt_kms_get_hdmi_audio_edid();
 	case TEST_EDID_DP_AUDIO:
 		return igt_kms_get_dp_audio_edid();
+	case TEST_EDID_ASPECT_RATIO:
+		return get_aspect_ratio_edid();
 	}
 	assert(0); /* unreachable */
 }
@@ -2647,6 +2813,9 @@ igt_main
 		connector_subtest("hdmi-audio-edid", HDMIA)
 			test_display_audio_edid(&data, port,
 						TEST_EDID_HDMI_AUDIO);
+
+		connector_subtest("hdmi-aspect-ratio", HDMIA)
+			test_display_aspect_ratio(&data, port);
 	}
 
 	igt_subtest_group {
