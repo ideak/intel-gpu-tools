@@ -460,6 +460,7 @@ void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
 
 	assert(num_native_dtds <= 0x0F);
 	assert((flags & 0x0F) == 0);
+	assert(data_blocks_size <= sizeof(cea->data));
 	cea->revision = 3;
 	cea->dtd_start = 4 + data_blocks_size;
 	cea->misc = flags | num_native_dtds;
