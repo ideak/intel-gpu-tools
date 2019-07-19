@@ -368,7 +368,6 @@ void detailed_timing_set_string(struct detailed_timing *dt,
 
 void cea_sad_init_pcm(struct cea_sad *sad, int channels,
 		      uint8_t sampling_rates, uint8_t sample_sizes);
-void edid_ext_update_cea_checksum(struct edid_ext *ext);
 const struct cea_vsdb *cea_vsdb_get_hdmi_default(size_t *size);
 size_t edid_cea_data_block_set_sad(struct edid_cea_data_block *block,
 				   const struct cea_sad *sads, size_t sads_len);

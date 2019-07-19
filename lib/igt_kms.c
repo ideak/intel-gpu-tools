@@ -205,7 +205,6 @@ generate_audio_edid(unsigned char raw_edid[static AUDIO_EDID_SIZE],
 	edid_ext_set_cea(edid_ext, cea_data_size, 0, EDID_CEA_BASIC_AUDIO);
 
 	edid_update_checksum(edid);
-	edid_ext_update_cea_checksum(edid_ext);
 
 	return edid;
 }
@@ -314,7 +313,6 @@ const struct edid *igt_kms_get_4k_edid(void)
 	edid_ext_set_cea(edid_ext, cea_data_size, 0, 0);
 
 	edid_update_checksum(edid);
-	edid_ext_update_cea_checksum(edid_ext);
 
 	return edid;
 }
@@ -366,7 +364,6 @@ const struct edid *igt_kms_get_3d_edid(void)
 	edid_ext_set_cea(edid_ext, cea_data_size, 0, 0);
 
 	edid_update_checksum(edid);
-	edid_ext_update_cea_checksum(edid_ext);
 
 	return edid;
 }

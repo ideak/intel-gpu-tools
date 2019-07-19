@@ -296,12 +296,24 @@ static uint8_t compute_checksum(const uint8_t *buf, size_t size)
 }
 
 /**
- * edid_update_checksum: compute and update the EDID checksum
+ * edid_update_checksum: compute and update the checksums of the main EDID
+ * block and all extension blocks
  */
 void edid_update_checksum(struct edid *edid)
 {
+	size_t i;
+	struct edid_ext *ext;
+
 	edid->checksum = compute_checksum((uint8_t *) edid,
 					  sizeof(struct edid));
+
+	for (i = 0; i < edid->extensions_len; i++) {
+		ext = &edid->extensions[i];
+		if (ext->tag == EDID_EXT_CEA)
+			ext->data.cea.checksum =
+				compute_checksum((uint8_t *) ext,
+						 sizeof(struct edid_ext));
+	}
 }
 
 /**
@@ -464,10 +476,4 @@ void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
 	cea->revision = 3;
 	cea->dtd_start = 4 + data_blocks_size;
 	cea->misc = flags | num_native_dtds;
-}
-
-void edid_ext_update_cea_checksum(struct edid_ext *ext)
-{
-	ext->data.cea.checksum = compute_checksum((uint8_t *) ext,
-						  sizeof(struct edid_ext));
 }
