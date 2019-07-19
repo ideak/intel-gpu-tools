@@ -944,11 +944,13 @@ static void dump_psr(struct context *context,
 {
 	const struct bdb_psr *psr_block = block->data;
 	int i;
+	uint32_t psr2_tp_time;
 
 	/* The same block ID was used for something else before? */
 	if (context->bdb->version < 165)
 		return;
 
+	psr2_tp_time = psr_block->psr2_tp2_tp3_wakeup_time;
 	for (i = 0; i < 16; i++) {
 		const struct psr_table *psr = &psr_block->psr_table[i];
 
@@ -987,6 +989,15 @@ static void dump_psr(struct context *context,
 		printf("\t\tTP2/TP3 wakeup time: %d usec (0x%x)\n",
 		       psr->tp2_tp3_wakeup_time * 100,
 		       psr->tp2_tp3_wakeup_time);
+
+		if (context->bdb->version >= 226) {
+			int index;
+			static const uint16_t psr2_tp_times[] = {500, 100, 2500, 5};
+
+			index = (psr2_tp_time >> (i * 2)) & 0x3;
+			printf("\t\tPSR2 TP2/TP3 wakeup time: %d usec (0x%x)\n",
+			       psr2_tp_times[index], index);
+		}
 	}
 }
 
