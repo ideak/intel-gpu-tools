@@ -32,6 +32,8 @@
 
 #include <xf86drmMode.h>
 
+#define EDID_BLOCK_SIZE 128
+
 /**
  * est_timings: set of established timings
  */

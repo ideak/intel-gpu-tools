@@ -158,10 +158,10 @@ const struct edid *igt_kms_get_alt_edid(void)
 	return &edid;
 }
 
-#define AUDIO_EDID_LENGTH (2 * EDID_LENGTH)
+#define AUDIO_EDID_SIZE (2 * EDID_BLOCK_SIZE)
 
 static const struct edid *
-generate_audio_edid(unsigned char raw_edid[static AUDIO_EDID_LENGTH],
+generate_audio_edid(unsigned char raw_edid[static AUDIO_EDID_SIZE],
 		    bool with_vsdb, struct cea_sad *sad,
 		    struct cea_speaker_alloc *speaker_alloc)
 {
@@ -214,7 +214,7 @@ const struct edid *igt_kms_get_hdmi_audio_edid(void)
 {
 	int channels;
 	uint8_t sampling_rates, sample_sizes;
-	static unsigned char raw_edid[AUDIO_EDID_LENGTH] = {0};
+	static unsigned char raw_edid[AUDIO_EDID_SIZE] = {0};
 	struct cea_sad sad = {0};
 	struct cea_speaker_alloc speaker_alloc = {0};
 
@@ -238,7 +238,7 @@ const struct edid *igt_kms_get_dp_audio_edid(void)
 {
 	int channels;
 	uint8_t sampling_rates, sample_sizes;
-	static unsigned char raw_edid[AUDIO_EDID_LENGTH] = {0};
+	static unsigned char raw_edid[AUDIO_EDID_SIZE] = {0};
 	struct cea_sad sad = {0};
 	struct cea_speaker_alloc speaker_alloc = {0};
 

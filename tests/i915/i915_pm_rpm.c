@@ -50,6 +50,7 @@
 #include "igt_sysfs.h"
 #include "igt_debugfs.h"
 #include "igt_device.h"
+#include "igt_edid.h"
 
 #define MSR_PKG_CST_CONFIG_CONTROL	0xE2
 /* HSW/BDW: */
@@ -655,10 +656,10 @@ static bool i2c_read_edid(const char *connector_name, unsigned char *edid)
 	return rc >= 0;
 }
 
-static void format_hex_string(const unsigned char edid[static EDID_LENGTH],
-			      char buf[static EDID_LENGTH * 5 + 1])
+static void format_hex_string(const unsigned char edid[static EDID_BLOCK_SIZE],
+			      char buf[static EDID_BLOCK_SIZE * 5 + 1])
 {
-	for (int i = 0; i < EDID_LENGTH; ++i)
+	for (int i = 0; i < EDID_BLOCK_SIZE; ++i)
 		sprintf(buf+i*5, "0x%02x ", edid[i]);
 }
 
@@ -670,7 +671,7 @@ static void test_i2c(struct mode_set_data *data)
 
 	for (int i = 0; i < data->res->count_connectors; i++) {
 		unsigned char *drm_edid = data->edids[i] ? data->edids[i]->data : NULL;
-		unsigned char i2c_edid[EDID_LENGTH] = {};
+		unsigned char i2c_edid[EDID_BLOCK_SIZE] = {};
 
 		igt_output_t *output = igt_output_from_connector(&display,
 								 data->connectors[i]);
@@ -694,13 +695,13 @@ static void test_i2c(struct mode_set_data *data)
 			continue;
 
 		if (got_i2c_edid && got_drm_edid)
-			edids_equal = (0 == memcmp(drm_edid, i2c_edid, EDID_LENGTH));
+			edids_equal = (0 == memcmp(drm_edid, i2c_edid, EDID_BLOCK_SIZE));
 		else
 			edids_equal = false;
 
 
 		if (!edids_equal) {
-			char buf[5 * EDID_LENGTH + 1];
+			char buf[5 * EDID_BLOCK_SIZE + 1];
 			igt_critical("Detected EDID mismatch on connector %s\n",
 				     connector_name);
 

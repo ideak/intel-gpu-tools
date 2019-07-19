@@ -57,7 +57,7 @@ static bool edid_block_checksum(const unsigned char *raw_edid)
 	size_t i;
 	unsigned char csum = 0;
 
-	for (i = 0; i < EDID_LENGTH; i++) {
+	for (i = 0; i < EDID_BLOCK_SIZE; i++) {
 		csum += raw_edid[i];
 	}
 
@@ -81,7 +81,7 @@ igt_simple_main
 		{0},
 	}, *f;
 	const struct edid *edid;
-	const uint8_t *raw_edid;
+	const uint8_t *raw_edid, *raw_block;
 	size_t i;
 
 	for (f = funcs; f->f; f++) {
@@ -97,8 +97,11 @@ igt_simple_main
 		igt_assert_f(raw_edid[126] == f->exts,
 			     "unexpected number of extensions on %s EDID",
 			     f->desc);
-		for (i = 0; i < f->exts; i++)
-			igt_assert_f(edid_block_checksum(raw_edid + (i + 1) * EDID_LENGTH),
-				     "CEA block checksum failed on %s EDID", f->desc);
+		for (i = 0; i < f->exts; i++) {
+			raw_block = raw_edid + (i + 1) * EDID_BLOCK_SIZE;
+			igt_assert_f(edid_block_checksum(raw_block),
+				     "CEA block checksum failed on %s EDID",
+				     f->desc);
+		}
 	}
 }
