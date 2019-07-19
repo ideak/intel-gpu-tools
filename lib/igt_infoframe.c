@@ -27,6 +27,7 @@
 
 #include <string.h>
 
+#include "igt_core.h"
 #include "igt_infoframe.h"
 
 /**
@@ -60,6 +61,35 @@ static const int sample_sizes[] = {
 };
 
 static const size_t sample_sizes_len = sizeof(sample_sizes) / sizeof(sample_sizes[0]);
+
+bool infoframe_avi_parse(struct infoframe_avi *infoframe, int version,
+			 const uint8_t *buf, size_t buf_size)
+{
+	memset(infoframe, 0, sizeof(*infoframe));
+
+	switch (version) {
+	case 2:
+	case 3:
+	case 4:
+		break; /* supported */
+	default:
+		igt_debug("Unsuppported AVI InfoFrame version: %d\n", version);
+		return false;
+	}
+
+	if (buf_size < 13)
+		return false;
+
+	infoframe->rgb_ycbcr = buf[0] >> 5;
+	infoframe->scan = buf[0] & 0x3;
+
+	infoframe->colorimetry = buf[1] >> 6;
+	infoframe->picture_aspect_ratio = (buf[1] >> 4) & 0x3;
+	infoframe->active_aspect_ratio = buf[1] & 0xF;
+	infoframe->vic = buf[3];
+
+	return true;
+}
 
 bool infoframe_audio_parse(struct infoframe_audio *infoframe, int version,
 			   const uint8_t *buf, size_t buf_size)

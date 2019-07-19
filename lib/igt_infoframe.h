@@ -32,6 +32,52 @@
 #include <stddef.h>
 #include <stdint.h>
 
+enum infoframe_avi_rgb_ycbcr {
+	INFOFRAME_AVI_RGB = 0,
+	INFOFRAME_AVI_YCBCR422 = 1,
+	INFOFRAME_AVI_YCBCR444 = 2,
+	INFOFRAME_AVI_YCBCR420 = 3,
+	INFOFRAME_AVI_IDO_DEFINED = 7,
+};
+
+enum infoframe_avi_scan {
+	INFOFRAME_AVI_SCAN_UNSPECIFIED = 0,
+	INFOFRAME_AVI_OVERSCAN = 1,
+	INFOFRAME_AVI_UNDERSCAN = 2,
+};
+
+enum infoframe_avi_colorimetry {
+	INFOFRAME_AVI_COLORIMETRY_UNSPECIFIED = 0,
+	INFOFRAME_AVI_SMPTE_170M = 1,
+	INFOFRAME_AVI_ITUR_BT709 = 2,
+	INFOFRAME_AVI_COLORIMETRY_EXTENDED = 3,
+};
+
+enum infoframe_avi_picture_aspect_ratio {
+	INFOFRAME_AVI_PIC_AR_UNSPECIFIED = 0,
+	INFOFRAME_AVI_PIC_AR_4_3 = 1,
+	INFOFRAME_AVI_PIC_AR_16_9 = 2,
+};
+
+enum infoframe_avi_active_aspect_ratio {
+	INFOFRAME_AVI_ACT_AR_PIC = 8, /* same as picture aspect ratio */
+	INFOFRAME_AVI_ACT_AR_4_3 = 9,
+	INFOFRAME_AVI_ACT_AR_16_9 = 10,
+	INFOFRAME_AVI_ACT_AR_14_9 = 11,
+};
+
+#define INFOFRAME_AVI_VIC_UNSPECIFIED 0
+
+struct infoframe_avi {
+	enum infoframe_avi_rgb_ycbcr rgb_ycbcr;
+	enum infoframe_avi_scan scan;
+	enum infoframe_avi_colorimetry colorimetry;
+	enum infoframe_avi_picture_aspect_ratio picture_aspect_ratio;
+	enum infoframe_avi_active_aspect_ratio active_aspect_ratio;
+	uint8_t vic; /* Video Identification Code */
+	/* TODO: remaining fields */
+};
+
 enum infoframe_audio_coding_type {
 	INFOFRAME_AUDIO_CT_UNSPECIFIED = 0, /* refer to stream header */
 	INFOFRAME_AUDIO_CT_PCM = 1, /* IEC 60958 PCM */
@@ -58,6 +104,8 @@ struct infoframe_audio {
 	/* TODO: speaker allocation */
 };
 
+bool infoframe_avi_parse(struct infoframe_avi *infoframe, int version,
+			 const uint8_t *buf, size_t buf_size);
 bool infoframe_audio_parse(struct infoframe_audio *infoframe, int version,
 			   const uint8_t *buf, size_t buf_size);
 
