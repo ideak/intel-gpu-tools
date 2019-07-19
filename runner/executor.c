@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <sys/poll.h>
 #include <sys/signalfd.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -604,7 +605,6 @@ static int monitor_output(pid_t child,
 				close(outfd);
 				close(errfd);
 				close(kmsgfd);
-				close(sigfd);
 				return -1;
 			}
 
@@ -776,9 +776,8 @@ static int monitor_output(pid_t child,
 					*time_spent = time;
 			}
 
-			close(sigfd);
-			sigfd = -1;
 			child = 0;
+			sigfd = -1; /* we are dying, no signal handling for now */
 		}
 	}
 
@@ -790,7 +789,6 @@ static int monitor_output(pid_t child,
 	close(outfd);
 	close(errfd);
 	close(kmsgfd);
-	close(sigfd);
 
 	if (aborting)
 		return -1;
@@ -908,13 +906,12 @@ static int execute_next_entry(struct execute_state *state,
 			      double *time_spent,
 			      struct settings *settings,
 			      struct job_list_entry *entry,
-			      int testdirfd, int resdirfd)
+			      int testdirfd, int resdirfd,
+			      int sigfd, sigset_t *sigmask)
 {
 	int dirfd;
 	int outputs[_F_LAST];
 	int kmsgfd;
-	int sigfd;
-	sigset_t mask;
 	int outpipe[2] = { -1, -1 };
 	int errpipe[2] = { -1, -1 };
 	int outfd, errfd;
@@ -954,21 +951,6 @@ static int execute_next_entry(struct execute_state *state,
 		lseek(kmsgfd, 0, SEEK_END);
 	}
 
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGCHLD);
-	sigaddset(&mask, SIGINT);
-	sigaddset(&mask, SIGTERM);
-	sigaddset(&mask, SIGQUIT);
-	sigaddset(&mask, SIGHUP);
-	sigprocmask(SIG_BLOCK, &mask, NULL);
-	sigfd = signalfd(-1, &mask, O_CLOEXEC);
-
-	if (sigfd < 0) {
-		/* TODO: Handle better */
-		fprintf(stderr, "Cannot monitor child process with signalfd\n");
-		result = -1;
-		goto out_kmsgfd;
-	}
 
 	if (settings->log_level >= LOG_LEVEL_NORMAL) {
 		char *displayname;
@@ -1002,7 +984,7 @@ static int execute_next_entry(struct execute_state *state,
 		close(outpipe[0]);
 		close(errpipe[0]);
 
-		sigprocmask(SIG_UNBLOCK, &mask, NULL);
+		sigprocmask(SIG_UNBLOCK, sigmask, NULL);
 
 		setenv("IGT_SENTINEL_ON_STDERR", "1", 1);
 
@@ -1261,12 +1243,48 @@ static void oom_immortal(void)
 	close(fd);
 }
 
+static bool should_die_because_signal(int sigfd)
+{
+	struct signalfd_siginfo siginfo;
+	int ret;
+	struct pollfd sigpoll = { .fd = sigfd, .events = POLLIN | POLLRDBAND };
+
+	ret = poll(&sigpoll, 1, 0);
+
+	if (ret != 0) {
+		if (ret == -1) {
+			fprintf(stderr, "Poll on signalfd failed with %s\n", strerror(errno));
+			return true; /* something is wrong, let's die */
+		}
+
+		ret = read(sigfd, &siginfo, sizeof(siginfo));
+
+		if (ret == -1) {
+			fprintf(stderr, "Error reading from signalfd: %s\n", strerror(errno));
+			return false; /* we may want to retry later */
+		}
+
+		if (siginfo.ssi_signo == SIGCHLD) {
+			fprintf(stderr, "Runner got stray SIGCHLD while not executing any tests.\n");
+		} else {
+			fprintf(stderr, "Runner is being killed by %s\n",
+				strsignal(siginfo.ssi_signo));
+			return true;
+		}
+
+	}
+
+	return false;
+}
+
 bool execute(struct execute_state *state,
 	     struct settings *settings,
 	     struct job_list *job_list)
 {
 	struct utsname unamebuf;
 	int resdirfd, testdirfd, unamefd, timefd;
+	sigset_t sigmask;
+	int sigfd;
 	double time_spent = 0.0;
 	bool status = true;
 
@@ -1310,6 +1328,22 @@ bool execute(struct execute_state *state,
 
 	oom_immortal();
 
+	sigemptyset(&sigmask);
+	sigaddset(&sigmask, SIGCHLD);
+	sigaddset(&sigmask, SIGINT);
+	sigaddset(&sigmask, SIGTERM);
+	sigaddset(&sigmask, SIGQUIT);
+	sigaddset(&sigmask, SIGHUP);
+	sigfd = signalfd(-1, &sigmask, O_CLOEXEC);
+	sigprocmask(SIG_BLOCK, &sigmask, NULL);
+
+	if (sigfd < 0) {
+		/* TODO: Handle better */
+		fprintf(stderr, "Cannot mask signals\n");
+		status = false;
+		goto end;
+	}
+
 	init_watchdogs(settings);
 
 	if (!uname(&unamebuf)) {
@@ -1345,12 +1379,18 @@ bool execute(struct execute_state *state,
 		char *reason;
 		int result;
 
+		if (should_die_because_signal(sigfd)) {
+			status = false;
+			goto end;
+		}
+
 		result = execute_next_entry(state,
 					    job_list->size,
 					    &time_spent,
 					    settings,
 					    &job_list->entries[state->next],
-					    testdirfd, resdirfd);
+					    testdirfd, resdirfd,
+					    sigfd, &sigmask);
 
 		if (result < 0) {
 			status = false;
@@ -1383,8 +1423,15 @@ bool execute(struct execute_state *state,
 		if (result > 0) {
 			double time_left = state->time_left;
 
-			close(testdirfd);
 			close_watchdogs(settings);
+			sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
+			/* make sure that we do not leave any signals unhandled */
+			if (should_die_because_signal(sigfd)) {
+				status = false;
+				goto end_post_signal_restore;
+			}
+			close(sigfd);
+			close(testdirfd);
 			initialize_execute_state_from_resume(resdirfd, state, settings, job_list);
 			state->time_left = time_left;
 			return execute(state, settings, job_list);
@@ -1397,8 +1444,14 @@ bool execute(struct execute_state *state,
 	}
 
  end:
+	close_watchdogs(settings);
+	sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
+	/* make sure that we do not leave any signals unhandled */
+	if (should_die_because_signal(sigfd))
+		status = false;
+ end_post_signal_restore:
+	close(sigfd);
 	close(testdirfd);
 	close(resdirfd);
-	close_watchdogs(settings);
 	return status;
 }
