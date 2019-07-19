@@ -31,7 +31,7 @@ igt_simple_main
 	int drm_fd;
 	drmModeRes *res;
 	drmModeConnector *connector;
-	const unsigned char *edid;
+	const struct edid *edid;
 	int mode_count, connector_id;
 
 	drm_fd = drm_open_driver_master(DRIVER_INTEL);

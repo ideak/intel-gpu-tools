@@ -78,7 +78,7 @@ get_connector(int drm_fd, drmModeRes *res)
 static void
 hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 {
-	const unsigned char *edid;
+	const struct edid *edid;
 	struct kmstest_connector_config config;
 	int ret, cid, i, crtc_mask = -1;
 	int fb_id;
@@ -139,7 +139,7 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 static void
 hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 {
-	const unsigned char *edid;
+	const struct edid *edid;
 	int fb_id, cid, ret, crtc_mask = -1;
 	struct igt_fb fb;
 	struct kmstest_connector_config config;

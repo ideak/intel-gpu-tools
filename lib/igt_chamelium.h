@@ -34,6 +34,7 @@
 #include "igt_debugfs.h"
 
 struct igt_fb;
+struct edid;
 
 struct chamelium;
 struct chamelium_port;
@@ -127,7 +128,7 @@ void chamelium_schedule_hpd_toggle(struct chamelium *chamelium,
 				   struct chamelium_port *port, int delay_ms,
 				   bool rising_edge);
 struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
-					  const unsigned char *edid);
+					  const struct edid *edid);
 const struct edid *chamelium_edid_get_raw(struct chamelium_edid *edid,
 					  struct chamelium_port *port);
 void chamelium_port_set_edid(struct chamelium *chamelium,

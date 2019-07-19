@@ -64,7 +64,7 @@ static bool edid_block_checksum(const unsigned char *raw_edid)
 	return csum == 0;
 }
 
-typedef const unsigned char *(*get_edid_func)(void);
+typedef const struct edid *(*get_edid_func)(void);
 
 igt_simple_main
 {
@@ -80,23 +80,25 @@ igt_simple_main
 		{ "3d", igt_kms_get_3d_edid, 1 },
 		{0},
 	}, *f;
-	const unsigned char *edid;
+	const struct edid *edid;
+	const uint8_t *raw_edid;
 	size_t i;
 
 	for (f = funcs; f->f; f++) {
 		edid = f->f();
+		raw_edid = (uint8_t *) edid;
 
-		igt_assert_f(edid_header_is_valid(edid),
+		igt_assert_f(edid_header_is_valid(raw_edid),
 			     "invalid header on %s EDID", f->desc);
 		/* check base edid block */
-		igt_assert_f(edid_block_checksum(edid),
+		igt_assert_f(edid_block_checksum(raw_edid),
 			     "checksum failed on %s EDID", f->desc);
 		/* check extension blocks, if any */
-		igt_assert_f(edid[126] == f->exts,
+		igt_assert_f(raw_edid[126] == f->exts,
 			     "unexpected number of extensions on %s EDID",
 			     f->desc);
 		for (i = 0; i < f->exts; i++)
-			igt_assert_f(edid_block_checksum(edid + (i + 1) * EDID_LENGTH),
+			igt_assert_f(edid_block_checksum(raw_edid + (i + 1) * EDID_LENGTH),
 				     "CEA block checksum failed on %s EDID", f->desc);
 	}
 }

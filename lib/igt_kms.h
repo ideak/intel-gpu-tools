@@ -192,11 +192,12 @@ enum intel_broadcast_rgb_mode {
 	BROADCAST_RGB_16_235
 };
 
+struct edid;
 
 bool kmstest_force_connector(int fd, drmModeConnector *connector,
 			     enum kmstest_force_connector_state state);
 void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
-			const unsigned char *edid);
+			const struct edid *edid);
 
 bool kmstest_get_connector_default_mode(int drm_fd, drmModeConnector *connector,
 					drmModeModeInfo *mode);
@@ -754,16 +755,13 @@ void igt_reset_connectors(void);
 
 uint32_t kmstest_get_vbl_flag(uint32_t pipe_id);
 
-struct cea_sad;
-struct cea_speaker_alloc;
-
 #define EDID_LENGTH 128
-const unsigned char *igt_kms_get_base_edid(void);
-const unsigned char *igt_kms_get_alt_edid(void);
-const unsigned char *igt_kms_get_hdmi_audio_edid(void);
-const unsigned char *igt_kms_get_dp_audio_edid(void);
-const unsigned char *igt_kms_get_4k_edid(void);
-const unsigned char *igt_kms_get_3d_edid(void);
+const struct edid *igt_kms_get_base_edid(void);
+const struct edid *igt_kms_get_alt_edid(void);
+const struct edid *igt_kms_get_hdmi_audio_edid(void);
+const struct edid *igt_kms_get_dp_audio_edid(void);
+const struct edid *igt_kms_get_4k_edid(void);
+const struct edid *igt_kms_get_3d_edid(void);
 
 struct udev_monitor *igt_watch_hotplug(void);
 bool igt_hotplug_detected(struct udev_monitor *mon,

@@ -562,10 +562,9 @@ static void chamelium_destroy_edid(struct chamelium *chamelium, int edid_id)
  * Returns: An opaque pointer to the Chamelium EDID
  */
 struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
-					  const unsigned char *raw_edid)
+					  const struct edid *edid)
 {
 	struct chamelium_edid *chamelium_edid;
-	const struct edid *edid = (struct edid *) raw_edid;
 	size_t edid_size = edid_get_size(edid);
 
 	chamelium_edid = calloc(1, sizeof(struct chamelium_edid));

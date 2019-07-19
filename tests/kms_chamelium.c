@@ -261,7 +261,7 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port, int toggle_count)
 	igt_hpd_storm_reset(data->drm_fd);
 }
 
-static const unsigned char *get_edid(enum test_edid edid);
+static const struct edid *get_edid(enum test_edid edid);
 
 static void set_edid(data_t *data, struct chamelium_port *port,
 		     enum test_edid edid)
@@ -2197,7 +2197,7 @@ test_hpd_storm_disable(data_t *data, struct chamelium_port *port, int width)
 	igt_hpd_storm_reset(data->drm_fd);
 }
 
-static const unsigned char *get_edid(enum test_edid edid)
+static const struct edid *get_edid(enum test_edid edid)
 {
 	switch (edid) {
 	case TEST_EDID_BASE:
