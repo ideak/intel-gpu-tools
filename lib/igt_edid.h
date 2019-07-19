@@ -238,7 +238,7 @@ struct hdmi_vsdb {
 	uint8_t flags1; /* enum hdmi_vsdb_flags1 */
 	uint8_t max_tdms_clock; /* multiply by 5MHz */
 	uint8_t flags2; /* enum hdmi_vsdb_flags2 */
-	char data[]; /* latency, misc, VIC, 3D */
+	uint8_t data[]; /* latency, misc, VIC, 3D */
 } __attribute__((packed));
 
 #define HDMI_VSDB_MIN_SIZE 2 /* just the source physical address */
