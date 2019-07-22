@@ -309,6 +309,12 @@ static const struct intel_device_info intel_icelake_info = {
 	.codename = "icelake"
 };
 
+static const struct intel_device_info intel_tigerlake_info = {
+	.gen = BIT(11),
+	.is_tigerlake = true,
+	.codename = "tigerlake"
+};
+
 static const struct pci_id_match intel_device_match[] = {
 	INTEL_I810_IDS(&intel_i810_info),
 	INTEL_I815_IDS(&intel_i815_info),
