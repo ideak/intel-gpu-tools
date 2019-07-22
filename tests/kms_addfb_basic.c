@@ -527,7 +527,7 @@ static void addfb25_tests(int fd)
 		gem_close(fd, gem_bo);
 }
 
-static int addfb_expected_ret(int fd)
+static int addfb_expected_ret(int fd, uint64_t modifier)
 {
 	int gen;
 
@@ -535,6 +535,9 @@ static int addfb_expected_ret(int fd)
 		return 0;
 
 	gen = intel_gen(intel_get_drm_devid(fd));
+
+	if (modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED)
+		return gen >= 9 && gen < 12 ? 0 : -1;
 	return gen >= 9 ? 0 : -1;
 }
 
@@ -568,8 +571,8 @@ static void addfb25_ytile(int fd)
 
 		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Y_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) ==
-			   addfb_expected_ret(fd));
-		if (!addfb_expected_ret(fd))
+			   addfb_expected_ret(fd, f.modifier[0]));
+		if (!addfb_expected_ret(fd, f.modifier[0]))
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
 		f.fb_id = 0;
 	}
@@ -579,8 +582,8 @@ static void addfb25_ytile(int fd)
 
 		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Yf_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) ==
-			   addfb_expected_ret(fd));
-		if (!addfb_expected_ret(fd))
+			   addfb_expected_ret(fd, f.modifier[0]));
+		if (!addfb_expected_ret(fd, f.modifier[0]))
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
 		f.fb_id = 0;
 	}
