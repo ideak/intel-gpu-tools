@@ -137,7 +137,7 @@ static bool get_mocs_settings(int fd, struct mocs_table *table, bool dirty)
 	uint32_t devid = intel_get_drm_devid(fd);
 	bool result = false;
 
-	if (IS_SKYLAKE(devid) || IS_KABYLAKE(devid)) {
+	if (IS_SKYLAKE(devid) || IS_KABYLAKE(devid) || IS_COMETLAKE(devid)) {
 		if (dirty) {
 			table->size  = ARRAY_SIZE(dirty_skylake_mocs_table);
 			table->table = dirty_skylake_mocs_table;
