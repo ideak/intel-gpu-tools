@@ -192,7 +192,8 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 		.flags = ring,
 	};
 	uint32_t scratch, *s;
-	uint32_t batch[16];
+	uint32_t batch, cs[16];
+	uint64_t offset;
 	int i;
 
 	gem_require_ring(i915, ring);
@@ -207,54 +208,62 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 	obj.flags |= EXEC_OBJECT_PINNED; /* reuse this address */
 
 	scratch = gem_create(i915, 4096);
-	s = gem_mmap__cpu(i915, scratch, 0, 4096, PROT_WRITE);
+	s = gem_mmap__wc(i915, scratch, 0, 4096, PROT_WRITE);
 
-	gem_set_domain(i915, scratch, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
-	*s = bbe;
+	gem_set_domain(i915, scratch, I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
+	s[0] = bbe;
+	s[64] = bbe;
 
 	/* Load object into place in the GTT */
 	obj.handle = scratch;
 	gem_execbuf(i915, &execbuf);
+	offset = obj.offset;
 
 	/* Presume nothing causes an eviction in the meantime! */
 
-	obj.handle = gem_create(i915, 4096);
+	batch = gem_create(i915, 4096);
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	cs[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
-		batch[++i] = obj.offset;
-		batch[++i] = 0;
+		cs[++i] = obj.offset;
+		cs[++i] = obj.offset >> 32;
 	} else if (gen >= 4) {
-		batch[++i] = 0;
-		batch[++i] = obj.offset;
+		cs[++i] = 0;
+		cs[++i] = obj.offset;
 	} else {
-		batch[i]--;
-		batch[++i] = obj.offset;
+		cs[i]--;
+		cs[++i] = obj.offset;
 	}
-	batch[++i] = 0xc0ffee;
-	batch[++i] = bbe;
-	gem_write(i915, obj.handle, 0, batch, sizeof(batch));
+	cs[++i] = 0xc0ffee;
+	cs[++i] = bbe;
+	gem_write(i915, batch, 0, cs, sizeof(cs));
 
+	obj.handle = batch;
 	obj.offset += 8192; /* make sure we don't cause an eviction! */
 	execbuf.rsvd1 = gem_context_clone(i915, 0, I915_CONTEXT_CLONE_VM, 0);
 	if (gen > 3 && gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
-
 	gem_execbuf(i915, &execbuf);
+
+	/* Check the scratch didn't move */
+	obj.handle = scratch;
+	obj.offset = -1;
+	obj.flags &= ~EXEC_OBJECT_PINNED;
+	execbuf.batch_start_offset = 64 * sizeof(s[0]);
+	gem_execbuf(i915, &execbuf);
+	igt_assert_eq_u64(obj.offset, offset);
 	gem_context_destroy(i915, execbuf.rsvd1);
-	gem_sync(i915, obj.handle); /* write hazard lies */
-	gem_close(i915, obj.handle);
+
+	gem_sync(i915, batch); /* write hazard lies */
+	gem_close(i915, batch);
 
 	/*
 	 * If we created the new context with the old GTT, the write
 	 * into the stale location of scratch will have landed in the right
 	 * object. Otherwise, it should read the previous value of
 	 * MI_BATCH_BUFFER_END.
-	 *
-	 * Setting .write = CPU to paper over our write hazard lies above.
 	 */
-	gem_set_domain(i915, scratch, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 	igt_assert_eq_u32(*s, 0xc0ffee);
 
 	munmap(s, 4096);
