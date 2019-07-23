@@ -78,7 +78,6 @@ igt@gem_mmap_gtt@basic-small-bo-tiledx
 igt@gem_mmap_gtt@basic-small-bo-tiledy
 igt@gem_mmap_gtt@basic-small-copy
 igt@gem_mmap_gtt@basic-small-copy-xy
-igt@gem_mmap_gtt@basic-wc
 igt@gem_mmap_gtt@basic-write
 igt@gem_mmap_gtt@basic-write-cpu-read-gtt
 igt@gem_mmap_gtt@basic-write-gtt
