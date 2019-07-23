@@ -131,6 +131,7 @@ static void invalid_tests(int fd)
 	}
 
 	igt_subtest("clobberred-modifier") {
+		igt_require_intel(fd);
 		f.flags = 0;
 		f.modifier[0] = 0;
 		gem_set_tiling(fd, gem_bo, I915_TILING_X, 512*4);
@@ -302,6 +303,7 @@ static void tiling_tests(int fd)
 
 	igt_subtest_group {
 		igt_fixture {
+			igt_require_intel(fd);
 			tiled_x_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
 				DRM_FORMAT_XRGB8888, LOCAL_I915_FORMAT_MOD_X_TILED,
 				1024*4, NULL, NULL, NULL);
@@ -447,6 +449,7 @@ static void size_tests(int fd)
 	}
 
 	igt_subtest("bo-too-small-due-to-tiling") {
+		igt_require_intel(fd);
 		gem_set_tiling(fd, gem_bo_small, I915_TILING_X, 1024*4);
 		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) == -1 &&
 			   errno == EINVAL);
@@ -498,6 +501,7 @@ static void addfb25_tests(int fd)
 
 	igt_subtest_group {
 		igt_fixture {
+			igt_require_intel(fd);
 			gem_set_tiling(fd, gem_bo, I915_TILING_X, 1024*4);
 			igt_require_fb_modifiers(fd);
 		}
