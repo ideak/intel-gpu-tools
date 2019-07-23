@@ -119,15 +119,25 @@ reprobe_connector(data_t *data, struct chamelium_port *port)
 	return status;
 }
 
+static const char *connection_str(drmModeConnection c)
+{
+	switch (c) {
+	case DRM_MODE_CONNECTED:
+		return "connected";
+	case DRM_MODE_DISCONNECTED:
+		return "disconnected";
+	case DRM_MODE_UNKNOWNCONNECTION:
+		return "unknown";
+	}
+	assert(0); /* unreachable */
+}
+
 static void
 wait_for_connector(data_t *data, struct chamelium_port *port,
 		   drmModeConnection status)
 {
-	bool finished = false;
-
-	igt_debug("Waiting for %s to %sconnect...\n",
-		  chamelium_port_get_name(port),
-		  status == DRM_MODE_DISCONNECTED ? "dis" : "");
+	igt_debug("Waiting for %s to get %s...\n",
+		  chamelium_port_get_name(port), connection_str(status));
 
 	/*
 	 * Rely on simple reprobing so we don't fail tests that don't require
@@ -135,14 +145,14 @@ wait_for_connector(data_t *data, struct chamelium_port *port,
 	 */
 	igt_until_timeout(HOTPLUG_TIMEOUT) {
 		if (reprobe_connector(data, port) == status) {
-			finished = true;
 			return;
 		}
 
 		usleep(50000);
 	}
 
-	igt_assert(finished);
+	igt_assert_f(false, "Timed out waiting for %s to get %s\n",
+		  chamelium_port_get_name(port), connection_str(status));
 }
 
 static int chamelium_vga_modes[][2] = {
@@ -235,6 +245,7 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port, int toggle_count)
 {
 	struct udev_monitor *mon = igt_watch_hotplug();
 	int i;
+	drmModeConnection status;
 
 	reset_state(data, NULL);
 	igt_hpd_storm_set_threshold(data->drm_fd, 0);
@@ -244,17 +255,24 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port, int toggle_count)
 
 		/* Check if we get a sysfs hotplug event */
 		chamelium_plug(data->chamelium, port);
-		igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
-		igt_assert_eq(reprobe_connector(data, port),
-			      DRM_MODE_CONNECTED);
+		igt_assert_f(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT),
+			     "Timed out waiting for hotplug uevent\n");
+		status = reprobe_connector(data, port);
+		igt_assert_f(status == DRM_MODE_CONNECTED,
+			     "Invalid connector status after hotplug: "
+			     "got %s, expected connected\n",
+			     connection_str(status));
 
 		igt_flush_hotplugs(mon);
 
 		/* Now check if we get a hotplug from disconnection */
 		chamelium_unplug(data->chamelium, port);
-		igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
-		igt_assert_eq(reprobe_connector(data, port),
-			      DRM_MODE_DISCONNECTED);
+		igt_assert_f(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT),
+			     "Timed out waiting for unplug uevent\n");
+		igt_assert_f(status == DRM_MODE_DISCONNECTED,
+			     "Invalid connector status after hotplug: "
+			     "got %s, expected disconnected\n",
+			     connection_str(status));
 	}
 
 	igt_cleanup_hotplug(mon);
