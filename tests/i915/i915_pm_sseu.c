@@ -199,7 +199,7 @@ dbg_get_status(struct status *stat)
 	if (dbg_has_line(first, last, "Enabled Subslice Per Slice:")) {
 		stat->hw.subslice_per =
 			dbg_get_int(first, last, "Enabled Subslice Per Slice:");
-	} else {
+	} else if (dbg_has_line(first, last, "Enabled Slice0 subslices:")) {
 		stat->hw.subslice_per =
 			dbg_get_int(first, last, "Enabled Slice0 subslices:");
 	}
