@@ -101,7 +101,6 @@ static const struct mocs_entry icelake_mocs_table[GEN11_NUM_MOCS_ENTRIES] = {
 	[21] = { 0x00000137, 0x0030, 0x1},
 	[22] = { 0x000003b7, 0x0030, 0x1},
 	[23] = { 0x000007b7, 0x0030, 0x1},
-	[24 ... 61] = ICELAKE_MOCS_PTE,
 	[62] = { 0x00000037, 0x0010, 0x1},
 	[63] = { 0x00000037, 0x0010, 0x1},
 };
