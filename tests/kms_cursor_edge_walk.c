@@ -114,8 +114,6 @@ static void test_edge_pos(data_t *data, int sx, int ex, int y, bool swap_axis)
 
 	dx = (ex - sx)/XSTEP;
 
-	igt_pipe_crc_drain(data->pipe_crc);
-
 	i = 0;
 
 	for (x = sx; xdir * (x - ex) <= 0; x += dx) {
