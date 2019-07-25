@@ -203,6 +203,8 @@ igt_main
 
 		connector = get_connector(drm_fd, res);
 		igt_require(connector);
+
+		kmstest_unset_all_crtcs(drm_fd, res);
 	}
 
 	igt_describe("Make sure that 4K modes exposed by DRM match the "
