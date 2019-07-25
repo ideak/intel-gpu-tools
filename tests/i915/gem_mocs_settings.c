@@ -63,6 +63,7 @@ static const char * const test_modes[] = {
 #define GEN9_MFX1_MOCS_0	(0xcA00)	/* Media 1 MOCS base register*/
 #define GEN9_VEBOX_MOCS_0	(0xcB00)	/* Video MOCS base register*/
 #define GEN9_BLT_MOCS_0		(0xcc00)	/* Blitter MOCS base register*/
+#define GEN12_GLOBAL_MOCS	(0x4000)
 #define ICELAKE_MOCS_PTE	{0x00000004, 0x0030, 0x1}
 #define MOCS_PTE		{0x00000038, 0x0030, 0x1}
 
@@ -165,6 +166,11 @@ static const uint32_t write_values[GEN9_NUM_MOCS_ENTRIES] = {
 	[0 ... GEN9_NUM_MOCS_ENTRIES - 1] = 0xFFFFFFFF,
 };
 
+static bool has_global_mocs(int fd)
+{
+	return intel_gen(intel_get_drm_devid(fd)) >= 12;
+}
+
 static bool get_mocs_settings(int fd, struct mocs_table *table, bool dirty)
 {
 	uint32_t devid = intel_get_drm_devid(fd);
@@ -204,8 +210,11 @@ static bool get_mocs_settings(int fd, struct mocs_table *table, bool dirty)
 #define LOCAL_I915_EXEC_BSD1 (I915_EXEC_BSD | (1<<13))
 #define LOCAL_I915_EXEC_BSD2 (I915_EXEC_BSD | (2<<13))
 
-static uint32_t get_engine_base(uint32_t engine)
+static uint32_t get_engine_base(int fd, uint32_t engine)
 {
+	if (has_global_mocs(fd))
+		return GEN12_GLOBAL_MOCS;
+
 	switch (engine) {
 	case LOCAL_I915_EXEC_BSD1:	return GEN9_MFX0_MOCS_0;
 	case LOCAL_I915_EXEC_BSD2:	return GEN9_MFX1_MOCS_0;
@@ -339,7 +348,7 @@ static void check_control_registers(int fd,
 				    uint32_t ctx_id,
 				    bool dirty)
 {
-	const uint32_t reg_base = get_engine_base(engine);
+	const uint32_t reg_base = get_engine_base(fd, engine);
 	uint32_t dst_handle = gem_create(fd, 4096);
 	uint32_t *read_regs;
 	struct mocs_table table;
@@ -465,7 +474,7 @@ static void write_dirty_mocs(int fd,
 	else
 		num_of_mocs_entries = GEN9_NUM_MOCS_ENTRIES;
 
-	write_registers(fd, ctx_id, get_engine_base(engine),
+	write_registers(fd, ctx_id, get_engine_base(fd, engine),
 			write_values, num_of_mocs_entries,
 			engine, privileged);
 
@@ -491,7 +500,7 @@ static void run_test(int fd, unsigned engine, unsigned flags, unsigned mode)
 	gem_require_ring(fd, engine);
 
 	/* Skip if we don't know where the registers are for this engine */
-	igt_require(get_engine_base(engine));
+	igt_require(get_engine_base(fd, engine));
 
 	if (flags & MOCS_NON_DEFAULT_CTX)
 		ctx_id = gem_context_create(fd);
