@@ -46,8 +46,7 @@ igt_simple_main
 
 		connector = drmModeGetConnectorCurrent(drm_fd, res->connectors[i]);
 
-		if (connector->connector_type == DRM_MODE_CONNECTOR_HDMIA &&
-		    connector->connection == DRM_MODE_DISCONNECTED)
+		if (connector->connector_type == DRM_MODE_CONNECTOR_HDMIA)
 			break;
 
 		drmModeFreeConnector(connector);
