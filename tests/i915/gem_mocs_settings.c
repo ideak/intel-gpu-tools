@@ -366,10 +366,16 @@ static void check_control_registers(int fd,
 
 	gem_set_domain(fd, dst_handle, I915_GEM_DOMAIN_CPU, 0);
 	for (int index = 0; index < table.size; index++) {
+		uint32_t val, read_val;
+
 		if (!table.table[index].used)
 			continue;
-		igt_assert_eq_u32(read_regs[index],
-				  table.table[index].control_value);
+
+		read_val = read_regs[index];
+		val = table.table[index].control_value;
+		igt_assert_f(read_val == val,
+			     "engine=%u index=%u read_value=0x%08x value=0x%08x\n",
+			     engine, index, read_val, val);
 	}
 
 	munmap(read_regs, 4096);
