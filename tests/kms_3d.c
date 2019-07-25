@@ -56,6 +56,8 @@ igt_simple_main
 	}
 	igt_require(connector);
 
+	kmstest_unset_all_crtcs(drm_fd, res);
+
 	edid = igt_kms_get_3d_edid();
 
 	kmstest_force_edid(drm_fd, connector, edid);
