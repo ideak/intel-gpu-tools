@@ -236,6 +236,11 @@ emit_recursive_batch(igt_spin_t *spin,
 	if (opts->flags & IGT_SPIN_FENCE_OUT)
 		execbuf->flags |= I915_EXEC_FENCE_OUT;
 
+	if (opts->flags & IGT_SPIN_FENCE_IN) {
+		execbuf->flags |= I915_EXEC_FENCE_IN;
+		execbuf->rsvd2 = opts->fence;
+	}
+
 	for (i = 0; i < nengine; i++) {
 		execbuf->flags &= ~ENGINE_MASK;
 		execbuf->flags |= flags[i];

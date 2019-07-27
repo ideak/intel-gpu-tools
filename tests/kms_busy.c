@@ -75,22 +75,16 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
 	const int timeout = modeset ? 8500 : 100;
 	struct drm_event_vblank ev;
+	IGT_CORK_FENCE(cork);
+	igt_spin_t *t;
+	int fence;
 
-	igt_spin_t *t = igt_spin_new(dpy->drm_fd,
-				     .engine = ring,
-				     .dependency = fb->gem_handle);
-
-	if (modeset) {
-		/*
-		 * We want to check that a modeset actually waits for the
-		 * spin batch to complete, but we keep a bigger timeout for
-		 * disable than required for flipping.
-		 *
-		 * As a result, the GPU reset code may kick in, which we neuter
-		 * here to be sure there's no premature completion.
-		 */
-		igt_set_module_param_int("enable_hangcheck", 0);
-	}
+	fence = igt_cork_plug(&cork, dpy->drm_fd);
+	t = igt_spin_new(dpy->drm_fd,
+			 .engine = ring,
+			 .fence = fence,
+			 .dependency = fb->gem_handle,
+			 .flags = IGT_SPIN_FENCE_IN | IGT_SPIN_NO_PREEMPTION);
 
 	igt_fork(child, 1) {
 		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
@@ -116,13 +110,13 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 	igt_waitchildren_timeout(5 * timeout,
 				 "flip blocked waiting for busy bo\n");
 	igt_spin_end(t);
+	close(fence);
 
 	igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 	igt_assert(poll(&pfd, 1, 0) == 0);
 
 	if (modeset) {
 		gem_quiescent_gpu(dpy->drm_fd);
-		igt_set_module_param_int("enable_hangcheck", 1);
 
 		/* Clear old mode blob. */
 		igt_pipe_refresh(dpy, pipe, true);

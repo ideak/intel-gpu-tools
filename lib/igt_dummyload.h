@@ -54,12 +54,14 @@ struct igt_spin_factory {
 	uint32_t dependency;
 	unsigned int engine;
 	unsigned int flags;
+	int fence;
 };
 
-#define IGT_SPIN_FENCE_OUT     (1 << 0)
-#define IGT_SPIN_POLL_RUN      (1 << 1)
-#define IGT_SPIN_FAST          (1 << 2)
-#define IGT_SPIN_NO_PREEMPTION (1 << 3)
+#define IGT_SPIN_FENCE_IN      (1 << 0)
+#define IGT_SPIN_FENCE_OUT     (1 << 1)
+#define IGT_SPIN_POLL_RUN      (1 << 2)
+#define IGT_SPIN_FAST          (1 << 3)
+#define IGT_SPIN_NO_PREEMPTION (1 << 4)
 
 igt_spin_t *
 __igt_spin_factory(int fd, const struct igt_spin_factory *opts);
