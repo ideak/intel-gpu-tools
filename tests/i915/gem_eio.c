@@ -178,7 +178,9 @@ static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 	struct igt_spin_factory opts = {
 		.ctx = ctx,
 		.engine = flags,
-		.flags = IGT_SPIN_FAST | IGT_SPIN_FENCE_OUT,
+		.flags = (IGT_SPIN_FAST |
+			  IGT_SPIN_NO_PREEMPTION |
+			  IGT_SPIN_FENCE_OUT),
 	};
 
 	if (gem_can_store_dword(fd, opts.engine))

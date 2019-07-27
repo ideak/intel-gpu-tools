@@ -271,7 +271,8 @@ static void test_pageflip_modeset_hang(igt_display_t *dpy,
 
 	t = igt_spin_new(dpy->drm_fd,
 			 .engine = ring,
-			 .dependency = fb.gem_handle);
+			 .dependency = fb.gem_handle,
+			 .flags = IGT_SPIN_NO_PREEMPTION);
 
 	do_or_die(drmModePageFlip(dpy->drm_fd, dpy->pipes[pipe].crtc_id, fb.fb_id, DRM_MODE_PAGE_FLIP_EVENT, &fb));
 
