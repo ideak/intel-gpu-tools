@@ -1774,9 +1774,6 @@ igt_main
 		igt_fixture {
 			igt_require(gem_scheduler_enabled(fd));
 			igt_require(gem_scheduler_has_ctx_priority(fd));
-
-			/* need separate rings */
-			igt_require(gem_has_execlists(fd));
 		}
 
 		for (e = intel_execution_engines; e->name; e++) {
