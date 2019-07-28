@@ -140,12 +140,13 @@ static void check_error_state(const char *expected_ring_name,
 	size_t line_size = 0;
 	bool found = false;
 
-	igt_debug("%s(expected ring name=%s, expected offset=%"PRIx64")\n",
-		  __func__, expected_ring_name, expected_offset);
 	igt_debugfs_dump(device, "i915_error_state");
 
 	igt_assert(getline(&line, &line_size, file) != -1);
-	igt_assert(strcasecmp(line, "No error state collected"));
+	igt_require(strcasecmp(line, "No error state collected"));
+
+	igt_debug("%s(expected ring name=%s, expected offset=%"PRIx64")\n",
+		  __func__, expected_ring_name, expected_offset);
 
 	while (getline(&line, &line_size, file) > 0) {
 		char *dashes;
