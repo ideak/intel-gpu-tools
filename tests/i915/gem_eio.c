@@ -559,6 +559,7 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 obj[2];
 		struct drm_i915_gem_execbuffer2 execbuf;
+		unsigned int count;
 		igt_spin_t *hang;
 		uint32_t ctx[64];
 		int fence[64];
@@ -587,16 +588,19 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 		execbuf.buffer_count = 2;
 		execbuf.flags = engine | I915_EXEC_FENCE_OUT;
 
+		count = 0;
 		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
 			execbuf.rsvd1 = ctx[n];
-			gem_execbuf_wr(fd, &execbuf);
+			if (__gem_execbuf_wr(fd, &execbuf))
+				break; /* small shared ring */
 			fence[n] = execbuf.rsvd2 >> 32;
 			igt_assert(fence[n] != -1);
+			count++;
 		}
 
 		check_wait(fd, obj[1].handle, wait, NULL);
 
-		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
+		for (unsigned int n = 0; n < count; n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
 			close(fence[n]);
 		}
