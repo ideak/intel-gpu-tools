@@ -282,9 +282,11 @@ static void smoketest(int fd, unsigned ring, unsigned timeout)
 	nengine = 0;
 	if (ring == ALL_ENGINES) {
 		for_each_physical_engine(fd, engine)
-			engines[nengine++] = engine;
+			if (gem_can_store_dword(fd, engine))
+				engines[nengine++] = engine;
 	} else {
-		engines[nengine++] = ring;
+		if (gem_can_store_dword(fd, ring))
+			engines[nengine++] = ring;
 	}
 	igt_require(nengine);
 
