@@ -74,7 +74,6 @@ unsigned gem_submission_method(int fd)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	unsigned flags = 0;
-	int result;
 
 	int dir;
 
@@ -87,14 +86,7 @@ unsigned gem_submission_method(int fd)
 		goto out;
 	}
 
-	if (igt_sysfs_get_boolean(dir, "enable_guc_submission")) {
-		flags |= GEM_SUBMISSION_GUC | GEM_SUBMISSION_EXECLISTS;
-		goto out;
-	}
-
-	if (igt_sysfs_scanf(dir, "enable_execlists", "%d", &result) != 1)
-		result = gen >= 8;
-	if (result) {
+	if (gen >= 8) {
 		flags |= GEM_SUBMISSION_EXECLISTS;
 		goto out;
 	}
