@@ -79,45 +79,45 @@ In order to run tests using the Chamelium, a valid configuration file must be
 present. It must contain Chamelium-specific keys as shown with the following
 example:
 
-# The common configuration section follows.
-[Common]
-# The path to dump frames that fail comparison checks
-FrameDumpPath=/root/
+    # The common configuration section follows.
+    [Common]
+    # The path to dump frames that fail comparison checks
+    FrameDumpPath=/root/
 
-# The following section is used for configuring the Device Under Test.
-# It is not mandatory and allows overriding default values.
-[DUT]
-SuspendResumeDelay=15
+    # The following section is used for configuring the Device Under Test.
+    # It is not mandatory and allows overriding default values.
+    [DUT]
+    SuspendResumeDelay=15
 
-[Chamelium]
-# The URL used for connecting to the Chamelium's RPC server
-URL=http://192.168.1.2:9992
+    [Chamelium]
+    # The URL used for connecting to the Chamelium's RPC server
+    URL=http://192.168.1.2:9992
 
-# The rest of the sections are used for defining connector mappings.
-# This is required so any tests using the Chamelium know which connector
-# on the test machine should be connected to each Chamelium port.
-#
-# In the event that any of these mappings are specified incorrectly,
-# any hotplugging tests for the incorrect connector mapping will fail.
+    # The rest of the sections are used for defining connector mappings.
+    # This is required so any tests using the Chamelium know which connector
+    # on the test machine should be connected to each Chamelium port.
+    #
+    # In the event that any of these mappings are specified incorrectly,
+    # any hotplugging tests for the incorrect connector mapping will fail.
 
-# The name of the DRM connector
-# The DP-1 of [Chamelium:DP-1] and the HDMI-A-1 of [Chamelium:HDMI-A-1] indicate
-# "connector info type" of /sys/kernel/debug/dri/0/i915_display_info.
-[Chamelium:DP-1]
-# The ChameliumPortID indicates physical port (device) id of a Chamelium Board.
-# A Chamelium daemon program defines these port ids as
-# DP1 (located next to the HDMI port) = 1
-# DP2 (located next to the VGA connector) = 2
-# HDMI = 3 and VGA = 4
-# The port ids are defined at:
-# https://chromium.googlesource.com/chromiumos/platform/chameleon/+/master/chameleond/utils/ids.py
-ChameliumPortID=1
+    # The name of the DRM connector
+    # The DP-1 of [Chamelium:DP-1] and the HDMI-A-1 of [Chamelium:HDMI-A-1] indicate
+    # "connector info type" of /sys/kernel/debug/dri/0/i915_display_info.
+    [Chamelium:DP-1]
+    # The ChameliumPortID indicates physical port (device) id of a Chamelium Board.
+    # A Chamelium daemon program defines these port ids as
+    # DP1 (located next to the HDMI port) = 1
+    # DP2 (located next to the VGA connector) = 2
+    # HDMI = 3 and VGA = 4
+    # The port ids are defined at:
+    # https://chromium.googlesource.com/chromiumos/platform/chameleon/+/master/chameleond/utils/ids.py
+    ChameliumPortID=1
 
-[Chamelium:HDMI-A-2]
-ChameliumPortID=3
+    [Chamelium:HDMI-A-2]
+    ChameliumPortID=3
 
-[Chamelium:VGA-1]
-ChameliumPortID=4
+    [Chamelium:VGA-1]
+    ChameliumPortID=4
 
 Running the Chamelium With IGT
 ------------------------------
