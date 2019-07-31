@@ -77,7 +77,7 @@ IGT's behavior can be configured through a configuration file.
 By default, this file is expected to exist in ~/.igtrc
 In order to run tests using the Chamelium, a valid configuration file must be
 present. It must contain Chamelium-specific keys as shown with the following
-example:
+example (only Chamelium.URL is mandatory):
 
     # The common configuration section follows.
     [Common]
@@ -93,12 +93,8 @@ example:
     # The URL used for connecting to the Chamelium's RPC server
     URL=http://192.168.1.2:9992
 
-    # The rest of the sections are used for defining connector mappings.
-    # This is required so any tests using the Chamelium know which connector
-    # on the test machine should be connected to each Chamelium port.
-    #
-    # In the event that any of these mappings are specified incorrectly,
-    # any hotplugging tests for the incorrect connector mapping will fail.
+    # The rest of the sections are used for defining connector mappings. This
+    # is optional, the mappings will be discovered automatically.
 
     # The name of the DRM connector
     # The DP-1 of [Chamelium:DP-1] and the HDMI-A-1 of [Chamelium:HDMI-A-1] indicate
