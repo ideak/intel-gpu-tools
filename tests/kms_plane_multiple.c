@@ -317,6 +317,8 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 		for_each_plane_on_pipe(&data->display, pipe, plane)
 			igt_plane_set_fb(plane, NULL);
 
+		igt_display_commit2(&data->display, COMMIT_ATOMIC);
+
 		for (int x = 0; x < c; x++)
 			igt_remove_fb(data->drm_fd, &data->fb[x]);
 	} while (!err && c < n_planes);
@@ -339,6 +341,8 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 		for_each_plane_on_pipe(&data->display, pipe, plane)
 			igt_plane_set_fb(plane, NULL);
+
+		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 		for (int x = 0; x < c; x++)
 			igt_remove_fb(data->drm_fd, &data->fb[x]);
