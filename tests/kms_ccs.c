@@ -321,7 +321,7 @@ static int __test_output(data_t *data)
 static void test_output(data_t *data)
 {
 	int valid_tests = __test_output(data);
-	igt_require_f(valid_tests > 0, "CCS not supported, skipping");
+	igt_require_f(valid_tests > 0, "CCS not supported, skipping\n");
 }
 
 static data_t data;
@@ -373,7 +373,8 @@ igt_main
 				valid_tests += __test_output(&data);
 			}
 
-			igt_require_f(valid_tests > 0, "CCS not supported, skipping");
+			igt_require_f(valid_tests > 0,
+				      "CCS not supported, skipping\n");
 		}
 
 		data.plane = NULL;
