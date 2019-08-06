@@ -281,10 +281,13 @@ static void do_forked_test(int fd, unsigned flags)
 	struct igt_helper_process thrasher = {};
 
 	if (flags & (THRASH | THRASH_INACTIVE)) {
-		uint64_t val = (flags & THRASH_INACTIVE) ?
-				(DROP_RETIRE | DROP_BOUND | DROP_UNBOUND) : DROP_ALL;
-
 		igt_fork_helper(&thrasher) {
+			uint64_t val;
+
+			val = DROP_RETIRE | DROP_BOUND | DROP_UNBOUND;
+			if (!(flags & THRASH_INACTIVE))
+				val |= DROP_ACTIVE | DROP_SHRINK_ALL;
+
 			while (1) {
 				usleep(1000);
 				igt_drop_caches_set(fd, val);
