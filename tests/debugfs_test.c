@@ -167,27 +167,6 @@ igt_main
 	igt_subtest_group
 		kms_tests(fd, debugfs);
 
-	igt_subtest("emon_crash") {
-		int i;
-		/*
-		 * This check if we can crash the kernel with
-		 * segmentation-fault by reading
-		 * /sys/kernel/debug/dri/0/i915_emon_status too quickly
-		 */
-		for (i = 0; i < 1000; i++) {
-			char *buf = igt_sysfs_get(debugfs,
-						  "i915_emon_status");
-
-			igt_skip_on_f(!buf && !i, "i915_emon_status could not be read\n");
-
-			igt_assert(buf);
-			free(buf);
-		}
-
-		/* If we got here, we haven't crashed */
-		igt_success();
-	}
-
 	igt_fixture {
 		close(debugfs);
 		close(fd);
