@@ -91,7 +91,7 @@ static void max_bpc_prop_test(int fd, uint32_t id, uint32_t type, drmModePropert
 	if (atomic)
 		req = drmModeAtomicAlloc();
 
-	for ( i = prop->values[0]; i < prop->values[1] ; i++) {
+	for (i = prop->values[0]; i <= prop->values[1]; i++) {
 		if (!atomic) {
 			ret = drmModeObjectSetProperty(fd, id, type, prop_id, i);
 
