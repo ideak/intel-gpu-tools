@@ -1662,20 +1662,24 @@ struct stress_thread_data {
 static void *mm_stress_thread(void *data)
 {
 	struct stress_thread_data *stdata = (struct stress_thread_data *)data;
+	const size_t sz = 2 << 20;
 	void *ptr;
-	int ret;
 
 	while (!stdata->stop) {
-		ptr = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE,
-				MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+		ptr = mmap(NULL, sz, PROT_READ | PROT_WRITE,
+			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 		if (ptr == MAP_FAILED) {
 			stdata->exit_code = -EFAULT;
 			break;
 		}
-		ret = munmap(ptr, PAGE_SIZE);
-		if (ret) {
-		        stdata->exit_code = errno;
-		        break;
+
+		madvise(ptr, sz, MADV_HUGEPAGE);
+		for (size_t page = 0; page < sz; page += PAGE_SIZE)
+			*(volatile uint32_t *)((unsigned char *)ptr + page) = 0;
+
+		if (munmap(ptr, sz)) {
+			stdata->exit_code = errno;
+			break;
 		}
 	}
 
@@ -1710,6 +1714,35 @@ static void test_stress_mm(int fd)
 	ret = pthread_join(t, NULL);
 	igt_assert_eq(ret, 0);
 
+	igt_assert_eq(stdata.exit_code, 0);
+}
+
+static void test_stress_purge(int fd)
+{
+	struct stress_thread_data stdata;
+	uint32_t handle;
+	pthread_t t;
+	void *ptr;
+
+	memset(&stdata, 0, sizeof(stdata));
+
+	igt_assert(posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE) == 0);
+	igt_assert(!pthread_create(&t, NULL, mm_stress_thread, &stdata));
+
+	igt_until_timeout(150) {
+		gem_userptr(fd, ptr, PAGE_SIZE, 0, userptr_flags, &handle);
+
+		gem_set_domain(fd, handle,
+			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+		intel_purge_vm_caches(fd);
+
+		gem_close(fd, handle);
+	}
+
+	free(ptr);
+
+	stdata.stop = 1;
+	igt_assert(!pthread_join(t, NULL));
 	igt_assert_eq(stdata.exit_code, 0);
 }
 
@@ -1975,6 +2008,8 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 
 		igt_subtest("stress-mm")
 			test_stress_mm(fd);
+		igt_subtest("stress-purge")
+			test_stress_purge(fd);
 
 		igt_subtest("stress-mm-invalidate-close")
 			test_invalidate_close_race(fd, false);
