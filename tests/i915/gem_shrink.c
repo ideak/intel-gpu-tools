@@ -45,6 +45,13 @@ static void get_pages(int fd, uint64_t alloc)
 	gem_madvise(fd, handle, I915_MADV_DONTNEED);
 }
 
+static void get_pages_dirty(int fd, uint64_t alloc)
+{
+	uint32_t handle = gem_create(fd, alloc);
+	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	gem_madvise(fd, handle, I915_MADV_DONTNEED);
+}
+
 static void pwrite_(int fd, uint64_t alloc)
 {
 	uint32_t tmp;
@@ -214,7 +221,8 @@ static void hang(int fd, uint64_t alloc)
 	munmap(obj, obj_size);
 }
 
-static void userptr(int fd, uint64_t alloc)
+static void userptr(int fd, uint64_t alloc, unsigned int flags)
+#define UDIRTY (1 << 0)
 {
 	struct local_i915_gem_userptr userptr;
 	void *ptr;
@@ -231,7 +239,11 @@ static void userptr(int fd, uint64_t alloc)
 	userptr.user_ptr = to_user_pointer(ptr);
 	do_ioctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr);
 
-	gem_set_domain(fd, userptr.handle, I915_GEM_DOMAIN_GTT, 0);
+	if (flags & UDIRTY)
+		gem_set_domain(fd, userptr.handle,
+			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	else
+		gem_set_domain(fd, userptr.handle, I915_GEM_DOMAIN_GTT, 0);
 
 	madvise(ptr, alloc, MADV_FREE);
 }
@@ -273,7 +285,8 @@ static void leak(int fd, uint64_t alloc)
 
 #define SOLO 1
 #define USERPTR 2
-#define OOM 4
+#define USERPTR_DIRTY 4
+#define OOM 8
 
 static void run_test(int nchildren, uint64_t alloc,
 		     void (*func)(int, uint64_t), unsigned flags)
@@ -309,7 +322,20 @@ static void run_test(int nchildren, uint64_t alloc,
 			igt_until_timeout(timeout) {
 				int fd = drm_open_driver(DRIVER_INTEL);
 				for (int pass = 0; pass < nchildren; pass++)
-					userptr(fd, alloc);
+					userptr(fd, alloc, 0);
+				close(fd);
+			}
+		}
+		nchildren = (nchildren + 1)/2;
+	}
+
+	if (flags & USERPTR_DIRTY) {
+		igt_require(has_userptr());
+		igt_fork(child, (nchildren + 1)/2) {
+			igt_until_timeout(timeout) {
+				int fd = drm_open_driver(DRIVER_INTEL);
+				for (int pass = 0; pass < nchildren; pass++)
+					userptr(fd, alloc, UDIRTY);
 				close(fd);
 			}
 		}
@@ -373,6 +399,7 @@ igt_main
 		void (*func)(int, uint64_t);
 	} tests[] = {
 		{ "get-pages", get_pages },
+		{ "get-pages-dirty", get_pages_dirty },
 		{ "pwrite", pwrite_ },
 		{ "pread", pread_ },
 		{ "mmap-gtt", mmap_gtt },
@@ -390,6 +417,7 @@ igt_main
 		{ "-sanitycheck", SOLO },
 		{ "", 0 },
 		{ "-userptr", USERPTR },
+		{ "-userptr-dirty", USERPTR | USERPTR_DIRTY },
 		{ "-oom", USERPTR | OOM },
 		{ NULL },
 	};
