@@ -323,6 +323,44 @@ test_pf_nonblock(int i915)
 }
 
 static void
+test_isolation(int i915)
+{
+	struct drm_i915_gem_mmap_gtt mmap_arg;
+	int A = gem_reopen_driver(i915);
+	int B = gem_reopen_driver(i915);
+	uint64_t offset_a, offset_b;
+	uint32_t a, b;
+	void *ptr;
+
+	a = gem_create(A, 4096);
+	b = gem_open(B, gem_flink(A, a));
+
+	mmap_arg.handle = a;
+	do_ioctl(A, DRM_IOCTL_I915_GEM_MMAP_GTT, &mmap_arg);
+	offset_a = mmap_arg.offset;
+
+	mmap_arg.handle = b;
+	do_ioctl(B, DRM_IOCTL_I915_GEM_MMAP_GTT, &mmap_arg);
+	offset_b = mmap_arg.offset;
+
+	igt_info("A: {fd:%d, handle:%d, offset:%"PRIx64"}\n",
+		 A, a, offset_a);
+	igt_info("B: {fd:%d, handle:%d, offset:%"PRIx64"}\n",
+		 B, b, offset_b);
+
+	close(B);
+
+	ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
+	igt_assert(ptr != MAP_FAILED);
+	munmap(ptr, 4096);
+
+	close(A);
+
+	ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
+	igt_assert(ptr == MAP_FAILED);
+}
+
+static void
 test_write_gtt(int fd)
 {
 	uint32_t dst;
@@ -945,6 +983,8 @@ igt_main
 		test_write_cpu_read_gtt(fd);
 	igt_subtest("basic-wc")
 		test_wc(fd);
+	igt_subtest("isolation")
+		test_isolation(fd);
 	igt_subtest("pf-nonblock")
 		test_pf_nonblock(fd);
 
