@@ -734,6 +734,11 @@ static void reset_stress(int fd, uint32_t ctx0,
 		.flags = engine,
 	};
 	igt_stats_t stats;
+	int max;
+
+	max = gem_measure_ring_inflight(fd, engine, 0);
+	max = max / 2 - 1; /* assume !execlists and a shared ring */
+	igt_require(max > 0);
 
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
@@ -755,11 +760,11 @@ static void reset_stress(int fd, uint32_t ctx0,
 		hang = spin_sync(fd, ctx0, engine);
 
 		execbuf.rsvd1 = ctx;
-		for (i = 0; i < 10; i++)
+		for (i = 0; i < max; i++)
 			gem_execbuf(fd, &execbuf);
 
 		execbuf.rsvd1 = ctx0;
-		for (i = 0; i < 10; i++)
+		for (i = 0; i < max; i++)
 			gem_execbuf(fd, &execbuf);
 
 		/* Wedge after a small delay. */
@@ -777,11 +782,11 @@ static void reset_stress(int fd, uint32_t ctx0,
 		 * both contexts.
 		 */
 		execbuf.rsvd1 = ctx;
-		for (i = 0; i < 5; i++)
+		for (i = 0; i < max; i++)
 			gem_execbuf(fd, &execbuf);
 
 		execbuf.rsvd1 = ctx0;
-		for (i = 0; i < 5; i++)
+		for (i = 0; i < max; i++)
 			gem_execbuf(fd, &execbuf);
 
 		gem_sync(fd, obj.handle);
