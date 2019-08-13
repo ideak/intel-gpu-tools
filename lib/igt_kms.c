@@ -1859,6 +1859,10 @@ static void igt_output_reset(igt_output_t *output)
 	if (igt_output_has_prop(output, IGT_CONNECTOR_BROADCAST_RGB))
 		igt_output_set_prop_value(output, IGT_CONNECTOR_BROADCAST_RGB,
 					  BROADCAST_RGB_FULL);
+
+	if (igt_output_has_prop(output, IGT_CONNECTOR_CONTENT_PROTECTION))
+		igt_output_set_prop_enum(output, IGT_CONNECTOR_CONTENT_PROTECTION,
+					 "Undesired");
 }
 
 /**
@@ -1871,6 +1875,7 @@ static void igt_output_reset(igt_output_t *output)
  * For outputs:
  * - %IGT_CONNECTOR_CRTC_ID
  * - %IGT_CONNECTOR_BROADCAST_RGB (if applicable)
+ *   %IGT_CONNECTOR_CONTENT_PROTECTION (if applicable)
  * - igt_output_override_mode() to default.
  *
  * For pipes:
