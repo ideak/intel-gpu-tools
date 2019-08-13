@@ -164,8 +164,13 @@ static uint32_t create_highest_priority(int fd)
 static void unplug_show_queue(int fd, struct igt_cork *c, unsigned int engine)
 {
 	igt_spin_t *spin[MAX_ELSP_QLEN];
+	int max = MAX_ELSP_QLEN;
 
-	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
+	/* If no scheduler, all batches are emitted in submission order */
+	if (!gem_scheduler_enabled(fd))
+		max = 1;
+
+	for (int n = 0; n < max; n++) {
 		const struct igt_spin_factory opts = {
 			.ctx = create_highest_priority(fd),
 			.engine = engine,
@@ -177,7 +182,7 @@ static void unplug_show_queue(int fd, struct igt_cork *c, unsigned int engine)
 	igt_cork_unplug(c); /* batches will now be queued on the engine */
 	igt_debugfs_dump(fd, "i915_engine_info");
 
-	for (int n = 0; n < ARRAY_SIZE(spin); n++)
+	for (int n = 0; n < max; n++)
 		igt_spin_free(fd, spin[n]);
 
 }
