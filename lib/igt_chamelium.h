@@ -160,6 +160,9 @@ struct chamelium_infoframe *
 chamelium_get_last_infoframe(struct chamelium *chamelium,
 			     struct chamelium_port *port,
 			     enum chamelium_infoframe_type type);
+bool chamelium_supports_trigger_link_failure(struct chamelium *chamelium);
+void chamelium_trigger_link_failure(struct chamelium *chamelium,
+				    struct chamelium_port *port);
 bool chamelium_has_audio_support(struct chamelium *chamelium,
 				 struct chamelium_port *port);
 void chamelium_get_audio_channel_mapping(struct chamelium *chamelium,

@@ -1180,6 +1180,21 @@ void chamelium_infoframe_destroy(struct chamelium_infoframe *infoframe)
 	free(infoframe);
 }
 
+bool chamelium_supports_trigger_link_failure(struct chamelium *chamelium)
+{
+	return chamelium_supports_method(chamelium, "TriggerLinkFailure");
+}
+
+/**
+ * chamelium_trigger_link_failure: trigger a link failure on the provided port.
+ */
+void chamelium_trigger_link_failure(struct chamelium *chamelium,
+				    struct chamelium_port *port)
+{
+	xmlrpc_DECREF(chamelium_rpc(chamelium, port, "TriggerLinkFailure",
+				    "(i)", port->id));
+}
+
 bool chamelium_has_audio_support(struct chamelium *chamelium,
 				 struct chamelium_port *port)
 {
