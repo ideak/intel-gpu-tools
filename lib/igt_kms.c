@@ -411,6 +411,7 @@ const char * const igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	[IGT_CONNECTOR_CONTENT_PROTECTION] = "Content Protection",
 	[IGT_CONNECTOR_VRR_CAPABLE] = "vrr_capable",
 	[IGT_CONNECTOR_HDCP_CONTENT_TYPE] = "HDCP Content Type",
+	[IGT_CONNECTOR_LINK_STATUS] = "link-status",
 };
 
 /*
