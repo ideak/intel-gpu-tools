@@ -176,7 +176,7 @@ static void test_signal_detect_phaseshift(struct audio_signal *signal)
 
 igt_main
 {
-	struct audio_signal *signal;
+	struct audio_signal *signal = NULL;
 	int ret;
 	size_t i;
 
