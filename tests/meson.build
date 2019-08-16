@@ -48,6 +48,7 @@ test_progs = [
 	'kms_plane_lowres',
 	'kms_plane_multiple',
 	'kms_plane_scaling',
+	'kms_prime',
 	'kms_prop_blob',
 	'kms_properties',
 	'kms_psr',
