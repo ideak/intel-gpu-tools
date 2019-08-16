@@ -309,6 +309,7 @@ test_edid_read(data_t *data, struct chamelium_port *port, enum test_edid edid)
 	igt_assert(kmstest_get_property(data->drm_fd, connector->connector_id,
 					DRM_MODE_OBJECT_CONNECTOR, "EDID", NULL,
 					&edid_blob_id, NULL));
+	igt_assert(edid_blob_id != 0);
 	igt_assert(edid_blob = drmModeGetPropertyBlob(data->drm_fd,
 						      edid_blob_id));
 
