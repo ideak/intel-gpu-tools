@@ -351,6 +351,32 @@ static xmlrpc_value *chamelium_rpc(struct chamelium *chamelium,
 	return res;
 }
 
+static bool __chamelium_is_reachable(struct chamelium *chamelium)
+{
+	xmlrpc_value *res;
+
+	/* GetSupportedInputs does not require a port and is harmless */
+	res = __chamelium_rpc(chamelium, NULL, "GetSupportedInputs", "()");
+
+	if (res != NULL)
+		xmlrpc_DECREF(res);
+
+	if (chamelium->env.fault_occurred)
+		igt_debug("Chamelium RPC call failed: %s\n",
+			  chamelium->env.fault_string);
+
+	return !chamelium->env.fault_occurred;
+}
+
+void chamelium_wait_reachable(struct chamelium *chamelium, int timeout)
+{
+	bool chamelium_online = igt_wait(__chamelium_is_reachable(chamelium),
+					 timeout * 1000, 100);
+
+	igt_assert_f(chamelium_online,
+		     "Couldn't connect to Chamelium for %ds", timeout);
+}
+
 /**
  * chamelium_plug:
  * @chamelium: The Chamelium instance to use

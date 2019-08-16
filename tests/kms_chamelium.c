@@ -57,6 +57,7 @@ typedef struct {
 } data_t;
 
 #define HOTPLUG_TIMEOUT 20 /* seconds */
+#define ONLINE_TIMEOUT 20 /* seconds */
 
 #define HPD_STORM_PULSE_INTERVAL_DP 100 /* ms */
 #define HPD_STORM_PULSE_INTERVAL_HDMI 200 /* ms */
@@ -369,6 +370,7 @@ try_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 
 	igt_system_suspend_autoresume(state, test);
 	igt_assert(wait_for_hotplug(mon, &timeout));
+	chamelium_wait_reachable(data->chamelium, ONLINE_TIMEOUT);
 
 	if (port) {
 		igt_assert_eq(reprobe_connector(data, port), target_state);
@@ -474,8 +476,8 @@ test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 	igt_flush_hotplugs(mon);
 
 	igt_system_suspend_autoresume(state, test);
-
 	igt_assert(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT));
+	chamelium_wait_reachable(data->chamelium, ONLINE_TIMEOUT);
 
 	get_connectors_link_status_failed(data, link_status_failed[1]);
 

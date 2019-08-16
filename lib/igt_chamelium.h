@@ -112,6 +112,7 @@ drmModeConnector *chamelium_port_get_connector(struct chamelium *chamelium,
 					       bool reprobe);
 const char *chamelium_port_get_name(struct chamelium_port *port);
 
+void chamelium_wait_reachable(struct chamelium *chamelium, int timeout);
 void chamelium_plug(struct chamelium *chamelium, struct chamelium_port *port);
 void chamelium_unplug(struct chamelium *chamelium, struct chamelium_port *port);
 bool chamelium_is_plugged(struct chamelium *chamelium,
