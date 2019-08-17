@@ -5,6 +5,7 @@ test_progs = [
 	'core_getversion',
 	'core_setmaster_vs_auth',
 	'debugfs_test',
+	'dmabuf',
 	'drm_import_export',
 	'drm_mm',
 	'drm_read',
