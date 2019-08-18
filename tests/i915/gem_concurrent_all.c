@@ -968,8 +968,6 @@ static void do_basic0(struct buffers *buffers,
 		      do_copy do_copy_func,
 		      do_hang do_hang_func)
 {
-	gem_quiescent_gpu(fd);
-
 	buffers->mode->set_bo(buffers, buffers->src[0], 0xdeadbeef);
 	for (int i = 0; i < buffers->count; i++) {
 		igt_hang_t hang = do_hang_func();
@@ -985,8 +983,6 @@ static void do_basic1(struct buffers *buffers,
 		      do_copy do_copy_func,
 		      do_hang do_hang_func)
 {
-	gem_quiescent_gpu(fd);
-
 	for (int i = 0; i < buffers->count; i++) {
 		igt_hang_t hang = do_hang_func();
 
@@ -1006,8 +1002,6 @@ static void do_basicN(struct buffers *buffers,
 		      do_hang do_hang_func)
 {
 	igt_hang_t hang;
-
-	gem_quiescent_gpu(fd);
 
 	for (int i = 0; i < buffers->count; i++) {
 		buffers->mode->set_bo(buffers, buffers->src[i], i);
@@ -1034,7 +1028,6 @@ static void do_overwrite_source(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = 0; i < buffers->count; i++) {
 		buffers->mode->set_bo(buffers, buffers->src[i], i);
 		buffers->mode->set_bo(buffers, buffers->dst[i], ~i);
@@ -1058,7 +1051,6 @@ static void do_overwrite_source_read(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = 0; i < half; i++) {
 		buffers->mode->set_bo(buffers, buffers->src[i], i);
 		buffers->mode->set_bo(buffers, buffers->dst[i], ~i);
@@ -1102,7 +1094,6 @@ static void do_overwrite_source__rev(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = 0; i < buffers->count; i++) {
 		buffers->mode->set_bo(buffers, buffers->src[i], i);
 		buffers->mode->set_bo(buffers, buffers->dst[i], ~i);
@@ -1123,7 +1114,6 @@ static void do_overwrite_source__one(struct buffers *buffers,
 {
 	igt_hang_t hang;
 
-	gem_quiescent_gpu(fd);
 	buffers->mode->set_bo(buffers, buffers->src[0], 0);
 	buffers->mode->set_bo(buffers, buffers->dst[0], ~0);
 	do_copy_func(buffers, buffers->dst[0], buffers->src[0]);
@@ -1142,7 +1132,6 @@ static void do_intermix(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = 0; i < buffers->count; i++) {
 		buffers->mode->set_bo(buffers, buffers->src[i], 0xdeadbeef^~i);
 		buffers->mode->set_bo(buffers, buffers->dst[i], i);
@@ -1196,7 +1185,6 @@ static void do_early_read(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = buffers->count; i--; )
 		buffers->mode->set_bo(buffers, buffers->src[i], 0xdeadbeef);
 	for (i = 0; i < buffers->count; i++)
@@ -1214,7 +1202,6 @@ static void do_read_read_bcs(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = buffers->count; i--; )
 		buffers->mode->set_bo(buffers, buffers->src[i], 0xdeadbeef ^ i);
 	for (i = 0; i < buffers->count; i++) {
@@ -1235,7 +1222,6 @@ static void do_write_read_bcs(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = buffers->count; i--; )
 		buffers->mode->set_bo(buffers, buffers->src[i], 0xdeadbeef ^ i);
 	for (i = 0; i < buffers->count; i++) {
@@ -1255,7 +1241,6 @@ static void do_read_read_rcs(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = buffers->count; i--; )
 		buffers->mode->set_bo(buffers, buffers->src[i], 0xdeadbeef ^ i);
 	for (i = 0; i < buffers->count; i++) {
@@ -1276,7 +1261,6 @@ static void do_write_read_rcs(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = buffers->count; i--; )
 		buffers->mode->set_bo(buffers, buffers->src[i], 0xdeadbeef ^ i);
 	for (i = 0; i < buffers->count; i++) {
@@ -1296,7 +1280,6 @@ static void do_gpu_read_after_write(struct buffers *buffers,
 	igt_hang_t hang;
 	int i;
 
-	gem_quiescent_gpu(fd);
 	for (i = buffers->count; i--; )
 		buffers->mode->set_bo(buffers, buffers->src[i], 0xabcdabcd);
 	for (i = 0; i < buffers->count; i++)
