@@ -431,6 +431,7 @@ static void independent(int i915)
 	uint32_t last, *map;
 
 	igt_require(gen >= 6); /* No per-engine TIMESTAMP on older gen */
+	igt_require(gem_scheduler_enabled(i915));
 
 	{
 		struct drm_i915_gem_execbuffer2 execbuf = {
