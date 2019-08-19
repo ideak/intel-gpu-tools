@@ -90,7 +90,7 @@ check_test ()
 		# Subtest enumeration of kernel selftest launchers depends
 		# on the running kernel. If selftests are not enabled,
 		# they will output nothing and exit with 0.
-		if [ "$testname" != "i915_selftest" -a "$testname" != "drm_mm" -a "$testname" != "kms_selftest" ]; then
+		if [ "$testname" != "i915_selftest" -a "$testname" != "drm_mm" -a "$testname" != "kms_selftest" -a "$testname" != "dmabuf" ]; then
 			fail $test
 		fi
 	fi
