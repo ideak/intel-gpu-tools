@@ -41,6 +41,7 @@ static bool prime_busy(struct pollfd *pfd, bool excl)
 static void busy(int fd, unsigned ring, unsigned flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const uint32_t _bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct pollfd pfd[2];
 #define SCRATCH 0
@@ -55,7 +56,7 @@ static void busy(int fd, unsigned ring, unsigned flags)
 	gem_quiescent_gpu(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t)obj;
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
 	if (gen < 6)
@@ -65,7 +66,11 @@ static void busy(int fd, unsigned ring, unsigned flags)
 	obj[SCRATCH].handle = gem_create(fd, 4096);
 
 	obj[BATCH].handle = gem_create(fd, size);
-	obj[BATCH].relocs_ptr = (uintptr_t)store;
+	obj[BATCH].offset = 1 << 20;
+	gem_write(fd, obj[BATCH].handle, 0, &_bbe, sizeof(_bbe));
+	igt_require(__gem_execbuf(fd, &execbuf) == 0); /* prebind the buffers */
+
+	obj[BATCH].relocs_ptr = to_user_pointer(store);
 	obj[BATCH].relocation_count = ARRAY_SIZE(store);
 	memset(store, 0, sizeof(store));
 
@@ -81,23 +86,28 @@ static void busy(int fd, unsigned ring, unsigned flags)
 
 	i = 0;
 	for (count = 0; count < 1024; count++) {
+		uint64_t offset;
+
 		store[count].target_handle = obj[SCRATCH].handle;
-		store[count].presumed_offset = -1;
+		store[count].presumed_offset = obj[SCRATCH].offset;
 		store[count].offset = sizeof(uint32_t) * (i + 1);
 		store[count].delta = sizeof(uint32_t) * count;
-		store[count].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-		store[count].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
+		store[count].read_domains = I915_GEM_DOMAIN_RENDER;
+		store[count].write_domain = I915_GEM_DOMAIN_RENDER;
+
+		offset = store[count].presumed_offset + store[count].delta;
+
 		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
-			batch[++i] = 0;
-			batch[++i] = 0;
+			batch[++i] = offset;
+			batch[++i] = offset >> 32;
 		} else if (gen >= 4) {
 			batch[++i] = 0;
-			batch[++i] = 0;
+			batch[++i] = offset;
 			store[count].offset += sizeof(uint32_t);
 		} else {
 			batch[i]--;
-			batch[++i] = 0;
+			batch[++i] = offset;
 		}
 		batch[++i] = count;
 		i++;
@@ -105,7 +115,7 @@ static void busy(int fd, unsigned ring, unsigned flags)
 
 	bbe = &batch[i];
 	store[count].target_handle = obj[BATCH].handle; /* recurse */
-	store[count].presumed_offset = 0;
+	store[count].presumed_offset = obj[BATCH].offset;
 	store[count].offset = sizeof(uint32_t) * (i + 1);
 	store[count].delta = 0;
 	store[count].read_domains = I915_GEM_DOMAIN_COMMAND;
@@ -113,14 +123,14 @@ static void busy(int fd, unsigned ring, unsigned flags)
 	batch[i] = MI_BATCH_BUFFER_START;
 	if (gen >= 8) {
 		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
+		batch[++i] = obj[BATCH].offset;
+		batch[++i] = obj[BATCH].offset >> 32;
 	} else if (gen >= 6) {
 		batch[i] |= 1 << 8;
-		batch[++i] = 0;
+		batch[++i] = obj[BATCH].offset;
 	} else {
 		batch[i] |= 2 << 6;
-		batch[++i] = 0;
+		batch[++i] = obj[BATCH].offset;
 		if (gen < 4) {
 			batch[i] |= 1;
 			store[count].delta = 1;
