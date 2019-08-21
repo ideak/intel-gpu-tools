@@ -233,9 +233,9 @@ static int parse_line(struct reg *reg, const char *line)
 			reg->name = p;
 		} else if (i == 2) {
 			reg->addr = strtoul(p, &e, 16);
-			free(p);
 			if (*e)
 				ret = -1;
+			free(p);
 		} else if (i == 3) {
 			ret = parse_port_desc(reg, p);
 			free(p);
