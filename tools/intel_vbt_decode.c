@@ -229,6 +229,7 @@ static void dump_backlight_info(struct context *context,
 {
 	const struct bdb_lfp_backlight_data *backlight = block->data;
 	const struct lfp_backlight_data_entry *blc;
+	int i;
 
 	if (sizeof(*blc) != backlight->entry_size) {
 		printf("\tBacklight struct sizes don't match (expected %zu, got %u), skipping\n",
@@ -236,12 +237,21 @@ static void dump_backlight_info(struct context *context,
 		return;
 	}
 
-	blc = &backlight->data[context->panel_type];
+	for (i = 0; i < ARRAY_SIZE(backlight->data); i++) {
+		if (i != context->panel_type && !context->dump_all_panel_types)
+			continue;
 
-	printf("\tInverter type: %d\n", blc->type);
-	printf("\t     polarity: %d\n", blc->active_low_pwm);
-	printf("\t     PWM freq: %d\n", blc->pwm_freq_hz);
-	printf("\tMinimum brightness: %d\n", blc->min_brightness);
+		printf("\tPanel %d%s\n", i,
+		       context->panel_type == i ? " *" : "");
+
+		blc = &backlight->data[i];
+
+		printf("\t\tInverter type: %u\n", blc->type);
+		printf("\t\tActive low: %u\n", blc->active_low_pwm);
+		printf("\t\tPWM freq: %u\n", blc->pwm_freq_hz);
+		printf("\t\tMinimum brightness: %u\n", blc->min_brightness);
+	}
+
 }
 
 static const struct {
