@@ -390,6 +390,14 @@ struct igt_display {
 	int format_mod_count;
 };
 
+typedef struct {
+	int tile_group_id;
+	bool tile_is_single_monitor;
+	uint8_t num_h_tile, num_v_tile;
+	uint8_t tile_h_loc, tile_v_loc;
+	uint16_t tile_h_size, tile_v_size;
+} igt_tile_info_t;
+
 void igt_display_require(igt_display_t *display, int drm_fd);
 void igt_display_fini(igt_display_t *display);
 void igt_display_reset(igt_display_t *display);
@@ -833,5 +841,8 @@ static inline bool igt_vblank_before(uint32_t a, uint32_t b)
 {
 	return igt_vblank_after(b, a);
 }
+
+void igt_parse_connector_tile_blob(drmModePropertyBlobPtr blob,
+		igt_tile_info_t *tile);
 
 #endif /* __IGT_KMS_H__ */

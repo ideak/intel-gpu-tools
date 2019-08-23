@@ -4507,3 +4507,32 @@ bool igt_display_has_format_mod(igt_display_t *display, uint32_t format,
 
 	return false;
 }
+
+/**
+ * igt_parse_connector_tile_blob:
+ * @blob: pointer to the connector's tile properties
+ * @tile: pointer to tile structure that is populated by the function
+ *
+ * Parses the connector tile blob to extract the tile information.
+ * The blob information is exposed from drm/drm_connector.c in the kernel.
+ * The format of the tile property is defined in the kernel as char tile[256]
+ * that consists of 8 integers that are ':' separated.
+ *
+ */
+
+void igt_parse_connector_tile_blob(drmModePropertyBlobPtr blob,
+		igt_tile_info_t *tile)
+{
+	char *blob_data = blob->data;
+
+	igt_assert(blob);
+
+	tile->tile_group_id = atoi(strtok(blob_data, ":"));
+	tile->tile_is_single_monitor = atoi(strtok(NULL, ":"));
+	tile->num_h_tile = atoi(strtok(NULL, ":"));
+	tile->num_v_tile = atoi(strtok(NULL, ":"));
+	tile->tile_h_loc = atoi(strtok(NULL, ":"));
+	tile->tile_v_loc = atoi(strtok(NULL, ":"));
+	tile->tile_h_size = atoi(strtok(NULL, ":"));
+	tile->tile_v_size = atoi(strtok(NULL, ":"));
+}
