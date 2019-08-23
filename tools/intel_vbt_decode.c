@@ -229,6 +229,7 @@ static void dump_backlight_info(struct context *context,
 {
 	const struct bdb_lfp_backlight_data *backlight = block->data;
 	const struct lfp_backlight_data_entry *blc;
+	const struct lfp_backlight_control_method *control;
 	int i;
 
 	if (sizeof(*blc) != backlight->entry_size) {
@@ -250,8 +251,14 @@ static void dump_backlight_info(struct context *context,
 		printf("\t\tActive low: %u\n", blc->active_low_pwm);
 		printf("\t\tPWM freq: %u\n", blc->pwm_freq_hz);
 		printf("\t\tMinimum brightness: %u\n", blc->min_brightness);
-	}
 
+		printf("\t\tLevel: %u\n", backlight->level[i]);
+
+		control = &backlight->backlight_control[i];
+
+		printf("\t\tControl type: %u\n", control->type);
+		printf("\t\tController: %u\n", control->controller);
+	}
 }
 
 static const struct {
