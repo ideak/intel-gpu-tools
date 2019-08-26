@@ -26,6 +26,7 @@
  */
 
 #include <unistd.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -358,6 +359,103 @@ test_isolation(int i915)
 
 	ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
 	igt_assert(ptr == MAP_FAILED);
+}
+
+static void
+test_close_race(int i915)
+{
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	_Atomic uint32_t *handles;
+
+	handles = mmap64(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(handles != MAP_FAILED);
+
+	igt_fork(child, ncpus + 1) {
+		do {
+			struct drm_i915_gem_mmap_gtt mmap_arg = {};
+			const int i = 1 + random() % ncpus;
+			uint32_t old;
+
+			mmap_arg.handle = gem_create(i915, 4096);
+			old = atomic_exchange(&handles[i], mmap_arg.handle);
+			ioctl(i915, DRM_IOCTL_GEM_CLOSE, &old);
+
+			if (ioctl(i915,
+				  DRM_IOCTL_I915_GEM_MMAP_GTT,
+				  &mmap_arg) != -1) {
+				void *ptr;
+
+				ptr = mmap64(0, 4096,
+					     PROT_WRITE, MAP_SHARED, i915,
+					     mmap_arg.offset);
+				if (ptr != MAP_FAILED) {
+					*(volatile uint32_t *)ptr = 0;
+					munmap(ptr, 4096);
+				}
+			}
+		} while (!READ_ONCE(handles[0]));
+	}
+
+	sleep(20);
+	handles[0] = 1;
+	igt_waitchildren();
+
+	for (int i = 1; i <= ncpus; i++)
+		ioctl(i915, DRM_IOCTL_GEM_CLOSE, handles[i]);
+	munmap(handles, 4096);
+}
+
+static void
+test_flink_race(int i915)
+{
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	_Atomic uint32_t *handles;
+
+	handles = mmap64(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(handles != MAP_FAILED);
+
+	igt_fork(child, ncpus + 1) {
+		int fd = gem_reopen_driver(i915);
+
+		do {
+			struct drm_i915_gem_mmap_gtt mmap_arg = {};
+			const int i = 1 + random() % ncpus;
+			uint32_t old;
+
+			old = atomic_exchange(&handles[i],
+					      gem_create(i915, 4096));
+			if (!old)
+				continue;
+
+			mmap_arg.handle =
+				gem_open(fd, gem_flink(i915, old));
+			gem_close(i915, old);
+
+			if (ioctl(fd,
+				  DRM_IOCTL_I915_GEM_MMAP_GTT,
+				  &mmap_arg) != -1) {
+				void *ptr;
+
+				ptr = mmap64(0, 4096,
+					     PROT_WRITE, MAP_SHARED, fd,
+					     mmap_arg.offset);
+				if (ptr != MAP_FAILED) {
+					*(volatile uint32_t *)ptr = 0;
+					munmap(ptr, 4096);
+				}
+			}
+
+			gem_close(fd, mmap_arg.handle);
+		} while (!READ_ONCE(handles[0]));
+	}
+
+	sleep(20);
+	handles[0] = 1;
+	igt_waitchildren();
+
+	for (int i = 1; i <= ncpus; i++)
+		ioctl(i915, DRM_IOCTL_GEM_CLOSE, handles[i]);
+	munmap(handles, 4096);
 }
 
 static void
@@ -985,6 +1083,10 @@ igt_main
 		test_wc(fd);
 	igt_subtest("isolation")
 		test_isolation(fd);
+	igt_subtest("close-race")
+		test_close_race(fd);
+	igt_subtest("flink-race")
+		test_flink_race(fd);
 	igt_subtest("pf-nonblock")
 		test_pf_nonblock(fd);
 
