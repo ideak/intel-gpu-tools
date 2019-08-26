@@ -34,9 +34,9 @@
 #define VDISPLAY_4K	2160
 
 IGT_TEST_DESCRIPTION("Test that in-kernel EDID parsing is producing "
-		     "expected results by forcing a disconnected HDMI "
-		     "connector with a known EDID and checking that the "
-		     "metadata exposed to user space matches.");
+		     "expected results by forcing a HDMI connector "
+		     "with a known EDID and checking that the metadata "
+		     "exposed to user space matches.");
 
 /**
  * This collection of tests performs EDID and status injection tests. Injection
@@ -49,8 +49,6 @@ IGT_TEST_DESCRIPTION("Test that in-kernel EDID parsing is producing "
  * - 4K modes exposed via KMS
  * - Audio capabilities of the monitor exposed via ALSA. EDID-Like Data (ELD)
  *   entries in /proc/asound are verified.
- *
- * Injection is performed on a disconnected connector.
  */
 
 /** get_connector: get the first disconnected HDMI connector */
