@@ -2933,7 +2933,7 @@ static unsigned long calibrate_nop(unsigned int tolerance_pct)
 		size = loops * size / elapsed(&t_start, &t_end) / 1e6 * usecs;
 		size = ALIGN(size, sizeof(uint32_t));
 	} while (elapsed(&t_0, &t_end) < 5 ||
-		 abs(size - last_size) > (size * tolerance_pct / 100));
+		 labs(size - last_size) > (size * tolerance_pct / 100));
 
 	return size / sizeof(uint32_t);
 }

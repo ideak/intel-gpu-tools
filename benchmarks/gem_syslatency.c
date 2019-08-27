@@ -343,7 +343,7 @@ static unsigned long calibrate_nop(unsigned int target_us,
 		sz = loops * sz / elapsed(&t_start, &t_end) * 1e3 * target_us;
 		sz = ALIGN(sz, sizeof(uint32_t));
 	} while (elapsed(&t_0, &t_end) < 5 ||
-		 abs(sz - prev) > (sz * tolerance_pct / 100));
+		 labs(sz - prev) > (sz * tolerance_pct / 100));
 
 	close(fd);
 
