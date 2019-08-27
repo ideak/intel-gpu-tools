@@ -95,6 +95,7 @@ static void exec1(int fd, uint32_t handle, uint64_t reloc_ofs, unsigned flags, c
 	gem_execbuf(fd, &execbuf);
 
 	igt_warn_on(gem_reloc[0].presumed_offset == -1);
+	gem_set_domain(fd, gem_exec[0].handle, I915_GEM_DOMAIN_WC, 0);
 
 	if (use_64bit_relocs) {
 		uint64_t tmp;
@@ -102,14 +103,14 @@ static void exec1(int fd, uint32_t handle, uint64_t reloc_ofs, unsigned flags, c
 			tmp = *(uint64_t *)(ptr+reloc_ofs);
 		else
 			gem_read(fd, handle, reloc_ofs, &tmp, sizeof(tmp));
-		igt_assert_eq(tmp, gem_reloc[0].presumed_offset);
+		igt_assert_eq_u64(tmp, gem_reloc[0].presumed_offset);
 	} else {
 		uint32_t tmp;
 		if (ptr)
 			tmp = *(uint32_t *)(ptr+reloc_ofs);
 		else
 			gem_read(fd, handle, reloc_ofs, &tmp, sizeof(tmp));
-		igt_assert_eq(tmp, gem_reloc[0].presumed_offset);
+		igt_assert_eq_u32(tmp, gem_reloc[0].presumed_offset);
 	}
 }
 
@@ -173,6 +174,7 @@ static void execN(int fd, uint32_t handle, uint64_t batch_size, unsigned flags, 
 		if (igt_warn_on(gem_reloc[n].presumed_offset == -1))
 			break;
 	}
+	gem_set_domain(fd, gem_exec[0].handle, I915_GEM_DOMAIN_WC, 0);
 
 	if (use_64bit_relocs) {
 		for (n = 0; n < nreloc; n++) {
@@ -181,7 +183,7 @@ static void execN(int fd, uint32_t handle, uint64_t batch_size, unsigned flags, 
 				tmp = *(uint64_t *)(ptr+reloc_ofs(n, nreloc));
 			else
 				gem_read(fd, handle, reloc_ofs(n, nreloc), &tmp, sizeof(tmp));
-			igt_assert_eq(tmp, gem_reloc[n].presumed_offset);
+			igt_assert_eq_u64(tmp, gem_reloc[n].presumed_offset);
 		}
 	} else {
 		for (n = 0; n < nreloc; n++) {
@@ -190,7 +192,7 @@ static void execN(int fd, uint32_t handle, uint64_t batch_size, unsigned flags, 
 				tmp = *(uint32_t *)(ptr+reloc_ofs(n, nreloc));
 			else
 				gem_read(fd, handle, reloc_ofs(n, nreloc), &tmp, sizeof(tmp));
-			igt_assert_eq(tmp, gem_reloc[n].presumed_offset);
+			igt_assert_eq_u32(tmp, gem_reloc[n].presumed_offset);
 		}
 	}
 
