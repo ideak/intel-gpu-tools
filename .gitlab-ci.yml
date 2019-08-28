@@ -17,6 +17,96 @@ stages:
   - test
   - deploy
 
+################# CONTAINERS #######################
+
+containers:igt-debian:
+  stage: containers
+  image: docker:stable
+  only:
+    changes:
+      - Dockerfile.debian-minimal
+      - Dockerfile.debian
+      - .gitlab-ci.yml
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-minimal -t igt-debian-minimal -f Dockerfile.debian-minimal .
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian -f Dockerfile.debian .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-minimal
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian
+
+containers:igt-debian-armhf:
+  stage: containers
+  image: docker:stable
+  only:
+    changes:
+      - Dockerfile.debian-armhf
+      - .gitlab-ci.yml
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-armhf -f Dockerfile.debian-armhf .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-armhf
+
+containers:igt-debian-arm64:
+  stage: containers
+  image: docker:stable
+  only:
+    changes:
+      - Dockerfile.debian-arm64
+      - .gitlab-ci.yml
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64 -f Dockerfile.debian-arm64 .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64
+
+containers:igt-debian-mips:
+  stage: containers
+  image: docker:stable
+  only:
+    changes:
+      - Dockerfile.debian-mips
+      - .gitlab-ci.yml
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-mips -f Dockerfile.debian-mips .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-mips
+
+containers:igt-fedora:
+  stage: containers
+  image: docker:stable
+  only:
+    changes:
+      - Dockerfile.fedora
+      - .gitlab-ci.yml
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-fedora -f Dockerfile.fedora .
+    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-fedora
+
 #################### BUILD #########################
 
 build:tests-fedora:
@@ -210,92 +300,3 @@ pages:
   only:
     - master
 
-################# CONTAINERS #######################
-
-containers:igt-debian:
-  stage: containers
-  image: docker:stable
-  only:
-    changes:
-      - Dockerfile.debian-minimal
-      - Dockerfile.debian
-      - .gitlab-ci.yml
-  services:
-    - docker:dind
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_DRIVER: overlay2
-  script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-minimal -t igt-debian-minimal -f Dockerfile.debian-minimal .
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian -f Dockerfile.debian .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-minimal
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian
-
-containers:igt-debian-armhf:
-  stage: containers
-  image: docker:stable
-  only:
-    changes:
-      - Dockerfile.debian-armhf
-      - .gitlab-ci.yml
-  services:
-    - docker:dind
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_DRIVER: overlay2
-  script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-armhf -f Dockerfile.debian-armhf .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-armhf
-
-containers:igt-debian-arm64:
-  stage: containers
-  image: docker:stable
-  only:
-    changes:
-      - Dockerfile.debian-arm64
-      - .gitlab-ci.yml
-  services:
-    - docker:dind
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_DRIVER: overlay2
-  script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64 -f Dockerfile.debian-arm64 .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-arm64
-
-containers:igt-debian-mips:
-  stage: containers
-  image: docker:stable
-  only:
-    changes:
-      - Dockerfile.debian-mips
-      - .gitlab-ci.yml
-  services:
-    - docker:dind
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_DRIVER: overlay2
-  script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-mips -f Dockerfile.debian-mips .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-debian-mips
-
-containers:igt-fedora:
-  stage: containers
-  image: docker:stable
-  only:
-    changes:
-      - Dockerfile.fedora
-      - .gitlab-ci.yml
-  services:
-    - docker:dind
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_DRIVER: overlay2
-  script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/igt-fedora -f Dockerfile.fedora .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/igt-fedora
