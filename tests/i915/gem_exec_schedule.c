@@ -34,6 +34,7 @@
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
 #include "i915/gem_ring.h"
+#include "sw_sync.h"
 
 #define LO 0
 #define HI 1
@@ -85,7 +86,7 @@ void __sync_read_u32_count(int fd, uint32_t handle, uint32_t *dst, uint64_t size
 
 static uint32_t __store_dword(int fd, uint32_t ctx, unsigned ring,
 			      uint32_t target, uint32_t offset, uint32_t value,
-			      uint32_t cork, unsigned write_domain)
+			      uint32_t cork, int fence, unsigned write_domain)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[3];
@@ -101,6 +102,11 @@ static uint32_t __store_dword(int fd, uint32_t ctx, unsigned ring,
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 	execbuf.rsvd1 = ctx;
+
+	if (fence != -1) {
+		execbuf.flags |= I915_EXEC_FENCE_IN;
+		execbuf.rsvd2 = fence;
+	}
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = cork;
@@ -140,11 +146,29 @@ static uint32_t __store_dword(int fd, uint32_t ctx, unsigned ring,
 
 static void store_dword(int fd, uint32_t ctx, unsigned ring,
 			uint32_t target, uint32_t offset, uint32_t value,
-			uint32_t cork, unsigned write_domain)
+			unsigned write_domain)
 {
 	gem_close(fd, __store_dword(fd, ctx, ring,
 				    target, offset, value,
-				    cork, write_domain));
+				    0, -1, write_domain));
+}
+
+static void store_dword_plug(int fd, uint32_t ctx, unsigned ring,
+			     uint32_t target, uint32_t offset, uint32_t value,
+			     uint32_t cork, unsigned write_domain)
+{
+	gem_close(fd, __store_dword(fd, ctx, ring,
+				    target, offset, value,
+				    cork, -1, write_domain));
+}
+
+static void store_dword_fenced(int fd, uint32_t ctx, unsigned ring,
+			       uint32_t target, uint32_t offset, uint32_t value,
+			       int fence, unsigned write_domain)
+{
+	gem_close(fd, __store_dword(fd, ctx, ring,
+				    target, offset, value,
+				    0, fence, write_domain));
 }
 
 static uint32_t create_highest_priority(int fd)
@@ -189,20 +213,21 @@ static void unplug_show_queue(int fd, struct igt_cork *c, unsigned int engine)
 
 static void fifo(int fd, unsigned ring)
 {
-	IGT_CORK_HANDLE(cork);
-	uint32_t scratch, plug;
+	IGT_CORK_FENCE(cork);
+	uint32_t scratch;
 	uint32_t result;
+	int fence;
 
 	scratch = gem_create(fd, 4096);
 
-	plug = igt_cork_plug(&cork, fd);
+	fence = igt_cork_plug(&cork, fd);
 
 	/* Same priority, same timeline, final result will be the second eb */
-	store_dword(fd, 0, ring, scratch, 0, 1, plug, 0);
-	store_dword(fd, 0, ring, scratch, 0, 2, plug, 0);
+	store_dword_fenced(fd, 0, ring, scratch, 0, 1, fence, 0);
+	store_dword_fenced(fd, 0, ring, scratch, 0, 2, fence, 0);
 
 	unplug_show_queue(fd, &cork, ring);
-	gem_close(fd, plug);
+	close(fence);
 
 	result =  __sync_read_u32(fd, scratch, 0);
 	gem_close(fd, scratch);
@@ -212,11 +237,12 @@ static void fifo(int fd, unsigned ring)
 
 static void independent(int fd, unsigned int engine)
 {
-	IGT_CORK_HANDLE(cork);
-	uint32_t scratch, plug, batch;
+	IGT_CORK_FENCE(cork);
 	igt_spin_t *spin = NULL;
+	uint32_t scratch, batch;
 	unsigned int other;
 	uint32_t *ptr;
+	int fence;
 
 	igt_require(engine != 0);
 
@@ -224,7 +250,7 @@ static void independent(int fd, unsigned int engine)
 	ptr = gem_mmap__gtt(fd, scratch, 4096, PROT_READ);
 	igt_assert_eq(ptr[0], 0);
 
-	plug = igt_cork_plug(&cork, fd);
+	fence = igt_cork_plug(&cork, fd);
 
 	/* Check that we can submit to engine while all others are blocked */
 	for_each_physical_engine(fd, other) {
@@ -245,15 +271,15 @@ static void independent(int fd, unsigned int engine)
 			gem_execbuf(fd, &eb);
 		}
 
-		store_dword(fd, 0, other, scratch, 0, other, plug, 0);
+		store_dword_fenced(fd, 0, other, scratch, 0, other, fence, 0);
 	}
 	igt_require(spin);
 
 	/* Same priority, but different timeline (as different engine) */
-	batch = __store_dword(fd, 0, engine, scratch, 0, engine, plug, 0);
+	batch = __store_dword(fd, 0, engine, scratch, 0, engine, 0, fence, 0);
 
 	unplug_show_queue(fd, &cork, engine);
-	gem_close(fd, plug);
+	close(fence);
 
 	gem_sync(fd, batch);
 	igt_assert(!gem_bo_busy(fd, batch));
@@ -312,11 +338,11 @@ static void smoketest(int fd, unsigned ring, unsigned timeout)
 			engine = engines[hars_petruska_f54_1_random_unsafe_max(nengine)];
 			store_dword(fd, ctx, engine, scratch,
 				    8*child + 0, ~child,
-				    0, 0);
+				    0);
 			for (unsigned int step = 0; step < 8; step++)
 				store_dword(fd, ctx, engine, scratch,
 					    8*child + 4, count++,
-					    0, 0);
+					    0);
 		}
 		gem_context_destroy(fd, ctx);
 	}
@@ -698,10 +724,11 @@ static void semaphore_noskip(int i915)
 static void reorder(int fd, unsigned ring, unsigned flags)
 #define EQUAL 1
 {
-	IGT_CORK_HANDLE(cork);
-	uint32_t scratch, plug;
+	IGT_CORK_FENCE(cork);
+	uint32_t scratch;
 	uint32_t result;
 	uint32_t ctx[2];
+	int fence;
 
 	ctx[LO] = gem_context_create(fd);
 	gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
@@ -710,16 +737,16 @@ static void reorder(int fd, unsigned ring, unsigned flags)
 	gem_context_set_priority(fd, ctx[HI], flags & EQUAL ? MIN_PRIO : 0);
 
 	scratch = gem_create(fd, 4096);
-	plug = igt_cork_plug(&cork, fd);
+	fence = igt_cork_plug(&cork, fd);
 
 	/* We expect the high priority context to be executed first, and
 	 * so the final result will be value from the low priority context.
 	 */
-	store_dword(fd, ctx[LO], ring, scratch, 0, ctx[LO], plug, 0);
-	store_dword(fd, ctx[HI], ring, scratch, 0, ctx[HI], plug, 0);
+	store_dword_fenced(fd, ctx[LO], ring, scratch, 0, ctx[LO], fence, 0);
+	store_dword_fenced(fd, ctx[HI], ring, scratch, 0, ctx[HI], fence, 0);
 
 	unplug_show_queue(fd, &cork, ring);
-	gem_close(fd, plug);
+	close(fence);
 
 	gem_context_destroy(fd, ctx[LO]);
 	gem_context_destroy(fd, ctx[HI]);
@@ -735,11 +762,11 @@ static void reorder(int fd, unsigned ring, unsigned flags)
 
 static void promotion(int fd, unsigned ring)
 {
-	IGT_CORK_HANDLE(cork);
+	IGT_CORK_FENCE(cork);
 	uint32_t result, dep;
 	uint32_t result_read, dep_read;
 	uint32_t ctx[3];
-	uint32_t plug;
+	int fence;
 
 	ctx[LO] = gem_context_create(fd);
 	gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
@@ -753,24 +780,24 @@ static void promotion(int fd, unsigned ring)
 	result = gem_create(fd, 4096);
 	dep = gem_create(fd, 4096);
 
-	plug = igt_cork_plug(&cork, fd);
+	fence = igt_cork_plug(&cork, fd);
 
 	/* Expect that HI promotes LO, so the order will be LO, HI, NOISE.
 	 *
 	 * fifo would be NOISE, LO, HI.
 	 * strict priority would be  HI, NOISE, LO
 	 */
-	store_dword(fd, ctx[NOISE], ring, result, 0, ctx[NOISE], plug, 0);
-	store_dword(fd, ctx[LO], ring, result, 0, ctx[LO], plug, 0);
+	store_dword_fenced(fd, ctx[NOISE], ring, result, 0, ctx[NOISE], fence, 0);
+	store_dword_fenced(fd, ctx[LO], ring, result, 0, ctx[LO], fence, 0);
 
 	/* link LO <-> HI via a dependency on another buffer */
-	store_dword(fd, ctx[LO], ring, dep, 0, ctx[LO], 0, I915_GEM_DOMAIN_INSTRUCTION);
-	store_dword(fd, ctx[HI], ring, dep, 0, ctx[HI], 0, 0);
+	store_dword(fd, ctx[LO], ring, dep, 0, ctx[LO], I915_GEM_DOMAIN_INSTRUCTION);
+	store_dword(fd, ctx[HI], ring, dep, 0, ctx[HI], 0);
 
-	store_dword(fd, ctx[HI], ring, result, 0, ctx[HI], 0, 0);
+	store_dword(fd, ctx[HI], ring, result, 0, ctx[HI], 0);
 
 	unplug_show_queue(fd, &cork, ring);
-	gem_close(fd, plug);
+	close(fence);
 
 	gem_context_destroy(fd, ctx[NOISE]);
 	gem_context_destroy(fd, ctx[LO]);
@@ -816,7 +843,7 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 					 .engine = ring);
 		igt_debug("spin[%d].handle=%d\n", n, spin[n]->handle);
 
-		store_dword(fd, ctx[HI], ring, result, 0, n + 1, 0, I915_GEM_DOMAIN_RENDER);
+		store_dword(fd, ctx[HI], ring, result, 0, n + 1, I915_GEM_DOMAIN_RENDER);
 
 		result_read = __sync_read_u32(fd, result, 0);
 		igt_assert_eq_u32(result_read, n + 1);
@@ -875,21 +902,21 @@ static void __preempt_other(int fd,
 	n = 0;
 	store_dword(fd, ctx[LO], primary,
 		    result, (n + 1)*sizeof(uint32_t), n + 1,
-		    0, I915_GEM_DOMAIN_RENDER);
+		    I915_GEM_DOMAIN_RENDER);
 	n++;
 
 	if (flags & CHAIN) {
 		for_each_physical_engine(fd, other) {
 			store_dword(fd, ctx[LO], other,
 				    result, (n + 1)*sizeof(uint32_t), n + 1,
-				    0, I915_GEM_DOMAIN_RENDER);
+				    I915_GEM_DOMAIN_RENDER);
 			n++;
 		}
 	}
 
 	store_dword(fd, ctx[HI], target,
 		    result, (n + 1)*sizeof(uint32_t), n + 1,
-		    0, I915_GEM_DOMAIN_RENDER);
+		    I915_GEM_DOMAIN_RENDER);
 
 	igt_debugfs_dump(fd, "i915_engine_info");
 	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
@@ -980,21 +1007,21 @@ static void __preempt_queue(int fd,
 	n = 0;
 	store_dword(fd, ctx[LO], primary,
 		    result, (n + 1)*sizeof(uint32_t), n + 1,
-		    0, I915_GEM_DOMAIN_RENDER);
+		    I915_GEM_DOMAIN_RENDER);
 	n++;
 
 	if (flags & CHAIN) {
 		for_each_physical_engine(fd, other) {
 			store_dword(fd, ctx[LO], other,
 				    result, (n + 1)*sizeof(uint32_t), n + 1,
-				    0, I915_GEM_DOMAIN_RENDER);
+				    I915_GEM_DOMAIN_RENDER);
 			n++;
 		}
 	}
 
 	store_dword(fd, ctx[HI], target,
 		    result, (n + 1)*sizeof(uint32_t), n + 1,
-		    0, I915_GEM_DOMAIN_RENDER);
+		    I915_GEM_DOMAIN_RENDER);
 
 	igt_debugfs_dump(fd, "i915_engine_info");
 
@@ -1062,13 +1089,13 @@ static void preempt_self(int fd, unsigned ring)
 					 .engine = other);
 		store_dword(fd, ctx[HI], other,
 			    result, (n + 1)*sizeof(uint32_t), n + 1,
-			    0, I915_GEM_DOMAIN_RENDER);
+			    I915_GEM_DOMAIN_RENDER);
 		n++;
 	}
 	gem_context_set_priority(fd, ctx[HI], MAX_PRIO);
 	store_dword(fd, ctx[HI], ring,
 		    result, (n + 1)*sizeof(uint32_t), n + 1,
-		    0, I915_GEM_DOMAIN_RENDER);
+		    I915_GEM_DOMAIN_RENDER);
 
 	gem_set_domain(fd, result, I915_GEM_DOMAIN_GTT, 0);
 
@@ -1242,8 +1269,8 @@ static void deep(int fd, unsigned ring)
 		gem_context_set_priority(fd, context, MAX_PRIO - nreq + n);
 
 		for (int m = 0; m < XS; m++) {
-			store_dword(fd, context, ring, result, 4*n, context, dep[m], 0);
-			store_dword(fd, context, ring, result, 4*m, context, 0, I915_GEM_DOMAIN_INSTRUCTION);
+			store_dword_plug(fd, context, ring, result, 4*n, context, dep[m], 0);
+			store_dword(fd, context, ring, result, 4*m, context, I915_GEM_DOMAIN_INSTRUCTION);
 		}
 		expected = context;
 	}
@@ -1293,12 +1320,12 @@ static void wide(int fd, unsigned ring)
 	struct timespec tv = {};
 	unsigned int ring_size = gem_measure_ring_inflight(fd, ring, MEASURE_RING_NEW_CTX);
 
-	IGT_CORK_HANDLE(cork);
-	uint32_t plug;
+	IGT_CORK_FENCE(cork);
 	uint32_t result;
 	uint32_t result_read[MAX_CONTEXTS];
 	uint32_t *ctx;
 	unsigned int count;
+	int fence;
 
 	ctx = malloc(sizeof(*ctx)*MAX_CONTEXTS);
 	for (int n = 0; n < MAX_CONTEXTS; n++)
@@ -1306,21 +1333,22 @@ static void wide(int fd, unsigned ring)
 
 	result = gem_create(fd, 4*MAX_CONTEXTS);
 
-	plug = igt_cork_plug(&cork, fd);
+	fence = igt_cork_plug(&cork, fd);
 
 	/* Lots of in-order requests, plugged and submitted simultaneously */
 	for (count = 0;
 	     igt_seconds_elapsed(&tv) < 5 && count < ring_size;
 	     count++) {
 		for (int n = 0; n < MAX_CONTEXTS; n++) {
-			store_dword(fd, ctx[n], ring, result, 4*n, ctx[n], plug, I915_GEM_DOMAIN_INSTRUCTION);
+			store_dword_fenced(fd, ctx[n], ring, result, 4*n, ctx[n],
+					   fence, I915_GEM_DOMAIN_INSTRUCTION);
 		}
 	}
 	igt_info("Submitted %d requests over %d contexts in %.1fms\n",
 		 count, MAX_CONTEXTS, igt_nsec_elapsed(&tv) * 1e-6);
 
 	unplug_show_queue(fd, &cork, ring);
-	gem_close(fd, plug);
+	close(fence);
 
 	for (int n = 0; n < MAX_CONTEXTS; n++)
 		gem_context_destroy(fd, ctx[n]);
@@ -1337,27 +1365,27 @@ static void reorder_wide(int fd, unsigned ring)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_relocation_entry reloc;
-	struct drm_i915_gem_exec_object2 obj[3];
+	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct timespec tv = {};
 	unsigned int ring_size = gem_measure_ring_inflight(fd, ring, MEASURE_RING_NEW_CTX);
-	IGT_CORK_HANDLE(cork);
-	uint32_t result, target, plug;
+	IGT_CORK_FENCE(cork);
+	uint32_t result, target;
 	uint32_t result_read[1024];
 	uint32_t *expected;
+	int fence;
 
 	result = gem_create(fd, 4096);
 	target = gem_create(fd, 4096);
-	plug = igt_cork_plug(&cork, fd);
+	fence = igt_cork_plug(&cork, fd);
 
 	expected = gem_mmap__cpu(fd, target, 0, 4096, PROT_WRITE);
 	gem_set_domain(fd, target, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 	memset(obj, 0, sizeof(obj));
-	obj[0].handle = plug;
-	obj[1].handle = result;
-	obj[2].relocs_ptr = to_user_pointer(&reloc);
-	obj[2].relocation_count = 1;
+	obj[0].handle = result;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
+	obj[1].relocation_count = 1;
 
 	memset(&reloc, 0, sizeof(reloc));
 	reloc.target_handle = result;
@@ -1366,10 +1394,13 @@ static void reorder_wide(int fd, unsigned ring)
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.buffer_count = 3;
+	execbuf.buffer_count = ARRAY_SIZE(obj);
 	execbuf.flags = ring;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
+
+	execbuf.flags |= I915_EXEC_FENCE_IN;
+	execbuf.rsvd2 = fence;
 
 	for (int n = MIN_PRIO, x = 1;
 	     igt_seconds_elapsed(&tv) < 5 && n <= MAX_PRIO;
@@ -1380,9 +1411,9 @@ static void reorder_wide(int fd, unsigned ring)
 		execbuf.rsvd1 = gem_context_create(fd);
 		gem_context_set_priority(fd, execbuf.rsvd1, n);
 
-		obj[2].handle = gem_create(fd, sz);
-		batch = gem_mmap__gtt(fd, obj[2].handle, sz, PROT_WRITE);
-		gem_set_domain(fd, obj[2].handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+		obj[1].handle = gem_create(fd, sz);
+		batch = gem_mmap__gtt(fd, obj[1].handle, sz, PROT_WRITE);
+		gem_set_domain(fd, obj[1].handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 		for (int m = 0; m < ring_size; m++) {
 			uint64_t addr;
@@ -1417,12 +1448,12 @@ static void reorder_wide(int fd, unsigned ring)
 		}
 
 		munmap(batch, sz);
-		gem_close(fd, obj[2].handle);
+		gem_close(fd, obj[1].handle);
 		gem_context_destroy(fd, execbuf.rsvd1);
 	}
 
 	unplug_show_queue(fd, &cork, ring);
-	gem_close(fd, plug);
+	close(fence);
 
 	__sync_read_u32_count(fd, result, result_read, sizeof(result_read));
 	for (int n = 0; n < 1024; n++)
@@ -1641,6 +1672,8 @@ igt_main
 	igt_skip_on_simulation();
 
 	igt_fixture {
+		igt_require_sw_sync();
+
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		gem_submission_print_method(fd);
 		gem_scheduler_print_capability(fd);
