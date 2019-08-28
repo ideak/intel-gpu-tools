@@ -830,10 +830,10 @@ static void busy(int i915)
 		do_ioctl(i915, DRM_IOCTL_I915_GEM_BUSY, &busy);
 		igt_assert_eq_u32(busy.busy, 1u << (class + 16));
 
-		/* Queued(read): expected class */
+		/* Queued(read, maybe write if being migrated): expected class */
 		busy.handle = spin[1]->handle;
 		do_ioctl(i915, DRM_IOCTL_I915_GEM_BUSY, &busy);
-		igt_assert_eq_u32(busy.busy, 1u << (class + 16));
+		igt_assert_eq_u32(busy.busy & 0xffff << 16, 1u << (class + 16));
 
 		/* Queued(write): expected class */
 		busy.handle = scratch;
