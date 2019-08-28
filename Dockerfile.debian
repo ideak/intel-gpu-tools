@@ -1,4 +1,4 @@
-FROM igt-debian-minimal
+FROM build-debian-minimal
 
 RUN apt-get update
 RUN apt-get install -y \
