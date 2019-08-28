@@ -22,11 +22,6 @@ stages:
 build-containers:build-debian:
   stage: build-containers
   image: docker:stable
-  only:
-    changes:
-      - Dockefile.build-debian-minimal
-      - Dockefile.build-debian
-      - .gitlab-ci.yml
   services:
     - docker:dind
   variables:
@@ -34,18 +29,12 @@ build-containers:build-debian:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal -t build-debian-minimal -f Dockefile.build-debian-minimal .
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/build-debian -f Dockefile.build-debian .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/build-debian
+    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian-minimal build-debian-minimal
+    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian build-debian
 
 build-containers:build-debian-armhf:
   stage: build-containers
   image: docker:stable
-  only:
-    changes:
-      - Dockefile.build-debian-armhf
-      - .gitlab-ci.yml
   services:
     - docker:dind
   variables:
@@ -53,16 +42,11 @@ build-containers:build-debian-armhf:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf -f Dockefile.build-debian-armhf .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf
+    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian-armhf build-debian-armhf
 
 build-containers:build-debian-arm64:
   stage: build-containers
   image: docker:stable
-  only:
-    changes:
-      - Dockefile.build-debian-arm64
-      - .gitlab-ci.yml
   services:
     - docker:dind
   variables:
@@ -70,16 +54,11 @@ build-containers:build-debian-arm64:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64 -f Dockefile.build-debian-arm64 .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64
+    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian-arm64 build-debian-arm64
 
 build-containers:build-debian-mips:
   stage: build-containers
   image: docker:stable
-  only:
-    changes:
-      - Dockefile.build-debian-mips
-      - .gitlab-ci.yml
   services:
     - docker:dind
   variables:
@@ -87,16 +66,11 @@ build-containers:build-debian-mips:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips -f Dockefile.build-debian-mips .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips
+    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian-mips build-debian-mips
 
 build-containers:build-fedora:
   stage: build-containers
   image: docker:stable
-  only:
-    changes:
-      - Dockefile.build-fedora
-      - .gitlab-ci.yml
   services:
     - docker:dind
   variables:
@@ -104,8 +78,7 @@ build-containers:build-fedora:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker build -t $CI_REGISTRY/$CI_PROJECT_PATH/build-fedora -f Dockefile.build-fedora .
-    - docker push $CI_REGISTRY/$CI_PROJECT_PATH/build-fedora
+    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-fedora build-fedora
 
 #################### BUILD #########################
 
