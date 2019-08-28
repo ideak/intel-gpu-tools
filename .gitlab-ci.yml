@@ -1,4 +1,4 @@
-image: $CI_REGISTRY/$CI_PROJECT_PATH/build-fedora:latest
+image: $CI_REGISTRY/$CI_PROJECT_PATH/build-fedora:commit-$CI_COMMIT_SHA
 variables:
   MESON_OPTIONS: >
     -Dlibdrm_drivers=intel,nouveau,amdgpu
@@ -121,7 +121,7 @@ build:tests-fedora-clang:
       - build
 
 build:tests-debian-meson:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian:commit-$CI_COMMIT_SHA
   stage: build
   script:
     - meson $MESON_OPTIONS build
@@ -132,7 +132,7 @@ build:tests-debian-meson:
       - meson-test-list.txt
 
 build:tests-debian-minimal:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:commit-$CI_COMMIT_SHA
   stage: build
   script:
     - meson -Dtests=disabled -Dlibdrm_drivers="" build
@@ -142,7 +142,7 @@ build:tests-debian-minimal:
       - build
 
 build:tests-debian-meson-armhf:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf:commit-$CI_COMMIT_SHA
   stage: build
   script:
     - export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig/
@@ -153,7 +153,7 @@ build:tests-debian-meson-armhf:
       - build
 
 build:tests-debian-meson-arm64:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64:commit-$CI_COMMIT_SHA
   stage: build
   script:
     - export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig/
@@ -164,7 +164,7 @@ build:tests-debian-meson-arm64:
       - build
 
 build:tests-debian-meson-mips:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips:commit-$CI_COMMIT_SHA
   stage: build
   script:
     - export PKG_CONFIG_PATH=/usr/lib/mips-linux-gnu/pkgconfig/
@@ -175,7 +175,7 @@ build:tests-debian-meson-mips:
       - build
 
 build:tests-debian-autotools:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian:commit-$CI_COMMIT_SHA
   stage: build
   script:
     - ./autogen.sh --enable-{chamelium,audio,intel,amdgpu,nouveau,tests,runner}
@@ -202,14 +202,14 @@ test:ninja-test-clang:
   script: ninja -C build test
 
 test:ninja-test-minimal:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:commit-$CI_COMMIT_SHA
   dependencies:
     - build:tests-debian-minimal
   stage: test
   script: ninja -C build test
 
 test:ninja-test-arm64:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64:commit-$CI_COMMIT_SHA
   dependencies:
     - build:tests-debian-meson-arm64
   stage: test
@@ -223,7 +223,7 @@ test:ninja-test-arm64:
     when: on_failure
 
 test:ninja-test-armhf:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf:commit-$CI_COMMIT_SHA
   dependencies:
     - build:tests-debian-meson-armhf
   stage: test
@@ -237,7 +237,7 @@ test:ninja-test-armhf:
     when: on_failure
 
 test:ninja-test-mips:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips:latest
+  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips:commit-$CI_COMMIT_SHA
   dependencies:
     - build:tests-debian-meson-mips
   stage: test
