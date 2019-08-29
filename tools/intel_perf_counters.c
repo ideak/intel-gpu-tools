@@ -441,6 +441,7 @@ gen7_get_counters(void)
 int
 main(int argc, char **argv)
 {
+	struct intel_mmio_data mmio_data;
 	uint32_t devid;
 	int counter_format;
 	int counter_count;
@@ -483,10 +484,11 @@ main(int argc, char **argv)
 
 	if (oacontrol) {
 		/* Forcewake */
-		intel_register_access_init(intel_get_pci_device(), 0, fd);
+		intel_register_access_init(&mmio_data, intel_get_pci_device(),
+				0, fd);
 
 		/* Enable performance counters */
-		intel_register_write(OACONTROL,
+		intel_register_write(&mmio_data, OACONTROL,
 			counter_format << OACONTROL_COUNTER_SELECT_SHIFT |
 			PERFORMANCE_COUNTER_ENABLE);
 	}
@@ -520,10 +522,10 @@ main(int argc, char **argv)
 
 	if (oacontrol) {
 		/* Disable performance counters */
-		intel_register_write(OACONTROL, 0);
+		intel_register_write(&mmio_data, OACONTROL, 0);
 
 		/* Forcewake */
-		intel_register_access_fini();
+		intel_register_access_fini(&mmio_data);
 	}
 
 	free(totals);

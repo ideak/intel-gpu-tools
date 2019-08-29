@@ -187,7 +187,7 @@ int drm_fd;
 uint32_t devid;
 drmModeResPtr drm_res;
 drmModeConnectorPtr drm_connectors[MAX_CONNECTORS];
-
+struct intel_mmio_data mmio_data;
 igt_main
 {
 	igt_fixture {
@@ -210,7 +210,7 @@ igt_main
 
 		igt_require(supports_lpsp(devid));
 
-		intel_register_access_init(intel_get_pci_device(), 0, drm_fd);
+		intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, drm_fd);
 
 		kmstest_set_vt_graphics_mode();
 	}
@@ -227,7 +227,7 @@ igt_main
 	igt_fixture {
 		int i;
 
-		intel_register_access_fini();
+		intel_register_access_fini(&mmio_data);
 		for (i = 0; i < drm_res->count_connectors; i++)
 			drmModeFreeConnector(drm_connectors[i]);
 		drmModeFreeResources(drm_res);

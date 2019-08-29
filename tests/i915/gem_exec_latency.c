@@ -61,6 +61,8 @@
 
 static unsigned int ring_size;
 static double rcs_clock;
+static struct intel_mmio_data mmio_data;
+
 
 static void
 poll_ring(int fd, unsigned ring, const char *name)
@@ -667,7 +669,7 @@ igt_main
 		if (ring_size > 1024)
 			ring_size = 1024;
 
-		intel_register_access_init(intel_get_pci_device(), false, device);
+		intel_register_access_init(&mmio_data, intel_get_pci_device(), false, device);
 		rcs_clock = clockrate(device, RCS_TIMESTAMP);
 		igt_info("RCS timestamp clock: %.0fKHz, %.1fns\n",
 			 rcs_clock / 1e3, 1e9 / rcs_clock);

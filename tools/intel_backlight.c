@@ -38,9 +38,10 @@
 
 int main(int argc, char** argv)
 {
+	struct intel_mmio_data mmio_data;
 	uint32_t current, max;
 
-	intel_mmio_use_pci_bar(intel_get_pci_device());
+	intel_mmio_use_pci_bar(&mmio_data, intel_get_pci_device());
 
 	current = INREG(BLC_PWM_CPU_CTL) & BACKLIGHT_DUTY_CYCLE_MASK;
 	max = INREG(BLC_PWM_PCH_CTL2) >> 16;

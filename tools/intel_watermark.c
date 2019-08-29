@@ -237,6 +237,7 @@ static const char *skl_nv12_buf_cfg_reg_name(int pipe, int plane)
 
 static void skl_wm_dump(void)
 {
+	struct intel_mmio_data mmio_data;
 	int pipe, plane, level;
 	int num_pipes = 3;
 	int max_planes = skl_max_planes(devid);
@@ -249,7 +250,7 @@ static void skl_wm_dump(void)
 	uint32_t plane_ctl[num_pipes][max_planes];
 	uint32_t wm_linetime[num_pipes];
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
 
 	for (pipe = 0; pipe < num_pipes; pipe++) {
 		int num_planes = skl_num_planes(devid, pipe);
@@ -458,6 +459,7 @@ static void skl_wm_dump(void)
 
 static void ilk_wm_dump(void)
 {
+	struct intel_mmio_data mmio_data;
 	int i;
 	uint32_t dspcntr[3];
 	uint32_t spcntr[3];
@@ -469,7 +471,7 @@ static void ilk_wm_dump(void)
 	int num_pipes = intel_gen(devid) >= 7 ? 3 : 2;
 	struct ilk_wm wm = {};
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
 
 	for (i = 0; i < num_pipes; i++) {
 		dspcntr[i] = read_reg(0x70180 + i * 0x1000);
@@ -505,7 +507,7 @@ static void ilk_wm_dump(void)
 	if (IS_BROADWELL(devid) || IS_HASWELL(devid))
 		wm_misc = read_reg(0x45260);
 
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 
 	for (i = 0; i < num_pipes; i++)
 		printf("    WM_PIPE_%c = 0x%08x\n", pipe_name(i), wm_pipe[i]);
@@ -610,6 +612,7 @@ static void ilk_wm_dump(void)
 
 static void vlv_wm_dump(void)
 {
+	struct intel_mmio_data mmio_data;
 	int i;
 	unsigned int num_pipes = IS_CHERRYVIEW(devid) ? 3 : 2;
 	uint32_t dsparb, dsparb2, dsparb3;
@@ -619,7 +622,7 @@ static void vlv_wm_dump(void)
 	uint32_t dsp_ss_pm, ddr_setup2;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	dsparb2 = read_reg(0x70060);
@@ -650,13 +653,13 @@ static void vlv_wm_dump(void)
 
 		ddl3 = read_reg(0x70058);
 
-		intel_punit_read(0x36, &dsp_ss_pm);
-		intel_punit_read(0x139, &ddr_setup2);
+		intel_punit_read(&mmio_data, 0x36, &dsp_ss_pm);
+		intel_punit_read(&mmio_data, 0x139, &ddr_setup2);
 	} else {
 		fw7 = read_reg(0x7007c);
 	}
 
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 
 	printf("        FW1 = 0x%08x\n", fw1);
 	printf("        FW2 = 0x%08x\n", fw2);
@@ -827,6 +830,7 @@ static void vlv_wm_dump(void)
 
 static void g4x_wm_dump(void)
 {
+	struct intel_mmio_data mmio_data;
 	int i;
 	uint32_t dspacntr, dspbcntr;
 	uint32_t dsparb;
@@ -835,7 +839,7 @@ static void g4x_wm_dump(void)
 	uint32_t mi_arb_state;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
 
 	dspacntr = read_reg(0x70180);
 	dspbcntr = read_reg(0x71180);
@@ -846,7 +850,7 @@ static void g4x_wm_dump(void)
 	mi_display_power_down = read_reg(0x20e0);
 	mi_arb_state = read_reg(0x20e4);
 
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 
 	printf("             DSPACNTR = 0x%08x\n", dspacntr);
 	printf("             DSPBCNTR = 0x%08x\n", dspbcntr);
@@ -913,6 +917,7 @@ static void g4x_wm_dump(void)
 
 static void gen4_wm_dump(void)
 {
+	struct intel_mmio_data mmio_data;
 	int i;
 	int totalsize = IS_CRESTLINE(devid) ? 128 : 96;
 	uint32_t dsparb;
@@ -921,7 +926,7 @@ static void gen4_wm_dump(void)
 	uint32_t mi_arb_state;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	fw1 = read_reg(0x70034);
@@ -930,7 +935,7 @@ static void gen4_wm_dump(void)
 	mi_display_power_down = read_reg(0x20e0);
 	mi_arb_state = read_reg(0x20e4);
 
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 
 	printf("                  FW1 = 0x%08x\n", fw1);
 	printf("                  FW2 = 0x%08x\n", fw2);
@@ -983,6 +988,7 @@ static void gen4_wm_dump(void)
 
 static void pnv_wm_dump(void)
 {
+	struct intel_mmio_data mmio_data;
 	int i;
 	int totalsize = 96; /* FIXME? */
 	uint32_t dsparb;
@@ -992,7 +998,7 @@ static void pnv_wm_dump(void)
 	uint32_t cbr;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	fw1 = read_reg(0x70034);
@@ -1002,7 +1008,7 @@ static void pnv_wm_dump(void)
 	mi_display_power_down = read_reg(0x20e0);
 	mi_arb_state = read_reg(0x20e4);
 
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 
 	printf("               DSPARB = 0x%08x\n", dsparb);
 	printf("                  FW1 = 0x%08x\n", fw1);
@@ -1073,6 +1079,7 @@ static void pnv_wm_dump(void)
 
 static void gen3_wm_dump(void)
 {
+	struct intel_mmio_data mmio_data;
 	int i;
 	int totalsize = IS_945GM(devid) ? 128 : 96; /* FIXME? */
 	uint32_t dsparb;
@@ -1082,7 +1089,7 @@ static void gen3_wm_dump(void)
 	uint32_t mi_arb_state;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	instpm = read_reg(0x20c0);
@@ -1090,7 +1097,7 @@ static void gen3_wm_dump(void)
 	fw_blc_self = read_reg(0x20e0);
 	mi_arb_state = read_reg(0x20e4);
 
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 
 	printf("      DSPARB = 0x%08x\n", dsparb);
 	printf("      FW_BLC = 0x%016" PRIx64 "\n", fw_blc);
@@ -1142,6 +1149,7 @@ static void gen3_wm_dump(void)
 
 static void gen2_wm_dump(void)
 {
+	struct intel_mmio_data mmio_data;
 	int i;
 	int totalsize;
 	uint32_t dsparb;
@@ -1151,7 +1159,7 @@ static void gen2_wm_dump(void)
 	uint32_t mi_state;
 	struct gmch_wm wms[MAX_PLANE] = {};
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
 
 	dsparb = read_reg(0x70030);
 	mem_mode = read_reg(0x20cc);
@@ -1159,7 +1167,7 @@ static void gen2_wm_dump(void)
 	fw_blc_self = read_reg(0x20e0);
 	mi_state = read_reg(0x20e4);
 
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 
 	printf("     DSPARB = 0x%08x\n", dsparb);
 	printf("   MEM_MODE = 0x%08x\n", mem_mode);

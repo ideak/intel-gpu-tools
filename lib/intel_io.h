@@ -30,17 +30,42 @@
 
 #include <stdint.h>
 #include <pciaccess.h>
+#include <stdbool.h>
+
+extern void *igt_global_mmio;
 
 /* register access helpers from intel_mmio.c */
-extern void *igt_global_mmio;
-void intel_mmio_use_pci_bar(struct pci_device *pci_dev);
-void intel_mmio_use_dump_file(char *file);
+struct intel_register_range {
+	uint32_t base;
+	uint32_t size;
+	uint32_t flags;
+};
 
-int intel_register_access_init(struct pci_device *pci_dev, int safe, int fd);
-void intel_register_access_fini(void);
-uint32_t intel_register_read(uint32_t reg);
-void intel_register_write(uint32_t reg, uint32_t val);
-int intel_register_access_needs_fakewake(void);
+struct intel_register_map {
+	struct intel_register_range *map;
+	uint32_t top;
+	uint32_t alignment_mask;
+};
+
+struct intel_mmio_data {
+	void *igt_mmio;
+	struct intel_register_map map;
+	uint32_t pci_device_id;
+	int key;
+	bool safe;
+};
+
+void intel_mmio_use_pci_bar(struct intel_mmio_data *mmio_data,
+			    struct pci_device *pci_dev);
+void intel_mmio_use_dump_file(struct intel_mmio_data *mmio_data, char *file);
+
+int intel_register_access_init(struct intel_mmio_data *mmio_data,
+			       struct pci_device *pci_dev, int safe, int fd);
+void intel_register_access_fini(struct intel_mmio_data *mmio_data);
+uint32_t intel_register_read(struct intel_mmio_data *mmio_data, uint32_t reg);
+void intel_register_write(struct intel_mmio_data *mmio_data, uint32_t reg,
+			  uint32_t val);
+int intel_register_access_needs_fakewake(struct intel_mmio_data *mmio_data);
 
 /* mmio register access functions that use igt_global_mmio */
 
@@ -86,17 +111,24 @@ __OUTREG(8,8)
 #undef __OUTREG
 
 /* sideband access functions from intel_iosf.c */
-uint32_t intel_dpio_reg_read(uint32_t reg, int phy);
-void intel_dpio_reg_write(uint32_t reg, uint32_t val, int phy);
-uint32_t intel_flisdsi_reg_read(uint32_t reg);
-void intel_flisdsi_reg_write(uint32_t reg, uint32_t val);
-uint32_t intel_iosf_sb_read(uint32_t port, uint32_t reg);
-void intel_iosf_sb_write(uint32_t port, uint32_t reg, uint32_t val);
+uint32_t intel_dpio_reg_read(struct intel_mmio_data *mmio_data, uint32_t reg,
+			     int phy);
+void intel_dpio_reg_write(struct intel_mmio_data *mmio_data, uint32_t reg,
+			  uint32_t val, int phy);
+uint32_t intel_flisdsi_reg_read(struct intel_mmio_data *mmio_data, uint32_t reg);
+void intel_flisdsi_reg_write(struct intel_mmio_data *mmio_data, uint32_t reg,
+			     uint32_t val);
+uint32_t intel_iosf_sb_read(struct intel_mmio_data *mmio_data, uint32_t port,
+			    uint32_t reg);
+void intel_iosf_sb_write(struct intel_mmio_data *mmio_data, uint32_t port,
+			 uint32_t reg, uint32_t val);
 
-int intel_punit_read(uint32_t addr, uint32_t *val);
-int intel_punit_write(uint32_t addr, uint32_t val);
-int intel_nc_read(uint32_t addr, uint32_t *val);
-int intel_nc_write(uint32_t addr, uint32_t val);
+int intel_punit_read(struct intel_mmio_data *mmio_data, uint32_t addr,
+		     uint32_t *val);
+int intel_punit_write(struct intel_mmio_data *mmio_data, uint32_t addr,
+		      uint32_t val);
+int intel_nc_read(struct intel_mmio_data *mmio_data, uint32_t addr, uint32_t *val);
+int intel_nc_write(struct intel_mmio_data *mmio_data, uint32_t addr, uint32_t val);
 
 /* register maps from intel_reg_map.c */
 #ifndef __GTK_DOC_IGNORE__
@@ -107,17 +139,6 @@ int intel_nc_write(uint32_t addr, uint32_t val);
 #define INTEL_RANGE_RW		(INTEL_RANGE_READ | INTEL_RANGE_WRITE)
 #define INTEL_RANGE_END		(1<<31)
 
-struct intel_register_range {
-	uint32_t base;
-	uint32_t size;
-	uint32_t flags;
-};
-
-struct intel_register_map {
-	struct intel_register_range *map;
-	uint32_t top;
-	uint32_t alignment_mask;
-};
 struct intel_register_map intel_get_register_map(uint32_t devid);
 struct intel_register_range *intel_get_register_range(struct intel_register_map map, uint32_t offset, uint32_t mode);
 #endif /* __GTK_DOC_IGNORE__ */

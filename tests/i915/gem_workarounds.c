@@ -225,6 +225,7 @@ static void check_workarounds(int fd, enum operation op, unsigned int flags)
 
 igt_main
 {
+	struct intel_mmio_data mmio_data;
 	int device = -1;
 	const struct {
 		const char *name;
@@ -256,7 +257,7 @@ igt_main
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
 
-		intel_mmio_use_pci_bar(intel_get_pci_device());
+		intel_mmio_use_pci_bar(&mmio_data, intel_get_pci_device());
 
 		gen = intel_gen(intel_get_drm_devid(device));
 

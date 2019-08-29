@@ -57,6 +57,7 @@ static inline int _not_supported(void)
 
 struct config {
 	struct pci_device *pci_dev;
+	struct intel_mmio_data mmio_data;
 	char *mmiofile;
 	uint32_t devid;
 
@@ -387,7 +388,7 @@ static int read_register(struct config *config, struct reg *reg, uint32_t *valp)
 				reg->port_desc.name);
 			return -1;
 		}
-		val = intel_iosf_sb_read(reg->port_desc.port, reg->addr);
+		val = intel_iosf_sb_read(&config->mmio_data, reg->port_desc.port, reg->addr);
 		break;
 	default:
 		fprintf(stderr, "port %d not supported\n", reg->port_desc.port);
@@ -458,7 +459,7 @@ static int write_register(struct config *config, struct reg *reg, uint32_t val)
 				reg->port_desc.name);
 			return -1;
 		}
-		intel_iosf_sb_write(reg->port_desc.port, reg->addr, val);
+		intel_iosf_sb_write(&config->mmio_data, reg->port_desc.port, reg->addr, val);
 		break;
 	default:
 		fprintf(stderr, "port %d not supported\n", reg->port_desc.port);
@@ -552,9 +553,9 @@ static int intel_reg_read(struct config *config, int argc, char *argv[])
 	}
 
 	if (config->mmiofile)
-		intel_mmio_use_dump_file(config->mmiofile);
+		intel_mmio_use_dump_file(&config->mmio_data, config->mmiofile);
 	else
-		intel_register_access_init(config->pci_dev, 0, -1);
+		intel_register_access_init(&config->mmio_data, config->pci_dev, 0, -1);
 
 	for (i = 1; i < argc; i++) {
 		struct reg reg;
@@ -570,7 +571,7 @@ static int intel_reg_read(struct config *config, int argc, char *argv[])
 		}
 	}
 
-	intel_register_access_fini();
+	intel_register_access_fini(&config->mmio_data);
 
 	return EXIT_SUCCESS;
 }
@@ -584,7 +585,7 @@ static int intel_reg_write(struct config *config, int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	intel_register_access_init(config->pci_dev, 0, -1);
+	intel_register_access_init(&config->mmio_data, config->pci_dev, 0, -1);
 
 	for (i = 1; i < argc; i += 2) {
 		struct reg reg;
@@ -609,7 +610,7 @@ static int intel_reg_write(struct config *config, int argc, char *argv[])
 		write_register(config, &reg, val);
 	}
 
-	intel_register_access_fini();
+	intel_register_access_fini(&config->mmio_data);
 
 	return EXIT_SUCCESS;
 }
@@ -620,9 +621,9 @@ static int intel_reg_dump(struct config *config, int argc, char *argv[])
 	int i;
 
 	if (config->mmiofile)
-		intel_mmio_use_dump_file(config->mmiofile);
+		intel_mmio_use_dump_file(&config->mmio_data, config->mmiofile);
 	else
-		intel_register_access_init(config->pci_dev, 0, -1);
+		intel_register_access_init(&config->mmio_data, config->pci_dev, 0, -1);
 
 	for (i = 0; i < config->regcount; i++) {
 		reg = &config->regs[i];
@@ -634,7 +635,7 @@ static int intel_reg_dump(struct config *config, int argc, char *argv[])
 		dump_register(config, &config->regs[i]);
 	}
 
-	intel_register_access_fini();
+	intel_register_access_fini(&config->mmio_data);
 
 	return EXIT_SUCCESS;
 }
@@ -648,7 +649,7 @@ static int intel_reg_snapshot(struct config *config, int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	intel_mmio_use_pci_bar(config->pci_dev);
+	intel_mmio_use_pci_bar(&config->mmio_data, config->pci_dev);
 
 	/* XXX: error handling */
 	if (write(1, igt_global_mmio, config->pci_dev->regions[mmio_bar].size) == -1)

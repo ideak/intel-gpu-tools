@@ -42,6 +42,7 @@ static uint32_t devid;
 static int aud_reg_base = 0;	/* base address of audio registers */
 static int disp_reg_base = 0;	/* base address of display registers */
 
+
 #define IS_HASWELL_PLUS(devid)  (IS_HASWELL(devid) || IS_BROADWELL(devid))
 
 #define BITSTO(n)		(n >= sizeof(long) * 8 ? ~0 : (1UL << (n)) - 1)
@@ -2464,6 +2465,7 @@ static void dump_braswell(void)
 int main(int argc, char **argv)
 {
 	struct pci_device *pci_dev;
+	struct intel_mmio_data mmio_data;
 
 	pci_dev = intel_get_pci_device();
 	devid = pci_dev->device_id; /* XXX not true when mapping! */
@@ -2471,9 +2473,9 @@ int main(int argc, char **argv)
 	do_self_tests();
 
 	if (argc == 2)
-		intel_mmio_use_dump_file(argv[1]);
+		intel_mmio_use_dump_file(&mmio_data, argv[1]);
 	else
-		intel_mmio_use_pci_bar(pci_dev);
+		intel_mmio_use_pci_bar(&mmio_data, pci_dev);
 
 	printf("%s audio registers:\n\n", intel_get_device_info(devid)->codename);
 	if (IS_VALLEYVIEW(devid)) {

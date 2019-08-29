@@ -176,6 +176,7 @@ static void usage(const char *name)
 
 int main(int argc, char *argv[])
 {
+	struct intel_mmio_data mmio_data;
 	const char *path[REAL_MAX_SLICES] = {"l3_parity", "l3_parity_slice_1"};
 	int row = 0, bank = 0, sbank = 0;
 	int fd[REAL_MAX_SLICES] = {0}, ret, i;
@@ -189,7 +190,7 @@ int main(int argc, char *argv[])
 	if (intel_gen(devid) < 7 || IS_VALLEYVIEW(devid))
 		exit(77);
 
-	assert(intel_register_access_init(intel_get_pci_device(), 0, device) == 0);
+	assert(intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, device) == 0);
 
 	dir = igt_sysfs_open(device);
 
@@ -217,7 +218,7 @@ int main(int argc, char *argv[])
 	 * now. Just be aware of this if for some reason a hang is reported
 	 * when using this tool.
 	 */
-	dft = intel_register_read(0xb038);
+	dft = intel_register_read(&mmio_data, 0xb038);
 
 	while (1) {
 		int c, option_index = 0;
@@ -366,10 +367,10 @@ int main(int argc, char *argv[])
 				assert(i < 2);
 				dft |= i << 1; /* slice */
 				dft |= 1 << 0; /* enable */
-				intel_register_write(0xb038, dft);
+				intel_register_write(&mmio_data, 0xb038, dft);
 				break;
 			case 'u':
-				intel_register_write(0xb038, dft & ~(1<<0));
+				intel_register_write(&mmio_data ,0xb038, dft & ~(1<<0));
 				break;
 			case 'L':
 				break;
@@ -378,7 +379,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 	if (action == 'l')
 		exit(EXIT_SUCCESS);
 

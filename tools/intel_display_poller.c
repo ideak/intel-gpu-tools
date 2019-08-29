@@ -962,6 +962,7 @@ static void __attribute__((noreturn)) usage(const char *name)
 
 int main(int argc, char *argv[])
 {
+	struct intel_mmio_data mmio_data;
 	int i;
 	int pipe = 0, bit = 0, target_scanline = 0, target_fuzz = 1;
 	bool test_pixelcount = false;
@@ -1187,7 +1188,7 @@ int main(int argc, char *argv[])
 		break;
 	}
 
-	intel_register_access_init(intel_get_pci_device(), 0, -1);
+	intel_register_access_init(&mmio_data ,intel_get_pci_device(), 0, -1);
 
 	printf("%s?\n", test_name(test, pipe, bit, test_pixelcount));
 
@@ -1262,7 +1263,7 @@ int main(int argc, char *argv[])
 		assert(0);
 	}
 
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 
 	if (quit)
 		return 0;

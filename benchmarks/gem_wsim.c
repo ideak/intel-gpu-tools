@@ -238,6 +238,7 @@ struct workload
 	} busy_balancer;
 };
 
+struct intel_mmio_data mmio_data;
 static const unsigned int nop_calibration_us = 1000;
 static unsigned long nop_calibration;
 
@@ -3071,7 +3072,7 @@ static void init_clocks(void)
 	uint32_t rcs_start, rcs_end;
 	double overhead, t;
 
-	intel_register_access_init(intel_get_pci_device(), false, fd);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), false, fd);
 
 	if (verbose <= 1)
 		return;

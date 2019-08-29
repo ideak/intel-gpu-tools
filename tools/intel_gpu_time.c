@@ -65,9 +65,10 @@ int main(int argc, char **argv)
 	uint64_t ring_idle = 0, ring_time = 0;
 	struct timeval start, end;
 	static struct rusage rusage;
+	struct intel_mmio_data mmio_data;
 	int status;
 
-	intel_mmio_use_pci_bar(intel_get_pci_device());
+	intel_mmio_use_pci_bar(&mmio_data, intel_get_pci_device());
 
 	if (argc == 1) {
 		fprintf(stderr, "usage: %s cmd [args...]\n", argv[0]);

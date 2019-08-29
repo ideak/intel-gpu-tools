@@ -117,9 +117,10 @@ out:
 
 int main(int argc, char **argv)
 {
+	struct intel_mmio_data mmio_data;
 	int swf14, acpi_lid;
 
-	intel_mmio_use_pci_bar(intel_get_pci_device());
+	intel_mmio_use_pci_bar(&mmio_data, intel_get_pci_device());
 
 	while (1) {
 		swf14 = INREG(SWF14);

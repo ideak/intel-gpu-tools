@@ -264,6 +264,7 @@ const char *dip_frequency_names[] = {
 
 struct pci_device *pci_dev;
 int gen = 0;
+struct intel_mmio_data mmio_data;
 
 static const char *spd_source_to_string(SourceDevice source)
 {
@@ -1108,7 +1109,7 @@ int main(int argc, char *argv[])
 	       " perfectly: the Kernel might undo our changes.\n");
 
 	pci_dev = intel_get_pci_device();
-	intel_register_access_init(pci_dev, 0, -1);
+	intel_register_access_init(&mmio_data, pci_dev, 0, -1);
 	intel_check_pch();
 
 	if (IS_GEN4(pci_dev->device_id))
@@ -1256,6 +1257,6 @@ int main(int argc, char *argv[])
 	}
 
 out:
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 	return ret;
 }

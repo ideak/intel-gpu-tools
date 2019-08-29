@@ -58,6 +58,8 @@
 
 static int parser_version;
 
+struct intel_mmio_data mmio_data;
+
 static int command_parser_version(int fd)
 {
 	int version = -1;
@@ -284,9 +286,9 @@ test_lri(int fd, uint32_t handle, struct test_lri *test)
 		  test->name, test->reg, test->test_val,
 		  expected_errno, expect);
 
-	intel_register_write(test->reg, test->init_val);
+	intel_register_write(&mmio_data, test->reg, test->init_val);
 
-	igt_assert_eq_u32((intel_register_read(test->reg) &
+	igt_assert_eq_u32((intel_register_read(&mmio_data, test->reg) &
 			   test->read_mask),
 			  test->init_val);
 
@@ -296,7 +298,7 @@ test_lri(int fd, uint32_t handle, struct test_lri *test)
 		   expected_errno);
 	gem_sync(fd, handle);
 
-	igt_assert_eq_u32((intel_register_read(test->reg) &
+	igt_assert_eq_u32((intel_register_read(&mmio_data, test->reg) &
 			   test->read_mask),
 			  expect);
 }
@@ -530,7 +532,7 @@ igt_main
 #undef REG
 
 		igt_fixture {
-			intel_register_access_init(intel_get_pci_device(), 0, fd);
+			intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, fd);
 		}
 
 		for (int i = 0; i < ARRAY_SIZE(lris); i++) {
@@ -543,7 +545,7 @@ igt_main
 		}
 
 		igt_fixture {
-			intel_register_access_fini();
+			intel_register_access_fini(&mmio_data);
 		}
 	}
 

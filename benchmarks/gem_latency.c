@@ -55,6 +55,7 @@
 static int done;
 static int fd;
 static volatile uint32_t *timestamp_reg;
+static struct intel_mmio_data mmio_data;
 
 #define REG(x) (volatile uint32_t *)((volatile char *)igt_global_mmio + x)
 #define REG_OFFSET(x) ((volatile char *)(x) - (volatile char *)igt_global_mmio)
@@ -456,7 +457,7 @@ static int run(int seconds,
 	if (gen < 6)
 		return IGT_EXIT_SKIP; /* Needs BCS timestamp */
 
-	intel_register_access_init(intel_get_pci_device(), false, fd);
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), false, fd);
 
 	if (gen == 6)
 		timestamp_reg = REG(RCS_TIMESTAMP);

@@ -273,6 +273,7 @@ int main (int argc, char *argv[])
 	bool do_disable = false, do_dump = false, do_usage = false;
 	struct pci_device *pci_dev;
 	uint32_t devid;
+	struct intel_mmio_data mmio_data;
 
 	printf("WARNING:\n"
 	       "This tool is a workaround for people that don't have a Kernel "
@@ -280,7 +281,7 @@ int main (int argc, char *argv[])
 	       "solution that may or may not work. Use it at your own risk.\n");
 
 	pci_dev = intel_get_pci_device();
-	intel_register_access_init(pci_dev, 0, -1);
+	intel_register_access_init(&mmio_data, pci_dev, 0, -1);
 	devid = pci_dev->device_id;
 
 	if (!HAS_PCH_SPLIT(devid)) {
@@ -342,6 +343,6 @@ int main (int argc, char *argv[])
 	}
 
 out:
-	intel_register_access_fini();
+	intel_register_access_fini(&mmio_data);
 	return ret;
 }
