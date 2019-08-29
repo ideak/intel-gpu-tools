@@ -42,12 +42,48 @@ uint32_t intel_register_read(uint32_t reg);
 void intel_register_write(uint32_t reg, uint32_t val);
 int intel_register_access_needs_fakewake(void);
 
-uint32_t INREG(uint32_t reg);
-uint16_t INREG16(uint32_t reg);
-uint8_t INREG8(uint32_t reg);
-void OUTREG(uint32_t reg, uint32_t val);
-void OUTREG16(uint32_t reg, uint16_t val);
-void OUTREG8(uint32_t reg, uint8_t val);
+/* mmio register access functions that use igt_global_mmio */
+
+#define __ioread(x__) \
+static inline uint##x__##_t ioread##x__(void *mmio, uint32_t reg) \
+{\
+	return *(volatile uint##x__##_t *)(mmio + reg);\
+}
+__ioread(32)
+__ioread(16)
+__ioread(8)
+#undef __ioread
+
+#define __iowrite(x__) \
+static inline void iowrite##x__(void *mmio, uint32_t reg, uint##x__##_t val) \
+{\
+	*(volatile uint##x__##_t *)(mmio + reg) = val; \
+}
+__iowrite(32)
+__iowrite(16)
+__iowrite(8)
+#undef __iowrite
+
+#define __INREG(x__,s__) \
+static inline uint##x__##_t INREG##s__(uint32_t reg) \
+{\
+	return ioread##x__(igt_global_mmio, reg); \
+}
+
+#define __OUTREG(x__,s__) \
+static inline void OUTREG##s__(uint32_t reg, uint##x__##_t val) \
+{\
+	iowrite##x__(igt_global_mmio, reg, val); \
+}
+__INREG(32,)
+__INREG(16,16)
+__INREG(8,8)
+
+__OUTREG(32,)
+__OUTREG(16,16)
+__OUTREG(8,8)
+#undef __INREG
+#undef __OUTREG
 
 /* sideband access functions from intel_iosf.c */
 uint32_t intel_dpio_reg_read(uint32_t reg, int phy);

@@ -266,7 +266,7 @@ intel_register_read(uint32_t reg)
 	}
 
 read_out:
-	ret = *(volatile uint32_t *)((volatile char *)igt_global_mmio + reg);
+	ret = ioread32(igt_global_mmio, reg);
 out:
 	return ret;
 }
@@ -303,105 +303,5 @@ intel_register_write(uint32_t reg, uint32_t val)
 		      "Register write blocked for safety ""(*0x%08x = 0x%x)\n", reg, val);
 
 write_out:
-	*(volatile uint32_t *)((volatile char *)igt_global_mmio + reg) = val;
-}
-
-
-/**
- * INREG:
- * @reg: register offset
- *
- * 32-bit read of the register at offset @reg. This function only works when the
- * new register access helper is initialized with intel_register_access_init().
- *
- * This function directly accesses the #igt_global_mmio without safety checks.
- *
- * Returns:
- * The value read from the register.
- */
-uint32_t INREG(uint32_t reg)
-{
-	return *(volatile uint32_t *)((volatile char *)igt_global_mmio + reg);
-}
-
-/**
- * INREG16:
- * @reg: register offset
- *
- * 16-bit read of the register at offset @reg. This function only works when the
- * new register access helper is initialized with intel_register_access_init().
- *
- * This function directly accesses the #igt_global_mmio without safety checks.
- *
- * Returns:
- * The value read from the register.
- */
-uint16_t INREG16(uint32_t reg)
-{
-	return *(volatile uint16_t *)((volatile char *)igt_global_mmio + reg);
-}
-
-/**
- * INREG8:
- * @reg: register offset
- *
- * 8-bit read of the register at offset @reg. This function only works when the
- * new register access helper is initialized with intel_register_access_init().
- *
- * This function directly accesses the #igt_global_mmio without safety checks.
- *
- * Returns:
- * The value read from the register.
- */
-uint8_t INREG8(uint32_t reg)
-{
-	return *((volatile uint8_t *)igt_global_mmio + reg);
-}
-
-/**
- * OUTREG:
- * @reg: register offset
- * @val: value to write
- *
- * 32-bit write of @val to the register at offset @reg. This function only works
- * when the new register access helper is initialized with
- * intel_register_access_init().
- *
- * This function directly accesses the #igt_global_mmio without safety checks.
- */
-void OUTREG(uint32_t reg, uint32_t val)
-{
-	*(volatile uint32_t *)((volatile char *)igt_global_mmio + reg) = val;
-}
-
-/**
- * OUTREG16:
- * @reg: register offset
- * @val: value to write
- *
- * 16-bit write of @val to the register at offset @reg. This function only works
- * when the new register access helper is initialized with
- * intel_register_access_init().
- *
- * This function directly accesses the #igt_global_mmio without safety checks.
- */
-void OUTREG16(uint32_t reg, uint16_t val)
-{
-	*(volatile uint16_t *)((volatile char *)igt_global_mmio + reg) = val;
-}
-
-/**
- * OUTREG8:
- * @reg: register offset
- * @val: value to write
- *
- * 8-bit write of @val to the register at offset @reg. This function only works
- * when the new register access helper is initialized with
- * intel_register_access_init().
- *
- * This function directly accesses the #igt_global_mmio without safety checks.
- */
-void OUTREG8(uint32_t reg, uint8_t val)
-{
-	*((volatile uint8_t *)igt_global_mmio + reg) = val;
+	iowrite32(igt_global_mmio, reg, val);
 }
