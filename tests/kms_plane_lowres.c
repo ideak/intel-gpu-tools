@@ -59,8 +59,12 @@ get_lowres_mode(int drmfd, igt_output_t *output, drmModeModeInfo *mode_default)
 		}
 	}
 
-	if (!found)
+	if (!found) {
+		igt_require_f(mode_default->vdisplay - SIZE > 768,
+			      "Current mode not tall enough; plane would still be onscreen after switch to 10x7.\n");
+
 		return *igt_std_1024_mode_get();
+	}
 
 	return mode;
 }
