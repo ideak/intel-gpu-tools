@@ -780,6 +780,7 @@ igt_main
 		igt_require_pipe_crc(data.gfx_fd);
 
 		igt_display_require(&data.display, data.gfx_fd);
+		igt_require(data.display.is_atomic);
 	}
 
 	for (subtest = subtests; subtest->rot; subtest++) {
