@@ -30,7 +30,7 @@ igt_simple_main
 {
 	int drm_fd;
 	drmModeRes *res;
-	drmModeConnector *connector;
+	drmModeConnector *connector = NULL;
 	const struct edid *edid;
 	int mode_count, connector_id;
 
@@ -43,14 +43,10 @@ igt_simple_main
 
 	/* find an hdmi connector */
 	for (int i = 0; i < res->count_connectors; i++) {
-
 		connector = drmModeGetConnectorCurrent(drm_fd, res->connectors[i]);
-
 		if (connector->connector_type == DRM_MODE_CONNECTOR_HDMIA)
 			break;
-
 		drmModeFreeConnector(connector);
-
 		connector = NULL;
 	}
 	igt_require(connector);
