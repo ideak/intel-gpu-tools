@@ -44,12 +44,6 @@ static size_t sizeof_param_engines(int count)
 			engines[count]);
 }
 
-static size_t sizeof_engines_bond(int count)
-{
-	return offsetof(struct i915_context_engines_bond,
-			engines[count]);
-}
-
 #define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
 
 static bool has_class_instance(int i915, uint16_t class, uint16_t instance)
