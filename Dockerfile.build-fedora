@@ -37,6 +37,9 @@ RUN rm -fr /tmp/peg
 # For compile-testing on clang
 RUN dnf install -y clang
 
+# For the helpers for the container with IGT inside
+RUN dnf install -y findutils
+
 # Meson version switching shenanigans
 WORKDIR /usr/src
 RUN curl -O https://files.pythonhosted.org/packages/c0/9b/44cdb8adcbb186be6cba5c93718d0c68f177b0e8082ae00cafa63a1d3535/meson-0.47.0.tar.gz

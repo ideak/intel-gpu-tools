@@ -1,9 +1,6 @@
 # Version number to bump for force image rebuild: 0
 FROM build-fedora
 
-RUN dnf install -y findutils && \
-        dnf clean all
-
 COPY opt-igt /opt/igt
 COPY .gitlab-ci/docker-help.sh /usr/local/bin/docker-help.sh
 
