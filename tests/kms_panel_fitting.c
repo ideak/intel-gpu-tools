@@ -131,11 +131,10 @@ static void test_panel_fitting(data_t *d)
 		igt_fb_set_position(&d->fb2, d->plane2, 100, 100);
 		igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-200, d->fb2.height-200);
 		igt_plane_set_position(d->plane2, 100, 100);
-		igt_plane_set_size(d->plane2, mode->hdisplay-200, mode->vdisplay-200);
-		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
 		/*
-		 * most of gen7 and all of gen8 doesn't support scaling at all.
+		 * Most of gen7 and all of gen8 doesn't support plane scaling
+		 * at all.
 		 *
 		 * gen9 pipe C has only 1 scaler shared with the crtc, which
 		 * means pipe scaling can't work simultaneously with panel
@@ -144,9 +143,24 @@ static void test_panel_fitting(data_t *d)
 		 * Since this is the legacy path, userspace has to know about
 		 * the HW limitations, whereas atomic can ask.
 		 */
-		if (IS_GEN8(devid) || (IS_GEN7(devid) && !IS_IVYBRIDGE(devid)) ||
+		if (IS_GEN8(devid) ||
+		    (IS_GEN7(devid) && !IS_IVYBRIDGE(devid)) ||
 		    (IS_GEN9(devid) && pipe == PIPE_C))
-			igt_plane_set_size(d->plane2, d->fb2.width-200, d->fb2.height-200);
+			/* same as visible area of fb => no scaling */
+			igt_plane_set_size(d->plane2,
+					   d->fb2.width-200,
+					   d->fb2.height-200);
+		else
+			/*
+			 * different than visible area of fb => plane scaling
+			 * active
+			 */
+			igt_plane_set_size(d->plane2,
+					   mode->hdisplay-200,
+					   mode->vdisplay-200);
+
+		/* Plane scaling active (if possible), pfit off */
+		igt_display_commit2(display, COMMIT_UNIVERSAL);
 
 		/* enable panel fitting along with sprite scaling */
 		mode->hdisplay = 1024;
