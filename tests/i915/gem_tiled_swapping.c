@@ -165,8 +165,9 @@ static void check_memory_layout(int fd)
 
 igt_main
 {
+	unsigned long n, count;
 	struct thread *threads;
-	int fd, n, count, num_threads;
+	int fd, num_threads;
 
 	igt_fixture {
 		size_t lock_size;
@@ -179,23 +180,30 @@ igt_main
 		check_memory_layout(fd);
 
 		/* lock RAM, leaving only 512MB available */
-		lock_size = max(0, intel_get_total_ram_mb() - AVAIL_RAM);
+		count = intel_get_total_ram_mb() - intel_get_avail_ram_mb();
+		count = max(count + 64, AVAIL_RAM);
+		lock_size = max(0, intel_get_total_ram_mb() - count);
+		igt_info("Mlocking %zdMiB of %ld/%ldMiB\n",
+			 lock_size,
+			 (long)intel_get_avail_ram_mb(),
+			 (long)intel_get_total_ram_mb());
 		igt_lock_mem(lock_size);
 
 		/* need slightly more than available memory */
-		count = min(intel_get_total_ram_mb(), AVAIL_RAM) * 1.25;
-		bo_handles = calloc(count, sizeof(uint32_t));
-		igt_assert(bo_handles);
-
-		num_threads = gem_available_fences(fd);
-		threads = calloc(num_threads, sizeof(struct thread));
-		igt_assert(threads);
-
-		igt_info("Using %d 1MiB objects (available RAM: %ld/%ld, swap: %ld)\n",
+		count = intel_get_avail_ram_mb() + 128;
+		igt_info("Using %lu 1MiB objects (available RAM: %ld/%ld, swap: %ld)\n",
 			 count,
 			 (long)intel_get_avail_ram_mb(),
 			 (long)intel_get_total_ram_mb(),
 			 (long)intel_get_total_swap_mb());
+		bo_handles = calloc(count, sizeof(uint32_t));
+		igt_assert(bo_handles);
+
+		num_threads = gem_available_fences(fd) + 1;
+		igt_info("Using up to %d fences/threads\n", num_threads);
+		threads = calloc(num_threads, sizeof(struct thread));
+		igt_assert(threads);
+
 		intel_require_memory(count, 1024*1024, CHECK_RAM | CHECK_SWAP);
 
 		for (n = 0; n < count; n++) {
