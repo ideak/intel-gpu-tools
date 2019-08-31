@@ -24,6 +24,8 @@
 #ifndef GEM_SUBMISSION_H
 #define GEM_SUBMISSION_H
 
+#include <stdint.h>
+
 #define GEM_SUBMISSION_SEMAPHORES	(1 << 0)
 #define GEM_SUBMISSION_EXECLISTS	(1 << 1)
 #define GEM_SUBMISSION_GUC		(1 << 2)

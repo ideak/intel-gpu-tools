@@ -21,11 +21,12 @@
  * IN THE SOFTWARE.
  */
 
-#include "gem_ring.h"
-
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+
+#include "gem_ring.h"
+#include "gem_submission.h"
 
 #include "intel_reg.h"
 #include "drmtest.h"
@@ -140,18 +141,23 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 unsigned int
 gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags flags)
 {
+	unsigned int min = ~0u;
+
+	fd = gem_reopen_driver(fd);
+
 	if (engine == ALL_ENGINES) {
-		unsigned int global_min = ~0u;
-
 		for_each_physical_engine(fd, engine) {
-			unsigned int engine_min = __gem_measure_ring_inflight(fd, engine, flags);
+			unsigned int count =
+				__gem_measure_ring_inflight(fd, engine, flags);
 
-			if (engine_min < global_min)
-				global_min = engine_min;
+			if (count < min)
+				min = count;
 		}
-
-		return global_min;
+	} else {
+		min =  __gem_measure_ring_inflight(fd, engine, flags);
 	}
 
-	return __gem_measure_ring_inflight(fd, engine, flags);
+	close(fd);
+
+	return min;
 }
