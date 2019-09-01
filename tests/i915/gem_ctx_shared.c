@@ -191,6 +191,7 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 		.buffer_count = 1,
 		.flags = ring,
 	};
+	uint32_t clone;
 	uint32_t scratch, *s;
 	uint32_t batch, cs[16];
 	uint64_t offset;
@@ -199,13 +200,18 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 	gem_require_ring(i915, ring);
 	igt_require(gem_can_store_dword(i915, ring));
 
+	clone = gem_context_clone(i915, 0, I915_CONTEXT_CLONE_VM, 0);
+
 	/* Find a hole big enough for both objects later */
 	scratch = gem_create(i915, 16384);
 	gem_write(i915, scratch, 0, &bbe, sizeof(bbe));
 	obj.handle = scratch;
 	gem_execbuf(i915, &execbuf);
-	gem_close(i915, scratch);
 	obj.flags |= EXEC_OBJECT_PINNED; /* reuse this address */
+	execbuf.rsvd1 = clone; /* and bind the second context image */
+	gem_execbuf(i915, &execbuf);
+	execbuf.rsvd1 = 0;
+	gem_close(i915, scratch);
 
 	scratch = gem_create(i915, 4096);
 	s = gem_mmap__wc(i915, scratch, 0, 4096, PROT_WRITE);
@@ -241,7 +247,7 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 
 	obj.handle = batch;
 	obj.offset += 8192; /* make sure we don't cause an eviction! */
-	execbuf.rsvd1 = gem_context_clone(i915, 0, I915_CONTEXT_CLONE_VM, 0);
+	execbuf.rsvd1 = clone;
 	if (gen > 3 && gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 	gem_execbuf(i915, &execbuf);
@@ -253,7 +259,6 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 	execbuf.batch_start_offset = 64 * sizeof(s[0]);
 	gem_execbuf(i915, &execbuf);
 	igt_assert_eq_u64(obj.offset, offset);
-	gem_context_destroy(i915, execbuf.rsvd1);
 
 	gem_sync(i915, batch); /* write hazard lies */
 	gem_close(i915, batch);
@@ -268,6 +273,8 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 
 	munmap(s, 4096);
 	gem_close(i915, scratch);
+
+	gem_context_destroy(i915, clone);
 }
 
 static int nop_sync(int i915, uint32_t ctx, unsigned int ring, int64_t timeout)
