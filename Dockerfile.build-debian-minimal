@@ -23,3 +23,5 @@ RUN apt-get install -y \
 RUN apt-get install -t stretch-backports -y \
 					meson \
 					libdrm-dev
+
+RUN apt-get clean

@@ -44,7 +44,7 @@ if [ "$TYPE" = "base" ]; then
 		echo "Skipping, already built"
 	else
 		echo "Building!"
-		podman build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA -t $DOCKERNAME -f $DOCKERFILE .
+		podman build --squash --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA -t $DOCKERNAME -f $DOCKERFILE .
 		podman push $DOCKERNAME
 	fi
 

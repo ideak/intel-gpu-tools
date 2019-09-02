@@ -23,3 +23,5 @@ RUN apt-get install -y \
 			xutils-dev \
 			libtool \
 			make
+
+RUN apt-get clean
