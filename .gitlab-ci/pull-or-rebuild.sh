@@ -38,12 +38,12 @@ IMAGE_PRESENT=$?
 
 set -e
 if [ $IMAGE_PRESENT -eq 0 ] && [ ${FORCE_REBUILD:-0} -eq 0 ] ; then
-	echo "Skipping $NAME:$TAG, already built"
+	echo "Skipping, already built"
 	docker tag $DOCKERNAME $NAME
 	docker tag $DOCKERNAME $REFNAME
 	docker tag $DOCKERNAME $COMMITNAME
 else
-	echo "Building $NAME:$TAG"
+	echo "Building!"
 	docker build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA \
 			 -t $DOCKERNAME -t $NAME \
 			 -t $REFNAME -t $COMMITNAME -f $DOCKERFILE .
@@ -51,7 +51,3 @@ else
 fi
 docker push $REFNAME
 docker push $COMMITNAME
-if [ $TAG = "master" ]; then
-	docker tag $CHECKNAME $IMAGENAME
-	docker push $IMAGENAME
-fi
