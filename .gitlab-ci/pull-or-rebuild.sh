@@ -21,9 +21,10 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-DOCKERFILE=$1
-NAME=$2
-REF=${3:-${CI_COMMIT_REF_NAME:-latest}}
+TYPE=$1
+DOCKERFILE=$2
+NAME=$3
+REF=${4:-${CI_COMMIT_REF_NAME:-latest}}
 
 REF=$(echo $REF | tr / - )
 IMAGENAME=$CI_REGISTRY/$CI_PROJECT_PATH/$NAME
@@ -33,21 +34,31 @@ REFNAME=$IMAGENAME:$REF
 DOCKERNAME=$IMAGENAME:dockerfile-$DOCKERFILE_CHECKSUM
 COMMITNAME=$IMAGENAME:commit-$CI_COMMIT_SHA
 
-docker pull $DOCKERNAME
-IMAGE_PRESENT=$?
+if [ "$TYPE" = "base" ]; then
+	# base container (building, etc) - we rebuild only if changed or forced
+	docker pull $DOCKERNAME
+	IMAGE_PRESENT=$?
 
-set -e
-if [ $IMAGE_PRESENT -eq 0 ] && [ ${FORCE_REBUILD:-0} -eq 0 ] ; then
-	echo "Skipping, already built"
-	docker tag $DOCKERNAME $NAME
-	docker tag $DOCKERNAME $REFNAME
-	docker tag $DOCKERNAME $COMMITNAME
-else
-	echo "Building!"
+	set -e
+	if [ $IMAGE_PRESENT -eq 0 ] && [ ${FORCE_REBUILD:-0} -eq 0 ] ; then
+		echo "Skipping, already built"
+		docker tag $DOCKERNAME $COMMITNAME
+	else
+		echo "Building!"
+		docker build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA \
+			     -t $DOCKERNAME -t $COMMITNAME -f $DOCKERFILE .
+		docker push $DOCKERNAME
+    fi
+    docker push $COMMITNAME
+elif [ "$TYPE" = "igt" ]; then
+	# container with IGT, we don't care about Dockerfile changes
+	# we always rebuild
+	set -e
 	docker build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA \
-			 -t $DOCKERNAME -t $NAME \
-			 -t $REFNAME -t $COMMITNAME -f $DOCKERFILE .
-	docker push $DOCKERNAME
+		     -t $REFNAME -t $COMMITNAME -f $DOCKERFILE .
+	docker push $REFNAME
+	docker push $COMMITNAME
+else
+	echo "unknown build type $TYPE"
+	exit 1
 fi
-docker push $REFNAME
-docker push $COMMITNAME

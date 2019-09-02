@@ -30,10 +30,10 @@ build-containers:build-debian:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian-minimal build-debian-minimal
+    - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-debian-minimal build-debian-minimal
     - docker pull $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:commit-$CI_COMMIT_SHA
     - docker tag $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:commit-$CI_COMMIT_SHA build-debian-minimal:commit-$CI_COMMIT_SHA
-    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian build-debian
+    - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-debian build-debian
 
 build-containers:build-debian-armhf:
   stage: build-containers
@@ -45,7 +45,7 @@ build-containers:build-debian-armhf:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian-armhf build-debian-armhf
+    - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-debian-armhf build-debian-armhf
 
 build-containers:build-debian-arm64:
   stage: build-containers
@@ -57,7 +57,7 @@ build-containers:build-debian-arm64:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian-arm64 build-debian-arm64
+    - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-debian-arm64 build-debian-arm64
 
 build-containers:build-debian-mips:
   stage: build-containers
@@ -69,7 +69,7 @@ build-containers:build-debian-mips:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian-mips build-debian-mips
+    - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-debian-mips build-debian-mips
 
 build-containers:build-fedora:
   stage: build-containers
@@ -81,7 +81,7 @@ build-containers:build-fedora:
     DOCKER_DRIVER: overlay2
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-fedora build-fedora
+    - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-fedora build-fedora
 
 #################### BUILD #########################
 
@@ -296,4 +296,4 @@ containers:igt:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - docker pull $CI_REGISTRY/$CI_PROJECT_PATH/build-fedora:commit-$CI_COMMIT_SHA
     - docker tag $CI_REGISTRY/$CI_PROJECT_PATH/build-fedora:commit-$CI_COMMIT_SHA build-fedora:commit-$CI_COMMIT_SHA
-    - .gitlab-ci/pull-or-rebuild.sh Dockerfile igt
+    - .gitlab-ci/pull-or-rebuild.sh igt Dockerfile igt
