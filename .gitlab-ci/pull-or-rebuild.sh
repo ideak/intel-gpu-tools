@@ -36,28 +36,26 @@ COMMITNAME=$IMAGENAME:commit-$CI_COMMIT_SHA
 
 if [ "$TYPE" = "base" ]; then
 	# base container (building, etc) - we rebuild only if changed or forced
-	docker pull $DOCKERNAME
+	skopeo inspect docker://$DOCKERNAME
 	IMAGE_PRESENT=$?
 
 	set -e
 	if [ $IMAGE_PRESENT -eq 0 ] && [ ${FORCE_REBUILD:-0} -eq 0 ] ; then
 		echo "Skipping, already built"
-		docker tag $DOCKERNAME $COMMITNAME
 	else
 		echo "Building!"
-		docker build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA \
-			     -t $DOCKERNAME -t $COMMITNAME -f $DOCKERFILE .
-		docker push $DOCKERNAME
-    fi
-    docker push $COMMITNAME
+		podman build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA -t $DOCKERNAME -f $DOCKERFILE .
+		podman push $DOCKERNAME
+	fi
+
+	skopeo copy docker://$DOCKERNAME docker://$COMMITNAME
 elif [ "$TYPE" = "igt" ]; then
 	# container with IGT, we don't care about Dockerfile changes
 	# we always rebuild
 	set -e
-	docker build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA \
-		     -t $REFNAME -t $COMMITNAME -f $DOCKERFILE .
-	docker push $REFNAME
-	docker push $COMMITNAME
+	podman build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA -t $COMMITNAME -f $DOCKERFILE .
+	podman push $COMMITNAME
+	skopeo copy docker://$COMMITNAME docker://$REFNAME
 else
 	echo "unknown build type $TYPE"
 	exit 1
