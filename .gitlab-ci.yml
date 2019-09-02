@@ -31,6 +31,8 @@ build-containers:build-debian:
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian-minimal build-debian-minimal
+    - docker pull $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:commit-$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:commit-$CI_COMMIT_SHA build-debian-minimal:commit-$CI_COMMIT_SHA
     - .gitlab-ci/pull-or-rebuild.sh Dockerfile.build-debian build-debian
 
 build-containers:build-debian-armhf:
@@ -293,5 +295,5 @@ containers:igt:
   script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - docker pull $CI_REGISTRY/$CI_PROJECT_PATH/build-fedora:commit-$CI_COMMIT_SHA
-    - docker tag $CI_REGISTRY/$CI_PROJECT_PATH/build-fedora:commit-$CI_COMMIT_SHA build-fedora
+    - docker tag $CI_REGISTRY/$CI_PROJECT_PATH/build-fedora:commit-$CI_COMMIT_SHA build-fedora:commit-$CI_COMMIT_SHA
     - .gitlab-ci/pull-or-rebuild.sh Dockerfile igt

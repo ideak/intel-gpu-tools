@@ -1,4 +1,5 @@
-FROM build-debian-minimal
+ARG CI_COMMIT_SHA
+FROM build-debian-minimal:commit-$CI_COMMIT_SHA
 
 RUN apt-get update
 RUN apt-get install -y \

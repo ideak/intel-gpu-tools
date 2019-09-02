@@ -44,8 +44,9 @@ if [ $IMAGE_PRESENT -eq 0 ] && [ ${FORCE_REBUILD:-0} -eq 0 ] ; then
 	docker tag $DOCKERNAME $COMMITNAME
 else
 	echo "Building $NAME:$TAG"
-	docker build -t $DOCKERNAME -t $NAME \
-		     -t $REFNAME -t $COMMITNAME -f $DOCKERFILE .
+	docker build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA \
+			 -t $DOCKERNAME -t $NAME \
+			 -t $REFNAME -t $COMMITNAME -f $DOCKERFILE .
 	docker push $DOCKERNAME
 fi
 docker push $REFNAME
