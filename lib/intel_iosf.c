@@ -49,7 +49,7 @@ static int vlv_sideband_rw(struct intel_mmio_data *mmio_data, uint32_t port,
 	do {
 		usleep(1);
 		timeout++;
-	} while (intel_register_read(mmio_data->igt_mmio,
+	} while (intel_register_read(mmio_data,
 				     VLV_IOSF_DOORBELL_REQ) &
 		IOSF_SB_BUSY && timeout < TIMEOUT_US);
 
@@ -59,8 +59,8 @@ static int vlv_sideband_rw(struct intel_mmio_data *mmio_data, uint32_t port,
 	}
 
 	if (is_read)
-		*val = intel_register_read(mmio_data->igt_mmio, VLV_IOSF_DATA);
-	intel_register_write(mmio_data->igt_mmio, VLV_IOSF_DATA, 0);
+		*val = intel_register_read(mmio_data, VLV_IOSF_DATA);
+	intel_register_write(mmio_data, VLV_IOSF_DATA, 0);
 
 	return 0;
 }
