@@ -63,14 +63,14 @@ build-containers:build-fedora:
 build:tests-fedora:
   stage: build
   script:
-    - meson --prefix=`pwd`/opt-igt $MESON_OPTIONS build
+    - meson --prefix=/opt/igt $MESON_OPTIONS build
     - ninja -C build
-    - ninja -C build install
+    - DESTDIR="$PWD/installdir" ninja -C build install
     - ninja -C build igt-gpu-tools-doc
   artifacts:
     paths:
       - build
-      - opt-igt
+      - installdir
 
 build:tests-fedora-no-libunwind:
   stage: build
