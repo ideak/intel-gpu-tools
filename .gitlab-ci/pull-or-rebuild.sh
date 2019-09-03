@@ -34,6 +34,8 @@ REFNAME=$IMAGENAME:$REF
 DOCKERNAME=$IMAGENAME:dockerfile-$DOCKERFILE_CHECKSUM
 COMMITNAME=$IMAGENAME:commit-$CI_COMMIT_SHA
 
+PODMAN_BUILD="podman build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA --build-arg=CI_REGISTRY_IMAGE=$CI_REGISTRY_IMAGE"
+
 if [ "$TYPE" = "base" ]; then
 	# base container (building, etc) - we rebuild only if changed or forced
 	skopeo inspect docker://$DOCKERNAME
@@ -44,7 +46,7 @@ if [ "$TYPE" = "base" ]; then
 		echo "Skipping, already built"
 	else
 		echo "Building!"
-		podman build --squash --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA -t $DOCKERNAME -f $DOCKERFILE .
+		$PODMAN_BUILD --squash -t $DOCKERNAME -f $DOCKERFILE .
 		podman push $DOCKERNAME
 	fi
 
@@ -53,7 +55,7 @@ elif [ "$TYPE" = "igt" ]; then
 	# container with IGT, we don't care about Dockerfile changes
 	# we always rebuild
 	set -e
-	podman build --build-arg=CI_COMMIT_SHA=$CI_COMMIT_SHA -t $COMMITNAME -f $DOCKERFILE .
+	$PODMAN_BUILD -t $COMMITNAME -f $DOCKERFILE .
 	podman push $COMMITNAME
 	skopeo copy docker://$COMMITNAME docker://$REFNAME
 else
