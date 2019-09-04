@@ -237,6 +237,15 @@ test:test-list-diff:
   stage: test
   script: diff <(sed "s/ /\n/g" meson-test-list.txt| grep -v 'vc4\|v3d\|panfrost' | sort) <(sed "s/ /\n/g" autotools-test-list.txt | sort)
 
+test:list-undocumented-tests:
+  dependencies:
+    - build:tests-fedora
+  stage: test
+  script: .gitlab-ci/list_undocumented_tests.py build/tests/test-list.txt > undocumented_tests.txt
+  artifacts:
+    paths:
+      - undocumented_tests.txt
+
 ################### DEPLOY #########################
 
 pages:
