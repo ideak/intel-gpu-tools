@@ -271,6 +271,7 @@ test_basic_hotplug(data_t *data, struct chamelium_port *port, int toggle_count)
 		chamelium_unplug(data->chamelium, port);
 		igt_assert_f(igt_hotplug_detected(mon, HOTPLUG_TIMEOUT),
 			     "Timed out waiting for unplug uevent\n");
+		status = reprobe_connector(data, port);
 		igt_assert_f(status == DRM_MODE_DISCONNECTED,
 			     "Invalid connector status after hotplug: "
 			     "got %s, expected disconnected\n",
