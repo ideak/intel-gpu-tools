@@ -242,6 +242,9 @@ reset_state(data_t *data, struct chamelium_port *port)
 	}
 }
 
+static const char test_basic_hotplug_desc[] =
+	"Check that we get uevents and updated connector status on "
+	"hotplug and unplug";
 static void
 test_basic_hotplug(data_t *data, struct chamelium_port *port, int toggle_count)
 {
@@ -290,6 +293,8 @@ static void set_edid(data_t *data, struct chamelium_port *port,
 	chamelium_port_set_edid(data->chamelium, port, data->edids[edid]);
 }
 
+static const char test_edid_read_desc[] =
+	"Make sure the EDID exposed by KMS is the same as the screen's";
 static void
 test_edid_read(data_t *data, struct chamelium_port *port, enum test_edid edid)
 {
@@ -400,6 +405,9 @@ try_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 	}
 }
 
+static const char test_suspend_resume_hpd_desc[] =
+	"Toggle HPD during suspend, check that uevents are sent and connector "
+	"status is updated";
 static void
 test_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 			enum igt_suspend_state state,
@@ -418,6 +426,9 @@ test_suspend_resume_hpd(data_t *data, struct chamelium_port *port,
 	igt_cleanup_hotplug(mon);
 }
 
+static const char test_suspend_resume_hpd_common_desc[] =
+	"Toggle HPD during suspend on all connectors, check that uevents are "
+	"sent and connector status is updated";
 static void
 test_suspend_resume_hpd_common(data_t *data, enum igt_suspend_state state,
 			       enum igt_suspend_test test)
@@ -442,6 +453,10 @@ test_suspend_resume_hpd_common(data_t *data, enum igt_suspend_state state,
 	igt_cleanup_hotplug(mon);
 }
 
+static const char test_suspend_resume_edid_change_desc[] =
+	"Simulate a screen being unplugged and another screen being plugged "
+	"during suspend, check that a uevent is sent and connector status is "
+	"updated";
 static void
 test_suspend_resume_edid_change(data_t *data, struct chamelium_port *port,
 				enum igt_suspend_state state,
@@ -600,6 +615,10 @@ static bool are_fallback_modes(const drmModeModeInfo *modes, size_t modes_len)
 	return modes[0].hdisplay <= 1024 && modes[0].vdisplay <= 768;
 }
 
+static const char test_link_status_desc[] =
+	"Simulate a series of link failures, check we get a uevent each time "
+	"with the link-status property set to BAD and the list of modes "
+	"shrinks (or stays the same), until we reach fallback modes";
 static void
 test_link_status(data_t *data, struct chamelium_port *port)
 {
@@ -812,6 +831,9 @@ static void do_test_display(data_t *data, struct chamelium_port *port,
 	igt_remove_fb(data->drm_fd, &fb);
 }
 
+static const char test_display_one_mode_desc[] =
+	"Pick the first mode of the IGT base EDID, display and capture a few "
+	"frames, then check captured frames are correct";
 static void test_display_one_mode(data_t *data, struct chamelium_port *port,
 				  uint32_t fourcc, enum chamelium_check check,
 				  int count)
@@ -842,6 +864,9 @@ static void test_display_one_mode(data_t *data, struct chamelium_port *port,
 	drmModeFreeConnector(connector);
 }
 
+static const char test_display_all_modes_desc[] =
+	"For each mode of the IGT base EDID, display and capture a few "
+	"frames, then check captured frames are correct";
 static void test_display_all_modes(data_t *data, struct chamelium_port *port,
 				   uint32_t fourcc, enum chamelium_check check,
 				   int count)
@@ -876,6 +901,10 @@ static void test_display_all_modes(data_t *data, struct chamelium_port *port,
 	drmModeFreeConnector(connector);
 }
 
+static const char test_display_frame_dump_desc[] =
+	"For each mode of the IGT base EDID, display and capture a few "
+	"frames, then download the captured frames and compare them "
+	"bit-by-bit to the sent ones";
 static void
 test_display_frame_dump(data_t *data, struct chamelium_port *port)
 {
@@ -983,6 +1012,9 @@ static void check_mode(struct chamelium *chamelium, struct chamelium_port *port,
 	igt_assert(video_params.vsync_polarity == mode_vsync_polarity);
 }
 
+static const char test_mode_timings_desc[] =
+	"For each mode of the IGT base EDID, perform a modeset and check the "
+	"mode detected by the Chamelium receiver matches the mode we set";
 static void test_mode_timings(data_t *data, struct chamelium_port *port)
 {
 	igt_output_t *output;
@@ -1113,6 +1145,9 @@ static const struct edid *get_aspect_ratio_edid(void)
 	return edid;
 }
 
+static const char test_display_aspect_ratio_desc[] =
+	"Pick a mode with a picture aspect-ratio, capture AVI InfoFrames and "
+	"check they include the relevant fields";
 static void test_display_aspect_ratio(data_t *data, struct chamelium_port *port)
 {
 	igt_output_t *output;
@@ -1825,6 +1860,9 @@ static bool check_audio_configuration(struct alsa *alsa, snd_pcm_format_t format
 	return true;
 }
 
+static const char test_display_audio_desc[] =
+	"Playback various audio signals with various audio formats/rates, "
+	"capture them and check they are correct";
 static void
 test_display_audio(data_t *data, struct chamelium_port *port,
 		   const char *audio_device, enum test_edid edid)
@@ -1914,6 +1952,9 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 	free(alsa);
 }
 
+static const char test_display_audio_edid_desc[] =
+	"Plug a connector with an EDID suitable for audio, check ALSA's "
+	"EDID-Like Data reports the correct audio parameters";
 static void
 test_display_audio_edid(data_t *data, struct chamelium_port *port,
 			enum test_edid edid)
@@ -2327,6 +2368,9 @@ static void prepare_randomized_plane(data_t *data,
 	igt_remove_fb(data->drm_fd, &pattern_fb);
 }
 
+static const char test_display_planes_random_desc[] =
+	"Setup a few overlay planes with random parameters, capture the frame "
+	"and check it matches the expected output";
 static void test_display_planes_random(data_t *data,
 				       struct chamelium_port *port,
 				       enum chamelium_check check)
@@ -2460,6 +2504,8 @@ static void test_display_planes_random(data_t *data,
 	igt_remove_fb(data->drm_fd, &result_fb);
 }
 
+static const char test_hpd_without_ddc_desc[] =
+	"Disable DDC on a VGA connector, check we still get a uevent on hotplug";
 static void
 test_hpd_without_ddc(data_t *data, struct chamelium_port *port)
 {
@@ -2480,6 +2526,10 @@ test_hpd_without_ddc(data_t *data, struct chamelium_port *port)
 	igt_cleanup_hotplug(mon);
 }
 
+static const char test_hpd_storm_detect_desc[] =
+	"Trigger a series of hotplugs in a very small timeframe to simulate a"
+	"bad cable, check the kernel falls back to polling to avoid a hotplug "
+	"storm";
 static void
 test_hpd_storm_detect(data_t *data, struct chamelium_port *port, int width)
 {
@@ -2508,6 +2558,9 @@ test_hpd_storm_detect(data_t *data, struct chamelium_port *port, int width)
 	igt_hpd_storm_reset(data->drm_fd);
 }
 
+static const char test_hpd_storm_disable_desc[] =
+	"Disable HPD storm detection, trigger a storm and check the kernel "
+	"doesn't detect one";
 static void
 test_hpd_storm_disable(data_t *data, struct chamelium_port *port, int width)
 {
@@ -2552,6 +2605,7 @@ static const struct edid *get_edid(enum test_edid edid)
 
 static data_t data;
 
+IGT_TEST_DESCRIPTION("Tests requiring a Chamelium board");
 igt_main
 {
 	struct chamelium_port *port;
@@ -2580,46 +2634,56 @@ igt_main
 		igt_require(data.display.is_atomic);
 	}
 
+	igt_describe("DisplayPort tests");
 	igt_subtest_group {
 		igt_fixture {
 			require_connector_present(
 			    &data, DRM_MODE_CONNECTOR_DisplayPort);
 		}
 
+		igt_describe(test_basic_hotplug_desc);
 		connector_subtest("dp-hpd", DisplayPort)
 			test_basic_hotplug(&data, port,
 					   HPD_TOGGLE_COUNT_DP_HDMI);
 
+		igt_describe(test_basic_hotplug_desc);
 		connector_subtest("dp-hpd-fast", DisplayPort)
 			test_basic_hotplug(&data, port,
 					   HPD_TOGGLE_COUNT_FAST);
 
+		igt_describe(test_edid_read_desc);
 		connector_subtest("dp-edid-read", DisplayPort) {
 			test_edid_read(&data, port, TEST_EDID_BASE);
 			test_edid_read(&data, port, TEST_EDID_ALT);
 		}
 
+		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("dp-hpd-after-suspend", DisplayPort)
 			test_suspend_resume_hpd(&data, port,
 						SUSPEND_STATE_MEM,
 						SUSPEND_TEST_NONE);
 
+		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("dp-hpd-after-hibernate", DisplayPort)
 			test_suspend_resume_hpd(&data, port,
 						SUSPEND_STATE_DISK,
 						SUSPEND_TEST_DEVICES);
 
+		igt_describe(test_hpd_storm_detect_desc);
 		connector_subtest("dp-hpd-storm", DisplayPort)
 			test_hpd_storm_detect(&data, port,
 					      HPD_STORM_PULSE_INTERVAL_DP);
 
+		igt_describe(test_hpd_storm_disable_desc);
 		connector_subtest("dp-hpd-storm-disable", DisplayPort)
 			test_hpd_storm_disable(&data, port,
 					       HPD_STORM_PULSE_INTERVAL_DP);
 
+		igt_describe(test_link_status_desc);
 		connector_subtest("dp-link-status", DisplayPort)
 			test_link_status(&data, port);
 
+		igt_describe(test_suspend_resume_edid_change_desc);
 		connector_subtest("dp-edid-change-during-suspend", DisplayPort)
 			test_suspend_resume_edid_change(&data, port,
 							SUSPEND_STATE_MEM,
@@ -2627,6 +2691,7 @@ igt_main
 							TEST_EDID_BASE,
 							TEST_EDID_ALT);
 
+		igt_describe(test_suspend_resume_edid_change_desc);
 		connector_subtest("dp-edid-change-during-hibernate", DisplayPort)
 			test_suspend_resume_edid_change(&data, port,
 							SUSPEND_STATE_DISK,
@@ -2634,70 +2699,86 @@ igt_main
 							TEST_EDID_BASE,
 							TEST_EDID_ALT);
 
+		igt_describe(test_display_all_modes_desc);
 		connector_subtest("dp-crc-single", DisplayPort)
 			test_display_all_modes(&data, port, DRM_FORMAT_XRGB8888,
 					       CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("dp-crc-fast", DisplayPort)
 			test_display_one_mode(&data, port, DRM_FORMAT_XRGB8888,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_all_modes_desc);
 		connector_subtest("dp-crc-multiple", DisplayPort)
 			test_display_all_modes(&data, port, DRM_FORMAT_XRGB8888,
 					       CHAMELIUM_CHECK_CRC, 3);
 
+		igt_describe(test_display_frame_dump_desc);
 		connector_subtest("dp-frame-dump", DisplayPort)
 			test_display_frame_dump(&data, port);
 
+		igt_describe(test_mode_timings_desc);
 		connector_subtest("dp-mode-timings", DisplayPort)
 			test_mode_timings(&data, port);
 
+		igt_describe(test_display_audio_desc);
 		connector_subtest("dp-audio", DisplayPort)
 			test_display_audio(&data, port, "HDMI",
 					   TEST_EDID_DP_AUDIO);
 
+		igt_describe(test_display_audio_edid_desc);
 		connector_subtest("dp-audio-edid", DisplayPort)
 			test_display_audio_edid(&data, port,
 						TEST_EDID_DP_AUDIO);
 	}
 
+	igt_describe("HDMI tests");
 	igt_subtest_group {
 		igt_fixture {
 			require_connector_present(
 			    &data, DRM_MODE_CONNECTOR_HDMIA);
 		}
 
+		igt_describe(test_basic_hotplug_desc);
 		connector_subtest("hdmi-hpd", HDMIA)
 			test_basic_hotplug(&data, port,
 					   HPD_TOGGLE_COUNT_DP_HDMI);
 
+		igt_describe(test_basic_hotplug_desc);
 		connector_subtest("hdmi-hpd-fast", HDMIA)
 			test_basic_hotplug(&data, port,
 					   HPD_TOGGLE_COUNT_FAST);
 
+		igt_describe(test_edid_read_desc);
 		connector_subtest("hdmi-edid-read", HDMIA) {
 			test_edid_read(&data, port, TEST_EDID_BASE);
 			test_edid_read(&data, port, TEST_EDID_ALT);
 		}
 
+		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("hdmi-hpd-after-suspend", HDMIA)
 			test_suspend_resume_hpd(&data, port,
 						SUSPEND_STATE_MEM,
 						SUSPEND_TEST_NONE);
 
+		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("hdmi-hpd-after-hibernate", HDMIA)
 			test_suspend_resume_hpd(&data, port,
 						SUSPEND_STATE_DISK,
 						SUSPEND_TEST_DEVICES);
 
+		igt_describe(test_hpd_storm_detect_desc);
 		connector_subtest("hdmi-hpd-storm", HDMIA)
 			test_hpd_storm_detect(&data, port,
 					      HPD_STORM_PULSE_INTERVAL_HDMI);
 
+		igt_describe(test_hpd_storm_disable_desc);
 		connector_subtest("hdmi-hpd-storm-disable", HDMIA)
 			test_hpd_storm_disable(&data, port,
 					       HPD_STORM_PULSE_INTERVAL_HDMI);
 
+		igt_describe(test_suspend_resume_edid_change_desc);
 		connector_subtest("hdmi-edid-change-during-suspend", HDMIA)
 			test_suspend_resume_edid_change(&data, port,
 							SUSPEND_STATE_MEM,
@@ -2705,6 +2786,7 @@ igt_main
 							TEST_EDID_BASE,
 							TEST_EDID_ALT);
 
+		igt_describe(test_suspend_resume_edid_change_desc);
 		connector_subtest("hdmi-edid-change-during-hibernate", HDMIA)
 			test_suspend_resume_edid_change(&data, port,
 							SUSPEND_STATE_DISK,
@@ -2712,157 +2794,196 @@ igt_main
 							TEST_EDID_BASE,
 							TEST_EDID_ALT);
 
+		igt_describe(test_display_all_modes_desc);
 		connector_subtest("hdmi-crc-single", HDMIA)
 			test_display_all_modes(&data, port, DRM_FORMAT_XRGB8888,
 					       CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-fast", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_XRGB8888,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_all_modes_desc);
 		connector_subtest("hdmi-crc-multiple", HDMIA)
 			test_display_all_modes(&data, port, DRM_FORMAT_XRGB8888,
 					       CHAMELIUM_CHECK_CRC, 3);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-argb8888", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_ARGB8888,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-abgr8888", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_ABGR8888,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-xrgb8888", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_XRGB8888,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-xbgr8888", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_XBGR8888,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-rgb888", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_RGB888,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-bgr888", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_BGR888,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-rgb565", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_RGB565,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-bgr565", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_BGR565,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-argb1555", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_ARGB1555,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-crc-xrgb1555", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_XRGB1555,
 					      CHAMELIUM_CHECK_CRC, 1);
 
+		igt_describe(test_display_planes_random_desc);
 		connector_subtest("hdmi-crc-planes-random", HDMIA)
 			test_display_planes_random(&data, port,
 						   CHAMELIUM_CHECK_CRC);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-cmp-nv12", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_NV12,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-cmp-nv16", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_NV16,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-cmp-nv21", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_NV21,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-cmp-nv61", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_NV61,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-cmp-yu12", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_YUV420,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-cmp-yu16", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_YUV422,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-cmp-yv12", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_YVU420,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
+		igt_describe(test_display_one_mode_desc);
 		connector_subtest("hdmi-cmp-yv16", HDMIA)
 			test_display_one_mode(&data, port, DRM_FORMAT_YVU422,
 					      CHAMELIUM_CHECK_CHECKERBOARD, 1);
 
+		igt_describe(test_display_planes_random_desc);
 		connector_subtest("hdmi-cmp-planes-random", HDMIA)
 			test_display_planes_random(&data, port,
 						   CHAMELIUM_CHECK_CHECKERBOARD);
 
+		igt_describe(test_display_frame_dump_desc);
 		connector_subtest("hdmi-frame-dump", HDMIA)
 			test_display_frame_dump(&data, port);
 
+		igt_describe(test_mode_timings_desc);
 		connector_subtest("hdmi-mode-timings", HDMIA)
 			test_mode_timings(&data, port);
 
+		igt_describe(test_display_audio_desc);
 		connector_subtest("hdmi-audio", HDMIA)
 			test_display_audio(&data, port, "HDMI",
 					   TEST_EDID_HDMI_AUDIO);
 
+		igt_describe(test_display_audio_edid_desc);
 		connector_subtest("hdmi-audio-edid", HDMIA)
 			test_display_audio_edid(&data, port,
 						TEST_EDID_HDMI_AUDIO);
 
+		igt_describe(test_display_aspect_ratio_desc);
 		connector_subtest("hdmi-aspect-ratio", HDMIA)
 			test_display_aspect_ratio(&data, port);
 	}
 
+	igt_describe("VGA tests");
 	igt_subtest_group {
 		igt_fixture {
 			require_connector_present(
 			    &data, DRM_MODE_CONNECTOR_VGA);
 		}
 
+		igt_describe(test_basic_hotplug_desc);
 		connector_subtest("vga-hpd", VGA)
 			test_basic_hotplug(&data, port, HPD_TOGGLE_COUNT_VGA);
 
+		igt_describe(test_basic_hotplug_desc);
 		connector_subtest("vga-hpd-fast", VGA)
 			test_basic_hotplug(&data, port, HPD_TOGGLE_COUNT_FAST);
 
+		igt_describe(test_edid_read_desc);
 		connector_subtest("vga-edid-read", VGA) {
 			test_edid_read(&data, port, TEST_EDID_BASE);
 			test_edid_read(&data, port, TEST_EDID_ALT);
 		}
 
+		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("vga-hpd-after-suspend", VGA)
 			test_suspend_resume_hpd(&data, port,
 						SUSPEND_STATE_MEM,
 						SUSPEND_TEST_NONE);
 
+		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("vga-hpd-after-hibernate", VGA)
 			test_suspend_resume_hpd(&data, port,
 						SUSPEND_STATE_DISK,
 						SUSPEND_TEST_DEVICES);
 
+		igt_describe(test_hpd_without_ddc_desc);
 		connector_subtest("vga-hpd-without-ddc", VGA)
 			test_hpd_without_ddc(&data, port);
 
+		igt_describe(test_display_all_modes_desc);
 		connector_subtest("vga-frame-dump", VGA)
 			test_display_all_modes(&data, port, DRM_FORMAT_XRGB8888,
 					       CHAMELIUM_CHECK_ANALOG, 1);
 	}
 
+	igt_describe("Tests that operate on all connectors");
 	igt_subtest_group {
+		igt_describe(test_suspend_resume_hpd_common_desc);
 		igt_subtest("common-hpd-after-suspend")
 			test_suspend_resume_hpd_common(&data,
 						       SUSPEND_STATE_MEM,
 						       SUSPEND_TEST_NONE);
 
+		igt_describe(test_suspend_resume_hpd_common_desc);
 		igt_subtest("common-hpd-after-hibernate")
 			test_suspend_resume_hpd_common(&data,
 						       SUSPEND_STATE_DISK,
