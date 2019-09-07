@@ -180,6 +180,7 @@ int main(int argc, char *argv[])
 	const char *path[REAL_MAX_SLICES] = {"l3_parity", "l3_parity_slice_1"};
 	int row = 0, bank = 0, sbank = 0;
 	int fd[REAL_MAX_SLICES] = {0}, ret, i;
+	int exitcode = EXIT_FAILURE;
 	int action = '0';
 	int daemonize = 0;
 	int device, dir;
@@ -198,13 +199,13 @@ int main(int argc, char *argv[])
 		fd[i] = openat(dir, path[i], O_RDWR);
 		if (fd[i] < 0) {
 			if (i == 0) /* at least one slice must be supported */
-				exit(77);
+				goto skip;
 			continue;
 		}
 
 		if (read(fd[i], l3logs[i], NUM_REGS * sizeof(uint32_t)) < 0) {
 			perror(path[i]);
-			exit(77);
+			goto skip;
 		}
 		assert(lseek(fd[i], 0, SEEK_SET) == 0);
 	}
@@ -252,45 +253,45 @@ int main(int argc, char *argv[])
 			case '?':
 			case 'h':
 				usage(argv[0]);
-				exit(EXIT_SUCCESS);
+				goto success;
 			case 'H':
 				printf("Number of slices: %d\n", MAX_SLICES);
 				printf("Number of banks: %d\n", num_banks());
 				printf("Subbanks per bank: %d\n", NUM_SUBBANKS);
 				printf("Max L3 size: %dK\n", L3_SIZE >> 10);
 				printf("Has error injection: %s\n", IS_HASWELL(devid) ? "yes" : "no");
-				exit(EXIT_SUCCESS);
+				goto success;
 			case 'r':
 				row = atoi(optarg);
 				if (row >= MAX_ROW)
-					exit(EXIT_FAILURE);
+					goto failure;
 				break;
 			case 'b':
 				bank = atoi(optarg);
 				if (bank >= num_banks() || bank >= MAX_BANKS_PER_SLICE)
-					exit(EXIT_FAILURE);
+					goto failure;
 				break;
 			case 's':
 				sbank = atoi(optarg);
 				if (sbank >= NUM_SUBBANKS)
-					exit(EXIT_FAILURE);
+					goto failure;
 				break;
 			case 'w':
 				which_slice = atoi(optarg);
 				if (which_slice >= MAX_SLICES)
-					exit(EXIT_FAILURE);
+					goto failure;
 				break;
 			case 'i':
 			case 'u':
 				if (!IS_HASWELL(devid)) {
 					fprintf(stderr, "Error injection supported on HSW+ only\n");
-					exit(EXIT_FAILURE);
+					goto failure;
 				}
 			case 'd':
 				if (optarg) {
 					ret = sscanf(optarg, "%d,%d,%d", &row, &bank, &sbank);
 					if (ret != 3)
-						exit(EXIT_FAILURE);
+						goto failure;
 				}
 			case 'a':
 			case 'l':
@@ -298,24 +299,24 @@ int main(int argc, char *argv[])
 			case 'L':
 				if (action != '0') {
 					fprintf(stderr, "Only one action may be specified\n");
-					exit(EXIT_FAILURE);
+					goto failure;
 				}
 				action = c;
 				break;
 			default:
-				abort();
+				goto failure;
 		}
 	}
 
 	if (action == 'i') {
 		if (((dft >> 1) & 1) != which_slice) {
 			fprintf(stderr, "DFT register already has slice %d enabled, and we don't support multiple slices. Try modifying -w; but sometimes the register sticks in the wrong way\n", (dft >> 1) & 1);
-			exit(EXIT_FAILURE);
+			goto failure;
 		}
 
 		if (which_slice == -1) {
 			fprintf(stderr, "Cannot inject errors to multiple slices (modify -w)\n");
-			exit(EXIT_FAILURE);
+			goto failure;
 		}
 		if (dft & 1 && ((dft >> 1) && 1) == which_slice)
 			printf("warning: overwriting existing injections. This is very dangerous.\n");
@@ -332,7 +333,7 @@ int main(int argc, char *argv[])
 		memset(&par, 0, sizeof(par));
 		assert(l3_uevent_setup(&par) == 0);
 		assert(l3_listen(&par, daemonize == 1, &loc) == 0);
-		exit(EXIT_SUCCESS);
+		goto success;
 	}
 
 	if (action == 'l')
@@ -359,7 +360,7 @@ int main(int argc, char *argv[])
 			case 'i':
 				if (bank == 3) {
 					fprintf(stderr, "The hardware does not support error inject on bank 3.\n");
-					exit(EXIT_FAILURE);
+					goto failure;
 				}
 				dft |= row << 7;
 				dft |= sbank << 4;
@@ -375,13 +376,12 @@ int main(int argc, char *argv[])
 			case 'L':
 				break;
 			default:
-				abort();
+				goto failure;
 		}
 	}
 
-	intel_register_access_fini(&mmio_data);
 	if (action == 'l')
-		exit(EXIT_SUCCESS);
+		goto success;
 
 	for_each_slice(i) {
 		if (fd[i] < 0)
@@ -390,11 +390,19 @@ int main(int argc, char *argv[])
 		ret = write(fd[i], l3logs[i], NUM_REGS * sizeof(uint32_t));
 		if (ret == -1) {
 			perror("Writing sysfs");
-			exit(EXIT_FAILURE);
+			goto failure;
 		}
 		close(fd[i]);
 	}
 
 
-	exit(EXIT_SUCCESS);
+success:
+	exitcode = EXIT_SUCCESS;
+failure:
+	intel_register_access_fini(&mmio_data);
+	return exitcode;
+
+skip:
+	exitcode = 77;
+	goto failure;
 }
