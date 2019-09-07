@@ -44,6 +44,7 @@ cc_args = [
 	'-Wno-maybe-uninitialized',
 	'-Wno-missing-field-initializers',
 	'-Wno-pointer-arith',
+	'-Wno-address-of-packed-member',
 	'-Wno-sign-compare',
 # Macros asserting on the range of their arguments triggers this.
 	'-Wno-type-limits',
