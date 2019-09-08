@@ -3072,8 +3072,6 @@ static void init_clocks(void)
 	uint32_t rcs_start, rcs_end;
 	double overhead, t;
 
-	intel_register_access_init(&mmio_data, intel_get_pci_device(), false, fd);
-
 	if (verbose <= 1)
 		return;
 
@@ -3114,6 +3112,7 @@ int main(int argc, char **argv)
 	struct w_arg *w_args = NULL;
 	unsigned int tolerance_pct = 1;
 	const struct workload_balancer *balancer = NULL;
+	int exitcode = EXIT_FAILURE;
 	char *endptr = NULL;
 	int prio = 0;
 	double t;
@@ -3128,6 +3127,8 @@ int main(int argc, char **argv)
 	fd = __drm_open_driver(DRIVER_INTEL);
 	igt_require(fd);
 
+	intel_register_access_init(&mmio_data, intel_get_pci_device(), false, fd);
+
 	init_clocks();
 
 	master_prng = time(NULL);
@@ -3138,7 +3139,7 @@ int main(int argc, char **argv)
 		case 'W':
 			if (master_workload >= 0) {
 				wsim_err("Only one master workload can be given!\n");
-				return 1;
+				goto err;
 			}
 			master_workload = nr_w_args;
 			/* Fall through */
@@ -3152,7 +3153,7 @@ int main(int argc, char **argv)
 		case 'a':
 			if (append_workload_arg) {
 				wsim_err("Only one append workload can be given!\n");
-				return 1;
+				goto err;
 			}
 			append_workload_arg = optarg;
 			break;
@@ -3217,7 +3218,7 @@ int main(int argc, char **argv)
 			if (!balancer) {
 				wsim_err("Unknown balancing mode '%s'!\n",
 					 optarg);
-				return 1;
+				goto err;
 			}
 			break;
 		case 'I':
@@ -3225,20 +3226,20 @@ int main(int argc, char **argv)
 			break;
 		case 'h':
 			print_help();
-			return 0;
+			goto out;
 		default:
-			return 1;
+			goto err;
 		}
 	}
 
 	if ((flags & HEARTBEAT) && !(flags & SEQNO)) {
 		wsim_err("Heartbeat needs a seqno based balancer!\n");
-		return 1;
+		goto err;
 	}
 
 	if ((flags & VCS2REMAP) && (flags & I915)) {
 		wsim_err("VCS remapping not supported with i915 balancing!\n");
-		return 1;
+		goto err;
 	}
 
 	if (!nop_calibration) {
@@ -3250,29 +3251,29 @@ int main(int argc, char **argv)
 			printf("Nop calibration for %uus delay is %lu.\n",
 			       nop_calibration_us, nop_calibration);
 
-		return 0;
+		goto out;
 	}
 
 	if (!nr_w_args) {
 		wsim_err("No workload descriptor(s)!\n");
-		return 1;
+		goto err;
 	}
 
 	if (nr_w_args > 1 && clients > 1) {
 		wsim_err("Cloned clients cannot be combined with multiple workloads!\n");
-		return 1;
+		goto err;
 	}
 
 	if ((flags & GLOBAL_BALANCE) && !balancer) {
 		wsim_err("Balancer not specified in global balancing mode!\n");
-		return 1;
+		goto err;
 	}
 
 	if (append_workload_arg) {
 		append_workload_arg = load_workload_descriptor(append_workload_arg);
 		if (!append_workload_arg) {
 			wsim_err("Failed to load append workload descriptor!\n");
-			return 1;
+			goto err;
 		}
 	}
 
@@ -3281,7 +3282,7 @@ int main(int argc, char **argv)
 		app_w = parse_workload(&arg, flags, NULL);
 		if (!app_w) {
 			wsim_err("Failed to parse append workload!\n");
-			return 1;
+			goto err;
 		}
 	}
 
@@ -3293,13 +3294,13 @@ int main(int argc, char **argv)
 
 		if (!w_args[i].desc) {
 			wsim_err("Failed to load workload descriptor %u!\n", i);
-			return 1;
+			goto err;
 		}
 
 		wrk[i] = parse_workload(&w_args[i], flags, app_w);
 		if (!wrk[i]) {
 			wsim_err("Failed to parse workload %u!\n", i);
-			return 1;
+			goto err;
 		}
 	}
 
@@ -3359,7 +3360,7 @@ int main(int argc, char **argv)
 
 		if (prepare_workload(i, w[i], flags_)) {
 			wsim_err("Failed to prepare workload %u!\n", i);
-			return 1;
+			goto err;
 		}
 
 
@@ -3368,12 +3369,10 @@ int main(int argc, char **argv)
 			if (ret) {
 				wsim_err("Failed to initialize balancing! (%u=%d)\n",
 					 i, ret);
-				return 1;
+				goto err;
 			}
 		}
 	}
-
-	gem_quiescent_gpu(fd);
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
 
@@ -3414,5 +3413,9 @@ int main(int argc, char **argv)
 		fini_workload(wrk[i]);
 	free(w_args);
 
-	return 0;
+out:
+	exitcode = EXIT_SUCCESS;
+err:
+	intel_register_access_fini(&mmio_data);
+	return exitcode;
 }
