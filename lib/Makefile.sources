@@ -142,6 +142,13 @@ lib_source_list =	 	\
 	veboxcopy_gen12.c	\
 	$(NULL)
 
+i915_perf_sources =			\
+	igt_list.c			\
+	i915/perf.c	 		\
+	i915/perf.h			\
+	i915/i915_perf_metrics.c	\
+	i915/i915_perf_metrics.h
+
 .PHONY: version.h.tmp
 
 # leaving a space here to work around automake's conditionals
@@ -172,6 +179,8 @@ $(IGT_LIB_PATH)/version.h: $(IGT_LIB_PATH)/version.h.tmp
 		rm $(IGT_LIB_PATH)/version.h.tmp ; \
 	fi
 
-BUILT_SOURCES = $(IGT_LIB_PATH)/version.h
+BUILT_SOURCES =				\
+	$(IGT_LIB_PATH)/version.h	\
+	i915/i915_perf_metrics.c	\
+	i915/i915_perf_metrics.h
 CLEANFILES = $(IGT_LIB_PATH)/version.h $(IGT_LIB_PATH)/version.h.tmp
-

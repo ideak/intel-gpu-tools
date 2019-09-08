@@ -1,6 +1,25 @@
 IGT_LIB_PATH := $(builddir)
 GPU_TOOLS_PATH := $(top_srcdir)
 
+i915_perf_hardware =		\
+	hsw			\
+	bdw chv			\
+	sklgt2 sklgt3 sklgt4	\
+	kblgt2 kblgt3		\
+	cflgt2 cflgt3		\
+	bxt glk			\
+	cnl			\
+	icl ehl			\
+	tgl
+
+i915_perf_xml_files_ = $(addprefix i915/perf-configs/oa-,$(i915_perf_hardware))
+i915_perf_xml_files = $(addsuffix .xml,$(i915_perf_xml_files_))
+
+$(builddir)/i915/i915_perf_metrics.h: i915/perf-configs/perf-codegen.py $(i915_perf_xml_files)
+	$(PYTHON) i915/perf-configs/perf-codegen.py --code $(builddir)/i915/i915_perf_metrics.c --header $(builddir)/i915/i915_perf_metrics.h $(i915_perf_xml_files)
+
+$(builddir)/i915/i915_perf_metrics.c: $(builddir)/i915/i915_perf_metrics.h
+
 include Makefile.sources
 
 libintel_tools_la_SOURCES = $(lib_source_list)
@@ -8,6 +27,17 @@ libintel_tools_la_SOURCES = $(lib_source_list)
 libigt_perf_la_SOURCES = \
 	igt_perf.c	 \
 	igt_perf.h
+
+libi915_perf_la_SOURCES = $(i915_perf_sources)
+libi915_perf_HEADERS =	\
+	igt_list.h	\
+	i915/perf.h
+libi915_perfdir = $(includedir)/i915-perf
+
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = i915-perf.pc
+
+lib_LTLIBRARIES = libi915_perf.la
 
 noinst_LTLIBRARIES = libintel_tools.la libigt_perf.la
 noinst_HEADERS = check-ndebug.h

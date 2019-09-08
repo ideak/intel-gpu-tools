@@ -170,4 +170,71 @@ lib_igt_perf_build = static_library('igt_perf',
 lib_igt_perf = declare_dependency(link_with : lib_igt_perf_build,
 				  include_directories : inc)
 
+
+i915_perf_files = [
+  'igt_list.c',
+  'i915/perf.c',
+]
+
+i915_perf_hardware = [
+  'hsw',
+  'bdw', 'chv',
+  'sklgt2', 'sklgt3', 'sklgt4',
+  'kblgt2', 'kblgt3',
+  'cflgt2', 'cflgt3',
+  'bxt', 'glk',
+  'cnl',
+  'icl', 'ehl',
+  'tgl',
+]
+
+i915_xml_files = []
+foreach hw : i915_perf_hardware
+  i915_xml_files += 'i915/perf-configs/oa-@0@.xml'.format(hw)
+endforeach
+
+i915_perf_files += custom_target(
+  'i915-perf-metrics',
+  input : i915_xml_files,
+  output : [ 'i915_perf_metrics.c', 'i915_perf_metrics.h' ],
+  command : [
+    find_program('i915/perf-configs/perf-codegen.py'),
+    '--code', '@OUTPUT0@',
+    '--header', '@OUTPUT1@',
+    '@INPUT@',
+  ])
+
+lib_igt_i915_perf_build = shared_library(
+  'i915_perf',
+  i915_perf_files,
+  dependencies: [lib_igt, lib_igt_chipset],
+  include_directories : inc,
+  install: true,
+  soversion: '0')
+
+lib_igt_i915_perf = declare_dependency(
+  link_with : lib_igt_i915_perf_build,
+  include_directories : inc)
+
+install_headers(
+  'igt_list.h',
+  'intel_chipset.h',
+  'i915/perf.h',
+  subdir : 'i915-perf'
+)
+
+pkgconf = configuration_data()
+
+pkgconf.set('prefix', get_option('prefix'))
+pkgconf.set('exec_prefix', '${prefix}')
+pkgconf.set('libdir', '${prefix}/@0@'.format(get_option('libdir')))
+pkgconf.set('includedir', '${prefix}/@0@'.format(get_option('includedir')))
+pkgconf.set('i915_perf_version', '1.0.0')
+
+configure_file(
+  input : 'i915-perf.pc.in',
+  output : 'i915-perf.pc',
+  configuration : pkgconf,
+  install_dir : pkgconfigdir)
+
 subdir('tests')

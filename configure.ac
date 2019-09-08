@@ -26,6 +26,8 @@ AC_INIT([igt-gpu-tools],
 	[https://bugs.freedesktop.org/enter_bug.cgi?product=DRI&component=IGT],
 	[igt-gpu-tools])
 
+AC_SUBST([i915_perf_version], [1.0.0], [libi915_perf.so version])
+
 AC_CONFIG_SRCDIR([Makefile.am])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -304,10 +306,12 @@ AC_CONFIG_FILES([
 		 Makefile
 		 benchmarks/Makefile
 		 lib/Makefile
+		 lib/i915-perf.pc
 		 scripts/Makefile
 		 tests/Makefile
 		 tests/intel-ci/Makefile
 		 tools/Makefile
+		 tools/i915-perf/Makefile
 		 tools/null_state_gen/Makefile
 		 tools/registers/Makefile
 		 overlay/Makefile

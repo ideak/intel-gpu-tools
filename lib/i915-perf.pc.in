@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: i915-perf
+Description: i915 perf library
+Version: @i915_perf_version@
+Libs: -L${libdir} -li915_perf
+Cflags: -I${includedir}/i915-perf

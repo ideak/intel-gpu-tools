@@ -100,4 +100,5 @@ executable('amd_hdmi_compliance', 'amd_hdmi_compliance.c',
 	   install_rpath : bindir_rpathdir,
 	   install : true)
 
+subdir('i915-perf')
 subdir('null_state_gen')
