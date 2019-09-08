@@ -65,7 +65,7 @@ static void read_and_discard_sysfs_entries(int path_fd, int indent)
 			igt_debug("%sReading file \"%s\"\n", tabs, dirent->d_name);
 			igt_set_timeout(5, "reading sysfs entry");
 
-			sub_fd = openat(path_fd, dirent->d_name, O_RDONLY);
+			sub_fd = openat(path_fd, dirent->d_name, O_RDONLY | O_NONBLOCK);
 			if (sub_fd == -1) {
 				igt_debug("%sCould not open file \"%s\" with error: %m\n",
 					  tabs, dirent->d_name);
