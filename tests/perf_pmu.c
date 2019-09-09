@@ -191,10 +191,12 @@ static unsigned long __spin_wait(int fd, igt_spin_t *spin)
 		while (!igt_spin_has_started(spin)) {
 			unsigned long t = igt_nsec_elapsed(&start);
 
+			igt_assert(gem_bo_busy(fd, spin->handle));
 			if ((t - timeout) > 250e6) {
 				timeout = t;
 				igt_warn("Spinner not running after %.2fms\n",
 					 (double)t / 1e6);
+				igt_assert(t < 2e9);
 			}
 		}
 	} else {
@@ -202,6 +204,7 @@ static unsigned long __spin_wait(int fd, igt_spin_t *spin)
 		usleep(500e3); /* Better than nothing! */
 	}
 
+	igt_assert(gem_bo_busy(fd, spin->handle));
 	return igt_nsec_elapsed(&start);
 }
 
