@@ -51,6 +51,7 @@ static struct {
 } abort_conditions[] = {
 	{ ABORT_TAINT, "taint" },
 	{ ABORT_LOCKDEP, "lockdep" },
+	{ ABORT_PING, "ping" },
 	{ ABORT_ALL, "all" },
 	{ 0, 0 },
 };
@@ -140,6 +141,9 @@ static const char *usage_str =
 	"                        Possible conditions:\n"
 	"                         lockdep - abort when kernel lockdep has been angered.\n"
 	"                         taint   - abort when kernel becomes fatally tainted.\n"
+	"                         ping    - abort when a host configured in .igtrc or\n"
+	"                                   environment variable IGT_PING_HOSTNAME does\n"
+	"                                   not respond to ping.\n"
 	"                         all     - abort for all of the above.\n"
 	"  -s, --sync            Sync results to disk after every test\n"
 	"  -l {quiet,verbose,dummy}, --log-level {quiet,verbose,dummy}\n"

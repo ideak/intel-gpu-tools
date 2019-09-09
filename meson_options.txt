@@ -42,6 +42,10 @@ option('runner',
        type : 'feature',
        description : 'Build test runner')
 
+option('oping',
+       type : 'feature',
+       description : 'Build test runner with liboping for pinging support')
+
 option('use_rpath',
        type : 'boolean',
        value : false,

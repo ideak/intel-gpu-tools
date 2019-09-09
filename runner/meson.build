@@ -13,6 +13,14 @@ runner_test_sources = [ 'runner_tests.c' ]
 runner_json_test_sources = [ 'runner_json_tests.c' ]
 
 jsonc = dependency('json-c', required: build_runner)
+runner_deps = [jsonc, glib]
+runner_c_args = []
+
+liboping = dependency('liboping', required: get_option('oping'))
+if liboping.found()
+	runner_deps += liboping
+	runner_c_args += '-DHAVE_OPING=1'
+endif
 
 if not build_tests and jsonc.found()
 	error('Building test runner requires building tests')
@@ -23,7 +31,8 @@ if jsonc.found()
 
 	runnerlib = static_library('igt_runner', runnerlib_sources,
 				   include_directories : inc,
-				   dependencies : [jsonc, glib])
+				   c_args : runner_c_args,
+				   dependencies : runner_deps)
 
 	runner = executable('igt_runner', runner_sources,
 			    link_with : runnerlib,
@@ -61,6 +70,9 @@ if jsonc.found()
 	test('runner_json', runner_json_test)
 
 	build_info += 'Build test runner: true'
+	if liboping.found()
+		build_info += 'Build test runner with oping: true'
+	endif
 else
 	build_info += 'Build test runner: false'
 endif

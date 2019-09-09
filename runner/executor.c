@@ -1,6 +1,10 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <glib.h>
 #include <linux/watchdog.h>
+#if HAVE_OPING
+#include <oping.h>
+#endif
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -18,6 +22,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "igt_aux.h"
 #include "igt_core.h"
 #include "executor.h"
 #include "output_strings.h"
@@ -147,6 +152,129 @@ static void ping_watchdogs(void)
 	}
 }
 
+#if HAVE_OPING
+static pingobj_t *pingobj = NULL;
+
+static bool load_ping_config_from_file(void)
+{
+	GError *error = NULL;
+	GKeyFile *key_file = NULL;
+	const char *ping_hostname;
+
+	/* Load igt config file */
+	key_file = igt_load_igtrc();
+	if (!key_file)
+		return false;
+
+	ping_hostname =
+		g_key_file_get_string(key_file, "DUT",
+				      "PingHostName", &error);
+
+	g_clear_error(&error);
+	g_key_file_free(key_file);
+
+	if (!ping_hostname)
+		return false;
+
+	if (ping_host_add(pingobj, ping_hostname)) {
+		fprintf(stderr,
+			"abort on ping: Cannot use hostname from config file\n");
+		return false;
+	}
+
+	return true;
+}
+
+static bool load_ping_config_from_env(void)
+{
+	const char *ping_hostname;
+
+	ping_hostname = getenv("IGT_PING_HOSTNAME");
+	if (!ping_hostname)
+		return false;
+
+	if (ping_host_add(pingobj, ping_hostname)) {
+		fprintf(stderr,
+			"abort on ping: Cannot use hostname from environment\n");
+		return false;
+	}
+
+	return true;
+}
+
+/*
+ * On some hosts, getting network back up after suspend takes
+ * upwards of 10 seconds. 20 seconds should be enough to see
+ * if network comes back at all, and hopefully not too long to
+ * make external monitoring freak out.
+ */
+#define PING_ABORT_DEADLINE 20
+
+static bool can_ping(void)
+{
+	igt_until_timeout(PING_ABORT_DEADLINE) {
+		pingobj_iter_t *iter;
+
+		ping_send(pingobj);
+
+		for (iter = ping_iterator_get(pingobj);
+		     iter != NULL;
+		     iter = ping_iterator_next(iter)) {
+			double latency;
+			size_t len = sizeof(latency);
+
+			ping_iterator_get_info(iter,
+					       PING_INFO_LATENCY,
+					       &latency,
+					       &len);
+			if (latency >= 0.0)
+				return true;
+		}
+	}
+
+	return false;
+}
+
+#endif
+
+static void ping_config(void)
+{
+#if HAVE_OPING
+	double single_attempt_timeout = 1.0;
+
+	if (pingobj)
+		return;
+
+	pingobj = ping_construct();
+
+	/* Try env first, then config file */
+	if (!load_ping_config_from_env() && !load_ping_config_from_file()) {
+		fprintf(stderr,
+			"abort on ping: No host to ping configured\n");
+		ping_destroy(pingobj);
+		pingobj = NULL;
+		return;
+	}
+
+	ping_setopt(pingobj, PING_OPT_TIMEOUT, &single_attempt_timeout);
+#endif
+}
+
+static char *handle_ping(void)
+{
+#if HAVE_OPING
+	if (pingobj && !can_ping()) {
+		char *reason;
+
+		asprintf(&reason,
+			 "Ping host did not respond to ping, network down");
+		return reason;
+	}
+#endif
+
+	return NULL;
+}
+
 static char *handle_lockdep(void)
 {
 	const char *header = "Lockdep not active\n\n/proc/lockdep_stats contents:\n";
@@ -236,6 +364,7 @@ static const struct {
 } abort_handlers[] = {
 	{ ABORT_LOCKDEP, handle_lockdep },
 	{ ABORT_TAINT, handle_taint },
+	{ ABORT_PING, handle_ping },
 	{ 0, 0 },
 };
 
@@ -1360,6 +1489,9 @@ bool execute(struct execute_state *state,
 	}
 
 	init_watchdogs(settings);
+
+	if (settings->abort_mask & ABORT_PING)
+		ping_config();
 
 	if (!uname(&unamebuf)) {
 		dprintf(unamefd, "%s %s %s %s %s\n",

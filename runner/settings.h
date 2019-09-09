@@ -15,9 +15,10 @@ enum {
 
 #define ABORT_TAINT   (1 << 0)
 #define ABORT_LOCKDEP (1 << 1)
-#define ABORT_ALL     (ABORT_TAINT | ABORT_LOCKDEP)
+#define ABORT_PING    (1 << 2)
+#define ABORT_ALL     (ABORT_TAINT | ABORT_LOCKDEP | ABORT_PING)
 
-_Static_assert(ABORT_ALL == (ABORT_TAINT | ABORT_LOCKDEP), "ABORT_ALL must be all conditions bitwise or'd");
+_Static_assert(ABORT_ALL == (ABORT_TAINT | ABORT_LOCKDEP | ABORT_PING), "ABORT_ALL must be all conditions bitwise or'd");
 
 struct regex_list {
 	char **regex_strings;
