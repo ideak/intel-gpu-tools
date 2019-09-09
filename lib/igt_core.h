@@ -83,6 +83,8 @@ extern const char* __igt_test_description __attribute__((weak));
 extern bool __igt_plain_output;
 extern char *igt_frame_dump_path;
 
+struct _GKeyFile *igt_load_igtrc(void);
+
 /**
  * IGT_TEST_DESCRIPTION:
  * @str: description string

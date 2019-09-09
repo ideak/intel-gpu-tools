@@ -642,11 +642,21 @@ static void oom_adjust_for_doom(void)
 
 }
 
-static void common_init_config(void)
+/**
+ * load_igtrc:
+ *
+ * Load .igtrc from the path pointed to by #IGT_CONFIG_PATH or from
+ * home directory if that is not set. The returned keyfile needs to be
+ * deallocated using g_key_file_free().
+ *
+ * Returns: Pointer to the keyfile, NULL on error.
+ */
+GKeyFile *igt_load_igtrc(void)
 {
 	char *key_file_env = NULL;
 	char *key_file_loc = NULL;
 	GError *error = NULL;
+	GKeyFile *file;
 	int ret;
 
 	/* Determine igt config path */
@@ -659,18 +669,34 @@ static void common_init_config(void)
 	}
 
 	/* Load igt config file */
-	igt_key_file = g_key_file_new();
-	ret = g_key_file_load_from_file(igt_key_file, key_file_loc,
+	file = g_key_file_new();
+	ret = g_key_file_load_from_file(file, key_file_loc,
 					G_KEY_FILE_NONE, &error);
 	if (!ret) {
 		g_error_free(error);
-		g_key_file_free(igt_key_file);
-		igt_key_file = NULL;
+		g_key_file_free(file);
+		file = NULL;
 
 		goto out;
 	}
 
 	g_clear_error(&error);
+
+ out:
+	if (!key_file_env && key_file_loc)
+		free(key_file_loc);
+
+	return file;
+}
+
+static void common_init_config(void)
+{
+	GError *error = NULL;
+	int ret;
+
+	igt_key_file = igt_load_igtrc();
+	if (!igt_key_file)
+		return;
 
 	if (!igt_frame_dump_path)
 		igt_frame_dump_path =
@@ -687,10 +713,6 @@ static void common_init_config(void)
 
 	if (ret != 0)
 		igt_set_autoresume_delay(ret);
-
-out:
-	if (!key_file_env && key_file_loc)
-		free(key_file_loc);
 }
 
 static void common_init_env(void)
