@@ -41,6 +41,6 @@ RUN dnf install -y clang
 RUN dnf install -y findutils
 
 # Meson version switching shenanigans
-RUN curl -o "/usr/src/#1" "https://files.pythonhosted.org/packages/c0/9b/44cdb8adcbb186be6cba5c93718d0c68f177b0e8082ae00cafa63a1d3535/{meson-0.47.0.tar.gz}"
+RUN curl -o "/usr/src/#1" "https://files.pythonhosted.org/packages/e8/ec/3e6a68c9e0fd4b4f4fb6877a3ccfb6f6e6d09f2b4fc87674e671bf64b7b8/{meson-0.47.2.tar.gz}"
 
 RUN dnf clean all
