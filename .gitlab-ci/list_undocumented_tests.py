@@ -47,13 +47,11 @@ def main():
     for test in tests:
         subtests = get_subtests(testdir, test)
 
-        if subtests and subtests[0].name is None:
-            # top level description missing, list binary
-            print(test)
-
         for name, description in subtests:
-            if name is None: # top level description, skipping
-                continue
+            if name is None: # top level description
+                if not description: # is empty
+                    print(test) # mention the test binary
+                continue # and skip because it's not a subtest
 
             if "NO DOCUMENTATION!" in description:
                 print("{}@{}".format(test, name))
