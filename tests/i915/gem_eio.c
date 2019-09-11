@@ -42,6 +42,8 @@
 
 #include "igt.h"
 #include "igt_device.h"
+#include "igt_fb.h"
+#include "igt_kms.h"
 #include "igt_stats.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
@@ -813,6 +815,67 @@ static void test_reset_stress(int fd, unsigned int flags)
 	gem_context_destroy(fd, ctx0);
 }
 
+/*
+ * Modesetting vs wedged
+ */
+
+static void display_helper(igt_display_t *dpy, int *done)
+{
+	const int commit = dpy->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY;
+	struct igt_fb fb = {};
+
+	while (!READ_ONCE(*done)) {
+		drmModeModeInfoPtr mode;
+		igt_plane_t *primary;
+		igt_output_t *output;
+		int pipe;
+
+		pipe = rand() % dpy->n_pipes;
+		output = igt_get_single_output_for_pipe(dpy, pipe);
+		if (!output)
+			continue;
+
+		igt_output_set_pipe(output, pipe);
+		mode = igt_output_get_mode(output);
+
+		if (fb.width != mode->hdisplay || fb.height != mode->vdisplay) {
+			igt_remove_fb(dpy->drm_fd, &fb);
+			igt_create_pattern_fb(dpy->drm_fd,
+					      mode->hdisplay, mode->vdisplay,
+					      DRM_FORMAT_XRGB8888,
+					      LOCAL_I915_FORMAT_MOD_X_TILED,
+					      &fb);
+		}
+
+		primary = igt_output_get_plane_type(output,
+						    DRM_PLANE_TYPE_PRIMARY);
+		igt_plane_set_fb(primary, &fb);
+
+		igt_display_commit2(dpy, commit);
+		igt_display_reset(dpy);
+	}
+
+	igt_remove_fb(dpy->drm_fd, &fb);
+}
+
+static void test_kms(int i915, igt_display_t *dpy)
+{
+	int *shared;
+
+	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(shared != MAP_FAILED);
+
+	igt_fork(child, 1)
+		display_helper(dpy, shared);
+
+	test_reset_stress(i915, 0);
+	test_reset_stress(i915, TEST_WEDGE);
+
+	*shared = 1;
+	igt_waitchildren();
+	munmap(shared, 4096);
+}
+
 static int fd = -1;
 
 static void
@@ -905,5 +968,21 @@ igt_main
 				test_inflight_internal(fd, waits[i].wait);
 			}
 		}
+	}
+
+	igt_subtest_group {
+		igt_display_t display = {
+			.drm_fd = -1, .n_pipes = IGT_MAX_PIPES
+		};
+
+		igt_fixture {
+			igt_device_set_master(fd);
+
+			igt_display_require(&display, fd);
+			igt_display_require_output(&display);
+		}
+
+		igt_subtest("kms")
+			test_kms(fd, &display);
 	}
 }
