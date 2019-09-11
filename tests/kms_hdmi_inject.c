@@ -142,6 +142,8 @@ hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 	struct igt_fb fb;
 	struct kmstest_connector_config config;
 
+	igt_require(eld_is_supported());
+
 	edid = igt_kms_get_hdmi_audio_edid();
 	kmstest_force_edid(drm_fd, connector, edid);
 

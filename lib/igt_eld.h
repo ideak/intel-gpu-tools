@@ -49,6 +49,7 @@ struct eld_entry {
 	struct eld_sad sads[ELD_SADS_CAP];
 };
 
+bool eld_is_supported(void);
 bool eld_get_igt(struct eld_entry *eld);
 bool eld_has_igt(void);
 

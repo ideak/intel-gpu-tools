@@ -26,6 +26,8 @@
 #include "config.h"
 
 #include <dirent.h>
+#include <errno.h>
+#include <glob.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -261,4 +263,20 @@ bool eld_has_igt(void)
 {
 	struct eld_entry eld;
 	return eld_get_igt(&eld);
+}
+
+/** eld_is_supported: check whether the ALSA procfs is enabled, audio cards
+ * are found and ELDs are supported */
+bool eld_is_supported(void)
+{
+	glob_t glob_buf = {0};
+	bool has_elds;
+
+	igt_assert_f(glob("/proc/asound/card*/" ELD_PREFIX "*",
+			  GLOB_NOSORT, NULL, &glob_buf) == 0,
+		     "glob failed\n");
+	has_elds = glob_buf.gl_pathc > 0;
+	globfree(&glob_buf);
+
+	return has_elds;
 }

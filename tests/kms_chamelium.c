@@ -1968,6 +1968,8 @@ test_display_audio_edid(data_t *data, struct chamelium_port *port,
 	struct eld_entry eld;
 	struct eld_sad *sad;
 
+	igt_require(eld_is_supported());
+
 	reset_state(data, port);
 
 	output = prepare_output(data, port, edid);
