@@ -100,6 +100,11 @@ executable('intel_gpu_top', 'intel_gpu_top.c',
 	   install_rpath : bindir_rpathdir,
 	   dependencies : lib_igt_perf)
 
+executable('amd_hdmi_compliance', 'amd_hdmi_compliance.c',
+	   dependencies : [tool_deps],
+	   install_rpath : bindir_rpathdir,
+	   install : true)
+
 conf_data = configuration_data()
 conf_data.set('prefix', prefix)
 conf_data.set('exec_prefix', '${prefix}')
