@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <linux/watchdog.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,13 +27,31 @@ static struct {
 	size_t num_dogs;
 } watchdogs;
 
+__attribute__((format(printf, 2, 3)))
+static void __logf__(FILE *stream, const char *fmt, ...)
+{
+	int saved_errno = errno;
+	struct timespec tv;
+	va_list ap;
+
+	if (clock_gettime(CLOCK_BOOTTIME, &tv))
+		clock_gettime(CLOCK_REALTIME, &tv);
+	fprintf(stream, "[%ld.%06ld] ", tv.tv_sec, tv.tv_nsec / 1000);
+
+	va_start(ap, fmt);
+	errno = saved_errno;
+	vfprintf(stream, fmt, ap);
+	va_end(ap);
+}
+#define outf(fmt...) __logf__(stdout, fmt)
+#define errf(fmt...) __logf__(stderr, fmt)
+
 static void __close_watchdog(int fd)
 {
 	ssize_t ret = write(fd, "V", 1);
 
 	if (ret == -1)
-		fprintf(stderr, "Failed to stop a watchdog: %s\n",
-			strerror(errno));
+		errf("Failed to stop a watchdog: %m\n");
 
 	close(fd);
 }
@@ -42,10 +61,10 @@ static void close_watchdogs(struct settings *settings)
 	size_t i;
 
 	if (settings && settings->log_level >= LOG_LEVEL_VERBOSE)
-		printf("Closing watchdogs\n");
+		outf("Closing watchdogs\n");
 
 	if (settings == NULL && watchdogs.num_dogs != 0)
-		fprintf(stderr, "Closing watchdogs from exit handler!\n");
+		errf("Closing watchdogs from exit handler!\n");
 
 	for (i = 0; i < watchdogs.num_dogs; i++) {
 		__close_watchdog(watchdogs.fds[i]);
@@ -73,7 +92,7 @@ static void init_watchdogs(struct settings *settings)
 		return;
 
 	if (settings->log_level >= LOG_LEVEL_VERBOSE) {
-		printf("Initializing watchdogs\n");
+		outf("Initializing watchdogs\n");
 	}
 
 	atexit(close_watchdogs_atexit);
@@ -88,7 +107,7 @@ static void init_watchdogs(struct settings *settings)
 		watchdogs.fds[i] = fd;
 
 		if (settings->log_level >= LOG_LEVEL_VERBOSE)
-			printf(" %s\n", name);
+			outf("  %s\n", name);
 	}
 }
 
@@ -123,10 +142,8 @@ static void ping_watchdogs(void)
 
 	for (i = 0; i < watchdogs.num_dogs; i++) {
 		ret = ioctl(watchdogs.fds[i], WDIOC_KEEPALIVE, NULL);
-
 		if (ret == -1)
-			fprintf(stderr, "Failed to ping a watchdog: %s\n",
-				strerror(errno));
+			errf("Failed to ping a watchdog: %m\n");
 	}
 }
 
@@ -237,7 +254,7 @@ static char *need_to_abort(const struct settings* settings)
 			continue;
 
 		if (settings->log_level >= LOG_LEVEL_NORMAL)
-			fprintf(stderr, "Aborting: %s\n", abort);
+			errf("Aborting: %s\n", abort);
 
 		return abort;
 	}
@@ -456,7 +473,7 @@ static bool kill_child(int sig, pid_t child)
 	 */
 	kill(-child, sig);
 	if (kill(child, sig) && errno == ESRCH) {
-		fprintf(stderr, "Child process does not exist. This shouldn't happen.\n");
+		errf("Child process does not exist. This shouldn't happen.\n");
 		return false;
 	}
 
@@ -518,9 +535,8 @@ static int monitor_output(pid_t child,
 			timeout /= timeout_intervals;
 
 			if (settings->log_level >= LOG_LEVEL_VERBOSE) {
-				printf("Watchdog doesn't support the timeout we requested (shortened to %d seconds).\n"
-				       "Using %d intervals of %d seconds.\n",
-				       wd_timeout, timeout_intervals, timeout);
+				outf("Watchdog doesn't support the timeout we requested (shortened to %d seconds). Using %d intervals of %d seconds.\n",
+				     wd_timeout, timeout_intervals, timeout);
 			}
 		}
 	}
@@ -555,7 +571,7 @@ static int monitor_output(pid_t child,
 			switch (killed) {
 			case 0:
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					printf("Timeout. Killing the current test with SIGQUIT.\n");
+					outf("Timeout. Killing the current test with SIGQUIT.\n");
 					fflush(stdout);
 				}
 
@@ -573,7 +589,7 @@ static int monitor_output(pid_t child,
 				break;
 			case SIGQUIT:
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					printf("Timeout. Killing the current test with SIGKILL.\n");
+					outf("Timeout. Killing the current test with SIGKILL.\n");
 					fflush(stdout);
 				}
 
@@ -597,8 +613,8 @@ static int monitor_output(pid_t child,
 
 				/* Nothing that can be done, really. Let's tell the caller we want to abort. */
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					fprintf(stderr, "Child refuses to die, tainted %lx. Aborting.\n",
-						taints);
+					errf("Child refuses to die, tainted %lx. Aborting.\n",
+					     taints);
 				}
 				close_watchdogs(settings);
 				free(outbuf);
@@ -621,8 +637,7 @@ static int monitor_output(pid_t child,
 			s = read(outfd, buf, sizeof(buf));
 			if (s <= 0) {
 				if (s < 0) {
-					fprintf(stderr, "Error reading test's stdout: %s\n",
-						strerror(errno));
+					errf("Error reading test's stdout: %m\n");
 				}
 
 				close(outfd);
@@ -689,8 +704,7 @@ static int monitor_output(pid_t child,
 			s = read(errfd, buf, sizeof(buf));
 			if (s <= 0) {
 				if (s < 0) {
-					fprintf(stderr, "Error reading test's stderr: %s\n",
-						strerror(errno));
+					errf("Error reading test's stderr: %m\n");
 				}
 				close(errfd);
 				errfd = -1;
@@ -706,12 +720,11 @@ static int monitor_output(pid_t child,
 			s = read(kmsgfd, buf, sizeof(buf));
 			if (s < 0) {
 				if (errno != EPIPE && errno != EINVAL) {
-					fprintf(stderr, "Error reading from kmsg, stopping monitoring: %s\n",
-						strerror(errno));
+					errf("Error reading from kmsg, stopping monitoring: %m\n");
 					close(kmsgfd);
 					kmsgfd = -1;
 				} else if (errno == EINVAL) {
-					fprintf(stderr, "Warning: Buffer too small for kernel log record, record lost.\n");
+					errf("Warning: Buffer too small for kernel log record, record lost.\n");
 				}
 			} else {
 				write(outputs[_F_DMESG], buf, s);
@@ -726,12 +739,11 @@ static int monitor_output(pid_t child,
 
 			s = read(sigfd, &siginfo, sizeof(siginfo));
 			if (s < 0) {
-				fprintf(stderr, "Error reading from signalfd: %s\n",
-					strerror(errno));
+				errf("Error reading from signalfd: %m\n");
 				continue;
 			} else if (siginfo.ssi_signo == SIGCHLD) {
 				if (child != waitpid(child, &status, WNOHANG)) {
-					fprintf(stderr, "Failed to reap child\n");
+					errf("Failed to reap child\n");
 					status = 9999;
 				} else if (WIFEXITED(status)) {
 					status = WEXITSTATUS(status);
@@ -746,8 +758,8 @@ static int monitor_output(pid_t child,
 			} else {
 				/* We're dying, so we're taking them with us */
 				if (settings->log_level >= LOG_LEVEL_NORMAL)
-					printf("Abort requested via %s, terminating children\n",
-					       strsignal(siginfo.ssi_signo));
+					outf("Abort requested via %s, terminating children\n",
+					     strsignal(siginfo.ssi_signo));
 
 				aborting = true;
 				timeout = 2;
@@ -836,7 +848,7 @@ execute_test_process(int outfd, int errfd,
 	}
 
 	execv(argv[0], argv);
-	fprintf(stderr, "Cannot execute %s\n", argv[0]);
+	errf("Cannot execute %s\n", argv[0]);
 	exit(IGT_EXIT_INVALID);
 }
 
@@ -852,16 +864,17 @@ static int digits(size_t num)
 	return ret;
 }
 
-static void print_time_left(struct execute_state *state,
-			    struct settings *settings)
+static int print_time_left(struct execute_state *state,
+			   struct settings *settings,
+			   char *buf, int rem)
 {
 	int width;
 
 	if (settings->overall_timeout <= 0)
-		return;
+		return 0;
 
 	width = digits(settings->overall_timeout);
-	printf("(%*.0fs left) ", width, state->time_left);
+	return snprintf(buf, rem, "(%*.0fs left) ", width, state->time_left);
 }
 
 static char *entry_display_name(struct job_list_entry *entry)
@@ -923,12 +936,12 @@ static int execute_next_entry(struct execute_state *state,
 	snprintf(name, sizeof(name), "%zd", idx);
 	mkdirat(resdirfd, name, 0777);
 	if ((dirfd = openat(resdirfd, name, O_DIRECTORY | O_RDONLY | O_CLOEXEC)) < 0) {
-		fprintf(stderr, "Error accessing individual test result directory\n");
+		errf("Error accessing individual test result directory\n");
 		return -1;
 	}
 
 	if (!open_output_files(dirfd, outputs, true)) {
-		fprintf(stderr, "Error opening output files\n");
+		errf("Error opening output files\n");
 		result = -1;
 		goto out_dirfd;
 	}
@@ -939,13 +952,13 @@ static int execute_next_entry(struct execute_state *state,
 	}
 
 	if (pipe(outpipe) || pipe(errpipe)) {
-		fprintf(stderr, "Error creating pipes: %s\n", strerror(errno));
+		errf("Error creating pipes: %m\n");
 		result = -1;
 		goto out_pipe;
 	}
 
 	if ((kmsgfd = open("/dev/kmsg", O_RDONLY | O_CLOEXEC)) < 0) {
-		fprintf(stderr, "Warning: Cannot open /dev/kmsg\n");
+		errf("Warning: Cannot open /dev/kmsg\n");
 	} else {
 		/* TODO: Checking of abort conditions in pre-execute dmesg */
 		lseek(kmsgfd, 0, SEEK_END);
@@ -953,17 +966,22 @@ static int execute_next_entry(struct execute_state *state,
 
 
 	if (settings->log_level >= LOG_LEVEL_NORMAL) {
+		char buf[100];
 		char *displayname;
 		int width = digits(total);
-		printf("[%0*zd/%0*zd] ", width, idx + 1, width, total);
+		int len;
 
-		print_time_left(state, settings);
+		len = snprintf(buf, sizeof(buf),
+			       "[%0*zd/%0*zd] ", width, idx + 1, width, total);
+
+		len += print_time_left(state, settings,
+				       buf + len, sizeof(buf) - len);
 
 		displayname = entry_display_name(entry);
-		printf("%s", displayname);
+		len += snprintf(buf + len, sizeof(buf) - len, "%s", displayname);
 		free(displayname);
 
-		printf("\n");
+		outf("%s\n", buf);
 	}
 
 	/*
@@ -975,7 +993,7 @@ static int execute_next_entry(struct execute_state *state,
 
 	child = fork();
 	if (child < 0) {
-		fprintf(stderr, "Failed to fork: %s\n", strerror(errno));
+		errf("Failed to fork: %m\n");
 		result = -1;
 		goto out_kmsgfd;
 	} else if (child == 0) {
@@ -1027,9 +1045,8 @@ static bool clear_test_result_directory(int dirfd)
 
 	for (i = 0; i < _F_LAST; i++) {
 		if (remove_file(dirfd, filenames[i])) {
-			fprintf(stderr, "Error deleting %s from test result directory: %s\n",
-				filenames[i],
-				strerror(errno));
+			errf("Error deleting %s from test result directory: %m\n",
+			     filenames[i]);
 			return false;
 		}
 	}
@@ -1048,7 +1065,7 @@ static bool clear_old_results(char *path)
 			return true;
 		}
 
-		fprintf(stderr, "Error clearing old results: %s\n", strerror(errno));
+		errf("Error clearing old results: %m\n");
 		return false;
 	}
 
@@ -1057,7 +1074,7 @@ static bool clear_old_results(char *path)
 	    remove_file(dirfd, "endtime.txt") ||
 	    remove_file(dirfd, "aborted.txt")) {
 		close(dirfd);
-		fprintf(stderr, "Error clearing old results: %s\n", strerror(errno));
+		errf("Error clearing old results: %m\n");
 		return false;
 	}
 
@@ -1076,9 +1093,8 @@ static bool clear_old_results(char *path)
 		}
 		close(resdirfd);
 		if (unlinkat(dirfd, name, AT_REMOVEDIR)) {
-			fprintf(stderr,
-				"Warning: Result directory %s contains extra files\n",
-				name);
+			errf("Warning: Result directory %s contains extra files\n",
+			     name);
 		}
 	}
 
@@ -1234,11 +1250,11 @@ static void oom_immortal(void)
 
 	fd = open("/proc/self/oom_score_adj", O_WRONLY);
 	if (fd < 0) {
-		fprintf(stderr, "Warning: Cannot adjust oom score.\n");
+		errf("Warning: Cannot adjust oom score.\n");
 		return;
 	}
 	if (write(fd, never_kill, sizeof(never_kill)) != sizeof(never_kill))
-		fprintf(stderr, "Warning: Adjusting oom score failed.\n");
+		errf("Warning: Adjusting oom score failed.\n");
 
 	close(fd);
 }
@@ -1253,22 +1269,22 @@ static bool should_die_because_signal(int sigfd)
 
 	if (ret != 0) {
 		if (ret == -1) {
-			fprintf(stderr, "Poll on signalfd failed with %s\n", strerror(errno));
+			errf("Poll on signalfd failed with %m\n");
 			return true; /* something is wrong, let's die */
 		}
 
 		ret = read(sigfd, &siginfo, sizeof(siginfo));
 
 		if (ret == -1) {
-			fprintf(stderr, "Error reading from signalfd: %s\n", strerror(errno));
+			errf("Error reading from signalfd: %m\n");
 			return false; /* we may want to retry later */
 		}
 
 		if (siginfo.ssi_signo == SIGCHLD) {
-			fprintf(stderr, "Runner got stray SIGCHLD while not executing any tests.\n");
+			errf("Runner got stray SIGCHLD while not executing any tests.\n");
 		} else {
-			fprintf(stderr, "Runner is being killed by %s\n",
-				strsignal(siginfo.ssi_signo));
+			errf("Runner is being killed by %s\n",
+			     strsignal(siginfo.ssi_signo));
 			return true;
 		}
 
@@ -1289,28 +1305,27 @@ bool execute(struct execute_state *state,
 	bool status = true;
 
 	if (state->dry) {
-		printf("Dry run, not executing. Invoke igt_resume if you want to execute.\n");
+		outf("Dry run, not executing. Invoke igt_resume if you want to execute.\n");
 		return true;
 	}
 
 	if ((resdirfd = open(settings->results_path, O_DIRECTORY | O_RDONLY)) < 0) {
 		/* Initialize state should have done this */
-		fprintf(stderr, "Error: Failure opening results path %s\n",
-			settings->results_path);
+		errf("Error: Failure opening results path %s\n",
+		     settings->results_path);
 		return false;
 	}
 
 	if ((testdirfd = open(settings->test_root, O_DIRECTORY | O_RDONLY)) < 0) {
-		fprintf(stderr, "Error: Failure opening test root %s\n",
-			settings->test_root);
+		errf("Error: Failure opening test root %s\n",
+		     settings->test_root);
 		close(resdirfd);
 		return false;
 	}
 
 	/* TODO: On resume, don't rewrite, verify that content matches current instead */
 	if ((unamefd = openat(resdirfd, "uname.txt", O_CREAT | O_WRONLY | O_TRUNC, 0666)) < 0) {
-		fprintf(stderr, "Error: Failure opening uname.txt: %s\n",
-			strerror(errno));
+		errf("Error: Failure opening uname.txt: %m\n");
 		close(testdirfd);
 		close(resdirfd);
 		return false;
@@ -1339,7 +1354,7 @@ bool execute(struct execute_state *state,
 
 	if (sigfd < 0) {
 		/* TODO: Handle better */
-		fprintf(stderr, "Cannot mask signals\n");
+		errf("Cannot mask signals\n");
 		status = false;
 		goto end;
 	}
@@ -1401,7 +1416,7 @@ bool execute(struct execute_state *state,
 
 		if (overall_timeout_exceeded(state)) {
 			if (settings->log_level >= LOG_LEVEL_NORMAL) {
-				printf("Overall timeout time exceeded, stopping.\n");
+				outf("Overall timeout time exceeded, stopping.\n");
 			}
 
 			break;
