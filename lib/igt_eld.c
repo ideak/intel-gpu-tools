@@ -270,11 +270,14 @@ bool eld_has_igt(void)
 bool eld_is_supported(void)
 {
 	glob_t glob_buf = {0};
+	int ret;
 	bool has_elds;
 
-	igt_assert_f(glob("/proc/asound/card*/" ELD_PREFIX "*",
-			  GLOB_NOSORT, NULL, &glob_buf) == 0,
-		     "glob failed\n");
+	ret = glob("/proc/asound/card*/" ELD_PREFIX "*",
+		   GLOB_NOSORT, NULL, &glob_buf);
+	if (ret == GLOB_NOMATCH)
+		return false;
+	igt_assert_f(ret == 0, "glob failed: %d\n", ret);
 	has_elds = glob_buf.gl_pathc > 0;
 	globfree(&glob_buf);
 
