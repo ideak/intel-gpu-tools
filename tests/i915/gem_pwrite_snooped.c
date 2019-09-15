@@ -131,6 +131,7 @@ igt_simple_main
 
 	fd = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(fd);
+	gem_require_blitter(fd);
 
 	devid = intel_get_drm_devid(fd);
 	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);

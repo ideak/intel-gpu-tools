@@ -1266,6 +1266,7 @@ static void gem_execbuf_subtest(void)
 	uint32_t color;
 
 	igt_require_gem(drm_fd);
+	gem_require_blitter(drm_fd);
 
 	/* Create and set data while the device is active. */
 	enable_one_screen_and_wait(&ms_data);

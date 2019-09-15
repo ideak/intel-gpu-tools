@@ -285,6 +285,7 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
+		gem_require_blitter(fd);
 
 		dst = gem_create(fd, object_size);
 		src = gem_create(fd, object_size);

@@ -312,6 +312,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
+		gem_require_blitter(fd);
 
 		sysfs = igt_sysfs_open(fd);
 		igt_require(sysfs >= 0);
