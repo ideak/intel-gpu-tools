@@ -220,6 +220,8 @@ void intel_perf_add_logical_counter(struct intel_perf *perf,
 void intel_perf_add_metric_set(struct intel_perf *perf,
 			       struct intel_perf_metric_set *metric_set);
 
+void intel_perf_load_perf_configs(struct intel_perf *perf, int drm_fd);
+
 #ifdef __cplusplus
 };
 #endif

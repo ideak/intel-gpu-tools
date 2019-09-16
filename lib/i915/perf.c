@@ -422,3 +422,90 @@ intel_perf_add_metric_set(struct intel_perf *perf,
 {
 	igt_list_add_tail(&metric_set->link, &perf->metric_sets);
 }
+
+static void
+load_metric_set_config(struct intel_perf_metric_set *metric_set, int drm_fd)
+{
+	struct drm_i915_perf_oa_config config;
+	uint64_t config_id = 0;
+
+	memset(&config, 0, sizeof(config));
+
+	memcpy(config.uuid, metric_set->hw_config_guid, sizeof(config.uuid));
+
+	config.n_mux_regs = metric_set->n_mux_regs;
+	config.mux_regs_ptr = (uintptr_t) metric_set->mux_regs;
+
+	config.n_boolean_regs = metric_set->n_b_counter_regs;
+	config.boolean_regs_ptr = (uintptr_t) metric_set->b_counter_regs;
+
+	config.n_flex_regs = metric_set->n_flex_regs;
+	config.flex_regs_ptr = (uintptr_t) metric_set->flex_regs;
+
+	while (ioctl(drm_fd, DRM_IOCTL_I915_PERF_ADD_CONFIG, &config) < 0 &&
+	       (errno == EAGAIN || errno == EINTR));
+
+	metric_set->perf_oa_metrics_set = config_id;
+}
+
+void
+intel_perf_load_perf_configs(struct intel_perf *perf, int drm_fd)
+{
+	int sysfs_dir_fd = open_master_sysfs_dir(drm_fd);
+	struct dirent *entry;
+	int metrics_dir_fd;
+	DIR *metrics_dir;
+	struct intel_perf_metric_set *metric_set;
+
+	if (sysfs_dir_fd < 0)
+		return;
+
+	metrics_dir_fd = openat(sysfs_dir_fd, "metrics", O_DIRECTORY);
+	close(sysfs_dir_fd);
+	if (metrics_dir_fd < -1)
+		return;
+
+	metrics_dir = fdopendir(metrics_dir_fd);
+	if (!metrics_dir) {
+		close(metrics_dir_fd);
+		return;
+	}
+
+	while ((entry = readdir(metrics_dir))) {
+		bool metric_id_read;
+		uint64_t metric_id;
+		char path[256 + 4];
+		int id_fd;
+
+		if (entry->d_type != DT_DIR)
+			continue;
+
+		snprintf(path, sizeof(path), "%s/id", entry->d_name);
+
+		id_fd = openat(metrics_dir_fd, path, O_RDONLY);
+		if (id_fd < 0)
+			continue;
+
+		metric_id_read = read_fd_uint64(id_fd, &metric_id);
+		close(id_fd);
+
+		if (!metric_id_read)
+			continue;
+
+		igt_list_for_each_entry(metric_set, &perf->metric_sets, link) {
+			if (!strcmp(metric_set->hw_config_guid, entry->d_name)) {
+				metric_set->perf_oa_metrics_set = metric_id;
+				break;
+			}
+		}
+	}
+
+	closedir(metrics_dir);
+
+	igt_list_for_each_entry(metric_set, &perf->metric_sets, link) {
+		if (metric_set->perf_oa_metrics_set)
+			continue;
+
+		load_metric_set_config(metric_set, drm_fd);
+	}
+}
