@@ -101,6 +101,24 @@ static const uint32_t ps_kernel_gen11[][4] = {
 #endif
 };
 
+/* see lib/i915/shaders/ps/gen12_render_copy.asm */
+static const uint32_t gen12_render_copy[][4] = {
+	{ 0x8003005b, 0x200002f0, 0x0a0a0664, 0x06040205 },
+	{ 0x8003005b, 0x71040fa8, 0x0a0a2001, 0x06240305 },
+	{ 0x8003005b, 0x200002f0, 0x0a0a0664, 0x06040405 },
+	{ 0x8003005b, 0x72040fa8, 0x0a0a2001, 0x06240505 },
+	{ 0x8003005b, 0x200002f0, 0x0a0a06e4, 0x06840205 },
+	{ 0x8003005b, 0x73040fa8, 0x0a0a2001, 0x06a40305 },
+	{ 0x8003005b, 0x200002f0, 0x0a0a06e4, 0x06840405 },
+	{ 0x8003005b, 0x74040fa8, 0x0a0a2001, 0x06a40505 },
+	{ 0x80049031, 0x0c440000, 0x20027124, 0x01000000 },
+	{ 0x00042061, 0x71050aa0, 0x00460c05, 0x00000000 },
+	{ 0x00040061, 0x73050aa0, 0x00460e05, 0x00000000 },
+	{ 0x00040061, 0x75050aa0, 0x00461005, 0x00000000 },
+	{ 0x00040061, 0x77050aa0, 0x00461205, 0x00000000 },
+	{ 0x80040131, 0x00000004, 0x50007144, 0x00c40000 },
+};
+
 /* AUB annotation support */
 #define MAX_ANNOTATIONS	33
 struct annotations_context {
@@ -1088,4 +1106,16 @@ void gen11_render_copyfunc(struct intel_batchbuffer *batch,
 	_gen9_render_copyfunc(batch, context, src, src_x, src_y,
 			  width, height, dst, dst_x, dst_y, ps_kernel_gen11,
 			  sizeof(ps_kernel_gen11));
+}
+
+void gen12_render_copyfunc(struct intel_batchbuffer *batch,
+			   drm_intel_context *context,
+			   const struct igt_buf *src, unsigned src_x, unsigned src_y,
+			   unsigned width, unsigned height,
+			   const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
+
+{
+	_gen9_render_copyfunc(batch, context, src, src_x, src_y,
+			  width, height, dst, dst_x, dst_y, gen12_render_copy,
+			  sizeof(gen12_render_copy));
 }
