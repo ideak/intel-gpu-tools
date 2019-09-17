@@ -792,9 +792,6 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 	uint64_t huge_object_size, i;
 	unsigned mode = CHECK_RAM;
 
-	igt_fail_on_f(intel_gen(devid) >= 11 && ncpus > 1,
-		      "Please adjust your expectations, https://bugs.freedesktop.org/show_bug.cgi?id=110882\n");
-
 	switch (huge) {
 	case -2:
 		huge_object_size = gem_mappable_aperture_size() / 4;
@@ -1138,17 +1135,34 @@ igt_main
 			for (const struct copy_mode *m = copy_modes; m->suffix; m++) {
 				igt_subtest_f("%s-copy%s", s->prefix, m->suffix)
 					test_huge_copy(fd,
-							s->size,
-							m->tiling_x,
-							m->tiling_y,
-							1);
+						       s->size,
+						       m->tiling_x,
+						       m->tiling_y,
+						       1);
+
+				igt_subtest_f("cpuset-%s-copy%s", s->prefix, m->suffix) {
+					cpu_set_t cpu, old;
+
+					sched_getaffinity(0, sizeof(old), &old);
+
+					CPU_ZERO(&cpu);
+					CPU_SET(0, &cpu);
+					igt_assert(sched_setaffinity(0, sizeof(cpu), &cpu) == 0);
+					test_huge_copy(fd,
+						       s->size,
+						       m->tiling_x,
+						       m->tiling_y,
+						       2);
+
+					igt_assert(sched_setaffinity(0, sizeof(old), &old) == 0);
+				}
 
 				igt_subtest_f("forked-%s-copy%s", s->prefix, m->suffix)
 					test_huge_copy(fd,
-							s->size,
-							m->tiling_x,
-							m->tiling_y,
-							ncpus);
+						       s->size,
+						       m->tiling_x,
+						       m->tiling_y,
+						       ncpus);
 			}
 	}
 
