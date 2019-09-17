@@ -173,6 +173,8 @@ static void run(int object_size)
 
 	fd = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(fd);
+	gem_require_blitter(fd);
+
 	devid = intel_get_drm_devid(fd);
 	handle = gem_create(fd, 4096);
 	src = gem_create(fd, object_size);
