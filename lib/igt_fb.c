@@ -80,6 +80,10 @@
 #define cairo_format_t int
 #endif
 
+#if PIXMAN_VERSION < PIXMAN_VERSION_ENCODE(0, 36, 0)
+#define PIXMAN_rgba_float PIXMAN_invalid
+#endif
+
 /* drm fourcc/cairo format maps */
 static const struct format_desc_struct {
 	const char *name;
@@ -172,6 +176,18 @@ static const struct format_desc_struct {
 	{ .name = "ABGR8888", .depth = -1, .drm_id = DRM_FORMAT_ABGR8888,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_a8b8g8r8,
+	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
+	},
+	{ .name = "ARGB2101010", .depth = 30, .drm_id = DRM_FORMAT_ARGB2101010,
+	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .pixman_id = PIXMAN_a2r10g10b10,
+	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
+	},
+	{ .name = "ABGR2101010", .depth = -1, .drm_id = DRM_FORMAT_ABGR2101010,
+	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .pixman_id = PIXMAN_a2b10g10r10,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
 	},
@@ -313,6 +329,7 @@ static const struct format_desc_struct {
 	},
 	{ .name = "IGT-FLOAT", .depth = -1, .drm_id = IGT_FORMAT_FLOAT,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .pixman_id = PIXMAN_rgba_float,
 	  .num_planes = 1, .plane_bpp = { 128 },
 	},
 };
@@ -3110,6 +3127,10 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 		default:
 			igt_assert_f(0, "Unsupported format %u", f->cairo_id);
 		}
+	} else if (PIXMAN_FORMAT_A(f->pixman_id) &&
+		   PIXMAN_FORMAT_R(f->pixman_id) > 8) {
+		cairo_id = CAIRO_FORMAT_RGBA128F;
+		drm_format = IGT_FORMAT_FLOAT;
 	} else if (PIXMAN_FORMAT_A(f->pixman_id)) {
 		cairo_id = CAIRO_FORMAT_ARGB32;
 		drm_format = DRM_FORMAT_ARGB8888;
