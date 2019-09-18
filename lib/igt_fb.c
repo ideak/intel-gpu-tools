@@ -3192,6 +3192,16 @@ void igt_fb_unmap_buffer(struct igt_fb *fb, void *buffer)
 	return unmap_bo(fb, buffer);
 }
 
+static bool use_convert(const struct igt_fb *fb)
+{
+	const struct format_desc_struct *f = lookup_drm_format(fb->drm_format);
+
+	return igt_format_is_yuv(fb->drm_format) ||
+		igt_format_is_fp16(fb->drm_format) ||
+		(f->cairo_id == CAIRO_FORMAT_INVALID &&
+		 f->pixman_id != PIXMAN_invalid);
+}
+
 /**
  * igt_get_cairo_surface:
  * @fd: open drm file descriptor
@@ -3208,10 +3218,7 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 	const struct format_desc_struct *f = lookup_drm_format(fb->drm_format);
 
 	if (fb->cairo_surface == NULL) {
-		if (igt_format_is_yuv(fb->drm_format) ||
-		    igt_format_is_fp16(fb->drm_format) ||
-		    ((f->cairo_id == CAIRO_FORMAT_INVALID) &&
-		     (f->pixman_id != PIXMAN_invalid)))
+		if (use_convert(fb))
 			create_cairo_surface__convert(fd, fb);
 		else if (use_blitter(fb) || use_rendercopy(fb) || igt_vc4_is_tiled(fb->modifier))
 			create_cairo_surface__gpu(fd, fb);
