@@ -220,6 +220,7 @@ install_headers(
   'igt_list.h',
   'intel_chipset.h',
   'i915/perf.h',
+  'i915/perf_data.h',
   subdir : 'i915-perf'
 )
 

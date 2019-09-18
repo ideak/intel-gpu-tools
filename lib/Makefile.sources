@@ -146,6 +146,7 @@ i915_perf_sources =			\
 	igt_list.c			\
 	i915/perf.c	 		\
 	i915/perf.h			\
+	i915/perf_data.h		\
 	i915/i915_perf_metrics.c	\
 	i915/i915_perf_metrics.h
 
