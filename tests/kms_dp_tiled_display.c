@@ -100,37 +100,29 @@ cleanup:
 
 static void get_number_of_h_tiles(data_t *data)
 {
-	int i;
+	igt_tile_info_t tile = {};
 	drmModeResPtr res;
-	drmModeConnectorPtr connector;
-	igt_tile_info_t tile = {.num_h_tile = 0};
 
 	igt_assert(res = drmModeGetResources(data->drm_fd));
 
-	for (i = 0; i < res->count_connectors; i++) {
+	for (int i = 0; !data->num_h_tiles && i < res->count_connectors; i++) {
+		drmModeConnectorPtr connector;
+
 		connector = drmModeGetConnectorCurrent(data->drm_fd,
 						       res->connectors[i]);
-
 		igt_assert(connector);
 
-		if (connector->connection != DRM_MODE_CONNECTED ||
-		    connector->connector_type != DRM_MODE_CONNECTOR_DisplayPort) {
-			drmModeFreeConnector(connector);
-			continue;
+		if (connector->connection == DRM_MODE_CONNECTED &&
+		    connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+			get_connector_tile_props(data, connector, &tile);
+
+			data->num_h_tiles = tile.num_h_tile;
 		}
 
-		get_connector_tile_props(data, connector, &tile);
-
-		if (tile.num_h_tile == 0) {
-			drmModeFreeConnector(connector);
-			continue;
-		}
-		data->num_h_tiles = tile.num_h_tile;
-		break;
+		drmModeFreeConnector(connector);
 	}
 
 	drmModeFreeResources(res);
-	drmModeFreeConnector(connector);
 }
 
 static void get_connectors(data_t *data)
