@@ -69,9 +69,11 @@ static bool has_prime_export(int fd)
 static igt_output_t *setup_display(int importer_fd, igt_display_t *display,
 				   enum pipe pipe)
 {
+	igt_output_t *output;
+
 	igt_display_require(display, importer_fd);
 	igt_skip_on(pipe >= display->n_pipes);
-	igt_output_t *output = igt_get_single_output_for_pipe(display, pipe);
+	output = igt_get_single_output_for_pipe(display, pipe);
 
 	igt_require_f(output, "No connector found for pipe %s\n",
 		      kmstest_pipe_name(pipe));
