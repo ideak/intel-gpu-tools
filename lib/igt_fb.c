@@ -157,6 +157,12 @@ static const struct format_desc_struct {
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
 	},
+	{ .name = "XBGB2101010", .depth = -1, .drm_id = DRM_FORMAT_XBGR2101010,
+	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .pixman_id = PIXMAN_x2b10g10r10,
+	  .num_planes = 1, .plane_bpp = { 32, },
+	  .hsub = 1, .vsub = 1,
+	},
 	{ .name = "ARGB8888", .depth = 32, .drm_id = DRM_FORMAT_ARGB8888,
 	  .cairo_id = CAIRO_FORMAT_ARGB32,
 	  .pixman_id = PIXMAN_a8r8g8b8,
@@ -3107,6 +3113,9 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	} else if (PIXMAN_FORMAT_A(f->pixman_id)) {
 		cairo_id = CAIRO_FORMAT_ARGB32;
 		drm_format = DRM_FORMAT_ARGB8888;
+	} else if (PIXMAN_FORMAT_R(f->pixman_id) > 8) {
+		cairo_id = CAIRO_FORMAT_RGB30;
+		drm_format = DRM_FORMAT_XRGB2101010;
 	} else {
 		cairo_id = CAIRO_FORMAT_RGB24;
 		drm_format = DRM_FORMAT_XRGB8888;
