@@ -281,6 +281,12 @@ int main(int argc, char *argv[])
 		test_dc_state_dpms(&data, CHECK_DC5);
 	}
 
+	igt_describe("This test validates display engine entry to DC5 state "
+		     "while all connectors's DPMS property set to OFF");
+	igt_subtest("dc6-dpms") {
+		test_dc_state_dpms(&data, CHECK_DC6);
+	}
+
 	igt_fixture {
 		close(data.debugfs_fd);
 		display_fini(&data);
