@@ -44,6 +44,7 @@ typedef struct {
 	enum psr_mode op_psr_mode;
 	drmModeModeInfo *mode;
 	igt_output_t *output;
+	bool runtime_suspend_disabled;
 } data_t;
 
 static bool dc_state_wait_entry(int drm_fd, int dc_flag, int prev_dc_count);
@@ -171,6 +172,67 @@ static void test_dc_state_psr(data_t *data, int dc_flag)
 	cleanup_dc_psr(data);
 }
 
+static void cleanup_dc_dpms(data_t *data)
+{
+	/*
+	 * if runtime PM is disabled for i915 restore it,
+	 * so any other sub-test can use runtime-PM.
+	 */
+	if (data->runtime_suspend_disabled) {
+		igt_restore_runtime_pm();
+		igt_setup_runtime_pm();
+	}
+}
+
+static void setup_dc_dpms(data_t *data)
+{
+	if (IS_BROXTON(data->devid) || IS_GEMINILAKE(data->devid) ||
+	    AT_LEAST_GEN(data->devid, 11)) {
+		igt_disable_runtime_pm();
+		data->runtime_suspend_disabled = true;
+	} else {
+		data->runtime_suspend_disabled = false;
+	}
+}
+
+static void dpms_off(data_t *data)
+{
+	for (int i = 0; i < data->display.n_outputs; i++) {
+		kmstest_set_connector_dpms(data->drm_fd,
+					   data->display.outputs[i].config.connector,
+					   DRM_MODE_DPMS_OFF);
+	}
+
+	if (!data->runtime_suspend_disabled)
+		igt_assert(igt_wait_for_pm_status
+			   (IGT_RUNTIME_PM_STATUS_SUSPENDED));
+}
+
+static void dpms_on(data_t *data)
+{
+	for (int i = 0; i < data->display.n_outputs; i++) {
+		kmstest_set_connector_dpms(data->drm_fd,
+					   data->display.outputs[i].config.connector,
+					   DRM_MODE_DPMS_ON);
+	}
+
+	if (!data->runtime_suspend_disabled)
+		igt_assert(igt_wait_for_pm_status
+			   (IGT_RUNTIME_PM_STATUS_ACTIVE));
+}
+
+static void test_dc_state_dpms(data_t *data, int dc_flag)
+{
+	uint32_t dc_counter;
+
+	setup_dc_dpms(data);
+	dc_counter = read_dc_counter(data->drm_fd, dc_flag);
+	dpms_off(data);
+	check_dc_counter(data->drm_fd, dc_flag, dc_counter);
+	dpms_on(data);
+	cleanup_dc_dpms(data);
+}
+
 IGT_TEST_DESCRIPTION("These tests validate Display Power DC states");
 int main(int argc, char *argv[])
 {
@@ -211,6 +273,12 @@ int main(int argc, char *argv[])
 		igt_require_f(edp_psr_sink_support(&data),
 			      "Sink does not support PSR\n");
 		test_dc_state_psr(&data, CHECK_DC6);
+	}
+
+	igt_describe("This test validates display engine entry to DC5 state "
+		     "while all connectors's DPMS property set to OFF");
+	igt_subtest("dc5-dpms") {
+		test_dc_state_dpms(&data, CHECK_DC5);
 	}
 
 	igt_fixture {
