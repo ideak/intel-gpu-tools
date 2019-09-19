@@ -52,11 +52,6 @@
 #include "igt_device.h"
 #include "igt_edid.h"
 
-#define MSR_PKG_CST_CONFIG_CONTROL	0xE2
-/* HSW/BDW: */
-#define  PKG_CST_LIMIT_MASK		0xF
-#define  PKG_CST_LIMIT_C8		0x6
-
 #define MSR_PC8_RES	0x630
 #define MSR_PC9_RES	0x631
 #define MSR_PC10_RES	0x632
@@ -123,8 +118,6 @@ struct modeset_params lpsp_mode_params;
 struct modeset_params non_lpsp_mode_params;
 struct modeset_params *default_mode_params;
 
-static int8_t *pm_data = NULL;
-
 static int modprobe(const char *driver)
 {
 	return igt_kmod_load(driver, NULL);
@@ -146,15 +139,7 @@ static bool supports_pc8_plus_residencies(void)
 	if (rc != sizeof(val))
 		return false;
 
-	rc = pread(msr_fd, &val, sizeof(uint64_t), MSR_PKG_CST_CONFIG_CONTROL);
-	if (rc != sizeof(val))
-		return false;
-	if ((val & PKG_CST_LIMIT_MASK) < PKG_CST_LIMIT_C8) {
-		igt_info("PKG C-states limited below PC8 by the BIOS\n");
-		return false;
-	}
-
-	return true;
+	return igt_pm_pc8_plus_residencies_enabled(msr_fd);
 }
 
 static uint64_t get_residency(uint32_t type)
@@ -755,21 +740,6 @@ static void setup_pc8(void)
 	has_pc8 = true;
 }
 
-static bool dmc_loaded(void)
-{
-	char buf[15];
-	int len;
-
-	len = igt_sysfs_read(debugfs, "i915_dmc_info", buf, sizeof(buf) - 1);
-	if (len < 0)
-	    return true; /* no CSR support, no DMC requirement */
-
-	buf[len] = '\0';
-
-	igt_info("DMC: %s\n", buf);
-	return strstr(buf, "fw loaded: yes");
-}
-
 static void dump_file(int dir, const char *filename)
 {
 	char *contents;
@@ -796,7 +766,7 @@ static bool setup_environment(void)
 
 	init_mode_set_data(&ms_data);
 
-	pm_data = igt_pm_enable_sata_link_power_management();
+	igt_pm_enable_sata_link_power_management();
 
 	has_runtime_pm = igt_setup_runtime_pm();
 	setup_pc8();
@@ -804,7 +774,7 @@ static bool setup_environment(void)
 	igt_info("Runtime PM support: %d\n", has_runtime_pm);
 	igt_info("PC8 residency support: %d\n", has_pc8);
 	igt_require(has_runtime_pm);
-	igt_require(dmc_loaded());
+	igt_require(igt_pm_dmc_loaded(debugfs));
 
 out:
 	disable_all_screens(&ms_data);
@@ -821,8 +791,7 @@ static void teardown_environment(void)
 
 	igt_restore_runtime_pm();
 
-	igt_pm_restore_sata_link_power_management(pm_data);
-	free(pm_data);
+	igt_pm_restore_sata_link_power_management();
 
 	fini_mode_set_data(&ms_data);
 

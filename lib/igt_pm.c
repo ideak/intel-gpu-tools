@@ -38,6 +38,7 @@
 #include "drmtest.h"
 #include "igt_pm.h"
 #include "igt_aux.h"
+#include "igt_sysfs.h"
 
 /**
  * SECTION:igt_pm
@@ -58,15 +59,29 @@ enum {
 	POLICY_MIN_POWER = 2
 };
 
+#define MSR_PKG_CST_CONFIG_CONTROL	0xE2
+/*
+ * Below PKG CST limit mask and PC8 bits are meant for
+ * HSW,BDW SKL,ICL and Goldmont Microarch and future platforms.
+ * Refer IA S/W developers manual vol3c part3 chapter:35
+ */
+#define  PKG_CST_LIMIT_MASK		0xF
+#define  PKG_CST_LIMIT_C8		0x6
+
 #define MAX_PERFORMANCE_STR	"max_performance\n"
 #define MEDIUM_POWER_STR	"medium_power\n"
 #define MIN_POWER_STR		"min_power\n"
 /* Remember to fix this if adding longer strings */
 #define MAX_POLICY_STRLEN	strlen(MAX_PERFORMANCE_STR)
+int8_t *__sata_pm_policies;
+int __scsi_host_cnt;
 
 static char __igt_pm_audio_runtime_power_save[64];
 static char * __igt_pm_audio_runtime_control_path;
 static char __igt_pm_audio_runtime_control[64];
+
+static void __igt_pm_sata_link_pm_exit_handler(int sig);
+static void __igt_pm_restore_sata_link_power_management(void);
 
 static int __igt_pm_audio_restore_runtime_pm(void)
 {
@@ -280,39 +295,26 @@ void igt_pm_enable_audio_runtime_pm(void)
 		igt_debug("Failed to enable audio runtime PM! (%d)\n", -err);
 }
 
-/**
- * igt_pm_enable_sata_link_power_management:
- *
- * Enable the min_power policy for SATA link power management.
- * Without this we cannot reach deep runtime power states.
- *
- * We don't have any assertions on open since the system might not have
- * a SATA host.
- *
- * Returns:
- * An opaque pointer to the data needed to restore the default values
- * after the test has terminated, or NULL if SATA link power management
- * is not supported. This pointer should be freed when no longer used
- * (typically after having called restore_sata_link_power_management()).
- */
-int8_t *igt_pm_enable_sata_link_power_management(void)
+static void __igt_pm_enable_sata_link_power_management(void)
 {
 	int fd, i;
 	ssize_t len;
 	char *buf;
 	char *file_name;
-	int8_t *link_pm_policies = NULL;
+	int8_t policy;
 
 	file_name = malloc(PATH_MAX);
 	buf = malloc(MAX_POLICY_STRLEN + 1);
 
-	for (i = 0; ; i++) {
-		int8_t policy;
-
+	for (__scsi_host_cnt = 0; ; __scsi_host_cnt++) {
 		snprintf(file_name, PATH_MAX,
 			 "/sys/class/scsi_host/host%d/link_power_management_policy",
-			 i);
+			 __scsi_host_cnt);
 
+		/*
+		 * We don't have any assertions on open since the system
+		 * might not have a SATA host.
+		 */
 		fd = open(file_name, O_RDWR);
 		if (fd < 0)
 			break;
@@ -332,12 +334,26 @@ int8_t *igt_pm_enable_sata_link_power_management(void)
 		else
 			policy = POLICY_UNKNOWN;
 
-		if (!(i % 256))
-			link_pm_policies = realloc(link_pm_policies,
-						   (i / 256 + 1) * 256 + 1);
+		if (!(__scsi_host_cnt % 256))
+			__sata_pm_policies = realloc(__sata_pm_policies,
+						     (__scsi_host_cnt / 256 + 1)
+						     * 256 + 1);
 
-		link_pm_policies[i] = policy;
-		link_pm_policies[i + 1] = 0;
+		__sata_pm_policies[__scsi_host_cnt] = policy;
+		close(fd);
+	}
+
+	igt_install_exit_handler(__igt_pm_sata_link_pm_exit_handler);
+
+	for (i = 0; i < __scsi_host_cnt; i++) {
+		snprintf(file_name, PATH_MAX,
+			 "/sys/class/scsi_host/host%d/link_power_management_policy",
+			 i);
+		fd = open(file_name, O_RDWR);
+		if (fd < 0)
+			break;
+
+		policy = __sata_pm_policies[i];
 
 		/* If the policy is something we don't know about,
 		 * don't touch it, since we might potentially break things.
@@ -355,39 +371,25 @@ int8_t *igt_pm_enable_sata_link_power_management(void)
 	}
 	free(buf);
 	free(file_name);
-
-	return link_pm_policies;
 }
 
-/**
- * igt_pm_restore_sata_link_power_management:
- * @pm_data: An opaque pointer with saved link PM policies;
- *           If NULL is passed we force enable the "max_performance" policy.
- *
- * Restore the link power management policies to the values
- * prior to enabling min_power.
- *
- * Caveat: If the system supports hotplugging and hotplugging takes
- *         place during our testing so that the hosts change numbers
- *         we might restore the settings to the wrong hosts.
- */
-void igt_pm_restore_sata_link_power_management(int8_t *pm_data)
-
+static void __igt_pm_restore_sata_link_power_management(void)
 {
 	int fd, i;
 	char *file_name;
 
+	if (!__sata_pm_policies)
+		return;
+
 	/* Disk runtime PM policies. */
 	file_name = malloc(PATH_MAX);
-	for (i = 0; ; i++) {
+	for (i = 0; i < __scsi_host_cnt; i++) {
 		int8_t policy;
 
-		if (!pm_data)
-			policy = POLICY_MAX_PERFORMANCE;
-		else if (pm_data[i] == POLICY_UNKNOWN)
+		if (__sata_pm_policies[i] == POLICY_UNKNOWN)
 			continue;
 		else
-			policy = pm_data[i];
+			policy = __sata_pm_policies[i];
 
 		snprintf(file_name, PATH_MAX,
 			 "/sys/class/scsi_host/host%d/link_power_management_policy",
@@ -421,7 +423,48 @@ void igt_pm_restore_sata_link_power_management(int8_t *pm_data)
 		close(fd);
 	}
 	free(file_name);
+	free(__sata_pm_policies);
+	__sata_pm_policies = NULL;
 }
+
+/**
+ * igt_pm_enable_sata_link_power_management:
+ *
+ * Enable the min_power policy for SATA link power management.
+ * Without this we cannot reach deep runtime power states.
+ */
+void igt_pm_enable_sata_link_power_management(void)
+{
+	/* Check if has been already saved. */
+	if (__sata_pm_policies)
+		return;
+
+	 __igt_pm_enable_sata_link_power_management();
+}
+
+/**
+ * igt_pm_restore_sata_link_power_management:
+ *
+ * Restore the link power management policies to the values
+ * prior to enabling min_power.
+ *
+ * Caveat: If the system supports hotplugging and hotplugging takes
+ *         place during our testing so that the hosts change numbers
+ *         we might restore the settings to the wrong hosts.
+ */
+void igt_pm_restore_sata_link_power_management(void)
+{
+	if (!__sata_pm_policies)
+		return;
+
+	 __igt_pm_restore_sata_link_power_management();
+}
+
+static void __igt_pm_sata_link_pm_exit_handler(int sig)
+{
+	__igt_pm_restore_sata_link_power_management();
+}
+
 #define POWER_DIR "/sys/devices/pci0000:00/0000:00:02.0/power"
 /* We just leak this on exit ... */
 int pm_status_fd = -1;
@@ -586,6 +629,34 @@ bool igt_setup_runtime_pm(void)
 }
 
 /**
+ * igt_disable_runtime_pm:
+ *
+ * Disable the runtime pm for i915 device.
+ * igt_disable_runtime_pm assumes that igt_setup_runtime_pm has already
+ * called to save runtime autosuspend and control attributes.
+ */
+void igt_disable_runtime_pm(void)
+{
+	int fd;
+	ssize_t size;
+	char buf[6];
+
+	igt_assert_fd(pm_status_fd);
+
+	/* We know we support runtime PM, let's try to disable it now. */
+	fd = open(POWER_DIR "/control", O_RDWR);
+	igt_assert_f(fd >= 0, "Can't open " POWER_DIR "/control\n");
+
+	size = write(fd, "on\n", 3);
+	igt_assert(size == 3);
+	lseek(fd, 0, SEEK_SET);
+	size = read(fd, buf, ARRAY_SIZE(buf));
+	igt_assert(size == 3);
+	igt_assert(strncmp(buf, "on\n", 3) == 0);
+	close(fd);
+}
+
+/**
  * igt_get_runtime_pm_status:
  *
  * Returns: The current runtime PM status.
@@ -627,4 +698,54 @@ enum igt_runtime_pm_status igt_get_runtime_pm_status(void)
 bool igt_wait_for_pm_status(enum igt_runtime_pm_status status)
 {
 	return igt_wait(igt_get_runtime_pm_status() == status, 10000, 100);
+}
+
+/**
+ * dmc_loaded:
+ * @debugfs: fd to the debugfs dir.
+ *
+ * Check whether DMC FW is loaded or not. DMC FW is require for few Display C
+ * states like DC5 and DC6. FW does the Context Save and Restore during Display
+ * C States entry and exit.
+ *
+ * Returns:
+ * True if DMC FW is loaded otherwise false.
+ */
+bool igt_pm_dmc_loaded(int debugfs)
+{
+	char buf[15];
+	int len;
+
+	len = igt_sysfs_read(debugfs, "i915_dmc_info", buf, sizeof(buf) - 1);
+	if (len < 0)
+		return true; /* no CSR support, no DMC requirement */
+
+	buf[len] = '\0';
+
+	igt_info("DMC: %s\n", buf);
+	return strstr(buf, "fw loaded: yes");
+}
+
+/**
+ * igt_pm_pc8_plus_residencies_enabled:
+ * @msr_fd: fd to /dev/cpu/0/msr
+ * Check whether BIOS has disabled the PC8 package deeper state.
+ *
+ * Returns:
+ * True if PC8+ package deeper state enabled on machine otherwise false.
+ */
+bool igt_pm_pc8_plus_residencies_enabled(int msr_fd)
+{
+	int rc;
+	uint64_t val;
+
+	rc = pread(msr_fd, &val, sizeof(uint64_t), MSR_PKG_CST_CONFIG_CONTROL);
+	if (rc != sizeof(val))
+		return false;
+	if ((val & PKG_CST_LIMIT_MASK) < PKG_CST_LIMIT_C8) {
+		igt_info("PKG C-states limited below PC8 by the BIOS\n");
+		return false;
+	}
+
+	return true;
 }

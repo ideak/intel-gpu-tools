@@ -47,7 +47,6 @@ struct context {
 #define FADESPEED 100 /* milliseconds between steps */
 
 IGT_TEST_DESCRIPTION("Basic backlight sysfs test");
-static int8_t *pm_data = NULL;
 
 static int backlight_read(int *result, const char *fname)
 {
@@ -235,7 +234,7 @@ igt_main
 		igt_plane_set_fb(primary, &fb);
 
 		igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
-		pm_data = igt_pm_enable_sata_link_power_management();
+		igt_pm_enable_sata_link_power_management();
 	}
 
 	igt_subtest("basic-brightness")
@@ -255,8 +254,7 @@ igt_main
 
 		igt_display_fini(&display);
 		igt_remove_fb(display.drm_fd, &fb);
-		igt_pm_restore_sata_link_power_management(pm_data);
-		free(pm_data);
+		igt_pm_restore_sata_link_power_management();
 		close(display.drm_fd);
 	}
 }

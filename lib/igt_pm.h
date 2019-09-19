@@ -25,8 +25,8 @@
 #define IGT_PM_H
 
 void igt_pm_enable_audio_runtime_pm(void);
-int8_t *igt_pm_enable_sata_link_power_management(void);
-void igt_pm_restore_sata_link_power_management(int8_t *pm_data);
+void igt_pm_enable_sata_link_power_management(void);
+void igt_pm_restore_sata_link_power_management(void);
 
 /**
  * igt_runtime_pm_status:
@@ -47,8 +47,11 @@ enum igt_runtime_pm_status {
 };
 
 bool igt_setup_runtime_pm(void);
+void igt_disable_runtime_pm(void);
 void igt_restore_runtime_pm(void);
 enum igt_runtime_pm_status igt_get_runtime_pm_status(void);
 bool igt_wait_for_pm_status(enum igt_runtime_pm_status status);
+bool igt_pm_dmc_loaded(int debugfs);
+bool igt_pm_pc8_plus_residencies_enabled(int msr_fd);
 
 #endif /* IGT_PM_H */
