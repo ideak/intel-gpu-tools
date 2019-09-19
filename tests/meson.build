@@ -231,6 +231,7 @@ i915_progs = [
 	'i915_pm_lpsp',
 	'i915_pm_rc6_residency',
 	'i915_pm_rpm',
+	'i915_pm_dc',
 	'i915_pm_rps',
 	'i915_pm_sseu',
 	'i915_query',

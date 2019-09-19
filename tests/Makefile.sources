@@ -508,6 +508,9 @@ i915_pm_rc6_residency_SOURCES = i915/i915_pm_rc6_residency.c
 TESTS_progs += i915_pm_rpm
 i915_pm_rpm_SOURCES = i915/i915_pm_rpm.c
 
+TESTS_progs += i915_pm_dc
+i915_pm_dc_SOURCES = i915/i915_pm_dc.c
+
 TESTS_progs += i915_pm_rps
 i915_pm_rps_SOURCES = i915/i915_pm_rps.c
 
