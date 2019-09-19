@@ -203,6 +203,16 @@ int main(int argc, char *argv[])
 		test_dc_state_psr(&data, CHECK_DC5);
 	}
 
+	igt_describe("This test validates display engine entry to DC6 state "
+		     "while PSR is active");
+	igt_subtest("dc6-psr") {
+		data.op_psr_mode = PSR_MODE_1;
+		psr_enable(data.debugfs_fd, data.op_psr_mode);
+		igt_require_f(edp_psr_sink_support(&data),
+			      "Sink does not support PSR\n");
+		test_dc_state_psr(&data, CHECK_DC6);
+	}
+
 	igt_fixture {
 		close(data.debugfs_fd);
 		display_fini(&data);
