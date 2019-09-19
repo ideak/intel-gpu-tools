@@ -23,10 +23,12 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include "igt.h"
+#include "igt_kmod.h"
 #include "igt_psr.h"
 #include "igt_sysfs.h"
 #include "limits.h"
@@ -37,6 +39,7 @@
 
 typedef struct {
 	int drm_fd;
+	int msr_fd;
 	int debugfs_fd;
 	uint32_t devid;
 	igt_display_t display;
@@ -253,6 +256,12 @@ int main(int argc, char *argv[])
 		igt_require(has_runtime_pm);
 		igt_require(igt_pm_dmc_loaded(data.debugfs_fd));
 		igt_display_require(&data.display, data.drm_fd);
+		/* Make sure our Kernel supports MSR and the module is loaded */
+		igt_require(igt_kmod_load("msr", NULL) == 0);
+
+		data.msr_fd = open("/dev/cpu/0/msr", O_RDONLY);
+		igt_assert_f(data.msr_fd >= 0,
+			     "Can't open /dev/cpu/0/msr.\n");
 	}
 
 	igt_describe("This test validates display engine entry to DC5 state "
@@ -272,6 +281,8 @@ int main(int argc, char *argv[])
 		psr_enable(data.debugfs_fd, data.op_psr_mode);
 		igt_require_f(edp_psr_sink_support(&data),
 			      "Sink does not support PSR\n");
+		igt_require_f(igt_pm_pc8_plus_residencies_enabled(data.msr_fd),
+			      "PC8+ residencies not supported\n");
 		test_dc_state_psr(&data, CHECK_DC6);
 	}
 
@@ -284,11 +295,14 @@ int main(int argc, char *argv[])
 	igt_describe("This test validates display engine entry to DC5 state "
 		     "while all connectors's DPMS property set to OFF");
 	igt_subtest("dc6-dpms") {
+		igt_require_f(igt_pm_pc8_plus_residencies_enabled(data.msr_fd),
+			      "PC8+ residencies not supported\n");
 		test_dc_state_dpms(&data, CHECK_DC6);
 	}
 
 	igt_fixture {
 		close(data.debugfs_fd);
+		close(data.msr_fd);
 		display_fini(&data);
 	}
 
