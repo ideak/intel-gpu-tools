@@ -176,7 +176,8 @@ static void test_atomic_commit_hang(igt_display_t *dpy, igt_plane_t *primary,
 {
 	igt_spin_t *t = igt_spin_new(dpy->drm_fd,
 				     .engine = ring,
-				     .dependency = busy_fb->gem_handle);
+				     .dependency = busy_fb->gem_handle,
+				     .flags = IGT_SPIN_NO_PREEMPTION);
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
 	unsigned flags = 0;
 	struct drm_event_vblank ev;
