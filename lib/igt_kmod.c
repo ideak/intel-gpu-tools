@@ -374,25 +374,34 @@ igt_i915_driver_unload(void)
 
 static void kmsg_dump(int fd)
 {
-	FILE *file;
+	char record[4096 + 1];
 
-	file = NULL;
-	if (fd != -1)
-		file = fdopen(fd, "r");
-	if (file) {
-		size_t len = 0;
-		char *line = NULL;
+	if (fd == -1) {
+		igt_warn("Unable to retrieve kernel log (from /dev/kmsg)\n");
+		return;
+	}
 
-		while (getline(&line, &len, file) != -1) {
-			char *start = strchr(line, ':');
-			if (start)
-				igt_warn("%s", start + 2);
+	record[sizeof(record) - 1] = '\0';
+
+	for (;;) {
+		const char *start, *end;
+		ssize_t r;
+
+		r = read(fd, record, sizeof(record) - 1);
+		if (r < 0) {
+			if (errno == EINTR)
+				continue;
+			if (errno != EAGAIN)
+				igt_warn("kmsg truncated due to unknown error: %m\n");
+			break;
 		}
 
-		free(line);
-		fclose(file);
-	} else {
-		igt_warn("Unable to retrieve kernel log (from /dev/kmsg)\n");
+		start = strchr(record, ';');
+		if (start) {
+			start++;
+			end = strchrnul(start, '\n');
+			igt_warn("%.*s\n", (int)(end - start), start);
+		}
 	}
 }
 
