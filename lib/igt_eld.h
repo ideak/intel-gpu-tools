@@ -52,5 +52,6 @@ struct eld_entry {
 bool eld_is_supported(void);
 bool eld_get_igt(struct eld_entry *eld);
 bool eld_has_igt(void);
+bool eld_is_igt(const char *eld, size_t eld_size);
 
 #endif

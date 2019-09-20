@@ -283,3 +283,32 @@ bool eld_is_supported(void)
 
 	return has_elds;
 }
+
+#define ELD_MAX_SIZE 256
+#define MONITOR_NAME_OFFSET 20
+#define MONITOR_NAME_MAX_SIZE 16
+
+/** eld_is_igt: check whether the ELD blob comes from an IGT EDID */
+bool eld_is_igt(const char *eld, size_t eld_size)
+{
+	char name[MONITOR_NAME_MAX_SIZE + 1];
+	int name_size;
+
+	igt_assert_f(eld_size >= MONITOR_NAME_OFFSET &&
+		     eld_size <= ELD_MAX_SIZE,
+		     "Invalid ELD size: %zu\n", eld_size);
+
+	name_size = eld[4] & 0x1F;
+	igt_assert_f(name_size <= MONITOR_NAME_MAX_SIZE &&
+		     MONITOR_NAME_OFFSET + name_size <= eld_size,
+		     "Invalid monitor name size in ELD: %d\n", name_size);
+	if (name_size == 0) {
+		igt_debug("ELD doesn't contain a monitor name\n");
+		return false;
+	}
+
+	memcpy(name, &eld[MONITOR_NAME_OFFSET], name_size);
+	name[name_size] = '\0';
+	igt_debug("Checking ELD with monitor name: %s\n", name);
+	return strcmp(name, "IGT") == 0;
+}
