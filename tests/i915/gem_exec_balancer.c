@@ -30,6 +30,15 @@
 
 IGT_TEST_DESCRIPTION("Exercise in-kernel load-balancing");
 
+#define MI_SEMAPHORE_WAIT		(0x1c << 23)
+#define   MI_SEMAPHORE_POLL             (1 << 15)
+#define   MI_SEMAPHORE_SAD_GT_SDD       (0 << 12)
+#define   MI_SEMAPHORE_SAD_GTE_SDD      (1 << 12)
+#define   MI_SEMAPHORE_SAD_LT_SDD       (2 << 12)
+#define   MI_SEMAPHORE_SAD_LTE_SDD      (3 << 12)
+#define   MI_SEMAPHORE_SAD_EQ_SDD       (4 << 12)
+#define   MI_SEMAPHORE_SAD_NEQ_SDD      (5 << 12)
+
 #define INSTANCE_COUNT (1 << I915_PMU_SAMPLE_INSTANCE_BITS)
 
 static size_t sizeof_load_balance(int count)
@@ -694,6 +703,157 @@ static void bonded(int i915, unsigned int flags)
 	gem_context_destroy(i915, master);
 }
 
+static unsigned int offset_in_page(void *addr)
+{
+	return (uintptr_t)addr & 4095;
+}
+
+static uint32_t create_semaphore_to_spinner(int i915, igt_spin_t *spin)
+{
+	uint32_t *cs, *map;
+	uint32_t handle;
+	uint64_t addr;
+
+	handle = gem_create(i915, 4096);
+	cs = map = gem_mmap__cpu(i915, handle, 0, 4096, PROT_WRITE);
+
+	/* Wait until the spinner is running */
+	addr = spin->obj[0].offset + 4 * SPIN_POLL_START_IDX;
+	*cs++ = MI_SEMAPHORE_WAIT |
+		MI_SEMAPHORE_POLL |
+		MI_SEMAPHORE_SAD_NEQ_SDD |
+		(4 - 2);
+	*cs++ = 0;
+	*cs++ = addr;
+	*cs++ = addr >> 32;
+
+	/* Then cancel the spinner */
+	addr = spin->obj[IGT_SPIN_BATCH].offset +
+		offset_in_page(spin->condition);
+	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = addr;
+	*cs++ = addr >> 32;
+	*cs++ = MI_BATCH_BUFFER_END;
+
+	*cs++ = MI_BATCH_BUFFER_END;
+	munmap(map, 4096);
+
+	return handle;
+}
+
+static void bonded_slice(int i915)
+{
+	uint32_t ctx;
+	int *stop;
+
+	/*
+	 * Mix and match bonded/parallel execution of multiple requests in
+	 * the presence of background load and timeslicing [preemption].
+	 */
+
+	igt_require(gem_scheduler_has_semaphores(i915));
+
+	stop = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(stop != MAP_FAILED);
+
+	ctx = gem_context_create(i915); /* NB timeline per engine */
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *siblings;
+		struct drm_i915_gem_exec_object2 obj[3] = {};
+		struct drm_i915_gem_execbuffer2 eb = {};
+		unsigned int count;
+		igt_spin_t *spin;
+
+		siblings = list_engines(i915, 1u << class, &count);
+		if (!siblings)
+			continue;
+
+		if (count < 2) {
+			free(siblings);
+			continue;
+		}
+
+		/*
+		 * A: semaphore wait on spinner on a real engine; cancel spinner
+		 * B: unpreemptable spinner on virtual engine
+		 *
+		 * A waits for running ack from B, if scheduled on the same
+		 * engine -> hang.
+		 *
+		 * C+: background load across engines to trigger timeslicing
+		 *
+		 * XXX add explicit bonding options for A->B
+		 */
+
+		set_load_balancer(i915, ctx, siblings, count, NULL);
+
+		spin = __igt_spin_new(i915,
+				      .ctx = ctx,
+				      .flags = (IGT_SPIN_NO_PREEMPTION |
+						IGT_SPIN_POLL_RUN));
+		igt_spin_end(spin); /* we just want its address for later */
+		gem_sync(i915, spin->handle);
+		igt_spin_reset(spin);
+
+		/* igt_spin_t poll and batch obj must be laid out as we expect */
+		igt_assert_eq(IGT_SPIN_BATCH, 1);
+		obj[0] = spin->obj[0];
+		obj[1] = spin->obj[1];
+		obj[2].handle = create_semaphore_to_spinner(i915, spin);
+
+		eb.buffers_ptr = to_user_pointer(obj);
+		eb.rsvd1 = ctx;
+
+		*stop = 0;
+		igt_fork(child, count + 1) { /* C: arbitrary background load */
+			igt_list_del(&spin->link);
+
+			ctx = gem_context_clone(i915, ctx,
+						I915_CONTEXT_CLONE_ENGINES, 0);
+
+			while (!READ_ONCE(*stop)) {
+				spin = igt_spin_new(i915,
+						    .ctx = ctx,
+						    .engine = (1 + rand() % count),
+						    .flags = IGT_SPIN_POLL_RUN);
+				igt_spin_busywait_until_started(spin);
+				usleep(50000);
+				igt_spin_free(i915, spin);
+			}
+
+			gem_context_destroy(i915, ctx);
+		}
+
+		igt_until_timeout(5) {
+			igt_spin_reset(spin); /* indirectly cancelled by A */
+
+			/* A: Submit the semaphore wait on a real engine */
+			eb.buffer_count = 3;
+			eb.flags = (1 + rand() % count) | I915_EXEC_FENCE_OUT;
+			gem_execbuf_wr(i915, &eb);
+
+			/* B: Submit the spinner (in parallel) on virtual [0] */
+			eb.buffer_count = 2;
+			eb.flags = 0 | I915_EXEC_FENCE_SUBMIT;
+			eb.rsvd2 >>= 32;
+			gem_execbuf(i915, &eb);
+			close(eb.rsvd2);
+
+			gem_sync(i915, obj[2].handle);
+		}
+
+		*stop = 1;
+		igt_waitchildren();
+
+		gem_close(i915, obj[2].handle);
+		igt_spin_free(i915, spin);
+	}
+
+	gem_context_destroy(i915, ctx);
+	munmap(stop, 4096);
+}
+
 static void indices(int i915)
 {
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
@@ -1319,6 +1479,9 @@ igt_main
 
 	igt_subtest("bonded-cork")
 		bonded(i915, CORK);
+
+	igt_subtest("bonded-slice")
+		bonded_slice(i915);
 
 	igt_fixture {
 		igt_stop_hang_detector();
