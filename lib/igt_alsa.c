@@ -31,6 +31,7 @@
 #include "igt_alsa.h"
 #include "igt_aux.h"
 #include "igt_core.h"
+#include "igt_eld.h"
 
 #define HANDLES_MAX	8
 
@@ -105,6 +106,68 @@ struct alsa *alsa_init(void)
 	return alsa;
 }
 
+static bool alsa_dev_has_igt_eld(snd_ctl_t *ctl, int dev)
+{
+	snd_hctl_t *handle;
+	snd_hctl_elem_t *elem;
+	snd_ctl_elem_info_t *info;
+	snd_ctl_elem_value_t *value;
+	const char *name;
+	snd_ctl_elem_type_t type;
+	unsigned int count;
+	const char *eld;
+	bool is_igt, eld_found;
+
+	igt_assert(snd_hctl_open_ctl(&handle, ctl) == 0);
+	igt_assert(snd_hctl_load(handle) == 0);
+	igt_assert(snd_ctl_elem_info_malloc(&info) == 0);
+	igt_assert(snd_ctl_elem_value_malloc(&value) == 0);
+
+	is_igt = eld_found = false;
+	for (elem = snd_hctl_first_elem(handle); elem;
+	     elem = snd_hctl_elem_next(elem)) {
+		igt_assert(snd_hctl_elem_info(elem, info) == 0);
+		name = snd_ctl_elem_info_get_name(info);
+		type = snd_ctl_elem_info_get_type(info);
+		count = snd_ctl_elem_info_get_count(info);
+
+		if (strcmp(name, "ELD") != 0)
+			continue;
+		igt_assert(type == SND_CTL_ELEM_TYPE_BYTES);
+		if (snd_ctl_elem_info_get_device(info) != dev)
+			continue;
+
+		eld_found = true;
+
+		igt_assert(snd_hctl_elem_read(elem, value) == 0);
+		if (count == 0) {
+			igt_debug("ELD found for device %s,%d, but it's empty "
+				  "(the screen is probably disconnected)\n",
+				  snd_hctl_name(handle), dev);
+			break;
+		}
+
+		igt_debug("ELD found for device %s,%d\n",
+			  snd_hctl_name(handle), dev);
+		eld = snd_ctl_elem_value_get_bytes(value);
+		is_igt = eld_is_igt(eld, count);
+		break;
+	}
+
+	if (!eld_found) {
+		/* ELDs are probably not supported */
+		igt_debug("ELD not found for device %s,%d, skipping ELD check\n",
+			  snd_hctl_name(handle), dev);
+		is_igt = true;
+	}
+
+	snd_ctl_elem_info_free(info);
+	snd_ctl_elem_value_free(value);
+	snd_hctl_free(handle);
+
+	return is_igt;
+}
+
 static char *alsa_resolve_indentifier(const char *device_name, int skip)
 {
 	snd_ctl_card_info_t *card_info;
@@ -148,7 +211,6 @@ static char *alsa_resolve_indentifier(const char *device_name, int skip)
 		}
 
 		dev = -1;
-
 		do {
 			ret = snd_ctl_pcm_next_device(handle, &dev);
 			if (ret < 0 || dev < 0)
@@ -167,21 +229,28 @@ static char *alsa_resolve_indentifier(const char *device_name, int skip)
 
 			ret = strncmp(device_name, pcm_name,
 				      strlen(device_name));
+			if (ret != 0)
+				continue;
 
-			if (ret == 0) {
-				if (skip > 0) {
-					skip--;
-					continue;
-				}
-
-				igt_debug("Matched device \"%s\"\n", pcm_name);
-
-				snprintf(name, sizeof(name), "hw:%d,%d", card,
-					 dev);
-
-				identifier = strdup(name);
-				goto resolved;
+			if (!alsa_dev_has_igt_eld(handle, dev)) {
+				igt_debug("Device hw:%d,%d matches the name "
+					  "but doesn't have an IGT ELD\n",
+					  card, dev);
+				continue;
 			}
+
+			if (skip > 0) {
+				skip--;
+				continue;
+			}
+
+			igt_debug("Matched device \"%s\" (hw:%d,%d)\n",
+				  pcm_name, card, dev);
+
+			snprintf(name, sizeof(name), "hw:%d,%d", card,
+				 dev);
+			identifier = strdup(name);
+			goto resolved;
 		} while (dev >= 0);
 
 		snd_ctl_close(handle);
