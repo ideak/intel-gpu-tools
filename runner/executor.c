@@ -609,7 +609,7 @@ static bool kill_child(int sig, pid_t child)
 	return true;
 }
 
-static const char *get_cmdline(pid_t pid, char *buf, size_t len)
+static const char *get_cmdline(pid_t pid, char *buf, ssize_t len)
 {
 	int fd;
 
@@ -625,7 +625,12 @@ static const char *get_cmdline(pid_t pid, char *buf, size_t len)
 	if (len < 0)
 		return "unknown";
 
-	buf[len] = '\0';
+	/* cmdline is the whole argv[], completed with NUL-terminators */
+	for (size_t i = 0; i < len; i++)
+		if (buf[i] == '\0')
+			buf[i] = ' ';
+
+	buf[len] = '\0'; /* but make sure that we return a valid string! */
 	return buf;
 }
 
@@ -907,7 +912,7 @@ static int monitor_output(pid_t child,
 			} else {
 				/* We're dying, so we're taking them with us */
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					char comm[80];
+					char comm[120];
 
 					outf("Abort requested by %s [%d] via %s, terminating children\n",
 					     get_cmdline(siginfo.ssi_pid, comm, sizeof(comm)),
