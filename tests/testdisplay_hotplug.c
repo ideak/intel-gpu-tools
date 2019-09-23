@@ -117,8 +117,10 @@ out:
 
 void testdisplay_cleanup_hotplug(void)
 {
-	if (udevchannel)
-		g_io_channel_shutdown(udevchannel, TRUE, NULL);
+	if (udevchannel) {
+		g_io_channel_flush(udevchannel, NULL);
+		g_io_channel_unref(udevchannel);
+	}
 	if (uevent_monitor)
 		udev_monitor_unref(uevent_monitor);
 	if (udev)
