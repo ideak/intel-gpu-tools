@@ -870,8 +870,11 @@ static void test_kms(int i915, igt_display_t *dpy)
 	igt_fork(child, 1)
 		display_helper(dpy, shared);
 
-	test_reset_stress(i915, 0);
-	test_reset_stress(i915, TEST_WEDGE);
+	test_inflight(i915, 0);
+	if (gem_has_contexts(i915)) {
+		test_reset_stress(i915, 0);
+		test_reset_stress(i915, TEST_WEDGE);
+	}
 
 	*shared = 1;
 	igt_waitchildren();
