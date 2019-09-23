@@ -715,6 +715,8 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 
 		data.batch = intel_batchbuffer_alloc(data.bufmgr, data.devid);
 		igt_assert(data.batch);
+
+		igt_fork_hang_detector(data.drm_fd);
 	}
 
 	igt_subtest("linear")
@@ -745,6 +747,7 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 		test(&data, I915_TILING_Yf, I915_TILING_Yf);
 
 	igt_fixture {
+		igt_stop_hang_detector();
 		intel_batchbuffer_free(data.batch);
 		drm_intel_bufmgr_destroy(data.bufmgr);
 	}
