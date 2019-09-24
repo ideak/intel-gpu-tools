@@ -630,6 +630,10 @@ static const char *get_cmdline(pid_t pid, char *buf, ssize_t len)
 		if (buf[i] == '\0')
 			buf[i] = ' ';
 
+	/* chomp away the trailing spaces */
+	while (len && buf[len - 1] == ' ')
+		--len;
+
 	buf[len] = '\0'; /* but make sure that we return a valid string! */
 	return buf;
 }
