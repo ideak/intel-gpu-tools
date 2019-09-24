@@ -130,7 +130,7 @@ static uint64_t pmu_read_multi(int fd, unsigned int num, uint64_t *val)
 #define __assert_within_epsilon(x, ref, tol_up, tol_down) \
 	igt_assert_f((double)(x) <= (1.0 + (tol_up)) * (double)(ref) && \
 		     (double)(x) >= (1.0 - (tol_down)) * (double)(ref), \
-		     "'%s' != '%s' (%f not within +%f%%/-%f%% tolerance of %f)\n",\
+		     "'%s' != '%s' (%f not within +%.1f%%/-%.1f%% tolerance of %f)\n",\
 		     #x, #ref, (double)(x), \
 		     (tol_up) * 100.0, (tol_down) * 100.0, \
 		     (double)(ref))
@@ -742,6 +742,94 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e,
 	close(fd);
 
 	assert_within_epsilon(val[1] - val[0], slept, tolerance);
+}
+
+static void
+__sema_busy(int gem_fd, int pmu,
+	    const struct intel_execution_engine2 *e,
+	    const struct intel_execution_engine2 *signal,
+	    int sema_pct,
+	    int busy_pct)
+{
+	enum {
+		SEMA = 0,
+		BUSY,
+	};
+	uint64_t total, sema, busy;
+	uint64_t start[2], val[2];
+	igt_spin_t *spin[2];
+
+	/* Time spent being busy includes time waiting on semaphores */
+	igt_assert(busy_pct >= sema_pct);
+
+	gem_quiescent_gpu(gem_fd);
+
+	spin[0] = igt_spin_new(gem_fd,
+			       .engine = signal->flags,
+			       .flags = IGT_SPIN_FENCE_OUT | IGT_SPIN_POLL_RUN);
+	spin[1] = igt_spin_new(gem_fd,
+			       .engine = e->flags,
+			       .fence = spin[0]->out_fence,
+			       .flags = IGT_SPIN_FENCE_IN);
+
+	igt_spin_busywait_until_started(spin[0]);
+
+	total = pmu_read_multi(pmu, 2, start);
+
+	sema = measured_usleep(batch_duration_ns * sema_pct / 100 / 1000);
+	igt_spin_end(spin[0]);
+	busy = measured_usleep(batch_duration_ns * (busy_pct - sema_pct) / 100 / 1000);
+	igt_spin_end(spin[1]);
+	measured_usleep(batch_duration_ns * (100 - busy_pct) / 100 / 1000);
+
+	total = pmu_read_multi(pmu, 2, val) - total;
+
+	busy += sema;
+	val[SEMA] -= start[SEMA];
+	val[BUSY] -= start[BUSY];
+
+	igt_info("%s<-%s, target: {%.1f%% [%d], %.1f%% [%d]}, measured: {%.1f%%, %.1f%%}\n",
+		 e->name, signal->name,
+		 sema * 100. / total, sema_pct,
+		 busy * 100. / total, busy_pct,
+		 val[SEMA] * 100. / total,
+		 val[BUSY] * 100. / total);
+
+	assert_within_epsilon(val[SEMA], sema, tolerance);
+	assert_within_epsilon(val[BUSY], busy, tolerance);
+	igt_assert_f(val[SEMA] < val[BUSY] * (1 + tolerance),
+		     "Semaphore time (%.3fus, %.1f%%) greater than total time busy (%.3fus, %.1f%%)!\n",
+		     val[SEMA] * 1e-3, val[SEMA] * 100. / total,
+		     val[BUSY] * 1e-3, val[BUSY] * 100. / total);
+
+	igt_spin_free(gem_fd, spin[1]);
+	igt_spin_free(gem_fd, spin[0]);
+}
+
+static void
+sema_busy(int gem_fd,
+	  const struct intel_execution_engine2 *e,
+	  unsigned int flags)
+{
+	const struct intel_execution_engine2 *signal;
+	int fd;
+
+	igt_require(gem_scheduler_has_semaphores(gem_fd));
+
+	fd = open_group(I915_PMU_ENGINE_SEMA(e->class, e->instance), -1);
+	open_group(I915_PMU_ENGINE_BUSY(e->class, e->instance), fd);
+
+	__for_each_physical_engine(gem_fd, signal) {
+		if (e->class == signal->class &&
+		    e->instance == signal->instance)
+			continue;
+
+		__sema_busy(gem_fd, fd, e, signal, 50, 100);
+		__sema_busy(gem_fd, fd, e, signal, 25, 50);
+		__sema_busy(gem_fd, fd, e, signal, 75, 75);
+	}
+
+	close(fd);
 }
 
 #define   MI_WAIT_FOR_PIPE_C_VBLANK (1<<21)
@@ -1773,6 +1861,9 @@ igt_main
 		igt_subtest_f("semaphore-wait-idle-%s", e->name)
 			sema_wait(fd, e,
 				  TEST_BUSY | TEST_TRAILING_IDLE);
+
+		igt_subtest_f("semaphore-busy-%s", e->name)
+			sema_busy(fd, e, 0);
 
 		/**
 		 * Check that two perf clients do not influence each
