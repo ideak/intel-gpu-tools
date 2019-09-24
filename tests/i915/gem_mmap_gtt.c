@@ -602,6 +602,9 @@ test_hang(int fd)
 
 				gtt[0][x] = patterns[next_pattern];
 				gtt[1][x] = patterns[next_pattern];
+
+				if (READ_ONCE(control->done))
+					break;
 			}
 
 			last_pattern = next_pattern;
