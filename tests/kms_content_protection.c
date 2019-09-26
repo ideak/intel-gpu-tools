@@ -617,26 +617,6 @@ test_content_protection(enum igt_commit_style s, int content_type)
 	igt_require_f(valid_tests, "No connector found with HDCP capability\n");
 }
 
-static void test_content_protection_cleanup(void)
-{
-	igt_display_t *display = &data.display;
-	igt_output_t *output;
-	uint64_t val;
-
-	for_each_connected_output(display, output) {
-		if (!output->props[IGT_CONNECTOR_CONTENT_PROTECTION])
-			continue;
-
-		val = igt_output_get_prop(output,
-					  IGT_CONNECTOR_CONTENT_PROTECTION);
-		if (val == CP_UNDESIRED)
-			continue;
-
-		igt_info("CP Prop being UNDESIRED on %s\n", output->name);
-		test_cp_disable(output, COMMIT_ATOMIC);
-	}
-}
-
 igt_main
 {
 	igt_fixture {
@@ -712,8 +692,6 @@ igt_main
 		test_content_protection(COMMIT_ATOMIC, HDCP_CONTENT_TYPE_0);
 	}
 
-	igt_fixture {
-		test_content_protection_cleanup();
+	igt_fixture
 		igt_display_fini(&data.display);
-	}
 }
