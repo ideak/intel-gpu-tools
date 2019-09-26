@@ -2113,6 +2113,8 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 	igt_subtest("module-reload") {
 		igt_debug("Reload w/o display\n");
 		igt_i915_driver_unload();
+
+		igt_kmsg(KMSG_INFO "Reloading i915 w/o display\n");
 		igt_assert_eq(igt_i915_driver_load("disable_display=1 mmio_debug=-1"), 0);
 
 		igt_assert(setup_environment());
@@ -2121,6 +2123,8 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 
 		igt_debug("Reload as normal\n");
 		igt_i915_driver_unload();
+
+		igt_kmsg(KMSG_INFO "Reloading i915 as normal\n");
 		igt_assert_eq(igt_i915_driver_load("mmio_debug=-1"), 0);
 
 		igt_assert(setup_environment());
