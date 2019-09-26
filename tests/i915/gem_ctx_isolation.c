@@ -579,6 +579,35 @@ static void nonpriv(int fd,
 			  __func__, v, values[v]);
 		write_regs(fd, ctx, e, flags, values[v]);
 
+		if (flags & DIRTY2) {
+			uint32_t sw = gem_context_create(fd);
+			igt_spin_t *syncpt, *dirt;
+
+			/* Explicit sync to keep the switch between write/read */
+			syncpt = igt_spin_new(fd,
+					      .ctx = ctx,
+					      .engine = engine,
+					      .flags = IGT_SPIN_FENCE_OUT);
+
+			dirt = igt_spin_new(fd,
+					    .ctx = sw,
+					    .engine = engine,
+					    .fence = syncpt->out_fence,
+					    .flags = (IGT_SPIN_FENCE_IN |
+						      IGT_SPIN_FENCE_OUT));
+			igt_spin_free(fd, syncpt);
+
+			syncpt = igt_spin_new(fd,
+					      .ctx = ctx,
+					      .engine = engine,
+					      .fence = dirt->out_fence,
+					      .flags = IGT_SPIN_FENCE_IN);
+			igt_spin_free(fd, dirt);
+
+			igt_spin_free(fd, syncpt);
+			gem_context_destroy(fd, sw);
+		}
+
 		regs[1] = read_regs(fd, ctx, e, flags);
 
 		/*
@@ -838,6 +867,8 @@ igt_main
 
 			igt_subtest_f("%s-nonpriv", e->name)
 				nonpriv(fd, e, 0);
+			igt_subtest_f("%s-nonpriv-switch", e->name)
+				nonpriv(fd, e, DIRTY2);
 
 			igt_subtest_f("%s-clean", e->name)
 				isolation(fd, e, 0);
