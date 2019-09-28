@@ -391,8 +391,15 @@ static void kmsg_dump(int fd)
 		if (r < 0) {
 			if (errno == EINTR)
 				continue;
+
+			if (errno == EPIPE) {
+				igt_warn("kmsg truncated: too many messages. You may want to increase log_buf_len in kmcdline\n");
+				continue;
+			}
+
 			if (errno != EAGAIN)
-				igt_warn("kmsg truncated due to unknown error: %m\n");
+				igt_warn("kmsg truncated: unknown error (%m)\n");
+
 			break;
 		}
 
