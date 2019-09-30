@@ -57,11 +57,26 @@ set_domain_gtt(int fd, uint32_t handle)
 }
 
 static void *
-mmap_bo(int fd, uint32_t handle)
+mmap_bo(int fd, uint32_t handle, uint64_t size)
 {
 	void *ptr;
 
-	ptr = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	ptr = gem_mmap__gtt(fd, handle, size, PROT_READ | PROT_WRITE);
+
+	return ptr;
+}
+
+static void *
+create_pointer_size(int fd, uint64_t size)
+{
+	uint32_t handle;
+	void *ptr;
+
+	handle = gem_create(fd, size);
+
+	ptr = mmap_bo(fd, handle, size);
+
+	gem_close(fd, handle);
 
 	return ptr;
 }
@@ -69,16 +84,7 @@ mmap_bo(int fd, uint32_t handle)
 static void *
 create_pointer(int fd)
 {
-	uint32_t handle;
-	void *ptr;
-
-	handle = gem_create(fd, OBJECT_SIZE);
-
-	ptr = mmap_bo(fd, handle);
-
-	gem_close(fd, handle);
-
-	return ptr;
+	return create_pointer_size(fd, OBJECT_SIZE);
 }
 
 static void
@@ -482,7 +488,7 @@ test_write_gtt(int fd)
 	dst = gem_create(fd, OBJECT_SIZE);
 
 	/* prefault object into gtt */
-	dst_gtt = mmap_bo(fd, dst);
+	dst_gtt = mmap_bo(fd, dst, OBJECT_SIZE);
 	set_domain_gtt(fd, dst);
 	memset(dst_gtt, 0, OBJECT_SIZE);
 	munmap(dst_gtt, OBJECT_SIZE);
@@ -972,10 +978,16 @@ thread_fault_concurrent(void *closure)
 	int n;
 
 	for (n = 0; n < 32; n++) {
+		unsigned int id = (n + t->id) % 32;
+		uint32_t sz = *t->ptr[id] - 1;
+		int idx = rand() % sz + 1;
+
 		if (n & 1)
-			*t->ptr[(n + t->id) % 32] = val;
+			t->ptr[id][idx] = val;
 		else
-			val = *t->ptr[(n + t->id) % 32];
+			val = t->ptr[id][idx];
+
+		val++;
 	}
 
 	return NULL;
@@ -989,7 +1001,10 @@ test_fault_concurrent(int fd)
 	int n;
 
 	for (n = 0; n < 32; n++) {
-		ptr[n] = create_pointer(fd);
+		uint32_t sz = (n + 1) << 19; /* 512KiB increments */
+
+		ptr[n] = create_pointer_size(fd, sz);
+		*ptr[n] = sz / sizeof(uint32_t); /* num_elems for convenience */
 	}
 
 	for (n = 0; n < 64; n++) {
@@ -998,12 +1013,13 @@ test_fault_concurrent(int fd)
 		pthread_create(&thread[n].thread, NULL, thread_fault_concurrent, &thread[n]);
 	}
 
+	sleep(2);
+
 	for (n = 0; n < 64; n++)
 		pthread_join(thread[n].thread, NULL);
 
-	for (n = 0; n < 32; n++) {
-		munmap(ptr[n], OBJECT_SIZE);
-	}
+	for (n = 0; n < 32; n++)
+		munmap(ptr[n], *ptr[n] * sizeof(uint32_t));
 }
 
 static void
