@@ -304,7 +304,7 @@ flip_and_measure(data_t *data, igt_output_t *output, enum pipe pipe,
 		while (get_time_ns() < target_ns);
 	}
 
-	igt_info("Completed %u flips, %u were in threshold for %luns.\n",
+	igt_info("Completed %u flips, %u were in threshold for %"PRIu64"ns.\n",
 		 total_flip, total_pass, rate_ns);
 
 	return total_flip ? ((total_pass * 100) / total_flip) : 0;
