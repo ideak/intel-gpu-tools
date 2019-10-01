@@ -69,10 +69,32 @@
 
 static uint32_t userptr_flags = LOCAL_I915_USERPTR_UNSYNCHRONIZED;
 
+static bool can_gtt_mmap;
+
 #define WIDTH 512
 #define HEIGHT 512
 
 static uint32_t linear[WIDTH*HEIGHT];
+
+static bool has_gtt_mmap(int i915)
+{
+	void *ptr, *map;
+	uint32_t handle;
+
+	igt_assert(posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE) == 0);
+
+	gem_userptr(i915, ptr, 4096, 0, 0, &handle);
+	igt_assert(handle != 0);
+
+	map = __gem_mmap__gtt(i915, handle, 4096, PROT_WRITE);
+	if (map)
+		munmap(map, 4096);
+
+	gem_close(i915, handle);
+	free(ptr);
+
+	return map != NULL;
+}
 
 static void gem_userptr_test_unsynchronized(void)
 {
@@ -617,7 +639,7 @@ static int test_invalid_gtt_mapping(int fd)
 static void test_process_exit(int fd, int flags)
 {
 	if (flags & PE_GTT_MAP)
-		igt_require(gem_has_llc(fd));
+		igt_require(can_gtt_mmap);
 
 	igt_fork(child, 1) {
 		uint32_t handle;
@@ -853,7 +875,7 @@ static void *umap(int fd, uint32_t handle)
 {
 	void *ptr;
 
-	if (gem_has_llc(fd)) {
+	if (can_gtt_mmap) {
 		ptr = gem_mmap__gtt(fd, handle, sizeof(linear),
 				    PROT_READ | PROT_WRITE);
 	} else {
@@ -884,7 +906,7 @@ check_bo(int fd1, uint32_t handle1, int is_userptr, int fd2, uint32_t handle2)
 	sigbus_start = (unsigned long)ptr2;
 	igt_assert(memcmp(ptr1, ptr2, sizeof(linear)) == 0);
 
-	if (gem_has_llc(fd1)) {
+	if (can_gtt_mmap) {
 		counter++;
 		memset(ptr1, counter, size);
 		memset(ptr2, counter, size);
@@ -971,7 +993,7 @@ static int test_dmabuf(void)
 	free_userptr_bo(fd1, handle);
 	close(fd1);
 
-	if (gem_has_llc(fd2)) {
+	if (can_gtt_mmap) {
 		struct sigaction sigact, orig_sigact;
 
 		memset(&sigact, 0, sizeof(sigact));
@@ -1227,31 +1249,33 @@ static void test_readonly_mmap(int i915)
 	ptr = __gem_mmap__gtt(i915, handle, sz, PROT_WRITE);
 	igt_assert(ptr == NULL);
 
-	ptr = gem_mmap__gtt(i915, handle, sz, PROT_READ);
+	/* Optional kernel support for GTT mmaps of userptr */
+	ptr = __gem_mmap__gtt(i915, handle, sz, PROT_READ);
 	gem_close(i915, handle);
 
-	/* Check that a write into the GTT readonly map fails */
-	if (!(sig = sigsetjmp(sigjmp, 1))) {
-		signal(SIGBUS, sigjmp_handler);
-		signal(SIGSEGV, sigjmp_handler);
-		memset(ptr, 0x5a, sz);
-		igt_assert(0);
-	}
-	igt_assert_eq(sig, SIGSEGV);
+	if (ptr) { /* Check that a write into the GTT readonly map fails */
+		if (!(sig = sigsetjmp(sigjmp, 1))) {
+			signal(SIGBUS, sigjmp_handler);
+			signal(SIGSEGV, sigjmp_handler);
+			memset(ptr, 0x5a, sz);
+			igt_assert(0);
+		}
+		igt_assert_eq(sig, SIGSEGV);
 
-	/* Check that we disallow removing the readonly protection */
-	igt_assert(mprotect(ptr, sz, PROT_WRITE));
-	if (!(sig = sigsetjmp(sigjmp, 1))) {
-		signal(SIGBUS, sigjmp_handler);
-		signal(SIGSEGV, sigjmp_handler);
-		memset(ptr, 0x5a, sz);
-		igt_assert(0);
-	}
-	igt_assert_eq(sig, SIGSEGV);
+		/* Check that we disallow removing the readonly protection */
+		igt_assert(mprotect(ptr, sz, PROT_WRITE));
+		if (!(sig = sigsetjmp(sigjmp, 1))) {
+			signal(SIGBUS, sigjmp_handler);
+			signal(SIGSEGV, sigjmp_handler);
+			memset(ptr, 0x5a, sz);
+			igt_assert(0);
+		}
+		igt_assert_eq(sig, SIGSEGV);
 
-	/* A single read from the GTT pointer to prove that works */
-	igt_assert_eq_u32(*(uint8_t *)ptr, 0xa5);
-	munmap(ptr, sz);
+		/* A single read from the GTT pointer to prove that works */
+		igt_assert_eq_u32(*(uint8_t *)ptr, 0xa5);
+		munmap(ptr, sz);
+	}
 
 	/* Double check that the kernel did indeed not let any writes through */
 	igt_clflush_range(pages, sz);
@@ -1833,6 +1857,8 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 		igt_assert(fd >= 0);
 		igt_require_gem(fd);
 		gem_require_blitter(fd);
+
+		can_gtt_mmap = has_gtt_mmap(fd) && gem_has_llc(fd);
 
 		size = sizeof(linear);
 
