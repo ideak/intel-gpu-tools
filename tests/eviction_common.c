@@ -30,7 +30,6 @@
 #include "igt.h"
 #include <stdlib.h>
 
-
 struct igt_eviction_test_ops {
 	uint32_t (*create)(int fd, uint64_t size);
 	void (*flink)(uint32_t old_handle, uint32_t new_handle);
@@ -133,7 +132,8 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 			      uint64_t surface_size,
 			      uint64_t surface_count)
 {
-	uint64_t sz, pin, total;
+	uint64_t sz, pin;
+	size_t total;
 	void *mem;
 
 	intel_require_memory(surface_count, surface_size, CHECK_RAM);
