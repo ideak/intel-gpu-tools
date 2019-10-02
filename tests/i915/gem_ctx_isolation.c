@@ -55,10 +55,11 @@ enum {
 #define GEN9 (ALL << 9)
 #define GEN10 (ALL << 10)
 #define GEN11 (ALL << 11)
+#define GEN12 (ALL << 12)
 
 #define NOCTX 0
 
-#define LAST_KNOWN_GEN 11
+#define LAST_KNOWN_GEN 12
 
 static const struct named_register {
 	const char *name;
@@ -116,9 +117,9 @@ static const struct named_register {
 	{ "Cache_Mode_0", GEN7, RCS0, 0x7000, .masked = true },
 	{ "Cache_Mode_1", GEN7, RCS0, 0x7004, .masked = true },
 	{ "GT_MODE", GEN8, RCS0, 0x7008, .masked = true },
-	{ "L3_Config", GEN8, RCS0, 0x7034 },
-	{ "TD_CTL", GEN8, RCS0, 0xe400, .write_mask = 0xffff },
-	{ "TD_CTL2", GEN8, RCS0, 0xe404 },
+	{ "L3_Config", GEN_RANGE(8, 11), RCS0, 0x7034 },
+	{ "TD_CTL", GEN_RANGE(8, 11), RCS0, 0xe400, .write_mask = 0xffff },
+	{ "TD_CTL2", GEN_RANGE(8, 11), RCS0, 0xe404 },
 	{ "SO_NUM_PRIMS_WRITTEN0", GEN6, RCS0, 0x5200, 2 },
 	{ "SO_NUM_PRIMS_WRITTEN1", GEN6, RCS0, 0x5208, 2 },
 	{ "SO_NUM_PRIMS_WRITTEN2", GEN6, RCS0, 0x5210, 2 },
@@ -142,7 +143,9 @@ static const struct named_register {
 	/* Privileged (enabled by w/a + FORCE_TO_NONPRIV) */
 	{ "CTX_PREEMPT", NOCTX /* GEN9 */, RCS0, 0x2248 },
 	{ "CS_CHICKEN1", GEN_RANGE(9, 10), RCS0, 0x2580, .masked = true },
+	{ "COMMON_SLICE_CHICKEN2", GEN9, RCS0, 0x7014, .masked = true },
 	{ "HDC_CHICKEN1", GEN_RANGE(9, 9), RCS0, 0x7304, .masked = true },
+	{ "SLICE_COMMON_ECO_CHICKEN1", GEN_RANGE(9, 11), 0x731c, .masked = true },
 	{ "L3SQREG4", NOCTX /* GEN9:skl,kbl */, RCS0, 0xb118, .write_mask = ~0x1ffff0 },
 	{ "HALF_SLICE_CHICKEN7", GEN_RANGE(11, 11), RCS0, 0xe194, .masked = true },
 	{ "SAMPLER_MODE", GEN_RANGE(11, 11), RCS0, 0xe18c, .masked = true },
@@ -177,6 +180,23 @@ static const struct named_register {
 	{ "VCS2 timestamp", GEN11, ~0u, 0x1d0358 },
 	{ "VCS3 timestamp", GEN11, ~0u, 0x1d4358 },
 	{ "VECS timestamp", GEN11, ~0u, 0x1c8358 },
+
+	/* huc read only */
+	{ "BSD0 0x2000", GEN11, ~0u, 0x1c0000 + 0x2000 },
+	{ "BSD0 0x2000", GEN11, ~0u, 0x1c0000 + 0x2014 },
+	{ "BSD0 0x2000", GEN11, ~0u, 0x1c0000 + 0x23b0 },
+
+	{ "BSD1 0x2000", GEN11, ~0u, 0x1c4000 + 0x2000 },
+	{ "BSD1 0x2000", GEN11, ~0u, 0x1c4000 + 0x2014 },
+	{ "BSD1 0x2000", GEN11, ~0u, 0x1c4000 + 0x23b0 },
+
+	{ "BSD2 0x2000", GEN11, ~0u, 0x1d0000 + 0x2000 },
+	{ "BSD2 0x2000", GEN11, ~0u, 0x1d0000 + 0x2014 },
+	{ "BSD2 0x2000", GEN11, ~0u, 0x1d0000 + 0x23b0 },
+
+	{ "BSD3 0x2000", GEN11, ~0u, 0x1d4000 + 0x2000 },
+	{ "BSD3 0x2000", GEN11, ~0u, 0x1d4000 + 0x2014 },
+	{ "BSD3 0x2000", GEN11, ~0u, 0x1d4000 + 0x23b0 },
 
 	{}
 };
@@ -852,7 +872,7 @@ igt_main
 		gen = intel_gen(intel_get_drm_devid(fd));
 
 		igt_warn_on_f(gen > LAST_KNOWN_GEN,
-					  "GEN not recognized! Test needs to be updated to run.");
+			      "GEN not recognized! Test needs to be updated to run.\n");
 		igt_skip_on(gen > LAST_KNOWN_GEN);
 	}
 
