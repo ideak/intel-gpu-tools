@@ -82,7 +82,7 @@ static void trigger_reset(int fd)
 	igt_drop_caches_set(fd, DROP_ACTIVE);
 
 	/* We expect forced reset and health check to be quick. */
-	igt_assert(igt_seconds_elapsed(&ts) < 2);
+	igt_assert_lte(igt_seconds_elapsed(&ts), 10);
 }
 
 static void manual_hang(int drm_fd)
