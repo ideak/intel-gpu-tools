@@ -157,7 +157,7 @@ static const struct format_desc_struct {
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
 	},
-	{ .name = "XBGB2101010", .depth = -1, .drm_id = DRM_FORMAT_XBGR2101010,
+	{ .name = "XBGR2101010", .depth = -1, .drm_id = DRM_FORMAT_XBGR2101010,
 	  .cairo_id = CAIRO_FORMAT_INVALID,
 	  .pixman_id = PIXMAN_x2b10g10r10,
 	  .num_planes = 1, .plane_bpp = { 32, },
