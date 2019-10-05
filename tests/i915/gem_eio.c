@@ -82,6 +82,8 @@ static void trigger_reset(int fd)
 	/* And just check the gpu is indeed running again */
 	igt_kmsg(KMSG_DEBUG "Checking that the GPU recovered\n");
 	gem_test_engine(fd, ALL_ENGINES);
+
+	igt_debugfs_dump(fd, "i915_engine_info");
 	igt_drop_caches_set(fd, DROP_ACTIVE);
 
 	/* We expect the health check to be quick! */
@@ -392,6 +394,7 @@ static void test_wait(int fd, unsigned int flags, unsigned int wait)
 
 	hang = spin_sync(fd, 0, I915_EXEC_DEFAULT);
 
+	igt_debugfs_dump(fd, "i915_engine_info");
 	check_wait(fd, hang->handle, wait, NULL);
 
 	igt_spin_free(fd, hang);
@@ -467,14 +470,15 @@ static void test_inflight(int fd, unsigned int wait)
 			igt_assert(fence[n] != -1);
 		}
 
+		igt_debugfs_dump(fd, "i915_engine_info");
 		check_wait(fd, obj[1].handle, wait, NULL);
 
 		for (unsigned int n = 0; n < max; n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
 			close(fence[n]);
 		}
-
 		igt_spin_free(fd, hang);
+
 		igt_assert(i915_reset_control(true));
 		trigger_reset(fd);
 
@@ -523,14 +527,15 @@ static void test_inflight_suspend(int fd)
 	igt_set_autoresume_delay(30);
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
 
+	igt_debugfs_dump(fd, "i915_engine_info");
 	check_wait(fd, obj[1].handle, 10, NULL);
 
 	for (unsigned int n = 0; n < max; n++) {
 		igt_assert_eq(sync_fence_status(fence[n]), -EIO);
 		close(fence[n]);
 	}
-
 	igt_spin_free(fd, hang);
+
 	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
 	close(fd);
@@ -605,15 +610,16 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 			count++;
 		}
 
+		igt_debugfs_dump(fd, "i915_engine_info");
 		check_wait(fd, obj[1].handle, wait, NULL);
 
 		for (unsigned int n = 0; n < count; n++) {
 			igt_assert_eq(sync_fence_status(fence[n]), -EIO);
 			close(fence[n]);
 		}
-
 		igt_spin_free(fd, hang);
 		gem_close(fd, obj[1].handle);
+
 		igt_assert(i915_reset_control(true));
 		trigger_reset(fd);
 
@@ -714,14 +720,15 @@ static void test_inflight_internal(int fd, unsigned int wait)
 		nfence++;
 	}
 
+	igt_debugfs_dump(fd, "i915_engine_info");
 	check_wait(fd, obj[1].handle, wait, NULL);
 
 	while (nfence--) {
 		igt_assert_eq(sync_fence_status(fences[nfence]), -EIO);
 		close(fences[nfence]);
 	}
-
 	igt_spin_free(fd, hang);
+
 	igt_assert(i915_reset_control(true));
 	trigger_reset(fd);
 	close(fd);
