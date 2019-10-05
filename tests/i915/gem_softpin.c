@@ -102,14 +102,14 @@ static void test_softpin(int fd)
 	struct drm_i915_gem_exec_object2 object;
 	uint64_t offset, end;
 	uint32_t last_handle;
-	int loop;
+	unsigned long count = 0;
 
 	last_handle = gem_create(fd, size);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&object);
 	execbuf.buffer_count = 1;
-	for (loop = 0; loop < 1024; loop++) {
+	igt_until_timeout(30) {
 		memset(&object, 0, sizeof(object));
 		object.handle = gem_create(fd, 2*size);
 		gem_write(fd, object.handle, 0, &bbe, sizeof(bbe));
@@ -134,7 +134,9 @@ static void test_softpin(int fd)
 		}
 
 		last_handle = object.handle;
+		count++;
 	}
+	igt_info("Completed %lu cycles\n", count);
 }
 
 static void test_overlap(int fd)
