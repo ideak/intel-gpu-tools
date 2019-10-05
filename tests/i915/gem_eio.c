@@ -76,12 +76,15 @@ static void trigger_reset(int fd)
 	igt_kmsg(KMSG_DEBUG "Forcing GPU reset\n");
 	igt_force_gpu_reset(fd);
 
+	/* The forced reset should be immediate */
+	igt_assert_lte(igt_seconds_elapsed(&ts), 2);
+
 	/* And just check the gpu is indeed running again */
 	igt_kmsg(KMSG_DEBUG "Checking that the GPU recovered\n");
 	gem_test_engine(fd, ALL_ENGINES);
 	igt_drop_caches_set(fd, DROP_ACTIVE);
 
-	/* We expect forced reset and health check to be quick. */
+	/* We expect the health check to be quick! */
 	igt_assert_lte(igt_seconds_elapsed(&ts), 10);
 }
 
