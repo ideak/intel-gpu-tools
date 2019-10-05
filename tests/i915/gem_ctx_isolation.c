@@ -143,9 +143,9 @@ static const struct named_register {
 	/* Privileged (enabled by w/a + FORCE_TO_NONPRIV) */
 	{ "CTX_PREEMPT", NOCTX /* GEN9 */, RCS0, 0x2248 },
 	{ "CS_CHICKEN1", GEN_RANGE(9, 10), RCS0, 0x2580, .masked = true },
-	{ "COMMON_SLICE_CHICKEN2", GEN9, RCS0, 0x7014, .masked = true },
+	{ "COMMON_SLICE_CHICKEN2", GEN_RANGE(9, 9), RCS0, 0x7014, .masked = true },
 	{ "HDC_CHICKEN1", GEN_RANGE(9, 9), RCS0, 0x7304, .masked = true },
-	{ "SLICE_COMMON_ECO_CHICKEN1", GEN_RANGE(9, 11), 0x731c, .masked = true },
+	{ "SLICE_COMMON_ECO_CHICKEN1", GEN_RANGE(11, 11) /* + glk */, RCS0,  0x731c, .masked = true },
 	{ "L3SQREG4", NOCTX /* GEN9:skl,kbl */, RCS0, 0xb118, .write_mask = ~0x1ffff0 },
 	{ "HALF_SLICE_CHICKEN7", GEN_RANGE(11, 11), RCS0, 0xe194, .masked = true },
 	{ "SAMPLER_MODE", GEN_RANGE(11, 11), RCS0, 0xe18c, .masked = true },
