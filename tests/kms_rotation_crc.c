@@ -252,6 +252,12 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	}
 
 	/*
+	 * Just try here if requested tiling format is generally available,
+	 * if one format fail it will skip entire subtest.
+	 */
+	igt_require(igt_display_has_format_mod(display, pixel_format, tiling));
+
+	/*
 	 * Create a reference software rotated flip framebuffer.
 	 */
 	igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format, tiling,
