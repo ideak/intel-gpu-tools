@@ -78,12 +78,14 @@ static uint32_t linear[WIDTH*HEIGHT];
 
 static bool has_gtt_mmap(int i915)
 {
-	void *ptr, *map;
+	void *ptr, *map = NULL;
 	uint32_t handle;
 
 	igt_assert(posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE) == 0);
 
-	gem_userptr(i915, ptr, 4096, 0, 0, &handle);
+	if (__gem_userptr(i915, ptr, 4096, 0,
+			  LOCAL_I915_USERPTR_UNSYNCHRONIZED, &handle))
+		goto out_ptr;
 	igt_assert(handle != 0);
 
 	map = __gem_mmap__gtt(i915, handle, 4096, PROT_WRITE);
@@ -91,6 +93,7 @@ static bool has_gtt_mmap(int i915)
 		munmap(map, 4096);
 
 	gem_close(i915, handle);
+out_ptr:
 	free(ptr);
 
 	return map != NULL;
