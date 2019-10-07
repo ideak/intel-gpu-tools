@@ -56,6 +56,7 @@ igt@gem_exec_reloc@basic-write-read-active
 igt@gem_exec_reloc@basic-softpin
 igt@gem_exec_store@basic-all
 igt@gem_exec_suspend@basic
+igt@gem_exec_suspend@basic-s0
 igt@gem_exec_suspend@basic-s3
 igt@gem_exec_suspend@basic-s4-devices
 igt@gem_flink_basic@bad-flink
