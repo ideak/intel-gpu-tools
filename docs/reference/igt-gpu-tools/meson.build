@@ -52,7 +52,7 @@ generated_docs = []
 
 configure_file(input: 'version.xml.in',
 	       output: 'version.xml',
-	       install: false, configuration: config)
+	       configuration: config)
 
 foreach group : test_groups
 	programs_xml = 'igt_test_programs_' + group + '_programs.xml'

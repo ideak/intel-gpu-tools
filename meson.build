@@ -239,7 +239,7 @@ config.set_quoted('PACKAGE', meson.project_name())
 config.set('PACKAGE_STRING', meson.project_name() + ' ' + meson.project_version())
 config.set_quoted('TARGET_CPU_PLATFORM', host_machine.cpu_family())
 
-configure_file(output: 'config.h', install: false, configuration: config)
+configure_file(output: 'config.h', configuration: config)
 
 prefix = get_option('prefix')
 bindir = get_option('bindir')
