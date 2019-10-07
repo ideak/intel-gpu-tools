@@ -103,21 +103,22 @@ static const struct format_desc_struct {
 	int plane_bpp[4];
 	uint8_t hsub;
 	uint8_t vsub;
+	bool convert;
 } format_desc[] = {
 	{ .name = "ARGB1555", .depth = -1, .drm_id = DRM_FORMAT_ARGB1555,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_ARGB32, .convert = true,
 	  .pixman_id = PIXMAN_a1r5g5b5,
 	  .num_planes = 1, .plane_bpp = { 16, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "C8", .depth = -1, .drm_id = DRM_FORMAT_C8,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .pixman_id = PIXMAN_r3g3b2,
 	  .num_planes = 1, .plane_bpp = { 8, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XRGB1555", .depth = -1, .drm_id = DRM_FORMAT_XRGB1555,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .pixman_id = PIXMAN_x1r5g5b5,
 	  .num_planes = 1, .plane_bpp = { 16, },
 	  .hsub = 1, .vsub = 1,
@@ -129,25 +130,25 @@ static const struct format_desc_struct {
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "BGR565", .depth = -1, .drm_id = DRM_FORMAT_BGR565,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGB16_565, .convert = true,
 	  .pixman_id = PIXMAN_b5g6r5,
 	  .num_planes = 1, .plane_bpp = { 16, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "BGR888", .depth = -1, .drm_id = DRM_FORMAT_BGR888,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .pixman_id = PIXMAN_b8g8r8,
 	  .num_planes = 1, .plane_bpp = { 24, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "RGB888", .depth = -1, .drm_id = DRM_FORMAT_RGB888,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .pixman_id = PIXMAN_r8g8b8,
 	  .num_planes = 1, .plane_bpp = { 24, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XYUV8888", .depth = -1, .drm_id = DRM_FORMAT_XYUV8888,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
 	},
@@ -158,7 +159,7 @@ static const struct format_desc_struct {
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XBGR8888", .depth = -1, .drm_id = DRM_FORMAT_XBGR8888,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .pixman_id = PIXMAN_x8b8g8r8,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
@@ -170,7 +171,7 @@ static const struct format_desc_struct {
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XBGR2101010", .depth = -1, .drm_id = DRM_FORMAT_XBGR2101010,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGB30, .convert = true,
 	  .pixman_id = PIXMAN_x2b10g10r10,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
@@ -182,161 +183,161 @@ static const struct format_desc_struct {
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "ABGR8888", .depth = -1, .drm_id = DRM_FORMAT_ABGR8888,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_ARGB32, .convert = true,
 	  .pixman_id = PIXMAN_a8b8g8r8,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "ARGB2101010", .depth = 30, .drm_id = DRM_FORMAT_ARGB2101010,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .pixman_id = PIXMAN_a2r10g10b10,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "ABGR2101010", .depth = -1, .drm_id = DRM_FORMAT_ABGR2101010,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .pixman_id = PIXMAN_a2b10g10r10,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XRGB16161616F", .depth = -1, .drm_id = DRM_FORMAT_XRGB16161616F,
-	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 64, },
 	},
 	{ .name = "ARGB16161616F", .depth = -1, .drm_id = DRM_FORMAT_ARGB16161616F,
-	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 64, },
 	},
 	{ .name = "XBGR16161616F", .depth = -1, .drm_id = DRM_FORMAT_XBGR16161616F,
-	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 64, },
 	},
 	{ .name = "ABGR16161616F", .depth = -1, .drm_id = DRM_FORMAT_ABGR16161616F,
-	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 64, },
 	},
 	{ .name = "NV12", .depth = -1, .drm_id = DRM_FORMAT_NV12,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 2, .plane_bpp = { 8, 16, },
 	  .hsub = 2, .vsub = 2,
 	},
 	{ .name = "NV16", .depth = -1, .drm_id = DRM_FORMAT_NV16,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 2, .plane_bpp = { 8, 16, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "NV21", .depth = -1, .drm_id = DRM_FORMAT_NV21,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 2, .plane_bpp = { 8, 16, },
 	  .hsub = 2, .vsub = 2,
 	},
 	{ .name = "NV61", .depth = -1, .drm_id = DRM_FORMAT_NV61,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 2, .plane_bpp = { 8, 16, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "YUYV", .depth = -1, .drm_id = DRM_FORMAT_YUYV,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 16, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "YVYU", .depth = -1, .drm_id = DRM_FORMAT_YVYU,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 16, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "UYVY", .depth = -1, .drm_id = DRM_FORMAT_UYVY,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 16, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "VYUY", .depth = -1, .drm_id = DRM_FORMAT_VYUY,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 16, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "YU12", .depth = -1, .drm_id = DRM_FORMAT_YUV420,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 3, .plane_bpp = { 8, 8, 8, },
 	  .hsub = 2, .vsub = 2,
 	},
 	{ .name = "YU16", .depth = -1, .drm_id = DRM_FORMAT_YUV422,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 3, .plane_bpp = { 8, 8, 8, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "YV12", .depth = -1, .drm_id = DRM_FORMAT_YVU420,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 3, .plane_bpp = { 8, 8, 8, },
 	  .hsub = 2, .vsub = 2,
 	},
 	{ .name = "YV16", .depth = -1, .drm_id = DRM_FORMAT_YVU422,
-	  .cairo_id = CAIRO_FORMAT_RGB24,
+	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 3, .plane_bpp = { 8, 8, 8, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "Y410", .depth = -1, .drm_id = DRM_FORMAT_Y410,
-	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "Y412", .depth = -1, .drm_id = DRM_FORMAT_Y412,
-	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 64, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "Y416", .depth = -1, .drm_id = DRM_FORMAT_Y416,
-	  .cairo_id = CAIRO_FORMAT_RGBA128F,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 64, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XV30", .depth = -1, .drm_id = DRM_FORMAT_XVYU2101010,
-	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .cairo_id = CAIRO_FORMAT_RGB96F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XV36", .depth = -1, .drm_id = DRM_FORMAT_XVYU12_16161616,
-	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .cairo_id = CAIRO_FORMAT_RGB96F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 64, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "XV48", .depth = -1, .drm_id = DRM_FORMAT_XVYU16161616,
-	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .cairo_id = CAIRO_FORMAT_RGB96F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 64, },
 	  .hsub = 1, .vsub = 1,
 	},
 	{ .name = "P010", .depth = -1, .drm_id = DRM_FORMAT_P010,
-	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .cairo_id = CAIRO_FORMAT_RGB96F, .convert = true,
 	  .num_planes = 2, .plane_bpp = { 16, 32 },
 	  .vsub = 2, .hsub = 2,
 	},
 	{ .name = "P012", .depth = -1, .drm_id = DRM_FORMAT_P012,
-	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .cairo_id = CAIRO_FORMAT_RGB96F, .convert = true,
 	  .num_planes = 2, .plane_bpp = { 16, 32 },
 	  .vsub = 2, .hsub = 2,
 	},
 	{ .name = "P016", .depth = -1, .drm_id = DRM_FORMAT_P016,
-	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .cairo_id = CAIRO_FORMAT_RGB96F, .convert = true,
 	  .num_planes = 2, .plane_bpp = { 16, 32 },
 	  .vsub = 2, .hsub = 2,
 	},
 	{ .name = "Y210", .depth = -1, .drm_id = DRM_FORMAT_Y210,
-	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .cairo_id = CAIRO_FORMAT_RGB96F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "Y212", .depth = -1, .drm_id = DRM_FORMAT_Y212,
-	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .cairo_id = CAIRO_FORMAT_RGB96F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "Y216", .depth = -1, .drm_id = DRM_FORMAT_Y216,
-	  .cairo_id = CAIRO_FORMAT_RGB96F,
+	  .cairo_id = CAIRO_FORMAT_RGB96F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 32, },
 	  .hsub = 2, .vsub = 1,
 	},
 	{ .name = "IGT-FLOAT", .depth = -1, .drm_id = IGT_FORMAT_FLOAT,
-	  .cairo_id = CAIRO_FORMAT_INVALID,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F,
 	  .pixman_id = PIXMAN_rgba_float,
 	  .num_planes = 1, .plane_bpp = { 128 },
 	},
@@ -1817,6 +1818,21 @@ static cairo_format_t drm_format_to_cairo(uint32_t drm_format)
 		     drm_format, igt_format_str(drm_format));
 }
 
+static uint32_t cairo_format_to_drm_format(cairo_format_t cairo_format)
+{
+	const struct format_desc_struct *f;
+
+	if (cairo_format == CAIRO_FORMAT_RGB96F)
+		cairo_format = CAIRO_FORMAT_RGBA128F;
+
+	for_each_format(f)
+		if (f->cairo_id == cairo_format && !f->convert)
+			return f->drm_id;
+
+	igt_assert_f(0, "can't find a drm format for cairo format %u\n",
+		     cairo_format);
+}
+
 struct fb_blit_linear {
 	struct igt_fb fb;
 	uint8_t *map;
@@ -3118,37 +3134,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	struct fb_convert_blit_upload *blit = calloc(1, sizeof(*blit));
 	struct fb_convert cvt = { };
 	const struct format_desc_struct *f = lookup_drm_format(fb->drm_format);
-	unsigned drm_format;
-	cairo_format_t cairo_id;
-
-	if (f->cairo_id != CAIRO_FORMAT_INVALID) {
-		cairo_id = f->cairo_id;
-
-		switch (f->cairo_id) {
-		case CAIRO_FORMAT_RGB96F:
-		case CAIRO_FORMAT_RGBA128F:
-			drm_format = IGT_FORMAT_FLOAT;
-			break;
-		case CAIRO_FORMAT_RGB24:
-			drm_format = DRM_FORMAT_XRGB8888;
-			break;
-		default:
-			igt_assert_f(0, "Unsupported format %u", f->cairo_id);
-		}
-	} else if (PIXMAN_FORMAT_A(f->pixman_id) &&
-		   PIXMAN_FORMAT_R(f->pixman_id) > 8) {
-		cairo_id = CAIRO_FORMAT_RGBA128F;
-		drm_format = IGT_FORMAT_FLOAT;
-	} else if (PIXMAN_FORMAT_A(f->pixman_id)) {
-		cairo_id = CAIRO_FORMAT_ARGB32;
-		drm_format = DRM_FORMAT_ARGB8888;
-	} else if (PIXMAN_FORMAT_R(f->pixman_id) > 8) {
-		cairo_id = CAIRO_FORMAT_RGB30;
-		drm_format = DRM_FORMAT_XRGB2101010;
-	} else {
-		cairo_id = CAIRO_FORMAT_RGB24;
-		drm_format = DRM_FORMAT_XRGB8888;
-	}
+	unsigned drm_format = cairo_format_to_drm_format(f->cairo_id);
 
 	igt_assert(blit);
 
@@ -3181,7 +3167,7 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 
 	fb->cairo_surface =
 		cairo_image_surface_create_for_data(blit->shadow_ptr,
-						    cairo_id,
+						    f->cairo_id,
 						    fb->width, fb->height,
 						    blit->shadow_fb.strides[0]);
 
@@ -3225,10 +3211,7 @@ static bool use_convert(const struct igt_fb *fb)
 {
 	const struct format_desc_struct *f = lookup_drm_format(fb->drm_format);
 
-	return igt_format_is_yuv(fb->drm_format) ||
-		igt_format_is_fp16(fb->drm_format) ||
-		(f->cairo_id == CAIRO_FORMAT_INVALID &&
-		 f->pixman_id != PIXMAN_invalid);
+	return f->convert;
 }
 
 /**
