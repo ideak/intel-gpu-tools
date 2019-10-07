@@ -36,6 +36,7 @@ typedef struct {
 	int drm_fd;
 	igt_display_t display;
 	int gen;
+	uint32_t testformat;
 } data_t;
 
 static igt_pipe_crc_t *_pipe_crc;
@@ -101,13 +102,13 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 	}
 
 	fb_id = igt_create_pattern_fb(data->drm_fd, width, mode->vdisplay,
-				      DRM_FORMAT_XRGB8888, tiling[0],
+				      data->testformat, tiling[0],
 				      &fb[0]);
 	igt_assert(fb_id);
 
 	/* Second fb has different background so CRC does not match. */
 	fb_id = igt_create_color_pattern_fb(data->drm_fd, width, mode->vdisplay,
-				      DRM_FORMAT_XRGB8888, tiling[1],
+				      data->testformat, tiling[1],
 				      0.5, 0.5, 0.5, &fb[1]);
 	igt_assert(fb_id);
 
@@ -156,6 +157,8 @@ igt_main
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		data.gen = intel_gen(intel_get_drm_devid(data.drm_fd));
 
+		data.testformat = DRM_FORMAT_XRGB8888;
+
 		kmstest_set_vt_graphics_mode();
 
 		igt_require_pipe_crc(data.drm_fd);
@@ -175,6 +178,9 @@ igt_main
 				       LOCAL_DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
 
+		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+
 		for_each_pipe_with_valid_output(&data.display, pipe, output)
 			test_flip_tiling(&data, pipe, output, tiling);
 	}
@@ -185,6 +191,10 @@ igt_main
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
+
+		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output)
@@ -197,6 +207,10 @@ igt_main
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
+
+		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output)
@@ -216,6 +230,9 @@ igt_main
 				       LOCAL_I915_FORMAT_MOD_X_TILED };
 		enum pipe pipe;
 
+		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+
 		for_each_pipe_with_valid_output(&data.display, pipe, output)
 			test_flip_tiling(&data, pipe, output, tiling);
 	}
@@ -226,6 +243,10 @@ igt_main
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
+
+		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output)
@@ -238,6 +259,10 @@ igt_main
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
+
+		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output)
@@ -257,6 +282,9 @@ igt_main
 				       LOCAL_I915_FORMAT_MOD_X_TILED };
 		enum pipe pipe;
 
+		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+
 		for_each_pipe_with_valid_output(&data.display, pipe, output)
 			test_flip_tiling(&data, pipe, output, tiling);
 	}
@@ -267,6 +295,10 @@ igt_main
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
+
+		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output)
@@ -279,6 +311,10 @@ igt_main
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
+
+		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output)
