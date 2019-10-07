@@ -3096,8 +3096,10 @@ static void fb_convert(struct fb_convert *cvt)
 	}
 
 	igt_assert_f(false,
-		     "Conversion not implemented (from format 0x%x to 0x%x)\n",
-		     cvt->src.fb->drm_format, cvt->dst.fb->drm_format);
+		     "Conversion not implemented (from format "
+		     IGT_FORMAT_FMT " to " IGT_FORMAT_FMT ")\n",
+		     IGT_FORMAT_ARGS(cvt->src.fb->drm_format),
+		     IGT_FORMAT_ARGS(cvt->dst.fb->drm_format));
 }
 
 static void destroy_cairo_surface__convert(void *arg)
