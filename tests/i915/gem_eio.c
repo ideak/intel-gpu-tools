@@ -437,6 +437,7 @@ static void test_inflight(int fd, unsigned int wait)
 	max = gem_measure_ring_inflight(fd, -1, 0);
 	igt_require(max > 1);
 	max = min(max - 1, ARRAY_SIZE(fence));
+	igt_debug("Using %d inflight batches\n", max);
 
 	for_each_engine(parent_fd, engine) {
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -499,6 +500,7 @@ static void test_inflight_suspend(int fd)
 	max = gem_measure_ring_inflight(fd, -1, 0);
 	igt_require(max > 1);
 	max = min(max - 1, ARRAY_SIZE(fence));
+	igt_debug("Using %d inflight batches\n", max);
 
 	fd = gem_reopen_driver(fd);
 	igt_require_gem(fd);
@@ -753,6 +755,7 @@ static void reset_stress(int fd, uint32_t ctx0,
 	max = gem_measure_ring_inflight(fd, engine, 0);
 	max = max / 2 - 1; /* assume !execlists and a shared ring */
 	igt_require(max > 0);
+	igt_debug("Using %d inflight batches for %s\n", max, name);
 
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 

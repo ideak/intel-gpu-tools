@@ -104,7 +104,7 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 	} while (1);
 
 	igt_assert_eq(__execbuf(fd, &execbuf), -EINTR);
-	igt_assert(count > 1);
+	igt_assert(count > 2);
 
 	memset(&itv, 0, sizeof(itv));
 	setitimer(ITIMER_REAL, &itv, NULL);
@@ -120,7 +120,7 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 	gem_quiescent_gpu(fd);
 
 	/* Be conservative in case we must wrap later */
-	return count - 1;
+	return count - 2;
 }
 
 /**
