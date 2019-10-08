@@ -27,6 +27,7 @@
  *
  */
 
+#include <sched.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -224,20 +225,25 @@ struct hang_ctx {
 static void hang_handler(union sigval arg)
 {
 	struct hang_ctx *ctx = arg.sival_ptr;
+	struct timespec *ts = ctx->ts;
+	int dir = ctx->debugfs;
 
 	igt_debug("hang delay = %.2fus\n",
 		  igt_nsec_elapsed(&ctx->delay) / 1000.0);
+
+	igt_assert_eq(timer_delete(ctx->timer), 0);
+	free(ctx);
 
 	/* flush any excess work before we start timing our reset */
 	igt_assert(igt_sysfs_printf(ctx->debugfs, "i915_drop_caches",
 				    "%d", DROP_RCU));
 
-	igt_nsec_elapsed(ctx->ts);
-	igt_assert(igt_sysfs_set(ctx->debugfs, "i915_wedged", "-1"));
+	igt_nsec_elapsed(ts);
+	igt_assert(igt_sysfs_set(dir, "i915_wedged", "-1"));
+	/* -> wake up gem_sync() in check_wait() */
 
-	igt_assert_eq(timer_delete(ctx->timer), 0);
-	close(ctx->debugfs);
-	free(ctx);
+	sched_yield();
+	close(dir);
 }
 
 static void hang_after(int fd, unsigned int us, struct timespec *ts)
