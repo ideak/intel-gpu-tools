@@ -228,7 +228,7 @@ static void test_sync_busy_fork_unixsocket(void)
 		cmsg->cmsg_type = SCM_RIGHTS;
 		cmsg->cmsg_len = CMSG_LEN(sizeof(timeline));
 
-		*((int *) CMSG_DATA(cmsg)) = timeline;
+		memcpy(CMSG_DATA(cmsg), &timeline, sizeof(timeline));
 		msg.msg_controllen = cmsg->cmsg_len;
 
 		igt_assert_f(sync_fence_wait(fence, 0) == -ETIME,
