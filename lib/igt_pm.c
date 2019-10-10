@@ -685,6 +685,28 @@ enum igt_runtime_pm_status igt_get_runtime_pm_status(void)
 }
 
 /**
+ * _pm_status_name
+ * @status: runtime PM status to stringify
+ *
+ * Returns: The current runtime PM status as a string
+ */
+static const char *_pm_status_name(enum igt_runtime_pm_status status)
+{
+	switch (status) {
+	case IGT_RUNTIME_PM_STATUS_ACTIVE:
+		return "active";
+	case IGT_RUNTIME_PM_STATUS_RESUMING:
+		return "resuming";
+	case IGT_RUNTIME_PM_STATUS_SUSPENDED:
+		return "suspended";
+	case IGT_RUNTIME_PM_STATUS_SUSPENDING:
+		return "suspending";
+	default:
+		return "unknown";
+	}
+}
+
+/**
  * igt_wait_for_pm_status:
  * @status: desired runtime PM status
  *
@@ -697,7 +719,16 @@ enum igt_runtime_pm_status igt_get_runtime_pm_status(void)
  */
 bool igt_wait_for_pm_status(enum igt_runtime_pm_status status)
 {
-	return igt_wait(igt_get_runtime_pm_status() == status, 10000, 100);
+	bool ret;
+	enum igt_runtime_pm_status expected = status;
+
+	ret = igt_wait((status = igt_get_runtime_pm_status()) == expected, 10000, 100);
+	if (!ret)
+		igt_warn("timeout: pm_status expected:%s, got:%s\n",
+			_pm_status_name(expected),
+			_pm_status_name(status));
+
+	return ret;
 }
 
 /**
