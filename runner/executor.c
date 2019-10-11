@@ -638,6 +638,25 @@ static const char *get_cmdline(pid_t pid, char *buf, ssize_t len)
 	return buf;
 }
 
+static bool sysrq(char cmd)
+{
+	bool success = false;
+	int fd;
+
+	fd = open("/proc/sysrq-trigger", O_WRONLY);
+	if (fd >= 0) {
+		success = write(fd, &cmd, 1) == 1;
+		close(fd);
+	}
+
+	return success;
+}
+
+static void show_kernel_task_state(void)
+{
+	sysrq('t');
+}
+
 /*
  * Returns:
  *  =0 - Success
@@ -728,6 +747,8 @@ static int monitor_output(pid_t child,
 
 			switch (killed) {
 			case 0:
+				show_kernel_task_state();
+
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
 					outf("Timeout. Killing the current test with SIGQUIT.\n");
 					fflush(stdout);
