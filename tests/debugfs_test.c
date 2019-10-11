@@ -56,7 +56,7 @@ static void read_and_discard_sysfs_entries(int path_fd, int indent)
 			igt_debug("%sEntering subdir %s\n", tabs, dirent->d_name);
 			read_and_discard_sysfs_entries(sub_fd, indent + 1);
 			close(sub_fd);
-		} else {
+		} else if (dirent->d_type == DT_REG) {
 			char buf[512];
 			int sub_fd;
 			ssize_t ret;
@@ -149,7 +149,7 @@ static void kms_tests(int fd, int debugfs)
 
 igt_main
 {
-	int fd = -1, debugfs;
+	int fd = -1, debugfs, sysfs;
 
 	igt_skip_on_simulation();
 
@@ -157,10 +157,13 @@ igt_main
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
 		debugfs = igt_debugfs_dir(fd);
+		sysfs = igt_sysfs_open(fd);
 
 		kmstest_set_vt_graphics_mode();
 	}
 
+	igt_subtest("sysfs")
+		read_and_discard_sysfs_entries(sysfs, 0);
 	igt_subtest("read_all_entries")
 		read_and_discard_sysfs_entries(debugfs, 0);
 
@@ -168,6 +171,7 @@ igt_main
 		kms_tests(fd, debugfs);
 
 	igt_fixture {
+		close(sysfs);
 		close(debugfs);
 		close(fd);
 	}
