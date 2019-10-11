@@ -173,6 +173,13 @@ void igt_require_hpd_storm_ctl(int fd);
  */
 #define DROP_RESET_SEQNO 0x100
 /**
+ * DROP_RCU:
+ *
+ * Performs rcu_barrier() and waits for an RCU grace period to complete,
+ * which will flush any RCU callbacks and deferred tasks.
+ */
+#define DROP_RCU 0x200
+/**
  * DROP_ALL:
  *
  * All of the above DROP_ flags combined.
@@ -189,6 +196,11 @@ void igt_reset_fifo_underrun_reporting(int drm_fd);
 
 bool igt_drop_caches_has(int fd, uint64_t val);
 void igt_drop_caches_set(int fd, uint64_t val);
+
+static inline void rcu_barrier(int fd)
+{
+	igt_drop_caches_set(fd, DROP_RCU);
+}
 
 /*
  * Prefault control
