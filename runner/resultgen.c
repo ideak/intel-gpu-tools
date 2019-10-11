@@ -268,8 +268,9 @@ static struct json_object *get_or_create_json_object(struct json_object *base,
 
 static void set_result(struct json_object *obj, const char *result)
 {
-	json_object_object_add(obj, "result",
-			       json_object_new_string(result));
+	if (result)
+		json_object_object_add(obj, "result",
+				       json_object_new_string(result));
 }
 
 static void add_runtime(struct json_object *obj, double time)
