@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  */
 
+#include <fcntl.h>
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -89,10 +90,15 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 
 	count = 0;
 	do {
-		if (__execbuf(fd, &execbuf) == 0) {
+		int err = __execbuf(fd, &execbuf);
+
+		if (err == 0) {
 			count++;
 			continue;
 		}
+
+		if (err == -EWOULDBLOCK)
+			break;
 
 		if (last[1] == count)
 			break;
@@ -102,8 +108,6 @@ __gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags
 		last[1] = last[0];
 		last[0] = count;
 	} while (1);
-
-	igt_assert_eq(__execbuf(fd, &execbuf), -EINTR);
 	igt_assert(count > 2);
 
 	memset(&itv, 0, sizeof(itv));
@@ -144,6 +148,9 @@ gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags f
 	unsigned int min = ~0u;
 
 	fd = gem_reopen_driver(fd);
+
+	/* When available, disable execbuf throttling */
+	fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | O_NONBLOCK);
 
 	if (engine == ALL_ENGINES) {
 		for_each_physical_engine(fd, engine) {
