@@ -77,15 +77,6 @@ static uint64_t filename_to_u64(const char *filename, int base)
 	return strtoull(b, NULL, base);
 }
 
-static uint64_t debugfs_file_to_u64(const char *name)
-{
-	char buf[1024];
-
-	snprintf(buf, sizeof(buf), "%s/%s", debugfs_dri_path, name);
-
-	return filename_to_u64(buf, 0);
-}
-
 static uint64_t rapl_type_id(void)
 {
 	return filename_to_u64("/sys/devices/power/type", 10);
@@ -94,6 +85,11 @@ static uint64_t rapl_type_id(void)
 static uint64_t rapl_gpu_power(void)
 {
 	return filename_to_u64("/sys/devices/power/events/energy-gpu", 0);
+}
+
+static uint64_t rapl_pkg_power(void)
+{
+	return filename_to_u64("/sys/devices/power/events/energy-pkg", 0);
 }
 
 static double filename_to_double(const char *filename)
@@ -117,70 +113,58 @@ static double rapl_gpu_power_scale(void)
 	return filename_to_double("/sys/devices/power/events/energy-gpu.scale");
 }
 
+static double rapl_pkg_power_scale(void)
+{
+	return filename_to_double("/sys/devices/power/events/energy-pkg.scale");
+}
+
 int power_init(struct power *power)
 {
-	uint64_t val;
-
 	memset(power, 0, sizeof(*power));
 
-	power->fd = igt_perf_open(rapl_type_id(), rapl_gpu_power());
-	if (power->fd >= 0) {
-		power->rapl_scale = rapl_gpu_power_scale();
+	power->gpu.fd = igt_perf_open(rapl_type_id(), rapl_gpu_power());
+	if (power->gpu.fd < 0)
+		return power->error = ENOENT;
+	power->gpu.scale = rapl_gpu_power_scale() * 1e3; /* to milli */
 
-		if (power->rapl_scale != NAN) {
-			power->rapl_scale *= 1e3; /* from nano to micro */
-			return 0;
-		}
-	}
-
-	val = debugfs_file_to_u64("i915_energy_uJ");
-	if (val == 0)
-		return power->error = EINVAL;
+	power->pkg.fd = igt_perf_open(rapl_type_id(), rapl_pkg_power());
+	power->pkg.scale = rapl_pkg_power_scale() *1e3; /* to milli */
 
 	return 0;
 }
 
-static uint64_t clock_ms_to_u64(void)
+static void __power_update(struct power_domain *pd, int count)
 {
-	struct timespec tv;
+	struct power_stat *s = &pd->stat[count & 1];
+	struct power_stat *d = &pd->stat[(count + 1) & 1];
+	uint64_t data[2], d_time;
+	int len;
 
-	if (clock_gettime(CLOCK_MONOTONIC, &tv) < 0)
-		return 0;
+	len = read(pd->fd, data, sizeof(data));
+	if (len != sizeof(data))
+		return;
 
-	return (uint64_t)tv.tv_sec * 1e3 + tv.tv_nsec / 1e6;
+	s->energy = llround((double)data[0] * pd->scale);
+	s->timestamp = data[1];
+
+	if (!count)
+		return;
+
+	d_time = s->timestamp - d->timestamp;
+	pd->power_mW = round((s->energy - d->energy) * 1e9 / d_time);
+	pd->new_sample = 1;
 }
 
 int power_update(struct power *power)
 {
-	struct power_stat *s = &power->stat[power->count++ & 1];
-	struct power_stat *d = &power->stat[power->count & 1];
-	uint64_t d_time;
-
 	if (power->error)
 		return power->error;
 
-	if (power->fd >= 0) {
-		uint64_t data[2];
-		int len;
+	__power_update(&power->gpu, power->count);
+	__power_update(&power->pkg, power->count);
 
-		len = read(power->fd, data, sizeof(data));
-		if (len != sizeof(data))
-			return power->error = errno;
-
-		s->energy = llround((double)data[0] * power->rapl_scale);
-		s->timestamp = data[1] / 1e6;
-	} else {
-		s->energy = debugfs_file_to_u64("i915_energy_uJ") / 1e3;
-		s->timestamp = clock_ms_to_u64();
-	}
-
-	if (power->count == 1)
+	if (!power->count++)
 		return EAGAIN;
-
-	d_time = s->timestamp - d->timestamp;
-	power->power_mW = round((double)(s->energy - d->energy) *
-				(1e3f / d_time));
-	power->new_sample = 1;
 
 	return 0;
 }

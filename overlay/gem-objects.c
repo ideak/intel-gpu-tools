@@ -159,6 +159,11 @@ int gem_objects_update(struct gem_objects *obj)
 		}
 
 		colon = strchr(b, ':');
+		if (!colon) { /* out of buffer space */
+			free(comm);
+			break;
+		}
+
 		memcpy(comm->name, b, colon-b+1);
 		comm->name[colon-b+1] = '\0';
 

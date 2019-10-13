@@ -28,19 +28,20 @@
 #include <stdint.h>
 
 struct power {
-	struct power_stat {
-		uint64_t energy;
-		uint64_t timestamp;
-	} stat[2];
+	struct power_domain {
+		double scale;
+		uint64_t power_mW;
+		int new_sample;
+		int fd;
 
-	int fd;
+		struct power_stat {
+			uint64_t energy;
+			uint64_t timestamp;
+		} stat[2];
+	} gpu, pkg;
+
 	int error;
 	int count;
-	int new_sample;
-
-	uint64_t power_mW;
-
-	double rapl_scale;
 };
 
 int power_init(struct power *power);

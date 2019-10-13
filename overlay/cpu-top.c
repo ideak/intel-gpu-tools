@@ -77,7 +77,10 @@ int cpu_top_update(struct cpu_top *cpu)
 
 	d_total = s->total - d->total;
 	d_idle = s->idle - d->idle;
-	cpu->busy = 100 - 100 * d_idle / d_total;
+	if (d_total)
+		cpu->busy = 100 - 100 * d_idle / d_total;
+	else
+		cpu->busy = 0;
 
 	return 0;
 }
