@@ -29,8 +29,8 @@
 #include <signal.h>
 
 #include "igt.h"
-#include "igt_gpu_power.h"
 #include "igt_rand.h"
+#include "igt_rapl.h"
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
 #include "i915/gem_ring.h"
@@ -1608,14 +1608,16 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 
 static void measure_semaphore_power(int i915)
 {
-	struct gpu_power power;
 	unsigned int engine, signaler;
+	struct rapl gpu, pkg;
 
-	igt_require(gpu_power_open(&power) == 0);
+	igt_require(pkg_power_open(&pkg) == 0);
+	igt_require(gpu_power_open(&gpu) == 0);
 
 	for_each_physical_engine(i915, signaler) {
-		struct gpu_power_sample s_spin[2];
-		struct gpu_power_sample s_sema[2];
+		struct {
+			struct power_sample pkg, gpu;
+		} s_spin[2], s_sema[2];
 		double baseline, total;
 		int64_t jiffie = 1;
 		igt_spin_t *spin;
@@ -1626,9 +1628,11 @@ static void measure_semaphore_power(int i915)
 		gem_wait(i915, spin->handle, &jiffie); /* waitboost */
 		igt_spin_busywait_until_started(spin);
 
-		gpu_power_read(&power, &s_spin[0]);
+		rapl_read(&pkg, &s_spin[0].pkg);
+		rapl_read(&gpu, &s_spin[0].gpu);
 		usleep(100*1000);
-		gpu_power_read(&power, &s_spin[1]);
+		rapl_read(&gpu, &s_spin[1].gpu);
+		rapl_read(&pkg, &s_spin[1].pkg);
 
 		/* Add a waiter to each engine */
 		for_each_physical_engine(i915, engine) {
@@ -1645,23 +1649,32 @@ static void measure_semaphore_power(int i915)
 		}
 		usleep(10); /* just give the tasklets a chance to run */
 
-		gpu_power_read(&power, &s_sema[0]);
+		rapl_read(&pkg, &s_sema[0].pkg);
+		rapl_read(&gpu, &s_sema[0].gpu);
 		usleep(100*1000);
-		gpu_power_read(&power, &s_sema[1]);
+		rapl_read(&gpu, &s_sema[1].gpu);
+		rapl_read(&pkg, &s_sema[1].pkg);
 
 		igt_spin_free(i915, spin);
 
-		baseline = gpu_power_W(&power, &s_spin[0], &s_spin[1]);
-		total = gpu_power_W(&power, &s_sema[0], &s_sema[1]);
-
+		baseline = power_W(&gpu, &s_spin[0].gpu, &s_spin[1].gpu);
+		total = power_W(&gpu, &s_sema[0].gpu, &s_sema[1].gpu);
 		igt_info("%s: %.1fmW + %.1fmW (total %1.fmW)\n",
 			 e__->name,
 			 1e3 * baseline,
 			 1e3 * (total - baseline),
 			 1e3 * total);
+
+		baseline = power_W(&pkg, &s_spin[0].pkg, &s_spin[1].pkg);
+		total = power_W(&pkg, &s_sema[0].pkg, &s_sema[1].pkg);
+		igt_info("pkg: %.1fmW + %.1fmW (total %1.fmW)\n",
+			 1e3 * baseline,
+			 1e3 * (total - baseline),
+			 1e3 * total);
 	}
 
-	gpu_power_close(&power);
+	rapl_close(&gpu);
+	rapl_close(&pkg);
 }
 
 igt_main

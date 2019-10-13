@@ -22,45 +22,74 @@
  *
  */
 
-#ifndef IGT_GPU_POWER_H
-#define IGT_GPU_POWER_H
+#ifndef IGT_RAPL_H
+#define IGT_RAPL_H
 
 #include <stdbool.h>
 #include <stdint.h>
 
-struct gpu_power {
-	int fd;
+struct rapl {
+	uint64_t power, type;
 	double scale;
+	int fd;
 };
 
-struct gpu_power_sample {
+struct power_sample {
 	uint64_t energy;
 	uint64_t time;
 };
 
-int gpu_power_open(struct gpu_power *power);
-bool gpu_power_read(struct gpu_power *power, struct gpu_power_sample *s);
-void gpu_power_close(struct gpu_power *power);
+int rapl_open(struct rapl *r, const char *domain);
 
-static inline double gpu_power_J(const struct gpu_power *p,
-				 const struct gpu_power_sample *p0,
-				 const struct gpu_power_sample *p1)
+static inline int cpu_power_open(struct rapl *r)
 {
-	return (p1->energy - p0->energy) * p->scale;
+	return rapl_open(r, "cpu");
 }
 
-static inline double gpu_power_s(const struct gpu_power *p,
-				 const struct gpu_power_sample *p0,
-				 const struct gpu_power_sample *p1)
+static inline int gpu_power_open(struct rapl *r)
+{
+	return rapl_open(r, "gpu");
+}
+
+static inline int pkg_power_open(struct rapl *r)
+{
+	return rapl_open(r, "pkg");
+}
+
+static inline int ram_power_open(struct rapl *r)
+{
+	return rapl_open(r, "ram");
+}
+
+static inline bool rapl_read(struct rapl *r, struct power_sample *s)
+{
+	return read(r->fd, s, sizeof(*s)) == sizeof(*s);
+}
+
+static inline void rapl_close(struct rapl *r)
+{
+	close(r->fd);
+}
+
+static inline double power_J(const struct rapl *r,
+			     const struct power_sample *p0,
+			     const struct power_sample *p1)
+{
+	return (p1->energy - p0->energy) * r->scale;
+}
+
+static inline double power_s(const struct rapl *r,
+			     const struct power_sample *p0,
+			     const struct power_sample *p1)
 {
 	return (p1->time - p0->time) * 1e-9;
 }
 
-static inline double gpu_power_W(const struct gpu_power *p,
-				 const struct gpu_power_sample *p0,
-				 const struct gpu_power_sample *p1)
+static inline double power_W(const struct rapl *r,
+			     const struct power_sample *p0,
+			     const struct power_sample *p1)
 {
-	return gpu_power_J(p, p0, p1) / gpu_power_s(p, p0, p1);
+	return power_J(r, p0, p1) / power_s(r, p0, p1);
 }
 
-#endif /* IGT_GPU_POWER_H */
+#endif /* IGT_RAPL_H */

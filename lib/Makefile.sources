@@ -33,8 +33,6 @@ lib_source_list =	 	\
 	igt_edid.h		\
 	igt_eld.c		\
 	igt_eld.h		\
-	igt_gpu_power.c		\
-	igt_gpu_power.h		\
 	igt_gt.c		\
 	igt_gt.h		\
 	igt_gvt.c		\
@@ -49,6 +47,8 @@ lib_source_list =	 	\
 	igt_primes.h		\
 	igt_rand.c		\
 	igt_rand.h		\
+	igt_rapl.c		\
+	igt_rapl.h		\
 	igt_rc.h		\
 	igt_stats.c		\
 	igt_stats.h		\
