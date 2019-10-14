@@ -25,7 +25,7 @@
  *      <madhumitha.tolakanahalli.pradeep@intel.com>
  *  Manasi Navare <manasi.d.navare@intel.com>
  *
- * Display Port Tiled Display Test
+ * Tiled display genlocked CRTC test
  * This test parses the tile information of the connectors that have TILE
  * property set, sets up the framebuffer with correct offsets corresponding to
  * the tile offsets and does an atomic modeset with two CRTCs for two
@@ -42,7 +42,7 @@
 #include "drm_fourcc.h"
 #include "igt_edid.h"
 
-IGT_TEST_DESCRIPTION("Test for Transcoder Port Sync for Display Port Tiled Displays");
+IGT_TEST_DESCRIPTION("Test for genlocked CRTCs with tiled displays");
 
 typedef struct {
 	igt_output_t *output;
@@ -122,8 +122,7 @@ static void get_number_of_h_tiles(data_t *data)
 						       res->connectors[i]);
 		igt_assert(connector);
 
-		if (connector->connection == DRM_MODE_CONNECTED &&
-		    connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+		if (connector->connection == DRM_MODE_CONNECTED) {
 			get_connector_tile_props(data, connector, &tile);
 
 			data->num_h_tiles = tile.num_h_tile;
@@ -146,12 +145,6 @@ static void get_connectors(data_t *data)
 							     output->id);
 
 		igt_assert(conns[count].connector);
-
-		if (conns[count].connector->connector_type !=
-		    DRM_MODE_CONNECTOR_DisplayPort) {
-			drmModeFreeConnector(conns[count].connector);
-			continue;
-		}
 
 		get_connector_tile_props(data, conns[count].connector,
 					 &conns[count].tile);
