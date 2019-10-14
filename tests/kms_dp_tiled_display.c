@@ -302,51 +302,54 @@ static void setup_framebuffer(data_t *data)
 	}
 }
 
+static data_connector_t *conn_for_crtc(data_t *data, unsigned int crtc_id)
+{
+	for (int i = 0; i < data->num_h_tiles; i++) {
+		data_connector_t *conn = &data->conns[i];
+
+		if (data->display->pipes[conn->pipe].crtc_id == crtc_id)
+			return conn;
+	}
+
+	return NULL;
+}
+
 static void page_flip_handler(int fd, unsigned int seq,
 			      unsigned int tv_sec, unsigned int tv_usec,
 			      unsigned int crtc_id, void *_data)
 {
 	data_t *data = _data;
-	data_connector_t *conn;
+	data_connector_t *conn = conn_for_crtc(data, crtc_id);
 	struct timeval current_ts = {
 		.tv_sec = tv_sec,
 		.tv_usec = tv_usec,
 	};
-	int i;
+	struct timeval diff;
+	long usec;
 
 	if (!timerisset(&data->first_ts))
 		data->first_ts = current_ts;
 
+	igt_assert_f(conn, "Got page-flip event for unexpected CRTC %u\n",
+		     crtc_id);
+
+	igt_assert_f(!conn->got_page_flip, "Got two page-flips for CRTC %u\n",
+		     crtc_id);
+
 	igt_debug("Page Flip Event received from CRTC:%d at %u:%u\n", crtc_id,
 		  tv_sec, tv_usec);
 
-	for (i = 0; i < data->num_h_tiles; i++) {
+	conn->got_page_flip = true;
 
-		conn = &data->conns[i];
-		if (data->display->pipes[conn->pipe].crtc_id == crtc_id) {
-			struct timeval diff;
-			long usec;
+	timersub(&current_ts, &data->first_ts, &diff);
+	usec = diff.tv_sec * 1000000 + diff.tv_usec;
 
-			igt_assert_f(!conn->got_page_flip,
-				     "Got two page-flips for CRTC %u\n",
-				     crtc_id);
-			conn->got_page_flip = true;
-
-			timersub(&current_ts, &data->first_ts, &diff);
-			usec = diff.tv_sec * 1000000 + diff.tv_usec;
-
-			/*
-			 * For seamless tear-free display, the page flip event timestamps
-			 * from all the tiles should not differ by more than 10us.
-			 */
-			igt_fail_on_f(abs(usec) >= 10, "Delayed page flip event from CRTC:%d at %u:%u\n",
-				      crtc_id, tv_sec, tv_usec);
-			return;
-		}
-	}
-
-	igt_assert_f(false, "Got page-flip event for unexpected CRTC %u\n",
-		     crtc_id);
+	/*
+	 * For seamless tear-free display, the page flip event timestamps
+	 * from all the tiles should not differ by more than 10us.
+	 */
+	igt_fail_on_f(abs(usec) >= 10, "Delayed page flip event from CRTC:%d at %u:%u\n",
+		      crtc_id, tv_sec, tv_usec);
 }
 
 static bool got_all_page_flips(data_t *data)
