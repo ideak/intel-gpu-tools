@@ -58,6 +58,7 @@ typedef struct {
 	igt_display_t *display;
 	data_connector_t *conns;
 	enum igt_commit_style commit;
+	struct timeval first_ts;
 } data_t;
 
 static int drm_property_is_tile(drmModePropertyPtr prop)
@@ -307,9 +308,14 @@ static void page_flip_handler(int fd, unsigned int seq,
 {
 	data_t *data = _data;
 	data_connector_t *conn;
-	bool is_on_time = false;
-	static unsigned int _tv_sec, _tv_usec;
+	struct timeval current_ts = {
+		.tv_sec = tv_sec,
+		.tv_usec = tv_usec,
+	};
 	int i;
+
+	if (!timerisset(&data->first_ts))
+		data->first_ts = current_ts;
 
 	igt_debug("Page Flip Event received from CRTC:%d at %u:%u\n", crtc_id,
 		  tv_sec, tv_usec);
@@ -318,24 +324,22 @@ static void page_flip_handler(int fd, unsigned int seq,
 
 		conn = &data->conns[i];
 		if (data->display->pipes[conn->pipe].crtc_id == crtc_id) {
+			struct timeval diff;
+			long usec;
+
 			igt_assert_f(!conn->got_page_flip,
 				     "Got two page-flips for CRTC %u\n",
 				     crtc_id);
 			conn->got_page_flip = true;
 
-			/* Skip the following checks for the first page flip event */
-			if (_tv_sec == 0 || _tv_usec == 0) {
-				_tv_sec = tv_sec;
-				_tv_usec = tv_usec;
-				return;
-			}
+			timersub(&current_ts, &data->first_ts, &diff);
+			usec = diff.tv_sec * 1000000 + diff.tv_usec;
+
 			/*
 			 * For seamless tear-free display, the page flip event timestamps
 			 * from all the tiles should not differ by more than 10us.
 			 */
-			is_on_time = tv_sec == _tv_sec && (abs(tv_usec - _tv_usec) < 10);
-
-			igt_fail_on_f(!is_on_time, "Delayed page flip event from CRTC:%d at %u:%u\n",
+			igt_fail_on_f(abs(usec) >= 10, "Delayed page flip event from CRTC:%d at %u:%u\n",
 				      crtc_id, tv_sec, tv_usec);
 			return;
 		}
@@ -394,6 +398,7 @@ igt_main
 		get_connectors(&data);
 		setup_mode(&data);
 		setup_framebuffer(&data);
+		timerclear(&data.first_ts);
 		igt_display_commit_atomic(data.display, DRM_MODE_ATOMIC_NONBLOCK |
 					  DRM_MODE_PAGE_FLIP_EVENT, &data);
 		while (!got_all_page_flips(&data)) {
