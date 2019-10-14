@@ -1191,6 +1191,15 @@ int igt_system_quiet(const char *command);
 	} while (0)
 
 /**
+ * igt_trace:
+ * @format: printf-style format string with optional args
+ *
+ * Writes a message into the kernel trace log.
+ */
+__attribute__((format(printf, 1, 2)))
+void igt_trace(const char *format, ...);
+
+/**
  * igt_kmsg:
  * @format: printf-style format string with optional args
  *

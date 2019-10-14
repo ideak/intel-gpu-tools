@@ -421,6 +421,26 @@ void igt_kmsg(const char *format, ...)
 	fclose(file);
 }
 
+void igt_trace(const char *format, ...)
+{
+	char path[128];
+	va_list ap;
+	FILE *file;
+
+	snprintf(path, sizeof(path), "%s/tracing/trace_marker",
+		 igt_debugfs_mount());
+
+	file = fopen(path, "w");
+	if (file == NULL)
+		return;
+
+	va_start(ap, format);
+	vfprintf(file, format, ap);
+	va_end(ap);
+
+	fclose(file);
+}
+
 #define time_valid(ts) ((ts)->tv_sec || (ts)->tv_nsec)
 
 double igt_time_elapsed(struct timespec *then,
