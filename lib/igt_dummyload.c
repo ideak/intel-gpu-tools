@@ -450,7 +450,8 @@ void igt_spin_free(int fd, igt_spin_t *spin)
 		gem_close(fd, spin->poll_handle);
 	}
 
-	gem_close(fd, spin->handle);
+	if (spin->handle)
+		gem_close(fd, spin->handle);
 
 	if (spin->out_fence >= 0)
 		close(spin->out_fence);
