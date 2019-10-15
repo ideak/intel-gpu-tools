@@ -445,6 +445,7 @@ int gem_wait(int fd, uint32_t handle, int64_t *timeout_ns)
 	ret = 0;
 	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_WAIT, &wait))
 		ret = -errno;
+	errno = 0;
 
 	if (timeout_ns)
 		*timeout_ns = wait.timeout_ns;
