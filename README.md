@@ -20,8 +20,8 @@ Generated documentation for the latest master is published under
 Requirements
 ------------
 
-See `Dockerfile.*` for up-to-date list of package names in Fedora and
-Debian.
+See `Dockerfile.build-fedora` for up-to-date list of package names in Fedora
+or `Dockerfile.build-debian-minimal` and `Dockerfile.build-debian` for Debian.
 
 If your distribution packages IGT you can also use your package manager to
 install the dependencies, e.g.:

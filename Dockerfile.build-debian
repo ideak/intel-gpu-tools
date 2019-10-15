@@ -2,6 +2,11 @@ ARG CI_COMMIT_SHA
 ARG CI_REGISTRY_IMAGE
 FROM $CI_REGISTRY_IMAGE/build-debian-minimal:commit-$CI_COMMIT_SHA
 
+# inherits from Dockerfile.build-debian-minimal
+#
+# just few extra dependencies for building IGT with all the optional components
+# enabled
+
 RUN apt-get update
 RUN apt-get install -y \
 			libunwind-dev \
