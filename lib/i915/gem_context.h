@@ -24,6 +24,11 @@
 #ifndef GEM_CONTEXT_H
 #define GEM_CONTEXT_H
 
+#include <stdbool.h>
+#include <stdint.h>
+
+struct drm_i915_gem_context_param;
+
 uint32_t gem_context_create(int fd);
 int __gem_context_create(int fd, uint32_t *ctx_id);
 void gem_context_destroy(int fd, uint32_t ctx_id);
@@ -57,6 +62,9 @@ int __gem_context_get_param(int fd, struct drm_i915_gem_context_param *p);
 #define LOCAL_I915_CONTEXT_MIN_USER_PRIORITY	-1023
 int __gem_context_set_priority(int fd, uint32_t ctx, int prio);
 void gem_context_set_priority(int fd, uint32_t ctx, int prio);
+
+int __gem_context_set_persistence(int i915, uint32_t ctx, bool state);
+void gem_context_set_persistence(int i915, uint32_t ctx, bool state);
 
 bool gem_context_has_engine(int fd, uint32_t ctx, uint64_t engine);
 

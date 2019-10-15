@@ -272,6 +272,43 @@ void gem_context_set_priority(int fd, uint32_t ctx_id, int prio)
 	igt_assert_eq(__gem_context_set_priority(fd, ctx_id, prio), 0);
 }
 
+/**
+ * __gem_context_set_persistence:
+ * @i915: open i915 drm file descriptor
+ * @ctx: i915 context id
+ * @state: desired persistence
+ *
+ * Declare whether this context is allowed to persist after closing until
+ * its requests are complete (persistent=true) or if it should be
+ * immediately reaped on closing and its requests cancelled
+ * (persistent=false).
+ *
+ * Returns: An integer equal to zero for success and negative for failure
+ */
+int __gem_context_set_persistence(int i915, uint32_t ctx, bool state)
+{
+	struct drm_i915_gem_context_param p = {
+		.ctx_id = ctx,
+		.param = I915_CONTEXT_PARAM_PERSISTENCE,
+		.value = state,
+	};
+
+	return __gem_context_set_param(i915, &p);
+}
+
+/**
+ * __gem_context_set_persistence:
+ * @i915: open i915 drm file descriptor
+ * @ctx: i915 context id
+ * @state: desired persistence
+ *
+ * Like __gem_context_set_persistence(), except we assert on failure.
+ */
+void gem_context_set_persistence(int i915, uint32_t ctx, bool state)
+{
+	igt_assert_eq(__gem_context_set_persistence(i915, ctx, state), 0);
+}
+
 int
 __gem_context_clone(int i915,
 		    uint32_t src, unsigned int share,
