@@ -732,7 +732,7 @@ static const char *result_from_exitcode(int exitcode)
 	case IGT_EXIT_SUCCESS:
 		return "pass";
 	case IGT_EXIT_INVALID:
-		return "notrun";
+		return "skip";
 	case INCOMPLETE_EXITCODE:
 		return "incomplete";
 	default:
