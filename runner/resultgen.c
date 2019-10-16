@@ -10,6 +10,7 @@
 
 #include <json.h>
 
+#include "igt_aux.h"
 #include "igt_core.h"
 #include "resultgen.h"
 #include "settings.h"
@@ -59,28 +60,7 @@ static char *find_line_starting_with(char *haystack, const char *needle, char *e
 	return NULL;
 }
 
-static char *find_line_starting_with_either(char *haystack,
-					    const char *needle1,
-					    const char *needle2,
-					    char *end)
-{
-	while (haystack < end) {
-		char *line_end = memchr(haystack, '\n', end - haystack);
-		size_t linelen = line_end != NULL ? line_end - haystack : end - haystack;
-		if ((linelen >= strlen(needle1) && !memcmp(haystack, needle1, strlen(needle1))) ||
-		    (linelen >= strlen(needle2) && !memcmp(haystack, needle2, strlen(needle2))))
-			return haystack;
-
-		if (line_end == NULL)
-			return NULL;
-
-		haystack = line_end + 1;
-	}
-
-	return NULL;
-}
-
-static char *next_line(char *line, char *bufend)
+static const char *next_line(const char *line, const char *bufend)
 {
 	char *ret;
 
@@ -95,45 +75,6 @@ static char *next_line(char *line, char *bufend)
 		return ret;
 	else
 		return NULL;
-}
-
-static char *find_line_after_last(char *begin,
-				  const char *needle1,
-				  const char *needle2,
-				  char *end)
-{
-	char *one, *two;
-	char *current_pos = begin;
-	char *needle1_newline = malloc(strlen(needle1) + 2);
-	char *needle2_newline = malloc(strlen(needle2) + 2);
-
-	needle1_newline[0] = needle2_newline[0] = '\n';
-	strcpy(needle1_newline + 1, needle1);
-	strcpy(needle2_newline + 1, needle2);
-
-	while (true) {
-		one = memmem(current_pos, end - current_pos, needle1_newline, strlen(needle1_newline));
-		two = memmem(current_pos, end - current_pos, needle2_newline, strlen(needle2_newline));
-		if (one == NULL && two == NULL)
-			break;
-
-		if (one != NULL && current_pos < one)
-			current_pos = one;
-		if (two != NULL && current_pos < two)
-			current_pos = two;
-
-		one = next_line(current_pos, end);
-		if (one != NULL)
-			current_pos = one;
-	}
-	free(needle1_newline);
-	free(needle2_newline);
-
-	one = memchr(current_pos, '\n', end - current_pos);
-	if (one != NULL)
-		return ++one;
-
-	return current_pos;
 }
 
 static size_t count_lines(const char *buf, const char *bufend)
@@ -166,7 +107,7 @@ static const struct {
 	{ "CRASH", "crash" },
 	{ "TIMEOUT", "timeout" },
 };
-static void parse_result_string(char *resultstring, size_t len, const char **result, double *time)
+static void parse_result_string(const char *resultstring, size_t len, const char **result, double *time)
 {
 	size_t i;
 	size_t wordlen = 0;
@@ -206,18 +147,19 @@ static void parse_result_string(char *resultstring, size_t len, const char **res
 	}
 }
 
-static void parse_subtest_result(char *subtest, const char **result, double *time, char *buf, char *bufend)
+static void parse_subtest_result(const char *subtest,
+				 const char **result,
+				 double *time,
+				 const char *line,
+				 const char *bufend)
 {
-	char *line;
-	char *line_end;
-	char *resultstring;
-	size_t linelen;
+	const char *resultstring;
 	size_t subtestlen = strlen(subtest);
+	const char *line_end;
+	size_t linelen;
 
-	*result = NULL;
+	*result = "incomplete";
 	*time = 0.0;
-
-	if (!buf) return;
 
 	/*
 	 * The result line structure is:
@@ -235,18 +177,17 @@ static void parse_subtest_result(char *subtest, const char **result, double *tim
 	 * Subtest subtestname: PASS (0.003s)
 	 */
 
-	line = find_line_starting_with(buf, SUBTEST_RESULT, bufend);
-	if (!line) {
-		*result = "incomplete";
+	if (!line)
 		return;
-	}
 
 	line_end = memchr(line, '\n', bufend - line);
 	linelen = line_end != NULL ? line_end - line : bufend - line;
 
 	if (strlen(SUBTEST_RESULT) + subtestlen + strlen(": ") > linelen ||
-	    strncmp(line + strlen(SUBTEST_RESULT), subtest, subtestlen))
-		return parse_subtest_result(subtest, result, time, line + linelen, bufend);
+	    strncmp(line + strlen(SUBTEST_RESULT), subtest, subtestlen)) {
+		/* This is not the correct result line */
+		return;
+	}
 
 	resultstring = line + strlen(SUBTEST_RESULT) + subtestlen + strlen(": ");
 	parse_result_string(resultstring, linelen - (resultstring - line), result, time);
@@ -309,6 +250,59 @@ static void set_runtime(struct json_object *obj, double time)
 			       json_object_new_double(time));
 }
 
+struct match_item
+{
+	const char *where;
+	const char *what;
+};
+
+struct matches
+{
+	struct match_item *items;
+	size_t size;
+};
+
+static void match_add(struct matches *matches, const char *where, const char *what)
+{
+	struct match_item newitem = { where, what };
+
+	matches->size++;
+	matches->items = realloc(matches->items, matches->size * sizeof(*matches->items));
+	matches->items[matches->size - 1] = newitem;
+}
+
+static struct matches find_matches(const char *buf, const char *bufend,
+				   const char **needles)
+{
+	struct matches ret = {};
+
+	while (buf < bufend) {
+		const char **needle;
+
+		for (needle = needles; *needle; needle++) {
+			if (bufend - buf < strlen(*needle))
+				continue;
+
+			if (!memcmp(buf, *needle, strlen(*needle))) {
+				match_add(&ret, buf, *needle);
+				goto end_find;
+			}
+		}
+
+	end_find:
+		buf = next_line(buf, bufend);
+		if (!buf)
+			break;
+	}
+
+	return ret;
+}
+
+static void free_matches(struct matches *matches)
+{
+	free(matches->items);
+}
+
 static bool fill_from_output(int fd, const char *binary, const char *key,
 			     struct subtests *subtests,
 			     struct json_object *tests)
@@ -319,7 +313,13 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 	char *igt_version = NULL;
 	size_t igt_version_len = 0;
 	struct json_object *current_test = NULL;
-	size_t i;
+	const char *needles[] = {
+		STARTING_SUBTEST,
+		SUBTEST_RESULT,
+		NULL
+	};
+	struct matches matches = {};
+	size_t i, k;
 
 	if (fstat(fd, &statbuf))
 		return false;
@@ -364,10 +364,13 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 		return true;
 	}
 
+	matches = find_matches(buf, bufend, needles);
+
 	for (i = 0; i < subtests->size; i++) {
 		char *this_sub_begin, *this_sub_result;
+		int begin_idx = -1, result_idx = -1;
 		const char *resulttext;
-		char *beg, *end, *startline;
+		const char *beg, *end;
 		double time;
 		int begin_len;
 		int result_len;
@@ -383,66 +386,68 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 			return false;
 		}
 
-		beg = find_line_starting_with(buf, this_sub_begin, bufend);
-		end = find_line_starting_with(buf, this_sub_result, bufend);
-		startline = beg;
+		for (k = 0; k < matches.size; k++) {
+			if (matches.items[k].what == STARTING_SUBTEST &&
+			    !memcmp(matches.items[k].where,
+				    this_sub_begin,
+				    min(begin_len, bufend - matches.items[k].where))) {
+				beg = matches.items[k].where;
+				begin_idx = k;
+			}
+			if (matches.items[k].what == SUBTEST_RESULT &&
+			    !memcmp(matches.items[k].where,
+				    this_sub_result,
+				    min(result_len, bufend - matches.items[k].where))) {
+				end = matches.items[k].where;
+				result_idx = k;
+			}
+		}
 
 		free(this_sub_begin);
 		free(this_sub_result);
 
-		if (beg == NULL && end == NULL) {
+		if (begin_idx < 0 && result_idx < 0) {
 			/* No output at all */
-			beg = bufend;
+			beg = buf;
 			end = bufend;
-		}
-
-		if (beg == NULL) {
+		} else if (begin_idx < 0) {
 			/*
-			 * Subtest didn't start, probably skipped from
-			 * fixture already. Start from the result
-			 * line, it gets adjusted below.
+			 * Subtest didn't start, but we have the
+			 * result. Probably because an igt_fixture
+			 * made it fail/skip.
+			 *
+			 * Start the output right after the previous
+			 * subtest result/start.
 			 */
-			beg = end;
-		}
-
-		/* Include the output after the previous subtest output */
-		beg = find_line_after_last(buf,
-					   STARTING_SUBTEST,
-					   SUBTEST_RESULT,
-					   beg);
-
-		if (end == NULL) {
-			/* Incomplete result. Find the next starting subtest or result. */
-			end = next_line(startline, bufend);
-			if (end != NULL) {
-				end = find_line_starting_with_either(end,
-								     STARTING_SUBTEST,
-								     SUBTEST_RESULT,
-								     bufend);
-			}
-			if (end == NULL) {
-				end = bufend;
-			}
+			if (result_idx > 0)
+				beg = next_line(matches.items[result_idx - 1].where, bufend);
+			else
+				beg = buf;
 		} else {
-			/*
-			 * Now pointing to the line where this sub's
-			 * result is. We need to include that of
-			 * course.
-			 */
-			char *nexttest = next_line(end, bufend);
+			/* Stretch output beginning backwards */
+			if (begin_idx == 0)
+				beg = buf;
+			else
+				beg = next_line(matches.items[begin_idx - 1].where, bufend);
+		}
 
-			/* Stretch onwards until the next subtest begins or ends */
-			if (nexttest != NULL) {
-				nexttest = find_line_starting_with_either(nexttest,
-									  STARTING_SUBTEST,
-									  SUBTEST_RESULT,
-									  bufend);
-			}
-			if (nexttest != NULL) {
-				end = nexttest;
-			} else {
+		if (result_idx < 0 && begin_idx < 0) {
+			/* No output at all: Already handled above */
+		} else if (result_idx < 0) {
+			/*
+			 * Incomplete result. Include output up to the
+			 * next starting subtest or result.
+			 */
+			if (begin_idx < matches.size - 1)
+				end = matches.items[begin_idx + 1].where;
+			else
 				end = bufend;
-			}
+		} else {
+			/* Stretch output to the next starting subtest or result. */
+			if (result_idx < matches.size - 1)
+				end = matches.items[result_idx + 1].where;
+			else
+				end = bufend;
 		}
 
 		json_object_object_add(current_test, key,
@@ -455,12 +460,16 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 		}
 
 		if (!json_object_object_get_ex(current_test, "result", NULL)) {
-			parse_subtest_result(subtests->names[i], &resulttext, &time, beg, end);
+			parse_subtest_result(subtests->names[i],
+					     &resulttext, &time,
+					     result_idx < 0 ? NULL : matches.items[result_idx].where,
+					     end);
 			set_result(current_test, resulttext);
 			set_runtime(current_test, time);
 		}
 	}
 
+	free_matches(&matches);
 	return true;
 }
 
