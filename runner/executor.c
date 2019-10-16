@@ -1032,7 +1032,7 @@ execute_test_process(int outfd, int errfd,
 	}
 
 	execv(argv[0], argv);
-	errf("Cannot execute %s\n", argv[0]);
+	fprintf(stderr, "Cannot execute %s\n", argv[0]);
 	exit(IGT_EXIT_INVALID);
 }
 
