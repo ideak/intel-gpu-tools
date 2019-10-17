@@ -104,6 +104,9 @@ TESTS_progs = \
 	vgem_slow \
 	$(NULL)
 
+TESTS_progs += sysfs_heartbeat_interval
+sysfs_heartbeat_interval_SOURCES = i915/sysfs_heartbeat_interval.c
+
 TESTS_progs += sysfs_preempt_timeout
 sysfs_preempt_timeout_SOURCES = i915/sysfs_preempt_timeout.c
 
