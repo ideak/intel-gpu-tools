@@ -227,6 +227,7 @@ i915_progs = [
 	'i915_query',
 	'i915_selftest',
 	'i915_suspend',
+	'sysfs_preempt_timeout',
 ]
 
 test_deps = [ igt_deps ]

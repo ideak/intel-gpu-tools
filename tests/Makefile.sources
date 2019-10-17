@@ -104,6 +104,9 @@ TESTS_progs = \
 	vgem_slow \
 	$(NULL)
 
+TESTS_progs += sysfs_preempt_timeout
+sysfs_preempt_timeout_SOURCES = i915/sysfs_preempt_timeout.c
+
 TESTS_progs += gem_bad_reloc
 gem_bad_reloc_SOURCES = i915/gem_bad_reloc.c
 
