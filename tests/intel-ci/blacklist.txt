@@ -106,5 +106,5 @@ igt@i915_suspend@shrink
 ###############################################
 # pipe-e, pipe-f no current HW support
 ###############################################
-igt@.*@.*pipe-e-.*
-igt@.*@.*pipe-f-.*
+igt@.*@.*pipe-e($|-.*)
+igt@.*@.*pipe-f($|-.*)
