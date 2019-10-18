@@ -25,7 +25,7 @@
 #include "igt.h"
 #include <stdbool.h>
 
-IGT_TEST_DESCRIPTION("Make sure all modesets are rejected when the requested dotclock is too high");
+IGT_TEST_DESCRIPTION("Make sure all modesets are rejected when the requested mode is invalid");
 
 typedef struct {
 	int drm_fd;

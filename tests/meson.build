@@ -228,7 +228,7 @@ i915_progs = [
 	'kms_flip_scaled_crc',
 	'kms_flip_tiling',
 	'kms_frontbuffer_tracking',
-	'kms_invalid_dotclock',
+	'kms_invalid_mode',
 	'kms_legacy_colorkey',
 	'kms_mmap_write_crc',
 	'kms_pipe_b_c_ivb',
