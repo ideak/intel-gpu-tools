@@ -27,13 +27,16 @@
 
 IGT_TEST_DESCRIPTION("Make sure all modesets are rejected when the requested mode is invalid");
 
-typedef struct {
+typedef struct _data data_t;
+
+struct _data {
 	int drm_fd;
 	igt_display_t display;
 	igt_output_t *output;
 	drmModeResPtr res;
 	int max_dotclock;
-} data_t;
+	bool (*adjust_mode)(data_t *data, drmModeModeInfoPtr mode);
+};
 
 static bool has_scaling_mode_prop(data_t *data)
 {
@@ -63,13 +66,10 @@ can_bigjoiner(data_t *data)
 	return false;
 }
 
-static int
-test_output(data_t *data)
+static bool
+adjust_mode_clock_too_high(data_t *data, drmModeModeInfoPtr mode)
 {
-	igt_output_t *output = data->output;
-	drmModeModeInfo mode;
-	struct igt_fb fb;
-	int i;
+	igt_require(data->max_dotclock != 0);
 
 	/*
 	 * FIXME When we have a fixed mode, the kernel will ignore
@@ -80,14 +80,28 @@ test_output(data_t *data)
 	 * test on  any connector with a fixed mode.
 	 */
 	if (has_scaling_mode_prop(data))
-		return 0;
+		return false;
+
+	mode->clock = data->max_dotclock + 1;
+
+	return true;
+}
+
+static int
+test_output(data_t *data)
+{
+	igt_output_t *output = data->output;
+	drmModeModeInfo mode;
+	struct igt_fb fb;
+	int i;
 
 	/*
 	 * FIXME test every mode we have to be more
 	 * sure everything is really getting rejected?
 	 */
 	mode = *igt_output_get_mode(output);
-	mode.clock = data->max_dotclock + 1;
+	if (!data->adjust_mode(data, &mode))
+		return 0;
 
 	/*
 	 * Newer platforms can support modes higher than the maximum dot clock
@@ -154,25 +168,43 @@ static int i915_max_dotclock(data_t *data)
 	return max_dotclock;
 }
 
+static const struct {
+	const char *name;
+	bool (*adjust_mode)(data_t *data, drmModeModeInfoPtr mode);
+} subtests[] = {
+	{ .name = "clock-too-high",
+	  .adjust_mode = adjust_mode_clock_too_high,
+	},
+};
+
 static data_t data;
 
-igt_simple_main
+igt_main
 {
-	data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
-	igt_require_intel(data.drm_fd);
+	igt_fixture {
+		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		igt_require_intel(data.drm_fd);
 
-	kmstest_set_vt_graphics_mode();
+		kmstest_set_vt_graphics_mode();
 
-	igt_display_require(&data.display, data.drm_fd);
-	data.res = drmModeGetResources(data.drm_fd);
-	igt_assert(data.res);
+		igt_display_require(&data.display, data.drm_fd);
+		data.res = drmModeGetResources(data.drm_fd);
+		igt_assert(data.res);
 
-	data.max_dotclock = i915_max_dotclock(&data);
-	igt_info("Max dotclock: %d kHz\n", data.max_dotclock);
+		data.max_dotclock = i915_max_dotclock(&data);
+		igt_info("Max dotclock: %d kHz\n", data.max_dotclock);
+	}
 
-	test(&data);
+	for (int i = 0; i < ARRAY_SIZE(subtests); i++) {
+		igt_subtest(subtests[i].name) {
+			data.adjust_mode = subtests[i].adjust_mode;
+			test(&data);
+		}
+	}
 
-	igt_display_fini(&data.display);
-	igt_reset_connectors();
-	drmModeFreeResources(data.res);
+	igt_fixture {
+		igt_display_fini(&data.display);
+		igt_reset_connectors();
+		drmModeFreeResources(data.res);
+	}
 }
