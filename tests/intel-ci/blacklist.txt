@@ -62,6 +62,7 @@ igt@gem_userptr_blits@(major|minor|forked|mlocked|swapping).*
 igt@gem_wait@.*hang.*
 igt@sysfs_heartbeat_timeout@long.*
 igt@sysfs_preemption_timeout@off.*
+igt@sysfs_timeslice_duration@off.*
 ###############################################
 # GEM: Not worth fixing
 ###############################################

@@ -229,6 +229,7 @@ i915_progs = [
 	'i915_suspend',
 	'sysfs_heartbeat_interval',
 	'sysfs_preempt_timeout',
+	'sysfs_timeslice_duration',
 ]
 
 test_deps = [ igt_deps ]
