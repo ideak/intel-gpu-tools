@@ -100,6 +100,69 @@ adjust_mode_clock_too_high(data_t *data, drmModeModeInfoPtr mode)
 	return true;
 }
 
+static bool
+adjust_mode_zero_clock(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->clock = 0;
+	return true;
+}
+
+static bool
+adjust_mode_zero_hdisplay(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->hdisplay = 0;
+	return true;
+}
+
+static bool
+adjust_mode_zero_vdisplay(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->vdisplay = 0;
+	return true;
+}
+
+static bool
+adjust_mode_bad_hsync_start(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->hsync_start = mode->hdisplay - 1;
+	return true;
+}
+
+static bool
+adjust_mode_bad_vsync_start(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->vsync_start = mode->vdisplay - 1;
+	return true;
+}
+
+static bool
+adjust_mode_bad_hsync_end(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->hsync_end = mode->hsync_start - 1;
+	return true;
+}
+
+static bool
+adjust_mode_bad_vsync_end(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->vsync_end = mode->vsync_start - 1;
+	return true;
+}
+
+static bool
+adjust_mode_bad_htotal(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->htotal = mode->hsync_end - 1;
+	return true;
+}
+
+static bool
+adjust_mode_bad_vtotal(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->vtotal = mode->vsync_end - 1;
+	return true;
+}
+
 static int
 test_output(data_t *data)
 {
@@ -117,7 +180,8 @@ test_output(data_t *data)
 		return 0;
 
 	igt_create_fb(data->drm_fd,
-		      mode.hdisplay, mode.vdisplay,
+		      max(mode.hdisplay, 64),
+		      max(mode.vdisplay, 64),
 		      DRM_FORMAT_XRGB8888,
 		      DRM_FORMAT_MOD_NONE,
 		      &fb);
@@ -176,6 +240,33 @@ static const struct {
 } subtests[] = {
 	{ .name = "clock-too-high",
 	  .adjust_mode = adjust_mode_clock_too_high,
+	},
+	{ .name = "zero-clock",
+	  .adjust_mode = adjust_mode_zero_clock,
+	},
+	{ .name = "zero-hdisplay",
+	  .adjust_mode = adjust_mode_zero_hdisplay,
+	},
+	{ .name = "zero-vdisplay",
+	  .adjust_mode = adjust_mode_zero_vdisplay,
+	},
+	{ .name = "bad-hsync-start",
+	  .adjust_mode = adjust_mode_bad_hsync_start,
+	},
+	{ .name = "bad-vsync-start",
+	  .adjust_mode = adjust_mode_bad_vsync_start,
+	},
+	{ .name = "bad-hsync-end",
+	  .adjust_mode = adjust_mode_bad_hsync_end,
+	},
+	{ .name = "bad-vsync-end",
+	  .adjust_mode = adjust_mode_bad_vsync_end,
+	},
+	{ .name = "bad-htotal",
+	  .adjust_mode = adjust_mode_bad_htotal,
+	},
+	{ .name = "bad-vtotal",
+	  .adjust_mode = adjust_mode_bad_vtotal,
 	},
 };
 
