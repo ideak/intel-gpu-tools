@@ -123,6 +123,7 @@ i915_progs = [
 	'gem_ctx_isolation',
 	'gem_ctx_param',
 	'gem_ctx_persistence',
+	'gem_ctx_ringsize',
 	'gem_ctx_shared',
 	'gem_ctx_switch',
 	'gem_ctx_thrash',
