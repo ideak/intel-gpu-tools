@@ -38,6 +38,7 @@
 
 #include <drm.h>
 
+#include "i915/gem_engine_topology.h"
 #include "igt_rand.h"
 #include "igt_vgem.h"
 #include "sync_file.h"
@@ -548,6 +549,14 @@ static uint32_t store_timestamp(int i915,
 	return obj.handle;
 }
 
+static uint32_t ring_base(int i915, unsigned ring)
+{
+	if (ring == I915_EXEC_DEFAULT)
+		ring = I915_EXEC_RENDER; /* XXX */
+
+	return gem_engine_mmio_base(i915, gem_eb_flags_to_engine(ring).name);
+}
+
 static void independent(int i915, unsigned ring, unsigned flags)
 {
 	const int TIMESTAMP = 1023;
@@ -555,33 +564,8 @@ static void independent(int i915, unsigned ring, unsigned flags)
 	igt_spin_t *spin[MAX_ELSP_QLEN];
 	unsigned int mmio_base;
 
-	/* XXX i915_query()! */
-	switch (ring) {
-	case I915_EXEC_DEFAULT:
-	case I915_EXEC_RENDER:
-		mmio_base = 0x2000;
-		break;
-#if 0
-	case I915_EXEC_BSD:
-		mmio_base = 0x12000;
-		break;
-#endif
-	case I915_EXEC_BLT:
-		mmio_base = 0x22000;
-		break;
-
-#define GEN11_VECS0_BASE 0x1c8000
-#define GEN11_VECS1_BASE 0x1d8000
-	case I915_EXEC_VEBOX:
-		if (intel_gen(intel_get_drm_devid(i915)) >= 11)
-			mmio_base = GEN11_VECS0_BASE;
-		else
-			mmio_base = 0x1a000;
-		break;
-
-	default:
-		igt_skip("mmio base not known\n");
-	}
+	mmio_base = ring_base(i915, ring);
+	igt_require_f(mmio_base, "mmio base not known\n");
 
 	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
 		const struct igt_spin_factory opts = {

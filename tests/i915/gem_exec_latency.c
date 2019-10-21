@@ -109,7 +109,7 @@ poll_ring(int fd, unsigned ring, const char *name)
 	igt_spin_free(fd, spin[0]);
 }
 
-#define RCS_TIMESTAMP (0x2000 + 0x358)
+#define TIMESTAMP (0x358)
 static void latency_on_ring(int fd,
 			    unsigned ring, const char *name,
 			    unsigned flags)
@@ -119,6 +119,7 @@ static void latency_on_ring(int fd,
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
+	const uint32_t mmio_base = gem_engine_mmio_base(fd, name);
 	igt_spin_t *spin = NULL;
 	IGT_CORK_HANDLE(c);
 	volatile uint32_t *reg;
@@ -128,7 +129,8 @@ static void latency_on_ring(int fd,
 	double gpu_latency;
 	int i, j;
 
-	reg = (volatile uint32_t *)((volatile char *)igt_global_mmio + RCS_TIMESTAMP);
+	igt_require(mmio_base);
+	reg = (volatile uint32_t *)((volatile char *)igt_global_mmio + mmio_base + TIMESTAMP);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
@@ -176,7 +178,7 @@ static void latency_on_ring(int fd,
 		map[i++] = 0x24 << 23 | 1;
 		if (has_64bit_reloc)
 			map[i-1]++;
-		map[i++] = RCS_TIMESTAMP; /* ring local! */
+		map[i++] = mmio_base + TIMESTAMP;
 		map[i++] = offset;
 		if (has_64bit_reloc)
 			map[i++] = offset >> 32;
@@ -266,10 +268,13 @@ static void latency_from_ring(int fd,
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
+	const uint32_t mmio_base = gem_engine_mmio_base(fd, name);
 	const unsigned int repeats = ring_size / 2;
 	uint32_t *map, *results;
 	uint32_t ctx[2] = {};
 	int i, j;
+
+	igt_require(mmio_base);
 
 	if (flags & PREEMPT) {
 		ctx[0] = gem_context_create(fd);
@@ -351,7 +356,7 @@ static void latency_from_ring(int fd,
 			map[i++] = 0x24 << 23 | 1;
 			if (has_64bit_reloc)
 				map[i-1]++;
-			map[i++] = RCS_TIMESTAMP; /* ring local! */
+			map[i++] = mmio_base + TIMESTAMP;
 			map[i++] = offset;
 			if (has_64bit_reloc)
 				map[i++] = offset >> 32;
@@ -376,7 +381,7 @@ static void latency_from_ring(int fd,
 			map[i++] = 0x24 << 23 | 1;
 			if (has_64bit_reloc)
 				map[i-1]++;
-			map[i++] = RCS_TIMESTAMP; /* ring local! */
+			map[i++] = mmio_base + TIMESTAMP;
 			map[i++] = offset;
 			if (has_64bit_reloc)
 				map[i++] = offset >> 32;
@@ -669,7 +674,7 @@ igt_main
 			ring_size = 1024;
 
 		intel_register_access_init(&mmio_data, intel_get_pci_device(), false, device);
-		rcs_clock = clockrate(device, RCS_TIMESTAMP);
+		rcs_clock = clockrate(device, 0x2000 + TIMESTAMP);
 		igt_info("RCS timestamp clock: %.0fKHz, %.1fns\n",
 			 rcs_clock / 1e3, 1e9 / rcs_clock);
 		rcs_clock = 1e9 / rcs_clock;

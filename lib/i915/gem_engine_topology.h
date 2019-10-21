@@ -75,4 +75,9 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
 #define __for_each_physical_engine(fd__, e__) \
 	____for_each_physical_engine(fd__, 0, e__)
 
+__attribute__((format(scanf, 4, 5)))
+int gem_engine_property_scanf(int i915, const char *engine, const char *attr,
+			      const char *fmt, ...);
+uint32_t gem_engine_mmio_base(int i915, const char *engine);
+
 #endif /* GEM_ENGINE_TOPOLOGY_H */

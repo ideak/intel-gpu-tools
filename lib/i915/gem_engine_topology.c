@@ -21,7 +21,12 @@
  * IN THE SOFTWARE.
  */
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "drmtest.h"
+#include "igt_sysfs.h"
+#include "intel_chipset.h"
 #include "ioctl_wrappers.h"
 
 #include "i915/gem_engine_topology.h"
@@ -326,4 +331,85 @@ bool gem_engine_is_equal(const struct intel_execution_engine2 *e1,
 			 const struct intel_execution_engine2 *e2)
 {
 	return e1->class == e2->class && e1->instance == e2->instance;
+}
+
+static FILE *__open_attr(int dir, ...)
+{
+	const char *path;
+	FILE *file;
+	va_list ap;
+
+	va_start(ap, dir);
+	while (dir >= 0 && (path = va_arg(ap, const char *))) {
+		int fd;
+
+		fd = openat(dir, path, O_RDONLY);
+		close(dir);
+
+		dir = fd;
+	}
+	va_end(ap);
+
+	file = fdopen(dir, "r");
+	if (!file) {
+		close(dir);
+		return NULL;
+	}
+
+	return file;
+}
+
+int gem_engine_property_scanf(int i915, const char *engine, const char *attr,
+			      const char *fmt, ...)
+{
+	FILE *file;
+	va_list ap;
+	int ret;
+	int fd;
+
+	fd = igt_sysfs_open(i915);
+	if (fd < 0)
+		return fd;
+
+	file = __open_attr(fd, "engine", engine, attr, NULL);
+	if (!file)
+		return -1;
+
+	va_start(ap, fmt);
+	ret = vfscanf(file, fmt, ap);
+	va_end(ap);
+
+	fclose(file);
+	return ret;
+}
+
+uint32_t gem_engine_mmio_base(int i915, const char *engine)
+{
+	unsigned int mmio = 0;
+
+	if (gem_engine_property_scanf(i915, engine, "mmio_base",
+				      "%x", &mmio) < 0) {
+		int gen = intel_gen(intel_get_drm_devid(i915));
+
+		/* The layout of xcs1+ is unreliable -- hence the property! */
+		if (!strcmp(engine, "rcs0")) {
+			mmio = 0x2000;
+		} else if (!strcmp(engine, "bcs0")) {
+			mmio = 0x22000;
+		} else if (!strcmp(engine, "vcs0")) {
+			if (gen < 6)
+				mmio = 0x4000;
+			else if (gen < 11)
+				mmio = 0x12000;
+			else
+				mmio = 0x1c0000;
+		} else if (!strcmp(engine, "vecs0")) {
+			if (gen < 11)
+				mmio = 0x1a000;
+			else
+				mmio = 0x1c8000;
+		}
+	}
+
+	return mmio;
 }
