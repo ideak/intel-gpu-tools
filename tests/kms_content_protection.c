@@ -554,7 +554,11 @@ static bool sink_hdcp_capable(igt_output_t *output)
 	if (fd < 0)
 		return false;
 
-	debugfs_read(fd, "i915_hdcp_sink_capability", buf);
+	if (is_i915_device(data.drm_fd))
+		debugfs_read(fd, "i915_hdcp_sink_capability", buf);
+	else
+		debugfs_read(fd, "hdcp_sink_capability", buf);
+
 	close(fd);
 
 	igt_debug("Sink capability: %s\n", buf);
@@ -571,7 +575,11 @@ static bool sink_hdcp2_capable(igt_output_t *output)
 	if (fd < 0)
 		return false;
 
-	debugfs_read(fd, "i915_hdcp_sink_capability", buf);
+	if (is_i915_device(data.drm_fd))
+		debugfs_read(fd, "i915_hdcp_sink_capability", buf);
+	else
+		debugfs_read(fd, "hdcp_sink_capability", buf);
+
 	close(fd);
 
 	igt_debug("Sink capability: %s\n", buf);
