@@ -48,7 +48,10 @@ typedef struct {
 	int drm_fd;
 	igt_display_t display;
 	igt_pipe_crc_t *pipe_crc;
+	const color_t *colors;
+	int num_colors;
 	uint32_t crop;
+	bool extended;
 } data_t;
 
 static color_t red   = { 1.0f, 0.0f, 0.0f };
@@ -362,7 +365,7 @@ test_plane_panning(data_t *data, enum pipe pipe, unsigned int flags)
 	test_fini(data);
 }
 
-static const color_t colors[] = {
+static const color_t colors_extended[] = {
 	{ 1.0f, 0.0f, 0.0f, },
 	{ 0.0f, 1.0f, 0.0f, },
 	{ 0.0f, 0.0f, 1.0f, },
@@ -371,6 +374,13 @@ static const color_t colors[] = {
 	{ 0.0f, 1.0f, 1.0f, },
 	{ 1.0f, 0.0f, 1.0f, },
 	{ 1.0f, 1.0f, 0.0f, },
+};
+
+static const color_t colors_reduced[] = {
+	{ 1.0f, 0.0f, 0.0f, },
+	{ 1.0f, 1.0f, 1.0f, },
+	{ 0.0f, 0.0f, 0.0f, },
+	{ 0.0f, 1.0f, 1.0f, },
 };
 
 static void set_legacy_lut(data_t *data, enum pipe pipe,
@@ -436,9 +446,8 @@ static void test_format_plane_color(data_t *data, enum pipe pipe,
 				    int width, int height,
 				    enum igt_color_encoding color_encoding,
 				    enum igt_color_range color_range,
-				    int color, igt_crc_t *crc, struct igt_fb *fb)
+				    const color_t *c, igt_crc_t *crc, struct igt_fb *fb)
 {
-	const color_t *c = &colors[color];
 	struct igt_fb old_fb = *fb;
 	cairo_t *cr;
 
@@ -522,21 +531,22 @@ static bool test_format_plane_colors(data_t *data, enum pipe pipe,
 				     int width, int height,
 				     enum igt_color_encoding encoding,
 				     enum igt_color_range range,
-				     igt_crc_t ref_crc[ARRAY_SIZE(colors)],
+				     igt_crc_t ref_crc[],
 				     struct igt_fb *fb)
 {
 	int crc_mismatch_count = 0;
 	unsigned int crc_mismatch_mask = 0;
 	bool result = true;
 
-	for (int i = 0; i < ARRAY_SIZE(colors); i++) {
+	for (int i = 0; i < data->num_colors; i++) {
+		const color_t *c = &data->colors[i];
 		igt_crc_t crc;
 
 		test_format_plane_color(data, pipe, plane,
 					format, modifier,
 					width, height,
 					encoding, range,
-					i, &crc, fb);
+					c, &crc, fb);
 
 		if (!igt_check_crc_equal(&crc, &ref_crc[i])) {
 			crc_mismatch_count++;
@@ -548,7 +558,7 @@ static bool test_format_plane_colors(data_t *data, enum pipe pipe,
 	if (crc_mismatch_count)
 		igt_warn("CRC mismatches with format " IGT_FORMAT_FMT " on %s.%u with %d/%d solid colors tested (0x%X)\n",
 			 IGT_FORMAT_ARGS(format), kmstest_pipe_name(pipe),
-			 plane->index, crc_mismatch_count, (int)ARRAY_SIZE(colors), crc_mismatch_mask);
+			 plane->index, crc_mismatch_count, data->num_colors, crc_mismatch_mask);
 
 	return result;
 }
@@ -557,7 +567,7 @@ static bool test_format_plane_rgb(data_t *data, enum pipe pipe,
 				  igt_plane_t *plane,
 				  uint32_t format, uint64_t modifier,
 				  int width, int height,
-				  igt_crc_t ref_crc[ARRAY_SIZE(colors)],
+				  igt_crc_t ref_crc[],
 				  struct igt_fb *fb)
 {
 	igt_info("Testing format " IGT_FORMAT_FMT " / modifier 0x%" PRIx64 " on %s.%u\n",
@@ -576,7 +586,7 @@ static bool test_format_plane_yuv(data_t *data, enum pipe pipe,
 				  igt_plane_t *plane,
 				  uint32_t format, uint64_t modifier,
 				  int width, int height,
-				  igt_crc_t ref_crc[ARRAY_SIZE(colors)],
+				  igt_crc_t ref_crc[],
 				  struct igt_fb *fb)
 {
 	bool result = true;
@@ -608,7 +618,18 @@ static bool test_format_plane_yuv(data_t *data, enum pipe pipe,
 							   format, modifier,
 							   width, height,
 							   e, r, ref_crc, fb);
+
+			/*
+			 * Only test all combinations for linear or
+			 * if the user asked for extended tests.
+			 */
+			if (result && !data->extended &&
+			    modifier != DRM_FORMAT_MOD_LINEAR)
+				break;
 		}
+		if (result && !data->extended &&
+		    modifier != DRM_FORMAT_MOD_LINEAR)
+			break;
 	}
 
 	return result;
@@ -622,7 +643,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 	uint32_t format, ref_format;
 	uint64_t modifier, ref_modifier;
 	uint64_t width, height;
-	igt_crc_t ref_crc[ARRAY_SIZE(colors)];
+	igt_crc_t ref_crc[ARRAY_SIZE(colors_extended)];
 	bool result = true;
 
 	/*
@@ -679,13 +700,15 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		igt_remove_fb(data->drm_fd, &test_fb);
 	}
 
-	for (int i = 0; i < ARRAY_SIZE(colors); i++) {
+	for (int i = 0; i < data->num_colors; i++) {
+		const color_t *c = &data->colors[i];
+
 		test_format_plane_color(data, pipe, plane,
 					format, modifier,
 					width, height,
 					IGT_COLOR_YCBCR_BT709,
 					IGT_COLOR_YCBCR_LIMITED_RANGE,
-					i, &ref_crc[i], &fb);
+					c, &ref_crc[i], &fb);
 	}
 
 	/*
@@ -693,7 +716,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 	 * at least avoids claiming success when everything is just
 	 * black all the time (eg. if the plane is never even on).
 	 */
-	igt_require(num_unique_crcs(ref_crc, ARRAY_SIZE(colors)) > 1);
+	igt_require(num_unique_crcs(ref_crc, data->num_colors) > 1);
 
 	for (int i = 0; i < plane->format_mod_count; i++) {
 		format = plane->formats[i];
@@ -743,6 +766,14 @@ test_pixel_formats(data_t *data, enum pipe pipe)
 	bool result;
 	igt_output_t *output;
 	igt_plane_t *plane;
+
+	if (data->extended) {
+		data->colors = colors_extended;
+		data->num_colors = ARRAY_SIZE(colors_extended);
+	} else {
+		data->colors = colors_reduced;
+		data->num_colors = ARRAY_SIZE(colors_reduced);
+	}
 
 	output = igt_get_single_output_for_pipe(&data->display, pipe);
 	igt_require(output);
@@ -824,10 +855,30 @@ run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 					       TEST_SUSPEND_RESUME);
 }
 
+static int opt_handler(int opt, int opt_index, void *_data)
+{
+	data_t *data = _data;
+
+	switch (opt) {
+	case 'e':
+		data->extended = true;
+		break;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+static const struct option long_opts[] = {
+	{ .name = "extended", .has_arg = false, .val = 'e', },
+	{}
+};
+
+static const char help_str[] =
+	"  --extended\t\tRun the extended tests\n";
 
 static data_t data;
 
-igt_main
+igt_main_args("", long_opts, help_str, opt_handler, &data)
 {
 	enum pipe pipe;
 
