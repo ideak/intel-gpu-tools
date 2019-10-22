@@ -40,6 +40,8 @@
 
 #include <drm.h>
 
+#include "igt_dummyload.h"
+#include "igt_sysfs.h"
 
 IGT_TEST_DESCRIPTION("Test context batch buffer execution.");
 
@@ -196,6 +198,42 @@ static void norecovery(int i915)
 	 igt_disallow_hang(i915, hang);
 }
 
+static bool __enable_hangcheck(int dir, bool state)
+{
+	return igt_sysfs_set(dir, "enable_hangcheck", state ? "1" : "0");
+}
+
+static void nohangcheck_hostile(int i915)
+{
+	int64_t timeout = NSEC_PER_SEC / 2;
+	igt_spin_t *spin;
+	uint32_t ctx;
+	int dir;
+
+	/*
+	 * Even if the user disables hangcheck during their context,
+	 * we forcibly terminate that context.
+	 */
+
+	dir = igt_sysfs_open_parameters(i915);
+	igt_require(dir != -1);
+
+	ctx = gem_context_create(i915);
+
+	igt_require(__enable_hangcheck(dir, false));
+
+	spin = igt_spin_new(i915, ctx, .flags = IGT_SPIN_NO_PREEMPTION);
+	gem_context_destroy(i915, ctx);
+
+	igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
+
+	igt_require(__enable_hangcheck(dir, true));
+
+	igt_spin_free(i915, spin);
+	gem_quiescent_gpu(i915);
+	close(dir);
+}
+
 igt_main
 {
 	const uint32_t batch[2] = { 0, MI_BATCH_BUFFER_END };
@@ -238,6 +276,9 @@ igt_main
 
 	igt_subtest("basic-norecovery")
 		norecovery(fd);
+
+	igt_subtest("basic-nohangcheck")
+		nohangcheck_hostile(fd);
 
 	igt_subtest("reset-pin-leak") {
 		int i;
