@@ -1611,8 +1611,8 @@ static void measure_semaphore_power(int i915)
 	unsigned int engine, signaler;
 	struct rapl gpu, pkg;
 
-	igt_require(pkg_power_open(&pkg) == 0);
 	igt_require(gpu_power_open(&gpu) == 0);
+	pkg_power_open(&pkg);
 
 	for_each_physical_engine(i915, signaler) {
 		struct {
@@ -1665,12 +1665,14 @@ static void measure_semaphore_power(int i915)
 			 1e3 * (total - baseline),
 			 1e3 * total);
 
-		baseline = power_W(&pkg, &s_spin[0].pkg, &s_spin[1].pkg);
-		total = power_W(&pkg, &s_sema[0].pkg, &s_sema[1].pkg);
-		igt_info("pkg: %.1fmW + %.1fmW (total %1.fmW)\n",
-			 1e3 * baseline,
-			 1e3 * (total - baseline),
-			 1e3 * total);
+		if (rapl_valid(&pkg)) {
+			baseline = power_W(&pkg, &s_spin[0].pkg, &s_spin[1].pkg);
+			total = power_W(&pkg, &s_sema[0].pkg, &s_sema[1].pkg);
+			igt_info("pkg: %.1fmW + %.1fmW (total %1.fmW)\n",
+				 1e3 * baseline,
+				 1e3 * (total - baseline),
+				 1e3 * total);
+		}
 	}
 
 	rapl_close(&gpu);

@@ -56,6 +56,11 @@ static inline int pkg_power_open(struct rapl *r)
 	return rapl_open(r, "pkg");
 }
 
+static inline bool rapl_valid(struct rapl *r)
+{
+	return r->fd >= 0;
+}
+
 static inline int ram_power_open(struct rapl *r)
 {
 	return rapl_open(r, "ram");
@@ -69,6 +74,7 @@ static inline bool rapl_read(struct rapl *r, struct power_sample *s)
 static inline void rapl_close(struct rapl *r)
 {
 	close(r->fd);
+	r->fd = -1;
 }
 
 static inline double power_J(const struct rapl *r,
