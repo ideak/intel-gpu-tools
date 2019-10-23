@@ -38,11 +38,6 @@ static bool psr_active_check(int debugfs_fd, enum psr_mode mode)
 	return strstr(buf, state);
 }
 
-static inline const char *psr_active_state_get(enum psr_mode mode)
-{
-	return mode == PSR_MODE_1 ? "SRDENT" : "DEEP_SLEEP";
-}
-
 /*
  * For PSR1, we wait until PSR is active. We wait until DEEP_SLEEP for PSR2.
  */
