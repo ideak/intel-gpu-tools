@@ -33,6 +33,8 @@ static bool psr_active_check(int debugfs_fd, enum psr_mode mode)
 	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				sizeof(buf));
 
+	igt_skip_on(strstr(buf, "PSR sink not reliable: yes"));
+
 	return strstr(buf, state);
 }
 
