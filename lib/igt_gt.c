@@ -175,8 +175,6 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 	if (!igt_check_boolean_env_var("IGT_HANG", true))
 		igt_skip("hang injection disabled by user");
 	gem_context_require_bannable(fd);
-	if (!igt_check_boolean_env_var("IGT_HANG_WITHOUT_RESET", false))
-		igt_require(has_gpu_reset(fd));
 
 	allow_reset = 1;
 	if ((flags & HANG_ALLOW_CAPTURE) == 0) {
@@ -190,6 +188,9 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 		allow_reset = INT_MAX; /* any reset method */
 	}
 	igt_require(igt_sysfs_set_parameter(fd, "reset", "%d", allow_reset));
+
+	if (!igt_check_boolean_env_var("IGT_HANG_WITHOUT_RESET", false))
+		igt_require(has_gpu_reset(fd));
 
 	ban = context_get_ban(fd, ctx);
 	if ((flags & HANG_ALLOW_BAN) == 0)
