@@ -10,6 +10,7 @@ lib_sources = [
 	'igt_color_encoding.c',
 	'igt_debugfs.c',
 	'igt_device.c',
+	'igt_device_scan.c',
 	'igt_aux.c',
 	'igt_gt.c',
 	'igt_halffloat.c',

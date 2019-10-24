@@ -23,6 +23,7 @@
     <xi:include href="xml/igt_core.xml"/>
     <xi:include href="xml/igt_debugfs.xml"/>
     <xi:include href="xml/igt_device.xml"/>
+    <xi:include href="xml/igt_device_scan.xml"/>
     <xi:include href="xml/igt_draw.xml"/>
     <xi:include href="xml/igt_dummyload.xml"/>
     <xi:include href="xml/igt_fb.xml"/>

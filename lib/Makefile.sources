@@ -25,6 +25,8 @@ lib_source_list =	 	\
 	igt_debugfs.h		\
 	igt_device.c		\
 	igt_device.h		\
+	igt_device_scan.c	\
+	igt_device_scan.h	\
 	igt_aux.c		\
 	igt_aux.h		\
 	igt_color_encoding.c	\
