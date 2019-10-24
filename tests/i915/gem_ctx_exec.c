@@ -209,6 +209,7 @@ static void nohangcheck_hostile(int i915)
 	igt_spin_t *spin;
 	uint32_t ctx;
 	int dir;
+	int err;
 
 	/*
 	 * Even if the user disables hangcheck during their context,
@@ -225,12 +226,19 @@ static void nohangcheck_hostile(int i915)
 	spin = igt_spin_new(i915, ctx, .flags = IGT_SPIN_NO_PREEMPTION);
 	gem_context_destroy(i915, ctx);
 
-	igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
-
-	igt_require(__enable_hangcheck(dir, true));
+	if (gem_wait(i915, spin->handle, &timeout)) {
+		igt_debugfs_dump(i915, "i915_engine_info");
+		err = -ETIME;
+	}
 
 	igt_spin_free(i915, spin);
+
+	igt_require(__enable_hangcheck(dir, true));
 	gem_quiescent_gpu(i915);
+
+	igt_assert_f(err == 0,
+		     "Hostile unpreemptable context was not cancelled immediately upon closure\n");
+
 	close(dir);
 }
 
