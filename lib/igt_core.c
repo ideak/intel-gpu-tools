@@ -71,6 +71,7 @@
 #include "igt_sysrq.h"
 #include "igt_rc.h"
 #include "igt_list.h"
+#include "igt_device_scan.h"
 
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
@@ -247,6 +248,9 @@
  *	[Common]
  *	FrameDumpPath=/tmp # The path to dump frames that fail comparison checks
  *
+ *	&num; Device selection filter
+ *	Device=pci:vendor=8086,card=0;vgem:
+ *
  *	&num; The following section is used for configuring the Device Under Test.
  *	&num; It is not mandatory and allows overriding default values.
  *	[DUT]
@@ -312,6 +316,7 @@ enum {
 	OPT_INTERACTIVE_DEBUG,
 	OPT_SKIP_CRC,
 	OPT_TRACE_OOPS,
+	OPT_DEVICE,
 	OPT_HELP = 'h'
 };
 
@@ -328,6 +333,7 @@ static pthread_mutex_t log_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 GKeyFile *igt_key_file;
 
 char *igt_frame_dump_path;
+char *igt_rc_device;
 
 static bool stderr_needs_sentinel = false;
 
@@ -657,6 +663,7 @@ static void print_usage(const char *help_str, bool output_on_stderr)
 		   "  --skip-crc-compare\n"
 		   "  --help-description\n"
 		   "  --describe\n"
+		   "  --device filter\n"
 		   "  --help|-h\n");
 	if (help_str)
 		fprintf(f, "%s\n", help_str);
@@ -746,6 +753,31 @@ static void common_init_config(void)
 
 	if (ret != 0)
 		igt_set_autoresume_delay(ret);
+
+	/* Adding filters, order .igtrc, IGT_DEVICE, --device filter */
+	if (igt_device_is_filter_set())
+		igt_debug("Notice: using --device filters:\n");
+	else {
+		if (igt_rc_device) {
+			igt_debug("Notice: using IGT_DEVICE env:\n");
+		} else {
+			igt_rc_device =	g_key_file_get_string(igt_key_file,
+							      "Common",
+							      "Device", &error);
+			g_clear_error(&error);
+			if (igt_rc_device)
+				igt_debug("Notice: using .igtrc "
+					  "Common::Device:\n");
+		}
+		if (igt_rc_device) {
+			igt_device_filter_set(igt_rc_device);
+			free(igt_rc_device);
+			igt_rc_device = NULL;
+		}
+	}
+
+	if (igt_device_is_filter_set())
+		igt_debug("[%s]\n", igt_device_filter_get());
 }
 
 static void common_init_env(void)
@@ -780,6 +812,11 @@ static void common_init_env(void)
 	if (env) {
 		__set_forced_driver(env);
 	}
+
+	env = getenv("IGT_DEVICE");
+	if (env) {
+		igt_rc_device = strdup(env);
+	}
 }
 
 static int common_init(int *argc, char **argv,
@@ -800,6 +837,7 @@ static int common_init(int *argc, char **argv,
 		{"interactive-debug", optional_argument, NULL, OPT_INTERACTIVE_DEBUG},
 		{"skip-crc-compare",  no_argument,       NULL, OPT_SKIP_CRC},
 		{"trace-on-oops",     no_argument,       NULL, OPT_TRACE_OOPS},
+		{"device",            required_argument, NULL, OPT_DEVICE},
 		{"help",              no_argument,       NULL, OPT_HELP},
 		{0, 0, 0, 0}
 	};
@@ -930,6 +968,15 @@ static int common_init(int *argc, char **argv,
 		case OPT_TRACE_OOPS:
 			show_ftrace = true;
 			goto out;
+		case OPT_DEVICE:
+			assert(optarg);
+			/* if set by env IGT_DEVICE we need to free it */
+			if (igt_rc_device) {
+				free(igt_rc_device);
+				igt_rc_device = NULL;
+			}
+			igt_device_filter_set(optarg);
+			break;
 		case OPT_HELP:
 			print_usage(help_str, false);
 			ret = -1;

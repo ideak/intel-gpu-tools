@@ -55,6 +55,7 @@
 #include "igt_gt.h"
 #include "igt_kmod.h"
 #include "igt_sysfs.h"
+#include "igt_device_scan.h"
 #include "version.h"
 #include "config.h"
 #include "intel_reg.h"
@@ -266,14 +267,9 @@ static int __search_and_open(const char *base, int offset, unsigned int chipset)
 	return -1;
 }
 
-static int __open_driver(const char *base, int offset, unsigned int chipset)
+static void __try_modprobe(unsigned int chipset)
 {
 	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-	int fd;
-
-	fd = __search_and_open(base, offset, chipset);
-	if (fd != -1)
-		return fd;
 
 	pthread_mutex_lock(&mutex);
 	for (const struct module *m = modules; m->module; m++) {
@@ -285,26 +281,108 @@ static int __open_driver(const char *base, int offset, unsigned int chipset)
 		}
 	}
 	pthread_mutex_unlock(&mutex);
+}
+
+static int __open_driver(const char *base, int offset, unsigned int chipset)
+{
+	int fd;
+
+	fd = __search_and_open(base, offset, chipset);
+	if (fd != -1)
+		return fd;
+
+	__try_modprobe(chipset);
 
 	return __search_and_open(base, offset, chipset);
+}
+
+static int __open_driver_exact(const char *name, unsigned int chipset)
+{
+	int fd;
+
+	fd = open_device(name, chipset);
+	if (fd != -1)
+		return fd;
+
+	__try_modprobe(chipset);
+
+	return open_device(name, chipset);
+}
+
+/*
+ * A helper to get the first matching card in case a filter is set.
+ * It does all the extra logging around the filters for us.
+ *
+ * @card: pointer to the igt_device_card structure to be filled
+ * when a card is found.
+ *
+ * Returns:
+ * True if card according to the added filter was found,
+ * false othwerwise.
+ */
+static bool __get_the_first_card(struct igt_device_card *card)
+{
+	const char *filter;
+
+	if (igt_device_is_filter_set()) {
+		filter = igt_device_filter_get();
+		igt_info("Looking for devices to open using filter: %s\n", filter);
+
+		if (igt_device_card_match(filter, card)) {
+			igt_info("Filter matched %s | %s\n", card->card, card->render);
+			return true;
+		}
+
+		igt_warn("No card matches the filter!\n");
+	}
+
+	return false;
 }
 
 /**
  * __drm_open_driver:
  * @chipset: OR'd flags for each chipset to search, eg. #DRIVER_INTEL
  *
- * Open the first DRM device we can find, searching up to 16 device nodes
+ * Function opens device in the following order:
+ * 1. when --device arguments are present device scanning will be executed,
+ * then filter argument is used to find matching one.
+ * 2. compatibility mode - open the first DRM device we can find,
+ * searching up to 16 device nodes.
  *
  * Returns:
  * An open DRM fd or -1 on error
  */
 int __drm_open_driver(int chipset)
 {
+	if (igt_device_is_filter_set()) {
+		bool found;
+		struct igt_device_card card;
+
+		found = __get_the_first_card(&card);
+
+		if (!found || !strlen(card.card))
+			return -1;
+
+		return __open_driver_exact(card.card, chipset);
+	}
+
 	return __open_driver("/dev/dri/card", 0, chipset);
 }
 
-static int __drm_open_driver_render(int chipset)
+int __drm_open_driver_render(int chipset)
 {
+	if (igt_device_is_filter_set()) {
+		bool found;
+		struct igt_device_card card;
+
+		found = __get_the_first_card(&card);
+
+		if (!found || !strlen(card.render))
+			return -1;
+
+		return __open_driver_exact(card.render, chipset);
+	}
+
 	return __open_driver("/dev/dri/renderD", 128, chipset);
 }
 

@@ -44,6 +44,13 @@
           </varlistentry>
 
           <varlistentry>
+            <term><option>--device filter</option></term>
+            <listitem><para>
+                select device using filter (see "Device selection" for details)
+            </para></listitem>
+          </varlistentry>
+
+          <varlistentry>
             <term><option>--help-description</option></term>
             <listitem><para>
                 print a short description of the test and exit
