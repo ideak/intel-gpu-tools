@@ -87,6 +87,14 @@ static void fake_main(int argc, char **argv) {
 	igt_subtest("F")
 		;
 
+	igt_describe("Subtest with dynamic subsubtests");
+	igt_subtest_with_dynamic_subsubtests("G") {
+		printf("should not be executed!\n");
+		igt_describe("should assert on execution");
+		igt_dynamic_subsubtest("should-not-list")
+			printf("should not be executed!\n");
+	}
+
 	igt_exit();
 }
 
@@ -129,7 +137,10 @@ static const char DESCRIBE_ALL_OUTPUT[] = \
 	"\n"
 	"SUB F ../lib/tests/igt_describe.c:87:\n"
 	"  verylongwordthatshoudlbeprintedeventhoughitspastthewrppinglimitverylongwordthatshoudlbeprintedeventhoughitspastthewrappinglimit\n"
-	"  verylongwordthatshoudlbeprintedeventhoughitspastthewrappinglimitverylongwordthatshoudlbeprintedeventhoughitspastthewrappinglimit\n\n";
+	"  verylongwordthatshoudlbeprintedeventhoughitspastthewrappinglimitverylongwordthatshoudlbeprintedeventhoughitspastthewrappinglimit\n"
+	"\n"
+	"SUB G ../lib/tests/igt_describe.c:91:\n"
+	"  Subtest with dynamic subsubtests\n\n";
 
 static const char JUST_C_OUTPUT[] = \
 	"the top level description\n"
@@ -273,6 +284,23 @@ int main(int argc, char **argv)
 		internal_assert(WIFEXITED(status));
 		internal_assert(WEXITSTATUS(status) == IGT_EXIT_INVALID);
 		internal_assert(strstr(err, "Unknown subtest: Z"));
+
+		close(outfd);
+		close(errfd);
+	}
+
+	/* trying to igt_describe a dynamic subsubtest should assert */ {
+		static char err[4096];
+		char arg[] = "--run-subtest=G";
+		char *fake_argv[] = {prog, arg};
+		int fake_argc = ARRAY_SIZE(fake_argv);
+
+		pid_t pid = do_fork(fake_argc, fake_argv, &outfd, &errfd);
+
+		read_whole_pipe(errfd, err, sizeof(err));
+
+		internal_assert(_wait(pid, &status) != -1);
+		internal_assert_wsignaled(status, SIGABRT);
 
 		close(outfd);
 		close(errfd);
