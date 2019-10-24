@@ -15,9 +15,27 @@ static const char STARTING_SUBTEST[] = "Starting subtest: ";
  *
  * Examples:
  * Subtest subtestname: SKIP
- * Subtest subtestname: PASS (0.003s)
+ * Subtest subtestname: SUCCESS (0.003s)
  */
 static const char SUBTEST_RESULT[] = "Subtest ";
+
+/*
+ * Output when a dynamic subtest has begun. Is followed by the subtest name.
+ *
+ * Example:
+ * Starting dynamic subtest: subtestname
+ */
+static const char STARTING_DYNAMIC_SUBTEST[] = "Starting dynamic subtest: ";
+
+/*
+ * Output when a dynamic subtest has ended. Is followed by the subtest name
+ * and optionally its runtime.
+ *
+ * Examples:
+ * Dynamic subtest subtestname: SKIP
+ * Dynamic subtest subtestname: SUCCESS (0.003s)
+ */
+static const char DYNAMIC_SUBTEST_RESULT[] = "Dynamic subtest ";
 
 /*
  * Output in dmesg when a subtest has begin. Is followed by the subtest name.
@@ -26,6 +44,15 @@ static const char SUBTEST_RESULT[] = "Subtest ";
  * [IGT] test-binary-name: starting subtest subtestname
  */
 static const char STARTING_SUBTEST_DMESG[] = ": starting subtest ";
+
+/*
+ * Output in dmesg when a dynamic subtest has begin. Is followed by
+ * the subtest name.
+ *
+ * Example:
+ * [IGT] test-binary-name: starting dynamic subtest subtestname
+ */
+static const char STARTING_DYNAMIC_SUBTEST_DMESG[] = ": starting dynamic subtest ";
 
 /*
  * Output when a test process is executed.

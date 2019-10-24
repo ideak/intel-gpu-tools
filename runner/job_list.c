@@ -357,6 +357,17 @@ void generate_piglit_name(const char *binary, const char *subtest,
 	free(lc_subtest);
 }
 
+void generate_piglit_name_for_dynamic(const char *base_piglit_name,
+				      const char *dynamic_subtest,
+				      char *namebuf, size_t namebuf_size)
+{
+	char *lc_dynamic = lowercase(dynamic_subtest);
+
+	snprintf(namebuf, namebuf_size, "%s@%s", base_piglit_name, lc_dynamic);
+
+	free(lc_dynamic);
+}
+
 void init_job_list(struct job_list *job_list)
 {
 	memset(job_list, 0, sizeof(*job_list));

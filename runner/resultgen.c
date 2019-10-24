@@ -23,9 +23,16 @@ _Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_SKIP, "exit code clash");
 _Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_SUCCESS, "exit code clash");
 _Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_INVALID, "exit code clash");
 
-struct subtests
+struct subtest
 {
-	char **names;
+	char *name;
+	char **dynamic_names;
+	size_t dynamic_size;
+};
+
+struct subtest_list
+{
+	struct subtest *subs;
 	size_t size;
 };
 
@@ -35,6 +42,67 @@ struct results
 	struct json_object *totals;
 	struct json_object *runtimes;
 };
+
+static void add_dynamic_subtest(struct subtest *subtest, char *dynamic)
+{
+	size_t len = strlen(dynamic);
+	size_t i;
+
+	if (len == 0)
+		return;
+
+	if (dynamic[len - 1] == '\n')
+		dynamic[len - 1] = '\0';
+
+	/* Don't add if we already have this one */
+	for (i = 0; i < subtest->dynamic_size; i++)
+		if (!strcmp(dynamic, subtest->dynamic_names[i]))
+			return;
+
+	subtest->dynamic_size++;
+	subtest->dynamic_names = realloc(subtest->dynamic_names, sizeof(*subtest->dynamic_names) * subtest->dynamic_size);
+	subtest->dynamic_names[subtest->dynamic_size - 1] = dynamic;
+}
+
+static void add_subtest(struct subtest_list *subtests, char *subtest)
+{
+	size_t len = strlen(subtest);
+	size_t i;
+
+	if (len == 0)
+		return;
+
+	if (subtest[len - 1] == '\n')
+		subtest[len - 1] = '\0';
+
+	/* Don't add if we already have this subtest */
+	for (i = 0; i < subtests->size; i++)
+		if (!strcmp(subtest, subtests->subs[i].name))
+			return;
+
+	subtests->size++;
+	subtests->subs = realloc(subtests->subs, sizeof(*subtests->subs) * subtests->size);
+	memset(&subtests->subs[subtests->size - 1], 0, sizeof(struct subtest));
+	subtests->subs[subtests->size - 1].name = subtest;
+}
+
+static void free_subtest(struct subtest *subtest)
+{
+	size_t i;
+
+	for (i = 0; i < subtest->dynamic_size; i++)
+		free(subtest->dynamic_names[i]);
+	free(subtest->dynamic_names);
+}
+
+static void free_subtests(struct subtest_list *subtests)
+{
+	size_t i;
+
+	for (i = 0; i < subtests->size; i++)
+		free_subtest(&subtests->subs[i]);
+	free(subtests->subs);
+}
 
 /*
  * A lot of string handling here operates on an mmapped buffer, and
@@ -75,17 +143,6 @@ static const char *next_line(const char *line, const char *bufend)
 		return ret;
 	else
 		return NULL;
-}
-
-static size_t count_lines(const char *buf, const char *bufend)
-{
-	size_t ret = 0;
-	while (buf < bufend && (buf = memchr(buf, '\n', bufend - buf)) != NULL) {
-		ret++;
-		buf++;
-	}
-
-	return ret;
 }
 
 static void append_line(char **buf, size_t *buflen, char *line)
@@ -148,6 +205,7 @@ static void parse_result_string(const char *resultstring, size_t len, const char
 }
 
 static void parse_subtest_result(const char *subtest,
+				 const char *resulttextprefix,
 				 const char **result,
 				 double *time,
 				 const char *line,
@@ -175,6 +233,10 @@ static void parse_subtest_result(const char *subtest,
 	 *
 	 * Example:
 	 * Subtest subtestname: PASS (0.003s)
+	 *
+	 * For dynamic subtests the same structure applies, but the
+	 * string "Subtest " is "Dynamic subtest "
+	 * instead. (`DYNAMIC_SUBTEST_RESULT` from output_strings.h)
 	 */
 
 	if (!line)
@@ -183,13 +245,13 @@ static void parse_subtest_result(const char *subtest,
 	line_end = memchr(line, '\n', bufend - line);
 	linelen = line_end != NULL ? line_end - line : bufend - line;
 
-	if (strlen(SUBTEST_RESULT) + subtestlen + strlen(": ") > linelen ||
-	    strncmp(line + strlen(SUBTEST_RESULT), subtest, subtestlen)) {
+	if (strlen(resulttextprefix) + subtestlen + strlen(": ") > linelen ||
+	    strncmp(line + strlen(resulttextprefix), subtest, subtestlen)) {
 		/* This is not the correct result line */
 		return;
 	}
 
-	resultstring = line + strlen(SUBTEST_RESULT) + subtestlen + strlen(": ");
+	resultstring = line + strlen(resulttextprefix) + subtestlen + strlen(": ");
 	parse_result_string(resultstring, linelen - (resultstring - line), result, time);
 }
 
@@ -304,7 +366,7 @@ static void free_matches(struct matches *matches)
 }
 
 static bool fill_from_output(int fd, const char *binary, const char *key,
-			     struct subtests *subtests,
+			     struct subtest_list *subtests,
 			     struct json_object *tests)
 {
 	char *buf, *bufend, *nullchr;
@@ -316,6 +378,8 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 	const char *needles[] = {
 		STARTING_SUBTEST,
 		SUBTEST_RESULT,
+		STARTING_DYNAMIC_SUBTEST,
+		DYNAMIC_SUBTEST_RESULT,
 		NULL
 	};
 	struct matches matches = {};
@@ -375,11 +439,11 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 		int begin_len;
 		int result_len;
 
-		generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+		generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
 		current_test = get_or_create_json_object(tests, piglit_name);
 
-		begin_len = asprintf(&this_sub_begin, "%s%s\n", STARTING_SUBTEST, subtests->names[i]);
-		result_len = asprintf(&this_sub_result, "%s%s: ", SUBTEST_RESULT, subtests->names[i]);
+		begin_len = asprintf(&this_sub_begin, "%s%s\n", STARTING_SUBTEST, subtests->subs[i].name);
+		result_len = asprintf(&this_sub_result, "%s%s: ", SUBTEST_RESULT, subtests->subs[i].name);
 
 		if (begin_len < 0 || result_len < 0) {
 			fprintf(stderr, "Failure generating strings\n");
@@ -438,8 +502,13 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 			 * Incomplete result. Include output up to the
 			 * next starting subtest or result.
 			 */
-			if (begin_idx < matches.size - 1)
-				end = matches.items[begin_idx + 1].where;
+			for (k = begin_idx + 1; k < matches.size; k++) {
+				if (matches.items[k].what == STARTING_SUBTEST ||
+				    matches.items[k].what == SUBTEST_RESULT)
+					break;
+			}
+			if (k < matches.size)
+				end = matches.items[k].where;
 			else
 				end = bufend;
 		} else {
@@ -460,12 +529,103 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 		}
 
 		if (!json_object_object_get_ex(current_test, "result", NULL)) {
-			parse_subtest_result(subtests->names[i],
+			parse_subtest_result(subtests->subs[i].name,
+					     SUBTEST_RESULT,
 					     &resulttext, &time,
 					     result_idx < 0 ? NULL : matches.items[result_idx].where,
 					     end);
 			set_result(current_test, resulttext);
 			set_runtime(current_test, time);
+		}
+
+		/*
+		 * Look for dynamic subtests: If any, they are within
+		 * the subtest output.
+		 */
+		if (result_idx < 0) {
+			/* If the subtest itself is incomplete, stop at the next start of a subtest */
+			for (result_idx = begin_idx + 1;
+			     result_idx < matches.size;
+			     result_idx++) {
+				if (matches.items[result_idx].what == STARTING_SUBTEST)
+					break;
+			}
+		}
+
+		for (k = begin_idx + 1; k < result_idx; k++) {
+			if (matches.items[k].what == STARTING_DYNAMIC_SUBTEST) {
+				struct json_object *current_dynamic_test = NULL;
+				int dyn_result_idx = -1;
+				char dynamic_name[256];
+				char dynamic_piglit_name[256];
+				char *this_dyn_result;
+				int dyn_result_len;
+				const char *dynbeg, *dynend;
+				int n;
+
+				if (sscanf(matches.items[k].where + strlen(STARTING_DYNAMIC_SUBTEST), "%s", dynamic_name) != 1) {
+					/* Cannot parse name, just ignore this one */
+					continue;
+				}
+
+				dyn_result_len = asprintf(&this_dyn_result, "%s%s: ", DYNAMIC_SUBTEST_RESULT, dynamic_name);
+				if (dyn_result_len < 0)
+					continue;
+
+				for (n = k + 1; n < result_idx; n++) {
+					if (matches.items[n].what == DYNAMIC_SUBTEST_RESULT &&
+					    !memcmp(matches.items[n].where,
+						    this_dyn_result,
+						    min(dyn_result_len, bufend - matches.items[n].where))) {
+						dyn_result_idx = n;
+						break;
+					}
+				}
+
+				free(this_dyn_result);
+
+				if (k == 0)
+					dynbeg = beg;
+				else
+					dynbeg = next_line(matches.items[k - 1].where, end);
+
+				if (dyn_result_idx < 0) {
+					if (k < matches.size - 1)
+						dynend = matches.items[k + 1].where;
+					else
+						dynend = end;
+				} else {
+					if (dyn_result_idx < matches.size - 1)
+						dynend = matches.items[dyn_result_idx + 1].where;
+					else
+						dynend = end;
+				}
+
+				generate_piglit_name_for_dynamic(piglit_name, dynamic_name, dynamic_piglit_name, sizeof(dynamic_piglit_name));
+
+				add_dynamic_subtest(&subtests->subs[i], strdup(dynamic_name));
+				current_dynamic_test = get_or_create_json_object(tests, dynamic_piglit_name);
+
+				json_object_object_add(current_dynamic_test, key,
+						       json_object_new_string_len(dynbeg, dynend - dynbeg));
+				if (igt_version)
+					json_object_object_add(current_dynamic_test, "igt-version",
+							       json_object_new_string_len(igt_version,
+											  igt_version_len));
+
+				if (!json_object_object_get_ex(current_dynamic_test, "result", NULL)) {
+					const char *dynresulttext;
+					double dyntime;
+
+					parse_subtest_result(dynamic_name,
+							     DYNAMIC_SUBTEST_RESULT,
+							     &dynresulttext, &dyntime,
+							     dyn_result_idx < 0 ? NULL : matches.items[dyn_result_idx].where,
+							     dynend);
+					set_result(current_dynamic_test, dynresulttext);
+					set_runtime(current_dynamic_test, dyntime);
+				}
+			}
 		}
 	}
 
@@ -614,17 +774,27 @@ static void add_dmesg(struct json_object *obj,
 
 static void add_empty_dmesgs_where_missing(struct json_object *tests,
 					   char *binary,
-					   struct subtests *subtests)
+					   struct subtest_list *subtests)
 {
 	struct json_object *current_test;
 	char piglit_name[256];
-	size_t i;
+	char dynamic_piglit_name[256];
+	size_t i, k;
 
 	for (i = 0; i < subtests->size; i++) {
-		generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+		generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
 		current_test = get_or_create_json_object(tests, piglit_name);
 		if (!json_object_object_get_ex(current_test, "dmesg", NULL)) {
 			add_dmesg(current_test, "", 0, NULL, 0);
+		}
+
+		for (k = 0; k < subtests->subs[i].dynamic_size; k++) {
+			generate_piglit_name_for_dynamic(piglit_name, subtests->subs[i].dynamic_names[k],
+							 dynamic_piglit_name, sizeof(dynamic_piglit_name));
+			current_test = get_or_create_json_object(tests, dynamic_piglit_name);
+			if (!json_object_object_get_ex(current_test, "dmesg", NULL)) {
+				add_dmesg(current_test, "", 0, NULL, 0);
+			}
 		}
 	}
 
@@ -633,14 +803,20 @@ static void add_empty_dmesgs_where_missing(struct json_object *tests,
 static bool fill_from_dmesg(int fd,
 			    struct settings *settings,
 			    char *binary,
-			    struct subtests *subtests,
+			    struct subtest_list *subtests,
 			    struct json_object *tests)
 {
-	char *line = NULL, *warnings = NULL, *dmesg = NULL;
-	size_t linelen = 0, warningslen = 0, dmesglen = 0;
+	char *line = NULL;
+	char *warnings = NULL, *dynamic_warnings = NULL;
+	char *dmesg = NULL, *dynamic_dmesg = NULL;
+	size_t linelen = 0;
+	size_t warningslen = 0, dynamic_warnings_len = 0;
+	size_t dmesglen = 0, dynamic_dmesg_len = 0;
 	struct json_object *current_test = NULL;
+	struct json_object *current_dynamic_test = NULL;
 	FILE *f = fdopen(fd, "r");
 	char piglit_name[256];
+	char dynamic_piglit_name[256];
 	ssize_t read;
 	size_t i;
 	GRegex *re;
@@ -659,7 +835,7 @@ static bool fill_from_dmesg(int fd,
 		unsigned flags;
 		unsigned long long ts_usec;
 		char continuation;
-		char *message, *subtest;
+		char *message, *subtest, *dynamic_subtest;
 
 		if (!parse_dmesg_line(line, &flags, &ts_usec, &continuation, &message))
 			continue;
@@ -675,6 +851,15 @@ static bool fill_from_dmesg(int fd,
 				free(warnings);
 				dmesg = warnings = NULL;
 				dmesglen = warningslen = 0;
+
+				if (current_dynamic_test != NULL)
+					add_dmesg(current_dynamic_test, dynamic_dmesg, dynamic_dmesg_len, dynamic_warnings, dynamic_warnings_len);
+
+				free(dynamic_dmesg);
+				free(dynamic_warnings);
+				dynamic_dmesg = dynamic_warnings = NULL;
+				dynamic_dmesg_len = dynamic_warnings_len = 0;
+				current_dynamic_test = NULL;
 			}
 
 			subtest += strlen(STARTING_SUBTEST_DMESG);
@@ -682,24 +867,50 @@ static bool fill_from_dmesg(int fd,
 			current_test = get_or_create_json_object(tests, piglit_name);
 		}
 
+		if (current_test != NULL &&
+		    (dynamic_subtest = strstr(message, STARTING_DYNAMIC_SUBTEST_DMESG)) != NULL) {
+			if (current_dynamic_test != NULL) {
+				/* Done with the previous dynamic subtest, file up */
+				add_dmesg(current_dynamic_test, dynamic_dmesg, dynamic_dmesg_len, dynamic_warnings, dynamic_warnings_len);
+
+				free(dynamic_dmesg);
+				free(dynamic_warnings);
+				dynamic_dmesg = dynamic_warnings = NULL;
+				dynamic_dmesg_len = dynamic_warnings_len = 0;
+			}
+
+			dynamic_subtest += strlen(STARTING_DYNAMIC_SUBTEST_DMESG);
+			generate_piglit_name_for_dynamic(piglit_name, dynamic_subtest, dynamic_piglit_name, sizeof(dynamic_piglit_name));
+			current_dynamic_test = get_or_create_json_object(tests, dynamic_piglit_name);
+		}
+
 		if (settings->piglit_style_dmesg) {
 			if ((flags & 0x07) <= settings->dmesg_warn_level && continuation != 'c' &&
 			    g_regex_match(re, message, 0, NULL)) {
 				append_line(&warnings, &warningslen, formatted);
+				if (current_test != NULL)
+					append_line(&dynamic_warnings, &dynamic_warnings_len, formatted);
 			}
 		} else {
 			if ((flags & 0x07) <= settings->dmesg_warn_level && continuation != 'c' &&
 			    !g_regex_match(re, message, 0, NULL)) {
 				append_line(&warnings, &warningslen, formatted);
+				if (current_test != NULL)
+					append_line(&dynamic_warnings, &dynamic_warnings_len, formatted);
 			}
 		}
 		append_line(&dmesg, &dmesglen, formatted);
+		if (current_test != NULL)
+			append_line(&dynamic_dmesg, &dynamic_dmesg_len, formatted);
 		free(formatted);
 	}
 	free(line);
 
 	if (current_test != NULL) {
 		add_dmesg(current_test, dmesg, dmesglen, warnings, warningslen);
+		if (current_dynamic_test != NULL) {
+			add_dmesg(current_dynamic_test, dynamic_dmesg, dynamic_dmesg_len, dynamic_warnings, dynamic_warnings_len);
+		}
 	} else {
 		/*
 		 * Didn't get any subtest messages at all. If there
@@ -707,7 +918,7 @@ static bool fill_from_dmesg(int fd,
 		 * them.
 		 */
 		for (i = 0; i < subtests->size; i++) {
-			generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+			generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
 			current_test = get_or_create_json_object(tests, piglit_name);
 			/*
 			 * Don't bother with warnings, any subtests
@@ -727,7 +938,9 @@ static bool fill_from_dmesg(int fd,
 	add_empty_dmesgs_where_missing(tests, binary, subtests);
 
 	free(dmesg);
+	free(dynamic_dmesg);
 	free(warnings);
+	free(dynamic_warnings);
 	g_regex_unref(re);
 	fclose(f);
 	return true;
@@ -749,39 +962,9 @@ static const char *result_from_exitcode(int exitcode)
 	}
 }
 
-static void add_subtest(struct subtests *subtests, char *subtest)
-{
-	size_t len = strlen(subtest);
-	size_t i;
-
-	if (len == 0)
-		return;
-
-	if (subtest[len - 1] == '\n')
-		subtest[len - 1] = '\0';
-
-	/* Don't add if we already have this subtest */
-	for (i = 0; i < subtests->size; i++)
-		if (!strcmp(subtest, subtests->names[i]))
-			return;
-
-	subtests->size++;
-	subtests->names = realloc(subtests->names, sizeof(*subtests->names) * subtests->size);
-	subtests->names[subtests->size - 1] = subtest;
-}
-
-static void free_subtests(struct subtests *subtests)
-{
-	size_t i;
-
-	for (i = 0; i < subtests->size; i++)
-		free(subtests->names[i]);
-	free(subtests->names);
-}
-
 static void fill_from_journal(int fd,
 			      struct job_list_entry *entry,
-			      struct subtests *subtests,
+			      struct subtest_list *subtests,
 			      struct results *results)
 {
 	FILE *f = fdopen(fd, "r");
@@ -821,7 +1004,7 @@ static void fill_from_journal(int fd,
 
 			if (subtests->size) {
 				/* Assign the timeout to the previously appeared subtest */
-				char *last_subtest = subtests->names[subtests->size - 1];
+				char *last_subtest = subtests->subs[subtests->size - 1].name;
 				char piglit_name[256];
 				char *p = strchr(line, '(');
 				double time = 0.0;
@@ -874,6 +1057,30 @@ static void fill_from_journal(int fd,
 	fclose(f);
 }
 
+static bool stderr_contains_warnings(const char *beg, const char *end)
+{
+	const char *needles[] = {
+		STARTING_SUBTEST,
+		SUBTEST_RESULT,
+		STARTING_DYNAMIC_SUBTEST,
+		DYNAMIC_SUBTEST_RESULT,
+		NULL
+	};
+	struct matches matches;
+	size_t i = 0;
+
+	matches = find_matches(beg, end, needles);
+
+	while (i < matches.size) {
+		if (matches.items[i].where != beg)
+			return true;
+		beg = next_line(beg, end);
+		i++;
+	}
+
+	return false;
+}
+
 static void override_result_single(struct json_object *obj)
 {
 	const char *errtext = "", *result = "";
@@ -888,7 +1095,7 @@ static void override_result_single(struct json_object *obj)
 		dmesgwarns = true;
 
 	if (!strcmp(result, "pass") &&
-	    count_lines(errtext, errtext + strlen(errtext)) > 2) {
+	    stderr_contains_warnings(errtext, errtext + strlen(errtext))) {
 		set_result(obj, "warn");
 		result = "warn";
 	}
@@ -903,12 +1110,13 @@ static void override_result_single(struct json_object *obj)
 }
 
 static void override_results(char *binary,
-			     struct subtests *subtests,
+			     struct subtest_list *subtests,
 			     struct json_object *tests)
 {
 	struct json_object *obj;
 	char piglit_name[256];
-	size_t i;
+	char dynamic_piglit_name[256];
+	size_t i, k;
 
 	if (subtests->size == 0) {
 		generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
@@ -918,9 +1126,16 @@ static void override_results(char *binary,
 	}
 
 	for (i = 0; i < subtests->size; i++) {
-		generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+		generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
 		obj = get_or_create_json_object(tests, piglit_name);
 		override_result_single(obj);
+
+		for (k = 0; k < subtests->subs[i].dynamic_size; k++) {
+			generate_piglit_name_for_dynamic(piglit_name, subtests->subs[i].dynamic_names[k],
+							 dynamic_piglit_name, sizeof(dynamic_piglit_name));
+			obj = get_or_create_json_object(tests, dynamic_piglit_name);
+			override_result_single(obj);
+		}
 	}
 }
 
@@ -965,13 +1180,14 @@ static void add_result_to_totals(struct json_object *totals,
 }
 
 static void add_to_totals(const char *binary,
-			  struct subtests *subtests,
+			  struct subtest_list *subtests,
 			  struct results *results)
 {
 	struct json_object *test, *resultobj, *emptystrtotal, *roottotal, *binarytotal;
 	char piglit_name[256];
+	char dynamic_piglit_name[256];
 	const char *result;
-	size_t i;
+	size_t i, k;
 
 	generate_piglit_name(binary, NULL, piglit_name, sizeof(piglit_name));
 	emptystrtotal = get_totals_object(results->totals, "");
@@ -992,7 +1208,7 @@ static void add_to_totals(const char *binary,
 	}
 
 	for (i = 0; i < subtests->size; i++) {
-		generate_piglit_name(binary, subtests->names[i], piglit_name, sizeof(piglit_name));
+		generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
 		test = get_or_create_json_object(results->tests, piglit_name);
 		if (!json_object_object_get_ex(test, "result", &resultobj)) {
 			fprintf(stderr, "Warning: No results set for %s\n", piglit_name);
@@ -1002,6 +1218,21 @@ static void add_to_totals(const char *binary,
 		add_result_to_totals(emptystrtotal, result);
 		add_result_to_totals(roottotal, result);
 		add_result_to_totals(binarytotal, result);
+
+		for (k = 0; k < subtests->subs[i].dynamic_size; k++) {
+			generate_piglit_name_for_dynamic(piglit_name, subtests->subs[i].dynamic_names[k],
+							 dynamic_piglit_name, sizeof(dynamic_piglit_name));
+			test = get_or_create_json_object(results->tests, dynamic_piglit_name);
+			if (!json_object_object_get_ex(test, "result", &resultobj)) {
+				fprintf(stderr, "Warning: No results set for %s\n", dynamic_piglit_name);
+				return;
+			}
+			result = json_object_get_string(resultobj);
+			add_result_to_totals(emptystrtotal, result);
+			add_result_to_totals(roottotal, result);
+			add_result_to_totals(binarytotal, result);
+		}
+
 	}
 }
 
@@ -1011,7 +1242,7 @@ static bool parse_test_directory(int dirfd,
 				 struct results *results)
 {
 	int fds[_F_LAST];
-	struct subtests subtests = {};
+	struct subtest_list subtests = {};
 	bool status = true;
 
 	if (!open_output_files(dirfd, fds, false)) {
@@ -1047,7 +1278,7 @@ static void try_add_notrun_results(const struct job_list_entry *entry,
 				   const struct settings *settings,
 				   struct results *results)
 {
-	struct subtests subtests = {};
+	struct subtest_list subtests = {};
 	struct json_object *current_test;
 	size_t i;
 
@@ -1184,7 +1415,7 @@ struct json_object *generate_results_json(int dirfd)
 	if ((fd = openat(dirfd, "aborted.txt", O_RDONLY)) >= 0) {
 		char buf[4096];
 		char piglit_name[] = "igt@runner@aborted";
-		struct subtests abortsub = {};
+		struct subtest_list abortsub = {};
 		struct json_object *aborttest = get_or_create_json_object(results.tests, piglit_name);
 		ssize_t s;
 
