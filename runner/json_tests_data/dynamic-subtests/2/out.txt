@@ -1,0 +1,10 @@
+IGT-Version: 1.23-g9e957acd (x86_64) (Linux: 4.18.0-1-amd64 x86_64)
+Starting subtest: normal
+Starting dynamic subtest: normal-dynamic-subtest
+Dynamic subtest normal-dynamic-subtest: SUCCESS (0.055s)
+Subtest normal: SUCCESS (0.100s)
+Starting subtest: incomplete
+Starting dynamic subtest: this-is-incomplete
+This is some output
+Starting subtest: resume
+Subtest resume: SUCCESS (0.109s)

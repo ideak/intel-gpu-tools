@@ -1,0 +1,19 @@
+IGT-Version: 1.23-g9e957acd (x86_64) (Linux: 4.18.0-1-amd64 x86_64)
+Starting subtest: debug-log-checking
+Starting dynamic subtest: this-is-dynamic-1
+Stack trace:
+  #0 ../lib/igt_core.c:1607 __igt_fail_assert()
+  #1 ../runner/testdata/dynamic.c:11 __real_main3()
+  #2 ../runner/testdata/dynamic.c:3 main()
+  #3 ../csu/libc-start.c:342 __libc_start_main()
+  #4 [_start+0x2a]
+Dynamic subtest this-is-dynamic-1: FAIL (0.055s)
+Starting dynamic subtest: this-is-dynamic-2
+Stack trace:
+  #0 ../lib/igt_core.c:1607 __igt_fail_assert()
+  #1 ../runner/testdata/dynamic.c:5 __real_main3()
+  #2 ../runner/testdata/dynamic.c:3 main()
+  #3 ../csu/libc-start.c:342 __libc_start_main()
+  #4 [_start+0x2a]
+Dynamic subtest this-is-dynamic-2: FAIL (0.054s)
+Subtest debug-log-checking: FAIL (0.109s)

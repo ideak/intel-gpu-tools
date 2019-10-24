@@ -1,0 +1,8 @@
+Starting subtest: normal
+Starting dynamic subtest: normal-dynamic-subtest
+Dynamic subtest normal-dynamic-subtest: SUCCESS (0.055s)
+Subtest normal: SUCCESS (0.100s)
+Starting subtest: incomplete
+Starting dynamic subtest: this-is-incomplete
+Starting subtest: resume
+Subtest resume: SUCCESS (0.109s)

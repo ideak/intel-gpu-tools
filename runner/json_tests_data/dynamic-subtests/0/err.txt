@@ -1,0 +1,36 @@
+Starting subtest: debug-log-checking
+Starting dynamic subtest: this-is-dynamic-1
+(dynamic:20904) CRITICAL: Test assertion failure function __real_main3, file ../runner/testdata/dynamic.c:8:
+(dynamic:20904) CRITICAL: Failed assertion: false
+Dynamic subtest this-is-dynamic-1 failed.
+**** DEBUG ****
+(dynamic:20904) DEBUG: This print is from 1
+(dynamic:20904) CRITICAL: Test assertion failure function __real_main3, file ../runner/testdata/dynamic.c:8:
+(dynamic:20904) CRITICAL: Failed assertion: false
+(dynamic:20904) igt_core-INFO: Stack trace:
+(dynamic:20904) igt_core-INFO:   #0 ../lib/igt_core.c:1607 __igt_fail_assert()
+(dynamic:20904) igt_core-INFO:   #1 ../runner/testdata/dynamic.c:11 __real_main3()
+(dynamic:20904) igt_core-INFO:   #2 ../runner/testdata/dynamic.c:3 main()
+(dynamic:20904) igt_core-INFO:   #3 ../csu/libc-start.c:342 __libc_start_main()
+(dynamic:20904) igt_core-INFO:   #4 [_start+0x2a]
+****  END  ****
+Dynamic subtest this-is-dynamic-1: FAIL (0.055s)
+Starting dynamic subtest: this-is-dynamic-2
+(dynamic:20904) CRITICAL: Test assertion failure function __real_main3, file ../runner/testdata/dynamic.c:13:
+(dynamic:20904) CRITICAL: Failed assertion: false
+Dynamic subtest this-is-dynamic-2 failed.
+**** DEBUG ****
+(dynamic:20904) DEBUG: This print is from 2
+(dynamic:20904) CRITICAL: Test assertion failure function __real_main3, file ../runner/testdata/dynamic.c:13:
+(dynamic:20904) CRITICAL: Failed assertion: false
+(dynamic:20904) igt_core-INFO: Stack trace:
+(dynamic:20904) igt_core-INFO:   #0 ../lib/igt_core.c:1607 __igt_fail_assert()
+(dynamic:20904) igt_core-INFO:   #1 ../runner/testdata/dynamic.c:5 __real_main3()
+(dynamic:20904) igt_core-INFO:   #2 ../runner/testdata/dynamic.c:3 main()
+(dynamic:20904) igt_core-INFO:   #3 ../csu/libc-start.c:342 __libc_start_main()
+(dynamic:20904) igt_core-INFO:   #4 [_start+0x2a]
+****  END  ****
+Dynamic subtest this-is-dynamic-2: FAIL (0.054s)
+Subtest debug-log-checking failed.
+No log.
+Subtest debug-log-checking: FAIL (0.109s)

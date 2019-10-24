@@ -1,0 +1,7 @@
+6,1157,23426155175691,-;Console: switching to colour dummy device 80x25
+14,1158,23426155175708,-;[IGT] dynamic: executing
+14,1159,23426155184875,-;[IGT] dynamic: starting subtest debug-log-checking
+14,1160,23426155184895,-;[IGT] dynamic: starting dynamic subtest this-is-dynamic-1
+14,1161,23426155240164,-;[IGT] dynamic: starting dynamic subtest this-is-dynamic-2
+14,1162,23426155293846,-;[IGT] dynamic: exiting, ret=98
+6,1163,23426155294003,-;Console: switching to colour frame buffer device 240x75
