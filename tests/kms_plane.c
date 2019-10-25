@@ -757,6 +757,33 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 	return result;
 }
 
+static bool skip_plane(data_t *data, igt_plane_t *plane)
+{
+	int index = plane->index;
+
+	if (data->extended)
+		return false;
+
+	if (!is_i915_device(data->drm_fd))
+		return false;
+
+	if (plane->type == DRM_PLANE_TYPE_CURSOR)
+		return false;
+
+	if (intel_gen(intel_get_drm_devid(data->drm_fd)) < 11)
+		return false;
+
+	/*
+	 * Test 1 HDR plane, 1 SDR UV plane, 1 SDR Y plane.
+	 *
+	 * Kernel registers planes in the hardware Z order:
+	 * 0,1,2 HDR planes
+	 * 3,4 SDR UV planes
+	 * 5,6 SDR Y planes
+	 */
+	return index != 0 && index != 3 && index != 5;
+}
+
 static void
 test_pixel_formats(data_t *data, enum pipe pipe)
 {
@@ -794,8 +821,11 @@ test_pixel_formats(data_t *data, enum pipe pipe)
 	test_init(data, pipe);
 
 	result = true;
-	for_each_plane_on_pipe(&data->display, pipe, plane)
+	for_each_plane_on_pipe(&data->display, pipe, plane) {
+		if (skip_plane(data, plane))
+			continue;
 		result &= test_format_plane(data, pipe, output, plane);
+	}
 
 	test_fini(data);
 
