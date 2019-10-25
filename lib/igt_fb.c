@@ -3227,8 +3227,6 @@ static bool use_convert(const struct igt_fb *fb)
  */
 cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 {
-	const struct format_desc_struct *f = lookup_drm_format(fb->drm_format);
-
 	if (fb->cairo_surface == NULL) {
 		if (use_convert(fb))
 			create_cairo_surface__convert(fd, fb);
@@ -3236,21 +3234,6 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 			create_cairo_surface__gpu(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);
-
-		if (f->cairo_id == CAIRO_FORMAT_RGB96F ||
-		    f->cairo_id == CAIRO_FORMAT_RGBA128F) {
-			cairo_status_t status = cairo_surface_status(fb->cairo_surface);
-
-			igt_skip_on_f(status == CAIRO_STATUS_INVALID_FORMAT &&
-				      cairo_version() < CAIRO_VERSION_ENCODE(1, 17, 2),
-				      "Cairo version too old, need 1.17.2, have %s\n",
-				      cairo_version_string());
-
-			igt_skip_on_f(status == CAIRO_STATUS_NO_MEMORY &&
-				      pixman_version() < PIXMAN_VERSION_ENCODE(0, 36, 0),
-				      "Pixman version too old, need 0.36.0, have %s\n",
-				      pixman_version_string());
-		}
 	}
 
 	igt_assert(cairo_surface_status(fb->cairo_surface) == CAIRO_STATUS_SUCCESS);
@@ -3474,12 +3457,26 @@ bool igt_fb_supported_format(uint32_t drm_format)
 	if (drm_format == DRM_FORMAT_C8)
 		return false;
 
-	for_each_format(f)
-		if (f->drm_id == drm_format)
-			return (f->cairo_id != CAIRO_FORMAT_INVALID) ||
-				(f->pixman_id != PIXMAN_invalid);
+	f = lookup_drm_format(drm_format);
+	if (!f)
+		return false;
 
-	return false;
+	if ((f->cairo_id == CAIRO_FORMAT_RGB96F ||
+	     f->cairo_id == CAIRO_FORMAT_RGBA128F) &&
+	    cairo_version() < CAIRO_VERSION_ENCODE(1, 17, 2)) {
+		igt_info("Cairo version too old for " IGT_FORMAT_FMT ", need 1.17.2, have %s\n",
+			 IGT_FORMAT_ARGS(drm_format), cairo_version_string());
+		return false;
+	}
+
+	if (f->pixman_id == PIXMAN_rgba_float &&
+	    pixman_version() < PIXMAN_VERSION_ENCODE(0, 36, 0)) {
+		igt_info("Pixman version too old for " IGT_FORMAT_FMT ", need 0.36.0, have %s\n",
+			 IGT_FORMAT_ARGS(drm_format), pixman_version_string());
+		return false;
+	}
+
+	return true;
 }
 
 /**
