@@ -61,13 +61,11 @@ static void all(int fd, unsigned flags, int timeout, int ncpus)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
-	unsigned engines[16];
-	unsigned nengine;
-	unsigned engine;
+	unsigned engines[16], nengine;
 
 	nengine = 0;
-	for_each_physical_engine(fd, engine)
-		engines[nengine++] = engine;
+	for_each_physical_engine(e, fd)
+		engines[nengine++] = eb_ring(e);
 	igt_require(nengine);
 
 	memset(&obj, 0, sizeof(obj));

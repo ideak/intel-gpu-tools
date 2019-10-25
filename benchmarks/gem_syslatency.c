@@ -79,17 +79,6 @@ static void force_low_latency(void)
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
 
-static bool ignore_engine(int fd, unsigned engine)
-{
-	if (engine == 0)
-		return true;
-
-	if (gem_has_bsd2(fd) && engine == I915_EXEC_BSD)
-		return true;
-
-	return false;
-}
-
 static void *gem_busyspin(void *arg)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -100,14 +89,13 @@ static void *gem_busyspin(void *arg)
 		bs->sz ? bs->sz + sizeof(bbe) : bs->leak ? 16 << 20 : 4 << 10;
 	unsigned engines[16];
 	unsigned nengine;
-	unsigned engine;
 	int fd;
 
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	nengine = 0;
-	for_each_engine(fd, engine)
-		if (!ignore_engine(fd, engine)) engines[nengine++] = engine;
+	for_each_physical_engine(e, fd)
+		engines[nengine++] = eb_ring(e);
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create(fd, 4096);

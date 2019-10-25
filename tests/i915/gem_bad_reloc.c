@@ -196,10 +196,10 @@ igt_main
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("negative-reloc-%s", e->name)
-			negative_reloc(fd, e->exec_id | e->flags, 0);
+			negative_reloc(fd, eb_ring(e), 0);
 
 		igt_subtest_f("negative-reloc-lut-%s", e->name)
-			negative_reloc(fd, e->exec_id | e->flags, USE_LUT);
+			negative_reloc(fd, eb_ring(e), USE_LUT);
 	}
 
 	igt_subtest("negative-reloc-bltcopy")

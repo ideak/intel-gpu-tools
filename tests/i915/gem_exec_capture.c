@@ -558,9 +558,9 @@ igt_main
 			continue;
 
 		igt_subtest_f("capture-%s", e->name) {
-			igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
-			igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
-			capture(fd, dir, e->exec_id | e->flags);
+			igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
+			igt_require(gem_can_store_dword(fd, eb_ring(e)));
+			capture(fd, dir, eb_ring(e));
 		}
 	}
 

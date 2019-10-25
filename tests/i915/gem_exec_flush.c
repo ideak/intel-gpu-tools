@@ -600,7 +600,7 @@ igt_main
 	}
 
 	for (e = intel_execution_engines; e->name; e++) igt_subtest_group {
-		unsigned ring = e->exec_id | e->flags;
+		unsigned ring = eb_ring(e);
 		unsigned timeout = 5 + 120*!!e->exec_id;
 
 		igt_fixture {

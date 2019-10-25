@@ -527,14 +527,12 @@ igt_main
 	int fd = -1;
 
 	igt_fixture {
-		unsigned engine;
-
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 		gem_require_contexts(fd);
 
-		for_each_physical_engine(fd, engine)
-			all_engines[all_nengine++] = engine;
+		for_each_physical_engine(e, fd)
+			all_engines[all_nengine++] = eb_ring(e);
 		igt_require(all_nengine);
 
 		if (gem_uses_full_ppgtt(fd)) {
@@ -582,12 +580,12 @@ igt_main
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {
 		igt_subtest_f("active-%s", e->name)
-			active(fd, e->exec_id | e->flags, 20, 1);
+			active(fd, eb_ring(e), 20, 1);
 		igt_subtest_f("forked-active-%s", e->name)
-			active(fd, e->exec_id | e->flags, 20, ncpus);
+			active(fd, eb_ring(e), 20, ncpus);
 		if (e->exec_id) {
 			igt_subtest_f("hog-%s", e->name)
-				active(fd, e->exec_id | e->flags, 20, -1);
+				active(fd, eb_ring(e), 20, -1);
 		}
 	}
 

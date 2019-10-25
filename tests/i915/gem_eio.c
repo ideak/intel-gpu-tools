@@ -427,7 +427,6 @@ static void test_suspend(int fd, int state)
 static void test_inflight(int fd, unsigned int wait)
 {
 	int parent_fd = fd;
-	unsigned int engine;
 	int fence[64]; /* mostly conservative estimate of ring size */
 	int max;
 
@@ -439,7 +438,7 @@ static void test_inflight(int fd, unsigned int wait)
 	max = min(max - 1, ARRAY_SIZE(fence));
 	igt_debug("Using %d inflight batches\n", max);
 
-	for_each_engine(parent_fd, engine) {
+	for_each_engine(e, parent_fd) {
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 obj[2];
 		struct drm_i915_gem_execbuffer2 execbuf;
@@ -454,16 +453,16 @@ static void test_inflight(int fd, unsigned int wait)
 		gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
 		gem_quiescent_gpu(fd);
-		igt_debug("Starting %s on engine '%s'\n", __func__, e__->name);
+		igt_debug("Starting %s on engine '%s'\n", __func__, e->name);
 		igt_require(i915_reset_control(false));
 
-		hang = spin_sync(fd, 0, engine);
+		hang = spin_sync(fd, 0, eb_ring(e));
 		obj[0].handle = hang->handle;
 
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(obj);
 		execbuf.buffer_count = 2;
-		execbuf.flags = engine | I915_EXEC_FENCE_OUT;
+		execbuf.flags = eb_ring(e) | I915_EXEC_FENCE_OUT;
 
 		for (unsigned int n = 0; n < max; n++) {
 			gem_execbuf_wr(fd, &execbuf);
@@ -563,13 +562,12 @@ static uint32_t context_create_safe(int i915)
 static void test_inflight_contexts(int fd, unsigned int wait)
 {
 	int parent_fd = fd;
-	unsigned int engine;
 
 	igt_require_gem(fd);
 	igt_require(gem_has_exec_fence(fd));
 	gem_require_contexts(fd);
 
-	for_each_engine(parent_fd, engine) {
+	for_each_engine(e, parent_fd) {
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 obj[2];
 		struct drm_i915_gem_execbuffer2 execbuf;
@@ -586,7 +584,7 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 
 		gem_quiescent_gpu(fd);
 
-		igt_debug("Starting %s on engine '%s'\n", __func__, e__->name);
+		igt_debug("Starting %s on engine '%s'\n", __func__, e->name);
 		igt_require(i915_reset_control(false));
 
 		memset(obj, 0, sizeof(obj));
@@ -594,13 +592,13 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 		obj[1].handle = gem_create(fd, 4096);
 		gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 
-		hang = spin_sync(fd, 0, engine);
+		hang = spin_sync(fd, 0, eb_ring(e));
 		obj[0].handle = hang->handle;
 
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(obj);
 		execbuf.buffer_count = 2;
-		execbuf.flags = engine | I915_EXEC_FENCE_OUT;
+		execbuf.flags = eb_ring(e) | I915_EXEC_FENCE_OUT;
 
 		count = 0;
 		for (unsigned int n = 0; n < ARRAY_SIZE(fence); n++) {
@@ -691,7 +689,7 @@ static void test_inflight_internal(int fd, unsigned int wait)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
 	uint32_t bbe = MI_BATCH_BUFFER_END;
-	unsigned engine, nfence = 0;
+	unsigned nfence = 0;
 	int fences[16];
 	igt_spin_t *hang;
 
@@ -712,8 +710,8 @@ static void test_inflight_internal(int fd, unsigned int wait)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
-	for_each_engine(fd, engine) {
-		execbuf.flags = engine | I915_EXEC_FENCE_OUT;
+	for_each_engine(e, fd) {
+		execbuf.flags = eb_ring(e) | I915_EXEC_FENCE_OUT;
 
 		gem_execbuf_wr(fd, &execbuf);
 
@@ -822,10 +820,9 @@ static void reset_stress(int fd, uint32_t ctx0,
 static void test_reset_stress(int fd, unsigned int flags)
 {
 	uint32_t ctx0 = context_create_safe(fd);
-	unsigned int engine;
 
-	for_each_engine(fd, engine)
-		reset_stress(fd, ctx0, e__->name, engine, flags);
+	for_each_engine(e, fd)
+		reset_stress(fd, ctx0, e->name, eb_ring(e), flags);
 
 	gem_context_destroy(fd, ctx0);
 }

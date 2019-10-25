@@ -326,7 +326,6 @@ static void single_timeline(int i915)
 	struct sync_file_info sync_file_info = {
 		.num_fences = 1,
 	};
-	unsigned int engine;
 	int n;
 
 	igt_require(has_single_timeline(i915));
@@ -347,7 +346,7 @@ static void single_timeline(int i915)
 				  I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
 	execbuf.flags = I915_EXEC_FENCE_OUT;
 	n = 0;
-	for_each_engine(i915, engine) {
+	for_each_engine(e, i915) {
 		gem_execbuf_wr(i915, &execbuf);
 		sync_file_info.sync_fence_info = to_user_pointer(&rings[n]);
 		do_ioctl(execbuf.rsvd2 >> 32, SYNC_IOC_FILE_INFO, &sync_file_info);
@@ -368,7 +367,6 @@ static void single_timeline(int i915)
 
 static void exec_single_timeline(int i915, unsigned int engine)
 {
-	unsigned int other;
 	igt_spin_t *spin;
 	uint32_t ctx;
 
@@ -381,17 +379,17 @@ static void exec_single_timeline(int i915, unsigned int engine)
 	 */
 	ctx = 0;
 	spin = NULL;
-	for_each_physical_engine(i915, other) {
-		if (other == engine)
+	for_each_physical_engine(e, i915) {
+		if (eb_ring(e) == engine)
 			continue;
 
 		if (spin == NULL) {
-			spin = __igt_spin_new(i915, .ctx = ctx, .engine = other);
+			spin = __igt_spin_new(i915, .ctx = ctx, .engine = eb_ring(e));
 		} else {
 			struct drm_i915_gem_execbuffer2 execbuf = {
 				.buffers_ptr = spin->execbuf.buffers_ptr,
 				.buffer_count = spin->execbuf.buffer_count,
-				.flags = other,
+				.flags = eb_ring(e),
 				.rsvd1 = ctx,
 			};
 			gem_execbuf(i915, &execbuf);
@@ -409,17 +407,17 @@ static void exec_single_timeline(int i915, unsigned int engine)
 	ctx = gem_context_clone(i915, 0, 0,
 				I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
 	spin = NULL;
-	for_each_physical_engine(i915, other) {
-		if (other == engine)
+	for_each_physical_engine(e, i915) {
+		if (eb_ring(e) == engine)
 			continue;
 
 		if (spin == NULL) {
-			spin = __igt_spin_new(i915, .ctx = ctx, .engine = other);
+			spin = __igt_spin_new(i915, .ctx = ctx, .engine = eb_ring(e));
 		} else {
 			struct drm_i915_gem_execbuffer2 execbuf = {
 				.buffers_ptr = spin->execbuf.buffers_ptr,
 				.buffer_count = spin->execbuf.buffer_count,
-				.flags = other,
+				.flags = eb_ring(e),
 				.rsvd1 = ctx,
 			};
 			gem_execbuf(i915, &execbuf);
@@ -742,8 +740,8 @@ static void smoketest(int i915, unsigned ring, unsigned timeout)
 	uint32_t *ptr;
 
 	nengine = 0;
-	for_each_physical_engine(i915, engine)
-		engines[nengine++] = engine;
+	for_each_physical_engine(e, i915)
+		engines[nengine++] = eb_ring(e);
 	igt_require(nengine);
 
 	scratch = gem_create(i915, 4096);
@@ -827,11 +825,10 @@ igt_main
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("exec-shared-gtt-%s", e->name)
-				exec_shared_gtt(i915, e->exec_id | e->flags);
+				exec_shared_gtt(i915, eb_ring(e));
 
 			igt_subtest_f("exec-single-timeline-%s", e->name)
-				exec_single_timeline(i915,
-						     e->exec_id | e->flags);
+				exec_single_timeline(i915, eb_ring(e));
 
 			/*
 			 * Check that the shared contexts operate independently,
@@ -842,26 +839,26 @@ igt_main
 			 */
 			igt_subtest_group {
 				igt_fixture {
-					gem_require_ring(i915, e->exec_id | e->flags);
-					igt_require(gem_can_store_dword(i915, e->exec_id | e->flags));
+					gem_require_ring(i915, eb_ring(e));
+					igt_require(gem_can_store_dword(i915, eb_ring(e)));
 					igt_require(gem_scheduler_enabled(i915));
 					igt_require(gem_scheduler_has_ctx_priority(i915));
 				}
 
 				igt_subtest_f("Q-independent-%s", e->name)
-					independent(i915, e->exec_id | e->flags, 0);
+					independent(i915, eb_ring(e), 0);
 
 				igt_subtest_f("Q-in-order-%s", e->name)
-					reorder(i915, e->exec_id | e->flags, EQUAL);
+					reorder(i915, eb_ring(e), EQUAL);
 
 				igt_subtest_f("Q-out-order-%s", e->name)
-					reorder(i915, e->exec_id | e->flags, 0);
+					reorder(i915, eb_ring(e), 0);
 
 				igt_subtest_f("Q-promotion-%s", e->name)
-					promotion(i915, e->exec_id | e->flags);
+					promotion(i915, eb_ring(e));
 
 				igt_subtest_f("Q-smoketest-%s", e->name)
-					smoketest(i915, e->exec_id | e->flags, 5);
+					smoketest(i915, eb_ring(e), 5);
 			}
 		}
 

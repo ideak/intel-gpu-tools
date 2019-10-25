@@ -44,12 +44,11 @@ sync_loop(int fd)
 	struct drm_i915_gem_relocation_entry reloc[1];
 	unsigned engines[16];
 	unsigned nengine;
-	unsigned engine;
 	int i;
 
 	nengine = 0;
-	for_each_physical_engine(fd, engine)
-		engines[nengine++] = engine;
+	for_each_physical_engine(e, fd)
+		engines[nengine++] = eb_ring(e);
 	igt_require(nengine);
 
 	memset(object, 0, sizeof(object));

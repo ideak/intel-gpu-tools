@@ -88,7 +88,7 @@ static int noop(int fd, uint32_t ctx, const struct intel_execution_engine *e)
 	memset(&eb, 0, sizeof(eb));
 	eb.buffers_ptr = to_user_pointer(&exec);
 	eb.buffer_count = 1;
-	eb.flags = e->exec_id | e->flags;
+	eb.flags = eb_ring(e);
 	i915_execbuffer2_set_context_id(eb, ctx);
 
 	ret = __gem_execbuf(fd, &eb);
@@ -164,7 +164,7 @@ static void inject_hang(int fd, uint32_t ctx,
 
 	clock_gettime(CLOCK_MONOTONIC, &ts_injected);
 
-	hang = igt_hang_ctx(fd, ctx, e->exec_id | e->flags, flags & BAN);
+	hang = igt_hang_ctx(fd, ctx, eb_ring(e), flags & BAN);
 	if ((flags & ASYNC) == 0)
 		igt_post_hang_ring(fd, hang);
 }
@@ -523,12 +523,12 @@ static void noop_on_each_ring(int fd, const bool reverse)
 		for (e = intel_execution_engines; e->name; e++)
 			;
 		while (--e >= intel_execution_engines) {
-			eb.flags = e->exec_id | e->flags;
+			eb.flags = eb_ring(e);
 			__gem_execbuf(fd, &eb);
 		}
 	} else {
 		for (e = intel_execution_engines; e->name; e++) {
-			eb.flags = e->exec_id | e->flags;
+			eb.flags = eb_ring(e);
 			__gem_execbuf(fd, &eb);
 		}
 	}
@@ -546,7 +546,7 @@ static void test_close_pending_fork(const struct intel_execution_engine *e,
 
 	assert_reset_status(fd, fd, 0, RS_NO_ERROR);
 
-	hang = igt_hang_ctx(fd, 0, e->exec_id | e->flags, 0);
+	hang = igt_hang_ctx(fd, 0, eb_ring(e), 0);
 	sleep(1);
 
 	/* Avoid helpers as we need to kill the child

@@ -319,8 +319,8 @@ static void close_race(int fd)
 	 */
 
 	nengine = 0;
-	for_each_engine(fd, i)
-		engines[nengine++] = i;
+	for_each_engine(e, fd)
+		engines[nengine++] = eb_ring(e);
 	igt_require(nengine);
 
 	control = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);

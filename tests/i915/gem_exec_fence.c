@@ -216,7 +216,6 @@ static void test_fence_busy_all(int fd, unsigned flags)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct timespec tv;
 	uint32_t *batch;
-	unsigned int engine;
 	int all, i, timeout;
 
 	gem_quiescent_gpu(fd);
@@ -263,10 +262,10 @@ static void test_fence_busy_all(int fd, unsigned flags)
 	i++;
 
 	all = -1;
-	for_each_engine(fd, engine) {
+	for_each_engine(e, fd) {
 		int fence, new;
 
-		execbuf.flags = engine | LOCAL_EXEC_FENCE_OUT;
+		execbuf.flags = eb_ring(e) | LOCAL_EXEC_FENCE_OUT;
 		execbuf.rsvd2 = -1;
 		gem_execbuf_wr(fd, &execbuf);
 		fence = execbuf.rsvd2 >> 32;
@@ -319,7 +318,6 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 {
 	uint32_t scratch = gem_create(fd, 4096);
 	igt_spin_t *spin;
-	unsigned engine;
 	uint32_t *out;
 	int i;
 
@@ -336,15 +334,15 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 	igt_assert(spin->out_fence != -1);
 
 	i = 0;
-	for_each_physical_engine(fd, engine) {
-		if (!gem_can_store_dword(fd, engine))
+	for_each_physical_engine(e, fd) {
+		if (!gem_can_store_dword(fd, eb_ring(e)))
 			continue;
 
 		if (flags & NONBLOCK) {
-			store(fd, engine, spin->out_fence, scratch, i);
+			store(fd, eb_ring(e), spin->out_fence, scratch, i);
 		} else {
 			igt_fork(child, 1)
-				store(fd, engine, spin->out_fence, scratch, i);
+				store(fd, eb_ring(e), spin->out_fence, scratch, i);
 		}
 
 		i++;
@@ -412,7 +410,6 @@ static void test_parallel(int fd, unsigned int master)
 	uint32_t handle[16];
 	uint32_t batch[16];
 	igt_spin_t *spin;
-	unsigned engine;
 	IGT_CORK_HANDLE(c);
 	uint32_t plug;
 	int i, x = 0;
@@ -498,11 +495,11 @@ static void test_parallel(int fd, unsigned int master)
 	obj[BATCH].relocation_count = 1;
 
 	/* Queue all secondaries */
-	for_each_physical_engine(fd, engine) {
-		if (engine == master)
+	for_each_physical_engine(e, fd) {
+		if (eb_ring(e) == master)
 			continue;
 
-		execbuf.flags = engine | LOCAL_EXEC_FENCE_SUBMIT;
+		execbuf.flags = eb_ring(e) | LOCAL_EXEC_FENCE_SUBMIT;
 		if (gen < 6)
 			execbuf.flags |= I915_EXEC_SECURE;
 
@@ -663,8 +660,7 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
-	unsigned int engines[16], engine;
-	unsigned int nengine, n, s;
+	unsigned int engines[16], nengine, n, s;
 	unsigned long limit;
 	int all_fences;
 	IGT_CORK_HANDLE(c);
@@ -674,8 +670,8 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 		limit = ring_size / 3;
 
 	nengine = 0;
-	for_each_physical_engine(fd, engine)
-		engines[nengine++] = engine;
+	for_each_physical_engine(e, fd)
+		engines[nengine++] = eb_ring(e);
 	igt_require(nengine);
 
 	gem_quiescent_gpu(fd);
@@ -1156,7 +1152,6 @@ static void test_syncobj_wait(int fd)
 		.handle = syncobj_create(fd),
 	};
 	igt_spin_t *spin;
-	unsigned engine;
 	unsigned handle[16];
 	int n;
 
@@ -1189,13 +1184,13 @@ static void test_syncobj_wait(int fd)
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
 	n = 0;
-	for_each_engine(fd, engine) {
+	for_each_engine(e, fd) {
 		obj.handle = gem_create(fd, 4096);
 		gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
 		/* No inter-engine synchronisation, will complete */
-		if (engine == I915_EXEC_BLT) {
-			execbuf.flags = engine;
+		if (eb_ring(e) == I915_EXEC_BLT) {
+			execbuf.flags = eb_ring(e);
 			execbuf.cliprects_ptr = 0;
 			execbuf.num_cliprects = 0;
 			gem_execbuf(fd, &execbuf);
@@ -1205,7 +1200,7 @@ static void test_syncobj_wait(int fd)
 		igt_assert(gem_bo_busy(fd, spin->handle));
 
 		/* Now wait upon the blocked engine */
-		execbuf.flags = LOCAL_EXEC_FENCE_ARRAY | engine;
+		execbuf.flags = LOCAL_EXEC_FENCE_ARRAY | eb_ring(e);
 		execbuf.cliprects_ptr = to_user_pointer(&fence);
 		execbuf.num_cliprects = 1;
 		fence.flags = LOCAL_EXEC_FENCE_WAIT;
@@ -1549,8 +1544,8 @@ igt_main
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_group {
 			igt_fixture {
-				igt_require(gem_has_ring(i915, e->exec_id | e->flags));
-				igt_require(gem_can_store_dword(i915, e->exec_id | e->flags));
+				igt_require(gem_has_ring(i915, eb_ring(e)));
+				igt_require(gem_can_store_dword(i915, eb_ring(e)));
 			}
 
 			igt_subtest_group {
@@ -1561,27 +1556,27 @@ igt_main
 				igt_subtest_f("%sbusy-%s",
 						e->exec_id == 0 ? "basic-" : "",
 						e->name)
-					test_fence_busy(i915, e->exec_id | e->flags, 0);
+					test_fence_busy(i915, eb_ring(e), 0);
 				igt_subtest_f("%swait-%s",
 						e->exec_id == 0 ? "basic-" : "",
 						e->name)
-					test_fence_busy(i915, e->exec_id | e->flags, WAIT);
+					test_fence_busy(i915, eb_ring(e), WAIT);
 				igt_subtest_f("%sawait-%s",
 						e->exec_id == 0 ? "basic-" : "",
 						e->name)
-					test_fence_await(i915, e->exec_id | e->flags, 0);
+					test_fence_await(i915, eb_ring(e), 0);
 				igt_subtest_f("nb-await-%s", e->name)
-					test_fence_await(i915, e->exec_id | e->flags, NONBLOCK);
+					test_fence_await(i915, eb_ring(e), NONBLOCK);
 
 				igt_subtest_f("keep-in-fence-%s", e->name)
-					test_keep_in_fence(i915, e->exec_id | e->flags, 0);
+					test_keep_in_fence(i915, eb_ring(e), 0);
 
 				if (e->exec_id &&
 				    !(e->exec_id == I915_EXEC_BSD && !e->flags)) {
 					igt_subtest_f("parallel-%s", e->name) {
 						igt_require(has_submit_fence(i915));
 						igt_until_timeout(2)
-							test_parallel(i915, e->exec_id | e->flags);
+							test_parallel(i915, eb_ring(e));
 					}
 				}
 
@@ -1600,13 +1595,13 @@ igt_main
 				}
 
 				igt_subtest_f("busy-hang-%s", e->name)
-					test_fence_busy(i915, e->exec_id | e->flags, HANG);
+					test_fence_busy(i915, eb_ring(e), HANG);
 				igt_subtest_f("wait-hang-%s", e->name)
-					test_fence_busy(i915, e->exec_id | e->flags, HANG | WAIT);
+					test_fence_busy(i915, eb_ring(e), HANG | WAIT);
 				igt_subtest_f("await-hang-%s", e->name)
-					test_fence_await(i915, e->exec_id | e->flags, HANG);
+					test_fence_await(i915, eb_ring(e), HANG);
 				igt_subtest_f("nb-await-hang-%s", e->name)
-					test_fence_await(i915, e->exec_id | e->flags, NONBLOCK | HANG);
+					test_fence_await(i915, eb_ring(e), NONBLOCK | HANG);
 				igt_fixture {
 					igt_disallow_hang(i915, hang);
 				}

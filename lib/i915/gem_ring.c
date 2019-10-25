@@ -153,9 +153,9 @@ gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags f
 	fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | O_NONBLOCK);
 
 	if (engine == ALL_ENGINES) {
-		for_each_physical_engine(fd, engine) {
+		for_each_physical_engine(e, fd) {
 			unsigned int count =
-				__gem_measure_ring_inflight(fd, engine, flags);
+				__gem_measure_ring_inflight(fd, eb_ring(e), flags);
 
 			if (count < min)
 				min = count;

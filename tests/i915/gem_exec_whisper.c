@@ -203,9 +203,9 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
-		for_each_physical_engine(fd, engine) {
-			if (gem_can_store_dword(fd, engine))
-				engines[nengine++] = engine;
+		for_each_physical_engine(e, fd) {
+			if (gem_can_store_dword(fd, eb_ring(e)))
+				engines[nengine++] = eb_ring(e);
 		}
 	} else {
 		igt_assert(!(flags & ALL));
@@ -578,7 +578,7 @@ igt_main
 				continue;
 
 			igt_subtest_f("%s-%s", e->name, m->name)
-				whisper(fd, e->exec_id | e->flags, m->flags);
+				whisper(fd, eb_ring(e), m->flags);
 		}
 	}
 

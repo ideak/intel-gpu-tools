@@ -173,14 +173,14 @@ static void i915_to_amd(int i915, int amd, amdgpu_device_handle device)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
-	unsigned int engines[16], engine;
+	unsigned int engines[16];
 	unsigned int nengine;
 	unsigned long count;
 	struct cork c;
 
 	nengine = 0;
-	for_each_physical_engine(i915, engine)
-		engines[nengine++] = engine;
+	for_each_physical_engine(e, i915)
+		engines[nengine++] = eb_ring(e);
 	igt_require(nengine);
 
 	memset(obj, 0, sizeof(obj));

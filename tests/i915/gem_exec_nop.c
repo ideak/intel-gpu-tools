@@ -222,7 +222,7 @@ static void poll_sequential(int fd, const char *name, int timeout)
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_relocation_entry reloc[4], *r;
 	uint32_t *bbe[2], *state, *batch;
-	unsigned engines[16], nengine, engine, flags;
+	unsigned engines[16], nengine, flags;
 	struct timespec tv = {};
 	unsigned long cycles;
 	uint64_t elapsed;
@@ -233,11 +233,11 @@ static void poll_sequential(int fd, const char *name, int timeout)
 		flags |= I915_EXEC_SECURE;
 
 	nengine = 0;
-	for_each_physical_engine(fd, engine) {
-		if (!gem_can_store_dword(fd, engine))
+	for_each_physical_engine(e, fd) {
+		if (!gem_can_store_dword(fd, eb_ring(e)))
 			continue;
 
-		engines[nengine++] = engine;
+		engines[nengine++] = eb_ring(e);
 	}
 	igt_require(nengine);
 
@@ -438,14 +438,14 @@ static void parallel(int fd, uint32_t handle, int timeout)
 
 	sum = 0;
 	nengine = 0;
-	for_each_physical_engine(fd, engine) {
-		engines[nengine] = engine;
-		names[nengine] = e__->name;
+	for_each_physical_engine(e, fd) {
+		engines[nengine] = eb_ring(e);
+		names[nengine] = e->name;
 		nengine++;
 
 		time = nop_on_ring(fd, handle, engine, 1, &count) / count;
 		sum += time;
-		igt_debug("%s: %.3fus\n", e__->name, 1e6*time);
+		igt_debug("%s: %.3fus\n", e->name, 1e6*time);
 	}
 	igt_require(nengine);
 	igt_info("average (individually): %.3fus\n", sum/nengine*1e6);
@@ -494,22 +494,21 @@ static void series(int fd, uint32_t handle, int timeout)
 	struct timespec start, now, sync;
 	unsigned engines[16];
 	unsigned nengine;
-	unsigned engine;
 	unsigned long count;
 	double time, max = 0, min = HUGE_VAL, sum = 0;
 	const char *name;
 
 	nengine = 0;
-	for_each_physical_engine(fd, engine) {
-		time = nop_on_ring(fd, handle, engine, 1, &count) / count;
+	for_each_physical_engine(e, fd) {
+		time = nop_on_ring(fd, handle, eb_ring(e), 1, &count) / count;
 		if (time > max) {
-			name = e__->name;
+			name = e->name;
 			max = time;
 		}
 		if (time < min)
 			min = time;
 		sum += time;
-		engines[nengine++] = engine;
+		engines[nengine++] = eb_ring(e);
 	}
 	igt_require(nengine);
 	igt_info("Maximum execution latency on %s, %.3fus, min %.3fus, total %.3fus per cycle, average %.3fus\n",
@@ -595,14 +594,14 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 
 	nengine = 0;
 	sum = 0;
-	for_each_physical_engine(fd, n) {
+	for_each_physical_engine(e, fd) {
 		unsigned long count;
 
 		time = nop_on_ring(fd, handle, n, 1, &count) / count;
 		sum += time;
-		igt_debug("%s: %.3fus\n", e__->name, 1e6*time);
+		igt_debug("%s: %.3fus\n", e->name, 1e6*time);
 
-		engines[nengine++] = n;
+		engines[nengine++] = eb_ring(e);
 	}
 	igt_require(nengine);
 	igt_info("Total (individual) execution latency %.3fus per cycle\n",
@@ -726,8 +725,8 @@ static void fence_signal(int fd, uint32_t handle,
 
 	nengine = 0;
 	if (ring_id == ALL_ENGINES) {
-		for_each_physical_engine(fd, n)
-			engines[nengine++] = n;
+		for_each_physical_engine(e, fd)
+			engines[nengine++] = eb_ring(e);
 	} else {
 		gem_require_ring(fd, ring_id);
 		engines[nengine++] = ring_id;
@@ -875,9 +874,9 @@ igt_main
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%s", e->name)
-			single(device, handle, e->exec_id | e->flags, e->name);
+			single(device, handle, eb_ring(e), e->name);
 		igt_subtest_f("signal-%s", e->name)
-			fence_signal(device, handle, e->exec_id | e->flags, e->name, 5);
+			fence_signal(device, handle, eb_ring(e), e->name, 5);
 	}
 
 	igt_subtest("signal-all")
@@ -910,7 +909,7 @@ igt_main
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("preempt-%s", e->name)
-				preempt(device, handle, e->exec_id | e->flags, e->name);
+				preempt(device, handle, eb_ring(e), e->name);
 		}
 	}
 
@@ -922,8 +921,7 @@ igt_main
 		for (e = intel_execution_engines; e->name; e++) {
 			/* Requires master for STORE_DWORD on gen4/5 */
 			igt_subtest_f("poll-%s", e->name)
-				poll_ring(device,
-					  e->exec_id | e->flags, e->name, 20);
+				poll_ring(device, eb_ring(e), e->name, 20);
 		}
 
 		igt_subtest("poll-sequential")

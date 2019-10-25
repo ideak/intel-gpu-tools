@@ -848,8 +848,8 @@ igt_main
 		igt_subtest_f("%ssync-%s",
 			      e->exec_id == 0 ? "basic-" : "",
 			      e->name) {
-			gem_require_ring(i915, e->exec_id | e->flags);
-			igt_require(gem_can_store_dword(i915, e->exec_id | e->flags));
+			gem_require_ring(i915, eb_ring(e));
+			igt_require(gem_can_store_dword(i915, eb_ring(e)));
 
 			gem_quiescent_gpu(i915);
 			test_sync(i915, vgem, e->exec_id, e->flags);
@@ -860,8 +860,8 @@ igt_main
 		igt_subtest_f("%sbusy-%s",
 			      e->exec_id == 0 ? "basic-" : "",
 			      e->name) {
-			gem_require_ring(i915, e->exec_id | e->flags);
-			igt_require(gem_can_store_dword(i915, e->exec_id | e->flags));
+			gem_require_ring(i915, eb_ring(e));
+			igt_require(gem_can_store_dword(i915, eb_ring(e)));
 
 			gem_quiescent_gpu(i915);
 			test_busy(i915, vgem, e->exec_id, e->flags);
@@ -872,8 +872,8 @@ igt_main
 		igt_subtest_f("%swait-%s",
 			      e->exec_id == 0 ? "basic-" : "",
 			      e->name) {
-			gem_require_ring(i915, e->exec_id | e->flags);
-			igt_require(gem_can_store_dword(i915, e->exec_id | e->flags));
+			gem_require_ring(i915, eb_ring(e));
+			igt_require(gem_can_store_dword(i915, eb_ring(e)));
 
 			gem_quiescent_gpu(i915);
 			test_wait(i915, vgem, e->exec_id, e->flags);
@@ -895,8 +895,8 @@ igt_main
 			igt_subtest_f("%sfence-wait-%s",
 					e->exec_id == 0 ? "basic-" : "",
 					e->name) {
-				gem_require_ring(i915, e->exec_id | e->flags);
-				igt_require(gem_can_store_dword(i915, e->exec_id | e->flags));
+				gem_require_ring(i915, eb_ring(e));
+				igt_require(gem_can_store_dword(i915, eb_ring(e)));
 
 				gem_quiescent_gpu(i915);
 				test_fence_wait(i915, vgem, e->exec_id, e->flags);

@@ -1165,18 +1165,17 @@ static void test_readonly(int i915)
 	igt_assert(mprotect(space, total, PROT_READ) == 0);
 
 	igt_fork(child, 1) {
-		unsigned int engine;
 		char *orig;
 
 		orig = g_compute_checksum_for_data(G_CHECKSUM_SHA1, pages, sz);
 
 		gem_userptr(i915, space, total, true, userptr_flags, &rhandle);
 
-		for_each_engine(i915, engine) {
+		for_each_engine(e, i915) {
 			char *ref, *result;
 
 			/* First tweak the backing store through the write */
-			store_dword_rand(i915, engine, whandle, sz, 1024);
+			store_dword_rand(i915, eb_ring(e), whandle, sz, 1024);
 			gem_sync(i915, whandle);
 			ref = g_compute_checksum_for_data(G_CHECKSUM_SHA1,
 							  pages, sz);
@@ -1185,7 +1184,7 @@ static void test_readonly(int i915)
 			igt_assert(strcmp(ref, orig));
 
 			/* Now try the same through the read-only handle */
-			store_dword_rand(i915, engine, rhandle, total, 1024);
+			store_dword_rand(i915, eb_ring(e), rhandle, total, 1024);
 			gem_sync(i915, rhandle);
 			result = g_compute_checksum_for_data(G_CHECKSUM_SHA1,
 							     pages, sz);

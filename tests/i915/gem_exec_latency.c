@@ -267,7 +267,6 @@ static void latency_from_ring(int fd,
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	const unsigned int repeats = ring_size / 2;
-	unsigned int other;
 	uint32_t *map, *results;
 	uint32_t ctx[2] = {};
 	int i, j;
@@ -313,7 +312,7 @@ static void latency_from_ring(int fd,
 	reloc.presumed_offset = obj[1].offset;
 	reloc.target_handle = flags & CORK ? 1 : 0;
 
-	for_each_physical_engine(fd, other) {
+	for_each_physical_engine(e, fd) {
 		igt_spin_t *spin = NULL;
 		IGT_CORK_HANDLE(c);
 
@@ -361,7 +360,7 @@ static void latency_from_ring(int fd,
 			gem_execbuf(fd, &execbuf);
 
 			execbuf.flags &= ~ENGINE_FLAGS;
-			execbuf.flags |= other;
+			execbuf.flags |= eb_ring(e);
 
 			execbuf.batch_start_offset = 64 * (j + repeats);
 			reloc.offset =
@@ -394,7 +393,7 @@ static void latency_from_ring(int fd,
 		igt_spin_free(fd, spin);
 
 		igt_info("%s-%s delay: %.2fns\n",
-			 name, e__->name,
+			 name, e->name,
 			 (results[2*repeats-1] - results[0]) / (double)repeats * rcs_clock);
 	}
 
@@ -475,12 +474,12 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
-		for_each_physical_engine(fd, engine) {
-			if (!gem_can_store_dword(fd, engine))
+		for_each_physical_engine(e, fd) {
+			if (!gem_can_store_dword(fd, eb_ring(e)))
 				continue;
 
-			engines[nengine] = engine;
-			names[nengine] = e__->name;
+			engines[nengine] = eb_ring(e);
+			names[nengine] = e->name;
 			nengine++;
 		}
 		igt_require(nengine > 1);
@@ -692,22 +691,22 @@ igt_main
 
 			igt_subtest_group {
 				igt_fixture {
-					igt_require(gem_ring_has_physical_engine(device, e->exec_id | e->flags));
+					igt_require(gem_ring_has_physical_engine(device, eb_ring(e)));
 				}
 
 				igt_subtest_f("%s-dispatch", e->name)
 					latency_on_ring(device,
-							e->exec_id | e->flags,
+							eb_ring(e),
 							e->name, 0);
 
 				igt_subtest_f("%s-live-dispatch", e->name)
 					latency_on_ring(device,
-							e->exec_id | e->flags,
+							eb_ring(e),
 							e->name, LIVE);
 
 				igt_subtest_f("%s-poll", e->name)
 					poll_ring(device,
-						  e->exec_id | e->flags,
+						  eb_ring(e),
 						  e->name);
 
 				igt_subtest_f("%s-rtidle-submit", e->name)
@@ -726,21 +725,21 @@ igt_main
 
 				igt_subtest_f("%s-live-dispatch-queued", e->name)
 					latency_on_ring(device,
-							e->exec_id | e->flags,
+							eb_ring(e),
 							e->name, LIVE | CORK);
 				igt_subtest_f("%s-dispatch-queued", e->name)
 					latency_on_ring(device,
-							e->exec_id | e->flags,
+							eb_ring(e),
 							e->name, CORK);
 
 				igt_subtest_f("%s-synchronisation", e->name)
 					latency_from_ring(device,
-							  e->exec_id | e->flags,
+							  eb_ring(e),
 							  e->name, 0);
 
 				igt_subtest_f("%s-synchronisation-queued", e->name)
 					latency_from_ring(device,
-							  e->exec_id | e->flags,
+							  eb_ring(e),
 							  e->name, CORK);
 
 				igt_subtest_group {
@@ -751,7 +750,7 @@ igt_main
 
 					igt_subtest_f("%s-preemption", e->name)
 						latency_from_ring(device,
-								  e->exec_id | e->flags,
+								  eb_ring(e),
 								  e->name, PREEMPT);
 				}
 			}

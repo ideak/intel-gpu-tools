@@ -152,7 +152,7 @@ igt_main
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
-		e2__ = gem_eb_flags_to_engine(e->exec_id | e->flags);
+		e2__ = gem_eb_flags_to_engine(eb_ring(e));
 		if (e2__.flags == -1)
 			continue;
 		e2 = &e2__;

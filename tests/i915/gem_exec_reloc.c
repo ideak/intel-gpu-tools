@@ -258,9 +258,9 @@ static void active(int fd, unsigned engine)
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
-		for_each_physical_engine(fd, engine) {
-			if (gem_can_store_dword(fd, engine))
-				engines[nengine++] = engine;
+		for_each_physical_engine(e, fd) {
+			if (gem_can_store_dword(fd, eb_ring(e)))
+				engines[nengine++] = eb_ring(e);
 		}
 	} else {
 		igt_require(gem_has_ring(fd, engine));
@@ -754,7 +754,7 @@ igt_main
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {
 		igt_subtest_f("active-%s", e->name)
-			active(fd, e->exec_id | e->flags);
+			active(fd, eb_ring(e));
 	}
 	igt_fixture
 		close(fd);

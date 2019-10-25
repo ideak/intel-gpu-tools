@@ -349,7 +349,7 @@ igt_main
 	for (e = intel_execution_engines; e->name; e++) {
 		struct intel_execution_engine2 e2__;
 
-		e2__ = gem_eb_flags_to_engine(e->exec_id | e->flags);
+		e2__ = gem_eb_flags_to_engine(eb_ring(e));
 		if (e2__.flags == -1)
 			continue; /* I915_EXEC_BSD with no ring selectors */
 

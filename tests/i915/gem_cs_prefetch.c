@@ -145,5 +145,5 @@ igt_main
 
 	for (e = intel_execution_engines; e->name; e++)
 		igt_subtest_f("%s", e->name)
-			test_ring(e->exec_id | e->flags);
+			test_ring(eb_ring(e));
 }

@@ -103,13 +103,11 @@ static void single(const char *name, bool all_engines)
 
 	num_engines = 0;
 	if (all_engines) {
-		unsigned engine;
-
-		for_each_physical_engine(fd, engine) {
-			if (!gem_can_store_dword(fd, engine))
+		for_each_physical_engine(e, fd) {
+			if (!gem_can_store_dword(fd, eb_ring(e)))
 				continue;
 
-			engines[num_engines++] = engine;
+			engines[num_engines++] = eb_ring(e);
 			if (num_engines == ARRAY_SIZE(engines))
 				break;
 		}
@@ -220,7 +218,7 @@ static void single(const char *name, bool all_engines)
 
 static void processes(void)
 {
-	unsigned engines[16], engine;
+	unsigned engines[16];
 	int num_engines;
 	struct rlimit rlim;
 	unsigned num_ctx;
@@ -230,8 +228,8 @@ static void processes(void)
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	num_engines = 0;
-	for_each_physical_engine(fd, engine) {
-		engines[num_engines++] = engine;
+	for_each_physical_engine(e, fd) {
+		engines[num_engines++] = eb_ring(e);
 		if (num_engines == ARRAY_SIZE(engines))
 			break;
 	}

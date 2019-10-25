@@ -51,10 +51,10 @@ static void store_dword(int fd, unsigned ring)
 	uint32_t batch[16];
 	int i;
 
-	if (!gem_can_store_dword(fd, ring))
+	if (!gem_has_ring(fd, ring))
 		return;
 
-	if (!gem_has_ring(fd, ring))
+	if (!gem_can_store_dword(fd, ring))
 		return;
 
 	intel_detect_and_clear_missed_interrupts(fd);
@@ -113,7 +113,7 @@ static void store_all(int fd)
 	unsigned engines[16], permuted[16];
 	uint32_t batch[16];
 	uint64_t offset;
-	unsigned engine, nengine;
+	unsigned nengine;
 	int value;
 	int i, j;
 
@@ -151,14 +151,14 @@ static void store_all(int fd)
 
 	nengine = 0;
 	intel_detect_and_clear_missed_interrupts(fd);
-	for_each_engine(fd, engine) {
-		if (!gem_can_store_dword(fd, engine))
+	for_each_engine(e, fd) {
+		if (!gem_can_store_dword(fd, eb_ring(e)))
 			continue;
 
-		igt_assert(2*(nengine+1)*sizeof(batch) <= 4096);
+		igt_assert(2 * (nengine + 1) * sizeof(batch) <= 4096);
 
 		execbuf.flags &= ~ENGINE_MASK;
-		execbuf.flags |= engine;
+		execbuf.flags |= eb_ring(e);
 
 		j = 2*nengine;
 		reloc[j].target_handle = obj[0].handle;
@@ -190,7 +190,7 @@ static void store_all(int fd)
 		execbuf.batch_start_offset = j*sizeof(batch);
 		gem_execbuf(fd, &execbuf);
 
-		engines[nengine++] = engine;
+		engines[nengine++] = eb_ring(e);
 	}
 	gem_sync(fd, obj[1].handle);
 
@@ -286,10 +286,8 @@ gem_exec_store(void)
 	fd = __drm_open_driver(DRIVER_INTEL);
 	igt_fork_hang_detector(fd);
 
-	for (e = intel_execution_engines; e->name; e++) {
-		if (gem_can_store_dword(fd, e->exec_id | e->flags))
-			store_dword(fd, e->exec_id | e->flags);
-	}
+	for (e = intel_execution_engines; e->name; e++)
+		store_dword(fd, eb_ring(e));
 
 	store_all(fd);
 

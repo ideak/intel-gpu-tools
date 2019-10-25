@@ -113,20 +113,19 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	struct batch *batches;
 	unsigned engines[16];
 	unsigned nengine;
-	unsigned engine;
-	uint64_t size;
 	unsigned count;
+	uint64_t size;
 
 	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(shared != MAP_FAILED);
 
 	nengine = 0;
 	if (ring == 0) {
-		for_each_physical_engine(fd, engine) {
-			if (!gem_can_store_dword(fd, engine))
+		for_each_physical_engine(e, fd) {
+			if (!gem_can_store_dword(fd, eb_ring(e)))
 				continue;
 
-			engines[nengine++] = engine;
+			engines[nengine++] = eb_ring(e);
 		}
 	} else {
 		gem_require_ring(fd, ring);
@@ -224,7 +223,7 @@ igt_main
 
 	for (e = intel_execution_engines; e->name; e++)
 		igt_subtest_f("%s", e->name)
-			fillgtt(device, e->exec_id | e->flags, 20);
+			fillgtt(device, eb_ring(e), 20);
 
 	igt_subtest("all")
 		fillgtt(device, 0, 150);

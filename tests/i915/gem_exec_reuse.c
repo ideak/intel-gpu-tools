@@ -89,7 +89,6 @@ igt_main
 	igt_fixture {
 		uint64_t gtt_size, max;
 		uint32_t bbe = MI_BATCH_BUFFER_END;
-		unsigned engine;
 
 		igt_allow_unlimited_files();
 
@@ -118,9 +117,8 @@ igt_main
 		no.obj = malloc(sizeof(struct drm_i915_gem_exec_object2) * (no.max_age + 1));
 
 		nengine = 0;
-		for_each_engine(no.fd, engine)
-			if (engine)
-				engines[nengine++] = engine;
+		for_each_physical_engine(e, no.fd)
+			engines[nengine++] = eb_ring(e);
 		igt_require(nengine);
 
 		no.batch = gem_create(no.fd, 4096);

@@ -73,14 +73,13 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 	} *exec;
 	struct drm_i915_gem_exec_object2 *obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
-	unsigned engines[16];
-	unsigned nengine, engine;
+	unsigned engines[16], nengine;
 	unsigned long count;
 	double time;
 
 	nengine = 0;
-	for_each_physical_engine(fd, engine)
-		engines[nengine++] = engine;
+	for_each_physical_engine(e, fd)
+		engines[nengine++] = eb_ring(e);
 	igt_require(nengine);
 
 	exec = calloc(nengine, sizeof(*exec));

@@ -428,7 +428,6 @@ igt_main
 
 	igt_fixture {
 		uint64_t mem_size = intel_get_total_ram_mb();
-		unsigned int engine;
 		int fd;
 
 		fd = drm_open_driver(DRIVER_INTEL);
@@ -451,8 +450,8 @@ igt_main
 				     CHECK_SWAP | CHECK_RAM);
 
 		nengine = 0;
-		for_each_engine(fd, engine)
-			engines[nengine++] = engine;
+		for_each_engine(e, fd)
+			engines[nengine++] = eb_ring(e);
 		igt_require(nengine);
 
 		close(fd);

@@ -236,8 +236,8 @@ igt_main
 
 	igt_subtest("control") {
 		for (e = intel_execution_engines; e->name; e++) {
-			if (has_ring(fd, e->exec_id | e->flags)) {
-				execbuf.flags = e->exec_id | e->flags;
+			if (has_ring(fd, eb_ring(e))) {
+				execbuf.flags = eb_ring(e);
 				gem_execbuf(fd, &execbuf);
 			}
 		}
@@ -387,14 +387,16 @@ igt_main
 
 	igt_subtest("rs-invalid") {
 		bool has_rs = has_resource_streamer(fd);
-		unsigned int engine;
 
-		for_each_engine(fd, engine) {
+		for_each_engine(it, fd) {
 			int expect = -EINVAL;
-			if (has_rs && (engine == 0 || engine == I915_EXEC_RENDER))
+			if (has_rs &&
+			    (eb_ring(it) == 0 ||
+			     eb_ring(it) == I915_EXEC_RENDER))
 				expect = 0;
 
-			execbuf.flags = engine | LOCAL_I915_EXEC_RESOURCE_STREAMER;
+			execbuf.flags =
+				eb_ring(it) | LOCAL_I915_EXEC_RESOURCE_STREAMER;
 			igt_assert_eq(__gem_execbuf(fd, &execbuf), expect);
 		}
 	}

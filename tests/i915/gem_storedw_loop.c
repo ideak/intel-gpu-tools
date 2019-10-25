@@ -186,7 +186,7 @@ igt_main
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("store-%s", e->name) {
 			check_test_requirements(fd, e->exec_id);
-			store_test(fd, e->exec_id | e->flags);
+			store_test(fd, eb_ring(e));
 		}
 	}
 

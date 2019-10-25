@@ -240,7 +240,6 @@ static void independent(int fd, unsigned int engine)
 	IGT_CORK_FENCE(cork);
 	igt_spin_t *spin = NULL;
 	uint32_t scratch, batch;
-	unsigned int other;
 	uint32_t *ptr;
 	int fence;
 
@@ -253,25 +252,25 @@ static void independent(int fd, unsigned int engine)
 	fence = igt_cork_plug(&cork, fd);
 
 	/* Check that we can submit to engine while all others are blocked */
-	for_each_physical_engine(fd, other) {
-		if (other == engine)
+	for_each_physical_engine(e, fd) {
+		if (eb_ring(e) == engine)
 			continue;
 
-		if (!gem_can_store_dword(fd, other))
+		if (!gem_can_store_dword(fd, eb_ring(e)))
 			continue;
 
 		if (spin == NULL) {
-			spin = __igt_spin_new(fd, .engine = other);
+			spin = __igt_spin_new(fd, .engine = eb_ring(e));
 		} else {
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
 				.buffers_ptr = to_user_pointer(&spin->obj[IGT_SPIN_BATCH]),
-				.flags = other,
+				.flags = eb_ring(e),
 			};
 			gem_execbuf(fd, &eb);
 		}
 
-		store_dword_fenced(fd, 0, other, scratch, 0, other, fence, 0);
+		store_dword_fenced(fd, 0, eb_ring(e), scratch, 0, eb_ring(e), fence, 0);
 	}
 	igt_require(spin);
 
@@ -312,9 +311,9 @@ static void smoketest(int fd, unsigned ring, unsigned timeout)
 
 	nengine = 0;
 	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(fd, engine)
-			if (gem_can_store_dword(fd, engine))
-				engines[nengine++] = engine;
+		for_each_physical_engine(e, fd)
+			if (gem_can_store_dword(fd, eb_ring(e)))
+				engines[nengine++] = eb_ring(e);
 	} else {
 		if (gem_can_store_dword(fd, ring))
 			engines[nengine++] = ring;
@@ -385,7 +384,6 @@ static void semaphore_userlock(int i915)
 		.handle = batch_create(i915),
 	};
 	igt_spin_t *spin = NULL;
-	unsigned int engine;
 	uint32_t scratch;
 
 	igt_require(gem_scheduler_has_semaphores(i915));
@@ -398,16 +396,16 @@ static void semaphore_userlock(int i915)
 	 */
 
 	scratch = gem_create(i915, 4096);
-	for_each_physical_engine(i915, engine) {
+	for_each_physical_engine(e, i915) {
 		if (!spin) {
 			spin = igt_spin_new(i915,
 					    .dependency = scratch,
-					    .engine = engine);
+					    .engine = eb_ring(e));
 		} else {
 			uint64_t saved = spin->execbuf.flags;
 
 			spin->execbuf.flags &= ~ENGINE_MASK;
-			spin->execbuf.flags |= engine;
+			spin->execbuf.flags |= eb_ring(e);
 
 			gem_execbuf(i915, &spin->execbuf);
 
@@ -423,15 +421,15 @@ static void semaphore_userlock(int i915)
 	 * taking precedence.
 	 */
 	scratch = gem_context_create(i915);
-	for_each_physical_engine(i915, engine) {
+	for_each_physical_engine(e, i915) {
 		struct drm_i915_gem_execbuffer2 execbuf = {
 			.buffers_ptr = to_user_pointer(&obj),
 			.buffer_count = 1,
-			.flags = engine,
+			.flags = eb_ring(e),
 			.rsvd1 = scratch,
 		};
 
-		if (engine == (spin->execbuf.flags & ENGINE_MASK))
+		if (eb_ring(e) == (spin->execbuf.flags & ENGINE_MASK))
 			continue;
 
 		gem_execbuf(i915, &execbuf);
@@ -448,7 +446,6 @@ static void semaphore_codependency(int i915)
 	struct {
 		igt_spin_t *xcs, *rcs;
 	} task[2];
-	unsigned int engine;
 	int i;
 
 	/*
@@ -462,13 +459,13 @@ static void semaphore_codependency(int i915)
 	 */
 
 	i = 0;
-	for_each_physical_engine(i915, engine) {
+	for_each_physical_engine(e, i915) {
 		uint32_t ctx;
 
-		if (engine == I915_EXEC_RENDER)
+		if (eb_ring(e) == I915_EXEC_RENDER)
 			continue;
 
-		if (!gem_can_store_dword(i915, engine))
+		if (!gem_can_store_dword(i915, eb_ring(e)))
 			continue;
 
 		ctx = gem_context_create(i915);
@@ -476,7 +473,7 @@ static void semaphore_codependency(int i915)
 		task[i].xcs =
 			__igt_spin_new(i915,
 				       .ctx = ctx,
-				       .engine = engine,
+				       .engine = eb_ring(e),
 				       .flags = IGT_SPIN_POLL_RUN);
 		igt_spin_busywait_until_started(task[i].xcs);
 
@@ -514,7 +511,6 @@ static void semaphore_resolve(int i915)
 {
 	const uint32_t SEMAPHORE_ADDR = 64 << 10;
 	uint32_t semaphore, outer, inner, *sema;
-	unsigned int engine;
 
 	/*
 	 * Userspace may submit batches that wait upon unresolved
@@ -534,7 +530,7 @@ static void semaphore_resolve(int i915)
 	semaphore = gem_create(i915, 4096);
 	sema = gem_mmap__wc(i915, semaphore, 0, 4096, PROT_WRITE);
 
-	for_each_physical_engine(i915, engine) {
+	for_each_physical_engine(e, i915) {
 		struct drm_i915_gem_exec_object2 obj[3];
 		struct drm_i915_gem_execbuffer2 eb;
 		uint32_t handle, cancel;
@@ -542,10 +538,10 @@ static void semaphore_resolve(int i915)
 		igt_spin_t *spin;
 		int64_t poke = 1;
 
-		if (!gem_can_store_dword(i915, engine))
+		if (!gem_can_store_dword(i915, eb_ring(e)))
 			continue;
 
-		spin = __igt_spin_new(i915, .engine = engine);
+		spin = __igt_spin_new(i915, .engine = eb_ring(e));
 		igt_spin_end(spin); /* we just want its address for later */
 		gem_sync(i915, spin->handle);
 		igt_spin_reset(spin);
@@ -642,26 +638,27 @@ static void semaphore_resolve(int i915)
 static void semaphore_noskip(int i915)
 {
 	const int gen = intel_gen(intel_get_drm_devid(i915));
-	unsigned int engine, other;
+	unsigned int other;
 	uint32_t ctx;
 
 	igt_require(gen >= 6); /* MI_STORE_DWORD_IMM convenience */
 
 	ctx = gem_context_create(i915);
 
-	for_each_physical_engine(i915, engine) {
-	for_each_physical_engine(i915, other) {
+	for_each_physical_engine(outer, i915) {
+	for_each_physical_engine(inner, i915) {
 		struct drm_i915_gem_exec_object2 obj[3];
 		struct drm_i915_gem_execbuffer2 eb;
 		uint32_t handle, *cs, *map;
 		igt_spin_t *chain, *spin;
 
-		if (other == engine || !gem_can_store_dword(i915, other))
+		if (eb_ring(inner) == eb_ring(outer) ||
+		    !gem_can_store_dword(i915, eb_ring(inner)))
 			continue;
 
-		chain = __igt_spin_new(i915, .engine = engine);
+		chain = __igt_spin_new(i915, .engine = eb_ring(outer));
 
-		spin = __igt_spin_new(i915, .engine = other);
+		spin = __igt_spin_new(i915, .engine = eb_ring(inner));
 		igt_spin_end(spin); /* we just want its address for later */
 		gem_sync(i915, spin->handle);
 		igt_spin_reset(spin);
@@ -867,21 +864,19 @@ static void preempt(int fd, unsigned ring, unsigned flags)
 
 static igt_spin_t *__noise(int fd, uint32_t ctx, int prio, igt_spin_t *spin)
 {
-	unsigned other;
-
 	gem_context_set_priority(fd, ctx, prio);
 
-	for_each_physical_engine(fd, other) {
+	for_each_physical_engine(e, fd) {
 		if (spin == NULL) {
 			spin = __igt_spin_new(fd,
 					      .ctx = ctx,
-					      .engine = other);
+					      .engine = eb_ring(e));
 		} else {
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
 				.buffers_ptr = to_user_pointer(&spin->obj[IGT_SPIN_BATCH]),
 				.rsvd1 = ctx,
-				.flags = other,
+				.flags = eb_ring(e),
 			};
 			gem_execbuf(fd, &eb);
 		}
@@ -897,7 +892,7 @@ static void __preempt_other(int fd,
 {
 	uint32_t result = gem_create(fd, 4096);
 	uint32_t result_read[4096 / sizeof(uint32_t)];
-	unsigned int n, i, other;
+	unsigned int n, i;
 
 	n = 0;
 	store_dword(fd, ctx[LO], primary,
@@ -906,8 +901,8 @@ static void __preempt_other(int fd,
 	n++;
 
 	if (flags & CHAIN) {
-		for_each_physical_engine(fd, other) {
-			store_dword(fd, ctx[LO], other,
+		for_each_physical_engine(e, fd) {
+			store_dword(fd, ctx[LO], eb_ring(e),
 				    result, (n + 1)*sizeof(uint32_t), n + 1,
 				    I915_GEM_DOMAIN_RENDER);
 			n++;
@@ -932,7 +927,6 @@ static void __preempt_other(int fd,
 
 static void preempt_other(int fd, unsigned ring, unsigned int flags)
 {
-	unsigned int primary;
 	igt_spin_t *spin = NULL;
 	uint32_t ctx[3];
 
@@ -955,9 +949,9 @@ static void preempt_other(int fd, unsigned ring, unsigned int flags)
 	ctx[HI] = gem_context_create(fd);
 	gem_context_set_priority(fd, ctx[HI], MAX_PRIO);
 
-	for_each_physical_engine(fd, primary) {
-		igt_debug("Primary engine: %s\n", e__->name);
-		__preempt_other(fd, ctx, ring, primary, flags);
+	for_each_physical_engine(e, fd) {
+		igt_debug("Primary engine: %s\n", e->name);
+		__preempt_other(fd, ctx, ring, eb_ring(e), flags);
 
 	}
 
@@ -976,13 +970,13 @@ static void __preempt_queue(int fd,
 	uint32_t result = gem_create(fd, 4096);
 	uint32_t result_read[4096 / sizeof(uint32_t)];
 	igt_spin_t *above = NULL, *below = NULL;
-	unsigned int other, n, i;
-	int prio = MAX_PRIO;
 	uint32_t ctx[3] = {
 		gem_context_create(fd),
 		gem_context_create(fd),
 		gem_context_create(fd),
 	};
+	int prio = MAX_PRIO;
+	unsigned int n, i;
 
 	for (n = 0; n < depth; n++) {
 		if (flags & CONTEXTS) {
@@ -1011,8 +1005,8 @@ static void __preempt_queue(int fd,
 	n++;
 
 	if (flags & CHAIN) {
-		for_each_physical_engine(fd, other) {
-			store_dword(fd, ctx[LO], other,
+		for_each_physical_engine(e, fd) {
+			store_dword(fd, ctx[LO], eb_ring(e),
 				    result, (n + 1)*sizeof(uint32_t), n + 1,
 				    I915_GEM_DOMAIN_RENDER);
 			n++;
@@ -1052,11 +1046,9 @@ static void __preempt_queue(int fd,
 
 static void preempt_queue(int fd, unsigned ring, unsigned int flags)
 {
-	unsigned other;
-
-	for_each_physical_engine(fd, other) {
+	for_each_physical_engine(e, fd) {
 		for (unsigned depth = 0; depth <= MAX_ELSP_QLEN; depth++)
-			__preempt_queue(fd, ring, other, depth, flags);
+			__preempt_queue(fd, ring, eb_ring(e), depth, flags);
 	}
 }
 
@@ -1065,7 +1057,6 @@ static void preempt_self(int fd, unsigned ring)
 	uint32_t result = gem_create(fd, 4096);
 	uint32_t result_read[4096 / sizeof(uint32_t)];
 	igt_spin_t *spin[MAX_ELSP_QLEN];
-	unsigned int other;
 	unsigned int n, i;
 	uint32_t ctx[3];
 
@@ -1083,11 +1074,11 @@ static void preempt_self(int fd, unsigned ring)
 
 	n = 0;
 	gem_context_set_priority(fd, ctx[HI], MIN_PRIO);
-	for_each_physical_engine(fd, other) {
+	for_each_physical_engine(e, fd) {
 		spin[n] = __igt_spin_new(fd,
 					 .ctx = ctx[NOISE],
-					 .engine = other);
-		store_dword(fd, ctx[HI], other,
+					 .engine = eb_ring(e));
+		store_dword(fd, ctx[HI], eb_ring(e),
 			    result, (n + 1)*sizeof(uint32_t), n + 1,
 			    I915_GEM_DOMAIN_RENDER);
 		n++;
@@ -1608,13 +1599,12 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 
 static void measure_semaphore_power(int i915)
 {
-	unsigned int engine, signaler;
 	struct rapl gpu, pkg;
 
 	igt_require(gpu_power_open(&gpu) == 0);
 	pkg_power_open(&pkg);
 
-	for_each_physical_engine(i915, signaler) {
+	for_each_physical_engine(signaler, i915) {
 		struct {
 			struct power_sample pkg, gpu;
 		} s_spin[2], s_sema[2];
@@ -1623,7 +1613,7 @@ static void measure_semaphore_power(int i915)
 		igt_spin_t *spin;
 
 		spin = __igt_spin_new(i915,
-				      .engine = signaler,
+				      .engine = eb_ring(signaler),
 				      .flags = IGT_SPIN_POLL_RUN);
 		gem_wait(i915, spin->handle, &jiffie); /* waitboost */
 		igt_spin_busywait_until_started(spin);
@@ -1635,14 +1625,14 @@ static void measure_semaphore_power(int i915)
 		rapl_read(&pkg, &s_spin[1].pkg);
 
 		/* Add a waiter to each engine */
-		for_each_physical_engine(i915, engine) {
+		for_each_physical_engine(e, i915) {
 			igt_spin_t *sema;
 
-			if (engine == signaler)
+			if (eb_ring(e) == eb_ring(signaler))
 				continue;
 
 			sema = __igt_spin_new(i915,
-					      .engine = engine,
+					      .engine = eb_ring(e),
 					      .dependency = spin->handle);
 
 			igt_spin_free(i915, sema);
@@ -1660,7 +1650,7 @@ static void measure_semaphore_power(int i915)
 		baseline = power_W(&gpu, &s_spin[0].gpu, &s_spin[1].gpu);
 		total = power_W(&gpu, &s_sema[0].gpu, &s_sema[1].gpu);
 		igt_info("%s: %.1fmW + %.1fmW (total %1.fmW)\n",
-			 e__->name,
+			 signaler->name,
 			 1e3 * baseline,
 			 1e3 * (total - baseline),
 			 1e3 * total);
@@ -1707,15 +1697,15 @@ igt_main
 				continue;
 
 			igt_subtest_f("fifo-%s", e->name) {
-				igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
-				igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
-				fifo(fd, e->exec_id | e->flags);
+				igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
+				igt_require(gem_can_store_dword(fd, eb_ring(e)));
+				fifo(fd, eb_ring(e));
 			}
 
 			igt_subtest_f("independent-%s", e->name) {
-				igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
-				igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
-				independent(fd, e->exec_id | e->flags);
+				igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
+				igt_require(gem_can_store_dword(fd, eb_ring(e)));
+				independent(fd, eb_ring(e));
 			}
 		}
 	}
@@ -1744,18 +1734,18 @@ igt_main
 
 			igt_subtest_group {
 				igt_fixture {
-					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
-					igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
+					igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
+					igt_require(gem_can_store_dword(fd, eb_ring(e)));
 				}
 
 				igt_subtest_f("in-order-%s", e->name)
-					reorder(fd, e->exec_id | e->flags, EQUAL);
+					reorder(fd, eb_ring(e), EQUAL);
 
 				igt_subtest_f("out-order-%s", e->name)
-					reorder(fd, e->exec_id | e->flags, 0);
+					reorder(fd, eb_ring(e), 0);
 
 				igt_subtest_f("promotion-%s", e->name)
-					promotion(fd, e->exec_id | e->flags);
+					promotion(fd, eb_ring(e));
 
 				igt_subtest_group {
 					igt_fixture {
@@ -1763,30 +1753,30 @@ igt_main
 					}
 
 					igt_subtest_f("preempt-%s", e->name)
-						preempt(fd, e->exec_id | e->flags, 0);
+						preempt(fd, eb_ring(e), 0);
 
 					igt_subtest_f("preempt-contexts-%s", e->name)
-						preempt(fd, e->exec_id | e->flags, NEW_CTX);
+						preempt(fd, eb_ring(e), NEW_CTX);
 
 					igt_subtest_f("preempt-self-%s", e->name)
-						preempt_self(fd, e->exec_id | e->flags);
+						preempt_self(fd, eb_ring(e));
 
 					igt_subtest_f("preempt-other-%s", e->name)
-						preempt_other(fd, e->exec_id | e->flags, 0);
+						preempt_other(fd, eb_ring(e), 0);
 
 					igt_subtest_f("preempt-other-chain-%s", e->name)
-						preempt_other(fd, e->exec_id | e->flags, CHAIN);
+						preempt_other(fd, eb_ring(e), CHAIN);
 
 					igt_subtest_f("preempt-queue-%s", e->name)
-						preempt_queue(fd, e->exec_id | e->flags, 0);
+						preempt_queue(fd, eb_ring(e), 0);
 
 					igt_subtest_f("preempt-queue-chain-%s", e->name)
-						preempt_queue(fd, e->exec_id | e->flags, CHAIN);
+						preempt_queue(fd, eb_ring(e), CHAIN);
 					igt_subtest_f("preempt-queue-contexts-%s", e->name)
-						preempt_queue(fd, e->exec_id | e->flags, CONTEXTS);
+						preempt_queue(fd, eb_ring(e), CONTEXTS);
 
 					igt_subtest_f("preempt-queue-contexts-chain-%s", e->name)
-						preempt_queue(fd, e->exec_id | e->flags, CONTEXTS | CHAIN);
+						preempt_queue(fd, eb_ring(e), CONTEXTS | CHAIN);
 
 					igt_subtest_group {
 						igt_hang_t hang;
@@ -1797,11 +1787,11 @@ igt_main
 						}
 
 						igt_subtest_f("preempt-hang-%s", e->name) {
-							preempt(fd, e->exec_id | e->flags, NEW_CTX | HANG_LP);
+							preempt(fd, eb_ring(e), NEW_CTX | HANG_LP);
 						}
 
 						igt_subtest_f("preemptive-hang-%s", e->name)
-							preemptive_hang(fd, e->exec_id | e->flags);
+							preemptive_hang(fd, eb_ring(e));
 
 						igt_fixture {
 							igt_disallow_hang(fd, hang);
@@ -1811,16 +1801,16 @@ igt_main
 				}
 
 				igt_subtest_f("deep-%s", e->name)
-					deep(fd, e->exec_id | e->flags);
+					deep(fd, eb_ring(e));
 
 				igt_subtest_f("wide-%s", e->name)
-					wide(fd, e->exec_id | e->flags);
+					wide(fd, eb_ring(e));
 
 				igt_subtest_f("reorder-wide-%s", e->name)
-					reorder_wide(fd, e->exec_id | e->flags);
+					reorder_wide(fd, eb_ring(e));
 
 				igt_subtest_f("smoketest-%s", e->name)
-					smoketest(fd, e->exec_id | e->flags, 5);
+					smoketest(fd, eb_ring(e), 5);
 			}
 		}
 	}
@@ -1837,12 +1827,12 @@ igt_main
 
 			igt_subtest_group {
 				igt_fixture {
-					igt_require(gem_ring_has_physical_engine(fd, e->exec_id | e->flags));
+					igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
 					igt_require(gem_scheduler_has_preemption(fd));
 				}
 
 				igt_subtest_f("pi-ringfull-%s", e->name)
-					test_pi_ringfull(fd, e->exec_id | e->flags);
+					test_pi_ringfull(fd, eb_ring(e));
 			}
 		}
 	}

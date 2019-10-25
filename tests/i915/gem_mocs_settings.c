@@ -605,7 +605,7 @@ igt_main
 						if (flags & (MOCS_NON_DEFAULT_CTX | MOCS_DIRTY_VALUES))
 							gem_require_contexts(fd);
 
-						run_test(fd, e->exec_id | e->flags, flags, mode);
+						run_test(fd, eb_ring(e), flags, mode);
 					}
 				}
 
@@ -617,10 +617,10 @@ igt_main
 		}
 
 		igt_subtest_f("mocs-isolation-%s", e->name) {
-			gem_require_ring(fd, e->exec_id | e->flags);
+			gem_require_ring(fd, eb_ring(e));
 			gem_require_contexts(fd);
 
-			isolation_test(fd, e->exec_id | e->flags);
+			isolation_test(fd, eb_ring(e));
 		}
 	}
 

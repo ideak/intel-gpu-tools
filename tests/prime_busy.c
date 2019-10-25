@@ -192,8 +192,8 @@ static void test_engine_mode(int fd,
 
 	igt_subtest_group {
 		igt_fixture {
-			gem_require_ring(fd, e->exec_id | e->flags);
-			igt_require(gem_can_store_dword(fd, e->exec_id | e->flags));
+			gem_require_ring(fd, eb_ring(e));
+			igt_require(gem_can_store_dword(fd, eb_ring(e)));
 
 			if ((flags & HANG) == 0)
 			{
@@ -209,12 +209,12 @@ static void test_engine_mode(int fd,
 		igt_subtest_f("%s%s-%s",
 			      !e->exec_id && !(flags & HANG) ? "basic-" : "",
 			      name, e->name)
-			busy(fd, e->exec_id | e->flags, flags);
+			busy(fd, eb_ring(e), flags);
 
 		igt_subtest_f("%swait-%s-%s",
 			      !e->exec_id && !(flags & HANG) ? "basic-" : "",
 			      name, e->name)
-			busy(fd, e->exec_id | e->flags, flags | POLL);
+			busy(fd, eb_ring(e), flags | POLL);
 
 		igt_fixture {
 			if ((flags & HANG) == 0)

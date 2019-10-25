@@ -65,11 +65,9 @@ static void check_bo(int fd, uint32_t handle)
 
 static void test_all(int fd, unsigned flags)
 {
-	unsigned engine;
-
-	for_each_physical_engine(fd, engine)
-		if (gem_can_store_dword(fd, engine))
-			run_test(fd, engine, flags & ~0xff);
+	for_each_physical_engine(e, fd)
+		if (gem_can_store_dword(fd, eb_ring(e)))
+			run_test(fd, eb_ring(e), flags & ~0xff);
 }
 
 static bool has_semaphores(int fd)
@@ -107,9 +105,9 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 		 * GPU is then unlikely to be active!)
 		 */
 		if (has_semaphores(fd)) {
-			for_each_physical_engine(fd, engine) {
-				if (gem_can_store_dword(fd, engine))
-					engines[nengine++] = engine;
+			for_each_physical_engine(e, fd) {
+				if (gem_can_store_dword(fd, eb_ring(e)))
+					engines[nengine++] = eb_ring(e);
 			}
 		} else {
 			igt_require(gem_has_ring(fd, 0));
@@ -275,11 +273,9 @@ igt_main
 	for (e = intel_execution_engines; e->name; e++) {
 		for (m = modes; m->suffix; m++) {
 			igt_subtest_f("%s-uncached%s", e->name, m->suffix)
-				run_test(fd, e->exec_id | e->flags,
-					 m->mode | UNCACHED);
+				run_test(fd, eb_ring(e), m->mode | UNCACHED);
 			igt_subtest_f("%s-cached%s", e->name, m->suffix)
-				run_test(fd, e->exec_id | e->flags,
-					 m->mode | CACHED);
+				run_test(fd, eb_ring(e), m->mode | CACHED);
 		}
 	}
 
