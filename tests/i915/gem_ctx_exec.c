@@ -208,8 +208,8 @@ static void nohangcheck_hostile(int i915)
 	int64_t timeout = NSEC_PER_SEC / 2;
 	igt_spin_t *spin;
 	uint32_t ctx;
+	int err = 0;
 	int dir;
-	int err;
 
 	/*
 	 * Even if the user disables hangcheck during their context,
