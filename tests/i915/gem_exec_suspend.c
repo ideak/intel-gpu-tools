@@ -27,9 +27,13 @@
  * Exercise executing batches across suspend before checking the results.
  */
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "igt.h"
-#include "igt_gt.h"
 #include "igt_dummyload.h"
+#include "igt_gt.h"
+#include "igt_sysfs.h"
 
 #define NOSLEEP 0
 #define IDLE 1
@@ -232,6 +236,61 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 		test_all(fd, flags);
 }
 
+struct battery_sample {
+	struct timespec tv;
+	uint64_t charge;
+};
+
+static bool get_power(int dir, struct battery_sample *s)
+{
+	return (clock_gettime(CLOCK_REALTIME, &s->tv) == 0 &&
+		igt_sysfs_scanf(dir, "charge_now", "%"PRIu64, &s->charge) == 1);
+}
+
+static double d_charge(const struct battery_sample *after,
+		       const struct battery_sample *before)
+{
+	return (before->charge - after->charge) * 1e-3; /* mWh */
+}
+
+static double d_time(const struct battery_sample *after,
+		     const struct battery_sample *before)
+{
+	return ((after->tv.tv_sec - before->tv.tv_sec) +
+		(after->tv.tv_nsec - before->tv.tv_nsec) * 1e-9); /* s */
+}
+
+static void power_test(int i915, unsigned engine, unsigned flags)
+{
+	struct battery_sample before, after;
+	char *status;
+	int dir;
+
+	dir = open("/sys/class/power_supply/BAT0", O_RDONLY);
+	igt_require_f(dir != -1, "/sys/class/power_supply/BAT0 not available\n");
+
+	igt_require_f(get_power(dir, &before),
+		      "power test needs reported energy level\n");
+
+	status = igt_sysfs_get(dir, "status");
+	igt_require_f(status && strcmp(status, "Discharging") == 0,
+		      "power test needs to be on battery, not mains, power\n");
+	free(status);
+
+	igt_set_autoresume_delay(5 * 60); /* 5 minutes; longer == more stable */
+
+	igt_assert(get_power(dir, &before));
+	run_test(i915, engine, flags);
+	igt_assert(get_power(dir, &after));
+
+	igt_set_autoresume_delay(0);
+
+	igt_info("Power consumed while suspended: %.3fmWh\n",
+		 d_charge(&after, &before));
+	igt_info("Discharge rate while suspended: %.3fmW\n",
+		 d_charge(&after, &before) * 3600 / d_time(&after, &before));
+}
+
 igt_main
 {
 	const struct {
@@ -288,6 +347,11 @@ igt_main
 		run_test(fd, 0, SUSPEND | HANG);
 	igt_subtest("hang-S4")
 		run_test(fd, 0, HIBERNATE | HANG);
+
+	igt_subtest("power-S0")
+		power_test(fd, 0, IDLE);
+	igt_subtest("power-S3")
+		power_test(fd, 0, SUSPEND);
 
 	igt_fixture {
 		igt_disallow_hang(fd, hang);
