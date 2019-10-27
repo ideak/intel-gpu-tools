@@ -638,7 +638,6 @@ static void semaphore_resolve(int i915)
 static void semaphore_noskip(int i915)
 {
 	const int gen = intel_gen(intel_get_drm_devid(i915));
-	unsigned int other;
 	uint32_t ctx;
 
 	igt_require(gen >= 6); /* MI_STORE_DWORD_IMM convenience */
@@ -692,7 +691,7 @@ static void semaphore_noskip(int i915)
 		eb.buffer_count = 3;
 		eb.buffers_ptr = to_user_pointer(obj);
 		eb.rsvd1 = ctx;
-		eb.flags = other;
+		eb.flags = eb_ring(inner);
 		gem_execbuf(i915, &eb);
 
 		/* port1: dependency chain from port0 */
@@ -703,7 +702,7 @@ static void semaphore_noskip(int i915)
 		memset(&eb, 0, sizeof(eb));
 		eb.buffer_count = 2;
 		eb.buffers_ptr = to_user_pointer(obj);
-		eb.flags = other;
+		eb.flags = eb_ring(inner);
 		gem_execbuf(i915, &eb);
 
 		igt_spin_set_timeout(chain, NSEC_PER_SEC / 100);
