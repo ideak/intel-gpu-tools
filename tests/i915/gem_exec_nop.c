@@ -432,7 +432,6 @@ static void parallel(int fd, uint32_t handle, int timeout)
 	unsigned engines[16];
 	const char *names[16];
 	unsigned nengine;
-	unsigned engine;
 	unsigned long count;
 	double time, sum;
 
@@ -443,7 +442,7 @@ static void parallel(int fd, uint32_t handle, int timeout)
 		names[nengine] = e->name;
 		nengine++;
 
-		time = nop_on_ring(fd, handle, engine, 1, &count) / count;
+		time = nop_on_ring(fd, handle, eb_ring(e), 1, &count) / count;
 		sum += time;
 		igt_debug("%s: %.3fus\n", e->name, 1e6*time);
 	}
@@ -597,7 +596,7 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 	for_each_physical_engine(e, fd) {
 		unsigned long count;
 
-		time = nop_on_ring(fd, handle, n, 1, &count) / count;
+		time = nop_on_ring(fd, handle, eb_ring(e), 1, &count) / count;
 		sum += time;
 		igt_debug("%s: %.3fus\n", e->name, 1e6*time);
 
