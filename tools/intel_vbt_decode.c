@@ -1548,6 +1548,88 @@ static void dump_mipi_sequence(struct context *context,
 			dump_sequence(sequence_ptrs[i], sequence->version);
 }
 
+#define KB(x) ((x) * 1024)
+
+static int dsc_buffer_block_size(u8 buffer_block_size)
+{
+	switch (buffer_block_size) {
+	case VBT_RC_BUFFER_BLOCK_SIZE_1KB:
+		return KB(1);
+		break;
+	case VBT_RC_BUFFER_BLOCK_SIZE_4KB:
+		return KB(4);
+		break;
+	case VBT_RC_BUFFER_BLOCK_SIZE_16KB:
+		return KB(16);
+		break;
+	case VBT_RC_BUFFER_BLOCK_SIZE_64KB:
+		return KB(64);
+		break;
+	default:
+		return 0;
+	}
+}
+
+static int actual_buffer_size(u8 buffer_block_size, u8 rc_buffer_size)
+{
+	return dsc_buffer_block_size(buffer_block_size) * (rc_buffer_size + 1);
+}
+
+static const char *dsc_max_bpp(u8 value)
+{
+	switch (value) {
+	case 0:
+		return "6";
+	case 1:
+		return "8";
+	case 2:
+		return "10";
+	case 3:
+		return "12";
+	default:
+		return "<unknown>";
+	}
+}
+
+static void dump_compression_parameters(struct context *context,
+					const struct bdb_block *block)
+{
+	const struct bdb_compression_parameters *dsc = block->data;
+	const struct dsc_compression_parameters_entry *data;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(dsc->data); i++) {
+		/* FIXME: need to handle sizeof(*data) != dsc->entry_size */
+		data = &dsc->data[i];
+
+		if (i != context->panel_type && !context->dump_all_panel_types)
+			continue;
+
+		printf("\tDSC block %d%s\n", i,
+		       i == context->panel_type ? " *" : "");
+		printf("\t\tDSC version: %u.%u\n", data->version_major,
+		       data->version_minor);
+		printf("\t\tActual buffer size: %d\n",
+		       actual_buffer_size(data->rc_buffer_block_size,
+					  data->rc_buffer_size));
+		printf("\t\t\tRC buffer block size: %d (%u)\n",
+		       dsc_buffer_block_size(data->rc_buffer_block_size),
+		       data->rc_buffer_block_size);
+		printf("\t\t\tRC buffer size: %u\n", data->rc_buffer_size);
+		printf("\t\tSlices per line: 0x%02x\n", data->slices_per_line);
+		printf("\t\tLine buffer depth: %u bits (%u)\n",
+		       data->line_buffer_depth + 8, data->line_buffer_depth);
+		printf("\t\tBlock prediction enable: %u\n",
+		       data->block_prediction_enable);
+		printf("\t\tMax bpp: %s bpp (%u)\n", dsc_max_bpp(data->max_bpp),
+		       data->max_bpp);
+		printf("\t\tSupport 8 bpc: %u\n", data->support_8bpc);
+		printf("\t\tSupport 10 bpc: %u\n", data->support_10bpc);
+		printf("\t\tSupport 12 bpc: %u\n", data->support_12bpc);
+		printf("\t\tSlice height: %u\n", data->slice_height);
+	}
+}
+
 /* get panel type from lvds options block, or -1 if block not found */
 static int get_panel_type(struct context *context)
 {
@@ -1664,6 +1746,11 @@ struct dumper dumpers[] = {
 		.id = BDB_MIPI_SEQUENCE,
 		.name = "MIPI sequence block",
 		.dump = dump_mipi_sequence,
+	},
+	{
+		.id = BDB_COMPRESSION_PARAMETERS,
+		.name = "Compression parameters block",
+		.dump = dump_compression_parameters,
 	},
 };
 
