@@ -32,6 +32,7 @@
 #include "igt_psr.h"
 #include "igt_sysfs.h"
 #include "limits.h"
+#include "time.h"
 
 /* DC State Flags */
 #define CHECK_DC5	(1 << 0)
@@ -39,12 +40,16 @@
 #define CHECK_DC3CO	(1 << 2)
 
 typedef struct {
+	double r, g, b;
+} color_t;
+
+typedef struct {
 	int drm_fd;
 	int msr_fd;
 	int debugfs_fd;
 	uint32_t devid;
 	igt_display_t display;
-	struct igt_fb fb_white;
+	struct igt_fb fb_white, fb_rgb, fb_rgr;
 	enum psr_mode op_psr_mode;
 	drmModeModeInfo *mode;
 	igt_output_t *output;
@@ -110,6 +115,42 @@ static void cleanup_dc_psr(data_t *data)
 	igt_remove_fb(data->drm_fd, &data->fb_white);
 }
 
+static void cleanup_dc3co_fbs(data_t *data)
+{
+	igt_plane_t *primary;
+
+	primary = igt_output_get_plane_type(data->output,
+					    DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_fb(primary, NULL);
+	/* Clear Frame Buffers */
+	igt_display_commit(&data->display);
+	igt_remove_fb(data->drm_fd, &data->fb_rgb);
+	igt_remove_fb(data->drm_fd, &data->fb_rgr);
+}
+
+static void paint_rectangles(data_t *data,
+			     drmModeModeInfo *mode,
+			     color_t *colors,
+			     igt_fb_t *fb)
+{
+	cairo_t *cr = igt_get_cairo_ctx(data->drm_fd, fb);
+	int i, l = mode->hdisplay / 3;
+	int rows_remaining = mode->hdisplay % 3;
+
+	/* Paint 3 solid rectangles. */
+	for (i = 0 ; i < 3; i++) {
+		igt_paint_color(cr, i * l, 0, l, mode->vdisplay,
+				colors[i].r, colors[i].g, colors[i].b);
+	}
+
+	if (rows_remaining > 0)
+		igt_paint_color(cr, i * l, 0, rows_remaining, mode->vdisplay,
+				colors[i - 1].r, colors[i - 1].g,
+				colors[i - 1].b);
+
+	igt_put_cairo_ctx(data->drm_fd, fb, cr);
+}
+
 static void setup_primary(data_t *data)
 {
 	igt_plane_t *primary;
@@ -125,6 +166,20 @@ static void setup_primary(data_t *data)
 			    &data->fb_white);
 	igt_plane_set_fb(primary, &data->fb_white);
 	igt_display_commit(&data->display);
+}
+
+static void create_color_fb(data_t *data, igt_fb_t *fb, color_t *fb_color)
+{
+	int fb_id;
+
+	fb_id = igt_create_fb(data->drm_fd,
+			      data->mode->hdisplay,
+			      data->mode->vdisplay,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_DRM_FORMAT_MOD_NONE,
+			      fb);
+	igt_assert(fb_id);
+	paint_rectangles(data, data->mode, fb_color, fb);
 }
 
 static uint32_t get_dc_counter(char *dc_data)
@@ -150,13 +205,13 @@ static uint32_t read_dc_counter(uint32_t drm_fd, int dc_flag)
 
 	if (dc_flag & CHECK_DC5) {
 		str = strstr(buf, "DC3 -> DC5 count");
-		igt_skip_on_f(!str, "DC5 counter is not available\n");
+		igt_assert_f(str, "DC5 counter is not available\n");
 	} else if (dc_flag & CHECK_DC6) {
 		str = strstr(buf, "DC5 -> DC6 count");
-		igt_skip_on_f(!str, "DC6 counter is not available\n");
+		igt_assert_f(str, "DC6 counter is not available\n");
 	} else if (dc_flag & CHECK_DC3CO) {
 		str = strstr(buf, "DC3CO count");
-		igt_skip_on_f(!str, "DC3CO counter is not available\n");
+		igt_assert_f(str, "DC3CO counter is not available\n");
 	}
 
 	return get_dc_counter(str);
@@ -178,10 +233,99 @@ static void check_dc_counter(int drm_fd, int dc_flag, uint32_t prev_dc_count)
 		     "%s state is not achieved\n", tmp);
 }
 
+static void setup_videoplayback(data_t *data)
+{
+	color_t red_green_blue[] = {
+		{ 1.0, 0.0, 0.0 },
+		{ 0.0, 1.0, 0.0 },
+		{ 0.0, 0.0, 1.0 },
+	};
+	color_t red_green_red[] = {
+		{ 1.0, 0.0, 0.0 },
+		{ 0.0, 1.0, 0.0 },
+		{ 1.0, 0.0, 0.0 },
+	};
+
+	create_color_fb(data, &data->fb_rgb, red_green_blue);
+	create_color_fb(data, &data->fb_rgr, red_green_red);
+}
+
+static void check_dc3co_with_videoplayback_like_load(data_t *data)
+{
+	igt_plane_t *primary;
+	uint32_t dc3co_prev_cnt;
+	int delay;
+	time_t secs = 6;
+	time_t startTime = time(NULL);
+
+	primary = igt_output_get_plane_type(data->output,
+					    DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_fb(primary, NULL);
+	dc3co_prev_cnt = read_dc_counter(data->drm_fd, CHECK_DC3CO);
+	/* Calculate delay to generate idle frame in usec*/
+	delay = 1.5 * ((1000 * 1000) / data->mode->vrefresh);
+
+	while (time(NULL) - startTime < secs) {
+		igt_plane_set_fb(primary, &data->fb_rgb);
+		igt_display_commit(&data->display);
+		usleep(delay);
+
+		igt_plane_set_fb(primary, &data->fb_rgr);
+		igt_display_commit(&data->display);
+		usleep(delay);
+	}
+
+	check_dc_counter(data->drm_fd, CHECK_DC3CO, dc3co_prev_cnt);
+}
+
+static void require_dc_counter(int drm_fd, int dc_flag)
+{
+	char buf[4096];
+
+	igt_debugfs_simple_read(drm_fd, "i915_dmc_info",
+				buf, sizeof(buf));
+
+	switch (dc_flag) {
+	case CHECK_DC3CO:
+		igt_skip_on_f(strstr(buf, "DC3CO count"),
+			      "DC3CO counter is not available\n");
+		break;
+	case CHECK_DC5:
+		igt_skip_on_f(strstr(buf, "DC3 -> DC5 count"),
+			      "DC5 counter is not available\n");
+		break;
+	case CHECK_DC6:
+		igt_skip_on_f(strstr(buf, "DC5 -> DC6 count"),
+			      "DC6 counter is not available\n");
+		break;
+	default:
+		igt_assert_f(0, "Unknown DC counter %d\n", dc_flag);
+	}
+}
+
+static void setup_dc3co(data_t *data)
+{
+	data->op_psr_mode = PSR_MODE_2;
+	psr_enable(data->debugfs_fd, data->op_psr_mode);
+	igt_require_f(edp_psr2_enabled(data),
+		      "PSR2 is not enabled\n");
+}
+
+static void test_dc3co_vpb_simulation(data_t *data)
+{
+	require_dc_counter(data->drm_fd, CHECK_DC3CO);
+	setup_output(data);
+	setup_dc3co(data);
+	setup_videoplayback(data);
+	check_dc3co_with_videoplayback_like_load(data);
+	cleanup_dc3co_fbs(data);
+}
+
 static void test_dc_state_psr(data_t *data, int dc_flag)
 {
 	uint32_t dc_counter_before_psr;
 
+	require_dc_counter(data->drm_fd, dc_flag);
 	dc_counter_before_psr = read_dc_counter(data->drm_fd, dc_flag);
 	setup_output(data);
 	setup_primary(data);
@@ -243,6 +387,7 @@ static void test_dc_state_dpms(data_t *data, int dc_flag)
 {
 	uint32_t dc_counter;
 
+	require_dc_counter(data->drm_fd, dc_flag);
 	setup_dc_dpms(data);
 	dc_counter = read_dc_counter(data->drm_fd, dc_flag);
 	dpms_off(data);
@@ -277,6 +422,12 @@ int main(int argc, char *argv[])
 		data.msr_fd = open("/dev/cpu/0/msr", O_RDONLY);
 		igt_assert_f(data.msr_fd >= 0,
 			     "Can't open /dev/cpu/0/msr.\n");
+	}
+
+	igt_describe("In this test we make sure that system enters DC3CO "
+		     "when PSR2 is active and system is in SLEEP state");
+	igt_subtest("dc3co-vpb-simulation") {
+		test_dc3co_vpb_simulation(&data);
 	}
 
 	igt_describe("This test validates display engine entry to DC5 state "
