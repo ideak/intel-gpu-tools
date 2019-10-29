@@ -350,11 +350,17 @@ igt_main
 	}
 
 	igt_subtest("reload-with-fault-injection") {
+		const char *param;
 		int i = 0;
 
 		igt_i915_driver_unload();
 
-		while (inject_fault("i915", "inject_load_failure", ++i) == 0)
+		param = "inject_probe_failure";
+		if (!igt_kmod_has_param("i915", param))
+			param = "inject_load_failure";
+		igt_require(igt_kmod_has_param("i915", param));
+
+		while (inject_fault("i915", param, ++i) == 0)
 			;
 
 		/* We expect to hit at least one fault! */

@@ -154,6 +154,46 @@ static int modprobe(struct kmod_module *kmod, const char *options)
 }
 
 /**
+ * igt_kmod_has_param:
+ * @mod_name: The name of the module
+ * @param: The name of the parameter
+ *
+ * Returns: true if the module has the parameter, false otherwise.
+ */
+bool igt_kmod_has_param(const char *module_name, const char *param)
+{
+	struct kmod_module *kmod;
+	struct kmod_list *d, *pre;
+	bool result = false;
+
+	if (kmod_module_new_from_name(kmod_ctx(), module_name, &kmod))
+		return false;
+
+	pre = NULL;
+	if (!kmod_module_get_info(kmod, &pre))
+		goto out;
+
+	kmod_list_foreach(d, pre) {
+		const char *key, *val;
+
+		key = kmod_module_info_get_key(d);
+		if (strcmp(key, "parmtype"))
+			continue;
+
+		val = kmod_module_info_get_value(d);
+		if (val && strncmp(val, param, strlen(param)) == 0) {
+			result = true;
+			break;
+		}
+	}
+	kmod_module_info_free_list(pre);
+
+out:
+	kmod_module_unref(kmod);
+	return result;
+}
+
+/**
  * igt_kmod_load:
  * @mod_name: The name of the module
  * @opts: Parameters for the module. NULL in case no parameters
