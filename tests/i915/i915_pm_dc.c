@@ -34,8 +34,9 @@
 #include "limits.h"
 
 /* DC State Flags */
-#define CHECK_DC5	1
-#define CHECK_DC6	2
+#define CHECK_DC5	(1 << 0)
+#define CHECK_DC6	(1 << 1)
+#define CHECK_DC3CO	(1 << 2)
 
 typedef struct {
 	int drm_fd;
@@ -88,6 +89,16 @@ static bool edp_psr_sink_support(data_t *data)
 	return strstr(buf, "Sink support: yes");
 }
 
+static bool edp_psr2_enabled(data_t *data)
+{
+	char buf[512];
+
+	igt_debugfs_simple_read(data->debugfs_fd, "i915_edp_psr_status",
+				buf, sizeof(buf));
+
+	return strstr(buf, "PSR mode: PSR2 enabled") != NULL;
+}
+
 static void cleanup_dc_psr(data_t *data)
 {
 	igt_plane_t *primary;
@@ -137,16 +148,17 @@ static uint32_t read_dc_counter(uint32_t drm_fd, int dc_flag)
 
 	igt_debugfs_read(drm_fd, "i915_dmc_info", buf);
 
-	if (dc_flag & CHECK_DC5)
+	if (dc_flag & CHECK_DC5) {
 		str = strstr(buf, "DC3 -> DC5 count");
-	else if (dc_flag & CHECK_DC6)
+		igt_skip_on_f(!str, "DC5 counter is not available\n");
+	} else if (dc_flag & CHECK_DC6) {
 		str = strstr(buf, "DC5 -> DC6 count");
+		igt_skip_on_f(!str, "DC6 counter is not available\n");
+	} else if (dc_flag & CHECK_DC3CO) {
+		str = strstr(buf, "DC3CO count");
+		igt_skip_on_f(!str, "DC3CO counter is not available\n");
+	}
 
-	/* Check DC5/DC6 counter is available for the platform.
-	 * Skip the test if counter is not available.
-	 */
-	igt_skip_on_f(!str, "DC%d counter is not available\n",
-		      dc_flag & CHECK_DC5 ? 5 : 6);
 	return get_dc_counter(str);
 }
 
@@ -158,9 +170,12 @@ static bool dc_state_wait_entry(int drm_fd, int dc_flag, int prev_dc_count)
 
 static void check_dc_counter(int drm_fd, int dc_flag, uint32_t prev_dc_count)
 {
+	char tmp[64];
+
+	snprintf(tmp, sizeof(tmp), "%s", dc_flag & CHECK_DC3CO ? "DC3CO" :
+		(dc_flag & CHECK_DC5 ? "DC5" : "DC6"));
 	igt_assert_f(dc_state_wait_entry(drm_fd, dc_flag, prev_dc_count),
-		     "DC%d state is not achieved\n",
-		     dc_flag & CHECK_DC5 ? 5 : 6);
+		     "%s state is not achieved\n", tmp);
 }
 
 static void test_dc_state_psr(data_t *data, int dc_flag)
