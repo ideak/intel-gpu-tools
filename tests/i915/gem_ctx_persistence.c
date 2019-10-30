@@ -352,6 +352,7 @@ static void test_nonpersistent_file(int i915)
 	spin = igt_spin_new(i915, .flags = IGT_SPIN_FENCE_OUT);
 
 	close(i915);
+	sched_yield();
 	rcu_barrier(debugfs); /* force the delayed fput() */
 
 	igt_assert_eq(sync_fence_wait(spin->out_fence, MSEC_PER_SEC / 5), 0);
@@ -363,17 +364,16 @@ static void test_nonpersistent_file(int i915)
 
 static void test_nonpersistent_queued(int i915, unsigned int engine)
 {
-	int count = gem_measure_ring_inflight(i915, engine, 0);
+	const int count = gem_measure_ring_inflight(i915, engine, 0);
 	igt_spin_t *spin;
+	int fence = -1;
 	uint32_t ctx;
-	int fence;
 
 	/*
 	 * Not only must the immediate batch be cancelled, but
 	 * all pending batches in the context.
 	 */
 
-	i915 = gem_reopen_driver(i915);
 	gem_quiescent_gpu(i915);
 
 	ctx = gem_context_create(i915);
@@ -383,21 +383,26 @@ static void test_nonpersistent_queued(int i915, unsigned int engine)
 			    .flags = IGT_SPIN_FENCE_OUT);
 
 	for (int i = 0; i < count - 1; i++) {
+		spin->execbuf.rsvd2 = 0;
 		if (fence != -1)
 			close(fence);
-		spin->execbuf.rsvd2 = 0;
+
+		igt_assert(spin->execbuf.flags & I915_EXEC_FENCE_OUT);
 		gem_execbuf_wr(i915, &spin->execbuf);
+
 		igt_assert(spin->execbuf.rsvd2);
 		fence = spin->execbuf.rsvd2 >> 32;
 	}
 
 	gem_context_destroy(i915, ctx);
 
+	igt_assert_eq(sync_fence_wait(spin->out_fence, MSEC_PER_SEC / 5), 0);
+	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
+
 	igt_assert_eq(sync_fence_wait(fence, MSEC_PER_SEC / 5), 0);
 	igt_assert_eq(sync_fence_status(fence), -EIO);
 
-	spin->handle = 0;
-	igt_spin_free(-1, spin);
+	igt_spin_free(i915, spin);
 }
 
 static void sendfd(int socket, int fd)
@@ -531,10 +536,6 @@ static void test_process_mixed(int i915, unsigned int engine)
 	gem_quiescent_gpu(i915);
 }
 
-static void sigign(int sig)
-{
-}
-
 static void test_processes(int i915)
 {
 	struct {
@@ -566,8 +567,10 @@ static void test_processes(int i915)
 			/* Wait until we are told to die */
 			pid = getpid();
 			write(p[i].sv[0], &pid, sizeof(pid));
-			signal(SIGINT, sigign);
-			pause();
+
+			pid = 0;
+			read(p[i].sv[0], &pid, sizeof(pid));
+			igt_assert(pid == getpid());
 		}
 	}
 
@@ -580,7 +583,7 @@ static void test_processes(int i915)
 
 		/* Kill *this* process */
 		read(p[i].sv[1], &pid, sizeof(pid));
-		igt_assert(kill(pid, SIGINT) == 0);
+		write(p[i].sv[1], &pid, sizeof(pid));
 
 		/*
 		 * A little bit of slack required for the signal to terminate
@@ -624,21 +627,24 @@ static void __smoker(int i915, unsigned int engine, int expected)
 		if (fence != -1)
 			close(fence);
 		spin->execbuf.rsvd2 = 0;
-		gem_execbuf_wr(i915, &spin->execbuf);
+		gem_execbuf_wr(fd, &spin->execbuf);
 		igt_assert(spin->execbuf.rsvd2);
 		fence = spin->execbuf.rsvd2 >> 32;
 	}
 
 	close(fd);
+
+	sched_yield();
 	rcu_barrier(i915);
 
 	igt_spin_end(spin);
+
 	igt_assert_eq(sync_fence_wait(spin->out_fence, MSEC_PER_SEC), 0);
 	igt_assert_eq(sync_fence_status(spin->out_fence), expected);
 
 	if (fence != -1) {
 		igt_assert_eq(sync_fence_wait(fence, MSEC_PER_SEC), 0);
-		igt_assert_eq(sync_fence_status(fence), 1 /* XXX expected */);
+		igt_assert_eq(sync_fence_status(fence), expected);
 		close(fence);
 	}
 
