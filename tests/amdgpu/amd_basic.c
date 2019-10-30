@@ -681,16 +681,20 @@ static void amdgpu_command_submission_compute_nop(void)
 	struct amdgpu_cs_request ibs_request;
 	struct amdgpu_cs_ib_info ib_info;
 	struct amdgpu_cs_fence fence_status;
+	struct drm_amdgpu_info_hw_ip info;
 	uint32_t *ptr;
 	uint32_t expired;
-	int i, r, instance;
+	int r, instance;
 	amdgpu_bo_list_handle bo_list;
 	amdgpu_va_handle va_handle;
+
+	r = amdgpu_query_hw_ip_info(device, AMDGPU_HW_IP_COMPUTE, 0, &info);
+	igt_assert_eq(r, 0);
 
 	r = amdgpu_cs_ctx_create(device, &context_handle);
 	igt_assert_eq(r, 0);
 
-	for (instance = 0; instance < 8; instance++) {
+	for (instance = 0; info.available_rings & (1 << instance); instance++) {
 		r = amdgpu_bo_alloc_and_map(device, 4096, 4096,
 					    AMDGPU_GEM_DOMAIN_GTT, 0,
 					    &ib_result_handle, &ib_result_cpu,
@@ -702,8 +706,8 @@ static void amdgpu_command_submission_compute_nop(void)
 		igt_assert_eq(r, 0);
 
 		ptr = ib_result_cpu;
-		for (i = 0; i < 16; ++i)
-			ptr[i] = 0xffff1000;
+		memset(ptr, 0, 16);
+		ptr[0] = PACKET3(PACKET3_NOP, 14);
 
 		memset(&ib_info, 0, sizeof(struct amdgpu_cs_ib_info));
 		ib_info.ib_mc_address = ib_result_mc_address;
