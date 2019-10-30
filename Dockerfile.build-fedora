@@ -1,4 +1,4 @@
-FROM fedora:30
+FROM fedora:31
 
 RUN dnf install -y \
 	gcc flex bison libatomic meson ninja-build xdotool \
@@ -37,10 +37,14 @@ RUN rm -fr /tmp/peg
 # For compile-testing on clang
 RUN dnf install -y clang
 
+# For test list comparison
+RUN dnf install -y diffutils
+
 # For the helpers for the container with IGT inside
 RUN dnf install -y findutils
 
 # Meson version switching shenanigans
+RUN dnf install -y python3-pip
 RUN curl -o "/usr/src/#1" "https://files.pythonhosted.org/packages/e8/ec/3e6a68c9e0fd4b4f4fb6877a3ccfb6f6e6d09f2b4fc87674e671bf64b7b8/{meson-0.47.2.tar.gz}"
 
 RUN dnf clean all

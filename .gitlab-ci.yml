@@ -84,7 +84,7 @@ build:tests-fedora-oldest-meson:
   stage: build
   script:
     - dnf remove -y meson
-    - pip3 install /usr/src/meson-*.tar.gz
+    - pip install /usr/src/meson-*.tar.gz
     - meson $MESON_OPTIONS build
     - ninja -C build
     - ninja -C build igt-gpu-tools-doc
