@@ -634,8 +634,9 @@ static void __smoker(int i915, unsigned int engine, int expected)
 
 	close(fd);
 
+	rcu_barrier(i915); /* flush the delayed fput */
 	sched_yield();
-	rcu_barrier(i915);
+	rcu_barrier(i915); /* again, in case it was added after we waited! */
 
 	igt_spin_end(spin);
 
