@@ -136,6 +136,38 @@ static void spin_on_all_engines(int fd, unsigned int timeout_sec)
 	igt_waitchildren();
 }
 
+static void spin_all(int i915, unsigned int flags)
+#define PARALLEL_SPIN_NEW_CTX BIT(0)
+{
+	struct igt_spin *spin, *n;
+	IGT_LIST(list);
+
+	for_each_physical_engine(e, i915) {
+		uint32_t ctx;
+
+		ctx = 0;
+		if (flags & PARALLEL_SPIN_NEW_CTX)
+			ctx = gem_context_create(i915);
+
+		/* Prevent preemption so only one is allowed on each engine */
+		spin = igt_spin_new(i915,
+				    .ctx = ctx,
+				    .engine = eb_ring(e),
+				    .flags = (IGT_SPIN_POLL_RUN |
+					      IGT_SPIN_NO_PREEMPTION));
+		if (ctx)
+			gem_context_destroy(i915, ctx);
+
+		igt_spin_busywait_until_started(spin);
+		igt_list_move(&spin->link, &list);
+	}
+
+	igt_list_for_each_safe(spin, n, &list, link) {
+		igt_assert(gem_bo_busy(i915, spin->handle));
+		igt_spin_free(i915, spin);
+	}
+}
+
 igt_main
 {
 	const struct intel_execution_engine2 *e2;
@@ -166,6 +198,11 @@ igt_main
 		igt_subtest_f("legacy-resubmit-new-%s", e->name)
 			spin_resubmit(fd, e2, RESUBMIT_NEW_CTX);
 	}
+
+	igt_subtest("spin-all")
+		spin_all(fd, 0);
+	igt_subtest("spin-all-new")
+		spin_all(fd, PARALLEL_SPIN_NEW_CTX);
 
 	__for_each_physical_engine(fd, e2) {
 		igt_subtest_f("%s", e2->name)
