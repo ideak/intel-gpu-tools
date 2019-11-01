@@ -40,4 +40,9 @@ igt_main
 			    "live_selftests=-1 disable_display=1 st_filter=%s",
 			    env) < sizeof(opts));
 	igt_kselftests("i915", opts, "live_selftests", "live");
+
+	igt_assert(snprintf(opts, sizeof(opts),
+			    "perf_selftests=-1 disable_display=1 st_filter=%s",
+			    env) < sizeof(opts));
+	igt_kselftests("i915", opts, "perf_selftests", "perf");
 }
