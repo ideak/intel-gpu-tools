@@ -840,7 +840,7 @@ static void bonded_slice(int i915)
 			gem_execbuf(i915, &eb);
 			close(eb.rsvd2);
 
-			gem_sync(i915, obj[2].handle);
+			gem_sync(i915, obj[0].handle);
 		}
 
 		*stop = 1;
