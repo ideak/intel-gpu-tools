@@ -468,6 +468,7 @@ static void test_process(int i915)
 	}
 	close(sv[0]);
 	igt_waitchildren();
+	rcu_barrier(i915); /* force the delayed fput() */
 
 	fence = recvfd(sv[1]);
 	close(sv[1]);
@@ -516,6 +517,7 @@ static void test_process_mixed(int i915, unsigned int engine)
 	}
 	close(sv[0]);
 	igt_waitchildren();
+	rcu_barrier(i915); /* force the delayed fput() */
 
 	fence[0] = recvfd(sv[1]);
 	fence[1] = recvfd(sv[1]);
