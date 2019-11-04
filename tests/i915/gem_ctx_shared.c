@@ -740,8 +740,13 @@ static void smoketest(int i915, unsigned ring, unsigned timeout)
 	uint32_t *ptr;
 
 	nengine = 0;
-	for_each_physical_engine(e, i915)
-		engines[nengine++] = eb_ring(e);
+	if (ring == -1) {
+		for_each_physical_engine(e, i915)
+			engines[nengine++] = eb_ring(e);
+	} else {
+		gem_require_ring(i915, ring);
+		engines[nengine++] = ring;
+	}
 	igt_require(nengine);
 
 	scratch = gem_create(i915, 4096);
