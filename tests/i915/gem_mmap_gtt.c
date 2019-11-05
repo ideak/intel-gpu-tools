@@ -1019,8 +1019,19 @@ igt_main
 	if (igt_run_in_simulation())
 		OBJECT_SIZE = 1 * 1024 * 1024;
 
-	igt_fixture
+	igt_fixture {
+		struct drm_i915_gem_mmap_gtt arg = {};
+
 		fd = drm_open_driver(DRIVER_INTEL);
+
+		/*
+		 * If the HW lacks or does not expose an aperture for indirect
+		 * detiling access from untrusted userspace to the objects,
+		 * the kernel does an early rejection of the mmap_gtt ioctl.
+		 */
+		igt_require_f(mmap_ioctl(fd, &arg) != -ENODEV,
+			      "HW & kernel support for indirect detiling aperture\n");
+	}
 
 	igt_subtest("bad-object") {
 		uint32_t real_handle = gem_create(fd, 4096);
