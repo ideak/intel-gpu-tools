@@ -278,24 +278,24 @@ static void check_dc3co_with_videoplayback_like_load(data_t *data)
 	check_dc_counter(data->drm_fd, CHECK_DC3CO, dc3co_prev_cnt);
 }
 
-static void require_dc_counter(int drm_fd, int dc_flag)
+static void require_dc_counter(int debugfs_fd, int dc_flag)
 {
 	char buf[4096];
 
-	igt_debugfs_simple_read(drm_fd, "i915_dmc_info",
+	igt_debugfs_simple_read(debugfs_fd, "i915_dmc_info",
 				buf, sizeof(buf));
 
 	switch (dc_flag) {
 	case CHECK_DC3CO:
-		igt_skip_on_f(strstr(buf, "DC3CO count"),
+		igt_skip_on_f(!strstr(buf, "DC3CO count"),
 			      "DC3CO counter is not available\n");
 		break;
 	case CHECK_DC5:
-		igt_skip_on_f(strstr(buf, "DC3 -> DC5 count"),
+		igt_skip_on_f(!strstr(buf, "DC3 -> DC5 count"),
 			      "DC5 counter is not available\n");
 		break;
 	case CHECK_DC6:
-		igt_skip_on_f(strstr(buf, "DC5 -> DC6 count"),
+		igt_skip_on_f(!strstr(buf, "DC5 -> DC6 count"),
 			      "DC6 counter is not available\n");
 		break;
 	default:
@@ -313,7 +313,7 @@ static void setup_dc3co(data_t *data)
 
 static void test_dc3co_vpb_simulation(data_t *data)
 {
-	require_dc_counter(data->drm_fd, CHECK_DC3CO);
+	require_dc_counter(data->debugfs_fd, CHECK_DC3CO);
 	setup_output(data);
 	setup_dc3co(data);
 	setup_videoplayback(data);
@@ -325,7 +325,7 @@ static void test_dc_state_psr(data_t *data, int dc_flag)
 {
 	uint32_t dc_counter_before_psr;
 
-	require_dc_counter(data->drm_fd, dc_flag);
+	require_dc_counter(data->debugfs_fd, dc_flag);
 	dc_counter_before_psr = read_dc_counter(data->drm_fd, dc_flag);
 	setup_output(data);
 	setup_primary(data);
@@ -387,7 +387,7 @@ static void test_dc_state_dpms(data_t *data, int dc_flag)
 {
 	uint32_t dc_counter;
 
-	require_dc_counter(data->drm_fd, dc_flag);
+	require_dc_counter(data->debugfs_fd, dc_flag);
 	setup_dc_dpms(data);
 	dc_counter = read_dc_counter(data->drm_fd, dc_flag);
 	dpms_off(data);
