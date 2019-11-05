@@ -196,12 +196,12 @@ static uint32_t get_dc_counter(char *dc_data)
 	return ret;
 }
 
-static uint32_t read_dc_counter(uint32_t drm_fd, int dc_flag)
+static uint32_t read_dc_counter(uint32_t debugfs_fd, int dc_flag)
 {
 	char buf[4096];
 	char *str;
 
-	igt_debugfs_read(drm_fd, "i915_dmc_info", buf);
+	igt_debugfs_simple_read(debugfs_fd, "i915_dmc_info", buf, sizeof(buf));
 
 	if (dc_flag & CHECK_DC5) {
 		str = strstr(buf, "DC3 -> DC5 count");
@@ -217,19 +217,19 @@ static uint32_t read_dc_counter(uint32_t drm_fd, int dc_flag)
 	return get_dc_counter(str);
 }
 
-static bool dc_state_wait_entry(int drm_fd, int dc_flag, int prev_dc_count)
+static bool dc_state_wait_entry(int debugfs_fd, int dc_flag, int prev_dc_count)
 {
-	return igt_wait(read_dc_counter(drm_fd, dc_flag) >
+	return igt_wait(read_dc_counter(debugfs_fd, dc_flag) >
 			prev_dc_count, 3000, 100);
 }
 
-static void check_dc_counter(int drm_fd, int dc_flag, uint32_t prev_dc_count)
+static void check_dc_counter(int debugfs_fd, int dc_flag, uint32_t prev_dc_count)
 {
 	char tmp[64];
 
 	snprintf(tmp, sizeof(tmp), "%s", dc_flag & CHECK_DC3CO ? "DC3CO" :
 		(dc_flag & CHECK_DC5 ? "DC5" : "DC6"));
-	igt_assert_f(dc_state_wait_entry(drm_fd, dc_flag, prev_dc_count),
+	igt_assert_f(dc_state_wait_entry(debugfs_fd, dc_flag, prev_dc_count),
 		     "%s state is not achieved\n", tmp);
 }
 
@@ -261,7 +261,8 @@ static void check_dc3co_with_videoplayback_like_load(data_t *data)
 	primary = igt_output_get_plane_type(data->output,
 					    DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, NULL);
-	dc3co_prev_cnt = read_dc_counter(data->drm_fd, CHECK_DC3CO);
+	dc3co_prev_cnt = read_dc_counter(data->debugfs_fd, CHECK_DC3CO);
+
 	/* Calculate delay to generate idle frame in usec*/
 	delay = 1.5 * ((1000 * 1000) / data->mode->vrefresh);
 
@@ -275,7 +276,7 @@ static void check_dc3co_with_videoplayback_like_load(data_t *data)
 		usleep(delay);
 	}
 
-	check_dc_counter(data->drm_fd, CHECK_DC3CO, dc3co_prev_cnt);
+	check_dc_counter(data->debugfs_fd, CHECK_DC3CO, dc3co_prev_cnt);
 }
 
 static void require_dc_counter(int debugfs_fd, int dc_flag)
@@ -326,11 +327,11 @@ static void test_dc_state_psr(data_t *data, int dc_flag)
 	uint32_t dc_counter_before_psr;
 
 	require_dc_counter(data->debugfs_fd, dc_flag);
-	dc_counter_before_psr = read_dc_counter(data->drm_fd, dc_flag);
+	dc_counter_before_psr = read_dc_counter(data->debugfs_fd, dc_flag);
 	setup_output(data);
 	setup_primary(data);
 	igt_assert(psr_wait_entry(data->debugfs_fd, data->op_psr_mode));
-	check_dc_counter(data->drm_fd, dc_flag, dc_counter_before_psr);
+	check_dc_counter(data->debugfs_fd, dc_flag, dc_counter_before_psr);
 	cleanup_dc_psr(data);
 }
 
@@ -389,9 +390,9 @@ static void test_dc_state_dpms(data_t *data, int dc_flag)
 
 	require_dc_counter(data->debugfs_fd, dc_flag);
 	setup_dc_dpms(data);
-	dc_counter = read_dc_counter(data->drm_fd, dc_flag);
+	dc_counter = read_dc_counter(data->debugfs_fd, dc_flag);
 	dpms_off(data);
-	check_dc_counter(data->drm_fd, dc_flag, dc_counter);
+	check_dc_counter(data->debugfs_fd, dc_flag, dc_counter);
 	dpms_on(data);
 	cleanup_dc_dpms(data);
 }
