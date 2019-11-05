@@ -218,21 +218,37 @@ static void scratch_buf_write_to_png(data_t *data, struct igt_buf *buf,
 	free(linear);
 }
 
-static int scratch_buf_aux_width(const struct igt_buf *buf)
+static int scratch_buf_aux_width(uint32_t devid, const struct igt_buf *buf)
 {
+	/*
+	 * GEN12+: The AUX CCS unit size is 64 bytes mapping 4 main surface
+	 * tiles. Thus the width of the CCS unit is 4*32=128 pixels on the
+	 * main surface.
+	 */
+	if (intel_gen(devid) >= 12)
+		return DIV_ROUND_UP(igt_buf_width(buf), 128) * 64;
+
 	return DIV_ROUND_UP(igt_buf_width(buf), 1024) * 128;
 }
 
-static int scratch_buf_aux_height(const struct igt_buf *buf)
+static int scratch_buf_aux_height(uint32_t devid, const struct igt_buf *buf)
 {
+	/*
+	 * GEN12+: The AUX CCS unit size is 64 bytes mapping 4 main surface
+	 * tiles. Thus the height of the CCS unit is 32 pixel rows on the main
+	 * surface.
+	 */
+	if (intel_gen(devid) >= 12)
+		return DIV_ROUND_UP(igt_buf_height(buf), 32);
+
 	return DIV_ROUND_UP(igt_buf_height(buf), 512) * 32;
 }
 
 static void *linear_copy_aux(data_t *data, struct igt_buf *buf)
 {
 	void *map, *linear;
-	int aux_size = scratch_buf_aux_width(buf) *
-		scratch_buf_aux_height(buf);
+	int aux_size = scratch_buf_aux_width(data->devid, buf) *
+		scratch_buf_aux_height(data->devid, buf);
 
 	igt_assert_eq(posix_memalign(&linear, 16, aux_size), 0);
 
@@ -261,8 +277,8 @@ static void scratch_buf_aux_write_to_png(data_t *data,
 
 	surface = cairo_image_surface_create_for_data(linear,
 						      CAIRO_FORMAT_A8,
-						      scratch_buf_aux_width(buf),
-						      scratch_buf_aux_height(buf),
+						      scratch_buf_aux_width(data->devid, buf),
+						      scratch_buf_aux_height(data->devid, buf),
 						      buf->aux.stride);
 	ret = cairo_surface_write_to_png(surface, make_filename(filename));
 	igt_assert(ret == CAIRO_STATUS_SUCCESS);
@@ -413,13 +429,26 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 		igt_assert(tiling == I915_TILING_Y ||
 			   tiling == I915_TILING_Yf);
 
-		buf->stride = ALIGN(width * (bpp / 8), 128);
+		/*
+		 * On GEN12+ we align the main surface to 4 * 4 main surface
+		 * tiles, which is 64kB. These 16 tiles are mapped by 4 AUX
+		 * CCS units, that is 4 * 64 bytes. These 4 CCS units are in
+		 * turn mapped by one L1 AUX page table entry.
+		 */
+		if (intel_gen(data->devid) >= 12)
+			buf->stride = ALIGN(width * (bpp / 8), 128 * 4);
+		else
+			buf->stride = ALIGN(width * (bpp / 8), 128);
+
+		if (intel_gen(data->devid) >= 12)
+			height = ALIGN(height, 4 * 32);
+
 		buf->size = buf->stride * height;
 		buf->tiling = tiling;
 		buf->bpp = bpp;
 
-		aux_width = scratch_buf_aux_width(buf);
-		aux_height = scratch_buf_aux_height(buf);
+		aux_width = scratch_buf_aux_width(data->devid, buf);
+		aux_height = scratch_buf_aux_height(data->devid, buf);
 
 		buf->aux.offset = buf->stride * ALIGN(height, 32);
 		buf->aux.stride = aux_width;
@@ -525,8 +554,8 @@ scratch_buf_check_all(data_t *data,
 static void scratch_buf_aux_check(data_t *data,
 				  struct igt_buf *buf)
 {
-	int aux_size = scratch_buf_aux_width(buf) *
-		scratch_buf_aux_height(buf);
+	int aux_size = scratch_buf_aux_width(data->devid, buf) *
+		scratch_buf_aux_height(data->devid, buf);
 	uint8_t *linear;
 	int i;
 
