@@ -64,7 +64,7 @@ build:tests-fedora:
   stage: build
   script:
     - meson --prefix=/opt/igt $MESON_OPTIONS build
-    - ninja -C build
+    - ninja -C build || ninja -C build -j 1
     - DESTDIR="$PWD/installdir" ninja -C build install
     - ninja -C build igt-gpu-tools-doc
   artifacts:
@@ -77,7 +77,7 @@ build:tests-fedora-no-libunwind:
   script:
     - dnf remove -y libunwind-devel
     - meson -Dlibunwind=disabled build
-    - ninja -C build
+    - ninja -C build || ninja -C build -j 1
 
 # documentation building is different with meson<0.47
 build:tests-fedora-oldest-meson:
@@ -86,7 +86,7 @@ build:tests-fedora-oldest-meson:
     - dnf remove -y meson
     - pip install /usr/src/meson-*.tar.gz
     - meson $MESON_OPTIONS build
-    - ninja -C build
+    - ninja -C build || ninja -C build -j 1
     - ninja -C build igt-gpu-tools-doc
 
 build:tests-fedora-clang:
@@ -95,7 +95,7 @@ build:tests-fedora-clang:
     CC: clang
   script:
     - meson $MESON_OPTIONS build
-    - ninja -C build
+    - ninja -C build || ninja -C build -j 1
   artifacts:
     paths:
       - build
@@ -105,7 +105,7 @@ build:tests-debian-meson:
   stage: build
   script:
     - meson $MESON_OPTIONS build
-    - ninja -C build
+    - ninja -C build || ninja -C build -j 1
     - cp build/tests/test-list.txt meson-test-list.txt
   artifacts:
     paths:
@@ -116,7 +116,7 @@ build:tests-debian-minimal:
   stage: build
   script:
     - meson -Dtests=disabled -Dlibdrm_drivers="" build
-    - ninja -C build
+    - ninja -C build || ninja -C build -j 1
   artifacts:
     paths:
       - build
@@ -127,7 +127,7 @@ build:tests-debian-meson-armhf:
   script:
     - export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig/
     - meson --cross-file meson-cross-armhf.txt build
-    - ninja -C build
+    - ninja -C build || ninja -C build -j 1
   artifacts:
     paths:
       - build
@@ -138,7 +138,7 @@ build:tests-debian-meson-arm64:
   script:
     - export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig/
     - meson --cross-file meson-cross-arm64.txt build
-    - ninja -C build
+    - ninja -C build || ninja -C build -j 1
   artifacts:
     paths:
       - build
@@ -149,7 +149,7 @@ build:tests-debian-meson-mips:
   script:
     - export PKG_CONFIG_PATH=/usr/lib/mips-linux-gnu/pkgconfig/
     - meson --cross-file meson-cross-mips.txt build
-    - ninja -C build
+    - ninja -C build || ninja -C build -j 1
   artifacts:
     paths:
       - build
@@ -159,7 +159,7 @@ build:tests-debian-autotools:
   stage: build
   script:
     - ./autogen.sh --enable-{chamelium,audio,intel,amdgpu,nouveau,tests,runner}
-    - make -j
+    - make -j $(nproc) || make -j 1
     - cp tests/test-list.txt autotools-test-list.txt
   artifacts:
     paths:
