@@ -44,6 +44,7 @@ lib_sources = [
 	'rendercopy_gen8.c',
 	'rendercopy_gen9.c',
 	'sw_sync.c',
+	'intel_aux_pgtable.c',
 	'intel_reg_map.c',
 	'intel_iosf.c',
 	'igt_kms.c',

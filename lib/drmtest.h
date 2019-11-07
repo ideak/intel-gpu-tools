@@ -77,6 +77,15 @@ void __set_forced_driver(const char *name);
  */
 #define ALIGN(v, a) (((v) + (a)-1) & ~((a)-1))
 
+/**
+ * ALIGN_DOWN:
+ * @v: value to be aligned down
+ * @a: alignment unit in bytes
+ *
+ * Macro to align down a value @v to a specified unit @a.
+ */
+#define ALIGN_DOWN(x, a)	ALIGN((x) - ((a) - 1), (a))
+
 int drm_open_driver(int chipset);
 int drm_open_driver_master(int chipset);
 int drm_open_driver_render(int chipset);

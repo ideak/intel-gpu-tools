@@ -15,6 +15,7 @@
 #include <i915_drm.h>
 
 #include "drmtest.h"
+#include "intel_aux_pgtable.h"
 #include "intel_bufmgr.h"
 #include "intel_batchbuffer.h"
 #include "intel_io.h"
@@ -972,19 +973,227 @@ static void gen8_emit_primitive(struct intel_batchbuffer *batch, uint32_t offset
 
 #define BATCH_STATE_SPLIT 2048
 
+static void
+aux_pgtable_find_max_free_range(const struct igt_buf **bufs, int buf_count,
+				uint64_t *range_start, uint64_t *range_size)
+{
+	/*
+	 * Keep the first page reserved, so we can differentiate pinned
+	 * objects based on a non-NULL offset.
+	 */
+	uint64_t start = 0x1000;
+	/* For now alloc only from the first 4GB address space. */
+	const uint64_t end = 1ULL << 32;
+	uint64_t max_range_start = 0;
+	uint64_t max_range_size = 0;
+	int i;
+
+	for (i = 0; i < buf_count; i++) {
+		if (bufs[i]->bo->offset64 >= end)
+			break;
+
+		if (bufs[i]->bo->offset64 - start > max_range_size) {
+			max_range_start = start;
+			max_range_size = bufs[i]->bo->offset64 - start;
+		}
+		start = bufs[i]->bo->offset64 + bufs[i]->bo->size;
+	}
+
+	if (start < end && end - start > max_range_size) {
+		max_range_start = start;
+		max_range_size = end - start;
+	}
+
+	*range_start = max_range_start;
+	*range_size = max_range_size;
+}
+
+static uint64_t
+aux_pgtable_find_free_range(const struct igt_buf **bufs, int buf_count,
+			    uint32_t size)
+{
+	uint64_t range_start;
+	uint64_t range_size;
+	/* A compressed surface must be 64kB aligned. */
+	const uint32_t align = 0x10000;
+	int pad;
+
+	aux_pgtable_find_max_free_range(bufs, buf_count,
+					&range_start, &range_size);
+
+	pad = ALIGN(range_start, align) - range_start;
+	range_start += pad;
+	range_size -= pad;
+	igt_assert(range_size >= size);
+
+	return range_start +
+	       ALIGN_DOWN(rand() % ((range_size - size) + 1), align);
+}
+
+static void
+aux_pgtable_reserve_range(const struct igt_buf **bufs, int buf_count,
+			  const struct igt_buf *new_buf)
+{
+	int i;
+
+	if (new_buf->aux.stride) {
+		uint64_t pin_offset = new_buf->bo->offset64;
+
+		if (!pin_offset)
+			pin_offset = aux_pgtable_find_free_range(bufs,
+								 buf_count,
+								 new_buf->bo->size);
+		drm_intel_bo_set_softpin_offset(new_buf->bo, pin_offset);
+		igt_assert(new_buf->bo->offset64 == pin_offset);
+	}
+
+	for (i = 0; i < buf_count; i++)
+		if (bufs[i]->bo->offset64 > new_buf->bo->offset64)
+			break;
+
+	memmove(&bufs[i + 1], &bufs[i], sizeof(bufs[0]) * (buf_count - i));
+
+	bufs[i] = new_buf;
+}
+
+struct aux_pgtable_info {
+	int buf_count;
+	const struct igt_buf *bufs[2];
+	uint64_t buf_pin_offsets[2];
+	drm_intel_bo *pgtable_bo;
+};
+
+static void
+gen12_aux_pgtable_init(struct aux_pgtable_info *info,
+		       drm_intel_bufmgr *bufmgr,
+		       const struct igt_buf *src_buf,
+		       const struct igt_buf *dst_buf)
+{
+	const struct igt_buf *bufs[2];
+	const struct igt_buf *reserved_bufs[2];
+	int reserved_buf_count;
+	int i;
+
+	if (!src_buf->aux.stride && !dst_buf->aux.stride)
+		return;
+
+	bufs[0] = src_buf;
+	bufs[1] = dst_buf;
+
+	/*
+	 * Ideally we'd need an IGT-wide GFX address space allocator, which
+	 * would consider all allocations and thus avoid evictions. For now use
+	 * a simpler scheme here, which only considers the buffers involved in
+	 * the blit, which should at least minimize the chance for evictions
+	 * in the case of subsequent blits:
+	 *   1. If they were already bound (bo->offset64 != 0), use this
+	 *      address.
+	 *   2. Pick a range randomly from the 4GB address space, that is not
+	 *      already occupied by a bound object, or an object we pinned.
+	 */
+	reserved_buf_count = 0;
+	/* First reserve space for any bufs that are bound already. */
+	for (i = 0; i < ARRAY_SIZE(bufs); i++)
+		if (bufs[i]->bo->offset64)
+			aux_pgtable_reserve_range(reserved_bufs,
+						  reserved_buf_count++,
+						  bufs[i]);
+
+	/* Next, reserve space for unbound bufs with an AUX surface. */
+	for (i = 0; i < ARRAY_SIZE(bufs); i++)
+		if (!bufs[i]->bo->offset64 && bufs[i]->aux.stride)
+			aux_pgtable_reserve_range(reserved_bufs,
+						  reserved_buf_count++,
+						  bufs[i]);
+
+	/* Create AUX pgtable entries only for bufs with an AUX surface */
+	info->buf_count = 0;
+	for (i = 0; i < reserved_buf_count; i++) {
+		if (!reserved_bufs[i]->aux.stride)
+			continue;
+
+		info->bufs[info->buf_count] = reserved_bufs[i];
+		info->buf_pin_offsets[info->buf_count] =
+			reserved_bufs[i]->bo->offset64;
+		info->buf_count++;
+	}
+
+	info->pgtable_bo = intel_aux_pgtable_create(bufmgr,
+						    info->bufs,
+						    info->buf_count);
+	igt_assert(info->pgtable_bo);
+}
+
+static void
+gen12_aux_pgtable_cleanup(struct aux_pgtable_info *info)
+{
+	int i;
+
+	/* Check that the pinned bufs kept their offset after the exec. */
+	for (i = 0; i < info->buf_count; i++)
+		igt_assert_eq_u64(info->bufs[i]->bo->offset64,
+				  info->buf_pin_offsets[i]);
+
+	drm_intel_bo_unreference(info->pgtable_bo);
+}
+
+static uint32_t
+gen12_create_aux_pgtable_state(struct intel_batchbuffer *batch,
+			       drm_intel_bo *aux_pgtable_bo)
+{
+	uint64_t *pgtable_ptr;
+	uint32_t pgtable_ptr_offset;
+	int ret;
+
+	if (!aux_pgtable_bo)
+		return 0;
+
+	pgtable_ptr = intel_batchbuffer_subdata_alloc(batch,
+						      sizeof(*pgtable_ptr),
+						      sizeof(*pgtable_ptr));
+	pgtable_ptr_offset = intel_batchbuffer_subdata_offset(batch,
+							      pgtable_ptr);
+
+	*pgtable_ptr = aux_pgtable_bo->offset64;
+	ret = drm_intel_bo_emit_reloc(batch->bo, pgtable_ptr_offset,
+				      aux_pgtable_bo, 0,
+				      0, 0);
+	assert(ret == 0);
+
+	return pgtable_ptr_offset;
+}
+
+static void
+gen12_emit_aux_pgtable_state(struct intel_batchbuffer *batch, uint32_t state)
+{
+	if (!state)
+		return;
+
+	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8);
+	OUT_BATCH(GEN12_GFX_AUX_TABLE_BASE_ADDR);
+	OUT_RELOC(batch->bo, 0, 0, state);
+
+	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8);
+	OUT_BATCH(GEN12_GFX_AUX_TABLE_BASE_ADDR + 4);
+	OUT_RELOC(batch->bo, 0, 0, state + 4);
+}
+
 static
 void _gen9_render_copyfunc(struct intel_batchbuffer *batch,
 			  drm_intel_context *context,
 			  const struct igt_buf *src, unsigned src_x,
 			  unsigned src_y, unsigned width, unsigned height,
 			  const struct igt_buf *dst, unsigned dst_x,
-			  unsigned dst_y, const uint32_t ps_kernel[][4],
+			  unsigned dst_y,
+			  drm_intel_bo *aux_pgtable_bo,
+			  const uint32_t ps_kernel[][4],
 			  uint32_t ps_kernel_size)
 {
 	uint32_t ps_sampler_state, ps_kernel_off, ps_binding_table;
 	uint32_t scissor_state;
 	uint32_t vertex_buffer;
 	uint32_t batch_end;
+	uint32_t aux_pgtable_state;
 
 	igt_assert(src->bpp == dst->bpp);
 	intel_batchbuffer_flush_with_context(batch, context);
@@ -1007,6 +1216,10 @@ void _gen9_render_copyfunc(struct intel_batchbuffer *batch,
 	viewport.cc_state = gen6_create_cc_viewport(batch);
 	viewport.sf_clip_state = gen7_create_sf_clip_viewport(batch);
 	scissor_state = gen6_create_scissor_rect(batch);
+
+	aux_pgtable_state = gen12_create_aux_pgtable_state(batch,
+							   aux_pgtable_bo);
+
 	/* TODO: theree is other state which isn't setup */
 
 	assert(batch->ptr < &batch->buffer[4095]);
@@ -1017,6 +1230,8 @@ void _gen9_render_copyfunc(struct intel_batchbuffer *batch,
 	 * order */
 	OUT_BATCH(G4X_PIPELINE_SELECT | PIPELINE_SELECT_3D |
 				GEN9_PIPELINE_SELECTION_MASK);
+
+	gen12_emit_aux_pgtable_state(batch, aux_pgtable_state);
 
 	gen8_emit_sip(batch);
 
@@ -1092,8 +1307,8 @@ void gen9_render_copyfunc(struct intel_batchbuffer *batch,
 
 {
 	_gen9_render_copyfunc(batch, context, src, src_x, src_y,
-			  width, height, dst, dst_x, dst_y, ps_kernel_gen9,
-			  sizeof(ps_kernel_gen9));
+			  width, height, dst, dst_x, dst_y, NULL,
+			  ps_kernel_gen9, sizeof(ps_kernel_gen9));
 }
 
 void gen11_render_copyfunc(struct intel_batchbuffer *batch,
@@ -1104,8 +1319,8 @@ void gen11_render_copyfunc(struct intel_batchbuffer *batch,
 
 {
 	_gen9_render_copyfunc(batch, context, src, src_x, src_y,
-			  width, height, dst, dst_x, dst_y, ps_kernel_gen11,
-			  sizeof(ps_kernel_gen11));
+			  width, height, dst, dst_x, dst_y, NULL,
+			  ps_kernel_gen11, sizeof(ps_kernel_gen11));
 }
 
 void gen12_render_copyfunc(struct intel_batchbuffer *batch,
@@ -1115,7 +1330,15 @@ void gen12_render_copyfunc(struct intel_batchbuffer *batch,
 			   const struct igt_buf *dst, unsigned dst_x, unsigned dst_y)
 
 {
+	struct aux_pgtable_info pgtable_info = { };
+
+	gen12_aux_pgtable_init(&pgtable_info, batch->bufmgr, src, dst);
+
 	_gen9_render_copyfunc(batch, context, src, src_x, src_y,
-			  width, height, dst, dst_x, dst_y, gen12_render_copy,
+			  width, height, dst, dst_x, dst_y,
+			  pgtable_info.pgtable_bo,
+			  gen12_render_copy,
 			  sizeof(gen12_render_copy));
+
+	gen12_aux_pgtable_cleanup(&pgtable_info);
 }

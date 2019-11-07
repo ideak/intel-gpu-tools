@@ -233,6 +233,12 @@ int drm_intel_bo_set_tiling(drm_intel_bo *bo, uint32_t * tiling_mode,
 	return -ENODEV;
 }
 
+int drm_intel_bo_set_softpin_offset(drm_intel_bo *bo, uint64_t offset)
+{
+	igt_require_f(false, missing_support_str);
+	return -ENODEV;
+}
+
 int drm_intel_bo_disable_reuse(drm_intel_bo *bo)
 {
 	igt_require_f(false, missing_support_str);
