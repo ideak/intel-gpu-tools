@@ -1444,6 +1444,7 @@ static void audio_state_stop(struct audio_state *state, bool success)
 	bool ok;
 	int ret;
 	struct chamelium_audio_file *audio_file;
+	enum igt_log_level log_level;
 
 	igt_debug("Stopping audio playback\n");
 	state->run = false;
@@ -1475,11 +1476,17 @@ static void audio_state_stop(struct audio_state *state, bool success)
 		state->dump_path = NULL;
 	}
 
-	igt_debug("Audio %s test result for format %s, sampling rate %d Hz "
-		  "and %d channels: %s\n",
-		  state->name, snd_pcm_format_name(state->playback.format),
-		  state->playback.rate, state->playback.channels,
-		  success ? "ALL GREEN" : "FAILED");
+	if (success)
+		log_level = IGT_LOG_DEBUG;
+	else
+		log_level = IGT_LOG_CRITICAL;
+
+	igt_log(IGT_LOG_DOMAIN, log_level, "Audio %s test result for format %s, "
+		"sampling rate %d Hz and %d channels: %s\n",
+		state->name, snd_pcm_format_name(state->playback.format),
+		state->playback.rate, state->playback.channels,
+		success ? "ALL GREEN" : "FAILED");
+
 }
 
 static void check_audio_infoframe(struct audio_state *state)
@@ -1809,18 +1816,18 @@ static bool test_audio_flatline(struct audio_state *state)
 	align_success = true;
 	for (i = 0; i < state->playback.channels; i++) {
 		if (falling_edges[i] < 0) {
-			igt_debug("Falling edge not detected for channel %zu\n",
-				  i);
+			igt_critical("Falling edge not detected for channel %zu\n",
+				     i);
 			align_success = false;
 			continue;
 		}
 
 		if (abs(falling_edges[0] - falling_edges[i]) >
 		    FLATLINE_ALIGN_ACCURACY) {
-			igt_debug("Channel alignment mismatch: "
-				  "channel 0 has a falling edge at index %d "
-				  "while channel %zu has index %d\n",
-				  falling_edges[0], i, falling_edges[i]);
+			igt_critical("Channel alignment mismatch: "
+				     "channel 0 has a falling edge at index %d "
+				     "while channel %zu has index %d\n",
+				     falling_edges[0], i, falling_edges[i]);
 			align_success = false;
 		}
 	}
