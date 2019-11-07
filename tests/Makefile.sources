@@ -24,7 +24,6 @@ TESTS_progs = \
 	drm_import_export \
 	drm_mm \
 	drm_read \
-	i915/gem_blits \
 	kms_3d \
 	kms_addfb_basic \
 	kms_atomic \
@@ -106,6 +105,9 @@ gem_bad_reloc_SOURCES = i915/gem_bad_reloc.c
 
 TESTS_progs += gem_basic
 gem_basic_SOURCES = i915/gem_basic.c
+
+TESTS_progs += gem_blits
+gem_blits_SOURCES = i915/gem_blits.c
 
 TESTS_progs += gem_busy
 gem_busy_SOURCES = i915/gem_busy.c
