@@ -402,6 +402,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 	case LOCAL_I915_FORMAT_MOD_Y_TILED:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
+	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
 		igt_require_intel(fd);
 		if (intel_gen(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
@@ -468,13 +469,15 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 
 static bool is_gen12_ccs_modifier(uint64_t modifier)
 {
-	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
+	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS ||
+		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC;
 }
 
 static bool is_ccs_modifier(uint64_t modifier)
 {
 
-	return is_gen12_ccs_modifier(modifier) ||
+	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS ||
+		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
 		modifier == I915_FORMAT_MOD_Y_TILED_CCS ||
 		modifier == I915_FORMAT_MOD_Yf_TILED_CCS;
 }
@@ -489,6 +492,8 @@ static unsigned fb_plane_width(const struct igt_fb *fb, int plane)
 					    512 / (fb->plane_bpp[0] / 8)) * 64;
 		else
 			return DIV_ROUND_UP(fb->width, 1024) * 128;
+	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 2) {
+		return 64;
 	}
 
 	if (plane == 0)
@@ -501,7 +506,7 @@ static unsigned fb_plane_bpp(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->modifier) && plane == 1)
+	if (is_ccs_modifier(fb->modifier) && (plane == 1 || plane == 2))
 		return 8;
 	else
 		return format->plane_bpp[plane];
@@ -516,7 +521,8 @@ static unsigned fb_plane_height(const struct igt_fb *fb, int plane)
 			return DIV_ROUND_UP(fb->height, 128) * 4;
 		else
 			return DIV_ROUND_UP(fb->height, 512) * 32;
-	}
+	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 2)
+		return 1;
 
 	if (plane == 0)
 		return fb->height;
@@ -528,10 +534,14 @@ static int fb_num_planes(const struct igt_fb *fb)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->modifier))
-		return 2;
-	else
+	if (is_ccs_modifier(fb->modifier)) {
+		if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
+			return 3;
+		else
+			return 2;
+	} else {
 		return format->num_planes;
+	}
 }
 
 void igt_init_fb(struct igt_fb *fb, int fd, int width, int height,
@@ -592,6 +602,9 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 1) {
 		/* A main surface using a CCS AUX surface must be 4x4 tiles aligned. */
 		return ALIGN(min_stride, 64);
+	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 2) {
+		/* clear color always fixed to 64 bytes */
+		return 64;
 	} else {
 		unsigned int tile_width, tile_height;
 
@@ -626,7 +639,7 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		size = roundup_power_of_two(size);
 
 		return size;
-	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 1) {
+	} else if (is_gen12_ccs_modifier(fb->modifier) && (plane == 1 || plane == 2)) {
 		/* The AUX CCS surface must be page aligned */
 		return (uint64_t)fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], 64);
@@ -719,6 +732,7 @@ uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 	case LOCAL_I915_FORMAT_MOD_Y_TILED:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
+	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
 		return I915_TILING_Y;
 	case LOCAL_I915_FORMAT_MOD_Yf_TILED:
 	case LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS:
