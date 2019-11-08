@@ -79,10 +79,12 @@ check_test ()
 	LIST=`./$test --list-subtests`
 	RET=$?
 	if [ $RET -ne 0 -a $RET -ne 79 ]; then
+		echo "    test does not exit with 0 or 79 with --list-subtests!"
 		fail $test
 	fi
 
 	if [ $RET -eq 79 -a -n "$LIST" ]; then
+		echo "    test seems to be using igt_simple_main() (no subtests) and yet --list-subtests is NOT empty!"
 		fail $test
 	fi
 
@@ -91,6 +93,7 @@ check_test ()
 		# on the running kernel. If selftests are not enabled,
 		# they will output nothing and exit with 0.
 		if [ "$testname" != "i915_selftest" -a "$testname" != "drm_mm" -a "$testname" != "kms_selftest" -a "$testname" != "dmabuf" ]; then
+			echo "    test does seem to be using igt_main() (should have subtests) and yet --list-subtests is empty!"
 			fail $test
 		fi
 	fi
