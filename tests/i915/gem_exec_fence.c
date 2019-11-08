@@ -348,7 +348,8 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 		i++;
 	}
 
-	sleep(1);
+	/* Long, but not too long to anger preemption disable checks */
+	usleep(50 * 1000); /* 50 ms, typical preempt reset is 150+ms */
 
 	/* Check for invalidly completing the task early */
 	igt_assert(fence_busy(spin->out_fence));
