@@ -1470,7 +1470,8 @@ static void bind_to_cpu(int cpu)
 	igt_assert(sched_setaffinity(getpid(), sizeof(cpu_set_t), &allowed) == 0);
 }
 
-static void test_pi_ringfull(int fd, unsigned int engine)
+static void test_pi_ringfull(int fd, unsigned int engine, unsigned int flags)
+#define SHARED BIT(0)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct sigaction sa = { .sa_handler = alarm_handler };
@@ -1481,6 +1482,24 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	IGT_CORK_HANDLE(c);
 	uint32_t vip;
 	bool *result;
+
+	/*
+	 * We start simple. A low priority client should never prevent a high
+	 * priority client from submitting their work; even if the low priority
+	 * client exhausts their ringbuffer and so is throttled.
+	 *
+	 * SHARED: A variant on the above rule is that even is the 2 clients
+	 * share a read-only resource, the blocked low priority client should
+	 * not prevent the high priority client from executing. A buffer,
+	 * e.g. the batch buffer, that is shared only for reads (no write
+	 * hazard, so the reads can be executed in parallel or in any order),
+	 * so not cause priority inversion due to the resource conflict.
+	 *
+	 * First, we have the low priority context who fills their ring and so
+	 * blocks. As soon as that context blocks, we try to submit a high
+	 * priority batch, which should be executed immediately before the low
+	 * priority context is unblocked.
+	 */
 
 	result = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(result != MAP_FAILED);
@@ -1547,6 +1566,12 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 	igt_fork(child, 1) {
 		int err;
 
+		/* Replace our batch to avoid conflicts over shared resources? */
+		if (!(flags & SHARED)) {
+			obj[1].handle = gem_create(fd, 4096);
+			gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+		}
+
 		result[0] = vip != execbuf.rsvd1;
 
 		igt_debug("Waking parent\n");
@@ -1559,7 +1584,8 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 		itv.it_value.tv_usec = 10000;
 		setitimer(ITIMER_REAL, &itv, NULL);
 
-		/* Since we are the high priority task, we expect to be
+		/*
+		 * Since we are the high priority task, we expect to be
 		 * able to add ourselves to *our* ring without interruption.
 		 */
 		igt_debug("HP child executing\n");
@@ -1571,6 +1597,9 @@ static void test_pi_ringfull(int fd, unsigned int engine)
 		setitimer(ITIMER_REAL, &itv, NULL);
 
 		result[2] = err == 0;
+
+		if (!(flags & SHARED))
+			gem_close(fd, obj[1].handle);
 	}
 
 	/* Relinquish CPU just to allow child to create a context */
@@ -1833,7 +1862,10 @@ igt_main
 				}
 
 				igt_subtest_f("pi-ringfull-%s", e->name)
-					test_pi_ringfull(fd, eb_ring(e));
+					test_pi_ringfull(fd, eb_ring(e), 0);
+
+				igt_subtest_f("pi-common-%s", e->name)
+					test_pi_ringfull(fd, eb_ring(e), SHARED);
 			}
 		}
 	}
