@@ -32,26 +32,36 @@
 
 IGT_TEST_DESCRIPTION("Test atomic mode setting with a plane by switching between high and low resolutions");
 
-#define SIZE            256
+#define SIZE 64
 
 typedef struct {
 	int drm_fd;
 	igt_display_t display;
 	struct igt_fb fb_primary;
-	struct igt_fb fb_plane;
+	struct igt_fb fb_plane[2];
+	struct {
+		struct igt_fb fb;
+		igt_crc_t crc;
+	} ref_lowres;
+	struct {
+		struct igt_fb fb;
+		igt_crc_t crc;
+	} ref_hires;
+	int x, y;
 } data_t;
 
 static drmModeModeInfo
-get_lowres_mode(int drmfd, igt_output_t *output, drmModeModeInfo *mode_default)
+get_lowres_mode(int drmfd, igt_output_t *output,
+		const drmModeModeInfo *mode_default)
 {
-	drmModeModeInfo mode;
+	const drmModeModeInfo *mode;
 	bool found = false;
 	int limit = mode_default->vdisplay - SIZE;
 	int j;
 
 	for (j = 0; j < output->config.connector->count_modes; j++) {
-		mode = output->config.connector->modes[j];
-		if (mode.vdisplay < limit) {
+		mode = &output->config.connector->modes[j];
+		if (mode->vdisplay < limit) {
 			found = true;
 			break;
 		}
@@ -64,73 +74,69 @@ get_lowres_mode(int drmfd, igt_output_t *output, drmModeModeInfo *mode_default)
 		return *igt_std_1024_mode_get();
 	}
 
-	return mode;
+	return *mode;
 }
 
-static void
-check_mode(drmModeModeInfo *mode1, drmModeModeInfo *mode2)
+static bool setup_plane(data_t *data, igt_plane_t *plane)
 {
-	igt_assert_eq(mode1->hdisplay, mode2->hdisplay);
-	igt_assert_eq(mode1->vdisplay, mode2->vdisplay);
-	igt_assert_eq(mode1->vrefresh, mode2->vrefresh);
-}
-
-/*
- * Return false if test on this plane should be skipped
- */
-static bool
-setup_plane(data_t *data, igt_plane_t *plane, drmModeModeInfo *mode,
-	    uint64_t modifier)
-{
-	uint64_t plane_modifier;
-	uint32_t plane_format;
-	int size, x, y;
+	struct igt_fb *fb;
 
 	if (plane->type == DRM_PLANE_TYPE_PRIMARY)
 		return false;
 
-	if (plane->type == DRM_PLANE_TYPE_CURSOR)
-		size = 64;
-	else
-		size = SIZE;
-
-	x = 0;
-	y = mode->vdisplay - size;
-
-	if (plane->type == DRM_PLANE_TYPE_CURSOR) {
-		plane_format = DRM_FORMAT_ARGB8888;
-		plane_modifier = LOCAL_DRM_FORMAT_MOD_NONE;
-	} else {
-		plane_format = DRM_FORMAT_XRGB8888;
-		plane_modifier = modifier;
-	}
-
-	if (!igt_plane_has_format_mod(plane, plane_format, plane_modifier))
+	fb = &data->fb_plane[0];
+	if (!igt_plane_has_format_mod(plane, fb->drm_format, fb->modifier))
+		fb = &data->fb_plane[1];
+	if (!igt_plane_has_format_mod(plane, fb->drm_format, fb->modifier))
 		return false;
 
-	igt_create_color_fb(data->drm_fd, size, size, plane_format,
-			    plane_modifier, 1.0, 1.0, 0.0, &data->fb_plane);
-	igt_plane_set_position(plane, x, y);
-	igt_plane_set_fb(plane, &data->fb_plane);
+	igt_plane_set_position(plane, data->x, data->y);
+	igt_plane_set_fb(plane, fb);
 
 	return true;
 }
 
-static igt_plane_t *
-primary_plane_get(igt_display_t *display, enum pipe pipe)
+static void blit(data_t *data, cairo_t *cr,
+		 struct igt_fb *src, int x, int y)
 {
-	unsigned plane_primary_id = display->pipes[pipe].plane_primary;
-	return &display->pipes[pipe].planes[plane_primary_id];
+	cairo_surface_t *surface;
+
+	surface = igt_get_cairo_surface(data->drm_fd, src);
+
+	cairo_set_source_surface(cr, surface, x, y);
+	cairo_rectangle(cr, x, y, src->width, src->height);
+	cairo_fill (cr);
+
+	cairo_surface_destroy(surface);
+}
+
+static void create_ref_fb(data_t *data, uint64_t modifier,
+			  const drmModeModeInfo *mode, struct igt_fb *fb)
+{
+	cairo_t *cr;
+
+	igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
+		      DRM_FORMAT_XRGB8888, modifier, fb);
+
+	cr = igt_get_cairo_ctx(data->drm_fd, fb);
+	blit(data, cr, &data->fb_primary, 0, 0);
+	blit(data, cr, &data->fb_plane[0], data->x, data->y);
+	igt_put_cairo_ctx(data->drm_fd, fb, cr);
 }
 
 static unsigned
 test_planes_on_pipe_with_output(data_t *data, enum pipe pipe,
 				igt_output_t *output, uint64_t modifier)
 {
-	drmModeModeInfo *mode, mode_lowres;
+	igt_pipe_t *pipe_obj = &data->display.pipes[pipe];
+	const drmModeModeInfo *mode;
+	drmModeModeInfo mode_lowres;
 	igt_pipe_crc_t *pipe_crc;
 	unsigned tested = 0;
 	igt_plane_t *plane;
+	igt_plane_t *primary;
+
+	primary = igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_PRIMARY);
 
 	igt_info("Testing connector %s using pipe %s\n",
 		 igt_output_name(output), kmstest_pipe_name(pipe));
@@ -139,71 +145,82 @@ test_planes_on_pipe_with_output(data_t *data, enum pipe pipe,
 	mode = igt_output_get_mode(output);
 	mode_lowres = get_lowres_mode(data->drm_fd, output, mode);
 
-	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-			    DRM_FORMAT_XRGB8888, modifier, 0.0, 0.0, 1.0,
-			    &data->fb_primary);
-	igt_plane_set_fb(primary_plane_get(&data->display, pipe),
-			 &data->fb_primary);
+	igt_create_color_pattern_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
+				    DRM_FORMAT_XRGB8888, modifier, 0.0, 0.0, 1.0,
+				    &data->fb_primary);
+
+	data->x = 0;
+	data->y = mode->vdisplay - SIZE;
+
+	/* for other planes */
+	igt_create_color_pattern_fb(data->drm_fd, SIZE, SIZE,
+				    DRM_FORMAT_XRGB8888, modifier,
+				    1.0, 1.0, 0.0, &data->fb_plane[0]);
+	/* for cursor */
+	igt_create_color_pattern_fb(data->drm_fd, SIZE, SIZE,
+				    DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR,
+				    1.0, 1.0, 0.0, &data->fb_plane[1]);
+
+	create_ref_fb(data, modifier, mode, &data->ref_hires.fb);
+	create_ref_fb(data, modifier, &mode_lowres, &data->ref_lowres.fb);
 
 	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe,
 				    INTEL_PIPE_CRC_SOURCE_AUTO);
 
+	igt_output_override_mode(output, &mode_lowres);
+	igt_plane_set_fb(primary, &data->ref_lowres.fb);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
+	igt_pipe_crc_collect_crc(pipe_crc, &data->ref_lowres.crc);
+
+	igt_output_override_mode(output, NULL);
+	igt_plane_set_fb(primary, &data->ref_hires.fb);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
+	igt_pipe_crc_collect_crc(pipe_crc, &data->ref_hires.crc);
+
+	igt_plane_set_fb(primary, &data->fb_primary);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
+
 	/* yellow sprite plane in lower left corner */
 	for_each_plane_on_pipe(&data->display, pipe, plane) {
-		igt_crc_t crc_hires1, crc_hires2;
-		int r;
+		igt_crc_t crc_lowres, crc_hires1, crc_hires2;
 
-		if (!setup_plane(data, plane, mode, modifier))
+		if (!setup_plane(data, plane))
 			continue;
 
-		r = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
-		if (r) {
-			igt_debug("Commit failed %i", r);
-			continue;
-		}
+		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-		igt_pipe_crc_start(pipe_crc);
-		igt_pipe_crc_get_single(pipe_crc, &crc_hires1);
-
-		igt_assert_plane_visible(data->drm_fd, pipe, plane->index,
-					 true);
+		igt_pipe_crc_collect_crc(pipe_crc, &crc_hires1);
 
 		/* switch to lower resolution */
 		igt_output_override_mode(output, &mode_lowres);
-		igt_output_set_pipe(output, pipe);
-		check_mode(&mode_lowres, igt_output_get_mode(output));
-
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-		igt_assert_plane_visible(data->drm_fd, pipe, plane->index,
-					 false);
+		igt_pipe_crc_collect_crc(pipe_crc, &crc_lowres);
 
 		/* switch back to higher resolution */
 		igt_output_override_mode(output, NULL);
-		igt_output_set_pipe(output, pipe);
-		check_mode(mode, igt_output_get_mode(output));
-
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc_hires2);
+		igt_pipe_crc_collect_crc(pipe_crc, &crc_hires2);
 
-		igt_assert_plane_visible(data->drm_fd, pipe, plane->index,
-					 true);
-
-		igt_assert_crc_equal(&crc_hires1, &crc_hires2);
-
-		igt_pipe_crc_stop(pipe_crc);
+		igt_assert_crc_equal(&data->ref_hires.crc, &crc_hires1);
+		igt_assert_crc_equal(&data->ref_hires.crc, &crc_hires2);
+		igt_assert_crc_equal(&data->ref_lowres.crc, &crc_lowres);
 
 		igt_plane_set_fb(plane, NULL);
-		igt_remove_fb(data->drm_fd, &data->fb_plane);
 		tested++;
 	}
 
 	igt_pipe_crc_free(pipe_crc);
 
-	igt_plane_set_fb(primary_plane_get(&data->display, pipe), NULL);
-	igt_remove_fb(data->drm_fd, &data->fb_primary);
+	igt_plane_set_fb(primary, NULL);
 	igt_output_set_pipe(output, PIPE_NONE);
+
+	igt_remove_fb(data->drm_fd, &data->fb_plane[1]);
+	igt_remove_fb(data->drm_fd, &data->fb_plane[0]);
+	igt_remove_fb(data->drm_fd, &data->fb_primary);
+	igt_remove_fb(data->drm_fd, &data->ref_hires.fb);
+	igt_remove_fb(data->drm_fd, &data->ref_lowres.fb);
 
 	return tested;
 }
