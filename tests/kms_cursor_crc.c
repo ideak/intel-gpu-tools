@@ -78,12 +78,13 @@ static void draw_cursor(cairo_t *cr, int x, int y, int cw, int ch, double a)
 	/* Cairo doesn't like to be fed numbers that are too wild */
 	if ((x < SHRT_MIN) || (x > SHRT_MAX) || (y < SHRT_MIN) || (y > SHRT_MAX))
 		return;
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	cairo_set_antialias(cr, CAIRO_ANTIALIAS_NONE);
 	/* 4 color rectangles in the corners, RGBY */
 	igt_paint_color_alpha(cr, x,      y,      wl, ht, 1.0, 0.0, 0.0, a);
 	igt_paint_color_alpha(cr, x + wl, y,      wr, ht, 0.0, 1.0, 0.0, a);
 	igt_paint_color_alpha(cr, x,      y + ht, wl, hb, 0.0, 0.0, 1.0, a);
-	igt_paint_color_alpha(cr, x + wl, y + ht, wr, hb, 0.5, 0.5, 0.5, a);
+	igt_paint_color_alpha(cr, x + wl, y + ht, wr, hb, 1.0, 1.0, 1.0, a);
 }
 
 static void cursor_enable(data_t *data)
