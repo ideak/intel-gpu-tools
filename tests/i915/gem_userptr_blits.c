@@ -36,6 +36,8 @@
  * The goal is to simply ensure the basics work.
  */
 
+#include <linux/userfaultfd.h>
+
 #include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -44,9 +46,11 @@
 #include <inttypes.h>
 #include <errno.h>
 #include <setjmp.h>
-#include <sys/stat.h>
-#include <sys/time.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/time.h>
 #include <glib.h>
 #include <signal.h>
 #include <pthread.h>
@@ -1831,6 +1835,118 @@ static void test_invalidate_close_race(int fd, bool overlap)
 	free(t_data.ptr);
 }
 
+struct ufd_thread {
+	uint32_t *page;
+	int i915;
+};
+
+static uint32_t create_page(int i915, void *page)
+{
+	uint32_t handle;
+
+	gem_userptr(i915, page, 4096, 0, 0, &handle);
+	return handle;
+}
+
+static uint32_t create_batch(int i915)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
+
+	handle = gem_create(i915, 4096);
+	gem_write(i915, handle, 0, &bbe, sizeof(bbe));
+
+	return handle;
+}
+
+static void *ufd_thread(void *arg)
+{
+	struct ufd_thread *t = arg;
+	struct drm_i915_gem_exec_object2 obj[2] = {
+		{ .handle = create_page(t->i915, t->page) },
+		{ .handle = create_batch(t->i915) },
+	};
+	struct drm_i915_gem_execbuffer2 eb = {
+		.buffers_ptr = to_user_pointer(obj),
+		.buffer_count = ARRAY_SIZE(obj),
+	};
+
+	igt_debug("submitting fault\n");
+	gem_execbuf(t->i915, &eb);
+	gem_sync(t->i915, obj[1].handle);
+
+	for (int i = 0; i < ARRAY_SIZE(obj); i++)
+		gem_close(t->i915, obj[i].handle);
+
+	t->i915 = -1;
+	return NULL;
+}
+
+static int userfaultfd(int flags)
+{
+	return syscall(SYS_userfaultfd, flags);
+}
+
+static void test_userfault(int i915)
+{
+	struct uffdio_api api = { .api = UFFD_API };
+	struct uffdio_register reg;
+	struct uffdio_copy copy;
+	struct uffd_msg msg;
+	struct ufd_thread t;
+	pthread_t thread;
+	char poison[4096];
+	int ufd;
+
+	/*
+	 * Register a page with userfaultfd, and wrap that inside a userptr bo.
+	 * When we try to use gup insider userptr_get_pages, it will trigger
+	 * a pagefault that is sent to the userfaultfd for servicing. This
+	 * is arbitrarily slow, as the submission must wait until the fault
+	 * is serviced by the userspace fault handler.
+	 */
+
+	ufd = userfaultfd(0);
+	igt_require_f(ufd != -1, "kernel support for userfaultfd\n");
+	igt_require_f(ioctl(ufd, UFFDIO_API, &api) == 0 && api.api == UFFD_API,
+		      "userfaultfd API v%lld:%lld\n", UFFD_API, api.api);
+
+	t.i915 = i915;
+
+	t.page = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, 0, 0);
+	igt_assert(t.page != MAP_FAILED);
+
+	/* Register the page with userfault, we are its pagefault handler now! */
+	memset(&reg, 0, sizeof(reg));
+	reg.mode = UFFDIO_REGISTER_MODE_MISSING;
+	reg.range.start = to_user_pointer(t.page);
+	reg.range.len = 4096;
+	do_ioctl(ufd, UFFDIO_REGISTER, &reg);
+	igt_assert(reg.ioctls == UFFD_API_RANGE_IOCTLS);
+
+	igt_assert(pthread_create(&thread, NULL, ufd_thread, &t) == 0);
+
+	/* Wait for the fault */
+	igt_assert_eq(read(ufd, &msg, sizeof(msg)), sizeof(msg));
+	igt_assert_eq(msg.event, UFFD_EVENT_PAGEFAULT);
+	igt_assert(from_user_pointer(msg.arg.pagefault.address) == t.page);
+
+	/* Faulting thread remains blocked */
+	igt_assert_eq(t.i915, i915);
+
+	/* Service the fault; releasing the thread & submission */
+	memset(&copy, 0, sizeof(copy));
+	copy.dst = msg.arg.pagefault.address;
+	copy.src = to_user_pointer(memset(poison, 0xc5, sizeof(poison)));
+	copy.len = 4096;
+	do_ioctl(ufd, UFFDIO_COPY, &copy);
+
+	pthread_join(thread, NULL);
+
+	munmap(t.page, 4096);
+	close(ufd);
+}
+
 uint64_t total_ram;
 uint64_t aperture_size;
 int fd, count;
@@ -1901,6 +2017,9 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 
 		igt_subtest("forbidden-operations")
 			test_forbidden_ops(fd);
+
+		igt_subtest("userfault")
+			test_userfault(fd);
 
 		igt_subtest("relocations")
 			test_relocations(fd);
