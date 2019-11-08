@@ -23,10 +23,16 @@
 
 #include "config.h"
 
+#include <linux/userfaultfd.h>
+
+#include <pthread.h>
 #include <sys/poll.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/syscall.h>
 #include <sched.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include "igt.h"
 #include "igt_rand.h"
@@ -1627,6 +1633,152 @@ static void test_pi_ringfull(int fd, unsigned int engine, unsigned int flags)
 	munmap(result, 4096);
 }
 
+static int userfaultfd(int flags)
+{
+	return syscall(SYS_userfaultfd, flags);
+}
+
+struct ufd_thread {
+	uint32_t batch;
+	uint32_t *page;
+	unsigned int engine;
+	int i915;
+};
+
+static uint32_t create_userptr(int i915, void *page)
+{
+	uint32_t handle;
+
+	gem_userptr(i915, page, 4096, 0, 0, &handle);
+	return handle;
+}
+
+static void *ufd_thread(void *arg)
+{
+	struct ufd_thread *t = arg;
+	struct drm_i915_gem_exec_object2 obj[2] = {
+		{ .handle = create_userptr(t->i915, t->page) },
+		{ .handle = t->batch },
+	};
+	struct drm_i915_gem_execbuffer2 eb = {
+		.buffers_ptr = to_user_pointer(obj),
+		.buffer_count = ARRAY_SIZE(obj),
+		.flags = t->engine,
+		.rsvd1 = gem_context_create(t->i915),
+	};
+	gem_context_set_priority(t->i915, eb.rsvd1, MIN_PRIO);
+
+	igt_debug("submitting fault\n");
+	gem_execbuf(t->i915, &eb);
+	gem_sync(t->i915, obj[0].handle);
+	gem_close(t->i915, obj[0].handle);
+
+	gem_context_destroy(t->i915, eb.rsvd1);
+
+	t->i915 = -1;
+	return NULL;
+}
+
+static void test_pi_userfault(int i915, unsigned int engine)
+{
+	struct uffdio_api api = { .api = UFFD_API };
+	struct uffdio_register reg;
+	struct uffdio_copy copy;
+	struct uffd_msg msg;
+	struct ufd_thread t;
+	pthread_t thread;
+	char poison[4096];
+	int ufd;
+
+	/*
+	 * Resource contention can easily lead to priority inversion problems,
+	 * that we wish to avoid. Here, we simulate one simple form of resource
+	 * starvation by using an arbitrary slow userspace fault handler to cause
+	 * the low priority context to block waiting for its resource. While it
+	 * is blocked, it should not prevent a higher priority context from
+	 * executing.
+	 *
+	 * This is only a very simple scenario, in more general tests we will
+	 * need to simulate contention on the shared resource such that both
+	 * low and high priority contexts are starving and must fight over
+	 * the meagre resources. One step at a time.
+	 */
+
+	ufd = userfaultfd(0);
+	igt_require_f(ufd != -1, "kernel support for userfaultfd\n");
+	igt_require_f(ioctl(ufd, UFFDIO_API, &api) == 0 && api.api == UFFD_API,
+		      "userfaultfd API v%lld:%lld\n", UFFD_API, api.api);
+
+	t.i915 = i915;
+	t.engine = engine;
+
+	t.page = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, 0, 0);
+	igt_assert(t.page != MAP_FAILED);
+
+	t.batch = gem_create(i915, 4096);
+	memset(poison, 0xff, sizeof(poison));
+	gem_write(i915, t.batch, 0, poison, 4096);
+
+	/* Register our fault handler for t.page */
+	memset(&reg, 0, sizeof(reg));
+	reg.mode = UFFDIO_REGISTER_MODE_MISSING;
+	reg.range.start = to_user_pointer(t.page);
+	reg.range.len = 4096;
+	do_ioctl(ufd, UFFDIO_REGISTER, &reg);
+	igt_assert(reg.ioctls == UFFD_API_RANGE_IOCTLS);
+
+	/* Kick off the low priority submission */
+	igt_assert(pthread_create(&thread, NULL, ufd_thread, &t) == 0);
+
+	/* Wait until the low priority thread is blocked on a fault */
+	igt_assert_eq(read(ufd, &msg, sizeof(msg)), sizeof(msg));
+	igt_assert_eq(msg.event, UFFD_EVENT_PAGEFAULT);
+	igt_assert(from_user_pointer(msg.arg.pagefault.address) == t.page);
+
+	/* While the low priority context is blocked; execute a vip */
+	if (1) {
+		const uint32_t bbe = MI_BATCH_BUFFER_END;
+		struct drm_i915_gem_exec_object2 obj = {
+			.handle = t.batch,
+		};
+		struct pollfd pfd;
+		struct drm_i915_gem_execbuffer2 eb = {
+			.buffers_ptr = to_user_pointer(&obj),
+			.buffer_count = 1,
+			.flags = engine | I915_EXEC_FENCE_OUT,
+			.rsvd1 = gem_context_create(i915),
+		};
+		gem_context_set_priority(i915, eb.rsvd1, MAX_PRIO);
+		gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
+		gem_execbuf_wr(i915, &eb);
+
+		memset(&pfd, 0, sizeof(pfd));
+		pfd.fd = eb.rsvd2 >> 32;
+		pfd.events = POLLIN;
+		poll(&pfd, 1, -1);
+		igt_assert_eq(sync_fence_status(pfd.fd), 1);
+		close(pfd.fd);
+
+		gem_context_destroy(i915, eb.rsvd1);
+	}
+
+	/* Confirm the low priority context is still waiting */
+	igt_assert_eq(t.i915, i915);
+
+	/* Service the fault; releasing the low priority context */
+	memset(&copy, 0, sizeof(copy));
+	copy.dst = msg.arg.pagefault.address;
+	copy.src = to_user_pointer(memset(poison, 0xc5, sizeof(poison)));
+	copy.len = 4096;
+	do_ioctl(ufd, UFFDIO_COPY, &copy);
+
+	pthread_join(thread, NULL);
+
+	gem_close(i915, t.batch);
+	munmap(t.page, 4096);
+	close(ufd);
+}
+
 static void measure_semaphore_power(int i915)
 {
 	struct rapl gpu, pkg;
@@ -1866,6 +2018,9 @@ igt_main
 
 				igt_subtest_f("pi-common-%s", e->name)
 					test_pi_ringfull(fd, eb_ring(e), SHARED);
+
+				igt_subtest_f("pi-userfault-%s", e->name)
+					test_pi_userfault(fd, eb_ring(e));
 			}
 		}
 	}
