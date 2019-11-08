@@ -32,9 +32,7 @@
 
 IGT_TEST_DESCRIPTION("Test atomic mode setting with a plane by switching between high and low resolutions");
 
-#define MAX_CRCS          1
 #define SIZE            256
-#define LOOP_FOREVER     -1
 
 typedef struct {
 	int drm_fd;
