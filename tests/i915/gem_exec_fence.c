@@ -1522,6 +1522,8 @@ igt_main
 	}
 
 	igt_subtest_group {
+		igt_hang_t hang;
+
 		igt_fixture {
 			igt_fork_hang_detector(i915);
 		}
@@ -1533,12 +1535,17 @@ igt_main
 
 		igt_fixture {
 			igt_stop_hang_detector();
+			hang = igt_allow_hang(i915, 0, 0);
 		}
 
 		igt_subtest("busy-hang-all")
 			test_fence_busy_all(i915, HANG);
 		igt_subtest("wait-hang-all")
 			test_fence_busy_all(i915, WAIT | HANG);
+
+		igt_fixture {
+			igt_disallow_hang(i915, hang);
+		}
 	}
 
 	for (e = intel_execution_engines; e->name; e++) {
