@@ -1640,9 +1640,15 @@ static int userfaultfd(int flags)
 
 struct ufd_thread {
 	uint32_t batch;
+	uint32_t scratch;
 	uint32_t *page;
 	unsigned int engine;
+	unsigned int flags;
 	int i915;
+
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+	int count;
 };
 
 static uint32_t create_userptr(int i915, void *page)
@@ -1775,6 +1781,160 @@ static void test_pi_userfault(int i915, unsigned int engine)
 	pthread_join(thread, NULL);
 
 	gem_close(i915, t.batch);
+	munmap(t.page, 4096);
+	close(ufd);
+}
+
+static void *iova_thread(struct ufd_thread *t, int prio)
+{
+	uint32_t ctx =
+		gem_context_clone(t->i915, 0,
+				  t->flags & SHARED ? I915_CONTEXT_CLONE_VM : 0,
+				  0);
+
+	gem_context_set_priority(t->i915, ctx, prio);
+
+	store_dword_plug(t->i915, ctx, t->engine,
+			 t->scratch, 0, prio,
+			 t->batch, 0 /* no write hazard! */);
+
+	pthread_mutex_lock(&t->mutex);
+	if (!--t->count)
+		pthread_cond_signal(&t->cond);
+	pthread_mutex_unlock(&t->mutex);
+
+	gem_context_destroy(t->i915, ctx);
+	return NULL;
+}
+
+static void *iova_low(void *arg)
+{
+	return iova_thread(arg, MIN_PRIO);
+}
+
+static void *iova_high(void *arg)
+{
+	return iova_thread(arg, MAX_PRIO);
+}
+
+static void test_pi_iova(int i915, unsigned int engine, unsigned int flags)
+{
+	struct uffdio_api api = { .api = UFFD_API };
+	struct uffdio_register reg;
+	struct uffdio_copy copy;
+	struct uffd_msg msg;
+	struct ufd_thread t;
+	igt_spin_t *spin;
+	pthread_t hi, lo;
+	char poison[4096];
+	uint32_t result;
+	int ufd;
+
+	/*
+	 * In this scenario, we have a pair of contending contexts that
+	 * share the same resource. That resource is stuck behind a slow
+	 * page fault such that neither context has immediate access to it.
+	 * What is expected is that as soon as that resource becomes available,
+	 * the two contexts are queued with the high priority context taking
+	 * precedence. We need to check that we do not cross-contaminate
+	 * the two contents with the page fault on the shared resource
+	 * initiated by the low priority context. (Consider that the low
+	 * priority context may install an exclusive fence for the page
+	 * fault, which is then used for strict ordering by the high priority
+	 * context, causing an unwanted implicit dependency between the two
+	 * and promoting the low priority context to high.)
+	 *
+	 * SHARED: the two contexts share a vm, but still have separate
+	 * timelines that should not mingle.
+	 */
+
+	ufd = userfaultfd(0);
+	igt_require_f(ufd != -1, "kernel support for userfaultfd\n");
+	igt_require_f(ioctl(ufd, UFFDIO_API, &api) == 0 && api.api == UFFD_API,
+		      "userfaultfd API v%lld:%lld\n", UFFD_API, api.api);
+
+	t.i915 = i915;
+	t.engine = engine;
+	t.flags = flags;
+
+	t.count = 2;
+	pthread_cond_init(&t.cond, NULL);
+	pthread_mutex_init(&t.mutex, NULL);
+
+	t.page = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, 0, 0);
+	igt_assert(t.page != MAP_FAILED);
+	t.batch = create_userptr(i915, t.page);
+	t.scratch = gem_create(i915, 4096);
+
+	/* Register our fault handler for t.page */
+	memset(&reg, 0, sizeof(reg));
+	reg.mode = UFFDIO_REGISTER_MODE_MISSING;
+	reg.range.start = to_user_pointer(t.page);
+	reg.range.len = 4096;
+	do_ioctl(ufd, UFFDIO_REGISTER, &reg);
+	igt_assert(reg.ioctls == UFFD_API_RANGE_IOCTLS);
+
+	/*
+	 * Fill the engine with spinners; the store_dword() is too quick!
+	 *
+	 * It is not that it is too quick, it that the order in which the
+	 * requests are signaled from the pagefault completion is loosely
+	 * defined (currently, it's in order of attachment so low context
+	 * wins), then submission into the execlists is immediate with the
+	 * low context filling the last slot in the ELSP. Preemption will
+	 * not take place until after the low priority context has had a
+	 * chance to run, and since the task is very short there is no
+	 * arbitration point inside the batch buffer so we only preempt
+	 * after the low priority context has completed.
+	 *
+	 * One way to prevent such opportunistic execution of the low priority
+	 * context would be to remove direct submission and wait until all
+	 * signals are delivered (as the signal delivery is under the irq lock,
+	 * the local tasklet will not run until after all signals have been
+	 * delivered... but another tasklet might).
+	 */
+	spin = igt_spin_new(i915, .engine = engine);
+	for (int i = 0; i < MAX_ELSP_QLEN; i++) {
+		spin->execbuf.rsvd1 = create_highest_priority(i915);
+		gem_execbuf(i915, &spin->execbuf);
+		gem_context_destroy(i915, spin->execbuf.rsvd1);
+	}
+
+	/* Kick off the submission threads */
+	igt_assert(pthread_create(&lo, NULL, iova_low, &t) == 0);
+
+	/* Wait until the low priority thread is blocked on the fault */
+	igt_assert_eq(read(ufd, &msg, sizeof(msg)), sizeof(msg));
+	igt_assert_eq(msg.event, UFFD_EVENT_PAGEFAULT);
+	igt_assert(from_user_pointer(msg.arg.pagefault.address) == t.page);
+
+	/* Then release a very similar thread, but at high priority! */
+	igt_assert(pthread_create(&hi, NULL, iova_high, &t) == 0);
+
+	/* Service the fault; releasing both contexts */
+	memset(&copy, 0, sizeof(copy));
+	copy.dst = msg.arg.pagefault.address;
+	copy.src = to_user_pointer(memset(poison, 0xc5, sizeof(poison)));
+	copy.len = 4096;
+	do_ioctl(ufd, UFFDIO_COPY, &copy);
+
+	/* Wait until both threads have had a chance to submit */
+	pthread_mutex_lock(&t.mutex);
+	while (t.count)
+		pthread_cond_wait(&t.cond, &t.mutex);
+	pthread_mutex_unlock(&t.mutex);
+	igt_debugfs_dump(i915, "i915_engine_info");
+	igt_spin_free(i915, spin);
+
+	pthread_join(hi, NULL);
+	pthread_join(lo, NULL);
+	gem_close(i915, t.batch);
+
+	gem_sync(i915, t.scratch); /* write hazard lies */
+	gem_read(i915, t.scratch, 0, &result, sizeof(result));
+	igt_assert_eq(result, MIN_PRIO);
+	gem_close(i915, t.scratch);
+
 	munmap(t.page, 4096);
 	close(ufd);
 }
@@ -2021,6 +2181,12 @@ igt_main
 
 				igt_subtest_f("pi-userfault-%s", e->name)
 					test_pi_userfault(fd, eb_ring(e));
+
+				igt_subtest_f("pi-distinct-iova-%s", e->name)
+					test_pi_iova(fd, eb_ring(e), 0);
+
+				igt_subtest_f("pi-shared-iova-%s", e->name)
+					test_pi_iova(fd, eb_ring(e), SHARED);
 			}
 		}
 	}
