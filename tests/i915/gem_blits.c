@@ -57,16 +57,6 @@ enum mode {
 	WC,
 };
 
-static int fls(uint64_t x)
-{
-	int t;
-
-	for (t = 0; x >> t; t++)
-		;
-
-	return t;
-}
-
 static unsigned int
 get_tiling_stride(const struct device *device,
 		  unsigned int width, unsigned int tiling)
@@ -81,7 +71,7 @@ get_tiling_stride(const struct device *device,
 		else
 			stride = ALIGN(stride, 128);
 		if (device->gen < 4)
-			stride = 1 << fls(stride - 1);
+			stride = 1 << igt_fls(stride - 1);
 	} else {
 		if (device->gen >= 8)
 			stride = ALIGN(stride, 64);
