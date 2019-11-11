@@ -71,6 +71,7 @@ static void trigger_reset(int fd)
 {
 	struct timespec ts = { };
 
+	rcu_barrier(fd); /* flush any excess work before we start timing */
 	igt_nsec_elapsed(&ts);
 
 	igt_kmsg(KMSG_DEBUG "Forcing GPU reset\n");
@@ -226,6 +227,10 @@ static void hang_handler(union sigval arg)
 
 	igt_debug("hang delay = %.2fus\n",
 		  igt_nsec_elapsed(&ctx->delay) / 1000.0);
+
+	/* flush any excess work before we start timing our reset */
+	igt_assert(igt_sysfs_printf(ctx->debugfs, "i915_drop_caches",
+				    "%d", DROP_RCU));
 
 	igt_nsec_elapsed(ctx->ts);
 	igt_assert(igt_sysfs_set(ctx->debugfs, "i915_wedged", "-1"));
