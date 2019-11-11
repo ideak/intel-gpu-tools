@@ -420,7 +420,7 @@ static void sendfd(int socket, int fd)
 	cmsg->cmsg_level = SOL_SOCKET;
 	cmsg->cmsg_type = SCM_RIGHTS;
 	cmsg->cmsg_len = msg.msg_controllen;
-	*(int *)CMSG_DATA(cmsg) = fd;
+	memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
 
 	igt_assert(sendmsg(socket, &msg, 0) != -1);
 }
