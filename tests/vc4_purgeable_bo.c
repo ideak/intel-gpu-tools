@@ -36,7 +36,7 @@
 #include "vc4_drm.h"
 
 struct igt_vc4_bo {
-	struct igt_list node;
+	struct igt_list_head node;
 	int handle;
 	void *map;
 	size_t size;
@@ -49,7 +49,7 @@ static void __attribute__((noreturn)) sigtrap(int sig)
 	longjmp(jmp, sig);
 }
 
-static void igt_vc4_alloc_mmap_max_bo(int fd, struct igt_list *list,
+static void igt_vc4_alloc_mmap_max_bo(int fd, struct igt_list_head *list,
 				      size_t size)
 {
 	struct igt_vc4_bo *bo;
@@ -71,7 +71,7 @@ static void igt_vc4_alloc_mmap_max_bo(int fd, struct igt_list *list,
 	}
 }
 
-static void igt_vc4_unmap_free_bo_pool(int fd, struct igt_list *list)
+static void igt_vc4_unmap_free_bo_pool(int fd, struct igt_list_head *list)
 {
 	struct igt_vc4_bo *bo;
 
@@ -87,9 +87,9 @@ static void igt_vc4_unmap_free_bo_pool(int fd, struct igt_list *list)
 
 static void igt_vc4_trigger_purge(int fd)
 {
-	struct igt_list list;
+	struct igt_list_head list;
 
-	igt_list_init(&list);
+	IGT_INIT_LIST_HEAD(&list);
 
 	/* Try to allocate as much as we can to trigger a purge. */
 	igt_vc4_alloc_mmap_max_bo(fd, &list, 64 * 1024);
@@ -97,7 +97,7 @@ static void igt_vc4_trigger_purge(int fd)
 	igt_vc4_unmap_free_bo_pool(fd, &list);
 }
 
-static void igt_vc4_purgeable_subtest_prepare(int fd, struct igt_list *list)
+static void igt_vc4_purgeable_subtest_prepare(int fd, struct igt_list_head *list)
 {
 	igt_vc4_unmap_free_bo_pool(fd, list);
 	igt_vc4_alloc_mmap_max_bo(fd, list, 64 * 1024);
@@ -107,7 +107,7 @@ static void igt_vc4_purgeable_subtest_prepare(int fd, struct igt_list *list)
 igt_main
 {
 	struct igt_vc4_bo *bo;
-	struct igt_list list;
+	struct igt_list_head list;
 	uint32_t *map;
 	int fd, ret;
 
@@ -117,22 +117,22 @@ igt_main
 		fd = drm_open_driver(DRIVER_VC4);
 		igt_vc4_get_param(fd, DRM_VC4_PARAM_SUPPORTS_MADVISE, &val);
 		igt_require(val);
-		igt_list_init(&list);
+		IGT_INIT_LIST_HEAD(&list);
 	}
 
 	igt_subtest("mark-willneed") {
 		igt_vc4_purgeable_subtest_prepare(fd, &list);
-		igt_list_for_each(bo, &list, node)
+		igt_list_for_each_entry(bo, &list, node)
 			igt_assert(igt_vc4_purgeable_bo(fd, bo->handle,
 							false));
 	}
 
 	igt_subtest("mark-purgeable") {
 		igt_vc4_purgeable_subtest_prepare(fd, &list);
-		igt_list_for_each(bo, &list, node)
+		igt_list_for_each_entry(bo, &list, node)
 			igt_vc4_purgeable_bo(fd, bo->handle, true);
 
-		igt_list_for_each(bo, &list, node)
+		igt_list_for_each_entry(bo, &list, node)
 			igt_vc4_purgeable_bo(fd, bo->handle, false);
 	}
 
@@ -205,13 +205,13 @@ igt_main
 
 	igt_subtest("mark-unpurgeable-check-retained") {
 		igt_vc4_purgeable_subtest_prepare(fd, &list);
-		igt_list_for_each(bo, &list, node) {
+		igt_list_for_each_entry(bo, &list, node) {
 			map = (uint32_t *)bo->map;
 			*map = 0xdeadbeef;
 			igt_vc4_purgeable_bo(fd, bo->handle, true);
 		}
 
-		igt_list_for_each(bo, &list, node) {
+		igt_list_for_each_entry(bo, &list, node) {
 			map = (uint32_t *)bo->map;
 			if (igt_vc4_purgeable_bo(fd, bo->handle, false))
 				igt_assert(*map == 0xdeadbeef);
@@ -221,7 +221,7 @@ igt_main
 	igt_subtest("mark-unpurgeable-purged") {
 		igt_vc4_purgeable_subtest_prepare(fd, &list);
 
-		igt_list_for_each(bo, &list, node)
+		igt_list_for_each_entry(bo, &list, node)
 			igt_vc4_purgeable_bo(fd, bo->handle, true);
 
 		/* Trigger a purge. */

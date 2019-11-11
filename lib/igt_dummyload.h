@@ -35,7 +35,7 @@
 typedef struct igt_spin {
 	unsigned int handle;
 	timer_t timer;
-	struct igt_list link;
+	struct igt_list_head link;
 
 	uint32_t *condition;
 	uint32_t cmd_precondition;

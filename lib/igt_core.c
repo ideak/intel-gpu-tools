@@ -278,10 +278,10 @@ static char __current_description[512];
 
 struct description_node {
 	char desc[sizeof(__current_description)];
-	struct igt_list link;
+	struct igt_list_head link;
 };
 
-static struct igt_list subgroup_descriptions;
+static struct igt_list_head subgroup_descriptions;
 
 
 bool __igt_plain_output = false;
@@ -797,7 +797,7 @@ static int common_init(int *argc, char **argv,
 	int ret = 0;
 
 	common_init_env();
-	igt_list_init(&subgroup_descriptions);
+	IGT_INIT_LIST_HEAD(&subgroup_descriptions);
 
 	command_str = argv[0];
 	if (strrchr(command_str, '/'))
@@ -1068,7 +1068,7 @@ static void __igt_print_description(const char *subtest_name, const char *file, 
 
 	printf("SUB %s %s:%d:\n", subtest_name, file, line);
 
-	igt_list_for_each(desc, &subgroup_descriptions, link) {
+	igt_list_for_each_entry(desc, &subgroup_descriptions, link) {
 		print_line_wrapping(indent, desc->desc);
 		printf("\n");
 		has_doc = true;

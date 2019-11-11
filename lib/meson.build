@@ -50,6 +50,7 @@ lib_sources = [
 	'igt_fb.c',
 	'igt_core.c',
 	'igt_draw.c',
+	'igt_list.c',
 	'igt_pm.c',
 	'igt_dummyload.c',
 	'uwildmat/uwildmat.c',

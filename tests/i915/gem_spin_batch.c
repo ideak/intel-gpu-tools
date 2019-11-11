@@ -140,7 +140,7 @@ static void spin_all(int i915, unsigned int flags)
 #define PARALLEL_SPIN_NEW_CTX BIT(0)
 {
 	struct igt_spin *spin, *n;
-	IGT_LIST(list);
+	IGT_LIST_HEAD(list);
 
 	for_each_physical_engine(e, i915) {
 		uint32_t ctx;
@@ -162,7 +162,7 @@ static void spin_all(int i915, unsigned int flags)
 		igt_list_move(&spin->link, &list);
 	}
 
-	igt_list_for_each_safe(spin, n, &list, link) {
+	igt_list_for_each_entry_safe(spin, n, &list, link) {
 		igt_assert(gem_bo_busy(i915, spin->handle));
 		igt_spin_free(i915, spin);
 	}

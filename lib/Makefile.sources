@@ -41,6 +41,8 @@ lib_source_list =	 	\
 	igt_halffloat.h		\
 	igt_infoframe.c		\
 	igt_infoframe.h		\
+	igt_list.c		\
+	igt_list.h		\
 	igt_matrix.c		\
 	igt_matrix.h		\
 	igt_primes.c		\

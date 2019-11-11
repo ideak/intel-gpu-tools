@@ -142,7 +142,7 @@ struct w_step
 
 	/* Implementation details */
 	unsigned int idx;
-	struct igt_list rq_link;
+	struct igt_list_head rq_link;
 	unsigned int request;
 	unsigned int preempt_us;
 
@@ -213,7 +213,7 @@ struct workload
 	unsigned long qd_sum[NUM_ENGINES];
 	unsigned long nr_bb[NUM_ENGINES];
 
-	struct igt_list requests[NUM_ENGINES];
+	struct igt_list_head requests[NUM_ENGINES];
 	unsigned int nrequest[NUM_ENGINES];
 
 	struct workload *global_wrk;
@@ -1061,7 +1061,7 @@ clone_workload(struct workload *_wrk)
 	}
 
 	for (i = 0; i < NUM_ENGINES; i++)
-		igt_list_init(&wrk->requests[i]);
+		IGT_INIT_LIST_HEAD(&wrk->requests[i]);
 
 	return wrk;
 }

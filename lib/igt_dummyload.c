@@ -65,7 +65,7 @@
 static const int BATCH_SIZE = 4096;
 static const int LOOP_START_OFFSET = 64;
 
-static IGT_LIST(spin_list);
+static IGT_LIST_HEAD(spin_list);
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int
@@ -464,7 +464,7 @@ void igt_terminate_spins(void)
 	struct igt_spin *iter;
 
 	pthread_mutex_lock(&list_lock);
-	igt_list_for_each(iter, &spin_list, link)
+	igt_list_for_each_entry(iter, &spin_list, link)
 		igt_spin_end(iter);
 	pthread_mutex_unlock(&list_lock);
 }
@@ -474,9 +474,9 @@ void igt_unshare_spins(void)
 	struct igt_spin *it, *n;
 
 	/* Disable the automatic termination on inherited spinners */
-	igt_list_for_each_safe(it, n, &spin_list, link)
-		igt_list_init(&it->link);
-	igt_list_init(&spin_list);
+	igt_list_for_each_entry_safe(it, n, &spin_list, link)
+		IGT_INIT_LIST_HEAD(&it->link);
+	IGT_INIT_LIST_HEAD(&spin_list);
 }
 
 static uint32_t plug_vgem_handle(struct igt_cork *cork, int fd)

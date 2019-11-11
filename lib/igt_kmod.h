@@ -51,7 +51,7 @@ struct igt_kselftest {
 };
 
 struct igt_kselftest_list {
-	struct igt_list link;
+	struct igt_list_head link;
 	unsigned int number;
 	char *name;
 	char param[];
@@ -63,7 +63,7 @@ int igt_kselftest_begin(struct igt_kselftest *tst);
 
 void igt_kselftest_get_tests(struct kmod_module *kmod,
 			     const char *filter,
-			     struct igt_list *tests);
+			     struct igt_list_head *tests);
 int igt_kselftest_execute(struct igt_kselftest *tst,
 			  struct igt_kselftest_list *tl,
 			  const char *module_options,

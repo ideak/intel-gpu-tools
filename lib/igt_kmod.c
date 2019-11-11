@@ -452,11 +452,11 @@ static void kmsg_dump(int fd)
 	}
 }
 
-static void tests_add(struct igt_kselftest_list *tl, struct igt_list *list)
+static void tests_add(struct igt_kselftest_list *tl, struct igt_list_head *list)
 {
 	struct igt_kselftest_list *pos;
 
-	igt_list_for_each(pos, list, link)
+	igt_list_for_each_entry(pos, list, link)
 		if (pos->number > tl->number)
 			break;
 
@@ -465,7 +465,7 @@ static void tests_add(struct igt_kselftest_list *tl, struct igt_list *list)
 
 void igt_kselftest_get_tests(struct kmod_module *kmod,
 			     const char *filter,
-			     struct igt_list *tests)
+			     struct igt_list_head *tests)
 {
 	const char *param_prefix = "igt__";
 	const int prefix_len = strlen(param_prefix);
@@ -608,7 +608,7 @@ void igt_kselftests(const char *module_name,
 		    const char *filter)
 {
 	struct igt_kselftest tst;
-	IGT_LIST(tests);
+	IGT_LIST_HEAD(tests);
 	struct igt_kselftest_list *tl, *tn;
 
 	if (igt_kselftest_init(&tst, module_name) != 0)
@@ -618,7 +618,7 @@ void igt_kselftests(const char *module_name,
 		igt_require(igt_kselftest_begin(&tst) == 0);
 
 	igt_kselftest_get_tests(tst.kmod, filter, &tests);
-	igt_list_for_each_safe(tl, tn, &tests, link) {
+	igt_list_for_each_entry_safe(tl, tn, &tests, link) {
 		igt_subtest_f("%s", tl->name)
 			igt_kselftest_execute(&tst, tl, options, result);
 		free(tl);
