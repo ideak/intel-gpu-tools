@@ -125,12 +125,14 @@
  *   to interacting with the kernel driver must be reinitialized to avoid such
  *   issues.
  *
- * - Code blocks with magic control flow are implemented with setjmp() and
- *   longjmp(). This applies to #igt_fixture and #igt_subtest blocks and all the
- *   three variants to finish test: igt_success(), igt_skip() and igt_fail().
- *   Mostly this is of no concern, except when such a control block changes
- *   stack variables defined in the same function as the control block resides.
- *   Any store/load behaviour after a longjmp() is ill-defined for these
+ * - Code blocks with magic control flow are implemented with setjmp()
+ *   and longjmp(). This applies to #igt_fixture, #igt_subtest,
+ *   #igt_subtest_with_dynamic_subsubtests and #igt_dynamic_subsubtest
+ *   blocks and all the three variants to finish test: igt_success(),
+ *   igt_skip() and igt_fail(). Mostly this is of no concern, except
+ *   when such a control block changes stack variables defined in the
+ *   same function as the control block resides.  Any store/load
+ *   behaviour after a longjmp() is ill-defined for these
  *   variables. Avoid such code.
  *
  *   Quoting the man page for longjmp():
@@ -263,9 +265,12 @@ bool igt_skip_crc_compare;
 static bool list_subtests = false;
 static bool describe_subtests = false;
 static char *run_single_subtest = NULL;
+static char *run_single_dynamic_subtest = NULL;
 static bool run_single_subtest_found = false;
 static const char *in_subtest = NULL;
+static const char *in_dynamic_subtest = NULL;
 static struct timespec subtest_time;
+static struct timespec dynamic_subtest_time;
 static clockid_t igt_clock = (clockid_t)-1;
 static bool in_fixture = false;
 static bool test_with_subtests = false;
@@ -300,6 +305,7 @@ enum {
 	OPT_LIST_SUBTESTS = 500,
 	OPT_DESCRIBE_SUBTESTS,
 	OPT_RUN_SUBTEST,
+	OPT_RUN_DYNAMIC_SUBTEST,
 	OPT_DESCRIPTION,
 	OPT_DEBUG,
 	OPT_INTERACTIVE_DEBUG,
@@ -322,6 +328,8 @@ GKeyFile *igt_key_file;
 char *igt_frame_dump_path;
 
 static bool stderr_needs_sentinel = false;
+
+static int _igt_dynamic_tests_executed = -1;
 
 const char *igt_test_name(void)
 {
@@ -354,7 +362,9 @@ static void _igt_log_buffer_dump(void)
 {
 	uint8_t i;
 
-	if (in_subtest)
+	if (in_dynamic_subtest)
+		fprintf(stderr, "Dynamic subtest %s failed.\n", in_dynamic_subtest);
+	else if (in_subtest)
 		fprintf(stderr, "Subtest %s failed.\n", in_subtest);
 	else
 		fprintf(stderr, "Test %s failed.\n", command_str);
@@ -639,6 +649,7 @@ static void print_usage(const char *help_str, bool output_on_stderr)
 	fprintf(f, "Usage: %s [OPTIONS]\n", command_str);
 	fprintf(f, "  --list-subtests\n"
 		   "  --run-subtest <pattern>\n"
+		   "  --dynamic-subtest <pattern>\n"
 		   "  --debug[=log-domain]\n"
 		   "  --interactive-debug[=domain]\n"
 		   "  --skip-crc-compare\n"
@@ -781,6 +792,7 @@ static int common_init(int *argc, char **argv,
 		{"list-subtests",     no_argument,       NULL, OPT_LIST_SUBTESTS},
 		{"describe",          optional_argument, NULL, OPT_DESCRIBE_SUBTESTS},
 		{"run-subtest",       required_argument, NULL, OPT_RUN_SUBTEST},
+		{"dynamic-subtest",   required_argument, NULL, OPT_RUN_DYNAMIC_SUBTEST},
 		{"help-description",  no_argument,       NULL, OPT_DESCRIPTION},
 		{"debug",             optional_argument, NULL, OPT_DEBUG},
 		{"interactive-debug", optional_argument, NULL, OPT_INTERACTIVE_DEBUG},
@@ -899,6 +911,11 @@ static int common_init(int *argc, char **argv,
 			assert(optarg);
 			if (!list_subtests)
 				run_single_subtest = strdup(optarg);
+			break;
+		case OPT_RUN_DYNAMIC_SUBTEST:
+			assert(optarg);
+			if (!list_subtests)
+				run_single_dynamic_subtest = strdup(optarg);
 			break;
 		case OPT_DESCRIPTION:
 			print_test_description();
@@ -1084,6 +1101,19 @@ static void __igt_print_description(const char *subtest_name, const char *file, 
 		printf("%sNO DOCUMENTATION!\n\n", indent);
 }
 
+static bool valid_name_for_subtest(const char *subtest_name)
+{
+	int i;
+
+	/* check the subtest name only contains a-z, A-Z, 0-9, '-' and '_' */
+	for (i = 0; subtest_name[i] != '\0'; i++)
+		if (subtest_name[i] != '_' && subtest_name[i] != '-'
+		    && !isalnum(subtest_name[i]))
+			return false;
+
+	return true;
+}
+
 /*
  * Note: Testcases which use these helpers MUST NOT output anything to stdout
  * outside of places protected by igt_run_subtest checks - the piglit
@@ -1091,18 +1121,13 @@ static void __igt_print_description(const char *subtest_name, const char *file, 
  */
 bool __igt_run_subtest(const char *subtest_name, const char *file, const int line)
 {
-	int i;
-
 	assert(!igt_can_fail());
 
-	/* check the subtest name only contains a-z, A-Z, 0-9, '-' and '_' */
-	for (i = 0; subtest_name[i] != '\0'; i++)
-		if (subtest_name[i] != '_' && subtest_name[i] != '-'
-		    && !isalnum(subtest_name[i])) {
-			igt_critical("Invalid subtest name \"%s\".\n",
-				     subtest_name);
-			igt_exit();
-		}
+	if (!valid_name_for_subtest(subtest_name)) {
+		igt_critical("Invalid subtest name \"%s\".\n",
+			     subtest_name);
+		igt_exit();
+	}
 
 	if (run_single_subtest) {
 		if (uwildmat(subtest_name, run_single_subtest) == 0) {
@@ -1147,6 +1172,36 @@ bool __igt_run_subtest(const char *subtest_name, const char *file, const int lin
 
 	igt_gettime(&subtest_time);
 	return (in_subtest = subtest_name);
+}
+
+bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name)
+{
+	assert(in_subtest);
+	assert(_igt_dynamic_tests_executed >= 0);
+
+	if (!valid_name_for_subtest(dynamic_subtest_name)) {
+			igt_critical("Invalid dynamic subtest name \"%s\".\n",
+				     dynamic_subtest_name);
+			igt_exit();
+	}
+
+	if (run_single_dynamic_subtest &&
+	    uwildmat(dynamic_subtest_name, run_single_dynamic_subtest) == 0)
+		return false;
+
+	igt_kmsg(KMSG_INFO "%s: starting dynamic subtest %s\n",
+		 command_str, dynamic_subtest_name);
+	igt_info("Starting dynamic subtest: %s\n", dynamic_subtest_name);
+	fflush(stdout);
+	if (stderr_needs_sentinel)
+		fprintf(stderr, "Starting dynamic subtest: %s\n", dynamic_subtest_name);
+
+	_igt_log_buffer_reset();
+
+	_igt_dynamic_tests_executed++;
+
+	igt_gettime(&dynamic_subtest_time);
+	return (in_dynamic_subtest = dynamic_subtest_name);
 }
 
 /**
@@ -1203,26 +1258,53 @@ void __igt_subtest_group_restore(int save, int desc)
 static bool skipped_one = false;
 static bool succeeded_one = false;
 static bool failed_one = false;
+static bool dynamic_failed_one = false;
+
+bool __igt_enter_dynamic_container(void)
+{
+	_igt_dynamic_tests_executed = 0;
+	dynamic_failed_one = false;
+
+	return true;
+}
 
 static void exit_subtest(const char *) __attribute__((noreturn));
 static void exit_subtest(const char *result)
 {
 	struct timespec now;
+	const char *subtest_text = in_dynamic_subtest ? "Dynamic subtest" : "Subtest";
+	const char **subtest_name = in_dynamic_subtest ? &in_dynamic_subtest : &in_subtest;
+	struct timespec *thentime = in_dynamic_subtest ? &dynamic_subtest_time : &subtest_time;
+	jmp_buf *jmptarget = in_dynamic_subtest ? &igt_dynamic_subsubtest_jmpbuf : &igt_subtest_jmpbuf;
 
 	igt_gettime(&now);
-	igt_info("%sSubtest %s: %s (%.3fs)%s\n",
+
+	igt_info("%s%s %s: %s (%.3fs)%s\n",
 		 (!__igt_plain_output) ? "\x1b[1m" : "",
-		 in_subtest, result, igt_time_elapsed(&subtest_time, &now),
+		 subtest_text, *subtest_name, result,
+		 igt_time_elapsed(thentime, &now),
 		 (!__igt_plain_output) ? "\x1b[0m" : "");
 	fflush(stdout);
 	if (stderr_needs_sentinel)
-		fprintf(stderr, "Subtest %s: %s (%.3fs)\n",
-			in_subtest, result, igt_time_elapsed(&subtest_time, &now));
+		fprintf(stderr, "%s %s: %s (%.3fs)\n",
+			subtest_text, *subtest_name,
+			result, igt_time_elapsed(thentime, &now));
 
 	igt_terminate_spins();
 
-	in_subtest = NULL;
-	siglongjmp(igt_subtest_jmpbuf, 1);
+	if (!in_dynamic_subtest)
+		_igt_dynamic_tests_executed = -1;
+
+	/*
+	 * Don't keep the above text in the log if exiting a dynamic
+	 * subsubtest, the subtest would print it again otherwise
+	 */
+	if (in_dynamic_subtest)
+		_igt_log_buffer_reset();
+
+	*subtest_name = NULL;
+
+	siglongjmp(*jmptarget, 1);
 }
 
 /**
@@ -1253,6 +1335,7 @@ void igt_skip(const char *f, ...)
 	}
 
 	if (in_subtest) {
+		/* Doing the same even if inside a dynamic subtest */
 		exit_subtest("SKIP");
 	} else if (test_with_subtests) {
 		skip_subtests_henceforth = SKIP;
@@ -1309,7 +1392,22 @@ void __igt_skip_check(const char *file, const int line,
  */
 void igt_success(void)
 {
-	succeeded_one = true;
+	if (in_subtest && !in_dynamic_subtest && _igt_dynamic_tests_executed >= 0) {
+		/*
+		 * We're exiting a dynamic container, yield a result
+		 * according to the dynamic tests that got
+		 * executed.
+		 */
+		if (dynamic_failed_one)
+			igt_fail(IGT_EXIT_FAILURE);
+
+		if (_igt_dynamic_tests_executed == 0)
+			igt_skip("No dynamic tests executed.\n");
+	}
+
+	if (!in_dynamic_subtest)
+		succeeded_one = true;
+
 	if (in_subtest)
 		exit_subtest("SUCCESS");
 }
@@ -1340,10 +1438,17 @@ void igt_fail(int exitcode)
 	if (in_atexit_handler)
 		_exit(IGT_EXIT_FAILURE);
 
-	if (!failed_one)
-		igt_exitcode = exitcode;
+	if (in_dynamic_subtest) {
+		dynamic_failed_one = true;
+	} else {
+		/* Dynamic subtest containers must not fail explicitly */
+		assert(_igt_dynamic_tests_executed < 0 || dynamic_failed_one);
 
-	failed_one = true;
+		if (!failed_one)
+			igt_exitcode = exitcode;
+
+		failed_one = true;
+	}
 
 	/* Silent exit, parent will do the yelling. */
 	if (test_child)
@@ -1418,6 +1523,9 @@ void igt_describe_f(const char *fmt, ...)
 {
 	int ret;
 	va_list args;
+
+	if (in_subtest && _igt_dynamic_tests_executed >= 0)
+		assert(!"Documenting dynamic subsubtests is impossible. Document the subtest instead.");
 
 	if (!describe_subtests)
 		return;
