@@ -63,14 +63,30 @@ static void assert_cmd_success(int exec_return)
 static bool chdir_to_tools_dir(void)
 {
 	char path[PATH_MAX];
+	char *cwd;
+
+	cwd = get_current_dir_name();
+	igt_info("Current working directory: %s\n", cwd);
+	free(cwd);
 
 	/* Try TOOLS relative to cwd */
+	igt_info("Trying to cd to %s\n", TOOLS);
 	if (chdir(TOOLS) == 0)
 		return true;
 
+	igt_info("Failed to cd to %s\n", TOOLS);
+
 	/* Try TOOLS and install dir relative to test binary */
-	if (readlink("/proc/self/exe", path, sizeof(path)) > 0)
+	if (readlink("/proc/self/exe", path, sizeof(path)) > 0) {
+		igt_info("/proc/self/exe point to %s, going to dirname()\n", path);
 		chdir(dirname(path));
+	}
+
+	cwd = get_current_dir_name();
+	igt_info("Current working directory: %s\n", cwd);
+	free(cwd);
+
+	igt_info("Trying to cd to %s or ../../bin\n", TOOLS);
 
 	return chdir(TOOLS) == 0 || chdir("../../bin") == 0;
 }
