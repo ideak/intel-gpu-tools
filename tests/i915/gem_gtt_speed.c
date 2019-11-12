@@ -124,7 +124,9 @@ igt_simple_main_args("s:", NULL, help_str, opt_handler, NULL)
 
 	buf = malloc(size);
 	memset(buf, 0, size);
+
 	fd = drm_open_driver(DRIVER_INTEL);
+	gem_require_mappable_ggtt(fd);
 
 	handle = gem_create(fd, size);
 	igt_assert(handle);

@@ -175,6 +175,7 @@ igt_main
 		current_tiling_mode = I915_TILING_X;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+		gem_require_mappable_ggtt(fd);
 
 		intel_purge_vm_caches(fd);
 		check_memory_layout(fd);

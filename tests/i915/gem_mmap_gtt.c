@@ -1020,8 +1020,6 @@ igt_main
 		OBJECT_SIZE = 1 * 1024 * 1024;
 
 	igt_fixture {
-		struct drm_i915_gem_mmap_gtt arg = {};
-
 		fd = drm_open_driver(DRIVER_INTEL);
 
 		/*
@@ -1029,8 +1027,7 @@ igt_main
 		 * detiling access from untrusted userspace to the objects,
 		 * the kernel does an early rejection of the mmap_gtt ioctl.
 		 */
-		igt_require_f(mmap_ioctl(fd, &arg) != -ENODEV,
-			      "HW & kernel support for indirect detiling aperture\n");
+		gem_require_mappable_ggtt(fd);
 	}
 
 	igt_subtest("bad-object") {

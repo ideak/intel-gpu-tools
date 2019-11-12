@@ -35,6 +35,9 @@ void *gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsi
 #define I915_GEM_DOMAIN_WC 0x80
 #endif
 
+bool gem_has_mappable_ggtt(int i915);
+void gem_require_mappable_ggtt(int i915);
+
 void *__gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot);
 void *__gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
 void *__gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);

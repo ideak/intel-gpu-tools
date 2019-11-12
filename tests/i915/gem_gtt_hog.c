@@ -161,6 +161,7 @@ igt_simple_main
 	/* check for an intel gpu before goint nuts. */
 	int fd = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(fd);
+	gem_require_mappable_ggtt(fd);
 	close(fd);
 
 	igt_skip_on_simulation();

@@ -252,3 +252,22 @@ void *gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, uns
 	igt_assert(ptr);
 	return ptr;
 }
+
+bool gem_has_mappable_ggtt(int i915)
+{
+	struct drm_i915_gem_mmap_gtt arg = {};
+	int err;
+
+	err = 0;
+	if (ioctl(i915, DRM_IOCTL_I915_GEM_MMAP_GTT, &arg))
+		err = errno;
+	errno = 0;
+
+	return err != ENODEV;
+}
+
+void gem_require_mappable_ggtt(int i915)
+{
+	igt_require_f(gem_has_mappable_ggtt(i915),
+		      "HW & kernel support for indirect detiling aperture\n");
+}
