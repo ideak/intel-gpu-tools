@@ -84,16 +84,6 @@ static void display_fini(data_t *data)
 	igt_display_fini(&data->display);
 }
 
-static bool edp_psr_sink_support(data_t *data)
-{
-	char buf[512];
-
-	igt_debugfs_simple_read(data->debugfs_fd, "i915_edp_psr_status",
-				buf, sizeof(buf));
-
-	return strstr(buf, "Sink support: yes");
-}
-
 static bool edp_psr2_enabled(data_t *data)
 {
 	char buf[512];
@@ -417,6 +407,7 @@ int main(int argc, char *argv[])
 		igt_require(has_runtime_pm);
 		igt_require(igt_pm_dmc_loaded(data.debugfs_fd));
 		igt_display_require(&data.display, data.drm_fd);
+		igt_require(psr_sink_support(data.debugfs_fd, PSR_MODE_1));
 		/* Make sure our Kernel supports MSR and the module is loaded */
 		igt_require(igt_kmod_load("msr", NULL) == 0);
 
@@ -436,8 +427,6 @@ int main(int argc, char *argv[])
 	igt_subtest("dc5-psr") {
 		data.op_psr_mode = PSR_MODE_1;
 		psr_enable(data.debugfs_fd, data.op_psr_mode);
-		igt_require_f(edp_psr_sink_support(&data),
-			      "Sink does not support PSR\n");
 		test_dc_state_psr(&data, CHECK_DC5);
 	}
 
@@ -446,8 +435,6 @@ int main(int argc, char *argv[])
 	igt_subtest("dc6-psr") {
 		data.op_psr_mode = PSR_MODE_1;
 		psr_enable(data.debugfs_fd, data.op_psr_mode);
-		igt_require_f(edp_psr_sink_support(&data),
-			      "Sink does not support PSR\n");
 		igt_require_f(igt_pm_pc8_plus_residencies_enabled(data.msr_fd),
 			      "PC8+ residencies not supported\n");
 		test_dc_state_psr(&data, CHECK_DC6);
