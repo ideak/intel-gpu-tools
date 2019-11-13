@@ -324,6 +324,49 @@ static void active(int fd, unsigned engine)
 	gem_close(fd, obj[0].handle);
 }
 
+static unsigned int offset_in_page(void *addr)
+{
+	return (uintptr_t)addr & 4095;
+}
+
+static void active_spin(int fd, unsigned engine)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_relocation_entry reloc;
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	igt_spin_t *spin;
+
+	spin = igt_spin_new(fd, .engine = engine);
+
+	memset(obj, 0, sizeof(obj));
+	obj[0] = spin->obj[IGT_SPIN_BATCH];
+	obj[0].relocs_ptr = to_user_pointer(&reloc);
+	obj[0].relocation_count = 1;
+	obj[1].handle = gem_create(fd, 4096);
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	memset(&reloc, 0, sizeof(reloc));
+	reloc.presumed_offset = -1;
+	reloc.offset = offset_in_page(spin->condition);
+	reloc.target_handle = obj[0].handle;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+	execbuf.flags = engine;
+
+	gem_execbuf(fd, &execbuf);
+	gem_close(fd, obj[1].handle);
+	igt_assert_eq(*spin->condition, spin->cmd_precondition);
+
+	igt_spin_end(spin);
+	gem_sync(fd, spin->handle);
+
+	igt_assert_eq(*spin->condition, obj[0].offset);
+	igt_spin_free(fd, spin);
+}
+
 static bool has_64b_reloc(int fd)
 {
 	return intel_gen(intel_get_drm_devid(fd)) >= 8;
@@ -749,12 +792,14 @@ igt_main
 	igt_subtest("gpu")
 		from_gpu(fd);
 
-	igt_subtest("active")
+	igt_subtest("basic-active")
 		active(fd, ALL_ENGINES);
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {
-		igt_subtest_f("active-%s", e->name)
+		igt_subtest_f("basic-active-%s", e->name)
 			active(fd, eb_ring(e));
+		igt_subtest_f("basic-spin-%s", e->name)
+			active_spin(fd, eb_ring(e));
 	}
 	igt_fixture
 		close(fd);
