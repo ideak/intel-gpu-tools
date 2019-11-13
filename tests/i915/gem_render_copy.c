@@ -572,9 +572,13 @@ static void scratch_buf_aux_check(data_t *data,
 		     "Aux surface indicates that nothing was compressed\n");
 }
 
-static void test(data_t *data, uint32_t tiling, uint64_t ccs_modifier)
+#define SRC_COMPRESSED	1
+#define DST_COMPRESSED	2
+
+static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
+		 int flags)
 {
-	struct igt_buf dst, ccs, ref;
+	struct igt_buf dst, src_ccs, dst_ccs, ref;
 	struct {
 		struct igt_buf buf;
 		const char *filename;
@@ -602,22 +606,34 @@ static void test(data_t *data, uint32_t tiling, uint64_t ccs_modifier)
 			.x = 1, .y = 1,
 		},
 	};
-
 	int opt_dump_aub = igt_aub_dump_enabled();
 	int num_src = ARRAY_SIZE(src);
+	bool src_compressed = flags & SRC_COMPRESSED;
+	bool dst_compressed = flags & DST_COMPRESSED;
+
+	/*
+	 * The tiling for uncompressed source buffers is determined by the
+	 * tiling of the src[] buffers above.
+	 */
+	igt_assert(!src_tiling || src_compressed);
 
 	/* no Yf before gen9 */
 	if (intel_gen(data->devid) < 9)
 		num_src--;
 
-	if (tiling == I915_TILING_Yf || ccs_modifier)
+	if (src_tiling == I915_TILING_Yf || dst_tiling == I915_TILING_Yf ||
+	    src_compressed || dst_compressed)
 		igt_require(intel_gen(data->devid) >= 9);
 
 	for (int i = 0; i < num_src; i++)
 		scratch_buf_init(data, &src[i].buf, WIDTH, HEIGHT, src[i].tiling, false);
-	scratch_buf_init(data, &dst, WIDTH, HEIGHT, tiling, false);
-	if (ccs_modifier)
-		scratch_buf_init(data, &ccs, WIDTH, HEIGHT, ccs_modifier, true);
+	scratch_buf_init(data, &dst, WIDTH, HEIGHT, dst_tiling, false);
+	if (src_compressed)
+		scratch_buf_init(data, &src_ccs, WIDTH, HEIGHT,
+				 src_tiling, true);
+	if (dst_compressed)
+		scratch_buf_init(data, &dst_ccs, WIDTH, HEIGHT,
+				 dst_tiling, true);
 	scratch_buf_init(data, &ref, WIDTH, HEIGHT, I915_TILING_NONE, false);
 
 	for (int i = 0; i < num_src; i++)
@@ -657,26 +673,45 @@ static void test(data_t *data, uint32_t tiling, uint64_t ccs_modifier)
 	 *	 |dst|src|
 	 *	  -------
 	 */
-	if (ccs_modifier)
+	if (src_compressed)
 		data->render_copy(data->batch, NULL,
 				  &dst, 0, 0, WIDTH, HEIGHT,
-				  &ccs, 0, 0);
+				  &src_ccs, 0, 0);
 
 	for (int i = 0; i < num_src; i++)
 		data->render_copy(data->batch, NULL,
-				  &src[i].buf, WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
-				  ccs_modifier ? &ccs : &dst, src[i].x, src[i].y);
+				  &src[i].buf,
+				  WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
+				  src_compressed ? &src_ccs : &dst,
+				  src[i].x, src[i].y);
 
-	if (ccs_modifier)
+	if (src_compressed || dst_compressed)
 		data->render_copy(data->batch, NULL,
-				  &ccs, 0, 0, WIDTH, HEIGHT,
-				  &dst, 0, 0);
+				  src_compressed ? &src_ccs : &dst,
+				  0, 0, WIDTH, HEIGHT,
+				  dst_compressed ? &dst_ccs : &dst,
+				  0, 0);
+
+	if (dst_compressed)
+		data->render_copy(data->batch, NULL,
+				  &dst_ccs,
+				  0, 0, WIDTH, HEIGHT,
+				  &dst,
+				  0, 0);
 
 	if (opt_dump_png){
 		scratch_buf_write_to_png(data, &dst, "result.png");
-		if (ccs_modifier) {
-			scratch_buf_write_to_png(data, &ccs, "compressed.png");
-			scratch_buf_aux_write_to_png(data, &ccs, "compressed-aux.png");
+		if (src_compressed) {
+			scratch_buf_write_to_png(data, &src_ccs,
+						 "compressed-src.png");
+			scratch_buf_aux_write_to_png(data, &src_ccs,
+						     "compressed-src-aux.png");
+		}
+		if (dst_compressed) {
+			scratch_buf_write_to_png(data, &dst_ccs,
+						 "compressed-dst.png");
+			scratch_buf_aux_write_to_png(data, &dst_ccs,
+						     "compressed-dst-aux.png");
 		}
 	}
 
@@ -694,12 +729,16 @@ static void test(data_t *data, uint32_t tiling, uint64_t ccs_modifier)
 		scratch_buf_check(data, &dst, &ref, WIDTH - 10, HEIGHT - 10);
 	}
 
-	if (ccs_modifier)
-		scratch_buf_aux_check(data, &ccs);
+	if (src_compressed)
+		scratch_buf_aux_check(data, &src_ccs);
+	if (dst_compressed)
+		scratch_buf_aux_check(data, &dst_ccs);
 
 	scratch_buf_fini(&ref);
-	if (ccs_modifier)
-		scratch_buf_fini(&ccs);
+	if (dst_compressed)
+		scratch_buf_fini(&dst_ccs);
+	if (src_compressed)
+		scratch_buf_fini(&src_ccs);
 	scratch_buf_fini(&dst);
 	for (int i = 0; i < num_src; i++)
 		scratch_buf_fini(&src[i].buf);
@@ -726,8 +765,50 @@ const char *help_str =
 	"  -a\tCheck all pixels\n"
 	;
 
+static const char *buf_mode_str(uint32_t tiling, bool compressed)
+{
+	switch (tiling) {
+	default:
+	case I915_TILING_NONE:
+		return "linear";
+	case I915_TILING_X:
+		return "x-tiled";
+	case I915_TILING_Y:
+		return compressed ? "y-tiled-ccs" : "y-tiled";
+	case I915_TILING_Yf:
+		return compressed ? "yf-tiled-ccs" : "yf-tiled";
+	}
+}
+
 igt_main_args("da", NULL, help_str, opt_handler, NULL)
 {
+	static const struct test_desc {
+		int src_tiling;
+		int dst_tiling;
+		int flags;
+	} tests[] = {
+		{ I915_TILING_NONE, I915_TILING_NONE, 0 },
+		{ I915_TILING_NONE, I915_TILING_X,    0 },
+		{ I915_TILING_NONE, I915_TILING_Y,    0 },
+		{ I915_TILING_NONE, I915_TILING_Yf,   0 },
+
+		{ I915_TILING_Y,    I915_TILING_NONE, SRC_COMPRESSED },
+		{ I915_TILING_Y,    I915_TILING_X,    SRC_COMPRESSED },
+		{ I915_TILING_Y,    I915_TILING_Y,    SRC_COMPRESSED },
+		{ I915_TILING_Y,    I915_TILING_Yf,   SRC_COMPRESSED },
+
+		{ I915_TILING_Yf,   I915_TILING_NONE, SRC_COMPRESSED },
+		{ I915_TILING_Yf,   I915_TILING_X,    SRC_COMPRESSED },
+		{ I915_TILING_Yf,   I915_TILING_Y,    SRC_COMPRESSED },
+		{ I915_TILING_Yf,   I915_TILING_Yf,   SRC_COMPRESSED },
+
+		{ I915_TILING_Y,    I915_TILING_Y,    SRC_COMPRESSED | DST_COMPRESSED },
+		{ I915_TILING_Yf,   I915_TILING_Yf,   SRC_COMPRESSED | DST_COMPRESSED },
+		{ I915_TILING_Y,    I915_TILING_Yf,   SRC_COMPRESSED | DST_COMPRESSED },
+		{ I915_TILING_Yf,   I915_TILING_Y,    SRC_COMPRESSED | DST_COMPRESSED },
+	};
+	int i;
+
 	data_t data = {0, };
 
 	igt_fixture {
@@ -748,32 +829,22 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 		igt_fork_hang_detector(data.drm_fd);
 	}
 
-	igt_subtest("linear")
-		test(&data, I915_TILING_NONE, 0);
-	igt_subtest("x-tiled")
-		test(&data, I915_TILING_X, 0);
-	igt_subtest("y-tiled")
-		test(&data, I915_TILING_Y, 0);
-	igt_subtest("yf-tiled")
-		test(&data, I915_TILING_Yf, 0);
+	for (i = 0; i < ARRAY_SIZE(tests); i++) {
+		const struct test_desc *t = &tests[i];
+		const char *src_mode = buf_mode_str(t->src_tiling,
+						    t->flags & SRC_COMPRESSED);
+		const char *dst_mode = buf_mode_str(t->dst_tiling,
+						    t->flags & DST_COMPRESSED);
 
-	igt_subtest("y-tiled-ccs-to-linear")
-		test(&data, I915_TILING_NONE, I915_TILING_Y);
-	igt_subtest("y-tiled-ccs-to-x-tiled")
-		test(&data, I915_TILING_X, I915_TILING_Y);
-	igt_subtest("y-tiled-ccs-to-y-tiled")
-		test(&data, I915_TILING_Y, I915_TILING_Y);
-	igt_subtest("y-tiled-ccs-to-yf-tiled")
-		test(&data, I915_TILING_Yf, I915_TILING_Y);
+		igt_describe_f("Test render_copy() from a %s to a %s buffer.",
+			       src_mode, dst_mode);
 
-	igt_subtest("yf-tiled-ccs-to-linear")
-		test(&data, I915_TILING_NONE, I915_TILING_Yf);
-	igt_subtest("yf-tiled-ccs-to-x-tiled")
-		test(&data, I915_TILING_X, I915_TILING_Yf);
-	igt_subtest("yf-tiled-ccs-to-y-tiled")
-		test(&data, I915_TILING_Y, I915_TILING_Yf);
-	igt_subtest("yf-tiled-ccs-to-yf-tiled")
-		test(&data, I915_TILING_Yf, I915_TILING_Yf);
+		igt_subtest_f("%s%s%s",
+			      t->flags ? src_mode : "",
+			      t->flags ? "-to-" : "",
+			      dst_mode)
+			test(&data, t->src_tiling, t->dst_tiling, t->flags);
+	}
 
 	igt_fixture {
 		igt_stop_hang_detector();
