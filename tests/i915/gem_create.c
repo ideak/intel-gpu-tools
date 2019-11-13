@@ -55,8 +55,10 @@
 #include "intel_io.h"
 #include "intel_chipset.h"
 #include "igt_aux.h"
+#include "igt_x86.h"
 #include "drmtest.h"
 #include "drm.h"
+#include "i915/gem_mman.h"
 #include "i915_drm.h"
 
 IGT_TEST_DESCRIPTION("This is a test for the extended & old gem_create ioctl,"
@@ -188,11 +190,13 @@ static void *thread_clear(void *data)
 {
 	struct thread_clear *arg = data;
 	unsigned long checked = 0;
+	enum { PRW, GTT, WC, WB, __LAST__ } mode = PRW;
 	int i915 = arg->i915;
 
 	igt_until_timeout(arg->timeout) {
 		struct drm_i915_gem_create create = {};
 		uint64_t npages;
+		void *ptr;
 
 		npages = random();
 		npages <<= 32;
@@ -201,18 +205,51 @@ static void *thread_clear(void *data)
 		create.size = npages << 12;
 
 		create_ioctl(i915, &create);
-		for (uint64_t page = 0; page < npages; page++) {
-			uint64_t x;
-
-			gem_read(i915, create.handle,
-				 page * 4096 + (page % (4096 - sizeof(x))),
-				 &x, sizeof(x));
-			igt_assert_eq_u64(x, 0);
+		switch (mode) {
+		case __LAST__:
+		case PRW:
+			ptr = NULL;
+			break;
+		case WB:
+			ptr = __gem_mmap__cpu(i915, create.handle,
+					      0, create.size, PROT_READ);
+			break;
+		case WC:
+			ptr = __gem_mmap__wc(i915, create.handle,
+					     0, create.size, PROT_READ);
+			break;
+		case GTT:
+			ptr = __gem_mmap__gtt(i915, create.handle,
+					      create.size, PROT_READ);
+			break;
 		}
+		/* No set-domains as we are being as naughty as possible */
+
+		for (uint64_t page = 0; page < npages; page++) {
+			uint64_t x[8] = {
+				page * 4096 +
+				sizeof(x) * ((page % (4096 - sizeof(x)) / sizeof(x)))
+			};
+
+			if (!ptr)
+				gem_read(i915, create.handle, x[0], x, sizeof(x));
+			else if (page & 1)
+				igt_memcpy_from_wc(x, ptr + x[0], sizeof(x));
+			else
+				memcpy(x, ptr + x[0], sizeof(x));
+
+			for (int i = 0; i < ARRAY_SIZE(x); i++)
+				igt_assert_eq_u64(x[i], 0);
+		}
+		if (ptr)
+			munmap(ptr, create.size);
 		gem_close(i915, create.handle);
 		checked += npages;
 
 		atomic_fetch_add(&arg->max, npages);
+
+		if (++mode == __LAST__)
+			mode = PRW;
 	}
 
 	return (void *)(uintptr_t)checked;
