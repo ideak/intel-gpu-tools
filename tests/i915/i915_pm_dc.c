@@ -390,7 +390,6 @@ static void test_dc_state_dpms(data_t *data, int dc_flag)
 IGT_TEST_DESCRIPTION("These tests validate Display Power DC states");
 int main(int argc, char *argv[])
 {
-	bool has_runtime_pm;
 	data_t data = {};
 
 	igt_skip_on_simulation();
@@ -402,9 +401,7 @@ int main(int argc, char *argv[])
 		kmstest_set_vt_graphics_mode();
 		data.devid = intel_get_drm_devid(data.drm_fd);
 		igt_pm_enable_sata_link_power_management();
-		has_runtime_pm = igt_setup_runtime_pm();
-		igt_info("Runtime PM support: %d\n", has_runtime_pm);
-		igt_require(has_runtime_pm);
+		igt_require(igt_setup_runtime_pm());
 		igt_require(igt_pm_dmc_loaded(data.debugfs_fd));
 		igt_display_require(&data.display, data.drm_fd);
 		igt_require(psr_sink_support(data.debugfs_fd, PSR_MODE_1));
