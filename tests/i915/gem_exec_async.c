@@ -138,6 +138,9 @@ static void one(int fd, unsigned ring, uint32_t flags)
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring | flags;
+
+	igt_require(gem_engine_has_mutable_submission(fd, ring));
+
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 	gem_close(fd, obj[BATCH].handle);
 

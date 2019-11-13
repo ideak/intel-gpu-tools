@@ -123,6 +123,7 @@ static void poll_ring(int fd, unsigned engine, const char *name, int timeout)
 
 	gem_require_ring(fd, engine);
 	igt_require(gem_can_store_dword(fd, engine));
+	igt_require(gem_engine_has_mutable_submission(fd, engine));
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
@@ -234,7 +235,8 @@ static void poll_sequential(int fd, const char *name, int timeout)
 
 	nengine = 0;
 	for_each_physical_engine(e, fd) {
-		if (!gem_can_store_dword(fd, eb_ring(e)))
+		if (!gem_can_store_dword(fd, eb_ring(e)) ||
+		    !gem_engine_has_mutable_submission(fd, eb_ring(e)))
 			continue;
 
 		engines[nengine++] = eb_ring(e);

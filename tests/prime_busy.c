@@ -53,6 +53,9 @@ static void busy(int fd, unsigned ring, unsigned flags)
 	uint32_t *batch, *bbe;
 	int i, count, timeout;
 
+	if ((flags & HANG) == 0)
+		igt_require(gem_engine_has_mutable_submission(fd, ring));
+
 	gem_quiescent_gpu(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));

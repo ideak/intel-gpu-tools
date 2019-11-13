@@ -78,8 +78,13 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 	double time;
 
 	nengine = 0;
-	for_each_physical_engine(e, fd)
+	for_each_physical_engine(e, fd) {
+		if (!gem_engine_has_mutable_submission(fd, eb_ring(e)))
+			continue;
+
 		engines[nengine++] = eb_ring(e);
+	}
+
 	igt_require(nengine);
 
 	exec = calloc(nengine, sizeof(*exec));

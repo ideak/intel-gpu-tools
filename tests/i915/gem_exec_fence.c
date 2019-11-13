@@ -129,6 +129,9 @@ static void test_fence_busy(int fd, unsigned ring, unsigned flags)
 	uint32_t *batch;
 	int fence, i, timeout;
 
+	if ((flags & HANG) == 0)
+		igt_require(gem_engine_has_mutable_submission(fd, ring));
+
 	gem_quiescent_gpu(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -265,6 +268,8 @@ static void test_fence_busy_all(int fd, unsigned flags)
 	for_each_engine(e, fd) {
 		int fence, new;
 
+		if ((flags & HANG) == 0)
+			igt_require(gem_engine_has_mutable_submission(fd, eb_ring(e)));
 		execbuf.flags = eb_ring(e) | LOCAL_EXEC_FENCE_OUT;
 		execbuf.rsvd2 = -1;
 		gem_execbuf_wr(fd, &execbuf);
@@ -320,6 +325,9 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 	igt_spin_t *spin;
 	uint32_t *out;
 	int i;
+
+	if ((flags & HANG) == 0)
+		igt_require(gem_engine_has_mutable_submission(fd, ring));
 
 	igt_require(gem_can_store_dword(fd, 0));
 

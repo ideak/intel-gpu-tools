@@ -253,3 +253,45 @@ void gem_require_blitter(int i915)
 {
 	igt_require(gem_has_blitter(i915));
 }
+
+static bool gem_engine_has_immutable_submission(int i915, int class)
+{
+	const int gen = intel_gen(intel_get_drm_devid(i915));
+        int parser_version;
+
+	parser_version = gem_cmdparser_version(i915, 0);
+	if (parser_version < 0)
+		return false;
+
+	if (gen == 9 && class == I915_ENGINE_CLASS_COPY && parser_version > 9)
+		return true;
+
+	return false;
+}
+
+/**
+ * gem_class_has_mutable_submission:
+ * @i915: open i915 drm file descriptor
+ * @class: engine class
+ *
+ * Returns boolean value if the engine class allows batch modifications
+ * post execbuf.
+ */
+bool gem_class_has_mutable_submission(int i915, int class)
+{
+	return !gem_engine_has_immutable_submission(i915, class);
+}
+
+/**
+ * gem_engine_has_mutable_submission:
+ * @i915: open i915 drm file descriptor
+ * @engine: the engine (I915_EXEC_RING id) of target
+ *
+ * Returns boolean value if the engine allows batch modifications
+ * post execbuf.
+ */
+bool gem_engine_has_mutable_submission(int i915, unsigned int engine)
+{
+	return gem_class_has_mutable_submission(i915,
+						gem_execbuf_flags_to_engine_class(engine));
+}

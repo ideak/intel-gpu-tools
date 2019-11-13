@@ -243,6 +243,10 @@ static void one(int fd, const struct intel_execution_engine2 *e, unsigned test_f
 	i++;
 
 	igt_assert(i < size/sizeof(*batch));
+
+	if ((test_flags & HANG) == 0)
+		igt_require(gem_class_has_mutable_submission(fd, e->class));
+
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 
 	__gem_busy(fd, obj[SCRATCH].handle, &read[SCRATCH], &write[SCRATCH]);
@@ -256,7 +260,8 @@ static void one(int fd, const struct intel_execution_engine2 *e, unsigned test_f
 			    e2->instance == e->instance)
 				continue;
 
-			if (!gem_class_can_store_dword(fd, e2->class))
+			if (!gem_class_can_store_dword(fd, e2->class) ||
+			    !gem_class_has_mutable_submission(fd, e2->class))
 				continue;
 
 			igt_debug("Testing %s in parallel\n", e2->name);

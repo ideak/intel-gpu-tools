@@ -342,6 +342,8 @@ static void work(int i915, int dmabuf, unsigned ring, uint32_t flags)
 	uint32_t *batch, *bbe;
 	int i, count;
 
+	igt_require(gem_engine_has_mutable_submission(i915, ring));
+
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = (uintptr_t)obj;
 	execbuf.buffer_count = 2;
@@ -850,6 +852,7 @@ igt_main
 			      e->name) {
 			gem_require_ring(i915, eb_ring(e));
 			igt_require(gem_can_store_dword(i915, eb_ring(e)));
+			igt_require(gem_engine_has_mutable_submission(i915, eb_ring(e)));
 
 			gem_quiescent_gpu(i915);
 			test_sync(i915, vgem, e->exec_id, e->flags);
@@ -862,6 +865,7 @@ igt_main
 			      e->name) {
 			gem_require_ring(i915, eb_ring(e));
 			igt_require(gem_can_store_dword(i915, eb_ring(e)));
+			igt_require(gem_engine_has_mutable_submission(i915, eb_ring(e)));
 
 			gem_quiescent_gpu(i915);
 			test_busy(i915, vgem, e->exec_id, e->flags);
@@ -874,6 +878,7 @@ igt_main
 			      e->name) {
 			gem_require_ring(i915, eb_ring(e));
 			igt_require(gem_can_store_dword(i915, eb_ring(e)));
+			igt_require(gem_engine_has_mutable_submission(i915, eb_ring(e)));
 
 			gem_quiescent_gpu(i915);
 			test_wait(i915, vgem, e->exec_id, e->flags);
@@ -897,6 +902,7 @@ igt_main
 					e->name) {
 				gem_require_ring(i915, eb_ring(e));
 				igt_require(gem_can_store_dword(i915, eb_ring(e)));
+				igt_require(gem_engine_has_mutable_submission(i915, eb_ring(e)));
 
 				gem_quiescent_gpu(i915);
 				test_fence_wait(i915, vgem, e->exec_id, e->flags);

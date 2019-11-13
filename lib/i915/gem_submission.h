@@ -34,6 +34,8 @@ void gem_submission_print_method(int fd);
 bool gem_has_semaphores(int fd);
 bool gem_has_execlists(int fd);
 bool gem_has_guc_submission(int fd);
+bool gem_engine_has_mutable_submission(int fd, unsigned int engine);
+bool gem_class_has_mutable_submission(int fd, int class);
 
 int gem_cmdparser_version(int i915, uint32_t engine);
 static inline bool gem_has_cmdparser(int i915, uint32_t engine)

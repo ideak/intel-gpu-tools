@@ -1157,6 +1157,8 @@ static void deep(int fd, unsigned ring)
 	int dep_nreq;
 	int n;
 
+	igt_require(gem_can_store_dword(fd, ring));
+
 	ctx = malloc(sizeof(*ctx) * MAX_CONTEXTS);
 	for (n = 0; n < MAX_CONTEXTS; n++) {
 		ctx[n] = gem_context_create(fd);
