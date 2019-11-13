@@ -2,6 +2,7 @@
 
 igt@core_auth@basic-auth
 igt@debugfs_test@read_all_entries
+igt@fbdev@mmap
 igt@gem_basic@bad-close
 igt@gem_basic@create-close
 igt@gem_basic@create-fd-close
