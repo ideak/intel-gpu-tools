@@ -72,9 +72,10 @@ static int has_psr_debugfs(int debugfs_fd)
 	 * -ENODEV is returned when PSR is unavailable.
 	 */
 	ret = psr_write(debugfs_fd, "0xf");
-	if (ret == -EINVAL)
+	if (ret == -EINVAL) {
+		errno = 0;
 		return 0;
-	else if (ret < 0)
+	} else if (ret < 0)
 		return ret;
 
 	/* legacy debugfs api, we enabled irqs by writing, disable them. */
