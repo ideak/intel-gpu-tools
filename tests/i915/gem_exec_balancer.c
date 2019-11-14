@@ -24,6 +24,7 @@
 #include <sched.h>
 
 #include "igt.h"
+#include "igt_gt.h"
 #include "igt_perf.h"
 #include "i915/gem_ring.h"
 #include "sw_sync.h"
@@ -1314,6 +1315,102 @@ static void semaphore(int i915)
 	gem_quiescent_gpu(i915);
 }
 
+static void set_unbannable(int i915, uint32_t ctx)
+{
+	struct drm_i915_gem_context_param p = {
+		.ctx_id = ctx,
+		.param = I915_CONTEXT_PARAM_BANNABLE,
+	};
+
+	igt_assert_eq(__gem_context_set_param(i915, &p), 0);
+}
+
+static void hangme(int i915)
+{
+	struct drm_i915_gem_exec_object2 batch = {
+		.handle = batch_create(i915),
+	};
+
+	/*
+	 * Fill the available engines with hanging virtual engines and verify
+	 * that execution continues onto the second batch.
+	 */
+
+	for (int class = 1; class < 32; class++) {
+		struct i915_engine_class_instance *ci;
+		struct client {
+			igt_spin_t *spin[2];
+		} *client;
+		unsigned int count;
+		uint32_t bg;
+
+		ci = list_engines(i915, 1u << class, &count);
+		if (!ci)
+			continue;
+
+		if (count < 2) {
+			free(ci);
+			continue;
+		}
+
+		client = malloc(sizeof(*client) * count);
+		igt_assert(client);
+
+		for (int i = 0; i < count; i++) {
+			uint32_t ctx = gem_context_create(i915);
+			struct client *c = &client[i];
+			unsigned int flags;
+
+			set_unbannable(i915, ctx);
+			set_load_balancer(i915, ctx, ci, count, NULL);
+
+			flags = IGT_SPIN_FENCE_OUT | IGT_SPIN_NO_PREEMPTION;
+			for (int j = 0; j < ARRAY_SIZE(c->spin); j++)  {
+				c->spin[j] = igt_spin_new(i915, ctx,
+							  .flags = flags);
+				flags = IGT_SPIN_FENCE_OUT;
+			}
+
+			gem_context_destroy(i915, ctx);
+		}
+
+		/* Apply some background context to speed up hang detection */
+		bg = gem_context_create(i915);
+		set_engines(i915, bg, ci, count);
+		for (int i = 0; i < count; i++) {
+			struct drm_i915_gem_execbuffer2 execbuf = {
+				.buffers_ptr = to_user_pointer(&batch),
+				.buffer_count = 1,
+				.flags = i,
+				.rsvd1 = bg,
+			};
+			gem_execbuf(i915, &execbuf);
+		}
+		gem_context_destroy(i915, bg);
+
+		for (int i = 0; i < count; i++) {
+			struct client *c = &client[i];
+
+			igt_debug("Waiting for client[%d].spin[%d]\n", i, 0);
+			gem_sync(i915, c->spin[0]->handle);
+			igt_assert_eq(sync_fence_status(c->spin[0]->out_fence),
+				      -EIO);
+
+			igt_debug("Waiting for client[%d].spin[%d]\n", i, 1);
+			gem_sync(i915, c->spin[1]->handle);
+			igt_assert_eq(sync_fence_status(c->spin[1]->out_fence),
+				      -EIO);
+
+			igt_spin_free(i915, c->spin[0]);
+			igt_spin_free(i915, c->spin[1]);
+		}
+		free(client);
+	}
+
+	gem_close(i915, batch.handle);
+	gem_quiescent_gpu(i915);
+}
+
 static void smoketest(int i915, int timeout)
 {
 	struct drm_i915_gem_exec_object2 batch[2] = {
@@ -1485,5 +1582,13 @@ igt_main
 
 	igt_fixture {
 		igt_stop_hang_detector();
+	}
+
+	igt_subtest("hang") {
+		igt_hang_t hang = igt_allow_hang(i915, 0, 0);
+
+		hangme(i915);
+
+		igt_disallow_hang(i915, hang);
 	}
 }
