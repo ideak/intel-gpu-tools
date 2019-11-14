@@ -52,13 +52,14 @@ static void *wrap_gem_mmap__gtt(int i915, uint32_t handle,
 
 static void pwrite_self(int i915)
 {
+	int start = gem_has_mappable_ggtt(i915) ? 0 : 1;
 	static const mmap_fn_t mmap_fn[] = {
 		wrap_gem_mmap__gtt,
 		gem_mmap__cpu,
 		gem_mmap__wc,
 		NULL
 	};
-	for (const mmap_fn_t *fn = mmap_fn; *fn; fn++) {
+	for (const mmap_fn_t *fn = mmap_fn + start; *fn; fn++) {
 		uint32_t handle = gem_create(i915, MiB(4));
 		void *ptr = (*fn)(i915, handle, 0, MiB(4), PROT_READ);
 
