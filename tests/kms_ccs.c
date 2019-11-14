@@ -73,6 +73,7 @@ static const struct {
 static const uint64_t ccs_modifiers[] = {
 	LOCAL_I915_FORMAT_MOD_Y_TILED_CCS,
 	LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS,
+	LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS,
 };
 
 /*
@@ -109,7 +110,13 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	uint32_t format;
 	uint64_t modifier;
 	cairo_t *cr;
+	int unit;
 	int ret;
+
+	if (intel_gen(intel_get_drm_devid(data->drm_fd)) >= 12)
+		unit = 64;
+	else
+		unit = 128;
 
 	/* Use either compressed or Y-tiled to test. However, given the lack of
 	 * available bandwidth, we use linear for the primary plane when
@@ -137,13 +144,13 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		if (fb_flags & FB_MISALIGN_AUX_STRIDE) {
 			igt_skip_on_f(width <= 1024,
 				      "FB already has the smallest possible stride\n");
-			f.pitches[1] -= 64;
+			f.pitches[1] -= (unit/2);
 		}
 
 		if (fb_flags & FB_SMALL_AUX_STRIDE) {
 			igt_skip_on_f(width <= 1024,
 				      "FB already has the smallest possible stride\n");
-			f.pitches[1] = ALIGN(f.pitches[1]/2, 128);
+			f.pitches[1] = ALIGN(f.pitches[1]/2, unit);
 		}
 
 		if (fb_flags & FB_ZERO_AUX_STRIDE)
@@ -346,22 +353,27 @@ igt_main
 		data.pipe = pipe;
 
 		data.flags = TEST_BAD_PIXEL_FORMAT;
+		igt_describe("Test bad pixel format with given CCS modifier");
 		igt_subtest_f("pipe-%s-bad-pixel-format", pipe_name)
 			test_output(&data);
 
 		data.flags = TEST_BAD_ROTATION_90;
+		igt_describe("Test 90 degree rotation with given CCS modifier");
 		igt_subtest_f("pipe-%s-bad-rotation-90", pipe_name)
 			test_output(&data);
 
 		data.flags = TEST_CRC;
+		igt_describe("Test primary plane CRC compatibility with given CCS modifier");
 		igt_subtest_f("pipe-%s-crc-primary-basic", pipe_name)
 			test_output(&data);
 
 		data.flags = TEST_CRC | TEST_ROTATE_180;
+		igt_describe("Test 180 degree rotation with given CCS modifier");
 		igt_subtest_f("pipe-%s-crc-primary-rotation-180", pipe_name)
 			test_output(&data);
 
 		data.flags = TEST_CRC;
+		igt_describe("Test sprite plane CRC compatibility with given CCS modifier");
 		igt_subtest_f("pipe-%s-crc-sprite-planes-basic", pipe_name) {
 			int valid_tests = 0;
 
@@ -380,14 +392,17 @@ igt_main
 		data.plane = NULL;
 
 		data.flags = TEST_NO_AUX_BUFFER;
+		igt_describe("Test missing CCS buffer with given CCS modifier");
 		igt_subtest_f("pipe-%s-missing-ccs-buffer", pipe_name)
 			test_output(&data);
 
 		data.flags = TEST_BAD_CCS_HANDLE;
+		igt_describe("Test CCS with different BO with given modifier");
 		igt_subtest_f("pipe-%s-ccs-on-another-bo", pipe_name)
 			test_output(&data);
 
 		data.flags = TEST_BAD_AUX_STRIDE;
+		igt_describe("Test with bad AUX stride with given CCS modifier");
 		igt_subtest_f("pipe-%s-bad-aux-stride", pipe_name)
 			test_output(&data);
 	}
