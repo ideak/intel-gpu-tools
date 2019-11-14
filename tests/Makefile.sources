@@ -245,6 +245,9 @@ gem_exec_params_SOURCES = i915/gem_exec_params.c
 TESTS_progs += gem_exec_parse
 gem_exec_parse_SOURCES = i915/gem_exec_parse.c
 
+TESTS_progs += gem_exec_parse_blt
+gem_exec_parse_blt_SOURCES = i915/gem_exec_parse_blt.c
+
 TESTS_progs += gem_exec_reloc
 gem_exec_reloc_SOURCES = i915/gem_exec_reloc.c
 

@@ -149,6 +149,7 @@ i915_progs = [
 	'gem_exec_parallel',
 	'gem_exec_params',
 	'gem_exec_parse',
+	'gem_exec_parse_blt',
 	'gem_exec_reloc',
 	'gem_exec_reuse',
 	'gem_exec_schedule',
