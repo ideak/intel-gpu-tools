@@ -401,6 +401,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 		break;
 	case LOCAL_I915_FORMAT_MOD_Y_TILED:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
+	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 		igt_require_intel(fd);
 		if (intel_gen(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
@@ -465,18 +466,30 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 	}
 }
 
+static bool is_gen12_ccs_modifier(uint64_t modifier)
+{
+	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
+}
+
 static bool is_ccs_modifier(uint64_t modifier)
 {
-	return modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_CCS ||
-		modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS;
+
+	return is_gen12_ccs_modifier(modifier) ||
+		modifier == I915_FORMAT_MOD_Y_TILED_CCS ||
+		modifier == I915_FORMAT_MOD_Yf_TILED_CCS;
 }
 
 static unsigned fb_plane_width(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->modifier) && plane == 1)
-		return DIV_ROUND_UP(fb->width, 1024) * 128;
+	if (is_ccs_modifier(fb->modifier) && plane == 1) {
+		if (is_gen12_ccs_modifier(fb->modifier))
+			return DIV_ROUND_UP(fb->width,
+					    512 / (fb->plane_bpp[0] / 8)) * 64;
+		else
+			return DIV_ROUND_UP(fb->width, 1024) * 128;
+	}
 
 	if (plane == 0)
 		return fb->width;
@@ -498,8 +511,12 @@ static unsigned fb_plane_height(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->modifier) && plane == 1)
-		return DIV_ROUND_UP(fb->height, 512) * 32;
+	if (is_ccs_modifier(fb->modifier) && plane == 1) {
+		if (is_gen12_ccs_modifier(fb->modifier))
+			return DIV_ROUND_UP(fb->height, 128) * 4;
+		else
+			return DIV_ROUND_UP(fb->height, 512) * 32;
+	}
 
 	if (plane == 0)
 		return fb->height;
@@ -572,11 +589,17 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		 * so the easiest way is to align the luma stride to 256.
 		 */
 		return ALIGN(min_stride, 256);
+	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 1) {
+		/* A main surface using a CCS AUX surface must be 4x4 tiles aligned. */
+		return ALIGN(min_stride, 64);
 	} else {
 		unsigned int tile_width, tile_height;
 
 		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
+
+		if (is_gen12_ccs_modifier(fb->modifier))
+			tile_width *= 4;
 
 		return ALIGN(min_stride, tile_width);
 	}
@@ -603,11 +626,19 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		size = roundup_power_of_two(size);
 
 		return size;
+	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 1) {
+		/* The AUX CCS surface must be page aligned */
+		return (uint64_t)fb->strides[plane] *
+			ALIGN(fb->plane_height[plane], 64);
 	} else {
 		unsigned int tile_width, tile_height;
 
 		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
+
+		/* A main surface using a CCS AUX surface must be 4x4 tiles aligned. */
+		if (is_gen12_ccs_modifier(fb->modifier))
+			tile_height *= 4;
 
 		/* Special case where the "tile height" represents a
 		 * height-based stride, such as with VC4 SAND tiling modes.
@@ -687,6 +718,7 @@ uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 		return I915_TILING_X;
 	case LOCAL_I915_FORMAT_MOD_Y_TILED:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
+	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 		return I915_TILING_Y;
 	case LOCAL_I915_FORMAT_MOD_Yf_TILED:
 	case LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS:
@@ -1895,7 +1927,11 @@ static void init_buf(struct fb_blit_upload *blit,
 
 	if (is_ccs_modifier(fb->modifier)) {
 		igt_assert_eq(fb->strides[0] & 127, 0);
-		igt_assert_eq(fb->strides[1] & 127, 0);
+
+		if (is_gen12_ccs_modifier(fb->modifier))
+			igt_assert_eq(fb->strides[1] & 63, 0);
+		else
+			igt_assert_eq(fb->strides[1] & 127, 0);
 
 		buf->aux.offset = fb->offsets[1];
 		buf->aux.stride = fb->strides[1];
