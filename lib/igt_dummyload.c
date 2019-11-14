@@ -228,7 +228,8 @@ emit_recursive_batch(igt_spin_t *spin,
 		 * For simplicity, we try to stick to a one-size fits all.
 		 */
 		spin->condition = batch + BATCH_SIZE / sizeof(*batch) - 2;
-		*spin->condition = 0xffffffff;
+		spin->condition[0] = 0xffffffff;
+		spin->condition[1] = 0xffffffff;
 
 		r->presumed_offset = 0;
 		r->target_handle = obj[BATCH].handle;
