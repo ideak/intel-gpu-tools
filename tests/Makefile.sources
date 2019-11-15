@@ -326,9 +326,6 @@ gem_mmap_offset_exhaustion_SOURCES = i915/gem_mmap_offset_exhaustion.c
 TESTS_progs += gem_mmap_wc
 gem_mmap_wc_SOURCES = i915/gem_mmap_wc.c
 
-TESTS_progs += gem_mocs_settings
-gem_mocs_settings_SOURCES = i915/gem_mocs_settings.c
-
 TESTS_progs += gem_partial_pwrite_pread
 gem_partial_pwrite_pread_SOURCES = i915/gem_partial_pwrite_pread.c
 

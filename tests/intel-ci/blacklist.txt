@@ -49,7 +49,6 @@ igt@gem_hangcheck_forcewake(@.*)?
 igt@gem_lut_handle(@.*)?
 igt@gem_mmap_gtt@.*(huge|swap|clflush|forked).*
 igt@gem_mmap@.*(swap|huge).*
-igt@gem_mocs_settings@.*(suspend|hibernate).*
 igt@gem_pin(@.*)?
 igt@gem_pread_after_blit(@.*)?
 igt@gem_pwrite_pread@.*performance.*
