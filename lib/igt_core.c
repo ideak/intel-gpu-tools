@@ -275,6 +275,7 @@ static clockid_t igt_clock = (clockid_t)-1;
 static bool in_fixture = false;
 static bool test_with_subtests = false;
 static bool in_atexit_handler = false;
+static bool show_ftrace = false;
 static enum {
 	CONT = 0, SKIP, FAIL
 } skip_subtests_henceforth = CONT;
@@ -310,6 +311,7 @@ enum {
 	OPT_DEBUG,
 	OPT_INTERACTIVE_DEBUG,
 	OPT_SKIP_CRC,
+	OPT_TRACE_OOPS,
 	OPT_HELP = 'h'
 };
 
@@ -797,6 +799,7 @@ static int common_init(int *argc, char **argv,
 		{"debug",             optional_argument, NULL, OPT_DEBUG},
 		{"interactive-debug", optional_argument, NULL, OPT_INTERACTIVE_DEBUG},
 		{"skip-crc-compare",  no_argument,       NULL, OPT_SKIP_CRC},
+		{"trace-on-oops",     no_argument,       NULL, OPT_TRACE_OOPS},
 		{"help",              no_argument,       NULL, OPT_HELP},
 		{0, 0, 0, 0}
 	};
@@ -924,6 +927,9 @@ static int common_init(int *argc, char **argv,
 		case OPT_SKIP_CRC:
 			igt_skip_crc_compare = true;
 			goto out;
+		case OPT_TRACE_OOPS:
+			show_ftrace = true;
+			goto out;
 		case OPT_HELP:
 			print_usage(help_str, false);
 			ret = -1;
@@ -967,7 +973,7 @@ out:
 
 		sync();
 		oom_adjust_for_doom();
-		ftrace_dump_on_oops(true);
+		ftrace_dump_on_oops(show_ftrace);
 	}
 
 	/* install exit handler, to ensure we clean up */
