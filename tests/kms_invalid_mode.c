@@ -237,6 +237,9 @@ static int i915_max_dotclock(data_t *data)
 	char *s;
 	int max_dotclock = 0;
 
+	if (!is_i915_device(data->drm_fd))
+		return 0;
+
 	igt_debugfs_read(data->drm_fd, "i915_frequency_info", buf);
 	s = strstr(buf, "Max pixel clock frequency:");
 	igt_assert(s);
@@ -296,8 +299,7 @@ static data_t data;
 igt_main
 {
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
-		igt_require_intel(data.drm_fd);
+		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
 		kmstest_set_vt_graphics_mode();
 
