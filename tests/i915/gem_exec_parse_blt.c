@@ -330,9 +330,7 @@ static unsigned long batch_bytes(const uint32_t * const batch_start,
 {
 	const unsigned long bytes = batch_num_cmds(batch_start, batch_end) * 4;
 
-	igt_assert(!(bytes & 0x7));
-
-	return bytes;
+	return ALIGN(bytes, 8);
 }
 
 static void test_allowed_all(const int i915, const uint32_t handle)
