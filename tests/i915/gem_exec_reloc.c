@@ -337,7 +337,9 @@ static void active_spin(int fd, unsigned engine)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	igt_spin_t *spin;
 
-	spin = igt_spin_new(fd, .engine = engine);
+	spin = igt_spin_new(fd,
+			    .engine = engine,
+			    .flags = IGT_SPIN_NO_PREEMPTION);
 
 	memset(obj, 0, sizeof(obj));
 	obj[0] = spin->obj[IGT_SPIN_BATCH];
