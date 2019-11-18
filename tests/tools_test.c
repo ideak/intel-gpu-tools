@@ -77,7 +77,8 @@ static bool chdir_to_tools_dir(void)
 	igt_info("Failed to cd to %s\n", TOOLS);
 
 	/* Try TOOLS and install dir relative to test binary */
-	if (readlink("/proc/self/exe", path, sizeof(path)) > 0) {
+	memset(path, 0, sizeof(path)); /* readlink() does not append NUL */
+	if (readlink("/proc/self/exe", path, sizeof(path)-1) > 0) {
 		igt_info("/proc/self/exe point to %s, going to dirname()\n", path);
 		chdir(dirname(path));
 	}
