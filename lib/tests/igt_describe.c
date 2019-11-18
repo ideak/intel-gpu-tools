@@ -88,10 +88,10 @@ static void fake_main(int argc, char **argv) {
 		;
 
 	igt_describe("Subtest with dynamic subsubtests");
-	igt_subtest_with_dynamic_subsubtests("G") {
+	igt_subtest_with_dynamic("G") {
 		printf("should not be executed!\n");
 		igt_describe("should assert on execution");
-		igt_dynamic_subsubtest("should-not-list")
+		igt_dynamic("should-not-list")
 			printf("should not be executed!\n");
 	}
 

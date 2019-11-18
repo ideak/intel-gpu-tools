@@ -56,7 +56,7 @@ static void dynamic_subtest_in_normal_subtest(void)
 	igt_subtest_init(fake_argc, fake_argv);
 
 	igt_subtest("normal-subtest") {
-		igt_dynamic_subsubtest("dynamic") {
+		igt_dynamic("dynamic") {
 			igt_info("Dynamic subtest in normal subtest\n");
 		}
 	}
@@ -72,8 +72,8 @@ static void invalid_dynamic_subtest_name(void)
 
 	igt_subtest_init(fake_argc, fake_argv);
 
-	igt_subtest_with_dynamic_subsubtests("subtest") {
-		igt_dynamic_subsubtest("# invalid name !") {
+	igt_subtest_with_dynamic("subtest") {
+		igt_dynamic("# invalid name !") {
 			igt_info("Invalid dynamic subtest name test\n");
 		}
 	}
@@ -89,7 +89,7 @@ static void dynamic_subtest_in_toplevel(void)
 
 	igt_subtest_init(fake_argc, fake_argv);
 
-	igt_dynamic_subsubtest("dynamic-subtest-in-toplevel") {
+	igt_dynamic("dynamic-subtest-in-toplevel") {
 		igt_info("Dynamic subtests need to be in a subtest\n");
 	}
 
@@ -104,7 +104,7 @@ static void subtest_itself_failing(void)
 
 	igt_subtest_init(fake_argc, fake_argv);
 
-	igt_subtest_with_dynamic_subsubtests("subtest") {
+	igt_subtest_with_dynamic("subtest") {
 		igt_assert(false);
 	}
 
@@ -119,7 +119,7 @@ static void subtest_itself_skipping(void)
 
 	igt_subtest_init(fake_argc, fake_argv);
 
-	igt_subtest_with_dynamic_subsubtests("subtest") {
+	igt_subtest_with_dynamic("subtest") {
 		igt_skip("Skipping\n");
 	}
 
@@ -134,8 +134,8 @@ static void dynamic_subtest_failure_leads_to_fail(void)
 
 	igt_subtest_init(fake_argc, fake_argv);
 
-	igt_subtest_with_dynamic_subsubtests("subtest") {
-		igt_dynamic_subsubtest("dynamic") {
+	igt_subtest_with_dynamic("subtest") {
+		igt_dynamic("dynamic") {
 			igt_assert(false);
 		}
 	}
@@ -151,7 +151,7 @@ static void no_dynamic_subtests_entered_leads_to_skip(void)
 
 	igt_subtest_init(fake_argc, fake_argv);
 
-	igt_subtest_with_dynamic_subsubtests("subtest") {
+	igt_subtest_with_dynamic("subtest") {
 	}
 
 	igt_exit();

@@ -127,7 +127,7 @@
  *
  * - Code blocks with magic control flow are implemented with setjmp()
  *   and longjmp(). This applies to #igt_fixture, #igt_subtest,
- *   #igt_subtest_with_dynamic_subsubtests and #igt_dynamic_subsubtest
+ *   #igt_subtest_with_dynamic and #igt_dynamic
  *   blocks and all the three variants to finish test: igt_success(),
  *   igt_skip() and igt_fail(). Mostly this is of no concern, except
  *   when such a control block changes stack variables defined in the
@@ -1281,7 +1281,7 @@ static void exit_subtest(const char *result)
 	const char *subtest_text = in_dynamic_subtest ? "Dynamic subtest" : "Subtest";
 	const char **subtest_name = in_dynamic_subtest ? &in_dynamic_subtest : &in_subtest;
 	struct timespec *thentime = in_dynamic_subtest ? &dynamic_subtest_time : &subtest_time;
-	jmp_buf *jmptarget = in_dynamic_subtest ? &igt_dynamic_subsubtest_jmpbuf : &igt_subtest_jmpbuf;
+	jmp_buf *jmptarget = in_dynamic_subtest ? &igt_dynamic_jmpbuf : &igt_subtest_jmpbuf;
 
 	igt_gettime(&now);
 

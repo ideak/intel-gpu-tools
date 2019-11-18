@@ -146,7 +146,7 @@ void __igt_fixture_end(void) __attribute__((noreturn));
 
 /* subtest infrastructure */
 jmp_buf igt_subtest_jmpbuf;
-jmp_buf igt_dynamic_subsubtest_jmpbuf;
+jmp_buf igt_dynamic_jmpbuf;
 typedef int (*igt_opt_handler_t)(int opt, int opt_index, void *data);
 #define IGT_OPT_HANDLER_SUCCESS 0
 #define IGT_OPT_HANDLER_ERROR -2
@@ -230,7 +230,7 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name);
 	__igt_subtest_f(igt_tokencat(__tmpchar, __LINE__), f)
 
 /**
- * igt_subtest_with_dynamic_subsubtests:
+ * igt_subtest_with_dynamic:
  * @name: name of the subtest
  *
  * This is a magic control flow block which denotes a subtest code
@@ -238,13 +238,13 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name);
  * printf format string, which is useful for constructing
  * combinatorial tests.
  *
- * See igt_subtest_with_dynamic_subsubtests_f() for documentation.
+ * See igt_subtest_with_dynamic_f() for documentation.
  */
-#define igt_subtest_with_dynamic_subsubtests(name) for (; __igt_run_subtest((name), __FILE__, __LINE__) && \
+#define igt_subtest_with_dynamic(name) for (; __igt_run_subtest((name), __FILE__, __LINE__) && \
 							 __igt_enter_dynamic_container() && \
 							 (sigsetjmp(igt_subtest_jmpbuf, 1) == 0); \
 						 igt_success())
-#define __igt_subtest_with_dynamic_subsubtests_f(tmp, format...) \
+#define __igt_subtest_with_dynamic_f(tmp, format...) \
 	for (char tmp [256]; \
 	     snprintf( tmp , sizeof( tmp ), \
 		      format), \
@@ -254,7 +254,7 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name);
 	     igt_success())
 
 /**
- * igt_subtest_with_dynamic_subsubtests_f:
+ * igt_subtest_with_dynamic_f:
  * @...: format string and optional arguments
  *
  * This is a magic control flow block which denotes a subtest code
@@ -275,12 +275,12 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name);
  * subsubtest for each pipe and performs the operation for that pipe
  * in there.
  *
- * The result of a subtest igt_subtest_with_dynamic_subsubtests will be
+ * The result of a subtest igt_subtest_with_dynamic will be
  * * SKIP, if no dynamic subsubtests are entered
  * * PASS, if _all_ dynamic subsubtests PASS
  * * FAIL, if _any_ dynamic subsubtests FAIL
  *
- * Within a igt_subtest_with_dynamic_subsubtests block, explicit
+ * Within a igt_subtest_with_dynamic block, explicit
  * failure (e.g. igt_assert) is not allowed, only dynamic subsubtests
  * themselves will produce test results. igt_skip()/igt_require() is
  * allowed. Example:
@@ -288,7 +288,7 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name);
  * |[<!-- language="C" -->
  * igt_main
  * {
- *     igt_subtest_with_dynamic_subsubtests("engine-tests") {
+ *     igt_subtest_with_dynamic("engine-tests") {
  *               igt_require(is_awesome(fd)); // requires ok here
  *
  *               for_each_engine(fd, e) {
@@ -300,14 +300,14 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name);
  * }
  * ]|
  *
- * Like igt_subtest_with_dynamic_subsubtests(), but also accepts a printf
+ * Like igt_subtest_with_dynamic(), but also accepts a printf
  * format string instead of a static string.
  */
-#define igt_subtest_with_dynamic_subsubtests_f(f...) \
-	__igt_subtest_with_dynamic_subsubtests_f(igt_tokencat(__tmpchar, __LINE__), f)
+#define igt_subtest_with_dynamic_f(f...) \
+	__igt_subtest_with_dynamic_f(igt_tokencat(__tmpchar, __LINE__), f)
 
 /**
- * igt_dynamic_subsubtest:
+ * igt_dynamic:
  * @name: name of the dynamic subtest
  *
  * This is a magic control flow block which denotes a dynamic
@@ -316,22 +316,22 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name);
  * variant accepts a printf format string, which is useful for
  * constructing combinatorial tests.
  *
- * See igt_subtest_with_dynamic_subsubtests_f() for documentation on
+ * See igt_subtest_with_dynamic_f() for documentation on
  * dynamic subsubtests.
  */
-#define igt_dynamic_subsubtest(name) for (; __igt_run_dynamic_subtest((name)) && \
-					  (sigsetjmp(igt_dynamic_subsubtest_jmpbuf, 1) == 0); \
+#define igt_dynamic(name) for (; __igt_run_dynamic_subtest((name)) && \
+					  (sigsetjmp(igt_dynamic_jmpbuf, 1) == 0); \
 				  igt_success())
-#define __igt_dynamic_subsubtest_f(tmp, format...) \
+#define __igt_dynamic_f(tmp, format...) \
 	for (char tmp [256]; \
 	     snprintf( tmp , sizeof( tmp ), \
 		      format), \
 	     __igt_run_dynamic_subtest( tmp ) && \
-	     (sigsetjmp(igt_dynamic_subsubtest_jmpbuf, 1) == 0); \
+	     (sigsetjmp(igt_dynamic_jmpbuf, 1) == 0); \
 	     igt_success())
 
 /**
- * igt_dynamic_subsubtest_f:
+ * igt_dynamic_f:
  * @...: format string and optional arguments
  *
  * This is a magic control flow block which denotes a dynamic
@@ -340,14 +340,14 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name);
  * variant accepts a printf format string, which is useful for
  * constructing combinatorial tests.
  *
- * See igt_subtest_with_dynamic_subsubtests_f() for documentation on
+ * See igt_subtest_with_dynamic_f() for documentation on
  * dynamic subsubtests.
  *
- * Like igt_dynamic_subsubtest(), but also accepts a printf format string
+ * Like igt_dynamic(), but also accepts a printf format string
  * instead of a static string.
  */
-#define igt_dynamic_subsubtest_f(f...) \
-	__igt_dynamic_subsubtest_f(igt_tokencat(__tmpchar, __LINE__), f)
+#define igt_dynamic_f(f...) \
+	__igt_dynamic_f(igt_tokencat(__tmpchar, __LINE__), f)
 
 const char *igt_subtest_name(void);
 bool igt_only_list_subtests(void);
