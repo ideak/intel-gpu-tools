@@ -16,7 +16,7 @@ igt@gem_ctx_param@basic
 igt@gem_ctx_param@basic-default
 igt@gem_ctx_switch@legacy-render
 igt@gem_ctx_switch@rcs0
-igt@gem_exec_basic@basic-all
+igt@gem_exec_basic@basic
 igt@gem_exec_create@basic
 igt@gem_exec_fence@basic-busy-default
 igt@gem_exec_fence@basic-wait-default

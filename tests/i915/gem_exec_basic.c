@@ -114,30 +114,6 @@ static void gtt(int fd, uint64_t flags)
 	munmap(execbuf, 4096);
 }
 
-static void all(int i915)
-{
-	const struct intel_execution_engine2 *e;
-
-	__for_each_physical_engine(i915, e)
-		noop(i915, e->flags);
-}
-
-static void readonly_all(int i915)
-{
-	const struct intel_execution_engine2 *e;
-
-	__for_each_physical_engine(i915, e)
-		readonly(i915, e->flags);
-}
-
-static void gtt_all(int i915)
-{
-	const struct intel_execution_engine2 *e;
-
-	__for_each_physical_engine(i915, e)
-		gtt(i915, e->flags);
-}
-
 igt_main
 {
 	const struct intel_execution_engine2 *e;
@@ -150,22 +126,25 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	igt_subtest("basic-all")
-		all(fd);
+	igt_subtest_with_dynamic("basic") {
+		__for_each_physical_engine(fd, e) {
+			igt_dynamic_f("%s", e->name)
+				noop(fd, e->flags);
+		}
+	}
 
-	igt_subtest("readonly-all")
-		readonly_all(fd);
+	igt_subtest_with_dynamic("readonly") {
+		__for_each_physical_engine(fd, e) {
+			igt_dynamic_f("%s", e->name)
+				readonly(fd, e->flags);
+		}
+	}
 
-	igt_subtest("gtt-all")
-		gtt_all(fd);
-
-	__for_each_physical_engine(fd, e) {
-		igt_subtest_f("basic-%s", e->name)
-			noop(fd, e->flags);
-		igt_subtest_f("readonly-%s", e->name)
-			readonly(fd, e->flags);
-		igt_subtest_f("gtt-%s", e->name)
-			gtt(fd, e->flags);
+	igt_subtest_with_dynamic("gtt") {
+		__for_each_physical_engine(fd, e) {
+			igt_dynamic_f("%s", e->name)
+				gtt(fd, e->flags);
+		}
 	}
 
 	igt_fixture {
