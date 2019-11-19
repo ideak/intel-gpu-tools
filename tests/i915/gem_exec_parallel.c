@@ -126,8 +126,10 @@ static void *thread(void *data)
 	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 	if (t->gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
-	if (t->flags & CONTEXTS)
+	if (t->flags & CONTEXTS) {
 		execbuf.rsvd1 = gem_context_create(fd);
+		gem_context_set_all_engines(fd, execbuf.rsvd1);
+	}
 
 	for (i = 0; i < 16; i++) {
 		obj[0].handle = t->scratch[i];
