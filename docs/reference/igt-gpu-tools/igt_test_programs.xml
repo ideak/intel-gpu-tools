@@ -104,15 +104,6 @@
     <xi:include href="igt_test_programs_amdgpu_description.xml"/>
   </refentry>
 
-  <refentry id="igt-chamelium-tests">
-    <refnamediv>
-      <refname>Chamelium Tests</refname>
-      <refpurpose>Tests using the Chamelium platform</refpurpose>
-    </refnamediv>
-    <xi:include href="igt_test_programs_chamelium_programs.xml"/>
-    <xi:include href="igt_test_programs_chamelium_description.xml"/>
-  </refentry>
-
   <refentry id="igt-core-tests">
     <refnamediv>
       <refname>Core Tests</refname>
@@ -165,15 +156,6 @@
     </refnamediv>
     <xi:include href="igt_test_programs_gen7_programs.xml"/>
     <xi:include href="igt_test_programs_gen7_description.xml"/>
-  </refentry>
-
-  <refentry id="igt-gvt-tests">
-    <refnamediv>
-      <refname>GVT Tests</refname>
-      <refpurpose>Tests for graphics virtualization technology</refpurpose>
-    </refnamediv>
-    <xi:include href="igt_test_programs_gvt_programs.xml"/>
-    <xi:include href="igt_test_programs_gvt_description.xml"/>
   </refentry>
 
   <refentry id="igt-i915-tests">

@@ -25,14 +25,12 @@ ignore_headers = [
 
 test_groups = [
 	'amdgpu',
-	'chamelium',
 	'core',
 	'debugfs',
 	'drm',
 	'gem',
 	'gen3',
 	'gen7',
-	'gvt',
 	'i915',
 	'kms',
 	'meta',
