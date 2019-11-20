@@ -51,8 +51,8 @@ static struct write_only_list {
 	unsigned int gen;
 	uint32_t addr;
 } wo_list[] = {
-	{ 10, 0xE5F0 } /* WaForceContextSaveRestoreNonCoherent:cnl */
-
+	{ 10, 0xE5F0 }, /* WaForceContextSaveRestoreNonCoherent:cnl */
+	{ 12, 0x6604 },	/* FIXME: Stepping > B0 might be readable */
 	/*
 	 * FIXME: If you are contemplating adding stuff here
 	 * consider this as a temporary solution. You need to
