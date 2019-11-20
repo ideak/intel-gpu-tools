@@ -17,10 +17,8 @@ RUN apt-get install -y \
 			libcurl4-openssl-dev \
 			python-docutils \
 			valgrind \
-			peg
-
-RUN apt-get install -t stretch-backports -y \
-					libdrm-intel1
+			peg \
+			libdrm-intel1
 
 # autotools build deps
 RUN apt-get install -y \

@@ -1,4 +1,4 @@
-FROM debian:stretch-backports
+FROM debian:buster
 
 RUN apt-get update
 RUN apt-get install -y \
@@ -30,12 +30,10 @@ RUN apt-get install -y \
 			libjson-c-dev:armhf \
 			libcurl4-openssl-dev:armhf \
 			libxrandr-dev:armhf \
-			libxv-dev:armhf
-
-RUN apt-get install -t stretch-backports -y \
-					meson \
-					libdrm-dev:armhf \
-					qemu-user \
-					qemu-user-static
+			libxv-dev:armhf \
+			meson \
+			libdrm-dev:armhf \
+			qemu-user \
+			qemu-user-static
 
 RUN apt-get clean
