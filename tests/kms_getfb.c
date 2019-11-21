@@ -81,23 +81,47 @@ static void get_ccs_fb(int fd, struct drm_mode_fb_cmd2 *ret)
 		.height = 1024,
 		.pixel_format = DRM_FORMAT_XRGB8888,
 		.flags = DRM_MODE_FB_MODIFIERS,
-		.modifier = {
-			I915_FORMAT_MOD_Y_TILED_CCS,
-			I915_FORMAT_MOD_Y_TILED_CCS,
-		},
 	};
 	int size;
 
 	igt_require(has_addfb2_iface(fd));
 	igt_require_intel(fd);
 
-	/* An explanation of the magic numbers can be found in kms_ccs.c. */
-	add.pitches[0] = ALIGN(add.width * 4, 128);
-	add.offsets[1] = add.pitches[0] * ALIGN(add.height, 32);
-	add.pitches[1] = ALIGN(ALIGN(add.width * 4, 32) / 32, 128);
+	if ((intel_gen(intel_get_drm_devid(fd))) >= 12) {
+		add.modifier[0] = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
+		add.modifier[1] = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
 
-	size = add.offsets[1];
-	size += add.pitches[1] * ALIGN(ALIGN(add.height, 16) / 16, 32);
+		/* The main surface for TGL is 4x4 tiles aligned
+		 * For 32bpp the pitch is 4*4*32 bytes i.e. 512 bytes
+		 */
+		add.pitches[0] = ALIGN(add.width * 4, 4 * 128);
+
+		/* The main surface height is 4 tile rows aligned */
+		add.offsets[1] = add.pitches[0] * ALIGN(add.height, 128);
+
+		/* CCS surface pitch is 64 bytes aligned which corresponds to
+		 * 4 tiles on the main surface
+		 */
+		add.pitches[1] = DIV_ROUND_UP(add.width, 128) * 64;
+
+		size = add.offsets[1];
+		/* CCS surface height is 4 tile rows aligned */
+		size += add.pitches[1] * DIV_ROUND_UP(add.height, 128) * 4;
+
+		/* GEM object is page aligned */
+		size = ALIGN(size, 4096);
+	} else {
+		add.modifier[0] = I915_FORMAT_MOD_Y_TILED_CCS;
+		add.modifier[1] = I915_FORMAT_MOD_Y_TILED_CCS;
+
+		/* An explanation of the magic numbers can be found in kms_ccs.c. */
+		add.pitches[0] = ALIGN(add.width * 4, 128);
+		add.offsets[1] = add.pitches[0] * ALIGN(add.height, 32);
+		add.pitches[1] = ALIGN(ALIGN(add.width * 4, 32) / 32, 128);
+
+		size = add.offsets[1];
+		size += add.pitches[1] * ALIGN(ALIGN(add.height, 16) / 16, 32);
+	}
 
 	add.handles[0] = gem_create(fd, size);
 	igt_require(add.handles[0] != 0);
