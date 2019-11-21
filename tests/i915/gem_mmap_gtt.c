@@ -117,6 +117,20 @@ test_access(int fd)
 }
 
 static void
+test_zero_extend(int i915)
+{
+	struct drm_i915_gem_mmap_gtt arg = {};
+	uint64_t redzone[16];
+
+	memset(redzone, 0xc5, sizeof(redzone));
+	arg.handle = gem_create(i915, 4096);
+
+	igt_assert_eq(ioctl(i915, DRM_IOCTL_I915_GEM_MMAP_GTT, &arg), 0);
+
+	gem_close(i915, arg.handle);
+}
+
+static void
 test_short(int fd)
 {
 	struct drm_i915_gem_mmap_gtt mmap_arg;
@@ -1091,6 +1105,8 @@ igt_main
 		test_wc(fd);
 	igt_subtest("isolation")
 		test_isolation(fd);
+	igt_subtest("zero-extend")
+		test_zero_extend(fd);
 	igt_subtest("close-race")
 		test_close_race(fd);
 	igt_subtest("flink-race")
