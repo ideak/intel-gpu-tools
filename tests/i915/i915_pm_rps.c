@@ -250,7 +250,7 @@ static void load_helper_run(enum load load)
 		bool prev_load;
 		uint32_t handle;
 
-		signal(SIGUSR1, load_helper_signal_handler);
+		signal(SIGTERM, load_helper_signal_handler);
 		signal(SIGUSR2, load_helper_signal_handler);
 
 		igt_debug("Applying %s load...\n", lh.load ? "high" : "low");
@@ -320,7 +320,7 @@ static void load_helper_run(enum load load)
 
 static void load_helper_stop(void)
 {
-	kill(lh.igt_proc.pid, SIGUSR1);
+	kill(lh.igt_proc.pid, SIGTERM);
 	igt_assert(igt_wait_helper(&lh.igt_proc) == 0);
 }
 
