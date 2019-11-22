@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "igt_syncobj.h"
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
 #include "sw_sync.h"
@@ -833,168 +834,24 @@ static void test_invalid_fence_array(int fd)
 	munmap(ptr, 4096);
 }
 
-static uint32_t __syncobj_create(int fd)
-{
-	struct local_syncobj_create {
-		uint32_t handle, flags;
-	} arg;
-#define LOCAL_IOCTL_SYNCOBJ_CREATE        DRM_IOWR(0xBF, struct local_syncobj_create)
-
-	memset(&arg, 0, sizeof(arg));
-	igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_CREATE, &arg);
-
-	return arg.handle;
-}
-
-static uint32_t syncobj_create(int fd)
-{
-	uint32_t ret;
-
-	igt_assert_neq((ret = __syncobj_create(fd)), 0);
-
-	return ret;
-}
-
-static int __syncobj_destroy(int fd, uint32_t handle)
-{
-	struct local_syncobj_destroy {
-		uint32_t handle, flags;
-	} arg;
-#define LOCAL_IOCTL_SYNCOBJ_DESTROY        DRM_IOWR(0xC0, struct local_syncobj_destroy)
-	int err = 0;
-
-	memset(&arg, 0, sizeof(arg));
-	arg.handle = handle;
-	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_DESTROY, &arg))
-		err = -errno;
-
-	errno = 0;
-	return err;
-}
-
-static void syncobj_destroy(int fd, uint32_t handle)
-{
-	igt_assert_eq(__syncobj_destroy(fd, handle), 0);
-}
-
 static int __syncobj_to_sync_file(int fd, uint32_t handle)
 {
-	struct local_syncobj_handle {
-		uint32_t handle;
-		uint32_t flags;
-		int32_t fd;
-		uint32_t pad;
-	} arg;
-#define LOCAL_IOCTL_SYNCOBJ_HANDLE_TO_FD  DRM_IOWR(0xC1, struct local_syncobj_handle)
+	struct drm_syncobj_handle arg = {
+		.handle = handle,
+		.flags = DRM_SYNCOBJ_HANDLE_TO_FD_FLAGS_EXPORT_SYNC_FILE,
+	};
 
-	memset(&arg, 0, sizeof(arg));
-	arg.handle = handle;
-	arg.flags = 1 << 0; /* EXPORT_SYNC_FILE */
-	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_HANDLE_TO_FD, &arg))
-		arg.fd = -errno;
-
-	errno = 0;
-	return arg.fd;
-}
-
-static int syncobj_to_sync_file(int fd, uint32_t handle)
-{
-	int ret;
-
-	igt_assert_lte(0, (ret = __syncobj_to_sync_file(fd, handle)));
-
-	return ret;
-}
-
-static int __syncobj_from_sync_file(int fd, uint32_t handle, int sf)
-{
-	struct local_syncobj_handle {
-		uint32_t handle;
-		uint32_t flags;
-		int32_t fd;
-		uint32_t pad;
-	} arg;
-#define LOCAL_IOCTL_SYNCOBJ_FD_TO_HANDLE  DRM_IOWR(0xC2, struct local_syncobj_handle)
-	int err = 0;
-
-	memset(&arg, 0, sizeof(arg));
-	arg.handle = handle;
-	arg.fd = sf;
-	arg.flags = 1 << 0; /* IMPORT_SYNC_FILE */
-	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_FD_TO_HANDLE, &arg))
-		err = -errno;
-
-	errno = 0;
-	return err;
-}
-
-static void syncobj_from_sync_file(int fd, uint32_t handle, int sf)
-{
-	igt_assert_eq(__syncobj_from_sync_file(fd, handle, sf), 0);
-}
-
-static int __syncobj_export(int fd, uint32_t handle, int *syncobj)
-{
-	struct local_syncobj_handle {
-		uint32_t handle;
-		uint32_t flags;
-		int32_t fd;
-		uint32_t pad;
-	} arg;
-	int err;
-
-	memset(&arg, 0, sizeof(arg));
-	arg.handle = handle;
-
-	err = 0;
-	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_HANDLE_TO_FD, &arg))
-		err = -errno;
-
-	errno = 0;
-	*syncobj = arg.fd;
-	return err;
+	return __syncobj_handle_to_fd(fd, &arg);
 }
 
 static int syncobj_export(int fd, uint32_t handle)
 {
-	int syncobj;
-
-	igt_assert_eq(__syncobj_export(fd, handle, &syncobj), 0);
-
-	return syncobj;
-}
-
-static int __syncobj_import(int fd, int syncobj, uint32_t *handle)
-{
-	struct local_syncobj_handle {
-		uint32_t handle;
-		uint32_t flags;
-		int32_t fd;
-		uint32_t pad;
-	} arg;
-#define LOCAL_IOCTL_SYNCOBJ_FD_TO_HANDLE  DRM_IOWR(0xC2, struct local_syncobj_handle)
-	int err;
-
-	memset(&arg, 0, sizeof(arg));
-	arg.fd = syncobj;
-
-	err = 0;
-	if (igt_ioctl(fd, LOCAL_IOCTL_SYNCOBJ_FD_TO_HANDLE, &arg))
-		err = -errno;
-
-	errno = 0;
-	*handle = arg.handle;
-	return err;
+	return syncobj_handle_to_fd(fd, handle, 0);
 }
 
 static uint32_t syncobj_import(int fd, int syncobj)
 {
-	uint32_t handle;
-
-	igt_assert_eq(__syncobj_import(fd, syncobj, &handle), 0);
-
-
-	return handle;
+	return syncobj_fd_to_handle(fd, syncobj, 0);
 }
 
 static bool syncobj_busy(int fd, uint32_t handle)
@@ -1002,7 +859,8 @@ static bool syncobj_busy(int fd, uint32_t handle)
 	bool result;
 	int sf;
 
-	sf = syncobj_to_sync_file(fd, handle);
+	sf = syncobj_handle_to_fd(fd, handle,
+				  DRM_SYNCOBJ_HANDLE_TO_FD_FLAGS_EXPORT_SYNC_FILE);
 	result = poll(&(struct pollfd){sf, POLLIN}, 1, 0) == 0;
 	close(sf);
 
@@ -1015,7 +873,7 @@ static void test_syncobj_unused_fence(int fd)
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_fence fence = {
-		.handle = syncobj_create(fd),
+		.handle = syncobj_create(fd, 0),
 	};
 	igt_spin_t *spin = igt_spin_new(fd);
 
@@ -1051,7 +909,7 @@ static void test_syncobj_invalid_wait(int fd)
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_fence fence = {
-		.handle = syncobj_create(fd),
+		.handle = syncobj_create(fd, 0),
 	};
 
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -1079,7 +937,7 @@ static void test_syncobj_invalid_flags(int fd)
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_fence fence = {
-		.handle = syncobj_create(fd),
+		.handle = syncobj_create(fd, 0),
 	};
 
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -1107,7 +965,7 @@ static void test_syncobj_signal(int fd)
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_fence fence = {
-		.handle = syncobj_create(fd),
+		.handle = syncobj_create(fd, 0),
 	};
 	igt_spin_t *spin = igt_spin_new(fd);
 
@@ -1146,7 +1004,7 @@ static void test_syncobj_wait(int fd)
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_fence fence = {
-		.handle = syncobj_create(fd),
+		.handle = syncobj_create(fd, 0),
 	};
 	igt_spin_t *spin;
 	unsigned handle[16];
@@ -1225,7 +1083,7 @@ static void test_syncobj_export(int fd)
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_fence fence = {
-		.handle = syncobj_create(fd),
+		.handle = syncobj_create(fd, 0),
 	};
 	int export[2];
 	igt_spin_t *spin = igt_spin_new(fd);
@@ -1290,7 +1148,7 @@ static void test_syncobj_repeat(int fd)
 
 	/* Check that we can wait on the same fence multiple times */
 	fence = calloc(nfences, sizeof(*fence));
-	fence->handle = syncobj_create(fd);
+	fence->handle = syncobj_create(fd, 0);
 	export = syncobj_export(fd, fence->handle);
 	for (int i = 1; i < nfences; i++)
 		fence[i].handle = syncobj_import(fd, export);
@@ -1342,7 +1200,7 @@ static void test_syncobj_import(int fd)
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	igt_spin_t *spin = igt_spin_new(fd);
-	uint32_t sync = syncobj_create(fd);
+	uint32_t sync = syncobj_create(fd, 0);
 	int fence;
 
 	/* Check that we can create a syncobj from an explicit fence (which
@@ -1363,7 +1221,7 @@ static void test_syncobj_import(int fd)
 
 	fence = execbuf.rsvd2 >> 32;
 	igt_assert(fence_busy(fence));
-	syncobj_from_sync_file(fd, sync, fence);
+	syncobj_import_sync_file(fd, sync, fence);
 	close(fence);
 
 	igt_assert(gem_bo_busy(fd, obj.handle));
@@ -1412,7 +1270,7 @@ static void test_syncobj_channel(int fd)
 		execbuf.num_cliprects = 1;
 
 		/* Create a primed fence */
-		fence.handle = syncobj_create(fd);
+		fence.handle = syncobj_create(fd, 0);
 		fence.flags = I915_EXEC_FENCE_SIGNAL;
 
 		gem_execbuf(fd, &execbuf);
