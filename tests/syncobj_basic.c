@@ -149,7 +149,7 @@ test_bad_create_flags(int fd)
 static void
 test_create_signaled(int fd)
 {
-	uint32_t syncobj = syncobj_create(fd, LOCAL_SYNCOBJ_CREATE_SIGNALED);
+	uint32_t syncobj = syncobj_create(fd, DRM_SYNCOBJ_CREATE_SIGNALED);
 
 	igt_assert_eq(syncobj_wait_err(fd, &syncobj, 1, 0, 0), 0);
 

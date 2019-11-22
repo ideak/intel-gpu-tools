@@ -43,8 +43,11 @@ __syncobj_create(int fd, uint32_t *handle, uint32_t flags)
 	int err = 0;
 
 	create.flags = flags;
-	if (drmIoctl(fd, DRM_IOCTL_SYNCOBJ_CREATE, &create))
+	if (igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_CREATE, &create)) {
 		err = -errno;
+		igt_assume(err);
+		errno = 0;
+	}
 	*handle = create.handle;
 	return err;
 }
@@ -74,8 +77,11 @@ __syncobj_destroy(int fd, uint32_t handle)
 	int err = 0;
 
 	destroy.handle = handle;
-	if (drmIoctl(fd, DRM_IOCTL_SYNCOBJ_DESTROY, &destroy))
+	if (igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_DESTROY, &destroy)) {
 		err = -errno;
+		igt_assume(err);
+		errno = 0;
+	}
 	return err;
 }
 
@@ -95,8 +101,11 @@ int
 __syncobj_handle_to_fd(int fd, struct drm_syncobj_handle *args)
 {
 	int err = 0;
-	if (drmIoctl(fd, DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD, args))
+	if (igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD, args)) {
 		err = -errno;
+		igt_assume(err);
+		errno = 0;
+	}
 	return err;
 }
 
@@ -125,8 +134,11 @@ int
 __syncobj_fd_to_handle(int fd, struct drm_syncobj_handle *args)
 {
 	int err = 0;
-	if (drmIoctl(fd, DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, args))
+	if (igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, args)) {
 		err = -errno;
+		igt_assume(err);
+		errno = 0;
+	}
 	return err;
 }
 
@@ -170,11 +182,14 @@ syncobj_import_sync_file(int fd, uint32_t handle, int sync_file)
 }
 
 int
-__syncobj_wait(int fd, struct local_syncobj_wait *args)
+__syncobj_wait(int fd, struct drm_syncobj_wait *args)
 {
 	int err = 0;
-	if (drmIoctl(fd, LOCAL_IOCTL_SYNCOBJ_WAIT, args))
+	if (igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_WAIT, args)) {
 		err = -errno;
+		igt_assume(err);
+		errno = 0;
+	}
 	return err;
 }
 
@@ -182,7 +197,7 @@ int
 syncobj_wait_err(int fd, uint32_t *handles, uint32_t count,
 		 uint64_t abs_timeout_nsec, uint32_t flags)
 {
-	struct local_syncobj_wait wait;
+	struct drm_syncobj_wait wait;
 
 	wait.handles = to_user_pointer(handles);
 	wait.timeout_nsec = abs_timeout_nsec;
@@ -212,7 +227,7 @@ syncobj_wait(int fd, uint32_t *handles, uint32_t count,
 	     uint64_t abs_timeout_nsec, uint32_t flags,
 	     uint32_t *first_signaled)
 {
-	struct local_syncobj_wait wait;
+	struct drm_syncobj_wait wait;
 	int ret;
 
 	wait.handles = to_user_pointer(handles);
@@ -236,13 +251,16 @@ syncobj_wait(int fd, uint32_t *handles, uint32_t count,
 static int
 __syncobj_reset(int fd, uint32_t *handles, uint32_t count)
 {
-	struct local_syncobj_array array = { 0 };
+	struct drm_syncobj_array array = { 0 };
 	int err = 0;
 
 	array.handles = to_user_pointer(handles);
 	array.count_handles = count;
-	if (drmIoctl(fd, LOCAL_IOCTL_SYNCOBJ_RESET, &array))
+	if (igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_RESET, &array)) {
 		err = -errno;
+		igt_assume(err);
+		errno = 0;
+	}
 	return err;
 }
 
@@ -263,13 +281,16 @@ syncobj_reset(int fd, uint32_t *handles, uint32_t count)
 static int
 __syncobj_signal(int fd, uint32_t *handles, uint32_t count)
 {
-	struct local_syncobj_array array = { 0 };
+	struct drm_syncobj_array array = { 0 };
 	int err = 0;
 
 	array.handles = to_user_pointer(handles);
 	array.count_handles = count;
-	if (drmIoctl(fd, LOCAL_IOCTL_SYNCOBJ_SIGNAL, &array))
+	if (igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_SIGNAL, &array)) {
 		err = -errno;
+		igt_assume(err);
+		errno = 0;
+	}
 	return err;
 }
 

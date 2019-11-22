@@ -28,30 +28,6 @@
 #include <stdbool.h>
 #include <drm.h>
 
-#define LOCAL_SYNCOBJ_CREATE_SIGNALED (1 << 0)
-
-#define LOCAL_SYNCOBJ_WAIT_FLAGS_WAIT_ALL (1 << 0)
-#define LOCAL_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT (1 << 1)
-struct local_syncobj_wait {
-       __u64 handles;
-       /* absolute timeout */
-       __s64 timeout_nsec;
-       __u32 count_handles;
-       __u32 flags;
-       __u32 first_signaled; /* only valid when not waiting all */
-       __u32 pad;
-};
-
-struct local_syncobj_array {
-       __u64 handles;
-       __u32 count_handles;
-       __u32 pad;
-};
-
-#define LOCAL_IOCTL_SYNCOBJ_WAIT	DRM_IOWR(0xC3, struct local_syncobj_wait)
-#define LOCAL_IOCTL_SYNCOBJ_RESET	DRM_IOWR(0xC4, struct local_syncobj_array)
-#define LOCAL_IOCTL_SYNCOBJ_SIGNAL	DRM_IOWR(0xC5, struct local_syncobj_array)
-
 uint32_t syncobj_create(int fd, uint32_t flags);
 void syncobj_destroy(int fd, uint32_t handle);
 int __syncobj_handle_to_fd(int fd, struct drm_syncobj_handle *args);
@@ -59,7 +35,7 @@ int __syncobj_fd_to_handle(int fd, struct drm_syncobj_handle *args);
 int syncobj_handle_to_fd(int fd, uint32_t handle, uint32_t flags);
 uint32_t syncobj_fd_to_handle(int fd, int syncobj_fd, uint32_t flags);
 void syncobj_import_sync_file(int fd, uint32_t handle, int sync_file);
-int __syncobj_wait(int fd, struct local_syncobj_wait *args);
+int __syncobj_wait(int fd, struct drm_syncobj_wait *args);
 int syncobj_wait_err(int fd, uint32_t *handles, uint32_t count,
 		     uint64_t abs_timeout_nsec, uint32_t flags);
 bool syncobj_wait(int fd, uint32_t *handles, uint32_t count,
