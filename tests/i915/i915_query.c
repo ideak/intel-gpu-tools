@@ -496,7 +496,8 @@ static void engines_invalid(int fd)
 {
 	struct drm_i915_query_engine_info *engines;
 	struct drm_i915_query_item item;
-	unsigned int len;
+	unsigned int i, len;
+	uint8_t *buf;
 
 	/* Flags is MBZ. */
 	memset(&item, 0, sizeof(item));
@@ -573,6 +574,22 @@ static void engines_invalid(int fd)
 	engines = mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON,
 		       -1, 0);
 	igt_assert(engines != MAP_FAILED);
+
+	/* Check no write past len. */
+	memset(engines, 0xa5, 4096);
+	memset(engines, 0, len);
+	memset(&item, 0, sizeof(item));
+	item.query_id = DRM_I915_QUERY_ENGINE_INFO;
+	item.length = len;
+	item.data_ptr = to_user_pointer(engines);
+	i915_query_items(fd, &item, 1);
+	igt_assert_eq(item.length, len);
+	buf = (uint8_t *)engines;
+	buf += len;
+	for (i = 0; i < 4096 - len; i++, buf++)
+		igt_assert_f(*buf == 0xa5,
+			     "Garbage %u bytes after buffer! (%x)\n",
+			     i, *buf);
 
 	/* PROT_NONE is similar to unmapped area. */
 	memset(engines, 0, len);
