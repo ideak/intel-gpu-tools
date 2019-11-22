@@ -77,6 +77,13 @@ static void enable_hangcheck(int i915)
 	close(dir);
 }
 
+static void flush_delayed_fput(int i915)
+{
+	rcu_barrier(i915); /* flush the delayed fput */
+	sched_yield();
+	rcu_barrier(i915); /* again, in case it was added after we waited! */
+}
+
 static void test_idempotent(int i915)
 {
 	struct drm_i915_gem_context_param p = {
@@ -352,8 +359,7 @@ static void test_nonpersistent_file(int i915)
 	spin = igt_spin_new(i915, .flags = IGT_SPIN_FENCE_OUT);
 
 	close(i915);
-	sched_yield();
-	rcu_barrier(debugfs); /* force the delayed fput() */
+	flush_delayed_fput(i915);
 
 	igt_assert_eq(sync_fence_wait(spin->out_fence, MSEC_PER_SEC / 5), 0);
 	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
@@ -468,7 +474,7 @@ static void test_process(int i915)
 	}
 	close(sv[0]);
 	igt_waitchildren();
-	rcu_barrier(i915); /* force the delayed fput() */
+	flush_delayed_fput(i915);
 
 	fence = recvfd(sv[1]);
 	close(sv[1]);
@@ -517,7 +523,7 @@ static void test_process_mixed(int i915, unsigned int engine)
 	}
 	close(sv[0]);
 	igt_waitchildren();
-	rcu_barrier(i915); /* force the delayed fput() */
+	flush_delayed_fput(i915);
 
 	fence[0] = recvfd(sv[1]);
 	fence[1] = recvfd(sv[1]);
@@ -594,7 +600,7 @@ static void test_processes(int i915)
 		sched_yield();
 		close(p[i].sv[0]);
 		close(p[i].sv[1]);
-		rcu_barrier(i915);
+		flush_delayed_fput(i915);
 
 		if (i == 0) {
 			/* First fence is non-persistent, so should be reset */
@@ -635,10 +641,7 @@ static void __smoker(int i915, unsigned int engine, int expected)
 	}
 
 	close(fd);
-
-	rcu_barrier(i915); /* flush the delayed fput */
-	sched_yield();
-	rcu_barrier(i915); /* again, in case it was added after we waited! */
+	flush_delayed_fput(i915);
 
 	igt_spin_end(spin);
 
