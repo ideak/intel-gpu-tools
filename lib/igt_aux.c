@@ -864,6 +864,10 @@ void igt_system_suspend_autoresume(enum igt_suspend_state state,
 	igt_require(test == SUSPEND_TEST_NONE ||
 		    faccessat(power_dir, "pm_test", R_OK | W_OK, 0) == 0);
 
+	igt_skip_on_f(state == SUSPEND_STATE_DISK &&
+		      !intel_get_total_swap_mb(),
+		      "Suspend to disk requires swap space.\n");
+
 	orig_test = get_suspend_test(power_dir);
 	set_suspend_test(power_dir, test);
 
