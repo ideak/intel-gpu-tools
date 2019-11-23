@@ -359,7 +359,7 @@ static void test_nonpersistent_file(int i915)
 	spin = igt_spin_new(i915, .flags = IGT_SPIN_FENCE_OUT);
 
 	close(i915);
-	flush_delayed_fput(i915);
+	flush_delayed_fput(debugfs);
 
 	igt_assert_eq(sync_fence_wait(spin->out_fence, MSEC_PER_SEC / 5), 0);
 	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
