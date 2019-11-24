@@ -161,6 +161,7 @@ static void test_vm(int i915)
 		.param = I915_CONTEXT_PARAM_VM,
 	};
 	uint32_t parent, child;
+	igt_spin_t *spin;
 
 	/*
 	 * Proving 2 contexts share the same GTT is quite tricky as we have no
@@ -176,6 +177,15 @@ static void test_vm(int i915)
 
 	parent = gem_context_create(i915);
 	child = gem_context_create(i915);
+
+	/* Create a background spinner to keep the engines busy */
+	spin = igt_spin_new(i915);
+	for (int i = 0; i < 16; i++) {
+		spin->execbuf.rsvd1 = gem_context_create(i915);
+		gem_context_set_priority(i915, spin->execbuf.rsvd1, 1023);
+		gem_execbuf(i915, &spin->execbuf);
+		gem_context_destroy(i915, spin->execbuf.rsvd1);
+	}
 
 	/* Using implicit soft-pinning */
 	eb.rsvd1 = parent;
@@ -226,6 +236,7 @@ static void test_vm(int i915)
 	gem_context_destroy(i915, child);
 	gem_vm_destroy(i915, arg.value);
 
+	igt_spin_free(i915, spin);
 	gem_sync(i915, batch.handle);
 	gem_close(i915, batch.handle);
 }
