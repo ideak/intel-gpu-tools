@@ -314,25 +314,16 @@ static bool has_single_timeline(int i915)
 
 static void single_timeline(int i915)
 {
-	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct drm_i915_gem_exec_object2 obj = {
-		.handle = gem_create(i915, 4096),
-	};
-	struct drm_i915_gem_execbuffer2 execbuf = {
-		.buffers_ptr = to_user_pointer(&obj),
-		.buffer_count = 1,
-	};
-	struct sync_fence_info rings[16];
+	struct sync_fence_info rings[64];
 	struct sync_file_info sync_file_info = {
 		.num_fences = 1,
 	};
+	igt_spin_t *spin;
 	int n;
 
 	igt_require(has_single_timeline(i915));
 
-	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
-	gem_execbuf(i915, &execbuf);
-	gem_sync(i915, obj.handle);
+	spin = igt_spin_new(i915);
 
 	/*
 	 * For a "single timeline" context, each ring is on the common
@@ -341,23 +332,24 @@ static void single_timeline(int i915)
 	 * to, it reports the same timeline name and fence context. However,
 	 * the fence context is not reported through the sync_fence_info.
 	 */
-	execbuf.rsvd1 =
+	spin->execbuf.rsvd1 =
 		gem_context_clone(i915, 0, 0,
 				  I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
-	execbuf.flags = I915_EXEC_FENCE_OUT;
 	n = 0;
 	for_each_engine(e, i915) {
-		gem_execbuf_wr(i915, &execbuf);
+		spin->execbuf.flags = eb_ring(e) | I915_EXEC_FENCE_OUT;
+
+		gem_execbuf_wr(i915, &spin->execbuf);
 		sync_file_info.sync_fence_info = to_user_pointer(&rings[n]);
-		do_ioctl(execbuf.rsvd2 >> 32, SYNC_IOC_FILE_INFO, &sync_file_info);
-		close(execbuf.rsvd2 >> 32);
+		do_ioctl(spin->execbuf.rsvd2 >> 32, SYNC_IOC_FILE_INFO, &sync_file_info);
+		close(spin->execbuf.rsvd2 >> 32);
 
 		igt_info("ring[%d] fence: %s %s\n",
 			 n, rings[n].driver_name, rings[n].obj_name);
-		n++;
+		if (++n == ARRAY_SIZE(rings))
+			break;
 	}
-	gem_sync(i915, obj.handle);
-	gem_close(i915, obj.handle);
+	igt_spin_free(i915, spin);
 
 	for (int i = 1; i < n; i++) {
 		igt_assert(!strcmp(rings[0].driver_name, rings[i].driver_name));
