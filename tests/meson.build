@@ -328,6 +328,14 @@ test_executables += executable('gem_exec_balancer', 'i915/gem_exec_balancer.c',
 	   install : true)
 test_list += 'gem_exec_balancer'
 
+test_executables += executable('gem_mmap_offset',
+	   join_paths('i915', 'gem_mmap_offset.c'),
+	   dependencies : test_deps + [ libatomic ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'gem_mmap_offset'
+
 test_executables += executable('perf_pmu', 'perf_pmu.c',
 	   dependencies : test_deps + [ lib_igt_perf ],
 	   install_dir : libexecdir,
