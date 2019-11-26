@@ -356,7 +356,7 @@ void gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf, uint64
 	igt_assert_eq(__gem_write(fd, handle, offset, buf, length), 0);
 }
 
-static int __gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t length)
+int __gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t length)
 {
 	struct drm_i915_gem_pread gem_pread;
 	int err;

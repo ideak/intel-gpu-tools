@@ -46,6 +46,8 @@ static void test_read(int vgem, int i915)
 	handle = prime_fd_to_handle(i915, dmabuf);
 	close(dmabuf);
 
+	igt_skip_on(__gem_read(i915, handle, 0, &i, sizeof(i)));
+
 	ptr = vgem_mmap(vgem, &scratch, PROT_WRITE);
 	for (i = 0; i < 1024; i++)
 		ptr[1024*i] = i;
@@ -80,6 +82,8 @@ static void test_fence_read(int i915, int vgem)
 	dmabuf = prime_handle_to_fd(vgem, scratch.handle);
 	handle = prime_fd_to_handle(i915, dmabuf);
 	close(dmabuf);
+
+	igt_skip_on(__gem_read(i915, handle, 0, &i, sizeof(i)));
 
 	igt_fork(child, 1) {
 		close(master[0]);
@@ -190,6 +194,8 @@ static void test_write(int vgem, int i915)
 	dmabuf = prime_handle_to_fd(vgem, scratch.handle);
 	handle = prime_fd_to_handle(i915, dmabuf);
 	close(dmabuf);
+
+	igt_skip_on(__gem_write(i915, handle, 0, &i, sizeof(i)));
 
 	ptr = vgem_mmap(vgem, &scratch, PROT_READ);
 	gem_close(vgem, scratch.handle);
