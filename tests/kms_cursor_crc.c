@@ -175,10 +175,15 @@ static void do_single_test(data_t *data, int x, int y)
 	igt_display_commit(display);
 
 	igt_wait_for_vblank(data->drm_fd, data->pipe);
-	igt_pipe_crc_collect_crc(pipe_crc, &crc);
+	igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc);
 
 	if (data->flags & (TEST_DPMS | TEST_SUSPEND)) {
 		igt_crc_t crc_after;
+		/*
+		 * stop/start crc to avoid dmesg notifications about userspace
+		 * reading too slow.
+		 */
+		igt_pipe_crc_stop(pipe_crc);
 
 		if (data->flags & TEST_DPMS) {
 			igt_debug("dpms off/on cycle\n");
@@ -194,7 +199,8 @@ static void do_single_test(data_t *data, int x, int y)
 			igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 						      SUSPEND_TEST_NONE);
 
-		igt_pipe_crc_collect_crc(pipe_crc, &crc_after);
+		igt_pipe_crc_start(pipe_crc);
+		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc_after);
 		igt_assert_crc_equal(&crc, &crc_after);
 	}
 
@@ -208,7 +214,8 @@ static void do_single_test(data_t *data, int x, int y)
 	igt_display_commit(display);
 
 	igt_wait_for_vblank(data->drm_fd, data->pipe);
-	igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
+	igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &ref_crc);
+
 	igt_assert_crc_equal(&crc, &ref_crc);
 
 	/* Clear screen afterwards */
@@ -344,6 +351,7 @@ static void cleanup_crtc(data_t *data)
 {
 	igt_display_t *display = &data->display;
 
+	igt_pipe_crc_stop(data->pipe_crc);
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = NULL;
 
@@ -358,8 +366,6 @@ static void prepare_crtc(data_t *data, igt_output_t *output,
 	drmModeModeInfo *mode;
 	igt_display_t *display = &data->display;
 	igt_plane_t *primary;
-
-	cleanup_crtc(data);
 
 	/* select the pipe we want to use */
 	igt_output_set_pipe(output, data->pipe);
@@ -393,7 +399,8 @@ static void prepare_crtc(data_t *data, igt_output_t *output,
 	data->refresh = mode->vrefresh;
 
 	/* get reference crc w/o cursor */
-	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
+	igt_pipe_crc_start(data->pipe_crc);
+	igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &data->ref_crc);
 }
 
 static void test_cursor_alpha(data_t *data, double a)
@@ -420,7 +427,7 @@ static void test_cursor_alpha(data_t *data, double a)
 	cursor_enable(data);
 	igt_display_commit(display);
 	igt_wait_for_vblank(data->drm_fd, data->pipe);
-	igt_pipe_crc_collect_crc(pipe_crc, &crc);
+	igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc);
 	cursor_disable(data);
 	igt_remove_fb(data->drm_fd, &data->fb);
 
@@ -431,7 +438,7 @@ static void test_cursor_alpha(data_t *data, double a)
 
 	igt_display_commit(display);
 	igt_wait_for_vblank(data->drm_fd, data->pipe);
-	igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
+	igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &ref_crc);
 	igt_assert_crc_equal(&crc, &ref_crc);
 
 	/*Clear Screen*/
@@ -456,6 +463,7 @@ static void run_test(data_t *data, void (*testfunc)(data_t *), int cursor_w, int
 {
 	prepare_crtc(data, data->output, cursor_w, cursor_h);
 	testfunc(data);
+	cleanup_crtc(data);
 }
 
 static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
@@ -537,7 +545,7 @@ static void test_cursor_size(data_t *data)
 		igt_fb_set_size(&data->fb, cursor, size, size);
 		igt_display_commit(display);
 		igt_wait_for_vblank(data->drm_fd, data->pipe);
-		igt_pipe_crc_collect_crc(pipe_crc, &crc[i]);
+		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc[i]);
 	}
 	cursor_disable(data);
 	igt_display_commit(display);
@@ -551,7 +559,7 @@ static void test_cursor_size(data_t *data)
 
 		igt_display_commit(display);
 		igt_wait_for_vblank(data->drm_fd, data->pipe);
-		igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
+		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &ref_crc);
 		/* Clear screen afterwards */
 		cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb);
 		igt_paint_color(cr, 0, 0, data->screenw, data->screenh,
