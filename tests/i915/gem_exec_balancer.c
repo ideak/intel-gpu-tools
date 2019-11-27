@@ -855,6 +855,110 @@ static void bonded_slice(int i915)
 	munmap(stop, 4096);
 }
 
+static void __bonded_chain(int i915, uint32_t ctx,
+			   const struct i915_engine_class_instance *siblings,
+			   unsigned int count)
+{
+	const int priorities[] = { -1023, 0, 1023 };
+	struct drm_i915_gem_exec_object2 batch = {
+		.handle = batch_create(i915),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&batch),
+		.buffer_count = 1,
+		.rsvd1 = ctx,
+	};
+	igt_spin_t *spin;
+
+	for (int i = 0; i < ARRAY_SIZE(priorities); i++) {
+		/* A: spin forever on engine 1 */
+		set_load_balancer(i915, ctx, siblings, count, NULL);
+		if (priorities[i] < 0)
+			gem_context_set_priority(i915, ctx, priorities[i]);
+		spin = igt_spin_new(i915,
+				    .ctx = ctx,
+				    .engine = 1,
+				    .flags = (IGT_SPIN_POLL_RUN |
+					      IGT_SPIN_FENCE_OUT));
+		igt_spin_busywait_until_started(spin);
+		gem_context_set_priority(i915, ctx, 0);
+
+		/*
+		 * Note we replace the timelines between each execbuf, so
+		 * that any pair of requests on the same engine could be
+		 * re-ordered by the scheduler -- if the dependency tracking
+		 * is subpar.
+		 */
+
+		/* B: waits for A on engine 2 */
+		set_load_balancer(i915, ctx, siblings, count, NULL);
+		execbuf.rsvd2 = spin->out_fence;
+		execbuf.flags = I915_EXEC_FENCE_IN | I915_EXEC_FENCE_OUT;
+		execbuf.flags |= 2; /* opposite engine to spinner */
+		gem_execbuf_wr(i915, &execbuf);
+
+		/* B': run in parallel with B on engine 1, i.e. not before A! */
+		if (priorities[i] > 0)
+			gem_context_set_priority(i915, ctx, priorities[i]);
+		set_load_balancer(i915, ctx, siblings, count, NULL);
+		execbuf.flags = I915_EXEC_FENCE_SUBMIT | I915_EXEC_FENCE_OUT;
+		execbuf.flags |= 1; /* same engine as spinner */
+		execbuf.rsvd2 >>= 32;
+		gem_execbuf_wr(i915, &execbuf);
+		gem_context_set_priority(i915, ctx, 0);
+
+		/* Wait for any magic timeslicing or preemptions... */
+		igt_assert_eq(sync_fence_wait(execbuf.rsvd2 >> 32, 1000),
+			      -ETIME);
+
+		igt_debugfs_dump(i915, "i915_engine_info");
+
+		/*
+		 * ... which should not have happened, so everything is still
+		 * waiting on the spinner
+		 */
+		igt_assert_eq(sync_fence_status(spin->out_fence), 0);
+		igt_assert_eq(sync_fence_status(execbuf.rsvd2 & 0xffffffff), 0);
+		igt_assert_eq(sync_fence_status(execbuf.rsvd2 >> 32), 0);
+
+		igt_spin_free(i915, spin);
+		gem_sync(i915, batch.handle);
+
+		igt_assert_eq(sync_fence_status(execbuf.rsvd2 & 0xffffffff), 1);
+		igt_assert_eq(sync_fence_status(execbuf.rsvd2 >> 32), 1);
+
+		close(execbuf.rsvd2);
+		close(execbuf.rsvd2 >> 32);
+	}
+
+	gem_close(i915, batch.handle);
+}
+
+static void bonded_chain(int i915)
+{
+	uint32_t ctx;
+
+	/*
+	 * Given batches A, B and B', where B and B' are a bonded pair, with
+	 * B' depending on B with a submit fence and B depending on A as
+	 * an ordinary fence; prove B' cannot complete before A.
+	 */
+
+	ctx = gem_context_create(i915);
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *siblings;
+		unsigned int count;
+
+		siblings = list_engines(i915, 1u << class, &count);
+		if (count > 1)
+			__bonded_chain(i915, ctx, siblings, count);
+		free(siblings);
+	}
+
+	gem_context_destroy(i915, ctx);
+}
+
 static void indices(int i915)
 {
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
@@ -1579,6 +1683,9 @@ igt_main
 
 	igt_subtest("bonded-slice")
 		bonded_slice(i915);
+
+	igt_subtest("bonded-chain")
+		bonded_chain(i915);
 
 	igt_fixture {
 		igt_stop_hang_detector();
