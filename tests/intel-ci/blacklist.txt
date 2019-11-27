@@ -25,7 +25,7 @@ igt@gem_cs_prefetch(@.*)?
 igt@gem_ctx_create@(?!.*basic).*
 igt@gem_ctx_exec@(?!.*basic).*
 igt@gem_ctx_shared@*exhaust*
-igt@gem_ctx_switch@.*(forked|interruptible).*
+igt@gem_ctx_switch(@.*)?
 igt@gem_ctx_thrash(@.*)?
 igt@gem_evict_alignment(@.*)?
 igt@gem_evict_everything(@.*)?
