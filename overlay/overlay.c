@@ -599,10 +599,8 @@ static void show_gpu_freq(struct overlay_context *ctx, struct overlay_gpu_freq *
 	}
 
 	if (has_freq) {
-		if (gf->gpu_freq.current)
-			chart_add_sample(&gf->current, gf->gpu_freq.current);
-		if (gf->gpu_freq.request)
-			chart_add_sample(&gf->request, gf->gpu_freq.request);
+		chart_add_sample(&gf->current, gf->gpu_freq.current);
+		chart_add_sample(&gf->request, gf->gpu_freq.request);
 
 		chart_draw(&gf->request, ctx->cr);
 		chart_draw(&gf->current, ctx->cr);
@@ -648,8 +646,8 @@ static void show_gpu_freq(struct overlay_context *ctx, struct overlay_gpu_freq *
 
 		len = sprintf(buf, "Frequency: %dMHz", gf->gpu_freq.current);
 		if (gf->gpu_freq.request)
-		cairo_set_source_rgba(ctx->cr, 1, 1, 1, 1);
 			sprintf(buf + len, " (requested %dMHz)", gf->gpu_freq.request);
+		cairo_set_source_rgba(ctx->cr, 1, 1, 1, 1);
 		cairo_move_to(ctx->cr, PAD, y);
 		cairo_show_text(ctx->cr, buf);
 		y += 12;
