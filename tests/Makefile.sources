@@ -125,9 +125,6 @@ gem_close_race_SOURCES = i915/gem_close_race.c
 TESTS_progs += gem_concurrent_blit
 gem_concurrent_blit_SOURCES = i915/gem_concurrent_blit.c
 
-TESTS_progs += gem_cpu_reloc
-gem_cpu_reloc_SOURCES = i915/gem_cpu_reloc.c
-
 TESTS_progs += gem_create
 gem_create_SOURCES = i915/gem_create.c
 

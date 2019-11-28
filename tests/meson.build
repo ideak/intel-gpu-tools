@@ -113,7 +113,6 @@ i915_progs = [
 	'gem_close',
 	'gem_close_race',
 	'gem_concurrent_blit',
-	'gem_cpu_reloc',
 	'gem_cs_prefetch',
 	'gem_cs_tlb',
 	'gem_ctx_bad_destroy',

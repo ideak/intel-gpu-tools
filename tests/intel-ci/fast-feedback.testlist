@@ -9,7 +9,6 @@ igt@gem_basic@create-fd-close
 igt@gem_busy@busy-all
 igt@gem_close_race@basic-process
 igt@gem_close_race@basic-threads
-igt@gem_cpu_reloc@basic
 igt@gem_ctx_create@basic
 igt@gem_ctx_create@basic-files
 igt@gem_ctx_exec@basic
