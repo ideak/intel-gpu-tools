@@ -84,16 +84,6 @@ static void display_fini(data_t *data)
 	igt_display_fini(&data->display);
 }
 
-static bool edp_psr2_enabled(data_t *data)
-{
-	char buf[512];
-
-	igt_debugfs_simple_read(data->debugfs_fd, "i915_edp_psr_status",
-				buf, sizeof(buf));
-
-	return strstr(buf, "PSR mode: PSR2 enabled") != NULL;
-}
-
 static void cleanup_dc_psr(data_t *data)
 {
 	igt_plane_t *primary;
@@ -298,7 +288,7 @@ static void setup_dc3co(data_t *data)
 {
 	data->op_psr_mode = PSR_MODE_2;
 	psr_enable(data->debugfs_fd, data->op_psr_mode);
-	igt_require_f(edp_psr2_enabled(data),
+	igt_require_f(psr_wait_entry(data->debugfs_fd, data->op_psr_mode),
 		      "PSR2 is not enabled\n");
 }
 
