@@ -87,8 +87,10 @@ test_rmfb(struct rmfb_data *data, igt_output_t *output, enum pipe pipe, bool reo
 			igt_plane_set_fb(plane, &fb);
 		}
 
-		if (igt_display_try_commit2(&data->display, data->display.is_atomic ?
-					    COMMIT_ATOMIC : COMMIT_LEGACY)) {
+		if (igt_display_try_commit2(&data->display,
+					    data->display.is_atomic ? COMMIT_ATOMIC :
+					    plane->type == DRM_PLANE_TYPE_PRIMARY ?
+					    COMMIT_LEGACY : COMMIT_UNIVERSAL)) {
 			/*
 			 * Disable any plane that fails (presumably
 			 * due to exceeding some hardware limit).
