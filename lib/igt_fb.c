@@ -1936,6 +1936,9 @@ static void init_buf(struct fb_blit_upload *blit,
 		buf->aux.offset = fb->offsets[1];
 		buf->aux.stride = fb->strides[1];
 	}
+
+	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
+		buf->cc.offset = fb->offsets[2];
 }
 
 static void fini_buf(struct igt_buf *buf)

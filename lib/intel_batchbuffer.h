@@ -234,6 +234,9 @@ struct igt_buf {
 		uint32_t offset;
 		uint32_t stride;
 	} aux;
+	struct {
+		uint32_t offset;
+	} cc;
 	/*< private >*/
 	unsigned num_tiles;
 };

@@ -118,12 +118,15 @@ struct gen9_surface_state {
 		uint32_t aux_base_addr_hi;
 	} ss11;
 
+	/* register can be used for either
+	 * clear value or depth clear value
+	 */
 	struct {
-		uint32_t hiz_depth_clear_value;
+		uint32_t clear_address;
 	} ss12;
 
 	struct {
-		uint32_t reserved;
+		uint32_t clear_address_hi;
 	} ss13;
 
 	struct {

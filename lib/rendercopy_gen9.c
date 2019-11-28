@@ -271,6 +271,17 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 		assert(ret == 0);
 	}
 
+	if (buf->cc.offset) {
+		ss->ss12.clear_address = buf->bo->offset64 + buf->cc.offset;
+		ss->ss13.clear_address_hi = (buf->bo->offset64 + buf->cc.offset) >> 32;
+
+		ret = drm_intel_bo_emit_reloc(batch->bo,
+					      intel_batchbuffer_subdata_offset(batch, &ss->ss12),
+					      buf->bo, buf->cc.offset,
+					      read_domain, write_domain);
+		assert(ret == 0);
+	}
+
 	return offset;
 }
 
