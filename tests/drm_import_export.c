@@ -40,6 +40,7 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 
+#define DURATION 10
 
 int fd;
 drm_intel_bufmgr *bufmgr;
@@ -105,10 +106,7 @@ static void test_surfaces(drm_intel_bo *bo_shared)
 
 static void start_test(void)
 {
-	int i;
-
-	for (i=0; i < 16384; i++)
-	{
+	igt_until_timeout(DURATION) {
 		drm_intel_bo * bo_shared;
 
 		bo_shared = drm_intel_bo_alloc(bufmgr1, "buf-shared",16384, 4096);
@@ -196,7 +194,7 @@ static void test_import_close_race(void)
 
 	igt_assert_eq(pthread_create(&t, NULL, import_close_thread , &t_data), 0);
 
-	igt_until_timeout(15) {
+	igt_until_timeout(DURATION) {
 		bo = drm_intel_bo_alloc(bufmgr, "buf-shared", 4096, 4096);
 		igt_assert(bo != NULL);
 		/*
