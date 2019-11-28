@@ -206,9 +206,6 @@ gem_exec_basic_SOURCES = i915/gem_exec_basic.c
 TESTS_progs += gem_exec_big
 gem_exec_big_SOURCES = i915/gem_exec_big.c
 
-TESTS_progs += gem_exec_blt
-gem_exec_blt_SOURCES = i915/gem_exec_blt.c
-
 TESTS_progs += gem_exec_capture
 gem_exec_capture_SOURCES = i915/gem_exec_capture.c
 

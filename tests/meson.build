@@ -135,7 +135,6 @@ i915_progs = [
 	'gem_exec_bad_domains',
 	'gem_exec_basic',
 	'gem_exec_big',
-	'gem_exec_blt',
 	'gem_exec_capture',
 	'gem_exec_create',
 	'gem_exec_faulting_reloc',
