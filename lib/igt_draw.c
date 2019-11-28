@@ -273,6 +273,8 @@ static void switch_blt_tiling(struct intel_batchbuffer *batch, uint32_t tiling,
 	if (tiling != I915_TILING_Y)
 		return;
 
+	igt_require(batch->gen >= 6);
+
 	bcs_swctrl = (0x3 << 16) | (on ? 0x3 : 0x0);
 
 	/* To change the tile register, insert an MI_FLUSH_DW followed by an
