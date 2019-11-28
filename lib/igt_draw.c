@@ -551,7 +551,7 @@ static void draw_rect_blt(int fd, struct cmd_data *cmd_data,
 
 	blt_cmd_len = (gen >= 8) ?  0x5 : 0x4;
 	blt_cmd_tiling = (tiling) ? XY_COLOR_BLT_TILED : 0;
-	pitch = (tiling) ? buf->stride / 4 : buf->stride;
+	pitch = (gen >= 4 && tiling) ? buf->stride / 4 : buf->stride;
 
 	switch_blt_tiling(batch, tiling, true);
 
