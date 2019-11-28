@@ -32,7 +32,6 @@ IGT_RESUME=
 USE_PIGLIT=0
 RUNNER=
 RESUME=
-BLACKLIST=
 
 function find_file # basename <possible paths>
 {
@@ -134,11 +133,11 @@ while getopts ":dhlr:st:T:vx:Rnpb:" opt; do
 		t) FILTER="$FILTER -t $OPTARG" ;;
 		T) FILTER="$FILTER --test-list $OPTARG" ;;
 		v) VERBOSE="-l verbose" ;;
-		x) EXCLUDE="$EXCLUDE -x $OPTARG" ;;
+		x) FILTER="$FILTER -x $OPTARG" ;;
 		R) RESUME_RUN="true" ;;
 		n) NORETRY="--no-retry" ;;
 		p) USE_PIGLIT=1 ;;
-		b) BLACKLIST="$BLACKLIST -b $OPTARG" ;;
+		b) FILTER="$FILTER -b $OPTARG" ;;
 		:)
 			echo "Option -$OPTARG requires an argument."
 			exit 1
@@ -187,12 +186,11 @@ else
 
 	RUNNER=$IGT_RUNNER
 	RESUME=$IGT_RESUME
-	RUN_ARGS="$BLACKLIST"
-	LIST_ARGS="-L $BLACKLIST"
+	LIST_ARGS="-L"
 fi
 
 if [ "x$LIST_TESTS" != "x" ]; then
-	execute_runner 0 $RUNNER $LIST_ARGS
+	execute_runner 0 $RUNNER $LIST_ARGS $FILTER
 	exit
 fi
 
@@ -200,7 +198,7 @@ if [ "x$RESUME_RUN" != "x" ]; then
 	execute_runner 1 $RESUME $RESUME_ARGS "$RESULTS"
 else
 	mkdir -p "$RESULTS"
-	execute_runner 1 $RUNNER $RUN_ARGS -o -s "$RESULTS" $VERBOSE $EXCLUDE $FILTER
+	execute_runner 1 $RUNNER $RUN_ARGS -o -s "$RESULTS" $VERBOSE $FILTER
 fi
 
 if [ "$SUMMARY" == "html" ]; then
