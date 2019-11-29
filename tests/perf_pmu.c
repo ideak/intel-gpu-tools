@@ -1477,6 +1477,46 @@ test_frequency(int gem_fd)
 	__assert_within_epsilon(max[0], max_freq, tolerance, 0.15f);
 }
 
+static void
+test_frequency_idle(int gem_fd)
+{
+	uint32_t min_freq;
+	uint64_t val[2], start[2], slept;
+	double idle[2];
+	int fd, sysfs;
+
+	sysfs = igt_sysfs_open(gem_fd);
+	igt_require(sysfs >= 0);
+
+	min_freq = igt_sysfs_get_u32(sysfs, "gt_RPn_freq_mhz");
+	close(sysfs);
+
+	/* While parked, our convention is to report the GPU at 0Hz */
+
+	fd = open_group(I915_PMU_REQUESTED_FREQUENCY, -1);
+	open_group(I915_PMU_ACTUAL_FREQUENCY, fd);
+
+	gem_quiescent_gpu(gem_fd); /* Be idle! */
+	measured_usleep(2000); /* Wait for timers to cease */
+
+	slept = pmu_read_multi(fd, 2, start);
+	measured_usleep(batch_duration_ns / 1000);
+	slept = pmu_read_multi(fd, 2, val) - slept;
+
+	close(fd);
+
+	idle[0] = 1e9*(val[0] - start[0]) / slept;
+	idle[1] = 1e9*(val[1] - start[1]) / slept;
+
+	igt_info("Idle frequency: requested %.1f, actual %.1f; HW min %u\n",
+		 idle[0], idle[1], min_freq);
+
+	igt_assert_f(idle[0] <= min_freq,
+		     "Request frequency should be 0 while parked!\n");
+	igt_assert_f(idle[1] <= min_freq,
+		     "Actual frequency should be 0 while parked!\n");
+}
+
 static bool wait_for_rc6(int fd)
 {
 	struct timespec tv = {};
@@ -1967,6 +2007,8 @@ igt_main
 	 */
 	igt_subtest("frequency")
 		test_frequency(fd);
+	igt_subtest("frequency-idle")
+		test_frequency_idle(fd);
 
 	/**
 	 * Test interrupt count reporting.
