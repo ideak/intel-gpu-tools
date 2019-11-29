@@ -837,6 +837,7 @@ uint32_t kmstest_dumb_create(int fd, int width, int height, int bpp,
  * @size: Length of the mapping, must be greater than 0
  * @prot: Describes the memory protection of the mapping
  * Returns: A pointer representing the start of the virtual mapping
+ * Caller of this function should munmap the pointer returned, after its usage.
  */
 void *kmstest_dumb_map_buffer(int fd, uint32_t handle, uint64_t size,
 			      unsigned prot)
