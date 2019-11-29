@@ -89,6 +89,8 @@ AM_LDFLAGS = -Wl,--as-needed
 
 drm_import_export_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 drm_import_export_LDADD = $(LDADD) -lpthread
+dumb_buffer_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
+dumb_buffer_LDADD = $(LDADD) -lpthread -latomic
 gem_create_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_create_LDADD = $(LDADD) -lpthread -latomic
 gem_close_race_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)

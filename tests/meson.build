@@ -281,6 +281,13 @@ foreach prog : i915_progs
 	test_list += prog
 endforeach
 
+test_executables += executable('dumb_buffer', 'dumb_buffer.c',
+	   dependencies : test_deps + [ libatomic ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'dumb_buffer'
+
 test_executables += executable('gem_create',
 	   join_paths('i915', 'gem_create.c'),
 	   dependencies : test_deps + [ libatomic ],
