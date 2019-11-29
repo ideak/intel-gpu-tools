@@ -210,6 +210,11 @@ void intel_copy_bo(struct intel_batchbuffer *batch,
 #define I915_TILING_Yf	3
 #define I915_TILING_Ys	4
 
+enum i915_compression {
+	I915_COMPRESSION_NONE,
+	I915_COMPRESSION_RENDER,
+};
+
 /**
  * igt_buf:
  * @bo: underlying libdrm buffer object

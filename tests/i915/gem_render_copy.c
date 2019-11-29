@@ -413,7 +413,8 @@ scratch_buf_copy(data_t *data,
 
 static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 			     int width, int height,
-			     uint32_t req_tiling, bool ccs)
+			     uint32_t req_tiling,
+			     enum i915_compression compression)
 {
 	uint32_t tiling = req_tiling;
 	unsigned long pitch;
@@ -421,7 +422,7 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 
 	memset(buf, 0, sizeof(*buf));
 
-	if (ccs) {
+	if (compression != I915_COMPRESSION_NONE) {
 		int aux_width, aux_height;
 		int size;
 
@@ -572,10 +573,11 @@ static void scratch_buf_aux_check(data_t *data,
 		     "Aux surface indicates that nothing was compressed\n");
 }
 
-#define SRC_COMPRESSED	1
-#define DST_COMPRESSED	2
+#define SOURCE_MIXED_TILED	1
 
 static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
+		 enum i915_compression src_compression,
+		 enum i915_compression dst_compression,
 		 int flags)
 {
 	struct igt_buf dst, src_ccs, dst_ccs, ref;
@@ -608,14 +610,15 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	};
 	int opt_dump_aub = igt_aub_dump_enabled();
 	int num_src = ARRAY_SIZE(src);
-	bool src_compressed = flags & SRC_COMPRESSED;
-	bool dst_compressed = flags & DST_COMPRESSED;
+	const bool src_mixed_tiled = flags & SOURCE_MIXED_TILED;
+	const bool src_compressed = src_compression != I915_COMPRESSION_NONE;
+	const bool dst_compressed = dst_compression != I915_COMPRESSION_NONE;
 
 	/*
-	 * The tiling for uncompressed source buffers is determined by the
-	 * tiling of the src[] buffers above.
+	 * The source tilings for mixed source tiling test cases are determined
+	 * by the tiling of the src[] buffers above.
 	 */
-	igt_assert(!src_tiling || src_compressed);
+	igt_assert(src_tiling == I915_TILING_NONE || !src_mixed_tiled);
 
 	/* no Yf before gen9 */
 	if (intel_gen(data->devid) < 9)
@@ -626,15 +629,18 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 		igt_require(intel_gen(data->devid) >= 9);
 
 	for (int i = 0; i < num_src; i++)
-		scratch_buf_init(data, &src[i].buf, WIDTH, HEIGHT, src[i].tiling, false);
-	scratch_buf_init(data, &dst, WIDTH, HEIGHT, dst_tiling, false);
+		scratch_buf_init(data, &src[i].buf, WIDTH, HEIGHT, src[i].tiling,
+				 I915_COMPRESSION_NONE);
+	scratch_buf_init(data, &dst, WIDTH, HEIGHT, dst_tiling,
+			 I915_COMPRESSION_NONE);
 	if (src_compressed)
 		scratch_buf_init(data, &src_ccs, WIDTH, HEIGHT,
-				 src_tiling, true);
+				 src_tiling, src_compression);
 	if (dst_compressed)
 		scratch_buf_init(data, &dst_ccs, WIDTH, HEIGHT,
-				 dst_tiling, true);
-	scratch_buf_init(data, &ref, WIDTH, HEIGHT, I915_TILING_NONE, false);
+				 dst_tiling, dst_compression);
+	scratch_buf_init(data, &ref, WIDTH, HEIGHT, I915_TILING_NONE,
+			 I915_COMPRESSION_NONE);
 
 	for (int i = 0; i < num_src; i++)
 		scratch_buf_draw_pattern(data, &src[i].buf,
@@ -765,7 +771,8 @@ const char *help_str =
 	"  -a\tCheck all pixels\n"
 	;
 
-static const char *buf_mode_str(uint32_t tiling, bool compressed)
+static const char *buf_mode_str(uint32_t tiling,
+				enum i915_compression compression)
 {
 	switch (tiling) {
 	default:
@@ -774,9 +781,11 @@ static const char *buf_mode_str(uint32_t tiling, bool compressed)
 	case I915_TILING_X:
 		return "x-tiled";
 	case I915_TILING_Y:
-		return compressed ? "y-tiled-ccs" : "y-tiled";
+		return compression == I915_COMPRESSION_RENDER ? "y-tiled-ccs" :
+								"y-tiled";
 	case I915_TILING_Yf:
-		return compressed ? "yf-tiled-ccs" : "yf-tiled";
+		return compression == I915_COMPRESSION_RENDER ? "yf-tiled-ccs" :
+								"yf-tiled";
 	}
 }
 
@@ -785,27 +794,61 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 	static const struct test_desc {
 		int src_tiling;
 		int dst_tiling;
+		enum i915_compression src_compression;
+		enum i915_compression dst_compression;
 		int flags;
 	} tests[] = {
-		{ I915_TILING_NONE, I915_TILING_NONE, 0 },
-		{ I915_TILING_NONE, I915_TILING_X,    0 },
-		{ I915_TILING_NONE, I915_TILING_Y,    0 },
-		{ I915_TILING_NONE, I915_TILING_Yf,   0 },
+		{ I915_TILING_NONE,		I915_TILING_NONE,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  SOURCE_MIXED_TILED, },
+		{ I915_TILING_NONE,		I915_TILING_X,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  SOURCE_MIXED_TILED, },
+		{ I915_TILING_NONE,		I915_TILING_Y,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  SOURCE_MIXED_TILED, },
+		{ I915_TILING_NONE,		I915_TILING_Yf,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  SOURCE_MIXED_TILED, },
 
-		{ I915_TILING_Y,    I915_TILING_NONE, SRC_COMPRESSED },
-		{ I915_TILING_Y,    I915_TILING_X,    SRC_COMPRESSED },
-		{ I915_TILING_Y,    I915_TILING_Y,    SRC_COMPRESSED },
-		{ I915_TILING_Y,    I915_TILING_Yf,   SRC_COMPRESSED },
+		{ I915_TILING_Y,		I915_TILING_NONE,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_NONE,
+		  0, },
+		{ I915_TILING_Y,		I915_TILING_X,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_NONE,
+		  0, },
+		{ I915_TILING_Y,		I915_TILING_Y,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_NONE,
+		  0, },
+		{ I915_TILING_Y,		I915_TILING_Yf,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_NONE,
+		  0, },
 
-		{ I915_TILING_Yf,   I915_TILING_NONE, SRC_COMPRESSED },
-		{ I915_TILING_Yf,   I915_TILING_X,    SRC_COMPRESSED },
-		{ I915_TILING_Yf,   I915_TILING_Y,    SRC_COMPRESSED },
-		{ I915_TILING_Yf,   I915_TILING_Yf,   SRC_COMPRESSED },
+		{ I915_TILING_Yf,		I915_TILING_NONE,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_NONE,
+		  0, },
+		{ I915_TILING_Yf,		I915_TILING_X,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_NONE,
+		  0, },
+		{ I915_TILING_Yf,		I915_TILING_Y,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_NONE,
+		  0, },
+		{ I915_TILING_Yf,		I915_TILING_Yf,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_NONE,
+		  0, },
 
-		{ I915_TILING_Y,    I915_TILING_Y,    SRC_COMPRESSED | DST_COMPRESSED },
-		{ I915_TILING_Yf,   I915_TILING_Yf,   SRC_COMPRESSED | DST_COMPRESSED },
-		{ I915_TILING_Y,    I915_TILING_Yf,   SRC_COMPRESSED | DST_COMPRESSED },
-		{ I915_TILING_Yf,   I915_TILING_Y,    SRC_COMPRESSED | DST_COMPRESSED },
+		{ I915_TILING_Y,		I915_TILING_Y,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_RENDER,
+		  0, },
+		{ I915_TILING_Yf,		I915_TILING_Yf,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_RENDER,
+		  0, },
+		{ I915_TILING_Y,		I915_TILING_Yf,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_RENDER,
+		  0, },
+		{ I915_TILING_Yf,		I915_TILING_Y,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_RENDER,
+		  0, },
 	};
 	int i;
 
@@ -832,18 +875,22 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
 		const struct test_desc *t = &tests[i];
 		const char *src_mode = buf_mode_str(t->src_tiling,
-						    t->flags & SRC_COMPRESSED);
+						    t->src_compression);
 		const char *dst_mode = buf_mode_str(t->dst_tiling,
-						    t->flags & DST_COMPRESSED);
+						    t->dst_compression);
+		const bool src_mixed_tiled = t->flags & SOURCE_MIXED_TILED;
 
 		igt_describe_f("Test render_copy() from a %s to a %s buffer.",
 			       src_mode, dst_mode);
 
 		igt_subtest_f("%s%s%s",
-			      t->flags ? src_mode : "",
-			      t->flags ? "-to-" : "",
+			      src_mixed_tiled ? "" : src_mode,
+			      src_mixed_tiled ? "" : "-to-",
 			      dst_mode)
-			test(&data, t->src_tiling, t->dst_tiling, t->flags);
+			test(&data,
+			     t->src_tiling, t->dst_tiling,
+			     t->src_compression, t->dst_compression,
+			     t->flags);
 	}
 
 	igt_fixture {
