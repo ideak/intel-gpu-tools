@@ -197,6 +197,26 @@ static void *linear_copy(data_t *data, struct igt_buf *buf)
 	return linear;
 }
 
+static void
+copy_from_linear_buf(data_t *data, struct igt_buf *src, struct igt_buf *dst)
+{
+	void *linear;
+
+	igt_assert(src->tiling == I915_TILING_NONE);
+
+	gem_set_domain(data->drm_fd, src->bo->handle,
+		       I915_GEM_DOMAIN_CPU, 0);
+	linear = gem_mmap__cpu(data->drm_fd, src->bo->handle, 0,
+			       src->bo->size, PROT_READ);
+
+	if (dst->tiling == I915_TILING_Yf)
+		copy_linear_to_yf(data, dst, linear);
+	else
+		copy_linear_to_gtt(data, dst, linear);
+
+	munmap(linear, src->bo->size);
+}
+
 static void scratch_buf_write_to_png(data_t *data, struct igt_buf *buf,
 				     const char *filename)
 {
@@ -580,7 +600,7 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 		 enum i915_compression dst_compression,
 		 int flags)
 {
-	struct igt_buf dst, src_ccs, dst_ccs, ref;
+	struct igt_buf ref, src_tiled, src_ccs, dst_ccs, dst;
 	struct {
 		struct igt_buf buf;
 		const char *filename;
@@ -631,6 +651,9 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	for (int i = 0; i < num_src; i++)
 		scratch_buf_init(data, &src[i].buf, WIDTH, HEIGHT, src[i].tiling,
 				 I915_COMPRESSION_NONE);
+	if (!src_mixed_tiled)
+		scratch_buf_init(data, &src_tiled, WIDTH, HEIGHT, src_tiling,
+				 I915_COMPRESSION_NONE);
 	scratch_buf_init(data, &dst, WIDTH, HEIGHT, dst_tiling,
 			 I915_COMPRESSION_NONE);
 	if (src_compressed)
@@ -658,9 +681,15 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 				 &src[i].buf, WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
 				 &ref, src[i].x, src[i].y);
 
+	if (!src_mixed_tiled)
+		copy_from_linear_buf(data, &ref, &src_tiled);
+
 	if (opt_dump_png) {
 		for (int i = 0; i < num_src; i++)
 			scratch_buf_write_to_png(data, &src[i].buf, src[i].filename);
+		if (!src_mixed_tiled)
+			scratch_buf_write_to_png(data, &src_tiled,
+						 "source-tiled.png");
 		scratch_buf_write_to_png(data, &dst, "destination.png");
 		scratch_buf_write_to_png(data, &ref, "reference.png");
 	}
@@ -679,31 +708,51 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	 *	 |dst|src|
 	 *	  -------
 	 */
-	if (src_compressed)
-		data->render_copy(data->batch, NULL,
-				  &dst, 0, 0, WIDTH, HEIGHT,
-				  &src_ccs, 0, 0);
+	if (src_mixed_tiled) {
+		if (dst_compressed)
+			data->render_copy(data->batch, NULL,
+					  &dst, 0, 0, WIDTH, HEIGHT,
+					  &dst_ccs, 0, 0);
 
-	for (int i = 0; i < num_src; i++)
-		data->render_copy(data->batch, NULL,
-				  &src[i].buf,
-				  WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
-				  src_compressed ? &src_ccs : &dst,
-				  src[i].x, src[i].y);
+		for (int i = 0; i < num_src; i++)
+			data->render_copy(data->batch, NULL,
+					  &src[i].buf,
+					  WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
+					  dst_compressed ? &dst_ccs : &dst,
+					  src[i].x, src[i].y);
 
-	if (src_compressed || dst_compressed)
-		data->render_copy(data->batch, NULL,
-				  src_compressed ? &src_ccs : &dst,
-				  0, 0, WIDTH, HEIGHT,
-				  dst_compressed ? &dst_ccs : &dst,
-				  0, 0);
+		if (dst_compressed)
+			data->render_copy(data->batch, NULL,
+					  &dst_ccs, 0, 0, WIDTH, HEIGHT,
+					  &dst, 0, 0);
 
-	if (dst_compressed)
-		data->render_copy(data->batch, NULL,
-				  &dst_ccs,
-				  0, 0, WIDTH, HEIGHT,
-				  &dst,
-				  0, 0);
+	} else {
+		if (src_compression == I915_COMPRESSION_RENDER)
+			data->render_copy(data->batch, NULL,
+					  &src_tiled, 0, 0, WIDTH, HEIGHT,
+					  &src_ccs,
+					  0, 0);
+
+		if (dst_compression == I915_COMPRESSION_RENDER) {
+			data->render_copy(data->batch, NULL,
+					  src_compressed ? &src_ccs : &src_tiled,
+					  0, 0, WIDTH, HEIGHT,
+					  &dst_ccs,
+					  0, 0);
+
+			data->render_copy(data->batch, NULL,
+					  &dst_ccs,
+					  0, 0, WIDTH, HEIGHT,
+					  &dst,
+					  0, 0);
+		} else {
+			data->render_copy(data->batch, NULL,
+					  src_compressed ? &src_ccs : &src_tiled,
+					  0, 0, WIDTH, HEIGHT,
+					  &dst,
+					  0, 0);
+		}
+	}
 
 	if (opt_dump_png){
 		scratch_buf_write_to_png(data, &dst, "result.png");
@@ -771,22 +820,45 @@ const char *help_str =
 	"  -a\tCheck all pixels\n"
 	;
 
-static const char *buf_mode_str(uint32_t tiling,
-				enum i915_compression compression)
+static void buf_mode_to_str(uint32_t tiling, bool mixed_tiled,
+			    enum i915_compression compression,
+			    char *buf, int buf_size)
 {
-	switch (tiling) {
-	default:
+	const char *compression_str;
+	const char *tiling_str;
+
+	if (mixed_tiled)
+		tiling_str = "mixed-tiled";
+	else switch (tiling) {
 	case I915_TILING_NONE:
-		return "linear";
+		tiling_str = "linear";
+		break;
 	case I915_TILING_X:
-		return "x-tiled";
+		tiling_str = "x-tiled";
+		break;
 	case I915_TILING_Y:
-		return compression == I915_COMPRESSION_RENDER ? "y-tiled-ccs" :
-								"y-tiled";
+		tiling_str = "y-tiled";
+		break;
 	case I915_TILING_Yf:
-		return compression == I915_COMPRESSION_RENDER ? "yf-tiled-ccs" :
-								"yf-tiled";
+		tiling_str = "yf-tiled";
+		break;
+	default:
+		igt_assert(0);
 	}
+
+	switch (compression) {
+	case I915_COMPRESSION_NONE:
+		compression_str = "";
+		break;
+	case I915_COMPRESSION_RENDER:
+		compression_str = "ccs";
+		break;
+	default:
+		igt_assert(0);
+	}
+
+	snprintf(buf, buf_size, "%s%s%s",
+		 tiling_str, compression_str[0] ? "-" : "", compression_str);
 }
 
 igt_main_args("da", NULL, help_str, opt_handler, NULL)
@@ -810,6 +882,13 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 		{ I915_TILING_NONE,		I915_TILING_Yf,
 		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
 		  SOURCE_MIXED_TILED, },
+
+		{ I915_TILING_NONE,		I915_TILING_Y,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_RENDER,
+		  SOURCE_MIXED_TILED },
+		{ I915_TILING_NONE,		I915_TILING_Yf,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_RENDER,
+		  SOURCE_MIXED_TILED },
 
 		{ I915_TILING_Y,		I915_TILING_NONE,
 		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_NONE,
@@ -874,19 +953,25 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
 		const struct test_desc *t = &tests[i];
-		const char *src_mode = buf_mode_str(t->src_tiling,
-						    t->src_compression);
-		const char *dst_mode = buf_mode_str(t->dst_tiling,
-						    t->dst_compression);
+		char src_mode[32];
+		char dst_mode[32];
 		const bool src_mixed_tiled = t->flags & SOURCE_MIXED_TILED;
+
+		buf_mode_to_str(t->src_tiling, src_mixed_tiled,
+				t->src_compression, src_mode, sizeof(src_mode));
+		buf_mode_to_str(t->dst_tiling, false,
+				t->dst_compression, dst_mode, sizeof(dst_mode));
 
 		igt_describe_f("Test render_copy() from a %s to a %s buffer.",
 			       src_mode, dst_mode);
 
+		/* Preserve original test names */
+		if (src_mixed_tiled &&
+		    t->dst_compression == I915_COMPRESSION_NONE)
+			src_mode[0] = '\0';
+
 		igt_subtest_f("%s%s%s",
-			      src_mixed_tiled ? "" : src_mode,
-			      src_mixed_tiled ? "" : "-to-",
-			      dst_mode)
+			      src_mode, src_mode[0] ? "-to-" : "", dst_mode)
 			test(&data,
 			     t->src_tiling, t->dst_tiling,
 			     t->src_compression, t->dst_compression,
