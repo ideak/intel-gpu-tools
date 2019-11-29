@@ -370,3 +370,201 @@ intel_aux_pgtable_create(drm_intel_bufmgr *bufmgr,
 
 	return pgt_bo;
 }
+
+static void
+aux_pgtable_find_max_free_range(const struct igt_buf **bufs, int buf_count,
+				uint64_t *range_start, uint64_t *range_size)
+{
+	/*
+	 * Keep the first page reserved, so we can differentiate pinned
+	 * objects based on a non-NULL offset.
+	 */
+	uint64_t start = 0x1000;
+	/* For now alloc only from the first 4GB address space. */
+	const uint64_t end = 1ULL << 32;
+	uint64_t max_range_start = 0;
+	uint64_t max_range_size = 0;
+	int i;
+
+	for (i = 0; i < buf_count; i++) {
+		if (bufs[i]->bo->offset64 >= end)
+			break;
+
+		if (bufs[i]->bo->offset64 - start > max_range_size) {
+			max_range_start = start;
+			max_range_size = bufs[i]->bo->offset64 - start;
+		}
+		start = bufs[i]->bo->offset64 + bufs[i]->bo->size;
+	}
+
+	if (start < end && end - start > max_range_size) {
+		max_range_start = start;
+		max_range_size = end - start;
+	}
+
+	*range_start = max_range_start;
+	*range_size = max_range_size;
+}
+
+static uint64_t
+aux_pgtable_find_free_range(const struct igt_buf **bufs, int buf_count,
+			    uint32_t size)
+{
+	uint64_t range_start;
+	uint64_t range_size;
+	/* A compressed surface must be 64kB aligned. */
+	const uint32_t align = 0x10000;
+	int pad;
+
+	aux_pgtable_find_max_free_range(bufs, buf_count,
+					&range_start, &range_size);
+
+	pad = ALIGN(range_start, align) - range_start;
+	range_start += pad;
+	range_size -= pad;
+	igt_assert(range_size >= size);
+
+	return range_start +
+	       ALIGN_DOWN(rand() % ((range_size - size) + 1), align);
+}
+
+static void
+aux_pgtable_reserve_range(const struct igt_buf **bufs, int buf_count,
+			  const struct igt_buf *new_buf)
+{
+	int i;
+
+	if (new_buf->aux.stride) {
+		uint64_t pin_offset = new_buf->bo->offset64;
+
+		if (!pin_offset)
+			pin_offset = aux_pgtable_find_free_range(bufs,
+								 buf_count,
+								 new_buf->bo->size);
+		drm_intel_bo_set_softpin_offset(new_buf->bo, pin_offset);
+		igt_assert(new_buf->bo->offset64 == pin_offset);
+	}
+
+	for (i = 0; i < buf_count; i++)
+		if (bufs[i]->bo->offset64 > new_buf->bo->offset64)
+			break;
+
+	memmove(&bufs[i + 1], &bufs[i], sizeof(bufs[0]) * (buf_count - i));
+
+	bufs[i] = new_buf;
+}
+
+void
+gen12_aux_pgtable_init(struct aux_pgtable_info *info,
+		       drm_intel_bufmgr *bufmgr,
+		       const struct igt_buf *src_buf,
+		       const struct igt_buf *dst_buf)
+{
+	const struct igt_buf *bufs[2];
+	const struct igt_buf *reserved_bufs[2];
+	int reserved_buf_count;
+	int i;
+
+	if (!src_buf->aux.stride && !dst_buf->aux.stride)
+		return;
+
+	bufs[0] = src_buf;
+	bufs[1] = dst_buf;
+
+	/*
+	 * Ideally we'd need an IGT-wide GFX address space allocator, which
+	 * would consider all allocations and thus avoid evictions. For now use
+	 * a simpler scheme here, which only considers the buffers involved in
+	 * the blit, which should at least minimize the chance for evictions
+	 * in the case of subsequent blits:
+	 *   1. If they were already bound (bo->offset64 != 0), use this
+	 *      address.
+	 *   2. Pick a range randomly from the 4GB address space, that is not
+	 *      already occupied by a bound object, or an object we pinned.
+	 */
+	reserved_buf_count = 0;
+	/* First reserve space for any bufs that are bound already. */
+	for (i = 0; i < ARRAY_SIZE(bufs); i++)
+		if (bufs[i]->bo->offset64)
+			aux_pgtable_reserve_range(reserved_bufs,
+						  reserved_buf_count++,
+						  bufs[i]);
+
+	/* Next, reserve space for unbound bufs with an AUX surface. */
+	for (i = 0; i < ARRAY_SIZE(bufs); i++)
+		if (!bufs[i]->bo->offset64 && bufs[i]->aux.stride)
+			aux_pgtable_reserve_range(reserved_bufs,
+						  reserved_buf_count++,
+						  bufs[i]);
+
+	/* Create AUX pgtable entries only for bufs with an AUX surface */
+	info->buf_count = 0;
+	for (i = 0; i < reserved_buf_count; i++) {
+		if (!reserved_bufs[i]->aux.stride)
+			continue;
+
+		info->bufs[info->buf_count] = reserved_bufs[i];
+		info->buf_pin_offsets[info->buf_count] =
+			reserved_bufs[i]->bo->offset64;
+		info->buf_count++;
+	}
+
+	info->pgtable_bo = intel_aux_pgtable_create(bufmgr,
+						    info->bufs,
+						    info->buf_count);
+	igt_assert(info->pgtable_bo);
+}
+
+void
+gen12_aux_pgtable_cleanup(struct aux_pgtable_info *info)
+{
+	int i;
+
+	/* Check that the pinned bufs kept their offset after the exec. */
+	for (i = 0; i < info->buf_count; i++)
+		igt_assert_eq_u64(info->bufs[i]->bo->offset64,
+				  info->buf_pin_offsets[i]);
+
+	drm_intel_bo_unreference(info->pgtable_bo);
+}
+
+uint32_t
+gen12_create_aux_pgtable_state(struct intel_batchbuffer *batch,
+			       drm_intel_bo *aux_pgtable_bo)
+{
+	uint64_t *pgtable_ptr;
+	uint32_t pgtable_ptr_offset;
+	int ret;
+
+	if (!aux_pgtable_bo)
+		return 0;
+
+	pgtable_ptr = intel_batchbuffer_subdata_alloc(batch,
+						      sizeof(*pgtable_ptr),
+						      sizeof(*pgtable_ptr));
+	pgtable_ptr_offset = intel_batchbuffer_subdata_offset(batch,
+							      pgtable_ptr);
+
+	*pgtable_ptr = aux_pgtable_bo->offset64;
+	ret = drm_intel_bo_emit_reloc(batch->bo, pgtable_ptr_offset,
+				      aux_pgtable_bo, 0,
+				      0, 0);
+	assert(ret == 0);
+
+	return pgtable_ptr_offset;
+}
+
+void
+gen12_emit_aux_pgtable_state(struct intel_batchbuffer *batch, uint32_t state)
+{
+	if (!state)
+		return;
+
+	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8);
+	OUT_BATCH(GEN12_GFX_AUX_TABLE_BASE_ADDR);
+	OUT_RELOC(batch->bo, 0, 0, state);
+
+	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8);
+	OUT_BATCH(GEN12_GFX_AUX_TABLE_BASE_ADDR + 4);
+	OUT_RELOC(batch->bo, 0, 0, state + 4);
+}
