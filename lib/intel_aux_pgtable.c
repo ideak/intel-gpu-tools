@@ -560,11 +560,11 @@ gen12_emit_aux_pgtable_state(struct intel_batchbuffer *batch, uint32_t state)
 	if (!state)
 		return;
 
-	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8);
+	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8 | MI_MMIO_REMAP_ENABLE_GEN12);
 	OUT_BATCH(GEN12_GFX_AUX_TABLE_BASE_ADDR);
 	OUT_RELOC(batch->bo, 0, 0, state);
 
-	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8);
+	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8 | MI_MMIO_REMAP_ENABLE_GEN12);
 	OUT_BATCH(GEN12_GFX_AUX_TABLE_BASE_ADDR + 4);
 	OUT_RELOC(batch->bo, 0, 0, state + 4);
 }
