@@ -182,7 +182,7 @@ static void test_vm(int i915)
 	spin = igt_spin_new(i915);
 	for (int i = 0; i < 16; i++) {
 		spin->execbuf.rsvd1 = gem_context_create(i915);
-		gem_context_set_priority(i915, spin->execbuf.rsvd1, 1023);
+		__gem_context_set_priority(i915, spin->execbuf.rsvd1, 1023);
 		gem_execbuf(i915, &spin->execbuf);
 		gem_context_destroy(i915, spin->execbuf.rsvd1);
 	}
