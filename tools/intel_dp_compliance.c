@@ -1017,8 +1017,6 @@ int main(int argc, char **argv)
 		{"help", 0, 0, 'h'},
 	};
 
-	igt_skip_on_simulation();
-
 	enter_exec_path(argv);
 
 	while ((c = getopt_long(argc, argv, optstr, long_opts, NULL)) != -1) {
