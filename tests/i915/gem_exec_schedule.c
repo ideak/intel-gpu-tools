@@ -2016,8 +2016,6 @@ igt_main
 	const struct intel_execution_engine *e;
 	int fd = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		igt_require_sw_sync();
 

@@ -160,8 +160,6 @@ igt_main
 	unsigned int num_fences = 0;
 	int fd = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);

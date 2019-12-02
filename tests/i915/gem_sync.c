@@ -1213,8 +1213,6 @@ igt_main
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	int fd = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);

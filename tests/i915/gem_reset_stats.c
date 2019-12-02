@@ -773,7 +773,6 @@ static bool gem_has_reset_stats(int fd)
 igt_main
 {
 	const struct intel_execution_engine *e;
-	igt_skip_on_simulation();
 
 	igt_fixture {
 		int fd;

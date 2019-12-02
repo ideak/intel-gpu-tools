@@ -54,8 +54,6 @@ igt_simple_main
 {
 	int fd, i;
 
-	igt_skip_on_simulation();
-
 	fd = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(fd);
 	gem_require_blitter(fd);

@@ -306,8 +306,6 @@ igt_main
 	igt_hang_t hang;
 	int fd;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);

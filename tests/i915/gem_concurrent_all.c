@@ -1777,8 +1777,6 @@ igt_main
 	char name[80];
 	int count = 0;
 
-	igt_skip_on_simulation();
-
 	if (strstr(igt_test_name(), "all"))
 		all = true;
 

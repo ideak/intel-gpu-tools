@@ -262,8 +262,6 @@ igt_main
 {
 	uint32_t tiling_mode = I915_TILING_X;
 
-	igt_skip_on_simulation();
-
 	srandom(0xdeadbeef);
 
 	igt_fixture {

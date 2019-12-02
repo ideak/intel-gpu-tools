@@ -137,8 +137,6 @@ igt_main
 	const struct intel_execution_engine2 *e;
 	int fd = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);

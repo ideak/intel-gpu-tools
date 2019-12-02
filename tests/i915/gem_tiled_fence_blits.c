@@ -219,9 +219,6 @@ igt_main
 	igt_subtest("basic")
 		run_test (fd, 2);
 
-	/* the rest of the tests are too long for simulation */
-	igt_skip_on_simulation();
-
 	igt_subtest("normal") {
 		uint64_t count;
 

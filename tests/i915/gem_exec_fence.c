@@ -1450,8 +1450,6 @@ igt_main
 			igt_subtest_group {
 				igt_hang_t hang;
 
-				igt_skip_on_simulation();
-
 				igt_fixture {
 					hang = igt_allow_hang(i915, 0, 0);
 				}

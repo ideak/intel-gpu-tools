@@ -531,8 +531,6 @@ igt_main
 	int fd = -1;
 	int dir = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		int gen;
 

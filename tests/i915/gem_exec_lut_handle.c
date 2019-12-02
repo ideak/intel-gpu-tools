@@ -101,8 +101,6 @@ igt_simple_main
 	uint32_t reloc_handle;
 	int size;
 
-	igt_skip_on_simulation();
-
 	fd = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(fd);
 

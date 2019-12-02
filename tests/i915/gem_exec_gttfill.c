@@ -209,8 +209,6 @@ igt_main
 	const struct intel_execution_engine *e;
 	int device = -1;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);

@@ -81,8 +81,6 @@ igt_main
 	uint8_t buf[OBJECT_SIZE];
 	int ret;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 

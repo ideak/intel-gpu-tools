@@ -365,9 +365,6 @@ igt_main
 
 				igt_subtest_f("legacy-%s%s", e->name, p->name)
 					single(fd, light, e2, p->flags, 1, 5);
-
-				igt_skip_on_simulation();
-
 				igt_subtest_f("legacy-%s-heavy%s",
 					      e->name, p->name)
 					single(fd, heavy, e2, p->flags, 1, 5);
@@ -394,9 +391,6 @@ igt_main
 
 				igt_subtest_f("%s%s", e2->name, p->name)
 					single(fd, light, e2, p->flags, 1, 5);
-
-				igt_skip_on_simulation();
-
 				igt_subtest_f("%s-heavy%s", e2->name, p->name)
 					single(fd, heavy, e2, p->flags, 1, 5);
 				igt_subtest_f("%s-forked%s", e2->name, p->name)

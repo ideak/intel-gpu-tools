@@ -562,7 +562,6 @@ igt_main
 			igt_subtest_f("%shang-%s",
 				      e->class == I915_ENGINE_CLASS_RENDER
 				      ? "basic-" : "", e->name) {
-				igt_skip_on_simulation();
 				gem_quiescent_gpu(fd);
 				basic(fd, e, HANG);
 			}
@@ -576,7 +575,6 @@ igt_main
 
 			__for_each_physical_engine(fd, e) {
 				igt_subtest_f("extended-hang-%s", e->name) {
-					igt_skip_on_simulation();
 					igt_require(gem_class_can_store_dword(fd, e->class));
 
 					gem_quiescent_gpu(fd);

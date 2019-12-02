@@ -78,8 +78,6 @@ igt_simple_main
 {
 	int fd, i;
 
-	igt_skip_on_simulation();
-
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	/* we have 32bit of address space, so try to fit one MB more

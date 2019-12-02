@@ -141,8 +141,6 @@ igt_main
 {
 	const struct intel_execution_engine *e;
 
-	igt_skip_on_simulation();
-
 	for (e = intel_execution_engines; e->name; e++)
 		igt_subtest_f("%s", e->name)
 			test_ring(eb_ring(e));

@@ -290,8 +290,6 @@ igt_main
 	igt_subtest("reset-pin-leak") {
 		int i;
 
-		igt_skip_on_simulation();
-
 		/*
 		 * Use an explicit context to isolate the test from
 		 * any major code changes related to the per-file

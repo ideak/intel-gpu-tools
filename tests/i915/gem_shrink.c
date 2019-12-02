@@ -424,8 +424,6 @@ igt_main
 	uint64_t alloc_size = 0;
 	int num_processes = 0;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		uint64_t mem_size = intel_get_total_ram_mb();
 		int fd;

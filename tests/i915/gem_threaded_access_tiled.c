@@ -95,8 +95,6 @@ igt_simple_main
 	unsigned long pitch = 0;
 	int r;
 
-	igt_skip_on_simulation();
-
 	fd = drm_open_driver(DRIVER_INTEL);
 	igt_assert(fd >= 0);
 

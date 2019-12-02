@@ -112,8 +112,6 @@ igt_simple_main_args("s:", NULL, help_str, opt_handler, NULL)
 	int loop, i, tiling;
 	int fd;
 
-	igt_skip_on_simulation();
-
 	igt_assert_f(size != 0, "Invalid object size specified\n");
 
 	if (cpu) {

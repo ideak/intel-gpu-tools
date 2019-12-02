@@ -54,8 +54,6 @@ igt_simple_main
 	int i;
 	uint32_t handle;
 
-	igt_skip_on_simulation();
-
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	for (i = 0; i < OBJECT_SIZE/4; i++)

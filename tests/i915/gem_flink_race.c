@@ -197,8 +197,6 @@ static void test_flink_close(void)
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_subtest("flink_name")
 		test_flink_name(5);
 

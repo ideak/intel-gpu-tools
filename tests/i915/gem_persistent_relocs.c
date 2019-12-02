@@ -322,8 +322,6 @@ int fd;
 #define MAX_BLT_SIZE 128
 igt_main
 {
-	igt_skip_on_simulation();
-
 	memset(blob, 'A', sizeof(blob));
 
 	igt_fixture {

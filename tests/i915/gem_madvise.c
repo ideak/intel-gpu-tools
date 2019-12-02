@@ -149,8 +149,6 @@ dontneed_before_exec(void)
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_subtest("dontneed-before-mmap")
 		dontneed_before_mmap();
 

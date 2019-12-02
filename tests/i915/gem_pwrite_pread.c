@@ -274,8 +274,6 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 	uint32_t buf[20];
 	int count;
 
-	igt_skip_on_simulation();
-
 	if (object_size == 0)
 		object_size = OBJECT_SIZE;
 	object_size = (object_size + 3) & -4;

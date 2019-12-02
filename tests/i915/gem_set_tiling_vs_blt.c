@@ -225,8 +225,6 @@ igt_main
 	int i;
 	uint32_t tiling, tiling_after;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		for (i = 0; i < 1024*256; i++)
 			data[i] = i;

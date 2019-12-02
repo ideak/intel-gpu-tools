@@ -210,9 +210,6 @@ igt_main
 		run_test(fd, 2);
 	}
 
-	/* the rest of the tests are too long for simulation */
-	igt_skip_on_simulation();
-
 	igt_subtest("aperture-thrash") {
 		count = 3 * gem_aperture_size(fd) / SIZE / 2;
 		intel_require_memory(count, SIZE, CHECK_RAM);

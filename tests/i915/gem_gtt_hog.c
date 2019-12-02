@@ -164,8 +164,6 @@ igt_simple_main
 	gem_require_mappable_ggtt(fd);
 	close(fd);
 
-	igt_skip_on_simulation();
-
 	data.fd = drm_open_driver(DRIVER_INTEL);
 	data.devid = intel_get_drm_devid(data.fd);
 	data.intel_gen = intel_gen(data.devid);

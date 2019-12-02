@@ -180,8 +180,6 @@ igt_main
 	drm_intel_bufmgr *bufmgr = NULL;
 	int fd, i;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		int devid;
 

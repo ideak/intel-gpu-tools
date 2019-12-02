@@ -56,8 +56,6 @@ igt_simple_main
 	bool tiling_changed;
 	int tile_height;
 
-	igt_skip_on_simulation();
-
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	if (IS_GEN2(intel_get_drm_devid(fd)))

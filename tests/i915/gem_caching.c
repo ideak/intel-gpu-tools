@@ -106,8 +106,6 @@ igt_main
 	uint8_t *cpu_ptr;
 	uint8_t *gtt_ptr;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		srandom(0xdeadbeef);
 

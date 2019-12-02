@@ -76,8 +76,6 @@ igt_simple_main
 
 	uint32_t *ptr;
 
-	igt_skip_on_simulation();
-
 	fd = drm_open_driver(DRIVER_INTEL);
 	gem_require_mappable_ggtt(fd);
 

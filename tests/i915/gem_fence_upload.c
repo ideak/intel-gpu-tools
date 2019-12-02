@@ -388,8 +388,6 @@ static void wc_contention(void)
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_subtest("performance")
 		performance();
 	igt_subtest("thread-contention")

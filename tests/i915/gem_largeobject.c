@@ -77,8 +77,6 @@ igt_simple_main
 {
 	int fd;
 
-	igt_skip_on_simulation();
-
 	data = malloc(OBJ_SIZE);
 	igt_assert(data);
 

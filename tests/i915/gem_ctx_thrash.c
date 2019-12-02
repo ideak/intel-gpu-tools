@@ -359,8 +359,6 @@ static void threads(void)
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_subtest("single")
 		single("single", false);
 	igt_subtest("engines")
