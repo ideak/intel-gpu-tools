@@ -854,11 +854,6 @@ void igt_system_suspend_autoresume(enum igt_suspend_state state,
 	int power_dir;
 	enum igt_suspend_test orig_test;
 
-	/* FIXME: Simulation doesn't like suspend/resume, and not even a lighter
-	 * approach using /sys/power/pm_test to just test our driver's callbacks
-	 * seems to fare better. We need to investigate what's going on. */
-	igt_skip_on_simulation();
-
 	igt_require((power_dir = open("/sys/power", O_RDONLY)) >= 0);
 	igt_require(get_supported_suspend_states(power_dir) & (1 << state));
 	igt_require(test == SUSPEND_TEST_NONE ||
@@ -908,8 +903,6 @@ void igt_set_autoresume_delay(int delay_secs)
 {
 	int delay_fd;
 	char delay_str[10];
-
-	igt_skip_on_simulation();
 
 	delay_fd = open("/sys/module/suspend/parameters/pm_test_delay", O_RDWR);
 

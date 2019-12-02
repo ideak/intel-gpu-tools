@@ -365,8 +365,6 @@ void intel_require_memory(uint64_t count, uint64_t size, unsigned mode)
 	uint64_t required, total;
 	bool sufficient_memory;
 
-	igt_skip_on_simulation();
-
 	sufficient_memory = __intel_check_memory(count, size, mode,
 						 &required, &total);
 	if (!sufficient_memory) {
