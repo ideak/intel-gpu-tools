@@ -564,9 +564,9 @@ static gboolean input_event(GIOChannel *source, GIOCondition condition,
 
 static void enter_exec_path(void)
 {
-	char path[PATH_MAX];
+	char path[PATH_MAX] = {};
 
-	if (readlink("/proc/self/exe", path, sizeof(path)) > 0)
+	if (readlink("/proc/self/exe", path, sizeof(path) - 1) > 0)
 		chdir(dirname(path));
 }
 
