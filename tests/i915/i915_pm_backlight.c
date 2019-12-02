@@ -187,8 +187,6 @@ igt_main
 	igt_output_t *output;
 	struct igt_fb fb;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		enum pipe pipe;
 		bool found = false;

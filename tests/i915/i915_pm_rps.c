@@ -628,8 +628,6 @@ static void pm_rps_exit_handler(int sig)
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		struct sysfs_file *sysfs_file = sysfs_files;
 		char sysfs_path[80];

@@ -381,7 +381,6 @@ int main(int argc, char *argv[])
 {
 	data_t data = {};
 
-	igt_skip_on_simulation();
 	igt_subtest_init(argc, argv);
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);

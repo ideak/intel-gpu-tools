@@ -352,9 +352,6 @@ full_enable(void)
 	const int spin_msec = 10;
 	int ret, spins;
 
-	/* Simulation doesn't currently model slice/subslice/EU power gating. */
-	igt_skip_on_simulation();
-
 	/*
 	 * Gen9 SKL is the first case in which render power gating can leave
 	 * slice/subslice/EU in a partially enabled state upon resumption of

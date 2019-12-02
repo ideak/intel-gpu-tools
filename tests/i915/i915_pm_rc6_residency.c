@@ -200,8 +200,6 @@ igt_main
 	unsigned int rc6_enabled = 0;
 	unsigned int devid = 0;
 
-	igt_skip_on_simulation();
-
 	/* Use drm_open_driver to verify device existence */
 	igt_fixture {
 		int fd;
