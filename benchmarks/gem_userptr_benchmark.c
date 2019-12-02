@@ -469,8 +469,6 @@ int main(int argc, char **argv)
 {
 	int fd = -1, ret;
 
-	igt_skip_on_simulation();
-
 	igt_subtest_init(argc, argv);
 
 	fd = drm_open_driver(DRIVER_INTEL);
