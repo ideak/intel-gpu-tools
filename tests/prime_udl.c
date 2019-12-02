@@ -147,8 +147,6 @@ out:
 
 igt_simple_main
 {
-	igt_skip_on_simulation();
-
 	igt_assert(find_and_open_devices() >= 0);
 
 	igt_skip_on(udl_fd == -1);

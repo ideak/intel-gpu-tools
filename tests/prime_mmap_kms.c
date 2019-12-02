@@ -239,8 +239,6 @@ igt_main
 {
 	gpu_process_t gpu;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		gpu.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_skip_on((check_for_dma_buf_mmap(gpu.drm_fd) != 0));

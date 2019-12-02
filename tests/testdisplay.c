@@ -696,7 +696,6 @@ igt_simple_main_args(optstr, long_opts, help_str, opt_handler, NULL)
 	int ret = 0;
 	GIOChannel *stdinchannel;
 	GMainLoop *mainloop;
-	igt_skip_on_simulation();
 
 	enter_exec_path();
 

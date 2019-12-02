@@ -94,8 +94,6 @@ static bool chdir_to_tools_dir(void)
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		char *path;
 

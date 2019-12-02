@@ -4066,8 +4066,6 @@ test_sysctl_defaults(void)
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		struct stat sb;
 

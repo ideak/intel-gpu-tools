@@ -204,7 +204,6 @@ static void test_engine_mode(int fd,
 			}
 			else
 			{
-				igt_skip_on_simulation();
 				hang = igt_allow_hang(fd, 0, 0);
 			}
 		}
