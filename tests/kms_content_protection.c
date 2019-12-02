@@ -648,8 +648,6 @@ static void test_content_protection_cleanup(void)
 igt_main
 {
 	igt_fixture {
-		igt_skip_on_simulation();
-
 		data.drm_fd = drm_open_driver(DRIVER_ANY);
 
 		igt_display_require(&data.display, data.drm_fd);

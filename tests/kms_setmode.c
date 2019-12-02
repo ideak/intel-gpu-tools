@@ -854,8 +854,6 @@ igt_main_args("dt:", NULL, help_str, opt_handler, NULL)
 	};
 	int i;
 
-	igt_skip_on_simulation();
-
 	igt_assert_f(!(dry_run && filter_test_id),
 		     "only one of -d and -t is accepted\n");
 

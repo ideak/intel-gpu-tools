@@ -774,8 +774,6 @@ igt_main
 	data_t data = {};
 	int gen = 0;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		data.gfx_fd = drm_open_driver_master(DRIVER_INTEL);
 		data.devid = intel_get_drm_devid(data.gfx_fd);

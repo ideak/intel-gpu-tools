@@ -304,8 +304,6 @@ static const char *help_str =
 
 igt_main_args("", long_opts, help_str, opt_handler, &data)
 {
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		int ret;
 

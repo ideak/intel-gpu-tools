@@ -198,8 +198,6 @@ igt_simple_main
 	drm_intel_context *ctx;
 	data_t data = {};
 
-	igt_skip_on_simulation();
-
 	data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 	igt_require_gem(data.drm_fd);
 

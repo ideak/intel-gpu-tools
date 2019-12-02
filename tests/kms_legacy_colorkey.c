@@ -45,8 +45,6 @@ static void test_plane(uint32_t plane_id, int expected_ret)
 
 igt_simple_main
 {
-	igt_skip_on_simulation();
-
 	drm_fd = drm_open_driver_master(DRIVER_INTEL);
 
 	kmstest_set_vt_graphics_mode();

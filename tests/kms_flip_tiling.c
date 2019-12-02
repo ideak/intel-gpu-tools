@@ -151,8 +151,6 @@ igt_output_t *output;
 
 igt_main
 {
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		data.gen = intel_gen(intel_get_drm_devid(data.drm_fd));

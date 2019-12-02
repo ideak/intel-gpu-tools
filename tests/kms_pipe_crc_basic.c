@@ -173,8 +173,6 @@ igt_main
 	igt_subtest("bad-source")
 		test_bad_source(&data);
 
-	igt_skip_on_simulation();
-
 	for_each_pipe_static(pipe) {
 		igt_subtest_f("read-crc-pipe-%s", kmstest_pipe_name(pipe))
 			test_read_crc(&data, pipe, 0);

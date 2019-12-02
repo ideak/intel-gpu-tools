@@ -232,8 +232,6 @@ igt_main
 {
 	data_t data = {};
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		struct itimerspec interval;
 		int r;

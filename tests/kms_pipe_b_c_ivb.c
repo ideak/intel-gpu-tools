@@ -255,8 +255,6 @@ igt_main
 {
 	int devid;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		devid = intel_get_drm_devid(data.drm_fd);

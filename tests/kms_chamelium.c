@@ -2622,8 +2622,6 @@ igt_main
 	size_t i;
 
 	igt_fixture {
-		igt_skip_on_simulation();
-
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 		data.chamelium = chamelium_init(data.drm_fd);
 		igt_require(data.chamelium);

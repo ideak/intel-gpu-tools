@@ -1212,8 +1212,6 @@ igt_main
 	data_t data = {};
 	enum pipe pipe;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_AMDGPU);
 		if (is_i915_device(data.drm_fd))

@@ -290,8 +290,6 @@ igt_main
 	const struct intel_execution_engine *e = &intel_execution_engines[1];
 	enum pipe n;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		int fd = drm_open_driver_master(DRIVER_INTEL);
 

@@ -272,8 +272,6 @@ igt_main
 	igt_output_t *output;
 	enum pipe pipe;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		display.drm_fd = drm_open_driver_master(DRIVER_ANY);
 

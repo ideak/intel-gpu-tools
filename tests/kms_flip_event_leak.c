@@ -96,8 +96,6 @@ igt_simple_main
 	int valid_tests = 0;
 	enum pipe pipe;
 
-	igt_skip_on_simulation();
-
 	data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 	kmstest_set_vt_graphics_mode();
 

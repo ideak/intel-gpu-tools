@@ -157,8 +157,6 @@ igt_main
 {
 	struct rmfb_data data = {};
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 

@@ -392,8 +392,6 @@ igt_main
 {
 	data_t data = { 0 };
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 

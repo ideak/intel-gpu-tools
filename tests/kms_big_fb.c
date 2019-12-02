@@ -605,8 +605,6 @@ igt_main
 	igt_fixture {
 		drmModeResPtr res;
 
-		igt_skip_on_simulation();
-
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 
 		igt_require(is_i915_device(data.drm_fd));

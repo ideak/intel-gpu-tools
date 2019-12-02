@@ -306,8 +306,6 @@ igt_main
 	enum pipe pipe;
 	int i;
 
-	igt_skip_on_simulation();
-
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 

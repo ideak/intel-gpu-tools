@@ -126,8 +126,6 @@ static data_t data;
 
 igt_simple_main
 {
-	igt_skip_on_simulation();
-
 	data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 	igt_require_intel(data.drm_fd);
 
