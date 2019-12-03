@@ -844,4 +844,7 @@ static inline bool igt_vblank_before(uint32_t a, uint32_t b)
 void igt_parse_connector_tile_blob(drmModePropertyBlobPtr blob,
 		igt_tile_info_t *tile);
 
+int igt_connector_sysfs_open(int drm_fd,
+			     drmModeConnector *connector);
+
 #endif /* __IGT_KMS_H__ */

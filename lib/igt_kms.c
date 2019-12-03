@@ -965,6 +965,40 @@ static void reset_connectors_at_exit(int sig)
 	igt_reset_connectors();
 }
 
+static char *kmstest_connector_dirname(int idx,
+				       uint32_t connector_type,
+				       uint32_t connector_type_id,
+				       char *name, int namelen)
+{
+	snprintf(name, namelen, "card%d-%s-%d", idx,
+		 kmstest_connector_type_str(connector_type),
+		 connector_type_id);
+
+	return name;
+}
+
+int igt_connector_sysfs_open(int drm_fd,
+			     drmModeConnector *connector)
+{
+	char name[80];
+	int dir, conn_dir;
+
+	dir = igt_sysfs_open(drm_fd);
+	if (dir < 0)
+		return dir;
+
+	kmstest_connector_dirname(igt_device_get_card_index(drm_fd),
+				  connector->connector_type,
+				  connector->connector_type_id,
+				  name, sizeof(name));
+
+	conn_dir = openat(dir, name, O_RDONLY);
+
+	close(dir);
+
+	return conn_dir;
+}
+
 /**
  * kmstest_force_connector:
  * @fd: drm file descriptor
