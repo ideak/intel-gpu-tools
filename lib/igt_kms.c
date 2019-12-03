@@ -1075,6 +1075,8 @@ bool kmstest_force_connector(int drm_fd, drmModeConnector *connector,
 	if (len != -1 && len < MAX_CONNECTORS) {
 		forced_connectors[len] = path;
 		forced_connectors_device[len] = dir;
+	} else {
+		close(dir);
 	}
 
 	if (len >= MAX_CONNECTORS)
