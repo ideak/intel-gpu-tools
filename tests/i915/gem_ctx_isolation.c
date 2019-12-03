@@ -856,6 +856,7 @@ static unsigned int __has_context_isolation(int fd)
 
 igt_main
 {
+	struct intel_execution_engine2 *e;
 	unsigned int has_context_isolation = 0;
 	int fd = -1;
 
@@ -876,8 +877,7 @@ igt_main
 		igt_skip_on(gen > LAST_KNOWN_GEN);
 	}
 
-	for (const struct intel_execution_engine2 *e = intel_execution_engines2;
-	     e->name; e++) {
+	__for_each_physical_engine(fd, e) {
 		igt_subtest_group {
 			igt_fixture {
 				igt_require(has_context_isolation & (1 << e->class));
