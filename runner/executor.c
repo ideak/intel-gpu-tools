@@ -734,6 +734,8 @@ static int monitor_output(pid_t child,
 			FD_SET(sigfd, &set);
 
 		n = select(nfds, &set, NULL, NULL, timeout == 0 ? NULL : &tv);
+		ping_watchdogs();
+
 		if (n < 0) {
 			/* TODO */
 			return -1;
@@ -742,8 +744,6 @@ static int monitor_output(pid_t child,
 		if (n == 0) {
 			if (--intervals_left)
 				continue;
-
-			ping_watchdogs();
 
 			switch (killed) {
 			case 0:
@@ -807,7 +807,6 @@ static int monitor_output(pid_t child,
 		}
 
 		intervals_left = timeout_intervals;
-		ping_watchdogs();
 
 		/* TODO: Refactor these handlers to their own functions */
 		if (outfd >= 0 && FD_ISSET(outfd, &set)) {
