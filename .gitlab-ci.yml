@@ -24,7 +24,7 @@ stages:
 
 build-containers:build-debian:
   stage: build-containers
-  image: registry.freedesktop.org/wayland/ci-templates/buildah
+  image: registry.freedesktop.org/wayland/ci-templates/buildah:2019-12-02
   script:
     - podman login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-debian-minimal build-debian-minimal
@@ -32,28 +32,28 @@ build-containers:build-debian:
 
 build-containers:build-debian-armhf:
   stage: build-containers
-  image: registry.freedesktop.org/wayland/ci-templates/buildah
+  image: registry.freedesktop.org/wayland/ci-templates/buildah:2019-12-02
   script:
     - podman login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-debian-armhf build-debian-armhf
 
 build-containers:build-debian-arm64:
   stage: build-containers
-  image: registry.freedesktop.org/wayland/ci-templates/buildah
+  image: registry.freedesktop.org/wayland/ci-templates/buildah:2019-12-02
   script:
     - podman login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-debian-arm64 build-debian-arm64
 
 build-containers:build-debian-mips:
   stage: build-containers
-  image: registry.freedesktop.org/wayland/ci-templates/buildah
+  image: registry.freedesktop.org/wayland/ci-templates/buildah:2019-12-02
   script:
     - podman login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-debian-mips build-debian-mips
 
 build-containers:build-fedora:
   stage: build-containers
-  image: registry.freedesktop.org/wayland/ci-templates/buildah
+  image: registry.freedesktop.org/wayland/ci-templates/buildah:2019-12-02
   script:
     - podman login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
     - .gitlab-ci/pull-or-rebuild.sh base Dockerfile.build-fedora build-fedora
