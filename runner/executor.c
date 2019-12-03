@@ -682,6 +682,9 @@ static int monitor_output(pid_t child,
 	int timeout_intervals = 1, intervals_left;
 	int wd_extra = 10;
 	int killed = 0; /* 0 if not killed, signal number otherwise */
+	int sigkill_timeout = 120;
+	int sigkill_interval = 20;
+	int sigkill_intervals_left = sigkill_timeout / sigkill_interval;
 	struct timespec time_beg, time_end;
 	unsigned long taints = 0;
 	bool aborting = false;
@@ -776,25 +779,33 @@ static int monitor_output(pid_t child,
 				if (!kill_child(killed, child))
 					return -1;
 
-				intervals_left = timeout_intervals = 1;
+				/*
+				 * Allow the test two minutes to die
+				 * on SIGKILL. If it takes more than
+				 * that, we're quite likely in a
+				 * scenario where we want to reboot
+				 * the machine anyway.
+				 */
+				watchdogs_set_timeout(sigkill_timeout);
+				timeout = sigkill_interval;
+				intervals_left = 1; /* Intervals handled separately for sigkill */
 				break;
 			case SIGKILL:
-				/*
-				 * If the child still exists, and the kernel
-				 * hasn't oopsed, assume it is still making
-				 * forward progress towards exiting (i.e. still
-				 * freeing all of its resources).
-				 */
-				if (kill(child, 0) == 0 && !tainted(&taints)) {
-					intervals_left =  1;
+				if (!tainted(&taints) && --sigkill_intervals_left) {
+					intervals_left = 1;
 					break;
 				}
 
 				/* Nothing that can be done, really. Let's tell the caller we want to abort. */
+
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
 					errf("Child refuses to die, tainted %lx. Aborting.\n",
 					     taints);
+					if (kill(child, 0) && errno == ESRCH)
+						errf("The test process no longer exists, "
+						     "but we didn't get informed of its demise...\n");
 				}
+
 				close_watchdogs(settings);
 				free(outbuf);
 				close(outfd);
