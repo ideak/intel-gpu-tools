@@ -50,14 +50,16 @@ if [ "$TYPE" = "base" ]; then
 		podman push $DOCKERNAME
 	fi
 
-	skopeo copy docker://$DOCKERNAME docker://$COMMITNAME
+	skopeo copy --dest-creds $CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD \
+               docker://$DOCKERNAME docker://$COMMITNAME
 elif [ "$TYPE" = "igt" ]; then
 	# container with IGT, we don't care about Dockerfile changes
 	# we always rebuild
 	set -e
 	$PODMAN_BUILD -t $COMMITNAME -f $DOCKERFILE .
 	podman push $COMMITNAME
-	skopeo copy docker://$COMMITNAME docker://$REFNAME
+	skopeo copy --dest-creds $CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD \
+               docker://$COMMITNAME docker://$REFNAME
 else
 	echo "unknown build type $TYPE"
 	exit 1
