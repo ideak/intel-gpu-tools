@@ -26,6 +26,7 @@ test_progs = [
 	'kms_cursor_crc',
 	'kms_cursor_edge_walk',
 	'kms_cursor_legacy',
+	'kms_dp_aux_dev',
 	'kms_dp_dsc',
 	'kms_dp_tiled_display',
 	'kms_draw_crc',
