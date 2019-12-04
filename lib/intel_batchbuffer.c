@@ -37,6 +37,7 @@
 #include "intel_bufmgr.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
+#include "veboxcopy.h"
 #include "rendercopy.h"
 #include "media_fill.h"
 #include "ioctl_wrappers.h"
@@ -846,6 +847,16 @@ igt_render_copyfunc_t igt_get_render_copyfunc(int devid)
 		copy = gen11_render_copyfunc;
 	else if (IS_GEN12(devid))
 		copy = gen12_render_copyfunc;
+
+	return copy;
+}
+
+igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid)
+{
+	igt_vebox_copyfunc_t copy = NULL;
+
+	if (IS_GEN12(devid))
+		copy = gen12_vebox_copyfunc;
 
 	return copy;
 }

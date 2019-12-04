@@ -1037,7 +1037,7 @@ void _gen9_render_copyfunc(struct intel_batchbuffer *batch,
 	OUT_BATCH(G4X_PIPELINE_SELECT | PIPELINE_SELECT_3D |
 				GEN9_PIPELINE_SELECTION_MASK);
 
-	gen12_emit_aux_pgtable_state(batch, aux_pgtable_state);
+	gen12_emit_aux_pgtable_state(batch, aux_pgtable_state, true);
 
 	gen8_emit_sip(batch);
 

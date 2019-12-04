@@ -403,6 +403,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
+	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 		igt_require_intel(fd);
 		if (intel_gen(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
@@ -467,17 +468,21 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 	}
 }
 
+static bool is_gen12_mc_ccs_modifier(uint64_t modifier)
+{
+	return modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS;
+}
+
 static bool is_gen12_ccs_modifier(uint64_t modifier)
 {
-	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS ||
+	return is_gen12_mc_ccs_modifier(modifier) ||
+		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS ||
 		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC;
 }
 
 static bool is_ccs_modifier(uint64_t modifier)
 {
-
-	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS ||
-		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
+	return is_gen12_ccs_modifier(modifier) ||
 		modifier == I915_FORMAT_MOD_Y_TILED_CCS ||
 		modifier == I915_FORMAT_MOD_Yf_TILED_CCS;
 }
@@ -733,6 +738,7 @@ uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
+	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 		return I915_TILING_Y;
 	case LOCAL_I915_FORMAT_MOD_Yf_TILED:
 	case LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS:
@@ -1911,7 +1917,7 @@ static bool blitter_ok(const struct igt_fb *fb)
 	return true;
 }
 
-static bool use_rendercopy(const struct igt_fb *fb)
+static bool use_enginecopy(const struct igt_fb *fb)
 {
 	return is_ccs_modifier(fb->modifier) ||
 		(fb->modifier == I915_FORMAT_MOD_Yf_TILED &&
@@ -1960,25 +1966,52 @@ static void fini_buf(struct igt_buf *buf)
 	drm_intel_bo_unreference(buf->bo);
 }
 
-static void rendercopy(struct fb_blit_upload *blit,
-		       const struct igt_fb *dst_fb,
-		       const struct igt_fb *src_fb)
+/**
+ * copy_with_engine:
+ * @blit: context for the copy operation
+ * @dst_fb: destination buffer
+ * @src_fb: source buffer
+ *
+ * Copy @src_fb to @dst_fb using either the render or vebox engine. The engine
+ * is selected based on the compression surface format required by the @dst_fb
+ * FB modifier. On GEN12+ a given compression format (render or media) can be
+ * produced only by the selected engine:
+ * - For GEN12 media compressed: vebox engine
+ * - For uncompressed, pre-GEN12 compressed, GEN12+ render compressed: render engine
+ * Note that both GEN12 engine is capable of reading either compression formats.
+ */
+static void copy_with_engine(struct fb_blit_upload *blit,
+			     const struct igt_fb *dst_fb,
+			     const struct igt_fb *src_fb)
 {
 	struct igt_buf src = {}, dst = {};
-	igt_render_copyfunc_t render_copy =
-		igt_get_render_copyfunc(intel_get_drm_devid(blit->fd));
+	igt_render_copyfunc_t render_copy = NULL;
+	igt_vebox_copyfunc_t vebox_copy = NULL;
 
-	igt_require(render_copy);
+	if (is_gen12_mc_ccs_modifier(dst_fb->modifier))
+		vebox_copy = igt_get_vebox_copyfunc(intel_get_drm_devid(blit->fd));
+	else
+		render_copy = igt_get_render_copyfunc(intel_get_drm_devid(blit->fd));
+
+	igt_require(vebox_copy || render_copy);
 
 	igt_assert_eq(dst_fb->offsets[0], 0);
 	igt_assert_eq(src_fb->offsets[0], 0);
 
-	init_buf(blit, &src, src_fb, "cairo rendercopy src");
-	init_buf(blit, &dst, dst_fb, "cairo rendercopy dst");
+	init_buf(blit, &src, src_fb, "cairo enginecopy src");
+	init_buf(blit, &dst, dst_fb, "cairo enginecopy dst");
 
-	render_copy(blit->batch, NULL,
-		    &src, 0, 0, dst_fb->plane_width[0], dst_fb->plane_height[0],
-		    &dst, 0, 0);
+	if (vebox_copy)
+		vebox_copy(blit->batch, &src,
+			   dst_fb->plane_width[0], dst_fb->plane_height[0],
+			   &dst);
+	else
+		render_copy(blit->batch, NULL,
+			    &src,
+			    0, 0,
+			    dst_fb->plane_width[0], dst_fb->plane_height[0],
+			    &dst,
+			    0, 0);
 
 	fini_buf(&dst);
 	fini_buf(&src);
@@ -2029,7 +2062,7 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 			I915_GEM_DOMAIN_GTT, 0);
 
 		if (blit->batch)
-			rendercopy(blit, fb, &linear->fb);
+			copy_with_engine(blit, fb, &linear->fb);
 		else
 			blitcopy(fb, &linear->fb);
 
@@ -2060,7 +2093,7 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 	struct igt_fb *fb = blit->fb;
 	struct fb_blit_linear *linear = &blit->linear;
 
-	if (!igt_vc4_is_tiled(fb->modifier) && use_rendercopy(fb)) {
+	if (!igt_vc4_is_tiled(fb->modifier) && use_enginecopy(fb)) {
 		blit->bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
 		blit->batch = intel_batchbuffer_alloc(blit->bufmgr,
 						      intel_get_drm_devid(fd));
@@ -2096,7 +2129,7 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 				I915_GEM_DOMAIN_GTT, 0);
 
 		if (blit->batch)
-			rendercopy(blit, &linear->fb, fb);
+			copy_with_engine(blit, &linear->fb, fb);
 		else
 			blitcopy(&linear->fb, fb);
 
@@ -3202,7 +3235,8 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 							     &blit->shadow_fb);
 	igt_assert(blit->shadow_ptr);
 
-	if (use_rendercopy(fb) || use_blitter(fb) || igt_vc4_is_tiled(fb->modifier)) {
+	if (use_enginecopy(fb) || use_blitter(fb) ||
+	    igt_vc4_is_tiled(fb->modifier)) {
 		setup_linear_mapping(&blit->base);
 	} else {
 		blit->base.linear.fb = *fb;
@@ -3285,7 +3319,8 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 	if (fb->cairo_surface == NULL) {
 		if (use_convert(fb))
 			create_cairo_surface__convert(fd, fb);
-		else if (use_blitter(fb) || use_rendercopy(fb) || igt_vc4_is_tiled(fb->modifier))
+		else if (use_blitter(fb) || use_enginecopy(fb) ||
+			 igt_vc4_is_tiled(fb->modifier))
 			create_cairo_surface__gpu(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);

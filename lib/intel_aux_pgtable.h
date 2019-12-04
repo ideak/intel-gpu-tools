@@ -30,6 +30,7 @@ uint32_t
 gen12_create_aux_pgtable_state(struct intel_batchbuffer *batch,
 			       drm_intel_bo *aux_pgtable_bo);
 void
-gen12_emit_aux_pgtable_state(struct intel_batchbuffer *batch, uint32_t state);
+gen12_emit_aux_pgtable_state(struct intel_batchbuffer *batch, uint32_t state,
+			     bool render);
 
 #endif

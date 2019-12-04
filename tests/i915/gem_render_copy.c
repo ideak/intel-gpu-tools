@@ -471,6 +471,7 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 		aux_width = scratch_buf_aux_width(data->devid, buf);
 		aux_height = scratch_buf_aux_height(data->devid, buf);
 
+		buf->compression = compression;
 		buf->aux.offset = buf->stride * ALIGN(height, 32);
 		buf->aux.stride = aux_width;
 

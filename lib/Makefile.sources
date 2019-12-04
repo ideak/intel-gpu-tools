@@ -131,6 +131,7 @@ lib_source_list =	 	\
 	igt_vc4.h		\
 	igt_amd.c		\
 	igt_amd.h		\
+	veboxcopy_gen12.c	\
 	$(NULL)
 
 .PHONY: version.h.tmp

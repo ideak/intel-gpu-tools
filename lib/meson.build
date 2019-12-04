@@ -64,6 +64,7 @@ lib_sources = [
 	'igt_edid.c',
 	'igt_eld.c',
 	'igt_infoframe.c',
+	'veboxcopy_gen12.c',
 ]
 
 lib_deps = [

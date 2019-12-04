@@ -213,6 +213,7 @@ void intel_copy_bo(struct intel_batchbuffer *batch,
 enum i915_compression {
 	I915_COMPRESSION_NONE,
 	I915_COMPRESSION_RENDER,
+	I915_COMPRESSION_MEDIA,
 };
 
 /**
@@ -220,18 +221,20 @@ enum i915_compression {
  * @bo: underlying libdrm buffer object
  * @stride: stride of the buffer
  * @tiling: tiling mode bits
+ * @compression: memory compression mode
  * @bpp: bits per pixel, 8, 16 or 32.
  * @data: pointer to the memory mapping of the buffer
  * @size: size of the buffer object
  *
  * This is a i-g-t buffer object wrapper structure which augments the baseline
- * libdrm buffer object with suitable data needed by the render copy and the
- * fill functions.
+ * libdrm buffer object with suitable data needed by the render/vebox copy and
+ * the fill functions.
  */
 struct igt_buf {
 	drm_intel_bo *bo;
 	uint32_t stride;
 	uint32_t tiling;
+	enum i915_compression compression;
 	uint32_t bpp;
 	uint32_t *data;
 	uint32_t size;
@@ -306,6 +309,29 @@ typedef void (*igt_render_copyfunc_t)(struct intel_batchbuffer *batch,
 				      const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
 
 igt_render_copyfunc_t igt_get_render_copyfunc(int devid);
+
+
+/**
+ * igt_vebox_copyfunc_t:
+ * @batch: batchbuffer object
+ * @src: source i-g-t buffer object
+ * @width: width of the copied rectangle
+ * @height: height of the copied rectangle
+ * @dst: destination i-g-t buffer object
+ *
+ * This is the type of the per-platform vebox copy functions. The
+ * platform-specific implementation can be obtained by calling
+ * igt_get_vebox_copyfunc().
+ *
+ * A vebox copy function will emit a batchbuffer to the kernel which executes
+ * the specified blit copy operation using the vebox engine.
+ */
+typedef void (*igt_vebox_copyfunc_t)(struct intel_batchbuffer *batch,
+				     const struct igt_buf *src,
+				     unsigned width, unsigned height,
+				     const struct igt_buf *dst);
+
+igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid);
 
 /**
  * igt_fillfunc_t:
