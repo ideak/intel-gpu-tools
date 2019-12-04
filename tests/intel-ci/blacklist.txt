@@ -12,7 +12,7 @@ igt@drm_mm(@.*)?
 # self-contained tests, leading to random
 # failures in tests run afterwards.
 ###############################################
-igt@i915_module_load(@.*)?
+#igt@i915_module_load(@.*)? # danger, danger; hope for taints!
 igt@i915_pm_rpm@module-reload
 igt@i915_pm_rpm@gem-execbuf-stress-extra-wait
 ###############################################
