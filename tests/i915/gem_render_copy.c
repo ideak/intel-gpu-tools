@@ -59,6 +59,7 @@ typedef struct {
 	drm_intel_bufmgr *bufmgr;
 	struct intel_batchbuffer *batch;
 	igt_render_copyfunc_t render_copy;
+	igt_vebox_copyfunc_t vebox_copy;
 } data_t;
 static int opt_dump_png = false;
 static int check_all_pixels = false;
@@ -595,6 +596,7 @@ static void scratch_buf_aux_check(data_t *data,
 }
 
 #define SOURCE_MIXED_TILED	1
+#define FORCE_VEBOX_DST_COPY	2
 
 static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 		 enum i915_compression src_compression,
@@ -634,12 +636,21 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	const bool src_mixed_tiled = flags & SOURCE_MIXED_TILED;
 	const bool src_compressed = src_compression != I915_COMPRESSION_NONE;
 	const bool dst_compressed = dst_compression != I915_COMPRESSION_NONE;
+	const bool force_vebox_dst_copy = flags & FORCE_VEBOX_DST_COPY;
 
 	/*
 	 * The source tilings for mixed source tiling test cases are determined
 	 * by the tiling of the src[] buffers above.
 	 */
 	igt_assert(src_tiling == I915_TILING_NONE || !src_mixed_tiled);
+
+	/*
+	 * The vebox engine can produce only a media compressed or
+	 * uncompressed surface.
+	 */
+	igt_assert(!force_vebox_dst_copy ||
+		   dst_compression == I915_COMPRESSION_MEDIA ||
+		   dst_compression == I915_COMPRESSION_NONE);
 
 	/* no Yf before gen9 */
 	if (intel_gen(data->devid) < 9)
@@ -733,6 +744,10 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 					  &src_tiled, 0, 0, WIDTH, HEIGHT,
 					  &src_ccs,
 					  0, 0);
+		else if (src_compression == I915_COMPRESSION_MEDIA)
+			data->vebox_copy(data->batch,
+					 &src_tiled, WIDTH, HEIGHT,
+					 &src_ccs);
 
 		if (dst_compression == I915_COMPRESSION_RENDER) {
 			data->render_copy(data->batch, NULL,
@@ -746,6 +761,21 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 					  0, 0, WIDTH, HEIGHT,
 					  &dst,
 					  0, 0);
+		} else if (dst_compression == I915_COMPRESSION_MEDIA) {
+			data->vebox_copy(data->batch,
+					 src_compressed ? &src_ccs : &src_tiled,
+					 WIDTH, HEIGHT,
+					 &dst_ccs);
+
+			data->vebox_copy(data->batch,
+					 &dst_ccs,
+					 WIDTH, HEIGHT,
+					 &dst);
+		} else if (force_vebox_dst_copy) {
+			data->vebox_copy(data->batch,
+					 src_compressed ? &src_ccs : &src_tiled,
+					 WIDTH, HEIGHT,
+					 &dst);
 		} else {
 			data->render_copy(data->batch, NULL,
 					  src_compressed ? &src_ccs : &src_tiled,
@@ -854,6 +884,9 @@ static void buf_mode_to_str(uint32_t tiling, bool mixed_tiled,
 	case I915_COMPRESSION_RENDER:
 		compression_str = "ccs";
 		break;
+	case I915_COMPRESSION_MEDIA:
+		compression_str = "mc-ccs";
+		break;
 	default:
 		igt_assert(0);
 	}
@@ -929,6 +962,73 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 		{ I915_TILING_Yf,		I915_TILING_Y,
 		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_RENDER,
 		  0, },
+
+		{ I915_TILING_NONE,		I915_TILING_Yf,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_NONE,		I915_TILING_Y,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+
+		{ I915_TILING_X,		I915_TILING_Yf,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_X,		I915_TILING_Y,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+
+		{ I915_TILING_Y,		I915_TILING_NONE,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_Y,		I915_TILING_X,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_Y,		I915_TILING_Y,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_Y,		I915_TILING_Yf,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+
+		{ I915_TILING_Yf,		I915_TILING_NONE,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_Yf,		I915_TILING_X,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_Yf,		I915_TILING_Yf,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_Yf,		I915_TILING_Y,
+		  I915_COMPRESSION_NONE,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+
+		{ I915_TILING_Y,		I915_TILING_Y,
+		  I915_COMPRESSION_MEDIA,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_Yf,		I915_TILING_Yf,
+		  I915_COMPRESSION_MEDIA,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_Y,		I915_TILING_Yf,
+		  I915_COMPRESSION_MEDIA,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+		{ I915_TILING_Yf,		I915_TILING_Y,
+		  I915_COMPRESSION_MEDIA,	I915_COMPRESSION_NONE,
+		  FORCE_VEBOX_DST_COPY, },
+
+		{ I915_TILING_Y,		I915_TILING_Y,
+		  I915_COMPRESSION_MEDIA,	I915_COMPRESSION_RENDER,
+		  0, },
+		{ I915_TILING_Y,		I915_TILING_Yf,
+		  I915_COMPRESSION_MEDIA,	I915_COMPRESSION_RENDER,
+		  0, },
+
+		{ I915_TILING_Y,		I915_TILING_Y,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_MEDIA,
+		  0, },
+		{ I915_TILING_Y,		I915_TILING_Yf,
+		  I915_COMPRESSION_RENDER,	I915_COMPRESSION_MEDIA,
+		  0, },
 	};
 	int i;
 
@@ -946,6 +1046,8 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 		igt_require_f(data.render_copy,
 			      "no render-copy function\n");
 
+		data.vebox_copy = igt_get_vebox_copyfunc(data.devid);
+
 		data.batch = intel_batchbuffer_alloc(data.bufmgr, data.devid);
 		igt_assert(data.batch);
 
@@ -957,13 +1059,25 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 		char src_mode[32];
 		char dst_mode[32];
 		const bool src_mixed_tiled = t->flags & SOURCE_MIXED_TILED;
+		const bool force_vebox_dst_copy = t->flags & FORCE_VEBOX_DST_COPY;
+		const bool vebox_copy_used =
+			t->src_compression == I915_COMPRESSION_MEDIA ||
+			t->dst_compression == I915_COMPRESSION_MEDIA ||
+			force_vebox_dst_copy;
+		const bool render_copy_used =
+			!vebox_copy_used ||
+			t->src_compression == I915_COMPRESSION_RENDER ||
+			t->dst_compression == I915_COMPRESSION_RENDER;
 
 		buf_mode_to_str(t->src_tiling, src_mixed_tiled,
 				t->src_compression, src_mode, sizeof(src_mode));
 		buf_mode_to_str(t->dst_tiling, false,
 				t->dst_compression, dst_mode, sizeof(dst_mode));
 
-		igt_describe_f("Test render_copy() from a %s to a %s buffer.",
+		igt_describe_f("Test %s%s%s from a %s to a %s buffer.",
+			       render_copy_used ? "render_copy()" : "",
+			       render_copy_used && vebox_copy_used ? " and " : "",
+			       vebox_copy_used ? "vebox_copy()" : "",
 			       src_mode, dst_mode);
 
 		/* Preserve original test names */
@@ -971,12 +1085,19 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 		    t->dst_compression == I915_COMPRESSION_NONE)
 			src_mode[0] = '\0';
 
-		igt_subtest_f("%s%s%s",
-			      src_mode, src_mode[0] ? "-to-" : "", dst_mode)
+		igt_subtest_f("%s%s%s%s",
+			      src_mode,
+			      src_mode[0] ? "-to-" : "",
+			      force_vebox_dst_copy ? "vebox-" : "",
+			      dst_mode) {
+			igt_require_f(data.vebox_copy || !vebox_copy_used,
+				      "no vebox-copy function\n");
+
 			test(&data,
 			     t->src_tiling, t->dst_tiling,
 			     t->src_compression, t->dst_compression,
 			     t->flags);
+		}
 	}
 
 	igt_fixture {

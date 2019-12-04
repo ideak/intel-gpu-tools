@@ -252,12 +252,14 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	ss->ss2.width  = igt_buf_width(buf) - 1;
 	ss->ss3.pitch  = buf->stride - 1;
 
-	ss->ss7.shader_chanel_select_r = 4;
-	ss->ss7.shader_chanel_select_g = 5;
-	ss->ss7.shader_chanel_select_b = 6;
-	ss->ss7.shader_chanel_select_a = 7;
+	ss->ss7.skl.shader_chanel_select_r = 4;
+	ss->ss7.skl.shader_chanel_select_g = 5;
+	ss->ss7.skl.shader_chanel_select_b = 6;
+	ss->ss7.skl.shader_chanel_select_a = 7;
 
-	if (buf->aux.stride) {
+	if (buf->compression == I915_COMPRESSION_MEDIA)
+		ss->ss7.tgl.media_compression = 1;
+	else if (buf->aux.stride) {
 		ss->ss6.aux_mode = 0x5; /* AUX_CCS_E */
 		ss->ss6.aux_pitch = (buf->aux.stride / 128) - 1;
 

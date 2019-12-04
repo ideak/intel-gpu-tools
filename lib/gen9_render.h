@@ -86,20 +86,36 @@ struct gen9_surface_state {
 		uint32_t pad1:1;
 	} ss6;
 
-	struct {
-		uint32_t resource_min_lod:12;
+	union {
+		struct {
+			uint32_t resource_min_lod:12;
 
-		/* Only on Haswell */
-		uint32_t pad0:4;
-		uint32_t shader_chanel_select_a:3;
-		uint32_t shader_chanel_select_b:3;
-		uint32_t shader_chanel_select_g:3;
-		uint32_t shader_chanel_select_r:3;
+			/* Only on Haswell */
+			uint32_t pad0:4;
+			uint32_t shader_chanel_select_a:3;
+			uint32_t shader_chanel_select_b:3;
+			uint32_t shader_chanel_select_g:3;
+			uint32_t shader_chanel_select_r:3;
 
-		uint32_t alpha_clear_color:1;
-		uint32_t blue_clear_color:1;
-		uint32_t green_clear_color:1;
-		uint32_t red_clear_color:1;
+			uint32_t alpha_clear_color:1;
+			uint32_t blue_clear_color:1;
+			uint32_t green_clear_color:1;
+			uint32_t red_clear_color:1;
+		} skl;
+		struct {
+			uint32_t resource_min_lod:12;
+
+			/* Only on Haswell */
+			uint32_t pad0:4;
+			uint32_t shader_chanel_select_a:3;
+			uint32_t shader_chanel_select_b:3;
+			uint32_t shader_chanel_select_g:3;
+			uint32_t shader_chanel_select_r:3;
+
+			uint32_t pad1:2;
+			uint32_t media_compression:1;
+			uint32_t pad2:1;
+		} tgl;
 	} ss7;
 
 	struct {
