@@ -207,7 +207,7 @@ static void isolation(int i915)
 		b = gem_open(B, gem_flink(A, a));
 
 		mmap_arg.handle = a;
-		if (mmap_offset_ioctl(i915, &mmap_arg)) {
+		if (mmap_offset_ioctl(A, &mmap_arg)) {
 			close(A);
 			close(B);
 			continue;
@@ -215,7 +215,7 @@ static void isolation(int i915)
 		offset_a = mmap_arg.offset;
 
 		mmap_arg.handle = b;
-		igt_assert_eq(mmap_offset_ioctl(i915, &mmap_arg), 0);
+		igt_assert_eq(mmap_offset_ioctl(B, &mmap_arg), 0);
 		offset_b = mmap_arg.offset;
 
 		igt_info("A[%s]: {fd:%d, handle:%d, offset:%"PRIx64"}\n",
@@ -223,11 +223,25 @@ static void isolation(int i915)
 		igt_info("B[%s]: {fd:%d, handle:%d, offset:%"PRIx64"}\n",
 			 t->name, B, b, offset_b);
 
+		errno = 0;
+		ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, i915, offset_a);
+		igt_assert(ptr == MAP_FAILED);
+		igt_assert_eq(errno, EACCES);
+
+		errno = 0;
+		ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, i915, offset_b);
+		igt_assert(ptr == MAP_FAILED);
+		igt_assert_eq(errno, EACCES);
+
+		errno = 0;
 		ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, B, offset_a);
 		igt_assert(ptr == MAP_FAILED);
+		igt_assert_eq(errno, EACCES);
 
+		errno = 0;
 		ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, A, offset_b);
 		igt_assert(ptr == MAP_FAILED);
+		igt_assert_eq(errno, EACCES);
 
 		close(B);
 
