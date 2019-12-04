@@ -959,7 +959,7 @@ static struct filter_class filter_definition_list[] = {
 		.is_valid = sys_path_valid,
 		.filter_function = filter_sys,
 		.help = "sys:/sys/devices/pci0000:00/0000:00:02.0",
-		.detail = "find device byt its sysfs path\n",
+		.detail = "find device by its sysfs path\n",
 	},
 	{
 		.name = "drm",
