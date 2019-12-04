@@ -42,6 +42,7 @@
 #include "igt_perf.h"
 #include "igt_sysfs.h"
 #include "igt_pm.h"
+#include "i915/gem_ring.h"
 #include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Test the i915 pmu perf interface");
@@ -1276,8 +1277,9 @@ static void cpu_hotplug(int gem_fd)
 static void
 test_interrupts(int gem_fd)
 {
+	const int target =
+		gem_measure_ring_inflight(gem_fd, I915_EXEC_DEFAULT, 0);
 	const unsigned int test_duration_ms = 1000;
-	const int target = 30;
 	igt_spin_t *spin[target];
 	struct pollfd pfd;
 	uint64_t idle, busy;
