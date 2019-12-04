@@ -472,19 +472,17 @@ void gem_sync(int fd, uint32_t handle)
 
 bool gem_create__has_stolen_support(int fd)
 {
-	static int has_stolen_support = -1;
+	int has_stolen_support;
 	struct drm_i915_getparam gp;
 	int val = -1;
 
-	if (has_stolen_support < 0) {
-		memset(&gp, 0, sizeof(gp));
-		gp.param = 38; /* CREATE_VERSION */
-		gp.value = &val;
+	memset(&gp, 0, sizeof(gp));
+	gp.param = 38; /* CREATE_VERSION */
+	gp.value = &val;
 
-		/* Do we have the extended gem_create_ioctl? */
-		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
-		has_stolen_support = val >= 2;
-	}
+	/* Do we have the extended gem_create_ioctl? */
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+	has_stolen_support = val >= 2;
 
 	return has_stolen_support;
 }
@@ -865,38 +863,32 @@ bool gem_engine_reset_enabled(int fd)
  */
 int gem_available_fences(int fd)
 {
-	static int num_fences = -1;
+	int num_fences;
+	struct drm_i915_getparam gp;
 
-	if (num_fences < 0) {
-		struct drm_i915_getparam gp;
+	memset(&gp, 0, sizeof(gp));
+	gp.param = I915_PARAM_NUM_FENCES_AVAIL;
+	gp.value = &num_fences;
 
-		memset(&gp, 0, sizeof(gp));
-		gp.param = I915_PARAM_NUM_FENCES_AVAIL;
-		gp.value = &num_fences;
-
-		num_fences = 0;
-		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
-		errno = 0;
-	}
+	num_fences = 0;
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
+	errno = 0;
 
 	return num_fences;
 }
 
 bool gem_has_llc(int fd)
 {
-	static int has_llc = -1;
+	int has_llc;
+	struct drm_i915_getparam gp;
 
-	if (has_llc < 0) {
-		struct drm_i915_getparam gp;
+	memset(&gp, 0, sizeof(gp));
+	gp.param = I915_PARAM_HAS_LLC;
+	gp.value = &has_llc;
 
-		memset(&gp, 0, sizeof(gp));
-		gp.param = I915_PARAM_HAS_LLC;
-		gp.value = &has_llc;
-
-		has_llc = 0;
-		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
-		errno = 0;
-	}
+	has_llc = 0;
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
+	errno = 0;
 
 	return has_llc;
 }
@@ -929,10 +921,7 @@ static bool has_param(int fd, int param)
  */
 bool gem_has_bsd(int fd)
 {
-	static int has_bsd = -1;
-	if (has_bsd < 0)
-		has_bsd = has_param(fd, I915_PARAM_HAS_BSD);
-	return has_bsd;
+	return has_param(fd, I915_PARAM_HAS_BSD);
 }
 
 /**
@@ -947,10 +936,7 @@ bool gem_has_bsd(int fd)
  */
 bool gem_has_blt(int fd)
 {
-	static int has_blt = -1;
-	if (has_blt < 0)
-		has_blt =  has_param(fd, I915_PARAM_HAS_BLT);
-	return has_blt;
+	return has_param(fd, I915_PARAM_HAS_BLT);
 }
 
 /**
@@ -966,10 +952,7 @@ bool gem_has_blt(int fd)
  */
 bool gem_has_vebox(int fd)
 {
-	static int has_vebox = -1;
-	if (has_vebox < 0)
-		has_vebox =  has_param(fd, I915_PARAM_HAS_VEBOX);
-	return has_vebox;
+	return has_param(fd, I915_PARAM_HAS_VEBOX);
 }
 
 #define I915_PARAM_HAS_BSD2 31
@@ -985,10 +968,7 @@ bool gem_has_vebox(int fd)
  */
 bool gem_has_bsd2(int fd)
 {
-	static int has_bsd2 = -1;
-	if (has_bsd2 < 0)
-		has_bsd2 = has_param(fd, I915_PARAM_HAS_BSD2);
-	return has_bsd2;
+	return has_param(fd, I915_PARAM_HAS_BSD2);
 }
 
 struct local_i915_gem_get_aperture {
@@ -1066,24 +1046,21 @@ uint64_t gem_available_aperture_size(int fd)
  */
 uint64_t gem_aperture_size(int fd)
 {
-	static uint64_t aperture_size = 0;
+	uint64_t aperture_size = 0;
+	struct drm_i915_gem_context_param p;
 
-	if (aperture_size == 0) {
-		struct drm_i915_gem_context_param p;
+	memset(&p, 0, sizeof(p));
+	p.param = 0x3;
+	if (__gem_context_get_param(fd, &p) == 0) {
+		aperture_size = p.value;
+	} else {
+		struct drm_i915_gem_get_aperture aperture;
 
-		memset(&p, 0, sizeof(p));
-		p.param = 0x3;
-		if (__gem_context_get_param(fd, &p) == 0) {
-			aperture_size = p.value;
-		} else {
-			struct drm_i915_gem_get_aperture aperture;
+		memset(&aperture, 0, sizeof(aperture));
+		aperture.aper_size = 256*1024*1024;
 
-			memset(&aperture, 0, sizeof(aperture));
-			aperture.aper_size = 256*1024*1024;
-
-			do_ioctl(fd, DRM_IOCTL_I915_GEM_GET_APERTURE, &aperture);
-			aperture_size =  aperture.aper_size;
-		}
+		do_ioctl(fd, DRM_IOCTL_I915_GEM_GET_APERTURE, &aperture);
+		aperture_size =  aperture.aper_size;
 	}
 
 	return aperture_size;
@@ -1141,19 +1118,16 @@ uint64_t gem_global_aperture_size(int fd)
  */
 bool gem_has_softpin(int fd)
 {
-	static int has_softpin = -1;
+	int has_softpin;
+	struct drm_i915_getparam gp;
 
-	if (has_softpin < 0) {
-		struct drm_i915_getparam gp;
+	memset(&gp, 0, sizeof(gp));
+	gp.param = I915_PARAM_HAS_EXEC_SOFTPIN;
+	gp.value = &has_softpin;
 
-		memset(&gp, 0, sizeof(gp));
-		gp.param = I915_PARAM_HAS_EXEC_SOFTPIN;
-		gp.value = &has_softpin;
-
-		has_softpin = 0;
-		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
-		errno = 0;
-	}
+	has_softpin = 0;
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
+	errno = 0;
 
 	return has_softpin;
 }
@@ -1169,19 +1143,16 @@ bool gem_has_softpin(int fd)
  */
 bool gem_has_exec_fence(int fd)
 {
-	static int has_exec_fence = -1;
+	int has_exec_fence;
+	struct drm_i915_getparam gp;
 
-	if (has_exec_fence < 0) {
-		struct drm_i915_getparam gp;
+	memset(&gp, 0, sizeof(gp));
+	gp.param = I915_PARAM_HAS_EXEC_FENCE;
+	gp.value = &has_exec_fence;
 
-		memset(&gp, 0, sizeof(gp));
-		gp.param = I915_PARAM_HAS_EXEC_FENCE;
-		gp.value = &has_exec_fence;
-
-		has_exec_fence = 0;
-		ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
-		errno = 0;
-	}
+	has_exec_fence = 0;
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
+	errno = 0;
 
 	return has_exec_fence;
 }
@@ -1429,17 +1400,13 @@ void prime_sync_end(int dma_buf_fd, bool write)
 
 bool igt_has_fb_modifiers(int fd)
 {
-	static bool has_modifiers, cap_modifiers_tested;
+	bool has_modifiers;
+	uint64_t cap_modifiers;
+	int ret;
 
-	if (!cap_modifiers_tested) {
-		uint64_t cap_modifiers;
-		int ret;
-
-		ret = drmGetCap(fd, DRM_CAP_ADDFB2_MODIFIERS, &cap_modifiers);
-		igt_assert(ret == 0 || errno == EINVAL || errno == EOPNOTSUPP);
-		has_modifiers = ret == 0 && cap_modifiers == 1;
-		cap_modifiers_tested = true;
-	}
+	ret = drmGetCap(fd, DRM_CAP_ADDFB2_MODIFIERS, &cap_modifiers);
+	igt_assert(ret == 0 || errno == EINVAL || errno == EOPNOTSUPP);
+	has_modifiers = ret == 0 && cap_modifiers == 1;
 
 	return has_modifiers;
 }
