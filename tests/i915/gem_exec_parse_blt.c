@@ -30,6 +30,7 @@
 
 #include "igt.h"
 #include "i915/gem_submission.h"
+#include "sw_sync.h"
 
 /* To help craft commands known to be invalid across all engines */
 #define INSTR_CLIENT_SHIFT	29
@@ -52,6 +53,30 @@
 #define BCS_GPR_UDW(n) (0x22600 + (n) * 8 + 4)
 
 #define HANDLE_SIZE  4096
+
+static int
+__checked_execbuf(int i915, struct drm_i915_gem_execbuffer2 *eb)
+{
+	int fence;
+	int err;
+
+	igt_assert(!(eb->flags & I915_EXEC_FENCE_OUT));
+	eb->flags |= I915_EXEC_FENCE_OUT;
+	err = __gem_execbuf_wr(i915, eb);
+	eb->flags &= ~I915_EXEC_FENCE_OUT;
+	if (err)
+		return err;
+
+	fence = eb->rsvd2 >> 32;
+
+	sync_fence_wait(fence, -1);
+	err = sync_fence_status(fence);
+	close(fence);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
 
 static int
 __exec_batch_patched(int i915, int engine,
@@ -85,7 +110,7 @@ __exec_batch_patched(int i915, int engine,
 	execbuf.batch_len = size;
 	execbuf.flags = engine;
 
-	return __gem_execbuf(i915, &execbuf);
+	return __checked_execbuf(i915, &execbuf);
 }
 
 static void exec_batch_patched(int i915, int engine,
@@ -129,7 +154,7 @@ static int __exec_batch(int i915, int engine, uint32_t cmd_bo,
 	execbuf.batch_len = size;
 	execbuf.flags = engine;
 
-	return  __gem_execbuf(i915, &execbuf);
+	return  __checked_execbuf(i915, &execbuf);
 }
 
 #if 0
@@ -188,7 +213,7 @@ static void exec_split_batch(int i915, int engine, const uint32_t *cmds,
 		      0x8);
 	execbuf.flags = engine;
 
-	igt_assert_eq(__gem_execbuf(i915, &execbuf), expected_ret);
+	igt_assert_eq(__checked_execbuf(i915, &execbuf), expected_ret);
 
 	gem_close(i915, cmd_bo);
 }
@@ -251,7 +276,7 @@ static void exec_batch_chained(int i915, int engine,
 	execbuf.batch_len = sizeof(first_level_cmds);
 	execbuf.flags = engine;
 
-	ret = __gem_execbuf(i915, &execbuf);
+	ret = __checked_execbuf(i915, &execbuf);
 	if (expected_return && ret == expected_return)
 		goto out;
 
@@ -402,7 +427,7 @@ static void test_bb_secure(const int i915, const uint32_t handle)
 	execbuf.batch_len = sizeof(batch_secure);
 	execbuf.flags = I915_EXEC_BLT;
 
-	igt_assert_eq(__gem_execbuf(i915, &execbuf), -EACCES);
+	igt_assert_eq(__checked_execbuf(i915, &execbuf), -EACCES);
 }
 
 #define BB_START_PARAM 0
@@ -414,12 +439,10 @@ static void test_bb_start(const int i915, const uint32_t handle, int test)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
-	struct drm_i915_gem_relocation_entry reloc[3];
+	struct drm_i915_gem_relocation_entry reloc[4];
 	const uint32_t target_bo = gem_create(i915, 4096);
-	uint32_t *dst;
-	int ret;
 	unsigned int jump_off, footer_pos;
-	const uint32_t batch_header[] = {
+	uint32_t batch[1024] = {
 		MI_NOOP,
 		MI_NOOP,
 		MI_NOOP,
@@ -432,10 +455,11 @@ static void test_bb_start(const int i915, const uint32_t handle, int test)
 		4,
 		0,
 		2,
-		MI_COND_BATCH_BUFFER_END | 1,
+		MI_COND_BATCH_BUFFER_END | MI_DO_COMPARE | 2,
 		0,
 		0,
-		0
+		0,
+		MI_ARB_CHECK,
 	};
 	const uint32_t batch_footer[] = {
 		MI_BATCH_BUFFER_START | MI_BATCH_NON_SECURE_I965 | 1,
@@ -443,12 +467,9 @@ static void test_bb_start(const int i915, const uint32_t handle, int test)
 		0,
 		MI_BATCH_BUFFER_END,
 	};
-	uint32_t batch[1024];
+	uint32_t *dst;
 
 	igt_require(gem_can_store_dword(i915, I915_EXEC_BLT));
-
-	memset(batch, 0, sizeof(batch));
-	memcpy(batch, batch_header, sizeof(batch_header));
 
 	switch (test) {
 	case BB_START_PARAM:
@@ -460,12 +481,13 @@ static void test_bb_start(const int i915, const uint32_t handle, int test)
 		break;
 	default:
 		jump_off = 0xf00d0000;
+		break;
 	}
 
 	if (test == BB_START_FAR)
-		footer_pos = (sizeof(batch) - sizeof(batch_footer));
+		footer_pos = sizeof(batch) - sizeof(batch_footer);
 	else
-		footer_pos = sizeof(batch_header);
+		footer_pos = 17 * sizeof(uint32_t);
 
 	memcpy(batch + footer_pos / sizeof(uint32_t),
 	       batch_footer, sizeof(batch_footer));
@@ -481,24 +503,28 @@ static void test_bb_start(const int i915, const uint32_t handle, int test)
 	reloc[0].delta = 0;
 	reloc[0].read_domains = I915_GEM_DOMAIN_COMMAND;
 	reloc[0].write_domain = I915_GEM_DOMAIN_COMMAND;
-	reloc[0].presumed_offset = -1;
 
 	reloc[1].offset = 9 * sizeof(uint32_t);
 	reloc[1].target_handle = obj[0].handle;
 	reloc[1].delta = 1 * sizeof(uint32_t);
 	reloc[1].read_domains = I915_GEM_DOMAIN_COMMAND;
 	reloc[1].write_domain = I915_GEM_DOMAIN_COMMAND;
-	reloc[1].presumed_offset = -1;
 
-	reloc[2].offset = footer_pos + 1 * sizeof(uint32_t);
-	reloc[2].target_handle = obj[1].handle;
-	reloc[2].delta = jump_off;
+	reloc[2].offset = 14 * sizeof(uint32_t);
+	reloc[2].target_handle = obj[0].handle;
+	reloc[2].delta = 0;
 	reloc[2].read_domains = I915_GEM_DOMAIN_COMMAND;
 	reloc[2].write_domain = 0;
-	reloc[2].presumed_offset = -1;
+
+	reloc[3].offset = footer_pos + 1 * sizeof(uint32_t);
+	reloc[3].target_handle = obj[1].handle;
+	reloc[3].delta = jump_off;
+	reloc[3].read_domains = I915_GEM_DOMAIN_COMMAND;
+	reloc[3].write_domain = 0;
+	reloc[3].presumed_offset = -1;
 
 	obj[1].relocs_ptr = to_user_pointer(reloc);
-	obj[1].relocation_count = 3;
+	obj[1].relocation_count = ARRAY_SIZE(reloc);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
@@ -506,21 +532,20 @@ static void test_bb_start(const int i915, const uint32_t handle, int test)
 	execbuf.batch_len = sizeof(batch);
 	execbuf.flags = I915_EXEC_BLT;
 
-	dst = gem_mmap__cpu(i915, obj[0].handle, 0, 4096,
-			    PROT_READ | PROT_WRITE);
+	dst = gem_mmap__wc(i915, obj[0].handle, 0, 4096, PROT_WRITE);
 
 	igt_assert_eq(dst[0], 0);
 	igt_assert_eq(dst[1], 0);
 
-	ret = __gem_execbuf(i915, &execbuf);
-
 	switch (test) {
 	case BB_START_PARAM:
-		igt_assert_eq(ret, -EINVAL);
+	case BB_START_OUT:
+		igt_assert_eq(__checked_execbuf(i915, &execbuf), -EINVAL);
 		break;
+
 	case BB_START_CMD:
 	case BB_START_FAR:
-		igt_assert_eq(ret, 0);
+		gem_execbuf(i915, &execbuf);
 
 		while (READ_ONCE(dst[0]) == 0)
 		       ;
@@ -531,19 +556,8 @@ static void test_bb_start(const int i915, const uint32_t handle, int test)
 		igt_assert_eq(dst[0], 1);
 		igt_assert_eq(dst[1], 2);
 
-		igt_info("values now %x %x\n", dst[0], dst[1]);
-
 		dst[0] = 0;
-
-		igt_info("values now %x %x\n", dst[0], dst[1]);
-
-		igt_assert_eq(dst[0], 0);
-		igt_assert_eq(dst[1], 2);
-
-		break;
-
-	case BB_START_OUT:
-		igt_assert_eq(ret, -EINVAL);
+		__sync_synchronize();
 		break;
 	}
 
@@ -896,7 +910,7 @@ static void test_unaligned_jump(const int i915, const uint32_t handle)
 		memcpy(&batch[1], &offset, sizeof(offset));
 		gem_write(i915, handle, 4000, batch, sizeof(batch));
 
-		igt_assert_f(__gem_execbuf(i915, &execbuf) == -EINVAL,
+		igt_assert_f(__checked_execbuf(i915, &execbuf) == -EINVAL,
 			     "unaligned jump accepted to %d; batch=%08x\n",
 			     reloc.delta, batch[reloc.delta / 4]);
 	}
@@ -1032,19 +1046,11 @@ igt_main
 	igt_subtest("unaligned-jump")
 		test_unaligned_jump(i915, handle);
 
-	igt_subtest_group {
-		igt_hang_t hang;
+	igt_subtest("bb-start-cmd")
+		test_bb_start(i915, handle, BB_START_CMD);
 
-		igt_fixture igt_allow_hang(i915, 0, 0);
-
-		igt_subtest("bb-start-cmd")
-			test_bb_start(i915, handle, BB_START_CMD);
-
-		igt_subtest("bb-start-far")
-			test_bb_start(i915, handle, BB_START_FAR);
-
-		igt_fixture igt_disallow_hang(i915, hang);
-	}
+	igt_subtest("bb-start-far")
+		test_bb_start(i915, handle, BB_START_FAR);
 
 	igt_fixture {
 		igt_stop_hang_detector();
