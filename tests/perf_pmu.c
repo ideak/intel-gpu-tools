@@ -1342,8 +1342,9 @@ test_interrupts(int gem_fd)
 static void
 test_interrupts_sync(int gem_fd)
 {
+	const int target =
+		gem_measure_ring_inflight(gem_fd, I915_EXEC_DEFAULT, 0);
 	const unsigned int test_duration_ms = 1000;
-	const int target = 30;
 	igt_spin_t *spin[target];
 	struct pollfd pfd;
 	uint64_t idle, busy;
