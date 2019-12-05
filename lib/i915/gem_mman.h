@@ -25,24 +25,50 @@
 #ifndef GEM_MMAN_H
 #define GEM_MMAN_H
 
+#include <stdint.h>
+
 void *gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot);
 void *gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
+void *gem_mmap_offset__cpu(int fd, uint32_t handle, uint64_t offset,
+			   uint64_t size, unsigned prot);
 
 bool gem_mmap__has_wc(int fd);
+bool gem_mmap_offset__has_wc(int fd);
 void *gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
-
+void *gem_mmap_offset__wc(int fd, uint32_t handle, uint64_t offset,
+			  uint64_t size, unsigned prot);
+void *gem_mmap__device_coherent(int fd, uint32_t handle, uint64_t offset,
+				uint64_t size, unsigned prot);
 #ifndef I915_GEM_DOMAIN_WC
 #define I915_GEM_DOMAIN_WC 0x80
 #endif
 
 bool gem_has_mappable_ggtt(int i915);
 void gem_require_mappable_ggtt(int i915);
+bool gem_has_mmap_offset(int fd);
 
 void *__gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot);
 void *__gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
+void *__gem_mmap_offset__cpu(int fd, uint32_t handle, uint64_t offset,
+			     uint64_t size, unsigned prot);
 void *__gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);
+void *__gem_mmap_offset__wc(int fd, uint32_t handle, uint64_t offset,
+			    uint64_t size, unsigned prot);
+void *__gem_mmap__device_coherent(int fd, uint32_t handle, uint64_t offset,
+				  uint64_t size, unsigned prot);
+void *__gem_mmap_offset(int fd, uint32_t handle, uint64_t offset, uint64_t size,
+			unsigned int prot, uint64_t flags);
 
 int gem_munmap(void *ptr, uint64_t size);
+
+/**
+ * gem_require_mmap_offset:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether is possible to map memory using mmap
+ * offset interface. Automatically skips through igt_require() if not.
+ */
+#define gem_require_mmap_offset(fd) igt_require(gem_has_mmap_offset(fd))
 
 /**
  * gem_require_mmap_wc:
@@ -53,6 +79,16 @@ int gem_munmap(void *ptr, uint64_t size);
  * through igt_require() if not.
  */
 #define gem_require_mmap_wc(fd) igt_require(gem_mmap__has_wc(fd))
+
+/**
+ * gem_require_mmap_offset_wc:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether direct (i.e. cpu access path, bypassing
+ * the gtt) write-combine memory mappings are available. Automatically skips
+ * through igt_require() if not.
+ */
+#define gem_require_mmap_offset_wc(fd) igt_require(gem_mmap_offset__has_wc(fd))
 
 #endif /* GEM_MMAN_H */
 
