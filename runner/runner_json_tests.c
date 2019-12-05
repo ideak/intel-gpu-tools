@@ -164,6 +164,7 @@ static const char *dirnames[] = {
 	"dmesg-warn-level-one-piglit-style",
 	"dynamic-subtests",
 	"dynamic-subtest-name-in-multiple-subtests",
+	"unprintable-characters",
 };
 
 igt_main
