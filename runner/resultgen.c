@@ -405,15 +405,40 @@ static void free_matches(struct matches *matches)
 	free(matches->items);
 }
 
+static struct json_object *new_escaped_json_string(const char *buf, size_t len)
+{
+	struct json_object *obj;
+	char *str = NULL;
+	size_t strsize = 0;
+	size_t i;
+
+	for (i = 0; i < len; i++) {
+		if (buf[i] > 0 && buf[i] < 128) {
+			str = realloc(str, strsize + 1);
+			str[strsize] = buf[i];
+			++strsize;
+		} else {
+			/* Encode > 128 character to UTF-8. */
+			str = realloc(str, strsize + 2);
+			str[strsize] = ((unsigned char)buf[i] >> 6) | 0xC0;
+			str[strsize + 1] = ((unsigned char)buf[i] & 0x3F) | 0x80;
+			strsize += 2;
+		}
+	}
+
+	obj = json_object_new_string_len(str, strsize);
+	free(str);
+
+	return obj;
+}
+
 static void add_igt_version(struct json_object *testobj,
 			    const char *igt_version,
 			    size_t igt_version_len)
 {
 	if (igt_version)
 		json_object_object_add(testobj, "igt-version",
-				       json_object_new_string_len(igt_version,
-								  igt_version_len));
-
+				       new_escaped_json_string(igt_version, igt_version_len));
 }
 
 enum subtest_find_pattern {
@@ -608,7 +633,7 @@ static void process_dynamic_subtest_output(const char *piglit_name,
 		current_dynamic_test = get_or_create_json_object(tests, dynamic_piglit_name);
 
 		json_object_object_add(current_dynamic_test, key,
-				       json_object_new_string_len(dynbeg, dynend - dynbeg));
+				       new_escaped_json_string(dynbeg, dynend - dynbeg));
 		add_igt_version(current_dynamic_test, igt_version, igt_version_len);
 
 		if (!json_object_object_get_ex(current_dynamic_test, "result", NULL)) {
@@ -680,7 +705,7 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 		current_test = get_or_create_json_object(tests, piglit_name);
 
 		json_object_object_add(current_test, key,
-				       json_object_new_string_len(buf, statbuf.st_size));
+				       new_escaped_json_string(buf, statbuf.st_size));
 		add_igt_version(current_test, igt_version, igt_version_len);
 
 		return true;
@@ -704,7 +729,7 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 		end = find_subtest_end_limit(matches, begin_idx, result_idx, buf, bufend);
 
 		json_object_object_add(current_test, key,
-				       json_object_new_string_len(beg, end - beg));
+				       new_escaped_json_string(beg, end - beg));
 
 		add_igt_version(current_test, igt_version, igt_version_len);
 
@@ -863,11 +888,11 @@ static void add_dmesg(struct json_object *obj,
 		      const char *warnings, size_t warningslen)
 {
 	json_object_object_add(obj, "dmesg",
-			       json_object_new_string_len(dmesg, dmesglen));
+			       new_escaped_json_string(dmesg, dmesglen));
 
 	if (warnings) {
 		json_object_object_add(obj, "dmesg-warnings",
-				       json_object_new_string_len(warnings, warningslen));
+				       new_escaped_json_string(warnings, warningslen));
 	}
 }
 
@@ -1482,7 +1507,7 @@ struct json_object *generate_results_json(int dirfd)
 			r--;
 
 		json_object_object_add(obj, "uname",
-				       json_object_new_string_len(buf, r));
+				       new_escaped_json_string(buf, r));
 		close(fd);
 	}
 
@@ -1545,7 +1570,7 @@ struct json_object *generate_results_json(int dirfd)
 		s = read(fd, buf, sizeof(buf));
 
 		json_object_object_add(aborttest, "out",
-				       json_object_new_string_len(buf, s));
+				       new_escaped_json_string(buf, s));
 		json_object_object_add(aborttest, "err",
 				       json_object_new_string(""));
 		json_object_object_add(aborttest, "dmesg",
