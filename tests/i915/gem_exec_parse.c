@@ -30,9 +30,7 @@
 
 #include <drm.h>
 
-#ifndef I915_PARAM_CMD_PARSER_VERSION
-#define I915_PARAM_CMD_PARSER_VERSION       28
-#endif
+#include "sw_sync.h"
 
 #define DERRMR 0x44050
 #define OASTATUS2 0x2368
@@ -60,18 +58,28 @@ static int parser_version;
 
 struct intel_mmio_data mmio_data;
 
-static int command_parser_version(int fd)
+static int
+__checked_execbuf(int i915, struct drm_i915_gem_execbuffer2 *eb)
 {
-	int version = -1;
-	drm_i915_getparam_t gp;
+	int fence;
+	int err;
 
-	gp.param = I915_PARAM_CMD_PARSER_VERSION;
-	gp.value = &version;
+	igt_assert(!(eb->flags & I915_EXEC_FENCE_OUT));
+	eb->flags |= I915_EXEC_FENCE_OUT;
+	err = __gem_execbuf_wr(i915, eb);
+	eb->flags &= ~I915_EXEC_FENCE_OUT;
+	if (err)
+		return err;
 
-	if (drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp) == 0)
-		return version;
+	fence = eb->rsvd2 >> 32;
 
-	return -1;
+	sync_fence_wait(fence, -1);
+	err = sync_fence_status(fence);
+	close(fence);
+	if (err < 0)
+		return err;
+
+	return 0;
 }
 
 static uint64_t __exec_batch_patched(int fd, uint32_t cmd_bo, uint32_t *cmds,
@@ -141,7 +149,7 @@ static int __exec_batch(int fd, uint32_t cmd_bo, uint32_t *cmds,
 	execbuf.batch_len = size;
 	execbuf.flags = ring;
 
-	return __gem_execbuf(fd, &execbuf);
+	return __checked_execbuf(fd, &execbuf);
 }
 #define exec_batch(fd, bo, cmds, sz, ring, expected) \
 	igt_assert_eq(__exec_batch(fd, bo, cmds, sz, ring), expected)
@@ -184,7 +192,7 @@ static void exec_split_batch(int fd, uint32_t *cmds,
 		      0x8);
 	execbuf.flags = ring;
 
-	igt_assert_eq(__gem_execbuf(fd, &execbuf), expected_ret);
+	igt_assert_eq(__checked_execbuf(fd, &execbuf), expected_ret);
 
 	gem_sync(fd, cmd_bo);
 	gem_close(fd, cmd_bo);
@@ -436,7 +444,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 
-		parser_version = command_parser_version(fd);
+		parser_version = gem_cmdparser_version(fd, 0);
 		igt_require(parser_version != -1);
 
 		igt_require(gem_uses_ppgtt(fd));
