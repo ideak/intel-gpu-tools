@@ -159,6 +159,15 @@ static struct oa_format gen8_oa_formats[I915_OA_FORMAT_MAX] = {
 		.b_off = 32, .n_b = 8, },
 };
 
+static struct oa_format gen12_oa_formats[I915_OA_FORMAT_MAX] = {
+	[I915_OA_FORMAT_A32u40_A4u32_B8_C8] = {
+		"A32u40_A4u32_B8_C8", .size = 256,
+		.a40_high_off = 160, .a40_low_off = 16, .n_a40 = 32,
+		.a_off = 144, .n_a = 4, .first_a = 32,
+		.b_off = 192, .n_b = 8,
+		.c_off = 224, .n_c = 8, },
+};
+
 static bool hsw_undefined_a_counters[45] = {
 	[4] = true,
 	[6] = true,
@@ -206,7 +215,10 @@ get_oa_format(enum drm_i915_oa_format format)
 {
 	if (IS_HASWELL(devid))
 		return hsw_oa_formats[format];
-	return gen8_oa_formats[format];
+	else if (IS_GEN12(devid))
+		return gen12_oa_formats[format];
+	else
+		return gen8_oa_formats[format];
 }
 
 static void
@@ -945,6 +957,8 @@ init_sys_info(void)
 			test_set_uuid = "db41edd4-d8e7-4730-ad11-b9a2d6833503";
 		} else if (IS_ICELAKE(devid)) {
 			test_set_uuid = "a291665e-244b-4b76-9b9a-01de9d3c8068";
+		} else if (IS_TIGERLAKE(devid)) {
+			test_set_uuid = "80a833f0-2504-4321-8894-e9277844ce7b";
 		} else {
 			igt_debug("unsupported GT\n");
 			return false;
@@ -3846,6 +3860,8 @@ test_whitelisted_registers_userspace_config(void)
 	uint32_t b_counters_regs[200];
 	uint32_t flex_regs[200];
 	uint32_t i;
+	uint32_t oa_start_trig1, oa_start_trig8;
+	uint32_t oa_report_trig1, oa_report_trig8;
 	uint64_t config_id;
 	char path[512];
 	int ret;
@@ -3869,14 +3885,26 @@ test_whitelisted_registers_userspace_config(void)
 	memset(&config, 0, sizeof(config));
 	memcpy(config.uuid, uuid, sizeof(config.uuid));
 
+	if (intel_gen(devid) >= 12) {
+		oa_start_trig1 = 0xd900;
+		oa_start_trig8 = 0xd91c;
+		oa_report_trig1 = 0xd920;
+		oa_report_trig8 = 0xd93c;
+	} else {
+		oa_start_trig1 = 0x2710;
+		oa_start_trig8 = 0x272c;
+		oa_report_trig1 = 0x2740;
+		oa_report_trig8 = 0x275c;
+	}
+
 	/* OASTARTTRIG[1-8] */
-	for (i = 0x2710; i <= 0x272c; i += 4) {
+	for (i = oa_start_trig1; i <= oa_start_trig8; i += 4) {
 		b_counters_regs[config.n_boolean_regs * 2] = i;
 		b_counters_regs[config.n_boolean_regs * 2 + 1] = 0;
 		config.n_boolean_regs++;
 	}
 	/* OAREPORTTRIG[1-8] */
-	for (i = 0x2740; i <= 0x275c; i += 4) {
+	for (i = oa_report_trig1; i <= oa_report_trig8; i += 4) {
 		b_counters_regs[config.n_boolean_regs * 2] = i;
 		b_counters_regs[config.n_boolean_regs * 2 + 1] = 0;
 		config.n_boolean_regs++;
@@ -3897,7 +3925,7 @@ test_whitelisted_registers_userspace_config(void)
 	i = 0;
 
 	/* NOA_WRITE */
-	mux_regs[i++] = 0x9800;
+	mux_regs[i++] = 0x9888;
 	mux_regs[i++] = 0;
 
 	if (IS_HASWELL(devid)) {
@@ -3922,10 +3950,6 @@ test_whitelisted_registers_userspace_config(void)
 		mux_regs[i++] = 0;
 	}
 
-	/* HALF_SLICE_CHICKEN2 (shared with kernel workaround) */
-	mux_regs[i++] = 0xE180;
-	mux_regs[i++] = 0;
-
 	if (IS_CHERRYVIEW(devid)) {
 		/* Cherryview specific. undocumented... */
 		mux_regs[i++] = 0x182300;
@@ -3934,12 +3958,17 @@ test_whitelisted_registers_userspace_config(void)
 		mux_regs[i++] = 0;
 	}
 
-	/* PERFCNT[12] */
-	mux_regs[i++] = 0x91B8;
-	mux_regs[i++] = 0;
-	/* PERFMATRIX */
-	mux_regs[i++] = 0x91C8;
-	mux_regs[i++] = 0;
+	if (intel_gen(devid) <= 11) {
+		/* HALF_SLICE_CHICKEN2 (shared with kernel workaround) */
+		mux_regs[i++] = 0xE180;
+		mux_regs[i++] = 0;
+		/* PERFCNT[12] */
+		mux_regs[i++] = 0x91B8;
+		mux_regs[i++] = 0;
+		/* PERFMATRIX */
+		mux_regs[i++] = 0x91C8;
+		mux_regs[i++] = 0;
+	}
 
 	config.mux_regs_ptr = (uintptr_t) mux_regs;
 	config.n_mux_regs = i / 2;
@@ -4168,8 +4197,10 @@ igt_main
 		 * functionality to HW filter timer reports for a specific
 		 * context (SKL+) can't stop multiple applications viewing
 		 * system-wide data via MI_REPORT_PERF_COUNT commands.
+		 *
+		 * For gen12 implement a separate test that uses only OAR
 		 */
-		igt_require(intel_gen(devid) >= 8);
+		igt_require(intel_gen(devid) >= 8 && intel_gen(devid) < 12);
 		gen8_test_single_ctx_render_target_writes_a_counter();
 	}
 
