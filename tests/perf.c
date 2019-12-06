@@ -210,6 +210,19 @@ static uint32_t (*read_report_ticks)(uint32_t *report,
 static void (*sanity_check_reports)(uint32_t *oa_report0, uint32_t *oa_report1,
 				    enum drm_i915_oa_format format);
 
+static void
+dump_report(const uint32_t *report, uint32_t size, const char *message) {
+	uint32_t i;
+	igt_debug("%s\n", message);
+	for (i = 0; i < size; i += 4) {
+		igt_debug("%08x %08x %08x %08x\n",
+				report[i],
+				report[i + 1],
+				report[i + 2],
+				report[i + 3]);
+	}
+}
+
 static struct oa_format
 get_oa_format(enum drm_i915_oa_format format)
 {
@@ -874,6 +887,7 @@ init_sys_info(void)
 	igt_assert_neq(devid, 0);
 
 	timestamp_frequency = get_cs_timestamp_frequency();
+	igt_debug("timestamp_frequency = %lu\n", timestamp_frequency);
 	igt_assert_neq(timestamp_frequency, 0);
 
 	if (IS_HASWELL(devid)) {
@@ -1289,6 +1303,7 @@ read_2_oa_reports(int format_id,
 			igt_assert_eq(header->size, sample_size);
 
 			report = (const void *)(header + 1);
+			dump_report(report, 64, "oa-formats");
 
 			igt_debug("read report: reason = %x, timestamp = %x, exponent mask=%x\n",
 				  report[0], report[1], exponent_mask);
@@ -2856,6 +2871,7 @@ test_mi_rpc(void)
 	igt_assert_eq(ret, 0);
 
 	report32 = bo->virtual;
+	dump_report(report32, 64, "mi-rpc");
 	igt_assert_eq(report32[0], 0xdeadbeef); /* report ID */
 	igt_assert_neq(report32[1], 0); /* timestamp */
 
@@ -3335,11 +3351,13 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			prev = report0_32;
 			ctx_id = prev[2];
 			igt_debug("MI_RPC(start) CTX ID: %u\n", ctx_id);
+			dump_report(report0_32, 64, "report0_32");
 
 			report1_32 = report0_32 + 64; /* 64 uint32_t = 256bytes offset */
 			igt_assert_eq(report1_32[0], 0xbeefbeef); /* report ID */
 			igt_assert_neq(report1_32[1], 0); /* timestamp */
 			ctx1_id = report1_32[2];
+			dump_report(report1_32, 64, "report1_32");
 
 			memset(accumulator.deltas, 0, sizeof(accumulator.deltas));
 			accumulate_reports(&accumulator, report0_32, report1_32);
@@ -3434,6 +3452,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 				igt_assert_eq(header->size, sample_size);
 
 				report = (void *)(header + 1);
+				dump_report(report, 64, "OA report");
 
 				/* Don't expect zero for timestamps */
 				igt_assert_neq(report[1], 0);
