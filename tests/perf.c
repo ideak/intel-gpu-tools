@@ -2817,6 +2817,114 @@ test_disabled_read_error(void)
 }
 
 static void
+gen12_test_mi_rpc(void)
+{
+	uint64_t properties[] = {
+		/* On Gen12, MI RPC uses OAR. OAR is configured only for the
+		 * render context that wants to measure the performance. Hence a
+		 * context must be specified in the gen12 MI RPC when compared
+		 * to previous gens.
+		 *
+		 * Have a random value here for the context id, but initialize
+		 * it once you figure out the context ID for the work to be
+		 * measured
+		 */
+		DRM_I915_PERF_PROP_CTX_HANDLE, UINT64_MAX,
+
+		/* OA unit configuration:
+		 * DRM_I915_PERF_PROP_SAMPLE_OA is no longer required for Gen12
+		 * because the OAR unit increments counters only for the
+		 * relevant context. No other parameters are needed since we do
+		 * not rely on the OA buffer anymore to normalize the counter
+		 * values.
+		 */
+		DRM_I915_PERF_PROP_OA_METRICS_SET, test_metric_set_id,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_oa_format,
+	};
+	struct drm_i915_perf_open_param param = {
+		.flags = I915_PERF_FLAG_FD_CLOEXEC,
+		.num_properties = ARRAY_SIZE(properties) / 2,
+		.properties_ptr = to_user_pointer(properties),
+	};
+	drm_intel_bo *bo;
+	drm_intel_bufmgr *bufmgr;
+	drm_intel_context *context;
+	struct intel_batchbuffer *batch;
+#define INVALID_CTX_ID 0xffffffff
+	uint32_t ctx_id = INVALID_CTX_ID;
+	uint32_t *report32;
+	int ret;
+	size_t format_size_32;
+	struct oa_format format = get_oa_format(test_oa_format);
+
+	/* Ensure perf_stream_paranoid is set to 1 by default */
+	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
+
+	bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
+	igt_assert(bufmgr);
+
+	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+
+	context = drm_intel_gem_context_create(bufmgr);
+	igt_assert(context);
+
+	ret = drm_intel_gem_context_get_id(context, &ctx_id);
+	igt_assert_eq(ret, 0);
+	igt_assert_neq(ctx_id, INVALID_CTX_ID);
+	properties[1] = ctx_id;
+
+	batch = intel_batchbuffer_alloc(bufmgr, devid);
+	bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
+
+	ret = drm_intel_bo_map(bo, true);
+	igt_assert_eq(ret, 0);
+	memset(bo->virtual, 0x80, 4096);
+	drm_intel_bo_unmap(bo);
+
+	stream_fd = __perf_open(drm_fd, &param, false);
+
+#define REPORT_ID 0xdeadbeef
+#define REPORT_OFFSET 0
+	emit_report_perf_count(batch,
+			       bo,
+			       REPORT_OFFSET,
+			       REPORT_ID);
+	intel_batchbuffer_flush_with_context(batch, context);
+
+	ret = drm_intel_bo_map(bo, false);
+	igt_assert_eq(ret, 0);
+
+	report32 = bo->virtual;
+	format_size_32 = format.size >> 2;
+	dump_report(report32, format_size_32, "mi-rpc");
+
+	/* Sanity check reports
+	 * reportX_32[0]: report id passed with mi-rpc
+	 * reportX_32[1]: timestamp. NOTE: wraps around in ~6 minutes.
+	 *
+	 * reportX_32[format.b_off]: check if the entire report was filled.
+	 * B0 counter falls in the last 64 bytes of this report format.
+	 * Since reports are filled in 64 byte blocks, we should be able to
+	 * assure that the report was filled by checking the B0 counter. B0
+	 * counter is defined to be zero, so we can easily validate it.
+	 *
+	 * reportX_32[format_size_32]: outside report, make sure only the report
+	 * size amount of data was written.
+	 */
+	igt_assert_eq(report32[0], REPORT_ID);
+	igt_assert_neq(report32[1], 0);
+	igt_assert_eq(report32[format.b_off >> 2], 0);
+	igt_assert_eq(report32[format_size_32], 0x80808080);
+
+	drm_intel_bo_unmap(bo);
+	drm_intel_bo_unreference(bo);
+	intel_batchbuffer_free(batch);
+	drm_intel_gem_context_destroy(context);
+	drm_intel_bufmgr_destroy(bufmgr);
+	__perf_close(stream_fd);
+}
+
+static void
 test_mi_rpc(void)
 {
 	uint64_t properties[] = {
@@ -4530,8 +4638,16 @@ igt_main
 	igt_subtest("short-reads")
 		test_short_reads();
 
-	igt_subtest("mi-rpc")
+	igt_subtest("mi-rpc") {
+		igt_require(intel_gen(devid) < 12);
 		test_mi_rpc();
+	}
+
+	igt_describe("Test MI REPORT PERF COUNT for Gen 12");
+	igt_subtest("gen12-mi-rpc") {
+		igt_require(intel_gen(devid) >= 12);
+		gen12_test_mi_rpc();
+	}
 
 	igt_subtest("unprivileged-single-ctx-counters") {
 		igt_require(IS_HASWELL(devid));
