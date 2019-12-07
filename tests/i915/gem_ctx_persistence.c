@@ -727,7 +727,7 @@ igt_main
 	igt_subtest("hangcheck")
 		test_nohangcheck_hostile(i915);
 
-	__for_each_physical_engine(i915, e) {
+	__for_each_static_engine(e) {
 		igt_subtest_group {
 			igt_fixture {
 				gem_require_ring(i915, e->flags);
