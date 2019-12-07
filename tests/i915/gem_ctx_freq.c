@@ -109,10 +109,10 @@ static void set_sysfs_freq(uint32_t min, uint32_t max)
 	igt_sysfs_printf(sysfs, "gt_max_freq_mhz", "%u", max);
 }
 
-static void get_sysfs_freq(uint32_t *min, uint32_t *max)
+static bool get_sysfs_freq(uint32_t *min, uint32_t *max)
 {
-	igt_sysfs_scanf(sysfs, "gt_min_freq_mhz", "%u", min);
-	igt_sysfs_scanf(sysfs, "gt_max_freq_mhz", "%u", max);
+	return (igt_sysfs_scanf(sysfs, "gt_min_freq_mhz", "%u", min) == 1 &&
+		igt_sysfs_scanf(sysfs, "gt_max_freq_mhz", "%u", max) == 1);
 }
 
 static void sysfs_range(int i915)
@@ -131,7 +131,7 @@ static void sysfs_range(int i915)
 	 * constriained sysfs range.
 	 */
 
-	get_sysfs_freq(&sys_min, &sys_max);
+	igt_require(get_sysfs_freq(&sys_min, &sys_max));
 	igt_info("System min freq: %dMHz; max freq: %dMHz\n", sys_min, sys_max);
 
 	triangle_fill(frequencies, N_STEPS, sys_min, sys_max);
@@ -182,18 +182,17 @@ static void restore_sysfs_freq(int sig)
 	}
 }
 
-static void disable_boost(int i915)
+static void disable_boost(void)
 {
-	char *value;
+	char buf[256];
 
-	value = igt_sysfs_get(i915, "gt_RPn_freq_mhz");
-	igt_sysfs_set(i915, "gt_min_freq_mhz", value);
-	igt_sysfs_set(i915, "gt_boost_freq_mhz", value);
-	free(value);
+	if (igt_sysfs_read(sysfs, "gt_RPn_freq_mhz", buf, sizeof(buf)) > 0) {
+		igt_sysfs_set(sysfs, "gt_min_freq_mhz", buf);
+		igt_sysfs_set(sysfs, "gt_boost_freq_mhz", buf);
+	}
 
-	value = igt_sysfs_get(i915, "gt_RP0_freq_mhz");
-	igt_sysfs_set(i915, "gt_max_freq_mhz", value);
-	free(value);
+	if (igt_sysfs_read(sysfs, "gt_RP0_freq_mhz", buf, sizeof(buf)) > 0)
+		igt_sysfs_set(sysfs, "gt_max_freq_mhz", buf);
 }
 
 igt_main
@@ -208,7 +207,7 @@ igt_main
 		igt_assert(sysfs != -1);
 		igt_install_exit_handler(restore_sysfs_freq);
 
-		disable_boost(sysfs);
+		disable_boost();
 	}
 
 	igt_subtest_f("sysfs")
