@@ -425,7 +425,10 @@ static void independent(int i915)
 		.value = to_user_pointer(&engines),
 		.size = sizeof(engines),
 	};
-	struct drm_i915_gem_exec_object2 results = { .handle = gem_create(i915, 4096) };
+	struct drm_i915_gem_exec_object2 results = {
+		.handle = gem_create(i915, 4096),
+		.offset = gem_aperture_size(i915) / 2,
+	};
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	int timeline = sw_sync_timeline_create();
 	uint32_t last, *map;
