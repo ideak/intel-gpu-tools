@@ -72,12 +72,12 @@ struct pipe_info {
 	bool enabled;
 	bool pf_enabled;
 	uint32_t interlace_mode;
-	uint32_t tot_width;  /* htotal */
-	uint32_t tot_height; /* vtotal */
-	uint32_t src_width;  /* pipesrc.x */
-	uint32_t src_height; /* pipesrc.y */
-	uint32_t dst_width;  /* pf_win_sz.x */
-	uint32_t dst_height; /* pf_win_sz.y */
+	int tot_width;  /* htotal */
+	int tot_height; /* vtotal */
+	int src_width;  /* pipesrc.x */
+	int src_height; /* pipesrc.y */
+	int dst_width;  /* pf_win_sz.x */
+	int dst_height; /* pf_win_sz.y */
 };
 
 static void read_pipe_info(int intel_pipe, struct pipe_info *info)
@@ -155,7 +155,7 @@ static void dump_info(void)
 static int change_screen_size(int intel_pipe, int x, int y)
 {
 	struct pipe_info info;
-	uint32_t dst_width, dst_height, pos_x, pos_y;
+	int dst_width, dst_height, pos_x, pos_y;
 	uint32_t ctrl1_val;
 	uint32_t win_pos_val;
 	uint32_t win_sz_val;
