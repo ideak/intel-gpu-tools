@@ -364,7 +364,7 @@ static void page_flip_handler(int fd, unsigned int seq,
 	 * For seamless tear-free display, the page flip event timestamps
 	 * from all the tiles should not differ by more than 10us.
 	 */
-	igt_fail_on_f(abs(usec) >= 10, "Delayed page flip event from CRTC:%d at %u:%u\n",
+	igt_fail_on_f(labs(usec) >= 10, "Delayed page flip event from CRTC:%d at %u:%u\n",
 		      crtc_id, tv_sec, tv_usec);
 }
 
