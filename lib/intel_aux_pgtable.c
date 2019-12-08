@@ -9,9 +9,9 @@
 
 #include "i915/gem_mman.h"
 
-#define BITS_PER_LONG		(sizeof(long) * 8)
-#define BITMASK(e, s)		((~0UL << (s)) & \
-				 (~0UL >> (BITS_PER_LONG - 1 - (e))))
+#define BITS_PER_LONG_LONG	(sizeof(long long) * 8)
+#define BITMASK(e, s)		((~0ULL << (s)) & \
+				 (~0ULL >> (BITS_PER_LONG_LONG - 1 - (e))))
 
 /* The unit size to which the AUX CCS surface is aligned to. */
 #define AUX_CCS_UNIT_SIZE	64
