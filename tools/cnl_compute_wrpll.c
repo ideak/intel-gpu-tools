@@ -23,6 +23,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -30,7 +31,6 @@
 #include <string.h>
 #include <math.h>
 
-#define U32_MAX         ((uint32_t)~0ULL)
 #define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 
 static inline uint64_t div_u64(uint64_t dividend, uint32_t divisor)
@@ -194,20 +194,20 @@ static bool
 cnl_ddi_calculate_wrpll2(int clock,
 			 struct skl_wrpll_params *params)
 {
-	uint32_t afe_clock = clock * 5 / 1000; /* clock in kHz */
-	uint32_t dco_min = 7998000;
-	uint32_t dco_max = 10000000;
-	uint32_t dco_mid = (dco_min + dco_max) / 2;
+	int afe_clock = clock * 5 / 1000; /* clock in kHz */
+	int dco_min = 7998000;
+	int dco_max = 10000000;
+	int dco_mid = (dco_min + dco_max) / 2;
 	static const int dividers[] = {  2,  4,  6,  8, 10, 12,  14,  16,
 					 18, 20, 24, 28, 30, 32,  36,  40,
 					 42, 44, 48, 50, 52, 54,  56,  60,
 					 64, 66, 68, 70, 72, 76,  78,  80,
 					 84, 88, 90, 92, 96, 98, 100, 102,
 					  3,  5,  7,  9, 15, 21 };
-	uint32_t dco, best_dco = 0, dco_centrality = 0;
-	uint32_t best_dco_centrality = U32_MAX; /* Spec meaning of 999999 MHz */
+	int dco, best_dco = 0, dco_centrality = 0;
+	int best_dco_centrality = INT_MAX; /* Spec meaning of 999999 MHz */
 	int d, best_div = 0, pdiv = 0, qdiv = 0, kdiv = 0;
-	uint32_t ref_clock = params->ref_clock;
+	int ref_clock = params->ref_clock;
 
 	for (d = 0; d < ARRAY_SIZE(dividers); d++) {
 		dco = afe_clock * dividers[d];
@@ -236,10 +236,10 @@ cnl_ddi_calculate_wrpll2(int clock,
 
 static void test_multipliers(unsigned int clock)
 {
-	uint64_t afe_clock = clock * 5 / 1000; /* clocks in kHz */
-	unsigned int dco_min = 7998000;
-	unsigned int dco_max = 10000000;
-	unsigned int dco_mid = (dco_min + dco_max) / 2;
+	int afe_clock = clock * 5 / 1000; /* clocks in kHz */
+	int dco_min = 7998000;
+	int dco_max = 10000000;
+	int dco_mid = (dco_min + dco_max) / 2;
 
 	static const int dividerlist[] = {  2,  4,  6,  8, 10, 12,  14,  16,
 					   18, 20, 24, 28, 30, 32,  36,  40,
@@ -247,8 +247,8 @@ static void test_multipliers(unsigned int clock)
 					   64, 66, 68, 70, 72, 76,  78,  80,
 					   84, 88, 90, 92, 96, 98, 100, 102,
 					    3,  5,  7,  9, 15, 21 };
-	unsigned int dco, dco_centrality = 0;
-	unsigned int best_dco_centrality = U32_MAX;
+	int dco, dco_centrality = 0;
+	int best_dco_centrality = INT_MAX;
 	int d, best_div = 0, pdiv = 0, qdiv = 0, kdiv = 0;
 
 	for (d = 0; d < ARRAY_SIZE(dividerlist); d++) {
