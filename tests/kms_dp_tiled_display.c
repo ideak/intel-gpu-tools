@@ -207,9 +207,10 @@ static void test_cleanup(data_t *data)
 
 static void setup_mode(data_t *data)
 {
-	int count = 0, prev = 0;
-	bool pipe_in_use = false;
+	int count = 0, prev = 0, i = 0;
+	bool pipe_in_use = false, found = false;
 	enum pipe pipe;
+	drmModeModeInfo *mode;
 	igt_output_t *output;
 	data_connector_t *conns = data->conns;
 
@@ -226,6 +227,8 @@ static void setup_mode(data_t *data)
 
 		for_each_pipe(data->display, pipe) {
 			pipe_in_use = false;
+			found = false;
+
 			if (count > 0) {
 				for (prev = count - 1; prev >= 0; prev--) {
 					if (pipe == conns[prev].pipe) {
@@ -247,6 +250,17 @@ static void setup_mode(data_t *data)
 			}
 		}
 		igt_require(conns[count].pipe != PIPE_NONE);
+
+		for (i = 0; i < conns[count].connector->count_modes; i++) {
+			mode = &conns[count].connector->modes[i];
+			if (mode->vdisplay == conns[count].tile.tile_v_size &&
+			    mode->hdisplay == conns[count].tile.tile_h_size) {
+				found = true;
+				break;
+			}
+		}
+		igt_require(found);
+		igt_output_override_mode(output, mode);
 	}
 	igt_display_commit_atomic(data->display, DRM_MODE_ATOMIC_ALLOW_MODESET,
 				  NULL);
