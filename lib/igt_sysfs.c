@@ -475,10 +475,18 @@ bool igt_sysfs_set_u32(int dir, const char *attr, uint32_t value)
 bool igt_sysfs_get_boolean(int dir, const char *attr)
 {
 	int result;
+	char *buf;
 
-	if (igt_sysfs_scanf(dir, attr, "%d", &result) != 1)
+	buf = igt_sysfs_get(dir, attr);
+	if (!buf)
 		return false;
 
+	if (sscanf(buf, "%d", &result) != 1) {
+		/* kernel's param_get_bool() returns "Y"/"N" */
+		result = !strcasecmp(buf, "Y");
+	}
+
+	free(buf);
 	return result;
 }
 
