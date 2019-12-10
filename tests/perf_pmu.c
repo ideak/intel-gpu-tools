@@ -1274,11 +1274,15 @@ static void cpu_hotplug(int gem_fd)
 	assert_within_epsilon(val, ts[1] - ts[0], tolerance);
 }
 
+static int target_num_interrupts(int i915)
+{
+	return min(gem_measure_ring_inflight(i915, I915_EXEC_DEFAULT, 0), 30);
+}
+
 static void
 test_interrupts(int gem_fd)
 {
-	const int target =
-		gem_measure_ring_inflight(gem_fd, I915_EXEC_DEFAULT, 0);
+	const int target = target_num_interrupts(gem_fd);
 	const unsigned int test_duration_ms = 1000;
 	igt_spin_t *spin[target];
 	struct pollfd pfd;
@@ -1342,8 +1346,7 @@ test_interrupts(int gem_fd)
 static void
 test_interrupts_sync(int gem_fd)
 {
-	const int target =
-		gem_measure_ring_inflight(gem_fd, I915_EXEC_DEFAULT, 0);
+	const int target = target_num_interrupts(gem_fd);
 	const unsigned int test_duration_ms = 1000;
 	igt_spin_t *spin[target];
 	struct pollfd pfd;
