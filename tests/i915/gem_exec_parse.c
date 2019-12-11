@@ -82,8 +82,10 @@ __checked_execbuf(int i915, struct drm_i915_gem_execbuffer2 *eb)
 	return 0;
 }
 
-static uint64_t __exec_batch_patched(int fd, uint32_t cmd_bo, uint32_t *cmds,
-				     int size, int patch_offset)
+static uint64_t __exec_batch_patched(int fd,
+				     uint32_t cmd_bo, unsigned int offset,
+				     uint32_t *cmds, unsigned int size,
+				     unsigned int patch_offset)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -92,14 +94,14 @@ static uint64_t __exec_batch_patched(int fd, uint32_t cmd_bo, uint32_t *cmds,
 	uint32_t target_bo = gem_create(fd, 4096);
 	uint64_t actual_value = 0;
 
-	gem_write(fd, cmd_bo, 0, cmds, size);
+	gem_write(fd, cmd_bo, offset, cmds, size);
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = target_bo;
 	obj[1].handle = cmd_bo;
 
 	memset(reloc, 0, sizeof(reloc));
-	reloc[0].offset = patch_offset;
+	reloc[0].offset = offset + patch_offset;
 	reloc[0].target_handle = obj[0].handle;
 	reloc[0].delta = 0;
 	reloc[0].read_domains = I915_GEM_DOMAIN_COMMAND;
@@ -110,6 +112,7 @@ static uint64_t __exec_batch_patched(int fd, uint32_t cmd_bo, uint32_t *cmds,
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
+	execbuf.batch_start_offset = offset;
 	execbuf.batch_len = size;
 	execbuf.flags = I915_EXEC_RENDER;
 
@@ -123,12 +126,25 @@ static uint64_t __exec_batch_patched(int fd, uint32_t cmd_bo, uint32_t *cmds,
 	return actual_value;
 }
 
-static void exec_batch_patched(int fd, uint32_t cmd_bo, uint32_t *cmds,
-			       int size, int patch_offset,
+static void exec_batch_patched(int fd, uint32_t cmd_bo,
+			       uint32_t *cmds, unsigned int size,
+			       unsigned int patch_offset,
 			       uint64_t expected_value)
 {
-	igt_assert_eq(__exec_batch_patched(fd, cmd_bo, cmds,
-					   size, patch_offset),
+	igt_assert_eq(__exec_batch_patched(fd, cmd_bo, 0,
+					   cmds, size,
+					   patch_offset),
+		      expected_value);
+}
+
+static void exec_batch_offset(int fd, uint32_t cmd_bo, unsigned int offset,
+			      uint32_t *cmds, unsigned int size,
+			      unsigned int patch_offset,
+			      uint64_t expected_value)
+{
+	igt_assert_eq(__exec_batch_patched(fd, cmd_bo, offset,
+					   cmds, size,
+					   patch_offset),
 		      expected_value);
 }
 
@@ -408,7 +424,7 @@ static void hsw_load_register_reg(void)
 		exec_batch(fd, handle, do_lrr, sizeof(do_lrr),
 			   I915_EXEC_RENDER,
 			   0);
-		var = __exec_batch_patched(fd, handle,
+		var = __exec_batch_patched(fd, handle, 0,
 					   store_gpr0, sizeof(store_gpr0),
 					   2 * sizeof(uint32_t)); /* reloc */
 		igt_assert_neq(var, 0xabcdabc0);
@@ -469,6 +485,27 @@ igt_main
 				   pc, sizeof(pc),
 				   8, /* patch offset, */
 				   0x12000000);
+	}
+
+	igt_subtest("basic-offset") {
+		uint32_t pc[] = {
+			GFX_OP_PIPE_CONTROL,
+			PIPE_CONTROL_QW_WRITE,
+			0, /* To be patched */
+			0x12000000,
+			0,
+			MI_BATCH_BUFFER_END,
+		};
+		uint32_t scrub[1024];
+
+		memset(scrub, 0xc5, sizeof(scrub));
+		for (int i = 0; i <= 4096 - sizeof(pc); i += 8) {
+			gem_write(fd, handle, 0, scrub, sizeof(scrub));
+			exec_batch_offset(fd, handle, i,
+					  pc, sizeof(pc),
+					  8, /* patch offset, */
+					  0x12000000);
+		}
 	}
 
 	igt_subtest("basic-rejected") {
