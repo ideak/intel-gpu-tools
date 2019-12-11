@@ -60,14 +60,14 @@ if jsonc.found()
 				 link_with : runnerlib,
 				 install : false,
 				 dependencies : igt_deps)
-	test('runner', runner_test)
+	test('runner', runner_test, timeout : 300)
 
 	runner_json_test = executable('runner_json_test', runner_json_test_sources,
 				      c_args : '-DJSON_TESTS_DIRECTORY="@0@"'.format(join_paths(meson.current_source_dir(), 'json_tests_data')),
 				      link_with : runnerlib,
 				      install : false,
 				      dependencies : [igt_deps, jsonc])
-	test('runner_json', runner_json_test)
+	test('runner_json', runner_json_test, timeout : 300)
 
 	build_info += 'Build test runner: true'
 	if liboping.found()
