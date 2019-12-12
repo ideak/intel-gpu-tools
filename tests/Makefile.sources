@@ -241,11 +241,11 @@ gem_exec_parallel_SOURCES = i915/gem_exec_parallel.c
 TESTS_progs += gem_exec_params
 gem_exec_params_SOURCES = i915/gem_exec_params.c
 
-TESTS_progs += gem_exec_parse
-gem_exec_parse_SOURCES = i915/gem_exec_parse.c
+TESTS_progs += gen7_exec_parse
+gen7_exec_parse_SOURCES = i915/gen7_exec_parse.c
 
-TESTS_progs += gem_exec_parse_blt
-gem_exec_parse_blt_SOURCES = i915/gem_exec_parse_blt.c
+TESTS_progs += gen9_exec_parse
+gen9_exec_parse_SOURCES = i915/gen9_exec_parse.c
 
 TESTS_progs += gem_exec_reloc
 gem_exec_reloc_SOURCES = i915/gem_exec_reloc.c
