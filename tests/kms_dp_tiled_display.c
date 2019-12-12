@@ -159,6 +159,8 @@ static void get_connectors(data_t *data)
 
 		count++;
 	}
+	igt_require_f(count == data->num_h_tiles,
+		     "All the tiled connectors are not connected\n");
 }
 
 static void
