@@ -107,12 +107,8 @@ emit_recursive_batch(igt_spin_t *spin,
 	memset(relocs, 0, sizeof(relocs));
 
 	obj[BATCH].handle = gem_create(fd, BATCH_SIZE);
-	batch = __gem_mmap__wc(fd, obj[BATCH].handle,
-			       0, BATCH_SIZE, PROT_WRITE);
-	if (!batch)
-		batch = gem_mmap__gtt(fd, obj[BATCH].handle,
-				      BATCH_SIZE, PROT_WRITE);
-
+	batch = gem_mmap__device_coherent(fd, obj[BATCH].handle,
+					  0, BATCH_SIZE, PROT_WRITE);
 	gem_set_domain(fd, obj[BATCH].handle,
 		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	execbuf->buffer_count++;
@@ -152,9 +148,10 @@ emit_recursive_batch(igt_spin_t *spin,
 						   0, 4096,
 						   PROT_READ | PROT_WRITE);
 		else
-			spin->poll = gem_mmap__wc(fd, spin->poll_handle,
-						  0, 4096,
-						  PROT_READ | PROT_WRITE);
+			spin->poll = gem_mmap__device_coherent(fd,
+							       spin->poll_handle,
+							       0, 4096,
+							       PROT_READ | PROT_WRITE);
 
 		igt_assert_eq(spin->poll[SPIN_POLL_START_IDX], 0);
 
