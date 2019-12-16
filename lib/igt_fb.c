@@ -487,18 +487,50 @@ static bool is_ccs_modifier(uint64_t modifier)
 		modifier == I915_FORMAT_MOD_Yf_TILED_CCS;
 }
 
+static bool is_ccs_plane(const struct igt_fb *fb, int plane)
+{
+	if (!is_ccs_modifier(fb->modifier))
+		return false;
+
+	return plane >= fb->num_planes / 2;
+}
+
+static bool is_gen12_ccs_plane(const struct igt_fb *fb, int plane)
+{
+	return is_gen12_ccs_modifier(fb->modifier) && is_ccs_plane(fb, plane);
+}
+
+static bool is_gen12_ccs_cc_plane(const struct igt_fb *fb, int plane)
+{
+	return fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC &&
+	       plane == 2;
+}
+
+static int ccs_to_main_plane(const struct igt_fb *fb, int plane)
+{
+	if (is_gen12_ccs_cc_plane(fb, plane))
+		return 0;
+
+	return plane - fb->num_planes / 2;
+}
+
 static unsigned fb_plane_width(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->modifier) && plane == 1) {
-		if (is_gen12_ccs_modifier(fb->modifier))
-			return DIV_ROUND_UP(fb->width,
-					    512 / (fb->plane_bpp[0] / 8)) * 64;
-		else
-			return DIV_ROUND_UP(fb->width, 1024) * 128;
-	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 2) {
+	if (is_gen12_ccs_cc_plane(fb, plane)) {
 		return 64;
+	} if (is_gen12_ccs_plane(fb, plane)) {
+		int main_plane = ccs_to_main_plane(fb, plane);
+		int width = fb->width;
+
+		if (main_plane)
+			width = DIV_ROUND_UP(width, format->hsub);
+
+		return DIV_ROUND_UP(width,
+				    512 / (fb->plane_bpp[main_plane] / 8)) * 64;
+	} else if (is_ccs_plane(fb, plane)) {
+		 return DIV_ROUND_UP(fb->width, 1024) * 128;
 	}
 
 	if (plane == 0)
@@ -511,7 +543,7 @@ static unsigned fb_plane_bpp(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->modifier) && (plane == 1 || plane == 2))
+	if (is_ccs_plane(fb, plane))
 		return 8;
 	else
 		return format->plane_bpp[plane];
@@ -521,13 +553,18 @@ static unsigned fb_plane_height(const struct igt_fb *fb, int plane)
 {
 	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
 
-	if (is_ccs_modifier(fb->modifier) && plane == 1) {
-		if (is_gen12_ccs_modifier(fb->modifier))
-			return DIV_ROUND_UP(fb->height, 128) * 4;
-		else
-			return DIV_ROUND_UP(fb->height, 512) * 32;
-	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 2)
+	if (is_gen12_ccs_cc_plane(fb, plane)) {
 		return 1;
+	} else if (is_gen12_ccs_plane(fb, plane)) {
+		int height = fb->height;
+
+		if (ccs_to_main_plane(fb, plane))
+			height = DIV_ROUND_UP(height, format->vsub);
+
+		return DIV_ROUND_UP(height, 128) * 4;
+	} else if (is_ccs_plane(fb, plane)) {
+		return DIV_ROUND_UP(fb->height, 512) * 32;
+	}
 
 	if (plane == 0)
 		return fb->height;
@@ -537,16 +574,15 @@ static unsigned fb_plane_height(const struct igt_fb *fb, int plane)
 
 static int fb_num_planes(const struct igt_fb *fb)
 {
-	const struct format_desc_struct *format = lookup_drm_format(fb->drm_format);
+	int num_planes = lookup_drm_format(fb->drm_format)->num_planes;
 
-	if (is_ccs_modifier(fb->modifier)) {
-		if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
-			return 3;
-		else
-			return 2;
-	} else {
-		return format->num_planes;
-	}
+	if (is_ccs_modifier(fb->modifier))
+		num_planes *= 2;
+
+	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
+		num_planes++;
+
+	return num_planes;
 }
 
 void igt_init_fb(struct igt_fb *fb, int fd, int width, int height,
@@ -604,12 +640,12 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		 * so the easiest way is to align the luma stride to 256.
 		 */
 		return ALIGN(min_stride, 256);
-	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 1) {
-		/* A main surface using a CCS AUX surface must be 4x4 tiles aligned. */
-		return ALIGN(min_stride, 64);
-	} else if (is_gen12_ccs_modifier(fb->modifier) && plane == 2) {
+	} else if (is_gen12_ccs_cc_plane(fb, plane)) {
 		/* clear color always fixed to 64 bytes */
 		return 64;
+	} else if (is_gen12_ccs_plane(fb, plane)) {
+		/* A main surface using a CCS AUX surface must be 4x4 tiles aligned. */
+		return ALIGN(min_stride, 64);
 	} else {
 		unsigned int tile_width, tile_height;
 
@@ -644,7 +680,7 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		size = roundup_power_of_two(size);
 
 		return size;
-	} else if (is_gen12_ccs_modifier(fb->modifier) && (plane == 1 || plane == 2)) {
+	} else if (is_gen12_ccs_plane(fb, plane)) {
 		/* The AUX CCS surface must be page aligned */
 		return (uint64_t)fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], 64);
