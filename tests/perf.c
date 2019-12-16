@@ -884,11 +884,9 @@ init_sys_info(void)
 	const char *test_set_uuid = NULL;
 	char buf[256];
 
-	igt_assert_neq(devid, 0);
-
 	timestamp_frequency = get_cs_timestamp_frequency();
 	igt_debug("timestamp_frequency = %"PRIu64"\n", timestamp_frequency);
-	igt_assert_neq(timestamp_frequency, 0);
+	igt_require(timestamp_frequency);
 
 	if (IS_HASWELL(devid)) {
 		/* We don't have a TestOa metric set for Haswell so use
