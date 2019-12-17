@@ -324,6 +324,12 @@ struct matches
 	size_t size;
 };
 
+struct match_needle
+{
+	const char *str;
+	bool (*validate)(const char *needle, const char *line, const char *bufend);
+};
+
 static void match_add(struct matches *matches, const char *where, const char *what)
 {
 	struct match_item newitem = { where, what };
@@ -334,19 +340,20 @@ static void match_add(struct matches *matches, const char *where, const char *wh
 }
 
 static struct matches find_matches(const char *buf, const char *bufend,
-				   const char **needles)
+				   const struct match_needle *needles)
 {
 	struct matches ret = {};
 
 	while (buf < bufend) {
-		const char **needle;
+		const struct match_needle *needle;
 
-		for (needle = needles; *needle; needle++) {
-			if (bufend - buf < strlen(*needle))
+		for (needle = needles; needle->str; needle++) {
+			if (bufend - buf < strlen(needle->str))
 				continue;
 
-			if (!memcmp(buf, *needle, strlen(*needle))) {
-				match_add(&ret, buf, *needle);
+			if (!memcmp(buf, needle->str, strlen(needle->str)) &&
+			    (!needle->validate || needle->validate(needle->str, buf, bufend))) {
+				match_add(&ret, buf, needle->str);
 				goto end_find;
 			}
 		}
@@ -596,12 +603,12 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 	char *igt_version = NULL;
 	size_t igt_version_len = 0;
 	struct json_object *current_test = NULL;
-	const char *needles[] = {
-		STARTING_SUBTEST,
-		SUBTEST_RESULT,
-		STARTING_DYNAMIC_SUBTEST,
-		DYNAMIC_SUBTEST_RESULT,
-		NULL
+	struct match_needle needles[] = {
+		{ STARTING_SUBTEST, NULL },
+		{ SUBTEST_RESULT, NULL },
+		{ STARTING_DYNAMIC_SUBTEST, NULL },
+		{ DYNAMIC_SUBTEST_RESULT, NULL },
+		{ NULL, NULL },
 	};
 	struct matches matches = {};
 	size_t i;
@@ -1117,12 +1124,12 @@ static void fill_from_journal(int fd,
 
 static bool stderr_contains_warnings(const char *beg, const char *end)
 {
-	const char *needles[] = {
-		STARTING_SUBTEST,
-		SUBTEST_RESULT,
-		STARTING_DYNAMIC_SUBTEST,
-		DYNAMIC_SUBTEST_RESULT,
-		NULL
+	struct match_needle needles[] = {
+		{ STARTING_SUBTEST, NULL },
+		{ SUBTEST_RESULT, NULL },
+		{ STARTING_DYNAMIC_SUBTEST, NULL },
+		{ DYNAMIC_SUBTEST_RESULT, NULL },
+		{ NULL, NULL },
 	};
 	struct matches matches;
 	size_t i = 0;
