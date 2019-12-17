@@ -431,17 +431,18 @@ static int find_subtest_idx(struct matches matches,
 	return find_subtest_idx_limited(matches, bufend, linekey, pattern, subtest_name, 0, matches.size);
 }
 
-static const char *find_subtest_begin_limit(struct matches matches,
-					    int begin_idx,
-					    int result_idx,
-					    const char *buf,
-					    const char *bufend)
+static const char *find_subtest_begin_limit_limited(struct matches matches,
+						    int begin_idx,
+						    int result_idx,
+						    const char *buf,
+						    const char *bufend,
+						    int first_idx)
 {
 	/* No matching output at all, include everything */
-	if (begin_idx < 0 && result_idx < 0)
+	if (begin_idx < first_idx && result_idx < first_idx)
 		return buf;
 
-	if (begin_idx < 0) {
+	if (begin_idx < first_idx) {
 		/*
 		 * Subtest didn't start, but we have the
 		 * result. Probably because an igt_fixture
@@ -450,37 +451,48 @@ static const char *find_subtest_begin_limit(struct matches matches,
 		 * We go backwards one match from the result match,
 		 * and start from the next line.
 		 */
-		if (result_idx > 0)
+		if (result_idx > first_idx)
 			return next_line(matches.items[result_idx - 1].where, bufend);
 		else
 			return buf;
 	}
 
 	/* Include all non-special output before the beginning line. */
-	if (begin_idx == 0)
+	if (begin_idx <= first_idx)
 		return buf;
 
 	return next_line(matches.items[begin_idx - 1].where, bufend);
 }
 
-static const char *find_subtest_end_limit(struct matches matches,
-					  int begin_idx,
-					  int result_idx,
-					  const char *buf,
-					  const char *bufend)
+static const char *find_subtest_begin_limit(struct matches matches,
+					    int begin_idx,
+					    int result_idx,
+					    const char *buf,
+					    const char *bufend)
+{
+	return find_subtest_begin_limit_limited(matches, begin_idx, result_idx, buf, bufend, 0);
+}
+
+static const char *find_subtest_end_limit_limited(struct matches matches,
+						  int begin_idx,
+						  int result_idx,
+						  const char *buf,
+						  const char *bufend,
+						  int first_idx,
+						  int last_idx)
 {
 	int k;
 
 	/* No matching output at all, include everything */
-	if (begin_idx < 0 && result_idx < 0)
+	if (begin_idx < first_idx && result_idx < first_idx)
 		return bufend;
 
-	if (result_idx < 0) {
+	if (result_idx < first_idx) {
 		/*
 		 * Incomplete result. Include all output up to the
 		 * next starting subtest, or the result of one.
 		 */
-		for (k = begin_idx + 1; k < matches.size; k++) {
+		for (k = begin_idx + 1; k < last_idx; k++) {
 			if (matches.items[k].what == STARTING_SUBTEST ||
 			    matches.items[k].what == SUBTEST_RESULT)
 				return matches.items[k].where;
@@ -490,10 +502,19 @@ static const char *find_subtest_end_limit(struct matches matches,
 	}
 
 	/* Include all non-special output to the next match, whatever it is. */
-	if (result_idx < matches.size - 1)
+	if (result_idx < last_idx - 1)
 		return matches.items[result_idx + 1].where;
 
 	return bufend;
+}
+
+static const char *find_subtest_end_limit(struct matches matches,
+					  int begin_idx,
+					  int result_idx,
+					  const char *buf,
+					  const char *bufend)
+{
+	return find_subtest_end_limit_limited(matches, begin_idx, result_idx, buf, bufend, 0, matches.size);
 }
 
 static void process_dynamic_subtest_output(const char *piglit_name,
@@ -538,8 +559,8 @@ static void process_dynamic_subtest_output(const char *piglit_name,
 
 		dyn_result_idx = find_subtest_idx_limited(matches, end, DYNAMIC_SUBTEST_RESULT, PATTERN_RESULT, dynamic_name, k, result_idx);
 
-		dynbeg = find_subtest_begin_limit(matches, k, dyn_result_idx, beg, end);
-		dynend = find_subtest_end_limit(matches, k, dyn_result_idx, beg, end);
+		dynbeg = find_subtest_begin_limit_limited(matches, k, dyn_result_idx, beg, end, begin_idx + 1);
+		dynend = find_subtest_end_limit_limited(matches, k, dyn_result_idx, beg, end, begin_idx + 1, result_idx);
 
 		generate_piglit_name_for_dynamic(piglit_name, dynamic_name, dynamic_piglit_name, sizeof(dynamic_piglit_name));
 
@@ -938,8 +959,7 @@ static bool fill_from_dmesg(int fd,
 			}
 		}
 		append_line(&dmesg, &dmesglen, formatted);
-		if (current_test != NULL)
-			append_line(&dynamic_dmesg, &dynamic_dmesg_len, formatted);
+		append_line(&dynamic_dmesg, &dynamic_dmesg_len, formatted);
 		free(formatted);
 	}
 	free(line);
