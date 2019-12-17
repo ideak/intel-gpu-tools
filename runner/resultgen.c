@@ -1155,6 +1155,22 @@ static void fill_from_journal(int fd,
 	fclose(f);
 }
 
+static void prune_subtests_with_dynamic_subtests(const char *binary,
+						 struct subtest_list *subtests,
+						 struct json_object *tests)
+{
+	char piglit_name[256];
+	size_t i;
+
+	for (i = 0; i < subtests->size; i++) {
+		if (subtests->subs[i].dynamic_size) {
+			generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
+			json_object_object_del(tests, piglit_name);
+		}
+
+	}
+}
+
 static bool stderr_contains_warnings(const char *beg, const char *end)
 {
 	struct match_needle needles[] = {
@@ -1225,8 +1241,10 @@ static void override_results(char *binary,
 
 	for (i = 0; i < subtests->size; i++) {
 		generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
-		obj = get_or_create_json_object(tests, piglit_name);
-		override_result_single(obj);
+		if (subtests->subs[i].dynamic_size == 0) {
+			obj = get_or_create_json_object(tests, piglit_name);
+			override_result_single(obj);
+		}
 
 		for (k = 0; k < subtests->subs[i].dynamic_size; k++) {
 			generate_piglit_name_for_dynamic(piglit_name, subtests->subs[i].dynamic_names[k],
@@ -1307,15 +1325,18 @@ static void add_to_totals(const char *binary,
 
 	for (i = 0; i < subtests->size; i++) {
 		generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
-		test = get_or_create_json_object(results->tests, piglit_name);
-		if (!json_object_object_get_ex(test, "result", &resultobj)) {
-			fprintf(stderr, "Warning: No results set for %s\n", piglit_name);
-			return;
+
+		if (subtests->subs[i].dynamic_size == 0) {
+			test = get_or_create_json_object(results->tests, piglit_name);
+			if (!json_object_object_get_ex(test, "result", &resultobj)) {
+				fprintf(stderr, "Warning: No results set for %s\n", piglit_name);
+				return;
+			}
+			result = json_object_get_string(resultobj);
+			add_result_to_totals(emptystrtotal, result);
+			add_result_to_totals(roottotal, result);
+			add_result_to_totals(binarytotal, result);
 		}
-		result = json_object_get_string(resultobj);
-		add_result_to_totals(emptystrtotal, result);
-		add_result_to_totals(roottotal, result);
-		add_result_to_totals(binarytotal, result);
 
 		for (k = 0; k < subtests->subs[i].dynamic_size; k++) {
 			generate_piglit_name_for_dynamic(piglit_name, subtests->subs[i].dynamic_names[k],
@@ -1361,6 +1382,8 @@ static bool parse_test_directory(int dirfd,
 		status = false;
 		goto parse_output_end;
 	}
+
+	prune_subtests_with_dynamic_subtests(entry->binary, &subtests, results->tests);
 
 	override_results(entry->binary, &subtests, results->tests);
 	add_to_totals(entry->binary, &subtests, results);
