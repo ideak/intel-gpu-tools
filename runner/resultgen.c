@@ -367,6 +367,39 @@ static struct matches find_matches(const char *buf, const char *bufend,
 	return ret;
 }
 
+static bool valid_char_for_subtest_name(char x)
+{
+	return x == '-' || x == '_' || isalnum(x);
+}
+
+static bool is_subtest_result_line(const char *needle, const char *line, const char *bufend)
+{
+	line += strlen(needle);
+
+	/*
+	 * At this point of the string we're expecting:
+	 * - The subtest name (one or more of a-z, A-Z, 0-9, '-' and '_')
+	 * - The characters ':' and ' '
+	 *
+	 * If we find all those, allow parsing this line as [dynamic]
+	 * subtest result.
+	 */
+
+	if (!valid_char_for_subtest_name(*line))
+		return false;
+
+	while (line < bufend && valid_char_for_subtest_name(*line))
+		line++;
+
+	if (line >= bufend || *line++ != ':')
+		return false;
+
+	if (line >= bufend || *line++ != ' ')
+		return false;
+
+	return true;
+}
+
 static void free_matches(struct matches *matches)
 {
 	free(matches->items);
@@ -605,9 +638,9 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 	struct json_object *current_test = NULL;
 	struct match_needle needles[] = {
 		{ STARTING_SUBTEST, NULL },
-		{ SUBTEST_RESULT, NULL },
+		{ SUBTEST_RESULT, is_subtest_result_line },
 		{ STARTING_DYNAMIC_SUBTEST, NULL },
-		{ DYNAMIC_SUBTEST_RESULT, NULL },
+		{ DYNAMIC_SUBTEST_RESULT, is_subtest_result_line },
 		{ NULL, NULL },
 	};
 	struct matches matches = {};
@@ -1126,9 +1159,9 @@ static bool stderr_contains_warnings(const char *beg, const char *end)
 {
 	struct match_needle needles[] = {
 		{ STARTING_SUBTEST, NULL },
-		{ SUBTEST_RESULT, NULL },
+		{ SUBTEST_RESULT, is_subtest_result_line },
 		{ STARTING_DYNAMIC_SUBTEST, NULL },
-		{ DYNAMIC_SUBTEST_RESULT, NULL },
+		{ DYNAMIC_SUBTEST_RESULT, is_subtest_result_line },
 		{ NULL, NULL },
 	};
 	struct matches matches;
