@@ -1,0 +1,10 @@
+Starting subtest: subtest-one
+Starting dynamic subtest: this-name-is-shared
+This stderr output is from subtest-one/this-name-is-shared
+Dynamic subtest this-name-is-shared: SUCCESS (0.050s)
+Subtest subtest-one: SUCCESS (0.050s)
+Starting subtest: subtest-two
+Starting dynamic subtest: this-name-is-shared
+This stderr output is from subtest-two/this-name-is-shared
+Dynamic subtest this-name-is-shared: SUCCESS (0.050s)
+Subtest subtest-two: SUCCESS (0.050s)

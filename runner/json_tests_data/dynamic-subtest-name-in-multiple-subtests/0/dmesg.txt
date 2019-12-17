@@ -1,0 +1,10 @@
+6,1157,23426155175691,-;Console: switching to colour dummy device 80x25
+14,1158,23426155175708,-;[IGT] dynamic: executing
+14,1159,23426155184875,-;[IGT] dynamic: starting subtest subtest-one
+14,1160,23426155184895,-;[IGT] dynamic: starting dynamic subtest this-name-is-shared
+14,1160,23426155184895,-;This dmesg output is from subtest-one/this-name-is-shared
+14,1159,23426155184875,-;[IGT] dynamic: starting subtest subtest-two
+14,1160,23426155184895,-;[IGT] dynamic: starting dynamic subtest this-name-is-shared
+14,1160,23426155184895,-;This dmesg output is from subtest-two/this-name-is-shared
+14,1162,23426155293846,-;[IGT] dynamic: exiting, ret=0
+6,1163,23426155294003,-;Console: switching to colour frame buffer device 240x75

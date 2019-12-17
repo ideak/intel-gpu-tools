@@ -1,0 +1,84 @@
+{
+  "__type__":"TestrunResult",
+  "results_version":10,
+  "name":"dynamic-subtest-name-in-multiple-subtests",
+  "uname":"Linux hostname 4.18.0-1-amd64 #1 SMP Debian 4.18.6-1 (2018-09-06) x86_64",
+  "time_elapsed":{
+    "__type__":"TimeAttribute",
+    "start":1560163492.266377,
+    "end":1560163492.4104891
+  },
+  "tests":{
+    "igt@dynamic@subtest-one@this-name-is-shared":{
+      "out":"IGT-Version: 1.23-g9e957acd (x86_64) (Linux: 4.18.0-1-amd64 x86_64)\nStarting subtest: subtest-one\nStarting dynamic subtest: this-name-is-shared\nThis stdout output is from subtest-one\/this-name-is-shared\nDynamic subtest this-name-is-shared: SUCCESS (0.050s)\nSubtest subtest-one: SUCCESS (0.050s)\n",
+      "igt-version":"IGT-Version: 1.23-g9e957acd (x86_64) (Linux: 4.18.0-1-amd64 x86_64)",
+      "result":"warn",
+      "time":{
+        "__type__":"TimeAttribute",
+        "start":0,
+        "end":0.050000000000000003
+      },
+      "err":"Starting subtest: subtest-one\nStarting dynamic subtest: this-name-is-shared\nThis stderr output is from subtest-one\/this-name-is-shared\nDynamic subtest this-name-is-shared: SUCCESS (0.050s)\nSubtest subtest-one: SUCCESS (0.050s)\n",
+      "dmesg":"<6> [23426155.175691] Console: switching to colour dummy device 80x25\n<6> [23426155.175708] [IGT] dynamic: executing\n<6> [23426155.184875] [IGT] dynamic: starting subtest subtest-one\n<6> [23426155.184895] [IGT] dynamic: starting dynamic subtest this-name-is-shared\n<6> [23426155.184895] This dmesg output is from subtest-one\/this-name-is-shared\n"
+    },
+    "igt@dynamic@subtest-two@this-name-is-shared":{
+      "out":"Starting subtest: subtest-two\nStarting dynamic subtest: this-name-is-shared\nThis stdout output is from subtest-two\/this-name-is-shared\nDynamic subtest this-name-is-shared: SUCCESS (0.050s)\nSubtest subtest-two: SUCCESS (0.050s)\n",
+      "igt-version":"IGT-Version: 1.23-g9e957acd (x86_64) (Linux: 4.18.0-1-amd64 x86_64)",
+      "result":"warn",
+      "time":{
+        "__type__":"TimeAttribute",
+        "start":0,
+        "end":0.050000000000000003
+      },
+      "err":"Starting subtest: subtest-two\nStarting dynamic subtest: this-name-is-shared\nThis stderr output is from subtest-two\/this-name-is-shared\nDynamic subtest this-name-is-shared: SUCCESS (0.050s)\nSubtest subtest-two: SUCCESS (0.050s)\n",
+      "dmesg":"<6> [23426155.184875] [IGT] dynamic: starting subtest subtest-two\n<6> [23426155.184895] [IGT] dynamic: starting dynamic subtest this-name-is-shared\n<6> [23426155.184895] This dmesg output is from subtest-two\/this-name-is-shared\n<6> [23426155.293846] [IGT] dynamic: exiting, ret=0\n<6> [23426155.294003] Console: switching to colour frame buffer device 240x75\n"
+    }
+  },
+  "totals":{
+    "":{
+      "crash":0,
+      "pass":0,
+      "dmesg-fail":0,
+      "dmesg-warn":0,
+      "skip":0,
+      "incomplete":0,
+      "timeout":0,
+      "notrun":0,
+      "fail":0,
+      "warn":2
+    },
+    "root":{
+      "crash":0,
+      "pass":0,
+      "dmesg-fail":0,
+      "dmesg-warn":0,
+      "skip":0,
+      "incomplete":0,
+      "timeout":0,
+      "notrun":0,
+      "fail":0,
+      "warn":2
+    },
+    "igt@dynamic":{
+      "crash":0,
+      "pass":0,
+      "dmesg-fail":0,
+      "dmesg-warn":0,
+      "skip":0,
+      "incomplete":0,
+      "timeout":0,
+      "notrun":0,
+      "fail":0,
+      "warn":2
+    }
+  },
+  "runtimes":{
+    "igt@dynamic":{
+      "time":{
+        "__type__":"TimeAttribute",
+        "start":0,
+        "end":0.10000000000000001
+      }
+    }
+  }
+}
