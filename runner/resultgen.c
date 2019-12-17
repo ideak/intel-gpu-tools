@@ -365,6 +365,17 @@ static void free_matches(struct matches *matches)
 	free(matches->items);
 }
 
+static void add_igt_version(struct json_object *testobj,
+			    const char *igt_version,
+			    size_t igt_version_len)
+{
+	if (igt_version)
+		json_object_object_add(testobj, "igt-version",
+				       json_object_new_string_len(igt_version,
+								  igt_version_len));
+
+}
+
 static bool fill_from_output(int fd, const char *binary, const char *key,
 			     struct subtest_list *subtests,
 			     struct json_object *tests)
@@ -420,10 +431,7 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 
 		json_object_object_add(current_test, key,
 				       json_object_new_string_len(buf, statbuf.st_size));
-		if (igt_version)
-			json_object_object_add(current_test, "igt-version",
-					       json_object_new_string_len(igt_version,
-									  igt_version_len));
+		add_igt_version(current_test, igt_version, igt_version_len);
 
 		return true;
 	}
@@ -522,11 +530,7 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 		json_object_object_add(current_test, key,
 				       json_object_new_string_len(beg, end - beg));
 
-		if (igt_version) {
-			json_object_object_add(current_test, "igt-version",
-					       json_object_new_string_len(igt_version,
-									  igt_version_len));
-		}
+		add_igt_version(current_test, igt_version, igt_version_len);
 
 		if (!json_object_object_get_ex(current_test, "result", NULL)) {
 			parse_subtest_result(subtests->subs[i].name,
@@ -608,10 +612,7 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 
 				json_object_object_add(current_dynamic_test, key,
 						       json_object_new_string_len(dynbeg, dynend - dynbeg));
-				if (igt_version)
-					json_object_object_add(current_dynamic_test, "igt-version",
-							       json_object_new_string_len(igt_version,
-											  igt_version_len));
+				add_igt_version(current_dynamic_test, igt_version, igt_version_len);
 
 				if (!json_object_object_get_ex(current_dynamic_test, "result", NULL)) {
 					const char *dynresulttext;
