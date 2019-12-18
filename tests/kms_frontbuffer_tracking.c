@@ -2833,7 +2833,8 @@ static void badstride_subtest(const struct test_mode *t)
 	struct modeset_params *params = pick_params(t);
 	int rc;
 
-	try_invalid_strides();
+	if (gem_available_fences(drm.fd))
+		try_invalid_strides();
 
 	prepare_subtest(t, NULL);
 
