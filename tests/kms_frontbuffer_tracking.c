@@ -291,6 +291,7 @@ struct {
 	int height;
 	uint32_t color;
 	int bpp;
+	uint32_t tiling;
 } busy_thread = {
 	.stop = true,
 };
@@ -1126,9 +1127,9 @@ static void *busy_thread_func(void *data)
 	while (!busy_thread.stop)
 		igt_draw_rect(drm.fd, drm.bufmgr, NULL, busy_thread.handle,
 			      busy_thread.size, busy_thread.stride,
-			      IGT_DRAW_BLT, 0, 0, busy_thread.width,
-			      busy_thread.height, busy_thread.color,
-			      busy_thread.bpp);
+			      busy_thread.tiling, IGT_DRAW_BLT, 0, 0,
+			      busy_thread.width, busy_thread.height,
+			      busy_thread.color, busy_thread.bpp);
 
 	pthread_exit(0);
 }
@@ -1146,6 +1147,7 @@ static void start_busy_thread(struct igt_fb *fb)
 	busy_thread.height = fb->height;
 	busy_thread.color = pick_color(fb, COLOR_PRIM_BG);
 	busy_thread.bpp = igt_drm_format_to_bpp(fb->drm_format);
+	busy_thread.tiling = igt_fb_mod_to_tiling(fb->modifier);
 
 	rc = pthread_create(&busy_thread.thread, NULL, busy_thread_func, NULL);
 	igt_assert_eq(rc, 0);
