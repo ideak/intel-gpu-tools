@@ -265,6 +265,27 @@ unsigned igt_buf_height(const struct igt_buf *buf);
 unsigned int igt_buf_intel_ccs_width(int gen, const struct igt_buf *buf);
 unsigned int igt_buf_intel_ccs_height(int gen, const struct igt_buf *buf);
 
+void igt_blitter_src_copy(int fd,
+			  /* src */
+			  uint32_t src_handle,
+			  uint32_t src_delta,
+			  uint32_t src_stride,
+			  uint32_t src_tiling,
+			  uint32_t src_x, uint32_t src_y,
+
+			  /* size */
+			  uint32_t width, uint32_t height,
+
+			  /* bpp */
+			  uint32_t bpp,
+
+			  /* dst */
+			  uint32_t dst_handle,
+			  uint32_t dst_delta,
+			  uint32_t dst_stride,
+			  uint32_t dst_tiling,
+			  uint32_t dst_x, uint32_t dst_y);
+
 void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 			   const struct igt_buf *src, unsigned src_delta,
 			   unsigned src_x, unsigned src_y,
