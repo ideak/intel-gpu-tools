@@ -565,7 +565,7 @@ igt_main
 	enum pipe pipe;
 
 	igt_fixture {
-		data.gfx_fd = drm_open_driver(DRIVER_ANY);
+		data.gfx_fd = drm_open_driver_master(DRIVER_ANY);
 		igt_require_pipe_crc(data.gfx_fd);
 		igt_display_require(&data.display, data.gfx_fd);
 		igt_require(data.display.is_atomic);
