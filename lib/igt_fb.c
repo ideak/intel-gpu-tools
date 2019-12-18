@@ -2149,27 +2149,58 @@ static void copy_with_engine(struct fb_blit_upload *blit,
 static void blitcopy(const struct igt_fb *dst_fb,
 		     const struct igt_fb *src_fb)
 {
+	uint32_t src_tiling, dst_tiling;
+
 	igt_assert_eq(dst_fb->fd, src_fb->fd);
 	igt_assert_eq(dst_fb->num_planes, src_fb->num_planes);
 
+	src_tiling = igt_fb_mod_to_tiling(src_fb->modifier);
+	dst_tiling = igt_fb_mod_to_tiling(dst_fb->modifier);
+
 	for (int i = 0; i < dst_fb->num_planes; i++) {
+		int gen = intel_gen(intel_get_drm_devid(src_fb->fd));
+
 		igt_assert_eq(dst_fb->plane_bpp[i], src_fb->plane_bpp[i]);
 		igt_assert_eq(dst_fb->plane_width[i], src_fb->plane_width[i]);
 		igt_assert_eq(dst_fb->plane_height[i], src_fb->plane_height[i]);
-
-		igt_blitter_fast_copy__raw(dst_fb->fd,
-					   src_fb->gem_handle,
-					   src_fb->offsets[i],
-					   src_fb->strides[i],
-					   igt_fb_mod_to_tiling(src_fb->modifier),
-					   0, 0, /* src_x, src_y */
-					   dst_fb->plane_width[i], dst_fb->plane_height[i],
-					   dst_fb->plane_bpp[i],
-					   dst_fb->gem_handle,
-					   dst_fb->offsets[i],
-					   dst_fb->strides[i],
-					   igt_fb_mod_to_tiling(dst_fb->modifier),
-					   0, 0 /* dst_x, dst_y */);
+		/*
+		 * On GEN12+ X-tiled format support is removed from the fast
+		 * blit command, so use the XY_SRC blit command for it
+		 * instead.
+		 */
+		if ((gen >= 9 && gen < 12) ||
+		    (gen >= 12 && (src_tiling != I915_TILING_X &&
+				   dst_tiling != I915_TILING_X))) {
+			igt_blitter_fast_copy__raw(dst_fb->fd,
+						   src_fb->gem_handle,
+						   src_fb->offsets[i],
+						   src_fb->strides[i],
+						   src_tiling,
+						   0, 0, /* src_x, src_y */
+						   dst_fb->plane_width[i],
+						   dst_fb->plane_height[i],
+						   dst_fb->plane_bpp[i],
+						   dst_fb->gem_handle,
+						   dst_fb->offsets[i],
+						   dst_fb->strides[i],
+						   dst_tiling,
+						   0, 0 /* dst_x, dst_y */);
+		} else {
+			igt_blitter_src_copy(dst_fb->fd,
+					     src_fb->gem_handle,
+					     src_fb->offsets[i],
+					     src_fb->strides[i],
+					     src_tiling,
+					     0, 0, /* src_x, src_y */
+					     dst_fb->plane_width[i],
+					     dst_fb->plane_height[i],
+					     dst_fb->plane_bpp[i],
+					     dst_fb->gem_handle,
+					     dst_fb->offsets[i],
+					     dst_fb->strides[i],
+					     dst_tiling,
+					     0, 0 /* dst_x, dst_y */);
+		}
 	}
 }
 
