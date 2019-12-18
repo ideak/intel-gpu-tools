@@ -211,16 +211,10 @@ static bool setup_fb(data_t *data, igt_output_t *output, igt_plane_t *plane,
 	data->buf = (unsigned char *)calloc(data->size*2, 1);
 
 	data->gem_handle = gem_create(data->gfx_fd, gemsize);
-	ret = __gem_set_tiling(data->gfx_fd, data->gem_handle,
-			       igt_fb_mod_to_tiling(tiling),
-			       data->fb.strides[0]);
-
 	data->fb.gem_handle = data->gem_handle;
 	data->fb.width = w;
 	data->fb.height = h;
 	fill_in_fb(data, output, plane, format);
-
-	igt_assert_eq(ret, 0);
 
 	ret = __kms_addfb(data->gfx_fd, data->gem_handle, w, h,
 			  format, tiling, data->fb.strides, data->fb.offsets,
