@@ -203,7 +203,7 @@ static int run_test(int threads_per_fence, void *f, int tiling,
 	t.num_surfaces = surfaces_per_thread;
 
 	num_fences = gem_available_fences(t.fd);
-	igt_assert_lt(0, num_fences);
+	igt_require(num_fences > 0);
 
 	num_threads = threads_per_fence * num_fences;
 
