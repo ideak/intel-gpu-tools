@@ -249,6 +249,11 @@ struct igt_buf {
 	unsigned num_tiles;
 };
 
+static inline bool igt_buf_compressed(const struct igt_buf *buf)
+{
+	return buf->compression != I915_COMPRESSION_NONE;
+}
+
 unsigned igt_buf_width(const struct igt_buf *buf);
 unsigned igt_buf_height(const struct igt_buf *buf);
 

@@ -434,7 +434,7 @@ aux_pgtable_reserve_range(const struct igt_buf **bufs, int buf_count,
 {
 	int i;
 
-	if (new_buf->aux.stride) {
+	if (igt_buf_compressed(new_buf)) {
 		uint64_t pin_offset = new_buf->bo->offset64;
 
 		if (!pin_offset)
@@ -465,7 +465,7 @@ gen12_aux_pgtable_init(struct aux_pgtable_info *info,
 	int reserved_buf_count;
 	int i;
 
-	if (!src_buf->aux.stride && !dst_buf->aux.stride)
+	if (!igt_buf_compressed(src_buf) && !igt_buf_compressed(dst_buf))
 		return;
 
 	bufs[0] = src_buf;
@@ -492,7 +492,7 @@ gen12_aux_pgtable_init(struct aux_pgtable_info *info,
 
 	/* Next, reserve space for unbound bufs with an AUX surface. */
 	for (i = 0; i < ARRAY_SIZE(bufs); i++)
-		if (!bufs[i]->bo->offset64 && bufs[i]->aux.stride)
+		if (!bufs[i]->bo->offset64 && igt_buf_compressed(bufs[i]))
 			aux_pgtable_reserve_range(reserved_bufs,
 						  reserved_buf_count++,
 						  bufs[i]);
@@ -500,7 +500,7 @@ gen12_aux_pgtable_init(struct aux_pgtable_info *info,
 	/* Create AUX pgtable entries only for bufs with an AUX surface */
 	info->buf_count = 0;
 	for (i = 0; i < reserved_buf_count; i++) {
-		if (!reserved_bufs[i]->aux.stride)
+		if (!igt_buf_compressed(reserved_bufs[i]))
 			continue;
 
 		info->bufs[info->buf_count] = reserved_bufs[i];

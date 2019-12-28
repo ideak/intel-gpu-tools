@@ -1989,6 +1989,11 @@ static void init_buf(struct fb_blit_upload *blit,
 		else
 			igt_assert_eq(fb->strides[1] & 127, 0);
 
+		if (is_gen12_mc_ccs_modifier(fb->modifier))
+			buf->compression = I915_COMPRESSION_MEDIA;
+		else
+			buf->compression = I915_COMPRESSION_RENDER;
+
 		buf->aux.offset = fb->offsets[1];
 		buf->aux.stride = fb->strides[1];
 	}

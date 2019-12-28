@@ -259,7 +259,9 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 
 	if (buf->compression == I915_COMPRESSION_MEDIA)
 		ss->ss7.tgl.media_compression = 1;
-	else if (buf->aux.stride) {
+	else if (buf->compression == I915_COMPRESSION_RENDER) {
+		igt_assert(buf->aux.stride);
+
 		ss->ss6.aux_mode = 0x5; /* AUX_CCS_E */
 		ss->ss6.aux_pitch = (buf->aux.stride / 128) - 1;
 
@@ -274,6 +276,8 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	}
 
 	if (buf->cc.offset) {
+		igt_assert(buf->compression == I915_COMPRESSION_RENDER);
+
 		ss->ss12.clear_address = buf->bo->offset64 + buf->cc.offset;
 		ss->ss13.clear_address_hi = (buf->bo->offset64 + buf->cc.offset) >> 32;
 
