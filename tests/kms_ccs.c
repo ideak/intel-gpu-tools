@@ -58,6 +58,7 @@ typedef struct {
 	enum test_flags flags;
 	igt_plane_t *plane;
 	igt_pipe_crc_t *pipe_crc;
+	uint32_t format;
 	uint64_t ccs_modifier;
 } data_t;
 
@@ -68,6 +69,10 @@ static const struct {
 } colors[2] = {
 	{1.0, 0.0, 0.0},
 	{0.0, 1.0, 0.0}
+};
+
+static const uint32_t formats[] = {
+	DRM_FORMAT_XRGB8888,
 };
 
 static const uint64_t ccs_modifiers[] = {
@@ -134,7 +139,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	if (data->flags & TEST_BAD_PIXEL_FORMAT)
 		format = DRM_FORMAT_RGB565;
 	else
-		format = DRM_FORMAT_XRGB8888;
+		format = data->format;
 
 	igt_create_bo_for_fb(data->drm_fd, width, height, format, modifier, fb);
 	igt_assert(fb->gem_handle > 0);
@@ -206,12 +211,12 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 
 	primary = igt_output_get_plane_type(data->output,
 					    DRM_PLANE_TYPE_PRIMARY);
-	if (!igt_plane_has_format_mod(primary, DRM_FORMAT_XRGB8888,
+	if (!igt_plane_has_format_mod(primary, data->format,
 				      data->ccs_modifier))
 		return false;
 
 	if (data->plane && fb_flags & FB_COMPRESSED) {
-		if (!igt_plane_has_format_mod(data->plane, DRM_FORMAT_XRGB8888,
+		if (!igt_plane_has_format_mod(data->plane, data->format,
 					      data->ccs_modifier))
 			return false;
 
@@ -316,8 +321,13 @@ static int __test_output(data_t *data)
 	igt_output_set_pipe(data->output, data->pipe);
 
 	for (i = 0; i < ARRAY_SIZE(ccs_modifiers); i++) {
+		int j;
+
 		data->ccs_modifier = ccs_modifiers[i];
-		valid_tests += test_ccs(data);
+		for (j = 0; j < ARRAY_SIZE(formats); j++) {
+			data->format = formats[j];
+			valid_tests += test_ccs(data);
+		}
 	}
 
 	igt_output_set_pipe(data->output, PIPE_NONE);
