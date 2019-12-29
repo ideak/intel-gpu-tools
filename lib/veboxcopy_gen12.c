@@ -26,7 +26,10 @@
 #include "intel_aux_pgtable.h"
 #include "veboxcopy.h"
 
+#define YCRCB_NORMAL	0
+#define PLANAR_420_8	4
 #define R8G8B8A8_UNORM	8
+#define PLANAR_420_16	12
 
 struct vebox_surface_state {
 	struct {
@@ -129,10 +132,23 @@ struct vebox_tiling_convert {
 	};
 } __attribute__((packed));
 
+static bool format_is_interleaved_yuv(int format)
+{
+	switch (format) {
+	case YCRCB_NORMAL:
+	case PLANAR_420_8:
+	case PLANAR_420_16:
+		return true;
+	}
+
+	return false;
+}
+
 static void emit_surface_state_cmd(struct intel_batchbuffer *batch,
 				   int surface_id,
 				   int width, int height, int bpp,
-				   int pitch, uint32_t tiling, int format)
+				   int pitch, uint32_t tiling, int format,
+				   uint32_t uv_offset)
 {
 	struct vebox_surface_state *ss;
 
@@ -149,10 +165,14 @@ static void emit_surface_state_cmd(struct intel_batchbuffer *batch,
 	ss->ss2.width = width - 1;
 
 	ss->ss3.surface_format = format;
+	if (format_is_interleaved_yuv(format))
+		ss->ss3.chroma_interleave = 1;
 	ss->ss3.surface_pitch = pitch - 1;
 	ss->ss3.tile_walk = (tiling == I915_TILING_Y) ||
 			    (tiling == I915_TILING_Yf);
 	ss->ss3.tiled_surface = tiling != I915_TILING_NONE;
+
+	ss->ss4.u_y_offset = uv_offset / pitch;
 
 	ss->ss7.derived_surface_pitch = pitch - 1;
 }
@@ -226,8 +246,7 @@ void gen12_vebox_copyfunc(struct intel_batchbuffer *batch,
 {
 	struct aux_pgtable_info aux_pgtable_info = { };
 	uint32_t aux_pgtable_state;
-
-	igt_assert(src->bpp == dst->bpp);
+	int format;
 
 	intel_batchbuffer_flush_on_ring(batch, I915_EXEC_VEBOX);
 
@@ -245,18 +264,43 @@ void gen12_vebox_copyfunc(struct intel_batchbuffer *batch,
 
 	gen12_emit_aux_pgtable_state(batch, aux_pgtable_state, false);
 
+	/* The tiling convert command can't convert formats. */
+	igt_assert_eq(src->format_is_yuv, dst->format_is_yuv);
+	igt_assert_eq(src->format_is_yuv_semiplanar,
+		      dst->format_is_yuv_semiplanar);
+	igt_assert_eq(src->bpp, dst->bpp);
+
 	/* TODO: add support for more formats */
-	igt_assert(src->bpp == 32);
+	switch (src->bpp) {
+	case 8:
+		igt_assert(src->format_is_yuv_semiplanar);
+		format = PLANAR_420_8;
+		break;
+	case 16:
+		igt_assert(src->format_is_yuv);
+		format = src->format_is_yuv_semiplanar ? PLANAR_420_16 :
+							 YCRCB_NORMAL;
+		break;
+	case 32:
+		igt_assert(!src->format_is_yuv &&
+			   !src->format_is_yuv_semiplanar);
+		format = R8G8B8A8_UNORM;
+		break;
+	default:
+		igt_assert_f(0, "Unsupported bpp: %u\n", src->bpp);
+	}
+
+	igt_assert(!src->format_is_yuv_semiplanar ||
+		   (src->surface[1].offset && dst->surface[1].offset));
 	emit_surface_state_cmd(batch, VEBOX_SURFACE_INPUT,
 			       width, height, src->bpp,
 			       src->surface[0].stride,
-			       src->tiling, R8G8B8A8_UNORM);
+			       src->tiling, format, src->surface[1].offset);
 
-	igt_assert(dst->bpp == 32);
 	emit_surface_state_cmd(batch, VEBOX_SURFACE_OUTPUT,
 			       width, height, dst->bpp,
 			       dst->surface[0].stride,
-			       dst->tiling, R8G8B8A8_UNORM);
+			       dst->tiling, format, dst->surface[1].offset);
 
 	emit_tiling_convert_cmd(batch,
 				src->bo, src->tiling, src->compression,

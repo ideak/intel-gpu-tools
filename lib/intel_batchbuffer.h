@@ -235,8 +235,12 @@ struct igt_buf {
 	uint32_t tiling;
 	enum i915_compression compression;
 	uint32_t bpp;
+	uint32_t yuv_semiplanar_bpp;
 	uint32_t *data;
+	bool format_is_yuv:1;
+	bool format_is_yuv_semiplanar:1;
 	struct {
+		uint32_t offset;
 		uint32_t stride;
 		uint32_t size;
 	} surface[2];

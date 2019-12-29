@@ -359,6 +359,13 @@ static const struct format_desc_struct *lookup_drm_format(uint32_t drm_format)
 	return NULL;
 }
 
+static bool igt_format_is_yuv_semiplanar(uint32_t format)
+{
+	const struct format_desc_struct *f = lookup_drm_format(format);
+
+	return igt_format_is_yuv(format) && f->num_planes == 2;
+}
+
 /**
  * igt_get_fb_tile_size:
  * @fd: the DRM file descriptor
@@ -1967,19 +1974,56 @@ static bool use_blitter(const struct igt_fb *fb)
 		blitter_ok(fb);
 }
 
+static void init_buf_ccs(struct igt_buf *buf, int ccs_idx,
+			 uint32_t offset, uint32_t stride)
+{
+	buf->ccs[ccs_idx].offset = offset;
+	buf->ccs[ccs_idx].stride = stride;
+}
+
+static void init_buf_surface(struct igt_buf *buf, int surface_idx,
+			     uint32_t offset, uint32_t stride, uint32_t size)
+{
+	buf->surface[surface_idx].offset = offset;
+	buf->surface[surface_idx].stride = stride;
+	buf->surface[surface_idx].size = size;
+}
+
+static int yuv_semiplanar_bpp(uint32_t drm_format)
+{
+	switch (drm_format) {
+	case DRM_FORMAT_NV12:
+		return 8;
+	case DRM_FORMAT_P010:
+		return 10;
+	case DRM_FORMAT_P012:
+		return 12;
+	case DRM_FORMAT_P016:
+		return 16;
+	default:
+		igt_assert_f(0, "Unsupported format: %08x\n", drm_format);
+	}
+}
+
 static void init_buf(struct fb_blit_upload *blit,
 		     struct igt_buf *buf,
 		     const struct igt_fb *fb,
 		     const char *name)
 {
+	int num_surfaces;
+	int i;
+
 	igt_assert_eq(fb->offsets[0], 0);
 
 	buf->bo = gem_handle_to_libdrm_bo(blit->bufmgr, blit->fd,
 					  name, fb->gem_handle);
 	buf->tiling = igt_fb_mod_to_tiling(fb->modifier);
-	buf->surface[0].stride = fb->strides[0];
 	buf->bpp = fb->plane_bpp[0];
-	buf->surface[0].size = fb->size;
+	buf->format_is_yuv = igt_format_is_yuv(fb->drm_format);
+	buf->format_is_yuv_semiplanar =
+		igt_format_is_yuv_semiplanar(fb->drm_format);
+	if (buf->format_is_yuv_semiplanar)
+		buf->yuv_semiplanar_bpp = yuv_semiplanar_bpp(fb->drm_format);
 
 	if (is_ccs_modifier(fb->modifier)) {
 		igt_assert_eq(fb->strides[0] & 127, 0);
@@ -1994,8 +2038,24 @@ static void init_buf(struct fb_blit_upload *blit,
 		else
 			buf->compression = I915_COMPRESSION_RENDER;
 
-		buf->ccs[0].offset = fb->offsets[1];
-		buf->ccs[0].stride = fb->strides[1];
+		num_surfaces = fb->num_planes / 2;
+		for (i = 0; i < num_surfaces; i++)
+			init_buf_ccs(buf, i,
+				     fb->offsets[num_surfaces + i],
+				     fb->strides[num_surfaces + i]);
+	} else {
+		num_surfaces = fb->num_planes;
+	}
+
+	igt_assert(fb->offsets[0] == 0);
+	for (i = 0; i < num_surfaces; i++) {
+		uint32_t end =
+			i == fb->num_planes - 1 ? fb->size : fb->offsets[i + 1];
+
+		init_buf_surface(buf, i,
+				 fb->offsets[i],
+				 fb->strides[i],
+				 end - fb->offsets[i]);
 	}
 
 	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
@@ -2005,6 +2065,15 @@ static void init_buf(struct fb_blit_upload *blit,
 static void fini_buf(struct igt_buf *buf)
 {
 	drm_intel_bo_unreference(buf->bo);
+}
+
+static bool use_vebox_copy(const struct igt_fb *src_fb,
+			   const struct igt_fb *dst_fb)
+{
+
+	return is_gen12_mc_ccs_modifier(dst_fb->modifier) ||
+	       igt_format_is_yuv(src_fb->drm_format) ||
+	       igt_format_is_yuv(dst_fb->drm_format);
 }
 
 /**
@@ -2029,7 +2098,7 @@ static void copy_with_engine(struct fb_blit_upload *blit,
 	igt_render_copyfunc_t render_copy = NULL;
 	igt_vebox_copyfunc_t vebox_copy = NULL;
 
-	if (is_gen12_mc_ccs_modifier(dst_fb->modifier))
+	if (use_vebox_copy(src_fb, dst_fb))
 		vebox_copy = igt_get_vebox_copyfunc(intel_get_drm_devid(blit->fd));
 	else
 		render_copy = igt_get_render_copyfunc(intel_get_drm_devid(blit->fd));

@@ -33,6 +33,12 @@
 
 #define max(a, b)		((a) > (b) ? (a) : (b))
 
+#define AUX_FORMAT_YCRCB	0x03
+#define AUX_FORMAT_P010		0x07
+#define AUX_FORMAT_P016		0x08
+#define AUX_FORMAT_ARGB_8B	0x0A
+#define AUX_FORMAT_NV12_21	0x0F
+
 struct pgtable_level_desc {
 	int idx_shift;
 	int idx_bits;
@@ -54,6 +60,23 @@ struct pgtable {
 	int max_align;
 	drm_intel_bo *bo;
 };
+
+static uint64_t last_buf_surface_end(const struct igt_buf *buf)
+{
+	uint64_t end_offset = 0;
+	int num_surfaces = buf->format_is_yuv_semiplanar ? 2 : 1;
+	int i;
+
+	for (i = 0; i < num_surfaces; i++) {
+		uint64_t surface_end = buf->surface[i].offset +
+				       buf->surface[i].size;
+
+		if (surface_end > end_offset)
+			end_offset = surface_end;
+	}
+
+	return end_offset;
+}
 
 static int
 pgt_table_count(int address_bits, const struct igt_buf **bufs, int buf_count)
@@ -77,7 +100,7 @@ pgt_table_count(int address_bits, const struct igt_buf **bufs, int buf_count)
 		/* Avoid double counting for overlapping aligned bufs. */
 		start = max(start, end);
 
-		end = ALIGN(buf->bo->offset64 + buf->surface[0].size,
+		end = ALIGN(buf->bo->offset64 + last_buf_surface_end(buf),
 			    1UL << address_bits);
 		igt_assert(end >= start);
 
@@ -189,7 +212,29 @@ pgt_set_l1_entry(struct pgtable *pgt, uint64_t l1_table,
 	*l1_entry_ptr = ptr | flags;
 }
 
-static uint64_t pgt_get_l1_flags(const struct igt_buf *buf)
+#define DEPTH_VAL_RESERVED	3
+
+static int bpp_to_depth_val(int bpp)
+{
+	switch (bpp) {
+	case 8:
+		return 4;
+	case 10:
+		return 1;
+	case 12:
+		return 2;
+	case 16:
+		return 0;
+	case 32:
+		return 5;
+	case 64:
+		return 6;
+	default:
+		igt_assert_f(0, "invalid bpp %d\n", bpp);
+	}
+}
+
+static uint64_t pgt_get_l1_flags(const struct igt_buf *buf, int surface_idx)
 {
 	/*
 	 * The offset of .tile_mode isn't specifed by bspec, it's what Mesa
@@ -213,8 +258,6 @@ static uint64_t pgt_get_l1_flags(const struct igt_buf *buf)
 		.e = {
 			.valid = 1,
 			.tile_mode = buf->tiling == I915_TILING_Y ? 1 : 0,
-			.depth = 5,		/* 32bpp */
-			.format = 0xA,		/* B8G8R8A8_UNORM */
 		}
 	};
 
@@ -227,7 +270,49 @@ static uint64_t pgt_get_l1_flags(const struct igt_buf *buf)
 		   buf->tiling == I915_TILING_Yf ||
 		   buf->tiling == I915_TILING_Ys);
 
-	igt_assert(buf->bpp == 32);
+	entry.e.ycr = surface_idx > 0;
+
+	if (buf->format_is_yuv_semiplanar) {
+		entry.e.depth = bpp_to_depth_val(buf->bpp);
+		switch (buf->yuv_semiplanar_bpp) {
+		case 8:
+			entry.e.format = AUX_FORMAT_NV12_21;
+			entry.e.depth = DEPTH_VAL_RESERVED;
+			break;
+		case 10:
+			entry.e.format = AUX_FORMAT_P010;
+			entry.e.depth = bpp_to_depth_val(10);
+			break;
+		case 12:
+			entry.e.format = AUX_FORMAT_P016;
+			entry.e.depth = bpp_to_depth_val(12);
+			break;
+		case 16:
+			entry.e.format = AUX_FORMAT_P016;
+			entry.e.depth = bpp_to_depth_val(16);
+			break;
+		default:
+			igt_assert(0);
+		}
+	} else if (buf->format_is_yuv) {
+		switch (buf->bpp) {
+		case 16:
+			entry.e.format = AUX_FORMAT_YCRCB;
+			entry.e.depth = DEPTH_VAL_RESERVED;
+			break;
+		default:
+			igt_assert(0);
+		}
+	} else {
+		switch (buf->bpp) {
+		case 32:
+			entry.e.format = AUX_FORMAT_ARGB_8B;
+			entry.e.depth = bpp_to_depth_val(32);
+			break;
+		default:
+			igt_assert(0);
+		}
+	}
 
 	return entry.l;
 }
@@ -253,13 +338,20 @@ static uint64_t pgt_get_lx_flags(void)
 static void
 pgt_populate_entries_for_buf(struct pgtable *pgt,
 			       const struct igt_buf *buf,
-			       uint64_t top_table)
+			       uint64_t top_table,
+			       int surface_idx)
 {
-	uint64_t surface_addr = buf->bo->offset64;
-	uint64_t surface_end = surface_addr + buf->surface[0].size;
-	uint64_t aux_addr = buf->bo->offset64 + buf->ccs[0].offset;
-	uint64_t l1_flags = pgt_get_l1_flags(buf);
+	uint64_t surface_addr = buf->bo->offset64 +
+				buf->surface[surface_idx].offset;
+	uint64_t surface_end = surface_addr +
+			       buf->surface[surface_idx].size;
+	uint64_t aux_addr = buf->bo->offset64 + buf->ccs[surface_idx].offset;
+	uint64_t l1_flags = pgt_get_l1_flags(buf, surface_idx);
 	uint64_t lx_flags = pgt_get_lx_flags();
+
+	igt_assert(!(buf->surface[surface_idx].stride % 512));
+	igt_assert_eq(buf->ccs[surface_idx].stride,
+		      buf->surface[surface_idx].stride / 512 * 64);
 
 	for (; surface_addr < surface_end;
 	     surface_addr += MAIN_SURFACE_BLOCK_SIZE,
@@ -292,8 +384,13 @@ static void pgt_populate_entries(struct pgtable *pgt,
 	/* Top level table must be at offset 0. */
 	igt_assert(top_table == 0);
 
-	for (i = 0; i < buf_count; i++)
-		pgt_populate_entries_for_buf(pgt, bufs[i], top_table);
+	for (i = 0; i < buf_count; i++) {
+		igt_assert_eq(bufs[i]->surface[0].offset, 0);
+
+		pgt_populate_entries_for_buf(pgt, bufs[i], top_table, 0);
+		if (bufs[i]->format_is_yuv_semiplanar)
+			pgt_populate_entries_for_buf(pgt, bufs[i], top_table, 1);
+	}
 }
 
 static struct pgtable *
