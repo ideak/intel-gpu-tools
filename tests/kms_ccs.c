@@ -75,6 +75,10 @@ static const struct {
 
 static const uint32_t formats[] = {
 	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_YUYV,
+	DRM_FORMAT_NV12,
+	DRM_FORMAT_P012,
+	DRM_FORMAT_P016,
 };
 
 static const uint64_t ccs_modifiers[] = {
