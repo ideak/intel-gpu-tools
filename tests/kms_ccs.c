@@ -89,6 +89,8 @@ static const uint64_t ccs_modifiers[] = {
 	LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS,
 };
 
+static bool check_ccs_planes;
+
 /*
  * Limit maximum used sprite plane width so this test will not mistakenly
  * fail on hardware limitations which are not interesting to this test.
@@ -112,6 +114,52 @@ static void addfb_init(struct igt_fb *fb, struct drm_mode_fb_cmd2 *f)
 		f->modifier[i] = fb->modifier;
 		f->pitches[i] = fb->strides[i];
 		f->offsets[i] = fb->offsets[i];
+	}
+}
+
+/*
+ * The CCS planes of compressed framebuffers contain non-zero bytes if the
+ * engine compressed effectively the framebuffer. The actual encoding of these
+ * bytes is not specified, but we know that seeing an all-zero CCS plane means
+ * that the engine left the FB uncompressed, which is not what we expect in
+ * the test. Look for the first non-zero byte in the given CCS plane to get a
+ * minimal assurance that compression took place.
+ */
+static void check_ccs_plane(int drm_fd, igt_fb_t *fb, int plane)
+{
+	void *map;
+	void *ccs_p;
+	size_t ccs_size;
+	int i;
+
+	ccs_size = fb->strides[plane] * fb->plane_height[plane];
+	igt_assert(ccs_size);
+
+	gem_set_domain(drm_fd, fb->gem_handle, I915_GEM_DOMAIN_CPU, 0);
+
+	map = gem_mmap__cpu(drm_fd, fb->gem_handle, 0, fb->size, PROT_READ);
+
+	ccs_size = fb->strides[plane] * fb->plane_height[plane];
+	ccs_p = map + fb->offsets[plane];
+	for (i = 0; i < ccs_size; i += sizeof(uint32_t))
+		if (*(uint32_t *)(ccs_p + i))
+			break;
+
+	munmap(map, fb->size);
+
+	igt_assert_f(i < ccs_size,
+		     "CCS plane %d (for main plane %d) lacks compression meta-data\n",
+		     plane, igt_fb_ccs_to_main_plane(fb, plane));
+}
+
+static void check_all_ccs_planes(int drm_fd, igt_fb_t *fb)
+{
+	int i;
+
+	for (i = 0; i < fb->num_planes; i++) {
+		if (igt_fb_is_ccs_plane(fb, i) &&
+		    !igt_fb_is_gen12_ccs_cc_plane(fb, i))
+			check_ccs_plane(drm_fd, fb, i);
 	}
 }
 
@@ -197,6 +245,9 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		return;
 	} else
 		igt_assert_eq(ret, 0);
+
+	if (check_ccs_planes)
+		check_all_ccs_planes(data->drm_fd, fb);
 
 	fb->fb_id = f.fb_id;
 }
@@ -376,7 +427,24 @@ static void test_output(data_t *data)
 
 static data_t data;
 
-igt_main
+static int opt_handler(int opt, int opt_index, void *opt_data)
+{
+	switch (opt) {
+	case 'c':
+		check_ccs_planes = true;
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+static const char *help_str =
+"  -c\tCheck the presence of compression meta-data\n"
+;
+
+igt_main_args("c", NULL, help_str, opt_handler, NULL)
 {
 	enum pipe pipe;
 

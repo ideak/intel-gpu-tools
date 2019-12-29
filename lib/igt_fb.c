@@ -502,6 +502,11 @@ static bool is_ccs_plane(const struct igt_fb *fb, int plane)
 	return plane >= fb->num_planes / 2;
 }
 
+bool igt_fb_is_ccs_plane(const struct igt_fb *fb, int plane)
+{
+	return is_ccs_plane(fb, plane);
+}
+
 static bool is_gen12_ccs_plane(const struct igt_fb *fb, int plane)
 {
 	return is_gen12_ccs_modifier(fb->modifier) && is_ccs_plane(fb, plane);
@@ -513,12 +518,22 @@ static bool is_gen12_ccs_cc_plane(const struct igt_fb *fb, int plane)
 	       plane == 2;
 }
 
+bool igt_fb_is_gen12_ccs_cc_plane(const struct igt_fb *fb, int plane)
+{
+	return is_gen12_ccs_cc_plane(fb, plane);
+}
+
 static int ccs_to_main_plane(const struct igt_fb *fb, int plane)
 {
 	if (is_gen12_ccs_cc_plane(fb, plane))
 		return 0;
 
 	return plane - fb->num_planes / 2;
+}
+
+int igt_fb_ccs_to_main_plane(const struct igt_fb *fb, int plane)
+{
+	return ccs_to_main_plane(fb, plane);
 }
 
 static unsigned fb_plane_width(const struct igt_fb *fb, int plane)
