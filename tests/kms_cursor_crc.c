@@ -385,9 +385,9 @@ static void cleanup_crtc(data_t *data)
 static void scratch_buf_init(data_t *data, int buffer)
 {
 	data->igtbo[buffer].bo = data->drmibo[buffer];
-	data->igtbo[buffer].stride = data->primary_fb[buffer].strides[0];
+	data->igtbo[buffer].surface[0].stride = data->primary_fb[buffer].strides[0];
 	data->igtbo[buffer].tiling = data->primary_fb[buffer].modifier;
-	data->igtbo[buffer].size = data->primary_fb[buffer].size;
+	data->igtbo[buffer].surface[0].size = data->primary_fb[buffer].size;
 	data->igtbo[buffer].bpp = data->primary_fb[buffer].plane_bpp[0];
 }
 

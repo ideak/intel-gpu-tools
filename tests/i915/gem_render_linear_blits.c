@@ -108,15 +108,15 @@ static void run_test (int fd, int count)
 		struct igt_buf src = {}, dst = {};
 
 		src.bo = bo[i % count];
-		src.stride = STRIDE;
+		src.surface[0].stride = STRIDE;
 		src.tiling = I915_TILING_NONE;
-		src.size = SIZE;
+		src.surface[0].size = SIZE;
 		src.bpp = 32;
 
 		dst.bo = bo[(i + 1) % count];
-		dst.stride = STRIDE;
+		dst.surface[0].stride = STRIDE;
 		dst.tiling = I915_TILING_NONE;
-		dst.size = SIZE;
+		dst.surface[0].size = SIZE;
 		dst.bpp = 32;
 
 		render_copy(batch, NULL, &src, 0, 0, WIDTH, HEIGHT, &dst, 0, 0);
@@ -133,15 +133,15 @@ static void run_test (int fd, int count)
 		struct igt_buf src = {}, dst = {};
 
 		src.bo = bo[(i + 1) % count];
-		src.stride = STRIDE;
+		src.surface[0].stride = STRIDE;
 		src.tiling = I915_TILING_NONE;
-		src.size = SIZE;
+		src.surface[0].size = SIZE;
 		src.bpp = 32;
 
 		dst.bo = bo[i % count];
-		dst.stride = STRIDE;
+		dst.surface[0].stride = STRIDE;
 		dst.tiling = I915_TILING_NONE;
-		dst.size = SIZE;
+		dst.surface[0].size = SIZE;
 		dst.bpp = 32;
 
 		render_copy(batch, NULL, &src, 0, 0, WIDTH, HEIGHT, &dst, 0, 0);
@@ -160,15 +160,15 @@ static void run_test (int fd, int count)
 			continue;
 
 		src.bo = bo[s];
-		src.stride = STRIDE;
+		src.surface[0].stride = STRIDE;
 		src.tiling = I915_TILING_NONE;
-		src.size = SIZE;
+		src.surface[0].size = SIZE;
 		src.bpp = 32;
 
 		dst.bo = bo[d];
-		dst.stride = STRIDE;
+		dst.surface[0].stride = STRIDE;
 		dst.tiling = I915_TILING_NONE;
-		dst.size = SIZE;
+		dst.surface[0].size = SIZE;
 		dst.bpp = 32;
 
 		render_copy(batch, NULL, &src, 0, 0, WIDTH, HEIGHT, &dst, 0, 0);

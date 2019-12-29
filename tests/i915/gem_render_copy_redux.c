@@ -106,9 +106,9 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 	memset(buf, 0, sizeof(*buf));
 
 	buf->bo = bo;
-	buf->stride = stride;
+	buf->surface[0].stride = stride;
 	buf->tiling = I915_TILING_NONE;
-	buf->size = SIZE;
+	buf->surface[0].size = SIZE;
 	buf->bpp = 32;
 }
 

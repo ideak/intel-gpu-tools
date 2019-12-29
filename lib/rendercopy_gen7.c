@@ -65,7 +65,7 @@ gen7_bind_buf(struct intel_batchbuffer *batch,
 	uint32_t write_domain, read_domain;
 	int ret;
 
-	igt_assert_lte(buf->stride, 256*1024);
+	igt_assert_lte(buf->surface[0].stride, 256*1024);
 	igt_assert_lte(igt_buf_width(buf), 16384);
 	igt_assert_lte(igt_buf_height(buf), 16384);
 
@@ -92,7 +92,7 @@ gen7_bind_buf(struct intel_batchbuffer *batch,
 	ss[1] = buf->bo->offset;
 	ss[2] = ((igt_buf_width(buf) - 1)  << GEN7_SURFACE_WIDTH_SHIFT |
 		 (igt_buf_height(buf) - 1) << GEN7_SURFACE_HEIGHT_SHIFT);
-	ss[3] = (buf->stride - 1) << GEN7_SURFACE_PITCH_SHIFT;
+	ss[3] = (buf->surface[0].stride - 1) << GEN7_SURFACE_PITCH_SHIFT;
 	ss[4] = 0;
 	if (IS_VALLEYVIEW(batch->devid))
 		ss[5] = VLV_MOCS_L3 << 16;

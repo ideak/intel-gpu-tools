@@ -1977,9 +1977,9 @@ static void init_buf(struct fb_blit_upload *blit,
 	buf->bo = gem_handle_to_libdrm_bo(blit->bufmgr, blit->fd,
 					  name, fb->gem_handle);
 	buf->tiling = igt_fb_mod_to_tiling(fb->modifier);
-	buf->stride = fb->strides[0];
+	buf->surface[0].stride = fb->strides[0];
 	buf->bpp = fb->plane_bpp[0];
-	buf->size = fb->size;
+	buf->surface[0].size = fb->size;
 
 	if (is_ccs_modifier(fb->modifier)) {
 		igt_assert_eq(fb->strides[0] & 127, 0);

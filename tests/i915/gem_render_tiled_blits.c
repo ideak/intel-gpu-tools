@@ -66,9 +66,9 @@ check_bo(struct intel_batchbuffer *batch, struct igt_buf *buf, uint32_t val)
 	int i;
 
 	tmp.bo = linear;
-	tmp.stride = STRIDE;
+	tmp.surface[0].stride = STRIDE;
 	tmp.tiling = I915_TILING_NONE;
-	tmp.size = SIZE;
+	tmp.surface[0].size = SIZE;
 	tmp.bpp = 32;
 
 	render_copy(batch, NULL, buf, 0, 0, WIDTH, HEIGHT, &tmp, 0, 0);
@@ -132,9 +132,9 @@ static void run_test (int fd, int count)
 		buf[i].bo = drm_intel_bo_alloc_tiled(bufmgr, "",
 						     WIDTH, HEIGHT, 4,
 						     &tiling, &pitch, 0);
-		buf[i].stride = pitch;
+		buf[i].surface[0].stride = pitch;
 		buf[i].tiling = tiling;
-		buf[i].size = SIZE;
+		buf[i].surface[0].size = SIZE;
 		buf[i].bpp = 32;
 
 		start_val[i] = start;

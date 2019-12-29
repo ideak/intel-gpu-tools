@@ -248,12 +248,14 @@ void gen12_vebox_copyfunc(struct intel_batchbuffer *batch,
 	/* TODO: add support for more formats */
 	igt_assert(src->bpp == 32);
 	emit_surface_state_cmd(batch, VEBOX_SURFACE_INPUT,
-			       width, height, src->bpp, src->stride,
+			       width, height, src->bpp,
+			       src->surface[0].stride,
 			       src->tiling, R8G8B8A8_UNORM);
 
 	igt_assert(dst->bpp == 32);
 	emit_surface_state_cmd(batch, VEBOX_SURFACE_OUTPUT,
-			       width, height, dst->bpp, dst->stride,
+			       width, height, dst->bpp,
+			       dst->surface[0].stride,
 			       dst->tiling, R8G8B8A8_UNORM);
 
 	emit_tiling_convert_cmd(batch,

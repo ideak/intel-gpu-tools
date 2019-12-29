@@ -134,9 +134,9 @@ static void scratch_buf_init_from_bo(struct igt_buf *buf, drm_intel_bo *bo)
 	memset(buf, 0, sizeof(*buf));
 
 	buf->bo = bo;
-	buf->stride = 4 * WIDTH;
+	buf->surface[0].stride = 4 * WIDTH;
 	buf->tiling = I915_TILING_NONE;
-	buf->size = 4 * WIDTH * HEIGHT;
+	buf->surface[0].size = 4 * WIDTH * HEIGHT;
 	buf->bpp = 32;
 }
 

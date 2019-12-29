@@ -53,15 +53,17 @@ static drm_intel_bo *rcs_copy_bo(drm_intel_bo *dst, drm_intel_bo *src)
 {
 	struct igt_buf d = {
 		.bo = dst,
-		.size = width * height * 4,
 		.num_tiles = width * height * 4,
-		.stride = width * 4,
+		.surface[0] = {
+			.size = width * height * 4, .stride = width * 4,
+		},
 		.bpp = 32,
 	}, s = {
 		.bo = src,
-		.size = width * height * 4,
 		.num_tiles = width * height * 4,
-		.stride = width * 4,
+		.surface[0] = {
+			.size = width * height * 4, .stride = width * 4,
+		},
 		.bpp = 32,
 	};
 	uint32_t swizzle;

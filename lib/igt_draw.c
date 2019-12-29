@@ -603,14 +603,14 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 	igt_assert(dst);
 
 	src_buf.bo = src;
-	src_buf.stride = tmp.stride;
+	src_buf.surface[0].stride = tmp.stride;
 	src_buf.tiling = I915_TILING_NONE;
-	src_buf.size = tmp.size;
+	src_buf.surface[0].size = tmp.size;
 	src_buf.bpp = tmp.bpp;
 	dst_buf.bo = dst;
-	dst_buf.stride = buf->stride;
+	dst_buf.surface[0].stride = buf->stride;
 	dst_buf.tiling = tiling;
-	dst_buf.size = buf->size;
+	dst_buf.surface[0].size = buf->size;
 	dst_buf.bpp = buf->bpp;
 
 	batch = intel_batchbuffer_alloc(cmd_data->bufmgr, devid);

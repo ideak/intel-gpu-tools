@@ -155,8 +155,8 @@ struct {
 static void tile2xy(struct igt_buf *buf, unsigned tile, unsigned *x, unsigned *y)
 {
 	igt_assert(tile < buf->num_tiles);
-	*x = (tile*options.tile_size) % (buf->stride/sizeof(uint32_t));
-	*y = ((tile*options.tile_size) / (buf->stride/sizeof(uint32_t))) * options.tile_size;
+	*x = (tile*options.tile_size) % (buf->surface[0].stride/sizeof(uint32_t));
+	*y = ((tile*options.tile_size) / (buf->surface[0].stride/sizeof(uint32_t))) * options.tile_size;
 }
 
 static void emit_blt(drm_intel_bo *src_bo, uint32_t src_tiling, unsigned src_pitch,
@@ -268,8 +268,10 @@ static void cpu_copyfunc(struct igt_buf *src, unsigned src_x, unsigned src_y,
 		set_to_cpu_domain(dst, 1);
 	}
 
-	cpucpy2d(src->data, src->stride/sizeof(uint32_t), src_x, src_y,
-		 dst->data, dst->stride/sizeof(uint32_t), dst_x, dst_y,
+	cpucpy2d(src->data, src->surface[0].stride/sizeof(uint32_t), src_x,
+		 src_y,
+		 dst->data, dst->surface[0].stride/sizeof(uint32_t), dst_x,
+		 dst_y,
 		 logical_tile_no);
 }
 
@@ -287,7 +289,7 @@ static void prw_copyfunc(struct igt_buf *src, unsigned src_x, unsigned src_y,
 
 	if (src->tiling == I915_TILING_NONE) {
 		for (i = 0; i < options.tile_size; i++) {
-			unsigned ofs = src_x*sizeof(uint32_t) + src->stride*(src_y + i);
+			unsigned ofs = src_x*sizeof(uint32_t) + src->surface[0].stride*(src_y + i);
 			drm_intel_bo_get_subdata(src->bo, ofs,
 						 options.tile_size*sizeof(uint32_t),
 						 tmp_tile + options.tile_size*i);
@@ -296,13 +298,14 @@ static void prw_copyfunc(struct igt_buf *src, unsigned src_x, unsigned src_y,
 		if (options.use_cpu_maps)
 			set_to_cpu_domain(src, 0);
 
-		cpucpy2d(src->data, src->stride/sizeof(uint32_t), src_x, src_y,
+		cpucpy2d(src->data, src->surface[0].stride/sizeof(uint32_t),
+			 src_x, src_y,
 			 tmp_tile, options.tile_size, 0, 0, logical_tile_no);
 	}
 
 	if (dst->tiling == I915_TILING_NONE) {
 		for (i = 0; i < options.tile_size; i++) {
-			unsigned ofs = dst_x*sizeof(uint32_t) + dst->stride*(dst_y + i);
+			unsigned ofs = dst_x*sizeof(uint32_t) + dst->surface[0].stride*(dst_y + i);
 			drm_intel_bo_subdata(dst->bo, ofs,
 					     options.tile_size*sizeof(uint32_t),
 					     tmp_tile + options.tile_size*i);
@@ -312,7 +315,8 @@ static void prw_copyfunc(struct igt_buf *src, unsigned src_x, unsigned src_y,
 			set_to_cpu_domain(dst, 1);
 
 		cpucpy2d(tmp_tile, options.tile_size, 0, 0,
-			 dst->data, dst->stride/sizeof(uint32_t), dst_x, dst_y,
+			 dst->data, dst->surface[0].stride/sizeof(uint32_t),
+			 dst_x, dst_y,
 			 logical_tile_no);
 	}
 }
@@ -327,9 +331,9 @@ static void blitter_copyfunc(struct igt_buf *src, unsigned src_x, unsigned src_y
 	if (keep_gpu_busy_counter & 1 && !fence_storm)
 		keep_gpu_busy();
 
-	emit_blt(src->bo, src->tiling, src->stride, src_x, src_y,
+	emit_blt(src->bo, src->tiling, src->surface[0].stride, src_x, src_y,
 		 options.tile_size, options.tile_size,
-		 dst->bo, dst->tiling, dst->stride, dst_x, dst_y);
+		 dst->bo, dst->tiling, dst->surface[0].stride, dst_x, dst_y);
 
 	if (!(keep_gpu_busy_counter & 1) && !fence_storm)
 		keep_gpu_busy();
@@ -441,7 +445,7 @@ static void fan_out(void)
 
 		cpucpy2d(tmp_tile, options.tile_size, 0, 0,
 			 buffers[current_set][buf_idx].data,
-			 buffers[current_set][buf_idx].stride / sizeof(uint32_t),
+			 buffers[current_set][buf_idx].surface[0].stride / sizeof(uint32_t),
 			 x, y, i);
 	}
 
@@ -465,7 +469,7 @@ static void fan_in_and_check(void)
 			set_to_cpu_domain(&buffers[current_set][buf_idx], 0);
 
 		cpucpy2d(buffers[current_set][buf_idx].data,
-			 buffers[current_set][buf_idx].stride / sizeof(uint32_t),
+			 buffers[current_set][buf_idx].surface[0].stride / sizeof(uint32_t),
 			 x, y,
 			 tmp_tile, options.tile_size, 0, 0,
 			 i);
@@ -476,15 +480,15 @@ static void sanitize_stride(struct igt_buf *buf)
 {
 
 	if (igt_buf_height(buf) > options.max_dimension)
-		buf->stride = buf->size / options.max_dimension;
+		buf->surface[0].stride = buf->surface[0].size / options.max_dimension;
 
 	if (igt_buf_height(buf) < options.tile_size)
-		buf->stride = buf->size / options.tile_size;
+		buf->surface[0].stride = buf->surface[0].size / options.tile_size;
 
 	if (igt_buf_width(buf) < options.tile_size)
-		buf->stride = options.tile_size * sizeof(uint32_t);
+		buf->surface[0].stride = options.tile_size * sizeof(uint32_t);
 
-	igt_assert(buf->stride <= 8192);
+	igt_assert(buf->surface[0].stride <= 8192);
 	igt_assert(igt_buf_width(buf) <= options.max_dimension);
 	igt_assert(igt_buf_height(buf) <= options.max_dimension);
 
@@ -498,10 +502,10 @@ static void init_buffer(struct igt_buf *buf, unsigned size)
 	memset(buf, 0, sizeof(*buf));
 
 	buf->bo = drm_intel_bo_alloc(bufmgr, "tiled bo", size, 4096);
-	buf->size = size;
+	buf->surface[0].size = size;
 	igt_assert(buf->bo);
 	buf->tiling = I915_TILING_NONE;
-	buf->stride = 4096;
+	buf->surface[0].stride = 4096;
 	buf->bpp = 32;
 
 	sanitize_stride(buf);
@@ -560,25 +564,26 @@ static void init_set(unsigned set)
 		if (buffers[set][i].tiling == I915_TILING_NONE) {
 			/* min 64 byte stride */
 			r %= 8;
-			buffers[set][i].stride = 64 * (1 << r);
+			buffers[set][i].surface[0].stride = 64 * (1 << r);
 		} else if (IS_GEN2(devid)) {
 			/* min 128 byte stride */
 			r %= 7;
-			buffers[set][i].stride = 128 * (1 << r);
+			buffers[set][i].surface[0].stride = 128 * (1 << r);
 		} else {
 			/* min 512 byte stride */
 			r %= 5;
-			buffers[set][i].stride = 512 * (1 << r);
+			buffers[set][i].surface[0].stride = 512 * (1 << r);
 		}
 
 		sanitize_stride(&buffers[set][i]);
 
 		gem_set_tiling(drm_fd, buffers[set][i].bo->handle,
 			       buffers[set][i].tiling,
-			       buffers[set][i].stride);
+			       buffers[set][i].surface[0].stride);
 
 		if (options.trace_tile != -1 && i == options.trace_tile/options.tiles_per_buf)
-			igt_info("changing buffer %i containing tile %i: tiling %i, stride %i\n", i, options.trace_tile, buffers[set][i].tiling, buffers[set][i].stride);
+			igt_info("changing buffer %i containing tile %i: tiling %i, stride %i\n", i, options.trace_tile, buffers[set][i].tiling,
+				 buffers[set][i].surface[0].stride);
 	}
 }
 
@@ -616,10 +621,10 @@ static void copy_tiles(unsigned *permutation)
 
 		if (options.no_hw) {
 			cpucpy2d(src_buf->data,
-				 src_buf->stride / sizeof(uint32_t),
+				 src_buf->surface[0].stride / sizeof(uint32_t),
 				 src_x, src_y,
 				 dst_buf->data,
-				 dst_buf->stride / sizeof(uint32_t),
+				 dst_buf->surface[0].stride / sizeof(uint32_t),
 				 dst_x, dst_y,
 				 i);
 		} else {
@@ -808,7 +813,7 @@ static void check_render_copyfunc(void)
 
 		memset(src.data, 0xff, options.scratch_buf_size);
 		for (j = 0; j < options.tile_size; j++) {
-			ptr = (uint32_t*)((char *)src.data + sx*4 + (sy+j) * src.stride);
+			ptr = (uint32_t*)((char *)src.data + sx*4 + (sy+j) * src.surface[0].stride);
 			for (i = 0; i < options.tile_size; i++)
 				ptr[i] = j * options.tile_size + i;
 		}
@@ -819,7 +824,7 @@ static void check_render_copyfunc(void)
 			set_to_cpu_domain(&dst, 0);
 
 		for (j = 0; j < options.tile_size; j++) {
-			ptr = (uint32_t*)((char *)dst.data + dx*4 + (dy+j) * dst.stride);
+			ptr = (uint32_t*)((char *)dst.data + dx*4 + (dy+j) * dst.surface[0].stride);
 			for (i = 0; i < options.tile_size; i++)
 				if (ptr[i] != j * options.tile_size + i) {
 					igt_info("render copyfunc mismatch at (%d, %d): found %d, expected %d\n", i, j, ptr[i], j * options.tile_size + i);

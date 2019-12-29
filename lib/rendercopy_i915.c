@@ -88,7 +88,7 @@ void gen3_render_copyfunc(struct intel_batchbuffer *batch,
 #define TEX_COUNT 1
 		uint32_t format_bits, tiling_bits = 0;
 
-		igt_assert_lte(src->stride, 8192);
+		igt_assert_lte(src->surface[0].stride, 8192);
 		igt_assert_lte(igt_buf_width(src), 2048);
 		igt_assert_lte(igt_buf_height(src), 2048);
 
@@ -110,7 +110,7 @@ void gen3_render_copyfunc(struct intel_batchbuffer *batch,
 		OUT_BATCH(format_bits | tiling_bits |
 			  (igt_buf_height(src) - 1) << MS3_HEIGHT_SHIFT |
 			  (igt_buf_width(src) - 1) << MS3_WIDTH_SHIFT);
-		OUT_BATCH((src->stride/4-1) << MS4_PITCH_SHIFT);
+		OUT_BATCH((src->surface[0].stride/4-1) << MS4_PITCH_SHIFT);
 
 		OUT_BATCH(_3DSTATE_SAMPLER_STATE | (3 * TEX_COUNT));
 		OUT_BATCH((1 << TEX_COUNT) - 1);
@@ -128,7 +128,7 @@ void gen3_render_copyfunc(struct intel_batchbuffer *batch,
 		uint32_t tiling_bits = 0;
 		uint32_t format_bits;
 
-		igt_assert_lte(dst->stride, 8192);
+		igt_assert_lte(dst->surface[0].stride, 8192);
 		igt_assert_lte(igt_buf_width(dst), 2048);
 		igt_assert_lte(igt_buf_height(dst), 2048);
 
@@ -146,7 +146,7 @@ void gen3_render_copyfunc(struct intel_batchbuffer *batch,
 
 		OUT_BATCH(_3DSTATE_BUF_INFO_CMD);
 		OUT_BATCH(BUF_3D_ID_COLOR_BACK | tiling_bits |
-			  BUF_3D_PITCH(dst->stride));
+			  BUF_3D_PITCH(dst->surface[0].stride));
 		OUT_RELOC(dst->bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
 
 		OUT_BATCH(_3DSTATE_DST_BUF_VARS_CMD);

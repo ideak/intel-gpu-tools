@@ -299,10 +299,11 @@ gem_init(void)
 	igt_assert(gem.batch);
 	gem.init = 3;
 
-	gem.buf.stride = sizeof(uint32_t);
+	gem.buf.surface[0].stride = sizeof(uint32_t);
 	gem.buf.tiling = I915_TILING_NONE;
-	gem.buf.size = gem.buf.stride;
-	gem.buf.bo = drm_intel_bo_alloc(gem.bufmgr, "", gem.buf.size, 4096);
+	gem.buf.surface[0].size = gem.buf.surface[0].stride;
+	gem.buf.bo = drm_intel_bo_alloc(gem.bufmgr, "",
+					gem.buf.surface[0].size, 4096);
 	gem.buf.bpp = 32;
 	igt_assert(gem.buf.bo);
 	gem.init = 4;

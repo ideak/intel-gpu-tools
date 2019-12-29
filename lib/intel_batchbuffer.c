@@ -512,7 +512,7 @@ intel_copy_bo(struct intel_batchbuffer *batch,
  */
 unsigned igt_buf_width(const struct igt_buf *buf)
 {
-	return buf->stride/(buf->bpp / 8);
+	return buf->surface[0].stride/(buf->bpp / 8);
 }
 
 /**
@@ -526,7 +526,7 @@ unsigned igt_buf_width(const struct igt_buf *buf)
  */
 unsigned igt_buf_height(const struct igt_buf *buf)
 {
-	return buf->size/buf->stride;
+	return buf->surface[0].size/buf->surface[0].stride;
 }
 
 /*
@@ -785,8 +785,8 @@ void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 
 	igt_assert(src->bpp == dst->bpp);
 
-	src_pitch = fast_copy_pitch(src->stride, src->tiling);
-	dst_pitch = fast_copy_pitch(dst->stride, src->tiling);
+	src_pitch = fast_copy_pitch(src->surface[0].stride, src->tiling);
+	dst_pitch = fast_copy_pitch(dst->surface[0].stride, src->tiling);
 	dword0 = fast_copy_dword0(src->tiling, dst->tiling);
 	dword1 = fast_copy_dword1(src->tiling, dst->tiling, dst->bpp);
 

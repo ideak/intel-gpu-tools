@@ -77,7 +77,8 @@ pgt_table_count(int address_bits, const struct igt_buf **bufs, int buf_count)
 		/* Avoid double counting for overlapping aligned bufs. */
 		start = max(start, end);
 
-		end = ALIGN(buf->bo->offset64 + buf->size, 1UL << address_bits);
+		end = ALIGN(buf->bo->offset64 + buf->surface[0].size,
+			    1UL << address_bits);
 		igt_assert(end >= start);
 
 		count += (end - start) >> address_bits;
@@ -255,7 +256,7 @@ pgt_populate_entries_for_buf(struct pgtable *pgt,
 			       uint64_t top_table)
 {
 	uint64_t surface_addr = buf->bo->offset64;
-	uint64_t surface_end = surface_addr + buf->size;
+	uint64_t surface_end = surface_addr + buf->surface[0].size;
 	uint64_t aux_addr = buf->bo->offset64 + buf->ccs[0].offset;
 	uint64_t l1_flags = pgt_get_l1_flags(buf);
 	uint64_t lx_flags = pgt_get_lx_flags();

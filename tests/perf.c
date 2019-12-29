@@ -506,9 +506,9 @@ scratch_buf_init(drm_intel_bufmgr *bufmgr,
 	memset(buf, 0, sizeof(*buf));
 
 	buf->bo = bo;
-	buf->stride = stride;
+	buf->surface[0].stride = stride;
 	buf->tiling = I915_TILING_NONE;
-	buf->size = size;
+	buf->surface[0].size = size;
 	buf->bpp = 32;
 }
 

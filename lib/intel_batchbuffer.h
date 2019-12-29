@@ -232,12 +232,14 @@ enum i915_compression {
  */
 struct igt_buf {
 	drm_intel_bo *bo;
-	uint32_t stride;
 	uint32_t tiling;
 	enum i915_compression compression;
 	uint32_t bpp;
 	uint32_t *data;
-	uint32_t size;
+	struct {
+		uint32_t stride;
+		uint32_t size;
+	} surface[2];
 	struct {
 		uint32_t offset;
 		uint32_t stride;

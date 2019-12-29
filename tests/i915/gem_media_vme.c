@@ -58,7 +58,7 @@ scratch_buf_init(drm_intel_bufmgr *bufmgr,
 
 	buf->bo = bo;
 	buf->tiling = I915_TILING_NONE;
-	buf->size = size;
+	buf->surface[0].size = size;
 }
 
 static void scratch_buf_init_src(drm_intel_bufmgr *bufmgr, struct igt_buf *buf)
@@ -71,14 +71,14 @@ static void scratch_buf_init_src(drm_intel_bufmgr *bufmgr, struct igt_buf *buf)
 	 * with this vme kernel.
 	 */
 
-	buf->stride = STRIDE;
+	buf->surface[0].stride = STRIDE;
 }
 
 static void scratch_buf_init_dst(drm_intel_bufmgr *bufmgr, struct igt_buf *buf)
 {
 	scratch_buf_init(bufmgr, buf, OUTPUT_SIZE);
 
-	buf->stride = 1;
+	buf->surface[0].stride = 1;
 }
 
 static uint64_t switch_off_n_bits(uint64_t mask, unsigned int n)

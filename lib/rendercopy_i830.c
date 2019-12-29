@@ -138,7 +138,7 @@ static void gen2_emit_target(struct intel_batchbuffer *batch,
 	uint32_t tiling;
 	uint32_t format;
 
-	igt_assert_lte(dst->stride, 8192);
+	igt_assert_lte(dst->surface[0].stride, 8192);
 	igt_assert_lte(igt_buf_width(dst), 2048);
 	igt_assert_lte(igt_buf_height(dst), 2048);
 
@@ -156,7 +156,7 @@ static void gen2_emit_target(struct intel_batchbuffer *batch,
 		tiling |= BUF_3D_TILE_WALK_Y;
 
 	OUT_BATCH(_3DSTATE_BUF_INFO_CMD);
-	OUT_BATCH(BUF_3D_ID_COLOR_BACK | tiling | BUF_3D_PITCH(dst->stride));
+	OUT_BATCH(BUF_3D_ID_COLOR_BACK | tiling | BUF_3D_PITCH(dst->surface[0].stride));
 	OUT_RELOC(dst->bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
 
 	OUT_BATCH(_3DSTATE_DST_BUF_VARS_CMD);
@@ -179,7 +179,7 @@ static void gen2_emit_texture(struct intel_batchbuffer *batch,
 	uint32_t tiling;
 	uint32_t format;
 
-	igt_assert_lte(src->stride, 8192);
+	igt_assert_lte(src->surface[0].stride, 8192);
 	igt_assert_lte(igt_buf_width(src), 2048);
 	igt_assert_lte(igt_buf_height(src), 2048);
 
@@ -201,7 +201,7 @@ static void gen2_emit_texture(struct intel_batchbuffer *batch,
 	OUT_BATCH((igt_buf_height(src) - 1) << TM0S1_HEIGHT_SHIFT |
 		  (igt_buf_width(src) - 1) << TM0S1_WIDTH_SHIFT |
 		  format | tiling);
-	OUT_BATCH((src->stride / 4 - 1) << TM0S2_PITCH_SHIFT | TM0S2_MAP_2D);
+	OUT_BATCH((src->surface[0].stride / 4 - 1) << TM0S2_PITCH_SHIFT | TM0S2_MAP_2D);
 	OUT_BATCH(FILTER_NEAREST << TM0S3_MAG_FILTER_SHIFT |
 		  FILTER_NEAREST << TM0S3_MIN_FILTER_SHIFT |
 		  MIPFILTER_NONE << TM0S3_MIP_FILTER_SHIFT);

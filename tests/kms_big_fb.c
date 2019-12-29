@@ -60,9 +60,9 @@ static void init_buf(data_t *data,
 	buf->bo = gem_handle_to_libdrm_bo(data->bufmgr, data->drm_fd,
 					  name, fb->gem_handle);
 	buf->tiling = igt_fb_mod_to_tiling(fb->modifier);
-	buf->stride = fb->strides[0];
+	buf->surface[0].stride = fb->strides[0];
 	buf->bpp = fb->plane_bpp[0];
-	buf->size = fb->size;
+	buf->surface[0].size = fb->size;
 }
 
 static void fini_buf(struct igt_buf *buf)
@@ -99,8 +99,10 @@ static void copy_pattern(data_t *data,
 		h = min(h, src_fb->height - sy);
 		h = min(h, dst_fb->height - dy);
 
-		intel_blt_copy(data->batch, src.bo, sx, sy, src.stride,
-			       dst.bo, dx, dy, dst.stride, w, h, dst.bpp);
+		intel_blt_copy(data->batch, src.bo, sx, sy,
+			       src.surface[0].stride,
+			       dst.bo, dx, dy, dst.surface[0].stride, w, h,
+			       dst.bpp);
 	}
 
 	fini_buf(&dst);

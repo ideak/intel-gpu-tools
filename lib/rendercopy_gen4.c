@@ -142,7 +142,7 @@ gen4_bind_buf(struct intel_batchbuffer *batch,
 	uint32_t write_domain, read_domain;
 	int ret;
 
-	igt_assert_lte(buf->stride, 128*1024);
+	igt_assert_lte(buf->surface[0].stride, 128*1024);
 	igt_assert_lte(igt_buf_width(buf), 8192);
 	igt_assert_lte(igt_buf_height(buf), 8192);
 
@@ -176,7 +176,7 @@ gen4_bind_buf(struct intel_batchbuffer *batch,
 
 	ss->ss2.height = igt_buf_height(buf) - 1;
 	ss->ss2.width  = igt_buf_width(buf) - 1;
-	ss->ss3.pitch  = buf->stride - 1;
+	ss->ss3.pitch  = buf->surface[0].stride - 1;
 	ss->ss3.tiled_surface = buf->tiling != I915_TILING_NONE;
 	ss->ss3.tile_walk     = buf->tiling == I915_TILING_Y;
 

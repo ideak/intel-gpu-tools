@@ -118,7 +118,8 @@ static void copy_linear_to_yf(data_t *data, struct igt_buf *buf,
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			uint32_t *ptr = yf_ptr(map, x, y,
-					       buf->stride, buf->bpp / 8);
+					       buf->surface[0].stride,
+					       buf->bpp / 8);
 
 			*ptr = linear[y * width + x];
 		}
@@ -142,7 +143,8 @@ static void copy_yf_to_linear(data_t *data, struct igt_buf *buf,
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			uint32_t *ptr = yf_ptr(map, x, y,
-					       buf->stride, buf->bpp / 8);
+					       buf->surface[0].stride,
+					       buf->bpp / 8);
 
 			linear[y * width + x] = *ptr;
 		}
@@ -231,7 +233,7 @@ static void scratch_buf_write_to_png(data_t *data, struct igt_buf *buf,
 						      CAIRO_FORMAT_RGB24,
 						      igt_buf_width(buf),
 						      igt_buf_height(buf),
-						      buf->stride);
+						      buf->surface[0].stride);
 	ret = cairo_surface_write_to_png(surface, make_filename(filename));
 	igt_assert(ret == CAIRO_STATUS_SUCCESS);
 	cairo_surface_destroy(surface);
@@ -324,7 +326,7 @@ static void scratch_buf_draw_pattern(data_t *data, struct igt_buf *buf,
 						      CAIRO_FORMAT_RGB24,
 						      igt_buf_width(buf),
 						      igt_buf_height(buf),
-						      buf->stride);
+						      buf->surface[0].stride);
 
 	cr = cairo_create(surface);
 
@@ -403,7 +405,7 @@ scratch_buf_copy(data_t *data,
 		for (int y = 0; y < h; y++) {
 			for (int x = 0; x < w; x++) {
 				const uint32_t *ptr = yf_ptr(map, sx+x, sy+y,
-							     src->stride,
+							     src->surface[0].stride,
 							     src->bpp / 8);
 
 				linear_dst[(dy+y) * width + dx+x] = *ptr;
@@ -458,14 +460,14 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 		 * turn mapped by one L1 AUX page table entry.
 		 */
 		if (intel_gen(data->devid) >= 12)
-			buf->stride = ALIGN(width * (bpp / 8), 128 * 4);
+			buf->surface[0].stride = ALIGN(width * (bpp / 8), 128 * 4);
 		else
-			buf->stride = ALIGN(width * (bpp / 8), 128);
+			buf->surface[0].stride = ALIGN(width * (bpp / 8), 128);
 
 		if (intel_gen(data->devid) >= 12)
 			height = ALIGN(height, 4 * 32);
 
-		buf->size = buf->stride * height;
+		buf->surface[0].size = buf->surface[0].stride * height;
 		buf->tiling = tiling;
 		buf->bpp = bpp;
 
@@ -473,7 +475,7 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 		aux_height = scratch_buf_aux_height(data->devid, buf);
 
 		buf->compression = compression;
-		buf->ccs[0].offset = buf->stride * ALIGN(height, 32);
+		buf->ccs[0].offset = buf->surface[0].stride * ALIGN(height, 32);
 		buf->ccs[0].stride = aux_width;
 
 		size = buf->ccs[0].offset + aux_width * aux_height;
@@ -481,18 +483,19 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 		buf->bo = drm_intel_bo_alloc(data->bufmgr, "", size, 4096);
 
 		if (tiling == I915_TILING_Y) {
-			drm_intel_bo_set_tiling(buf->bo, &tiling, buf->stride);
+			drm_intel_bo_set_tiling(buf->bo, &tiling,
+						buf->surface[0].stride);
 			igt_assert_eq(tiling, req_tiling);
 		}
 	} else if (req_tiling == I915_TILING_Yf) {
 		int size;
 
-		buf->stride = ALIGN(width * (bpp / 8), 128);
-		buf->size = buf->stride * height;
+		buf->surface[0].stride = ALIGN(width * (bpp / 8), 128);
+		buf->surface[0].size = buf->surface[0].stride * height;
 		buf->tiling = tiling;
 		buf->bpp = bpp;
 
-		size = buf->stride * ALIGN(height, 32);
+		size = buf->surface[0].stride * ALIGN(height, 32);
 
 		buf->bo = drm_intel_bo_alloc(data->bufmgr, "", size, 4096);
 	} else {
@@ -501,9 +504,9 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 						   &tiling, &pitch, 0);
 		igt_assert_eq(tiling, req_tiling);
 
-		buf->stride = pitch;
+		buf->surface[0].stride = pitch;
 		buf->tiling = tiling;
-		buf->size = pitch * height;
+		buf->surface[0].size = pitch * height;
 		buf->bpp = bpp;
 	}
 
@@ -806,7 +809,7 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 					      0, 0, igt_buf_width(&dst),
 					      igt_buf_height(&dst),
 					      AUB_DUMP_BMP_FORMAT_ARGB_8888,
-					      dst.stride, 0);
+					      dst.surface[0].stride, 0);
 		drm_intel_bufmgr_gem_set_aub_dump(data->bufmgr, false);
 	} else if (check_all_pixels) {
 		scratch_buf_check_all(data, &dst, &ref);

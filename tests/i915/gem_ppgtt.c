@@ -73,9 +73,9 @@ static void scratch_buf_init(struct igt_buf *buf,
 	memset(buf, 0, sizeof(*buf));
 
 	buf->bo = create_bo(bufmgr, pixel);
-	buf->stride = STRIDE;
+	buf->surface[0].stride = STRIDE;
 	buf->tiling = I915_TILING_NONE;
-	buf->size = SIZE;
+	buf->surface[0].size = SIZE;
 	buf->bpp = 32;
 }
 
@@ -140,9 +140,9 @@ static void fork_rcs_copy(int timeout, uint32_t final,
 		}
 
 		buf.bo = dst[child];
-		buf.stride = STRIDE;
+		buf.surface[0].stride = STRIDE;
 		buf.tiling = I915_TILING_NONE;
-		buf.size = SIZE;
+		buf.surface[0].size = SIZE;
 		buf.bpp = 32;
 
 		i = 0;
