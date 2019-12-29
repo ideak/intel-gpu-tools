@@ -256,7 +256,7 @@ pgt_populate_entries_for_buf(struct pgtable *pgt,
 {
 	uint64_t surface_addr = buf->bo->offset64;
 	uint64_t surface_end = surface_addr + buf->size;
-	uint64_t aux_addr = buf->bo->offset64 + buf->aux.offset;
+	uint64_t aux_addr = buf->bo->offset64 + buf->ccs[0].offset;
 	uint64_t l1_flags = pgt_get_l1_flags(buf);
 	uint64_t lx_flags = pgt_get_lx_flags();
 

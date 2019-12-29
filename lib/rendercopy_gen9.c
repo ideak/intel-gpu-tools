@@ -260,17 +260,17 @@ gen8_bind_buf(struct intel_batchbuffer *batch, const struct igt_buf *buf,
 	if (buf->compression == I915_COMPRESSION_MEDIA)
 		ss->ss7.tgl.media_compression = 1;
 	else if (buf->compression == I915_COMPRESSION_RENDER) {
-		igt_assert(buf->aux.stride);
+		igt_assert(buf->ccs[0].stride);
 
 		ss->ss6.aux_mode = 0x5; /* AUX_CCS_E */
-		ss->ss6.aux_pitch = (buf->aux.stride / 128) - 1;
+		ss->ss6.aux_pitch = (buf->ccs[0].stride / 128) - 1;
 
-		ss->ss10.aux_base_addr = buf->bo->offset64 + buf->aux.offset;
-		ss->ss11.aux_base_addr_hi = (buf->bo->offset64 + buf->aux.offset) >> 32;
+		ss->ss10.aux_base_addr = buf->bo->offset64 + buf->ccs[0].offset;
+		ss->ss11.aux_base_addr_hi = (buf->bo->offset64 + buf->ccs[0].offset) >> 32;
 
 		ret = drm_intel_bo_emit_reloc(batch->bo,
 					      intel_batchbuffer_subdata_offset(batch, &ss->ss10),
-					      buf->bo, buf->aux.offset,
+					      buf->bo, buf->ccs[0].offset,
 					      read_domain, write_domain);
 		assert(ret == 0);
 	}

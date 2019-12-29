@@ -279,7 +279,7 @@ static void *linear_copy_aux(data_t *data, struct igt_buf *buf)
 	map = gem_mmap__gtt(data->drm_fd, buf->bo->handle,
 			    buf->bo->size, PROT_READ);
 
-	igt_memcpy_from_wc(linear, map + buf->aux.offset, aux_size);
+	igt_memcpy_from_wc(linear, map + buf->ccs[0].offset, aux_size);
 
 	munmap(map, buf->bo->size);
 
@@ -300,7 +300,7 @@ static void scratch_buf_aux_write_to_png(data_t *data,
 						      CAIRO_FORMAT_A8,
 						      scratch_buf_aux_width(data->devid, buf),
 						      scratch_buf_aux_height(data->devid, buf),
-						      buf->aux.stride);
+						      buf->ccs[0].stride);
 	ret = cairo_surface_write_to_png(surface, make_filename(filename));
 	igt_assert(ret == CAIRO_STATUS_SUCCESS);
 	cairo_surface_destroy(surface);
@@ -473,10 +473,10 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 		aux_height = scratch_buf_aux_height(data->devid, buf);
 
 		buf->compression = compression;
-		buf->aux.offset = buf->stride * ALIGN(height, 32);
-		buf->aux.stride = aux_width;
+		buf->ccs[0].offset = buf->stride * ALIGN(height, 32);
+		buf->ccs[0].stride = aux_width;
 
-		size = buf->aux.offset + aux_width * aux_height;
+		size = buf->ccs[0].offset + aux_width * aux_height;
 
 		buf->bo = drm_intel_bo_alloc(data->bufmgr, "", size, 4096);
 

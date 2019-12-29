@@ -241,7 +241,7 @@ struct igt_buf {
 	struct {
 		uint32_t offset;
 		uint32_t stride;
-	} aux;
+	} ccs[2];
 	struct {
 		uint32_t offset;
 	} cc;

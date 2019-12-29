@@ -1994,8 +1994,8 @@ static void init_buf(struct fb_blit_upload *blit,
 		else
 			buf->compression = I915_COMPRESSION_RENDER;
 
-		buf->aux.offset = fb->offsets[1];
-		buf->aux.stride = fb->strides[1];
+		buf->ccs[0].offset = fb->offsets[1];
+		buf->ccs[0].stride = fb->strides[1];
 	}
 
 	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
