@@ -73,7 +73,6 @@ igt@gem_tiled_pread_basic
 igt@gem_wait@basic-busy-all
 igt@gem_wait@basic-wait-all
 igt@gem_wait@basic-await-all
-igt@gem_workarounds@basic-read
 igt@i915_getparams_basic@basic-eu-total
 igt@i915_getparams_basic@basic-subslice-total
 igt@i915_hangman@error-state-basic
