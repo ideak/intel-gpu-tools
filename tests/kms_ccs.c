@@ -24,6 +24,8 @@
 
 #include "igt.h"
 
+#define SDR_PLANE_BASE	3
+
 IGT_TEST_DESCRIPTION("Test render compression (RC), in which the main surface "
 		     "is complemented by a color control surface (CCS) that "
 		     "the display uses to interpret the compressed data.");
@@ -195,11 +197,35 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	fb->fb_id = f.fb_id;
 }
 
+static igt_plane_t *first_sdr_plane(data_t *data)
+{
+	return igt_output_get_plane(data->output, SDR_PLANE_BASE);
+}
+
+static bool is_sdr_plane(const igt_plane_t *plane)
+{
+	return plane->index >= SDR_PLANE_BASE;
+}
+
+/*
+ * Mixing SDR and HDR planes results in a CRC mismatch, so use the first
+ * SDR/HDR plane as the main plane matching the SDR/HDR type of the sprite
+ * plane under test.
+ */
+static igt_plane_t *compatible_main_plane(data_t *data)
+{
+	if (data->plane && is_sdr_plane(data->plane) &&
+	    igt_format_is_yuv(data->format))
+		return first_sdr_plane(data);
+
+	return igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
+}
+
 static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 		       igt_crc_t *crc)
 {
 	igt_display_t *display = &data->display;
-	igt_plane_t *primary;
+	igt_plane_t *primary = compatible_main_plane(data);
 	drmModeModeInfo *drm_mode = igt_output_get_mode(data->output);
 	enum igt_commit_style commit;
 	struct igt_fb fb, fb_sprite;
@@ -210,8 +236,9 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 	else
 		commit = COMMIT_UNIVERSAL;
 
-	primary = igt_output_get_plane_type(data->output,
-					    DRM_PLANE_TYPE_PRIMARY);
+	if (primary == data->plane)
+		return false;
+
 	if (!igt_plane_has_format_mod(primary, data->format,
 				      data->ccs_modifier))
 		return false;
@@ -392,8 +419,6 @@ igt_main
 			igt_display_require_output_on_pipe(&data.display, data.pipe);
 
 			for_each_plane_on_pipe(&data.display, data.pipe, data.plane) {
-				if (data.plane->type == DRM_PLANE_TYPE_PRIMARY)
-					continue;
 				valid_tests += __test_output(&data);
 			}
 
