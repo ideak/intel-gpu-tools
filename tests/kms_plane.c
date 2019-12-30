@@ -596,13 +596,6 @@ static bool test_format_plane_yuv(data_t *data, enum pipe pipe,
 	if (!igt_plane_has_prop(plane, IGT_PLANE_COLOR_RANGE))
 		return true;
 
-	/*
-	 * The Vebox blitter backend needed for this can't handle YUV formats
-	 * yet, so skip it for now.
-	 */
-	if (modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS)
-		return true;
-
 	for (enum igt_color_encoding e = 0; e < IGT_NUM_COLOR_ENCODINGS; e++) {
 		if (!igt_plane_try_prop_enum(plane,
 					     IGT_PLANE_COLOR_ENCODING,
