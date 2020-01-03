@@ -50,22 +50,22 @@ IGT_TEST_DESCRIPTION("Test the i915 pmu perf interface");
 const double tolerance = 0.05f;
 const unsigned long batch_duration_ns = 500e6;
 
-static int open_pmu(uint64_t config)
+static int open_pmu(int i915, uint64_t config)
 {
 	int fd;
 
-	fd = perf_i915_open(config);
+	fd = perf_i915_open(i915, config);
 	igt_skip_on(fd < 0 && errno == ENODEV);
 	igt_assert(fd >= 0);
 
 	return fd;
 }
 
-static int open_group(uint64_t config, int group)
+static int open_group(int i915, uint64_t config, int group)
 {
 	int fd;
 
-	fd = perf_i915_open_group(config, group);
+	fd = perf_i915_open_group(i915, config, group);
 	igt_skip_on(fd < 0 && errno == ENODEV);
 	igt_assert(fd >= 0);
 
@@ -79,7 +79,8 @@ init(int gem_fd, const struct intel_execution_engine2 *e, uint8_t sample)
 	bool exists;
 
 	errno = 0;
-	fd = perf_i915_open(__I915_PMU_ENGINE(e->class, e->instance, sample));
+	fd = perf_i915_open(gem_fd,
+			    __I915_PMU_ENGINE(e->class, e->instance, sample));
 	if (fd < 0)
 		err = errno;
 
@@ -278,7 +279,7 @@ single(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 	uint64_t val;
 	int fd;
 
-	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
+	fd = open_pmu(gem_fd, I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
 	if (flags & TEST_BUSY)
 		spin = spin_sync(gem_fd, 0, e);
@@ -332,7 +333,7 @@ busy_start(int gem_fd, const struct intel_execution_engine2 *e)
 
 	spin = __spin_sync(gem_fd, 0, e);
 
-	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
+	fd = open_pmu(gem_fd, I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
 	val = __pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
@@ -384,7 +385,7 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	 * Open PMU as fast as possible after the second spin batch in attempt
 	 * to be faster than the driver handling lite-restore.
 	 */
-	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
+	fd = open_pmu(gem_fd, I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
 	val = __pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(batch_duration_ns / 1000);
@@ -453,7 +454,8 @@ busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 		if (e->class == e_->class && e->instance == e_->instance)
 			busy_idx = i;
 
-		fd[i++] = open_group(I915_PMU_ENGINE_BUSY(e_->class,
+		fd[i++] = open_group(gem_fd,
+				     I915_PMU_ENGINE_BUSY(e_->class,
 							  e_->instance),
 				     fd[0]);
 	}
@@ -527,7 +529,7 @@ most_busy_check_all(int gem_fd, const struct intel_execution_engine2 *e,
 
 	fd[0] = -1;
 	for (i = 0; i < num_engines; i++)
-		fd[i] = open_group(val[i], fd[0]);
+		fd[i] = open_group(gem_fd, val[i], fd[0]);
 
 	/* Small delay to allow engines to start. */
 	usleep(__spin_wait(gem_fd, spin) * num_engines / 1e3);
@@ -581,7 +583,7 @@ all_busy_check_all(int gem_fd, const unsigned int num_engines,
 
 	fd[0] = -1;
 	for (i = 0; i < num_engines; i++)
-		fd[i] = open_group(val[i], fd[0]);
+		fd[i] = open_group(gem_fd, val[i], fd[0]);
 
 	/* Small delay to allow engines to start. */
 	usleep(__spin_wait(gem_fd, spin) * num_engines / 1e3);
@@ -613,8 +615,9 @@ no_sema(int gem_fd, const struct intel_execution_engine2 *e, unsigned int flags)
 	uint64_t val[2][2];
 	int fd;
 
-	fd = open_group(I915_PMU_ENGINE_SEMA(e->class, e->instance), -1);
-	open_group(I915_PMU_ENGINE_WAIT(e->class, e->instance), fd);
+	fd = open_group(gem_fd,
+			I915_PMU_ENGINE_SEMA(e->class, e->instance), -1);
+	open_group(gem_fd, I915_PMU_ENGINE_WAIT(e->class, e->instance), fd);
 
 	if (flags & TEST_BUSY)
 		spin = spin_sync(gem_fd, 0, e);
@@ -712,7 +715,7 @@ sema_wait(int gem_fd, const struct intel_execution_engine2 *e,
 	 * to expected time spent in semaphore wait state.
 	 */
 
-	fd = open_pmu(I915_PMU_ENGINE_SEMA(e->class, e->instance));
+	fd = open_pmu(gem_fd, I915_PMU_ENGINE_SEMA(e->class, e->instance));
 
 	val[0] = pmu_read_single(fd);
 
@@ -817,8 +820,9 @@ sema_busy(int gem_fd,
 
 	igt_require(gem_scheduler_has_semaphores(gem_fd));
 
-	fd = open_group(I915_PMU_ENGINE_SEMA(e->class, e->instance), -1);
-	open_group(I915_PMU_ENGINE_BUSY(e->class, e->instance), fd);
+	fd = open_group(gem_fd,
+			I915_PMU_ENGINE_SEMA(e->class, e->instance), -1);
+	open_group(gem_fd, I915_PMU_ENGINE_BUSY(e->class, e->instance), fd);
 
 	__for_each_physical_engine(gem_fd, signal) {
 		if (e->class == signal->class &&
@@ -992,7 +996,8 @@ event_wait(int gem_fd, const struct intel_execution_engine2 *e)
 		data.pipe = p;
 		prepare_crtc(&data, gem_fd, output);
 
-		fd = open_pmu(I915_PMU_ENGINE_WAIT(e->class, e->instance));
+		fd = open_pmu(gem_fd,
+			      I915_PMU_ENGINE_WAIT(e->class, e->instance));
 
 		val[0] = pmu_read_single(fd);
 
@@ -1044,14 +1049,14 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
 
 	gem_quiescent_gpu(gem_fd);
 
-	fd[0] = open_pmu(config);
+	fd[0] = open_pmu(gem_fd, config);
 
 	/*
 	 * Second PMU client which is initialized after the first one,
 	 * and exists before it, should not affect accounting as reported
 	 * in the first client.
 	 */
-	fd[1] = open_pmu(config);
+	fd[1] = open_pmu(gem_fd, config);
 
 	spin = spin_sync(gem_fd, 0, e);
 
@@ -1085,7 +1090,7 @@ multi_client(int gem_fd, const struct intel_execution_engine2 *e)
  *  - cpu != 0 is not supported since i915 PMU only allows running on one cpu
  *    and that is normally CPU0.
  */
-static void invalid_init(void)
+static void invalid_init(int i915)
 {
 	struct perf_event_attr attr;
 
@@ -1093,7 +1098,7 @@ static void invalid_init(void)
 do { \
 	memset(&attr, 0, sizeof (attr)); \
 	attr.config = I915_PMU_ENGINE_BUSY(I915_ENGINE_CLASS_RENDER, 0); \
-	attr.type = i915_type_id(); \
+	attr.type = i915_perf_type_id(i915); \
 	igt_assert(attr.type != 0); \
 	errno = 0; \
 } while(0)
@@ -1112,11 +1117,11 @@ do { \
 	igt_assert_eq(errno, EINVAL);
 }
 
-static void init_other(unsigned int i, bool valid)
+static void init_other(int i915, unsigned int i, bool valid)
 {
 	int fd;
 
-	fd = perf_i915_open(__I915_PMU_OTHER(i));
+	fd = perf_i915_open(i915, __I915_PMU_OTHER(i));
 	igt_require(!(fd < 0 && errno == ENODEV));
 	if (valid) {
 		igt_assert(fd >= 0);
@@ -1128,11 +1133,11 @@ static void init_other(unsigned int i, bool valid)
 	close(fd);
 }
 
-static void read_other(unsigned int i, bool valid)
+static void read_other(int i915, unsigned int i, bool valid)
 {
 	int fd;
 
-	fd = perf_i915_open(__I915_PMU_OTHER(i));
+	fd = perf_i915_open(i915, __I915_PMU_OTHER(i));
 	igt_require(!(fd < 0 && errno == ENODEV));
 	if (valid) {
 		igt_assert(fd >= 0);
@@ -1163,7 +1168,8 @@ static void cpu_hotplug(int gem_fd)
 
 	igt_require(cpu0_hotplug_support());
 
-	fd = open_pmu(I915_PMU_ENGINE_BUSY(I915_ENGINE_CLASS_RENDER, 0));
+	fd = open_pmu(gem_fd,
+		      I915_PMU_ENGINE_BUSY(I915_ENGINE_CLASS_RENDER, 0));
 
 	/*
 	 * Create two spinners so test can ensure shorter gaps in engine
@@ -1292,7 +1298,7 @@ test_interrupts(int gem_fd)
 
 	gem_quiescent_gpu(gem_fd);
 
-	fd = open_pmu(I915_PMU_INTERRUPTS);
+	fd = open_pmu(gem_fd, I915_PMU_INTERRUPTS);
 
 	/* Queue spinning batches. */
 	for (int i = 0; i < target; i++) {
@@ -1355,7 +1361,7 @@ test_interrupts_sync(int gem_fd)
 
 	gem_quiescent_gpu(gem_fd);
 
-	fd = open_pmu(I915_PMU_INTERRUPTS);
+	fd = open_pmu(gem_fd, I915_PMU_INTERRUPTS);
 
 	/* Queue spinning batches. */
 	for (int i = 0; i < target; i++)
@@ -1409,8 +1415,8 @@ test_frequency(int gem_fd)
 	igt_require(max_freq > min_freq);
 	igt_require(boost_freq > min_freq);
 
-	fd = open_group(I915_PMU_REQUESTED_FREQUENCY, -1);
-	open_group(I915_PMU_ACTUAL_FREQUENCY, fd);
+	fd = open_group(gem_fd, I915_PMU_REQUESTED_FREQUENCY, -1);
+	open_group(gem_fd, I915_PMU_ACTUAL_FREQUENCY, fd);
 
 	/*
 	 * Set GPU to min frequency and read PMU counters.
@@ -1499,8 +1505,8 @@ test_frequency_idle(int gem_fd)
 
 	/* While parked, our convention is to report the GPU at 0Hz */
 
-	fd = open_group(I915_PMU_REQUESTED_FREQUENCY, -1);
-	open_group(I915_PMU_ACTUAL_FREQUENCY, fd);
+	fd = open_group(gem_fd, I915_PMU_REQUESTED_FREQUENCY, -1);
+	open_group(gem_fd, I915_PMU_ACTUAL_FREQUENCY, fd);
 
 	gem_quiescent_gpu(gem_fd); /* Be idle! */
 	measured_usleep(2000); /* Wait for timers to cease */
@@ -1554,7 +1560,7 @@ test_rc6(int gem_fd, unsigned int flags)
 
 	gem_quiescent_gpu(gem_fd);
 
-	fd = open_pmu(I915_PMU_RC6_RESIDENCY);
+	fd = open_pmu(gem_fd, I915_PMU_RC6_RESIDENCY);
 
 	if (flags & TEST_RUNTIME_PM) {
 		drmModeRes *res;
@@ -1651,7 +1657,7 @@ test_enable_race(int gem_fd, const struct intel_execution_engine2 *e)
 		usleep(500e3);
 
 		/* Enable the PMU. */
-		fd = open_pmu(config);
+		fd = open_pmu(gem_fd, config);
 
 		/* Stop load and close the PMU. */
 		igt_stop_helper(&engine_load);
@@ -1797,7 +1803,7 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 		igt_spin_free(gem_fd, spin);
 	}
 
-	fd = open_pmu(I915_PMU_ENGINE_BUSY(e->class, e->instance));
+	fd = open_pmu(gem_fd, I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
 	/* Let the child run. */
 	read(link[0], &expected, sizeof(expected));
@@ -1835,7 +1841,7 @@ igt_main
 		fd = drm_open_driver_master(DRIVER_INTEL);
 
 		igt_require_gem(fd);
-		igt_require(i915_type_id() > 0);
+		igt_require(i915_perf_type_id(fd) > 0);
 
 		__for_each_physical_engine(fd, e)
 			num_engines++;
@@ -1845,7 +1851,7 @@ igt_main
 	 * Test invalid access via perf API is rejected.
 	 */
 	igt_subtest("invalid-init")
-		invalid_init();
+		invalid_init(fd);
 
 	__for_each_physical_engine(fd, e) {
 		const unsigned int pct[] = { 2, 50, 98 };
@@ -1996,10 +2002,10 @@ igt_main
 	 */
 	for (i = 0; i < num_other_metrics + 1; i++) {
 		igt_subtest_f("other-init-%u", i)
-			init_other(i, i < num_other_metrics);
+			init_other(fd, i, i < num_other_metrics);
 
 		igt_subtest_f("other-read-%u", i)
-			read_other(i, i < num_other_metrics);
+			read_other(fd, i, i < num_other_metrics);
 	}
 
 	/**

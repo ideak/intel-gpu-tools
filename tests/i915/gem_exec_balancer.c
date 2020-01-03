@@ -60,7 +60,7 @@ static bool has_class_instance(int i915, uint16_t class, uint16_t instance)
 {
 	int fd;
 
-	fd = perf_i915_open(I915_PMU_ENGINE_BUSY(class, instance));
+	fd = perf_i915_open(i915, I915_PMU_ENGINE_BUSY(class, instance));
 	if (fd != -1) {
 		close(fd);
 		return true;
@@ -483,9 +483,11 @@ static void measure_all_load(int pmu, double *v, unsigned int num, int period_us
 	}
 }
 
-static int add_pmu(int pmu, const struct i915_engine_class_instance *ci)
+static int
+add_pmu(int i915, int pmu, const struct i915_engine_class_instance *ci)
 {
-	return perf_i915_open_group(I915_PMU_ENGINE_BUSY(ci->engine_class,
+	return perf_i915_open_group(i915,
+				    I915_PMU_ENGINE_BUSY(ci->engine_class,
 							 ci->engine_instance),
 				    pmu);
 }
@@ -514,7 +516,8 @@ static void check_individual_engine(int i915,
 	double load;
 	int pmu;
 
-	pmu = perf_i915_open(I915_PMU_ENGINE_BUSY(ci[idx].engine_class,
+	pmu = perf_i915_open(i915,
+			     I915_PMU_ENGINE_BUSY(ci[idx].engine_class,
 						  ci[idx].engine_instance));
 
 	spin = igt_spin_new(i915, .ctx = ctx, .engine = idx + 1);
@@ -636,8 +639,9 @@ static void bonded(int i915, unsigned int flags)
 
 			pmu[0] = -1;
 			for (int i = 0; i < limit; i++)
-				pmu[i] = add_pmu(pmu[0], &siblings[i]);
-			pmu[limit] = add_pmu(pmu[0], &master_engines[bond]);
+				pmu[i] = add_pmu(i915, pmu[0], &siblings[i]);
+			pmu[limit] = add_pmu(i915,
+					     pmu[0], &master_engines[bond]);
 
 			igt_assert(siblings[bond].engine_class !=
 				   master_engines[bond].engine_class);
@@ -1346,7 +1350,7 @@ static void full(int i915, unsigned int flags)
 		for (unsigned int n = 0; n < count; n++) {
 			uint32_t ctx;
 
-			pmu[n] = add_pmu(pmu[0], &ci[n]);
+			pmu[n] = add_pmu(i915, pmu[0], &ci[n]);
 
 			if (flags & PULSE) {
 				struct drm_i915_gem_execbuffer2 eb = {

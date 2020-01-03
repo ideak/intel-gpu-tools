@@ -37,8 +37,8 @@ static int perf_open(void)
 {
 	int fd;
 
-	fd = perf_i915_open_group(I915_PMU_ACTUAL_FREQUENCY, -1);
-	if (perf_i915_open_group(I915_PMU_REQUESTED_FREQUENCY, fd) < 0) {
+	fd = perf_igfx_open_group(I915_PMU_ACTUAL_FREQUENCY, -1);
+	if (perf_igfx_open_group(I915_PMU_REQUESTED_FREQUENCY, fd) < 0) {
 		close(fd);
 		fd = -1;
 	}

@@ -113,7 +113,7 @@ int gem_interrupts_init(struct gem_interrupts *irqs)
 {
 	memset(irqs, 0, sizeof(*irqs));
 
-	irqs->fd = perf_i915_open(I915_PMU_INTERRUPTS);
+	irqs->fd = perf_igfx_open(I915_PMU_INTERRUPTS);
 	if (irqs->fd < 0 && interrupts_read() < 0)
 		irqs->error = ENODEV;
 

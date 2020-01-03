@@ -423,7 +423,7 @@ static const char *imc_data_writes_unit(void)
 ({ \
 	int fd__; \
 \
-	fd__ = perf_i915_open_group((pmu)->config, (fd)); \
+	fd__ = perf_igfx_open_group((pmu)->config, (fd)); \
 	if (fd__ >= 0) { \
 		if ((fd) == -1) \
 			(fd) = fd__; \

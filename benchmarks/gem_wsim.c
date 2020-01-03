@@ -2268,8 +2268,8 @@ busy_init(const struct workload_balancer *balancer, struct workload *wrk)
 	for (d = &engines[0]; d->id != VCS; d++) {
 		int pfd;
 
-		pfd = perf_i915_open_group(I915_PMU_ENGINE_BUSY(d->class,
-							        d->inst),
+		pfd = perf_igfx_open_group(I915_PMU_ENGINE_BUSY(d->class,
+								d->inst),
 					   bb->fd);
 		if (pfd < 0) {
 			if (d->id != VCS2)

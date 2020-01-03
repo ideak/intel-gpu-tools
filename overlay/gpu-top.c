@@ -58,16 +58,16 @@ static int perf_init(struct gpu_top *gt)
 
 	d = &engines[0];
 
-	gt->fd = perf_i915_open_group(I915_PMU_ENGINE_BUSY(d->class, d->inst),
+	gt->fd = perf_igfx_open_group(I915_PMU_ENGINE_BUSY(d->class, d->inst),
 				      -1);
 	if (gt->fd < 0)
 		return -1;
 
-	if (perf_i915_open_group(I915_PMU_ENGINE_WAIT(d->class, d->inst),
+	if (perf_igfx_open_group(I915_PMU_ENGINE_WAIT(d->class, d->inst),
 				 gt->fd) >= 0)
 		gt->have_wait = 1;
 
-	if (perf_i915_open_group(I915_PMU_ENGINE_SEMA(d->class, d->inst),
+	if (perf_igfx_open_group(I915_PMU_ENGINE_SEMA(d->class, d->inst),
 				 gt->fd) >= 0)
 		gt->have_sema = 1;
 
@@ -75,19 +75,19 @@ static int perf_init(struct gpu_top *gt)
 	gt->num_rings = 1;
 
 	for (d++; d->name; d++) {
-		if (perf_i915_open_group(I915_PMU_ENGINE_BUSY(d->class,
+		if (perf_igfx_open_group(I915_PMU_ENGINE_BUSY(d->class,
 							      d->inst),
 					gt->fd) < 0)
 			continue;
 
 		if (gt->have_wait &&
-		    perf_i915_open_group(I915_PMU_ENGINE_WAIT(d->class,
+		    perf_igfx_open_group(I915_PMU_ENGINE_WAIT(d->class,
 							      d->inst),
 					 gt->fd) < 0)
 			return -1;
 
 		if (gt->have_sema &&
-		    perf_i915_open_group(I915_PMU_ENGINE_SEMA(d->class,
+		    perf_igfx_open_group(I915_PMU_ENGINE_SEMA(d->class,
 							      d->inst),
 				   gt->fd) < 0)
 			return -1;

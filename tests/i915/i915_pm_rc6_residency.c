@@ -273,7 +273,7 @@ static int open_pmu(int i915, uint64_t config)
 {
 	int fd;
 
-	fd = perf_i915_open(config);
+	fd = perf_i915_open(i915, config);
 	igt_skip_on(fd < 0 && errno == ENODEV);
 	igt_assert(fd >= 0);
 

@@ -136,7 +136,7 @@ static void sysfs_range(int i915)
 
 	triangle_fill(frequencies, N_STEPS, sys_min, sys_max);
 
-	pmu = perf_i915_open(I915_PMU_REQUESTED_FREQUENCY);
+	pmu = perf_i915_open(i915, I915_PMU_REQUESTED_FREQUENCY);
 	igt_require(pmu >= 0);
 
 	for (int outer = 0; outer <= 2*N_STEPS; outer++) {

@@ -119,7 +119,7 @@ kernel_has_per_context_sseu_support(int fd)
 
 static bool has_engine(int fd, unsigned int class, unsigned int instance)
 {
-	int pmu = perf_i915_open(I915_PMU_ENGINE_BUSY(class, instance));
+	int pmu = perf_i915_open(fd, I915_PMU_ENGINE_BUSY(class, instance));
 
 	if (pmu >= 0)
 		close(pmu);

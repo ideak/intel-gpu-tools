@@ -39,7 +39,7 @@ int rc6_init(struct rc6 *rc6)
 {
 	memset(rc6, 0, sizeof(*rc6));
 
-	rc6->fd = perf_i915_open(I915_PMU_RC6_RESIDENCY);
+	rc6->fd = perf_igfx_open(I915_PMU_RC6_RESIDENCY);
 	if (rc6->fd < 0) {
 		struct stat st;
 		if (stat("/sys/class/drm/card0/power", &st) < 0)
