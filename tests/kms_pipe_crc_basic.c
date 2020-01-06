@@ -221,6 +221,41 @@ static void test_compare_crc(data_t *data, enum pipe pipe)
 	igt_remove_fb(data->drm_fd, &fb1);
 }
 
+static void test_disable_crc_after_crtc(data_t *data, enum pipe pipe)
+{
+	igt_display_t *display = &data->display;
+	igt_output_t *output = igt_get_single_output_for_pipe(&data->display, pipe);
+	igt_pipe_crc_t *pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, "auto");
+	drmModeModeInfo *mode = igt_output_get_mode(output);
+	igt_crc_t crc[2];
+
+	igt_display_reset(display);
+	igt_output_set_pipe(output, pipe);
+
+	igt_create_color_fb(data->drm_fd,
+			    mode->hdisplay, mode->vdisplay,
+			    DRM_FORMAT_XRGB8888,
+			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    0.0, 1.0, 0.0, &data->fb);
+	igt_plane_set_fb(igt_output_get_plane(output, 0), &data->fb);
+	igt_display_commit(display);
+
+	igt_pipe_crc_start(pipe_crc);
+	igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc[0]);
+
+	kmstest_set_connector_dpms(data->drm_fd, output->config.connector,
+				   DRM_MODE_DPMS_OFF);
+	igt_pipe_crc_stop(pipe_crc);
+
+	kmstest_set_connector_dpms(data->drm_fd, output->config.connector,
+				   DRM_MODE_DPMS_ON);
+	igt_pipe_crc_collect_crc(pipe_crc, &crc[1]);
+	igt_assert_crc_equal(&crc[0], &crc[1]);
+
+	igt_pipe_crc_free(pipe_crc);
+	igt_remove_fb(data->drm_fd, &data->fb);
+}
+
 data_t data = {0, };
 
 igt_main
@@ -264,6 +299,11 @@ igt_main
 
 			test_read_crc(&data, pipe, 0);
 		}
+
+		igt_describe("Check that disabling CRCs on a CRTC after having disabled the CRTC "
+			     "does not cause issues.");
+		igt_subtest_f("disable-crc-after-crtc-pipe-%s", kmstest_pipe_name(pipe))
+			test_disable_crc_after_crtc(&data, pipe);
 
 		igt_subtest_f("hang-read-crc-pipe-%s", kmstest_pipe_name(pipe)) {
 			igt_hang_t hang = igt_allow_hang(data.drm_fd, 0, 0);
