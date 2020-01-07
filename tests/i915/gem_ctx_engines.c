@@ -454,7 +454,6 @@ static void independent(int i915)
 	map = gem_mmap__cpu(i915, results.handle, 0, 4096, PROT_READ);
 	gem_set_domain(i915, results.handle,
 		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
-	memset(map, 0, 4096);
 
 	for (int i = 0; i < I915_EXEC_RING_MASK + 1; i++) {
 		struct drm_i915_gem_exec_object2 obj[2] = {
