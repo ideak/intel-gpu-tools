@@ -186,20 +186,23 @@ static void run_test(gpu_process_t *gpu)
 	igt_display_t *display = &gpu->display;
 	igt_output_t *output;
 	enum pipe pipe;
-	int prime_fd;
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
+		int prime_fd;
+
 		gpu->output = output;
 		gpu->pipe = pipe;
 
 		prepare_crtc(gpu);
 
 		prime_fd = prime_handle_to_fd_for_mmap(gpu->drm_fd,
-							gpu->fb.gem_handle);
+						       gpu->fb.gem_handle);
 		igt_skip_on(prime_fd == -1 && errno == EINVAL);
 
-		/* Note that it only shares the dma-buf fd and some
-		  * other basic info */
+		/*
+		 * Note that it only shares the dma-buf fd and some
+		 * other basic info.
+		 */
 		igt_fork(renderer_no, 1) {
 			init_renderer(prime_fd, gpu->fb.size, gpu->fb.width,
 				      gpu->fb.height);
@@ -207,6 +210,9 @@ static void run_test(gpu_process_t *gpu)
 		igt_waitchildren();
 
 		igt_debug_wait_for_keypress("paint");
+
+		close(prime_fd);
+
 		cleanup_crtc(gpu);
 
 		/* once is enough */
@@ -227,11 +233,12 @@ check_for_dma_buf_mmap(int fd)
 	handle = gem_create(fd, 4096);
 	dma_buf_fd = prime_handle_to_fd(fd, handle);
 	ptr = mmap(NULL, 4096, PROT_READ, MAP_SHARED, dma_buf_fd, 0);
-	if (ptr != MAP_FAILED)
+	if (ptr != MAP_FAILED) {
 		ret = 0;
-	munmap(ptr, 4096);
-	gem_close(fd, handle);
+		munmap(ptr, 4096);
+	}
 	close(dma_buf_fd);
+	gem_close(fd, handle);
 	return ret;
 }
 
