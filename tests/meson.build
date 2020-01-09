@@ -232,7 +232,6 @@ i915_progs = [
 	'i915_module_load',
 	'i915_pm_backlight',
 	'i915_pm_lpsp',
-	'i915_pm_rc6_residency',
 	'i915_pm_rpm',
 	'i915_pm_dc',
 	'i915_pm_rps',
@@ -335,6 +334,14 @@ test_executables += executable('gem_mmap_offset',
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_list += 'gem_mmap_offset'
+
+test_executables += executable('i915_pm_rc6_residency',
+	   join_paths('i915', 'i915_pm_rc6_residency.c'),
+	   dependencies : test_deps + [ lib_igt_perf ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'i915_pm_rc6_residency'
 
 test_executables += executable('perf_pmu', 'perf_pmu.c',
 	   dependencies : test_deps + [ lib_igt_perf ],
