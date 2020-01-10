@@ -214,15 +214,13 @@ static uint64_t pmu_read_single(int fd)
 }
 
 #define __assert_within_epsilon(x, ref, tol_up, tol_down) \
-	igt_assert_f((double)(x) <= (1.0 + (tol_up)) * (double)(ref) && \
-		     (double)(x) >= (1.0 - (tol_down)) * (double)(ref), \
-		     "'%s' != '%s' (%f not within +%.1f%%/-%.1f%% tolerance of %f)\n",\
-		     #x, #ref, (double)(x), \
-		     (tol_up) * 100.0, (tol_down) * 100.0, \
-		     (double)(ref))
+	igt_assert_f((double)(x) <= (1.0 + (tol_up)/100.) * (double)(ref) && \
+		     (double)(x) >= (1.0 - (tol_down)/100.) * (double)(ref), \
+		     "'%s' != '%s' (%.3g not within +%d%%/-%df%% tolerance of %.3g)\n",\
+		     #x, #ref, (double)(x), (tol_up), (tol_down), (double)(ref))
 
 #define assert_within_epsilon(x, ref, tolerance) \
-	__assert_within_epsilon(x, ref, tolerance, tolerance)
+	__assert_within_epsilon((x), (ref), tolerance, tolerance)
 
 static bool __pmu_wait_for_rc6(int fd)
 {
@@ -285,20 +283,21 @@ static int open_pmu(int i915, uint64_t config)
 static void rc6_idle(int i915)
 {
 	const int64_t duration_ns = SLEEP_DURATION * (int64_t)NSEC_PER_SEC;
-	uint64_t idle, prev, ts[2];
 	unsigned long slept, cycles;
 	unsigned long *done;
+	uint64_t rc6, ts[2];
 	int fd;
 
 	fd = open_pmu(i915, I915_PMU_RC6_RESIDENCY);
 	igt_require(__pmu_wait_for_rc6(fd));
 
 	/* While idle check full RC6. */
-	prev = __pmu_read_single(fd, &ts[0]);
+	rc6 = -__pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(duration_ns / 1000);
-	idle = __pmu_read_single(fd, &ts[1]);
-	igt_debug("slept=%lu perf=%"PRIu64"\n", slept, ts[1] - ts[0]);
-	assert_within_epsilon(idle - prev, ts[1] - ts[0], 5);
+	rc6 += __pmu_read_single(fd, &ts[1]);
+	igt_debug("slept=%lu perf=%"PRIu64", rc6=%"PRIu64"\n",
+		  slept, ts[1] - ts[0], rc6);
+	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
 
 	/* Setup up a very light load */
 	done = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
@@ -317,7 +316,8 @@ static void rc6_idle(int i915)
 			igt_nsec_elapsed(&tv);
 
 			gem_execbuf(i915, &execbuf);
-			gem_sync(i915, obj.handle);
+			while (gem_bo_busy(i915, obj.handle))
+				usleep(0);
 			done[1]++;
 
 			usleep(igt_nsec_elapsed(&tv) / 10); /* => 1% busy */
@@ -326,14 +326,14 @@ static void rc6_idle(int i915)
 
 	/* While very nearly idle (idle to within tolerance), expect full RC6 */
 	cycles = -READ_ONCE(done[1]);
-	prev = __pmu_read_single(fd, &ts[0]);
+	rc6 = -__pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(duration_ns / 1000);
-	idle = __pmu_read_single(fd, &ts[1]);
+	rc6 += __pmu_read_single(fd, &ts[1]);
 	cycles += READ_ONCE(done[1]);
-	igt_debug("slept=%lu perf=%"PRIu64", cycles=%lu\n",
-		  slept, ts[1] - ts[0], cycles);
+	igt_debug("slept=%lu perf=%"PRIu64", cycles=%lu, rc6=%"PRIu64"\n",
+		  slept, ts[1] - ts[0], cycles, rc6);
 	igt_assert(cycles >= SLEEP_DURATION); /* At least one wakeup/s needed */
-	assert_within_epsilon(idle - prev, ts[1] - ts[0], 5);
+	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
 
 	close(fd);
 
