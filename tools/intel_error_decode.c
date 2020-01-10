@@ -605,6 +605,8 @@ read_data_file(FILE *file)
 				const char *name;
 				int do_decode;
 			} buffers[] = {
+				{ "ring", "ring", 1 },
+				{ "batch", "batch", 1 },
 				{ "ringbuffer", "ring", 1 },
 				{ "gtt_offset", "batch", 1 },
 				{ "hw context", "HW context", 1 },
