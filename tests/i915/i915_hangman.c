@@ -159,6 +159,9 @@ static void check_error_state(const char *expected_ring_name,
 
 		matched = sscanf(dashes, "--- gtt_offset = 0x%08x %08x\n",
 				 &gtt_offset_upper, &gtt_offset_lower);
+		if (!matched)
+			matched = sscanf(dashes, "--- batch = 0x%08x %08x\n",
+					 &gtt_offset_upper, &gtt_offset_lower);
 		if (matched) {
 			char expected_line[128];
 			uint64_t gtt_offset;
