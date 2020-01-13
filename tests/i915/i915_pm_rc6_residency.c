@@ -214,13 +214,13 @@ static uint64_t pmu_read_single(int fd)
 }
 
 #define __assert_within_epsilon(x, ref, tol_up, tol_down) \
-	igt_assert_f((double)(x) <= (1.0 + (tol_up)/100.) * (double)(ref) && \
-		     (double)(x) >= (1.0 - (tol_down)/100.) * (double)(ref), \
-		     "'%s' != '%s' (%.3g not within +%d%%/-%df%% tolerance of %.3g)\n",\
+	igt_assert_f((x) <= (ref) * (1.0 + (tol_up)/100.) && \
+		     (x) >= (ref) * (1.0 - (tol_down)/100.), \
+		     "'%s' != '%s' (%.3g not within +%d%%/-%d%% tolerance of %.3g)\n",\
 		     #x, #ref, (double)(x), (tol_up), (tol_down), (double)(ref))
 
 #define assert_within_epsilon(x, ref, tolerance) \
-	__assert_within_epsilon((x), (ref), tolerance, tolerance)
+	__assert_within_epsilon(x, ref, tolerance, tolerance)
 
 static bool __pmu_wait_for_rc6(int fd)
 {
@@ -332,14 +332,14 @@ static void rc6_idle(int i915)
 	cycles += READ_ONCE(done[1]);
 	igt_debug("slept=%lu perf=%"PRIu64", cycles=%lu, rc6=%"PRIu64"\n",
 		  slept, ts[1] - ts[0], cycles, rc6);
-	igt_assert(cycles >= SLEEP_DURATION); /* At least one wakeup/s needed */
-	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
-
-	close(fd);
 
 	*done = 1;
 	igt_waitchildren();
 	munmap(done, 4096);
+	close(fd);
+
+	igt_assert(cycles >= SLEEP_DURATION); /* At least one wakeup/s needed */
+	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
 }
 
 igt_main
