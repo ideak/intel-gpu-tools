@@ -887,7 +887,7 @@ init_sys_info(void)
 	igt_assert_neq(devid, 0);
 
 	timestamp_frequency = get_cs_timestamp_frequency();
-	igt_debug("timestamp_frequency = %lu\n", timestamp_frequency);
+	igt_debug("timestamp_frequency = %"PRIu64"\n", timestamp_frequency);
 	igt_assert_neq(timestamp_frequency, 0);
 
 	if (IS_HASWELL(devid)) {
