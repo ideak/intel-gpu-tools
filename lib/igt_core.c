@@ -370,6 +370,23 @@ static void _igt_log_buffer_dump(void)
 {
 	uint8_t i;
 
+	if (in_subtest && !in_dynamic_subtest && _igt_dynamic_tests_executed >= 0) {
+		/*
+		 * We're exiting a subtest with dynamic subparts and
+		 * we're reaching this function because a dynamic
+		 * subpart failed which automatically translates to
+		 * the subtest failing. There cannot be anything in
+		 * the log buffer that is of any use to anyone; The
+		 * dynamic subpart that failed has already printed out
+		 * the real reason for the failure, and dumping the
+		 * buffer at this point will only cause the last
+		 * executed dynamic part be incorrectly marked as
+		 * 'WARN' by igt_runner.
+		 */
+		_igt_log_buffer_reset();
+		return;
+	}
+
 	if (in_dynamic_subtest)
 		fprintf(stderr, "Dynamic subtest %s failed.\n", in_dynamic_subtest);
 	else if (in_subtest)
