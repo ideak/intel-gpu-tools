@@ -470,6 +470,56 @@ void *gem_mmap_offset__cpu(int fd, uint32_t handle, uint64_t offset,
 	return ptr;
 }
 
+/**
+ * __gem_mmap__cpu_coherent:
+ * @fd: open i915 drm file descriptor
+ * @handle: gem buffer object handle
+ * @offset: offset in the gem buffer of the mmap arena
+ * @size: size of the mmap arena
+ * @prot: memory protection bits as used by mmap()
+ *
+ * This function wraps up procedure to establish a memory mapping through
+ * direct cpu access.
+ */
+void *__gem_mmap__cpu_coherent(int fd, uint32_t handle, uint64_t offset,
+			       uint64_t size, unsigned prot)
+{
+	void *ptr = __gem_mmap_offset__cpu(fd, handle, offset, size, prot);
+
+	if (!ptr)
+		ptr = __gem_mmap__cpu(fd, handle, offset, size, prot);
+
+	return ptr;
+}
+
+/**
+ * gem_mmap__cpu_coherent:
+ * @fd: open i915 drm file descriptor
+ * @handle: gem buffer object handle
+ * @offset: offset in the gem buffer of the mmap arena
+ * @size: size of the mmap arena
+ * @prot: memory protection bits as used by mmap()
+ *
+ * Call __gem_mmap__cpu__coherent(), asserts on fail.
+ * Offset argument passed in function call must be 0. In the future
+ * when driver will allow slice mapping of buffer object this restriction
+ * will be removed.
+ *
+ * Returns: A pointer to the created memory mapping.
+ */
+void *gem_mmap__cpu_coherent(int fd, uint32_t handle, uint64_t offset,
+			     uint64_t size, unsigned prot)
+{
+	void *ptr;
+
+	igt_assert(offset == 0);
+
+	ptr = __gem_mmap__cpu_coherent(fd, handle, offset, size, prot);
+	igt_assert(ptr);
+
+	return ptr;
+}
+
 bool gem_has_mappable_ggtt(int i915)
 {
 	struct drm_i915_gem_mmap_gtt arg = {};

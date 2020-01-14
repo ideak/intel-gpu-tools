@@ -39,6 +39,9 @@ void *gem_mmap_offset__wc(int fd, uint32_t handle, uint64_t offset,
 			  uint64_t size, unsigned prot);
 void *gem_mmap__device_coherent(int fd, uint32_t handle, uint64_t offset,
 				uint64_t size, unsigned prot);
+void *gem_mmap__cpu_coherent(int fd, uint32_t handle, uint64_t offset,
+			     uint64_t size, unsigned prot);
+
 #ifndef I915_GEM_DOMAIN_WC
 #define I915_GEM_DOMAIN_WC 0x80
 #endif
@@ -58,6 +61,8 @@ void *__gem_mmap__device_coherent(int fd, uint32_t handle, uint64_t offset,
 				  uint64_t size, unsigned prot);
 void *__gem_mmap_offset(int fd, uint32_t handle, uint64_t offset, uint64_t size,
 			unsigned int prot, uint64_t flags);
+void *__gem_mmap__cpu_coherent(int fd, uint32_t handle, uint64_t offset,
+			       uint64_t size, unsigned prot);
 
 int gem_munmap(void *ptr, uint64_t size);
 
