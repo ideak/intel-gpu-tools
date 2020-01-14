@@ -4,11 +4,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <json.h>
+
 #include "igt.h"
 
 #include "settings.h"
 #include "job_list.h"
 #include "executor.h"
+#include "resultgen.h"
 
 /*
  * NOTE: this test is using a lot of variables that are changed in igt_fixture,
@@ -25,9 +28,9 @@ static const char testdatadir[] = TESTDATA_DIRECTORY;
  * that test binaries without subtests should still be counted as one
  * for this macro.
  */
-#define NUM_TESTDATA_SUBTESTS 5
+#define NUM_TESTDATA_SUBTESTS 6
 /* The total number of test binaries in runner/testdata/ */
-#define NUM_TESTDATA_BINARIES 3
+#define NUM_TESTDATA_BINARIES 4
 
 static void igt_assert_eqstr(const char *one, const char *two)
 {
@@ -1346,6 +1349,54 @@ igt_main
 
 		igt_fixture
 			free(list);
+	}
+
+	igt_subtest_group {
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1;
+		char dirname[] = "tmpdirXXXXXX";
+
+		igt_fixture {
+			igt_require(mkdtemp(dirname) != NULL);
+			rmdir(dirname);
+
+			init_job_list(list);
+		}
+
+		igt_subtest("dynamic-subtest-failure-should-not-cause-warn") {
+			struct execute_state state;
+			struct json_object *results, *obj;
+			const char *argv[] = { "runner",
+					       "-t", "dynamic",
+					       testdatadir,
+					       dirname,
+			};
+
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+			igt_assert(create_job_list(list, settings));
+			igt_assert(initialize_execute_state(&state, settings, list));
+			igt_assert(execute(&state, settings, list));
+
+			igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
+				     "Execute didn't create the results directory\n");
+			igt_assert_f((results = generate_results_json(dirfd)) != NULL,
+				     "Results parsing failed\n");
+
+			obj = results;
+			igt_assert(json_object_object_get_ex(obj, "tests", &obj));
+			igt_assert(json_object_object_get_ex(obj, "igt@dynamic@dynamic-subtest@passing", &obj));
+			igt_assert(json_object_object_get_ex(obj, "result", &obj));
+
+			igt_assert_eqstr(json_object_get_string(obj), "pass");
+
+			igt_assert_eq(json_object_put(results), 1);
+		}
+
+		igt_fixture {
+			close(dirfd);
+			clear_directory(dirname);
+			free_job_list(list);
+		}
 	}
 
 	igt_subtest("file-descriptor-leakage") {

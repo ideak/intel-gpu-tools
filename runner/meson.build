@@ -59,7 +59,7 @@ if jsonc.found()
 				 c_args : '-DTESTDATA_DIRECTORY="@0@"'.format(testdata_dir),
 				 link_with : runnerlib,
 				 install : false,
-				 dependencies : igt_deps)
+				 dependencies : [igt_deps, jsonc])
 	test('runner', runner_test, timeout : 300)
 
 	runner_json_test = executable('runner_json_test', runner_json_test_sources,

@@ -2,6 +2,7 @@
 testdata_progs = [ 'successtest',
 		   'no-subtests',
 		   'skippers',
+		   'dynamic',
 		 ]
 
 testdata_executables = []
