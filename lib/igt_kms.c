@@ -4474,3 +4474,98 @@ void igt_parse_connector_tile_blob(drmModePropertyBlobPtr blob,
 	tile->tile_h_size = atoi(strtok(NULL, ":"));
 	tile->tile_v_size = atoi(strtok(NULL, ":"));
 }
+
+/**
+ * igt_reduce_format:
+ * @format: drm fourcc
+ *
+ * Reduce @format to a base format. The aim is to allow grouping
+ * sufficiently similar formats into classes. Formats with identical
+ * component sizes, overall pixel size, chroma subsamling, etc. are
+ * considered part of the same class, no matter in which order the
+ * components appear. We arbitrarily choose one of the formats in
+ * the class as the base format. Note that the base format itself
+ * may not be supported by whatever device is being tested even if
+ * some of the other formats in the class are supported.
+ *
+ * Returns:
+ * The base format for @format
+ */
+uint32_t igt_reduce_format(uint32_t format)
+{
+	switch (format) {
+	case DRM_FORMAT_RGB332:
+	case DRM_FORMAT_BGR233:
+		return DRM_FORMAT_RGB332;
+	case DRM_FORMAT_XRGB1555:
+	case DRM_FORMAT_XBGR1555:
+	case DRM_FORMAT_ARGB1555:
+	case DRM_FORMAT_ABGR1555:
+	case DRM_FORMAT_RGBX5551:
+	case DRM_FORMAT_BGRX5551:
+	case DRM_FORMAT_RGBA5551:
+	case DRM_FORMAT_BGRA5551:
+		return DRM_FORMAT_XRGB1555;
+	case DRM_FORMAT_RGB565:
+	case DRM_FORMAT_BGR565:
+		return DRM_FORMAT_RGB565;
+	case DRM_FORMAT_XRGB8888:
+	case DRM_FORMAT_XBGR8888:
+	case DRM_FORMAT_ARGB8888:
+	case DRM_FORMAT_ABGR8888:
+	case DRM_FORMAT_RGBX8888:
+	case DRM_FORMAT_BGRX8888:
+	case DRM_FORMAT_RGBA8888:
+	case DRM_FORMAT_BGRA8888:
+		return DRM_FORMAT_XRGB8888;
+	case DRM_FORMAT_XRGB2101010:
+	case DRM_FORMAT_XBGR2101010:
+	case DRM_FORMAT_ARGB2101010:
+	case DRM_FORMAT_ABGR2101010:
+	case DRM_FORMAT_RGBX1010102:
+	case DRM_FORMAT_BGRX1010102:
+	case DRM_FORMAT_RGBA1010102:
+	case DRM_FORMAT_BGRA1010102:
+		return DRM_FORMAT_XRGB2101010;
+	case DRM_FORMAT_XRGB16161616F:
+	case DRM_FORMAT_XBGR16161616F:
+	case DRM_FORMAT_ARGB16161616F:
+	case DRM_FORMAT_ABGR16161616F:
+		return DRM_FORMAT_XRGB16161616F;
+	case DRM_FORMAT_YUYV:
+	case DRM_FORMAT_UYVY:
+	case DRM_FORMAT_YVYU:
+	case DRM_FORMAT_VYUY:
+		return DRM_FORMAT_YUYV;
+	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_NV21:
+		return DRM_FORMAT_NV12;
+	case DRM_FORMAT_NV16:
+	case DRM_FORMAT_NV61:
+		return DRM_FORMAT_NV16;
+	case DRM_FORMAT_NV24:
+	case DRM_FORMAT_NV42:
+		return DRM_FORMAT_NV24;
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
+		return DRM_FORMAT_P010;
+	case DRM_FORMAT_Y210:
+	case DRM_FORMAT_Y212:
+	case DRM_FORMAT_Y216:
+		return DRM_FORMAT_Y210;
+	case DRM_FORMAT_XYUV8888:
+	case DRM_FORMAT_AYUV:
+		return DRM_FORMAT_XYUV8888;
+	case DRM_FORMAT_XVYU2101010:
+	case DRM_FORMAT_Y410:
+		return DRM_FORMAT_XVYU2101010;
+	case DRM_FORMAT_XVYU12_16161616:
+	case DRM_FORMAT_XVYU16161616:
+	case DRM_FORMAT_Y412:
+	case DRM_FORMAT_Y416:
+		return DRM_FORMAT_XVYU12_16161616;
+	default:
+		return format;
+	}
+}

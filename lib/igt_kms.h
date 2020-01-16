@@ -846,5 +846,6 @@ void igt_parse_connector_tile_blob(drmModePropertyBlobPtr blob,
 
 int igt_connector_sysfs_open(int drm_fd,
 			     drmModeConnector *connector);
+uint32_t igt_reduce_format(uint32_t format);
 
 #endif /* __IGT_KMS_H__ */
