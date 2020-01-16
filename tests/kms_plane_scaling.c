@@ -23,6 +23,7 @@
  */
 
 #include "igt.h"
+#include "igt_vec.h"
 #include <math.h>
 
 
@@ -43,6 +44,7 @@ typedef struct {
 	igt_plane_t *plane2;
 	igt_plane_t *plane3;
 	igt_plane_t *plane4;
+	bool extended;
 } data_t;
 
 static int get_num_scalers(data_t* d, enum pipe pipe)
@@ -221,6 +223,28 @@ static bool can_scale(data_t *d, unsigned format)
 	}
 }
 
+static bool test_format(data_t *data,
+			struct igt_vec *tested_formats,
+			uint32_t format)
+{
+	if (!igt_fb_supported_format(format))
+		return false;
+
+	if (!is_i915_device(data->drm_fd) ||
+	    data->extended)
+		return true;
+
+	format = igt_reduce_format(format);
+
+	/* only test each format "class" once */
+	if (igt_vec_index(tested_formats, &format) >= 0)
+		return false;
+
+	igt_vec_push(tested_formats, &format);
+
+	return true;
+}
+
 static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 					   igt_output_t *output)
 {
@@ -236,10 +260,14 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 
 		for (int i = 0; i < ARRAY_SIZE(rotations); i++) {
 			igt_rotation_t rot = rotations[i];
+			struct igt_vec tested_formats;
+
+			igt_vec_init(&tested_formats, sizeof(uint32_t));
+
 			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
 				unsigned format = plane->drm_plane->formats[j];
 
-				if (igt_fb_supported_format(format) &&
+				if (test_format(d, &tested_formats, format) &&
 				    igt_plane_has_format_mod(plane, format, tiling) &&
 				    can_rotate(d, format, tiling, rot) &&
 				    can_scale(d, format))
@@ -247,6 +275,8 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 								     tiling, pipe,
 								     output, rot);
 			}
+
+			igt_vec_fini(&tested_formats);
 		}
 	}
 }
@@ -271,17 +301,22 @@ static void test_scaler_with_pixel_format_pipe(data_t *d, enum pipe pipe, igt_ou
 
 		for (int i = 0; i < ARRAY_SIZE(tilings); i++) {
 			uint64_t tiling = tilings[i];
+			struct igt_vec tested_formats;
+
+			igt_vec_init(&tested_formats, sizeof(uint32_t));
 
 			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
 				uint32_t format = plane->drm_plane->formats[j];
 
-				if (igt_fb_supported_format(format) &&
+				if (test_format(d, &tested_formats, format) &&
 				    igt_plane_has_format_mod(plane, format, tiling) &&
 				    can_scale(d, format))
 					check_scaling_pipe_plane_rot(d, plane,
 								     format, tiling,
 								     pipe, output, IGT_ROTATION_0);
 			}
+
+			igt_vec_fini(&tested_formats);
 		}
 	}
 }
@@ -502,6 +537,7 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 {
 	igt_pipe_t *pipe_obj = &d->display.pipes[pipe];
 	drmModeModeInfo *mode;
+	struct igt_vec tested_formats1;
 
 	igt_require(get_num_scalers(d, pipe) >= 2);
 
@@ -510,22 +546,32 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 	d->plane2 = igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_OVERLAY);
 	prepare_crtc(d, output, pipe, d->plane1, mode);
 
+	igt_vec_init(&tested_formats1, sizeof(uint32_t));
+
 	for (int i = 0; i < d->plane1->drm_plane->count_formats; i++) {
 		unsigned f1 = d->plane1->drm_plane->formats[i];
-		if (!igt_fb_supported_format(f1) ||
+		struct igt_vec tested_formats2;
+
+		if (!test_format(d, &tested_formats1, f1) ||
 		    !can_scale(d, f1))
 			continue;
+
+		igt_vec_init(&tested_formats2, sizeof(uint32_t));
 
 		for (int j = 0; j < d->plane2->drm_plane->count_formats; j++) {
 			unsigned f2 = d->plane2->drm_plane->formats[j];
 
-			if (!igt_fb_supported_format(f2) ||
+			if (!test_format(d, &tested_formats2, f2) ||
 			    !can_scale(d, f2))
 				continue;
 
 			__test_scaler_with_clipping_clamping_scenario(d, mode, f1, f2);
 		}
+
+		igt_vec_fini(&tested_formats2);
 	}
+
+	igt_vec_fini(&tested_formats1);
 }
 
 static void find_connected_pipe(igt_display_t *display, bool second, enum pipe *pipe, igt_output_t **output)
@@ -619,9 +665,31 @@ static void test_scaler_with_multi_pipe_plane(data_t *d)
 	igt_display_commit2(display, COMMIT_ATOMIC);
 }
 
-igt_main
+static int opt_handler(int opt, int opt_index, void *_data)
 {
-	data_t data = {};
+	data_t *data = _data;
+
+	switch (opt) {
+	case 'e':
+		data->extended = true;
+		break;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+static const struct option long_opts[] = {
+	{ .name = "extended", .has_arg = false, .val = 'e', },
+	{}
+};
+
+static const char help_str[] =
+	"  --extended\t\tRun the extended tests\n";
+
+static data_t data;
+
+igt_main_args("", long_opts, help_str, opt_handler, &data)
+{
 	enum pipe pipe;
 
 	igt_fixture {
