@@ -168,12 +168,14 @@ build:tests-debian-autotools:
 #################### TEST ##########################
 
 test:ninja-test:
+  retry: 2
   dependencies:
     - build:tests-fedora
   stage: test
   script: ninja -C build test
 
 test:ninja-test-clang:
+  retry: 2
   dependencies:
     - build:tests-fedora-clang
   variables:
@@ -182,6 +184,7 @@ test:ninja-test-clang:
   script: ninja -C build test
 
 test:ninja-test-minimal:
+  retry: 2
   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:commit-$CI_COMMIT_SHA
   dependencies:
     - build:tests-debian-minimal
@@ -189,6 +192,7 @@ test:ninja-test-minimal:
   script: ninja -C build test
 
 test:ninja-test-arm64:
+  retry: 2
   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64:commit-$CI_COMMIT_SHA
   dependencies:
     - build:tests-debian-meson-arm64
@@ -203,6 +207,7 @@ test:ninja-test-arm64:
     when: on_failure
 
 test:ninja-test-armhf:
+  retry: 2
   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf:commit-$CI_COMMIT_SHA
   dependencies:
     - build:tests-debian-meson-armhf
@@ -217,6 +222,7 @@ test:ninja-test-armhf:
     when: on_failure
 
 test:ninja-test-mips:
+  retry: 2
   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips:commit-$CI_COMMIT_SHA
   dependencies:
     - build:tests-debian-meson-mips
