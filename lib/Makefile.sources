@@ -62,6 +62,8 @@ lib_source_list =	 	\
 	igt_sysrq.h		\
 	igt_x86.h		\
 	igt_x86.c		\
+	igt_vec.c		\
+	igt_vec.h		\
 	igt_vgem.c		\
 	igt_vgem.h		\
 	instdone.c		\
