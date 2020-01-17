@@ -262,6 +262,8 @@ static inline bool igt_buf_compressed(const struct igt_buf *buf)
 
 unsigned igt_buf_width(const struct igt_buf *buf);
 unsigned igt_buf_height(const struct igt_buf *buf);
+unsigned int igt_buf_intel_ccs_width(int gen, const struct igt_buf *buf);
+unsigned int igt_buf_intel_ccs_height(int gen, const struct igt_buf *buf);
 
 void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 			   const struct igt_buf *src, unsigned src_delta,

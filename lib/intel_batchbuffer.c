@@ -43,6 +43,7 @@
 #include "ioctl_wrappers.h"
 #include "media_spin.h"
 #include "gpgpu_fill.h"
+#include "igt_aux.h"
 
 #include <i915_drm.h>
 
@@ -527,6 +528,52 @@ unsigned igt_buf_width(const struct igt_buf *buf)
 unsigned igt_buf_height(const struct igt_buf *buf)
 {
 	return buf->surface[0].size/buf->surface[0].stride;
+}
+
+/**
+ * igt_buf_intel_ccs_width:
+ * @buf: the Intel i-g-t buffer object
+ * @gen: device generation
+ *
+ * Computes the width of ccs buffer when considered as Intel surface data.
+ *
+ * Returns:
+ * The width of the ccs buffer data.
+ */
+unsigned int igt_buf_intel_ccs_width(int gen, const struct igt_buf *buf)
+{
+	/*
+	 * GEN12+: The CCS unit size is 64 bytes mapping 4 main surface
+	 * tiles. Thus the width of the CCS unit is 4*32=128 pixels on the
+	 * main surface.
+	 */
+	if (gen >= 12)
+		return DIV_ROUND_UP(igt_buf_width(buf), 128) * 64;
+
+	return DIV_ROUND_UP(igt_buf_width(buf), 1024) * 128;
+}
+
+/**
+ * igt_buf_intel_ccs_height:
+ * @buf: the i-g-t buffer object
+ * @gen: device generation
+ *
+ * Computes the height of ccs buffer when considered as Intel surface data.
+ *
+ * Returns:
+ * The height of the ccs buffer data.
+ */
+unsigned int igt_buf_intel_ccs_height(int gen, const struct igt_buf *buf)
+{
+	/*
+	 * GEN12+: The CCS unit size is 64 bytes mapping 4 main surface
+	 * tiles. Thus the height of the CCS unit is 32 pixel rows on the main
+	 * surface.
+	 */
+	if (gen >= 12)
+		return DIV_ROUND_UP(igt_buf_height(buf), 32);
+
+	return DIV_ROUND_UP(igt_buf_height(buf), 512) * 32;
 }
 
 /*
