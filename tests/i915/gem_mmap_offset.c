@@ -233,15 +233,17 @@ static void isolation(int i915)
 		igt_assert(ptr == MAP_FAILED);
 		igt_assert_eq(errno, EACCES);
 
-		errno = 0;
-		ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, B, offset_a);
-		igt_assert(ptr == MAP_FAILED);
-		igt_assert_eq(errno, EACCES);
+		if (offset_a != offset_b) {
+			errno = 0;
+			ptr = mmap(0, 4096, PROT_READ, MAP_SHARED, B, offset_a);
+			igt_assert(ptr == MAP_FAILED);
+			igt_assert_eq(errno, EACCES);
 
-		errno = 0;
-		ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, A, offset_b);
-		igt_assert(ptr == MAP_FAILED);
-		igt_assert_eq(errno, EACCES);
+			errno = 0;
+			ptr = mmap(0, 4096, PROT_READ, MAP_SHARED, A, offset_b);
+			igt_assert(ptr == MAP_FAILED);
+			igt_assert_eq(errno, EACCES);
+		}
 
 		close(B);
 
