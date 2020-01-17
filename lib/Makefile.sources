@@ -95,6 +95,8 @@ lib_source_list =	 	\
 	gen7_render.h		\
 	gen8_render.h		\
 	gen9_render.h		\
+	rendercopy_bufmgr.c	\
+	rendercopy_bufmgr.h	\
 	rendercopy_gen4.c	\
 	rendercopy_gen6.c	\
 	rendercopy_gen7.c	\

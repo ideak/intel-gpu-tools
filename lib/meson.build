@@ -39,6 +39,7 @@ lib_sources = [
 	'gpu_cmds.c',
 	'rendercopy_i915.c',
 	'rendercopy_i830.c',
+	'rendercopy_bufmgr.c',
 	'rendercopy_gen4.c',
 	'rendercopy_gen6.c',
 	'rendercopy_gen7.c',
