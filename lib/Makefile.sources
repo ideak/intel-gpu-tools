@@ -67,6 +67,8 @@ lib_source_list =	 	\
 	intel_aub.h		\
 	intel_batchbuffer.c	\
 	intel_batchbuffer.h	\
+	intel_bufops.c		\
+	intel_bufops.h		\
 	intel_chipset.c		\
 	intel_chipset.h		\
 	intel_device_info.c	\

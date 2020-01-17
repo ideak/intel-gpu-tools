@@ -27,6 +27,7 @@ lib_sources = [
 	'igt_x86.c',
 	'instdone.c',
 	'intel_batchbuffer.c',
+	'intel_bufops.c',
 	'intel_chipset.c',
 	'intel_device_info.c',
 	'intel_os.c',
