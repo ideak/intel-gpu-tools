@@ -47,6 +47,7 @@
 #include <drm.h>
 
 #include "intel_bufmgr.h"
+#include "rendercopy_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Basic test for the render_copy() function.");
 
@@ -60,9 +61,11 @@ typedef struct {
 	struct intel_batchbuffer *batch;
 	igt_render_copyfunc_t render_copy;
 	igt_vebox_copyfunc_t vebox_copy;
+	struct rendercopy_bufmgr *bmgr;
 } data_t;
 static int opt_dump_png = false;
 static int check_all_pixels = false;
+static bool dump_compressed_src_buf = false;
 
 static const char *make_filename(const char *filename)
 {
@@ -73,131 +76,13 @@ static const char *make_filename(const char *filename)
 	return buf;
 }
 
-static void *yf_ptr(void *ptr,
-		    unsigned int x, unsigned int y,
-		    unsigned int stride, unsigned int cpp)
+static void *alloc_aligned(uint64_t size)
 {
-	const int tile_size = 4 * 1024;
-	const int tile_width = 128;
-	int row_size = (stride / tile_width) * tile_size;
+	void *p;
 
-	x *= cpp; /* convert to Byte offset */
+	igt_assert_eq(posix_memalign(&p, 16, size), 0);
 
-
-	/*
-	 * Within a 4k Yf tile, the byte swizzling pattern is
-	 * msb......lsb
-	 * xyxyxyyyxxxx
-	 * The tiles themselves are laid out in row major order.
-	 */
-	return ptr +
-		((x & 0xf) * 1) + /* 4x1 pixels(32bpp) = 16B */
-		((y & 0x3) * 16) + /* 4x4 pixels = 64B */
-		(((y & 0x4) >> 2) * 64) + /* 1x2 64B blocks */
-		(((x & 0x10) >> 4) * 128) + /* 2x2 64B blocks = 256B block */
-		(((y & 0x8) >> 3) * 256) + /* 2x1 256B blocks */
-		(((x & 0x20) >> 5) * 512) + /* 2x2 256B blocks */
-		(((y & 0x10) >> 4) * 1024) + /* 4x2 256 blocks */
-		(((x & 0x40) >> 6) * 2048) + /* 4x4 256B blocks = 4k tile */
-		(((x & ~0x7f) >> 7) * tile_size) + /* row of tiles */
-		(((y & ~0x1f) >> 5) * row_size);
-}
-
-static void copy_linear_to_yf(data_t *data, struct igt_buf *buf,
-			      const uint32_t *linear)
-{
-	int height = igt_buf_height(buf);
-	int width = igt_buf_width(buf);
-	void *map;
-
-	gem_set_domain(data->drm_fd, buf->bo->handle,
-		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
-	map = gem_mmap__cpu(data->drm_fd, buf->bo->handle, 0,
-			    buf->bo->size, PROT_READ | PROT_WRITE);
-
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < width; x++) {
-			uint32_t *ptr = yf_ptr(map, x, y,
-					       buf->surface[0].stride,
-					       buf->bpp / 8);
-
-			*ptr = linear[y * width + x];
-		}
-	}
-
-	munmap(map, buf->bo->size);
-}
-
-static void copy_yf_to_linear(data_t *data, struct igt_buf *buf,
-			      uint32_t *linear)
-{
-	int height = igt_buf_height(buf);
-	int width = igt_buf_width(buf);
-	void *map;
-
-	gem_set_domain(data->drm_fd, buf->bo->handle,
-		       I915_GEM_DOMAIN_CPU, 0);
-	map = gem_mmap__cpu(data->drm_fd, buf->bo->handle, 0,
-			    buf->bo->size, PROT_READ);
-
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < width; x++) {
-			uint32_t *ptr = yf_ptr(map, x, y,
-					       buf->surface[0].stride,
-					       buf->bpp / 8);
-
-			linear[y * width + x] = *ptr;
-		}
-	}
-
-	munmap(map, buf->bo->size);
-}
-
-static void copy_linear_to_gtt(data_t *data, struct igt_buf *buf,
-			       const uint32_t *linear)
-{
-	void *map;
-
-	gem_set_domain(data->drm_fd, buf->bo->handle,
-		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	map = gem_mmap__gtt(data->drm_fd, buf->bo->handle,
-			    buf->bo->size, PROT_READ | PROT_WRITE);
-
-	memcpy(map, linear, buf->bo->size);
-
-	munmap(map, buf->bo->size);
-}
-
-static void copy_gtt_to_linear(data_t *data, struct igt_buf *buf,
-			       uint32_t *linear)
-{
-	void *map;
-
-	gem_set_domain(data->drm_fd, buf->bo->handle,
-		       I915_GEM_DOMAIN_GTT, 0);
-
-	map = gem_mmap__gtt(data->drm_fd, buf->bo->handle,
-			    buf->bo->size, PROT_READ);
-
-	igt_memcpy_from_wc(linear, map, buf->bo->size);
-
-	munmap(map, buf->bo->size);
-}
-
-static void *linear_copy(data_t *data, struct igt_buf *buf)
-{
-	void *linear;
-
-	/* 16B alignment allows to potentially make use of SSE4 for copying */
-	igt_assert_eq(posix_memalign(&linear, 16, buf->bo->size), 0);
-
-	if (buf->tiling == I915_TILING_Yf)
-		copy_yf_to_linear(data, buf, linear);
-	else
-		copy_gtt_to_linear(data, buf, linear);
-
-	return linear;
+	return p;
 }
 
 static void
@@ -209,13 +94,13 @@ copy_from_linear_buf(data_t *data, struct igt_buf *src, struct igt_buf *dst)
 
 	gem_set_domain(data->drm_fd, src->bo->handle,
 		       I915_GEM_DOMAIN_CPU, 0);
-	linear = gem_mmap__cpu(data->drm_fd, src->bo->handle, 0,
-			       src->bo->size, PROT_READ);
+	linear = __gem_mmap_offset__cpu(data->drm_fd, src->bo->handle, 0,
+					src->bo->size, PROT_READ);
+	if (!linear)
+		linear = gem_mmap__cpu(data->drm_fd, src->bo->handle, 0,
+				       src->bo->size, PROT_READ);
 
-	if (dst->tiling == I915_TILING_Yf)
-		copy_linear_to_yf(data, dst, linear);
-	else
-		copy_linear_to_gtt(data, dst, linear);
+	linear_to_igt_buf(data->bmgr, dst, linear);
 
 	munmap(linear, src->bo->size);
 }
@@ -227,7 +112,8 @@ static void scratch_buf_write_to_png(data_t *data, struct igt_buf *buf,
 	cairo_status_t ret;
 	void *linear;
 
-	linear = linear_copy(data, buf);
+	linear = alloc_aligned(buf->bo->size);
+	igt_buf_to_linear(data->bmgr, buf, linear);
 
 	surface = cairo_image_surface_create_for_data(linear,
 						      CAIRO_FORMAT_RGB24,
@@ -241,67 +127,41 @@ static void scratch_buf_write_to_png(data_t *data, struct igt_buf *buf,
 	free(linear);
 }
 
-static int scratch_buf_aux_width(uint32_t devid, const struct igt_buf *buf)
+static void *linear_copy_ccs(data_t *data, struct igt_buf *buf)
 {
-	/*
-	 * GEN12+: The AUX CCS unit size is 64 bytes mapping 4 main surface
-	 * tiles. Thus the width of the CCS unit is 4*32=128 pixels on the
-	 * main surface.
-	 */
-	if (intel_gen(devid) >= 12)
-		return DIV_ROUND_UP(igt_buf_width(buf), 128) * 64;
+	void *ccs_data, *linear;
+	int gen = intel_gen(data->devid);
+	int ccs_size = igt_buf_intel_ccs_width(gen, buf) *
+		igt_buf_intel_ccs_height(gen, buf);
 
-	return DIV_ROUND_UP(igt_buf_width(buf), 1024) * 128;
+	ccs_data = alloc_aligned(ccs_size);
+	linear = alloc_aligned(buf->bo->size);
+	memset(linear, 0, buf->bo->size);
+
+	igt_buf_to_linear(data->bmgr, buf, linear);
+	igt_memcpy_from_wc(ccs_data, linear + buf->ccs[0].offset, ccs_size);
+
+	free(linear);
+
+	return ccs_data;
 }
 
-static int scratch_buf_aux_height(uint32_t devid, const struct igt_buf *buf)
-{
-	/*
-	 * GEN12+: The AUX CCS unit size is 64 bytes mapping 4 main surface
-	 * tiles. Thus the height of the CCS unit is 32 pixel rows on the main
-	 * surface.
-	 */
-	if (intel_gen(devid) >= 12)
-		return DIV_ROUND_UP(igt_buf_height(buf), 32);
-
-	return DIV_ROUND_UP(igt_buf_height(buf), 512) * 32;
-}
-
-static void *linear_copy_aux(data_t *data, struct igt_buf *buf)
-{
-	void *map, *linear;
-	int aux_size = scratch_buf_aux_width(data->devid, buf) *
-		scratch_buf_aux_height(data->devid, buf);
-
-	igt_assert_eq(posix_memalign(&linear, 16, aux_size), 0);
-
-	gem_set_domain(data->drm_fd, buf->bo->handle,
-		       I915_GEM_DOMAIN_GTT, 0);
-
-	map = gem_mmap__gtt(data->drm_fd, buf->bo->handle,
-			    buf->bo->size, PROT_READ);
-
-	igt_memcpy_from_wc(linear, map + buf->ccs[0].offset, aux_size);
-
-	munmap(map, buf->bo->size);
-
-	return linear;
-}
-
-static void scratch_buf_aux_write_to_png(data_t *data,
+static void scratch_buf_ccs_write_to_png(data_t *data,
 					 struct igt_buf *buf,
 					 const char *filename)
 {
 	cairo_surface_t *surface;
 	cairo_status_t ret;
 	void *linear;
+	int gen = intel_gen(data->devid);
+	unsigned int ccs_width = igt_buf_intel_ccs_width(gen, buf);
+	unsigned int ccs_height = igt_buf_intel_ccs_height(gen, buf);
 
-	linear = linear_copy_aux(data, buf);
+	linear = linear_copy_ccs(data, buf);
 
 	surface = cairo_image_surface_create_for_data(linear,
 						      CAIRO_FORMAT_A8,
-						      scratch_buf_aux_width(data->devid, buf),
-						      scratch_buf_aux_height(data->devid, buf),
+						      ccs_width, ccs_height,
 						      buf->ccs[0].stride);
 	ret = cairo_surface_write_to_png(surface, make_filename(filename));
 	igt_assert(ret == CAIRO_STATUS_SUCCESS);
@@ -320,7 +180,7 @@ static void scratch_buf_draw_pattern(data_t *data, struct igt_buf *buf,
 	cairo_t *cr;
 	void *linear;
 
-	linear = linear_copy(data, buf);
+	linear = alloc_aligned(buf->bo->size);
 
 	surface = cairo_image_surface_create_for_data(linear,
 						      CAIRO_FORMAT_RGB24,
@@ -361,10 +221,7 @@ static void scratch_buf_draw_pattern(data_t *data, struct igt_buf *buf,
 
 	cairo_surface_destroy(surface);
 
-	if (buf->tiling == I915_TILING_Yf)
-		copy_linear_to_yf(data, buf, linear);
-	else
-		copy_linear_to_gtt(data, buf, linear);
+	linear_to_igt_buf(data->bmgr, buf, linear);
 
 	free(linear);
 }
@@ -377,6 +234,7 @@ scratch_buf_copy(data_t *data,
 	int width = igt_buf_width(dst);
 	int height  = igt_buf_height(dst);
 	uint32_t *linear_dst;
+	uint32_t *linear_src;
 
 	igt_assert_eq(igt_buf_width(dst), igt_buf_width(src));
 	igt_assert_eq(igt_buf_height(dst), igt_buf_height(src));
@@ -389,49 +247,20 @@ scratch_buf_copy(data_t *data,
 	h = min(h, height - sy);
 	h = min(h, height - dy);
 
-	gem_set_domain(data->drm_fd, dst->bo->handle,
-		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-	linear_dst = gem_mmap__gtt(data->drm_fd, dst->bo->handle,
-				   dst->bo->size, PROT_WRITE);
+	linear_dst = alloc_aligned(dst->bo->size);
+	linear_src = alloc_aligned(src->bo->size);
+	igt_buf_to_linear(data->bmgr, src, linear_src);
+	igt_buf_to_linear(data->bmgr, dst, linear_dst);
 
-	if (src->tiling == I915_TILING_Yf) {
-		void *map;
-
-		gem_set_domain(data->drm_fd, src->bo->handle,
-			       I915_GEM_DOMAIN_CPU, 0);
-		map = gem_mmap__cpu(data->drm_fd, src->bo->handle, 0,
-				    src->bo->size, PROT_READ);
-
-		for (int y = 0; y < h; y++) {
-			for (int x = 0; x < w; x++) {
-				const uint32_t *ptr = yf_ptr(map, sx+x, sy+y,
-							     src->surface[0].stride,
-							     src->bpp / 8);
-
-				linear_dst[(dy+y) * width + dx+x] = *ptr;
-			}
-		}
-
-		munmap(map, src->bo->size);
-	} else {
-		uint32_t *linear_src;
-
-		gem_set_domain(data->drm_fd, src->bo->handle,
-			       I915_GEM_DOMAIN_GTT, 0);
-
-		linear_src = gem_mmap__gtt(data->drm_fd, src->bo->handle,
-					   src->bo->size, PROT_READ);
-
-		for (int y = 0; y < h; y++) {
-			igt_memcpy_from_wc(&linear_dst[(dy+y) * width + dx],
-					   &linear_src[(sy+y) * width + sx],
-					   w * (src->bpp / 8));
-		}
-
-		munmap(linear_src, src->bo->size);
+	for (int y = 0; y < h; y++) {
+		memcpy(&linear_dst[(dy+y) * width + dx],
+				&linear_src[(sy+y) * width + sx],
+				w * (src->bpp / 8));
 	}
+	free(linear_src);
 
-	munmap(linear_dst, dst->bo->size);
+	linear_to_igt_buf(data->bmgr, dst, linear_dst);
+	free(linear_dst);
 }
 
 static void scratch_buf_init(data_t *data, struct igt_buf *buf,
@@ -439,76 +268,10 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 			     uint32_t req_tiling,
 			     enum i915_compression compression)
 {
-	uint32_t tiling = req_tiling;
-	unsigned long pitch;
 	int bpp = 32;
 
-	memset(buf, 0, sizeof(*buf));
-
-	if (compression != I915_COMPRESSION_NONE) {
-		int aux_width, aux_height;
-		int size;
-
-		igt_require(intel_gen(data->devid) >= 9);
-		igt_assert(tiling == I915_TILING_Y ||
-			   tiling == I915_TILING_Yf);
-
-		/*
-		 * On GEN12+ we align the main surface to 4 * 4 main surface
-		 * tiles, which is 64kB. These 16 tiles are mapped by 4 AUX
-		 * CCS units, that is 4 * 64 bytes. These 4 CCS units are in
-		 * turn mapped by one L1 AUX page table entry.
-		 */
-		if (intel_gen(data->devid) >= 12)
-			buf->surface[0].stride = ALIGN(width * (bpp / 8), 128 * 4);
-		else
-			buf->surface[0].stride = ALIGN(width * (bpp / 8), 128);
-
-		if (intel_gen(data->devid) >= 12)
-			height = ALIGN(height, 4 * 32);
-
-		buf->surface[0].size = buf->surface[0].stride * height;
-		buf->tiling = tiling;
-		buf->bpp = bpp;
-
-		aux_width = scratch_buf_aux_width(data->devid, buf);
-		aux_height = scratch_buf_aux_height(data->devid, buf);
-
-		buf->compression = compression;
-		buf->ccs[0].offset = buf->surface[0].stride * ALIGN(height, 32);
-		buf->ccs[0].stride = aux_width;
-
-		size = buf->ccs[0].offset + aux_width * aux_height;
-
-		buf->bo = drm_intel_bo_alloc(data->bufmgr, "", size, 4096);
-
-		if (tiling == I915_TILING_Y) {
-			drm_intel_bo_set_tiling(buf->bo, &tiling,
-						buf->surface[0].stride);
-			igt_assert_eq(tiling, req_tiling);
-		}
-	} else if (req_tiling == I915_TILING_Yf) {
-		int size;
-
-		buf->surface[0].stride = ALIGN(width * (bpp / 8), 128);
-		buf->surface[0].size = buf->surface[0].stride * height;
-		buf->tiling = tiling;
-		buf->bpp = bpp;
-
-		size = buf->surface[0].stride * ALIGN(height, 32);
-
-		buf->bo = drm_intel_bo_alloc(data->bufmgr, "", size, 4096);
-	} else {
-		buf->bo = drm_intel_bo_alloc_tiled(data->bufmgr, "",
-						   width, height, bpp / 8,
-						   &tiling, &pitch, 0);
-		igt_assert_eq(tiling, req_tiling);
-
-		buf->surface[0].stride = pitch;
-		buf->tiling = tiling;
-		buf->surface[0].size = pitch * height;
-		buf->bpp = bpp;
-	}
+	igt_buf_init(data->bmgr, buf, width, height, bpp, req_tiling,
+		     compression);
 
 	igt_assert(igt_buf_width(buf) == width);
 	igt_assert(igt_buf_height(buf) == height);
@@ -533,11 +296,13 @@ scratch_buf_check(data_t *data,
 	igt_assert_eq(igt_buf_height(buf), igt_buf_height(ref));
 	igt_assert_eq(buf->bo->size, ref->bo->size);
 
-	linear = linear_copy(data, buf);
+	linear = alloc_aligned(buf->bo->size);
+	igt_buf_to_linear(data->bmgr, buf, linear);
 	buf_val = linear[y * width + x];
 	free(linear);
 
-	linear = linear_copy(data, ref);
+	linear = alloc_aligned(ref->bo->size);
+	igt_buf_to_linear(data->bmgr, buf, linear);
 	ref_val = linear[y * width + x];
 	free(linear);
 
@@ -559,8 +324,10 @@ scratch_buf_check_all(data_t *data,
 	igt_assert_eq(igt_buf_height(buf), igt_buf_height(ref));
 	igt_assert_eq(buf->bo->size, ref->bo->size);
 
-	linear_buf = linear_copy(data, buf);
-	linear_ref = linear_copy(data, ref);
+	linear_buf = alloc_aligned(buf->bo->size);
+	linear_ref = alloc_aligned(ref->bo->size);
+	igt_buf_to_linear(data->bmgr, buf, linear_buf);
+	igt_buf_to_linear(data->bmgr, ref, linear_ref);
 
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
@@ -577,25 +344,49 @@ scratch_buf_check_all(data_t *data,
 	free(linear_buf);
 }
 
-static void scratch_buf_aux_check(data_t *data,
+static void scratch_buf_ccs_check(data_t *data,
 				  struct igt_buf *buf)
 {
-	int aux_size = scratch_buf_aux_width(data->devid, buf) *
-		scratch_buf_aux_height(data->devid, buf);
+	int gen = intel_gen(data->devid);
+	int ccs_size = igt_buf_intel_ccs_width(gen, buf) *
+		igt_buf_intel_ccs_height(gen, buf);
 	uint8_t *linear;
 	int i;
 
-	linear = linear_copy_aux(data, buf);
+	linear = linear_copy_ccs(data, buf);
 
-	for (i = 0; i < aux_size; i++) {
+	for (i = 0; i < ccs_size; i++) {
 		if (linear[i])
 			break;
 	}
 
 	free(linear);
 
-	igt_assert_f(i < aux_size,
-		     "Aux surface indicates that nothing was compressed\n");
+	igt_assert_f(i < ccs_size,
+		     "Ccs surface indicates that nothing was compressed\n");
+}
+
+static void
+dump_igt_buf_to_file(data_t *data, struct igt_buf *buf, const char *filename)
+{
+	FILE *out;
+	void *linear;
+
+	gem_set_domain(data->drm_fd, buf->bo->handle,
+		       I915_GEM_DOMAIN_CPU, 0);
+
+	linear = __gem_mmap_offset__cpu(data->drm_fd, buf->bo->handle, 0,
+					buf->bo->size, PROT_READ);
+	if (!linear)
+		linear = gem_mmap__cpu(data->drm_fd, buf->bo->handle, 0,
+				       buf->bo->size, PROT_READ);
+	out = fopen(filename, "wb");
+	igt_assert(out);
+	fwrite(linear, buf->bo->size, 1, out);
+	fclose(out);
+
+	munmap(linear, buf->bo->size);
+
 }
 
 #define SOURCE_MIXED_TILED	1
@@ -671,6 +462,7 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 				 I915_COMPRESSION_NONE);
 	scratch_buf_init(data, &dst, WIDTH, HEIGHT, dst_tiling,
 			 I915_COMPRESSION_NONE);
+
 	if (src_compressed)
 		scratch_buf_init(data, &src_ccs, WIDTH, HEIGHT,
 				 src_tiling, src_compression);
@@ -683,7 +475,8 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	for (int i = 0; i < num_src; i++)
 		scratch_buf_draw_pattern(data, &src[i].buf,
 					 0, 0, WIDTH, HEIGHT,
-					 0, 0, WIDTH, HEIGHT, true);
+					 0, 0, WIDTH, HEIGHT, (i % 2));
+
 	scratch_buf_draw_pattern(data, &dst,
 				 0, 0, WIDTH, HEIGHT,
 				 0, 0, WIDTH, HEIGHT, false);
@@ -742,15 +535,28 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 					  &dst, 0, 0);
 
 	} else {
-		if (src_compression == I915_COMPRESSION_RENDER)
+		if (src_compression == I915_COMPRESSION_RENDER) {
 			data->render_copy(data->batch, NULL,
 					  &src_tiled, 0, 0, WIDTH, HEIGHT,
 					  &src_ccs,
 					  0, 0);
-		else if (src_compression == I915_COMPRESSION_MEDIA)
+			if (dump_compressed_src_buf) {
+				dump_igt_buf_to_file(data, &src_tiled,
+						     "render-src_tiled.bin");
+				dump_igt_buf_to_file(data, &src_ccs,
+						     "render-src_ccs.bin");
+			}
+		} else if (src_compression == I915_COMPRESSION_MEDIA) {
 			data->vebox_copy(data->batch,
 					 &src_tiled, WIDTH, HEIGHT,
 					 &src_ccs);
+			if (dump_compressed_src_buf) {
+				dump_igt_buf_to_file(data, &src_tiled,
+						     "vebox-src_tiled.bin");
+				dump_igt_buf_to_file(data, &src_ccs,
+						     "vebox-src_ccs.bin");
+			}
+		}
 
 		if (dst_compression == I915_COMPRESSION_RENDER) {
 			data->render_copy(data->batch, NULL,
@@ -793,14 +599,14 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 		if (src_compressed) {
 			scratch_buf_write_to_png(data, &src_ccs,
 						 "compressed-src.png");
-			scratch_buf_aux_write_to_png(data, &src_ccs,
-						     "compressed-src-aux.png");
+			scratch_buf_ccs_write_to_png(data, &src_ccs,
+						     "compressed-src-ccs.png");
 		}
 		if (dst_compressed) {
 			scratch_buf_write_to_png(data, &dst_ccs,
 						 "compressed-dst.png");
-			scratch_buf_aux_write_to_png(data, &dst_ccs,
-						     "compressed-dst-aux.png");
+			scratch_buf_ccs_write_to_png(data, &dst_ccs,
+						     "compressed-dst-ccs.png");
 		}
 	}
 
@@ -819,9 +625,9 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	}
 
 	if (src_compressed)
-		scratch_buf_aux_check(data, &src_ccs);
+		scratch_buf_ccs_check(data, &src_ccs);
 	if (dst_compressed)
-		scratch_buf_aux_check(data, &dst_ccs);
+		scratch_buf_ccs_check(data, &dst_ccs);
 
 	scratch_buf_fini(&ref);
 	if (dst_compressed)
@@ -1054,6 +860,9 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 		data.batch = intel_batchbuffer_alloc(data.bufmgr, data.devid);
 		igt_assert(data.batch);
 
+		data.bmgr = rendercopy_bufmgr_create(data.drm_fd, data.bufmgr);
+		igt_assert(data.bmgr);
+
 		igt_fork_hang_detector(data.drm_fd);
 	}
 
@@ -1107,5 +916,6 @@ igt_main_args("da", NULL, help_str, opt_handler, NULL)
 		igt_stop_hang_detector();
 		intel_batchbuffer_free(data.batch);
 		drm_intel_bufmgr_destroy(data.bufmgr);
+		rendercopy_bufmgr_destroy(data.bmgr);
 	}
 }
