@@ -45,9 +45,6 @@ igt@gem_ringfill@basic-default-forked
 igt@gem_ringfill@basic-default-fd
 igt@gem_sync@basic-all
 igt@gem_sync@basic-each
-igt@gem_sync@basic-many-each
-igt@gem_sync@basic-store-all
-igt@gem_sync@basic-store-each
 igt@gem_tiled_blits@basic
 igt@gem_tiled_fence_blits@basic
 igt@gem_tiled_pread_basic
