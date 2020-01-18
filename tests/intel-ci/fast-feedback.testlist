@@ -14,8 +14,6 @@ igt@gem_ctx_create@basic-files
 igt@gem_ctx_exec@basic
 igt@gem_ctx_param@basic
 igt@gem_ctx_param@basic-default
-igt@gem_ctx_switch@legacy-render
-igt@gem_ctx_switch@rcs0
 igt@gem_exec_basic@basic
 igt@gem_exec_create@basic
 igt@gem_exec_fence@basic-busy-default
@@ -24,6 +22,8 @@ igt@gem_exec_fence@basic-await-default
 igt@gem_exec_fence@nb-await-default
 igt@gem_exec_gttfill@basic
 igt@gem_exec_parallel@basic
+igt@gem_exec_parallel@contexts
+igt@gem_exec_parallel@fds
 igt@gem_exec_store@basic-all
 igt@gem_exec_suspend@basic
 igt@gem_exec_suspend@basic-s0
