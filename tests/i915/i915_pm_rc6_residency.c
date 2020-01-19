@@ -283,6 +283,7 @@ static int open_pmu(int i915, uint64_t config)
 static void rc6_idle(int i915)
 {
 	const int64_t duration_ns = SLEEP_DURATION * (int64_t)NSEC_PER_SEC;
+	const int tolerance = 20; /* Some RC6 is better than none! */
 	unsigned long slept, cycles;
 	unsigned long *done;
 	uint64_t rc6, ts[2];
@@ -339,7 +340,7 @@ static void rc6_idle(int i915)
 	close(fd);
 
 	igt_assert(cycles >= SLEEP_DURATION); /* At least one wakeup/s needed */
-	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
+	assert_within_epsilon(rc6, ts[1] - ts[0], tolerance);
 }
 
 igt_main
