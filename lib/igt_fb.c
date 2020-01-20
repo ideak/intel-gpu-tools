@@ -1975,6 +1975,9 @@ static bool fast_blit_ok(const struct igt_fb *fb)
 
 static bool blitter_ok(const struct igt_fb *fb)
 {
+	if (is_ccs_modifier(fb->modifier))
+		return false;
+
 	for (int i = 0; i < fb->num_planes; i++) {
 		int width = fb->plane_width[i];
 
@@ -2003,16 +2006,22 @@ static bool blitter_ok(const struct igt_fb *fb)
 
 static bool use_enginecopy(const struct igt_fb *fb)
 {
-	return is_ccs_modifier(fb->modifier) ||
-		(fb->modifier == I915_FORMAT_MOD_Yf_TILED &&
-		 !blitter_ok(fb));
+	if (blitter_ok(fb))
+		return false;
+
+	return fb->modifier == I915_FORMAT_MOD_Yf_TILED ||
+	       is_ccs_modifier(fb->modifier) ||
+	       !gem_has_mappable_ggtt(fb->fd);
 }
 
 static bool use_blitter(const struct igt_fb *fb)
 {
-	return (fb->modifier == I915_FORMAT_MOD_Y_TILED ||
-		fb->modifier == I915_FORMAT_MOD_Yf_TILED) &&
-		blitter_ok(fb);
+	if (!blitter_ok(fb))
+		return false;
+
+	return fb->modifier == I915_FORMAT_MOD_Y_TILED ||
+	       fb->modifier == I915_FORMAT_MOD_Yf_TILED ||
+	       !gem_has_mappable_ggtt(fb->fd);
 }
 
 static void init_buf_ccs(struct igt_buf *buf, int ccs_idx,
