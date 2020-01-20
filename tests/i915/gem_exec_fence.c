@@ -139,14 +139,17 @@ static void test_fence_busy(int fd, unsigned ring, unsigned flags)
 	gem_set_domain(fd, obj.handle,
 		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
+	i = 0;
+	if ((flags & HANG) == 0)
+		batch[i++] = 0x5 << 23;
+
 	reloc.target_handle = obj.handle; /* recurse */
 	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
+	reloc.offset = (i + 1) * sizeof(uint32_t);
 	reloc.delta = 0;
 	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
 	reloc.write_domain = 0;
 
-	i = 0;
 	batch[i] = MI_BATCH_BUFFER_START;
 	if (gen >= 8) {
 		batch[i] |= 1 << 8 | 1;
@@ -227,14 +230,17 @@ static void test_fence_busy_all(int fd, unsigned flags)
 	gem_set_domain(fd, obj.handle,
 		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
+	i = 0;
+	if ((flags & HANG) == 0)
+		batch[i++] = 0x5 << 23;
+
 	reloc.target_handle = obj.handle; /* recurse */
 	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
+	reloc.offset = (i + 1) * sizeof(uint32_t);
 	reloc.delta = 0;
 	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
 	reloc.write_domain = 0;
 
-	i = 0;
 	batch[i] = MI_BATCH_BUFFER_START;
 	if (gen >= 8) {
 		batch[i] |= 1 << 8 | 1;
@@ -257,8 +263,10 @@ static void test_fence_busy_all(int fd, unsigned flags)
 	for_each_engine(e, fd) {
 		int fence, new;
 
-		if ((flags & HANG) == 0)
-			igt_require(gem_engine_has_mutable_submission(fd, eb_ring(e)));
+		if ((flags & HANG) == 0 &&
+		    !gem_engine_has_mutable_submission(fd, eb_ring(e)))
+			continue;
+
 		execbuf.flags = eb_ring(e) | I915_EXEC_FENCE_OUT;
 		execbuf.rsvd2 = -1;
 		gem_execbuf_wr(fd, &execbuf);
