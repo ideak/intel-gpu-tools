@@ -943,10 +943,14 @@ static int create_bo_for_fb(struct igt_fb *fb)
 		fb->is_dumb = false;
 
 		if (is_i915_device(fd)) {
+			int err;
+
 			fb->gem_handle = gem_create(fd, fb->size);
-			gem_set_tiling(fd, fb->gem_handle,
-				       igt_fb_mod_to_tiling(fb->modifier),
-				       fb->strides[0]);
+			err = __gem_set_tiling(fd, fb->gem_handle,
+					       igt_fb_mod_to_tiling(fb->modifier),
+					       fb->strides[0]);
+			/* If we can't use fences, we won't use ggtt detiling later. */
+			igt_assert(err == 0 || err == -EOPNOTSUPP);
 		} else if (is_vc4_device(fd)) {
 			fb->gem_handle = igt_vc4_create_bo(fd, fb->size);
 
