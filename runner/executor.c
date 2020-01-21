@@ -314,13 +314,28 @@ static const struct {
   {(1 << 9), "TAINT_WARN: WARN_ON has happened."},
   {0, 0}};
 
+static unsigned long bad_taints(void)
+{
+	static unsigned long __bad_taints;
+
+	if (!__bad_taints) {
+		for (typeof(*abort_taints) *taint = abort_taints;
+		     taint->bit;
+		     taint++)
+			__bad_taints |= taint->bit;
+	}
+
+	return __bad_taints;
+}
+
+static unsigned long is_tainted(unsigned long taints)
+{
+	return taints & bad_taints();
+}
+
 static unsigned long tainted(unsigned long *taints)
 {
 	FILE *f;
-	unsigned long bad_taints = 0;
-
-	for (typeof(*abort_taints) *taint = abort_taints; taint->bit; taint++)
-		bad_taints |= taint->bit;
 
 	*taints = 0;
 
@@ -330,7 +345,7 @@ static unsigned long tainted(unsigned long *taints)
 		fclose(f);
 	}
 
-	return *taints & bad_taints;
+	return is_tainted(*taints);
 }
 
 static char *handle_taint(void)
@@ -744,17 +759,27 @@ static int monitor_output(pid_t child,
 			return -1;
 		}
 
+		if (tainted(&taints)) /* cancel children after a kernel OOPS */
+			n = 0, intervals_left = 1;
+
 		if (n == 0) {
 			if (--intervals_left)
 				continue;
 
 			switch (killed) {
 			case 0:
-				show_kernel_task_state();
+				if (!is_tainted(taints)) {
+					show_kernel_task_state();
+					if (settings->log_level >= LOG_LEVEL_NORMAL) {
+						outf("Timeout. Killing the current test with SIGQUIT.\n");
 
-				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					outf("Timeout. Killing the current test with SIGQUIT.\n");
-					fflush(stdout);
+						fflush(stdout);
+					}
+				} else {
+					if (settings->log_level >= LOG_LEVEL_NORMAL) {
+						outf("Killing the test because the kernel is tainted.\n");
+						fflush(stdout);
+					}
 				}
 
 				killed = SIGQUIT;
@@ -791,7 +816,7 @@ static int monitor_output(pid_t child,
 				intervals_left = 1; /* Intervals handled separately for sigkill */
 				break;
 			case SIGKILL:
-				if (!tainted(&taints) && --sigkill_intervals_left) {
+				if (!is_tainted(taints) && --sigkill_intervals_left) {
 					intervals_left = 1;
 					break;
 				}
