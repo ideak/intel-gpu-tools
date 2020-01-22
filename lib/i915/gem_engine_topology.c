@@ -105,7 +105,7 @@ static const char *class_names[] = {
 };
 
 static void init_engine(struct intel_execution_engine2 *e2,
-			int class, int instance, uint64_t flags)
+			uint16_t class, uint16_t instance, uint64_t flags)
 {
 	int ret;
 

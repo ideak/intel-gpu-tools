@@ -96,8 +96,8 @@ bool gem_class_can_store_dword(int fd, int class);
 
 extern const struct intel_execution_engine2 {
 	char name[16];
-	int class;
-	int instance;
+	uint16_t class;
+	uint16_t instance;
 	uint64_t flags;
 	bool is_virtual;
 } intel_execution_engines2[];
