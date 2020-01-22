@@ -1609,12 +1609,12 @@ void igt_describe_f(const char *fmt, ...)
 	assert(ret < sizeof(__current_description));
 }
 
-static bool running_under_gdb(void)
+static bool is_gdb(pid_t pid)
 {
 	char pathname[30], buf[1024];
 	ssize_t len;
 
-	sprintf(pathname, "/proc/%d/exe", getppid());
+	sprintf(pathname, "/proc/%d/exe", pid);
 	len = readlink(pathname, buf, sizeof(buf) - 1);
 	if (len < 0)
 		return false;
@@ -1622,6 +1622,47 @@ static bool running_under_gdb(void)
 	buf[len] = '\0';
 
 	return strncmp(basename(buf), "gdb", 3) == 0;
+}
+
+static pid_t tracer_pid(void)
+{
+	char pathname[30];
+	pid_t pid = 0;
+	FILE *f;
+
+	sprintf(pathname, "/proc/%d/status", getpid());
+
+	f = fopen(pathname, "r");
+	if (!f)
+		return getppid();
+
+	for (;;) {
+		char buf[32];
+		char *s;
+
+		s = fgets(buf, sizeof(buf), f);
+		if (!s)
+			break;
+
+		if (sscanf(s, "TracerPid: %d", &pid) == 1)
+			break;
+	}
+
+	fclose(f);
+
+	return pid ?: getppid();
+}
+
+/*
+ * By default gdb will only track a single process. To make
+ * it track all of them, and let them all run simultaneously
+ * one needs the following incantations:
+ *   set detach-on-fork off
+ *   set schedule-multiple on
+ */
+static bool running_under_gdb(void)
+{
+	return is_gdb(tracer_pid());
 }
 
 static void __write_stderr(const char *str, size_t len)
