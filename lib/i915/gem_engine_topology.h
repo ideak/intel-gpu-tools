@@ -61,7 +61,7 @@ bool gem_engine_is_equal(const struct intel_execution_engine2 *e1,
 struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
 
 #define __for_each_static_engine(e__) \
-	for ((e__) = intel_execution_engines2; (e__)->name; (e__)++)
+	for ((e__) = intel_execution_engines2; (e__)->name[0]; (e__)++)
 
 #define for_each_context_engine(fd__, ctx__, e__) \
 	for (struct intel_engine_data i__ = intel_init_engine_list(fd__, ctx__); \

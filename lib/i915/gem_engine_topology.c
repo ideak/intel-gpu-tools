@@ -97,39 +97,43 @@ static void ctx_map_engines(int fd, struct intel_engine_data *ed,
 	gem_context_set_param(fd, param);
 }
 
+static const char *class_names[] = {
+	[I915_ENGINE_CLASS_RENDER]	  = "rcs",
+	[I915_ENGINE_CLASS_COPY]	  = "bcs",
+	[I915_ENGINE_CLASS_VIDEO]	  = "vcs",
+	[I915_ENGINE_CLASS_VIDEO_ENHANCE] = "vecs",
+};
+
 static void init_engine(struct intel_execution_engine2 *e2,
 			int class, int instance, uint64_t flags)
 {
-	const struct intel_execution_engine2 *__e2;
-	static const char *unknown_name = "unknown",
-			  *virtual_name = "virtual";
+	int ret;
 
 	e2->class    = class;
 	e2->instance = instance;
-	e2->flags    = flags;
 
 	/* engine is a virtual engine */
 	if (class == I915_ENGINE_CLASS_INVALID &&
 	    instance == I915_ENGINE_CLASS_INVALID_VIRTUAL) {
-		e2->name = virtual_name;
+		strcpy(e2->name, "virtual");
 		e2->is_virtual = true;
 		return;
+	} else {
+		e2->is_virtual = false;
 	}
 
-	__for_each_static_engine(__e2)
-		if (__e2->class == class && __e2->instance == instance)
-			break;
-
-	if (__e2->name) {
-		e2->name = __e2->name;
+	if (class < ARRAY_SIZE(class_names)) {
+		e2->flags = flags;
+		ret = snprintf(e2->name, sizeof(e2->name), "%s%u",
+			       class_names[class], instance);
 	} else {
 		igt_warn("found unknown engine (%d, %d)\n", class, instance);
-		e2->name = unknown_name;
 		e2->flags = -1;
+		ret = snprintf(e2->name, sizeof(e2->name), "unknown%u-%u",
+			       class, instance);
 	}
 
-	/* just to remark it */
-	e2->is_virtual = false;
+	igt_assert(ret < sizeof(e2->name));
 }
 
 static void query_engine_list(int fd, struct intel_engine_data *ed)
@@ -223,7 +227,7 @@ struct intel_engine_data intel_init_engine_list(int fd, uint32_t ctx_id)
 			struct intel_execution_engine2 *__e2 =
 				&engine_data.engines[engine_data.nengines];
 
-			__e2->name       = e2->name;
+			strcpy(__e2->name, e2->name);
 			__e2->instance   = e2->instance;
 			__e2->class      = e2->class;
 			__e2->flags      = e2->flags;
@@ -297,12 +301,11 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags)
 		.class = -1,
 		.instance = -1,
 		.flags = -1,
-		.name = "invalid"
 	};
 
 	if (ring == I915_EXEC_DEFAULT) {
 		e2__.flags = I915_EXEC_DEFAULT;
-		e2__.name = "default";
+		strcpy(e2__.name, "default");
 	} else {
 		const struct intel_execution_engine2 *e2;
 
@@ -310,6 +313,8 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags)
 			if (e2->flags == ring)
 				return *e2;
 		}
+
+		strcpy(e2__.name, "invalid");
 	}
 
 	return e2__;

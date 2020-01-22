@@ -95,7 +95,7 @@ bool gem_can_store_dword(int fd, unsigned int engine);
 bool gem_class_can_store_dword(int fd, int class);
 
 extern const struct intel_execution_engine2 {
-	const char *name;
+	char name[16];
 	int class;
 	int instance;
 	uint64_t flags;
