@@ -29,6 +29,8 @@ lib_source_list =	 	\
 	igt_device_scan.h	\
 	igt_aux.c		\
 	igt_aux.h		\
+	igt_collection.c	\
+	igt_collection.h	\
 	igt_color_encoding.c	\
 	igt_color_encoding.h	\
 	igt_edid.c		\
