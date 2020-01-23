@@ -1583,6 +1583,27 @@ void chamelium_assert_frame_match_or_dump(struct chamelium *chamelium,
 					  struct igt_fb *fb,
 					  enum chamelium_check check)
 {
+	igt_assert(chamelium_frame_match_or_dump(chamelium, port,
+						 frame, fb, check));
+}
+
+/**
+ * chamelium_frame_match_or_dump:
+ * @chamelium: The chamelium instance the frame dump belongs to
+ * @frame: The chamelium frame dump to match
+ * @fb: pointer to an #igt_fb structure
+ * @check: the type of frame matching check to use
+ *
+ * Returns bool that the provided captured frame matches the reference
+ * frame from the framebuffer. If they do not, this saves the reference
+ * and captured frames to a png file.
+ */
+bool chamelium_frame_match_or_dump(struct chamelium *chamelium,
+				   struct chamelium_port *port,
+				   const struct chamelium_frame_dump *frame,
+				   struct igt_fb *fb,
+				   enum chamelium_check check)
+{
 	cairo_surface_t *reference;
 	cairo_surface_t *capture;
 	igt_crc_t *reference_crc;
@@ -1625,10 +1646,10 @@ void chamelium_assert_frame_match_or_dump(struct chamelium *chamelium,
 		free(capture_crc);
 	}
 
-	igt_assert(match);
-
 	cairo_surface_destroy(reference);
 	cairo_surface_destroy(capture);
+
+	return match;
 }
 
 /**
