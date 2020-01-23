@@ -183,8 +183,12 @@ static bool update_screen_and_test(data_t *data)
 		igt_assert_f(data->op, "Operation not handled\n");
 	}
 
-	if (psr2_wait_su(data->debugfs_fd, &su_blocks))
+	if (psr2_wait_su(data->debugfs_fd, &su_blocks)) {
 		ret = su_blocks == EXPECTED_NUM_SU_BLOCKS;
+
+		if (!ret)
+			igt_debug("Not matching SU blocks read: %u\n", su_blocks);
+	}
 
 	return ret;
 }
@@ -206,7 +210,6 @@ static void run(data_t *data)
 			result = update_screen_and_test(data);
 	}
 
-	igt_debug("Screen changes: %u\n", data->screen_changes);
 	igt_assert_f(result,
 		     "No matching selective update blocks read from debugfs\n");
 }
