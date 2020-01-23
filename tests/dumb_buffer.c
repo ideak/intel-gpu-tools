@@ -31,18 +31,18 @@
  * combinations are rejected.
  */
 
-#include <stdlib.h>
-#include <sys/ioctl.h>
-#include <stdio.h>
-#include <string.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
-#include <errno.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdatomic.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <getopt.h>
-#include <pthread.h>
-#include <stdatomic.h>
 
 #include <drm.h>
 
@@ -325,12 +325,62 @@ static void *thread_clear(void *data)
 	return (void *)(uintptr_t)checked;
 }
 
+static jmp_buf sigjmp;
+
+static void sigprobe(int sig)
+{
+	longjmp(sigjmp, sig);
+}
+
+static uint64_t estimate_largest_dumb_buffer(int fd)
+{
+	sighandler_t old_sigbus = signal(SIGBUS, sigprobe);
+	sighandler_t old_sigsegv = signal(SIGSEGV, sigprobe);
+	struct drm_mode_create_dumb create = {
+		.bpp = 32,
+		.width = 1 << 20, /* in pixels */
+		.height = 1, /* in rows */
+	};
+	volatile uint64_t largest = 0;
+	char * volatile ptr = NULL;
+
+	if (setjmp(sigjmp)) {
+		if (ptr)
+			munmap(ptr, create.size);
+
+		signal(SIGBUS, old_sigbus);
+		signal(SIGSEGV, old_sigsegv);
+
+		igt_info("Largest dumb buffer sucessfully created: %'"PRIu64" bytes\n",
+			 largest);
+		return largest / PAGE_SIZE;
+	}
+
+	for (create.height = 1; create.height; create.height *= 2) {
+		if (__dumb_create(fd, &create))
+			longjmp(sigjmp, SIGABRT);
+
+		ptr = __dumb_map(fd, create.handle, create.size, PROT_READ);
+		dumb_destroy(fd, create.handle);
+		if (!ptr)
+			longjmp(sigjmp, SIGABRT);
+
+		if (!*ptr)
+			largest = create.size;
+
+		munmap(ptr, create.size);
+		ptr = NULL;
+	}
+
+	longjmp(sigjmp, SIGABRT);
+}
+
 static void always_clear(int fd, int timeout)
 {
 	struct thread_clear arg = {
 		.fd = fd,
 		.timeout = timeout,
-		.max = intel_get_avail_ram_mb() << (20 - 12), /* in pages */
+		.max = estimate_largest_dumb_buffer(fd), /* in pages */
 	};
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	unsigned long checked;
