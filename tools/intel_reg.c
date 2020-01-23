@@ -252,7 +252,7 @@ static const struct intel_execution_engine2 *find_engine(const char *name)
 	if (name[0] == '-')
 		name++;
 
-	for (e = intel_execution_engines2; e->name; e++) {
+	__for_each_static_engine(e) {
 		if (!strcasecmp(e->name, name))
 			return e;
 	}
@@ -783,7 +783,7 @@ static int intel_reg_help(struct config *config, int argc, char *argv[])
 	printf("\n\n");
 
 	printf("ENGINE is one of:\n");
-	for (e = intel_execution_engines2; e->name; e++)
+	__for_each_static_engine(e)
 		printf("%s -%s ", e->name, e->name);
 	printf("\n\n");
 
