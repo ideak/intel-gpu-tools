@@ -41,8 +41,10 @@ int __gem_context_clone(int i915,
 uint32_t gem_context_clone(int i915,
 			   uint32_t src, unsigned int share,
 			   unsigned int flags);
+uint32_t gem_context_clone_with_engines(int i915, uint32_t src);
 
 uint32_t gem_queue_create(int i915);
+uint32_t gem_queue_clone_with_engines(int i915, uint32_t src);
 
 bool gem_contexts_has_shared_gtt(int i915);
 bool gem_has_queues(int i915);
@@ -51,6 +53,8 @@ bool gem_has_contexts(int fd);
 void gem_require_contexts(int fd);
 void gem_context_require_bannable(int fd);
 void gem_context_require_param(int fd, uint64_t param);
+
+bool gem_has_context_clone(int i915);
 
 void gem_context_get_param(int fd, struct drm_i915_gem_context_param *p);
 void gem_context_set_param(int fd, struct drm_i915_gem_context_param *p);

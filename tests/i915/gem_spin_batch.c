@@ -73,9 +73,10 @@ static void spin(int fd, const struct intel_execution_engine2 *e2,
 static void spin_resubmit(int fd, const struct intel_execution_engine2 *e2,
 			  unsigned int flags)
 {
-	const uint32_t ctx0 = gem_context_create(fd);
-	const uint32_t ctx1 = (flags & RESUBMIT_NEW_CTX) ?
-		gem_context_create(fd) : ctx0;
+	const uint32_t ctx0 = gem_context_clone_with_engines(fd, 0);
+	const uint32_t ctx1 =
+		(flags & RESUBMIT_NEW_CTX) ?
+		gem_context_clone_with_engines(fd, 0) : ctx0;
 	igt_spin_t *spin = __igt_spin_new(fd, .ctx = ctx0, .engine = e2->flags);
 	const struct intel_execution_engine2 *other;
 
@@ -89,10 +90,6 @@ static void spin_resubmit(int fd, const struct intel_execution_engine2 *e2,
 		   !(flags & RESUBMIT_ALL_ENGINES));
 
 	if (flags & RESUBMIT_ALL_ENGINES) {
-		gem_context_set_all_engines(fd, ctx0);
-		if (ctx0 != ctx1)
-			gem_context_set_all_engines(fd, ctx1);
-
 		for_each_context_engine(fd, ctx1, other) {
 			if (gem_engine_is_equal(other, e2))
 				continue;

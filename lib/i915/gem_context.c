@@ -372,9 +372,68 @@ uint32_t gem_context_clone(int i915,
 	return ctx;
 }
 
+bool gem_has_context_clone(int i915)
+{
+	struct drm_i915_gem_context_create_ext_clone ext = {
+		{ .name = I915_CONTEXT_CREATE_EXT_CLONE },
+		.clone_id = -1,
+	};
+	struct drm_i915_gem_context_create_ext create = {
+		.flags = I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS,
+		.extensions = to_user_pointer(&ext),
+	};
+	int err;
+
+	err = 0;
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT, &create)) {
+		err = -errno;
+		igt_assume(err);
+	}
+	errno = 0;
+
+	return err == -ENOENT;
+}
+
+/**
+ * gem_context_clone_with_engines:
+ * @i915: open i915 drm file descriptor
+ * @src: i915 context id
+ *
+ * Special purpose wrapper to create a new context by cloning engines from @src.
+ *
+ * In can be called regardless of whether the kernel supports context cloning.
+ *
+ * Intended purpose is to use for creating contexts against which work will be
+ * submitted and the engine index came from external source, derived from a
+ * default context potentially configured with an engine map.
+ */
+uint32_t gem_context_clone_with_engines(int i915, uint32_t src)
+{
+	if (!gem_has_context_clone(i915))
+		return gem_context_create(i915);
+	else
+		return gem_context_clone(i915, src, I915_CONTEXT_CLONE_ENGINES,
+					 0);
+}
+
 uint32_t gem_queue_create(int i915)
 {
 	return gem_context_clone(i915, 0,
+				 I915_CONTEXT_CLONE_VM,
+				 I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
+}
+
+/**
+ * gem_queue_clone_with_engines:
+ * @i915: open i915 drm file descriptor
+ * @src: i915 context id
+ *
+ * See gem_context_clone_with_engines.
+ */
+uint32_t gem_queue_clone_with_engines(int i915, uint32_t src)
+{
+	return gem_context_clone(i915, src,
+				 I915_CONTEXT_CLONE_ENGINES |
 				 I915_CONTEXT_CLONE_VM,
 				 I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
 }

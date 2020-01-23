@@ -274,17 +274,6 @@ int gem_context_lookup_engine(int fd, uint64_t engine, uint32_t ctx_id,
 	return 0;
 }
 
-void gem_context_set_all_engines(int fd, uint32_t ctx)
-{
-	DEFINE_CONTEXT_ENGINES_PARAM(engines, param, ctx, GEM_MAX_ENGINES);
-	struct intel_engine_data engine_data = { };
-
-	if (!gem_topology_get_param(fd, &param) && !param.size) {
-		query_engine_list(fd, &engine_data);
-		ctx_map_engines(fd, &engine_data, &param);
-	}
-}
-
 bool gem_has_engine_topology(int fd)
 {
 	struct drm_i915_gem_context_param param = {

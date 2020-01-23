@@ -127,8 +127,7 @@ static void *thread(void *data)
 	if (t->gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 	if (t->flags & CONTEXTS) {
-		execbuf.rsvd1 = gem_context_create(fd);
-		gem_context_set_all_engines(fd, execbuf.rsvd1);
+		execbuf.rsvd1 = gem_context_clone_with_engines(fd, 0);
 	}
 
 	for (i = 0; i < 16; i++) {

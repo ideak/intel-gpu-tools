@@ -63,10 +63,8 @@ static int measure_qlen(int fd,
 	uint32_t ctx[64];
 	int min = INT_MAX, max = 0;
 
-	for (int i = 0; i < ARRAY_SIZE(ctx); i++) {
-		ctx[i] = gem_context_create(fd);
-		gem_context_set_all_engines(fd, ctx[i]);
-	}
+	for (int i = 0; i < ARRAY_SIZE(ctx); i++)
+		ctx[i] = gem_context_clone_with_engines(fd, 0);
 
 	for (unsigned int n = 0; n < engines->nengines; n++) {
 		uint64_t saved = execbuf->flags;
@@ -130,12 +128,9 @@ static void single(int fd, uint32_t handle,
 
 	for (n = 0; n < 64; n++) {
 		if (flags & QUEUE)
-			contexts[n] = gem_queue_create(fd);
+			contexts[n] = gem_queue_clone_with_engines(fd, 0);
 		else
-			contexts[n] = gem_context_create(fd);
-
-		if (gem_context_has_engine_map(fd, 0))
-			gem_context_set_all_engines(fd, contexts[n]);
+			contexts[n] = gem_context_clone_with_engines(fd, 0);
 	}
 
 	memset(&obj, 0, sizeof(obj));
@@ -237,11 +232,9 @@ static void all(int fd, uint32_t handle, unsigned flags, int timeout)
 
 	for (n = 0; n < ARRAY_SIZE(contexts); n++) {
 		if (flags & QUEUE)
-			contexts[n] = gem_queue_create(fd);
+			contexts[n] = gem_queue_clone_with_engines(fd, 0);
 		else
-			contexts[n] = gem_context_create(fd);
-
-		gem_context_set_all_engines(fd, contexts[n]);
+			contexts[n] = gem_context_clone_with_engines(fd, 0);
 	}
 
 	memset(obj, 0, sizeof(obj));

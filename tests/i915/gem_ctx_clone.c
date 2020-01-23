@@ -40,19 +40,6 @@ static int ctx_create_ioctl(int i915, struct drm_i915_gem_context_create_ext *ar
 	return err;
 }
 
-static bool has_ctx_clone(int i915)
-{
-	struct drm_i915_gem_context_create_ext_clone ext = {
-		{ .name = I915_CONTEXT_CREATE_EXT_CLONE },
-		.clone_id = -1,
-	};
-	struct drm_i915_gem_context_create_ext create = {
-		.flags = I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS,
-		.extensions = to_user_pointer(&ext),
-	};
-	return ctx_create_ioctl(i915, &create) == -ENOENT;
-}
-
 static void invalid_clone(int i915)
 {
 	struct drm_i915_gem_context_create_ext_clone ext = {
@@ -436,7 +423,7 @@ igt_main
 		igt_require_gem(i915);
 		gem_require_contexts(i915);
 
-		igt_require(has_ctx_clone(i915));
+		igt_require(gem_has_context_clone(i915));
 		igt_fork_hang_detector(i915);
 	}
 

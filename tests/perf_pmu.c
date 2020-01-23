@@ -361,8 +361,7 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	uint32_t ctx;
 	int fd;
 
-	ctx = gem_context_create(gem_fd);
-	gem_context_set_all_engines(gem_fd, ctx);
+	ctx = gem_context_clone_with_engines(gem_fd, 0);
 
 	/*
 	 * Defeat the busy stats delayed disable, we need to guarantee we are
