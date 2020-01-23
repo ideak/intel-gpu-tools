@@ -19,7 +19,6 @@ test_progs = [
 	'kms_big_fb',
 	'kms_busy',
 	'kms_ccs',
-	'kms_color',
 	'kms_concurrent',
 	'kms_content_protection',
 	'kms_crtc_background_color',
@@ -356,6 +355,14 @@ executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_list += 'testdisplay'
+
+test_executables += executable('kms_color',
+	   [ 'kms_color.c', 'kms_color_helper.c' ],
+	   dependencies : test_deps,
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'kms_color'
 
 test_executables += executable('sw_sync', 'sw_sync.c',
 	   dependencies : test_deps + [ libatomic ],

@@ -18,6 +18,8 @@ endif
 
 TESTS_progs += testdisplay
 
+TESTS_progs += kms_color
+
 if BUILD_TESTS
 test-list.txt: Makefile
 	@echo TESTLIST > $@
