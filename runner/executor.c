@@ -759,7 +759,7 @@ static int monitor_output(pid_t child,
 			return -1;
 		}
 
-		if (tainted(&taints)) /* cancel children after a kernel OOPS */
+		if (settings->abort_mask & ABORT_TAINT && tainted(&taints)) /* cancel children after a kernel OOPS */
 			n = 0, intervals_left = 1;
 
 		if (n == 0) {
@@ -768,6 +768,7 @@ static int monitor_output(pid_t child,
 
 			switch (killed) {
 			case 0:
+				/* If abort_mask doesn't have taint set, taints is still 0 here */
 				if (!is_tainted(taints)) {
 					show_kernel_task_state();
 					if (settings->log_level >= LOG_LEVEL_NORMAL) {
