@@ -252,7 +252,7 @@ static void independent(int fd, unsigned int engine)
 	igt_require(engine != 0);
 
 	scratch = gem_create(fd, 4096);
-	ptr = gem_mmap__gtt(fd, scratch, 4096, PROT_READ);
+	ptr = gem_mmap__device_coherent(fd, scratch, 0, 4096, PROT_READ);
 	igt_assert_eq(ptr[0], 0);
 
 	fence = igt_cork_plug(&cork, fd);
@@ -1410,7 +1410,7 @@ static void reorder_wide(int fd, unsigned ring)
 		gem_context_set_priority(fd, execbuf.rsvd1, n);
 
 		obj[1].handle = gem_create(fd, sz);
-		batch = gem_mmap__gtt(fd, obj[1].handle, sz, PROT_WRITE);
+		batch = gem_mmap__device_coherent(fd, obj[1].handle, 0, sz, PROT_WRITE);
 		gem_set_domain(fd, obj[1].handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 		for (int m = 0; m < ring_size; m++) {
