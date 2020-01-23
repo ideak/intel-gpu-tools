@@ -13,6 +13,7 @@ endif
 if HAVE_CHAMELIUM
 TESTS_progs += \
 	kms_chamelium \
+	kms_color_chamelium \
 	$(NULL)
 endif
 

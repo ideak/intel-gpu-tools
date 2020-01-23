@@ -364,6 +364,16 @@ test_executables += executable('kms_color',
 	   install : true)
 test_list += 'kms_color'
 
+if chamelium.found()
+       test_executables += executable('kms_color_chamelium',
+                             [ 'kms_color_chamelium.c', 'kms_color_helper.c' ],
+                             dependencies : test_deps + [ chamelium ],
+                             install_dir : libexecdir,
+                             install_rpath : libexecdir_rpathdir,
+                             install : true)
+       test_list += 'kms_color_chamelium'
+endif
+
 test_executables += executable('sw_sync', 'sw_sync.c',
 	   dependencies : test_deps + [ libatomic ],
 	   install_dir : libexecdir,

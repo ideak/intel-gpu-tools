@@ -595,6 +595,12 @@ kms_color_SOURCES = \
         kms_color_helper.c \
         $(NULL)
 
+kms_color_chamelium_SOURCES = \
+        kms_color_chamelium.c \
+        kms_color_helper.h \
+        kms_color_helper.c \
+        $(NULL)
+
 check_SCRIPTS = igt_command_line.sh \
 	$(NULL)
 
