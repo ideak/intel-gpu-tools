@@ -217,9 +217,9 @@ static void exhaustive(int fd)
 		gem_write(fd, handle, 0, batch, sizeof(batch));
 
 		if (!FORCE_PREAD_PWRITE && gem_has_llc(fd))
-			ptr = __gem_mmap__cpu(fd, handle, 0, batch_size, PROT_READ);
+			ptr = __gem_mmap__cpu(fd, handle, 0, batch_size, PROT_WRITE);
 		else if (!FORCE_PREAD_PWRITE && gem_mmap__has_wc(fd))
-			ptr = __gem_mmap__wc(fd, handle, 0, batch_size, PROT_READ);
+			ptr = __gem_mmap__wc(fd, handle, 0, batch_size, PROT_WRITE);
 		else
 			ptr = NULL;
 
@@ -281,9 +281,9 @@ static void single(int i915)
 	gem_write(i915, handle, 0, &bbe, sizeof(bbe));
 
 	if (!FORCE_PREAD_PWRITE && gem_has_llc(i915))
-		ptr = __gem_mmap__cpu(i915, handle, 0, batch_size, PROT_READ);
+		ptr = __gem_mmap__cpu(i915, handle, 0, batch_size, PROT_WRITE);
 	else if (!FORCE_PREAD_PWRITE && gem_mmap__has_wc(i915))
-		ptr = __gem_mmap__wc(i915, handle, 0, batch_size, PROT_READ);
+		ptr = __gem_mmap__wc(i915, handle, 0, batch_size, PROT_WRITE);
 	else
 		ptr = NULL;
 
