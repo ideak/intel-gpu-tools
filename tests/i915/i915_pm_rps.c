@@ -397,9 +397,11 @@ static void min_max_config(void (*check)(void), bool load_gpu)
 	writeval_inval(sysfs_files[MIN].filp, origfreqs[RP0] + 1000);
 	check();
 
-	igt_debug("\nDecrease max to RPn (invalid)...\n");
-	writeval_inval(sysfs_files[MAX].filp, origfreqs[RPn]);
-	check();
+	if (origfreqs[RPn] < origfreqs[RP0]) {
+		igt_debug("\nDecrease max to RPn (invalid)...\n");
+		writeval_inval(sysfs_files[MAX].filp, origfreqs[RPn]);
+		check();
+	}
 
 	igt_debug("\nDecrease min to midpoint...\n");
 	writeval(sysfs_files[MIN].filp, fmid);
@@ -429,9 +431,11 @@ static void min_max_config(void (*check)(void), bool load_gpu)
 	writeval_inval(sysfs_files[MAX].filp, 0);
 	check();
 
-	igt_debug("\nIncrease min to RP0 (invalid)...\n");
-	writeval_inval(sysfs_files[MIN].filp, origfreqs[RP0]);
-	check();
+	if (origfreqs[RP0] > origfreqs[RPn]) {
+		igt_debug("\nIncrease min to RP0 (invalid)...\n");
+		writeval_inval(sysfs_files[MIN].filp, origfreqs[RP0]);
+		check();
+	}
 
 	igt_debug("\nIncrease max to midpoint...\n");
 	writeval(sysfs_files[MAX].filp, fmid);
