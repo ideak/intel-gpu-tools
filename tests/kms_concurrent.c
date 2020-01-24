@@ -57,33 +57,11 @@ struct {
 static void test_init(data_t *data, enum pipe pipe, int n_planes,
 		      igt_output_t *output)
 {
-	drmModeModeInfo *mode;
-	igt_plane_t *primary;
-	int ret;
-
 	data->plane = calloc(n_planes, sizeof(*data->plane));
 	igt_assert_f(data->plane != NULL, "Failed to allocate memory for planes\n");
 
 	data->fb = calloc(n_planes, sizeof(struct igt_fb));
 	igt_assert_f(data->fb != NULL, "Failed to allocate memory for FBs\n");
-
-	igt_output_set_pipe(output, pipe);
-
-	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-	data->plane[primary->index] = primary;
-
-	mode = igt_output_get_mode(output);
-
-	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-			    DRM_FORMAT_XRGB8888,
-			    LOCAL_I915_FORMAT_MOD_X_TILED,
-			    0.0f, 0.0f, 1.0f,
-			    &data->fb[primary->index]);
-
-	igt_plane_set_fb(data->plane[primary->index], &data->fb[primary->index]);
-
-	ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
-	igt_skip_on(ret != 0);
 }
 
 static void test_fini(data_t *data, enum pipe pipe, int n_planes,
@@ -184,7 +162,6 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 	y[primary->index] = 0;
 	for (i = 0; i < max_planes; i++) {
 		igt_plane_t *plane = igt_output_get_plane(output, i);
-		int ret;
 
 		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
 			continue;
@@ -207,18 +184,7 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 
 		igt_plane_set_position(data->plane[i], x[i], y[i]);
 		igt_plane_set_fb(data->plane[i], &data->fb[i]);
-
-		ret = igt_display_try_commit_atomic(&data->display, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
-		if (ret) {
-			igt_plane_set_fb(data->plane[i], NULL);
-			igt_remove_fb(data->drm_fd, &data->fb[i]);
-			data->plane[i] = NULL;
-			break;
-		}
 	}
-	max_planes = i;
-
-	igt_assert_lt(0, max_planes);
 
 	/* primary plane */
 	data->plane[primary->index] = primary;
@@ -282,10 +248,39 @@ test_resolution_with_output(data_t *data, enum pipe pipe, igt_output_t *output)
 	const drmModeModeInfo *mode_hi, *mode_lo;
 	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
 	bool loop_forever = opt.iterations == LOOP_FOREVER ? true : false;
-	int i;
+	int i, c, ret;
+	int max_planes = data->display.pipes[pipe].n_planes;
+	igt_plane_t *primary;
+	drmModeModeInfo *mode;
 
 	i = 0;
 	while (i < iterations || loop_forever) {
+		igt_output_set_pipe(output, pipe);
+		for (c = 0; c < max_planes; c++) {
+			igt_plane_t *plane = igt_output_get_plane(output, c);
+
+			if (plane->type != DRM_PLANE_TYPE_PRIMARY)
+				continue;
+			primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+			data->plane[primary->index] = primary;
+			mode = igt_output_get_mode(output);
+			igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
+						DRM_FORMAT_XRGB8888,
+						LOCAL_I915_FORMAT_MOD_X_TILED,
+						0.0f, 0.0f, 1.0f,
+						&data->fb[primary->index]);
+			igt_plane_set_fb(data->plane[primary->index], &data->fb[primary->index]);
+			ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
+			if (ret) {
+				igt_plane_set_fb(data->plane[i], NULL);
+				igt_remove_fb(data->drm_fd, &data->fb[i]);
+				data->plane[i] = NULL;
+				break;
+			}
+		}
+		max_planes = c;
+		igt_assert_lt(0, max_planes);
+
 		mode_hi = igt_output_get_mode(output);
 		mode_lo = get_lowres_mode(data, mode_hi, output);
 
