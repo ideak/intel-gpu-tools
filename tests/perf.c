@@ -955,7 +955,7 @@ init_sys_info(void)
 			}
 		} else if (IS_GEMINILAKE(devid)) {
 			test_set_uuid = "dd3fd789-e783-4204-8cd0-b671bbccb0cf";
-		} else if (IS_COFFEELAKE(devid)) {
+		} else if (IS_COFFEELAKE(devid) || IS_COMETLAKE(devid)) {
 			switch (intel_gt(devid)) {
 			case 1:
 				test_set_uuid = "74fb4902-d3d3-4237-9e90-cbdc68d0a446";
