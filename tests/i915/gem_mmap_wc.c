@@ -253,19 +253,19 @@ test_coherency(int fd)
 }
 
 static void
-test_write_gtt(int fd)
+test_write_prefaulted(int fd)
 {
 	uint32_t dst;
-	char *dst_gtt;
+	char *fault;
 	void *src;
 
 	dst = gem_create(fd, OBJECT_SIZE);
 	set_domain(fd, dst);
 
 	/* prefault object into gtt */
-	dst_gtt = mmap_bo(fd, dst);
-	memset(dst_gtt, 0, OBJECT_SIZE);
-	munmap(dst_gtt, OBJECT_SIZE);
+	fault = mmap_bo(fd, dst);
+	memset(fault, 0, OBJECT_SIZE);
+	munmap(fault, OBJECT_SIZE);
 
 	src = create_pointer(fd);
 
@@ -330,6 +330,27 @@ test_write_cpu_read_wc(int fd, int force_domain)
 
 static void
 test_write_gtt_read_wc(int fd)
+{
+	uint32_t handle;
+	uint32_t *src, *dst;
+
+	handle = gem_create(fd, OBJECT_SIZE);
+	set_domain(fd, handle);
+
+	src = local_gem_mmap__wc(fd, handle, 0, OBJECT_SIZE, PROT_READ);
+
+	dst = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_WRITE);
+
+	memset(src, 0xaa, OBJECT_SIZE);
+	igt_assert(memcmp(dst, src, OBJECT_SIZE) == 0);
+	gem_close(fd, handle);
+
+	munmap(src, OBJECT_SIZE);
+	munmap(dst, OBJECT_SIZE);
+}
+
+static void
+test_write_wc_read_gtt(int fd)
 {
 	uint32_t handle;
 	uint32_t *src, *dst;
@@ -461,15 +482,6 @@ test_pf_nonblock(int i915)
 	igt_spin_free(i915, spin);
 }
 
-static void
-run_without_prefault(int fd,
-			void (*func)(int fd))
-{
-	igt_disable_prefault();
-	func(fd);
-	igt_enable_prefault();
-}
-
 static int mmap_ioctl(int i915, struct drm_i915_gem_mmap *arg)
 {
 	int err = 0;
@@ -577,8 +589,8 @@ igt_main
 		test_write(fd);
 	igt_subtest("coherency")
 		test_coherency(fd);
-	igt_subtest("write-gtt")
-		test_write_gtt(fd);
+	igt_subtest("write-prefaulted")
+		test_write_prefaulted(fd);
 	igt_subtest("read-write")
 		test_read_write(fd, READ_BEFORE_WRITE);
 	igt_subtest("write-read")
@@ -589,18 +601,19 @@ igt_main
 		test_read_write2(fd, READ_AFTER_WRITE);
 	igt_subtest("fault-concurrent")
 		test_fault_concurrent(fd);
-	igt_subtest("read-no-prefault")
-		run_without_prefault(fd, test_read);
-	igt_subtest("write-no-prefault")
-		run_without_prefault(fd, test_write);
-	igt_subtest("write-gtt-no-prefault")
-		run_without_prefault(fd, test_write_gtt);
 	igt_subtest("write-cpu-read-wc")
 		test_write_cpu_read_wc(fd, 1);
 	igt_subtest("write-cpu-read-wc-unflushed")
 		test_write_cpu_read_wc(fd, 0);
-	igt_subtest("write-gtt-read-wc")
-		test_write_gtt_read_wc(fd);
+
+	igt_subtest_group {
+		igt_fixture gem_require_mappable_ggtt(fd);
+		igt_subtest("write-wc-read-gtt")
+			test_write_wc_read_gtt(fd);
+		igt_subtest("write-gtt-read-gtt")
+			test_write_gtt_read_wc(fd);
+	}
+
 	igt_subtest("pf-nonblock")
 		test_pf_nonblock(fd);
 	igt_subtest("set-cache-level")
