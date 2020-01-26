@@ -187,6 +187,7 @@ static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 		.engine = flags,
 		.flags = (IGT_SPIN_FAST |
 			  IGT_SPIN_NO_PREEMPTION |
+			  IGT_SPIN_INVALID_CS |
 			  IGT_SPIN_FENCE_OUT),
 	};
 

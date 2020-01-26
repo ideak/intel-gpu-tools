@@ -189,6 +189,8 @@ emit_recursive_batch(igt_spin_t *spin,
 	/* Allow ourselves to be preempted */
 	if (!(opts->flags & IGT_SPIN_NO_PREEMPTION))
 		*cs++ = MI_ARB_CHK;
+	if (opts->flags & IGT_SPIN_INVALID_CS)
+		*cs++ = 0xdeadbeef;
 
 	/* Pad with a few nops so that we do not completely hog the system.
 	 *

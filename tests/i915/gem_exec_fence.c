@@ -335,7 +335,8 @@ static void test_fence_await(int fd, unsigned ring, unsigned flags)
 	spin = igt_spin_new(fd,
 			    .engine = ring,
 			    .flags = (IGT_SPIN_FENCE_OUT |
-				      IGT_SPIN_NO_PREEMPTION));
+				      IGT_SPIN_NO_PREEMPTION |
+				      (flags & HANG ? IGT_SPIN_INVALID_CS : 0)));
 	igt_assert(spin->out_fence != -1);
 
 	i = 0;

@@ -345,6 +345,41 @@ static void test_nohangcheck_hostile(int i915)
 	close(dir);
 }
 
+static void test_nohangcheck_hang(int i915)
+{
+	int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
+	int dir;
+
+	/*
+	 * Even if the user disables hangcheck during their context,
+	 * we forcibly terminate that context.
+	 */
+
+	dir = igt_sysfs_open_parameters(i915);
+	igt_require(dir != -1);
+
+	igt_require(__enable_hangcheck(dir, false));
+
+	for_each_physical_engine(e, i915) {
+		uint32_t ctx = gem_context_create(i915);
+		igt_spin_t *spin;
+
+		spin = igt_spin_new(i915, ctx,
+				    .engine = eb_ring(e),
+				    .flags = IGT_SPIN_INVALID_CS);
+		gem_context_destroy(i915, ctx);
+
+		igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
+
+		igt_spin_free(i915, spin);
+	}
+
+	igt_require(__enable_hangcheck(dir, true));
+
+	gem_quiescent_gpu(i915);
+	close(dir);
+}
+
 static void test_nonpersistent_file(int i915)
 {
 	int debugfs = i915;
@@ -724,8 +759,10 @@ igt_main
 	igt_subtest("processes")
 		test_processes(i915);
 
-	igt_subtest("hangcheck")
+	igt_subtest("hostile")
 		test_nohangcheck_hostile(i915);
+	igt_subtest("hang")
+		test_nohangcheck_hang(i915);
 
 	__for_each_static_engine(e) {
 		igt_subtest_group {

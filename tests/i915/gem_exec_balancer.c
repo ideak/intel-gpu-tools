@@ -1654,7 +1654,9 @@ static void hangme(int i915)
 			set_unbannable(i915, ctx);
 			set_load_balancer(i915, ctx, ci, count, NULL);
 
-			flags = IGT_SPIN_FENCE_OUT | IGT_SPIN_NO_PREEMPTION;
+			flags = IGT_SPIN_FENCE_OUT |
+				IGT_SPIN_NO_PREEMPTION |
+				IGT_SPIN_INVALID_CS;
 			for (int j = 0; j < ARRAY_SIZE(c->spin); j++)  {
 				c->spin[j] = igt_spin_new(i915, ctx,
 							  .flags = flags);
