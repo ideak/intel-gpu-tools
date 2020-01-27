@@ -120,9 +120,8 @@ static void invalid_size_test(int fd)
 }
 
 /*
- * Creating an object with non-aligned size and trying to access it with an
- * offset, which is greater than the requested size but smaller than the
- * object's last page boundary. pwrite here must be successful.
+ * Creating an object with non-aligned size request and assert the buffer is
+ * page aligned. And test the write into the padded extra memory.
  */
 static void valid_nonaligned_size(int fd)
 {
@@ -132,29 +131,9 @@ static void valid_nonaligned_size(int fd)
 	char buf[PAGE_SIZE];
 
 	igt_assert_eq(create_ioctl(fd, &create), 0);
+	igt_assert(create.size >= PAGE_SIZE);
 
 	gem_write(fd, create.handle, PAGE_SIZE / 2, buf, PAGE_SIZE / 2);
-
-	gem_close(fd, create.handle);
-}
-
-/*
- * Creating an object with non-aligned size and trying to access it with an
- * offset, which is greater than the requested size and larger than the
- * object's last page boundary. pwrite here must fail.
- */
-static void invalid_nonaligned_size(int fd)
-{
-	struct drm_i915_gem_create create = {
-		.size = PAGE_SIZE / 2,
-	};
-	char buf[PAGE_SIZE];
-
-	igt_assert_eq(create_ioctl(fd, &create), 0);
-
-	/* This should fail. Hence cannot use gem_write. */
-	igt_assert(__gem_write(fd, create.handle,
-			       PAGE_SIZE / 2, buf, PAGE_SIZE));
 
 	gem_close(fd, create.handle);
 }
@@ -306,9 +285,6 @@ igt_main
 
 	igt_subtest("create-valid-nonaligned")
 		valid_nonaligned_size(fd);
-
-	igt_subtest("create-invalid-nonaligned")
-		invalid_nonaligned_size(fd);
 
 	igt_subtest("create-size-update")
 		size_update(fd);
