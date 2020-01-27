@@ -64,7 +64,7 @@ uint32_t devid;
 static void
 store_pipe_control_loop(bool preuse_buffer, int timeout)
 {
-	int i, val = 0;
+	int val = 0;
 	uint32_t *buf;
 	drm_intel_bo *target_bo;
 
