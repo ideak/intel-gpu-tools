@@ -566,16 +566,16 @@ igt_main
 		maximum(fd, ncpus, CHECK_RAM | CHECK_SWAP);
 
 	igt_subtest("basic-files")
-		files(fd, 5, 1);
+		files(fd, 2, 1);
 	igt_subtest("files")
-		files(fd, 150, 1);
+		files(fd, 20, 1);
 	igt_subtest("forked-files")
-		files(fd, 150, ncpus);
+		files(fd, 20, ncpus);
 
 	igt_subtest("active-all")
-		active(fd, ALL_ENGINES, 120, 1);
+		active(fd, ALL_ENGINES, 20, 1);
 	igt_subtest("forked-active-all")
-		active(fd, ALL_ENGINES, 120, ncpus);
+		active(fd, ALL_ENGINES, 20, ncpus);
 
 	for (const struct intel_execution_engine *e = intel_execution_engines;
 	     e->name; e++) {
