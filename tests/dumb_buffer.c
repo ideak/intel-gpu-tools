@@ -200,52 +200,6 @@ static void invalid_size_map(int fd)
 	dumb_destroy(fd, create.handle);
 }
 
-/*
- * Creating an dumb buffer with non-aligned size and trying to access it with an
- * offset, which is greater than the requested size but smaller than the
- * object's last page boundary. pwrite here must be successful.
- */
-static void valid_nonaligned_size(int fd)
-{
-	struct drm_mode_create_dumb create = {
-		.width = 24,
-		.height = 24,
-		.bpp = 32,
-	};
-	char buf[PAGE_SIZE];
-
-	igt_require(is_i915_device(fd));
-
-	dumb_create(fd, &create);
-
-	gem_write(fd, create.handle, PAGE_SIZE / 2, buf, PAGE_SIZE / 2);
-
-	dumb_destroy(fd, create.handle);
-}
-
-/*
- * Creating an object with non-aligned size and trying to access it with an
- * offset, which is greater than the requested size and larger than the
- * object's last page boundary. pwrite here must fail.
- */
-static void invalid_nonaligned_size(int fd)
-{
-	struct drm_mode_create_dumb create = {
-		.width = 24,
-		.height = 24,
-		.bpp = 32,
-	};
-	char buf[PAGE_SIZE];
-
-	igt_require(is_i915_device(fd));
-
-	dumb_create(fd, &create);
-	/* This should fail. Hence cannot use gem_write. */
-	igt_assert(__gem_write(fd, create.handle,
-			       create.size - (PAGE_SIZE / 2), buf, PAGE_SIZE));
-	dumb_destroy(fd, create.handle);
-}
-
 static uint64_t atomic_compare_swap_u64(_Atomic(uint64_t) *ptr,
 					uint64_t oldval, uint64_t newval)
 {
@@ -411,12 +365,6 @@ igt_main
 
 	igt_subtest("create-valid-dumb")
 		valid_dumb_creation_test(fd);
-
-	igt_subtest("create-valid-nonaligned")
-		valid_nonaligned_size(fd);
-
-	igt_subtest("create-invalid-nonaligned")
-		invalid_nonaligned_size(fd);
 
 	igt_subtest("map-valid")
 		valid_map(fd);
