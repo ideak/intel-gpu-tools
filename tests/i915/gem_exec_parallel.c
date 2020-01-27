@@ -83,10 +83,12 @@ static void *thread(void *data)
 		pthread_cond_wait(t->cond, t->mutex);
 	pthread_mutex_unlock(t->mutex);
 
-	if (t->flags & FDS)
+	if (t->flags & FDS) {
 		fd = drm_open_driver(DRIVER_INTEL);
-	else
+		gem_context_copy_engines(t->fd, 0, fd, 0);
+	} else {
 		fd = t->fd;
+	}
 
 	i = 0;
 	batch[i] = MI_STORE_DWORD_IMM | (t->gen < 6 ? 1 << 22 : 0);
