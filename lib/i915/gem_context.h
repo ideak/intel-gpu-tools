@@ -42,6 +42,8 @@ uint32_t gem_context_clone(int i915,
 			   uint32_t src, unsigned int share,
 			   unsigned int flags);
 uint32_t gem_context_clone_with_engines(int i915, uint32_t src);
+void gem_context_copy_engines(int src_fd, uint32_t src,
+			      int dst_fd, uint32_t dst);
 
 uint32_t gem_queue_create(int i915);
 uint32_t gem_queue_clone_with_engines(int i915, uint32_t src);

@@ -462,3 +462,33 @@ bool gem_context_has_engine(int fd, uint32_t ctx, uint64_t engine)
 
 	return __gem_execbuf(fd, &execbuf) == -ENOENT;
 }
+
+/**
+ * gem_context_copy_engines:
+ * @src_fd: open i915 drm file descriptor where @src context belongs to
+ * @src: source engine map context id
+ * @dst_fd: open i915 drm file descriptor where @dst context belongs to
+ * @dst: destination engine map context id
+ *
+ * Special purpose helper for copying engine map from one context to another.
+ *
+ * In can be called regardless of whether the kernel supports context engine
+ * maps and is a no-op if not supported.
+ */
+void
+gem_context_copy_engines(int src_fd, uint32_t src, int dst_fd, uint32_t dst)
+{
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
+	struct drm_i915_gem_context_param param = {
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.ctx_id = src,
+		.size = sizeof(engines),
+		.value = to_user_pointer(&engines),
+	};
+
+	if (__gem_context_get_param(src_fd, &param))
+		return;
+
+	param.ctx_id = dst;
+	gem_context_set_param(dst_fd, &param);
+}
