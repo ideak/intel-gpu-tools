@@ -357,18 +357,18 @@ igt_main
 				}
 
 				igt_subtest_f("legacy-%s%s", e->name, p->name)
-					single(fd, light, e2, p->flags, 1, 5);
+					single(fd, light, e2, p->flags, 1, 2);
 				igt_subtest_f("legacy-%s-heavy%s",
 					      e->name, p->name)
-					single(fd, heavy, e2, p->flags, 1, 5);
+					single(fd, heavy, e2, p->flags, 1, 2);
 				igt_subtest_f("legacy-%s-forked%s",
 					      e->name, p->name)
 					single(fd, light, e2, p->flags, ncpus,
-					       150);
+					       20);
 				igt_subtest_f("legacy-%s-forked-heavy%s",
 					      e->name, p->name)
 					single(fd, heavy, e2, p->flags, ncpus,
-					       150);
+					       20);
 			}
 		}
 	}
@@ -383,33 +383,33 @@ igt_main
 				}
 
 				igt_subtest_f("%s%s", e2->name, p->name)
-					single(fd, light, e2, p->flags, 1, 5);
+					single(fd, light, e2, p->flags, 1, 2);
 				igt_subtest_f("%s-heavy%s", e2->name, p->name)
-					single(fd, heavy, e2, p->flags, 1, 5);
+					single(fd, heavy, e2, p->flags, 1, 2);
 				igt_subtest_f("%s-forked%s", e2->name, p->name)
 					single(fd, light, e2, p->flags, ncpus,
-					       150);
+					       20);
 				igt_subtest_f("%s-forked-heavy%s",
 					      e2->name, p->name)
 					single(fd, heavy, e2, p->flags, ncpus,
-					       150);
+					       20);
 			}
 		}
 	}
 
 	igt_subtest("all-light")
-		all(fd, light, 0, 5);
+		all(fd, light, 0, 2);
 	igt_subtest("all-heavy")
-		all(fd, heavy, 0, 5);
+		all(fd, heavy, 0, 2);
 
 	igt_subtest_group {
 		igt_fixture {
 			igt_require(gem_has_queues(fd));
 		}
 		igt_subtest("queue-light")
-			all(fd, light, QUEUE, 5);
+			all(fd, light, QUEUE, 2);
 		igt_subtest("queue-heavy")
-			all(fd, heavy, QUEUE, 5);
+			all(fd, heavy, QUEUE, 2);
 	}
 
 	igt_fixture {
