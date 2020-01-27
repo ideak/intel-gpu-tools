@@ -865,41 +865,41 @@ igt_main
 	}
 
 	igt_subtest("basic-series")
-		series(device, handle, 5);
+		series(device, handle, 2);
 
 	igt_subtest("basic-parallel")
-		parallel(device, handle, 5);
+		parallel(device, handle, 2);
 
 	igt_subtest("basic-sequential")
-		sequential(device, handle, 0, 5);
+		sequential(device, handle, 0, 2);
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%s", e->name)
 			single(device, handle, eb_ring(e), e->name);
 		igt_subtest_f("signal-%s", e->name)
-			fence_signal(device, handle, eb_ring(e), e->name, 5);
+			fence_signal(device, handle, eb_ring(e), e->name, 2);
 	}
 
 	igt_subtest("signal-all")
-		fence_signal(device, handle, ALL_ENGINES, "all", 150);
+		fence_signal(device, handle, ALL_ENGINES, "all", 20);
 
 	igt_subtest("series")
-		series(device, handle, 150);
+		series(device, handle, 20);
 
 	igt_subtest("parallel")
-		parallel(device, handle, 150);
+		parallel(device, handle, 20);
 
 	igt_subtest("sequential")
-		sequential(device, handle, 0, 150);
+		sequential(device, handle, 0, 20);
 
 	igt_subtest("forked-sequential")
-		sequential(device, handle, FORKED, 150);
+		sequential(device, handle, FORKED, 20);
 
 	igt_subtest("chained-sequential")
-		sequential(device, handle, FORKED | CHAINED, 150);
+		sequential(device, handle, FORKED | CHAINED, 20);
 
 	igt_subtest("context-sequential")
-		sequential(device, handle, FORKED | CONTEXT, 150);
+		sequential(device, handle, FORKED | CONTEXT, 20);
 
 	igt_subtest_group {
 		igt_fixture {
