@@ -2215,8 +2215,14 @@ int __igt_waitchildren(void)
 		int c;
 
 		pid = wait(&status);
-		if (pid == -1)
-			continue;
+		if (pid == -1) {
+			if (errno == EINTR)
+				continue;
+
+			printf("wait(num_children:%d) failed with %m\n",
+			       num_test_children - count);
+			return IGT_EXIT_FAILURE;
+		}
 
 		for (c = 0; c < num_test_children; c++)
 			if (pid == test_children[c])
