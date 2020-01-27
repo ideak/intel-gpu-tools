@@ -62,13 +62,13 @@ uint32_t devid;
 
 /* Like the store dword test, but we create new command buffers each time */
 static void
-store_pipe_control_loop(bool preuse_buffer)
+store_pipe_control_loop(bool preuse_buffer, int timeout)
 {
 	int i, val = 0;
 	uint32_t *buf;
 	drm_intel_bo *target_bo;
 
-	for (i = 0; i < SLOW_QUICK(0x10000, 4); i++) {
+	igt_until_timeout(timeout) {
 		/* we want to check tlb consistency of the pipe_control target,
 		 * so get a new buffer every time around */
 		target_bo = drm_intel_bo_alloc(bufmgr, "target bo", 4096, 4096);
@@ -182,10 +182,10 @@ igt_main
 	}
 
 	igt_subtest("fresh-buffer")
-		store_pipe_control_loop(false);
+		store_pipe_control_loop(false, 2);
 
 	igt_subtest("reused-buffer")
-		store_pipe_control_loop(true);
+		store_pipe_control_loop(true, 2);
 
 	igt_fixture {
 		intel_batchbuffer_free(batch);
