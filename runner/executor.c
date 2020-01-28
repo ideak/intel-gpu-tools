@@ -759,28 +759,41 @@ static int monitor_output(pid_t child,
 			return -1;
 		}
 
-		if (settings->abort_mask & ABORT_TAINT && tainted(&taints)) /* cancel children after a kernel OOPS */
-			n = 0, intervals_left = 1;
+		/*
+		 * If we're configured to care about taints, kill the
+		 * test if there's a taint. But only if we didn't
+		 * already kill it, and make sure we still process the
+		 * fds select() marked for us.
+		 */
+		if (settings->abort_mask & ABORT_TAINT &&
+		    tainted(&taints) &&
+		    killed == 0) {
+			if (settings->log_level >= LOG_LEVEL_NORMAL) {
+				outf("Killing the test because the kernel is tainted.\n");
+				fflush(stdout);
+			}
 
-		if (n == 0) {
+			killed = SIGQUIT;
+			if (!kill_child(killed, child))
+				return -1;
+
+			/*
+			 * Now continue the loop and let the
+			 * dying child be handled normally.
+			 */
+			timeout = 20;
+			watchdogs_set_timeout(120);
+			intervals_left = timeout_intervals = 1;
+		} else if (n == 0) {
 			if (--intervals_left)
 				continue;
 
 			switch (killed) {
 			case 0:
-				/* If abort_mask doesn't have taint set, taints is still 0 here */
-				if (!is_tainted(taints)) {
-					show_kernel_task_state();
-					if (settings->log_level >= LOG_LEVEL_NORMAL) {
-						outf("Timeout. Killing the current test with SIGQUIT.\n");
-
-						fflush(stdout);
-					}
-				} else {
-					if (settings->log_level >= LOG_LEVEL_NORMAL) {
-						outf("Killing the test because the kernel is tainted.\n");
-						fflush(stdout);
-					}
+				show_kernel_task_state();
+				if (settings->log_level >= LOG_LEVEL_NORMAL) {
+					outf("Timeout. Killing the current test with SIGQUIT.\n");
+					fflush(stdout);
 				}
 
 				killed = SIGQUIT;
