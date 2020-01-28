@@ -278,7 +278,8 @@ static void invalid_balancer(int i915)
 		igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
 
 		handle = gem_create(i915, 4096 * 3);
-		ptr = gem_mmap__gtt(i915, handle, 4096 * 3, PROT_WRITE);
+		ptr = gem_mmap__device_coherent(i915, handle, 0, 4096 * 3,
+						PROT_WRITE);
 		gem_close(i915, handle);
 
 		memset(&engines, 0, sizeof(engines));
@@ -369,7 +370,7 @@ static void invalid_bonds(int i915)
 	gem_context_set_param(i915, &p);
 
 	handle = gem_create(i915, 4096 * 3);
-	ptr = gem_mmap__gtt(i915, handle, 4096 * 3, PROT_WRITE);
+	ptr = gem_mmap__device_coherent(i915, handle, 0, 4096 * 3, PROT_WRITE);
 	gem_close(i915, handle);
 
 	memcpy(ptr + 4096, &bonds[0], sizeof(bonds[0]));
@@ -720,7 +721,7 @@ static uint32_t create_semaphore_to_spinner(int i915, igt_spin_t *spin)
 	uint64_t addr;
 
 	handle = gem_create(i915, 4096);
-	cs = map = gem_mmap__cpu(i915, handle, 0, 4096, PROT_WRITE);
+	cs = map = gem_mmap__device_coherent(i915, handle, 0, 4096, PROT_WRITE);
 
 	/* Wait until the spinner is running */
 	addr = spin->obj[0].offset + 4 * SPIN_POLL_START_IDX;
