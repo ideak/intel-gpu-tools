@@ -144,7 +144,7 @@ static void invalid_engines(int i915)
 	igt_assert_eq(__gem_context_set_param(i915, &param), -EFAULT);
 
 	handle = gem_create(i915, 4096 * 3);
-	ptr = gem_mmap__gtt(i915, handle, 4096 * 3, PROT_READ);
+	ptr = gem_mmap__device_coherent(i915, handle, 0, 4096 * 3, PROT_READ);
 	gem_close(i915, handle);
 
 	munmap(ptr, 4096);
