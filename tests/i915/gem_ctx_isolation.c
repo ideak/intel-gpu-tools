@@ -575,7 +575,6 @@ static void nonpriv(int fd,
 		0x0505c0c0,
 		0xdeadbeef
 	};
-	unsigned int engine = e->flags;
 	unsigned int num_values = ARRAY_SIZE(values);
 
 	/* Sigh -- hsw: we need cmdparser access to our own registers! */
@@ -593,7 +592,7 @@ static void nonpriv(int fd,
 
 		tmpl_regs(fd, ctx, e, tmpl, values[v]);
 
-		spin = igt_spin_new(fd, .ctx = ctx, .engine = engine);
+		spin = igt_spin_new(fd, .ctx = ctx, .engine = e->flags);
 
 		igt_debug("%s[%d]: Setting all registers to 0x%08x\n",
 			  __func__, v, values[v]);
@@ -606,12 +605,12 @@ static void nonpriv(int fd,
 			/* Explicit sync to keep the switch between write/read */
 			syncpt = igt_spin_new(fd,
 					      .ctx = ctx,
-					      .engine = engine,
+					      .engine = e->flags,
 					      .flags = IGT_SPIN_FENCE_OUT);
 
 			dirt = igt_spin_new(fd,
 					    .ctx = sw,
-					    .engine = engine,
+					    .engine = e->flags,
 					    .fence = syncpt->out_fence,
 					    .flags = (IGT_SPIN_FENCE_IN |
 						      IGT_SPIN_FENCE_OUT));
@@ -619,7 +618,7 @@ static void nonpriv(int fd,
 
 			syncpt = igt_spin_new(fd,
 					      .ctx = ctx,
-					      .engine = engine,
+					      .engine = e->flags,
 					      .fence = dirt->out_fence,
 					      .flags = IGT_SPIN_FENCE_IN);
 			igt_spin_free(fd, dirt);
@@ -660,7 +659,6 @@ static void isolation(int fd,
 		0xaaaaaaaa,
 		0xdeadbeef
 	};
-	unsigned int engine = e->flags;
 	unsigned int num_values =
 		flags & (DIRTY1 | DIRTY2) ? ARRAY_SIZE(values) : 1;
 
@@ -673,7 +671,7 @@ static void isolation(int fd,
 		ctx[0] = gem_context_create(fd);
 		regs[0] = read_regs(fd, ctx[0], e, flags);
 
-		spin = igt_spin_new(fd, .ctx = ctx[0], .engine = engine);
+		spin = igt_spin_new(fd, .ctx = ctx[0], .engine = e->flags);
 
 		if (flags & DIRTY1) {
 			igt_debug("%s[%d]: Setting all registers of ctx 0 to 0x%08x\n",
@@ -726,11 +724,11 @@ static void isolation(int fd,
 #define S4 (4 << 8)
 #define SLEEP_MASK (0xf << 8)
 
-static void inject_reset_context(int fd, unsigned int engine)
+static void inject_reset_context(int fd, const struct intel_execution_engine2 *e)
 {
 	struct igt_spin_factory opts = {
 		.ctx = gem_context_create(fd),
-		.engine = engine,
+		.engine = e->flags,
 		.flags = IGT_SPIN_FAST,
 	};
 	igt_spin_t *spin;
@@ -741,7 +739,7 @@ static void inject_reset_context(int fd, unsigned int engine)
 	 * HW for screwing up if the context was already broken.
 	 */
 
-	if (gem_can_store_dword(fd, engine))
+	if (gem_class_can_store_dword(fd, e->class))
 		opts.flags |= IGT_SPIN_POLL_RUN;
 
 	spin = __igt_spin_factory(fd, &opts);
@@ -771,7 +769,6 @@ static void preservation(int fd,
 		0xdeadbeef
 	};
 	const unsigned int num_values = ARRAY_SIZE(values);
-	unsigned int engine = e->flags;
 	uint32_t ctx[num_values +1 ];
 	uint32_t regs[num_values + 1][2];
 	igt_spin_t *spin;
@@ -779,7 +776,7 @@ static void preservation(int fd,
 	gem_quiescent_gpu(fd);
 
 	ctx[num_values] = gem_context_create(fd);
-	spin = igt_spin_new(fd, .ctx = ctx[num_values], .engine = engine);
+	spin = igt_spin_new(fd, .ctx = ctx[num_values], .engine = e->flags);
 	regs[num_values][0] = read_regs(fd, ctx[num_values], e, flags);
 	for (int v = 0; v < num_values; v++) {
 		ctx[v] = gem_context_create(fd);
@@ -792,7 +789,7 @@ static void preservation(int fd,
 	igt_spin_free(fd, spin);
 
 	if (flags & RESET)
-		inject_reset_context(fd, engine);
+		inject_reset_context(fd, e);
 
 	switch (flags & SLEEP_MASK) {
 	case NOSLEEP:
@@ -819,7 +816,7 @@ static void preservation(int fd,
 		break;
 	}
 
-	spin = igt_spin_new(fd, .ctx = ctx[num_values], .engine = engine);
+	spin = igt_spin_new(fd, .ctx = ctx[num_values], .engine = e->flags);
 	for (int v = 0; v < num_values; v++)
 		regs[v][1] = read_regs(fd, ctx[v], e, flags);
 	regs[num_values][1] = read_regs(fd, ctx[num_values], e, flags);
