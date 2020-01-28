@@ -2379,18 +2379,23 @@ static void destroy_cairo_surface__gtt(void *arg)
 
 static void *map_bo(int fd, struct igt_fb *fb)
 {
+	bool is_i915 = is_i915_device(fd);
 	void *ptr;
 
-	if (is_i915_device(fd))
+	if (is_i915)
 		gem_set_domain(fd, fb->gem_handle,
 			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 	if (fb->is_dumb)
 		ptr = kmstest_dumb_map_buffer(fd, fb->gem_handle, fb->size,
 					      PROT_READ | PROT_WRITE);
-	else if (is_i915_device(fd))
+	else if (is_i915 && gem_has_mappable_ggtt(fd))
 		ptr = gem_mmap__gtt(fd, fb->gem_handle, fb->size,
 				    PROT_READ | PROT_WRITE);
+	else if (is_i915)
+		ptr = gem_mmap__device_coherent(fd, fb->gem_handle, 0,
+						fb->size,
+						PROT_READ | PROT_WRITE);
 	else if (is_vc4_device(fd))
 		ptr = igt_vc4_mmap_bo(fd, fb->gem_handle, fb->size,
 				      PROT_READ | PROT_WRITE);
