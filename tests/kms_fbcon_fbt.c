@@ -222,7 +222,8 @@ static bool psr_wait_until_update(int debugfs_fd)
 static void disable_features(int debugfs_fd)
 {
 	igt_set_module_param_int("enable_fbc", 0);
-	psr_disable(debugfs_fd);
+	if (psr_sink_support(debugfs_fd, PSR_MODE_1))
+		psr_disable(debugfs_fd);
 }
 
 static inline void fbc_modparam_enable(int debugfs_fd)
