@@ -578,6 +578,8 @@ static void waitboost(int fd, bool reset)
 	int fmid = (origfreqs[RPn] + origfreqs[RP0]) / 2;
 	fmid = get_hw_rounded_freq(fmid);
 
+	igt_require(origfreqs[RP0] > origfreqs[RPn]);
+
 	load_helper_run(LOW);
 
 	igt_debug("Apply low load...\n");
