@@ -74,6 +74,8 @@ static void teardown_drm(struct drm_info *drm)
 {
 	int i;
 
+	igt_assert_eq(drmDropMaster(drm->fd), 0);
+
 	kmstest_restore_vt_mode();
 
 	for (i = 0; i < drm->res->count_connectors; i++)
