@@ -54,6 +54,37 @@ static int tile_width;
 static int tile_height;
 static int tile_size;
 
+static int mmap_ioctl(int i915, struct drm_i915_gem_mmap *arg)
+{
+	int err = 0;
+
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_MMAP, arg)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
+}
+
+static void *
+local_gem_mmap__wc(int fd, uint32_t handle, uint64_t offset, uint64_t size,
+		   unsigned prot)
+{
+	struct drm_i915_gem_mmap arg = {
+		.handle = handle,
+		.offset = offset,
+		.size = size,
+		.flags = I915_MMAP_WC,
+	};
+	(void) prot; //currently not used
+
+	igt_assert_eq(mmap_ioctl(fd, &arg), 0);
+	igt_assert(arg.addr_ptr);
+
+	return from_user_pointer(arg.addr_ptr);
+}
+
 static uint32_t
 create_bo(int fd)
 {
@@ -114,6 +145,7 @@ igt_simple_main
 
 	fd = drm_open_driver(DRIVER_INTEL);
 	gem_require_mmap_wc(fd);
+	gem_require_mappable_ggtt(fd);
 
 	handle = create_bo(fd);
 	igt_require(gem_get_tiling(fd, handle, &tiling, &swizzle));
@@ -153,7 +185,8 @@ igt_simple_main
 		first_page = offset & -PAGE_SIZE;
 		last_page = (offset + len + PAGE_SIZE - 1) & -PAGE_SIZE;
 
-		linear = gem_mmap__wc(fd, handle, first_page, last_page - first_page, PROT_READ);
+		linear = local_gem_mmap__wc(fd, handle, first_page,
+					    last_page - first_page, PROT_READ);
 
 		/* Translate from offsets in the read buffer to the swizzled
 		 * address that it corresponds to.  This is the opposite of
