@@ -3430,6 +3430,10 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 	if (use_enginecopy(fb) || use_blitter(fb) ||
 	    igt_vc4_is_tiled(fb->modifier)) {
 		setup_linear_mapping(&blit->base);
+
+		/* speed things up by working from a copy in system memory */
+		cvt.src.slow_reads =
+			is_i915_device(fd) && !gem_has_mappable_ggtt(fd);
 	} else {
 		blit->base.linear.fb = *fb;
 		blit->base.linear.fb.gem_handle = 0;
