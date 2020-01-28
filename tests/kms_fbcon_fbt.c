@@ -37,8 +37,6 @@ IGT_TEST_DESCRIPTION("Test the relationship between fbcon and the frontbuffer "
 
 #define MAX_CONNECTORS 32
 
-static bool do_wait_user = false;
-
 struct drm_info {
 	int fd;
 	int debugfs_fd;
@@ -48,12 +46,8 @@ struct drm_info {
 
 static void wait_user(const char *msg)
 {
-	if (!do_wait_user)
-		return;
-
-	igt_info("%s Press enter...\n", msg);
-	while (getchar() != '\n')
-		;
+	igt_info("%s\n", msg);
+	igt_debug_wait_for_keypress("fbt");
 }
 
 static void setup_drm(struct drm_info *drm)
