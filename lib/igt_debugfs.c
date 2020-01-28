@@ -77,9 +77,6 @@
  *
  * - drm/i915 supports interfaces to evict certain classes of gem buffer
  *   objects, see igt_drop_caches_set().
- *
- * - drm/i915 supports an interface to disable prefaulting, useful to test
- *   slow paths in ioctls. See igt_disable_prefault().
  */
 
 /*
@@ -1059,62 +1056,6 @@ void igt_drop_caches_set(int drm_fd, uint64_t val)
 	igt_assert(igt_sysfs_printf(dir, "i915_gem_drop_caches",
 				    "0x%" PRIx64, val) > 0);
 	close(dir);
-}
-
-/*
- * Prefault control
- */
-
-#define PREFAULT_DEBUGFS "/sys/module/i915/parameters/prefault_disable"
-static void igt_prefault_control(bool enable)
-{
-	const char *name = PREFAULT_DEBUGFS;
-	int fd;
-	char buf[2] = {'Y', 'N'};
-	int index;
-
-	fd = open(name, O_RDWR);
-	igt_require(fd >= 0);
-
-	if (enable)
-		index = 1;
-	else
-		index = 0;
-
-	igt_require(write(fd, &buf[index], 1) == 1);
-
-	close(fd);
-}
-
-static void enable_prefault_at_exit(int sig)
-{
-	igt_enable_prefault();
-}
-
-/**
- * igt_disable_prefault:
- *
- * Disable prefaulting in certain gem ioctls through the debugfs interface. As
- * usual this installs an exit handler to clean up and re-enable prefaulting
- * even when the test exited abnormally.
- *
- * igt_enable_prefault() will enable normale operation again.
- */
-void igt_disable_prefault(void)
-{
-	igt_prefault_control(false);
-
-	igt_install_exit_handler(enable_prefault_at_exit);
-}
-
-/**
- * igt_enable_prefault:
- *
- * Enable prefault (again) through the debugfs interface.
- */
-void igt_enable_prefault(void)
-{
-	igt_prefault_control(true);
 }
 
 static int get_object_count(int fd)

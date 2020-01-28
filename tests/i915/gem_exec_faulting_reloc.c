@@ -247,9 +247,4 @@ igt_main
 {
 	igt_subtest("normal")
 		run(OBJECT_SIZE);
-	igt_subtest("no-prefault") {
-		igt_disable_prefault();
-		run(OBJECT_SIZE);
-		igt_enable_prefault();
-	}
 }

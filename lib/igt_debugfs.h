@@ -203,13 +203,6 @@ static inline void rcu_barrier(int fd)
 }
 
 /*
- * Prefault control
- */
-
-void igt_disable_prefault(void);
-void igt_enable_prefault(void);
-
-/*
  * Put the driver into a stable (quiescent) state and get the current number of
  * gem buffer objects
  */

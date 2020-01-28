@@ -192,15 +192,12 @@ static void faulting_reloc_and_emit(int fd, drm_intel_bo *target_bo,
 	gem_execbuf(fd, &execbuf);
 }
 
-static void do_test(int fd, bool faulting_reloc)
+static void do_test(int fd)
 {
 	uint32_t tiling_mode = I915_TILING_X;
 	unsigned long pitch, act_size;
 	uint32_t test;
 	int i, repeat;
-
-	if (faulting_reloc)
-		igt_disable_prefault();
 
 	act_size = 2048;
 	dummy_bo = drm_intel_bo_alloc_tiled(bufmgr, "tiled dummy_bo", act_size, act_size,
@@ -268,16 +265,12 @@ static void do_test(int fd, bool faulting_reloc)
 	drm_intel_gem_bo_unmap_gtt(dummy_bo);
 
 	drm_intel_bo_unreference(dummy_bo);
-
-	if (faulting_reloc)
-		igt_enable_prefault();
 }
 
 #define INTERRUPT	(1 << 0)
-#define FAULTING	(1 << 1)
-#define THRASH		(1 << 2)
-#define THRASH_INACTIVE	(1 << 3)
-#define ALL_FLAGS	(INTERRUPT | FAULTING | THRASH | THRASH_INACTIVE)
+#define THRASH		(1 << 1)
+#define THRASH_INACTIVE	(1 << 2)
+#define ALL_FLAGS	(INTERRUPT | THRASH | THRASH_INACTIVE)
 static void do_forked_test(int fd, unsigned flags)
 {
 	int num_threads = sysconf(_SC_NPROCESSORS_ONLN);
@@ -306,7 +299,7 @@ static void do_forked_test(int fd, unsigned flags)
 		if (flags & INTERRUPT)
 			igt_fork_signal_helper();
 
-		do_test(fd, flags & FAULTING);
+		do_test(fd);
 
 		if (flags & INTERRUPT)
 			igt_stop_signal_helper();
@@ -337,20 +330,19 @@ igt_main
 	}
 
 	igt_subtest("normal")
-		do_test(fd, false);
+		do_test(fd);
 
 	igt_fork_signal_helper();
 	igt_subtest("interruptible")
-		do_test(fd, false);
+		do_test(fd);
 	igt_stop_signal_helper();
 
 	for (unsigned flags = 0; flags <= ALL_FLAGS; flags++) {
 		if ((flags & THRASH) && (flags & THRASH_INACTIVE))
 			continue;
 
-		igt_subtest_f("forked%s%s%s%s",
+		igt_subtest_f("forked%s%s%s",
 			      flags & INTERRUPT ? "-interruptible" : "",
-			      flags & FAULTING ? "-faulting-reloc" : "",
 			      flags & THRASH ? "-thrashing" : "",
 			      flags & THRASH_INACTIVE ? "-thrash-inactive" : "")
 			do_forked_test(fd, flags);

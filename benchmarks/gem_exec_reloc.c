@@ -48,7 +48,6 @@
 #define SKIP_RELOC 0x1
 #define NO_RELOC 0x2
 #define CYCLE_BATCH 0x4
-#define FAULT 0x8
 #define LUT 0x10
 #define SEQUENTIAL_OFFSET 0x20
 #define REVERSE_OFFSET 0x40
@@ -121,11 +120,7 @@ static int run(unsigned batch_size,
 		memcpy(reloc, mem_reloc, sizeof(*mem_reloc)*num_relocs);
 		munmap(reloc, size);
 
-		if (flags & FAULT) {
-			igt_disable_prefault();
-			reloc = __gem_mmap__cpu(fd, reloc_handle, 0, size, PROT_READ | PROT_WRITE);
-		} else
-			reloc = mem_reloc;
+		reloc = mem_reloc;
 	}
 
 	gem_exec[num_objects].relocation_count = num_relocs;
@@ -162,20 +157,10 @@ static int run(unsigned batch_size,
 					gem_exec[num_objects].handle = cycle[c];
 				}
 			}
-			if (flags & FAULT && reloc) {
-				munmap(reloc, size);
-				reloc = __gem_mmap__cpu(fd, reloc_handle, 0, size, PROT_READ | PROT_WRITE);
-				gem_exec[num_objects].relocs_ptr = (uintptr_t)reloc;
-			}
 			gem_execbuf(fd, &execbuf);
 		}
 		gettimeofday(&end, NULL);
 		printf("%.3f\n", ELAPSED(&start, &end));
-	}
-
-	if (flags & FAULT && reloc) {
-		munmap(reloc, size);
-		igt_enable_prefault();
 	}
 
 	return 0;
@@ -208,8 +193,6 @@ int main(int argc, char **argv)
 				flags |= 0;
 			} else if (strcmp(optarg, "cyclic") == 0) {
 				flags |= CYCLE_BATCH;
-			} else if (strcmp(optarg, "fault") == 0) {
-				flags |= FAULT;
 			} else if (strcmp(optarg, "skip") == 0) {
 				flags |= SKIP_RELOC;
 			} else if (strcmp(optarg, "none") == 0) {

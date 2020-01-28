@@ -360,12 +360,6 @@ gem_readwrite_SOURCES = i915/gem_readwrite.c
 TESTS_progs += gem_reg_read
 gem_reg_read_SOURCES = i915/gem_reg_read.c
 
-TESTS_progs += gem_reloc_overflow
-gem_reloc_overflow_SOURCES = i915/gem_reloc_overflow.c
-
-TESTS_progs += gem_reloc_vs_gpu
-gem_reloc_vs_gpu_SOURCES = i915/gem_reloc_vs_gpu.c
-
 TESTS_progs += gem_render_copy
 gem_render_copy_SOURCES = i915/gem_render_copy.c
 

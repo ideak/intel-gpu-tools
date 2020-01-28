@@ -1022,15 +1022,6 @@ test_fault_concurrent(int fd)
 		munmap(ptr[n], *ptr[n] * sizeof(uint32_t));
 }
 
-static void
-run_without_prefault(int fd,
-			void (*func)(int fd))
-{
-	igt_disable_prefault();
-	func(fd);
-	igt_enable_prefault();
-}
-
 static int mmap_ioctl(int i915, struct drm_i915_gem_mmap_gtt *arg)
 {
 	int err = 0;
@@ -1109,12 +1100,6 @@ igt_main
 		test_read_write2(fd, READ_AFTER_WRITE);
 	igt_subtest("fault-concurrent")
 		test_fault_concurrent(fd);
-	igt_subtest("basic-read-no-prefault")
-		run_without_prefault(fd, test_read);
-	igt_subtest("basic-write-no-prefault")
-		run_without_prefault(fd, test_write);
-	igt_subtest("basic-write-gtt-no-prefault")
-		run_without_prefault(fd, test_write_gtt);
 	igt_subtest("basic-write-cpu-read-gtt")
 		test_write_cpu_read_gtt(fd);
 	igt_subtest("basic-wc")

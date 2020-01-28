@@ -52,7 +52,6 @@ IGT_TEST_DESCRIPTION("Exercises the basic execbuffer using the handle LUT"
 #define SKIP_RELOC 0x1
 #define NO_RELOC 0x2
 #define CYCLE_BATCH 0x4
-#define FAULT 0x8
 
 int target[MAX_NUM_RELOC];
 struct drm_i915_gem_exec_object2 gem_exec[MAX_NUM_EXEC+1];
@@ -92,7 +91,6 @@ igt_simple_main
 	} pass[] = {
 		{ .name = "relocation", .flags = 0 },
 		{ .name = "cycle-relocation", .flags = CYCLE_BATCH },
-		{ .name = "fault-relocation", .flags = FAULT },
 		{ .name = "skip-relocs", .flags = SKIP_RELOC },
 		{ .name = "no-relocs", .flags = SKIP_RELOC | NO_RELOC },
 		{ .name = NULL },
@@ -132,8 +130,6 @@ igt_simple_main
 	igt_require(has_exec_lut(fd));
 
 	for (p = pass; p->name != NULL; p++) {
-		if (p->flags & FAULT)
-			igt_disable_prefault();
 		for (n = 1; n <= MAX_NUM_EXEC; n *= 2) {
 			double elapsed[16][2];
 			double s_x, s_y, s_xx, s_xy;
@@ -145,10 +141,7 @@ igt_simple_main
 				struct drm_i915_gem_exec_object2 *objects;
 				struct timeval start, end;
 
-				if (p->flags & FAULT)
-					reloc = __gem_mmap__cpu(fd, reloc_handle, 0, size, PROT_READ | PROT_WRITE);
-				else
-					reloc = mem_reloc;
+				reloc = mem_reloc;
 
 				gem_exec[MAX_NUM_EXEC].relocation_count = m;
 				gem_exec[MAX_NUM_EXEC].relocs_ptr = to_user_pointer(reloc);
@@ -178,11 +171,6 @@ igt_simple_main
 							gem_exec[MAX_NUM_EXEC].handle = cycle[c];
 						}
 					}
-					if (p->flags & FAULT) {
-						munmap(reloc, size);
-						reloc = __gem_mmap__cpu(fd, reloc_handle, 0, size, PROT_READ | PROT_WRITE);
-						gem_exec[MAX_NUM_EXEC].relocs_ptr = to_user_pointer(reloc);
-					}
 					gem_execbuf(fd, &execbuf);
 				}
 				gettimeofday(&end, NULL);
@@ -208,11 +196,6 @@ igt_simple_main
 							gem_exec[MAX_NUM_EXEC].handle = cycle[c];
 						}
 					}
-					if (p->flags & FAULT) {
-						munmap(reloc, size);
-						reloc = __gem_mmap__cpu(fd, reloc_handle, 0, size, PROT_READ | PROT_WRITE);
-						gem_exec[MAX_NUM_EXEC].relocs_ptr = to_user_pointer(reloc);
-					}
 					gem_execbuf(fd, &execbuf);
 				}
 				gettimeofday(&end, NULL);
@@ -222,9 +205,6 @@ igt_simple_main
 				while (c != 0);
 				gem_exec[MAX_NUM_EXEC].handle = cycle[c];
 				elapsed[i][0] = ELAPSED(&start, &end);
-
-				if (p->flags & FAULT)
-					munmap(reloc, size);
 			}
 
 			igt_info("%s: buffers=%4d:", p->name, n);
@@ -255,7 +235,5 @@ igt_simple_main
 
 			igt_info("\n");
 		}
-		if (p->flags & FAULT)
-			igt_enable_prefault();
 	}
 }

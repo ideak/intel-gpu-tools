@@ -185,8 +185,6 @@ i915_progs = [
 	'gem_read_read_speed',
 	'gem_readwrite',
 	'gem_reg_read',
-	'gem_reloc_overflow',
-	'gem_reloc_vs_gpu',
 	'gem_render_copy',
 	'gem_render_copy_redux',
 	'gem_render_linear_blits',
