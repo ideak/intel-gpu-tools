@@ -142,7 +142,7 @@ static int workaround_fail_count(int i915, uint32_t ctx)
 
 	igt_debug("Address\tval\t\tmask\t\tread\t\tresult\n");
 
-	out = gem_mmap__cpu(i915, obj[0].handle, 0, result_sz, PROT_READ);
+	out = gem_mmap__cpu(i915, obj[0].handle, 0, result_sz, PROT_WRITE);
 	for (int i = 0; i < num_wa_regs; i++) {
 		char buf[80];
 
