@@ -276,6 +276,22 @@ static igt_plane_t *compatible_main_plane(data_t *data)
 	return igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 }
 
+static drmModeModeInfo *get_wide_mode(drmModeModeInfo *preferred_mode,
+				      igt_output_t *output)
+{
+	drmModeModeInfo *mode, *tmp;
+	int i;
+
+	mode = preferred_mode;
+	for (i = 0; i < output->config.connector->count_modes; i++) {
+		tmp = &output->config.connector->modes[i];
+		if (tmp->hdisplay > mode->hdisplay)
+			mode = tmp;
+	}
+
+	return mode;
+}
+
 static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 		       igt_crc_t *crc)
 {
@@ -297,6 +313,12 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 	if (!igt_plane_has_format_mod(primary, data->format,
 				      data->ccs_modifier))
 		return false;
+
+	if ((fb_flags & FB_MISALIGN_AUX_STRIDE) ||
+	    (fb_flags & FB_SMALL_AUX_STRIDE)) {
+		drm_mode = get_wide_mode(drm_mode, data->output);
+		igt_output_override_mode(data->output, drm_mode);
+	}
 
 	if (data->plane && fb_flags & FB_COMPRESSED) {
 		if (!igt_plane_has_format_mod(data->plane, data->format,
@@ -355,6 +377,11 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 
 	if (data->flags & TEST_CRC)
 		igt_remove_fb(data->drm_fd, &fb);
+
+	if ((fb_flags & FB_MISALIGN_AUX_STRIDE) ||
+	    (fb_flags & FB_SMALL_AUX_STRIDE)) {
+		igt_output_override_mode(data->output, NULL);
+	}
 
 	return true;
 }
