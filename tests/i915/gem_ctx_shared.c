@@ -605,7 +605,7 @@ static void independent(int i915, unsigned ring, unsigned flags)
 	for (int i = 0; i < ARRAY_SIZE(priorities); i++) {
 		uint32_t *ptr;
 
-		ptr = gem_mmap__gtt(i915, handle[i], 4096, PROT_READ);
+		ptr = gem_mmap__device_coherent(i915, handle[i], 0, 4096, PROT_READ);
 		gem_set_domain(i915, handle[i], /* no write hazard lies! */
 			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 		gem_close(i915, handle[i]);
@@ -650,7 +650,7 @@ static void reorder(int i915, unsigned ring, unsigned flags)
 	gem_context_destroy(i915, ctx[LO]);
 	gem_context_destroy(i915, ctx[HI]);
 
-	ptr = gem_mmap__gtt(i915, scratch, 4096, PROT_READ);
+	ptr = gem_mmap__device_coherent(i915, scratch, 0, 4096, PROT_READ);
 	gem_set_domain(i915, scratch, /* no write hazard lies! */
 		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	gem_close(i915, scratch);
@@ -705,7 +705,7 @@ static void promotion(int i915, unsigned ring)
 	gem_context_destroy(i915, ctx[LO]);
 	gem_context_destroy(i915, ctx[HI]);
 
-	ptr = gem_mmap__gtt(i915, dep, 4096, PROT_READ);
+	ptr = gem_mmap__device_coherent(i915, dep, 0, 4096, PROT_READ);
 	gem_set_domain(i915, dep, /* no write hazard lies! */
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	gem_close(i915, dep);
@@ -713,7 +713,7 @@ static void promotion(int i915, unsigned ring)
 	igt_assert_eq_u32(ptr[0], ctx[HI]);
 	munmap(ptr, 4096);
 
-	ptr = gem_mmap__gtt(i915, result, 4096, PROT_READ);
+	ptr = gem_mmap__device_coherent(i915, result, 0, 4096, PROT_READ);
 	gem_set_domain(i915, result, /* no write hazard lies! */
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	gem_close(i915, result);
@@ -768,7 +768,7 @@ static void smoketest(int i915, unsigned ring, unsigned timeout)
 	}
 	igt_waitchildren();
 
-	ptr = gem_mmap__gtt(i915, scratch, 4096, PROT_READ);
+	ptr = gem_mmap__device_coherent(i915, scratch, 0, 4096, PROT_READ);
 	gem_set_domain(i915, scratch, /* no write hazard lies! */
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	gem_close(i915, scratch);
