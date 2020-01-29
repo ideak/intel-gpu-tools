@@ -327,9 +327,6 @@ gem_mmap_wc_SOURCES = i915/gem_mmap_wc.c
 TESTS_progs += gem_partial_pwrite_pread
 gem_partial_pwrite_pread_SOURCES = i915/gem_partial_pwrite_pread.c
 
-TESTS_progs += gem_persistent_relocs
-gem_persistent_relocs_SOURCES = i915/gem_persistent_relocs.c
-
 TESTS_progs += gem_pipe_control_store_loop
 gem_pipe_control_store_loop_SOURCES = i915/gem_pipe_control_store_loop.c
 

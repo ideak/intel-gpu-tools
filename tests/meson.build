@@ -174,7 +174,6 @@ i915_progs = [
 	'gem_mmap_offset_exhaustion',
 	'gem_mmap_wc',
 	'gem_partial_pwrite_pread',
-	'gem_persistent_relocs',
 	'gem_pipe_control_store_loop',
 	'gem_ppgtt',
 	'gem_pread',
