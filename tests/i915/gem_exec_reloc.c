@@ -379,7 +379,8 @@ static bool has_64b_reloc(int fd)
 
 #define NORELOC 1
 #define ACTIVE 2
-#define HANG 4
+#define INTERRUPTIBLE 4
+#define HANG 8
 static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 {
 #define OBJSZ 8192
@@ -735,6 +736,7 @@ igt_main
 		{ "", 0 , true},
 		{ "-noreloc", NORELOC, true },
 		{ "-active", ACTIVE, true },
+		{ "-interruptible", ACTIVE | INTERRUPTIBLE },
 		{ "-hang", ACTIVE | HANG },
 		{ },
 	}, *f;
@@ -762,14 +764,17 @@ igt_main
 					      f->name) {
 					if ((m->before | m->after) & I915_GEM_DOMAIN_WC)
 						igt_require(gem_mmap__has_wc(fd));
-					basic_reloc(fd, m->before, m->after, f->flags);
+					igt_while_interruptible(f->flags & INTERRUPTIBLE)
+						basic_reloc(fd, m->before, m->after, f->flags);
 				}
 			}
 
 			if (!(f->flags & NORELOC)) {
 				igt_subtest_f("%srange%s",
-					      f->basic ? "basic-" : "", f->name)
-					basic_range(fd, f->flags);
+					      f->basic ? "basic-" : "", f->name) {
+					igt_while_interruptible(f->flags & INTERRUPTIBLE)
+						basic_range(fd, f->flags);
+				}
 			}
 
 			igt_fixture {
