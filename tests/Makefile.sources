@@ -294,9 +294,6 @@ gem_gtt_hog_SOURCES = i915/gem_gtt_hog.c
 TESTS_progs += gem_gtt_speed
 gem_gtt_speed_SOURCES = i915/gem_gtt_speed.c
 
-TESTS_progs += gem_largeobject
-gem_largeobject_SOURCES = i915/gem_largeobject.c
-
 TESTS_progs += gem_linear_blits
 gem_linear_blits_SOURCES = i915/gem_linear_blits.c
 
