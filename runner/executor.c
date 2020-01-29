@@ -1010,8 +1010,26 @@ static int monitor_output(pid_t child,
 				time = 0.0;
 
 			if (!aborting) {
+				const char *exitline;
+
+				exitline = killed ? EXECUTOR_TIMEOUT : EXECUTOR_EXIT;
+
+				/* If we're stopping because we killed
+				 * the test for tainting, let's not
+				 * call it a timeout. Since the test
+				 * execution was still going on, we
+				 * probably didn't yet get the subtest
+				 * result line printed. Such a case is
+				 * parsed as an incomplete unless the
+				 * journal says timeout, ergo to make
+				 * the result an incomplete we avoid
+				 * journaling a timeout here.
+				 */
+				if (is_tainted(taints))
+					exitline = EXECUTOR_EXIT;
+
 				dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
-					killed ? EXECUTOR_TIMEOUT : EXECUTOR_EXIT,
+					exitline,
 					status, time);
 				if (settings->sync) {
 					fdatasync(outputs[_F_JOURNAL]);
