@@ -818,6 +818,11 @@ void igt_blitter_src_copy(int fd,
 	src_pitch = (gen >= 4 && src_tiling) ? src_stride / 4 : src_stride;
 	dst_pitch = (gen >= 4 && dst_tiling) ? dst_stride / 4 : dst_stride;
 
+	if (bpp == 64) {
+		bpp /= 2;
+		width *= 2;
+	}
+
 	CHECK_RANGE(src_x); CHECK_RANGE(src_y);
 	CHECK_RANGE(dst_x); CHECK_RANGE(dst_y);
 	CHECK_RANGE(width); CHECK_RANGE(height);

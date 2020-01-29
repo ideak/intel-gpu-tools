@@ -1960,9 +1960,31 @@ struct fb_blit_upload {
 	struct intel_batchbuffer *batch;
 };
 
+static bool fast_blit_ok(const struct igt_fb *fb)
+{
+	int gen = intel_gen(intel_get_drm_devid(fb->fd));
+
+	if (gen < 9)
+		return false;
+
+	if (gen < 12)
+		return true;
+
+	return fb->modifier != I915_FORMAT_MOD_X_TILED;
+}
+
 static bool blitter_ok(const struct igt_fb *fb)
 {
 	for (int i = 0; i < fb->num_planes; i++) {
+		int width = fb->plane_width[i];
+
+		/*
+		 * XY_SRC blit supports only 32bpp, but we can still use it
+		 * for a 64bpp plane by treating that as a 2x wide 32bpp plane.
+		 */
+		if (!fast_blit_ok(fb) && fb->plane_bpp[i] == 64)
+			width *= 2;
+
 		/*
 		 * gen4+ stride limit is 4x this with tiling,
 		 * but since our blits are always between tiled
@@ -1970,7 +1992,7 @@ static bool blitter_ok(const struct igt_fb *fb)
 		 * for the tiled surface) we must use the lower
 		 * linear stride limit here.
 		 */
-		if (fb->plane_width[i] > 32767 ||
+		if (width > 32767 ||
 		    fb->plane_height[i] > 32767 ||
 		    fb->strides[i] > 32767)
 			return false;
@@ -2158,8 +2180,6 @@ static void blitcopy(const struct igt_fb *dst_fb,
 	dst_tiling = igt_fb_mod_to_tiling(dst_fb->modifier);
 
 	for (int i = 0; i < dst_fb->num_planes; i++) {
-		int gen = intel_gen(intel_get_drm_devid(src_fb->fd));
-
 		igt_assert_eq(dst_fb->plane_bpp[i], src_fb->plane_bpp[i]);
 		igt_assert_eq(dst_fb->plane_width[i], src_fb->plane_width[i]);
 		igt_assert_eq(dst_fb->plane_height[i], src_fb->plane_height[i]);
@@ -2168,9 +2188,7 @@ static void blitcopy(const struct igt_fb *dst_fb,
 		 * blit command, so use the XY_SRC blit command for it
 		 * instead.
 		 */
-		if ((gen >= 9 && gen < 12) ||
-		    (gen >= 12 && (src_tiling != I915_TILING_X &&
-				   dst_tiling != I915_TILING_X))) {
+		if (fast_blit_ok(src_fb) && fast_blit_ok(dst_fb)) {
 			igt_blitter_fast_copy__raw(dst_fb->fd,
 						   src_fb->gem_handle,
 						   src_fb->offsets[i],
