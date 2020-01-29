@@ -152,9 +152,10 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 			       I915_GEM_DOMAIN_WC,
 			       I915_GEM_DOMAIN_WC);
 
-		/* Prepara a mappable binding to prevent pread mighrating */
+		/* Prepare a mappable binding to prevent pread migrating */
 		if (!snoop) {
-			ptr = gem_mmap__gtt(fd, obj[0].handle, 4096, PROT_READ);
+			ptr = gem_mmap__device_coherent(fd, obj[0].handle, 0,
+							4096, PROT_READ);
 			igt_assert_eq_u32(ptr[0], 0xabcdabcd);
 			munmap(ptr, 4096);
 		}
@@ -356,6 +357,9 @@ static void batch(int fd, unsigned ring, int nchild, int timeout,
 		  enum batch_mode mode, unsigned flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
+
+	if (mode == BATCH_GTT)
+		gem_require_mappable_ggtt(fd);
 
 	if (flags & CMDPARSER) {
 		int cmdparser = -1;
