@@ -310,6 +310,31 @@ static void test_nonpersistent_hostile_preempt(int i915, unsigned int engine)
 	gem_quiescent_gpu(i915);
 }
 
+static void test_nonpersistent_hang(int i915, unsigned int engine)
+{
+	int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
+	igt_spin_t *spin;
+	uint32_t ctx;
+
+	/*
+	 * The user made a simple mistake and submitted an invalid batch,
+	 * but fortunately under a nonpersistent context. Do we detect it?
+	 */
+
+	ctx = gem_context_create(i915);
+	gem_context_set_persistence(i915, ctx, false);
+
+	spin = igt_spin_new(i915, ctx,
+			    .engine = engine,
+			    .flags = IGT_SPIN_INVALID_CS);
+	gem_context_destroy(i915, ctx);
+
+	igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
+
+	igt_spin_free(i915, spin);
+	gem_quiescent_gpu(i915);
+}
+
 static void test_nohangcheck_hostile(int i915)
 {
 	int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
@@ -792,6 +817,9 @@ igt_main
 			igt_subtest_f("%s-hostile-preempt", e->name)
 				test_nonpersistent_hostile_preempt(i915,
 								   e->flags);
+
+			igt_subtest_f("%s-hang", e->name)
+				test_nonpersistent_hang(i915, e->flags);
 		}
 	}
 
