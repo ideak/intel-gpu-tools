@@ -180,10 +180,8 @@ intel_get_current_physical_engine(struct intel_engine_data *ed)
 {
 	struct intel_execution_engine2 *e;
 
-	for (e = intel_get_current_engine(ed);
-	     e && e->is_virtual;
-	     intel_next_engine(ed))
-		;
+	while ((e = intel_get_current_engine(ed)) && e->is_virtual)
+	     intel_next_engine(ed);
 
 	return e;
 }
