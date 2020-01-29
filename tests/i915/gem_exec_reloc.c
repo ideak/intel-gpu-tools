@@ -110,6 +110,9 @@ static void from_mmap(int fd, uint64_t size, enum mode mode)
 	uint64_t max, i;
 	int retry = 2;
 
+	if ((mode & ~RO) == GTT)
+		gem_require_mappable_ggtt(fd);
+
 	/* Worst case is that the kernel has to copy the entire incoming
 	 * reloc[], so double the memory requirements.
 	 */
@@ -386,6 +389,9 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 	uint64_t address_mask = has_64b_reloc(fd) ? ~(uint64_t)0 : ~(uint32_t)0;
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	unsigned int reloc_offset;
+
+	if ((before | after) & I915_GEM_DOMAIN_GTT)
+		gem_require_mappable_ggtt(fd);
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, OBJSZ);
