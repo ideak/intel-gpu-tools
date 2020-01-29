@@ -1064,7 +1064,7 @@ execute_test_process(int outfd, int errfd,
 		     struct settings *settings,
 		     struct job_list_entry *entry)
 {
-	char *argv[4] = {};
+	char *argv[6] = {};
 	size_t rootlen;
 
 	dup2(outfd, STDOUT_FILENO);
@@ -1080,16 +1080,30 @@ execute_test_process(int outfd, int errfd,
 
 	if (entry->subtest_count) {
 		size_t argsize;
+		const char *dynbegin;
 		size_t i;
 
 		argv[1] = strdup("--run-subtest");
-		argsize = strlen(entry->subtests[0]);
+
+		if ((dynbegin = strchr(entry->subtests[0], '@')) != NULL)
+			argsize = dynbegin - entry->subtests[0];
+		else
+			argsize = strlen(entry->subtests[0]);
+
 		argv[2] = malloc(argsize + 1);
-		strcpy(argv[2], entry->subtests[0]);
+		memcpy(argv[2], entry->subtests[0], argsize);
+		argv[2][argsize] = '\0';
+
+		if (dynbegin) {
+			argv[3] = strdup("--dynamic-subtest");
+			argv[4] = strdup(dynbegin + 1);
+		}
 
 		for (i = 1; i < entry->subtest_count; i++) {
 			char *sub = entry->subtests[i];
 			size_t sublen = strlen(sub);
+
+			assert(dynbegin == NULL);
 
 			argv[2] = realloc(argv[2], argsize + sublen + 2);
 			argv[2][argsize] = ',';

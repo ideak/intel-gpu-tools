@@ -248,8 +248,12 @@ static bool job_list_from_test_list(struct job_list *job_list,
 			 * If the currently built entry has the same
 			 * binary, add a subtest. Otherwise submit
 			 * what's already built and start a new one.
+			 *
+			 * If the new test has a dynamic subtest
+			 * specified, also start a new entry.
 			 */
-			if (entry.binary && !strcmp(entry.binary, binary)) {
+			if (entry.binary && !strcmp(entry.binary, binary) &&
+			    (delim == NULL || strchr(delim, '@') == NULL)) {
 				if (!delim) {
 					/* ... except we didn't get a subtest */
 					fprintf(stderr,
@@ -275,11 +279,23 @@ static bool job_list_from_test_list(struct job_list *job_list,
 			}
 
 			memset(&entry, 0, sizeof(entry));
-			entry.binary = strdup(binary);
-			if (delim) {
-				entry.subtests = malloc(sizeof(*entry.subtests));
-				entry.subtests[0] = strdup(delim);
-				entry.subtest_count = 1;
+
+			if (delim != NULL && strchr(delim, '@') != NULL) {
+				/* Dynamic subtest specified. Add to job list alone. */
+				char **subtests;
+
+				subtests = malloc(sizeof(char*));
+				subtests[0] = strdup(delim);
+
+				add_job_list_entry(job_list, strdup(binary), subtests, 1);
+				any = true;
+			} else {
+				entry.binary = strdup(binary);
+				if (delim) {
+					entry.subtests = malloc(sizeof(*entry.subtests));
+					entry.subtests[0] = strdup(delim);
+					entry.subtest_count = 1;
+				}
 			}
 
 			free(binary);
