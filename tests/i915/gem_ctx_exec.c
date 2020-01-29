@@ -42,6 +42,7 @@
 
 #include "igt_dummyload.h"
 #include "igt_sysfs.h"
+#include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Test context batch buffer execution.");
 
@@ -203,9 +204,9 @@ static bool __enable_hangcheck(int dir, bool state)
 
 static void nohangcheck_hostile(int i915)
 {
-	int64_t timeout = NSEC_PER_SEC / 2;
-	igt_spin_t *spin;
+	const struct intel_execution_engine2 *e;
 	igt_hang_t hang;
+	int fence = -1;
 	uint32_t ctx;
 	int err = 0;
 	int dir;
@@ -215,6 +216,8 @@ static void nohangcheck_hostile(int i915)
 	 * we forcibly terminate that context.
 	 */
 
+	i915 = gem_reopen_driver(i915);
+
 	dir = igt_sysfs_open_parameters(i915);
 	igt_require(dir != -1);
 
@@ -223,15 +226,34 @@ static void nohangcheck_hostile(int i915)
 
 	igt_require(__enable_hangcheck(dir, false));
 
-	spin = igt_spin_new(i915, ctx, .flags = IGT_SPIN_NO_PREEMPTION);
-	gem_context_destroy(i915, ctx);
+	__for_each_physical_engine(i915, e) {
+		igt_spin_t *spin;
 
-	if (gem_wait(i915, spin->handle, &timeout)) {
+		spin = igt_spin_new(i915, ctx,
+				    .engine = e->flags,
+				    .flags = (IGT_SPIN_NO_PREEMPTION |
+					      IGT_SPIN_FENCE_OUT));
+
+		igt_assert(spin->out_fence != -1);
+		if (fence < 0) {
+			fence = spin->out_fence;
+			spin->out_fence = -1;
+		} else {
+			int new;
+
+			new = sync_fence_merge(fence, spin->out_fence);
+			close(fence);
+
+			fence = new;
+		}
+	}
+	gem_context_destroy(i915, ctx);
+	igt_assert(fence != -1);
+
+	if (sync_fence_wait(fence, MSEC_PER_SEC / 2)) {
 		igt_debugfs_dump(i915, "i915_engine_info");
 		err = -ETIME;
 	}
-
-	igt_spin_free(i915, spin);
 
 	__enable_hangcheck(dir, true);
 	gem_quiescent_gpu(i915);
@@ -240,7 +262,11 @@ static void nohangcheck_hostile(int i915)
 	igt_assert_f(err == 0,
 		     "Hostile unpreemptable context was not cancelled immediately upon closure\n");
 
+	igt_assert_eq(sync_fence_status(fence), -EIO);
+	close(fence);
+
 	close(dir);
+	close(i915);
 }
 
 igt_main
