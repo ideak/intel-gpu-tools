@@ -373,11 +373,17 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 
 	spin = spin_create(fd, opts);
 
-	igt_assert(gem_bo_busy(fd, spin->handle));
-	if (opts->flags & IGT_SPIN_FENCE_OUT) {
-		struct pollfd pfd = { spin->out_fence, POLLIN };
+	if (!(opts->flags & IGT_SPIN_INVALID_CS)) {
+		/*
+		 * When injecting invalid CS into the batch, the spinner may
+		 * be killed immediately -- i.e. may already be completed!
+		 */
+		igt_assert(gem_bo_busy(fd, spin->handle));
+		if (opts->flags & IGT_SPIN_FENCE_OUT) {
+			struct pollfd pfd = { spin->out_fence, POLLIN };
 
-		igt_assert(poll(&pfd, 1, 0) == 0);
+			igt_assert(poll(&pfd, 1, 0) == 0);
+		}
 	}
 
 	return spin;
