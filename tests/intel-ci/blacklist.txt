@@ -51,7 +51,6 @@ igt@gem_mmap_gtt@.*(huge|swap|clflush|forked).*
 igt@gem_mmap@.*(swap|huge).*
 igt@gem_pin(@.*)?
 igt@gem_pread_after_blit(@.*)?
-igt@gem_pwrite_pread@.*performance.*
 igt@gem_read_read_speed(@.*)?
 igt@gem_reloc_overflow(@.*)?
 igt@gem_reloc_vs_gpu(@.*)?

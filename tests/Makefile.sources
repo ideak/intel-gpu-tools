@@ -348,9 +348,6 @@ gem_pread_after_blit_SOURCES = i915/gem_pread_after_blit.c
 TESTS_progs += gem_pwrite
 gem_pwrite_SOURCES = i915/gem_pwrite.c
 
-TESTS_progs += gem_pwrite_pread
-gem_pwrite_pread_SOURCES = i915/gem_pwrite_pread.c
-
 TESTS_progs += gem_pwrite_snooped
 gem_pwrite_snooped_SOURCES = i915/gem_pwrite_snooped.c
 

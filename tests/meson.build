@@ -181,7 +181,6 @@ i915_progs = [
 	'gem_pread',
 	'gem_pread_after_blit',
 	'gem_pwrite',
-	'gem_pwrite_pread',
 	'gem_pwrite_snooped',
 	'gem_read_read_speed',
 	'gem_readwrite',
