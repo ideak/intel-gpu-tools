@@ -43,70 +43,116 @@ IGT_TEST_DESCRIPTION("Checks that the kernel reports EFAULT when trying to use"
 
 #define OBJECT_SIZE (1024*1024)
 
-/* Testcase: checks that the kernel reports EFAULT when trying to use purged bo
+/*
+ * Testcase: checks that the kernel reports EFAULT when trying to use purged bo
  *
  */
+
+static const struct mmap_offset {
+	const char *name;
+	unsigned int type;
+	unsigned int domain;
+} mmap_offset_types[] = {
+	{ "gtt", I915_MMAP_OFFSET_GTT, I915_GEM_DOMAIN_GTT },
+	{ "wb", I915_MMAP_OFFSET_WB, I915_GEM_DOMAIN_CPU },
+	{ "wc", I915_MMAP_OFFSET_WC, I915_GEM_DOMAIN_WC },
+	{ "uc", I915_MMAP_OFFSET_UC, I915_GEM_DOMAIN_WC },
+	{},
+};
+
+#define for_each_mmap_offset_type(__t) \
+	for (const struct mmap_offset *__t = mmap_offset_types; \
+	     (__t)->name; \
+	     (__t)++)
+
 
 static jmp_buf jmp;
 
 static void __attribute__((noreturn)) sigtrap(int sig)
 {
-	longjmp(jmp, sig);
+	siglongjmp(jmp, sig);
 }
 
 static void
 dontneed_before_mmap(void)
 {
-	int fd = drm_open_driver(DRIVER_INTEL);
 	uint32_t handle;
 	char *ptr;
+	int fd;
 
-	handle = gem_create(fd, OBJECT_SIZE);
-	gem_madvise(fd, handle, I915_MADV_DONTNEED);
-	ptr = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_READ | PROT_WRITE);
-	close(fd);
+	for_each_mmap_offset_type(t) {
+		sighandler_t old_sigsegv, old_sigbus;
 
-	signal(SIGSEGV, sigtrap);
-	signal(SIGBUS, sigtrap);
-	switch (setjmp(jmp)) {
-	case SIGBUS:
-		break;
-	case 0:
-		*ptr = 0;
-	default:
-		igt_assert(!"reached");
-		break;
+		igt_debug("Mapping mode: %s\n", t->name);
+
+		fd = drm_open_driver(DRIVER_INTEL);
+		handle = gem_create(fd, OBJECT_SIZE);
+		gem_madvise(fd, handle, I915_MADV_DONTNEED);
+
+		ptr = __gem_mmap_offset(fd, handle, 0, OBJECT_SIZE,
+					PROT_READ | PROT_WRITE,
+					t->type);
+
+		close(fd);
+		if (!ptr)
+			continue;
+
+		old_sigsegv = signal(SIGSEGV, sigtrap);
+		old_sigbus = signal(SIGBUS, sigtrap);
+		switch (sigsetjmp(jmp, SIGBUS | SIGSEGV)) {
+		case SIGBUS:
+			break;
+		case 0:
+			*ptr = 0;
+		default:
+			igt_assert(!"reached");
+			break;
+		}
+		munmap(ptr, OBJECT_SIZE);
+		signal(SIGBUS, old_sigsegv);
+		signal(SIGSEGV, old_sigbus);
 	}
-	munmap(ptr, OBJECT_SIZE);
-	signal(SIGBUS, SIG_DFL);
-	signal(SIGSEGV, SIG_DFL);
 }
 
 static void
 dontneed_after_mmap(void)
 {
-	int fd = drm_open_driver(DRIVER_INTEL);
 	uint32_t handle;
 	char *ptr;
+	int fd;
 
-	handle = gem_create(fd, OBJECT_SIZE);
-	ptr = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_READ | PROT_WRITE);
-	igt_assert(ptr);
-	gem_madvise(fd, handle, I915_MADV_DONTNEED);
-	close(fd);
+	for_each_mmap_offset_type(t) {
+		sighandler_t old_sigsegv, old_sigbus;
 
-	signal(SIGBUS, sigtrap);
-	switch (setjmp(jmp)) {
-	case SIGBUS:
-		break;
-	case 0:
-		*ptr = 0;
-	default:
-		igt_assert(!"reached");
-		break;
+		igt_debug("Mapping mode: %s\n", t->name);
+
+		fd = drm_open_driver(DRIVER_INTEL);
+		handle = gem_create(fd, OBJECT_SIZE);
+
+		ptr = __gem_mmap_offset(fd, handle, 0, OBJECT_SIZE,
+					PROT_READ | PROT_WRITE,
+					t->type);
+
+		gem_madvise(fd, handle, I915_MADV_DONTNEED);
+		close(fd);
+		if (!ptr)
+			continue;
+
+		old_sigsegv = signal(SIGSEGV, sigtrap);
+		old_sigbus = signal(SIGBUS, sigtrap);
+		switch (sigsetjmp(jmp, SIGBUS | SIGSEGV)) {
+		case SIGBUS:
+			break;
+		case 0:
+			*ptr = 0;
+		default:
+			igt_assert(!"reached");
+			break;
+		}
+		munmap(ptr, OBJECT_SIZE);
+		signal(SIGBUS, old_sigbus);
+		signal(SIGSEGV, old_sigsegv);
 	}
-	munmap(ptr, OBJECT_SIZE);
-	signal(SIGBUS, SIG_DFL);
 }
 
 static void
