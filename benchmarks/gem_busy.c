@@ -185,10 +185,7 @@ static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 	if (flags & WRITE)
 		obj[0].flags = EXEC_OBJECT_WRITE;
 	obj[1].handle = gem_create(fd, 4096);
-	if (gem_mmap__has_wc(fd))
-		batch = gem_mmap__wc(fd, obj[1].handle, 0, 4096, PROT_WRITE);
-	else
-		batch = gem_mmap__gtt(fd, obj[1].handle, 4096, PROT_WRITE);
+	batch = gem_mmap__device_coherent(fd, obj[1].handle, 0, 4096, PROT_WRITE);
 	gem_set_domain(fd, obj[1].handle,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	batch[0] = MI_BATCH_BUFFER_END;
