@@ -693,6 +693,7 @@ static void __smoker(int i915, unsigned int engine, int expected)
 	int fd, extra;
 
 	fd = gem_reopen_driver(i915);
+	gem_context_copy_engines(i915, 0, fd, 0);
 	gem_context_set_persistence(fd, 0, expected > 0);
 	spin = igt_spin_new(fd, .engine = engine, .flags = IGT_SPIN_FENCE_OUT);
 
@@ -721,7 +722,7 @@ static void __smoker(int i915, unsigned int engine, int expected)
 	}
 
 	spin->handle = 0;
-	igt_spin_free(i915, spin);
+	igt_spin_free(fd, spin);
 }
 
 static void smoker(int i915, unsigned int engine, unsigned int *ctl)
@@ -734,6 +735,7 @@ static void smoker(int i915, unsigned int engine, unsigned int *ctl)
 
 static void smoketest(int i915)
 {
+	const struct intel_execution_engine2 *e;
 	uint32_t *ctl;
 
 	/*
@@ -744,9 +746,9 @@ static void smoketest(int i915)
 	ctl = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(ctl != MAP_FAILED);
 
-	for_each_physical_engine(e, i915) {
+	__for_each_physical_engine(i915, e) {
 		igt_fork(child, 4)
-			smoker(i915, eb_ring(e), ctl);
+			smoker(i915, e->flags, ctl);
 	}
 
 	sleep(20);
@@ -759,7 +761,20 @@ static void smoketest(int i915)
 
 igt_main
 {
-	const struct intel_execution_engine2 *e;
+	struct {
+		const char *name;
+		void (*func)(int fd, unsigned int engine);
+	} *test, tests[] = {
+		{ "persistence", test_persistence },
+		{ "cleanup", test_nonpersistent_cleanup },
+		{ "queued", test_nonpersistent_queued },
+		{ "mixed", test_nonpersistent_mixed },
+		{ "mixed-process", test_process_mixed },
+		{ "hostile", test_nonpersistent_hostile },
+		{ "hostile-preempt", test_nonpersistent_hostile_preempt },
+		{ "hang", test_nonpersistent_hang },
+		{ NULL, NULL },
+	};
 	int i915;
 
 	igt_fixture {
@@ -771,6 +786,8 @@ igt_main
 
 		igt_allow_hang(i915, 0, 0);
 	}
+
+	/* Legacy execbuf engine selection flags. */
 
 	igt_subtest("idempotent")
 		test_idempotent(i915);
@@ -792,71 +809,44 @@ igt_main
 	igt_subtest("hang")
 		test_nohangcheck_hang(i915);
 
-	__for_each_static_engine(e) {
-		igt_subtest_group {
-			igt_fixture {
-				gem_require_ring(i915, e->flags);
-				gem_require_contexts(i915);
+	igt_subtest_group {
+		igt_fixture
+			gem_require_contexts(i915);
+
+		for (test = tests; test->name; test++) {
+			igt_subtest_with_dynamic_f("legacy-engines-%s",
+						   test->name) {
+				for_each_engine(e, i915) {
+					igt_dynamic_f("%s", e->name)
+						test->func(i915, eb_ring(e));
+				}
 			}
-
-			igt_subtest_f("legacy-%s-persistence", e->name)
-				test_persistence(i915, e->flags);
-
-			igt_subtest_f("legacy-%s-cleanup", e->name)
-				test_nonpersistent_cleanup(i915, e->flags);
-
-			igt_subtest_f("legacy-%s-queued", e->name)
-				test_nonpersistent_queued(i915, e->flags);
-
-			igt_subtest_f("legacy-%s-mixed", e->name)
-				test_nonpersistent_mixed(i915, e->flags);
-
-			igt_subtest_f("legacy-%s-mixed-process", e->name)
-				test_process_mixed(i915, e->flags);
-
-			igt_subtest_f("legacy-%s-hostile", e->name)
-				test_nonpersistent_hostile(i915, e->flags);
-
-			igt_subtest_f("legacy-%s-hostile-preempt", e->name)
-				test_nonpersistent_hostile_preempt(i915,
-								   e->flags);
 		}
+
+		/* Assert things are under control. */
+		igt_assert(!gem_context_has_engine_map(i915, 0));
 	}
 
-        __for_each_physical_engine(i915, e) {
-                igt_subtest_group {
-                        igt_fixture
-                                gem_require_contexts(i915);
+	/* New way of selecting engines. */
 
-			igt_subtest_f("%s-persistence", e->name)
-				test_persistence(i915, e->flags);
+	igt_subtest_group {
+		const struct intel_execution_engine2 *e;
 
-			igt_subtest_f("%s-cleanup", e->name)
-				test_nonpersistent_cleanup(i915, e->flags);
+		igt_fixture
+			gem_require_contexts(i915);
 
-			igt_subtest_f("%s-queued", e->name)
-				test_nonpersistent_queued(i915, e->flags);
-
-			igt_subtest_f("%s-mixed", e->name)
-				test_nonpersistent_mixed(i915, e->flags);
-
-			igt_subtest_f("%s-mixed-process", e->name)
-				test_process_mixed(i915, e->flags);
-
-			igt_subtest_f("%s-hostile", e->name)
-				test_nonpersistent_hostile(i915, e->flags);
-
-			igt_subtest_f("%s-hostile-preempt", e->name)
-				test_nonpersistent_hostile_preempt(i915,
-								   e->flags);
-
-			igt_subtest_f("%s-hang", e->name)
-				test_nonpersistent_hang(i915, e->flags);
+		for (test = tests; test->name; test++) {
+			igt_subtest_with_dynamic_f("engines-%s", test->name) {
+				__for_each_physical_engine(i915, e) {
+					igt_dynamic_f("%s", e->name)
+						test->func(i915, e->flags);
+				}
+			}
 		}
-	}
 
-	igt_subtest("smoketest")
-		smoketest(i915);
+		igt_subtest("smoketest")
+			smoketest(i915);
+	}
 
 	igt_fixture {
 		close(i915);
