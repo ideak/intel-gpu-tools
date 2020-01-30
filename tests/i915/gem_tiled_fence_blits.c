@@ -214,6 +214,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 		gem_require_blitter(fd);
+		gem_require_mappable_ggtt(fd);
 	}
 
 	igt_subtest("basic")
