@@ -242,7 +242,7 @@ static void setup_latency(struct producer *p, int gen, unsigned flags)
 	if (gem_has_llc(fd))
 		map = gem_mmap__cpu(fd, handle, 0, 4096, PROT_WRITE);
 	else
-		map = gem_mmap__gtt(fd, handle, 4096, PROT_WRITE);
+		map = gem_mmap__device_coherent(fd, handle, 0, 4096, PROT_WRITE);
 
 	p->latency_dispatch.exec[0].relocation_count = 1;
 	p->latency_dispatch.exec[0].relocs_ptr =
