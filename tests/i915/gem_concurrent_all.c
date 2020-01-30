@@ -440,6 +440,11 @@ static void create_vgem_require(const struct create *create, unsigned count)
 	create_dmabuf_require(create, count);
 }
 
+static void create_gtt_require(const struct create *create, unsigned count)
+{
+	gem_require_mappable_ggtt(fd);
+}
+
 static drm_intel_bo *
 vgem_create_bo(const struct buffers *b)
 {
@@ -1406,6 +1411,7 @@ static void cpu_require(void)
 
 static void gtt_require(void)
 {
+	gem_require_mappable_ggtt(fd);
 }
 
 static void bcs_require(void)
@@ -1722,6 +1728,7 @@ igt_main
 		{
 			.name = "gtt",
 			.create_bo = gtt_create_bo,
+			.require = create_gtt_require,
 			.set_bo = gtt_set_bo,
 			.cmp_bo = gtt_cmp_bo,
 			.release_bo = nop_release_bo,
@@ -1729,6 +1736,7 @@ igt_main
 		{
 			.name = "gttX",
 			.create_bo = gttX_create_bo,
+			.require = create_gtt_require,
 			.set_bo = gtt_set_bo,
 			.cmp_bo = gtt_cmp_bo,
 			.release_bo = nop_release_bo,
