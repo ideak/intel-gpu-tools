@@ -171,7 +171,6 @@ i915_progs = [
 	'gem_media_vme',
 	'gem_mmap',
 	'gem_mmap_gtt',
-	'gem_mmap_offset_exhaustion',
 	'gem_mmap_wc',
 	'gem_partial_pwrite_pread',
 	'gem_pipe_control_store_loop',

@@ -318,9 +318,6 @@ gem_mmap_gtt_SOURCES = i915/gem_mmap_gtt.c
 TESTS_progs += gem_mmap_offset
 gem_mmap_offset_SOURCES = i915/gem_mmap_offset.c
 
-TESTS_progs += gem_mmap_offset_exhaustion
-gem_mmap_offset_exhaustion_SOURCES = i915/gem_mmap_offset_exhaustion.c
-
 TESTS_progs += gem_mmap_wc
 gem_mmap_wc_SOURCES = i915/gem_mmap_wc.c
 
