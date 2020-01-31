@@ -71,6 +71,7 @@ igt_simple_main
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	devid = intel_get_drm_devid(fd);
+	gem_require_mappable_ggtt(fd);
 
 	if (intel_gen(devid) >= 7) {
 		stride = 256 * 1024;
