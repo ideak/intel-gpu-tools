@@ -85,8 +85,8 @@ test_correct(void)
 	dma_buf_fd = prime_handle_to_fd(fd, handle);
 	igt_assert(errno == 0);
 
-	/* Check correctness vs GEM_MMAP_GTT */
-	ptr1 = gem_mmap__gtt(fd, handle, BO_SIZE, PROT_READ);
+	/* Check correctness vs GEM_MMAP */
+	ptr1 = gem_mmap__device_coherent(fd, handle, 0, BO_SIZE, PROT_READ);
 	ptr2 = mmap(NULL, BO_SIZE, PROT_READ, MAP_SHARED, dma_buf_fd, 0);
 	igt_assert(ptr1 != MAP_FAILED);
 	igt_assert(ptr2 != MAP_FAILED);
