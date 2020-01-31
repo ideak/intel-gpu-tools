@@ -759,6 +759,13 @@ static void smoketest(int i915)
 	gem_quiescent_gpu(i915);
 }
 
+int i915;
+
+static void exit_handler(int sig)
+{
+	enable_hangcheck(i915);
+}
+
 igt_main
 {
 	struct {
@@ -775,7 +782,6 @@ igt_main
 		{ "hang", test_nonpersistent_hang },
 		{ NULL, NULL },
 	};
-	int i915;
 
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
@@ -783,6 +789,7 @@ igt_main
 
 		igt_require(has_persistence(i915));
 		enable_hangcheck(i915);
+		igt_install_exit_handler(exit_handler);
 
 		igt_allow_hang(i915, 0, 0);
 	}
