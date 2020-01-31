@@ -69,7 +69,7 @@ static int test_read_flush(void)
 
 	/* STEP #3: write 0x11 into BO 1. */
 	bo_2 = drm_intel_bo_alloc(bufmgr, "BO 2", width * height * 4, 4096);
-	ptr_gtt = gem_mmap__gtt(fd, bo_2->handle, width * height, PROT_READ | PROT_WRITE);
+	ptr_gtt = gem_mmap__device_coherent(fd, bo_2->handle, 0, width * height, PROT_READ | PROT_WRITE);
 	gem_set_domain(fd, bo_2->handle,
 		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	memset(ptr_gtt, 0xc5, width * height);
