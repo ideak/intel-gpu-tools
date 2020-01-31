@@ -448,6 +448,7 @@ igt_main
 	data.commit = data.display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY;
 
 	igt_subtest("available_mode_test_crc") {
+		gem_require_mappable_ggtt(data.gfx_fd);
 		test_available_modes(&data);
 	}
 
