@@ -270,6 +270,7 @@ static void run_test(data_t *data)
 		expected = "GREEN";
 		break;
 	case MMAP_GTT:
+		gem_require_mappable_ggtt(data->drm_fd);
 		ptr = gem_mmap__gtt(data->drm_fd, handle, data->mod_size,
 				    PROT_WRITE);
 		gem_set_domain(data->drm_fd, handle,
