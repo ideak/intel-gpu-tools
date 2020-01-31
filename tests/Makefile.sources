@@ -174,9 +174,6 @@ gem_ctx_switch_SOURCES = i915/gem_ctx_switch.c
 TESTS_progs += gem_ctx_thrash
 gem_ctx_thrash_SOURCES = i915/gem_ctx_thrash.c
 
-TESTS_progs += gem_double_irq_loop
-gem_double_irq_loop_SOURCES = i915/gem_double_irq_loop.c
-
 TESTS_progs += gem_eio
 gem_eio_SOURCES = i915/gem_eio.c
 
