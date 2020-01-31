@@ -768,7 +768,7 @@ static bool setup_environment(void)
 
 	igt_pm_enable_sata_link_power_management();
 
-	has_runtime_pm = igt_setup_runtime_pm();
+	has_runtime_pm = igt_setup_runtime_pm(drm_fd);
 	setup_pc8();
 
 	igt_info("Runtime PM support: %d\n", has_runtime_pm);

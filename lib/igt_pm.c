@@ -32,6 +32,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <dirent.h>
 
@@ -76,12 +77,28 @@ enum {
 int8_t *__sata_pm_policies;
 int __scsi_host_cnt;
 
+static int __igt_pm_power = -1;
+
 static char __igt_pm_audio_runtime_power_save[64];
 static char * __igt_pm_audio_runtime_control_path;
 static char __igt_pm_audio_runtime_control[64];
 
 static void __igt_pm_sata_link_pm_exit_handler(int sig);
 static void __igt_pm_restore_sata_link_power_management(void);
+
+static int find_runtime_pm(int device)
+{
+	char path[128];
+	struct stat st;
+
+	if (fstat(device, &st) || !S_ISCHR(st.st_mode))
+		return -1;
+
+	snprintf(path, sizeof(path), "/sys/dev/char/%d:%d/device/power",
+		 major(st.st_rdev), minor(st.st_rdev));
+
+	return open(path, O_RDONLY);
+}
 
 static int __igt_pm_audio_restore_runtime_pm(void)
 {
@@ -465,10 +482,6 @@ static void __igt_pm_sata_link_pm_exit_handler(int sig)
 	__igt_pm_restore_sata_link_power_management();
 }
 
-#define POWER_DIR "/sys/devices/pci0000:00/0000:00:02.0/power"
-/* We just leak this on exit ... */
-int pm_status_fd = -1;
-
 static char __igt_pm_runtime_autosuspend[64];
 static char __igt_pm_runtime_control[64];
 
@@ -476,10 +489,10 @@ static int __igt_restore_runtime_pm(void)
 {
 	int fd;
 
-	if (pm_status_fd < 0)
+	if (__igt_pm_power < 0)
 		return 0;
 
-	fd = open(POWER_DIR "/autosuspend_delay_ms", O_WRONLY);
+	fd = openat(__igt_pm_power, "autosuspend_delay_ms", O_WRONLY);
 	if (fd < 0)
 		return errno;
 
@@ -492,7 +505,7 @@ static int __igt_restore_runtime_pm(void)
 
 	close(fd);
 
-	fd = open(POWER_DIR "/control", O_WRONLY);
+	fd = openat(__igt_pm_power, "control", O_WRONLY);
 	if (fd < 0)
 		return errno;
 
@@ -505,8 +518,8 @@ static int __igt_restore_runtime_pm(void)
 
 	close(fd);
 
-	close(pm_status_fd);
-	pm_status_fd = -1;
+	close(__igt_pm_power);
+	__igt_pm_power = -1;
 
 	return 0;
 }
@@ -521,7 +534,7 @@ void igt_restore_runtime_pm(void)
 {
 	int ret;
 
-	if (pm_status_fd < 0)
+	if (__igt_pm_power < 0)
 		return;
 
 	igt_debug("Restoring runtime PM management to '%s' and '%s'\n",
@@ -549,14 +562,18 @@ static void __igt_pm_runtime_exit_handler(int sig)
  * Returns:
  * True if runtime pm is available, false otherwise.
  */
-bool igt_setup_runtime_pm(void)
+bool igt_setup_runtime_pm(int device)
 {
 	int fd;
 	ssize_t size;
 	char buf[6];
 
-	if (pm_status_fd >= 0)
+	if (__igt_pm_power != -1) /* XXX assume it's the same device! */
 		return true;
+
+	__igt_pm_power = find_runtime_pm(device);
+	if (__igt_pm_power < 0)
+		return false;
 
 	igt_pm_enable_audio_runtime_pm();
 
@@ -565,9 +582,11 @@ bool igt_setup_runtime_pm(void)
 	 * test suite goes faster and we have a higher probability of
 	 * triggering race conditions.
 	 */
-	fd = open(POWER_DIR "/autosuspend_delay_ms", O_RDWR);
+	fd = openat(__igt_pm_power, "autosuspend_delay_ms", O_RDWR);
 	if (fd < 0) {
 		igt_pm_audio_restore_runtime_pm();
+		close(__igt_pm_power);
+		__igt_pm_power = -1;
 		return false;
 	}
 
@@ -585,6 +604,8 @@ bool igt_setup_runtime_pm(void)
 	if (size <= 0) {
 		close(fd);
 		igt_pm_audio_restore_runtime_pm();
+		close(__igt_pm_power);
+		__igt_pm_power = -1;
 		return false;
 	}
 
@@ -597,12 +618,15 @@ bool igt_setup_runtime_pm(void)
 
 	close(fd);
 
-	if (size != 2)
+	if (size != 2) {
+		close(__igt_pm_power);
+		__igt_pm_power = -1;
 		return false;
+	}
 
 	/* We know we support runtime PM, let's try to enable it now. */
-	fd = open(POWER_DIR "/control", O_RDWR);
-	igt_assert_f(fd >= 0, "Can't open " POWER_DIR "/control\n");
+	fd = openat(__igt_pm_power, "control", O_RDWR);
+	igt_assert_f(fd >= 0, "Can't open control\n");
 
 	igt_assert(read(fd, __igt_pm_runtime_control,
 			sizeof(__igt_pm_runtime_control) - 1) > 0);
@@ -621,10 +645,6 @@ bool igt_setup_runtime_pm(void)
 
 	close(fd);
 
-	pm_status_fd = open(POWER_DIR "/runtime_status", O_RDONLY);
-	igt_assert_f(pm_status_fd >= 0,
-		     "Can't open " POWER_DIR "/runtime_status\n");
-
 	return true;
 }
 
@@ -641,11 +661,11 @@ void igt_disable_runtime_pm(void)
 	ssize_t size;
 	char buf[6];
 
-	igt_assert_fd(pm_status_fd);
+	igt_assert_fd(__igt_pm_power);
 
 	/* We know we support runtime PM, let's try to disable it now. */
-	fd = open(POWER_DIR "/control", O_RDWR);
-	igt_assert_f(fd >= 0, "Can't open " POWER_DIR "/control\n");
+	fd = openat(__igt_pm_power, "control", O_RDWR);
+	igt_assert_f(fd >= 0, "Can't open control\n");
 
 	size = write(fd, "on\n", 3);
 	igt_assert(size == 3);
@@ -661,13 +681,13 @@ void igt_disable_runtime_pm(void)
  *
  * Returns: The current runtime PM status.
  */
-enum igt_runtime_pm_status igt_get_runtime_pm_status(void)
+static enum igt_runtime_pm_status __igt_get_runtime_pm_status(int fd)
 {
 	ssize_t n_read;
 	char buf[32];
 
-	lseek(pm_status_fd, 0, SEEK_SET);
-	n_read = read(pm_status_fd, buf, ARRAY_SIZE(buf) - 1);
+	lseek(fd, 0, SEEK_SET);
+	n_read = read(fd, buf, ARRAY_SIZE(buf) - 1);
 	igt_assert(n_read >= 0);
 	buf[n_read] = '\0';
 
@@ -682,6 +702,23 @@ enum igt_runtime_pm_status igt_get_runtime_pm_status(void)
 
 	igt_assert_f(false, "Unknown status %s\n", buf);
 	return IGT_RUNTIME_PM_STATUS_UNKNOWN;
+}
+
+enum igt_runtime_pm_status igt_get_runtime_pm_status(void)
+{
+	enum igt_runtime_pm_status status;
+	int fd;
+
+	if (__igt_pm_power < 0)
+		return IGT_RUNTIME_PM_STATUS_UNKNOWN;
+
+	fd = openat(__igt_pm_power, "runtime_status", O_RDONLY);
+	igt_assert_f(fd >= 0, "Can't open runtime_status\n");
+
+	status = __igt_get_runtime_pm_status(fd);
+	close(fd);
+
+	return status;
 }
 
 /**
@@ -719,10 +756,20 @@ static const char *_pm_status_name(enum igt_runtime_pm_status status)
  */
 bool igt_wait_for_pm_status(enum igt_runtime_pm_status status)
 {
-	bool ret;
 	enum igt_runtime_pm_status expected = status;
+	bool ret;
+	int fd;
 
-	ret = igt_wait((status = igt_get_runtime_pm_status()) == expected, 10000, 100);
+	if (__igt_pm_power < 0)
+		return false;
+
+	fd = openat(__igt_pm_power, "runtime_status", O_RDONLY);
+	igt_assert_f(fd >= 0, "Can't open runtime_status\n");
+
+	ret = igt_wait((status = __igt_get_runtime_pm_status(fd)) == expected,
+		       10000, 100);
+	close(fd);
+
 	if (!ret)
 		igt_warn("timeout: pm_status expected:%s, got:%s\n",
 			_pm_status_name(expected),

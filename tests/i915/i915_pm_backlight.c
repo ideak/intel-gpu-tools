@@ -156,7 +156,7 @@ static void test_fade(struct context *context)
 static void
 test_fade_with_dpms(struct context *context, igt_output_t *output)
 {
-	igt_require(igt_setup_runtime_pm());
+	igt_require(igt_setup_runtime_pm(output->display->drm_fd));
 
 	kmstest_set_connector_dpms(output->display->drm_fd,
 				   output->config.connector,

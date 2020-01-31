@@ -1572,7 +1572,7 @@ test_rc6(int gem_fd, unsigned int flags)
 		kmstest_unset_all_crtcs(gem_fd, res);
 		drmModeFreeResources(res);
 
-		igt_require(igt_setup_runtime_pm());
+		igt_require(igt_setup_runtime_pm(gem_fd));
 		igt_require(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
 
 		/*

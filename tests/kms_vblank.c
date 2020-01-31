@@ -121,7 +121,7 @@ static void run_test(data_t *data, void (*testfunc)(data_t *, int, int))
 	prepare_crtc(data, fd, output);
 
 	if (data->flags & RPM)
-		igt_require(igt_setup_runtime_pm());
+		igt_require(igt_setup_runtime_pm(fd));
 
 	igt_info("Beginning %s on pipe %s, connector %s\n",
 		 igt_subtest_name(), kmstest_pipe_name(data->pipe),

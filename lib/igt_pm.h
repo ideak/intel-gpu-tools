@@ -46,7 +46,7 @@ enum igt_runtime_pm_status {
 	IGT_RUNTIME_PM_STATUS_UNKNOWN,
 };
 
-bool igt_setup_runtime_pm(void);
+bool igt_setup_runtime_pm(int device);
 void igt_disable_runtime_pm(void);
 void igt_restore_runtime_pm(void);
 enum igt_runtime_pm_status igt_get_runtime_pm_status(void);
