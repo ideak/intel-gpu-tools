@@ -380,6 +380,8 @@ static void test_nohangcheck_hang(int i915)
 	 * we forcibly terminate that context.
 	 */
 
+	igt_require(!gem_has_cmdparser(i915, ALL_ENGINES));
+
 	dir = igt_sysfs_open_parameters(i915);
 	igt_require(dir != -1);
 
