@@ -846,14 +846,18 @@ igt_main
 	igt_subtest("basic-write")
 		test_write(vgem, i915);
 
-	igt_subtest("basic-gtt")
+	igt_subtest("basic-gtt") {
+		gem_require_mappable_ggtt(i915);
 		test_gtt(vgem, i915);
+	}
 
 	igt_subtest("shrink")
 		test_shrink(vgem, i915);
 
-	igt_subtest("coherency-gtt")
+	igt_subtest("coherency-gtt") {
+		gem_require_mappable_ggtt(i915);
 		test_gtt_interleaved(vgem, i915);
+	}
 
 	for (e = intel_execution_engines; e->name; e++) {
 		igt_subtest_f("%ssync-%s",
@@ -902,8 +906,10 @@ igt_main
 
 		igt_subtest("basic-fence-read")
 			test_fence_read(i915, vgem);
-		igt_subtest("basic-fence-mmap")
+		igt_subtest("basic-fence-mmap") {
+			gem_require_mappable_ggtt(i915);
 			test_fence_mmap(i915, vgem);
+		}
 
 		for (e = intel_execution_engines; e->name; e++) {
 			igt_subtest_f("%sfence-wait-%s",
