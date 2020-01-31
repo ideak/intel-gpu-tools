@@ -208,11 +208,15 @@ igt_main
 	igt_fixture
 		fd = drm_open_driver(DRIVER_INTEL);
 
-	igt_subtest("fence-restore-tiled2untiled")
+	igt_subtest("fence-restore-tiled2untiled") {
+		gem_require_mappable_ggtt(fd);
 		test_fence_restore(fd, true, false);
+	}
 
-	igt_subtest("fence-restore-untiled")
+	igt_subtest("fence-restore-untiled") {
+		gem_require_mappable_ggtt(fd);
 		test_fence_restore(fd, false, false);
+	}
 
 	igt_subtest("debugfs-reader")
 		test_debugfs_reader(fd, false);
@@ -226,11 +230,15 @@ igt_main
 	igt_subtest("forcewake")
 		test_forcewake(fd, false);
 
-	igt_subtest("fence-restore-tiled2untiled-hibernate")
+	igt_subtest("fence-restore-tiled2untiled-hibernate") {
+		gem_require_mappable_ggtt(fd);
 		test_fence_restore(fd, true, true);
+	}
 
-	igt_subtest("fence-restore-untiled-hibernate")
+	igt_subtest("fence-restore-untiled-hibernate") {
+		gem_require_mappable_ggtt(fd);
 		test_fence_restore(fd, false, true);
+	}
 
 	igt_subtest("debugfs-reader-hibernate")
 		test_debugfs_reader(fd, true);
