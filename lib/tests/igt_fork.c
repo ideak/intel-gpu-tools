@@ -107,6 +107,48 @@ static int do_fork(void (*test_to_run)(void))
 	}
 }
 
+static int do_subtest(void (*test_to_run)(void))
+{
+	int pid, status;
+	int argc;
+
+	switch (pid = fork()) {
+	case -1:
+		internal_assert(0);
+	case 0:
+		argc = ARRAY_SIZE(argv_run);
+		igt_subtest_init(argc, argv_run);
+		test_to_run();
+		igt_exit();
+	default:
+		while (waitpid(pid, &status, 0) == -1 &&
+		       errno == EINTR)
+			;
+
+		return status;
+	}
+}
+
+static void subtest_leak(void)
+{
+	pid_t *children =
+		mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	const int num_children = 4096 / sizeof(*children);
+
+	igt_subtest("fork-leak") {
+		igt_fork(child, num_children)
+			children[child] = getpid();
+
+		/* leak the children */
+		igt_assert(0);
+	}
+
+	/* We expect the exit_subtest to cleanup after the igt_fork */
+	for (int i = 0; i < num_children; i++)
+		assert(kill(children[i], 0) == -1 && errno == ESRCH);
+
+	munmap(children, 4096);
+}
 
 int main(int argc, char **argv)
 {
@@ -131,4 +173,7 @@ int main(int argc, char **argv)
 	/* check that any other process leaks are caught*/
 	ret = do_fork(plain_fork_leak);
 	internal_assert_wsignaled(ret, SIGABRT);
+
+	ret = do_subtest(subtest_leak);
+	internal_assert_wexited(ret, IGT_EXIT_FAILURE); /* not asserted! */
 }

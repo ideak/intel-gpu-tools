@@ -1362,6 +1362,13 @@ static void exit_subtest(const char *result)
 
 	igt_terminate_spins();
 
+	/* If the subtest aborted, it may have left children behind */
+	for (int c = 0; c < num_test_children; c++) {
+		kill(test_children[c], SIGKILL);
+		waitpid(test_children[c], NULL, 0); /* don't leave zombies! */
+	}
+	num_test_children = 0;
+
 	if (!in_dynamic_subtest)
 		_igt_dynamic_tests_executed = -1;
 
