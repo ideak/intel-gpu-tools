@@ -789,6 +789,10 @@ igt_main
 		i915 = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(i915);
 
+		/* Restore the reset modparam if left clobbered */
+		igt_assert(igt_sysfs_set_parameter
+			   (i915, "reset", "%d", -1 /* any [default] reset */));
+
 		igt_require(has_persistence(i915));
 		enable_hangcheck(i915);
 		igt_install_exit_handler(exit_handler);
