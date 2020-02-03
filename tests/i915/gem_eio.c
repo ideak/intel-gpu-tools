@@ -185,11 +185,15 @@ static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 	struct igt_spin_factory opts = {
 		.ctx = ctx,
 		.engine = flags,
-		.flags = (IGT_SPIN_FAST |
-			  IGT_SPIN_NO_PREEMPTION |
-			  IGT_SPIN_INVALID_CS |
-			  IGT_SPIN_FENCE_OUT),
+		.flags = IGT_SPIN_NO_PREEMPTION | IGT_SPIN_FENCE_OUT,
 	};
+
+	if (!gem_has_cmdparser(fd, opts.engine) &&
+	    intel_gen(intel_get_drm_devid(fd)) != 6)
+		opts.flags |= IGT_SPIN_INVALID_CS;
+
+	if (intel_gen(intel_get_drm_devid(fd)) > 7)
+		opts.flags |= IGT_SPIN_FAST;
 
 	if (gem_can_store_dword(fd, opts.engine))
 		opts.flags |= IGT_SPIN_POLL_RUN;
