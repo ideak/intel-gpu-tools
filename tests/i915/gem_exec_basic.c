@@ -36,84 +36,6 @@ static uint32_t batch_create(int fd)
 	return handle;
 }
 
-static void batch_fini(int fd, uint32_t handle)
-{
-	gem_sync(fd, handle); /* catch any GPU hang */
-	gem_close(fd, handle);
-}
-
-static void noop(int fd, uint64_t flags)
-{
-	struct drm_i915_gem_execbuffer2 execbuf;
-	struct drm_i915_gem_exec_object2 exec;
-
-	gem_require_ring(fd, flags);
-
-	memset(&exec, 0, sizeof(exec));
-
-	exec.handle = batch_create(fd);
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&exec);
-	execbuf.buffer_count = 1;
-	execbuf.flags = flags;
-	gem_execbuf(fd, &execbuf);
-
-	batch_fini(fd, exec.handle);
-}
-
-static void readonly(int fd, uint64_t flags)
-{
-	struct drm_i915_gem_execbuffer2 *execbuf;
-	struct drm_i915_gem_exec_object2 exec;
-
-	gem_require_ring(fd, flags);
-
-	memset(&exec, 0, sizeof(exec));
-	exec.handle = batch_create(fd);
-
-	execbuf = mmap(NULL, 4096, PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-	igt_assert(execbuf != NULL);
-
-	execbuf->buffers_ptr = to_user_pointer(&exec);
-	execbuf->buffer_count = 1;
-	execbuf->flags = flags;
-	igt_assert(mprotect(execbuf, 4096, PROT_READ) == 0);
-
-	gem_execbuf(fd, execbuf);
-
-	munmap(execbuf, 4096);
-
-	batch_fini(fd, exec.handle);
-}
-
-static void gtt(int fd, uint64_t flags)
-{
-	struct drm_i915_gem_execbuffer2 *execbuf;
-	struct drm_i915_gem_exec_object2 *exec;
-	uint32_t handle;
-
-	gem_require_ring(fd, flags);
-
-	handle = gem_create(fd, 4096);
-
-	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-	execbuf = gem_mmap__gtt(fd, handle, 4096, PROT_WRITE);
-	exec = (struct drm_i915_gem_exec_object2 *)(execbuf + 1);
-	gem_close(fd, handle);
-
-	exec->handle = batch_create(fd);
-
-	execbuf->buffers_ptr = to_user_pointer(exec);
-	execbuf->buffer_count = 1;
-	execbuf->flags = flags;
-
-	gem_execbuf(fd, execbuf);
-
-	batch_fini(fd, exec->handle);
-	munmap(execbuf, 4096);
-}
-
 igt_main
 {
 	const struct intel_execution_engine2 *e;
@@ -121,30 +43,29 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
-		igt_require_gem(fd);
-
+		/* igt_require_gem(fd); // test is mandatory */
 		igt_fork_hang_detector(fd);
 	}
 
 	igt_subtest_with_dynamic("basic") {
-		__for_each_physical_engine(fd, e) {
-			igt_dynamic_f("%s", e->name)
-				noop(fd, e->flags);
-		}
-	}
+		struct drm_i915_gem_exec_object2 exec = {
+			.handle = batch_create(fd),
+		};
 
-	igt_subtest_with_dynamic("readonly") {
 		__for_each_physical_engine(fd, e) {
-			igt_dynamic_f("%s", e->name)
-				readonly(fd, e->flags);
-		}
-	}
+			igt_dynamic_f("%s", e->name) {
+				struct drm_i915_gem_execbuffer2 execbuf = {
+					.buffers_ptr = to_user_pointer(&exec),
+					.buffer_count = 1,
+					.flags = e->flags,
+				};
 
-	igt_subtest_with_dynamic("gtt") {
-		__for_each_physical_engine(fd, e) {
-			igt_dynamic_f("%s", e->name)
-				gtt(fd, e->flags);
+				gem_execbuf(fd, &execbuf);
+			}
 		}
+
+		gem_sync(fd, exec.handle); /* catch any GPU hang */
+		gem_close(fd, exec.handle);
 	}
 
 	igt_fixture {

@@ -52,6 +52,24 @@
 #define LOCAL_I915_EXEC_BATCH_FIRST (1 << 18)
 #define LOCAL_I915_EXEC_FENCE_ARRAY (1 << 19)
 
+static const struct mmap_offset {
+	const char *name;
+	unsigned int type;
+	unsigned int domain;
+} mmap_offset_types[] = {
+	{ "gtt", I915_MMAP_OFFSET_GTT, I915_GEM_DOMAIN_GTT },
+	{ "wb", I915_MMAP_OFFSET_WB, I915_GEM_DOMAIN_CPU },
+	{ "wc", I915_MMAP_OFFSET_WC, I915_GEM_DOMAIN_WC },
+	{ "uc", I915_MMAP_OFFSET_UC, I915_GEM_DOMAIN_WC },
+	{},
+};
+
+#define for_each_mmap_offset_type(__t) \
+	for (const struct mmap_offset *__t = mmap_offset_types; \
+	     (__t)->name; \
+	     (__t)++)
+
+
 static bool has_ring(int fd, unsigned ring_exec_flags)
 {
 	switch (ring_exec_flags & I915_EXEC_RING_MASK) {
@@ -206,6 +224,68 @@ static int has_secure_batches(const int fd)
 	return v > 0;
 }
 
+static uint32_t batch_create(int i915)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
+
+	handle = gem_create(i915, 4096);
+	gem_write(i915, handle, 0, &bbe, sizeof(bbe));
+
+	return handle;
+}
+
+static void readonly(int i915)
+{
+	struct drm_i915_gem_execbuffer2 *execbuf;
+	struct drm_i915_gem_exec_object2 exec = {
+		batch_create(i915)
+	};
+
+	execbuf = mmap(NULL, 4096, PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+	igt_assert(execbuf != MAP_FAILED);
+
+	execbuf->buffers_ptr = to_user_pointer(&exec);
+	execbuf->buffer_count = 1;
+	igt_assert(mprotect(execbuf, 4096, PROT_READ) == 0);
+
+	gem_execbuf(i915, execbuf);
+	gem_close(i915, exec.handle);
+
+	munmap(execbuf, 4096);
+}
+
+static void mmapped(int i915)
+{
+	uint32_t buf, handle;
+
+	buf = gem_create(i915, 4096);
+	handle = batch_create(i915);
+
+	for_each_mmap_offset_type(t) { /* repetitive! */
+		struct drm_i915_gem_execbuffer2 *execbuf;
+		struct drm_i915_gem_exec_object2 *exec;
+
+		execbuf = __gem_mmap_offset(i915, buf, 0, 4096,
+					    PROT_WRITE, t->type);
+		if (!execbuf)
+			continue;
+
+		gem_set_domain(i915, buf, t->domain, t->domain);
+		exec = (struct drm_i915_gem_exec_object2 *)(execbuf + 1);
+		exec->handle = handle;
+
+		execbuf->buffers_ptr = to_user_pointer(exec);
+		execbuf->buffer_count = 1;
+
+		gem_execbuf(i915, execbuf);
+
+		munmap(execbuf, 4096);
+	}
+	gem_close(i915, handle);
+	gem_close(i915, buf);
+}
+
 struct drm_i915_gem_execbuffer2 execbuf;
 struct drm_i915_gem_exec_object2 gem_exec[1];
 uint32_t batch[2] = {MI_BATCH_BUFFER_END};
@@ -255,6 +335,12 @@ igt_main
 			}
 		}
 	}
+
+	igt_subtest("readonly")
+		readonly(fd);
+
+	igt_subtest("mmapped")
+		mmapped(fd);
 
 #define RUN_FAIL(expected_errno) do { \
 		igt_assert_eq(__gem_execbuf(fd, &execbuf), -expected_errno); \
