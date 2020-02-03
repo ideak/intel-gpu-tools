@@ -204,6 +204,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
+		igt_require(gem_available_fences(fd) > 0);
 	}
 
 	igt_subtest("basic") {
