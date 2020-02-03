@@ -210,9 +210,6 @@ gem_exec_capture_SOURCES = i915/gem_exec_capture.c
 TESTS_progs += gem_exec_create
 gem_exec_create_SOURCES = i915/gem_exec_create.c
 
-TESTS_progs += gem_exec_faulting_reloc
-gem_exec_faulting_reloc_SOURCES = i915/gem_exec_faulting_reloc.c
-
 TESTS_progs += gem_exec_fence
 gem_exec_fence_SOURCES = i915/gem_exec_fence.c
 
