@@ -113,6 +113,7 @@ igt_simple_main
 	int fd;
 	
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require(gem_available_fences(fd) > 0);
 	count = SLOW_QUICK(intel_get_total_ram_mb() * 9 / 10, 8) ;
 
 	for (int i = 0; i < count/2; i++) {

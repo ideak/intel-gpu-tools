@@ -124,7 +124,7 @@ igt_simple_main
 	uint32_t devid;
 
 	fd = drm_open_driver(DRIVER_INTEL);
-
+	igt_require(gem_available_fences(fd) > 0);
 	handle = create_bo(fd);
 	igt_require(gem_get_tiling(fd, handle, &tiling, &swizzle));
 
