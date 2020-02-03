@@ -393,12 +393,6 @@ gem_spin_batch_SOURCES = i915/gem_spin_batch.c
 TESTS_progs += gem_stolen
 gem_stolen_SOURCES = i915/gem_stolen.c
 
-TESTS_progs += gem_storedw_batches_loop
-gem_storedw_batches_loop_SOURCES = i915/gem_storedw_batches_loop.c
-
-TESTS_progs += gem_storedw_loop
-gem_storedw_loop_SOURCES = i915/gem_storedw_loop.c
-
 TESTS_progs += gem_streaming_writes
 gem_streaming_writes_SOURCES = i915/gem_streaming_writes.c
 

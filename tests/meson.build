@@ -196,8 +196,6 @@ i915_progs = [
 	'gem_softpin',
 	'gem_spin_batch',
 	'gem_stolen',
-	'gem_storedw_batches_loop',
-	'gem_storedw_loop',
 	'gem_streaming_writes',
 	'gem_sync',
 	'gem_threaded_access_tiled',
