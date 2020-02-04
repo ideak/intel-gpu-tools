@@ -313,8 +313,6 @@ AC_CONFIG_FILES([
 		 overlay/Makefile
 		 ])
 
-AC_CONFIG_FILES([tools/intel_aubdump], [chmod +x tools/intel_aubdump])
-
 AC_OUTPUT
 
 # Print a summary of the compilation

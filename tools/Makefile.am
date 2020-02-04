@@ -24,15 +24,4 @@ AM_CFLAGS = $(DEBUG_CFLAGS) $(DRM_CFLAGS) $(PCIACCESS_CFLAGS) $(CWARNFLAGS) \
 LDADD = $(top_builddir)/lib/libintel_tools.la
 AM_LDFLAGS = -Wl,--as-needed
 
-# aubdumper
-
-module_LTLIBRARIES = intel_aubdump.la
-moduledir = $(libdir)
-intel_aubdump_la_LDFLAGS = -module -avoid-version -no-undefined
-intel_aubdump_la_SOURCES = aubdump.c
-intel_aubdump_la_LIBADD = $(top_builddir)/lib/libintel_tools.la -ldl
-
 intel_gpu_top_LDADD = $(top_builddir)/lib/libigt_perf.la
-
-bin_SCRIPTS = intel_aubdump
-CLEANFILES = $(bin_SCRIPTS)

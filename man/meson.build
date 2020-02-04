@@ -1,7 +1,6 @@
 build_man = get_option('man')
 
 manpages = [
-	'intel_aubdump',
 	'intel_audio_dump',
 	'intel_bios_dumper',
 	'intel_error_decode',

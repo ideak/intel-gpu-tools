@@ -3,7 +3,6 @@ cnl_compute_wrpll
 dpcd_reg
 hsw_compute_wrpll
 igt_stats
-intel_aubdump
 intel_audio_dump
 intel_backlight
 intel_bios_dumper

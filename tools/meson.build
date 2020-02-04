@@ -90,12 +90,6 @@ install_subdir('registers', install_dir : datadir,
 		 'Makefile', 'Makefile.in', 'Makefile.am',
 	       ])
 
-shared_library('intel_aubdump', 'aubdump.c',
-	       dependencies : [ lib_igt_chipset, dlsym ],
-	       name_prefix : '',
-	       install : true,
-	       soversion : '0')
-
 executable('intel_gpu_top', 'intel_gpu_top.c',
 	   install : true,
 	   install_rpath : bindir_rpathdir,
@@ -105,12 +99,5 @@ executable('amd_hdmi_compliance', 'amd_hdmi_compliance.c',
 	   dependencies : [tool_deps],
 	   install_rpath : bindir_rpathdir,
 	   install : true)
-
-conf_data = configuration_data()
-conf_data.set('prefix', prefix)
-conf_data.set('exec_prefix', '${prefix}')
-conf_data.set('libdir', join_paths('${prefix}', libdir))
-configure_file(input : 'intel_aubdump.in', output : 'intel_aubdump',
-               configuration : conf_data, install_dir : bindir)
 
 subdir('null_state_gen')
