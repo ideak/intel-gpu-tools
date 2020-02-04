@@ -54,6 +54,7 @@ TESTS_progs = \
 	kms_frontbuffer_tracking \
 	kms_getfb \
 	kms_hdmi_inject \
+	kms_hdr \
 	kms_invalid_dotclock \
 	kms_lease \
 	kms_legacy_colorkey \
