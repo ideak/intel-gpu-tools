@@ -2170,6 +2170,23 @@ static void format_draw_subtest(const struct test_mode *t)
 		badformat_subtest(t);
 }
 
+static bool tiling_is_valid(int feature_flags, enum tiling_type tiling)
+{
+	if (!(feature_flags & FEATURE_FBC))
+		return true;
+
+	switch (tiling) {
+	case TILING_LINEAR:
+		return false;
+	case TILING_X:
+	case TILING_Y:
+		return true;
+	default:
+		igt_assert(false);
+		return false;
+	}
+}
+
 /*
  * slow_draw - sleep a little bit between drawing operations
  *
@@ -2975,45 +2992,47 @@ static void stridechange_subtest(const struct test_mode *t)
 }
 
 /**
- * tilingchange - alternate between tiled and untiled in multiple ways
+ * tiling_disable_fbc_subtest - Check if tiling is unsupported by FBC
  *
  * METHOD
- *   This test alternates between tiled and untiled frontbuffers of the same
- *   size and format through multiple different APIs: the page flip IOCTL,
- *   normal modesets and the plane APIs.
+ *   This test alternates between a FBC supported and non-supported tiled
+ *   frontbuffers of the same size and format through multiple different
+ *   APIs: the page flip IOCTL, normal modesets and the plane APIs.
  *
  * EXPECTED RESULTS
- *   FBC gets properly disabled for the untiled FB and reenabled for the
- *   tiled FB.
+ *   FBC gets properly disabled for the non-supported tiling and reenabled for
+ *   the supported tiling.
  *
  * FAILURES
  *   Bad Kernels may somehow leave FBC enabled, which can cause FIFO underruns
  *   that lead to CRC assertion failures.
  */
-static void tilingchange_subtest(const struct test_mode *t)
+static void tiling_disable_fbc_subtest(const struct test_mode *t)
 {
-	struct igt_fb new_fb, *old_fb;
+	struct igt_fb new_fb, *supported_fb;
 	struct modeset_params *params = pick_params(t);
 	enum flip_type flip_type;
+	struct test_mode supported_mode;
 
-	prepare_subtest(t, NULL);
+	memcpy(&supported_mode, t, sizeof(*t));
+	supported_mode.tiling = TILING_X;
+	prepare_subtest(&supported_mode, NULL);
+	supported_fb = params->primary.fb;
 
-	old_fb = params->primary.fb;
-
-	create_fb(t->format, params->primary.fb->width, params->primary.fb->height,
-		  LOCAL_DRM_FORMAT_MOD_NONE, t->plane, &new_fb);
+	create_fb(t->format, params->primary.fb->width,
+		  params->primary.fb->height, t->tiling, t->plane, &new_fb);
 	fill_fb(&new_fb, COLOR_PRIM_BG);
 
 	for (flip_type = 0; flip_type < FLIP_COUNT; flip_type++) {
 		igt_debug("Flip type: %d\n", flip_type);
 
-		/* Set a buffer with no tiling. */
+		/* Set a buffer with new tiling. */
 		params->primary.fb = &new_fb;
 		page_flip_for_params(params, flip_type);
 		do_assertions(ASSERT_FBC_DISABLED);
 
 		/* Put FBC back in a working state. */
-		params->primary.fb = old_fb;
+		params->primary.fb = supported_fb;
 		page_flip_for_params(params, flip_type);
 		do_assertions(0);
 	}
@@ -3513,8 +3532,33 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 			igt_subtest_f("%s-stridechange", feature_str(t.feature))
 				stridechange_subtest(&t);
 
-			igt_subtest_f("%s-tilingchange", feature_str(t.feature))
-				tilingchange_subtest(&t);
+			for (t.tiling = TILING_LINEAR; t.tiling < TILING_COUNT;
+			     t.tiling++) {
+				if (t.tiling == TILING_X)
+					continue;
+
+				igt_describe("Test the tiling formats, if the "
+					     "tiling format supports FBC do"
+					     "the basic drawing test if not "
+					     "set the mode and test if FBC is "
+					     "disabled");
+				igt_subtest_f("%s-tiling-%s",
+					      feature_str(t.feature),
+					      tiling_str(t.tiling)) {
+
+					/* Tiling Y is only supported on GEN9+ */
+					if (t.tiling == TILING_Y) {
+						int devid = intel_get_drm_devid(drm.fd);
+						igt_require(AT_LEAST_GEN(devid, 9));
+					}
+
+					if (tiling_is_valid(t.feature, t.tiling))
+						draw_subtest(&t);
+					else
+						tiling_disable_fbc_subtest(&t);
+				}
+			}
+			t.tiling = opt.tiling;
 		}
 
 		if ((t.feature & FEATURE_PSR) || (t.feature & FEATURE_DRRS))
