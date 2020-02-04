@@ -57,6 +57,8 @@ igt_simple_main
 	int tile_height;
 
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require(gem_available_fences(fd) > 0);
+	igt_require(gem_has_mappable_ggtt(fd));
 
 	if (IS_GEN2(intel_get_drm_devid(fd)))
 		tile_height = 16;

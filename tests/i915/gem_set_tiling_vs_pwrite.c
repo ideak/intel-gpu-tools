@@ -48,36 +48,42 @@ IGT_TEST_DESCRIPTION("Check set_tiling vs pwrite coherency.");
 
 igt_simple_main
 {
-	int fd;
-	uint32_t *ptr;
 	uint32_t data[OBJECT_SIZE/4];
-	int i;
+	uint32_t *ptr;
 	uint32_t handle;
+	int fd;
 
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require(gem_available_fences(fd) > 0);
 
-	for (i = 0; i < OBJECT_SIZE/4; i++)
+	for (int i = 0; i < OBJECT_SIZE/4; i++)
 		data[i] = i;
 
 	handle = gem_create(fd, OBJECT_SIZE);
-	ptr = gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_READ | PROT_WRITE);
+	ptr = __gem_mmap__gtt(fd, handle, OBJECT_SIZE, PROT_WRITE);
 
 	gem_set_tiling(fd, handle, I915_TILING_X, TEST_STRIDE);
 
 	/* touch it */
-	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-	*ptr = 0xdeadbeef;
+	if (ptr) {
+		gem_set_domain(fd, handle,
+			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+		*ptr = 0xdeadbeef;
+	}
 
 	igt_info("testing pwrite on tiled buffer\n");
 	gem_write(fd, handle, 0, data, OBJECT_SIZE);
 	memset(data, 0, OBJECT_SIZE);
 	gem_read(fd, handle, 0, data, OBJECT_SIZE);
-	for (i = 0; i < OBJECT_SIZE/4; i++)
+	for (int i = 0; i < OBJECT_SIZE/4; i++)
 		igt_assert_eq_u32(data[i], i);
 
 	/* touch it before changing the tiling, so that the fence sticks around */
-	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-	*ptr = 0xdeadbeef;
+	if (ptr) {
+		gem_set_domain(fd, handle,
+			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+		*ptr = 0xdeadbeef;
+	}
 
 	gem_set_tiling(fd, handle, I915_TILING_NONE, 0);
 
@@ -85,7 +91,7 @@ igt_simple_main
 	gem_write(fd, handle, 0, data, OBJECT_SIZE);
 	memset(data, 0, OBJECT_SIZE);
 	gem_read(fd, handle, 0, data, OBJECT_SIZE);
-	for (i = 0; i < OBJECT_SIZE/4; i++)
+	for (int i = 0; i < OBJECT_SIZE/4; i++)
 		igt_assert_eq_u32(data[i], i);
 
 	munmap(ptr, OBJECT_SIZE);
