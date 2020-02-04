@@ -8,7 +8,6 @@ benchmark_progs = [
 	'gem_exec_reloc',
 	'gem_exec_trace',
 	'gem_latency',
-	'gem_mmap',
 	'gem_prw',
 	'gem_set_domain',
 	'gem_syslatency',
