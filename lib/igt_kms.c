@@ -417,6 +417,7 @@ const char * const igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	[IGT_CONNECTOR_HDCP_CONTENT_TYPE] = "HDCP Content Type",
 	[IGT_CONNECTOR_LINK_STATUS] = "link-status",
 	[IGT_CONNECTOR_MAX_BPC] = "max bpc",
+	[IGT_CONNECTOR_HDR_OUTPUT_METADATA] = "HDR_OUTPUT_METADATA",
 };
 
 /*
@@ -1794,6 +1795,10 @@ static void igt_output_reset(igt_output_t *output)
 	if (igt_output_has_prop(output, IGT_CONNECTOR_CONTENT_PROTECTION))
 		igt_output_set_prop_enum(output, IGT_CONNECTOR_CONTENT_PROTECTION,
 					 "Undesired");
+
+	if (igt_output_has_prop(output, IGT_CONNECTOR_HDR_OUTPUT_METADATA))
+		igt_output_set_prop_value(output,
+					  IGT_CONNECTOR_HDR_OUTPUT_METADATA, 0);
 }
 
 /**
@@ -1807,6 +1812,7 @@ static void igt_output_reset(igt_output_t *output)
  * - %IGT_CONNECTOR_CRTC_ID
  * - %IGT_CONNECTOR_BROADCAST_RGB (if applicable)
  *   %IGT_CONNECTOR_CONTENT_PROTECTION (if applicable)
+ *   %IGT_CONNECTOR_HDR_OUTPUT_METADATA (if applicable)
  * - igt_output_override_mode() to default.
  *
  * For pipes:
