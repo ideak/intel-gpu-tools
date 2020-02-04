@@ -125,6 +125,7 @@ enum igt_atomic_connector_properties {
        IGT_CONNECTOR_VRR_CAPABLE,
        IGT_CONNECTOR_HDCP_CONTENT_TYPE,
        IGT_CONNECTOR_LINK_STATUS,
+       IGT_CONNECTOR_MAX_BPC,
        IGT_NUM_CONNECTOR_PROPS
 };
 
