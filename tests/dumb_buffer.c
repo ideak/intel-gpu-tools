@@ -52,8 +52,6 @@
 
 IGT_TEST_DESCRIPTION("This is a test for the generic dumb buffer interface.");
 
-#define PAGE_SIZE 4096
-
 static int __dumb_create(int fd, struct drm_mode_create_dumb *create)
 {
 	int err = 0;
@@ -223,6 +221,7 @@ static uint64_t get_npages(_Atomic(uint64_t) *global, uint64_t npages)
 
 struct thread_clear {
 	_Atomic(uint64_t) max;
+	uint64_t page_size;
 	int timeout;
 	int fd;
 };
@@ -247,14 +246,12 @@ static void *thread_clear(void *data)
 
 		for (uint64_t _npages = npages; npages > 0; npages -= _npages) {
 			create.bpp = 32;
-			create.width = PAGE_SIZE / (create.bpp / 8);
+			create.width = arg->page_size / (create.bpp / 8);
 			_npages = npages <= MAX_PAGE_TO_REQUEST ? npages :
 				  MAX_PAGE_TO_REQUEST;
 			create.height = _npages;
 
 			dumb_create(fd, &create);
-			igt_assert_eq(PAGE_SIZE * create.height, create.size);
-
 			ptr = dumb_map(fd,
 				       create.handle, create.size,
 				       PROT_WRITE);
@@ -307,7 +304,7 @@ static uint64_t estimate_largest_dumb_buffer(int fd)
 
 		igt_info("Largest dumb buffer sucessfully created: %'"PRIu64" bytes\n",
 			 largest);
-		return largest / PAGE_SIZE;
+		return largest;
 	}
 
 	for (create.height = 1; create.height; create.height *= 2) {
@@ -329,18 +326,34 @@ static uint64_t estimate_largest_dumb_buffer(int fd)
 	longjmp(sigjmp, SIGABRT);
 }
 
+static uint64_t probe_page_size(int fd)
+{
+	struct drm_mode_create_dumb create = {
+		.bpp = 32,
+		.width = 1, /* in pixels */
+		.height = 1, /* in rows */
+	};
+
+	dumb_create(fd, &create);
+	dumb_destroy(fd, create.handle);
+
+	return create.size;
+}
+
 static void always_clear(int fd, int timeout)
 {
 	struct thread_clear arg = {
 		.fd = fd,
 		.timeout = timeout,
-		.max = estimate_largest_dumb_buffer(fd), /* in pages */
+		.page_size = probe_page_size(fd),
+		.max = estimate_largest_dumb_buffer(fd),
 	};
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	unsigned long checked;
 	pthread_t thread[ncpus];
 	void *result;
 
+	arg.max /= arg.page_size;
 	for (int i = 0; i < ncpus; i++)
 		pthread_create(&thread[i], NULL, thread_clear, &arg);
 
