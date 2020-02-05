@@ -226,7 +226,7 @@ static void nohangcheck_hostile(int i915)
 
 	igt_require(__enable_hangcheck(dir, false));
 
-	__for_each_physical_engine(i915, e) {
+	____for_each_physical_engine(i915, ctx, e) {
 		igt_spin_t *spin;
 
 		spin = igt_spin_new(i915, ctx,
