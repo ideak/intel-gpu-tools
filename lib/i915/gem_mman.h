@@ -95,5 +95,16 @@ int gem_munmap(void *ptr, uint64_t size);
  */
 #define gem_require_mmap_offset_wc(fd) igt_require(gem_mmap_offset__has_wc(fd))
 
+extern const struct mmap_offset {
+	const char *name;
+	unsigned int type;
+	unsigned int domain;
+} mmap_offset_types[];
+
+#define for_each_mmap_offset_type(__t) \
+	for (const struct mmap_offset *__t = mmap_offset_types; \
+	     (__t)->name; \
+	     (__t)++)
+
 #endif /* GEM_MMAN_H */
 

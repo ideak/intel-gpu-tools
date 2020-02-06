@@ -52,24 +52,6 @@
 #define LOCAL_I915_EXEC_BATCH_FIRST (1 << 18)
 #define LOCAL_I915_EXEC_FENCE_ARRAY (1 << 19)
 
-static const struct mmap_offset {
-	const char *name;
-	unsigned int type;
-	unsigned int domain;
-} mmap_offset_types[] = {
-	{ "gtt", I915_MMAP_OFFSET_GTT, I915_GEM_DOMAIN_GTT },
-	{ "wb", I915_MMAP_OFFSET_WB, I915_GEM_DOMAIN_CPU },
-	{ "wc", I915_MMAP_OFFSET_WC, I915_GEM_DOMAIN_WC },
-	{ "uc", I915_MMAP_OFFSET_UC, I915_GEM_DOMAIN_WC },
-	{},
-};
-
-#define for_each_mmap_offset_type(__t) \
-	for (const struct mmap_offset *__t = mmap_offset_types; \
-	     (__t)->name; \
-	     (__t)++)
-
-
 static bool has_ring(int fd, unsigned ring_exec_flags)
 {
 	switch (ring_exec_flags & I915_EXEC_RING_MASK) {

@@ -538,3 +538,11 @@ void gem_require_mappable_ggtt(int i915)
 	igt_require_f(gem_has_mappable_ggtt(i915),
 		      "HW & kernel support for indirect detiling aperture\n");
 }
+
+const struct mmap_offset mmap_offset_types[] = {
+	{ "gtt", I915_MMAP_OFFSET_GTT, I915_GEM_DOMAIN_GTT },
+	{ "wb", I915_MMAP_OFFSET_WB, I915_GEM_DOMAIN_CPU },
+	{ "wc", I915_MMAP_OFFSET_WC, I915_GEM_DOMAIN_WC },
+	{ "uc", I915_MMAP_OFFSET_UC, I915_GEM_DOMAIN_WC },
+	{},
+};

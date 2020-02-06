@@ -33,23 +33,6 @@
 
 IGT_TEST_DESCRIPTION("Basic MMAP_OFFSET IOCTL tests for mem regions\n");
 
-static const struct mmap_offset {
-	const char *name;
-	unsigned int type;
-	unsigned int domain;
-} mmap_offset_types[] = {
-	{ "gtt", I915_MMAP_OFFSET_GTT, I915_GEM_DOMAIN_GTT },
-	{ "wb", I915_MMAP_OFFSET_WB, I915_GEM_DOMAIN_CPU },
-	{ "wc", I915_MMAP_OFFSET_WC, I915_GEM_DOMAIN_WC },
-	{ "uc", I915_MMAP_OFFSET_UC, I915_GEM_DOMAIN_WC },
-	{},
-};
-
-#define for_each_mmap_offset_type(__t) \
-	for (const struct mmap_offset *__t = mmap_offset_types; \
-	     (__t)->name; \
-	     (__t)++)
-
 static int mmap_offset_ioctl(int i915, struct drm_i915_gem_mmap_offset *arg)
 {
 	int err = 0;
