@@ -2172,12 +2172,14 @@ static void format_draw_subtest(const struct test_mode *t)
 
 static bool tiling_is_valid(int feature_flags, enum tiling_type tiling)
 {
+	int devid = intel_get_drm_devid(drm.fd);
+
 	if (!(feature_flags & FEATURE_FBC))
 		return true;
 
 	switch (tiling) {
 	case TILING_LINEAR:
-		return false;
+		return AT_LEAST_GEN(devid, 9);
 	case TILING_X:
 	case TILING_Y:
 		return true;
