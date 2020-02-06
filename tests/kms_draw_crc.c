@@ -183,11 +183,13 @@ static void draw_method_subtest(enum igt_draw_method method,
 
 	igt_require(format_is_supported(formats[format_index], tiling));
 
-	/* Use IGT_DRAW_MMAP_GTT on an untiled buffer as the parameter for
+	/* Use IGT_DRAW_MMAP_GTT/WC on an untiled buffer as the parameter for
 	 * comparison. Cache the value so we don't recompute it for every single
 	 * subtest. */
 	if (!base_crcs[format_index].set) {
-		get_method_crc(IGT_DRAW_MMAP_GTT, formats[format_index],
+		get_method_crc(gem_has_mappable_ggtt(drm_fd) ? IGT_DRAW_MMAP_GTT :
+							       IGT_DRAW_MMAP_WC,
+			       formats[format_index],
 			       LOCAL_DRM_FORMAT_MOD_NONE,
 			       &base_crcs[format_index].crc);
 		base_crcs[format_index].set = true;
@@ -225,7 +227,9 @@ static void fill_fb_subtest(void)
 	igt_create_fb(drm_fd, ms.mode->hdisplay, ms.mode->vdisplay,
 		      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, &fb);
 
-	igt_draw_rect_fb(drm_fd, bufmgr, NULL, &fb, IGT_DRAW_MMAP_GTT,
+	igt_draw_rect_fb(drm_fd, bufmgr, NULL, &fb,
+			 gem_has_mappable_ggtt(drm_fd) ? IGT_DRAW_MMAP_GTT :
+							 IGT_DRAW_MMAP_WC,
 			 0, 0, fb.width, fb.height, 0xFF);
 
 	rc = drmModeSetCrtc(drm_fd, ms.crtc_id, fb.fb_id, 0, 0,
