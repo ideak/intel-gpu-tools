@@ -44,8 +44,9 @@ struct buffer {
 	uint16_t height;
 	uint16_t stride;
 	uint32_t size;
-	unsigned int tiling;
-	unsigned int caching;
+	unsigned int caching : 3;
+	unsigned int tiling : 3;
+	unsigned int fenced : 1;
 	uint64_t gtt_offset;
 	uint32_t model[] __attribute__((aligned(16)));
 };
@@ -160,14 +161,12 @@ static void buffer_set_tiling(const struct device *device,
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create(device->fd, size);
-	if (tiling) {
+	if (__gem_set_tiling(device->fd, obj[0].handle, tiling, stride) == 0)
 		obj[0].flags = EXEC_OBJECT_NEEDS_FENCE;
-		gem_set_tiling(device->fd, obj[0].handle, tiling, stride);
-	}
 
 	obj[1].handle = buffer->handle;
 	obj[1].offset = buffer->gtt_offset;
-	if (buffer->tiling)
+	if (buffer->fenced)
 		obj[1].flags = EXEC_OBJECT_NEEDS_FENCE;
 
 	obj[2].handle = gem_create(device->fd, 4096);
@@ -251,6 +250,7 @@ static void buffer_set_tiling(const struct device *device,
 	buffer->gtt_offset = obj[0].offset;
 	buffer->handle = obj[0].handle;
 
+	buffer->fenced = !!(obj[0].flags & EXEC_OBJECT_NEEDS_FENCE);
 	buffer->tiling = tiling;
 	buffer->stride = stride;
 	buffer->size = size;
@@ -380,6 +380,11 @@ static void *download(const struct device *device,
 	void *linear, *src;
 
 	igt_assert(posix_memalign(&linear, 4096, buffer->size) == 0);
+
+	if (buffer->tiling && !buffer->fenced) {
+		igt_assert(blit_to_linear(device, buffer, linear));
+		return linear;
+	}
 
 	switch (mode) {
 	case CPU:
@@ -755,6 +760,9 @@ igt_main
 								buffer_set_tiling(&device, dst, dst_tiling);
 
 								for (enum mode down = CPU; down <= WC; down++) {
+									if (down == GTT && !gem_has_mappable_ggtt(device.fd))
+										continue;
+
 									igt_debug("Testing src_tiling=%d, dst_tiling=%d, down=%d at (%d, %d) x (%d, %d)\n",
 										  src_tiling,
 										  dst_tiling,
