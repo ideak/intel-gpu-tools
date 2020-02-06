@@ -364,7 +364,7 @@ test_invalid_args(int fd)
  * Verify that ggtt mapped area can be used as the sseu pointer.
  */
 static void
-test_ggtt_args(int fd)
+test_mmapped_args(int fd, const struct mmap_offset *t)
 {
 	struct drm_i915_gem_context_param_sseu *sseu;
 	struct drm_i915_gem_context_param arg = {
@@ -372,17 +372,19 @@ test_ggtt_args(int fd)
 		.ctx_id = gem_context_create(fd),
 		.size = sizeof(*sseu),
 	};
+	void *ptr;
 	uint32_t bo;
 
 	bo = gem_create(fd, 4096);
-	arg.value = to_user_pointer(gem_mmap__gtt(fd, bo, 4096,
-						  PROT_READ | PROT_WRITE));
+	ptr = __gem_mmap_offset(fd, bo, 0, 4096, PROT_WRITE, t->type);
+	gem_close(fd, bo);
+	igt_require(ptr);
 
+	arg.value = to_user_pointer(ptr);
 	igt_assert_eq(__gem_context_get_param(fd, &arg), 0);
 	igt_assert_eq(__gem_context_set_param(fd, &arg), 0);
 
 	munmap((void *)(uintptr_t)arg.value, 4096);
-	gem_close(fd, bo);
 	gem_context_destroy(fd, arg.ctx_id);
 }
 
@@ -528,8 +530,12 @@ igt_main
 		igt_subtest("invalid-sseu")
 			test_invalid_sseu(fd);
 
-		igt_subtest("ggtt-args")
-			test_ggtt_args(fd);
+		igt_subtest_with_dynamic("mmap-args") {
+			for_each_mmap_offset_type(t) {
+				igt_dynamic_f("%s", t->name)
+					test_mmapped_args(fd, t);
+			}
+		}
 
 		igt_subtest("engines")
 			test_engines(fd);
