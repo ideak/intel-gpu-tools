@@ -178,6 +178,8 @@ static void draw_method_subtest(enum igt_draw_method method,
 	igt_crc_t crc;
 
 	igt_skip_on(method == IGT_DRAW_MMAP_WC && !gem_mmap__has_wc(drm_fd));
+	igt_skip_on(method == IGT_DRAW_MMAP_GTT &&
+		    !gem_has_mappable_ggtt(drm_fd));
 
 	igt_require(format_is_supported(formats[format_index], tiling));
 
