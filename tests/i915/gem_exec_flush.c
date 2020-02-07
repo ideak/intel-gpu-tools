@@ -251,8 +251,6 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 			i = 16 * (idx % 64) + (idx / 64);
 			obj[1].relocs_ptr = to_user_pointer(&reloc0[i]);
 			obj[2].relocs_ptr = to_user_pointer(&reloc1[i]);
-			igt_assert_eq_u64(reloc0[i].presumed_offset, obj[0].offset);
-			igt_assert_eq_u64(reloc1[i].presumed_offset, obj[0].offset);
 			execbuf.batch_start_offset =  64*i;
 
 overwrite:
