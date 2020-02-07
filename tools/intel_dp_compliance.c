@@ -451,9 +451,9 @@ static int setup_framebuffers(struct connector *dp_conn)
 	igt_assert(dp_conn->fb);
 
 	/* Map the mapping of GEM object into the virtual address space */
-	dp_conn->pixmap = gem_mmap__gtt(drm_fd,
+	dp_conn->pixmap = gem_mmap__device_coherent(drm_fd,
 					dp_conn->fb_video_pattern.gem_handle,
-					dp_conn->fb_video_pattern.size,
+					0, dp_conn->fb_video_pattern.size,
 					PROT_READ | PROT_WRITE);
 	if (dp_conn->pixmap == NULL)
 		return -1;
@@ -481,9 +481,9 @@ static int setup_failsafe_framebuffer(struct connector *dp_conn)
 	igt_assert(dp_conn->failsafe_fb);
 
 	/* Map the mapping of GEM object into the virtual address space */
-	dp_conn->failsafe_pixmap = gem_mmap__gtt(drm_fd,
+	dp_conn->failsafe_pixmap = gem_mmap__device_coherent(drm_fd,
 						 dp_conn->fb_failsafe_pattern.gem_handle,
-						 dp_conn->fb_failsafe_pattern.size,
+						 0, dp_conn->fb_failsafe_pattern.size,
 						 PROT_READ | PROT_WRITE);
 	if (dp_conn->failsafe_pixmap == NULL)
 		return -1;
@@ -518,9 +518,9 @@ static int setup_video_pattern_framebuffer(struct connector *dp_conn)
 	igt_assert(dp_conn->test_pattern.fb);
 
 	/* Map the mapping of GEM object into the virtual address space */
-	dp_conn->test_pattern.pixmap = gem_mmap__gtt(drm_fd,
+	dp_conn->test_pattern.pixmap = gem_mmap__device_coherent(drm_fd,
 						     dp_conn->test_pattern.fb_pattern.gem_handle,
-						     dp_conn->test_pattern.fb_pattern.size,
+						     0, dp_conn->test_pattern.fb_pattern.size,
 						     PROT_READ | PROT_WRITE);
 	if (dp_conn->test_pattern.pixmap == NULL)
 		return -1;
