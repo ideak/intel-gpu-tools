@@ -41,7 +41,7 @@ void igt_vec_fini(struct igt_vec *vec)
 
 void *igt_vec_elem(const struct igt_vec *vec, int idx)
 {
-	igt_assert(idx < vec->len);
+	igt_assert(idx >= 0 && idx < vec->len);
 
 	return vec->elems + idx * vec->elem_size;
 }
@@ -79,7 +79,7 @@ int igt_vec_index(const struct igt_vec *vec, void *elem)
 
 void igt_vec_remove(struct igt_vec *vec, int idx)
 {
-	igt_assert(idx < vec->len);
+	igt_assert(idx >= 0 && idx < vec->len);
 
 	memmove(igt_vec_elem(vec, idx),
 		igt_vec_elem(vec, idx + 1),
