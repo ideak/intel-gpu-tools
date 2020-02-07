@@ -200,6 +200,7 @@ igt_simple_main
 
 	data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 	igt_require_gem(data.drm_fd);
+	igt_require(gem_available_fences(data.drm_fd) > 0);
 
 	data.devid = intel_get_drm_devid(data.drm_fd);
 
