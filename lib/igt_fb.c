@@ -841,9 +841,20 @@ static void memset64(uint64_t *s, uint64_t c, size_t n)
 static void clear_yuv_buffer(struct igt_fb *fb)
 {
 	bool full_range = fb->color_range == IGT_COLOR_YCBCR_FULL_RANGE;
+	size_t plane_size[2];
 	void *ptr;
 
 	igt_assert(igt_format_is_yuv(fb->drm_format));
+
+	for (int i = 0; i < lookup_drm_format(fb->drm_format)->num_planes; i++) {
+		unsigned int tile_width, tile_height;
+
+		igt_assert_lt(i, ARRAY_SIZE(plane_size));
+		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[i],
+				     &tile_width, &tile_height);
+		plane_size[i] = fb->strides[i] *
+			ALIGN(fb->plane_height[i], tile_height);
+	}
 
 	/* Ensure the framebuffer is preallocated */
 	ptr = igt_fb_map_buffer(fb->fd, fb);
@@ -853,48 +864,48 @@ static void clear_yuv_buffer(struct igt_fb *fb)
 	case DRM_FORMAT_NV12:
 		memset(ptr + fb->offsets[0],
 		       full_range ? 0x00 : 0x10,
-		       fb->strides[0] * fb->plane_height[0]);
+		       plane_size[0]);
 		memset(ptr + fb->offsets[1],
 		       0x80,
-		       fb->strides[1] * fb->plane_height[1]);
+		       plane_size[1]);
 		break;
 	case DRM_FORMAT_XYUV8888:
 		wmemset(ptr + fb->offsets[0], full_range ? 0x00008080 : 0x00108080,
-			fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+			plane_size[0] / sizeof(wchar_t));
 		break;
 	case DRM_FORMAT_YUYV:
 	case DRM_FORMAT_YVYU:
 		wmemset(ptr + fb->offsets[0],
 			full_range ? 0x80008000 : 0x80108010,
-			fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+			plane_size[0] / sizeof(wchar_t));
 		break;
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
 		wmemset(ptr + fb->offsets[0],
 			full_range ? 0x00800080 : 0x10801080,
-			fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+			plane_size[0] / sizeof(wchar_t));
 		break;
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_P012:
 	case DRM_FORMAT_P016:
 		wmemset(ptr, full_range ? 0 : 0x10001000,
-			fb->offsets[1] / sizeof(wchar_t));
+			plane_size[0] / sizeof(wchar_t));
 		wmemset(ptr + fb->offsets[1], 0x80008000,
-			fb->strides[1] * fb->plane_height[1] / sizeof(wchar_t));
+			plane_size[1] / sizeof(wchar_t));
 		break;
 	case DRM_FORMAT_Y210:
 	case DRM_FORMAT_Y212:
 	case DRM_FORMAT_Y216:
 		wmemset(ptr + fb->offsets[0],
 			full_range ? 0x80000000 : 0x80001000,
-			fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+			plane_size[0] / sizeof(wchar_t));
 		break;
 
 	case DRM_FORMAT_XVYU2101010:
 	case DRM_FORMAT_Y410:
 		wmemset(ptr + fb->offsets[0],
 			full_range ? 0x20000200 : 0x20010200,
-		fb->strides[0] * fb->plane_height[0] / sizeof(wchar_t));
+			plane_size[0] / sizeof(wchar_t));
 		break;
 
 	case DRM_FORMAT_XVYU12_16161616:
@@ -903,7 +914,7 @@ static void clear_yuv_buffer(struct igt_fb *fb)
 	case DRM_FORMAT_Y416:
 		memset64(ptr + fb->offsets[0],
 			 full_range ? 0x800000008000ULL : 0x800010008000ULL,
-			 fb->strides[0] * fb->plane_height[0] / sizeof(uint64_t));
+			 plane_size[0] / sizeof(uint64_t));
 		break;
 	}
 
