@@ -728,6 +728,8 @@ void igt_draw_rect_fb(int fd, drm_intel_bufmgr *bufmgr,
  */
 void igt_draw_fill_fb(int fd, struct igt_fb *fb, uint32_t color)
 {
-	igt_draw_rect_fb(fd, NULL, NULL, fb, IGT_DRAW_MMAP_GTT,
+	igt_draw_rect_fb(fd, NULL, NULL, fb,
+			 gem_has_mappable_ggtt(fd) ? IGT_DRAW_MMAP_GTT :
+						     IGT_DRAW_MMAP_WC,
 			 0, 0, fb->width, fb->height, color);
 }
