@@ -27,6 +27,7 @@
 #include "igt.h"
 #include <limits.h>
 #include <unistd.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -202,6 +203,63 @@ static bool __enable_hangcheck(int dir, bool state)
 	return igt_sysfs_set(dir, "enable_hangcheck", state ? "1" : "0");
 }
 
+static int __execbuf(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err;
+
+	err = 0;
+	if (ioctl(i915, DRM_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
+}
+
+static void alarm_handler(int sig)
+{
+}
+
+static int fill_ring(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	struct sigaction old_sa, sa = { .sa_handler = alarm_handler };
+	int fence = execbuf->rsvd2 >> 32;
+	struct itimerval itv;
+	bool once = false;
+
+	sigaction(SIGALRM, &sa, &old_sa);
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 1000;
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 10000;
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	igt_assert(execbuf->flags & I915_EXEC_FENCE_OUT);
+	do {
+		int err = __execbuf(i915, execbuf);
+
+		if (err == 0) {
+			close(fence);
+			fence = execbuf->rsvd2 >> 32;
+			continue;
+		}
+
+		if (err == -EWOULDBLOCK || once)
+			break;
+
+		/* sleep until the next timer interrupt (woken on signal) */
+		pause();
+		once = true;
+	} while (1);
+
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+	sigaction(SIGALRM, &old_sa, NULL);
+
+	return fence;
+}
+
 static void nohangcheck_hostile(int i915)
 {
 	const struct intel_execution_engine2 *e;
@@ -228,23 +286,27 @@ static void nohangcheck_hostile(int i915)
 
 	____for_each_physical_engine(i915, ctx, e) {
 		igt_spin_t *spin;
+		int new;
 
-		spin = igt_spin_new(i915, ctx,
-				    .engine = e->flags,
-				    .flags = (IGT_SPIN_NO_PREEMPTION |
-					      IGT_SPIN_FENCE_OUT));
+		spin = __igt_spin_new(i915, ctx,
+				      .engine = e->flags,
+				      .flags = (IGT_SPIN_NO_PREEMPTION |
+						IGT_SPIN_FENCE_OUT));
 
-		igt_assert(spin->out_fence != -1);
+		new = fill_ring(i915, &spin->execbuf);
+		igt_assert(new != -1);
+		spin->out_fence = -1;
+
 		if (fence < 0) {
-			fence = spin->out_fence;
-			spin->out_fence = -1;
-		} else {
-			int new;
-
-			new = sync_fence_merge(fence, spin->out_fence);
-			close(fence);
-
 			fence = new;
+		} else {
+			int tmp;
+
+			tmp = sync_fence_merge(fence, new);
+			close(fence);
+			close(new);
+
+			fence = tmp;
 		}
 	}
 	gem_context_destroy(i915, ctx);
