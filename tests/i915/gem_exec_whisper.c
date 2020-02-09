@@ -44,6 +44,8 @@
 
 #define VERIFY 0
 
+#define TIMEOUT 20
+
 static void check_bo(int fd, uint32_t handle, int pass)
 {
 	uint32_t *map;
@@ -343,7 +345,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 
 		igt_while_interruptible(flags & INTERRUPTIBLE) {
 			pass = 0;
-			igt_until_timeout(150) {
+			igt_until_timeout(TIMEOUT) {
 				uint64_t offset;
 
 				if (flags & HANG)
