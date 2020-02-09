@@ -1682,8 +1682,6 @@ static void test_unmap_cycles(int fd, int expected)
 		test_unmap(fd, expected);
 }
 
-#define MM_STRESS_LOOPS 100000
-
 struct stress_thread_data {
 	unsigned int stop;
 	int exit_code;
@@ -1716,11 +1714,10 @@ static void *mm_stress_thread(void *data)
 	return NULL;
 }
 
-static void test_stress_mm(int fd)
+static void test_stress_mm(int fd, int timeout)
 {
 	int ret;
 	pthread_t t;
-	unsigned int loops = MM_STRESS_LOOPS;
 	uint32_t handle;
 	void *ptr;
 	struct stress_thread_data stdata;
@@ -1732,7 +1729,7 @@ static void test_stress_mm(int fd)
 	ret = pthread_create(&t, NULL, mm_stress_thread, &stdata);
 	igt_assert_eq(ret, 0);
 
-	while (loops--) {
+	igt_until_timeout(timeout) {
 		gem_userptr(fd, ptr, PAGE_SIZE, 0, userptr_flags, &handle);
 
 		gem_close(fd, handle);
@@ -1747,7 +1744,7 @@ static void test_stress_mm(int fd)
 	igt_assert_eq(stdata.exit_code, 0);
 }
 
-static void test_stress_purge(int fd)
+static void test_stress_purge(int fd, int timeout)
 {
 	struct stress_thread_data stdata;
 	uint32_t handle;
@@ -1759,7 +1756,7 @@ static void test_stress_purge(int fd)
 	igt_assert(posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE) == 0);
 	igt_assert(!pthread_create(&t, NULL, mm_stress_thread, &stdata));
 
-	igt_until_timeout(150) {
+	igt_until_timeout(timeout) {
 		gem_userptr(fd, ptr, PAGE_SIZE, 0, userptr_flags, &handle);
 
 		gem_set_domain(fd, handle,
@@ -1806,10 +1803,9 @@ static void *mm_userptr_close_thread(void *data)
 	return NULL;
 }
 
-static void test_invalidate_close_race(int fd, bool overlap)
+static void test_invalidate_close_race(int fd, bool overlap, int timeout)
 {
 	pthread_t t;
-	unsigned int loops = MM_STRESS_LOOPS;
 	struct userptr_close_thread_data t_data;
 
 	memset(&t_data, 0, sizeof(t_data));
@@ -1820,7 +1816,7 @@ static void test_invalidate_close_race(int fd, bool overlap)
 
 	igt_assert(pthread_create(&t, NULL, mm_userptr_close_thread, &t_data) == 0);
 
-	while (loops--) {
+	igt_until_timeout(timeout) {
 		mprotect(t_data.ptr, PAGE_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
 		mprotect(t_data.ptr, PAGE_SIZE, PROT_READ | PROT_WRITE);
 	}
@@ -2155,15 +2151,15 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 			test_unmap_after_close(fd);
 
 		igt_subtest("stress-mm")
-			test_stress_mm(fd);
+			test_stress_mm(fd, 5);
 		igt_subtest("stress-purge")
-			test_stress_purge(fd);
+			test_stress_purge(fd, 5);
 
 		igt_subtest("stress-mm-invalidate-close")
-			test_invalidate_close_race(fd, false);
+			test_invalidate_close_race(fd, false, 2);
 
 		igt_subtest("stress-mm-invalidate-close-overlap")
-			test_invalidate_close_race(fd, true);
+			test_invalidate_close_race(fd, true, 2);
 
 		for (unsigned flags = 0; flags < ALL_MAP_FIXED_INVALIDATE + 1; flags++) {
 			igt_subtest_f("map-fixed-invalidate%s%s%s",
