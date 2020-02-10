@@ -207,8 +207,16 @@ endif
 if cc.has_header('sys/io.h')
 	config.set('HAVE_SYS_IO_H', 1)
 endif
-if cc.has_header('cpuid.h')
-	# FIXME: Do we need the example link test from configure.ac?
+if cc.links('''
+#include <cpuid.h>
+#include <stddef.h>
+
+int main(void) {
+  int eax, ebx, ecx, edx;
+  if (__get_cpuid_max(0, NULL) < 4)
+    return 0;
+  __cpuid_count(4, 0, eax, ebx, ecx, edx);
+}''', name : 'cpuid.h')
 	config.set('HAVE_CPUID_H', 1)
 endif
 if cc.has_header_symbol('unistd.h', 'gettid', args : '-D_GNU_SOURCE')
