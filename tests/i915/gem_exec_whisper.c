@@ -82,6 +82,7 @@ static void verify_reloc(int fd, uint32_t handle,
 #define PRIORITY 0x80
 #define ALL 0x100
 #define QUEUES 0x200
+#define BASIC 0x400
 
 struct hang {
 	struct drm_i915_gem_exec_object2 obj;
@@ -527,30 +528,30 @@ igt_main
 		const char *name;
 		unsigned flags;
 	} modes[] = {
-		{ "normal", 0 },
+		{ "normal", BASIC },
 		{ "interruptible", INTERRUPTIBLE },
-		{ "forked", FORKED },
-		{ "sync", SYNC },
+		{ "forked", BASIC | FORKED },
+		{ "sync", BASIC | SYNC },
 		{ "chain", CHAIN },
 		{ "chain-forked", CHAIN | FORKED },
 		{ "chain-interruptible", CHAIN | INTERRUPTIBLE },
 		{ "chain-sync", CHAIN | SYNC },
-		{ "fds", FDS },
+		{ "fds", BASIC | FDS },
 		{ "fds-interruptible", FDS | INTERRUPTIBLE},
-		{ "fds-forked", FDS | FORKED},
-		{ "fds-priority", FDS | FORKED | PRIORITY },
+		{ "fds-forked", BASIC | FDS | FORKED},
+		{ "fds-priority", BASIC | FDS | FORKED | PRIORITY },
 		{ "fds-chain", FDS | CHAIN},
 		{ "fds-sync", FDS | SYNC},
-		{ "contexts", CONTEXTS },
+		{ "contexts", BASIC | CONTEXTS },
 		{ "contexts-interruptible", CONTEXTS | INTERRUPTIBLE},
-		{ "contexts-forked", CONTEXTS | FORKED},
-		{ "contexts-priority", CONTEXTS | FORKED | PRIORITY },
+		{ "contexts-forked", BASIC | CONTEXTS | FORKED},
+		{ "contexts-priority", BASIC | CONTEXTS | FORKED | PRIORITY },
 		{ "contexts-chain", CONTEXTS | CHAIN },
 		{ "contexts-sync", CONTEXTS | SYNC },
-		{ "queues", QUEUES },
+		{ "queues", BASIC | QUEUES },
 		{ "queues-interruptible", QUEUES | INTERRUPTIBLE},
-		{ "queues-forked", QUEUES | FORKED},
-		{ "queues-priority", QUEUES | FORKED | PRIORITY },
+		{ "queues-forked", BASIC | QUEUES | FORKED},
+		{ "queues-priority", BASIC | QUEUES | FORKED | PRIORITY },
 		{ "queues-chain", QUEUES | CHAIN },
 		{ "queues-sync", QUEUES | SYNC },
 		{ NULL }
@@ -567,9 +568,11 @@ igt_main
 	}
 
 	for (const struct mode *m = modes; m->name; m++) {
-		igt_subtest_f("%s", m->name)
+		igt_subtest_f("%s%s",
+			      m->flags & BASIC ? "basic-" : "", m->name)
 			whisper(fd, ALL_ENGINES, m->flags);
-		igt_subtest_f("%s-all", m->name)
+		igt_subtest_f("%s%s-all",
+			      m->flags & BASIC ? "basic-" : "", m->name)
 			whisper(fd, ALL_ENGINES, m->flags | ALL);
 	}
 

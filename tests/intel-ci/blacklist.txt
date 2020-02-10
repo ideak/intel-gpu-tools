@@ -40,7 +40,7 @@ igt@gem_exec_lut_handle(@.*)?
 igt@gem_exec_nop@(?!.*basic).*
 igt@gem_exec_reloc@(?!.*basic).*
 igt@gem_exec_suspend@(?!.*basic).*
-igt@gem_exec_whisper@(?!normal$).*
+igt@gem_exec_whisper@(?!basic).*
 igt@gem_fd_exhaustion(@.*)?
 igt@gem_fence_upload(@.*)?
 igt@gem_gtt_hog(@.*)?
