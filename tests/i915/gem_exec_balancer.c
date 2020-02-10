@@ -61,7 +61,7 @@ static bool has_class_instance(int i915, uint16_t class, uint16_t instance)
 	int fd;
 
 	fd = perf_i915_open(i915, I915_PMU_ENGINE_BUSY(class, instance));
-	if (fd != -1) {
+	if (fd >= 0) {
 		close(fd);
 		return true;
 	}
@@ -111,6 +111,11 @@ list_engines(int i915, uint32_t class_mask, unsigned int *out)
 
 	*out = count;
 	return engines;
+}
+
+static bool has_perf_engines(int i915)
+{
+	return i915_perf_type_id(i915);
 }
 
 static int __set_engines(int i915, uint32_t ctx,
@@ -1818,6 +1823,7 @@ igt_main
 		gem_require_contexts(i915);
 		igt_require(has_context_engines(i915));
 		igt_require(has_load_balancer(i915));
+		igt_require(has_perf_engines(i915));
 
 		igt_fork_hang_detector(i915);
 	}
