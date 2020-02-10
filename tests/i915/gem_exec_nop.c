@@ -436,7 +436,7 @@ static void parallel(int fd, uint32_t handle, int timeout)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
 	unsigned engines[16];
-	const char *names[16];
+	char *names[16];
 	unsigned nengine;
 	unsigned long count;
 	double time, sum;
@@ -445,7 +445,7 @@ static void parallel(int fd, uint32_t handle, int timeout)
 	nengine = 0;
 	__for_each_physical_engine(fd, e) {
 		engines[nengine] = e->flags;
-		names[nengine++] = e->name;
+		names[nengine++] = strdup(e->name);
 
 		time = nop_on_ring(fd, handle, e, 1, &count) / count;
 		sum += time;
@@ -485,10 +485,11 @@ static void parallel(int fd, uint32_t handle, int timeout)
 		time = elapsed(&start, &now) / count;
 		igt_info("%s: %ld cycles, %.3fus\n", names[child], count, 1e6*time);
 	}
+	while (nengine--)
+		free(names[nengine]);
 
 	igt_waitchildren();
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
-
 }
 
 static void series(int fd, uint32_t handle, int timeout)
