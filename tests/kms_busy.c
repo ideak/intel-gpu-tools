@@ -302,6 +302,21 @@ igt_main
 
 	/* XXX Extend to cover atomic rendering tests to all planes + legacy */
 
+	igt_subtest_with_dynamic("basic") { /* just run on the first pipe */
+		enum pipe pipe;
+		igt_output_t *output;
+
+		igt_require(gem_has_ring(display.drm_fd, eb_ring(e)));
+
+		for_each_pipe_with_valid_output(&display, pipe, output) {
+			igt_dynamic("flip")
+				test_flip(&display, eb_ring(e), pipe, false);
+			igt_dynamic("modeset")
+				test_flip(&display, eb_ring(e), pipe, true);
+			break;
+		}
+	}
+
 	for_each_pipe_static(n) igt_subtest_group {
 		igt_hang_t hang;
 
