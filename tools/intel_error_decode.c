@@ -609,6 +609,7 @@ read_data_file(FILE *file)
 				{ "batch", "batch", 1 },
 				{ "ringbuffer", "ring", 1 },
 				{ "gtt_offset", "batch", 1 },
+				{ "NULL context", "NULL context", 0 },
 				{ "hw context", "HW context", 1 },
 				{ "hw status", "HW status", 0 },
 				{ "wa context", "WA context", 1 },
