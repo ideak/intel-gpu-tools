@@ -195,16 +195,16 @@ igt_main
 		drmModeModeInfo *mode;
 		igt_plane_t *primary;
 
-		/* Get the max value and skip the whole test if sysfs interface not available */
-		igt_skip_on(backlight_read(&old, "brightness"));
-		igt_assert(backlight_read(&context.max, "max_brightness") > -1);
-
 		/*
 		 * Backlight tests requires the output to be enabled,
 		 * try to enable all.
 		 */
 		kmstest_set_vt_graphics_mode();
 		igt_display_require(&display, drm_open_driver(DRIVER_INTEL));
+
+		/* Get the max value and skip the whole test if sysfs interface not available */
+		igt_skip_on(backlight_read(&old, "brightness"));
+		igt_assert(backlight_read(&context.max, "max_brightness") > -1);
 
 		/* should be ../../cardX-$output */
 		igt_assert_lt(12, readlink(BACKLIGHT_PATH "/device", full_name, sizeof(full_name) - 1));
