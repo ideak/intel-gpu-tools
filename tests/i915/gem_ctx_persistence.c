@@ -33,6 +33,7 @@
 #include "i915/gem_engine_topology.h"
 #include "i915/gem_ring.h"
 #include "i915/gem_submission.h"
+#include "igt_aux.h"
 #include "igt_debugfs.h"
 #include "igt_dummyload.h"
 #include "igt_gt.h"
@@ -803,6 +804,90 @@ static void replace_engines(int i915, const struct intel_execution_engine2 *e)
 	gem_quiescent_gpu(i915);
 }
 
+static void race_set_engines(int i915, int fd)
+{
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 1) = {
+		.engines = {}
+	};
+	struct drm_i915_gem_context_param param = {
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.value = to_user_pointer(&engines),
+		.size = sizeof(engines),
+	};
+
+	while (read(fd, &param.ctx_id, sizeof(param.ctx_id)) > 0) {
+		if (!param.ctx_id)
+			break;
+		__gem_context_set_param(i915, &param);
+	}
+}
+
+static void close_replace_race(int i915)
+{
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	int fence = -1;
+	int fd[2];
+
+	/*
+	 * If we time the submission of a hanging batch to one set of engines
+	 * and then simultaneously replace the engines in one thread, and
+	 * close the context in another, it might be possible for the kernel
+	 * to lose track of the old engines believing that the non-persisten
+	 * context is already closed and the hanging requests cancelled.
+	 *
+	 * Our challenge is try and expose any such race condition.
+	 */
+
+	igt_assert(pipe(fd) == 0);
+	igt_fork(child, ncpus) {
+		close(fd[1]);
+		race_set_engines(i915, fd[0]);
+	}
+	for (int i = 0; i < ncpus; i++)
+		close(fd[0]);
+
+	igt_until_timeout(5) {
+		igt_spin_t *spin;
+		uint32_t ctx;
+
+		ctx = gem_context_clone_with_engines(i915, 0);
+		gem_context_set_persistence(i915, ctx, false);
+
+		spin = igt_spin_new(i915, ctx, .flags = IGT_SPIN_FENCE_OUT);
+		for (int i = 0; i < ncpus; i++)
+			write(fd[1], &ctx, sizeof(ctx));
+
+		if (fence < 0) {
+			fence = spin->out_fence;
+		} else {
+			int tmp;
+
+			tmp = sync_fence_merge(fence, spin->out_fence);
+			close(fence);
+			close(spin->out_fence);
+
+			fence = tmp;
+		}
+		spin->out_fence = -1;
+
+		gem_context_destroy(i915, ctx);
+	}
+
+	for (int i = 0; i < ncpus; i++) {
+		uint32_t end = 0;
+
+		write(fd[1], &end, sizeof(end));
+	}
+	close(fd[1]);
+
+	igt_debugfs_dump(i915, "i915_engine_info");
+	igt_assert(sync_fence_wait(fence, MSEC_PER_SEC / 2) == 0);
+	close(fence);
+
+	igt_waitchildren();
+	gem_quiescent_gpu(i915);
+}
+
 static void replace_engines_hostile(int i915,
 				    const struct intel_execution_engine2 *e)
 {
@@ -961,6 +1046,9 @@ igt_main
 					replace_engines_hostile(i915, e);
 			}
 		}
+
+		igt_subtest("close-replace-race")
+			close_replace_race(i915);
 	}
 
 	igt_fixture {
