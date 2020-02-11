@@ -16,10 +16,10 @@ igt@gem_ctx_param@basic
 igt@gem_ctx_param@basic-default
 igt@gem_exec_basic@basic
 igt@gem_exec_create@basic
-igt@gem_exec_fence@basic-busy-default
-igt@gem_exec_fence@basic-wait-default
-igt@gem_exec_fence@basic-await-default
-igt@gem_exec_fence@nb-await-default
+igt@gem_exec_fence@basic-busy
+igt@gem_exec_fence@basic-wait
+igt@gem_exec_fence@basic-await
+igt@gem_exec_fence@nb-await
 igt@gem_exec_gttfill@basic
 igt@gem_exec_parallel@basic
 igt@gem_exec_parallel@contexts
