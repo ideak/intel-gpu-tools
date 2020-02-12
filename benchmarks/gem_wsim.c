@@ -2969,7 +2969,7 @@ static unsigned long calibrate_nop(unsigned int tolerance_pct, struct intel_exec
 		.buffers_ptr = (uintptr_t)&obj,
 		.flags = engine->flags
 	};
-	unsigned long size, last_size;
+	long size, last_size;
 	struct timespec t_0, t_end;
 
 	clock_gettime(CLOCK_MONOTONIC, &t_0);
