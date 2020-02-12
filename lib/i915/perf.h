@@ -114,6 +114,11 @@ typedef enum {
 	INTEL_PERF_LOGICAL_COUNTER_UNIT_MAX
 } intel_perf_logical_counter_unit_t;
 
+/* Hold deltas of raw performance counters. */
+struct intel_perf_accumulator {
+#define INTEL_PERF_MAX_RAW_OA_COUNTERS 62
+	uint64_t deltas[INTEL_PERF_MAX_RAW_OA_COUNTERS];
+};
 
 struct intel_perf;
 struct intel_perf_metric_set;
@@ -202,6 +207,7 @@ struct intel_perf {
 	struct intel_perf_devinfo devinfo;
 };
 
+struct drm_i915_perf_record_header;
 struct drm_i915_query_topology_info;
 
 struct intel_perf *intel_perf_for_fd(int drm_fd);
@@ -221,6 +227,11 @@ void intel_perf_add_metric_set(struct intel_perf *perf,
 			       struct intel_perf_metric_set *metric_set);
 
 void intel_perf_load_perf_configs(struct intel_perf *perf, int drm_fd);
+
+void intel_perf_accumulate_reports(struct intel_perf_accumulator *acc,
+				   int oa_format,
+				   const struct drm_i915_perf_record_header *record0,
+				   const struct drm_i915_perf_record_header *record1);
 
 #ifdef __cplusplus
 };
