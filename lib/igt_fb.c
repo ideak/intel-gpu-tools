@@ -359,7 +359,13 @@ static const struct format_desc_struct *lookup_drm_format(uint32_t drm_format)
 	return NULL;
 }
 
-static bool igt_format_is_yuv_semiplanar(uint32_t format)
+/**
+ * igt_format_is_yuv_semiplanar:
+ * @format: drm fourcc pixel format code
+ *
+ * This function returns true if given format is yuv semiplanar.
+ */
+bool igt_format_is_yuv_semiplanar(uint32_t format)
 {
 	const struct format_desc_struct *f = lookup_drm_format(format);
 

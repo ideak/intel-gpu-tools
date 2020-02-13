@@ -163,6 +163,16 @@ static void check_all_ccs_planes(int drm_fd, igt_fb_t *fb)
 	}
 }
 
+static int get_ccs_plane_index(uint32_t format)
+{
+	int index = 1;
+
+	if (igt_format_is_yuv_semiplanar(format))
+		return 2;
+
+	return index;
+}
+
 static void generate_fb(data_t *data, struct igt_fb *fb,
 			int width, int height,
 			enum test_fb_flags fb_flags)
@@ -172,6 +182,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	uint64_t modifier;
 	cairo_t *cr;
 	int unit;
+	int index;
 	int ret;
 
 	if (intel_gen(intel_get_drm_devid(data->drm_fd)) >= 12)
@@ -196,6 +207,8 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	else
 		format = data->format;
 
+	index = get_ccs_plane_index(format);
+
 	igt_create_bo_for_fb(data->drm_fd, width, height, format, modifier, fb);
 	igt_assert(fb->gem_handle > 0);
 
@@ -205,27 +218,27 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		if (fb_flags & FB_MISALIGN_AUX_STRIDE) {
 			igt_skip_on_f(width <= 1024,
 				      "FB already has the smallest possible stride\n");
-			f.pitches[1] -= (unit/2);
+			f.pitches[index] -= (unit/2);
 		}
 
 		if (fb_flags & FB_SMALL_AUX_STRIDE) {
 			igt_skip_on_f(width <= 1024,
 				      "FB already has the smallest possible stride\n");
-			f.pitches[1] = ALIGN(f.pitches[1]/2, unit);
+			f.pitches[index] = ALIGN(f.pitches[1]/2, unit);
 		}
 
 		if (fb_flags & FB_ZERO_AUX_STRIDE)
-			f.pitches[1] = 0;
+			f.pitches[index] = 0;
 
 		/* Put the CCS buffer on a different BO. */
 		if (data->flags & TEST_BAD_CCS_HANDLE)
-			f.handles[1] = gem_create(data->drm_fd, fb->size);
+			f.handles[index] = gem_create(data->drm_fd, fb->size);
 
 		if (data->flags & TEST_NO_AUX_BUFFER) {
-			f.handles[1] = 0;
-			f.modifier[1] = 0;
-			f.pitches[1] = 0;
-			f.offsets[1] = 0;
+			f.handles[index] = 0;
+			f.modifier[index] = 0;
+			f.pitches[index] = 0;
+			f.offsets[index] = 0;
 		}
 	}
 
