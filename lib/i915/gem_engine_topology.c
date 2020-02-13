@@ -156,10 +156,10 @@ static void query_engine_list(int fd, struct intel_engine_data *ed)
 struct intel_execution_engine2 *
 intel_get_current_engine(struct intel_engine_data *ed)
 {
-	if (!ed->n)
-		ed->current_engine = &ed->engines[0];
-	else if (ed->n >= ed->nengines)
+	if (ed->n >= ed->nengines)
 		ed->current_engine = NULL;
+	else if (!ed->n)
+		ed->current_engine = &ed->engines[0];
 
 	return ed->current_engine;
 }
@@ -211,18 +211,21 @@ struct intel_engine_data intel_init_engine_list(int fd, uint32_t ctx_id)
 		igt_debug("using pre-allocated engine list\n");
 
 		__for_each_static_engine(e2) {
-			struct intel_execution_engine2 *__e2 =
-				&engine_data.engines[engine_data.nengines];
-
-			strcpy(__e2->name, e2->name);
-			__e2->instance   = e2->instance;
-			__e2->class      = e2->class;
-			__e2->flags      = e2->flags;
-			__e2->is_virtual = false;
-
 			if (igt_only_list_subtests() ||
-			    gem_has_ring(fd, e2->flags))
+			    (fd < 0) ||
+			    gem_has_ring(fd, e2->flags)) {
+				struct intel_execution_engine2 *__e2 =
+					&engine_data.engines[
+					engine_data.nengines];
+
+				strcpy(__e2->name, e2->name);
+				__e2->instance   = e2->instance;
+				__e2->class      = e2->class;
+				__e2->flags      = e2->flags;
+				__e2->is_virtual = false;
+
 				engine_data.nengines++;
+                        }
 		}
 		return engine_data;
 	}
