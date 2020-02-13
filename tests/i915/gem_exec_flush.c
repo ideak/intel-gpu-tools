@@ -163,7 +163,7 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(obj);
 		execbuf.buffer_count = 3;
-		execbuf.flags = ring | (1 << 11) | (1<<12);
+		execbuf.flags = ring | (1 << 12);
 		if (gen < 6)
 			execbuf.flags |= I915_EXEC_SECURE;
 
@@ -251,7 +251,7 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 			i = 16 * (idx % 64) + (idx / 64);
 			obj[1].relocs_ptr = to_user_pointer(&reloc0[i]);
 			obj[2].relocs_ptr = to_user_pointer(&reloc1[i]);
-			execbuf.batch_start_offset =  64*i;
+			execbuf.batch_start_offset = 64 * i;
 
 overwrite:
 			if ((flags & BEFORE) &&
@@ -396,7 +396,7 @@ static void batch(int fd, unsigned ring, int nchild, int timeout,
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(obj);
 		execbuf.buffer_count = 2;
-		execbuf.flags = ring | (1 << 11) | (1<<12);
+		execbuf.flags = ring | (1 << 12);
 		if (gen < 6)
 			execbuf.flags |= I915_EXEC_SECURE;
 
