@@ -181,14 +181,8 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	uint32_t format;
 	uint64_t modifier;
 	cairo_t *cr;
-	int unit;
 	int index;
 	int ret;
-
-	if (intel_gen(intel_get_drm_devid(data->drm_fd)) >= 12)
-		unit = 64;
-	else
-		unit = 128;
 
 	/* Use either compressed or Y-tiled to test. However, given the lack of
 	 * available bandwidth, we use linear for the primary plane when
@@ -214,17 +208,21 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 
 	addfb_init(fb, &f);
 
+	/*
+	 * The stride of CCS planes on GEN12+ is fixed, so we can check for
+	 * an incorrect stride with the same delta as on earlier platforms.
+	 */
 	if (fb_flags & FB_COMPRESSED) {
 		if (fb_flags & FB_MISALIGN_AUX_STRIDE) {
 			igt_skip_on_f(width <= 1024,
 				      "FB already has the smallest possible stride\n");
-			f.pitches[index] -= (unit/2);
+			f.pitches[index] -= 64;
 		}
 
 		if (fb_flags & FB_SMALL_AUX_STRIDE) {
 			igt_skip_on_f(width <= 1024,
 				      "FB already has the smallest possible stride\n");
-			f.pitches[index] = ALIGN(f.pitches[1]/2, unit);
+			f.pitches[index] = ALIGN(f.pitches[1]/2, 128);
 		}
 
 		if (fb_flags & FB_ZERO_AUX_STRIDE)
