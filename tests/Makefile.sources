@@ -442,9 +442,6 @@ gem_wait_SOURCES = i915/gem_wait.c
 TESTS_progs += gem_workarounds
 gem_workarounds_SOURCES = i915/gem_workarounds.c
 
-TESTS_progs += gem_write_read_ring_switch
-gem_write_read_ring_switch_SOURCES = i915/gem_write_read_ring_switch.c
-
 TESTS_progs += gen3_mixed_blits
 gen3_mixed_blits_SOURCES = i915/gen3_mixed_blits.c
 

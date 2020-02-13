@@ -214,7 +214,6 @@ i915_progs = [
 	'gem_vm_create',
 	'gem_wait',
 	'gem_workarounds',
-	'gem_write_read_ring_switch',
 	'i915_fb_tiling',
 	'i915_getparams_basic',
 	'i915_hangman',
