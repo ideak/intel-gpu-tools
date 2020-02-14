@@ -195,17 +195,6 @@ static int gem_topology_get_param(int fd,
 	if (__gem_context_get_param(fd, p))
 		return -1; /* using default engine map */
 
-	if (!p->size)
-		return 0;
-
-	/* size will store the engine count */
-	p->size = (p->size - sizeof(struct i915_context_param_engines)) /
-		  (offsetof(struct i915_context_param_engines,
-			    engines[1]) -
-		  sizeof(struct i915_context_param_engines));
-
-	igt_assert_f(p->size <= GEM_MAX_ENGINES, "unsupported engine count\n");
-
 	return 0;
 }
 
@@ -242,7 +231,13 @@ struct intel_engine_data intel_init_engine_list(int fd, uint32_t ctx_id)
 		query_engine_list(fd, &engine_data);
 		ctx_map_engines(fd, &engine_data, &param);
 	} else {
-		/* param.size contains the engine count */
+		/* engine count can be inferred from size */
+		param.size -= sizeof(struct i915_context_param_engines);
+		param.size /= sizeof(struct i915_engine_class_instance);
+
+		igt_assert_f(param.size <= GEM_MAX_ENGINES,
+			     "unsupported engine count\n");
+
 		for (i = 0; i < param.size; i++)
 			init_engine(&engine_data.engines[i],
 				    engines.engines[i].engine_class,
