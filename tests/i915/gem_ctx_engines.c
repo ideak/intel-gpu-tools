@@ -549,6 +549,74 @@ static void independent(int i915)
 	gem_context_destroy(i915, param.ctx_id);
 }
 
+static void libapi(int i915)
+{
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 64) = {};
+	struct drm_i915_gem_context_param p = {
+		.ctx_id = gem_context_create(i915),
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.value = to_user_pointer(&engines),
+	};
+	const struct intel_execution_engine2 *e;
+	unsigned int count, idx;
+
+	p.size = sizeof(struct i915_context_param_engines);
+	gem_context_set_param(i915, &p);
+
+	/* An empty context should be a short loop */
+	count = 0;
+	for_each_context_engine(i915, p.ctx_id, e)
+		count++;
+	igt_assert_eq(count, 0);
+
+	p.size += sizeof(struct i915_engine_class_instance);
+	engine_class(&engines, 0) = -1;
+	engine_instance(&engines, 0) = -1;
+	gem_context_set_param(i915, &p);
+
+	/* We report all engines from the context, even if invalid/unusable */
+	count = 0;
+	for_each_context_engine(i915, p.ctx_id, e) {
+		igt_assert_eq(e->class, engine_class(&engines, 0));
+		igt_assert_eq(e->instance, engine_instance(&engines, 0));
+		count++;
+	}
+	igt_assert_eq(count, 1);
+
+	/* Check that every known engine can be found from the context map */
+	idx = 0;
+	p.size = sizeof(struct i915_context_param_engines);
+	p.size += sizeof(struct i915_engine_class_instance);
+	for (engine_class(&engines, idx) = 0;
+	     engine_class(&engines, idx) < 16;
+	     engine_class(&engines, idx)++) {
+		for (engine_instance(&engines, idx) = 0;
+		     engine_instance(&engines, idx) < 16;
+		     engine_instance(&engines, idx)++) {
+			if (__gem_context_set_param(i915, &p))
+				break;
+
+			count = 0;
+			for_each_context_engine(i915, p.ctx_id, e) {
+				igt_assert_eq(e->class,
+					      engine_class(&engines, count));
+				igt_assert_eq(e->instance,
+					      engine_instance(&engines, count));
+				count++;
+			}
+			igt_assert_eq(count, idx + 1);
+
+			engines.engines[(idx + 1) % 64] = engines.engines[idx];
+			idx = (idx + 1) % 64;
+
+			p.size = sizeof(struct i915_context_param_engines);
+			p.size += (idx + 1) * sizeof(struct i915_engine_class_instance);
+		}
+	}
+
+	gem_context_destroy(i915, p.ctx_id);
+}
+
 igt_main
 {
 	int i915 = -1;
@@ -583,6 +651,9 @@ igt_main
 
 	igt_subtest("independent")
 		independent(i915);
+
+	igt_subtest("libapi")
+		libapi(i915);
 
 	igt_fixture
 		igt_stop_hang_detector();
