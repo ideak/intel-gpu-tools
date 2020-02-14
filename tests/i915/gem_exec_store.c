@@ -180,14 +180,30 @@ static void store_all(int fd)
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct intel_execution_engine2 *engine;
-	struct drm_i915_gem_relocation_entry reloc[32];
+	struct drm_i915_gem_relocation_entry *reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
-	unsigned engines[16], permuted[16];
+	unsigned *engines, *permuted;
 	uint32_t batch[16];
 	uint64_t offset;
 	unsigned nengine;
 	int value;
 	int i, j;
+
+	nengine = 0;
+	__for_each_physical_engine(fd, engine) {
+		if (!gem_class_can_store_dword(fd, engine->class))
+			continue;
+		nengine++;
+	}
+
+	reloc = calloc(2*nengine, sizeof(*reloc));
+	igt_assert(reloc);
+
+	engines = calloc(nengine, sizeof(*engines));
+	igt_assert(engines);
+
+	permuted = calloc(nengine, sizeof(*permuted));
+	igt_assert(permuted);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
@@ -195,10 +211,9 @@ static void store_all(int fd)
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
-	memset(reloc, 0, sizeof(reloc));
 	memset(obj, 0, sizeof(obj));
-	obj[0].handle = gem_create(fd, 4096);
-	obj[1].handle = gem_create(fd, 4096);
+	obj[0].handle = gem_create(fd, nengine*sizeof(uint32_t));
+	obj[1].handle = gem_create(fd, 2*nengine*sizeof(batch));
 	obj[1].relocation_count = 1;
 
 	offset = sizeof(uint32_t);
@@ -223,8 +238,6 @@ static void store_all(int fd)
 	__for_each_physical_engine(fd, engine) {
 		if (!gem_class_can_store_dword(fd, engine->class))
 			continue;
-
-		igt_assert(2*(nengine+1)*sizeof(batch) <= 4096);
 
 		execbuf.flags &= ~ENGINE_MASK;
 		execbuf.flags |= engine->flags;
@@ -281,12 +294,16 @@ static void store_all(int fd)
 	}
 	gem_close(fd, obj[1].handle);
 
-	gem_read(fd, obj[0].handle, 0, engines, sizeof(engines));
+	gem_read(fd, obj[0].handle, 0, engines, nengine*sizeof(engines[0]));
 	gem_close(fd, obj[0].handle);
 
 	for (i = 0; i < nengine; i++)
 		igt_assert_eq_u32(engines[i], i);
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+
+	free(permuted);
+	free(engines);
+	free(reloc);
 }
 
 static int print_welcome(int fd)
