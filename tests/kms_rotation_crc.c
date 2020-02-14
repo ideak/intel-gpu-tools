@@ -23,6 +23,7 @@
  */
 
 #include "igt.h"
+#include "igt_vec.h"
 #include <math.h>
 
 #define MAX_FENCES 32
@@ -69,6 +70,7 @@ typedef struct {
 	struct p_point planepos[MAXMULTIPLANESAMOUNT];
 
 	bool use_native_resolution;
+	bool extended;
 } data_t;
 
 typedef struct {
@@ -380,6 +382,28 @@ static void test_single_case(data_t *data, enum pipe pipe,
 	}
 }
 
+static bool test_format(data_t *data,
+			struct igt_vec *tested_formats,
+			uint32_t format)
+{
+	if (!igt_fb_supported_format(format))
+		return false;
+
+	if (!is_i915_device(data->gfx_fd) ||
+	    data->extended)
+		return true;
+
+	format = igt_reduce_format(format);
+
+	/* only test each format "class" once */
+	if (igt_vec_index(tested_formats, &format) >= 0)
+		return false;
+
+	igt_vec_push(tested_formats, &format);
+
+	return true;
+}
+
 static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_format)
 {
 	igt_display_t *display = &data->display;
@@ -423,15 +447,21 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 			}
 
 			if (!data->override_fmt) {
+				struct igt_vec tested_formats;
+
+				igt_vec_init(&tested_formats, sizeof(uint32_t));
+
 				for (j = 0; j < plane->drm_plane->count_formats; j++) {
 					uint32_t format = plane->drm_plane->formats[j];
 
-					if (!igt_fb_supported_format(format))
+					if (!test_format(data, &tested_formats, format))
 						continue;
 
 					test_single_case(data, pipe, output, plane, i,
 							 format, test_bad_format);
 				}
+
+				igt_vec_fini(&tested_formats);
 			} else {
 				test_single_case(data, pipe, output, plane, i,
 						 data->override_fmt, test_bad_format);
@@ -756,7 +786,30 @@ static const char *tiling_test_str(uint64_t tiling)
 	}
 }
 
-igt_main
+static int opt_handler(int opt, int opt_index, void *_data)
+{
+	data_t *data = _data;
+
+	switch (opt) {
+	case 'e':
+		data->extended = true;
+		break;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+static const struct option long_opts[] = {
+	{ .name = "extended", .has_arg = false, .val = 'e', },
+	{}
+};
+
+static const char help_str[] =
+	"  --extended\t\tRun the extended tests\n";
+
+static data_t data;
+
+igt_main_args("", long_opts, help_str, opt_handler, &data)
 {
 	struct rot_subtest {
 		unsigned plane;
@@ -789,7 +842,6 @@ igt_main
 		{ 0, 0 }
 	};
 
-	data_t data = {};
 	int gen = 0;
 
 	igt_fixture {
