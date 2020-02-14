@@ -98,6 +98,8 @@ igt_simple_main
 	fd = drm_open_driver(DRIVER_INTEL);
 	igt_assert(fd >= 0);
 
+	igt_require(gem_available_fences(fd) > 0);
+
 	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
 	igt_assert(bufmgr);
 
