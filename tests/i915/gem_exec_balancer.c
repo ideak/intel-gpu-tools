@@ -1688,14 +1688,19 @@ static void hangme(int i915)
 
 		for (int i = 0; i < count; i++) {
 			struct client *c = &client[i];
+			int64_t timeout;
 
 			igt_debug("Waiting for client[%d].spin[%d]\n", i, 0);
-			gem_sync(i915, c->spin[0]->handle);
+			timeout = NSEC_PER_SEC / 2;
+			if (gem_wait(i915, c->spin[0]->handle, &timeout))
+				igt_debugfs_dump(i915, "i915_engine_info");
 			igt_assert_eq(sync_fence_status(c->spin[0]->out_fence),
 				      -EIO);
 
 			igt_debug("Waiting for client[%d].spin[%d]\n", i, 1);
-			gem_sync(i915, c->spin[1]->handle);
+			timeout = NSEC_PER_SEC / 2;
+			if (gem_wait(i915, c->spin[1]->handle, &timeout))
+				igt_debugfs_dump(i915, "i915_engine_info");
 			igt_assert_eq(sync_fence_status(c->spin[1]->out_fence),
 				      -EIO);
 
