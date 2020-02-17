@@ -20,6 +20,7 @@ enum {
 	OPT_PIGLIT_DMESG,
 	OPT_DMESG_WARN_LEVEL,
 	OPT_OVERALL_TIMEOUT,
+	OPT_PER_TEST_TIMEOUT,
 	OPT_HELP = 'h',
 	OPT_NAME = 'n',
 	OPT_DRY_RUN = 'd',
@@ -163,6 +164,10 @@ static const char *usage_str =
 	"  --inactivity-timeout <seconds>\n"
 	"                        Kill the running test after <seconds> of inactivity in\n"
 	"                        the test's stdout, stderr, or dmesg\n"
+	"  --per-test-timeout <seconds>\n"
+	"                        Kill the running test after <seconds>. This timeout is per\n"
+	"                        subtest, or dynamic subtest. In other words, every subtest,\n"
+	"                        even when running in multiple-mode, must finish in <seconds>.\n"
 	"  --overall-timeout <seconds>\n"
 	"                        Don't execute more tests after <seconds> has elapsed\n"
 	"  --use-watchdog        Use hardware watchdog for lethal enforcement of the\n"
@@ -325,6 +330,7 @@ bool parse_options(int argc, char **argv,
 		{"ignore-missing", no_argument, NULL, OPT_IGNORE_MISSING},
 		{"multiple-mode", no_argument, NULL, OPT_MULTIPLE},
 		{"inactivity-timeout", required_argument, NULL, OPT_TIMEOUT},
+		{"per-test-timeout", required_argument, NULL, OPT_PER_TEST_TIMEOUT},
 		{"overall-timeout", required_argument, NULL, OPT_OVERALL_TIMEOUT},
 		{"use-watchdog", no_argument, NULL, OPT_WATCHDOG},
 		{"piglit-style-dmesg", no_argument, NULL, OPT_PIGLIT_DMESG},
@@ -387,6 +393,9 @@ bool parse_options(int argc, char **argv,
 			break;
 		case OPT_TIMEOUT:
 			settings->inactivity_timeout = atoi(optarg);
+			break;
+		case OPT_PER_TEST_TIMEOUT:
+			settings->per_test_timeout = atoi(optarg);
 			break;
 		case OPT_OVERALL_TIMEOUT:
 			settings->overall_timeout = atoi(optarg);
@@ -617,6 +626,7 @@ bool serialize_settings(struct settings *settings)
 	SERIALIZE_LINE(f, settings, overwrite, "%d");
 	SERIALIZE_LINE(f, settings, multiple_mode, "%d");
 	SERIALIZE_LINE(f, settings, inactivity_timeout, "%d");
+	SERIALIZE_LINE(f, settings, per_test_timeout, "%d");
 	SERIALIZE_LINE(f, settings, overall_timeout, "%d");
 	SERIALIZE_LINE(f, settings, use_watchdog, "%d");
 	SERIALIZE_LINE(f, settings, piglit_style_dmesg, "%d");
@@ -662,6 +672,7 @@ bool read_settings_from_file(struct settings *settings, FILE *f)
 		PARSE_LINE(settings, name, val, overwrite, numval);
 		PARSE_LINE(settings, name, val, multiple_mode, numval);
 		PARSE_LINE(settings, name, val, inactivity_timeout, numval);
+		PARSE_LINE(settings, name, val, per_test_timeout, numval);
 		PARSE_LINE(settings, name, val, overall_timeout, numval);
 		PARSE_LINE(settings, name, val, use_watchdog, numval);
 		PARSE_LINE(settings, name, val, piglit_style_dmesg, numval);

@@ -676,6 +676,7 @@ static const char *need_to_timeout(struct settings *settings,
 				   int killed,
 				   unsigned long taints,
 				   double time_since_activity,
+				   double time_since_subtest,
 				   double time_since_kill)
 {
 	if (killed) {
@@ -712,10 +713,16 @@ static const char *need_to_timeout(struct settings *settings,
 	    is_tainted(taints))
 		return "Killing the test because the kernel is tainted.\n";
 
+	if (settings->per_test_timeout != 0 &&
+	    time_since_subtest > settings->per_test_timeout) {
+		show_kernel_task_state();
+		return "Per-test timeout exceeded. Killing the current test with SIGQUIT.\n";
+	}
+
 	if (settings->inactivity_timeout != 0 &&
 	    time_since_activity > settings->inactivity_timeout) {
 		show_kernel_task_state();
-		return "Timeout. Killing the current test with SIGQUIT.\n";
+		return "Inactivity timeout exceeded. Killing the current test with SIGQUIT.\n";
 	}
 
 	return NULL;
@@ -759,12 +766,12 @@ static int monitor_output(pid_t child,
 	const int interval_length = 1;
 	int wd_timeout;
 	int killed = 0; /* 0 if not killed, signal number otherwise */
-	struct timespec time_beg, time_now, time_last_activity, time_killed;
+	struct timespec time_beg, time_now, time_last_activity, time_last_subtest, time_killed;
 	unsigned long taints = 0;
 	bool aborting = false;
 
 	igt_gettime(&time_beg);
-	time_last_activity = time_killed = time_beg;
+	time_last_activity = time_last_subtest = time_killed = time_beg;
 
 	if (errfd > nfds)
 		nfds = errfd;
@@ -823,6 +830,7 @@ static int monitor_output(pid_t child,
 
 		timeout_reason = need_to_timeout(settings, killed, tainted(&taints),
 						 igt_time_elapsed(&time_last_activity, &time_now),
+						 igt_time_elapsed(&time_last_subtest, &time_now),
 						 igt_time_elapsed(&time_killed, &time_now));
 
 		if (timeout_reason) {
@@ -893,6 +901,8 @@ static int monitor_output(pid_t child,
 					       linelen - strlen(STARTING_SUBTEST));
 					current_subtest[linelen - strlen(STARTING_SUBTEST)] = '\0';
 
+					time_last_subtest = time_now;
+
 					if (settings->log_level >= LOG_LEVEL_VERBOSE) {
 						fwrite(outbuf, 1, linelen, stdout);
 					}
@@ -916,6 +926,24 @@ static int monitor_output(pid_t child,
 							current_subtest[0] = '\0';
 						}
 
+						if (settings->log_level >= LOG_LEVEL_VERBOSE) {
+							fwrite(outbuf, 1, linelen, stdout);
+						}
+					}
+				}
+				if (linelen > strlen(STARTING_DYNAMIC_SUBTEST) &&
+				    !memcmp(outbuf, STARTING_DYNAMIC_SUBTEST, strlen(STARTING_DYNAMIC_SUBTEST))) {
+					time_last_subtest = time_now;
+
+					if (settings->log_level >= LOG_LEVEL_VERBOSE) {
+						fwrite(outbuf, 1, linelen, stdout);
+					}
+				}
+				if (linelen > strlen(DYNAMIC_SUBTEST_RESULT) &&
+				    !memcmp(outbuf, DYNAMIC_SUBTEST_RESULT, strlen(DYNAMIC_SUBTEST_RESULT))) {
+					char *delim = memchr(outbuf, ':', linelen);
+
+					if (delim != NULL) {
 						if (settings->log_level >= LOG_LEVEL_VERBOSE) {
 							fwrite(outbuf, 1, linelen, stdout);
 						}

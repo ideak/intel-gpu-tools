@@ -173,6 +173,7 @@ static void assert_settings_equal(struct settings *one, struct settings *two)
 	igt_assert_eq(one->overwrite, two->overwrite);
 	igt_assert_eq(one->multiple_mode, two->multiple_mode);
 	igt_assert_eq(one->inactivity_timeout, two->inactivity_timeout);
+	igt_assert_eq(one->per_test_timeout, two->per_test_timeout);
 	igt_assert_eq(one->use_watchdog, two->use_watchdog);
 	igt_assert_eqstr(one->test_root, two->test_root);
 	igt_assert_eqstr(one->results_path, two->results_path);
@@ -261,6 +262,7 @@ igt_main
 		igt_assert(!settings->overwrite);
 		igt_assert(!settings->multiple_mode);
 		igt_assert_eq(settings->inactivity_timeout, 0);
+		igt_assert_eq(settings->per_test_timeout, 0);
 		igt_assert_eq(settings->overall_timeout, 0);
 		igt_assert(!settings->use_watchdog);
 		igt_assert(strstr(settings->test_root, "test-root-dir") != NULL);
@@ -378,6 +380,7 @@ igt_main
 		igt_assert(!settings->overwrite);
 		igt_assert(!settings->multiple_mode);
 		igt_assert_eq(settings->inactivity_timeout, 0);
+		igt_assert_eq(settings->per_test_timeout, 0);
 		igt_assert_eq(settings->overall_timeout, 0);
 		igt_assert(!settings->use_watchdog);
 		igt_assert(strstr(settings->test_root, testdatadir) != NULL);
@@ -408,6 +411,7 @@ igt_main
 				       "--overwrite",
 				       "--multiple-mode",
 				       "--inactivity-timeout", "27",
+				       "--per-test-timeout", "72",
 				       "--overall-timeout", "360",
 				       "--use-watchdog",
 				       "--piglit-style-dmesg",
@@ -438,6 +442,7 @@ igt_main
 		igt_assert(settings->overwrite);
 		igt_assert(settings->multiple_mode);
 		igt_assert_eq(settings->inactivity_timeout, 27);
+		igt_assert_eq(settings->per_test_timeout, 72);
 		igt_assert_eq(settings->overall_timeout, 360);
 		igt_assert(settings->use_watchdog);
 		igt_assert(strstr(settings->test_root, "test-root-dir") != NULL);
@@ -827,6 +832,7 @@ igt_main
 					       "--overwrite",
 					       "--multiple-mode",
 					       "--inactivity-timeout", "27",
+					       "--per-test-timeout", "72",
 					       "--overall-timeout", "360",
 					       "--use-watchdog",
 					       "--piglit-style-dmesg",
