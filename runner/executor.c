@@ -93,7 +93,7 @@ static void init_watchdogs(struct settings *settings)
 
 	memset(&watchdogs, 0, sizeof(watchdogs));
 
-	if (!settings->use_watchdog || settings->inactivity_timeout <= 0)
+	if (!settings->use_watchdog)
 		return;
 
 	if (settings->log_level >= LOG_LEVEL_VERBOSE) {
@@ -672,6 +672,69 @@ static void show_kernel_task_state(void)
 	sysrq('t');
 }
 
+static const char *need_to_timeout(struct settings *settings,
+				   int killed,
+				   unsigned long taints,
+				   double time_since_activity,
+				   double time_since_kill)
+{
+	if (killed) {
+		/*
+		 * Timeout after being killed is a hardcoded amount
+		 * depending on which signal we already used. The
+		 * exception is SIGKILL which just immediately bails
+		 * out if the kernel is tainted, because there's
+		 * little to no hope of the process dying gracefully
+		 * or at all.
+		 *
+		 * Note that if killed == SIGKILL, the caller needs
+		 * special handling anyway and should ignore the
+		 * actual string returned.
+		 */
+		const double kill_timeout = killed == SIGKILL ? 20.0 : 120.0;
+
+		if ((killed == SIGKILL && is_tainted(taints)) ||
+		    time_since_kill > kill_timeout)
+			return "Timeout. Killing the current test with SIGKILL.\n";
+
+		/*
+		 * We don't care for the other reasons to timeout if
+		 * we're already killing the test.
+		 */
+		return NULL;
+	}
+
+	/*
+	 * If we're configured to care about taints, kill the
+	 * test if there's a taint.
+	 */
+	if (settings->abort_mask & ABORT_TAINT &&
+	    is_tainted(taints))
+		return "Killing the test because the kernel is tainted.\n";
+
+	if (settings->inactivity_timeout != 0 &&
+	    time_since_activity > settings->inactivity_timeout) {
+		show_kernel_task_state();
+		return "Timeout. Killing the current test with SIGQUIT.\n";
+	}
+
+	return NULL;
+}
+
+static int next_kill_signal(int killed)
+{
+	switch (killed) {
+	case 0:
+		return SIGQUIT;
+	case SIGQUIT:
+		return SIGKILL;
+	case SIGKILL:
+	default:
+		assert(!"Unreachable");
+		return SIGKILL;
+	}
+}
+
 /*
  * Returns:
  *  =0 - Success
@@ -693,18 +756,15 @@ static int monitor_output(pid_t child,
 	ssize_t s;
 	int n, status;
 	int nfds = outfd;
-	int timeout = settings->inactivity_timeout;
-	int timeout_intervals = 1, intervals_left;
-	int wd_extra = 10;
+	const int interval_length = 1;
+	int wd_timeout;
 	int killed = 0; /* 0 if not killed, signal number otherwise */
-	int sigkill_timeout = 120;
-	int sigkill_interval = 20;
-	int sigkill_intervals_left = sigkill_timeout / sigkill_interval;
-	struct timespec time_beg, time_end;
+	struct timespec time_beg, time_now, time_last_activity, time_killed;
 	unsigned long taints = 0;
 	bool aborting = false;
 
 	igt_gettime(&time_beg);
+	time_last_activity = time_killed = time_beg;
 
 	if (errfd > nfds)
 		nfds = errfd;
@@ -714,32 +774,32 @@ static int monitor_output(pid_t child,
 		nfds = sigfd;
 	nfds++;
 
-	if (timeout > 0) {
+	/*
+	 * If we're still alive, we want to kill the test process
+	 * instead of cutting power. Use a healthy 2 minute watchdog
+	 * timeout that gets automatically reduced if the device
+	 * doesn't support it.
+	 *
+	 * watchdogs_set_timeout() is a no-op and returns the given
+	 * timeout if we don't have use_watchdog set in settings.
+	 */
+	wd_timeout = watchdogs_set_timeout(120);
+
+	if (wd_timeout < 120) {
 		/*
-		 * Use original timeout plus some leeway. If we're still
-		 * alive, we want to kill the test process instead of cutting
-		 * power.
+		 * Watchdog timeout smaller, warn the user. With the
+		 * short select() timeout we're using we're able to
+		 * ping the watchdog regardless.
 		 */
-		int wd_timeout = watchdogs_set_timeout(timeout + wd_extra);
-
-		if (wd_timeout < timeout + wd_extra) {
-			/* Watchdog timeout smaller, so ping it more often */
-			if (wd_timeout - wd_extra < 0)
-				wd_extra = wd_timeout / 2;
-			timeout_intervals = timeout / (wd_timeout - wd_extra);
-			timeout /= timeout_intervals;
-
-			if (settings->log_level >= LOG_LEVEL_VERBOSE) {
-				outf("Watchdog doesn't support the timeout we requested (shortened to %d seconds). Using %d intervals of %d seconds.\n",
-				     wd_timeout, timeout_intervals, timeout);
-			}
+		if (settings->log_level >= LOG_LEVEL_VERBOSE) {
+			outf("Watchdog doesn't support the timeout we requested (shortened to %d seconds).\n",
+			     wd_timeout);
 		}
 	}
 
-	intervals_left = timeout_intervals;
-
 	while (outfd >= 0 || errfd >= 0 || sigfd >= 0) {
-		struct timeval tv = { .tv_sec = timeout };
+		const char *timeout_reason;
+		struct timeval tv = { .tv_sec = interval_length };
 
 		FD_ZERO(&set);
 		if (outfd >= 0)
@@ -751,7 +811,7 @@ static int monitor_output(pid_t child,
 		if (sigfd >= 0)
 			FD_SET(sigfd, &set);
 
-		n = select(nfds, &set, NULL, NULL, timeout == 0 ? NULL : &tv);
+		n = select(nfds, &set, NULL, NULL, &tv);
 		ping_watchdogs();
 
 		if (n < 0) {
@@ -759,86 +819,18 @@ static int monitor_output(pid_t child,
 			return -1;
 		}
 
-		/*
-		 * If we're configured to care about taints, kill the
-		 * test if there's a taint. But only if we didn't
-		 * already kill it, and make sure we still process the
-		 * fds select() marked for us.
-		 */
-		if (settings->abort_mask & ABORT_TAINT &&
-		    tainted(&taints) &&
-		    killed == 0) {
-			if (settings->log_level >= LOG_LEVEL_NORMAL) {
-				outf("Killing the test because the kernel is tainted.\n");
-				fflush(stdout);
-			}
+		igt_gettime(&time_now);
 
-			killed = SIGQUIT;
-			if (!kill_child(killed, child))
-				return -1;
+		timeout_reason = need_to_timeout(settings, killed, tainted(&taints),
+						 igt_time_elapsed(&time_last_activity, &time_now),
+						 igt_time_elapsed(&time_killed, &time_now));
 
-			/*
-			 * Now continue the loop and let the
-			 * dying child be handled normally.
-			 */
-			timeout = 20;
-			watchdogs_set_timeout(120);
-			intervals_left = timeout_intervals = 1;
-		} else if (n == 0) {
-			if (--intervals_left)
-				continue;
-
-			switch (killed) {
-			case 0:
-				show_kernel_task_state();
-				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					outf("Timeout. Killing the current test with SIGQUIT.\n");
-					fflush(stdout);
-				}
-
-				killed = SIGQUIT;
-				if (!kill_child(killed, child))
-					return -1;
-
-				/*
-				 * Now continue the loop and let the
-				 * dying child be handled normally.
-				 */
-				timeout = 20;
-				watchdogs_set_timeout(120);
-				intervals_left = timeout_intervals = 1;
-				break;
-			case SIGQUIT:
-				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					outf("Timeout. Killing the current test with SIGKILL.\n");
-					fflush(stdout);
-				}
-
-				killed = SIGKILL;
-				if (!kill_child(killed, child))
-					return -1;
-
-				/*
-				 * Allow the test two minutes to die
-				 * on SIGKILL. If it takes more than
-				 * that, we're quite likely in a
-				 * scenario where we want to reboot
-				 * the machine anyway.
-				 */
-				watchdogs_set_timeout(sigkill_timeout);
-				timeout = sigkill_interval;
-				intervals_left = 1; /* Intervals handled separately for sigkill */
-				break;
-			case SIGKILL:
-				if (!is_tainted(taints) && --sigkill_intervals_left) {
-					intervals_left = 1;
-					break;
-				}
-
+		if (timeout_reason) {
+			if (killed == SIGKILL) {
 				/* Nothing that can be done, really. Let's tell the caller we want to abort. */
 
 				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					errf("Child refuses to die, tainted %lx. Aborting.\n",
+					errf("Child refuses to die, tainted 0x%lx. Aborting.\n",
 					     taints);
 					if (kill(child, 0) && errno == ESRCH)
 						errf("The test process no longer exists, "
@@ -853,14 +845,22 @@ static int monitor_output(pid_t child,
 				return -1;
 			}
 
-			continue;
-		}
+			if (settings->log_level >= LOG_LEVEL_NORMAL) {
+				outf("%s", timeout_reason);
+				fflush(stdout);
+			}
 
-		intervals_left = timeout_intervals;
+			killed = next_kill_signal(killed);
+			if (!kill_child(killed, child))
+				return -1;
+			time_killed = time_now;
+		}
 
 		/* TODO: Refactor these handlers to their own functions */
 		if (outfd >= 0 && FD_ISSET(outfd, &set)) {
 			char *newline;
+
+			time_last_activity = time_now;
 
 			s = read(outfd, buf, sizeof(buf));
 			if (s <= 0) {
@@ -929,6 +929,8 @@ static int monitor_output(pid_t child,
 	out_end:
 
 		if (errfd >= 0 && FD_ISSET(errfd, &set)) {
+			time_last_activity = time_now;
+
 			s = read(errfd, buf, sizeof(buf));
 			if (s <= 0) {
 				if (s < 0) {
@@ -945,6 +947,8 @@ static int monitor_output(pid_t child,
 		}
 
 		if (kmsgfd >= 0 && FD_ISSET(kmsgfd, &set)) {
+			time_last_activity = time_now;
+
 			s = read(kmsgfd, buf, sizeof(buf));
 			if (s < 0) {
 				if (errno != EPIPE && errno != EINVAL) {
@@ -995,17 +999,15 @@ static int monitor_output(pid_t child,
 				}
 
 				aborting = true;
-				timeout = 2;
 				killed = SIGQUIT;
 				if (!kill_child(killed, child))
 					return -1;
+				time_killed = time_now;
 
 				continue;
 			}
 
-			igt_gettime(&time_end);
-
-			time = igt_time_elapsed(&time_beg, &time_end);
+			time = igt_time_elapsed(&time_beg, &time_now);
 			if (time < 0.0)
 				time = 0.0;
 
