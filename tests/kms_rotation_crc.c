@@ -27,6 +27,8 @@
 
 #define MAX_FENCES 32
 #define MAXMULTIPLANESAMOUNT 2
+#define TEST_MAX_WIDTH 640
+#define TEST_MAX_HEIGHT 480
 
 struct p_struct {
 	igt_plane_t *plane;
@@ -65,6 +67,8 @@ typedef struct {
 
 	struct p_struct *multiplaneoldview;
 	struct p_point planepos[MAXMULTIPLANESAMOUNT];
+
+	bool use_native_resolution;
 } data_t;
 
 typedef struct {
@@ -210,8 +214,13 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 
 	mode = igt_output_get_mode(output);
 	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
-		w = mode->hdisplay;
-		h = mode->vdisplay;
+		if (data->use_native_resolution) {
+			w = mode->hdisplay;
+			h = mode->vdisplay;
+		} else {
+			w = min(TEST_MAX_WIDTH, mode->hdisplay);
+			h = min(TEST_MAX_HEIGHT, mode->vdisplay);
+		}
 
 		min_w = 256;
 		min_h = 256;
@@ -404,8 +413,14 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 
 			/* Only support partial covering primary plane on gen9+ */
 			if (plane_type == DRM_PLANE_TYPE_PRIMARY &&
-			    i != rectangle && intel_gen(intel_get_drm_devid(data->gfx_fd)) < 9)
-				continue;
+			    intel_gen(intel_get_drm_devid(data->gfx_fd)) < 9) {
+				if (i != rectangle)
+					continue;
+				else
+					data->use_native_resolution = true;
+			} else {
+				data->use_native_resolution = false;
+			}
 
 			if (!data->override_fmt) {
 				for (j = 0; j < plane->drm_plane->count_formats; j++) {
@@ -493,7 +508,7 @@ static void pointlocation(data_t *data, planeinfos *p, drmModeModeInfo *mode,
 			  int c)
 {
 	if (data->planepos[c].origo & p_right) {
-		p[c].x1 = (int32_t)(data->planepos[c].x * mode->hdisplay
+		p[c].x1 = (int32_t)(data->planepos[c].x * min(TEST_MAX_WIDTH, mode->hdisplay)
 				+ mode->hdisplay);
 		p[c].x1 &= ~3;
 		/*
@@ -504,17 +519,17 @@ static void pointlocation(data_t *data, planeinfos *p, drmModeModeInfo *mode,
 		 */
 		p[c].x1 -= mode->hdisplay & 2;
 	} else {
-		p[c].x1 = (int32_t)(data->planepos[c].x * mode->hdisplay);
+		p[c].x1 = (int32_t)(data->planepos[c].x * min(TEST_MAX_WIDTH, mode->hdisplay));
 		p[c].x1 &= ~3;
 	}
 
 	if (data->planepos[c].origo & p_bottom) {
-		p[c].y1 = (int32_t)(data->planepos[c].y * mode->vdisplay
+		p[c].y1 = (int32_t)(data->planepos[c].y * min(TEST_MAX_HEIGHT, mode->vdisplay)
 				+ mode->vdisplay);
 		p[c].y1 &= ~3;
 		p[c].y1 -= mode->vdisplay & 2;
 	} else {
-		p[c].y1 = (int32_t)(data->planepos[c].y * mode->vdisplay);
+		p[c].y1 = (int32_t)(data->planepos[c].y * min(TEST_MAX_HEIGHT, mode->vdisplay));
 		p[c].y1 &= ~3;
 	}
 }
@@ -530,7 +545,7 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 	igt_output_t *output;
 	igt_crc_t retcrc_sw, retcrc_hw;
 	planeinfos p[2];
-	int c;
+	int c, used_w, used_h;
 	struct p_struct *oldplanes;
 	drmModeModeInfo *mode;
 
@@ -568,14 +583,17 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 		igt_display_require_output(display);
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
+		used_w = min(TEST_MAX_WIDTH, mode->hdisplay);
+		used_h = min(TEST_MAX_HEIGHT, mode->vdisplay);
+
 		data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe,
 						  INTEL_PIPE_CRC_SOURCE_AUTO);
 		igt_pipe_crc_start(data->pipe_crc);
 
 		for (i = 0; i < ARRAY_SIZE(planeconfigs); i++) {
 			p[0].planetype = DRM_PLANE_TYPE_PRIMARY;
-			p[0].width = (uint64_t)(planeconfigs[i].width * mode->hdisplay);
-			p[0].height = (uint64_t)(planeconfigs[i].height * mode->vdisplay);
+			p[0].width = (uint64_t)(planeconfigs[i].width * used_w);
+			p[0].height = (uint64_t)(planeconfigs[i].height * used_h);
 			p[0].tiling = planeconfigs[i].tiling;
 			pointlocation(data, (planeinfos *)&p, mode, 0);
 
@@ -584,8 +602,8 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 
 				for (j = 0; j < ARRAY_SIZE(planeconfigs); j++) {
 					p[1].planetype = DRM_PLANE_TYPE_OVERLAY;
-					p[1].width = (uint64_t)(planeconfigs[j].width * mode->hdisplay);
-					p[1].height = (uint64_t)(planeconfigs[j].height * mode->vdisplay);
+					p[1].width = (uint64_t)(planeconfigs[j].width * used_w);
+					p[1].height = (uint64_t)(planeconfigs[j].height * used_h);
 					p[1].tiling = planeconfigs[j].tiling;
 					pointlocation(data, (planeinfos *)&p,
 						      mode, 1);
