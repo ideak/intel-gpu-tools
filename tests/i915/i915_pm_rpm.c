@@ -1007,7 +1007,7 @@ static void debugfs_forcewake_user_subtest(void)
 	igt_assert(wait_for_suspended());
 }
 
-static void gem_mmap_subtest(bool gtt_mmap)
+static void gem_mmap_args(const struct mmap_offset *t)
 {
 	int i;
 	uint32_t handle;
@@ -1019,14 +1019,9 @@ static void gem_mmap_subtest(bool gtt_mmap)
 
 	handle = gem_create(drm_fd, buf_size);
 
-	if (gtt_mmap) {
-		gem_buf = gem_mmap__gtt(drm_fd, handle, buf_size,
-					PROT_READ | PROT_WRITE);
-	}
-	else {
-		gem_buf = gem_mmap__cpu(drm_fd, handle, 0, buf_size, 0);
-	}
-
+	gem_buf = __gem_mmap_offset(drm_fd, handle, 0, buf_size,
+				    PROT_READ | PROT_WRITE, t->type);
+	igt_require(gem_buf);
 
 	for (i = 0; i < buf_size; i++)
 		gem_buf[i] = i & 0xFF;
@@ -1056,13 +1051,9 @@ static void gem_mmap_subtest(bool gtt_mmap)
 	 * suspended. */
 	disable_all_screens_and_wait(&ms_data);
 
-	if (gtt_mmap) {
-		gem_buf = gem_mmap__gtt(drm_fd, handle, buf_size,
-					PROT_READ | PROT_WRITE);
-	}
-	else {
-		gem_buf = gem_mmap__cpu(drm_fd, handle, 0, buf_size, 0);
-	}
+	gem_buf = __gem_mmap_offset(drm_fd, handle, 0, buf_size,
+				    PROT_READ | PROT_WRITE, t->type);
+	igt_require(gem_buf);
 
 	igt_assert(wait_for_suspended());
 
@@ -2014,10 +2005,13 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		modeset_subtest(SCREEN_TYPE_NON_LPSP, 1, WAIT_STATUS | USE_DPMS);
 
 	/* GEM */
-	igt_subtest("gem-mmap-cpu")
-		gem_mmap_subtest(false);
-	igt_subtest("gem-mmap-gtt")
-		gem_mmap_subtest(true);
+	igt_subtest_with_dynamic("gem-mmap-type") {
+		for_each_mmap_offset_type(t) {
+			igt_dynamic_f("%s", t->name)
+				gem_mmap_args(t);
+		}
+	}
+
 	igt_subtest("gem-pread")
 		gem_pread_subtest();
 	igt_subtest("gem-execbuf")
