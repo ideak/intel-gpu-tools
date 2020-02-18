@@ -241,6 +241,62 @@ static void fifo(int fd, unsigned ring)
 	igt_assert_eq_u32(result, 2);
 }
 
+enum implicit_dir {
+	READ_WRITE = 0x1,
+	WRITE_READ = 0x2,
+};
+
+static void implicit_rw(int i915, unsigned ring, enum implicit_dir dir)
+{
+	IGT_CORK_FENCE(cork);
+	unsigned int count;
+	uint32_t scratch;
+	uint32_t result;
+	int fence;
+
+	count = 0;
+	for_each_physical_engine(other, i915) {
+		if (eb_ring(other) == ring)
+			continue;
+
+		count++;
+	}
+	igt_require(count);
+
+	scratch = gem_create(i915, 4096);
+	fence = igt_cork_plug(&cork, i915);
+
+	if (dir & WRITE_READ)
+		store_dword_fenced(i915, 0,
+				   ring, scratch, 0, -ring,
+				   fence, I915_GEM_DOMAIN_RENDER);
+
+	for_each_physical_engine(other, i915) {
+		if (eb_ring(other) == ring)
+			continue;
+
+		store_dword_fenced(i915, 0,
+				   eb_ring(other), scratch, 0, eb_ring(other),
+				   fence, 0);
+	}
+
+	if (dir & READ_WRITE)
+		store_dword_fenced(i915, 0,
+				   ring, scratch, 0, ring,
+				   fence, I915_GEM_DOMAIN_RENDER);
+
+	unplug_show_queue(i915, &cork, ring);
+	close(fence);
+
+	result =  __sync_read_u32(i915, scratch, 0);
+	gem_close(i915, scratch);
+
+	if (dir & WRITE_READ)
+		igt_assert_neq_u32(result, -ring);
+	if (dir & READ_WRITE)
+		igt_assert_eq_u32(result, ring);
+}
+
 static void independent(int fd, unsigned int engine)
 {
 	IGT_CORK_FENCE(cork);
@@ -2040,6 +2096,24 @@ igt_main
 				igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
 				igt_require(gem_can_store_dword(fd, eb_ring(e)));
 				fifo(fd, eb_ring(e));
+			}
+
+			igt_subtest_f("implicit-read-write-%s", e->name) {
+				igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
+				igt_require(gem_can_store_dword(fd, eb_ring(e)));
+				implicit_rw(fd, eb_ring(e), READ_WRITE);
+			}
+
+			igt_subtest_f("implicit-write-read-%s", e->name) {
+				igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
+				igt_require(gem_can_store_dword(fd, eb_ring(e)));
+				implicit_rw(fd, eb_ring(e), WRITE_READ);
+			}
+
+			igt_subtest_f("implicit-both-%s", e->name) {
+				igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
+				igt_require(gem_can_store_dword(fd, eb_ring(e)));
+				implicit_rw(fd, eb_ring(e), READ_WRITE | WRITE_READ);
 			}
 
 			igt_subtest_f("independent-%s", e->name) {
