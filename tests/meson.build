@@ -73,7 +73,6 @@ test_progs = [
 	'panfrost_gem_new',
 	'panfrost_prime',
 	'panfrost_submit',
-	'perf',
 	'prime_busy',
 	'prime_mmap',
 	'prime_mmap_coherency',
@@ -337,6 +336,13 @@ test_executables += executable('perf_pmu', 'perf_pmu.c',
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_list += 'perf_pmu'
+
+test_executables += executable('perf', 'perf.c',
+	   dependencies : test_deps + [ lib_igt_i915_perf ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'perf'
 
 executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   dependencies : test_deps,

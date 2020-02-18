@@ -130,6 +130,7 @@ prime_self_import_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 prime_self_import_LDADD = $(LDADD) -lpthread
 gem_userptr_blits_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_userptr_blits_LDADD = $(LDADD) -lpthread
+perf_LDADD = $(LDADD) $(top_builddir)/lib/libi915_perf.la
 perf_pmu_LDADD = $(LDADD) $(top_builddir)/lib/libigt_perf.la
 sw_sync_LDADD = $(LDADD) -latomic
 
