@@ -1992,6 +1992,9 @@ static bool fast_blit_ok(const struct igt_fb *fb)
 
 static bool blitter_ok(const struct igt_fb *fb)
 {
+	if (!is_i915_device(fb->fd))
+		return false;
+
 	if (is_ccs_modifier(fb->modifier))
 		return false;
 
