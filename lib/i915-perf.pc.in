@@ -6,5 +6,6 @@ includedir=@includedir@
 Name: i915-perf
 Description: i915 perf library
 Version: @i915_perf_version@
+Requires: libdrm >= 2.4.92
 Libs: -L${libdir} -li915_perf
 Cflags: -I${includedir}/i915-perf
