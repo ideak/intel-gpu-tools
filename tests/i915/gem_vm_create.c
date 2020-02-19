@@ -324,11 +324,15 @@ static void isolation(int i915)
 	gem_execbuf(i915, &eb); /* bind object into vm[0] */
 
 	/* Verify the trick with the assumed target address works */
+	gem_set_domain(i915, obj[0].handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	write_to_address(i915, ctx[0], obj[0].offset, 1);
 	gem_read(i915, obj[0].handle, 0, &result, sizeof(result));
 	igt_assert_eq(result, 1);
 
 	/* Now check that we can't write to vm[0] from second fd/vm */
+	gem_set_domain(i915, obj[0].handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	write_to_address(other, ctx[1], obj[0].offset, 2);
 	gem_read(i915, obj[0].handle, 0, &result, sizeof(result));
 	igt_assert_eq(result, 1);
