@@ -1220,6 +1220,29 @@ static bool stderr_contains_warnings(const char *beg, const char *end)
 	return false;
 }
 
+static bool json_field_has_data(struct json_object *obj, const char *key)
+{
+	struct json_object *field;
+
+	if (json_object_object_get_ex(obj, key, &field))
+		return strcmp(json_object_get_string(field), "");
+
+	return false;
+}
+
+static void override_completely_empty_results(struct json_object *obj)
+{
+	if (json_field_has_data(obj, "out") ||
+	    json_field_has_data(obj, "err") ||
+	    json_field_has_data(obj, "dmesg"))
+		return;
+
+	json_object_object_add(obj, "out",
+			       json_object_new_string("This test didn't produce any output. "
+						      "The machine probably rebooted ungracefully.\n"));
+	set_result(obj, "incomplete");
+}
+
 static void override_result_single(struct json_object *obj)
 {
 	const char *errtext = "", *result = "";
@@ -1246,6 +1269,8 @@ static void override_result_single(struct json_object *obj)
 			set_result(obj, "dmesg-fail");
 		}
 	}
+
+	override_completely_empty_results(obj);
 }
 
 static void override_results(char *binary,
