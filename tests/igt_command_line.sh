@@ -89,13 +89,8 @@ check_test ()
 	fi
 
 	if [ $RET -eq 0 -a -z "$LIST" ]; then
-		# Subtest enumeration of kernel selftest launchers depends
-		# on the running kernel. If selftests are not enabled,
-		# they will output nothing and exit with 0.
-		if [ "$testname" != "i915_selftest" -a "$testname" != "drm_mm" -a "$testname" != "kms_selftest" -a "$testname" != "dmabuf" ]; then
-			echo "    test does seem to be using igt_main() (should have subtests) and yet --list-subtests is empty!"
-			fail $test
-		fi
+		echo "    test does seem to be using igt_main() (should have subtests) and yet --list-subtests is empty!"
+		fail $test
 	fi
 }
 

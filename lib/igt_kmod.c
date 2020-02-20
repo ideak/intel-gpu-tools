@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  */
 
+#include <ctype.h>
 #include <signal.h>
 #include <errno.h>
 
@@ -602,6 +603,18 @@ void igt_kselftest_fini(struct igt_kselftest *tst)
 	kmod_module_unref(tst->kmod);
 }
 
+static const char *unfilter(const char *filter, const char *name)
+{
+	if (!filter)
+		return name;
+
+	name += strlen(filter);
+	if (!isalpha(*name))
+		name++;
+
+	return name;
+}
+
 void igt_kselftests(const char *module_name,
 		    const char *options,
 		    const char *result,
@@ -618,10 +631,12 @@ void igt_kselftests(const char *module_name,
 		igt_require(igt_kselftest_begin(&tst) == 0);
 
 	igt_kselftest_get_tests(tst.kmod, filter, &tests);
-	igt_list_for_each_entry_safe(tl, tn, &tests, link) {
-		igt_subtest_f("%s", tl->name)
-			igt_kselftest_execute(&tst, tl, options, result);
-		free(tl);
+	igt_subtest_with_dynamic(filter ?: "all") {
+		igt_list_for_each_entry_safe(tl, tn, &tests, link) {
+			igt_dynamic_f("%s", unfilter(filter, tl->name))
+				igt_kselftest_execute(&tst, tl, options, result);
+			free(tl);
+		}
 	}
 
 	igt_fixture {
