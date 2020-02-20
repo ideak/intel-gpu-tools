@@ -183,6 +183,14 @@ static enum pc8_status get_pc8_status(void)
 		return PC8_DISABLED;
 }
 
+static bool is_suspended(void)
+{
+	if (has_pc8 && !has_runtime_pm)
+		return get_pc8_status() == PC8_ENABLED;
+	else
+		return igt_get_runtime_pm_status() == IGT_RUNTIME_PM_STATUS_SUSPENDED;
+}
+
 static bool wait_for_pc8_status(enum pc8_status status)
 {
 	return igt_wait(get_pc8_status() == status, 10000, 100);
@@ -932,7 +940,7 @@ static int read_entry(const char *filepath,
 	int fd;
 	int rc;
 
-	igt_assert_f(wait_for_suspended(), "Before opening: %s (%s)\n",
+	igt_assert_f(is_suspended(), "Before opening: %s (%s)\n",
 		     filepath + pathinfo->base, filepath);
 
 	fd = open(filepath, O_RDONLY | O_NONBLOCK);
