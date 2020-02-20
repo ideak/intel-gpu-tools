@@ -459,7 +459,9 @@ static void test_sync_multi_timeline_wait(void)
 }
 
 #define MULTI_CONSUMER_THREADS 8
-#define MULTI_CONSUMER_ITERATIONS (1 << 14)
+#define MULTI_CONSUMER_ITERATIONS (1 << 12)
+static int multi_consumer_threads = MULTI_CONSUMER_THREADS;
+
 static void * test_sync_multi_consumer_thread(void *arg)
 {
 	data_t *data = arg;
@@ -468,7 +470,7 @@ static void * test_sync_multi_consumer_thread(void *arg)
 	int i;
 
 	for (i = 0; i < MULTI_CONSUMER_ITERATIONS; i++) {
-		int next_point = i * MULTI_CONSUMER_THREADS + thread_id;
+		int next_point = i * multi_consumer_threads + thread_id;
 		int fence = sw_sync_timeline_create_fence(timeline, next_point);
 
 		if (sync_fence_wait(fence, 1000) < 0)
@@ -503,8 +505,7 @@ static void test_sync_multi_consumer(void)
 	data.sem = &sem;
 
 	/* Start sync threads. */
-	for (i = 0; i < MULTI_CONSUMER_THREADS; i++)
-	{
+	for (i = 0; i < multi_consumer_threads; i++) {
 		data_arr[i] = data;
 		data_arr[i].thread_id = i;
 		ret = pthread_create(&thread_arr[i], NULL,
@@ -514,8 +515,7 @@ static void test_sync_multi_consumer(void)
 	}
 
 	/* Produce 'content'. */
-	for (i = 0; i < MULTI_CONSUMER_THREADS * MULTI_CONSUMER_ITERATIONS; i++)
-	{
+	for (i = 0; i < multi_consumer_threads * MULTI_CONSUMER_ITERATIONS; i++) {
 		sem_wait(&sem);
 
 		atomic_fetch_add(&counter, 1);
@@ -523,8 +523,7 @@ static void test_sync_multi_consumer(void)
 	}
 
 	/* Wait for threads to complete. */
-	for (i = 0; i < MULTI_CONSUMER_THREADS; i++)
-	{
+	for (i = 0; i < multi_consumer_threads; i++) {
 		uintptr_t local_thread_ret;
 		pthread_join(thread_arr[i], (void **)&local_thread_ret);
 		thread_ret |= local_thread_ret;
@@ -534,13 +533,11 @@ static void test_sync_multi_consumer(void)
 	sem_destroy(&sem);
 
 	igt_assert_eq(counter,
-		      MULTI_CONSUMER_THREADS * MULTI_CONSUMER_ITERATIONS);
+		      multi_consumer_threads * MULTI_CONSUMER_ITERATIONS);
 
 	igt_assert_f(thread_ret == 0, "A sync thread reported failure.\n");
 }
 
-#define MULTI_CONSUMER_PRODUCER_THREADS 8
-#define MULTI_CONSUMER_PRODUCER_ITERATIONS (1 << 14)
 static void * test_sync_multi_consumer_producer_thread(void *arg)
 {
 	data_t *data = arg;
@@ -548,8 +545,8 @@ static void * test_sync_multi_consumer_producer_thread(void *arg)
 	int timeline = data->timeline;
 	int i;
 
-	for (i = 0; i < MULTI_CONSUMER_PRODUCER_ITERATIONS; i++) {
-		int next_point = i * MULTI_CONSUMER_PRODUCER_THREADS + thread_id;
+	for (i = 0; i < MULTI_CONSUMER_ITERATIONS; i++) {
+		int next_point = i * multi_consumer_threads + thread_id;
 		int fence = sw_sync_timeline_create_fence(timeline, next_point);
 
 		if (sync_fence_wait(fence, 1000) < 0)
@@ -568,8 +565,8 @@ static void * test_sync_multi_consumer_producer_thread(void *arg)
 
 static void test_sync_multi_consumer_producer(void)
 {
-	data_t data_arr[MULTI_CONSUMER_PRODUCER_THREADS];
-	pthread_t thread_arr[MULTI_CONSUMER_PRODUCER_THREADS];
+	data_t data_arr[MULTI_CONSUMER_THREADS];
+	pthread_t thread_arr[MULTI_CONSUMER_THREADS];
 	int timeline;
 	_Atomic(uint32_t) counter = 0;
 	uintptr_t thread_ret = 0;
@@ -582,8 +579,7 @@ static void test_sync_multi_consumer_producer(void)
 	data.timeline = timeline;
 
 	/* Start consumer threads. */
-	for (i = 0; i < MULTI_CONSUMER_PRODUCER_THREADS; i++)
-	{
+	for (i = 0; i < multi_consumer_threads; i++) {
 		data_arr[i] = data;
 		data_arr[i].thread_id = i;
 		ret = pthread_create(&thread_arr[i], NULL,
@@ -593,8 +589,7 @@ static void test_sync_multi_consumer_producer(void)
 	}
 
 	/* Wait for threads to complete. */
-	for (i = 0; i < MULTI_CONSUMER_PRODUCER_THREADS; i++)
-	{
+	for (i = 0; i < multi_consumer_threads; i++) {
 		uintptr_t local_thread_ret;
 		pthread_join(thread_arr[i], (void **)&local_thread_ret);
 		thread_ret |= local_thread_ret;
@@ -603,8 +598,7 @@ static void test_sync_multi_consumer_producer(void)
 	close(timeline);
 
 	igt_assert_eq(counter,
-		      MULTI_CONSUMER_PRODUCER_THREADS *
-		      MULTI_CONSUMER_PRODUCER_ITERATIONS);
+		      multi_consumer_threads * MULTI_CONSUMER_ITERATIONS);
 
 	igt_assert_f(thread_ret == 0, "A sync thread reported failure.\n");
 }
@@ -625,7 +619,6 @@ static int test_mspc_wait_on_fence(int fence)
 }
 
 static struct {
-	int iterations;
 	int threads;
 	int counter;
 	int cons_timeline;
@@ -636,18 +629,18 @@ static struct {
 static void *mpsc_producer_thread(void *d)
 {
 	int id = (long)d;
-	int fence, i;
 	int *prod_timeline = test_mpsc_data.prod_timeline;
 	int cons_timeline = test_mpsc_data.cons_timeline;
-	int iterations = test_mpsc_data.iterations;
+	int seqno = 0;
+	int fence;
 
-	for (i = 0; i < iterations; i++) {
-		fence = sw_sync_timeline_create_fence(cons_timeline, i);
+	igt_until_timeout(1) {
+		fence = sw_sync_timeline_create_fence(cons_timeline, seqno++);
 
 		/* Wait for the consumer to finish. Use alternate
 		 * means of waiting on the fence
 		 */
-		if ((iterations + id) % 8 != 0) {
+		if (id % 8 != 0) {
 			igt_assert_f(sync_fence_wait(fence, -1) == 0,
 				     "Failure waiting on fence\n");
 		} else {
@@ -671,16 +664,18 @@ static void *mpsc_producer_thread(void *d)
 
 static int mpsc_consumer_thread(void)
 {
-	int fence, merged, tmp, it, i;
+	int fence, merged, tmp, i;
 	int *prod_timeline = test_mpsc_data.prod_timeline;
 	int cons_timeline = test_mpsc_data.cons_timeline;
-	int iterations = test_mpsc_data.iterations;
 	int n = test_mpsc_data.threads;
+	int seqno = 0;
 
-	for (it = 1; it <= iterations; it++) {
-		fence = sw_sync_timeline_create_fence(prod_timeline[0], it);
+	igt_until_timeout(1) {
+		fence = sw_sync_timeline_create_fence(prod_timeline[0],
+						      ++seqno);
 		for (i = 1; i < n; i++) {
-			tmp = sw_sync_timeline_create_fence(prod_timeline[i], it);
+			tmp = sw_sync_timeline_create_fence(prod_timeline[i],
+							    seqno);
 			merged = sync_fence_merge(tmp, fence);
 			close(tmp);
 			close(fence);
@@ -690,15 +685,10 @@ static int mpsc_consumer_thread(void)
 		/* Make sure we see an increment from every producer thread.
 		 * Vary the means by which we wait.
 		 */
-		if (iterations % 8 != 0) {
-			igt_assert_f(sync_fence_wait(fence, -1) == 0,
-				    "Producers did not increment as expected\n");
-		} else {
-			igt_assert_f(test_mspc_wait_on_fence(fence) == 0,
-				     "Failure waiting on fence\n");
-		}
+		igt_assert_f(sync_fence_wait(fence, -1) == 0,
+			     "Producers did not increment as expected\n");
 
-		igt_assert_f(test_mpsc_data.counter == n * it,
+		igt_assert_f(test_mpsc_data.counter == n * seqno,
 			     "Counter value mismatch\n");
 
 		/* Release the producer threads */
@@ -715,7 +705,6 @@ static int mpsc_consumer_thread(void)
  */
 static void test_sync_multi_producer_single_consumer(void)
 {
-	int iterations = 1 << 12;
 	int n = 5;
 	int prod_timeline[n];
 	int cons_timeline;
@@ -728,7 +717,6 @@ static void test_sync_multi_producer_single_consumer(void)
 
 	test_mpsc_data.prod_timeline = prod_timeline;
 	test_mpsc_data.cons_timeline = cons_timeline;
-	test_mpsc_data.iterations = iterations;
 	test_mpsc_data.threads = n;
 	test_mpsc_data.counter = 0;
 	pthread_mutex_init(&test_mpsc_data.lock, NULL);
@@ -747,30 +735,27 @@ static void test_sync_multi_producer_single_consumer(void)
 
 static void test_sync_expired_merge(void)
 {
-	int iterations = 1 << 20;
 	int timeline;
-	int i;
-	int fence_expired, fence_merged;
+	int expired;
 
 	timeline = sw_sync_timeline_create();
 
 	sw_sync_timeline_inc(timeline, 100);
-	fence_expired = sw_sync_timeline_create_fence(timeline, 1);
-	igt_assert_f(sync_fence_wait(fence_expired, 0) == 0,
+	expired = sw_sync_timeline_create_fence(timeline, 1);
+	igt_assert_f(sync_fence_wait(expired, 0) == 0,
 	             "Failure waiting for expired fence\n");
 
-	fence_merged = sync_fence_merge(fence_expired, fence_expired);
-	close(fence_merged);
+	close(sync_fence_merge(expired, expired));
 
-	for (i = 0; i < iterations; i++) {
-		int fence = sync_fence_merge(fence_expired, fence_expired);
+	igt_until_timeout(1) {
+		int fence = sync_fence_merge(expired, expired);
 
 		igt_assert_f(sync_fence_wait(fence, -1) == 0,
 			     "Failure waiting on fence\n");
 		close(fence);
 	}
 
-	close(fence_expired);
+	close(expired);
 }
 
 static void test_sync_random_merge(void)
@@ -844,8 +829,12 @@ static void test_sync_random_merge(void)
 
 igt_main
 {
-	igt_fixture
+	igt_fixture {
 		igt_require_sw_sync();
+		multi_consumer_threads =
+			min(multi_consumer_threads,
+			    sysconf(_SC_NPROCESSORS_ONLN));
+	}
 
 	igt_subtest("alloc_timeline")
 		test_alloc_timeline();
