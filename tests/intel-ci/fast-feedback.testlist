@@ -171,3 +171,7 @@ igt@vgem_basic@sysfs
 igt@vgem_basic@unload
 igt@i915_module_load@reload
 igt@i915_pm_rpm@module-reload
+
+# Kernel selftests
+igt@i915_selftest@live
+igt@dmabuf@all

@@ -1,10 +1,5 @@
 igt@meta_test(@.*)?
 ###############################################
-# Kernel selftests (run separately)
-###############################################
-igt@i915_selftest(@.*)?
-igt@drm_mm(@.*)?
-###############################################
 # Handle module reloads with great care!
 #
 # Reloading a module is more likely to leave
