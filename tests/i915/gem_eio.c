@@ -898,8 +898,14 @@ static void test_kms(int i915, igt_display_t *dpy)
 
 	test_inflight(i915, 0);
 	if (gem_has_contexts(i915)) {
-		test_reset_stress(i915, 0);
-		test_reset_stress(i915, TEST_WEDGE);
+		uint32_t ctx = context_create_safe(i915);
+
+		reset_stress(i915, ctx,
+			     "default", I915_EXEC_DEFAULT, 0);
+		reset_stress(i915, ctx,
+			     "default", I915_EXEC_DEFAULT, TEST_WEDGE);
+
+		gem_context_destroy(i915, ctx);
 	}
 
 	*shared = 1;
