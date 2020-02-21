@@ -519,6 +519,15 @@ static int num_unique_crcs(const igt_crc_t crc[], int num_crc)
 	return num_unique_crc;
 }
 
+static void capture_crc(data_t *data, unsigned int vblank, igt_crc_t *crc)
+{
+	igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc, vblank, crc);
+
+	igt_fail_on_f(crc->has_valid_frame && crc->frame != vblank,
+		      "Got CRC for the wrong frame (got %u, expected %u). CRC buffer overflow?\n",
+		      crc->frame, vblank);
+}
+
 static void capture_format_crcs(data_t *data, enum pipe pipe,
 				igt_plane_t *plane,
 				uint32_t format, uint64_t modifier,
@@ -528,6 +537,7 @@ static void capture_format_crcs(data_t *data, enum pipe pipe,
 				igt_crc_t crc[], struct igt_fb *fb)
 {
 	unsigned int vblank[ARRAY_SIZE(colors_extended)];
+	struct drm_event_vblank ev;
 	int i;
 
 	for (i = 0; i < data->num_colors; i++) {
@@ -537,6 +547,16 @@ static void capture_format_crcs(data_t *data, enum pipe pipe,
 		prepare_format_color(data, pipe, plane, format, modifier,
 				     width, height, encoding, range, c, fb);
 
+		if (data->display.is_atomic && i >= 1) {
+			igt_assert(read(data->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
+			/*
+			 * The last time we saw the crc for
+			 * flip N-2 is when the flip N-1 latched.
+			 */
+			if (i >= 2)
+				vblank[i - 2] = ev.sequence;
+		}
+
 		/*
 		 * The flip issued during frame N will latch
 		 * at the start of frame N+1, and its CRC will
@@ -545,21 +565,59 @@ static void capture_format_crcs(data_t *data, enum pipe pipe,
 		 * is for frame N-2.
 		 */
 		if (i >= 2)
-			igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc,
-						   vblank[i - 2], &crc[i - 2]);
+			capture_crc(data, vblank[i - 2], &crc[i - 2]);
 
-		igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
-		/*
-		 * TODO: Use flip events to get this. Would also allow
-		 * switching to non-blocking commits so that the next
-		 * fb can be prepared in parallel to waiting for the
-		 * flip to complete.
-		 *
-		 * crc is available one frame after the flip latches
-		 */
-		vblank[i] = kmstest_get_vblank(data->drm_fd, pipe, 0) + 1;
+		if (data->display.is_atomic) {
+			/*
+			 * Use non-blocking commits to allow the next fb
+			 * to be prepared in parallel while the current fb
+			 * awaits to be latched.
+			 */
+			igt_display_commit_atomic(&data->display,
+						  DRM_MODE_ATOMIC_NONBLOCK |
+						  DRM_MODE_PAGE_FLIP_EVENT, NULL);
+		} else {
+			/*
+			 * Last moment to grab the previous crc
+			 * is when the next flip latches.
+			 */
+			if (i >= 1)
+				vblank[i - 1] = kmstest_get_vblank(data->drm_fd, pipe, 0) + 1;
+
+			/*
+			 * Can't use drmModePageFlip() since we need to
+			 * change pixel format and potentially update some
+			 * properties as well.
+			 */
+			igt_display_commit2(&data->display, COMMIT_UNIVERSAL);
+
+			/* setplane for the cursor does not block */
+			if (plane->type == DRM_PLANE_TYPE_CURSOR)
+				igt_wait_for_vblank(data->drm_fd, pipe);
+		}
 
 		igt_remove_fb(data->drm_fd, &old_fb);
+	}
+
+	if (data->display.is_atomic) {
+		igt_assert(read(data->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
+		/*
+		 * The last time we saw the crc for
+		 * flip N-2 is when the flip N-1 latched.
+		 */
+		if (i >= 2)
+			vblank[i - 2] = ev.sequence;
+		/*
+		 * The last crc is available earliest one
+		 * frame after the last flip latched.
+		 */
+		vblank[i - 1] = ev.sequence + 1;
+	} else {
+		/*
+		 * The last crc is available earliest one
+		 * frame after the last flip latched.
+		 */
+		vblank[i - 1] = kmstest_get_vblank(data->drm_fd, pipe, 0) + 1;
 	}
 
 	/*
@@ -569,10 +627,8 @@ static void capture_format_crcs(data_t *data, enum pipe pipe,
 	 * between different pixel formats as well? Could get messy.
 	 */
 	if (i >= 2)
-		igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc,
-					   vblank[i - 2], &crc[i - 2]);
-	igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc,
-				   vblank[i - 1], &crc[i - 1]);
+		capture_crc(data, vblank[i - 2], &crc[i - 2]);
+	capture_crc(data, vblank[i - 1], &crc[i - 1]);
 }
 
 static bool test_format_plane_colors(data_t *data, enum pipe pipe,
