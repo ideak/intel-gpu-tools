@@ -605,7 +605,7 @@ read_command_file(struct recording_context *ctx)
 	switch (header.command) {
 	case RECORDER_COMMAND_DUMP: {
 		uint32_t len = header.size - sizeof(header), offset = 0;
-		struct recorder_command_dump *dump = malloc(len);
+		uint8_t *dump = malloc(len);
 		FILE *file;
 
 		while (offset < len &&
@@ -616,9 +616,9 @@ read_command_file(struct recording_context *ctx)
 				offset += ret;
 		}
 
-		fprintf(stdout, "Writing circular buffer to %s\n", dump->path);
+		fprintf(stdout, "Writing circular buffer to %s\n", dump);
 
-		file = fopen((const char *) dump->path, "w+");
+		file = fopen((const char *) dump, "w+");
 		if (file) {
 			struct chunk chunks[2];
 
@@ -634,11 +634,11 @@ read_command_file(struct recording_context *ctx)
 			     fwrite(chunks[1].data, chunks[1].len, 1, file) != 1) ||
 			    !write_correlation_timestamps(file, ctx->drm_fd)) {
 				fprintf(stderr, "Unable to write circular buffer data in file '%s'\n",
-					dump->path);
+					dump);
 			}
 			fclose(file);
 		} else
-			fprintf(stderr, "Unable to write dump file '%s'\n", dump->path);
+			fprintf(stderr, "Unable to write dump file '%s'\n", dump);
 
 		free(dump);
 		break;

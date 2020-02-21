@@ -20,6 +20,9 @@
  * SOFTWARE.
  */
 
+#ifndef I915_PERF_RECORDER_COMMANDS_H
+#define I915_PERF_RECORDER_COMMANDS_H
+
 #include <stdint.h>
 
 #define I915_PERF_RECORD_FIFO_PATH "/tmp/.i915-perf-record"
@@ -31,9 +34,15 @@ enum recorder_command {
 
 struct recorder_command_base {
 	uint32_t command;
-	uint32_t size;
+	uint32_t size; /* size of recorder_command_base + dump in bytes */
 };
+
+/*
+ The dump after the recorder_command_base header:
 
 struct recorder_command_dump {
 	uint8_t path[0];
 };
+*/
+
+#endif

@@ -93,12 +93,12 @@ main(int argc, char *argv[])
 				sizeof(struct recorder_command_base) + strlen(dump_file) + 1;
 			struct {
 				struct recorder_command_base base;
-				struct recorder_command_dump dump;
+				uint8_t dump[];
 			} *data = malloc(total_len);
 
 			data->base.command = RECORDER_COMMAND_DUMP;
 			data->base.size = total_len;
-			snprintf((char *) data->dump.path, strlen(dump_file) + 1, "%s", dump_file);
+			snprintf((char *) data->dump, strlen(dump_file) + 1, "%s", dump_file);
 
 			fwrite(data, total_len, 1, command_fifo_file);
 		} else {
@@ -107,12 +107,12 @@ main(int argc, char *argv[])
 			uint32_t total_len = sizeof(struct recorder_command_base) + path_len;
 			struct {
 				struct recorder_command_base base;
-				struct recorder_command_dump dump;
+				uint8_t dump[];
 			} *data = malloc(total_len);
 
 			data->base.command = RECORDER_COMMAND_DUMP;
 			data->base.size = total_len;
-			snprintf((char *) data->dump.path, path_len, "%s/%s", cwd, dump_file);
+			snprintf((char *) data->dump, path_len, "%s/%s", cwd, dump_file);
 
 			fwrite(data, total_len, 1, command_fifo_file);
 		}
