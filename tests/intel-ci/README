@@ -37,6 +37,13 @@ blacklist.txt
 This file contains regular expressions (one per line) for tests that
 are not to be executed in full suite test rounds.
 
+=======================
+blacklist-pre-merge.txt
+=======================
+
+This file contains regular expressions (one per line) for tests that
+are not to be executed in pre-merge full suite test rounds.
+
 =============
 meta.testlist
 =============
