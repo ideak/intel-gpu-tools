@@ -440,15 +440,14 @@ static bool set_c8_legacy_lut(data_t *data, enum pipe pipe,
 	return true;
 }
 
-static void test_format_plane_color(data_t *data, enum pipe pipe,
-				    igt_plane_t *plane,
-				    uint32_t format, uint64_t modifier,
-				    int width, int height,
-				    enum igt_color_encoding color_encoding,
-				    enum igt_color_range color_range,
-				    const color_t *c, igt_crc_t *crc, struct igt_fb *fb)
+static void prepare_format_color(data_t *data, enum pipe pipe,
+				 igt_plane_t *plane,
+				 uint32_t format, uint64_t modifier,
+				 int width, int height,
+				 enum igt_color_encoding color_encoding,
+				 enum igt_color_range color_range,
+				 const color_t *c, struct igt_fb *fb)
 {
-	struct igt_fb old_fb = *fb;
 	cairo_t *cr;
 
 	if (data->crop == 0 || format == DRM_FORMAT_XRGB8888) {
@@ -499,11 +498,6 @@ static void test_format_plane_color(data_t *data, enum pipe pipe,
 		igt_fb_set_size(fb, plane, width, height);
 		igt_plane_set_size(plane, width, height);
 	}
-
-	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
-	igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, crc);
-
-	igt_remove_fb(data->drm_fd, &old_fb);
 }
 
 static int num_unique_crcs(const igt_crc_t crc[], int num_crc)
@@ -525,6 +519,62 @@ static int num_unique_crcs(const igt_crc_t crc[], int num_crc)
 	return num_unique_crc;
 }
 
+static void capture_format_crcs(data_t *data, enum pipe pipe,
+				igt_plane_t *plane,
+				uint32_t format, uint64_t modifier,
+				int width, int height,
+				enum igt_color_encoding encoding,
+				enum igt_color_range range,
+				igt_crc_t crc[], struct igt_fb *fb)
+{
+	unsigned int vblank[ARRAY_SIZE(colors_extended)];
+	int i;
+
+	for (i = 0; i < data->num_colors; i++) {
+		const color_t *c = &data->colors[i];
+		struct igt_fb old_fb = *fb;
+
+		prepare_format_color(data, pipe, plane, format, modifier,
+				     width, height, encoding, range, c, fb);
+
+		/*
+		 * The flip issued during frame N will latch
+		 * at the start of frame N+1, and its CRC will
+		 * be ready at the start of frame N+2. So the
+		 * CRC captured here before the flip is issued
+		 * is for frame N-2.
+		 */
+		if (i >= 2)
+			igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc,
+						   vblank[i - 2], &crc[i - 2]);
+
+		igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_UNIVERSAL);
+		/*
+		 * TODO: Use flip events to get this. Would also allow
+		 * switching to non-blocking commits so that the next
+		 * fb can be prepared in parallel to waiting for the
+		 * flip to complete.
+		 *
+		 * crc is available one frame after the flip latches
+		 */
+		vblank[i] = kmstest_get_vblank(data->drm_fd, pipe, 0) + 1;
+
+		igt_remove_fb(data->drm_fd, &old_fb);
+	}
+
+	/*
+	 * Get the remaining two crcs
+	 *
+	 * TODO: avoid the extra wait by maintaining the pipeline
+	 * between different pixel formats as well? Could get messy.
+	 */
+	if (i >= 2)
+		igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc,
+					   vblank[i - 2], &crc[i - 2]);
+	igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc,
+				   vblank[i - 1], &crc[i - 1]);
+}
+
 static bool test_format_plane_colors(data_t *data, enum pipe pipe,
 				     igt_plane_t *plane,
 				     uint32_t format, uint64_t modifier,
@@ -534,21 +584,17 @@ static bool test_format_plane_colors(data_t *data, enum pipe pipe,
 				     igt_crc_t ref_crc[],
 				     struct igt_fb *fb)
 {
-	int crc_mismatch_count = 0;
+	igt_crc_t crc[ARRAY_SIZE(colors_extended)];
 	unsigned int crc_mismatch_mask = 0;
+	int crc_mismatch_count = 0;
 	bool result = true;
+	int i;
 
-	for (int i = 0; i < data->num_colors; i++) {
-		const color_t *c = &data->colors[i];
-		igt_crc_t crc;
+	capture_format_crcs(data, pipe, plane, format, modifier,
+			    width, height, encoding, range, crc, fb);
 
-		test_format_plane_color(data, pipe, plane,
-					format, modifier,
-					width, height,
-					encoding, range,
-					c, &crc, fb);
-
-		if (!igt_check_crc_equal(&crc, &ref_crc[i])) {
+	for (i = 0; i < data->num_colors; i++) {
+		if (!igt_check_crc_equal(&crc[i], &ref_crc[i])) {
 			crc_mismatch_count++;
 			crc_mismatch_mask |= (1 << i);
 			result = false;
@@ -700,16 +746,9 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		igt_remove_fb(data->drm_fd, &test_fb);
 	}
 
-	for (int i = 0; i < data->num_colors; i++) {
-		const color_t *c = &data->colors[i];
-
-		test_format_plane_color(data, pipe, plane,
-					format, modifier,
-					width, height,
-					IGT_COLOR_YCBCR_BT709,
-					IGT_COLOR_YCBCR_LIMITED_RANGE,
-					c, &ref_crc[i], &fb);
-	}
+	capture_format_crcs(data, pipe, plane, format, modifier,
+			    width, height, IGT_COLOR_YCBCR_BT709,
+			    IGT_COLOR_YCBCR_LIMITED_RANGE, ref_crc, &fb);
 
 	/*
 	 * Make sure we have some difference between the colors. This
