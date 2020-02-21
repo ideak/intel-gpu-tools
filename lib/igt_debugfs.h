@@ -104,6 +104,8 @@ int igt_pipe_crc_get_crcs(igt_pipe_crc_t *pipe_crc, int n_crcs,
 void igt_pipe_crc_drain(igt_pipe_crc_t *pipe_crc);
 void igt_pipe_crc_get_single(igt_pipe_crc_t *pipe_crc, igt_crc_t *out_crc);
 void igt_pipe_crc_get_current(int drm_fd, igt_pipe_crc_t *pipe_crc, igt_crc_t *crc);
+void igt_pipe_crc_get_for_frame(int drm_fd, igt_pipe_crc_t *pipe_crc,
+				unsigned int vblank, igt_crc_t *crc);
 
 void igt_pipe_crc_collect_crc(igt_pipe_crc_t *pipe_crc, igt_crc_t *out_crc);
 

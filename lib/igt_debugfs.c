@@ -945,17 +945,16 @@ void igt_pipe_crc_get_single(igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
  * igt_pipe_crc_get_current:
  * @drm_fd: Pointer to drm fd for vblank counter
  * @pipe_crc: pipe CRC object
+ * @vblank: frame counter value we're looking for
  * @crc: buffer pointer for the captured CRC value
  *
- * Same as igt_pipe_crc_get_single(), but will wait until a new CRC can be captured.
- * This is useful for retrieving the current CRC in a more race free way than
- * igt_pipe_crc_drain() + igt_pipe_crc_get_single().
+ * Same as igt_pipe_crc_get_single(), but will wait until a CRC has been captured
+ * for frame @vblank.
  */
 void
-igt_pipe_crc_get_current(int drm_fd, igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
+igt_pipe_crc_get_for_frame(int drm_fd, igt_pipe_crc_t *pipe_crc,
+			   unsigned int vblank, igt_crc_t *crc)
 {
-	unsigned vblank = kmstest_get_vblank(drm_fd, pipe_crc->pipe, 0);
-
 	do {
 		read_one_crc(pipe_crc, crc);
 
@@ -965,9 +964,27 @@ igt_pipe_crc_get_current(int drm_fd, igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
 			igt_pipe_crc_get_single(pipe_crc, crc);
 			return;
 		}
-	} while (igt_vblank_before_eq(crc->frame, vblank));
+	} while (igt_vblank_before(crc->frame, vblank));
 
 	crc_sanity_checks(pipe_crc, crc);
+}
+
+/**
+ * igt_pipe_crc_get_current:
+ * @drm_fd: Pointer to drm fd for vblank counter
+ * @pipe_crc: pipe CRC object
+ * @crc: buffer pointer for the captured CRC value
+ *
+ * Same as igt_pipe_crc_get_single(), but will wait until a new CRC can be captured.
+ * This is useful for retrieving the current CRC in a more race free way than
+ * igt_pipe_crc_drain() + igt_pipe_crc_get_single().
+ */
+void
+igt_pipe_crc_get_current(int drm_fd, igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
+{
+	unsigned vblank = kmstest_get_vblank(drm_fd, pipe_crc->pipe, 0) + 1;
+
+	return igt_pipe_crc_get_for_frame(drm_fd, pipe_crc, vblank, crc);
 }
 
 /**
