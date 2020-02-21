@@ -147,7 +147,6 @@ i915_progs = [
 	'gen7_exec_parse',
 	'gen9_exec_parse',
 	'gem_exec_reloc',
-	'gem_exec_reuse',
 	'gem_exec_schedule',
 	'gem_exec_store',
 	'gem_exec_suspend',

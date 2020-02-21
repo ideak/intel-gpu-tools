@@ -244,9 +244,6 @@ gen9_exec_parse_SOURCES = i915/gen9_exec_parse.c
 TESTS_progs += gem_exec_reloc
 gem_exec_reloc_SOURCES = i915/gem_exec_reloc.c
 
-TESTS_progs += gem_exec_reuse
-gem_exec_reuse_SOURCES = i915/gem_exec_reuse.c
-
 TESTS_progs += gem_exec_schedule
 gem_exec_schedule_SOURCES = i915/gem_exec_schedule.c
 

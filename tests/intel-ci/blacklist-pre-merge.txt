@@ -182,23 +182,3 @@ igt@kms_plane@pixel-format-pipe-[a-d]-planes(-source-clamping)?
 # Data acquired on 2020-02-20 by Martin Peres
 ###############################################################################
 igt@i915_pm_rpm@modeset-stress-extra-wait
-
-
-###############################################################################
-# These 2 tests are stressing the re-usability of objects. It does not look
-# like we have had issues with this outside of the gen7 ppgtt issue, which
-# does not counterbalance its overall execution time.
-#
-# - shard-skl: 2% (~5 minutes)
-# - shard-kbl: 1% (~1.5 minutes)
-# - shard-apl: 1.7% (~3 minutes)
-# - shard-glk: 1% (2.5 minutes)
-# - shard-icl: 0.5% (1 minute)
-# - shard-tgl: 0.5% (1 minute)
-#
-# Issue: https://gitlab.freedesktop.org/drm/intel/issues/1289
-#
-# Data acquired on 2020-02-20 by Martin Peres
-###############################################################################
-igt@gem_exec_reuse@baggage
-igt@gem_exec_reuse@contexts
