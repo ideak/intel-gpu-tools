@@ -128,7 +128,7 @@ static void basic_uaf(int i915)
 {
 	const uint32_t obj_size = 4096;
 
-	for_each_mmap_offset_type(t) {
+	for_each_mmap_offset_type(i915, t) {
 		uint32_t handle = gem_create(i915, obj_size);
 		uint8_t *expected, *buf, *addr;
 
@@ -176,7 +176,7 @@ static void basic_uaf(int i915)
 
 static void isolation(int i915)
 {
-	for_each_mmap_offset_type(t) {
+	for_each_mmap_offset_type(i915, t) {
 		struct drm_i915_gem_mmap_offset mmap_arg = {
 			.flags = t->type
 		};
@@ -245,7 +245,7 @@ static void pf_nonblock(int i915)
 {
 	igt_spin_t *spin = igt_spin_new(i915);
 
-	for_each_mmap_offset_type(t) {
+	for_each_mmap_offset_type(i915, t) {
 		uint32_t *ptr;
 
 		ptr = __mmap_offset(i915, spin->handle, 0, 4096,
@@ -324,7 +324,7 @@ static void open_flood(int i915, int timeout)
 	handle = gem_create(i915, 4096);
 	dmabuf = prime_handle_to_fd(i915, handle);
 
-	for_each_mmap_offset_type(t) {
+	for_each_mmap_offset_type(i915, t) {
 		struct drm_i915_gem_mmap_offset arg = {
 			.handle = handle,
 			.flags = t->type,
@@ -351,7 +351,7 @@ static void open_flood(int i915, int timeout)
 		tmp = gem_reopen_driver(i915);
 		handle = prime_fd_to_handle(i915, dmabuf);
 
-		for_each_mmap_offset_type(t) {
+		for_each_mmap_offset_type(i915, t) {
 			struct drm_i915_gem_mmap_offset arg = {
 				.handle = handle,
 				.flags = t->type,

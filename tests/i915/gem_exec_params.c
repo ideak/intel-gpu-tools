@@ -244,7 +244,7 @@ static void mmapped(int i915)
 	buf = gem_create(i915, 4096);
 	handle = batch_create(i915);
 
-	for_each_mmap_offset_type(t) { /* repetitive! */
+	for_each_mmap_offset_type(i915, t) { /* repetitive! */
 		struct drm_i915_gem_execbuffer2 *execbuf;
 		struct drm_i915_gem_exec_object2 *exec;
 

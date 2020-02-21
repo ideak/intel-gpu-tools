@@ -101,10 +101,13 @@ extern const struct mmap_offset {
 	unsigned int domain;
 } mmap_offset_types[];
 
-#define for_each_mmap_offset_type(__t) \
+bool gem_has_mmap_offset_type(int fd, const struct mmap_offset *t);
+
+#define for_each_mmap_offset_type(fd, __t) \
 	for (const struct mmap_offset *__t = mmap_offset_types; \
 	     (__t)->name; \
-	     (__t)++)
+	     (__t)++) \
+		for_each_if(gem_has_mmap_offset_type((fd), (__t)))
 
 #endif /* GEM_MMAN_H */
 

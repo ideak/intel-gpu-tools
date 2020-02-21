@@ -62,12 +62,13 @@ dontneed_before_mmap(void)
 	char *ptr;
 	int fd;
 
-	for_each_mmap_offset_type(t) {
+	fd = drm_open_driver(DRIVER_INTEL);
+
+	for_each_mmap_offset_type(fd, t) {
 		sighandler_t old_sigsegv, old_sigbus;
 
 		igt_debug("Mapping mode: %s\n", t->name);
 
-		fd = drm_open_driver(DRIVER_INTEL);
 		handle = gem_create(fd, OBJECT_SIZE);
 		gem_madvise(fd, handle, I915_MADV_DONTNEED);
 
@@ -93,7 +94,11 @@ dontneed_before_mmap(void)
 		munmap(ptr, OBJECT_SIZE);
 		signal(SIGBUS, old_sigsegv);
 		signal(SIGSEGV, old_sigbus);
+
+		fd = drm_open_driver(DRIVER_INTEL);
 	}
+
+	close(fd);
 }
 
 static void
@@ -103,12 +108,13 @@ dontneed_after_mmap(void)
 	char *ptr;
 	int fd;
 
-	for_each_mmap_offset_type(t) {
+	fd = drm_open_driver(DRIVER_INTEL);
+
+	for_each_mmap_offset_type(fd, t) {
 		sighandler_t old_sigsegv, old_sigbus;
 
 		igt_debug("Mapping mode: %s\n", t->name);
 
-		fd = drm_open_driver(DRIVER_INTEL);
 		handle = gem_create(fd, OBJECT_SIZE);
 
 		ptr = __gem_mmap_offset(fd, handle, 0, OBJECT_SIZE,
@@ -134,7 +140,11 @@ dontneed_after_mmap(void)
 		munmap(ptr, OBJECT_SIZE);
 		signal(SIGBUS, old_sigbus);
 		signal(SIGSEGV, old_sigsegv);
+
+		fd = drm_open_driver(DRIVER_INTEL);
 	}
+
+	close(fd);
 }
 
 static void

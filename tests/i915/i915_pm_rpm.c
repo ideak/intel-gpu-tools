@@ -2006,7 +2006,7 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 
 	/* GEM */
 	igt_subtest_with_dynamic("gem-mmap-type") {
-		for_each_mmap_offset_type(t) {
+		for_each_mmap_offset_type(drm_fd, t) {
 			igt_dynamic_f("%s", t->name)
 				gem_mmap_args(t);
 		}

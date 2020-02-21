@@ -531,7 +531,7 @@ igt_main
 			test_invalid_sseu(fd);
 
 		igt_subtest_with_dynamic("mmap-args") {
-			for_each_mmap_offset_type(t) {
+			for_each_mmap_offset_type(fd, t) {
 				igt_dynamic_f("%s", t->name)
 					test_mmapped_args(fd, t);
 			}

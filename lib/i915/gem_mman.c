@@ -60,6 +60,11 @@ bool gem_has_mmap_offset(int fd)
 	return gtt_version >= 4;
 }
 
+bool gem_has_mmap_offset_type(int fd, const struct mmap_offset *t)
+{
+	return gem_has_mmap_offset(fd) || t->type == I915_MMAP_OFFSET_GTT;
+}
+
 /**
  * __gem_mmap__gtt:
  * @fd: open i915 drm file descriptor
