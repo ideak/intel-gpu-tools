@@ -797,6 +797,40 @@ static int test_map_fixed_invalidate(int fd, uint32_t flags)
 	return 0;
 }
 
+static void test_mmap_offset_invalidate(int fd, const struct mmap_offset *t)
+{
+	void *ptr, *map;
+	uint32_t handle;
+
+	/* check if mmap_offset type is supported by hardware, skip if not */
+	handle = gem_create(fd, PAGE_SIZE);
+	map = __gem_mmap_offset(fd, handle, 0, PAGE_SIZE,
+				PROT_READ | PROT_WRITE, t->type);
+	igt_require_f(map,
+		      "HW & kernel support for mmap_offset(%s)\n", t->name);
+	munmap(map, PAGE_SIZE);
+	gem_close(fd, handle);
+
+	/* create userptr object */
+	igt_assert_eq(posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE), 0);
+	gem_userptr(fd, ptr, PAGE_SIZE, 0, userptr_flags, &handle);
+
+	/* set up mmap-offset mapping on top of the object, skip if refused */
+	map = __gem_mmap_offset(fd, handle, 0, PAGE_SIZE,
+				PROT_READ | PROT_WRITE, t->type);
+	igt_require_f(map, "mmap-offset banned, lockdep loop prevention\n");
+
+	/* set object pages in order to activate MMU notifier for it */
+	gem_set_domain(fd, handle, t->domain, t->domain);
+
+	/* trigger the notifier */
+	munmap(ptr, PAGE_SIZE);
+
+	/* cleanup */
+	munmap(map, PAGE_SIZE);
+	gem_close(fd, handle);
+}
+
 static int test_forbidden_ops(int fd)
 {
 	struct drm_i915_gem_pread gem_pread;
@@ -2169,6 +2203,12 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 				test_map_fixed_invalidate(fd, flags);
 			}
 		}
+
+		igt_describe("Invalidate pages of userptr with mmap-offset on top");
+		igt_subtest_with_dynamic("mmap-offset-invalidate")
+			for_each_mmap_offset_type(fd, t)
+				igt_dynamic_f("%s", t->name)
+					test_mmap_offset_invalidate(fd, t);
 
 		igt_subtest("coherency-sync")
 			test_coherency(fd, count);
