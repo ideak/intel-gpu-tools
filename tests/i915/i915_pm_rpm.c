@@ -931,14 +931,23 @@ static void i2c_subtest(void)
 	enable_one_screen(&ms_data);
 }
 
+struct read_entry_elapsed {
+	uint64_t elapsed;
+	char *path;
+} max_read_entry;
+
 static int read_entry(const char *filepath,
 		      const struct stat *info,
 		      const int typeflag,
 		      struct FTW *pathinfo)
 {
+	struct timespec tv = {};
+	uint64_t elapsed;
 	char buf[4096];
 	int fd;
 	int rc;
+
+	igt_nsec_elapsed(&tv);
 
 	igt_assert_f(is_suspended(), "Before opening: %s (%s)\n",
 		     filepath + pathinfo->base, filepath);
@@ -958,13 +967,29 @@ static int read_entry(const char *filepath,
 	igt_assert_f(wait_for_suspended(), "After closing: %s (%s)\n",
 		     filepath + pathinfo->base, filepath);
 
+	elapsed = igt_nsec_elapsed(&tv);
+	if (elapsed > max_read_entry.elapsed) {
+		max_read_entry.elapsed = elapsed;
+		free(max_read_entry.path);
+		max_read_entry.path = strdup(filepath);
+	}
+
 	return 0;
 }
 
 static void walk_fs(char *path)
 {
+	max_read_entry.elapsed = 0;
+
 	disable_all_screens_and_wait(&ms_data);
 	nftw(path, read_entry, 20, FTW_PHYS | FTW_MOUNT);
+
+	if (max_read_entry.path) {
+		igt_info("Slowest file + suspend: %s took %.2fms\n",
+			 max_read_entry.path, max_read_entry.elapsed * 1e-6);
+		free(max_read_entry.path);
+		max_read_entry.path = NULL;
+	}
 }
 
 /* This test will probably pass, with a small chance of hanging the machine in
