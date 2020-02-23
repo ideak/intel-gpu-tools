@@ -199,6 +199,55 @@ static void test_overlap(int fd)
 	gem_close(fd, handle);
 }
 
+static void test_reverse(int i915)
+{
+	const uint32_t size = 1024 * 1024;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 object[2];
+	uint64_t offset;
+	uint32_t handle;
+
+	handle = gem_create(i915, 2 * size);
+	gem_write(i915, handle, 0, &bbe, sizeof(bbe));
+
+	memset(object, 0, sizeof(object));
+	object[0].handle = handle;
+
+	/* Find a hole */
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(object);
+	execbuf.buffer_count = 1;
+	gem_execbuf(i915, &execbuf);
+
+	igt_debug("Made a 2x1 MiB hole: %08llx\n", object[0].offset);
+	offset = object[0].offset;
+
+	object[0].handle = gem_create(i915, size);
+	object[0].flags |= EXEC_OBJECT_PINNED;
+	object[1].handle = gem_create(i915, size);
+	object[1].flags |= EXEC_OBJECT_PINNED;
+	gem_write(i915, object[1].handle, 0, &bbe, sizeof(bbe));
+	execbuf.buffer_count = 2;
+
+	/* Check that we fit into our hole */
+	object[1].offset = offset + size;
+	gem_execbuf(i915, &execbuf);
+	igt_assert_eq_u64(object[0].offset, offset);
+	igt_assert_eq_u64(object[1].offset, offset + size);
+
+	/* And then swap over the placements */
+	object[0].offset = offset + size;
+	object[1].offset = offset;
+	gem_execbuf(i915, &execbuf);
+	igt_assert_eq_u64(object[1].offset, offset);
+	igt_assert_eq_u64(object[0].offset, offset + size);
+
+	gem_close(i915, object[1].handle);
+	gem_close(i915, object[0].handle);
+	gem_close(i915, handle);
+}
+
 static uint64_t busy_batch(int fd)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
@@ -494,6 +543,8 @@ igt_main
 		test_softpin(fd);
 	igt_subtest("overlap")
 		test_overlap(fd);
+	igt_subtest("reverse")
+		test_reverse(fd);
 
 	igt_subtest("noreloc")
 		test_noreloc(fd, NOSLEEP);
