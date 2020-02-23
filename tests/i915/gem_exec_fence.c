@@ -771,7 +771,7 @@ static bool has_submit_fence(int fd)
 	int value = 0;
 
 	memset(&gp, 0, sizeof(gp));
-	gp.param = 0xdeadbeef ^ I915_PARAM_HAS_EXEC_SUBMIT_FENCE;
+	gp.param = I915_PARAM_HAS_EXEC_SUBMIT_FENCE;
 	gp.value = &value;
 
 	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
@@ -1469,10 +1469,12 @@ igt_main
 			igt_subtest_with_dynamic("parallel") {
 				__for_each_physical_engine(i915, e) {
 				/* Requires master for STORE_DWORD on gen4/5 */
-					igt_dynamic_f("%s", e->name)
-					igt_require(has_submit_fence(i915));
-					igt_until_timeout(2)
-						test_parallel(i915, e);
+					igt_dynamic_f("%s", e->name) {
+						igt_require(has_submit_fence(i915));
+						igt_require(gem_class_has_mutable_submission(i915, e->class));
+						igt_until_timeout(2)
+							test_parallel(i915, e);
+					}
 				}
 			}
 
