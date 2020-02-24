@@ -49,6 +49,21 @@ static const struct port_desc port_descs[] = {
 		.stride = 1,
 	},
 	{
+		.name = "mchbar",
+		.port = PORT_MCHBAR_32,
+		.stride = 4,
+	},
+	{
+		.name = "mchbar16",
+		.port = PORT_MCHBAR_16,
+		.stride = 2,
+	},
+	{
+		.name = "mchbar8",
+		.port = PORT_MCHBAR_8,
+		.stride = 1,
+	},
+	{
 		.name = "portio",
 		.port = PORT_PORTIO,
 		.stride = 1,

@@ -186,6 +186,9 @@ static bool port_is_mmio(enum port_addr port)
 	case PORT_MMIO_32:
 	case PORT_MMIO_16:
 	case PORT_MMIO_8:
+	case PORT_MCHBAR_32:
+	case PORT_MCHBAR_16:
+	case PORT_MCHBAR_8:
 		return true;
 	default:
 		return false;
@@ -367,20 +370,28 @@ static int register_srm(struct config *config, struct reg *reg,
 	return val;
 }
 
+static uint32_t mcbar_offset(uint32_t devid)
+{
+	return intel_gen(devid) >= 6 ? 0x140000 : 0x10000;
+}
+
 static int read_register(struct config *config, struct reg *reg, uint32_t *valp)
 {
 	uint32_t val = 0;
 
 	switch (reg->port_desc.port) {
+	case PORT_MCHBAR_32:
 	case PORT_MMIO_32:
 		if (reg->engine)
 			val = register_srm(config, reg, NULL);
 		else
 			val = INREG(reg->mmio_offset + reg->addr);
 		break;
+	case PORT_MCHBAR_16:
 	case PORT_MMIO_16:
 		val = INREG16(reg->mmio_offset + reg->addr);
 		break;
+	case PORT_MCHBAR_8:
 	case PORT_MMIO_8:
 		val = INREG8(reg->mmio_offset + reg->addr);
 		break;
@@ -552,6 +563,16 @@ static int parse_reg(struct config *config, struct reg *reg, const char *s)
 	if (ret) {
 		fprintf(stderr, "invalid port in '%s'\n", s);
 		return ret;
+	}
+
+	switch (reg->port_desc.port) {
+	case PORT_MCHBAR_32:
+	case PORT_MCHBAR_16:
+	case PORT_MCHBAR_8:
+		reg->mmio_offset = mcbar_offset(config->devid);
+		break;
+	default:
+		break;
 	}
 
 	addr = strtoul(p, &endp, 16);
