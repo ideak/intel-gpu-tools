@@ -157,7 +157,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 
 		perf->devinfo.slice_mask |= 1ULL << s;
 		for (uint32_t ss = 0; ss < topology->max_subslices; ss++) {
-			if (!subslice_available(topology, 0, s))
+			if (!subslice_available(topology, s, ss))
 				continue;
 
 			perf->devinfo.subslice_mask |= 1ULL << (s * bits_per_subslice + ss);
