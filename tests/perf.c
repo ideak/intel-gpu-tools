@@ -898,8 +898,10 @@ init_sys_info(void)
 
 	intel_perf_load_perf_configs(intel_perf, drm_fd);
 
-	if (test_set->perf_oa_metrics_set == 0)
+	if (test_set->perf_oa_metrics_set == 0) {
+		igt_debug("Unable to load configurations\n");
 		return false;
+	}
 
 	oa_exp_1_millisec = max_oa_exponent_for_period_lte(1000000);
 
