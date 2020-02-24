@@ -847,7 +847,8 @@ gen8_sanity_check_test_oa_reports(uint32_t *oa_report0, uint32_t *oa_report1,
 					    format.c_off);
 		uint32_t delta = c1[j] - c0[j];
 
-		igt_debug("C%d: delta = %"PRIu32"\n", j, delta);
+		igt_debug("C%d: delta = %"PRIu32", max_delta=%"PRIu32"\n",
+			  j, delta, max_delta);
 		igt_assert(delta <= max_delta);
 	}
 }
@@ -863,6 +864,9 @@ init_sys_info(void)
 	intel_perf = intel_perf_for_fd(drm_fd);
 	igt_require(intel_perf);
 
+	igt_debug("n_eu_slices: %"PRIu64"\n", intel_perf->devinfo.n_eu_slices);
+	igt_debug("n_eu_sub_slices: %"PRIu64"\n", intel_perf->devinfo.n_eu_sub_slices);
+	igt_debug("n_eus: %"PRIu64"\n", intel_perf->devinfo.n_eus);
 	igt_debug("timestamp_frequency = %"PRIu64"\n",
 		  intel_perf->devinfo.timestamp_frequency);
 	igt_assert_neq(intel_perf->devinfo.timestamp_frequency, 0);
