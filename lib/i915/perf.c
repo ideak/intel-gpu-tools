@@ -39,6 +39,17 @@
 #include "perf.h"
 #include "i915_perf_metrics.h"
 
+static int
+perf_ioctl(int fd, unsigned long request, void *arg)
+{
+	int ret;
+
+	do {
+		ret = ioctl(fd, request, arg);
+	} while (ret == -1 && (errno == EINTR || errno == EAGAIN));
+	return ret;
+}
+
 static struct intel_perf_logical_counter_group *
 intel_perf_logical_counter_group_new(struct intel_perf *perf,
 				     struct intel_perf_logical_counter_group *parent,
@@ -237,8 +248,7 @@ getparam(int drm_fd, uint32_t param)
         gp.param = param;
         gp.value = &val;
 
-	while (ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp) < 0 &&
-	       (errno == EAGAIN || errno == EINTR));
+	perf_ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp);
 
         return val;
 }
@@ -281,11 +291,8 @@ query_items(int drm_fd, struct drm_i915_query_item *items, uint32_t n_items)
 		.num_items = n_items,
 		.items_ptr = (uintptr_t) items,
 	};
-	int ret;
 
-	while ((ret = ioctl(drm_fd, DRM_IOCTL_I915_QUERY, &q)) < 0 &&
-	       (errno == EAGAIN || errno == EINTR));
-	return ret;
+	return perf_ioctl(drm_fd, DRM_IOCTL_I915_QUERY, &q);
 }
 
 static struct drm_i915_query_topology_info *
@@ -427,7 +434,7 @@ static void
 load_metric_set_config(struct intel_perf_metric_set *metric_set, int drm_fd)
 {
 	struct drm_i915_perf_oa_config config;
-	uint64_t config_id = 0;
+	int ret;
 
 	memset(&config, 0, sizeof(config));
 
@@ -442,10 +449,9 @@ load_metric_set_config(struct intel_perf_metric_set *metric_set, int drm_fd)
 	config.n_flex_regs = metric_set->n_flex_regs;
 	config.flex_regs_ptr = (uintptr_t) metric_set->flex_regs;
 
-	while (ioctl(drm_fd, DRM_IOCTL_I915_PERF_ADD_CONFIG, &config) < 0 &&
-	       (errno == EAGAIN || errno == EINTR));
-
-	metric_set->perf_oa_metrics_set = config_id;
+	ret = perf_ioctl(drm_fd, DRM_IOCTL_I915_PERF_ADD_CONFIG, &config);
+	if (ret >= 0)
+		metric_set->perf_oa_metrics_set = ret;
 }
 
 void
