@@ -28,6 +28,8 @@
 #include <assert.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 /*
  * We need to hide assert from the cocci igt test refactor spatch.
@@ -72,19 +74,32 @@ static inline pid_t do_fork_bg_with_pipes(void (*test_to_run)(void), int *out, i
 	int outfd[2], errfd[2];
 	pid_t pid;
 
-	internal_assert(pipe(outfd) != -1);
-	internal_assert(pipe(errfd) != -1);
+	if (out != NULL)
+		internal_assert(pipe(outfd) != -1);
+
+	if (err != NULL)
+		internal_assert(pipe(errfd) != -1);
 
 	pid = fork();
 	internal_assert(pid != -1);
 
 	if (pid == 0) {
+		/* we'll leak the /dev/null fds, let them die with the forked
+		 * process, also close reading ends if they are any */
+		if (out == NULL)
+			outfd[1] = open("/dev/null", O_WRONLY);
+		else
+			close(outfd[0]);
+
+		if (err == NULL)
+			errfd[1] = open("/dev/null", O_WRONLY);
+		else
+			close(errfd[0]);
+
 		while (dup2(outfd[1], STDOUT_FILENO) == -1 && errno == EINTR) {}
 		while (dup2(errfd[1], STDERR_FILENO) == -1 && errno == EINTR) {}
 
-		close(outfd[0]);
 		close(outfd[1]);
-		close(errfd[0]);
 		close(errfd[1]);
 
 		test_to_run();
@@ -92,11 +107,15 @@ static inline pid_t do_fork_bg_with_pipes(void (*test_to_run)(void), int *out, i
 		exit(-1);
 	} else {
 		/* close the writing ends */
-		close(outfd[1]);
-		close(errfd[1]);
+		if (out != NULL) {
+			close(outfd[1]);
+			*out = outfd[0];
+		}
 
-		*out = outfd[0];
-		*err = errfd[0];
+		if (err != NULL) {
+			close(errfd[1]);
+			*err = errfd[0];
+		}
 
 		return pid;
 	}
