@@ -2293,7 +2293,7 @@ static bool chamelium_autodiscover(struct chamelium *chamelium, int drm_fd)
 	return true;
 }
 
-static bool chamelium_read_config(struct chamelium *chamelium, int drm_fd)
+static bool chamelium_read_config(struct chamelium *chamelium)
 {
 	GError *error = NULL;
 
@@ -2310,10 +2310,7 @@ static bool chamelium_read_config(struct chamelium *chamelium, int drm_fd)
 		return false;
 	}
 
-	if (!chamelium_read_port_mappings(chamelium, drm_fd)) {
-		return false;
-	}
-	return chamelium_autodiscover(chamelium, drm_fd);
+	return true;
 }
 
 /**
@@ -2338,6 +2335,64 @@ static void chamelium_exit_handler(int sig)
 }
 
 /**
+ * chamelium_deinit_rpc_only:
+ * @chamelium: The Chamelium instance to use
+ *
+ * Frees the resources used by a connection to the chamelium that was set up
+ * with #chamelium_init_rpc_only.
+ */
+void chamelium_deinit_rpc_only(struct chamelium *chamelium)
+{
+	xmlrpc_env_clean(&chamelium->env);
+	free(chamelium);
+}
+
+/**
+ * chamelium_init_rpc_only:
+ *
+ * Sets up a connection with a chamelium, using the URL specified in the
+ * Chamelium configuration. The function initializes only the RPC - no port
+ * autodiscovery happens, which means only the functions that do not require
+ * struct #chamelium_port can be called with an instance produced by this
+ * function.
+ *
+ * #chamelium_init is almost always a better choice.
+ *
+ * Returns: A newly initialized chamelium struct, or NULL on lack of
+ * configuration
+ */
+struct chamelium *chamelium_init_rpc_only(void)
+{
+	struct chamelium *chamelium = malloc(sizeof(struct chamelium));
+
+	if (!chamelium)
+		return NULL;
+
+	memset(chamelium, 0, sizeof(*chamelium));
+
+	chamelium->drm_fd = -1;
+
+	/* Setup the libxmlrpc context */
+	xmlrpc_env_init(&chamelium->env);
+	xmlrpc_client_setup_global_const(&chamelium->env);
+	xmlrpc_client_create(&chamelium->env, XMLRPC_CLIENT_NO_FLAGS, PACKAGE,
+			     PACKAGE_VERSION, NULL, 0, &chamelium->client);
+	if (chamelium->env.fault_occurred) {
+		igt_debug("Failed to init xmlrpc: %s\n",
+			  chamelium->env.fault_string);
+		goto error;
+	}
+
+	if (!chamelium_read_config(chamelium))
+		goto error;
+
+	return chamelium;
+error:
+	chamelium_deinit_rpc_only(chamelium);
+	return NULL;
+}
+
+/**
  * chamelium_init:
  * @chamelium: The Chamelium instance to use
  * @drm_fd: a display initialized with #igt_display_require
@@ -2353,9 +2408,9 @@ static void chamelium_exit_handler(int sig)
  */
 struct chamelium *chamelium_init(int drm_fd)
 {
-	struct chamelium *chamelium = malloc(sizeof(struct chamelium));
+	struct chamelium *chamelium = chamelium_init_rpc_only();
 
-	if (!chamelium)
+	if (chamelium == NULL)
 		return NULL;
 
 	/* A chamelium instance was set up previously, so clean it up before
@@ -2364,34 +2419,22 @@ struct chamelium *chamelium_init(int drm_fd)
 	if (cleanup_instance)
 		chamelium_deinit(cleanup_instance);
 
-	memset(chamelium, 0, sizeof(*chamelium));
 	chamelium->drm_fd = drm_fd;
 	IGT_INIT_LIST_HEAD(&chamelium->edids);
 
-	/* Setup the libxmlrpc context */
-	xmlrpc_env_init(&chamelium->env);
-	xmlrpc_client_setup_global_const(&chamelium->env);
-	xmlrpc_client_create(&chamelium->env, XMLRPC_CLIENT_NO_FLAGS, PACKAGE,
-			     PACKAGE_VERSION, NULL, 0, &chamelium->client);
-	if (chamelium->env.fault_occurred) {
-		igt_debug("Failed to init xmlrpc: %s\n",
-			  chamelium->env.fault_string);
+	if (!chamelium_read_port_mappings(chamelium, drm_fd))
 		goto error;
-	}
 
-	if (!chamelium_read_config(chamelium, drm_fd))
+	if (!chamelium_autodiscover(chamelium, drm_fd))
 		goto error;
 
 	cleanup_instance = chamelium;
 	igt_install_exit_handler(chamelium_exit_handler);
 
 	return chamelium;
-
 error:
-	xmlrpc_env_clean(&chamelium->env);
-	free(chamelium);
-
-	return NULL;
+	chamelium_deinit_rpc_only(chamelium);
+	return chamelium;
 }
 
 /**
