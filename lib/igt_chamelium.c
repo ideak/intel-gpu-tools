@@ -361,11 +361,17 @@ static bool __chamelium_is_reachable(struct chamelium *chamelium)
 	if (res != NULL)
 		xmlrpc_DECREF(res);
 
-	if (chamelium->env.fault_occurred)
+	if (chamelium->env.fault_occurred) {
 		igt_debug("Chamelium RPC call failed: %s\n",
 			  chamelium->env.fault_string);
 
-	return !chamelium->env.fault_occurred;
+		xmlrpc_env_clean(&chamelium->env);
+		xmlrpc_env_init(&chamelium->env);
+
+		return false;
+	}
+
+	return true;
 }
 
 void chamelium_wait_reachable(struct chamelium *chamelium, int timeout)
