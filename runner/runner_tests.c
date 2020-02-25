@@ -28,9 +28,10 @@ static const char testdatadir[] = TESTDATA_DIRECTORY;
  * that test binaries without subtests should still be counted as one
  * for this macro.
  */
-#define NUM_TESTDATA_SUBTESTS 6
+#define NUM_TESTDATA_SUBTESTS 15
+#define NUM_TESTDATA_ABORT_SUBTESTS 9
 /* The total number of test binaries in runner/testdata/ */
-#define NUM_TESTDATA_BINARIES 4
+#define NUM_TESTDATA_BINARIES 8
 
 static const char *igt_get_result(struct json_object *tests, const char* testname)
 {
@@ -954,6 +955,7 @@ igt_main
 			struct execute_state state;
 			const char *argv[] = { "runner",
 					       "--dry-run",
+					       "-x", "^abort",
 					       testdatadir,
 					       dirname,
 			};
@@ -964,7 +966,7 @@ igt_main
 			igt_assert(initialize_execute_state(&state, settings, list));
 			igt_assert_eq(state.next, 0);
 			igt_assert(state.dry);
-			igt_assert_eq(list->size, NUM_TESTDATA_SUBTESTS);
+			igt_assert_eq(list->size, NUM_TESTDATA_SUBTESTS - NUM_TESTDATA_ABORT_SUBTESTS);
 
 			igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
 				     "Dry run initialization didn't create the results directory.\n");
@@ -985,7 +987,7 @@ igt_main
 			igt_assert(initialize_execute_state_from_resume(dirfd, &state, settings, list));
 			igt_assert_eq(state.next, 0);
 			igt_assert(!state.dry);
-			igt_assert_eq(list->size, NUM_TESTDATA_SUBTESTS);
+			igt_assert_eq(list->size, NUM_TESTDATA_SUBTESTS - NUM_TESTDATA_ABORT_SUBTESTS);
 			/* initialize_execute_state_from_resume() closes the dirfd */
 			igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
 				     "Dry run resume somehow deleted the results directory.\n");
@@ -1512,7 +1514,7 @@ igt_main
 			struct execute_state state;
 			struct json_object *results, *tests;
 			const char *argv[] = { "runner",
-					       "-t", "dynamic",
+					       "-t", "^dynamic$",
 					       testdatadir,
 					       dirname,
 			};
@@ -1538,6 +1540,284 @@ igt_main
 			close(dirfd);
 			clear_directory(dirname);
 			free_job_list(list);
+		}
+	}
+
+	igt_subtest_group {
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1;
+		char dirname[] = "tmpdirXXXXXX";
+
+		igt_fixture {
+			igt_require(mkdtemp(dirname) != NULL);
+			rmdir(dirname);
+
+			init_job_list(list);
+		}
+
+		igt_subtest("execute-abort-simple") {
+			struct execute_state state;
+			struct json_object *results, *tests;
+			const char *argv[] = { "runner",
+					       "-t", "^abort-simple$",
+					       testdatadir,
+					       dirname,
+			};
+
+			igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+			igt_assert(create_job_list(list, settings));
+			igt_assert(initialize_execute_state(&state, settings, list));
+			igt_assert(!execute(&state, settings, list)); /* false = signal abort */
+
+			igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
+				     "Execute didn't create the results directory\n");
+			igt_assert_f((results = generate_results_json(dirfd)) != NULL,
+				     "Results parsing failed\n");
+
+			igt_assert(json_object_object_get_ex(results, "tests", &tests));
+
+			igt_assert_eqstr(igt_get_result(tests, "igt@abort-simple"), "abort");
+
+			igt_assert_eq(json_object_put(results), 1);
+		}
+
+		igt_fixture {
+			close(dirfd);
+			clear_directory(dirname);
+			free_job_list(list);
+		}
+	}
+
+	igt_subtest_group {
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1;
+
+		for (int multiple = 0; multiple <= 1; ++multiple) {
+			char dirname[] = "tmpdirXXXXXX";
+
+			igt_fixture {
+				igt_require(mkdtemp(dirname) != NULL);
+				rmdir(dirname);
+
+				init_job_list(list);
+			}
+
+			igt_subtest_f("execute-abort%s", multiple ? "-multiple" : "") {
+				struct execute_state state;
+				struct json_object *results, *tests;
+				const char *argv[] = { "runner",
+						       "-t", "^abort$",
+						       multiple ? "--multiple-mode" : "--sync",
+						       testdatadir,
+						       dirname,
+				};
+
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+				igt_assert(create_job_list(list, settings));
+				igt_assert(initialize_execute_state(&state, settings, list));
+				igt_assert(!execute(&state, settings, list)); /* false = signal abort */
+
+				igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
+					     "Execute didn't create the results directory\n");
+				igt_assert_f((results = generate_results_json(dirfd)) != NULL,
+					     "Results parsing failed\n");
+
+				igt_assert(json_object_object_get_ex(results, "tests", &tests));
+
+				igt_assert_eqstr(igt_get_result(tests, "igt@abort@a-subtest"), "pass");
+				igt_assert_eqstr(igt_get_result(tests, "igt@abort@b-subtest"), "abort");
+
+				if (multiple) /* no notrun injection for multiple mode */
+					igt_assert_no_result_for(tests, "igt@abort@c-subtest");
+				else
+					igt_assert_eqstr(igt_get_result(tests, "igt@abort@c-subtest"), "notrun");
+
+				igt_assert_eq(json_object_put(results), 1);
+			}
+
+			igt_fixture {
+				close(dirfd);
+				clear_directory(dirname);
+				free_job_list(list);
+			}
+		}
+	}
+
+	igt_subtest_group {
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1;
+
+		for (int multiple = 0; multiple <= 1; ++multiple) {
+			char dirname[] = "tmpdirXXXXXX";
+
+			igt_fixture {
+				igt_require(mkdtemp(dirname) != NULL);
+				rmdir(dirname);
+
+				init_job_list(list);
+			}
+
+			igt_subtest_f("execute-abort-fixture%s", multiple ? "-multiple" : "") {
+				struct execute_state state;
+				struct json_object *results, *tests;
+				const char *argv[] = { "runner", multiple ? "--multiple-mode" : "--sync",
+						       "-t", "^abort-fixture$",
+						       testdatadir,
+						       dirname,
+				};
+
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+				igt_assert(create_job_list(list, settings));
+				igt_assert(initialize_execute_state(&state, settings, list));
+				igt_assert(!execute(&state, settings, list)); /* false = signal abort */
+
+				igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
+					     "Execute didn't create the results directory\n");
+				igt_assert_f((results = generate_results_json(dirfd)) != NULL,
+					     "Results parsing failed\n");
+
+				igt_assert(json_object_object_get_ex(results, "tests", &tests));
+
+				if (multiple) {
+					/*
+					 * running the whole binary via -t, no
+					 * way of blaming the particular subtest
+					 */
+					igt_assert_eqstr(igt_get_result(tests, "igt@abort-fixture"), "abort");
+					igt_assert_no_result_for(tests, "igt@abort-fixture@a-subtest");
+					igt_assert_no_result_for(tests, "igt@abort-fixture@b-subtest");
+				} else {
+					igt_assert_eqstr(igt_get_result(tests, "igt@abort-fixture@a-subtest"), "abort");
+					igt_assert_eqstr(igt_get_result(tests, "igt@abort-fixture@b-subtest"), "notrun");
+				}
+
+				igt_assert_eq(json_object_put(results), 1);
+			}
+
+			igt_fixture {
+				close(dirfd);
+				clear_directory(dirname);
+				free_job_list(list);
+			}
+		}
+	}
+
+	igt_subtest_group {
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1;
+
+		for (int multiple = 0; multiple <= 1; ++multiple) {
+			char dirname[] = "tmpdirXXXXXX";
+			char filename[] = "tmplistXXXXXX";
+			const char testlisttext[] = "igt@abort-fixture@b-subtest\n"
+				"igt@abort-fixture@a-subtest\n";
+
+			igt_fixture {
+				int fd;
+				igt_require((fd = mkstemp(filename)) >= 0);
+				igt_require(write(fd, testlisttext, strlen(testlisttext)) == strlen(testlisttext));
+				close(fd);
+				igt_require(mkdtemp(dirname) != NULL);
+				rmdir(dirname);
+
+				init_job_list(list);
+			}
+
+			igt_subtest_f("execute-abort-fixture-testlist%s", multiple ? "-multiple" : "") {
+				struct execute_state state;
+				struct json_object *results, *tests;
+				const char *argv[] = { "runner", multiple ? "--multiple-mode" : "--sync",
+						       "--test-list", filename,
+						       testdatadir,
+						       dirname,
+				};
+
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+				igt_assert(create_job_list(list, settings));
+				igt_assert(initialize_execute_state(&state, settings, list));
+				igt_assert(!execute(&state, settings, list)); /* false = signal abort */
+
+				igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
+					     "Execute didn't create the results directory\n");
+				igt_assert_f((results = generate_results_json(dirfd)) != NULL,
+					     "Results parsing failed\n");
+
+				igt_assert(json_object_object_get_ex(results, "tests", &tests));
+
+				if (multiple) /* multiple mode = no notruns */
+					igt_assert_no_result_for(tests, "igt@abort-fixture@a-subtest");
+				else
+					igt_assert_eqstr(igt_get_result(tests, "igt@abort-fixture@a-subtest"), "notrun");
+
+
+				igt_assert_eqstr(igt_get_result(tests, "igt@abort-fixture@b-subtest"), "abort");
+
+				igt_assert_eq(json_object_put(results), 1);
+			}
+
+			igt_fixture {
+				unlink(filename);
+				close(dirfd);
+				clear_directory(dirname);
+				free_job_list(list);
+			}
+		}
+	}
+
+	igt_subtest_group {
+		struct job_list *list = malloc(sizeof(*list));
+		volatile int dirfd = -1;
+
+		for (int multiple = 0; multiple <= 1; ++multiple) {
+			char dirname[] = "tmpdirXXXXXX";
+
+			igt_fixture {
+				igt_require(mkdtemp(dirname) != NULL);
+				rmdir(dirname);
+
+				init_job_list(list);
+			}
+
+			igt_subtest_f("execute-abort-dynamic%s", multiple ? "-multiple" : "") {
+				struct execute_state state;
+				struct json_object *results, *tests;
+				const char *argv[] = { "runner", multiple ? "--multiple-mode" : "--sync",
+						       "-t", "^abort-dynamic$",
+						       testdatadir,
+						       dirname,
+				};
+
+				igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+				igt_assert(create_job_list(list, settings));
+				igt_assert(initialize_execute_state(&state, settings, list));
+				igt_assert(!execute(&state, settings, list)); /* false = signal abort */
+
+				igt_assert_f((dirfd = open(dirname, O_DIRECTORY | O_RDONLY)) >= 0,
+					     "Execute didn't create the results directory\n");
+				igt_assert_f((results = generate_results_json(dirfd)) != NULL,
+					     "Results parsing failed\n");
+
+				igt_assert(json_object_object_get_ex(results, "tests", &tests));
+
+				igt_assert_eqstr(igt_get_result(tests, "igt@abort-dynamic@a-subtest@dynamic-1"), "pass");
+				igt_assert_eqstr(igt_get_result(tests, "igt@abort-dynamic@b-subtest@dynamic-1"), "pass");
+				igt_assert_eqstr(igt_get_result(tests, "igt@abort-dynamic@b-subtest@dynamic-2"), "abort");
+
+				igt_assert_no_result_for(tests, "igt@abort-dynamic@b-subtest@dynamic-3");
+
+				if (multiple) /* multiple mode = no notruns */
+					igt_assert_no_result_for(tests, "igt@abort-dynamic@c-subtest");
+				else
+					igt_assert_eqstr(igt_get_result(tests, "igt@abort-dynamic@c-subtest"), "notrun");
+
+				igt_assert_eq(json_object_put(results), 1);
+			}
+
+			igt_fixture {
+				close(dirfd);
+				clear_directory(dirname);
+				free_job_list(list);
+			}
 		}
 	}
 

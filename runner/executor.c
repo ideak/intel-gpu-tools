@@ -1031,6 +1031,9 @@ static int monitor_output(pid_t child,
 					fdatasync(outputs[_F_JOURNAL]);
 				}
 
+				if (status == IGT_EXIT_ABORT)
+					aborting = true;
+
 				if (time_spent)
 					*time_spent = time;
 			}

@@ -645,6 +645,23 @@ static void process_dynamic_subtest_output(const char *piglit_name,
 					     &dynresulttext, &dyntime,
 					     dyn_result_idx < 0 ? NULL : matches.items[dyn_result_idx].where,
 					     dynend);
+
+			/*
+			 * If a dynamic subsubtest is considered incomplete we
+			 * need to check parent's status first, to be sure that
+			 * the binary hasn't aborted (exit code). If it has
+			 * aborted then we have to attribute this status to our
+			 * subsubtest.
+			 */
+			if (!strcmp(dynresulttext, "incomplete")) {
+				struct json_object *parent_subtest;
+
+				if (json_object_object_get_ex(tests, piglit_name, &parent_subtest) &&
+				    json_object_object_get_ex(parent_subtest, "result", &parent_subtest) &&
+				    !strcmp(json_object_get_string(parent_subtest), "abort"))
+					dynresulttext = "abort";
+			}
+
 			set_result(current_dynamic_test, dynresulttext);
 			set_runtime(current_dynamic_test, dyntime);
 		}
@@ -1078,6 +1095,8 @@ static const char *result_from_exitcode(int exitcode)
 		return "pass";
 	case IGT_EXIT_INVALID:
 		return "skip";
+	case IGT_EXIT_ABORT:
+		return "abort";
 	case INCOMPLETE_EXITCODE:
 		return "incomplete";
 	default:
@@ -1152,6 +1171,17 @@ static void fill_from_journal(int fd,
 		} else {
 			add_subtest(subtests, strdup(line));
 		}
+	}
+
+	if (subtests->size && exitcode == IGT_EXIT_ABORT) {
+		char *last_subtest = subtests->subs[subtests->size - 1].name;
+		char subtest_piglit_name[256];
+		struct json_object *subtest_obj;
+
+		generate_piglit_name(entry->binary, last_subtest, subtest_piglit_name, sizeof(subtest_piglit_name));
+		subtest_obj = get_or_create_json_object(tests, subtest_piglit_name);
+
+		set_result(subtest_obj, "abort");
 	}
 
 	if (subtests->size == 0) {
@@ -1322,6 +1352,7 @@ static struct json_object *get_totals_object(struct json_object *totals,
 	json_object_object_add(obj, "dmesg-warn", json_object_new_int(0));
 	json_object_object_add(obj, "skip", json_object_new_int(0));
 	json_object_object_add(obj, "incomplete", json_object_new_int(0));
+	json_object_object_add(obj, "abort", json_object_new_int(0));
 	json_object_object_add(obj, "timeout", json_object_new_int(0));
 	json_object_object_add(obj, "notrun", json_object_new_int(0));
 	json_object_object_add(obj, "fail", json_object_new_int(0));
