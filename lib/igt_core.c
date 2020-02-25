@@ -590,6 +590,7 @@ static void ftrace_dump_on_oops(bool enable)
 }
 
 bool igt_exit_called;
+bool igt_is_aborting;
 static void common_exit_handler(int sig)
 {
 	if (!igt_only_list_subtests()) {
@@ -598,7 +599,7 @@ static void common_exit_handler(int sig)
 
 	/* When not killed by a signal check that igt_exit() has been properly
 	 * called. */
-	assert(sig != 0 || igt_exit_called);
+	assert(sig != 0 || igt_exit_called || igt_is_aborting);
 }
 
 static void print_line_wrapping(const char *indent, const char *text)
@@ -1947,6 +1948,48 @@ void __igt_fail_assert(const char *domain, const char *file, const int line,
 	igt_fail(IGT_EXIT_FAILURE);
 }
 
+static void kill_children(void)
+{
+	for (int c = 0; c < num_test_children; c++)
+		kill(test_children[c], SIGKILL);
+}
+
+void __igt_abort(const char *domain, const char *file, const int line,
+		 const char *func, const char *expression,
+		 const char *f, ...)
+{
+	va_list args;
+	int err = errno;
+
+	igt_is_aborting = true;
+
+	igt_log(domain, IGT_LOG_CRITICAL,
+		"Test abort in function %s, file %s:%i:\n", func, file,
+		line);
+	igt_log(domain, IGT_LOG_CRITICAL, "abort condition: %s\n", expression);
+	if (err)
+		igt_log(domain, IGT_LOG_CRITICAL, "Last errno: %i, %s\n", err,
+			strerror(err));
+
+	if (f) {
+		va_start(args, f);
+		igt_vlog(domain, IGT_LOG_CRITICAL, f, args);
+		va_end(args);
+	}
+
+	/* just try our best, we are aborting the execution anyway */
+	kill_children();
+
+	print_backtrace();
+
+	if (running_under_gdb())
+		abort();
+
+	_igt_log_buffer_dump();
+
+	exit(IGT_EXIT_ABORT);
+}
+
 /**
  * igt_exit:
  *
@@ -1996,8 +2039,7 @@ void igt_exit(void)
 			 command_str, igt_exitcode);
 	igt_debug("Exiting with status code %d\n", igt_exitcode);
 
-	for (int c = 0; c < num_test_children; c++)
-		kill(test_children[c], SIGKILL);
+	kill_children();
 	assert(!num_test_children);
 
 	assert(waitpid(-1, &tmp, WNOHANG) == -1 && errno == ECHILD);

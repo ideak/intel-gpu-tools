@@ -149,6 +149,9 @@ igt_main
 	igt_subtest("piglit-timeout")
 		test_piglit_timeout();
 
+	igt_subtest("abort")
+		igt_abort_on_f(true, "ojoj\n");
+
 	igt_subtest("generate-panic")
 		test_panic();
 }

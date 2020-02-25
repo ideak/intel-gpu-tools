@@ -123,6 +123,14 @@ struct _GKeyFile *igt_load_igtrc(void);
  */
 #define IGT_EXIT_FAILURE 98
 
+/**
+ * IGT_EXIT_ABORT
+ *
+ * Exit status indicating a severe test/enviroment failure, any continued
+ * testing past this point can yeild unexpected reasults and is not recommended
+ */
+#define IGT_EXIT_ABORT 112
+
 bool __igt_fixture(void);
 void __igt_fixture_complete(void);
 void __igt_fixture_end(void) __attribute__((noreturn));
@@ -498,6 +506,11 @@ __attribute__((format(printf, 6, 7)))
 void __igt_fail_assert(const char *domain, const char *file,
 		       const int line, const char *func, const char *assertion,
 		       const char *format, ...)
+	__attribute__((noreturn));
+__attribute__((format(printf, 6, 7)))
+void __igt_abort(const char *domain, const char *file, const int line,
+		 const char *func, const char *expression,
+		 const char *f, ...)
 	__attribute__((noreturn));
 void igt_exit(void) __attribute__((noreturn));
 void igt_fatal_error(void) __attribute__((noreturn));
@@ -1026,6 +1039,22 @@ void igt_describe_f(const char *fmt, ...);
 	if ((expr)) igt_skip_check("!("#expr")", f); \
 	else igt_debug("Test requirement passed: !(%s)\n", #expr); \
 } while (0)
+
+
+/**
+ * igt_abort_on_f:
+ * @expr: condition to test
+ * @...: format string and optional arguments
+ *
+ * Aborts current execution if a condition is met.
+ *
+ * Should be used only when there is a serious issue with the environment and
+ * any further testing may be affected by it.
+ */
+#define igt_abort_on_f(expr, f...) \
+	do { if ((expr)) \
+		__igt_abort(IGT_LOG_DOMAIN, __FILE__, __LINE__, __func__, #expr , f); \
+	} while (0)
 
 /* fork support code */
 bool __igt_fork(void);

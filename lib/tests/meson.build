@@ -1,5 +1,6 @@
 lib_tests = [
 	'igt_assert',
+	'igt_abort',
 	'igt_can_fail',
 	'igt_can_fail_simple',
 	'igt_conflicting_args',
