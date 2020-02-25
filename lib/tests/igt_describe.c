@@ -28,9 +28,15 @@
 #include "drmtest.h"
 #include "igt_tests_common.h"
 
+char prog[] = "igt_describe";
+char fake_arg[100];
+char *fake_argv[] = {prog, fake_arg};
+int fake_argc = ARRAY_SIZE(fake_argv);
+
 IGT_TEST_DESCRIPTION("the top level description");
-static void fake_main(int argc, char **argv) {
-	igt_subtest_init(argc, argv);
+static void fake_main(void)
+{
+	igt_subtest_init(fake_argc, fake_argv);
 
 	igt_describe("Basic A");
 	igt_subtest("A")
@@ -101,33 +107,33 @@ static void fake_main(int argc, char **argv) {
 static const char DESCRIBE_ALL_OUTPUT[] = \
 	"the top level description\n"
 	"\n"
-	"SUB A " __FILE__ ":36:\n"
+	"SUB A " __FILE__ ":42:\n"
 	"  Basic A\n"
 	"\n"
-	"SUB B " __FILE__ ":45:\n"
+	"SUB B " __FILE__ ":51:\n"
 	"  Group with B, C & D\n"
 	"\n"
 	"  Basic B\n"
 	"\n"
-	"SUB C " __FILE__ ":54:\n"
+	"SUB C " __FILE__ ":60:\n"
 	"  Group with B, C & D\n"
 	"\n"
 	"  Group with C & D\n"
 	"\n"
 	"  Basic C\n"
 	"\n"
-	"SUB D " __FILE__ ":58:\n"
+	"SUB D " __FILE__ ":64:\n"
 	"  Group with B, C & D\n"
 	"\n"
 	"  Group with C & D\n"
 	"\n"
-	"SUB E " __FILE__ ":66:\n"
+	"SUB E " __FILE__ ":72:\n"
 	"  NO DOCUMENTATION!\n"
 	"\n"
-	"SUB F " __FILE__ ":71:\n"
+	"SUB F " __FILE__ ":77:\n"
 	"  NO DOCUMENTATION!\n"
 	"\n"
-	"SUB G " __FILE__ ":80:\n"
+	"SUB G " __FILE__ ":86:\n"
 	"  this description should be so long that it wraps itself nicely in the terminal this\n"
 	"  description should be so long that it wraps itself nicely in the terminal this description\n"
 	"  should be so long that it wraps itself nicely in the terminal this description should be so\n"
@@ -135,17 +141,17 @@ static const char DESCRIBE_ALL_OUTPUT[] = \
 	"  wraps itself nicely in the terminal this description should be so long that it wraps itself\n"
 	"  nicely in the terminal\n"
 	"\n"
-	"SUB F " __FILE__ ":87:\n"
+	"SUB F " __FILE__ ":93:\n"
 	"  verylongwordthatshoudlbeprintedeventhoughitspastthewrppinglimitverylongwordthatshoudlbeprintedeventhoughitspastthewrappinglimit\n"
 	"  verylongwordthatshoudlbeprintedeventhoughitspastthewrappinglimitverylongwordthatshoudlbeprintedeventhoughitspastthewrappinglimit\n"
 	"\n"
-	"SUB G " __FILE__ ":91:\n"
+	"SUB G " __FILE__ ":97:\n"
 	"  Subtest with dynamic subsubtests\n\n";
 
 static const char JUST_C_OUTPUT[] = \
 	"the top level description\n"
 	"\n"
-	"SUB C " __FILE__ ":54:\n"
+	"SUB C " __FILE__ ":60:\n"
 	"  Group with B, C & D\n"
 	"\n"
 	"  Group with C & D\n"
@@ -153,95 +159,22 @@ static const char JUST_C_OUTPUT[] = \
 	"  Basic C\n"
 	"\n";
 
-static void assert_pipe_empty(int fd)
-{
-	char buf[5];
-	internal_assert(0 == read(fd, buf, sizeof(buf)));
-}
-
-static void read_whole_pipe(int fd, char *buf, size_t buflen)
-{
-	ssize_t readlen;
-	off_t offset;
-
-	offset = 0;
-	while ((readlen = read(fd, buf+offset, buflen-offset))) {
-		if (readlen == -1) {
-			if (errno == EINTR) {
-				continue;
-			} else {
-				printf("read failed with %s\n", strerror(errno));
-				exit(1);
-			}
-		}
-		internal_assert(readlen != -1);
-		offset += readlen;
-	}
-}
-
-static pid_t do_fork(int argc, char **argv, int *out, int *err)
-{
-	int outfd[2], errfd[2];
-	pid_t pid;
-
-	internal_assert(pipe(outfd) != -1);
-	internal_assert(pipe(errfd) != -1);
-
-	pid = fork();
-	internal_assert(pid != -1);
-
-	if (pid == 0) {
-		while (dup2(outfd[1], STDOUT_FILENO) == -1 && errno == EINTR) {}
-		while (dup2(errfd[1], STDERR_FILENO) == -1 && errno == EINTR) {}
-
-		close(outfd[0]);
-		close(outfd[1]);
-		close(errfd[0]);
-		close(errfd[1]);
-
-		fake_main(argc, argv);
-
-		exit(-1);
-	} else {
-		/* close the writing ends */
-		close(outfd[1]);
-		close(errfd[1]);
-
-		*out = outfd[0];
-		*err = errfd[0];
-
-		return pid;
-	}
-}
-
-static int _wait(pid_t pid, int *status) {
-	int ret;
-
-	do {
-		ret = waitpid(pid, status, 0);
-	} while (ret == -1 && errno == EINTR);
-
-	return ret;
-}
-
 int main(int argc, char **argv)
 {
-	char prog[] = "igt_describe";
 	int status;
 	int outfd, errfd;
+	pid_t pid;
 
 	/* describe all subtest */ {
 		static char out[4096];
-		char arg[] = "--describe";
-		char *fake_argv[] = {prog, arg};
-		int fake_argc = ARRAY_SIZE(fake_argv);
+		strncpy(fake_arg, "--describe", sizeof(fake_arg));
 
-		pid_t pid = do_fork(fake_argc, fake_argv, &outfd, &errfd);
+		pid = do_fork_bg_with_pipes(fake_main, &outfd, &errfd);
 
 		read_whole_pipe(outfd, out, sizeof(out));
 		assert_pipe_empty(errfd);
 
-		internal_assert(_wait(pid, &status) != -1);
+		internal_assert(safe_wait(pid, &status) != -1);
 		internal_assert(WIFEXITED(status));
 		internal_assert(WEXITSTATUS(status) == IGT_EXIT_SUCCESS);
 		internal_assert(0 == strcmp(DESCRIBE_ALL_OUTPUT, out));
@@ -252,16 +185,14 @@ int main(int argc, char **argv)
 
 	/* describe C using a pattern */ {
 		static char out[4096];
-		char arg[] = "--describe=C";
-		char *fake_argv[] = {prog, arg};
-		int fake_argc = ARRAY_SIZE(fake_argv);
+		strncpy(fake_arg, "--describe=C", sizeof(fake_arg));
 
-		pid_t pid = do_fork(fake_argc, fake_argv, &outfd, &errfd);
+		pid = do_fork_bg_with_pipes(fake_main, &outfd, &errfd);
 
 		read_whole_pipe(outfd, out, sizeof(out));
 		assert_pipe_empty(errfd);
 
-		internal_assert(_wait(pid, &status) != -1);
+		internal_assert(safe_wait(pid, &status) != -1);
 		internal_assert(WIFEXITED(status));
 		internal_assert(WEXITSTATUS(status) == IGT_EXIT_SUCCESS);
 		internal_assert(0 == strcmp(JUST_C_OUTPUT, out));
@@ -272,15 +203,13 @@ int main(int argc, char **argv)
 
 	/* fail describing with a bad pattern */ {
 		static char err[4096];
-		char arg[] = "--describe=Z";
-		char *fake_argv[] = {prog, arg};
-		int fake_argc = ARRAY_SIZE(fake_argv);
+		strncpy(fake_arg, "--describe=Z", sizeof(fake_arg));
 
-		pid_t pid = do_fork(fake_argc, fake_argv, &outfd, &errfd);
+		pid = do_fork_bg_with_pipes(fake_main, &outfd, &errfd);
 
 		read_whole_pipe(errfd, err, sizeof(err));
 
-		internal_assert(_wait(pid, &status) != -1);
+		internal_assert(safe_wait(pid, &status) != -1);
 		internal_assert(WIFEXITED(status));
 		internal_assert(WEXITSTATUS(status) == IGT_EXIT_INVALID);
 		internal_assert(strstr(err, "Unknown subtest: Z"));
@@ -291,15 +220,13 @@ int main(int argc, char **argv)
 
 	/* trying to igt_describe a dynamic subsubtest should assert */ {
 		static char err[4096];
-		char arg[] = "--run-subtest=G";
-		char *fake_argv[] = {prog, arg};
-		int fake_argc = ARRAY_SIZE(fake_argv);
+		strncpy(fake_arg, "--run-subtest=G", sizeof(fake_arg));
 
-		pid_t pid = do_fork(fake_argc, fake_argv, &outfd, &errfd);
+		pid = do_fork_bg_with_pipes(fake_main, &outfd, &errfd);
 
 		read_whole_pipe(errfd, err, sizeof(err));
 
-		internal_assert(_wait(pid, &status) != -1);
+		internal_assert(safe_wait(pid, &status) != -1);
 		internal_assert_wsignaled(status, SIGABRT);
 
 		close(outfd);

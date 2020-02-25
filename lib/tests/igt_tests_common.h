@@ -26,6 +26,8 @@
 #define IGT_LIB_TESTS_COMMON_H
 
 #include <assert.h>
+#include <sys/wait.h>
+#include <errno.h>
 
 /*
  * We need to hide assert from the cocci igt test refactor spatch.
@@ -45,5 +47,94 @@ static inline void internal_assert_wsignaled(int wstatus, int signal)
 {
 	internal_assert(WIFSIGNALED(wstatus) &&
 			WTERMSIG(wstatus) == signal);
+}
+
+static inline int do_fork(void (*test_to_run)(void))
+{
+	int pid, status;
+
+	switch (pid = fork()) {
+	case -1:
+		internal_assert(0);
+	case 0:
+		test_to_run();
+	default:
+		while (waitpid(pid, &status, 0) == -1 &&
+		       errno == EINTR)
+			;
+
+		return status;
+	}
+}
+
+static inline pid_t do_fork_bg_with_pipes(void (*test_to_run)(void), int *out, int *err)
+{
+	int outfd[2], errfd[2];
+	pid_t pid;
+
+	internal_assert(pipe(outfd) != -1);
+	internal_assert(pipe(errfd) != -1);
+
+	pid = fork();
+	internal_assert(pid != -1);
+
+	if (pid == 0) {
+		while (dup2(outfd[1], STDOUT_FILENO) == -1 && errno == EINTR) {}
+		while (dup2(errfd[1], STDERR_FILENO) == -1 && errno == EINTR) {}
+
+		close(outfd[0]);
+		close(outfd[1]);
+		close(errfd[0]);
+		close(errfd[1]);
+
+		test_to_run();
+
+		exit(-1);
+	} else {
+		/* close the writing ends */
+		close(outfd[1]);
+		close(errfd[1]);
+
+		*out = outfd[0];
+		*err = errfd[0];
+
+		return pid;
+	}
+}
+
+static inline int safe_wait(pid_t pid, int *status) {
+	int ret;
+
+	do {
+		ret = waitpid(pid, status, 0);
+	} while (ret == -1 && errno == EINTR);
+
+	return ret;
+}
+
+static inline void assert_pipe_empty(int fd)
+{
+	char buf[5];
+	internal_assert(0 == read(fd, buf, sizeof(buf)));
+}
+
+static inline void read_whole_pipe(int fd, char *buf, size_t buflen)
+{
+	ssize_t readlen;
+	off_t offset;
+
+	offset = 0;
+	while ((readlen = read(fd, buf+offset, buflen-offset))) {
+		if (readlen == -1) {
+			if (errno == EINTR) {
+				continue;
+			} else {
+				printf("read failed with %s\n", strerror(errno));
+				exit(1);
+			}
+		}
+		internal_assert(readlen != -1);
+		offset += readlen;
+	}
 }
 #endif

@@ -38,8 +38,6 @@
 
 #include "igt_tests_common.h"
 
-char test[] = "test";
-char *argv_run[] = { test };
 void (*test_to_run)(void) = NULL;
 
 /*
@@ -55,26 +53,17 @@ void (*test_to_run)(void) = NULL;
 	exec_total++; \
 }
 
-static int do_fork(void)
+static void fake_test(void)
 {
-	int pid, status;
-	int argc;
+	char test[] = "test";
+	char *argv_run[] = { test };
+	int argc = ARRAY_SIZE(argv_run);
 
-	switch (pid = fork()) {
-	case -1:
-		internal_assert(0);
-	case 0:
-		argc = ARRAY_SIZE(argv_run);
-		igt_simple_init(argc, argv_run);
-		test_to_run();
-		igt_exit();
-	default:
-		while (waitpid(pid, &status, 0) == -1 &&
-		       errno == EINTR)
-			;
+	igt_simple_init(argc, argv_run);
 
-		return status;
-	}
+	test_to_run();
+
+	igt_exit();
 }
 
 static void test_cmpint_negative(void)
@@ -150,7 +139,7 @@ igt_main
 	 * we inherit the state from the parent, so ...
 	 */
 	test_to_run = test_cmpint_negative;
-	ret = do_fork();
+	ret = do_fork(fake_test);
 	igt_subtest("igt_cmpint_negative")
 		internal_assert_wexited(ret, IGT_EXIT_FAILURE);
 
@@ -158,7 +147,7 @@ igt_main
 		test_fd();
 
 	test_to_run = test_fd_negative;
-	ret = do_fork();
+	ret = do_fork(fake_test);
 	igt_subtest("igt_assert_fd_negative")
 		internal_assert_wexited(ret, IGT_EXIT_FAILURE);
 }

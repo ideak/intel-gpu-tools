@@ -35,36 +35,51 @@
 #include "igt_tests_common.h"
 
 char test[] = "test";
-char *argv_run[] = { test };
+char *fake_argv[] = { test };
+int fake_argc = ARRAY_SIZE(fake_argv);
 
 static void igt_fork_vs_skip(void)
 {
+	igt_simple_init(fake_argc, fake_argv);
+
 	igt_fork(i, 1) {
 		igt_skip("skipping");
 	}
 
 	igt_waitchildren();
+
+	igt_exit();
 }
 
 static void igt_fork_vs_assert(void)
 {
+	igt_simple_init(fake_argc, fake_argv);
+
 	igt_fork(i, 1) {
 		igt_assert(0);
 	}
 
 	igt_waitchildren();
+
+	igt_exit();
 }
 
 static void igt_fork_leak(void)
 {
+	igt_simple_init(fake_argc, fake_argv);
+
 	igt_fork(i, 1) {
 		sleep(10);
 	}
+
+	igt_exit();
 }
 
 static void plain_fork_leak(void)
 {
 	int pid;
+
+	igt_simple_init(fake_argc, fake_argv);
 
 	switch (pid = fork()) {
 	case -1:
@@ -74,59 +89,21 @@ static void plain_fork_leak(void)
 	default:
 		exit(0);
 	}
+
+	igt_exit();
 }
 
 static void igt_fork_timeout_leak(void)
 {
+	igt_simple_init(fake_argc, fake_argv);
+
 	igt_fork(i, 1) {
 		sleep(10);
 	}
 
 	igt_waitchildren_timeout(1, "library test");
-}
 
-static int do_fork(void (*test_to_run)(void))
-{
-	int pid, status;
-	int argc;
-
-	switch (pid = fork()) {
-	case -1:
-		internal_assert(0);
-	case 0:
-		argc = ARRAY_SIZE(argv_run);
-		igt_simple_init(argc, argv_run);
-		test_to_run();
-		igt_exit();
-	default:
-		while (waitpid(pid, &status, 0) == -1 &&
-		       errno == EINTR)
-			;
-
-		return status;
-	}
-}
-
-static int do_subtest(void (*test_to_run)(void))
-{
-	int pid, status;
-	int argc;
-
-	switch (pid = fork()) {
-	case -1:
-		internal_assert(0);
-	case 0:
-		argc = ARRAY_SIZE(argv_run);
-		igt_subtest_init(argc, argv_run);
-		test_to_run();
-		igt_exit();
-	default:
-		while (waitpid(pid, &status, 0) == -1 &&
-		       errno == EINTR)
-			;
-
-		return status;
-	}
+	igt_exit();
 }
 
 static void subtest_leak(void)
@@ -134,6 +111,8 @@ static void subtest_leak(void)
 	pid_t *children =
 		mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	const int num_children = 4096 / sizeof(*children);
+
+	igt_subtest_init(fake_argc, fake_argv);
 
 	igt_subtest("fork-leak") {
 		igt_fork(child, num_children)
@@ -148,6 +127,8 @@ static void subtest_leak(void)
 		assert(kill(children[i], 0) == -1 && errno == ESRCH);
 
 	munmap(children, 4096);
+
+	igt_exit();
 }
 
 int main(int argc, char **argv)
@@ -174,6 +155,6 @@ int main(int argc, char **argv)
 	ret = do_fork(plain_fork_leak);
 	internal_assert_wsignaled(ret, SIGABRT);
 
-	ret = do_subtest(subtest_leak);
+	ret = do_fork(subtest_leak);
 	internal_assert_wexited(ret, IGT_EXIT_FAILURE); /* not asserted! */
 }

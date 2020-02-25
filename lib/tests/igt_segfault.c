@@ -48,51 +48,38 @@
 bool simple;
 bool runa;
 bool runc;
-char test[] = "test";
-char *argv_run[] = { test };
 
 static void crashme(void)
 {
 	raise(SIGSEGV);
 }
 
-static int do_fork(void)
+static void fake_test(void)
 {
-	int pid, status;
-	int argc;
+	char prog[] = "test";
+	char *fake_argv[] = { prog };
+	int fake_argc = ARRAY_SIZE(fake_argv);
 
-	switch (pid = fork()) {
-	case -1:
-		internal_assert(0);
-	case 0:
-		argc = ARRAY_SIZE(argv_run);
-		if (simple) {
-			igt_simple_init(argc, argv_run);
+
+	if (simple) {
+		igt_simple_init(fake_argc, fake_argv);
+		crashme();
+
+		igt_exit();
+	} else {
+		igt_subtest_init(fake_argc, fake_argv);
+		if(runa)
+			igt_subtest("A")
+				;
+
+		igt_subtest("B")
 			crashme();
 
-			igt_exit();
-		} else {
-			igt_subtest_init(argc, argv_run);
+		if(runc)
+			igt_subtest("C")
+				;
 
-			if(runa)
-				igt_subtest("A")
-					;
-
-			igt_subtest("B")
-				crashme();
-
-			if(runc)
-				igt_subtest("C")
-					;
-
-			igt_exit();
-		}
-	default:
-		while (waitpid(pid, &status, 0) == -1 &&
-		       errno == EINTR)
-			;
-
-		return status;
+		igt_exit();
 	}
 }
 
@@ -104,20 +91,20 @@ int main(int argc, char **argv)
 	runc=false;
 	igt_info("Simple test.\n");
 	fflush(stdout);
-	internal_assert_wsignaled(do_fork(), SIGSEGV);
+	internal_assert_wsignaled(do_fork(fake_test), SIGSEGV);
 
 	/* Test crash in a single subtest is reported */
 	simple = false;
 	igt_info("Single subtest.\n");
 	fflush(stdout);
-	internal_assert_wexited(do_fork(), SIGSEGV + 128);
+	internal_assert_wexited(do_fork(fake_test), SIGSEGV + 128);
 
 	/* Test crash in a subtest following a pass is reported */
 	simple = false;
 	runa=true;
 	igt_info("Passing then crashing subtest.\n");
 	fflush(stdout);
-	internal_assert_wexited(do_fork(), SIGSEGV + 128);
+	internal_assert_wexited(do_fork(fake_test), SIGSEGV + 128);
 
 	/* Test crash in a subtest preceeding a pass is reported */
 	simple = false;
@@ -125,7 +112,7 @@ int main(int argc, char **argv)
 	runc=true;
 	igt_info("Crashing then passing subtest.\n");
 	fflush(stdout);
-	internal_assert_wexited(do_fork(), SIGSEGV + 128);
+	internal_assert_wexited(do_fork(fake_test), SIGSEGV + 128);
 
 	return 0;
 }

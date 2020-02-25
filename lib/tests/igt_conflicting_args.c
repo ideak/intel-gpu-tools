@@ -43,24 +43,11 @@ static int opt_handler(int option, int option_index, void *input)
 	return 0;
 }
 
-static int do_fork(void)
+static void fake_test(void)
 {
 	char test_name[] = "test";
-
 	char *argv[] = { test_name };
 	int argc = ARRAY_SIZE(argv);
-
-	pid_t pid = fork();
-	internal_assert(pid != -1);
-
-	if (pid) {
-		int status;
-		while (waitpid(pid, &status, 0) == -1 && errno == EINTR)
-			;
-
-		return status;
-	}
-
 
 	igt_subtest_init_parse_opts(&argc, argv, short_options, long_options,
 				    "", opt_handler, NULL);
@@ -73,27 +60,27 @@ int main(int argc, char **argv)
 	/* no conflict */
 	long_options[0] = (struct option) { "iterations", required_argument, NULL, 'i'};
 	short_options = "";
-	internal_assert_wexited(do_fork(), 0);
+	internal_assert_wexited(do_fork(fake_test), 0);
 
 	/* conflict on short option */
 	long_options[0] = (struct option) { "iterations", required_argument, NULL, 'i'};
 	short_options = "h";
-	internal_assert_wsignaled(do_fork(), SIGABRT);
+	internal_assert_wsignaled(do_fork(fake_test), SIGABRT);
 
 	/* conflict on long option name */
 	long_options[0] = (struct option) { "help", required_argument, NULL, 'i'};
 	short_options = "";
-	internal_assert_wsignaled(do_fork(), SIGABRT);
+	internal_assert_wsignaled(do_fork(fake_test), SIGABRT);
 
 	/* conflict on long option 'val' representation vs short option */
 	long_options[0] = (struct option) { "iterations", required_argument, NULL, 'h'};
 	short_options = "";
-	internal_assert_wsignaled(do_fork(), SIGABRT);
+	internal_assert_wsignaled(do_fork(fake_test), SIGABRT);
 
 	/* conflict on long option 'val' representations */
 	long_options[0] = (struct option) { "iterations", required_argument, NULL, 500};
 	short_options = "";
-	internal_assert_wsignaled(do_fork(), SIGABRT);
+	internal_assert_wsignaled(do_fork(fake_test), SIGABRT);
 
 	return 0;
 }

@@ -60,24 +60,6 @@ static void nonexisting_subtest(void)
 	igt_exit();
 }
 
-static int do_fork(void (*test_to_run)(void))
-{
-	int pid, status;
-
-	switch (pid = fork()) {
-	case -1:
-		internal_assert(0);
-	case 0:
-		test_to_run();
-	default:
-		while (waitpid(pid, &status, 0) == -1 &&
-		       errno == EINTR)
-			;
-
-		return status;
-	}
-}
-
 int main(int argc, char **argv)
 {
 	int ret;
