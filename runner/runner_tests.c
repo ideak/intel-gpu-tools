@@ -32,6 +32,23 @@ static const char testdatadir[] = TESTDATA_DIRECTORY;
 /* The total number of test binaries in runner/testdata/ */
 #define NUM_TESTDATA_BINARIES 4
 
+static const char *igt_get_result(struct json_object *tests, const char* testname)
+{
+	struct json_object *obj;
+
+	igt_assert(json_object_object_get_ex(tests, testname, &obj));
+	igt_assert(json_object_object_get_ex(obj, "result", &obj));
+
+	return json_object_get_string(obj);
+}
+
+static void igt_assert_no_result_for(struct json_object *tests, const char* testname)
+{
+	struct json_object *obj;
+	igt_assert(!json_object_object_get_ex(tests, testname, &obj));
+}
+
+
 static void igt_assert_eqstr(const char *one, const char *two)
 {
 	if (one == NULL && two == NULL)
@@ -1438,7 +1455,7 @@ igt_main
 
 		igt_subtest("dynamic-subtests-in-testlist") {
 			struct execute_state state;
-			struct json_object *results, *obj;
+			struct json_object *results, *tests;
 			const char *argv[] = { "runner",
 					       "--test-list", filename,
 					       testdatadir,
@@ -1459,16 +1476,13 @@ igt_main
 			igt_assert_f((results = generate_results_json(dirfd)) != NULL,
 				     "Results parsing failed\n");
 
-			obj = results;
-			igt_assert(json_object_object_get_ex(obj, "tests", &obj));
+			igt_assert(json_object_object_get_ex(results, "tests", &tests));
 
 			/* Check that the dynamic subtest we didn't request is not reported */
-			igt_assert(!json_object_object_get_ex(obj, "igt@dynamic@dynamic-subtest@failing", NULL));
+			igt_assert_no_result_for(tests, "igt@dynamic@dynamic-subtest@failing");
 
 			/* Check that the dynamic subtest we did request is */
-			igt_assert(json_object_object_get_ex(obj, "igt@dynamic@dynamic-subtest@passing", &obj));
-			igt_assert(json_object_object_get_ex(obj, "result", &obj));
-			igt_assert_eqstr(json_object_get_string(obj), "pass");
+			igt_assert_eqstr(igt_get_result(tests, "igt@dynamic@dynamic-subtest@passing"), "pass");
 
 			igt_assert_eq(json_object_put(results), 1);
 		}
@@ -1496,7 +1510,7 @@ igt_main
 
 		igt_subtest("dynamic-subtest-failure-should-not-cause-warn") {
 			struct execute_state state;
-			struct json_object *results, *obj;
+			struct json_object *results, *tests;
 			const char *argv[] = { "runner",
 					       "-t", "dynamic",
 					       testdatadir,
@@ -1513,12 +1527,9 @@ igt_main
 			igt_assert_f((results = generate_results_json(dirfd)) != NULL,
 				     "Results parsing failed\n");
 
-			obj = results;
-			igt_assert(json_object_object_get_ex(obj, "tests", &obj));
-			igt_assert(json_object_object_get_ex(obj, "igt@dynamic@dynamic-subtest@passing", &obj));
-			igt_assert(json_object_object_get_ex(obj, "result", &obj));
+			igt_assert(json_object_object_get_ex(results, "tests", &tests));
 
-			igt_assert_eqstr(json_object_get_string(obj), "pass");
+			igt_assert_eqstr(igt_get_result(tests, "igt@dynamic@dynamic-subtest@passing"), "pass");
 
 			igt_assert_eq(json_object_put(results), 1);
 		}
