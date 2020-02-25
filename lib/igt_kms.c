@@ -58,6 +58,9 @@
 #include "igt_device.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+#ifdef HAVE_CHAMELIUM
+#include "igt_chamelium.h"
+#endif
 
 /**
  * SECTION:igt_kms
@@ -1885,6 +1888,21 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 	resources = drmModeGetResources(display->drm_fd);
 	if (!resources)
 		goto out;
+
+#ifdef HAVE_CHAMELIUM
+	{
+		struct chamelium *chamelium;
+
+		chamelium = chamelium_init_rpc_only();
+		if (chamelium) {
+			igt_abort_on_f(!chamelium_wait_reachable(chamelium, 20),
+				       "cannot reach the configured chamelium!\n");
+			igt_abort_on_f(!chamelium_plug_all(chamelium),
+				       "failed to plug all the chamelium ports!\n");
+			chamelium_deinit_rpc_only(chamelium);
+		}
+	}
+#endif
 
 	/*
 	 * We cache the number of pipes, that number is a physical limit of the

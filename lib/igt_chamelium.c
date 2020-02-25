@@ -1977,7 +1977,13 @@ static size_t chamelium_get_video_ports(struct chamelium *chamelium,
 	int res_len, i, port_id;
 	size_t port_ids_len = 0;
 
-	res = chamelium_rpc(chamelium, NULL, "GetSupportedInputs", "()");
+	res = __chamelium_rpc(chamelium, NULL, "GetSupportedInputs", "()");
+	if (chamelium->env.fault_occurred) {
+		igt_debug("Chamelium RPC call failed: %s\n",
+		     chamelium->env.fault_string);
+
+		return -1;
+	}
 	res_len = xmlrpc_array_size(&chamelium->env, res);
 	for (i = 0; i < res_len; i++) {
 		xmlrpc_array_read_item(&chamelium->env, res, i, &res_port);
@@ -2180,6 +2186,8 @@ static bool chamelium_autodiscover(struct chamelium *chamelium, int drm_fd)
 	candidate_ports_len = chamelium_get_video_ports(chamelium,
 							candidate_ports);
 
+	igt_assert(candidate_ports_len > 0);
+
 	igt_debug("Starting Chamelium port auto-discovery on %zu ports\n",
 		  candidate_ports_len);
 	igt_gettime(&start);
@@ -2298,14 +2306,14 @@ static bool chamelium_read_config(struct chamelium *chamelium)
 	GError *error = NULL;
 
 	if (!igt_key_file) {
-		igt_warn("No configuration file available for chamelium\n");
+		igt_debug("No configuration file available for chamelium\n");
 		return false;
 	}
 
 	chamelium->url = g_key_file_get_string(igt_key_file, "Chamelium", "URL",
 					       &error);
 	if (!chamelium->url) {
-		igt_warn("Couldn't read chamelium URL from config file: %s\n",
+		igt_debug("Couldn't read chamelium URL from config file: %s\n",
 			 error->message);
 		return false;
 	}
@@ -2401,6 +2409,9 @@ error:
  * Chamelium configuration. This must be called first before trying to use the
  * chamelium.
  *
+ * Needs to happen *after* igt_display_require() as otherwise the board will
+ * get reset.
+ *
  * If we fail to establish a connection with the chamelium, fail to find a
  * configured connector, etc. we fail the current test.
  *
@@ -2478,6 +2489,44 @@ void chamelium_deinit(struct chamelium *chamelium)
 		free(chamelium->ports[i].name);
 
 	free(chamelium);
+}
+
+bool chamelium_plug_all(struct chamelium *chamelium)
+{
+	size_t port_count;
+	int port_ids[CHAMELIUM_MAX_PORTS];
+	xmlrpc_value *v;
+	v = __chamelium_rpc(chamelium, NULL, "Reset", "()");
+
+	if (v != NULL)
+		xmlrpc_DECREF(v);
+
+	if (chamelium->env.fault_occurred) {
+		igt_debug("Chamelium RPC call failed: %s\n",
+		     chamelium->env.fault_string);
+
+		return false;
+	}
+
+	port_count = chamelium_get_video_ports(chamelium, port_ids);
+	if (port_count <= 0)
+		return false;
+
+	for (int i = 0; i < port_count; ++i) {
+		v = __chamelium_rpc(chamelium, NULL, "Plug", "(i)", port_ids[i]);
+
+		if (v != NULL)
+			xmlrpc_DECREF(v);
+
+		if (chamelium->env.fault_occurred) {
+			igt_debug("Chamelium RPC call failed: %s\n",
+			     chamelium->env.fault_string);
+
+			return false;
+		}
+	}
+
+	return true;
 }
 
 igt_constructor {

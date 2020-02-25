@@ -214,5 +214,6 @@ void chamelium_crop_analog_frame(struct chamelium_frame_dump *dump, int width,
 void chamelium_destroy_frame_dump(struct chamelium_frame_dump *dump);
 void chamelium_destroy_audio_file(struct chamelium_audio_file *audio_file);
 void chamelium_infoframe_destroy(struct chamelium_infoframe *infoframe);
+bool chamelium_plug_all(struct chamelium *chamelium);
 
 #endif /* IGT_CHAMELIUM_H */

@@ -2486,7 +2486,14 @@ igt_main
 	size_t i;
 
 	igt_fixture {
+		/* So fbcon doesn't try to reprobe things itself */
+		kmstest_set_vt_graphics_mode();
+
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
+		igt_display_require(&data.display, data.drm_fd);
+		igt_require(data.display.is_atomic);
+
+		/* we need to initalize chamelium after igt_display_require */
 		data.chamelium = chamelium_init(data.drm_fd);
 		igt_require(data.chamelium);
 
@@ -2497,12 +2504,6 @@ igt_main
 			data.edids[i] = chamelium_new_edid(data.chamelium,
 							   get_edid(i));
 		}
-
-		/* So fbcon doesn't try to reprobe things itself */
-		kmstest_set_vt_graphics_mode();
-
-		igt_display_require(&data.display, data.drm_fd);
-		igt_require(data.display.is_atomic);
 	}
 
 	igt_describe("DisplayPort tests");
