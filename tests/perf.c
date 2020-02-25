@@ -4489,7 +4489,8 @@ igt_main
 		 */
 		igt_assert_eq(drm_fd, -1);
 
-		drm_fd = drm_open_driver(DRIVER_INTEL);
+		/* Avoid the normal exithandler, our perf-fd interferes */
+		drm_fd = __drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(drm_fd);
 
 		devid = intel_get_drm_devid(drm_fd);
