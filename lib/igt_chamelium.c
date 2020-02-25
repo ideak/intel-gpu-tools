@@ -374,11 +374,29 @@ static bool __chamelium_is_reachable(struct chamelium *chamelium)
 	return true;
 }
 
-void chamelium_wait_reachable(struct chamelium *chamelium, int timeout)
+/**
+ * chamelium_wait_reachable:
+ * @chamelium: The Chamelium instance to use
+ * @timeout: Time (in seconds) to wait for chamelium to be reachable
+ *
+ * Returns: %true if the Chamelium is reachable, %false otherwise.
+ */
+bool chamelium_wait_reachable(struct chamelium *chamelium, int timeout)
 {
-	bool chamelium_online = igt_wait(__chamelium_is_reachable(chamelium),
-					 timeout * 1000, 100);
+	return igt_wait(__chamelium_is_reachable(chamelium),
+			timeout * 1000, 100);
+}
 
+/**
+ * chamelium_assert_reachable:
+ * @chamelium: The Chamelium instance to use
+ * @timeout: Time (in seconds) to wait for chamelium to be reachable
+ *
+ * Asserts that the chamelium is reachable.
+ */
+void chamelium_assert_reachable(struct chamelium *chamelium, int timeout)
+{
+	bool chamelium_online = chamelium_wait_reachable(chamelium, timeout);
 	igt_assert_f(chamelium_online,
 		     "Couldn't connect to Chamelium for %ds", timeout);
 }
