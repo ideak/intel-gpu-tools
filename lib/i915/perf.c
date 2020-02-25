@@ -116,6 +116,13 @@ eu_available(const struct drm_i915_query_topology_info *topo,
 			   eu / 8] >> (eu % 8)) & 1;
 }
 
+static struct intel_perf *
+unsupported_i915_perf_platform(struct intel_perf *perf)
+{
+	intel_perf_free(perf);
+	return NULL;
+}
+
 struct intel_perf *
 intel_perf_for_devinfo(uint32_t device_id,
 		       uint32_t revision,
@@ -193,7 +200,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 			intel_perf_load_metrics_sklgt4(perf);
 			break;
 		default:
-			assert(0); /* unreachable */
+			return unsupported_i915_perf_platform(perf);
 		}
 	} else if (devinfo->is_broxton) {
 		perf->devinfo.eu_threads_count = 6;
@@ -207,7 +214,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 			intel_perf_load_metrics_kblgt3(perf);
 			break;
 		default:
-			assert(0); /* unreachable */
+			return unsupported_i915_perf_platform(perf);
 		}
 	} else if (devinfo->is_geminilake) {
 		perf->devinfo.eu_threads_count = 6;
@@ -221,7 +228,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 			intel_perf_load_metrics_cflgt3(perf);
 			break;
 		default:
-			assert(0); /* unreachable */
+			return unsupported_i915_perf_platform(perf);
 		}
 	} else if (devinfo->is_cannonlake) {
 		intel_perf_load_metrics_cnl(perf);
@@ -232,7 +239,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 	} else if (devinfo->is_tigerlake) {
 		intel_perf_load_metrics_tgl(perf);
 	} else {
-		assert(0); /* unreachable */
+		return unsupported_i915_perf_platform(perf);
 	}
 
 	return perf;
