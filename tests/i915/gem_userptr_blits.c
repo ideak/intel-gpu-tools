@@ -722,7 +722,8 @@ static void test_forked_access(int fd)
 				  MAP_FIXED_INVALIDATE_BUSY | \
 				  MAP_FIXED_INVALIDATE_GET_PAGES)
 
-static int test_map_fixed_invalidate(int fd, uint32_t flags)
+static int test_map_fixed_invalidate(int fd, uint32_t flags,
+				     const struct mmap_offset *t)
 {
 	const size_t ptr_size = sizeof(linear) + 2*PAGE_SIZE;
 	const int num_handles = (flags & MAP_FIXED_INVALIDATE_OVERLAP) ? 2 : 1;
@@ -741,7 +742,7 @@ static int test_map_fixed_invalidate(int fd, uint32_t flags)
 	for (char *fixed = (char *)ptr, *end = fixed + ptr_size;
 	     fixed + 2*PAGE_SIZE <= end;
 	     fixed += PAGE_SIZE) {
-		struct drm_i915_gem_mmap_gtt mmap_gtt;
+		struct drm_i915_gem_mmap_offset mmap_offset;
 		uint32_t *map;
 
 		map = mmap(ptr, ptr_size, PROT_READ | PROT_WRITE,
@@ -750,9 +751,13 @@ static int test_map_fixed_invalidate(int fd, uint32_t flags)
 		igt_assert(map != MAP_FAILED);
 		igt_assert(map == ptr);
 
-		memset(&mmap_gtt, 0, sizeof(mmap_gtt));
-		mmap_gtt.handle = gem_create(fd, 2*PAGE_SIZE);
-		do_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &mmap_gtt);
+		memset(&mmap_offset, 0, sizeof(mmap_offset));
+		mmap_offset.handle = gem_create(fd, 2 * PAGE_SIZE);
+		mmap_offset.flags = t->type;
+		igt_skip_on_f(igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET,
+					&mmap_offset),
+			      "HW & kernel support for mmap_offset(%s)\n",
+			      t->name);
 
 		if (flags & MAP_FIXED_INVALIDATE_GET_PAGES)
 			igt_assert_eq(__gem_set_domain(fd, handle[0],
@@ -766,11 +771,11 @@ static int test_map_fixed_invalidate(int fd, uint32_t flags)
 		map = mmap(fixed, 2*PAGE_SIZE,
 			   PROT_READ | PROT_WRITE,
 			   MAP_SHARED | MAP_FIXED,
-			   fd, mmap_gtt.offset);
+			   fd, mmap_offset.offset);
 		igt_assert(map != MAP_FAILED);
 		igt_assert(map == (uint32_t *)fixed);
 
-		gem_set_tiling(fd, mmap_gtt.handle, I915_TILING_NONE, 0);
+		gem_set_tiling(fd, mmap_offset.handle, I915_TILING_NONE, 0);
 		*map = 0xdead;
 
 		if (flags & MAP_FIXED_INVALIDATE_GET_PAGES) {
@@ -784,10 +789,10 @@ static int test_map_fixed_invalidate(int fd, uint32_t flags)
 			handle[0] = create_userptr(fd, 0, ptr + PAGE_SIZE/sizeof(*ptr));
 		}
 
-		gem_set_tiling(fd, mmap_gtt.handle, I915_TILING_Y, 512 * 4);
+		gem_set_tiling(fd, mmap_offset.handle, I915_TILING_Y, 512 * 4);
 		*(uint32_t*)map = 0xbeef;
 
-		gem_close(fd, mmap_gtt.handle);
+		gem_close(fd, mmap_offset.handle);
 	}
 
 	for (int i = 0; i < num_handles; i++)
@@ -2196,11 +2201,21 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 			test_invalidate_close_race(fd, true, 2);
 
 		for (unsigned flags = 0; flags < ALL_MAP_FIXED_INVALIDATE + 1; flags++) {
-			igt_subtest_f("map-fixed-invalidate%s%s%s",
-				      flags & MAP_FIXED_INVALIDATE_OVERLAP ? "-overlap" : "",
-				      flags & MAP_FIXED_INVALIDATE_BUSY ? "-busy" : "",
-				      flags & MAP_FIXED_INVALIDATE_GET_PAGES ? "-gup" : "") {
-				test_map_fixed_invalidate(fd, flags);
+			igt_describe("Try to anger lockdep with MMU notifier still active after MAP_FIXED remap");
+			igt_subtest_with_dynamic_f("map-fixed-invalidate%s%s%s",
+					flags & MAP_FIXED_INVALIDATE_OVERLAP ?
+							"-overlap" : "",
+					flags & MAP_FIXED_INVALIDATE_BUSY ?
+							"-busy" : "",
+					flags & MAP_FIXED_INVALIDATE_GET_PAGES ?
+							"-gup" : "") {
+				igt_require_f(gem_available_fences(fd),
+					      "HW & kernel support for tiling\n");
+
+				for_each_mmap_offset_type(fd, t)
+					igt_dynamic_f("%s", t->name)
+						test_map_fixed_invalidate(fd,
+								      flags, t);
 			}
 		}
 
