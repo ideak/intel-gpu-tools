@@ -219,7 +219,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 	} else if (devinfo->is_geminilake) {
 		perf->devinfo.eu_threads_count = 6;
 		intel_perf_load_metrics_glk(perf);
-	} else if (devinfo->is_coffeelake) {
+	} else if (devinfo->is_coffeelake || devinfo->is_cometlake) {
 		switch (devinfo->gt) {
 		case 2:
 			intel_perf_load_metrics_cflgt2(perf);
