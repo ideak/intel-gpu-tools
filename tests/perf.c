@@ -85,6 +85,8 @@ IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 
 #define MAX_OA_BUF_SIZE (16 * 1024 * 1024)
 
+#define NUM_PROPERTIES(p) (sizeof(p) / (2 * sizeof(uint64_t)))
+
 struct accumulator {
 #define MAX_RAW_OA_COUNTERS 62
 	enum drm_i915_oa_format format;
@@ -3999,6 +4001,40 @@ test_rc6_disable(void)
 	igt_assert_neq(n_events_end - n_events_start, 0);
 }
 
+static void
+test_stress_open_close(void)
+{
+	load_helper_init();
+	load_helper_run(HIGH);
+
+	igt_until_timeout(2) {
+		int oa_exponent = 5; /* 5 micro seconds */
+		uint64_t properties[] = {
+			/* XXX: even without periodic sampling we have to
+			 * specify at least one sample layout property...
+			 */
+			DRM_I915_PERF_PROP_SAMPLE_OA, true,
+
+			/* OA unit configuration */
+			DRM_I915_PERF_PROP_OA_METRICS_SET, test_set->perf_oa_metrics_set,
+			DRM_I915_PERF_PROP_OA_FORMAT, test_set->perf_oa_format,
+			DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
+		};
+		struct drm_i915_perf_open_param param = {
+			.flags = I915_PERF_FLAG_FD_CLOEXEC |
+			         I915_PERF_FLAG_DISABLED, /* XXX: open disabled */
+			.num_properties = NUM_PROPERTIES(properties),
+			.properties_ptr = to_user_pointer(properties),
+		};
+
+		stream_fd = __perf_open(drm_fd, &param, false);
+		__perf_close(stream_fd);
+	}
+
+	load_helper_stop();
+	load_helper_fini();
+}
+
 static int __i915_perf_add_config(int fd, struct drm_i915_perf_oa_config *config)
 {
 	int ret = igt_ioctl(fd, DRM_IOCTL_I915_PERF_ADD_CONFIG, config);
@@ -4594,6 +4630,10 @@ igt_main
 
 	igt_subtest("rc6-disable")
 		test_rc6_disable();
+
+	igt_describe("Stress tests opening & closing the i915-perf stream in a busy loop");
+	igt_subtest("stress-open-close")
+		test_stress_open_close();
 
 	igt_subtest("invalid-create-userspace-config")
 		test_invalid_create_userspace_config();
