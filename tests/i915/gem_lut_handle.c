@@ -41,10 +41,6 @@
 IGT_TEST_DESCRIPTION("Exercises the basic execbuffer using the handle LUT"
 		     " interface.");
 
-#define BATCH_SIZE		(1024*1024)
-
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
 #define NORMAL 0
 #define USE_LUT 0x1
 #define BROKEN 0x2
@@ -80,7 +76,7 @@ static int exec(int fd, uint32_t handle, unsigned int flags)
 	execbuf.num_cliprects = 0;
 	execbuf.DR1 = 0;
 	execbuf.DR4 = 0;
-	execbuf.flags = flags & USE_LUT ? LOCAL_I915_EXEC_HANDLE_LUT : 0;
+	execbuf.flags = flags & USE_LUT ? I915_EXEC_HANDLE_LUT : 0;
 	i915_execbuffer2_set_context_id(execbuf, 0);
 	execbuf.rsvd2 = 0;
 
@@ -147,7 +143,7 @@ static int many_exec(int fd, uint32_t batch, int num_exec, int num_reloc, unsign
 	execbuf.num_cliprects = 0;
 	execbuf.DR1 = 0;
 	execbuf.DR4 = 0;
-	execbuf.flags = flags & USE_LUT ? LOCAL_I915_EXEC_HANDLE_LUT : 0;
+	execbuf.flags = flags & USE_LUT ? I915_EXEC_HANDLE_LUT : 0;
 	i915_execbuffer2_set_context_id(execbuf, 0);
 	execbuf.rsvd2 = 0;
 
