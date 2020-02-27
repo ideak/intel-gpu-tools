@@ -54,7 +54,6 @@ typedef struct {
 	igt_display_t display;
 	struct igt_fb fb;
 	struct igt_fb fb_reference;
-	struct igt_fb fb_unrotated;
 	struct igt_fb fb_flip;
 	igt_crc_t ref_crc;
 	igt_crc_t flip_crc;
@@ -156,7 +155,6 @@ static void remove_fbs(data_t *data)
 {
 	igt_remove_fb(data->gfx_fd, &data->fb);
 	igt_remove_fb(data->gfx_fd, &data->fb_reference);
-	igt_remove_fb(data->gfx_fd, &data->fb_unrotated);
 	igt_remove_fb(data->gfx_fd, &data->fb_flip);
 }
 
@@ -304,17 +302,6 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &data->ref_crc);
-
-	/*
-	 * Prepare the non-rotated reference fb.
-	 */
-	igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format, tiling, &data->fb_unrotated);
-	paint_squares(data, IGT_ROTATION_0, &data->fb_unrotated, 1.0);
-	igt_plane_set_fb(plane, &data->fb_unrotated);
-	igt_plane_set_rotation(plane, IGT_ROTATION_0);
-	if (plane->type != DRM_PLANE_TYPE_CURSOR)
-		igt_plane_set_position(plane, data->pos_x, data->pos_y);
-	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	/*
 	 * Prepare the plane with an non-rotated fb let the hw rotate it.
