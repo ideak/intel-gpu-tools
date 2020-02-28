@@ -442,7 +442,7 @@ static void test_noreloc(int fd, enum sleep sleep)
 	uint64_t offset;
 	uint32_t handle;
 	uint32_t *batch, *b;
-	int i, loop;
+	int i, loop = 0;
 
 	handle = gem_create(fd, (ARRAY_SIZE(object)+1)*size);
 	gem_write(fd, handle, 0, &bbe, sizeof(bbe));
@@ -494,11 +494,11 @@ static void test_noreloc(int fd, enum sleep sleep)
 	munmap(batch, size);
 
 	execbuf.buffer_count = ARRAY_SIZE(object);
-	for (loop = 0; loop < 1024; loop++) {
+	igt_until_timeout(5) {
 		igt_permute_array(object, ARRAY_SIZE(object)-1, xchg_offset);
 		gem_execbuf(fd, &execbuf);
 
-		if ((loop & 127) == 0) {
+		if ((loop++ & 127) == 0) {
 			switch (sleep) {
 			case NOSLEEP:
 				break;
