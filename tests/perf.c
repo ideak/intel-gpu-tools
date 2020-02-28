@@ -4140,6 +4140,181 @@ test_stress_open_close(void)
 	load_helper_fini();
 }
 
+static uint64_t mask_minus_one(uint64_t mask)
+{
+	unsigned int i;
+
+	for (i = 0; i < (sizeof(mask) * 8 - 1); i++) {
+		if ((1ULL << i) & mask)
+			return mask & ~(1ULL << i);
+	}
+
+	igt_assert(0);
+	return 0;
+}
+
+static uint64_t mask_plus_one(uint64_t mask)
+{
+	unsigned int i;
+
+	for (i = 0; i < (sizeof(mask) * 8 - 1); i++) {
+		if (((1ULL << i) & mask) == 0)
+			return mask | (1ULL << i);
+	}
+
+	igt_assert(0);
+	return 0;
+}
+
+static void print_sseu_config(struct drm_i915_gem_context_param_sseu *sseu)
+{
+	igt_debug("   engine class/instance=%hu:%hu\n",
+		  sseu->engine.engine_class,
+		  sseu->engine.engine_instance);
+	igt_debug("   slice_mask=0x%llx\n", sseu->slice_mask);
+	igt_debug("   subslice_mask=0x%llx\n", sseu->subslice_mask);
+	igt_debug("   eu min/max=%hu/%hu\n",
+		  sseu->min_eus_per_subslice,
+		  sseu->max_eus_per_subslice);
+}
+
+static void
+test_global_sseu_config_invalid(void)
+{
+	struct drm_i915_gem_context_param_sseu default_sseu;
+	struct drm_i915_gem_context_param_sseu sseu_param;
+	struct drm_i915_gem_context_param ctx_gp = {
+		.param = I915_CONTEXT_PARAM_SSEU,
+		.size = sizeof(default_sseu),
+		.value = to_user_pointer(&default_sseu),
+	};
+	uint64_t properties[] = {
+		/* XXX: even without periodic sampling we have to
+		 * specify at least one sample layout property...
+		 */
+		DRM_I915_PERF_PROP_SAMPLE_OA, true,
+
+		/* OA unit configuration */
+		DRM_I915_PERF_PROP_OA_METRICS_SET, test_set->perf_oa_metrics_set,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_set->perf_oa_format,
+		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exp_1_millisec,
+		DRM_I915_PERF_PROP_GLOBAL_SSEU, to_user_pointer(&sseu_param),
+	};
+	struct drm_i915_perf_open_param param = {
+		.flags = I915_PERF_FLAG_FD_CLOEXEC |
+		I915_PERF_FLAG_DISABLED, /* XXX: open disabled */
+		.num_properties = NUM_PROPERTIES(properties),
+			.properties_ptr = to_user_pointer(properties),
+	};
+
+	memset(&default_sseu, 0, sizeof(default_sseu));
+	igt_require(__gem_context_get_param(drm_fd, &ctx_gp) == 0);
+
+	igt_debug("Default context sseu:\n");
+	print_sseu_config(&default_sseu);
+
+	/* Invalid engine class */
+	sseu_param = default_sseu;
+	sseu_param.engine.engine_class = -1;
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	/* Invalid engine instance */
+	sseu_param = default_sseu;
+	sseu_param.engine.engine_instance = -1;
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	/* Invalid slice mask */
+	sseu_param = default_sseu;
+	sseu_param.slice_mask = 0;
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	sseu_param = default_sseu;
+	sseu_param.slice_mask = mask_plus_one(sseu_param.slice_mask);
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	/* Invalid subslice mask */
+	sseu_param = default_sseu;
+	sseu_param.subslice_mask = 0;
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	sseu_param = default_sseu;
+	sseu_param.subslice_mask = mask_plus_one(sseu_param.subslice_mask);
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	/* Privileged operation */
+	if (__builtin_popcount(default_sseu.subslice_mask) > 1) {
+		igt_fork(child, 1) {
+			igt_drop_root();
+
+			sseu_param = default_sseu;
+			sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
+			do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EACCES);
+		}
+		igt_waitchildren();
+	}
+}
+
+static void
+test_global_sseu_config(void)
+{
+	struct drm_i915_gem_context_param_sseu default_sseu;
+	struct drm_i915_gem_context_param_sseu sseu_param;
+	struct drm_i915_gem_context_param ctx_gp = {
+		.param = I915_CONTEXT_PARAM_SSEU,
+		.size = sizeof(default_sseu),
+		.value = to_user_pointer(&default_sseu),
+	};
+	uint64_t properties[] = {
+		/* XXX: even without periodic sampling we have to
+		 * specify at least one sample layout property...
+		 */
+		DRM_I915_PERF_PROP_SAMPLE_OA, true,
+
+		/* OA unit configuration */
+		DRM_I915_PERF_PROP_OA_METRICS_SET, test_set->perf_oa_metrics_set,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_set->perf_oa_format,
+		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exp_1_millisec,
+		DRM_I915_PERF_PROP_GLOBAL_SSEU, to_user_pointer(&sseu_param),
+	};
+	struct drm_i915_perf_open_param param = {
+		.flags = I915_PERF_FLAG_FD_CLOEXEC |
+		I915_PERF_FLAG_DISABLED, /* XXX: open disabled */
+		.num_properties = NUM_PROPERTIES(properties),
+			.properties_ptr = to_user_pointer(properties),
+	};
+
+	memset(&default_sseu, 0, sizeof(default_sseu));
+	igt_require(__gem_context_get_param(drm_fd, &ctx_gp) == 0);
+
+	igt_debug("Default context sseu:\n");
+	print_sseu_config(&default_sseu);
+
+	igt_require(__builtin_popcount(default_sseu.subslice_mask) > 1);
+
+	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 0);
+
+	igt_fork(child, 1) {
+		igt_drop_root();
+
+		sseu_param = default_sseu;
+		sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
+
+		stream_fd = __perf_open(drm_fd, &param, false);
+		__perf_close(stream_fd);
+	}
+
+	igt_waitchildren();
+
+	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
+
+
+	sseu_param = default_sseu;
+	sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
+
+	stream_fd = __perf_open(drm_fd, &param, false);
+	__perf_close(stream_fd);
+}
+
 static int __i915_perf_add_config(int fd, struct drm_i915_perf_oa_config *config)
 {
 	int ret = igt_ioctl(fd, DRM_IOCTL_I915_PERF_ADD_CONFIG, config);
@@ -4792,6 +4967,20 @@ igt_main
 	igt_describe("Stress tests opening & closing the i915-perf stream in a busy loop");
 	igt_subtest("stress-open-close")
 		test_stress_open_close();
+
+	igt_subtest_group {
+		igt_fixture {
+			igt_require(i915_perf_revision(drm_fd) >= 4);
+		}
+
+		igt_describe("Verify invalid SSEU opening parameters");
+		igt_subtest("global-sseu-config-invalid")
+			test_global_sseu_config_invalid();
+
+		igt_describe("Verify specifying SSEU opening parameters");
+		igt_subtest("global-sseu-config")
+			test_global_sseu_config();
+	}
 
 	igt_subtest("invalid-create-userspace-config")
 		test_invalid_create_userspace_config();
