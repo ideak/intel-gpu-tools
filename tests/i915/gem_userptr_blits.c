@@ -577,11 +577,11 @@ static int test_invalid_null_pointer(int fd)
 	return 0;
 }
 
-static int test_invalid_gtt_mapping(int fd)
+static int test_invalid_mapping(int fd, const struct mmap_offset *t)
 {
-	struct drm_i915_gem_mmap_gtt arg;
+	struct drm_i915_gem_mmap_offset arg;
 	uint32_t handle;
-	char *gtt, *map;
+	char *ptr, *map;
 
 	/* Anonymous mapping to find a hole */
 	map = mmap(NULL, sizeof(linear) + 2 * PAGE_SIZE,
@@ -602,28 +602,29 @@ static int test_invalid_gtt_mapping(int fd)
 	igt_assert_eq(copy(fd, handle, handle), 0);
 	gem_close(fd, handle);
 
-	/* GTT mapping */
+	/* mmap-offset mapping */
 	memset(&arg, 0, sizeof(arg));
 	arg.handle = create_bo(fd, 0);
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &arg);
-	gtt = mmap(map + PAGE_SIZE, sizeof(linear),
-		   PROT_READ | PROT_WRITE,
-		   MAP_SHARED | MAP_FIXED,
-		   fd, arg.offset);
-	igt_assert(gtt == map + PAGE_SIZE);
+	arg.flags = t->type;
+	igt_skip_on_f(igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &arg),
+		      "HW & kernel support for mmap_offset(%s)\n", t->name);
+	ptr = mmap(map + PAGE_SIZE, sizeof(linear), PROT_READ | PROT_WRITE,
+		   MAP_SHARED | MAP_FIXED, fd, arg.offset);
+	igt_assert(ptr == map + PAGE_SIZE);
 	gem_close(fd, arg.handle);
-	igt_assert(((unsigned long)gtt & (PAGE_SIZE - 1)) == 0);
+	igt_assert(((unsigned long)ptr & (PAGE_SIZE - 1)) == 0);
 	igt_assert((sizeof(linear) & (PAGE_SIZE - 1)) == 0);
 
-	gem_userptr(fd, gtt, sizeof(linear), 0, userptr_flags, &handle);
+	gem_userptr(fd, ptr, sizeof(linear), 0, userptr_flags, &handle);
 	igt_assert_eq(copy(fd, handle, handle), -EFAULT);
 	gem_close(fd, handle);
 
-	gem_userptr(fd, gtt, PAGE_SIZE, 0, userptr_flags, &handle);
+	gem_userptr(fd, ptr, PAGE_SIZE, 0, userptr_flags, &handle);
 	igt_assert_eq(copy(fd, handle, handle), -EFAULT);
 	gem_close(fd, handle);
 
-	gem_userptr(fd, gtt + sizeof(linear) - PAGE_SIZE, PAGE_SIZE, 0, userptr_flags, &handle);
+	gem_userptr(fd, ptr + sizeof(linear) - PAGE_SIZE, PAGE_SIZE, 0,
+		    userptr_flags, &handle);
 	igt_assert_eq(copy(fd, handle, handle), -EFAULT);
 	gem_close(fd, handle);
 
@@ -802,10 +803,13 @@ static int test_map_fixed_invalidate(int fd, uint32_t flags,
 	return 0;
 }
 
-static void test_mmap_offset_invalidate(int fd, const struct mmap_offset *t)
+static void test_mmap_offset_invalidate(int fd,
+					const struct mmap_offset *t,
+					unsigned int flags)
 {
-	void *ptr, *map;
 	uint32_t handle;
+	uint32_t *map;
+	void *ptr;
 
 	/* check if mmap_offset type is supported by hardware, skip if not */
 	handle = gem_create(fd, PAGE_SIZE);
@@ -827,6 +831,7 @@ static void test_mmap_offset_invalidate(int fd, const struct mmap_offset *t)
 
 	/* set object pages in order to activate MMU notifier for it */
 	gem_set_domain(fd, handle, t->domain, t->domain);
+	*map = 0;
 
 	/* trigger the notifier */
 	munmap(ptr, PAGE_SIZE);
@@ -2044,9 +2049,6 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 		igt_subtest("invalid-null-pointer")
 			test_invalid_null_pointer(fd);
 
-		igt_subtest("invalid-gtt-mapping")
-			test_invalid_gtt_mapping(fd);
-
 		igt_subtest("forked-access")
 			test_forked_access(fd);
 
@@ -2066,6 +2068,12 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 		igt_fixture {
 			igt_require(has_userptr(fd));
 		}
+
+		igt_describe("Verify unsynchronized userptr on mmap-offset mappings fails");
+		igt_subtest_with_dynamic("invalid-mmap-offset-unsync")
+			for_each_mmap_offset_type(fd, t)
+				igt_dynamic_f("%s", t->name)
+					test_invalid_mapping(fd, t);
 
 		igt_subtest("create-destroy-unsync")
 			test_create_destroy(fd, 5);
@@ -2219,11 +2227,11 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 			}
 		}
 
-		igt_describe("Invalidate pages of userptr with mmap-offset on top");
-		igt_subtest_with_dynamic("mmap-offset-invalidate")
+		igt_describe("Invalidate pages of idle userptr with mmap-offset on top");
+		igt_subtest_with_dynamic("mmap-offset-invalidate-idle")
 			for_each_mmap_offset_type(fd, t)
 				igt_dynamic_f("%s", t->name)
-					test_mmap_offset_invalidate(fd, t);
+					test_mmap_offset_invalidate(fd, t, 0);
 
 		igt_subtest("coherency-sync")
 			test_coherency(fd, count);
