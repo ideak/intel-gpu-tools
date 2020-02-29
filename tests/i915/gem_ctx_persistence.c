@@ -41,7 +41,7 @@
 #include "ioctl_wrappers.h" /* gem_wait()! */
 #include "sw_sync.h"
 
-static unsigned long reset_timeout_ms = MSEC_PER_SEC; /* default: 640ms */
+static unsigned long reset_timeout_ms = 2 * MSEC_PER_SEC; /* default: 640ms */
 #define NSEC_PER_MSEC (1000 * 1000ull)
 
 static bool has_persistence(int i915)
