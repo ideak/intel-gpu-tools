@@ -23,6 +23,14 @@ uint32_t hars_petruska_f54_1_random(uint32_t *s)
 #undef rol
 }
 
+uint64_t hars_petruska_f54_1_random64(uint32_t *s)
+{
+	uint32_t l = hars_petruska_f54_1_random(s);
+	uint32_t h = hars_petruska_f54_1_random(s);
+
+	return (uint64_t)h << 32 | l;
+}
+
 uint32_t hars_petruska_f54_1_random_unsafe(void)
 {
 	return hars_petruska_f54_1_random(&global);

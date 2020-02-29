@@ -27,6 +27,7 @@
 #include <stdint.h>
 
 uint32_t hars_petruska_f54_1_random(uint32_t *state);
+uint64_t hars_petruska_f54_1_random64(uint32_t *s);
 
 uint32_t hars_petruska_f54_1_random_seed(uint32_t seed);
 uint32_t hars_petruska_f54_1_random_unsafe(void);

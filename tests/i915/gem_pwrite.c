@@ -25,7 +25,6 @@
  *
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -37,7 +36,11 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+
 #include "drm.h"
+
+#include "igt.h"
+#include "igt_rand.h"
 
 #define MiB(x) ((x) * 1024 * 1024)
 
@@ -238,6 +241,41 @@ static void test_big_gtt(int fd, int scale, unsigned flags)
 	gem_close(fd, handle);
 }
 
+static void test_random(int fd)
+{
+	uint32_t prng = 0xdeadbeef;
+	unsigned long count;
+	uint32_t handle;
+	uint64_t *map;
+	uint64_t size;
+
+	gem_require_mmap_wc(fd);
+
+	size = min(intel_get_total_ram_mb() / 2,
+		    gem_mappable_aperture_size() + 4096);
+	intel_require_memory(1, size, CHECK_RAM);
+
+	handle = gem_create(fd, size);
+	map = gem_mmap__wc(fd, handle, 0, size, PROT_WRITE);
+
+	count = 0;
+	igt_until_timeout(5) {
+		uint64_t a = hars_petruska_f54_1_random64(&prng) % (size / sizeof(uint64_t));
+		uint64_t x = hars_petruska_f54_1_random64(&prng);
+
+		gem_write(fd, handle, a * sizeof(x), &x, sizeof(x));
+
+		gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, 0);
+		igt_assert_eq_u64(map[a], x);
+
+		count++;
+	}
+	igt_info("Completed %lu cycles\n", count);
+
+	munmap(map, handle);
+	gem_close(fd, handle);
+}
+
 uint32_t *src, dst;
 uint32_t *src_user, dst_stolen;
 int fd;
@@ -368,6 +406,9 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 		free(src_user);
 		gem_close(fd, dst_stolen);
 	}
+
+	igt_subtest_f("basic-random")
+		test_random(fd);
 
 	{
 		const struct mode {

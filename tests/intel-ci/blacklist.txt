@@ -44,6 +44,7 @@ igt@gem_lut_handle(@.*)?
 igt@gem_mmap_gtt@.*(huge|swap|clflush|forked).*
 igt@gem_mmap@.*(swap|huge).*
 igt@gem_pread_after_blit(@.*)?
+igt@gem_pwrite@(?!.*basic).*
 igt@gem_read_read_speed(@.*)?
 igt@gem_render_linear_blits@(?!.*basic).*
 igt@gem_render_tiled_blits@(?!.*basic).*
