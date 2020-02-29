@@ -39,6 +39,8 @@
 #define CHECK_DC6	(1 << 1)
 #define CHECK_DC3CO	(1 << 2)
 
+#define PWR_DOMAIN_INFO "i915_power_domain_info"
+
 typedef struct {
 	double r, g, b;
 } color_t;
@@ -48,6 +50,7 @@ typedef struct {
 	int msr_fd;
 	int debugfs_fd;
 	uint32_t devid;
+	char *pwr_dmn_info;
 	igt_display_t display;
 	struct igt_fb fb_white, fb_rgb, fb_rgr;
 	enum psr_mode op_psr_mode;
@@ -57,7 +60,7 @@ typedef struct {
 } data_t;
 
 static bool dc_state_wait_entry(int drm_fd, int dc_flag, int prev_dc_count);
-static void check_dc_counter(int drm_fd, int dc_flag, uint32_t prev_dc_count);
+static void check_dc_counter(data_t *data, int dc_flag, uint32_t prev_dc_count);
 
 static void setup_output(data_t *data)
 {
@@ -203,14 +206,15 @@ static bool dc_state_wait_entry(int debugfs_fd, int dc_flag, int prev_dc_count)
 			prev_dc_count, 3000, 100);
 }
 
-static void check_dc_counter(int debugfs_fd, int dc_flag, uint32_t prev_dc_count)
+static void check_dc_counter(data_t *data, int dc_flag, uint32_t prev_dc_count)
 {
 	char tmp[64];
 
 	snprintf(tmp, sizeof(tmp), "%s", dc_flag & CHECK_DC3CO ? "DC3CO" :
 		(dc_flag & CHECK_DC5 ? "DC5" : "DC6"));
-	igt_assert_f(dc_state_wait_entry(debugfs_fd, dc_flag, prev_dc_count),
-		     "%s state is not achieved\n", tmp);
+	igt_assert_f(dc_state_wait_entry(data->debugfs_fd, dc_flag, prev_dc_count),
+		     "%s state is not achieved\n%s:\n%s\n", tmp, PWR_DOMAIN_INFO,
+		     data->pwr_dmn_info = igt_sysfs_get(data->debugfs_fd, PWR_DOMAIN_INFO));
 }
 
 static void setup_videoplayback(data_t *data)
@@ -256,7 +260,7 @@ static void check_dc3co_with_videoplayback_like_load(data_t *data)
 		usleep(delay);
 	}
 
-	check_dc_counter(data->debugfs_fd, CHECK_DC3CO, dc3co_prev_cnt);
+	check_dc_counter(data, CHECK_DC3CO, dc3co_prev_cnt);
 }
 
 static void require_dc_counter(int debugfs_fd, int dc_flag)
@@ -311,7 +315,7 @@ static void test_dc_state_psr(data_t *data, int dc_flag)
 	setup_output(data);
 	setup_primary(data);
 	igt_assert(psr_wait_entry(data->debugfs_fd, data->op_psr_mode));
-	check_dc_counter(data->debugfs_fd, dc_flag, dc_counter_before_psr);
+	check_dc_counter(data, dc_flag, dc_counter_before_psr);
 	cleanup_dc_psr(data);
 }
 
@@ -372,7 +376,7 @@ static void test_dc_state_dpms(data_t *data, int dc_flag)
 	setup_dc_dpms(data);
 	dc_counter = read_dc_counter(data->debugfs_fd, dc_flag);
 	dpms_off(data);
-	check_dc_counter(data->debugfs_fd, dc_flag, dc_counter);
+	check_dc_counter(data, dc_flag, dc_counter);
 	dpms_on(data);
 	cleanup_dc_dpms(data);
 }
@@ -441,6 +445,7 @@ int main(int argc, char *argv[])
 	}
 
 	igt_fixture {
+		free(data.pwr_dmn_info);
 		close(data.debugfs_fd);
 		close(data.msr_fd);
 		display_fini(&data);
