@@ -1661,8 +1661,9 @@ static void hangme(int i915)
 			set_load_balancer(i915, ctx, ci, count, NULL);
 
 			flags = IGT_SPIN_FENCE_OUT |
-				IGT_SPIN_NO_PREEMPTION |
-				IGT_SPIN_INVALID_CS;
+				IGT_SPIN_NO_PREEMPTION;
+			if (!gem_has_cmdparser(i915, ALL_ENGINES))
+				flags |= IGT_SPIN_INVALID_CS;
 			for (int j = 0; j < ARRAY_SIZE(c->spin); j++)  {
 				c->spin[j] = igt_spin_new(i915, ctx,
 							  .flags = flags);
@@ -1675,6 +1676,7 @@ static void hangme(int i915)
 		/* Apply some background context to speed up hang detection */
 		bg = gem_context_create(i915);
 		set_engines(i915, bg, ci, count);
+		gem_context_set_priority(i915, bg, 1023);
 		for (int i = 0; i < count; i++) {
 			struct drm_i915_gem_execbuffer2 execbuf = {
 				.buffers_ptr = to_user_pointer(&batch),
@@ -1694,6 +1696,7 @@ static void hangme(int i915)
 			timeout = NSEC_PER_SEC / 2;
 			if (gem_wait(i915, c->spin[0]->handle, &timeout))
 				igt_debugfs_dump(i915, "i915_engine_info");
+			gem_sync(i915, c->spin[0]->handle);
 			igt_assert_eq(sync_fence_status(c->spin[0]->out_fence),
 				      -EIO);
 
