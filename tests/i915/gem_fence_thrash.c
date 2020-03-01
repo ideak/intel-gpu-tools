@@ -89,16 +89,14 @@ static void *
 bo_copy (void *_arg)
 {
 	struct test *t = (struct test *)_arg;
-	int fd = t->fd;
-	int n;
-	char *a, *b;
+	void *a, *b;
 
-	a = bo_create (fd, t->tiling);
-	b = bo_create (fd, t->tiling);
+	a = bo_create(t->fd, t->tiling);
+	b = bo_create(t->fd, t->tiling);
 
-	for (n = 0; n < 1000; n++) {
-		memcpy (a, b, OBJECT_SIZE);
-		sched_yield ();
+	igt_until_timeout(1) {
+		memcpy(a, b, OBJECT_SIZE);
+		sched_yield();
 	}
 
 	munmap(a, OBJECT_SIZE);
@@ -183,9 +181,8 @@ static void *
 bo_write_verify(void *_arg)
 {
 	struct test *t = (struct test *)_arg;
-	int i;
 
-	for (i = 0; i < 10; i++)
+	igt_until_timeout(1)
 		_bo_write_verify(t);
 
 	return 0;
@@ -246,19 +243,11 @@ igt_main
 	igt_subtest("bo-write-verify-threaded-none")
 		igt_assert(run_test(5, bo_write_verify, I915_TILING_NONE, 2) == 0);
 
-	igt_subtest("bo-write-verify-threaded-x") {
-		igt_assert(run_test(2, bo_write_verify, I915_TILING_X, 2) == 0);
+	igt_subtest("bo-write-verify-threaded-x")
 		igt_assert(run_test(5, bo_write_verify, I915_TILING_X, 2) == 0);
-		igt_assert(run_test(10, bo_write_verify, I915_TILING_X, 2) == 0);
-		igt_assert(run_test(20, bo_write_verify, I915_TILING_X, 2) == 0);
-	}
 
-	igt_subtest("bo-write-verify-threaded-y") {
-		igt_assert(run_test(2, bo_write_verify, I915_TILING_Y, 2) == 0);
+	igt_subtest("bo-write-verify-threaded-y")
 		igt_assert(run_test(5, bo_write_verify, I915_TILING_Y, 2) == 0);
-		igt_assert(run_test(10, bo_write_verify, I915_TILING_Y, 2) == 0);
-		igt_assert(run_test(20, bo_write_verify, I915_TILING_Y, 2) == 0);
-	}
 
 	igt_subtest("bo-copy")
 		igt_assert(run_test(1, bo_copy, I915_TILING_X, 1) == 0);
