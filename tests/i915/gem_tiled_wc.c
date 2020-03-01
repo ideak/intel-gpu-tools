@@ -138,10 +138,9 @@ calculate_expected(int offset)
 
 igt_simple_main
 {
-	int fd;
-	int i, iter = 100;
 	uint32_t tiling, swizzle;
 	uint32_t handle;
+	int fd;
 
 	fd = drm_open_driver(DRIVER_INTEL);
 	gem_require_mmap_wc(fd);
@@ -163,7 +162,7 @@ igt_simple_main
 	/* Read a bunch of random subsets of the data and check that they come
 	 * out right.
 	 */
-	for (i = 0; i < iter; i++) {
+	igt_until_timeout(2) {
 		int size = WIDTH * HEIGHT * 4;
 		int offset = (random() % size) & ~3;
 		int len = (random() % size) & ~3;
@@ -176,11 +175,6 @@ igt_simple_main
 
 		if (offset + len > size)
 			len = size - offset;
-
-		if (i == 0) {
-			offset = 0;
-			len = size;
-		}
 
 		first_page = offset & -PAGE_SIZE;
 		last_page = (offset + len + PAGE_SIZE - 1) & -PAGE_SIZE;
@@ -236,9 +230,9 @@ igt_simple_main
 			expected_val = calculate_expected(swizzled_offset);
 			found_val = linear[(j - first_page)/ 4];
 			igt_assert_f(expected_val == found_val,
-				     "Bad read [%d]: %d instead of %d at 0x%08x "
+				     "Bad read: %d instead of %d at 0x%08x "
 				     "for read from 0x%08x to 0x%08x, swizzle=%s\n",
-				     i, found_val, expected_val, j,
+				     found_val, expected_val, j,
 				     offset, offset + len,
 				     swizzle_str);
 		}
