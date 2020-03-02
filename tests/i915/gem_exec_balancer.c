@@ -1665,8 +1665,8 @@ static void hangme(int i915)
 			if (!gem_has_cmdparser(i915, ALL_ENGINES))
 				flags |= IGT_SPIN_INVALID_CS;
 			for (int j = 0; j < ARRAY_SIZE(c->spin); j++)  {
-				c->spin[j] = igt_spin_new(i915, ctx,
-							  .flags = flags);
+				c->spin[j] = __igt_spin_new(i915, ctx,
+							    .flags = flags);
 				flags = IGT_SPIN_FENCE_OUT;
 			}
 
