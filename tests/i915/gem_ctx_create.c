@@ -104,20 +104,17 @@ static void files(int core, int timeout, const int ncpus)
 
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		do {
-			do {
-				fd = gem_reopen_driver(core);
-				/*
-				 * Ensure the gpu is idle by launching
-				 * a nop execbuf  and stalling for it.
-				 */
-				gem_quiescent_gpu(fd);
-				gem_context_copy_engines(core, 0, fd, 0);
-				obj.handle = gem_open(fd, name);
-				execbuf.flags &= ~ENGINE_FLAGS;
-				execbuf.flags |= ppgtt_engines[count % ppgtt_nengine];
-				gem_execbuf(fd, &execbuf);
-				close(fd);
-			} while (++count & 1023);
+			fd = gem_reopen_driver(core);
+			gem_context_copy_engines(core, 0, fd, 0);
+
+			obj.handle = gem_open(fd, name);
+			execbuf.flags &= ~ENGINE_FLAGS;
+			execbuf.flags |= ppgtt_engines[count % ppgtt_nengine];
+			gem_execbuf(fd, &execbuf);
+
+			close(fd);
+			count++;
+
 			clock_gettime(CLOCK_MONOTONIC, &end);
 		} while (elapsed(&start, &end) < timeout);
 
