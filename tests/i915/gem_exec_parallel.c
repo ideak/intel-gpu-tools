@@ -50,7 +50,7 @@ static inline uint32_t hash32(uint32_t val)
 
 static void check_bo(int fd, uint32_t handle, int pass)
 {
-	uint32_t x = hash32(handle * pass) % (4096 / sizeof(uint32_t);
+	uint32_t x = hash32(handle * pass) % (4096 / sizeof(uint32_t));
 	uint32_t result;
 
 	igt_debug("Verifying result (pass=%d, handle=%d)\n", pass, handle);
