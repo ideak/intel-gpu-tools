@@ -178,7 +178,7 @@ static void active(int fd, const struct intel_execution_engine2 *e,
 
 			execbuf.flags = ppgtt_engines[child];
 
-			while (!*(volatile unsigned *)shared) {
+			while (!READ_ONCE(*shared)) {
 				obj.handle = gem_create(fd, 4096 << 10);
 				gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
@@ -209,16 +209,18 @@ static void active(int fd, const struct intel_execution_engine2 *e,
 
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		do {
-			do {
-				execbuf.rsvd1 = ctx;
-				for (unsigned n = 0; n < nengine; n++) {
-					execbuf.flags = engines[n];
-					gem_execbuf(fd, &execbuf);
-				}
-				gem_context_destroy(fd, execbuf.rsvd1);
-			} while (++count & 1023);
+			execbuf.rsvd1 = gem_context_clone_with_engines(fd, ctx);
+			for (unsigned n = 0; n < nengine; n++) {
+				execbuf.flags = engines[n];
+				gem_execbuf(fd, &execbuf);
+			}
+			gem_context_destroy(fd, execbuf.rsvd1);
+			count++;
+
 			clock_gettime(CLOCK_MONOTONIC, &end);
 		} while (elapsed(&start, &end) < timeout);
+
+		gem_context_destroy(fd, ctx);
 
 		gem_sync(fd, obj.handle);
 		clock_gettime(CLOCK_MONOTONIC, &end);
