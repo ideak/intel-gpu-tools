@@ -93,23 +93,21 @@ static void all(int fd, unsigned flags, int timeout, int ncpus)
 		count = 0;
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		do {
-			for (int loop = 0; loop < 1024; loop++) {
-				for (int n = 0; n < nengine; n++) {
-					obj.handle =  gem_create(fd, 4096);
-					gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
-					execbuf.flags &= ~ENGINE_FLAGS;
-					execbuf.flags |= engines[n];
-					gem_execbuf(fd, &execbuf);
-					if (flags & LEAK)
-						gem_madvise(fd, obj.handle, I915_MADV_DONTNEED);
-					else
-						gem_close(fd, obj.handle);
-				}
+			for (int n = 0; n < nengine; n++) {
+				obj.handle = gem_create(fd, 4096);
+				gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+				execbuf.flags &= ~ENGINE_FLAGS;
+				execbuf.flags |= engines[n];
+				gem_execbuf(fd, &execbuf);
+				if (flags & LEAK)
+					gem_madvise(fd, obj.handle, I915_MADV_DONTNEED);
+				else
+					gem_close(fd, obj.handle);
 			}
-			count += nengine * 1024;
+			count += nengine;
 			clock_gettime(CLOCK_MONOTONIC, &now);
 		} while (elapsed(&start, &now) < timeout); /* Hang detection ~120s */
-		obj.handle =  gem_create(fd, 4096);
+		obj.handle = gem_create(fd, 4096);
 		gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 		for (int n = 0; n < nengine; n++) {
 			execbuf.flags &= ~ENGINE_FLAGS;
