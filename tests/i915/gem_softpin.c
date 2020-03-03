@@ -184,13 +184,19 @@ static void test_overlap(int fd)
 	for (offset = object[0].offset - size + 4096;
 	     offset < object[0].offset + size;
 	     offset += 4096) {
+		int err;
+
 		object[1].offset = offset;
 		igt_debug("[0]=[%08llx - %08llx] [1]=[%08llx - %08llx]\n",
 			  (long long)object[0].offset,
 			  (long long)object[0].offset + size,
 			  (long long)object[1].offset,
 			  (long long)object[1].offset + size);
-		igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
+
+		/* Recent kernels do not track self-inflicted user errors */
+		err = __gem_execbuf(fd, &execbuf);
+		igt_assert(err == -EINVAL || err == -ENOSPC);
+
 		igt_assert_eq_u64(object[1].offset, offset);
 	}
 
