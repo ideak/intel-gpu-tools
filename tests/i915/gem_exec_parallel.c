@@ -48,16 +48,6 @@ static inline uint32_t hash32(uint32_t val)
 	return val * GOLDEN_RATIO_32;
 }
 
-static void check_bo(int fd, uint32_t handle, int pass)
-{
-	uint32_t x = hash32(handle * pass) % (4096 / sizeof(uint32_t));
-	uint32_t result;
-
-	igt_debug("Verifying result (pass=%d, handle=%d)\n", pass, handle);
-	gem_read(fd, handle, x * sizeof(result), &result, sizeof(result));
-	igt_assert_eq_u32(result, x);
-}
-
 #define CONTEXTS 0x1
 #define FDS 0x2
 
@@ -71,6 +61,7 @@ struct thread {
 	uint32_t *scratch;
 	unsigned id;
 	unsigned engine;
+	uint32_t used;
 	int fd, gen, *go;
 };
 
@@ -81,6 +72,7 @@ static void *thread(void *data)
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint32_t batch[16];
+	uint16_t used;
 	int fd, i;
 
 	pthread_mutex_lock(t->mutex);
@@ -137,8 +129,13 @@ static void *thread(void *data)
 		execbuf.rsvd1 = gem_context_clone_with_engines(fd, 0);
 	}
 
+	used = 0;
 	igt_until_timeout(1) {
-		obj[0].handle = t->scratch[i++ % NUMOBJ];
+		unsigned int x = rand() % NUMOBJ;
+
+		used |= 1u << x;
+		obj[0].handle = t->scratch[x];
+
 		if (t->flags & FDS)
 			obj[0].handle = gem_open(fd, obj[0].handle);
 
@@ -154,7 +151,22 @@ static void *thread(void *data)
 	if (t->flags & FDS)
 		close(fd);
 
+	t->used = used;
 	return NULL;
+}
+
+static void check_bo(int fd, uint32_t handle, int pass, struct thread *threads)
+{
+	uint32_t x = hash32(handle * pass) % 1024;
+	uint32_t result;
+
+	if (!(threads[x].used & (1 << pass)))
+		return;
+
+	igt_debug("Verifying result (pass=%d, handle=%d, thread %d)\n",
+		  pass, handle, x);
+	gem_read(fd, handle, x * sizeof(result), &result, sizeof(result));
+	igt_assert_eq_u32(result, x);
 }
 
 static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
@@ -163,9 +175,8 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	struct thread *threads;
-	unsigned engines[16];
-	unsigned nengine;
 	uint32_t scratch[NUMOBJ], handle[NUMOBJ];
+	unsigned engines[16], nengine;
 	int go;
 	int i;
 
@@ -227,7 +238,7 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 		pthread_join(threads[i].thread, NULL);
 
 	for (i = 0; i < NUMOBJ; i++) {
-		check_bo(fd, handle[i], i);
+		check_bo(fd, handle[i], i, threads);
 		gem_close(fd, handle[i]);
 	}
 
