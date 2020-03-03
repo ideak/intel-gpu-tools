@@ -42,21 +42,26 @@
 
 #define VERIFY 0
 
+static inline uint32_t hash32(uint32_t val)
+{
+#define GOLDEN_RATIO_32 0x61C88647
+	return val * GOLDEN_RATIO_32;
+}
+
 static void check_bo(int fd, uint32_t handle, int pass)
 {
-	uint32_t *map;
-	int i;
+	uint32_t x = hash32(handle * pass) % (4096 / sizeof(uint32_t);
+	uint32_t result;
 
 	igt_debug("Verifying result (pass=%d, handle=%d)\n", pass, handle);
-	map = gem_mmap__cpu(fd, handle, 0, 4096, PROT_READ);
-	gem_set_domain(fd, handle, I915_GEM_DOMAIN_CPU, 0);
-	for (i = 0; i < 1024; i++)
-		igt_assert_eq(map[i], i);
-	munmap(map, 4096);
+	gem_read(fd, handle, x * sizeof(result), &result, sizeof(result));
+	igt_assert_eq_u32(result, x);
 }
 
 #define CONTEXTS 0x1
 #define FDS 0x2
+
+#define NUMOBJ 16
 
 struct thread {
 	pthread_t thread;
@@ -132,8 +137,8 @@ static void *thread(void *data)
 		execbuf.rsvd1 = gem_context_clone_with_engines(fd, 0);
 	}
 
-	for (i = 0; i < 16; i++) {
-		obj[0].handle = t->scratch[i];
+	igt_until_timeout(1) {
+		obj[0].handle = t->scratch[i++ % NUMOBJ];
 		if (t->flags & FDS)
 			obj[0].handle = gem_open(fd, obj[0].handle);
 
@@ -160,7 +165,7 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 	struct thread *threads;
 	unsigned engines[16];
 	unsigned nengine;
-	uint32_t scratch[16], handle[16];
+	uint32_t scratch[NUMOBJ], handle[NUMOBJ];
 	int go;
 	int i;
 
@@ -185,7 +190,7 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 	}
 	igt_require(nengine);
 
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < NUMOBJ; i++) {
 		scratch[i] = handle[i] = gem_create(fd, 4096);
 		if (flags & FDS)
 			scratch[i] = gem_flink(fd, handle[i]);
@@ -221,7 +226,7 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 	for (i = 0; i < 1024; i++)
 		pthread_join(threads[i].thread, NULL);
 
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < NUMOBJ; i++) {
 		check_bo(fd, handle[i], i);
 		gem_close(fd, handle[i]);
 	}
