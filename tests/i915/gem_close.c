@@ -23,6 +23,11 @@
 
 #include "igt.h"
 
+static bool has_duplicate(int err)
+{
+	return err == -EINVAL || err == -EALREADY;
+}
+
 static void test_many_handles(int fd)
 {
 	uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -56,11 +61,11 @@ static void test_many_handles(int fd)
 	obj[0].handle = original;
 	for (int i = 0; i < ARRAY_SIZE(clones); i++) {
 		obj[1].handle = clones[i];
-		igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
+		igt_assert(has_duplicate(__gem_execbuf(fd, &execbuf)));
 	}
 	/* Any other clone pair should also be detected */
 	obj[1].handle = clones[0];  /* (last, first) */
-	igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
+	igt_assert(has_duplicate(__gem_execbuf(fd, &execbuf)));
 	execbuf.buffer_count = 1;
 
 	/* Now close the original having used every clone */
