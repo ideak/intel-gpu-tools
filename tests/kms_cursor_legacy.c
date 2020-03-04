@@ -251,7 +251,7 @@ static void flip_nonblocking(igt_display_t *display, enum pipe pipe_id, bool ato
 	igt_plane_t *primary = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 	int ret;
 
-	igt_set_timeout(1, "Scheduling page flip\n");
+	igt_set_timeout(5, "Scheduling page flip\n");
 	if (!atomic) {
 		/* Schedule a nonblocking flip for the next vblank */
 		do {
