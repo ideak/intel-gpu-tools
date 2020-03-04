@@ -964,6 +964,7 @@ static int read_entry(const char *filepath,
 
 	close(fd);
 
+	igt_drop_caches_set(drm_fd, DROP_IDLE); /* flush pm-idle */
 	igt_assert_f(wait_for_suspended(), "After closing: %s (%s)\n",
 		     filepath + pathinfo->base, filepath);
 
