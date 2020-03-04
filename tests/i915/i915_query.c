@@ -690,11 +690,6 @@ static void engines(int fd)
 			  engine->flags,
 			  engine->capabilities);
 
-		/* MBZ fields. */
-		igt_assert_eq(engine->rsvd0, 0);
-		igt_assert_eq(engine->rsvd1[0], 0);
-		igt_assert_eq(engine->rsvd1[1], 0);
-
 		switch (engine->engine.engine_class) {
 		case I915_ENGINE_CLASS_RENDER:
 			/* Will be tested later. */
