@@ -111,8 +111,12 @@ struct bond {
 	enum intel_engine_id master;
 };
 
+struct workload;
+
 struct w_step
 {
+	struct workload *wrk;
+
 	/* Workload step metadata */
 	enum w_type type;
 	unsigned int context;
@@ -1140,17 +1144,37 @@ static unsigned int get_duration(struct workload *wrk, struct w_step *w)
 		       (dur->max + 1 - dur->min);
 }
 
-static unsigned long get_bb_sz(unsigned int duration, enum intel_engine_id engine)
+static struct ctx *
+__get_ctx(struct workload *wrk, const struct w_step *w)
 {
-	return ALIGN(duration * engine_calib_map[engine] * sizeof(uint32_t) /
-		nop_calibration_us, sizeof(uint32_t));
+	return &wrk->ctx_list[w->context * 2];
+}
+
+static unsigned long
+get_bb_sz(const struct w_step *w, unsigned int duration)
+{
+	enum intel_engine_id engine = w->engine;
+	struct ctx *ctx = __get_ctx(w->wrk, w);
+	unsigned long d;
+
+	if (ctx->engine_map && engine == DEFAULT)
+		/* Assume first engine calibration. */
+		engine = ctx->engine_map[0];
+
+	igt_assert(engine_calib_map[engine]);
+	d = ALIGN(duration * engine_calib_map[engine] * sizeof(uint32_t) /
+		  nop_calibration_us,
+		  sizeof(uint32_t));
+	igt_assert(d);
+
+	return d;
 }
 
 static void
 init_bb(struct w_step *w, unsigned int flags)
 {
 	const unsigned int arb_period =
-			get_bb_sz(w->preempt_us, w->engine) / sizeof(uint32_t);
+			get_bb_sz(w, w->preempt_us) / sizeof(uint32_t);
 	const unsigned int mmap_len = ALIGN(w->bb_sz, 4096);
 	unsigned int i;
 	uint32_t *ptr;
@@ -1295,12 +1319,6 @@ find_engine_in_map(struct ctx *ctx, enum intel_engine_id engine)
 	return 0;
 }
 
-static struct ctx *
-__get_ctx(struct workload *wrk, struct w_step *w)
-{
-	return &wrk->ctx_list[w->context * 2];
-}
-
 static void
 eb_update_flags(struct workload *wrk, struct w_step *w,
 		enum intel_engine_id engine, unsigned int flags)
@@ -1377,10 +1395,10 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 
 	if (w->unbound_duration)
 		/* nops + MI_ARB_CHK + MI_BATCH_BUFFER_START */
-		w->bb_sz = max(PAGE_SIZE, get_bb_sz(w->preempt_us, w->engine)) +
+		w->bb_sz = max(PAGE_SIZE, get_bb_sz(w, w->preempt_us)) +
 			   (1 + 3) * sizeof(uint32_t);
 	else
-		w->bb_sz = get_bb_sz(w->duration.max, w->engine);
+		w->bb_sz = get_bb_sz(w, w->duration.max);
 
 	w->bb_handle = w->obj[j].handle = gem_create(fd, w->bb_sz + (w->unbound_duration ? 4096 : 0));
 	init_bb(w, flags);
@@ -1567,6 +1585,8 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
 		int ctx = w->context * 2 + 1; /* Odd slots are special. */
 		int delta;
+
+		w->wrk = wrk;
 
 		if (ctx <= max_ctx)
 			continue;
@@ -2681,7 +2701,7 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
 	w->eb.batch_start_offset =
 		w->unbound_duration ?
 		0 :
-		ALIGN(w->bb_sz - get_bb_sz(get_duration(wrk, w), w->engine),
+		ALIGN(w->bb_sz - get_bb_sz(w, get_duration(wrk, w)),
 		      2 * sizeof(uint32_t));
 
 	for (i = 0; i < w->fence_deps.nr; i++) {
@@ -3331,6 +3351,8 @@ int main(int argc, char **argv)
 						goto err;
 					} else {
 						engine_calib_map[eng] = calib_val;
+						if (eng == RCS)
+							engine_calib_map[DEFAULT] = calib_val;
 						has_nop_calibration = true;
 					}
 				} else {
@@ -3444,7 +3466,7 @@ int main(int argc, char **argv)
 		bool missing = false;
 
 		for (i = 0; i < NUM_ENGINES; i++) {
-			if (i == DEFAULT || i == VCS)
+			if (i == VCS)
 				continue;
 
 			if (!engine_calib_map[i]) {
