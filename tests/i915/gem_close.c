@@ -33,7 +33,7 @@ static void test_many_handles(int fd)
 	uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
-	uint32_t clones[1024];
+	uint32_t clones[128]; /* XXX try with 1024 */
 	uint32_t original;
 
 	original = gem_create(fd, 4096);
