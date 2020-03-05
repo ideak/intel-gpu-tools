@@ -268,6 +268,50 @@ static void mmapped(int i915)
 	gem_close(i915, buf);
 }
 
+static uint32_t batch_create_size(int fd, uint32_t size)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
+
+	handle = gem_create(fd, size);
+	gem_write(fd, handle, 0, &bbe, sizeof(bbe));
+
+	return handle;
+}
+
+static void __invalid_batch_start(int fd,
+				  struct drm_i915_gem_execbuffer2 *execbuf,
+				  uint32_t start_offset,
+				  uint32_t batch_len)
+{
+	execbuf->batch_start_offset = start_offset;
+	execbuf->batch_len = batch_len;
+	igt_assert_eq(__gem_execbuf(fd, execbuf), -EINVAL);
+}
+
+static void test_invalid_batch_start(int fd)
+{
+	uint32_t size = 4096;
+	struct drm_i915_gem_exec_object2 exec = {
+		.handle = batch_create_size(fd, size),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&exec),
+		.buffer_count = 1,
+	};
+
+	__invalid_batch_start(fd, &execbuf, 0, -1);
+	__invalid_batch_start(fd, &execbuf, -1, 0);
+	__invalid_batch_start(fd, &execbuf, -1, -1);
+	__invalid_batch_start(fd, &execbuf, -1U & ~0x7, 0);
+	__invalid_batch_start(fd, &execbuf, 0, -1U & ~0x7);
+	__invalid_batch_start(fd, &execbuf, size, 0);
+	__invalid_batch_start(fd, &execbuf, size, size);
+
+	gem_sync(fd, exec.handle);
+	gem_close(fd, exec.handle);
+}
+
 struct drm_i915_gem_execbuffer2 execbuf;
 struct drm_i915_gem_exec_object2 gem_exec[1];
 uint32_t batch[2] = {MI_BATCH_BUFFER_END};
@@ -506,6 +550,9 @@ igt_main
 
 	igt_subtest("batch-first")
 		test_batch_first(fd);
+
+	igt_subtest("invalid-batch-start-offset")
+		test_invalid_batch_start(fd);
 
 #define DIRT(name) \
 	igt_subtest(#name "-dirt") { \
