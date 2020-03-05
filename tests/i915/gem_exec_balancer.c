@@ -714,6 +714,8 @@ static void bonded(int i915, unsigned int flags)
 	gem_context_destroy(i915, master);
 }
 
+#define VIRTUAL_ENGINE (1u << 0)
+
 static unsigned int offset_in_page(void *addr)
 {
 	return (uintptr_t)addr & 4095;
@@ -1238,6 +1240,120 @@ static void indices(int i915)
 	}
 
 	gem_quiescent_gpu(i915);
+}
+
+static void __bonded_early(int i915, uint32_t ctx,
+			   const struct i915_engine_class_instance *siblings,
+			   unsigned int count,
+			   unsigned int flags)
+{
+	I915_DEFINE_CONTEXT_ENGINES_BOND(bonds[count], 1);
+	uint32_t handle = batch_create(i915);
+	struct drm_i915_gem_exec_object2 batch = {
+		.handle = handle,
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&batch),
+		.buffer_count = 1,
+		.rsvd1 = ctx,
+	};
+	igt_spin_t *spin;
+
+	memset(bonds, 0, sizeof(bonds));
+	for (int n = 0; n < ARRAY_SIZE(bonds); n++) {
+		bonds[n].base.name = I915_CONTEXT_ENGINES_EXT_BOND;
+		bonds[n].base.next_extension =
+			n ? to_user_pointer(&bonds[n - 1]) : 0;
+
+		bonds[n].master = siblings[n];
+		bonds[n].num_bonds = 1;
+		bonds[n].engines[0] = siblings[(n + 1) % count];
+	}
+
+	set_load_balancer(i915, ctx, siblings, count,
+			  flags & VIRTUAL_ENGINE ? &bonds : NULL);
+
+	/* A: spin forever on engine 1 */
+	spin = igt_spin_new(i915,
+			    .ctx = ctx,
+			    .engine = (flags & VIRTUAL_ENGINE) ? 0 : 1,
+			    .flags = IGT_SPIN_NO_PREEMPTION);
+
+	/* B: runs after A on engine 1 */
+	execbuf.flags = I915_EXEC_FENCE_OUT;
+	execbuf.flags |= spin->execbuf.flags & 63;
+	gem_execbuf_wr(i915, &execbuf);
+
+	/* B': run in parallel with B on engine 2, i.e. not before A! */
+	execbuf.flags = I915_EXEC_FENCE_SUBMIT | I915_EXEC_FENCE_OUT;
+	if(!(flags & VIRTUAL_ENGINE))
+		execbuf.flags |= 2;
+	execbuf.rsvd2 >>= 32;
+	gem_execbuf_wr(i915, &execbuf);
+
+	/* C: prevent anything running on engine 2 after B' */
+	spin->execbuf.flags = execbuf.flags & 63;
+	gem_execbuf(i915, &spin->execbuf);
+
+	igt_debugfs_dump(i915, "i915_engine_info");
+
+	/* D: cancel the spinner from engine 2 (new timeline) */
+	set_load_balancer(i915, ctx, siblings, count, NULL);
+	batch.handle = create_semaphore_to_spinner(i915, spin);
+	execbuf.flags = 0;
+	if(!(flags & VIRTUAL_ENGINE))
+		execbuf.flags |= 2;
+	gem_execbuf(i915, &execbuf);
+	gem_close(i915, batch.handle);
+
+	/* If C runs before D, we never cancel the spinner and so hang */
+	gem_sync(i915, handle);
+
+	/* Check the bonded pair completed successfully */
+	igt_assert_eq(sync_fence_status(execbuf.rsvd2 & 0xffffffff), 1);
+	igt_assert_eq(sync_fence_status(execbuf.rsvd2 >> 32), 1);
+
+	close(execbuf.rsvd2);
+	close(execbuf.rsvd2 >> 32);
+
+	gem_close(i915, handle);
+	igt_spin_free(i915, spin);
+}
+
+static void bonded_early(int i915)
+{
+	uint32_t ctx;
+
+	/*
+	 * Our goal is to start the bonded payloads at roughly the same time.
+	 * We do not want to start the secondary batch too early as it will
+	 * do nothing but hog the GPU until the first has a chance to execute.
+	 * So if we were to arbitrary delay the first by running it after a
+	 * spinner...
+	 *
+	 * By using a pair of spinners, we can create a bonded hog that when
+	 * set in motion will fully utilize both engines [if the scheduling is
+	 * incorrect]. We then use a third party submitted after the bonded
+	 * pair to cancel the spinner from the GPU -- if it is unable to run,
+	 * the spinner is never cancelled, and the bonded pair will cause a GPU
+	 * hang.
+	 */
+
+	ctx = gem_context_create(i915);
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *siblings;
+		unsigned int count;
+
+		siblings = list_engines(i915, 1u << class, &count);
+		if (count > 1) {
+			__bonded_early(i915, ctx, siblings, count, 0);
+			__bonded_early(i915, ctx, siblings, count, VIRTUAL_ENGINE);
+		}
+		free(siblings);
+	}
+
+	gem_context_destroy(i915, ctx);
 }
 
 static void busy(int i915)
@@ -1890,6 +2006,9 @@ igt_main
 
 	igt_subtest("bonded-semaphore")
 		bonded_semaphore(i915);
+
+	igt_subtest("bonded-early")
+		bonded_early(i915);
 
 	igt_fixture {
 		igt_stop_hang_detector();
