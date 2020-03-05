@@ -244,4 +244,24 @@ static inline void *from_user_pointer(uint64_t u64)
 	return (void *)(uintptr_t)u64;
 }
 
+/**
+ * lower_32_bits:
+ *
+ * return bits 0-31 of a number.
+ */
+static inline uint32_t lower_32_bits(uint64_t x)
+{
+	return x & 0xffffffff;
+}
+
+/**
+ * upper_32_bits:
+ *
+ * return bits 32-63 of a number.
+ */
+static inline uint32_t upper_32_bits(uint64_t x)
+{
+	return x >> 32;
+}
+
 #endif /* IOCTL_WRAPPERS_H */

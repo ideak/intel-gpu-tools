@@ -590,16 +590,6 @@ static uint32_t batch_create(int fd)
 	return handle;
 }
 
-static inline uint32_t lower_32_bits(uint64_t x)
-{
-	return x & 0xffffffff;
-}
-
-static inline uint32_t upper_32_bits(uint64_t x)
-{
-	return x >> 32;
-}
-
 static void test_keep_in_fence(int fd, const struct intel_execution_engine2 *e)
 {
 	struct sigaction sa = { .sa_handler = alarm_handler };
