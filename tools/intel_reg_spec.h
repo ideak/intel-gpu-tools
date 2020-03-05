@@ -26,9 +26,11 @@
 
 enum port_addr {
 	/* Negative port numbers are not real sideband ports. */
-	PORT_MMIO = -127,
-	PORT_PORTIO_VGA,	/* see vga reg read/write */
-	PORT_MMIO_VGA,		/* see vga reg read/write */
+	PORT_MMIO_32 = -127,
+	PORT_MMIO_16,
+	PORT_MMIO_8,
+
+	PORT_PORTIO,
 
 	PORT_NONE = 0,
 

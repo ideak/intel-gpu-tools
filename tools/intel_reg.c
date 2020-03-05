@@ -180,6 +180,18 @@ static void to_binary(char *buf, size_t buflen, uint32_t val)
 	snprintf(buf, buflen, "\n");
 }
 
+static bool port_is_mmio(enum port_addr port)
+{
+	switch (port) {
+	case PORT_MMIO_32:
+	case PORT_MMIO_16:
+	case PORT_MMIO_8:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static void dump_decode(struct config *config, struct reg *reg, uint32_t val)
 {
 	char decode[1300];
@@ -208,7 +220,7 @@ static void dump_decode(struct config *config, struct reg *reg, uint32_t val)
 		snprintf(decode, sizeof(decode), "\n");
 	}
 
-	if (reg->port_desc.port == PORT_MMIO) {
+	if (port_is_mmio(reg->port_desc.port)) {
 		/* Omit port name for MMIO, optionally include MMIO offset. */
 		if (reg->mmio_offset)
 			printf("%24s (0x%08x:0x%08x): 0x%08x%s",
@@ -360,19 +372,22 @@ static int read_register(struct config *config, struct reg *reg, uint32_t *valp)
 	uint32_t val = 0;
 
 	switch (reg->port_desc.port) {
-	case PORT_MMIO:
+	case PORT_MMIO_32:
 		if (reg->engine)
 			val = register_srm(config, reg, NULL);
 		else
 			val = INREG(reg->mmio_offset + reg->addr);
 		break;
-	case PORT_PORTIO_VGA:
+	case PORT_MMIO_16:
+		val = INREG16(reg->mmio_offset + reg->addr);
+		break;
+	case PORT_MMIO_8:
+		val = INREG8(reg->mmio_offset + reg->addr);
+		break;
+	case PORT_PORTIO:
 		iopl(3);
 		val = inb(reg->addr);
 		iopl(0);
-		break;
-	case PORT_MMIO_VGA:
-		val = INREG8(reg->addr);
 		break;
 	case PORT_BUNIT:
 	case PORT_PUNIT:
@@ -420,14 +435,30 @@ static int write_register(struct config *config, struct reg *reg, uint32_t val)
 	}
 
 	switch (reg->port_desc.port) {
-	case PORT_MMIO:
+	case PORT_MMIO_32:
 		if (reg->engine) {
 			register_srm(config, reg, &val);
 		} else {
 			OUTREG(reg->mmio_offset + reg->addr, val);
 		}
 		break;
-	case PORT_PORTIO_VGA:
+	case PORT_MMIO_16:
+		if (val > 0xffff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		OUTREG16(reg->mmio_offset + reg->addr, val);
+		break;
+	case PORT_MMIO_8:
+		if (val > 0xff) {
+			fprintf(stderr, "value 0x%08x out of range for port %s\n",
+				val, reg->port_desc.name);
+			return -1;
+		}
+		OUTREG8(reg->mmio_offset + reg->addr, val);
+		break;
+	case PORT_PORTIO:
 		if (val > 0xff) {
 			fprintf(stderr, "value 0x%08x out of range for port %s\n",
 				val, reg->port_desc.name);
@@ -436,14 +467,6 @@ static int write_register(struct config *config, struct reg *reg, uint32_t val)
 		iopl(3);
 		outb(val, reg->addr);
 		iopl(0);
-		break;
-	case PORT_MMIO_VGA:
-		if (val > 0xff) {
-			fprintf(stderr, "value 0x%08x out of range for port %s\n",
-				val, reg->port_desc.name);
-			return -1;
-		}
-		OUTREG8(reg->addr, val);
 		break;
 	case PORT_BUNIT:
 	case PORT_PUNIT:
@@ -483,7 +506,7 @@ static int parse_engine(struct reg *reg, const char *s)
 
 	e = find_engine(s);
 	if (e) {
-		reg->port_desc.port = PORT_MMIO;
+		reg->port_desc.port = PORT_MMIO_32;
 		reg->port_desc.name = strdup(s);
 		reg->port_desc.stride = 4;
 		reg->engine = strdup(s);
@@ -630,7 +653,7 @@ static int intel_reg_dump(struct config *config, int argc, char *argv[])
 		reg = &config->regs[i];
 
 		/* can't dump sideband with mmiofile */
-		if (config->mmiofile && reg->port_desc.port != PORT_MMIO)
+		if (config->mmiofile && !port_is_mmio(reg->port_desc.port))
 			continue;
 
 		dump_register(config, &config->regs[i]);

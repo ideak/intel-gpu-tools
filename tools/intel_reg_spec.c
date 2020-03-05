@@ -35,17 +35,22 @@
 static const struct port_desc port_descs[] = {
 	{
 		.name = "mmio",
-		.port = PORT_MMIO,
+		.port = PORT_MMIO_32,
 		.stride = 4,
 	},
 	{
-		.name = "portio-vga",
-		.port = PORT_PORTIO_VGA,
+		.name = "mmio16",
+		.port = PORT_MMIO_16,
+		.stride = 2,
+	},
+	{
+		.name = "mmio8",
+		.port = PORT_MMIO_8,
 		.stride = 1,
 	},
 	{
-		.name = "mmio-vga",
-		.port = PORT_MMIO_VGA,
+		.name = "portio",
+		.port = PORT_PORTIO,
 		.stride = 1,
 	},
 	{
@@ -116,7 +121,7 @@ int parse_port_desc(struct reg *reg, const char *s)
 		if (endp > s && *endp == 0) {
 			if (n > PORT_MAX) {
 				/* Not a sideband port, assume MMIO offset. */
-				port = PORT_MMIO;
+				port = PORT_MMIO_32;
 				reg->mmio_offset = n;
 			} else {
 				port = n;
@@ -127,7 +132,7 @@ int parse_port_desc(struct reg *reg, const char *s)
 		}
 	} else {
 		/* No port, default to searching for MMIO. */
-		port = PORT_MMIO;
+		port = PORT_MMIO_32;
 		reg->mmio_offset = 0;
 	}
 
