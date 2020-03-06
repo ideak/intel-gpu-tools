@@ -806,7 +806,9 @@ static int test_map_fixed_invalidate(int fd, uint32_t flags,
 static void test_mmap_offset_invalidate(int fd,
 					const struct mmap_offset *t,
 					unsigned int flags)
+#define MMOI_ACTIVE (1u << 0)
 {
+	igt_spin_t *spin = NULL;
 	uint32_t handle;
 	uint32_t *map;
 	void *ptr;
@@ -833,10 +835,19 @@ static void test_mmap_offset_invalidate(int fd,
 	gem_set_domain(fd, handle, t->domain, t->domain);
 	*map = 0;
 
+	if (flags & MMOI_ACTIVE) {
+		gem_quiescent_gpu(fd);
+		spin = igt_spin_new(fd,
+				    .dependency = handle,
+				    .flags = IGT_SPIN_NO_PREEMPTION);
+		igt_spin_set_timeout(spin, NSEC_PER_SEC); /* XXX borked */
+	}
+
 	/* trigger the notifier */
 	munmap(ptr, PAGE_SIZE);
 
 	/* cleanup */
+	igt_spin_free(fd, spin);
 	munmap(map, PAGE_SIZE);
 	gem_close(fd, handle);
 }
@@ -2232,6 +2243,13 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 			for_each_mmap_offset_type(fd, t)
 				igt_dynamic_f("%s", t->name)
 					test_mmap_offset_invalidate(fd, t, 0);
+
+		igt_describe("Invalidate pages of active userptr with mmap-offset on top");
+		igt_subtest_with_dynamic("mmap-offset-invalidate-active")
+			for_each_mmap_offset_type(fd, t)
+				igt_dynamic_f("%s", t->name)
+					test_mmap_offset_invalidate(fd, t,
+								   MMOI_ACTIVE);
 
 		igt_subtest("coherency-sync")
 			test_coherency(fd, count);
