@@ -3353,6 +3353,8 @@ int main(int argc, char **argv)
 						engine_calib_map[eng] = calib_val;
 						if (eng == RCS)
 							engine_calib_map[DEFAULT] = calib_val;
+						else if (eng == VCS1 || eng == VCS2)
+							engine_calib_map[VCS] = calib_val;
 						has_nop_calibration = true;
 					}
 				} else {
