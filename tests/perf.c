@@ -1742,8 +1742,14 @@ test_oa_exponents(void)
 
 		igt_debug("matches=%u/%u\n", matches, n_timer_reports - 1);
 
-		/* Allow for a couple of errors. */
-		igt_assert_lte(n_timer_reports - 3, matches);
+		/*
+		 * Expect half the reports to match the timing
+		 * expectation. The results are quite erratic because
+		 * the condition under which the HW reaches
+		 * expectations depends on memory controller pressure
+		 * etc...
+		 */
+		igt_assert_lte(n_timer_reports / 2, matches);
 	}
 
 	load_helper_stop();
