@@ -1431,7 +1431,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 #endif
 }
 
-static void __ctx_set_prio(uint32_t ctx_id, unsigned int prio)
+static bool set_priority(uint32_t ctx_id, int prio)
 {
 	struct drm_i915_gem_context_param param = {
 		.ctx_id = ctx_id,
@@ -1439,8 +1439,26 @@ static void __ctx_set_prio(uint32_t ctx_id, unsigned int prio)
 		.value = prio,
 	};
 
-	if (prio)
-		gem_context_set_param(fd, &param);
+	return __gem_context_set_param(fd, &param) == 0;
+}
+
+static bool set_persistence(uint32_t ctx_id, bool state)
+{
+	struct drm_i915_gem_context_param param = {
+		.ctx_id = ctx_id,
+		.param = I915_CONTEXT_PARAM_PERSISTENCE,
+		.value = state,
+	};
+
+	return __gem_context_set_param(fd, &param) == 0;
+}
+
+static void __configure_context(uint32_t ctx_id, unsigned int prio)
+{
+	set_priority(ctx_id, prio);
+
+	/* Mark as non-persistent if supported. */
+	set_persistence(ctx_id, false);
 }
 
 static int __vm_destroy(int i915, uint32_t vm_id)
@@ -1743,7 +1761,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			ctx_vcs ^= 1;
 		}
 
-		__ctx_set_prio(ctx_id, wrk->prio);
+		__configure_context(ctx_id, wrk->prio);
 
 		/*
 		 * Do we need a separate context to satisfy this workloads which
@@ -1772,7 +1790,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			ctx_id = args.ctx_id;
 			wrk->ctx_list[i + 1].id = args.ctx_id;
 
-			__ctx_set_prio(ctx_id, wrk->prio);
+			__configure_context(ctx_id, wrk->prio);
 		}
 
 		if (ctx->engine_map) {
