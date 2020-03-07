@@ -492,6 +492,129 @@ static void parallel(int fd, uint32_t handle, int timeout)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
+static void independent(int fd, uint32_t handle, int timeout)
+{
+	const struct intel_execution_engine2 *e;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj;
+	unsigned engines[16];
+	char *names[16];
+	unsigned nengine;
+	unsigned long count;
+	double time, sum;
+
+	sum = 0;
+	nengine = 0;
+	__for_each_physical_engine(fd, e) {
+		engines[nengine] = e->flags;
+		names[nengine++] = strdup(e->name);
+
+		time = nop_on_ring(fd, handle, e, 1, &count) / count;
+		sum += time;
+		igt_debug("%s: %.3fus\n", e->name, 1e6*time);
+	}
+	igt_require(nengine);
+	igt_info("average (individually): %.3fus\n", sum/nengine*1e6);
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = handle;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	if (__gem_execbuf(fd, &execbuf)) {
+		execbuf.flags = 0;
+		gem_execbuf(fd, &execbuf);
+	}
+	intel_detect_and_clear_missed_interrupts(fd);
+
+	igt_fork(child, nengine) {
+		const uint32_t bbe = MI_BATCH_BUFFER_END;
+		struct timespec start, now;
+
+		obj.handle = gem_create(fd, 4096);
+		gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+		execbuf.flags &= ~ENGINE_FLAGS;
+		execbuf.flags |= engines[child];
+
+		count = 0;
+		clock_gettime(CLOCK_MONOTONIC, &start);
+		do {
+			for (int loop = 0; loop < 1024; loop++)
+				gem_execbuf(fd, &execbuf);
+			count += 1024;
+			clock_gettime(CLOCK_MONOTONIC, &now);
+		} while (elapsed(&start, &now) < timeout);
+		time = elapsed(&start, &now) / count;
+		igt_info("%s: %ld cycles, %.3fus\n", names[child], count, 1e6*time);
+
+		gem_close(fd, obj.handle);
+	}
+	while (nengine--)
+		free(names[nengine]);
+
+	igt_waitchildren();
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+}
+
+static void multiple(int fd,
+		     const struct intel_execution_engine2 *e,
+		     int timeout)
+{
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 obj;
+
+	memset(&obj, 0, sizeof(obj));
+	obj.handle = gem_create(fd, 4096);
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj);
+	execbuf.buffer_count = 1;
+	execbuf.flags = e->flags;
+	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	if (__gem_execbuf(fd, &execbuf)) {
+		execbuf.flags = e->flags;
+		gem_execbuf(fd, &execbuf);
+	}
+	intel_detect_and_clear_missed_interrupts(fd);
+
+	igt_fork(child, ncpus) {
+		struct timespec start, now;
+		unsigned long count;
+		double time;
+		int i915;
+
+		i915 = gem_reopen_driver(fd);
+		gem_context_copy_engines(fd, 0, i915, 0);
+
+		obj.handle = gem_create(i915, 4096);
+		gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
+
+		count = 0;
+		clock_gettime(CLOCK_MONOTONIC, &start);
+		do {
+			for (int loop = 0; loop < 1024; loop++)
+				gem_execbuf(i915, &execbuf);
+			count += 1024;
+			clock_gettime(CLOCK_MONOTONIC, &now);
+		} while (elapsed(&start, &now) < timeout);
+		time = elapsed(&start, &now) / count;
+		igt_info("%d: %ld cycles, %.3fus\n", child, count, 1e6*time);
+	}
+
+	igt_waitchildren();
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+
+	gem_close(fd, obj.handle);
+}
+
 static void series(int fd, uint32_t handle, int timeout)
 {
 	const struct intel_execution_engine2 *e;
@@ -901,6 +1024,16 @@ igt_main
 
 	igt_subtest("parallel")
 		parallel(device, handle, 20);
+
+	igt_subtest("independent")
+		independent(device, handle, 20);
+
+	igt_subtest_with_dynamic("multiple") {
+		__for_each_physical_engine(device, e) {
+			igt_dynamic_f("%s", e->name)
+				multiple(device, e, 20);
+		}
+	}
 
 	igt_subtest("sequential")
 		sequential(device, handle, 0, 20);
