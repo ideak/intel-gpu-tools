@@ -440,9 +440,6 @@ static void basic(int fd, const struct intel_execution_engine2 *e, unsigned flag
 			     (flags & HANG ? IGT_SPIN_INVALID_CS : 0));
 	struct timespec tv;
 	int timeout;
-	bool busy;
-
-	busy = gem_bo_busy(fd, spin->handle);
 
 	timeout = 120;
 	if ((flags & HANG) == 0) {
@@ -450,7 +447,6 @@ static void basic(int fd, const struct intel_execution_engine2 *e, unsigned flag
 		timeout = 1;
 	}
 
-	igt_assert(busy);
 	memset(&tv, 0, sizeof(tv));
 	while (gem_bo_busy(fd, spin->handle)) {
 		if (igt_seconds_elapsed(&tv) > timeout) {
