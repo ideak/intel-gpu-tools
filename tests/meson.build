@@ -3,6 +3,7 @@ test_progs = [
 	'core_getclient',
 	'core_getstats',
 	'core_getversion',
+	'core_setmaster',
 	'core_setmaster_vs_auth',
 	'debugfs_test',
 	'dmabuf',
