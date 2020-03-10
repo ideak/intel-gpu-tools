@@ -43,6 +43,21 @@
  * software features improving submission model (context priority).
  */
 
+static int create_ext_ioctl(int i915,
+			    struct drm_i915_gem_context_create_ext *arg)
+{
+	int err;
+
+	err = 0;
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT, arg)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
+}
+
 /**
  * gem_has_contexts:
  * @fd: open i915 drm file descriptor
@@ -324,17 +339,14 @@ __gem_context_clone(int i915,
 		.flags = flags | I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS,
 		.extensions = to_user_pointer(&clone),
 	};
-	int err = 0;
+	int err;
 
-	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT, &arg)) {
-		err = -errno;
-		igt_assume(err);
-	}
+	err = create_ext_ioctl(i915, &arg);
+	if (err)
+		return err;
 
 	*out = arg.ctx_id;
-
-	errno = 0;
-	return err;
+	return 0;
 }
 
 static bool __gem_context_has(int i915, uint32_t share, unsigned int flags)
@@ -382,16 +394,8 @@ bool gem_has_context_clone(int i915)
 		.flags = I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS,
 		.extensions = to_user_pointer(&ext),
 	};
-	int err;
 
-	err = 0;
-	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT, &create)) {
-		err = -errno;
-		igt_assume(err);
-	}
-	errno = 0;
-
-	return err == -ENOENT;
+	return create_ext_ioctl(i915, &create) == -ENOENT;
 }
 
 /**
@@ -491,4 +495,30 @@ gem_context_copy_engines(int src_fd, uint32_t src, int dst_fd, uint32_t dst)
 
 	param.ctx_id = dst;
 	gem_context_set_param(dst_fd, &param);
+}
+
+uint32_t gem_context_create_for_engine(int i915, unsigned int class, unsigned int inst)
+{
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 1) = {
+		.engines = { { .engine_class = class, .engine_instance = inst } }
+	};
+	struct drm_i915_gem_context_create_ext_setparam p_engines = {
+		.base = {
+			.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
+			.next_extension = 0, /* end of chain */
+		},
+		.param = {
+			.param = I915_CONTEXT_PARAM_ENGINES,
+			.value = to_user_pointer(&engines),
+			.size = sizeof(engines),
+		},
+	};
+	struct drm_i915_gem_context_create_ext create = {
+		.flags = I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS,
+		.extensions = to_user_pointer(&p_engines),
+	};
+
+	igt_assert_eq(create_ext_ioctl(i915, &create), 0);
+	igt_assert_neq(create.ctx_id, 0);
+	return create.ctx_id;
 }

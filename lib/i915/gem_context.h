@@ -34,6 +34,8 @@ int __gem_context_create(int fd, uint32_t *ctx_id);
 void gem_context_destroy(int fd, uint32_t ctx_id);
 int __gem_context_destroy(int fd, uint32_t ctx_id);
 
+uint32_t gem_context_create_for_engine(int fd, unsigned int class, unsigned int inst);
+
 int __gem_context_clone(int i915,
 			uint32_t src, unsigned int share,
 			unsigned int flags,
