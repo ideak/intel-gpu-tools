@@ -22,6 +22,8 @@
  */
 
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 #include "drmtest.h"
@@ -412,4 +414,50 @@ uint32_t gem_engine_mmio_base(int i915, const char *engine)
 	}
 
 	return mmio;
+}
+
+void dyn_sysfs_engines(int i915, int engines, const char *file,
+		       void (*test)(int, int))
+{
+	char buf[512];
+	int len;
+
+	lseek(engines, 0, SEEK_SET);
+	while ((len = syscall(SYS_getdents64, engines, buf, sizeof(buf))) > 0) {
+		void *ptr = buf;
+
+		while (len) {
+			struct linux_dirent64 {
+				ino64_t        d_ino;
+				off64_t        d_off;
+				unsigned short d_reclen;
+				unsigned char  d_type;
+				char           d_name[];
+			} *de = ptr;
+			char *name;
+			int engine;
+
+			ptr += de->d_reclen;
+			len -= de->d_reclen;
+
+			engine = openat(engines, de->d_name, O_RDONLY);
+			name = igt_sysfs_get(engine, "name");
+			if (!name) {
+				close(engine);
+				continue;
+			}
+
+			igt_dynamic(name) {
+				if (file) {
+					struct stat st;
+
+					igt_require(fstatat(engine, file, &st, 0) == 0);
+				}
+
+				test(i915, engine);
+			}
+
+			close(engine);
+		}
+	}
 }

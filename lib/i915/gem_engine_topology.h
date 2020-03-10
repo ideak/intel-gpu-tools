@@ -80,4 +80,7 @@ int gem_engine_property_scanf(int i915, const char *engine, const char *attr,
 			      const char *fmt, ...);
 uint32_t gem_engine_mmio_base(int i915, const char *engine);
 
+void dyn_sysfs_engines(int i915, int engines, const char *file,
+		       void (*test)(int i915, int engine));
+
 #endif /* GEM_ENGINE_TOPOLOGY_H */
