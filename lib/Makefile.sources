@@ -148,9 +148,7 @@ i915_perf_sources =			\
 	i915/perf.h			\
 	i915/perf_data.h		\
 	i915/perf_data_reader.c		\
-	i915/perf_data_reader.h		\
-	i915/i915_perf_metrics.c	\
-	i915/i915_perf_metrics.h
+	i915/perf_data_reader.h
 
 .PHONY: version.h.tmp
 
@@ -184,6 +182,5 @@ $(IGT_LIB_PATH)/version.h: $(IGT_LIB_PATH)/version.h.tmp
 
 BUILT_SOURCES =				\
 	$(IGT_LIB_PATH)/version.h	\
-	i915/i915_perf_metrics.c	\
-	i915/i915_perf_metrics.h
-CLEANFILES = $(IGT_LIB_PATH)/version.h $(IGT_LIB_PATH)/version.h.tmp
+	$(i915_perf_generated_files)
+CLEANFILES = $(IGT_LIB_PATH)/version.h $(IGT_LIB_PATH)/version.h.tmp $(i915_perf_generated_files)

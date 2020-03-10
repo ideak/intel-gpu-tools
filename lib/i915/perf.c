@@ -37,7 +37,23 @@
 
 #include "intel_chipset.h"
 #include "perf.h"
-#include "i915_perf_metrics.h"
+
+#include "i915_perf_metrics_hsw.h"
+#include "i915_perf_metrics_bdw.h"
+#include "i915_perf_metrics_chv.h"
+#include "i915_perf_metrics_sklgt2.h"
+#include "i915_perf_metrics_sklgt3.h"
+#include "i915_perf_metrics_sklgt4.h"
+#include "i915_perf_metrics_kblgt2.h"
+#include "i915_perf_metrics_kblgt3.h"
+#include "i915_perf_metrics_cflgt2.h"
+#include "i915_perf_metrics_cflgt3.h"
+#include "i915_perf_metrics_bxt.h"
+#include "i915_perf_metrics_glk.h"
+#include "i915_perf_metrics_cnl.h"
+#include "i915_perf_metrics_icl.h"
+#include "i915_perf_metrics_ehl.h"
+#include "i915_perf_metrics_tgl.h"
 
 static int
 perf_ioctl(int fd, unsigned long request, void *arg)
