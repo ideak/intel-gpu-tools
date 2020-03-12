@@ -1559,7 +1559,7 @@ static void fill_igt_fb(struct igt_fb *fb, uint32_t color)
 	int i;
 	uint32_t *ptr;
 
-	ptr = gem_mmap__gtt(drm_fd, fb->gem_handle, fb->size, PROT_WRITE);
+	ptr = gem_mmap__device_coherent(drm_fd, fb->gem_handle, 0, fb->size, PROT_WRITE);
 	for (i = 0; i < fb->size/sizeof(uint32_t); i++)
 		ptr[i] = color;
 	igt_assert(munmap(ptr, fb->size) == 0);
@@ -1629,7 +1629,7 @@ static void cursor_subtest(bool dpms)
 	 * hopefully it has some fences around it. */
 	rc = drmModeRmFB(drm_fd, cursor_fb3.fb_id);
 	igt_assert_eq(rc, 0);
-	gem_set_tiling(drm_fd, cursor_fb3.gem_handle, false, cursor_fb3.strides[0]);
+	__gem_set_tiling(drm_fd, cursor_fb3.gem_handle, false, cursor_fb3.strides[0]);
 	igt_assert(wait_for_suspended());
 
 	rc = drmModeSetCursor(drm_fd, crtc_id, cursor_fb3.gem_handle,
@@ -2051,8 +2051,10 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		gem_execbuf_subtest();
 	igt_subtest("gem-idle")
 		gem_idle_subtest();
-	igt_subtest("gem-evict-pwrite")
+	igt_subtest("gem-evict-pwrite") {
+		gem_require_mappable_ggtt(drm_fd);
 		gem_evict_pwrite_subtest();
+	}
 
 	/* Planes and cursors */
 	igt_subtest("cursor")
@@ -2085,10 +2087,14 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		dpms_mode_unset_subtest(SCREEN_TYPE_LPSP);
 	igt_subtest("dpms-mode-unset-non-lpsp")
 		dpms_mode_unset_subtest(SCREEN_TYPE_NON_LPSP);
-	igt_subtest("fences")
+	igt_subtest("fences") {
+		gem_require_mappable_ggtt(drm_fd);
 		fences_subtest(false);
-	igt_subtest("fences-dpms")
+	}
+	igt_subtest("fences-dpms") {
+		gem_require_mappable_ggtt(drm_fd);
 		fences_subtest(true);
+	}
 
 	/* Modeset stress */
 	igt_subtest("modeset-lpsp-stress")
@@ -2129,10 +2135,14 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		gem_execbuf_stress_subtest(rounds, WAIT_STATUS | WAIT_EXTRA);
 
 	/* power-wake reference tests */
-	igt_subtest("pm-tiling")
+	igt_subtest("pm-tiling") {
+		gem_require_mappable_ggtt(drm_fd);
 		pm_test_tiling();
-	igt_subtest("pm-caching")
+	}
+	igt_subtest("pm-caching") {
+		gem_require_mappable_ggtt(drm_fd);
 		pm_test_caching();
+	}
 
 	igt_fixture
 		teardown_environment();
