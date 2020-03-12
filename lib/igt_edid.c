@@ -578,3 +578,123 @@ void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
 	cea->dtd_start = 4 + data_blocks_size;
 	cea->misc = flags | num_native_dtds;
 }
+
+/**
+ * dispid_block_tiled:
+ * @ptr: The DisplayID data block
+ * @num_htiles: Total number of horizontal tiles
+ * @num_vtiles: Total number of vertical tiles
+ * @htile: Horizontal tile location
+ * @vtile: Vertical tile location
+ * @hsize: Horizontal size
+ * @vsize: Vertical size
+ * @topology_id: Tiled display topology ID
+ *
+ * Fill a DisplayID tiled display topology data block
+ *
+ * Returns:
+ * A pointer to the next data block
+ */
+void *dispid_block_tiled(void *ptr,
+			 int num_htiles, int num_vtiles,
+			 int htile, int vtile,
+			 int hsize, int vsize,
+			 const char *topology_id)
+{
+	struct dispid_block_header *block = ptr;
+	struct dispid_tiled_block *tiled = (void*)(block + 1);
+	size_t len;
+
+	block->tag = 0x12;
+	block->rev = 0;
+	block->num_bytes = sizeof(*tiled);
+
+	num_htiles--;
+	num_vtiles--;
+	hsize--;
+	vsize--;
+
+	tiled->tile_caps =
+		DISPID_MULTI_TILE_AT_TILE_LOCATION |
+		DISPID_SINGLE_TILE_AT_TILE_LOCATION;
+
+	tiled->topo[0] = (num_htiles & 0xf) << 4 |
+		(num_vtiles & 0xf) << 0;
+
+	tiled->topo[1] = (htile & 0xf) << 4 |
+		(vtile & 0xf) << 0;
+
+	tiled->topo[2] = (num_htiles >> 4) << 6 |
+		(num_vtiles >> 4) << 4 |
+		(htile >> 4) << 2 |
+		(vtile >> 4) << 0;
+
+	tiled->tile_size[0] = hsize;
+	tiled->tile_size[1] = hsize >> 8;
+	tiled->tile_size[2] = vsize;
+	tiled->tile_size[3] = vsize >> 8;
+
+	len = min(strlen(topology_id), sizeof(tiled->topology_id));
+	memcpy(tiled->topology_id, topology_id, len);
+
+	return tiled + 1;
+}
+
+/**
+ * edid_ext_dispid:
+ * @ext: EDID extension block
+ *
+ * Mark the EDID extentions block as DisplayID.
+
+ * Returns:
+ * A pointer to the contained DisplayID.
+ */
+void *edid_ext_dispid(struct edid_ext *ext)
+{
+	struct edid_dispid *dispid = &ext->data.dispid;
+
+	edid_ext_set_displayid(ext);
+
+	return dispid;
+}
+
+/**
+ * dispid_init:
+ * @ptr: Pointer to the DisplayID
+ *
+ * Initialize the DisplayID header.
+ *
+ * Returns:
+ * A pointer to the first data block.
+ */
+void *dispid_init(void *ptr)
+{
+	struct dispid_header *dispid = ptr;
+
+	dispid->rev = 0x10;
+	dispid->prod_id = 0x3;
+	dispid->ext_count = 0;
+
+	return dispid + 1;
+}
+
+/**
+ * dispid_done:
+ * @dispid: Pointer to the DisplayID
+ * @ptr: Pointer to the end of the DisplayID (the checksum byte)
+ *
+ * Finalize the DisplayID (fill the number of bytes and checksum).
+ *
+ * Returns:
+ * A pointer just past the end of the DisplayID.
+ */
+void *dispid_done(struct dispid_header *dispid, void *ptr)
+{
+	int bytes = ptr - (void *)dispid;
+
+	dispid->num_bytes = bytes - sizeof(*dispid);
+
+	*(uint8_t *)ptr = compute_checksum((void*)dispid, bytes + 1);
+
+	return ptr + 1;
+}

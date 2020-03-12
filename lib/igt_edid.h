@@ -303,6 +303,44 @@ struct edid_cea {
 	uint8_t checksum;
 } __attribute__((packed));
 
+enum dispid_tile_caps {
+	DISPID_SINGLE_PHYSICAL_ENCLOSURE = 1 << 7,
+	DISPID_BEZEL_INFORMATION_PRESENT = 1 << 6,
+	DISPID_MULTI_TILE_UNKNOWN = 0 << 3,
+	DISPID_MULTI_TILE_AT_TILE_LOCATION = 1 << 3,
+	DISPID_SINGLE_TILE_UNKNOWN = 0 << 0,
+	DISPID_SINGLE_TILE_AT_TILE_LOCATION = 1 << 0,
+	DISPID_SINGLE_TILE_SCALED_FULLSCREEN = 2 << 0,
+	DISPID_SINGLE_TILE_CLONED_TO_ALL_TILES = 3 << 0,
+};
+
+struct dispid_header {
+	uint8_t rev;
+	uint8_t num_bytes;
+	uint8_t prod_id;
+	uint8_t ext_count;
+} __attribute__((packed));
+
+struct dispid_block_header {
+	uint8_t tag;
+	uint8_t rev;
+	uint8_t num_bytes;
+} __attribute__((packed));
+
+struct dispid_tiled_block {
+	uint8_t tile_caps;
+	uint8_t topo[3];
+	uint8_t tile_size[4];
+	uint8_t tile_pixel_bezel[5];
+	uint8_t topology_id[9];
+} __attribute__((packed));
+
+struct edid_dispid {
+	struct dispid_header header;
+	char data[122];
+	uint8_t checksum;
+} __attribute__((packed));
+
 enum edid_ext_tag {
 	EDID_EXT_CEA = 0x02,
 	EDID_EXT_DISPLAYID = 0x70,
@@ -329,6 +367,7 @@ struct edid_ext {
 	union {
 		struct edid_cea cea;
 		struct edid_tile tile;
+		struct edid_dispid dispid;
 	} data;
 } __attribute__((packed));
 
@@ -408,4 +447,14 @@ void edid_ext_set_cea(struct edid_ext *ext, size_t data_blocks_size,
 		      uint8_t num_native_dtds, uint8_t flags);
 
 void edid_ext_set_displayid(struct edid_ext *ext);
+
+void *edid_ext_dispid(struct edid_ext *ext);
+void *dispid_init(void *ptr);
+void *dispid_done(struct dispid_header *dispid, void *ptr);
+void *dispid_block_tiled(void *ptr,
+			 int num_htiles, int num_vtiles,
+			 int htile, int vtile,
+			 int hsize, int vsize,
+			 const char *topology_id);
+
 #endif
