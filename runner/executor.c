@@ -1054,6 +1054,10 @@ static int monitor_output(pid_t child,
 						     "but we didn't get informed of its demise...\n");
 				}
 
+				dump_dmesg(kmsgfd, outputs[_F_DMESG]);
+				if (settings->sync)
+					fdatasync(outputs[_F_DMESG]);
+
 				close_watchdogs(settings);
 				free(outbuf);
 				close(outfd);
