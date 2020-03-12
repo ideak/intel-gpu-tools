@@ -828,42 +828,6 @@ static int monitor_output(pid_t child,
 
 		igt_gettime(&time_now);
 
-		timeout_reason = need_to_timeout(settings, killed, tainted(&taints),
-						 igt_time_elapsed(&time_last_activity, &time_now),
-						 igt_time_elapsed(&time_last_subtest, &time_now),
-						 igt_time_elapsed(&time_killed, &time_now));
-
-		if (timeout_reason) {
-			if (killed == SIGKILL) {
-				/* Nothing that can be done, really. Let's tell the caller we want to abort. */
-
-				if (settings->log_level >= LOG_LEVEL_NORMAL) {
-					errf("Child refuses to die, tainted 0x%lx. Aborting.\n",
-					     taints);
-					if (kill(child, 0) && errno == ESRCH)
-						errf("The test process no longer exists, "
-						     "but we didn't get informed of its demise...\n");
-				}
-
-				close_watchdogs(settings);
-				free(outbuf);
-				close(outfd);
-				close(errfd);
-				close(kmsgfd);
-				return -1;
-			}
-
-			if (settings->log_level >= LOG_LEVEL_NORMAL) {
-				outf("%s", timeout_reason);
-				fflush(stdout);
-			}
-
-			killed = next_kill_signal(killed);
-			if (!kill_child(killed, child))
-				return -1;
-			time_killed = time_now;
-		}
-
 		/* TODO: Refactor these handlers to their own functions */
 		if (outfd >= 0 && FD_ISSET(outfd, &set)) {
 			char *newline;
@@ -1071,6 +1035,42 @@ static int monitor_output(pid_t child,
 
 			child = 0;
 			sigfd = -1; /* we are dying, no signal handling for now */
+		}
+
+		timeout_reason = need_to_timeout(settings, killed, tainted(&taints),
+						 igt_time_elapsed(&time_last_activity, &time_now),
+						 igt_time_elapsed(&time_last_subtest, &time_now),
+						 igt_time_elapsed(&time_killed, &time_now));
+
+		if (timeout_reason) {
+			if (killed == SIGKILL) {
+				/* Nothing that can be done, really. Let's tell the caller we want to abort. */
+
+				if (settings->log_level >= LOG_LEVEL_NORMAL) {
+					errf("Child refuses to die, tainted 0x%lx. Aborting.\n",
+					     taints);
+					if (kill(child, 0) && errno == ESRCH)
+						errf("The test process no longer exists, "
+						     "but we didn't get informed of its demise...\n");
+				}
+
+				close_watchdogs(settings);
+				free(outbuf);
+				close(outfd);
+				close(errfd);
+				close(kmsgfd);
+				return -1;
+			}
+
+			if (settings->log_level >= LOG_LEVEL_NORMAL) {
+				outf("%s", timeout_reason);
+				fflush(stdout);
+			}
+
+			killed = next_kill_signal(killed);
+			if (!kill_child(killed, child))
+				return -1;
+			time_killed = time_now;
 		}
 	}
 
