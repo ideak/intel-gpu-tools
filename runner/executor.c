@@ -537,7 +537,7 @@ void close_outputs(int *fds)
 	}
 }
 
-static void dump_dmesg(int kmsgfd, int outfd)
+static int dump_dmesg(int kmsgfd, int outfd)
 {
 	/*
 	 * Write kernel messages to the log file until we reach
@@ -546,29 +546,31 @@ static void dump_dmesg(int kmsgfd, int outfd)
 	 * message to match against, or stop when we reach EAGAIN.
 	 */
 
-	int comparefd = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
+	int comparefd;
 	unsigned flags;
 	unsigned long long seq, cmpseq, usec;
 	char cont;
 	char buf[2048];
 	ssize_t r;
 
-	if (comparefd < 0)
-		return;
-	lseek(comparefd, 0, SEEK_END);
+	if (kmsgfd < 0)
+		return 0;
 
-	if (fcntl(kmsgfd, F_SETFL, O_NONBLOCK)) {
-		close(comparefd);
-		return;
+	comparefd = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
+	if (comparefd < 0) {
+		errf("Error opening another fd for /dev/kmsg\n");
+		return -1;
 	}
+	lseek(comparefd, 0, SEEK_END);
 
 	while (1) {
 		if (comparefd >= 0) {
 			r = read(comparefd, buf, sizeof(buf) - 1);
 			if (r < 0) {
 				if (errno != EAGAIN && errno != EPIPE) {
+					errf("Warning: Error reading kmsg comparison record: %m\n");
 					close(comparefd);
-					return;
+					return 0;
 				}
 			} else {
 				buf[r] = '\0';
@@ -582,16 +584,21 @@ static void dump_dmesg(int kmsgfd, int outfd)
 		}
 
 		r = read(kmsgfd, buf, sizeof(buf));
-		if (r <= 0) {
-			if (errno == EPIPE)
+		if (r < 0) {
+			if (errno == EPIPE) {
+				errf("Warning: kernel log ringbuffer underflow, some records lost.\n");
 				continue;
+			} else if (errno == EINVAL) {
+				errf("Warning: Buffer too small for kernel log record, record lost.\n");
+				continue;
+			} else if (errno != EAGAIN) {
+				errf("Error reading from kmsg: %m\n");
+				return errno;
+			}
 
-			/*
-			 * If EAGAIN, we're done. If some other error,
-			 * we can't do anything anyway.
-			 */
+			/* EAGAIN, so we're done dumping */
 			close(comparefd);
-			return;
+			return 0;
 		}
 
 		write(outfd, buf, r);
@@ -604,7 +611,7 @@ static void dump_dmesg(int kmsgfd, int outfd)
 			 * enough.
 			 */
 			if (seq >= cmpseq)
-				return;
+				return 0;
 		}
 	}
 }
@@ -939,22 +946,17 @@ static int monitor_output(pid_t child,
 		}
 
 		if (kmsgfd >= 0 && FD_ISSET(kmsgfd, &set)) {
+			int dmesgstatus;
+
 			time_last_activity = time_now;
 
-			s = read(kmsgfd, buf, sizeof(buf));
-			if (s < 0) {
-				if (errno != EPIPE && errno != EINVAL) {
-					errf("Error reading from kmsg, stopping monitoring: %m\n");
-					close(kmsgfd);
-					kmsgfd = -1;
-				} else if (errno == EINVAL) {
-					errf("Warning: Buffer too small for kernel log record, record lost.\n");
-				}
-			} else {
-				write(outputs[_F_DMESG], buf, s);
-				if (settings->sync) {
-					fdatasync(outputs[_F_DMESG]);
-				}
+			dmesgstatus = dump_dmesg(kmsgfd, outputs[_F_DMESG]);
+			if (settings->sync)
+				fdatasync(outputs[_F_DMESG]);
+
+			if (dmesgstatus) {
+				close(kmsgfd);
+				kmsgfd = -1;
 			}
 		}
 
@@ -1256,7 +1258,7 @@ static int execute_next_entry(struct execute_state *state,
 		goto out_pipe;
 	}
 
-	if ((kmsgfd = open("/dev/kmsg", O_RDONLY | O_CLOEXEC)) < 0) {
+	if ((kmsgfd = open("/dev/kmsg", O_RDONLY | O_CLOEXEC | O_NONBLOCK)) < 0) {
 		errf("Warning: Cannot open /dev/kmsg\n");
 	} else {
 		/* TODO: Checking of abort conditions in pre-execute dmesg */
