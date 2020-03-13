@@ -285,7 +285,7 @@ static void test_bpc_switch(data_t *data, uint32_t flags)
 		valid_tests++;
 	}
 
-	igt_require_f(valid_tests, "No connector found with MAX BPC connector property\n");
+	igt_require_f(valid_tests, "No connector found with max_bpc connector property\n");
 }
 
 static bool cta_block(const char *edid_ext)
@@ -609,24 +609,26 @@ static void test_hdr(data_t *data, const char *test_name, uint32_t flags)
 		 * set MAX_BPC property to 10bpc prior to setting
 		 * HDR metadata property. Therefore, checking.
 		 */
-		if (!has_max_bpc(output))
+		if (!has_max_bpc(output) || !has_hdr(output)) {
+			igt_info("%s connector not found with HDR metadata/max_bpc connector property\n", output->name);
 			continue;
+		}
 
-		if (!has_hdr(output))
+		if (!is_panel_hdr(data, output)) {
+			igt_info("Panel attached via %s connector is non-HDR\n", output->name);
 			continue;
-
-		if (!is_panel_hdr(data, output))
-			continue;
+		}
 
 		igt_info("HDR %s test execution on %s\n", test_name, output->name);
 		if (flags & TEST_NONE || flags & TEST_DPMS || flags & TEST_SUSPEND)
 			test_static_toggle(data, output, flags);
 		if (flags & TEST_SWAP)
 			test_static_swap(data, output);
+
 		valid_tests++;
 	}
 
-	igt_require_f(valid_tests, "No connector found with HDR metadata/MAX BPC connector property (or) panel is Non-HDR\n");
+	igt_require_f(valid_tests, "No connector found with HDR metadata/max_bpc connector property (or) panel is non-HDR\n");
 }
 
 igt_main
