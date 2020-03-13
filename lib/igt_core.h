@@ -145,8 +145,8 @@ void __igt_fixture_end(void) __attribute__((noreturn));
 			 __igt_fixture_complete())
 
 /* subtest infrastructure */
-jmp_buf igt_subtest_jmpbuf;
-jmp_buf igt_dynamic_jmpbuf;
+extern jmp_buf igt_subtest_jmpbuf;
+extern jmp_buf igt_dynamic_jmpbuf;
 typedef int (*igt_opt_handler_t)(int opt, int opt_index, void *data);
 #define IGT_OPT_HANDLER_SUCCESS 0
 #define IGT_OPT_HANDLER_ERROR -2

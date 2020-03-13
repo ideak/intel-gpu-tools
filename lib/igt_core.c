@@ -261,6 +261,9 @@
  * such as those related to Chamelium support.
  */
 
+jmp_buf igt_subtest_jmpbuf;
+jmp_buf igt_dynamic_jmpbuf;
+
 static unsigned int exit_handler_count;
 const char *igt_interactive_debug;
 bool igt_skip_crc_compare;
