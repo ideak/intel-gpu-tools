@@ -39,12 +39,12 @@ static void dump_batch(struct intel_batchbuffer *batch) {
 #define dump_batch(x) do { } while(0)
 #endif
 
-struct {
+static struct {
 	uint32_t cc_state;
 	uint32_t blend_state;
 } cc;
 
-struct {
+static struct {
 	uint32_t cc_state;
 	uint32_t sf_clip_state;
 } viewport;
