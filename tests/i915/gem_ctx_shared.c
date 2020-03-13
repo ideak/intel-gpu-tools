@@ -41,6 +41,7 @@
 #include "i915/gem_engine_topology.h"
 #include "igt_rand.h"
 #include "igt_vgem.h"
+#include "sw_sync.h"
 #include "sync_file.h"
 
 #define LO 0
@@ -196,6 +197,7 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 	uint32_t scratch, *s;
 	uint32_t batch, cs[16];
 	uint64_t offset;
+	int timeline;
 	int i;
 
 	gem_require_ring(i915, ring);
@@ -214,6 +216,10 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 	execbuf.rsvd1 = 0;
 	gem_close(i915, scratch);
 
+	timeline = sw_sync_timeline_create();
+	execbuf.rsvd2 = sw_sync_timeline_create_fence(timeline, 1);
+	execbuf.flags |= I915_EXEC_FENCE_IN;
+
 	scratch = gem_create(i915, 4096);
 	s = gem_mmap__wc(i915, scratch, 0, 4096, PROT_WRITE);
 
@@ -223,7 +229,10 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 
 	/* Load object into place in the GTT */
 	obj.handle = scratch;
-	gem_execbuf(i915, &execbuf);
+	execbuf.flags |= I915_EXEC_FENCE_OUT;
+	gem_execbuf_wr(i915, &execbuf);
+	execbuf.flags &= ~I915_EXEC_FENCE_OUT;
+	execbuf.rsvd2 >>= 32;
 	offset = obj.offset;
 
 	/* Presume nothing causes an eviction in the meantime! */
@@ -261,8 +270,13 @@ static void exec_shared_gtt(int i915, unsigned int ring)
 	gem_execbuf(i915, &execbuf);
 	igt_assert_eq_u64(obj.offset, offset);
 
-	gem_sync(i915, batch); /* write hazard lies */
 	gem_close(i915, batch);
+	sw_sync_timeline_inc(timeline, 1);
+	close(timeline);
+
+	gem_sync(i915, scratch); /* write hazard lies */
+	igt_assert_eq(sync_fence_status(execbuf.rsvd2), 1);
+	close(execbuf.rsvd2);
 
 	/*
 	 * If we created the new context with the old GTT, the write
