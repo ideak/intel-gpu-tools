@@ -72,6 +72,17 @@ igt@gen7_exec_parse@.*lri.*
 ###############################################
 igt@kms_frontbuffer_tracking@.*drrs.*
 ###############################################
+# Tends to generate invalid configurations
+# using CCS planes or configurations that
+# exceed HW capabilities resulting in sporadic
+# failure with -EINVAL.
+#
+# Maintaining extra constraints for Intel's HW
+# is too costly in comparison to the value
+# provided.
+###############################################
+igt@kms_chamelium@hdmi-.*-planes-random
+###############################################
 # Broadcom
 ###############################################
 igt@vc4_.*
