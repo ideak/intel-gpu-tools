@@ -352,7 +352,7 @@ static void test_nohangcheck_hostile(int i915)
 
 	igt_require(__enable_hangcheck(dir, false));
 
-	for_each_physical_engine(e, i915) {
+	for_each_engine(e, i915) {
 		uint32_t ctx = gem_context_create(i915);
 		igt_spin_t *spin;
 
@@ -389,7 +389,7 @@ static void test_nohangcheck_hang(int i915)
 
 	igt_require(__enable_hangcheck(dir, false));
 
-	for_each_physical_engine(e, i915) {
+	for_each_engine(e, i915) {
 		uint32_t ctx = gem_context_create(i915);
 		igt_spin_t *spin;
 
@@ -1101,11 +1101,11 @@ igt_main
 		for (test = tests; test->name; test++) {
 			igt_subtest_with_dynamic_f("legacy-engines-%s",
 						   test->name) {
-				for_each_engine(e, i915) {
+				for_each_physical_engine(e, i915) {
 					igt_dynamic_f("%s", e->name) {
 						do_test(test->func,
 							i915, eb_ring(e),
-							e->name);
+							e->full_name);
 					}
 				}
 			}
