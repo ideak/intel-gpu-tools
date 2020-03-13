@@ -335,13 +335,25 @@ bool gem_engine_is_equal(const struct intel_execution_engine2 *e1,
 	return e1->class == e2->class && e1->instance == e2->instance;
 }
 
-static FILE *__open_attr(int dir, ...)
+static int reopen(int dir, int mode)
+{
+	char buf[128];
+	int fd;
+
+	snprintf(buf, sizeof(buf), "/proc/self/fd/%d", dir);
+	fd = open(buf, mode);
+	close(dir);
+
+	return fd;
+}
+
+static FILE *__open_attr(int dir, const char *mode, ...)
 {
 	const char *path;
 	FILE *file;
 	va_list ap;
 
-	va_start(ap, dir);
+	va_start(ap, mode);
 	while (dir >= 0 && (path = va_arg(ap, const char *))) {
 		int fd;
 
@@ -352,7 +364,10 @@ static FILE *__open_attr(int dir, ...)
 	}
 	va_end(ap);
 
-	file = fdopen(dir, "r");
+	if (*mode != 'r') /* clumsy, but fun */
+		dir = reopen(dir, O_RDWR);
+
+	file = fdopen(dir, mode);
 	if (!file) {
 		close(dir);
 		return NULL;
@@ -367,18 +382,34 @@ int gem_engine_property_scanf(int i915, const char *engine, const char *attr,
 	FILE *file;
 	va_list ap;
 	int ret;
-	int fd;
 
-	fd = igt_sysfs_open(i915);
-	if (fd < 0)
-		return fd;
-
-	file = __open_attr(fd, "engine", engine, attr, NULL);
+	file = __open_attr(igt_sysfs_open(i915), "r",
+			   "engine", engine, attr, NULL);
 	if (!file)
 		return -1;
 
 	va_start(ap, fmt);
 	ret = vfscanf(file, fmt, ap);
+	va_end(ap);
+
+	fclose(file);
+	return ret;
+}
+
+int gem_engine_property_printf(int i915, const char *engine, const char *attr,
+			       const char *fmt, ...)
+{
+	FILE *file;
+	va_list ap;
+	int ret;
+
+	file = __open_attr(igt_sysfs_open(i915), "w",
+			   "engine", engine, attr, NULL);
+	if (!file)
+		return -1;
+
+	va_start(ap, fmt);
+	ret = vfprintf(file, fmt, ap);
 	va_end(ap);
 
 	fclose(file);

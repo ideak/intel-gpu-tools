@@ -78,6 +78,10 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
 __attribute__((format(scanf, 4, 5)))
 int gem_engine_property_scanf(int i915, const char *engine, const char *attr,
 			      const char *fmt, ...);
+__attribute__((format(printf, 4, 5)))
+int gem_engine_property_printf(int i915, const char *engine, const char *attr,
+			       const char *fmt, ...);
+
 uint32_t gem_engine_mmio_base(int i915, const char *engine);
 
 void dyn_sysfs_engines(int i915, int engines, const char *file,
