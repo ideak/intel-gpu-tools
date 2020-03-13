@@ -156,14 +156,8 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	for (unsigned i = 0; i < count; i++) {
 		batches[i].handle = gem_create(fd, BATCH_SIZE);
 		batches[i].ptr =
-			__gem_mmap__wc(fd, batches[i].handle,
-				       0, BATCH_SIZE, PROT_WRITE);
-		if (!batches[i].ptr) {
-			batches[i].ptr =
-				__gem_mmap__gtt(fd, batches[i].handle,
-						BATCH_SIZE, PROT_WRITE);
-		}
-		igt_require(batches[i].ptr);
+			gem_mmap__device_coherent(fd, batches[i].handle,
+						  0, BATCH_SIZE, PROT_WRITE);
 	}
 
 	/* Flush all memory before we start the timer */
