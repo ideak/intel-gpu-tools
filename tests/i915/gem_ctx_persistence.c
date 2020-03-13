@@ -41,7 +41,8 @@
 #include "ioctl_wrappers.h" /* gem_wait()! */
 #include "sw_sync.h"
 
-static unsigned long reset_timeout_ms = 2 * MSEC_PER_SEC; /* default: 640ms */
+#define RESET_TIMEOUT_MS 2 * MSEC_PER_SEC; /* default: 640ms */
+static unsigned long reset_timeout_ms = RESET_TIMEOUT_MS;
 #define NSEC_PER_MSEC (1000 * 1000ull)
 
 static bool has_persistence(int i915)
@@ -1010,6 +1011,28 @@ static void replace_engines_hostile(int i915,
 	gem_quiescent_gpu(i915);
 }
 
+static void do_test(void (*test)(int i915, unsigned int engine),
+		    int i915, unsigned int engine,
+		    const char *name)
+{
+#define ATTR "preempt_timeout_ms"
+	int timeout = -1;
+
+	gem_engine_property_scanf(i915, name, ATTR, "%d", &timeout);
+	if (timeout != -1) {
+		igt_require(gem_engine_property_printf(i915, name,
+						       ATTR, "%d", 50) > 0);
+		reset_timeout_ms = 200;
+	}
+
+	test(i915, engine);
+
+	if (timeout != -1) {
+		gem_engine_property_printf(i915, name, ATTR, "%d", timeout);
+		reset_timeout_ms = RESET_TIMEOUT_MS;
+	}
+}
+
 int i915;
 
 static void exit_handler(int sig)
@@ -1079,8 +1102,11 @@ igt_main
 			igt_subtest_with_dynamic_f("legacy-engines-%s",
 						   test->name) {
 				for_each_engine(e, i915) {
-					igt_dynamic_f("%s", e->name)
-						test->func(i915, eb_ring(e));
+					igt_dynamic_f("%s", e->name) {
+						do_test(test->func,
+							i915, eb_ring(e),
+							e->name);
+					}
 				}
 			}
 		}
@@ -1100,8 +1126,11 @@ igt_main
 		for (test = tests; test->name; test++) {
 			igt_subtest_with_dynamic_f("engines-%s", test->name) {
 				__for_each_physical_engine(i915, e) {
-					igt_dynamic_f("%s", e->name)
-						test->func(i915, e->flags);
+					igt_dynamic_f("%s", e->name) {
+						do_test(test->func,
+							i915, e->flags,
+							e->name);
+					}
 				}
 			}
 		}
