@@ -2265,6 +2265,92 @@ test_polling(void)
 	__perf_close(stream_fd);
 }
 
+static int
+num_valid_reports_captured(struct drm_i915_perf_open_param *param,
+			   int64_t *duration_ns)
+{
+	uint8_t buf[1024 * 1024];
+	int64_t start, end;
+	int num_reports = 0;
+
+	igt_debug("Expected duration = %lu\n", *duration_ns);
+
+	stream_fd = __perf_open(drm_fd, param, true);
+
+	start = get_time();
+	do_ioctl(stream_fd, I915_PERF_IOCTL_ENABLE, 0);
+	for (/* nop */; ((end = get_time()) - start) < *duration_ns; /* nop */) {
+		struct drm_i915_perf_record_header *header;
+		int ret;
+
+		while ((ret = read(stream_fd, buf, sizeof(buf))) < 0 &&
+		       errno == EINTR)
+			;
+
+		igt_assert(ret > 0);
+
+		for (int offset = 0; offset < ret; offset += header->size) {
+			header = (void *)(buf + offset);
+
+			if (header->type == DRM_I915_PERF_RECORD_SAMPLE) {
+				uint32_t *report = (void *)(header + 1);
+
+				if ((report[0] >> OAREPORT_REASON_SHIFT) &
+				    OAREPORT_REASON_TIMER)
+					num_reports++;
+			}
+		}
+	}
+	__perf_close(stream_fd);
+
+	*duration_ns = end - start;
+
+	igt_debug("Actual duration = %lu\n", *duration_ns);
+
+	return num_reports;
+}
+
+static void
+gen12_test_oa_tlb_invalidate(void)
+{
+	int oa_exponent = max_oa_exponent_for_period_lte(30000000);
+	uint64_t properties[] = {
+		DRM_I915_PERF_PROP_SAMPLE_OA, true,
+
+		DRM_I915_PERF_PROP_OA_METRICS_SET, test_set->perf_oa_metrics_set,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_set->perf_oa_format,
+		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
+	};
+	struct drm_i915_perf_open_param param = {
+		.flags = I915_PERF_FLAG_FD_CLOEXEC |
+			I915_PERF_FLAG_DISABLED,
+		.num_properties = sizeof(properties) / 16,
+		.properties_ptr = to_user_pointer(properties),
+	};
+	int num_reports1, num_reports2, num_expected_reports;
+	int64_t duration;
+
+	/* Capture reports for 5 seconds twice and then make sure you get around
+	 * the same number of reports. In the case of failure, the number of
+	 * reports will vary largely since the beginning of the OA buffer
+	 * will have invalid entries.
+	 */
+	duration = 5LL * NSEC_PER_SEC;
+	num_reports1 = num_valid_reports_captured(&param, &duration);
+	num_expected_reports = duration / oa_exponent_to_ns(oa_exponent);
+	igt_debug("expected num reports = %d\n", num_expected_reports);
+	igt_debug("actual num reports = %d\n", num_reports1);
+	igt_assert(num_reports1 > 0.95 * num_expected_reports);
+
+	duration = 5LL * NSEC_PER_SEC;
+	num_reports2 = num_valid_reports_captured(&param, &duration);
+	num_expected_reports = duration / oa_exponent_to_ns(oa_exponent);
+	igt_debug("expected num reports = %d\n", num_expected_reports);
+	igt_debug("actual num reports = %d\n", num_reports2);
+	igt_assert(num_reports2 > 0.95 * num_expected_reports);
+}
+
+
 static void
 test_buffer_fill(void)
 {
@@ -4598,12 +4684,6 @@ igt_main
 		test_mi_rpc();
 	}
 
-	igt_describe("Test MI REPORT PERF COUNT for Gen 12");
-	igt_subtest("gen12-mi-rpc") {
-		igt_require(intel_gen(devid) >= 12);
-		gen12_test_mi_rpc();
-	}
-
 	igt_subtest("unprivileged-single-ctx-counters") {
 		igt_require(IS_HASWELL(devid));
 		hsw_test_single_ctx_counters();
@@ -4622,10 +4702,20 @@ igt_main
 		gen8_test_single_ctx_render_target_writes_a_counter();
 	}
 
-	igt_describe("Measure performance for a specific context using OAR in Gen 12");
-	igt_subtest("gen12-unprivileged-single-ctx-counters") {
-		igt_require(intel_gen(devid) >= 12);
-		gen12_test_single_ctx_render_target_writes_a_counter();
+	igt_subtest_group {
+		igt_fixture igt_require(intel_gen(devid) >= 12);
+
+		igt_describe("Test MI REPORT PERF COUNT for Gen 12");
+		igt_subtest("gen12-mi-rpc")
+			gen12_test_mi_rpc();
+
+		igt_describe("Test OA TLB invalidate");
+		igt_subtest("gen12-oa-tlb-invalidate")
+			gen12_test_oa_tlb_invalidate();
+
+		igt_describe("Measure performance for a specific context using OAR in Gen 12");
+		igt_subtest("gen12-unprivileged-single-ctx-counters")
+			gen12_test_single_ctx_render_target_writes_a_counter();
 	}
 
 	igt_subtest("rc6-disable")
