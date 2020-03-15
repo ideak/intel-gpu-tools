@@ -57,12 +57,10 @@
 IGT_TEST_DESCRIPTION("Test doing many tiled blits, with a working set larger"
 		     " than the aperture size.");
 
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
 static int width = 512, height = 512;
 
 static drm_intel_bo *
-create_bo(uint32_t start_val)
+create_bo(drm_intel_bufmgr *bufmgr, struct intel_batchbuffer *batch, uint32_t x)
 {
 	drm_intel_bo *bo, *linear_bo;
 	uint32_t *linear;
@@ -79,7 +77,7 @@ create_bo(uint32_t start_val)
 	do_or_die(drm_intel_bo_map(linear_bo, 1));
 	linear = linear_bo->virtual;
 	for (i = 0; i < 1024 * 1024 / 4; i++)
-		linear[i] = start_val++;
+		linear[i] = x++;
 	drm_intel_bo_unmap(linear_bo);
 
 	intel_copy_bo (batch, bo, linear_bo, width*height*4);
@@ -90,14 +88,15 @@ create_bo(uint32_t start_val)
 }
 
 static void
-check_bo(drm_intel_bo *bo, uint32_t val)
+check_bo(drm_intel_bo *bo, uint32_t val, struct intel_batchbuffer *batch)
 {
 	drm_intel_bo *linear_bo;
 	uint32_t *linear;
 	int num_errors;
 	int i;
 
-	linear_bo = drm_intel_bo_alloc(bufmgr, "linear dst", 1024 * 1024, 4096);
+	linear_bo = drm_intel_bo_alloc(bo->bufmgr, "linear dst",
+				       1024 * 1024, 4096);
 
 	intel_copy_bo(batch, linear_bo, bo, width*height*4);
 
@@ -117,64 +116,30 @@ check_bo(drm_intel_bo *bo, uint32_t val)
 	drm_intel_bo_unreference(linear_bo);
 }
 
-static void run_test(int count)
+static void run_test(int fd, int count)
 {
+	struct intel_batchbuffer *batch;
+	drm_intel_bufmgr *bufmgr;
 	drm_intel_bo **bo;
 	uint32_t *bo_start_val;
 	uint32_t start = 0;
 	int i;
 
-	igt_debug("Using %d 1MiB buffers\n", count);
+	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
+	drm_intel_bufmgr_gem_set_vma_cache_size(bufmgr, 32);
+	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+	batch = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(fd));
+
 
 	bo = malloc(sizeof(drm_intel_bo *)*count);
 	bo_start_val = malloc(sizeof(uint32_t)*count);
 
 	for (i = 0; i < count; i++) {
-		bo[i] = create_bo(start);
+		bo[i] = create_bo(bufmgr, batch, start);
 		bo_start_val[i] = start;
 		start += 1024 * 1024 / 4;
 	}
-	igt_info("Verifying initialisation...\n");
-	for (i = 0; i < count; i++)
-		check_bo(bo[i], bo_start_val[i]);
 
-	igt_info("Cyclic blits, forward...\n");
-	for (i = 0; i < count * 4; i++) {
-		int src = i % count;
-		int dst = (i+1) % count;
-
-		if (src == dst)
-			continue;
-
-		intel_copy_bo(batch, bo[dst], bo[src], width*height*4);
-		bo_start_val[dst] = bo_start_val[src];
-	}
-	for (i = 0; i < count; i++)
-		check_bo(bo[i], bo_start_val[i]);
-
-	if (igt_run_in_simulation()) {
-		for (i = 0; i < count; i++)
-			drm_intel_bo_unreference(bo[i]);
-		free(bo_start_val);
-		free(bo);
-		return;
-	}
-
-	igt_info("Cyclic blits, backward...\n");
-	for (i = 0; i < count * 4; i++) {
-		int src = (i+1) % count;
-		int dst = i % count;
-
-		if (src == dst)
-			continue;
-
-		intel_copy_bo(batch, bo[dst], bo[src], width*height*4);
-		bo_start_val[dst] = bo_start_val[src];
-	}
-	for (i = 0; i < count; i++)
-		check_bo(bo[i], bo_start_val[i]);
-
-	igt_info("Random blits...\n");
 	for (i = 0; i < count * 4; i++) {
 		int src = random() % count;
 		int dst = random() % count;
@@ -185,68 +150,62 @@ static void run_test(int count)
 		intel_copy_bo(batch, bo[dst], bo[src], width*height*4);
 		bo_start_val[dst] = bo_start_val[src];
 	}
+
 	for (i = 0; i < count; i++) {
-		check_bo(bo[i], bo_start_val[i]);
+		check_bo(bo[i], bo_start_val[i], batch);
 		drm_intel_bo_unreference(bo[i]);
 	}
 
 	free(bo_start_val);
 	free(bo);
+
+	intel_batchbuffer_free(batch);
+	drm_intel_bufmgr_destroy(bufmgr);
 }
 
 #define MAX_32b ((1ull << 32) - 4096)
 
-int fd;
-
 igt_main
 {
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	uint64_t count = 0;
+	int fd = -1;
+
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 		gem_require_blitter(fd);
 		gem_require_mappable_ggtt(fd);
 
-		bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-		drm_intel_bufmgr_gem_set_vma_cache_size(bufmgr, 32);
-		batch = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(fd));
+		count = gem_aperture_size(fd);
+		if (count >> 32)
+			count = MAX_32b;
+		count = 3 + count / (1024 * 1024);
+		igt_require(count > 1);
+		intel_require_memory(count, 1024 * 1024 , CHECK_RAM);
+
+		igt_debug("Using %'"PRIu64" 1MiB buffers\n", count);
+		count = (count + ncpus - 1) / ncpus;
 	}
 
 	igt_subtest("basic")
-		run_test(2);
+		run_test(fd, 2);
 
 	igt_subtest("normal") {
-		uint64_t count;
-
-		count = gem_aperture_size(fd);
-		if (count >> 32)
-			count = MAX_32b;
-		count = 3 * count / (1024*1024) / 2;
-		count += (count & 1) == 0;
-		intel_require_memory(count, 1024*1024, CHECK_RAM);
-
-		run_test(count);
+		igt_fork(child, ncpus)
+			run_test(fd, count);
+		igt_waitchildren();
 	}
 
 	igt_subtest("interruptible") {
-		uint64_t count;
-
-		count = gem_aperture_size(fd);
-		if (count >> 32)
-			count = MAX_32b;
-		count = 3 * count / (1024*1024) / 2;
-		count += (count & 1) == 0;
-		intel_require_memory(count, 1024*1024, CHECK_RAM);
-
 		igt_fork_signal_helper();
-		run_test(count);
+		igt_fork(child, ncpus)
+			run_test(fd, count);
+		igt_waitchildren();
 		igt_stop_signal_helper();
 	}
 
 	igt_fixture {
-		intel_batchbuffer_free(batch);
-		drm_intel_bufmgr_destroy(bufmgr);
-
 		close(fd);
 	}
 }

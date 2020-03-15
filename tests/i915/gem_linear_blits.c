@@ -162,9 +162,7 @@ static void run_test(int fd, int count)
 	uint32_t start = 0;
 	int i;
 
-	igt_debug("Using %d 1MiB buffers\n", count);
-
-	handle = malloc(sizeof(uint32_t)*count*2);
+	handle = malloc(sizeof(uint32_t) * count * 2);
 	start_val = handle + count;
 
 	for (i = 0; i < count; i++) {
@@ -173,34 +171,7 @@ static void run_test(int fd, int count)
 		start += 1024 * 1024 / 4;
 	}
 
-	igt_debug("Verifying initialisation...\n");
-	for (i = 0; i < count; i++)
-		check_bo(fd, handle[i], start_val[i]);
-
-	igt_debug("Cyclic blits, forward...\n");
-	for (i = 0; i < count * 4; i++) {
-		int src = i % count;
-		int dst = (i + 1) % count;
-
-		copy(fd, handle[dst], handle[src]);
-		start_val[dst] = start_val[src];
-	}
-	for (i = 0; i < count; i++)
-		check_bo(fd, handle[i], start_val[i]);
-
-	igt_debug("Cyclic blits, backward...\n");
-	for (i = 0; i < count * 4; i++) {
-		int src = (i + 1) % count;
-		int dst = i % count;
-
-		copy(fd, handle[dst], handle[src]);
-		start_val[dst] = start_val[src];
-	}
-	for (i = 0; i < count; i++)
-		check_bo(fd, handle[i], start_val[i]);
-
-	igt_debug("Random blits...\n");
-	for (i = 0; i < count * 4; i++) {
+	for (i = 0; i < count; i++) {
 		int src = random() % count;
 		int dst = random() % count;
 
@@ -210,6 +181,7 @@ static void run_test(int fd, int count)
 		copy(fd, handle[dst], handle[src]);
 		start_val[dst] = start_val[src];
 	}
+
 	for (i = 0; i < count; i++) {
 		check_bo(fd, handle[i], start_val[i]);
 		gem_close(fd, handle[i]);
@@ -222,42 +194,40 @@ static void run_test(int fd, int count)
 
 igt_main
 {
-	int fd = 0;
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	uint64_t count = 0;
+	int fd = -1;
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 		gem_require_blitter(fd);
+
+		count = gem_aperture_size(fd);
+		if (count >> 32)
+			count = MAX_32b;
+		count = 3 + count / (1024*1024);
+		igt_require(count > 1);
+		intel_require_memory(count, sizeof(linear), CHECK_RAM);
+
+		igt_debug("Using %'"PRIu64" 1MiB buffers\n", count);
+		count = (count + ncpus - 1) / ncpus;
 	}
 
 	igt_subtest("basic")
 		run_test(fd, 2);
 
 	igt_subtest("normal") {
-		uint64_t count;
-
-		count = gem_aperture_size(fd);
-		if (count >> 32)
-			count = MAX_32b;
-		count = 3 * count / (1024*1024) / 2;
-		igt_require(count > 1);
-		intel_require_memory(count, sizeof(linear), CHECK_RAM);
-
-		run_test(fd, count);
+		igt_fork(child, ncpus)
+			run_test(fd, count);
+		igt_waitchildren();
 	}
 
 	igt_subtest("interruptible") {
-		uint64_t count;
-
-		count = gem_aperture_size(fd);
-		if (count >> 32)
-			count = MAX_32b;
-		count = 3 * count / (1024*1024) / 2;
-		igt_require(count > 1);
-		intel_require_memory(count, sizeof(linear), CHECK_RAM);
-
 		igt_fork_signal_helper();
-		run_test(fd, count);
+		igt_fork(child, ncpus)
+			run_test(fd, count);
+		igt_waitchildren();
 		igt_stop_signal_helper();
 	}
 }
