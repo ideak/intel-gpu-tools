@@ -70,6 +70,7 @@ cc_args = [
 # well with longjmp which is heavily used by IGT framework.
 	'-fno-builtin-malloc',
 	'-fno-builtin-calloc',
+	'-fcommon',
 ]
 
 foreach cc_arg : cc_args
