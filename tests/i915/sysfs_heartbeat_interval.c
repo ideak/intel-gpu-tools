@@ -227,7 +227,7 @@ static void test_nopreempt(int i915, int engine)
 	 */
 
 	/* Test heartbeats with forced preemption  disabled */
-	igt_sysfs_printf(engine, "preempt_timeout_ms", "%u", 0);
+	igt_require(igt_sysfs_printf(engine, "preempt_timeout_ms", "%u", 0) > 0);
 
 	igt_assert(igt_sysfs_scanf(engine, ATTR, "%u", &saved) == 1);
 	igt_debug("Initial %s:%u\n", ATTR, saved);
