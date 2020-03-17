@@ -60,14 +60,24 @@ static void enable_hangcheck(int i915, bool state)
 	close(dir);
 }
 
+static void set_attr(int engine, const char *attr, unsigned int value)
+{
+	unsigned int saved = ~value;
+
+	igt_debug("set %s:%d\n", attr, value);
+	igt_require(igt_sysfs_printf(engine, attr, "%u", value) > 0);
+	igt_sysfs_scanf(engine, attr, "%u", &saved);
+	igt_assert_eq(saved, value);
+}
+
 static void set_heartbeat(int engine, unsigned int value)
 {
-	unsigned int delay = ~value;
+	set_attr(engine, ATTR, value);
+}
 
-	igt_debug("set %s:%d\n", ATTR, value);
-	igt_require(igt_sysfs_printf(engine, ATTR, "%u", value) > 0);
-	igt_sysfs_scanf(engine, ATTR, "%u", &delay);
-	igt_assert_eq(delay, value);
+static void set_preempt_timeout(int engine, unsigned int value)
+{
+	set_attr(engine, "preempt_timeout_ms", value);
 }
 
 static void test_idempotent(int i915, int engine)
@@ -184,7 +194,7 @@ static void test_precise(int i915, int engine)
 	 * heartbeat interval, and so confirm it matches our specification.
 	 */
 
-	igt_require(igt_sysfs_printf(engine, "preempt_timeout_ms", "%u", 1) == 1);
+	set_preempt_timeout(engine, 1);
 
 	igt_assert(igt_sysfs_scanf(engine, ATTR, "%u", &saved) == 1);
 	igt_debug("Initial %s:%u\n", ATTR, saved);
@@ -227,7 +237,7 @@ static void test_nopreempt(int i915, int engine)
 	 */
 
 	/* Test heartbeats with forced preemption  disabled */
-	igt_require(igt_sysfs_printf(engine, "preempt_timeout_ms", "%u", 0) > 0);
+	set_preempt_timeout(engine, 0);
 
 	igt_assert(igt_sysfs_scanf(engine, ATTR, "%u", &saved) == 1);
 	igt_debug("Initial %s:%u\n", ATTR, saved);
@@ -334,7 +344,7 @@ static void test_mixed(int i915, int engine)
 	 * innocents. We inspect the fence status of each to verify that
 	 * only the hogs are reset.
 	 */
-	igt_require(igt_sysfs_printf(engine, "preempt_timeout_ms", "%u", 1) == 1);
+	set_preempt_timeout(engine, 1);
 	__test_mixed(i915, engine, 10, 10, 100, 5);
 }
 
@@ -345,7 +355,7 @@ static void test_long(int i915, int engine)
 	 * never do hangchecking. Never is hard to test, so instead we
 	 * run over a day and verify that only the super hogs are reset.
 	 */
-	igt_sysfs_printf(engine, "preempt_timeout_ms", "%u", 0);
+	set_preempt_timeout(engine, 0);
 	__test_mixed(i915, engine,
 		     60 * 1000, /* 60s */
 		     60 * 1000, /* 60s */
