@@ -377,8 +377,8 @@ static void test_mixed(int i915, int engine)
 	 * innocents. We inspect the fence status of each to verify that
 	 * only the hogs are reset.
 	 */
-	set_preempt_timeout(engine, 1);
-	__test_mixed(i915, engine, 10, 10, 100, 5);
+	set_preempt_timeout(engine, 25);
+	__test_mixed(i915, engine, 25, 10, 250, 5);
 }
 
 static void test_long(int i915, int engine)
