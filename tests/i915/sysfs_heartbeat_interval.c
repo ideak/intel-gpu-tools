@@ -265,6 +265,21 @@ static void test_nopreempt(int i915, int engine)
 	set_heartbeat(engine, saved);
 }
 
+static unsigned int measured_usleep(unsigned int usec)
+{
+	struct timespec ts = { };
+	unsigned int slept;
+
+	slept = igt_nsec_elapsed(&ts);
+	igt_assert(slept == 0);
+	do {
+		usleep(usec - slept);
+		slept = igt_nsec_elapsed(&ts) / 1000;
+	} while (slept < usec);
+
+	return igt_nsec_elapsed(&ts);
+}
+
 static void client(int i915, int engine, int *ctl, int duration, int expect)
 {
 	unsigned int class, inst;
@@ -277,24 +292,39 @@ static void client(int i915, int engine, int *ctl, int duration, int expect)
 	ctx = create_context(i915, class, inst, 0);
 
 	while (!READ_ONCE(*ctl)) {
+		unsigned int elapsed;
 		igt_spin_t *spin;
 
 		spin = igt_spin_new(i915, ctx,
 				    .flags = (IGT_SPIN_NO_PREEMPTION |
 					      IGT_SPIN_POLL_RUN |
 					      IGT_SPIN_FENCE_OUT));
+
 		igt_spin_busywait_until_started(spin);
+		igt_assert_eq(sync_fence_status(spin->out_fence), 0);
 
-		igt_spin_set_timeout(spin, (uint64_t)duration * 1000 * 1000);
+		elapsed = measured_usleep(duration * 1000);
+		igt_spin_end(spin);
+
 		sync_fence_wait(spin->out_fence, -1);
+		if (sync_fence_status(spin->out_fence) != expect)
+			kill(getppid(), SIGALRM); /* cancel parent's sleep */
 
-		igt_assert_eq(sync_fence_status(spin->out_fence), expect);
+		igt_assert_f(sync_fence_status(spin->out_fence) == expect,
+			     "%s client: elapsed: %.3fms, expected %d, got %d\n",
+			     expect < 0 ? "Bad" : "Good", elapsed * 1e-6,
+			     expect, sync_fence_status(spin->out_fence));
+		igt_spin_free(i915, spin);
 		count++;
 	}
 
 	gem_context_destroy(i915, ctx);
 	igt_info("%s client completed %lu spins\n",
 		 expect < 0 ? "Bad" : "Good", count);
+}
+
+static void sighandler(int sig)
+{
 }
 
 static void __test_mixed(int i915, int engine,
@@ -304,6 +334,7 @@ static void __test_mixed(int i915, int engine,
 			 int duration)
 {
 	unsigned int saved;
+	sighandler_t old;
 	int *shared;
 
 	/*
@@ -325,7 +356,9 @@ static void __test_mixed(int i915, int engine,
 	igt_fork(child, 1) /* bad client */
 		client(i915, engine, shared, bad, -EIO);
 
+	old = signal(SIGALRM, sighandler);
 	sleep(duration);
+	signal(SIGALRM, old);
 
 	*shared = true;
 	igt_waitchildren();
