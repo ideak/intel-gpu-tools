@@ -316,7 +316,7 @@ static int nop_sync(int i915, uint32_t ctx, unsigned int ring, int64_t timeout)
 
 static bool has_single_timeline(int i915)
 {
-	uint32_t ctx;
+	uint32_t ctx = 0;
 
 	__gem_context_clone(i915, 0, 0,
 			    I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE,
