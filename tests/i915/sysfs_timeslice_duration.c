@@ -40,7 +40,7 @@
 #include "sw_sync.h"
 
 #define ATTR "timeslice_duration_ms"
-#define RESET_TIMEOUT 20 /* milliseconds, at least one jiffie for kworker */
+#define RESET_TIMEOUT 50 /* milliseconds, at least one jiffie for kworker */
 
 #define MI_SEMAPHORE_WAIT		(0x1c << 23)
 #define   MI_SEMAPHORE_POLL             (1 << 15)
@@ -78,6 +78,13 @@ static void set_timeslice(int engine, unsigned int value)
 	igt_sysfs_printf(engine, ATTR, "%u", value);
 	igt_sysfs_scanf(engine, ATTR, "%u", &delay);
 	igt_assert_eq(delay, value);
+}
+
+static int wait_for_reset(int fence)
+{
+	/* Do a double wait to paper over scheduler fluctuations */
+	sync_fence_wait(fence, RESET_TIMEOUT);
+	return sync_fence_wait(fence, RESET_TIMEOUT);
 }
 
 static void test_idempotent(int i915, int engine)
@@ -374,7 +381,7 @@ static uint64_t __test_timeout(int i915, int engine, unsigned int timeout)
 
 	igt_spin_free(i915, spin[1]);
 
-	igt_assert_eq(sync_fence_wait(spin[0]->out_fence, RESET_TIMEOUT), 0);
+	igt_assert_eq(wait_for_reset(spin[0]->out_fence), 0);
 	igt_assert_eq(sync_fence_status(spin[0]->out_fence), -EIO);
 
 	igt_spin_free(i915, spin[0]);
@@ -475,7 +482,7 @@ static void test_off(int i915, int engine)
 	igt_spin_busywait_until_started(spin[1]);
 	igt_spin_free(i915, spin[1]);
 
-	igt_assert_eq(sync_fence_wait(spin[0]->out_fence, RESET_TIMEOUT), 0);
+	igt_assert_eq(wait_for_reset(spin[0]->out_fence), 0);
 	igt_assert_eq(sync_fence_status(spin[0]->out_fence), -EIO);
 
 	igt_spin_free(i915, spin[0]);
