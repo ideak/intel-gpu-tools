@@ -50,7 +50,6 @@ igt@gem_render_linear_blits@(?!.*basic).*
 igt@gem_render_tiled_blits@(?!.*basic).*
 igt@gem_reset_stats(@.*)?
 igt@gem_ringfill@(?!.*basic).*
-igt@gem_ring_sync_loop(@.*)?
 igt@gem_shrink@(?!reclaim$).*
 igt@gem_softpin@.*(hang|S4).*
 igt@gem_spin_batch(@.*)?

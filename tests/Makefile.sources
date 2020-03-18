@@ -374,9 +374,6 @@ gem_request_retire_SOURCES = i915/gem_request_retire.c
 TESTS_progs += gem_reset_stats
 gem_reset_stats_SOURCES = i915/gem_reset_stats.c
 
-TESTS_progs += gem_ring_sync_loop
-gem_ring_sync_loop_SOURCES = i915/gem_ring_sync_loop.c
-
 TESTS_progs += gem_ringfill
 gem_ringfill_SOURCES = i915/gem_ringfill.c
 

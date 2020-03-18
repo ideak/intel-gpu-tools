@@ -187,7 +187,6 @@ i915_progs = [
 	'gem_render_tiled_blits',
 	'gem_request_retire',
 	'gem_reset_stats',
-	'gem_ring_sync_loop',
 	'gem_ringfill',
 	'gem_set_tiling_vs_blt',
 	'gem_set_tiling_vs_gtt',
