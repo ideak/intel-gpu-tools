@@ -41,7 +41,7 @@
 #include "igt_debugfs.h"
 
 #define ATTR "heartbeat_interval_ms"
-#define RESET_TIMEOUT 20 /* milliseconds, at least one jiffie for kworker */
+#define RESET_TIMEOUT 50 /* milliseconds, at least one jiffie for kworker */
 
 static bool __enable_hangcheck(int dir, bool state)
 {
@@ -78,6 +78,13 @@ static void set_heartbeat(int engine, unsigned int value)
 static void set_preempt_timeout(int engine, unsigned int value)
 {
 	set_attr(engine, "preempt_timeout_ms", value);
+}
+
+static int wait_for_reset(int fence)
+{
+	/* Do a double wait to paper over scheduler fluctuations */
+	sync_fence_wait(fence, RESET_TIMEOUT);
+	return sync_fence_wait(fence, RESET_TIMEOUT);
 }
 
 static void test_idempotent(int i915, int engine)
@@ -163,7 +170,7 @@ static uint64_t __test_timeout(int i915, int engine, unsigned int timeout)
 
 	igt_spin_free(i915, spin[1]);
 
-	igt_assert_eq(sync_fence_wait(spin[0]->out_fence, RESET_TIMEOUT), 0);
+	igt_assert_eq(wait_for_reset(spin[0]->out_fence), 0);
 	igt_assert_eq(sync_fence_status(spin[0]->out_fence), -EIO);
 
 	igt_spin_free(i915, spin[0]);
