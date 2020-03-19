@@ -34,8 +34,11 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <errno.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
+
 #include "drm.h"
 
 IGT_TEST_DESCRIPTION("Exercises the basic execbuffer using object alignments");
@@ -65,22 +68,78 @@ static uint32_t file_max(void)
 	return max;
 }
 
-static void many(int fd)
+static bool timed_out;
+
+static void alarm_handler(int signal)
+{
+	timed_out = true;
+}
+
+static void set_timeout(uint64_t timeout_ns)
+{
+	struct sigaction sa = {
+		.sa_handler = alarm_handler,
+	};
+	struct itimerval itv = {
+		.it_value.tv_sec = timeout_ns / NSEC_PER_SEC,
+		.it_value.tv_usec = timeout_ns % NSEC_PER_SEC / 1000,
+	};
+
+	timed_out = false;
+	sigaction(SIGALRM, &sa, NULL);
+	setitimer(ITIMER_REAL, &itv, NULL);
+}
+
+static void reset_timeout(void)
+{
+	struct itimerval itv = {};
+
+	sigaction(SIGALRM, NULL, NULL);
+	setitimer(ITIMER_REAL, &itv, NULL);
+}
+
+static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err = 0;
+
+	if (ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	return err;
+}
+
+static uint32_t batch_create(int i915, unsigned long sz)
 {
 	uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
+
+	handle = gem_create(i915, sz);
+	gem_write(i915, handle, 0, &bbe, sizeof(bbe));
+
+	return handle;
+}
+
+static void many(int fd, int timeout)
+{
 	struct drm_i915_gem_exec_object2 *execobj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint64_t gtt_size, ram_size;
-	uint64_t alignment, max_alignment, count, i;
+	uint64_t max_alignment;
+	unsigned long count, i;
 
 	gtt_size = gem_aperture_size(fd);
 	if (!gem_uses_full_ppgtt(fd))
 		gtt_size /= 2; /* We have to *share* our GTT! */
+
 	ram_size = intel_get_total_ram_mb();
 	ram_size *= 1024 * 1024;
+
 	count = ram_size / 4096;
 	if (count > file_max()) /* vfs cap */
 		count = file_max();
+
 	max_alignment = find_last_bit(gtt_size / count);
 	if (max_alignment <= 13)
 		max_alignment = 4096;
@@ -88,54 +147,68 @@ static void many(int fd)
 		max_alignment = 1ull << (max_alignment - 1);
 	count = gtt_size / max_alignment / 2;
 
-	igt_info("gtt_size=%lld MiB, max-alignment=%lld, count=%lld\n",
+	igt_info("gtt_size=%lld MiB, max-alignment=%lld, count=%lu\n",
 		 (long long)gtt_size/1024/1024,
 		 (long long)max_alignment,
-		 (long long)count);
+		 count);
 	intel_require_memory(count, 4096, CHECK_RAM);
 
-	execobj = calloc(sizeof(*execobj), count + 1);
+	execobj = calloc(sizeof(*execobj), count);
 	igt_assert(execobj);
 
 	for (i = 0; i < count; i++) {
-		execobj[i].handle = gem_create(fd, 4096);
-		if ((gtt_size-1) >> 32)
-			execobj[i].flags = 1<<3; /* EXEC_OBJECT_SUPPORTS_48B_ADDRESS */
+		execobj[i].handle = batch_create(fd, 4096);
+		if ((gtt_size - 1) >> 32)
+			execobj[i].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	}
-	execobj[i].handle = gem_create(fd, 4096);
-	if ((gtt_size-1) >> 32)
-		execobj[i].flags = 1<<3; /* EXEC_OBJECT_SUPPORTS_48B_ADDRESS */
-	gem_write(fd, execobj[i].handle, 0, &bbe, sizeof(bbe));
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(execobj);
-	execbuf.buffer_count = count + 1;
+	execbuf.buffer_count = count;
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 
-	for (alignment = 4096; alignment < gtt_size; alignment <<= 1) {
-		for (i = 0; i < count; i++)
-			execobj[i].alignment = alignment;
-		if (alignment > max_alignment) {
-			uint64_t factor = alignment / max_alignment;
-			execbuf.buffer_count = 2*count / factor;
-			execbuf.buffers_ptr =
-				to_user_pointer(execobj + count - execbuf.buffer_count + 1);
-		}
+	set_timeout((uint64_t)timeout * NSEC_PER_SEC);
+	for (uint64_t alignment = 8192;
+	     alignment < gtt_size && !READ_ONCE(timed_out);
+	     alignment <<= 1) {
+		unsigned long max;
 
-		igt_debug("testing %lld x alignment=%#llx [%db]\n",
-			  (long long)execbuf.buffer_count - 1,
-			  (long long)alignment,
-			  find_last_bit(alignment)-1);
-		gem_execbuf(fd, &execbuf);
-		for(i = count - execbuf.buffer_count + 1; i < count; i++) {
-			igt_assert_eq_u64(execobj[i].alignment, alignment);
-			igt_assert_eq_u64(execobj[i].offset % alignment, 0);
+		max = count;
+		if (alignment > max_alignment)
+			max = max * max_alignment / alignment;
+		igt_debug("Testing alignment:%" PRIx64", max_count:%lu\n",
+			  alignment, max);
+
+		for (i = 0; i < max; i++)
+			execobj[i].alignment = alignment;
+
+		for (i = 2; i < max; i <<= 1) {
+			struct timespec tv = {};
+			int err;
+
+			execbuf.buffer_count = i;
+
+			igt_nsec_elapsed(&tv);
+			err = __execbuf(fd, &execbuf);
+			igt_debug("Testing %lu x alignment=%#llx [%db], took %'"PRIu64"ns\n",
+				  i,
+				  (long long)alignment,
+				  find_last_bit(alignment) - 1,
+				  igt_nsec_elapsed(&tv));
+			if (READ_ONCE(timed_out))
+				break;
+			igt_assert_eq(err, 0);
+
+			for (unsigned long j = 0; j < i; j++) {
+				igt_assert_eq_u64(execobj[j].alignment, alignment);
+				igt_assert_eq_u64(execobj[j].offset % alignment, 0);
+			}
 		}
 	}
+	reset_timeout();
 
 	for (i = 0; i < count; i++)
 		gem_close(fd, execobj[i].handle);
-	gem_close(fd, execobj[i].handle);
 	free(execobj);
 }
 
@@ -207,6 +280,5 @@ igt_main
 	igt_subtest("single") /* basic! */
 		single(fd);
 	igt_subtest("many")
-		many(fd);
-
+		many(fd, 20);
 }
