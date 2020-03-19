@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
 		{"help",              no_argument,       NULL, OPT_HELP},
 		{0, 0, 0, 0}
 	};
-	int c, index = 0;
+	int c, ret = 0, index = 0;
 	char *env_device = NULL, *opt_device = NULL, *rc_device = NULL;
 	struct igt_devices_print_format fmt = {
 			.type = IGT_PRINT_USER,
@@ -257,7 +257,8 @@ int main(int argc, char *argv[])
 
 		if (!igt_device_card_match(igt_device, &card)) {
 			printf("No device found for the filter\n\n");
-			return -1;
+			ret = -1;
+			goto out;
 		}
 
 		printf("Device detail:\n");
@@ -272,9 +273,10 @@ int main(int argc, char *argv[])
 	} else {
 		igt_devices_print(&fmt);
 	}
-
+out:
+	igt_devices_free();
 	free(rc_device);
 	free(opt_device);
 
-	return 0;
+	return ret;
 }
