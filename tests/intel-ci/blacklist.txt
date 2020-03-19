@@ -24,7 +24,6 @@ igt@gem_ctx_switch(@.*)?
 igt@gem_ctx_thrash(@.*)?
 igt@gem_evict_alignment(@.*)?
 igt@gem_evict_everything(@.*)?
-igt@gem_exec_alignment@(?!.*single).*
 igt@gem_exec_big@(?!.*single).*
 igt@gem_exec_capture@many-(?!4K-).*
 igt@gem_exec_fence@(?!.*basic).*

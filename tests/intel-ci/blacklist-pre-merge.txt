@@ -63,6 +63,15 @@ igt@gem_pwrite@big-.*
 
 
 ###############################################################################
+# This test checks some edge cases of the execbuf API, which is quite time
+# consuming and rarely changes. Very unlikely to be affected by any code
+# outside of drm_mm and i915_gem_execbuffer, for which the authors assure us
+# that they are making deliberate and well tested changes.
+###############################################################################
+igt@gem_exec_alignment@.*
+
+
+###############################################################################
 # These 4 tests are covering an edge case which should never be hit by users
 # unless we already are in a bad situation, yet they are responsible for a
 # significant portion of our execution time:

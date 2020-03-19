@@ -38,6 +38,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
+#include <signal.h>
+#include <sched.h>
 
 #include "drm.h"
 
@@ -119,6 +121,118 @@ static uint32_t batch_create(int i915, unsigned long sz)
 	gem_write(i915, handle, 0, &bbe, sizeof(bbe));
 
 	return handle;
+}
+
+static void naughty_child(int i915, int link)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 *obj;
+	uint64_t gtt_size, ram_size, count;
+	struct timespec tv = {};
+
+	gtt_size = gem_aperture_size(i915); /* We have to *share* our GTT! */
+	ram_size = intel_get_total_ram_mb();
+	ram_size *= 1024 * 1024;
+
+	count = min(gtt_size, ram_size) / 16384;
+	if (count > file_max()) /* vfs cap */
+		count = file_max();
+	intel_require_memory(count, 4096, CHECK_RAM);
+
+	/* Fill the low-priority address space */
+	obj = calloc(sizeof(*obj), count);
+	igt_assert(obj);
+	for (unsigned long i = 0; i < count; i++) {
+		obj[i].handle = batch_create(i915, 4096);
+		if ((gtt_size - 1) >> 32)
+			obj[i].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+		obj[i].alignment = 4096;
+	}
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = count;
+	execbuf.rsvd1 = gem_context_create(i915);
+	gem_execbuf(i915, &execbuf);
+
+	/* Calibrate a long execbuf() */
+	for (unsigned long i = 0; i < count; i++)
+		obj[i].alignment = 8192;
+
+	execbuf.buffer_count = 2;
+	while (igt_seconds_elapsed(&tv) < 2) {
+		execbuf.buffer_count <<= 1;
+		gem_execbuf(i915, &execbuf);
+	}
+	execbuf.buffer_count <<= 1;
+	if (execbuf.buffer_count > count)
+		execbuf.buffer_count = count;
+	igt_debug("Using %u buffers to delay execbuf\n", execbuf.buffer_count);
+
+	for (unsigned long i = 0; i < count; i++)
+		obj[i].alignment = 16384;
+
+	write(link, &tv, sizeof(tv));
+
+	igt_debug("Executing naughty execbuf\n");
+	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+	gem_execbuf(i915, &execbuf); /* this should take over 2s */
+	igt_info("Naughty client took %'"PRIu64"ns\n",
+		 igt_nsec_elapsed(&tv));
+
+	gem_context_destroy(i915, execbuf.rsvd1);
+	for (unsigned long i = 0; i < count; i++)
+		gem_close(i915, obj[i].handle);
+	free(obj);
+}
+
+static void prio_inversion(int i915)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = batch_create(i915, 4095)
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+	};
+	struct timespec tv;
+	uint64_t elapsed;
+	int link[2];
+
+	/*
+	 * First low priority client create mass of holes in their
+	 * own address space, then launch a batch with oodles of object with
+	 * alignment that doesn't match previous one. While lp execbufer
+	 * is performing we want to start high priority task
+	 * and we expect it will not be blocked.
+	 */
+
+	igt_require(gem_uses_full_ppgtt(i915));
+	igt_assert(pipe(link) == 0);
+
+	/* Prime our prestine context */
+	gem_execbuf(i915, &execbuf);
+
+	igt_fork(child, 1)
+		naughty_child(i915, link[1]);
+
+	igt_debug("Waiting for naughty client\n");
+	read(link[0], &tv, sizeof(tv));
+	igt_debug("Ready...\n");
+	sleep(1); /* let the naughty execbuf begin */
+	igt_debug("Go!\n");
+
+	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+	gem_execbuf(i915, &execbuf);
+	elapsed = igt_nsec_elapsed(&tv);
+	igt_info("Normal client took %'"PRIu64"ns\n", elapsed);
+
+	igt_waitchildren();
+	gem_close(i915, obj.handle);
+
+	igt_assert(elapsed < 10 * 1000 * 1000); /* 10ms */
+	close(link[0]);
+	close(link[1]);
 }
 
 static void many(int fd, int timeout)
@@ -281,4 +395,6 @@ igt_main
 		single(fd);
 	igt_subtest("many")
 		many(fd, 20);
+	igt_subtest("pi")
+		prio_inversion(fd);
 }
