@@ -121,8 +121,7 @@ get_reference_crc(data_t *data, igt_output_t *output, enum pipe pipe,
 	ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
 	igt_skip_on(ret != 0);
 
-	igt_pipe_crc_start(data->pipe_crc);
-	igt_pipe_crc_get_single(data->pipe_crc, &data->ref_crc);
+	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);
 }
 
 static void
@@ -329,6 +328,8 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 	igt_info("Testing connector %s using pipe %s with %d planes %s with seed %d\n",
 		 igt_output_name(output), kmstest_pipe_name(pipe), c,
 		 info, opt.seed);
+
+	igt_pipe_crc_start(data->pipe_crc);
 
 	i = 0;
 	while (i < iterations || loop_forever) {
