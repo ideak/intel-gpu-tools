@@ -164,6 +164,7 @@ static void check_same_vm(int i915, uint32_t ctx_a, uint32_t ctx_b)
 	eb.rsvd1 = ctx_a;
 	gem_execbuf(i915, &eb);
 	igt_assert_eq_u64(batch.offset, 48 << 20);
+	gem_sync(i915, batch.handle); /* be still */
 
 	/* An already active VMA will try to keep its offset */
 	batch.offset = 0;
@@ -224,12 +225,15 @@ static void execbuf(int i915)
 	batch.offset = 48 << 20;
 	gem_execbuf(i915, &eb);
 	igt_assert_eq_u64(batch.offset, 48 << 20);
+	gem_sync(i915, batch.handle);
 
 	arg.value = gem_vm_create(i915);
 	gem_context_set_param(i915, &arg);
 	gem_execbuf(i915, &eb);
 	igt_assert_eq_u64(batch.offset, 48 << 20);
 	gem_vm_destroy(i915, arg.value);
+
+	gem_sync(i915, batch.handle); /* be idle! */
 
 	arg.value = gem_vm_create(i915);
 	gem_context_set_param(i915, &arg);
@@ -354,13 +358,18 @@ static void async_destroy(int i915)
 		.param = I915_CONTEXT_PARAM_VM,
 	};
 	igt_spin_t *spin[2];
+	int err;
 
 	spin[0] = igt_spin_new(i915,
 			       .ctx = arg.ctx_id,
 			       .flags = IGT_SPIN_POLL_RUN);
 	igt_spin_busywait_until_started(spin[0]);
 
-	gem_context_set_param(i915, &arg);
+	err = __gem_context_set_param(i915, &arg);
+	if (err == -EBUSY) /* update while busy may be verboten, let it ride. */
+		err = 0;
+	igt_assert_eq(err, 0);
+
 	spin[1] = __igt_spin_new(i915, .ctx = arg.ctx_id);
 
 	igt_spin_end(spin[0]);

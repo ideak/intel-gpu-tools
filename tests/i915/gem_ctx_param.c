@@ -211,13 +211,14 @@ static void test_vm(int i915)
 	gem_execbuf(i915, &eb);
 	igt_assert_eq_u64(batch.offset, nonzero_offset);
 
+	/* Note: changing an active ctx->vm may be verboten */
 	arg.ctx_id = child;
-	gem_context_set_param(i915, &arg);
-
-	eb.rsvd1 = child;
-	batch.offset = 0;
-	gem_execbuf(i915, &eb);
-	igt_assert_eq_u64(batch.offset, nonzero_offset);
+	if (__gem_context_set_param(i915, &arg) != -EBUSY) {
+		eb.rsvd1 = child;
+		batch.offset = 0;
+		gem_execbuf(i915, &eb);
+		igt_assert_eq_u64(batch.offset, nonzero_offset);
+	}
 
 	gem_context_destroy(i915, child);
 	gem_context_destroy(i915, parent);
