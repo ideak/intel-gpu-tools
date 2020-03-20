@@ -42,6 +42,7 @@ struct drm_info {
 	int debugfs_fd;
 	drmModeResPtr res;
 	drmModeConnectorPtr connectors[MAX_CONNECTORS];
+	uint32_t devid;
 };
 
 static void wait_user(const char *msg)
@@ -66,6 +67,8 @@ static void setup_drm(struct drm_info *drm)
 	for (i = 0; i < drm->res->count_connectors; i++)
 		drm->connectors[i] = drmModeGetConnectorCurrent(drm->fd,
 						drm->res->connectors[i]);
+
+	drm->devid = intel_get_drm_devid(drm->fd);
 
 	kmstest_set_vt_graphics_mode();
 }
@@ -139,19 +142,30 @@ static bool fbc_wait_until_disabled(int debugfs_fd)
 	return r;
 }
 
-static bool fbc_wait_until_update(int debugfs)
+static bool fbc_not_compressing_enabled(int debugfs_fd)
+{
+	char buf[128];
+
+	igt_debugfs_simple_read(debugfs_fd, "i915_fbc_status", buf,
+				sizeof(buf));
+	return strstr(buf, "FBC enabled\nCompressing: no");
+}
+
+static bool fbc_wait_until_update(struct drm_info *drm)
 {
 	/*
-	 * FBC is not expected to be enabled because fbcon do not uses a tiled
-	 * framebuffer so a fence can not be setup on the framebuffer and FBC
-	 * code requires a fence to accurate track frontbuffer modifications
-	 * (what maybe is not necessary anymore as we now have
-	 * intel_fbc_invalidate()/flush()).
+	 * As now kernel enables FBC on linear surfaces on GEN9+, check if the
+	 * fbcon cursor blinking is causing the FBC to uncompress the
+	 * framebuffer.
 	 *
-	 * If one day fbcon starts to use a tiled framebuffer we would need to
-	 * check the 'Compressing' status as in each blink it would be disabled.
+	 * For older GENs FBC is still expected to be disabled as it still
+	 * relies on a tiled and fenceable framebuffer to track modifications.
 	 */
-	return fbc_wait_until_disabled(debugfs);
+	if (AT_LEAST_GEN(drm->devid, 9))
+		return igt_wait(fbc_not_compressing_enabled(drm->debugfs_fd),
+				2500, 1);
+	else
+		return fbc_wait_until_disabled(drm->debugfs_fd);
 }
 
 typedef bool (*connector_possible_fn)(drmModeConnectorPtr connector);
@@ -220,9 +234,9 @@ static bool psr_supported_on_chipset(int debugfs_fd)
 	return psr_sink_support(debugfs_fd, PSR_MODE_1);
 }
 
-static bool psr_wait_until_update(int debugfs_fd)
+static bool psr_wait_until_update(struct drm_info *drm)
 {
-	return psr_long_wait_update(debugfs_fd, PSR_MODE_1);
+	return psr_long_wait_update(drm->debugfs_fd, PSR_MODE_1);
 }
 
 static void disable_features(int debugfs_fd)
@@ -245,7 +259,7 @@ static inline void psr_debugfs_enable(int debugfs_fd)
 struct feature {
 	bool (*supported_on_chipset)(int debugfs_fd);
 	bool (*wait_until_enabled)(int debugfs_fd);
-	bool (*wait_until_update)(int debugfs_fd);
+	bool (*wait_until_update)(struct drm_info *drm);
 	bool (*connector_possible_fn)(drmModeConnectorPtr connector);
 	void (*enable)(int debugfs_fd);
 } fbc = {
@@ -295,13 +309,13 @@ static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 	sleep(3);
 
 	wait_user("Back to fbcon.");
-	igt_assert(feature->wait_until_update(drm->debugfs_fd));
+	igt_assert(feature->wait_until_update(drm));
 
 	if (suspend) {
 		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
 					      SUSPEND_TEST_NONE);
 		sleep(5);
-		igt_assert(feature->wait_until_update(drm->debugfs_fd));
+		igt_assert(feature->wait_until_update(drm));
 	}
 }
 
