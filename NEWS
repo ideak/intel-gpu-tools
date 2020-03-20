@@ -1,9 +1,45 @@
-Unreleased
-----------
+Release 1.25 (2020-03-20)
+-------------------------
 
-Meson build options have been renamed. Please check the news options in
-meson_options.txt and make sure you don't get any warnings when configuring the
-project.
+- Meson build options have been renamed. Please check the news options in
+  meson_options.txt and make sure you don't get any warnings when configuring
+  the project. (Simon Ser)
+
+- Compile-testing CI for MIPS. (Guillaume Tucker)
+
+- Various igt_runner reliability improvements (Petri Latvala & Arkadiusz Hiler)
+
+- Switched GEM tests to engine discovery. (Tvrtko Ursulin et al)
+
+- Subtests can now be documented and their descriptions are available in
+  generated HTML docs and on the command line via --describe. Documenting new
+  tests is mandatory. (Arkadiusz Hiler)
+
+- Unified library for EDID creation (Simon Ser)
+
+- Chamelium port auto-discovery (Simon Ser)
+
+- Tigerlake support (Lucas De Marchi)
+
+- Cometlake support (Anusha Srivatsa)
+
+- Add kernel selftest wrapper for dmabuf (Chris Wilson)
+
+- Bumped required meson version to 0.47.2 (Arkadiusz Hiler)
+
+- Rewritten README to be more friendly (Arkadiusz Hiler)
+
+- Introduced dynamic subsubtests for getting partial result for
+  runtime-dependant features (Petri Latvala)
+
+- IGT can now run on the selected GPU via --device and lsgpu tool (Zbigniew
+  Kempczyński)
+
+- Reduced runtime of many many tests (Chris Wilson et al)
+
+
+And many other bug fixes, improvements, cleanups and new tests.
+
 
 Release 1.24 (2019-06-20)
 -------------------------

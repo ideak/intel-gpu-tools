@@ -22,7 +22,7 @@
 
 AC_PREREQ([2.60])
 AC_INIT([igt-gpu-tools],
-	[1.24],
+	[1.25],
 	[https://bugs.freedesktop.org/enter_bug.cgi?product=DRI&component=IGT],
 	[igt-gpu-tools])
 
