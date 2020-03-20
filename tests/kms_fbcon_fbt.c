@@ -113,18 +113,28 @@ static void fbc_print_status(int debugfs_fd)
 	igt_debug("FBC status: %s\n", buf);
 }
 
-static bool fbc_is_enabled(int debugfs_fd)
+static bool fbc_check_status(int debugfs_fd, bool enabled)
 {
 	char buf[128];
 
 	igt_debugfs_simple_read(debugfs_fd, "i915_fbc_status", buf,
 				sizeof(buf));
-	return strstr(buf, "FBC enabled\n");
+	if (enabled)
+		return strstr(buf, "FBC enabled\n");
+	else
+		return strstr(buf, "FBC disabled");
 }
 
 static bool fbc_wait_until_enabled(int debugfs_fd)
 {
-	bool r = igt_wait(fbc_is_enabled(debugfs_fd), 5000, 1);
+	bool r = igt_wait(fbc_check_status(debugfs_fd, true), 5000, 1);
+	fbc_print_status(debugfs_fd);
+	return r;
+}
+
+static bool fbc_wait_until_disabled(int debugfs_fd)
+{
+	bool r = igt_wait(fbc_check_status(debugfs_fd, false), 5000, 1);
 	fbc_print_status(debugfs_fd);
 	return r;
 }
@@ -141,7 +151,7 @@ static bool fbc_wait_until_update(int debugfs)
 	 * If one day fbcon starts to use a tiled framebuffer we would need to
 	 * check the 'Compressing' status as in each blink it would be disabled.
 	 */
-	return !fbc_wait_until_enabled(debugfs);
+	return fbc_wait_until_disabled(debugfs);
 }
 
 typedef bool (*connector_possible_fn)(drmModeConnectorPtr connector);
