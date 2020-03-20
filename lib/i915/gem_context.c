@@ -351,7 +351,7 @@ __gem_context_clone(int i915,
 
 static bool __gem_context_has(int i915, uint32_t share, unsigned int flags)
 {
-	uint32_t ctx;
+	uint32_t ctx = 0;
 
 	__gem_context_clone(i915, 0, share, flags, &ctx);
 	if (ctx)
