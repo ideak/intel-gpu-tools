@@ -45,6 +45,17 @@
 static unsigned long reset_timeout_ms = RESET_TIMEOUT_MS;
 #define NSEC_PER_MSEC (1000 * 1000ull)
 
+static int wait_for_status(int fence, int timeout)
+{
+	int err;
+
+	err = sync_fence_wait(fence, timeout);
+	if (err)
+		return err;
+
+	return sync_fence_status(fence);
+}
+
 static bool has_persistence(int i915)
 {
 	struct drm_i915_gem_context_param p = {
@@ -231,11 +242,8 @@ static void test_nonpersistent_mixed(int i915, unsigned int engine)
 	}
 
 	/* Outer pair of contexts were non-persistent and killed */
-	igt_assert_eq(sync_fence_wait(fence[0], reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(fence[0]), -EIO);
-
-	igt_assert_eq(sync_fence_wait(fence[2], reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(fence[2]), -EIO);
+	igt_assert_eq(wait_for_status(fence[0], reset_timeout_ms), -EIO);
+	igt_assert_eq(wait_for_status(fence[2], reset_timeout_ms), -EIO);
 
 	/* But the middle context is still running */
 	igt_assert_eq(sync_fence_wait(fence[1], 0), -ETIME);
@@ -428,8 +436,7 @@ static void test_nonpersistent_file(int i915)
 	close(i915);
 	flush_delayed_fput(debugfs);
 
-	igt_assert_eq(sync_fence_wait(spin->out_fence, reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
+	igt_assert_eq(wait_for_status(spin->out_fence, reset_timeout_ms), -EIO);
 
 	spin->handle = 0;
 	igt_spin_free(-1, spin);
@@ -469,11 +476,8 @@ static void test_nonpersistent_queued(int i915, unsigned int engine)
 
 	gem_context_destroy(i915, ctx);
 
-	igt_assert_eq(sync_fence_wait(spin->out_fence, reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
-
-	igt_assert_eq(sync_fence_wait(fence, reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(fence), -EIO);
+	igt_assert_eq(wait_for_status(spin->out_fence, reset_timeout_ms), -EIO);
+	igt_assert_eq(wait_for_status(fence, reset_timeout_ms), -EIO);
 
 	igt_spin_free(i915, spin);
 }
@@ -546,8 +550,7 @@ static void test_process(int i915)
 	fence = recvfd(sv[1]);
 	close(sv[1]);
 
-	igt_assert_eq(sync_fence_wait(fence, reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(fence), -EIO);
+	igt_assert_eq(wait_for_status(fence, reset_timeout_ms), -EIO);
 	close(fence);
 
 	/* We have to manually clean up the orphaned spinner */
@@ -600,8 +603,7 @@ static void test_process_mixed(int pfd, unsigned int engine)
 	close(sv[1]);
 
 	/* First fence is non-persistent, so should be reset */
-	igt_assert_eq(sync_fence_wait(fence[0], reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(fence[0]), -EIO);
+	igt_assert_eq(wait_for_status(fence[0], reset_timeout_ms), -EIO);
 	close(fence[0]);
 
 	/* Second fence is persistent, so should be still spinning */
@@ -669,13 +671,11 @@ test_saturated_hostile(int i915, const struct intel_execution_engine2 *engine)
 	gem_context_destroy(i915, ctx);
 
 	/* Hostile request requires a GPU reset to terminate */
-	igt_assert_eq(sync_fence_wait(spin->out_fence, reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
+	igt_assert_eq(wait_for_status(spin->out_fence, reset_timeout_ms), -EIO);
 
 	/* All other spinners should be left unharmed */
 	gem_quiescent_gpu(i915);
-	igt_assert_eq(sync_fence_wait(fence, reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(fence), 1);
+	igt_assert_eq(wait_for_status(fence, reset_timeout_ms), 1);
 	close(fence);
 }
 
@@ -739,9 +739,8 @@ static void test_processes(int i915)
 
 		if (i == 0) {
 			/* First fence is non-persistent, so should be reset */
-			igt_assert_eq(sync_fence_wait(fence,
-						      reset_timeout_ms), 0);
-			igt_assert_eq(sync_fence_status(fence), -EIO);
+			igt_assert_eq(wait_for_status(fence, reset_timeout_ms),
+				      -EIO);
 		} else {
 			/* Second fence is persistent, so still spinning */
 			igt_assert_eq(sync_fence_wait(fence, 0), -ETIME);
@@ -755,7 +754,10 @@ static void test_processes(int i915)
 	gem_quiescent_gpu(i915);
 }
 
-static void __smoker(int i915, unsigned int engine, int expected)
+static void __smoker(int i915,
+		     unsigned int engine,
+		     unsigned int timeout,
+		     int expected)
 {
 	igt_spin_t *spin;
 	int fence = -1;
@@ -781,12 +783,10 @@ static void __smoker(int i915, unsigned int engine, int expected)
 
 	igt_spin_end(spin);
 
-	igt_assert_eq(sync_fence_wait(spin->out_fence, reset_timeout_ms), 0);
-	igt_assert_eq(sync_fence_status(spin->out_fence), expected);
+	igt_assert_eq(wait_for_status(spin->out_fence, timeout), expected);
 
 	if (fence != -1) {
-		igt_assert_eq(sync_fence_wait(fence, reset_timeout_ms), 0);
-		igt_assert_eq(sync_fence_status(fence), expected);
+		igt_assert_eq(wait_for_status(fence, timeout), expected);
 		close(fence);
 	}
 
@@ -794,16 +794,20 @@ static void __smoker(int i915, unsigned int engine, int expected)
 	igt_spin_free(fd, spin);
 }
 
-static void smoker(int i915, unsigned int engine, unsigned int *ctl)
+static void smoker(int i915,
+		   unsigned int engine,
+		   unsigned int timeout,
+		   unsigned int *ctl)
 {
 	while (!READ_ONCE(*ctl)) {
-		__smoker(i915, engine, -EIO);
-		__smoker(i915, engine, 1);
+		__smoker(i915, engine, timeout, -EIO);
+		__smoker(i915, engine, timeout, 1);
 	}
 }
 
 static void smoketest(int i915)
 {
+	const int SMOKE_LOAD_FACTOR = 4;
 	const struct intel_execution_engine2 *e;
 	uint32_t *ctl;
 
@@ -815,14 +819,22 @@ static void smoketest(int i915)
 	ctl = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(ctl != MAP_FAILED);
 
-	__for_each_physical_engine(i915, e) {
-		igt_fork(child, 4)
-			smoker(i915, e->flags, ctl);
-	}
+	for (int i = 1; i <= SMOKE_LOAD_FACTOR; i <<= 1) {
+		*ctl = 0;
 
-	sleep(20);
-	*ctl = 1;
-	igt_waitchildren();
+		igt_debug("Applying load factor: %d\n", i);
+		__for_each_physical_engine(i915, e) {
+			igt_fork(child, i)
+				smoker(i915,
+				       e->flags,
+				       i * reset_timeout_ms,
+				       ctl);
+		}
+
+		sleep(10);
+		*ctl = 1;
+		igt_waitchildren();
+	}
 
 	munmap(ctl, 4096);
 	gem_quiescent_gpu(i915);
