@@ -34,6 +34,7 @@
 
 #include "igt.h"
 #include "igt_perf.h"
+#include "igt_rapl.h"
 #include "igt_sysfs.h"
 
 #define SLEEP_DURATION 3 /* in seconds */
@@ -280,67 +281,122 @@ static int open_pmu(int i915, uint64_t config)
 	return fd;
 }
 
+#define WAITBOOST 0x1
+#define ONCE 0x2
+
+static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = batch_create(i915),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+	};
+
+	do {
+		struct timespec tv = {};
+
+		igt_nsec_elapsed(&tv);
+
+		gem_execbuf(i915, &execbuf);
+		if (flags & WAITBOOST) {
+			gem_sync(i915, obj.handle);
+			if (flags & ONCE)
+				flags &= ~WAITBOOST;
+		} else  {
+			while (gem_bo_busy(i915, obj.handle))
+				usleep(0);
+		}
+		ctl[1]++;
+
+		usleep(igt_nsec_elapsed(&tv) / 10); /* => 1% busy */
+	} while (!READ_ONCE(*ctl));
+}
+
 static void rc6_idle(int i915)
 {
 	const int64_t duration_ns = SLEEP_DURATION * (int64_t)NSEC_PER_SEC;
 	const int tolerance = 20; /* Some RC6 is better than none! */
+	struct {
+		const char *name;
+		unsigned int flags;
+		double power;
+	} phases[] = {
+		{ "normal", 0 },
+		{ "boost", WAITBOOST },
+		{ "once", WAITBOOST | ONCE },
+	};
+	struct power_sample sample[2];
 	unsigned long slept, cycles;
 	unsigned long *done;
 	uint64_t rc6, ts[2];
+	struct rapl rapl;
 	int fd;
 
 	fd = open_pmu(i915, I915_PMU_RC6_RESIDENCY);
 	igt_require(__pmu_wait_for_rc6(fd));
+	gpu_power_open(&rapl);
 
 	/* While idle check full RC6. */
+	rapl_read(&rapl, &sample[0]);
 	rc6 = -__pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(duration_ns / 1000);
 	rc6 += __pmu_read_single(fd, &ts[1]);
 	igt_debug("slept=%lu perf=%"PRIu64", rc6=%"PRIu64"\n",
 		  slept, ts[1] - ts[0], rc6);
+	if (rapl_read(&rapl, &sample[1]))  {
+		double idle = power_J(&rapl, &sample[0], &sample[1]);
+		igt_info("Total energy used while idle: %.1fmJ\n", idle * 1e3);
+		igt_assert(idle < 1e-3);
+	}
 	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
 
-	/* Setup up a very light load */
 	done = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
-	igt_fork(child, 1) {
-		struct drm_i915_gem_exec_object2 obj = {
-			.handle = batch_create(i915),
-		};
-		struct drm_i915_gem_execbuffer2 execbuf = {
-			.buffers_ptr = to_user_pointer(&obj),
-			.buffer_count = 1,
-		};
 
-		do {
-			struct timespec tv = {};
+	for (int p = 0; p < ARRAY_SIZE(phases); p++) {
+		memset(done, 0, 2 * sizeof(*done));
+		igt_fork(child, 1) /* Setup up a very light load */
+			bg_load(i915, phases[p].flags, done);
 
-			igt_nsec_elapsed(&tv);
+		rapl_read(&rapl, &sample[0]);
+		cycles = -READ_ONCE(done[1]);
+		rc6 = -__pmu_read_single(fd, &ts[0]);
+		slept = measured_usleep(duration_ns / 1000);
+		rc6 += __pmu_read_single(fd, &ts[1]);
+		cycles += READ_ONCE(done[1]);
+		igt_debug("%s: slept=%lu perf=%"PRIu64", cycles=%lu, rc6=%"PRIu64"\n",
+			  phases[p].name, slept, ts[1] - ts[0], cycles, rc6);
+		if (rapl_read(&rapl, &sample[1]))  {
+			phases[p].power = power_J(&rapl, &sample[0], &sample[1]);
+			igt_info("Total energy used for %s: %.1fmJ (%.1fmW)\n",
+				 phases[p].name,
+				 phases[p].power * 1e3,
+				 phases[p].power * 1e12 / slept);
+			phases[p].power /= slept; /* normalize */
+			phases[p].power *= 1e12; /* => mW */
+		}
 
-			gem_execbuf(i915, &execbuf);
-			while (gem_bo_busy(i915, obj.handle))
-				usleep(0);
-			done[1]++;
+		*done = 1;
+		igt_waitchildren();
 
-			usleep(igt_nsec_elapsed(&tv) / 10); /* => 1% busy */
-		} while (!READ_ONCE(*done));
+		/* At least one wakeup/s needed for a reasonable test */
+		igt_assert(cycles >= SLEEP_DURATION);
+
+		/* While very nearly idle, expect full RC6 */
+		assert_within_epsilon(rc6, ts[1] - ts[0], tolerance);
 	}
 
-	/* While very nearly idle (idle to within tolerance), expect full RC6 */
-	cycles = -READ_ONCE(done[1]);
-	rc6 = -__pmu_read_single(fd, &ts[0]);
-	slept = measured_usleep(duration_ns / 1000);
-	rc6 += __pmu_read_single(fd, &ts[1]);
-	cycles += READ_ONCE(done[1]);
-	igt_debug("slept=%lu perf=%"PRIu64", cycles=%lu, rc6=%"PRIu64"\n",
-		  slept, ts[1] - ts[0], cycles, rc6);
-
-	*done = 1;
-	igt_waitchildren();
 	munmap(done, 4096);
 	close(fd);
 
-	igt_assert(cycles >= SLEEP_DURATION); /* At least one wakeup/s needed */
-	assert_within_epsilon(rc6, ts[1] - ts[0], tolerance);
+	rapl_close(&rapl);
+
+	igt_assert_f(2 * phases[2].power - phases[0].power <= phases[1].power,
+		     "Exceeded energy expectations for single busy wait load\n"
+		     "Used %.1fmW, min %.1fmW, max %.1fmW, expected less than %.1fmW\n",
+		     phases[2].power, phases[0].power, phases[1].power,
+		     phases[0].power + (phases[1].power - phases[0].power) / 2);
 }
 
 igt_main
