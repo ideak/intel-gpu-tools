@@ -401,24 +401,11 @@ static void rc6_idle(int i915)
 
 igt_main
 {
-	unsigned int rc6_enabled = 0;
-	unsigned int devid = 0;
 	int i915 = -1;
 
 	/* Use drm_open_driver to verify device existence */
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
-		devid = intel_get_drm_devid(i915);
-		sysfs = igt_sysfs_open(i915);
-
-		igt_require(has_rc6_residency("rc6"));
-
-		/* Make sure rc6 counters are running */
-		igt_drop_caches_set(i915, DROP_IDLE);
-		igt_require(wait_for_rc6());
-
-		rc6_enabled = get_rc6_enabled_mask();
-		igt_require(rc6_enabled & RC6_ENABLED);
 	}
 
 	igt_subtest("rc6-idle") {
@@ -428,20 +415,42 @@ igt_main
 		rc6_idle(i915);
 	}
 
-	igt_subtest("rc6-accuracy") {
-		struct residencies res;
+	igt_subtest_group {
+		unsigned int rc6_enabled = 0;
+		unsigned int devid = 0;
 
-		measure_residencies(devid, rc6_enabled, &res);
-		residency_accuracy(res.rc6, res.duration, "rc6");
-	}
+		igt_fixture {
+			devid = intel_get_drm_devid(i915);
+			sysfs = igt_sysfs_open(i915);
 
-	igt_subtest("media-rc6-accuracy") {
-		struct residencies res;
+			igt_require(has_rc6_residency("rc6"));
 
-		igt_require(IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid));
+			/* Make sure rc6 counters are running */
+			igt_drop_caches_set(i915, DROP_IDLE);
+			igt_require(wait_for_rc6());
 
-		measure_residencies(devid, rc6_enabled, &res);
-		residency_accuracy(res.media_rc6, res.duration, "media_rc6");
+			rc6_enabled = get_rc6_enabled_mask();
+			igt_require(rc6_enabled & RC6_ENABLED);
+		}
+
+		igt_subtest("rc6-accuracy") {
+			struct residencies res;
+
+			measure_residencies(devid, rc6_enabled, &res);
+			residency_accuracy(res.rc6, res.duration, "rc6");
+		}
+
+		igt_subtest("media-rc6-accuracy") {
+			struct residencies res;
+
+			igt_require(IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid));
+
+			measure_residencies(devid, rc6_enabled, &res);
+			residency_accuracy(res.media_rc6, res.duration, "media_rc6");
+		}
+
+		igt_fixture
+			close(sysfs);
 	}
 
 	igt_fixture
