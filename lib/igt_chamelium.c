@@ -270,6 +270,8 @@ static void *chamelium_fsm_mon(void *data)
 	return NULL;
 }
 
+#define _RECEIVER_RESPONSIVE_AFTER_RESET_SECONDS 10
+
 static xmlrpc_value *__chamelium_rpc_va(struct chamelium *chamelium,
 					struct chamelium_port *fsm_port,
 					const char *method_name,
@@ -279,12 +281,6 @@ static xmlrpc_value *__chamelium_rpc_va(struct chamelium *chamelium,
 	xmlrpc_value *res = NULL;
 	struct fsm_monitor_args monitor_args;
 	pthread_t fsm_thread_id;
-
-	/* Cleanup the last error, if any */
-	if (chamelium->env.fault_occurred) {
-		xmlrpc_env_clean(&chamelium->env);
-		xmlrpc_env_init(&chamelium->env);
-	}
 
 	/* Unfortunately xmlrpc_client's event loop helpers are rather useless
 	 * for implementing any sort of event loop, since they provide no way
@@ -300,9 +296,25 @@ static xmlrpc_value *__chamelium_rpc_va(struct chamelium *chamelium,
 			       &monitor_args);
 	}
 
-	xmlrpc_client_call2f_va(&chamelium->env, chamelium->client,
-				chamelium->url, method_name, format_str, &res,
-				va_args);
+	igt_until_timeout(_RECEIVER_RESPONSIVE_AFTER_RESET_SECONDS) {
+		/* Cleanup the last error, if any */
+		if (chamelium->env.fault_occurred) {
+			xmlrpc_env_clean(&chamelium->env);
+			xmlrpc_env_init(&chamelium->env);
+		}
+
+		xmlrpc_client_call2f_va(&chamelium->env, chamelium->client,
+					chamelium->url, method_name, format_str, &res,
+					va_args);
+
+		if (!chamelium->env.fault_occurred)
+			break;
+
+		if (NULL == strstr(chamelium->env.fault_string, "I2C"))
+			break;
+
+		/* i2c error, let's try to retry */
+	}
 
 	if (fsm_port) {
 		pthread_cancel(fsm_thread_id);
