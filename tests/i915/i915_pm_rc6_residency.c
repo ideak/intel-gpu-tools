@@ -335,6 +335,7 @@ static void rc6_idle(int i915)
 	int fd;
 
 	fd = open_pmu(i915, I915_PMU_RC6_RESIDENCY);
+	igt_drop_caches_set(i915, DROP_IDLE);
 	igt_require(__pmu_wait_for_rc6(fd));
 	gpu_power_open(&rapl);
 
