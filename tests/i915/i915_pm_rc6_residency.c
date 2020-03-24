@@ -348,8 +348,9 @@ static void rc6_idle(int i915)
 		  slept, ts[1] - ts[0], rc6);
 	if (rapl_read(&rapl, &sample[1]))  {
 		double idle = power_J(&rapl, &sample[0], &sample[1]);
-		igt_info("Total energy used while idle: %.1fmJ\n", idle * 1e3);
-		igt_assert(idle < 1e-3);
+		igt_log(IGT_LOG_DOMAIN,
+                        idle > 1e-3 ? IGT_LOG_WARN : IGT_LOG_INFO,
+                        "Total energy used while idle: %.1fmJ\n", idle * 1e3);
 	}
 	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
 
