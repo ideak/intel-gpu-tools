@@ -45,6 +45,16 @@
 static unsigned long reset_timeout_ms = RESET_TIMEOUT_MS;
 #define NSEC_PER_MSEC (1000 * 1000ull)
 
+static void cleanup(int i915)
+{
+	igt_drop_caches_set(i915,
+			    /* cancel everything */
+			    DROP_RESET_ACTIVE | DROP_RESET_SEQNO |
+			    /* cleanup */
+			    DROP_ACTIVE | DROP_RETIRE | DROP_IDLE | DROP_FREED);
+	igt_require_gem(i915);
+}
+
 static int wait_for_status(int fence, int timeout)
 {
 	int err;
@@ -187,7 +197,6 @@ static void test_persistence(int i915, unsigned int engine)
 	igt_assert_eq(sync_fence_status(spin->out_fence), 1);
 
 	igt_spin_free(i915, spin);
-	gem_quiescent_gpu(i915);
 }
 
 static void test_nonpersistent_cleanup(int i915, unsigned int engine)
@@ -213,7 +222,6 @@ static void test_nonpersistent_cleanup(int i915, unsigned int engine)
 	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
 
 	igt_spin_free(i915, spin);
-	gem_quiescent_gpu(i915);
 }
 
 static void test_nonpersistent_mixed(int i915, unsigned int engine)
@@ -247,8 +255,6 @@ static void test_nonpersistent_mixed(int i915, unsigned int engine)
 
 	/* But the middle context is still running */
 	igt_assert_eq(sync_fence_wait(fence[1], 0), -ETIME);
-
-	gem_quiescent_gpu(i915);
 }
 
 static void test_nonpersistent_hostile(int i915, unsigned int engine)
@@ -274,7 +280,6 @@ static void test_nonpersistent_hostile(int i915, unsigned int engine)
 	igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
 
 	igt_spin_free(i915, spin);
-	gem_quiescent_gpu(i915);
 }
 
 static void test_nonpersistent_hostile_preempt(int i915, unsigned int engine)
@@ -317,7 +322,6 @@ static void test_nonpersistent_hostile_preempt(int i915, unsigned int engine)
 
 	igt_spin_free(i915, spin[1]);
 	igt_spin_free(i915, spin[0]);
-	gem_quiescent_gpu(i915);
 }
 
 static void test_nonpersistent_hang(int i915, unsigned int engine)
@@ -342,13 +346,14 @@ static void test_nonpersistent_hang(int i915, unsigned int engine)
 	igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
 
 	igt_spin_free(i915, spin);
-	gem_quiescent_gpu(i915);
 }
 
 static void test_nohangcheck_hostile(int i915)
 {
 	int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
 	int dir;
+
+	cleanup(i915);
 
 	/*
 	 * Even if the user disables hangcheck during their context,
@@ -375,8 +380,6 @@ static void test_nohangcheck_hostile(int i915)
 	}
 
 	igt_require(__enable_hangcheck(dir, true));
-
-	gem_quiescent_gpu(i915);
 	close(dir);
 }
 
@@ -384,6 +387,8 @@ static void test_nohangcheck_hang(int i915)
 {
 	int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
 	int dir;
+
+	cleanup(i915);
 
 	/*
 	 * Even if the user disables hangcheck during their context,
@@ -412,8 +417,6 @@ static void test_nohangcheck_hang(int i915)
 	}
 
 	igt_require(__enable_hangcheck(dir, true));
-
-	gem_quiescent_gpu(i915);
 	close(dir);
 }
 
@@ -422,13 +425,14 @@ static void test_nonpersistent_file(int i915)
 	int debugfs = i915;
 	igt_spin_t *spin;
 
+	cleanup(i915);
+
 	/*
 	 * A context may live beyond its initial struct file, except if it
 	 * has been made nonpersistent, in which case it must be terminated.
 	 */
 
 	i915 = gem_reopen_driver(i915);
-	gem_quiescent_gpu(i915);
 
 	gem_context_set_persistence(i915, 0, false);
 	spin = igt_spin_new(i915, .flags = IGT_SPIN_FENCE_OUT);
@@ -453,8 +457,6 @@ static void test_nonpersistent_queued(int i915, unsigned int engine)
 	 * Not only must the immediate batch be cancelled, but
 	 * all pending batches in the context.
 	 */
-
-	gem_quiescent_gpu(i915);
 
 	ctx = gem_context_clone_with_engines(i915, 0);
 	gem_context_set_persistence(i915, ctx, false);
@@ -523,6 +525,8 @@ static int recvfd(int socket)
 static void test_process(int i915)
 {
 	int fence, sv[2];
+
+	cleanup(i915);
 
 	/*
 	 * If a process dies early, any nonpersistent contexts it had
@@ -624,6 +628,8 @@ test_saturated_hostile(int i915, const struct intel_execution_engine2 *engine)
 	uint32_t ctx;
 	int fence = -1;
 
+	cleanup(i915);
+
 	/*
 	 * Check that if we have to remove a hostile request from a
 	 * non-persistent context, we do so without harming any other
@@ -685,12 +691,13 @@ static void test_processes(int i915)
 		int sv[2];
 	} p[2];
 
+	cleanup(i915);
+
 	/*
 	 * If one process dies early, its nonpersistent context are cleaned up,
 	 * but that should not affect a second process.
 	 */
 
-	gem_quiescent_gpu(i915);
 	for (int i = 0; i < ARRAY_SIZE(p); i++) {
 		igt_require(socketpair(AF_UNIX, SOCK_DGRAM, 0, p[i].sv) == 0);
 
@@ -811,6 +818,8 @@ static void smoketest(int i915)
 	const struct intel_execution_engine2 *e;
 	uint32_t *ctl;
 
+	cleanup(i915);
+
 	/*
 	 * All of the above! A mixture of naive and hostile processes and
 	 * contexts, all trying to trick the kernel into mass slaughter.
@@ -917,6 +926,8 @@ static void close_replace_race(int i915)
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	int fence = -1;
 	int out[2], in[2];
+
+	cleanup(i915);
 
 	/*
 	 * If we time the submission of a hanging batch to one set of engines
@@ -1030,6 +1041,8 @@ static void do_test(void (*test)(int i915, unsigned int engine),
 #define ATTR "preempt_timeout_ms"
 	int timeout = -1;
 
+	cleanup(i915);
+
 	gem_engine_property_scanf(i915, name, ATTR, "%d", &timeout);
 	if (timeout != -1) {
 		igt_require(gem_engine_property_printf(i915, name,
@@ -1043,6 +1056,8 @@ static void do_test(void (*test)(int i915, unsigned int engine),
 		gem_engine_property_printf(i915, name, ATTR, "%d", timeout);
 		reset_timeout_ms = RESET_TIMEOUT_MS;
 	}
+
+	gem_quiescent_gpu(i915);
 }
 
 int i915;
