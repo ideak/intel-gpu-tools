@@ -329,6 +329,7 @@ static void rc6_idle(int i915)
 {
 	const int64_t duration_ns = SLEEP_DURATION * (int64_t)NSEC_PER_SEC;
 	const int tolerance = 20; /* Some RC6 is better than none! */
+	const int gen = intel_gen(intel_get_drm_devid(i915));
 	struct {
 		const char *name;
 		unsigned int flags;
@@ -360,7 +361,7 @@ static void rc6_idle(int i915)
 	if (rapl_read(&rapl, &sample[1]))  {
 		double idle = power_J(&rapl, &sample[0], &sample[1]);
 		igt_log(IGT_LOG_DOMAIN,
-                        idle > 1e-3 ? IGT_LOG_WARN : IGT_LOG_INFO,
+                        idle > 1e-3 && gen > 6 ? IGT_LOG_WARN : IGT_LOG_INFO,
                         "Total energy used while idle: %.1fmJ\n", idle * 1e3);
 	}
 	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
