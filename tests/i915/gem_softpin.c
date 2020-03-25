@@ -139,6 +139,17 @@ static void test_softpin(int fd)
 	igt_info("Completed %lu cycles\n", count);
 }
 
+static void invalid_execbuf(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err;
+
+	/* More recent kernels do not track self-inflicted user errors */
+	err = __gem_execbuf(i915, execbuf);
+	igt_assert_f(err == -EINVAL || err == -ENOSPC,
+		     "execbuf reported %d, not invalid (-EINVAL or -ENOSPC)\n",
+		     err);
+}
+
 static void test_overlap(int fd)
 {
 	const uint32_t size = 1024 * 1024;
@@ -184,8 +195,6 @@ static void test_overlap(int fd)
 	for (offset = object[0].offset - size + 4096;
 	     offset < object[0].offset + size;
 	     offset += 4096) {
-		int err;
-
 		object[1].offset = offset;
 		igt_debug("[0]=[%08llx - %08llx] [1]=[%08llx - %08llx]\n",
 			  (long long)object[0].offset,
@@ -193,10 +202,7 @@ static void test_overlap(int fd)
 			  (long long)object[1].offset,
 			  (long long)object[1].offset + size);
 
-		/* Recent kernels do not track self-inflicted user errors */
-		err = __gem_execbuf(fd, &execbuf);
-		igt_assert(err == -EINVAL || err == -ENOSPC);
-
+		invalid_execbuf(fd, &execbuf);
 		igt_assert_eq_u64(object[1].offset, offset);
 	}
 
@@ -377,12 +383,12 @@ static void test_evict_snoop(int fd)
 	/* snoop abutting before uncached -> error */
 	object[0].offset = hole;
 	object[1].offset = hole + 4096;
-	igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
+	invalid_execbuf(fd, &execbuf);
 
 	/* snoop abutting after uncached -> error */
 	object[0].offset = hole + 4096;
 	object[1].offset = hole;
-	igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
+	invalid_execbuf(fd, &execbuf);
 
 	/* with gap -> okay */
 	object[0].offset = hole + 2*4096;
