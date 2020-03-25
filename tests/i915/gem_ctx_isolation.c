@@ -888,23 +888,28 @@ static unsigned int __has_context_isolation(int fd)
 	return value;
 }
 
+#define test_each_engine(e, i915, mask) \
+	__for_each_physical_engine(i915, e) \
+		for_each_if(mask & (1 << (e)->class)) \
+			igt_dynamic_f("%s", (e)->name)
+
 igt_main
 {
 	unsigned int has_context_isolation = 0;
 	const struct intel_execution_engine2 *e;
-	int fd = -1;
+	int i915 = -1;
 
 	igt_fixture {
 		int gen;
 
-		fd = drm_open_driver(DRIVER_INTEL);
-		igt_require_gem(fd);
-		igt_require(gem_has_contexts(fd));
+		i915 = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(i915);
+		igt_require(gem_has_contexts(i915));
 
-		has_context_isolation = __has_context_isolation(fd);
+		has_context_isolation = __has_context_isolation(i915);
 		igt_require(has_context_isolation);
 
-		gen = intel_gen(intel_get_drm_devid(fd));
+		gen = intel_gen(intel_get_drm_devid(i915));
 
 		igt_warn_on_f(gen > LAST_KNOWN_GEN,
 			      "GEN not recognized! Test needs to be updated to run.\n");
@@ -913,42 +918,60 @@ igt_main
 
 	/* __for_each_physical_engine switches context to all engines. */
 
-	__for_each_physical_engine(fd, e) {
-		igt_subtest_group {
-			igt_fixture {
-				igt_require(has_context_isolation & (1 << e->class));
-				gem_require_ring(fd, e->flags);
-				igt_fork_hang_detector(fd);
-			}
+	igt_fixture {
+		igt_fork_hang_detector(i915);
+	}
 
-			igt_subtest_f("%s-nonpriv", e->name)
-				nonpriv(fd, e, 0);
-			igt_subtest_f("%s-nonpriv-switch", e->name)
-				nonpriv(fd, e, DIRTY2);
+	igt_subtest_with_dynamic("nonpriv") {
+		test_each_engine(e, i915, has_context_isolation)
+			nonpriv(i915, e, 0);
+	}
 
-			igt_subtest_f("%s-clean", e->name)
-				isolation(fd, e, 0);
-			igt_subtest_f("%s-dirty-create", e->name)
-				isolation(fd, e, DIRTY1);
-			igt_subtest_f("%s-dirty-switch", e->name)
-				isolation(fd, e, DIRTY2);
+	igt_subtest_with_dynamic("nonpriv-switch") {
+		test_each_engine(e, i915, has_context_isolation)
+			nonpriv(i915, e, DIRTY2);
+	}
 
-			igt_subtest_f("%s-none", e->name)
-				preservation(fd, e, 0);
-			igt_subtest_f("%s-S3", e->name)
-				preservation(fd, e, S3);
-			igt_subtest_f("%s-S4", e->name)
-				preservation(fd, e, S4);
+	igt_subtest_with_dynamic("clean") {
+		test_each_engine(e, i915, has_context_isolation)
+			isolation(i915, e, 0);
+	}
 
-			igt_fixture {
-				igt_stop_hang_detector();
-			}
+	igt_subtest_with_dynamic("dirty-create") {
+		test_each_engine(e, i915, has_context_isolation)
+			isolation(i915, e, DIRTY1);
+	}
 
-			igt_subtest_f("%s-reset", e->name) {
-				igt_hang_t hang = igt_allow_hang(fd, 0, 0);
-				preservation(fd, e, RESET);
-				igt_disallow_hang(fd, hang);
-			}
-		}
+	igt_subtest_with_dynamic("dirty-switch") {
+		test_each_engine(e, i915, has_context_isolation)
+			isolation(i915, e, DIRTY2);
+	}
+
+	igt_subtest_with_dynamic("preservation") {
+		test_each_engine(e, i915, has_context_isolation)
+			preservation(i915, e, 0);
+	}
+
+	igt_subtest_with_dynamic("preservation-S3") {
+		test_each_engine(e, i915, has_context_isolation)
+			preservation(i915, e, S3);
+	}
+
+	igt_subtest_with_dynamic("preservation-S4") {
+		test_each_engine(e, i915, has_context_isolation)
+			preservation(i915, e, S4);
+	}
+
+	igt_fixture {
+		igt_stop_hang_detector();
+	}
+
+	igt_subtest_with_dynamic("preservation-reset") {
+		igt_hang_t hang = igt_allow_hang(i915, 0, 0);
+
+		test_each_engine(e, i915, has_context_isolation)
+			preservation(i915, e, RESET);
+
+		igt_disallow_hang(i915, hang);
 	}
 }
