@@ -872,6 +872,9 @@ static int monitor_output(pid_t child,
 				    !memcmp(outbuf, STARTING_SUBTEST, strlen(STARTING_SUBTEST))) {
 					write(outputs[_F_JOURNAL], outbuf + strlen(STARTING_SUBTEST),
 					      linelen - strlen(STARTING_SUBTEST));
+					if (settings->sync) {
+						fdatasync(outputs[_F_JOURNAL]);
+					}
 					memcpy(current_subtest, outbuf + strlen(STARTING_SUBTEST),
 					       linelen - strlen(STARTING_SUBTEST));
 					current_subtest[linelen - strlen(STARTING_SUBTEST)] = '\0';
