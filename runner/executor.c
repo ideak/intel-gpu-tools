@@ -549,6 +549,7 @@ static int dump_dmesg(int kmsgfd, int outfd)
 	int comparefd;
 	unsigned flags;
 	unsigned long long seq, cmpseq, usec;
+	bool underflow_once = false;
 	char cont;
 	char buf[2048];
 	ssize_t r;
@@ -586,7 +587,10 @@ static int dump_dmesg(int kmsgfd, int outfd)
 		r = read(kmsgfd, buf, sizeof(buf));
 		if (r < 0) {
 			if (errno == EPIPE) {
-				errf("Warning: kernel log ringbuffer underflow, some records lost.\n");
+				if (!underflow_once) {
+					errf("Warning: kernel log ringbuffer underflow, some records lost.\n");
+					underflow_once = true;
+				}
 				continue;
 			} else if (errno == EINVAL) {
 				errf("Warning: Buffer too small for kernel log record, record lost.\n");
