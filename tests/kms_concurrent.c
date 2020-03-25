@@ -195,6 +195,25 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 	igt_plane_set_fb(data->plane[primary->index], &data->fb[primary->index]);
 }
 
+static int test_bandwidth(data_t *data, enum pipe pipe, igt_output_t *output)
+{
+
+	int n_planes = data->display.pipes[pipe].n_planes;
+	int i;
+	int ret;
+
+	igt_pipe_refresh(&data->display, pipe, true);
+
+	for (i = 1; i <= n_planes; i++) {
+		prepare_planes(data, pipe, i, output);
+		ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC | DRM_MODE_ATOMIC_TEST_ONLY);
+		if (ret != 0)
+			break;
+	}
+
+	return i - 1;
+}
+
 static void
 test_plane_position_with_output(data_t *data, enum pipe pipe, int max_planes,
 				igt_output_t *output)
@@ -208,7 +227,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe, int max_planes,
 	i = 0;
 	while (i < iterations || loop_forever) {
 		prepare_planes(data, pipe, max_planes, output);
-		igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
+		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 		i++;
 	}
 }
@@ -241,44 +260,17 @@ get_lowres_mode(data_t *data, const drmModeModeInfo *mode_default,
 	return mode;
 }
 
-static int
+static void
 test_resolution_with_output(data_t *data, enum pipe pipe, igt_output_t *output)
 {
 	const drmModeModeInfo *mode_hi, *mode_lo;
 	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
 	bool loop_forever = opt.iterations == LOOP_FOREVER ? true : false;
-	int i, c, ret;
-	int max_planes = data->display.pipes[pipe].n_planes;
-	igt_plane_t *primary;
-	drmModeModeInfo *mode;
+	int i;
 
 	i = 0;
 	while (i < iterations || loop_forever) {
 		igt_output_set_pipe(output, pipe);
-		for (c = 0; c < max_planes; c++) {
-			igt_plane_t *plane = igt_output_get_plane(output, c);
-
-			if (plane->type != DRM_PLANE_TYPE_PRIMARY)
-				continue;
-			primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-			data->plane[primary->index] = primary;
-			mode = igt_output_get_mode(output);
-			igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-						DRM_FORMAT_XRGB8888,
-						LOCAL_I915_FORMAT_MOD_X_TILED,
-						0.0f, 0.0f, 1.0f,
-						&data->fb[primary->index]);
-			igt_plane_set_fb(data->plane[primary->index], &data->fb[primary->index]);
-			ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
-			if (ret) {
-				igt_plane_set_fb(data->plane[i], NULL);
-				igt_remove_fb(data->drm_fd, &data->fb[i]);
-				data->plane[i] = NULL;
-				break;
-			}
-		}
-		max_planes = c;
-		igt_assert_lt(0, max_planes);
 
 		mode_hi = igt_output_get_mode(output);
 		mode_lo = get_lowres_mode(data, mode_hi, output);
@@ -293,48 +285,35 @@ test_resolution_with_output(data_t *data, enum pipe pipe, igt_output_t *output)
 
 		i++;
 	}
-
-	return max_planes;
 }
 
 static void
-run_test(data_t *data, enum pipe pipe, igt_output_t *output)
+run_test(data_t *data, enum pipe pipe, int max_planes, igt_output_t *output)
 {
-	int connected_outs;
-	int n_planes = data->display.pipes[pipe].n_planes;
-	int max_planes = n_planes;
-
 	if (!opt.user_seed)
 		opt.seed = time(NULL);
 
-	connected_outs = 0;
-	for_each_valid_output_on_pipe(&data->display, pipe, output) {
-		igt_info("Testing resolution with connector %s using pipe %s with seed %d\n",
-			 igt_output_name(output), kmstest_pipe_name(pipe), opt.seed);
+	igt_info("Testing resolution with connector %s using pipe %s with seed %d\n",
+		 igt_output_name(output), kmstest_pipe_name(pipe), opt.seed);
 
-		test_init(data, pipe, n_planes, output);
-		max_planes = test_resolution_with_output(data, pipe, output);
-
-		igt_fork(child, 1) {
-			test_plane_position_with_output(data, pipe, max_planes, output);
-		}
-
-		test_resolution_with_output(data, pipe, output);
-
-		igt_waitchildren();
-
-		test_fini(data, pipe, n_planes, output);
-
-		connected_outs++;
+	test_init(data, pipe, max_planes, output);
+	igt_fork(child, 1) {
+		test_plane_position_with_output(data, pipe, max_planes, output);
 	}
 
-	igt_skip_on(connected_outs == 0);
+	test_resolution_with_output(data, pipe, output);
+
+	igt_waitchildren();
+
+	test_fini(data, pipe, max_planes, output);
+
 }
 
 static void
 run_tests_for_pipe(data_t *data, enum pipe pipe)
 {
 	igt_output_t *output;
+	int max_planes;
 
 	igt_fixture {
 		int valid_tests = 0;
@@ -348,9 +327,18 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 	}
 
-	igt_subtest_f("pipe-%s", kmstest_pipe_name(pipe))
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			run_test(data, pipe, output);
+	igt_subtest_f("pipe-%s", kmstest_pipe_name(pipe)) {
+		for_each_valid_output_on_pipe(&data->display, pipe, output) {
+			int n_planes = data->display.pipes[pipe].n_planes;
+
+			test_init(data, pipe, n_planes, output);
+			max_planes = test_bandwidth(data, pipe, output);
+			test_fini(data, pipe, n_planes, output);
+
+			igt_display_reset(&data->display);
+			run_test(data, pipe, max_planes, output);
+		}
+	}
 }
 
 static int opt_handler(int option, int option_index, void *input)
