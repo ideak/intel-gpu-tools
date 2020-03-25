@@ -353,14 +353,31 @@ struct recording_context {
 
 	const char *command_fifo;
 	int command_fifo_fd;
+
+	uint64_t poll_period;
 };
+
+static int
+perf_revision(int drm_fd)
+{
+	drm_i915_getparam_t gp;
+	int value = 1;
+
+	gp.param = I915_PARAM_PERF_REVISION;
+	gp.value = &value;
+	perf_ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	return value;
+}
 
 static int
 perf_open(struct recording_context *ctx)
 {
 	uint64_t properties[DRM_I915_PERF_PROP_MAX * 2];
 	struct drm_i915_perf_open_param param;
-	int p = 0, stream_fd;
+	int p = 0, stream_fd, revision;
+
+	revision = perf_revision(ctx->drm_fd);
 
 	properties[p++] = DRM_I915_PERF_PROP_SAMPLE_OA;
 	properties[p++] = true;
@@ -373,6 +390,11 @@ perf_open(struct recording_context *ctx)
 
 	properties[p++] = DRM_I915_PERF_PROP_OA_EXPONENT;
 	properties[p++] = ctx->oa_exponent;
+
+	if (revision >= 5) {
+		properties[p++] = DRM_I915_PERF_PROP_POLL_OA_PERIOD;
+		properties[p++] = ctx->poll_period;
+	}
 
 	memset(&param, 0, sizeof(param));
 	param.flags = 0;
@@ -720,7 +742,10 @@ usage(const char *name)
 		"                                       (To use with i915-perf-control)\n"
 		"     --output,             -o <path>   Output file (default = i915_perf.record)\n"
 		"     --cpu-clock,          -k <path>   Cpu clock to use for correlations\n"
-		"                                       Values: boot, mono, mono_raw (default = mono)\n",
+		"                                       Values: boot, mono, mono_raw (default = mono)\n"
+		"     --poll-period         -P <value>  Polling interval in microseconds used by a timer in the driver to query\n"
+		"                                       for OA reports periodically\n"
+		"                                       (default = 5000), Minimum = 100.\n",
 		name);
 }
 
@@ -762,6 +787,7 @@ main(int argc, char *argv[])
 		{"size",                 required_argument, 0, 's'},
 		{"command-fifo",         required_argument, 0, 'f'},
 		{"cpu-clock",            required_argument, 0, 'k'},
+		{"poll-period",          required_argument, 0, 'P'},
 		{0, 0, 0, 0}
 	};
 	const struct {
@@ -788,9 +814,12 @@ main(int argc, char *argv[])
 
 		.command_fifo = I915_PERF_RECORD_FIFO_PATH,
 		.command_fifo_fd = -1,
+
+		/* 5 ms poll period */
+		.poll_period = 5 * 1000 * 1000,
 	};
 
-	while ((opt = getopt_long(argc, argv, "hc:p:m:Co:s:f:k:", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hc:p:m:Co:s:f:k:P:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'h':
 			usage(argv[0]);
@@ -832,6 +861,9 @@ main(int argc, char *argv[])
 			}
 			break;
 		}
+		case 'P':
+			ctx.poll_period = MAX(100, atol(optarg)) * 1000;
+			break;
 		default:
 			fprintf(stderr, "Internal error: "
 				"unexpected getopt value: %d\n", opt);
