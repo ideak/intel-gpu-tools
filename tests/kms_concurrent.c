@@ -193,6 +193,10 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 				    max_planes, output);
 
 	igt_plane_set_fb(data->plane[primary->index], &data->fb[primary->index]);
+
+	free(x);
+	free(y);
+	free(size);
 }
 
 static int test_bandwidth(data_t *data, enum pipe pipe, igt_output_t *output)
@@ -228,6 +232,10 @@ test_plane_position_with_output(data_t *data, enum pipe pipe, int max_planes,
 	while (i < iterations || loop_forever) {
 		prepare_planes(data, pipe, max_planes, output);
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
+
+		for (int c = 0; c < max_planes; c++)
+			igt_remove_fb(data->drm_fd, &data->fb[c]);
+
 		i++;
 	}
 }
