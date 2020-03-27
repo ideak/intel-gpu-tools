@@ -55,6 +55,7 @@
 
 #define MAX_PRIO LOCAL_I915_CONTEXT_MAX_USER_PRIORITY
 #define MIN_PRIO LOCAL_I915_CONTEXT_MIN_USER_PRIORITY
+#define MAX_ENGINES (I915_EXEC_RING_MASK + 1)
 
 #define FORKED 1
 #define CHAINED 2
@@ -225,7 +226,7 @@ static void poll_sequential(int fd, const char *name, int timeout)
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_relocation_entry reloc[4], *r;
 	uint32_t *bbe[2], *state, *batch;
-	unsigned engines[16], nengine, flags;
+	unsigned engines[MAX_ENGINES], nengine, flags;
 	struct timespec tv = {};
 	unsigned long cycles;
 	uint64_t elapsed;
@@ -435,14 +436,15 @@ static void parallel(int fd, uint32_t handle, int timeout)
 	const struct intel_execution_engine2 *e;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
-	unsigned engines[16];
-	char *names[16];
+	unsigned engines[MAX_ENGINES];
+	char *names[MAX_ENGINES];
 	unsigned nengine;
 	unsigned long count;
 	double time, sum;
 
 	sum = 0;
 	nengine = 0;
+
 	__for_each_physical_engine(fd, e) {
 		engines[nengine] = e->flags;
 		names[nengine++] = strdup(e->name);
@@ -497,8 +499,8 @@ static void independent(int fd, uint32_t handle, int timeout)
 	const struct intel_execution_engine2 *e;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
-	unsigned engines[16];
-	char *names[16];
+	unsigned engines[MAX_ENGINES];
+	char *names[MAX_ENGINES];
 	unsigned nengine;
 	unsigned long count;
 	double time, sum;
@@ -621,7 +623,7 @@ static void series(int fd, uint32_t handle, int timeout)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
 	struct timespec start, now, sync;
-	unsigned engines[16];
+	unsigned engines[MAX_ENGINES];
 	unsigned nengine;
 	unsigned long count;
 	double time, max = 0, min = HUGE_VAL, sum = 0;
@@ -711,7 +713,7 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 	const struct intel_execution_engine2 *e;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
-	unsigned engines[16];
+	unsigned engines[MAX_ENGINES];
 	unsigned nengine;
 	double *results;
 	double time, sum;
@@ -847,7 +849,7 @@ static void fence_signal(int fd, uint32_t handle,
 	struct drm_i915_gem_exec_object2 obj;
 	struct intel_execution_engine2 *__e;
 	struct timespec start, now;
-	unsigned engines[16];
+	unsigned engines[MAX_ENGINES];
 	unsigned nengine;
 	int *fences, n;
 	unsigned long count, signal;
