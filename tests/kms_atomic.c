@@ -1102,7 +1102,7 @@ igt_main
 				      LOCAL_DRM_FORMAT_MOD_NONE, &fb);
 	}
 
-	igt_subtest("plane_overlay_legacy") {
+	igt_subtest("plane-overlay-legacy") {
 		igt_plane_t *overlay =
 			igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_OVERLAY);
 
@@ -1112,7 +1112,7 @@ igt_main
 		plane_overlay(pipe_obj, output, overlay);
 	}
 
-	igt_subtest("plane_primary_legacy") {
+	igt_subtest("plane-primary-legacy") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		plane_primary(pipe_obj, primary, &fb);
@@ -1120,7 +1120,7 @@ igt_main
 
 	igt_describe("Verify that the overlay plane can cover the primary one (and "\
 		     "vice versa) by changing their zpos property.");
-	igt_subtest("plane_primary_overlay_mutable_zpos") {
+	igt_subtest("plane-primary-overlay-mutable-zpos") {
 		uint32_t format_primary = DRM_FORMAT_ARGB8888;
 		uint32_t format_overlay = DRM_FORMAT_ARGB1555;
 
@@ -1141,18 +1141,18 @@ igt_main
 
 	igt_describe("Verify the reported zpos property of planes by making sure "\
 		     "only higher zpos planes cover the lower zpos ones.");
-	igt_subtest("plane_immutable_zpos") {
+	igt_subtest("plane-immutable-zpos") {
 		igt_output_set_pipe(output, pipe);
 		plane_immutable_zpos(&display, pipe_obj, output);
 	}
 
-	igt_subtest("test_only") {
+	igt_subtest("test-only") {
 		atomic_clear(&display, pipe, primary, output);
 
 		test_only(pipe_obj, primary, output);
 	}
 
-	igt_subtest("plane_cursor_legacy") {
+	igt_subtest("plane-cursor-legacy") {
 		igt_plane_t *cursor =
 			igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_CURSOR);
 
@@ -1162,31 +1162,31 @@ igt_main
 		plane_cursor(pipe_obj, output, cursor);
 	}
 
-	igt_subtest("plane_invalid_params") {
+	igt_subtest("plane-invalid-params") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		plane_invalid_params(pipe_obj, output, primary, &fb);
 	}
 
-	igt_subtest("plane_invalid_params_fence") {
+	igt_subtest("plane-invalid-params-fence") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		plane_invalid_params_fence(pipe_obj, output, primary);
 	}
 
-	igt_subtest("crtc_invalid_params") {
+	igt_subtest("crtc-invalid-params") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		crtc_invalid_params(pipe_obj, output, primary, &fb);
 	}
 
-	igt_subtest("crtc_invalid_params_fence") {
+	igt_subtest("crtc-invalid-params-fence") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		crtc_invalid_params_fence(pipe_obj, output, primary, &fb);
 	}
 
-	igt_subtest("atomic_invalid_params") {
+	igt_subtest("atomic-invalid-params") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		atomic_invalid_params(pipe_obj, primary, output, &fb);
