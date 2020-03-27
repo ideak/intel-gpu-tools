@@ -2290,6 +2290,64 @@ test_polling(uint64_t requested_oa_period, bool set_kernel_hrtimer, uint64_t ker
 	__perf_close(stream_fd);
 }
 
+static void test_polling_small_buf(void)
+{
+	int oa_exponent = max_oa_exponent_for_period_lte(40 * 1000); /* 40us */
+	uint64_t properties[] = {
+		/* Include OA reports in samples */
+		DRM_I915_PERF_PROP_SAMPLE_OA, true,
+
+		/* OA unit configuration */
+		DRM_I915_PERF_PROP_OA_METRICS_SET, test_set->perf_oa_metrics_set,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_set->perf_oa_format,
+		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exponent,
+	};
+	struct drm_i915_perf_open_param param = {
+		.flags = I915_PERF_FLAG_FD_CLOEXEC |
+			I915_PERF_FLAG_DISABLED |
+			I915_PERF_FLAG_FD_NONBLOCK,
+		.num_properties = NUM_PROPERTIES(properties),
+		.properties_ptr = to_user_pointer(properties),
+	};
+	uint32_t test_duration = 80 * 1000 * 1000;
+	int sample_size = (sizeof(struct drm_i915_perf_record_header) +
+			   get_oa_format(test_set->perf_oa_format).size);
+	int n_expected_reports = test_duration / oa_exponent_to_ns(oa_exponent);
+	int n_expect_read_bytes = n_expected_reports * sample_size;
+	struct timespec ts = {};
+	int n_bytes_read = 0;
+	uint32_t n_polls = 0;
+
+	stream_fd = __perf_open(drm_fd, &param, true /* prevent_pm */);
+	do_ioctl(stream_fd, I915_PERF_IOCTL_ENABLE, 0);
+
+	while (igt_nsec_elapsed(&ts) < test_duration) {
+		struct pollfd pollfd = { .fd = stream_fd, .events = POLLIN };
+
+		ppoll(&pollfd, 1, NULL, NULL);
+		if (pollfd.revents & POLLIN) {
+			uint8_t buf[1024];
+			int ret;
+
+			ret = read(stream_fd, buf, sizeof(buf));
+			if (ret >= 0)
+				n_bytes_read += ret;
+		}
+
+		n_polls++;
+	}
+
+	igt_info("Read %d expected %d (%.2f%% of the expected number), polls=%u\n",
+		 n_bytes_read, n_expect_read_bytes,
+		 n_bytes_read * 100.0f / n_expect_read_bytes,
+		 n_polls);
+
+	__perf_close(stream_fd);
+
+	igt_assert(abs(n_expect_read_bytes - n_bytes_read) <
+		   0.20 * n_expect_read_bytes);
+}
+
 static int
 num_valid_reports_captured(struct drm_i915_perf_open_param *param,
 			   int64_t *duration_ns)
@@ -4924,6 +4982,10 @@ igt_main
 			     true /* set_kernel_hrtimer */,
 			     2 * 1000 * 1000 /* default 2ms hrtimer */);
 	}
+
+	igt_describe("Test polled read with buffer size smaller than available data");
+	igt_subtest("polling-small-buf")
+		test_polling_small_buf();
 
 	igt_subtest("short-reads")
 		test_short_reads();
