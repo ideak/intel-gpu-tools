@@ -559,28 +559,22 @@ static uint32_t store_timestamp(int i915,
 	return obj.handle;
 }
 
-static uint32_t ring_base(int i915, unsigned ring)
-{
-	if (ring == I915_EXEC_DEFAULT)
-		ring = I915_EXEC_RENDER; /* XXX */
-
-	return gem_engine_mmio_base(i915, gem_eb_flags_to_engine(ring).name);
-}
-
-static void independent(int i915, unsigned ring, unsigned flags)
+static void independent(int i915,
+			const struct intel_execution_engine2 *e,
+			unsigned flags)
 {
 	const int TIMESTAMP = 1023;
 	uint32_t handle[ARRAY_SIZE(priorities)];
 	igt_spin_t *spin[MAX_ELSP_QLEN];
 	unsigned int mmio_base;
 
-	mmio_base = ring_base(i915, ring);
+	mmio_base = gem_engine_mmio_base(i915, e->name);
 	igt_require_f(mmio_base, "mmio base not known\n");
 
 	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
 		const struct igt_spin_factory opts = {
 			.ctx = create_highest_priority(i915),
-			.engine = ring,
+			.engine = e->flags,
 		};
 		spin[n] = __igt_spin_factory(i915, &opts);
 		gem_context_destroy(i915, opts.ctx);
@@ -589,7 +583,7 @@ static void independent(int i915, unsigned ring, unsigned flags)
 	for (int i = 0; i < ARRAY_SIZE(priorities); i++) {
 		uint32_t ctx = gem_queue_create(i915);
 		gem_context_set_priority(i915, ctx, priorities[i]);
-		handle[i] = store_timestamp(i915, ctx, ring, mmio_base, TIMESTAMP);
+		handle[i] = store_timestamp(i915, ctx, e->flags, mmio_base, TIMESTAMP);
 		gem_context_destroy(i915, ctx);
 	}
 
@@ -840,7 +834,7 @@ igt_main
 
 			igt_subtest_with_dynamic("Q-independent") {
 				for_each_queue(e, i915)
-					independent(i915, e->flags, 0);
+					independent(i915, e, 0);
 			}
 
 			igt_subtest_with_dynamic("Q-in-order") {
