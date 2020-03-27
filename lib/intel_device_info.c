@@ -395,6 +395,8 @@ static const struct pci_id_match intel_device_match[] = {
 
 	INTEL_CML_GT1_IDS(&intel_cometlake_gt1_info),
 	INTEL_CML_GT2_IDS(&intel_cometlake_gt2_info),
+	INTEL_CML_U_GT1_IDS(&intel_cometlake_gt1_info),
+	INTEL_CML_U_GT2_IDS(&intel_cometlake_gt2_info),
 
 	INTEL_CNL_IDS(&intel_cannonlake_info),
 
