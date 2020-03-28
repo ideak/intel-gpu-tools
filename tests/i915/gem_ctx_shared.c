@@ -487,7 +487,7 @@ static void store_dword(int i915, uint32_t ctx, unsigned ring,
 
 static uint32_t create_highest_priority(int i915)
 {
-	uint32_t ctx = gem_context_create(i915);
+	uint32_t ctx = gem_context_clone_with_engines(i915, 0);
 
 	/*
 	 * If there is no priority support, all contexts will have equal
@@ -583,7 +583,8 @@ static void independent(int i915,
 	for (int i = 0; i < ARRAY_SIZE(priorities); i++) {
 		uint32_t ctx = gem_queue_create(i915);
 		gem_context_set_priority(i915, ctx, priorities[i]);
-		handle[i] = store_timestamp(i915, ctx, e->flags, mmio_base, TIMESTAMP);
+		handle[i] = store_timestamp(i915, ctx,
+					    e->flags, mmio_base, TIMESTAMP);
 		gem_context_destroy(i915, ctx);
 	}
 

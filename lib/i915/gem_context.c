@@ -423,7 +423,8 @@ uint32_t gem_context_clone_with_engines(int i915, uint32_t src)
 uint32_t gem_queue_create(int i915)
 {
 	return gem_context_clone(i915, 0,
-				 I915_CONTEXT_CLONE_VM,
+				 I915_CONTEXT_CLONE_VM |
+				 I915_CONTEXT_CLONE_ENGINES,
 				 I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
 }
 
