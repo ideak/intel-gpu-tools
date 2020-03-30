@@ -1635,7 +1635,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 /**
  * igt_create_fb:
- * @fd: open i915 drm file descriptor
+ * @fd: open drm file descriptor
  * @width: width of the framebuffer in pixel
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
@@ -1663,7 +1663,7 @@ unsigned int igt_create_fb(int fd, int width, int height, uint32_t format,
 
 /**
  * igt_create_color_fb:
- * @fd: open i915 drm file descriptor
+ * @fd: open drm file descriptor
  * @width: width of the framebuffer in pixel
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
@@ -1704,7 +1704,7 @@ unsigned int igt_create_color_fb(int fd, int width, int height,
 
 /**
  * igt_create_pattern_fb:
- * @fd: open i915 drm file descriptor
+ * @fd: open drm file descriptor
  * @width: width of the framebuffer in pixel
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
@@ -1741,7 +1741,7 @@ unsigned int igt_create_pattern_fb(int fd, int width, int height,
 
 /**
  * igt_create_color_pattern_fb:
- * @fd: open i915 drm file descriptor
+ * @fd: open drm file descriptor
  * @width: width of the framebuffer in pixel
  * @height: height of the framebuffer in pixel
  * @format: drm fourcc pixel format code
@@ -1784,7 +1784,7 @@ unsigned int igt_create_color_pattern_fb(int fd, int width, int height,
 
 /**
  * igt_create_image_fb:
- * @drm_fd: open i915 drm file descriptor
+ * @drm_fd: open drm file descriptor
  * @width: width of the framebuffer in pixel or 0
  * @height: height of the framebuffer in pixel or 0
  * @format: drm fourcc pixel format code
