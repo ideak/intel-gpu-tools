@@ -50,7 +50,7 @@ IGT_TEST_DESCRIPTION("Simulates SNA behaviour using negative self-relocations"
  * than the total size of the GTT), the GPU will hang.
  * See https://bugs.freedesktop.org/show_bug.cgi?id=78533
  */
-static void negative_reloc(int fd, unsigned engine, unsigned flags)
+static void negative_reloc(int fd, unsigned flags)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
@@ -60,7 +60,6 @@ static void negative_reloc(int fd, unsigned engine, unsigned flags)
 	uint64_t *offsets;
 	int i;
 
-	gem_require_ring(fd, engine);
 	igt_require(intel_gen(intel_get_drm_devid(fd)) >= 7);
 
 	memset(&obj, 0, sizeof(obj));
@@ -70,7 +69,7 @@ static void negative_reloc(int fd, unsigned engine, unsigned flags)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = (uintptr_t)&obj;
 	execbuf.buffer_count = 1;
-	execbuf.flags = engine | (flags & USE_LUT);
+	execbuf.flags = flags & USE_LUT;
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 
 	igt_info("Found offset %lld for 4k batch\n", (long long)obj.offset);
@@ -185,7 +184,6 @@ static void negative_reloc_blt(int fd)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
 	int fd = -1;
 
 	igt_fixture {
@@ -194,13 +192,11 @@ igt_main
 		gem_require_blitter(fd);
 	}
 
-	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("negative-reloc-%s", e->name)
-			negative_reloc(fd, eb_ring(e), 0);
+	igt_subtest("negative-reloc")
+		negative_reloc(fd, 0);
 
-		igt_subtest_f("negative-reloc-lut-%s", e->name)
-			negative_reloc(fd, eb_ring(e), USE_LUT);
-	}
+	igt_subtest("negative-reloc-lut")
+		negative_reloc(fd, USE_LUT);
 
 	igt_subtest("negative-reloc-bltcopy")
 		negative_reloc_blt(fd);
