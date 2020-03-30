@@ -80,9 +80,10 @@ static void store_dword(int fd, unsigned ring,
 	gem_close(fd, obj[1].handle);
 }
 
-static void one(int fd, unsigned ring, uint32_t flags)
+static void one(int fd, unsigned engine)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const struct intel_execution_engine2 *e;
 	struct drm_i915_gem_exec_object2 obj[2];
 #define SCRATCH 0
 #define BATCH 1
@@ -137,22 +138,20 @@ static void one(int fd, unsigned ring, uint32_t flags)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
-	execbuf.flags = ring | flags;
-
-	igt_require(gem_engine_has_mutable_submission(fd, ring));
+	execbuf.flags = engine;
 
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 	gem_close(fd, obj[BATCH].handle);
 
 	i = 0;
-	for_each_physical_engine(e, fd) {
-		if (eb_ring(e) == ring)
+	__for_each_physical_engine(fd, e) {
+		if (e->flags == engine)
 			continue;
 
-		if (!gem_can_store_dword(fd, eb_ring(e)))
+		if (!gem_class_can_store_dword(fd, e->class))
 			continue;
 
-		store_dword(fd, eb_ring(e), obj[SCRATCH].handle, 4*i, i);
+		store_dword(fd, e->flags, obj[SCRATCH].handle, 4*i, i);
 		i++;
 	}
 
@@ -185,9 +184,15 @@ static bool has_async_execbuf(int fd)
 	return async > 0;
 }
 
+#define test_each_engine(T, i915, e) \
+	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
+		for_each_if(gem_class_can_store_dword(i915, (e)->class) && \
+			    gem_class_has_mutable_submission(i915, (e)->class))\
+			igt_dynamic_f("%s", (e)->name)
+
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_engine2 *e;
 	int fd = -1;
 
 	igt_fixture {
@@ -195,21 +200,11 @@ igt_main
 		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
 		igt_require(has_async_execbuf(fd));
-		igt_require(gem_can_store_dword(fd, 0));
 		igt_fork_hang_detector(fd);
 	}
 
-	for (e = intel_execution_engines; e->name; e++) {
-		/* default exec-id is purely symbolic */
-		if (e->exec_id == 0)
-			continue;
-
-		igt_subtest_f("concurrent-writes-%s", e->name) {
-			igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
-			igt_require(gem_can_store_dword(fd, eb_ring(e)));
-			one(fd, e->exec_id, e->flags);
-		}
-	}
+	test_each_engine("concurrent-writes", fd, e)
+		one(fd, e->flags);
 
 	igt_fixture {
 		igt_stop_hang_detector();
