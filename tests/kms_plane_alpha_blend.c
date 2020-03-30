@@ -247,14 +247,14 @@ static void basic_alpha(data_t *data, enum pipe pipe, igt_plane_t *plane)
 	igt_crc_t ref_crc, crc;
 	int i;
 
-	/* Testcase 1: alpha = 0.0, plane should be transparant. */
+	/* Testcase 1: alpha = 0.0, plane should be transparent. */
 	igt_display_commit2(display, COMMIT_ATOMIC);
 	igt_pipe_crc_start(data->pipe_crc);
 	igt_pipe_crc_get_single(data->pipe_crc, &ref_crc);
 
 	igt_plane_set_fb(plane, &data->argb_fb_0);
 
-	/* transparant fb should be transparant, no matter what.. */
+	/* transparent fb should be transparent, no matter what.. */
 	for (i = 7; i < 256; i += 8) {
 		igt_plane_set_prop_value(plane, IGT_PLANE_ALPHA, i | (i << 8));
 		igt_display_commit2(display, COMMIT_ATOMIC);
@@ -290,12 +290,12 @@ static void argb_opaque(data_t *data, enum pipe pipe, igt_plane_t *plane)
 	igt_assert_crc_equal(&ref_crc, &crc);
 }
 
-static void argb_transparant(data_t *data, enum pipe pipe, igt_plane_t *plane)
+static void argb_transparent(data_t *data, enum pipe pipe, igt_plane_t *plane)
 {
 	igt_display_t *display = &data->display;
 	igt_crc_t ref_crc, crc;
 
-	/* alpha = 1.0, plane should be fully opaque, test with a transparant fb */
+	/* alpha = 1.0, plane should be fully opaque, test with a transparent fb */
 	igt_plane_set_fb(plane, NULL);
 	igt_display_commit2(display, COMMIT_ATOMIC);
 	igt_pipe_crc_collect_crc(data->pipe_crc, &ref_crc);
@@ -543,8 +543,8 @@ static void run_subtests(data_t *data, enum pipe pipe)
 	igt_subtest_f("pipe-%s-coverage-vs-premult-vs-constant", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, true, false, coverage_premult_constant);
 
-	igt_subtest_f("pipe-%s-alpha-transparant-fb", kmstest_pipe_name(pipe))
-		run_test_on_pipe_planes(data, pipe, false, false, argb_transparant);
+	igt_subtest_f("pipe-%s-alpha-transparent-fb", kmstest_pipe_name(pipe))
+		run_test_on_pipe_planes(data, pipe, false, false, argb_transparent);
 
 	igt_subtest_f("pipe-%s-alpha-opaque-fb", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, false, false, argb_opaque);
