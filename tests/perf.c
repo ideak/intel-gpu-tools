@@ -4357,11 +4357,26 @@ test_global_sseu_config(void)
 
 	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 0);
 
+	sseu_param = default_sseu;
+
+	if (intel_gen(devid) == 11) {
+		/*
+		 * On Gen11 there are restrictions on what subslices
+		 * can be disabled, notably we're not able to enable
+		 * more than half the subslice. So disable half
+		 * subslices only.
+		 */
+		for (int i = 0; i < DIV_ROUND_UP(__builtin_popcount(default_sseu.subslice_mask), 2); i++)
+			sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
+	} else {
+		sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
+	}
+
+	igt_debug("Selected context sseu:\n");
+	print_sseu_config(&sseu_param);
+
 	igt_fork(child, 1) {
 		igt_drop_root();
-
-		sseu_param = default_sseu;
-		sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
 
 		stream_fd = __perf_open(drm_fd, &param, false);
 		__perf_close(stream_fd);
@@ -4370,10 +4385,6 @@ test_global_sseu_config(void)
 	igt_waitchildren();
 
 	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
-
-
-	sseu_param = default_sseu;
-	sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
 
 	stream_fd = __perf_open(drm_fd, &param, false);
 	__perf_close(stream_fd);
