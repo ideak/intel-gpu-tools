@@ -21,9 +21,7 @@ igt@gem_exec_fence@basic-wait
 igt@gem_exec_fence@basic-await
 igt@gem_exec_fence@nb-await
 igt@gem_exec_gttfill@basic
-igt@gem_exec_parallel@basic
-igt@gem_exec_parallel@contexts
-igt@gem_exec_parallel@fds
+igt@gem_exec_parallel@engines
 igt@gem_exec_store@basic-all
 igt@gem_exec_suspend@basic
 igt@gem_exec_suspend@basic-s0

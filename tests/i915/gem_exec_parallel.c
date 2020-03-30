@@ -196,7 +196,6 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 				engines[nengine++] = e->flags;
 		}
 	} else {
-		igt_require(gem_class_can_store_dword(fd, engine->class));
 		engines[nengine++] = engine->flags;
 	}
 	igt_require(nengine);
@@ -254,7 +253,7 @@ igt_main
 		const char *name;
 		unsigned flags;
 	} modes[] = {
-		{ "", 0 },
+		{ "basic", 0 },
 		{ "contexts", CONTEXTS },
 		{ "fds", FDS },
 		{ NULL }
@@ -268,18 +267,21 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	for (const struct mode *m = modes; m->name; m++)
-		igt_subtest_f("%s", *m->name ? m->name : "basic")
-			/* NULL value means all engines */
-			all(fd, NULL, m->flags);
-
-	__for_each_physical_engine(fd, e) {
+	igt_subtest_with_dynamic("engines") {
 		for (const struct mode *m = modes; m->name; m++)
-			igt_subtest_f("%s%s%s",
-				      e->name,
-				      *m->name ? "-" : "",
-				      m->name)
-				all(fd, e, m->flags);
+			igt_dynamic(m->name)
+				/* NULL value means all engines */
+				all(fd, NULL, m->flags);
+	}
+
+	for (const struct mode *m = modes; m->name; m++) {
+		igt_subtest_with_dynamic(m->name) {
+			__for_each_physical_engine(fd, e) {
+				if (gem_class_can_store_dword(fd, e->class))
+					igt_dynamic(e->name)
+						all(fd, e, m->flags);
+			}
+		}
 	}
 
 	igt_fixture {
