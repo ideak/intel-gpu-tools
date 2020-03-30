@@ -524,9 +524,14 @@ static size_t safer_strlen(const char *s)
 	return s ? strlen(s) : 0;
 }
 
+#define test_each_engine(T, i915, e) \
+	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
+		for_each_if(gem_class_can_store_dword(i915, (e)->class)) \
+			igt_dynamic_f("%s", (e)->name)
+
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_engine2 *e;
 	igt_hang_t hang;
 	int fd = -1;
 	int dir = -1;
@@ -550,17 +555,8 @@ igt_main
 		igt_require(safer_strlen(igt_sysfs_get(dir, "error")) > 0);
 	}
 
-	for (e = intel_execution_engines; e->name; e++) {
-		/* default exec-id is purely symbolic */
-		if (e->exec_id == 0)
-			continue;
-
-		igt_subtest_f("capture-%s", e->name) {
-			igt_require(gem_ring_has_physical_engine(fd, eb_ring(e)));
-			igt_require(gem_can_store_dword(fd, eb_ring(e)));
-			capture(fd, dir, eb_ring(e));
-		}
-	}
+	test_each_engine("capture", fd, e)
+		capture(fd, dir, e->flags);
 
 	igt_subtest_f("many-4K-zero") {
 		igt_require(gem_can_store_dword(fd, 0));
