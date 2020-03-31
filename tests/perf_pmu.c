@@ -1827,14 +1827,21 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	assert_within(100.0 * busy_r, 100.0 * expected, 2);
 }
 
+#define test_each_engine(T, i915, e) \
+	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
+		igt_dynamic_f("%s", e->name)
+
+#define test_each_rcs(T, i915, e) \
+	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
+		for_each_if((e)->class == I915_ENGINE_CLASS_RENDER)
+
 igt_main
 {
+	const struct intel_execution_engine2 *e;
 	const unsigned int num_other_metrics =
-				I915_PMU_LAST - __I915_PMU_OTHER(0) + 1;
+		I915_PMU_LAST - __I915_PMU_OTHER(0) + 1;
 	unsigned int num_engines = 0;
 	int fd = -1;
-	struct intel_execution_engine2 *e;
-	unsigned int i;
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
@@ -1844,6 +1851,7 @@ igt_main
 
 		__for_each_physical_engine(fd, e)
 			num_engines++;
+		igt_require(num_engines);
 	}
 
 	/**
@@ -1852,138 +1860,141 @@ igt_main
 	igt_subtest("invalid-init")
 		invalid_init(fd);
 
-	__for_each_physical_engine(fd, e) {
-		const unsigned int pct[] = { 2, 50, 98 };
+	/**
+	 * Test that a single engine metric can be initialized or it
+	 * is correctly rejected.
+	 */
+	test_each_engine("init-busy", fd, e)
+		init(fd, e, I915_SAMPLE_BUSY);
 
-		/**
-		 * Test that a single engine metric can be initialized or it
-		 * is correctly rejected.
-		 */
-		igt_subtest_f("init-busy-%s", e->name)
-			init(fd, e, I915_SAMPLE_BUSY);
+	test_each_engine("init-wait", fd, e)
+		init(fd, e, I915_SAMPLE_WAIT);
 
-		igt_subtest_f("init-wait-%s", e->name)
-			init(fd, e, I915_SAMPLE_WAIT);
+	test_each_engine("init-sema", fd, e)
+		init(fd, e, I915_SAMPLE_SEMA);
 
-		igt_subtest_f("init-sema-%s", e->name)
-			init(fd, e, I915_SAMPLE_SEMA);
+	/**
+	 * Test that engines show no load when idle.
+	 */
+	test_each_engine("idle", fd, e)
+		single(fd, e, 0);
 
-		/**
-		 * Test that engines show no load when idle.
-		 */
-		igt_subtest_f("idle-%s", e->name)
-			single(fd, e, 0);
+	/**
+	 * Test that a single engine reports load correctly.
+	 */
+	test_each_engine("busy", fd, e)
+		single(fd, e, TEST_BUSY);
+	test_each_engine("busy-idle", fd, e)
+		single(fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
 
-		/**
-		 * Test that a single engine reports load correctly.
-		 */
-		igt_subtest_f("busy-%s", e->name)
-			single(fd, e, TEST_BUSY);
-		igt_subtest_f("busy-idle-%s", e->name)
-			single(fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
+	/**
+	 * Test that when one engine is loaded other report no
+	 * load.
+	 */
+	test_each_engine("busy-check-all", fd, e)
+		busy_check_all(fd, e, num_engines, TEST_BUSY);
+	test_each_engine("busy-idle-check-all", fd, e)
+		busy_check_all(fd, e, num_engines,
+			       TEST_BUSY | TEST_TRAILING_IDLE);
 
-		/**
-		 * Test that when one engine is loaded other report no
-		 * load.
-		 */
-		igt_subtest_f("busy-check-all-%s", e->name)
-			busy_check_all(fd, e, num_engines, TEST_BUSY);
-		igt_subtest_f("busy-idle-check-all-%s", e->name)
-			busy_check_all(fd, e, num_engines,
-				       TEST_BUSY | TEST_TRAILING_IDLE);
+	/**
+	 * Test that when all except one engine are loaded all
+	 * loads are correctly reported.
+	 */
+	test_each_engine("most-busy-check-all", fd, e)
+		most_busy_check_all(fd, e, num_engines,
+				    TEST_BUSY);
+	test_each_engine("most-busy-idle-check-all", fd, e)
+		most_busy_check_all(fd, e, num_engines,
+				    TEST_BUSY |
+				    TEST_TRAILING_IDLE);
 
-		/**
-		 * Test that when all except one engine are loaded all
-		 * loads are correctly reported.
-		 */
-		igt_subtest_f("most-busy-check-all-%s", e->name)
-			most_busy_check_all(fd, e, num_engines,
-					    TEST_BUSY);
-		igt_subtest_f("most-busy-idle-check-all-%s", e->name)
-			most_busy_check_all(fd, e, num_engines,
-					    TEST_BUSY |
-					    TEST_TRAILING_IDLE);
+	/**
+	 * Test that semphore counters report no activity on
+	 * idle or busy engines.
+	 */
+	test_each_engine("idle-no-semaphores", fd, e)
+		no_sema(fd, e, 0);
 
-		/**
-		 * Test that semphore counters report no activity on
-		 * idle or busy engines.
-		 */
-		igt_subtest_f("idle-no-semaphores-%s", e->name)
-			no_sema(fd, e, 0);
+	test_each_engine("busy-no-semaphores", fd, e)
+		no_sema(fd, e, TEST_BUSY);
 
-		igt_subtest_f("busy-no-semaphores-%s", e->name)
-			no_sema(fd, e, TEST_BUSY);
+	test_each_engine("busy-idle-no-semaphores", fd, e)
+		no_sema(fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
 
-		igt_subtest_f("busy-idle-no-semaphores-%s", e->name)
-			no_sema(fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
+	/**
+	 * Test that semaphore waits are correctly reported.
+	 */
+	test_each_engine("semaphore-wait", fd, e)
+		sema_wait(fd, e, TEST_BUSY);
 
-		/**
-		 * Test that semaphore waits are correctly reported.
-		 */
-		igt_subtest_f("semaphore-wait-%s", e->name)
-			sema_wait(fd, e, TEST_BUSY);
+	test_each_engine("semaphore-wait-idle", fd, e)
+		sema_wait(fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
 
-		igt_subtest_f("semaphore-wait-idle-%s", e->name)
-			sema_wait(fd, e,
-				  TEST_BUSY | TEST_TRAILING_IDLE);
+	test_each_engine("semaphore-busy", fd, e)
+		sema_busy(fd, e, 0);
 
-		igt_subtest_f("semaphore-busy-%s", e->name)
-			sema_busy(fd, e, 0);
+	/**
+	 * Check that two perf clients do not influence each
+	 * others observations.
+	 */
+	test_each_engine("multi-client", fd, e)
+		multi_client(fd, e);
 
-		/**
-		 * Check that two perf clients do not influence each
-		 * others observations.
-		 */
-		igt_subtest_f("multi-client-%s", e->name)
-			multi_client(fd, e);
+	/**
+	 * Check that reported usage is correct when PMU is
+	 * enabled after the batch is running.
+	 */
+	test_each_engine("busy-start", fd, e)
+		busy_start(fd, e);
 
-		/**
-		 * Check that reported usage is correct when PMU is
-		 * enabled after the batch is running.
-		 */
-		igt_subtest_f("busy-start-%s", e->name)
-			busy_start(fd, e);
+	/**
+	 * Check that reported usage is correct when PMU is
+	 * enabled after two batches are running.
+	 */
+	igt_subtest_group {
+		igt_fixture gem_require_contexts(fd);
 
-		/**
-		 * Check that reported usage is correct when PMU is
-		 * enabled after two batches are running.
-		 */
-		igt_subtest_f("busy-double-start-%s", e->name) {
-			gem_require_contexts(fd);
+		test_each_engine("busy-double-start", fd, e)
 			busy_double_start(fd, e);
-		}
+	}
 
-		/**
-		 * Check that the PMU can be safely enabled in face of
-		 * interrupt-heavy engine load.
-		 */
-		igt_subtest_f("enable-race-%s", e->name)
-			test_enable_race(fd, e);
+	/**
+	 * Check that the PMU can be safely enabled in face of
+	 * interrupt-heavy engine load.
+	 */
+	test_each_engine("enable-race", fd, e)
+		test_enable_race(fd, e);
+
+	igt_subtest_group {
+		const unsigned int pct[] = { 2, 50, 98 };
 
 		/**
 		 * Check engine busyness accuracy is as expected.
 		 */
-		for (i = 0; i < ARRAY_SIZE(pct); i++) {
-			igt_subtest_f("busy-accuracy-%u-%s",
-				      pct[i], e->name)
-				accuracy(fd, e, pct[i], 10);
+		for (unsigned int i = 0; i < ARRAY_SIZE(pct); i++) {
+			igt_subtest_with_dynamic_f("busy-accuracy-%u", pct[i]) {
+				__for_each_physical_engine(fd, e) {
+					igt_dynamic_f("%s", e->name)
+						accuracy(fd, e, pct[i], 10);
+				}
+			}
 		}
-
-		igt_subtest_f("busy-hang-%s", e->name) {
-			igt_hang_t hang = igt_allow_hang(fd, 0, 0);
-
-			single(fd, e, TEST_BUSY | FLAG_HANG);
-
-			igt_disallow_hang(fd, hang);
-		}
-
-		/**
-		 * Test that event waits are correctly reported.
-		 */
-		if (e->class == I915_ENGINE_CLASS_RENDER)
-			igt_subtest_f("event-wait-%s", e->name)
-				event_wait(fd, e);
 	}
+
+	test_each_engine("busy-hang", fd, e) {
+		igt_hang_t hang = igt_allow_hang(fd, 0, 0);
+
+		single(fd, e, TEST_BUSY | FLAG_HANG);
+
+		igt_disallow_hang(fd, hang);
+	}
+
+	/**
+	 * Test that event waits are correctly reported.
+	 */
+	test_each_rcs("event-wait", fd, e)
+		event_wait(fd, e);
 
 	/**
 	 * Test that when all engines are loaded all loads are
@@ -1999,7 +2010,7 @@ igt_main
 	 * Test that non-engine counters can be initialized and read. Apart
 	 * from the invalid metric which should fail.
 	 */
-	for (i = 0; i < num_other_metrics + 1; i++) {
+	for (unsigned int i = 0; i < num_other_metrics + 1; i++) {
 		igt_subtest_f("other-init-%u", i)
 			init_other(fd, i, i < num_other_metrics);
 
@@ -2055,14 +2066,10 @@ igt_main
 			gem_quiescent_gpu(fd);
 		}
 
-		__for_each_physical_engine(render_fd, e) {
-			igt_subtest_f("render-node-busy-%s", e->name)
-				single(render_fd, e, TEST_BUSY);
-			igt_subtest_f("render-node-busy-idle-%s",
-				      e->name)
-				single(render_fd, e,
-				       TEST_BUSY | TEST_TRAILING_IDLE);
-		}
+		test_each_engine("render-node-busy", render_fd, e)
+			single(render_fd, e, TEST_BUSY);
+		test_each_engine("render-node-busy-idle", render_fd, e)
+			single(render_fd, e, TEST_BUSY | TEST_TRAILING_IDLE);
 
 		igt_fixture {
 			close(render_fd);
