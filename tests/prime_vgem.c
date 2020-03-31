@@ -514,7 +514,7 @@ static bool prime_busy(int fd, bool excl)
 	return poll(&pfd, 1, 0) == 0;
 }
 
-static void work(int i915, int dmabuf, unsigned ring, uint32_t flags)
+static void work(int i915, int dmabuf, unsigned ring)
 {
 	const int SCRATCH = 0;
 	const int BATCH = 1;
@@ -527,12 +527,10 @@ static void work(int i915, int dmabuf, unsigned ring, uint32_t flags)
 	uint32_t *batch, *bbe;
 	int i, count;
 
-	igt_require(gem_engine_has_mutable_submission(i915, ring));
-
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = (uintptr_t)obj;
 	execbuf.buffer_count = 2;
-	execbuf.flags = ring | flags;
+	execbuf.flags = ring;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
@@ -611,7 +609,7 @@ static void work(int i915, int dmabuf, unsigned ring, uint32_t flags)
 	igt_assert(read_busy && write_busy);
 }
 
-static void test_busy(int i915, int vgem, unsigned ring, uint32_t flags)
+static void test_busy(int i915, int vgem, unsigned ring)
 {
 	struct vgem_bo scratch;
 	struct timespec tv;
@@ -625,7 +623,7 @@ static void test_busy(int i915, int vgem, unsigned ring, uint32_t flags)
 	vgem_create(vgem, &scratch);
 	dmabuf = prime_handle_to_fd(vgem, scratch.handle);
 
-	work(i915, dmabuf, ring, flags);
+	work(i915, dmabuf, ring);
 
 	/* Calling busy in a loop should be enough to flush the rendering */
 	memset(&tv, 0, sizeof(tv));
@@ -641,7 +639,7 @@ static void test_busy(int i915, int vgem, unsigned ring, uint32_t flags)
 	close(dmabuf);
 }
 
-static void test_wait(int i915, int vgem, unsigned ring, uint32_t flags)
+static void test_wait(int i915, int vgem, unsigned ring)
 {
 	struct vgem_bo scratch;
 	struct pollfd pfd;
@@ -654,7 +652,7 @@ static void test_wait(int i915, int vgem, unsigned ring, uint32_t flags)
 	vgem_create(vgem, &scratch);
 	pfd.fd = prime_handle_to_fd(vgem, scratch.handle);
 
-	work(i915, pfd.fd, ring, flags);
+	work(i915, pfd.fd, ring);
 
 	pfd.events = POLLIN;
 	igt_assert_eq(poll(&pfd, 1, 10000), 1);
@@ -668,7 +666,7 @@ static void test_wait(int i915, int vgem, unsigned ring, uint32_t flags)
 	close(pfd.fd);
 }
 
-static void test_sync(int i915, int vgem, unsigned ring, uint32_t flags)
+static void test_sync(int i915, int vgem, unsigned ring)
 {
 	struct vgem_bo scratch;
 	uint32_t *ptr;
@@ -685,7 +683,7 @@ static void test_sync(int i915, int vgem, unsigned ring, uint32_t flags)
 	igt_assert(ptr != MAP_FAILED);
 	gem_close(vgem, scratch.handle);
 
-	work(i915, dmabuf, ring, flags);
+	work(i915, dmabuf, ring);
 
 	prime_sync_start(dmabuf, false);
 	for (i = 0; i < 1024; i++)
@@ -696,7 +694,7 @@ static void test_sync(int i915, int vgem, unsigned ring, uint32_t flags)
 	munmap(ptr, scratch.size);
 }
 
-static void test_fence_wait(int i915, int vgem, unsigned ring, unsigned flags)
+static void test_fence_wait(int i915, int vgem, unsigned ring)
 {
 	struct vgem_bo scratch;
 	uint32_t fence;
@@ -717,7 +715,7 @@ static void test_fence_wait(int i915, int vgem, unsigned ring, unsigned flags)
 	igt_assert(ptr != MAP_FAILED);
 
 	igt_fork(child, 1)
-		work(i915, dmabuf, ring, flags);
+		work(i915, dmabuf, ring);
 
 	sleep(1);
 
@@ -757,7 +755,7 @@ static void test_fence_hang(int i915, int vgem, unsigned flags)
 	igt_assert(ptr != MAP_FAILED);
 	gem_close(vgem, scratch.handle);
 
-	work(i915, dmabuf, I915_EXEC_DEFAULT, 0);
+	work(i915, dmabuf, 0);
 
 	/* The work should have been cancelled */
 
@@ -998,9 +996,29 @@ static void test_flip(int i915, int vgem, unsigned hang)
 	}
 }
 
+static void test_each_engine(const char *name, int vgem, int i915,
+			     void (*fn)(int i915, int vgem, unsigned int flags))
+{
+	const struct intel_execution_engine2 *e;
+
+	igt_subtest_with_dynamic(name) {
+		__for_each_physical_engine(i915, e) {
+			if (!gem_class_can_store_dword(i915, e->class))
+				continue;
+
+			if (!gem_class_has_mutable_submission(i915, e->class))
+				continue;
+
+			igt_dynamic_f("%s", e->name) {
+				gem_quiescent_gpu(i915);
+				fn(i915, vgem, e->flags);
+			}
+		}
+	}
+}
+
 igt_main
 {
-	const struct intel_execution_engine *e;
 	int i915 = -1;
 	int vgem = -1;
 
@@ -1041,43 +1059,19 @@ igt_main
 	igt_subtest("coherency-blt")
 		test_blt_interleaved(vgem, i915);
 
-	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("%ssync-%s",
-			      e->exec_id == 0 ? "basic-" : "",
-			      e->name) {
-			gem_require_ring(i915, eb_ring(e));
-			igt_require(gem_can_store_dword(i915, eb_ring(e)));
-			igt_require(gem_engine_has_mutable_submission(i915, eb_ring(e)));
+	{
+		static const struct {
+			const char *name;
+			void (*fn)(int i915, int vgem, unsigned int engine);
+		} tests[] = {
+			{ "sync", test_sync },
+			{ "busy", test_busy },
+			{ "wait", test_wait },
+			{ }
+		};
 
-			gem_quiescent_gpu(i915);
-			test_sync(i915, vgem, e->exec_id, e->flags);
-		}
-	}
-
-	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("%sbusy-%s",
-			      e->exec_id == 0 ? "basic-" : "",
-			      e->name) {
-			gem_require_ring(i915, eb_ring(e));
-			igt_require(gem_can_store_dword(i915, eb_ring(e)));
-			igt_require(gem_engine_has_mutable_submission(i915, eb_ring(e)));
-
-			gem_quiescent_gpu(i915);
-			test_busy(i915, vgem, e->exec_id, e->flags);
-		}
-	}
-
-	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("%swait-%s",
-			      e->exec_id == 0 ? "basic-" : "",
-			      e->name) {
-			gem_require_ring(i915, eb_ring(e));
-			igt_require(gem_can_store_dword(i915, eb_ring(e)));
-			igt_require(gem_engine_has_mutable_submission(i915, eb_ring(e)));
-
-			gem_quiescent_gpu(i915);
-			test_wait(i915, vgem, e->exec_id, e->flags);
-		}
+		for(const typeof(*tests) *t = tests; t->name; t++)
+			test_each_engine(t->name, vgem, i915, t->fn);
 	}
 
 	/* Fence testing */
@@ -1097,18 +1091,7 @@ igt_main
 		igt_subtest("basic-fence-blt")
 			test_fence_blt(i915, vgem);
 
-		for (e = intel_execution_engines; e->name; e++) {
-			igt_subtest_f("%sfence-wait-%s",
-					e->exec_id == 0 ? "basic-" : "",
-					e->name) {
-				gem_require_ring(i915, eb_ring(e));
-				igt_require(gem_can_store_dword(i915, eb_ring(e)));
-				igt_require(gem_engine_has_mutable_submission(i915, eb_ring(e)));
-
-				gem_quiescent_gpu(i915);
-				test_fence_wait(i915, vgem, e->exec_id, e->flags);
-			}
-		}
+		test_each_engine("fence-wait", vgem, i915, test_fence_wait);
 
 		igt_subtest("basic-fence-flip")
 			test_flip(i915, vgem, 0);

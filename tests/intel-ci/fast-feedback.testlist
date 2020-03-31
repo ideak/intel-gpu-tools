@@ -136,15 +136,11 @@ igt@prime_self_import@basic-with_fd_dup
 igt@prime_self_import@basic-with_one_bo
 igt@prime_self_import@basic-with_one_bo_two_files
 igt@prime_self_import@basic-with_two_bos
-igt@prime_vgem@basic-busy-default
 igt@prime_vgem@basic-fence-flip
 igt@prime_vgem@basic-fence-mmap
 igt@prime_vgem@basic-fence-read
-igt@prime_vgem@basic-fence-wait-default
 igt@prime_vgem@basic-gtt
 igt@prime_vgem@basic-read
-igt@prime_vgem@basic-sync-default
-igt@prime_vgem@basic-wait-default
 igt@prime_vgem@basic-write
 igt@vgem_basic@setversion
 igt@vgem_basic@create
