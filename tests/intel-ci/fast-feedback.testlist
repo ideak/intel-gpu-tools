@@ -130,10 +130,6 @@ igt@i915_pm_backlight@basic-brightness
 igt@i915_pm_rpm@basic-pci-d3-state
 igt@i915_pm_rpm@basic-rte
 igt@i915_pm_rps@basic-api
-igt@prime_busy@basic-after-default
-igt@prime_busy@basic-before-default
-igt@prime_busy@basic-wait-after-default
-igt@prime_busy@basic-wait-before-default
 igt@prime_self_import@basic-llseek-bad
 igt@prime_self_import@basic-llseek-size
 igt@prime_self_import@basic-with_fd_dup

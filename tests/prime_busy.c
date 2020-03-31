@@ -53,9 +53,6 @@ static void busy(int fd, unsigned ring, unsigned flags)
 	uint32_t *batch, *bbe;
 	int i, count, timeout;
 
-	if ((flags & HANG) == 0)
-		igt_require(gem_engine_has_mutable_submission(fd, ring));
-
 	gem_quiescent_gpu(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -187,49 +184,35 @@ static void busy(int fd, unsigned ring, unsigned flags)
 	close(pfd[SCRATCH].fd);
 }
 
-static void test_engine_mode(int fd,
-			     const struct intel_execution_engine *e,
-			     const char *name, unsigned int flags)
+static void test_mode(int fd, unsigned int flags)
 {
+	const struct intel_execution_engine2 *e;
 	igt_hang_t hang = {};
 
-	igt_subtest_group {
-		igt_fixture {
-			gem_require_ring(fd, eb_ring(e));
-			igt_require(gem_can_store_dword(fd, eb_ring(e)));
+	if ((flags & HANG) == 0)
+		igt_fork_hang_detector(fd);
+	else
+		hang = igt_allow_hang(fd, 0, 0);
 
-			if ((flags & HANG) == 0)
-			{
-				igt_fork_hang_detector(fd);
-			}
-			else
-			{
-				hang = igt_allow_hang(fd, 0, 0);
-			}
-		}
+	__for_each_physical_engine(fd, e) {
+		if (!gem_class_can_store_dword(fd, e->class))
+			continue;
 
-		igt_subtest_f("%s%s-%s",
-			      !e->exec_id && !(flags & HANG) ? "basic-" : "",
-			      name, e->name)
-			busy(fd, eb_ring(e), flags);
+		if (!gem_class_has_mutable_submission(fd, e->class))
+			continue;
 
-		igt_subtest_f("%swait-%s-%s",
-			      !e->exec_id && !(flags & HANG) ? "basic-" : "",
-			      name, e->name)
-			busy(fd, eb_ring(e), flags | POLL);
-
-		igt_fixture {
-			if ((flags & HANG) == 0)
-				igt_stop_hang_detector();
-			else
-				igt_disallow_hang(fd, hang);
-		}
+		igt_dynamic_f("%s", e->name)
+			busy(fd, e->flags, flags);
 	}
+
+	if ((flags & HANG) == 0)
+		igt_stop_hang_detector();
+	else
+		igt_disallow_hang(fd, hang);
 }
 
 igt_main
 {
-	const struct intel_execution_engine *e;
 	int fd = -1;
 
 	igt_fixture {
@@ -245,15 +228,18 @@ igt_main
 			{ "before", BEFORE },
 			{ "after", AFTER },
 			{ "hang", BEFORE | HANG },
-			{ NULL },
+			{ },
 		};
 
 		igt_fixture
 			gem_require_mmap_wc(fd);
 
-		for (e = intel_execution_engines; e->name; e++) {
-			for (const struct mode *m = modes; m->name; m++)
-				test_engine_mode(fd, e, m->name, m->flags);
+		for (const struct mode *m = modes; m->name; m++) {
+			igt_subtest_with_dynamic(m->name)
+				test_mode(fd, m->flags);
+
+			igt_subtest_with_dynamic_f("%s-wait", m->name)
+				test_mode(fd, m->flags | POLL);
 		}
 	}
 
