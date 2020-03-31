@@ -278,9 +278,12 @@ igt_main
 	igt_subtest("error-state-basic")
 		test_error_state_basic();
 
-	__for_each_physical_engine(device, e)
-		igt_subtest_f("error-state-capture-%s", e->name)
-			test_error_state_capture(e->flags, e->name);
+	igt_subtest_with_dynamic("error-state-capture") {
+		__for_each_physical_engine(device, e) {
+			igt_dynamic_f("%s", e->name)
+				test_error_state_capture(e->flags, e->name);
+		}
+	}
 
 	igt_subtest("hangcheck-unterminated")
 		hangcheck_unterminated();
