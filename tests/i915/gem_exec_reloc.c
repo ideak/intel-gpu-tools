@@ -261,13 +261,13 @@ static void active(int fd, unsigned engine)
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
-			if (gem_can_store_dword(fd, eb_ring(e)))
-				engines[nengine++] = eb_ring(e);
+		const struct intel_execution_engine2 *e;
+
+		__for_each_physical_engine(fd, e) {
+			if (gem_class_can_store_dword(fd, e->class))
+				engines[nengine++] = e->flags;
 		}
 	} else {
-		igt_require(gem_has_ring(fd, engine));
-		igt_require(gem_can_store_dword(fd, engine));
 		engines[nengine++] = engine;
 	}
 	igt_require(nengine);
@@ -706,6 +706,7 @@ static void basic_softpin(int fd)
 
 igt_main
 {
+	const struct intel_execution_engine2 *e;
 	const struct mode {
 		const char *name;
 		unsigned before, after;
@@ -805,15 +806,26 @@ igt_main
 	igt_subtest("gpu")
 		from_gpu(fd);
 
-	igt_subtest("basic-active")
-		active(fd, ALL_ENGINES);
-	for (const struct intel_execution_engine *e = intel_execution_engines;
-	     e->name; e++) {
-		igt_subtest_f("basic-active-%s", e->name)
-			active(fd, eb_ring(e));
-		igt_subtest_f("basic-spin-%s", e->name)
-			active_spin(fd, eb_ring(e));
+	igt_subtest_with_dynamic("basic-active") {
+		igt_dynamic("all")
+			active(fd, ALL_ENGINES);
+
+		__for_each_physical_engine(fd, e) {
+			if (!gem_class_can_store_dword(fd, e->class))
+				continue;
+
+			igt_dynamic_f("%s", e->name)
+				active(fd, e->flags);
+		}
 	}
+
+	igt_subtest_with_dynamic("basic-spin") {
+		__for_each_physical_engine(fd, e) {
+			igt_dynamic_f("%s", e->name)
+				active_spin(fd, e->flags);
+		}
+	}
+
 	igt_fixture
 		close(fd);
 }
