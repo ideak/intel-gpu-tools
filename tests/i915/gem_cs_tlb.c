@@ -52,8 +52,6 @@
 
 IGT_TEST_DESCRIPTION("Check whether we correctly invalidate the cs tlb.");
 
-#define LOCAL_I915_EXEC_VEBOX	(4<<0)
-#define EXEC_OBJECT_PINNED	(1<<4)
 #define BATCH_SIZE (1024*1024)
 
 static bool has_softpin(int fd)
@@ -148,9 +146,12 @@ igt_main
 		igt_require_gem(fd);
 	}
 
-	__for_each_physical_engine(fd, e)
-		igt_subtest_f("%s", e->name)
-			run_on_ring(fd, e->flags, e->name);
+	igt_subtest_with_dynamic("engines") {
+		__for_each_physical_engine(fd, e) {
+			igt_dynamic_f("%s", e->name)
+				run_on_ring(fd, e->flags, e->name);
+		}
+	}
 
 	igt_fixture
 		close(fd);
