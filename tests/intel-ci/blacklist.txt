@@ -28,7 +28,6 @@ igt@gem_exec_big@(?!.*single).*
 igt@gem_exec_capture@many-(?!4K-).*
 igt@gem_exec_fence@(?!.*basic).*
 igt@gem_exec_flush@(?!.*basic).*
-igt@gem_exec_gttfill@(?!.*basic).*
 igt@gem_exec_latency(@.*)?
 igt@gem_exec_lut_handle(@.*)?
 igt@gem_exec_nop@(?!.*basic).*

@@ -120,17 +120,16 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	igt_assert(shared != MAP_FAILED);
 
 	nengine = 0;
-	if (ring == 0) {
-		for_each_physical_engine(e, fd) {
-			if (!gem_can_store_dword(fd, eb_ring(e)))
+	if (ring == ALL_ENGINES) {
+		struct intel_execution_engine2 *e;
+
+		__for_each_physical_engine(fd, e) {
+			if (!gem_class_can_store_dword(fd, e->class))
 				continue;
 
-			engines[nengine++] = eb_ring(e);
+			engines[nengine++] = e->flags;
 		}
 	} else {
-		gem_require_ring(fd, ring);
-		igt_require(gem_can_store_dword(fd, ring));
-
 		engines[nengine++] = ring;
 	}
 	igt_require(nengine);
@@ -200,28 +199,33 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
-	int device = -1;
+	const struct intel_execution_engine2 *e;
+	int i915 = -1;
 
 	igt_fixture {
-		device = drm_open_driver(DRIVER_INTEL);
-		igt_require_gem(device);
-		igt_require(gem_can_store_dword(device, 0));
-		igt_fork_hang_detector(device);
+		i915 = drm_open_driver(DRIVER_INTEL);
+		igt_require_gem(i915);
+		igt_fork_hang_detector(i915);
 	}
 
-	igt_subtest("basic")
-		fillgtt(device, 0, 1); /* just enough to run a single pass */
+	igt_subtest("basic") /* just enough to run a single pass */
+		fillgtt(i915, ALL_ENGINES, 1);
 
-	for (e = intel_execution_engines; e->name; e++)
-		igt_subtest_f("%s", e->name)
-			fillgtt(device, eb_ring(e), 20);
+	igt_subtest_with_dynamic("engines") {
+		__for_each_physical_engine(i915, e) {
+			if (!gem_class_can_store_dword(i915, e->class))
+				continue;
+
+			igt_dynamic_f("%s", e->name)
+				fillgtt(i915, e->flags, 20);
+		}
+	}
 
 	igt_subtest("all")
-		fillgtt(device, 0, 150);
+		fillgtt(i915, ALL_ENGINES, 20);
 
 	igt_fixture {
 		igt_stop_hang_detector();
-		close(device);
+		close(i915);
 	}
 }
