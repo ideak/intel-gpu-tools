@@ -1936,6 +1936,22 @@ static bool has_load_balancer(int i915)
 	return err == 0;
 }
 
+static bool has_bonding(int i915)
+{
+	I915_DEFINE_CONTEXT_ENGINES_BOND(bonds, 0) = {
+		.base.name = I915_CONTEXT_ENGINES_EXT_BOND,
+	};
+	struct i915_engine_class_instance ci = {};
+	uint32_t ctx;
+	int err;
+
+	ctx = gem_context_create(i915);
+	err = __set_load_balancer(i915, ctx, &ci, 1, &bonds);
+	gem_context_destroy(i915, ctx);
+
+	return err == 0;
+}
+
 igt_main
 {
 	int i915 = -1;
@@ -1992,11 +2008,18 @@ igt_main
 	igt_subtest("smoke")
 		smoketest(i915, 20);
 
-	igt_subtest("bonded-imm")
-		bonded(i915, 0);
+	igt_subtest_group {
+		igt_fixture igt_require(has_bonding(i915));
 
-	igt_subtest("bonded-cork")
-		bonded(i915, CORK);
+		igt_subtest("bonded-imm")
+			bonded(i915, 0);
+
+		igt_subtest("bonded-cork")
+			bonded(i915, CORK);
+
+		igt_subtest("bonded-early")
+			bonded_early(i915);
+	}
 
 	igt_subtest("bonded-slice")
 		bonded_slice(i915);
@@ -2006,9 +2029,6 @@ igt_main
 
 	igt_subtest("bonded-semaphore")
 		bonded_semaphore(i915);
-
-	igt_subtest("bonded-early")
-		bonded_early(i915);
 
 	igt_fixture {
 		igt_stop_hang_detector();
