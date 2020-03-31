@@ -25,6 +25,7 @@
  *
  */
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -284,6 +285,10 @@ static int open_pmu(int i915, uint64_t config)
 #define WAITBOOST 0x1
 #define ONCE 0x2
 
+static void sighandler(int sig)
+{
+}
+
 static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 {
 	struct drm_i915_gem_exec_object2 obj = {
@@ -293,7 +298,11 @@ static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 		.buffers_ptr = to_user_pointer(&obj),
 		.buffer_count = 1,
 	};
+	struct sigaction act = {
+		.sa_handler = sighandler
+	};
 
+	sigaction(SIGINT, &act, NULL);
 	do {
 		struct timespec tv = {};
 
@@ -321,8 +330,18 @@ static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 		if (!gem_has_execlists(i915))
 			igt_drop_caches_set(i915, DROP_IDLE);
 
-		usleep(igt_nsec_elapsed(&tv) / 10); /* => 1% busy */
+		/* aim for ~1% busy */
+		usleep(max(igt_nsec_elapsed(&tv) / 10, 500 * 1000));
 	} while (!READ_ONCE(*ctl));
+}
+
+static void kill_children(int sig)
+{
+	void (*old)(int);
+
+	old = signal(sig, SIG_IGN);
+	kill(-getpgrp(), sig);
+	signal(sig, old);
 }
 
 static void rc6_idle(int i915)
@@ -392,6 +411,7 @@ static void rc6_idle(int i915)
 		}
 
 		*done = 1;
+		kill_children(SIGINT);
 		igt_waitchildren();
 
 		/* At least one wakeup/s needed for a reasonable test */
