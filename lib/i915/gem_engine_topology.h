@@ -68,9 +68,9 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
 
 /* needs to replace "for_each_physical_engine" when conflicts are fixed */
 #define ____for_each_physical_engine(fd__, ctx__, e__) \
-	for (struct intel_engine_data i__ = intel_init_engine_list(fd__, ctx__); \
-	     ((e__) = intel_get_current_physical_engine(&i__)); \
-	     intel_next_engine(&i__))
+	for (struct intel_engine_data i__##e__ = intel_init_engine_list(fd__, ctx__); \
+	     ((e__) = intel_get_current_physical_engine(&i__##e__)); \
+	     intel_next_engine(&i__##e__))
 
 #define __for_each_physical_engine(fd__, e__) \
 	____for_each_physical_engine(fd__, 0, e__)
