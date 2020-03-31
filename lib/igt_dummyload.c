@@ -26,6 +26,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <sys/poll.h>
+#include <sys/timerfd.h>
 
 #include <i915_drm.h>
 
@@ -394,11 +395,20 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 	return spin;
 }
 
-static void notify(union sigval arg)
+static void *timer_thread(void *data)
 {
-	igt_spin_t *spin = arg.sival_ptr;
+	igt_spin_t *spin = data;
+	struct pollfd pfd;
+	int ret;
 
-	igt_spin_end(spin);
+	pfd.fd = spin->timerfd;
+	pfd.events = POLLIN;
+
+	ret = poll(&pfd, 1, -1);
+	if (ret >= 0)
+		igt_spin_end(spin);
+
+	return NULL;
 }
 
 /**
@@ -412,29 +422,24 @@ static void notify(union sigval arg)
  */
 void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 {
-	timer_t timer;
-	struct sigevent sev;
 	struct itimerspec its;
+	int timerfd;
 
 	igt_assert(ns > 0);
 	if (!spin)
 		return;
 
-	igt_assert(!spin->timer);
+	igt_assert(!spin->timerfd);
+	timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
+	igt_assert(timerfd >= 0);
+	spin->timerfd = timerfd;
 
-	memset(&sev, 0, sizeof(sev));
-	sev.sigev_notify = SIGEV_THREAD;
-	sev.sigev_value.sival_ptr = spin;
-	sev.sigev_notify_function = notify;
-	igt_assert(timer_create(CLOCK_MONOTONIC, &sev, &timer) == 0);
-	igt_assert(timer);
+	pthread_create(&spin->timer_thread, NULL, timer_thread, spin);
 
 	memset(&its, 0, sizeof(its));
 	its.it_value.tv_sec = ns / NSEC_PER_SEC;
 	its.it_value.tv_nsec = ns % NSEC_PER_SEC;
-	igt_assert(timer_settime(timer, 0, &its, NULL) == 0);
-
-	spin->timer = timer;
+	igt_assert(timerfd_settime(timerfd, 0, &its, NULL) == 0);
 }
 
 /**
@@ -484,8 +489,11 @@ void igt_spin_free(int fd, igt_spin_t *spin)
 	igt_list_del(&spin->link);
 	pthread_mutex_unlock(&list_lock);
 
-	if (spin->timer)
-		timer_delete(spin->timer);
+	if (spin->timerfd) {
+		pthread_cancel(spin->timer_thread);
+		igt_assert(pthread_join(spin->timer_thread, NULL) == 0);
+		close(spin->timerfd);
+	}
 
 	igt_spin_end(spin);
 	gem_munmap((void *)((unsigned long)spin->condition & (~4095UL)),

@@ -34,7 +34,8 @@
 
 typedef struct igt_spin {
 	unsigned int handle;
-	timer_t timer;
+	int timerfd;
+	pthread_t timer_thread;
 	struct igt_list_head link;
 
 	uint32_t *condition;
