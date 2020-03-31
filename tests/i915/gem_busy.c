@@ -310,6 +310,7 @@ static void close_race(int fd)
 {
 	const unsigned int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	const unsigned int nhandles = gem_measure_ring_inflight(fd, ALL_ENGINES, 0) / 2;
+	const struct intel_execution_engine2 *e;
 	unsigned int engines[16], nengine;
 	unsigned long *control;
 	uint32_t *handles;
@@ -324,8 +325,8 @@ static void close_race(int fd)
 	 */
 
 	nengine = 0;
-	for_each_engine(e, fd)
-		engines[nengine++] = eb_ring(e);
+	__for_each_physical_engine(fd, e)
+		engines[nengine++] = e->flags;
 	igt_require(nengine);
 
 	control = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
@@ -467,8 +468,18 @@ static void all(int i915)
 	const struct intel_execution_engine2 *e;
 
 	__for_each_physical_engine(i915, e)
-		basic(i915, e, 0);
+		igt_fork(child, 1) basic(i915, e, 0);
+	igt_waitchildren();
 }
+
+#define test_each_engine(T, i915, e) \
+	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
+		igt_dynamic_f("%s", (e)->name)
+
+#define test_each_engine_store(T, i915, e) \
+	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
+		for_each_if (gem_class_can_store_dword(i915, (e)->class)) \
+			igt_dynamic_f("%s", (e)->name)
 
 igt_main
 {
@@ -478,8 +489,6 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
-		igt_require(gem_class_can_store_dword(fd,
-						     I915_ENGINE_CLASS_RENDER));
 	}
 
 	igt_subtest_group {
@@ -487,14 +496,14 @@ igt_main
 			igt_fork_hang_detector(fd);
 		}
 
-		igt_subtest("busy-all") {
-			gem_quiescent_gpu(fd);
-			all(fd);
-		}
+		igt_subtest_with_dynamic("busy") {
+			igt_dynamic("all") {
+				gem_quiescent_gpu(fd);
+				all(fd);
+			}
 
-		__for_each_physical_engine(fd, e) {
-			igt_subtest_group {
-				igt_subtest_f("busy-%s", e->name) {
+			__for_each_physical_engine(fd, e) {
+				igt_dynamic_f("%s", e->name) {
 					gem_quiescent_gpu(fd);
 					basic(fd, e, 0);
 				}
@@ -507,24 +516,16 @@ igt_main
 				gem_require_mmap_wc(fd);
 			}
 
-			__for_each_physical_engine(fd, e) {
-				igt_subtest_f("extended-%s", e->name) {
-					igt_require(gem_class_can_store_dword(fd,
-						     e->class));
-					gem_quiescent_gpu(fd);
-					one(fd, e, 0);
-					gem_quiescent_gpu(fd);
-				}
+			test_each_engine_store("extended", fd, e) {
+				gem_quiescent_gpu(fd);
+				one(fd, e, 0);
+				gem_quiescent_gpu(fd);
 			}
 
-			__for_each_physical_engine(fd, e) {
-				igt_subtest_f("extended-parallel-%s", e->name) {
-					igt_require(gem_class_can_store_dword(fd, e->class));
-
-					gem_quiescent_gpu(fd);
-					one(fd, e, PARALLEL);
-					gem_quiescent_gpu(fd);
-				}
+			test_each_engine_store("parallel", fd, e) {
+				gem_quiescent_gpu(fd);
+				one(fd, e, PARALLEL);
+				gem_quiescent_gpu(fd);
 			}
 		}
 
@@ -534,9 +535,10 @@ igt_main
 				igt_require(has_semaphores(fd));
 			}
 
-			__for_each_physical_engine(fd, e) {
-				igt_subtest_f("extended-semaphore-%s", e->name)
-					semaphore(fd, e);
+			test_each_engine("semaphore", fd, e) {
+				gem_quiescent_gpu(fd);
+				semaphore(fd, e);
+				gem_quiescent_gpu(fd);
 			}
 		}
 
@@ -555,13 +557,10 @@ igt_main
 			hang = igt_allow_hang(fd, 0, 0);
 		}
 
-		__for_each_physical_engine(fd, e) {
-			igt_subtest_f("%shang-%s",
-				      e->class == I915_ENGINE_CLASS_RENDER
-				      ? "basic-" : "", e->name) {
-				gem_quiescent_gpu(fd);
-				basic(fd, e, HANG);
-			}
+		test_each_engine("hang", fd, e) {
+			gem_quiescent_gpu(fd);
+			basic(fd, e, HANG);
+			gem_quiescent_gpu(fd);
 		}
 
 		igt_subtest_group {
@@ -570,14 +569,10 @@ igt_main
 				gem_require_mmap_wc(fd);
 			}
 
-			__for_each_physical_engine(fd, e) {
-				igt_subtest_f("extended-hang-%s", e->name) {
-					igt_require(gem_class_can_store_dword(fd, e->class));
-
-					gem_quiescent_gpu(fd);
-					one(fd, e, HANG);
-					gem_quiescent_gpu(fd);
-				}
+			test_each_engine_store("hang-extended", fd, e) {
+				gem_quiescent_gpu(fd);
+				one(fd, e, HANG);
+				gem_quiescent_gpu(fd);
 			}
 		}
 

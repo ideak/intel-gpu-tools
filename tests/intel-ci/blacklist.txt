@@ -13,7 +13,7 @@ igt@i915_pm_rpm@gem-execbuf-stress-extra-wait
 ###############################################
 # GEM
 ###############################################
-igt@gem_busy@(?!.*basic).*hang.*
+igt@gem_busy@hang.*
 igt@gem_close_race@(?!.*basic).*
 igt@gem_concurrent_blit(@.*)?
 igt@gem_cs_prefetch(@.*)?
