@@ -204,18 +204,22 @@ test_plane_position_with_output(data_t *data, enum pipe pipe, int max_planes,
 				igt_output_t *output)
 {
 	int i;
-	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
+	int iterations = opt.iterations < 1 ? max_planes : opt.iterations;
 	bool loop_forever = opt.iterations == LOOP_FOREVER ? true : false;
+	int ret;
 
 	igt_pipe_refresh(&data->display, pipe, true);
 
 	i = 0;
 	while (i < iterations || loop_forever) {
 		prepare_planes(data, pipe, max_planes, output);
-		igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
+		ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
 
 		for (int c = 0; c < max_planes; c++)
 			igt_remove_fb(data->drm_fd, &data->fb[c]);
+
+		if (ret != 0)
+			max_planes > 1 ? max_planes-- : 1;
 
 		i++;
 	}
@@ -249,44 +253,17 @@ get_lowres_mode(data_t *data, const drmModeModeInfo *mode_default,
 	return mode;
 }
 
-static int
-test_resolution_with_output(data_t *data, enum pipe pipe, igt_output_t *output)
+static void
+test_resolution_with_output(data_t *data, enum pipe pipe, int max_planes, igt_output_t *output)
 {
 	const drmModeModeInfo *mode_hi, *mode_lo;
-	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
+	int iterations = opt.iterations < 1 ? max_planes : opt.iterations;
 	bool loop_forever = opt.iterations == LOOP_FOREVER ? true : false;
-	int i, c, ret;
-	int max_planes = data->display.pipes[pipe].n_planes;
-	igt_plane_t *primary;
-	drmModeModeInfo *mode;
+	int i;
 
 	i = 0;
 	while (i < iterations || loop_forever) {
 		igt_output_set_pipe(output, pipe);
-		for (c = 0; c < max_planes; c++) {
-			igt_plane_t *plane = igt_output_get_plane(output, c);
-
-			if (plane->type != DRM_PLANE_TYPE_PRIMARY)
-				continue;
-			primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-			data->plane[primary->index] = primary;
-			mode = igt_output_get_mode(output);
-			igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-						DRM_FORMAT_XRGB8888,
-						LOCAL_I915_FORMAT_MOD_X_TILED,
-						0.0f, 0.0f, 1.0f,
-						&data->fb[primary->index]);
-			igt_plane_set_fb(data->plane[primary->index], &data->fb[primary->index]);
-			ret = igt_display_try_commit2(&data->display, COMMIT_ATOMIC);
-			if (ret) {
-				igt_plane_set_fb(data->plane[i], NULL);
-				igt_remove_fb(data->drm_fd, &data->fb[i]);
-				data->plane[i] = NULL;
-				break;
-			}
-		}
-		max_planes = c;
-		igt_assert_lt(0, max_planes);
 
 		mode_hi = igt_output_get_mode(output);
 		mode_lo = get_lowres_mode(data, mode_hi, output);
@@ -301,8 +278,6 @@ test_resolution_with_output(data_t *data, enum pipe pipe, igt_output_t *output)
 
 		i++;
 	}
-
-	return max_planes;
 }
 
 static void
@@ -310,7 +285,6 @@ run_test(data_t *data, enum pipe pipe, igt_output_t *output)
 {
 	int connected_outs;
 	int n_planes = data->display.pipes[pipe].n_planes;
-	int max_planes = n_planes;
 
 	if (!opt.user_seed)
 		opt.seed = time(NULL);
@@ -321,13 +295,12 @@ run_test(data_t *data, enum pipe pipe, igt_output_t *output)
 			 igt_output_name(output), kmstest_pipe_name(pipe), opt.seed);
 
 		test_init(data, pipe, n_planes, output);
-		max_planes = test_resolution_with_output(data, pipe, output);
 
 		igt_fork(child, 1) {
-			test_plane_position_with_output(data, pipe, max_planes, output);
+			test_plane_position_with_output(data, pipe, n_planes, output);
 		}
 
-		test_resolution_with_output(data, pipe, output);
+		test_resolution_with_output(data, pipe, n_planes, output);
 
 		igt_waitchildren();
 
