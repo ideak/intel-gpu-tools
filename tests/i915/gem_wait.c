@@ -74,9 +74,11 @@ static void basic(int fd, unsigned engine, unsigned flags)
 	IGT_CORK_HANDLE(cork);
 	uint32_t plug =
 		flags & (WRITE | AWAIT) ? igt_cork_plug(&cork, fd) : 0;
-	igt_spin_t *spin = igt_spin_new(fd,
-					.engine = engine,
-					.dependency = plug);
+	igt_spin_t *spin =
+		igt_spin_new(fd,
+			     .engine = engine,
+			     .dependency = plug,
+			     .flags = (flags & HANG) ? IGT_SPIN_NO_PREEMPTION : 0);
 	struct drm_i915_gem_wait wait = {
 		flags & WRITE ? plug : spin->handle
 	};
@@ -132,9 +134,29 @@ static void basic(int fd, unsigned engine, unsigned flags)
 	igt_spin_free(fd, spin);
 }
 
-igt_main
+static void test_all_engines(const char *name, int i915, unsigned int test)
 {
 	const struct intel_execution_engine2 *e;
+
+	igt_subtest_with_dynamic(name) {
+		igt_dynamic("all") {
+			gem_quiescent_gpu(i915);
+			basic(i915, ALL_ENGINES, test);
+			gem_quiescent_gpu(i915);
+		}
+
+		__for_each_physical_engine(i915, e) {
+			igt_dynamic_f("%s", e->name) {
+				gem_quiescent_gpu(i915);
+				basic(i915, e->flags, test);
+				gem_quiescent_gpu(i915);
+			}
+		}
+	}
+}
+
+igt_main
+{
 	int fd = -1;
 
 	igt_fixture {
@@ -149,56 +171,25 @@ igt_main
 		invalid_buf(fd);
 
 	igt_subtest_group {
+		static const struct {
+			const char *name;
+			unsigned int flags;
+		} tests[] = {
+			{ "busy", BUSY },
+			{ "wait", 0 },
+			{ "await", AWAIT },
+			{ "write-busy", BUSY | WRITE },
+			{ "write-wait", WRITE },
+			{ }
+		};
+
 		igt_fixture {
 			igt_fork_hang_detector(fd);
 			igt_fork_signal_helper();
 		}
 
-		igt_subtest("basic-busy-all") {
-			gem_quiescent_gpu(fd);
-			basic(fd, ALL_ENGINES, BUSY);
-		}
-		igt_subtest("basic-wait-all") {
-			gem_quiescent_gpu(fd);
-			basic(fd, ALL_ENGINES, 0);
-		}
-		igt_subtest("basic-await-all") {
-			gem_quiescent_gpu(fd);
-			basic(fd, ALL_ENGINES, AWAIT);
-		}
-		igt_subtest("basic-busy-write-all") {
-			gem_quiescent_gpu(fd);
-			basic(fd, ALL_ENGINES, BUSY | WRITE);
-		}
-		igt_subtest("basic-wait-write-all") {
-			gem_quiescent_gpu(fd);
-			basic(fd, ALL_ENGINES, WRITE);
-		}
-
-		__for_each_physical_engine(fd, e) {
-			igt_subtest_group {
-				igt_subtest_f("busy-%s", e->name) {
-					gem_quiescent_gpu(fd);
-					basic(fd, e->flags, BUSY);
-				}
-				igt_subtest_f("wait-%s", e->name) {
-					gem_quiescent_gpu(fd);
-					basic(fd, e->flags, 0);
-				}
-				igt_subtest_f("await-%s", e->name) {
-					gem_quiescent_gpu(fd);
-					basic(fd, e->flags, AWAIT);
-				}
-				igt_subtest_f("write-busy-%s", e->name) {
-					gem_quiescent_gpu(fd);
-					basic(fd, e->flags, BUSY | WRITE);
-				}
-				igt_subtest_f("write-wait-%s", e->name) {
-					gem_quiescent_gpu(fd);
-					basic(fd, e->flags, WRITE);
-				}
-			}
-		}
+		for (const typeof(*tests) *t = tests; t->name; t++)
+			test_all_engines(t->name, fd, t->flags);
 
 		igt_fixture {
 			igt_stop_signal_helper();
@@ -207,6 +198,16 @@ igt_main
 	}
 
 	igt_subtest_group {
+		static const struct {
+			const char *name;
+			unsigned int flags;
+		} tests[] = {
+			{ "hang-busy", HANG | BUSY },
+			{ "hang-wait", HANG },
+			{ "hang-busy-write", HANG | WRITE  | BUSY},
+			{ "hang-wait-write", HANG | WRITE },
+			{ }
+		};
 		igt_hang_t hang;
 
 		igt_fixture {
@@ -214,42 +215,8 @@ igt_main
 			igt_fork_signal_helper();
 		}
 
-		igt_subtest("hang-busy-all") {
-			gem_quiescent_gpu(fd);
-			basic(fd, ALL_ENGINES, BUSY | HANG);
-		}
-		igt_subtest("hang-wait-all") {
-			gem_quiescent_gpu(fd);
-			basic(fd, ALL_ENGINES, HANG);
-		}
-
-		igt_subtest("hang-busy-write-all") {
-			gem_quiescent_gpu(fd);
-			basic(fd, ALL_ENGINES, BUSY | WRITE | HANG);
-		}
-		igt_subtest("hang-wait-write-all") {
-			gem_quiescent_gpu(fd);
-			basic(fd, ALL_ENGINES, WRITE | HANG);
-		}
-
-		__for_each_physical_engine(fd, e) {
-			igt_subtest_f("hang-busy-%s", e->name) {
-				gem_quiescent_gpu(fd);
-				basic(fd, e->flags, HANG | BUSY);
-			}
-			igt_subtest_f("hang-wait-%s", e->name) {
-				gem_quiescent_gpu(fd);
-				basic(fd, e->flags, HANG);
-			}
-			igt_subtest_f("hang-busy-write-%s", e->name) {
-				gem_quiescent_gpu(fd);
-				basic(fd, e->flags, HANG | WRITE | BUSY);
-			}
-			igt_subtest_f("hang-wait-write-%s", e->name) {
-				gem_quiescent_gpu(fd);
-				basic(fd, e->flags, HANG | WRITE);
-			}
-		}
+		for (const typeof(*tests) *t = tests; t->name; t++)
+			test_all_engines(t->name, fd, t->flags);
 
 		igt_fixture {
 			igt_stop_signal_helper();
