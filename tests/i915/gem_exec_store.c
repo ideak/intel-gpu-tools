@@ -46,8 +46,6 @@ static void store_dword(int fd, const struct intel_execution_engine2 *e)
 	uint32_t batch[16];
 	int i;
 
-	igt_require(gem_class_can_store_dword(fd, e->class));
-
 	intel_detect_and_clear_missed_interrupts(fd);
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
@@ -109,8 +107,6 @@ static void store_cachelines(int fd, const struct intel_execution_engine2 *e,
 
 	reloc = calloc(NCACHELINES, sizeof(*reloc));
 	igt_assert(reloc);
-
-	igt_require(gem_class_can_store_dword(fd, e->class));
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -326,6 +322,11 @@ static int print_welcome(int fd)
 	return ffs(info->gen);
 }
 
+#define test_each_engine(T, i915, e)  \
+	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
+		for_each_if(gem_class_can_store_dword(i915, (e)->class)) \
+			igt_dynamic_f("%s", (e)->name)
+
 igt_main
 {
 	const struct intel_execution_engine2 *e;
@@ -341,24 +342,21 @@ igt_main
 			igt_device_set_master(fd);
 
 		igt_require_gem(fd);
-		igt_require(gem_can_store_dword(fd, 0));
 
 		igt_fork_hang_detector(fd);
 	}
 
-	__for_each_physical_engine(fd, e) {
-		igt_subtest_f("basic-%s", e->name)
-			store_dword(fd, e);
-
-		igt_subtest_f("cachelines-%s", e->name)
-			store_cachelines(fd, e, 0);
-
-		igt_subtest_f("pages-%s", e->name)
-			store_cachelines(fd, e, PAGES);
-	}
-
-	igt_subtest("basic-all")
+	igt_subtest("basic")
 		store_all(fd);
+
+	test_each_engine("dword", fd, e)
+		store_dword(fd, e);
+
+	test_each_engine("cachelines", fd, e)
+		store_cachelines(fd, e, 0);
+
+	test_each_engine("pages", fd, e)
+		store_cachelines(fd, e, PAGES);
 
 	igt_fixture {
 		igt_stop_hang_detector();
