@@ -191,6 +191,7 @@ static void store_all(int fd)
 			continue;
 		nengine++;
 	}
+	igt_require(nengine);
 
 	reloc = calloc(2*nengine, sizeof(*reloc));
 	igt_assert(reloc);
