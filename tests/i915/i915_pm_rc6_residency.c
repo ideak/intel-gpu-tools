@@ -331,7 +331,7 @@ static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 			igt_drop_caches_set(i915, DROP_IDLE);
 
 		/* aim for ~1% busy */
-		usleep(max(igt_nsec_elapsed(&tv) / 10, 500 * 1000));
+		usleep(min(igt_nsec_elapsed(&tv) / 10, 50 * 1000));
 	} while (!READ_ONCE(*ctl));
 }
 
