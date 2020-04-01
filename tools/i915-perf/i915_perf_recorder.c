@@ -485,8 +485,8 @@ get_topology(int drm_fd, uint32_t *topology_size)
 		return NULL;
 
 	assert(item.length > 0);
-	*topology_size = item.length;
-	topo_info = malloc(item.length);
+	*topology_size = ALIGN(item.length, 8);
+	topo_info = calloc(1, *topology_size);
 	item.data_ptr = (uintptr_t) topo_info;
 
 	ret = perf_ioctl(drm_fd, DRM_IOCTL_I915_QUERY, &query);
@@ -501,7 +501,6 @@ write_topology(FILE *output, struct recording_context *ctx)
 	struct drm_i915_perf_record_header header = {
 		.type = INTEL_PERF_RECORD_TYPE_DEVICE_TOPOLOGY,
 	};
-	char pad[8] = { 0, };
 
 	header.size = sizeof(header) + ctx->topology_size;
 	if (fwrite(&header, sizeof(header), 1, output) != 1)
@@ -509,12 +508,6 @@ write_topology(FILE *output, struct recording_context *ctx)
 
 	if (fwrite(ctx->topology, ctx->topology_size, 1, output) != 1)
 		return false;
-
-	/* Align the size to align all other packets to 8 bytes. */
-	if (ctx->topology_size % 8) {
-		if (fwrite(pad, ctx->topology_size % 8, 1, output) != 1)
-			return false;
-	}
 
 	return true;
 }
