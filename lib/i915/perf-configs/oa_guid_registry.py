@@ -54,9 +54,19 @@ class Registry:
         changes that might affect our useages.
         """
 
+        def reorder_attributes(root):
+            for el in root.iter():
+                attrib = el.attrib
+                if len(attrib) > 1:
+                    # adjust attribute order, e.g. by sorting
+                    attribs = sorted(attrib.items())
+                    attrib.clear()
+                    attrib.update(attribs)
+
         config = et.Element('config')
         for registers in mdapi_metric_set.findall(".//RegConfigStart"):
             config.append(copy.deepcopy(registers))
+        reorder_attributes(config)
         registers_str = et.tostring(config)
 
         return hashlib.md5(registers_str).hexdigest()
