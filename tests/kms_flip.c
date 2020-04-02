@@ -216,6 +216,7 @@ static void emit_fence_stress(struct test_output *o)
 
 	igt_require(bufmgr);
 
+	igt_assert(num_fences);
 	bo = calloc(sizeof(*bo), num_fences);
 	exec = calloc(sizeof(*exec), num_fences+1);
 	for (i = 0; i < num_fences - 1; i++) {
@@ -1339,6 +1340,8 @@ static int run_test(int duration, int flags)
 	int i, n, modes = 0;
 
 	igt_require((flags & TEST_HANG) == 0 || !is_wedged(drm_fd));
+	igt_require(!(flags & TEST_FENCE_STRESS) ||
+		    gem_available_fences(drm_fd));
 
 	resources = drmModeGetResources(drm_fd);
 	igt_require(resources);
@@ -1396,6 +1399,8 @@ static int run_pair(int duration, int flags)
 	int i, j, m, n, modes = 0;
 
 	igt_require((flags & TEST_HANG) == 0 || !is_wedged(drm_fd));
+	igt_require(!(flags & TEST_FENCE_STRESS) ||
+		    gem_available_fences(drm_fd));
 
 	resources = drmModeGetResources(drm_fd);
 	igt_require(resources);
