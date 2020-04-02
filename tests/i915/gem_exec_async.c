@@ -131,8 +131,7 @@ static bool has_async_execbuf(int fd)
 
 #define test_each_engine(T, i915, e) \
 	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
-		for_each_if(gem_class_can_store_dword(i915, (e)->class)) \
-			igt_dynamic_f("%s", (e)->name)
+		igt_dynamic_f("%s", (e)->name)
 
 igt_main
 {
