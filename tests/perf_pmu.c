@@ -1827,6 +1827,39 @@ accuracy(int gem_fd, const struct intel_execution_engine2 *e,
 	assert_within(100.0 * busy_r, 100.0 * expected, 2);
 }
 
+static void *create_mmap(int gem_fd, const struct mmap_offset *t, int sz)
+{
+	uint32_t handle;
+	void *ptr;
+
+	handle = gem_create(gem_fd, sz);
+	ptr = __gem_mmap_offset(gem_fd, handle, 0, sz, PROT_WRITE, t->type);
+	gem_close(gem_fd, handle);
+
+	return ptr;
+}
+
+static void faulting_read(int gem_fd, const struct mmap_offset *t)
+{
+	void *ptr;
+	int fd;
+
+	/*
+	 * Trigger a pagefault within the perf read() so that we can
+	 * teach lockdep about the potential chains.
+	 */
+
+	ptr = create_mmap(gem_fd, t, 4096);
+	igt_require(ptr != NULL);
+
+	fd = open_pmu(gem_fd, I915_PMU_ENGINE_BUSY(0, 0));
+	igt_require(fd != -1);
+	igt_assert_eq(read(fd, ptr, 4096), 2 * sizeof(uint64_t));
+	close(fd);
+
+	munmap(ptr, 4096);
+}
+
 #define test_each_engine(T, i915, e) \
 	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
 		igt_dynamic_f("%s", e->name)
@@ -1859,6 +1892,13 @@ igt_main
 	 */
 	igt_subtest("invalid-init")
 		invalid_init(fd);
+
+	igt_subtest_with_dynamic("faulting-read") {
+		for_each_mmap_offset_type(fd, t) {
+			igt_dynamic_f("%s", t->name)
+				faulting_read(fd, t);
+		}
+	}
 
 	/**
 	 * Test that a single engine metric can be initialized or it
