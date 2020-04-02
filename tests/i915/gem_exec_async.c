@@ -77,71 +77,24 @@ static void store_dword(int fd, unsigned ring,
 	batch[++i] = MI_BATCH_BUFFER_END;
 	gem_write(fd, obj[1].handle, 0, batch, sizeof(batch));
 	gem_execbuf(fd, &execbuf);
+	gem_sync(fd, obj[1].handle);
 	gem_close(fd, obj[1].handle);
 }
 
 static void one(int fd, unsigned engine)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
 	const struct intel_execution_engine2 *e;
-	struct drm_i915_gem_exec_object2 obj[2];
-#define SCRATCH 0
-#define BATCH 1
-	struct drm_i915_gem_relocation_entry reloc;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t *batch;
+	uint32_t scratch = gem_create(fd, 4096);
+	igt_spin_t *spin;
+	uint32_t *result;
 	int i;
 
-	/* On the target ring, create a looping batch that marks
+	/*
+	 * On the target ring, create a looping batch that marks
 	 * the scratch for write. Then on the other rings try and
 	 * write into that target. If it blocks we hang the GPU...
 	 */
-
-	memset(obj, 0, sizeof(obj));
-	obj[SCRATCH].handle = gem_create(fd, 4096);
-
-	obj[BATCH].handle = gem_create(fd, 4096);
-	obj[BATCH].relocs_ptr = to_user_pointer(&reloc);
-	obj[BATCH].relocation_count = 1;
-
-	memset(&reloc, 0, sizeof(reloc));
-	reloc.target_handle = obj[BATCH].handle; /* recurse */
-	reloc.presumed_offset = 0;
-	reloc.offset = sizeof(uint32_t);
-	reloc.delta = 0;
-	reloc.read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc.write_domain = 0;
-
-	batch = gem_mmap__wc(fd, obj[BATCH].handle, 0, 4096, PROT_WRITE);
-	gem_set_domain(fd, obj[BATCH].handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	i = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc.delta = 1;
-		}
-	}
-	i++;
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.buffer_count = 2;
-	execbuf.flags = engine;
-
-	igt_require(__gem_execbuf(fd, &execbuf) == 0);
-	gem_close(fd, obj[BATCH].handle);
+	spin = igt_spin_new(fd, .engine = engine, .dependency = scratch);
 
 	i = 0;
 	__for_each_physical_engine(fd, e) {
@@ -151,25 +104,17 @@ static void one(int fd, unsigned engine)
 		if (!gem_class_can_store_dword(fd, e->class))
 			continue;
 
-		store_dword(fd, e->flags, obj[SCRATCH].handle, 4*i, i);
+		store_dword(fd, e->flags, scratch, 4*i, ~i);
 		i++;
 	}
 
-	*batch = MI_BATCH_BUFFER_END;
-	__sync_synchronize();
-	munmap(batch, 4096);
-
-	batch = gem_mmap__wc(fd, obj[SCRATCH].handle, 0, 4096, PROT_READ);
-	/* The kernel only tracks the last *submitted* write (but all reads),
-	 * so to ensure *all* rings are flushed, we flush all reads even
-	 * though we only need read access for ourselves.
-	 */
-	gem_set_domain(fd, obj[SCRATCH].handle,
-		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-	gem_close(fd, obj[SCRATCH].handle);
+	result = gem_mmap__device_coherent(fd, scratch, 0, 4096, PROT_READ);
 	while (i--)
-		igt_assert_eq_u32(batch[i], i);
-	munmap(batch, 4096);
+		igt_assert_eq_u32(result[i], ~i);
+	munmap(result, 4096);
+
+	igt_spin_free(fd, spin);
+	gem_close(fd, scratch);
 }
 
 static bool has_async_execbuf(int fd)
@@ -186,8 +131,7 @@ static bool has_async_execbuf(int fd)
 
 #define test_each_engine(T, i915, e) \
 	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
-		for_each_if(gem_class_can_store_dword(i915, (e)->class) && \
-			    gem_class_has_mutable_submission(i915, (e)->class))\
+		for_each_if(gem_class_can_store_dword(i915, (e)->class)) \
 			igt_dynamic_f("%s", (e)->name)
 
 igt_main
