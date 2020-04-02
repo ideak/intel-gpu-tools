@@ -852,6 +852,19 @@ static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 	igt_remove_fb(display->drm_fd, &cursor_fb);
 }
 
+static void wait_for_modeset(igt_display_t *display, unsigned flags, int timeout,
+			     const char *info)
+{
+	int ret;
+
+	igt_set_timeout(timeout, info);
+	do {
+		ret = igt_display_try_commit_atomic(display, flags, NULL);
+	} while (ret == -EBUSY);
+	igt_assert(!ret);
+	igt_reset_timeout();
+}
+
 static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool modeset, bool atomic)
 {
 	struct drm_mode_cursor arg1[2], arg2[2];
@@ -927,7 +940,7 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 
 		if (ret == -EBUSY) {
 			/* Force completion on both pipes, and generate event. */
-			igt_display_commit_atomic(display, flags, NULL);
+			wait_for_modeset(display, flags, 5, "Stuck with -EBUSY");
 
 			while (nloops--) {
 				shared[1] = nloops & 1;
@@ -945,12 +958,7 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 				igt_output_set_pipe(output2, enabled ? PIPE_NONE : pipe2);
 				enabled = !enabled;
 
-				igt_set_timeout(5, "Scheduling modeset\n");
-				do {
-					ret = igt_display_try_commit_atomic(display, flags, NULL);
-				} while (ret == -EBUSY);
-				igt_assert(!ret);
-				igt_reset_timeout();
+				wait_for_modeset(display, flags, 5, "Scheduling modeset");
 			}
 
 			goto done;
