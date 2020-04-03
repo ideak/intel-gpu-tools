@@ -123,12 +123,20 @@ static uint32_t batch_create(int i915, unsigned long sz)
 	return handle;
 }
 
+static void sighandler(int sig)
+{
+}
+
 static void naughty_child(int i915, int link)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 *obj;
 	uint64_t gtt_size, ram_size, count;
+	struct sigaction act = {
+		.sa_handler = sighandler,
+	};
 	struct timespec tv = {};
+	int err;
 
 	gtt_size = gem_aperture_size(i915); /* We have to *share* our GTT! */
 	ram_size = intel_get_total_ram_mb();
@@ -174,16 +182,24 @@ static void naughty_child(int i915, int link)
 
 	write(link, &tv, sizeof(tv));
 
+	sigaction(SIGINT, &act, NULL);
 	igt_debug("Executing naughty execbuf\n");
 	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
-	gem_execbuf(i915, &execbuf); /* this should take over 2s */
-	igt_info("Naughty client took %'"PRIu64"ns\n",
-		 igt_nsec_elapsed(&tv));
+	err = __execbuf(i915, &execbuf); /* this should take over 2s */
+	igt_info("Naughty client took %'"PRIu64"ns, result %d\n",
+		 igt_nsec_elapsed(&tv), err);
 
 	gem_context_destroy(i915, execbuf.rsvd1);
 	for (unsigned long i = 0; i < count; i++)
 		gem_close(i915, obj[i].handle);
 	free(obj);
+}
+
+static void kill_children(int sig)
+{
+	signal(sig, SIG_IGN);
+	kill(-getpgrp(), SIGINT);
+	signal(sig, SIG_DFL);
 }
 
 static void prio_inversion(int i915)
@@ -227,6 +243,7 @@ static void prio_inversion(int i915)
 	elapsed = igt_nsec_elapsed(&tv);
 	igt_info("Normal client took %'"PRIu64"ns\n", elapsed);
 
+	kill_children(SIGINT);
 	igt_waitchildren();
 	gem_close(i915, obj.handle);
 
