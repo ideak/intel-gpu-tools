@@ -353,14 +353,11 @@ static void set_vendor_device(struct igt_device *dev)
 	dev->device = strndup(pci_id + 5, 4);
 }
 
-/* Allocate arrays for keeping scanned devices */
+/* Initialize lists for keeping scanned devices */
 static bool prepare_scan(void)
 {
-	if (igt_devs.all.prev == NULL || igt_devs.all.next == NULL)
-		IGT_INIT_LIST_HEAD(&igt_devs.all);
-
-	if (igt_devs.filtered.prev == NULL || igt_devs.filtered.next == NULL)
-		IGT_INIT_LIST_HEAD(&igt_devs.filtered);
+	IGT_INIT_LIST_HEAD(&igt_devs.all);
+	IGT_INIT_LIST_HEAD(&igt_devs.filtered);
 
 	return true;
 }
@@ -595,7 +592,14 @@ void igt_devices_scan(bool force)
 {
 	if (force && igt_devs.devs_scanned) {
 		struct igt_device *dev, *tmp;
+
+		igt_list_for_each_entry_safe(dev, tmp, &igt_devs.filtered,
+					     link) {
+			igt_list_del(&dev->link);
+			free(dev);
+		}
 		igt_list_for_each_entry_safe(dev, tmp, &igt_devs.all, link) {
+			igt_list_del(&dev->link);
 			igt_device_free(dev);
 			free(dev);
 		}
