@@ -138,8 +138,11 @@ static void naughty_child(int i915, int link)
 	struct timespec tv = {};
 	int err;
 
-	gtt_size = gem_aperture_size(i915); /* We have to *share* our GTT! */
-	ram_size = intel_get_total_ram_mb();
+	gtt_size = gem_aperture_size(i915);
+	if (!gem_uses_full_ppgtt(i915))
+		gtt_size /= 2; /* We have to *share* our GTT! */
+
+	ram_size = min(intel_get_total_ram_mb(), 4096);
 	ram_size *= 1024 * 1024;
 
 	count = min(gtt_size, ram_size) / 16384;
@@ -257,31 +260,18 @@ static void many(int fd, int timeout)
 	struct drm_i915_gem_exec_object2 *execobj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint64_t gtt_size, ram_size;
-	uint64_t max_alignment;
 	unsigned long count, i;
 
 	gtt_size = gem_aperture_size(fd);
 	if (!gem_uses_full_ppgtt(fd))
 		gtt_size /= 2; /* We have to *share* our GTT! */
 
-	ram_size = intel_get_total_ram_mb();
+	ram_size = min(intel_get_total_ram_mb(), 4096);
 	ram_size *= 1024 * 1024;
 
-	count = ram_size / 4096;
+	count = min(gtt_size, ram_size) / 16384;
 	if (count > file_max()) /* vfs cap */
 		count = file_max();
-
-	max_alignment = find_last_bit(gtt_size / count);
-	if (max_alignment <= 13)
-		max_alignment = 4096;
-	else
-		max_alignment = 1ull << (max_alignment - 1);
-	count = gtt_size / max_alignment / 2;
-
-	igt_info("gtt_size=%lld MiB, max-alignment=%lld, count=%lu\n",
-		 (long long)gtt_size/1024/1024,
-		 (long long)max_alignment,
-		 count);
 	intel_require_memory(count, 4096, CHECK_RAM);
 
 	execobj = calloc(sizeof(*execobj), count);
@@ -305,8 +295,8 @@ static void many(int fd, int timeout)
 		unsigned long max;
 
 		max = count;
-		if (alignment > max_alignment)
-			max = max * max_alignment / alignment;
+		if (max * alignment * 2 > gtt_size)
+			max = gtt_size / alignment / 2;
 		igt_debug("Testing alignment:%" PRIx64", max_count:%lu\n",
 			  alignment, max);
 
