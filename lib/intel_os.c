@@ -306,7 +306,7 @@ int __intel_check_memory(uint64_t count, uint64_t size, unsigned mode,
 			 uint64_t *out_required, uint64_t *out_total)
 {
 /* rough estimate of how many bytes the kernel requires to track each object */
-#define KERNEL_BO_OVERHEAD 512
+#define KERNEL_BO_OVERHEAD 8192 /* 2k for an object, 2k for an inode, etc */
 	uint64_t required, total;
 
 	required = count;
