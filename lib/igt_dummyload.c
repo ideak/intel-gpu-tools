@@ -422,7 +422,9 @@ static void *timer_thread(void *data)
  */
 void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 {
+	struct sched_param param = { .sched_priority = 99 };
 	struct itimerspec its;
+	pthread_attr_t attr;
 	int timerfd;
 
 	igt_assert(ns > 0);
@@ -434,7 +436,14 @@ void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 	igt_assert(timerfd >= 0);
 	spin->timerfd = timerfd;
 
-	pthread_create(&spin->timer_thread, NULL, timer_thread, spin);
+	pthread_attr_init(&attr);
+	pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+	pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
+	pthread_attr_setschedparam(&attr, &param);
+
+	igt_assert(pthread_create(&spin->timer_thread, &attr,
+				  timer_thread, spin) == 0);
+	pthread_attr_destroy(&attr);
 
 	memset(&its, 0, sizeof(its));
 	its.it_value.tv_sec = ns / NSEC_PER_SEC;
