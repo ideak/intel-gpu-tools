@@ -1600,10 +1600,17 @@ igt_main
 			continue;
 
 		/*
+		 * -EINVAL are negative API tests, they are rejected before
+		 *  any waits and so not subject to interruptiblity.
+		 *
 		 * -EBUSY needs to complete in a single vblank, skip them for
 		 * interruptible tests
+		 *
+		 * HANGs are slow enough and interruptible hang testing is
+		 * an oxymoron (can't force the wait-for-hang if being
+		 * interrupted all the time).
 		 */
-		if (tests[i].flags & TEST_EBUSY)
+		if (tests[i].flags & (TEST_EINVAL | TEST_EBUSY | TEST_HANG))
 			continue;
 
 		igt_subtest_f( "%s-interruptible", tests[i].name)
