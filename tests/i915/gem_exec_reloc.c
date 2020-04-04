@@ -830,7 +830,7 @@ static void parallel(int i915)
 	}
 	sleep(2);
 
-	if (gem_scheduler_enabled(i915)) {
+	if (gem_scheduler_has_preemption(i915)) {
 		uint32_t ctx = gem_context_clone_with_engines(i915, 0);
 
 		__for_each_physical_engine(i915, e) {
