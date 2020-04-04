@@ -127,7 +127,7 @@ static void sighandler(int sig)
 {
 }
 
-static void naughty_child(int i915, int link)
+static void naughty_child(int i915, int link, uint32_t shared)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 *obj;
@@ -158,6 +158,10 @@ static void naughty_child(int i915, int link)
 		if ((gtt_size - 1) >> 32)
 			obj[i].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 		obj[i].alignment = 4096;
+	}
+	if (shared) {
+		gem_close(i915, obj[0].handle);
+		obj[0].handle = shared;
 	}
 
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -194,7 +198,7 @@ static void naughty_child(int i915, int link)
 		 igt_nsec_elapsed(&tv), err);
 
 	gem_context_destroy(i915, execbuf.rsvd1);
-	for (unsigned long i = 0; i < count; i++)
+	for (unsigned long i = !!shared; i < count; i++)
 		gem_close(i915, obj[i].handle);
 	free(obj);
 }
@@ -206,7 +210,8 @@ static void kill_children(int sig)
 	signal(sig, SIG_DFL);
 }
 
-static void prio_inversion(int i915)
+static void prio_inversion(int i915, unsigned int flags)
+#define SHARED 0x1
 {
 	struct drm_i915_gem_exec_object2 obj = {
 		.handle = batch_create(i915, 4095)
@@ -234,7 +239,7 @@ static void prio_inversion(int i915)
 	gem_execbuf(i915, &execbuf);
 
 	igt_fork(child, 1)
-		naughty_child(i915, link[1]);
+		naughty_child(i915, link[1], flags & SHARED ? obj.handle : 0);
 
 	igt_debug("Waiting for naughty client\n");
 	read(link[0], &tv, sizeof(tv));
@@ -404,5 +409,7 @@ igt_main
 	igt_subtest("many")
 		many(fd, 20);
 	igt_subtest("pi")
-		prio_inversion(fd);
+		prio_inversion(fd, 0);
+	igt_subtest("pi-shared")
+		prio_inversion(fd, SHARED);
 }
