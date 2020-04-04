@@ -172,11 +172,12 @@ static void naughty_child(int i915, int link)
 
 	execbuf.buffer_count = 2;
 	while (igt_seconds_elapsed(&tv) < 2) {
-		execbuf.buffer_count <<= 1;
 		gem_execbuf(i915, &execbuf);
+		if (execbuf.buffer_count >= count)
+			break;
+		execbuf.buffer_count <<= 1;
 	}
-	execbuf.buffer_count <<= 1;
-	if (execbuf.buffer_count > count)
+	if (execbuf.buffer_count >= count)
 		execbuf.buffer_count = count;
 	igt_debug("Using %u buffers to delay execbuf\n", execbuf.buffer_count);
 
