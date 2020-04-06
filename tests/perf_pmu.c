@@ -1866,7 +1866,8 @@ static void faulting_read(int gem_fd, const struct mmap_offset *t)
 
 #define test_each_rcs(T, i915, e) \
 	igt_subtest_with_dynamic(T) __for_each_physical_engine(i915, e) \
-		for_each_if((e)->class == I915_ENGINE_CLASS_RENDER)
+		for_each_if((e)->class == I915_ENGINE_CLASS_RENDER) \
+			igt_dynamic_f("%s", e->name)
 
 igt_main
 {
