@@ -133,11 +133,21 @@ create_batch(int fd, struct drm_i915_gem_relocation_entry *reloc)
 	return handle;
 }
 
+static void xchg_u32(void *array, unsigned i, unsigned j)
+{
+	uint32_t tmp, *base = array;
+
+	tmp = base[i];
+	base[i] = base[j];
+	base[j] = tmp;
+}
+
 static void run_test(int fd, int count)
 {
 	struct drm_i915_gem_relocation_entry reloc[2];
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_execbuffer2 eb;
+	uint32_t *src_order, *dst_order;
 	uint32_t *bo, *bo_start_val;
 	uint32_t start = 0;
 
@@ -155,44 +165,40 @@ static void run_test(int fd, int count)
 	if (intel_gen(intel_get_drm_devid(fd)) >= 6)
 		eb.flags = I915_EXEC_BLT;
 
-	count |= 1;
-	igt_info("Using %d 1MiB buffers\n", count);
-
-	bo = malloc(count * (sizeof(*bo) + sizeof(*bo_start_val)));
+	bo = calloc(count,
+		    sizeof(*bo) + sizeof(*bo_start_val) +
+		    sizeof(*src_order) + sizeof(*dst_order));
 	igt_assert(bo);
 	bo_start_val = bo + count;
+	src_order = bo_start_val + count;
+	dst_order = src_order + count;
 
 	for (int i = 0; i < count; i++) {
 		bo[i] = create_bo(fd, start);
 		bo_start_val[i] = start;
 		start += width * height;
+		src_order[i] = i;
+		dst_order[i] = i;
 	}
 
-	for (int dst = 0; dst < count; dst++) {
-		int src = count - dst - 1;
+	/* Twice should be enough to thrash (cause eviction and reload)... */
+	for (int pass = 0; pass < 3; pass++) {
+		igt_permute_array(src_order, count, xchg_u32);
+		igt_permute_array(dst_order, count, xchg_u32);
 
-		if (src == dst)
-			continue;
+		for (int i = 0; i < count; i++) {
+			int src = src_order[i];
+			int dst = dst_order[i];
 
-		reloc[0].target_handle = obj[0].handle = bo[dst];
-		reloc[1].target_handle = obj[1].handle = bo[src];
+			if (src == dst)
+				continue;
 
-		gem_execbuf(fd, &eb);
-		bo_start_val[dst] = bo_start_val[src];
-	}
+			reloc[0].target_handle = obj[0].handle = bo[dst];
+			reloc[1].target_handle = obj[1].handle = bo[src];
 
-	for (int i = 0; i < count * 4; i++) {
-		int src = random() % count;
-		int dst = random() % count;
-
-		if (src == dst)
-			continue;
-
-		reloc[0].target_handle = obj[0].handle = bo[dst];
-		reloc[1].target_handle = obj[1].handle = bo[src];
-
-		gem_execbuf(fd, &eb);
-		bo_start_val[dst] = bo_start_val[src];
+			gem_execbuf(fd, &eb);
+			bo_start_val[dst] = bo_start_val[src];
+		}
 	}
 
 	for (int i = 0; i < count; i++) {
@@ -208,6 +214,8 @@ static void run_test(int fd, int count)
 
 igt_main
 {
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	uint64_t count = 0;
 	int fd;
 
 	igt_fixture {
@@ -215,20 +223,25 @@ igt_main
 		igt_require_gem(fd);
 		gem_require_blitter(fd);
 		gem_require_mappable_ggtt(fd);
+
+		count = gem_aperture_size(fd);
+		if (count >> 32)
+			count = MAX_32b;
+		count = 3 + count / (1024 * 1024);
+		igt_require(count > 1);
+		intel_require_memory(count, 1024 * 1024 , CHECK_RAM);
+
+		igt_debug("Using %'"PRIu64" 1MiB buffers\n", count);
+		count = (count + ncpus - 1) / ncpus;
 	}
 
 	igt_subtest("basic")
 		run_test (fd, 2);
 
 	igt_subtest("normal") {
-		uint64_t count;
-
-		count = gem_aperture_size(fd);
-		if (count >> 32)
-			count = MAX_32b;
-		count = 3 * count / bo_size / 2;
-		intel_require_memory(count, bo_size, CHECK_RAM);
-		run_test(fd, count);
+		igt_fork(child, ncpus)
+			run_test(fd, count);
+		igt_waitchildren();
 	}
 
 	igt_fixture
