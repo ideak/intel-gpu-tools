@@ -186,17 +186,16 @@ test_shrink(int fd, unsigned int mode)
 static void
 test_forcewake(int fd, bool hibernate)
 {
+	int suspend = hibernate ? SUSPEND_STATE_DISK : SUSPEND_STATE_MEM;
 	int fw_fd;
+
+	/* Once before to verify we can suspend */
+	igt_system_suspend_autoresume(suspend, SUSPEND_TEST_NONE);
 
 	fw_fd = igt_open_forcewake_handle(fd);
 	igt_assert_lte(0, fw_fd);
 
-	if (hibernate)
-		igt_system_suspend_autoresume(SUSPEND_STATE_DISK,
-					      SUSPEND_TEST_NONE);
-	else
-		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-					      SUSPEND_TEST_NONE);
+	igt_system_suspend_autoresume(suspend, SUSPEND_TEST_NONE);
 
 	close (fw_fd);
 }
