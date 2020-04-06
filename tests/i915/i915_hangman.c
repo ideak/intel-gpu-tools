@@ -140,8 +140,6 @@ static void check_error_state(const char *expected_ring_name,
 	size_t line_size = 0;
 	bool found = false;
 
-	igt_debugfs_dump(device, "i915_error_state");
-
 	igt_assert(getline(&line, &line_size, file) != -1);
 	igt_require(strcasecmp(line, "No error state collected"));
 

@@ -484,7 +484,6 @@ hang_detector_process(int fd, pid_t pid, dev_t rdev)
 
 			str = udev_device_get_property_value(dev, "ERROR");
 			if (str && atoi(str) == 1) {
-				igt_debugfs_dump(fd, "i915_error_state");
 				show_kernel_stack(pid);
 				kill(pid, SIGIO);
 			}
