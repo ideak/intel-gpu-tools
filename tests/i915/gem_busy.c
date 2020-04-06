@@ -452,7 +452,6 @@ static void basic(int fd, const struct intel_execution_engine2 *e, unsigned flag
 	while (gem_bo_busy(fd, spin->handle)) {
 		if (igt_seconds_elapsed(&tv) > timeout) {
 			igt_debugfs_dump(fd, "i915_engine_info");
-			igt_debugfs_dump(fd, "i915_hangcheck_info");
 			igt_assert_f(igt_seconds_elapsed(&tv) < timeout,
 				     "%s batch did not complete within %ds\n",
 				     flags & HANG ? "Hanging" : "Normal",
