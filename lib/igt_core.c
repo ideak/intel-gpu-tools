@@ -320,6 +320,7 @@ enum {
 	OPT_SKIP_CRC,
 	OPT_TRACE_OOPS,
 	OPT_DEVICE,
+	OPT_VERSION,
 	OPT_HELP = 'h'
 };
 
@@ -685,6 +686,7 @@ static void print_usage(const char *help_str, bool output_on_stderr)
 		   "  --help-description\n"
 		   "  --describe\n"
 		   "  --device filter\n"
+		   "  --version\n"
 		   "  --help|-h\n");
 	if (help_str)
 		fprintf(f, "%s\n", help_str);
@@ -859,6 +861,7 @@ static int common_init(int *argc, char **argv,
 		{"skip-crc-compare",  no_argument,       NULL, OPT_SKIP_CRC},
 		{"trace-on-oops",     no_argument,       NULL, OPT_TRACE_OOPS},
 		{"device",            required_argument, NULL, OPT_DEVICE},
+		{"version",           no_argument,       NULL, OPT_VERSION},
 		{"help",              no_argument,       NULL, OPT_HELP},
 		{0, 0, 0, 0}
 	};
@@ -998,6 +1001,10 @@ static int common_init(int *argc, char **argv,
 			}
 			igt_device_filter_set(optarg);
 			break;
+		case OPT_VERSION:
+			print_version();
+			ret = -1;
+			goto out;
 		case OPT_HELP:
 			print_usage(help_str, false);
 			ret = -1;
