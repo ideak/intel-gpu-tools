@@ -27,6 +27,9 @@
 #include "executor.h"
 #include "output_strings.h"
 
+#define KMSG_HEADER "[IGT] "
+#define KMSG_WARN 4
+
 static struct {
 	int *fds;
 	size_t num_dogs;
@@ -678,9 +681,30 @@ static bool sysrq(char cmd)
 	return success;
 }
 
-static void show_kernel_task_state(void)
+static void kmsg_log(int severity, const char *msg)
 {
+	char *str = NULL;
+	int len, fd;
+
+	len = asprintf(&str, "<%d>%s%s", severity, KMSG_HEADER, msg);
+	if (!str)
+		return;
+
+	fd = open("/dev/kmsg", O_WRONLY);
+	if (fd != -1) {
+		write(fd, str, len);
+		close(fd);
+	}
+
+	free(str);
+}
+
+static const char *show_kernel_task_state(const char *msg)
+{
+	kmsg_log(KMSG_WARN, msg);
 	sysrq('t');
+
+	return msg;
 }
 
 static const char *need_to_timeout(struct settings *settings,
@@ -725,16 +749,12 @@ static const char *need_to_timeout(struct settings *settings,
 		return "Killing the test because the kernel is tainted.\n";
 
 	if (settings->per_test_timeout != 0 &&
-	    time_since_subtest > settings->per_test_timeout) {
-		show_kernel_task_state();
-		return "Per-test timeout exceeded. Killing the current test with SIGQUIT.\n";
-	}
+	    time_since_subtest > settings->per_test_timeout)
+		return show_kernel_task_state("Per-test timeout exceeded. Killing the current test with SIGQUIT.\n");
 
 	if (settings->inactivity_timeout != 0 &&
-	    time_since_activity > settings->inactivity_timeout) {
-		show_kernel_task_state();
-		return "Inactivity timeout exceeded. Killing the current test with SIGQUIT.\n";
-	}
+	    time_since_activity > settings->inactivity_timeout)
+		return show_kernel_task_state("Inactivity timeout exceeded. Killing the current test with SIGQUIT.\n");
 
 	return NULL;
 }
