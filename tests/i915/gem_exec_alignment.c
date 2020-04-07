@@ -196,6 +196,7 @@ static void naughty_child(int i915, int link, uint32_t shared)
 	err = __execbuf(i915, &execbuf); /* this should take over 2s */
 	igt_info("Naughty client took %'"PRIu64"ns, result %d\n",
 		 igt_nsec_elapsed(&tv), err);
+	igt_assert(igt_nsec_elapsed(&tv) > NSEC_PER_SEC);
 
 	gem_context_destroy(i915, execbuf.rsvd1);
 	for (unsigned long i = !!shared; i < count; i++)
@@ -244,7 +245,7 @@ static void prio_inversion(int i915, unsigned int flags)
 	igt_debug("Waiting for naughty client\n");
 	read(link[0], &tv, sizeof(tv));
 	igt_debug("Ready...\n");
-	sleep(1); /* let the naughty execbuf begin */
+	usleep(100 * 1000); /* let the naughty execbuf begin */
 	igt_debug("Go!\n");
 
 	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
@@ -256,7 +257,7 @@ static void prio_inversion(int i915, unsigned int flags)
 	igt_waitchildren();
 	gem_close(i915, obj.handle);
 
-	igt_assert(elapsed < 10 * 1000 * 1000); /* 10ms */
+	igt_assert(elapsed < NSEC_PER_SEC / 2);
 	close(link[0]);
 	close(link[1]);
 }
