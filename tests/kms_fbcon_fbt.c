@@ -135,6 +135,14 @@ static bool fbc_wait_until_enabled(int debugfs_fd)
 	return r;
 }
 
+static bool fbc_is_disabled(int debugfs_fd)
+{
+	bool r = fbc_check_status(debugfs_fd, false);
+
+	fbc_print_status(debugfs_fd);
+	return r;
+}
+
 static bool fbc_wait_until_disabled(int debugfs_fd)
 {
 	bool r = igt_wait(fbc_check_status(debugfs_fd, false), 5000, 1);
@@ -250,6 +258,14 @@ static bool psr_wait_until_enabled(int debugfs_fd)
 	return r;
 }
 
+static bool psr_is_disabled(int debugfs_fd)
+{
+	bool r = psr_disabled_check(debugfs_fd);
+
+	psr_print_status(debugfs_fd);
+	return r;
+}
+
 static bool psr_supported_on_chipset(int debugfs_fd)
 {
 	return psr_sink_support(debugfs_fd, PSR_MODE_1);
@@ -280,18 +296,21 @@ static inline void psr_debugfs_enable(int debugfs_fd)
 struct feature {
 	bool (*supported_on_chipset)(int debugfs_fd);
 	bool (*wait_until_enabled)(int debugfs_fd);
+	bool (*is_disabled)(int debugfs_fd);
 	bool (*wait_until_update)(struct drm_info *drm);
 	bool (*connector_possible_fn)(drmModeConnectorPtr connector);
 	void (*enable)(int debugfs_fd);
 } fbc = {
 	.supported_on_chipset = fbc_supported_on_chipset,
 	.wait_until_enabled = fbc_wait_until_enabled,
+	.is_disabled = fbc_is_disabled,
 	.wait_until_update = fbc_wait_until_update,
 	.connector_possible_fn = connector_can_fbc,
 	.enable = fbc_modparam_enable,
 }, psr = {
 	.supported_on_chipset = psr_supported_on_chipset,
 	.wait_until_enabled = psr_wait_until_enabled,
+	.is_disabled = psr_is_disabled,
 	.wait_until_update = psr_wait_until_update,
 	.connector_possible_fn = connector_can_psr,
 	.enable = psr_debugfs_enable,
@@ -310,7 +329,7 @@ static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 
 	kmstest_unset_all_crtcs(drm->fd, drm->res);
 	wait_user("Modes unset.");
-	igt_assert(!feature->wait_until_enabled(drm->debugfs_fd));
+	igt_assert(feature->is_disabled(drm->debugfs_fd));
 
 	set_mode_for_one_screen(drm, &fb, feature->connector_possible_fn);
 	wait_user("Screen set.");

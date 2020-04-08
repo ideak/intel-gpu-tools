@@ -35,6 +35,7 @@ enum psr_mode {
 	PSR_MODE_2
 };
 
+bool psr_disabled_check(int debugfs_fd);
 bool psr_wait_entry(int debugfs_fd, enum psr_mode mode);
 bool psr_wait_update(int debugfs_fd, enum psr_mode mode);
 bool psr_long_wait_update(int debugfs_fd, enum psr_mode mode);
