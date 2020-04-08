@@ -85,6 +85,7 @@ typedef struct {
 #define INTEL_PIPE_CRC_SOURCE_AUTO "auto"
 #define AMDGPU_PIPE_CRC_SOURCE_DPRX "dprx"
 
+bool igt_find_crc_mismatch(const igt_crc_t *a, const igt_crc_t *b, int *index);
 void igt_assert_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
 bool igt_check_crc_equal(const igt_crc_t *a, const igt_crc_t *b);
 char *igt_crc_to_string_extended(igt_crc_t *crc, char delimiter, int crc_size);

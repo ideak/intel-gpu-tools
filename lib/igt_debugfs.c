@@ -368,8 +368,17 @@ bool igt_debugfs_search(int device, const char *filename, const char *substring)
  * Pipe CRC
  */
 
-static bool igt_find_crc_mismatch(const igt_crc_t *a, const igt_crc_t *b,
-				  int *index)
+/**
+ * igt_find_crc_mismatch:
+ * @a: first pipe CRC value
+ * @b: second pipe CRC value
+ * @index: index of the first value that mismatched
+ *
+ * Check if CRC a and CRC b mismatch.
+ *
+ * Returns true if CRC values mismatch, false otherwise;
+ */
+bool igt_find_crc_mismatch(const igt_crc_t *a, const igt_crc_t *b, int *index)
 {
 	int nwords = min(a->n_words, b->n_words);
 	int i;

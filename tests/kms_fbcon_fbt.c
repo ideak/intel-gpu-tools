@@ -142,13 +142,31 @@ static bool fbc_wait_until_disabled(int debugfs_fd)
 	return r;
 }
 
-static bool fbc_not_compressing_enabled(int debugfs_fd)
+static bool fbc_check_cursor_blinking(struct drm_info *drm)
 {
-	char buf[128];
+	igt_pipe_crc_t *pipe_crc;
+	igt_crc_t crc[2];
+	bool ret;
+	int i;
 
-	igt_debugfs_simple_read(debugfs_fd, "i915_fbc_status", buf,
-				sizeof(buf));
-	return strstr(buf, "FBC enabled\nCompressing: no");
+	pipe_crc = igt_pipe_crc_new(drm->fd, PIPE_A, INTEL_PIPE_CRC_SOURCE_AUTO);
+
+	igt_pipe_crc_start(pipe_crc);
+	igt_pipe_crc_drain(pipe_crc);
+
+	for (i = 0; i < 60; i++) {
+		igt_pipe_crc_get_single(pipe_crc, &crc[i % 2]);
+
+		if (i > 0) {
+			ret = igt_find_crc_mismatch(&crc[0], &crc[1], NULL);
+			if (ret)
+				break;
+		}
+	}
+	igt_pipe_crc_stop(pipe_crc);
+	igt_pipe_crc_free(pipe_crc);
+
+	return ret;
 }
 
 static bool fbc_wait_until_update(struct drm_info *drm)
@@ -161,11 +179,14 @@ static bool fbc_wait_until_update(struct drm_info *drm)
 	 * For older GENs FBC is still expected to be disabled as it still
 	 * relies on a tiled and fenceable framebuffer to track modifications.
 	 */
-	if (AT_LEAST_GEN(drm->devid, 9))
-		return igt_wait(fbc_not_compressing_enabled(drm->debugfs_fd),
-				2500, 1);
-	else
+	if (AT_LEAST_GEN(drm->devid, 9)) {
+		if (!fbc_wait_until_enabled(drm->debugfs_fd))
+			return false;
+
+		return fbc_check_cursor_blinking(drm);
+	} else {
 		return fbc_wait_until_disabled(drm->debugfs_fd);
+	}
 }
 
 typedef bool (*connector_possible_fn)(drmModeConnectorPtr connector);
