@@ -291,6 +291,7 @@ static void sighandler(int sig)
 
 static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 {
+	const bool has_execlists = intel_gen(intel_get_drm_devid(i915)) >= 8;
 	struct drm_i915_gem_exec_object2 obj = {
 		.handle = batch_create(i915),
 	};
@@ -304,11 +305,13 @@ static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 
 	sigaction(SIGINT, &act, NULL);
 	do {
+		uint64_t submit, wait, elapsed;
 		struct timespec tv = {};
 
 		igt_nsec_elapsed(&tv);
 
 		gem_execbuf(i915, &execbuf);
+		submit = igt_nsec_elapsed(&tv);
 		if (flags & WAITBOOST) {
 			gem_sync(i915, obj.handle);
 			if (flags & ONCE)
@@ -317,7 +320,7 @@ static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 			while (gem_bo_busy(i915, obj.handle))
 				usleep(0);
 		}
-		ctl[1]++;
+		wait = igt_nsec_elapsed(&tv);
 
 		/*
 		 * The legacy ringbuffer submission lacks a fast soft-rc6
@@ -327,11 +330,19 @@ static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 		 *
 		 * Fake it until we make it.
 		 */
-		if (!gem_has_execlists(i915))
+		if (!has_execlists)
 			igt_drop_caches_set(i915, DROP_IDLE);
 
+		elapsed = igt_nsec_elapsed(&tv);
+		igt_info("Pulse took %.3fms (submit %.1fus, wait %.1fus, idle %.1fus)\n",
+			 1e-6 * elapsed,
+			 1e-3 * submit,
+			 1e-3 * (wait - submit),
+			 1e-3 * (elapsed - wait));
+		ctl[1]++;
+
 		/* aim for ~1% busy */
-		usleep(min(igt_nsec_elapsed(&tv) / 10, 50 * 1000));
+		usleep(min(elapsed / 10, 50 * 1000));
 	} while (!READ_ONCE(*ctl));
 }
 
