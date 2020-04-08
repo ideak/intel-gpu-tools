@@ -127,7 +127,10 @@ static void sighandler(int sig)
 {
 }
 
-static void naughty_child(int i915, int link, uint32_t shared)
+static void
+naughty_child(int i915, int link, uint32_t shared, unsigned int flags)
+#define SHARED 0x1
+#define ISOLATED 0x2
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 *obj;
@@ -137,6 +140,12 @@ static void naughty_child(int i915, int link, uint32_t shared)
 	};
 	struct timespec tv = {};
 	int err;
+
+	if (flags & ISOLATED)
+		i915 = gem_reopen_driver(i915);
+
+	if (!(flags & SHARED))
+		shared = 0;
 
 	gtt_size = gem_aperture_size(i915);
 	if (!gem_uses_full_ppgtt(i915))
@@ -212,7 +221,6 @@ static void kill_children(int sig)
 }
 
 static void prio_inversion(int i915, unsigned int flags)
-#define SHARED 0x1
 {
 	struct drm_i915_gem_exec_object2 obj = {
 		.handle = batch_create(i915, 4095)
@@ -240,12 +248,12 @@ static void prio_inversion(int i915, unsigned int flags)
 	gem_execbuf(i915, &execbuf);
 
 	igt_fork(child, 1)
-		naughty_child(i915, link[1], flags & SHARED ? obj.handle : 0);
+		naughty_child(i915, link[1], obj.handle, flags);
 
 	igt_debug("Waiting for naughty client\n");
 	read(link[0], &tv, sizeof(tv));
 	igt_debug("Ready...\n");
-	usleep(100 * 1000); /* let the naughty execbuf begin */
+	usleep(250 * 1000); /* let the naughty execbuf begin */
 	igt_debug("Go!\n");
 
 	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
@@ -413,4 +421,6 @@ igt_main
 		prio_inversion(fd, 0);
 	igt_subtest("pi-shared")
 		prio_inversion(fd, SHARED);
+	igt_subtest("pi-isolated")
+		prio_inversion(fd, ISOLATED);
 }
