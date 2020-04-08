@@ -175,14 +175,14 @@ static void naughty_child(int i915, int link, uint32_t shared)
 		obj[i].alignment = 8192;
 
 	execbuf.buffer_count = 2;
-	while (igt_seconds_elapsed(&tv) < 2) {
+	while (igt_seconds_elapsed(&tv) < 4) {
 		gem_execbuf(i915, &execbuf);
-		if (execbuf.buffer_count >= count)
-			break;
 		execbuf.buffer_count <<= 1;
+		if (execbuf.buffer_count > count) {
+			execbuf.buffer_count = count;
+			break;
+		}
 	}
-	if (execbuf.buffer_count >= count)
-		execbuf.buffer_count = count;
 	igt_debug("Using %u buffers to delay execbuf\n", execbuf.buffer_count);
 
 	for (unsigned long i = 0; i < count; i++)
@@ -196,7 +196,7 @@ static void naughty_child(int i915, int link, uint32_t shared)
 	err = __execbuf(i915, &execbuf); /* this should take over 2s */
 	igt_info("Naughty client took %'"PRIu64"ns, result %d\n",
 		 igt_nsec_elapsed(&tv), err);
-	igt_assert(igt_nsec_elapsed(&tv) > NSEC_PER_SEC);
+	igt_assert(igt_nsec_elapsed(&tv) > NSEC_PER_SEC / 2 || err == -EINTR);
 
 	gem_context_destroy(i915, execbuf.rsvd1);
 	for (unsigned long i = !!shared; i < count; i++)
