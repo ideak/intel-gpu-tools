@@ -36,13 +36,12 @@ static void
 gen7_render_flush(struct intel_batchbuffer *batch,
 		  drm_intel_context *context, uint32_t batch_end)
 {
-	int ret;
-
-	ret = drm_intel_bo_subdata(batch->bo, 0, 4096, batch->buffer);
-	if (ret == 0)
-		ret = drm_intel_gem_bo_context_exec(batch->bo, context,
-						    batch_end, 0);
-	igt_assert(ret == 0);
+	igt_assert_eq(drm_intel_bo_subdata(batch->bo,
+					   0, 4096, batch->buffer),
+		      0);
+	igt_assert_eq(drm_intel_gem_bo_context_exec(batch->bo, context,
+						    batch_end, 0),
+		      0);
 }
 
 static uint32_t
