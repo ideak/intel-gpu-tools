@@ -30,6 +30,12 @@ The Code
   provided by the igt library. The semantic patch lib/igt.cocci can help with
   more automatic conversions.
 
+- Tests that use kernel interfaces (uapi, sysfs, or even debugfs) that
+  become deprecated in favour of new interfaces should have fallbacks
+  to the deprecated interfaces if the new stuff is not present in the
+  running kernel. The same IGT version can be used to test the tip of
+  development along with stable kernel releases that way.
+
 [igt-describe]: https://drm.pages.freedesktop.org/igt-gpu-tools/igt-gpu-tools-Core.html#igt-describe
 
 
