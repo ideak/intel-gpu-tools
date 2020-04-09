@@ -25,6 +25,8 @@
  *
  */
 
+#include <sys/poll.h>
+
 #include "igt.h"
 #include "igt_vgem.h"
 
@@ -107,7 +109,8 @@ static void basic(int fd, unsigned engine, unsigned flags)
 			;
 
 		if ((flags & HANG) == 0 && !timespec_isset(&spin->last_signal))
-			igt_warn("spinner not terminated!\n");
+			igt_warn("spinner not terminated, expired? %d!\n",
+				 poll(&(struct pollfd){ spin->timerfd, POLLIN }, 1, 0));
 
 		igt_assert_eq(__gem_wait(fd, &wait), 0);
 	} else {
