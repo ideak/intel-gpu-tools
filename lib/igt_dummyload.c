@@ -324,6 +324,7 @@ spin_create(int fd, const struct igt_spin_factory *opts)
 	spin = calloc(1, sizeof(struct igt_spin));
 	igt_assert(spin);
 
+	spin->timerfd = -1;
 	spin->out_fence = emit_recursive_batch(spin, fd, opts);
 
 	pthread_mutex_lock(&list_lock);
@@ -398,14 +399,12 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 static void *timer_thread(void *data)
 {
 	igt_spin_t *spin = data;
-	struct pollfd pfd;
-	int ret;
+	struct pollfd pfd = {
+		.fd = spin->timerfd,
+		.events = POLLIN,
+	};
 
-	pfd.fd = spin->timerfd;
-	pfd.events = POLLIN;
-
-	ret = poll(&pfd, 1, -1);
-	if (ret >= 0)
+	if (poll(&pfd, 1, -1) >= 0)
 		igt_spin_end(spin);
 
 	return NULL;
@@ -431,7 +430,7 @@ void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 	if (!spin)
 		return;
 
-	igt_assert(!spin->timerfd);
+	igt_assert(spin->timerfd == -1);
 	timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
 	igt_assert(timerfd >= 0);
 	spin->timerfd = timerfd;
@@ -501,7 +500,7 @@ void igt_spin_free(int fd, igt_spin_t *spin)
 	igt_list_del(&spin->link);
 	pthread_mutex_unlock(&list_lock);
 
-	if (spin->timerfd) {
+	if (spin->timerfd >= 0) {
 		pthread_cancel(spin->timer_thread);
 		igt_assert(pthread_join(spin->timer_thread, NULL) == 0);
 		close(spin->timerfd);
