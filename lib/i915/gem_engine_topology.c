@@ -485,6 +485,7 @@ void dyn_sysfs_engines(int i915, int engines, const char *file,
 					igt_require(fstatat(engine, file, &st, 0) == 0);
 				}
 
+				errno = 0; /* start afresh */
 				test(i915, engine);
 			}
 
