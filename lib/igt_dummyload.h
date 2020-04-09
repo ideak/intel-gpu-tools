@@ -34,12 +34,14 @@
 
 typedef struct igt_spin {
 	unsigned int handle;
-	int timerfd;
-	pthread_t timer_thread;
 	struct igt_list_head link;
 
 	uint32_t *condition;
 	uint32_t cmd_precondition;
+
+	struct timespec last_signal;
+	pthread_t timer_thread;
+	int timerfd;
 
 	int out_fence;
 	struct drm_i915_gem_exec_object2 obj[2];

@@ -69,6 +69,8 @@ static void invalid_buf(int fd)
 #define AWAIT 4
 #define WRITE 8
 
+#define timespec_isset(x) ((x)->tv_sec | (x)->tv_nsec)
+
 static void basic(int fd, unsigned engine, unsigned flags)
 {
 	IGT_CORK_HANDLE(cork);
@@ -100,8 +102,14 @@ static void basic(int fd, unsigned engine, unsigned flags)
 
 		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);
 
-		while (__gem_wait(fd, &wait) == -ETIME)
-			igt_assert(igt_seconds_elapsed(&tv) < timeout);
+		while (__gem_wait(fd, &wait) == -ETIME &&
+		       igt_seconds_elapsed(&tv) < timeout)
+			;
+
+		if ((flags & HANG) == 0 && !timespec_isset(&spin->last_signal))
+			igt_warn("spinner not terminated!\n");
+
+		igt_assert_eq(__gem_wait(fd, &wait), 0);
 	} else {
 		wait.timeout_ns = NSEC_PER_SEC / 2; /* 0.5s */
 		igt_assert_eq(__gem_wait(fd, &wait), -ETIME);

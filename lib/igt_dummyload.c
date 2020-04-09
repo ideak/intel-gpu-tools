@@ -464,6 +464,8 @@ void igt_spin_reset(igt_spin_t *spin)
 
 	*spin->condition = spin->cmd_precondition;
 	__sync_synchronize();
+
+	memset(&spin->last_signal, 0, sizeof(spin->last_signal));
 }
 
 /**
@@ -477,6 +479,7 @@ void igt_spin_end(igt_spin_t *spin)
 	if (!spin)
 		return;
 
+	igt_gettime(&spin->last_signal);
 	*spin->condition = MI_BATCH_BUFFER_END;
 	__sync_synchronize();
 }
