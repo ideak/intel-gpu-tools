@@ -1185,51 +1185,16 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 	o->vblank_interval = mean;
 }
 
-static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
-				 int crtc_count, int duration_ms)
+static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
+				   int crtc_count, int duration_ms)
 {
-	char test_name[128];
-	unsigned elapsed;
 	unsigned bo_size = 0;
+	bool vblank = true;
+	unsigned elapsed;
 	uint64_t tiling;
 	int i;
-	bool vblank = true;
-
-	switch (crtc_count) {
-	case RUN_TEST:
-		connector_find_preferred_mode(o->_connector[0], crtc_idxs[0], o);
-		if (!o->mode_valid)
-			return;
-		snprintf(test_name, sizeof(test_name),
-			 "%s on pipe %s, connector %s-%d",
-			 igt_subtest_name(),
-			 kmstest_pipe_name(o->_pipe[0]),
-			 kmstest_connector_type_str(o->kconnector[0]->connector_type),
-			 o->kconnector[0]->connector_type_id);
-		break;
-	case RUN_PAIR:
-		connector_find_compatible_mode(crtc_idxs[0], crtc_idxs[1], o);
-		if (!o->mode_valid)
-			return;
-		snprintf(test_name, sizeof(test_name),
-			 "%s on pipe %s:%s, connector %s-%d:%s-%d",
-			 igt_subtest_name(),
-			 kmstest_pipe_name(o->_pipe[0]),
-			 kmstest_pipe_name(o->_pipe[1]),
-			 kmstest_connector_type_str(o->kconnector[0]->connector_type),
-			 o->kconnector[0]->connector_type_id,
-			 kmstest_connector_type_str(o->kconnector[1]->connector_type),
-			 o->kconnector[1]->connector_type_id);
-		break;
-	default:
-		igt_assert(0);
-	}
-
-	igt_assert_eq(o->count, crtc_count);
 
 	last_connector = o->kconnector[0];
-
-	igt_info("Beginning %s\n", test_name);
 
 	if (o->flags & TEST_PAN)
 		o->fb_width *= 2;
@@ -1274,7 +1239,6 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 		 */
 		igt_assert_f(crtc_count > 1 || crtc_idxs[0] < 2,
 			     "set_mode may only fail on the 3rd pipe or in multiple crtc tests\n");
-		igt_info("\n%s: SKIPPED\n\n", test_name);
 		goto out;
 	}
 	igt_assert(fb_is_bound(o, o->fb_ids[0]));
@@ -1322,8 +1286,6 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	if (o->flags & TEST_VBLANK)
 		check_final_state(o, &o->vblank_state, elapsed);
 
-	igt_info("\n%s: PASSED\n\n", test_name);
-
 out:
 	igt_remove_fb(drm_fd, &o->fb_info[2]);
 	igt_remove_fb(drm_fd, &o->fb_info[1]);
@@ -1332,6 +1294,45 @@ out:
 	last_connector = NULL;
 
 	free_test_output(o);
+}
+
+static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
+				 int crtc_count, int duration_ms)
+{
+	char test_name[128];
+
+	switch (crtc_count) {
+	case RUN_TEST:
+		connector_find_preferred_mode(o->_connector[0], crtc_idxs[0], o);
+		if (!o->mode_valid)
+			return;
+		snprintf(test_name, sizeof(test_name),
+			 "%s-%s%d",
+			 kmstest_pipe_name(o->_pipe[0]),
+			 kmstest_connector_type_str(o->kconnector[0]->connector_type),
+			 o->kconnector[0]->connector_type_id);
+		break;
+	case RUN_PAIR:
+		connector_find_compatible_mode(crtc_idxs[0], crtc_idxs[1], o);
+		if (!o->mode_valid)
+			return;
+		snprintf(test_name, sizeof(test_name),
+			 "%s%s-%s%d-%s%d",
+			 kmstest_pipe_name(o->_pipe[0]),
+			 kmstest_pipe_name(o->_pipe[1]),
+			 kmstest_connector_type_str(o->kconnector[0]->connector_type),
+			 o->kconnector[0]->connector_type_id,
+			 kmstest_connector_type_str(o->kconnector[1]->connector_type),
+			 o->kconnector[1]->connector_type_id);
+		break;
+	default:
+		igt_assert(0);
+	}
+
+	igt_assert_eq(o->count, crtc_count);
+
+	igt_dynamic_f("%s", test_name)
+		__run_test_on_crtc_set(o, crtc_idxs, crtc_count, duration_ms);
 }
 
 static int run_test(int duration, int flags)
@@ -1584,7 +1585,7 @@ igt_main
 		test_nonblocking_read(drm_fd);
 
 	for (i = 0; i < sizeof(tests) / sizeof (tests[0]); i++) {
-		igt_subtest_f("%s%s",
+		igt_subtest_with_dynamic_f("%s%s",
 			      tests[i].flags & TEST_BASIC ? "basic-" : "",
 			      tests[i].name)
 			run_test(tests[i].duration, tests[i].flags);
@@ -1592,7 +1593,7 @@ igt_main
 		if (tests[i].flags & TEST_NO_2X_OUTPUT)
 			continue;
 
-		igt_subtest_f( "2x-%s", tests[i].name)
+		igt_subtest_with_dynamic_f("2x-%s", tests[i].name)
 			run_pair(tests[i].duration, tests[i].flags);
 	}
 
@@ -1618,13 +1619,13 @@ igt_main
 		if (tests[i].flags & (TEST_EINVAL | TEST_EBUSY | TEST_HANG))
 			continue;
 
-		igt_subtest_f( "%s-interruptible", tests[i].name)
+		igt_subtest_with_dynamic_f("%s-interruptible", tests[i].name)
 			run_test(tests[i].duration, tests[i].flags);
 
 		if (tests[i].flags & TEST_NO_2X_OUTPUT)
 			continue;
 
-		igt_subtest_f( "2x-%s-interruptible", tests[i].name)
+		igt_subtest_with_dynamic_f("2x-%s-interruptible", tests[i].name)
 			run_pair(tests[i].duration, tests[i].flags);
 	}
 	igt_stop_signal_helper();
