@@ -270,15 +270,62 @@ static void prio_inversion(int i915, unsigned int flags)
 	close(link[1]);
 }
 
-static void many(int fd, int timeout)
+static void __many(int fd, int timeout,
+		   struct drm_i915_gem_exec_object2 *execobj,
+		   unsigned long count)
 {
-	struct drm_i915_gem_exec_object2 *execobj;
-	struct drm_i915_gem_execbuffer2 execbuf;
-	uint64_t gtt_size, ram_size;
-	unsigned long count, i;
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(execobj),
+		.buffer_count = count,
+	};
 
-	gtt_size = gem_aperture_size(fd);
-	if (!gem_uses_full_ppgtt(fd))
+	set_timeout((uint64_t)timeout * NSEC_PER_SEC);
+	for (uint64_t align = 8192; !READ_ONCE(timed_out); align <<= 1) {
+		unsigned long i, j;
+
+		for (i = 0; i < count; i++)
+			execobj[i].alignment = align;
+
+		for (i = 2; i < count; i <<= 1) {
+			struct timespec tv = {};
+			int err;
+
+			execbuf.buffer_count = i;
+
+			igt_nsec_elapsed(&tv);
+			err = __execbuf(fd, &execbuf);
+			igt_debug("Testing %lu x alignment=%#llx [%db], took %'"PRIu64"ns\n",
+				  i,
+				  (long long)align,
+				  find_last_bit(align) - 1,
+				  igt_nsec_elapsed(&tv));
+			if (READ_ONCE(timed_out))
+				break;
+			igt_assert_eq(err, 0);
+
+			for (j = 0; j < i; j++) {
+				igt_assert_eq_u64(execobj[j].alignment, align);
+				igt_assert_eq_u64(execobj[j].offset % align, 0);
+			}
+		}
+
+		count >>= 1;
+		if (!count)
+			break;
+	}
+	reset_timeout();
+}
+
+static struct drm_i915_gem_exec_object2 *
+setup_many(int i915, unsigned long *out)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 *obj;
+	uint64_t gtt_size, ram_size;
+	unsigned long count;
+
+	gtt_size = gem_aperture_size(i915);
+	if (!gem_uses_full_ppgtt(i915))
 		gtt_size /= 2; /* We have to *share* our GTT! */
 
 	ram_size = min(intel_get_total_ram_mb(), 4096);
@@ -289,63 +336,67 @@ static void many(int fd, int timeout)
 		count = file_max();
 	intel_require_memory(count, 4096, CHECK_RAM);
 
-	execobj = calloc(sizeof(*execobj), count);
-	igt_assert(execobj);
+	obj = calloc(sizeof(*obj), count);
+	igt_assert(obj);
 
-	for (i = 0; i < count; i++) {
-		execobj[i].handle = batch_create(fd, 4096);
+	for (unsigned long i = 0; i < count; i++) {
+		obj[i].handle = batch_create(i915, 4096);
 		if ((gtt_size - 1) >> 32)
-			execobj[i].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+			obj[i].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	}
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(execobj);
+	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = count;
-	igt_require(__gem_execbuf(fd, &execbuf) == 0);
+	igt_require(__gem_execbuf(i915, &execbuf) == 0);
 
-	set_timeout((uint64_t)timeout * NSEC_PER_SEC);
-	for (uint64_t alignment = 8192;
-	     alignment < gtt_size && !READ_ONCE(timed_out);
-	     alignment <<= 1) {
-		unsigned long max;
+	*out = count;
+	return obj;
+}
 
-		max = count;
-		if (max * alignment * 2 > gtt_size)
-			max = gtt_size / alignment / 2;
-		igt_debug("Testing alignment:%" PRIx64", max_count:%lu\n",
-			  alignment, max);
+static void cleanup_many(int i915,
+			 struct drm_i915_gem_exec_object2 *obj,
+			 unsigned long count)
+{
+	for (unsigned long i = 0; i < count; i++)
+		gem_close(i915, obj[i].handle);
+	free(obj);
+}
 
-		for (i = 0; i < max; i++)
-			execobj[i].alignment = alignment;
+static void many(int fd, int timeout)
+{
+	struct drm_i915_gem_exec_object2 *obj;
+	unsigned long count;
 
-		for (i = 2; i < max; i <<= 1) {
-			struct timespec tv = {};
-			int err;
+	obj = setup_many(fd, &count);
 
-			execbuf.buffer_count = i;
+	__many(fd, timeout, obj, count);
 
-			igt_nsec_elapsed(&tv);
-			err = __execbuf(fd, &execbuf);
-			igt_debug("Testing %lu x alignment=%#llx [%db], took %'"PRIu64"ns\n",
-				  i,
-				  (long long)alignment,
-				  find_last_bit(alignment) - 1,
-				  igt_nsec_elapsed(&tv));
-			if (READ_ONCE(timed_out))
-				break;
-			igt_assert_eq(err, 0);
+	cleanup_many(fd, obj, count);
+}
 
-			for (unsigned long j = 0; j < i; j++) {
-				igt_assert_eq_u64(execobj[j].alignment, alignment);
-				igt_assert_eq_u64(execobj[j].offset % alignment, 0);
-			}
-		}
+static void forked(int i915, int timeout)
+{
+	struct drm_i915_gem_exec_object2 *obj;
+	unsigned long count;
+
+	i915 = gem_reopen_driver(i915);
+	igt_require(gem_uses_full_ppgtt(i915));
+
+	obj = setup_many(i915, &count);
+	for (unsigned long i = 0; i < count; i++)
+		obj[i].handle = gem_flink(i915, obj[i].handle);
+
+	igt_fork(child, sysconf(_SC_NPROCESSORS_ONLN)) {
+		i915 = gem_reopen_driver(i915);
+		for (unsigned long i = 0; i < count; i++)
+			obj[i].handle = gem_open(i915, obj[i].handle);
+		__many(i915, timeout, obj, count);
 	}
-	reset_timeout();
+	igt_waitchildren_timeout(3 * timeout, NULL);
 
-	for (i = 0; i < count; i++)
-		gem_close(fd, execobj[i].handle);
-	free(execobj);
+	free(obj);
+	close(i915);
 }
 
 static void single(int fd)
@@ -417,6 +468,8 @@ igt_main
 		single(fd);
 	igt_subtest("many")
 		many(fd, 20);
+	igt_subtest("forked")
+		forked(fd, 20);
 	igt_subtest("pi")
 		prio_inversion(fd, 0);
 	igt_subtest("pi-shared")
