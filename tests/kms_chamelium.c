@@ -2520,6 +2520,12 @@ igt_main
 		igt_display_require(&data.display, data.drm_fd);
 		igt_require(data.display.is_atomic);
 
+		/*
+		 * XXX: disabling modeset, can be removed when
+		 * igt_display_require will start doing this for us
+		 */
+		igt_display_commit2(&data.display, COMMIT_ATOMIC);
+
 		/* we need to initalize chamelium after igt_display_require */
 		data.chamelium = chamelium_init(data.drm_fd);
 		igt_require(data.chamelium);
