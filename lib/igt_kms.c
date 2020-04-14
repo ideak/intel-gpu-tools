@@ -1666,7 +1666,7 @@ static void igt_display_log_shift(igt_display_t *display, int shift)
 	igt_assert(display->log_shift >= 0);
 }
 
-static void igt_output_refresh(igt_output_t *output)
+void igt_output_refresh(igt_output_t *output)
 {
 	igt_display_t *display = output->display;
 	unsigned long crtc_idx_mask = 0;
