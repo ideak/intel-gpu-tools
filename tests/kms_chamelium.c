@@ -273,7 +273,14 @@ check_analog_bridge(data_t *data, struct chamelium_port *port)
 static void
 reset_state(data_t *data, struct chamelium_port *port)
 {
-	int p;
+	int p, i;
+
+	for (i = 0; i < data->display.n_outputs; i++) {
+		igt_output_t *output = &data->display.outputs[i];
+		igt_output_set_pipe(output, PIPE_NONE);
+	}
+
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 	chamelium_reset(data->chamelium);
 
