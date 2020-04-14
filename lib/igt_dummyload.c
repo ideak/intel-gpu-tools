@@ -399,14 +399,14 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 static void *timer_thread(void *data)
 {
 	igt_spin_t *spin = data;
-	struct pollfd pfd = {
-		.fd = spin->timerfd,
-		.events = POLLIN,
-	};
+	uint64_t overruns = 0;
 
-	if (poll(&pfd, 1, -1) >= 0)
-		igt_spin_end(spin);
+	/* Wait until we see the timer fire, or we get cancelled */
+	do {
+		read(spin->timerfd, &overruns, sizeof(overruns));
+	} while (!overruns);
 
+	igt_spin_end(spin);
 	return NULL;
 }
 
