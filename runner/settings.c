@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "version.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -11,6 +12,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 enum {
@@ -21,6 +23,7 @@ enum {
 	OPT_DMESG_WARN_LEVEL,
 	OPT_OVERALL_TIMEOUT,
 	OPT_PER_TEST_TIMEOUT,
+	OPT_VERSION,
 	OPT_HELP = 'h',
 	OPT_NAME = 'n',
 	OPT_DRY_RUN = 'd',
@@ -292,6 +295,17 @@ static bool readable_file(char *filename)
 	return !access(filename, R_OK);
 }
 
+static void print_version(void)
+{
+	struct utsname uts;
+
+	uname(&uts);
+
+	printf("IGT-Version: %s-%s (%s) (%s: %s %s)\n", PACKAGE_VERSION,
+	       IGT_GIT_SHA1, TARGET_CPU_PLATFORM,
+	       uts.sysname, uts.release, uts.machine);
+}
+
 void init_settings(struct settings *settings)
 {
 	memset(settings, 0, sizeof(*settings));
@@ -317,6 +331,7 @@ bool parse_options(int argc, char **argv,
 	char *env_test_root;
 
 	static struct option long_options[] = {
+		{"version", no_argument, NULL, OPT_VERSION},
 		{"help", no_argument, NULL, OPT_HELP},
 		{"name", required_argument, NULL, OPT_NAME},
 		{"dry-run", no_argument, NULL, OPT_DRY_RUN},
@@ -349,6 +364,9 @@ bool parse_options(int argc, char **argv,
 	while ((c = getopt_long(argc, argv, "hn:dt:x:sl:omb:L",
 				long_options, NULL)) != -1) {
 		switch (c) {
+		case OPT_VERSION:
+			print_version();
+			goto error;
 		case OPT_HELP:
 			usage(NULL, stdout);
 			goto error;

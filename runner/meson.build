@@ -4,6 +4,7 @@ runnerlib_sources = [ 'settings.c',
 		      'job_list.c',
 		      'executor.c',
 		      'resultgen.c',
+		      lib_version,
 		    ]
 
 runner_sources = [ 'runner.c' ]
