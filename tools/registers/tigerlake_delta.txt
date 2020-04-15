@@ -110,7 +110,7 @@
 ('PLANE_COLOR_CTL_5_D', '0x735cc', '')
 ('PLANE_COLOR_CTL_6_D', '0x736cc', '')
 ('PLANE_COLOR_CTL_7_D', '0x737cc', '')
-('PLANE_OFFSET_1_D', '0x731a4', ''
+('PLANE_OFFSET_1_D', '0x731a4', '')
 ('PLANE_OFFSET_2_D', '0x732a4', '')
 ('PLANE_OFFSET_3_D', '0x733a4', '')
 ('PLANE_OFFSET_4_D', '0x734a4', '')
