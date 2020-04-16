@@ -702,7 +702,8 @@ static void kmsg_log(int severity, const char *msg)
 static const char *show_kernel_task_state(const char *msg)
 {
 	kmsg_log(KMSG_WARN, msg);
-	sysrq('t');
+	sysrq('t'); /* task state, stack traces and cpu run lists */
+	sysrq('m'); /* task memory usage */
 
 	return msg;
 }
