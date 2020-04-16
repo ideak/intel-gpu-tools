@@ -849,7 +849,8 @@ int update_display(int mode, bool is_compliance_test)
 		conn = &connectors[cnt];
 		conn->id = resources->connectors[cnt];
 		c = drmModeGetConnector(drm_fd, conn->id);
-		if (c->connector_type == DRM_MODE_CONNECTOR_DisplayPort &&
+		if ((c->connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
+		    c->connector_type == DRM_MODE_CONNECTOR_eDP) &&
 		    c->connection == DRM_MODE_CONNECTED) {
 			test_connector_id = c->connector_id;
 			conn->connector = c;
