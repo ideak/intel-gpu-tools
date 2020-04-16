@@ -322,6 +322,7 @@ setup_many(int i915, unsigned long *out)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 *obj;
 	uint64_t gtt_size, ram_size;
+	struct timespec tv = {};
 	unsigned long count;
 
 	gtt_size = gem_aperture_size(i915);
@@ -339,6 +340,7 @@ setup_many(int i915, unsigned long *out)
 	obj = calloc(sizeof(*obj), count);
 	igt_assert(obj);
 
+	igt_nsec_elapsed(&tv);
 	for (unsigned long i = 0; i < count; i++) {
 		obj[i].handle = batch_create(i915, 4096);
 		if ((gtt_size - 1) >> 32)
@@ -349,6 +351,10 @@ setup_many(int i915, unsigned long *out)
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = count;
 	igt_require(__gem_execbuf(i915, &execbuf) == 0);
+	gem_sync(i915, obj[0].handle);
+
+	igt_info("Setup %'lu 4KiB objects in %.1fms\n",
+		 count, igt_nsec_elapsed(&tv) * 1e-6);
 
 	*out = count;
 	return obj;
