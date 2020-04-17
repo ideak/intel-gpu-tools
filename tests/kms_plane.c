@@ -574,6 +574,7 @@ static void capture_format_crcs(data_t *data, enum pipe pipe,
 			 * awaits to be latched.
 			 */
 			igt_display_commit_atomic(&data->display,
+						  DRM_MODE_ATOMIC_ALLOW_MODESET |
 						  DRM_MODE_ATOMIC_NONBLOCK |
 						  DRM_MODE_PAGE_FLIP_EVENT, NULL);
 		} else {
