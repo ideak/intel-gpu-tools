@@ -4242,6 +4242,27 @@ static void print_sseu_config(struct drm_i915_gem_context_param_sseu *sseu)
 		  sseu->max_eus_per_subslice);
 }
 
+static struct drm_i915_gem_context_param_sseu
+make_valid_reduced_sseu_config(struct drm_i915_gem_context_param_sseu default_sseu)
+{
+	struct drm_i915_gem_context_param_sseu sseu = default_sseu;
+
+	if (intel_gen(devid) == 11) {
+		/*
+		 * On Gen11 there are restrictions on what subslices
+		 * can be disabled, notably we're not able to enable
+		 * more than half the subslice. So disable half
+		 * subslices only.
+		 */
+		for (int i = 0; i < DIV_ROUND_UP(__builtin_popcount(default_sseu.subslice_mask), 2); i++)
+			sseu.subslice_mask = mask_minus_one(sseu.subslice_mask);
+	} else {
+		sseu.subslice_mask = mask_minus_one(sseu.subslice_mask);
+	}
+
+	return sseu;
+}
+
 static void
 test_global_sseu_config_invalid(void)
 {
@@ -4310,8 +4331,7 @@ test_global_sseu_config_invalid(void)
 		igt_fork(child, 1) {
 			igt_drop_root();
 
-			sseu_param = default_sseu;
-			sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
+			sseu_param = make_valid_reduced_sseu_config(default_sseu);
 			do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EACCES);
 		}
 		igt_waitchildren();
@@ -4357,21 +4377,7 @@ test_global_sseu_config(void)
 
 	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 0);
 
-	sseu_param = default_sseu;
-
-	if (intel_gen(devid) == 11) {
-		/*
-		 * On Gen11 there are restrictions on what subslices
-		 * can be disabled, notably we're not able to enable
-		 * more than half the subslice. So disable half
-		 * subslices only.
-		 */
-		for (int i = 0; i < DIV_ROUND_UP(__builtin_popcount(default_sseu.subslice_mask), 2); i++)
-			sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
-	} else {
-		sseu_param.subslice_mask = mask_minus_one(sseu_param.subslice_mask);
-	}
-
+	sseu_param = make_valid_reduced_sseu_config(default_sseu);
 	igt_debug("Selected context sseu:\n");
 	print_sseu_config(&sseu_param);
 
