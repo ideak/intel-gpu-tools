@@ -316,6 +316,19 @@ static void __many(int fd, int timeout,
 	reset_timeout();
 }
 
+static unsigned long create_batch(int i915,
+				  struct drm_i915_gem_exec_object2 *obj,
+				  unsigned long from, unsigned long to,
+				  unsigned int flags)
+{
+	for (unsigned long i = from; i < to; i++) {
+		obj[i].handle = batch_create(i915, 4096);
+		obj[i].flags = flags;
+	}
+
+	return to;
+}
+
 static struct drm_i915_gem_exec_object2 *
 setup_many(int i915, unsigned long *out)
 {
@@ -324,6 +337,7 @@ setup_many(int i915, unsigned long *out)
 	uint64_t gtt_size, ram_size;
 	struct timespec tv = {};
 	unsigned long count;
+	unsigned int flags;
 
 	gtt_size = gem_aperture_size(i915);
 	if (!gem_uses_full_ppgtt(i915))
@@ -340,17 +354,32 @@ setup_many(int i915, unsigned long *out)
 	obj = calloc(sizeof(*obj), count);
 	igt_assert(obj);
 
-	igt_nsec_elapsed(&tv);
-	for (unsigned long i = 0; i < count; i++) {
-		obj[i].handle = batch_create(i915, 4096);
-		if ((gtt_size - 1) >> 32)
-			obj[i].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
-	}
+	flags = 0;
+	if ((gtt_size - 1) >> 32)
+		flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
+	/* Instantiating all the objects may take awhile, so limit to 20s */
+	igt_seconds_elapsed(&tv);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.buffer_count = count;
+	execbuf.buffer_count =
+		create_batch(i915, obj, execbuf.buffer_count, 1, flags);
 	igt_require(__gem_execbuf(i915, &execbuf) == 0);
+
+	for (unsigned long i = 2; i < count; i *= 2) {
+		execbuf.buffer_count =
+			create_batch(i915, obj, execbuf.buffer_count, i, flags);
+		gem_execbuf(i915, &execbuf);
+		if (igt_seconds_elapsed(&tv) > 10) { /* NB doubling each time */
+			count = i;
+			break;
+		}
+	}
+
+	execbuf.buffer_count =
+		create_batch(i915, obj, execbuf.buffer_count, count, flags);
+	gem_execbuf(i915, &execbuf);
 	gem_sync(i915, obj[0].handle);
 
 	igt_info("Setup %'lu 4KiB objects in %.1fms\n",
