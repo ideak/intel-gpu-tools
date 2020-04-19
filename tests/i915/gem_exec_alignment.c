@@ -123,6 +123,19 @@ static uint32_t batch_create(int i915, unsigned long sz)
 	return handle;
 }
 
+static unsigned long create_batch(int i915,
+				  struct drm_i915_gem_exec_object2 *obj,
+				  unsigned long from, unsigned long to,
+				  unsigned int flags)
+{
+	for (unsigned long i = from; i < to; i++) {
+		obj[i].handle = batch_create(i915, 4096);
+		obj[i].flags = flags;
+	}
+
+	return to;
+}
+
 static void sighandler(int sig)
 {
 }
@@ -159,27 +172,41 @@ naughty_child(int i915, int link, uint32_t shared, unsigned int flags)
 		count = file_max();
 	intel_require_memory(count, 4096, CHECK_RAM);
 
+	flags = 0;
+	if ((gtt_size - 1) >> 32)
+		flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
 	/* Fill the low-priority address space */
 	obj = calloc(sizeof(*obj), count);
 	igt_assert(obj);
-	for (unsigned long i = 0; i < count; i++) {
-		obj[i].handle = batch_create(i915, 4096);
-		if ((gtt_size - 1) >> 32)
-			obj[i].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
-		obj[i].alignment = 4096;
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = create_batch(i915, obj, 0, 1, flags);
+	execbuf.rsvd1 = gem_context_create(i915);
+	gem_execbuf(i915, &execbuf);
+
+	igt_seconds_elapsed(memset(&tv, 0, sizeof(tv)));
+	for (unsigned long i = 1; i < count; i *= 2) {
+		execbuf.buffer_count =
+			create_batch(i915, obj, execbuf.buffer_count, i, flags);
+		gem_execbuf(i915, &execbuf);
+		if (igt_seconds_elapsed(&tv) > 8) {
+			count = i;
+			break;
+		}
 	}
 	if (shared) {
 		gem_close(i915, obj[0].handle);
 		obj[0].handle = shared;
 	}
-
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.buffer_count = count;
-	execbuf.rsvd1 = gem_context_create(i915);
+	execbuf.buffer_count =
+		create_batch(i915, obj, execbuf.buffer_count, count, flags);
 	gem_execbuf(i915, &execbuf);
+	igt_debug("Created %lu buffers ready for delay\n", count);
 
 	/* Calibrate a long execbuf() */
+	memset(&tv, 0, sizeof(tv));
 	for (unsigned long i = 0; i < count; i++)
 		obj[i].alignment = 8192;
 
@@ -314,19 +341,6 @@ static void __many(int fd, int timeout,
 			break;
 	}
 	reset_timeout();
-}
-
-static unsigned long create_batch(int i915,
-				  struct drm_i915_gem_exec_object2 *obj,
-				  unsigned long from, unsigned long to,
-				  unsigned int flags)
-{
-	for (unsigned long i = from; i < to; i++) {
-		obj[i].handle = batch_create(i915, 4096);
-		obj[i].flags = flags;
-	}
-
-	return to;
 }
 
 static struct drm_i915_gem_exec_object2 *
