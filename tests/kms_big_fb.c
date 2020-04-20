@@ -294,6 +294,7 @@ static bool test_plane(data_t *data)
 		 */
 		if (i == 0 && data->display.is_atomic &&
 		    igt_display_try_commit_atomic(&data->display,
+						  DRM_MODE_ATOMIC_ALLOW_MODESET |
 						  DRM_MODE_ATOMIC_TEST_ONLY,
 						  NULL) != 0) {
 			if (igt_plane_has_prop(plane, IGT_PLANE_ROTATION))
