@@ -1803,7 +1803,7 @@ static void planes_subtest(bool universal, bool dpms)
 
 			type = universal ? get_plane_type(plane->plane_id) :
 					   PLANE_OVERLAY;
-			igt_dynamic_f("plane-%d\n", plane->plane_id)
+			igt_dynamic_f("plane-%d", plane->plane_id)
 				test_one_plane(dpms, plane->plane_id, type);
 		}
 		drmModeFreePlane(plane);
