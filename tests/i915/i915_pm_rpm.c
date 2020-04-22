@@ -1778,7 +1778,7 @@ static void test_one_plane(bool dpms, uint32_t plane_id,
 /* This one also triggered WARNs on our driver at some point in time. */
 static void planes_subtest(bool universal, bool dpms)
 {
-	int i, rc, planes_tested = 0, crtc_idx;
+	int i, rc, crtc_idx;
 	drmModePlaneResPtr planes;
 
 	igt_require(default_mode_params);
@@ -1803,8 +1803,8 @@ static void planes_subtest(bool universal, bool dpms)
 
 			type = universal ? get_plane_type(plane->plane_id) :
 					   PLANE_OVERLAY;
-			test_one_plane(dpms, plane->plane_id, type);
-			planes_tested++;
+			igt_dynamic_f("plane-%d\n", plane->plane_id)
+				test_one_plane(dpms, plane->plane_id, type);
 		}
 		drmModeFreePlane(plane);
 	}
@@ -1813,10 +1813,6 @@ static void planes_subtest(bool universal, bool dpms)
 	if (universal) {
 		rc = drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 0);
 		igt_assert_eq(rc, 0);
-
-		igt_assert_lte(3, planes_tested);
-	} else {
-		igt_assert_lte(1, planes_tested);
 	}
 }
 
@@ -2062,13 +2058,13 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		cursor_subtest(false);
 	igt_subtest("cursor-dpms")
 		cursor_subtest(true);
-	igt_subtest("legacy-planes")
+	igt_subtest_with_dynamic("legacy-planes")
 		planes_subtest(false, false);
-	igt_subtest("legacy-planes-dpms")
+	igt_subtest_with_dynamic("legacy-planes-dpms")
 		planes_subtest(false, true);
-	igt_subtest("universal-planes")
+	igt_subtest_with_dynamic("universal-planes")
 		planes_subtest(true, false);
-	igt_subtest("universal-planes-dpms")
+	igt_subtest_with_dynamic("universal-planes-dpms")
 		planes_subtest(true, true);
 
 	/* Misc */
