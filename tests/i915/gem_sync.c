@@ -24,6 +24,9 @@
 #include <time.h>
 #include <pthread.h>
 
+#include "igt_debugfs.h"
+#include "igt_dummyload.h"
+#include "igt_gt.h"
 #include "igt.h"
 #include "igt_sysfs.h"
 
@@ -70,7 +73,7 @@ static double gettime(void)
 		goto out;
 error:
 	igt_warn("Could not read monotonic time: %s\n",
-			strerror(errno));
+		 strerror(errno));
 	igt_assert(0);
 	return 0;
 
@@ -79,26 +82,84 @@ out:
 }
 
 static void
-sync_ring(int fd, unsigned ring, int num_children, int timeout)
+filter_engines_can_store_dword(int fd, struct intel_engine_data *ied)
 {
-	unsigned engines[16];
-	const char *names[16];
-	int num_engines = 0;
+	unsigned int count = 0;
+
+	for (unsigned int n = 0; n < ied->nengines; n++) {
+		if (!gem_class_can_store_dword(fd, ied->engines[n].class))
+			continue;
+
+		if (count != n)
+			memcpy(&ied->engines[count],
+			       &ied->engines[n],
+			       sizeof(ied->engines[0]));
+		count++;
+	}
+
+	ied->nengines = count;
+}
+
+static struct intel_engine_data list_store_engines(int fd, unsigned ring)
+{
+	struct intel_engine_data ied = { };
 
 	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
-			names[num_engines] = e->name;
-			engines[num_engines++] = eb_ring(e);
-			if (num_engines == ARRAY_SIZE(engines))
-				break;
-		}
-
-		num_children *= num_engines;
+		ied = intel_init_engine_list(fd, 0);
+		filter_engines_can_store_dword(fd, &ied);
 	} else {
-		gem_require_ring(fd, ring);
-		names[num_engines] = NULL;
-		engines[num_engines++] = ring;
+		if (gem_has_ring(fd, ring) && gem_can_store_dword(fd, ring)) {
+			ied.engines[ied.nengines].flags = ring;
+			strcpy(ied.engines[ied.nengines].name, " ");
+			ied.nengines++;
+		}
 	}
+
+	return ied;
+}
+
+static struct intel_engine_data list_engines(int fd, unsigned ring)
+{
+	struct intel_engine_data ied = { };
+
+	if (ring == ALL_ENGINES) {
+		ied = intel_init_engine_list(fd, 0);
+	} else {
+		if (gem_has_ring(fd, ring)) {
+			ied.engines[ied.nengines].flags = ring;
+			strcpy(ied.engines[ied.nengines].name, " ");
+			ied.nengines++;
+		}
+	}
+
+	return ied;
+}
+
+static const char *ied_name(const struct intel_engine_data *ied, int idx)
+{
+	return ied->engines[idx % ied->nengines].name;
+}
+
+static unsigned int ied_flags(const struct intel_engine_data *ied, int idx)
+{
+	return ied->engines[idx % ied->nengines].flags;
+}
+
+static void xchg_engine(void *array, unsigned i, unsigned j)
+{
+	struct intel_execution_engine2 *E = array;
+
+	igt_swap(E[i], E[j]);
+}
+
+static void
+sync_ring(int fd, unsigned ring, int num_children, int timeout)
+{
+	struct intel_engine_data ied;
+
+	ied = list_engines(fd, ring);
+	igt_require(ied.nengines);
+	num_children *= ied.nengines;
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	igt_fork(child, num_children) {
@@ -115,7 +176,7 @@ sync_ring(int fd, unsigned ring, int num_children, int timeout)
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(&object);
 		execbuf.buffer_count = 1;
-		execbuf.flags = engines[child % num_engines];
+		execbuf.flags = ied_flags(&ied, child);
 		gem_execbuf(fd, &execbuf);
 		gem_sync(fd, object.handle);
 
@@ -127,10 +188,9 @@ sync_ring(int fd, unsigned ring, int num_children, int timeout)
 				gem_sync(fd, object.handle);
 			} while (++cycles & 1023);
 		} while ((elapsed = gettime() - start) < timeout);
-		igt_info("%s%sompleted %ld cycles: %.3f us\n",
-			 names[child % num_engines] ?: "",
-			 names[child % num_engines] ? " c" : "C",
-			 cycles, elapsed*1e6/cycles);
+
+		igt_info("%s %ld cycles: %.3f us\n",
+			 ied_name(&ied, child), cycles, elapsed * 1e6 / cycles);
 
 		gem_close(fd, object.handle);
 	}
@@ -139,7 +199,7 @@ sync_ring(int fd, unsigned ring, int num_children, int timeout)
 }
 
 static void
-idle_ring(int fd, unsigned ring, int timeout)
+idle_ring(int fd, unsigned int ring, int num_children, int timeout)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 object;
@@ -172,7 +232,7 @@ idle_ring(int fd, unsigned ring, int timeout)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 
 	igt_info("Completed %ld cycles: %.3f us\n",
-		 cycles, elapsed*1e6/cycles);
+		 cycles, elapsed * 1e6 / cycles);
 
 	gem_close(fd, object.handle);
 }
@@ -180,30 +240,13 @@ idle_ring(int fd, unsigned ring, int timeout)
 static void
 wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 {
-	unsigned engines[16];
-	const char *names[16];
-	int num_engines = 0;
+	struct intel_engine_data ied;
 
-	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
-			if (!gem_can_store_dword(fd, eb_ring(e)))
-				continue;
-
-			names[num_engines] = e->name;
-			engines[num_engines++] = eb_ring(e);
-			if (num_engines == ARRAY_SIZE(engines))
-				break;
-		}
-		igt_require(num_engines);
-	} else {
-		gem_require_ring(fd, ring);
-		igt_require(gem_can_store_dword(fd, ring));
-		names[num_engines] = NULL;
-		engines[num_engines++] = ring;
-	}
+	ied = list_store_engines(fd, ring);
+	igt_require(ied.nengines);
 
 	intel_detect_and_clear_missed_interrupts(fd);
-	igt_fork(child, num_engines) {
+	igt_fork(child, ied.nengines) {
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 object;
 		struct drm_i915_gem_execbuffer2 execbuf;
@@ -218,7 +261,7 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(&object);
 		execbuf.buffer_count = 1;
-		execbuf.flags = engines[child % num_engines];
+		execbuf.flags = ied_flags(&ied, child);
 
 		spin = __igt_spin_new(fd,
 				      .engine = execbuf.flags,
@@ -251,10 +294,8 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 			} while (now < end);
 			baseline = elapsed / cycles;
 		}
-		igt_info("%s%saseline %ld cycles: %.3f us\n",
-			 names[child % num_engines] ?: "",
-			 names[child % num_engines] ? " b" : "B",
-			 cycles, elapsed*1e6/cycles);
+		igt_info("%s baseline %ld cycles: %.3f us\n",
+			 ied_name(&ied, child), cycles, elapsed * 1e6 / cycles);
 
 		end = gettime() + timeout;
 		elapsed = 0;
@@ -278,10 +319,9 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 		} while (now < end);
 		elapsed -= cycles * baseline;
 
-		igt_info("%s%sompleted %ld cycles: %.3f + %.3f us\n",
-			 names[child % num_engines] ?: "",
-			 names[child % num_engines] ? " c" : "C",
-			 cycles, 1e6*baseline, elapsed*1e6/cycles);
+		igt_info("%s completed %ld cycles: %.3f + %.3f us\n",
+			 ied_name(&ied, child),
+			 cycles, 1e6 * baseline, elapsed * 1e6 / cycles);
 
 		igt_spin_free(fd, spin);
 		gem_close(fd, object.handle);
@@ -290,42 +330,26 @@ wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
-static void active_ring(int fd, unsigned ring, int timeout)
+static void active_ring(int fd, unsigned int ring,
+			int num_children, int timeout)
 {
-	unsigned engines[16];
-	const char *names[16];
-	int num_engines = 0;
+	struct intel_engine_data ied;
 
-	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
-			if (!gem_can_store_dword(fd, eb_ring(e)))
-				continue;
-
-			names[num_engines] = e->name;
-			engines[num_engines++] = eb_ring(e);
-			if (num_engines == ARRAY_SIZE(engines))
-				break;
-		}
-		igt_require(num_engines);
-	} else {
-		gem_require_ring(fd, ring);
-		igt_require(gem_can_store_dword(fd, ring));
-		names[num_engines] = NULL;
-		engines[num_engines++] = ring;
-	}
+	ied = list_store_engines(fd, ring);
+	igt_require(ied.nengines);
 
 	intel_detect_and_clear_missed_interrupts(fd);
-	igt_fork(child, num_engines) {
+	igt_fork(child, ied.nengines) {
 		double start, end, elapsed;
 		unsigned long cycles;
 		igt_spin_t *spin[2];
 
 		spin[0] = __igt_spin_new(fd,
-					 .engine = ring,
+					 .engine = ied_flags(&ied, child),
 					 .flags = IGT_SPIN_FAST);
 
 		spin[1] = __igt_spin_new(fd,
-					 .engine = ring,
+					 .engine = ied_flags(&ied, child),
 					 .flags = IGT_SPIN_FAST);
 
 		start = gettime();
@@ -347,10 +371,9 @@ static void active_ring(int fd, unsigned ring, int timeout)
 		igt_spin_free(fd, spin[1]);
 		igt_spin_free(fd, spin[0]);
 
-		igt_info("%s%sompleted %ld cycles: %.3f us\n",
-			 names[child % num_engines] ?: "",
-			 names[child % num_engines] ? " c" : "C",
-			 cycles, (elapsed - start)*1e6/cycles);
+		igt_info("%s %ld cycles: %.3f us\n",
+			 ied_name(&ied, child),
+			 cycles, (elapsed - start) * 1e6 / cycles);
 	}
 	igt_waitchildren_timeout(2*timeout, NULL);
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
@@ -359,30 +382,13 @@ static void active_ring(int fd, unsigned ring, int timeout)
 static void
 active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 {
-	unsigned engines[16];
-	const char *names[16];
-	int num_engines = 0;
+	struct intel_engine_data ied;
 
-	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
-			if (!gem_can_store_dword(fd, eb_ring(e)))
-				continue;
-
-			names[num_engines] = e->name;
-			engines[num_engines++] = eb_ring(e);
-			if (num_engines == ARRAY_SIZE(engines))
-				break;
-		}
-		igt_require(num_engines);
-	} else {
-		gem_require_ring(fd, ring);
-		igt_require(gem_can_store_dword(fd, ring));
-		names[num_engines] = NULL;
-		engines[num_engines++] = ring;
-	}
+	ied = list_store_engines(fd, ring);
+	igt_require(ied.nengines);
 
 	intel_detect_and_clear_missed_interrupts(fd);
-	igt_fork(child, num_engines) {
+	igt_fork(child, ied.nengines) {
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 object;
 		struct drm_i915_gem_execbuffer2 execbuf;
@@ -397,7 +403,7 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(&object);
 		execbuf.buffer_count = 1;
-		execbuf.flags = engines[child % num_engines];
+		execbuf.flags = ied_flags(&ied, child);
 
 		spin[0] = __igt_spin_new(fd,
 					 .engine = execbuf.flags,
@@ -443,10 +449,8 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 			igt_spin_end(spin[0]);
 			baseline = elapsed / cycles;
 		}
-		igt_info("%s%saseline %ld cycles: %.3f us\n",
-			 names[child % num_engines] ?: "",
-			 names[child % num_engines] ? " b" : "B",
-			 cycles, elapsed*1e6/cycles);
+		igt_info("%s baseline %ld cycles: %.3f us\n",
+			 ied_name(&ied, child), cycles, elapsed * 1e6  /cycles);
 
 		igt_spin_reset(spin[0]);
 
@@ -477,10 +481,9 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 		igt_spin_end(spin[0]);
 		elapsed -= cycles * baseline;
 
-		igt_info("%s%sompleted %ld cycles: %.3f + %.3f us\n",
-			 names[child % num_engines] ?: "",
-			 names[child % num_engines] ? " c" : "C",
-			 cycles, 1e6*baseline, elapsed*1e6/cycles);
+		igt_info("%s completed %ld cycles: %.3f + %.3f us\n",
+			 ied_name(&ied, child),
+			 cycles, 1e6 * baseline, elapsed * 1e6 / cycles);
 
 		igt_spin_free(fd, spin[1]);
 		igt_spin_free(fd, spin[0]);
@@ -494,28 +497,11 @@ static void
 store_ring(int fd, unsigned ring, int num_children, int timeout)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
-	unsigned engines[16];
-	const char *names[16];
-	int num_engines = 0;
+	struct intel_engine_data ied;
 
-	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
-			if (!gem_can_store_dword(fd, eb_ring(e)))
-				continue;
-
-			names[num_engines] = e->name;
-			engines[num_engines++] = eb_ring(e);
-			if (num_engines == ARRAY_SIZE(engines))
-				break;
-		}
-
-		num_children *= num_engines;
-	} else {
-		gem_require_ring(fd, ring);
-		igt_require(gem_can_store_dword(fd, ring));
-		names[num_engines] = NULL;
-		engines[num_engines++] = ring;
-	}
+	ied = list_store_engines(fd, ring);
+	igt_require(ied.nengines);
+	num_children *= ied.nengines;
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	igt_fork(child, num_children) {
@@ -529,7 +515,7 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(object);
-		execbuf.flags = engines[child % num_engines];
+		execbuf.flags = ied_flags(&ied, child);
 		execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 		execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
 		if (gen < 6)
@@ -548,9 +534,9 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 		object[1].relocation_count = 1024;
 
 		batch = gem_mmap__cpu(fd, object[1].handle, 0, 20*1024,
-				PROT_WRITE | PROT_READ);
+				      PROT_WRITE | PROT_READ);
 		gem_set_domain(fd, object[1].handle,
-				I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+			       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 		memset(reloc, 0, sizeof(reloc));
 		b = batch;
@@ -593,10 +579,8 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 				gem_sync(fd, object[1].handle);
 			} while (++cycles & 1023);
 		} while ((elapsed = gettime() - start) < timeout);
-		igt_info("%s%sompleted %ld cycles: %.3f us\n",
-			 names[child % num_engines] ?: "",
-			 names[child % num_engines] ? " c" : "C",
-			 cycles, elapsed*1e6/cycles);
+		igt_info("%s completed %ld cycles: %.3f us\n",
+			 ied_name(&ied, child), cycles, elapsed  *1e6 / cycles);
 
 		gem_close(fd, object[1].handle);
 		gem_close(fd, object[0].handle);
@@ -609,30 +593,13 @@ static void
 switch_ring(int fd, unsigned ring, int num_children, int timeout)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
-	unsigned engines[16];
-	const char *names[16];
-	int num_engines = 0;
+	struct intel_engine_data ied;
 
 	gem_require_contexts(fd);
 
-	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
-			if (!gem_can_store_dword(fd, eb_ring(e)))
-				continue;
-
-			names[num_engines] = e->name;
-			engines[num_engines++] = eb_ring(e);
-			if (num_engines == ARRAY_SIZE(engines))
-				break;
-		}
-
-		num_children *= num_engines;
-	} else {
-		gem_require_ring(fd, ring);
-		igt_require(gem_can_store_dword(fd, ring));
-		names[num_engines] = NULL;
-		engines[num_engines++] = ring;
-	}
+	ied = list_store_engines(fd, ring);
+	igt_require(ied.nengines);
+	num_children *= ied.nengines;
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	igt_fork(child, num_children) {
@@ -652,7 +619,7 @@ switch_ring(int fd, unsigned ring, int num_children, int timeout)
 
 			memset(&c->execbuf, 0, sizeof(c->execbuf));
 			c->execbuf.buffers_ptr = to_user_pointer(c->object);
-			c->execbuf.flags = engines[child % num_engines];
+			c->execbuf.flags = ied_flags(&ied, child);
 			c->execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
 			c->execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
 			if (gen < 6)
@@ -672,9 +639,9 @@ switch_ring(int fd, unsigned ring, int num_children, int timeout)
 			c->object[1].relocation_count = 1024 * i;
 
 			batch = gem_mmap__cpu(fd, c->object[1].handle, 0, sz,
-					PROT_WRITE | PROT_READ);
+					      PROT_WRITE | PROT_READ);
 			gem_set_domain(fd, c->object[1].handle,
-					I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+				       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 			memset(c->reloc, 0, sizeof(c->reloc));
 			b = batch;
@@ -746,10 +713,9 @@ switch_ring(int fd, unsigned ring, int num_children, int timeout)
 		}
 		elapsed /= cycles;
 
-		igt_info("%s%sompleted %ld cycles: %.3f us, baseline %.3f us\n",
-			 names[child % num_engines] ?: "",
-			 names[child % num_engines] ? " c" : "C",
-			 cycles, elapsed*1e6, baseline*1e6);
+		igt_info("%s completed %ld cycles: %.3f us, baseline %.3f us\n",
+			 ied_name(&ied, child),
+			 cycles, elapsed * 1e6, baseline * 1e6);
 
 		for (int i = 0; i < ARRAY_SIZE(contexts); i++) {
 			gem_close(fd, contexts[i].object[1].handle);
@@ -931,41 +897,31 @@ __store_many(int fd, unsigned ring, int timeout, unsigned long *cycles)
 }
 
 static void
-store_many(int fd, unsigned ring, int timeout)
+store_many(int fd, unsigned int ring, int num_children, int timeout)
 {
+	struct intel_engine_data ied;
 	unsigned long *shared;
-	const char *names[16];
-	int n = 0;
 
 	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(shared != MAP_FAILED);
 
+	ied = list_store_engines(fd, ring);
+	igt_require(ied.nengines);
+
 	intel_detect_and_clear_missed_interrupts(fd);
 
-	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
-			if (!gem_can_store_dword(fd, eb_ring(e)))
-				continue;
-
-			igt_fork(child, 1)
-				__store_many(fd,
-					     eb_ring(e),
-					     timeout,
-					     &shared[n]);
-
-			names[n++] = e->name;
-		}
-		igt_waitchildren();
-	} else {
-		gem_require_ring(fd, ring);
-		igt_require(gem_can_store_dword(fd, ring));
-		__store_many(fd, ring, timeout, &shared[n]);
-		names[n++] = NULL;
+	for (int n = 0; n < ied.nengines; n++) {
+		igt_fork(child, 1)
+			__store_many(fd,
+				     ied_flags(&ied, n),
+				     timeout,
+				     &shared[n]);
 	}
+	igt_waitchildren();
 
-	for (int i = 0; i < n; i++) {
-		igt_info("%s%sompleted %ld cycles\n",
-			 names[i] ?: "", names[i] ? " c" : "C", shared[i]);
+	for (int n = 0; n < ied.nengines; n++) {
+		igt_info("%s completed %ld cycles\n",
+			 ied_name(&ied, n), shared[n]);
 	}
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 	munmap(shared, 4096);
@@ -974,15 +930,10 @@ store_many(int fd, unsigned ring, int timeout)
 static void
 sync_all(int fd, int num_children, int timeout)
 {
-	unsigned engines[16];
-	int num_engines = 0;
+	struct intel_engine_data ied;
 
-	for_each_physical_engine(e, fd) {
-		engines[num_engines++] = eb_ring(e);
-		if (num_engines == ARRAY_SIZE(engines))
-			break;
-	}
-	igt_require(num_engines);
+	ied = list_engines(fd, ALL_ENGINES);
+	igt_require(ied.nengines);
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	igt_fork(child, num_children) {
@@ -1006,15 +957,15 @@ sync_all(int fd, int num_children, int timeout)
 		cycles = 0;
 		do {
 			do {
-				for (int n = 0; n < num_engines; n++) {
-					execbuf.flags = engines[n];
+				for (int n = 0; n < ied.nengines; n++) {
+					execbuf.flags = ied_flags(&ied, n);
 					gem_execbuf(fd, &execbuf);
 				}
 				gem_sync(fd, object.handle);
 			} while (++cycles & 1023);
 		} while ((elapsed = gettime() - start) < timeout);
 		igt_info("Completed %ld cycles: %.3f us\n",
-			 cycles, elapsed*1e6/cycles);
+			 cycles, elapsed * 1e6 / cycles);
 
 		gem_close(fd, object.handle);
 	}
@@ -1026,18 +977,10 @@ static void
 store_all(int fd, int num_children, int timeout)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
-	unsigned engines[16];
-	int num_engines = 0;
+	struct intel_engine_data ied;
 
-	for_each_physical_engine(e, fd) {
-		if (!gem_can_store_dword(fd, eb_ring(e)))
-			continue;
-
-		engines[num_engines++] = eb_ring(e);
-		if (num_engines == ARRAY_SIZE(engines))
-			break;
-	}
-	igt_require(num_engines);
+	ied = list_store_engines(fd, ALL_ENGINES);
+	igt_require(ied.nengines);
 
 	intel_detect_and_clear_missed_interrupts(fd);
 	igt_fork(child, num_children) {
@@ -1069,9 +1012,9 @@ store_all(int fd, int num_children, int timeout)
 		object[1].relocation_count = 1024;
 
 		batch = gem_mmap__cpu(fd, object[1].handle, 0, 16*1024 + 4096,
-				PROT_WRITE | PROT_READ);
+				      PROT_WRITE | PROT_READ);
 		gem_set_domain(fd, object[1].handle,
-				I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+			       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 		memset(reloc, 0, sizeof(reloc));
 		b = batch;
@@ -1110,17 +1053,17 @@ store_all(int fd, int num_children, int timeout)
 		cycles = 0;
 		do {
 			do {
-				igt_permute_array(engines, num_engines, xchg);
-				for (int n = 0; n < num_engines; n++) {
+				igt_permute_array(ied.engines, ied.nengines, xchg_engine);
+				for (int n = 0; n < ied.nengines; n++) {
 					execbuf.flags &= ~ENGINE_MASK;
-					execbuf.flags |= engines[n];
+					execbuf.flags |= ied_flags(&ied, n);
 					gem_execbuf(fd, &execbuf);
 				}
 				gem_sync(fd, object[1].handle);
 			} while (++cycles & 1023);
 		} while ((elapsed = gettime() - start) < timeout);
 		igt_info("Completed %ld cycles: %.3f us\n",
-			 cycles, elapsed*1e6/cycles);
+			 cycles, elapsed * 1e6 / cycles);
 
 		gem_close(fd, object[1].handle);
 		gem_close(fd, object[0].handle);
@@ -1132,25 +1075,12 @@ store_all(int fd, int num_children, int timeout)
 static void
 preempt(int fd, unsigned ring, int num_children, int timeout)
 {
-	unsigned engines[16];
-	const char *names[16];
-	int num_engines = 0;
+	struct intel_engine_data ied;
 	uint32_t ctx[2];
 
-	if (ring == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
-			names[num_engines] = e->name;
-			engines[num_engines++] = eb_ring(e);
-			if (num_engines == ARRAY_SIZE(engines))
-				break;
-		}
-
-		num_children *= num_engines;
-	} else {
-		gem_require_ring(fd, ring);
-		names[num_engines] = NULL;
-		engines[num_engines++] = ring;
-	}
+	ied = list_engines(fd, ALL_ENGINES);
+	igt_require(ied.nengines);
+	num_children *= ied.nengines;
 
 	ctx[0] = gem_context_create(fd);
 	gem_context_set_priority(fd, ctx[0], MIN_PRIO);
@@ -1173,7 +1103,7 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(&object);
 		execbuf.buffer_count = 1;
-		execbuf.flags = engines[child % num_engines];
+		execbuf.flags = ied_flags(&ied, child);
 		execbuf.rsvd1 = ctx[1];
 		gem_execbuf(fd, &execbuf);
 		gem_sync(fd, object.handle);
@@ -1193,10 +1123,9 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 
 			igt_spin_free(fd, spin);
 		} while ((elapsed = gettime() - start) < timeout);
-		igt_info("%s%sompleted %ld cycles: %.3f us\n",
-			 names[child % num_engines] ?: "",
-			 names[child % num_engines] ? " c" : "C",
-			 cycles, elapsed*1e6/cycles);
+
+		igt_info("%s %ld cycles: %.3f us\n",
+			 ied_name(&ied, child), cycles, elapsed * 1e6/cycles);
 
 		gem_close(fd, object.handle);
 	}
@@ -1209,8 +1138,44 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	const struct {
+		const char *name;
+		void (*func)(int fd, unsigned int engine,
+			     int num_children, int timeout);
+		int num_children;
+		int timeout;
+	} all[] = {
+		{ "basic-each", sync_ring, 1, 2 },
+		{ "basic-store-each", store_ring, 1, 2 },
+		{ "basic-many-each", store_many, 0, 2 },
+		{ "switch-each", switch_ring, 1, 20 },
+		{ "forked-switch-each", switch_ring, ncpus, 20 },
+		{ "forked-each", sync_ring, ncpus, 20 },
+		{ "forked-store-each", store_ring, ncpus, 20 },
+		{ "active-each", active_ring, 0, 20 },
+		{ "wakeup-each", wakeup_ring, 20, 1 },
+		{ "active-wakeup-each", active_wakeup_ring, 20, 1 },
+		{ "double-wakeup-each", wakeup_ring, 20, 2 },
+		{}
+	}, individual[] = {
+		{ "default", sync_ring, 1, 20 },
+		{ "idle", idle_ring, 0, 20 },
+		{ "active", active_ring, 0, 20 },
+		{ "wakeup", wakeup_ring, 20, 1 },
+		{ "active-wakeup", active_wakeup_ring, 20, 1 },
+		{ "double-wakeup", wakeup_ring, 20, 2 },
+		{ "store", store_ring, 1, 20 },
+		{ "switch", switch_ring, 1, 20 },
+		{ "forked-switch", switch_ring, ncpus, 20 },
+		{ "many", store_many, 0, 20 },
+		{ "forked", sync_ring, ncpus, 20 },
+		{ "forked-store", store_ring, ncpus, 20 },
+		{}
+	};
+#define for_each_test(t, T) for(typeof(*T) *t = T; t->name; t++)
+
+	const struct intel_execution_engine2 *e;
 	int fd = -1;
 
 	igt_fixture {
@@ -1222,55 +1187,17 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	for (e = intel_execution_engines; e->name; e++) {
-		igt_subtest_f("%s", e->name)
-			sync_ring(fd, eb_ring(e), 1, 20);
-		igt_subtest_f("idle-%s", e->name)
-			idle_ring(fd, eb_ring(e), 20);
-		igt_subtest_f("active-%s", e->name)
-			active_ring(fd, eb_ring(e), 20);
-		igt_subtest_f("wakeup-%s", e->name)
-			wakeup_ring(fd, eb_ring(e), 20, 1);
-		igt_subtest_f("active-wakeup-%s", e->name)
-			active_wakeup_ring(fd, eb_ring(e), 20, 1);
-		igt_subtest_f("double-wakeup-%s", e->name)
-			wakeup_ring(fd, eb_ring(e), 20, 2);
-		igt_subtest_f("store-%s", e->name)
-			store_ring(fd, eb_ring(e), 1, 20);
-		igt_subtest_f("switch-%s", e->name)
-			switch_ring(fd, eb_ring(e), 1, 20);
-		igt_subtest_f("forked-switch-%s", e->name)
-			switch_ring(fd, eb_ring(e), ncpus, 20);
-		igt_subtest_f("many-%s", e->name)
-			store_many(fd, eb_ring(e), 20);
-		igt_subtest_f("forked-%s", e->name)
-			sync_ring(fd, eb_ring(e), ncpus, 20);
-		igt_subtest_f("forked-store-%s", e->name)
-			store_ring(fd, eb_ring(e), ncpus, 20);
+	/* Legacy for selecting rings. */
+	for_each_test(t, individual) {
+		igt_subtest_with_dynamic_f("%s", t->name) {
+			for (const struct intel_execution_engine *l = intel_execution_engines; l->name; l++) {
+				igt_dynamic_f("%s", l->name) {
+					t->func(fd, eb_ring(l),
+						t->num_children, t->timeout);
+				}
+			}
+		}
 	}
-
-	igt_subtest("basic-each")
-		sync_ring(fd, ALL_ENGINES, 1, 2);
-	igt_subtest("basic-store-each")
-		store_ring(fd, ALL_ENGINES, 1, 2);
-	igt_subtest("basic-many-each")
-		store_many(fd, ALL_ENGINES, 2);
-	igt_subtest("switch-each")
-		switch_ring(fd, ALL_ENGINES, 1, 20);
-	igt_subtest("forked-switch-each")
-		switch_ring(fd, ALL_ENGINES, ncpus, 20);
-	igt_subtest("forked-each")
-		sync_ring(fd, ALL_ENGINES, ncpus, 20);
-	igt_subtest("forked-store-each")
-		store_ring(fd, ALL_ENGINES, ncpus, 20);
-	igt_subtest("active-each")
-		active_ring(fd, ALL_ENGINES, 20);
-	igt_subtest("wakeup-each")
-		wakeup_ring(fd, ALL_ENGINES, 20, 1);
-	igt_subtest("active-wakeup-each")
-		active_wakeup_ring(fd, ALL_ENGINES, 20, 1);
-	igt_subtest("double-wakeup-each")
-		wakeup_ring(fd, ALL_ENGINES, 20, 2);
 
 	igt_subtest("basic-all")
 		sync_all(fd, 1, 2);
@@ -1286,6 +1213,23 @@ igt_main
 	igt_subtest("forked-store-all")
 		store_all(fd, ncpus, 20);
 
+	for_each_test(t, all) {
+		igt_subtest_f("%s", t->name)
+			t->func(fd, ALL_ENGINES, t->num_children, t->timeout);
+	}
+
+	/* New way of selecting engines. */
+	for_each_test(t, individual) {
+		igt_subtest_with_dynamic_f("%s", t->name) {
+			__for_each_physical_engine(fd, e) {
+				igt_dynamic_f("%s", e->name) {
+					t->func(fd, e->flags,
+						t->num_children, t->timeout);
+				}
+			}
+		}
+	}
+
 	igt_subtest_group {
 		igt_fixture {
 			gem_require_contexts(fd);
@@ -1295,10 +1239,11 @@ igt_main
 
 		igt_subtest("preempt-all")
 			preempt(fd, ALL_ENGINES, 1, 20);
-
-		for (e = intel_execution_engines; e->name; e++) {
-			igt_subtest_f("preempt-%s", e->name)
-				preempt(fd, eb_ring(e), ncpus, 20);
+		igt_subtest_with_dynamic("preempt") {
+			__for_each_physical_engine(fd, e) {
+				igt_dynamic_f("%s", e->name)
+					preempt(fd, e->flags, ncpus, 20);
+			}
 		}
 	}
 
