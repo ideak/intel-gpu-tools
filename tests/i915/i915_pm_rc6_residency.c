@@ -334,11 +334,11 @@ static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 			igt_drop_caches_set(i915, DROP_IDLE);
 
 		elapsed = igt_nsec_elapsed(&tv);
-		igt_info("Pulse took %.3fms (submit %.1fus, wait %.1fus, idle %.1fus)\n",
-			 1e-6 * elapsed,
-			 1e-3 * submit,
-			 1e-3 * (wait - submit),
-			 1e-3 * (elapsed - wait));
+		igt_debug("Pulse took %.3fms (submit %.1fus, wait %.1fus, idle %.1fus)\n",
+			  1e-6 * elapsed,
+			  1e-3 * submit,
+			  1e-3 * (wait - submit),
+			  1e-3 * (elapsed - wait));
 		ctl[1]++;
 
 		/* aim for ~1% busy */
