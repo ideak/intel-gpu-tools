@@ -114,9 +114,11 @@ igt_simple_main
 	
 	fd = drm_open_driver(DRIVER_INTEL);
 	igt_require(gem_available_fences(fd) > 0);
-	count = SLOW_QUICK(intel_get_total_ram_mb() * 9 / 10, 8) ;
 
-	for (int i = 0; i < count/2; i++) {
+	count = gem_available_fences(fd) + 1;
+	intel_require_memory(2 * count, sizeof(linear), CHECK_RAM);
+
+	for (int i = 0; i < count; i++) {
 		uint32_t handle, handle_target;
 		char *data;
 		int n;
@@ -149,8 +151,6 @@ igt_simple_main
 		/* Leak both bos so that we use all of system mem! */
 		gem_madvise(fd, handle_target, I915_MADV_DONTNEED);
 		gem_madvise(fd, handle, I915_MADV_DONTNEED);
-
-		igt_progress("gem_tiled_pread_pwrite: ", i, count/2);
 	}
 
 	close(fd);
