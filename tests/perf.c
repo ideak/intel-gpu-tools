@@ -4147,27 +4147,35 @@ test_rc6_disable(void)
 		.num_properties = sizeof(properties) / 16,
 		.properties_ptr = to_user_pointer(properties),
 	};
-	unsigned long n_events_start, n_events_end;
-	unsigned long rc6_enabled;
+	unsigned long rc6_start, rc6_end, rc6_enabled;
 
 	rc6_enabled = 0;
 	igt_sysfs_scanf(sysfs, "power/rc6_enable", "%lu", &rc6_enabled);
 	igt_require(rc6_enabled);
 
+	/* Verify rc6 is functional by measuring residency while idle */
+	gem_quiescent_gpu(drm_fd);
+	rc6_start = rc6_residency_ms();
+	usleep(50000);
+	rc6_end = rc6_residency_ms();
+	igt_require(rc6_end != rc6_start);
+
+	/* While OA is active, we keep rc6 disabled so we don't lose metrics */
 	stream_fd = __perf_open(drm_fd, &param, false);
 
-	n_events_start = rc6_residency_ms();
-	nanosleep(&(struct timespec){ .tv_sec = 0, .tv_nsec = 500000000 }, NULL);
-	n_events_end = rc6_residency_ms();
-	igt_assert_eq(n_events_end - n_events_start, 0);
+	rc6_start = rc6_residency_ms();
+	usleep(50000);
+	rc6_end = rc6_residency_ms();
+	igt_assert_eq(rc6_end - rc6_start, 0);
 
 	__perf_close(stream_fd);
 	gem_quiescent_gpu(drm_fd);
 
-	n_events_start = rc6_residency_ms();
-	nanosleep(&(struct timespec){ .tv_sec = 1, .tv_nsec = 0 }, NULL);
-	n_events_end = rc6_residency_ms();
-	igt_assert_neq(n_events_end - n_events_start, 0);
+	/* But once OA is closed, we expect the device to sleep again */
+	rc6_start = rc6_residency_ms();
+	usleep(50000);
+	rc6_end = rc6_residency_ms();
+	igt_assert_neq(rc6_end - rc6_start, 0);
 }
 
 static void
