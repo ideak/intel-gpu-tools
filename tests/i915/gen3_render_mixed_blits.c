@@ -336,36 +336,17 @@ check_bo(int fd, uint32_t handle, uint32_t val)
 	munmap(v, WIDTH*HEIGHT*4);
 }
 
-int count;
-
-static int opt_handler(int opt, int opt_index, void *data)
-{
-	switch (opt) {
-	case 'c':
-		count = atoi(optarg);
-		break;
-	default:
-		return IGT_OPT_HANDLER_ERROR;
-	}
-
-	return IGT_OPT_HANDLER_SUCCESS;
-}
-
-const char *help_str = "  -c\tBuffer count\n";
-
-igt_simple_main_args("c:", NULL, help_str, opt_handler, NULL)
+igt_simple_main
 {
 	uint32_t *handle, *tiling, *start_val;
 	uint32_t start = 0;
-	int i, fd;
+	int i, fd, count;
 
 	fd = drm_open_driver(DRIVER_INTEL);
-
 	igt_require(IS_GEN3(intel_get_drm_devid(fd)));
+	igt_require_gem(fd);
 
-	if (count == 0)
-		count = 3 * gem_aperture_size(fd) / (1024*1024) / 2;
-	igt_info("Using %d 1MiB buffers\n", count);
+	count = 3 + gem_aperture_size(fd) / (1024 * 1024);
 	intel_require_memory(count, 1024*1024, CHECK_RAM);
 
 	handle = malloc(sizeof(uint32_t)*count*3);
@@ -378,39 +359,7 @@ igt_simple_main_args("c:", NULL, help_str, opt_handler, NULL)
 		start += 1024 * 1024 / 4;
 	}
 
-	igt_info("Verifying initialisation..."); fflush(stdout);
-	for (i = 0; i < count; i++)
-		check_bo(fd, handle[i], start_val[i]);
-	igt_info("done\n");
-
-	igt_info("Cyclic blits, forward..."); fflush(stdout);
-	for (i = 0; i < count * 32; i++) {
-		int src = i % count;
-		int dst = (i + 1) % count;
-
-		copy(fd, handle[dst], tiling[dst], handle[src], tiling[src]);
-		start_val[dst] = start_val[src];
-	}
-	igt_info("verifying..."); fflush(stdout);
-	for (i = 0; i < count; i++)
-		check_bo(fd, handle[i], start_val[i]);
-	igt_info("done\n");
-
-	igt_info("Cyclic blits, backward..."); fflush(stdout);
-	for (i = 0; i < count * 32; i++) {
-		int src = (i + 1) % count;
-		int dst = i % count;
-
-		copy(fd, handle[dst], tiling[dst], handle[src], tiling[src]);
-		start_val[dst] = start_val[src];
-	}
-	igt_info("verifying..."); fflush(stdout);
-	for (i = 0; i < count; i++)
-		check_bo(fd, handle[i], start_val[i]);
-	igt_info("done\n");
-
-	igt_info("Random blits..."); fflush(stdout);
-	for (i = 0; i < count * 32; i++) {
+	for (i = 0; i < count; i++) {
 		int src = random() % count;
 		int dst = random() % count;
 
@@ -420,8 +369,7 @@ igt_simple_main_args("c:", NULL, help_str, opt_handler, NULL)
 		copy(fd, handle[dst], tiling[dst], handle[src], tiling[src]);
 		start_val[dst] = start_val[src];
 	}
-	igt_info("verifying..."); fflush(stdout);
+
 	for (i = 0; i < count; i++)
 		check_bo(fd, handle[i], start_val[i]);
-	igt_info("done\n");
 }
