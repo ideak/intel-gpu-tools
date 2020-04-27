@@ -1151,7 +1151,7 @@ __get_ctx(struct workload *wrk, const struct w_step *w)
 }
 
 static unsigned long
-get_bb_sz(const struct w_step *w, unsigned int duration)
+__get_bb_sz(const struct w_step *w, unsigned int duration)
 {
 	enum intel_engine_id engine = w->engine;
 	struct ctx *ctx = __get_ctx(w->wrk, w);
@@ -1165,6 +1165,15 @@ get_bb_sz(const struct w_step *w, unsigned int duration)
 	d = ALIGN(duration * engine_calib_map[engine] * sizeof(uint32_t) /
 		  nop_calibration_us,
 		  sizeof(uint32_t));
+
+	return d;
+}
+
+static unsigned long
+get_bb_sz(const struct w_step *w, unsigned int duration)
+{
+	unsigned long d = __get_bb_sz(w, duration);
+
 	igt_assert(d);
 
 	return d;
@@ -1174,7 +1183,7 @@ static void
 init_bb(struct w_step *w, unsigned int flags)
 {
 	const unsigned int arb_period =
-			get_bb_sz(w, w->preempt_us) / sizeof(uint32_t);
+			__get_bb_sz(w, w->preempt_us) / sizeof(uint32_t);
 	const unsigned int mmap_len = ALIGN(w->bb_sz, 4096);
 	unsigned int i;
 	uint32_t *ptr;
@@ -1395,7 +1404,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 
 	if (w->unbound_duration)
 		/* nops + MI_ARB_CHK + MI_BATCH_BUFFER_START */
-		w->bb_sz = max(PAGE_SIZE, get_bb_sz(w, w->preempt_us)) +
+		w->bb_sz = max(PAGE_SIZE, __get_bb_sz(w, w->preempt_us)) +
 			   (1 + 3) * sizeof(uint32_t);
 	else
 		w->bb_sz = get_bb_sz(w, w->duration.max);
