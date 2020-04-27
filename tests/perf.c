@@ -3002,7 +3002,7 @@ gen12_test_mi_rpc(void)
 	 */
 	igt_assert_eq(report32[0], REPORT_ID);
 	igt_assert_neq(report32[1], 0);
-	igt_assert_eq(report32[format.b_off >> 2], 0);
+	igt_assert_neq(report32[format.b_off >> 2], 0x80808080);
 	igt_assert_eq(report32[format_size_32], 0x80808080);
 
 	drm_intel_bo_unmap(bo);
