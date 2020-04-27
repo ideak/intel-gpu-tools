@@ -132,7 +132,6 @@ int gem_gpu_reset_type(int fd);
 bool gem_gpu_reset_enabled(int fd);
 bool gem_engine_reset_enabled(int fd);
 int gem_available_fences(int fd);
-uint64_t gem_total_mappable_size(int fd);
 uint64_t gem_total_stolen_size(int fd);
 uint64_t gem_available_aperture_size(int fd);
 uint64_t gem_aperture_size(int fd);
