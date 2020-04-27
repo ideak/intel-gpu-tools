@@ -120,6 +120,11 @@ static void addfb_init(struct igt_fb *fb, struct drm_mode_fb_cmd2 *f)
 	}
 }
 
+static bool is_ccs_cc_modifier(uint64_t modifier)
+{
+	return modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC;
+}
+
 /*
  * The CCS planes of compressed framebuffers contain non-zero bytes if the
  * engine compressed effectively the framebuffer. The actual encoding of these
@@ -155,7 +160,36 @@ static void check_ccs_plane(int drm_fd, igt_fb_t *fb, int plane)
 		     plane, igt_fb_ccs_to_main_plane(fb, plane));
 }
 
-static void check_all_ccs_planes(int drm_fd, igt_fb_t *fb)
+static void check_ccs_cc_plane(int drm_fd, igt_fb_t *fb, int plane, const float *cc_color)
+{
+	union cc {
+		float f;
+		uint32_t d;
+	} *cc_p;
+	void *map;
+	uint32_t native_color;
+
+	gem_set_domain(drm_fd, fb->gem_handle, I915_GEM_DOMAIN_CPU, 0);
+
+	map = gem_mmap__cpu(drm_fd, fb->gem_handle, 0, fb->size, PROT_READ);
+	cc_p = map + fb->offsets[plane];
+
+	igt_assert(cc_color[0] == cc_p[0].f &&
+		   cc_color[1] == cc_p[1].f &&
+		   cc_color[2] == cc_p[2].f &&
+		   cc_color[3] == cc_p[3].f);
+
+	native_color = (uint8_t)(cc_color[3] * 0xff) << 24 |
+		       (uint8_t)(cc_color[0] * 0xff) << 16 |
+		       (uint8_t)(cc_color[1] * 0xff) << 8 |
+		       (uint8_t)(cc_color[2] * 0xff);
+
+	igt_assert(native_color == cc_p[4].d);
+
+	munmap(map, fb->size);
+};
+
+static void check_all_ccs_planes(int drm_fd, igt_fb_t *fb, const float *cc_color)
 {
 	int i;
 
@@ -163,6 +197,8 @@ static void check_all_ccs_planes(int drm_fd, igt_fb_t *fb)
 		if (igt_fb_is_ccs_plane(fb, i) &&
 		    !igt_fb_is_gen12_ccs_cc_plane(fb, i))
 			check_ccs_plane(drm_fd, fb, i);
+		else if (igt_fb_is_gen12_ccs_cc_plane(fb, i))
+			check_ccs_cc_plane(drm_fd, fb, i, cc_color);
 	}
 }
 
@@ -176,6 +212,24 @@ static int get_ccs_plane_index(uint32_t format)
 	return index;
 }
 
+static void fast_clear_fb(int drm_fd, struct igt_fb *fb, const float *cc_color)
+{
+	igt_render_clearfunc_t fast_clear = igt_get_render_clearfunc(intel_get_drm_devid(drm_fd));
+	struct intel_bb *ibb = intel_bb_create(drm_fd, 4096);
+	struct buf_ops *bops = buf_ops_create(drm_fd);
+	struct intel_buf *dst = igt_fb_create_intel_buf(drm_fd, bops, fb, "fast clear dst");
+
+	gem_set_domain(drm_fd, fb->gem_handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
+	fast_clear(ibb, dst, 0, 0, fb->width, fb->height, cc_color);
+
+	intel_bb_sync(ibb);
+	intel_bb_destroy(ibb);
+	intel_buf_destroy(dst);
+	buf_ops_destroy(bops);
+}
+
 static void generate_fb(data_t *data, struct igt_fb *fb,
 			int width, int height,
 			enum test_fb_flags fb_flags)
@@ -186,6 +240,10 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	cairo_t *cr;
 	int index;
 	int ret;
+	const float cc_color[4] = {colors[!!data->plane].r,
+				   colors[!!data->plane].g,
+				   colors[!!data->plane].b,
+				   1.0};
 
 	/* Use either compressed or Y-tiled to test. However, given the lack of
 	 * available bandwidth, we use linear for the primary plane when
@@ -246,10 +304,14 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	if (!(data->flags & TEST_BAD_PIXEL_FORMAT)) {
 		int c = !!data->plane;
 
-		cr = igt_get_cairo_ctx(data->drm_fd, fb);
-		igt_paint_color(cr, 0, 0, width, height,
-				colors[c].r, colors[c].g, colors[c].b);
-		igt_put_cairo_ctx(cr);
+		if (is_ccs_cc_modifier(modifier)) {
+			fast_clear_fb(data->drm_fd, fb, cc_color);
+		} else {
+			cr = igt_get_cairo_ctx(data->drm_fd, fb);
+			igt_paint_color(cr, 0, 0, width, height,
+					colors[c].r, colors[c].g, colors[c].b);
+					igt_put_cairo_ctx(cr);
+		}
 	}
 
 	ret = drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f);
@@ -261,7 +323,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		igt_assert_eq(ret, 0);
 
 	if (check_ccs_planes)
-		check_all_ccs_planes(data->drm_fd, fb);
+		check_all_ccs_planes(data->drm_fd, fb, cc_color);
 
 	fb->fb_id = f.fb_id;
 }
@@ -311,6 +373,10 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 
 	if (!igt_plane_has_format_mod(primary, data->format,
 				      data->ccs_modifier))
+		return false;
+
+	if (is_ccs_cc_modifier(data->ccs_modifier) &&
+	    data->format != DRM_FORMAT_XRGB8888)
 		return false;
 
 	if ((fb_flags & FB_MISALIGN_AUX_STRIDE) ||
