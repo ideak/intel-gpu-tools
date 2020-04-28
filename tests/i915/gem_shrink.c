@@ -225,7 +225,7 @@ static void hang(int fd, uint64_t alloc)
 static void userptr(int fd, uint64_t alloc, unsigned int flags)
 #define UDIRTY (1 << 0)
 {
-	struct local_i915_gem_userptr userptr;
+	struct drm_i915_gem_userptr userptr;
 	void *ptr;
 
 	igt_assert((alloc & 4095) == 0);
@@ -238,7 +238,7 @@ static void userptr(int fd, uint64_t alloc, unsigned int flags)
 	memset(&userptr, 0, sizeof(userptr));
 	userptr.user_size = alloc;
 	userptr.user_ptr = to_user_pointer(ptr);
-	do_ioctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr);
+	do_ioctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr);
 
 	if (flags & UDIRTY)
 		gem_set_domain(fd, userptr.handle,
@@ -251,7 +251,7 @@ static void userptr(int fd, uint64_t alloc, unsigned int flags)
 
 static bool has_userptr(void)
 {
-	struct local_i915_gem_userptr userptr;
+	struct drm_i915_gem_userptr userptr;
 	int fd = drm_open_driver(DRIVER_INTEL);
 	int err;
 
@@ -260,7 +260,7 @@ static bool has_userptr(void)
 	userptr.user_ptr = -4096;
 
 	err = 0;
-	if (drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr))
+	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr))
 		err = errno;
 
 	close(fd);

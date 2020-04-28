@@ -31,16 +31,10 @@
 #include "igt.h"
 #include "igt_sysfs.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
+#define MAX_PRIO I915_CONTEXT_MAX_USER_PRIORITY
+#define MIN_PRIO I915_CONTEXT_MIN_USER_PRIORITY
 
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define MAX_PRIO LOCAL_I915_CONTEXT_MAX_USER_PRIORITY
-#define MIN_PRIO LOCAL_I915_CONTEXT_MIN_USER_PRIORITY
-
-#define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+#define ENGINE_MASK  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 IGT_TEST_DESCRIPTION("Basic check of ring<->ring write synchronisation.");
 
@@ -517,8 +511,8 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(object);
 		execbuf.flags = ied_flags(&ied, child);
-		execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
-		execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+		execbuf.flags |= I915_EXEC_NO_RELOC;
+		execbuf.flags |= I915_EXEC_HANDLE_LUT;
 		if (gen < 6)
 			execbuf.flags |= I915_EXEC_SECURE;
 
@@ -621,8 +615,8 @@ switch_ring(int fd, unsigned ring, int num_children, int timeout)
 			memset(&c->execbuf, 0, sizeof(c->execbuf));
 			c->execbuf.buffers_ptr = to_user_pointer(c->object);
 			c->execbuf.flags = ied_flags(&ied, child);
-			c->execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
-			c->execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+			c->execbuf.flags |= I915_EXEC_NO_RELOC;
+			c->execbuf.flags |= I915_EXEC_HANDLE_LUT;
 			if (gen < 6)
 				c->execbuf.flags |= I915_EXEC_SECURE;
 			c->execbuf.rsvd1 = gem_context_create(fd);
@@ -785,8 +779,8 @@ __store_many(int fd, unsigned ring, int timeout, unsigned long *cycles)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(object);
 	execbuf.flags = ring;
-	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
-	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_NO_RELOC;
+	execbuf.flags |= I915_EXEC_HANDLE_LUT;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 
@@ -995,8 +989,8 @@ store_all(int fd, int num_children, int timeout)
 
 		memset(&execbuf, 0, sizeof(execbuf));
 		execbuf.buffers_ptr = to_user_pointer(object);
-		execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
-		execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+		execbuf.flags |= I915_EXEC_NO_RELOC;
+		execbuf.flags |= I915_EXEC_HANDLE_LUT;
 		if (gen < 6)
 			execbuf.flags |= I915_EXEC_SECURE;
 

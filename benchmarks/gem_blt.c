@@ -42,9 +42,6 @@
 
 #include "drm.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
 #define COPY_BLT_CMD		(2<<29|0x53<<22|0x6)
 #define BLT_WRITE_ALPHA		(1<<21)
 #define BLT_WRITE_RGB		(1<<20)
@@ -229,7 +226,7 @@ static int run(int object, int batch, int time, int reps, int ncpus, unsigned fl
 	execbuf.buffer_count = 3;
 	execbuf.batch_len = len;
 	execbuf.flags = ring;
-	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_HANDLE_LUT;
 
 	if (__gem_execbuf(fd, &execbuf)) {
 		gem_set_domain(fd, handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
@@ -241,7 +238,7 @@ static int run(int object, int batch, int time, int reps, int ncpus, unsigned fl
 	gem_sync(fd, handle);
 
 	if (batch > 1) {
-		if (execbuf.flags & LOCAL_I915_EXEC_HANDLE_LUT) {
+		if (execbuf.flags & I915_EXEC_HANDLE_LUT) {
 			src = 0;
 			dst = 1;
 		}
@@ -258,8 +255,8 @@ static int run(int object, int batch, int time, int reps, int ncpus, unsigned fl
 		gem_execbuf(fd, &execbuf);
 		gem_sync(fd, handle);
 	}
-	if (execbuf.flags & LOCAL_I915_EXEC_HANDLE_LUT)
-		execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	if (execbuf.flags & I915_EXEC_HANDLE_LUT)
+		execbuf.flags |= I915_EXEC_NO_RELOC;
 
 	/* Guess how many loops we need for 0.1s */
 	count = baseline((uint64_t)object * batch, 100) / ncpus;

@@ -33,13 +33,7 @@
 #include "igt.h"
 #include "igt_gt.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+#define ENGINE_MASK  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 #define VERIFY 0
 
@@ -122,8 +116,8 @@ static void *thread(void *data)
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
 	execbuf.flags = t->engine;
-	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
-	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	execbuf.flags |= I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_NO_RELOC;
 	if (t->gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
 	if (t->flags & CONTEXTS) {

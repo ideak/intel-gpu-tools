@@ -45,13 +45,7 @@
 #include "intel_reg.h"
 #include "igt_stats.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 #define SYNC 0x1
 #define WRITE 0x2
@@ -95,15 +89,15 @@ static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = (uintptr_t)obj;
 	execbuf.buffer_count = 2;
-	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
-	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	execbuf.flags |= I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_NO_RELOC;
 	if (__gem_execbuf(fd, &execbuf)) {
 		execbuf.flags = 0;
 		if (__gem_execbuf(fd, &execbuf))
 			return 77;
 	}
 
-	if (flags & WRITE && !(execbuf.flags & LOCAL_I915_EXEC_HANDLE_LUT))
+	if (flags & WRITE && !(execbuf.flags & I915_EXEC_HANDLE_LUT))
 		return 77;
 
 	all_nengine = 0;

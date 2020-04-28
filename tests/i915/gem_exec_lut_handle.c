@@ -43,11 +43,6 @@
 IGT_TEST_DESCRIPTION("Exercises the basic execbuffer using the handle LUT"
 		     " interface.");
 
-#define BATCH_SIZE		(1024*1024)
-
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
 #define MAX_NUM_EXEC 2048
 #define MAX_NUM_RELOC 4096
 
@@ -76,7 +71,7 @@ static int has_exec_lut(int fd)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer((gem_exec + MAX_NUM_EXEC));
 	execbuf.buffer_count = 1;
-	execbuf.flags = LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags = I915_EXEC_HANDLE_LUT;
 
 	return __gem_execbuf(fd, &execbuf) == 0;
 }
@@ -152,9 +147,9 @@ igt_simple_main
 				memset(&execbuf, 0, sizeof(execbuf));
 				execbuf.buffers_ptr = to_user_pointer(objects);
 				execbuf.buffer_count = n + 1;
-				execbuf.flags = LOCAL_I915_EXEC_HANDLE_LUT;
+				execbuf.flags = I915_EXEC_HANDLE_LUT;
 				if (p->flags & NO_RELOC)
-					execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+					execbuf.flags |= I915_EXEC_NO_RELOC;
 
 				for (j = 0; j < m; j++) {
 					target[j] = hars_petruska_f54_1_random() % n;
@@ -183,7 +178,7 @@ igt_simple_main
 				gem_exec[MAX_NUM_EXEC].handle = cycle[c];
 				elapsed[i][1] = ELAPSED(&start, &end);
 
-				execbuf.flags &= ~LOCAL_I915_EXEC_HANDLE_LUT;
+				execbuf.flags &= ~I915_EXEC_HANDLE_LUT;
 				for (j = 0; j < m; j++)
 					reloc[j].target_handle = objects[target[j]].handle;
 

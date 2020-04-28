@@ -102,16 +102,6 @@ int __gem_execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf);
 
 int gem_madvise(int fd, uint32_t handle, int state);
 
-#define LOCAL_I915_GEM_USERPTR       0x33
-#define LOCAL_IOCTL_I915_GEM_USERPTR DRM_IOWR (DRM_COMMAND_BASE + LOCAL_I915_GEM_USERPTR, struct local_i915_gem_userptr)
-struct local_i915_gem_userptr {
-	uint64_t user_ptr;
-	uint64_t user_size;
-	uint32_t flags;
-#define LOCAL_I915_USERPTR_READ_ONLY (1<<0)
-#define LOCAL_I915_USERPTR_UNSYNCHRONIZED (1<<31)
-	uint32_t handle;
-};
 void gem_userptr(int fd, void *ptr, uint64_t size, int read_only, uint32_t flags, uint32_t *handle);
 int __gem_userptr(int fd, void *ptr, uint64_t size, int read_only, uint32_t flags, uint32_t *handle);
 

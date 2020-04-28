@@ -70,9 +70,7 @@
 #define PAGE_SIZE 4096
 #endif
 
-#define LOCAL_EXEC_OBJECT_SUPPORTS_48B (1 << 3)
-
-static uint32_t userptr_flags = LOCAL_I915_USERPTR_UNSYNCHRONIZED;
+static uint32_t userptr_flags = I915_USERPTR_UNSYNCHRONIZED;
 
 static bool *can_mmap;
 
@@ -102,7 +100,7 @@ static bool has_mmap(int i915, const struct mmap_offset *t)
 	igt_assert(posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE) == 0);
 
 	if (__gem_userptr(i915, ptr, 4096, 0,
-			  LOCAL_I915_USERPTR_UNSYNCHRONIZED, &handle))
+			  I915_USERPTR_UNSYNCHRONIZED, &handle))
 		goto out_ptr;
 	igt_assert(handle != 0);
 
@@ -122,7 +120,7 @@ out_ptr:
 
 static void gem_userptr_test_unsynchronized(void)
 {
-	userptr_flags = LOCAL_I915_USERPTR_UNSYNCHRONIZED;
+	userptr_flags = I915_USERPTR_UNSYNCHRONIZED;
 }
 
 static void gem_userptr_test_synchronized(void)
@@ -191,19 +189,19 @@ static int copy(int fd, uint32_t dst, uint32_t src)
 	memset(obj, 0, sizeof(obj));
 
 	obj[exec.buffer_count].handle = dst;
-	obj[exec.buffer_count].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+	obj[exec.buffer_count].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	exec.buffer_count++;
 
 	if (src != dst) {
 		obj[exec.buffer_count].handle = src;
-		obj[exec.buffer_count].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+		obj[exec.buffer_count].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 		exec.buffer_count++;
 	}
 
 	obj[exec.buffer_count].handle = handle;
 	obj[exec.buffer_count].relocation_count = 2;
 	obj[exec.buffer_count].relocs_ptr = to_user_pointer(reloc);
-	obj[exec.buffer_count].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+	obj[exec.buffer_count].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	exec.buffer_count++;
 	exec.buffers_ptr = to_user_pointer(obj);
 	exec.flags = HAS_BLT_RING(intel_get_drm_devid(fd)) ? I915_EXEC_BLT : 0;
@@ -270,10 +268,10 @@ blit(int fd, uint32_t dst, uint32_t src, uint32_t *all_bo, int n_bo)
 	obj = calloc(n_bo + 1, sizeof(*obj));
 	for (n = 0; n < n_bo; n++) {
 		obj[n].handle = all_bo[n];
-		obj[n].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+		obj[n].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	}
 	obj[n].handle = handle;
-	obj[n].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+	obj[n].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	obj[n].relocation_count = 2;
 	obj[n].relocs_ptr = to_user_pointer(reloc);
 
@@ -516,7 +514,7 @@ static int has_userptr(int fd)
 
 static int test_input_checking(int fd)
 {
-	struct local_i915_gem_userptr userptr;
+	struct drm_i915_gem_userptr userptr;
 	int ret;
 
 	/* Invalid flags. */
@@ -524,7 +522,7 @@ static int test_input_checking(int fd)
 	userptr.user_ptr = 0;
 	userptr.user_size = 0;
 	userptr.flags = ~0;
-	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr);
+	ret = drmIoctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr);
 	igt_assert_neq(ret, 0);
 
 	/* Too big. */
@@ -532,7 +530,7 @@ static int test_input_checking(int fd)
 	userptr.user_ptr = 0;
 	userptr.user_size = ~0;
 	userptr.flags = 0;
-	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr);
+	ret = drmIoctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr);
 	igt_assert_neq(ret, 0);
 
 	/* Both wrong. */
@@ -540,7 +538,7 @@ static int test_input_checking(int fd)
 	userptr.user_ptr = 0;
 	userptr.user_size = ~0;
 	userptr.flags = ~0;
-	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr);
+	ret = drmIoctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr);
 	igt_assert_neq(ret, 0);
 
 	/* Zero user_size. */
@@ -548,7 +546,7 @@ static int test_input_checking(int fd)
 	userptr.user_ptr = 0;
 	userptr.user_size = 0;
 	userptr.flags = 0;
-	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr);
+	ret = drmIoctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr);
 	igt_assert_neq(ret, 0);
 
 	return 0;
@@ -1065,7 +1063,7 @@ static int test_dmabuf(void)
 	memset(get_handle_ptr(handle), counter, sizeof(linear));
 
 	ret = export_handle(fd1, handle, &dma_buf_fd);
-	if (userptr_flags & LOCAL_I915_USERPTR_UNSYNCHRONIZED && ret) {
+	if (userptr_flags & I915_USERPTR_UNSYNCHRONIZED && ret) {
 		igt_assert(ret == EINVAL || ret == ENODEV);
 		free_userptr_bo(fd1, handle);
 		close(fd1);
@@ -1131,7 +1129,7 @@ static void store_dword_rand(int i915, unsigned int engine,
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = target;
-	obj[0].flags = LOCAL_EXEC_OBJECT_SUPPORTS_48B;
+	obj[0].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	obj[1].handle = gem_create(i915, batchsz);
 	obj[1].relocation_count = count;
 	obj[1].relocs_ptr = to_user_pointer(reloc);

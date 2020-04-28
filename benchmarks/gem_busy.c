@@ -47,13 +47,7 @@
 #include "igt_stats.h"
 #include "i915/gem_mman.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 #define WRITE 0x1
 #define IDLE 0x2
@@ -62,12 +56,9 @@
 #define SYNC 0x10
 #define SYNCOBJ 0x20
 
-#define LOCAL_I915_EXEC_FENCE_ARRAY (1 << 19)
 struct local_gem_exec_fence {
 	uint32_t handle;
 	uint32_t flags;
-#define LOCAL_EXEC_FENCE_WAIT (1 << 0)
-#define LOCAL_EXEC_FENCE_SIGNAL (1 << 1)
 };
 
 static void gem_busy(int fd, uint32_t handle)
@@ -193,8 +184,8 @@ static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
-	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
-	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	execbuf.flags |= I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_NO_RELOC;
 	if (__gem_execbuf(fd, &execbuf)) {
 		execbuf.flags = 0;
 		if (__gem_execbuf(fd, &execbuf))
@@ -203,11 +194,11 @@ static int loop(unsigned ring, int reps, int ncpus, unsigned flags)
 
 	if (flags & SYNCOBJ) {
 		syncobj.handle = syncobj_create(fd);
-		syncobj.flags = LOCAL_EXEC_FENCE_SIGNAL;
+		syncobj.flags = I915_EXEC_FENCE_SIGNAL;
 
 		execbuf.cliprects_ptr = to_user_pointer(&syncobj);
 		execbuf.num_cliprects = 1;
-		execbuf.flags |= LOCAL_I915_EXEC_FENCE_ARRAY;
+		execbuf.flags |= I915_EXEC_FENCE_ARRAY;
 	}
 
 	if (ring == -1) {

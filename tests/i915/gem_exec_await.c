@@ -32,13 +32,7 @@
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 static double elapsed(const struct timespec *start, const struct timespec *end)
 {
@@ -108,8 +102,8 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 		exec[e].execbuf.buffers_ptr = to_user_pointer(exec[e].exec);
 		exec[e].execbuf.buffer_count = 1;
 		exec[e].execbuf.flags = (engines[e] |
-					 LOCAL_I915_EXEC_NO_RELOC |
-					 LOCAL_I915_EXEC_HANDLE_LUT);
+					 I915_EXEC_NO_RELOC |
+					 I915_EXEC_HANDLE_LUT);
 
 		if (flags & CONTEXTS) {
 			exec[e].execbuf.rsvd1 = gem_context_create(fd);
@@ -196,8 +190,8 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		for (unsigned e = 0; e < nengine; e++) {
 			execbuf.flags = (engines[e] |
-					 LOCAL_I915_EXEC_NO_RELOC |
-					 LOCAL_I915_EXEC_HANDLE_LUT);
+					 I915_EXEC_NO_RELOC |
+					 I915_EXEC_HANDLE_LUT);
 			gem_execbuf(fd, &execbuf);
 		}
 		clock_gettime(CLOCK_MONOTONIC, &now);

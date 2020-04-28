@@ -237,12 +237,12 @@ static void create_userptr_require(const struct create *create, unsigned count)
 		arg.user_ptr = -4096ULL;
 		arg.user_size = 8192;
 		errno = 0;
-		drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &arg);
+		drmIoctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &arg);
 		if (errno == EFAULT) {
 			igt_assert(posix_memalign((void **)&arg.user_ptr,
 						  4096, arg.user_size) == 0);
 			has_userptr = drmIoctl(fd,
-					 LOCAL_IOCTL_I915_GEM_USERPTR,
+					 DRM_IOCTL_I915_GEM_USERPTR,
 					 &arg) == 0;
 			free(from_user_pointer(arg.user_ptr));
 		}
@@ -254,7 +254,7 @@ static void create_userptr_require(const struct create *create, unsigned count)
 static drm_intel_bo *
 userptr_create_bo(const struct buffers *b)
 {
-	struct local_i915_gem_userptr userptr;
+	struct drm_i915_gem_userptr userptr;
 	drm_intel_bo *bo;
 	void *ptr;
 
@@ -267,7 +267,7 @@ userptr_create_bo(const struct buffers *b)
 	userptr.user_ptr = to_user_pointer(ptr);
 
 #if 0
-	do_or_die(drmIoctl(fd, LOCAL_IOCTL_I915_GEM_USERPTR, &userptr));
+	do_or_die(drmIoctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr));
 	bo = gem_handle_to_libdrm_bo(b->bufmgr, fd, "userptr", userptr.handle);
 	gem_close(fd, userptr.handle);
 #else

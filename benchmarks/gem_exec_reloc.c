@@ -42,9 +42,6 @@
 #include "drmtest.h"
 #include "i915/gem_mman.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
 #define SKIP_RELOC 0x1
 #define NO_RELOC 0x2
 #define CYCLE_BATCH 0x4
@@ -131,9 +128,9 @@ static int run(unsigned batch_size,
 	execbuf.buffers_ptr = (uintptr_t)objects;
 	execbuf.buffer_count = num_objects + 1;
 	if (flags & LUT)
-		execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
+		execbuf.flags |= I915_EXEC_HANDLE_LUT;
 	if (flags & NO_RELOC)
-		execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+		execbuf.flags |= I915_EXEC_NO_RELOC;
 
 	for (n = 0; n < num_relocs; n++) {
 		target[n] = hars_petruska_f54_1_random() % num_objects;

@@ -47,13 +47,7 @@
 #include "intel_reg.h"
 #include "igt_stats.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 static double elapsed(const struct timespec *start,
 		      const struct timespec *end)
@@ -88,8 +82,8 @@ static int loop(uint64_t size, unsigned ring, int reps, int ncpus, unsigned flag
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = (uintptr_t)&obj;
 	execbuf.buffer_count = 1;
-	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
-	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	execbuf.flags |= I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_NO_RELOC;
 	if (__gem_execbuf(fd, &execbuf)) {
 		execbuf.flags = 0;
 		if (__gem_execbuf(fd, &execbuf))

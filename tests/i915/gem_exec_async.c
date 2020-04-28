@@ -24,9 +24,6 @@
 #include "i915/gem.h"
 #include "igt.h"
 
-#define LOCAL_OBJECT_ASYNC (1 << 6)
-#define LOCAL_PARAM_HAS_EXEC_ASYNC 43
-
 IGT_TEST_DESCRIPTION("Check that we can issue concurrent writes across the engines.");
 
 static void store_dword(int fd, unsigned ring,
@@ -48,7 +45,7 @@ static void store_dword(int fd, unsigned ring,
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = target;
-	obj[0].flags = LOCAL_OBJECT_ASYNC;
+	obj[0].flags = EXEC_OBJECT_ASYNC;
 	obj[1].handle = gem_create(fd, 4096);
 
 	memset(&reloc, 0, sizeof(reloc));
@@ -123,7 +120,7 @@ static bool has_async_execbuf(int fd)
 	drm_i915_getparam_t gp;
 	int async = -1;
 
-	gp.param = LOCAL_PARAM_HAS_EXEC_ASYNC;
+	gp.param = I915_PARAM_HAS_EXEC_ASYNC;
 	gp.value = &async;
 	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
 

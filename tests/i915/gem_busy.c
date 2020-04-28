@@ -31,7 +31,6 @@
 #include "igt_rand.h"
 #include "igt_vgem.h"
 
-#define LOCAL_EXEC_NO_RELOC (1<<11)
 #define PAGE_ALIGN(x) ALIGN(x, 4096)
 
 /* Exercise the busy-ioctl, ensuring the ABI is never broken */

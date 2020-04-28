@@ -29,9 +29,6 @@
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 
-#define LOCAL_OBJECT_CAPTURE (1 << 7)
-#define LOCAL_PARAM_HAS_EXEC_CAPTURE 45
-
 IGT_TEST_DESCRIPTION("Check that we capture the user specified objects on a hang");
 
 static void check_error_state(int dir, struct drm_i915_gem_exec_object2 *obj)
@@ -78,7 +75,7 @@ static void __capture1(int fd, int dir, unsigned ring, uint32_t target)
 	memset(obj, 0, sizeof(obj));
 	obj[SCRATCH].handle = gem_create(fd, 4096);
 	obj[CAPTURE].handle = target;
-	obj[CAPTURE].flags = LOCAL_OBJECT_CAPTURE;
+	obj[CAPTURE].flags = EXEC_OBJECT_CAPTURE;
 	obj[NOCAPTURE].handle = gem_create(fd, 4096);
 
 	obj[BATCH].handle = gem_create(fd, 4096);
@@ -217,7 +214,7 @@ static struct offset {
 	for (i = 0; i < count; i++) {
 		obj[i + 1].handle = gem_create(fd, size);
 		obj[i + 1].flags =
-			LOCAL_OBJECT_CAPTURE | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+			EXEC_OBJECT_CAPTURE | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 		if (flags & INCREMENTAL) {
 			uint32_t *ptr;
 
@@ -513,7 +510,7 @@ static bool has_capture(int fd)
 	drm_i915_getparam_t gp;
 	int async = -1;
 
-	gp.param = LOCAL_PARAM_HAS_EXEC_CAPTURE;
+	gp.param = I915_PARAM_HAS_EXEC_CAPTURE;
 	gp.value = &async;
 	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
 

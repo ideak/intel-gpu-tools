@@ -58,13 +58,13 @@
   #define PAGE_SIZE 4096
 #endif
 
-static uint32_t userptr_flags = LOCAL_I915_USERPTR_UNSYNCHRONIZED;
+static uint32_t userptr_flags = I915_USERPTR_UNSYNCHRONIZED;
 
 #define BO_SIZE (65536)
 
 static void gem_userptr_test_unsynchronized(void)
 {
-	userptr_flags = LOCAL_I915_USERPTR_UNSYNCHRONIZED;
+	userptr_flags = I915_USERPTR_UNSYNCHRONIZED;
 }
 
 static void gem_userptr_test_synchronized(void)

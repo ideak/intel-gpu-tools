@@ -42,16 +42,6 @@
 #include "igt.h"
 #include "igt_device.h"
 
-#define LOCAL_I915_EXEC_VEBOX (4<<0)
-#define LOCAL_I915_EXEC_BSD_MASK (3<<13)
-#define LOCAL_I915_EXEC_BSD_RING1 (1<<13)
-#define LOCAL_I915_EXEC_BSD_RING2 (2<<13)
-#define LOCAL_I915_EXEC_RESOURCE_STREAMER (1<<15)
-#define LOCAL_I915_EXEC_FENCE_IN (1 << 16)
-#define LOCAL_I915_EXEC_FENCE_OUT (1 << 17)
-#define LOCAL_I915_EXEC_BATCH_FIRST (1 << 18)
-#define LOCAL_I915_EXEC_FENCE_ARRAY (1 << 19)
-
 static bool has_ring(int fd, unsigned ring_exec_flags)
 {
 	switch (ring_exec_flags & I915_EXEC_RING_MASK) {
@@ -60,7 +50,7 @@ static bool has_ring(int fd, unsigned ring_exec_flags)
 		return true;
 
 	case I915_EXEC_BSD:
-		if (ring_exec_flags & LOCAL_I915_EXEC_BSD_MASK)
+		if (ring_exec_flags & I915_EXEC_BSD_MASK)
 			return gem_has_bsd2(fd);
 		else
 			return gem_has_bsd(fd);
@@ -183,7 +173,7 @@ static void test_batch_first(int fd)
 	igt_assert_eq_u32(value, 2);
 
 	/* Batch first mode */
-	execbuf.flags |= LOCAL_I915_EXEC_BATCH_FIRST;
+	execbuf.flags |= I915_EXEC_BATCH_FIRST;
 	gem_execbuf(fd, &execbuf);
 	gem_read(fd, obj[1].handle, 0, &value, sizeof(value));
 	igt_assert_eq_u32(value, 1);
@@ -384,7 +374,7 @@ igt_main
 	}
 	igt_subtest("no-vebox") {
 		igt_require(!gem_has_vebox(fd));
-		execbuf.flags = LOCAL_I915_EXEC_VEBOX;
+		execbuf.flags = I915_EXEC_VEBOX;
 		RUN_FAIL(EINVAL);
 	}
 	igt_subtest("invalid-ring") {
@@ -393,45 +383,45 @@ igt_main
 	}
 
 	igt_subtest("invalid-ring2") {
-		execbuf.flags = LOCAL_I915_EXEC_VEBOX+1;
+		execbuf.flags = I915_EXEC_VEBOX+1;
 		RUN_FAIL(EINVAL);
 	}
 
 	igt_subtest("invalid-bsd-ring") {
 		igt_require(gem_has_bsd2(fd));
-		execbuf.flags = I915_EXEC_BSD | LOCAL_I915_EXEC_BSD_MASK;
+		execbuf.flags = I915_EXEC_BSD | I915_EXEC_BSD_MASK;
 		RUN_FAIL(EINVAL);
 	}
 
 	igt_subtest("invalid-bsd1-flag-on-render") {
-		execbuf.flags = I915_EXEC_RENDER | LOCAL_I915_EXEC_BSD_RING1;
+		execbuf.flags = I915_EXEC_RENDER | I915_EXEC_BSD_RING1;
 		RUN_FAIL(EINVAL);
 	}
 
 	igt_subtest("invalid-bsd2-flag-on-render") {
-		execbuf.flags = I915_EXEC_RENDER | LOCAL_I915_EXEC_BSD_RING2;
+		execbuf.flags = I915_EXEC_RENDER | I915_EXEC_BSD_RING2;
 		RUN_FAIL(EINVAL);
 	}
 
 	igt_subtest("invalid-bsd1-flag-on-blt") {
-		execbuf.flags = I915_EXEC_BLT | LOCAL_I915_EXEC_BSD_RING1;
+		execbuf.flags = I915_EXEC_BLT | I915_EXEC_BSD_RING1;
 		RUN_FAIL(EINVAL);
 	}
 
 	igt_subtest("invalid-bsd2-flag-on-blt") {
-		execbuf.flags = I915_EXEC_BLT | LOCAL_I915_EXEC_BSD_RING2;
+		execbuf.flags = I915_EXEC_BLT | I915_EXEC_BSD_RING2;
 		RUN_FAIL(EINVAL);
 	}
 
 	igt_subtest("invalid-bsd1-flag-on-vebox") {
 		igt_require(gem_has_vebox(fd));
-		execbuf.flags = LOCAL_I915_EXEC_VEBOX | LOCAL_I915_EXEC_BSD_RING1;
+		execbuf.flags = I915_EXEC_VEBOX | I915_EXEC_BSD_RING1;
 		RUN_FAIL(EINVAL);
 	}
 
 	igt_subtest("invalid-bsd2-flag-on-vebox") {
 		igt_require(gem_has_vebox(fd));
-		execbuf.flags = LOCAL_I915_EXEC_VEBOX | LOCAL_I915_EXEC_BSD_RING2;
+		execbuf.flags = I915_EXEC_VEBOX | I915_EXEC_BSD_RING2;
 		RUN_FAIL(EINVAL);
 	}
 
@@ -501,7 +491,7 @@ igt_main
 		/* NOTE: This test intentionally exercise the next available
 		 * flag. Don't "fix" this testcase without adding the required
 		 * tests for the new flag first. */
-		execbuf.flags = I915_EXEC_RENDER | (LOCAL_I915_EXEC_FENCE_ARRAY << 1);
+		execbuf.flags = I915_EXEC_RENDER | (I915_EXEC_FENCE_ARRAY << 1);
 		RUN_FAIL(EINVAL);
 	}
 
@@ -526,14 +516,14 @@ igt_main
 				expect = 0;
 
 			execbuf.flags =
-				eb_ring(it) | LOCAL_I915_EXEC_RESOURCE_STREAMER;
+				eb_ring(it) | I915_EXEC_RESOURCE_STREAMER;
 			igt_assert_eq(__gem_execbuf(fd, &execbuf), expect);
 		}
 	}
 
 	igt_subtest("invalid-fence-in") {
 		igt_require(gem_has_exec_fence(fd));
-		execbuf.flags = LOCAL_I915_EXEC_FENCE_IN;
+		execbuf.flags = I915_EXEC_FENCE_IN;
 		execbuf.rsvd2 = -1;
 		RUN_FAIL(EINVAL);
 		execbuf.rsvd2 = fd;

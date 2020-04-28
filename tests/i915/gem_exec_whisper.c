@@ -35,13 +35,7 @@
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+#define ENGINE_MASK  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 #define VERIFY 0
 
@@ -274,8 +268,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 			memset(&execbuf, 0, sizeof(execbuf));
 			execbuf.buffers_ptr = to_user_pointer(tmp);
 			execbuf.buffer_count = 2;
-			execbuf.flags = LOCAL_I915_EXEC_HANDLE_LUT;
-			execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+			execbuf.flags = I915_EXEC_HANDLE_LUT;
+			execbuf.flags |= I915_EXEC_NO_RELOC;
 			if (gen < 6)
 				execbuf.flags |= I915_EXEC_SECURE;
 			igt_require(__gem_execbuf(fd, &execbuf) == 0);

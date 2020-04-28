@@ -43,9 +43,6 @@
 #include "i915/gem.h"
 #include "igt.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
 #define INTERRUPTIBLE 0x1
 #define QUEUE 0x2
 
@@ -154,8 +151,8 @@ static void single(int fd, uint32_t handle,
 	execbuf.buffer_count = 1;
 	execbuf.rsvd1 = contexts[0];
 	execbuf.flags = e2->flags;
-	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
-	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	execbuf.flags |= I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_NO_RELOC;
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 	if (__gem_execbuf(fd, &execbuf)) {
 		execbuf.flags = e2->flags;
@@ -246,8 +243,8 @@ static void all(int fd, uint32_t handle, unsigned flags, int timeout)
 	execbuf.buffers_ptr = to_user_pointer(obj + 1);
 	execbuf.buffer_count = 1;
 	execbuf.rsvd1 = contexts[0];
-	execbuf.flags |= LOCAL_I915_EXEC_HANDLE_LUT;
-	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+	execbuf.flags |= I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_NO_RELOC;
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 	gem_sync(fd, handle);
 

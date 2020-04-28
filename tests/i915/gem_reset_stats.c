@@ -65,8 +65,6 @@ struct local_drm_i915_reset_stats {
 
 #define GET_RESET_STATS_IOCTL DRM_IOWR(DRM_COMMAND_BASE + 0x32, struct local_drm_i915_reset_stats)
 
-#define LOCAL_I915_EXEC_VEBOX	(4 << 0)
-
 static void sync_gpu(void)
 {
 	int fd = drm_open_driver(DRIVER_INTEL);

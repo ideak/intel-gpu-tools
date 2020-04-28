@@ -31,13 +31,7 @@
 
 IGT_TEST_DESCRIPTION("Basic sanity check of execbuf-ioctl relocations.");
 
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
-#define ENGINE_MASK  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+#define ENGINE_MASK  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 static uint32_t find_last_set(uint64_t x)
 {
@@ -561,7 +555,7 @@ static void basic_reloc(int fd, unsigned before, unsigned after, unsigned flags)
 	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	if (flags & NORELOC)
-		execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC;
+		execbuf.flags |= I915_EXEC_NO_RELOC;
 
 	for (reloc_offset = 4096 - 8; reloc_offset <= 4096 + 8; reloc_offset += 4) {
 		igt_spin_t *spin = NULL;

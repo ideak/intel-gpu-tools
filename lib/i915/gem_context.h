@@ -65,9 +65,6 @@ void gem_context_set_param(int fd, struct drm_i915_gem_context_param *p);
 int __gem_context_set_param(int fd, struct drm_i915_gem_context_param *p);
 int __gem_context_get_param(int fd, struct drm_i915_gem_context_param *p);
 
-#define LOCAL_I915_CONTEXT_MAX_USER_PRIORITY	1023
-#define LOCAL_I915_CONTEXT_DEFAULT_PRIORITY	0
-#define LOCAL_I915_CONTEXT_MIN_USER_PRIORITY	-1023
 int __gem_context_set_priority(int fd, uint32_t ctx, int prio);
 void gem_context_set_priority(int fd, uint32_t ctx, int prio);
 

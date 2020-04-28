@@ -48,13 +48,7 @@
 #include "i915/gem.h"
 #include "i915/gem_ring.h"
 
-#define LOCAL_I915_EXEC_NO_RELOC (1<<11)
-#define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)
-
-#define LOCAL_I915_EXEC_BSD_SHIFT      (13)
-#define LOCAL_I915_EXEC_BSD_MASK       (3 << LOCAL_I915_EXEC_BSD_SHIFT)
-
-#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | LOCAL_I915_EXEC_BSD_MASK)
+#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 #define LIVE 0x1
 #define CORK 0x2
@@ -137,7 +131,7 @@ static void latency_on_ring(int fd,
 	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
-	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC | LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_NO_RELOC | I915_EXEC_HANDLE_LUT;
 
 	memset(obj, 0, sizeof(obj));
 	obj[1].handle = gem_create(fd, 4096);
@@ -289,7 +283,7 @@ static void latency_from_ring(int fd,
 	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
 	execbuf.buffer_count = 2;
 	execbuf.flags = ring;
-	execbuf.flags |= LOCAL_I915_EXEC_NO_RELOC | LOCAL_I915_EXEC_HANDLE_LUT;
+	execbuf.flags |= I915_EXEC_NO_RELOC | I915_EXEC_HANDLE_LUT;
 	execbuf.rsvd1 = ctx[1];
 
 	memset(obj, 0, sizeof(obj));

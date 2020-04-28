@@ -30,8 +30,6 @@
 
 #include "i915/gem_scheduler.h"
 
-#define LOCAL_I915_PARAM_HAS_SCHEDULER		41
-
 /**
  * SECTION:gem_scheduler
  * @short_description: Helpers for querying scheduler capabilities
@@ -55,7 +53,7 @@ unsigned gem_scheduler_capability(int fd)
 		struct drm_i915_getparam gp;
 
 		memset(&gp, 0, sizeof(gp));
-		gp.param = LOCAL_I915_PARAM_HAS_SCHEDULER;
+		gp.param = I915_PARAM_HAS_SCHEDULER;
 		gp.value = &caps;
 
 		caps = 0;
