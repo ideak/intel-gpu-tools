@@ -3595,8 +3595,10 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 				(delta_ts64_ns - delta_oa32_ns) :
 				(delta_oa32_ns - delta_ts64_ns);
 			if (delta_delta > 500) {
-				igt_debug("skipping\n");
-				exit(EAGAIN);
+				igt_debug("Too slow %d; skipping\n",
+					  delta_delta);
+				ret = EAGAIN;
+				goto again;
 			}
 
 			len = i915_read_reports_until_timestamp(test_set->perf_oa_format,
@@ -3636,7 +3638,8 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 				 */
 				if (header->type == DRM_I915_PERF_RECORD_OA_REPORT_LOST) {
 					igt_debug("OA trigger collision / report lost\n");
-					exit(EAGAIN);
+					ret = EAGAIN;
+					goto again;
 				}
 
 				/* Currently the only other record type expected is a
@@ -3762,19 +3765,10 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			igt_assert_eq(ret, 0);
 
 			ret = memcmp(src[0].bo->virtual, dst[0].bo->virtual, 4 * width * height);
-			if (ret != 0) {
-				accumulator_print(&accumulator, "total");
-				/* This needs to be investigated... From time
-				 * to time, the work we kick off doesn't seem
-				 * to happen. WTH?? */
-				exit(EAGAIN);
-			}
-
 			drm_intel_bo_unmap(src[0].bo);
 			drm_intel_bo_unmap(dst[0].bo);
 
-			igt_assert_eq(accumulator.deltas[2 + 26], width * height);
-
+again:
 			for (int i = 0; i < ARRAY_SIZE(src); i++) {
 				drm_intel_bo_unreference(src[i].bo);
 				drm_intel_bo_unreference(dst[i].bo);
@@ -3787,6 +3781,17 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			drm_intel_gem_context_destroy(context1);
 			drm_intel_bufmgr_destroy(bufmgr);
 			__perf_close(stream_fd);
+			gem_quiescent_gpu(drm_fd);
+
+			if (ret != 0) {
+				accumulator_print(&accumulator, "total");
+				/* This needs to be investigated... From time
+				 * to time, the work we kick off doesn't seem
+				 * to happen. WTH?? */
+				exit(EAGAIN);
+			}
+
+			igt_assert_eq(accumulator.deltas[2 + 26], width * height);
 		}
 
 		child_ret = igt_wait_helper(&child);
