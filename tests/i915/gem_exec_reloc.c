@@ -26,6 +26,7 @@
 
 #include "igt.h"
 #include "igt_dummyload.h"
+#include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Basic sanity check of execbuf-ioctl relocations.");
 
@@ -328,6 +329,81 @@ static void active(int fd, unsigned engine)
 
 	check_bo(fd, obj[0].handle);
 	gem_close(fd, obj[0].handle);
+}
+
+static uint64_t many_relocs(unsigned long count, unsigned long *out)
+{
+	struct drm_i915_gem_relocation_entry *reloc;
+	unsigned long sz;
+	int i;
+
+	sz = count * sizeof(*reloc);
+	sz = ALIGN(sz, 4096);
+
+	reloc = mmap(0, sz, PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+	igt_assert(reloc != MAP_FAILED);
+	for (i = 0; i < count; i++) {
+		reloc[i].target_handle = 0;
+		reloc[i].presumed_offset = ~0ull;
+		reloc[i].offset = 8 * i;
+		reloc[i].delta = 8 * i;
+	}
+	mprotect(reloc, sz, PROT_READ);
+
+	*out = sz;
+	return to_user_pointer(reloc);
+}
+
+static void __many_active(int i915, unsigned engine, unsigned long count)
+{
+	unsigned long reloc_sz;
+	struct drm_i915_gem_exec_object2 obj[2] = {{
+		.handle = gem_create(i915, count * sizeof(uint64_t)),
+			.relocs_ptr = many_relocs(count, &reloc_sz),
+			.relocation_count = count,
+	}};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(obj),
+		.buffer_count = ARRAY_SIZE(obj),
+		.flags = engine | I915_EXEC_HANDLE_LUT,
+	};
+	igt_spin_t *spin;
+
+	spin = __igt_spin_new(i915,
+			      .engine = engine,
+			      .dependency = obj[0].handle,
+			      .flags = (IGT_SPIN_FENCE_OUT |
+					IGT_SPIN_NO_PREEMPTION));
+	obj[1] = spin->obj[1];
+	gem_execbuf(i915, &execbuf);
+	igt_assert_eq(sync_fence_status(spin->out_fence), 0);
+	igt_spin_free(i915, spin);
+
+	for (unsigned long i = 0; i < obj[0].relocation_count; i++) {
+		uint64_t addr;
+
+		gem_read(i915, obj[0].handle, i * sizeof(addr),
+			 &addr, sizeof(addr));
+
+		igt_assert_eq_u64(addr, obj[0].offset + i * sizeof(addr));
+	}
+
+	munmap(from_user_pointer(obj[0].relocs_ptr), reloc_sz);
+	gem_close(i915, obj[0].handle);
+}
+
+static void many_active(int i915, unsigned engine)
+{
+	unsigned long count = 256;
+
+	igt_until_timeout(5) {
+		igt_debug("Testing count:%lu\n", count);
+		__many_active(i915, engine, count);
+
+		count <<= 2;
+		if (!count)
+			break;
+	}
 }
 
 static unsigned int offset_in_page(void *addr)
@@ -978,6 +1054,13 @@ igt_main
 		__for_each_physical_engine(fd, e) {
 			igt_dynamic_f("%s", e->name)
 				active_spin(fd, e->flags);
+		}
+	}
+
+	igt_subtest_with_dynamic("basic-many-active") {
+		__for_each_physical_engine(fd, e) {
+			igt_dynamic_f("%s", e->name)
+				many_active(fd, e->flags);
 		}
 	}
 
