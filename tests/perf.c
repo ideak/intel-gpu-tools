@@ -3415,13 +3415,13 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			uint64_t timestamp0_64, timestamp1_64;
 			uint32_t delta_ts64, delta_oa32;
 			uint64_t delta_ts64_ns, delta_oa32_ns;
-			uint32_t delta_delta;
 			int width = 800;
 			int height = 600;
 			uint32_t ctx_id = 0xffffffff; /* invalid handle */
 			uint32_t ctx1_id = 0xffffffff;  /* invalid handle */
 			uint32_t current_ctx_id = 0xffffffff;
 			uint32_t n_invalid_ctx = 0;
+			int delta_delta;
 			int ret;
 			struct accumulator accumulator = {
 				.format = test_set->perf_oa_format
@@ -3589,12 +3589,10 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 
 			/* The delta as calculated via the PIPE_CONTROL timestamp or
 			 * the OA report timestamps should be almost identical but
-			 * allow a 500 nanoseconds margin.
+			 * allow a 2 microsecond margin.
 			 */
-			delta_delta = delta_ts64_ns > delta_oa32_ns ?
-				(delta_ts64_ns - delta_oa32_ns) :
-				(delta_oa32_ns - delta_ts64_ns);
-			if (delta_delta > 500) {
+			delta_delta = delta_ts64_ns - delta_oa32_ns;
+			if (abs(delta_delta) > 2000) {
 				igt_debug("Too slow %d; skipping\n",
 					  delta_delta);
 				ret = EAGAIN;
