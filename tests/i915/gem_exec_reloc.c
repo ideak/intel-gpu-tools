@@ -359,8 +359,8 @@ static void __many_active(int i915, unsigned engine, unsigned long count)
 	unsigned long reloc_sz;
 	struct drm_i915_gem_exec_object2 obj[2] = {{
 		.handle = gem_create(i915, count * sizeof(uint64_t)),
-			.relocs_ptr = many_relocs(count, &reloc_sz),
-			.relocation_count = count,
+		.relocs_ptr = many_relocs(count, &reloc_sz),
+		.relocation_count = count,
 	}};
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(obj),
@@ -379,7 +379,7 @@ static void __many_active(int i915, unsigned engine, unsigned long count)
 	igt_assert_eq(sync_fence_status(spin->out_fence), 0);
 	igt_spin_free(i915, spin);
 
-	for (unsigned long i = 0; i < obj[0].relocation_count; i++) {
+	for (unsigned long i = 0; i < count; i++) {
 		uint64_t addr;
 
 		gem_read(i915, obj[0].handle, i * sizeof(addr),
@@ -394,14 +394,90 @@ static void __many_active(int i915, unsigned engine, unsigned long count)
 
 static void many_active(int i915, unsigned engine)
 {
+	const uint64_t max = gem_aperture_size(i915) / 2;
 	unsigned long count = 256;
 
 	igt_until_timeout(5) {
+		uint64_t required, total;
+
+		if (!__intel_check_memory(1, 8 * count, CHECK_RAM,
+					  &required, &total))
+			break;
+
 		igt_debug("Testing count:%lu\n", count);
 		__many_active(i915, engine, count);
 
 		count <<= 2;
-		if (!count)
+		if (count * 8 >= max)
+			break;
+	}
+}
+
+static void __wide_active(int i915, unsigned engine, unsigned long count)
+{
+	struct drm_i915_gem_relocation_entry *reloc =
+		calloc(count, sizeof(*reloc));
+	struct drm_i915_gem_exec_object2 *obj =
+		calloc(count + 1, sizeof(*obj));
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(obj),
+		.buffer_count = count + 1,
+		.flags = engine | I915_EXEC_HANDLE_LUT,
+	};
+	igt_spin_t *spin;
+
+	for (unsigned long i = 0; i < count; i++) {
+		obj[i].handle = gem_create(i915, 4096);
+		obj[i].flags = EXEC_OBJECT_WRITE;
+	}
+
+	spin = __igt_spin_new(i915,
+			      .engine = engine,
+			      .flags = (IGT_SPIN_FENCE_OUT |
+					IGT_SPIN_NO_PREEMPTION));
+	obj[count] = spin->obj[1];
+	gem_execbuf(i915, &execbuf); /* mark all the objects as active */
+
+	for (unsigned long i = 0; i < count; i++) {
+		reloc[i].target_handle = i;
+		reloc[i].presumed_offset = ~0ull;
+		obj[i].relocs_ptr = to_user_pointer(&reloc[i]);
+		obj[i].relocation_count = 1;
+	}
+	gem_execbuf(i915, &execbuf); /* relocation onto active objects */
+
+	igt_assert_eq(sync_fence_status(spin->out_fence), 0);
+	igt_spin_free(i915, spin);
+
+	for (unsigned long i = 0; i < count; i++) {
+		uint64_t addr;
+
+		gem_read(i915, obj[i].handle, 0, &addr, sizeof(addr));
+		igt_assert_eq_u64(addr, obj[i].offset);
+
+		gem_close(i915, obj[i].handle);
+	}
+	free(obj);
+	free(reloc);
+}
+
+static void wide_active(int i915, unsigned engine)
+{
+	const uint64_t max = gem_aperture_size(i915) / 4096 / 2;
+	unsigned long count = 256;
+
+	igt_until_timeout(5) {
+		uint64_t required, total;
+
+		if (!__intel_check_memory(count, 4096, CHECK_RAM,
+					  &required, &total))
+			break;
+
+		igt_debug("Testing count:%lu\n", count);
+		__wide_active(i915, engine, count);
+
+		count <<= 2;
+		if (count >= max)
 			break;
 	}
 }
@@ -1061,6 +1137,13 @@ igt_main
 		__for_each_physical_engine(fd, e) {
 			igt_dynamic_f("%s", e->name)
 				many_active(fd, e->flags);
+		}
+	}
+
+	igt_subtest_with_dynamic("basic-wide-active") {
+		__for_each_physical_engine(fd, e) {
+			igt_dynamic_f("%s", e->name)
+				wide_active(fd, e->flags);
 		}
 	}
 
