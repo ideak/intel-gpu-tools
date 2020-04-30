@@ -1750,11 +1750,13 @@ static void hangme(int i915)
 
 	for (int class = 1; class < 32; class++) {
 		struct i915_engine_class_instance *ci;
+		IGT_CORK_FENCE(cork);
 		struct client {
 			igt_spin_t *spin[2];
 		} *client;
 		unsigned int count;
 		uint32_t bg;
+		int fence;
 
 		ci = list_engines(i915, 1u << class, &count);
 		if (!ci)
@@ -1768,6 +1770,7 @@ static void hangme(int i915)
 		client = malloc(sizeof(*client) * count);
 		igt_assert(client);
 
+		fence = igt_cork_plug(&cork, i915);
 		for (int i = 0; i < count; i++) {
 			uint32_t ctx = gem_context_create(i915);
 			struct client *c = &client[i];
@@ -1776,18 +1779,22 @@ static void hangme(int i915)
 			set_unbannable(i915, ctx);
 			set_load_balancer(i915, ctx, ci, count, NULL);
 
-			flags = IGT_SPIN_FENCE_OUT |
+			flags = IGT_SPIN_FENCE_IN |
+				IGT_SPIN_FENCE_OUT |
 				IGT_SPIN_NO_PREEMPTION;
 			if (!gem_has_cmdparser(i915, ALL_ENGINES))
 				flags |= IGT_SPIN_INVALID_CS;
 			for (int j = 0; j < ARRAY_SIZE(c->spin); j++)  {
 				c->spin[j] = __igt_spin_new(i915, ctx,
+							    .fence = fence,
 							    .flags = flags);
 				flags = IGT_SPIN_FENCE_OUT;
 			}
 
 			gem_context_destroy(i915, ctx);
 		}
+		close(fence);
+		igt_cork_unplug(&cork); /* queue all hangs en masse */
 
 		/* Apply some background context to speed up hang detection */
 		bg = gem_context_create(i915);
