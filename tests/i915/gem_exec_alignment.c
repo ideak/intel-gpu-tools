@@ -152,7 +152,7 @@ naughty_child(int i915, int link, uint32_t shared, unsigned int flags)
 		.sa_handler = sighandler,
 	};
 	struct timespec tv = {};
-	int err;
+	uint64_t elapsed;
 
 	if (flags & ISOLATED)
 		i915 = gem_reopen_driver(i915);
@@ -224,15 +224,13 @@ naughty_child(int i915, int link, uint32_t shared, unsigned int flags)
 	for (unsigned long i = 0; i < count; i++)
 		obj[i].alignment = 16384;
 
-	write(link, &tv, sizeof(tv));
-
 	sigaction(SIGINT, &act, NULL);
 	igt_debug("Executing naughty execbuf\n");
 	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
-	err = __execbuf(i915, &execbuf); /* this should take over 2s */
-	igt_info("Naughty client took %'"PRIu64"ns, result %d\n",
-		 igt_nsec_elapsed(&tv), err);
-	igt_assert(igt_nsec_elapsed(&tv) > NSEC_PER_SEC / 2 || err == -EINTR);
+	write(link, &elapsed, sizeof(elapsed)); /* wake the parent up */
+	__execbuf(i915, &execbuf);
+	elapsed = igt_nsec_elapsed(&tv);
+	write(link, &elapsed, sizeof(elapsed));
 
 	gem_context_destroy(i915, execbuf.rsvd1);
 	for (unsigned long i = !!shared; i < count; i++)
@@ -258,6 +256,7 @@ static void prio_inversion(int i915, unsigned int flags)
 	};
 	struct timespec tv;
 	uint64_t elapsed;
+	uint64_t naughty;
 	int link[2];
 
 	/*
@@ -278,21 +277,39 @@ static void prio_inversion(int i915, unsigned int flags)
 		naughty_child(i915, link[1], obj.handle, flags);
 
 	igt_debug("Waiting for naughty client\n");
-	read(link[0], &tv, sizeof(tv));
+	read(link[0], &elapsed, sizeof(elapsed));
 	igt_debug("Ready...\n");
 	usleep(250 * 1000); /* let the naughty execbuf begin */
 	igt_debug("Go!\n");
 
-	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
-	gem_execbuf(i915, &execbuf);
-	elapsed = igt_nsec_elapsed(&tv);
-	igt_info("Normal client took %'"PRIu64"ns\n", elapsed);
+	/*
+	 * Our goal is to run concurrently with the naughty client; so
+	 * repeat a few times just in case we manage to complete before the
+	 * slow execbuf. Individual runs of an unblocked nop should only take
+	 * a few microseconds, so repeating more than is required will not
+	 * add significantly to the overall runtime.
+	 */
+	elapsed = 0;
+	for (int pass = 0; pass < 5; pass++) {
+		uint64_t dt;
+
+		igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+		gem_execbuf(i915, &execbuf);
+		dt = igt_nsec_elapsed(&tv);
+		igt_debug("[%d] Normal client took %'"PRIu64"ns\n", pass, dt);
+		if (dt > elapsed)
+			elapsed = dt;
+	}
+	igt_info("Normal client took %'"PRIu64"ns (worst of 5)\n", elapsed);
 
 	kill_children(SIGINT);
 	igt_waitchildren();
 	gem_close(i915, obj.handle);
 
-	igt_assert(elapsed < NSEC_PER_SEC / 2);
+	read(link[0], &naughty, sizeof(naughty));
+	igt_info("Naughty client took %'"PRIu64"ns\n", naughty);
+
+	igt_assert(elapsed < naughty / 2);
 	close(link[0]);
 	close(link[1]);
 }
