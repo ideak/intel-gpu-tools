@@ -916,8 +916,10 @@ static int __execbuf(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
 	return err;
 }
 
+static int stop;
 static void sighandler(int sig)
 {
+	stop = 1;
 }
 
 static void parallel_child(int i915,
@@ -947,7 +949,7 @@ static void parallel_child(int i915,
 	unsigned long count = 0;
 
 	sigaction(SIGINT, &act, NULL);
-	for (;;) {
+	while (!READ_ONCE(stop)) {
 		int err = __execbuf(i915, &execbuf);
 		if (err == -EINTR)
 			break;
@@ -977,6 +979,7 @@ static void parallel(int i915)
 
 	reloc = parallel_relocs(32 * 1024, &reloc_sz);
 
+	stop = 0;
 	__for_each_physical_engine(i915, e) {
 		igt_fork(child, 1)
 			parallel_child(i915, e, reloc, common);
