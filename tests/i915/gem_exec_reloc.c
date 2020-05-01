@@ -397,7 +397,7 @@ static void many_active(int i915, unsigned engine)
 	const uint64_t max = gem_aperture_size(i915) / 2;
 	unsigned long count = 256;
 
-	igt_until_timeout(5) {
+	igt_until_timeout(2) {
 		uint64_t required, total;
 
 		if (!__intel_check_memory(1, 8 * count, CHECK_RAM,
@@ -407,7 +407,7 @@ static void many_active(int i915, unsigned engine)
 		igt_debug("Testing count:%lu\n", count);
 		__many_active(i915, engine, count);
 
-		count <<= 2;
+		count <<= 1;
 		if (count * 8 >= max)
 			break;
 	}
@@ -467,7 +467,7 @@ static void wide_active(int i915, unsigned engine)
 	const uint64_t max = gem_aperture_size(i915) / 4096 / 2;
 	unsigned long count = 256;
 
-	igt_until_timeout(5) {
+	igt_until_timeout(2) {
 		uint64_t required, total;
 
 		if (!__intel_check_memory(count, 4096, CHECK_RAM,
@@ -477,7 +477,7 @@ static void wide_active(int i915, unsigned engine)
 		igt_debug("Testing count:%lu\n", count);
 		__wide_active(i915, engine, count);
 
-		count <<= 2;
+		count <<= 1;
 		if (count >= max)
 			break;
 	}
