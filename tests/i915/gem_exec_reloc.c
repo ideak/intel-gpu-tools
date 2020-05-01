@@ -429,6 +429,7 @@ static void __wide_active(int i915, unsigned engine, unsigned long count)
 	for (unsigned long i = 0; i < count; i++) {
 		obj[i].handle = gem_create(i915, 4096);
 		obj[i].flags = EXEC_OBJECT_WRITE;
+		obj[i].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	}
 
 	spin = __igt_spin_new(i915,
