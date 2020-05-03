@@ -168,7 +168,7 @@ struct thread_clear {
 static void *thread_clear(void *data)
 {
 	struct thread_clear *arg = data;
-	unsigned long checked = 0;
+	unsigned long checked = 0, total = 0;
 	enum { PRW, GTT, WC, WB, __LAST__ } mode = PRW;
 	int i915 = arg->i915;
 
@@ -204,7 +204,7 @@ static void *thread_clear(void *data)
 		}
 		/* No set-domains as we are being as naughty as possible */
 
-		for (uint64_t page = 0; page < npages; page++) {
+		for (uint64_t page = 0; page < npages; page += 1 + random() % (npages - page)) {
 			uint64_t x[8] = {
 				page * 4096 +
 				sizeof(x) * ((page % (4096 - sizeof(x)) / sizeof(x)))
@@ -219,18 +219,21 @@ static void *thread_clear(void *data)
 
 			for (int i = 0; i < ARRAY_SIZE(x); i++)
 				igt_assert_eq_u64(x[i], 0);
+
+			checked++;
 		}
 		if (ptr)
 			munmap(ptr, create.size);
 		gem_close(i915, create.handle);
-		checked += npages;
 
+		total += npages;
 		atomic_fetch_add(&arg->max, npages);
 
 		if (++mode == __LAST__)
 			mode = PRW;
 	}
 
+	igt_info("Checked %'lu / %'lu pages\n", checked, total);
 	return (void *)(uintptr_t)checked;
 }
 
