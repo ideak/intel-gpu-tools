@@ -1898,8 +1898,6 @@ static void test_unload(void)
 		int i915;
 		int fd;
 
-		igt_debug("Unloading and then re-opening i915 device\n");
-		igt_require(unload_i915() == 0);
 		i915 = __drm_open_driver(DRIVER_INTEL);
 
 		igt_debug("Opening perf events\n");
@@ -2203,6 +2201,7 @@ igt_main
 	}
 
 	igt_subtest("module-unload") {
+		igt_require(unload_i915() == 0);
 		for (int pass = 0; pass < 3; pass++)
 			test_unload();
 	}
