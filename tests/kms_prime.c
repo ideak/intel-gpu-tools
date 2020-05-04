@@ -22,11 +22,18 @@
  */
 
 #include "igt.h"
-#include "igt_vgem.h"
+#include "igt_device.h"
 
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <time.h>
+
+struct dumb_bo {
+	uint32_t handle;
+	uint32_t width, height;
+	uint32_t bpp, pitch;
+	uint64_t size;
+};
 
 struct crc_info {
 	igt_crc_t crc;
@@ -67,23 +74,24 @@ static bool has_prime_export(int fd)
 }
 
 static igt_output_t *setup_display(int importer_fd, igt_display_t *display,
-				   enum pipe pipe)
+				   enum pipe *pipe)
 {
 	igt_output_t *output;
+	bool found = false;
 
-	igt_display_require(display, importer_fd);
-	igt_skip_on(pipe >= display->n_pipes);
-	output = igt_get_single_output_for_pipe(display, pipe);
+	for_each_pipe_with_valid_output(display, *pipe, output) {
+		found = true;
+		break;
+	}
 
-	igt_require_f(output, "No connector found for pipe %s\n",
-		      kmstest_pipe_name(pipe));
+	igt_require_f(found, "No valid connector/pipe found\n");
 
 	igt_display_reset(display);
-	igt_output_set_pipe(output, pipe);
+	igt_output_set_pipe(output, *pipe);
 	return output;
 }
 
-static void prepare_scratch(int exporter_fd, struct vgem_bo *scratch,
+static void prepare_scratch(int exporter_fd, struct dumb_bo *scratch,
 			    drmModeModeInfo *mode, uint32_t color)
 {
 	uint32_t *ptr;
@@ -91,16 +99,27 @@ static void prepare_scratch(int exporter_fd, struct vgem_bo *scratch,
 	scratch->width = mode->hdisplay;
 	scratch->height = mode->vdisplay;
 	scratch->bpp = 32;
-	vgem_create(exporter_fd, scratch);
 
-	ptr = vgem_mmap(exporter_fd, scratch, PROT_WRITE);
+	scratch->handle = kmstest_dumb_create(exporter_fd,
+			scratch->width,
+			scratch->height,
+			scratch->bpp,
+			&scratch->pitch,
+			&scratch->size);
+
+
+	ptr = kmstest_dumb_map_buffer(exporter_fd,
+				      scratch->handle,
+				      scratch->size,
+				      PROT_WRITE);
+
 	for (size_t idx = 0; idx < scratch->size / sizeof(*ptr); ++idx)
 		ptr[idx] = color;
 
 	munmap(ptr, scratch->size);
 }
 
-static void prepare_fb(int importer_fd, struct vgem_bo *scratch, struct igt_fb *fb)
+static void prepare_fb(int importer_fd, struct dumb_bo *scratch, struct igt_fb *fb)
 {
 	enum igt_color_encoding color_encoding = IGT_COLOR_YCBCR_BT709;
 	enum igt_color_range color_range = IGT_COLOR_YCBCR_LIMITED_RANGE;
@@ -126,6 +145,7 @@ static void import_fb(int importer_fd, struct igt_fb *fb,
 			    DRM_FORMAT_XRGB8888,
 			    handles, pitches, offsets,
 			    &fb->fb_id, 0);
+
 	igt_assert(ret == 0);
 }
 
@@ -162,19 +182,19 @@ static void test_crc(int exporter_fd, int importer_fd)
 	igt_display_t display;
 	igt_output_t *output;
 	igt_pipe_crc_t *pipe_crc;
-	enum pipe pipe = PIPE_A;
+	enum pipe pipe;
 	struct igt_fb fb;
 	int dmabuf_fd;
-	struct vgem_bo scratch = {}; /* despite the name, it suits for any
-				      * gem-compatible device
-				      * TODO: rename
-				      */
+	struct dumb_bo scratch = {};
+	bool crc_equal;
 	int i, j;
 	drmModeModeInfo *mode;
 
-	bool crc_equal = false;
+	igt_device_set_master(importer_fd);
+	igt_require_pipe_crc(importer_fd);
+	igt_display_require(&display, importer_fd);
 
-	output = setup_display(importer_fd, &display, pipe);
+	output = setup_display(importer_fd, &display, &pipe);
 
 	mode = igt_output_get_mode(output);
 	pipe_crc = igt_pipe_crc_new(importer_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
@@ -187,6 +207,7 @@ static void test_crc(int exporter_fd, int importer_fd)
 		prepare_fb(importer_fd, &scratch, &fb);
 		import_fb(importer_fd, &fb, dmabuf_fd, scratch.pitch);
 		close(dmabuf_fd);
+
 
 		colors[i].prime_crc.name = "prime";
 		collect_crc_for_fb(importer_fd, &fb, &display, output,
@@ -228,29 +249,35 @@ static void test_crc(int exporter_fd, int importer_fd)
 	igt_display_fini(&display);
 }
 
-static void run_test_crc(int export_chipset, int import_chipset)
-{
-	int importer_fd = -1;
-	int exporter_fd = -1;
-
-	exporter_fd = drm_open_driver(export_chipset);
-	importer_fd = drm_open_driver_master(import_chipset);
-
-	igt_require(has_prime_export(exporter_fd));
-	igt_require(has_prime_import(importer_fd));
-	igt_require_pipe_crc(importer_fd);
-
-	test_crc(exporter_fd, importer_fd);
-	close(importer_fd);
-	close(exporter_fd);
-}
-
 igt_main
 {
-	igt_fixture {
+	igt_fixture
 		kmstest_set_vt_graphics_mode();
+
+	igt_describe("Make a dumb color buffer, export to another device and"
+		     " compare the CRCs with a buffer native to that device");
+	igt_subtest_with_dynamic("basic-crc") {
+		int first_fd = -1;
+		int second_fd = -1;
+
+		/* ANY = anything that is not VGEM */
+		first_fd = __drm_open_driver_another(0, DRIVER_ANY | DRIVER_VGEM);
+		igt_require(first_fd >= 0);
+
+		second_fd = __drm_open_driver_another(1, DRIVER_ANY | DRIVER_VGEM);
+		igt_require(second_fd >= 0);
+
+		if (has_prime_export(first_fd) &&
+		    has_prime_import(second_fd))
+			igt_dynamic("first-to-second")
+				test_crc(first_fd, second_fd);
+
+		if (has_prime_import(first_fd) &&
+		    has_prime_export(second_fd))
+			igt_dynamic("second-to-first")
+				test_crc(second_fd, first_fd);
+
+		close(first_fd);
+		close(second_fd);
 	}
-	igt_describe("Make a dumb buffer inside vgem, fill it, export to another device and compare the CRC");
-	igt_subtest("basic-crc")
-		run_test_crc(DRIVER_VGEM, DRIVER_ANY);
 }
