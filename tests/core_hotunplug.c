@@ -167,7 +167,8 @@ static void set_filter_from_device(int fd)
 	strncat(path, "/device", PATH_MAX - strlen(path));
 	igt_assert(realpath(path, dst));
 
-	igt_device_filter_set(filter);
+	igt_device_filter_free_all();
+	igt_device_filter_add(filter);
 }
 
 /* Subtests */

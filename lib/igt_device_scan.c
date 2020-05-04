@@ -1014,16 +1014,21 @@ void igt_device_print_filter_types(void)
 	}
 }
 
-static char *device_filter;
+struct device_filter {
+	char filter[NAME_MAX];
+	struct igt_list_head link;
+};
+
+static IGT_LIST_HEAD(device_filters);
 
 /**
- * igt_device_is_filter_set
+ * igt_device_filter_count
  *
- * Returns whether we have a filter set.
+ * Returns number of filters collected in the filter list.
  */
-bool igt_device_is_filter_set(void)
+int igt_device_filter_count(void)
 {
-	return device_filter != NULL;
+	return igt_list_length(&device_filters);
 }
 
 /* Check does filter is valid. It checks:
@@ -1054,43 +1059,79 @@ static bool is_filter_valid(const char *fstr)
 }
 
 /**
- * igt_device_filter_set
- * @filter: filter that should be set globally
+ * igt_device_filter_add
+ * @filters: filter(s) to be stored in filter array
+ *
+ * Function allows passing single or more filters within one string. This is
+ * for CI when it can extract filter from environment variable (and it must
+ * be single string). So if @filter contains semicolon ';' it treats
+ * each part as separate filter and adds to the filter array.
+ *
+ * Returns number of filters added to filter array. Can be greater than
+ * 1 if @filters contains more than one filter separated by semicolon.
  */
-void igt_device_filter_set(const char *filter)
+int igt_device_filter_add(const char *filters)
 {
-	if (!is_filter_valid(filter)) {
-		igt_warn("Invalid filter: %s\n", filter);
-		return;
+	char *dup, *dup_orig, *filter;
+	int count = 0;
+
+	dup = strdup(filters);
+	dup_orig = dup;
+
+	while ((filter = strsep(&dup, ";"))) {
+		bool is_valid = is_filter_valid(filter);
+		igt_warn_on(!is_valid);
+		if (is_valid) {
+			struct device_filter *df = malloc(sizeof(*df));
+			strncpy(df->filter, filter, sizeof(df->filter)-1);
+			igt_list_add_tail(&df->link, &device_filters);
+			count++;
+		}
 	}
 
-	if (device_filter != NULL)
-		free(device_filter);
+	free(dup_orig);
 
-	device_filter = strdup(filter);
+	return count;
 }
 
 /**
- * igt_device_filter_free
+ * igt_device_filter_free_all
  *
- * Free the filter that we store internally, effectively unsetting it.
+ * Free all filters within array.
  */
-void igt_device_filter_free(void)
+void igt_device_filter_free_all(void)
 {
-	if (device_filter != NULL)
-		free(device_filter);
+	struct device_filter *filter, *tmp;
 
-	device_filter = NULL;
+	igt_list_for_each_entry_safe(filter, tmp, &device_filters, link) {
+		igt_list_del(&filter->link);
+		free(filter);
+	}
 }
 
 /**
  * igt_device_filter_get
+ * @num: Number of filter from filter array
  *
- * Returns filter string or NULL if not set
+ * Returns filter string or NULL if @num is out of range of filter array.
  */
-const char *igt_device_filter_get(void)
+const char *igt_device_filter_get(int num)
 {
-	return device_filter;
+	struct device_filter *filter;
+	int i = 0;
+
+	if (num < 0)
+		return NULL;
+
+
+	igt_list_for_each_entry(filter, &device_filters, link) {
+		if (i == num)
+			return filter->filter;
+		i++;
+	}
+
+
+	return NULL;
 }
 
 static bool igt_device_filter_apply(const char *fstr)

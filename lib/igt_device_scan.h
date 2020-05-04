@@ -50,10 +50,10 @@ void igt_device_print_filter_types(void);
  * IGT can store/retrieve filters passed by user using '--device' args.
  */
 
-bool igt_device_is_filter_set(void);
-void igt_device_filter_set(const char *filter);
-void igt_device_filter_free(void);
-const char *igt_device_filter_get(void);
+int igt_device_filter_count(void);
+int igt_device_filter_add(const char *filter);
+void igt_device_filter_free_all(void);
+const char *igt_device_filter_get(int num);
 
 /* Use filter to match the device and fill card structure */
 bool igt_device_card_match(const char *filter, struct igt_device_card *card);

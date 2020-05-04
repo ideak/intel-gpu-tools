@@ -324,8 +324,8 @@ static bool __get_the_first_card(struct igt_device_card *card)
 {
 	const char *filter;
 
-	if (igt_device_is_filter_set()) {
-		filter = igt_device_filter_get();
+	if (igt_device_filter_count() > 0) {
+		filter = igt_device_filter_get(0);
 		igt_info("Looking for devices to open using filter: %s\n", filter);
 
 		if (igt_device_card_match(filter, card)) {
@@ -354,7 +354,7 @@ static bool __get_the_first_card(struct igt_device_card *card)
  */
 int __drm_open_driver(int chipset)
 {
-	if (igt_device_is_filter_set()) {
+	if (igt_device_filter_count() > 0) {
 		bool found;
 		struct igt_device_card card;
 
@@ -371,7 +371,7 @@ int __drm_open_driver(int chipset)
 
 int __drm_open_driver_render(int chipset)
 {
-	if (igt_device_is_filter_set()) {
+	if (igt_device_filter_count() > 0) {
 		bool found;
 		struct igt_device_card card;
 

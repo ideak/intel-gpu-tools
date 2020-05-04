@@ -249,7 +249,7 @@
  *	FrameDumpPath=/tmp # The path to dump frames that fail comparison checks
  *
  *	&num; Device selection filter
- *	Device=pci:vendor=8086,card=0;vgem:
+ *	Device=pci:vendor=8086,card=0;sys:/sys/devices/platform/vgem
  *
  *	&num; The following section is used for configuring the Device Under Test.
  *	&num; It is not mandatory and allows overriding default values.
@@ -685,7 +685,7 @@ static void print_usage(const char *help_str, bool output_on_stderr)
 		   "  --skip-crc-compare\n"
 		   "  --help-description\n"
 		   "  --describe\n"
-		   "  --device filter\n"
+		   "  --device filters\n"
 		   "  --version\n"
 		   "  --help|-h\n");
 	if (help_str)
@@ -778,7 +778,7 @@ static void common_init_config(void)
 		igt_set_autoresume_delay(ret);
 
 	/* Adding filters, order .igtrc, IGT_DEVICE, --device filter */
-	if (igt_device_is_filter_set())
+	if (igt_device_filter_count() > 0)
 		igt_debug("Notice: using --device filters:\n");
 	else {
 		if (igt_rc_device) {
@@ -793,14 +793,14 @@ static void common_init_config(void)
 					  "Common::Device:\n");
 		}
 		if (igt_rc_device) {
-			igt_device_filter_set(igt_rc_device);
+			igt_device_filter_add(igt_rc_device);
 			free(igt_rc_device);
 			igt_rc_device = NULL;
 		}
 	}
 
-	if (igt_device_is_filter_set())
-		igt_debug("[%s]\n", igt_device_filter_get());
+	for (int i = 0; i < igt_device_filter_count(); i++)
+		igt_debug("[%s]\n", igt_device_filter_get(i));
 }
 
 static void common_init_env(void)
@@ -999,7 +999,7 @@ static int common_init(int *argc, char **argv,
 				free(igt_rc_device);
 				igt_rc_device = NULL;
 			}
-			igt_device_filter_set(optarg);
+			igt_device_filter_add(optarg);
 			break;
 		case OPT_VERSION:
 			print_version();
