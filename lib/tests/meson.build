@@ -12,6 +12,7 @@ lib_tests = [
 	'igt_fork_helper',
 	'igt_list_only',
 	'igt_invalid_subtest_name',
+	'igt_nesting',
 	'igt_no_exit',
 	'igt_segfault',
 	'igt_simulation',

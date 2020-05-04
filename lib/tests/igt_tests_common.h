@@ -51,6 +51,11 @@ static inline void internal_assert_wsignaled(int wstatus, int signal)
 			WTERMSIG(wstatus) == signal);
 }
 
+static inline void internal_assert_not_wsignaled(int wstatus)
+{
+	internal_assert(!WIFSIGNALED(wstatus));
+}
+
 static inline int do_fork(void (*test_to_run)(void))
 {
 	int pid, status;
