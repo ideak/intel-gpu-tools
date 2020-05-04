@@ -328,11 +328,6 @@ static void test_fence_await(int fd, const struct intel_execution_engine2 *e,
 	uint32_t *out;
 	int i;
 
-	if ((flags & HANG) == 0)
-		igt_require(gem_class_has_mutable_submission(fd, e->class));
-
-	igt_require(gem_class_can_store_dword(fd, 0));
-
 	out = gem_mmap__wc(fd, scratch, 0, 4096, PROT_WRITE);
 	gem_set_domain(fd, scratch,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
