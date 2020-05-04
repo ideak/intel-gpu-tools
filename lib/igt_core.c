@@ -1280,6 +1280,8 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name)
 {
 	internal_assert(in_subtest && _igt_dynamic_tests_executed >= 0,
 			"igt_dynamic is allowed only inside igt_subtest_with_dynamic\n");
+	internal_assert(!in_dynamic_subtest,
+			"igt_dynamic is not allowed to be nested in another igt_dynamic\n");
 
 	if (!valid_name_for_subtest(dynamic_subtest_name)) {
 			igt_critical("Invalid dynamic subtest name \"%s\".\n",
