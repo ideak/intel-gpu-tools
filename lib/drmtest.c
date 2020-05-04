@@ -246,7 +246,51 @@ err:
 	return -1;
 }
 
-static int __search_and_open(const char *base, int offset, unsigned int chipset)
+static struct {
+	int fd;
+	struct stat stat;
+}_opened_fds[64];
+
+static int _opened_fds_count;
+
+static void _set_opened_fd(int idx, int fd)
+{
+	assert(idx < ARRAY_SIZE(_opened_fds));
+	assert(idx <= _opened_fds_count);
+
+	_opened_fds[idx].fd = fd;
+
+	assert(fstat(fd, &_opened_fds[idx].stat) == 0);
+
+	_opened_fds_count = idx+1;
+}
+
+static bool _is_already_opened(const char *path, int as_idx)
+{
+	struct stat new;
+
+	assert(as_idx < ARRAY_SIZE(_opened_fds));
+	assert(as_idx <= _opened_fds_count);
+
+	/*
+	 * we cannot even stat the device, so it's of no use - let's claim it's
+	 * already opened
+	 */
+	if (stat(path, &new) != 0)
+		return true;
+
+	for (int i = 0; i < as_idx; ++i) {
+		/* did we cross filesystem boundary? */
+		assert(_opened_fds[i].stat.st_dev == new.st_dev);
+
+		if (_opened_fds[i].stat.st_ino == new.st_ino)
+			return true;
+	}
+
+	return false;
+}
+
+static int __search_and_open(const char *base, int offset, unsigned int chipset, int as_idx)
 {
 	const char *forced;
 
@@ -259,6 +303,10 @@ static int __search_and_open(const char *base, int offset, unsigned int chipset)
 		int fd;
 
 		sprintf(name, "%s%u", base, i + offset);
+
+		if (_is_already_opened(name, as_idx))
+			continue;
+
 		fd = open_device(name, chipset);
 		if (fd != -1)
 			return fd;
@@ -283,17 +331,17 @@ static void __try_modprobe(unsigned int chipset)
 	pthread_mutex_unlock(&mutex);
 }
 
-static int __open_driver(const char *base, int offset, unsigned int chipset)
+static int __open_driver(const char *base, int offset, unsigned int chipset, int as_idx)
 {
 	int fd;
 
-	fd = __search_and_open(base, offset, chipset);
+	fd = __search_and_open(base, offset, chipset, as_idx);
 	if (fd != -1)
 		return fd;
 
 	__try_modprobe(chipset);
 
-	return __search_and_open(base, offset, chipset);
+	return __search_and_open(base, offset, chipset, as_idx);
 }
 
 static int __open_driver_exact(const char *name, unsigned int chipset)
@@ -320,13 +368,13 @@ static int __open_driver_exact(const char *name, unsigned int chipset)
  * True if card according to the added filter was found,
  * false othwerwise.
  */
-static bool __get_the_first_card(struct igt_device_card *card)
+static bool __get_card_for_nth_filter(int idx, struct igt_device_card *card)
 {
 	const char *filter;
 
-	if (igt_device_filter_count() > 0) {
-		filter = igt_device_filter_get(0);
-		igt_info("Looking for devices to open using filter: %s\n", filter);
+	if (igt_device_filter_count() > idx) {
+		filter = igt_device_filter_get(idx);
+		igt_info("Looking for devices to open using filter %d: %s\n", idx, filter);
 
 		if (igt_device_card_match(filter, card)) {
 			igt_info("Filter matched %s | %s\n", card->card, card->render);
@@ -337,6 +385,92 @@ static bool __get_the_first_card(struct igt_device_card *card)
 	}
 
 	return false;
+}
+
+/**
+ * __drm_open_driver_another:
+ * @idx: index of the device you are opening
+ * @chipset: OR'd flags for each chipset to search, eg. #DRIVER_INTEL
+ *
+ * This function is intended to be used instead of drm_open_driver() for tests
+ * that are opening multiple /dev/dri/card* nodes, usually for the purpose of
+ * multi-GPU testing.
+ *
+ * This function opens device in the following order:
+ *
+ * 1. when --device arguments are present:
+ *   * device scanning is executed,
+ *   * idx-th filter (starting with 0, filters are semicolon separated) is used
+ *   * if there is no idx-th filter, goto 2
+ *   * first device maching the filter is selected
+ *   * if it's already opened (for indexes = 0..idx-1) we fail with -1
+ *   * otherwise open the device and return the fd
+ *
+ * 2. compatibility mode - open the first DRM device we can find that is not
+ *    already opened for indexes 0..idx-1, searching up to 16 device nodes
+ *
+ * The test is reponsible to test the interaction between devices in both
+ * directions if applicable.
+ *
+ * Example:
+ *
+ * |[<!-- language="c" -->
+ * igt_subtest_with_dynamic("basic") {
+ * 	int first_fd = -1;
+ * 	int second_fd = -1;
+ *
+ * 	first_fd = __drm_open_driver_another(0, DRIVER_ANY);
+ * 	igt_require(first_fd >= 0);
+ *
+ * 	second_fd = __drm_open_driver_another(1, DRIVER_ANY);
+ * 	igt_require(second_fd >= 0);
+ *
+ * 	if (can_do_foo(first_fd, second_fd))
+ * 		igt_dynamic("first-to-second")
+ * 			test_basic_from_to(first_fd, second_fd);
+ *
+ * 	if (can_do_foo(second_fd, first_fd))
+ * 		igt_dynamic("second-to-first")
+ * 			test_basic_from_to(second_fd, first_fd);
+ *
+ * 	close(first_fd);
+ * 	close(second_fd);
+ * }
+ * ]|
+ *
+ * Returns:
+ * An open DRM fd or -1 on error
+ */
+int __drm_open_driver_another(int idx, int chipset)
+{
+	int fd = -1;
+	if (igt_device_filter_count() > idx) {
+		bool found;
+		struct igt_device_card card;
+
+		found = __get_card_for_nth_filter(idx, &card);
+
+		if (!found) {
+			__try_modprobe(chipset);
+			found = __get_card_for_nth_filter(idx, &card);
+		}
+
+		if (!found || !strlen(card.card))
+			igt_warn("No card matches the filter!\n");
+		else if (_is_already_opened(card.card, idx))
+			igt_warn("card maching filter %d is already opened\n", idx);
+		else
+			fd = __open_driver_exact(card.card, chipset);
+
+	} else {
+		/* no filter for device idx, let's open whatever is available */
+		fd = __open_driver("/dev/dri/card", 0, chipset, idx);
+	}
+
+	if (fd >= 0)
+		_set_opened_fd(idx, fd);
+
+	return fd;
 }
 
 /**
@@ -354,19 +488,7 @@ static bool __get_the_first_card(struct igt_device_card *card)
  */
 int __drm_open_driver(int chipset)
 {
-	if (igt_device_filter_count() > 0) {
-		bool found;
-		struct igt_device_card card;
-
-		found = __get_the_first_card(&card);
-
-		if (!found || !strlen(card.card))
-			return -1;
-
-		return __open_driver_exact(card.card, chipset);
-	}
-
-	return __open_driver("/dev/dri/card", 0, chipset);
+	return __drm_open_driver_another(0, chipset);
 }
 
 int __drm_open_driver_render(int chipset)
@@ -375,7 +497,7 @@ int __drm_open_driver_render(int chipset)
 		bool found;
 		struct igt_device_card card;
 
-		found = __get_the_first_card(&card);
+		found = __get_card_for_nth_filter(0, &card);
 
 		if (!found || !strlen(card.render))
 			return -1;
@@ -383,7 +505,7 @@ int __drm_open_driver_render(int chipset)
 		return __open_driver_exact(card.render, chipset);
 	}
 
-	return __open_driver("/dev/dri/renderD", 128, chipset);
+	return __open_driver("/dev/dri/renderD", 128, chipset, 0);
 }
 
 static int at_exit_drm_fd = -1;
