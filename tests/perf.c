@@ -38,9 +38,10 @@
 #include <poll.h>
 #include <math.h>
 
+#include "i915/gem.h"
+#include "i915/perf.h"
 #include "igt.h"
 #include "igt_sysfs.h"
-#include "i915/perf.h"
 #include "drm.h"
 
 IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");

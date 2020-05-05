@@ -26,7 +26,6 @@
  *
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,6 +38,8 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "igt.h"
 #include "igt_device.h"
 
 #define OBJECT_SIZE (16*1024*1024)

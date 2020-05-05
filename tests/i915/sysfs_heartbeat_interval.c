@@ -31,14 +31,14 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "drmtest.h" /* gem_quiescent_gpu()! */
+#include "drmtest.h"
+#include "i915/gem.h"
+#include "i915/gem_context.h"
 #include "i915/gem_engine_topology.h"
+#include "igt_debugfs.h"
 #include "igt_dummyload.h"
 #include "igt_sysfs.h"
-#include "ioctl_wrappers.h" /* igt_require_gem()! */
 #include "sw_sync.h"
-
-#include "igt_debugfs.h"
 
 #define ATTR "heartbeat_interval_ms"
 #define RESET_TIMEOUT 50 /* milliseconds, at least one jiffie for kworker */

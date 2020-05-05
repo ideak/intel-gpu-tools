@@ -21,9 +21,10 @@
  * IN THE SOFTWARE.
  */
 
+#include "i915/gem.h"
+#include "i915/gem_vm.h"
 #include "igt.h"
 #include "igt_dummyload.h"
-#include "i915/gem_vm.h"
 
 static int vm_create_ioctl(int i915, struct drm_i915_gem_vm_control *ctl)
 {

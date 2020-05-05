@@ -25,7 +25,6 @@
  *
  */
 
-#include "igt.h"
 #include <pthread.h>
 #include <unistd.h>
 #include <signal.h>
@@ -40,7 +39,10 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/syscall.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 
 #define OBJECT_SIZE (256 * 1024)
 

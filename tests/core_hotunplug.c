@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_device_scan.h"
 #include "igt_kmod.h"

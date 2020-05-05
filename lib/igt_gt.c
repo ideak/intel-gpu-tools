@@ -32,6 +32,8 @@
 #include <fcntl.h>
 
 #include "drmtest.h"
+#include "i915/gem.h"
+#include "i915/gem_engine_topology.h"
 #include "igt_aux.h"
 #include "igt_core.h"
 #include "igt_gt.h"
@@ -41,7 +43,6 @@
 #include "intel_reg.h"
 #include "intel_chipset.h"
 #include "igt_dummyload.h"
-#include "i915/gem_engine_topology.h"
 
 /**
  * SECTION:igt_gt

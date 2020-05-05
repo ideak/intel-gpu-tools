@@ -30,19 +30,20 @@
 
 #include <i915_drm.h>
 
-#include "igt_core.h"
 #include "drmtest.h"
+#include "i915/gem.h"
+#include "i915/gem_engine_topology.h"
+#include "i915/gem_mman.h"
+#include "i915/gem_submission.h"
+#include "igt_core.h"
 #include "igt_device.h"
 #include "igt_dummyload.h"
 #include "igt_gt.h"
+#include "igt_vgem.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
 #include "sw_sync.h"
-#include "igt_vgem.h"
-#include "i915/gem_engine_topology.h"
-#include "i915/gem_mman.h"
-#include "i915/gem_submission.h"
 
 /**
  * SECTION:igt_dummyload

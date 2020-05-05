@@ -22,7 +22,6 @@
  *
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -34,7 +33,10 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 
 IGT_TEST_DESCRIPTION(
    "pwrite to a snooped bo then make it uncached and check that the GPU sees the data.");

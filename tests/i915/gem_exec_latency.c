@@ -22,7 +22,6 @@
  *
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -40,11 +39,13 @@
 
 #include "drm.h"
 
+#include "igt.h"
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
 #include "igt_dummyload.h"
 #include "igt_stats.h"
 
+#include "i915/gem.h"
 #include "i915/gem_ring.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)

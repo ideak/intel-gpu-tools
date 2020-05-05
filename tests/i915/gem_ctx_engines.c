@@ -22,8 +22,6 @@
  *
  */
 
-#include "igt.h"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -38,7 +36,9 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
 #include "i915/gem_context.h"
+#include "igt.h"
 #include "sw_sync.h"
 
 #define engine_class(e, n) ((e)->engines[(n)].engine_class)

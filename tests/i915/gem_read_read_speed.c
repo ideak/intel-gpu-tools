@@ -26,8 +26,6 @@
  * This is a test of performance with multiple readers from the same source.
  */
 
-#include "igt.h"
-#include "igt_sysfs.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -41,6 +39,9 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "igt.h"
+#include "igt_sysfs.h"
 #include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Test speed of concurrent reads between engines.");

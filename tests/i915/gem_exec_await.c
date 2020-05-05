@@ -22,14 +22,15 @@
  *
  */
 
+#include <sys/ioctl.h>
+#include <sys/signal.h>
+
+#include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
-#include "i915/gem_ring.h"
-
-#include <sys/ioctl.h>
-#include <sys/signal.h>
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)

@@ -22,6 +22,7 @@
  *
  */
 
+#include "i915/gem.h"
 #include "igt.h"
 
 #define MAX_ERROR 5 /* % */

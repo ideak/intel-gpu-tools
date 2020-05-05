@@ -29,12 +29,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "drmtest.h" /* gem_quiescent_gpu()! */
+#include "drmtest.h"
+#include "i915/gem.h"
 #include "i915/gem_engine_topology.h"
 #include "i915/gem_mman.h"
 #include "igt_dummyload.h"
 #include "igt_sysfs.h"
-#include "ioctl_wrappers.h" /* igt_require_gem()! */
+#include "ioctl_wrappers.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "sw_sync.h"

@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <time.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_perf.h"
 #include "igt_rapl.h"

@@ -21,6 +21,8 @@
  * IN THE SOFTWARE.
  */
 #include "config.h"
+
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_sysfs.h"
 #include <fcntl.h>

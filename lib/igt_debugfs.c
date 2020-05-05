@@ -1110,13 +1110,10 @@ static int get_object_count(int fd)
  */
 int igt_get_stable_obj_count(int driver)
 {
-	int obj_count;
-	gem_quiescent_gpu(driver);
-	obj_count = get_object_count(driver);
 	/* The test relies on the system being in the same state before and
 	 * after the test so any difference in the object count is a result of
 	 * leaks during the test. */
-	return obj_count;
+	return get_object_count(driver);
 }
 
 void __igt_debugfs_dump(int device, const char *filename, int level)

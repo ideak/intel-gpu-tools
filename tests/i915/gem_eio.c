@@ -41,6 +41,8 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_device.h"
 #include "igt_fb.h"
@@ -48,7 +50,6 @@
 #include "igt_stats.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
-#include "i915/gem_ring.h"
 
 IGT_TEST_DESCRIPTION("Test that specific ioctls report a wedged GPU (EIO).");
 

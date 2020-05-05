@@ -21,16 +21,17 @@
  * IN THE SOFTWARE.
  */
 
+#include <sys/ioctl.h>
+#include <sys/poll.h>
+#include <sys/signal.h>
+
+#include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_syncobj.h"
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
 #include "sw_sync.h"
-#include "i915/gem_ring.h"
-
-#include <sys/ioctl.h>
-#include <sys/poll.h>
-#include <sys/signal.h>
 
 IGT_TEST_DESCRIPTION("Check that execbuf waits for explicit fences");
 

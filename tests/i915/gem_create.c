@@ -47,8 +47,8 @@
 #include <pthread.h>
 #include <stdatomic.h>
 
-#include <drm.h>
-
+#include "drm.h"
+#include "drmtest.h"
 #include "ioctl_wrappers.h"
 #include "intel_bufmgr.h"
 #include "intel_batchbuffer.h"
@@ -56,8 +56,6 @@
 #include "intel_chipset.h"
 #include "igt_aux.h"
 #include "igt_x86.h"
-#include "drmtest.h"
-#include "drm.h"
 #include "i915/gem_mman.h"
 #include "i915_drm.h"
 

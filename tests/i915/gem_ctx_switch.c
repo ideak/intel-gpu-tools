@@ -25,7 +25,6 @@
  *
  */
 
-#include "igt.h"
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -39,7 +38,10 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <time.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)

@@ -25,10 +25,11 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 
+#include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_vgem.h"
-#include "i915/gem_ring.h"
 
 #define LOCAL_EXEC_NO_RELOC (1<<11)
 #define PAGE_ALIGN(x) ALIGN(x, 4096)

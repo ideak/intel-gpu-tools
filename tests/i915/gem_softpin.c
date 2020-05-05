@@ -26,6 +26,7 @@
  *
  */
 
+#include "i915/gem.h"
 #include "igt.h"
 
 #define EXEC_OBJECT_PINNED	(1<<4)

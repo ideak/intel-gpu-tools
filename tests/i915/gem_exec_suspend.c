@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_dummyload.h"
 #include "igt_gt.h"

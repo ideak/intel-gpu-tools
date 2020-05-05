@@ -22,8 +22,6 @@
  *
  */
 
-#include "igt.h"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -38,7 +36,9 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
 #include "i915/gem_engine_topology.h"
+#include "igt.h"
 #include "igt_rand.h"
 #include "igt_vgem.h"
 #include "sw_sync.h"

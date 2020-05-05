@@ -27,6 +27,7 @@
  * Exercise the shrinker by overallocating GEM objects
  */
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_gt.h"
 #include "igt_debugfs.h"

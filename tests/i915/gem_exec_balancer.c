@@ -23,10 +23,11 @@
 
 #include <sched.h>
 
+#include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_gt.h"
 #include "igt_perf.h"
-#include "i915/gem_ring.h"
 #include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Exercise in-kernel load-balancing");

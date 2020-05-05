@@ -28,7 +28,9 @@
 
 #include <i915_drm.h>
 
+#include "i915/gem.h"
 #include "i915/gem_engine_topology.h"
+#include "i915/gem_submission.h"
 
 #include "igt_core.h"
 #include "igt_gt.h"
@@ -36,8 +38,6 @@
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
-
-#include "i915/gem_submission.h"
 
 /**
  * SECTION:gem_submission
@@ -157,24 +157,6 @@ bool gem_has_execlists(int fd)
 bool gem_has_guc_submission(int fd)
 {
 	return gem_submission_method(fd) & GEM_SUBMISSION_GUC;
-}
-
-/**
- * gem_reopen_driver:
- * @fd: re-open the i915 drm file descriptor
- *
- * Re-opens the drm fd which is useful in instances where a clean default
- * context is needed.
- */
-int gem_reopen_driver(int fd)
-{
-	char path[256];
-
-	snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
-	fd = open(path, O_RDWR);
-	igt_assert_fd(fd);
-
-	return fd;
 }
 
 static bool is_wedged(int i915)

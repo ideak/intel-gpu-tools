@@ -30,7 +30,6 @@
  * Testcase: run a couple of big batches to force the eviction code.
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -42,7 +41,10 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 
 #include "eviction_common.c"
 

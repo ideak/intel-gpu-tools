@@ -38,6 +38,8 @@
 #include <poll.h>
 #include <sched.h>
 
+#include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_core.h"
 #include "igt_device.h"
@@ -45,7 +47,6 @@
 #include "igt_perf.h"
 #include "igt_sysfs.h"
 #include "igt_pm.h"
-#include "i915/gem_ring.h"
 #include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Test the i915 pmu perf interface");

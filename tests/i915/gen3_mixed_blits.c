@@ -33,7 +33,6 @@
  * The goal is to simply ensure the basics work.
  */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,9 +42,11 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
-#include "drm.h"
 
+#include "drm.h"
+#include "i915/gem.h"
 #include "i915_reg.h"
+#include "igt.h"
 
 #define WIDTH (512)
 #define HEIGHT (512)

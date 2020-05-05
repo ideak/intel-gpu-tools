@@ -41,7 +41,6 @@
  * resulted.
  */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -53,6 +52,8 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "igt.h"
 
 IGT_TEST_DESCRIPTION("Test doing many tiled blits, with a working set larger"
 		     " than the aperture size.");

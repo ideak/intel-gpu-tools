@@ -29,6 +29,7 @@
 
 #include <pthread.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_gt.h"
 

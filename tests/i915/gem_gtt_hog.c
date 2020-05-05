@@ -25,7 +25,6 @@
  *
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -40,6 +39,8 @@
 #include <sys/wait.h>
 
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 
 static const uint32_t canary = 0xdeadbeef;
 

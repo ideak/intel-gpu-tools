@@ -25,13 +25,13 @@
  *
  */
 
-#include "igt.h"
-
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <time.h>
 
+#include "i915/gem.h"
+#include "igt.h"
 #include "igt_rand.h"
 #include "sw_sync.h"
 

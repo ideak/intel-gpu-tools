@@ -30,6 +30,7 @@
 #include <inttypes.h>
 #include <errno.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Test execbuf fence accounting.");

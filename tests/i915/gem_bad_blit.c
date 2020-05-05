@@ -41,7 +41,6 @@
  * resulted.
  */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -50,7 +49,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 #include "intel_bufmgr.h"
 
 static drm_intel_bufmgr *bufmgr;

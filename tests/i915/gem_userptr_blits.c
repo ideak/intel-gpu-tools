@@ -38,7 +38,6 @@
 
 #include <linux/userfaultfd.h>
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -61,6 +60,8 @@
 #include "drm.h"
 #include "i915_drm.h"
 
+#include "i915/gem.h"
+#include "igt.h"
 #include "intel_bufmgr.h"
 
 #include "eviction_common.c"

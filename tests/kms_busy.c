@@ -21,11 +21,12 @@
  * IN THE SOFTWARE.
  */
 
-#include "igt.h"
-
 #include <sys/poll.h>
 #include <signal.h>
 #include <time.h>
+
+#include "i915/gem.h"
+#include "igt.h"
 
 IGT_TEST_DESCRIPTION("Basic check of KMS ABI with busy framebuffers.");
 

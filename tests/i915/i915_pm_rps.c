@@ -36,6 +36,7 @@
 #include <time.h>
 #include <sys/wait.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_dummyload.h"
 #include "igt_sysfs.h"

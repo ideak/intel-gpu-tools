@@ -29,7 +29,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "drmtest.h" /* gem_quiescent_gpu()! */
+#include "drmtest.h"
+#include "i915/gem.h"
 #include "i915/gem_context.h"
 #include "i915/gem_engine_topology.h"
 #include "ioctl_wrappers.h" /* gem_wait()! */

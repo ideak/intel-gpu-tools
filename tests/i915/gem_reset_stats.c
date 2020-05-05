@@ -25,8 +25,6 @@
  *
  */
 
-#include "igt.h"
-#include "igt_sysfs.h"
 #include <limits.h>
 #include <stdbool.h>
 #include <unistd.h>
@@ -42,6 +40,9 @@
 #include <time.h>
 #include <signal.h>
 
+#include "i915/gem.h"
+#include "igt.h"
+#include "igt_sysfs.h"
 
 #define RS_NO_ERROR      0
 #define RS_BATCH_ACTIVE  (1 << 0)

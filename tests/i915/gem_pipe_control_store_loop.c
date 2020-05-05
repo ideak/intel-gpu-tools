@@ -31,7 +31,6 @@
  * Writes a counter-value into an always newly allocated target bo (by disabling
  * buffer reuse). Decently trashes on tlb inconsistencies, too.
  */
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -40,7 +39,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 #include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Test (TLB-)Coherency of pipe_control QW writes.");

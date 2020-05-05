@@ -21,7 +21,6 @@
  * IN THE SOFTWARE.
  */
 
-#include "igt.h"
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -36,8 +35,10 @@
 
 #include <drm.h>
 
-#include "intel_bufmgr.h"
+#include "i915/gem.h"
+#include "igt.h"
 #include "igt_debugfs.h"
+#include "intel_bufmgr.h"
 
 #define WIDTH 512
 #define STRIDE (WIDTH*4)

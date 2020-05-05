@@ -27,7 +27,6 @@
 
 /* Exercises the basic execbuffer using object alignments */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -42,6 +41,8 @@
 #include <sched.h>
 
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 
 IGT_TEST_DESCRIPTION("Exercises the basic execbuffer using object alignments");
 

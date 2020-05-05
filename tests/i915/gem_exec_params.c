@@ -25,9 +25,6 @@
  *
  */
 
-#include "igt.h"
-#include "igt_device.h"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -39,8 +36,11 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
-#include "drm.h"
 
+#include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
+#include "igt_device.h"
 
 #define LOCAL_I915_EXEC_VEBOX (4<<0)
 #define LOCAL_I915_EXEC_BSD_MASK (3<<13)

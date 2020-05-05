@@ -29,8 +29,6 @@
  * workload for the 3D engine.
  */
 
-#include "igt.h"
-#include "igt_x86.h"
 #include <stdbool.h>
 #include <unistd.h>
 #include <cairo.h>
@@ -46,6 +44,9 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "igt.h"
+#include "igt_x86.h"
 #include "intel_bufmgr.h"
 #include "rendercopy_bufmgr.h"
 

@@ -27,7 +27,6 @@
 
 /* Exercises the basic execbuffer using the handle LUT interface */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -36,7 +35,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 
 IGT_TEST_DESCRIPTION("Exercises the basic execbuffer using the handle LUT"
 		     " interface.");

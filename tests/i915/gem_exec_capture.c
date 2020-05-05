@@ -23,6 +23,7 @@
 
 #include <zlib.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_device.h"
 #include "igt_rand.h"

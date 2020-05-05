@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_perf.h"
 #include "igt_sysfs.h"

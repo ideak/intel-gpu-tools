@@ -30,7 +30,6 @@
  * Testcase: run a couple of big batches to force the unbind on misalignment code.
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -45,6 +44,8 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "igt.h"
 
 IGT_TEST_DESCRIPTION("Run a couple of big batches to force the unbind on"
 		     " misalignment code.");

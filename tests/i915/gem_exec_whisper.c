@@ -27,6 +27,7 @@
  * Pass around a value to write into a scratch buffer between lots of batches
  */
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_debugfs.h"
 #include "igt_rapl.h"

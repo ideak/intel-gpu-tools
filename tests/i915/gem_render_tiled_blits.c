@@ -33,7 +33,6 @@
  * The goal is to simply ensure the basics work.
  */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
@@ -46,6 +45,8 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "igt.h"
 #include "intel_bufmgr.h"
 
 #define WIDTH 512

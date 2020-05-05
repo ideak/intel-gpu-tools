@@ -24,6 +24,7 @@
 #include <time.h>
 #include <pthread.h>
 
+#include "i915/gem.h"
 #include "igt_debugfs.h"
 #include "igt_dummyload.h"
 #include "igt_gt.h"

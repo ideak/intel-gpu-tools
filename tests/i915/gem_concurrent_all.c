@@ -35,8 +35,6 @@
  * Based on gem_gtt_concurrent_blt.
  */
 
-#include "igt.h"
-#include "igt_vgem.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -50,6 +48,9 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "igt.h"
+#include "igt_vgem.h"
 #include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Test of pread/pwrite/mmap behavior when writing to active"

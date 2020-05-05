@@ -31,11 +31,12 @@
  * catching failure to manage the ring properly near full.
  */
 
+#include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_device.h"
 #include "igt_gt.h"
 #include "igt_vgem.h"
-#include "i915/gem_ring.h"
 
 #include <signal.h>
 #include <sys/ioctl.h>

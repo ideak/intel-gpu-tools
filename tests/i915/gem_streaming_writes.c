@@ -25,7 +25,6 @@
  *
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -36,7 +35,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 
 #define OBJECT_SIZE 1024*1024
 #define CHUNK_SIZE 32

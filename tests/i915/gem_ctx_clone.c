@@ -21,10 +21,11 @@
  * IN THE SOFTWARE.
  */
 
-#include "igt.h"
-#include "igt_gt.h"
+#include "i915/gem.h"
 #include "i915/gem_vm.h"
 #include "i915_drm.h"
+#include "igt.h"
+#include "igt_gt.h"
 
 static int ctx_create_ioctl(int i915, struct drm_i915_gem_context_create_ext *arg)
 {

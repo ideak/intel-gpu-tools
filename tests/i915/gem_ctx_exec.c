@@ -24,7 +24,6 @@
  *    Ben Widawsky <ben@bwidawsk.net>
  *
  */
-#include "igt.h"
 #include <limits.h>
 #include <unistd.h>
 #include <signal.h>
@@ -41,6 +40,8 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "igt.h"
 #include "igt_dummyload.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"

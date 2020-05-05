@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  */
 
+#include "i915/gem.h"
 #include "igt.h"
 
 #define LOCAL_OBJECT_ASYNC (1 << 6)

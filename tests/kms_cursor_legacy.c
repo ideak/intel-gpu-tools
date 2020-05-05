@@ -25,6 +25,7 @@
 #include <sched.h>
 #include <sys/poll.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_stats.h"

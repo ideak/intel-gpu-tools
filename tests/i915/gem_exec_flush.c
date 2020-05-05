@@ -23,6 +23,7 @@
 
 #include <time.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_x86.h"
 

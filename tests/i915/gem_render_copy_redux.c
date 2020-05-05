@@ -32,7 +32,6 @@
  * the execbuffer interface with a simple render workload.
  */
 
-#include "igt.h"
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -47,6 +46,8 @@
 
 #include <drm.h>
 
+#include "i915/gem.h"
+#include "igt.h"
 #include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Advanced test for the render_copy() function.");

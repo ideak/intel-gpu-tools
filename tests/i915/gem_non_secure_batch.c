@@ -25,7 +25,6 @@
  *
  */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -34,9 +33,12 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+
 #include "drm.h"
-#include "intel_bufmgr.h"
 #include "i830_reg.h"
+#include "i915/gem.h"
+#include "igt.h"
+#include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Basic check of non-secure batches.");
 

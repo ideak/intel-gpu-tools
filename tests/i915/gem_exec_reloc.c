@@ -24,6 +24,7 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_dummyload.h"
 #include "sw_sync.h"

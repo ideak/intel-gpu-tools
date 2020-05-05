@@ -25,11 +25,6 @@
  *
  */
 
-#include "igt.h"
-#include "igt_device.h"
-#include "igt_rand.h"
-#include "igt_sysfs.h"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -43,7 +38,14 @@
 #include <sys/poll.h>
 #include <sys/time.h>
 #include <time.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
+#include "igt_device.h"
+#include "igt_rand.h"
+#include "igt_sysfs.h"
+
 
 #define LOCAL_I915_EXEC_NO_RELOC (1<<11)
 #define LOCAL_I915_EXEC_HANDLE_LUT (1<<12)

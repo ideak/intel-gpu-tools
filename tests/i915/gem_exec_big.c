@@ -32,7 +32,6 @@
  * Mostly useful to stress-test the error-capture code
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -44,7 +43,10 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 
 IGT_TEST_DESCRIPTION("Run a large nop batch to stress test the error capture"
 		     " code.");

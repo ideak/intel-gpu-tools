@@ -24,11 +24,13 @@
  *   Ander Conselvan de Oliveira <ander.conselvan.de.oliveira@intel.com>
  */
 
-#include "igt.h"
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "i915/gem.h"
+#include "igt.h"
 
 IGT_TEST_DESCRIPTION("Test page flips and tiling scenarios");
 

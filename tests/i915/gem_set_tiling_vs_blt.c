@@ -44,7 +44,6 @@
  * transitions (i.e. changing stride).
  */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -54,7 +53,10 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <stdbool.h>
+
 #include "drm.h"
+#include "i915/gem.h"
+#include "igt.h"
 #include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Check for proper synchronization of tiling changes vs."

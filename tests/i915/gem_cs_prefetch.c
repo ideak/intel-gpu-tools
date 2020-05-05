@@ -35,6 +35,7 @@
  * This test for a bug where we've failed to plug a scratch pte entry into the
  * very last gtt pte.
  */
+#include "i915/gem.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Test the CS prefetch behaviour on batches.");

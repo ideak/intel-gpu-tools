@@ -24,13 +24,16 @@
  *    Jeff McGee <jeff.mcgee@intel.com>
  */
 
-#include "igt.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <time.h>
+
 #include "i915_drm.h"
+
+#include "i915/gem.h"
+#include "igt.h"
 #include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Tests slice/subslice/EU power gating functionality.\n");

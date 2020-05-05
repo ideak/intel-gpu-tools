@@ -48,6 +48,7 @@
 
 #include "drmtest.h"
 #include "i915_drm.h"
+#include "i915/gem.h"
 #include "intel_chipset.h"
 #include "intel_io.h"
 #include "igt_debugfs.h"
@@ -160,27 +161,6 @@ static const char *forced_driver(void)
 		return _forced_driver;
 
 	return NULL;
-}
-
-#define LOCAL_I915_EXEC_VEBOX	(4 << 0)
-/**
- * gem_quiescent_gpu:
- * @fd: open i915 drm file descriptor
- *
- * Ensure the gpu is idle by launching a nop execbuf and stalling for it. This
- * is automatically run when opening a drm device node and is also installed as
- * an exit handler to have the best assurance that the test is run in a pristine
- * and controlled environment.
- *
- * This function simply allows tests to make additional calls in-between, if so
- * desired.
- */
-void gem_quiescent_gpu(int fd)
-{
-	igt_terminate_spins();
-
-	igt_drop_caches_set(fd,
-			    DROP_ACTIVE | DROP_RETIRE | DROP_IDLE | DROP_FREED);
 }
 
 static int modprobe(const char *driver)

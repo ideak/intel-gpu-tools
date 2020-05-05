@@ -21,13 +21,13 @@
  * IN THE SOFTWARE.
  */
 
-#include "igt.h"
-#include "igt_vgem.h"
-
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <time.h>
 
+#include "i915/gem.h"
+#include "igt.h"
+#include "igt_vgem.h"
 #include "intel_batchbuffer.h"	/* igt_blitter_src_copy() */
 
 IGT_TEST_DESCRIPTION("Basic check of polling for prime/vgem fences.");

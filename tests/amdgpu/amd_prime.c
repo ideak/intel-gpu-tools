@@ -21,13 +21,14 @@
  * IN THE SOFTWARE.
  */
 
-#include "igt.h"
-#include "igt_vgem.h"
-
 #include <amdgpu.h>
 #include <amdgpu_drm.h>
 
 #include <sys/poll.h>
+
+#include "i915/gem.h"
+#include "igt.h"
+#include "igt_vgem.h"
 
 #define GFX_COMPUTE_NOP  0xffff1000
 #define SDMA_NOP  0x0

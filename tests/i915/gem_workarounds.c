@@ -25,9 +25,10 @@
  *
  */
 
-#include "igt.h"
-
 #include <fcntl.h>
+
+#include "i915/gem.h"
+#include "igt.h"
 
 #define PAGE_SIZE 4096
 #define PAGE_ALIGN(x) ALIGN(x, PAGE_SIZE)

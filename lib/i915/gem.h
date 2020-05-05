@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019 Intel Corporation
+ * Copyright © 2007,2014,2020 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,21 +19,15 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
+ *
  */
 
-#ifndef GEM_VM_H
-#define GEM_VM_H
+#ifndef I915_GEM_H
+#define I915_GEM_H
 
-#include <stdbool.h>
-#include <stdint.h>
+void igt_require_gem(int i915);
+void gem_quiescent_gpu(int i915);
 
-bool gem_has_vm(int i915);
-void gem_require_vm(int i915);
+int gem_reopen_driver(int i915);
 
-uint32_t gem_vm_create(int i915);
-int __gem_vm_create(int i915, uint32_t *vm_id);
-
-void gem_vm_destroy(int i915, uint32_t vm_id);
-int __gem_vm_destroy(int i915, uint32_t vm_id);
-
-#endif /* GEM_VM_H */
+#endif /* I915_GEM_H */

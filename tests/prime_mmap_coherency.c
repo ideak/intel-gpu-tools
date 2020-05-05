@@ -29,6 +29,7 @@
  * TODO: need to show the need for prime_sync_end().
  */
 
+#include "i915/gem.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Test dma-buf mmap on !llc platforms mostly and provoke"

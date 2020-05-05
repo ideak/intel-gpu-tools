@@ -28,8 +28,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "igt.h"
+#include "i915/gem.h"
 #include "i915/gem_submission.h"
+#include "igt.h"
 #include "sw_sync.h"
 
 /* To help craft commands known to be invalid across all engines */
