@@ -172,8 +172,6 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 	 * to recover from reset and for it to remain wedged. It's hard to
 	 * say even if we do hang/reset making the test suspect.
 	 */
-	igt_require_gem(fd);
-
 	if (!igt_check_boolean_env_var("IGT_HANG", true))
 		igt_skip("hang injection disabled by user [IGT_HANG=0]\n");
 	gem_context_require_bannable(fd);

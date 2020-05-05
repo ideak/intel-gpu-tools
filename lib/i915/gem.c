@@ -22,6 +22,7 @@
  *
  */
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
@@ -29,6 +30,89 @@
 #include "igt.h"
 #include "igt_debugfs.h"
 #include "igt_sysfs.h"
+
+static void __restore_defaults(int engine)
+{
+	struct dirent *de;
+	int defaults;
+	DIR *dir;
+
+	defaults = openat(engine, ".defaults", O_RDONLY);
+	if (defaults < 0)
+		return;
+
+	dir = fdopendir(defaults);
+	if (!dir) {
+		close(defaults);
+		return;
+	}
+
+	while ((de = readdir(dir))) {
+		char buf[256];
+		int fd, len;
+
+		if (*de->d_name == '.')
+			continue;
+
+		fd = openat(defaults, de->d_name, O_RDONLY);
+		if (fd < 0)
+			continue;
+
+		len = read(fd, buf, sizeof(buf));
+		close(fd);
+		if (len < 0)
+			continue;
+
+		fd = openat(engine, de->d_name, O_WRONLY);
+		if (fd < 0)
+			continue;
+
+		write(fd, buf, len);
+		close(fd);
+	}
+
+	closedir(dir);
+}
+
+static void restore_defaults(int i915)
+{
+	struct dirent *de;
+	int engines;
+	DIR *dir;
+	int sys;
+
+	sys = igt_sysfs_open(i915);
+	if (sys < 0)
+		return;
+
+	engines = openat(sys, "engine", O_RDONLY);
+	if (engines < 0)
+		goto close_sys;
+
+	dir = fdopendir(engines);
+	if (!dir) {
+		close(engines);
+		goto close_sys;
+	}
+
+	while ((de = readdir(dir))) {
+		int engine;
+
+		if (*de->d_name == '.')
+			continue;
+
+		engine = openat(engines, de->d_name, O_RDONLY);
+		if (engine < 0)
+			continue;
+
+		__restore_defaults(engine);
+		close(engine);
+	}
+
+	closedir(dir);
+close_sys:
+	close(sys);
+}
 
 static void reset_device(int i915)
 {
@@ -66,6 +150,7 @@ void igt_require_gem(int i915)
 	 * sequences of batches.
 	 */
 	reset_device(i915);
+	restore_defaults(i915);
 
 	err = 0;
 	if (ioctl(i915, DRM_IOCTL_I915_GEM_THROTTLE)) {

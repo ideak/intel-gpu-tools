@@ -56,7 +56,6 @@ static void cleanup(int i915)
 			    DROP_RESET_ACTIVE | DROP_RESET_SEQNO |
 			    /* cleanup */
 			    DROP_ACTIVE | DROP_RETIRE | DROP_IDLE | DROP_FREED);
-	igt_require_gem(i915);
 }
 
 static int wait_for_status(int fence, int timeout)

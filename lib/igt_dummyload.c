@@ -355,8 +355,6 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 {
 	igt_spin_t *spin;
 
-	igt_require_gem(fd);
-
 	if (opts->engine != ALL_ENGINES) {
 		struct intel_execution_engine2 e;
 		int class;
