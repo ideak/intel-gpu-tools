@@ -745,11 +745,6 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 	gem_close(fd, obj[0].handle);
 }
 
-static void test_fence_flip(int i915)
-{
-	igt_skip_on_f(1, "no fence-in for atomic flips\n");
-}
-
 static bool has_submit_fence(int fd)
 {
 	struct drm_i915_getparam gp;
@@ -1524,11 +1519,6 @@ igt_main
 
 		igt_subtest("expired-history")
 			test_long_history(i915, ring_size, EXPIRED);
-	}
-
-	igt_subtest("flip") {
-		gem_quiescent_gpu(i915);
-		test_fence_flip(i915);
 	}
 
 	igt_subtest_group { /* syncobj */
