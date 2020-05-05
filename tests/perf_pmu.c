@@ -1894,29 +1894,39 @@ static void test_unload(void)
 	igt_fork(child, 1) {
 		const struct intel_execution_engine2 *e;
 		uint64_t *buf;
-		int count;
+		int count = 1;
 		int i915;
 		int fd;
 
 		i915 = __drm_open_driver(DRIVER_INTEL);
 
 		igt_debug("Opening perf events\n");
-		fd = open_group(i915, I915_PMU_REQUESTED_FREQUENCY, -1);
-		open_group(fd, I915_PMU_ACTUAL_FREQUENCY, fd);
-		count = 2;
+		fd = open_group(i915, I915_PMU_INTERRUPTS, -1);
+
+		if (perf_i915_open_group(i915, I915_PMU_REQUESTED_FREQUENCY,fd))
+			count++;
+		if (perf_i915_open_group(i915, I915_PMU_ACTUAL_FREQUENCY, fd))
+			count++;
 
 		__for_each_physical_engine(i915, e) {
-			open_group(i915,
-					I915_PMU_ENGINE_BUSY(e->class, e->instance),
-					fd);
-			open_group(i915,
-					I915_PMU_ENGINE_SEMA(e->class, e->instance),
-					fd);
-			open_group(i915,
-					I915_PMU_ENGINE_WAIT(e->class, e->instance),
-					fd);
-			count += 3;
+			if (perf_i915_open_group(i915,
+						 I915_PMU_ENGINE_BUSY(e->class, e->instance),
+						 fd) != -1)
+				count++;
+
+			if (perf_i915_open_group(i915,
+						 I915_PMU_ENGINE_SEMA(e->class, e->instance),
+						 fd) != -1)
+				count++;
+
+			if (perf_i915_open_group(i915,
+						 I915_PMU_ENGINE_WAIT(e->class, e->instance),
+						 fd) != -1)
+				count++;
 		}
+
+		if (perf_i915_open_group(i915, I915_PMU_RC6_RESIDENCY,fd) != -1)
+			count++;
 
 		close(i915);
 
