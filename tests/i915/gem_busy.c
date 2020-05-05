@@ -101,7 +101,6 @@ static void semaphore(int fd, const struct intel_execution_engine2 *e)
 {
 	struct intel_execution_engine2 *__e;
 	uint32_t bbe = MI_BATCH_BUFFER_END;
-	const unsigned uabi = e->class;
 	igt_spin_t *spin;
 	uint32_t handle[3];
 	uint32_t read, write;
@@ -122,15 +121,15 @@ static void semaphore(int fd, const struct intel_execution_engine2 *e)
 	igt_assert(exec_noop(fd, handle, e->flags, false));
 	igt_assert(still_busy(fd, handle[BUSY]));
 	__gem_busy(fd, handle[TEST], &read, &write);
-	igt_assert_eq(read, 1 << uabi);
+	igt_assert_eq(read, 1 << e->class);
 	igt_assert_eq(write, 0);
 
 	/* Requeue with a write */
 	igt_assert(exec_noop(fd, handle, e->flags, true));
 	igt_assert(still_busy(fd, handle[BUSY]));
 	__gem_busy(fd, handle[TEST], &read, &write);
-	igt_assert_eq(read, 1 << uabi);
-	igt_assert_eq(write, 1 + uabi);
+	igt_assert_eq(read, 1 << e->class);
+	igt_assert_eq(write, 1 + e->class);
 
 	/* Now queue it for a read across all available rings */
 	active = 0;
@@ -141,7 +140,7 @@ static void semaphore(int fd, const struct intel_execution_engine2 *e)
 	igt_assert(still_busy(fd, handle[BUSY]));
 	__gem_busy(fd, handle[TEST], &read, &write);
 	igt_assert_eq(read, active);
-	igt_assert_eq(write, 1 + uabi); /* from the earlier write */
+	igt_assert_eq(write, 1 + e->class); /* from the earlier write */
 
 	/* Check that our long batch was long enough */
 	igt_assert(still_busy(fd, handle[BUSY]));
@@ -161,96 +160,20 @@ static void semaphore(int fd, const struct intel_execution_engine2 *e)
 #define HANG 2
 static void one(int fd, const struct intel_execution_engine2 *e, unsigned test_flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj[2];
-#define SCRATCH 0
-#define BATCH 1
-	struct drm_i915_gem_relocation_entry store[1024+1];
-	struct drm_i915_gem_execbuffer2 execbuf;
-	unsigned size = ALIGN(ARRAY_SIZE(store)*16 + 4, 4096);
-	const unsigned uabi = e->class;
+	uint32_t scratch = gem_create(fd, 4096);
 	uint32_t read[2], write[2];
+	enum { READ, WRITE };
 	struct timespec tv;
-	uint32_t *batch, *bbe;
-	int i, count, timeout;
+	igt_spin_t *spin;
+	int timeout;
 
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.buffer_count = 2;
-	execbuf.flags = e->flags;
-	if (gen < 6)
-		execbuf.flags |= I915_EXEC_SECURE;
+	spin = igt_spin_new(fd,
+			    .engine = e->flags,
+			    .dependency = scratch,
+			    .flags = (test_flags & HANG) ? IGT_SPIN_NO_PREEMPTION : 0);
 
-	memset(obj, 0, sizeof(obj));
-	obj[SCRATCH].handle = gem_create(fd, 4096);
-
-	obj[BATCH].handle = gem_create(fd, size);
-	obj[BATCH].relocs_ptr = to_user_pointer(store);
-	obj[BATCH].relocation_count = ARRAY_SIZE(store);
-	memset(store, 0, sizeof(store));
-
-	batch = gem_mmap__wc(fd, obj[BATCH].handle, 0, size, PROT_WRITE);
-	gem_set_domain(fd, obj[BATCH].handle,
-			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-
-	i = 0;
-	for (count = 0; count < 1024; count++) {
-		store[count].target_handle = obj[SCRATCH].handle;
-		store[count].presumed_offset = -1;
-		store[count].offset = sizeof(uint32_t) * (i + 1);
-		store[count].delta = sizeof(uint32_t) * count;
-		store[count].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-		store[count].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
-		if (gen >= 8) {
-			batch[++i] = 0;
-			batch[++i] = 0;
-		} else if (gen >= 4) {
-			batch[++i] = 0;
-			batch[++i] = 0;
-			store[count].offset += sizeof(uint32_t);
-		} else {
-			batch[i]--;
-			batch[++i] = 0;
-		}
-		batch[++i] = count;
-		i++;
-	}
-
-	bbe = &batch[i];
-	store[count].target_handle = obj[BATCH].handle; /* recurse */
-	store[count].presumed_offset = 0;
-	store[count].offset = sizeof(uint32_t) * (i + 1);
-	store[count].delta = 0;
-	store[count].read_domains = I915_GEM_DOMAIN_COMMAND;
-	store[count].write_domain = 0;
-	batch[i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			store[count].delta = 1;
-		}
-	}
-	i++;
-
-	igt_assert(i < size/sizeof(*batch));
-
-	if ((test_flags & HANG) == 0)
-		igt_require(gem_class_has_mutable_submission(fd, e->class));
-
-	igt_require(__gem_execbuf(fd, &execbuf) == 0);
-
-	__gem_busy(fd, obj[SCRATCH].handle, &read[SCRATCH], &write[SCRATCH]);
-	__gem_busy(fd, obj[BATCH].handle, &read[BATCH], &write[BATCH]);
+	__gem_busy(fd, scratch, &read[WRITE], &write[WRITE]);
+	__gem_busy(fd, spin->handle, &read[READ], &write[READ]);
 
 	if (test_flags & PARALLEL) {
 		struct intel_execution_engine2 *e2;
@@ -260,42 +183,29 @@ static void one(int fd, const struct intel_execution_engine2 *e, unsigned test_f
 			    e2->instance == e->instance)
 				continue;
 
-			if (!gem_class_can_store_dword(fd, e2->class) ||
-			    !gem_class_has_mutable_submission(fd, e2->class))
-				continue;
-
 			igt_debug("Testing %s in parallel\n", e2->name);
 			one(fd, e2, 0);
 		}
 	}
 
 	timeout = 120;
-	if ((test_flags & HANG) == 0) {
-		*bbe = MI_BATCH_BUFFER_END;
-		__sync_synchronize();
-		timeout = 1;
-	}
+	if ((test_flags & HANG) == 0)
+		igt_spin_end(spin);
 
-	igt_assert_eq(write[SCRATCH], 1 + uabi);
-	igt_assert_eq_u32(read[SCRATCH], 1 << uabi);
+	igt_assert_eq(write[WRITE], 1 + e->class);
+	igt_assert_eq_u32(read[WRITE], 1 << e->class);
 
-	igt_assert_eq(write[BATCH], 0);
-	igt_assert_eq_u32(read[BATCH], 1 << uabi);
+	igt_assert_eq(write[READ], 0);
+	igt_assert_eq_u32(read[READ], 1 << e->class);
 
 	/* Calling busy in a loop should be enough to flush the rendering */
 	memset(&tv, 0, sizeof(tv));
-	while (gem_busy(fd, obj[BATCH].handle))
+	while (gem_busy(fd, spin->handle))
 		igt_assert(igt_seconds_elapsed(&tv) < timeout);
-	igt_assert(!gem_busy(fd, obj[SCRATCH].handle));
+	igt_assert(!gem_busy(fd, scratch));
 
-	munmap(batch, size);
-	batch = gem_mmap__wc(fd, obj[SCRATCH].handle, 0, 4096, PROT_READ);
-	for (i = 0; i < 1024; i++)
-		igt_assert_eq_u32(batch[i], i);
-	munmap(batch, 4096);
-
-	gem_close(fd, obj[BATCH].handle);
-	gem_close(fd, obj[SCRATCH].handle);
+	igt_spin_free(fd, spin);
+	gem_close(fd, scratch);
 }
 
 static void xchg_u32(void *array, unsigned i, unsigned j)
