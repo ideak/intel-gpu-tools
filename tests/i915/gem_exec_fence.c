@@ -376,19 +376,6 @@ static void test_fence_await(int fd, const struct intel_execution_engine2 *e,
 	gem_close(fd, scratch);
 }
 
-static void resubmit(int fd, uint32_t handle,
-		     const struct intel_execution_engine2 *e, int count)
-{
-	struct drm_i915_gem_exec_object2 obj = { .handle = handle };
-	struct drm_i915_gem_execbuffer2 execbuf = {
-		.buffers_ptr = to_user_pointer(&obj),
-		.buffer_count = 1,
-		.flags = e->flags,
-	};
-	while (count--)
-		gem_execbuf(fd, &execbuf);
-}
-
 static void alarm_handler(int sig)
 {
 }
@@ -405,173 +392,111 @@ static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 	return err;
 }
 
-static void test_parallel(int fd, const struct intel_execution_engine2 *e)
+static void test_parallel(int i915, const struct intel_execution_engine2 *e)
 {
 	const struct intel_execution_engine2 *e2;
-	const int SCRATCH = 0;
-	const int BATCH = 1;
-	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 obj[2];
-	struct drm_i915_gem_relocation_entry reloc[2];
-	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t scratch = gem_create(fd, 4096);
-	uint32_t *out = gem_mmap__wc(fd, scratch, 0, 4096, PROT_READ);
-	uint32_t handle[16];
-	uint32_t batch[16];
+	const int gen = intel_gen(intel_get_drm_devid(i915));
+	uint32_t scratch = gem_create(i915, 4096);
+	uint32_t *out = gem_mmap__wc(i915, scratch, 0, 4096, PROT_READ);
+	uint32_t handle[I915_EXEC_RING_MASK];
+	IGT_CORK_FENCE(cork);
 	igt_spin_t *spin;
-	IGT_CORK_HANDLE(c);
-	uint32_t plug;
-	int i, x = 0;
+	int fence;
+	int x = 0;
 
-	plug = igt_cork_plug(&c, fd);
-
-	/* Fill the queue with many requests so that the next one has to
-	 * wait before it can be executed by the hardware.
-	 */
-	spin = igt_spin_new(fd, .engine = e->flags, .dependency = plug);
-	resubmit(fd, spin->handle, e, 16);
-
-	/* Now queue the master request and its secondaries */
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(obj);
-	execbuf.buffer_count = 2;
-	execbuf.flags = e->flags | I915_EXEC_FENCE_OUT;
-	if (gen < 6)
-		execbuf.flags |= I915_EXEC_SECURE;
-
-	memset(obj, 0, sizeof(obj));
-	obj[SCRATCH].handle = scratch;
-
-	obj[BATCH].handle = gem_create(fd, 4096);
-	handle[x] = obj[BATCH].handle;
-	obj[BATCH].relocs_ptr = to_user_pointer(&reloc);
-	obj[BATCH].relocation_count = 2;
-	memset(reloc, 0, sizeof(reloc));
-
-	i = 0;
-
-	reloc[0].target_handle = obj[SCRATCH].handle;
-	reloc[0].presumed_offset = -1;
-	reloc[0].offset = sizeof(uint32_t) * (i + 1);
-	reloc[0].delta = sizeof(uint32_t) * x++;
-	reloc[0].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-	reloc[0].write_domain = 0; /* lies */
-
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
-	if (gen >= 8) {
-		batch[++i] = reloc[0].presumed_offset + reloc[0].delta;
-		batch[++i] = (reloc[0].presumed_offset + reloc[0].delta) >> 32;
-	} else if (gen >= 4) {
-		batch[++i] = 0;
-		batch[++i] = reloc[0].presumed_offset + reloc[0].delta;
-		reloc[0].offset += sizeof(uint32_t);
-	} else {
-		batch[i]--;
-		batch[++i] = reloc[0].presumed_offset + reloc[0].delta;
-	}
-	batch[++i] = ~0u ^ x;
-
-	reloc[1].target_handle = obj[BATCH].handle; /* recurse */
-	reloc[1].presumed_offset = 0;
-	reloc[1].offset = sizeof(uint32_t) * (i + 2);
-	reloc[1].delta = 0;
-	reloc[1].read_domains = I915_GEM_DOMAIN_COMMAND;
-	reloc[1].write_domain = 0;
-
-	batch[++i] = MI_BATCH_BUFFER_START;
-	if (gen >= 8) {
-		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
-	} else if (gen >= 6) {
-		batch[i] |= 1 << 8;
-		batch[++i] = 0;
-	} else {
-		batch[i] |= 2 << 6;
-		batch[++i] = 0;
-		if (gen < 4) {
-			batch[i] |= 1;
-			reloc[1].delta = 1;
-		}
-	}
-	batch[++i] = MI_BATCH_BUFFER_END;
-	igt_assert(i < sizeof(batch)/sizeof(batch[0]));
-	gem_write(fd, obj[BATCH].handle, 0, batch, sizeof(batch));
-	gem_execbuf_wr(fd, &execbuf);
-
-	igt_assert(execbuf.rsvd2);
-	execbuf.rsvd2 >>= 32; /* out fence -> in fence */
-	obj[BATCH].relocation_count = 1;
+	fence = igt_cork_plug(&cork, i915),
+	spin = igt_spin_new(i915,
+			    .engine = e->flags,
+			    .fence = fence,
+			    .flags = (IGT_SPIN_FENCE_OUT |
+				      IGT_SPIN_FENCE_IN));
+	close(fence);
 
 	/* Queue all secondaries */
-	__for_each_physical_engine(fd, e2) {
+	__for_each_physical_engine(i915, e2) {
+		struct drm_i915_gem_relocation_entry reloc = {
+			.target_handle = scratch,
+			.offset = sizeof(uint32_t),
+			.delta = sizeof(uint32_t) * x
+		};
+		struct drm_i915_gem_exec_object2 obj[] = {
+			{ .handle = scratch, },
+			{
+				.relocs_ptr = to_user_pointer(&reloc),
+				.relocation_count = 1,
+			}
+		};
+		struct drm_i915_gem_execbuffer2 execbuf = {
+			.buffers_ptr = to_user_pointer(obj),
+			.buffer_count = ARRAY_SIZE(obj),
+			.flags = e2->flags | I915_EXEC_FENCE_SUBMIT,
+			.rsvd2 = spin->out_fence,
+		};
+		uint32_t batch[16];
+		int i;
+
 		if (e2->flags == e->flags)
 			continue;
 
-		execbuf.flags = e2->flags | I915_EXEC_FENCE_SUBMIT;
+		obj[1].handle = gem_create(i915, 4096);
+
+		i = 0;
+		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		if (gen >= 8) {
+			batch[++i] = reloc.delta;
+			batch[++i] = 0;
+		} else if (gen >= 4) {
+			batch[++i] = 0;
+			batch[++i] = reloc.delta;
+			reloc.offset += sizeof(uint32_t);
+		} else {
+			batch[i]--;
+			batch[++i] = reloc.delta;
+		}
+		batch[++i] = ~x;
+		batch[++i] = MI_BATCH_BUFFER_END;
+		gem_write(i915, obj[1].handle, 0, batch, sizeof(batch));
+
 		if (gen < 6)
 			execbuf.flags |= I915_EXEC_SECURE;
 
-		obj[BATCH].handle = gem_create(fd, 4096);
-		handle[x] = obj[BATCH].handle;
-
-		i = 0;
-		reloc[0].delta = sizeof(uint32_t) * x++;
-		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
-		if (gen >= 8) {
-			batch[++i] = reloc[0].presumed_offset + reloc[0].delta;
-			batch[++i] = (reloc[0].presumed_offset + reloc[0].delta) >> 32;
-		} else if (gen >= 4) {
-			batch[++i] = 0;
-			batch[++i] = reloc[0].presumed_offset + reloc[0].delta;
-		} else {
-			batch[i]--;
-			batch[++i] = reloc[0].presumed_offset + reloc[0].delta;
-		}
-		batch[++i] = ~0u ^ x;
-		batch[++i] = MI_BATCH_BUFFER_END;
-		gem_write(fd, obj[BATCH].handle, 0, batch, sizeof(batch));
-		gem_execbuf(fd, &execbuf);
+		gem_execbuf(i915, &execbuf);
+		handle[x++] = obj[1].handle;
 	}
-	igt_assert(gem_bo_busy(fd, spin->handle));
-	close(execbuf.rsvd2);
+	igt_assert(gem_bo_busy(i915, spin->handle));
+	gem_close(i915, scratch);
+	igt_require(x);
 
-	/* No secondary should be executed since master is stalled. If there
+	/*
+	 * No secondary should be executed since master is stalled. If there
 	 * was no dependency chain at all, the secondaries would start
 	 * immediately.
 	 */
-	for (i = 0; i < x; i++) {
+	for (int i = 0; i < x; i++) {
 		igt_assert_eq_u32(out[i], 0);
-		igt_assert(gem_bo_busy(fd, handle[i]));
+		igt_assert(gem_bo_busy(i915, handle[i]));
 	}
+	igt_cork_unplug(&cork);
 
-	/* Unblock the master */
-	igt_cork_unplug(&c);
-	gem_close(fd, plug);
-	igt_spin_end(spin);
-
-	/* Wait for all secondaries to complete. If we used a regular fence
+	/*
+	 * Wait for all secondaries to complete. If we used a regular fence
 	 * then the secondaries would not start until the master was complete.
 	 * In this case that can only happen with a GPU reset, and so we run
 	 * under the hang detector and double check that the master is still
 	 * running afterwards.
 	 */
-	for (i = 1; i < x; i++) {
-		while (gem_bo_busy(fd, handle[i]))
+	for (int i = 0; i < x; i++) {
+		while (gem_bo_busy(i915, handle[i]))
 			sleep(0);
 
-		igt_assert_f(out[i], "Missing output from engine %d\n", i);
-		gem_close(fd, handle[i]);
+		igt_assert_eq_u32(out[i], ~i);
+		gem_close(i915, handle[i]);
 	}
 	munmap(out, 4096);
-	gem_close(fd, obj[SCRATCH].handle);
 
 	/* Master should still be spinning, but all output should be written */
-	igt_assert(gem_bo_busy(fd, handle[0]));
-	out = gem_mmap__wc(fd, handle[0], 0, 4096, PROT_WRITE);
-	out[0] = MI_BATCH_BUFFER_END;
-	munmap(out, 4096);
-	gem_close(fd, handle[0]);
+	igt_assert(gem_bo_busy(i915, spin->handle));
+	igt_spin_free(i915, spin);
 }
 
 static uint32_t batch_create(int fd)
@@ -1447,11 +1372,10 @@ igt_main
 				}
 			}
 			igt_subtest_with_dynamic("parallel") {
+				igt_require(has_submit_fence(i915));
 				__for_each_physical_engine(i915, e) {
 				/* Requires master for STORE_DWORD on gen4/5 */
 					igt_dynamic_f("%s", e->name) {
-						igt_require(has_submit_fence(i915));
-						igt_require(gem_class_has_mutable_submission(i915, e->class));
 						igt_until_timeout(2)
 							test_parallel(i915, e);
 					}
