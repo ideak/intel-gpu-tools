@@ -82,6 +82,14 @@
  *
  */
 
+/*
+ * We cannot expect chamelium_plug() to take effect imediately.
+ *
+ * Especially with modern, more complex hardware where we may have LSPcons and
+ * USB controllers in the way.
+ */
+#define CHAMELIUM_HOTPLUG_DETECTION_DELAY 10
+
 struct chamelium_edid {
 	struct chamelium *chamelium;
 	struct edid *base;
@@ -2231,6 +2239,10 @@ static bool chamelium_autodiscover(struct chamelium *chamelium, int drm_fd)
 		chamelium_plug(chamelium, port);
 	}
 
+	igt_info("Sleeping %d seconds for the hotplug to take effect.\n",
+		 CHAMELIUM_HOTPLUG_DETECTION_DELAY);
+	sleep(CHAMELIUM_HOTPLUG_DETECTION_DELAY);
+
 	/* Reprobe connectors and build the mapping */
 	res = drmModeGetResources(drm_fd);
 	if (!res)
@@ -2448,8 +2460,20 @@ struct chamelium *chamelium_init(int drm_fd)
 	if (!chamelium_read_port_mappings(chamelium, drm_fd))
 		goto error;
 
-	if (!chamelium_autodiscover(chamelium, drm_fd))
-		goto error;
+	if (chamelium->port_count == 0) {
+		igt_info("Chamelium configured without port mapping, "
+			 "performing autodiscovery\n");
+
+		if (!chamelium_autodiscover(chamelium, drm_fd))
+			goto error;
+
+		if (chamelium->port_count != 0)
+			igt_info("\nConsider adding the following to your .igtrc:\n");
+		for (int i = 0; i < chamelium->port_count; ++i) {
+			igt_info("[Chamelium:%s]\n", chamelium->ports[i].name);
+			igt_info("ChameliumPortID=%d\n\n", chamelium->ports[i].id);
+		}
+	}
 
 	cleanup_instance = chamelium;
 	igt_install_exit_handler(chamelium_exit_handler);
