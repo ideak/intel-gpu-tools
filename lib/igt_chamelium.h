@@ -215,5 +215,7 @@ void chamelium_destroy_frame_dump(struct chamelium_frame_dump *dump);
 void chamelium_destroy_audio_file(struct chamelium_audio_file *audio_file);
 void chamelium_infoframe_destroy(struct chamelium_infoframe *infoframe);
 bool chamelium_plug_all(struct chamelium *chamelium);
+bool chamelium_wait_all_configured_ports_connected(struct chamelium *chamelium,
+						   int drm_fd);
 
 #endif /* IGT_CHAMELIUM_H */

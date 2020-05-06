@@ -2532,17 +2532,6 @@ bool chamelium_plug_all(struct chamelium *chamelium)
 	size_t port_count;
 	int port_ids[CHAMELIUM_MAX_PORTS];
 	xmlrpc_value *v;
-	v = __chamelium_rpc(chamelium, NULL, "Reset", "()");
-
-	if (v != NULL)
-		xmlrpc_DECREF(v);
-
-	if (chamelium->env.fault_occurred) {
-		igt_debug("Chamelium RPC call failed: %s\n",
-		     chamelium->env.fault_string);
-
-		return false;
-	}
 
 	port_count = chamelium_get_video_ports(chamelium, port_ids);
 	if (port_count <= 0)
@@ -2563,6 +2552,82 @@ bool chamelium_plug_all(struct chamelium *chamelium)
 	}
 
 	return true;
+}
+
+bool chamelium_wait_all_configured_ports_connected(struct chamelium *chamelium, int drm_fd)
+{
+	drmModeRes *res;
+	drmModeConnector *connector;
+	char **group_list;
+	char *group;
+	bool ret = true;
+
+	int connectors[CHAMELIUM_MAX_PORTS];
+	int connectors_count = 0;
+
+	res = drmModeGetResources(drm_fd);
+
+	group_list = g_key_file_get_groups(igt_key_file, NULL);
+
+	for (int i = 0; group_list[i] != NULL; i++) {
+		char *map_name;
+		group = group_list[i];
+
+		if (!strstr(group, "Chamelium:"))
+			continue;
+
+		igt_assert(chamelium->port_count <= CHAMELIUM_MAX_PORTS);
+
+		map_name = group + (sizeof("Chamelium:") - 1);
+
+		for (int j = 0;
+		     j < res->count_connectors;
+		     j++) {
+			char name[50];
+
+			connector = drmModeGetConnectorCurrent(
+			    drm_fd, res->connectors[j]);
+
+			/* We have to generate the connector name on our own */
+			snprintf(name, 50, "%s-%u",
+				 kmstest_connector_type_str(connector->connector_type),
+				 connector->connector_type_id);
+
+
+			if (strcmp(name, map_name) == 0) {
+				igt_assert(connectors_count < CHAMELIUM_MAX_PORTS);
+				connectors[connectors_count++] = connector->connector_id;
+				break;
+			}
+
+			drmModeFreeConnector(connector);
+		}
+	}
+
+	drmModeFreeResources(res);
+
+	if (connectors_count == 0) {
+		igt_info("No chamelium port mappping, sleeping for %d seconds "
+			 "for the hotplug to take effect\n",
+			 CHAMELIUM_HOTPLUG_DETECTION_DELAY);
+		sleep(CHAMELIUM_HOTPLUG_DETECTION_DELAY);
+		return true;
+	}
+
+	igt_until_timeout(CHAMELIUM_HOTPLUG_DETECTION_DELAY) {
+		ret = true;
+		for (int i = 0; i < connectors_count; ++i) {
+			connector = drmModeGetConnector(drm_fd, connectors[i]);
+			if (connector->connection != DRM_MODE_CONNECTED)
+				ret = false;
+			drmModeFreeConnector(connector);
+		}
+
+		if (ret)
+			break;
+	}
+
+	return ret;
 }
 
 igt_constructor {

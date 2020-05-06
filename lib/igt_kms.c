@@ -1899,6 +1899,8 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 				       "cannot reach the configured chamelium!\n");
 			igt_abort_on_f(!chamelium_plug_all(chamelium),
 				       "failed to plug all the chamelium ports!\n");
+			igt_abort_on_f(!chamelium_wait_all_configured_ports_connected(chamelium, drm_fd),
+				       "not all configured chamelium ports are connected!\n");
 			chamelium_deinit_rpc_only(chamelium);
 		}
 	}
