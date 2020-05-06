@@ -198,7 +198,12 @@ static void run_test(int fd, unsigned ring, unsigned flags, unsigned timeout)
 		igt_debug("Forking %d children\n", nchild);
 		igt_fork(child, nchild) {
 			if (flags & NEWFD) {
-				fd = drm_open_driver(DRIVER_INTEL);
+				int this;
+
+				this = gem_reopen_driver(fd);
+				gem_context_copy_engines(fd, 0, this, 0);
+				fd = this;
+
 				setup_execbuf(fd, &execbuf, obj, reloc, ring);
 			}
 			fill_ring(fd, &execbuf, flags, timeout);
@@ -267,17 +272,16 @@ igt_main
 		const char *suffix;
 		unsigned flags;
 		unsigned timeout;
-		bool basic;
 	} modes[] = {
-		{ "", 0, 0, true},
-		{ "-interruptible", INTERRUPTIBLE, 1, true },
-		{ "-hang", HANG, 10, true },
-		{ "-child", CHILD, 0 },
-		{ "-forked", FORKED, 0, true },
-		{ "-fd", FORKED | NEWFD, 0, true },
-		{ "-bomb", BOMB | NEWFD | INTERRUPTIBLE, 150 },
-		{ "-S3", BOMB | SUSPEND, 30 },
-		{ "-S4", BOMB | HIBERNATE, 30 },
+		{ "basic", 0, 0 },
+		{ "interruptible", INTERRUPTIBLE, 1 },
+		{ "hang", HANG, 10 },
+		{ "child", CHILD, 0 },
+		{ "forked", FORKED, 0 },
+		{ "fd", FORKED | NEWFD, 0 },
+		{ "bomb", BOMB | NEWFD | INTERRUPTIBLE, 150 },
+		{ "S3", BOMB | SUSPEND, 30 },
+		{ "S4", BOMB | HIBERNATE, 30 },
 		{ NULL }
 	}, *m;
 	bool master = false;
@@ -302,19 +306,44 @@ igt_main
 		igt_require(ring_size);
 	}
 
+	/* Legacy path for selecting "rings". */
 	for (m = modes; m->suffix; m++) {
-		const struct intel_execution_engine *e;
+		igt_subtest_with_dynamic_f("legacy-%s", m->suffix) {
+			const struct intel_execution_engine *e;
 
-		for (e = intel_execution_engines; e->name; e++) {
-			igt_subtest_f("%s%s%s",
-				      m->basic && !e->exec_id ? "basic-" : "",
-				      e->name,
-				      m->suffix) {
-				igt_skip_on(m->flags & NEWFD && master);
-				gem_require_ring(fd, eb_ring(e));
-				igt_require(gem_can_store_dword(fd, eb_ring(e)));
-				run_test(fd, eb_ring(e), m->flags, m->timeout);
-				gem_quiescent_gpu(fd);
+			igt_skip_on(m->flags & NEWFD && master);
+
+			for (e = intel_execution_engines; e->name; e++) {
+				if (!gem_has_ring(fd, eb_ring(e)))
+					continue;
+
+				igt_dynamic_f("%s", e->name) {
+					igt_require(gem_can_store_dword(fd, eb_ring(e)));
+					run_test(fd, eb_ring(e),
+						 m->flags,
+						 m->timeout);
+					gem_quiescent_gpu(fd);
+				}
+			}
+		}
+	}
+
+	/* New interface for selecting "engines". */
+	for (m = modes; m->suffix; m++) {
+		igt_subtest_with_dynamic_f("engines-%s", m->suffix) {
+			const struct intel_execution_engine2 *e;
+
+			igt_skip_on(m->flags & NEWFD && master);
+			__for_each_physical_engine(fd, e) {
+				if (!gem_class_can_store_dword(fd, e->class))
+					continue;
+
+				igt_dynamic_f("%s", e->name) {
+					run_test(fd, e->flags,
+						 m->flags,
+						 m->timeout);
+					gem_quiescent_gpu(fd);
+				}
 			}
 		}
 	}
