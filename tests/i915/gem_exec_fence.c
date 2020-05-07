@@ -692,6 +692,100 @@ static void test_parallel(int i915, const struct intel_execution_engine2 *e)
 	igt_spin_free(i915, spin);
 }
 
+static void test_concurrent(int i915, const struct intel_execution_engine2 *e)
+{
+	const int gen = intel_gen(intel_get_drm_devid(i915));
+	struct drm_i915_gem_relocation_entry reloc = {
+		.target_handle =  gem_create(i915, 4096),
+		.write_domain = I915_GEM_DOMAIN_RENDER,
+		.offset = sizeof(uint32_t),
+	};
+	struct drm_i915_gem_exec_object2 obj[] = {
+		{ .handle = reloc.target_handle, },
+		{
+			.handle = gem_create(i915, 4096),
+			.relocs_ptr = to_user_pointer(&reloc),
+			.relocation_count = 1,
+		}
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(obj),
+		.buffer_count = ARRAY_SIZE(obj),
+		.flags = e->flags | I915_EXEC_FENCE_SUBMIT,
+	};
+	IGT_CORK_FENCE(cork);
+	uint32_t batch[16];
+	igt_spin_t *spin;
+	uint32_t result;
+	int fence;
+	int i;
+
+	/*
+	 * A variant of test_parallel() that runs a bonded pair on a single
+	 * engine and ensures that the secondary batch cannot start before
+	 * the master is ready.
+	 */
+
+	fence = igt_cork_plug(&cork, i915),
+	      spin = igt_spin_new(i915,
+				  .engine = e->flags,
+				  .fence = fence,
+				  .flags = (IGT_SPIN_FENCE_OUT |
+					    IGT_SPIN_FENCE_IN));
+	close(fence);
+
+	i = 0;
+	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	if (gen >= 8) {
+		batch[++i] = reloc.delta;
+		batch[++i] = 0;
+	} else if (gen >= 4) {
+		batch[++i] = 0;
+		batch[++i] = reloc.delta;
+		reloc.offset += sizeof(uint32_t);
+	} else {
+		batch[i]--;
+		batch[++i] = reloc.delta;
+	}
+	batch[++i] = 0xd0df0d;
+	batch[++i] = MI_BATCH_BUFFER_END;
+	gem_write(i915, obj[1].handle, 0, batch, sizeof(batch));
+
+	execbuf.rsvd1 = gem_context_create(i915);
+	execbuf.rsvd2 = spin->out_fence;
+	if (gen < 6)
+		execbuf.flags |= I915_EXEC_SECURE;
+
+	gem_execbuf(i915, &execbuf);
+	gem_context_destroy(i915, execbuf.rsvd1);
+	gem_close(i915, obj[1].handle);
+
+	/*
+	 * No secondary should be executed since master is stalled. If there
+	 * was no dependency chain at all, the secondaries would start
+	 * immediately.
+	 */
+	usleep(20000);
+	igt_assert(gem_bo_busy(i915, spin->handle));
+	igt_assert(gem_bo_busy(i915, obj[0].handle));
+	igt_cork_unplug(&cork);
+
+	/*
+	 * Wait for all secondaries to complete. If we used a regular fence
+	 * then the secondaries would not start until the master was complete.
+	 * In this case that can only happen with a GPU reset, and so we run
+	 * under the hang detector and double check that the master is still
+	 * running afterwards.
+	 */
+	gem_read(i915, obj[0].handle, 0, &result, sizeof(result));
+	igt_assert_eq_u32(result, 0xd0df0d);
+	gem_close(i915, obj[0].handle);
+
+	/* Master should still be spinning, but all output should be written */
+	igt_assert(gem_bo_busy(i915, spin->handle));
+	igt_spin_free(i915, spin);
+}
+
 static uint32_t batch_create(int fd)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -1566,6 +1660,16 @@ igt_main
 						igt_until_timeout(2)
 							test_parallel(i915, e);
 					}
+				}
+			}
+
+			igt_subtest_with_dynamic("concurrent") {
+				igt_require(has_submit_fence(i915));
+				igt_require(gem_scheduler_has_semaphores(i915));
+				igt_require(gem_scheduler_has_preemption(i915));
+				__for_each_physical_engine(i915, e) {
+					igt_dynamic_f("%s", e->name)
+						test_concurrent(i915, e);
 				}
 			}
 
