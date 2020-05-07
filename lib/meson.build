@@ -17,6 +17,7 @@ lib_sources = [
 	'igt_gt.c',
 	'igt_halffloat.c',
 	'igt_matrix.c',
+	'igt_params.c',
 	'igt_perf.c',
 	'igt_primes.c',
 	'igt_rand.c',

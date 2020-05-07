@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015 Intel Corporation
+ * Copyright © 2019 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,40 +21,18 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef IGT_H
-#define IGT_H
+#ifndef __IGT_PARAMS_H__
+#define __IGT_PARAMS_H__
 
-#include "drmtest.h"
-#include "i915_3d.h"
-#include "i915_pciids.h"
-#include "igt_aux.h"
-#include "igt_core.h"
-#include "igt_core.h"
-#include "igt_debugfs.h"
-#include "igt_draw.h"
-#include "igt_dummyload.h"
-#include "igt_fb.h"
-#include "igt_frame.h"
-#include "igt_gt.h"
-#include "igt_kms.h"
-#include "igt_params.h"
-#include "igt_pm.h"
-#include "igt_stats.h"
-#ifdef HAVE_CHAMELIUM
-#include "igt_alsa.h"
-#include "igt_audio.h"
-#include "igt_chamelium.h"
-#include "igt_chamelium_stream.h"
-#endif
-#include "instdone.h"
-#include "intel_batchbuffer.h"
-#include "intel_chipset.h"
-#include "intel_io.h"
-#include "ioctl_wrappers.h"
-#include "media_fill.h"
-#include "media_spin.h"
-#include "rendercopy.h"
-#include "i915/gem_mman.h"
-#include "i915/gem_engine_topology.h"
+#include <stdbool.h>
 
-#endif /* IGT_H */
+int igt_sysfs_open_parameters(int device);
+
+__attribute__((format(printf, 3, 4)))
+bool igt_sysfs_set_parameter(int device, const char *parameter,
+			     const char *fmt, ...);
+
+void igt_set_module_param(const char *name, const char *val);
+void igt_set_module_param_int(const char *name, int val);
+
+#endif /* __IGT_PARAMS_H__ */

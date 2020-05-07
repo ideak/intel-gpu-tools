@@ -37,6 +37,7 @@
 #include "igt_aux.h"
 #include "igt_core.h"
 #include "igt_gt.h"
+#include "igt_params.h"
 #include "igt_sysfs.h"
 #include "igt_debugfs.h"
 #include "ioctl_wrappers.h"

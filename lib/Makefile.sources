@@ -49,6 +49,8 @@ lib_source_list =	 	\
 	igt_list.h		\
 	igt_matrix.c		\
 	igt_matrix.h		\
+	igt_params.c		\
+	igt_params.h		\
 	igt_primes.c		\
 	igt_primes.h		\
 	igt_rand.c		\

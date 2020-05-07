@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  */
 
+#include "igt_params.h"
 #include "igt_psr.h"
 #include "igt_sysfs.h"
 #include <errno.h>

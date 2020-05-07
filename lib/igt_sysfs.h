@@ -30,11 +30,6 @@
 
 char *igt_sysfs_path(int device, char *path, int pathlen);
 int igt_sysfs_open(int device);
-int igt_sysfs_open_parameters(int device);
-bool igt_sysfs_set_parameter(int device,
-			     const char *parameter,
-			     const char *fmt, ...)
-	__attribute__((format(printf,3,4)));
 
 int igt_sysfs_read(int dir, const char *attr, void *data, int len);
 int igt_sysfs_write(int dir, const char *attr, const void *data, int len);

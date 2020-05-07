@@ -41,6 +41,7 @@
 #include "igt_dummyload.h"
 #include "igt_gt.h"
 #include "igt_sysfs.h"
+#include "igt_params.h"
 #include "ioctl_wrappers.h" /* gem_wait()! */
 #include "sw_sync.h"
 
