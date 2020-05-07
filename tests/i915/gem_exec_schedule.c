@@ -522,6 +522,93 @@ static void semaphore_timeslice(int i915, unsigned int engine)
 	gem_close(i915, obj.handle);
 }
 
+static uint32_t timesliceN_batches(int i915, uint32_t offset, int count)
+{
+        uint32_t handle = gem_create(i915, (count + 1) * 1024);
+        uint32_t cs[256];
+
+	for (int pair = 0; pair < count; pair++) {
+		int x = pair;
+		int i = 0;
+
+		for (int step = 0; step < 8; step++) {
+			cs[i++] =
+				MI_SEMAPHORE_WAIT |
+				MI_SEMAPHORE_POLL |
+				MI_SEMAPHORE_SAD_EQ_SDD |
+				(4 - 2);
+			cs[i++] = x;
+			cs[i++] = offset;
+			cs[i++] = 0;
+
+			cs[i++] = MI_STORE_DWORD_IMM;
+			cs[i++] = offset;
+			cs[i++] = 0;
+			cs[i++] = x + 1;
+
+			x += count;
+		}
+
+		cs[i++] = MI_BATCH_BUFFER_END;
+		igt_assert(i < ARRAY_SIZE(cs));
+		gem_write(i915, handle, (pair + 1) * sizeof(cs),
+			  cs, sizeof(cs));
+	}
+
+        return handle;
+}
+
+static void semaphore_timesliceN(int i915, unsigned int engine, int count)
+{
+	unsigned int offset = 24 << 20;
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = timesliceN_batches(i915, offset, count),
+		.offset = offset,
+		.flags = EXEC_OBJECT_PINNED,
+	};
+	struct drm_i915_gem_execbuffer2 execbuf  = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = engine | I915_EXEC_FENCE_OUT,
+	};
+	int fence[count];
+	uint32_t result;
+
+	/*
+	 * Create a pair of interlocking batches, that ping pong
+	 * between each other, and only advance one step at a time.
+	 * We require the kernel to preempt at each semaphore and
+	 * switch to the other batch in order to advance.
+	 */
+
+	igt_require(gem_scheduler_has_semaphores(i915));
+	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
+
+	/* No coupling between requests; free to timeslice */
+
+	for (int i = 0; i < count; i++) {
+		execbuf.rsvd1 = gem_context_clone_with_engines(i915, 0);
+		execbuf.batch_start_offset = (i + 1) * 1024;;
+		gem_execbuf_wr(i915, &execbuf);
+		gem_context_destroy(i915, execbuf.rsvd1);
+
+		fence[i] = execbuf.rsvd2 >> 32;
+	}
+
+	gem_sync(i915, obj.handle);
+
+	/* no hangs! */
+	for (int i = 0; i < count; i++) {
+		igt_assert_eq(sync_fence_status(fence[i]), 1);
+		close(fence[i]);
+	}
+
+	gem_read(i915, obj.handle, 0, &result, sizeof(result));
+	igt_assert_eq(result, 8 * count);
+	gem_close(i915, obj.handle);
+}
+
 static uint32_t __batch_create(int i915, uint32_t offset)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -2234,6 +2321,12 @@ igt_main
 
 		test_each_engine("timeslicing", fd, e)
 			semaphore_timeslice(fd, e->flags);
+
+		test_each_engine("thriceslice", fd, e)
+			semaphore_timesliceN(fd, e->flags, 3);
+
+		test_each_engine("manyslice", fd, e)
+			semaphore_timesliceN(fd, e->flags, 67);
 
 		igt_subtest("semaphore-user")
 			semaphore_userlock(fd);
