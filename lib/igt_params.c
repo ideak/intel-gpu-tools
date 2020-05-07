@@ -153,6 +153,29 @@ int igt_params_open(int device)
 	return __igt_params_open(device, NULL);
 }
 
+__attribute__((format(printf, 3, 0)))
+static bool __igt_params_set(int device, const char *parameter,
+			     const char *fmt, va_list ap, bool save)
+{
+	char *path = NULL;
+	int dir;
+	int ret;
+
+	dir = __igt_params_open(device, save ? &path : NULL);
+	if (dir < 0)
+		return false;
+
+	if (save)
+		igt_params_save(dir, path, parameter);
+
+	ret = igt_sysfs_vprintf(dir, parameter, fmt, ap);
+
+	close(dir);
+	free(path);
+
+	return ret > 0;
+}
+
 /**
  * igt_params_set:
  * @device: fd of the device
@@ -164,20 +187,41 @@ int igt_params_open(int device)
 bool igt_params_set(int device, const char *parameter, const char *fmt, ...)
 {
 	va_list ap;
-	int dir;
-	int ret;
-
-	dir = igt_params_open(device);
-	if (dir < 0)
-		return false;
+	bool ret;
 
 	va_start(ap, fmt);
-	ret = igt_sysfs_vprintf(dir, parameter, fmt, ap);
+	ret = __igt_params_set(device, parameter, fmt, ap, false);
 	va_end(ap);
 
-	close(dir);
+	return ret;
+}
 
-	return ret > 0;
+/**
+ * igt_params_save_and_set:
+ * @device: fd of the device or -1 to default.
+ * @parameter: the name of the parameter to set
+ * @fmt: printf-esque format string
+ *
+ * Save original value to be restored by exit handler. Parameter is first
+ * searched at debugfs/dri/N/<device>_params and if not found will look for
+ * parameter at /sys/module/<device>/parameters.
+ *
+ * Giving -1 here for default device will search for matching device from
+ * debugfs/dri/N where N go from 0 to 63. First device found from debugfs
+ * which exist also at /sys/module/<device> will be 'default'.
+ *
+ * Returns true on success
+ */
+bool igt_params_save_and_set(int device, const char *parameter, const char *fmt, ...)
+{
+	va_list ap;
+	bool ret;
+
+	va_start(ap, fmt);
+	ret = __igt_params_set(device, parameter, fmt, ap, true);
+	va_end(ap);
+
+	return ret;
 }
 
 /**
