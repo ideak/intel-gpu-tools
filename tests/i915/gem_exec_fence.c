@@ -488,6 +488,86 @@ static void test_submit_fence(int i915, unsigned int engine)
 	}
 }
 
+static uint32_t submitN_batches(int i915, uint32_t offset, int count)
+{
+        uint32_t handle = gem_create(i915, (count + 1) * 1024);
+        uint32_t cs[256];
+
+	for (int pair = 0; pair < count; pair++) {
+		int x = pair;
+		int i = 0;
+
+		for (int step = 0; step < 8; step++) {
+			cs[i++] =
+				MI_SEMAPHORE_WAIT |
+				MI_SEMAPHORE_POLL |
+				MI_SEMAPHORE_SAD_EQ_SDD |
+				(4 - 2);
+			cs[i++] = x;
+			cs[i++] = offset;
+			cs[i++] = 0;
+
+			cs[i++] = MI_STORE_DWORD_IMM;
+			cs[i++] = offset;
+			cs[i++] = 0;
+			cs[i++] = x + 1;
+
+			x += count;
+		}
+
+		cs[i++] = MI_BATCH_BUFFER_END;
+		igt_assert(i < ARRAY_SIZE(cs));
+		gem_write(i915, handle, (pair + 1) * sizeof(cs),
+			  cs, sizeof(cs));
+	}
+
+        return handle;
+}
+
+static void test_submitN(int i915, unsigned int engine, int count)
+{
+	unsigned int offset = 24 << 20;
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = submitN_batches(i915, offset, count),
+		.offset = offset,
+		.flags = EXEC_OBJECT_PINNED,
+	};
+	struct drm_i915_gem_execbuffer2 execbuf  = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = engine | I915_EXEC_FENCE_OUT,
+	};
+	int fence[count];
+	uint32_t result;
+
+	igt_require(gem_scheduler_has_semaphores(i915));
+	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
+
+	for (int i = 0; i < count; i++) {
+		execbuf.rsvd1 = gem_context_clone_with_engines(i915, 0);
+		execbuf.batch_start_offset = (i + 1) * 1024;
+		gem_execbuf_wr(i915, &execbuf);
+		gem_context_destroy(i915, execbuf.rsvd1);
+
+		execbuf.flags |= I915_EXEC_FENCE_SUBMIT;
+		execbuf.rsvd2 >>= 32;
+		fence[i] = execbuf.rsvd2;
+	}
+
+	gem_sync(i915, obj.handle);
+
+	/* no hangs! */
+	for (int i = 0; i < count; i++) {
+		igt_assert_eq(sync_fence_status(fence[i]), 1);
+		close(fence[i]);
+	}
+
+	gem_read(i915, obj.handle, 0, &result, sizeof(result));
+	igt_assert_eq(result, 8 * count);
+	gem_close(i915, obj.handle);
+}
+
 static void alarm_handler(int sig)
 {
 }
@@ -1496,6 +1576,28 @@ igt_main
 				__for_each_physical_engine(i915, e) {
 					igt_dynamic_f("%s", e->name)
 						test_submit_fence(i915, e->flags);
+				}
+			}
+
+			igt_subtest_with_dynamic("submit3") {
+				igt_require(gem_scheduler_has_semaphores(i915));
+				igt_require(gem_scheduler_has_preemption(i915));
+				igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
+
+				__for_each_physical_engine(i915, e) {
+					igt_dynamic_f("%s", e->name)
+						test_submitN(i915, e->flags, 3);
+				}
+			}
+
+			igt_subtest_with_dynamic("submit67") {
+				igt_require(gem_scheduler_has_semaphores(i915));
+				igt_require(gem_scheduler_has_preemption(i915));
+				igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
+
+				__for_each_physical_engine(i915, e) {
+					igt_dynamic_f("%s", e->name)
+						test_submitN(i915, e->flags, 67);
 				}
 			}
 
