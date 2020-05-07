@@ -1903,9 +1903,9 @@ static void test_unload(void)
 		igt_debug("Opening perf events\n");
 		fd = open_group(i915, I915_PMU_INTERRUPTS, -1);
 
-		if (perf_i915_open_group(i915, I915_PMU_REQUESTED_FREQUENCY,fd))
+		if (perf_i915_open_group(i915, I915_PMU_REQUESTED_FREQUENCY,fd) != -1)
 			count++;
-		if (perf_i915_open_group(i915, I915_PMU_ACTUAL_FREQUENCY, fd))
+		if (perf_i915_open_group(i915, I915_PMU_ACTUAL_FREQUENCY, fd) != -1)
 			count++;
 
 		__for_each_physical_engine(i915, e) {
