@@ -467,7 +467,7 @@ static uint32_t timeslicing_batches(int i915, uint32_t *offset)
         return handle;
 }
 
-static void semaphore_timeslice(int i915, unsigned int engine)
+static void timeslice(int i915, unsigned int engine)
 {
 	unsigned int offset = 24 << 20;
 	struct drm_i915_gem_exec_object2 obj = {
@@ -559,7 +559,7 @@ static uint32_t timesliceN_batches(int i915, uint32_t offset, int count)
         return handle;
 }
 
-static void semaphore_timesliceN(int i915, unsigned int engine, int count)
+static void timesliceN(int i915, unsigned int engine, int count)
 {
 	unsigned int offset = 24 << 20;
 	struct drm_i915_gem_exec_object2 obj = {
@@ -608,6 +608,63 @@ static void semaphore_timesliceN(int i915, unsigned int engine, int count)
 	gem_read(i915, obj.handle, 0, &result, sizeof(result));
 	igt_assert_eq(result, 8 * count);
 	gem_close(i915, obj.handle);
+}
+
+static void lateslice(int i915, unsigned int engine)
+{
+	igt_spin_t *spin[3];
+	uint32_t ctx;
+
+	igt_require(gem_scheduler_has_semaphores(i915));
+	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
+
+	ctx = gem_context_create(i915);
+	spin[0] = igt_spin_new(i915, .ctx = ctx, .engine = engine,
+			       .flags = (IGT_SPIN_POLL_RUN |
+					 IGT_SPIN_FENCE_OUT));
+	gem_context_destroy(i915, ctx);
+
+	igt_spin_busywait_until_started(spin[0]);
+
+	ctx = gem_context_create(i915);
+	spin[1] = igt_spin_new(i915, .ctx = ctx, .engine = engine,
+			       .fence = spin[0]->out_fence,
+			       .flags = (IGT_SPIN_POLL_RUN |
+					 IGT_SPIN_FENCE_IN));
+	gem_context_destroy(i915, ctx);
+
+	usleep(5000); /* give some time for the new spinner to be scheduled */
+
+	/*
+	 * Now that we have two spinners in the HW submission queue [ELSP],
+	 * and since they are strictly ordered, the timeslicing timer may
+	 * be disabled as no reordering is possible. However, upon adding a
+	 * third spinner we then expect timeslicing to be real enabled.
+	 */
+
+	ctx = gem_context_create(i915);
+	spin[2] = igt_spin_new(i915, .ctx = ctx, .engine = engine,
+			       .flags = IGT_SPIN_POLL_RUN);
+	gem_context_destroy(i915, ctx);
+
+	igt_spin_busywait_until_started(spin[2]);
+
+	igt_assert(gem_bo_busy(i915, spin[0]->handle));
+	igt_assert(gem_bo_busy(i915, spin[1]->handle));
+	igt_assert(gem_bo_busy(i915, spin[2]->handle));
+
+	igt_assert(!igt_spin_has_started(spin[1]));
+	igt_spin_free(i915, spin[0]);
+
+	/* Now just spin[1] and spin[2] active */
+	igt_spin_busywait_until_started(spin[1]);
+
+	igt_assert(gem_bo_busy(i915, spin[2]->handle));
+	igt_spin_free(i915, spin[2]);
+
+	igt_assert(gem_bo_busy(i915, spin[1]->handle));
+	igt_spin_free(i915, spin[1]);
 }
 
 static uint32_t __batch_create(int i915, uint32_t offset)
@@ -2321,13 +2378,16 @@ igt_main
 		}
 
 		test_each_engine("timeslicing", fd, e)
-			semaphore_timeslice(fd, e->flags);
+			timeslice(fd, e->flags);
 
 		test_each_engine("thriceslice", fd, e)
-			semaphore_timesliceN(fd, e->flags, 3);
+			timesliceN(fd, e->flags, 3);
 
 		test_each_engine("manyslice", fd, e)
-			semaphore_timesliceN(fd, e->flags, 67);
+			timesliceN(fd, e->flags, 67);
+
+		test_each_engine("lateslice", fd, e)
+			lateslice(fd, e->flags);
 
 		igt_subtest("semaphore-user")
 			semaphore_userlock(fd);
