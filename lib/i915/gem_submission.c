@@ -78,7 +78,7 @@ unsigned gem_submission_method(int fd)
 
 	int dir;
 
-	dir = igt_sysfs_open_parameters(fd);
+	dir = igt_params_open(fd);
 	if (dir < 0)
 		return 0;
 

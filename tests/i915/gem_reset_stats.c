@@ -785,8 +785,7 @@ igt_main
 
 		has_reset_stats = gem_has_reset_stats(fd);
 
-		igt_assert(igt_sysfs_set_parameter
-			   (fd, "reset", "%d", 1 /* only global reset */));
+		igt_assert(igt_params_set(fd, "reset", "%d", 1 /* only global reset */));
 
 		using_full_reset = !gem_engine_reset_enabled(fd) &&
 				   gem_gpu_reset_enabled(fd);
@@ -847,8 +846,7 @@ igt_main
 		int fd;
 
 		fd = drm_open_driver(DRIVER_INTEL);
-		igt_assert(igt_sysfs_set_parameter
-			   (fd, "reset", "%d", INT_MAX /* any reset method */));
+		igt_assert(igt_params_set(fd, "reset", "%d", INT_MAX /* any reset method */));
 		close(fd);
 	}
 }

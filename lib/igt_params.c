@@ -126,7 +126,7 @@ static void igt_save_module_param(const char *name, const char *file_path)
 }
 
 /**
- * igt_sysfs_open_parameters:
+ * igt_params_open:
  * @device: fd of the device
  *
  * This opens the module parameters directory (under sysfs) corresponding
@@ -135,7 +135,7 @@ static void igt_save_module_param(const char *name, const char *file_path)
  * Returns:
  * The directory fd, or -1 on failure.
  */
-int igt_sysfs_open_parameters(int device)
+int igt_params_open(int device)
 {
 	int dir, params = -1;
 
@@ -165,22 +165,20 @@ int igt_sysfs_open_parameters(int device)
 }
 
 /**
- * igt_sysfs_set_parameters:
+ * igt_params_set:
  * @device: fd of the device
  * @parameter: the name of the parameter to set
  * @fmt: printf-esque format string
  *
  * Returns true on success
  */
-bool igt_sysfs_set_parameter(int device,
-			     const char *parameter,
-			     const char *fmt, ...)
+bool igt_params_set(int device, const char *parameter, const char *fmt, ...)
 {
 	va_list ap;
 	int dir;
 	int ret;
 
-	dir = igt_sysfs_open_parameters(device);
+	dir = igt_params_open(device);
 	if (dir < 0)
 		return false;
 

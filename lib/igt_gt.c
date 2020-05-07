@@ -189,7 +189,7 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 		__gem_context_set_param(fd, &param);
 		allow_reset = INT_MAX; /* any reset method */
 	}
-	igt_require(igt_sysfs_set_parameter(fd, "reset", "%d", allow_reset));
+	igt_require(igt_params_set(fd, "reset", "%d", allow_reset));
 
 	if (!igt_check_boolean_env_var("IGT_HANG_WITHOUT_RESET", false))
 		igt_require(has_gpu_reset(fd));

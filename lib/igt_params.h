@@ -26,11 +26,10 @@
 
 #include <stdbool.h>
 
-int igt_sysfs_open_parameters(int device);
+int igt_params_open(int device);
 
 __attribute__((format(printf, 3, 4)))
-bool igt_sysfs_set_parameter(int device, const char *parameter,
-			     const char *fmt, ...);
+bool igt_params_set(int device, const char *parameter, const char *fmt, ...);
 
 void igt_set_module_param(const char *name, const char *val);
 void igt_set_module_param_int(const char *name, int val);

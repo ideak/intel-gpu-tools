@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "igt_params.h"
 #include "drmtest.h"
 #include "i915/gem.h"
 #include "i915/gem_context.h"
@@ -51,7 +52,7 @@ static bool enable_hangcheck(int i915, bool state)
 	bool success;
 	int dir;
 
-	dir = igt_sysfs_open_parameters(i915);
+	dir = igt_params_open(i915);
 	if (dir < 0) /* no parameters, must be default! */
 		return false;
 

@@ -277,7 +277,7 @@ static void nohangcheck_hostile(int i915)
 
 	i915 = gem_reopen_driver(i915);
 
-	dir = igt_sysfs_open_parameters(i915);
+	dir = igt_params_open(i915);
 	igt_require(dir != -1);
 
 	ctx = gem_context_create(i915);

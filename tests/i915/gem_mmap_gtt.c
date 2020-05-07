@@ -656,7 +656,7 @@ test_hang(int fd)
 	int dir;
 
 	hang = igt_allow_hang(fd, 0, 0);
-	igt_require(igt_sysfs_set_parameter(fd, "reset", "1")); /* global */
+	igt_require(igt_params_set(fd, "reset", "1")); /* global */
 
 	control = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(control != MAP_FAILED);

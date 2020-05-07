@@ -514,8 +514,7 @@ void igt_fork_hang_detector(int fd)
 	 * they are a test failure!) and so the loss of per-engine reset
 	 * functionality is not an issue.
 	 */
-	igt_assert(igt_sysfs_set_parameter
-		   (fd, "reset", "%d", 1 /* only global reset */));
+	igt_assert(igt_params_set(fd, "reset", "%d", 1 /* only global reset */));
 
 	signal(SIGIO, sig_abort);
 	igt_fork_helper(&hang_detector)

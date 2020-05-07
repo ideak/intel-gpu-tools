@@ -98,7 +98,7 @@ static void enable_hangcheck(int i915)
 {
 	int dir;
 
-	dir = igt_sysfs_open_parameters(i915);
+	dir = igt_params_open(i915);
 	if (dir < 0) /* no parameters, must be default! */
 		return;
 
@@ -364,7 +364,7 @@ static void test_nohangcheck_hostile(int i915)
 	 * we forcibly terminate that context.
 	 */
 
-	dir = igt_sysfs_open_parameters(i915);
+	dir = igt_params_open(i915);
 	igt_require(dir != -1);
 
 	igt_require(__enable_hangcheck(dir, false));
@@ -401,7 +401,7 @@ static void test_nohangcheck_hang(int i915)
 
 	igt_require(!gem_has_cmdparser(i915, ALL_ENGINES));
 
-	dir = igt_sysfs_open_parameters(i915);
+	dir = igt_params_open(i915);
 	igt_require(dir != -1);
 
 	igt_require(__enable_hangcheck(dir, false));
@@ -1124,8 +1124,7 @@ igt_main
 		igt_require_gem(i915);
 
 		/* Restore the reset modparam if left clobbered */
-		igt_assert(igt_sysfs_set_parameter
-			   (i915, "reset", "%d", -1 /* any [default] reset */));
+		igt_assert(igt_params_set(i915, "reset", "%d", -1));
 
 		enable_hangcheck(i915);
 		igt_install_exit_handler(exit_handler);
