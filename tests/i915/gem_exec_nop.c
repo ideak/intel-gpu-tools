@@ -59,9 +59,8 @@
 #define MIN_PRIO LOCAL_I915_CONTEXT_MIN_USER_PRIORITY
 #define MAX_ENGINES (I915_EXEC_RING_MASK + 1)
 
-#define FORKED 1
-#define CHAINED 2
-#define CONTEXT 4
+#define FORKED (1 << 0)
+#define CONTEXT (1 << 1)
 
 static double elapsed(const struct timespec *start, const struct timespec *end)
 {
@@ -70,7 +69,8 @@ static double elapsed(const struct timespec *start, const struct timespec *end)
 }
 
 static double nop_on_ring(int fd, uint32_t handle,
-			  const struct intel_execution_engine2 *e, int timeout,
+			  const struct intel_execution_engine2 *e,
+			  int timeout,
 			  unsigned long *out)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -96,10 +96,9 @@ static double nop_on_ring(int fd, uint32_t handle,
 	count = 0;
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do {
-		for (int loop = 0; loop < 1024; loop++)
-			gem_execbuf(fd, &execbuf);
+		gem_execbuf(fd, &execbuf);
+		count++;
 
-		count += 1024;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 	} while (elapsed(&start, &now) < timeout);
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
@@ -481,9 +480,9 @@ static void parallel(int fd, uint32_t handle, int timeout)
 		count = 0;
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		do {
-			for (int loop = 0; loop < 1024; loop++)
-				gem_execbuf(fd, &execbuf);
-			count += 1024;
+			gem_execbuf(fd, &execbuf);
+			count++;
+
 			clock_gettime(CLOCK_MONOTONIC, &now);
 		} while (elapsed(&start, &now) < timeout);
 		time = elapsed(&start, &now) / count;
@@ -547,9 +546,9 @@ static void independent(int fd, uint32_t handle, int timeout)
 		count = 0;
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		do {
-			for (int loop = 0; loop < 1024; loop++)
-				gem_execbuf(fd, &execbuf);
-			count += 1024;
+			gem_execbuf(fd, &execbuf);
+			count++;
+
 			clock_gettime(CLOCK_MONOTONIC, &now);
 		} while (elapsed(&start, &now) < timeout);
 		time = elapsed(&start, &now) / count;
@@ -604,9 +603,9 @@ static void multiple(int fd,
 		count = 0;
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		do {
-			for (int loop = 0; loop < 1024; loop++)
-				gem_execbuf(i915, &execbuf);
-			count += 1024;
+			gem_execbuf(i915, &execbuf);
+			count++;
+
 			clock_gettime(CLOCK_MONOTONIC, &now);
 		} while (elapsed(&start, &now) < timeout);
 		time = elapsed(&start, &now) / count;
@@ -664,14 +663,12 @@ static void series(int fd, uint32_t handle, int timeout)
 	count = 0;
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do {
-		for (int loop = 0; loop < 1024; loop++) {
-			for (int n = 0; n < nengine; n++) {
-				execbuf.flags &= ~ENGINE_FLAGS;
-				execbuf.flags |= engines[n];
-				gem_execbuf(fd, &execbuf);
-			}
+		for (int n = 0; n < nengine; n++) {
+			execbuf.flags &= ~ENGINE_FLAGS;
+			execbuf.flags |= engines[n];
+			gem_execbuf(fd, &execbuf);
 		}
-		count += nengine * 1024;
+		count += nengine;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 	} while (elapsed(&start, &now) < timeout); /* Hang detection ~120s */
 	gem_sync(fd, handle);
@@ -767,25 +764,14 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		do {
 			igt_permute_array(engines, nengine, xchg);
-			if (flags & CHAINED) {
-				for (n = 0; n < nengine; n++) {
-					execbuf.flags &= ~ENGINE_FLAGS;
-					execbuf.flags |= engines[n];
-					for (int loop = 0; loop < 1024; loop++)
-						gem_execbuf(fd, &execbuf);
-				}
-			} else {
-				for (int loop = 0; loop < 1024; loop++) {
-					for (n = 0; n < nengine; n++) {
-						execbuf.flags &= ~ENGINE_FLAGS;
-						execbuf.flags |= engines[n];
-						gem_execbuf(fd, &execbuf);
-					}
-				}
+			for (n = 0; n < nengine; n++) {
+				execbuf.flags &= ~ENGINE_FLAGS;
+				execbuf.flags |= engines[n];
+				gem_execbuf(fd, &execbuf);
 			}
-			count += 1024;
+			count++;
 			clock_gettime(CLOCK_MONOTONIC, &now);
-		} while (elapsed(&start, &now) < timeout); /* Hang detection ~120s */
+		} while (elapsed(&start, &now) < timeout);
 
 		gem_sync(fd, obj[0].handle);
 		clock_gettime(CLOCK_MONOTONIC, &now);
@@ -869,26 +855,24 @@ static void fence_signal(int fd, uint32_t handle,
 	intel_detect_and_clear_missed_interrupts(fd);
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do {
-		for (int loop = 0; loop < 1024; loop++) {
-			for (int e = 0; e < nengine; e++) {
-				if (fences[n] != -1) {
-					igt_assert(fence_wait(fences[n]));
-					close(fences[n]);
-				}
-
-				execbuf.flags &= ~ENGINE_FLAGS;
-				execbuf.flags |= engines[e];
-				gem_execbuf_wr(fd, &execbuf);
-
-				/* Enable signaling by doing a poll() */
-				fences[n] = execbuf.rsvd2 >> 32;
-				signal += fence_enable_signaling(fences[n]);
-
-				n = (n + 1) % NFENCES;
+		for (int e = 0; e < nengine; e++) {
+			if (fences[n] != -1) {
+				igt_assert(fence_wait(fences[n]));
+				close(fences[n]);
 			}
+
+			execbuf.flags &= ~ENGINE_FLAGS;
+			execbuf.flags |= engines[e];
+			gem_execbuf_wr(fd, &execbuf);
+
+			/* Enable signaling by doing a poll() */
+			fences[n] = execbuf.rsvd2 >> 32;
+			signal += fence_enable_signaling(fences[n]);
+
+			n = (n + 1) % NFENCES;
 		}
 
-		count += 1024 * nengine;
+		count += nengine;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 	} while (elapsed(&start, &now) < timeout);
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
@@ -910,6 +894,7 @@ static void preempt(int fd, uint32_t handle,
 	struct timespec start, now;
 	unsigned long count;
 	uint32_t ctx[2];
+	igt_spin_t *spin;
 
 	ctx[0] = gem_context_clone_with_engines(fd, 0);
 	gem_context_set_priority(fd, ctx[0], MIN_PRIO);
@@ -934,21 +919,14 @@ static void preempt(int fd, uint32_t handle,
 	intel_detect_and_clear_missed_interrupts(fd);
 
 	count = 0;
+	spin = __igt_spin_new(fd, .ctx = ctx[0], .engine = e->flags);
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do {
-		igt_spin_t *spin =
-			__igt_spin_new(fd,
-				       .ctx = ctx[0],
-				       .engine = e->flags);
-
-		for (int loop = 0; loop < 1024; loop++)
-			gem_execbuf(fd, &execbuf);
-
-		igt_spin_free(fd, spin);
-
-		count += 1024;
+		gem_execbuf(fd, &execbuf);
+		count++;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 	} while (elapsed(&start, &now) < 20);
+	igt_spin_free(fd, spin);
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 
 	gem_context_destroy(fd, ctx[1]);
@@ -1027,9 +1005,6 @@ igt_main
 
 	igt_subtest("forked-sequential")
 		sequential(device, handle, FORKED, 20);
-
-	igt_subtest("chained-sequential")
-		sequential(device, handle, FORKED | CHAINED, 20);
 
 	igt_subtest("context-sequential")
 		sequential(device, handle, FORKED | CONTEXT, 20);
