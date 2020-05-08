@@ -58,7 +58,7 @@ static void pwrite_(int fd, uint64_t alloc)
 	uint32_t tmp;
 	uint32_t handle = gem_create(fd, alloc);
 	for (int page = 0; page < alloc>>12; page++)
-		gem_write(fd, handle, (page + page % 4095) & ~3, &tmp, 4);
+		gem_write(fd, handle, ((page << 12) + page % 4095) & ~3, &tmp, 4);
 	gem_madvise(fd, handle, I915_MADV_DONTNEED);
 }
 
@@ -67,7 +67,7 @@ static void pread_(int fd, uint64_t alloc)
 	uint32_t tmp;
 	uint32_t handle = gem_create(fd, alloc);
 	for (int page = 0; page < alloc>>12; page++)
-		gem_read(fd, handle, (page + page % 4095) & ~3, &tmp, 4);
+		gem_read(fd, handle, ((page << 12) + page % 4095) & ~3, &tmp, 4);
 	gem_madvise(fd, handle, I915_MADV_DONTNEED);
 }
 
