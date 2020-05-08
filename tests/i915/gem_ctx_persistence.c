@@ -22,8 +22,10 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <sched.h>
 #include <signal.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -447,9 +449,28 @@ static void test_nonpersistent_file(int i915)
 	igt_spin_free(-1, spin);
 }
 
+static int __execbuf_wr(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err;
+
+	err = 0;
+	if (ioctl(i915, DRM_IOCTL_I915_GEM_EXECBUFFER2_WR, execbuf)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
+}
+
+static void alarm_handler(int sig)
+{
+}
+
 static void test_nonpersistent_queued(int i915, unsigned int engine)
 {
-	const int count = gem_measure_ring_inflight(i915, engine, 0);
+	struct sigaction old_sa, sa = { .sa_handler = alarm_handler };
+	struct itimerval itv;
 	igt_spin_t *spin;
 	int fence = -1;
 	uint32_t ctx;
@@ -465,17 +486,29 @@ static void test_nonpersistent_queued(int i915, unsigned int engine)
 			    .engine = engine,
 			    .flags = IGT_SPIN_FENCE_OUT);
 
-	for (int i = 0; i < count - 1; i++) {
-		spin->execbuf.rsvd2 = 0;
+	sigaction(SIGALRM, &sa, &old_sa);
+	memset(&itv, 0, sizeof(itv));
+	itv.it_value.tv_sec = 1;
+	itv.it_value.tv_usec = 0;
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) | O_NONBLOCK);
+	while (1) {
+		igt_assert(spin->execbuf.flags & I915_EXEC_FENCE_OUT);
+		if (__execbuf_wr(i915, &spin->execbuf))
+			break;
+
 		if (fence != -1)
 			close(fence);
-
-		igt_assert(spin->execbuf.flags & I915_EXEC_FENCE_OUT);
-		gem_execbuf_wr(i915, &spin->execbuf);
 
 		igt_assert(spin->execbuf.rsvd2);
 		fence = spin->execbuf.rsvd2 >> 32;
 	}
+	fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) & ~O_NONBLOCK);
+
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+	sigaction(SIGALRM, &old_sa, NULL);
 
 	gem_context_destroy(i915, ctx);
 
