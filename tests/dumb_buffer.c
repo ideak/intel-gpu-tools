@@ -292,6 +292,8 @@ static uint64_t estimate_largest_dumb_buffer(int fd)
 		.width = 1 << 20, /* in pixels */
 		.height = 1, /* in rows */
 	};
+	const unsigned long max_rows =
+		intel_get_total_ram_mb() / 2; /* leave some spare */
 	volatile uint64_t largest = 0;
 	char * volatile ptr = NULL;
 
@@ -307,7 +309,7 @@ static uint64_t estimate_largest_dumb_buffer(int fd)
 		return largest;
 	}
 
-	for (create.height = 1; create.height; create.height *= 2) {
+	for (create.height = 1; create.height < max_rows; create.height *= 2) {
 		if (__dumb_create(fd, &create))
 			longjmp(sigjmp, SIGABRT);
 
