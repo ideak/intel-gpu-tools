@@ -109,7 +109,10 @@ static void enable_hangcheck(int i915)
 
 static void flush_delayed_fput(int i915)
 {
+	rcu_barrier(i915);
+	usleep(50 * 1000);
 	rcu_barrier(i915); /* flush the delayed fput */
+
 	sched_yield();
 	rcu_barrier(i915); /* again, in case it was added after we waited! */
 }
