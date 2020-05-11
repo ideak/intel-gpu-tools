@@ -1017,24 +1017,39 @@ static const char test_mode_timings_desc[] =
 	"mode detected by the Chamelium receiver matches the mode we set";
 static void test_mode_timings(data_t *data, struct chamelium_port *port)
 {
-	igt_output_t *output;
-	igt_plane_t *primary;
-	drmModeConnector *connector;
-	int fb_id, i;
-	struct igt_fb fb;
+	int i, count_modes;
 
+	i = 0;
 	igt_require(chamelium_supports_get_video_params(data->chamelium));
+	do {
+		igt_output_t *output;
+		igt_plane_t *primary;
+		drmModeConnector *connector;
+		drmModeModeInfo *mode;
+		int fb_id;
+		struct igt_fb fb;
 
-	reset_state(data, port);
+		/*
+		 * let's reset state each mode so we will get the
+		 * HPD pulses realibably
+		 */
+		reset_state(data, port);
 
-	output = prepare_output(data, port, TEST_EDID_BASE);
-	connector = chamelium_port_get_connector(data->chamelium, port, false);
-	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-	igt_assert(primary);
+		/*
+		 * modes may change due to mode pruining and link issues, so we
+		 * need to refresh the connector
+		 */
+		output = prepare_output(data, port, TEST_EDID_BASE);
+		connector = chamelium_port_get_connector(data->chamelium, port, false);
+		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+		igt_assert(primary);
 
-	igt_assert(connector->count_modes > 0);
-	for (i = 0; i < connector->count_modes; i++) {
-		drmModeModeInfo *mode = &connector->modes[i];
+		/* we may skip some modes due to above but that's ok */
+		count_modes = connector->count_modes;
+		if (i >= count_modes)
+			break;
+
+		mode = &connector->modes[i];
 
 		fb_id = igt_create_color_pattern_fb(data->drm_fd,
 						    mode->hdisplay, mode->vdisplay,
@@ -1051,9 +1066,8 @@ static void test_mode_timings(data_t *data, struct chamelium_port *port)
 		check_mode(data->chamelium, port, mode);
 
 		igt_remove_fb(data->drm_fd, &fb);
-	}
-
-	drmModeFreeConnector(connector);
+		drmModeFreeConnector(connector);
+	} while (++i < count_modes);
 }
 
 /* Set of Video Identification Codes advertised in the EDID */
