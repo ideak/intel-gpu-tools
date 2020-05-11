@@ -388,9 +388,14 @@ igt_main
 	}
 
 	igt_subtest("invalid-bsd-ring") {
-		igt_require(gem_has_bsd2(fd));
+		int expected;
+
+		expected = 0;
+		if (gem_has_bsd2(fd))
+			expected = -EINVAL;
+
 		execbuf.flags = I915_EXEC_BSD | I915_EXEC_BSD_MASK;
-		RUN_FAIL(EINVAL);
+		igt_assert_eq(__gem_execbuf(fd, &execbuf), expected);
 	}
 
 	igt_subtest("invalid-bsd1-flag-on-render") {
