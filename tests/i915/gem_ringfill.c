@@ -93,16 +93,15 @@ static void fill_ring(int fd,
 	}
 }
 
-static int setup_execbuf(int fd,
-			 struct drm_i915_gem_execbuffer2 *execbuf,
-			 struct drm_i915_gem_exec_object2 *obj,
-			 struct drm_i915_gem_relocation_entry *reloc,
-			 unsigned int ring)
+static void setup_execbuf(int fd,
+			  struct drm_i915_gem_execbuffer2 *execbuf,
+			  struct drm_i915_gem_exec_object2 *obj,
+			  struct drm_i915_gem_relocation_entry *reloc,
+			  unsigned int ring)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	uint32_t *batch, *b;
-	int ret;
 	int i;
 
 	memset(execbuf, 0, sizeof(*execbuf));
@@ -118,9 +117,7 @@ static int setup_execbuf(int fd,
 	obj[0].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[0].handle, 0, &bbe, sizeof(bbe));
 	execbuf->buffer_count = 1;
-	ret = __gem_execbuf(fd, execbuf);
-	if (ret)
-		return ret;
+	gem_execbuf(fd, execbuf);
 
 	obj[0].flags |= EXEC_OBJECT_WRITE;
 	obj[1].handle = gem_create(fd, 1024*16 + 4096);
@@ -168,7 +165,6 @@ static int setup_execbuf(int fd,
 	gem_execbuf(fd, execbuf);
 
 	check_bo(fd, obj[0].handle);
-	return 0;
 }
 
 static void run_test(int fd, unsigned ring, unsigned flags, unsigned timeout)
@@ -178,14 +174,12 @@ static void run_test(int fd, unsigned ring, unsigned flags, unsigned timeout)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	igt_hang_t hang;
 
-	gem_require_ring(fd, ring);
-	igt_require(gem_can_store_dword(fd, ring));
-
-	if (flags & (SUSPEND | HIBERNATE))
+	if (flags & (SUSPEND | HIBERNATE)) {
 		run_test(fd, ring, 0, 0);
+		gem_quiescent_gpu(fd);
+	}
 
-	gem_quiescent_gpu(fd);
-	igt_require(setup_execbuf(fd, &execbuf, obj, reloc, ring) == 0);
+	setup_execbuf(fd, &execbuf, obj, reloc, ring);
 
 	memset(&hang, 0, sizeof(hang));
 	if (flags & HANG)
@@ -233,10 +227,38 @@ static void run_test(int fd, unsigned ring, unsigned flags, unsigned timeout)
 	gem_close(fd, obj[1].handle);
 	gem_close(fd, obj[0].handle);
 
-	gem_quiescent_gpu(fd);
-
-	if (flags & (SUSPEND | HIBERNATE))
+	if (flags & (SUSPEND | HIBERNATE)) {
+		gem_quiescent_gpu(fd);
 		run_test(fd, ring, 0, 0);
+	}
+}
+
+static uint32_t batch_create(int i915)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle = gem_create(i915, 4096);
+
+	gem_write(i915, handle, 0, &bbe, sizeof(bbe));
+	return handle;
+}
+
+static bool has_lut_handle(int i915)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = batch_create(i915),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffer_count = 1,
+		.buffers_ptr = to_user_pointer(&obj),
+		.flags = (1 << 11) | (1 << 12),
+	};
+	bool result;
+
+	/* Check for v3.10 with LUT_HANDLE AND NORELOC */
+	result = __gem_execbuf(i915, &execbuf) == 0;
+	gem_close(i915, obj.handle);
+
+	return result;
 }
 
 igt_main
@@ -265,8 +287,10 @@ igt_main
 		int gen;
 
 		fd = drm_open_driver(DRIVER_INTEL);
+
 		igt_require_gem(fd);
-		igt_require(gem_can_store_dword(fd, 0));
+		igt_require(has_lut_handle(fd));
+
 		gen = intel_gen(intel_get_drm_devid(fd));
 		if (gen > 3 && gen < 6) { /* ctg and ilk need secure batches */
 			igt_device_set_master(fd);
@@ -287,9 +311,26 @@ igt_main
 				      e->name,
 				      m->suffix) {
 				igt_skip_on(m->flags & NEWFD && master);
+				gem_require_ring(fd, eb_ring(e));
+				igt_require(gem_can_store_dword(fd, eb_ring(e)));
 				run_test(fd, eb_ring(e), m->flags, m->timeout);
+				gem_quiescent_gpu(fd);
 			}
 		}
+	}
+
+	igt_subtest("basic-all") {
+		const struct intel_execution_engine2 *e;
+
+		__for_each_physical_engine(fd, e) {
+			if (!gem_class_can_store_dword(fd, e->class))
+				continue;
+
+			igt_fork(child, 1)
+				run_test(fd, e->flags, 0, 1);
+		}
+
+		igt_waitchildren();
 	}
 
 	igt_fixture
