@@ -478,7 +478,7 @@ static void timeslice(int i915, unsigned int engine)
 		.buffers_ptr = to_user_pointer(&obj),
 		.buffer_count = 1,
 	};
-	uint32_t result;
+	uint32_t *result;
 	int out;
 
 	/*
@@ -493,6 +493,7 @@ static void timeslice(int i915, unsigned int engine)
 	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
 
 	obj.handle = timeslicing_batches(i915, &offset);
+	result = gem_mmap__device_coherent(i915, obj.handle, 0, 4096, PROT_READ);
 
 	execbuf.flags = engine | I915_EXEC_FENCE_OUT;
 	execbuf.batch_start_offset = 0;
@@ -508,6 +509,7 @@ static void timeslice(int i915, unsigned int engine)
 	gem_context_destroy(i915, execbuf.rsvd1);
 
 	gem_sync(i915, obj.handle);
+	gem_close(i915, obj.handle);
 
 	/* no hangs! */
 	out = execbuf.rsvd2;
@@ -518,9 +520,8 @@ static void timeslice(int i915, unsigned int engine)
 	igt_assert_eq(sync_fence_status(out), 1);
 	close(out);
 
-	gem_read(i915, obj.handle, 4000, &result, sizeof(result));
-	igt_assert_eq(result, 16);
-	gem_close(i915, obj.handle);
+	igt_assert_eq(result[1000], 16);
+	munmap(result, 4096);
 }
 
 static uint32_t timesliceN_batches(int i915, uint32_t offset, int count)
@@ -561,6 +562,7 @@ static uint32_t timesliceN_batches(int i915, uint32_t offset, int count)
 
 static void timesliceN(int i915, unsigned int engine, int count)
 {
+	const unsigned int sz = ALIGN((count + 1) * 1024, 4096);
 	unsigned int offset = 24 << 20;
 	struct drm_i915_gem_exec_object2 obj = {
 		.handle = timesliceN_batches(i915, offset, count),
@@ -572,8 +574,9 @@ static void timesliceN(int i915, unsigned int engine, int count)
 		.buffer_count = 1,
 		.flags = engine | I915_EXEC_FENCE_OUT,
 	};
+	uint32_t *result =
+		gem_mmap__device_coherent(i915, obj.handle, 0, sz, PROT_READ);
 	int fence[count];
-	uint32_t result;
 
 	/*
 	 * Create a pair of interlocking batches, that ping pong
@@ -598,6 +601,7 @@ static void timesliceN(int i915, unsigned int engine, int count)
 	}
 
 	gem_sync(i915, obj.handle);
+	gem_close(i915, obj.handle);
 
 	/* no hangs! */
 	for (int i = 0; i < count; i++) {
@@ -605,9 +609,8 @@ static void timesliceN(int i915, unsigned int engine, int count)
 		close(fence[i]);
 	}
 
-	gem_read(i915, obj.handle, 0, &result, sizeof(result));
-	igt_assert_eq(result, 8 * count);
-	gem_close(i915, obj.handle);
+	igt_assert_eq(*result, 8 * count);
+	munmap(result, sz);
 }
 
 static void lateslice(int i915, unsigned int engine)
