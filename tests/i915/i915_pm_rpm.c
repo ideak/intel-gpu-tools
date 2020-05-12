@@ -1786,18 +1786,15 @@ static void test_one_plane(bool dpms, uint32_t plane_id,
 /* This one also triggered WARNs on our driver at some point in time. */
 static void planes_subtest(bool universal, bool dpms)
 {
-	int i, rc, crtc_idx;
+	int i, planes_tested = 0, crtc_idx;
 	drmModePlaneResPtr planes;
 
 	igt_require(default_mode_params);
 	crtc_idx = kmstest_get_crtc_idx(ms_data.res,
 					default_mode_params->crtc_id);
 
-	if (universal) {
-		rc = drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES,
-				     1);
-		igt_require(rc == 0);
-	}
+	igt_assert_eq(drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES,
+				      universal), 0);
 
 	planes = drmModeGetPlaneResources(drm_fd);
 	for (i = 0; i < planes->count_planes; i++) {
@@ -1818,10 +1815,9 @@ static void planes_subtest(bool universal, bool dpms)
 	}
 	drmModeFreePlaneResources(planes);
 
-	if (universal) {
-		rc = drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 0);
-		igt_assert_eq(rc, 0);
-	}
+	igt_assert_eq(drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES,
+				      1), 0);
+	igt_assert_lte(universal ? 3 : 1, planes_tested);
 }
 
 static void pm_test_tiling(void)
