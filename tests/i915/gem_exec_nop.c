@@ -64,7 +64,7 @@ static double elapsed(const struct timespec *start, const struct timespec *end)
 
 static double nop_on_ring(int fd, uint32_t handle,
 			  const struct intel_execution_engine2 *e,
-			  int timeout,
+			  int timeout_ms,
 			  unsigned long *out)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -94,7 +94,7 @@ static double nop_on_ring(int fd, uint32_t handle,
 		count++;
 
 		clock_gettime(CLOCK_MONOTONIC, &now);
-	} while (elapsed(&start, &now) < timeout);
+	} while (elapsed(&start, &now) < timeout_ms * 1e-3);
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 
 	*out = count;
@@ -348,14 +348,15 @@ static void single(int fd, uint32_t handle,
 	double time;
 	unsigned long count;
 
-	time = nop_on_ring(fd, handle, e, 20, &count);
+	time = nop_on_ring(fd, handle, e, 20000, &count);
 	igt_info("%s: %'lu cycles: %.3fus\n",
 		  e->name, count, time*1e6 / count);
 }
 
 static double
 stable_nop_on_ring(int fd, uint32_t handle,
-		   const struct intel_execution_engine2 *e, int timeout,
+		   const struct intel_execution_engine2 *e,
+		   int timeout_ms,
 		   int reps)
 {
 	igt_stats_t s;
@@ -370,7 +371,7 @@ stable_nop_on_ring(int fd, uint32_t handle,
 		unsigned long count;
 		double time;
 
-		time = nop_on_ring(fd, handle, e, timeout, &count);
+		time = nop_on_ring(fd, handle, e, timeout_ms, &count);
 		igt_stats_push_float(&s, time / count);
 	}
 
@@ -390,9 +391,10 @@ static void headless(int fd, uint32_t handle,
 		     const struct intel_execution_engine2 *e)
 {
 	unsigned int nr_connected = 0;
-	drmModeConnector *connector;
-	drmModeRes *res;
 	double n_display, n_headless;
+	drmModeConnector *connector;
+	unsigned long count;
+	drmModeRes *res;
 
 	res = drmModeGetResources(fd);
 	igt_require(res);
@@ -409,8 +411,11 @@ static void headless(int fd, uint32_t handle,
 	/* set graphics mode to prevent blanking */
 	kmstest_set_vt_graphics_mode();
 
+	nop_on_ring(fd, handle, e, 10, &count);
+	igt_require_f(count > 100, "submillisecond precision required\n");
+
 	/* benchmark nops */
-	n_display = stable_nop_on_ring(fd, handle, e, 1, 5);
+	n_display = stable_nop_on_ring(fd, handle, e, 500, 5);
 	igt_info("With one display connected: %.2fus\n",
 		 n_display * 1e6);
 
@@ -418,7 +423,7 @@ static void headless(int fd, uint32_t handle,
 	kmstest_unset_all_crtcs(fd, res);
 
 	/* benchmark nops again */
-	n_headless = stable_nop_on_ring(fd, handle, e, 1, 5);
+	n_headless = stable_nop_on_ring(fd, handle, e, 500, 5);
 	igt_info("Without a display connected (headless): %.2fus\n",
 		 n_headless * 1e6);
 
@@ -444,7 +449,7 @@ static void parallel(int fd, uint32_t handle, int timeout)
 		engines[nengine] = e->flags;
 		names[nengine++] = strdup(e->name);
 
-		time = nop_on_ring(fd, handle, e, 1, &count) / count;
+		time = nop_on_ring(fd, handle, e, 250, &count) / count;
 		sum += time;
 		igt_debug("%s: %.3fus\n", e->name, 1e6*time);
 	}
@@ -506,7 +511,7 @@ static void independent(int fd, uint32_t handle, int timeout)
 		engines[nengine] = e->flags;
 		names[nengine++] = strdup(e->name);
 
-		time = nop_on_ring(fd, handle, e, 1, &count) / count;
+		time = nop_on_ring(fd, handle, e, 250, &count) / count;
 		sum += time;
 		igt_debug("%s: %.3fus\n", e->name, 1e6*time);
 	}
@@ -626,7 +631,7 @@ static void series(int fd, uint32_t handle, int timeout)
 
 	nengine = 0;
 	__for_each_physical_engine(fd, e) {
-		time = nop_on_ring(fd, handle, e, 1, &count) / count;
+		time = nop_on_ring(fd, handle, e, 250, &count) / count;
 		if (time > max) {
 			name = e->name;
 			max = time;
@@ -705,7 +710,7 @@ static void sequential(int fd, uint32_t handle, unsigned flags, int timeout)
 	__for_each_physical_engine(fd, e) {
 		unsigned long count;
 
-		time = nop_on_ring(fd, handle, e, 1, &count) / count;
+		time = nop_on_ring(fd, handle, e, 250, &count) / count;
 		sum += time;
 		igt_debug("%s: %.3fus\n", e->name, 1e6*time);
 
