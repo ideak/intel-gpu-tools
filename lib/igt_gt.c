@@ -120,7 +120,7 @@ static void eat_error_state(int dev)
 void igt_require_hang_ring(int fd, int ring)
 {
 	if (!igt_check_boolean_env_var("IGT_HANG", true))
-		igt_skip("hang injection disabled by user");
+		igt_skip("hang injection disabled by user [IGT_HANG=0]\n");
 
 	gem_require_ring(fd, ring);
 	gem_context_require_bannable(fd);
@@ -175,7 +175,7 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 	igt_require_gem(fd);
 
 	if (!igt_check_boolean_env_var("IGT_HANG", true))
-		igt_skip("hang injection disabled by user");
+		igt_skip("hang injection disabled by user [IGT_HANG=0]\n");
 	gem_context_require_bannable(fd);
 
 	allow_reset = 1;
