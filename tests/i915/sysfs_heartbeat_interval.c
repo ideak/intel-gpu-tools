@@ -308,8 +308,13 @@ static void client(int i915, int engine, int *ctl, int duration, int expect)
 					      IGT_SPIN_POLL_RUN |
 					      IGT_SPIN_FENCE_OUT));
 
+		/* XXX we need more precise means of limiting the spinner */
 		igt_spin_busywait_until_started(spin);
-		igt_assert_eq(sync_fence_status(spin->out_fence), 0);
+		if (sync_fence_status(spin->out_fence)) {
+			/* CPU too slow! */
+			igt_spin_free(i915, spin);
+			continue;
+		}
 
 		elapsed = measured_usleep(duration * 1000);
 		igt_spin_end(spin);
