@@ -41,6 +41,7 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "igt_device.h"
+#include "sw_sync.h"
 
 static bool has_ring(int fd, unsigned ring_exec_flags)
 {
@@ -192,6 +193,20 @@ static int has_secure_batches(const int fd)
 	};
 
 	drmIoctl(fd, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	return v > 0;
+}
+
+static bool has_submit_fence(int fd)
+{
+	int v = 0;
+	struct drm_i915_getparam gp = {
+		.param = I915_PARAM_HAS_EXEC_SUBMIT_FENCE,
+		.value = &v,
+	};
+
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
+	errno = 0;
 
 	return v > 0;
 }
@@ -533,6 +548,28 @@ igt_main
 		RUN_FAIL(EINVAL);
 		execbuf.rsvd2 = fd;
 		RUN_FAIL(EINVAL);
+	}
+
+	igt_subtest("invalid-fence-in-submit") {
+		int timeline;
+
+		igt_require(gem_has_exec_fence(fd));
+		igt_require(has_submit_fence(fd));
+
+		timeline = sw_sync_timeline_create();
+		execbuf.rsvd2 = sw_sync_timeline_create_fence(timeline, 1);
+
+		execbuf.flags = I915_EXEC_FENCE_IN;
+		gem_execbuf(fd, &execbuf);
+
+		execbuf.flags = I915_EXEC_FENCE_SUBMIT;
+		gem_execbuf(fd, &execbuf);
+
+		execbuf.flags = I915_EXEC_FENCE_IN | I915_EXEC_FENCE_SUBMIT;
+		RUN_FAIL(EINVAL);
+
+		close(execbuf.rsvd2);
+		close(timeline);
 	}
 
 	igt_subtest("rsvd2-dirt") {
