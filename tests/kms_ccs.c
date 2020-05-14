@@ -81,12 +81,15 @@ static const uint32_t formats[] = {
 	DRM_FORMAT_P016,
 };
 
-static const uint64_t ccs_modifiers[] = {
-	LOCAL_I915_FORMAT_MOD_Y_TILED_CCS,
-	LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS,
-	LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS,
-	LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC,
-	LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS,
+static const struct {
+	uint64_t modifier;
+	const char *str;
+} ccs_modifiers[5] = {
+	{LOCAL_I915_FORMAT_MOD_Y_TILED_CCS, "LOCAL_I915_FORMAT_MOD_Y_TILED_CCS"},
+	{LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS, "LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS"},
+	{LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS, "LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS"},
+	{LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC, "LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC"},
+	{LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS, "LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS"},
 };
 
 static bool check_ccs_planes;
@@ -422,7 +425,8 @@ static int __test_output(data_t *data)
 	for (i = 0; i < ARRAY_SIZE(ccs_modifiers); i++) {
 		int j;
 
-		data->ccs_modifier = ccs_modifiers[i];
+		data->ccs_modifier = ccs_modifiers[i].modifier;
+		igt_debug("Modifier in use: %s\n", ccs_modifiers[i].str);
 		for (j = 0; j < ARRAY_SIZE(formats); j++) {
 			data->format = formats[j];
 			valid_tests += test_ccs(data);
