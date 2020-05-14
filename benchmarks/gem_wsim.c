@@ -1490,6 +1490,11 @@ get_ctxid(struct workload *wrk, struct w_step *w)
 	return wrk->ctx_list[w->context].id;
 }
 
+static uint32_t alloc_bo(int i915, unsigned long size)
+{
+	return gem_create(i915, size);
+}
+
 static void
 alloc_step_batch(struct workload *wrk, struct w_step *w)
 {
@@ -1501,7 +1506,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w)
 	w->obj = calloc(nr_obj, sizeof(*w->obj));
 	igt_assert(w->obj);
 
-	w->obj[j].handle = gem_create(fd, 4096);
+	w->obj[j].handle = alloc_bo(fd, 4096);
 	w->obj[j].flags = EXEC_OBJECT_WRITE;
 	j++;
 	igt_assert(j < nr_obj);
@@ -1546,7 +1551,8 @@ alloc_step_batch(struct workload *wrk, struct w_step *w)
 	else
 		w->bb_sz = get_bb_sz(w, w->duration.max);
 
-	w->bb_handle = w->obj[j].handle = gem_create(fd, w->bb_sz + (w->unbound_duration ? 4096 : 0));
+	w->bb_handle = w->obj[j].handle =
+		alloc_bo(fd, w->bb_sz + (w->unbound_duration ? 4096 : 0));
 	init_bb(w);
 	w->obj[j].relocation_count = terminate_bb(w);
 
@@ -1703,7 +1709,7 @@ static void allocate_working_set(struct working_set *set)
 	igt_assert(set->handles);
 
 	for (i = 0; i < set->nr; i++)
-		set->handles[i] = gem_create(fd, set->sizes[i]);
+		set->handles[i] = alloc_bo(fd, set->sizes[i]);
 }
 
 #define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
@@ -2339,7 +2345,7 @@ static unsigned long calibrate_nop(unsigned int tolerance_pct, struct intel_exec
 	do {
 		struct timespec t_start;
 
-		obj.handle = gem_create(fd, size);
+		obj.handle = alloc_bo(fd, size);
 		gem_write(fd, obj.handle, size - sizeof(bbe), &bbe,
 			  sizeof(bbe));
 		gem_execbuf(fd, &eb);
