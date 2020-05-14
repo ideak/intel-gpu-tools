@@ -1531,6 +1531,86 @@ static void full(int i915, unsigned int flags)
 	gem_quiescent_gpu(i915);
 }
 
+static void __sliced(int i915,
+		     uint32_t ctx, unsigned int count,
+		     unsigned int flags)
+{
+	igt_spin_t *load[count];
+	igt_spin_t *virtual;
+
+	virtual = igt_spin_new(i915, ctx, .engine = 0,
+			       .flags = (IGT_SPIN_FENCE_OUT |
+					 IGT_SPIN_POLL_RUN));
+	for (int i = 0; i < count; i++)
+		load[i] = __igt_spin_new(i915, ctx,
+					 .engine = i + 1,
+					 .fence = virtual->out_fence,
+					 .flags = flags);
+
+	/* Wait long enough for the virtual timeslice [1 ms] to expire */
+	igt_spin_busywait_until_started(virtual);
+	usleep(50 * 1000); /* 50ms */
+
+	igt_spin_end(virtual);
+	igt_assert_eq(sync_fence_wait(virtual->out_fence, 1000), 0);
+	igt_assert_eq(sync_fence_status(virtual->out_fence), 1);
+
+	for (int i = 0; i < count; i++)
+		igt_spin_free(i915, load[i]);
+	igt_spin_free(i915, virtual);
+}
+
+static void sliced(int i915)
+{
+	/*
+	 * Let's investigate what happens when the virtual request is
+	 * timesliced away.
+	 *
+	 * If the engine is busy with independent work, we want the virtual
+	 * request to hop over to an idle engine (within its balancing set).
+	 * However, if the work is dependent upon the virtual request,
+	 * we most certainly do not want to reschedule that work ahead of
+	 * the virtual request. [If we did, we should still have the saving
+	 * grace of being able to move the virual request to another engine
+	 * and so run both in parallel.] If we do neither, and get stuck
+	 * on the dependent work and never run the virtual request, we hang.
+	 */
+
+	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(gem_scheduler_has_semaphores(i915));
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *ci;
+		unsigned int count;
+
+		ci = list_engines(i915, 1u << class, &count);
+		if (!ci)
+			continue;
+
+		if (count < 2) {
+			free(ci);
+			continue;
+		}
+
+		igt_fork(child, count) {
+			uint32_t ctx = load_balancer_create(i915, ci, count);
+
+			/* Independent load */
+			__sliced(i915, ctx, count, 0);
+
+			/* Dependent load */
+			__sliced(i915, ctx, count, IGT_SPIN_FENCE_IN);
+
+			gem_context_destroy(i915, ctx);
+		}
+		igt_waitchildren();
+
+		free(ci);
+	}
+
+	gem_quiescent_gpu(i915);
+}
+
 static void nop(int i915)
 {
 	struct drm_i915_gem_exec_object2 batch = {
@@ -2013,6 +2093,9 @@ igt_main
 
 	igt_subtest("semaphore")
 		semaphore(i915);
+
+	igt_subtest("sliced")
+		sliced(i915);
 
 	igt_subtest("smoke")
 		smoketest(i915, 20);
