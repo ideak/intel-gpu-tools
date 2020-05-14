@@ -88,14 +88,21 @@ enum w_type
 	LOAD_BALANCE,
 	BOND,
 	TERMINATE,
-	SSEU
+	SSEU,
+	WORKINGSET,
+};
+
+struct dep_entry {
+	int target;
+	bool write;
+	int working_set; /* -1 = step dependecy, >= 0 working set id */
 };
 
 struct deps
 {
 	int nr;
 	bool submit_fence;
-	int *list;
+	struct dep_entry *list;
 };
 
 struct w_arg {
@@ -108,6 +115,14 @@ struct w_arg {
 struct bond {
 	uint64_t mask;
 	enum intel_engine_id master;
+};
+
+struct working_set {
+	int id;
+	bool shared;
+	unsigned int nr;
+	uint32_t *handles;
+	unsigned long *sizes;
 };
 
 struct workload;
@@ -143,6 +158,7 @@ struct w_step
 			enum intel_engine_id bond_master;
 		};
 		int sseu;
+		struct working_set working_set;
 	};
 
 	/* Implementation details */
@@ -192,6 +208,9 @@ struct workload
 
 	unsigned int nr_ctxs;
 	struct ctx *ctx_list;
+
+	struct working_set **working_sets; /* array indexed by set id */
+	int max_working_set_id;
 
 	int sync_timeline;
 	uint32_t sync_seqno;
@@ -281,11 +300,129 @@ print_engine_calibrations(void)
 	printf("\n");
 }
 
+static void add_dep(struct deps *deps, struct dep_entry entry)
+{
+	deps->list = realloc(deps->list, sizeof(*deps->list) * (deps->nr + 1));
+	igt_assert(deps->list);
+
+	deps->list[deps->nr++] = entry;
+}
+
+static int
+parse_working_set_deps(struct workload *wrk,
+		       struct deps *deps,
+		       struct dep_entry _entry,
+		       char *str)
+{
+	/*
+	 * 1 - target handle index in the specified working set.
+	 * 2-4 - range
+	 */
+	struct dep_entry entry = _entry;
+	char *s;
+
+	s = index(str, '-');
+	if (s) {
+		int from, to;
+
+		from = atoi(str);
+		if (from < 0)
+			return -1;
+
+		to = atoi(++s);
+		if (to <= 0)
+			return -1;
+
+		if (to <= from)
+			return -1;
+
+		for (entry.target = from; entry.target <= to; entry.target++)
+			add_dep(deps, entry);
+	} else {
+		entry.target = atoi(str);
+		if (entry.target < 0)
+			return -1;
+
+		add_dep(deps, entry);
+	}
+
+	return 0;
+}
+
+static int
+parse_dependency(unsigned int nr_steps, struct w_step *w, char *str)
+{
+	struct dep_entry entry = { .working_set = -1 };
+	bool submit_fence = false;
+	char *s;
+
+	switch (str[0]) {
+	case '-':
+		if (str[1] < '0' || str[1] > '9')
+			return -1;
+
+		entry.target = atoi(str);
+		if (entry.target > 0 || ((int)nr_steps + entry.target) < 0)
+			return -1;
+
+		add_dep(&w->data_deps, entry);
+
+		break;
+	case 's':
+		submit_fence = true;
+		/* Fall-through. */
+	case 'f':
+		/* Multiple fences not yet supported. */
+		igt_assert_eq(w->fence_deps.nr, 0);
+
+		entry.target = atoi(++str);
+		if (entry.target > 0 || ((int)nr_steps + entry.target) < 0)
+			return -1;
+
+		add_dep(&w->fence_deps, entry);
+
+		w->fence_deps.submit_fence = submit_fence;
+		break;
+	case 'w':
+		entry.write = true;
+		/* Fall-through. */
+	case 'r':
+		/*
+		 * [rw]N-<str>
+		 * r1-<str> or w2-<str>, where N is working set id.
+		 */
+		s = index(++str, '-');
+		if (!s)
+			return -1;
+
+		entry.working_set = atoi(str);
+		if (entry.working_set < 0)
+			return -1;
+
+		if (parse_working_set_deps(w->wrk, &w->data_deps, entry, ++s))
+			return -1;
+
+		break;
+	default:
+		return -1;
+	};
+
+	return 0;
+}
+
 static int
 parse_dependencies(unsigned int nr_steps, struct w_step *w, char *_desc)
 {
 	char *desc = strdup(_desc);
 	char *token, *tctx = NULL, *tstart = desc;
+	int ret = 0;
+
+	/*
+	 * Skip when no dependencies to avoid having to detect
+	 * non-sensical "0/0/..." below.
+	 */
+	if (!strcmp(_desc, "0"))
+		goto out;
 
 	igt_assert(desc);
 	igt_assert(!w->data_deps.nr && w->data_deps.nr == w->fence_deps.nr);
@@ -293,47 +430,17 @@ parse_dependencies(unsigned int nr_steps, struct w_step *w, char *_desc)
 		   w->data_deps.list == w->fence_deps.list);
 
 	while ((token = strtok_r(tstart, "/", &tctx)) != NULL) {
-		bool submit_fence = false;
-		char *str = token;
-		struct deps *deps;
-		int dep;
-
 		tstart = NULL;
 
-		if (str[0] == '-' || (str[0] >= '0' && str[0] <= '9')) {
-			deps = &w->data_deps;
-		} else {
-			if (str[0] == 's')
-				submit_fence = true;
-			else if (str[0] != 'f')
-				return -1;
-
-			deps = &w->fence_deps;
-			str++;
-		}
-
-		dep = atoi(str);
-		if (dep > 0 || ((int)nr_steps + dep) < 0) {
-			if (deps->list)
-				free(deps->list);
-			return -1;
-		}
-
-		if (dep < 0) {
-			deps->nr++;
-			/* Multiple fences not yet supported. */
-			igt_assert(deps->nr == 1 || deps != &w->fence_deps);
-			deps->list = realloc(deps->list,
-					     sizeof(*deps->list) * deps->nr);
-			igt_assert(deps->list);
-			deps->list[deps->nr - 1] = dep;
-			deps->submit_fence = submit_fence;
-		}
+		ret = parse_dependency(nr_steps, w, token);
+		if (ret)
+			break;
 	}
 
+out:
 	free(desc);
 
-	return 0;
+	return ret;
 }
 
 static void __attribute__((format(printf, 1, 2)))
@@ -624,6 +731,101 @@ static int parse_engine_map(struct w_step *step, const char *_str)
 	return 0;
 }
 
+static unsigned long parse_size(char *str)
+{
+	const unsigned int len = strlen(str);
+	unsigned int mult = 1;
+	long val;
+
+	/* "1234567890[gGmMkK]" */
+
+	if (len == 0)
+		return 0;
+
+	switch (str[len - 1]) {
+	case 'g':
+	case 'G':
+		mult *= 1024;
+		/* Fall-throuogh. */
+	case 'm':
+	case 'M':
+		mult *= 1024;
+		/* Fall-throuogh. */
+	case 'k':
+	case 'K':
+		mult *= 1024;
+
+		str[len - 1] = 0;
+		/* Fall-throuogh. */
+
+	case '0' ... '9':
+		break;
+	default:
+		return 0; /* Unrecognized non-digit. */
+	}
+
+	val = atol(str);
+	if (val <= 0)
+		return 0;
+
+	return val * mult;
+}
+
+static int add_buffers(struct working_set *set, char *str)
+{
+	/*
+	 * 4096
+	 * 4k
+	 * 4m
+	 * 4g
+	 * 10n4k - 10 4k batches
+	 */
+	unsigned long *sizes, size;
+	int add, i;
+	char *n;
+
+	n = index(str, 'n');
+	if (n) {
+		*n = 0;
+		add = atoi(str);
+		if (add <= 0)
+			return -1;
+		str = ++n;
+	} else {
+		add = 1;
+	}
+
+	size = parse_size(str);
+	if (!size)
+		return -1;
+
+	sizes = realloc(set->sizes, (set->nr + add) * sizeof(*sizes));
+	if (!sizes)
+		return -1;
+
+	for (i = 0; i < add; i++)
+		sizes[set->nr + i] = size;
+
+	set->nr += add;
+	set->sizes = sizes;
+
+	return 0;
+}
+
+static int parse_working_set(struct working_set *set, char *str)
+{
+	char *token, *tctx = NULL, *tstart = str;
+
+	while ((token = strtok_r(tstart, "/", &tctx))) {
+		tstart = NULL;
+
+		if (add_buffers(set, token))
+			return -1;
+	}
+
+	return 0;
+}
+
 static uint64_t engine_list_mask(const char *_str)
 {
 	uint64_t mask = 0;
@@ -644,6 +846,8 @@ static uint64_t engine_list_mask(const char *_str)
 	return mask;
 }
 
+static void allocate_working_set(struct working_set *set);
+
 #define int_field(_STEP_, _FIELD_, _COND_, _ERR_) \
 	if ((field = strtok_r(fstart, ".", &fctx))) { \
 		tmp = atoi(field); \
@@ -661,7 +865,7 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 	char *desc = strdup(arg->desc);
 	char *_token, *token, *tctx = NULL, *tstart = desc;
 	char *field, *fctx = NULL, *fstart;
-	struct w_step step, *steps = NULL;
+	struct w_step step, *w, *steps = NULL;
 	unsigned int valid;
 	int i, j, tmp;
 
@@ -851,6 +1055,28 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 
 				step.type = BOND;
 				goto add_step;
+			} else if (!strcmp(field, "w") || !strcmp(field, "W")) {
+				unsigned int nr = 0;
+
+				step.working_set.shared = field[0] == 'W';
+
+				while ((field = strtok_r(fstart, ".", &fctx))) {
+					tmp = atoi(field);
+					if (nr == 0) {
+						step.working_set.id = tmp;
+					} else {
+						tmp = parse_working_set(&step.working_set,
+									field);
+						check_arg(tmp < 0,
+							  "Invalid working set at step %u!\n",
+							  nr_steps);
+					}
+
+					nr++;
+				}
+
+				step.type = WORKINGSET;
+				goto add_step;
 			}
 
 			if (!field) {
@@ -975,6 +1201,8 @@ add_step:
 	wrk->steps = steps;
 	wrk->prio = arg->prio;
 	wrk->sseu = arg->sseu;
+	wrk->max_working_set_id = -1;
+	wrk->working_sets = NULL;
 
 	free(desc);
 
@@ -984,7 +1212,7 @@ add_step:
 	 */
 	for (i = 0; i < nr_steps; i++) {
 		for (j = 0; j < steps[i].fence_deps.nr; j++) {
-			tmp = steps[i].idx + steps[i].fence_deps.list[j];
+			tmp = steps[i].idx + steps[i].fence_deps.list[j].target;
 			check_arg(tmp < 0 || tmp >= i ||
 				  (steps[tmp].type != BATCH &&
 				   steps[tmp].type != SW_FENCE),
@@ -1001,6 +1229,51 @@ add_step:
 				  steps[tmp].type != SW_FENCE,
 				  "Invalid sw fence target %u!\n", i);
 		}
+	}
+
+	/*
+	 * Check no duplicate working set ids.
+	 */
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		struct w_step *w2;
+
+		if (w->type != WORKINGSET)
+			continue;
+
+		for (j = 0, w2 = wrk->steps; j < wrk->nr_steps; w2++, j++) {
+			if (j == i)
+				continue;
+			if (w2->type != WORKINGSET)
+				continue;
+
+			check_arg(w->working_set.id == w2->working_set.id,
+				  "Duplicate working set id at %u!\n", j);
+		}
+	}
+
+	/*
+	 * Allocate shared working sets.
+	 */
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		if (w->type == WORKINGSET && w->working_set.shared)
+			allocate_working_set(&w->working_set);
+	}
+
+	wrk->max_working_set_id = -1;
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		if (w->type == WORKINGSET &&
+		    w->working_set.shared &&
+		    w->working_set.id > wrk->max_working_set_id)
+			wrk->max_working_set_id = w->working_set.id;
+	}
+
+	wrk->working_sets = calloc(wrk->max_working_set_id + 1,
+				   sizeof(*wrk->working_sets));
+	igt_assert(wrk->working_sets);
+
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		if (w->type == WORKINGSET && w->working_set.shared)
+			wrk->working_sets[w->working_set.id] = &w->working_set;
 	}
 
 	return wrk;
@@ -1023,6 +1296,18 @@ clone_workload(struct workload *_wrk)
 	igt_assert(wrk->steps);
 
 	memcpy(wrk->steps, _wrk->steps, sizeof(struct w_step) * wrk->nr_steps);
+
+	wrk->max_working_set_id = _wrk->max_working_set_id;
+	if (wrk->max_working_set_id >= 0) {
+		wrk->working_sets = calloc(wrk->max_working_set_id + 1,
+					sizeof(*wrk->working_sets));
+		igt_assert(wrk->working_sets);
+
+		memcpy(wrk->working_sets,
+		       _wrk->working_sets,
+		       (wrk->max_working_set_id + 1) *
+		       sizeof(*wrk->working_sets));
+	}
 
 	/* Check if we need a sw sync timeline. */
 	for (i = 0; i < wrk->nr_steps; i++) {
@@ -1222,17 +1507,36 @@ alloc_step_batch(struct workload *wrk, struct w_step *w)
 	igt_assert(j < nr_obj);
 
 	for (i = 0; i < w->data_deps.nr; i++) {
-		igt_assert(w->data_deps.list[i] <= 0);
-		if (w->data_deps.list[i]) {
-			int dep_idx = w->idx + w->data_deps.list[i];
+		struct dep_entry *entry = &w->data_deps.list[i];
+		uint32_t dep_handle;
 
+		if (entry->working_set == -1) {
+			int dep_idx = w->idx + entry->target;
+
+			igt_assert(entry->target <= 0);
 			igt_assert(dep_idx >= 0 && dep_idx < w->idx);
 			igt_assert(wrk->steps[dep_idx].type == BATCH);
 
-			w->obj[j].handle = wrk->steps[dep_idx].obj[0].handle;
-			j++;
-			igt_assert(j < nr_obj);
+			dep_handle = wrk->steps[dep_idx].obj[0].handle;
+		} else {
+			struct working_set *set;
+
+			igt_assert(entry->working_set <=
+				   wrk->max_working_set_id);
+
+			set = wrk->working_sets[entry->working_set];
+
+			igt_assert(set->nr);
+			igt_assert(entry->target < set->nr);
+			igt_assert(set->sizes[entry->target]);
+
+			dep_handle = set->handles[entry->target];
 		}
+
+		w->obj[j].flags = entry->write ? EXEC_OBJECT_WRITE : 0;
+		w->obj[j].handle = dep_handle;
+		j++;
+		igt_assert(j < nr_obj);
 	}
 
 	if (w->unbound_duration)
@@ -1391,10 +1695,22 @@ static size_t sizeof_engines_bond(int count)
 			engines[count]);
 }
 
+static void allocate_working_set(struct working_set *set)
+{
+	unsigned int i;
+
+	set->handles = calloc(set->nr, sizeof(*set->handles));
+	igt_assert(set->handles);
+
+	for (i = 0; i < set->nr; i++)
+		set->handles[i] = gem_create(fd, set->sizes[i]);
+}
+
 #define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
 
 static int prepare_workload(unsigned int id, struct workload *wrk)
 {
+	struct working_set **sets;
 	uint32_t share_vm = 0;
 	int max_ctx = -1;
 	struct w_step *w;
@@ -1630,6 +1946,51 @@ static int prepare_workload(unsigned int id, struct workload *wrk)
 	}
 
 	/*
+	 * Allocate working sets.
+	 */
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		if (w->type == WORKINGSET && !w->working_set.shared)
+			allocate_working_set(&w->working_set);
+	}
+
+	/*
+	 * Map of working set ids.
+	 */
+	wrk->max_working_set_id = -1;
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		if (w->type == WORKINGSET &&
+		    w->working_set.id > wrk->max_working_set_id)
+			wrk->max_working_set_id = w->working_set.id;
+	}
+
+	sets = wrk->working_sets;
+	wrk->working_sets = calloc(wrk->max_working_set_id + 1,
+				   sizeof(*wrk->working_sets));
+	igt_assert(wrk->working_sets);
+
+	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
+		struct working_set *set;
+
+		if (w->type != WORKINGSET)
+			continue;
+
+		if (!w->working_set.shared) {
+			set = &w->working_set;
+		} else {
+			igt_assert(sets);
+
+			set = sets[w->working_set.id];
+			igt_assert(set->shared);
+			igt_assert(set->sizes);
+		}
+
+		wrk->working_sets[w->working_set.id] = set;
+	}
+
+	if (sets)
+		free(sets);
+
+	/*
 	 * Allocate batch buffers.
 	 */
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
@@ -1698,7 +2059,7 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine)
 		      2 * sizeof(uint32_t));
 
 	for (i = 0; i < w->fence_deps.nr; i++) {
-		int tgt = w->idx + w->fence_deps.list[i];
+		int tgt = w->idx + w->fence_deps.list[i].target;
 
 		/* TODO: fence merging needed to support multiple inputs */
 		igt_assert(i == 0);
@@ -1729,14 +2090,18 @@ static void sync_deps(struct workload *wrk, struct w_step *w)
 	unsigned int i;
 
 	for (i = 0; i < w->data_deps.nr; i++) {
+		struct dep_entry *entry = &w->data_deps.list[i];
 		int dep_idx;
 
-		igt_assert(w->data_deps.list[i] <= 0);
-
-		if (!w->data_deps.list[i])
+		if (entry->working_set == -1)
 			continue;
 
-		dep_idx = w->idx + w->data_deps.list[i];
+		igt_assert(entry->target <= 0);
+
+		if (!entry->target)
+			continue;
+
+		dep_idx = w->idx + entry->target;
 
 		igt_assert(dep_idx >= 0 && dep_idx < w->idx);
 		igt_assert(wrk->steps[dep_idx].type == BATCH);
@@ -1836,17 +2201,19 @@ static void *run_workload(void *data)
 					MI_BATCH_BUFFER_END;
 				__sync_synchronize();
 				continue;
-			} else if (w->type == PREEMPTION ||
-				   w->type == ENGINE_MAP ||
-				   w->type == LOAD_BALANCE ||
-				   w->type == BOND) {
-				continue;
 			} else if (w->type == SSEU) {
 				if (w->sseu != wrk->ctx_list[w->context * 2].sseu) {
 					wrk->ctx_list[w->context * 2].sseu =
 						set_ctx_sseu(&wrk->ctx_list[w->context * 2],
 							     w->sseu);
 				}
+				continue;
+			} else if (w->type == PREEMPTION ||
+				   w->type == ENGINE_MAP ||
+				   w->type == LOAD_BALANCE ||
+				   w->type == BOND ||
+				   w->type == WORKINGSET) {
+				   /* No action for these at execution time. */
 				continue;
 			}
 

@@ -8,6 +8,7 @@ M.<uint>.<str>[|<str>]...
 P|S|X.<uint>.<int>
 d|p|s|t|q|a|T.<int>,...
 b.<uint>.<str>[|<str>].<str>
+w|W.<uint>.<str>[/<str>]...
 f
 
 For duration a range can be given from which a random value will be picked
@@ -32,6 +33,8 @@ Additional workload steps are also supported:
  'P' - Context priority.
  'S' - Context SSEU configuration.
  'T' - Terminate an infinite batch.
+ 'w' - Working set. (See Working sets section.)
+ 'W' - Shared working set.
  'X' - Context preemption control.
 
 Engine ids: DEFAULT, RCS, BCS, VCS, VCS1, VCS2, VECS
@@ -275,3 +278,59 @@ for the render engine.
 Slice mask of -1 has a special meaning of "all slices". Otherwise any integer
 can be specifying as the slice mask, but beware any apart from 1 and -1 can make
 the workload not portable between different GPUs.
+
+Working sets
+------------
+
+When used plainly workload steps can create implicit data dependencies by
+relatively referencing another workload steps of a batch buffer type. Fourth
+field contains the relative data dependncy. For example:
+
+  1.RCS.1000.0.0
+  1.BCS.1000.-1.0
+
+This means the second batch buffer will be marked as having a read data
+dependency on the first one. (The shared buffer is always marked as written to
+by the dependency target buffer.) This will cause a serialization between the
+two batch buffers.
+
+Working sets are used where more complex data dependencies are required. Each
+working set has an id, a list of buffers, and can either be local to the
+workload or shared within the cloned workloads (-c command line option).
+
+Lower-case 'w' command defines a local working set while upper-case 'W' defines
+a shared version. Syntax is as follows:
+
+  w.<id>.<size>[/<size>]...
+
+For size a byte size can be given, or suffix 'k', 'm' or 'g' can be used (case
+insensitive). Prefix in the format of "<int>n<size>" can also be given to create
+multiple objects of the same size.
+
+Examples:
+
+  w.1.4k - Working set 1 with a single 4KiB object in it.
+  W.2.2M/32768 - Working set 2 with one 2MiB and one 32768 byte object.
+  w.3.10n4k/2n20000 - Working set 3 with ten 4KiB and two 20000 byte objects.
+
+Working set objects can be referenced as data dependency targets using the new
+'r'/'w' syntax. Simple example:
+
+  w.1.4k
+  W.2.1m
+  1.RCS.1000.r1-0/w2-0.0
+  1.BCS.1000.r2-0.0
+
+In this example the RCS batch is reading from working set 1 object 0 and writing
+to working set 2 object 0. BCS batch is reading from working set 2 object 0.
+
+Because working set 2 is of a shared type, should two instances of the same
+workload be executed (-c 2) then the 1MiB buffer would be shared and written
+and read by both clients creating a serialization point.
+
+Apart from single objects, ranges can also be given as depenencies:
+
+  w.1.10n4k
+  1.RCS.1000.r1-0-9.0
+
+Here the RCS batch has a read dependency on working set 1 objects 0 to 9.
