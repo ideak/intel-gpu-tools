@@ -1611,6 +1611,76 @@ static void sliced(int i915)
 	gem_quiescent_gpu(i915);
 }
 
+static void __hog(int i915, uint32_t ctx, unsigned int count)
+{
+	int64_t timeout = 50 * 1000 * 1000; /* 50ms */
+	igt_spin_t *virtual;
+	igt_spin_t *hog;
+
+	virtual = igt_spin_new(i915, ctx, .engine = 0);
+	for (int i = 0; i < count; i++)
+		gem_execbuf(i915, &virtual->execbuf);
+	usleep(50 * 1000); /* 50ms, long enough to spread across all engines */
+
+	gem_context_set_priority(i915, ctx, 1023);
+	hog = __igt_spin_new(i915, ctx,
+			     .engine = 1 + (random() % count),
+			     .flags = (IGT_SPIN_POLL_RUN |
+				       IGT_SPIN_NO_PREEMPTION));
+	gem_context_set_priority(i915, ctx, 0);
+
+	/* No matter which engine we choose, we'll have interrupted someone */
+	igt_spin_busywait_until_started(hog);
+
+	igt_spin_end(virtual);
+	if (gem_wait(i915, virtual->handle, &timeout)) {
+		igt_debugfs_dump(i915, "i915_engine_info");
+		igt_assert_eq(gem_wait(i915, virtual->handle, &timeout), 0);
+	}
+
+	igt_spin_free(i915, hog);
+	igt_spin_free(i915, virtual);
+}
+
+static void hog(int i915)
+{
+	/*
+	 * Suppose there we are, happily using an engine, minding our
+	 * own business, when all of a sudden a very important process
+	 * takes over the engine and refuses to let go. Clearly we have
+	 * to vacate that engine and find a new home.
+	 */
+
+	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(gem_scheduler_has_semaphores(i915));
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *ci;
+		unsigned int count;
+		uint32_t ctx;
+
+		ci = list_engines(i915, 1u << class, &count);
+		if (!ci)
+			continue;
+
+		if (count < 2) {
+			free(ci);
+			continue;
+		}
+
+		ctx = load_balancer_create(i915, ci, count);
+
+		__hog(i915, ctx, count);
+
+		gem_context_destroy(i915, ctx);
+		igt_waitchildren();
+
+		free(ci);
+	}
+
+	gem_quiescent_gpu(i915);
+}
+
 static void nop(int i915)
 {
 	struct drm_i915_gem_exec_object2 batch = {
@@ -2096,6 +2166,9 @@ igt_main
 
 	igt_subtest("sliced")
 		sliced(i915);
+
+	igt_subtest("hog")
+		hog(i915);
 
 	igt_subtest("smoke")
 		smoketest(i915, 20);
