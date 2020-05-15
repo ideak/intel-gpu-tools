@@ -800,7 +800,7 @@ static const char igt_dmesg_whitelist[] =
 	 * module load after the testing finishes, which produces this
 	 * message.
 	 */
-	"i915: probe of [0-9:.]+ failed with error -25" _
+	"i915: probe of [0-9a-fA-F:.]+ failed with error -25" _
 	/* swiotbl warns even when asked not to */
 	"mock: DMA: Out of SW-IOMMU space for [0-9]+ bytes" _
 	"usb usb[0-9]+: root hub lost power or was reset"
