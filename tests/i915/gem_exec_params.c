@@ -406,7 +406,7 @@ igt_main
 		int expected;
 
 		expected = 0;
-		if (gem_has_bsd2(fd))
+		if (gem_has_bsd2(fd) || !gem_has_bsd(fd))
 			expected = -EINVAL;
 
 		execbuf.flags = I915_EXEC_BSD | I915_EXEC_BSD_MASK;
