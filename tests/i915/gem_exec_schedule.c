@@ -1370,6 +1370,68 @@ static void preempt_queue(int fd, unsigned ring, unsigned int flags)
 	}
 }
 
+static bool has_context_engines(int i915)
+{
+	struct drm_i915_gem_context_param param = {
+		.ctx_id = 0,
+		.param = I915_CONTEXT_PARAM_ENGINES,
+	};
+	return __gem_context_set_param(i915, &param) == 0;
+}
+
+static void preempt_engines(int i915,
+			    const struct intel_execution_engine2 *e,
+			    unsigned int flags)
+{
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines , I915_EXEC_RING_MASK + 1);
+	struct drm_i915_gem_context_param param = {
+		.ctx_id = gem_context_create(i915),
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.value = to_user_pointer(&engines),
+		.size = sizeof(engines),
+	};
+	struct pnode {
+		struct igt_list_head spinners;
+		struct igt_list_head link;
+	} pnode[I915_EXEC_RING_MASK + 1], *p;
+	IGT_LIST_HEAD(plist);
+	igt_spin_t *spin, *sn;
+
+	/*
+	 * A quick test that each engine within a context is an independent
+	 * timeline that we can reprioritise and shuffle amongst themselves.
+	 */
+
+	igt_require(has_context_engines(i915));
+
+	for (int n = 0; n <= I915_EXEC_RING_MASK; n++) {
+		engines.engines[n].engine_class = e->class;
+		engines.engines[n].engine_instance = e->instance;
+		IGT_INIT_LIST_HEAD(&pnode[n].spinners);
+		igt_list_add(&pnode[n].link, &plist);
+	}
+	gem_context_set_param(i915, &param);
+
+	for (int n = MIN_PRIO; n <= MAX_PRIO; n++) {
+		unsigned int engine = n & I915_EXEC_RING_MASK;
+
+		gem_context_set_priority(i915, param.ctx_id, n);
+		spin = igt_spin_new(i915, param.ctx_id, .engine = engine);
+
+		igt_list_move_tail(&spin->link, &pnode[engine].spinners);
+		igt_list_move(&pnode[engine].link, &plist);
+	}
+
+	igt_list_for_each_entry(p, &plist, link) {
+		igt_list_for_each_entry_safe(spin, sn, &p->spinners, link) {
+			igt_spin_end(spin);
+			gem_sync(i915, spin->handle);
+			igt_spin_free(i915, spin);
+		}
+	}
+	gem_context_destroy(i915, param.ctx_id);
+}
+
 static void preempt_self(int fd, unsigned ring)
 {
 	const struct intel_execution_engine2 *e;
@@ -2443,6 +2505,9 @@ igt_main
 
 			test_each_engine_store("preempt-queue-contexts-chain", fd, e)
 				preempt_queue(fd, e->flags, CONTEXTS | CHAIN);
+
+			test_each_engine_store("preempt-engines", fd, e)
+				preempt_engines(fd, e, 0);
 
 			igt_subtest_group {
 				igt_hang_t hang;
