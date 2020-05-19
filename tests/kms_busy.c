@@ -374,20 +374,20 @@ igt_main
 
 		igt_subtest_f("extended-modeset-hang-oldfb-with-reset-%s-pipe-%s",
 				e->name, kmstest_pipe_name(n)) {
-			igt_set_module_param_int("force_reset_modeset_test", 1);
+			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 1);
 
 			test_hang(&display, eb_ring(e), n, true, false);
 
-			igt_set_module_param_int("force_reset_modeset_test", 0);
+			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 0);
 		}
 
 		igt_subtest_f("extended-modeset-hang-newfb-with-reset-%s-pipe-%s",
 				e->name, kmstest_pipe_name(n)) {
-			igt_set_module_param_int("force_reset_modeset_test", 1);
+			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 1);
 
 			test_hang(&display, eb_ring(e), n, true, true);
 
-			igt_set_module_param_int("force_reset_modeset_test", 0);
+			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 0);
 		}
 
 		igt_fixture {

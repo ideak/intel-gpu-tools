@@ -94,11 +94,11 @@ static int has_psr_debugfs(int debugfs_fd)
 	return -EINVAL;
 }
 
-static bool psr_modparam_set(int val)
+static bool psr_modparam_set(int device, int val)
 {
 	static int oldval = -1;
 
-	igt_set_module_param_int("enable_psr", val);
+	igt_set_module_param_int(device, "enable_psr", val);
 
 	if (val == oldval)
 		return false;
@@ -114,7 +114,7 @@ static void restore_psr_debugfs(int sig)
 	psr_write(psr_restore_debugfs_fd, "0");
 }
 
-static bool psr_set(int debugfs_fd, int mode)
+static bool psr_set(int device, int debugfs_fd, int mode)
 {
 	int ret;
 
@@ -131,7 +131,7 @@ static bool psr_set(int debugfs_fd, int mode)
 		 * version enabled and the PSR version of the test, it will
 		 * fail in the first psr_wait_entry() of the test.
 		 */
-		ret = psr_modparam_set(mode >= PSR_MODE_1);
+		ret = psr_modparam_set(device, mode >= PSR_MODE_1);
 	} else {
 		const char *debug_val;
 
@@ -161,18 +161,18 @@ static bool psr_set(int debugfs_fd, int mode)
 	return ret;
 }
 
-bool psr_enable(int debugfs_fd, enum psr_mode mode)
+bool psr_enable(int device, int debugfs_fd, enum psr_mode mode)
 {
-	return psr_set(debugfs_fd, mode);
+	return psr_set(device, debugfs_fd, mode);
 }
 
-bool psr_disable(int debugfs_fd)
+bool psr_disable(int device, int debugfs_fd)
 {
 	/* Any mode different than PSR_MODE_1/2 will disable PSR */
-	return psr_set(debugfs_fd, -1);
+	return psr_set(device, debugfs_fd, -1);
 }
 
-bool psr_sink_support(int debugfs_fd, enum psr_mode mode)
+bool psr_sink_support(int device, int debugfs_fd, enum psr_mode mode)
 {
 	char buf[PSR_STATUS_MAX_LEN];
 	int ret;

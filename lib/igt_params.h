@@ -34,7 +34,7 @@ bool igt_params_set(int device, const char *parameter, const char *fmt, ...);
 __attribute__((format(printf, 3, 4)))
 bool igt_params_save_and_set(int device, const char *parameter, const char *fmt, ...);
 
-void igt_set_module_param(const char *name, const char *val);
-void igt_set_module_param_int(const char *name, int val);
+void igt_set_module_param(int device, const char *name, const char *val);
+void igt_set_module_param_int(int device, const char *name, int val);
 
 #endif /* __IGT_PARAMS_H__ */

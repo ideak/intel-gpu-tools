@@ -938,8 +938,8 @@ static bool drrs_wait_until_rr_switch_to_low(void)
 	return igt_wait(is_drrs_low(), 5000, 1);
 }
 
-#define fbc_enable() igt_set_module_param_int("enable_fbc", 1)
-#define fbc_disable() igt_set_module_param_int("enable_fbc", 0)
+#define fbc_enable() igt_set_module_param_int(drm.fd, "enable_fbc", 1)
+#define fbc_disable() igt_set_module_param_int(drm.fd, "enable_fbc", 0)
 #define drrs_enable()	drrs_set(1)
 #define drrs_disable()	drrs_set(0)
 
@@ -1135,7 +1135,7 @@ static bool disable_features(const struct test_mode *t)
 
 	fbc_disable();
 	drrs_disable();
-	return psr.can_test ? psr_disable(drm.debugfs) : false;
+	return psr.can_test ? psr_disable(drm.fd, drm.debugfs) : false;
 }
 
 static void *busy_thread_func(void *data)
@@ -1427,7 +1427,7 @@ static void setup_psr(void)
 		return;
 	}
 
-	if (!psr_sink_support(drm.debugfs, PSR_MODE_1)) {
+	if (!psr_sink_support(drm.fd, drm.debugfs, PSR_MODE_1)) {
 		igt_info("Can't test PSR: not supported by sink.\n");
 		return;
 	}
@@ -1725,7 +1725,7 @@ static bool enable_features_for_test(const struct test_mode *t)
 	if (t->feature & FEATURE_FBC)
 		fbc_enable();
 	if (t->feature & FEATURE_PSR)
-		ret = psr_enable(drm.debugfs, PSR_MODE_1);
+		ret = psr_enable(drm.fd, drm.debugfs, PSR_MODE_1);
 	if (t->feature & FEATURE_DRRS)
 		drrs_enable();
 

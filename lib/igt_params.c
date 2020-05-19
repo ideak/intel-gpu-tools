@@ -343,9 +343,9 @@ bool igt_params_save_and_set(int device, const char *parameter, const char *fmt,
  * Please consider using igt_set_module_param_int() for the integer and bool
  * parameters.
  */
-void igt_set_module_param(const char *name, const char *val)
+void igt_set_module_param(int device, const char *name, const char *val)
 {
-	igt_assert(igt_params_save_and_set(-1, name, "%s", val));
+	igt_assert(igt_params_save_and_set(device, name, "%s", val));
 }
 
 /**
@@ -356,7 +356,7 @@ void igt_set_module_param(const char *name, const char *val)
  * This is a wrapper for igt_set_module_param() that takes an integer instead of
  * a string. Please see igt_set_module_param().
  */
-void igt_set_module_param_int(const char *name, int val)
+void igt_set_module_param_int(int device, const char *name, int val)
 {
-	igt_assert(igt_params_save_and_set(-1, name, "%d", val));
+	igt_assert(igt_params_save_and_set(device, name, "%d", val));
 }

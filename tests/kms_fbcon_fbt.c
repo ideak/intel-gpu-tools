@@ -89,7 +89,7 @@ static void teardown_drm(struct drm_info *drm)
 	drm->fd = -1;
 }
 
-static bool fbc_supported_on_chipset(int debugfs_fd)
+static bool fbc_supported_on_chipset(int device, int debugfs_fd)
 {
 	char buf[128];
 	int ret;
@@ -266,9 +266,9 @@ static bool psr_is_disabled(int debugfs_fd)
 	return r;
 }
 
-static bool psr_supported_on_chipset(int debugfs_fd)
+static bool psr_supported_on_chipset(int device, int debugfs_fd)
 {
-	return psr_sink_support(debugfs_fd, PSR_MODE_1);
+	return psr_sink_support(device, debugfs_fd, PSR_MODE_1);
 }
 
 static bool psr_wait_until_update(struct drm_info *drm)
@@ -276,30 +276,30 @@ static bool psr_wait_until_update(struct drm_info *drm)
 	return psr_long_wait_update(drm->debugfs_fd, PSR_MODE_1);
 }
 
-static void disable_features(int debugfs_fd)
+static void disable_features(int device, int debugfs_fd)
 {
-	igt_set_module_param_int("enable_fbc", 0);
-	if (psr_sink_support(debugfs_fd, PSR_MODE_1))
-		psr_disable(debugfs_fd);
+	igt_set_module_param_int(device, "enable_fbc", 0);
+	if (psr_sink_support(device, debugfs_fd, PSR_MODE_1))
+		psr_disable(device, debugfs_fd);
 }
 
-static inline void fbc_modparam_enable(int debugfs_fd)
+static inline void fbc_modparam_enable(int device, int debugfs_fd)
 {
-	igt_set_module_param_int("enable_fbc", 1);
+	igt_set_module_param_int(device, "enable_fbc", 1);
 }
 
-static inline void psr_debugfs_enable(int debugfs_fd)
+static inline void psr_debugfs_enable(int device, int debugfs_fd)
 {
-	psr_enable(debugfs_fd, PSR_MODE_1);
+	psr_enable(device, debugfs_fd, PSR_MODE_1);
 }
 
 struct feature {
-	bool (*supported_on_chipset)(int debugfs_fd);
+	bool (*supported_on_chipset)(int device, int debugfs_fd);
 	bool (*wait_until_enabled)(int debugfs_fd);
 	bool (*is_disabled)(int debugfs_fd);
 	bool (*wait_until_update)(struct drm_info *drm);
 	bool (*connector_possible_fn)(drmModeConnectorPtr connector);
-	void (*enable)(int debugfs_fd);
+	void (*enable)(int device, int debugfs_fd);
 } fbc = {
 	.supported_on_chipset = fbc_supported_on_chipset,
 	.wait_until_enabled = fbc_wait_until_enabled,
@@ -322,10 +322,10 @@ static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 
 	setup_drm(drm);
 
-	igt_require(feature->supported_on_chipset(drm->debugfs_fd));
+	igt_require(feature->supported_on_chipset(drm->fd, drm->debugfs_fd));
 
-	disable_features(drm->debugfs_fd);
-	feature->enable(drm->debugfs_fd);
+	disable_features(drm->fd, drm->debugfs_fd);
+	feature->enable(drm->fd, drm->debugfs_fd);
 
 	kmstest_unset_all_crtcs(drm->fd, drm->res);
 	wait_user("Modes unset.");

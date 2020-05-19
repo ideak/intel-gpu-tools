@@ -243,7 +243,8 @@ igt_main
 		data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
 
-		igt_require_f(psr_sink_support(data.debugfs_fd, PSR_MODE_2),
+		igt_require_f(psr_sink_support(data.drm_fd,
+					       data.debugfs_fd, PSR_MODE_2),
 			      "Sink does not support PSR2\n");
 
 		data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
@@ -253,7 +254,8 @@ igt_main
 		display_init(&data);
 
 		/* Test if PSR2 can be enabled */
-		igt_require_f(psr_enable(data.debugfs_fd, PSR_MODE_2),
+		igt_require_f(psr_enable(data.drm_fd,
+					 data.debugfs_fd, PSR_MODE_2),
 			      "Error enabling PSR2\n");
 		data.op = FRONTBUFFER;
 		prepare(&data);

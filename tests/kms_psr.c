@@ -195,7 +195,7 @@ static void fill_render(data_t *data, uint32_t handle, unsigned char color)
 static bool sink_support(data_t *data, enum psr_mode mode)
 {
 	return data->with_psr_disabled ||
-	       psr_sink_support(data->debugfs_fd, mode);
+	       psr_sink_support(data->drm_fd, data->debugfs_fd, mode);
 }
 
 static bool psr_wait_entry_if_enabled(data_t *data)
@@ -219,7 +219,7 @@ static bool psr_enable_if_enabled(data_t *data)
 	if (data->with_psr_disabled)
 		return true;
 
-	return psr_enable(data->debugfs_fd, data->op_psr_mode);
+	return psr_enable(data->drm_fd, data->debugfs_fd, data->op_psr_mode);
 }
 
 static inline void manual(const char *expected)
@@ -525,7 +525,7 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 
 	igt_fixture {
 		if (!data.with_psr_disabled)
-			psr_disable(data.debugfs_fd);
+			psr_disable(data.drm_fd, data.debugfs_fd);
 
 		close(data.debugfs_fd);
 		drm_intel_bufmgr_destroy(data.bufmgr);

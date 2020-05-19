@@ -231,7 +231,7 @@ static void test_atomic_fastset(data_t *data)
 
 	/* Until this is force enabled, force modeset evasion. */
 	if (stat("/sys/module/i915/parameters/fastboot", &sb) == 0)
-		igt_set_module_param_int("fastboot", 1);
+		igt_set_module_param_int(data->drm_fd, "fastboot", 1);
 
 	igt_require(display->is_atomic);
 	igt_require(intel_gen(intel_get_drm_devid(display->drm_fd)) >= 5);

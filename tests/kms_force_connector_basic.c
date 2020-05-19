@@ -53,7 +53,7 @@ static void reset_connectors(void)
 		drmModeFreeConnector(connector);
 	}
 
-	igt_set_module_param_int("load_detect_test", 0);
+	igt_set_module_param_int(drm_fd, "load_detect_test", 0);
 }
 
 static int opt_handler(int opt, int opt_index, void *data)
@@ -158,7 +158,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		kmstest_set_vt_graphics_mode();
 		kmstest_unset_all_crtcs(drm_fd, res);
 
-		igt_set_module_param_int("load_detect_test", 1);
+		igt_set_module_param_int(drm_fd, "load_detect_test", 1);
 
 		plane_resources = drmModeGetPlaneResources(drm_fd);
 		igt_assert(plane_resources);
@@ -201,7 +201,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		 */
 		temp = drmModeGetConnector(drm_fd, connector->connector_id);
 
-		igt_set_module_param_int("load_detect_test", 0);
+		igt_set_module_param_int(drm_fd, "load_detect_test", 0);
 
 		igt_assert(temp->connection != DRM_MODE_UNKNOWNCONNECTION);
 

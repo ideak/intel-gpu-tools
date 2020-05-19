@@ -291,7 +291,7 @@ static void require_dc_counter(int debugfs_fd, int dc_flag)
 static void setup_dc3co(data_t *data)
 {
 	data->op_psr_mode = PSR_MODE_2;
-	psr_enable(data->debugfs_fd, data->op_psr_mode);
+	psr_enable(data->drm_fd, data->debugfs_fd, data->op_psr_mode);
 	igt_require_f(psr_wait_entry(data->debugfs_fd, data->op_psr_mode),
 		      "PSR2 is not enabled\n");
 }
@@ -408,25 +408,25 @@ int main(int argc, char *argv[])
 	igt_describe("In this test we make sure that system enters DC3CO "
 		     "when PSR2 is active and system is in SLEEP state");
 	igt_subtest("dc3co-vpb-simulation") {
-		igt_require(psr_sink_support(data.debugfs_fd, PSR_MODE_2));
+		igt_require(psr_sink_support(data.drm_fd, data.debugfs_fd, PSR_MODE_2));
 		test_dc3co_vpb_simulation(&data);
 	}
 
 	igt_describe("This test validates display engine entry to DC5 state "
 		     "while PSR is active");
 	igt_subtest("dc5-psr") {
-		igt_require(psr_sink_support(data.debugfs_fd, PSR_MODE_1));
+		igt_require(psr_sink_support(data.drm_fd, data.debugfs_fd, PSR_MODE_1));
 		data.op_psr_mode = PSR_MODE_1;
-		psr_enable(data.debugfs_fd, data.op_psr_mode);
+		psr_enable(data.drm_fd, data.debugfs_fd, data.op_psr_mode);
 		test_dc_state_psr(&data, CHECK_DC5);
 	}
 
 	igt_describe("This test validates display engine entry to DC6 state "
 		     "while PSR is active");
 	igt_subtest("dc6-psr") {
-		igt_require(psr_sink_support(data.debugfs_fd, PSR_MODE_1));
+		igt_require(psr_sink_support(data.drm_fd, data.debugfs_fd, PSR_MODE_1));
 		data.op_psr_mode = PSR_MODE_1;
-		psr_enable(data.debugfs_fd, data.op_psr_mode);
+		psr_enable(data.drm_fd, data.debugfs_fd, data.op_psr_mode);
 		igt_require_f(igt_pm_pc8_plus_residencies_enabled(data.msr_fd),
 			      "PC8+ residencies not supported\n");
 		test_dc_state_psr(&data, CHECK_DC6);
