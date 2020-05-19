@@ -117,12 +117,18 @@ struct bond {
 	enum intel_engine_id master;
 };
 
+struct work_buffer_size {
+	unsigned long size;
+	unsigned long min;
+	unsigned long max;
+};
+
 struct working_set {
 	int id;
 	bool shared;
 	unsigned int nr;
 	uint32_t *handles;
-	unsigned long *sizes;
+	struct work_buffer_size *sizes;
 };
 
 struct workload;
@@ -203,6 +209,7 @@ struct workload
 	bool print_stats;
 
 	uint32_t bb_prng;
+	uint32_t bo_prng;
 
 	struct timespec repeat_start;
 
@@ -779,10 +786,12 @@ static int add_buffers(struct working_set *set, char *str)
 	 * 4m
 	 * 4g
 	 * 10n4k - 10 4k batches
+	 * 4096-16k - random size in range
 	 */
-	unsigned long *sizes, size;
+	struct work_buffer_size *sizes;
+	unsigned long min_sz, max_sz;
+	char *n, *max = NULL;
 	int add, i;
-	char *n;
 
 	n = index(str, 'n');
 	if (n) {
@@ -795,16 +804,34 @@ static int add_buffers(struct working_set *set, char *str)
 		add = 1;
 	}
 
-	size = parse_size(str);
-	if (!size)
+	n = index(str, '-');
+	if (n) {
+		*n = 0;
+		max = ++n;
+	}
+
+	min_sz = parse_size(str);
+	if (!min_sz)
 		return -1;
+
+	if (max) {
+		max_sz = parse_size(max);
+		if (!max_sz)
+			return -1;
+	} else {
+		max_sz = min_sz;
+	}
 
 	sizes = realloc(set->sizes, (set->nr + add) * sizeof(*sizes));
 	if (!sizes)
 		return -1;
 
-	for (i = 0; i < add; i++)
-		sizes[set->nr + i] = size;
+	for (i = 0; i < add; i++) {
+		struct work_buffer_size *sz = &sizes[set->nr + i];
+		sz->min = min_sz;
+		sz->max = max_sz;
+		sz->size = 0;
+	}
 
 	set->nr += add;
 	set->sizes = sizes;
@@ -846,7 +873,7 @@ static uint64_t engine_list_mask(const char *_str)
 	return mask;
 }
 
-static void allocate_working_set(struct working_set *set);
+static void allocate_working_set(struct workload *wrk, struct working_set *set);
 
 #define int_field(_STEP_, _FIELD_, _COND_, _ERR_) \
 	if ((field = strtok_r(fstart, ".", &fctx))) { \
@@ -1203,6 +1230,7 @@ add_step:
 	wrk->sseu = arg->sseu;
 	wrk->max_working_set_id = -1;
 	wrk->working_sets = NULL;
+	wrk->bo_prng = (flags & SYNCEDCLIENTS) ? master_prng : rand();
 
 	free(desc);
 
@@ -1256,7 +1284,7 @@ add_step:
 	 */
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
 		if (w->type == WORKINGSET && w->working_set.shared)
-			allocate_working_set(&w->working_set);
+			allocate_working_set(wrk, &w->working_set);
 	}
 
 	wrk->max_working_set_id = -1;
@@ -1533,7 +1561,7 @@ alloc_step_batch(struct workload *wrk, struct w_step *w)
 
 			igt_assert(set->nr);
 			igt_assert(entry->target < set->nr);
-			igt_assert(set->sizes[entry->target]);
+			igt_assert(set->sizes[entry->target].size);
 
 			dep_handle = set->handles[entry->target];
 		}
@@ -1701,15 +1729,27 @@ static size_t sizeof_engines_bond(int count)
 			engines[count]);
 }
 
-static void allocate_working_set(struct working_set *set)
+static unsigned long
+get_buffer_size(struct workload *wrk, const struct work_buffer_size *sz)
+{
+	if (sz->min == sz->max)
+		return sz->min;
+	else
+		return sz->min + hars_petruska_f54_1_random(&wrk->bo_prng) %
+		       (sz->max + 1 - sz->min);
+}
+
+static void allocate_working_set(struct workload *wrk, struct working_set *set)
 {
 	unsigned int i;
 
 	set->handles = calloc(set->nr, sizeof(*set->handles));
 	igt_assert(set->handles);
 
-	for (i = 0; i < set->nr; i++)
-		set->handles[i] = alloc_bo(fd, set->sizes[i]);
+	for (i = 0; i < set->nr; i++) {
+		set->sizes[i].size = get_buffer_size(wrk, &set->sizes[i]);
+		set->handles[i] = alloc_bo(fd, set->sizes[i].size);
+	}
 }
 
 #define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
@@ -1724,6 +1764,7 @@ static int prepare_workload(unsigned int id, struct workload *wrk)
 
 	wrk->id = id;
 	wrk->bb_prng = (wrk->flags & SYNCEDCLIENTS) ? master_prng : rand();
+	wrk->bo_prng = (wrk->flags & SYNCEDCLIENTS) ? master_prng : rand();
 	wrk->run = true;
 
 	/*
@@ -1956,7 +1997,7 @@ static int prepare_workload(unsigned int id, struct workload *wrk)
 	 */
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
 		if (w->type == WORKINGSET && !w->working_set.shared)
-			allocate_working_set(&w->working_set);
+			allocate_working_set(wrk, &w->working_set);
 	}
 
 	/*

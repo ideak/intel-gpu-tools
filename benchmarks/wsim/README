@@ -307,11 +307,15 @@ For size a byte size can be given, or suffix 'k', 'm' or 'g' can be used (case
 insensitive). Prefix in the format of "<int>n<size>" can also be given to create
 multiple objects of the same size.
 
+Ranges can also be specified using the <min>-<max> syntax.
+
 Examples:
 
   w.1.4k - Working set 1 with a single 4KiB object in it.
   W.2.2M/32768 - Working set 2 with one 2MiB and one 32768 byte object.
   w.3.10n4k/2n20000 - Working set 3 with ten 4KiB and two 20000 byte objects.
+  w.4.4n4k-1m - Working set 4 with four objects of random size between 4KiB and
+		1MiB.
 
 Working set objects can be referenced as data dependency targets using the new
 'r'/'w' syntax. Simple example:
