@@ -218,6 +218,7 @@ i915_progs = [
 	'i915_getparams_basic',
 	'i915_hangman',
 	'i915_module_load',
+	'i915_pciid',
 	'i915_pm_backlight',
 	'i915_pm_lpsp',
 	'i915_pm_rpm',

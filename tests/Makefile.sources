@@ -475,6 +475,9 @@ i915_hangman_SOURCES = i915/i915_hangman.c
 TESTS_progs += i915_module_load
 i915_module_load_SOURCES = i915/i915_module_load.c
 
+TESTS_progs += i915_pciid
+i915_pciid_SOURCES = i915/i915_pciid.c
+
 TESTS_progs += i915_pm_backlight
 i915_pm_backlight_SOURCES = i915/i915_pm_backlight.c
 
