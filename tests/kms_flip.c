@@ -1541,10 +1541,8 @@ static void get_timestamp_format(void)
 
 static void kms_flip_exit_handler(int sig)
 {
-	igt_fixture {
-		if (last_connector)
-			kmstest_set_connector_dpms(drm_fd, last_connector, DRM_MODE_DPMS_ON);
-	}
+	if (last_connector)
+		kmstest_set_connector_dpms(drm_fd, last_connector, DRM_MODE_DPMS_ON);
 }
 
 static void test_nonblocking_read(int in)
