@@ -347,8 +347,8 @@ static void basic(int fd, const struct intel_execution_engine2 *e, unsigned flag
 	igt_spin_t *spin =
 		igt_spin_new(fd,
 			     .engine = e->flags,
-			     .flags = IGT_SPIN_NO_PREEMPTION |
-			     (flags & HANG ? IGT_SPIN_INVALID_CS : 0));
+			     .flags = flags & HANG ?
+			     IGT_SPIN_NO_PREEMPTION | IGT_SPIN_INVALID_CS : 0);
 	struct timespec tv;
 	int timeout;
 
