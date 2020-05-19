@@ -45,7 +45,12 @@ static bool has_known_intel_chipset(int fd)
 
 	info = intel_get_device_info(devid);
 	if (!info) {
-		igt_warn("Unrecognised PCI-ID: %04x\n", devid);
+		igt_warn("Unrecognised PCI-ID: %04x, lookup failed\n", devid);
+		return false;
+	}
+
+	if (!info->gen) {
+		igt_warn("Unknown PCI-ID: %04x\n", devid);
 		return false;
 	}
 
