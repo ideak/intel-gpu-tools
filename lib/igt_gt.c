@@ -565,6 +565,9 @@ bool gem_class_can_store_dword(int fd, int class)
 	const struct intel_device_info *info = intel_get_device_info(devid);
 	const int gen = ffs(info->gen);
 
+	if (info->gen == 0) /* unknown, assume it just works */
+		return true;
+
 	if (gen <= 2) /* requires physical addresses */
 		return false;
 
@@ -572,7 +575,7 @@ bool gem_class_can_store_dword(int fd, int class)
 		return false; /* only supports physical addresses */
 
 	if (gen == 6 && class == I915_ENGINE_CLASS_VIDEO)
-		return false;
+		return false; /* broken, unbelievably broken */
 
 	if (info->is_broadwater)
 		return false; /* Not sure yet... */
