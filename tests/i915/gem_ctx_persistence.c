@@ -1126,7 +1126,7 @@ igt_main
 		igt_require_gem(i915);
 
 		/* Restore the reset modparam if left clobbered */
-		igt_assert(igt_params_set(i915, "reset", "%d", -1));
+		igt_assert(igt_params_set(i915, "reset", "%u", -1));
 
 		enable_hangcheck(i915);
 		igt_install_exit_handler(exit_handler);
