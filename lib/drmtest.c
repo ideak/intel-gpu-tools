@@ -118,24 +118,6 @@ bool is_vc4_device(int fd)
 	return __is_device(fd, "vc4");
 }
 
-static bool has_known_intel_chipset(int fd)
-{
-	struct drm_i915_getparam gp;
-	int devid = 0;
-
-	memset(&gp, 0, sizeof(gp));
-	gp.param = I915_PARAM_CHIPSET_ID;
-	gp.value = &devid;
-
-	if (ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp)))
-		return false;
-
-	if (!intel_gen(devid))
-		return false;
-
-	return true;
-}
-
 static char _forced_driver[16] = "";
 
 /**
@@ -636,7 +618,7 @@ void igt_require_amdgpu(int fd)
 
 void igt_require_intel(int fd)
 {
-	igt_require(is_i915_device(fd) && has_known_intel_chipset(fd));
+	igt_require(is_i915_device(fd));
 }
 
 void igt_require_vc4(int fd)
