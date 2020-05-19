@@ -1325,9 +1325,14 @@ retry:
 	 * reset event, which the driver signals with a hotplug event.
 	 */
 	if (!state_ok) {
+		bool hotplug_detected;
+
 		igt_suspend_signal_helper();
-		igt_assert(!retried && igt_hotplug_detected(mon, 3));
+		if (!retried)
+			hotplug_detected = igt_hotplug_detected(mon, 3);
 		igt_resume_signal_helper();
+
+		igt_assert(!retried && hotplug_detected);
 
 		igt_debug("Retrying after a hotplug event\n");
 		retried = true;
