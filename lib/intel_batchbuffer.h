@@ -7,6 +7,7 @@
 
 #include "igt_core.h"
 #include "intel_reg.h"
+#include "drmtest.h"
 
 #define BATCH_SZ 4096
 #define BATCH_RESERVED 16
@@ -421,5 +422,105 @@ typedef void (*igt_media_spinfunc_t)(struct intel_batchbuffer *batch,
 				     const struct igt_buf *dst, uint32_t spins);
 
 igt_media_spinfunc_t igt_get_media_spinfunc(int devid);
+
+
+/*
+ * Batchbuffer without libdrm dependency
+ */
+struct intel_bb {
+	int i915;
+	int gen;
+	bool debug;
+	uint32_t devid;
+	uint32_t handle;
+	uint32_t size;
+	uint32_t *batch;
+	uint32_t *ptr;
+
+	uint32_t prng;
+	uint64_t gtt_size;
+	bool supports_48b_address;
+
+	void *root;
+	struct drm_i915_gem_exec_object2 *objects;
+	uint32_t num_objects;
+	uint32_t allocated_objects;
+	uint64_t batch_offset;
+
+	struct drm_i915_gem_relocation_entry *relocs;
+	uint32_t num_relocs;
+	uint32_t allocated_relocs;
+};
+
+struct intel_bb *intel_bb_create(int i915, uint32_t size);
+
+void intel_bb_destroy(struct intel_bb *ibb);
+void intel_bb_set_debug(struct intel_bb *ibb, bool debug);
+
+static inline uint32_t intel_bb_offset(struct intel_bb *ibb)
+{
+	return (uint32_t) ((uint8_t *) ibb->ptr - (uint8_t *) ibb->batch);
+}
+
+static inline void intel_bb_ptr_set(struct intel_bb *ibb, uint32_t offset)
+{
+	ibb->ptr = (void *) ((uint8_t *) ibb->batch + offset);
+
+	igt_assert(intel_bb_offset(ibb) < ibb->size);
+}
+
+static inline void intel_bb_ptr_add(struct intel_bb *ibb, uint32_t offset)
+{
+	intel_bb_ptr_set(ibb, intel_bb_offset(ibb) + offset);
+}
+
+static inline void intel_bb_ptr_align(struct intel_bb *ibb,
+				      uint32_t alignment)
+{
+	intel_bb_ptr_set(ibb, ALIGN(intel_bb_offset(ibb), alignment));
+}
+
+static inline void *intel_bb_ptr(struct intel_bb *ibb)
+{
+	return (void *) ibb->ptr;
+}
+
+static inline void intel_bb_out(struct intel_bb *ibb, uint32_t dword)
+{
+	*ibb->ptr = dword;
+	ibb->ptr++;
+
+	igt_assert(intel_bb_offset(ibb) < ibb->size);
+}
+
+
+struct drm_i915_gem_exec_object2 *
+intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
+		    uint64_t offset, bool write);
+
+uint64_t intel_bb_emit_reloc(struct intel_bb *ibb,
+			 uint32_t handle,
+			 uint32_t read_domains,
+			 uint32_t write_domain,
+			 uint64_t delta,
+			 uint64_t presumed_offset);
+
+uint64_t intel_bb_offset_reloc(struct intel_bb *ibb,
+			       uint32_t handle,
+			       uint32_t read_domains,
+			       uint32_t write_domain,
+			       uint32_t offset,
+			       uint64_t presumed_offset);
+
+int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
+		    uint32_t ctx, uint64_t flags, bool sync);
+
+void intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
+		   uint64_t flags, bool sync);
+
+void intel_bb_exec_with_context(struct intel_bb *ibb, uint32_t end_offset,
+				uint32_t ctx, uint64_t flags, bool sync);
+
+uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle);
 
 #endif
