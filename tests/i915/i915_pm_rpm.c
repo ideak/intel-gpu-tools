@@ -1786,7 +1786,7 @@ static void test_one_plane(bool dpms, uint32_t plane_id,
 /* This one also triggered WARNs on our driver at some point in time. */
 static void planes_subtest(bool universal, bool dpms)
 {
-	int i, planes_tested = 0, crtc_idx;
+	int i, crtc_idx;
 	drmModePlaneResPtr planes;
 
 	igt_require(default_mode_params);
@@ -1817,7 +1817,6 @@ static void planes_subtest(bool universal, bool dpms)
 
 	igt_assert_eq(drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES,
 				      1), 0);
-	igt_assert_lte(universal ? 3 : 1, planes_tested);
 }
 
 static void pm_test_tiling(void)
