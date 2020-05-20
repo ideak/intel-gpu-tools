@@ -2,10 +2,12 @@
 #define __INTEL_BUFOPS_H__
 
 #include <stdint.h>
+#include "igt_aux.h"
 
 struct buf_ops;
 
 struct intel_buf {
+	struct buf_ops *bops;
 	uint32_t handle;
 	uint32_t stride;
 	uint32_t tiling;
@@ -58,6 +60,7 @@ intel_buf_aux_height(int gen, const struct intel_buf *buf)
 
 struct buf_ops *buf_ops_create(int fd);
 void buf_ops_destroy(struct buf_ops *bops);
+int buf_ops_getfd(struct buf_ops *bops);
 
 bool buf_ops_set_software_tiling(struct buf_ops *bops,
 				 uint32_t tiling,
@@ -73,14 +76,14 @@ bool buf_ops_has_hw_fence(struct buf_ops *bops, uint32_t tiling);
 bool buf_ops_has_tiling_support(struct buf_ops *bops, uint32_t tiling);
 
 void intel_buf_init(struct buf_ops *bops, struct intel_buf *buf,
-		    int width, int height, int bpp,
+		    int width, int height, int bpp, int alignment,
 		    uint32_t tiling, uint32_t compression);
 void intel_buf_close(struct buf_ops *bops, struct intel_buf *buf);
 
 void intel_buf_init_using_handle(struct buf_ops *bops,
 				 uint32_t handle,
 				 struct intel_buf *buf,
-				 int width, int height, int bpp,
+				 int width, int height, int bpp, int alignment,
 				 uint32_t req_tiling, uint32_t compression);
 
 #endif

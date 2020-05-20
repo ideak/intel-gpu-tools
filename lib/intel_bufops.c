@@ -52,7 +52,7 @@
  * struct intel_buf ibuf;
  * ...
  * bops = buf_ops_create(fd);
- * intel_buf_init(bops, &ibuf, 512, 512, 32, I915_TILING_X, false);
+ * intel_buf_init(bops, &ibuf, 512, 512, 32, 64, I915_TILING_X, false);
  * ...
  * linear_to_intel_buf(bops, &ibuf, linear);
  * ...
@@ -673,18 +673,23 @@ void linear_to_intel_buf(struct buf_ops *bops, struct intel_buf *buf,
 static void __intel_buf_init(struct buf_ops *bops,
 			     uint32_t handle,
 			     struct intel_buf *buf,
-			     int width, int height, int bpp,
+			     int width, int height, int bpp, int alignment,
 			     uint32_t req_tiling, uint32_t compression)
 {
 	uint32_t tiling = req_tiling;
 	uint32_t size;
+	uint32_t devid;
+	int tile_width;
 
 	igt_assert(bops);
 	igt_assert(buf);
 	igt_assert(width > 0 && height > 0);
 	igt_assert(bpp == 8 || bpp == 16 || bpp == 32);
+	igt_assert(alignment % 4 == 0);
 
 	memset(buf, 0, sizeof(*buf));
+
+	buf->bops = bops;
 
 	if (compression) {
 		int aux_width, aux_height;
@@ -721,7 +726,22 @@ static void __intel_buf_init(struct buf_ops *bops,
 		size = buf->aux.offset + aux_width * aux_height;
 
 	} else {
-		buf->stride = ALIGN(width * (bpp / 8), 128);
+		if (buf->tiling) {
+			devid =  intel_get_drm_devid(bops->fd);
+
+			if (bops->intel_gen < 3)
+				tile_width = 128;
+			else if (IS_915GM(devid) || IS_915G(devid) ||
+				 buf->tiling == I915_TILING_X)
+				tile_width = 512;
+			else
+				tile_width = 128;
+
+			buf->stride = ALIGN(width * (bpp / 8), tile_width);
+		} else {
+			buf->stride = ALIGN(width * (bpp / 8), alignment ?: 4);
+		}
+
 		buf->size = buf->stride * height;
 		buf->tiling = tiling;
 		buf->bpp = bpp;
@@ -744,6 +764,7 @@ static void __intel_buf_init(struct buf_ops *bops,
  * @width: surface width
  * @height: surface height
  * @bpp: bits-per-pixel (8 / 16 / 32)
+ * @alignment: alignment of the stride for linear surfaces
  * @tiling: surface tiling
  * @compression: surface compression type
  *
@@ -754,11 +775,11 @@ static void __intel_buf_init(struct buf_ops *bops,
  */
 void intel_buf_init(struct buf_ops *bops,
 		    struct intel_buf *buf,
-		    int width, int height, int bpp,
+		    int width, int height, int bpp, int alignment,
 		    uint32_t tiling, uint32_t compression)
 {
-	__intel_buf_init(bops, 0, buf, width, height, bpp, tiling,
-			 compression);
+	__intel_buf_init(bops, 0, buf, width, height, bpp, alignment,
+			 tiling, compression);
 }
 
 /**
@@ -784,6 +805,7 @@ void intel_buf_close(struct buf_ops *bops, struct intel_buf *buf)
  * @width: surface width
  * @height: surface height
  * @bpp: bits-per-pixel (8 / 16 / 32)
+ * @alignment: alignment of the stride for linear surfaces
  * @tiling: surface tiling
  * @compression: surface compression type
  *
@@ -797,11 +819,11 @@ void intel_buf_close(struct buf_ops *bops, struct intel_buf *buf)
 void intel_buf_init_using_handle(struct buf_ops *bops,
 				 uint32_t handle,
 				 struct intel_buf *buf,
-				 int width, int height, int bpp,
+				 int width, int height, int bpp, int alignment,
 				 uint32_t req_tiling, uint32_t compression)
 {
-	__intel_buf_init(bops, handle, buf, width, height, bpp, req_tiling,
-			 compression);
+	__intel_buf_init(bops, handle, buf, width, height, bpp, alignment,
+			 req_tiling, compression);
 }
 
 #define DEFAULT_BUFOPS(__gen_start, __gen_end) \
@@ -908,7 +930,7 @@ static void idempotency_selftest(struct buf_ops *bops, uint32_t tiling)
 			  bool_str(software_tiling),
 			  bool_str(!software_tiling),
 			  tiling_str(tiling));
-		intel_buf_init(bops, &buf, width, height, bpp, tiling, false);
+		intel_buf_init(bops, &buf, width, height, bpp, 0, tiling, false);
 		buf_ops_set_software_tiling(bops, tiling, software_tiling);
 
 		linear_to_intel_buf(bops, &buf, (uint32_t *) linear_in);
@@ -1036,6 +1058,19 @@ void buf_ops_destroy(struct buf_ops *bops)
 {
 	igt_assert(bops);
 	free(bops);
+}
+
+/**
+ * buf_ops_getfd
+ * @bops: pointer to buf_ops
+ *
+ * Returns: drm fd
+ */
+int buf_ops_getfd(struct buf_ops *bops)
+{
+	igt_assert(bops);
+
+	return bops->fd;
 }
 
 /**
