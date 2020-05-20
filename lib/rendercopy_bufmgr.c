@@ -163,8 +163,8 @@ void igt_buf_init(struct rendercopy_bufmgr *bmgr, struct igt_buf *buf,
 	intel_buf_init_using_handle(bmgr->bops,
 				    buf->bo->handle,
 				    &ibuf,
-				    width, height, bpp, tiling,
-				    compression);
+				    width, height, bpp, 0,
+				    tiling, compression);
 
 	buf->ccs[0].offset = ibuf.aux.offset;
 	buf->ccs[0].stride = ibuf.aux.stride;
