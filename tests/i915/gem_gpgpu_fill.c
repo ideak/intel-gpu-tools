@@ -46,6 +46,7 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "intel_bufmgr.h"
+#include "intel_bufops.h"
 
 #define WIDTH 64
 #define HEIGHT 64
@@ -60,6 +61,7 @@ typedef struct {
 	uint32_t devid;
 	drm_intel_bufmgr *bufmgr;
 	uint8_t linear[WIDTH * HEIGHT];
+	struct buf_ops *bops;
 } data_t;
 
 static void scratch_buf_init(data_t *data, struct igt_buf *buf,
@@ -83,6 +85,34 @@ static void scratch_buf_init(data_t *data, struct igt_buf *buf,
 	buf->bpp = 32;
 }
 
+static struct intel_buf *
+create_buf(data_t *data, int width, int height, uint8_t color)
+{
+	struct intel_buf *buf;
+	uint8_t *ptr;
+	int i;
+
+	buf = calloc(1, sizeof(*buf));
+	igt_assert(buf);
+
+	/*
+	 * Legacy code uses 32 bpp after buffer creation.
+	 * Let's do the same due to keep shader intact.
+	 */
+	intel_buf_init(data->bops, buf, width/4, height, 32, 0,
+		       I915_TILING_NONE, 0);
+
+	ptr = gem_mmap__cpu_coherent(data->drm_fd,
+				     buf->handle, 0, buf->size, PROT_WRITE);
+
+	for (i = 0; i < buf->size; i++)
+		ptr[i] = color;
+
+	munmap(ptr, buf->size);
+
+	return buf;
+}
+
 static void
 scratch_buf_check(data_t *data, struct igt_buf *buf, int x, int y,
 		uint8_t color)
@@ -97,47 +127,89 @@ scratch_buf_check(data_t *data, struct igt_buf *buf, int x, int y,
 		     color, val, x, y);
 }
 
+static void buf_check(uint8_t *ptr, int x, int y, uint8_t color)
+{
+	uint8_t val;
+
+	val = ptr[y * WIDTH + x];
+	igt_assert_f(val == color,
+		     "Expected 0x%02x, found 0x%02x at (%d,%d)\n",
+		     color, val, x, y);
+}
+
+static void no_libdrm(data_t *data, igt_fillfunc_v2_t fill)
+{
+	struct intel_buf *buf;
+	uint8_t *ptr;
+	int i, j;
+
+	buf = create_buf(data, WIDTH, HEIGHT, COLOR_C4);
+	ptr = gem_mmap__device_coherent(data->drm_fd, buf->handle,
+					0, buf->size, PROT_READ);
+	for (i = 0; i < WIDTH; i++)
+		for (j = 0; j < HEIGHT; j++)
+			buf_check(ptr, i, j, COLOR_C4);
+
+	fill(data->drm_fd, buf, 0, 0, WIDTH / 2, HEIGHT / 2, COLOR_4C);
+
+	for (i = 0; i < WIDTH; i++)
+		for (j = 0; j < HEIGHT; j++)
+			if (i < WIDTH / 2 && j < HEIGHT / 2)
+				buf_check(ptr, i, j, COLOR_4C);
+			else
+				buf_check(ptr, i, j, COLOR_C4);
+
+	munmap(ptr, buf->size);
+}
+
+static void with_libdrm(data_t *data, igt_fillfunc_t fill)
+{
+	struct intel_batchbuffer *batch = NULL;
+	struct igt_buf dst;
+	int i, j;
+
+	batch = intel_batchbuffer_alloc(data->bufmgr, data->devid);
+	igt_assert(batch);
+
+	scratch_buf_init(data, &dst, WIDTH, HEIGHT, STRIDE, COLOR_C4);
+
+	for (i = 0; i < WIDTH; i++)
+		for (j = 0; j < HEIGHT; j++)
+			scratch_buf_check(data, &dst, i, j, COLOR_C4);
+
+	fill(batch, &dst, 0, 0, WIDTH / 2, HEIGHT / 2, COLOR_4C);
+
+	for (i = 0; i < WIDTH; i++)
+		for (j = 0; j < HEIGHT; j++)
+			if (i < WIDTH / 2 && j < HEIGHT / 2)
+				scratch_buf_check(data, &dst, i, j, COLOR_4C);
+			else
+				scratch_buf_check(data, &dst, i, j, COLOR_C4);
+
+}
+
 igt_simple_main
 {
 	data_t data = {0, };
-	struct intel_batchbuffer *batch = NULL;
-	struct igt_buf dst;
 	igt_fillfunc_t gpgpu_fill = NULL;
-	int i, j;
+	igt_fillfunc_v2_t gpgpu_fill_v2 = NULL;
 
 	data.drm_fd = drm_open_driver_render(DRIVER_INTEL);
 	data.devid = intel_get_drm_devid(data.drm_fd);
 	igt_require_gem(data.drm_fd);
+	data.bops = buf_ops_create(data.drm_fd);
 
 	data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
 	igt_assert(data.bufmgr);
 
 	gpgpu_fill = igt_get_gpgpu_fillfunc(data.devid);
+	gpgpu_fill_v2 = igt_get_gpgpu_fillfunc_v2(data.devid);
 
-	igt_require_f(gpgpu_fill,
+	igt_require_f(gpgpu_fill || gpgpu_fill_v2,
 		      "no gpgpu-fill function\n");
 
-	batch = intel_batchbuffer_alloc(data.bufmgr, data.devid);
-	igt_assert(batch);
-
-	scratch_buf_init(&data, &dst, WIDTH, HEIGHT, STRIDE, COLOR_C4);
-
-	for (i = 0; i < WIDTH; i++) {
-		for (j = 0; j < HEIGHT; j++) {
-			scratch_buf_check(&data, &dst, i, j, COLOR_C4);
-		}
-	}
-
-	gpgpu_fill(batch,
-		   &dst, 0, 0, WIDTH / 2, HEIGHT / 2,
-		   COLOR_4C);
-
-	for (i = 0; i < WIDTH; i++) {
-		for (j = 0; j < HEIGHT; j++) {
-			if (i < WIDTH / 2 && j < HEIGHT / 2)
-				scratch_buf_check(&data, &dst, i, j, COLOR_4C);
-			else
-				scratch_buf_check(&data, &dst, i, j, COLOR_C4);
-		}
-	}
+	if (gpgpu_fill_v2)
+		no_libdrm(&data, gpgpu_fill_v2);
+	else
+		with_libdrm(&data, gpgpu_fill);
 }
