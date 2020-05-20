@@ -65,6 +65,11 @@
 
 IGT_TEST_DESCRIPTION("Check that we can control the order of execution");
 
+static unsigned int offset_in_page(void *addr)
+{
+	return (uintptr_t)addr & 4095;
+}
+
 static inline
 uint32_t __sync_read_u32(int fd, uint32_t handle, uint64_t offset)
 {
@@ -670,6 +675,110 @@ static void lateslice(int i915, unsigned int engine)
 	igt_spin_free(i915, spin[1]);
 }
 
+static void cancel_spinner(int i915,
+			   uint32_t ctx, unsigned int engine,
+			   igt_spin_t *spin)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(i915, 4096),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = engine | I915_EXEC_FENCE_SUBMIT,
+		.rsvd1 = ctx, /* same vm */
+		.rsvd2 = spin->out_fence,
+	};
+	uint32_t *map, *cs;
+
+	map = gem_mmap__device_coherent(i915, obj.handle, 0, 4096, PROT_WRITE);
+	cs = map;
+
+	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = spin->obj[IGT_SPIN_BATCH].offset +
+		offset_in_page(spin->condition);
+	*cs++ = spin->obj[IGT_SPIN_BATCH].offset >> 32;
+	*cs++ = MI_BATCH_BUFFER_END;
+
+	*cs++ = MI_BATCH_BUFFER_END;
+	munmap(map, 4096);
+
+	gem_execbuf(i915, &execbuf);
+	gem_close(i915, obj.handle);
+}
+
+static void submit_slice(int i915,
+			 const struct intel_execution_engine2 *e,
+			 unsigned int flags)
+#define EARLY_SUBMIT 0x1
+#define LATE_SUBMIT 0x2
+{
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines , 1) = {};
+	const struct intel_execution_engine2 *cancel;
+	struct drm_i915_gem_context_param param = {
+		.ctx_id = gem_context_create(i915),
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.value = to_user_pointer(&engines),
+		.size = sizeof(engines),
+	};
+
+	/*
+	 * When using a submit fence, we do not want to block concurrent work,
+	 * especially when that work is coperating with the spinner.
+	 */
+
+	igt_require(gem_scheduler_has_semaphores(i915));
+	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
+
+	__for_each_physical_engine(i915, cancel) {
+		igt_spin_t *bg, *spin;
+		int timeline = -1;
+		int fence = -1;
+
+		if (!gem_class_can_store_dword(i915, cancel->class))
+			continue;
+
+		igt_debug("Testing cancellation from %s\n", e->name);
+
+		bg = igt_spin_new(i915, .engine = e->flags);
+
+		if (flags & LATE_SUBMIT) {
+			timeline = sw_sync_timeline_create();
+			fence = sw_sync_timeline_create_fence(timeline, 1);
+		}
+
+		engines.engines[0].engine_class = e->class;
+		engines.engines[0].engine_instance = e->instance;
+		gem_context_set_param(i915, &param);
+		spin = igt_spin_new(i915, .ctx = param.ctx_id,
+				    .fence = fence,
+				    .flags =
+				    IGT_SPIN_POLL_RUN |
+				    (flags & LATE_SUBMIT ? IGT_SPIN_FENCE_IN : 0) |
+				    IGT_SPIN_FENCE_OUT);
+		if (fence != -1)
+			close(fence);
+
+		if (flags & EARLY_SUBMIT)
+			igt_spin_busywait_until_started(spin);
+
+		engines.engines[0].engine_class = cancel->class;
+		engines.engines[0].engine_instance = cancel->instance;
+		gem_context_set_param(i915, &param);
+		cancel_spinner(i915, param.ctx_id, 0, spin);
+
+		if (timeline != -1)
+			close(timeline);
+
+		gem_sync(i915, spin->handle);
+		igt_spin_free(i915, spin);
+		igt_spin_free(i915, bg);
+	}
+
+	gem_context_destroy(i915, param.ctx_id);
+}
+
 static uint32_t __batch_create(int i915, uint32_t offset)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -810,11 +919,6 @@ static void semaphore_codependency(int i915)
 		igt_spin_free(i915, task[i].xcs);
 		igt_spin_free(i915, task[i].rcs);
 	}
-}
-
-static unsigned int offset_in_page(void *addr)
-{
-	return (uintptr_t)addr & 4095;
 }
 
 static void semaphore_resolve(int i915)
@@ -2453,6 +2557,13 @@ igt_main
 
 		test_each_engine("lateslice", fd, e)
 			lateslice(fd, e->flags);
+
+		test_each_engine("submit-early-slice", fd, e)
+			submit_slice(fd, e, EARLY_SUBMIT);
+		test_each_engine("submit-golden-slice", fd, e)
+			submit_slice(fd, e, 0);
+		test_each_engine("submit-late-slice", fd, e)
+			submit_slice(fd, e, LATE_SUBMIT);
 
 		igt_subtest("semaphore-user")
 			semaphore_userlock(fd);
