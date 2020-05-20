@@ -50,10 +50,12 @@ struct pmu_pair {
 };
 
 struct pmu_counter {
-	bool present;
+	uint64_t type;
 	uint64_t config;
 	unsigned int idx;
 	struct pmu_pair val;
+	double scale;
+	bool present;
 };
 
 struct engine {
@@ -79,8 +81,8 @@ struct engines {
 	struct pmu_pair ts;
 
 	int rapl_fd;
-	double rapl_scale;
-	const char *rapl_unit;
+	struct pmu_counter r_gpu, r_pkg;
+	unsigned int num_rapl;
 
 	int imc_fd;
 	double imc_reads_scale;
@@ -92,7 +94,6 @@ struct engines {
 	struct pmu_counter freq_act;
 	struct pmu_counter irq;
 	struct pmu_counter rc6;
-	struct pmu_counter rapl;
 	struct pmu_counter imc_reads;
 	struct pmu_counter imc_writes;
 
@@ -107,6 +108,109 @@ struct engines {
 	struct engine engine;
 
 };
+
+__attribute__((format(scanf,3,4)))
+static int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
+{
+	FILE *file;
+	int fd;
+	int ret = -1;
+
+	fd = openat(dir, attr, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	file = fdopen(fd, "r");
+	if (file) {
+		va_list ap;
+
+		va_start(ap, fmt);
+		ret = vfscanf(file, fmt, ap);
+		va_end(ap);
+
+		fclose(file);
+	} else {
+		close(fd);
+	}
+
+	return ret;
+}
+
+static int rapl_parse(struct pmu_counter *pmu, const char *str)
+{
+	locale_t locale, oldlocale;
+	bool result = true;
+	char buf[128] = {};
+	int dir;
+
+	dir = open("/sys/devices/power", O_RDONLY);
+	if (dir < 0)
+		return -errno;
+
+	/* Replace user environment with plain C to match kernel format */
+	locale = newlocale(LC_ALL, "C", 0);
+	oldlocale = uselocale(locale);
+
+	result &= igt_sysfs_scanf(dir, "type", "%"PRIu64, &pmu->type) == 1;
+
+	snprintf(buf, sizeof(buf) - 1, "events/energy-%s", str);
+	result &= igt_sysfs_scanf(dir, buf, "event=%"PRIx64, &pmu->config) == 1;
+
+	snprintf(buf, sizeof(buf) - 1, "events/energy-%s.scale", str);
+	result &= igt_sysfs_scanf(dir, buf, "%lf", &pmu->scale) == 1;
+
+	snprintf(buf, sizeof(buf) - 1, "events/energy-%s.unit", str);
+	if (igt_sysfs_scanf(dir, buf, "%127s", buf) == 1 &&
+	    strcmp(buf, "Joules"))
+		fprintf(stderr, "Unexpected units for RAPL %s: found %s\n",
+			str, buf);
+
+	uselocale(oldlocale);
+	freelocale(locale);
+
+	close(dir);
+
+	if (!result)
+		return -EINVAL;
+
+	if (isnan(pmu->scale) || !pmu->scale)
+		return -ERANGE;
+
+	return 0;
+}
+
+static void
+rapl_open(struct pmu_counter *pmu,
+	  const char *domain,
+	  struct engines *engines)
+{
+	int fd;
+
+	if (rapl_parse(pmu, domain) < 0)
+		return;
+
+	fd = igt_perf_open_group(pmu->type, pmu->config, engines->rapl_fd);
+	if (fd < 0)
+		return;
+
+	if (engines->rapl_fd == -1)
+		engines->rapl_fd = fd;
+
+	pmu->idx = engines->num_rapl++;
+	pmu->present = true;
+}
+
+static void gpu_power_open(struct pmu_counter *pmu,
+			   struct engines *engines)
+{
+	rapl_open(pmu, "gpu", engines);
+}
+
+static void pkg_power_open(struct pmu_counter *pmu,
+			   struct engines *engines)
+{
+	rapl_open(pmu, "pkg", engines);
+}
 
 static uint64_t
 get_pmu_config(int dirfd, const char *name, const char *counter)
@@ -357,38 +461,6 @@ static double filename_to_double(const char *filename)
 	return v;
 }
 
-#define RAPL_ROOT "/sys/devices/power/"
-#define RAPL_EVENT "/sys/devices/power/events/"
-
-static uint64_t rapl_type_id(void)
-{
-	return filename_to_u64(RAPL_ROOT "type", 10);
-}
-
-static uint64_t rapl_gpu_power(void)
-{
-	return filename_to_u64(RAPL_EVENT "energy-gpu", 0);
-}
-
-static double rapl_gpu_power_scale(void)
-{
-	return filename_to_double(RAPL_EVENT "energy-gpu.scale");
-}
-
-static const char *rapl_gpu_power_unit(void)
-{
-	char buf[32];
-
-	if (filename_to_buf(RAPL_EVENT "energy-gpu.unit",
-			    buf, sizeof(buf)) == 0)
-		if (!strcmp(buf, "Joules"))
-			return strdup("Watts");
-		else
-			return strdup(buf);
-	else
-		return NULL;
-}
-
 #define IMC_ROOT "/sys/devices/uncore_imc/"
 #define IMC_EVENT "/sys/devices/uncore_imc/events/"
 
@@ -517,22 +589,9 @@ static int pmu_init(struct engines *engines)
 	}
 
 	engines->rapl_fd = -1;
-	if (!engines->discrete && rapl_type_id()) {
-		engines->rapl_scale = rapl_gpu_power_scale();
-		engines->rapl_unit = rapl_gpu_power_unit();
-		if (!engines->rapl_unit)
-			return -1;
-
-		engines->rapl.config = rapl_gpu_power();
-		if (!engines->rapl.config)
-			return -1;
-
-		engines->rapl_fd = igt_perf_open(rapl_type_id(),
-						 engines->rapl.config);
-		if (engines->rapl_fd < 0)
-			return -1;
-
-		engines->rapl.present = true;
+	if (!engines->discrete) {
+		gpu_power_open(&engines->r_gpu, engines);
+		pkg_power_open(&engines->r_pkg, engines);
 	}
 
 	engines->imc_fd = -1;
@@ -614,25 +673,6 @@ static void fill_str(char *buf, unsigned int bufsz, char c, unsigned int num)
 	*buf = 0;
 }
 
-static uint64_t __pmu_read_single(int fd, uint64_t *ts)
-{
-	uint64_t data[2] = { };
-	ssize_t len;
-
-	len = read(fd, data, sizeof(data));
-	assert(len == sizeof(data));
-
-	if (ts)
-		*ts = data[1];
-
-	return data[0];
-}
-
-static uint64_t pmu_read_single(int fd)
-{
-	return __pmu_read_single(fd, NULL);
-}
-
 static void __update_sample(struct pmu_counter *counter, uint64_t val)
 {
 	counter->val.prev = counter->val.cur;
@@ -653,10 +693,6 @@ static void pmu_sample(struct engines *engines)
 
 	engines->ts.prev = engines->ts.cur;
 
-	if (engines->rapl_fd >= 0)
-		__update_sample(&engines->rapl,
-				pmu_read_single(engines->rapl_fd));
-
 	if (engines->imc_fd >= 0) {
 		pmu_read_multi(engines->imc_fd, 2, val);
 		update_sample(&engines->imc_reads, val);
@@ -676,6 +712,12 @@ static void pmu_sample(struct engines *engines)
 		update_sample(&engine->busy, val);
 		update_sample(&engine->sema, val);
 		update_sample(&engine->wait, val);
+	}
+
+	if (engines->num_rapl) {
+		pmu_read_multi(engines->rapl_fd, engines->num_rapl, val);
+		update_sample(&engines->r_gpu, val);
+		update_sample(&engines->r_pkg, val);
 	}
 }
 
@@ -1076,14 +1118,14 @@ print_header(const struct igt_device_card *card,
 		.items = rc6_items,
 	};
 	struct cnt_item power_items[] = {
-		{ &engines->rapl, 4, 2, 1.0, t, engines->rapl_scale, "value",
-		  "W" },
+		{ &engines->r_gpu, 4, 2, 1.0, t, engines->r_gpu.scale, "GPU", "gpu" },
+		{ &engines->r_pkg, 4, 2, 1.0, t, engines->r_pkg.scale, "Package", "pkg" },
 		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "W" },
 		{ },
 	};
 	struct cnt_group power_group = {
 		.name = "power",
-		.display_name = "Power",
+		.display_name = "Power W",
 		.items = power_items,
 	};
 	struct cnt_group *groups[] = {
@@ -1108,17 +1150,17 @@ print_header(const struct igt_device_card *card,
 
 		if (lines++ < con_h) {
 			printf("intel-gpu-top: %s - ", card->card);
-			if (!engines->discrete)
-				printf("%s/%s MHz;  %s%% RC6; %s %s; %s irqs/s\n",
-					freq_items[1].buf, freq_items[0].buf,
-					rc6_items[0].buf, power_items[0].buf,
-					engines->rapl_unit,
-					irq_items[0].buf);
-			else
-				printf("%s/%s MHz;  %s%% RC6; %s irqs/s\n",
-					freq_items[1].buf, freq_items[0].buf,
-					rc6_items[0].buf, irq_items[0].buf);
+			printf("%s/%s MHz;  %s%% RC6; ",
+			       freq_items[1].buf, freq_items[0].buf,
+			       rc6_items[0].buf);
+			if (engines->r_gpu.present) {
+				printf("%s/%s W; ",
+				       power_items[0].buf,
+				       power_items[1].buf);
+			}
+			printf("%s irqs/s\n", irq_items[0].buf);
 		}
+
 		if (lines++ < con_h)
 			printf("\n");
 	}
