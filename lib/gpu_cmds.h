@@ -35,6 +35,7 @@
 #include "drmtest.h"
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
+#include "intel_bufops.h"
 #include <assert.h>
 
 void
@@ -147,5 +148,58 @@ gen_emit_media_object(struct intel_batchbuffer *batch, unsigned int xoffset,
 
 void
 gen9_emit_state_base_address(struct intel_batchbuffer *batch);
+
+
+/* No libdrm */
+uint32_t
+gen7_fill_curbe_buffer_data_v2(struct intel_bb *ibb,
+			       uint8_t color);
+
+uint32_t
+gen7_fill_interface_descriptor_v2(struct intel_bb *ibb,
+				  struct intel_buf *buf,
+				  const uint32_t kernel[][4],
+				  size_t size);
+
+uint32_t
+gen8_fill_interface_descriptor_v2(struct intel_bb *ibb,
+				  struct intel_buf *buf,
+				  const uint32_t kernel[][4],
+				  size_t size);
+
+void
+gen7_emit_state_base_address_v2(struct intel_bb *ibb);
+
+void
+gen8_emit_state_base_address_v2(struct intel_bb *ibb);
+
+void
+gen9_emit_state_base_address_v2(struct intel_bb *ibb);
+
+void
+gen7_emit_vfe_state_v2(struct intel_bb *ibb, uint32_t threads,
+		       uint32_t urb_entries, uint32_t urb_size,
+		       uint32_t curbe_size, uint32_t mode);
+
+void
+gen8_emit_vfe_state_v2(struct intel_bb *ibb, uint32_t threads,
+		       uint32_t urb_entries, uint32_t urb_size,
+		       uint32_t curbe_size);
+void
+gen7_emit_curbe_load_v2(struct intel_bb *ibb, uint32_t curbe_buffer);
+
+void
+gen7_emit_interface_descriptor_load_v2(struct intel_bb *ibb,
+				       uint32_t interface_descriptor);
+
+void
+gen7_emit_gpgpu_walk_v2(struct intel_bb *ibb,
+			unsigned int x, unsigned int y,
+			unsigned int width, unsigned int height);
+
+void
+gen8_emit_gpgpu_walk_v2(struct intel_bb *ibb,
+			unsigned int x, unsigned int y,
+			unsigned int width, unsigned int height);
 
 #endif /* GPU_CMDS_H */
