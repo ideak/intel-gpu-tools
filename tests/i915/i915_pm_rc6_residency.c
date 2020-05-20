@@ -38,6 +38,7 @@
 #include "igt_perf.h"
 #include "igt_rapl.h"
 #include "igt_sysfs.h"
+#include "sw_sync.h"
 
 #define SLEEP_DURATION 3 /* in seconds */
 
@@ -447,6 +448,81 @@ static void rc6_idle(int i915)
 	}
 }
 
+static void rc6_fence(int i915)
+{
+	const int64_t duration_ns = SLEEP_DURATION * (int64_t)NSEC_PER_SEC;
+	const int tolerance = 20; /* Some RC6 is better than none! */
+	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const struct intel_execution_engine2 *e;
+	struct power_sample sample[2];
+	unsigned long slept;
+	uint64_t rc6, ts[2];
+	struct rapl rapl;
+	int fd;
+
+	igt_require_sw_sync();
+
+	fd = open_pmu(i915, I915_PMU_RC6_RESIDENCY);
+	igt_drop_caches_set(i915, DROP_IDLE);
+	igt_require(__pmu_wait_for_rc6(fd));
+	gpu_power_open(&rapl);
+
+	/* While idle check full RC6. */
+	rapl_read(&rapl, &sample[0]);
+	rc6 = -__pmu_read_single(fd, &ts[0]);
+	slept = measured_usleep(duration_ns / 1000);
+	rc6 += __pmu_read_single(fd, &ts[1]);
+	igt_debug("slept=%lu perf=%"PRIu64", rc6=%"PRIu64"\n",
+		  slept, ts[1] - ts[0], rc6);
+	if (rapl_read(&rapl, &sample[1]))  {
+		double idle = power_J(&rapl, &sample[0], &sample[1]);
+		igt_log(IGT_LOG_DOMAIN,
+			idle > 1e-3 && gen > 6 ? IGT_LOG_WARN : IGT_LOG_INFO,
+			"Total energy used while idle: %.1fmJ\n", idle * 1e3);
+	}
+	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
+
+	/* Submit but delay execution, we should be idle and conserving power */
+	__for_each_physical_engine(i915, e) {
+		igt_spin_t *spin;
+		int timeline;
+		int fence;
+
+		timeline = sw_sync_timeline_create();
+		fence = sw_sync_timeline_create_fence(timeline, 1);
+		spin = igt_spin_new(i915,
+				    .engine = e->flags,
+				    .fence = fence,
+				    .flags = IGT_SPIN_FENCE_IN);
+		close(fence);
+
+		rapl_read(&rapl, &sample[0]);
+		rc6 = -__pmu_read_single(fd, &ts[0]);
+		slept = measured_usleep(duration_ns / 1000);
+		rc6 += __pmu_read_single(fd, &ts[1]);
+		igt_debug("%s: slept=%lu perf=%"PRIu64", rc6=%"PRIu64"\n",
+			  e->name, slept, ts[1] - ts[0], rc6);
+		if (rapl_read(&rapl, &sample[1]))  {
+			uint64_t power = power_J(&rapl, &sample[0], &sample[1]);
+			igt_info("Total energy used for %s: %.1fmJ (%.1fmW)\n",
+				 e->name,
+				 power * 1e3,
+				 power * 1e12 / slept);
+		}
+
+		igt_assert(gem_bo_busy(i915, spin->handle));
+		igt_spin_free(i915, spin);
+
+		close(timeline);
+
+		assert_within_epsilon(rc6, ts[1] - ts[0], tolerance);
+		gem_quiescent_gpu(i915);
+	}
+
+	rapl_close(&rapl);
+	close(fd);
+}
+
 igt_main
 {
 	int i915 = -1;
@@ -461,6 +537,13 @@ igt_main
 		gem_quiescent_gpu(i915);
 
 		rc6_idle(i915);
+	}
+
+	igt_subtest("rc6-fence") {
+		igt_require_gem(i915);
+		gem_quiescent_gpu(i915);
+
+		rc6_fence(i915);
 	}
 
 	igt_subtest_group {
