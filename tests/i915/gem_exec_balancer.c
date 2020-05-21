@@ -1154,6 +1154,95 @@ static void bonded_semaphore(int i915)
 	gem_context_destroy(i915, ctx);
 }
 
+static void __bonded_nohang(int i915, uint32_t ctx,
+			    const struct i915_engine_class_instance *siblings,
+			    unsigned int count,
+			    unsigned int flags)
+#define NOHANG 0x1
+{
+	struct drm_i915_gem_exec_object2 batch = {
+		.handle = batch_create(i915),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&batch),
+		.buffer_count = 1,
+		.rsvd1 = ctx,
+	};
+	igt_spin_t *time, *spin;
+	uint32_t load;
+
+	load = gem_context_create(i915);
+	gem_context_set_priority(i915, load, 1023);
+	set_load_balancer(i915, load, siblings, count, NULL);
+
+	spin = igt_spin_new(i915, load, .engine = 1);
+
+	/* Master on engine 1, stuck behind a spinner */
+	execbuf.flags = 1 | I915_EXEC_FENCE_OUT;
+	gem_execbuf_wr(i915, &execbuf);
+
+	/* Bond on engine 2, engine clear bond can be submitted immediately */
+	execbuf.rsvd2 >>= 32;
+	execbuf.flags = 2 | I915_EXEC_FENCE_SUBMIT | I915_EXEC_FENCE_OUT;
+	gem_execbuf_wr(i915, &execbuf);
+
+	igt_debugfs_dump(i915, "i915_engine_info");
+
+	/* The master will remain blocked until the spinner is reset */
+	time = igt_spin_new(i915); /* rcs0 */
+	while (gem_bo_busy(i915, time->handle)) {
+		igt_spin_t *next;
+
+		if (flags & NOHANG) {
+			/* Keep replacing spin, so that it doesn't hang */
+			next = igt_spin_new(i915, load, .engine = 1);
+			igt_spin_free(i915, spin);
+			spin = next;
+		}
+
+		if (!gem_bo_busy(i915, batch.handle))
+			break;
+	}
+	igt_spin_free(i915, time);
+	igt_spin_free(i915, spin);
+
+	/* Check the bonded pair completed and were not declared hung */
+	igt_assert_eq(sync_fence_status(execbuf.rsvd2 & 0xffffffff), 1);
+	igt_assert_eq(sync_fence_status(execbuf.rsvd2 >> 32), 1);
+
+	close(execbuf.rsvd2);
+	close(execbuf.rsvd2 >> 32);
+
+	gem_context_destroy(i915, load);
+	gem_close(i915, batch.handle);
+}
+
+static void bonded_nohang(int i915, unsigned int flags)
+{
+	uint32_t ctx;
+
+	/*
+	 * We try and trick ourselves into declaring a bonded request as
+	 * hung by preventing the master from running [after submission].
+	 */
+
+	igt_require(gem_scheduler_has_semaphores(i915));
+
+	ctx = gem_context_create(i915);
+
+	for (int class = 1; class < 32; class++) {
+		struct i915_engine_class_instance *siblings;
+		unsigned int count;
+
+		siblings = list_engines(i915, 1u << class, &count);
+		if (count > 1)
+			__bonded_nohang(i915, ctx, siblings, count, flags);
+		free(siblings);
+	}
+
+	gem_context_destroy(i915, ctx);
+}
+
 static void indices(int i915)
 {
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
@@ -2199,11 +2288,22 @@ igt_main
 		igt_stop_hang_detector();
 	}
 
-	igt_subtest("hang") {
-		igt_hang_t hang = igt_allow_hang(i915, 0, 0);
+	igt_subtest_group {
+		igt_hang_t  hang;
 
-		hangme(i915);
+		igt_fixture
+			hang = igt_allow_hang(i915, 0, 0);
 
-		igt_disallow_hang(i915, hang);
+		igt_subtest("bonded-false-hang")
+			bonded_nohang(i915, NOHANG);
+
+		igt_subtest("bonded-true-hang")
+			bonded_nohang(i915, 0);
+
+		igt_fixture
+			igt_disallow_hang(i915, hang);
+
+		igt_subtest("hang")
+			hangme(i915);
 	}
 }
