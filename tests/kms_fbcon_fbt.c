@@ -25,6 +25,7 @@
  */
 
 #include "igt.h"
+#include "igt_device.h"
 #include "igt_psr.h"
 #include "igt_sysfs.h"
 #include <sys/types.h>
@@ -38,55 +39,16 @@ IGT_TEST_DESCRIPTION("Test the relationship between fbcon and the frontbuffer "
 #define MAX_CONNECTORS 32
 
 struct drm_info {
-	int fd;
-	int debugfs_fd;
+	int fd, debugfs_fd;
+	struct igt_fb fb;
 	drmModeResPtr res;
 	drmModeConnectorPtr connectors[MAX_CONNECTORS];
-	uint32_t devid;
 };
 
 static void wait_user(const char *msg)
 {
 	igt_info("%s\n", msg);
 	igt_debug_wait_for_keypress("fbt");
-}
-
-static void setup_drm(struct drm_info *drm)
-{
-	int i;
-
-	if (drm->fd >= 0)
-		return;
-
-	drm->fd = drm_open_driver_master(DRIVER_INTEL);
-
-	drm->res = drmModeGetResources(drm->fd);
-	igt_require(drm->res);
-	igt_assert(drm->res->count_connectors <= MAX_CONNECTORS);
-
-	for (i = 0; i < drm->res->count_connectors; i++)
-		drm->connectors[i] = drmModeGetConnectorCurrent(drm->fd,
-						drm->res->connectors[i]);
-
-	drm->devid = intel_get_drm_devid(drm->fd);
-
-	kmstest_set_vt_graphics_mode();
-}
-
-static void teardown_drm(struct drm_info *drm)
-{
-	int i;
-
-	igt_assert_eq(drmDropMaster(drm->fd), 0);
-
-	kmstest_restore_vt_mode();
-
-	for (i = 0; i < drm->res->count_connectors; i++)
-		drmModeFreeConnector(drm->connectors[i]);
-
-	drmModeFreeResources(drm->res);
-	igt_assert(close(drm->fd) == 0);
-	drm->fd = -1;
 }
 
 static bool fbc_supported_on_chipset(int device, int debugfs_fd)
@@ -187,7 +149,7 @@ static bool fbc_wait_until_update(struct drm_info *drm)
 	 * For older GENs FBC is still expected to be disabled as it still
 	 * relies on a tiled and fenceable framebuffer to track modifications.
 	 */
-	if (AT_LEAST_GEN(drm->devid, 9)) {
+	if (AT_LEAST_GEN(intel_get_drm_devid(drm->fd), 9)) {
 		if (!fbc_wait_until_enabled(drm->debugfs_fd))
 			return false;
 
@@ -199,7 +161,7 @@ static bool fbc_wait_until_update(struct drm_info *drm)
 
 typedef bool (*connector_possible_fn)(drmModeConnectorPtr connector);
 
-static void set_mode_for_one_screen(struct drm_info *drm, struct igt_fb *fb,
+static void set_mode_for_one_screen(struct drm_info *drm,
 				    connector_possible_fn connector_possible)
 {
 	int i, rc;
@@ -224,8 +186,8 @@ static void set_mode_for_one_screen(struct drm_info *drm, struct igt_fb *fb,
 
 	buffer_id = igt_create_fb(drm->fd, mode->hdisplay, mode->vdisplay,
 				  DRM_FORMAT_XRGB8888,
-				  LOCAL_I915_FORMAT_MOD_X_TILED, fb);
-	igt_draw_fill_fb(drm->fd, fb, 0xFF);
+				  LOCAL_I915_FORMAT_MOD_X_TILED, &drm->fb);
+	igt_draw_fill_fb(drm->fd, &drm->fb, 0xFF);
 
 	igt_info("Setting %dx%d mode for %s connector\n",
 		 mode->hdisplay, mode->vdisplay,
@@ -316,11 +278,18 @@ struct feature {
 	.enable = psr_debugfs_enable,
 };
 
+static void restore_fbcon(struct drm_info *drm)
+{
+	kmstest_unset_all_crtcs(drm->fd, drm->res);
+	igt_remove_fb(drm->fd, &drm->fb);
+	igt_device_drop_master(drm->fd);
+	kmstest_restore_vt_mode();
+}
+
 static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 {
-	struct igt_fb fb;
-
-	setup_drm(drm);
+	igt_device_set_master(drm->fd);
+	kmstest_set_vt_graphics_mode();
 
 	igt_require(feature->supported_on_chipset(drm->fd, drm->debugfs_fd));
 
@@ -331,7 +300,7 @@ static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 	wait_user("Modes unset.");
 	igt_assert(feature->is_disabled(drm->debugfs_fd));
 
-	set_mode_for_one_screen(drm, &fb, feature->connector_possible_fn);
+	set_mode_for_one_screen(drm, feature->connector_possible_fn);
 	wait_user("Screen set.");
 	igt_assert(feature->wait_until_enabled(drm->debugfs_fd));
 
@@ -342,8 +311,7 @@ static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 		igt_assert(feature->wait_until_enabled(drm->debugfs_fd));
 	}
 
-	igt_remove_fb(drm->fd, &fb);
-	teardown_drm(drm);
+	restore_fbcon(drm);
 
 	/* Wait for fbcon to restore itself. */
 	sleep(3);
@@ -361,13 +329,20 @@ static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 
 static void setup_environment(struct drm_info *drm)
 {
-	int drm_fd;
+	int i;
 
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
-	igt_require(drm_fd >= 0);
-	drm->debugfs_fd = igt_debugfs_dir(drm_fd);
+	drm->fd = drm_open_driver_master(DRIVER_INTEL);
+	igt_require(drm->fd >= 0);
+	drm->debugfs_fd = igt_debugfs_dir(drm->fd);
 	igt_require(drm->debugfs_fd >= 0);
-	igt_assert(close(drm_fd) == 0);
+
+	drm->res = drmModeGetResources(drm->fd);
+	igt_require(drm->res);
+	igt_assert(drm->res->count_connectors <= MAX_CONNECTORS);
+
+	for (i = 0; i < drm->res->count_connectors; i++)
+		drm->connectors[i] = drmModeGetConnectorCurrent(drm->fd,
+						drm->res->connectors[i]);
 
 	/*
 	 * igt_main()->igt_subtest_init_parse_opts()->common_init() disables the
@@ -379,10 +354,15 @@ static void setup_environment(struct drm_info *drm)
 
 static void teardown_environment(struct drm_info *drm)
 {
-	if (drm->fd >= 0)
-		teardown_drm(drm);
+	int i;
 
+	for (i = 0; i < drm->res->count_connectors; i++)
+		drmModeFreeConnector(drm->connectors[i]);
+
+	drmModeFreeResources(drm->res);
 	close(drm->debugfs_fd);
+	close(drm->fd);
+	kmstest_restore_vt_mode();
 }
 
 igt_main
