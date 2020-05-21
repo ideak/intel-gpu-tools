@@ -283,7 +283,7 @@ static void test_resize(int i915,
 		gem_context_set_param(i915, &p);
 
 		igt_nsec_elapsed(&tv);
-		count = measure_inflight(i915, e->flags, 1 + ceil(2 * elapsed*1e-9));
+		count = measure_inflight(i915, e->flags, 1 + 4 * ceil(elapsed*1e-9));
 		elapsed = igt_nsec_elapsed(&tv);
 
 		igt_info("%s: %6llx -> %'6d\n", e->name, p.value, count);
