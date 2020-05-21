@@ -2307,7 +2307,6 @@ static void test_pi_iova(int i915, unsigned int engine, unsigned int flags)
 	igt_spin_t *spin;
 	pthread_t hi, lo;
 	char poison[4096];
-	uint32_t result;
 	int ufd;
 
 	/*
@@ -2410,9 +2409,7 @@ static void test_pi_iova(int i915, unsigned int engine, unsigned int flags)
 	pthread_join(lo, NULL);
 	gem_close(i915, t.batch);
 
-	gem_sync(i915, t.scratch); /* write hazard lies */
-	gem_read(i915, t.scratch, 0, &result, sizeof(result));
-	igt_assert_eq(result, MIN_PRIO);
+	igt_assert_eq(__sync_read_u32(i915, t.scratch, 0), MIN_PRIO);
 	gem_close(i915, t.scratch);
 
 	munmap(t.page, 4096);
