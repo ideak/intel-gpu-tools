@@ -401,6 +401,7 @@ typedef void (*igt_fillfunc_v2_t)(int i915,
 igt_fillfunc_t igt_get_media_fillfunc(int devid);
 igt_fillfunc_t igt_get_gpgpu_fillfunc(int devid);
 igt_fillfunc_v2_t igt_get_gpgpu_fillfunc_v2(int devid);
+igt_fillfunc_v2_t igt_get_media_fillfunc_v2(int devid);
 
 typedef void (*igt_vme_func_t)(struct intel_batchbuffer *batch,
 			       const struct igt_buf *src,
