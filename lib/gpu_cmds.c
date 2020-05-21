@@ -1331,3 +1331,46 @@ gen8_emit_gpgpu_walk_v2(struct intel_bb *ibb,
 	/* bottom mask, height 1, always 0xffffffff */
 	intel_bb_out(ibb, 0xffffffff);
 }
+
+void
+gen8_emit_media_state_flush_v2(struct intel_bb *ibb)
+{
+	intel_bb_out(ibb, GEN8_MEDIA_STATE_FLUSH | (2 - 2));
+	intel_bb_out(ibb, 0);
+}
+
+void
+gen_emit_media_object_v2(struct intel_bb *ibb,
+			 unsigned int xoffset, unsigned int yoffset)
+{
+	intel_bb_out(ibb, GEN7_MEDIA_OBJECT | (8 - 2));
+
+	/* interface descriptor offset */
+	intel_bb_out(ibb, 0);
+
+	/* without indirect data */
+	intel_bb_out(ibb, 0);
+	intel_bb_out(ibb, 0);
+
+	/* scoreboard */
+	intel_bb_out(ibb, 0);
+	intel_bb_out(ibb, 0);
+
+	/* inline data (xoffset, yoffset) */
+	intel_bb_out(ibb, xoffset);
+	intel_bb_out(ibb, yoffset);
+	if (AT_LEAST_GEN(ibb->devid, 8) && !IS_CHERRYVIEW(ibb->devid))
+		gen8_emit_media_state_flush_v2(ibb);
+}
+
+void
+gen7_emit_media_objects_v2(struct intel_bb *ibb,
+			   unsigned int x, unsigned int y,
+			   unsigned int width, unsigned int height)
+{
+	int i, j;
+
+	for (i = 0; i < width / 16; i++)
+		for (j = 0; j < height / 16; j++)
+			gen_emit_media_object_v2(ibb, x + i * 16, y + j * 16);
+}

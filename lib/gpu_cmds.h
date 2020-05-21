@@ -202,4 +202,15 @@ gen8_emit_gpgpu_walk_v2(struct intel_bb *ibb,
 			unsigned int x, unsigned int y,
 			unsigned int width, unsigned int height);
 
+void
+gen8_emit_media_state_flush_v2(struct intel_bb *ibb);
+
+void
+gen_emit_media_object_v2(struct intel_bb *ibb,
+			 unsigned int xoffset, unsigned int yoffset);
+
+void
+gen7_emit_media_objects_v2(struct intel_bb *ibb,
+			   unsigned int x, unsigned int y,
+			   unsigned int width, unsigned int height);
 #endif /* GPU_CMDS_H */
