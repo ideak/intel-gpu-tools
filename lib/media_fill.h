@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include "intel_batchbuffer.h"
+#include "intel_bufops.h"
 
 void
 gen8_media_fillfunc(struct intel_batchbuffer *batch,
@@ -43,11 +44,32 @@ gen7_media_fillfunc(struct intel_batchbuffer *batch,
 		    uint8_t color);
 
 void
+gen7_media_fillfunc_v2(int i915,
+		       struct intel_buf *buf,
+		       unsigned int x, unsigned int y,
+		       unsigned int width, unsigned int height,
+		       uint8_t color);
+
+void
+gen8_media_fillfunc_v2(int i915,
+		       struct intel_buf *buf,
+		       unsigned int x, unsigned int y,
+		       unsigned int width, unsigned int height,
+		       uint8_t color);
+
+void
 gen9_media_fillfunc(struct intel_batchbuffer *batch,
 		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
 		    unsigned int width, unsigned int height,
 		    uint8_t color);
+
+void
+gen9_media_fillfunc_v2(int i915,
+		       struct intel_buf *buf,
+		       unsigned int x, unsigned int y,
+		       unsigned int width, unsigned int height,
+		       uint8_t color);
 
 void
 gen11_media_vme_func(struct intel_batchbuffer *batch,
@@ -61,5 +83,12 @@ gen12_media_fillfunc(struct intel_batchbuffer *batch,
 		     unsigned int x, unsigned int y,
 		     unsigned int width, unsigned int height,
 		     uint8_t color);
+
+void
+gen12_media_fillfunc_v2(int i915,
+			struct intel_buf *buf,
+			unsigned int x, unsigned int y,
+			unsigned int width, unsigned int height,
+			uint8_t color);
 
 #endif /* RENDE_MEDIA_FILL_H */

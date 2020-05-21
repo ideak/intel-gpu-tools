@@ -135,6 +135,7 @@ static const uint32_t gen12_media_kernel[][4] = {
  *
  */
 
+#define PAGE_SIZE 4096
 #define BATCH_STATE_SPLIT 2048
 /* VFE STATE params */
 #define THREADS 1
@@ -188,6 +189,49 @@ gen7_media_fillfunc(struct intel_batchbuffer *batch,
 }
 
 void
+gen7_media_fillfunc_v2(int i915,
+		       struct intel_buf *buf,
+		       unsigned int x, unsigned int y,
+		       unsigned int width, unsigned int height,
+		       uint8_t color)
+{
+	struct intel_bb *ibb;
+	uint32_t curbe_buffer, interface_descriptor;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	intel_bb_add_object(ibb, buf->handle, 0, true);
+
+	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
+
+	curbe_buffer = gen7_fill_curbe_buffer_data_v2(ibb, color);
+	interface_descriptor = gen7_fill_interface_descriptor_v2(ibb, buf,
+					gen7_media_kernel,
+					sizeof(gen7_media_kernel));
+	intel_bb_ptr_set(ibb, 0);
+
+	/* media pipeline */
+	intel_bb_out(ibb, GEN7_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA);
+	gen7_emit_state_base_address_v2(ibb);
+
+	gen7_emit_vfe_state_v2(ibb, THREADS, MEDIA_URB_ENTRIES, MEDIA_URB_SIZE,
+			       MEDIA_CURBE_SIZE, GEN7_VFE_STATE_MEDIA_MODE);
+
+	gen7_emit_curbe_load_v2(ibb, curbe_buffer);
+
+	gen7_emit_interface_descriptor_load_v2(ibb, interface_descriptor);
+
+	gen7_emit_media_objects_v2(ibb, x, y, width, height);
+
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_ptr_align(ibb, 32);
+
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
+
+	intel_bb_destroy(ibb);
+}
+
+void
 gen8_media_fillfunc(struct intel_batchbuffer *batch,
 		    const struct igt_buf *dst,
 		    unsigned int x, unsigned int y,
@@ -229,6 +273,49 @@ gen8_media_fillfunc(struct intel_batchbuffer *batch,
 
 	gen7_render_flush(batch, batch_end);
 	intel_batchbuffer_reset(batch);
+}
+
+void
+gen8_media_fillfunc_v2(int i915,
+		       struct intel_buf *buf,
+		       unsigned int x, unsigned int y,
+		       unsigned int width, unsigned int height,
+		       uint8_t color)
+{
+	struct intel_bb *ibb;
+	uint32_t curbe_buffer, interface_descriptor;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	intel_bb_add_object(ibb, buf->handle, 0, true);
+
+	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
+
+	curbe_buffer = gen7_fill_curbe_buffer_data_v2(ibb, color);
+	interface_descriptor = gen8_fill_interface_descriptor_v2(ibb, buf,
+					gen8_media_kernel,
+					sizeof(gen8_media_kernel));
+	intel_bb_ptr_set(ibb, 0);
+
+	/* media pipeline */
+	intel_bb_out(ibb, GEN8_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA);
+	gen8_emit_state_base_address_v2(ibb);
+
+	gen8_emit_vfe_state_v2(ibb, THREADS, MEDIA_URB_ENTRIES, MEDIA_URB_SIZE,
+			       MEDIA_CURBE_SIZE);
+
+	gen7_emit_curbe_load_v2(ibb, curbe_buffer);
+
+	gen7_emit_interface_descriptor_load_v2(ibb, interface_descriptor);
+
+	gen7_emit_media_objects_v2(ibb, x, y, width, height);
+
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_ptr_align(ibb, 32);
+
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
+
+	intel_bb_destroy(ibb);
 }
 
 static void
@@ -298,6 +385,75 @@ gen9_media_fillfunc(struct intel_batchbuffer *batch,
 	__gen9_media_fillfunc(batch, dst, x, y, width, height, color,
 			      gen8_media_kernel, sizeof(gen8_media_kernel));
 
+}
+
+static void
+__gen9_media_fillfunc_v2(int i915,
+			 struct intel_buf *buf,
+			 unsigned int x, unsigned int y,
+			 unsigned int width, unsigned int height,
+			 uint8_t color,
+			 const uint32_t kernel[][4], size_t kernel_size)
+{
+	struct intel_bb *ibb;
+	uint32_t curbe_buffer, interface_descriptor;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	intel_bb_add_object(ibb, buf->handle, 0, true);
+
+	/* setup states */
+	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
+
+	curbe_buffer = gen7_fill_curbe_buffer_data_v2(ibb, color);
+	interface_descriptor = gen8_fill_interface_descriptor_v2(ibb, buf,
+								 kernel,
+								 kernel_size);
+	intel_bb_ptr_set(ibb, 0);
+
+	/* media pipeline */
+	intel_bb_out(ibb, GEN8_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA |
+		     GEN9_FORCE_MEDIA_AWAKE_ENABLE |
+		     GEN9_SAMPLER_DOP_GATE_DISABLE |
+		     GEN9_PIPELINE_SELECTION_MASK |
+		     GEN9_SAMPLER_DOP_GATE_MASK |
+		     GEN9_FORCE_MEDIA_AWAKE_MASK);
+	gen9_emit_state_base_address_v2(ibb);
+
+	gen8_emit_vfe_state_v2(ibb, THREADS, MEDIA_URB_ENTRIES, MEDIA_URB_SIZE,
+			       MEDIA_CURBE_SIZE);
+
+	gen7_emit_curbe_load_v2(ibb, curbe_buffer);
+
+	gen7_emit_interface_descriptor_load_v2(ibb, interface_descriptor);
+
+	gen7_emit_media_objects_v2(ibb, x, y, width, height);
+
+	intel_bb_out(ibb, GEN8_PIPELINE_SELECT | PIPELINE_SELECT_MEDIA |
+		     GEN9_FORCE_MEDIA_AWAKE_DISABLE |
+		     GEN9_SAMPLER_DOP_GATE_ENABLE |
+		     GEN9_PIPELINE_SELECTION_MASK |
+		     GEN9_SAMPLER_DOP_GATE_MASK |
+		     GEN9_FORCE_MEDIA_AWAKE_MASK);
+
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_ptr_align(ibb, 32);
+
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
+
+	intel_bb_destroy(ibb);
+}
+
+void
+gen9_media_fillfunc_v2(int i915,
+		       struct intel_buf *buf,
+		       unsigned int x, unsigned int y,
+		       unsigned int width, unsigned int height,
+		       uint8_t color)
+{
+
+	__gen9_media_fillfunc_v2(i915, buf, x, y, width, height, color,
+				 gen8_media_kernel, sizeof(gen8_media_kernel));
 }
 
 static void
@@ -379,4 +535,15 @@ gen12_media_fillfunc(struct intel_batchbuffer *batch,
 {
 	__gen9_media_fillfunc(batch, dst, x, y, width, height, color,
 			      gen12_media_kernel, sizeof(gen12_media_kernel));
+}
+
+void
+gen12_media_fillfunc_v2(int i915,
+			struct intel_buf *buf,
+			unsigned int x, unsigned int y,
+			unsigned int width, unsigned int height,
+			uint8_t color)
+{
+	__gen9_media_fillfunc_v2(i915, buf, x, y, width, height, color,
+				 gen12_media_kernel, sizeof(gen12_media_kernel));
 }
