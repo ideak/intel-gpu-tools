@@ -289,7 +289,7 @@ static uint64_t estimate_largest_dumb_buffer(int fd)
 	sighandler_t old_sigsegv = signal(SIGSEGV, sigprobe);
 	struct drm_mode_create_dumb create = {
 		.bpp = 32,
-		.width = 1 << 20, /* in pixels */
+		.width = 1 << 18, /* in pixels */
 		.height = 1, /* in rows */
 	};
 	const unsigned long max_rows =
