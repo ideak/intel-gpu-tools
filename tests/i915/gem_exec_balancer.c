@@ -1189,7 +1189,7 @@ static void __bonded_nohang(int i915, uint32_t ctx,
 	igt_debugfs_dump(i915, "i915_engine_info");
 
 	/* The master will remain blocked until the spinner is reset */
-	time = igt_spin_new(i915); /* rcs0 */
+	time = igt_spin_new(i915, .flags = IGT_SPIN_NO_PREEMPTION); /* rcs0 */
 	while (gem_bo_busy(i915, time->handle)) {
 		igt_spin_t *next;
 
