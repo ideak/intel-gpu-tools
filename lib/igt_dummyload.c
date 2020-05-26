@@ -82,7 +82,24 @@ emit_recursive_batch(igt_spin_t *spin,
 	unsigned int nengine;
 	int fence_fd = -1;
 	uint32_t *cs, *batch;
+	uint32_t addr;
 	int i;
+
+	/*
+	 * Pick a random location for our spinner et al.
+	 *
+	 * If available, the kernel will place our objects in our hinted
+	 * locations and we will avoid having to perform any relocations.
+	 *
+	 * It must be a valid location (or else the kernel will be forced
+	 * to select one for us) and so must be within the GTT and suitably
+	 * aligned. For simplicity, stick to the low 32bit addresses.
+	 *
+	 * One odd restriction to remember is that batches with relocations
+	 * are not allowed in the first 256KiB, for fear of negative relocations
+	 * that wrap.
+	 */
+	addr = (random() % 1024 + 1024) << 12;
 
 	nengine = 0;
 	if (opts->engine == ALL_ENGINES) {
@@ -114,6 +131,9 @@ emit_recursive_batch(igt_spin_t *spin,
 	execbuf->buffer_count++;
 	cs = batch;
 
+	obj[BATCH].offset = addr;
+	addr += BATCH_SIZE;
+
 	if (opts->dependency) {
 		igt_assert(!(opts->flags & IGT_SPIN_POLL_RUN));
 
@@ -121,7 +141,9 @@ emit_recursive_batch(igt_spin_t *spin,
 
 		/* dummy write to dependency */
 		obj[SCRATCH].handle = opts->dependency;
-		r->presumed_offset = 0;
+		obj[SCRATCH].offset = addr;
+
+		r->presumed_offset = obj[SCRATCH].offset;
 		r->target_handle = obj[SCRATCH].handle;
 		r->offset = sizeof(uint32_t) * 1020;
 		r->delta = 0;
@@ -152,11 +174,13 @@ emit_recursive_batch(igt_spin_t *spin,
 							       spin->poll_handle,
 							       0, 4096,
 							       PROT_READ | PROT_WRITE);
+		addr += 4096; /* guard page */
+		obj[SCRATCH].offset = addr;
+		addr += 4096;
 
 		igt_assert_eq(spin->poll[SPIN_POLL_START_IDX], 0);
 
-		/* batch is first */
-		r->presumed_offset = 4096;
+		r->presumed_offset = obj[SCRATCH].offset;
 		r->target_handle = obj[SCRATCH].handle;
 		r->offset = sizeof(uint32_t) * 1;
 		r->delta = sizeof(uint32_t) * SPIN_POLL_START_IDX;
@@ -231,7 +255,7 @@ emit_recursive_batch(igt_spin_t *spin,
 		spin->condition[0] = 0xffffffff;
 		spin->condition[1] = 0xffffffff;
 
-		r->presumed_offset = 0;
+		r->presumed_offset = obj[BATCH].offset;
 		r->target_handle = obj[BATCH].handle;
 		r->offset = (cs + 2 - batch) * sizeof(*cs);
 		r->read_domains = I915_GEM_DOMAIN_COMMAND;
@@ -239,28 +263,29 @@ emit_recursive_batch(igt_spin_t *spin,
 
 		*cs++ = MI_COND_BATCH_BUFFER_END | MI_DO_COMPARE | 2;
 		*cs++ = MI_BATCH_BUFFER_END;
-		*cs++ = r->delta;
+		*cs++ = r->presumed_offset + r->delta;
 		*cs++ = 0;
 	}
 
 	/* recurse */
 	r = &relocs[obj[BATCH].relocation_count++];
 	r->target_handle = obj[BATCH].handle;
+	r->presumed_offset = obj[BATCH].offset;
 	r->offset = (cs + 1 - batch) * sizeof(*cs);
 	r->read_domains = I915_GEM_DOMAIN_COMMAND;
 	r->delta = LOOP_START_OFFSET;
 	if (gen >= 8) {
 		*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
-		*cs++ = r->delta;
+		*cs++ = r->presumed_offset + r->delta;
 		*cs++ = 0;
 	} else if (gen >= 6) {
 		*cs++ = MI_BATCH_BUFFER_START | 1 << 8;
-		*cs++ = r->delta;
+		*cs++ = r->presumed_offset + r->delta;
 	} else {
 		*cs++ = MI_BATCH_BUFFER_START | 2 << 6;
 		if (gen < 4)
 			r->delta |= 1;
-		*cs = r->delta;
+		*cs = r->presumed_offset + r->delta;
 		cs++;
 	}
 	obj[BATCH].relocs_ptr = to_user_pointer(relocs);
