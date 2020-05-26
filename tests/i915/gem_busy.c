@@ -195,7 +195,20 @@ static void one(int fd, const struct intel_execution_engine2 *e, unsigned test_f
 	igt_assert_eq(write[WRITE], 1 + e->class);
 	igt_assert_eq_u32(read[WRITE], 1 << e->class);
 
-	igt_assert_eq(write[READ], 0);
+	/*
+	 * We do not expect the batch to be in a modified state, but
+	 * if we are using GPU relocations then it will indeed be marked
+	 * as written to by the GPU. We may use any engine to update the
+	 * relocations.
+	 *
+	 * If we just used CPU relocations, we could
+	 *   igt_assert_eq(write[READ], 0);
+	 * since we do not, we have to massage the busyness to remove the trace
+	 * of GPU relocation.
+	 */
+	if (write[READ] && write[READ] != 1 + e->class)
+		/* Inter-engine GPU relocation! */
+		read[READ] &= ~(1 << (write[READ] - 1));
 	igt_assert_eq_u32(read[READ], 1 << e->class);
 
 	/* Calling busy in a loop should be enough to flush the rendering */
