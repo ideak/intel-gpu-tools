@@ -130,6 +130,13 @@ static void reset_device(int i915)
 	close(dir);
 }
 
+static void restore_params(int i915)
+{
+	/* Re-enable modparams if left clobbered */
+	igt_params_set(i915, "reset", "%u", -1);
+	igt_params_set(i915, "enable_hangcheck", "%u", 1);
+}
+
 void igt_require_gem(int i915)
 {
 	int err;
@@ -150,6 +157,7 @@ void igt_require_gem(int i915)
 	 * sequences of batches.
 	 */
 	reset_device(i915);
+	restore_params(i915);
 	restore_defaults(i915);
 
 	err = 0;
