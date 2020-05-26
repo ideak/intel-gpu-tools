@@ -822,6 +822,7 @@ sema_busy(int gem_fd,
 	int fd;
 
 	igt_require(gem_scheduler_has_semaphores(gem_fd));
+	igt_require(gem_scheduler_has_preemption(gem_fd));
 
 	fd = open_group(gem_fd,
 			I915_PMU_ENGINE_SEMA(e->class, e->instance), -1);
