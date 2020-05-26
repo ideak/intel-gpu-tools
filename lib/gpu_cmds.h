@@ -47,8 +47,9 @@ gen7_render_context_flush(struct intel_batchbuffer *batch, uint32_t batch_end);
 uint32_t
 gen7_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
 			uint8_t color);
+
 uint32_t
-gen11_fill_curbe_buffer_data(struct intel_batchbuffer *batch);
+gen11_fill_curbe_buffer_data(struct intel_bb *ibb);
 
 uint32_t
 gen7_fill_surface_state(struct intel_batchbuffer *batch,
@@ -60,8 +61,9 @@ uint32_t
 gen7_fill_binding_table(struct intel_batchbuffer *batch,
 			const struct igt_buf *dst);
 uint32_t
-gen11_fill_binding_table(struct intel_batchbuffer *batch,
-			const struct igt_buf *src,const struct igt_buf *dst);
+gen11_fill_binding_table(struct intel_bb *ibb,
+			 const struct intel_buf *src,
+			 const struct intel_buf *dst);
 
 uint32_t
 gen7_fill_kernel(struct intel_batchbuffer *batch,
@@ -109,23 +111,24 @@ gen8_fill_surface_state(struct intel_batchbuffer *batch,
 			uint32_t format,
 			int is_dst);
 uint32_t
-gen11_fill_surface_state(struct intel_batchbuffer *batch,
-			const struct igt_buf *buf,
-			uint32_t surface_type,
-			uint32_t format,
-			uint32_t vertical_alignment,
-			uint32_t horizontal_alignment,
-			int is_dst);
+gen11_fill_surface_state(struct intel_bb *ibb,
+			 const struct intel_buf *buf,
+			 uint32_t surface_type,
+			 uint32_t format,
+			 uint32_t vertical_alignment,
+			 uint32_t horizontal_alignment,
+			 int is_dst);
+
 uint32_t
 gen8_fill_interface_descriptor(struct intel_batchbuffer *batch,
 			       const struct igt_buf *dst,
 			       const uint32_t kernel[][4],
 			       size_t size);
 uint32_t
-gen11_fill_interface_descriptor(struct intel_batchbuffer *batch,
-			       const struct igt_buf *src,const struct igt_buf *dst,
-			       const uint32_t kernel[][4],
-			       size_t size);
+gen11_fill_interface_descriptor(struct intel_bb *ibb,
+				struct intel_buf *src, struct intel_buf *dst,
+				const uint32_t kernel[][4],
+				size_t size);
 void
 gen8_emit_state_base_address(struct intel_batchbuffer *batch);
 

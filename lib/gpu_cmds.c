@@ -64,17 +64,19 @@ gen7_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
 }
 
 uint32_t
-gen11_fill_curbe_buffer_data(struct intel_batchbuffer *batch)
+gen11_fill_curbe_buffer_data(struct intel_bb *ibb)
+
 {
 	uint32_t *curbe_buffer;
 	uint32_t offset;
 
-	curbe_buffer = intel_batchbuffer_subdata_alloc(batch,
-						       sizeof(uint32_t) * 8,
-						       64);
-	offset = intel_batchbuffer_subdata_offset(batch, curbe_buffer);
+	intel_bb_ptr_align(ibb, 64);
+	curbe_buffer = intel_bb_ptr(ibb);
+	offset = intel_bb_offset(ibb);
+
 	*curbe_buffer++ = 0;
-	*curbe_buffer   = 1;
+	*curbe_buffer = 1;
+	intel_bb_ptr_add(ibb, 64);
 
 	return offset;
 }
@@ -147,23 +149,29 @@ gen7_fill_binding_table(struct intel_batchbuffer *batch,
 }
 
 uint32_t
-gen11_fill_binding_table(struct intel_batchbuffer *batch,
-			const struct igt_buf *src,const struct igt_buf *dst)
+gen11_fill_binding_table(struct intel_bb *ibb,
+			 const struct intel_buf *src,
+			 const struct intel_buf *dst)
 {
-	uint32_t *binding_table, offset;
+	uint32_t binding_table_offset;
+	uint32_t *binding_table;
 
-	binding_table = intel_batchbuffer_subdata_alloc(batch, 64, 64);
-	offset = intel_batchbuffer_subdata_offset(batch, binding_table);
-	binding_table[0] = gen11_fill_surface_state(batch, src,
-						SURFACE_1D,SURFACEFORMAT_R32G32B32A32_FLOAT,
-						0,0,
-						0);
-	binding_table[1] = gen11_fill_surface_state(batch, dst,
-						SURFACE_BUFFER, SURFACEFORMAT_RAW,
-						1,1,
-						1);
+	intel_bb_ptr_align(ibb, 64);
+	binding_table_offset = intel_bb_offset(ibb);
+	binding_table = intel_bb_ptr(ibb);
+	intel_bb_ptr_add(ibb, 64);
 
-	return offset;
+	binding_table[0] = gen11_fill_surface_state(ibb, src,
+						    SURFACE_1D,
+						    SURFACEFORMAT_R32G32B32A32_FLOAT,
+						    0, 0, 0);
+	binding_table[1] = gen11_fill_surface_state(ibb, dst,
+						    SURFACE_BUFFER,
+						    SURFACEFORMAT_RAW,
+						    1, 1, 1);
+
+	return binding_table_offset;
+
 }
 
 uint32_t
@@ -432,17 +440,17 @@ gen8_fill_surface_state(struct intel_batchbuffer *batch,
 }
 
 uint32_t
-gen11_fill_surface_state(struct intel_batchbuffer *batch,
-			const struct igt_buf *buf,
-			uint32_t surface_type,
-			uint32_t format,
-			uint32_t vertical_alignment,
-			uint32_t horizontal_alignment,
-			int is_dst)
+gen11_fill_surface_state(struct intel_bb *ibb,
+			 const struct intel_buf *buf,
+			 uint32_t surface_type,
+			 uint32_t format,
+			 uint32_t vertical_alignment,
+			 uint32_t horizontal_alignment,
+			 int is_dst)
 {
 	struct gen8_surface_state *ss;
 	uint32_t write_domain, read_domain, offset;
-	int ret;
+	uint64_t address;
 
 	if (is_dst) {
 		write_domain = read_domain = I915_GEM_DOMAIN_RENDER;
@@ -451,8 +459,10 @@ gen11_fill_surface_state(struct intel_batchbuffer *batch,
 		read_domain = I915_GEM_DOMAIN_SAMPLER;
 	}
 
-	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 64);
-	offset = intel_batchbuffer_subdata_offset(batch, ss);
+	intel_bb_ptr_align(ibb, 64);
+	offset = intel_bb_offset(ibb);
+	ss = intel_bb_ptr(ibb);
+	intel_bb_ptr_add(ibb, 64);
 
 	ss->ss0.surface_type = surface_type;
 	ss->ss0.surface_format = format;
@@ -467,12 +477,12 @@ gen11_fill_surface_state(struct intel_batchbuffer *batch,
 	else
 		ss->ss0.tiled_mode = 0;
 
-	ss->ss8.base_addr = buf->bo->offset;
+	address = intel_bb_offset_reloc(ibb, buf->handle,
+					read_domain, write_domain,
+					offset + 4 * 8, 0x0);
 
-	ret = drm_intel_bo_emit_reloc(batch->bo,
-				intel_batchbuffer_subdata_offset(batch, ss) + 8 * 4,
-				buf->bo, 0, read_domain, write_domain);
-	igt_assert(ret == 0);
+	ss->ss8.base_addr = (uint32_t) address;
+	ss->ss9.base_addr_hi = address >> 32;
 
 	if (is_dst) {
 		ss->ss1.memory_object_control = 2;
@@ -531,21 +541,27 @@ gen8_fill_interface_descriptor(struct intel_batchbuffer *batch,
 	return offset;
 }
 
+static uint32_t
+gen7_fill_kernel_v2(struct intel_bb *ibb,
+		    const uint32_t kernel[][4],
+		    size_t size);
+
 uint32_t
-gen11_fill_interface_descriptor(struct intel_batchbuffer *batch,
-			       const struct igt_buf *src,const struct igt_buf *dst,
-			       const uint32_t kernel[][4],
-			       size_t size)
+gen11_fill_interface_descriptor(struct intel_bb *ibb,
+				struct intel_buf *src, struct intel_buf *dst,
+				const uint32_t kernel[][4],
+				size_t size)
 {
 	struct gen8_interface_descriptor_data *idd;
 	uint32_t offset;
 	uint32_t binding_table_offset, kernel_offset;
 
-	binding_table_offset = gen11_fill_binding_table(batch, src,dst);
-	kernel_offset = gen7_fill_kernel(batch, kernel, size);
+	binding_table_offset = gen11_fill_binding_table(ibb, src, dst);
+	kernel_offset = gen7_fill_kernel_v2(ibb, kernel, size);
 
-	idd = intel_batchbuffer_subdata_alloc(batch, sizeof(*idd), 64);
-	offset = intel_batchbuffer_subdata_offset(batch, idd);
+	intel_bb_ptr_align(ibb, 64);
+	idd = intel_bb_ptr(ibb);
+	offset = intel_bb_offset(ibb);
 
 	idd->desc0.kernel_start_pointer = (kernel_offset >> 6);
 
