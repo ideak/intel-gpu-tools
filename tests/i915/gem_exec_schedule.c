@@ -116,12 +116,16 @@ static uint32_t __store_dword(int fd, uint32_t ctx, unsigned ring,
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = cork;
+	obj[0].offset = cork << 20;
 	obj[1].handle = target;
+	obj[1].offset = target << 20;
 	obj[2].handle = gem_create(fd, 4096);
+	obj[2].offset = 256 << 10;
+	obj[2].offset += (random() % 128) << 12;
 
 	memset(&reloc, 0, sizeof(reloc));
 	reloc.target_handle = obj[1].handle;
-	reloc.presumed_offset = 0;
+	reloc.presumed_offset = obj[1].offset;
 	reloc.offset = sizeof(uint32_t);
 	reloc.delta = offset;
 	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
@@ -132,15 +136,15 @@ static uint32_t __store_dword(int fd, uint32_t ctx, unsigned ring,
 	i = 0;
 	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
-		batch[++i] = offset;
+		batch[++i] = reloc.presumed_offset + reloc.delta;
 		batch[++i] = 0;
 	} else if (gen >= 4) {
 		batch[++i] = 0;
-		batch[++i] = offset;
+		batch[++i] = reloc.presumed_offset + reloc.delta;
 		reloc.offset += sizeof(uint32_t);
 	} else {
 		batch[i]--;
-		batch[++i] = offset;
+		batch[++i] = reloc.presumed_offset + reloc.delta;
 	}
 	batch[++i] = value;
 	batch[++i] = MI_BATCH_BUFFER_END;
