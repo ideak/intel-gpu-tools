@@ -23,8 +23,10 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 
 #include <i915_drm.h>
 
@@ -277,4 +279,117 @@ bool gem_engine_has_mutable_submission(int i915, unsigned int engine)
 {
 	return gem_class_has_mutable_submission(i915,
 						gem_execbuf_flags_to_engine_class(engine));
+}
+
+static int __execbuf(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err;
+
+	err = 0;
+	if (ioctl(i915, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
+}
+
+static void alarm_handler(int sig)
+{
+}
+
+static unsigned int
+__measure_ringsize(int i915, unsigned int engine)
+{
+	struct sigaction old_sa, sa = { .sa_handler = alarm_handler };
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 execbuf;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	unsigned int last[2]= { -1, -1 }, count;
+	struct itimerval itv;
+	IGT_CORK_HANDLE(cork);
+
+	memset(obj, 0, sizeof(obj));
+	obj[1].handle = gem_create(i915, 4096);
+	gem_write(i915, obj[1].handle, 0, &bbe, sizeof(bbe));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
+	execbuf.buffer_count = 1;
+	execbuf.flags = engine;
+	gem_execbuf(i915, &execbuf);
+
+	obj[0].handle = igt_cork_plug(&cork, i915);
+
+	execbuf.buffers_ptr = to_user_pointer(obj);
+	execbuf.buffer_count = 2;
+
+	sigaction(SIGALRM, &sa, &old_sa);
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 1000;
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 10000;
+	setitimer(ITIMER_REAL, &itv, NULL);
+
+	count = 0;
+	do {
+		int err = __execbuf(i915, &execbuf);
+
+		if (err == 0) {
+			count++;
+			continue;
+		}
+
+		if (err == -EWOULDBLOCK)
+			break;
+
+		if (last[1] == count)
+			break;
+
+		/* sleep until the next timer interrupt (woken on signal) */
+		pause();
+		last[1] = last[0];
+		last[0] = count;
+	} while (1);
+	igt_assert(count > 2);
+
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+	sigaction(SIGALRM, &old_sa, NULL);
+
+	igt_cork_unplug(&cork);
+	gem_close(i915, obj[0].handle);
+	gem_close(i915, obj[1].handle);
+
+	/* Be conservative, expect relocations, in case we must wrap later */
+	return count / 2 - 1;
+}
+
+unsigned int gem_submission_measure(int i915, unsigned int engine)
+{
+	unsigned int size;
+	bool nonblock;
+
+	nonblock = fcntl(i915, F_GETFD) & O_NONBLOCK;
+	if (!nonblock)
+		fcntl(i915, F_SETFD, fcntl(i915, F_GETFD) | O_NONBLOCK);
+
+	if (engine == ALL_ENGINES) {
+		struct intel_execution_engine2 *e;
+
+		size = -1;
+		__for_each_physical_engine(i915, e) {
+			unsigned int this =  __measure_ringsize(i915, e->flags);
+			if (this < size)
+				size = this;
+		}
+	} else {
+		size =  __measure_ringsize(i915, engine);
+	}
+
+	if (!nonblock)
+		fcntl(i915, F_SETFD, fcntl(i915, F_GETFD) & ~O_NONBLOCK);
+
+	return size;
 }

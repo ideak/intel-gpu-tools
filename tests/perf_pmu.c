@@ -1287,7 +1287,7 @@ static void cpu_hotplug(int gem_fd)
 
 static int target_num_interrupts(int i915)
 {
-	return min(gem_measure_ring_inflight(i915, I915_EXEC_DEFAULT, 0), 30);
+	return min(gem_submission_measure(i915, I915_EXEC_DEFAULT), 30);
 }
 
 static void

@@ -46,6 +46,8 @@ static inline bool gem_has_cmdparser(int i915, uint32_t engine)
 bool gem_has_blitter(int i915);
 void gem_require_blitter(int i915);
 
+unsigned int gem_submission_measure(int i915, unsigned int engine);
+
 void gem_test_engine(int fd, unsigned int engine);
 
 #endif /* GEM_SUBMISSION_H */

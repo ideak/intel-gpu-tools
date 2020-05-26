@@ -1756,7 +1756,7 @@ igt_main
 		long ring_size = 0;
 
 		igt_fixture {
-			ring_size = gem_measure_ring_inflight(i915, ALL_ENGINES, 0) - 1;
+			ring_size = gem_submission_measure(i915, ALL_ENGINES);
 			igt_info("Ring size: %ld batches\n", ring_size);
 			igt_require(ring_size);
 
