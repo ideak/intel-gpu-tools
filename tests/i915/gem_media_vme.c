@@ -35,7 +35,6 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
-#include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("A very simple workload for the VME media block.");
 
@@ -45,43 +44,6 @@ IGT_TEST_DESCRIPTION("A very simple workload for the VME media block.");
 
 #define INPUT_SIZE	(WIDTH * HEIGHT * sizeof(char) * 1.5)
 #define OUTPUT_SIZE	(56*sizeof(int))
-
-static void
-scratch_buf_init(drm_intel_bufmgr *bufmgr,
-		 struct igt_buf *buf,
-		 unsigned int size)
-{
-	drm_intel_bo *bo;
-
-	bo = drm_intel_bo_alloc(bufmgr, "", size, 4096);
-	igt_assert(bo);
-
-	memset(buf, 0, sizeof(*buf));
-
-	buf->bo = bo;
-	buf->tiling = I915_TILING_NONE;
-	buf->surface[0].size = size;
-}
-
-static void scratch_buf_init_src(drm_intel_bufmgr *bufmgr, struct igt_buf *buf)
-{
-	scratch_buf_init(bufmgr, buf, INPUT_SIZE);
-
-	/*
-	 * Ideally we would read src surface from file "SourceFrameI.yu12".
-	 * But even without it, we can still triger the rcs0 resetting
-	 * with this vme kernel.
-	 */
-
-	buf->surface[0].stride = STRIDE;
-}
-
-static void scratch_buf_init_dst(drm_intel_bufmgr *bufmgr, struct igt_buf *buf)
-{
-	scratch_buf_init(bufmgr, buf, OUTPUT_SIZE);
-
-	buf->surface[0].stride = 1;
-}
 
 static uint64_t switch_off_n_bits(uint64_t mask, unsigned int n)
 {
@@ -131,12 +93,11 @@ static void shut_non_vme_subslices(int drm_fd, uint32_t ctx)
 
 igt_simple_main
 {
+	struct buf_ops *bops;
+	struct intel_buf src, dst;
 	int drm_fd;
-	uint32_t devid;
-	drm_intel_bufmgr *bufmgr;
+	uint32_t devid, ctx;
 	igt_vme_func_t media_vme;
-	struct intel_batchbuffer *batch;
-	struct igt_buf src, dst;
 
 	drm_fd = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(drm_fd);
@@ -146,34 +107,29 @@ igt_simple_main
 	media_vme = igt_get_media_vme_func(devid);
 	igt_require_f(media_vme, "no media-vme function\n");
 
-	bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-	igt_assert(bufmgr);
+	bops = buf_ops_create(drm_fd);
 
-	batch = intel_batchbuffer_alloc(bufmgr, devid);
-	igt_assert(batch);
+	/* Use WIDTH/HEIGHT/STRIDE according to INPUT_SIZE */
+	intel_buf_init(bops, &src, WIDTH, HEIGHT * 1.5, 8, STRIDE,
+		       I915_TILING_NONE, 0);
 
-	scratch_buf_init_src(bufmgr, &src);
-	scratch_buf_init_dst(bufmgr, &dst);
+	/* This comes from OUTPUT_SIZE requirements */
+	intel_buf_init(bops, &dst, 56, sizeof(int), 8, 56,
+		       I915_TILING_NONE, 0);
+	dst.stride = 1;
 
-	batch->ctx = drm_intel_gem_context_create(bufmgr);
-	igt_assert(batch->ctx);
+	ctx = gem_context_create(drm_fd);
+	igt_assert(ctx);
 
 	/* ICL hangs if non-VME enabled slices are enabled with a VME kernel. */
-	if (intel_gen(devid) == 11) {
-		uint32_t ctx_id;
-		int ret;
-
-		ret = drm_intel_gem_context_get_id(batch->ctx, &ctx_id);
-		igt_assert_eq(ret, 0);
-
-		shut_non_vme_subslices(drm_fd, ctx_id);
-	}
+	if (intel_gen(devid) == 11)
+		shut_non_vme_subslices(drm_fd, ctx);
 
 	igt_fork_hang_detector(drm_fd);
 
-	media_vme(batch, &src, WIDTH, HEIGHT, &dst);
+	media_vme(drm_fd, ctx, &src, WIDTH, HEIGHT, &dst);
 
-	gem_sync(drm_fd, dst.bo->handle);
+	gem_sync(drm_fd, dst.handle);
 
 	igt_stop_hang_detector();
 }

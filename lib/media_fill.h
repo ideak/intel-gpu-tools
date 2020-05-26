@@ -72,10 +72,11 @@ gen9_media_fillfunc_v2(int i915,
 		       uint8_t color);
 
 void
-gen11_media_vme_func(struct intel_batchbuffer *batch,
-		     const struct igt_buf *src,
+gen11_media_vme_func(int i915,
+		     uint32_t ctx,
+		     struct intel_buf *src,
 		     unsigned int width, unsigned int height,
-		     const struct igt_buf *dst);
+		     struct intel_buf *dst);
 
 void
 gen12_media_fillfunc(struct intel_batchbuffer *batch,
