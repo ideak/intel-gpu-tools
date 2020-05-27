@@ -85,7 +85,8 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 			 .engine = ring,
 			 .fence = fence,
 			 .dependency = fb->gem_handle,
-			 .flags = IGT_SPIN_FENCE_IN | IGT_SPIN_NO_PREEMPTION);
+			 .flags = IGT_SPIN_FENCE_IN);
+	close(fence);
 
 	igt_fork(child, 1) {
 		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
@@ -106,12 +107,14 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 			     "flip completed whilst %s was busy [%d]\n",
 			     name, gem_bo_busy(dpy->drm_fd, fb->gem_handle));
 		igt_assert(gem_bo_busy(dpy->drm_fd, fb->gem_handle));
+
+		igt_cork_unplug(&cork);
 	}
 
 	igt_waitchildren_timeout(5 * timeout,
 				 "flip blocked waiting for busy bo\n");
 	igt_spin_end(t);
-	close(fence);
+	igt_cork_unplug(&cork);
 
 	igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 	igt_assert(poll(&pfd, 1, 0) == 0);
