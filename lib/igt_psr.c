@@ -195,11 +195,12 @@ bool psr_sink_support(int device, int debugfs_fd, enum psr_mode mode)
 
 #define PSR2_SU_BLOCK_STR_LOOKUP "PSR2 SU blocks:\n0\t"
 
+/* Return the the last or last but one su blocks */
 static bool
 psr2_read_last_num_su_blocks_val(int debugfs_fd, uint16_t *num_su_blocks)
 {
 	char buf[PSR_STATUS_MAX_LEN];
-	char *str;
+	char *str, *str2;
 	int ret;
 
 	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
@@ -212,6 +213,13 @@ psr2_read_last_num_su_blocks_val(int debugfs_fd, uint16_t *num_su_blocks)
 		return false;
 
 	str = &str[strlen(PSR2_SU_BLOCK_STR_LOOKUP)];
+	*num_su_blocks = (uint16_t)strtol(str, &str2, 10);
+	if (*num_su_blocks != 0)
+		return true;
+
+	str = str2;
+	/* Jump '\n''1''\t' */
+	str += 3;
 	*num_su_blocks = (uint16_t)strtol(str, NULL, 10);
 
 	return true;
