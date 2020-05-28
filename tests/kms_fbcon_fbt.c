@@ -283,7 +283,7 @@ static void restore_fbcon(struct drm_info *drm)
 	kmstest_unset_all_crtcs(drm->fd, drm->res);
 	igt_remove_fb(drm->fd, &drm->fb);
 	igt_device_drop_master(drm->fd);
-	kmstest_restore_vt_mode();
+	kmstest_set_vt_text_mode();
 }
 
 static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)

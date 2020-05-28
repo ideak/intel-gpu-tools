@@ -968,6 +968,17 @@ void kmstest_set_vt_graphics_mode(void)
 	igt_debug("VT: graphics mode set (mode was 0x%lx)\n", ret);
 }
 
+/**
+ * kmstest_set_vt_text_mode:
+ *
+ * Sets the controlling VT (if available) into text mode.
+ * Unlikely kmstest_set_vt_graphics_mode() it do not install an igt exit
+ * handler to set the VT back to the previous mode.
+ */
+void kmstest_set_vt_text_mode(void)
+{
+	igt_assert(set_vt_mode(KD_TEXT) >= 0);
+}
 
 static void reset_connectors_at_exit(int sig)
 {
