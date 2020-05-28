@@ -251,6 +251,29 @@ static uint32_t batch_create(int i915)
 	return handle;
 }
 
+static uint32_t batch_busy(uint32_t busy)
+{
+	unsigned int write;
+
+	/*
+	 * If we use GPU relocations, we may then write into the batch,
+	 * and the batch will correspondingly have a write flag. We may
+	 * not even use the same engine to perform the relocations
+	 */
+	write = busy & 0xfffff;
+	busy >>= 16; /* strip off the write marker */
+
+	if (write) {
+		write = 1 << (write - 1); /* writer => reader bit */
+
+		/* If we wrote using a different engine, remove it */
+		if (busy & ~write)
+			busy &= ~write;
+	}
+
+	return busy;
+}
+
 static void none(int i915)
 {
 	struct i915_context_param_engines engines = {};
@@ -349,7 +372,8 @@ static void execute_one(int i915)
 			}
 
 			do_ioctl(i915, DRM_IOCTL_I915_GEM_BUSY, &busy);
-			igt_assert_eq(busy.busy, i != -1 ? 1 << (e->class + 16) : 0);
+			igt_assert_eq(batch_busy(busy.busy),
+				      i != -1 ? 1 << e->class : 0);
 
 			igt_spin_free(i915, spin);
 
@@ -398,7 +422,7 @@ static void execute_oneforall(int i915)
 
 			busy.handle = spin->handle;
 			do_ioctl(i915, DRM_IOCTL_I915_GEM_BUSY, &busy);
-			igt_assert_eq(busy.busy, 1 << (e->class + 16));
+			igt_assert_eq(batch_busy(busy.busy), 1 << e->class);
 
 			igt_spin_free(i915, spin);
 		}
@@ -439,7 +463,7 @@ static void execute_allforone(int i915)
 
 		busy.handle = spin->handle;
 		do_ioctl(i915, DRM_IOCTL_I915_GEM_BUSY, &busy);
-		igt_assert_eq(busy.busy, 1 << (e->class + 16));
+		igt_assert_eq(batch_busy(busy.busy), 1 << e->class);
 
 		igt_spin_free(i915, spin);
 	}
