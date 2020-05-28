@@ -229,3 +229,16 @@ bool psr2_wait_su(int debugfs_fd, uint16_t *num_su_blocks)
 {
 	return igt_wait(psr2_read_last_num_su_blocks_val(debugfs_fd, num_su_blocks), 40, 1);
 }
+
+void psr_print_debugfs(int debugfs_fd)
+{
+	char buf[PSR_STATUS_MAX_LEN];
+	int ret;
+
+	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
+				      sizeof(buf));
+	if (ret < 0)
+		return;
+
+	igt_debug("%s", buf);
+}

@@ -261,6 +261,8 @@ igt_main
 		prepare(&data);
 		r = psr_wait_entry(data.debugfs_fd, PSR_MODE_2);
 		cleanup(&data);
+		if (!r)
+			psr_print_debugfs(data.debugfs_fd);
 		igt_require_f(r, "PSR2 can not be enabled\n");
 
 		/* blocking timerfd */

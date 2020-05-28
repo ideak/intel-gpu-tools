@@ -43,5 +43,6 @@ bool psr_enable(int device, int debugfs_fd, enum psr_mode);
 bool psr_disable(int device, int debugfs_fd);
 bool psr_sink_support(int device, int debugfs_fd, enum psr_mode mode);
 bool psr2_wait_su(int debugfs_fd, uint16_t *num_su_blocks);
+void psr_print_debugfs(int debugfs_fd);
 
 #endif
