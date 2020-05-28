@@ -70,11 +70,10 @@ static void do_cleanup_display(igt_display_t *dpy)
 
 static void flip_to_fb(igt_display_t *dpy, int pipe,
 		       igt_output_t *output,
-		       struct igt_fb *fb, unsigned ring,
+		       struct igt_fb *fb, unsigned ring, int timeout,
 		       const char *name, bool modeset)
 {
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
-	const int timeout = modeset ? 8500 : 100;
 	struct drm_event_vblank ev;
 	IGT_CORK_FENCE(cork);
 	igt_spin_t *t;
@@ -136,7 +135,9 @@ static void test_flip(igt_display_t *dpy, unsigned ring, int pipe, bool modeset)
 {
 	struct igt_fb fb[2];
 	int warmup[] = { 0, 1, 0, -1 };
+	struct timespec tv = {};
 	igt_output_t *output;
+	int timeout;
 
 	if (modeset)
 		igt_require(dpy->is_atomic);
@@ -153,6 +154,7 @@ static void test_flip(igt_display_t *dpy, unsigned ring, int pipe, bool modeset)
 	/* Bind both fb to the display (such that they are ready for future
 	 * flips without stalling for the bind) leaving fb[0] as bound.
 	 */
+	igt_nsec_elapsed(&tv);
 	for (int i = 0; warmup[i] != -1; i++) {
 		struct drm_event_vblank ev;
 
@@ -163,12 +165,14 @@ static void test_flip(igt_display_t *dpy, unsigned ring, int pipe, bool modeset)
 					  &fb[warmup[i]]));
 		igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 	}
+	timeout = igt_nsec_elapsed(&tv) / 1000 / 1000;
+	igt_info("Using timeout of %dms\n", timeout);
 
 	/* Make the frontbuffer busy and try to flip to itself */
-	flip_to_fb(dpy, pipe, output, &fb[0], ring, "fb[0]", modeset);
+	flip_to_fb(dpy, pipe, output, &fb[0], ring, timeout, "fb[0]", modeset);
 
 	/* Repeat for flip to second buffer */
-	flip_to_fb(dpy, pipe, output, &fb[1], ring, "fb[1]", modeset);
+	flip_to_fb(dpy, pipe, output, &fb[1], ring, timeout, "fb[1]", modeset);
 
 	do_cleanup_display(dpy);
 	igt_remove_fb(dpy->drm_fd, &fb[1]);
