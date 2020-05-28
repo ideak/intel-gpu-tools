@@ -329,6 +329,14 @@ static void test_fence_busy_all(int fd, unsigned flags)
 	gem_quiescent_gpu(fd);
 }
 
+static unsigned int spin_hang(unsigned int flags)
+{
+	if (!(flags & HANG))
+		return 0;
+
+	return IGT_SPIN_NO_PREEMPTION | IGT_SPIN_INVALID_CS;
+}
+
 static void test_fence_await(int fd, const struct intel_execution_engine2 *e,
 			     unsigned flags)
 {
@@ -344,9 +352,7 @@ static void test_fence_await(int fd, const struct intel_execution_engine2 *e,
 
 	spin = igt_spin_new(fd,
 			    .engine = e->flags,
-			    .flags = (IGT_SPIN_FENCE_OUT |
-				      IGT_SPIN_NO_PREEMPTION |
-				      (flags & HANG ? IGT_SPIN_INVALID_CS : 0)));
+			    .flags = IGT_SPIN_FENCE_OUT | spin_hang(flags));
 	igt_assert(spin->out_fence != -1);
 
 	i = 0;
