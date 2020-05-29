@@ -45,7 +45,6 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
-#include "intel_bufmgr.h"
 #include "intel_bufops.h"
 
 #define WIDTH 64
@@ -59,31 +58,8 @@
 typedef struct {
 	int drm_fd;
 	uint32_t devid;
-	drm_intel_bufmgr *bufmgr;
-	uint8_t linear[WIDTH * HEIGHT];
 	struct buf_ops *bops;
 } data_t;
-
-static void scratch_buf_init(data_t *data, struct igt_buf *buf,
-			int width, int height, int stride, uint8_t color)
-{
-	drm_intel_bo *bo;
-	int i;
-
-	bo = drm_intel_bo_alloc(data->bufmgr, "", SIZE, 4096);
-	for (i = 0; i < width * height; i++)
-		data->linear[i] = color;
-	gem_write(data->drm_fd, bo->handle, 0, data->linear,
-		sizeof(data->linear));
-
-	memset(buf, 0, sizeof(*buf));
-
-	buf->bo = bo;
-	buf->surface[0].stride = stride;
-	buf->tiling = I915_TILING_NONE;
-	buf->surface[0].size = SIZE;
-	buf->bpp = 32;
-}
 
 static struct intel_buf *
 create_buf(data_t *data, int width, int height, uint8_t color)
@@ -113,20 +89,6 @@ create_buf(data_t *data, int width, int height, uint8_t color)
 	return buf;
 }
 
-static void
-scratch_buf_check(data_t *data, struct igt_buf *buf, int x, int y,
-		uint8_t color)
-{
-	uint8_t val;
-
-	gem_read(data->drm_fd, buf->bo->handle, 0,
-		data->linear, sizeof(data->linear));
-	val = data->linear[y * WIDTH + x];
-	igt_assert_f(val == color,
-		     "Expected 0x%02x, found 0x%02x at (%d,%d)\n",
-		     color, val, x, y);
-}
-
 static void buf_check(uint8_t *ptr, int x, int y, uint8_t color)
 {
 	uint8_t val;
@@ -137,7 +99,7 @@ static void buf_check(uint8_t *ptr, int x, int y, uint8_t color)
 		     color, val, x, y);
 }
 
-static void no_libdrm(data_t *data, igt_fillfunc_v2_t fill)
+static void gpgpu_fill(data_t *data, igt_fillfunc_t fill)
 {
 	struct intel_buf *buf;
 	uint8_t *ptr;
@@ -162,54 +124,19 @@ static void no_libdrm(data_t *data, igt_fillfunc_v2_t fill)
 	munmap(ptr, buf->size);
 }
 
-static void with_libdrm(data_t *data, igt_fillfunc_t fill)
-{
-	struct intel_batchbuffer *batch = NULL;
-	struct igt_buf dst;
-	int i, j;
-
-	batch = intel_batchbuffer_alloc(data->bufmgr, data->devid);
-	igt_assert(batch);
-
-	scratch_buf_init(data, &dst, WIDTH, HEIGHT, STRIDE, COLOR_C4);
-
-	for (i = 0; i < WIDTH; i++)
-		for (j = 0; j < HEIGHT; j++)
-			scratch_buf_check(data, &dst, i, j, COLOR_C4);
-
-	fill(batch, &dst, 0, 0, WIDTH / 2, HEIGHT / 2, COLOR_4C);
-
-	for (i = 0; i < WIDTH; i++)
-		for (j = 0; j < HEIGHT; j++)
-			if (i < WIDTH / 2 && j < HEIGHT / 2)
-				scratch_buf_check(data, &dst, i, j, COLOR_4C);
-			else
-				scratch_buf_check(data, &dst, i, j, COLOR_C4);
-
-}
-
 igt_simple_main
 {
 	data_t data = {0, };
-	igt_fillfunc_t gpgpu_fill = NULL;
-	igt_fillfunc_v2_t gpgpu_fill_v2 = NULL;
+	igt_fillfunc_t fill_fn = NULL;
 
 	data.drm_fd = drm_open_driver_render(DRIVER_INTEL);
 	data.devid = intel_get_drm_devid(data.drm_fd);
 	igt_require_gem(data.drm_fd);
 	data.bops = buf_ops_create(data.drm_fd);
 
-	data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
-	igt_assert(data.bufmgr);
+	fill_fn = igt_get_gpgpu_fillfunc(data.devid);
 
-	gpgpu_fill = igt_get_gpgpu_fillfunc(data.devid);
-	gpgpu_fill_v2 = igt_get_gpgpu_fillfunc_v2(data.devid);
+	igt_require_f(fill_fn, "no gpgpu-fill function\n");
 
-	igt_require_f(gpgpu_fill || gpgpu_fill_v2,
-		      "no gpgpu-fill function\n");
-
-	if (gpgpu_fill_v2)
-		no_libdrm(&data, gpgpu_fill_v2);
-	else
-		with_libdrm(&data, gpgpu_fill);
+	gpgpu_fill(&data, fill_fn);
 }

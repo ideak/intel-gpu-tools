@@ -370,8 +370,8 @@ igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid);
 
 /**
  * igt_fillfunc_t:
- * @batch: batchbuffer object
- * @dst: destination i-g-t buffer object
+ * @i915: drm fd
+ * @buf: destination intel_buf object
  * @x: destination pixel x-coordination
  * @y: destination pixel y-coordination
  * @width: width of the filled rectangle
@@ -385,23 +385,15 @@ igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid);
  * A fill function will emit a batchbuffer to the kernel which executes
  * the specified blit fill operation using the media/gpgpu engine.
  */
-typedef void (*igt_fillfunc_t)(struct intel_batchbuffer *batch,
-			       const struct igt_buf *dst,
+struct intel_buf;
+typedef void (*igt_fillfunc_t)(int i915,
+			       struct intel_buf *buf,
 			       unsigned x, unsigned y,
 			       unsigned width, unsigned height,
 			       uint8_t color);
 
-struct intel_buf;
-typedef void (*igt_fillfunc_v2_t)(int i915,
-				  struct intel_buf *buf,
-				  unsigned x, unsigned y,
-				  unsigned width, unsigned height,
-				  uint8_t color);
-
-igt_fillfunc_t igt_get_media_fillfunc(int devid);
 igt_fillfunc_t igt_get_gpgpu_fillfunc(int devid);
-igt_fillfunc_v2_t igt_get_gpgpu_fillfunc_v2(int devid);
-igt_fillfunc_v2_t igt_get_media_fillfunc_v2(int devid);
+igt_fillfunc_t igt_get_media_fillfunc(int devid);
 
 typedef void (*igt_vme_func_t)(int i915,
 			       uint32_t ctx,

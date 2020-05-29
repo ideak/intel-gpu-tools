@@ -25,7 +25,6 @@
 #ifndef GPU_CMDS_H
 #define GPU_CMDS_H
 
-#include <intel_bufmgr.h>
 #include <i915_drm.h>
 
 #include "media_fill.h"
@@ -38,182 +37,74 @@
 #include "intel_bufops.h"
 #include <assert.h>
 
-void
-gen7_render_flush(struct intel_batchbuffer *batch, uint32_t batch_end);
-
-void
-gen7_render_context_flush(struct intel_batchbuffer *batch, uint32_t batch_end);
-
 uint32_t
-gen7_fill_curbe_buffer_data(struct intel_batchbuffer *batch,
-			uint8_t color);
+gen7_fill_curbe_buffer_data(struct intel_bb *ibb, uint8_t color);
 
 uint32_t
 gen11_fill_curbe_buffer_data(struct intel_bb *ibb);
 
 uint32_t
-gen7_fill_surface_state(struct intel_batchbuffer *batch,
-			const struct igt_buf *buf,
-			uint32_t format,
-			int is_dst);
-
-uint32_t
-gen7_fill_binding_table(struct intel_batchbuffer *batch,
-			const struct igt_buf *dst);
-uint32_t
-gen11_fill_binding_table(struct intel_bb *ibb,
-			 const struct intel_buf *src,
-			 const struct intel_buf *dst);
-
-uint32_t
-gen7_fill_kernel(struct intel_batchbuffer *batch,
-		const uint32_t kernel[][4],
-		size_t size);
-
-uint32_t
-gen7_fill_interface_descriptor(struct intel_batchbuffer *batch,
-			       const struct igt_buf *dst,
+gen7_fill_interface_descriptor(struct intel_bb *ibb,
+			       struct intel_buf *buf,
 			       const uint32_t kernel[][4],
 			       size_t size);
 
-void
-gen7_emit_state_base_address(struct intel_batchbuffer *batch);
-
-void
-gen7_emit_vfe_state(struct intel_batchbuffer *batch, uint32_t threads,
-		    uint32_t urb_entries, uint32_t urb_size,
-		    uint32_t curbe_size, uint32_t mode);
-
-void
-gen7_emit_curbe_load(struct intel_batchbuffer *batch, uint32_t curbe_buffer);
-
-void
-gen7_emit_interface_descriptor_load(struct intel_batchbuffer *batch,
-				    uint32_t interface_descriptor);
-
-void
-gen7_emit_media_objects(struct intel_batchbuffer *batch,
-			unsigned int x, unsigned int y,
-			unsigned int width, unsigned int height);
-
-void
-gen7_emit_gpgpu_walk(struct intel_batchbuffer *batch,
-		     unsigned int x, unsigned int y,
-		     unsigned int width, unsigned int height);
-
 uint32_t
-gen8_spin_curbe_buffer_data(struct intel_batchbuffer *batch,
-			    uint32_t iters);
-
-uint32_t
-gen8_fill_surface_state(struct intel_batchbuffer *batch,
-			const struct igt_buf *buf,
-			uint32_t format,
-			int is_dst);
-uint32_t
-gen11_fill_surface_state(struct intel_bb *ibb,
-			 const struct intel_buf *buf,
-			 uint32_t surface_type,
-			 uint32_t format,
-			 uint32_t vertical_alignment,
-			 uint32_t horizontal_alignment,
-			 int is_dst);
-
-uint32_t
-gen8_fill_interface_descriptor(struct intel_batchbuffer *batch,
-			       const struct igt_buf *dst,
+gen8_fill_interface_descriptor(struct intel_bb *ibb,
+			       struct intel_buf *buf,
 			       const uint32_t kernel[][4],
 			       size_t size);
+
 uint32_t
 gen11_fill_interface_descriptor(struct intel_bb *ibb,
 				struct intel_buf *src, struct intel_buf *dst,
 				const uint32_t kernel[][4],
 				size_t size);
-void
-gen8_emit_state_base_address(struct intel_batchbuffer *batch);
 
 void
-gen8_emit_media_state_flush(struct intel_batchbuffer *batch);
+gen7_emit_state_base_address(struct intel_bb *ibb);
 
 void
-gen8_emit_vfe_state(struct intel_batchbuffer *batch, uint32_t threads,
+gen8_emit_state_base_address(struct intel_bb *ibb);
+
+void
+gen9_emit_state_base_address(struct intel_bb *ibb);
+
+void
+gen7_emit_vfe_state(struct intel_bb *ibb, uint32_t threads,
+		    uint32_t urb_entries, uint32_t urb_size,
+		    uint32_t curbe_size, uint32_t mode);
+
+void
+gen8_emit_vfe_state(struct intel_bb *ibb, uint32_t threads,
 		    uint32_t urb_entries, uint32_t urb_size,
 		    uint32_t curbe_size);
+void
+gen7_emit_curbe_load(struct intel_bb *ibb, uint32_t curbe_buffer);
 
 void
-gen8_emit_gpgpu_walk(struct intel_batchbuffer *batch,
+gen7_emit_interface_descriptor_load(struct intel_bb *ibb,
+				    uint32_t interface_descriptor);
+
+void
+gen7_emit_gpgpu_walk(struct intel_bb *ibb,
 		     unsigned int x, unsigned int y,
 		     unsigned int width, unsigned int height);
 
 void
-gen_emit_media_object(struct intel_batchbuffer *batch, unsigned int xoffset,
-		  unsigned int yoffset);
+gen8_emit_gpgpu_walk(struct intel_bb *ibb,
+		     unsigned int x, unsigned int y,
+		     unsigned int width, unsigned int height);
 
 void
-gen9_emit_state_base_address(struct intel_batchbuffer *batch);
-
-
-/* No libdrm */
-uint32_t
-gen7_fill_curbe_buffer_data_v2(struct intel_bb *ibb,
-			       uint8_t color);
-
-uint32_t
-gen7_fill_interface_descriptor_v2(struct intel_bb *ibb,
-				  struct intel_buf *buf,
-				  const uint32_t kernel[][4],
-				  size_t size);
-
-uint32_t
-gen8_fill_interface_descriptor_v2(struct intel_bb *ibb,
-				  struct intel_buf *buf,
-				  const uint32_t kernel[][4],
-				  size_t size);
+gen8_emit_media_state_flush(struct intel_bb *ibb);
 
 void
-gen7_emit_state_base_address_v2(struct intel_bb *ibb);
+gen_emit_media_object(struct intel_bb *ibb,
+		      unsigned int xoffset, unsigned int yoffset);
 
 void
-gen8_emit_state_base_address_v2(struct intel_bb *ibb);
-
-void
-gen9_emit_state_base_address_v2(struct intel_bb *ibb);
-
-void
-gen7_emit_vfe_state_v2(struct intel_bb *ibb, uint32_t threads,
-		       uint32_t urb_entries, uint32_t urb_size,
-		       uint32_t curbe_size, uint32_t mode);
-
-void
-gen8_emit_vfe_state_v2(struct intel_bb *ibb, uint32_t threads,
-		       uint32_t urb_entries, uint32_t urb_size,
-		       uint32_t curbe_size);
-void
-gen7_emit_curbe_load_v2(struct intel_bb *ibb, uint32_t curbe_buffer);
-
-void
-gen7_emit_interface_descriptor_load_v2(struct intel_bb *ibb,
-				       uint32_t interface_descriptor);
-
-void
-gen7_emit_gpgpu_walk_v2(struct intel_bb *ibb,
+gen7_emit_media_objects(struct intel_bb *ibb,
 			unsigned int x, unsigned int y,
 			unsigned int width, unsigned int height);
-
-void
-gen8_emit_gpgpu_walk_v2(struct intel_bb *ibb,
-			unsigned int x, unsigned int y,
-			unsigned int width, unsigned int height);
-
-void
-gen8_emit_media_state_flush_v2(struct intel_bb *ibb);
-
-void
-gen_emit_media_object_v2(struct intel_bb *ibb,
-			 unsigned int xoffset, unsigned int yoffset);
-
-void
-gen7_emit_media_objects_v2(struct intel_bb *ibb,
-			   unsigned int x, unsigned int y,
-			   unsigned int width, unsigned int height);
 #endif /* GPU_CMDS_H */

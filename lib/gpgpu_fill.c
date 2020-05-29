@@ -25,7 +25,6 @@
  *  Dominik Zeromski <dominik.zeromski@intel.com>
  */
 
-#include <intel_bufmgr.h>
 #include <i915_drm.h>
 
 #include "intel_reg.h"
@@ -131,60 +130,11 @@ static const uint32_t gen12_gpgpu_kernel[][4] = {
 #define GEN7_VFE_STATE_GPGPU_MODE 1
 
 void
-gen7_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-		    const struct igt_buf *dst,
-		    unsigned int x, unsigned int y,
-		    unsigned int width, unsigned int height,
+gen7_gpgpu_fillfunc(int i915,
+		    struct intel_buf *buf,
+		    unsigned x, unsigned y,
+		    unsigned width, unsigned height,
 		    uint8_t color)
-{
-	uint32_t curbe_buffer, interface_descriptor;
-	uint32_t batch_end;
-
-	intel_batchbuffer_flush(batch);
-
-	/* setup states */
-	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
-
-	/*
-	 * const buffer needs to fill for every thread, but as we have just 1
-	 * thread per every group, so need only one curbe data.
-	 * For each thread, just use thread group ID for buffer offset.
-	 */
-	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
-
-	interface_descriptor = gen7_fill_interface_descriptor(batch, dst,
-				gen7_gpgpu_kernel, sizeof(gen7_gpgpu_kernel));
-
-	igt_assert(batch->ptr < &batch->buffer[4095]);
-
-	batch->ptr = batch->buffer;
-
-	/* GPGPU pipeline */
-	OUT_BATCH(GEN7_PIPELINE_SELECT | PIPELINE_SELECT_GPGPU);
-
-	gen7_emit_state_base_address(batch);
-	gen7_emit_vfe_state(batch, THREADS, GEN7_GPGPU_URB_ENTRIES,
-			    GPGPU_URB_SIZE, GPGPU_CURBE_SIZE,
-			    GEN7_VFE_STATE_GPGPU_MODE);
-	gen7_emit_curbe_load(batch, curbe_buffer);
-	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
-	gen7_emit_gpgpu_walk(batch, x, y, width, height);
-
-	OUT_BATCH(MI_BATCH_BUFFER_END);
-
-	batch_end = intel_batchbuffer_align(batch, 8);
-	igt_assert(batch_end < BATCH_STATE_SPLIT);
-
-	gen7_render_flush(batch, batch_end);
-	intel_batchbuffer_reset(batch);
-}
-
-void
-gen7_gpgpu_fillfunc_v2(int i915,
-		       struct intel_buf *buf,
-		       unsigned x, unsigned y,
-		       unsigned width, unsigned height,
-		       uint8_t color)
 {
 	struct intel_bb *ibb;
 	uint32_t curbe_buffer, interface_descriptor;
@@ -195,7 +145,7 @@ gen7_gpgpu_fillfunc_v2(int i915,
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
 
 	/* Fill curbe buffer data */
-	curbe_buffer = gen7_fill_curbe_buffer_data_v2(ibb, color);
+	curbe_buffer = gen7_fill_curbe_buffer_data(ibb, color);
 
 	/*
 	 * const buffer needs to fill for every thread, but as we have just 1
@@ -203,22 +153,22 @@ gen7_gpgpu_fillfunc_v2(int i915,
 	 * For each thread, just use thread group ID for buffer offset.
 	 */
 	interface_descriptor =
-			gen7_fill_interface_descriptor_v2(ibb, buf,
-							  gen7_gpgpu_kernel,
-							  sizeof(gen7_gpgpu_kernel));
+			gen7_fill_interface_descriptor(ibb, buf,
+						       gen7_gpgpu_kernel,
+						       sizeof(gen7_gpgpu_kernel));
 
 	intel_bb_ptr_set(ibb, 0);
 
 	/* GPGPU pipeline */
 	intel_bb_out(ibb, GEN7_PIPELINE_SELECT | PIPELINE_SELECT_GPGPU);
 
-	gen7_emit_state_base_address_v2(ibb);
-	gen7_emit_vfe_state_v2(ibb, THREADS, GEN7_GPGPU_URB_ENTRIES,
+	gen7_emit_state_base_address(ibb);
+	gen7_emit_vfe_state(ibb, THREADS, GEN7_GPGPU_URB_ENTRIES,
 			       GPGPU_URB_SIZE, GPGPU_CURBE_SIZE,
 			       GEN7_VFE_STATE_GPGPU_MODE);
-	gen7_emit_curbe_load_v2(ibb, curbe_buffer);
-	gen7_emit_interface_descriptor_load_v2(ibb, interface_descriptor);
-	gen7_emit_gpgpu_walk_v2(ibb, x, y, width, height);
+	gen7_emit_curbe_load(ibb, curbe_buffer);
+	gen7_emit_interface_descriptor_load(ibb, interface_descriptor);
+	gen7_emit_gpgpu_walk(ibb, x, y, width, height);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 32);
@@ -230,59 +180,11 @@ gen7_gpgpu_fillfunc_v2(int i915,
 }
 
 void
-gen8_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-		    const struct igt_buf *dst,
-		    unsigned int x, unsigned int y,
-		    unsigned int width, unsigned int height,
+gen8_gpgpu_fillfunc(int i915,
+		    struct intel_buf *buf,
+		    unsigned x, unsigned y,
+		    unsigned width, unsigned height,
 		    uint8_t color)
-{
-	uint32_t curbe_buffer, interface_descriptor;
-	uint32_t batch_end;
-
-	intel_batchbuffer_flush(batch);
-
-	/* setup states */
-	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
-
-	/*
-	 * const buffer needs to fill for every thread, but as we have just 1
-	 * thread per every group, so need only one curbe data.
-	 * For each thread, just use thread group ID for buffer offset.
-	 */
-	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
-
-	interface_descriptor = gen8_fill_interface_descriptor(batch, dst,
-				gen8_gpgpu_kernel, sizeof(gen8_gpgpu_kernel));
-
-	igt_assert(batch->ptr < &batch->buffer[4095]);
-
-	batch->ptr = batch->buffer;
-
-	/* GPGPU pipeline */
-	OUT_BATCH(GEN7_PIPELINE_SELECT | PIPELINE_SELECT_GPGPU);
-
-	gen8_emit_state_base_address(batch);
-	gen8_emit_vfe_state(batch, THREADS, GEN8_GPGPU_URB_ENTRIES,
-			    GPGPU_URB_SIZE, GPGPU_CURBE_SIZE);
-	gen7_emit_curbe_load(batch, curbe_buffer);
-	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
-	gen8_emit_gpgpu_walk(batch, x, y, width, height);
-
-	OUT_BATCH(MI_BATCH_BUFFER_END);
-
-	batch_end = intel_batchbuffer_align(batch, 8);
-	igt_assert(batch_end < BATCH_STATE_SPLIT);
-
-	gen7_render_flush(batch, batch_end);
-	intel_batchbuffer_reset(batch);
-}
-
-void
-gen8_gpgpu_fillfunc_v2(int i915,
-		       struct intel_buf *buf,
-		       unsigned x, unsigned y,
-		       unsigned width, unsigned height,
-		       uint8_t color)
 {
 	struct intel_bb *ibb;
 	uint32_t curbe_buffer, interface_descriptor;
@@ -297,9 +199,9 @@ gen8_gpgpu_fillfunc_v2(int i915,
 	 * thread per every group, so need only one curbe data.
 	 * For each thread, just use thread group ID for buffer offset.
 	 */
-	curbe_buffer = gen7_fill_curbe_buffer_data_v2(ibb, color);
+	curbe_buffer = gen7_fill_curbe_buffer_data(ibb, color);
 
-	interface_descriptor = gen8_fill_interface_descriptor_v2(ibb, buf,
+	interface_descriptor = gen8_fill_interface_descriptor(ibb, buf,
 				gen8_gpgpu_kernel, sizeof(gen8_gpgpu_kernel));
 
 	intel_bb_ptr_set(ibb, 0);
@@ -307,14 +209,14 @@ gen8_gpgpu_fillfunc_v2(int i915,
 	/* GPGPU pipeline */
 	intel_bb_out(ibb, GEN7_PIPELINE_SELECT | PIPELINE_SELECT_GPGPU);
 
-	gen8_emit_state_base_address_v2(ibb);
-	gen8_emit_vfe_state_v2(ibb, THREADS, GEN8_GPGPU_URB_ENTRIES,
-			       GPGPU_URB_SIZE, GPGPU_CURBE_SIZE);
+	gen8_emit_state_base_address(ibb);
+	gen8_emit_vfe_state(ibb, THREADS, GEN8_GPGPU_URB_ENTRIES,
+			    GPGPU_URB_SIZE, GPGPU_CURBE_SIZE);
 
-	gen7_emit_curbe_load_v2(ibb, curbe_buffer);
-	gen7_emit_interface_descriptor_load_v2(ibb, interface_descriptor);
+	gen7_emit_curbe_load(ibb, curbe_buffer);
+	gen7_emit_interface_descriptor_load(ibb, interface_descriptor);
 
-	gen8_emit_gpgpu_walk_v2(ibb, x, y, width, height);
+	gen8_emit_gpgpu_walk(ibb, x, y, width, height);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 32);
@@ -326,63 +228,12 @@ gen8_gpgpu_fillfunc_v2(int i915,
 }
 
 static void
-__gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-		      const struct igt_buf *dst,
-		      unsigned int x, unsigned int y,
-		      unsigned int width, unsigned int height,
-		      uint8_t color, const uint32_t kernel[][4],
-		      size_t kernel_size)
-{
-	uint32_t curbe_buffer, interface_descriptor;
-	uint32_t batch_end;
-
-	intel_batchbuffer_flush(batch);
-
-	/* setup states */
-	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
-
-	/*
-	 * const buffer needs to fill for every thread, but as we have just 1
-	 * thread per every group, so need only one curbe data.
-	 * For each thread, just use thread group ID for buffer offset.
-	 */
-	curbe_buffer = gen7_fill_curbe_buffer_data(batch, color);
-
-	interface_descriptor = gen8_fill_interface_descriptor(batch, dst,
-				kernel, kernel_size);
-
-	igt_assert(batch->ptr < &batch->buffer[4095]);
-
-	batch->ptr = batch->buffer;
-
-	/* GPGPU pipeline */
-	OUT_BATCH(GEN7_PIPELINE_SELECT | GEN9_PIPELINE_SELECTION_MASK |
-		  PIPELINE_SELECT_GPGPU);
-
-	gen9_emit_state_base_address(batch);
-	gen8_emit_vfe_state(batch, THREADS, GEN8_GPGPU_URB_ENTRIES,
-			    GPGPU_URB_SIZE, GPGPU_CURBE_SIZE);
-	gen7_emit_curbe_load(batch, curbe_buffer);
-	gen7_emit_interface_descriptor_load(batch, interface_descriptor);
-	gen8_emit_gpgpu_walk(batch, x, y, width, height);
-
-	OUT_BATCH(MI_BATCH_BUFFER_END);
-
-	batch_end = intel_batchbuffer_align(batch, 8);
-	igt_assert(batch_end < BATCH_STATE_SPLIT);
-
-	gen7_render_flush(batch, batch_end);
-	intel_batchbuffer_reset(batch);
-}
-
-
-static void
-__gen9_gpgpu_fillfunc_v2(int i915,
-			 struct intel_buf *buf,
-			 unsigned x, unsigned y,
-			 unsigned width, unsigned height,
-			 uint8_t color,
-			 const uint32_t kernel[][4], size_t kernel_size)
+__gen9_gpgpu_fillfunc(int i915,
+		      struct intel_buf *buf,
+		      unsigned x, unsigned y,
+		      unsigned width, unsigned height,
+		      uint8_t color,
+		      const uint32_t kernel[][4], size_t kernel_size)
 {
 	struct intel_bb *ibb;
 	uint32_t curbe_buffer, interface_descriptor;
@@ -398,11 +249,11 @@ __gen9_gpgpu_fillfunc_v2(int i915,
 	 * For each thread, just use thread group ID for buffer offset.
 	 */
 	/* Fill curbe buffer data */
-	curbe_buffer = gen7_fill_curbe_buffer_data_v2(ibb, color);
+	curbe_buffer = gen7_fill_curbe_buffer_data(ibb, color);
 
-	interface_descriptor = gen8_fill_interface_descriptor_v2(ibb, buf,
-								 kernel,
-								 kernel_size);
+	interface_descriptor = gen8_fill_interface_descriptor(ibb, buf,
+							      kernel,
+							      kernel_size);
 
 	intel_bb_ptr_set(ibb, 0);
 
@@ -410,15 +261,15 @@ __gen9_gpgpu_fillfunc_v2(int i915,
 	intel_bb_out(ibb, GEN7_PIPELINE_SELECT | GEN9_PIPELINE_SELECTION_MASK |
 		     PIPELINE_SELECT_GPGPU);
 
-	gen9_emit_state_base_address_v2(ibb);
+	gen9_emit_state_base_address(ibb);
 
-	gen8_emit_vfe_state_v2(ibb, THREADS, GEN8_GPGPU_URB_ENTRIES,
-			       GPGPU_URB_SIZE, GPGPU_CURBE_SIZE);
+	gen8_emit_vfe_state(ibb, THREADS, GEN8_GPGPU_URB_ENTRIES,
+			    GPGPU_URB_SIZE, GPGPU_CURBE_SIZE);
 
-	gen7_emit_curbe_load_v2(ibb, curbe_buffer);
-	gen7_emit_interface_descriptor_load_v2(ibb, interface_descriptor);
+	gen7_emit_curbe_load(ibb, curbe_buffer);
+	gen7_emit_interface_descriptor_load(ibb, interface_descriptor);
 
-	gen8_emit_gpgpu_walk_v2(ibb, x, y, width, height);
+	gen8_emit_gpgpu_walk(ibb, x, y, width, height);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 32);
@@ -429,66 +280,35 @@ __gen9_gpgpu_fillfunc_v2(int i915,
 	intel_bb_destroy(ibb);
 }
 
-void gen9_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-			 const struct igt_buf *dst,
-			 unsigned int x, unsigned int y,
-			 unsigned int width, unsigned int height,
+void gen9_gpgpu_fillfunc(int i915,
+			 struct intel_buf *buf,
+			 unsigned x, unsigned y,
+			 unsigned width, unsigned height,
 			 uint8_t color)
 {
-	__gen9_gpgpu_fillfunc(batch, dst, x, y, width, height, color,
-			      gen9_gpgpu_kernel, sizeof(gen9_gpgpu_kernel));
+	__gen9_gpgpu_fillfunc(i915, buf, x, y, width, height, color,
+			      gen9_gpgpu_kernel,
+			      sizeof(gen9_gpgpu_kernel));
 }
 
-void gen9_gpgpu_fillfunc_v2(int i915,
-			    struct intel_buf *buf,
-			    unsigned x, unsigned y,
-			    unsigned width, unsigned height,
-			    uint8_t color)
-{
-	__gen9_gpgpu_fillfunc_v2(i915, buf, x, y, width, height, color,
-				 gen9_gpgpu_kernel,
-				 sizeof(gen9_gpgpu_kernel));
-}
-
-
-void gen11_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-			  const struct igt_buf *dst,
-			  unsigned int x, unsigned int y,
-			  unsigned int width, unsigned int height,
+void gen11_gpgpu_fillfunc(int i915,
+			  struct intel_buf *buf,
+			  unsigned x, unsigned y,
+			  unsigned width, unsigned height,
 			  uint8_t color)
 {
-	__gen9_gpgpu_fillfunc(batch, dst, x, y, width, height, color,
-			      gen11_gpgpu_kernel, sizeof(gen11_gpgpu_kernel));
+	__gen9_gpgpu_fillfunc(i915, buf, x, y, width, height, color,
+			      gen11_gpgpu_kernel,
+			      sizeof(gen11_gpgpu_kernel));
 }
 
-void gen11_gpgpu_fillfunc_v2(int i915,
-			     struct intel_buf *buf,
-			     unsigned x, unsigned y,
-			     unsigned width, unsigned height,
-			     uint8_t color)
-{
-	__gen9_gpgpu_fillfunc_v2(i915, buf, x, y, width, height, color,
-				 gen11_gpgpu_kernel,
-				 sizeof(gen11_gpgpu_kernel));
-}
-
-void gen12_gpgpu_fillfunc(struct intel_batchbuffer *batch,
-			  const struct igt_buf *dst,
-			  unsigned int x, unsigned int y,
-			  unsigned int width, unsigned int height,
+void gen12_gpgpu_fillfunc(int i915,
+			  struct intel_buf *buf,
+			  unsigned x, unsigned y,
+			  unsigned width, unsigned height,
 			  uint8_t color)
 {
-	__gen9_gpgpu_fillfunc(batch, dst, x, y, width, height, color,
-			      gen12_gpgpu_kernel, sizeof(gen12_gpgpu_kernel));
-}
-
-void gen12_gpgpu_fillfunc_v2(int i915,
-			     struct intel_buf *buf,
-			     unsigned x, unsigned y,
-			     unsigned width, unsigned height,
-			     uint8_t color)
-{
-	__gen9_gpgpu_fillfunc_v2(i915, buf, x, y, width, height, color,
-				 gen12_gpgpu_kernel,
-				 sizeof(gen12_gpgpu_kernel));
+	__gen9_gpgpu_fillfunc(i915, buf, x, y, width, height, color,
+			      gen12_gpgpu_kernel,
+			      sizeof(gen12_gpgpu_kernel));
 }

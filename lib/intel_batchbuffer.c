@@ -1118,32 +1118,6 @@ igt_fillfunc_t igt_get_media_fillfunc(int devid)
 	return fill;
 }
 
-
-/**
- * igt_get_media_fillfunc_v2:
- * @devid: pci device id
- *
- * Returns:
- *
- * The platform-specific media fill function pointer for the device specified
- * with @devid. Will return NULL when no media fill function is implemented.
- */
-igt_fillfunc_v2_t igt_get_media_fillfunc_v2(int devid)
-{
-	igt_fillfunc_v2_t fill = NULL;
-
-	if (IS_GEN12(devid))
-		fill = gen12_media_fillfunc_v2;
-	else if (IS_GEN9(devid) || IS_GEN10(devid) || IS_GEN11(devid))
-		fill = gen9_media_fillfunc_v2;
-	else if (IS_GEN8(devid))
-		fill = gen8_media_fillfunc_v2;
-	else if (IS_GEN7(devid))
-		fill = gen7_media_fillfunc_v2;
-
-	return fill;
-}
-
 igt_vme_func_t igt_get_media_vme_func(int devid)
 {
 	igt_vme_func_t fill = NULL;
@@ -1153,6 +1127,7 @@ igt_vme_func_t igt_get_media_vme_func(int devid)
 
 	return fill;
 }
+
 /**
  * igt_get_gpgpu_fillfunc:
  * @devid: pci device id
@@ -1168,7 +1143,7 @@ igt_fillfunc_t igt_get_gpgpu_fillfunc(int devid)
 
 	if (IS_GEN7(devid))
 		fill = gen7_gpgpu_fillfunc;
-	else if (IS_BROADWELL(devid))
+	else if (IS_GEN8(devid))
 		fill = gen8_gpgpu_fillfunc;
 	else if (IS_GEN9(devid) || IS_GEN10(devid))
 		fill = gen9_gpgpu_fillfunc;
@@ -1176,33 +1151,6 @@ igt_fillfunc_t igt_get_gpgpu_fillfunc(int devid)
 		fill = gen11_gpgpu_fillfunc;
 	else if (IS_GEN12(devid))
 		fill = gen12_gpgpu_fillfunc;
-
-	return fill;
-}
-
-/**
- * igt_get_gpgpu_fillfunc_v2:
- * @devid: pci device id
- *
- * Returns:
- *
- * The platform-specific gpgpu fill function pointer for the device specified
- * with @devid. Will return NULL when no gpgpu fill function is implemented.
- */
-igt_fillfunc_v2_t igt_get_gpgpu_fillfunc_v2(int devid)
-{
-	igt_fillfunc_v2_t fill = NULL;
-
-	if (IS_GEN7(devid))
-		fill = gen7_gpgpu_fillfunc_v2;
-	else if (IS_GEN8(devid))
-		fill = gen8_gpgpu_fillfunc_v2;
-	else if (IS_GEN9(devid) || IS_GEN10(devid))
-		fill = gen9_gpgpu_fillfunc_v2;
-	else if (IS_GEN11(devid))
-		fill = gen11_gpgpu_fillfunc_v2;
-	else if (IS_GEN12(devid))
-		fill = gen12_gpgpu_fillfunc_v2;
 
 	return fill;
 }
