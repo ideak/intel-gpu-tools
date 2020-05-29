@@ -243,6 +243,35 @@ struct fsm_monitor_args {
 	struct udev_monitor *mon;
 };
 
+static bool wait_for_connected_state(int drm_fd,
+				     int *connectors, int connector_count)
+{
+	igt_assert(connector_count > 0);
+
+	igt_until_timeout(CHAMELIUM_HOTPLUG_DETECTION_DELAY) {
+		bool connected;
+
+		for (int i = 0; i < connector_count; i++) {
+			drmModeConnector *connector =
+				drmModeGetConnector(drm_fd, connectors[i]);
+
+			connected = connector->connection == DRM_MODE_CONNECTED;
+
+			drmModeFreeConnector(connector);
+
+			if (!connected)
+				break;
+		}
+
+		if (connected)
+			return true;
+
+		usleep(50000);
+	}
+
+	return false;
+}
+
 /*
  * Whenever resolutions or other factors change with the display output, the
  * Chamelium's display receivers need to be fully reset in order to perform any
@@ -272,6 +301,8 @@ static void *chamelium_fsm_mon(void *data)
 	connector = chamelium_port_get_connector(args->chamelium, args->port,
 						 false);
 	kmstest_set_connector_dpms(drm_fd, connector, DRM_MODE_DPMS_OFF);
+	wait_for_connected_state(drm_fd, &args->port->connector_id, 1);
+
 	kmstest_set_connector_dpms(drm_fd, connector, DRM_MODE_DPMS_ON);
 
 	drmModeFreeConnector(connector);
@@ -2560,7 +2591,6 @@ bool chamelium_wait_all_configured_ports_connected(struct chamelium *chamelium, 
 	drmModeConnector *connector;
 	char **group_list;
 	char *group;
-	bool ret = true;
 
 	int connectors[CHAMELIUM_MAX_PORTS];
 	int connectors_count = 0;
@@ -2614,20 +2644,7 @@ bool chamelium_wait_all_configured_ports_connected(struct chamelium *chamelium, 
 		return true;
 	}
 
-	igt_until_timeout(CHAMELIUM_HOTPLUG_DETECTION_DELAY) {
-		ret = true;
-		for (int i = 0; i < connectors_count; ++i) {
-			connector = drmModeGetConnector(drm_fd, connectors[i]);
-			if (connector->connection != DRM_MODE_CONNECTED)
-				ret = false;
-			drmModeFreeConnector(connector);
-		}
-
-		if (ret)
-			break;
-	}
-
-	return ret;
+	return wait_for_connected_state(drm_fd, connectors, connectors_count);
 }
 
 igt_constructor {
