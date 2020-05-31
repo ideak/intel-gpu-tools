@@ -990,10 +990,8 @@ igt_main
 			igt_subtest_f("in-flight-contexts-%s", waits[i].name)
 				test_inflight_contexts(fd, waits[i].wait);
 
-			igt_subtest_f("in-flight-internal-%s", waits[i].name) {
-				igt_skip_on(gem_has_semaphores(fd));
+			igt_subtest_f("in-flight-internal-%s", waits[i].name)
 				test_inflight_internal(fd, waits[i].wait);
-			}
 		}
 	}
 
