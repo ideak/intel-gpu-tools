@@ -1350,6 +1350,168 @@ static void __bonded_dual(int i915,
 	*out = cycles;
 }
 
+static uint32_t sync_from(int i915, uint32_t addr, uint32_t target)
+{
+	uint32_t handle = gem_create(i915, 4096);
+	uint32_t *map, *cs;
+
+	cs = map = gem_mmap__device_coherent(i915, handle, 0, 4096, PROT_WRITE);
+
+	/* cancel target spinner */
+	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = target + 16;
+	*cs++ = 0;
+	*cs++ = 0;
+
+	*cs++ = MI_NOOP;
+	*cs++ = MI_NOOP;
+	*cs++ = MI_NOOP;
+	*cs++ = MI_NOOP;
+
+	/* wait for them to cancel us */
+	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
+	*cs++ = addr + 16;
+	*cs++ = 0;
+
+	/* self-heal */
+	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = addr + 32;
+	*cs++ = 0;
+	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
+
+	*cs++ = MI_BATCH_BUFFER_END;
+
+	munmap(map, 4096);
+
+	return handle;
+}
+
+static uint32_t sync_to(int i915, uint32_t addr, uint32_t target)
+{
+	uint32_t handle = gem_create(i915, 4096);
+	uint32_t *map, *cs;
+
+	cs = map = gem_mmap__device_coherent(i915, handle, 0, 4096, PROT_WRITE);
+
+	*cs++ = MI_NOOP;
+	*cs++ = MI_NOOP;
+	*cs++ = MI_NOOP;
+	*cs++ = MI_NOOP;
+
+	/* wait to be cancelled */
+	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
+	*cs++ = addr;
+	*cs++ = 0;
+
+	/* cancel their spin as a compliment */
+	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = target + 32;
+	*cs++ = 0;
+	*cs++ = 0;
+
+	/* self-heal */
+	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = addr + 16;
+	*cs++ = 0;
+	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
+
+	*cs++ = MI_BATCH_BUFFER_END;
+
+	munmap(map, 4096);
+
+	return handle;
+}
+
+static void __bonded_sync(int i915,
+			  const struct i915_engine_class_instance *siblings,
+			  unsigned int count,
+			  unsigned int flags,
+			  unsigned long *out)
+{
+	const uint64_t A = 0 << 12, B = 1 << 12;
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffer_count = 1,
+		.rsvd1 = gem_context_create(i915),
+	};
+	struct drm_i915_gem_exec_object2 a = {
+		.handle = sync_to(i915, A, B),
+		.offset = A,
+		.flags = EXEC_OBJECT_PINNED
+	};
+	struct drm_i915_gem_exec_object2 b = {
+		.handle = sync_from(i915, B, A),
+		.offset = B,
+		.flags = EXEC_OBJECT_PINNED
+	};
+	unsigned long cycles = 0;
+	int timeline;
+
+	if (!(flags & B_HOSTILE)) { /* always non-preemptible */
+		*out = 0;
+		return;
+	}
+
+	set_load_balancer(i915, execbuf.rsvd1, siblings, count, NULL);
+
+	timeline = sw_sync_timeline_create();
+
+	srandom(getpid());
+	igt_until_timeout(2) {
+		int master;
+		int fence;
+
+		master = 1;
+		if (flags & B_MANY)
+			master = rand() % count + 1;
+
+		fence = -1;
+		if (flags & B_FENCE)
+			fence = sw_sync_timeline_create_fence(timeline,
+							      cycles + 1);
+
+		execbuf.buffers_ptr = to_user_pointer(&a);
+		execbuf.flags = master | I915_EXEC_FENCE_OUT;
+		if (fence != -1) {
+			execbuf.rsvd2 = fence;
+			execbuf.flags |= I915_EXEC_FENCE_IN;
+		}
+		gem_execbuf_wr(i915, &execbuf);
+
+		execbuf.rsvd2 >>= 32;
+
+		execbuf.buffers_ptr = to_user_pointer(&b);
+		do {
+			execbuf.flags = rand() % count + 1;
+		} while (execbuf.flags == master);
+		execbuf.flags |= I915_EXEC_FENCE_OUT | I915_EXEC_FENCE_SUBMIT;
+		gem_execbuf_wr(i915, &execbuf);
+
+		if (fence != -1) {
+			sw_sync_timeline_inc(timeline, 1);
+			close(fence);
+		}
+
+		gem_sync(i915, a.handle);
+		gem_sync(i915, b.handle);
+
+		igt_assert_eq(sync_fence_status(execbuf.rsvd2 & 0xffffffff), 1);
+		igt_assert_eq(sync_fence_status(execbuf.rsvd2 >> 32), 1);
+
+		close(execbuf.rsvd2);
+		close(execbuf.rsvd2 >> 32);
+
+		cycles++;
+		igt_swap(a, b);
+	}
+
+	close(timeline);
+	gem_close(i915, a.handle);
+	gem_close(i915, b.handle);
+	gem_context_destroy(i915, execbuf.rsvd1);
+
+	*out = cycles;
+}
+
 static void
 bonded_runner(int i915,
 	      void (*fn)(int i915,
@@ -1387,6 +1549,9 @@ bonded_runner(int i915,
 				cycles[0] = 0;
 				fn(i915, siblings, count, phases[i], &cycles[0]);
 				gem_quiescent_gpu(i915);
+				if (cycles[0] == 0)
+					continue;
+
 				igt_info("%s %s %s submission, %lu cycles\n",
 					 phases[i] & B_HOSTILE ? "Non-preemptible" : "Preemptible",
 					 phases[i] & B_MANY ? "many-master" : "single-master",
@@ -1407,6 +1572,8 @@ bonded_runner(int i915,
 
 				for (int child = 1; child < count + 1; child++)
 					cycles[0] += cycles[child];
+				if (cycles[0] == 0)
+					continue;
 
 				igt_info("%s %s %s submission, %lu cycles\n",
 					 phases[i] & B_HOSTILE ? "Non-preemptible" : "Preemptible",
@@ -2556,6 +2723,8 @@ igt_main
 		bonded_runner(i915, __bonded_pair);
 	igt_subtest("bonded-dual")
 		bonded_runner(i915, __bonded_dual);
+	igt_subtest("bonded-sync")
+		bonded_runner(i915, __bonded_sync);
 
 	igt_fixture {
 		igt_stop_hang_detector();
