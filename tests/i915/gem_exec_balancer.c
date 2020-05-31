@@ -1444,16 +1444,12 @@ static void __bonded_sync(int i915,
 		.flags = EXEC_OBJECT_PINNED
 	};
 	unsigned long cycles = 0;
-	int timeline;
+	int timeline = sw_sync_timeline_create();
 
-	if (!(flags & B_HOSTILE)) { /* always non-preemptible */
-		*out = 0;
-		return;
-	}
+	if (!(flags & B_HOSTILE)) /* always non-preemptible */
+		goto out;
 
 	set_load_balancer(i915, execbuf.rsvd1, siblings, count, NULL);
-
-	timeline = sw_sync_timeline_create();
 
 	srandom(getpid());
 	igt_until_timeout(2) {
@@ -1504,6 +1500,7 @@ static void __bonded_sync(int i915,
 		igt_swap(a, b);
 	}
 
+out:
 	close(timeline);
 	gem_close(i915, a.handle);
 	gem_close(i915, b.handle);
