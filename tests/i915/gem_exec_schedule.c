@@ -2435,6 +2435,9 @@ static void measure_semaphore_power(int i915)
 		int64_t jiffie = 1;
 		igt_spin_t *spin;
 
+		if (!gem_class_can_store_dword(i915, signaler->class))
+			continue;
+
 		spin = __igt_spin_new(i915,
 				      .engine = signaler->flags,
 				      .flags = IGT_SPIN_POLL_RUN);
