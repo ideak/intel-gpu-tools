@@ -833,6 +833,7 @@ igt_main
 		 */
 		igt_subtest_group {
 			igt_fixture {
+				igt_require(gem_has_queues(i915));
 				igt_require(gem_scheduler_enabled(i915));
 				igt_require(gem_scheduler_has_ctx_priority(i915));
 			}
