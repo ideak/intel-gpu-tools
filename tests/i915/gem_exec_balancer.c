@@ -1162,6 +1162,7 @@ static void __bonded_pair(int i915,
 #define B_FENCE 0x1
 #define B_HOSTILE 0x2
 #define B_MANY 0x4
+#define B_DELAY 0x8
 {
 	struct drm_i915_gem_exec_object2 batch = {};
 	struct drm_i915_gem_execbuffer2 execbuf = {
@@ -1208,6 +1209,9 @@ static void __bonded_pair(int i915,
 			a->execbuf.flags |= I915_EXEC_FENCE_IN;
 		}
 		gem_execbuf_wr(i915, &a->execbuf);
+
+		if (flags & B_DELAY)
+			usleep(100);
 
 		batch.handle = create_semaphore_to_spinner(i915, a);
 		execbuf.rsvd1 = a->execbuf.rsvd1;
@@ -1305,6 +1309,9 @@ static void __bonded_dual(int i915,
 
 		if (rand() % 1)
 			igt_swap(a, b);
+
+		if (flags & B_DELAY)
+			usleep(100);
 
 		batch.handle = create_semaphore_to_spinner(i915, a);
 		execbuf.rsvd1 = a->execbuf.rsvd1;
@@ -1474,6 +1481,8 @@ static void __bonded_sync(int i915,
 		gem_execbuf_wr(i915, &execbuf);
 
 		execbuf.rsvd2 >>= 32;
+		if (flags & B_DELAY)
+			usleep(100);
 
 		execbuf.buffers_ptr = to_user_pointer(&b);
 		do {
@@ -1521,8 +1530,10 @@ bonded_runner(int i915,
 		0,
 		B_FENCE,
 		B_MANY,
+		B_MANY | B_DELAY,
 		B_HOSTILE,
 		B_HOSTILE | B_FENCE,
+		B_HOSTILE | B_DELAY,
 	};
 	unsigned long *cycles;
 
@@ -1552,7 +1563,9 @@ bonded_runner(int i915,
 				igt_info("%s %s %s submission, %lu cycles\n",
 					 phases[i] & B_HOSTILE ? "Non-preemptible" : "Preemptible",
 					 phases[i] & B_MANY ? "many-master" : "single-master",
-					 phases[i] & B_FENCE ? "fenced" : "immediate",
+					 phases[i] & B_FENCE ? "fenced" :
+					 phases[i] & B_DELAY ? "delayed" :
+					 "immediate",
 					 cycles[0]);
 			}
 
@@ -1575,7 +1588,9 @@ bonded_runner(int i915,
 				igt_info("%s %s %s submission, %lu cycles\n",
 					 phases[i] & B_HOSTILE ? "Non-preemptible" : "Preemptible",
 					 phases[i] & B_MANY ? "many-master" : "single-master",
-					 phases[i] & B_FENCE ? "fenced" : "immediate",
+					 phases[i] & B_FENCE ? "fenced" :
+					 phases[i] & B_DELAY ? "delayed" :
+					 "immediate",
 					 cycles[0]);
 			}
 		}
