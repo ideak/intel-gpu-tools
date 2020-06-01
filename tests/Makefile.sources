@@ -275,6 +275,9 @@ gem_exec_reloc_SOURCES = i915/gem_exec_reloc.c
 TESTS_progs += gem_exec_schedule
 gem_exec_schedule_SOURCES = i915/gem_exec_schedule.c
 
+TESTS_progs += gem_exec_fair
+gem_exec_fair_SOURCES = i915/gem_exec_fair.c
+
 TESTS_progs += gem_exec_store
 gem_exec_store_SOURCES = i915/gem_exec_store.c
 

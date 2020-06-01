@@ -148,6 +148,7 @@ i915_progs = [
 	'gem_exec_capture',
 	'gem_exec_create',
 	'gem_exec_endless',
+	'gem_exec_fair',
 	'gem_exec_fence',
 	'gem_exec_flush',
 	'gem_exec_gttfill',

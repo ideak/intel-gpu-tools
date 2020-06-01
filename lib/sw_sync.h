@@ -31,6 +31,8 @@
 #define SW_SYNC_FENCE_STATUS_ACTIVE		(0)
 #define SW_SYNC_FENCE_STATUS_SIGNALED	(1)
 
+#include <stdint.h>
+
 void igt_require_sw_sync(void);
 
 int sw_sync_timeline_create(void);
@@ -44,6 +46,7 @@ int sync_fence_wait(int fence, int timeout);
 int sync_fence_status(int fence);
 int sync_fence_count(int fence);
 int sync_fence_count_status(int fence, int status);
+uint64_t sync_fence_timestamp(int fd);
 
 #define SYNC_FENCE_OK 1
 

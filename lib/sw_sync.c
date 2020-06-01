@@ -181,6 +181,23 @@ int sync_fence_count(int fd)
 	return info.num_fences;
 }
 
+uint64_t sync_fence_timestamp(int fd)
+{
+	struct sync_fence_info fence;
+	struct sync_file_info info = {
+		.sync_fence_info = to_user_pointer(&fence),
+		.num_fences = 1,
+	};
+
+	if (ioctl(fd, SYNC_IOC_FILE_INFO, &info))
+		return 0;
+
+	if (info.num_fences > 1)
+		return 0;
+
+	return fence.timestamp_ns;
+}
+
 static int __sync_fence_count_status(int fd, int status)
 {
 	struct sync_file_info info = {};
