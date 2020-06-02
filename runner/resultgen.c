@@ -808,7 +808,7 @@ static const char igt_dmesg_whitelist[] =
 #undef _
 
 static const char igt_piglit_style_dmesg_blacklist[] =
-	"(\\[drm:|drm_|intel_|i915_)";
+	"(\\[drm:|drm_|intel_|i915_|\\[drm\\])";
 
 static bool init_regex_whitelist(struct settings* settings, GRegex **re)
 {
