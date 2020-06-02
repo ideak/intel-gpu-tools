@@ -93,7 +93,7 @@ install_subdir('registers', install_dir : datadir,
 executable('intel_gpu_top', 'intel_gpu_top.c',
 	   install : true,
 	   install_rpath : bindir_rpathdir,
-	   dependencies : lib_igt_perf)
+	   dependencies : [lib_igt_perf,lib_igt_device_scan])
 
 executable('amd_hdmi_compliance', 'amd_hdmi_compliance.c',
 	   dependencies : [tool_deps],
