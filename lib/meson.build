@@ -172,6 +172,21 @@ lib_igt_perf_build = static_library('igt_perf',
 lib_igt_perf = declare_dependency(link_with : lib_igt_perf_build,
 				  include_directories : inc)
 
+scan_dep = [
+	glib,
+	libudev,
+]
+
+lib_igt_device_scan_build = static_library('igt_device_scan',
+	['igt_device_scan.c',
+	'igt_list.c',
+	'igt_tools_stub.c',
+	],
+	dependencies : scan_dep,
+	include_directories : inc)
+
+lib_igt_device_scan = declare_dependency(link_with : lib_igt_device_scan_build,
+				  include_directories : inc)
 
 i915_perf_files = [
   'igt_list.c',

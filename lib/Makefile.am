@@ -102,6 +102,12 @@ include Makefile.sources
 
 libintel_tools_la_SOURCES = $(lib_source_list)
 
+libigt_device_scan_la_SOURCES = \
+	igt_list.c		\
+	igt_tools_stub.c	\
+	igt_device_scan.c	\
+	igt_device_scan.h
+
 libigt_perf_la_SOURCES = \
 	igt_perf.c	 \
 	igt_perf.h
@@ -121,7 +127,7 @@ pkgconfig_DATA = i915-perf.pc
 
 lib_LTLIBRARIES = libi915_perf.la
 
-noinst_LTLIBRARIES = libintel_tools.la libigt_perf.la
+noinst_LTLIBRARIES = libintel_tools.la libigt_perf.la libigt_device_scan.la
 noinst_HEADERS = check-ndebug.h
 
 if !HAVE_LIBDRM_INTEL

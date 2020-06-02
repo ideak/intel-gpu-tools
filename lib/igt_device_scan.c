@@ -22,18 +22,17 @@
  *
  */
 
-#include "igt.h"
-#include "igt_list.h"
-#include "igt_sysfs.h"
-#include "igt_device.h"
+#include "igt_core.h"
 #include "igt_device_scan.h"
+#include "igt_list.h"
+
+#include <dirent.h>
+#include <fcntl.h>
 #include <glib.h>
 #include <libudev.h>
 #include <linux/limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <dirent.h>
-#include <fcntl.h>
 
 /**
  * SECTION:igt_device_scan

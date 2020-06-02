@@ -25,8 +25,14 @@
 #ifndef __IGT_DEVICE_SCAN_H__
 #define __IGT_DEVICE_SCAN_H__
 
+#include <errno.h>
+#include <fcntl.h>
+#include <getopt.h>
 #include <limits.h>
-#include <igt.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <unistd.h>
 
 enum igt_devices_print_type {
 	IGT_PRINT_SIMPLE,

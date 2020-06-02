@@ -55,6 +55,7 @@
 #include "igt_device.h"
 #include "igt_gt.h"
 #include "igt_kmod.h"
+#include "igt_params.h"
 #include "igt_sysfs.h"
 #include "igt_device_scan.h"
 #include "version.h"
