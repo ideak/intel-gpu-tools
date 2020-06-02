@@ -532,7 +532,7 @@ static void scan_drm_devices(void)
 	ret = udev_enumerate_add_match_subsystem(enumerate, "drm");
 	igt_assert(!ret);
 
-	udev_enumerate_add_match_property(enumerate, "DEVNAME", "/dev/dri/*");
+	ret = udev_enumerate_add_match_property(enumerate, "DEVNAME", "/dev/dri/*");
 	igt_assert(!ret);
 
 	ret = udev_enumerate_scan_devices(enumerate);
