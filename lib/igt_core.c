@@ -1399,8 +1399,10 @@ static void exit_subtest(const char *result)
 
 	/* If the subtest aborted, it may have left children behind */
 	for (int c = 0; c < num_test_children; c++) {
-		kill(test_children[c], SIGKILL);
-		waitpid(test_children[c], NULL, 0); /* don't leave zombies! */
+		if (test_children[c] > 0) {
+			kill(test_children[c], SIGKILL);
+			waitpid(test_children[c], NULL, 0); /* don't leave zombies! */
+		}
 	}
 	num_test_children = 0;
 
@@ -1986,8 +1988,10 @@ void __igt_fail_assert(const char *domain, const char *file, const int line,
 
 static void kill_children(void)
 {
-	for (int c = 0; c < num_test_children; c++)
-		kill(test_children[c], SIGKILL);
+	for (int c = 0; c < num_test_children; c++) {
+		if (test_children[c] > 0)
+			kill(test_children[c], SIGKILL);
+	}
 }
 
 void __igt_abort(const char *domain, const char *file, const int line,
@@ -2276,6 +2280,7 @@ bool __igt_fork(void)
 
 	switch (test_children[num_test_children++] = fork()) {
 	case -1:
+		num_test_children--; /* so we won't kill(-1) during cleanup */
 		igt_assert(0);
 	case 0:
 		test_child = true;
@@ -2335,8 +2340,7 @@ int __igt_waitchildren(void)
 				err = 256;
 			}
 
-			for (c = 0; c < num_test_children; c++)
-				kill(test_children[c], SIGKILL);
+			kill_children();
 		}
 
 		count++;
@@ -2370,8 +2374,7 @@ static void igt_alarm_killchildren(int signal)
 {
 	igt_info("Timed out waiting for children\n");
 
-	for (int c = 0; c < num_test_children; c++)
-		kill(test_children[c], SIGKILL);
+	kill_children();
 }
 
 /**

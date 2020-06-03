@@ -123,8 +123,10 @@ static void subtest_leak(void)
 	}
 
 	/* We expect the exit_subtest to cleanup after the igt_fork */
-	for (int i = 0; i < num_children; i++)
-		assert(kill(children[i], 0) == -1 && errno == ESRCH);
+	for (int i = 0; i < num_children; i++) {
+		if (children[i] > 0)
+			assert(kill(children[i], 0) == -1 && errno == ESRCH);
+	}
 
 	munmap(children, 4096);
 
