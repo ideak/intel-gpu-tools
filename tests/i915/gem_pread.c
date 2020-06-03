@@ -73,7 +73,6 @@ static void pread_self(int i915)
 }
 
 #define OBJECT_SIZE 16384
-#define LARGE_OBJECT_SIZE 1024 * 1024
 #define KGRN "\x1B[32m"
 #define KRED "\x1B[31m"
 #define KNRM "\x1B[0m"
@@ -110,10 +109,7 @@ static const char *bytes_per_sec(char *buf, double v)
 	return buf;
 }
 
-
 uint32_t *src, dst;
-uint32_t *dst_user, src_stolen, large_stolen;
-uint32_t *stolen_pf_user, *stolen_nopf_user;
 int fd, count;
 int object_size = 0;
 
@@ -156,8 +152,6 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 
 		dst = gem_create(fd, object_size);
 		src = malloc(object_size);
-		src_stolen = gem_create_stolen(fd, object_size);
-		dst_user = malloc(object_size);
 	}
 
 	igt_subtest("bench") {
@@ -197,96 +191,9 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 		}
 	}
 
-	igt_subtest("stolen-normal") {
-		gem_require_stolen_support(fd);
-		for (count = 1; count <= 1<<17; count <<= 1) {
-			struct timeval start, end;
-
-			gettimeofday(&start, NULL);
-			do_gem_read(fd, src_stolen, dst_user, object_size, count);
-			gettimeofday(&end, NULL);
-			usecs = elapsed(&start, &end, count);
-			bps = bytes_per_sec(buf, object_size/usecs*1e6);
-			igt_info("Time to pread %d bytes x %6d:	%7.3fµs, %s\n",
-				 object_size, count, usecs, bps);
-			fflush(stdout);
-		}
-	}
-	for (c = cache; c->level != -1; c++) {
-		igt_subtest_f("stolen-%s", c->name) {
-			gem_require_stolen_support(fd);
-			gem_set_caching(fd, src_stolen, c->level);
-
-			for (count = 1; count <= 1<<17; count <<= 1) {
-				struct timeval start, end;
-
-				gettimeofday(&start, NULL);
-				do_gem_read(fd, src_stolen, dst_user,
-					    object_size, count);
-				gettimeofday(&end, NULL);
-				usecs = elapsed(&start, &end, count);
-				bps = bytes_per_sec(buf, object_size/usecs*1e6);
-				igt_info("Time to stolen-%s pread %d bytes x %6d:      %7.3fµs, %s\n",
-					 c->name, object_size, count, usecs, bps);
-				fflush(stdout);
-			}
-		}
-	}
-
-	/* List the time taken in pread operation for stolen objects, with
-	 * and without the overhead of page fault handling on accessing the
-	 * user space buffer
-	 */
-	igt_subtest("pagefault-pread") {
-		gem_require_stolen_support(fd);
-		large_stolen = gem_create_stolen(fd, LARGE_OBJECT_SIZE);
-		stolen_nopf_user = (uint32_t *) mmap(NULL, LARGE_OBJECT_SIZE,
-						PROT_WRITE,
-						MAP_ANONYMOUS|MAP_PRIVATE,
-						-1, 0);
-		igt_assert(stolen_nopf_user);
-
-		for (count = 1; count <= 10; count ++) {
-			struct timeval start, end;
-			double t_elapsed = 0;
-
-			gettimeofday(&start, NULL);
-			do_gem_read(fd, large_stolen, stolen_nopf_user,
-				    LARGE_OBJECT_SIZE, 1);
-			gettimeofday(&end, NULL);
-			t_elapsed = elapsed(&start, &end, count);
-			bps = bytes_per_sec(buf, object_size/t_elapsed*1e6);
-			igt_info("Pagefault-N - Time to pread %d bytes: %7.3fµs, %s\n",
-				 LARGE_OBJECT_SIZE, t_elapsed, bps);
-
-			stolen_pf_user = (uint32_t *) mmap(NULL, LARGE_OBJECT_SIZE,
-						      PROT_WRITE,
-						      MAP_ANONYMOUS|MAP_PRIVATE,
-						      -1, 0);
-			igt_assert(stolen_pf_user);
-
-			gettimeofday(&start, NULL);
-			do_gem_read(fd, large_stolen, stolen_pf_user,
-				    LARGE_OBJECT_SIZE, 1);
-			gettimeofday(&end, NULL);
-			usecs = elapsed(&start, &end, count);
-			bps = bytes_per_sec(buf, object_size/usecs*1e6);
-			igt_info("Pagefault-Y - Time to pread %d bytes: %7.3fµs, %s%s%s\n",
-				 LARGE_OBJECT_SIZE, usecs,
-				 t_elapsed < usecs ? KGRN : KRED, bps, KNRM);
-			fflush(stdout);
-			munmap(stolen_pf_user, LARGE_OBJECT_SIZE);
-		}
-		munmap(stolen_nopf_user, LARGE_OBJECT_SIZE);
-		gem_close(fd, large_stolen);
-	}
-
-
 	igt_fixture {
 		free(src);
 		gem_close(fd, dst);
-		free(dst_user);
-		gem_close(fd, src_stolen);
 
 		close(fd);
 	}

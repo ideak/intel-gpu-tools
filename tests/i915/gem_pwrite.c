@@ -277,7 +277,6 @@ static void test_random(int fd)
 }
 
 uint32_t *src, dst;
-uint32_t *src_user, dst_stolen;
 int fd;
 int object_size = 0;
 
@@ -321,8 +320,6 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 
 		dst = gem_create(fd, object_size);
 		src = malloc(object_size);
-		dst_stolen = gem_create_stolen(fd, object_size);
-		src_user = malloc(object_size);
 	}
 
 	igt_subtest("bench") {
@@ -362,49 +359,9 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 		}
 	}
 
-	igt_subtest("stolen-normal") {
-		gem_require_stolen_support(fd);
-		for (count = 1; count <= 1<<17; count <<= 1) {
-			struct timeval start, end;
-
-			gettimeofday(&start, NULL);
-			do_gem_write(fd, dst_stolen, src_user,
-				     object_size, count);
-			gettimeofday(&end, NULL);
-			usecs = elapsed(&start, &end, count);
-			bps = bytes_per_sec(buf, object_size/usecs*1e6);
-			igt_info("Time to pwrite %d bytes x %6d:        %7.3fµs, %s\n",
-				 object_size, count, usecs, bps);
-			fflush(stdout);
-		}
-	}
-
-	for (c = cache; c->level != -1; c++) {
-		igt_subtest_f("stolen-%s", c->name) {
-			gem_require_stolen_support(fd);
-			gem_set_caching(fd, dst, c->level);
-			for (count = 1; count <= 1<<17; count <<= 1) {
-				struct timeval start, end;
-
-				gettimeofday(&start, NULL);
-				do_gem_write(fd, dst_stolen, src_user,
-					     object_size, count);
-				gettimeofday(&end, NULL);
-				bps = bytes_per_sec(buf,
-						    object_size/usecs*1e6);
-				igt_info("Time to stolen-%s pwrite %d bytes x %6d:     %7.3fµs, %s\n",
-					 c->name, object_size, count,
-					 usecs, bps);
-				fflush(stdout);
-			}
-		}
-	}
-
 	igt_fixture {
 		free(src);
 		gem_close(fd, dst);
-		free(src_user);
-		gem_close(fd, dst_stolen);
 	}
 
 	igt_subtest_f("basic-random")

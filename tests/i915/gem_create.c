@@ -27,11 +27,8 @@
 
 /** @file gem_create.c
  *
- * This is a test for the extended and old gem_create ioctl, that
- * includes allocation of object from stolen memory and shmem.
- *
- * The goal is to simply ensure that basics work and invalid input
- * combinations are rejected.
+ * This is a test for the gem_create ioctl. The goal is to simply ensure that
+ * basics work and invalid input combinations are rejected.
  */
 
 #include <stdlib.h>
@@ -59,41 +56,11 @@
 #include "i915/gem_mman.h"
 #include "i915_drm.h"
 
-IGT_TEST_DESCRIPTION("This is a test for the extended & old gem_create ioctl,"
-		     " that includes allocation of object from stolen memory"
-		     " and shmem.");
+IGT_TEST_DESCRIPTION("This is a test for the gem_create ioctl,"
+		     " where the goal is to simply ensure that basics work"
+		     " and invalid input combinations are rejected.");
 
-#define CLEAR(s) memset(&s, 0, sizeof(s))
 #define PAGE_SIZE 4096
-
-struct local_i915_gem_create_v2 {
-	uint64_t size;
-	uint32_t handle;
-	uint32_t pad;
-#define I915_CREATE_PLACEMENT_STOLEN (1<<0)
-	uint32_t flags;
-} create_v2;
-
-#define LOCAL_IOCTL_I915_GEM_CREATE       DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_CREATE, struct local_i915_gem_create_v2)
-
-static void invalid_flag_test(int fd)
-{
-	int ret;
-
-	gem_require_stolen_support(fd);
-
-	create_v2.handle = 0;
-	create_v2.size = PAGE_SIZE;
-	create_v2.flags = ~I915_CREATE_PLACEMENT_STOLEN;
-	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_CREATE, &create_v2);
-
-	igt_assert(ret <= 0);
-
-	create_v2.flags = ~0;
-	ret = drmIoctl(fd, LOCAL_IOCTL_I915_GEM_CREATE, &create_v2);
-
-	igt_assert(ret <= 0);
-}
 
 static int create_ioctl(int fd, struct drm_i915_gem_create *create)
 {
@@ -277,9 +244,6 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 	}
-
-	igt_subtest("stolen-invalid-flag")
-		invalid_flag_test(fd);
 
 	igt_subtest("create-invalid-size")
 		invalid_size_test(fd);
