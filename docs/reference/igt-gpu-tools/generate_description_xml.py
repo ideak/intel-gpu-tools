@@ -4,7 +4,7 @@ import re
 import sys
 import os.path
 import subprocess
-import xml.etree.cElementTree as ET
+import xml.etree.ElementTree as ET
 
 from collections import namedtuple
 
