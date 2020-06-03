@@ -126,6 +126,7 @@ reprobe_connector(data_t *data, struct chamelium_port *port)
 
 	/* let's make sure that igt_display is up to date too */
 	output = igt_output_from_connector(&data->display, connector);
+	output->force_reprobe = true;
 	igt_output_refresh(output);
 
 	drmModeFreeConnector(connector);
