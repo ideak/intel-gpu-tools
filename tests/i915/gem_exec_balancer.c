@@ -1366,14 +1366,13 @@ static uint32_t sync_from(int i915, uint32_t addr, uint32_t target)
 
 	/* cancel target spinner */
 	*cs++ = MI_STORE_DWORD_IMM;
-	*cs++ = target + 16;
+	*cs++ = target + 64;
 	*cs++ = 0;
 	*cs++ = 0;
 
-	*cs++ = MI_NOOP;
-	*cs++ = MI_NOOP;
-	*cs++ = MI_NOOP;
-	*cs++ = MI_NOOP;
+	do {
+		*cs++ = MI_NOOP;
+	} while (offset_in_page(cs) & 63);
 
 	/* wait for them to cancel us */
 	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
@@ -1382,7 +1381,7 @@ static uint32_t sync_from(int i915, uint32_t addr, uint32_t target)
 
 	/* self-heal */
 	*cs++ = MI_STORE_DWORD_IMM;
-	*cs++ = addr + 32;
+	*cs++ = addr + 64;
 	*cs++ = 0;
 	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
 
@@ -1400,25 +1399,26 @@ static uint32_t sync_to(int i915, uint32_t addr, uint32_t target)
 
 	cs = map = gem_mmap__device_coherent(i915, handle, 0, 4096, PROT_WRITE);
 
-	*cs++ = MI_NOOP;
-	*cs++ = MI_NOOP;
-	*cs++ = MI_NOOP;
-	*cs++ = MI_NOOP;
+	do {
+		*cs++ = MI_NOOP;
+	} while (offset_in_page(cs) & 63);
 
 	/* wait to be cancelled */
 	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
 	*cs++ = addr;
 	*cs++ = 0;
 
+	*cs++ = MI_NOOP;
+
 	/* cancel their spin as a compliment */
 	*cs++ = MI_STORE_DWORD_IMM;
-	*cs++ = target + 32;
+	*cs++ = target + 64;
 	*cs++ = 0;
 	*cs++ = 0;
 
 	/* self-heal */
 	*cs++ = MI_STORE_DWORD_IMM;
-	*cs++ = addr + 16;
+	*cs++ = addr + 64;
 	*cs++ = 0;
 	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
 
@@ -1429,6 +1429,28 @@ static uint32_t sync_to(int i915, uint32_t addr, uint32_t target)
 	return handle;
 }
 
+static void disable_preparser(int i915, uint32_t ctx)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(i915, 4096),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.rsvd1 = ctx,
+	};
+	uint32_t *cs;
+
+	cs = gem_mmap__device_coherent(i915, obj.handle, 0, 4096, PROT_WRITE);
+
+	cs[0] = 0x5 << 23 | 1 << 8 | 0; /* disable preparser magic */
+	cs[1] = MI_BATCH_BUFFER_END;
+	munmap(cs, 4096);
+
+	gem_execbuf(i915, &execbuf);
+	gem_close(i915, obj.handle);
+}
+
 static void __bonded_sync(int i915,
 			  const struct i915_engine_class_instance *siblings,
 			  unsigned int count,
@@ -1436,20 +1458,21 @@ static void __bonded_sync(int i915,
 			  unsigned long *out)
 {
 	const uint64_t A = 0 << 12, B = 1 << 12;
-	struct drm_i915_gem_execbuffer2 execbuf = {
-		.buffer_count = 1,
-		.rsvd1 = gem_context_create(i915),
-	};
-	struct drm_i915_gem_exec_object2 a = {
+	struct drm_i915_gem_exec_object2 obj[2] = { {
 		.handle = sync_to(i915, A, B),
 		.offset = A,
 		.flags = EXEC_OBJECT_PINNED
-	};
-	struct drm_i915_gem_exec_object2 b = {
+	}, {
 		.handle = sync_from(i915, B, A),
 		.offset = B,
 		.flags = EXEC_OBJECT_PINNED
+	} };
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(obj),
+		.buffer_count = 2,
+		.rsvd1 = gem_context_create(i915),
 	};
+
 	unsigned long cycles = 0;
 	int timeline = sw_sync_timeline_create();
 
@@ -1457,6 +1480,7 @@ static void __bonded_sync(int i915,
 		goto out;
 
 	set_load_balancer(i915, execbuf.rsvd1, siblings, count, NULL);
+	disable_preparser(i915, execbuf.rsvd1);
 
 	srandom(getpid());
 	igt_until_timeout(2) {
@@ -1472,7 +1496,6 @@ static void __bonded_sync(int i915,
 			fence = sw_sync_timeline_create_fence(timeline,
 							      cycles + 1);
 
-		execbuf.buffers_ptr = to_user_pointer(&a);
 		execbuf.flags = master | I915_EXEC_FENCE_OUT;
 		if (fence != -1) {
 			execbuf.rsvd2 = fence;
@@ -1484,7 +1507,8 @@ static void __bonded_sync(int i915,
 		if (flags & B_DELAY)
 			usleep(100);
 
-		execbuf.buffers_ptr = to_user_pointer(&b);
+		igt_swap(obj[0], obj[1]);
+
 		do {
 			execbuf.flags = rand() % count + 1;
 		} while (execbuf.flags == master);
@@ -1496,8 +1520,8 @@ static void __bonded_sync(int i915,
 			close(fence);
 		}
 
-		gem_sync(i915, a.handle);
-		gem_sync(i915, b.handle);
+		gem_sync(i915, obj[1].handle);
+		gem_sync(i915, obj[0].handle);
 
 		igt_assert_eq(sync_fence_status(execbuf.rsvd2 & 0xffffffff), 1);
 		igt_assert_eq(sync_fence_status(execbuf.rsvd2 >> 32), 1);
@@ -1506,13 +1530,12 @@ static void __bonded_sync(int i915,
 		close(execbuf.rsvd2 >> 32);
 
 		cycles++;
-		igt_swap(a, b);
 	}
 
 out:
 	close(timeline);
-	gem_close(i915, a.handle);
-	gem_close(i915, b.handle);
+	gem_close(i915, obj[0].handle);
+	gem_close(i915, obj[1].handle);
 	gem_context_destroy(i915, execbuf.rsvd1);
 
 	*out = cycles;
