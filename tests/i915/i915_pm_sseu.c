@@ -34,7 +34,7 @@
 
 #include "i915/gem.h"
 #include "igt.h"
-#include "intel_bufmgr.h"
+#include "intel_bufops.h"
 
 IGT_TEST_DESCRIPTION("Tests slice/subslice/EU power gating functionality.\n");
 
@@ -43,10 +43,10 @@ static struct {
 	int drm_fd;
 	int devid;
 	int gen;
-	drm_intel_bufmgr *bufmgr;
-	struct intel_batchbuffer *batch;
+
+	struct buf_ops *bops;
+	struct intel_buf buf;
 	igt_media_spinfunc_t spinfunc;
-	struct igt_buf buf;
 	uint32_t spins_per_msec;
 } gem;
 
@@ -217,6 +217,7 @@ dbg_init(void)
 {
 	igt_assert(gem.init);
 	dbg.status_fd = igt_debugfs_open(gem.drm_fd, "i915_sseu_status", O_RDONLY);
+
 	igt_skip_on_f(dbg.status_fd == -1,
 		      "debugfs entry 'i915_sseu_status' not found\n");
 	dbg.init = 1;
@@ -233,11 +234,8 @@ dbg_deinit(void)
 }
 
 static void
-gem_check_spin(uint32_t spins)
+gem_check_spin(uint32_t *data, uint32_t spins)
 {
-	uint32_t *data;
-
-	data = (uint32_t*)gem.buf.bo->virtual;
 	igt_assert_eq_u32(*data, spins);
 }
 
@@ -246,8 +244,8 @@ gem_get_target_spins(double dt)
 {
 	struct timespec tstart, tdone;
 	double prev_dt, cur_dt;
-	uint32_t spins;
-	int i, ret;
+	uint32_t spins, *ptr;
+	int i;
 
 	/* Double increments until we bound the target time */
 	prev_dt = 0.0;
@@ -255,13 +253,18 @@ gem_get_target_spins(double dt)
 		spins = 1 << i;
 		clock_gettime(CLOCK_MONOTONIC, &tstart);
 
-		gem.spinfunc(gem.batch, &gem.buf, spins);
-		ret = drm_intel_bo_map(gem.buf.bo, 0);
-		igt_assert_eq(ret, 0);
+		gem.spinfunc(gem.drm_fd, &gem.buf, spins);
+		gem_set_domain(gem.drm_fd, gem.buf.handle,
+			       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+
+		ptr = gem_mmap__device_coherent(gem.drm_fd, gem.buf.handle,
+						0, gem.buf.size, PROT_READ);
+
 		clock_gettime(CLOCK_MONOTONIC, &tdone);
 
-		gem_check_spin(spins);
-		drm_intel_bo_unmap(gem.buf.bo);
+		gem_check_spin(ptr, spins);
+
+		munmap(ptr, gem.buf.size);
 
 		cur_dt = to_dt(&tstart, &tdone);
 		if (cur_dt > dt)
@@ -292,24 +295,11 @@ gem_init(void)
 	gem.spinfunc = igt_get_media_spinfunc(gem.devid);
 	igt_require(gem.spinfunc);
 
-	gem.bufmgr = drm_intel_bufmgr_gem_init(gem.drm_fd, 4096);
-	igt_assert(gem.bufmgr);
+	gem.bops = buf_ops_create(gem.drm_fd);
 	gem.init = 2;
 
-	drm_intel_bufmgr_gem_enable_reuse(gem.bufmgr);
-
-	gem.batch = intel_batchbuffer_alloc(gem.bufmgr, gem.devid);
-	igt_assert(gem.batch);
+	intel_buf_init(gem.bops, &gem.buf, 1, 1, 32, 0, I915_TILING_NONE, 0);
 	gem.init = 3;
-
-	gem.buf.surface[0].stride = sizeof(uint32_t);
-	gem.buf.tiling = I915_TILING_NONE;
-	gem.buf.surface[0].size = gem.buf.surface[0].stride;
-	gem.buf.bo = drm_intel_bo_alloc(gem.bufmgr, "",
-					gem.buf.surface[0].size, 4096);
-	gem.buf.bpp = 32;
-	igt_assert(gem.buf.bo);
-	gem.init = 4;
 
 	gem.spins_per_msec = gem_get_target_spins(100) / 100;
 }
@@ -319,13 +309,10 @@ gem_deinit(void)
 {
 	switch (gem.init)
 	{
-	case 4:
-		drm_intel_bo_unmap(gem.buf.bo);
-		drm_intel_bo_unreference(gem.buf.bo);
 	case 3:
-		intel_batchbuffer_free(gem.batch);
+		intel_buf_close(gem.bops, &gem.buf);
 	case 2:
-		drm_intel_bufmgr_destroy(gem.bufmgr);
+		buf_ops_destroy(gem.bops);
 	case 1:
 		close(gem.drm_fd);
 	}
@@ -354,7 +341,8 @@ full_enable(void)
 {
 	struct status stat;
 	const int spin_msec = 10;
-	int ret, spins;
+	uint32_t *ptr;
+	int spins;
 
 	/*
 	 * Gen9 SKL is the first case in which render power gating can leave
@@ -365,16 +353,17 @@ full_enable(void)
 
 	spins = spin_msec * gem.spins_per_msec;
 
-	gem.spinfunc(gem.batch, &gem.buf, spins);
+	gem.spinfunc(gem.drm_fd, &gem.buf, spins);
 
 	usleep(2000); /* 2ms wait to make sure batch is running */
 	dbg_get_status(&stat);
 
-	ret = drm_intel_bo_map(gem.buf.bo, 0);
-	igt_assert_eq(ret, 0);
-
-	gem_check_spin(spins);
-	drm_intel_bo_unmap(gem.buf.bo);
+	gem_set_domain(gem.drm_fd, gem.buf.handle,
+		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	ptr = gem_mmap__device_coherent(gem.drm_fd, gem.buf.handle,
+					0, gem.buf.size, PROT_READ);
+	gem_check_spin(ptr, spins);
+	munmap(ptr, gem.buf.size);
 
 	check_full_enable(&stat);
 }

@@ -27,10 +27,10 @@
 #ifndef MEDIA_SPIN_H
 #define MEDIA_SPIN_H
 
-void gen8_media_spinfunc(struct intel_batchbuffer *batch,
-			 const struct igt_buf *dst, uint32_t spins);
+struct intel_buf;
 
-void gen9_media_spinfunc(struct intel_batchbuffer *batch,
-			 const struct igt_buf *dst, uint32_t spins);
+void gen8_media_spinfunc(int i915, struct intel_buf *buf, uint32_t spins);
+
+void gen9_media_spinfunc(int i915, struct intel_buf *buf, uint32_t spins);
 
 #endif /* MEDIA_SPIN_H */
