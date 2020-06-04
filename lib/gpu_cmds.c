@@ -109,7 +109,7 @@ gen7_fill_surface_state(struct intel_bb *ibb,
 
 	address = intel_bb_offset_reloc(ibb, buf->handle,
 					read_domain, write_domain,
-					offset + 4, 0x0);
+					offset + 4, buf->addr.offset);
 	igt_assert(address >> 32 == 0);
 
 	ss->ss1.base_addr = address;
@@ -161,7 +161,7 @@ gen8_fill_surface_state(struct intel_bb *ibb,
 
 	address = intel_bb_offset_reloc(ibb, buf->handle,
 					read_domain, write_domain,
-					offset + 4 * 8, 0x0);
+					offset + 4 * 8, buf->addr.offset);
 
 	ss->ss8.base_addr = (uint32_t) address;
 	ss->ss9.base_addr_hi = address >> 32;
@@ -218,7 +218,7 @@ gen11_fill_surface_state(struct intel_bb *ibb,
 
 	address = intel_bb_offset_reloc(ibb, buf->handle,
 					read_domain, write_domain,
-					offset + 4 * 8, 0x0);
+					offset + 4 * 8, buf->addr.offset);
 
 	ss->ss8.base_addr = (uint32_t) address;
 	ss->ss9.base_addr_hi = address >> 32;

@@ -18,6 +18,10 @@ struct intel_buf {
 		uint32_t offset;
 		uint32_t stride;
 	} aux;
+	struct {
+		uint64_t offset;
+		uint32_t ctx;
+	} addr;
 };
 
 static inline unsigned int intel_buf_width(const struct intel_buf *buf)
