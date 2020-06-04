@@ -1203,7 +1203,7 @@ static void __reallocate_objects(struct intel_bb *ibb)
 }
 
 /**
- * __intel_bb_create:
+ * intel_bb_create:
  * @i915: drm fd
  * @size: size of the batchbuffer
  *
@@ -1250,17 +1250,9 @@ static void __do_nothing(void *node)
 	(void) node;
 }
 
-/**
- * intel_bb_destroy:
- * @ibb: pointer to intel_bb
- *
- * Frees all relocations / objects allocated during filling the batch.
- */
-void intel_bb_destroy(struct intel_bb *ibb)
+static void __intel_bb_destroy_objects(struct intel_bb *ibb)
 {
 	uint32_t i;
-
-	igt_assert(ibb);
 
 	/* Free relocations */
 	for (i = 0; i < ibb->num_objects; i++)
@@ -1269,10 +1261,50 @@ void intel_bb_destroy(struct intel_bb *ibb)
 	free(ibb->objects);
 	tdestroy(ibb->root, __do_nothing);
 
-	munmap(ibb->batch, ibb->size);
+	ibb->objects = NULL;
+	ibb->root = NULL;
+	ibb->num_objects = 0;
+	ibb->num_relocs = 0;
+	ibb->allocated_objects = 0;
+	ibb->allocated_relocs = 0;
+	ibb->ptr = ibb->batch;
+}
+
+/**
+ * intel_bb_destroy:
+ * @ibb: pointer to intel_bb
+ *
+ * Frees all relocations / objects allocated during filling the batch.
+ */
+void intel_bb_destroy(struct intel_bb *ibb)
+{
+	igt_assert(ibb);
+
+	__intel_bb_destroy_objects(ibb);
 	gem_close(ibb->i915, ibb->handle);
 
 	free(ibb);
+}
+
+/*
+ * intel_bb_reset:
+ * @ibb: pointer to intel_bb
+ * @purge_objects_cache: if true destroy internal execobj and relocs + cache
+ *
+ * Recreate batch bo.
+*/
+void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
+{
+	if (purge_objects_cache) {
+		__intel_bb_destroy_objects(ibb);
+		__reallocate_objects(ibb);
+	}
+
+	gem_close(ibb->i915, ibb->handle);
+	ibb->handle = gem_create(ibb->i915, ibb->size);
+
+	intel_bb_add_object(ibb, ibb->handle, 0, false);
+	ibb->ptr = ibb->batch;
 }
 
 /**
@@ -1573,7 +1605,7 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 	execbuf.buffers_ptr = (uintptr_t) ibb->objects;
 	execbuf.buffer_count = ibb->num_objects;
 	execbuf.batch_len = end_offset;
-	execbuf.rsvd1 = ctx;
+	execbuf.rsvd1 = ibb->ctx = ctx;
 	execbuf.flags = flags | I915_EXEC_BATCH_FIRST;
 
 	ret = __gem_execbuf(ibb->i915, &execbuf);
@@ -1648,4 +1680,34 @@ uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle)
 		return 0;
 
 	return (*found)->offset;
+}
+
+/**
+ * intel_bb_object_offset_to_buf:
+ * @ibb: pointer to intel_bb
+ * @buf: buffer we want to store last exec offset and context id
+ *
+ * Copy object offset used in the batch to intel_buf to allow caller prepare
+ * other batch likely without relocations.
+ */
+bool intel_bb_object_offset_to_buf(struct intel_bb *ibb, struct intel_buf *buf)
+{
+	struct drm_i915_gem_exec_object2 object = { .handle = buf->handle };
+	struct drm_i915_gem_exec_object2 **found;
+
+	igt_assert(ibb);
+	igt_assert(buf);
+
+	found = tfind((void *) &object, &ibb->root, __compare_objects);
+	if (!found) {
+		buf->addr.offset = 0;
+		buf->addr.ctx = 0;
+
+		return false;
+	}
+
+	buf->addr.offset = (*found)->offset;
+	buf->addr.ctx = ibb->ctx;
+
+	return true;
 }

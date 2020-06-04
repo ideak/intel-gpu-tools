@@ -405,8 +405,8 @@ igt_vme_func_t igt_get_media_vme_func(int devid);
 
 /**
  * igt_media_spinfunc_t:
- * @batch: batchbuffer object
- * @dst: destination i-g-t buffer object
+ * @i915: drm fd
+ * @buf: destination buffer object
  * @spins: number of loops to execute
  *
  * This is the type of the per-platform media spin functions. The
@@ -420,8 +420,8 @@ igt_vme_func_t igt_get_media_vme_func(int devid);
  * destination buffer on completion. This utility provides a simple way
  * to keep the render engine busy for a set time for various tests.
  */
-typedef void (*igt_media_spinfunc_t)(struct intel_batchbuffer *batch,
-				     const struct igt_buf *dst, uint32_t spins);
+typedef void (*igt_media_spinfunc_t)(int i915,
+				     struct intel_buf *buf, uint32_t spins);
 
 igt_media_spinfunc_t igt_get_media_spinfunc(int devid);
 
@@ -443,6 +443,8 @@ struct intel_bb {
 	uint64_t gtt_size;
 	bool supports_48b_address;
 
+	uint32_t ctx;
+
 	void *root;
 	struct drm_i915_gem_exec_object2 *objects;
 	uint32_t num_objects;
@@ -457,6 +459,7 @@ struct intel_bb {
 struct intel_bb *intel_bb_create(int i915, uint32_t size);
 
 void intel_bb_destroy(struct intel_bb *ibb);
+void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache);
 void intel_bb_set_debug(struct intel_bb *ibb, bool debug);
 
 static inline uint32_t intel_bb_offset(struct intel_bb *ibb)
@@ -524,5 +527,6 @@ void intel_bb_exec_with_context(struct intel_bb *ibb, uint32_t end_offset,
 				uint32_t ctx, uint64_t flags, bool sync);
 
 uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle);
+bool intel_bb_object_offset_to_buf(struct intel_bb *ibb, struct intel_buf *buf);
 
 #endif
