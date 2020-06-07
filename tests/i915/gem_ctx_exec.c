@@ -313,7 +313,7 @@ static void nohangcheck_hostile(int i915)
 	gem_context_destroy(i915, ctx);
 	igt_assert(fence != -1);
 
-	if (sync_fence_wait(fence, MSEC_PER_SEC / 2)) {
+	if (sync_fence_wait(fence, MSEC_PER_SEC)) { /* 640ms preempt-timeout */
 		igt_debugfs_dump(i915, "i915_engine_info");
 		err = -ETIME;
 	}
