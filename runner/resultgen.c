@@ -1661,6 +1661,19 @@ bool generate_results(int dirfd)
 	}
 
 	json_string = json_object_to_json_string_ext(obj, JSON_C_TO_STRING_PRETTY);
+
+	if (json_string == NULL) {
+		fprintf(stderr, "resultgen: Failed to create json representation of the results.\n");
+		fprintf(stderr, "           This usually means that the results are too big\n");
+		fprintf(stderr, "           to fit in the memory as the text representation\n");
+		fprintf(stderr, "           is being created.\n\n");
+		fprintf(stderr, "           Either something was spamming the logs or your\n");
+		fprintf(stderr, "           system is very low on free mem.\n");
+
+		close(resultsfd);
+		return false;
+	}
+
 	write(resultsfd, json_string, strlen(json_string));
 	close(resultsfd);
 	return true;
