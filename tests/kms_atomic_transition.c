@@ -926,42 +926,42 @@ igt_main
 
 	igt_subtest_with_dynamic("plane-all-transition") {
 		for_each_pipe_with_valid_output(&display, pipe, output) {
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_PLANES, false, false);
 		}
 	}
 
 	igt_subtest_with_dynamic("plane-all-transition-fencing") {
 		for_each_pipe_with_valid_output(&display, pipe, output) {
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_PLANES, false, true);
 		}
 	}
 
 	igt_subtest_with_dynamic("plane-all-transition-nonblocking") {
 		for_each_pipe_with_valid_output(&display, pipe, output) {
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_PLANES, true, false);
 		}
 	}
 
 	igt_subtest_with_dynamic("plane-all-transition-nonblocking-fencing") {
 		for_each_pipe_with_valid_output(&display, pipe, output) {
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_PLANES, true, true);
 		}
 	}
 
 	igt_subtest_with_dynamic("plane-use-after-nonblocking-unbind") {
 		for_each_pipe_with_valid_output(&display, pipe, output) {
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_AFTER_FREE, true, false);
 		}
 	}
 
 	igt_subtest_with_dynamic("plane-use-after-nonblocking-unbind-fencing") {
 		for_each_pipe_with_valid_output(&display, pipe, output) {
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_AFTER_FREE, true, true);
 		}
 	}
@@ -976,7 +976,7 @@ igt_main
 			if (output_is_internal_panel(output))
 				continue;
 
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_MODESET, false, false);
 		}
 
@@ -985,7 +985,7 @@ igt_main
 			if (output_is_internal_panel(output))
 				continue;
 
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_MODESET, false, true);
 		}
 
@@ -994,7 +994,7 @@ igt_main
 			if (!output_is_internal_panel(output))
 				continue;
 
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_MODESET_FAST, false, false);
 		}
 	}
@@ -1004,7 +1004,7 @@ igt_main
 			if (!output_is_internal_panel(output))
 				continue;
 
-			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				run_transition_test(&display, pipe, output, TRANSITION_MODESET_FAST, false, true);
 		}
 	}
