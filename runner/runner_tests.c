@@ -1351,6 +1351,18 @@ igt_main
 
 			fclose(f);
 		}
+
+		igt_subtest("metadata-read-spaces") {
+			char metadata[] = "name : foo bar\n";
+			FILE *f = fmemopen(metadata, strlen(metadata), "r");
+			igt_assert(f);
+
+			igt_assert(read_settings_from_file(settings, f));
+
+			igt_assert_eqstr(settings->name, "foo bar");
+
+			fclose(f);
+		}
 	}
 
 	igt_subtest_group {

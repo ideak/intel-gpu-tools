@@ -679,7 +679,7 @@ bool read_settings_from_file(struct settings *settings, FILE *f)
 
 	settings->dmesg_warn_level = -1;
 
-	while (fscanf(f, "%ms : %ms", &name, &val) == 2) {
+	while (fscanf(f, "%ms : %m[^\n]", &name, &val) == 2) {
 		int numval = atoi(val);
 		PARSE_LINE(settings, name, val, abort_mask, numval);
 		PARSE_LINE(settings, name, val, test_list, val ? strdup(val) : NULL);
