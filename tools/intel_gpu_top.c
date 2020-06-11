@@ -438,11 +438,11 @@ static const char *imc_data_writes_unit(void)
 		return NULL;
 }
 
-#define _open_pmu(cnt, pmu, fd) \
+#define _open_pmu(type, cnt, pmu, fd) \
 ({ \
 	int fd__; \
 \
-	fd__ = perf_igfx_open_group((pmu)->config, (fd)); \
+	fd__ = igt_perf_open_group((type), (pmu)->config, (fd)); \
 	if (fd__ >= 0) { \
 		if ((fd) == -1) \
 			(fd) = fd__; \
@@ -472,23 +472,24 @@ static int pmu_init(struct engines *engines)
 {
 	unsigned int i;
 	int fd;
+	uint64_t type = igt_perf_type_id(engines->device);
 
 	engines->fd = -1;
 	engines->num_counters = 0;
 
 	engines->irq.config = I915_PMU_INTERRUPTS;
-	fd = _open_pmu(engines->num_counters, &engines->irq, engines->fd);
+	fd = _open_pmu(type, engines->num_counters, &engines->irq, engines->fd);
 	if (fd < 0)
 		return -1;
 
 	engines->freq_req.config = I915_PMU_REQUESTED_FREQUENCY;
-	_open_pmu(engines->num_counters, &engines->freq_req, engines->fd);
+	_open_pmu(type, engines->num_counters, &engines->freq_req, engines->fd);
 
 	engines->freq_act.config = I915_PMU_ACTUAL_FREQUENCY;
-	_open_pmu(engines->num_counters, &engines->freq_act, engines->fd);
+	_open_pmu(type, engines->num_counters, &engines->freq_act, engines->fd);
 
 	engines->rc6.config = I915_PMU_RC6_RESIDENCY;
-	_open_pmu(engines->num_counters, &engines->rc6, engines->fd);
+	_open_pmu(type, engines->num_counters, &engines->rc6, engines->fd);
 
 	for (i = 0; i < engines->num_engines; i++) {
 		struct engine *engine = engine_ptr(engines, i);
@@ -508,7 +509,7 @@ static int pmu_init(struct engines *engines)
 					get_pmu_config(dirfd(engines->root),
 						       engine->name,
 						       cnt->counter);
-			fd = _open_pmu(engines->num_counters, cnt->pmu,
+			fd = _open_pmu(type, engines->num_counters, cnt->pmu,
 				       engines->fd);
 			if (fd >= 0)
 				engine->num_counters++;
