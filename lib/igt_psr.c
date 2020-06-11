@@ -40,9 +40,15 @@ static bool psr_active_check(int debugfs_fd, enum psr_mode mode)
 {
 	char buf[PSR_STATUS_MAX_LEN];
 	const char *state = mode == PSR_MODE_1 ? "SRDENT" : "DEEP_SLEEP";
+	int ret;
 
-	igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
-				sizeof(buf));
+	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status",
+				     buf, sizeof(buf));
+	if (ret < 0) {
+		igt_debug("Could not read i915_edp_psr_status: %s\n",
+			  strerror(-ret));
+		return false;
+	}
 
 	igt_skip_on(strstr(buf, "PSR sink not reliable: yes"));
 
@@ -237,8 +243,11 @@ void psr_print_debugfs(int debugfs_fd)
 
 	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
 				      sizeof(buf));
-	if (ret < 0)
+	if (ret < 0) {
+		igt_debug("Could not read i915_edp_psr_status: %s\n",
+			  strerror(-ret));
 		return;
+	}
 
 	igt_debug("%s", buf);
 }
