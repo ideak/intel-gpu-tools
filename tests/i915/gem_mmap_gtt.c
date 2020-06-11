@@ -1043,6 +1043,7 @@ test_write_cpu_read_gtt(int fd)
 struct thread_fault_concurrent {
 	pthread_t thread;
 	int id;
+	int *ctl;
 	uint32_t **ptr;
 };
 
@@ -1053,10 +1054,13 @@ thread_fault_concurrent(void *closure)
 	uint32_t val = 0;
 	int n;
 
-	for (n = 0; n < 32; n++) {
+	for (n = 0; READ_ONCE(*t->ctl); n++) {
 		unsigned int id = (n + t->id) % 32;
 		uint32_t sz = *t->ptr[id] - 1;
 		int idx = rand() % sz + 1;
+
+		igt_assert(t->ptr[id][0]);
+		igt_assert(idx); /* avoid overwriting the size */
 
 		if (n & 1)
 			t->ptr[id][idx] = val;
@@ -1074,7 +1078,11 @@ test_fault_concurrent(int fd)
 {
 	uint32_t *ptr[32];
 	struct thread_fault_concurrent thread[64];
+	int *ctl;
 	int n;
+
+	ctl = create_pointer_size(fd, 4096);
+	*ctl = 1;
 
 	for (n = 0; n < 32; n++) {
 		uint32_t sz = (n + 1) << 19; /* 512KiB increments */
@@ -1083,19 +1091,25 @@ test_fault_concurrent(int fd)
 		*ptr[n] = sz / sizeof(uint32_t); /* num_elems for convenience */
 	}
 
+	__sync_synchronize();
 	for (n = 0; n < 64; n++) {
 		thread[n].ptr = ptr;
 		thread[n].id = n;
-		pthread_create(&thread[n].thread, NULL, thread_fault_concurrent, &thread[n]);
+		thread[n].ctl = ctl;
+		pthread_create(&thread[n].thread, NULL,
+				thread_fault_concurrent, &thread[n]);
 	}
 
 	sleep(2);
+	*ctl = 0;
 
+	__sync_synchronize();
 	for (n = 0; n < 64; n++)
 		pthread_join(thread[n].thread, NULL);
 
 	for (n = 0; n < 32; n++)
 		munmap(ptr[n], *ptr[n] * sizeof(uint32_t));
+	munmap(ctl, 4096);
 }
 
 static int mmap_ioctl(int i915, struct drm_i915_gem_mmap_gtt *arg)
