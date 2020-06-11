@@ -67,10 +67,21 @@ fi
 
 IGT_TEST_ROOT="`readlink -f ${IGT_TEST_ROOT}`"
 
-function find_runner_binaries
+function find_runner_binary # basename
 {
-	IGT_RUNNER=$(find_file igt_runner "$ROOT/build/runner" "$ROOT/runner")
-	IGT_RESUME=$(find_file igt_resume "$ROOT/build/runner" "$ROOT/runner")
+	base=$1
+	shift
+
+	binary=$(find_file "$base" "$ROOT/build/runner" "$ROOT/runner")
+	if [ -x "$binary" ]; then
+		echo "$binary"
+		return 0
+	elif binary=$(which "$base"); then
+		echo "$binary"
+		return 0
+	fi
+
+	return 1
 }
 
 function download_piglit {
@@ -177,8 +188,8 @@ if [ "$USE_PIGLIT" -eq "1" ]; then
 	RESUME_ARGS="resume $NORETRY"
 	LIST_ARGS="print-cmd igt --format {name}"
 else
-	find_runner_binaries
-	if [ ! -x "$IGT_RUNNER" -o ! -x "$IGT_RESUME" ]; then
+	if ! IGT_RUNNER=$(find_runner_binary igt_runner) ||
+	   ! IGT_RESUME=$(find_runner_binary igt_resume); then
 		echo "Could not find igt_runner binaries."
 		echo "Please build the runner, or use Piglit with the -p flag."
 		exit 1
