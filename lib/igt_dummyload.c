@@ -99,7 +99,9 @@ emit_recursive_batch(igt_spin_t *spin,
 	 * are not allowed in the first 256KiB, for fear of negative relocations
 	 * that wrap.
 	 */
-	addr = (random() % 1024 + 1024) << 12;
+	addr = gem_aperture_size(fd) / 2;
+	addr += random() % addr / 2;
+	addr &= -4096;
 
 	nengine = 0;
 	if (opts->engine == ALL_ENGINES) {
