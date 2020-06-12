@@ -82,7 +82,7 @@ emit_recursive_batch(igt_spin_t *spin,
 	unsigned int nengine;
 	int fence_fd = -1;
 	uint32_t *cs, *batch;
-	uint32_t addr;
+	uint64_t addr;
 	int i;
 
 	/*
@@ -100,6 +100,8 @@ emit_recursive_batch(igt_spin_t *spin,
 	 * that wrap.
 	 */
 	addr = gem_aperture_size(fd) / 2;
+	if (addr >> 31)
+		addr = 1 << 31;
 	addr += random() % addr / 2;
 	addr &= -4096;
 
