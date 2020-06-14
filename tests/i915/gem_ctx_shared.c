@@ -23,6 +23,7 @@
  */
 
 #include <unistd.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -526,41 +527,53 @@ static void unplug_show_queue(int i915, struct igt_cork *c, unsigned int engine)
 static uint32_t store_timestamp(int i915,
 				uint32_t ctx, unsigned ring,
 				unsigned mmio_base,
+				int fence,
 				int offset)
 {
 	const bool r64b = intel_gen(intel_get_drm_devid(i915)) >= 8;
+	uint32_t handle = gem_create(i915, 4096);
 	struct drm_i915_gem_exec_object2 obj = {
-		.handle = gem_create(i915, 4096),
+		.handle = handle,
 		.relocation_count = 1,
+		.offset = (32 << 20) + (handle << 16),
 	};
 	struct drm_i915_gem_relocation_entry reloc = {
 		.target_handle = obj.handle,
 		.offset = 2 * sizeof(uint32_t),
+		.presumed_offset = obj.offset,
 		.delta = offset * sizeof(uint32_t),
 		.read_domains = I915_GEM_DOMAIN_INSTRUCTION,
 	};
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(&obj),
 		.buffer_count = 1,
-		.flags = ring,
+		.flags = ring | I915_EXEC_FENCE_IN,
 		.rsvd1 = ctx,
+		.rsvd2 = fence
 	};
 	uint32_t batch[] = {
 		0x24 << 23 | (1 + r64b), /* SRM */
 		mmio_base + 0x358,
-		offset * sizeof(uint32_t),
+		reloc.presumed_offset + reloc.delta,
 		0,
 		MI_BATCH_BUFFER_END
 	};
 
 	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 7);
 
-	gem_write(i915, obj.handle, 0, batch, sizeof(batch));
+	gem_write(i915, handle, 0, batch, sizeof(batch));
 	obj.relocs_ptr = to_user_pointer(&reloc);
 
 	gem_execbuf(i915, &execbuf);
 
-	return obj.handle;
+	return handle;
+}
+
+static void kick_tasklets(void)
+{
+	sched_yield();
+	usleep(100);
+	sched_yield();
 }
 
 static void independent(int i915,
@@ -571,6 +584,8 @@ static void independent(int i915,
 	uint32_t handle[ARRAY_SIZE(priorities)];
 	igt_spin_t *spin[MAX_ELSP_QLEN];
 	unsigned int mmio_base;
+	IGT_CORK_FENCE(cork);
+	int fence;
 
 	mmio_base = gem_engine_mmio_base(i915, e->name);
 	igt_require_f(mmio_base, "mmio base not known\n");
@@ -584,13 +599,20 @@ static void independent(int i915,
 		gem_context_destroy(i915, opts.ctx);
 	}
 
+	fence = igt_cork_plug(&cork, i915);
 	for (int i = 0; i < ARRAY_SIZE(priorities); i++) {
 		uint32_t ctx = gem_queue_create(i915);
 		gem_context_set_priority(i915, ctx, priorities[i]);
 		handle[i] = store_timestamp(i915, ctx,
-					    e->flags, mmio_base, TIMESTAMP);
+					    e->flags, mmio_base,
+					    fence, TIMESTAMP);
 		gem_context_destroy(i915, ctx);
 	}
+	close(fence);
+	kick_tasklets(); /* XXX try to hide cmdparser delays XXX */
+
+	igt_cork_unplug(&cork);
+	igt_debugfs_dump(i915, "i915_engine_info");
 
 	for (int n = 0; n < ARRAY_SIZE(spin); n++)
 		igt_spin_free(i915, spin[n]);
