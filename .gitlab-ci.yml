@@ -252,6 +252,12 @@ test:list-undocumented-tests:
     paths:
       - undocumented_tests.txt
 
+test:verify-blacklists:
+  dependencies:
+    - build:tests-fedora
+  stage: test
+  script: for bl in tests/intel-ci/blacklist{,-pre-merge}.txt; do scripts/verify-blacklist.sh build/runner/igt_runner build/tests "$bl" || exit 1; done
+
 ################### DEPLOY #########################
 
 pages:
