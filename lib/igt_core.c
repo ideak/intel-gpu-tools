@@ -72,6 +72,7 @@
 #include "igt_rc.h"
 #include "igt_list.h"
 #include "igt_device_scan.h"
+#include "igt_thread.h"
 
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
@@ -2687,6 +2688,12 @@ void igt_log(const char *domain, enum igt_log_level level, const char *format, .
 	va_end(args);
 }
 
+static pthread_key_t __vlog_line_continuation;
+
+igt_constructor {
+	pthread_key_create(&__vlog_line_continuation, NULL);
+}
+
 /**
  * igt_vlog:
  * @domain: the log domain, or NULL for no domain
@@ -2705,6 +2712,7 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 {
 	FILE *file;
 	char *line, *formatted_line;
+	char *thread_id;
 	const char *program_name;
 	const char *igt_log_level_str[] = {
 		"DEBUG",
@@ -2713,7 +2721,8 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 		"CRITICAL",
 		"NONE"
 	};
-	static bool line_continuation = false;
+
+	static pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 	assert(format);
 
@@ -2723,23 +2732,37 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 	program_name = command_str;
 #endif
 
+
+	if (igt_thread_is_main()) {
+		thread_id = strdup("");
+	} else {
+		if (asprintf(&thread_id, "[thread:%d] ", gettid()) == -1)
+			thread_id = NULL;
+	}
+
+	if (!thread_id)
+		goto out;
+
 	if (list_subtests && level <= IGT_LOG_WARN)
 		return;
 
 	if (vasprintf(&line, format, args) == -1)
 		return;
 
-	if (line_continuation) {
+	if (pthread_getspecific(__vlog_line_continuation)) {
 		formatted_line = strdup(line);
 		if (!formatted_line)
 			goto out;
-	} else if (asprintf(&formatted_line, "(%s:%d) %s%s%s: %s", program_name,
-		     getpid(), (domain) ? domain : "", (domain) ? "-" : "",
+	} else if (asprintf(&formatted_line, "(%s:%d) %s%s%s%s: %s", program_name,
+		     getpid(), thread_id, (domain) ? domain : "", (domain) ? "-" : "",
 		     igt_log_level_str[level], line) == -1) {
 		goto out;
 	}
 
-	line_continuation = line[strlen(line) - 1] != '\n';
+	if (line[strlen(line) - 1] == '\n')
+		pthread_setspecific(__vlog_line_continuation, (void*) false);
+	else
+		pthread_setspecific(__vlog_line_continuation, (void*) true);
 
 	/* append log buffer */
 	_igt_log_buffer_append(formatted_line);
@@ -2758,6 +2781,8 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 			goto out;
 	}
 
+	pthread_mutex_lock(&print_mutex);
+
 	/* use stderr for warning messages and above */
 	if (level >= IGT_LOG_WARN) {
 		file = stderr;
@@ -2768,13 +2793,18 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 
 	/* prepend all except information messages with process, domain and log
 	 * level information */
-	if (level != IGT_LOG_INFO)
+	if (level != IGT_LOG_INFO) {
 		fwrite(formatted_line, sizeof(char), strlen(formatted_line),
 		       file);
-	else
+	} else {
+		fwrite(thread_id, sizeof(char), strlen(thread_id), file);
 		fwrite(line, sizeof(char), strlen(line), file);
+	}
+
+	pthread_mutex_unlock(&print_mutex);
 
 out:
+	free(thread_id);
 	free(line);
 }
 
