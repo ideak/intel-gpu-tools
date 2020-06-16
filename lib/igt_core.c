@@ -1475,6 +1475,9 @@ void __igt_skip_check(const char *file, const int line,
 	int err = errno;
 	char *err_str = NULL;
 
+	if (!igt_thread_is_main())
+		assert(!"igt_require/skip allowed only in the main thread!");
+
 	if (err)
 		igt_assert_neq(asprintf(&err_str, "Last errno: %i, %s\n", err, strerror(err)),
 			       -1);

@@ -43,6 +43,12 @@ static void *failure_thread(void *data)
 	return NULL;
 }
 
+static void *require_thread(void *data)
+{
+	igt_require(false);
+	return NULL;
+}
+
 static void one_subtest_fail(void) {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -103,10 +109,21 @@ static void simple_failure(void) {
 	igt_exit();
 }
 
+static void require_non_main_thread(void) {
+	pthread_t thread;
+
+	igt_simple_init(fake_argc, fake_argv);
+
+	pthread_create(&thread, 0, require_thread, NULL);
+	pthread_join(thread, NULL);
+
+	igt_exit();
+}
+
 int main(int argc, char **argv)
 {
 	int status;
-	int outfd;
+	int outfd, errfd;
 	pid_t pid;
 
 	/* failing should be limited just to a single subtest */ {
@@ -188,6 +205,21 @@ int main(int argc, char **argv)
 		internal_assert(matches(out, "^FAIL"));
 
 		close(outfd);
+	}
+
+	/* require in a thread should SIGABRT */ {
+		static char err[4096];
+
+		pid = do_fork_bg_with_pipes(require_non_main_thread, NULL, &errfd);
+
+		read_whole_pipe(errfd, err, sizeof(err));
+
+		internal_assert(safe_wait(pid, &status) != -1);
+		internal_assert_wsignaled(status, SIGABRT);
+
+		internal_assert(strstr(err, "allowed only in the main thread"));
+
+		close(errfd);
 	}
 
 	return 0;
