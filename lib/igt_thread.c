@@ -22,11 +22,41 @@
  */
 
 #include <pthread.h>
+#include <stdlib.h>
+#include <stdatomic.h>
 
 #include "igt_core.h"
 #include "igt_thread.h"
 
 static pthread_key_t __igt_is_main_thread;
+
+static _Atomic(bool) __thread_failed = false;
+
+void igt_thread_clear_fail_state(void)
+{
+	assert(igt_thread_is_main());
+
+	__thread_failed = false;
+}
+
+void igt_thread_fail(void)
+{
+	assert(!igt_thread_is_main());
+
+	__thread_failed = true;
+}
+
+void igt_thread_assert_no_failures(void)
+{
+	assert(igt_thread_is_main());
+
+	if (__thread_failed) {
+		/* so we won't get stuck in a loop */
+		igt_thread_clear_fail_state();
+		igt_critical("Failure in a thread!\n");
+		igt_fail(IGT_EXIT_FAILURE);
+	}
+}
 
 bool igt_thread_is_main(void)
 {

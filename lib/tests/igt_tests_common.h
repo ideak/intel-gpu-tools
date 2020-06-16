@@ -30,6 +30,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <regex.h>
 
 /*
  * We need to hide assert from the cocci igt test refactor spatch.
@@ -160,5 +161,26 @@ static inline void read_whole_pipe(int fd, char *buf, size_t buflen)
 		internal_assert(readlen != -1);
 		offset += readlen;
 	}
+}
+
+static inline bool matches(char *str, const char *regex)
+{
+	int ret;
+	regex_t reg;
+
+	ret = regcomp(&reg, regex, REG_EXTENDED | REG_NEWLINE);
+
+	if (ret == 0)
+		ret = regexec(&reg, str, 0, NULL, 0);
+
+	if (0 != ret && REG_NOMATCH != ret) {
+		char err[256];
+		regerror(ret, &reg, err, sizeof(err));
+		printf("%s\n", err);
+		abort();
+	}
+
+	regfree(&reg);
+	return !ret;
 }
 #endif

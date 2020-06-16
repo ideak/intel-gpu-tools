@@ -1272,6 +1272,7 @@ bool __igt_run_subtest(const char *subtest_name, const char *file, const int lin
 		fprintf(stderr, "Starting subtest: %s\n", subtest_name);
 
 	_igt_log_buffer_reset();
+	igt_thread_clear_fail_state();
 
 	igt_gettime(&subtest_time);
 	return (in_subtest = subtest_name);
@@ -1302,6 +1303,7 @@ bool __igt_run_dynamic_subtest(const char *dynamic_subtest_name)
 		fprintf(stderr, "Starting dynamic subtest: %s\n", dynamic_subtest_name);
 
 	_igt_log_buffer_reset();
+	igt_thread_clear_fail_state();
 
 	_igt_dynamic_tests_executed++;
 
@@ -1510,6 +1512,8 @@ void __igt_skip_check(const char *file, const int line,
  */
 void igt_success(void)
 {
+	igt_thread_assert_no_failures();
+
 	if (in_subtest && !in_dynamic_subtest && _igt_dynamic_tests_executed >= 0) {
 		/*
 		 * We're exiting a dynamic container, yield a result
@@ -1548,6 +1552,11 @@ void igt_success(void)
 void igt_fail(int exitcode)
 {
 	assert(exitcode != IGT_EXIT_SUCCESS && exitcode != IGT_EXIT_SKIP);
+
+	if (!igt_thread_is_main()) {
+		igt_thread_fail();
+		pthread_exit(NULL);
+	}
 
 	igt_debug_wait_for_keypress("failure");
 
@@ -2048,6 +2057,9 @@ void __igt_abort(const char *domain, const char *file, const int line,
 void igt_exit(void)
 {
 	int tmp;
+
+	if (!test_with_subtests)
+		igt_thread_assert_no_failures();
 
 	igt_exit_called = true;
 
