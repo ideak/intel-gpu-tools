@@ -55,7 +55,6 @@
 #include "sw_sync.h"
 #include "i915/gem_mman.h"
 
-#include "ewma.h"
 #include "i915/gem_engine_topology.h"
 
 enum intel_engine_id {
@@ -154,20 +153,11 @@ struct w_step
 
 	struct drm_i915_gem_execbuffer2 eb;
 	struct drm_i915_gem_exec_object2 *obj;
-	struct drm_i915_gem_relocation_entry reloc[5];
+	struct drm_i915_gem_relocation_entry reloc[1];
 	unsigned long bb_sz;
 	uint32_t bb_handle;
-	uint32_t *seqno_value;
-	uint32_t *seqno_address;
-	uint32_t *rt0_value;
-	uint32_t *rt0_address;
-	uint32_t *rt1_address;
-	uint32_t *latch_value;
-	uint32_t *latch_address;
 	uint32_t *recursive_bb_start;
 };
-
-DECLARE_EWMA(uint64_t, rt, 4, 2)
 
 struct ctx {
 	uint32_t id;
@@ -176,9 +166,7 @@ struct ctx {
 	enum intel_engine_id *engine_map;
 	unsigned int bond_count;
 	struct bond *bonds;
-	bool targets_instance;
-	bool wants_balance;
-	unsigned int static_vcs;
+	bool load_balance;
 	uint64_t sseu;
 };
 
@@ -194,13 +182,11 @@ struct workload
 	pthread_t thread;
 	bool run;
 	bool background;
-	const struct workload_balancer *balancer;
 	unsigned int repeat;
 	unsigned int flags;
 	bool print_stats;
 
 	uint32_t bb_prng;
-	uint32_t prng;
 
 	struct timespec repeat_start;
 
@@ -210,48 +196,15 @@ struct workload
 	int sync_timeline;
 	uint32_t sync_seqno;
 
-	uint32_t seqno[NUM_ENGINES];
-	struct drm_i915_gem_exec_object2 status_object[2];
-	uint32_t *status_page;
-	uint32_t *status_cs;
-	unsigned int vcs_rr;
-
-	unsigned long qd_sum[NUM_ENGINES];
-	unsigned long nr_bb[NUM_ENGINES];
-
 	struct igt_list_head requests[NUM_ENGINES];
 	unsigned int nrequest[NUM_ENGINES];
-
-	struct workload *global_wrk;
-	const struct workload_balancer *global_balancer;
-	pthread_mutex_t mutex;
-
-	union {
-		struct rtavg {
-			struct ewma_rt avg[NUM_ENGINES];
-			uint32_t last[NUM_ENGINES];
-		} rt;
-	};
-
-	struct busy_balancer {
-		int fd;
-		bool first;
-		unsigned int num_engines;
-		unsigned int engine_map[NUM_ENGINES];
-		uint64_t t_prev;
-		uint64_t prev[NUM_ENGINES];
-		double busy[NUM_ENGINES];
-	} busy_balancer;
 };
 
-struct intel_mmio_data mmio_data;
 static const unsigned int nop_calibration_us = 1000;
 static bool has_nop_calibration = false;
 static bool sequential = true;
 
 static unsigned int master_prng;
-
-static unsigned int context_vcs_rr;
 
 static int verbose = 1;
 static int fd;
@@ -259,24 +212,9 @@ static struct drm_i915_gem_context_param_sseu device_sseu = {
 	.slice_mask = -1 /* Force read on first use. */
 };
 
-#define SWAPVCS		(1<<0)
-#define SEQNO		(1<<1)
-#define BALANCE		(1<<2)
-#define RT		(1<<3)
-#define VCS2REMAP	(1<<4)
-#define INITVCSRR	(1<<5)
-#define SYNCEDCLIENTS	(1<<6)
-#define HEARTBEAT	(1<<7)
-#define GLOBAL_BALANCE	(1<<8)
-#define DEPSYNC		(1<<9)
-#define I915		(1<<10)
-#define SSEU		(1<<11)
-
-#define SEQNO_IDX(engine) ((engine) * 16)
-#define SEQNO_OFFSET(engine) (SEQNO_IDX(engine) * sizeof(uint32_t))
-
-#define RCS_TIMESTAMP (0x2000 + 0x358)
-#define REG(x) (volatile uint32_t *)((volatile char *)igt_global_mmio + x)
+#define SYNCEDCLIENTS	(1<<1)
+#define DEPSYNC		(1<<2)
+#define SSEU		(1<<3)
 
 static const char *ring_str_map[NUM_ENGINES] = {
 	[DEFAULT] = "DEFAULT",
@@ -579,26 +517,6 @@ static unsigned int num_engines_in_class(enum intel_engine_id class)
 }
 
 static void
-fill_engines_class(struct i915_engine_class_instance *ci,
-		   enum intel_engine_id class)
-{
-	unsigned int i, j = 0;
-
-	igt_assert(class == VCS);
-
-	query_engines();
-
-	for (i = 0; i < __num_engines; i++) {
-		if (__engines[i].engine_class != I915_ENGINE_CLASS_VIDEO)
-			continue;
-
-		ci[j].engine_class = __engines[i].engine_class;
-		ci[j].engine_instance = __engines[i].engine_instance;
-		j++;
-	}
-}
-
-static void
 fill_engines_id_class(enum intel_engine_id *list,
 		      enum intel_engine_id class)
 {
@@ -744,7 +662,6 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 	char *_token, *token, *tctx = NULL, *tstart = desc;
 	char *field, *fctx = NULL, *fstart;
 	struct w_step step, *steps = NULL;
-	bool bcs_used = false;
 	unsigned int valid;
 	int i, j, tmp;
 
@@ -962,9 +879,6 @@ parse_workload(struct w_arg *arg, unsigned int flags, struct workload *app_w)
 			valid++;
 
 			step.engine = i;
-
-			if (step.engine == BCS)
-				bcs_used = true;
 		}
 
 		if ((field = strtok_r(fstart, ".", &fctx))) {
@@ -1089,9 +1003,6 @@ add_step:
 		}
 	}
 
-	if (bcs_used && (flags & VCS2REMAP) && verbose)
-		printf("BCS usage in workload with VCS2 remapping enabled!\n");
-
 	return wrk;
 }
 
@@ -1147,7 +1058,7 @@ static unsigned int get_duration(struct workload *wrk, struct w_step *w)
 static struct ctx *
 __get_ctx(struct workload *wrk, const struct w_step *w)
 {
-	return &wrk->ctx_list[w->context * 2];
+	return &wrk->ctx_list[w->context];
 }
 
 static unsigned long
@@ -1179,8 +1090,7 @@ get_bb_sz(const struct w_step *w, unsigned int duration)
 	return d;
 }
 
-static void
-init_bb(struct w_step *w, unsigned int flags)
+static void init_bb(struct w_step *w)
 {
 	const unsigned int arb_period =
 			__get_bb_sz(w, w->preempt_us) / sizeof(uint32_t);
@@ -1202,8 +1112,7 @@ init_bb(struct w_step *w, unsigned int flags)
 	munmap(ptr, mmap_len);
 }
 
-static unsigned int
-terminate_bb(struct w_step *w, unsigned int flags)
+static unsigned int terminate_bb(struct w_step *w)
 {
 	const uint32_t bbe = 0xa << 23;
 	unsigned long mmap_start, mmap_len;
@@ -1211,13 +1120,7 @@ terminate_bb(struct w_step *w, unsigned int flags)
 	unsigned int r = 0;
 	uint32_t *ptr, *cs;
 
-	igt_assert(((flags & RT) && (flags & SEQNO)) || !(flags & RT));
-
 	batch_start -= sizeof(uint32_t); /* bbend */
-	if (flags & SEQNO)
-		batch_start -= 4 * sizeof(uint32_t);
-	if (flags & RT)
-		batch_start -= 12 * sizeof(uint32_t);
 
 	if (w->unbound_duration)
 		batch_start -= 4 * sizeof(uint32_t); /* MI_ARB_CHK + MI_BATCH_BUFFER_START */
@@ -1242,49 +1145,6 @@ terminate_bb(struct w_step *w, unsigned int flags)
 		*cs++ = 0;
 	}
 
-	if (flags & SEQNO) {
-		w->reloc[r++].offset = batch_start + sizeof(uint32_t);
-		batch_start += 4 * sizeof(uint32_t);
-
-		*cs++ = MI_STORE_DWORD_IMM;
-		w->seqno_address = cs;
-		*cs++ = 0;
-		*cs++ = 0;
-		w->seqno_value = cs;
-		*cs++ = 0;
-	}
-
-	if (flags & RT) {
-		w->reloc[r++].offset = batch_start + sizeof(uint32_t);
-		batch_start += 4 * sizeof(uint32_t);
-
-		*cs++ = MI_STORE_DWORD_IMM;
-		w->rt0_address = cs;
-		*cs++ = 0;
-		*cs++ = 0;
-		w->rt0_value = cs;
-		*cs++ = 0;
-
-		w->reloc[r++].offset = batch_start + 2 * sizeof(uint32_t);
-		batch_start += 4 * sizeof(uint32_t);
-
-		*cs++ = 0x24 << 23 | 2; /* MI_STORE_REG_MEM */
-		*cs++ = RCS_TIMESTAMP;
-		w->rt1_address = cs;
-		*cs++ = 0;
-		*cs++ = 0;
-
-		w->reloc[r++].offset = batch_start + sizeof(uint32_t);
-		batch_start += 4 * sizeof(uint32_t);
-
-		*cs++ = MI_STORE_DWORD_IMM;
-		w->latch_address = cs;
-		*cs++ = 0;
-		*cs++ = 0;
-		w->latch_value = cs;
-		*cs++ = 0;
-	}
-
 	*cs = bbe;
 
 	return r;
@@ -1301,17 +1161,9 @@ static const unsigned int eb_engine_map[NUM_ENGINES] = {
 };
 
 static void
-eb_set_engine(struct drm_i915_gem_execbuffer2 *eb,
-	      enum intel_engine_id engine,
-	      unsigned int flags)
+eb_set_engine(struct drm_i915_gem_execbuffer2 *eb, enum intel_engine_id engine)
 {
-	if (engine == VCS2 && (flags & VCS2REMAP))
-		engine = BCS;
-
-	if ((flags & I915) && engine == VCS)
-		eb->flags = 0;
-	else
-		eb->flags = eb_engine_map[engine];
+	eb->flags = eb_engine_map[engine];
 }
 
 static unsigned int
@@ -1324,20 +1176,20 @@ find_engine_in_map(struct ctx *ctx, enum intel_engine_id engine)
 			return i + 1;
 	}
 
-	igt_assert(ctx->wants_balance);
+	igt_assert(ctx->load_balance);
 	return 0;
 }
 
 static void
 eb_update_flags(struct workload *wrk, struct w_step *w,
-		enum intel_engine_id engine, unsigned int flags)
+		enum intel_engine_id engine)
 {
 	struct ctx *ctx = __get_ctx(wrk, w);
 
 	if (ctx->engine_map)
 		w->eb.flags = find_engine_in_map(ctx, engine);
 	else
-		eb_set_engine(&w->eb, engine, flags);
+		eb_set_engine(&w->eb, engine);
 
 	w->eb.flags |= I915_EXEC_HANDLE_LUT;
 	w->eb.flags |= I915_EXEC_NO_RELOC;
@@ -1347,32 +1199,18 @@ eb_update_flags(struct workload *wrk, struct w_step *w,
 		w->eb.flags |= I915_EXEC_FENCE_OUT;
 }
 
-static struct drm_i915_gem_exec_object2 *
-get_status_objects(struct workload *wrk)
-{
-	if (wrk->flags & GLOBAL_BALANCE)
-		return wrk->global_wrk->status_object;
-	else
-		return wrk->status_object;
-}
-
 static uint32_t
 get_ctxid(struct workload *wrk, struct w_step *w)
 {
-	struct ctx *ctx = __get_ctx(wrk, w);
-
-	if (ctx->targets_instance && ctx->wants_balance && w->engine == VCS)
-		return wrk->ctx_list[w->context * 2 + 1].id;
-	else
-		return wrk->ctx_list[w->context * 2].id;
+	return wrk->ctx_list[w->context].id;
 }
 
 static void
-alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
+alloc_step_batch(struct workload *wrk, struct w_step *w)
 {
 	enum intel_engine_id engine = w->engine;
 	unsigned int j = 0;
-	unsigned int nr_obj = 3 + w->data_deps.nr;
+	unsigned int nr_obj = 2 + w->data_deps.nr;
 	unsigned int i;
 
 	w->obj = calloc(nr_obj, sizeof(*w->obj));
@@ -1382,11 +1220,6 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 	w->obj[j].flags = EXEC_OBJECT_WRITE;
 	j++;
 	igt_assert(j < nr_obj);
-
-	if (flags & SEQNO) {
-		w->obj[j++] = get_status_objects(wrk)[0];
-		igt_assert(j < nr_obj);
-	}
 
 	for (i = 0; i < w->data_deps.nr; i++) {
 		igt_assert(w->data_deps.list[i] <= 0);
@@ -1410,26 +1243,20 @@ alloc_step_batch(struct workload *wrk, struct w_step *w, unsigned int flags)
 		w->bb_sz = get_bb_sz(w, w->duration.max);
 
 	w->bb_handle = w->obj[j].handle = gem_create(fd, w->bb_sz + (w->unbound_duration ? 4096 : 0));
-	init_bb(w, flags);
-	w->obj[j].relocation_count = terminate_bb(w, flags);
+	init_bb(w);
+	w->obj[j].relocation_count = terminate_bb(w);
 
 	if (w->obj[j].relocation_count) {
+		igt_assert(w->unbound_duration);
 		w->obj[j].relocs_ptr = to_user_pointer(&w->reloc);
-		for (i = 0; i < w->obj[j].relocation_count; i++)
-			w->reloc[i].target_handle = 1;
-		if (w->unbound_duration)
-			w->reloc[0].target_handle = j;
+		w->reloc[0].target_handle = j;
 	}
 
 	w->eb.buffers_ptr = to_user_pointer(w->obj);
 	w->eb.buffer_count = j + 1;
 	w->eb.rsvd1 = get_ctxid(wrk, w);
 
-	if (flags & SWAPVCS && engine == VCS1)
-		engine = VCS2;
-	else if (flags & SWAPVCS && engine == VCS2)
-		engine = VCS1;
-	eb_update_flags(wrk, w, engine, flags);
+	eb_update_flags(wrk, w, engine);
 #ifdef DEBUG
 	printf("%u: %u:|", w->idx, w->eb.buffer_count);
 	for (i = 0; i <= j; i++)
@@ -1528,7 +1355,7 @@ set_ctx_sseu(struct ctx *ctx, uint64_t slice_mask)
 	if (slice_mask == -1)
 		slice_mask = device_sseu.slice_mask;
 
-	if (ctx->engine_map && ctx->wants_balance) {
+	if (ctx->engine_map && ctx->load_balance) {
 		sseu.flags = I915_CONTEXT_SSEU_FLAG_ENGINE_INDEX;
 		sseu.engine.engine_class = I915_ENGINE_CLASS_INVALID;
 		sseu.engine.engine_instance = 0;
@@ -1566,51 +1393,22 @@ static size_t sizeof_engines_bond(int count)
 
 #define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
 
-static int
-prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
+static int prepare_workload(unsigned int id, struct workload *wrk)
 {
-	unsigned int ctx_vcs;
+	uint32_t share_vm = 0;
 	int max_ctx = -1;
 	struct w_step *w;
 	int i, j;
 
 	wrk->id = id;
-	wrk->prng = rand();
 	wrk->bb_prng = (wrk->flags & SYNCEDCLIENTS) ? master_prng : rand();
 	wrk->run = true;
-
-	ctx_vcs =  0;
-	if (flags & INITVCSRR)
-		ctx_vcs = id & 1;
-	wrk->vcs_rr = ctx_vcs;
-
-	if (flags & GLOBAL_BALANCE) {
-		int ret = pthread_mutex_init(&wrk->mutex, NULL);
-		igt_assert(ret == 0);
-	}
-
-	if (flags & SEQNO) {
-		if (!(flags & GLOBAL_BALANCE) || id == 0) {
-			uint32_t handle;
-
-			handle = gem_create(fd, 4096);
-			gem_set_caching(fd, handle, I915_CACHING_CACHED);
-			wrk->status_object[0].handle = handle;
-			wrk->status_page = gem_mmap__cpu(fd, handle, 0, 4096,
-							 PROT_READ);
-
-			handle = gem_create(fd, 4096);
-			wrk->status_object[1].handle = handle;
-			wrk->status_cs = gem_mmap__wc(fd, handle,
-						      0, 4096, PROT_WRITE);
-		}
-	}
 
 	/*
 	 * Pre-scan workload steps to allocate context list storage.
 	 */
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
-		int ctx = w->context * 2 + 1; /* Odd slots are special. */
+		int ctx = w->context + 1;
 		int delta;
 
 		w->wrk = wrk;
@@ -1630,27 +1428,16 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	}
 
 	/*
-	 * Identify if contexts target specific engine instances and if they
-	 * want to be balanced.
-	 *
 	 * Transfer over engine map configuration from the workload step.
 	 */
-	for (j = 0; j < wrk->nr_ctxs; j += 2) {
+	for (j = 0; j < wrk->nr_ctxs; j++) {
 		struct ctx *ctx = &wrk->ctx_list[j];
 
-		bool targets = false;
-		bool balance = false;
-
 		for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
-			if (w->context != (j / 2))
+			if (w->context != j)
 				continue;
 
-			if (w->type == BATCH) {
-				if (w->engine == VCS)
-					balance = true;
-				else
-					targets = true;
-			} else if (w->type == ENGINE_MAP) {
+			if (w->type == ENGINE_MAP) {
 				ctx->engine_map = w->engine_map;
 				ctx->engine_map_count = w->engine_map_count;
 			} else if (w->type == LOAD_BALANCE) {
@@ -1658,9 +1445,9 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 					wsim_err("Load balancing needs an engine map!\n");
 					return 1;
 				}
-				ctx->wants_balance = w->load_balance;
+				ctx->load_balance = w->load_balance;
 			} else if (w->type == BOND) {
-				if (!ctx->wants_balance) {
+				if (!ctx->load_balance) {
 					wsim_err("Engine bonds need load balancing engine map!\n");
 					return 1;
 				}
@@ -1675,132 +1462,52 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 					w->bond_master;
 			}
 		}
-
-		wrk->ctx_list[j].targets_instance = targets;
-		if (flags & I915)
-			wrk->ctx_list[j].wants_balance |= balance;
 	}
-
-	/*
-	 * Ensure VCS is not allowed with engine map contexts.
-	 */
-	for (j = 0; j < wrk->nr_ctxs; j += 2) {
-		for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
-			if (w->context != (j / 2))
-				continue;
-
-			if (w->type != BATCH)
-				continue;
-
-			if (wrk->ctx_list[j].engine_map &&
-			    !wrk->ctx_list[j].wants_balance &&
-			    (w->engine == VCS || w->engine == DEFAULT)) {
-				wsim_err("Batches targetting engine maps must use explicit engines!\n");
-				return -1;
-			}
-		}
-	}
-
 
 	/*
 	 * Create and configure contexts.
 	 */
-	for (i = 0; i < wrk->nr_ctxs; i += 2) {
+	for (i = 0; i < wrk->nr_ctxs; i++) {
+		struct drm_i915_gem_context_create_ext_setparam ext = {
+			.base.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
+			.param.param = I915_CONTEXT_PARAM_VM,
+		};
+		struct drm_i915_gem_context_create_ext args = { };
 		struct ctx *ctx = &wrk->ctx_list[i];
-		uint32_t ctx_id, share_vm = 0;
+		uint32_t ctx_id;
 
-		if (ctx->id)
-			continue;
+		igt_assert(!ctx->id);
 
-		if ((flags & I915) || ctx->engine_map) {
-			struct drm_i915_gem_context_create_ext_setparam ext = {
-				.base.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
-				.param.param = I915_CONTEXT_PARAM_VM,
+		/* Find existing context to share ppgtt with. */
+		for (j = 0; !share_vm && j < wrk->nr_ctxs; j++) {
+			struct drm_i915_gem_context_param param = {
+				.param = I915_CONTEXT_PARAM_VM,
+				.ctx_id = wrk->ctx_list[j].id,
 			};
-			struct drm_i915_gem_context_create_ext args = { };
 
-			/* Find existing context to share ppgtt with. */
-			for (j = 0; j < wrk->nr_ctxs; j++) {
-				struct drm_i915_gem_context_param param = {
-					.param = I915_CONTEXT_PARAM_VM,
-				};
+			if (!param.ctx_id)
+				continue;
 
-				if (!wrk->ctx_list[j].id)
-					continue;
-
-				param.ctx_id = wrk->ctx_list[j].id;
-
-				gem_context_get_param(fd, &param);
-				igt_assert(param.value);
-
-				share_vm = param.value;
-
-				ext.param.value = share_vm;
-				args.flags =
-				    I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS;
-				args.extensions = to_user_pointer(&ext);
-				break;
-			}
-
-			if ((!ctx->engine_map && !ctx->targets_instance) ||
-			    (ctx->engine_map && ctx->wants_balance))
-				args.flags |=
-				     I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE;
-
-			drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT,
-				 &args);
-
-			ctx_id = args.ctx_id;
-		} else {
-			struct drm_i915_gem_context_create args = {};
-
-			drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE, &args);
-			ctx_id = args.ctx_id;
+			gem_context_get_param(fd, &param);
+			igt_assert(param.value);
+			share_vm = param.value;
+			break;
 		}
 
-		igt_assert(ctx_id);
+		if (share_vm) {
+			ext.param.value = share_vm;
+			args.flags = I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS;
+			args.extensions = to_user_pointer(&ext);
+		}
+
+		drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT, &args);
+		igt_assert(args.ctx_id);
+
+		ctx_id = args.ctx_id;
 		ctx->id = ctx_id;
 		ctx->sseu = device_sseu.slice_mask;
 
-		if (flags & GLOBAL_BALANCE) {
-			ctx->static_vcs = context_vcs_rr;
-			context_vcs_rr ^= 1;
-		} else {
-			ctx->static_vcs = ctx_vcs;
-			ctx_vcs ^= 1;
-		}
-
 		__configure_context(ctx_id, wrk->prio);
-
-		/*
-		 * Do we need a separate context to satisfy this workloads which
-		 * both want to target specific engines and be balanced by i915?
-		 */
-		if ((flags & I915) && ctx->wants_balance &&
-		    ctx->targets_instance && !ctx->engine_map) {
-			struct drm_i915_gem_context_create_ext_setparam ext = {
-				.base.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
-				.param.param = I915_CONTEXT_PARAM_VM,
-				.param.value = share_vm,
-			};
-			struct drm_i915_gem_context_create_ext args = {
-				.extensions = to_user_pointer(&ext),
-				.flags =
-				    I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS |
-				    I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE,
-			};
-
-			igt_assert(share_vm);
-
-			drmIoctl(fd, DRM_IOCTL_I915_GEM_CONTEXT_CREATE_EXT,
-				 &args);
-
-			igt_assert(args.ctx_id);
-			ctx_id = args.ctx_id;
-			wrk->ctx_list[i + 1].id = args.ctx_id;
-
-			__configure_context(ctx_id, wrk->prio);
-		}
 
 		if (ctx->engine_map) {
 			struct i915_context_param_engines *set_engines =
@@ -1815,7 +1522,7 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			};
 			struct i915_context_engines_bond *last = NULL;
 
-			if (ctx->wants_balance) {
+			if (ctx->load_balance) {
 				set_engines->extensions =
 					to_user_pointer(load_balance);
 
@@ -1870,44 +1577,16 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 			load_balance->base.next_extension = to_user_pointer(last);
 
 			gem_context_set_param(fd, &param);
-		} else if (ctx->wants_balance) {
-			const unsigned int count = num_engines_in_class(VCS);
-			struct i915_context_engines_load_balance *load_balance =
-				alloca0(sizeof_load_balance(count));
-			struct i915_context_param_engines *set_engines =
-				alloca0(sizeof_param_engines(count + 1));
-			struct drm_i915_gem_context_param param = {
-				.ctx_id = ctx_id,
-				.param = I915_CONTEXT_PARAM_ENGINES,
-				.size = sizeof_param_engines(count + 1),
-				.value = to_user_pointer(set_engines),
-			};
-
-			set_engines->extensions = to_user_pointer(load_balance);
-
-			set_engines->engines[0].engine_class =
-				I915_ENGINE_CLASS_INVALID;
-			set_engines->engines[0].engine_instance =
-				I915_ENGINE_CLASS_INVALID_NONE;
-			fill_engines_class(&set_engines->engines[1], VCS);
-
-			load_balance->base.name =
-				I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
-			load_balance->num_siblings = count;
-
-			fill_engines_class(&load_balance->engines[0], VCS);
-
-			gem_context_set_param(fd, &param);
 		}
 
 		if (wrk->sseu) {
 			/* Set to slice 0 only, one slice. */
 			ctx->sseu = set_ctx_sseu(ctx, 1);
 		}
-
-		if (share_vm)
-			vm_destroy(fd, share_vm);
 	}
+
+	if (share_vm)
+		vm_destroy(fd, share_vm);
 
 	/* Record default preemption. */
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
@@ -1954,16 +1633,10 @@ prepare_workload(unsigned int id, struct workload *wrk, unsigned int flags)
 	 * Allocate batch buffers.
 	 */
 	for (i = 0, w = wrk->steps; i < wrk->nr_steps; i++, w++) {
-		unsigned int _flags = flags;
-		enum intel_engine_id engine = w->engine;
-
 		if (w->type != BATCH)
 			continue;
 
-		if (engine == VCS)
-			_flags &= ~SWAPVCS;
-
-		alloc_step_batch(wrk, w, _flags);
+		alloc_step_batch(wrk, w);
 	}
 
 	return 0;
@@ -1978,602 +1651,6 @@ static double elapsed(const struct timespec *start, const struct timespec *end)
 static int elapsed_us(const struct timespec *start, const struct timespec *end)
 {
 	return elapsed(start, end) * 1e6;
-}
-
-static enum intel_engine_id get_vcs_engine(unsigned int n)
-{
-	const enum intel_engine_id vcs_engines[2] = { VCS1, VCS2 };
-
-	igt_assert(n < ARRAY_SIZE(vcs_engines));
-
-	return vcs_engines[n];
-}
-
-static uint32_t new_seqno(struct workload *wrk, enum intel_engine_id engine)
-{
-	uint32_t seqno;
-	int ret;
-
-	if (wrk->flags & GLOBAL_BALANCE) {
-		igt_assert(wrk->global_wrk);
-		wrk = wrk->global_wrk;
-
-		ret = pthread_mutex_lock(&wrk->mutex);
-		igt_assert(ret == 0);
-	}
-
-	seqno = ++wrk->seqno[engine];
-
-	if (wrk->flags & GLOBAL_BALANCE) {
-		ret = pthread_mutex_unlock(&wrk->mutex);
-		igt_assert(ret == 0);
-	}
-
-	return seqno;
-}
-
-static uint32_t
-current_seqno(struct workload *wrk, enum intel_engine_id engine)
-{
-	if (wrk->flags & GLOBAL_BALANCE)
-		return wrk->global_wrk->seqno[engine];
-	else
-		return wrk->seqno[engine];
-}
-
-static uint32_t
-read_status_page(struct workload *wrk, unsigned int idx)
-{
-	if (wrk->flags & GLOBAL_BALANCE)
-		return READ_ONCE(wrk->global_wrk->status_page[idx]);
-	else
-		return READ_ONCE(wrk->status_page[idx]);
-}
-
-static uint32_t
-current_gpu_seqno(struct workload *wrk, enum intel_engine_id engine)
-{
-       return read_status_page(wrk, SEQNO_IDX(engine));
-}
-
-struct workload_balancer {
-	unsigned int id;
-	const char *name;
-	const char *desc;
-	unsigned int flags;
-	unsigned int min_gen;
-
-	int (*init)(const struct workload_balancer *balancer,
-		    struct workload *wrk);
-	unsigned int (*get_qd)(const struct workload_balancer *balancer,
-			       struct workload *wrk,
-			       enum intel_engine_id engine);
-	enum intel_engine_id (*balance)(const struct workload_balancer *balancer,
-					struct workload *wrk, struct w_step *w);
-};
-
-static enum intel_engine_id
-rr_balance(const struct workload_balancer *balancer,
-	   struct workload *wrk, struct w_step *w)
-{
-	unsigned int engine;
-
-	engine = get_vcs_engine(wrk->vcs_rr);
-	wrk->vcs_rr ^= 1;
-
-	return engine;
-}
-
-static enum intel_engine_id
-rand_balance(const struct workload_balancer *balancer,
-	     struct workload *wrk, struct w_step *w)
-{
-	return get_vcs_engine(hars_petruska_f54_1_random(&wrk->prng) & 1);
-}
-
-static unsigned int
-get_qd_depth(const struct workload_balancer *balancer,
-	     struct workload *wrk, enum intel_engine_id engine)
-{
-	return current_seqno(wrk, engine) - current_gpu_seqno(wrk, engine);
-}
-
-static enum intel_engine_id
-__qd_select_engine(struct workload *wrk, const unsigned long *qd, bool random)
-{
-	unsigned int n;
-
-	if (qd[VCS1] < qd[VCS2])
-		n = 0;
-	else if (qd[VCS1] > qd[VCS2])
-		n = 1;
-	else if (random)
-		n = hars_petruska_f54_1_random(&wrk->prng) & 1;
-	else
-		n = wrk->vcs_rr;
-	wrk->vcs_rr = n ^ 1;
-
-	return get_vcs_engine(n);
-}
-
-static enum intel_engine_id
-__qd_balance(const struct workload_balancer *balancer,
-	     struct workload *wrk, struct w_step *w, bool random)
-{
-	enum intel_engine_id engine;
-	unsigned long qd[NUM_ENGINES];
-
-	igt_assert(w->engine == VCS);
-
-	qd[VCS1] = balancer->get_qd(balancer, wrk, VCS1);
-	wrk->qd_sum[VCS1] += qd[VCS1];
-
-	qd[VCS2] = balancer->get_qd(balancer, wrk, VCS2);
-	wrk->qd_sum[VCS2] += qd[VCS2];
-
-	engine = __qd_select_engine(wrk, qd, random);
-
-#ifdef DEBUG
-	printf("qd_balance[%u]: 1:%ld 2:%ld rr:%u = %u\t(%u - %u) (%u - %u)\n",
-	       wrk->id, qd[VCS1], qd[VCS2], wrk->vcs_rr, engine,
-	       current_seqno(wrk, VCS1), current_gpu_seqno(wrk, VCS1),
-	       current_seqno(wrk, VCS2), current_gpu_seqno(wrk, VCS2));
-#endif
-	return engine;
-}
-
-static enum intel_engine_id
-qd_balance(const struct workload_balancer *balancer,
-	     struct workload *wrk, struct w_step *w)
-{
-	return __qd_balance(balancer, wrk, w, false);
-}
-
-static enum intel_engine_id
-qdr_balance(const struct workload_balancer *balancer,
-	     struct workload *wrk, struct w_step *w)
-{
-	return __qd_balance(balancer, wrk, w, true);
-}
-
-static enum intel_engine_id
-qdavg_balance(const struct workload_balancer *balancer,
-	     struct workload *wrk, struct w_step *w)
-{
-	unsigned long qd[NUM_ENGINES];
-	unsigned int engine;
-
-	igt_assert(w->engine == VCS);
-
-	for (engine = VCS1; engine <= VCS2; engine++) {
-		qd[engine] = balancer->get_qd(balancer, wrk, engine);
-		wrk->qd_sum[engine] += qd[engine];
-
-		ewma_rt_add(&wrk->rt.avg[engine], qd[engine]);
-		qd[engine] = ewma_rt_read(&wrk->rt.avg[engine]);
-	}
-
-	engine = __qd_select_engine(wrk, qd, false);
-#ifdef DEBUG
-	printf("qdavg_balance[%u]: 1:%ld 2:%ld rr:%u = %u\t(%u - %u) (%u - %u)\n",
-	       wrk->id, qd[VCS1], qd[VCS2], wrk->vcs_rr, engine,
-	       current_seqno(wrk, VCS1), current_gpu_seqno(wrk, VCS1),
-	       current_seqno(wrk, VCS2), current_gpu_seqno(wrk, VCS2));
-#endif
-	return engine;
-}
-
-static enum intel_engine_id
-__rt_select_engine(struct workload *wrk, unsigned long *qd, bool random)
-{
-	qd[VCS1] >>= 10;
-	qd[VCS2] >>= 10;
-
-	return __qd_select_engine(wrk, qd, random);
-}
-
-struct rt_depth {
-	uint32_t seqno;
-	uint32_t submitted;
-	uint32_t completed;
-};
-
-static void get_rt_depth(struct workload *wrk,
-			 unsigned int engine,
-			 struct rt_depth *rt)
-{
-	const unsigned int idx = SEQNO_IDX(engine);
-	uint32_t latch;
-
-	do {
-		latch = read_status_page(wrk, idx + 3);
-		rt->submitted = read_status_page(wrk, idx + 1);
-		rt->completed = read_status_page(wrk, idx + 2);
-		rt->seqno = read_status_page(wrk, idx);
-	} while (latch != rt->seqno);
-}
-
-static enum intel_engine_id
-__rt_balance(const struct workload_balancer *balancer,
-	     struct workload *wrk, struct w_step *w, bool random)
-{
-	unsigned long qd[NUM_ENGINES];
-	unsigned int engine;
-
-	igt_assert(w->engine == VCS);
-
-	/* Estimate the "speed" of the most recent batch
-	 *    (finish time - submit time)
-	 * and use that as an approximate for the total remaining time for
-	 * all batches on that engine, plus the time we expect this batch to
-	 * take. We try to keep the total balanced between the engines.
-	 */
-	for (engine = VCS1; engine <= VCS2; engine++) {
-		struct rt_depth rt;
-
-		get_rt_depth(wrk, engine, &rt);
-		qd[engine] = current_seqno(wrk, engine) - rt.seqno;
-		wrk->qd_sum[engine] += qd[engine];
-		qd[engine] = (qd[engine] + 1) * (rt.completed - rt.submitted);
-#ifdef DEBUG
-		printf("rt[0] = %d (%d - %d) x %d (%d - %d) = %ld\n",
-		       current_seqno(wrk, engine) - rt.seqno,
-		       current_seqno(wrk, engine), rt.seqno,
-		       rt.completed - rt.submitted,
-		       rt.completed, rt.submitted,
-		       qd[engine]);
-#endif
-	}
-
-	return __rt_select_engine(wrk, qd, random);
-}
-
-static enum intel_engine_id
-rt_balance(const struct workload_balancer *balancer,
-	   struct workload *wrk, struct w_step *w)
-{
-
-	return __rt_balance(balancer, wrk, w, false);
-}
-
-static enum intel_engine_id
-rtr_balance(const struct workload_balancer *balancer,
-	   struct workload *wrk, struct w_step *w)
-{
-	return __rt_balance(balancer, wrk, w, true);
-}
-
-static enum intel_engine_id
-rtavg_balance(const struct workload_balancer *balancer,
-	   struct workload *wrk, struct w_step *w)
-{
-	unsigned long qd[NUM_ENGINES];
-	unsigned int engine;
-
-	igt_assert(w->engine == VCS);
-
-	/* Estimate the average "speed" of the most recent batches
-	 *    (finish time - submit time)
-	 * and use that as an approximate for the total remaining time for
-	 * all batches on that engine plus the time we expect to execute in.
-	 * We try to keep the total remaining balanced between the engines.
-	 */
-	for (engine = VCS1; engine <= VCS2; engine++) {
-		struct rt_depth rt;
-
-		get_rt_depth(wrk, engine, &rt);
-		if (rt.seqno != wrk->rt.last[engine]) {
-			igt_assert((long)(rt.completed - rt.submitted) > 0);
-			ewma_rt_add(&wrk->rt.avg[engine],
-				    rt.completed - rt.submitted);
-			wrk->rt.last[engine] = rt.seqno;
-		}
-		qd[engine] = current_seqno(wrk, engine) - rt.seqno;
-		wrk->qd_sum[engine] += qd[engine];
-		qd[engine] =
-			(qd[engine] + 1) * ewma_rt_read(&wrk->rt.avg[engine]);
-
-#ifdef DEBUG
-		printf("rtavg[%d] = %d (%d - %d) x %ld (%d) = %ld\n",
-		       engine,
-		       current_seqno(wrk, engine) - rt.seqno,
-		       current_seqno(wrk, engine), rt.seqno,
-		       ewma_rt_read(&wrk->rt.avg[engine]),
-		       rt.completed - rt.submitted,
-		       qd[engine]);
-#endif
-	}
-
-	return __rt_select_engine(wrk, qd, false);
-}
-
-static enum intel_engine_id
-context_balance(const struct workload_balancer *balancer,
-		struct workload *wrk, struct w_step *w)
-{
-	return get_vcs_engine(__get_ctx(wrk, w)->static_vcs);
-}
-
-static unsigned int
-get_engine_busy(const struct workload_balancer *balancer,
-		struct workload *wrk, enum intel_engine_id engine)
-{
-	struct busy_balancer *bb = &wrk->busy_balancer;
-
-	if (engine == VCS2 && (wrk->flags & VCS2REMAP))
-		engine = BCS;
-
-	return bb->busy[bb->engine_map[engine]];
-}
-
-static void
-get_pmu_stats(const struct workload_balancer *b, struct workload *wrk)
-{
-	struct busy_balancer *bb = &wrk->busy_balancer;
-	uint64_t val[7];
-	unsigned int i;
-
-	igt_assert_eq(read(bb->fd, val, sizeof(val)),
-		      (2 + bb->num_engines) * sizeof(uint64_t));
-
-	if (!bb->first) {
-		for (i = 0; i < bb->num_engines; i++) {
-			double d;
-
-			d = (val[2 + i] - bb->prev[i]) * 100;
-			d /= val[1] - bb->t_prev;
-			bb->busy[i] = d;
-		}
-	}
-
-	for (i = 0; i < bb->num_engines; i++)
-		bb->prev[i] = val[2 + i];
-
-	bb->t_prev = val[1];
-	bb->first = false;
-}
-
-static enum intel_engine_id
-busy_avg_balance(const struct workload_balancer *balancer,
-		 struct workload *wrk, struct w_step *w)
-{
-	get_pmu_stats(balancer, wrk);
-
-	return qdavg_balance(balancer, wrk, w);
-}
-
-static enum intel_engine_id
-busy_balance(const struct workload_balancer *balancer,
-	     struct workload *wrk, struct w_step *w)
-{
-	get_pmu_stats(balancer, wrk);
-
-	return qd_balance(balancer, wrk, w);
-}
-
-static int
-busy_init(const struct workload_balancer *balancer, struct workload *wrk)
-{
-	struct busy_balancer *bb = &wrk->busy_balancer;
-	struct engine_desc {
-		unsigned class, inst;
-		enum intel_engine_id id;
-	} *d, engines[] = {
-		{ I915_ENGINE_CLASS_RENDER, 0, RCS },
-		{ I915_ENGINE_CLASS_COPY, 0, BCS },
-		{ I915_ENGINE_CLASS_VIDEO, 0, VCS1 },
-		{ I915_ENGINE_CLASS_VIDEO, 1, VCS2 },
-		{ I915_ENGINE_CLASS_VIDEO_ENHANCE, 0, VECS },
-		{ 0, 0, VCS }
-	};
-
-	bb->num_engines = 0;
-	bb->first = true;
-	bb->fd = -1;
-
-	for (d = &engines[0]; d->id != VCS; d++) {
-		int pfd;
-
-		pfd = perf_igfx_open_group(I915_PMU_ENGINE_BUSY(d->class,
-								d->inst),
-					   bb->fd);
-		if (pfd < 0) {
-			if (d->id != VCS2)
-				return -(10 + bb->num_engines);
-			else
-				continue;
-		}
-
-		if (bb->num_engines == 0)
-			bb->fd = pfd;
-
-		bb->engine_map[d->id] = bb->num_engines++;
-	}
-
-	if (bb->num_engines < 5 && !(wrk->flags & VCS2REMAP))
-		return -1;
-
-	return 0;
-}
-
-static const struct workload_balancer all_balancers[] = {
-	{
-		.id = 0,
-		.name = "rr",
-		.desc = "Simple round-robin.",
-		.balance = rr_balance,
-	},
-	{
-		.id = 6,
-		.name = "rand",
-		.desc = "Random selection.",
-		.balance = rand_balance,
-	},
-	{
-		.id = 1,
-		.name = "qd",
-		.desc = "Queue depth estimation with round-robin on equal depth.",
-		.flags = SEQNO,
-		.min_gen = 8,
-		.get_qd = get_qd_depth,
-		.balance = qd_balance,
-	},
-	{
-		.id = 5,
-		.name = "qdr",
-		.desc = "Queue depth estimation with random selection on equal depth.",
-		.flags = SEQNO,
-		.min_gen = 8,
-		.get_qd = get_qd_depth,
-		.balance = qdr_balance,
-	},
-	{
-		.id = 7,
-		.name = "qdavg",
-		.desc = "Like qd, but using an average queue depth estimator.",
-		.flags = SEQNO,
-		.min_gen = 8,
-		.get_qd = get_qd_depth,
-		.balance = qdavg_balance,
-	},
-	{
-		.id = 2,
-		.name = "rt",
-		.desc = "Queue depth plus last runtime estimation.",
-		.flags = SEQNO | RT,
-		.min_gen = 8,
-		.get_qd = get_qd_depth,
-		.balance = rt_balance,
-	},
-	{
-		.id = 3,
-		.name = "rtr",
-		.desc = "Like rt but with random engine selection on equal depth.",
-		.flags = SEQNO | RT,
-		.min_gen = 8,
-		.get_qd = get_qd_depth,
-		.balance = rtr_balance,
-	},
-	{
-		.id = 4,
-		.name = "rtavg",
-		.desc = "Improved version rt tracking average execution speed per engine.",
-		.flags = SEQNO | RT,
-		.min_gen = 8,
-		.get_qd = get_qd_depth,
-		.balance = rtavg_balance,
-	},
-	{
-		.id = 8,
-		.name = "context",
-		.desc = "Static round-robin VCS assignment at context creation.",
-		.balance = context_balance,
-	},
-	{
-		.id = 9,
-		.name = "busy",
-		.desc = "Engine busyness based balancing.",
-		.init = busy_init,
-		.get_qd = get_engine_busy,
-		.balance = busy_balance,
-	},
-	{
-		.id = 10,
-		.name = "busy-avg",
-		.desc = "Average engine busyness based balancing.",
-		.init = busy_init,
-		.get_qd = get_engine_busy,
-		.balance = busy_avg_balance,
-	},
-	{
-		.id = 11,
-		.name = "i915",
-		.desc = "i915 balancing.",
-		.flags = I915,
-	},
-};
-
-static unsigned int
-global_get_qd(const struct workload_balancer *balancer,
-	      struct workload *wrk, enum intel_engine_id engine)
-{
-	igt_assert(wrk->global_wrk);
-	igt_assert(wrk->global_balancer);
-
-	return wrk->global_balancer->get_qd(wrk->global_balancer,
-					    wrk->global_wrk, engine);
-}
-
-static enum intel_engine_id
-global_balance(const struct workload_balancer *balancer,
-	       struct workload *wrk, struct w_step *w)
-{
-	enum intel_engine_id engine;
-	int ret;
-
-	igt_assert(wrk->global_wrk);
-	igt_assert(wrk->global_balancer);
-
-	wrk = wrk->global_wrk;
-
-	ret = pthread_mutex_lock(&wrk->mutex);
-	igt_assert(ret == 0);
-
-	engine = wrk->global_balancer->balance(wrk->global_balancer, wrk, w);
-
-	ret = pthread_mutex_unlock(&wrk->mutex);
-	igt_assert(ret == 0);
-
-	return engine;
-}
-
-static const struct workload_balancer global_balancer = {
-		.id = ~0,
-		.name = "global",
-		.desc = "Global balancer",
-		.get_qd = global_get_qd,
-		.balance = global_balance,
-	};
-
-static void
-update_bb_seqno(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
-{
-	gem_set_domain(fd, w->bb_handle,
-		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
-
-	w->reloc[0].delta = SEQNO_OFFSET(engine);
-
-	*w->seqno_value = seqno;
-	*w->seqno_address = w->reloc[0].presumed_offset + w->reloc[0].delta;
-
-	/* If not using NO_RELOC, force the relocations */
-	if (!(w->eb.flags & I915_EXEC_NO_RELOC))
-		w->reloc[0].presumed_offset = -1;
-}
-
-static void
-update_bb_rt(struct w_step *w, enum intel_engine_id engine, uint32_t seqno)
-{
-	gem_set_domain(fd, w->bb_handle,
-		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
-
-	w->reloc[1].delta = SEQNO_OFFSET(engine) + sizeof(uint32_t);
-	w->reloc[2].delta = SEQNO_OFFSET(engine) + 2 * sizeof(uint32_t);
-	w->reloc[3].delta = SEQNO_OFFSET(engine) + 3 * sizeof(uint32_t);
-
-	*w->latch_value = seqno;
-	*w->latch_address = w->reloc[3].presumed_offset + w->reloc[3].delta;
-
-	*w->rt0_value = *REG(RCS_TIMESTAMP);
-	*w->rt0_address = w->reloc[1].presumed_offset + w->reloc[1].delta;
-	*w->rt1_address = w->reloc[2].presumed_offset + w->reloc[2].delta;
-
-	/* If not using NO_RELOC, force the relocations */
-	if (!(w->eb.flags & I915_EXEC_NO_RELOC)) {
-		w->reloc[1].presumed_offset = -1;
-		w->reloc[2].presumed_offset = -1;
-		w->reloc[3].presumed_offset = -1;
-	}
 }
 
 static void
@@ -2606,123 +1683,12 @@ static void w_sync_to(struct workload *wrk, struct w_step *w, int target)
 	gem_sync(fd, wrk->steps[target].obj[0].handle);
 }
 
-static uint32_t *get_status_cs(struct workload *wrk)
-{
-	return wrk->status_cs;
-}
-
-#define INIT_CLOCKS 0x1
-#define INIT_ALL (INIT_CLOCKS)
-static void init_status_page(struct workload *wrk, unsigned int flags)
-{
-	struct drm_i915_gem_relocation_entry reloc[4] = {};
-	struct drm_i915_gem_exec_object2 *status_object =
-						get_status_objects(wrk);
-	struct drm_i915_gem_execbuffer2 eb = {
-		.buffer_count = ARRAY_SIZE(wrk->status_object),
-		.buffers_ptr = to_user_pointer(status_object)
-	};
-	uint32_t *base = get_status_cs(wrk);
-
-	/* Want to make sure that the balancer has a reasonable view of
-	 * the background busyness of each engine. To do that we occasionally
-	 * send a dummy batch down the pipeline.
-	 */
-
-	if (!base)
-		return;
-
-	gem_set_domain(fd, status_object[1].handle,
-		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
-
-	status_object[1].relocs_ptr = to_user_pointer(reloc);
-	status_object[1].relocation_count = 2;
-	if (flags & INIT_CLOCKS)
-		status_object[1].relocation_count += 2;
-
-	for (int engine = 0; engine < NUM_ENGINES; engine++) {
-		struct drm_i915_gem_relocation_entry *r = reloc;
-		uint64_t presumed_offset = status_object[0].offset;
-		uint32_t offset = engine * 128;
-		uint32_t *cs = base + offset / sizeof(*cs);
-		uint64_t addr;
-
-		r->offset = offset + sizeof(uint32_t);
-		r->delta = SEQNO_OFFSET(engine);
-		r->presumed_offset = presumed_offset;
-		addr = presumed_offset + r->delta;
-		r++;
-		*cs++ = MI_STORE_DWORD_IMM;
-		*cs++ = addr;
-		*cs++ = addr >> 32;
-		*cs++ = new_seqno(wrk, engine);
-		offset += 4 * sizeof(uint32_t);
-
-		/* When we are busy, we can just reuse the last set of timings.
-		 * If we have been idle for a while, we want to resample the
-		 * latency on each engine (to measure external load).
-		 */
-		if (flags & INIT_CLOCKS) {
-			r->offset = offset + sizeof(uint32_t);
-			r->delta = SEQNO_OFFSET(engine) + sizeof(uint32_t);
-			r->presumed_offset = presumed_offset;
-			addr = presumed_offset + r->delta;
-			r++;
-			*cs++ = MI_STORE_DWORD_IMM;
-			*cs++ = addr;
-			*cs++ = addr >> 32;
-			*cs++ = *REG(RCS_TIMESTAMP);
-			offset += 4 * sizeof(uint32_t);
-
-			r->offset = offset + 2 * sizeof(uint32_t);
-			r->delta = SEQNO_OFFSET(engine) + 2*sizeof(uint32_t);
-			r->presumed_offset = presumed_offset;
-			addr = presumed_offset + r->delta;
-			r++;
-			*cs++ = 0x24 << 23 | 2; /* MI_STORE_REG_MEM */
-			*cs++ = RCS_TIMESTAMP;
-			*cs++ = addr;
-			*cs++ = addr >> 32;
-			offset += 4 * sizeof(uint32_t);
-		}
-
-		r->offset = offset + sizeof(uint32_t);
-		r->delta = SEQNO_OFFSET(engine) + 3*sizeof(uint32_t);
-		r->presumed_offset = presumed_offset;
-		addr = presumed_offset + r->delta;
-		r++;
-		*cs++ = MI_STORE_DWORD_IMM;
-		*cs++ = addr;
-		*cs++ = addr >> 32;
-		*cs++ = current_seqno(wrk, engine);
-		offset += 4 * sizeof(uint32_t);
-
-		*cs++ = MI_BATCH_BUFFER_END;
-
-		eb_set_engine(&eb, engine, wrk->flags);
-		eb.flags |= I915_EXEC_HANDLE_LUT;
-		eb.flags |= I915_EXEC_NO_RELOC;
-
-		eb.batch_start_offset = 128 * engine;
-
-		gem_execbuf(fd, &eb);
-	}
-}
-
 static void
-do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
-      unsigned int flags)
+do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine)
 {
-	uint32_t seqno = new_seqno(wrk, engine);
 	unsigned int i;
 
-	eb_update_flags(wrk, w, engine, flags);
-
-	if (flags & SEQNO)
-		update_bb_seqno(w, engine, seqno);
-	if (flags & RT)
-		update_bb_rt(w, engine, seqno);
-
+	eb_update_flags(wrk, w, engine);
 	update_bb_start(w);
 
 	w->eb.batch_start_offset =
@@ -2758,9 +1724,8 @@ do_eb(struct workload *wrk, struct w_step *w, enum intel_engine_id engine,
 	}
 }
 
-static bool sync_deps(struct workload *wrk, struct w_step *w)
+static void sync_deps(struct workload *wrk, struct w_step *w)
 {
-	bool synced = false;
 	unsigned int i;
 
 	for (i = 0; i < w->data_deps.nr; i++) {
@@ -2777,11 +1742,7 @@ static bool sync_deps(struct workload *wrk, struct w_step *w)
 		igt_assert(wrk->steps[dep_idx].type == BATCH);
 
 		gem_sync(fd, wrk->steps[dep_idx].obj[0].handle);
-
-		synced = true;
 	}
-
-	return synced;
 }
 
 static void *run_workload(void *data)
@@ -2789,7 +1750,6 @@ static void *run_workload(void *data)
 	struct workload *wrk = (struct workload *)data;
 	struct timespec t_start, t_end;
 	struct w_step *w;
-	bool last_sync = false;
 	int throttle = -1;
 	int qd_throttle = -1;
 	int count;
@@ -2797,7 +1757,6 @@ static void *run_workload(void *data)
 
 	clock_gettime(CLOCK_MONOTONIC, &t_start);
 
-	init_status_page(wrk, INIT_ALL);
 	for (count = 0; wrk->run && (wrk->background || count < wrk->repeat);
 	     count++) {
 		unsigned int cur_seqno = wrk->sync_seqno;
@@ -2898,26 +1857,13 @@ static void *run_workload(void *data)
 
 			igt_assert(w->type == BATCH);
 
-			if ((wrk->flags & DEPSYNC) && engine == VCS)
-				last_sync = sync_deps(wrk, w);
-
-			if (last_sync && (wrk->flags & HEARTBEAT))
-				init_status_page(wrk, 0);
-
-			last_sync = false;
-
-			wrk->nr_bb[engine]++;
-			if (engine == VCS && wrk->balancer &&
-			    wrk->balancer->balance) {
-				engine = wrk->balancer->balance(wrk->balancer,
-								wrk, w);
-				wrk->nr_bb[engine]++;
-			}
+			if (wrk->flags & DEPSYNC)
+				sync_deps(wrk, w);
 
 			if (throttle > 0)
 				w_sync_to(wrk, w, i - throttle);
 
-			do_eb(wrk, w, engine, wrk->flags);
+			do_eb(wrk, w, engine);
 
 			if (w->request != -1) {
 				igt_list_del(&w->rq_link);
@@ -2930,10 +1876,8 @@ static void *run_workload(void *data)
 			if (!wrk->run)
 				break;
 
-			if (w->sync) {
+			if (w->sync)
 				gem_sync(fd, w->obj[0].handle);
-				last_sync = true;
-			}
 
 			if (qd_throttle > 0) {
 				while (wrk->nrequest[engine] > qd_throttle) {
@@ -2943,7 +1887,6 @@ static void *run_workload(void *data)
 								 s, rq_link);
 
 					gem_sync(fd, s->obj[0].handle);
-					last_sync = true;
 
 					s->request = -1;
 					igt_list_del(&s->rq_link);
@@ -2986,13 +1929,6 @@ static void *run_workload(void *data)
 		printf("%c%u: %.3fs elapsed (%d cycles, %.3f workloads/s).",
 		       wrk->background ? ' ' : '*', wrk->id,
 		       t, count, count / t);
-		if (wrk->balancer)
-			printf(" %lu (%lu + %lu) total VCS batches.",
-			       wrk->nr_bb[VCS], wrk->nr_bb[VCS1], wrk->nr_bb[VCS2]);
-		if (wrk->balancer && wrk->balancer->get_qd)
-			printf(" Average queue depths %.3f, %.3f.",
-			       (double)wrk->qd_sum[VCS1] / wrk->nr_bb[VCS],
-			       (double)wrk->qd_sum[VCS2] / wrk->nr_bb[VCS]);
 		putchar('\n');
 	}
 
@@ -3114,8 +2050,6 @@ calibrate_engines(void)
 
 static void print_help(void)
 {
-	unsigned int i;
-
 	puts(
 "Usage: gem_wsim [OPTIONS]\n"
 "\n"
@@ -3145,32 +2079,11 @@ static void print_help(void)
 "  -a <desc|path>    Append a workload to all other workloads.\n"
 "  -r <n>            How many times to emit the workload.\n"
 "  -c <n>            Fork N clients emitting the workload simultaneously.\n"
-"  -x                Swap VCS1 and VCS2 engines in every other client.\n"
-"  -b <n>            Load balancing to use.\n"
-"                    Available load balancers are:"
-	);
-
-	for (i = 0; i < ARRAY_SIZE(all_balancers); i++) {
-		igt_assert(all_balancers[i].desc);
-		printf(
-"                       %s (%u): %s\n",
-		       all_balancers[i].name, all_balancers[i].id,
-		       all_balancers[i].desc);
-	}
-	puts(
-"                     Balancers can be specified either as names or as their id\n"
-"                     number as listed above.\n"
-"  -2                 Remap VCS2 to BCS.\n"
-"  -R                 Round-robin initial VCS assignment per client.\n"
-"  -H                 Send heartbeat on synchronisation points with seqno based\n"
-"                     balancers. Gives better engine busyness view in some cases.\n"
-"  -s                 Turn on small SSEU config for the next workload on the\n"
-"                     command line. Subsequent -s switches it off.\n"
-"  -S                 Synchronize the sequence of random batch durations between\n"
-"                     clients.\n"
-"  -G                 Global load balancing - a single load balancer will be shared\n"
-"                     between all clients and there will be a single seqno domain.\n"
-"  -d                 Sync between data dependencies in userspace."
+"  -s                Turn on small SSEU config for the next workload on the\n"
+"                    command line. Subsequent -s switches it off.\n"
+"  -S                Synchronize the sequence of random batch durations between\n"
+"                    clients.\n"
+"  -d                Sync between data dependencies in userspace."
 	);
 }
 
@@ -3218,62 +2131,6 @@ add_workload_arg(struct w_arg *w_args, unsigned int nr_args, char *w_arg,
 	return w_args;
 }
 
-static int find_balancer_by_name(char *name)
-{
-	unsigned int i;
-
-	for (i = 0; i < ARRAY_SIZE(all_balancers); i++) {
-		if (!strcasecmp(name, all_balancers[i].name))
-			return all_balancers[i].id;
-	}
-
-	return -1;
-}
-
-static const struct workload_balancer *find_balancer_by_id(unsigned int id)
-{
-	unsigned int i;
-
-	for (i = 0; i < ARRAY_SIZE(all_balancers); i++) {
-		if (id == all_balancers[i].id)
-			return &all_balancers[i];
-	}
-
-	return NULL;
-}
-
-static void init_clocks(void)
-{
-	struct timespec t_start, t_end;
-	uint32_t rcs_start, rcs_end;
-	double overhead, t;
-
-	if (verbose <= 1)
-		return;
-
-	clock_gettime(CLOCK_MONOTONIC, &t_start);
-	for (int i = 0; i < 100; i++)
-		rcs_start = *REG(RCS_TIMESTAMP);
-	clock_gettime(CLOCK_MONOTONIC, &t_end);
-	overhead = 2 * elapsed(&t_start, &t_end) / 100;
-
-	clock_gettime(CLOCK_MONOTONIC, &t_start);
-	for (int i = 0; i < 100; i++)
-		clock_gettime(CLOCK_MONOTONIC, &t_end);
-	clock_gettime(CLOCK_MONOTONIC, &t_end);
-	overhead += elapsed(&t_start, &t_end) / 100;
-
-	clock_gettime(CLOCK_MONOTONIC, &t_start);
-	rcs_start = *REG(RCS_TIMESTAMP);
-	usleep(100);
-	rcs_end = *REG(RCS_TIMESTAMP);
-	clock_gettime(CLOCK_MONOTONIC, &t_end);
-
-	t = elapsed(&t_start, &t_end) - overhead;
-	printf("%d cycles in %.1fus, i.e. 1024 cycles takes %1.fus\n",
-	       rcs_end - rcs_start, 1e6*t, 1024e6 * t / (rcs_end - rcs_start));
-}
-
 int main(int argc, char **argv)
 {
 	unsigned int repeat = 1;
@@ -3287,9 +2144,7 @@ int main(int argc, char **argv)
 	char *append_workload_arg = NULL;
 	struct w_arg *w_args = NULL;
 	unsigned int tolerance_pct = 1;
-	const struct workload_balancer *balancer = NULL;
 	int exitcode = EXIT_FAILURE;
-	char *endptr = NULL;
 	int prio = 0;
 	double t;
 	int i, c;
@@ -3304,17 +2159,13 @@ int main(int argc, char **argv)
 	 * This minimizes the gap in engine utilization tracking when observed
 	 * via external tools like trace.pl.
 	 */
-	fd = __drm_open_driver(DRIVER_INTEL);
+	fd = __drm_open_driver_render(DRIVER_INTEL);
 	igt_require(fd);
-
-	intel_register_access_init(&mmio_data, intel_get_pci_device(), false, fd);
-
-	init_clocks();
 
 	master_prng = time(NULL);
 
 	while ((c = getopt(argc, argv,
-			   "Thqv2RsSHxGdc:n:r:w:W:a:t:b:p:I:")) != -1) {
+			   "ThqvsSdc:n:r:w:W:a:t:p:I:")) != -1) {
 		switch (c) {
 		case 'W':
 			if (master_workload >= 0) {
@@ -3413,51 +2264,14 @@ int main(int argc, char **argv)
 		case 'v':
 			verbose++;
 			break;
-		case 'x':
-			flags |= SWAPVCS;
-			break;
-		case '2':
-			flags |= VCS2REMAP;
-			break;
-		case 'R':
-			flags |= INITVCSRR;
-			break;
 		case 'S':
 			flags |= SYNCEDCLIENTS;
 			break;
 		case 's':
 			flags ^= SSEU;
 			break;
-		case 'H':
-			flags |= HEARTBEAT;
-			break;
-		case 'G':
-			flags |= GLOBAL_BALANCE;
-			break;
 		case 'd':
 			flags |= DEPSYNC;
-			break;
-		case 'b':
-			i = find_balancer_by_name(optarg);
-			if (i < 0) {
-				i = strtol(optarg, &endptr, 0);
-				if (endptr && *endptr)
-					i = -1;
-			}
-
-			if (i >= 0) {
-				balancer = find_balancer_by_id(i);
-				if (balancer) {
-					igt_assert(intel_gen(intel_get_drm_devid(fd)) >= balancer->min_gen);
-					flags |= BALANCE | balancer->flags;
-				}
-			}
-
-			if (!balancer) {
-				wsim_err("Unknown balancing mode '%s'!\n",
-					 optarg);
-				goto err;
-			}
 			break;
 		case 'I':
 			master_prng = strtol(optarg, NULL, 0);
@@ -3468,16 +2282,6 @@ int main(int argc, char **argv)
 		default:
 			goto err;
 		}
-	}
-
-	if ((flags & HEARTBEAT) && !(flags & SEQNO)) {
-		wsim_err("Heartbeat needs a seqno based balancer!\n");
-		goto err;
-	}
-
-	if ((flags & VCS2REMAP) && (flags & I915)) {
-		wsim_err("VCS remapping not supported with i915 balancing!\n");
-		goto err;
 	}
 
 	if (!has_nop_calibration) {
@@ -3516,11 +2320,6 @@ int main(int argc, char **argv)
 
 	if (nr_w_args > 1 && clients > 1) {
 		wsim_err("Cloned clients cannot be combined with multiple workloads!\n");
-		goto err;
-	}
-
-	if ((flags & GLOBAL_BALANCE) && !balancer) {
-		wsim_err("Balancer not specified in global balancing mode!\n");
 		goto err;
 	}
 
@@ -3566,19 +2365,6 @@ int main(int argc, char **argv)
 		printf("Random seed is %u.\n", master_prng);
 		print_engine_calibrations();
 		printf("%u client%s.\n", clients, clients > 1 ? "s" : "");
-		if (flags & SWAPVCS)
-			printf("Swapping VCS rings between clients.\n");
-		if (flags & GLOBAL_BALANCE) {
-			if (flags & I915) {
-				printf("Ignoring global balancing with i915!\n");
-				flags &= ~GLOBAL_BALANCE;
-			} else {
-				printf("Using %s balancer in global mode.\n",
-				       balancer->name);
-			}
-		} else if (balancer) {
-			printf("Using %s balancer.\n", balancer->name);
-		}
 	}
 
 	srand(master_prng);
@@ -3591,20 +2377,7 @@ int main(int argc, char **argv)
 	igt_assert(w);
 
 	for (i = 0; i < clients; i++) {
-		unsigned int flags_ = flags;
-
 		w[i] = clone_workload(wrk[nr_w_args > 1 ? i : 0]);
-
-		if (flags & SWAPVCS && i & 1)
-			flags_ &= ~SWAPVCS;
-
-		if ((flags & GLOBAL_BALANCE) && !(flags & I915)) {
-			w[i]->balancer = &global_balancer;
-			w[i]->global_wrk = w[0];
-			w[i]->global_balancer = balancer;
-		} else {
-			w[i]->balancer = balancer;
-		}
 
 		w[i]->flags = flags;
 		w[i]->repeat = repeat;
@@ -3612,19 +2385,9 @@ int main(int argc, char **argv)
 		w[i]->print_stats = verbose > 1 ||
 				    (verbose > 0 && master_workload == i);
 
-		if (prepare_workload(i, w[i], flags_)) {
+		if (prepare_workload(i, w[i])) {
 			wsim_err("Failed to prepare workload %u!\n", i);
 			goto err;
-		}
-
-
-		if (balancer && balancer->init) {
-			int ret = balancer->init(balancer, w[i]);
-			if (ret) {
-				wsim_err("Failed to initialize balancing! (%u=%d)\n",
-					 i, ret);
-				goto err;
-			}
 		}
 	}
 
@@ -3670,6 +2433,5 @@ int main(int argc, char **argv)
 out:
 	exitcode = EXIT_SUCCESS;
 err:
-	intel_register_access_fini(&mmio_data);
 	return exitcode;
 }

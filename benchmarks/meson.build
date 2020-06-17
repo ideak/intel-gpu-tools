@@ -11,6 +11,7 @@ benchmark_progs = [
 	'gem_prw',
 	'gem_set_domain',
 	'gem_syslatency',
+	'gem_wsim',
 	'kms_vblank',
 	'prime_lookup',
 	'vgem_mmap',
@@ -34,8 +35,3 @@ foreach prog : benchmark_progs
 		   install_dir : benchmarksdir,
 		   dependencies : igt_deps)
 endforeach
-
-executable('gem_wsim', 'gem_wsim.c',
-	   install : true,
-	   install_dir : benchmarksdir,
-	   dependencies : igt_deps + [ lib_igt_perf ])
