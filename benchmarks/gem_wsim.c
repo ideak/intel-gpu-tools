@@ -295,8 +295,8 @@ print_engine_calibrations(void)
 
 	printf("Nop calibration for %uus delay is: ", nop_calibration_us);
 	for (int i = 0; i < NUM_ENGINES; i++) {
-		/* skip DEFAULT and VCS engines */
-		if (i != DEFAULT && i != VCS) {
+		/* skip engines not present and DEFAULT and VCS */
+		if (i != DEFAULT && i != VCS && engine_calib_map[i]) {
 			if (first_entry) {
 				printf("%s=%lu", ring_str_map[i], engine_calib_map[i]);
 				first_entry = false;
@@ -2831,22 +2831,6 @@ int main(int argc, char **argv)
 		if (verbose)
 			print_engine_calibrations();
 		goto out;
-	} else {
-		bool missing = false;
-
-		for (i = 0; i < NUM_ENGINES; i++) {
-			if (i == VCS)
-				continue;
-
-			if (!engine_calib_map[i]) {
-				wsim_err("Missing calibration for '%s'!\n",
-					 ring_str_map[i]);
-				missing = true;
-			}
-		}
-
-		if (missing)
-			goto err;
 	}
 
 	if (!nr_w_args) {
