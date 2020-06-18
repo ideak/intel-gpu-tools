@@ -1049,8 +1049,26 @@ static int monitor_output(pid_t child,
 				 * the result an incomplete we avoid
 				 * journaling a timeout here.
 				 */
-				if (is_tainted(taints))
+				if (is_tainted(taints)) {
 					exitline = EXECUTOR_EXIT;
+
+					/*
+					 * Also inject a message to
+					 * the test's stdout. As we're
+					 * shooting for an incomplete
+					 * anyway, we don't need to
+					 * care if we're not between
+					 * full lines from stdout. We
+					 * do need to make sure we
+					 * have newlines on both ends
+					 * of this injection though.
+					 */
+					dprintf(outputs[_F_OUT],
+						"\nrunner: This test was killed due to a kernel taint (0x%lx).\n",
+						taints);
+					if (settings->sync)
+						fdatasync(outputs[_F_OUT]);
+				}
 
 				dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
 					exitline,
