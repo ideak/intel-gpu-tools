@@ -28,6 +28,7 @@ struct regex_list {
 
 struct settings {
 	int abort_mask;
+	size_t disk_usage_limit;
 	char *test_list;
 	char *name;
 	bool dry_run;

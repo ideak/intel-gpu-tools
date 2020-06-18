@@ -183,6 +183,7 @@ static void assert_settings_equal(struct settings *one, struct settings *two)
 	 * here.
 	 */
 	igt_assert_eq(one->abort_mask, two->abort_mask);
+	igt_assert_eq_u64(one->disk_usage_limit, two->disk_usage_limit);
 	igt_assert_eqstr(one->test_list, two->test_list);
 	igt_assert_eqstr(one->name, two->name);
 	igt_assert_eq(one->dry_run, two->dry_run);
@@ -270,6 +271,7 @@ igt_main
 		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
 		igt_assert_eq(settings->abort_mask, 0);
+		igt_assert_eq_u64(settings->disk_usage_limit, 0UL);
 		igt_assert(!settings->test_list);
 		igt_assert_eqstr(settings->name, "path-to-results");
 		igt_assert(!settings->dry_run);
@@ -415,6 +417,7 @@ igt_main
 		const char *argv[] = { "runner",
 				       "-n", "foo",
 				       "--abort-on-monitored-error=taint,lockdep",
+				       "--disk-usage-limit=4096",
 				       "--test-list", "path-to-test-list",
 				       "--ignore-missing",
 				       "--dry-run",
@@ -444,6 +447,7 @@ igt_main
 		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
 		igt_assert_eq(settings->abort_mask, ABORT_TAINT | ABORT_LOCKDEP);
+		igt_assert_eq_u64(settings->disk_usage_limit, 4096UL);
 		igt_assert(strstr(settings->test_list, "path-to-test-list") != NULL);
 		igt_assert_eqstr(settings->name, "foo");
 		igt_assert(settings->dry_run);
@@ -590,6 +594,29 @@ igt_main
 		argv[1] = "--abort-on-monitored-error=doesnotexist";
 		igt_assert(!parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 
+	}
+
+	igt_subtest("disk-usage-limit-suffixes") {
+		const char *argv[] = { "runner",
+				       "--disk-usage-limit=4096",
+				       "test-root-dir",
+				       "results-path",
+		};
+
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq_u64(settings->disk_usage_limit, 4096UL);
+
+		argv[1] = "--disk-usage-limit=4k";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq_u64(settings->disk_usage_limit, 4096UL);
+
+		argv[1] = "--disk-usage-limit=1M";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq_u64(settings->disk_usage_limit, 1024UL * 1024UL);
+
+		argv[1] = "--disk-usage-limit=1G";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq_u64(settings->disk_usage_limit, 1024UL * 1024UL * 1024UL);
 	}
 
 	igt_subtest("parse-clears-old-data") {
@@ -838,6 +865,7 @@ igt_main
 			const char *argv[] = { "runner",
 					       "-n", "foo",
 					       "--abort-on-monitored-error",
+					       "--disk-usage-limit=4k",
 					       "--test-list", "path-to-test-list",
 					       "--ignore-missing",
 					       "--dry-run",

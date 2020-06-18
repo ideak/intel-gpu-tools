@@ -17,6 +17,7 @@
 
 enum {
 	OPT_ABORT_ON_ERROR,
+	OPT_DISK_USAGE_LIMIT,
 	OPT_TEST_LIST,
 	OPT_IGNORE_MISSING,
 	OPT_PIGLIT_DMESG,
@@ -124,6 +125,46 @@ static bool parse_abort_conditions(struct settings *settings, const char *optarg
 	return true;
 }
 
+static size_t char_to_multiplier(char c)
+{
+	switch (c) {
+	case 'k':
+	case 'K':
+		return 1024UL;
+	case 'm':
+	case 'M':
+		return 1024UL * 1024UL;
+	case 'g':
+	case 'G':
+		return 1024UL * 1024UL * 1024UL;
+	}
+
+	return 0;
+}
+
+static bool parse_usage_limit(struct settings *settings, const char *optarg)
+{
+	size_t value;
+	char *endptr = NULL;
+
+	if (!optarg)
+		return false;
+
+	value = strtoul(optarg, &endptr, 10);
+
+	if (*endptr) {
+		size_t multiplier = char_to_multiplier(*endptr);
+
+		if (multiplier == 0)
+			return false;
+
+		value *= multiplier;
+	}
+
+	settings->disk_usage_limit = value;
+	return true;
+}
+
 static const char *usage_str =
 	"usage: runner [options] [test_root] results-path\n"
 	"   or: runner --list-all [options] [test_root]\n\n"
@@ -173,6 +214,11 @@ static const char *usage_str =
 	"                        even when running in multiple-mode, must finish in <seconds>.\n"
 	"  --overall-timeout <seconds>\n"
 	"                        Don't execute more tests after <seconds> has elapsed\n"
+	"  --disk-usage-limit <limit>\n"
+	"                        Kill the running test if its logging, both itself and the\n"
+	"                        kernel logs, exceed the given limit in bytes. The limit\n"
+	"                        parameter can use suffixes k, M and G for kilo/mega/gigabytes,\n"
+	"                        respectively. Limit of 0 (default) disables the limit.\n"
 	"  --use-watchdog        Use hardware watchdog for lethal enforcement of the\n"
 	"                        above timeout. Killing the test process is still\n"
 	"                        attempted at timeout trigger.\n"
@@ -338,6 +384,7 @@ bool parse_options(int argc, char **argv,
 		{"include-tests", required_argument, NULL, OPT_INCLUDE},
 		{"exclude-tests", required_argument, NULL, OPT_EXCLUDE},
 		{"abort-on-monitored-error", optional_argument, NULL, OPT_ABORT_ON_ERROR},
+		{"disk-usage-limit", required_argument, NULL, OPT_DISK_USAGE_LIMIT},
 		{"sync", no_argument, NULL, OPT_SYNC},
 		{"log-level", required_argument, NULL, OPT_LOG_LEVEL},
 		{"test-list", required_argument, NULL, OPT_TEST_LIST},
@@ -387,6 +434,12 @@ bool parse_options(int argc, char **argv,
 		case OPT_ABORT_ON_ERROR:
 			if (!parse_abort_conditions(settings, optarg))
 				goto error;
+			break;
+		case OPT_DISK_USAGE_LIMIT:
+			if (!parse_usage_limit(settings, optarg)) {
+				usage("Cannot parse disk usage limit", stderr);
+				goto error;
+			}
 			break;
 		case OPT_SYNC:
 			settings->sync = true;
@@ -634,6 +687,7 @@ bool serialize_settings(struct settings *settings)
 	}
 
 	SERIALIZE_LINE(f, settings, abort_mask, "%d");
+	SERIALIZE_LINE(f, settings, disk_usage_limit, "%zd");
 	if (settings->test_list)
 		SERIALIZE_LINE(f, settings, test_list, "%s");
 	if (settings->name)
@@ -682,6 +736,7 @@ bool read_settings_from_file(struct settings *settings, FILE *f)
 	while (fscanf(f, "%ms : %m[^\n]", &name, &val) == 2) {
 		int numval = atoi(val);
 		PARSE_LINE(settings, name, val, abort_mask, numval);
+		PARSE_LINE(settings, name, val, disk_usage_limit, strtoul(val, NULL, 10));
 		PARSE_LINE(settings, name, val, test_list, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, name, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, dry_run, numval);

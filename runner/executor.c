@@ -540,7 +540,8 @@ void close_outputs(int *fds)
 	}
 }
 
-static int dump_dmesg(int kmsgfd, int outfd)
+/* Returns the number of bytes written to disk, or a negative number on error */
+static long dump_dmesg(int kmsgfd, int outfd)
 {
 	/*
 	 * Write kernel messages to the log file until we reach
@@ -556,6 +557,7 @@ static int dump_dmesg(int kmsgfd, int outfd)
 	char cont;
 	char buf[2048];
 	ssize_t r;
+	long written = 0;
 
 	if (kmsgfd < 0)
 		return 0;
@@ -600,15 +602,16 @@ static int dump_dmesg(int kmsgfd, int outfd)
 				continue;
 			} else if (errno != EAGAIN) {
 				errf("Error reading from kmsg: %m\n");
-				return errno;
+				return -errno;
 			}
 
 			/* EAGAIN, so we're done dumping */
 			close(comparefd);
-			return 0;
+			return written;
 		}
 
 		write(outfd, buf, r);
+		written += r;
 
 		if (comparefd < 0 && sscanf(buf, "%u,%llu,%llu,%c;",
 					    &flags, &seq, &usec, &cont) == 4) {
@@ -618,7 +621,7 @@ static int dump_dmesg(int kmsgfd, int outfd)
 			 * enough.
 			 */
 			if (seq >= cmpseq)
-				return 0;
+				return written;
 		}
 	}
 }
@@ -708,12 +711,20 @@ static const char *show_kernel_task_state(const char *msg)
 	return msg;
 }
 
+static bool disk_usage_limit_exceeded(struct settings *settings,
+				      size_t disk_usage)
+{
+	return settings->disk_usage_limit != 0 &&
+		disk_usage > settings->disk_usage_limit;
+}
+
 static const char *need_to_timeout(struct settings *settings,
 				   int killed,
 				   unsigned long taints,
 				   double time_since_activity,
 				   double time_since_subtest,
-				   double time_since_kill)
+				   double time_since_kill,
+				   size_t disk_usage)
 {
 	if (killed) {
 		/*
@@ -756,6 +767,9 @@ static const char *need_to_timeout(struct settings *settings,
 	if (settings->inactivity_timeout != 0 &&
 	    time_since_activity > settings->inactivity_timeout)
 		return show_kernel_task_state("Inactivity timeout exceeded. Killing the current test with SIGQUIT.\n");
+
+	if (disk_usage_limit_exceeded(settings, disk_usage))
+		return "Disk usage limit exceeded.\n";
 
 	return NULL;
 }
@@ -801,6 +815,7 @@ static int monitor_output(pid_t child,
 	struct timespec time_beg, time_now, time_last_activity, time_last_subtest, time_killed;
 	unsigned long taints = 0;
 	bool aborting = false;
+	size_t disk_usage = 0;
 
 	igt_gettime(&time_beg);
 	time_last_activity = time_last_subtest = time_killed = time_beg;
@@ -878,6 +893,7 @@ static int monitor_output(pid_t child,
 			}
 
 			write(outputs[_F_OUT], buf, s);
+			disk_usage += s;
 			if (settings->sync) {
 				fdatasync(outputs[_F_OUT]);
 			}
@@ -901,6 +917,7 @@ static int monitor_output(pid_t child,
 					current_subtest[linelen - strlen(STARTING_SUBTEST)] = '\0';
 
 					time_last_subtest = time_now;
+					disk_usage = s;
 
 					if (settings->log_level >= LOG_LEVEL_VERBOSE) {
 						fwrite(outbuf, 1, linelen, stdout);
@@ -933,6 +950,7 @@ static int monitor_output(pid_t child,
 				if (linelen > strlen(STARTING_DYNAMIC_SUBTEST) &&
 				    !memcmp(outbuf, STARTING_DYNAMIC_SUBTEST, strlen(STARTING_DYNAMIC_SUBTEST))) {
 					time_last_subtest = time_now;
+					disk_usage = s;
 
 					if (settings->log_level >= LOG_LEVEL_VERBOSE) {
 						fwrite(outbuf, 1, linelen, stdout);
@@ -967,6 +985,7 @@ static int monitor_output(pid_t child,
 				errfd = -1;
 			} else {
 				write(outputs[_F_ERR], buf, s);
+				disk_usage += s;
 				if (settings->sync) {
 					fdatasync(outputs[_F_ERR]);
 				}
@@ -974,17 +993,19 @@ static int monitor_output(pid_t child,
 		}
 
 		if (kmsgfd >= 0 && FD_ISSET(kmsgfd, &set)) {
-			int dmesgstatus;
+			long dmesgwritten;
 
 			time_last_activity = time_now;
 
-			dmesgstatus = dump_dmesg(kmsgfd, outputs[_F_DMESG]);
+			dmesgwritten = dump_dmesg(kmsgfd, outputs[_F_DMESG]);
 			if (settings->sync)
 				fdatasync(outputs[_F_DMESG]);
 
-			if (dmesgstatus) {
+			if (dmesgwritten < 0) {
 				close(kmsgfd);
 				kmsgfd = -1;
+			} else {
+				disk_usage += dmesgwritten;
 			}
 		}
 
@@ -1070,6 +1091,21 @@ static int monitor_output(pid_t child,
 						fdatasync(outputs[_F_OUT]);
 				}
 
+				/*
+				 * Same goes for stopping because we
+				 * exceeded the disk usage limit.
+				 */
+				if (disk_usage_limit_exceeded(settings, disk_usage)) {
+					exitline = EXECUTOR_EXIT;
+					dprintf(outputs[_F_OUT],
+						"\nrunner: This test was killed due to exceeding disk usage limit. "
+						"(Used %zd bytes, limit %zd)\n",
+						disk_usage,
+						settings->disk_usage_limit);
+					if (settings->sync)
+						fdatasync(outputs[_F_OUT]);
+				}
+
 				dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
 					exitline,
 					status, time);
@@ -1091,7 +1127,8 @@ static int monitor_output(pid_t child,
 		timeout_reason = need_to_timeout(settings, killed, tainted(&taints),
 						 igt_time_elapsed(&time_last_activity, &time_now),
 						 igt_time_elapsed(&time_last_subtest, &time_now),
-						 igt_time_elapsed(&time_killed, &time_now));
+						 igt_time_elapsed(&time_killed, &time_now),
+						 disk_usage);
 
 		if (timeout_reason) {
 			if (killed == SIGKILL) {
