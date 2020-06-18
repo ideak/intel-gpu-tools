@@ -336,14 +336,16 @@ test_executables += executable('i915_pm_rc6_residency',
 	   install : true)
 test_list += 'i915_pm_rc6_residency'
 
-test_executables += executable('perf_pmu', 'perf_pmu.c',
+test_executables += executable('perf_pmu',
+	   join_paths('i915', 'perf_pmu.c'),
 	   dependencies : test_deps + [ lib_igt_perf ],
 	   install_dir : libexecdir,
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_list += 'perf_pmu'
 
-test_executables += executable('perf', 'perf.c',
+test_executables += executable('perf',
+	   join_paths('i915', 'perf.c'),
 	   dependencies : test_deps + [ lib_igt_i915_perf ],
 	   install_dir : libexecdir,
 	   install_rpath : libexecdir_rpathdir,

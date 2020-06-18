@@ -88,8 +88,6 @@ TESTS_progs = \
 	kms_vblank \
 	kms_vrr \
 	meta_test \
-	perf \
-	perf_pmu \
 	prime_busy \
 	prime_mmap \
 	prime_mmap_coherency \
@@ -114,6 +112,12 @@ sysfs_preempt_timeout_SOURCES = i915/sysfs_preempt_timeout.c
 
 TESTS_progs += sysfs_timeslice_duration
 sysfs_timeslice_duration_SOURCES = i915/sysfs_timeslice_duration.c
+
+TESTS_progs += perf
+perf_SOURCES = i915/perf.c
+
+TESTS_progs += perf_pmu
+perf_pmu_SOURCES = i915/perf_pmu.c
 
 TESTS_progs += gem_bad_reloc
 gem_bad_reloc_SOURCES = i915/gem_bad_reloc.c
