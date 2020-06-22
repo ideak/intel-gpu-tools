@@ -264,6 +264,9 @@ static void implicit_rw(int i915, unsigned ring, enum implicit_dir dir)
 		if (e->flags == ring)
 			continue;
 
+		if (!gem_class_can_store_dword(i915, e->class))
+			continue;
+
 		count++;
 	}
 	igt_require(count);
@@ -278,6 +281,9 @@ static void implicit_rw(int i915, unsigned ring, enum implicit_dir dir)
 
 	__for_each_physical_engine(i915, e) {
 		if (e->flags == ring)
+			continue;
+
+		if (!gem_class_can_store_dword(i915, e->class))
 			continue;
 
 		store_dword_fenced(i915, 0,
