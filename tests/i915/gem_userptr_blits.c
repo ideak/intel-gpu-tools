@@ -63,6 +63,7 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "intel_bufmgr.h"
+#include "sw_sync.h"
 
 #include "eviction_common.c"
 
@@ -205,9 +206,19 @@ static int copy(int fd, uint32_t dst, uint32_t src)
 	exec.buffer_count++;
 	exec.buffers_ptr = to_user_pointer(obj);
 	exec.flags = HAS_BLT_RING(intel_get_drm_devid(fd)) ? I915_EXEC_BLT : 0;
+	exec.flags |= I915_EXEC_FENCE_OUT;
 
-	ret = __gem_execbuf(fd, &exec);
+	ret = __gem_execbuf_wr(fd, &exec);
 	gem_close(fd, handle);
+
+	if (ret == 0) {
+		int fence = exec.rsvd2 >> 32;
+
+		sync_fence_wait(fence, -1);
+		if (sync_fence_status(fence) < 0)
+			ret = sync_fence_status(fence);
+		close(fence);
+	}
 
 	return ret;
 }
