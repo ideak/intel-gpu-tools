@@ -2173,13 +2173,15 @@ static void *ufd_thread(void *arg)
 
 static void test_pi_userfault(int i915, unsigned int engine)
 {
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct uffdio_api api = { .api = UFFD_API };
 	struct uffdio_register reg;
 	struct uffdio_copy copy;
 	struct uffd_msg msg;
 	struct ufd_thread t;
 	pthread_t thread;
-	char poison[4096];
+	char buf[4096];
+	char *poison;
 	int ufd;
 
 	/*
@@ -2208,8 +2210,8 @@ static void test_pi_userfault(int i915, unsigned int engine)
 	igt_assert(t.page != MAP_FAILED);
 
 	t.batch = gem_create(i915, 4096);
-	memset(poison, 0xff, sizeof(poison));
-	gem_write(i915, t.batch, 0, poison, 4096);
+	poison = gem_mmap__device_coherent(i915, t.batch, 0, 4096, PROT_WRITE);
+	memset(poison, 0xff, 4096);
 
 	/* Register our fault handler for t.page */
 	memset(&reg, 0, sizeof(reg));
@@ -2229,9 +2231,8 @@ static void test_pi_userfault(int i915, unsigned int engine)
 
 	/* While the low priority context is blocked; execute a vip */
 	if (1) {
-		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 obj = {
-			.handle = t.batch,
+			.handle = gem_create(i915, 4096),
 		};
 		struct pollfd pfd;
 		struct drm_i915_gem_execbuffer2 eb = {
@@ -2243,6 +2244,7 @@ static void test_pi_userfault(int i915, unsigned int engine)
 		gem_context_set_priority(i915, eb.rsvd1, MAX_PRIO);
 		gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
 		gem_execbuf_wr(i915, &eb);
+		gem_close(i915, obj.handle);
 
 		memset(&pfd, 0, sizeof(pfd));
 		pfd.fd = eb.rsvd2 >> 32;
@@ -2256,11 +2258,13 @@ static void test_pi_userfault(int i915, unsigned int engine)
 
 	/* Confirm the low priority context is still waiting */
 	igt_assert_eq(t.i915, i915);
+	memcpy(poison, &bbe, sizeof(bbe));
+	munmap(poison, 4096);
 
 	/* Service the fault; releasing the low priority context */
 	memset(&copy, 0, sizeof(copy));
 	copy.dst = msg.arg.pagefault.address;
-	copy.src = to_user_pointer(memset(poison, 0xc5, sizeof(poison)));
+	copy.src = to_user_pointer(memset(buf, 0xc5, sizeof(buf)));
 	copy.len = 4096;
 	do_ioctl(ufd, UFFDIO_COPY, &copy);
 
