@@ -779,6 +779,8 @@ bool igt_hotplug_detected(struct udev_monitor *mon,
 			  int timeout_secs);
 bool igt_lease_change_detected(struct udev_monitor *mon,
 			       int timeout_secs);
+bool igt_connector_event_detected(struct udev_monitor *mon, uint32_t conn_id,
+				  uint32_t prop_id, int timeout_msecs);
 void igt_flush_hotplugs(struct udev_monitor *mon);
 void igt_cleanup_hotplug(struct udev_monitor *mon);
 

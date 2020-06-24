@@ -4194,33 +4194,60 @@ struct udev_monitor *igt_watch_hotplug(void)
 	return mon;
 }
 
-static bool event_detected(struct udev_monitor *mon, int timeout_secs,
-			   const char *property)
+static
+bool event_detected(struct udev_monitor *mon, int timeout_secs,
+		    const char **property, int *expected_val, int num_props)
 {
 	struct udev_device *dev;
-	const char *hotplug_val;
+	const char *prop_val;
 	struct pollfd fd = {
 		.fd = udev_monitor_get_fd(mon),
 		.events = POLLIN
 	};
-	bool hotplug_received = false;
+	bool event_received = false;
+	int i;
 
-	/* Go through all of the events pending on the udev monitor. Once we
-	 * receive a hotplug, we continue going through the rest of the events
-	 * so that redundant hotplug events don't change the results of future
-	 * checks
+	/* Go through all of the events pending on the udev monitor.
+	 * Match the given set of properties and their values to
+	 * the expected values.
 	 */
-	while (!hotplug_received && poll(&fd, 1, timeout_secs * 1000)) {
+	while (!event_received && poll(&fd, 1, timeout_secs * 1000)) {
 		dev = udev_monitor_receive_device(mon);
-
-		hotplug_val = udev_device_get_property_value(dev, property);
-		if (hotplug_val && atoi(hotplug_val) == 1)
-			hotplug_received = true;
+		for (i = 0; i < num_props; i++) {
+			prop_val = udev_device_get_property_value(dev,
+								  property[i]);
+			if (!prop_val || atoi(prop_val) != expected_val[i])
+				break;
+		}
+		if (i == num_props)
+			event_received = true;
 
 		udev_device_unref(dev);
 	}
 
-	return hotplug_received;
+	return event_received;
+}
+
+/**
+ * igt_connector_event_detected:
+ * @mon: A udev monitor initialized with #igt_watch_hotplug
+ * @conn_id: Connector id of the Connector for which the property change is
+ * expected.
+ * @prop_id: Property id for which the change is expected.
+ * @timeout_secs: How long to wait for a connector event to occur.
+ *
+ * Detect if a connector event is received for a given connector and property.
+ *
+ * Returns: true if the connector event was received, false if we timed out
+ */
+bool igt_connector_event_detected(struct udev_monitor *mon, uint32_t conn_id,
+				  uint32_t prop_id, int timeout_secs)
+{
+	const char *props[3] = {"HOTPLUG", "CONNECTOR", "PROPERTY"};
+	int expected_val[3] = {1, conn_id, prop_id};
+
+	return event_detected(mon, timeout_secs, props, expected_val,
+			      ARRAY_SIZE(props));
 }
 
 /**
@@ -4228,13 +4255,17 @@ static bool event_detected(struct udev_monitor *mon, int timeout_secs,
  * @mon: A udev monitor initialized with #igt_watch_hotplug
  * @timeout_secs: How long to wait for a hotplug event to occur.
  *
- * Assert that a hotplug event was received since we last checked the monitor.
+ * Detect if a hotplug event was received since we last checked the monitor.
  *
  * Returns: true if a sysfs hotplug event was received, false if we timed out
  */
 bool igt_hotplug_detected(struct udev_monitor *mon, int timeout_secs)
 {
-	return event_detected(mon, timeout_secs, "HOTPLUG");
+	const char *props[1] = {"HOTPLUG"};
+	int expected_val = 1;
+
+	return event_detected(mon, timeout_secs, props, &expected_val,
+			      ARRAY_SIZE(props));
 }
 
 /**
@@ -4242,13 +4273,17 @@ bool igt_hotplug_detected(struct udev_monitor *mon, int timeout_secs)
  * @mon: A udev monitor initialized with #igt_watch_hotplug
  * @timeout_secs: How long to wait for a lease change event to occur.
  *
- * Assert that a lease change event was received since we last checked the monitor.
+ * Detect if a lease change event was received since we last checked the monitor.
  *
  * Returns: true if a sysfs lease change event was received, false if we timed out
  */
 bool igt_lease_change_detected(struct udev_monitor *mon, int timeout_secs)
 {
-	return event_detected(mon, timeout_secs, "LEASE");
+	const char *props[1] = {"LEASE"};
+	int expected_val = 1;
+
+	return event_detected(mon, timeout_secs, props, &expected_val,
+			      ARRAY_SIZE(props));
 }
 
 /**
