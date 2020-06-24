@@ -774,15 +774,15 @@ const struct edid *igt_kms_get_dp_audio_edid(void);
 const struct edid *igt_kms_get_4k_edid(void);
 const struct edid *igt_kms_get_3d_edid(void);
 
-struct udev_monitor *igt_watch_hotplug(void);
+struct udev_monitor *igt_watch_uevents(void);
 bool igt_hotplug_detected(struct udev_monitor *mon,
 			  int timeout_secs);
 bool igt_lease_change_detected(struct udev_monitor *mon,
 			       int timeout_secs);
 bool igt_connector_event_detected(struct udev_monitor *mon, uint32_t conn_id,
 				  uint32_t prop_id, int timeout_msecs);
-void igt_flush_hotplugs(struct udev_monitor *mon);
-void igt_cleanup_hotplug(struct udev_monitor *mon);
+void igt_flush_uevents(struct udev_monitor *mon);
+void igt_cleanup_uevents(struct udev_monitor *mon);
 
 bool igt_display_has_format_mod(igt_display_t *display, uint32_t format, uint64_t modifier);
 bool igt_plane_has_format_mod(igt_plane_t *plane, uint32_t format, uint64_t modifier);

@@ -567,10 +567,10 @@ igt_main
 	igt_subtest("uevent") {
 		igt_require(data.display.is_atomic);
 		data.cp_tests = CP_UEVENT;
-		data.uevent_monitor = igt_watch_hotplug();
-		igt_flush_hotplugs(data.uevent_monitor);
+		data.uevent_monitor = igt_watch_uevents();
+		igt_flush_uevents(data.uevent_monitor);
 		test_content_protection(COMMIT_ATOMIC, HDCP_CONTENT_TYPE_0);
-		igt_cleanup_hotplug(data.uevent_monitor);
+		igt_cleanup_uevents(data.uevent_monitor);
 	}
 
 	/*

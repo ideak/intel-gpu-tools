@@ -330,7 +330,7 @@ static xmlrpc_value *__chamelium_rpc_va(struct chamelium *chamelium,
 	if (fsm_port) {
 		monitor_args.chamelium = chamelium;
 		monitor_args.port = fsm_port;
-		monitor_args.mon = igt_watch_hotplug();
+		monitor_args.mon = igt_watch_uevents();
 		pthread_create(&fsm_thread_id, NULL, chamelium_fsm_mon,
 			       &monitor_args);
 	}
@@ -358,7 +358,7 @@ static xmlrpc_value *__chamelium_rpc_va(struct chamelium *chamelium,
 	if (fsm_port) {
 		pthread_cancel(fsm_thread_id);
 		pthread_join(fsm_thread_id, NULL);
-		igt_cleanup_hotplug(monitor_args.mon);
+		igt_cleanup_uevents(monitor_args.mon);
 	}
 
 	return res;

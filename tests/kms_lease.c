@@ -1238,9 +1238,9 @@ static void lease_uevent(data_t *data)
 	struct local_drm_mode_list_lessees mll;
 	struct udev_monitor *uevent_monitor;
 
-	uevent_monitor = igt_watch_hotplug();
+	uevent_monitor = igt_watch_uevents();
 
-	igt_flush_hotplugs(uevent_monitor);
+	igt_flush_uevents(uevent_monitor);
 
 	lease_fd = create_simple_lease(data->master.fd, data);
 
@@ -1260,7 +1260,7 @@ static void lease_uevent(data_t *data)
 	igt_assert_eq(list_lessees(data->master.fd, &mll), 0);
 	igt_assert_eq(mll.count_lessees, 0);
 
-	igt_cleanup_hotplug(uevent_monitor);
+	igt_cleanup_uevents(uevent_monitor);
 }
 
 igt_main

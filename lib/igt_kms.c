@@ -4156,13 +4156,13 @@ void igt_reset_connectors(void)
 }
 
 /**
- * igt_watch_hotplug:
+ * igt_watch_uevents:
  *
- * Begin monitoring udev for sysfs hotplug events.
+ * Begin monitoring udev for sysfs uevents.
  *
- * Returns: a udev monitor for detecting hotplugs on
+ * Returns: a udev monitor for detecting uevents on
  */
-struct udev_monitor *igt_watch_hotplug(void)
+struct udev_monitor *igt_watch_uevents(void)
 {
 	struct udev *udev;
 	struct udev_monitor *mon;
@@ -4230,7 +4230,7 @@ bool event_detected(struct udev_monitor *mon, int timeout_secs,
 
 /**
  * igt_connector_event_detected:
- * @mon: A udev monitor initialized with #igt_watch_hotplug
+ * @mon: A udev monitor initialized with #igt_watch_uevents
  * @conn_id: Connector id of the Connector for which the property change is
  * expected.
  * @prop_id: Property id for which the change is expected.
@@ -4252,7 +4252,7 @@ bool igt_connector_event_detected(struct udev_monitor *mon, uint32_t conn_id,
 
 /**
  * igt_hotplug_detected:
- * @mon: A udev monitor initialized with #igt_watch_hotplug
+ * @mon: A udev monitor initialized with #igt_watch_uevents
  * @timeout_secs: How long to wait for a hotplug event to occur.
  *
  * Detect if a hotplug event was received since we last checked the monitor.
@@ -4270,7 +4270,7 @@ bool igt_hotplug_detected(struct udev_monitor *mon, int timeout_secs)
 
 /**
  * igt_lease_change_detected:
- * @mon: A udev monitor initialized with #igt_watch_hotplug
+ * @mon: A udev monitor initialized with #igt_watch_uevents
  * @timeout_secs: How long to wait for a lease change event to occur.
  *
  * Detect if a lease change event was received since we last checked the monitor.
@@ -4287,12 +4287,12 @@ bool igt_lease_change_detected(struct udev_monitor *mon, int timeout_secs)
 }
 
 /**
- * igt_flush_hotplugs:
- * @mon: A udev monitor initialized with #igt_watch_hotplug
+ * igt_flush_uevents:
+ * @mon: A udev monitor initialized with #igt_watch_uevents
  *
- * Get rid of any pending hotplug events
+ * Get rid of any pending uevents
  */
-void igt_flush_hotplugs(struct udev_monitor *mon)
+void igt_flush_uevents(struct udev_monitor *mon)
 {
 	struct udev_device *dev;
 
@@ -4301,12 +4301,12 @@ void igt_flush_hotplugs(struct udev_monitor *mon)
 }
 
 /**
- * igt_cleanup_hotplug:
- * @mon: A udev monitor initialized with #igt_watch_hotplug
+ * igt_cleanup_uevents:
+ * @mon: A udev monitor initialized with #igt_watch_uevents
  *
- * Cleanup the resources allocated by #igt_watch_hotplug
+ * Cleanup the resources allocated by #igt_watch_uevents
  */
-void igt_cleanup_hotplug(struct udev_monitor *mon)
+void igt_cleanup_uevents(struct udev_monitor *mon)
 {
 	struct udev *udev = udev_monitor_get_udev(mon);
 

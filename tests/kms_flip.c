@@ -1212,7 +1212,7 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 				   int crtc_count, int duration_ms)
 {
-	struct udev_monitor *mon = igt_watch_hotplug();
+	struct udev_monitor *mon = igt_watch_uevents();
 	unsigned bo_size = 0;
 	bool vblank = true;
 	bool retried = false;
@@ -1261,7 +1261,7 @@ static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 retry:
 	kmstest_unset_all_crtcs(drm_fd, resources);
 
-	igt_flush_hotplugs(mon);
+	igt_flush_uevents(mon);
 
 	if (set_mode(o, o->fb_ids[0], 0, 0)) {
 		/* We may fail to apply the mode if there are hidden
@@ -1351,7 +1351,7 @@ out:
 
 	free_test_output(o);
 
-	igt_cleanup_hotplug(mon);
+	igt_cleanup_uevents(mon);
 }
 
 static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
