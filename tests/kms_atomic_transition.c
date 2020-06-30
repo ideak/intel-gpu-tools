@@ -664,9 +664,10 @@ static unsigned set_combinations(igt_display_t *display, unsigned mask, struct i
 	igt_output_t *output;
 	enum pipe pipe;
 	unsigned event_mask = 0;
+	int i;
 
-	for_each_connected_output(display, output)
-		igt_output_set_pipe(output, PIPE_NONE);
+	for (i = 0; i < display->n_outputs; i++)
+		igt_output_set_pipe(&display->outputs[i], PIPE_NONE);
 
 	for_each_pipe(display, pipe) {
 		igt_plane_t *plane = igt_pipe_get_plane_type(&display->pipes[pipe],
@@ -743,10 +744,11 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 	igt_output_t *output;
 	unsigned width = 0, height = 0;
 
+	for (i = 0; i < display->n_outputs; i++)
+		igt_output_set_pipe(&display->outputs[i], PIPE_NONE);
+
 	for_each_connected_output(display, output) {
 		drmModeModeInfo *mode = igt_output_get_mode(output);
-
-		igt_output_set_pipe(output, PIPE_NONE);
 
 		width = max(width, mode->hdisplay);
 		height = max(height, mode->vdisplay);
