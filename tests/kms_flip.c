@@ -1115,7 +1115,7 @@ static void free_test_output(struct test_output *o)
 	}
 }
 
-static void calibrate_ts(struct test_output *o, int crtc_idx)
+static bool calibrate_ts(struct test_output *o, int crtc_idx)
 {
 #define CALIBRATE_TS_STEPS 16
 	drmVBlank wait;
@@ -1125,6 +1125,7 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 	double expected;
 	double mean;
 	double stddev;
+	bool failed = false;
 	int n;
 
 	memset(&wait, 0, sizeof(wait));
@@ -1176,7 +1177,18 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 			igt_assert_eq(errno, EINTR);
 		}
 		igt_assert(read(drm_fd, &ev, sizeof(ev)) == sizeof(ev));
-		igt_assert_eq(ev.sequence, last_seq + 1);
+
+		if (failed)
+			continue;
+
+		if (ev.sequence != last_seq + 1) {
+			igt_debug("Unexpected frame sequence %d vs. expected %d\n",
+				  ev.sequence, last_seq + 1);
+			failed = true;
+
+			/* Continue to flush all the events queued up */
+			continue;
+		}
 
 		now = ev.tv_sec;
 		now *= 1000000;
@@ -1187,6 +1199,9 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 		last_timestamp = now;
 		last_seq = ev.sequence;
 	}
+
+	if (failed)
+		return false;
 
 	expected = mode_frame_time(o);
 
@@ -1207,6 +1222,30 @@ static void calibrate_ts(struct test_output *o, int crtc_idx)
 	}
 
 	o->vblank_interval = mean;
+
+	return true;
+}
+
+/*
+ * Some monitors with odd behavior signal a bad link after waking from a power
+ * saving state and the subsequent (successful) modeset. This will result in a
+ * link-retraining (DP) or async modeset (HDMI), which in turn makes the test
+ * miss vblank/flip events and fail.  Work around this by retrying the test
+ * once in case of such a link reset event, which the driver signals with a
+ * hotplug event.
+ */
+static bool needs_retry_after_link_reset(struct udev_monitor *mon)
+{
+	bool hotplug_detected;
+
+	igt_suspend_signal_helper();
+	hotplug_detected = igt_hotplug_detected(mon, 3);
+	igt_resume_signal_helper();
+
+	if (hotplug_detected)
+		igt_debug("Retrying after a hotplug event\n");
+
+	return hotplug_detected;
 }
 
 static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
@@ -1259,6 +1298,11 @@ static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 		kmstest_dump_mode(&o->kmode[i]);
 
 retry:
+	memset(&o->vblank_state, 0, sizeof(o->vblank_state));
+	memset(&o->flip_state, 0, sizeof(o->flip_state));
+	o->flip_state.name = "flip";
+	o->vblank_state.name = "vblank";
+
 	kmstest_unset_all_crtcs(drm_fd, resources);
 
 	igt_flush_uevents(mon);
@@ -1282,8 +1326,13 @@ retry:
 	}
 
 	/* quiescent the hw a bit so ensure we don't miss a single frame */
-	if (o->flags & TEST_CHECK_TS)
-		calibrate_ts(o, crtc_idxs[0]);
+	if (o->flags & TEST_CHECK_TS && !calibrate_ts(o, crtc_idxs[0])) {
+		igt_assert(!retried && needs_retry_after_link_reset(mon));
+
+		retried = true;
+
+		goto retry;
+	}
 
 	if (o->flags & TEST_BO_TOOBIG) {
 		int err = do_page_flip(o, o->fb_ids[1], true);
@@ -1316,28 +1365,10 @@ retry:
 	if (o->flags & TEST_VBLANK)
 		state_ok &= check_final_state(o, &o->vblank_state, elapsed);
 
-	/*
-	 * Some monitors with odd behavior signal a bad link after waking from
-	 * a power saving state and the subsequent (successful) modeset. This
-	 * will result in a link-retraining (DP) or async modeset (HDMI),
-	 * which in turn makes the test miss vblank/flip events and fail.
-	 * Work around this by retrying the test once in case of such a link
-	 * reset event, which the driver signals with a hotplug event.
-	 */
 	if (!state_ok) {
-		bool hotplug_detected;
+		igt_assert(!retried && needs_retry_after_link_reset(mon));
 
-		igt_suspend_signal_helper();
-		if (!retried)
-			hotplug_detected = igt_hotplug_detected(mon, 3);
-		igt_resume_signal_helper();
-
-		igt_assert(!retried && hotplug_detected);
-
-		igt_debug("Retrying after a hotplug event\n");
 		retried = true;
-		memset(&o->vblank_state, 0, sizeof(o->vblank_state));
-		memset(&o->flip_state, 0, sizeof(o->flip_state));
 
 		goto retry;
 	}
@@ -1412,8 +1443,6 @@ static int run_test(int duration, int flags)
 			o.count = 1;
 			o._connector[0] = resources->connectors[i];
 			o.flags = flags;
-			o.flip_state.name = "flip";
-			o.vblank_state.name = "vblank";
 			o.bpp = 32;
 			o.depth = 24;
 
@@ -1438,8 +1467,6 @@ static int run_test(int duration, int flags)
 			o.count = 1;
 			o._connector[0] = resources->connectors[i];
 			o.flags = flags;
-			o.flip_state.name = "flip";
-			o.vblank_state.name = "vblank";
 			o.bpp = 32;
 			o.depth = 24;
 
@@ -1474,8 +1501,6 @@ static int run_pair(int duration, int flags)
 					o._connector[0] = resources->connectors[i];
 					o._connector[1] = resources->connectors[j];
 					o.flags = flags;
-					o.flip_state.name = "flip";
-					o.vblank_state.name = "vblank";
 					o.bpp = 32;
 					o.depth = 24;
 
@@ -1507,8 +1532,6 @@ static int run_pair(int duration, int flags)
 					o._connector[0] = resources->connectors[i];
 					o._connector[1] = resources->connectors[j];
 					o.flags = flags;
-					o.flip_state.name = "flip";
-					o.vblank_state.name = "vblank";
 					o.bpp = 32;
 					o.depth = 24;
 
