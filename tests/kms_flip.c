@@ -658,8 +658,12 @@ static int set_mode(struct test_output *o, uint32_t fb, int x, int y)
 	return 0;
 }
 
-/* Return mask of completed events. */
-static unsigned int run_test_step(struct test_output *o)
+/*
+ * Return true if the test steps were run successfully, false in case of a
+ * failure that requires rerunning the test steps. On success events will
+ * contain the mask of completed events.
+ */
+static bool run_test_step(struct test_output *o, unsigned int *events)
 {
 	unsigned int new_fb_id;
 	/* for funny reasons page_flip returns -EBUSY on disabled crtcs ... */
@@ -709,7 +713,11 @@ static unsigned int run_test_step(struct test_output *o)
 		end = gettime_us();
 		igt_debug("Vblank took %luus\n", end - start);
 		igt_assert(end - start < 500);
-		igt_assert_eq(reply.sequence, exp_seq);
+		if (reply.sequence != exp_seq) {
+			igt_debug("unexpected vblank seq %u, should be %u\n",
+				  reply.sequence, exp_seq);
+			return false;
+		}
 		igt_assert(timercmp(&reply.ts, &o->flip_state.last_ts, ==));
 	}
 
@@ -839,7 +847,9 @@ static unsigned int run_test_step(struct test_output *o)
 
 	unhang_gpu(drm_fd, hang);
 
-	return completed_events;
+	*events = completed_events;
+
+	return true;
 }
 
 static void update_state(struct event_state *es)
@@ -1079,7 +1089,9 @@ static bool event_loop(struct test_output *o, unsigned duration_ms,
 	while (1) {
 		unsigned int completed_events;
 
-		completed_events = run_test_step(o);
+		if (!run_test_step(o, &completed_events))
+			return false;
+
 		if (o->pending_events)
 			completed_events |= wait_for_events(o);
 
