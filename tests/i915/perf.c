@@ -4120,8 +4120,13 @@ gen12_test_single_ctx_render_target_writes_a_counter(void)
 
 	do {
 		igt_fork_helper(&child) {
+			/* A local device for local resources. */
+			drm_fd = gem_reopen_driver(drm_fd);
+
 			igt_drop_root();
 			gen12_single_ctx_helper();
+
+			close(drm_fd);
 		}
 		child_ret = igt_wait_helper(&child);
 		igt_assert(WEXITSTATUS(child_ret) == EAGAIN ||
