@@ -57,6 +57,7 @@ static void xchg_obj(void *array, unsigned i, unsigned j)
 #define CONTEXTS 0x1
 static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 {
+	const struct intel_execution_engine2 *engine;
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	struct {
@@ -68,18 +69,19 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 	} *exec;
 	struct drm_i915_gem_exec_object2 *obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
-	unsigned engines[16], nengine;
+	unsigned engines[I915_EXEC_RING_MASK + 1], nengine;
 	unsigned long count;
 	double time;
 
 	nengine = 0;
-	for_each_physical_engine(e, fd) {
-		if (!gem_engine_has_mutable_submission(fd, eb_ring(e)))
+	__for_each_physical_engine(fd, engine) {
+		if (!gem_class_has_mutable_submission(fd, engine->class))
 			continue;
 
-		engines[nengine++] = eb_ring(e);
+		engines[nengine++] = engine->flags;
+		if (nengine == ARRAY_SIZE(engines))
+			break;
 	}
-
 	igt_require(nengine);
 
 	exec = calloc(nengine, sizeof(*exec));
@@ -152,7 +154,8 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 
 			if (flags & CONTEXTS) {
 				gem_context_destroy(fd, exec[e].execbuf.rsvd1);
-				exec[e].execbuf.rsvd1 = gem_context_create(fd);
+				exec[e].execbuf.rsvd1 =
+					gem_context_clone_with_engines(fd, 0);
 			}
 
 			exec[e].reloc.presumed_offset = exec[e].exec[1].offset;
@@ -236,9 +239,8 @@ igt_main
 		igt_require_gem(device);
 		gem_submission_print_method(device);
 
-		ring_size = gem_measure_ring_inflight(device, ALL_ENGINES, 0) - 10;
-		if (!gem_has_execlists(device))
-			ring_size /= 2;
+		ring_size = gem_submission_measure(device, ALL_ENGINES);
+
 		igt_info("Ring size: %d batches\n", ring_size);
 		igt_require(ring_size > 0);
 

@@ -363,7 +363,7 @@ __measure_ringsize(int i915, unsigned int engine)
 	gem_close(i915, obj[1].handle);
 
 	/* Be conservative, expect relocations, in case we must wrap later */
-	return count / 2 - 1;
+	return count / 2 - 2;
 }
 
 unsigned int gem_submission_measure(int i915, unsigned int engine)
