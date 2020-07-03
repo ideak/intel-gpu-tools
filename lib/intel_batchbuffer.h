@@ -433,11 +433,13 @@ struct intel_bb {
 	int i915;
 	int gen;
 	bool debug;
+	bool enforce_relocs;
 	uint32_t devid;
 	uint32_t handle;
 	uint32_t size;
 	uint32_t *batch;
 	uint32_t *ptr;
+	int fence;
 
 	uint32_t prng;
 	uint64_t gtt_size;
@@ -454,12 +456,34 @@ struct intel_bb {
 	struct drm_i915_gem_relocation_entry *relocs;
 	uint32_t num_relocs;
 	uint32_t allocated_relocs;
+
+	/*
+	 * BO recreate in reset path only when refcount == 0
+	 * Currently we don't need to use atomics because intel_bb
+	 * is not thread-safe.
+	 */
+	int32_t refcount;
 };
 
 struct intel_bb *intel_bb_create(int i915, uint32_t size);
-
+struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size);
 void intel_bb_destroy(struct intel_bb *ibb);
+
+static inline void intel_bb_ref(struct intel_bb *ibb)
+{
+	ibb->refcount++;
+}
+
+static inline void intel_bb_unref(struct intel_bb *ibb)
+{
+	igt_assert_f(ibb->refcount > 0, "intel_bb refcount is 0!");
+	ibb->refcount--;
+}
+
 void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache);
+int intel_bb_sync(struct intel_bb *ibb);
+void intel_bb_print(struct intel_bb *ibb);
+void intel_bb_dump(struct intel_bb *ibb, const char *filename);
 void intel_bb_set_debug(struct intel_bb *ibb, bool debug);
 
 static inline uint32_t intel_bb_offset(struct intel_bb *ibb)
@@ -471,7 +495,7 @@ static inline void intel_bb_ptr_set(struct intel_bb *ibb, uint32_t offset)
 {
 	ibb->ptr = (void *) ((uint8_t *) ibb->batch + offset);
 
-	igt_assert(intel_bb_offset(ibb) < ibb->size);
+	igt_assert(intel_bb_offset(ibb) <= ibb->size);
 }
 
 static inline void intel_bb_ptr_add(struct intel_bb *ibb, uint32_t offset)
@@ -479,10 +503,22 @@ static inline void intel_bb_ptr_add(struct intel_bb *ibb, uint32_t offset)
 	intel_bb_ptr_set(ibb, intel_bb_offset(ibb) + offset);
 }
 
-static inline void intel_bb_ptr_align(struct intel_bb *ibb,
+static inline uint32_t intel_bb_ptr_add_return_prev_offset(struct intel_bb *ibb,
+							   uint32_t offset)
+{
+	uint32_t previous_offset = intel_bb_offset(ibb);
+
+	intel_bb_ptr_set(ibb, previous_offset + offset);
+
+	return previous_offset;
+}
+
+static inline void *intel_bb_ptr_align(struct intel_bb *ibb,
 				      uint32_t alignment)
 {
 	intel_bb_ptr_set(ibb, ALIGN(intel_bb_offset(ibb), alignment));
+
+	return (void *) ibb->ptr;
 }
 
 static inline void *intel_bb_ptr(struct intel_bb *ibb)
@@ -495,7 +531,7 @@ static inline void intel_bb_out(struct intel_bb *ibb, uint32_t dword)
 	*ibb->ptr = dword;
 	ibb->ptr++;
 
-	igt_assert(intel_bb_offset(ibb) < ibb->size);
+	igt_assert(intel_bb_offset(ibb) <= ibb->size);
 }
 
 
@@ -510,12 +546,27 @@ uint64_t intel_bb_emit_reloc(struct intel_bb *ibb,
 			 uint64_t delta,
 			 uint64_t presumed_offset);
 
+uint64_t intel_bb_emit_reloc_fenced(struct intel_bb *ibb,
+				    uint32_t handle,
+				    uint32_t read_domains,
+				    uint32_t write_domain,
+				    uint64_t delta,
+				    uint64_t presumed_offset);
+
 uint64_t intel_bb_offset_reloc(struct intel_bb *ibb,
 			       uint32_t handle,
 			       uint32_t read_domains,
 			       uint32_t write_domain,
 			       uint32_t offset,
 			       uint64_t presumed_offset);
+
+uint64_t intel_bb_offset_reloc_with_delta(struct intel_bb *ibb,
+					  uint32_t handle,
+					  uint32_t read_domains,
+					  uint32_t write_domain,
+					  uint32_t delta,
+					  uint32_t offset,
+					  uint64_t presumed_offset);
 
 int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 		    uint32_t ctx, uint64_t flags, bool sync);
@@ -529,4 +580,25 @@ void intel_bb_exec_with_context(struct intel_bb *ibb, uint32_t end_offset,
 uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle);
 bool intel_bb_object_offset_to_buf(struct intel_bb *ibb, struct intel_buf *buf);
 
+uint32_t intel_bb_emit_bbe(struct intel_bb *ibb);
+void intel_bb_flush_render(struct intel_bb *ibb);
+void intel_bb_flush_blit(struct intel_bb *ibb);
+
+uint32_t intel_bb_copy_data(struct intel_bb *ibb,
+			    const void *data, unsigned int bytes,
+			    uint32_t align);
+
+void intel_bb_blit_start(struct intel_bb *ibb, uint32_t flags);
+void intel_bb_emit_blt_copy(struct intel_bb *ibb,
+			    struct intel_buf *src,
+			    int src_x1, int src_y1, int src_pitch,
+			    struct intel_buf *dst,
+			    int dst_x1, int dst_y1, int dst_pitch,
+			    int width, int height, int bpp);
+void intel_bb_blt_copy(struct intel_bb *ibb,
+		       struct intel_buf *src,
+		       int src_x1, int src_y1, int src_pitch,
+		       struct intel_buf *dst,
+		       int dst_x1, int dst_y1, int dst_pitch,
+		       int width, int height, int bpp);
 #endif

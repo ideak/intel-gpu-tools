@@ -6,6 +6,7 @@
 
 struct buf_ops;
 
+#define INTEL_BUF_INVALID_ADDRESS (-1ull)
 struct intel_buf {
 	struct buf_ops *bops;
 	uint32_t handle;

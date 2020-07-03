@@ -26,6 +26,7 @@
  **************************************************************************/
 
 #include <inttypes.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -42,6 +43,7 @@
 #include "rendercopy.h"
 #include "media_fill.h"
 #include "ioctl_wrappers.h"
+#include "sw_sync.h"
 #include "i915/gem_mman.h"
 #include "media_spin.h"
 #include "gpgpu_fill.h"
@@ -1045,8 +1047,6 @@ void igt_blitter_fast_copy(struct intel_batchbuffer *batch,
 	intel_batchbuffer_flush(batch);
 }
 
-#undef CHECK_RANGE
-
 /**
  * igt_get_render_copyfunc:
  * @devid: pci device id
@@ -1202,6 +1202,67 @@ static void __reallocate_objects(struct intel_bb *ibb)
 	}
 }
 
+static inline uint64_t __intel_bb_propose_offset(struct intel_bb *ibb)
+{
+	uint64_t offset;
+
+	if (ibb->enforce_relocs)
+		return 0;
+
+	/* randomize the address, we try to avoid relocations */
+	offset = hars_petruska_f54_1_random64(&ibb->prng);
+	offset += 256 << 10; /* Keep the low 256k clear, for negative deltas */
+	offset &= ibb->gtt_size - 1;
+
+	return offset;
+}
+
+/**
+ * intel_bb_create:
+ * @i915: drm fd
+ * @size: size of the batchbuffer
+ *
+ * Returns:
+ *
+ * Pointer the intel_bb, asserts on failure.
+ */
+static struct intel_bb *
+__intel_bb_create(int i915, uint32_t size, bool do_relocs)
+{
+	struct intel_bb *ibb = calloc(1, sizeof(*ibb));
+	uint64_t gtt_size;
+	uint64_t bb_address;
+
+	igt_assert(ibb);
+
+	ibb->i915 = i915;
+	ibb->devid = intel_get_drm_devid(i915);
+	ibb->gen = intel_gen(ibb->devid);
+	ibb->enforce_relocs = do_relocs;
+	ibb->handle = gem_create(i915, size);
+	ibb->size = size;
+	ibb->batch = calloc(1, size);
+	igt_assert(ibb->batch);
+	ibb->ptr = ibb->batch;
+	ibb->prng = (uint32_t) to_user_pointer(ibb);
+	ibb->fence = -1;
+
+	gtt_size = gem_aperture_size(i915);
+	if (!gem_uses_full_ppgtt(i915))
+		gtt_size /= 2;
+	if ((gtt_size - 1) >> 32)
+		ibb->supports_48b_address = true;
+	ibb->gtt_size = gtt_size;
+
+	__reallocate_objects(ibb);
+	bb_address = __intel_bb_propose_offset(ibb);
+	intel_bb_add_object(ibb, ibb->handle, bb_address, false);
+
+	ibb->refcount = 1;
+
+	return ibb;
+}
+
 /**
  * intel_bb_create:
  * @i915: drm fd
@@ -1213,32 +1274,24 @@ static void __reallocate_objects(struct intel_bb *ibb)
  */
 struct intel_bb *intel_bb_create(int i915, uint32_t size)
 {
-	struct intel_bb *ibb = calloc(1, sizeof(*ibb));
-	uint64_t gtt_size;
+	return __intel_bb_create(i915, size, false);
+}
 
-	igt_assert(ibb);
-
-	ibb->i915 = i915;
-	ibb->devid = intel_get_drm_devid(i915);
-	ibb->gen = intel_gen(ibb->devid);
-	ibb->handle = gem_create(i915, size);
-	ibb->size = size;
-	ibb->batch = calloc(1, size);
-	igt_assert(ibb->batch);
-	ibb->ptr = ibb->batch;
-	ibb->prng = (uint32_t) to_user_pointer(ibb);
-
-	gtt_size = gem_aperture_size(i915);
-	if (!gem_uses_full_ppgtt(i915))
-		gtt_size /= 2;
-	if ((gtt_size - 1) >> 32)
-		ibb->supports_48b_address = true;
-	ibb->gtt_size = gtt_size;
-
-	__reallocate_objects(ibb);
-	intel_bb_add_object(ibb, ibb->handle, 0, false);
-
-	return ibb;
+/**
+ * intel_bb_create_with_relocs:
+ * @i915: drm fd
+ * @size: size of the batchbuffer
+ *
+ * Disable passing or randomizing addresses. This will lead to relocations
+ * when objects are not previously pinned.
+ *
+ * Returns:
+ *
+ * Pointer the intel_bb, asserts on failure.
+ */
+struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
+{
+	return __intel_bb_create(i915, size, true);
 }
 
 /*
@@ -1250,24 +1303,32 @@ static void __do_nothing(void *node)
 	(void) node;
 }
 
-static void __intel_bb_destroy_objects(struct intel_bb *ibb)
+static void __intel_bb_destroy_relocations(struct intel_bb *ibb)
 {
 	uint32_t i;
 
 	/* Free relocations */
-	for (i = 0; i < ibb->num_objects; i++)
+	for (i = 0; i < ibb->num_objects; i++) {
 		free(from_user_pointer(ibb->objects[i].relocs_ptr));
+		ibb->objects[i].relocs_ptr = to_user_pointer(NULL);
+		ibb->objects[i].relocation_count = 0;
+	}
 
-	free(ibb->objects);
-	tdestroy(ibb->root, __do_nothing);
-
-	ibb->objects = NULL;
-	ibb->root = NULL;
-	ibb->num_objects = 0;
+	ibb->relocs = NULL;
 	ibb->num_relocs = 0;
-	ibb->allocated_objects = 0;
 	ibb->allocated_relocs = 0;
-	ibb->ptr = ibb->batch;
+}
+
+static void __intel_bb_destroy_objects(struct intel_bb *ibb)
+{
+	free(ibb->objects);
+	ibb->objects = NULL;
+
+	tdestroy(ibb->root, __do_nothing);
+	ibb->root = NULL;
+
+	ibb->num_objects = 0;
+	ibb->allocated_objects = 0;
 }
 
 /**
@@ -1280,8 +1341,15 @@ void intel_bb_destroy(struct intel_bb *ibb)
 {
 	igt_assert(ibb);
 
+	ibb->refcount--;
+	igt_assert_f(ibb->refcount == 0, "Trying to destroy referenced bb!");
+
+	__intel_bb_destroy_relocations(ibb);
 	__intel_bb_destroy_objects(ibb);
 	gem_close(ibb->i915, ibb->handle);
+
+	if (ibb->fence >= 0)
+		close(ibb->fence);
 
 	free(ibb);
 }
@@ -1291,10 +1359,21 @@ void intel_bb_destroy(struct intel_bb *ibb)
  * @ibb: pointer to intel_bb
  * @purge_objects_cache: if true destroy internal execobj and relocs + cache
  *
- * Recreate batch bo.
+ * Recreate batch bo when there's no additional reference.
 */
 void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 {
+	uint64_t bb_address;
+
+	if (purge_objects_cache && ibb->refcount > 1)
+		igt_warn("Cannot purge objects cache on bb, refcount > 1!");
+
+	/* Someone keeps reference, just exit */
+	if (ibb->refcount > 1)
+		return;
+
+	__intel_bb_destroy_relocations(ibb);
+
 	if (purge_objects_cache) {
 		__intel_bb_destroy_objects(ibb);
 		__reallocate_objects(ibb);
@@ -1303,8 +1382,75 @@ void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 	gem_close(ibb->i915, ibb->handle);
 	ibb->handle = gem_create(ibb->i915, ibb->size);
 
-	intel_bb_add_object(ibb, ibb->handle, 0, false);
+	bb_address = __intel_bb_propose_offset(ibb);
+	intel_bb_add_object(ibb, ibb->handle, bb_address, false);
 	ibb->ptr = ibb->batch;
+	memset(ibb->batch, 0, ibb->size);
+}
+
+/*
+ * intel_bb_sync:
+ * @ibb: pointer to intel_bb
+ *
+ * Waits for bb completion. Returns 0 on success, otherwise errno.
+ */
+int intel_bb_sync(struct intel_bb *ibb)
+{
+	int ret;
+
+	if (ibb->fence < 0)
+		return 0;
+
+	ret = sync_fence_wait(ibb->fence, -1);
+	if (ret == 0) {
+		close(ibb->fence);
+		ibb->fence = -1;
+	}
+
+	return ret;
+}
+
+/*
+ * intel_bb_print:
+ * @ibb: pointer to intel_bb
+ *
+ * Prints batch to stdout.
+ */
+void intel_bb_print(struct intel_bb *ibb)
+{
+	igt_info("drm fd: %d, gen: %d, devid: %u, debug: %d\n",
+		 ibb->i915, ibb->gen, ibb->devid, ibb->debug);
+	igt_info("handle: %u, size: %u, batch: %p, ptr: %p\n",
+		 ibb->handle, ibb->size, ibb->batch, ibb->ptr);
+	igt_info("prng: %u, gtt_size: %" PRIu64 ", supports 48bit: %d\n",
+		 ibb->prng, ibb->gtt_size, ibb->supports_48b_address);
+	igt_info("ctx: %u\n", ibb->ctx);
+	igt_info("root: %p\n", ibb->root);
+	igt_info("objects: %p, num_objects: %u, allocated obj: %u\n",
+		 ibb->objects, ibb->num_objects, ibb->allocated_objects);
+	igt_info("relocs: %p, num_relocs: %u, allocated_relocs: %u\n----\n",
+		 ibb->relocs, ibb->num_relocs, ibb->allocated_relocs);
+}
+
+/*
+ * intel_bb_dump:
+ * @ibb: pointer to intel_bb
+ * @filename: name to which write bb
+ *
+ * Dump batch bo to file.
+ */
+void intel_bb_dump(struct intel_bb *ibb, const char *filename)
+{
+	FILE *out;
+	void *ptr;
+
+	ptr = gem_mmap__device_coherent(ibb->i915, ibb->handle, 0, ibb->size,
+					PROT_READ);
+	out = fopen(filename, "wb");
+	igt_assert(out);
+	fwrite(ptr, ibb->size, 1, out);
+	fclose(out);
+	munmap(ptr, ibb->size);
 }
 
 /**
@@ -1331,8 +1477,7 @@ static int __compare_objects(const void *p1, const void *p2)
  * intel_bb_add_object:
  * @ibb: pointer to intel_bb
  * @handle: which handle to add to objects array
- * @offset: presumed offset of the object when I915_EXEC_NO_RELOC flag is
- * used in execbuf call
+ * @offset: presumed offset of the object when no relocation is enforced
  * @write: does a handle is a render target
  *
  * Function adds or updates execobj slot in bb objects array and
@@ -1352,6 +1497,7 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
 	i = ibb->num_objects;
 	object = &ibb->objects[i];
 	object->handle = handle;
+	object->offset = offset;
 
 	found = tsearch((void *) object, &ibb->root, __compare_objects);
 
@@ -1360,18 +1506,8 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
 	else
 		object = *found;
 
-	/* Assign address once */
-	if (object->offset == 0) {
-		if (offset) {
-			object->offset = offset;
-		} else {
-			/* randomize the address, we try to avoid relocations */
-			offset = hars_petruska_f54_1_random64(&ibb->prng);
-			offset &= (ibb->gtt_size - 1);
-			offset &= ~(4096 - 1);
-			object->offset = offset;
-		}
-	}
+	if (object->offset == INTEL_BUF_INVALID_ADDRESS)
+		object->offset = __intel_bb_propose_offset(ibb);
 
 	if (write)
 		object->flags |= EXEC_OBJECT_WRITE;
@@ -1382,6 +1518,23 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
 	return object;
 }
 
+static bool intel_bb_object_set_fence(struct intel_bb *ibb, uint32_t handle)
+{
+	struct drm_i915_gem_exec_object2 object = { .handle = handle };
+	struct drm_i915_gem_exec_object2 **found;
+
+	found = tfind((void *) &object, &ibb->root, __compare_objects);
+	if (!found) {
+		igt_warn("Trying to set fence on not found handle: %u\n",
+			 handle);
+		return false;
+	}
+
+	(*found)->flags |= EXEC_OBJECT_NEEDS_FENCE;
+
+	return true;
+}
+
 /*
  * intel_bb_add_reloc:
  * @ibb: pointer to intel_bb
@@ -1390,8 +1543,10 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
  * @write_domain: gem domain bit for the relocation
  * @delta: delta value to add to @buffer's gpu address
  * @offset: offset within bb to be patched
- * @presumed_offset: address of the object in address space, important for
- * I915_EXEC_NO_RELOC flag
+ * @presumed_offset: address of the object in address space. If -1 is passed
+ * then final offset of the object will be randomized (for no-reloc bb) or
+ * 0 (for reloc bb, in that case reloc.presumed_offset will be -1). In
+ * case address is known it should passed in @presumed_offset (for no-reloc).
  *
  * Function allocates additional relocation slot in reloc array for a handle.
  * It also implicitly adds handle in the objects array if object doesn't
@@ -1426,14 +1581,18 @@ static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
 	relocs[i].write_domain = write_domain;
 	relocs[i].delta = delta;
 	relocs[i].offset = offset;
-	relocs[i].presumed_offset = object->offset;
+	if (ibb->enforce_relocs)
+		relocs[i].presumed_offset = -1;
+	else
+		relocs[i].presumed_offset = object->offset;
 
 	igt_debug("add reloc: handle: %u, r/w: 0x%x/0x%x, "
 		  "delta: 0x%" PRIx64 ", "
 		  "offset: 0x%" PRIx64 ", "
-		  "poffset: 0x%" PRIx64 "\n",
+		  "poffset: %p\n",
 		  handle, read_domains, write_domain,
-		  delta, offset, presumed_offset);
+		  delta, offset,
+		  from_user_pointer(relocs[i].presumed_offset));
 
 	return object->offset;
 }
@@ -1445,8 +1604,10 @@ static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
  * @read_domains: gem domain bits for the relocation
  * @write_domain: gem domain bit for the relocation
  * @delta: delta value to add to @buffer's gpu address
- * @presumed_offset: address of the object in address space, important for
- * I915_EXEC_NO_RELOC flag
+ * @presumed_offset: address of the object in address space. If -1 is passed
+ * then final offset of the object will be randomized (for no-reloc bb) or
+ * 0 (for reloc bb, in that case reloc.presumed_offset will be -1). In
+ * case address is known it should passed in @presumed_offset (for no-reloc).
  * @write: does a handle is a render target
  *
  * Function prepares relocation (execobj if required + reloc) and emits
@@ -1458,11 +1619,11 @@ static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
  * on instruction (see instruction specification).
  */
 uint64_t intel_bb_emit_reloc(struct intel_bb *ibb,
-			 uint32_t handle,
-			 uint32_t read_domains,
-			 uint32_t write_domain,
-			 uint64_t delta,
-			 uint64_t presumed_offset)
+			     uint32_t handle,
+			     uint32_t read_domains,
+			     uint32_t write_domain,
+			     uint64_t delta,
+			     uint64_t presumed_offset)
 {
 	uint64_t address;
 
@@ -1479,6 +1640,23 @@ uint64_t intel_bb_emit_reloc(struct intel_bb *ibb,
 	return address;
 }
 
+uint64_t intel_bb_emit_reloc_fenced(struct intel_bb *ibb,
+				    uint32_t handle,
+				    uint32_t read_domains,
+				    uint32_t write_domain,
+				    uint64_t delta,
+				    uint64_t presumed_offset)
+{
+	uint64_t address;
+
+	address = intel_bb_emit_reloc(ibb, handle, read_domains, write_domain,
+				      delta, presumed_offset);
+
+	intel_bb_object_set_fence(ibb, handle);
+
+	return address;
+}
+
 /**
  * intel_bb_offset_reloc:
  * @ibb: pointer to intel_bb
@@ -1486,8 +1664,10 @@ uint64_t intel_bb_emit_reloc(struct intel_bb *ibb,
  * @read_domains: gem domain bits for the relocation
  * @write_domain: gem domain bit for the relocation
  * @offset: offset within bb to be patched
- * @presumed_offset: address of the object in address space, important for
- * I915_EXEC_NO_RELOC flag
+ * @presumed_offset: address of the object in address space. If -1 is passed
+ * then final offset of the object will be randomized (for no-reloc bb) or
+ * 0 (for reloc bb, in that case reloc.presumed_offset will be -1). In
+ * case address is known it should passed in @presumed_offset (for no-reloc).
  *
  * Function prepares relocation (execobj if required + reloc). It it used
  * for editing batchbuffer via modifying structures. It means when we're
@@ -1509,11 +1689,27 @@ uint64_t intel_bb_offset_reloc(struct intel_bb *ibb,
 				  0, offset, presumed_offset);
 }
 
-static void intel_bb_dump_execbuf(struct drm_i915_gem_execbuffer2 *execbuf)
+uint64_t intel_bb_offset_reloc_with_delta(struct intel_bb *ibb,
+					  uint32_t handle,
+					  uint32_t read_domains,
+					  uint32_t write_domain,
+					  uint32_t delta,
+					  uint32_t offset,
+					  uint64_t presumed_offset)
+{
+	igt_assert(ibb);
+
+	return intel_bb_add_reloc(ibb, handle, read_domains, write_domain,
+				  delta, offset, presumed_offset);
+}
+
+static void intel_bb_dump_execbuf(struct intel_bb *ibb,
+				  struct drm_i915_gem_execbuffer2 *execbuf)
 {
 	struct drm_i915_gem_exec_object2 *objects;
 	struct drm_i915_gem_relocation_entry *relocs, *reloc;
 	int i, j;
+	uint64_t address;
 
 	igt_info("execbuf batch len: %u, start offset: 0x%x, "
 		 "DR1: 0x%x, DR4: 0x%x, "
@@ -1529,26 +1725,33 @@ static void intel_bb_dump_execbuf(struct drm_i915_gem_execbuffer2 *execbuf)
 		objects = &((struct drm_i915_gem_exec_object2 *)
 			    from_user_pointer(execbuf->buffers_ptr))[i];
 		relocs = from_user_pointer(objects->relocs_ptr);
+		address = objects->offset;
+		if (address != INTEL_BUF_INVALID_ADDRESS)
+			address = address & (ibb->gtt_size - 1);
 		igt_info(" [%d] handle: %u, reloc_count: %d, reloc_ptr: %p, "
-			 "align: 0x%llx, offset: 0x%llx, flags: 0x%llx, "
+			 "align: 0x%llx, offset: 0x%" PRIx64 ", flags: 0x%llx, "
 			 "rsvd1: 0x%llx, rsvd2: 0x%llx\n",
 			 i, objects->handle, objects->relocation_count,
 			 relocs,
 			 objects->alignment,
-			 objects->offset, objects->flags,
+			 address,
+			 objects->flags,
 			 objects->rsvd1, objects->rsvd2);
 		if (objects->relocation_count) {
 			igt_info("\texecbuf relocs:\n");
 			for (j = 0; j < objects->relocation_count; j++) {
 				reloc = &relocs[j];
+				address = reloc->presumed_offset;
+				if (address != INTEL_BUF_INVALID_ADDRESS)
+					address = address & (ibb->gtt_size - 1);
 				igt_info("\t [%d] target handle: %u, "
 					 "offset: 0x%llx, delta: 0x%x, "
-					 "presumed_offset: 0x%llx, "
+					 "presumed_offset: 0x%" PRIx64 ", "
 					 "read_domains: 0x%x, "
 					 "write_domain: 0x%x\n",
 					 j, reloc->target_handle,
 					 reloc->offset, reloc->delta,
-					 reloc->presumed_offset,
+					 address,
 					 reloc->read_domains,
 					 reloc->write_domain);
 			}
@@ -1559,7 +1762,7 @@ static void intel_bb_dump_execbuf(struct drm_i915_gem_execbuffer2 *execbuf)
 static void print_node(const void *node, VISIT which, int depth)
 {
 	const struct drm_i915_gem_exec_object2 *object =
-			*(const struct drm_i915_gem_exec_object2 **) node;
+		*(const struct drm_i915_gem_exec_object2 **) node;
 	(void) depth;
 
 	switch (which) {
@@ -1593,7 +1796,7 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 		    uint32_t ctx, uint64_t flags, bool sync)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
-	int ret;
+	int ret, fence, new_fence;
 
 	ibb->objects[0].relocs_ptr = to_user_pointer(ibb->relocs);
 	ibb->objects[0].relocation_count = ibb->num_relocs;
@@ -1606,17 +1809,34 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 	execbuf.buffer_count = ibb->num_objects;
 	execbuf.batch_len = end_offset;
 	execbuf.rsvd1 = ibb->ctx = ctx;
-	execbuf.flags = flags | I915_EXEC_BATCH_FIRST;
+	execbuf.flags = flags | I915_EXEC_BATCH_FIRST | I915_EXEC_FENCE_OUT;
+	if (ibb->enforce_relocs)
+		execbuf.flags &= ~I915_EXEC_NO_RELOC;
+	execbuf.rsvd2 = 0;
 
-	ret = __gem_execbuf(ibb->i915, &execbuf);
-	if (ret)
+	ret = __gem_execbuf_wr(ibb->i915, &execbuf);
+	if (ret) {
+		intel_bb_dump_execbuf(ibb, &execbuf);
 		return ret;
+	}
+
+	/* Save/merge fences */
+	fence = execbuf.rsvd2 >> 32;
+
+	if (ibb->fence < 0) {
+		ibb->fence = fence;
+	} else {
+		new_fence = sync_fence_merge(ibb->fence, fence);
+		close(ibb->fence);
+		close(fence);
+		ibb->fence = new_fence;
+	}
 
 	if (sync || ibb->debug)
-		gem_sync(ibb->i915, ibb->handle);
+		igt_assert(intel_bb_sync(ibb) == 0);
 
 	if (ibb->debug) {
-		intel_bb_dump_execbuf(&execbuf);
+		intel_bb_dump_execbuf(ibb, &execbuf);
 		if (intel_bb_debug_tree) {
 			igt_info("\nTree:\n");
 			twalk(ibb->root, print_node);
@@ -1672,14 +1892,20 @@ uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle)
 {
 	struct drm_i915_gem_exec_object2 object = { .handle = handle };
 	struct drm_i915_gem_exec_object2 **found;
+	uint64_t address;
 
 	igt_assert(ibb);
 
-	found = tfind((void *) &object, &ibb->root, __compare_objects);
+	found = tfind((void *)&object, &ibb->root, __compare_objects);
 	if (!found)
-		return 0;
+		return INTEL_BUF_INVALID_ADDRESS;
 
-	return (*found)->offset;
+	address = (*found)->offset;
+
+	if (address == INTEL_BUF_INVALID_ADDRESS)
+		return address;
+
+	return address & (ibb->gtt_size - 1);
 }
 
 /**
@@ -1698,7 +1924,7 @@ bool intel_bb_object_offset_to_buf(struct intel_bb *ibb, struct intel_buf *buf)
 	igt_assert(ibb);
 	igt_assert(buf);
 
-	found = tfind((void *) &object, &ibb->root, __compare_objects);
+	found = tfind((void *)&object, &ibb->root, __compare_objects);
 	if (!found) {
 		buf->addr.offset = 0;
 		buf->addr.ctx = 0;
@@ -1706,8 +1932,196 @@ bool intel_bb_object_offset_to_buf(struct intel_bb *ibb, struct intel_buf *buf)
 		return false;
 	}
 
-	buf->addr.offset = (*found)->offset;
+	buf->addr.offset = (*found)->offset & (ibb->gtt_size - 1);
 	buf->addr.ctx = ibb->ctx;
 
 	return true;
+}
+
+/*
+ * intel_bb_emit_bbe:
+ * @ibb: batchbuffer
+ *
+ * Outputs MI_BATCH_BUFFER_END and ensures batch is properly aligned.
+ */
+uint32_t intel_bb_emit_bbe(struct intel_bb *ibb)
+{
+	/* Mark the end of the buffer. */
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_ptr_align(ibb, 8);
+
+	return intel_bb_offset(ibb);
+}
+
+/*
+ * intel_bb_flush_with_context_ring:
+ * @ibb: batchbuffer
+ * @ctx: context id
+ * @ring: ring
+ *
+ * Submits the batch for execution on the @ring engine with the supplied
+ * hardware context @ctx.
+ */
+static void intel_bb_flush_with_context_ring(struct intel_bb *ibb,
+					     uint32_t ctx, uint32_t ring)
+{
+	intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), ctx,
+				   ring | I915_EXEC_NO_RELOC,
+				   false);
+	intel_bb_reset(ibb, false);
+}
+
+void intel_bb_flush_render(struct intel_bb *ibb)
+{
+	uint32_t ring = I915_EXEC_RENDER;
+
+	intel_bb_flush_with_context_ring(ibb, ibb->ctx, ring);
+}
+
+void intel_bb_flush_blit(struct intel_bb *ibb)
+{
+	uint32_t ring = I915_EXEC_DEFAULT;
+
+	if (HAS_BLT_RING(ibb->devid))
+		ring = I915_EXEC_BLT;
+
+	intel_bb_flush_with_context_ring(ibb, ibb->ctx, ring);
+}
+
+uint32_t intel_bb_copy_data(struct intel_bb *ibb,
+			    const void *data, unsigned int bytes,
+			    uint32_t align)
+{
+	uint32_t *subdata, offset;
+
+	igt_assert((bytes & 3) == 0);
+
+	intel_bb_ptr_align(ibb, align);
+	offset = intel_bb_offset(ibb);
+	igt_assert(offset + bytes < ibb->size);
+
+	subdata = intel_bb_ptr(ibb);
+	memcpy(subdata, data, bytes);
+	intel_bb_ptr_add(ibb, bytes);
+
+	return offset;
+}
+
+void intel_bb_blit_start(struct intel_bb *ibb, uint32_t flags)
+{
+	intel_bb_out(ibb, XY_SRC_COPY_BLT_CMD |
+		     XY_SRC_COPY_BLT_WRITE_ALPHA |
+		     XY_SRC_COPY_BLT_WRITE_RGB |
+		     flags |
+		     (6 + 2 * (ibb->gen >= 8)));
+}
+
+void intel_bb_emit_blt_copy(struct intel_bb *ibb,
+			    struct intel_buf *src,
+			    int src_x1, int src_y1, int src_pitch,
+			    struct intel_buf *dst,
+			    int dst_x1, int dst_y1, int dst_pitch,
+			    int width, int height, int bpp)
+{
+	const int gen = ibb->gen;
+	uint32_t cmd_bits = 0;
+	uint32_t br13_bits;
+	uint32_t mask;
+
+	igt_assert(bpp*(src_x1 + width) <= 8*src_pitch);
+	igt_assert(bpp*(dst_x1 + width) <= 8*dst_pitch);
+	igt_assert(src_pitch * (src_y1 + height) <= src->size);
+	igt_assert(dst_pitch * (dst_y1 + height) <= dst->size);
+
+	if (gen >= 4 && src->tiling != I915_TILING_NONE) {
+		src_pitch /= 4;
+		cmd_bits |= XY_SRC_COPY_BLT_SRC_TILED;
+	}
+
+	if (gen >= 4 && dst->tiling != I915_TILING_NONE) {
+		dst_pitch /= 4;
+		cmd_bits |= XY_SRC_COPY_BLT_DST_TILED;
+	}
+
+	CHECK_RANGE(src_x1); CHECK_RANGE(src_y1);
+	CHECK_RANGE(dst_x1); CHECK_RANGE(dst_y1);
+	CHECK_RANGE(width); CHECK_RANGE(height);
+	CHECK_RANGE(src_x1 + width); CHECK_RANGE(src_y1 + height);
+	CHECK_RANGE(dst_x1 + width); CHECK_RANGE(dst_y1 + height);
+	CHECK_RANGE(src_pitch); CHECK_RANGE(dst_pitch);
+
+	br13_bits = 0;
+	switch (bpp) {
+	case 8:
+		break;
+	case 16:		/* supporting only RGB565, not ARGB1555 */
+		br13_bits |= 1 << 24;
+		break;
+	case 32:
+		br13_bits |= 3 << 24;
+		cmd_bits |= (XY_SRC_COPY_BLT_WRITE_ALPHA |
+			     XY_SRC_COPY_BLT_WRITE_RGB);
+		break;
+	default:
+		igt_fail(IGT_EXIT_FAILURE);
+	}
+
+	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
+		intel_bb_out(ibb, MI_LOAD_REGISTER_IMM);
+		intel_bb_out(ibb, BCS_SWCTRL);
+
+		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
+		if (src->tiling == I915_TILING_Y)
+			mask |= BCS_SRC_Y;
+		if (dst->tiling == I915_TILING_Y)
+			mask |= BCS_DST_Y;
+		intel_bb_out(ibb, mask);
+	}
+
+	intel_bb_blit_start(ibb, cmd_bits);
+	intel_bb_out(ibb, (br13_bits) |
+		     (0xcc << 16) | /* copy ROP */
+		     dst_pitch);
+	intel_bb_out(ibb, (dst_y1 << 16) | dst_x1); /* dst x1,y1 */
+	intel_bb_out(ibb, ((dst_y1 + height) << 16) | (dst_x1 + width)); /* dst x2,y2 */
+	intel_bb_emit_reloc_fenced(ibb, dst->handle,
+				   I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER,
+				   0, dst->addr.offset);
+	intel_bb_out(ibb, (src_y1 << 16) | src_x1); /* src x1,y1 */
+	intel_bb_out(ibb, src_pitch);
+	intel_bb_emit_reloc_fenced(ibb, src->handle,
+				   I915_GEM_DOMAIN_RENDER, 0,
+				   0, src->addr.offset);
+
+	if (gen >= 6 && src->handle == dst->handle) {
+		intel_bb_out(ibb, XY_SETUP_CLIP_BLT_CMD);
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
+	}
+
+	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
+		igt_assert(ibb->gen >= 6);
+		intel_bb_out(ibb, MI_FLUSH_DW | 2);
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
+
+		intel_bb_out(ibb, MI_LOAD_REGISTER_IMM);
+		intel_bb_out(ibb, BCS_SWCTRL);
+		intel_bb_out(ibb, (BCS_SRC_Y | BCS_DST_Y) << 16);
+	}
+}
+
+void intel_bb_blt_copy(struct intel_bb *ibb,
+		       struct intel_buf *src,
+		       int src_x1, int src_y1, int src_pitch,
+		       struct intel_buf *dst,
+		       int dst_x1, int dst_y1, int dst_pitch,
+		       int width, int height, int bpp)
+{
+	intel_bb_emit_blt_copy(ibb, src, src_x1, src_y1, src_pitch,
+			       dst, dst_x1, dst_y1, dst_pitch,
+			       width, height, bpp);
+	intel_bb_emit_bbe(ibb);
+	intel_bb_flush_blit(ibb);
 }
