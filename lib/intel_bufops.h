@@ -7,6 +7,7 @@
 struct buf_ops;
 
 #define INTEL_BUF_INVALID_ADDRESS (-1ull)
+#define INTEL_BUF_NAME_MAXSIZE 32
 struct intel_buf {
 	struct buf_ops *bops;
 	uint32_t handle;
@@ -15,14 +16,21 @@ struct intel_buf {
 	uint32_t bpp;
 	uint32_t size;
 	uint32_t compression;
+	uint32_t swizzle_mode;
 	struct {
 		uint32_t offset;
 		uint32_t stride;
 	} aux;
 	struct {
+		uint32_t offset;
+	} cc;
+	struct {
 		uint64_t offset;
 		uint32_t ctx;
 	} addr;
+
+	/* For debugging purposes */
+	char name[INTEL_BUF_NAME_MAXSIZE + 1];
 };
 
 static inline unsigned int intel_buf_width(const struct intel_buf *buf)
@@ -63,9 +71,11 @@ intel_buf_aux_height(int gen, const struct intel_buf *buf)
 	return DIV_ROUND_UP(intel_buf_height(buf), 512) * 32;
 }
 
+int intel_buf_bo_size(const struct intel_buf *buf);
+
 struct buf_ops *buf_ops_create(int fd);
 void buf_ops_destroy(struct buf_ops *bops);
-int buf_ops_getfd(struct buf_ops *bops);
+int buf_ops_get_fd(struct buf_ops *bops);
 
 bool buf_ops_set_software_tiling(struct buf_ops *bops,
 				 uint32_t tiling,
@@ -90,5 +100,17 @@ void intel_buf_init_using_handle(struct buf_ops *bops,
 				 struct intel_buf *buf,
 				 int width, int height, int bpp, int alignment,
 				 uint32_t req_tiling, uint32_t compression);
+
+struct intel_buf *intel_buf_create(struct buf_ops *bops,
+				   int width, int height,
+				   int bpp, int alignment,
+				   uint32_t req_tiling, uint32_t compression);
+void intel_buf_destroy(struct intel_buf *buf);
+
+void intel_buf_print(const struct intel_buf *buf);
+const char *intel_buf_set_name(struct intel_buf *buf, const char *name);
+
+void intel_buf_write_to_png(struct intel_buf *buf, const char *filename);
+void intel_buf_write_aux_to_png(struct intel_buf *buf, const char *filename);
 
 #endif

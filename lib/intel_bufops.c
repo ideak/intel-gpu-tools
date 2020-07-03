@@ -23,6 +23,7 @@
  */
 
 #include <sys/ioctl.h>
+#include <cairo.h>
 #include "igt.h"
 #include "igt_x86.h"
 #include "intel_bufops.h"
@@ -174,10 +175,14 @@ static bool __get_tiling(int fd, uint32_t handle, uint32_t *tiling,
 }
 
 static int __set_tiling(int fd, uint32_t handle, uint32_t tiling,
-			uint32_t stride)
+			uint32_t stride,
+			uint32_t *ret_tiling, uint32_t *ret_swizzle)
 {
+	struct drm_i915_gem_set_tiling st;
+
+	memset(&st, 0, sizeof(st));
 	do {
-		struct drm_i915_gem_set_tiling st;
+
 		int err;
 
 		st.handle = handle;
@@ -188,13 +193,22 @@ static int __set_tiling(int fd, uint32_t handle, uint32_t tiling,
 		if (ioctl(fd, DRM_IOCTL_I915_GEM_SET_TILING, &st))
 			err = -errno;
 		errno = 0;
-		if (err != -EINTR)
+		if (err != -EINTR) {
+			if (ret_tiling)
+				*ret_tiling = st.tiling_mode;
+
+			if (ret_swizzle)
+				*ret_swizzle = st.swizzle_mode;
+
 			return err;
+		}
 	} while (1);
 }
 
 static void set_hw_tiled(struct buf_ops *bops, struct intel_buf *buf)
 {
+	uint32_t ret_tiling, ret_swizzle;
+
 	if (buf->tiling != I915_TILING_X && buf->tiling != I915_TILING_Y)
 		return;
 
@@ -202,8 +216,12 @@ static void set_hw_tiled(struct buf_ops *bops, struct intel_buf *buf)
 		return;
 
 	igt_assert_eq(__set_tiling(bops->fd,
-				   buf->handle, buf->tiling, buf->stride),
+				   buf->handle, buf->tiling, buf->stride,
+				   &ret_tiling, &ret_swizzle),
 		      0);
+
+	igt_assert(ret_tiling == buf->tiling);
+	buf->swizzle_mode = ret_swizzle;
 }
 
 static unsigned long swizzle_bit(unsigned int bit, unsigned long offset)
@@ -690,6 +708,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 	memset(buf, 0, sizeof(*buf));
 
 	buf->bops = bops;
+	buf->addr.offset = INTEL_BUF_INVALID_ADDRESS;
 
 	if (compression) {
 		int aux_width, aux_height;
@@ -697,7 +716,6 @@ static void __intel_buf_init(struct buf_ops *bops,
 		igt_require(bops->intel_gen >= 9);
 		igt_assert(req_tiling == I915_TILING_Y ||
 			   req_tiling == I915_TILING_Yf);
-
 		/*
 		 * On GEN12+ we align the main surface to 4 * 4 main surface
 		 * tiles, which is 64kB. These 16 tiles are mapped by 4 AUX
@@ -724,7 +742,6 @@ static void __intel_buf_init(struct buf_ops *bops,
 		buf->aux.stride = aux_width;
 
 		size = buf->aux.offset + aux_width * aux_height;
-
 	} else {
 		if (buf->tiling) {
 			devid =  intel_get_drm_devid(bops->fd);
@@ -826,6 +843,98 @@ void intel_buf_init_using_handle(struct buf_ops *bops,
 			 req_tiling, compression);
 }
 
+struct intel_buf *intel_buf_create(struct buf_ops *bops,
+				   int width, int height,
+				   int bpp, int alignment,
+				   uint32_t req_tiling, uint32_t compression)
+{
+	struct intel_buf *buf;
+
+	igt_assert(bops);
+
+	buf = calloc(1, sizeof(*buf));
+	igt_assert(buf);
+
+	intel_buf_init(bops, buf, width, height, bpp, alignment,
+		       req_tiling, compression);
+
+	return buf;
+}
+
+void intel_buf_destroy(struct intel_buf *buf)
+{
+	igt_assert(buf);
+
+	intel_buf_close(buf->bops, buf);
+	free(buf);
+}
+
+void intel_buf_print(const struct intel_buf *buf)
+{
+	igt_info("[name: %s]\n", buf->name);
+	igt_info("[%u]: w: %u, h: %u, stride: %u, size: %u, bo-size: %u, "
+		 "bpp: %u, tiling: %u, compress: %u\n",
+		 buf->handle, intel_buf_width(buf), intel_buf_height(buf),
+		 buf->stride, buf->size,
+		 intel_buf_bo_size(buf), buf->bpp,
+		 buf->tiling, buf->compression);
+	igt_info(" aux <offset: %u, stride: %u, w: %u, h: %u> cc <offset: %u>\n",
+		 buf->aux.offset,
+		 intel_buf_aux_width(buf->bops->intel_gen, buf),
+		 intel_buf_aux_height(buf->bops->intel_gen, buf),
+		 buf->aux.stride, buf->cc.offset);
+	igt_info(" addr <offset: %p, ctx: %u>\n",
+		 from_user_pointer(buf->addr.offset), buf->addr.ctx);
+}
+
+const char *intel_buf_set_name(struct intel_buf *buf, const char *name)
+{
+	return strncpy(buf->name, name, INTEL_BUF_NAME_MAXSIZE);
+}
+
+static void __intel_buf_write_to_png(struct buf_ops *bops,
+				     struct intel_buf *buf,
+				     const char *filename,
+				     bool write_aux)
+{
+	cairo_surface_t *surface;
+	cairo_status_t ret;
+	void *linear;
+	int format, width, height, stride, offset;
+	int gen = bops->intel_gen;
+
+	igt_assert_eq(posix_memalign(&linear, 16, intel_buf_bo_size(buf)), 0);
+
+	format = write_aux ? CAIRO_FORMAT_A8 : CAIRO_FORMAT_RGB24;
+	width = write_aux ? intel_buf_aux_width(gen, buf) : intel_buf_width(buf);
+	height = write_aux ? intel_buf_aux_height(gen, buf) : intel_buf_height(buf);
+	stride = write_aux ? buf->aux.stride : buf->stride;
+	offset = write_aux ? buf->aux.offset : 0;
+
+	intel_buf_to_linear(bops, buf, linear);
+
+	surface = cairo_image_surface_create_for_data((uint8_t *) linear + offset,
+						      format, width, height,
+						      stride);
+	ret = cairo_surface_write_to_png(surface, filename);
+	igt_assert(ret == CAIRO_STATUS_SUCCESS);
+	cairo_surface_destroy(surface);
+
+	free(linear);
+}
+
+void intel_buf_write_to_png(struct intel_buf *buf, const char *filename)
+{
+	__intel_buf_write_to_png(buf->bops, buf, filename, false);
+}
+
+void intel_buf_write_aux_to_png(struct intel_buf *buf, const char *filename)
+{
+	igt_assert(buf->compression);
+
+	__intel_buf_write_to_png(buf->bops, buf, filename, true);
+}
+
 #define DEFAULT_BUFOPS(__gen_start, __gen_end) \
 	.gen_start          = __gen_start, \
 	.gen_end            = __gen_end, \
@@ -876,7 +985,7 @@ static bool probe_hw_tiling(struct buf_ops *bops, uint32_t tiling)
 	handle = gem_create(bops->fd, size);
 
 	/* Single shot, if no fences are available we fail immediately */
-	ret = __set_tiling(bops->fd, handle, tiling, stride);
+	ret = __set_tiling(bops->fd, handle, tiling, stride, NULL, NULL);
 	if (ret)
 		goto end;
 
@@ -954,6 +1063,15 @@ static void idempotency_selftest(struct buf_ops *bops, uint32_t tiling)
 
 	igt_debug("Idempotency for %s tiling OK\n", tiling_str(tiling));
 	buf_ops_set_software_tiling(bops, tiling, false);
+}
+
+int intel_buf_bo_size(const struct intel_buf *buf)
+{
+	int offset = CCS_OFFSET(buf) ?: buf->size;
+	int ccs_size =
+		buf->compression ? CCS_SIZE(buf->bops->intel_gen, buf) : 0;
+
+	return offset + ccs_size;
 }
 
 /**
@@ -1061,12 +1179,12 @@ void buf_ops_destroy(struct buf_ops *bops)
 }
 
 /**
- * buf_ops_getfd
+ * buf_ops_get_fd
  * @bops: pointer to buf_ops
  *
  * Returns: drm fd
  */
-int buf_ops_getfd(struct buf_ops *bops)
+int buf_ops_get_fd(struct buf_ops *bops)
 {
 	igt_assert(bops);
 
