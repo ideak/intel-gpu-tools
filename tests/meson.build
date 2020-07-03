@@ -103,6 +103,7 @@ test_progs = [
 ]
 
 i915_progs = [
+	'api_intel_bb',
 	'gen3_mixed_blits',
 	'gen3_render_linear_blits',
 	'gen3_render_mixed_blits',
