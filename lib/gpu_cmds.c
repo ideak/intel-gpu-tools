@@ -363,6 +363,8 @@ gen8_fill_interface_descriptor(struct intel_bb *ibb,
 
 	idd->desc6.num_threads_in_tg = 1;
 
+	intel_bb_ptr_add(ibb, sizeof(*idd));
+
 	return offset;
 }
 
@@ -398,6 +400,8 @@ gen11_fill_interface_descriptor(struct intel_bb *ibb,
 	idd->desc5.constant_urb_entry_read_length = 1; /* grf 1 */
 
 	idd->desc6.num_threads_in_tg = 1;
+
+	intel_bb_ptr_add(ibb, sizeof(*idd));
 
 	return offset;
 }
