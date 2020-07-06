@@ -88,9 +88,9 @@
 #define TILE_Yf     TILE_DEF(I915_TILING_Yf)
 #define TILE_Ys     TILE_DEF(I915_TILING_Ys)
 
-#define CCS_OFFSET(buf) (buf->aux.offset)
+#define CCS_OFFSET(buf) (buf->ccs[0].offset)
 #define CCS_SIZE(gen, buf) \
-	(intel_buf_aux_width(gen, buf) * intel_buf_aux_height(gen, buf))
+	(intel_buf_ccs_width(gen, buf) * intel_buf_ccs_height(gen, buf))
 
 typedef void (*bo_copy)(struct buf_ops *, struct intel_buf *, uint32_t *);
 
@@ -216,7 +216,8 @@ static void set_hw_tiled(struct buf_ops *bops, struct intel_buf *buf)
 		return;
 
 	igt_assert_eq(__set_tiling(bops->fd,
-				   buf->handle, buf->tiling, buf->stride,
+				   buf->handle, buf->tiling,
+				   buf->surface[0].stride,
 				   &ret_tiling, &ret_swizzle),
 		      0);
 
@@ -409,10 +410,10 @@ static void *mmap_write(int fd, struct intel_buf *buf)
 	void *map = NULL;
 
 	if (is_cache_coherent(fd, buf->handle)) {
-		map = __gem_mmap_offset__cpu(fd, buf->handle, 0, buf->size,
+		map = __gem_mmap_offset__cpu(fd, buf->handle, 0, buf->surface[0].size,
 					     PROT_READ | PROT_WRITE);
 		if (!map)
-			map = __gem_mmap__cpu(fd, buf->handle, 0, buf->size,
+			map = __gem_mmap__cpu(fd, buf->handle, 0, buf->surface[0].size,
 					      PROT_READ | PROT_WRITE);
 
 		if (map)
@@ -422,10 +423,10 @@ static void *mmap_write(int fd, struct intel_buf *buf)
 	}
 
 	if (!map) {
-		map = __gem_mmap_offset__wc(fd, buf->handle, 0, buf->size,
+		map = __gem_mmap_offset__wc(fd, buf->handle, 0, buf->surface[0].size,
 					    PROT_READ | PROT_WRITE);
 		if (!map)
-			map = gem_mmap__wc(fd, buf->handle, 0, buf->size,
+			map = gem_mmap__wc(fd, buf->handle, 0, buf->surface[0].size,
 					   PROT_READ | PROT_WRITE);
 
 		gem_set_domain(fd, buf->handle,
@@ -441,9 +442,9 @@ static void *mmap_read(int fd, struct intel_buf *buf)
 
 	if (gem_has_llc(fd) || is_cache_coherent(fd, buf->handle)) {
 		map = __gem_mmap_offset__cpu(fd, buf->handle, 0,
-					     buf->size, PROT_READ);
+					     buf->surface[0].size, PROT_READ);
 		if (!map)
-			map = __gem_mmap__cpu(fd, buf->handle, 0, buf->size,
+			map = __gem_mmap__cpu(fd, buf->handle, 0, buf->surface[0].size,
 					      PROT_READ);
 
 		if (map)
@@ -451,10 +452,10 @@ static void *mmap_read(int fd, struct intel_buf *buf)
 	}
 
 	if (!map) {
-		map = __gem_mmap_offset__wc(fd, buf->handle, 0, buf->size,
+		map = __gem_mmap_offset__wc(fd, buf->handle, 0, buf->surface[0].size,
 					    PROT_READ);
 		if (!map)
-			map = gem_mmap__wc(fd, buf->handle, 0, buf->size,
+			map = gem_mmap__wc(fd, buf->handle, 0, buf->surface[0].size,
 					   PROT_READ);
 
 		gem_set_domain(fd, buf->handle, I915_GEM_DOMAIN_WC, 0);
@@ -474,7 +475,7 @@ static void __copy_linear_to(int fd, struct intel_buf *buf,
 
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
-			uint32_t *ptr = fn(map, x, y, buf->stride, buf->bpp/8);
+			uint32_t *ptr = fn(map, x, y, buf->surface[0].stride, buf->bpp/8);
 
 			if (swizzle)
 				ptr = from_user_pointer(swizzle_addr(ptr,
@@ -483,7 +484,7 @@ static void __copy_linear_to(int fd, struct intel_buf *buf,
 		}
 	}
 
-	munmap(map, buf->size);
+	munmap(map, buf->surface[0].size);
 }
 
 static void copy_linear_to_x(struct buf_ops *bops, struct intel_buf *buf,
@@ -524,7 +525,7 @@ static void __copy_to_linear(int fd, struct intel_buf *buf,
 
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
-			uint32_t *ptr = fn(map, x, y, buf->stride, buf->bpp/8);
+			uint32_t *ptr = fn(map, x, y, buf->surface[0].stride, buf->bpp/8);
 
 			if (swizzle)
 				ptr = from_user_pointer(swizzle_addr(ptr,
@@ -533,7 +534,7 @@ static void __copy_to_linear(int fd, struct intel_buf *buf,
 		}
 	}
 
-	munmap(map, buf->size);
+	munmap(map, buf->surface[0].size);
 }
 
 static void copy_x_to_linear(struct buf_ops *bops, struct intel_buf *buf,
@@ -572,14 +573,14 @@ static void copy_linear_to_gtt(struct buf_ops *bops, struct intel_buf *buf,
 	DEBUGFN();
 
 	map = gem_mmap__gtt(bops->fd, buf->handle,
-			    buf->size, PROT_READ | PROT_WRITE);
+			    buf->surface[0].size, PROT_READ | PROT_WRITE);
 
 	gem_set_domain(bops->fd, buf->handle,
 		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
-	memcpy(map, linear, buf->size);
+	memcpy(map, linear, buf->surface[0].size);
 
-	munmap(map, buf->size);
+	munmap(map, buf->surface[0].size);
 }
 
 static void copy_gtt_to_linear(struct buf_ops *bops, struct intel_buf *buf,
@@ -590,14 +591,14 @@ static void copy_gtt_to_linear(struct buf_ops *bops, struct intel_buf *buf,
 	DEBUGFN();
 
 	map = gem_mmap__gtt(bops->fd, buf->handle,
-			    buf->size, PROT_READ);
+			    buf->surface[0].size, PROT_READ);
 
 	gem_set_domain(bops->fd, buf->handle,
 		       I915_GEM_DOMAIN_GTT, 0);
 
-	igt_memcpy_from_wc(linear, map, buf->size);
+	igt_memcpy_from_wc(linear, map, buf->surface[0].size);
 
-	munmap(map, buf->size);
+	munmap(map, buf->surface[0].size);
 }
 
 static void copy_linear_to_wc(struct buf_ops *bops, struct intel_buf *buf,
@@ -608,8 +609,8 @@ static void copy_linear_to_wc(struct buf_ops *bops, struct intel_buf *buf,
 	DEBUGFN();
 
 	map = mmap_write(bops->fd, buf);
-	memcpy(map, linear, buf->size);
-	munmap(map, buf->size);
+	memcpy(map, linear, buf->surface[0].size);
+	munmap(map, buf->surface[0].size);
 }
 
 static void copy_wc_to_linear(struct buf_ops *bops, struct intel_buf *buf,
@@ -620,8 +621,8 @@ static void copy_wc_to_linear(struct buf_ops *bops, struct intel_buf *buf,
 	DEBUGFN();
 
 	map = mmap_read(bops->fd, buf);
-	igt_memcpy_from_wc(linear, map, buf->size);
-	munmap(map, buf->size);
+	igt_memcpy_from_wc(linear, map, buf->surface[0].size);
+	munmap(map, buf->surface[0].size);
 }
 
 void intel_buf_to_linear(struct buf_ops *bops, struct intel_buf *buf,
@@ -723,25 +724,25 @@ static void __intel_buf_init(struct buf_ops *bops,
 		 * turn mapped by one L1 AUX page table entry.
 		 */
 		if (bops->intel_gen >= 12)
-			buf->stride = ALIGN(width * (bpp / 8), 128 * 4);
+			buf->surface[0].stride = ALIGN(width * (bpp / 8), 128 * 4);
 		else
-			buf->stride = ALIGN(width * (bpp / 8), 128);
+			buf->surface[0].stride = ALIGN(width * (bpp / 8), 128);
 
 		if (bops->intel_gen >= 12)
 			height = ALIGN(height, 4 * 32);
 
-		buf->size = buf->stride * height;
+		buf->surface[0].size = buf->surface[0].stride * height;
 		buf->tiling = tiling;
 		buf->bpp = bpp;
 		buf->compression = compression;
 
-		aux_width = intel_buf_aux_width(bops->intel_gen, buf);
-		aux_height = intel_buf_aux_height(bops->intel_gen, buf);
+		aux_width = intel_buf_ccs_width(bops->intel_gen, buf);
+		aux_height = intel_buf_ccs_height(bops->intel_gen, buf);
 
-		buf->aux.offset = buf->stride * ALIGN(height, 32);
-		buf->aux.stride = aux_width;
+		buf->ccs[0].offset = buf->surface[0].stride * ALIGN(height, 32);
+		buf->ccs[0].stride = aux_width;
 
-		size = buf->aux.offset + aux_width * aux_height;
+		size = buf->ccs[0].offset + aux_width * aux_height;
 	} else {
 		if (buf->tiling) {
 			devid =  intel_get_drm_devid(bops->fd);
@@ -754,16 +755,16 @@ static void __intel_buf_init(struct buf_ops *bops,
 			else
 				tile_width = 128;
 
-			buf->stride = ALIGN(width * (bpp / 8), tile_width);
+			buf->surface[0].stride = ALIGN(width * (bpp / 8), tile_width);
 		} else {
-			buf->stride = ALIGN(width * (bpp / 8), alignment ?: 4);
+			buf->surface[0].stride = ALIGN(width * (bpp / 8), alignment ?: 4);
 		}
 
-		buf->size = buf->stride * height;
+		buf->surface[0].size = buf->surface[0].stride * height;
 		buf->tiling = tiling;
 		buf->bpp = bpp;
 
-		size = buf->stride * ALIGN(height, 32);
+		size = buf->surface[0].stride * ALIGN(height, 32);
 	}
 
 	if (handle)
@@ -875,14 +876,14 @@ void intel_buf_print(const struct intel_buf *buf)
 	igt_info("[%u]: w: %u, h: %u, stride: %u, size: %u, bo-size: %u, "
 		 "bpp: %u, tiling: %u, compress: %u\n",
 		 buf->handle, intel_buf_width(buf), intel_buf_height(buf),
-		 buf->stride, buf->size,
+		 buf->surface[0].stride, buf->surface[0].size,
 		 intel_buf_bo_size(buf), buf->bpp,
 		 buf->tiling, buf->compression);
-	igt_info(" aux <offset: %u, stride: %u, w: %u, h: %u> cc <offset: %u>\n",
-		 buf->aux.offset,
-		 intel_buf_aux_width(buf->bops->intel_gen, buf),
-		 intel_buf_aux_height(buf->bops->intel_gen, buf),
-		 buf->aux.stride, buf->cc.offset);
+	igt_info(" ccs <offset: %u, stride: %u, w: %u, h: %u> cc <offset: %u>\n",
+		 buf->ccs[0].offset,
+		 intel_buf_ccs_width(buf->bops->intel_gen, buf),
+		 intel_buf_ccs_height(buf->bops->intel_gen, buf),
+		 buf->ccs[0].stride, buf->cc.offset);
 	igt_info(" addr <offset: %p, ctx: %u>\n",
 		 from_user_pointer(buf->addr.offset), buf->addr.ctx);
 }
@@ -895,7 +896,7 @@ const char *intel_buf_set_name(struct intel_buf *buf, const char *name)
 static void __intel_buf_write_to_png(struct buf_ops *bops,
 				     struct intel_buf *buf,
 				     const char *filename,
-				     bool write_aux)
+				     bool write_ccs)
 {
 	cairo_surface_t *surface;
 	cairo_status_t ret;
@@ -905,11 +906,11 @@ static void __intel_buf_write_to_png(struct buf_ops *bops,
 
 	igt_assert_eq(posix_memalign(&linear, 16, intel_buf_bo_size(buf)), 0);
 
-	format = write_aux ? CAIRO_FORMAT_A8 : CAIRO_FORMAT_RGB24;
-	width = write_aux ? intel_buf_aux_width(gen, buf) : intel_buf_width(buf);
-	height = write_aux ? intel_buf_aux_height(gen, buf) : intel_buf_height(buf);
-	stride = write_aux ? buf->aux.stride : buf->stride;
-	offset = write_aux ? buf->aux.offset : 0;
+	format = write_ccs ? CAIRO_FORMAT_A8 : CAIRO_FORMAT_RGB24;
+	width = write_ccs ? intel_buf_ccs_width(gen, buf) : intel_buf_width(buf);
+	height = write_ccs ? intel_buf_ccs_height(gen, buf) : intel_buf_height(buf);
+	stride = write_ccs ? buf->ccs[0].stride : buf->surface[0].stride;
+	offset = write_ccs ? buf->ccs[0].offset : 0;
 
 	intel_buf_to_linear(bops, buf, linear);
 
@@ -1044,10 +1045,10 @@ static void idempotency_selftest(struct buf_ops *bops, uint32_t tiling)
 
 		linear_to_intel_buf(bops, &buf, (uint32_t *) linear_in);
 		map = __gem_mmap_offset__cpu(bops->fd, buf.handle, 0,
-					   buf.size, PROT_READ);
+					     buf.surface[0].size, PROT_READ);
 		if (!map)
 			map = gem_mmap__cpu(bops->fd, buf.handle, 0,
-					    buf.size, PROT_READ);
+					    buf.surface[0].size, PROT_READ);
 		gem_set_domain(bops->fd, buf.handle, I915_GEM_DOMAIN_CPU, 0);
 		igt_assert(memcmp(linear_in, map, size));
 		munmap(map, size);
@@ -1067,7 +1068,7 @@ static void idempotency_selftest(struct buf_ops *bops, uint32_t tiling)
 
 int intel_buf_bo_size(const struct intel_buf *buf)
 {
-	int offset = CCS_OFFSET(buf) ?: buf->size;
+	int offset = CCS_OFFSET(buf) ?: buf->surface[0].size;
 	int ccs_size =
 		buf->compression ? CCS_SIZE(buf->bops->intel_gen, buf) : 0;
 

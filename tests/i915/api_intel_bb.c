@@ -74,13 +74,13 @@ static void fill_buf(struct intel_buf *buf, uint8_t color)
 	int i915 = buf_ops_get_fd(buf->bops);
 	int i;
 
-	ptr = gem_mmap__device_coherent(i915, buf->handle, 0, buf->size,
-					PROT_WRITE);
+	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
+					buf->surface[0].size, PROT_WRITE);
 
-	for (i = 0; i < buf->size; i++)
+	for (i = 0; i < buf->surface[0].size; i++)
 		ptr[i] = color;
 
-	munmap(ptr, buf->size);
+	munmap(ptr, buf->surface[0].size);
 }
 
 static void check_buf(struct intel_buf *buf, uint8_t color)
@@ -89,13 +89,13 @@ static void check_buf(struct intel_buf *buf, uint8_t color)
 	int i915 = buf_ops_get_fd(buf->bops);
 	int i;
 
-	ptr = gem_mmap__device_coherent(i915, buf->handle, 0, buf->size,
-					PROT_READ);
+	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
+					buf->surface[0].size, PROT_READ);
 
-	for (i = 0; i < buf->size; i++)
+	for (i = 0; i < buf->surface[0].size; i++)
 		igt_assert(ptr[i] == color);
 
-	munmap(ptr, buf->size);
+	munmap(ptr, buf->surface[0].size);
 }
 
 
@@ -118,12 +118,12 @@ static void print_buf(struct intel_buf *buf, const char *name)
 	uint8_t *ptr;
 	int i915 = buf_ops_get_fd(buf->bops);
 
-	ptr = gem_mmap__device_coherent(i915, buf->handle, 0, buf->size,
-					PROT_READ);
+	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
+					buf->surface[0].size, PROT_READ);
 	igt_debug("[%s] Buf handle: %d, size: %d, v: 0x%02x, presumed_addr: %p\n",
-		  name, buf->handle, buf->size, ptr[0],
+		  name, buf->handle, buf->surface[0].size, ptr[0],
 			from_user_pointer(buf->addr.offset));
-	munmap(ptr, buf->size);
+	munmap(ptr, buf->surface[0].size);
 }
 
 static void simple_bb(struct buf_ops *bops, bool use_context)
@@ -194,7 +194,7 @@ static void __emit_blit(struct intel_bb *ibb,
 		     XY_SRC_COPY_BLT_WRITE_ALPHA |
 		     XY_SRC_COPY_BLT_WRITE_RGB |
 		     (6 + 2 * has_64b_reloc));
-	intel_bb_out(ibb, 3 << 24 | 0xcc << 16 | dst->stride);
+	intel_bb_out(ibb, 3 << 24 | 0xcc << 16 | dst->surface[0].stride);
 	intel_bb_out(ibb, 0);
 	intel_bb_out(ibb, intel_buf_height(dst) << 16 | intel_buf_width(dst));
 	intel_bb_emit_reloc_fenced(ibb, dst->handle,
@@ -202,7 +202,7 @@ static void __emit_blit(struct intel_bb *ibb,
 				   I915_GEM_DOMAIN_RENDER,
 				   0, dst->addr.offset);
 	intel_bb_out(ibb, 0);
-	intel_bb_out(ibb, src->stride);
+	intel_bb_out(ibb, src->surface[0].stride);
 	intel_bb_emit_reloc_fenced(ibb, src->handle,
 				   I915_GEM_DOMAIN_RENDER, 0,
 				   0, src->addr.offset);
@@ -351,13 +351,13 @@ static void scratch_buf_draw_pattern(struct buf_ops *bops,
 	cairo_t *cr;
 	void *linear;
 
-	linear = alloc_aligned(buf->size);
+	linear = alloc_aligned(buf->surface[0].size);
 
 	surface = cairo_image_surface_create_for_data(linear,
 						      CAIRO_FORMAT_RGB24,
 						      intel_buf_width(buf),
 						      intel_buf_height(buf),
-						      buf->stride);
+						      buf->surface[0].stride);
 
 	cr = cairo_create(surface);
 
@@ -435,21 +435,21 @@ static int compare_bufs(struct intel_buf *buf1, struct intel_buf *buf2,
 	void *ptr1, *ptr2;
 	int fd1, fd2, ret;
 
-	igt_assert(buf1->size == buf2->size);
+	igt_assert(buf1->surface[0].size == buf2->surface[0].size);
 
 	fd1 = buf_ops_get_fd(buf1->bops);
 	fd2 = buf_ops_get_fd(buf2->bops);
 
-	ptr1 = gem_mmap__device_coherent(fd1, buf1->handle, 0, buf1->size,
-					 PROT_READ);
-	ptr2 = gem_mmap__device_coherent(fd2, buf2->handle, 0, buf2->size,
-					 PROT_READ);
-	ret = memcmp(ptr1, ptr2, buf1->size);
+	ptr1 = gem_mmap__device_coherent(fd1, buf1->handle, 0,
+					 buf1->surface[0].size, PROT_READ);
+	ptr2 = gem_mmap__device_coherent(fd2, buf2->handle, 0,
+					 buf2->surface[0].size, PROT_READ);
+	ret = memcmp(ptr1, ptr2, buf1->surface[0].size);
 	if (detail_compare)
-		ret = compare_detail(ptr1, ptr2, buf1->size);
+		ret = compare_detail(ptr1, ptr2, buf1->surface[0].size);
 
-	munmap(ptr1, buf1->size);
-	munmap(ptr2, buf2->size);
+	munmap(ptr1, buf1->surface[0].size);
+	munmap(ptr2, buf2->surface[0].size);
 
 	return ret;
 }
@@ -484,15 +484,15 @@ static int __do_intel_bb_blit(struct buf_ops *bops, uint32_t tiling)
 				 0, 0, width, height, 0);
 
 	intel_bb_blt_copy(ibb,
-			  &src, 0, 0, src.stride,
-			  &dst, 0, 0, dst.stride,
+			  &src, 0, 0, src.surface[0].stride,
+			  &dst, 0, 0, dst.surface[0].stride,
 			  intel_buf_width(&dst),
 			  intel_buf_height(&dst),
 			  dst.bpp);
 
 	intel_bb_blt_copy(ibb,
-			  &dst, 0, 0, dst.stride,
-			  &final, 0, 0, final.stride,
+			  &dst, 0, 0, dst.surface[0].stride,
+			  &final, 0, 0, final.surface[0].stride,
 			  intel_buf_width(&dst),
 			  intel_buf_height(&dst),
 			  dst.bpp);

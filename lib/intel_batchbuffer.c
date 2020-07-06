@@ -2030,8 +2030,8 @@ void intel_bb_emit_blt_copy(struct intel_bb *ibb,
 
 	igt_assert(bpp*(src_x1 + width) <= 8*src_pitch);
 	igt_assert(bpp*(dst_x1 + width) <= 8*dst_pitch);
-	igt_assert(src_pitch * (src_y1 + height) <= src->size);
-	igt_assert(dst_pitch * (dst_y1 + height) <= dst->size);
+	igt_assert(src_pitch * (src_y1 + height) <= src->surface[0].size);
+	igt_assert(dst_pitch * (dst_y1 + height) <= dst->surface[0].size);
 
 	if (gen >= 4 && src->tiling != I915_TILING_NONE) {
 		src_pitch /= 4;

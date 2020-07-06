@@ -258,13 +258,14 @@ gem_get_target_spins(double dt)
 			       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 		ptr = gem_mmap__device_coherent(gem.drm_fd, gem.buf.handle,
-						0, gem.buf.size, PROT_READ);
+						0, gem.buf.surface[0].size,
+						PROT_READ);
 
 		clock_gettime(CLOCK_MONOTONIC, &tdone);
 
 		gem_check_spin(ptr, spins);
 
-		munmap(ptr, gem.buf.size);
+		munmap(ptr, gem.buf.surface[0].size);
 
 		cur_dt = to_dt(&tstart, &tdone);
 		if (cur_dt > dt)
@@ -361,9 +362,9 @@ full_enable(void)
 	gem_set_domain(gem.drm_fd, gem.buf.handle,
 		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 	ptr = gem_mmap__device_coherent(gem.drm_fd, gem.buf.handle,
-					0, gem.buf.size, PROT_READ);
+					0, gem.buf.surface[0].size, PROT_READ);
 	gem_check_spin(ptr, spins);
-	munmap(ptr, gem.buf.size);
+	munmap(ptr, gem.buf.surface[0].size);
 
 	check_full_enable(&stat);
 }

@@ -116,7 +116,7 @@ gen7_fill_surface_state(struct intel_bb *ibb,
 
 	ss->ss2.height = intel_buf_height(buf) - 1;
 	ss->ss2.width  = intel_buf_width(buf) - 1;
-	ss->ss3.pitch  = buf->stride - 1;
+	ss->ss3.pitch  = buf->surface[0].stride - 1;
 
 	ss->ss7.shader_chanel_select_r = 4;
 	ss->ss7.shader_chanel_select_g = 5;
@@ -168,7 +168,7 @@ gen8_fill_surface_state(struct intel_bb *ibb,
 
 	ss->ss2.height = intel_buf_height(buf) - 1;
 	ss->ss2.width  = intel_buf_width(buf) - 1;
-	ss->ss3.pitch  = buf->stride - 1;
+	ss->ss3.pitch  = buf->surface[0].stride - 1;
 
 	ss->ss7.shader_chanel_select_r = 4;
 	ss->ss7.shader_chanel_select_g = 5;

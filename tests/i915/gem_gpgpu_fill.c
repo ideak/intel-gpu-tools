@@ -78,13 +78,13 @@ create_buf(data_t *data, int width, int height, uint8_t color)
 	intel_buf_init(data->bops, buf, width/4, height, 32, 0,
 		       I915_TILING_NONE, 0);
 
-	ptr = gem_mmap__cpu_coherent(data->drm_fd,
-				     buf->handle, 0, buf->size, PROT_WRITE);
+	ptr = gem_mmap__cpu_coherent(data->drm_fd, buf->handle, 0,
+				     buf->surface[0].size, PROT_WRITE);
 
-	for (i = 0; i < buf->size; i++)
+	for (i = 0; i < buf->surface[0].size; i++)
 		ptr[i] = color;
 
-	munmap(ptr, buf->size);
+	munmap(ptr, buf->surface[0].size);
 
 	return buf;
 }
@@ -106,8 +106,8 @@ static void gpgpu_fill(data_t *data, igt_fillfunc_t fill)
 	int i, j;
 
 	buf = create_buf(data, WIDTH, HEIGHT, COLOR_C4);
-	ptr = gem_mmap__device_coherent(data->drm_fd, buf->handle,
-					0, buf->size, PROT_READ);
+	ptr = gem_mmap__device_coherent(data->drm_fd, buf->handle, 0,
+					buf->surface[0].size, PROT_READ);
 	for (i = 0; i < WIDTH; i++)
 		for (j = 0; j < HEIGHT; j++)
 			buf_check(ptr, i, j, COLOR_C4);
@@ -121,7 +121,7 @@ static void gpgpu_fill(data_t *data, igt_fillfunc_t fill)
 			else
 				buf_check(ptr, i, j, COLOR_C4);
 
-	munmap(ptr, buf->size);
+	munmap(ptr, buf->surface[0].size);
 }
 
 igt_simple_main

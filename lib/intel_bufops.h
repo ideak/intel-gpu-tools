@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "igt_aux.h"
+#include "intel_batchbuffer.h"
 
 struct buf_ops;
 
@@ -11,16 +12,19 @@ struct buf_ops;
 struct intel_buf {
 	struct buf_ops *bops;
 	uint32_t handle;
-	uint32_t stride;
 	uint32_t tiling;
 	uint32_t bpp;
-	uint32_t size;
 	uint32_t compression;
 	uint32_t swizzle_mode;
 	struct {
 		uint32_t offset;
 		uint32_t stride;
-	} aux;
+		uint32_t size;
+	} surface[2];
+	struct {
+		uint32_t offset;
+		uint32_t stride;
+	} ccs[2];
 	struct {
 		uint32_t offset;
 	} cc;
@@ -33,18 +37,23 @@ struct intel_buf {
 	char name[INTEL_BUF_NAME_MAXSIZE + 1];
 };
 
+static inline bool intel_buf_compressed(const struct intel_buf *buf)
+{
+	return buf->compression != I915_COMPRESSION_NONE;
+}
+
 static inline unsigned int intel_buf_width(const struct intel_buf *buf)
 {
-	return buf->stride / (buf->bpp / 8);
+	return buf->surface[0].stride / (buf->bpp / 8);
 }
 
 static inline unsigned int intel_buf_height(const struct intel_buf *buf)
 {
-	return buf->size / buf->stride;
+	return buf->surface[0].size / buf->surface[0].stride;
 }
 
 static inline unsigned int
-intel_buf_aux_width(int gen, const struct intel_buf *buf)
+intel_buf_ccs_width(int gen, const struct intel_buf *buf)
 {
 	/*
 	 * GEN12+: The AUX CCS unit size is 64 bytes mapping 4 main surface
@@ -58,7 +67,7 @@ intel_buf_aux_width(int gen, const struct intel_buf *buf)
 }
 
 static inline unsigned int
-intel_buf_aux_height(int gen, const struct intel_buf *buf)
+intel_buf_ccs_height(int gen, const struct intel_buf *buf)
 {
 	/*
 	 * GEN12+: The AUX CCS unit size is 64 bytes mapping 4 main surface

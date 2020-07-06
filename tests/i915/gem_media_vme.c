@@ -116,7 +116,7 @@ igt_simple_main
 	/* This comes from OUTPUT_SIZE requirements */
 	intel_buf_init(bops, &dst, 56, sizeof(int), 8, 56,
 		       I915_TILING_NONE, 0);
-	dst.stride = 1;
+	dst.surface[0].stride = 1;
 
 	ctx = gem_context_create(drm_fd);
 	igt_assert(ctx);

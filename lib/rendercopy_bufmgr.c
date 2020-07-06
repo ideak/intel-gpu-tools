@@ -62,13 +62,13 @@ struct rendercopy_bufmgr {
 static void __igt_buf_to_intel_buf(struct igt_buf *buf, struct intel_buf *ibuf)
 {
 	ibuf->handle = buf->bo->handle;
-	ibuf->stride = buf->surface[0].stride;
+	ibuf->surface[0].stride = buf->surface[0].stride;
 	ibuf->tiling = buf->tiling;
 	ibuf->bpp = buf->bpp;
-	ibuf->size = buf->surface[0].size;
+	ibuf->surface[0].size = buf->surface[0].size;
 	ibuf->compression = buf->compression;
-	ibuf->aux.offset = buf->ccs[0].offset;
-	ibuf->aux.stride = buf->ccs[0].stride;
+	ibuf->ccs[0].offset = buf->ccs[0].offset;
+	ibuf->ccs[0].stride = buf->ccs[0].stride;
 }
 
 void igt_buf_to_linear(struct rendercopy_bufmgr *bmgr, struct igt_buf *buf,
@@ -166,6 +166,6 @@ void igt_buf_init(struct rendercopy_bufmgr *bmgr, struct igt_buf *buf,
 				    width, height, bpp, 0,
 				    tiling, compression);
 
-	buf->ccs[0].offset = ibuf.aux.offset;
-	buf->ccs[0].stride = ibuf.aux.stride;
+	buf->ccs[0].offset = ibuf.ccs[0].offset;
+	buf->ccs[0].stride = ibuf.ccs[0].stride;
 }
