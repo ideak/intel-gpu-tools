@@ -78,7 +78,7 @@ static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 	else
 		igt_paint_color_alpha(cr, 0, 0, data->fb.width, data->fb.height,
 				      0.0, 0.0, 0.0, 0.0);
-	igt_put_cairo_ctx(data->drm_fd, &data->fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void cursor_move(data_t *data, int x, int y, int i)

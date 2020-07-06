@@ -96,7 +96,7 @@ static void generate_comparison_crc_list(data_t *data, igt_output_t *output)
 			    0.0, 0.0, 0.0);
 	igt_paint_color(cr, 0, 0, w, h, 1.0, 1.0, 1.0);
 	igt_assert(cairo_status(cr) == 0);
-	igt_put_cairo_ctx(data->gfx_fd, &data->primary_fb, cr);
+	igt_put_cairo_ctx(cr);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, &data->primary_fb);
@@ -108,7 +108,7 @@ static void generate_comparison_crc_list(data_t *data, igt_output_t *output)
 
 	cr = igt_get_cairo_ctx(data->gfx_fd, &data->primary_fb);
 	igt_paint_color(cr, 0, 0, mode->hdisplay, mode->vdisplay, 1.0, 1.0, 1.0);
-	igt_put_cairo_ctx(data->gfx_fd, &data->primary_fb, cr);
+	igt_put_cairo_ctx(cr);
 
 	igt_plane_set_fb(primary, &data->primary_fb);
 	igt_display_commit2(&data->display, data->commit);

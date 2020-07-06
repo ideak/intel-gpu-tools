@@ -132,7 +132,7 @@ static void prepare(data_t *data)
 		/* paint a white square */
 		igt_paint_color_alpha(cr, 0, 0, SQUARE_SIZE, SQUARE_SIZE,
 				      1.0, 1.0, 1.0, 1.0);
-		igt_put_cairo_ctx(data->drm_fd,  &data->fb[1], cr);
+		igt_put_cairo_ctx(cr);
 	} else if (data->op == FRONTBUFFER) {
 		data->cr = igt_get_cairo_ctx(data->drm_fd, &data->fb[0]);
 	}
@@ -226,7 +226,7 @@ static void cleanup(data_t *data)
 	if (data->op == PAGE_FLIP)
 		igt_remove_fb(data->drm_fd, &data->fb[1]);
 	else if (data->op == FRONTBUFFER)
-		igt_put_cairo_ctx(data->drm_fd, &data->fb[0], data->cr);
+		igt_put_cairo_ctx(data->cr);
 
 	igt_remove_fb(data->drm_fd, &data->fb[0]);
 }

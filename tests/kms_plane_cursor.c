@@ -102,7 +102,7 @@ static void draw_color(igt_fb_t *fb, double r, double g, double b)
 
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	igt_paint_color(cr, 0, 0, fb->width, fb->height, r, g, b);
-	igt_put_cairo_ctx(fb->fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 /*
@@ -129,7 +129,7 @@ static void test_cursor_pos(data_t *data, igt_fb_t *pfb, igt_fb_t *ofb,
 		igt_paint_color(cr, or->x, or->y, or->w, or->h, 0.5, 0.5, 0.5);
 
 	igt_paint_color(cr, x, y, cw, ch, 1.0, 0.0, 1.0);
-	igt_put_cairo_ctx(pfb->fd, pfb, cr);
+	igt_put_cairo_ctx(cr);
 
 	igt_plane_set_fb(data->overlay, NULL);
 	igt_plane_set_fb(data->cursor, NULL);

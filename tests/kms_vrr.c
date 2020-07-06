@@ -186,7 +186,7 @@ static void prepare_test(data_t *data, igt_output_t *output, enum pipe pipe)
 	igt_paint_color(cr, 0, 0, mode.hdisplay / 10, mode.vdisplay / 10,
 			1.00, 0.00, 0.00);
 
-	igt_put_cairo_ctx(data->drm_fd, &data->fb0, cr);
+	igt_put_cairo_ctx(cr);
 
 	/* Take care of any required modesetting before the test begins. */
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);

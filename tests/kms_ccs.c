@@ -246,7 +246,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		cr = igt_get_cairo_ctx(data->drm_fd, fb);
 		igt_paint_color(cr, 0, 0, width, height,
 				colors[c].r, colors[c].g, colors[c].b);
-		igt_put_cairo_ctx(data->drm_fd, fb, cr);
+		igt_put_cairo_ctx(cr);
 	}
 
 	ret = drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f);

@@ -60,7 +60,7 @@ static void draw_gradient(struct igt_fb *fb, int w, int h, double a)
 
 	__draw_gradient(fb, w, h, a, cr);
 
-	igt_put_cairo_ctx(fb->fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void draw_gradient_coverage(struct igt_fb *fb, int w, int h, uint8_t a)
@@ -76,7 +76,7 @@ static void draw_gradient_coverage(struct igt_fb *fb, int w, int h, uint8_t a)
 		for (i = 0; i < w; i++)
 			data[i * 4 + 3] = a;
 
-	igt_put_cairo_ctx(fb->fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void draw_squares(struct igt_fb *fb, int w, int h, double a)
@@ -90,7 +90,7 @@ static void draw_squares(struct igt_fb *fb, int w, int h, double a)
 	igt_paint_color_alpha(cr, w / 2, h / 2, w / 4, h / 2, 1., 1., 1., a);
 	igt_paint_color_alpha(cr, 3 * w / 4, h / 2, w / 4, h / 2, 0., 0., 0., a);
 
-	igt_put_cairo_ctx(fb->fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void draw_squares_coverage(struct igt_fb *fb, int w, int h, uint8_t as)
@@ -120,7 +120,7 @@ static void draw_squares_coverage(struct igt_fb *fb, int w, int h, uint8_t as)
 			data[j * stride + i] = a;
 	}
 
-	igt_put_cairo_ctx(fb->fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void reset_alpha(igt_display_t *display, enum pipe pipe)
@@ -200,7 +200,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 		cr = igt_get_cairo_ctx(data->gfx_fd, &data->argb_fb_0);
 		cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 		igt_paint_color_alpha(cr, 0, 0, w, h, 0., 0., 0., 0.0);
-		igt_put_cairo_ctx(data->gfx_fd, &data->argb_fb_0, cr);
+		igt_put_cairo_ctx(cr);
 
 		igt_create_fb(data->gfx_fd, w, h,
 			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,

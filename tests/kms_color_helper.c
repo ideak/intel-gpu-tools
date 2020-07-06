@@ -57,7 +57,7 @@ void paint_gradient_rectangles(data_t *data,
 					       colors[i-1].g,
 					       colors[i-1].b);
 
-	igt_put_cairo_ctx(data->drm_fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 void paint_rectangles(data_t *data,
@@ -79,7 +79,7 @@ void paint_rectangles(data_t *data,
 		igt_paint_color(cr, i * l, 0, rows_remaining, mode->vdisplay,
 				colors[i-1].r, colors[i-1].g, colors[i-1].b);
 
-	igt_put_cairo_ctx(data->drm_fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 gamma_lut_t *alloc_lut(int lut_size)

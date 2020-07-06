@@ -141,7 +141,7 @@ static void draw_hdr_pattern(igt_fb_t *fb)
 	igt_paint_color(cr, 0, 0, fb->width, fb->height, 1.0, 1.0, 1.0);
 	igt_paint_test_pattern(cr, fb->width, fb->height);
 
-	igt_put_cairo_ctx(fb->fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 /* Prepare test data. */

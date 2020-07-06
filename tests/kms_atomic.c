@@ -309,7 +309,7 @@ plane_primary_overlay_mutable_zpos(igt_pipe_t *pipe, igt_output_t *output,
 			      w_overlay / 2, h_overlay / 2,
 			      0.0, 0.0, 0.0, 0.0);
 	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-	igt_put_cairo_ctx(pipe->display->drm_fd, &fb_overlay, cr);
+	igt_put_cairo_ctx(cr);
 
 	igt_plane_set_fb(primary, &fb_primary);
 	igt_plane_set_fb(overlay, &fb_overlay);
@@ -343,7 +343,7 @@ plane_primary_overlay_mutable_zpos(igt_pipe_t *pipe, igt_output_t *output,
 			      w_overlay, h_overlay,
 			      0.0, 0.0, 0.0, 0.5);
 	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-	igt_put_cairo_ctx(pipe->display->drm_fd, &fb_primary, cr);
+	igt_put_cairo_ctx(cr);
 
 	igt_info("Committing with a hole in the primary through "\
 		 "which the underlay should be seen\n");
@@ -398,7 +398,7 @@ plane_immutable_zpos(igt_display_t *display, igt_pipe_t *pipe,
 	igt_assert(cairo_status(cr) == 0);
 	igt_paint_color(cr, 0, 0, w_lower, h_lower, 0.0, 0.0, 1.0);
 	igt_paint_color(cr, w_upper / 2, h_upper / 2, w_upper, h_upper, 1.0, 1.0, 0.0);
-	igt_put_cairo_ctx(display->drm_fd, &fb_ref, cr);
+	igt_put_cairo_ctx(cr);
 	igt_plane_set_fb(primary, &fb_ref);
 	igt_display_commit2(display, COMMIT_ATOMIC);
 

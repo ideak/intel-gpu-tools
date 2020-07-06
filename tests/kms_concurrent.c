@@ -126,7 +126,7 @@ create_fb_for_mode_position(data_t *data, drmModeModeInfo *mode,
 				rect_w[i], rect_h[i], 0.0, 0.0, 0.0);
 	}
 
-	igt_put_cairo_ctx(data->drm_fd, &data->fb[primary->index], cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void

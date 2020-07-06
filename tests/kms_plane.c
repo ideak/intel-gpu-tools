@@ -149,7 +149,7 @@ create_fb_for_mode__position(data_t *data, drmModeModeInfo *mode,
 	igt_paint_color(cr, 0, 0, mode->hdisplay, mode->vdisplay,
 			    0.0, 1.0, 0.0);
 	igt_paint_color(cr, rect_x, rect_y, rect_w, rect_h, 0.0, 0.0, 0.0);
-	igt_put_cairo_ctx(data->drm_fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 enum {
@@ -284,7 +284,7 @@ create_fb_for_mode__panning(data_t *data, drmModeModeInfo *mode,
 			mode->hdisplay, mode->vdisplay,
 			0.0, 0.0, 1.0);
 
-	igt_put_cairo_ctx(data->drm_fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 enum {
@@ -460,7 +460,7 @@ static void prepare_format_color(data_t *data, enum pipe pipe,
 		igt_paint_color(cr, 0, 0, width, height,
 				c->red, c->green, c->blue);
 
-		igt_put_cairo_ctx(data->drm_fd, fb, cr);
+		igt_put_cairo_ctx(cr);
 	} else {
 		igt_create_fb_with_bo_size(data->drm_fd,
 					   width + data->crop * 2,
@@ -485,7 +485,7 @@ static void prepare_format_color(data_t *data, enum pipe pipe,
 				width, height,
 				c->red, c->green, c->blue);
 
-		igt_put_cairo_ctx(data->drm_fd, fb, cr);
+		igt_put_cairo_ctx(cr);
 	}
 
 	igt_plane_set_fb(plane, fb);

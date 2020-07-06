@@ -88,7 +88,7 @@ static void create_cursor_fb(data_t *data)
 
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb_white);
 	igt_paint_color_alpha(cr, 0, 0, 64, 64, 1.0, 1.0, 1.0, 1.0);
-	igt_put_cairo_ctx(data->drm_fd, &data->fb_white, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void setup_output(data_t *data)

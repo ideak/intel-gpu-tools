@@ -158,7 +158,7 @@ static void create_ref_fb(data_t *data, uint64_t modifier,
 	cr = igt_get_cairo_ctx(data->drm_fd, fb);
 	blit(data, cr, &data->fb_primary, 0, 0);
 	blit(data, cr, &data->fb_plane[0], data->x, data->y);
-	igt_put_cairo_ctx(data->drm_fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static unsigned

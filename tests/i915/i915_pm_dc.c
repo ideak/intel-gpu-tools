@@ -131,7 +131,7 @@ static void paint_rectangles(data_t *data,
 				colors[i - 1].r, colors[i - 1].g,
 				colors[i - 1].b);
 
-	igt_put_cairo_ctx(data->drm_fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void setup_primary(data_t *data)

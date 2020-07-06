@@ -69,7 +69,7 @@ paint_background(data_t *data, struct igt_fb *fb, drmModeModeInfo *mode,
 	b = (double) ((background & 0xFF0000) >> 16) / 255.0;
 	igt_paint_color_alpha(cr, 0, 0, w, h, r, g, b, alpha);
 
-	igt_put_cairo_ctx(data->gfx_fd, &data->fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,

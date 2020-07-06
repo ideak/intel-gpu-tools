@@ -232,7 +232,7 @@ paint_color_key(struct igt_fb *fb_info)
 	cairo_set_source_rgb(cr, .8, .8, .8);
 	cairo_fill(cr);
 
-	igt_put_cairo_ctx(drm_fd, fb_info, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void paint_image(cairo_t *cr, const char *file)
@@ -317,7 +317,7 @@ static void paint_output_info(struct connector *c, struct igt_fb *fb)
 	if (qr_code)
 		paint_image(cr, "pass.png");
 
-	igt_put_cairo_ctx(drm_fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 static void sighandler(int signo)

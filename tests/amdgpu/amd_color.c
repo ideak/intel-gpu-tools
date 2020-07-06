@@ -134,7 +134,7 @@ static void draw_color(igt_fb_t *fb, double r, double g, double b)
 
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	igt_paint_color(cr, 0, 0, fb->width, fb->height, r, g, b);
-	igt_put_cairo_ctx(fb->fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 /* Generates the gamma test pattern. */
@@ -148,7 +148,7 @@ static void draw_gamma_test(igt_fb_t *fb)
 	igt_paint_color_gradient(cr, 0, gh * 2, fb->width, gh, 0, 1, 0);
 	igt_paint_color_gradient(cr, 0, gh * 3, fb->width, gh, 0, 0, 1);
 
-	igt_put_cairo_ctx(fb->fd, fb, cr);
+	igt_put_cairo_ctx(cr);
 }
 
 /* Sets the degamma LUT. */
