@@ -409,7 +409,6 @@ executable('gem_stress', 'i915/gem_stress.c',
 # unrecoverable gpu hangs. Don't put real testcases here.
 hang_progs = [
 	'gem_bad_batch',
-	'gem_hang',
 	'gem_bad_blit',
 	'gem_bad_address',
 	'gem_non_secure_batch',

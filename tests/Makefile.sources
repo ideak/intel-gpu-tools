@@ -547,9 +547,6 @@ kernel_tests_full = \
 HANG = gem_bad_batch
 gem_bad_batch_SOURCES = i915/gem_bad_batch.c
 
-HANG += gem_hang
-gem_hang_SOURCES = i915/gem_hang.c
-
 HANG += gem_bad_blit
 gem_bad_blit_SOURCES = i915/gem_bad_blit.c
 
