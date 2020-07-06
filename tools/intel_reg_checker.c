@@ -143,6 +143,11 @@ check_gfx_mode(void)
 	check_perf_bit(gfx_mode, 13, "Flush TLB Invalidation Mode", true);
 }
 
+static unsigned intel_gt(uint16_t __devid)
+{
+	return intel_get_device_info(__devid)->gt;
+}
+
 static void
 check_gt_mode(void)
 {

@@ -44,10 +44,11 @@
 #include "intel_l3_parity.h"
 
 static unsigned int devid;
+
 /* L3 size is always a function of banks. The number of banks cannot be
  * determined by number of slices however */
 static inline int num_banks(void) {
-	switch (intel_gt(devid)) {
+	switch (intel_get_device_info(devid)->gt) {
 	case 2: return 8;
 	case 1: return 4;
 	default: return 2;
@@ -61,7 +62,7 @@ static inline int num_banks(void) {
 #define MAX_ROW (1<<12)
 #define MAX_BANKS_PER_SLICE 4
 #define NUM_REGS (MAX_BANKS_PER_SLICE * NUM_SUBBANKS)
-#define MAX_SLICES (intel_gt(devid) > 1 ? 2 : 1)
+#define MAX_SLICES (intel_get_device_info(devid)->gt > 1 ? 2 : 1)
 #define REAL_MAX_SLICES 2
 /* TODO support SLM config */
 #define L3_SIZE ((MAX_ROW * 4) * NUM_SUBBANKS *  num_banks())

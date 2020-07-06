@@ -80,7 +80,6 @@ struct intel_device_info {
 const struct intel_device_info *intel_get_device_info(uint16_t devid) __attribute__((pure));
 
 unsigned intel_gen(uint16_t devid) __attribute__((pure));
-unsigned intel_gt(uint16_t devid) __attribute__((pure));
 
 extern enum pch_type intel_pch;
 
