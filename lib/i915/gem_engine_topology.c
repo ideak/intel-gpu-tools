@@ -136,7 +136,7 @@ static void init_engine(struct intel_execution_engine2 *e2,
 	} else {
 		igt_debug("found unknown engine (%d, %d)\n", class, instance);
 		e2->flags = -1;
-		ret = snprintf(e2->name, sizeof(e2->name), "%u:%u",
+		ret = snprintf(e2->name, sizeof(e2->name), "c%u_%u",
 			       class, instance);
 	}
 
