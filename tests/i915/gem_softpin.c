@@ -44,6 +44,8 @@ static uint64_t gen8_canonical_addr(uint64_t address)
 	return (__s64)(address << shift) >> shift;
 }
 
+#define INTERRUPTIBLE 0x1
+
 static void test_invalid(int fd)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -324,7 +326,7 @@ static uint64_t busy_batch(int fd)
 	return object[1].offset;
 }
 
-static void test_evict_active(int fd)
+static void test_evict_active(int fd, unsigned int flags)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -344,13 +346,14 @@ static void test_evict_active(int fd)
 	object.flags = EXEC_OBJECT_PINNED;
 
 	/* Replace the active batch with ourselves, forcing an eviction */
-	gem_execbuf(fd, &execbuf);
+	igt_while_interruptible(flags & INTERRUPTIBLE)
+		gem_execbuf(fd, &execbuf);
 	igt_assert_eq_u64(object.offset, expected);
 
 	gem_close(fd, object.handle);
 }
 
-static void test_evict_snoop(int fd)
+static void test_evict_snoop(int fd, unsigned int flags)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -394,12 +397,14 @@ static void test_evict_snoop(int fd)
 	/* with gap -> okay */
 	object[0].offset = hole + 2*4096;
 	object[1].offset = hole;
-	igt_assert_eq(__gem_execbuf(fd, &execbuf), 0);
+	igt_while_interruptible(flags & INTERRUPTIBLE)
+		gem_execbuf(fd, &execbuf);
 
 	/* And we should force the snoop away (or the GPU may hang) */
 	object[0].flags = 0;
 	object[1].offset = hole + 4096;
-	igt_assert_eq(__gem_execbuf(fd, &execbuf), 0);
+	igt_while_interruptible(flags & INTERRUPTIBLE)
+		gem_execbuf(fd, &execbuf);
 	igt_assert(object[0].offset != hole);
 	igt_assert(object[0].offset != hole + 2*4096);
 
@@ -445,7 +450,7 @@ static void xchg_offset(void *array, unsigned i, unsigned j)
 }
 
 enum sleep { NOSLEEP, SUSPEND, HIBERNATE };
-static void test_noreloc(int fd, enum sleep sleep)
+static void test_noreloc(int fd, enum sleep sleep, unsigned flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
 	const uint32_t size = 4096;
@@ -509,7 +514,9 @@ static void test_noreloc(int fd, enum sleep sleep)
 	execbuf.buffer_count = ARRAY_SIZE(object);
 	igt_until_timeout(5) {
 		igt_permute_array(object, ARRAY_SIZE(object)-1, xchg_offset);
-		gem_execbuf(fd, &execbuf);
+
+		igt_while_interruptible(flags & INTERRUPTIBLE)
+			gem_execbuf(fd, &execbuf);
 
 		if ((loop++ & 127) == 0) {
 			switch (sleep) {
@@ -560,19 +567,19 @@ igt_main
 		test_reverse(fd);
 
 	igt_subtest("noreloc")
-		test_noreloc(fd, NOSLEEP);
+		test_noreloc(fd, NOSLEEP, 0);
 	igt_subtest("noreloc-interruptible")
-		igt_while_interruptible(true) test_noreloc(fd, NOSLEEP);
+		test_noreloc(fd, NOSLEEP, INTERRUPTIBLE);
 	igt_subtest("noreloc-S3")
-		test_noreloc(fd, SUSPEND);
+		test_noreloc(fd, SUSPEND, 0);
 	igt_subtest("noreloc-S4")
-		test_noreloc(fd, HIBERNATE);
+		test_noreloc(fd, HIBERNATE, 0);
 
 	for (int signal = 0; signal <= 1; signal++) {
 		igt_subtest_f("evict-active%s", signal ? "-interruptible" : "")
-			igt_while_interruptible(signal) test_evict_active(fd);
+			test_evict_active(fd, signal);
 		igt_subtest_f("evict-snoop%s", signal ? "-interruptible" : "")
-			igt_while_interruptible(signal) test_evict_snoop(fd);
+			test_evict_snoop(fd, signal);
 	}
 	igt_subtest("evict-hang")
 		test_evict_hang(fd);
