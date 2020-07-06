@@ -24,21 +24,57 @@
 #include "i915/gem.h"
 #include "igt.h"
 
-static bool has_duplicate(int err)
+static int batch_create(int fd)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t handle;
+
+	handle = gem_create(fd, 4096);
+	gem_write(fd, handle, 0, &bbe, sizeof(bbe));
+
+	return handle;
+}
+
+static int allows_duplicate(int fd)
+{
+	struct drm_i915_gem_exec_object2 obj[2] = {
+		{ .handle = batch_create(fd), },
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(obj),
+		.buffer_count = 1,
+	};
+	int err;
+
+	gem_execbuf(fd, &execbuf);
+
+	obj[1] = obj[0];
+	execbuf.buffer_count = 2;
+
+	err = __gem_execbuf(fd, &execbuf);
+	gem_close(fd, obj[0].handle);
+
+	return err;
+}
+
+static bool is_duplicate(int err)
 {
 	return err == -EINVAL || err == -EALREADY;
 }
 
 static void test_many_handles(int fd)
 {
-	uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
 	uint32_t clones[128]; /* XXX try with 1024 */
 	uint32_t original;
+	int expected;
 
-	original = gem_create(fd, 4096);
-	gem_write(fd, original, 0, &bbe, sizeof(bbe));
+	expected = allows_duplicate(fd);
+	if (expected)
+		igt_assert(is_duplicate(expected));
+
+	original = batch_create(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
@@ -54,19 +90,20 @@ static void test_many_handles(int fd)
 		gem_execbuf(fd, &execbuf);
 	}
 
-	/* We do not allow the sam object to be referenced multiple times
-	 * within an execbuf; hence why this practice of cloning a handle
+	/*
+	 * We do not normally allow the same object to be referenced multiple
+	 * times within an execbuf; hence why this practice of cloning a handle
 	 * is only found within test cases.
 	 */
 	execbuf.buffer_count = 2;
 	obj[0].handle = original;
 	for (int i = 0; i < ARRAY_SIZE(clones); i++) {
 		obj[1].handle = clones[i];
-		igt_assert(has_duplicate(__gem_execbuf(fd, &execbuf)));
+		igt_assert_eq(__gem_execbuf(fd, &execbuf), expected);
 	}
 	/* Any other clone pair should also be detected */
 	obj[1].handle = clones[0];  /* (last, first) */
-	igt_assert(has_duplicate(__gem_execbuf(fd, &execbuf)));
+	igt_assert_eq(__gem_execbuf(fd, &execbuf), expected);
 	execbuf.buffer_count = 1;
 
 	/* Now close the original having used every clone */
