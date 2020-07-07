@@ -2541,6 +2541,11 @@ void chamelium_deinit(struct chamelium *chamelium)
 	for (i = 0; i < chamelium->port_count; i++)
 		chamelium_plug(chamelium, &chamelium->ports[i]);
 
+	igt_assert(chamelium->drm_fd != -1);
+	for (i = 0; i < chamelium->port_count; i++)
+		wait_for_connected_state(chamelium->drm_fd,
+					 &chamelium->ports[i].connector_id, 1);
+
 	/* Destroy any EDIDs we created to make sure we don't leak them */
 	igt_list_for_each_entry_safe(pos, tmp, &chamelium->edids, link) {
 		for (i = 0; i < CHAMELIUM_MAX_PORTS; i++) {
