@@ -2485,7 +2485,7 @@ struct chamelium *chamelium_init(int drm_fd)
 	if (cleanup_instance)
 		chamelium_deinit(cleanup_instance);
 
-	chamelium->drm_fd = drm_fd;
+	chamelium->drm_fd = dup(drm_fd);
 	IGT_INIT_LIST_HEAD(&chamelium->edids);
 
 	if (!chamelium_read_port_mappings(chamelium, drm_fd))
@@ -2511,6 +2511,8 @@ struct chamelium *chamelium_init(int drm_fd)
 
 	return chamelium;
 error:
+	close(chamelium->drm_fd);
+
 	chamelium_deinit_rpc_only(chamelium);
 
 	return NULL;
@@ -2549,6 +2551,8 @@ void chamelium_deinit(struct chamelium *chamelium)
 		free(pos->base);
 		free(pos);
 	}
+
+	close(chamelium->drm_fd);
 
 	xmlrpc_client_destroy(chamelium->client);
 
