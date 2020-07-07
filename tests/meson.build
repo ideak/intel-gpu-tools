@@ -8,6 +8,7 @@ test_progs = [
 	'core_setmaster_vs_auth',
 	'debugfs_test',
 	'dmabuf',
+	'device_reset',
 	'drm_import_export',
 	'drm_mm',
 	'drm_read',
