@@ -2512,7 +2512,8 @@ struct chamelium *chamelium_init(int drm_fd)
 	return chamelium;
 error:
 	chamelium_deinit_rpc_only(chamelium);
-	return chamelium;
+
+	return NULL;
 }
 
 /**
@@ -2550,12 +2551,11 @@ void chamelium_deinit(struct chamelium *chamelium)
 	}
 
 	xmlrpc_client_destroy(chamelium->client);
-	xmlrpc_env_clean(&chamelium->env);
 
 	for (i = 0; i < chamelium->port_count; i++)
 		free(chamelium->ports[i].name);
 
-	free(chamelium);
+	chamelium_deinit_rpc_only(chamelium);
 }
 
 bool chamelium_plug_all(struct chamelium *chamelium)
