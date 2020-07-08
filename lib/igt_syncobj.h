@@ -60,6 +60,9 @@ void syncobj_timeline_to_binary(int fd, uint32_t binary_handle,
 				uint32_t timeline_handle,
 				uint64_t point,
 				uint32_t flags);
+void syncobj_timeline_to_timeline(int fd,
+				  uint64_t timeline_dst, uint32_t point_dst,
+				  uint64_t timeline_src, uint32_t point_src);
 void syncobj_timeline_signal(int fd, uint32_t *handles, uint64_t *points,
 			     uint32_t count);
 

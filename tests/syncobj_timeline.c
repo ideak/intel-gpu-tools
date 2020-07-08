@@ -406,6 +406,29 @@ test_transfer_bad_pad(int fd)
 	igt_assert(ret == -1 && errno == EINVAL);
 }
 
+static const char *test_transfer_nonexistent_point_desc =
+	"Verifies that transfering a point from a syncobj timeline is to"
+	" another point in the same timeline works";
+static void
+test_transfer_nonexistent_point(int fd)
+{
+	struct drm_syncobj_transfer arg = {};
+	uint32_t handle = syncobj_create(fd, 0);
+	uint64_t value = 63;
+	int ret;
+
+	syncobj_timeline_signal(fd, &handle, &value, 1);
+
+	arg.src_handle = handle;
+	arg.dst_handle = handle;
+	arg.src_point = value; /* Point doesn't exist */
+	arg.dst_point = value + 11;
+	ret = igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_TRANSFER, &arg);
+	igt_assert(ret == 0);
+
+	syncobj_destroy(fd, handle);
+}
+
 #define WAIT_FOR_SUBMIT		(1 << 0)
 #define WAIT_ALL		(1 << 1)
 #define WAIT_AVAILABLE		(1 << 2)
@@ -413,6 +436,53 @@ test_transfer_bad_pad(int fd)
 #define WAIT_SUBMITTED		(1 << 4)
 #define WAIT_SIGNALED		(1 << 5)
 #define WAIT_FLAGS_MAX		(1 << 6) - 1
+
+static const char *test_transfer_point_desc =
+	"Verifies that transfering a point from a syncobj timeline is to"
+	" another point in the same timeline works for signal/wait operations";
+static void
+test_transfer_point(int fd)
+{
+	int timeline = sw_sync_timeline_create();
+	uint32_t handle = syncobj_create(fd, 0);
+	uint64_t value;
+
+	{
+		int sw_fence = sw_sync_timeline_create_fence(timeline, 1);
+		uint32_t tmp_syncobj = syncobj_create(fd, 0);
+
+		syncobj_import_sync_file(fd, tmp_syncobj, sw_fence);
+		syncobj_binary_to_timeline(fd, handle, 1, tmp_syncobj);
+		close(sw_fence);
+		syncobj_destroy(fd, tmp_syncobj);
+	}
+
+	syncobj_timeline_query(fd, &handle, &value, 1);
+	igt_assert_eq(value, 0);
+
+	value = 1;
+	igt_assert_eq(syncobj_timeline_wait_err(fd, &handle, &value,
+						1, 0, WAIT_ALL), -ETIME);
+
+	sw_sync_timeline_inc(timeline, 1);
+
+	syncobj_timeline_query(fd, &handle, &value, 1);
+	igt_assert_eq(value, 1);
+
+	igt_assert(syncobj_timeline_wait(fd, &handle, &value,
+					 1, 0, WAIT_ALL, NULL));
+
+	value = 2;
+	syncobj_timeline_signal(fd, &handle, &value, 1);
+
+	syncobj_timeline_to_timeline(fd, handle, 3, handle, 2);
+
+	syncobj_timeline_query(fd, &handle, &value, 1);
+	igt_assert_eq(value, 3);
+
+	syncobj_destroy(fd, handle);
+	close(timeline);
+}
 
 static uint32_t
 flags_for_test_flags(uint32_t test_flags)
@@ -615,6 +685,24 @@ test_signal(int fd)
 
 	igt_assert(syncobj_timeline_wait(fd, &syncobj, &point, 1, 0, 0, NULL));
 	igt_assert(syncobj_timeline_wait(fd, &syncobj, &point, 1, 0, flags, NULL));
+
+	syncobj_destroy(fd, syncobj);
+}
+
+static const char *test_signal_point_0_desc =
+	"Verifies that signaling point 0 of a timline syncobj works with both"
+	" timeline & legacy wait operations";
+static void
+test_signal_point_0(int fd)
+{
+	uint32_t syncobj = syncobj_create(fd, 0);
+	uint32_t flags = DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT;
+	uint64_t point = 0;
+
+	syncobj_timeline_signal(fd, &syncobj, &point, 1);
+
+	igt_assert(syncobj_timeline_wait(fd, &syncobj, &point, 1, 0, 0, NULL));
+	igt_assert(syncobj_wait(fd, &syncobj, 1, 0, flags, NULL));
 
 	syncobj_destroy(fd, syncobj);
 }
@@ -921,6 +1009,273 @@ test_wait_interrupted(int fd, uint32_t test_flags)
 	close(timeline);
 }
 
+const char *test_host_signal_points_desc =
+	"Verifies that as we signal points from the host, the syncobj timeline"
+	" value increments and that waits for submits/signals works properly.";
+static void
+test_host_signal_points(int fd)
+{
+	uint32_t syncobj = syncobj_create(fd, 0);
+	uint64_t value = 0;
+	int i;
+
+	for (i = 0; i < 100; i++) {
+		uint64_t query_value = 0;
+
+		value += rand();
+
+		syncobj_timeline_signal(fd, &syncobj, &value, 1);
+
+		syncobj_timeline_query(fd, &syncobj, &query_value, 1);
+		igt_assert_eq(query_value, value);
+
+		igt_assert(syncobj_timeline_wait(fd, &syncobj, &query_value,
+						 1, 0, WAIT_FOR_SUBMIT, NULL));
+
+		query_value -= 1;
+		igt_assert(syncobj_timeline_wait(fd, &syncobj, &query_value,
+						 1, 0, WAIT_ALL, NULL));
+	}
+
+	syncobj_destroy(fd, syncobj);
+}
+
+const char *test_device_signal_unordered_desc =
+	"Verifies that a device signaling fences out of order on the timeline"
+	" still increments the timeline monotonically and that waits work"
+	" properly.";
+static void
+test_device_signal_unordered(int fd)
+{
+	uint32_t syncobj = syncobj_create(fd, 0);
+	int point_indices[] = { 0, 2, 1, 4, 3 };
+	bool signaled[ARRAY_SIZE(point_indices)] = {};
+	int fences[ARRAY_SIZE(point_indices)];
+	int timeline = sw_sync_timeline_create();
+	uint64_t value = 0;
+	int i, j;
+
+	for (i = 0; i < ARRAY_SIZE(fences); i++) {
+		fences[point_indices[i]] = sw_sync_timeline_create_fence(timeline, i + 1);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(fences); i++) {
+		uint32_t tmp_syncobj = syncobj_create(fd, 0);
+
+		syncobj_import_sync_file(fd, tmp_syncobj, fences[i]);
+		syncobj_binary_to_timeline(fd, syncobj, i + 1, tmp_syncobj);
+		syncobj_destroy(fd, tmp_syncobj);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(fences); i++) {
+		uint64_t query_value = 0;
+		uint64_t min_value = 0;
+
+		sw_sync_timeline_inc(timeline, 1);
+
+		signaled[point_indices[i]] = true;
+
+		/*
+		 * Compute a minimum value of the timeline based of
+		 * the smallest signaled point.
+		 */
+		for (j = 0; j < ARRAY_SIZE(signaled); j++) {
+			if (!signaled[j])
+				break;
+			min_value = j;
+		}
+
+		syncobj_timeline_query(fd, &syncobj, &query_value, 1);
+		igt_assert(query_value >= min_value);
+		igt_assert(query_value >= value);
+
+		igt_debug("signaling point %i, timeline value = %" PRIu64 "\n",
+			  point_indices[i] + 1, query_value);
+
+		value = max(query_value, value);
+
+		igt_assert(syncobj_timeline_wait(fd, &syncobj, &query_value,
+						 1, 0, WAIT_FOR_SUBMIT, NULL));
+
+		igt_assert(syncobj_timeline_wait(fd, &syncobj, &query_value,
+						 1, 0, WAIT_ALL, NULL));
+	}
+
+	for (i = 0; i < ARRAY_SIZE(fences); i++)
+		close(fences[i]);
+
+	syncobj_destroy(fd, syncobj);
+	close(timeline);
+}
+
+const char *test_device_submit_unordered_desc =
+	"Verifies that submitting out of order doesn't break the timeline.";
+static void
+test_device_submit_unordered(int fd)
+{
+	uint32_t syncobj = syncobj_create(fd, 0);
+	uint64_t points[] = { 1, 5, 3, 6, 7 };
+	int timeline = sw_sync_timeline_create();
+	uint64_t query_value;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(points); i++) {
+		int fence = sw_sync_timeline_create_fence(timeline, i + 1);
+		uint32_t tmp_syncobj = syncobj_create(fd, 0);
+
+		syncobj_import_sync_file(fd, tmp_syncobj, fence);
+		syncobj_binary_to_timeline(fd, syncobj, points[i], tmp_syncobj);
+		close(fence);
+		syncobj_destroy(fd, tmp_syncobj);
+	}
+
+	/*
+	 * Signal points 1, 5 & 3. There are no other points <= 5 so
+	 * waiting on 5 should return immediately for submission &
+	 * signaling.
+	 */
+	sw_sync_timeline_inc(timeline, 3);
+
+	syncobj_timeline_query(fd, &syncobj, &query_value, 1);
+	igt_assert_eq(query_value, 5);
+
+	igt_assert(syncobj_timeline_wait(fd, &syncobj, &query_value,
+					 1, 0, WAIT_FOR_SUBMIT, NULL));
+
+	igt_assert(syncobj_timeline_wait(fd, &syncobj, &query_value,
+					 1, 0, WAIT_ALL, NULL));
+
+	syncobj_destroy(fd, syncobj);
+	close(timeline);
+}
+
+const char *test_host_signal_ordered_desc =
+	"Verifies that the host signaling fences out of order on the timeline"
+	" still increments the timeline monotonically and that waits work"
+	" properly.";
+static void
+test_host_signal_ordered(int fd)
+{
+	uint32_t syncobj = syncobj_create(fd, 0);
+	int timeline = sw_sync_timeline_create();
+	uint64_t host_signal_value = 8, query_value;
+	int i;
+
+	for (i = 0; i < 5; i++) {
+		int fence = sw_sync_timeline_create_fence(timeline, i + 1);
+		uint32_t tmp_syncobj = syncobj_create(fd, 0);
+
+		syncobj_import_sync_file(fd, tmp_syncobj, fence);
+		syncobj_binary_to_timeline(fd, syncobj, i + 1, tmp_syncobj);
+		syncobj_destroy(fd, tmp_syncobj);
+		close(fence);
+	}
+
+	sw_sync_timeline_inc(timeline, 3);
+
+	syncobj_timeline_query(fd, &syncobj, &query_value, 1);
+	igt_assert_eq(query_value, 3);
+
+	syncobj_timeline_signal(fd, &syncobj, &host_signal_value, 1);
+
+	syncobj_timeline_query(fd, &syncobj, &query_value, 1);
+	igt_assert_eq(query_value, 3);
+
+	sw_sync_timeline_inc(timeline, 5);
+
+	syncobj_timeline_query(fd, &syncobj, &query_value, 1);
+	igt_assert_eq(query_value, 8);
+
+	syncobj_destroy(fd, syncobj);
+	close(timeline);
+}
+
+struct checker_thread_data {
+	int fd;
+	uint32_t syncobj;
+	bool running;
+	bool started;
+};
+
+static void *
+checker_thread_func(void *_data)
+{
+	struct checker_thread_data *data = _data;
+	uint64_t value, last_value = 0;
+
+	while (READ_ONCE(data->running)) {
+		syncobj_timeline_query(data->fd, &data->syncobj, &value, 1);
+
+		data->started = true;
+
+		igt_assert(last_value <= value);
+		last_value = value;
+	}
+
+	return NULL;
+}
+
+const char *test_32bits_limit_desc =
+	"Verifies that signaling around the int32_t limit. For compatibility"
+	" reason, the handling of seqnos in the dma-fences can consider a seqnoA"
+	" is prior seqnoB even though seqnoA > seqnoB.";
+/*
+ * Fixed in kernel commit :
+ *
+ * commit b312d8ca3a7cebe19941d969a51f2b7f899b81e2
+ * Author: Christian König <christian.koenig@amd.com>
+ * Date:   Wed Nov 14 16:11:06 2018 +0100
+ *
+ *    dma-buf: make fence sequence numbers 64 bit v2
+ *
+ */
+static void
+test_32bits_limit(int fd)
+{
+	struct checker_thread_data thread_data = {
+		.fd = fd,
+		.syncobj = syncobj_create(fd, 0),
+		.running = true,
+		.started = false,
+	};
+	int timeline = sw_sync_timeline_create();
+	uint64_t limit_diff = (1ull << 31) - 1;
+	uint64_t points[] = { 1, 5, limit_diff + 5, limit_diff + 6, limit_diff * 2, };
+	pthread_t thread;
+	uint64_t value, last_value;
+	int i;
+
+	igt_assert_eq(pthread_create(&thread, NULL, checker_thread_func, &thread_data), 0);
+
+	while (!thread_data.started);
+
+	for (i = 0; i < ARRAY_SIZE(points); i++) {
+		int fence = sw_sync_timeline_create_fence(timeline, i + 1);
+		uint32_t tmp_syncobj = syncobj_create(fd, 0);
+
+		syncobj_import_sync_file(fd, tmp_syncobj, fence);
+		syncobj_binary_to_timeline(fd, thread_data.syncobj, points[i], tmp_syncobj);
+		close(fence);
+		syncobj_destroy(fd, tmp_syncobj);
+	}
+
+	last_value = 0;
+	for (i = 0; i < ARRAY_SIZE(points); i++) {
+		sw_sync_timeline_inc(timeline, 1);
+
+		syncobj_timeline_query(fd, &thread_data.syncobj, &value, 1);
+		igt_assert(last_value <= value);
+
+		last_value = value;
+	}
+
+	thread_data.running = false;
+	pthread_join(thread, NULL);
+
+	syncobj_destroy(fd, thread_data.syncobj);
+	close(timeline);
+}
+
 static bool
 has_syncobj_timeline_wait(int fd)
 {
@@ -1010,6 +1365,14 @@ igt_main
 	igt_subtest("invalid-transfer-bad-pad")
 		test_transfer_bad_pad(fd);
 
+	igt_describe(test_transfer_nonexistent_point_desc);
+	igt_subtest("invalid-transfer-non-existent-point")
+		test_transfer_nonexistent_point(fd);
+
+	igt_describe(test_transfer_point_desc);
+	igt_subtest("transfer-timeline-point")
+		test_transfer_point(fd);
+
 	for (unsigned flags = 0; flags < WAIT_FLAGS_MAX; flags++) {
 		int err;
 
@@ -1073,6 +1436,10 @@ igt_main
 	igt_describe(test_signal_desc);
 	igt_subtest("signal")
 		test_signal(fd);
+
+	igt_describe(test_signal_point_0_desc);
+	igt_subtest("signal-point-0")
+		test_signal_point_0(fd);
 
 	for (unsigned flags = 0; flags < WAIT_FLAGS_MAX; flags++) {
 		int err;
@@ -1147,4 +1514,24 @@ igt_main
 	igt_describe(test_wait_interrupted_desc);
 	igt_subtest("wait-all-interrupted")
 		test_wait_interrupted(fd, WAIT_ALL);
+
+	igt_describe(test_host_signal_points_desc);
+	igt_subtest("host-signal-points")
+		test_host_signal_points(fd);
+
+	igt_describe(test_device_signal_unordered_desc);
+	igt_subtest("device-signal-unordered")
+		test_device_signal_unordered(fd);
+
+	igt_describe(test_device_submit_unordered_desc);
+	igt_subtest("device-submit-unordered")
+		test_device_submit_unordered(fd);
+
+	igt_describe(test_host_signal_ordered_desc);
+	igt_subtest("host-signal-ordered")
+		test_host_signal_ordered(fd);
+
+	igt_describe(test_32bits_limit_desc);
+	igt_subtest("32bits-limit")
+		test_32bits_limit(fd);
 }

@@ -459,17 +459,19 @@ syncobj_timeline_query(int fd, uint32_t *handles, uint64_t *points,
 }
 
 static int
-__syncobj_binary_to_timeline(int fd, uint32_t timeline_handle,
-			     uint64_t point, uint32_t binary_handle)
+__syncobj_transfer(int fd,
+		   uint32_t handle_dst, uint64_t point_dst,
+		   uint32_t handle_src, uint64_t point_src,
+		   uint32_t flags)
 {
 	struct drm_syncobj_transfer args;
 	int ret;
 
-	args.src_handle = binary_handle;
-	args.dst_handle = timeline_handle;
-	args.src_point = 0;
-	args.dst_point = point;
-	args.flags = 0;
+	args.src_handle = handle_src;
+	args.dst_handle = handle_dst;
+	args.src_point = point_src;
+	args.dst_point = point_dst;
+	args.flags = flags;
 	args.pad = 0;
 	ret = igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_TRANSFER, &args);
 	if (ret) {
@@ -495,33 +497,9 @@ void
 syncobj_binary_to_timeline(int fd, uint32_t timeline_handle,
 			   uint64_t point, uint32_t binary_handle)
 {
-	igt_assert_eq(__syncobj_binary_to_timeline(fd, timeline_handle, point,
-						   binary_handle), 0);
-}
-
-static int
-__syncobj_timeline_to_binary(int fd, uint32_t binary_handle,
-			     uint32_t timeline_handle,
-			     uint64_t point,
-			     uint32_t flags)
-{
-	struct drm_syncobj_transfer args;
-	int ret;
-
-	args.dst_handle = binary_handle;
-	args.src_handle = timeline_handle;
-	args.dst_point = 0;
-	args.src_point = point;
-	args.flags = flags;
-	args.pad = 0;
-	ret = drmIoctl(fd, DRM_IOCTL_SYNCOBJ_TRANSFER, &args);
-	if (ret) {
-		ret = -errno;
-		igt_assert(ret);
-	}
-
-	errno = 0;
-	return ret;
+	igt_assert_eq(__syncobj_transfer(fd,
+					 timeline_handle, point,
+					 binary_handle, 0, 0), 0);
 }
 
 /**
@@ -540,7 +518,28 @@ syncobj_timeline_to_binary(int fd, uint32_t binary_handle,
 			   uint64_t point,
 			   uint32_t flags)
 {
-	igt_assert_eq(__syncobj_timeline_to_binary(fd, binary_handle,
-						   timeline_handle, point,
-						   flags), 0);
+	igt_assert_eq(__syncobj_transfer(fd,
+					 binary_handle, 0,
+					 timeline_handle, point,
+					 flags), 0);
+}
+
+/**
+ * syncobj_timeline_to_timeline:
+ * @fd: The DRM file descriptor.
+ * @timeline_src: A timeline syncobj handle
+ * @timeline_dst: A timeline syncobj handle
+ * @point_src: A point on the source timeline syncobj
+ * @point_dst: A point on the destination timeline syncobj
+ *
+ * query a set of syncobjs.
+ */
+void
+syncobj_timeline_to_timeline(int fd,
+			     uint64_t timeline_dst, uint32_t point_dst,
+			     uint64_t timeline_src, uint32_t point_src)
+{
+	igt_assert_eq(__syncobj_transfer(fd,
+					 timeline_dst, point_dst,
+					 timeline_src, point_src, 0), 0);
 }
