@@ -2596,6 +2596,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /* Batch */
 #define MI_BATCH_BUFFER		((0x30 << 23) | 1)
 #define MI_BATCH_BUFFER_START	(0x31 << 23)
+#define MI_BATCH_BUFFER_START_GEN8 ((0x31 << 13) | 1)
+#define   MI_BATCH_PREDICATE       (1 << 15) /* HSW+ on RCS only*/
 #define MI_BATCH_BUFFER_END	(0xA << 23)
 #define MI_COND_BATCH_BUFFER_END	(0x36 << 23)
 #define MI_DO_COMPARE                   (1 << 21)
