@@ -41,7 +41,26 @@ int syncobj_wait_err(int fd, uint32_t *handles, uint32_t count,
 bool syncobj_wait(int fd, uint32_t *handles, uint32_t count,
 		  uint64_t abs_timeout_nsec, uint32_t flags,
 		  uint32_t *first_signaled);
+int __syncobj_timeline_wait_ioctl(int fd,
+				  struct drm_syncobj_timeline_wait *args);
+bool syncobj_timeline_wait(int fd, uint32_t *handles, uint64_t *points,
+			   unsigned num_handles,
+			   int64_t timeout_nsec, unsigned flags,
+			   uint32_t *first_signaled);
+int syncobj_timeline_wait_err(int fd, uint32_t *handles, uint64_t *points,
+			      unsigned num_handles,
+			      int64_t timeout_nsec, unsigned flags);
 void syncobj_reset(int fd, uint32_t *handles, uint32_t count);
 void syncobj_signal(int fd, uint32_t *handles, uint32_t count);
+void syncobj_timeline_query(int fd, uint32_t *handles, uint64_t *points,
+			    uint32_t count);
+void syncobj_binary_to_timeline(int fd, uint32_t timeline_handle,
+				uint64_t point, uint32_t binary_handle);
+void syncobj_timeline_to_binary(int fd, uint32_t binary_handle,
+				uint32_t timeline_handle,
+				uint64_t point,
+				uint32_t flags);
+void syncobj_timeline_signal(int fd, uint32_t *handles, uint64_t *points,
+			     uint32_t count);
 
 #endif /* IGT_SYNCOBJ_H */

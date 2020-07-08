@@ -307,3 +307,240 @@ syncobj_signal(int fd, uint32_t *handles, uint32_t count)
 {
 	igt_assert_eq(__syncobj_signal(fd, handles, count), 0);
 }
+
+static int
+__syncobj_timeline_signal(int fd, uint32_t *handles, uint64_t *points, uint32_t count)
+{
+	struct drm_syncobj_timeline_array array = { 0 };
+	int err = 0;
+
+	array.handles = to_user_pointer(handles);
+	array.points = to_user_pointer(points);
+	array.count_handles = count;
+	if (igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_TIMELINE_SIGNAL, &array)) {
+		err = -errno;
+		igt_assume(err);
+		errno = 0;
+	}
+	return err;
+}
+
+/**
+ * syncobj_signal:
+ * @fd: The DRM file descriptor.
+ * @handles: Array of syncobj handles to signal
+ * @points: List of point of handles to signal.
+ * @count: Count of syncobj handles.
+ *
+ * Signal a set of syncobjs.
+ */
+void
+syncobj_timeline_signal(int fd, uint32_t *handles, uint64_t *points, uint32_t count)
+{
+	igt_assert_eq(__syncobj_timeline_signal(fd, handles, points, count), 0);
+}
+int
+__syncobj_timeline_wait_ioctl(int fd, struct drm_syncobj_timeline_wait *args)
+{
+	int err = 0;
+	if (igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_TIMELINE_WAIT, args)) {
+		err = -errno;
+		igt_assume(err);
+		errno = 0;
+	}
+	return err;
+}
+static int
+__syncobj_timeline_wait(int fd, uint32_t *handles, uint64_t *points,
+			unsigned num_handles,
+			int64_t timeout_nsec, unsigned flags,
+			uint32_t *first_signaled)
+{
+	struct drm_syncobj_timeline_wait args;
+	int ret;
+
+	args.handles = to_user_pointer(handles);
+	args.points = to_user_pointer(points);
+	args.timeout_nsec = timeout_nsec;
+	args.count_handles = num_handles;
+	args.flags = flags;
+	args.first_signaled = 0;
+	args.pad = 0;
+
+	ret = igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_TIMELINE_WAIT, &args);
+	if (ret < 0) {
+		ret = -errno;
+		igt_assume(ret);
+		errno = 0;
+	}
+
+	if (first_signaled)
+		*first_signaled = args.first_signaled;
+
+	return ret;
+}
+int
+syncobj_timeline_wait_err(int fd, uint32_t *handles, uint64_t *points,
+			  unsigned num_handles,
+			  int64_t timeout_nsec, unsigned flags)
+{
+	return __syncobj_timeline_wait(fd, handles, points, num_handles,
+				       timeout_nsec, flags, NULL);
+}
+
+/**
+ * syncobj_timeline_wait:
+ * @fd: The DRM file descriptor
+ * @handles: List of syncobj handles to wait for.
+ * @points: List of point of handles to wait for.
+ * @num_handles: Count of handles
+ * @timeout_nsec: Absolute wait timeout in nanoseconds.
+ * @flags: Wait ioctl flags.
+ * @first_signaled: Returned handle for first signaled syncobj.
+ *
+ * Waits in the kernel for any/all the requested syncobjs timeline point
+ * using the timeout and flags.
+ * Returns: bool value - false = timedout, true = signaled
+ */
+bool
+syncobj_timeline_wait(int fd, uint32_t *handles, uint64_t *points,
+		      unsigned num_handles,
+		      int64_t timeout_nsec, unsigned flags,
+		      uint32_t *first_signaled)
+{
+	int ret;
+
+	ret = __syncobj_timeline_wait(fd, handles, points, num_handles,
+				      timeout_nsec, flags, first_signaled);
+	if (ret == -ETIME)
+		return false;
+	igt_assert_eq(ret, 0);
+
+	return true;
+
+}
+
+static int
+__syncobj_timeline_query(int fd, uint32_t *handles, uint64_t *points,
+			 uint32_t handle_count)
+{
+	struct drm_syncobj_timeline_array args;
+	int ret;
+
+	args.handles = to_user_pointer(handles);
+	args.points = to_user_pointer(points);
+	args.count_handles = handle_count;
+	args.flags = 0;
+
+	ret = igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_QUERY, &args);
+	if (ret) {
+		ret = -errno;
+		igt_assume(ret);
+		errno = 0;
+	}
+
+	return ret;
+}
+
+/**
+ * syncobj_timeline_query:
+ * @fd: The DRM file descriptor.
+ * @handles: Array of syncobj handles.
+ * @points: Array of syncobj points queried.
+ * @count: Count of syncobj handles.
+ *
+ * Queries a set of syncobjs.
+ */
+void
+syncobj_timeline_query(int fd, uint32_t *handles, uint64_t *points,
+		       uint32_t count)
+{
+	igt_assert_eq(__syncobj_timeline_query(fd, handles, points, count), 0);
+}
+
+static int
+__syncobj_binary_to_timeline(int fd, uint32_t timeline_handle,
+			     uint64_t point, uint32_t binary_handle)
+{
+	struct drm_syncobj_transfer args;
+	int ret;
+
+	args.src_handle = binary_handle;
+	args.dst_handle = timeline_handle;
+	args.src_point = 0;
+	args.dst_point = point;
+	args.flags = 0;
+	args.pad = 0;
+	ret = igt_ioctl(fd, DRM_IOCTL_SYNCOBJ_TRANSFER, &args);
+	if (ret) {
+		ret = -errno;
+		igt_assume(ret);
+		errno = 0;
+	}
+
+	return ret;
+}
+
+/**
+ * syncobj_binary_to_timeline:
+ * @fd: The DRM file descriptor.
+ * @timeline_handle: A syncobj timeline handle
+ * @point: A syncobj timeline point in the timeline handle
+ * @binary_handle: A syncobj binary handle
+ *
+ * Transfers a DMA fence from a binary syncobj into a timeline syncobj
+ * at a given point on the timeline.
+ */
+void
+syncobj_binary_to_timeline(int fd, uint32_t timeline_handle,
+			   uint64_t point, uint32_t binary_handle)
+{
+	igt_assert_eq(__syncobj_binary_to_timeline(fd, timeline_handle, point,
+						   binary_handle), 0);
+}
+
+static int
+__syncobj_timeline_to_binary(int fd, uint32_t binary_handle,
+			     uint32_t timeline_handle,
+			     uint64_t point,
+			     uint32_t flags)
+{
+	struct drm_syncobj_transfer args;
+	int ret;
+
+	args.dst_handle = binary_handle;
+	args.src_handle = timeline_handle;
+	args.dst_point = 0;
+	args.src_point = point;
+	args.flags = flags;
+	args.pad = 0;
+	ret = drmIoctl(fd, DRM_IOCTL_SYNCOBJ_TRANSFER, &args);
+	if (ret) {
+		ret = -errno;
+		igt_assert(ret);
+	}
+
+	errno = 0;
+	return ret;
+}
+
+/**
+ * syncobj_binary_to_timeline:
+ * @fd: The DRM file descriptor.
+ * @binary_handle: A syncobj binary handle
+ * @timeline_handle: A syncobj timeline handle
+ * @point: A syncobj timeline point in the timeline handle
+ *
+ * Transfers DMA fence from a given point from timeline syncobj into a
+ * binary syncobj.
+ */
+void
+syncobj_timeline_to_binary(int fd, uint32_t binary_handle,
+			   uint32_t timeline_handle,
+			   uint64_t point,
+			   uint32_t flags)
+{
+	igt_assert_eq(__syncobj_timeline_to_binary(fd, binary_handle,
+						   timeline_handle, point,
+						   flags), 0);
+}
