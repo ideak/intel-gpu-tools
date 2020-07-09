@@ -44,7 +44,7 @@ struct hotunplug {
 		int sysfs_bus;
 		int sysfs_drv;
 	} fd;
-	char *dev_bus_addr;
+	const char *dev_bus_addr;
 };
 
 /* Helpers */
