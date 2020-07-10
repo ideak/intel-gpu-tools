@@ -136,7 +136,6 @@ i915_progs = [
 	'gem_exec_alignment',
 	'gem_exec_async',
 	'gem_exec_await',
-	'gem_exec_bad_domains',
 	'gem_exec_basic',
 	'gem_exec_big',
 	'gem_exec_capture',

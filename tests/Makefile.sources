@@ -215,9 +215,6 @@ gem_exec_async_SOURCES = i915/gem_exec_async.c
 TESTS_progs += gem_exec_await
 gem_exec_await_SOURCES = i915/gem_exec_await.c
 
-TESTS_progs += gem_exec_bad_domains
-gem_exec_bad_domains_SOURCES = i915/gem_exec_bad_domains.c
-
 TESTS_progs += gem_exec_balancer
 gem_exec_balancer_SOURCES = i915/gem_exec_balancer.c
 

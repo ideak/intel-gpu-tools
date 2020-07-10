@@ -1280,6 +1280,77 @@ static void concurrent(int i915, int num_common)
 	igt_assert_eq(result, 0);
 }
 
+#define I915_GEM_GPU_DOMAINS \
+	(I915_GEM_DOMAIN_RENDER | \
+	 I915_GEM_DOMAIN_SAMPLER | \
+	 I915_GEM_DOMAIN_COMMAND | \
+	 I915_GEM_DOMAIN_INSTRUCTION | \
+	 I915_GEM_DOMAIN_VERTEX)
+
+static void invalid_domains(int fd)
+{
+	static const struct bad_domain {
+		uint32_t read_domains;
+		uint32_t write_domains;
+		int expected;
+	} bd[] = {
+		{ I915_GEM_DOMAIN_CPU, 0, -EINVAL },
+		{ I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU, -EINVAL },
+		{ I915_GEM_DOMAIN_GTT, 0, -EINVAL },
+		{ I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT, -EINVAL },
+		{
+			I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION,
+			I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION,
+			-EINVAL
+		},
+		{
+			~(I915_GEM_GPU_DOMAINS |
+			  I915_GEM_DOMAIN_GTT |
+			  I915_GEM_DOMAIN_CPU),
+			0,
+			-EINVAL
+		},
+		{ I915_GEM_DOMAIN_GTT << 1, I915_GEM_DOMAIN_GTT << 1, -EINVAL },
+	};
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_relocation_entry reloc;
+	struct drm_i915_gem_exec_object2 obj[2] = {
+		{ .handle = gem_create(fd, 4096) },
+		{ .handle = gem_create(fd, 4096) },
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(obj),
+		.buffer_count = 2,
+	};
+
+	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
+	gem_execbuf(fd, &execbuf); /* verify the 2 objects are valid first */
+
+	obj[1].relocation_count = 1;
+	obj[1].relocs_ptr = to_user_pointer(&reloc);
+
+	memset(&reloc, 0, sizeof(reloc));
+	reloc.target_handle = obj[0].handle;
+	gem_execbuf(fd, &execbuf); /* verify the reloc is valid */
+
+	for (int i = 0; i < ARRAY_SIZE(bd); i++) {
+		int err;
+
+		reloc.read_domains = bd[i].read_domains;
+		reloc.write_domain = bd[i].write_domains;
+		err = __gem_execbuf(fd, &execbuf);
+		igt_assert_f(err == bd[i].expected,
+			     "[%d] Invalid .read_domains=%x, .write_domain=%x not reported; got %d, expected %d\n",
+			     i,
+			     bd[i].read_domains,
+			     bd[i].write_domains,
+			     err, bd[i].expected);
+	}
+
+	gem_close(fd, obj[1].handle);
+	gem_close(fd, obj[0].handle);
+}
+
 igt_main
 {
 	const struct intel_execution_engine2 *e;
@@ -1430,6 +1501,9 @@ igt_main
 		concurrent(fd, 0);
 	igt_subtest("basic-concurrent16")
 		concurrent(fd, 16);
+
+	igt_subtest("invalid-domains")
+		invalid_domains(fd);
 
 	igt_fixture
 		close(fd);
