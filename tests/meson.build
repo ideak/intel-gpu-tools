@@ -409,7 +409,6 @@ executable('gem_stress', 'i915/gem_stress.c',
 hang_progs = [
 	'gem_bad_batch',
 	'gem_bad_blit',
-	'gem_bad_address',
 	'gem_non_secure_batch',
 ]
 foreach prog : hang_progs
