@@ -404,17 +404,6 @@ executable('gem_stress', 'i915/gem_stress.c',
 	   install_rpath : libexecdir_rpathdir,
 	   dependencies : igt_deps)
 
-# IMPORTANT: These tests here are all disabled because the result in sometime
-# unrecoverable gpu hangs. Don't put real testcases here.
-hang_progs = [
-	'gem_non_secure_batch',
-]
-foreach prog : hang_progs
-	executable(prog, join_paths('i915', prog + '.c'),
-			dependencies : igt_deps,
-			install : false)
-endforeach
-
 image_files = [
   '1080p-left.png',
   '1080p-right.png',

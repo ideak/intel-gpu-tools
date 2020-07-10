@@ -539,13 +539,6 @@ kernel_tests_full = \
 	$(extra_kernel_tests) \
 	$(NULL)
 
-# IMPORTANT: These tests here are all disabled because the result in sometime
-# unrecoverable gpu hangs. Don't put real testcases here.
-HANG = gem_non_secure_batch
-gem_non_secure_batch_SOURCES = i915/gem_non_secure_batch.c
-
-	$(NULL)
-
 scripts = \
 	ddx_intel_after_fbdev \
 	$(NULL)
