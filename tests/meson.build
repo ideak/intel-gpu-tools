@@ -407,7 +407,6 @@ executable('gem_stress', 'i915/gem_stress.c',
 # IMPORTANT: These tests here are all disabled because the result in sometime
 # unrecoverable gpu hangs. Don't put real testcases here.
 hang_progs = [
-	'gem_bad_blit',
 	'gem_non_secure_batch',
 ]
 foreach prog : hang_progs
