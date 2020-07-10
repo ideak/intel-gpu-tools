@@ -541,10 +541,7 @@ kernel_tests_full = \
 
 # IMPORTANT: These tests here are all disabled because the result in sometime
 # unrecoverable gpu hangs. Don't put real testcases here.
-HANG = gem_bad_batch
-gem_bad_batch_SOURCES = i915/gem_bad_batch.c
-
-HANG += gem_bad_blit
+HANG = gem_bad_blit
 gem_bad_blit_SOURCES = i915/gem_bad_blit.c
 
 HANG += gem_non_secure_batch
