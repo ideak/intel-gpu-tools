@@ -1196,6 +1196,7 @@ static void test_readonly(int i915)
 {
 	uint64_t aperture_size;
 	uint32_t whandle, rhandle;
+	struct timespec tv;
 	size_t sz, total;
 	void *pages, *space;
 	int memfd;
@@ -1230,6 +1231,7 @@ static void test_readonly(int i915)
 	 * the target address for MI_STORE_DWORD_IMM, so our maximum
 	 * usable object size is only 2GiB. For now.
 	 */
+	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
 	total = 2048ull << 20;
 	aperture_size = gem_aperture_size(i915) / 2;
 	if (aperture_size < total)
@@ -1250,16 +1252,18 @@ static void test_readonly(int i915)
 	igt_assert_eq_u32(*(uint32_t *)pages, (uint32_t)(total - sz));
 	igt_assert(mlock(pages, sz) == 0);
 	close(memfd);
+	igt_info("Arena creation in %.1fms\n", igt_nsec_elapsed(&tv) * 1e-6);
 
 	/* Check we can create a normal userptr bo wrapping the wrapper */
+	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
 	gem_userptr(i915, space, total, false, userptr_flags, &rhandle);
 	gem_set_domain(i915, rhandle, I915_GEM_DOMAIN_CPU, 0);
-	for (size_t offset = 0; offset < total; offset += sz)
-		store_dword(i915, rhandle, offset + 4, offset / sz);
+	store_dword(i915, rhandle, total - sz + 4, total / sz);
 	gem_sync(i915, rhandle);
 	igt_assert_eq_u32(*(uint32_t *)(pages + 0), (uint32_t)(total - sz));
-	igt_assert_eq_u32(*(uint32_t *)(pages + 4), (uint32_t)(total / sz - 1));
+	igt_assert_eq_u32(*(uint32_t *)(pages + 4), (uint32_t)(total / sz));
 	gem_close(i915, rhandle);
+	igt_info("Sanity check took %.1fms\n", igt_nsec_elapsed(&tv) * 1e-6);
 
 	/* Now enforce read-only henceforth */
 	igt_assert(mprotect(space, total, PROT_READ) == 0);
@@ -1275,7 +1279,7 @@ static void test_readonly(int i915)
 			char *ref, *result;
 
 			/* First tweak the backing store through the write */
-			store_dword_rand(i915, eb_ring(e), whandle, sz, 1024);
+			store_dword_rand(i915, eb_ring(e), whandle, sz, 64);
 			gem_sync(i915, whandle);
 			ref = g_compute_checksum_for_data(G_CHECKSUM_SHA1,
 							  pages, sz);
@@ -1284,7 +1288,7 @@ static void test_readonly(int i915)
 			igt_assert(strcmp(ref, orig));
 
 			/* Now try the same through the read-only handle */
-			store_dword_rand(i915, eb_ring(e), rhandle, total, 1024);
+			store_dword_rand(i915, eb_ring(e), rhandle, total, 64);
 			gem_sync(i915, rhandle);
 			result = g_compute_checksum_for_data(G_CHECKSUM_SHA1,
 							     pages, sz);
