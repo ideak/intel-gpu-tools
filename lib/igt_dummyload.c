@@ -121,11 +121,10 @@ emit_recursive_batch(igt_spin_t *spin,
 	}
 	igt_require(nengine);
 
-	memset(&spin->execbuf, 0, sizeof(spin->execbuf));
-	execbuf = &spin->execbuf;
-	memset(spin->obj, 0, sizeof(spin->obj));
-	obj = spin->obj;
 	memset(relocs, 0, sizeof(relocs));
+	execbuf = memset(&spin->execbuf, 0, sizeof(spin->execbuf));
+	execbuf->flags = I915_EXEC_NO_RELOC;
+	obj = memset(spin->obj, 0, sizeof(spin->obj));
 
 	obj[BATCH].handle = gem_create(fd, BATCH_SIZE);
 	batch = gem_mmap__device_coherent(fd, obj[BATCH].handle,
@@ -146,6 +145,7 @@ emit_recursive_batch(igt_spin_t *spin,
 		/* dummy write to dependency */
 		obj[SCRATCH].handle = opts->dependency;
 		obj[SCRATCH].offset = addr;
+		obj[SCRATCH].flags = EXEC_OBJECT_WRITE;
 
 		r->presumed_offset = obj[SCRATCH].offset;
 		r->target_handle = obj[SCRATCH].handle;
