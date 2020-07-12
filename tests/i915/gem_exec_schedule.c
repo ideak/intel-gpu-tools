@@ -1526,7 +1526,7 @@ static void preempt_engines(int i915,
 	}
 	gem_context_set_param(i915, &param);
 
-	for (int n = MIN_PRIO; n <= MAX_PRIO; n++) {
+	for (int n = -I915_EXEC_RING_MASK; n <= I915_EXEC_RING_MASK; n++) {
 		unsigned int engine = n & I915_EXEC_RING_MASK;
 
 		gem_context_set_priority(i915, param.ctx_id, n);
