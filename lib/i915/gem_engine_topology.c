@@ -347,11 +347,62 @@ static int reopen(int dir, int mode)
 	return fd;
 }
 
+static int __open_primary(int dir)
+{
+	int fd, major, minor;
+	char target[1024];
+	char device[1024];
+	char buf[1024];
+	int len;
+
+	fd = openat(dir, "dev", O_RDONLY);
+	if (fd < 0)
+		return dir;
+
+	len = read(fd, buf, sizeof(buf) - 1);
+	close(fd);
+	if (len <= 0)
+		return dir;
+	buf[len] = '\0';
+
+	sscanf(buf, "%d:%d", &major, &minor);
+	if (minor < 64)
+		return dir;
+
+	if (readlinkat(dir, "device", target, sizeof(target)) < 0)
+		return dir;
+
+	fd = openat(dir, "..", O_RDONLY);
+	if (fd < 0)
+		return dir;
+
+	close(dir);
+	for (minor = 0; minor < 64; minor++) {
+		sprintf(buf, "/sys/dev/char/%d:%d", major, minor);
+		dir = openat(fd, buf, O_RDONLY);
+		if (dir < 0)
+			break;
+
+		if (readlinkat(dir, "device", device, sizeof(device)) > 0 &&
+		    !strcmp(device, target))
+			break;
+
+		close(dir);
+		dir = -1;
+	}
+	close(fd);
+
+	return dir;
+}
+
 static FILE *__open_attr(int dir, const char *mode, ...)
 {
 	const char *path;
 	FILE *file;
 	va_list ap;
+
+	/* The attributes are not to be found on render nodes */
+	dir = __open_primary(dir);
 
 	va_start(ap, mode);
 	while (dir >= 0 && (path = va_arg(ap, const char *))) {
