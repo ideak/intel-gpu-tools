@@ -1849,13 +1849,13 @@ static void reorder_wide(int fd, unsigned ring)
 {
 	const unsigned int ring_size = gem_submission_measure(fd, ring);
 	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const int priorities[] = { MIN_PRIO, MAX_PRIO };
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
-	struct timespec tv = {};
-	IGT_CORK_FENCE(cork);
-	uint32_t result, target;
 	uint32_t result_read[1024];
+	uint32_t result, target;
+	IGT_CORK_FENCE(cork);
 	uint32_t *expected;
 	int fence;
 
@@ -1886,14 +1886,12 @@ static void reorder_wide(int fd, unsigned ring)
 	execbuf.flags |= I915_EXEC_FENCE_IN;
 	execbuf.rsvd2 = fence;
 
-	for (int n = MIN_PRIO, x = 1;
-	     igt_seconds_elapsed(&tv) < 5 && n <= MAX_PRIO;
-	     n++, x++) {
+	for (int n = 0, x = 1; n < ARRAY_SIZE(priorities); n++, x++) {
 		unsigned int sz = ALIGN(ring_size * 64, 4096);
 		uint32_t *batch;
 
 		execbuf.rsvd1 = gem_context_clone_with_engines(fd, 0);
-		gem_context_set_priority(fd, execbuf.rsvd1, n);
+		gem_context_set_priority(fd, execbuf.rsvd1, priorities[n]);
 
 		obj[1].handle = gem_create(fd, sz);
 		batch = gem_mmap__device_coherent(fd, obj[1].handle, 0, sz, PROT_WRITE);
