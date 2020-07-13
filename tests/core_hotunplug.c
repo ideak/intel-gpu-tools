@@ -54,9 +54,11 @@ struct hotunplug {
  * use drm_open_driver() since in case of an i915 device it opens it
  * twice and keeps a second file descriptor open for exit handler use.
  */
-static int local_drm_open_driver(void)
+static int local_drm_open_driver(const char *when, const char *why)
 {
 	int fd_drm;
+
+	igt_debug("%sopening device%s\n", when, why);
 
 	fd_drm = __drm_open_driver(DRIVER_ANY);
 	igt_assert_fd(fd_drm);
@@ -85,8 +87,7 @@ static void prepare_for_unbind(struct hotunplug *priv, char *buf, int buflen)
 
 static void prepare(struct hotunplug *priv, char *buf, int buflen)
 {
-	igt_debug("opening device\n");
-	priv->fd.drm = local_drm_open_driver();
+	priv->fd.drm = local_drm_open_driver("", " for subtest");
 
 	priv->fd.sysfs_dev = igt_sysfs_open(priv->fd.drm);
 	igt_assert_fd(priv->fd.sysfs_dev);
@@ -104,8 +105,11 @@ static void prepare(struct hotunplug *priv, char *buf, int buflen)
 static const char *failure;
 
 /* Unbind the driver from the device */
-static void driver_unbind(int fd_sysfs_drv, const char *dev_bus_addr)
+static void driver_unbind(int fd_sysfs_drv, const char *dev_bus_addr,
+			  const char *prefix)
 {
+	igt_debug("%sunbinding the driver from the device\n", prefix);
+
 	failure = "Driver unbind timeout!";
 	igt_set_timeout(60, failure);
 	igt_sysfs_set(fd_sysfs_drv, "unbind", dev_bus_addr);
@@ -118,6 +122,8 @@ static void driver_unbind(int fd_sysfs_drv, const char *dev_bus_addr)
 /* Re-bind the driver to the device */
 static void driver_bind(int fd_sysfs_drv, const char *dev_bus_addr)
 {
+	igt_debug("rebinding the driver to the device\n");
+
 	failure = "Driver re-bind timeout!";
 	igt_set_timeout(60, failure);
 	igt_sysfs_set(fd_sysfs_drv, "bind", dev_bus_addr);
@@ -128,8 +134,10 @@ static void driver_bind(int fd_sysfs_drv, const char *dev_bus_addr)
 }
 
 /* Remove (virtually unplug) the device from its bus */
-static void device_unplug(int fd_sysfs_dev)
+static void device_unplug(int fd_sysfs_dev, const char *prefix)
 {
+	igt_debug("%sunplugging the device\n", prefix);
+
 	failure = "Device unplug timeout!";
 	igt_set_timeout(60, failure);
 	igt_sysfs_set(fd_sysfs_dev, "device/remove", "1");
@@ -142,6 +150,8 @@ static void device_unplug(int fd_sysfs_dev)
 /* Re-discover the device by rescanning its bus */
 static void bus_rescan(int fd_sysfs_bus)
 {
+	igt_debug("rediscovering the device\n");
+
 	failure = "Bus rescan timeout!";
 	igt_set_timeout(60, failure);
 	igt_sysfs_set(fd_sysfs_bus, "rescan", "1");
@@ -158,9 +168,8 @@ static void healthcheck(void)
 	/* device name may have changed, rebuild IGT device list */
 	igt_devices_scan(true);
 
-	igt_debug("reopening the device\n");
 	failure = "Device reopen failure!";
-	fd_drm = local_drm_open_driver();
+	fd_drm = local_drm_open_driver("re", " for health check");
 	failure = NULL;
 
 	if (is_i915_device(fd_drm)) {
@@ -199,10 +208,8 @@ static void unbind_rebind(void)
 	igt_debug("closing the device\n");
 	close(priv.fd.drm);
 
-	igt_debug("unbinding the driver from the device\n");
-	driver_unbind(priv.fd.sysfs_drv, priv.dev_bus_addr);
+	driver_unbind(priv.fd.sysfs_drv, priv.dev_bus_addr, "");
 
-	igt_debug("rebinding the driver to the device\n");
 	driver_bind(priv.fd.sysfs_drv, priv.dev_bus_addr);
 
 	healthcheck();
@@ -217,10 +224,8 @@ static void unplug_rescan(void)
 	igt_debug("closing the device\n");
 	close(priv.fd.drm);
 
-	igt_debug("unplugging the device\n");
-	device_unplug(priv.fd.sysfs_dev);
+	device_unplug(priv.fd.sysfs_dev, "");
 
-	igt_debug("recovering the device\n");
 	bus_rescan(priv.fd.sysfs_bus);
 
 	healthcheck();
@@ -233,10 +238,8 @@ static void hotunbind_lateclose(void)
 
 	prepare(&priv, buf, sizeof(buf));
 
-	igt_debug("hot unbinding the driver from the device\n");
-	driver_unbind(priv.fd.sysfs_drv, priv.dev_bus_addr);
+	driver_unbind(priv.fd.sysfs_drv, priv.dev_bus_addr, "hot ");
 
-	igt_debug("rebinding the driver to the device\n");
 	driver_bind(priv.fd.sysfs_drv, priv.dev_bus_addr);
 
 	igt_debug("late closing the unbound device instance\n");
@@ -251,10 +254,8 @@ static void hotunplug_lateclose(void)
 
 	prepare(&priv, NULL, 0);
 
-	igt_debug("hot unplugging the device\n");
-	device_unplug(priv.fd.sysfs_dev);
+	device_unplug(priv.fd.sysfs_dev, "hot ");
 
-	igt_debug("recovering the device\n");
 	bus_rescan(priv.fd.sysfs_bus);
 
 	igt_debug("late closing the removed device instance\n");
