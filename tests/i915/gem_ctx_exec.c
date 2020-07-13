@@ -289,6 +289,10 @@ static void nohangcheck_hostile(int i915)
 		igt_spin_t *spin;
 		int new;
 
+		/* Set a fast hang detection for a dead context */
+		gem_engine_property_printf(i915, e->name,
+					   "preempt_timeout_ms", "%d", 50);
+
 		spin = __igt_spin_new(i915, ctx,
 				      .engine = e->flags,
 				      .flags = (IGT_SPIN_NO_PREEMPTION |
