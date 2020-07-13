@@ -53,6 +53,12 @@ struct hotunplug {
 
 /* Helpers */
 
+#define local_debug(fmt, msg...)			       \
+({							       \
+	igt_debug(fmt, msg);				       \
+	igt_kmsg(KMSG_DEBUG "%s: " fmt, igt_test_name(), msg); \
+})
+
 /**
  * Subtests must be able to close examined devices completely.  Don't
  * use drm_open_driver() since in case of an i915 device it opens it
@@ -62,8 +68,8 @@ static int local_drm_open_driver(bool render, const char *when, const char *why)
 {
 	int fd_drm;
 
-	igt_debug("%sopening %s device%s\n", when, render ? "render" : "DRM",
-		  why);
+	local_debug("%sopening %s device%s\n", when, render ? "render" : "DRM",
+		    why);
 
 	fd_drm = render ? __drm_open_driver_render(DRIVER_ANY) :
 			  __drm_open_driver(DRIVER_ANY);
@@ -86,7 +92,7 @@ static int close_device(int fd_drm, const char *when, const char *which)
 	if (fd_drm < 0)	/* not open - return current status */
 		return fd_drm;
 
-	igt_debug("%sclosing %sdevice instance\n", when, which);
+	local_debug("%sclosing %sdevice instance\n", when, which);
 	return local_close(fd_drm, "Device close failed");
 }
 
@@ -128,7 +134,7 @@ static void prepare(struct hotunplug *priv)
 static void driver_unbind(struct hotunplug *priv, const char *prefix,
 			  int timeout)
 {
-	igt_debug("%sunbinding the driver from the device\n", prefix);
+	local_debug("%sunbinding the driver from the device\n", prefix);
 	priv->failure = "Driver unbind failure!";
 
 	igt_set_timeout(timeout, "Driver unbind timeout!");
@@ -144,7 +150,7 @@ static void driver_unbind(struct hotunplug *priv, const char *prefix,
 /* Re-bind the driver to the device */
 static void driver_bind(struct hotunplug *priv, int timeout)
 {
-	igt_debug("rebinding the driver to the device\n");
+	local_debug("%s\n", "rebinding the driver to the device");
 	priv->failure = "Driver re-bind failure!";
 
 	igt_set_timeout(timeout, "Driver re-bind timeout!");
@@ -168,7 +174,7 @@ static void device_unplug(struct hotunplug *priv, const char *prefix,
 				    O_DIRECTORY);
 	igt_assert_fd(priv->fd.sysfs_dev);
 
-	igt_debug("%sunplugging the device\n", prefix);
+	local_debug("%sunplugging the device\n", prefix);
 	priv->failure = "Device unplug failure!";
 
 	igt_set_timeout(timeout, "Device unplug timeout!");
@@ -186,7 +192,7 @@ static void device_unplug(struct hotunplug *priv, const char *prefix,
 /* Re-discover the device by rescanning its bus */
 static void bus_rescan(struct hotunplug *priv, int timeout)
 {
-	igt_debug("rediscovering the device\n");
+	local_debug("%s\n", "rediscovering the device");
 	priv->failure = "Bus rescan failure!";
 
 	igt_set_timeout(timeout, "Bus rescan timeout!");
@@ -241,7 +247,7 @@ static int local_i915_healthcheck(int i915, const char *prefix)
 	if (hang_detected)
 		return -EIO;
 
-	igt_debug("%srunning i915 GPU healthcheck\n", prefix);
+	local_debug("%s%s\n", prefix, "running i915 GPU healthcheck");
 
 	if (local_i915_is_wedged(i915))
 		return -EIO;
@@ -276,7 +282,7 @@ static int local_i915_recover(int i915)
 	if (!local_i915_healthcheck(i915, "re-"))
 		return 0;
 
-	igt_debug("forcing i915 GPU reset\n");
+	local_debug("%s\n", "forcing i915 GPU reset");
 	igt_force_gpu_reset(i915);
 
 	hang_detected = false;
