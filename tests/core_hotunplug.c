@@ -198,68 +198,62 @@ static void set_filter_from_device(int fd)
 
 /* Subtests */
 
-static void unbind_rebind(void)
+static void unbind_rebind(struct hotunplug *priv)
 {
-	struct hotunplug priv;
 	char buf[PATH_MAX];
 
-	prepare(&priv, buf, sizeof(buf));
+	prepare(priv, buf, sizeof(buf));
 
 	igt_debug("closing the device\n");
-	close(priv.fd.drm);
+	close(priv->fd.drm);
 
-	driver_unbind(priv.fd.sysfs_drv, priv.dev_bus_addr, "");
+	driver_unbind(priv->fd.sysfs_drv, priv->dev_bus_addr, "");
 
-	driver_bind(priv.fd.sysfs_drv, priv.dev_bus_addr);
+	driver_bind(priv->fd.sysfs_drv, priv->dev_bus_addr);
 
 	healthcheck();
 }
 
-static void unplug_rescan(void)
+static void unplug_rescan(struct hotunplug *priv)
 {
-	struct hotunplug priv;
-
-	prepare(&priv, NULL, 0);
+	prepare(priv, NULL, 0);
 
 	igt_debug("closing the device\n");
-	close(priv.fd.drm);
+	close(priv->fd.drm);
 
-	device_unplug(priv.fd.sysfs_dev, "");
+	device_unplug(priv->fd.sysfs_dev, "");
 
-	bus_rescan(priv.fd.sysfs_bus);
+	bus_rescan(priv->fd.sysfs_bus);
 
 	healthcheck();
 }
 
-static void hotunbind_lateclose(void)
+static void hotunbind_lateclose(struct hotunplug *priv)
 {
-	struct hotunplug priv;
 	char buf[PATH_MAX];
 
-	prepare(&priv, buf, sizeof(buf));
+	prepare(priv, buf, sizeof(buf));
 
-	driver_unbind(priv.fd.sysfs_drv, priv.dev_bus_addr, "hot ");
+	driver_unbind(priv->fd.sysfs_drv, priv->dev_bus_addr, "hot ");
 
-	driver_bind(priv.fd.sysfs_drv, priv.dev_bus_addr);
+	driver_bind(priv->fd.sysfs_drv, priv->dev_bus_addr);
 
 	igt_debug("late closing the unbound device instance\n");
-	close(priv.fd.drm);
+	close(priv->fd.drm);
 
 	healthcheck();
 }
 
-static void hotunplug_lateclose(void)
+static void hotunplug_lateclose(struct hotunplug *priv)
 {
-	struct hotunplug priv;
+	prepare(priv, NULL, 0);
 
-	prepare(&priv, NULL, 0);
+	device_unplug(priv->fd.sysfs_dev, "hot ");
 
-	device_unplug(priv.fd.sysfs_dev, "hot ");
-
-	bus_rescan(priv.fd.sysfs_bus);
+	bus_rescan(priv->fd.sysfs_bus);
 
 	igt_debug("late closing the removed device instance\n");
-	close(priv.fd.drm);
+	close(priv->fd.drm);
 
 	healthcheck();
 }
@@ -268,6 +262,8 @@ static void hotunplug_lateclose(void)
 
 igt_main
 {
+	struct hotunplug priv;
+
 	igt_fixture {
 		int fd_drm;
 
@@ -287,28 +283,28 @@ igt_main
 
 	igt_describe("Check if the driver can be cleanly unbound from a device believed to be closed");
 	igt_subtest("unbind-rebind")
-		unbind_rebind();
+		unbind_rebind(&priv);
 
 	igt_fixture
 		igt_abort_on_f(failure, "%s\n", failure);
 
 	igt_describe("Check if a device believed to be closed can be cleanly unplugged");
 	igt_subtest("unplug-rescan")
-		unplug_rescan();
+		unplug_rescan(&priv);
 
 	igt_fixture
 		igt_abort_on_f(failure, "%s\n", failure);
 
 	igt_describe("Check if the driver can be cleanly unbound from a still open device, then released");
 	igt_subtest("hotunbind-lateclose")
-		hotunbind_lateclose();
+		hotunbind_lateclose(&priv);
 
 	igt_fixture
 		igt_abort_on_f(failure, "%s\n", failure);
 
 	igt_describe("Check if a still open device can be cleanly unplugged, then released");
 	igt_subtest("hotunplug-lateclose")
-		hotunplug_lateclose();
+		hotunplug_lateclose(&priv);
 
 	igt_fixture
 		igt_abort_on_f(failure, "%s\n", failure);
