@@ -1479,7 +1479,7 @@ static void preempt_queue(int fd, unsigned ring, unsigned int flags)
 	const struct intel_execution_engine2 *e;
 
 	__for_each_physical_engine(fd, e) {
-		for (unsigned depth = 0; depth <= MAX_ELSP_QLEN; depth++)
+		for (unsigned depth = 1; depth <= MAX_ELSP_QLEN; depth *= 2)
 			__preempt_queue(fd, ring, e->flags, depth, flags);
 	}
 }
