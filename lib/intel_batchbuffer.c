@@ -50,6 +50,7 @@
 #include "igt_aux.h"
 #include "igt_rand.h"
 #include "i830_reg.h"
+#include "huc_copy.h"
 
 #include <i915_drm.h>
 
@@ -2124,4 +2125,23 @@ void intel_bb_blt_copy(struct intel_bb *ibb,
 			       width, height, bpp);
 	intel_bb_emit_bbe(ibb);
 	intel_bb_flush_blit(ibb);
+}
+
+/**
+ * igt_get_huc_copyfunc:
+ * @devid: pci device id
+ *
+ * Returns:
+ *
+ * The platform-specific huc copy function pointer for the device specified
+ * with @devid. Will return NULL when no media spin function is implemented.
+ */
+igt_huc_copyfunc_t igt_get_huc_copyfunc(int devid)
+{
+	igt_huc_copyfunc_t copy = NULL;
+
+	if (IS_GEN12(devid) || IS_GEN11(devid) || IS_GEN9(devid))
+		copy = gen9_huc_copyfunc;
+
+	return copy;
 }

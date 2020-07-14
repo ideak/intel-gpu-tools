@@ -90,6 +90,8 @@ lib_source_list =	 	\
 	ioctl_wrappers.h	\
 	media_fill.c		\
 	media_fill.h            \
+	huc_copy.c		\
+	huc_copy.h		\
 	media_spin.h		\
 	media_spin.c		\
 	gpgpu_fill.h		\

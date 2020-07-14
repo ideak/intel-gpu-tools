@@ -1,5 +1,6 @@
 lib_sources = [
 	'drmtest.c',
+	'huc_copy.c',
 	'i915/gem.c',
 	'i915/gem_context.c',
 	'i915/gem_engine_topology.c',

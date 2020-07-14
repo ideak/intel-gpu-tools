@@ -601,4 +601,23 @@ void intel_bb_blt_copy(struct intel_bb *ibb,
 		       struct intel_buf *dst,
 		       int dst_x1, int dst_y1, int dst_pitch,
 		       int width, int height, int bpp);
+
+/**
+ * igt_huc_copyfunc_t:
+ * @fd: drm fd
+ * @obj: drm_i915_gem_exec_object2 buffer array
+ *       obj[0] is source buffer
+ *       obj[1] is destination buffer
+ *       obj[2] is execution buffer
+ *
+ * This is the type of the per-platform huc copy functions.
+ *
+ * The huc copy function emits a batchbuffer to the VDBOX engine to
+ * invoke the HuC Copy kernel to copy 4K bytes from the source buffer
+ * to the destination buffer.
+ */
+typedef void (*igt_huc_copyfunc_t)(int fd,
+		struct drm_i915_gem_exec_object2 *obj);
+
+igt_huc_copyfunc_t	igt_get_huc_copyfunc(int devid);
 #endif

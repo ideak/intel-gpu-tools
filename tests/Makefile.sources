@@ -323,6 +323,9 @@ gem_media_fill_SOURCES = i915/gem_media_fill.c
 TESTS_progs += gem_media_vme
 gem_media_vme_SOURCES = i915/gem_media_vme.c
 
+TESTS_progs += gem_huc_copy
+gem_huc_copy_SOURCES = i915/gem_huc_copy.c
+
 TESTS_progs += gem_mmap
 gem_mmap_SOURCES = i915/gem_mmap.c
 
