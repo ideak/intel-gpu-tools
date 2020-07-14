@@ -247,7 +247,8 @@ get_blob(data_t *data, igt_pipe_t *pipe, enum igt_atomic_crtc_properties prop)
 
 bool crc_equal(igt_crc_t *a, igt_crc_t *b)
 {
-	return memcmp(a->crc, b->crc, sizeof(a->crc[0]) * a->n_words) == 0;
+	return igt_skip_crc_compare ||
+		memcmp(a->crc, b->crc, sizeof(a->crc[0]) * a->n_words) == 0;
 }
 
 int
