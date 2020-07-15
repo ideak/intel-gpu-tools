@@ -127,7 +127,9 @@ static void driver_unbind(struct hotunplug *priv, const char *prefix,
 	priv->failure = "Driver unbind failure!";
 
 	igt_set_timeout(timeout, "Driver unbind timeout!");
-	igt_sysfs_set(priv->fd.sysfs_drv, "unbind", priv->dev_bus_addr);
+	igt_assert_f(igt_sysfs_set(priv->fd.sysfs_drv, "unbind",
+				   priv->dev_bus_addr),
+		     "Driver unbind failure!\n");
 	igt_reset_timeout();
 }
 
@@ -138,7 +140,9 @@ static void driver_bind(struct hotunplug *priv, int timeout)
 	priv->failure = "Driver re-bind failure!";
 
 	igt_set_timeout(timeout, "Driver re-bind timeout!");
-	igt_sysfs_set(priv->fd.sysfs_drv, "bind", priv->dev_bus_addr);
+	igt_assert_f(igt_sysfs_set(priv->fd.sysfs_drv, "bind",
+				   priv->dev_bus_addr),
+		     "Driver re-bind failure\n!");
 	igt_reset_timeout();
 }
 
@@ -156,7 +160,8 @@ static void device_unplug(struct hotunplug *priv, const char *prefix,
 	priv->failure = "Device unplug failure!";
 
 	igt_set_timeout(timeout, "Device unplug timeout!");
-	igt_sysfs_set(priv->fd.sysfs_dev, "remove", "1");
+	igt_assert_f(igt_sysfs_set(priv->fd.sysfs_dev, "remove", "1"),
+		     "Device unplug failure\n!");
 	igt_reset_timeout();
 
 	priv->fd.sysfs_dev = close_sysfs(priv->fd.sysfs_dev);
@@ -170,7 +175,8 @@ static void bus_rescan(struct hotunplug *priv, int timeout)
 	priv->failure = "Bus rescan failure!";
 
 	igt_set_timeout(timeout, "Bus rescan timeout!");
-	igt_sysfs_set(priv->fd.sysfs_bus, "../rescan", "1");
+	igt_assert_f(igt_sysfs_set(priv->fd.sysfs_bus, "../rescan", "1"),
+		       "Bus rescan failure!\n");
 	igt_reset_timeout();
 }
 
