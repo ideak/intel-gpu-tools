@@ -193,7 +193,7 @@ static void set_filter_from_device(int fd)
 	igt_assert(realpath(path, dst));
 
 	igt_device_filter_free_all();
-	igt_device_filter_add(filter);
+	igt_assert_eq(igt_device_filter_add(filter), 1);
 }
 
 /* Subtests */
