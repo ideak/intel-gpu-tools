@@ -28,7 +28,7 @@ igt@gem_flink_basic@bad-open
 igt@gem_flink_basic@basic
 igt@gem_flink_basic@double-flink
 igt@gem_flink_basic@flink-lifetime
-igt@gem_huc_copy@huc_copy
+igt@gem_huc_copy@huc-copy
 igt@gem_linear_blits@basic
 igt@gem_mmap@basic
 igt@gem_mmap_gtt@basic
