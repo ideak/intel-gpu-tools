@@ -3548,7 +3548,7 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 
 /**
  * igt_get_cairo_ctx:
- * @fd: open i915 drm file descriptor
+ * @fd: open drm file descriptor
  * @fb: pointer to an #igt_fb structure
  *
  * This initializes a cairo surface for @fb and then allocates a drawing context
@@ -3594,7 +3594,7 @@ void igt_put_cairo_ctx(cairo_t *cr)
 
 /**
  * igt_remove_fb:
- * @fd: open i915 drm file descriptor
+ * @fd: open drm file descriptor
  * @fb: pointer to an #igt_fb structure
  *
  * This function releases all resources allocated in igt_create_fb() for @fb.
