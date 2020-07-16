@@ -163,7 +163,8 @@ static void test_lpsp(data_t *data)
 		    data->mode->vdisplay <= 2160);
 
 	setup_lpsp_output(data);
-	igt_assert_f(lpsp_is_enabled(data), "%s: lpsp is not enabled\n%s:\n%s\n",
+	igt_assert_f(igt_wait(lpsp_is_enabled(data), 1000, 100),
+		     "%s: lpsp is not enabled\n%s:\n%s\n",
 		     data->output->name, PWR_DOMAIN_INFO, data->pwr_dmn_info =
 		     igt_sysfs_get(data->debugfs_fd, PWR_DOMAIN_INFO));
 }
