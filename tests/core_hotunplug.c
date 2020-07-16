@@ -261,7 +261,7 @@ static void set_filter_from_device(int fd)
 	char path[PATH_MAX + 1];
 
 	igt_assert(igt_sysfs_path(fd, path, PATH_MAX));
-	strncat(path, "/device", PATH_MAX - strlen(path));
+	igt_ignore_warn(strncat(path, "/device", PATH_MAX - strlen(path)));
 	igt_assert(realpath(path, dst));
 
 	igt_device_filter_free_all();
@@ -398,7 +398,7 @@ igt_main
 	igt_fixture {
 		post_healthcheck(&priv);
 
-		close(priv.fd.sysfs_bus);
-		close(priv.fd.sysfs_drv);
+		igt_ignore_warn(close(priv.fd.sysfs_bus));
+		igt_ignore_warn(close(priv.fd.sysfs_drv));
 	}
 }
