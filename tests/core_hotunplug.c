@@ -111,7 +111,6 @@ static void prepare(struct hotunplug *priv)
 	igt_assert_fd(priv->fd.sysfs_bus);
 
 	priv->fd.sysfs_dev = close_sysfs(priv->fd.sysfs_dev);
-	igt_assert_eq(priv->fd.sysfs_dev, -1);
 }
 
 /* Unbind the driver from the device */
@@ -141,7 +140,8 @@ static void driver_bind(struct hotunplug *priv)
 /* Remove (virtually unplug) the device from its bus */
 static void device_unplug(struct hotunplug *priv, const char *prefix)
 {
-	igt_assert_eq(priv->fd.sysfs_dev, -1);
+	igt_require(priv->fd.sysfs_dev == -1);
+
 	priv->fd.sysfs_dev = openat(priv->fd.sysfs_bus, priv->dev_bus_addr,
 				    O_DIRECTORY);
 	igt_assert_fd(priv->fd.sysfs_dev);
@@ -200,7 +200,6 @@ static void post_healthcheck(struct hotunplug *priv)
 	igt_abort_on_f(priv->failure, "%s\n", priv->failure);
 
 	igt_require(priv->fd.drm == -1);
-	igt_require(priv->fd.sysfs_dev == -1);
 }
 
 static void set_filter_from_device(int fd)
