@@ -158,6 +158,7 @@ static void device_unplug(struct hotunplug *priv, const char *prefix)
 	igt_reset_timeout();
 
 	priv->fd.sysfs_dev = close_sysfs(priv->fd.sysfs_dev);
+	igt_assert_eq(priv->fd.sysfs_dev, -1);
 }
 
 /* Re-discover the device by rescanning its bus */
@@ -279,6 +280,7 @@ static void hotunbind_lateclose(struct hotunplug *priv)
 	driver_bind(priv);
 
 	priv->fd.drm = close_device(priv->fd.drm, "late ", "unbound ");
+	igt_assert_eq(priv->fd.drm, -1);
 
 	healthcheck(priv);
 }
@@ -293,6 +295,7 @@ static void hotunplug_lateclose(struct hotunplug *priv)
 	bus_rescan(priv);
 
 	priv->fd.drm = close_device(priv->fd.drm, "late ", "removed ");
+	igt_assert_eq(priv->fd.drm, -1);
 
 	healthcheck(priv);
 }
