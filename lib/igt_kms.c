@@ -1873,6 +1873,23 @@ void igt_display_reset(igt_display_t *display)
 static void igt_fill_plane_format_mod(igt_display_t *display, igt_plane_t *plane);
 static void igt_fill_display_format_mod(igt_display_t *display);
 
+/*
+ * igt_require_pipe:
+ * @display: pointer to igt_display_t
+ * @pipe: pipe which need to check
+ *
+ * Skip a (sub-)test if the pipe not enabled.
+ *
+ * Should be used everywhere where a test checks pipe and skip
+ * test when pipe is not enabled.
+ */
+void igt_require_pipe(igt_display_t *display, enum pipe pipe)
+{
+	igt_skip_on_f(!display->pipes[pipe].enabled,
+			"Pipe %s does not exist or not enabled\n",
+			kmstest_pipe_name(pipe));
+}
+
 /* Get crtc mask for a pipe using crtc id */
 static int
 __get_crtc_mask_for_pipe(drmModeRes *resources, igt_pipe_t *pipe)

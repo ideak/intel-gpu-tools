@@ -858,4 +858,17 @@ int igt_connector_sysfs_open(int drm_fd,
 			     drmModeConnector *connector);
 uint32_t igt_reduce_format(uint32_t format);
 
+/*
+ * igt_require_pipe:
+ * @display: pointer to igt_display_t
+ * @pipe: pipe which need to check
+ *
+ * Skip a (sub-)test if the pipe not enabled.
+ *
+ * Should be used everywhere where a test checks pipe and skip
+ * test when pipe is not enabled.
+ */
+void igt_require_pipe(igt_display_t *display,
+		enum pipe pipe);
+
 #endif /* __IGT_KMS_H__ */
