@@ -1983,6 +1983,8 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 		/* pipe is enabled/disabled */
 		pipe->enabled = true;
 		pipe->crtc_id = resources->crtcs[i];
+		/* offset of a pipe in crtcs list */
+		pipe->crtc_offset = i;
 	}
 
 	drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
@@ -4131,18 +4133,27 @@ void igt_pipe_request_out_fence(igt_pipe_t *pipe)
 /**
  * igt_wait_for_vblank_count:
  * @drm_fd: A drm file descriptor
- * @pipe: Pipe to wait_for_vblank on
+ * @crtc_offset: offset of the crtc in drmModeRes.crtcs
  * @count: Number of vblanks to wait on
  *
  * Waits for a given number of vertical blank intervals
+ *
+ * In DRM, 'Pipe', as understood by DRM_IOCTL_WAIT_VBLANK,
+ * is actually an offset of crtc in drmModeRes.crtcs
+ * and it has nothing to do with a hardware concept of a pipe.
+ * They can match but don't have to in case of DRM lease or
+ * non-contiguous pipes.
+ *
+ * To make thing clear we are calling DRM_IOCTL_WAIT_VBLANK's 'pipe'
+ * a crtc_offset.
  */
-void igt_wait_for_vblank_count(int drm_fd, enum pipe pipe, int count)
+void igt_wait_for_vblank_count(int drm_fd, int crtc_offset, int count)
 {
 	drmVBlank wait_vbl;
 	uint32_t pipe_id_flag;
 
 	memset(&wait_vbl, 0, sizeof(wait_vbl));
-	pipe_id_flag = kmstest_get_vbl_flag(pipe);
+	pipe_id_flag = kmstest_get_vbl_flag(crtc_offset);
 
 	wait_vbl.request.type = DRM_VBLANK_RELATIVE;
 	wait_vbl.request.type |= pipe_id_flag;
@@ -4154,13 +4165,15 @@ void igt_wait_for_vblank_count(int drm_fd, enum pipe pipe, int count)
 /**
  * igt_wait_for_vblank:
  * @drm_fd: A drm file descriptor
- * @pipe: Pipe to wait_for_vblank on
+ * @crtc_offset: offset of a crtc in drmModeRes.crtcs
+ *
+ * See #igt_wait_for_vblank_count for more details
  *
  * Waits for 1 vertical blank intervals
  */
-void igt_wait_for_vblank(int drm_fd, enum pipe pipe)
+void igt_wait_for_vblank(int drm_fd, int crtc_offset)
 {
-	igt_wait_for_vblank_count(drm_fd, pipe, 1);
+	igt_wait_for_vblank_count(drm_fd, crtc_offset, 1);
 }
 
 /**
@@ -4383,22 +4396,27 @@ void igt_cleanup_uevents(struct udev_monitor *mon)
 
 /**
  * kmstest_get_vbl_flag:
- * @pipe_id: Pipe to convert to flag representation.
+ * @crtc_offset: CRTC offset to convert into pipe flag representation.
  *
- * Convert a pipe id into the flag representation
- * expected in DRM while processing DRM_IOCTL_WAIT_VBLANK.
+ * Convert an offset of an crtc in drmModeRes.crtcs into flag representation
+ * expected by DRM_IOCTL_WAIT_VBLANK.
+ * See #igt_wait_for_vblank_count for details
  */
-uint32_t kmstest_get_vbl_flag(uint32_t pipe_id)
+uint32_t kmstest_get_vbl_flag(int crtc_offset)
 {
-	if (pipe_id == 0)
-		return 0;
-	else if (pipe_id == 1)
-		return _DRM_VBLANK_SECONDARY;
+	uint32_t pipe_id;
+
+	if (crtc_offset == 0)
+		pipe_id = 0;
+	else if (crtc_offset == 1)
+		pipe_id = _DRM_VBLANK_SECONDARY;
 	else {
-		uint32_t pipe_flag = pipe_id << 1;
+		uint32_t pipe_flag = crtc_offset << 1;
 		igt_assert(!(pipe_flag & ~DRM_VBLANK_HIGH_CRTC_MASK));
-		return pipe_flag;
+		pipe_id = pipe_flag;
 	}
+
+	return pipe_id;
 }
 
 static inline const uint32_t *

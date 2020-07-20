@@ -338,8 +338,15 @@ typedef struct igt_plane {
 	int format_mod_count;
 } igt_plane_t;
 
+/*
+ * This struct represents a hardware pipe
+ *
+ * DRM_IOCTL_WAIT_VBLANK notion of pipe is confusing and we are using
+ * crtc_offset instead (refer people to #igt_wait_for_vblank_count)
+ */
 struct igt_pipe {
 	igt_display_t *display;
+	/* ID of a hardware pipe */
 	enum pipe pipe;
 	/* pipe is enabled or not */
 	bool enabled;
@@ -353,7 +360,10 @@ struct igt_pipe {
 	uint32_t props[IGT_NUM_CRTC_PROPS];
 	uint64_t values[IGT_NUM_CRTC_PROPS];
 
+	/* ID of KMS CRTC object */
 	uint32_t crtc_id;
+	/* offset of a pipe in drmModeRes.crtcs */
+	uint32_t crtc_offset;
 
 	int32_t out_fence_fd;
 };
@@ -448,8 +458,8 @@ void igt_fb_set_position(struct igt_fb *fb, igt_plane_t *plane,
 void igt_fb_set_size(struct igt_fb *fb, igt_plane_t *plane,
 	uint32_t w, uint32_t h);
 
-void igt_wait_for_vblank(int drm_fd, enum pipe pipe);
-void igt_wait_for_vblank_count(int drm_fd, enum pipe pipe, int count);
+void igt_wait_for_vblank(int drm_fd, int crtc_offset);
+void igt_wait_for_vblank_count(int drm_fd, int crtc_offset, int count);
 
 static inline bool igt_output_is_connected(igt_output_t *output)
 {
@@ -769,7 +779,7 @@ void igt_pipe_refresh(igt_display_t *display, enum pipe pipe, bool force);
 void igt_enable_connectors(int drm_fd);
 void igt_reset_connectors(void);
 
-uint32_t kmstest_get_vbl_flag(uint32_t pipe_id);
+uint32_t kmstest_get_vbl_flag(int crtc_offset);
 
 const struct edid *igt_kms_get_base_edid(void);
 const struct edid *igt_kms_get_alt_edid(void);
