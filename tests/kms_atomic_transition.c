@@ -738,8 +738,8 @@ static void collect_crcs_mask(igt_pipe_crc_t **pipe_crcs, unsigned mask, igt_crc
 static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblocking, bool fencing)
 {
 	struct igt_fb fbs[2];
-	int i, j;
-	unsigned iter_max = 1 << display->n_pipes;
+	int i, j = 0;
+	unsigned iter_max;
 	igt_pipe_crc_t *pipe_crcs[IGT_MAX_PIPES] = { 0 };
 	igt_output_t *output;
 	unsigned width = 0, height = 0;
@@ -764,6 +764,9 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 		igt_plane_t *plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 		drmModeModeInfo *mode = NULL;
 
+		/* count enable pipes to set max iteration */
+		j += 1;
+
 		if (is_i915_device(display->drm_fd))
 			pipe_crcs[i] = igt_pipe_crc_new(display->drm_fd, i, INTEL_PIPE_CRC_SOURCE_AUTO);
 
@@ -786,6 +789,8 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 		} else
 			igt_plane_set_fb(plane, NULL);
 	}
+
+	iter_max = 1 << j;
 
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
