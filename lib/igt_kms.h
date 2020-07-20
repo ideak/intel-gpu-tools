@@ -341,6 +341,8 @@ typedef struct igt_plane {
 struct igt_pipe {
 	igt_display_t *display;
 	enum pipe pipe;
+	/* pipe is enabled or not */
+	bool enabled;
 
 	int n_planes;
 	int plane_cursor;
@@ -510,8 +512,9 @@ static inline bool igt_output_is_connected(igt_output_t *output)
  * depends upon runtime probing of the actual kms driver that is being tested.
  * Use #for_each_pipe_static instead.
  */
-#define for_each_pipe(display, pipe)					\
-	for (pipe = 0; assert(igt_can_fail()), pipe < igt_display_get_n_pipes(display); pipe++)
+#define for_each_pipe(display, pipe) \
+	for_each_pipe_static(pipe) \
+		for_each_if((display)->pipes[(pipe)].enabled)
 
 /**
  * for_each_pipe_with_valid_output:
@@ -530,8 +533,9 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 	for (int con__ = (pipe) = 0; \
 	     assert(igt_can_fail()), (pipe) < igt_display_get_n_pipes((display)) && con__ < (display)->n_outputs; \
 	     con__ = (con__ + 1 < (display)->n_outputs) ? con__ + 1 : (pipe = pipe + 1, 0)) \
-		for_each_if ((((output) = &(display)->outputs[con__]), \
-			     igt_pipe_connector_valid((pipe), (output))))
+		 for_each_if((display)->pipes[pipe].enabled) \
+			for_each_if ((((output) = &(display)->outputs[con__]), \
+						igt_pipe_connector_valid((pipe), (output))))
 
 igt_output_t **__igt_pipe_populate_outputs(igt_display_t *display,
 					   igt_output_t **chosen_outputs);
@@ -549,7 +553,7 @@ igt_output_t **__igt_pipe_populate_outputs(igt_display_t *display,
 #define for_each_pipe_with_single_output(display, pipe, output) \
 	for (igt_output_t *__outputs[(display)->n_pipes], \
 	     **__output = __igt_pipe_populate_outputs((display), __outputs); \
-	     __output < &__outputs[(display)->n_pipes]; __output++) \
+		 __output < &__outputs[(display)->n_pipes]; __output++) \
 		for_each_if (*__output && \
 			     ((pipe) = (__output - __outputs), (output) = *__output, 1))
 

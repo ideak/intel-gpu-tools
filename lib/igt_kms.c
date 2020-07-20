@@ -1873,6 +1873,21 @@ void igt_display_reset(igt_display_t *display)
 static void igt_fill_plane_format_mod(igt_display_t *display, igt_plane_t *plane);
 static void igt_fill_display_format_mod(igt_display_t *display);
 
+/* Get crtc mask for a pipe using crtc id */
+static int
+__get_crtc_mask_for_pipe(drmModeRes *resources, igt_pipe_t *pipe)
+{
+	int offset;
+
+	for (offset = 0; offset < resources->count_crtcs; offset++)
+	{
+		if(pipe->crtc_id == resources->crtcs[offset])
+			break;
+	}
+
+	return (1 << offset);
+}
+
 /**
  * igt_display_require:
  * @display: a pointer to an #igt_display_t structure
@@ -1889,12 +1904,14 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 	drmModeRes *resources;
 	drmModePlaneRes *plane_resources;
 	int i;
+	bool is_i915_dev;
 
 	memset(display, 0, sizeof(igt_display_t));
 
 	LOG_INDENT(display, "init");
 
 	display->drm_fd = drm_fd;
+	is_i915_dev = is_i915_device(drm_fd);
 
 	resources = drmModeGetResources(display->drm_fd);
 	if (!resources)
@@ -1918,12 +1935,38 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 #endif
 
 	/*
-	 * We cache the number of pipes, that number is a physical limit of the
-	 * hardware and cannot change of time (for now, at least).
+	 * With non-contiguous pipes display, crtc mapping is not always same
+	 * as pipe mapping, In i915 pipe is enum id of i915's crtc object.
+	 * hence allocating upper bound igt_pipe array to support non-contiguos
+	 * pipe display and reading pipe enum for a crtc using GET_PIPE_FROM_CRTC_ID ioctl
+	 * for a pipe to do pipe ordering with respect to crtc list.
 	 */
-	display->n_pipes = resources->count_crtcs;
+	display->n_pipes = IGT_MAX_PIPES;
 	display->pipes = calloc(sizeof(igt_pipe_t), display->n_pipes);
 	igt_assert_f(display->pipes, "Failed to allocate memory for %d pipes\n", display->n_pipes);
+
+	for (i = 0; i < resources->count_crtcs; i++) {
+		igt_pipe_t *pipe;
+
+		if (is_i915_dev) {
+			struct drm_i915_get_pipe_from_crtc_id get_pipe;
+
+			get_pipe.pipe = 0;
+			get_pipe.crtc_id =  resources->crtcs[i];
+			do_ioctl(display->drm_fd,
+					DRM_IOCTL_I915_GET_PIPE_FROM_CRTC_ID, &get_pipe);
+			pipe = &display->pipes[get_pipe.pipe];
+			pipe->pipe = get_pipe.pipe;
+		}
+		else {
+			pipe = &display->pipes[i];
+			pipe->pipe = i;
+		}
+
+		/* pipe is enabled/disabled */
+		pipe->enabled = true;
+		pipe->crtc_id = resources->crtcs[i];
+	}
 
 	drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 	if (drmSetClientCap(drm_fd, DRM_CLIENT_CAP_ATOMIC, 1) == 0)
@@ -1955,25 +1998,26 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 	for_each_pipe(display, i) {
 		igt_pipe_t *pipe = &display->pipes[i];
 		igt_plane_t *plane;
-		int p = 1;
+		int p = 1, crtc_mask = 0;
 		int j, type;
 		uint8_t last_plane = 0, n_planes = 0;
 
-		pipe->crtc_id = resources->crtcs[i];
 		pipe->display = display;
-		pipe->pipe = i;
 		pipe->plane_cursor = -1;
 		pipe->plane_primary = -1;
 		pipe->planes = NULL;
 
 		igt_fill_pipe_props(display, pipe, IGT_NUM_CRTC_PROPS, igt_crtc_prop_names);
 
+		/* Get valid crtc index from crtcs for a pipe */
+		crtc_mask = __get_crtc_mask_for_pipe(resources, pipe);
+
 		/* count number of valid planes */
 		for (j = 0; j < display->n_planes; j++) {
 			drmModePlane *drm_plane = display->planes[j].drm_plane;
 			igt_assert(drm_plane);
 
-			if (drm_plane->possible_crtcs & (1 << i))
+			if (drm_plane->possible_crtcs & crtc_mask)
 				n_planes++;
 		}
 
@@ -1987,7 +2031,7 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 			igt_plane_t *global_plane = &display->planes[j];
 			drmModePlane *drm_plane = global_plane->drm_plane;
 
-			if (!(drm_plane->possible_crtcs & (1 << i)))
+			if (!(drm_plane->possible_crtcs & crtc_mask))
 				continue;
 
 			type = global_plane->type;
@@ -2409,11 +2453,17 @@ static bool output_is_internal_panel(igt_output_t *output)
 
 igt_output_t **__igt_pipe_populate_outputs(igt_display_t *display, igt_output_t **chosen_outputs)
 {
-	unsigned full_pipe_mask = (1 << (display->n_pipes)) - 1, assigned_pipes = 0;
+	unsigned full_pipe_mask, assigned_pipes = 0;
 	igt_output_t *output;
 	int i, j;
 
 	memset(chosen_outputs, 0, sizeof(*chosen_outputs) * display->n_pipes);
+
+	for (i = 0; i < display->n_pipes; i++) {
+		igt_pipe_t *pipe = &display->pipes[i];
+		if (pipe->enabled)
+			full_pipe_mask |= (1 << i);
+	}
 
 	/*
 	 * Try to assign all outputs to the first available CRTC for
