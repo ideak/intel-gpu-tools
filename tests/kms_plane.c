@@ -593,8 +593,12 @@ static void capture_format_crcs(data_t *data, enum pipe pipe,
 			igt_display_commit2(&data->display, COMMIT_UNIVERSAL);
 
 			/* setplane for the cursor does not block */
-			if (plane->type == DRM_PLANE_TYPE_CURSOR)
-				igt_wait_for_vblank(data->drm_fd, pipe);
+			if (plane->type == DRM_PLANE_TYPE_CURSOR) {
+				igt_display_t *display = &data->display;
+
+				igt_wait_for_vblank(data->drm_fd,
+						display->pipes[pipe].crtc_offset);
+			}
 		}
 
 		igt_remove_fb(data->drm_fd, &old_fb);

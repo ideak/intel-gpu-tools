@@ -200,7 +200,8 @@ static void do_single_test(data_t *data, int x, int y)
 	igt_display_commit(display);
 
 	/* Extra vblank wait is because nonblocking cursor ioctl */
-	igt_wait_for_vblank(data->drm_fd, data->pipe);
+	igt_wait_for_vblank(data->drm_fd,
+			display->pipes[data->pipe].crtc_offset);
 	igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc);
 
 	if (data->flags & (TEST_DPMS | TEST_SUSPEND)) {
@@ -239,7 +240,8 @@ static void do_single_test(data_t *data, int x, int y)
 	igt_display_commit(display);
 	igt_dirty_fb(data->drm_fd, &data->primary_fb[FRONTBUFFER]);
 	/* Extra vblank wait is because nonblocking cursor ioctl */
-	igt_wait_for_vblank(data->drm_fd, data->pipe);
+	igt_wait_for_vblank(data->drm_fd,
+			display->pipes[data->pipe].crtc_offset);
 
 	igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &ref_crc);
 	igt_assert_crc_equal(&crc, &ref_crc);
@@ -499,7 +501,8 @@ static void test_cursor_alpha(data_t *data, double a)
 	/* Hardware Test - enable cursor and get PF CRC */
 	cursor_enable(data);
 	igt_display_commit(display);
-	igt_wait_for_vblank(data->drm_fd, data->pipe);
+	igt_wait_for_vblank(data->drm_fd,
+			display->pipes[data->pipe].crtc_offset);
 	igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc);
 
 	cursor_disable(data);
@@ -511,7 +514,8 @@ static void test_cursor_alpha(data_t *data, double a)
 	igt_put_cairo_ctx(cr);
 
 	igt_display_commit(display);
-	igt_wait_for_vblank(data->drm_fd, data->pipe);
+	igt_wait_for_vblank(data->drm_fd,
+			display->pipes[data->pipe].crtc_offset);
 	igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &ref_crc);
 
 	/* Compare CRC from Hardware/Software tests */
@@ -618,7 +622,8 @@ static void test_cursor_size(data_t *data)
 		igt_plane_set_size(data->cursor, size, size);
 		igt_fb_set_size(&data->fb, data->cursor, size, size);
 		igt_display_commit(display);
-		igt_wait_for_vblank(data->drm_fd, data->pipe);
+		igt_wait_for_vblank(data->drm_fd,
+				display->pipes[data->pipe].crtc_offset);
 		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc[i]);
 	}
 	cursor_disable(data);
@@ -632,7 +637,8 @@ static void test_cursor_size(data_t *data)
 		igt_put_cairo_ctx(cr);
 
 		igt_display_commit(display);
-		igt_wait_for_vblank(data->drm_fd, data->pipe);
+		igt_wait_for_vblank(data->drm_fd,
+				display->pipes[data->pipe].crtc_offset);
 		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &ref_crc);
 		/* Clear screen afterwards */
 		cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb[FRONTBUFFER]);

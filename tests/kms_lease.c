@@ -182,7 +182,7 @@ static int prepare_crtc(lease_t *lease, uint32_t connector_id, uint32_t crtc_id)
 	if (ret)
 		return ret;
 
-	igt_wait_for_vblank(lease->fd, pipe);
+	igt_wait_for_vblank(lease->fd, display->pipes[pipe].crtc_offset);
 
 	lease->output = output;
 	lease->mode = mode;
@@ -320,6 +320,8 @@ static void page_flip_implicit_plane(data_t *data)
 	drmModePlaneRes *plane_resources;
 	uint32_t wrong_plane_id = 0;
 	int i;
+	enum pipe pipe;
+	igt_display_t *display;
 
 	/* find a plane which isn't the primary one for us */
 	plane_resources = drmModeGetPlaneResources(data->master.fd);
@@ -350,9 +352,13 @@ static void page_flip_implicit_plane(data_t *data)
 	do_or_die(drmModePageFlip(data->master.fd, data->crtc_id,
 			      data->master.primary_fb.fb_id,
 			      0, NULL));
+
+	display = &data->master.display;
+	pipe = crtc_id_to_pipe(display, data->crtc_id);
+
 	igt_wait_for_vblank_count(data->master.fd,
-				  crtc_id_to_pipe(&data->master.display, data->crtc_id),
-				  1);
+			display->pipes[pipe].crtc_offset, 1);
+
 	do_or_die(drmModePageFlip(mcl.fd, data->crtc_id,
 			      data->master.primary_fb.fb_id,
 			      0, NULL));
@@ -361,9 +367,11 @@ static void page_flip_implicit_plane(data_t *data)
 	object_ids[mcl.object_count++] = wrong_plane_id;
 	do_or_die(create_lease(data->master.fd, &mcl));
 
+	pipe = crtc_id_to_pipe(display, data->crtc_id);
+
 	igt_wait_for_vblank_count(data->master.fd,
-				  crtc_id_to_pipe(&data->master.display, data->crtc_id),
-				  1);
+			display->pipes[pipe].crtc_offset, 1);
+
 	igt_assert_eq(drmModePageFlip(mcl.fd, data->crtc_id,
 				      data->master.primary_fb.fb_id,
 				      0, NULL),

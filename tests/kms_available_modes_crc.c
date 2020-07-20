@@ -285,6 +285,7 @@ test_one_mode(data_t* data, igt_output_t *output, igt_plane_t* plane,
 	igt_crc_t current_crc;
 	signed rVal = 0;
 	int i;
+	igt_display_t *display = &data->display;
 
 	/*
 	 * Limit tests only to those fb formats listed in fillers table
@@ -304,7 +305,8 @@ test_one_mode(data_t* data, igt_output_t *output, igt_plane_t* plane,
 		igt_fb_set_position(&data->fb, plane, 0, 0);
 		igt_display_commit2(&data->display, data->commit);
 
-		igt_wait_for_vblank(data->gfx_fd, pipe);
+		igt_wait_for_vblank(data->gfx_fd,
+				display->pipes[pipe].crtc_offset);
 		igt_pipe_crc_get_current(data->gfx_fd, data->pipe_crc, &current_crc);
 
 		if (plane->type != DRM_PLANE_TYPE_CURSOR) {

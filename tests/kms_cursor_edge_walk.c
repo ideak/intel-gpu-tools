@@ -84,6 +84,7 @@ static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 static void cursor_move(data_t *data, int x, int y, int i)
 {
 	int crtc_id = data->output->config.crtc->crtc_id;
+	igt_display_t *display = &data->display;
 
 	igt_debug("[%d] x=%d, y=%d\n", i, x, y);
 
@@ -95,7 +96,8 @@ static void cursor_move(data_t *data, int x, int y, int i)
 	igt_assert(drmModeMoveCursor(data->drm_fd, crtc_id, x, y) == 0 ||
 		   (IS_CHERRYVIEW(data->devid) && data->pipe == PIPE_C &&
 		    x < 0 && x > -data->curw));
-	igt_wait_for_vblank(data->drm_fd, data->pipe);
+	igt_wait_for_vblank(data->drm_fd,
+			display->pipes[data->pipe].crtc_offset);
 }
 
 #define XSTEP 8
