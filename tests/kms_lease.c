@@ -683,7 +683,10 @@ static void lease_unleased_crtc(data_t *data)
 
 	/* Find another CRTC that we don't control */
 	bad_crtc_id = 0;
-	for (p = 0; bad_crtc_id == 0 && p < data->master.display.n_pipes; p++) {
+
+	for_each_pipe(&data->master.display, p) {
+		if (bad_crtc_id != 0)
+			break;
 		if (pipe_to_crtc_id(&data->master.display, p) != data->crtc_id)
 			bad_crtc_id = pipe_to_crtc_id(&data->master.display, p);
 	}
