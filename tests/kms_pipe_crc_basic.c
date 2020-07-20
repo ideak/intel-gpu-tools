@@ -71,7 +71,7 @@ static void test_read_crc(data_t *data, enum pipe pipe, unsigned flags)
 	igt_crc_t *crcs = NULL;
 	int c, j;
 
-	igt_skip_on(pipe >= data->display.n_pipes);
+	igt_require_pipe(display, pipe);
 	igt_require_f(output, "No connector found for pipe %s\n",
 		      kmstest_pipe_name(pipe));
 
@@ -187,7 +187,7 @@ igt_main
 			test_read_crc(&data, pipe, TEST_SEQUENCE | TEST_NONBLOCK);
 
 		igt_subtest_f("suspend-read-crc-pipe-%s", kmstest_pipe_name(pipe)) {
-			igt_skip_on(pipe >= data.display.n_pipes);
+			igt_require_pipe(&data.display, pipe);
 
 			test_read_crc(&data, pipe, 0);
 

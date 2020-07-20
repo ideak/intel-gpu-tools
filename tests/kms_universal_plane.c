@@ -135,7 +135,7 @@ functional_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	int num_primary = 0, num_cursor = 0;
 	int i;
 
-	igt_skip_on(pipe >= display->n_pipes);
+	igt_require_pipe(display, pipe);
 
 	igt_info("Testing connector %s using pipe %s\n", igt_output_name(output),
 		 kmstest_pipe_name(pipe));
@@ -364,7 +364,7 @@ sanity_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	int i;
 	int expect;
 
-	igt_skip_on(pipe >= data->display.n_pipes);
+	igt_require_pipe(&data->display, pipe);
 
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
@@ -476,7 +476,7 @@ pageflip_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	fd_set fds;
 	int ret = 0;
 
-	igt_skip_on(pipe >= data->display.n_pipes);
+	igt_require_pipe(&data->display, pipe);
 
 	igt_output_set_pipe(output, pipe);
 
@@ -577,7 +577,7 @@ cursor_leak_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	int r, g, b;
 	int count1, count2;
 
-	igt_skip_on(pipe >= display->n_pipes);
+	igt_require_pipe(display, pipe);
 	igt_require(display->has_cursor_plane);
 
 	igt_output_set_pipe(output, pipe);
@@ -705,7 +705,7 @@ gen9_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	int ret = 0;
 
 	igt_skip_on(data->gen < 9);
-	igt_skip_on(pipe >= data->display.n_pipes);
+	igt_require_pipe(&data->display, pipe);
 
 	igt_output_set_pipe(output, pipe);
 
@@ -750,7 +750,7 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 	igt_fixture {
 		int valid_tests = 0;
 
-		igt_skip_on(pipe >= data->display.n_pipes);
+		igt_require_pipe(&data->display, pipe);
 
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			valid_tests++;

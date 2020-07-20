@@ -628,7 +628,7 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 	igt_fixture {
 		igt_require_pipe_crc(data->drm_fd);
 
-		igt_require(p < data->display.n_pipes);
+		igt_require_pipe(&data->display, p);
 
 		pipe = &data->display.pipes[p];
 		igt_require(pipe->n_planes >= 0);
