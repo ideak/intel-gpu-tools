@@ -58,7 +58,7 @@ static void stress(igt_display_t *display,
 	uint64_t *results;
 	bool torture;
 	int n;
-	unsigned crtc_id[IGT_MAX_PIPES], num_crtcs;
+	unsigned crtc_id[IGT_MAX_PIPES] = {0}, num_crtcs;
 
 	torture = false;
 	if (num_children < 0) {
@@ -84,8 +84,10 @@ static void stress(igt_display_t *display,
 		}
 	} else {
 		num_crtcs = 1;
-		arg.crtc_id = crtc_id[0] = display->pipes[pipe].crtc_id;
-		do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg);
+		if(display->pipes[pipe].enabled) {
+			arg.crtc_id = crtc_id[0] = display->pipes[pipe].crtc_id;
+			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg);
+		}
 	}
 
 	arg.flags = mode;
@@ -103,7 +105,8 @@ static void stress(igt_display_t *display,
 		hars_petruska_f54_1_random_perturb(child);
 		igt_until_timeout(timeout) {
 			arg.crtc_id = crtc_id[hars_petruska_f54_1_random_unsafe() % num_crtcs];
-			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg);
+			if (arg.crtc_id)
+				do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg);
 			count++;
 		}
 
@@ -1390,7 +1393,7 @@ igt_main
 			errno = 0;
 
 			igt_fixture {
-				igt_skip_on(n >= display.n_pipes);
+				igt_require_pipe(&display, n);
 			}
 
 			igt_subtest_f("pipe-%s-single-bo", kmstest_pipe_name(n))
