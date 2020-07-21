@@ -1113,8 +1113,10 @@ static int monitor_output(pid_t child,
 					fdatasync(outputs[_F_JOURNAL]);
 				}
 
-				if (status == IGT_EXIT_ABORT)
+				if (status == IGT_EXIT_ABORT) {
+					errf("Test exited with IGT_EXIT_ABORT, aborting.\n");
 					aborting = true;
+				}
 
 				if (time_spent)
 					*time_spent = time;
