@@ -28,11 +28,12 @@ int main(int argc, char **argv)
 
 	if ((dirfd = open(argv[1], O_RDONLY | O_DIRECTORY)) < 0) {
 		fprintf(stderr, "Failure opening %s: %s\n", argv[1], strerror(errno));
-		return 1;
+		return 127;
 	}
 
 	if (!initialize_execute_state_from_resume(dirfd, &state, &settings, &job_list)) {
-		return 1;
+		fprintf(stderr, "Failure reading metadata in %s\n", argv[1]);
+		return 127;
 	}
 
 	if (!execute(&state, &settings, &job_list)) {
