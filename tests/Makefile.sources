@@ -22,6 +22,7 @@ TESTS_progs = \
 	core_setmaster \
 	core_setmaster_vs_auth \
 	debugfs_test \
+	device_reset \
 	dmabuf \
 	drm_import_export \
 	drm_mm \
