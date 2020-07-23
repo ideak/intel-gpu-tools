@@ -299,7 +299,7 @@ static void abm_gradual(data_t *data)
 
 igt_main
 {
-	data_t data = { 0 };
+	data_t data = {};
 	enum pipe pipe;
 	igt_output_t *output;
 

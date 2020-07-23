@@ -302,7 +302,7 @@ static void test_cursor_viewport(data_t *data, int size, enum pipe pipe_id)
 igt_main
 {
 	static const int cursor_sizes[] = { 64, 128, 256 };
-	data_t data = { 0 };
+	data_t data = {};
 	enum pipe pipe;
 	int i;
 

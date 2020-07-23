@@ -390,7 +390,7 @@ run_vrr_test(data_t *data, test_t test, uint32_t flags)
 
 igt_main
 {
-	data_t data = { 0 };
+	data_t data = {};
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);

@@ -633,7 +633,7 @@ static void test_hdr(data_t *data, const char *test_name, uint32_t flags)
 
 igt_main
 {
-	data_t data = { 0 };
+	data_t data = {};
 
 	igt_fixture {
 		data.fd = drm_open_driver_master(DRIVER_AMDGPU | DRIVER_INTEL);
