@@ -82,12 +82,10 @@ static bool dmc_supported(int debugfs)
  */
 static void screens_disabled_subtest(data_t *data)
 {
-	igt_output_t *output;
 	int valid_output = 0;
-	enum pipe pipe;
 
-	for_each_pipe_with_single_output(&data->display, pipe, output) {
-		data->output = output;
+	for (int i = 0; i < data->display.n_outputs; i++) {
+		data->output = &data->display.outputs[i];
 		igt_output_set_pipe(data->output, PIPE_NONE);
 		igt_display_commit(&data->display);
 		valid_output++;
