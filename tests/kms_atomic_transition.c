@@ -788,8 +788,9 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 
 			if (fencing)
 				igt_pipe_request_out_fence(&display->pipes[i]);
-		} else
+		} else {
 			igt_plane_set_fb(plane, NULL);
+		}
 	}
 
 	iter_max = 1 << j;
@@ -859,9 +860,10 @@ static void run_modeset_tests(igt_display_t *display, int howmany, bool nonblock
 	set_combinations(display, 0, NULL);
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
-	if (is_i915_device(display->drm_fd))
+	if (is_i915_device(display->drm_fd)) {
 		for_each_pipe(display, i)
 			igt_pipe_crc_free(pipe_crcs[i]);
+	}
 
 	igt_remove_fb(display->drm_fd, &fbs[1]);
 	igt_remove_fb(display->drm_fd, &fbs[0]);
