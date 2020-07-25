@@ -40,6 +40,8 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 
+#include "i915/gem.h"
+
 #define DURATION 10
 
 int fd;
@@ -234,14 +236,14 @@ pthread_t test_thread_id4;
 igt_main {
 	igt_fixture {
 		fd1 = drm_open_driver(DRIVER_INTEL);
-		igt_assert(fd1 >= 0);
+		igt_require_gem(fd1);
+
 		bufmgr1 = drm_intel_bufmgr_gem_init(fd1, 8 *1024);
-		igt_assert(bufmgr1);
+		igt_require(bufmgr1);
 
 		drm_intel_bufmgr_gem_enable_reuse(bufmgr1);
 
-		fd = drm_open_driver(DRIVER_INTEL);
-		igt_assert(fd >= 0);
+		fd = gem_reopen_driver(fd1);
 		bufmgr = drm_intel_bufmgr_gem_init(fd, 8 *1024);
 		igt_assert(bufmgr);
 
