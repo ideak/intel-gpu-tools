@@ -21,7 +21,9 @@
  * IN THE SOFTWARE.
  */
 
+#include <fcntl.h>
 #include <sched.h>
+#include <sys/ioctl.h>
 
 #include "i915/gem.h"
 #include "i915/gem_ring.h"
@@ -2262,6 +2264,20 @@ static uint32_t sema_create(int i915, uint64_t addr, uint32_t **x)
 	return handle;
 }
 
+static int __execbuf(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err;
+
+	err = 0;
+	if (ioctl(i915, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
+}
+
 static uint32_t *sema(int i915, uint32_t ctx)
 {
 	uint32_t *ctl;
@@ -2279,8 +2295,9 @@ static uint32_t *sema(int i915, uint32_t ctx)
 	for (int n = 1; n <= 32; n++) {
 		int64_t poll = 1;
 
-		execbuf.batch_start_offset = 64 * n,
-		gem_execbuf(i915, &execbuf);
+		execbuf.batch_start_offset = 64 * n;
+		if (__execbuf(i915, &execbuf))
+			break;
 
 		/* Force a breadcrumb to be installed on each request */
 		gem_wait(i915, batch.handle, &poll);
@@ -2323,6 +2340,12 @@ static void __waits(int i915, int timeout, uint32_t ctx, unsigned int count)
 
 static void waits(int i915, int timeout)
 {
+	bool nonblock;
+
+	nonblock = fcntl(i915, F_GETFL) & O_NONBLOCK;
+	if (!nonblock)
+		fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) | O_NONBLOCK);
+
 	for (int class = 0; class < 32; class++) {
 		struct i915_engine_class_instance *ci;
 		unsigned int count;
@@ -2341,6 +2364,9 @@ static void waits(int i915, int timeout)
 
 		free(ci);
 	}
+
+	if (!nonblock)
+		fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) & ~O_NONBLOCK);
 
 	gem_quiescent_gpu(i915);
 }
