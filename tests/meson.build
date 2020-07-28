@@ -26,7 +26,6 @@ test_progs = [
 	'kms_ccs',
 	'kms_concurrent',
 	'kms_content_protection',
-	'kms_crtc_background_color',
 	'kms_cursor_crc',
 	'kms_cursor_edge_walk',
 	'kms_cursor_legacy',

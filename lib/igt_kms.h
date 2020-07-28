@@ -97,8 +97,7 @@ void kmstest_restore_vt_mode(void);
 void kmstest_set_vt_text_mode(void);
 
 enum igt_atomic_crtc_properties {
-       IGT_CRTC_BACKGROUND = 0,
-       IGT_CRTC_CTM,
+       IGT_CRTC_CTM = 0,
        IGT_CRTC_GAMMA_LUT,
        IGT_CRTC_GAMMA_LUT_SIZE,
        IGT_CRTC_DEGAMMA_LUT,

@@ -399,7 +399,6 @@ const char * const igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 };
 
 const char * const igt_crtc_prop_names[IGT_NUM_CRTC_PROPS] = {
-	[IGT_CRTC_BACKGROUND] = "background_color",
 	[IGT_CRTC_CTM] = "CTM",
 	[IGT_CRTC_GAMMA_LUT] = "GAMMA_LUT",
 	[IGT_CRTC_GAMMA_LUT_SIZE] = "GAMMA_LUT_SIZE",
