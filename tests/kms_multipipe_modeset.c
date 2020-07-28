@@ -112,12 +112,11 @@ static void run_test(data_t *data, int valid_outputs)
 	igt_remove_fb(data->drm_fd, &data->fb);
 }
 
-static void test_multipipe(data_t *data)
+static void test_multipipe(data_t *data, int num_pipes)
 {
 	igt_output_t *output;
-	int valid_outputs = 0, num_pipes;
+	int valid_outputs = 0;
 
-	num_pipes = igt_display_get_n_pipes(&data->display);
 	for_each_connected_output(&data->display, output)
 		valid_outputs++;
 
@@ -142,15 +141,15 @@ igt_main
 
 		res = drmModeGetResources(data.drm_fd);
 		igt_assert(res);
-
-		kmstest_unset_all_crtcs(data.drm_fd, res);
 	}
 
 	igt_describe("Verify if simultaneous modesets on all the supported "
 		     "pipes is successful. Validate using CRC verification");
 	igt_subtest("basic-max-pipe-crc-check")
-		test_multipipe(&data);
+		test_multipipe(&data, res->count_crtcs);
 
-	igt_fixture
+	igt_fixture {
+		drmModeFreeResources(res);
 		igt_display_fini(&data.display);
+	}
 }
