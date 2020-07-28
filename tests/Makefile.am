@@ -34,7 +34,6 @@ test-list-full.txt: Makefile
 
 
 noinst_PROGRAMS = \
-	$(HANG) \
 	$(TESTS_testsuite) \
 	$(NULL)
 
@@ -67,11 +66,9 @@ dist_pkgdata_DATA = \
 
 all-local: .gitignore
 .gitignore: Makefile.sources
-	@echo "$(pkglibexec_PROGRAMS) $(HANG) test-list.txt test-list-full.txt /.gitignore" | sed 's/\s\+/\n/g' | sort > $@
+	@echo "$(pkglibexec_PROGRAMS) test-list.txt test-list-full.txt /.gitignore" | sed 's/\s\+/\n/g' | sort > $@
 
-EXTRA_PROGRAMS = $(HANG)
-
-CLEANFILES = $(EXTRA_PROGRAMS) test-list.txt test-list-full.txt .gitignore
+CLEANFILES = test-list.txt test-list-full.txt .gitignore
 
 AM_CFLAGS = $(CWARNFLAGS) -Wno-unused-result $(DEBUG_CFLAGS)\
 	-I$(top_srcdir)/include/drm-uapi \
