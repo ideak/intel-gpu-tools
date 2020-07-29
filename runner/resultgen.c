@@ -1637,6 +1637,7 @@ struct json_object *generate_results_json(int dirfd)
 		add_to_totals("runner", &abortsub, &results);
 
 		free_subtests(&abortsub);
+		close(fd);
 	}
 
 	free_settings(&settings);
