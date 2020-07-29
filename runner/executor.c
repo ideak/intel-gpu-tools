@@ -795,10 +795,11 @@ static int next_kill_signal(int killed)
  *  >0 - Timeout happened, need to recreate from journal
  */
 static int monitor_output(pid_t child,
-			   int outfd, int errfd, int kmsgfd, int sigfd,
-			   int *outputs,
-			   double *time_spent,
-			   struct settings *settings)
+			  int outfd, int errfd, int kmsgfd, int sigfd,
+			  int *outputs,
+			  double *time_spent,
+			  struct settings *settings,
+			  char **abortreason)
 {
 	fd_set set;
 	char buf[2048];
@@ -1116,6 +1117,7 @@ static int monitor_output(pid_t child,
 				if (status == IGT_EXIT_ABORT) {
 					errf("Test exited with IGT_EXIT_ABORT, aborting.\n");
 					aborting = true;
+					*abortreason = strdup("Test exited with IGT_EXIT_ABORT");
 				}
 
 				if (time_spent)
@@ -1142,6 +1144,7 @@ static int monitor_output(pid_t child,
 					if (kill(child, 0) && errno == ESRCH)
 						errf("The test process no longer exists, "
 						     "but we didn't get informed of its demise...\n");
+					asprintf(abortreason, "Child refuses to die, tainted 0x%lx.", taints);
 				}
 
 				dump_dmesg(kmsgfd, outputs[_F_DMESG]);
@@ -1309,7 +1312,8 @@ static int execute_next_entry(struct execute_state *state,
 			      struct settings *settings,
 			      struct job_list_entry *entry,
 			      int testdirfd, int resdirfd,
-			      int sigfd, sigset_t *sigmask)
+			      int sigfd, sigset_t *sigmask,
+			      char **abortreason)
 {
 	int dirfd;
 	int outputs[_F_LAST];
@@ -1406,7 +1410,7 @@ static int execute_next_entry(struct execute_state *state,
 	outpipe[1] = errpipe[1] = -1;
 
 	result = monitor_output(child, outfd, errfd, kmsgfd, sigfd,
-				outputs, time_spent, settings);
+				outputs, time_spent, settings, abortreason);
 
 out_kmsgfd:
 	close(kmsgfd);
@@ -1783,7 +1787,7 @@ bool execute(struct execute_state *state,
 
 	for (; state->next < job_list->size;
 	     state->next++) {
-		char *reason;
+		char *reason = NULL;
 		int result;
 
 		if (should_die_because_signal(sigfd)) {
@@ -1797,7 +1801,21 @@ bool execute(struct execute_state *state,
 					    settings,
 					    &job_list->entries[state->next],
 					    testdirfd, resdirfd,
-					    sigfd, &sigmask);
+					    sigfd, &sigmask,
+					    &reason);
+
+		if (reason != NULL || (reason = need_to_abort(settings)) != NULL) {
+			char *prev = entry_display_name(&job_list->entries[state->next]);
+			char *next = (state->next + 1 < job_list->size ?
+				      entry_display_name(&job_list->entries[state->next + 1]) :
+				      strdup("nothing"));
+			write_abort_file(resdirfd, reason, prev, next);
+			free(prev);
+			free(next);
+			free(reason);
+			status = false;
+			break;
+		}
 
 		if (result < 0) {
 			status = false;
@@ -1811,19 +1829,6 @@ bool execute(struct execute_state *state,
 				outf("Overall timeout time exceeded, stopping.\n");
 			}
 
-			break;
-		}
-
-		if ((reason = need_to_abort(settings)) != NULL) {
-			char *prev = entry_display_name(&job_list->entries[state->next]);
-			char *next = (state->next + 1 < job_list->size ?
-				      entry_display_name(&job_list->entries[state->next + 1]) :
-				      strdup("nothing"));
-			write_abort_file(resdirfd, reason, prev, next);
-			free(prev);
-			free(next);
-			free(reason);
-			status = false;
 			break;
 		}
 
