@@ -13,6 +13,7 @@ test_progs = [
 	'drm_mm',
 	'drm_read',
 	'fbdev',
+	'feature_discovery',
 	'kms_3d',
 	'kms_addfb_basic',
 	'kms_atomic',
