@@ -29,6 +29,7 @@ TESTS_progs = \
 	drm_read \
 	dumb_buffer \
 	fbdev \
+	feature_discovery \
 	kms_3d \
 	kms_addfb_basic \
 	kms_atomic \

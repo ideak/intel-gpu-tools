@@ -23,7 +23,9 @@
  */
 
 #include "igt.h"
+#ifdef HAVE_CHAMELIUM
 #include "igt_chamelium.h"
+#endif
 #include "igt_kms.h"
 #include "igt_psr.h"
 #include "igt_sysfs.h"
@@ -91,12 +93,14 @@ igt_main {
 			}
 		}
 
+#ifdef HAVE_CHAMELIUM
 		igt_describe("Make sure that Chamelium is configured and reachable.");
 		igt_subtest("chamelium") {
 			struct chamelium *chamelium = chamelium_init(fd);
 			igt_require(chamelium);
 			chamelium_deinit(chamelium);
 		}
+#endif
 
 		igt_describe("Make sure that we have eDP panel with PSR1 support.");
 		igt_subtest("psr1") {
