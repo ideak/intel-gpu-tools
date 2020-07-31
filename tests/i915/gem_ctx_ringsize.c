@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <math.h>
+#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -198,51 +199,43 @@ static int __execbuf(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
 	return err;
 }
 
-static uint32_t __batch_create(int i915, uint32_t offset)
+#define IDLE (1 << 0)
+#define PLUG (1 << 1)
+
+static void sighandler(int sig)
 {
-	const uint32_t bbe = 0xa << 23;
-	uint32_t handle;
-
-	handle = gem_create(i915, offset + sizeof(bbe));
-	gem_write(i915, handle, offset, &bbe, sizeof(bbe));
-
-	return handle;
 }
 
-static uint32_t batch_create(int i915)
-{
-	return __batch_create(i915, 0);
-}
-
-static unsigned int measure_inflight(int i915, unsigned int engine, int timeout)
+static unsigned int
+measure_inflight(int i915, unsigned int engine, int timeout, unsigned int flags)
 {
 	IGT_CORK_FENCE(cork);
-	struct drm_i915_gem_exec_object2 obj = {
-		.handle = batch_create(i915)
-	};
-	struct drm_i915_gem_execbuffer2 execbuf = {
-		.buffers_ptr = to_user_pointer(&obj),
-		.buffer_count = 1,
-		.flags = engine | I915_EXEC_FENCE_IN,
-		.rsvd2 = igt_cork_plug(&cork, i915),
-	};
 	unsigned int count;
+	igt_spin_t *spin;
+	int fence;
 	int err;
 
 	fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) | O_NONBLOCK);
-	igt_set_timeout(timeout, "execbuf blocked!");
+	signal(SIGALRM, sighandler);
+	alarm(timeout);
 
-	gem_execbuf(i915, &execbuf);
-	for (count = 1; (err = __execbuf(i915, &execbuf)) == 0; count++)
+	fence = igt_cork_plug(&cork, i915);
+	spin = igt_spin_new(i915,
+			    .engine = engine,
+			    .fence = fence,
+			    .flags = (flags & PLUG) ? IGT_SPIN_FENCE_IN : 0);
+	for (count = 1; (err = __execbuf(i915, &spin->execbuf)) == 0; count++)
 		;
+	igt_debugfs_dump(i915, "i915_engine_info");
 	igt_assert_eq(err, -EWOULDBLOCK);
-	close(execbuf.rsvd2);
+	close(fence);
 
-	igt_reset_timeout();
+	alarm(0);
+	signal(SIGALRM, SIG_DFL);
 	fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) & ~O_NONBLOCK);
 
+	igt_spin_free(i915, spin);
 	igt_cork_unplug(&cork);
-	gem_close(i915, obj.handle);
 
 	return count;
 }
@@ -250,7 +243,6 @@ static unsigned int measure_inflight(int i915, unsigned int engine, int timeout)
 static void test_resize(int i915,
 			const struct intel_execution_engine2 *e,
 			void *data)
-#define IDLE (1 << 0)
 #define as_pointer(x) (void *)(uintptr_t)(x)
 {
 	struct drm_i915_gem_context_param p = {
@@ -283,7 +275,10 @@ static void test_resize(int i915,
 		gem_context_set_param(i915, &p);
 
 		igt_nsec_elapsed(&tv);
-		count = measure_inflight(i915, e->flags, 1 + 4 * ceil(elapsed*1e-9));
+		count = measure_inflight(i915,
+					 e->flags,
+					 1 + 4 * ceil(elapsed*1e-9),
+					 flags);
 		elapsed = igt_nsec_elapsed(&tv);
 
 		igt_info("%s: %6llx -> %'6d\n", e->name, p.value, count);
@@ -340,6 +335,7 @@ igt_main
 
 	gem_test_each_engine(i915, "idle", test_resize, as_pointer(IDLE));
 	gem_test_each_engine(i915, "active", test_resize, 0);
+	gem_test_each_engine(i915, "plugged", test_resize, as_pointer(PLUG));
 
 	/* XXX ctx->engines[]? Clone (above) should be enough */
 
