@@ -40,6 +40,7 @@
 #define VERIFY 0
 
 #define TIMEOUT 20
+#define QLEN 16
 
 static void check_bo(int fd, uint32_t handle, int pass)
 {
@@ -168,8 +169,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	const int gen = intel_gen(intel_get_drm_devid(fd));
-	struct drm_i915_gem_exec_object2 batches[1024];
-	struct drm_i915_gem_relocation_entry inter[1024];
+	struct drm_i915_gem_exec_object2 batches[QLEN];
+	struct drm_i915_gem_relocation_entry inter[QLEN];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_exec_object2 store, scratch;
 	struct drm_i915_gem_exec_object2 tmp[2];
@@ -307,19 +308,19 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		}
 
 		memset(batches, 0, sizeof(batches));
-		for (n = 0; n < 1024; n++) {
+		for (n = 0; n < QLEN; n++) {
 			batches[n].handle = gem_create(fd, 4096);
 			gem_write(fd, batches[n].handle, 0, &bbe, sizeof(bbe));
 		}
 		execbuf.buffers_ptr = to_user_pointer(batches);
-		execbuf.buffer_count = 1024;
+		execbuf.buffer_count = QLEN;
 		gem_execbuf(fd, &execbuf);
 
 		execbuf.buffers_ptr = to_user_pointer(tmp);
 		execbuf.buffer_count = 2;
 
 		old_offset = store.offset;
-		for (n = 0; n < 1024; n++) {
+		for (n = 0; n < QLEN; n++) {
 			if (gen >= 8) {
 				batch[1] = old_offset + loc;
 				batch[2] = (old_offset + loc) >> 32;
@@ -380,8 +381,8 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 					gem_sync(fd, tmp[0].handle);
 				scratch = tmp[0];
 
-				gem_write(fd, batches[1023].handle, loc, &pass, sizeof(pass));
-				for (n = 1024; --n >= 1; ) {
+				gem_write(fd, batches[QLEN-1].handle, loc, &pass, sizeof(pass));
+				for (n = QLEN; --n >= 1; ) {
 					uint32_t handle[2] = {};
 					int this_fd = fd;
 
@@ -498,7 +499,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 			for (n = 0; n < 64; n++)
 				gem_context_destroy(fd, contexts[n]);
 		}
-		for (n = 0; n < 1024; n++)
+		for (n = 0; n < QLEN; n++)
 			gem_close(fd, batches[n].handle);
 	}
 
