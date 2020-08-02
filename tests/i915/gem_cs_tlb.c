@@ -99,7 +99,6 @@ static void run_on_ring(int fd, unsigned ring_id, const char *ring_name)
 		uint32_t *batch;
 	} obj[2];
 	unsigned i;
-	char buf[100];
 
 	gem_require_ring(fd, ring_id);
 	igt_require(has_softpin(fd));
@@ -123,14 +122,17 @@ static void run_on_ring(int fd, unsigned ring_id, const char *ring_name)
 	gem_execbuf(fd, &execbuf);
 	execobj.flags = EXEC_OBJECT_PINNED;
 
-	sprintf(buf, "Testing %s cs tlb coherency: ", ring_name);
-	for (i = 0; i < BATCH_SIZE/64; i++) {
+	i = 0;
+	igt_until_timeout(2) {
 		execobj.handle = obj[i&1].handle;
 		obj[i&1].batch[i*64/4] = MI_BATCH_BUFFER_END;
 		execbuf.batch_start_offset = i*64;
 
 		gem_execbuf(fd, &execbuf);
+		if (++i == BATCH_SIZE / 64)
+			break;
 	}
+	igt_info("Completed %d cycles\n", i);
 
 	for (i = 0; i < 2; i++) {
 		gem_close(fd, obj[i].handle);
