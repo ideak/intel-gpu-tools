@@ -45,6 +45,7 @@ static inline uint32_t hash32(uint32_t val)
 
 #define CONTEXTS 0x1
 #define FDS 0x2
+#define USERPTR 0x4
 
 #define NUMOBJ 16
 
@@ -164,6 +165,30 @@ static void check_bo(int fd, uint32_t handle, int pass, struct thread *threads)
 	igt_assert_eq_u32(result, x);
 }
 
+static uint32_t handle_create(int fd, unsigned int flags, void **data)
+{
+	if (flags & USERPTR) {
+		uint32_t handle;
+		void *ptr;
+
+		posix_memalign(&ptr, 4096, 4096);
+		gem_userptr(fd, ptr, 4096, 0, 0, &handle);
+		*data = ptr;
+
+		return handle;
+	}
+
+	return gem_create(fd, 4096);
+}
+
+static void handle_close(int fd, unsigned int flags, uint32_t handle, void *data)
+{
+	if (flags & USERPTR)
+		free(data);
+
+	gem_close(fd, handle);
+}
+
 static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
@@ -172,6 +197,7 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 	struct thread *threads;
 	uint32_t scratch[NUMOBJ], handle[NUMOBJ];
 	unsigned engines[16], nengine;
+	void *arg[NUMOBJ];
 	int go;
 	int i;
 
@@ -196,7 +222,7 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 	igt_require(nengine);
 
 	for (i = 0; i < NUMOBJ; i++) {
-		scratch[i] = handle[i] = gem_create(fd, 4096);
+		scratch[i] = handle[i] = handle_create(fd, flags, &arg[i]);
 		if (flags & FDS)
 			scratch[i] = gem_flink(fd, handle[i]);
 	}
@@ -233,7 +259,7 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 
 	for (i = 0; i < NUMOBJ; i++) {
 		check_bo(fd, handle[i], i, threads);
-		gem_close(fd, handle[i]);
+		handle_close(fd, flags, handle[i], arg[i]);
 	}
 
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
@@ -251,6 +277,7 @@ igt_main
 		{ "basic", 0 },
 		{ "contexts", CONTEXTS },
 		{ "fds", FDS },
+		{ "userptr", USERPTR },
 		{ NULL }
 	};
 	int fd;
