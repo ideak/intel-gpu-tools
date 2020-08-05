@@ -1071,7 +1071,7 @@ static int monitor_output(pid_t child,
 				 * the result an incomplete we avoid
 				 * journaling a timeout here.
 				 */
-				if (is_tainted(taints)) {
+				if (killed && is_tainted(taints)) {
 					exitline = EXECUTOR_EXIT;
 
 					/*
@@ -1096,7 +1096,7 @@ static int monitor_output(pid_t child,
 				 * Same goes for stopping because we
 				 * exceeded the disk usage limit.
 				 */
-				if (disk_usage_limit_exceeded(settings, disk_usage)) {
+				if (killed && disk_usage_limit_exceeded(settings, disk_usage)) {
 					exitline = EXECUTOR_EXIT;
 					dprintf(outputs[_F_OUT],
 						"\nrunner: This test was killed due to exceeding disk usage limit. "
