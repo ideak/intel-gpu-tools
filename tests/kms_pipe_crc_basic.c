@@ -154,6 +154,75 @@ static void test_read_crc(data_t *data, enum pipe pipe, unsigned flags)
 	}
 }
 
+/*
+ * CRC-sanity test, to make sure there would be no CRC mismatches
+ *
+ * - Create two framebuffers (FB0 & FB1) with same color info
+ * - Flip FB0 with the Primary plane & collect the CRC as ref CRC.
+ * - Flip FB1 with the Primary plane, collect the CRC & compare with
+ *   the ref CRC.
+ *
+ *   No CRC mismatch should happen
+ */
+static void test_compare_crc(data_t *data, enum pipe pipe)
+{
+	igt_display_t *display = &data->display;
+	igt_plane_t *primary;
+	drmModeModeInfo *mode;
+	igt_crc_t ref_crc, crc;
+	igt_pipe_crc_t *pipe_crc = NULL;
+	struct igt_fb fb0, fb1;
+	igt_output_t *output = igt_get_single_output_for_pipe(display, pipe);
+
+	igt_require_f(output, "No connector found for pipe %s\n",
+			kmstest_pipe_name(pipe));
+
+	igt_require_pipe(display, pipe);
+	igt_display_reset(display);
+	igt_output_set_pipe(output, pipe);
+
+	mode = igt_output_get_mode(output);
+
+	/* Create two framebuffers with the same color info. */
+	igt_create_color_fb(data->drm_fd,
+			mode->hdisplay, mode->vdisplay,
+			DRM_FORMAT_XRGB8888,
+			LOCAL_DRM_FORMAT_MOD_NONE,
+			1.0, 1.0, 1.0,
+			&fb0);
+	igt_create_color_fb(data->drm_fd,
+			mode->hdisplay, mode->vdisplay,
+			DRM_FORMAT_XRGB8888,
+			LOCAL_DRM_FORMAT_MOD_NONE,
+			1.0, 1.0, 1.0,
+			&fb1);
+
+	/* Flip FB0 with the Primary plane & collect the CRC as ref CRC. */
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_fb(primary, &fb0);
+	igt_display_commit(display);
+
+	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe,
+				    INTEL_PIPE_CRC_SOURCE_AUTO);
+	igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
+
+	/* Flip FB1 with the Primary plane & compare the CRC with ref CRC. */
+	igt_plane_set_fb(primary, &fb1);
+	igt_display_commit(display);
+
+	igt_pipe_crc_collect_crc(pipe_crc, &crc);
+	igt_assert_crc_equal(&crc, &ref_crc);
+
+	/* Clean-up */
+	igt_pipe_crc_free(pipe_crc);
+	igt_plane_set_fb(primary, NULL);
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit(display);
+
+	igt_remove_fb(data->drm_fd, &fb0);
+	igt_remove_fb(data->drm_fd, &fb1);
+}
+
 data_t data = {0, };
 
 igt_main
@@ -209,6 +278,10 @@ igt_main
 
 			igt_disallow_hang(data.drm_fd, hang);
 		}
+
+		igt_describe("Basic sanity check for CRC mismatches");
+		igt_subtest_f("compare-crc-sanitycheck-pipe-%s", kmstest_pipe_name(pipe))
+			test_compare_crc(&data, pipe);
 	}
 
 	igt_fixture {
