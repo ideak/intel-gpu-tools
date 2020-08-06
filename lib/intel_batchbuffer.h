@@ -15,7 +15,7 @@
 struct intel_batchbuffer {
 	drm_intel_bufmgr *bufmgr;
 	uint32_t devid;
-	int gen;
+	unsigned int gen;
 
 	drm_intel_context *ctx;
 	drm_intel_bo *bo;
@@ -263,8 +263,10 @@ static inline bool igt_buf_compressed(const struct igt_buf *buf)
 
 unsigned igt_buf_width(const struct igt_buf *buf);
 unsigned igt_buf_height(const struct igt_buf *buf);
-unsigned int igt_buf_intel_ccs_width(int gen, const struct igt_buf *buf);
-unsigned int igt_buf_intel_ccs_height(int gen, const struct igt_buf *buf);
+unsigned int igt_buf_intel_ccs_width(unsigned int gen,
+				     const struct igt_buf *buf);
+unsigned int igt_buf_intel_ccs_height(unsigned int gen,
+				      const struct igt_buf *buf);
 
 void igt_blitter_src_copy(int fd,
 			  /* src */
@@ -434,7 +436,7 @@ igt_media_spinfunc_t igt_get_media_spinfunc(int devid);
  */
 struct intel_bb {
 	int i915;
-	int gen;
+	unsigned int gen;
 	bool debug;
 	bool dump_base64;
 	bool enforce_relocs;

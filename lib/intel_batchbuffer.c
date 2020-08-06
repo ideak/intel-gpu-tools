@@ -414,7 +414,7 @@ intel_blt_copy(struct intel_batchbuffer *batch,
 	       drm_intel_bo *dst_bo, int dst_x1, int dst_y1, int dst_pitch,
 	       int width, int height, int bpp)
 {
-	const int gen = batch->gen;
+	const unsigned int gen = batch->gen;
 	uint32_t src_tiling, dst_tiling, swizzle;
 	uint32_t cmd_bits = 0;
 	uint32_t br13_bits;
@@ -553,7 +553,7 @@ unsigned igt_buf_height(const struct igt_buf *buf)
  * Returns:
  * The width of the ccs buffer data.
  */
-unsigned int igt_buf_intel_ccs_width(int gen, const struct igt_buf *buf)
+unsigned int igt_buf_intel_ccs_width(unsigned int gen, const struct igt_buf *buf)
 {
 	/*
 	 * GEN12+: The CCS unit size is 64 bytes mapping 4 main surface
@@ -576,7 +576,7 @@ unsigned int igt_buf_intel_ccs_width(int gen, const struct igt_buf *buf)
  * Returns:
  * The height of the ccs buffer data.
  */
-unsigned int igt_buf_intel_ccs_height(int gen, const struct igt_buf *buf)
+unsigned int igt_buf_intel_ccs_height(unsigned int gen, const struct igt_buf *buf)
 {
 	/*
 	 * GEN12+: The CCS unit size is 64 bytes mapping 4 main surface
@@ -703,7 +703,7 @@ fill_object(struct drm_i915_gem_exec_object2 *obj, uint32_t gem_handle,
 
 static void exec_blit(int fd,
 		      struct drm_i915_gem_exec_object2 *objs, uint32_t count,
-		      int gen)
+		      unsigned int gen)
 {
 	struct drm_i915_gem_execbuffer2 exec = {
 		.buffers_ptr = to_user_pointer(objs),
@@ -2416,7 +2416,7 @@ void intel_bb_emit_blt_copy(struct intel_bb *ibb,
 			    int dst_x1, int dst_y1, int dst_pitch,
 			    int width, int height, int bpp)
 {
-	const int gen = ibb->gen;
+	const unsigned int gen = ibb->gen;
 	uint32_t cmd_bits = 0;
 	uint32_t br13_bits;
 	uint32_t mask;
