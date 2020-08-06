@@ -110,6 +110,10 @@ igt@kms_force_connector_basic@force-edid
 igt@kms_force_connector_basic@force-load-detect
 igt@kms_force_connector_basic@prune-stale-modes
 igt@kms_frontbuffer_tracking@basic
+igt@kms_pipe_crc_basic@compare-crc-sanitycheck-pipe-a
+igt@kms_pipe_crc_basic@compare-crc-sanitycheck-pipe-b
+igt@kms_pipe_crc_basic@compare-crc-sanitycheck-pipe-c
+igt@kms_pipe_crc_basic@compare-crc-sanitycheck-pipe-d
 igt@kms_pipe_crc_basic@hang-read-crc-pipe-a
 igt@kms_pipe_crc_basic@nonblocking-crc-pipe-a
 igt@kms_pipe_crc_basic@nonblocking-crc-pipe-a-frame-sequence
