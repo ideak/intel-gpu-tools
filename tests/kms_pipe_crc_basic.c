@@ -177,7 +177,6 @@ static void test_compare_crc(data_t *data, enum pipe pipe)
 	igt_require_f(output, "No connector found for pipe %s\n",
 			kmstest_pipe_name(pipe));
 
-	igt_require_pipe(display, pipe);
 	igt_display_reset(display);
 	igt_output_set_pipe(output, pipe);
 
