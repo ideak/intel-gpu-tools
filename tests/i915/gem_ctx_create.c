@@ -419,7 +419,7 @@ static void basic_ext_param(int i915)
 static void check_single_timeline(int i915, uint32_t ctx, int num_engines)
 {
 #define RCS_TIMESTAMP (0x2000 + 0x358)
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	const int has_64bit_reloc = gen >= 8;
 	struct drm_i915_gem_exec_object2 results = { .handle = gem_create(i915, 4096) };
 	const uint32_t bbe = MI_BATCH_BUFFER_END;

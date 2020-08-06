@@ -361,7 +361,7 @@ static void rc6_idle(int i915)
 {
 	const int64_t duration_ns = SLEEP_DURATION * (int64_t)NSEC_PER_SEC;
 	const int tolerance = 20; /* Some RC6 is better than none! */
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	struct {
 		const char *name;
 		unsigned int flags;
@@ -452,7 +452,7 @@ static void rc6_fence(int i915)
 {
 	const int64_t duration_ns = SLEEP_DURATION * (int64_t)NSEC_PER_SEC;
 	const int tolerance = 20; /* Some RC6 is better than none! */
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	const struct intel_execution_engine2 *e;
 	struct power_sample sample[2];
 	unsigned long slept;

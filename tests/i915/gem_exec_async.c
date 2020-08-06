@@ -29,7 +29,7 @@ IGT_TEST_DESCRIPTION("Check that we can issue concurrent writes across the engin
 static void store_dword(int fd, unsigned ring,
 			uint32_t target, uint32_t offset, uint32_t value)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;

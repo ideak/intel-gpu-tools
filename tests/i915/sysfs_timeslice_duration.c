@@ -186,7 +186,7 @@ static uint64_t __test_duration(int i915, int engine, unsigned int timeout)
 		.buffer_count = ARRAY_SIZE(obj),
 		.buffers_ptr = to_user_pointer(obj),
 	};
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	double duration = clockrate(i915);
 	unsigned int class, inst, mmio;
 	uint32_t *cs, *map;

@@ -46,7 +46,7 @@ static void xchg_int(void *array, unsigned i, unsigned j)
 
 static unsigned context_size(int fd)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 
 	switch (gen) {
 	case 0:

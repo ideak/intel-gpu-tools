@@ -64,7 +64,7 @@ static void write_dword(int fd,
 			uint64_t target_offset,
 			uint32_t value)
 {
-	int gen = intel_gen(intel_get_drm_devid(fd));
+	unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_relocation_entry reloc;
@@ -266,7 +266,7 @@ static void check_bo(int fd, uint32_t handle)
 
 static void active(int fd, unsigned engine)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -872,7 +872,7 @@ static void basic_softpin(int fd)
 static uint64_t concurrent_relocs(int i915, int idx, int count)
 {
 	struct drm_i915_gem_relocation_entry *reloc;
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	unsigned long sz;
 	int offset;
 
@@ -972,7 +972,7 @@ static void concurrent_child(int i915,
 
 static uint32_t create_concurrent_batch(int i915, unsigned int count)
 {
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	size_t sz = ALIGN(4 * (1 + 4 * count), 4096);
 	uint32_t handle = gem_create(i915, sz);
 	uint32_t *map, *cs;

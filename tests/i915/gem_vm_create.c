@@ -250,7 +250,7 @@ static void execbuf(int i915)
 static void
 write_to_address(int fd, uint32_t ctx, uint64_t addr, uint32_t value)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 batch = {
 		.handle = gem_create(fd, 4096)
 	};

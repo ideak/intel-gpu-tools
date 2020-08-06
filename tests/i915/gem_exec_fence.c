@@ -61,7 +61,7 @@ static void store(int fd, const struct intel_execution_engine2 *e,
 {
 	const int SCRATCH = 0;
 	const int BATCH = 1;
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -122,7 +122,7 @@ static bool fence_busy(int fence)
 static void test_fence_busy(int fd, const struct intel_execution_engine2 *e,
 			    unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -218,7 +218,7 @@ static void test_fence_busy(int fd, const struct intel_execution_engine2 *e,
 static void test_fence_busy_all(int fd, unsigned flags)
 {
 	const struct intel_execution_engine2 *e;
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -598,7 +598,7 @@ static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 static void test_parallel(int i915, const struct intel_execution_engine2 *e)
 {
 	const struct intel_execution_engine2 *e2;
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	uint32_t scratch = gem_create(i915, 4096);
 	uint32_t *out = gem_mmap__wc(i915, scratch, 0, 4096, PROT_READ);
 	uint32_t handle[I915_EXEC_RING_MASK];
@@ -704,7 +704,7 @@ static void test_parallel(int i915, const struct intel_execution_engine2 *e)
 
 static void test_concurrent(int i915, const struct intel_execution_engine2 *e)
 {
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	struct drm_i915_gem_relocation_entry reloc = {
 		.target_handle =  gem_create(i915, 4096),
 		.write_domain = I915_GEM_DOMAIN_RENDER,

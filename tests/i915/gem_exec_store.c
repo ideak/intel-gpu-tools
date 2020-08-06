@@ -38,7 +38,7 @@
 
 static void store_dword(int fd, const struct intel_execution_engine2 *e)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -96,7 +96,7 @@ static void store_dword(int fd, const struct intel_execution_engine2 *e)
 static void store_cachelines(int fd, const struct intel_execution_engine2 *e,
 			     unsigned int flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 *obj;
 	struct drm_i915_gem_relocation_entry *reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -172,7 +172,7 @@ static void store_cachelines(int fd, const struct intel_execution_engine2 *e,
 
 static void store_all(int fd)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct intel_execution_engine2 *engine;
 	struct drm_i915_gem_relocation_entry *reloc;

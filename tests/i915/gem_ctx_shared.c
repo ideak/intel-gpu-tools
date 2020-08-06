@@ -186,7 +186,7 @@ static void exhaust_shared_gtt(int i915, unsigned int flags)
 
 static void exec_shared_gtt(int i915, unsigned int ring)
 {
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj = {};
 	struct drm_i915_gem_execbuffer2 execbuf = {
@@ -436,7 +436,7 @@ static void store_dword(int i915, uint32_t ctx, unsigned ring,
 			uint32_t target, uint32_t offset, uint32_t value,
 			uint32_t cork, unsigned write_domain)
 {
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;

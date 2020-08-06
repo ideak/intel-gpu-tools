@@ -168,7 +168,7 @@ static void ctx_set_random_priority(int fd, uint32_t ctx)
 static void whisper(int fd, unsigned engine, unsigned flags)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 batches[QLEN];
 	struct drm_i915_gem_relocation_entry inter[QLEN];
 	struct drm_i915_gem_relocation_entry reloc;

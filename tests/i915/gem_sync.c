@@ -491,7 +491,7 @@ active_wakeup_ring(int fd, unsigned ring, int timeout, int wlen)
 static void
 store_ring(int fd, unsigned ring, int num_children, int timeout)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct intel_engine_data ied;
 
 	ied = list_store_engines(fd, ring);
@@ -587,7 +587,7 @@ store_ring(int fd, unsigned ring, int num_children, int timeout)
 static void
 switch_ring(int fd, unsigned ring, int num_children, int timeout)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct intel_engine_data ied;
 
 	gem_require_contexts(fd);
@@ -766,7 +766,7 @@ static void *waiter(void *arg)
 static void
 __store_many(int fd, unsigned ring, int timeout, unsigned long *cycles)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 object[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -971,7 +971,7 @@ sync_all(int fd, int num_children, int timeout)
 static void
 store_all(int fd, int num_children, int timeout)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct intel_engine_data ied;
 
 	ied = list_store_engines(fd, ALL_ENGINES);

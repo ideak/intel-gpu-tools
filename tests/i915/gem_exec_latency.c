@@ -109,7 +109,7 @@ static void latency_on_ring(int fd,
 			    unsigned ring, const char *name,
 			    unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const int has_64bit_reloc = gen >= 8;
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
@@ -258,7 +258,7 @@ static void latency_from_ring(int fd,
 			      unsigned ring, const char *name,
 			      unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const int has_64bit_reloc = gen >= 8;
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;

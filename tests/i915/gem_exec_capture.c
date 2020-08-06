@@ -61,7 +61,7 @@ static void check_error_state(int dir, struct drm_i915_gem_exec_object2 *obj)
 
 static void __capture1(int fd, int dir, unsigned ring, uint32_t target)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[4];
 #define SCRATCH 0
 #define CAPTURE 1
@@ -197,7 +197,7 @@ static struct offset {
 #define INCREMENTAL 0x1
 #define ASYNC 0x2
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 *obj;
 	struct drm_i915_gem_relocation_entry reloc[2];
 	struct drm_i915_gem_execbuffer2 execbuf;

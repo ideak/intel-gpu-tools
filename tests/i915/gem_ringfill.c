@@ -99,7 +99,7 @@ static void setup_execbuf(int fd,
 			  struct drm_i915_gem_relocation_entry *reloc,
 			  unsigned int ring)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	uint32_t *batch, *b;
 	int i;

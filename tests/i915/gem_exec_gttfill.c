@@ -107,7 +107,7 @@ static void submit(int fd, int gen,
 
 static void fillgtt(int fd, unsigned ring, int timeout)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_relocation_entry reloc[2];
 	volatile uint64_t *shared;

@@ -113,7 +113,7 @@ static void negative_reloc(int fd, unsigned flags)
 
 static void negative_reloc_blt(int fd)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[1024][2];
 	struct drm_i915_gem_relocation_entry reloc;

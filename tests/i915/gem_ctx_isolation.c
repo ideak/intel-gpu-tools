@@ -501,7 +501,7 @@ static void dump_regs(int fd,
 		      const struct intel_execution_engine2 *e,
 		      unsigned int regs)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const unsigned int gen_bit = 1 << gen;
 	const unsigned int engine_bit = ENGINE(e->class, e->instance);
 	const uint32_t mmio_base = gem_engine_mmio_base(fd, e->name);

@@ -101,7 +101,7 @@ copy_from_linear_buf(data_t *data, struct intel_buf *src, struct intel_buf *dst)
 static void *linear_copy_ccs(data_t *data, struct intel_buf *buf)
 {
 	void *ccs_data, *linear;
-	int gen = intel_gen(data->devid);
+	unsigned int gen = intel_gen(data->devid);
 	int ccs_size = intel_buf_ccs_width(gen, buf) *
 		intel_buf_ccs_height(gen, buf);
 	int bo_size = intel_buf_bo_size(buf);
@@ -295,7 +295,7 @@ scratch_buf_check_all(data_t *data,
 static void scratch_buf_ccs_check(data_t *data,
 				  struct intel_buf *buf)
 {
-	int gen = intel_gen(data->devid);
+	unsigned int gen = intel_gen(data->devid);
 	int ccs_size = intel_buf_ccs_width(gen, buf) *
 		intel_buf_ccs_height(gen, buf);
 	uint8_t *linear;

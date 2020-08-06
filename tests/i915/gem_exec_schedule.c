@@ -94,7 +94,7 @@ static uint32_t __store_dword(int fd, uint32_t ctx, unsigned ring,
 			      uint32_t target, uint32_t offset, uint32_t value,
 			      uint32_t cork, int fence, unsigned write_domain)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -1062,7 +1062,7 @@ static void semaphore_resolve(int i915)
 
 static void semaphore_noskip(int i915)
 {
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	const struct intel_execution_engine2 *outer, *inner;
 	uint32_t ctx;
 
@@ -1710,7 +1710,7 @@ static void deep(int fd, unsigned ring)
 
 	/* Create a deep dependency chain, with a few branches */
 	for (n = 0; n < nreq && igt_seconds_elapsed(&tv) < 2; n++) {
-		const int gen = intel_gen(intel_get_drm_devid(fd));
+		const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 		struct drm_i915_gem_exec_object2 obj[3];
 		struct drm_i915_gem_relocation_entry reloc;
 		struct drm_i915_gem_execbuffer2 eb = {
@@ -1863,7 +1863,7 @@ static void wide(int fd, unsigned ring)
 static void reorder_wide(int fd, unsigned ring)
 {
 	const unsigned int ring_size = gem_submission_measure(fd, ring);
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const int priorities[] = { MIN_PRIO, MAX_PRIO };
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_exec_object2 obj[2];

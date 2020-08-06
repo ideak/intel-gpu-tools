@@ -78,7 +78,7 @@ static uint32_t movnt(uint32_t *map, int i)
 static void run(int fd, unsigned ring, int nchild, int timeout,
 		unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 
 	/* The crux of this testing is whether writes by the GPU are coherent
 	 * from the CPU.
@@ -355,7 +355,7 @@ enum batch_mode {
 static void batch(int fd, unsigned ring, int nchild, int timeout,
 		  enum batch_mode mode, unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 
 	if (mode == BATCH_GTT)
 		gem_require_mappable_ggtt(fd);

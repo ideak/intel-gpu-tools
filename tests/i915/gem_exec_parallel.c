@@ -191,7 +191,7 @@ static void handle_close(int fd, unsigned int flags, uint32_t handle, void *data
 
 static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	struct thread *threads;

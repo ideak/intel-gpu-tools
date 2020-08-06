@@ -59,7 +59,7 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 {
 	const struct intel_execution_engine2 *engine;
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct {
 		struct drm_i915_gem_exec_object2 *obj;
 		struct drm_i915_gem_exec_object2 exec[2];

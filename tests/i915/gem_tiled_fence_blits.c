@@ -88,7 +88,7 @@ static void check_bo(int fd, uint32_t handle, uint32_t start_val)
 static uint32_t
 create_batch(int fd, struct drm_i915_gem_relocation_entry *reloc)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const bool has_64b_reloc = gen >= 8;
 	uint32_t *batch;
 	uint32_t handle;

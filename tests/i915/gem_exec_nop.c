@@ -104,7 +104,7 @@ static double nop_on_ring(int fd, uint32_t handle,
 static void poll_ring(int fd, const struct intel_execution_engine2 *e,
 		      int timeout)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const uint32_t MI_ARB_CHK = 0x5 << 23;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
@@ -214,7 +214,7 @@ static void poll_ring(int fd, const struct intel_execution_engine2 *e,
 
 static void poll_sequential(int fd, const char *name, int timeout)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const struct intel_execution_engine2 *e;
 	const uint32_t MI_ARB_CHK = 0x5 << 23;
 	struct drm_i915_gem_execbuffer2 execbuf;

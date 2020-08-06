@@ -265,7 +265,7 @@ static void test_reverse(int i915)
 
 static uint64_t busy_batch(int fd)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	unsigned const int gen = intel_gen(intel_get_drm_devid(fd));
 	const int has_64bit_reloc = gen >= 8;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 object[2];
@@ -452,7 +452,7 @@ static void xchg_offset(void *array, unsigned i, unsigned j)
 enum sleep { NOSLEEP, SUSPEND, HIBERNATE };
 static void test_noreloc(int fd, enum sleep sleep, unsigned flags)
 {
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	unsigned const int gen = intel_gen(intel_get_drm_devid(fd));
 	const uint32_t size = 4096;
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;

@@ -482,7 +482,7 @@ static uint32_t read_result(int timeline, uint32_t *map, int idx)
 static void independent(int i915)
 {
 #define RCS_TIMESTAMP (0x2000 + 0x358)
-	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	const int has_64bit_reloc = gen >= 8;
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines , I915_EXEC_RING_MASK + 1);
 	struct drm_i915_gem_context_param param = {
