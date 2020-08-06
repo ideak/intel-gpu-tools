@@ -257,7 +257,7 @@ endforeach
 lib_igt_i915_perf_build = shared_library(
   'i915_perf',
   i915_perf_files,
-  dependencies: [lib_igt, lib_igt_chipset],
+  dependencies: lib_igt_chipset,
   include_directories : inc,
   install: true,
   soversion: '0')
