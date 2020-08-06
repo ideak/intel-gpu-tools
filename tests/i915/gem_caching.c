@@ -282,7 +282,7 @@ igt_main
 			val2 = i + 63;
 			cpu_ptr = gem_mmap__cpu(data.fd, scratch_buf->handle,
 						0, scratch_buf->surface[0].size,
-						PROT_READ);
+						PROT_WRITE);
 
 			memset(cpu_ptr + start, val2, len);
 
