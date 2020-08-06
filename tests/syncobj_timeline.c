@@ -1245,9 +1245,11 @@ test_32bits_limit(int fd)
 	uint64_t value, last_value;
 	int i;
 
-	igt_assert_eq(pthread_create(&thread, NULL, checker_thread_func, &thread_data), 0);
+	igt_assert_eq(pthread_create(&thread, NULL,
+				     checker_thread_func, &thread_data), 0);
 
-	while (!thread_data.started);
+	while (!READ_ONCE(thread_data.started))
+		;
 
 	for (i = 0; i < ARRAY_SIZE(points); i++) {
 		int fence = sw_sync_timeline_create_fence(timeline, i + 1);
