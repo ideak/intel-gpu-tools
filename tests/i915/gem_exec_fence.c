@@ -1970,7 +1970,6 @@ static void test_syncobj_timeline_wait(int fd)
 		MI_BATCH_BUFFER_END,
 		MI_NOOP,
 	};
-	uint32_t gem_context = gem_context_clone_with_engines(fd, 0);
 	struct drm_i915_gem_exec_object2 obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_execbuffer_ext_timeline_fences timeline_fences;
@@ -1988,7 +1987,7 @@ static void test_syncobj_timeline_wait(int fd)
 
 	gem_quiescent_gpu(fd);
 
-	spin = igt_spin_new(fd, .ctx = gem_context, .engine = ALL_ENGINES);
+	spin = igt_spin_new(fd, .engine = ALL_ENGINES);
 
 	memset(&timeline_fences, 0, sizeof(timeline_fences));
 	timeline_fences.base.name = DRM_I915_GEM_EXECBUFFER_EXT_TIMELINE_FENCES;
@@ -2000,7 +1999,6 @@ static void test_syncobj_timeline_wait(int fd)
 	execbuf.buffers_ptr = to_user_pointer(&obj);
 	execbuf.buffer_count = 1;
 	execbuf.batch_len = sizeof(bbe);
-	execbuf.rsvd1 = gem_context;
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
@@ -2055,8 +2053,6 @@ static void test_syncobj_timeline_wait(int fd)
 		gem_sync(fd, handle[i]);
 		gem_close(fd, handle[i]);
 	}
-
-	gem_context_destroy(fd, gem_context);
 }
 
 static const char *test_syncobj_timeline_export_desc =
