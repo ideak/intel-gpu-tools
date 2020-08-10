@@ -574,6 +574,78 @@ static void always_clear(int i915, int timeout)
 	igt_info("Checked %'lu page allocations\n", checked);
 }
 
+static struct intel_buf *create_bo(struct buf_ops *bops, uint32_t value,
+				   uint32_t width, uint32_t height)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_buf *buf;
+	uint32_t *v, size;
+
+	buf = intel_buf_create(bops, width, height, 32, 0, I915_TILING_NONE, 0);
+	size = buf->surface[0].size;
+	v = gem_mmap__cpu_coherent(i915, buf->handle, 0, size, PROT_WRITE);
+
+	gem_set_domain(i915, buf->handle,
+		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+
+	for (int i = 0; i < 64 / sizeof(*v); i++)
+		v[i] = value;
+
+	munmap(buf, size);
+
+	return buf;
+}
+
+static void blt_coherency(int i915)
+{
+	struct buf_ops *bops;
+	struct intel_buf *src, *dst;
+	struct intel_bb *ibb;
+	uint32_t width = 512;
+	uint32_t height = 512;
+	uint32_t *psrc, *pdst, size;
+	bool compare_ok;
+	int i;
+
+	bops = buf_ops_create(i915);
+	ibb = intel_bb_create(i915, 4096);
+
+	src = create_bo(bops, 2, width, height);
+	dst = create_bo(bops, 1, width, height);
+	size = src->surface[0].size;
+
+	intel_bb_add_object(ibb, src->handle, src->addr.offset, false);
+	intel_bb_add_object(ibb, dst->handle, dst->addr.offset, true);
+
+	intel_bb_blt_copy(ibb,
+			  src, 0, 0, src->surface[0].stride,
+			  dst, 0, 0, dst->surface[0].stride,
+			  intel_buf_width(dst),
+			  intel_buf_height(dst), dst->bpp);
+
+	psrc = gem_mmap__cpu_coherent(i915, src->handle, 0, size, PROT_READ);
+	gem_set_domain(i915, src->handle, I915_GEM_DOMAIN_CPU, 0);
+
+	pdst = gem_mmap__cpu_coherent(i915, dst->handle, 0, size, PROT_READ);
+	gem_set_domain(i915, dst->handle, I915_GEM_DOMAIN_CPU, 0);
+
+	for (i = 0; i < 16; i++)
+		igt_debug("[%2d] %08x <> %08x\n", i, psrc[i], pdst[i]);
+
+	compare_ok = psrc[0] == pdst[0];
+
+	munmap(psrc, size);
+	munmap(pdst, size);
+
+	intel_buf_destroy(src);
+	intel_buf_destroy(dst);
+
+	intel_bb_destroy(ibb);
+	buf_ops_destroy(bops);
+
+	igt_assert_f(compare_ok, "Problem with coherency, flush is too late\n");
+}
+
 static int mmap_gtt_version(int i915)
 {
 	int gtt_version = -1;
@@ -629,6 +701,9 @@ igt_main
 
 	igt_subtest_f("clear")
 		always_clear(i915, 20);
+
+	igt_subtest_f("blt-coherency")
+		blt_coherency(i915);
 
 	igt_fixture {
 		close(i915);
