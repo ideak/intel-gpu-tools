@@ -341,7 +341,7 @@ static void test_nonpersistent_hang(int i915, unsigned int engine)
 	 * but fortunately under a nonpersistent context. Do we detect it?
 	 */
 
-	ctx = gem_context_create(i915);
+	ctx = gem_context_clone_with_engines(i915, 0);
 	gem_context_set_persistence(i915, ctx, false);
 
 	spin = igt_spin_new(i915, ctx,
