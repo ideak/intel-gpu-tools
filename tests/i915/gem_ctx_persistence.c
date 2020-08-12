@@ -426,6 +426,141 @@ static void test_nohangcheck_hang(int i915)
 	close(dir);
 }
 
+static bool set_heartbeat(int i915, const char *name, unsigned int value)
+{
+	unsigned int x;
+
+	if (gem_engine_property_printf(i915, name,
+				       "heartbeat_interval_ms",
+				       "%d", value) < 0)
+		return false;
+
+	x = ~value;
+	gem_engine_property_scanf(i915, name,
+				  "heartbeat_interval_ms",
+				  "%d", &x);
+	igt_assert_eq(x, value);
+
+	return true;
+}
+
+static bool set_preempt_timeout(int i915, const char *name, unsigned int value)
+{
+	unsigned int x;
+
+	if (gem_engine_property_printf(i915, name,
+				       "preempt_timeout_ms",
+				       "%d", value) < 0)
+		return false;
+
+	x = ~value;
+	gem_engine_property_scanf(i915, name,
+				  "preempt_timeout_ms",
+				  "%d", &x);
+	igt_assert_eq(x, value);
+
+	return true;
+}
+
+static void test_noheartbeat_many(int i915, int count, unsigned int flags)
+{
+	unsigned long checked = 0;
+
+	cleanup(i915);
+	enable_hangcheck(i915);
+
+	/*
+	 * If the user disables the heartbeat, after leaving behind
+	 * a number of long running *persistent* contexts, check they get
+	 * cleaned up.
+	 */
+
+	for_each_engine(e, i915) {
+		igt_spin_t *spin[count];
+
+		if (!set_preempt_timeout(i915, e->full_name, 250))
+			continue;
+
+		if (!set_heartbeat(i915, e->full_name, 0))
+			continue;
+
+		igt_assert(set_heartbeat(i915, e->full_name, 500));
+
+		for (int n = 0; n < ARRAY_SIZE(spin); n++) {
+			uint32_t ctx;
+
+			ctx = gem_context_create(i915);
+			spin[n] = igt_spin_new(i915, ctx, .engine = eb_ring(e),
+					       .flags = (IGT_SPIN_FENCE_OUT |
+							 IGT_SPIN_POLL_RUN |
+							 flags));
+			gem_context_destroy(i915, ctx);
+		}
+		igt_spin_busywait_until_started(spin[0]);
+
+		igt_debug("Testing %s\n", e->full_name);
+		igt_assert(set_heartbeat(i915, e->full_name, 0));
+
+		for (int n = 0; n < ARRAY_SIZE(spin); n++) {
+			igt_assert_eq(wait_for_status(spin[n]->out_fence, reset_timeout_ms),
+				      -EIO);
+		}
+
+		for (int n = 0; n < ARRAY_SIZE(spin); n++)
+			igt_spin_free(i915, spin[n]);
+
+		set_heartbeat(i915, e->full_name, 2500);
+		cleanup(i915);
+		checked++;
+	}
+	igt_require(checked);
+}
+
+static void test_noheartbeat_close(int i915, unsigned int flags)
+{
+	unsigned long checked = 0;
+
+	cleanup(i915);
+	enable_hangcheck(i915);
+
+	/*
+	 * Check that non-persistent contexts are also cleaned up if we
+	 * close the context while they are active, but the engine's
+	 * heartbeat has already been disabled.
+	 */
+
+	for_each_engine(e, i915) {
+		igt_spin_t *spin;
+		uint32_t ctx;
+		int err;
+
+		if (!set_preempt_timeout(i915, e->full_name, 250))
+			continue;
+
+		if (!set_heartbeat(i915, e->full_name, 0))
+			continue;
+
+		ctx = gem_context_create(i915);
+		spin = igt_spin_new(i915, ctx, .engine = eb_ring(e),
+				    .flags = (IGT_SPIN_FENCE_OUT |
+					      IGT_SPIN_POLL_RUN |
+					      flags));
+		igt_spin_busywait_until_started(spin);
+
+		igt_debug("Testing %s\n", e->full_name);
+		gem_context_destroy(i915, ctx);
+		err = wait_for_status(spin->out_fence, reset_timeout_ms);
+
+		set_heartbeat(i915, e->full_name, 2500);
+		igt_spin_free(i915, spin);
+
+		igt_assert_eq(err, -EIO);
+		cleanup(i915);
+		checked++;
+	}
+	igt_require(checked);
+}
+
 static void test_nonpersistent_file(int i915)
 {
 	int debugfs = i915;
@@ -1156,6 +1291,17 @@ igt_main
 		test_nohangcheck_hostile(i915);
 	igt_subtest("hang")
 		test_nohangcheck_hang(i915);
+
+	igt_subtest("heartbeat-stop")
+		test_noheartbeat_many(i915, 1, 0);
+	igt_subtest("heartbeat-hang")
+		test_noheartbeat_many(i915, 1, IGT_SPIN_NO_PREEMPTION);
+	igt_subtest("heartbeat-many")
+		test_noheartbeat_many(i915, 16, 0);
+	igt_subtest("heartbeat-close")
+		test_noheartbeat_close(i915, 0);
+	igt_subtest("heartbeat-hostile")
+		test_noheartbeat_close(i915, IGT_SPIN_NO_PREEMPTION);
 
 	igt_subtest_group {
 		igt_fixture
