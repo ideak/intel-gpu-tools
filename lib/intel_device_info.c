@@ -327,6 +327,12 @@ static const struct intel_device_info intel_rocketlake_info = {
 	.codename = "rocketlake"
 };
 
+static const struct intel_device_info intel_dg1_info = {
+	.gen = BIT(11),
+	.is_dg1 = true,
+	.codename = "dg1"
+};
+
 static const struct pci_id_match intel_device_match[] = {
 	INTEL_I810_IDS(&intel_i810_info),
 	INTEL_I815_IDS(&intel_i815_info),
@@ -412,6 +418,8 @@ static const struct pci_id_match intel_device_match[] = {
 
 	INTEL_TGL_12_IDS(&intel_tigerlake_info),
 	INTEL_RKL_IDS(&intel_rocketlake_info),
+
+	INTEL_DG1_IDS(&intel_dg1_info),
 
 	INTEL_VGA_DEVICE(PCI_MATCH_ANY, &intel_generic_info),
 };
