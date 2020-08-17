@@ -23,8 +23,10 @@
 
 #include <fcntl.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -202,8 +204,87 @@ static void cleanup(struct hotunplug *priv)
 	priv->fd.sysfs_dev = close_sysfs(priv->fd.sysfs_dev);
 }
 
-static void node_healthcheck(struct hotunplug *priv, bool render)
+static bool local_i915_is_wedged(int i915)
 {
+	int err = 0;
+
+	if (ioctl(i915, DRM_IOCTL_I915_GEM_THROTTLE))
+		err = -errno;
+	return err == -EIO;
+}
+
+static bool hang_detected = false;
+
+static void local_sig_abort(int sig)
+{
+	errno = 0; /* inside a signal, last errno reporting is confusing */
+	hang_detected = true;
+}
+
+static int local_i915_healthcheck(int i915, const char *prefix)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj = { };
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+	};
+	const struct intel_execution_engine2 *engine;
+
+	/* stop our hang detector possibly still running if we failed before */
+	igt_stop_hang_detector();
+
+	/* don't run again before GPU reset if hang has been already detected */
+	if (hang_detected)
+		return -EIO;
+
+	igt_debug("%srunning i915 GPU healthcheck\n", prefix);
+
+	if (local_i915_is_wedged(i915))
+		return -EIO;
+
+	obj.handle = gem_create(i915, 4096);
+	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
+
+	igt_fork_hang_detector(i915);
+	signal(SIGIO, local_sig_abort);
+
+	__for_each_physical_engine(i915, engine) {
+		execbuf.flags = engine->flags;
+		gem_execbuf(i915, &execbuf);
+	}
+
+	gem_sync(i915, obj.handle);
+	gem_close(i915, obj.handle);
+
+	igt_stop_hang_detector();
+	if (hang_detected)
+		return -EIO;
+
+	if (local_i915_is_wedged(i915))
+		return -EIO;
+
+	return 0;
+}
+
+static int local_i915_recover(int i915)
+{
+	hang_detected = false;
+	if (!local_i915_healthcheck(i915, "re-"))
+		return 0;
+
+	igt_debug("forcing i915 GPU reset\n");
+	igt_force_gpu_reset(i915);
+
+	hang_detected = false;
+	return local_i915_healthcheck(i915, "post-");
+}
+
+#define FLAG_RENDER	(1 << 0)
+#define FLAG_RECOVER	(1 << 1)
+static void node_healthcheck(struct hotunplug *priv, unsigned flags)
+{
+	bool render = flags & FLAG_RENDER;
 	/* preserve potentially dirty device status stored in priv->fd.drm */
 	bool closed = priv->fd.drm == -1;
 	int fd_drm;
@@ -215,9 +296,14 @@ static void node_healthcheck(struct hotunplug *priv, bool render)
 		priv->fd.drm = fd_drm;
 
 	if (is_i915_device(fd_drm)) {
-		priv->failure = "GEM failure";
-		igt_require_gem(fd_drm);
-		priv->failure = NULL;
+		/* don't report library failed asserts as healthcheck failure */
+		priv->failure = "Unrecoverable test failure";
+		if (local_i915_healthcheck(fd_drm, "") &&
+		    (!(flags & FLAG_RECOVER) || local_i915_recover(fd_drm)))
+			priv->failure = "Healthcheck failure!";
+		else
+			priv->failure = NULL;
+
 	} else {
 		/* no device specific healthcheck, rely on reopen result */
 		priv->failure = NULL;
@@ -228,14 +314,15 @@ static void node_healthcheck(struct hotunplug *priv, bool render)
 		priv->fd.drm = fd_drm;
 }
 
-static void healthcheck(struct hotunplug *priv)
+static void healthcheck(struct hotunplug *priv, bool recover)
 {
 	/* device name may have changed, rebuild IGT device list */
 	igt_devices_scan(true);
 
-	node_healthcheck(priv, false);
+	node_healthcheck(priv, recover ? FLAG_RECOVER : 0);
 	if (!priv->failure)
-		node_healthcheck(priv, true);
+		node_healthcheck(priv,
+				 FLAG_RENDER | (recover ? FLAG_RECOVER : 0));
 
 	/* not only request igt_abort on failure, also fail the health check */
 	igt_fail_on_f(priv->failure, "%s\n", priv->failure);
@@ -257,7 +344,7 @@ static void recover(struct hotunplug *priv)
 		driver_bind(priv, 60);
 
 	if (priv->failure)
-		healthcheck(priv);
+		healthcheck(priv, true);
 }
 
 static void post_healthcheck(struct hotunplug *priv)
@@ -293,7 +380,7 @@ static void unbind_rebind(struct hotunplug *priv)
 
 	driver_bind(priv, 0);
 
-	healthcheck(priv);
+	healthcheck(priv, false);
 }
 
 static void unplug_rescan(struct hotunplug *priv)
@@ -304,7 +391,7 @@ static void unplug_rescan(struct hotunplug *priv)
 
 	bus_rescan(priv, 0);
 
-	healthcheck(priv);
+	healthcheck(priv, false);
 }
 
 static void hotunbind_lateclose(struct hotunplug *priv)
@@ -319,7 +406,7 @@ static void hotunbind_lateclose(struct hotunplug *priv)
 	priv->fd.drm = close_device(priv->fd.drm, "late ", "unbound ");
 	igt_assert_eq(priv->fd.drm, -1);
 
-	healthcheck(priv);
+	healthcheck(priv, false);
 }
 
 static void hotunplug_lateclose(struct hotunplug *priv)
@@ -334,7 +421,7 @@ static void hotunplug_lateclose(struct hotunplug *priv)
 	priv->fd.drm = close_device(priv->fd.drm, "late ", "removed ");
 	igt_assert_eq(priv->fd.drm, -1);
 
-	healthcheck(priv);
+	healthcheck(priv, false);
 }
 
 /* Main */
@@ -364,9 +451,9 @@ igt_main
 
 		prepare(&priv);
 
-		node_healthcheck(&priv, false);
+		node_healthcheck(&priv, 0);
 		if (!priv.failure)
-			node_healthcheck(&priv, true);
+			node_healthcheck(&priv, FLAG_RENDER);
 		igt_skip_on_f(priv.failure, "%s\n", priv.failure);
 	}
 
