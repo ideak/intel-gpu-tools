@@ -204,7 +204,7 @@ naughty_child(int i915, int link, uint32_t shared, unsigned int flags)
 	execbuf.buffer_count =
 		create_batch(i915, obj, execbuf.buffer_count, count, flags);
 	gem_execbuf(i915, &execbuf);
-	igt_debug("Created %lu buffers ready for delay\n", count);
+	igt_debug("Created %"PRIu64" buffers ready for delay\n", count);
 
 	/* Calibrate a long execbuf() */
 	memset(&tv, 0, sizeof(tv));
