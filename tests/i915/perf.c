@@ -2077,7 +2077,7 @@ test_blocking(uint64_t requested_oa_period, bool set_kernel_hrtimer, uint64_t ke
 	user_ns = (end_times.tms_utime - start_times.tms_utime) * tick_ns;
 	kernel_ns = (end_times.tms_stime - start_times.tms_stime) * tick_ns;
 
-	igt_debug("%d blocking reads during test with %lu Hz OA sampling (expect no more than %d)\n",
+	igt_debug("%d blocking reads during test with %"PRIu64" Hz OA sampling (expect no more than %d)\n",
 		  n, NSEC_PER_SEC / oa_period, max_iterations);
 	igt_debug("%d extra iterations seen, not related to periodic sampling (e.g. context switches)\n",
 		  n_extra_iterations);
@@ -2265,7 +2265,7 @@ test_polling(uint64_t requested_oa_period, bool set_kernel_hrtimer, uint64_t ker
 	user_ns = (end_times.tms_utime - start_times.tms_utime) * tick_ns;
 	kernel_ns = (end_times.tms_stime - start_times.tms_stime) * tick_ns;
 
-	igt_debug("%d non-blocking reads during test with %lu Hz OA sampling (expect no more than %d)\n",
+	igt_debug("%d non-blocking reads during test with %"PRIu64" Hz OA sampling (expect no more than %d)\n",
 		  n, NSEC_PER_SEC / oa_period, max_iterations);
 	igt_debug("%d extra iterations seen, not related to periodic sampling (e.g. context switches)\n",
 		  n_extra_iterations);
@@ -2357,7 +2357,7 @@ num_valid_reports_captured(struct drm_i915_perf_open_param *param,
 	int64_t start, end;
 	int num_reports = 0;
 
-	igt_debug("Expected duration = %lu\n", *duration_ns);
+	igt_debug("Expected duration = %"PRId64"\n", *duration_ns);
 
 	stream_fd = __perf_open(drm_fd, param, true);
 
@@ -2389,7 +2389,7 @@ num_valid_reports_captured(struct drm_i915_perf_open_param *param,
 
 	*duration_ns = end - start;
 
-	igt_debug("Actual duration = %lu\n", *duration_ns);
+	igt_debug("Actual duration = %"PRIu64"\n", *duration_ns);
 
 	return num_reports;
 }

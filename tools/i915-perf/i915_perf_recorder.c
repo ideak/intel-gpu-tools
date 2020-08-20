@@ -1001,7 +1001,7 @@ main(int argc, char *argv[])
 	}
 
 	ctx.oa_exponent = oa_exponent_for_period(ctx.timestamp_frequency, perf_period);
-	fprintf(stdout, "Opening perf stream with metric_id=%lu oa_exponent=%u\n",
+	fprintf(stdout, "Opening perf stream with metric_id=%"PRIu64" oa_exponent=%u\n",
 		ctx.metric_set->perf_oa_metrics_set, ctx.oa_exponent);
 
 	ctx.perf_fd = perf_open(&ctx);
