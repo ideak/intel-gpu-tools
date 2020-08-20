@@ -2408,7 +2408,7 @@ static void build_wait_bb(struct inter_engine_context *context,
 	uint64_t wait_value =
 		0xffffffffffffffff - (delay * timestamp_frequency) / NSEC_PER_SEC;
 
-	igt_debug("wait_value=0x%lx\n", wait_value);
+	igt_debug("wait_value=0x%"PRIx64"\n", wait_value);
 
 	*bb++ = MI_LOAD_REGISTER_IMM;
 	*bb++ = 0x2000 + HSW_CS_GPR(0);
@@ -2680,7 +2680,7 @@ static void setup_timeline_chain_engines(struct inter_engine_context *context, i
 	}
 
 	for (uint32_t i = 0; i < 10; i++)
-		igt_debug("%u = %lu\n", i, fib(i));
+		igt_debug("%u = %"PRIu64"\n", i, fib(i));
 
 	/* Bootstrap the fibonacci sequence */
 	{
@@ -2759,7 +2759,7 @@ static void test_syncobj_timeline_chain_engines(int fd, struct intel_engine_data
 	counter_output = gem_mmap__wc(fd, ctx.engine_counter_object.handle, 0, 4096, PROT_READ);
 
 	for (uint32_t i = 0; i < ctx.engines->nengines; i++)
-		igt_debug("engine %i (%s)\t= %016lx\n", i,
+		igt_debug("engine %i (%s)\t= %016"PRIx64"\n", i,
 			  ctx.engines->engines[i].name, counter_output[i]);
 
 	/*
@@ -2825,7 +2825,7 @@ static void test_syncobj_stationary_timeline_chain_engines(int fd, struct intel_
 	counter_output = gem_mmap__wc(fd, ctx.engine_counter_object.handle, 0, 4096, PROT_READ);
 
 	for (uint32_t i = 0; i < ctx.engines->nengines; i++)
-		igt_debug("engine %i (%s)\t= %016lx\n", i,
+		igt_debug("engine %i (%s)\t= %016"PRIx64"\n", i,
 			  ctx.engines->engines[i].name, counter_output[i]);
 	igt_assert_eq(counter_output[engines->nengines - 1],
 		      fib(ARRAY_SIZE(ctx.iterations) * engines->nengines + 1));
@@ -2886,7 +2886,7 @@ static void test_syncobj_backward_timeline_chain_engines(int fd, struct intel_en
 	counter_output = gem_mmap__wc(fd, ctx.engine_counter_object.handle, 0, 4096, PROT_READ);
 
 	for (uint32_t i = 0; i < ctx.engines->nengines; i++)
-		igt_debug("engine %i (%s)\t= %016lx\n", i,
+		igt_debug("engine %i (%s)\t= %016"PRIx64"\n", i,
 			  ctx.engines->engines[i].name, counter_output[i]);
 	igt_assert_eq(counter_output[engines->nengines - 1],
 		      fib(ARRAY_SIZE(ctx.iterations) * engines->nengines + 1));
