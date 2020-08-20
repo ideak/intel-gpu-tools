@@ -260,9 +260,9 @@ static void blit(struct buf_ops *bops,
 	poff_bb = intel_bb_get_object_offset(ibb, ibb->handle);
 	poff_src = intel_bb_get_object_offset(ibb, src->handle);
 	poff_dst = intel_bb_get_object_offset(ibb, dst->handle);
-	igt_debug("bb  presumed offset: 0x%lx\n", poff_bb);
-	igt_debug("src presumed offset: 0x%lx\n", poff_src);
-	igt_debug("dst presumed offset: 0x%lx\n", poff_dst);
+	igt_debug("bb  presumed offset: 0x%"PRIx64"\n", poff_bb);
+	igt_debug("src presumed offset: 0x%"PRIx64"\n", poff_src);
+	igt_debug("dst presumed offset: 0x%"PRIx64"\n", poff_dst);
 	if (reloc_obj == RELOC) {
 		igt_assert(poff_bb == 0);
 		igt_assert(poff_src == 0);
@@ -289,12 +289,12 @@ static void blit(struct buf_ops *bops,
 	poff2_dst = intel_bb_get_object_offset(ibb, dst->handle);
 
 	igt_debug("purge: %d, relocs: %d\n", purge_cache, do_relocs);
-	igt_debug("bb  presumed offset: 0x%lx\n", poff_bb);
-	igt_debug("src presumed offset: 0x%lx\n", poff_src);
-	igt_debug("dst presumed offset: 0x%lx\n", poff_dst);
-	igt_debug("bb2  presumed offset: 0x%lx\n", poff2_bb);
-	igt_debug("src2 presumed offset: 0x%lx\n", poff2_src);
-	igt_debug("dst2 presumed offset: 0x%lx\n", poff2_dst);
+	igt_debug("bb  presumed offset: 0x%"PRIx64"\n", poff_bb);
+	igt_debug("src presumed offset: 0x%"PRIx64"\n", poff_src);
+	igt_debug("dst presumed offset: 0x%"PRIx64"\n", poff_dst);
+	igt_debug("bb2  presumed offset: 0x%"PRIx64"\n", poff2_bb);
+	igt_debug("src2 presumed offset: 0x%"PRIx64"\n", poff2_src);
+	igt_debug("dst2 presumed offset: 0x%"PRIx64"\n", poff2_dst);
 	if (purge_cache) {
 		if (do_relocs) {
 			igt_assert(poff2_bb == 0);
