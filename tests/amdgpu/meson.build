@@ -16,6 +16,7 @@ if libdrm_amdgpu.found()
 			  'amd_mem_leak',
 			  'amd_link_settings',
 			  'amd_vrr_range',
+			  'amd_mode_switch',
 			]
 	amdgpu_deps += libdrm_amdgpu
 endif
