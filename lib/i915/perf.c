@@ -55,6 +55,7 @@
 #include "i915_perf_metrics_ehl.h"
 #include "i915_perf_metrics_tglgt1.h"
 #include "i915_perf_metrics_tglgt2.h"
+#include "i915_perf_metrics_rkl.h"
 
 static int
 perf_ioctl(int fd, unsigned long request, void *arg)
@@ -264,6 +265,8 @@ intel_perf_for_devinfo(uint32_t device_id,
 		default:
 			unsupported_i915_perf_platform(perf);
 		}
+	} else if (devinfo->is_rocketlake) {
+		intel_perf_load_metrics_rkl(perf);
 	} else {
 		return unsupported_i915_perf_platform(perf);
 	}
