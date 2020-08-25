@@ -379,4 +379,30 @@
     <guid config_hash="e22892f60cde8659f1232e841465d9a7" mdapi_config_hash="2b0bd788a4dd148293490faa4e4462cc" id="b22d38f6-a056-496a-8d7d-dede47051806" chipset="rkl" name="EuActivity7" />
     <guid config_hash="adb6647fc3b2f89aaf0db2d7982aba41" mdapi_config_hash="b8374fb02e01d05ec140148aa6542d71" id="c68abf37-fe6e-45f6-9dcb-549b3fbef699" chipset="rkl" name="EuActivity8" />
     <guid config_hash="6a817294a8e34c900d6aadd3ca02bec8" mdapi_config_hash="9c1e8e315564af8e3c6d3fcf8f2a2cac" id="74dbc739-d871-41b5-be7b-fb547ac5bec9" chipset="rkl" name="TestOa" />
+    <guid config_hash="3b0ed513d1a7c63853a820e5e748438b" mdapi_config_hash="315a336fee753cf5618db15d2eeb19b6" id="1caf6b6d-a1ef-40d3-9033-311e482b826e" chipset="dg1" name="RenderBasic" />
+    <guid config_hash="6bfccfd98beccb8b008e8ba30a7a553b" mdapi_config_hash="c2e0ad3ca3f17e7e1dc6c9c83c83619e" id="e347a2bd-079d-4a77-b546-c3c114c55bae" chipset="dg1" name="ComputeBasic" />
+    <guid config_hash="f883320bd055670d538f60b8e6b27aff" mdapi_config_hash="ffc07e00266f5f110d13ddb6d217c58a" id="3b27f553-aebc-45ec-aa2f-926d81a91fd9" chipset="dg1" name="RenderPipeProfile" />
+    <guid config_hash="3a522ea0727a43a576351210fd6896e4" mdapi_config_hash="7e6ee2d91311ba67d5e0ab19669e5642" id="1fa73aed-3861-4c19-8105-e55986c8a4e5" chipset="dg1" name="HDCAndSF" />
+    <guid config_hash="18077e8f2d9d7ed2076a712a031dec43" mdapi_config_hash="a14b0d936832c119c334a12f3a2a4736" id="2bb016ee-a9b7-477e-8d5d-f7fd179a8f16" chipset="dg1" name="RasterizerAndPixelBackend" />
+    <guid config_hash="f2dad56fb97463feb948746a47673cfe" mdapi_config_hash="41e2d2b5bce44ef057c918f6c93aaecd" id="cdccda4b-c7c9-41a9-965f-fc2adf8cff0b" chipset="dg1" name="L3_1" />
+    <guid config_hash="d53b37306fedd5edada83df8a0c9f230" mdapi_config_hash="1799a960b844f0de04e4ba4331fa8349" id="3c44fb1b-f9b3-4d52-a507-e2b2a80ec8b7" chipset="dg1" name="L3_2" />
+    <guid config_hash="b409195dfab359d18b214b7769fc9f19" mdapi_config_hash="1764ebcd7fe7523785f0bb34abebadbe" id="ec911098-71bf-4432-9153-6143e3cfbe06" chipset="dg1" name="L3_3" />
+    <guid config_hash="46eba53287a6fd9a4e0bfb9910893843" mdapi_config_hash="a56ab80af81b9b80fa469e3d0de29cbb" id="17d351db-7916-4eea-9817-29ca522daacd" chipset="dg1" name="L3_4" />
+    <guid config_hash="d2efee8770c9bbbba1689c88c464758b" mdapi_config_hash="33d494933d4006521116be339ac25019" id="f2de5846-f330-4d26-ad41-824deb6b53f6" chipset="dg1" name="L3_5" />
+    <guid config_hash="0250bcbbcb791b76750387522e0fe3b0" mdapi_config_hash="9e633fcb9c5b1e40870082810bc37ada" id="8f4ccb12-ee11-4741-93d4-d431b8ca58ef" chipset="dg1" name="L3_6" />
+    <guid config_hash="37cc4cda9d9c8015181c719f17142c82" mdapi_config_hash="4c4a77a11765d5cf7297b1503b5a3f7d" id="d336f948-7e5c-41a9-be57-e3b01b8c829a" chipset="dg1" name="Sampler_1" />
+    <guid config_hash="ea1d527ce36e5829006f27e93eb527a3" mdapi_config_hash="6368419fc3f1a9c280d8ba44bdd7f4f1" id="c2929b2d-4ce9-4161-a1ac-fff0a75436b9" chipset="dg1" name="Sampler_2" />
+    <guid config_hash="9a88c13c80a3ddcaa5c7456380ee3fda" mdapi_config_hash="0dacd0234a9a4d8bc3b6a260c4464834" id="a98b240c-71b7-4e72-b167-8538a581e26d" chipset="dg1" name="TDL_1" />
+    <guid config_hash="58af884c274890892778f1666abf41ad" mdapi_config_hash="32ebce609c59ebe458a7e3825fb5a48c" id="5e7aa748-e1a6-4282-b3ae-48dbfb06dcf8" chipset="dg1" name="TDL_2" />
+    <guid config_hash="2b1a4a7b302b1c0097be59d352fcc28b" mdapi_config_hash="73b09f5594f2104d9b6b90a07599ec61" id="e12f8fc0-2eb9-4bf6-bf44-a13ceb42c9f7" chipset="dg1" name="TDL_3" />
+    <guid config_hash="17b1c751c0130c8949b71fd5d405778f" mdapi_config_hash="e36f027d7cc14d5d77e3978db97efdc6" id="81be185c-7ac7-4a17-85fc-4144ccba4a46" chipset="dg1" name="GpuBusyness" />
+    <guid config_hash="c4c57ffc24aeb94139731c32a28b51e1" mdapi_config_hash="c39c1c832edb8220860c46a4174d3d82" id="5354b8d9-12fd-44eb-8f7d-0a4dffae4409" chipset="dg1" name="EuActivity1" />
+    <guid config_hash="744790864bb4ff0e6600267ef6ae522a" mdapi_config_hash="eb49ba8b1a592d64e2c7996357ee540f" id="3225b6c6-805a-4e93-aaa5-5f09d87b31f9" chipset="dg1" name="EuActivity2" />
+    <guid config_hash="449a2e0ad45b8f3414a46e07d392971d" mdapi_config_hash="ff2f3818471fcf0d82e2c9bd93c4b3e9" id="c423d483-13da-4bae-9b61-c13ec19ee450" chipset="dg1" name="EuActivity3" />
+    <guid config_hash="8d5cb6bfe077f4f423c77cc39d465717" mdapi_config_hash="6abe34a989f329d4ead0f7ea8d78ca77" id="c7388ce3-9e3f-4804-a215-771791c4ea3c" chipset="dg1" name="EuActivity4" />
+    <guid config_hash="6003d223dee037ac2e24287c65d16686" mdapi_config_hash="bed831c292dd39a1d3ab99953802e09a" id="7ebc4a0a-5dc3-4de3-a8f8-2a6d1a95427f" chipset="dg1" name="EuActivity5" />
+    <guid config_hash="25117c0e61a97adaeae8070f1bd67b77" mdapi_config_hash="0e6668f4578041599c4b66f54f18a116" id="811a34c7-87f3-4d4d-b366-d4b5f5dc5be1" chipset="dg1" name="EuActivity6" />
+    <guid config_hash="302c5597353ebf81e4a8573dc8bedf89" mdapi_config_hash="8fcb9c5a064a3a38bd91cc78186f81c7" id="6ec13866-51c1-46c3-818b-c63cf38efcd5" chipset="dg1" name="EuActivity7" />
+    <guid config_hash="4630bd7b5bd097d512476903ab04938c" mdapi_config_hash="08dee2e1b8a5dde3fc89eb10fb6a5b4a" id="4bc9e67a-0ebd-4d65-86cd-2eb961ccac59" chipset="dg1" name="EuActivity8" />
+    <guid config_hash="a6fd576e08523e341220ce95087fa449" mdapi_config_hash="6c223244d277a52f874cd99a2ab89882" id="23f51139-6973-4b45-a211-778834ce2c9a" chipset="dg1" name="TestOa" />
 </guids>
