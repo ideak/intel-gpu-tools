@@ -484,8 +484,23 @@ igt_main
 		igt_skip_on_f(fd_drm < 0, "No known DRM device found\n");
 
 		if (is_i915_device(fd_drm)) {
+			uint32_t devid = intel_get_drm_devid(fd_drm);
+
 			gem_quiescent_gpu(fd_drm);
 			igt_require_gem(fd_drm);
+
+			/**
+			 * FIXME: Unbinding the i915 driver on some Haswell
+			 * platforms with Azalia audio results in a kernel WARN
+			 * on "i915 raw-wakerefs=1 wakelocks=1 on cleanup".  The
+			 * below CI friendly user level workaround prevents the
+			 * warning from appearing.  Drop this hack as soon as
+			 * this is fixed in the kernel.
+			 */
+			if (igt_warn_on_f(IS_HASWELL(devid) ||
+					  IS_BROADWELL(devid),
+			    "Manually enabling audio PM to work around a kernel WARN\n"))
+				igt_pm_enable_audio_runtime_pm();
 		}
 
 		/* Make sure subtests always reopen the same device */
