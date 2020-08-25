@@ -134,7 +134,6 @@ default_set_blacklist = { "RenderDX1x", # TODO: rename to something non 'DX'
                                         # usefull
                           "RenderBalance", # XXX: missing register config
                           "PipelineTimestamps", # Covered by API timestamp queries
-                          "AsyncCompute",
                         }
 
 counter_blacklist = {
@@ -485,8 +484,7 @@ def process_mux_configs(mdapi_set):
         mux_config_id_groups = [mux_config_id_groups[0]]
 
     if len(mux_config_id_groups) == 0 or mux_config_id_groups[0]['configs'] == 0:
-        print_err("ERROR: MUX register configs missing: MetricSet=\"" + mdapi_set.get('ShortName'))
-        sys.exit(1)
+        return ()
 
     mux_configs = mux_config_id_groups[0]['configs']
     assert isinstance(mux_configs, list)
