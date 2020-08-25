@@ -53,7 +53,8 @@
 #include "i915_perf_metrics_cnl.h"
 #include "i915_perf_metrics_icl.h"
 #include "i915_perf_metrics_ehl.h"
-#include "i915_perf_metrics_tgl.h"
+#include "i915_perf_metrics_tglgt1.h"
+#include "i915_perf_metrics_tglgt2.h"
 
 static int
 perf_ioctl(int fd, unsigned long request, void *arg)
@@ -253,7 +254,16 @@ intel_perf_for_devinfo(uint32_t device_id,
 	} else if (devinfo->is_elkhartlake) {
 		intel_perf_load_metrics_ehl(perf);
 	} else if (devinfo->is_tigerlake) {
-		intel_perf_load_metrics_tgl(perf);
+		switch (devinfo->gt) {
+		case 1:
+			intel_perf_load_metrics_tglgt1(perf);
+			break;
+		case 2:
+			intel_perf_load_metrics_tglgt2(perf);
+			break;
+		default:
+			unsupported_i915_perf_platform(perf);
+		}
 	} else {
 		return unsupported_i915_perf_platform(perf);
 	}

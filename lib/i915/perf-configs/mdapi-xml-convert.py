@@ -123,7 +123,8 @@ chipsets = {
     'CNL': gen8_11_chipset_params,
     'ICL': gen8_11_chipset_params,
     'EHL': gen8_11_chipset_params,
-    'TGL': gen8_11_chipset_params,
+    'TGLGT1': gen8_11_chipset_params,
+    'TGLGT2': gen8_11_chipset_params,
 }
 
 register_types = { 'OA', 'NOA', 'FLEX', 'PM' }
