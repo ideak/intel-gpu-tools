@@ -356,7 +356,6 @@ static void test_nonpersistent_hang(int i915, unsigned int engine)
 
 static void test_nohangcheck_hostile(int i915)
 {
-	int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
 	int dir;
 
 	cleanup(i915);
@@ -372,6 +371,7 @@ static void test_nohangcheck_hostile(int i915)
 	igt_require(__enable_hangcheck(dir, false));
 
 	for_each_physical_engine(e, i915) {
+		int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
 		uint32_t ctx = gem_context_create(i915);
 		igt_spin_t *spin;
 
@@ -391,7 +391,6 @@ static void test_nohangcheck_hostile(int i915)
 
 static void test_nohangcheck_hang(int i915)
 {
-	int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
 	int dir;
 
 	cleanup(i915);
@@ -409,6 +408,7 @@ static void test_nohangcheck_hang(int i915)
 	igt_require(__enable_hangcheck(dir, false));
 
 	for_each_physical_engine(e, i915) {
+		int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
 		uint32_t ctx = gem_context_create(i915);
 		igt_spin_t *spin;
 
