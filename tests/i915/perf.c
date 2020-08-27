@@ -1993,6 +1993,7 @@ test_blocking(uint64_t requested_oa_period, bool set_kernel_hrtimer, uint64_t ke
 
 	int64_t start, end;
 	int n = 0;
+	uint64_t max_expected_kernel_ns;
 
 	stream_fd = __perf_open(drm_fd, &param, true /* prevent_pm */);
 
@@ -2098,7 +2099,13 @@ test_blocking(uint64_t requested_oa_period, bool set_kernel_hrtimer, uint64_t ke
 	 */
 	igt_assert(n > (min_iterations + n_extra_iterations));
 
-	igt_assert(kernel_ns <= (test_duration_ns / 100ull));
+	if (set_kernel_hrtimer) {
+		max_expected_kernel_ns = kernel_hrtimer * (test_duration_ns / 100)
+					 /(5 * 1000 * 1000);
+	} else {
+		max_expected_kernel_ns = test_duration_ns / 100;
+	}
+	igt_assert(kernel_ns <= max_expected_kernel_ns);
 
 	__perf_close(stream_fd);
 }
@@ -2152,6 +2159,7 @@ test_polling(uint64_t requested_oa_period, bool set_kernel_hrtimer, uint64_t ker
 	int min_iterations = (test_duration_ns / (oa_period + (kernel_hrtimer + kernel_hrtimer / 5)));
 	int64_t start, end;
 	int n = 0;
+	uint64_t max_expected_kernel_ns;
 
 	stream_fd = __perf_open(drm_fd, &param, true /* prevent_pm */);
 
@@ -2286,7 +2294,13 @@ test_polling(uint64_t requested_oa_period, bool set_kernel_hrtimer, uint64_t ker
 	 */
 	igt_assert(n > (min_iterations + n_extra_iterations));
 
-	igt_assert(kernel_ns <= (test_duration_ns / 100ull));
+	if (set_kernel_hrtimer) {
+		max_expected_kernel_ns = kernel_hrtimer * (test_duration_ns / 100)
+					 /(5 * 1000 * 1000);
+	} else {
+		max_expected_kernel_ns = test_duration_ns / 100;
+	}
+	igt_assert(kernel_ns <= max_expected_kernel_ns);
 
 	__perf_close(stream_fd);
 }
