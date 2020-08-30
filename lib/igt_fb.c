@@ -3783,6 +3783,69 @@ bool igt_fb_supported_format(uint32_t drm_format)
 	return true;
 }
 
+/*
+ * This implements the FNV-1a hashing algorithm instead of CRC, for
+ * simplicity
+ * http://www.isthe.com/chongo/tech/comp/fnv/index.html
+ *
+ * hash = offset_basis
+ * for each octet_of_data to be hashed
+ *         hash = hash xor octet_of_data
+ *         hash = hash * FNV_prime
+ * return hash
+ *
+ * 32 bit offset_basis = 2166136261
+ * 32 bit FNV_prime = 224 + 28 + 0x93 = 16777619
+ */
+int igt_fb_get_fnv1a_crc(struct igt_fb *fb, igt_crc_t *crc)
+{
+	const uint32_t FNV1a_OFFSET_BIAS = 2166136261;
+	const uint32_t FNV1a_PRIME = 16777619;
+	uint32_t hash;
+	void *map;
+	char *ptr, *line = NULL;
+	int x, y, cpp = igt_drm_format_to_bpp(fb->drm_format) / 8;
+	uint32_t stride = calc_plane_stride(fb, 0);
+
+	if (fb->num_planes != 1)
+		return -EINVAL;
+
+	ptr = igt_fb_map_buffer(fb->fd, fb);
+	igt_assert(ptr);
+	map = ptr;
+
+	/*
+	 * Framebuffers are often uncached, which can make byte-wise accesses
+	 * very slow. We copy each line of the FB into a local buffer to speed
+	 * up the hashing.
+	 */
+	line = malloc(stride);
+	if (!line) {
+		munmap(map, fb->size);
+		return -ENOMEM;
+	}
+
+	hash = FNV1a_OFFSET_BIAS;
+
+	for (y = 0; y < fb->height; y++, ptr += stride) {
+
+		igt_memcpy_from_wc(line, ptr, fb->width * cpp);
+
+		for (x = 0; x < fb->width * cpp; x++) {
+			hash ^= line[x];
+			hash *= FNV1a_PRIME;
+		}
+	}
+
+	crc->n_words = 1;
+	crc->crc[0] = hash;
+
+	free(line);
+	igt_fb_unmap_buffer(fb, map);
+
+	return 0;
+}
+
 /**
  * igt_format_is_yuv:
  * @drm_format: drm fourcc
