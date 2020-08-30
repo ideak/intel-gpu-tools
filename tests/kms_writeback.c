@@ -30,6 +30,14 @@
 #include "igt.h"
 #include "igt_core.h"
 #include "igt_fb.h"
+#include "sw_sync.h"
+
+IGT_TEST_DESCRIPTION(
+   "This test validates the expected behavior of the writeback connectors "
+   "feature by checking if the target device support writeback; it validates "
+   "bad and good combination, check color format, and check the output result "
+   "by using CRC."
+);
 
 static drmModePropertyBlobRes *get_writeback_formats_blob(igt_output_t *output)
 {
@@ -217,6 +225,118 @@ static void writeback_fb_id(igt_output_t *output, igt_fb_t *valid_fb, igt_fb_t *
 	igt_assert(ret == 0);
 }
 
+static void fill_fb(igt_fb_t *fb, uint32_t pixel)
+{
+	void *ptr;
+
+	igt_assert(fb->drm_format == DRM_FORMAT_XRGB8888);
+
+	ptr = igt_fb_map_buffer(fb->fd, fb);
+	igt_assert(ptr);
+
+	memset(ptr, pixel, fb->strides[0] * fb->height);
+
+	igt_fb_unmap_buffer(fb, ptr);
+}
+
+static void get_and_wait_out_fence(igt_output_t *output)
+{
+	int ret;
+
+	igt_assert(output->writeback_out_fence_fd >= 0);
+
+	ret = sync_fence_wait(output->writeback_out_fence_fd, 1000);
+	igt_assert_f(ret == 0, "sync_fence_wait failed: %s\n", strerror(-ret));
+	close(output->writeback_out_fence_fd);
+	output->writeback_out_fence_fd = -1;
+}
+
+static void writeback_sequence(igt_output_t *output, igt_plane_t *plane,
+				igt_fb_t *in_fb, igt_fb_t *out_fbs[], int n_commits)
+{
+	int i = 0;
+	uint32_t in_fb_colors[2] = { 0xffff0000, 0xff00ff00 };
+	uint32_t clear_color = 0xffffffff;
+
+	igt_crc_t cleared_crc, out_expected;
+
+	for (i = 0; i < n_commits; i++) {
+		/* Change the input color each time */
+		fill_fb(in_fb, in_fb_colors[i % 2]);
+
+		if (out_fbs[i]) {
+			igt_crc_t out_before;
+
+			/* Get the expected CRC */
+			igt_fb_get_fnv1a_crc(in_fb, &out_expected);
+			fill_fb(out_fbs[i], clear_color);
+
+			if (i == 0)
+				igt_fb_get_fnv1a_crc(out_fbs[i], &cleared_crc);
+			igt_fb_get_fnv1a_crc(out_fbs[i], &out_before);
+			igt_assert_crc_equal(&cleared_crc, &out_before);
+		}
+
+		/* Commit */
+		igt_plane_set_fb(plane, in_fb);
+		igt_output_set_writeback_fb(output, out_fbs[i]);
+
+		igt_display_commit_atomic(output->display,
+					  DRM_MODE_ATOMIC_ALLOW_MODESET,
+					  NULL);
+		if (out_fbs[i])
+			get_and_wait_out_fence(output);
+
+		/* Make sure the old output buffer is untouched */
+		if (i > 0 && out_fbs[i - 1] && out_fbs[i] != out_fbs[i - 1]) {
+			igt_crc_t out_prev;
+			igt_fb_get_fnv1a_crc(out_fbs[i - 1], &out_prev);
+			igt_assert_crc_equal(&cleared_crc, &out_prev);
+		}
+
+		/* Make sure this output buffer is written */
+		if (out_fbs[i]) {
+			igt_crc_t out_after;
+			igt_fb_get_fnv1a_crc(out_fbs[i], &out_after);
+			igt_assert_crc_equal(&out_expected, &out_after);
+
+			/* And clear it, for the next time */
+			fill_fb(out_fbs[i], clear_color);
+		}
+	}
+}
+
+static void writeback_check_output(igt_output_t *output, igt_plane_t *plane,
+				   igt_fb_t *input_fb, igt_fb_t *output_fb)
+{
+	igt_fb_t *out_fbs[2] = { 0 };
+	igt_fb_t second_out_fb;
+	unsigned int fb_id;
+
+	/* One commit, with a writeback. */
+	writeback_sequence(output, plane, input_fb, &output_fb, 1);
+
+	/* Two commits, the second with no writeback */
+	out_fbs[0] = output_fb;
+	writeback_sequence(output, plane, input_fb, out_fbs, 2);
+
+	/* Two commits, both with writeback */
+	out_fbs[1] = output_fb;
+	writeback_sequence(output, plane, input_fb, out_fbs, 2);
+
+	fb_id = igt_create_fb(output_fb->fd, output_fb->width, output_fb->height,
+			      DRM_FORMAT_XRGB8888,
+			      igt_fb_mod_to_tiling(0),
+			      &second_out_fb);
+	igt_require(fb_id > 0);
+
+	/* Two commits, with different writeback buffers */
+	out_fbs[1] = &second_out_fb;
+	writeback_sequence(output, plane, input_fb, out_fbs, 2);
+
+	igt_remove_fb(output_fb->fd, &second_out_fb);
+}
+
 igt_main
 {
 	igt_display_t display;
@@ -305,6 +425,20 @@ igt_main
 		igt_require(fb_id > 0);
 
 		writeback_fb_id(output, &input_fb, &output_fb);
+
+		igt_remove_fb(display.drm_fd, &output_fb);
+	}
+
+	igt_describe("Check writeback output with CRC validation");
+	igt_subtest("writeback-check-output") {
+		igt_fb_t output_fb;
+		fb_id = igt_create_fb(display.drm_fd, mode.hdisplay, mode.vdisplay,
+				      DRM_FORMAT_XRGB8888,
+				      igt_fb_mod_to_tiling(0),
+				      &output_fb);
+		igt_require(fb_id > 0);
+
+		writeback_check_output(output, plane, &input_fb, &output_fb);
 
 		igt_remove_fb(display.drm_fd, &output_fb);
 	}
