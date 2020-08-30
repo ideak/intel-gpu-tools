@@ -89,6 +89,7 @@ TESTS_progs = \
 	kms_universal_plane \
 	kms_vblank \
 	kms_vrr \
+	kms_writeback \
 	meta_test \
 	prime_busy \
 	prime_mmap \
