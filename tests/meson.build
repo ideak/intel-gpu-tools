@@ -37,6 +37,7 @@ test_progs = [
 	'kms_fence_pin_leak',
 	'kms_flip',
 	'kms_flip_event_leak',
+	'kms_flip_scaled_crc',
 	'kms_flip_tiling',
 	'kms_force_connector_basic',
 	'kms_frontbuffer_tracking',
