@@ -124,6 +124,7 @@ def generate_metric_sets(args, gen):
                 metric_set->a_offset = 1;
                 metric_set->b_offset = metric_set->a_offset + 45;
                 metric_set->c_offset = metric_set->b_offset + 8;
+                metric_set->perfcnt_offset = metric_set->c_offset + 8;
 
             """))
         else:
@@ -136,6 +137,7 @@ def generate_metric_sets(args, gen):
                 metric_set->a_offset = 2;
                 metric_set->b_offset = metric_set->a_offset + 36;
                 metric_set->c_offset = metric_set->b_offset + 8;
+                metric_set->perfcnt_offset = metric_set->c_offset + 8;
 
             """))
 

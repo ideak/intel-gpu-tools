@@ -166,8 +166,8 @@ def print_err(*args):
     sys.stderr.write(' '.join(map(str,args)) + '\n')
 
 read_register_offsets = {
-    0x1f0: 'PERFCNT1',
-    0x1f8: 'PERFCNT2',
+    0x1f0: 'PERFCNT 0',
+    0x1f8: 'PERFCNT 1',
 }
 
 def read_value(chipset, offset):
@@ -209,7 +209,7 @@ def read_token_to_rpn_read(chipset, token, raw_offsets):
         elif offset < report_size:
             return "C " + str(int((offset - c_offset) / 4)) + " READ"
         else:
-            return "{0} READ_REG".format(read_value(chipset, offset))
+            return "{0} READ".format(read_value(chipset, offset))
     else:
         idx = int(offset / 8)
         if chipset == "HSW":
@@ -225,7 +225,7 @@ def read_token_to_rpn_read(chipset, token, raw_offsets):
             elif idx < 62:
                 return "C " + str(idx - 54) + " READ"
             else:
-                return "{0} READ_REG".format(read_value(chipset, offset))
+                return "{0} READ".format(read_value(chipset, offset))
         else:
             # For Gen8+ the array of accumulated counters is
             # assumed to start with a GPU_TIME then GPU_CLOCK,
@@ -242,7 +242,7 @@ def read_token_to_rpn_read(chipset, token, raw_offsets):
             elif idx < 54:
                 return "C " + str(idx - 46) + " READ"
             else:
-                return "{0} READ_REG".format(read_value(chipset, offset))
+                return "{0} READ".format(read_value(chipset, offset))
 
     assert 0
 

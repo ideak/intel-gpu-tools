@@ -116,7 +116,7 @@ typedef enum {
 
 /* Hold deltas of raw performance counters. */
 struct intel_perf_accumulator {
-#define INTEL_PERF_MAX_RAW_OA_COUNTERS 62
+#define INTEL_PERF_MAX_RAW_OA_COUNTERS 64
 	uint64_t deltas[INTEL_PERF_MAX_RAW_OA_COUNTERS];
 };
 
@@ -174,6 +174,7 @@ struct intel_perf_metric_set {
 	int a_offset;
 	int b_offset;
 	int c_offset;
+	int perfcnt_offset;
 
 	struct intel_perf_register_prog *b_counter_regs;
 	uint32_t n_b_counter_regs;

@@ -26,7 +26,7 @@ AC_INIT([igt-gpu-tools],
 	[https://bugs.freedesktop.org/enter_bug.cgi?product=DRI&component=IGT],
 	[igt-gpu-tools])
 
-AC_SUBST([i915_perf_version], [1.0.0], [libi915_perf.so version])
+AC_SUBST([i915_perf_version], [1.2.0], [libi915_perf.so version])
 
 AC_CONFIG_SRCDIR([Makefile.am])
 AC_CONFIG_HEADERS([config.h])

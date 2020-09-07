@@ -142,7 +142,6 @@ class Gen:
         self.ops["FMUL"]     = (2, self.emit_fmul)
         self.ops["FSUB"]     = (2, self.emit_fsub)
         self.ops["READ"]     = (2, self.emit_read)
-        self.ops["READ_REG"] = (1, self.emit_read_reg)
         self.ops["UADD"]     = (2, self.emit_uadd)
         self.ops["UDIV"]     = (2, self.emit_udiv)
         self.ops["UMUL"]     = (2, self.emit_umul)
@@ -202,13 +201,6 @@ class Gen:
     def emit_read(self, tmp_id, args):
         type = args[1].lower()
         self.c("uint64_t tmp{0} = accumulator[metric_set->{1}_offset + {2}];".format(tmp_id, type, args[0]))
-        return tmp_id + 1
-
-    # Disabled here as the generated code is not capturing registers. This
-    # will only be useful for query mode where the driver captures
-    # additional registers.
-    def emit_read_reg(self, tmp_id, args):
-        self.c("uint64_t tmp{0} = 0;".format(tmp_id))
         return tmp_id + 1
 
     def emit_uadd(self, tmp_id, args):
