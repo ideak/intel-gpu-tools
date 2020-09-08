@@ -42,6 +42,7 @@ IGT_TEST_DESCRIPTION("Examine behavior of a driver on device hot unplug");
 struct hotunplug {
 	struct {
 		int drm;
+		int drm_hc;	/* for health check */
 		int sysfs_dev;
 		int sysfs_bus;
 		int sysfs_drv;
@@ -200,7 +201,9 @@ static void bus_rescan(struct hotunplug *priv, int timeout)
 
 static void cleanup(struct hotunplug *priv)
 {
-	priv->fd.drm = close_device(priv->fd.drm, "post ", "failed ");
+	priv->fd.drm = close_device(priv->fd.drm, "post ", "exercised ");
+	priv->fd.drm_hc = close_device(priv->fd.drm_hc, "post ",
+							"health checked ");
 	priv->fd.sysfs_dev = close_sysfs(priv->fd.sysfs_dev);
 }
 
@@ -286,14 +289,14 @@ static void node_healthcheck(struct hotunplug *priv, unsigned flags)
 {
 	bool render = flags & FLAG_RENDER;
 	/* preserve potentially dirty device status stored in priv->fd.drm */
-	bool closed = priv->fd.drm == -1;
+	bool closed = priv->fd.drm_hc == -1;
 	int fd_drm;
 
 	priv->failure = render ? "Render device reopen failure!" :
 				 "DRM device reopen failure!";
 	fd_drm = local_drm_open_driver(render, "re", " for health check");
 	if (closed)	/* store fd for cleanup if not dirty */
-		priv->fd.drm = fd_drm;
+		priv->fd.drm_hc = fd_drm;
 
 	if (is_i915_device(fd_drm)) {
 		/* don't report library failed asserts as healthcheck failure */
@@ -311,7 +314,7 @@ static void node_healthcheck(struct hotunplug *priv, unsigned flags)
 
 	fd_drm = close_device(fd_drm, "", "health checked ");
 	if (closed || fd_drm < -1)	/* update status for post_healthcheck */
-		priv->fd.drm = fd_drm;
+		priv->fd.drm_hc = fd_drm;
 }
 
 static void healthcheck(struct hotunplug *priv, bool recover)
@@ -334,7 +337,7 @@ static void recover(struct hotunplug *priv)
 
 	/* unbind the driver from a possibly hot rebound unhealthy device */
 	if (!faccessat(priv->fd.sysfs_drv, priv->dev_bus_addr, F_OK, 0) &&
-	    priv->fd.drm == -1 && priv->failure)
+	    priv->fd.drm == -1 && priv->fd.drm_hc == -1 && priv->failure)
 		driver_unbind(priv, "post ", 60);
 
 	if (faccessat(priv->fd.sysfs_bus, priv->dev_bus_addr, F_OK, 0))
@@ -353,6 +356,7 @@ static void post_healthcheck(struct hotunplug *priv)
 
 	cleanup(priv);
 	igt_require(priv->fd.drm == -1);
+	igt_require(priv->fd.drm_hc == -1);
 }
 
 static void set_filter_from_device(int fd)
@@ -375,6 +379,7 @@ static void set_filter_from_device(int fd)
 static void unbind_rebind(struct hotunplug *priv)
 {
 	igt_assert_eq(priv->fd.drm, -1);
+	igt_assert_eq(priv->fd.drm_hc, -1);
 
 	driver_unbind(priv, "", 0);
 
@@ -386,6 +391,7 @@ static void unbind_rebind(struct hotunplug *priv)
 static void unplug_rescan(struct hotunplug *priv)
 {
 	igt_assert_eq(priv->fd.drm, -1);
+	igt_assert_eq(priv->fd.drm_hc, -1);
 
 	device_unplug(priv, "", 0);
 
@@ -397,6 +403,7 @@ static void unplug_rescan(struct hotunplug *priv)
 static void hotunbind_rebind(struct hotunplug *priv)
 {
 	igt_assert_eq(priv->fd.drm, -1);
+	igt_assert_eq(priv->fd.drm_hc, -1);
 	priv->fd.drm = local_drm_open_driver(false, "", " for hot unbind");
 
 	driver_unbind(priv, "hot ", 0);
@@ -412,6 +419,7 @@ static void hotunbind_rebind(struct hotunplug *priv)
 static void hotunplug_rescan(struct hotunplug *priv)
 {
 	igt_assert_eq(priv->fd.drm, -1);
+	igt_assert_eq(priv->fd.drm_hc, -1);
 	priv->fd.drm = local_drm_open_driver(false, "", " for hot unplug");
 
 	device_unplug(priv, "hot ", 0);
@@ -427,11 +435,14 @@ static void hotunplug_rescan(struct hotunplug *priv)
 static void hotrebind_lateclose(struct hotunplug *priv)
 {
 	igt_assert_eq(priv->fd.drm, -1);
+	igt_assert_eq(priv->fd.drm_hc, -1);
 	priv->fd.drm = local_drm_open_driver(false, "", " for hot rebind");
 
 	driver_unbind(priv, "hot ", 60);
 
 	driver_bind(priv, 0);
+
+	healthcheck(priv, false);
 
 	priv->fd.drm = close_device(priv->fd.drm, "late ", "unbound ");
 	igt_assert_eq(priv->fd.drm, -1);
@@ -442,11 +453,14 @@ static void hotrebind_lateclose(struct hotunplug *priv)
 static void hotreplug_lateclose(struct hotunplug *priv)
 {
 	igt_assert_eq(priv->fd.drm, -1);
+	igt_assert_eq(priv->fd.drm_hc, -1);
 	priv->fd.drm = local_drm_open_driver(false, "", " for hot replug");
 
 	device_unplug(priv, "hot ", 60);
 
 	bus_rescan(priv, 0);
+
+	healthcheck(priv, false);
 
 	priv->fd.drm = close_device(priv->fd.drm, "late ", "removed ");
 	igt_assert_eq(priv->fd.drm, -1);
@@ -459,7 +473,7 @@ static void hotreplug_lateclose(struct hotunplug *priv)
 igt_main
 {
 	struct hotunplug priv = {
-		.fd		= { .drm = -1, .sysfs_dev = -1, },
+		.fd		= { .drm = -1, .drm_hc = -1, .sysfs_dev = -1, },
 		.failure	= NULL,
 	};
 
