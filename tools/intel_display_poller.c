@@ -1128,8 +1128,7 @@ int main(int argc, char *argv[])
 		default:
 			usage(argv[0]);
 		}
-	} else if (HAS_PCH_SPLIT(devid) &&
-		   (IS_GEN5(devid) || IS_GEN6(devid) || IS_GEN7(devid))) {
+	} else {
 		if (pipe > 1 &&
 		    (IS_GEN5(devid) || IS_GEN6(devid)))
 			usage(argv[0]);
@@ -1154,29 +1153,6 @@ int main(int argc, char *argv[])
 		default:
 			usage(argv[0]);
 		}
-	} else if (intel_gen(devid) >= 8) {
-		if (test_pixelcount)
-			usage(argv[0]);
-
-		switch (test) {
-		case TEST_IIR:
-			test = TEST_DEIIR;
-			break;
-		case TEST_FRAMECOUNT:
-			test = TEST_FRAMECOUNT_G4X;
-			break;
-		case TEST_FLIPCOUNT:
-		case TEST_PAN:
-		case TEST_FLIP:
-		case TEST_SURFLIVE:
-		case TEST_WRAP:
-		case TEST_FIELD:
-			break;
-		default:
-			usage(argv[0]);
-		}
-	} else {
-		usage(argv[0]);
 	}
 
 	switch (test) {
