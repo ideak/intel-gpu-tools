@@ -58,7 +58,7 @@ enum test {
 };
 
 static uint32_t vlv_offset;
-static uint16_t pipe_offset[3] = { 0, 0x1000, 0x2000, };
+static uint16_t pipe_offset[4] = { 0, 0x1000, 0x2000, 0x3000, };
 
 #define PIPE_REG(pipe, reg_a) (pipe_offset[(pipe)] + (reg_a))
 
@@ -1023,7 +1023,7 @@ int main(int argc, char *argv[])
 				pipe -= '0';
 			else
 				usage(argv[0]);
-			if (pipe < 0 || pipe > 2)
+			if (pipe < 0 || pipe > 3)
 				usage(argv[0]);
 			break;
 		case 'b':
@@ -1104,6 +1104,8 @@ int main(int argc, char *argv[])
 
 		if (pipe > 1 && !IS_CHERRYVIEW(devid))
 			usage(argv[0]);
+		if (pipe > 2)
+			usage(argv[0]);
 
 		if (test_pixelcount)
 			usage(argv[0]);
@@ -1128,6 +1130,10 @@ int main(int argc, char *argv[])
 		}
 	} else {
 		if (pipe > 1 && intel_gen(devid) < 7)
+			usage(argv[0]);
+		if (pipe > 2 && intel_gen(devid) < 12)
+			usage(argv[0]);
+		if (pipe > 3)
 			usage(argv[0]);
 
 		if (test_pixelcount)
