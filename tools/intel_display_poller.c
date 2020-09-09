@@ -96,7 +96,7 @@ static char pipe_name(int pipe)
 
 static int pipe_to_plane(uint32_t devid, int pipe)
 {
-	if (!IS_GEN2(devid) && !IS_GEN3(devid))
+	if (intel_gen(devid) >= 4)
 		return pipe;
 
 	switch (pipe) {
@@ -145,7 +145,7 @@ static uint32_t dspsurf_reg(uint32_t devid, int pipe)
 {
 	int plane = pipe_to_plane(devid, pipe);
 
-	if (IS_GEN2(devid) || IS_GEN3(devid))
+	if (intel_gen(devid) < 4)
 		return PIPE_REG(plane, DSPABASE);
 	else
 		return PIPE_REG(plane, DSPASURF);
@@ -1053,7 +1053,7 @@ int main(int argc, char *argv[])
 	 * check if the requires registers are
 	 * avilable on the current platform.
 	 */
-	if (IS_GEN2(devid)) {
+	if (intel_gen(devid) == 2) {
 		if (pipe > 1)
 			usage(argv[0]);
 
@@ -1073,8 +1073,7 @@ int main(int argc, char *argv[])
 		default:
 			usage(argv[0]);
 		}
-	} else if (IS_GEN3(devid) ||
-		   (IS_GEN4(devid) && !IS_G4X(devid))) {
+	} else if (intel_gen(devid) < 5 && !IS_G4X(devid)) {
 		if (pipe > 1)
 			usage(argv[0]);
 
@@ -1091,14 +1090,13 @@ int main(int argc, char *argv[])
 		case TEST_FIELD:
 			break;
 		case TEST_FLIP:
-			if (IS_GEN3(devid))
+			if (intel_gen(devid) == 3)
 				test = TEST_PAN;
 			break;
 		default:
 			usage(argv[0]);
 		}
-	} else if (IS_G4X(devid) ||
-		   IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid)) {
+	} else if (IS_G4X(devid) || IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid)) {
 		if (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid))
 			vlv_offset = 0x180000;
 		if (IS_CHERRYVIEW(devid))
@@ -1129,8 +1127,7 @@ int main(int argc, char *argv[])
 			usage(argv[0]);
 		}
 	} else {
-		if (pipe > 1 &&
-		    (IS_GEN5(devid) || IS_GEN6(devid)))
+		if (pipe > 1 && intel_gen(devid) < 7)
 			usage(argv[0]);
 
 		if (test_pixelcount)
