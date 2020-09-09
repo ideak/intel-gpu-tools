@@ -329,7 +329,7 @@ test_write_cpu_read_wc(int fd, int force_domain)
 }
 
 static void
-test_write_gtt_read_wc(int fd)
+test_write_wc_read_gtt(int fd)
 {
 	uint32_t handle;
 	uint32_t *src, *dst;
@@ -350,7 +350,7 @@ test_write_gtt_read_wc(int fd)
 }
 
 static void
-test_write_wc_read_gtt(int fd)
+test_write_gtt_read_wc(int fd)
 {
 	uint32_t handle;
 	uint32_t *src, *dst;
@@ -616,7 +616,7 @@ igt_main
 		igt_fixture gem_require_mappable_ggtt(fd);
 		igt_subtest("write-wc-read-gtt")
 			test_write_wc_read_gtt(fd);
-		igt_subtest("write-gtt-read-gtt")
+		igt_subtest("write-gtt-read-wc")
 			test_write_gtt_read_wc(fd);
 	}
 
