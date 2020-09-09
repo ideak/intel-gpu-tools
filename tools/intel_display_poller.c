@@ -52,6 +52,9 @@ enum test {
 	TEST_FLIPCOUNT,
 	TEST_PAN,
 	TEST_FLIP,
+	TEST_FLIPDONE,
+	TEST_FLIPDONE_PIPESTAT,
+	TEST_FLIPDONE_DEIIR,
 	TEST_SURFLIVE,
 	TEST_WRAP,
 	TEST_FIELD,
@@ -789,6 +792,158 @@ static void poll_dsl_flip(uint32_t devid, int pipe, int target_scanline, int tar
 	write_reg(surf, saved);
 }
 
+static void poll_dsl_flipdone_pipestat(uint32_t devid, int pipe, int target_scanline, int target_fuzz,
+				       uint32_t *min, uint32_t *max, const int count)
+{
+	uint32_t dsl, dsl1 = 0, dsl2 = 0;
+	uint32_t pipestat, pipestat1, pipestat2, pipestat_save;
+	bool field1 = false, field2 = false;
+	uint32_t saved, next, surf = 0, bit;
+	int i[2] = {};
+
+	dsl = PIPE_REG(pipe, PIPEA_DSL);
+	pipestat = PIPE_REG(pipe, PIPEASTAT);
+	surf = dspsurf_reg(devid, pipe);
+
+	bit = 1 << 10;
+
+	saved = read_reg(surf);
+	next = saved;
+
+	pipestat_save = read_reg(pipestat) & 0x7fff0000;
+	pipestat1 = pipestat_save & ~(1 << (bit<<16));
+	write_reg(pipestat, pipestat1 | bit);
+
+	while (!quit) {
+		while (!quit) {
+			dsl1 = read_reg(dsl);
+			field1 = dsl1 & 0x80000000;
+			dsl1 &= ~0x80000000;
+			if (dsl1 == target_scanline)
+				break;
+		}
+
+		write_reg(pipestat, pipestat1 | bit);
+		if (next == saved)
+			next = saved+256*1024;
+		else
+			next = saved;
+		write_reg(surf, next);
+
+		while (!quit) {
+			pipestat2 = read_reg(pipestat);
+			dsl2 = read_reg(dsl);
+
+			field2 = dsl2 & 0x80000000;
+			dsl2 &= ~0x80000000;
+
+			if (pipestat2 & bit)
+				break;
+		}
+
+		write_reg(pipestat, pipestat1 | bit);
+
+		if (field1 != field2)
+			printf("fields are different (%u:%u -> %u:%u)\n",
+			       field1, dsl1, field2, dsl2);
+
+		min[field1*count+i[field1]] = dsl1;
+		max[field1*count+i[field1]] = dsl2;
+		if (++i[field1] >= count)
+			break;
+	}
+
+	write_reg(surf, saved);
+	write_reg(pipestat, pipestat_save);
+}
+
+static void poll_dsl_flipdone_deiir(uint32_t devid, int pipe, int target_scanline, int target_fuzz,
+				    uint32_t *min, uint32_t *max, const int count)
+{
+	uint32_t dsl, dsl1 = 0, dsl2 = 0;
+	uint32_t iir, iir2, ier, imr;
+	uint32_t ier_save, imr_save;
+	bool field1 = false, field2 = false;
+	uint32_t saved, next, surf = 0, bit;
+	int i[2] = {};
+
+	dsl = PIPE_REG(pipe, PIPEA_DSL);
+	surf = dspsurf_reg(devid, pipe);
+
+	if (intel_gen(devid) >= 9)
+		bit = 3;
+	else if (intel_gen(devid) >= 8)
+		bit = 4;
+	else if (intel_gen(devid) >= 7)
+		bit = 3 + 5 * pipe;
+	else if (intel_gen(devid) >= 5)
+		bit = 26 + pipe;
+	else
+		abort();
+	bit = 1 << bit;
+
+	if (intel_gen(devid) >= 8) {
+		iir = GEN8_DE_PIPE_IIR(pipe);
+		ier = GEN8_DE_PIPE_IER(pipe);
+		imr = GEN8_DE_PIPE_IMR(pipe);
+	} else {
+		iir = DEIIR;
+		ier = DEIER;
+		imr = DEIMR;
+	}
+
+	saved = read_reg(surf);
+	next = saved;
+
+	imr_save = read_reg(imr);
+	ier_save = read_reg(ier);
+	write_reg(ier, ier_save & ~bit);
+	write_reg(imr, imr_save & ~bit);
+
+	while (!quit) {
+		while (!quit) {
+			dsl1 = read_reg(dsl);
+			field1 = dsl1 & 0x80000000;
+			dsl1 &= ~0x80000000;
+			if (dsl1 == target_scanline)
+				break;
+		}
+
+		write_reg(iir, bit);
+		if (next == saved)
+			next = saved+256*1024;
+		else
+			next = saved;
+		write_reg(surf, next);
+
+		while (!quit) {
+			iir2 = read_reg(iir);
+			dsl2 = read_reg(dsl);
+
+			field2 = dsl2 & 0x80000000;
+			dsl2 &= ~0x80000000;
+
+			if (iir2 & bit)
+				break;
+		}
+
+		write_reg(iir, bit);
+
+		if (field1 != field2)
+			printf("fields are different (%u:%u -> %u:%u)\n",
+			       field1, dsl1, field2, dsl2);
+
+		min[field1*count+i[field1]] = dsl1;
+		max[field1*count+i[field1]] = dsl2;
+		if (++i[field1] >= count)
+			break;
+	}
+
+	write_reg(surf, saved);
+	write_reg(imr, imr_save);
+	write_reg(ier, ier_save);
+}
+
 static void poll_dsl_surflive(uint32_t devid, int pipe,
 			      uint32_t *min, uint32_t *max, const int count)
 {
@@ -933,6 +1088,12 @@ static const char *test_name(enum test test, int pipe, int bit, bool test_pixel_
 	case TEST_FLIP:
 		snprintf(str, sizeof str, "%s / pipe %c / Flip", type, pipe_name(pipe));
 		return str;
+	case TEST_FLIPDONE_PIPESTAT:
+		snprintf(str, sizeof str, "%s / pipe %c / Flip done (vlv/chv)", type, pipe_name(pipe));
+		return str;
+	case TEST_FLIPDONE_DEIIR:
+		snprintf(str, sizeof str, "%s / pipe %c / Flip done (pch)", type, pipe_name(pipe));
+		return str;
 	case TEST_SURFLIVE:
 		snprintf(str, sizeof str, "%s / pipe %c / Surflive", type, pipe_name(pipe));
 		return str;
@@ -950,7 +1111,7 @@ static const char *test_name(enum test test, int pipe, int bit, bool test_pixel_
 static void __attribute__((noreturn)) usage(const char *name)
 {
 	fprintf(stderr, "Usage: %s [options]\n"
-		" -t,--test <pipestat|iir|framecount|flipcount|pan|flip|surflive|wrap|field>\n"
+		" -t,--test <pipestat|iir|framecount|flipcount|pan|flip|flipdone|surflive|wrap|field>\n"
 		" -p,--pipe <pipe>\n"
 		" -b,--bit <bit>\n"
 		" -l,--line <target scanline/pixel>\n"
@@ -1002,6 +1163,8 @@ int main(int argc, char *argv[])
 				test = TEST_PAN;
 			else if (!strcmp(optarg, "flip"))
 				test = TEST_FLIP;
+			else if (!strcmp(optarg, "flipdone"))
+				test = TEST_FLIPDONE;
 			else if (!strcmp(optarg, "surflive"))
 				test = TEST_SURFLIVE;
 			else if (!strcmp(optarg, "wrap"))
@@ -1117,6 +1280,16 @@ int main(int argc, char *argv[])
 		case TEST_FRAMECOUNT:
 			test = TEST_FRAMECOUNT_G4X;
 			break;
+		case TEST_FLIPDONE:
+			/*
+			 * g4x has no apparent "flip done" interrupt,
+			 * and the "flip pending" interrupt does not
+			 * seem to do anything with mmio flips.
+			 */
+			if (IS_G4X(devid))
+				usage(argv[0]);
+			test = TEST_FLIPDONE_PIPESTAT;
+			break;
 		case TEST_FLIPCOUNT:
 		case TEST_PIPESTAT:
 		case TEST_PAN:
@@ -1146,6 +1319,9 @@ int main(int argc, char *argv[])
 		case TEST_FRAMECOUNT:
 			test = TEST_FRAMECOUNT_G4X;
 			break;
+		case TEST_FLIPDONE:
+			test = TEST_FLIPDONE_DEIIR;
+			break;
 		case TEST_FLIPCOUNT:
 		case TEST_PAN:
 		case TEST_FLIP:
@@ -1161,6 +1337,7 @@ int main(int argc, char *argv[])
 	switch (test) {
 	case TEST_IIR:
 	case TEST_FRAMECOUNT:
+	case TEST_FLIPDONE:
 		/* should no longer have the generic tests here */
 		assert(0);
 	default:
@@ -1225,6 +1402,14 @@ int main(int argc, char *argv[])
 		else
 			poll_dsl_flip(devid, pipe, target_scanline, target_fuzz,
 				      min, max, count);
+		break;
+	case TEST_FLIPDONE_PIPESTAT:
+		poll_dsl_flipdone_pipestat(devid, pipe, target_scanline, target_fuzz,
+					   min, max, count);
+		break;
+	case TEST_FLIPDONE_DEIIR:
+		poll_dsl_flipdone_deiir(devid, pipe, target_scanline, target_fuzz,
+					min, max, count);
 		break;
 	case TEST_SURFLIVE:
 		poll_dsl_surflive(devid, pipe, min, max, count);
