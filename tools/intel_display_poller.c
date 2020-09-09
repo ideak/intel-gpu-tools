@@ -128,9 +128,9 @@ static uint32_t dspoffset_reg(uint32_t devid, int pipe)
 	bool use_tileoff;
 	int plane = pipe_to_plane(devid, pipe);
 
-	if (IS_GEN2(devid) || IS_GEN3(devid))
+	if (intel_gen(devid) < 4)
 		use_tileoff = false;
-	else if (IS_HASWELL(devid) || IS_BROADWELL(devid))
+	else if (IS_HASWELL(devid) || IS_BROADWELL(devid) || intel_gen(devid) >= 9)
 		use_tileoff = true;
 	else
 		use_tileoff = read_reg(PIPE_REG(plane, DSPACNTR)) & DISPLAY_PLANE_TILED;
