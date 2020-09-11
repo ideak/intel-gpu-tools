@@ -144,7 +144,7 @@ static bool format_is_interleaved_yuv(int format)
 	return false;
 }
 
-static void emit_surface_state_cmd(struct intel_batchbuffer *batch,
+static void emit_surface_state_cmd(struct intel_bb *ibb,
 				   int surface_id,
 				   int width, int height, int bpp,
 				   int pitch, uint32_t tiling, int format,
@@ -152,7 +152,7 @@ static void emit_surface_state_cmd(struct intel_batchbuffer *batch,
 {
 	struct vebox_surface_state *ss;
 
-	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 4);
+	ss = intel_bb_ptr_align(ibb, 4);
 
 	ss->ss0.cmd_type = 3;
 	ss->ss0.media_cmd_pipeline = 2;
@@ -175,21 +175,19 @@ static void emit_surface_state_cmd(struct intel_batchbuffer *batch,
 	ss->ss4.u_y_offset = uv_offset / pitch;
 
 	ss->ss7.derived_surface_pitch = pitch - 1;
+
+	intel_bb_ptr_add(ibb, sizeof(*ss));
 }
 
-static void emit_tiling_convert_cmd(struct intel_batchbuffer *batch,
-				    drm_intel_bo *input_bo,
-				    uint32_t input_tiling,
-				    uint32_t input_compression,
-				    drm_intel_bo *output_bo,
-				    uint32_t output_tiling,
-				    uint32_t output_compression)
+static void emit_tiling_convert_cmd(struct intel_bb *ibb,
+				    struct intel_buf *src,
+				    struct intel_buf *dst)
 {
-	uint32_t reloc_delta;
+	uint32_t reloc_delta, tc_offset, offset;
 	struct vebox_tiling_convert *tc;
-	int ret;
 
-	tc = intel_batchbuffer_subdata_alloc(batch, sizeof(*tc), 8);
+	tc = intel_bb_ptr_align(ibb, 8);
+	tc_offset = intel_bb_offset(ibb);
 
 	tc->tc0.cmd_type = 3;
 	tc->tc0.pipeline = 2;
@@ -198,71 +196,70 @@ static void emit_tiling_convert_cmd(struct intel_batchbuffer *batch,
 
 	tc->tc0.dw_count = 3;
 
-	if (input_compression != I915_COMPRESSION_NONE) {
+	if (src->compression != I915_COMPRESSION_NONE) {
 		tc->tc1_2.input_memory_compression_enable = 1;
 		tc->tc1_2.input_compression_type =
-			input_compression == I915_COMPRESSION_RENDER;
+			src->compression == I915_COMPRESSION_RENDER;
 	}
-	tc->tc1_2.input_tiled_resource_mode = input_tiling == I915_TILING_Yf;
+	tc->tc1_2.input_tiled_resource_mode = src->tiling == I915_TILING_Yf;
 	reloc_delta = tc->tc1_2_l;
 
-	igt_assert(input_bo->offset64 == ALIGN(input_bo->offset64, 0x1000));
-	tc->tc1_2.input_address = input_bo->offset64 >> 12;
+	igt_assert(src->addr.offset == ALIGN(src->addr.offset, 0x1000));
+	tc->tc1_2.input_address = src->addr.offset >> 12;
 	igt_assert(reloc_delta <= INT32_MAX);
-	ret = drm_intel_bo_emit_reloc(batch->bo,
-				      intel_batchbuffer_subdata_offset(batch, tc) +
-					offsetof(typeof(*tc), tc1_2),
-				      input_bo, reloc_delta,
-				      0, 0);
-	igt_assert(ret == 0);
 
-	if (output_compression != I915_COMPRESSION_NONE) {
+	offset = tc_offset + offsetof(typeof(*tc), tc1_2);
+	intel_bb_offset_reloc_with_delta(ibb, src->handle, 0, 0,
+					 reloc_delta, offset,
+					 src->addr.offset);
+
+	if (dst->compression != I915_COMPRESSION_NONE) {
 		tc->tc3_4.output_memory_compression_enable = 1;
 		tc->tc3_4.output_compression_type =
-			output_compression == I915_COMPRESSION_RENDER;
+			dst->compression == I915_COMPRESSION_RENDER;
 	}
-	tc->tc3_4.output_tiled_resource_mode = output_tiling == I915_TILING_Yf;
+	tc->tc3_4.output_tiled_resource_mode = dst->tiling == I915_TILING_Yf;
 	reloc_delta = tc->tc3_4_l;
 
-	igt_assert(output_bo->offset64 == ALIGN(output_bo->offset64, 0x1000));
-	tc->tc3_4.output_address = output_bo->offset64 >> 12;
+	igt_assert(dst->addr.offset == ALIGN(dst->addr.offset, 0x1000));
+	tc->tc3_4.output_address = dst->addr.offset >> 12;
 	igt_assert(reloc_delta <= INT32_MAX);
-	ret = drm_intel_bo_emit_reloc(batch->bo,
-				      intel_batchbuffer_subdata_offset(batch, tc) +
-					offsetof(typeof(*tc), tc3_4),
-				      output_bo, reloc_delta,
-				      0, I915_GEM_DOMAIN_RENDER);
-	igt_assert(ret == 0);
 
+	offset = tc_offset + offsetof(typeof(*tc), tc3_4);
+	intel_bb_offset_reloc_with_delta(ibb, dst->handle,
+					 0, I915_GEM_DOMAIN_RENDER,
+					 reloc_delta, offset,
+					 dst->addr.offset);
+
+	intel_bb_ptr_add(ibb, sizeof(*tc));
 }
 
 /* Borrowing the idea from the rendercopy state setup. */
 #define BATCH_STATE_SPLIT 2048
 
-void gen12_vebox_copyfunc(struct intel_batchbuffer *batch,
-			  const struct igt_buf *src,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst)
+void gen12_vebox_copyfunc(struct intel_bb *ibb,
+			  struct intel_buf *src,
+			  unsigned int width, unsigned int height,
+			  struct intel_buf *dst)
 {
 	struct aux_pgtable_info aux_pgtable_info = { };
 	uint32_t aux_pgtable_state;
 	int format;
 
-	intel_batchbuffer_flush_on_ring(batch, I915_EXEC_VEBOX);
+	igt_assert(src->bpp == dst->bpp);
 
-	intel_batchbuffer_align(batch, 8);
+	intel_bb_flush(ibb, ibb->ctx, I915_EXEC_VEBOX);
 
-	batch->ptr = &batch->buffer[BATCH_STATE_SPLIT];
+	intel_bb_add_intel_buf(ibb, dst, true);
+	intel_bb_add_intel_buf(ibb, src, false);
 
-	gen12_aux_pgtable_init(&aux_pgtable_info, batch->bufmgr, src, dst);
+	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
+	gen12_aux_pgtable_init(&aux_pgtable_info, ibb, src, dst);
+	aux_pgtable_state = gen12_create_aux_pgtable_state(ibb,
+							   aux_pgtable_info.pgtable_buf);
 
-	aux_pgtable_state = gen12_create_aux_pgtable_state(batch,
-							   aux_pgtable_info.pgtable_bo);
-
-	assert(batch->ptr < &batch->buffer[4095]);
-	batch->ptr = batch->buffer;
-
-	gen12_emit_aux_pgtable_state(batch, aux_pgtable_state, false);
+	intel_bb_ptr_set(ibb, 0);
+	gen12_emit_aux_pgtable_state(ibb, aux_pgtable_state, false);
 
 	/* The tiling convert command can't convert formats. */
 	igt_assert_eq(src->format_is_yuv, dst->format_is_yuv);
@@ -292,24 +289,26 @@ void gen12_vebox_copyfunc(struct intel_batchbuffer *batch,
 
 	igt_assert(!src->format_is_yuv_semiplanar ||
 		   (src->surface[1].offset && dst->surface[1].offset));
-	emit_surface_state_cmd(batch, VEBOX_SURFACE_INPUT,
+	emit_surface_state_cmd(ibb, VEBOX_SURFACE_INPUT,
 			       width, height, src->bpp,
 			       src->surface[0].stride,
 			       src->tiling, format, src->surface[1].offset);
 
-	emit_surface_state_cmd(batch, VEBOX_SURFACE_OUTPUT,
+	emit_surface_state_cmd(ibb, VEBOX_SURFACE_OUTPUT,
 			       width, height, dst->bpp,
 			       dst->surface[0].stride,
 			       dst->tiling, format, dst->surface[1].offset);
 
-	emit_tiling_convert_cmd(batch,
-				src->bo, src->tiling, src->compression,
-				dst->bo, dst->tiling, dst->compression);
+	emit_tiling_convert_cmd(ibb, src, dst);
 
-	OUT_BATCH(MI_BATCH_BUFFER_END);
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_ptr_align(ibb, 8);
 
-	intel_batchbuffer_flush_on_ring(batch, I915_EXEC_VEBOX);
+	intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), 0,
+				   I915_EXEC_VEBOX | I915_EXEC_NO_RELOC,
+				   false);
 
-	gen12_aux_pgtable_cleanup(&aux_pgtable_info);
-	intel_batchbuffer_reset(batch);
+	intel_bb_reset(ibb, false);
+
+	gen12_aux_pgtable_cleanup(ibb, &aux_pgtable_info);
 }

@@ -2,6 +2,7 @@
 #include "intel_chipset.h"
 #include "gen4_render.h"
 #include "surfaceformat.h"
+#include "intel_bufops.h"
 
 #include <assert.h>
 
@@ -80,18 +81,13 @@ static const uint32_t gen5_ps_kernel_nomask_affine[][4] = {
 };
 
 static uint32_t
-batch_used(struct intel_batchbuffer *batch)
+batch_round_upto(struct intel_bb *ibb, uint32_t divisor)
 {
-	return batch->ptr - batch->buffer;
-}
-
-static uint32_t
-batch_round_upto(struct intel_batchbuffer *batch, uint32_t divisor)
-{
-	uint32_t offset = batch_used(batch);
+	uint32_t offset = intel_bb_offset(ibb);
 
 	offset = (offset + divisor - 1) / divisor * divisor;
-	batch->ptr = batch->buffer + offset;
+	intel_bb_ptr_set(ibb, offset);
+
 	return offset;
 }
 
@@ -120,30 +116,16 @@ static int gen4_max_wm_threads(uint32_t devid)
 	return IS_GEN5(devid) ? 72 : IS_G4X(devid) ? 50 : 32;
 }
 
-static void
-gen4_render_flush(struct intel_batchbuffer *batch,
-		  drm_intel_context *context, uint32_t batch_end)
-{
-	igt_assert_eq(drm_intel_bo_subdata(batch->bo,
-					   0, 4096, batch->buffer),
-		      0);
-	igt_assert_eq(drm_intel_gem_bo_context_exec(batch->bo, context,
-						    batch_end, 0),
-		      0);
-}
-
 static uint32_t
-gen4_bind_buf(struct intel_batchbuffer *batch,
-	      const struct igt_buf *buf,
-	      int is_dst)
+gen4_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst)
 {
 	struct gen4_surface_state *ss;
 	uint32_t write_domain, read_domain;
-	int ret;
+	uint64_t address;
 
 	igt_assert_lte(buf->surface[0].stride, 128*1024);
-	igt_assert_lte(igt_buf_width(buf), 8192);
-	igt_assert_lte(igt_buf_height(buf), 8192);
+	igt_assert_lte(intel_buf_width(buf), 8192);
+	igt_assert_lte(intel_buf_height(buf), 8192);
 
 	if (is_dst) {
 		write_domain = read_domain = I915_GEM_DOMAIN_RENDER;
@@ -152,7 +134,7 @@ gen4_bind_buf(struct intel_batchbuffer *batch,
 		read_domain = I915_GEM_DOMAIN_SAMPLER;
 	}
 
-	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 32);
+	ss = intel_bb_ptr_align(ibb, 32);
 
 	ss->ss0.surface_type = SURFACE_2D;
 	switch (buf->bpp) {
@@ -165,102 +147,102 @@ gen4_bind_buf(struct intel_batchbuffer *batch,
 
 	ss->ss0.data_return_format = SURFACERETURNFORMAT_FLOAT32;
 	ss->ss0.color_blend = 1;
-	ss->ss1.base_addr = buf->bo->offset;
 
-	ret = drm_intel_bo_emit_reloc(batch->bo,
-				      intel_batchbuffer_subdata_offset(batch, ss) + 4,
-				      buf->bo, 0,
-				      read_domain, write_domain);
-	assert(ret == 0);
+	address = intel_bb_offset_reloc(ibb, buf->handle,
+					read_domain, write_domain,
+					intel_bb_offset(ibb) + 4,
+					buf->addr.offset);
+	ss->ss1.base_addr = (uint32_t) address;
 
-	ss->ss2.height = igt_buf_height(buf) - 1;
-	ss->ss2.width  = igt_buf_width(buf) - 1;
+	ss->ss2.height = intel_buf_height(buf) - 1;
+	ss->ss2.width  = intel_buf_width(buf) - 1;
 	ss->ss3.pitch  = buf->surface[0].stride - 1;
 	ss->ss3.tiled_surface = buf->tiling != I915_TILING_NONE;
 	ss->ss3.tile_walk     = buf->tiling == I915_TILING_Y;
 
-	return intel_batchbuffer_subdata_offset(batch, ss);
+	return intel_bb_ptr_add_return_prev_offset(ibb, sizeof(*ss));
 }
 
 static uint32_t
-gen4_bind_surfaces(struct intel_batchbuffer *batch,
-		   const struct igt_buf *src,
-		   const struct igt_buf *dst)
+gen4_bind_surfaces(struct intel_bb *ibb,
+		   const struct intel_buf *src,
+		   const struct intel_buf *dst)
 {
-	uint32_t *binding_table;
+	uint32_t *binding_table, binding_table_offset;
 
-	binding_table = intel_batchbuffer_subdata_alloc(batch, 32, 32);
+	binding_table = intel_bb_ptr_align(ibb, 32);
+	binding_table_offset = intel_bb_ptr_add_return_prev_offset(ibb, 32);
 
-	binding_table[0] = gen4_bind_buf(batch, dst, 1);
-	binding_table[1] = gen4_bind_buf(batch, src, 0);
+	binding_table[0] = gen4_bind_buf(ibb, dst, 1);
+	binding_table[1] = gen4_bind_buf(ibb, src, 0);
 
-	return intel_batchbuffer_subdata_offset(batch, binding_table);
+	return binding_table_offset;
 }
 
 static void
-gen4_emit_sip(struct intel_batchbuffer *batch)
+gen4_emit_sip(struct intel_bb *ibb)
 {
-	OUT_BATCH(GEN4_STATE_SIP | (2 - 2));
-	OUT_BATCH(0);
+	intel_bb_out(ibb, GEN4_STATE_SIP | (2 - 2));
+	intel_bb_out(ibb, 0);
 }
 
 static void
-gen4_emit_state_base_address(struct intel_batchbuffer *batch)
+gen4_emit_state_base_address(struct intel_bb *ibb)
 {
-	if (IS_GEN5(batch->devid)) {
-		OUT_BATCH(GEN4_STATE_BASE_ADDRESS | (8 - 2));
-		OUT_RELOC(batch->bo, /* general */
-			  I915_GEM_DOMAIN_INSTRUCTION, 0,
-			  BASE_ADDRESS_MODIFY);
-		OUT_RELOC(batch->bo, /* surface */
-			  I915_GEM_DOMAIN_INSTRUCTION, 0,
-			  BASE_ADDRESS_MODIFY);
-		OUT_BATCH(0); /* media */
-		OUT_RELOC(batch->bo, /* instruction */
-			  I915_GEM_DOMAIN_INSTRUCTION, 0,
-			  BASE_ADDRESS_MODIFY);
+	if (IS_GEN5(ibb->devid)) {
+		intel_bb_out(ibb, GEN4_STATE_BASE_ADDRESS | (8 - 2));
+		intel_bb_emit_reloc(ibb, ibb->handle, /* general */
+				    I915_GEM_DOMAIN_INSTRUCTION, 0,
+				    BASE_ADDRESS_MODIFY, ibb->batch_offset);
+		intel_bb_emit_reloc(ibb, ibb->handle, /* surface */
+				    I915_GEM_DOMAIN_INSTRUCTION, 0,
+				    BASE_ADDRESS_MODIFY, ibb->batch_offset);
+		intel_bb_out(ibb, 0); /* media */
+		intel_bb_emit_reloc(ibb, ibb->handle, /* instruction */
+				    I915_GEM_DOMAIN_INSTRUCTION, 0,
+				    BASE_ADDRESS_MODIFY, ibb->batch_offset);
 
 		/* upper bounds, disable */
-		OUT_BATCH(BASE_ADDRESS_MODIFY); /* general */
-		OUT_BATCH(0); /* media */
-		OUT_BATCH(BASE_ADDRESS_MODIFY); /* instruction */
+		intel_bb_out(ibb, BASE_ADDRESS_MODIFY); /* general */
+		intel_bb_out(ibb, 0); /* media */
+		intel_bb_out(ibb, BASE_ADDRESS_MODIFY); /* instruction */
 	} else {
-		OUT_BATCH(GEN4_STATE_BASE_ADDRESS | (6 - 2));
-		OUT_RELOC(batch->bo, /* general */
-			  I915_GEM_DOMAIN_INSTRUCTION, 0,
-			  BASE_ADDRESS_MODIFY);
-		OUT_RELOC(batch->bo, /* surface */
-			  I915_GEM_DOMAIN_INSTRUCTION, 0,
-			  BASE_ADDRESS_MODIFY);
-		OUT_BATCH(0); /* media */
+		intel_bb_out(ibb, GEN4_STATE_BASE_ADDRESS | (6 - 2));
+		intel_bb_emit_reloc(ibb, ibb->handle, /* general */
+				    I915_GEM_DOMAIN_INSTRUCTION, 0,
+				    BASE_ADDRESS_MODIFY, ibb->batch_offset);
+		intel_bb_emit_reloc(ibb, ibb->handle, /* surface */
+				    I915_GEM_DOMAIN_INSTRUCTION, 0,
+				    BASE_ADDRESS_MODIFY, ibb->batch_offset);
+		intel_bb_out(ibb, 0); /* media */
 
 		/* upper bounds, disable */
-		OUT_BATCH(BASE_ADDRESS_MODIFY); /* general */
-		OUT_BATCH(0); /* media */
+		intel_bb_out(ibb, BASE_ADDRESS_MODIFY); /* general */
+		intel_bb_out(ibb, 0); /* media */
 	}
 }
 
 static void
-gen4_emit_pipelined_pointers(struct intel_batchbuffer *batch,
+gen4_emit_pipelined_pointers(struct intel_bb *ibb,
 			     uint32_t vs, uint32_t sf,
 			     uint32_t wm, uint32_t cc)
 {
-	OUT_BATCH(GEN4_3DSTATE_PIPELINED_POINTERS | (7 - 2));
-	OUT_BATCH(vs);
-	OUT_BATCH(GEN4_GS_DISABLE);
-	OUT_BATCH(GEN4_CLIP_DISABLE);
-	OUT_BATCH(sf);
-	OUT_BATCH(wm);
-	OUT_BATCH(cc);
+	intel_bb_out(ibb, GEN4_3DSTATE_PIPELINED_POINTERS | (7 - 2));
+	intel_bb_out(ibb, vs);
+	intel_bb_out(ibb, GEN4_GS_DISABLE);
+	intel_bb_out(ibb, GEN4_CLIP_DISABLE);
+	intel_bb_out(ibb, sf);
+	intel_bb_out(ibb, wm);
+	intel_bb_out(ibb, cc);
 }
 
 static void
-gen4_emit_urb(struct intel_batchbuffer *batch)
+gen4_emit_urb(struct intel_bb *ibb)
 {
-	int vs_entries = gen4_max_vs_nr_urb_entries(batch->devid);
+	int vs_entries = gen4_max_vs_nr_urb_entries(ibb->devid);
 	int gs_entries = 0;
 	int cl_entries = 0;
-	int sf_entries = gen4_max_sf_nr_urb_entries(batch->devid);
+	int sf_entries = gen4_max_sf_nr_urb_entries(ibb->devid);
 	int cs_entries = 0;
 
 	int urb_vs_end =              vs_entries * URB_VS_ENTRY_SIZE;
@@ -269,91 +251,91 @@ gen4_emit_urb(struct intel_batchbuffer *batch)
 	int urb_sf_end = urb_cl_end + sf_entries * URB_SF_ENTRY_SIZE;
 	int urb_cs_end = urb_sf_end + cs_entries * URB_CS_ENTRY_SIZE;
 
-	assert(urb_cs_end <= gen4_urb_size(batch->devid));
+	assert(urb_cs_end <= gen4_urb_size(ibb->devid));
 
-	intel_batchbuffer_align(batch, 16);
+	intel_bb_ptr_align(ibb, 16);
 
-	OUT_BATCH(GEN4_URB_FENCE |
-		  UF0_CS_REALLOC |
-		  UF0_SF_REALLOC |
-		  UF0_CLIP_REALLOC |
-		  UF0_GS_REALLOC |
-		  UF0_VS_REALLOC |
-		  (3 - 2));
-	OUT_BATCH(urb_cl_end << UF1_CLIP_FENCE_SHIFT |
-		  urb_gs_end << UF1_GS_FENCE_SHIFT |
-		  urb_vs_end << UF1_VS_FENCE_SHIFT);
-	OUT_BATCH(urb_cs_end << UF2_CS_FENCE_SHIFT |
-		  urb_sf_end << UF2_SF_FENCE_SHIFT);
+	intel_bb_out(ibb, GEN4_URB_FENCE |
+		     UF0_CS_REALLOC |
+		     UF0_SF_REALLOC |
+		     UF0_CLIP_REALLOC |
+		     UF0_GS_REALLOC |
+		     UF0_VS_REALLOC |
+		     (3 - 2));
+	intel_bb_out(ibb, urb_cl_end << UF1_CLIP_FENCE_SHIFT |
+		     urb_gs_end << UF1_GS_FENCE_SHIFT |
+		     urb_vs_end << UF1_VS_FENCE_SHIFT);
+	intel_bb_out(ibb, urb_cs_end << UF2_CS_FENCE_SHIFT |
+		     urb_sf_end << UF2_SF_FENCE_SHIFT);
 
-	OUT_BATCH(GEN4_CS_URB_STATE | (2 - 2));
-	OUT_BATCH((URB_CS_ENTRY_SIZE - 1) << 4 | cs_entries << 0);
+	intel_bb_out(ibb, GEN4_CS_URB_STATE | (2 - 2));
+	intel_bb_out(ibb, (URB_CS_ENTRY_SIZE - 1) << 4 | cs_entries << 0);
 }
 
 static void
-gen4_emit_null_depth_buffer(struct intel_batchbuffer *batch)
+gen4_emit_null_depth_buffer(struct intel_bb *ibb)
 {
-	if (IS_G4X(batch->devid) || IS_GEN5(batch->devid)) {
-		OUT_BATCH(GEN4_3DSTATE_DEPTH_BUFFER | (6 - 2));
-		OUT_BATCH(SURFACE_NULL << GEN4_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
-			  GEN4_DEPTHFORMAT_D32_FLOAT << GEN4_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
-		OUT_BATCH(0);
-		OUT_BATCH(0);
-		OUT_BATCH(0);
-		OUT_BATCH(0);
+	if (IS_G4X(ibb->devid) || IS_GEN5(ibb->devid)) {
+		intel_bb_out(ibb, GEN4_3DSTATE_DEPTH_BUFFER | (6 - 2));
+		intel_bb_out(ibb, SURFACE_NULL << GEN4_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
+			     GEN4_DEPTHFORMAT_D32_FLOAT << GEN4_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
 	} else {
-		OUT_BATCH(GEN4_3DSTATE_DEPTH_BUFFER | (5 - 2));
-		OUT_BATCH(SURFACE_NULL << GEN4_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
-			  GEN4_DEPTHFORMAT_D32_FLOAT << GEN4_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
-		OUT_BATCH(0);
-		OUT_BATCH(0);
-		OUT_BATCH(0);
+		intel_bb_out(ibb, GEN4_3DSTATE_DEPTH_BUFFER | (5 - 2));
+		intel_bb_out(ibb, SURFACE_NULL << GEN4_3DSTATE_DEPTH_BUFFER_TYPE_SHIFT |
+			     GEN4_DEPTHFORMAT_D32_FLOAT << GEN4_3DSTATE_DEPTH_BUFFER_FORMAT_SHIFT);
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
 	}
 
-	if (IS_GEN5(batch->devid)) {
-		OUT_BATCH(GEN4_3DSTATE_CLEAR_PARAMS | (2 - 2));
-		OUT_BATCH(0);
+	if (IS_GEN5(ibb->devid)) {
+		intel_bb_out(ibb, GEN4_3DSTATE_CLEAR_PARAMS | (2 - 2));
+		intel_bb_out(ibb, 0);
 	}
 }
 
 static void
-gen4_emit_invariant(struct intel_batchbuffer *batch)
+gen4_emit_invariant(struct intel_bb *ibb)
 {
-	OUT_BATCH(MI_FLUSH | MI_INHIBIT_RENDER_CACHE_FLUSH);
+	intel_bb_out(ibb, MI_FLUSH | MI_INHIBIT_RENDER_CACHE_FLUSH);
 
-	if (IS_GEN5(batch->devid) || IS_G4X(batch->devid))
-		OUT_BATCH(G4X_PIPELINE_SELECT | PIPELINE_SELECT_3D);
+	if (IS_GEN5(ibb->devid) || IS_G4X(ibb->devid))
+		intel_bb_out(ibb, G4X_PIPELINE_SELECT | PIPELINE_SELECT_3D);
 	else
-		OUT_BATCH(GEN4_PIPELINE_SELECT | PIPELINE_SELECT_3D);
+		intel_bb_out(ibb, GEN4_PIPELINE_SELECT | PIPELINE_SELECT_3D);
 }
 
 static uint32_t
-gen4_create_vs_state(struct intel_batchbuffer *batch)
+gen4_create_vs_state(struct intel_bb *ibb)
 {
 	struct gen4_vs_state *vs;
 	int nr_urb_entries;
 
-	vs = intel_batchbuffer_subdata_alloc(batch, sizeof(*vs), 32);
+	vs = intel_bb_ptr_align(ibb, 32);
 
 	/* Set up the vertex shader to be disabled (passthrough) */
-	nr_urb_entries = gen4_max_vs_nr_urb_entries(batch->devid);
-	if (IS_GEN5(batch->devid))
+	nr_urb_entries = gen4_max_vs_nr_urb_entries(ibb->devid);
+	if (IS_GEN5(ibb->devid))
 		nr_urb_entries >>= 2;
 	vs->vs4.nr_urb_entries = nr_urb_entries;
 	vs->vs4.urb_entry_allocation_size = URB_VS_ENTRY_SIZE - 1;
 	vs->vs6.vs_enable = 0;
 	vs->vs6.vert_cache_disable = 1;
 
-	return intel_batchbuffer_subdata_offset(batch, vs);
+	return intel_bb_ptr_add_return_prev_offset(ibb, sizeof(*vs));
 }
 
 static uint32_t
-gen4_create_sf_state(struct intel_batchbuffer *batch,
+gen4_create_sf_state(struct intel_bb *ibb,
 		     uint32_t kernel)
 {
 	struct gen4_sf_state *sf;
 
-	sf = intel_batchbuffer_subdata_alloc(batch, sizeof(*sf), 32);
+	sf = intel_bb_ptr_align(ibb, 32);
 
 	sf->sf0.grf_reg_count = GEN4_GRF_BLOCKS(SF_KERNEL_NUM_GRF);
 	sf->sf0.kernel_start_pointer = kernel >> 6;
@@ -363,25 +345,25 @@ gen4_create_sf_state(struct intel_batchbuffer *batch,
 	sf->sf3.urb_entry_read_offset = 1;
 	sf->sf3.dispatch_grf_start_reg = 3;
 
-	sf->sf4.max_threads = gen4_max_sf_threads(batch->devid) - 1;
+	sf->sf4.max_threads = gen4_max_sf_threads(ibb->devid) - 1;
 	sf->sf4.urb_entry_allocation_size = URB_SF_ENTRY_SIZE - 1;
-	sf->sf4.nr_urb_entries = gen4_max_sf_nr_urb_entries(batch->devid);
+	sf->sf4.nr_urb_entries = gen4_max_sf_nr_urb_entries(ibb->devid);
 
 	sf->sf6.cull_mode = GEN4_CULLMODE_NONE;
 	sf->sf6.dest_org_vbias = 0x8;
 	sf->sf6.dest_org_hbias = 0x8;
 
-	return intel_batchbuffer_subdata_offset(batch, sf);
+	return intel_bb_ptr_add_return_prev_offset(ibb, sizeof(*sf));
 }
 
 static uint32_t
-gen4_create_wm_state(struct intel_batchbuffer *batch,
+gen4_create_wm_state(struct intel_bb *ibb,
 		     uint32_t kernel,
 		     uint32_t sampler)
 {
 	struct gen4_wm_state *wm;
 
-	wm = intel_batchbuffer_subdata_alloc(batch, sizeof(*wm), 32);
+	wm = intel_bb_ptr_align(ibb, 32);
 
 	assert((kernel & 63) == 0);
 	wm->wm0.kernel_start_pointer = kernel >> 6;
@@ -394,48 +376,48 @@ gen4_create_wm_state(struct intel_batchbuffer *batch,
 	wm->wm4.sampler_state_pointer = sampler >> 5;
 	wm->wm4.sampler_count = 1;
 
-	wm->wm5.max_threads = gen4_max_wm_threads(batch->devid);
+	wm->wm5.max_threads = gen4_max_wm_threads(ibb->devid);
 	wm->wm5.thread_dispatch_enable = 1;
 	wm->wm5.enable_16_pix = 1;
 	wm->wm5.early_depth_test = 1;
 
-	if (IS_GEN5(batch->devid))
+	if (IS_GEN5(ibb->devid))
 		wm->wm1.binding_table_entry_count = 0;
 	else
 		wm->wm1.binding_table_entry_count = 2;
 	wm->wm3.urb_entry_read_length = 2;
 
-	return intel_batchbuffer_subdata_offset(batch, wm);
+	return intel_bb_ptr_add_return_prev_offset(ibb, sizeof(*wm));
 }
 
 static void
-gen4_emit_binding_table(struct intel_batchbuffer *batch,
+gen4_emit_binding_table(struct intel_bb *ibb,
 			uint32_t wm_table)
 {
-	OUT_BATCH(GEN4_3DSTATE_BINDING_TABLE_POINTERS | (6 - 2));
-	OUT_BATCH(0);		/* vs */
-	OUT_BATCH(0);		/* gs */
-	OUT_BATCH(0);		/* clip */
-	OUT_BATCH(0);		/* sf */
-	OUT_BATCH(wm_table);    /* ps */
+	intel_bb_out(ibb, GEN4_3DSTATE_BINDING_TABLE_POINTERS | (6 - 2));
+	intel_bb_out(ibb, 0);		/* vs */
+	intel_bb_out(ibb, 0);		/* gs */
+	intel_bb_out(ibb, 0);		/* clip */
+	intel_bb_out(ibb, 0);		/* sf */
+	intel_bb_out(ibb, wm_table);    /* ps */
 }
 
 static void
-gen4_emit_drawing_rectangle(struct intel_batchbuffer *batch,
-			    const struct igt_buf *dst)
+gen4_emit_drawing_rectangle(struct intel_bb *ibb,
+			    const struct intel_buf *dst)
 {
-	OUT_BATCH(GEN4_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
-	OUT_BATCH(0);
-	OUT_BATCH((igt_buf_height(dst) - 1) << 16 |
-		  (igt_buf_width(dst) - 1));
-	OUT_BATCH(0);
+	intel_bb_out(ibb, GEN4_3DSTATE_DRAWING_RECTANGLE | (4 - 2));
+	intel_bb_out(ibb, 0);
+	intel_bb_out(ibb, (intel_buf_height(dst) - 1) << 16 |
+		     (intel_buf_width(dst) - 1));
+	intel_bb_out(ibb, 0);
 }
 
 static void
-gen4_emit_vertex_elements(struct intel_batchbuffer *batch)
+gen4_emit_vertex_elements(struct intel_bb *ibb)
 {
 
-	if (IS_GEN5(batch->devid)) {
+	if (IS_GEN5(ibb->devid)) {
 		/* The VUE layout
 		 *    dword 0-3: pad (0.0, 0.0, 0.0, 0.0),
 		 *    dword 4-7: position (x, y, 1.0, 1.0),
@@ -443,34 +425,34 @@ gen4_emit_vertex_elements(struct intel_batchbuffer *batch)
 		 *
 		 * dword 4-11 are fetched from vertex buffer
 		 */
-		OUT_BATCH(GEN4_3DSTATE_VERTEX_ELEMENTS | (3 * 2 + 1 - 2));
+		intel_bb_out(ibb, GEN4_3DSTATE_VERTEX_ELEMENTS | (3 * 2 + 1 - 2));
 
 		/* pad */
-		OUT_BATCH(0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
-			  SURFACEFORMAT_R32G32B32A32_FLOAT << VE0_FORMAT_SHIFT |
-			  0 << VE0_OFFSET_SHIFT);
-		OUT_BATCH(GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
+		intel_bb_out(ibb, 0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
+			     SURFACEFORMAT_R32G32B32A32_FLOAT << VE0_FORMAT_SHIFT |
+			     0 << VE0_OFFSET_SHIFT);
+		intel_bb_out(ibb, GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_0_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_1_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
 
 		/* x,y */
-		OUT_BATCH(0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
-			  SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
-			  0 << VE0_OFFSET_SHIFT);
-		OUT_BATCH(GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_2_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
+		intel_bb_out(ibb, 0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
+			     SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
+			     0 << VE0_OFFSET_SHIFT);
+		intel_bb_out(ibb, GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_2_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT);
 
 		/* u0, v0 */
-		OUT_BATCH(0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
-			  SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
-			  4 << VE0_OFFSET_SHIFT);
-		OUT_BATCH(GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
+		intel_bb_out(ibb, 0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
+			     SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
+			     4 << VE0_OFFSET_SHIFT);
+		intel_bb_out(ibb, GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT);
 	} else {
 		/* The VUE layout
 		 *    dword 0-3: position (x, y, 1.0, 1.0),
@@ -478,90 +460,88 @@ gen4_emit_vertex_elements(struct intel_batchbuffer *batch)
 		 *
 		 * dword 0-7 are fetched from vertex buffer
 		 */
-		OUT_BATCH(GEN4_3DSTATE_VERTEX_ELEMENTS | (2 * 2 + 1 - 2));
+		intel_bb_out(ibb, GEN4_3DSTATE_VERTEX_ELEMENTS | (2 * 2 + 1 - 2));
 
 		/* x,y */
-		OUT_BATCH(0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
-			  SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
-			  0 << VE0_OFFSET_SHIFT);
-		OUT_BATCH(GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_2_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT |
-			  4 << VE1_DESTINATION_ELEMENT_OFFSET_SHIFT);
+		intel_bb_out(ibb, 0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
+			     SURFACEFORMAT_R16G16_SSCALED << VE0_FORMAT_SHIFT |
+			     0 << VE0_OFFSET_SHIFT);
+		intel_bb_out(ibb, GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_2_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_1_FLT << VE1_VFCOMPONENT_3_SHIFT |
+			     4 << VE1_DESTINATION_ELEMENT_OFFSET_SHIFT);
 
 		/* u0, v0 */
-		OUT_BATCH(0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
-			  SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
-			  4 << VE0_OFFSET_SHIFT);
-		OUT_BATCH(GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
-			  GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT |
-			  8 << VE1_DESTINATION_ELEMENT_OFFSET_SHIFT);
+		intel_bb_out(ibb, 0 << GEN4_VE0_VERTEX_BUFFER_INDEX_SHIFT | GEN4_VE0_VALID |
+			     SURFACEFORMAT_R32G32_FLOAT << VE0_FORMAT_SHIFT |
+			     4 << VE0_OFFSET_SHIFT);
+		intel_bb_out(ibb, GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_0_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_SRC << VE1_VFCOMPONENT_1_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_2_SHIFT |
+			     GEN4_VFCOMPONENT_STORE_0 << VE1_VFCOMPONENT_3_SHIFT |
+			     8 << VE1_DESTINATION_ELEMENT_OFFSET_SHIFT);
 	}
 }
 
 static uint32_t
-gen4_create_cc_viewport(struct intel_batchbuffer *batch)
+gen4_create_cc_viewport(struct intel_bb *ibb)
 {
 	struct gen4_cc_viewport *vp;
 
-	vp = intel_batchbuffer_subdata_alloc(batch, sizeof(*vp), 32);
+	vp = intel_bb_ptr_align(ibb, 32);
 
 	vp->min_depth = -1.e35;
 	vp->max_depth = 1.e35;
 
-	return intel_batchbuffer_subdata_offset(batch, vp);
+	return intel_bb_ptr_add_return_prev_offset(ibb, sizeof(*vp));
 }
 
 static uint32_t
-gen4_create_cc_state(struct intel_batchbuffer *batch,
+gen4_create_cc_state(struct intel_bb *ibb,
 		     uint32_t cc_vp)
 {
 	struct gen4_color_calc_state *cc;
 
-	cc = intel_batchbuffer_subdata_alloc(batch, sizeof(*cc), 64);
+	cc = intel_bb_ptr_align(ibb, 64);
 
 	cc->cc4.cc_viewport_state_offset = cc_vp;
 
-	return intel_batchbuffer_subdata_offset(batch, cc);
+	return intel_bb_ptr_add_return_prev_offset(ibb, sizeof(*cc));
 }
 
 static uint32_t
-gen4_create_sf_kernel(struct intel_batchbuffer *batch)
+gen4_create_sf_kernel(struct intel_bb *ibb)
 {
-	if (IS_GEN5(batch->devid))
-		return intel_batchbuffer_copy_data(batch, gen5_sf_kernel_nomask,
-						   sizeof(gen5_sf_kernel_nomask),
-						   64);
+	if (IS_GEN5(ibb->devid))
+		return intel_bb_copy_data(ibb, gen5_sf_kernel_nomask,
+					  sizeof(gen5_sf_kernel_nomask), 64);
 	else
-		return intel_batchbuffer_copy_data(batch, gen4_sf_kernel_nomask,
-						   sizeof(gen4_sf_kernel_nomask),
-						   64);
+		return intel_bb_copy_data(ibb, gen4_sf_kernel_nomask,
+					  sizeof(gen4_sf_kernel_nomask), 64);
 }
 
 static uint32_t
-gen4_create_ps_kernel(struct intel_batchbuffer *batch)
+gen4_create_ps_kernel(struct intel_bb *ibb)
 {
-	if (IS_GEN5(batch->devid))
-		return intel_batchbuffer_copy_data(batch, gen5_ps_kernel_nomask_affine,
-						   sizeof(gen5_ps_kernel_nomask_affine),
-						   64);
+	if (IS_GEN5(ibb->devid))
+		return intel_bb_copy_data(ibb, gen5_ps_kernel_nomask_affine,
+					  sizeof(gen5_ps_kernel_nomask_affine),
+					  64);
 	else
-		return intel_batchbuffer_copy_data(batch, gen4_ps_kernel_nomask_affine,
-						   sizeof(gen4_ps_kernel_nomask_affine),
-						   64);
+		return intel_bb_copy_data(ibb, gen4_ps_kernel_nomask_affine,
+					  sizeof(gen4_ps_kernel_nomask_affine),
+					  64);
 }
 
 static uint32_t
-gen4_create_sampler(struct intel_batchbuffer *batch,
+gen4_create_sampler(struct intel_bb *ibb,
 		    sampler_filter_t filter,
 		    sampler_extend_t extend)
 {
 	struct gen4_sampler_state *ss;
 
-	ss = intel_batchbuffer_subdata_alloc(batch, sizeof(*ss), 32);
+	ss = intel_bb_ptr_align(ibb, 32);
 
 	ss->ss0.lod_preclamp = GEN4_LOD_PRECLAMP_OGL;
 
@@ -606,50 +586,52 @@ gen4_create_sampler(struct intel_batchbuffer *batch,
 		break;
 	}
 
-	return intel_batchbuffer_subdata_offset(batch, ss);
+	return intel_bb_ptr_add_return_prev_offset(ibb, sizeof(*ss));
 }
 
-static void gen4_emit_vertex_buffer(struct intel_batchbuffer *batch)
+static void gen4_emit_vertex_buffer(struct intel_bb *ibb)
 {
-	OUT_BATCH(GEN4_3DSTATE_VERTEX_BUFFERS | (5 - 2));
-	OUT_BATCH(GEN4_VB0_VERTEXDATA |
-		  0 << GEN4_VB0_BUFFER_INDEX_SHIFT |
-		  VERTEX_SIZE << VB0_BUFFER_PITCH_SHIFT);
-	OUT_RELOC(batch->bo, I915_GEM_DOMAIN_VERTEX, 0, 0);
-	if (IS_GEN5(batch->devid))
-		OUT_RELOC(batch->bo, I915_GEM_DOMAIN_VERTEX, 0,
-			  batch->bo->size - 1);
+	intel_bb_out(ibb, GEN4_3DSTATE_VERTEX_BUFFERS | (5 - 2));
+	intel_bb_out(ibb, GEN4_VB0_VERTEXDATA |
+		     0 << GEN4_VB0_BUFFER_INDEX_SHIFT |
+		     VERTEX_SIZE << VB0_BUFFER_PITCH_SHIFT);
+	intel_bb_emit_reloc(ibb, ibb->handle,
+			    I915_GEM_DOMAIN_VERTEX, 0, 0, ibb->batch_offset);
+	if (IS_GEN5(ibb->devid))
+		intel_bb_emit_reloc(ibb, ibb->handle,
+				    I915_GEM_DOMAIN_VERTEX, 0,
+				    ibb->size - 1, ibb->batch_offset);
 	else
-		OUT_BATCH(batch->bo->size / VERTEX_SIZE - 1);
-	OUT_BATCH(0);
+		intel_bb_out(ibb, ibb->size / VERTEX_SIZE - 1);
+	intel_bb_out(ibb, 0);
 }
 
-static uint32_t gen4_emit_primitive(struct intel_batchbuffer *batch)
+static uint32_t gen4_emit_primitive(struct intel_bb *ibb)
 {
 	uint32_t offset;
 
-	OUT_BATCH(GEN4_3DPRIMITIVE |
-		  GEN4_3DPRIMITIVE_VERTEX_SEQUENTIAL |
-		  _3DPRIM_RECTLIST << GEN4_3DPRIMITIVE_TOPOLOGY_SHIFT |
-		  0 << 9 |
-		  (6 - 2));
-	OUT_BATCH(3);	/* vertex count */
-	offset = batch_used(batch);
-	OUT_BATCH(0);	/* vertex_index */
-	OUT_BATCH(1);	/* single instance */
-	OUT_BATCH(0);	/* start instance location */
-	OUT_BATCH(0);	/* index buffer offset, ignored */
+	intel_bb_out(ibb, GEN4_3DPRIMITIVE |
+		     GEN4_3DPRIMITIVE_VERTEX_SEQUENTIAL |
+		     _3DPRIM_RECTLIST << GEN4_3DPRIMITIVE_TOPOLOGY_SHIFT |
+		     0 << 9 |
+		     (6 - 2));
+	intel_bb_out(ibb, 3);	/* vertex count */
+	offset = intel_bb_offset(ibb);
+	intel_bb_out(ibb, 0);	/* vertex_index */
+	intel_bb_out(ibb, 1);	/* single instance */
+	intel_bb_out(ibb, 0);	/* start instance location */
+	intel_bb_out(ibb, 0);	/* index buffer offset, ignored */
 
 	return offset;
 }
 
-void gen4_render_copyfunc(struct intel_batchbuffer *batch,
-			  drm_intel_context *context,
-			  const struct igt_buf *src,
-			  unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst,
-			  unsigned dst_x, unsigned dst_y)
+void gen4_render_copyfunc(struct intel_bb *ibb,
+			  uint32_t ctx,
+			  struct intel_buf *src,
+			  uint32_t src_x, uint32_t src_y,
+			  uint32_t width, uint32_t height,
+			  struct intel_buf *dst,
+			  uint32_t dst_x, uint32_t dst_y)
 {
 	uint32_t cc, cc_vp;
 	uint32_t wm, wm_sampler, wm_kernel, wm_table;
@@ -658,60 +640,67 @@ void gen4_render_copyfunc(struct intel_batchbuffer *batch,
 	uint32_t offset, batch_end;
 
 	igt_assert(src->bpp == dst->bpp);
-	intel_batchbuffer_flush_with_context(batch, context);
 
-	batch->ptr = batch->buffer + 1024;
-	intel_batchbuffer_subdata_alloc(batch, 64, 64);
+	intel_bb_flush_render_with_context(ibb, ctx);
 
-	vs = gen4_create_vs_state(batch);
+	intel_bb_add_intel_buf(ibb, dst, true);
+	intel_bb_add_intel_buf(ibb, src, false);
 
-	sf_kernel = gen4_create_sf_kernel(batch);
-	sf = gen4_create_sf_state(batch, sf_kernel);
+	intel_bb_ptr_set(ibb, 1024 + 64);
 
-	wm_table = gen4_bind_surfaces(batch, src, dst);
-	wm_kernel = gen4_create_ps_kernel(batch);
-	wm_sampler = gen4_create_sampler(batch,
+	vs = gen4_create_vs_state(ibb);
+
+	sf_kernel = gen4_create_sf_kernel(ibb);
+	sf = gen4_create_sf_state(ibb, sf_kernel);
+
+	wm_table = gen4_bind_surfaces(ibb, src, dst);
+	wm_kernel = gen4_create_ps_kernel(ibb);
+	wm_sampler = gen4_create_sampler(ibb,
 					 SAMPLER_FILTER_NEAREST,
 					 SAMPLER_EXTEND_NONE);
-	wm = gen4_create_wm_state(batch, wm_kernel, wm_sampler);
+	wm = gen4_create_wm_state(ibb, wm_kernel, wm_sampler);
 
-	cc_vp = gen4_create_cc_viewport(batch);
-	cc = gen4_create_cc_state(batch, cc_vp);
+	cc_vp = gen4_create_cc_viewport(ibb);
+	cc = gen4_create_cc_state(ibb, cc_vp);
 
-	batch->ptr = batch->buffer;
+	intel_bb_ptr_set(ibb, 0);
 
-	gen4_emit_invariant(batch);
-	gen4_emit_state_base_address(batch);
-	gen4_emit_sip(batch);
-	gen4_emit_null_depth_buffer(batch);
+	gen4_emit_invariant(ibb);
+	gen4_emit_state_base_address(ibb);
+	gen4_emit_sip(ibb);
+	gen4_emit_null_depth_buffer(ibb);
 
-	gen4_emit_drawing_rectangle(batch, dst);
-	gen4_emit_binding_table(batch, wm_table);
-	gen4_emit_vertex_elements(batch);
-	gen4_emit_pipelined_pointers(batch, vs, sf, wm, cc);
-	gen4_emit_urb(batch);
+	gen4_emit_drawing_rectangle(ibb, dst);
+	gen4_emit_binding_table(ibb, wm_table);
+	gen4_emit_vertex_elements(ibb);
+	gen4_emit_pipelined_pointers(ibb, vs, sf, wm, cc);
+	gen4_emit_urb(ibb);
 
-	gen4_emit_vertex_buffer(batch);
-	offset = gen4_emit_primitive(batch);
+	gen4_emit_vertex_buffer(ibb);
+	offset = gen4_emit_primitive(ibb);
 
-	OUT_BATCH(MI_BATCH_BUFFER_END);
-	batch_end = intel_batchbuffer_align(batch, 8);
+	batch_end = intel_bb_emit_bbe(ibb);
 
-	*(uint32_t *)(batch->buffer + offset) =
-		batch_round_upto(batch, VERTEX_SIZE)/VERTEX_SIZE;
+	ibb->batch[offset / sizeof(uint32_t)] =
+			batch_round_upto(ibb, VERTEX_SIZE)/VERTEX_SIZE;
 
-	emit_vertex_2s(batch, dst_x + width, dst_y + height);
-	emit_vertex_normalized(batch, src_x + width, igt_buf_width(src));
-	emit_vertex_normalized(batch, src_y + height, igt_buf_height(src));
+	emit_vertex_2s(ibb, dst_x + width, dst_y + height);
+	emit_vertex_normalized(ibb, src_x + width, intel_buf_width(src));
+	emit_vertex_normalized(ibb, src_y + height, intel_buf_height(src));
 
-	emit_vertex_2s(batch, dst_x, dst_y + height);
-	emit_vertex_normalized(batch, src_x, igt_buf_width(src));
-	emit_vertex_normalized(batch, src_y + height, igt_buf_height(src));
+	emit_vertex_2s(ibb, dst_x, dst_y + height);
+	emit_vertex_normalized(ibb, src_x, intel_buf_width(src));
+	emit_vertex_normalized(ibb, src_y + height, intel_buf_height(src));
 
-	emit_vertex_2s(batch, dst_x, dst_y);
-	emit_vertex_normalized(batch, src_x, igt_buf_width(src));
-	emit_vertex_normalized(batch, src_y, igt_buf_height(src));
+	emit_vertex_2s(ibb, dst_x, dst_y);
+	emit_vertex_normalized(ibb, src_x, intel_buf_width(src));
+	emit_vertex_normalized(ibb, src_y, intel_buf_height(src));
 
-	gen4_render_flush(batch, context, batch_end);
-	intel_batchbuffer_reset(batch);
+	/* Position to valid batch end position for batch reuse */
+	intel_bb_ptr_set(ibb, batch_end);
+
+	intel_bb_exec_with_context(ibb, batch_end, ctx,
+				   I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC,
+				   false);
+	intel_bb_reset(ibb, false);
 }

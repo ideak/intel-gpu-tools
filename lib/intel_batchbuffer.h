@@ -318,14 +318,14 @@ void igt_blitter_fast_copy__raw(int fd,
 
 /**
  * igt_render_copyfunc_t:
- * @batch: batchbuffer object
- * @context: libdrm hardware context to use
- * @src: source i-g-t buffer object
+ * @ibb: batchbuffer
+ * @ctx: context to use
+ * @src: intel_buf source object
  * @src_x: source pixel x-coordination
  * @src_y: source pixel y-coordination
  * @width: width of the copied rectangle
  * @height: height of the copied rectangle
- * @dst: destination i-g-t buffer object
+ * @dst: intel_buf destination object
  * @dst_x: destination pixel x-coordination
  * @dst_y: destination pixel y-coordination
  *
@@ -334,25 +334,30 @@ void igt_blitter_fast_copy__raw(int fd,
  * igt_get_render_copyfunc().
  *
  * A render copy function will emit a batchbuffer to the kernel which executes
- * the specified blit copy operation using the render engine. @context is
- * optional and can be NULL.
+ * the specified blit copy operation using the render engine. @ctx is
+ * optional and can be 0.
  */
-typedef void (*igt_render_copyfunc_t)(struct intel_batchbuffer *batch,
-				      drm_intel_context *context,
-				      const struct igt_buf *src, unsigned src_x, unsigned src_y,
-				      unsigned width, unsigned height,
-				      const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
+struct intel_bb;
+struct intel_buf;
+
+typedef void (*igt_render_copyfunc_t)(struct intel_bb *ibb,
+				      uint32_t ctx,
+				      struct intel_buf *src,
+				      uint32_t src_x, uint32_t src_y,
+				      uint32_t width, uint32_t height,
+				      struct intel_buf *dst,
+				      uint32_t dst_x, uint32_t dst_y);
 
 igt_render_copyfunc_t igt_get_render_copyfunc(int devid);
 
 
 /**
  * igt_vebox_copyfunc_t:
- * @batch: batchbuffer object
- * @src: source i-g-t buffer object
+ * @ibb: batchbuffer
+ * @src: intel_buf source object
  * @width: width of the copied rectangle
  * @height: height of the copied rectangle
- * @dst: destination i-g-t buffer object
+ * @dst: intel_buf destination object
  *
  * This is the type of the per-platform vebox copy functions. The
  * platform-specific implementation can be obtained by calling
@@ -361,10 +366,10 @@ igt_render_copyfunc_t igt_get_render_copyfunc(int devid);
  * A vebox copy function will emit a batchbuffer to the kernel which executes
  * the specified blit copy operation using the vebox engine.
  */
-typedef void (*igt_vebox_copyfunc_t)(struct intel_batchbuffer *batch,
-				     const struct igt_buf *src,
-				     unsigned width, unsigned height,
-				     const struct igt_buf *dst);
+typedef void (*igt_vebox_copyfunc_t)(struct intel_bb *ibb,
+				     struct intel_buf *src,
+				     unsigned int width, unsigned int height,
+				     struct intel_buf *dst);
 
 igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid);
 
@@ -385,7 +390,6 @@ igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid);
  * A fill function will emit a batchbuffer to the kernel which executes
  * the specified blit fill operation using the media/gpgpu engine.
  */
-struct intel_buf;
 typedef void (*igt_fillfunc_t)(int i915,
 			       struct intel_buf *buf,
 			       unsigned x, unsigned y,

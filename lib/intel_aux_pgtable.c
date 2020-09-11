@@ -4,7 +4,7 @@
 #include "drmtest.h"
 #include "intel_aux_pgtable.h"
 #include "intel_batchbuffer.h"
-#include "intel_bufmgr.h"
+#include "intel_bufops.h"
 #include "ioctl_wrappers.h"
 
 #include "i915/gem_mman.h"
@@ -31,8 +31,6 @@
 
 #define GFX_ADDRESS_BITS	48
 
-#define max(a, b)		((a) > (b) ? (a) : (b))
-
 #define AUX_FORMAT_YCRCB	0x03
 #define AUX_FORMAT_P010		0x07
 #define AUX_FORMAT_P016		0x08
@@ -58,10 +56,12 @@ struct pgtable {
 	struct pgtable_level_info *level_info;
 	int size;
 	int max_align;
-	drm_intel_bo *bo;
+	struct intel_bb *ibb;
+	struct intel_buf *buf;
+	void *ptr;
 };
 
-static uint64_t last_buf_surface_end(const struct igt_buf *buf)
+static uint64_t last_buf_surface_end(struct intel_buf *buf)
 {
 	uint64_t end_offset = 0;
 	int num_surfaces = buf->format_is_yuv_semiplanar ? 2 : 1;
@@ -79,7 +79,7 @@ static uint64_t last_buf_surface_end(const struct igt_buf *buf)
 }
 
 static int
-pgt_table_count(int address_bits, const struct igt_buf **bufs, int buf_count)
+pgt_table_count(int address_bits, struct intel_buf **bufs, int buf_count)
 {
 	uint64_t end;
 	int count;
@@ -88,19 +88,19 @@ pgt_table_count(int address_bits, const struct igt_buf **bufs, int buf_count)
 	count = 0;
 	end = 0;
 	for (i = 0; i < buf_count; i++) {
-		const struct igt_buf *buf = bufs[i];
+		struct intel_buf *buf = bufs[i];
 		uint64_t start;
 
 		/* We require bufs to be sorted. */
 		igt_assert(i == 0 ||
-			   buf->bo->offset64 >= bufs[i - 1]->bo->offset64 +
-						bufs[i - 1]->bo->size);
+			   buf->addr.offset >= bufs[i - 1]->addr.offset +
+					       intel_buf_bo_size(bufs[i - 1]));
 
-		start = ALIGN_DOWN(buf->bo->offset64, 1UL << address_bits);
+		start = ALIGN_DOWN(buf->addr.offset, 1UL << address_bits);
 		/* Avoid double counting for overlapping aligned bufs. */
 		start = max(start, end);
 
-		end = ALIGN(buf->bo->offset64 + last_buf_surface_end(buf),
+		end = ALIGN(buf->addr.offset + last_buf_surface_end(buf),
 			    1UL << address_bits);
 		igt_assert(end >= start);
 
@@ -111,7 +111,7 @@ pgt_table_count(int address_bits, const struct igt_buf **bufs, int buf_count)
 }
 
 static void
-pgt_calc_size(struct pgtable *pgt, const struct igt_buf **bufs, int buf_count)
+pgt_calc_size(struct pgtable *pgt, struct intel_buf **bufs, int buf_count)
 {
 	int level;
 
@@ -171,28 +171,33 @@ pgt_get_child_table(struct pgtable *pgt, uint64_t parent_table,
 	uint64_t *child_entry_ptr;
 	uint64_t child_table;
 
-	parent_table_ptr = pgt->bo->virtual + parent_table;
+	parent_table_ptr = pgt->ptr + parent_table;
 	child_entry_idx = pgt_entry_index(pgt, level, address);
 	child_entry_ptr = &parent_table_ptr[child_entry_idx];
 
 	if (!*child_entry_ptr) {
 		uint64_t pte;
+		uint32_t offset;
 
 		child_table = pgt_alloc_table(pgt, level - 1);
-		igt_assert(!((child_table + pgt->bo->offset64) &
+		igt_assert(!((child_table + pgt->buf->addr.offset) &
 			     ~ptr_mask(pgt, level)));
 
 		pte = child_table | flags;
-		*child_entry_ptr = pgt->bo->offset64 + pte;
+		*child_entry_ptr = pgt->buf->addr.offset + pte;
 
 		igt_assert(pte <= INT32_MAX);
-		drm_intel_bo_emit_reloc(pgt->bo,
-					parent_table +
-						child_entry_idx * sizeof(uint64_t),
-					pgt->bo, pte, 0, 0);
+
+		offset = parent_table + child_entry_idx * sizeof(uint64_t);
+		intel_bb_offset_reloc_to_object(pgt->ibb,
+						pgt->buf->handle,
+						pgt->buf->handle,
+						0, 0,
+						pte, offset,
+						pgt->buf->addr.offset);
 	} else {
 		child_table = (*child_entry_ptr & ptr_mask(pgt, level)) -
-			      pgt->bo->offset64;
+			      pgt->buf->addr.offset;
 	}
 
 	return child_table;
@@ -205,7 +210,7 @@ pgt_set_l1_entry(struct pgtable *pgt, uint64_t l1_table,
 	uint64_t *l1_table_ptr;
 	uint64_t *l1_entry_ptr;
 
-	l1_table_ptr = pgt->bo->virtual + l1_table;
+	l1_table_ptr = pgt->ptr + l1_table;
 	l1_entry_ptr = &l1_table_ptr[pgt_entry_index(pgt, 0, address)];
 
 	igt_assert(!(ptr & ~ptr_mask(pgt, 0)));
@@ -234,7 +239,7 @@ static int bpp_to_depth_val(int bpp)
 	}
 }
 
-static uint64_t pgt_get_l1_flags(const struct igt_buf *buf, int surface_idx)
+static uint64_t pgt_get_l1_flags(const struct intel_buf *buf, int surface_idx)
 {
 	/*
 	 * The offset of .tile_mode isn't specifed by bspec, it's what Mesa
@@ -337,15 +342,15 @@ static uint64_t pgt_get_lx_flags(void)
 
 static void
 pgt_populate_entries_for_buf(struct pgtable *pgt,
-			       const struct igt_buf *buf,
-			       uint64_t top_table,
-			       int surface_idx)
+			     struct intel_buf *buf,
+			     uint64_t top_table,
+			     int surface_idx)
 {
-	uint64_t surface_addr = buf->bo->offset64 +
+	uint64_t surface_addr = buf->addr.offset +
 				buf->surface[surface_idx].offset;
 	uint64_t surface_end = surface_addr +
 			       buf->surface[surface_idx].size;
-	uint64_t aux_addr = buf->bo->offset64 + buf->ccs[surface_idx].offset;
+	uint64_t aux_addr = buf->addr.offset + buf->ccs[surface_idx].offset;
 	uint64_t l1_flags = pgt_get_l1_flags(buf, surface_idx);
 	uint64_t lx_flags = pgt_get_lx_flags();
 
@@ -367,18 +372,23 @@ pgt_populate_entries_for_buf(struct pgtable *pgt,
 	}
 }
 
+static void pgt_map(int i915, struct pgtable *pgt)
+{
+	pgt->ptr = gem_mmap__device_coherent(i915, pgt->buf->handle, 0,
+					     pgt->size, PROT_READ | PROT_WRITE);
+}
+
+static void pgt_unmap(struct pgtable *pgt)
+{
+	munmap(pgt->ptr, pgt->size);
+}
+
 static void pgt_populate_entries(struct pgtable *pgt,
-				 const struct igt_buf **bufs,
-				 int buf_count,
-				 drm_intel_bo *pgt_bo)
+				 struct intel_buf **bufs,
+				 int buf_count)
 {
 	uint64_t top_table;
 	int i;
-
-	pgt->bo = pgt_bo;
-
-	igt_assert(pgt_bo->size >= pgt->size);
-	memset(pgt_bo->virtual, 0, pgt->size);
 
 	top_table = pgt_alloc_table(pgt, pgt->levels - 1);
 	/* Top level table must be at offset 0. */
@@ -395,7 +405,7 @@ static void pgt_populate_entries(struct pgtable *pgt,
 
 static struct pgtable *
 pgt_create(const struct pgtable_level_desc *level_descs, int levels,
-	   const struct igt_buf **bufs, int buf_count)
+	   struct intel_buf **bufs, int buf_count)
 {
 	struct pgtable *pgt;
 	int level;
@@ -427,10 +437,11 @@ static void pgt_destroy(struct pgtable *pgt)
 	free(pgt);
 }
 
-drm_intel_bo *
-intel_aux_pgtable_create(drm_intel_bufmgr *bufmgr,
-		       const struct igt_buf **bufs, int buf_count)
+struct intel_buf *
+intel_aux_pgtable_create(struct intel_bb *ibb,
+			 struct intel_buf **bufs, int buf_count)
 {
+	struct drm_i915_gem_exec_object2 *obj;
 	static const struct pgtable_level_desc level_desc[] = {
 		{
 			.idx_shift = 16,
@@ -452,99 +463,43 @@ intel_aux_pgtable_create(drm_intel_bufmgr *bufmgr,
 		},
 	};
 	struct pgtable *pgt;
-	drm_intel_bo *pgt_bo;
+	struct buf_ops *bops;
+	struct intel_buf *buf;
+	uint64_t prev_alignment;
+
+	igt_assert(buf_count);
+	bops = bufs[0]->bops;
 
 	pgt = pgt_create(level_desc, ARRAY_SIZE(level_desc), bufs, buf_count);
+	pgt->ibb = ibb;
+	pgt->buf = intel_buf_create(bops, pgt->size, 1, 8, 0, I915_TILING_NONE,
+				    I915_COMPRESSION_NONE);
 
-	pgt_bo = drm_intel_bo_alloc_for_render(bufmgr, "aux pgt",
-					       pgt->size, pgt->max_align);
-	igt_assert(pgt_bo);
+	/* We need to use pgt->max_align for aux table */
+	prev_alignment = intel_bb_set_default_object_alignment(ibb,
+							       pgt->max_align);
+	obj = intel_bb_add_intel_buf(ibb, pgt->buf, false);
+	intel_bb_set_default_object_alignment(ibb, prev_alignment);
+	obj->alignment = pgt->max_align;
 
-	igt_assert(drm_intel_bo_map(pgt_bo, true) == 0);
-	pgt_populate_entries(pgt, bufs, buf_count, pgt_bo);
-	igt_assert(drm_intel_bo_unmap(pgt_bo) == 0);
+	pgt_map(ibb->i915, pgt);
+	pgt_populate_entries(pgt, bufs, buf_count);
+	pgt_unmap(pgt);
 
+	buf = pgt->buf;
 	pgt_destroy(pgt);
 
-	return pgt_bo;
+	return buf;
 }
 
 static void
-aux_pgtable_find_max_free_range(const struct igt_buf **bufs, int buf_count,
-				uint64_t *range_start, uint64_t *range_size)
-{
-	/*
-	 * Keep the first page reserved, so we can differentiate pinned
-	 * objects based on a non-NULL offset.
-	 */
-	uint64_t start = 0x1000;
-	/* For now alloc only from the first 4GB address space. */
-	const uint64_t end = 1ULL << 32;
-	uint64_t max_range_start = 0;
-	uint64_t max_range_size = 0;
-	int i;
-
-	for (i = 0; i < buf_count; i++) {
-		if (bufs[i]->bo->offset64 >= end)
-			break;
-
-		if (bufs[i]->bo->offset64 - start > max_range_size) {
-			max_range_start = start;
-			max_range_size = bufs[i]->bo->offset64 - start;
-		}
-		start = bufs[i]->bo->offset64 + bufs[i]->bo->size;
-	}
-
-	if (start < end && end - start > max_range_size) {
-		max_range_start = start;
-		max_range_size = end - start;
-	}
-
-	*range_start = max_range_start;
-	*range_size = max_range_size;
-}
-
-static uint64_t
-aux_pgtable_find_free_range(const struct igt_buf **bufs, int buf_count,
-			    uint32_t size)
-{
-	uint64_t range_start;
-	uint64_t range_size;
-	/* A compressed surface must be 64kB aligned. */
-	const uint32_t align = 0x10000;
-	int pad;
-
-	aux_pgtable_find_max_free_range(bufs, buf_count,
-					&range_start, &range_size);
-
-	pad = ALIGN(range_start, align) - range_start;
-	range_start += pad;
-	range_size -= pad;
-	igt_assert(range_size >= size);
-
-	return range_start +
-	       ALIGN_DOWN(rand() % ((range_size - size) + 1), align);
-}
-
-static void
-aux_pgtable_reserve_range(const struct igt_buf **bufs, int buf_count,
-			  const struct igt_buf *new_buf)
+aux_pgtable_reserve_buf_slot(struct intel_buf **bufs, int buf_count,
+			     struct intel_buf *new_buf)
 {
 	int i;
-
-	if (igt_buf_compressed(new_buf)) {
-		uint64_t pin_offset = new_buf->bo->offset64;
-
-		if (!pin_offset)
-			pin_offset = aux_pgtable_find_free_range(bufs,
-								 buf_count,
-								 new_buf->bo->size);
-		drm_intel_bo_set_softpin_offset(new_buf->bo, pin_offset);
-		igt_assert(new_buf->bo->offset64 == pin_offset);
-	}
 
 	for (i = 0; i < buf_count; i++)
-		if (bufs[i]->bo->offset64 > new_buf->bo->offset64)
+		if (bufs[i]->addr.offset > new_buf->addr.offset)
 			break;
 
 	memmove(&bufs[i + 1], &bufs[i], sizeof(bufs[0]) * (buf_count - i));
@@ -554,107 +509,116 @@ aux_pgtable_reserve_range(const struct igt_buf **bufs, int buf_count,
 
 void
 gen12_aux_pgtable_init(struct aux_pgtable_info *info,
-		       drm_intel_bufmgr *bufmgr,
-		       const struct igt_buf *src_buf,
-		       const struct igt_buf *dst_buf)
+		       struct intel_bb *ibb,
+		       struct intel_buf *src_buf,
+		       struct intel_buf *dst_buf)
 {
-	const struct igt_buf *bufs[2];
-	const struct igt_buf *reserved_bufs[2];
+	struct intel_buf *bufs[2];
+	struct intel_buf *reserved_bufs[2];
 	int reserved_buf_count;
 	int i;
 
-	if (!igt_buf_compressed(src_buf) && !igt_buf_compressed(dst_buf))
+	igt_assert_f(ibb->enforce_relocs == false,
+		     "We support aux pgtables for non-forced relocs yet!");
+
+	if (!intel_buf_compressed(src_buf) && !intel_buf_compressed(dst_buf))
 		return;
 
 	bufs[0] = src_buf;
 	bufs[1] = dst_buf;
 
 	/*
-	 * Ideally we'd need an IGT-wide GFX address space allocator, which
-	 * would consider all allocations and thus avoid evictions. For now use
-	 * a simpler scheme here, which only considers the buffers involved in
-	 * the blit, which should at least minimize the chance for evictions
-	 * in the case of subsequent blits:
-	 *   1. If they were already bound (bo->offset64 != 0), use this
-	 *      address.
-	 *   2. Pick a range randomly from the 4GB address space, that is not
-	 *      already occupied by a bound object, or an object we pinned.
+	 * Surface index in pgt table depend on its address so:
+	 *   1. if handle was previously executed in batch use that address
+	 *   2. add object to batch, this will generate random address
+	 *
+	 * Randomizing addresses can lead to overlapping, but we don't have
+	 * global address space generator in IGT. Currently assumption is
+	 * randomizing address is spread over 48-bit address space equally
+	 * so risk with overlapping is minimal. Of course it is growing
+	 * with number of objects (+its sizes) involved in blit.
+	 * To avoid relocation EXEC_OBJECT_PINNED flag is set for compressed
+	 * surfaces.
 	 */
+
+	intel_bb_add_intel_buf(ibb, src_buf, false);
+	if (intel_buf_compressed(src_buf))
+		intel_bb_object_set_flag(ibb, src_buf->handle, EXEC_OBJECT_PINNED);
+
+	intel_bb_add_intel_buf(ibb, dst_buf, true);
+	if (intel_buf_compressed(dst_buf))
+		intel_bb_object_set_flag(ibb, dst_buf->handle, EXEC_OBJECT_PINNED);
+
 	reserved_buf_count = 0;
 	/* First reserve space for any bufs that are bound already. */
-	for (i = 0; i < ARRAY_SIZE(bufs); i++)
-		if (bufs[i]->bo->offset64)
-			aux_pgtable_reserve_range(reserved_bufs,
-						  reserved_buf_count++,
-						  bufs[i]);
-
-	/* Next, reserve space for unbound bufs with an AUX surface. */
-	for (i = 0; i < ARRAY_SIZE(bufs); i++)
-		if (!bufs[i]->bo->offset64 && igt_buf_compressed(bufs[i]))
-			aux_pgtable_reserve_range(reserved_bufs,
-						  reserved_buf_count++,
-						  bufs[i]);
+	for (i = 0; i < ARRAY_SIZE(bufs); i++) {
+		igt_assert(bufs[i]->addr.offset != INTEL_BUF_INVALID_ADDRESS);
+		aux_pgtable_reserve_buf_slot(reserved_bufs,
+					     reserved_buf_count++,
+					     bufs[i]);
+	}
 
 	/* Create AUX pgtable entries only for bufs with an AUX surface */
 	info->buf_count = 0;
 	for (i = 0; i < reserved_buf_count; i++) {
-		if (!igt_buf_compressed(reserved_bufs[i]))
+		if (!intel_buf_compressed(reserved_bufs[i]))
 			continue;
 
 		info->bufs[info->buf_count] = reserved_bufs[i];
 		info->buf_pin_offsets[info->buf_count] =
-			reserved_bufs[i]->bo->offset64;
+			reserved_bufs[i]->addr.offset;
+
 		info->buf_count++;
 	}
 
-	info->pgtable_bo = intel_aux_pgtable_create(bufmgr,
-						    info->bufs,
-						    info->buf_count);
-	igt_assert(info->pgtable_bo);
+	info->pgtable_buf = intel_aux_pgtable_create(ibb,
+						     info->bufs,
+						     info->buf_count);
+
+	igt_assert(info->pgtable_buf);
 }
 
 void
-gen12_aux_pgtable_cleanup(struct aux_pgtable_info *info)
+gen12_aux_pgtable_cleanup(struct intel_bb *ibb, struct aux_pgtable_info *info)
 {
 	int i;
 
 	/* Check that the pinned bufs kept their offset after the exec. */
-	for (i = 0; i < info->buf_count; i++)
-		igt_assert_eq_u64(info->bufs[i]->bo->offset64,
-				  info->buf_pin_offsets[i]);
+	for (i = 0; i < info->buf_count; i++) {
+		uint64_t addr;
 
-	drm_intel_bo_unreference(info->pgtable_bo);
+		addr = intel_bb_get_object_offset(ibb, info->bufs[i]->handle);
+		igt_assert_eq_u64(addr, info->buf_pin_offsets[i]);
+	}
+
+	if (info->pgtable_buf)
+		intel_buf_destroy(info->pgtable_buf);
 }
 
 uint32_t
-gen12_create_aux_pgtable_state(struct intel_batchbuffer *batch,
-			       drm_intel_bo *aux_pgtable_bo)
+gen12_create_aux_pgtable_state(struct intel_bb *ibb,
+			       struct intel_buf *aux_pgtable_buf)
 {
 	uint64_t *pgtable_ptr;
 	uint32_t pgtable_ptr_offset;
-	int ret;
 
-	if (!aux_pgtable_bo)
+	if (!aux_pgtable_buf)
 		return 0;
 
-	pgtable_ptr = intel_batchbuffer_subdata_alloc(batch,
-						      sizeof(*pgtable_ptr),
-						      sizeof(*pgtable_ptr));
-	pgtable_ptr_offset = intel_batchbuffer_subdata_offset(batch,
-							      pgtable_ptr);
+	pgtable_ptr = intel_bb_ptr(ibb);
+	pgtable_ptr_offset = intel_bb_offset(ibb);
 
-	*pgtable_ptr = aux_pgtable_bo->offset64;
-	ret = drm_intel_bo_emit_reloc(batch->bo, pgtable_ptr_offset,
-				      aux_pgtable_bo, 0,
-				      0, 0);
-	assert(ret == 0);
+	*pgtable_ptr = intel_bb_offset_reloc(ibb, aux_pgtable_buf->handle,
+					     0, 0,
+					     pgtable_ptr_offset,
+					     aux_pgtable_buf->addr.offset);
+	intel_bb_ptr_add(ibb, sizeof(*pgtable_ptr));
 
 	return pgtable_ptr_offset;
 }
 
 void
-gen12_emit_aux_pgtable_state(struct intel_batchbuffer *batch, uint32_t state,
-			     bool render)
+gen12_emit_aux_pgtable_state(struct intel_bb *ibb, uint32_t state, bool render)
 {
 	uint32_t table_base_reg = render ? GEN12_GFX_AUX_TABLE_BASE_ADDR :
 					   GEN12_VEBOX_AUX_TABLE_BASE_ADDR;
@@ -662,11 +626,11 @@ gen12_emit_aux_pgtable_state(struct intel_batchbuffer *batch, uint32_t state,
 	if (!state)
 		return;
 
-	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8 | MI_MMIO_REMAP_ENABLE_GEN12);
-	OUT_BATCH(table_base_reg);
-	OUT_RELOC(batch->bo, 0, 0, state);
+	intel_bb_out(ibb, MI_LOAD_REGISTER_MEM_GEN8 | MI_MMIO_REMAP_ENABLE_GEN12);
+	intel_bb_out(ibb, table_base_reg);
+	intel_bb_emit_reloc(ibb, ibb->handle, 0, 0, state, ibb->batch_offset);
 
-	OUT_BATCH(MI_LOAD_REGISTER_MEM_GEN8 | MI_MMIO_REMAP_ENABLE_GEN12);
-	OUT_BATCH(table_base_reg + 4);
-	OUT_RELOC(batch->bo, 0, 0, state + 4);
+	intel_bb_out(ibb, MI_LOAD_REGISTER_MEM_GEN8 | MI_MMIO_REMAP_ENABLE_GEN12);
+	intel_bb_out(ibb, table_base_reg + 4);
+	intel_bb_emit_reloc(ibb, ibb->handle, 0, 0, state + 4, ibb->batch_offset);
 }

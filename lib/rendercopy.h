@@ -1,70 +1,70 @@
 #include "intel_batchbuffer.h"
 
 
-static inline void emit_vertex_2s(struct intel_batchbuffer *batch,
+static inline void emit_vertex_2s(struct intel_bb *ibb,
 				  int16_t x, int16_t y)
 {
-	OUT_BATCH((uint16_t)y << 16 | (uint16_t)x);
+	intel_bb_out(ibb, (uint32_t) y << 16 | (uint32_t) x);
 }
 
-static inline void emit_vertex(struct intel_batchbuffer *batch,
+static inline void emit_vertex(struct intel_bb *ibb,
 			       float f)
 {
 	union { float f; uint32_t ui; } u;
 	u.f = f;
-	OUT_BATCH(u.ui);
+	intel_bb_out(ibb, u.ui);
 }
 
-static inline void emit_vertex_normalized(struct intel_batchbuffer *batch,
+static inline void emit_vertex_normalized(struct intel_bb *ibb,
 					  float f, float total)
 {
 	union { float f; uint32_t ui; } u;
 	u.f = f / total;
-	OUT_BATCH(u.ui);
+	intel_bb_out(ibb, u.ui);
 }
 
-void gen12_render_copyfunc(struct intel_batchbuffer *batch,
-			   drm_intel_context *context,
-			   const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			   unsigned width, unsigned height,
-			   const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
-void gen11_render_copyfunc(struct intel_batchbuffer *batch,
-			  drm_intel_context *context,
-			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
-void gen9_render_copyfunc(struct intel_batchbuffer *batch,
-			  drm_intel_context *context,
-			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
-void gen8_render_copyfunc(struct intel_batchbuffer *batch,
-			  drm_intel_context *context,
-			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
-void gen7_render_copyfunc(struct intel_batchbuffer *batch,
-			  drm_intel_context *context,
-			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
-void gen6_render_copyfunc(struct intel_batchbuffer *batch,
-			  drm_intel_context *context,
-			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
-void gen4_render_copyfunc(struct intel_batchbuffer *batch,
-			  drm_intel_context *context,
-			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
-void gen3_render_copyfunc(struct intel_batchbuffer *batch,
-			  drm_intel_context *context,
-			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
-void gen2_render_copyfunc(struct intel_batchbuffer *batch,
-			  drm_intel_context *context,
-			  const struct igt_buf *src, unsigned src_x, unsigned src_y,
-			  unsigned width, unsigned height,
-			  const struct igt_buf *dst, unsigned dst_x, unsigned dst_y);
+void gen12_render_copyfunc(struct intel_bb *ibb,
+			   uint32_t ctx,
+			   struct intel_buf *src, uint32_t src_x, uint32_t src_y,
+			   uint32_t width, uint32_t height,
+			   struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
+void gen11_render_copyfunc(struct intel_bb *ibb,
+			  uint32_t ctx,
+			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
+			  uint32_t width, uint32_t height,
+			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
+void gen9_render_copyfunc(struct intel_bb *ibb,
+			  uint32_t ctx,
+			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
+			  uint32_t width, uint32_t height,
+			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
+void gen8_render_copyfunc(struct intel_bb *ibb,
+			  uint32_t ctx,
+			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
+			  uint32_t width, uint32_t height,
+			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
+void gen7_render_copyfunc(struct intel_bb *ibb,
+			  uint32_t ctx,
+			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
+			  uint32_t width, uint32_t height,
+			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
+void gen6_render_copyfunc(struct intel_bb *ibb,
+			  uint32_t ctx,
+			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
+			  uint32_t width, uint32_t height,
+			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
+void gen4_render_copyfunc(struct intel_bb *ibb,
+			  uint32_t ctx,
+			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
+			  uint32_t width, uint32_t height,
+			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
+void gen3_render_copyfunc(struct intel_bb *ibb,
+			  uint32_t ctx,
+			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
+			  uint32_t width, uint32_t height,
+			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
+void gen2_render_copyfunc(struct intel_bb *ibb,
+			  uint32_t ctx,
+			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
+			  uint32_t width, uint32_t height,
+			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
