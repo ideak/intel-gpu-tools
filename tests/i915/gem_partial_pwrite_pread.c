@@ -101,9 +101,6 @@ static void copy_bo(struct intel_buf *src, struct intel_buf *dst)
 				   I915_GEM_DOMAIN_RENDER,
 				   0, 0, 0x0);
 
-	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
-	intel_bb_ptr_align(ibb, 8);
-
 	intel_bb_flush_blit(ibb);
 	intel_bb_sync(ibb);
 }

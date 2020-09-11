@@ -99,11 +99,6 @@ copy_bo(struct intel_bb *ibb, struct intel_buf *src, struct intel_buf *dst)
 	intel_bb_emit_reloc_fenced(ibb, src->handle,
 				   I915_GEM_DOMAIN_RENDER,
 				   0, 0, 0x0);
-
-	 /* Mark the end of the buffer. */
-	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
-	intel_bb_ptr_align(ibb, 8);
-
 	intel_bb_flush_blit(ibb);
 	intel_bb_sync(ibb);
 }
