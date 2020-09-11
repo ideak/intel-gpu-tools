@@ -82,7 +82,7 @@ struct {
 	int fd;
 	drmModeResPtr res;
 	drmModeConnectorPtr connectors[MAX_CONNECTORS];
-	drm_intel_bufmgr *bufmgr;
+	struct buf_ops *bops;
 } drm;
 
 struct {
@@ -191,16 +191,14 @@ static void setup_drm(void)
 		drm.connectors[i] = drmModeGetConnector(drm.fd,
 						drm.res->connectors[i]);
 
-	drm.bufmgr = drm_intel_bufmgr_gem_init(drm.fd, 4096);
-	igt_assert(drm.bufmgr);
-	drm_intel_bufmgr_gem_enable_reuse(drm.bufmgr);
+	drm.bops = buf_ops_create(drm.fd);
 }
 
 static void teardown_drm(void)
 {
 	int i;
 
-	drm_intel_bufmgr_destroy(drm.bufmgr);
+	buf_ops_destroy(drm.bops);
 
 	for (i = 0; i < drm.res->count_connectors; i++)
 		drmModeFreeConnector(drm.connectors[i]);
@@ -238,7 +236,7 @@ static void draw_rect(struct igt_fb *fb, enum igt_draw_method method,
 		igt_assert(false);
 	}
 
-	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, fb, method, clip.x1, clip.y1,
+	igt_draw_rect_fb(drm.fd, drm.bops, 0, fb, method, clip.x1, clip.y1,
 			 clip.x2 - clip.x1, clip.y2 - clip.y1, color);
 
 	if (method == IGT_DRAW_MMAP_WC) {
