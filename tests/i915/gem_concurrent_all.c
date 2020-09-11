@@ -51,7 +51,6 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "igt_vgem.h"
-#include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Test of pread/pwrite/mmap behavior when writing to active"
 		     " buffers.");
@@ -64,7 +63,9 @@ int pass;
 struct create {
 	const char *name;
 	void (*require)(const struct create *, unsigned);
-	drm_intel_bo *(*create)(drm_intel_bufmgr *, uint64_t size);
+	struct intel_buf *(*create)(struct buf_ops *bops, uint32_t width,
+				    uint32_t height, uint32_t tiling,
+				    uint64_t size);
 };
 
 struct size {
@@ -77,10 +78,10 @@ struct buffers {
 	const struct create *create;
 	const struct access_mode *mode;
 	const struct size *size;
-	drm_intel_bufmgr *bufmgr;
-	struct intel_batchbuffer *batch;
-	drm_intel_bo **src, **dst;
-	drm_intel_bo *snoop, *spare;
+	struct buf_ops *bops;
+	struct intel_bb *ibb;
+	struct intel_buf **src, **dst;
+	struct intel_buf *snoop, *spare;
 	uint32_t *tmp;
 	int width, height, npixels, page_size;
 	int count, num_buffers;
@@ -88,29 +89,32 @@ struct buffers {
 
 #define MIN_BUFFERS 3
 
-static void blt_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src);
+static void blt_copy_bo(struct buffers *b, struct intel_buf *dst,
+			struct intel_buf *src);
 
 static void
-nop_release_bo(drm_intel_bo *bo)
+nop_release_bo(struct intel_buf *buf)
 {
-	drm_intel_bo_unreference(bo);
+	if (buf->ptr)
+		intel_buf_unmap(buf);
+	intel_buf_destroy(buf);
 }
 
 static void
-prw_set_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+prw_set_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
 	for (int i = 0; i < b->npixels; i++)
 		b->tmp[i] = val;
-	drm_intel_bo_subdata(bo, 0, 4*b->npixels, b->tmp);
+	gem_write(fd, buf->handle, 0, b->tmp, 4*b->npixels);
 }
 
 static void
-prw_cmp_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+prw_cmp_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
 	uint32_t *vaddr;
 
 	vaddr = b->tmp;
-	do_or_die(drm_intel_bo_get_subdata(bo, 0, 4*b->npixels, vaddr));
+	gem_read(fd, buf->handle, 0, vaddr, 4*b->npixels);
 	for (int i = 0; i < b->npixels; i++)
 		igt_assert_eq_u32(vaddr[i], val);
 }
@@ -118,31 +122,33 @@ prw_cmp_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
 #define pixel(y, width) ((y)*(width) + (((y) + pass)%(width)))
 
 static void
-partial_set_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+partial_set_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
 	for (int y = 0; y < b->height; y++)
-		do_or_die(drm_intel_bo_subdata(bo, 4*pixel(y, b->width), 4, &val));
+		gem_write(fd, buf->handle, 4*pixel(y, b->width), &val, 4);
 }
 
 static void
-partial_cmp_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+partial_cmp_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
 	for (int y = 0; y < b->height; y++) {
-		uint32_t buf;
-		do_or_die(drm_intel_bo_get_subdata(bo, 4*pixel(y, b->width), 4, &buf));
-		igt_assert_eq_u32(buf, val);
+		uint32_t tmp;
+
+		gem_read(fd, buf->handle, 4*pixel(y, b->width), &tmp, 4);
+		igt_assert_eq_u32(tmp, val);
 	}
 }
 
-static drm_intel_bo *
-create_normal_bo(drm_intel_bufmgr *bufmgr, uint64_t size)
+static struct intel_buf *
+create_normal_bo(struct buf_ops *bops, uint32_t width,
+		 uint32_t height, uint32_t tiling, uint64_t size)
 {
-	drm_intel_bo *bo;
+	struct intel_buf *buf;
+	int bpp = size/height/width * 8;
 
-	bo = drm_intel_bo_alloc(bufmgr, "bo", size, 0);
-	igt_assert(bo);
+	buf = intel_buf_create(bops, width, height, bpp, 0, tiling, 0);
 
-	return bo;
+	return buf;
 }
 
 static void can_create_normal(const struct create *create, unsigned count)
@@ -150,19 +156,27 @@ static void can_create_normal(const struct create *create, unsigned count)
 }
 
 #if HAVE_CREATE_PRIVATE
-static drm_intel_bo *
-create_private_bo(drm_intel_bufmgr *bufmgr, uint64_t size)
+static struct intel_buf *
+create_private_bo(struct buf_ops *bops, uint32_t width, uint32_t height,
+		  uint32_t tiling, uint64_t size)
 {
-	drm_intel_bo *bo;
-	uint32_t handle;
+	struct intel_buf *buf;
+	uint32_t handle, buf_handle, name;
+	int bpp = size/height/width * 8;
 
 	/* XXX gem_create_with_flags(fd, size, I915_CREATE_PRIVATE); */
 
 	handle = gem_create(fd, size);
-	bo = gem_handle_to_libdrm_bo(bufmgr, fd, "stolen", handle);
+	name = gem_flink(fd, handle);
+	buf_handle = gem_open(fd, name);
+
+	buf = intel_buf_create_using_handle(bops, buf_handle,
+					    width, height, bpp, 0, tiling, 0);
+	intel_buf_set_ownership(buf, true);
+
 	gem_close(fd, handle);
 
-	return bo;
+	return buf;
 }
 
 static void can_create_private(const struct create *create, unsigned count)
@@ -172,19 +186,27 @@ static void can_create_private(const struct create *create, unsigned count)
 #endif
 
 #if HAVE_CREATE_STOLEN
-static drm_intel_bo *
-create_stolen_bo(drm_intel_bufmgr *bufmgr, uint64_t size)
+static struct intel_buf *
+create_stolen_bo(struct buf_ops *bops, uint32_t width, uint32_t height,
+		 uint32_t tiling, uint64_t size)
 {
-	drm_intel_bo *bo;
-	uint32_t handle;
+	struct intel_buf *buf;
+	uint32_t handle, buf_handle, name;
+	int bpp = size/height/width * 8;
 
-	/* XXX gem_create_with_flags(fd, size, I915_CREATE_STOLEN); */
+	/* XXX gem_create_with_flags(fd, size, I915_CREATE_PRIVATE); */
 
 	handle = gem_create(fd, size);
-	bo = gem_handle_to_libdrm_bo(bufmgr, fd, "stolen", handle);
+	name = gem_flink(fd, handle);
+	buf_handle = gem_open(fd, name);
+
+	buf = intel_buf_create_using_handle(bops, buf_handle,
+					    width, height, bpp, 0, tiling, 0);
+	intel_buf_set_ownership(buf, true);
+
 	gem_close(fd, handle);
 
-	return bo;
+	return buf;
 }
 
 static void can_create_stolen(const struct create *create, unsigned count)
@@ -201,10 +223,17 @@ static void create_cpu_require(const struct create *create, unsigned count)
 #endif
 }
 
-static drm_intel_bo *
+static struct intel_buf *
+create_bo(const struct buffers *b, uint32_t tiling)
+{
+	return b->create->create(b->bops, b->width, b->height,
+				 tiling, 4*b->npixels);
+}
+
+static struct intel_buf *
 unmapped_create_bo(const struct buffers *b)
 {
-	return b->create->create(b->bufmgr, 4*b->npixels);
+	return create_bo(b, I915_TILING_NONE);
 }
 
 static void create_snoop_require(const struct create *create, unsigned count)
@@ -213,16 +242,15 @@ static void create_snoop_require(const struct create *create, unsigned count)
 	igt_require(!gem_has_llc(fd));
 }
 
-static drm_intel_bo *
+static struct intel_buf *
 snoop_create_bo(const struct buffers *b)
 {
-	drm_intel_bo *bo;
+	struct intel_buf *buf;
 
-	bo = unmapped_create_bo(b);
-	gem_set_caching(fd, bo->handle, I915_CACHING_CACHED);
-	drm_intel_bo_disable_reuse(bo);
+	buf = unmapped_create_bo(b);
+	gem_set_caching(fd, buf->handle, I915_CACHING_CACHED);
 
-	return bo;
+	return buf;
 }
 
 static void create_userptr_require(const struct create *create, unsigned count)
@@ -251,11 +279,11 @@ static void create_userptr_require(const struct create *create, unsigned count)
 	igt_require(has_userptr);
 }
 
-static drm_intel_bo *
+static struct intel_buf *
 userptr_create_bo(const struct buffers *b)
 {
 	struct drm_i915_gem_userptr userptr;
-	drm_intel_bo *bo;
+	struct intel_buf *buf;
 	void *ptr;
 
 	memset(&userptr, 0, sizeof(userptr));
@@ -266,54 +294,50 @@ userptr_create_bo(const struct buffers *b)
 	igt_assert(ptr != (void *)-1);
 	userptr.user_ptr = to_user_pointer(ptr);
 
-#if 0
 	do_or_die(drmIoctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr));
-	bo = gem_handle_to_libdrm_bo(b->bufmgr, fd, "userptr", userptr.handle);
-	gem_close(fd, userptr.handle);
-#else
-	bo = drm_intel_bo_alloc_userptr(b->bufmgr, "name",
-					ptr, I915_TILING_NONE, 0,
-					userptr.user_size, 0);
-	igt_assert(bo);
-#endif
-	bo->virtual = from_user_pointer(userptr.user_ptr);
+	buf = intel_buf_create_using_handle(b->bops, userptr.handle,
+					    b->width, b->height, 32, 0,
+					    I915_TILING_NONE, 0);
+	intel_buf_set_ownership(buf, true);
 
-	return bo;
+	buf->ptr = (void *) from_user_pointer(userptr.user_ptr);
+
+	return buf;
 }
 
 static void
-userptr_set_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+userptr_set_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
 	int size = b->npixels;
-	uint32_t *vaddr = bo->virtual;
+	uint32_t *vaddr = buf->ptr;
 
-	gem_set_domain(fd, bo->handle,
+	gem_set_domain(fd, buf->handle,
 		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 	while (size--)
 		*vaddr++ = val;
 }
 
 static void
-userptr_cmp_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+userptr_cmp_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
 	int size =  b->npixels;
-	uint32_t *vaddr = bo->virtual;
+	uint32_t *vaddr = buf->ptr;
 
-	gem_set_domain(fd, bo->handle,
+	gem_set_domain(fd, buf->handle,
 		       I915_GEM_DOMAIN_CPU, 0);
 	while (size--)
 		igt_assert_eq_u32(*vaddr++, val);
 }
 
 static void
-userptr_release_bo(drm_intel_bo *bo)
+userptr_release_bo(struct intel_buf *buf)
 {
-	igt_assert(bo->virtual);
+	igt_assert(buf->ptr);
 
-	munmap(bo->virtual, bo->size);
-	bo->virtual = NULL;
+	munmap(buf->ptr, buf->surface[0].size);
+	buf->ptr = NULL;
 
-	drm_intel_bo_unreference(bo);
+	intel_buf_destroy(buf);
 }
 
 static void create_dmabuf_require(const struct create *create, unsigned count)
@@ -349,13 +373,14 @@ struct dmabuf {
 	void *map;
 };
 
-static drm_intel_bo *
+static struct intel_buf *
 dmabuf_create_bo(const struct buffers *b)
 {
 	struct drm_prime_handle args;
-	drm_intel_bo *bo;
+	static struct intel_buf *buf;
 	struct dmabuf *dmabuf;
 	int size;
+	uint32_t handle;
 
 	size = b->page_size;
 
@@ -366,9 +391,13 @@ dmabuf_create_bo(const struct buffers *b)
 
 	do_ioctl(fd, DRM_IOCTL_PRIME_HANDLE_TO_FD, &args);
 	gem_close(fd, args.handle);
+	igt_assert(args.fd != -1);
 
-	bo = drm_intel_bo_gem_create_from_prime(b->bufmgr, args.fd, size);
-	igt_assert(bo);
+	handle = prime_fd_to_handle(buf_ops_get_fd(b->bops), args.fd);
+	buf = intel_buf_create_using_handle(b->bops, handle,
+					    b->width, b->height, 32, 0,
+					    I915_TILING_NONE, 0);
+	intel_buf_set_ownership(buf, true);
 
 	dmabuf = malloc(sizeof(*dmabuf));
 	igt_assert(dmabuf);
@@ -379,15 +408,15 @@ dmabuf_create_bo(const struct buffers *b)
 			   dmabuf->fd, 0);
 	igt_assert(dmabuf->map != (void *)-1);
 
-	bo->virtual = dmabuf;
+	buf->ptr = (void *) dmabuf;
 
-	return bo;
+	return buf;
 }
 
 static void
-dmabuf_set_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+dmabuf_set_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
-	struct dmabuf *dmabuf = bo->virtual;
+	struct dmabuf *dmabuf = (void *) buf->ptr;
 	uint32_t *v = dmabuf->map;
 	int y;
 
@@ -398,9 +427,9 @@ dmabuf_set_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
 }
 
 static void
-dmabuf_cmp_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+dmabuf_cmp_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
-	struct dmabuf *dmabuf = bo->virtual;
+	struct dmabuf *dmabuf = (void *) buf->ptr;
 	uint32_t *v = dmabuf->map;
 	int y;
 
@@ -411,17 +440,17 @@ dmabuf_cmp_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
 }
 
 static void
-dmabuf_release_bo(drm_intel_bo *bo)
+dmabuf_release_bo(struct intel_buf *buf)
 {
-	struct dmabuf *dmabuf = bo->virtual;
+	struct dmabuf *dmabuf = (void *) buf->ptr;
 	igt_assert(dmabuf);
+	buf->ptr = NULL;
 
-	munmap(dmabuf->map, bo->size);
+	munmap(dmabuf->map, buf->surface[0].size);
 	close(dmabuf->fd);
 	free(dmabuf);
 
-	bo->virtual = NULL;
-	drm_intel_bo_unreference(bo);
+	intel_buf_destroy(buf);
 }
 
 static bool has_prime_export(int _fd)
@@ -446,13 +475,14 @@ static void create_gtt_require(const struct create *create, unsigned count)
 	gem_require_mappable_ggtt(fd);
 }
 
-static drm_intel_bo *
+static struct intel_buf *
 vgem_create_bo(const struct buffers *b)
 {
 	struct drm_prime_handle args;
-	drm_intel_bo *bo;
+	struct intel_buf *buf;
 	struct vgem_bo vgem;
 	struct dmabuf *dmabuf;
+	uint32_t handle;
 
 	igt_assert(vgem_drv != -1);
 
@@ -470,8 +500,11 @@ vgem_create_bo(const struct buffers *b)
 	gem_close(vgem_drv, args.handle);
 	igt_assert(args.fd != -1);
 
-	bo = drm_intel_bo_gem_create_from_prime(b->bufmgr, args.fd, vgem.size);
-	igt_assert(bo);
+	handle = prime_fd_to_handle(buf_ops_get_fd(b->bops), args.fd);
+	buf = intel_buf_create_using_handle(b->bops, handle,
+					    vgem.width, vgem.height, vgem.bpp,
+					    0, I915_TILING_NONE, 0);
+	intel_buf_set_ownership(buf, true);
 
 	dmabuf = malloc(sizeof(*dmabuf));
 	igt_assert(dmabuf);
@@ -482,64 +515,58 @@ vgem_create_bo(const struct buffers *b)
 			   dmabuf->fd, 0);
 	igt_assert(dmabuf->map != (void *)-1);
 
-	bo->virtual = dmabuf;
+	buf->ptr = (void *) dmabuf;
 
-	return bo;
+	return buf;
 }
 
 static void
-gtt_set_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+gtt_set_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
-	uint32_t *vaddr = bo->virtual;
+	uint32_t *vaddr = buf->ptr;
 
-	drm_intel_gem_bo_start_gtt_access(bo, true);
+	gem_set_domain(fd, buf->handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
 	for (int y = 0; y < b->height; y++)
 		vaddr[pixel(y, b->width)] = val;
 }
 
 static void
-gtt_cmp_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+gtt_cmp_bo(struct buffers *b, struct  intel_buf *buf, uint32_t val)
 {
-	uint32_t *vaddr = bo->virtual;
+	uint32_t *vaddr = buf->ptr;
 
 	/* GTT access is slow. So we just compare a few points */
-	drm_intel_gem_bo_start_gtt_access(bo, false);
+	gem_set_domain(fd, buf->handle,
+		       I915_GEM_DOMAIN_GTT, 0);
+
 	for (int y = 0; y < b->height; y++)
 		igt_assert_eq_u32(vaddr[pixel(y, b->width)], val);
 }
 
-static drm_intel_bo *
-map_bo(drm_intel_bo *bo)
+static struct intel_buf *
+map_bo(struct intel_buf *buf)
 {
 	/* gtt map doesn't have a write parameter, so just keep the mapping
 	 * around (to avoid the set_domain with the gtt write domain set) and
 	 * manually tell the kernel when we start access the gtt. */
-	do_or_die(drm_intel_gem_bo_map_gtt(bo));
+	buf->ptr = gem_mmap__gtt(buf_ops_get_fd(buf->bops), buf->handle,
+				 buf->surface[0].size, PROT_READ | PROT_WRITE);
 
-	return bo;
+	return buf;
 }
 
-static drm_intel_bo *
-tile_bo(drm_intel_bo *bo, int width)
-{
-	uint32_t tiling = I915_TILING_X;
-	uint32_t stride = width * 4;
-
-	do_or_die(drm_intel_bo_set_tiling(bo, &tiling, stride));
-
-	return bo;
-}
-
-static drm_intel_bo *
+static struct intel_buf *
 gtt_create_bo(const struct buffers *b)
 {
 	return map_bo(unmapped_create_bo(b));
 }
 
-static drm_intel_bo *
+static struct intel_buf *
 gttX_create_bo(const struct buffers *b)
 {
-	return tile_bo(gtt_create_bo(b), b->width);
+	return map_bo(create_bo(b, I915_TILING_X));
 }
 
 static void bit17_require(void)
@@ -574,85 +601,84 @@ wc_create_require(const struct create *create, unsigned count)
 	wc_require();
 }
 
-static drm_intel_bo *
+static struct intel_buf *
 wc_create_bo(const struct buffers *b)
 {
-	drm_intel_bo *bo;
+	static struct intel_buf *buf;
 
-	bo = unmapped_create_bo(b);
-	bo->virtual = gem_mmap__wc(fd, bo->handle, 0, bo->size, PROT_READ | PROT_WRITE);
-	return bo;
+	buf = unmapped_create_bo(b);
+	buf->ptr = gem_mmap__wc(fd, buf->handle, 0, buf->surface[0].size,
+				PROT_READ | PROT_WRITE);
+	return buf;
 }
 
 static void
-wc_release_bo(drm_intel_bo *bo)
+wc_release_bo(struct intel_buf *buf)
 {
-	igt_assert(bo->virtual);
+	igt_assert(buf->ptr);
 
-	munmap(bo->virtual, bo->size);
-	bo->virtual = NULL;
+	munmap(buf->ptr, buf->surface[0].size);
+	buf->ptr = 0;
 
-	nop_release_bo(bo);
+	nop_release_bo(buf);
 }
 
-static drm_intel_bo *
+static struct intel_buf *
 gpu_create_bo(const struct buffers *b)
 {
 	return unmapped_create_bo(b);
 }
 
-static drm_intel_bo *
+static struct intel_buf *
 gpuX_create_bo(const struct buffers *b)
 {
-	return tile_bo(gpu_create_bo(b), b->width);
+	return create_bo(b, I915_TILING_X);
 }
 
 static void
-cpu_set_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+cpu_set_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
 	int size = b->npixels;
 	uint32_t *vaddr;
 
-	do_or_die(drm_intel_bo_map(bo, true));
-	vaddr = bo->virtual;
+	intel_buf_device_map(buf, true);
+
+	vaddr = buf->ptr;
 	while (size--)
 		*vaddr++ = val;
-	drm_intel_bo_unmap(bo);
+	intel_buf_unmap(buf);
 }
 
 static void
-cpu_cmp_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+cpu_cmp_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
 	int size = b->npixels;
 	uint32_t *vaddr;
 
-	do_or_die(drm_intel_bo_map(bo, false));
-	vaddr = bo->virtual;
+	intel_buf_cpu_map(buf, false);
+	vaddr = buf->ptr;
 	while (size--)
 		igt_assert_eq_u32(*vaddr++, val);
-	drm_intel_bo_unmap(bo);
+	intel_buf_unmap(buf);
 }
 
 static void
-gpu_set_bo(struct buffers *buffers, drm_intel_bo *bo, uint32_t val)
+gpu_set_bo(struct buffers *buffers, struct intel_buf *buf, uint32_t val)
 {
 	struct drm_i915_gem_relocation_entry reloc[1];
 	struct drm_i915_gem_exec_object2 gem_exec[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t buf[10], *b;
-	uint32_t tiling, swizzle;
-
-	drm_intel_bo_get_tiling(bo, &tiling, &swizzle);
+	uint32_t tmp[10], *b;
 
 	memset(reloc, 0, sizeof(reloc));
 	memset(gem_exec, 0, sizeof(gem_exec));
 	memset(&execbuf, 0, sizeof(execbuf));
 
-	b = buf;
+	b = tmp;
 	*b++ = XY_COLOR_BLT_CMD_NOLEN |
 		((gen >= 8) ? 5 : 4) |
 		COLOR_BLT_WRITE_ALPHA | XY_COLOR_BLT_WRITE_RGB;
-	if (gen >= 4 && tiling) {
+	if (gen >= 4 && buf->tiling) {
 		b[-1] |= XY_COLOR_BLT_TILED;
 		*b = buffers->width;
 	} else
@@ -660,8 +686,8 @@ gpu_set_bo(struct buffers *buffers, drm_intel_bo *bo, uint32_t val)
 	*b++ |= 0xf0 << 16 | 1 << 25 | 1 << 24;
 	*b++ = 0;
 	*b++ = buffers->height << 16 | buffers->width;
-	reloc[0].offset = (b - buf) * sizeof(uint32_t);
-	reloc[0].target_handle = bo->handle;
+	reloc[0].offset = (b - tmp) * sizeof(uint32_t);
+	reloc[0].target_handle = buf->handle;
 	reloc[0].read_domains = I915_GEM_DOMAIN_RENDER;
 	reloc[0].write_domain = I915_GEM_DOMAIN_RENDER;
 	*b++ = 0;
@@ -669,10 +695,10 @@ gpu_set_bo(struct buffers *buffers, drm_intel_bo *bo, uint32_t val)
 		*b++ = 0;
 	*b++ = val;
 	*b++ = MI_BATCH_BUFFER_END;
-	if ((b - buf) & 1)
+	if ((b - tmp) & 1)
 		*b++ = 0;
 
-	gem_exec[0].handle = bo->handle;
+	gem_exec[0].handle = buf->handle;
 	gem_exec[0].flags = EXEC_OBJECT_NEEDS_FENCE;
 
 	gem_exec[1].handle = gem_create(fd, 4096);
@@ -681,30 +707,30 @@ gpu_set_bo(struct buffers *buffers, drm_intel_bo *bo, uint32_t val)
 
 	execbuf.buffers_ptr = to_user_pointer(gem_exec);
 	execbuf.buffer_count = 2;
-	execbuf.batch_len = (b - buf) * sizeof(buf[0]);
+	execbuf.batch_len = (b - tmp) * sizeof(tmp[0]);
 	if (gen >= 6)
 		execbuf.flags = I915_EXEC_BLT;
 
-	gem_write(fd, gem_exec[1].handle, 0, buf, execbuf.batch_len);
+	gem_write(fd, gem_exec[1].handle, 0, tmp, execbuf.batch_len);
 	gem_execbuf(fd, &execbuf);
 
 	gem_close(fd, gem_exec[1].handle);
 }
 
 static void
-gpu_cmp_bo(struct buffers *b, drm_intel_bo *bo, uint32_t val)
+gpu_cmp_bo(struct buffers *b, struct intel_buf *buf, uint32_t val)
 {
-	blt_copy_bo(b, b->snoop, bo);
+	blt_copy_bo(b, b->snoop, buf);
 	cpu_cmp_bo(b, b->snoop, val);
 }
 
 struct access_mode {
 	const char *name;
 	void (*require)(const struct create *, unsigned);
-	drm_intel_bo *(*create_bo)(const struct buffers *b);
-	void (*set_bo)(struct buffers *b, drm_intel_bo *bo, uint32_t val);
-	void (*cmp_bo)(struct buffers *b, drm_intel_bo *bo, uint32_t val);
-	void (*release_bo)(drm_intel_bo *bo);
+	struct intel_buf *(*create_bo)(const struct buffers *b);
+	void (*set_bo)(struct buffers *b, struct intel_buf *buf, uint32_t val);
+	void (*cmp_bo)(struct buffers *b, struct intel_buf *buf, uint32_t val);
+	void (*release_bo)(struct intel_buf *buf);
 };
 igt_render_copyfunc_t rendercopy;
 
@@ -745,7 +771,7 @@ static void buffers_init(struct buffers *b,
 			 const struct access_mode *mode,
 			 const struct size *size,
 			 int num_buffers,
-			 int _fd, int enable_reuse)
+			 int _fd)
 {
 	memset(b, 0, sizeof(*b));
 	b->name = name;
@@ -763,17 +789,13 @@ static void buffers_init(struct buffers *b,
 	b->tmp = malloc(b->page_size);
 	igt_assert(b->tmp);
 
-	b->bufmgr = drm_intel_bufmgr_gem_init(_fd, 4096);
-	igt_assert(b->bufmgr);
+	b->bops = buf_ops_create(_fd);
 
-	b->src = malloc(2*sizeof(drm_intel_bo *)*num_buffers);
+	b->src = malloc(2*sizeof(struct intel_buf *)*num_buffers);
 	igt_assert(b->src);
 	b->dst = b->src + num_buffers;
 
-	if (enable_reuse)
-		drm_intel_bufmgr_gem_enable_reuse(b->bufmgr);
-	b->batch = intel_batchbuffer_alloc(b->bufmgr, devid);
-	igt_assert(b->batch);
+	b->ibb = intel_bb_create(_fd, 4096);
 }
 
 static void buffers_destroy(struct buffers *b)
@@ -809,7 +831,7 @@ static void buffers_destroy(struct buffers *b)
 static void buffers_create(struct buffers *b)
 {
 	int count = b->num_buffers;
-	igt_assert(b->bufmgr);
+	igt_assert(b->bops);
 
 	buffers_destroy(b);
 	igt_assert(b->count == 0);
@@ -823,20 +845,15 @@ static void buffers_create(struct buffers *b)
 	b->snoop = snoop_create_bo(b);
 }
 
-static void buffers_reset(struct buffers *b, bool enable_reuse)
+static void buffers_reset(struct buffers *b)
 {
-	b->bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-	igt_assert(b->bufmgr);
-
-	if (enable_reuse)
-		drm_intel_bufmgr_gem_enable_reuse(b->bufmgr);
-	b->batch = intel_batchbuffer_alloc(b->bufmgr, devid);
-	igt_assert(b->batch);
+	b->bops = buf_ops_create(fd);
+	b->ibb = intel_bb_create(fd, 4096);
 }
 
 static void buffers_fini(struct buffers *b)
 {
-	if (b->bufmgr == NULL)
+	if (b->bops == NULL)
 		return;
 
 	buffers_destroy(b);
@@ -844,58 +861,45 @@ static void buffers_fini(struct buffers *b)
 	free(b->tmp);
 	free(b->src);
 
-	intel_batchbuffer_free(b->batch);
-	drm_intel_bufmgr_destroy(b->bufmgr);
+	intel_bb_destroy(b->ibb);
+	buf_ops_destroy(b->bops);
 
 	memset(b, 0, sizeof(*b));
 }
 
-typedef void (*do_copy)(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src);
+typedef void (*do_copy)(struct buffers *b, struct intel_buf *dst,
+			struct intel_buf *src);
 typedef igt_hang_t (*do_hang)(void);
 
-static void render_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src)
+static void render_copy_bo(struct buffers *b, struct intel_buf *dst,
+			   struct intel_buf *src)
 {
-	struct igt_buf d = {
-		.bo = dst,
-		.num_tiles = b->npixels * 4,
-		.surface[0] = {
-			.size = b->npixels * 4, .stride = b->width * 4,
-		},
-		.bpp = 32,
-	}, s = {
-		.bo = src,
-		.num_tiles = b->npixels * 4,
-		.surface[0] = {
-			.size = b->npixels * 4, .stride = b->width * 4,
-		},
-		.bpp = 32,
-	};
-	uint32_t swizzle;
-
-	drm_intel_bo_get_tiling(dst, &d.tiling, &swizzle);
-	drm_intel_bo_get_tiling(src, &s.tiling, &swizzle);
-
-	rendercopy(b->batch, NULL,
-		   &s, 0, 0,
+	rendercopy(b->ibb, 0,
+		   src, 0, 0,
 		   b->width, b->height,
-		   &d, 0, 0);
+		   dst, 0, 0);
+	intel_bb_reset(b->ibb, true);
 }
 
-static void blt_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src)
+static void blt_copy_bo(struct buffers *b, struct intel_buf *dst,
+			struct intel_buf *src)
 {
-	intel_blt_copy(b->batch,
+	intel_bb_blt_copy(b->ibb,
 		       src, 0, 0, 4*b->width,
 		       dst, 0, 0, 4*b->width,
 		       b->width, b->height, 32);
+	intel_bb_reset(b->ibb, true);
 }
 
-static void cpu_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src)
+static void cpu_copy_bo(struct buffers *b, struct intel_buf *dst,
+			struct intel_buf *src)
 {
 	const int size = b->page_size;
 	void *d, *s;
 
 	gem_set_domain(fd, src->handle, I915_GEM_DOMAIN_CPU, 0);
-	gem_set_domain(fd, dst->handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	gem_set_domain(fd, dst->handle, I915_GEM_DOMAIN_CPU,
+		       I915_GEM_DOMAIN_CPU);
 	s = gem_mmap__cpu(fd, src->handle, 0, size, PROT_READ);
 	d = gem_mmap__cpu(fd, dst->handle, 0, size, PROT_WRITE);
 
@@ -905,13 +909,15 @@ static void cpu_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src)
 	munmap(s, size);
 }
 
-static void gtt_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src)
+static void gtt_copy_bo(struct buffers *b, struct intel_buf *dst,
+			struct intel_buf *src)
 {
 	const int size = b->page_size;
 	void *d, *s;
 
 	gem_set_domain(fd, src->handle, I915_GEM_DOMAIN_GTT, 0);
-	gem_set_domain(fd, dst->handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	gem_set_domain(fd, dst->handle, I915_GEM_DOMAIN_GTT,
+		       I915_GEM_DOMAIN_GTT);
 
 	s = gem_mmap__gtt(fd, src->handle, size, PROT_READ);
 	d = gem_mmap__gtt(fd, dst->handle, size, PROT_WRITE);
@@ -922,13 +928,15 @@ static void gtt_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src)
 	munmap(s, size);
 }
 
-static void wc_copy_bo(struct buffers *b, drm_intel_bo *dst, drm_intel_bo *src)
+static void wc_copy_bo(struct buffers *b, struct intel_buf *dst,
+		       struct intel_buf *src)
 {
 	const int size = b->page_size;
 	void *d, *s;
 
 	gem_set_domain(fd, src->handle, I915_GEM_DOMAIN_WC, 0);
-	gem_set_domain(fd, dst->handle, I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
+	gem_set_domain(fd, dst->handle, I915_GEM_DOMAIN_WC,
+		       I915_GEM_DOMAIN_WC);
 
 	s = gem_mmap__wc(fd, src->handle, 0, size, PROT_READ);
 	d = gem_mmap__wc(fd, dst->handle, 0, size, PROT_WRITE);
@@ -1335,7 +1343,7 @@ static void run_child(struct buffers *buffers,
 		      do_hang do_hang_func)
 
 {
-	/* We inherit the buffers from the parent, but the bufmgr/batch
+	/* We inherit the buffers from the parent, but the bops/intel_bb
 	 * needs to be local as the cache of reusable itself will be COWed,
 	 * leading to the child closing an object without the parent knowing.
 	 */
@@ -1353,10 +1361,10 @@ static void __run_forked(struct buffers *buffers,
 			 do_hang do_hang_func)
 
 {
-	/* purge the libdrm caches before cloing the process */
+	/* purge the caches before cloing the process */
 	buffers_destroy(buffers);
-	intel_batchbuffer_free(buffers->batch);
-	drm_intel_bufmgr_destroy(buffers->bufmgr);
+	intel_bb_destroy(buffers->ibb);
+	buf_ops_destroy(buffers->bops);
 
 	igt_fork(child, num_children) {
 		int num_buffers;
@@ -1369,7 +1377,7 @@ static void __run_forked(struct buffers *buffers,
 		if (num_buffers < buffers->num_buffers)
 			buffers->num_buffers = num_buffers;
 
-		buffers_reset(buffers, true);
+		buffers_reset(buffers);
 		buffers_create(buffers);
 
 		igt_while_interruptible(interrupt) {
@@ -1382,7 +1390,7 @@ static void __run_forked(struct buffers *buffers,
 	igt_waitchildren();
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 
-	buffers_reset(buffers, true);
+	buffers_reset(buffers);
 }
 
 static void run_forked(struct buffers *buffers,
@@ -1459,8 +1467,7 @@ run_mode(const char *prefix,
 
 	igt_fixture
 		buffers_init(&buffers, prefix, create, mode,
-			     size, num_buffers,
-			     fd, run_wrap_func != run_child);
+			     size, num_buffers, fd);
 
 	for (h = hangs; h->suffix; h++) {
 		if (!all && *h->suffix)
