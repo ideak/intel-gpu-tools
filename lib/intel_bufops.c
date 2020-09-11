@@ -157,7 +157,7 @@ static int __gem_get_tiling(int fd, struct drm_i915_gem_get_tiling *arg)
 }
 
 static bool __get_tiling(int fd, uint32_t handle, uint32_t *tiling,
-			 uint32_t *swizzle)
+			 uint32_t *swizzle, uint32_t *phys_swizzle)
 {
 	struct drm_i915_gem_get_tiling get_tiling = { .handle = handle };
 
@@ -166,12 +166,13 @@ static bool __get_tiling(int fd, uint32_t handle, uint32_t *tiling,
 
 	*tiling = get_tiling.tiling_mode;
 	*swizzle = get_tiling.swizzle_mode;
+	*phys_swizzle = get_tiling.phys_swizzle_mode;
 	igt_debug("buf tiling: %s, swizzle: %x, phys_swizzle: %x\n",
 		  tiling_str(get_tiling.tiling_mode),
 		  get_tiling.swizzle_mode,
 		  get_tiling.phys_swizzle_mode);
 
-	return get_tiling.phys_swizzle_mode == get_tiling.swizzle_mode;
+	return true;
 }
 
 static int __set_tiling(int fd, uint32_t handle, uint32_t tiling,
@@ -212,8 +213,10 @@ static void set_hw_tiled(struct buf_ops *bops, struct intel_buf *buf)
 	if (buf->tiling != I915_TILING_X && buf->tiling != I915_TILING_Y)
 		return;
 
-	if (!buf_ops_has_hw_fence(bops, buf->tiling))
+	if (!buf_ops_has_hw_fence(bops, buf->tiling)) {
+		igt_debug("No HW fence for tiling: %d\n", buf->tiling);
 		return;
+	}
 
 	igt_assert_eq(__set_tiling(bops->fd,
 				   buf->handle, buf->tiling,
@@ -1041,10 +1044,11 @@ struct buf_ops buf_ops_arr[] = {
 	},
 };
 
-static bool probe_hw_tiling(struct buf_ops *bops, uint32_t tiling)
+static bool probe_hw_tiling(struct buf_ops *bops, uint32_t tiling,
+			    bool *swizzling_supported)
 {
 	uint64_t size = 256 * 256;
-	uint32_t handle, buf_tiling, buf_swizzle;
+	uint32_t handle, buf_tiling, buf_swizzle, phys_swizzle;
 	uint32_t stride;
 	int ret;
 	bool is_set = false;
@@ -1063,12 +1067,15 @@ static bool probe_hw_tiling(struct buf_ops *bops, uint32_t tiling)
 	if (ret)
 		goto end;
 
-	is_set = __get_tiling(bops->fd, handle, &buf_tiling, &buf_swizzle);
+	is_set = __get_tiling(bops->fd, handle, &buf_tiling, &buf_swizzle,
+			      &phys_swizzle);
 	if (is_set) {
 		if (tiling == I915_TILING_X)
 			bops->swizzle_x = buf_swizzle;
 		else if (tiling == I915_TILING_Y)
 			bops->swizzle_y = buf_swizzle;
+
+		*swizzling_supported = buf_swizzle == phys_swizzle;
 	}
 end:
 	gem_close(bops->fd, handle);
@@ -1191,7 +1198,14 @@ static struct buf_ops *__buf_ops_create(int fd, bool check_idempotency)
 
 	/* Let's probe X and Y hw tiling support */
 	if (is_hw_tiling_supported(bops, I915_TILING_X)) {
-		bool supported = probe_hw_tiling(bops, I915_TILING_X);
+		bool swizzling_supported;
+		bool supported = probe_hw_tiling(bops, I915_TILING_X,
+						 &swizzling_supported);
+
+		if (!swizzling_supported) {
+			igt_debug("Swizzling for X is not supported\n");
+			bops->supported_tiles &= ~TILE_X;
+		}
 
 		igt_debug("X fence support: %s\n", bool_str(supported));
 		if (!supported) {
@@ -1202,7 +1216,14 @@ static struct buf_ops *__buf_ops_create(int fd, bool check_idempotency)
 	}
 
 	if (is_hw_tiling_supported(bops, I915_TILING_Y)) {
-		bool supported = probe_hw_tiling(bops, I915_TILING_Y);
+		bool swizzling_supported;
+		bool supported = probe_hw_tiling(bops, I915_TILING_Y,
+						 &swizzling_supported);
+
+		if (!swizzling_supported) {
+			igt_debug("Swizzling for Y is not supported\n");
+			bops->supported_tiles &= ~TILE_Y;
+		}
 
 		igt_debug("Y fence support: %s\n", bool_str(supported));
 		if (!supported) {
@@ -1319,6 +1340,9 @@ bool buf_ops_set_software_tiling(struct buf_ops *bops,
 	switch (tiling) {
 	case I915_TILING_X:
 		if (use_software_tiling) {
+			bool supported = buf_ops_has_tiling_support(bops, tiling);
+
+			igt_assert_f(supported, "Cannot switch to X software tiling\n");
 			igt_debug("-> change X to SW\n");
 			bops->linear_to_x = copy_linear_to_x;
 			bops->x_to_linear = copy_x_to_linear;
@@ -1336,6 +1360,9 @@ bool buf_ops_set_software_tiling(struct buf_ops *bops,
 
 	case I915_TILING_Y:
 		if (use_software_tiling) {
+			bool supported = buf_ops_has_tiling_support(bops, tiling);
+
+			igt_assert_f(supported, "Cannot switch to Y software tiling\n");
 			igt_debug("-> change Y to SW\n");
 			bops->linear_to_y = copy_linear_to_y;
 			bops->y_to_linear = copy_y_to_linear;
