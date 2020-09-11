@@ -46,6 +46,7 @@
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
 #include "i915/gem_mman.h"
+#include "intel_bufops.h"
 
 /**
  * SECTION:igt_fb
@@ -2038,8 +2039,8 @@ struct fb_blit_upload {
 	int fd;
 	struct igt_fb *fb;
 	struct fb_blit_linear linear;
-	drm_intel_bufmgr *bufmgr;
-	struct intel_batchbuffer *batch;
+	struct buf_ops *bops;
+	struct intel_bb *ibb;
 };
 
 static bool fast_blit_ok(const struct igt_fb *fb)
@@ -2109,14 +2110,14 @@ static bool use_blitter(const struct igt_fb *fb)
 	       !gem_has_mappable_ggtt(fb->fd);
 }
 
-static void init_buf_ccs(struct igt_buf *buf, int ccs_idx,
+static void init_buf_ccs(struct intel_buf *buf, int ccs_idx,
 			 uint32_t offset, uint32_t stride)
 {
 	buf->ccs[ccs_idx].offset = offset;
 	buf->ccs[ccs_idx].stride = stride;
 }
 
-static void init_buf_surface(struct igt_buf *buf, int surface_idx,
+static void init_buf_surface(struct intel_buf *buf, int surface_idx,
 			     uint32_t offset, uint32_t stride, uint32_t size)
 {
 	buf->surface[surface_idx].offset = offset;
@@ -2140,25 +2141,16 @@ static int yuv_semiplanar_bpp(uint32_t drm_format)
 	}
 }
 
-static void init_buf(struct fb_blit_upload *blit,
-		     struct igt_buf *buf,
-		     const struct igt_fb *fb,
-		     const char *name)
+static struct intel_buf *create_buf(struct fb_blit_upload *blit,
+				   const struct igt_fb *fb,
+				   const char *name)
 {
+	struct intel_buf *buf;
+	uint32_t bo_name, handle, compression;
 	int num_surfaces;
 	int i;
 
 	igt_assert_eq(fb->offsets[0], 0);
-
-	buf->bo = gem_handle_to_libdrm_bo(blit->bufmgr, blit->fd,
-					  name, fb->gem_handle);
-	buf->tiling = igt_fb_mod_to_tiling(fb->modifier);
-	buf->bpp = fb->plane_bpp[0];
-	buf->format_is_yuv = igt_format_is_yuv(fb->drm_format);
-	buf->format_is_yuv_semiplanar =
-		igt_format_is_yuv_semiplanar(fb->drm_format);
-	if (buf->format_is_yuv_semiplanar)
-		buf->yuv_semiplanar_bpp = yuv_semiplanar_bpp(fb->drm_format);
 
 	if (is_ccs_modifier(fb->modifier)) {
 		igt_assert_eq(fb->strides[0] & 127, 0);
@@ -2169,17 +2161,39 @@ static void init_buf(struct fb_blit_upload *blit,
 			igt_assert_eq(fb->strides[1] & 127, 0);
 
 		if (is_gen12_mc_ccs_modifier(fb->modifier))
-			buf->compression = I915_COMPRESSION_MEDIA;
+			compression = I915_COMPRESSION_MEDIA;
 		else
-			buf->compression = I915_COMPRESSION_RENDER;
+			compression = I915_COMPRESSION_RENDER;
+	} else {
+		num_surfaces = fb->num_planes;
+		compression = I915_COMPRESSION_NONE;
+	}
 
+	bo_name = gem_flink(blit->fd, fb->gem_handle);
+	handle = gem_open(blit->fd, bo_name);
+
+	buf = intel_buf_create_using_handle(blit->bops, handle,
+					    fb->width, fb->height,
+					    fb->plane_bpp[0], 0,
+					    igt_fb_mod_to_tiling(fb->modifier),
+					    compression);
+	intel_buf_set_name(buf, name);
+
+	/* Make sure we close handle on destroy path */
+	intel_buf_set_ownership(buf, true);
+
+	buf->format_is_yuv = igt_format_is_yuv(fb->drm_format);
+	buf->format_is_yuv_semiplanar =
+		igt_format_is_yuv_semiplanar(fb->drm_format);
+	if (buf->format_is_yuv_semiplanar)
+		buf->yuv_semiplanar_bpp = yuv_semiplanar_bpp(fb->drm_format);
+
+	if (is_ccs_modifier(fb->modifier)) {
 		num_surfaces = fb->num_planes / 2;
 		for (i = 0; i < num_surfaces; i++)
 			init_buf_ccs(buf, i,
 				     fb->offsets[num_surfaces + i],
 				     fb->strides[num_surfaces + i]);
-	} else {
-		num_surfaces = fb->num_planes;
 	}
 
 	igt_assert(fb->offsets[0] == 0);
@@ -2195,11 +2209,13 @@ static void init_buf(struct fb_blit_upload *blit,
 
 	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
 		buf->cc.offset = fb->offsets[2];
+
+	return buf;
 }
 
-static void fini_buf(struct igt_buf *buf)
+static void fini_buf(struct intel_buf *buf)
 {
-	drm_intel_bo_unreference(buf->bo);
+	intel_buf_destroy(buf);
 }
 
 static bool use_vebox_copy(const struct igt_fb *src_fb,
@@ -2229,7 +2245,7 @@ static void copy_with_engine(struct fb_blit_upload *blit,
 			     const struct igt_fb *dst_fb,
 			     const struct igt_fb *src_fb)
 {
-	struct igt_buf src = {}, dst = {};
+	struct intel_buf *src, *dst;
 	igt_render_copyfunc_t render_copy = NULL;
 	igt_vebox_copyfunc_t vebox_copy = NULL;
 
@@ -2243,23 +2259,23 @@ static void copy_with_engine(struct fb_blit_upload *blit,
 	igt_assert_eq(dst_fb->offsets[0], 0);
 	igt_assert_eq(src_fb->offsets[0], 0);
 
-	init_buf(blit, &src, src_fb, "cairo enginecopy src");
-	init_buf(blit, &dst, dst_fb, "cairo enginecopy dst");
+	src = create_buf(blit, src_fb, "cairo enginecopy src");
+	dst = create_buf(blit, dst_fb, "cairo enginecopy dst");
 
 	if (vebox_copy)
-		vebox_copy(blit->batch, &src,
+		vebox_copy(blit->ibb, src,
 			   dst_fb->plane_width[0], dst_fb->plane_height[0],
-			   &dst);
+			   dst);
 	else
-		render_copy(blit->batch, NULL,
-			    &src,
+		render_copy(blit->ibb, 0,
+			    src,
 			    0, 0,
 			    dst_fb->plane_width[0], dst_fb->plane_height[0],
-			    &dst,
+			    dst,
 			    0, 0);
 
-	fini_buf(&dst);
-	fini_buf(&src);
+	fini_buf(dst);
+	fini_buf(src);
 }
 
 static void blitcopy(const struct igt_fb *dst_fb,
@@ -2333,7 +2349,7 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 		gem_set_domain(fd, linear->fb.gem_handle,
 			I915_GEM_DOMAIN_GTT, 0);
 
-		if (blit->batch)
+		if (blit->ibb)
 			copy_with_engine(blit, fb, &linear->fb);
 		else
 			blitcopy(fb, &linear->fb);
@@ -2342,9 +2358,9 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 		gem_close(fd, linear->fb.gem_handle);
 	}
 
-	if (blit->batch) {
-		intel_batchbuffer_free(blit->batch);
-		drm_intel_bufmgr_destroy(blit->bufmgr);
+	if (blit->ibb) {
+		intel_bb_destroy(blit->ibb);
+		buf_ops_destroy(blit->bops);
 	}
 }
 
@@ -2366,9 +2382,8 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 	struct fb_blit_linear *linear = &blit->linear;
 
 	if (!igt_vc4_is_tiled(fb->modifier) && use_enginecopy(fb)) {
-		blit->bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		blit->batch = intel_batchbuffer_alloc(blit->bufmgr,
-						      intel_get_drm_devid(fd));
+		blit->bops = buf_ops_create(fd);
+		blit->ibb = intel_bb_create(fd, 4096);
 	}
 
 	/*
@@ -2400,7 +2415,7 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 		gem_set_domain(fd, linear->fb.gem_handle,
 				I915_GEM_DOMAIN_GTT, 0);
 
-		if (blit->batch)
+		if (blit->ibb)
 			copy_with_engine(blit, &linear->fb, fb);
 		else
 			blitcopy(&linear->fb, fb);
