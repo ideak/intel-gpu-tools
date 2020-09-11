@@ -1958,8 +1958,7 @@ static void intel_bb_dump_execbuf(struct intel_bb *ibb,
 	}
 }
 
-#define LINELEN 76
-static void intel_bb_dump_base64(struct intel_bb *ibb)
+static void intel_bb_dump_base64(struct intel_bb *ibb, int linelen)
 {
 	int outsize;
 	gchar *str, *pos;
@@ -1968,18 +1967,12 @@ static void intel_bb_dump_base64(struct intel_bb *ibb)
 	pos = str = g_base64_encode((const guchar *) ibb->batch, ibb->size);
 	outsize = strlen(str);
 
-	while (pos) {
-		char line[LINELEN + 1];
-		int to_copy = min(LINELEN, outsize);
-
-		memcpy(line, pos, to_copy);
-		line[to_copy] = 0;
-		igt_info("%s\n", line);
-		pos += LINELEN;
-		outsize -= to_copy;
-		if (outsize == 0)
-			break;
+	while (outsize > 0) {
+		igt_info("%.*s\n", min(outsize, linelen), pos);
+		pos += linelen;
+		outsize -= linelen;
 	}
+
 	free(str);
 }
 
@@ -2031,6 +2024,7 @@ static void update_offsets(struct intel_bb *ibb,
 	}
 }
 
+#define LINELEN 76
 /*
  * @__intel_bb_exec:
  * @ibb: pointer to intel_bb
@@ -2070,7 +2064,7 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 	execbuf.rsvd2 = 0;
 
 	if (ibb->dump_base64)
-		intel_bb_dump_base64(ibb);
+		intel_bb_dump_base64(ibb, LINELEN);
 
 	ret = __gem_execbuf_wr(ibb->i915, &execbuf);
 	if (ret) {
