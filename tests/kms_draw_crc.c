@@ -38,7 +38,7 @@ struct modeset_params {
 int drm_fd;
 drmModeResPtr drm_res;
 drmModeConnectorPtr drm_connectors[MAX_CONNECTORS];
-drm_intel_bufmgr *bufmgr;
+struct buf_ops *bops;
 igt_pipe_crc_t *pipe_crc;
 
 #define N_FORMATS 3
@@ -126,23 +126,23 @@ static void get_method_crc(enum igt_draw_method method, uint32_t drm_format,
 
 	igt_create_fb(drm_fd, ms.mode->hdisplay, ms.mode->vdisplay,
 		      drm_format, tiling, &fb);
-	igt_draw_rect_fb(drm_fd, bufmgr, NULL, &fb, method,
+	igt_draw_rect_fb(drm_fd, bops, 0, &fb, method,
 			 0, 0, fb.width, fb.height,
 			 get_color(drm_format, 0, 0, 1));
 
-	igt_draw_rect_fb(drm_fd, bufmgr, NULL, &fb, method,
+	igt_draw_rect_fb(drm_fd, bops, 0, &fb, method,
 			 fb.width / 4, fb.height / 4,
 			 fb.width / 2, fb.height / 2,
 			 get_color(drm_format, 0, 1, 0));
-	igt_draw_rect_fb(drm_fd, bufmgr, NULL, &fb, method,
+	igt_draw_rect_fb(drm_fd, bops, 0, &fb, method,
 			 fb.width / 8, fb.height / 8,
 			 fb.width / 4, fb.height / 4,
 			 get_color(drm_format, 1, 0, 0));
-	igt_draw_rect_fb(drm_fd, bufmgr, NULL, &fb, method,
+	igt_draw_rect_fb(drm_fd, bops, 0, &fb, method,
 			 fb.width / 2, fb.height / 2,
 			 fb.width / 3, fb.height / 3,
 			 get_color(drm_format, 1, 0, 1));
-	igt_draw_rect_fb(drm_fd, bufmgr, NULL, &fb, method, 1, 1, 15, 15,
+	igt_draw_rect_fb(drm_fd, bops, 0, &fb, method, 1, 1, 15, 15,
 			 get_color(drm_format, 0, 1, 1));
 
 	rc = drmModeSetCrtc(drm_fd, ms.crtc_id, fb.fb_id, 0, 0,
@@ -228,7 +228,7 @@ static void fill_fb_subtest(void)
 	igt_create_fb(drm_fd, ms.mode->hdisplay, ms.mode->vdisplay,
 		      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, &fb);
 
-	igt_draw_rect_fb(drm_fd, bufmgr, NULL, &fb,
+	igt_draw_rect_fb(drm_fd, bops, 0, &fb,
 			 gem_has_mappable_ggtt(drm_fd) ? IGT_DRAW_MMAP_GTT :
 							 IGT_DRAW_MMAP_WC,
 			 0, 0, fb.width, fb.height, 0xFF);
@@ -270,9 +270,7 @@ static void setup_environment(void)
 
 	kmstest_set_vt_graphics_mode();
 
-	bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-	igt_assert(bufmgr);
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+	bops = buf_ops_create(drm_fd);
 
 	find_modeset_params();
 	pipe_crc = igt_pipe_crc_new(drm_fd, kmstest_get_crtc_idx(drm_res, ms.crtc_id),
@@ -285,7 +283,7 @@ static void teardown_environment(void)
 
 	igt_pipe_crc_free(pipe_crc);
 
-	drm_intel_bufmgr_destroy(bufmgr);
+	buf_ops_destroy(bops);
 
 	for (i = 0; i < drm_res->count_connectors; i++)
 		drmModeFreeConnector(drm_connectors[i]);
