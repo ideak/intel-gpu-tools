@@ -29,7 +29,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include "intel_bufmgr.h"
 
 enum operations {
 	PAGE_FLIP,
@@ -65,7 +64,7 @@ typedef struct {
 	uint32_t devid;
 	uint32_t crtc_id;
 	igt_display_t display;
-	drm_intel_bufmgr *bufmgr;
+	struct buf_ops *bops;
 	struct igt_fb fb_green, fb_white;
 	igt_plane_t *test_plane;
 	int mod_size;
@@ -123,73 +122,96 @@ static void display_fini(data_t *data)
 	igt_display_fini(&data->display);
 }
 
-static void fill_blt(data_t *data, uint32_t handle, unsigned char color)
+static void color_blit_start(struct intel_bb *ibb)
 {
-	drm_intel_bo *dst = gem_handle_to_libdrm_bo(data->bufmgr,
-						    data->drm_fd,
-						    "", handle);
-	struct intel_batchbuffer *batch;
-
-	batch = intel_batchbuffer_alloc(data->bufmgr, data->devid);
-	igt_assert(batch);
-
-	COLOR_BLIT_COPY_BATCH_START(0);
-	OUT_BATCH((1 << 24) | (0xf0 << 16) | 0);
-	OUT_BATCH(0);
-	OUT_BATCH(0xfff << 16 | 0xfff);
-	OUT_RELOC(dst, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-	OUT_BATCH(color);
-	ADVANCE_BATCH();
-
-	intel_batchbuffer_flush(batch);
-	intel_batchbuffer_free(batch);
-
-	gem_bo_busy(data->drm_fd, handle);
+	intel_bb_out(ibb, XY_COLOR_BLT_CMD_NOLEN |
+		     COLOR_BLT_WRITE_ALPHA |
+		     XY_COLOR_BLT_WRITE_RGB |
+		     (4 + (ibb->gen >= 8)));
 }
 
-static void scratch_buf_init(struct igt_buf *buf, drm_intel_bo *bo,
-			     int size, int stride)
+static struct intel_buf *create_buf_from_fb(data_t *data,
+					    const struct igt_fb *fb)
 {
-	memset(buf, 0, sizeof(*buf));
+	uint32_t name, handle, tiling, stride, width, height, bpp, size;
+	struct intel_buf *buf;
 
-	buf->bo = bo;
-	buf->surface[0].stride = stride;
-	buf->tiling = I915_TILING_X;
-	buf->surface[0].size = size;
-	buf->bpp = 32;
+	igt_assert_eq(fb->offsets[0], 0);
+
+	tiling = igt_fb_mod_to_tiling(fb->modifier);
+	stride = fb->strides[0];
+	bpp = fb->plane_bpp[0];
+	size = fb->size;
+	width = stride / (bpp / 8);
+	height = size / stride;
+
+	buf = calloc(1, sizeof(*buf));
+	igt_assert(buf);
+
+	name = gem_flink(data->drm_fd, fb->gem_handle);
+	handle = gem_open(data->drm_fd, name);
+	buf = intel_buf_create_using_handle(data->bops, handle,
+					    width, height, bpp, 0, tiling, 0);
+	intel_buf_set_ownership(buf, true);
+
+	return buf;
 }
 
-static void fill_render(data_t *data, uint32_t handle, unsigned char color)
+static void fill_blt(data_t *data, const struct igt_fb *fb, unsigned char color)
 {
-	drm_intel_bo *src, *dst;
-	struct intel_batchbuffer *batch;
-	struct igt_buf src_buf, dst_buf;
+	struct intel_bb *ibb;
+	struct intel_buf *dst;
+
+	ibb = intel_bb_create(data->drm_fd, 4096);
+	dst = create_buf_from_fb(data, fb);
+	intel_bb_add_intel_buf(ibb, dst, true);
+
+	color_blit_start(ibb);
+	intel_bb_out(ibb, (1 << 24) | (0xf0 << 16) | 0);
+	intel_bb_out(ibb, 0);
+	intel_bb_out(ibb, 0xfff << 16 | 0xfff);
+	intel_bb_emit_reloc(ibb, dst->handle, I915_GEM_DOMAIN_RENDER,
+			    I915_GEM_DOMAIN_RENDER, 0, dst->addr.offset);
+	intel_bb_out(ibb, color);
+
+	intel_bb_flush_blit(ibb);
+	intel_bb_destroy(ibb);
+	intel_buf_destroy(dst);
+
+	gem_bo_busy(data->drm_fd, fb->gem_handle);
+}
+
+static void fill_render(data_t *data, const struct igt_fb *fb,
+			unsigned char color)
+{
+	struct intel_buf *src, *dst;
+	struct intel_bb *ibb;
 	const uint8_t buf[4] = { color, color, color, color };
 	igt_render_copyfunc_t rendercopy = igt_get_render_copyfunc(data->devid);
+	int height, width, tiling;
 
 	igt_skip_on(!rendercopy);
 
-	dst = gem_handle_to_libdrm_bo(data->bufmgr, data->drm_fd, "", handle);
-	igt_assert(dst);
+	ibb = intel_bb_create(data->drm_fd, 4096);
+	dst = create_buf_from_fb(data, fb);
 
-	src = drm_intel_bo_alloc(data->bufmgr, "", data->mod_size, 4096);
-	igt_assert(src);
+	width = fb->strides[0] / (fb->plane_bpp[0] / 8);
+	height = fb->size / fb->strides[0];
+	tiling = igt_fb_mod_to_tiling(fb->modifier);
 
+	src = intel_buf_create(data->bops, width, height, fb->plane_bpp[0],
+			       0, tiling, 0);
 	gem_write(data->drm_fd, src->handle, 0, buf, 4);
 
-	scratch_buf_init(&src_buf, src, data->mod_size, data->mod_stride);
-	scratch_buf_init(&dst_buf, dst, data->mod_size, data->mod_stride);
+	rendercopy(ibb, 0,
+		   src, 0, 0, 0xff, 0xff,
+		   dst, 0, 0);
 
-	batch = intel_batchbuffer_alloc(data->bufmgr, data->devid);
-	igt_assert(batch);
+	intel_bb_destroy(ibb);
+	intel_buf_destroy(src);
+	intel_buf_destroy(dst);
 
-	rendercopy(batch, NULL,
-		   &src_buf, 0, 0, 0xff, 0xff,
-		   &dst_buf, 0, 0);
-
-	intel_batchbuffer_free(batch);
-
-	gem_bo_busy(data->drm_fd, handle);
+	gem_bo_busy(data->drm_fd, fb->gem_handle);
 }
 
 static bool sink_support(data_t *data, enum psr_mode mode)
@@ -290,11 +312,11 @@ static void run_test(data_t *data)
 		expected = "BLACK or TRANSPARENT mark on top of plane in test";
 		break;
 	case BLT:
-		fill_blt(data, handle, 0);
+		fill_blt(data, &data->fb_white, 0);
 		expected = "BLACK or TRANSPARENT mark on top of plane in test";
 		break;
 	case RENDER:
-		fill_render(data, handle, 0);
+		fill_render(data, &data->fb_white, 0);
 		expected = "BLACK or TRANSPARENT mark on top of plane in test";
 		break;
 	case PLANE_MOVE:
@@ -314,7 +336,8 @@ static void run_test(data_t *data)
 	manual(expected);
 }
 
-static void test_cleanup(data_t *data) {
+static void test_cleanup(data_t *data)
+{
 	igt_plane_t *primary;
 
 	primary = igt_output_get_plane_type(data->output,
@@ -444,11 +467,7 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 			      "Sink does not support PSR\n");
 
 		data.supports_psr2 = sink_support(&data, PSR_MODE_2);
-
-		data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
-		igt_assert(data.bufmgr);
-		drm_intel_bufmgr_gem_enable_reuse(data.bufmgr);
-
+		data.bops = buf_ops_create(data.drm_fd);
 		display_init(&data);
 	}
 
@@ -528,7 +547,7 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 			psr_disable(data.drm_fd, data.debugfs_fd);
 
 		close(data.debugfs_fd);
-		drm_intel_bufmgr_destroy(data.bufmgr);
+		buf_ops_destroy(data.bops);
 		display_fini(&data);
 	}
 }
