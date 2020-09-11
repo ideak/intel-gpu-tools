@@ -46,28 +46,39 @@ typedef struct {
 	int big_fb_width, big_fb_height;
 	uint64_t ram_size, aper_size, mappable_size;
 	igt_render_copyfunc_t render_copy;
-	drm_intel_bufmgr *bufmgr;
-	struct intel_batchbuffer *batch;
+	struct buf_ops *bops;
+	struct intel_bb *ibb;
 } data_t;
 
-static void init_buf(data_t *data,
-		     struct igt_buf *buf,
-		     const struct igt_fb *fb,
-		     const char *name)
+static struct intel_buf *init_buf(data_t *data,
+				  const struct igt_fb *fb,
+				  const char *buf_name)
 {
+	struct intel_buf *buf;
+	uint32_t name, handle, tiling, stride, width, height, bpp, size;
+
 	igt_assert_eq(fb->offsets[0], 0);
 
-	buf->bo = gem_handle_to_libdrm_bo(data->bufmgr, data->drm_fd,
-					  name, fb->gem_handle);
-	buf->tiling = igt_fb_mod_to_tiling(fb->modifier);
-	buf->surface[0].stride = fb->strides[0];
-	buf->bpp = fb->plane_bpp[0];
-	buf->surface[0].size = fb->size;
+	tiling = igt_fb_mod_to_tiling(fb->modifier);
+	stride = fb->strides[0];
+	bpp = fb->plane_bpp[0];
+	size = fb->size;
+	width = stride / (bpp / 8);
+	height = size / stride;
+
+	name = gem_flink(data->drm_fd, fb->gem_handle);
+	handle = gem_open(data->drm_fd, name);
+	buf = intel_buf_create_using_handle(data->bops, handle, width, height,
+					    bpp, 0, tiling, 0);
+	intel_buf_set_name(buf, buf_name);
+	intel_buf_set_ownership(buf, true);
+
+	return buf;
 }
 
-static void fini_buf(struct igt_buf *buf)
+static void fini_buf(struct intel_buf *buf)
 {
-	drm_intel_bo_unreference(buf->bo);
+	intel_buf_destroy(buf);
 }
 
 static void copy_pattern(data_t *data,
@@ -75,10 +86,10 @@ static void copy_pattern(data_t *data,
 			 struct igt_fb *src_fb, int sx, int sy,
 			 int w, int h)
 {
-	struct igt_buf src = {}, dst = {};
+	struct intel_buf *src, *dst;
 
-	init_buf(data, &src, src_fb, "big fb src");
-	init_buf(data, &dst, dst_fb, "big fb dst");
+	src = init_buf(data, src_fb, "big fb src");
+	dst = init_buf(data, dst_fb, "big fb dst");
 
 	gem_set_domain(data->drm_fd, dst_fb->gem_handle,
 		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
@@ -91,7 +102,7 @@ static void copy_pattern(data_t *data,
 	 * rendered with the blitter/render engine.
 	 */
 	if (data->render_copy) {
-		data->render_copy(data->batch, NULL, &src, sx, sy, w, h, &dst, dx, dy);
+		data->render_copy(data->ibb, 0, src, sx, sy, w, h, dst, dx, dy);
 	} else {
 		w = min(w, src_fb->width - sx);
 		w = min(w, dst_fb->width - dx);
@@ -99,14 +110,16 @@ static void copy_pattern(data_t *data,
 		h = min(h, src_fb->height - sy);
 		h = min(h, dst_fb->height - dy);
 
-		intel_blt_copy(data->batch, src.bo, sx, sy,
-			       src.surface[0].stride,
-			       dst.bo, dx, dy, dst.surface[0].stride, w, h,
-			       dst.bpp);
+		intel_bb_blt_copy(data->ibb, src, sx, sy, src->surface[0].stride,
+				  dst, dx, dy, dst->surface[0].stride, w, h, dst->bpp);
 	}
 
-	fini_buf(&dst);
-	fini_buf(&src);
+	fini_buf(dst);
+	fini_buf(src);
+
+	/* intel_bb cache doesn't know when objects dissappear, so
+	 * let's purge the cache */
+	intel_bb_reset(data->ibb, true);
 }
 
 static void generate_pattern(data_t *data,
@@ -648,8 +661,8 @@ igt_main
 		if (intel_gen(data.devid) >= 4)
 			data.render_copy = igt_get_render_copyfunc(data.devid);
 
-		data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
-		data.batch = intel_batchbuffer_alloc(data.bufmgr, data.devid);
+		data.bops = buf_ops_create(data.drm_fd);
+		data.ibb = intel_bb_create(data.drm_fd, 4096);
 	}
 
 	/*
@@ -708,7 +721,7 @@ igt_main
 	igt_fixture {
 		igt_display_fini(&data.display);
 
-		intel_batchbuffer_free(data.batch);
-		drm_intel_bufmgr_destroy(data.bufmgr);
+		intel_bb_destroy(data.ibb);
+		buf_ops_destroy(data.bops);
 	}
 }
