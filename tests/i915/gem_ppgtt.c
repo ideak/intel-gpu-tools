@@ -38,56 +38,45 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "igt_debugfs.h"
-#include "intel_bufmgr.h"
 
 #define WIDTH 512
 #define STRIDE (WIDTH*4)
 #define HEIGHT 512
 #define SIZE (HEIGHT*STRIDE)
 
-static drm_intel_bo *create_bo(drm_intel_bufmgr *bufmgr,
-			       uint32_t pixel)
+static struct intel_buf *create_bo(struct buf_ops *bops, uint32_t pixel)
 {
 	uint64_t value = (uint64_t)pixel << 32 | pixel, *v;
-	drm_intel_bo *bo;
+	struct intel_buf *buf;
 
-	bo = drm_intel_bo_alloc(bufmgr, "surface", SIZE, 4096);
-	igt_assert(bo);
+	buf = intel_buf_create(bops, WIDTH, HEIGHT, 32, 0, I915_TILING_NONE, 0);
+	v = intel_buf_device_map(buf, true);
 
-	do_or_die(drm_intel_bo_map(bo, 1));
-	v = bo->virtual;
 	for (int i = 0; i < SIZE / sizeof(value); i += 8) {
 		v[i + 0] = value; v[i + 1] = value;
 		v[i + 2] = value; v[i + 3] = value;
 		v[i + 4] = value; v[i + 5] = value;
 		v[i + 6] = value; v[i + 7] = value;
 	}
-	drm_intel_bo_unmap(bo);
+	intel_buf_unmap(buf);
 
-	return bo;
+	return buf;
 }
 
-static void scratch_buf_init(struct igt_buf *buf,
-			     drm_intel_bufmgr *bufmgr,
-			     uint32_t pixel)
+static void cleanup_bufs(struct intel_buf **buf, int count)
 {
-	memset(buf, 0, sizeof(*buf));
+	for (int child = 0; child < count; child++) {
+		struct buf_ops *bops = buf[child]->bops;
+		int fd = buf_ops_get_fd(buf[child]->bops);
 
-	buf->bo = create_bo(bufmgr, pixel);
-	buf->surface[0].stride = STRIDE;
-	buf->tiling = I915_TILING_NONE;
-	buf->surface[0].size = SIZE;
-	buf->bpp = 32;
-}
-
-static void scratch_buf_fini(struct igt_buf *buf)
-{
-	drm_intel_bo_unreference(buf->bo);
-	memset(buf, 0, sizeof(*buf));
+		intel_buf_destroy(buf[child]);
+		buf_ops_destroy(bops);
+		close(fd);
+	}
 }
 
 static void fork_rcs_copy(int timeout, uint32_t final,
-			  drm_intel_bo **dst, int count,
+			  struct intel_buf **dst, int count,
 			  unsigned flags)
 #define CREATE_CONTEXT 0x1
 {
@@ -102,21 +91,13 @@ static void fork_rcs_copy(int timeout, uint32_t final,
 
 	for (int child = 0; child < count; child++) {
 		int fd = drm_open_driver(DRIVER_INTEL);
-		drm_intel_bufmgr *bufmgr;
+		struct buf_ops *bops;
 
 		devid = intel_get_drm_devid(fd);
 
-		bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		igt_assert(bufmgr);
+		bops = buf_ops_create(fd);
 
-		dst[child] = create_bo(bufmgr, ~0);
-
-		if (flags & CREATE_CONTEXT) {
-			drm_intel_context *ctx;
-
-			ctx = drm_intel_gem_context_create(dst[child]->bufmgr);
-			igt_require(ctx);
-		}
+		dst[child] = create_bo(bops, ~0);
 
 		render_copy = igt_get_render_copyfunc(devid);
 		igt_require_f(render_copy,
@@ -124,113 +105,104 @@ static void fork_rcs_copy(int timeout, uint32_t final,
 	}
 
 	igt_fork(child, count) {
-		struct intel_batchbuffer *batch;
-		struct igt_buf buf = {};
-		struct igt_buf src;
+		struct intel_bb *ibb;
+		uint32_t ctx = 0;
+		struct intel_buf *src;
 		unsigned long i;
 
-		batch = intel_batchbuffer_alloc(dst[child]->bufmgr,
-						devid);
-		igt_assert(batch);
+		ibb = intel_bb_create(buf_ops_get_fd(dst[child]->bops), 4096);
 
-		if (flags & CREATE_CONTEXT) {
-			drm_intel_context *ctx;
-
-			ctx = drm_intel_gem_context_create(dst[child]->bufmgr);
-			intel_batchbuffer_set_context(batch, ctx);
-		}
-
-		buf.bo = dst[child];
-		buf.surface[0].stride = STRIDE;
-		buf.tiling = I915_TILING_NONE;
-		buf.surface[0].size = SIZE;
-		buf.bpp = 32;
+		if (flags & CREATE_CONTEXT)
+			ctx = gem_context_create(buf_ops_get_fd(dst[child]->bops));
 
 		i = 0;
 		igt_until_timeout(timeout) {
-			scratch_buf_init(&src, dst[child]->bufmgr,
-					 i++ | child << 16);
-			render_copy(batch, NULL,
-				    &src, 0, 0,
+			src = create_bo(dst[child]->bops,
+					i++ | child << 16);
+			render_copy(ibb, ctx,
+				    src, 0, 0,
 				    WIDTH, HEIGHT,
-				    &buf, 0, 0);
-			scratch_buf_fini(&src);
+				    dst[child], 0, 0);
+
+			intel_buf_destroy(src);
 		}
 
-		scratch_buf_init(&src, dst[child]->bufmgr,
-				 final | child << 16);
-		render_copy(batch, NULL,
-			    &src, 0, 0,
+		src = create_bo(dst[child]->bops,
+				final | child << 16);
+		render_copy(ibb, ctx,
+			    src, 0, 0,
 			    WIDTH, HEIGHT,
-			    &buf, 0, 0);
-		scratch_buf_fini(&src);
+			    dst[child], 0, 0);
+
+		intel_buf_destroy(src);
+
+		intel_bb_destroy(ibb);
 	}
 }
 
 static void fork_bcs_copy(int timeout, uint32_t final,
-			  drm_intel_bo **dst, int count)
+			  struct intel_buf **dst, int count)
 {
-	int devid;
-
 	for (int child = 0; child < count; child++) {
-		drm_intel_bufmgr *bufmgr;
+		struct buf_ops *bops;
 		int fd = drm_open_driver(DRIVER_INTEL);
 
-		devid = intel_get_drm_devid(fd);
-
-		bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		igt_assert(bufmgr);
-
-		dst[child] = create_bo(bufmgr, ~0);
+		bops = buf_ops_create(fd);
+		dst[child] = create_bo(bops, ~0);
 	}
 
 	igt_fork(child, count) {
-		struct intel_batchbuffer *batch;
-		drm_intel_bo *src[2];
+		struct intel_buf *src[2];
+		struct intel_bb *ibb;
 		unsigned long i;
 
-
-		batch = intel_batchbuffer_alloc(dst[child]->bufmgr,
-						devid);
-		igt_assert(batch);
+		ibb = intel_bb_create(buf_ops_get_fd(dst[child]->bops), 4096);
 
 		i = 0;
 		igt_until_timeout(timeout) {
-			src[0] = create_bo(dst[child]->bufmgr,
+			src[0] = create_bo(dst[child]->bops,
 					   ~0);
-			src[1] = create_bo(dst[child]->bufmgr,
+			src[1] = create_bo(dst[child]->bops,
 					   i++ | child << 16);
 
-			intel_copy_bo(batch, src[0], src[1], SIZE);
-			intel_copy_bo(batch, dst[child], src[0], SIZE);
+			intel_bb_blt_copy(ibb, src[1], 0, 0, 4096,
+					  src[0], 0, 0, 4096,
+					  4096/4, SIZE/4096, 32);
+			intel_bb_blt_copy(ibb, src[0], 0, 0, 4096,
+					  dst[child], 0, 0, 4096,
+					  4096/4, SIZE/4096, 32);
 
-			drm_intel_bo_unreference(src[1]);
-			drm_intel_bo_unreference(src[0]);
+			intel_buf_destroy(src[1]);
+			intel_buf_destroy(src[0]);
 		}
 
-		src[0] = create_bo(dst[child]->bufmgr,
-				   ~0);
-		src[1] = create_bo(dst[child]->bufmgr,
+		src[0] = create_bo(dst[child]->bops, ~0);
+		src[1] = create_bo(dst[child]->bops,
 				   final | child << 16);
 
-		intel_copy_bo(batch, src[0], src[1], SIZE);
-		intel_copy_bo(batch, dst[child], src[0], SIZE);
+		intel_bb_blt_copy(ibb, src[1], 0, 0, 4096,
+				  src[0], 0, 0, 4096,
+				  4096/4, SIZE/4096, 32);
+		intel_bb_blt_copy(ibb, src[0], 0, 0, 4096,
+				  dst[child], 0, 0, 4096,
+				  4096/4, SIZE/4096, 32);
 
-		drm_intel_bo_unreference(src[1]);
-		drm_intel_bo_unreference(src[0]);
+		intel_buf_destroy(src[1]);
+		intel_buf_destroy(src[0]);
+
+		intel_bb_destroy(ibb);
 	}
 }
 
-static void surfaces_check(drm_intel_bo **bo, int count, uint32_t expected)
+static void surfaces_check(struct intel_buf **buf, int count, uint32_t expected)
 {
 	for (int child = 0; child < count; child++) {
 		uint32_t *ptr;
 
-		do_or_die(drm_intel_bo_map(bo[child], 0));
-		ptr = bo[child]->virtual;
+		ptr = intel_buf_cpu_map(buf[child], 0);
 		for (int j = 0; j < SIZE/4; j++)
 			igt_assert_eq(ptr[j], expected | child << 16);
-		drm_intel_bo_unmap(bo[child]);
+		intel_buf_unmap(buf[child]);
 	}
 }
 
@@ -301,7 +273,7 @@ igt_main
 	}
 
 	igt_subtest("blt-vs-render-ctx0") {
-		drm_intel_bo *bcs[1], *rcs[N_CHILD];
+		struct intel_buf *bcs[1], *rcs[N_CHILD];
 
 		fork_bcs_copy(30, 0x4000, bcs, 1);
 		fork_rcs_copy(30, 0x8000 / N_CHILD, rcs, N_CHILD, 0);
@@ -310,10 +282,13 @@ igt_main
 
 		surfaces_check(bcs, 1, 0x4000);
 		surfaces_check(rcs, N_CHILD, 0x8000 / N_CHILD);
+
+		cleanup_bufs(bcs, 1);
+		cleanup_bufs(rcs, N_CHILD);
 	}
 
 	igt_subtest("blt-vs-render-ctxN") {
-		drm_intel_bo *bcs[1], *rcs[N_CHILD];
+		struct intel_buf *bcs[1], *rcs[N_CHILD];
 
 		fork_rcs_copy(30, 0x8000 / N_CHILD, rcs, N_CHILD, CREATE_CONTEXT);
 		fork_bcs_copy(30, 0x4000, bcs, 1);
@@ -322,6 +297,9 @@ igt_main
 
 		surfaces_check(bcs, 1, 0x4000);
 		surfaces_check(rcs, N_CHILD, 0x8000 / N_CHILD);
+
+		cleanup_bufs(bcs, 1);
+		cleanup_bufs(rcs, N_CHILD);
 	}
 
 	igt_subtest("flink-and-close-vma-leak")
