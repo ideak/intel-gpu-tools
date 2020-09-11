@@ -1205,6 +1205,20 @@ static void __reallocate_objects(struct intel_bb *ibb)
 	}
 }
 
+/*
+ * gen8_canonical_addr
+ * Used to convert any address into canonical form, i.e. [63:48] == [47].
+ * Based on kernel's sign_extend64 implementation.
+ * @address - a virtual address
+ */
+#define GEN8_HIGH_ADDRESS_BIT 47
+static uint64_t gen8_canonical_addr(uint64_t address)
+{
+	int shift = 63 - GEN8_HIGH_ADDRESS_BIT;
+
+	return (int64_t)(address << shift) >> shift;
+}
+
 static inline uint64_t __intel_bb_propose_offset(struct intel_bb *ibb)
 {
 	uint64_t offset;
@@ -1217,6 +1231,7 @@ static inline uint64_t __intel_bb_propose_offset(struct intel_bb *ibb)
 	offset += 256 << 10; /* Keep the low 256k clear, for negative deltas */
 	offset &= ibb->gtt_size - 1;
 	offset &= ~(ibb->alignment - 1);
+	offset = gen8_canonical_addr(offset);
 
 	return offset;
 }
@@ -1254,9 +1269,21 @@ __intel_bb_create(int i915, uint32_t size, bool do_relocs)
 	gtt_size = gem_aperture_size(i915);
 	if (!gem_uses_full_ppgtt(i915))
 		gtt_size /= 2;
-	if ((gtt_size - 1) >> 32)
+	if ((gtt_size - 1) >> 32) {
 		ibb->supports_48b_address = true;
 
+		/*
+		 * Until we develop IGT address allocator we workaround
+		 * playing with canonical addresses with 47-bit set to 1
+		 * just by limiting gtt size to 46-bit when gtt is 47 or 48
+		 * bit size. Current interface doesn't pass bo size, so
+		 * limiting to 46 bit make us sure we won't enter to
+		 * addresses with 47-bit set (we use 32-bit size now so
+		 * still we fit 47-bit address space).
+		 */
+		if (gtt_size & (3ull << 47))
+			gtt_size = (1ull << 46);
+	}
 	ibb->gtt_size = gtt_size;
 
 	__reallocate_objects(ibb);
@@ -1525,7 +1552,11 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
 	i = ibb->num_objects;
 	object = &ibb->objects[i];
 	object->handle = handle;
+
+	/* Limit current offset to gtt size */
 	object->offset = offset;
+	if (offset != INTEL_BUF_INVALID_ADDRESS)
+		object->offset = gen8_canonical_addr(offset & (ibb->gtt_size - 1));
 	object->alignment = ibb->alignment;
 
 	found = tsearch((void *) object, &ibb->root, __compare_objects);
@@ -1863,8 +1894,6 @@ static void intel_bb_dump_execbuf(struct intel_bb *ibb,
 			    from_user_pointer(execbuf->buffers_ptr))[i];
 		relocs = from_user_pointer(objects->relocs_ptr);
 		address = objects->offset;
-		if (address != INTEL_BUF_INVALID_ADDRESS)
-			address = address & (ibb->gtt_size - 1);
 		igt_info(" [%d] handle: %u, reloc_count: %d, reloc_ptr: %p, "
 			 "align: 0x%llx, offset: 0x%" PRIx64 ", flags: 0x%llx, "
 			 "rsvd1: 0x%llx, rsvd2: 0x%llx\n",
@@ -1879,8 +1908,6 @@ static void intel_bb_dump_execbuf(struct intel_bb *ibb,
 			for (j = 0; j < objects->relocation_count; j++) {
 				reloc = &relocs[j];
 				address = reloc->presumed_offset;
-				if (address != INTEL_BUF_INVALID_ADDRESS)
-					address = address & (ibb->gtt_size - 1);
 				igt_info("\t [%d] target handle: %u, "
 					 "offset: 0x%llx, delta: 0x%x, "
 					 "presumed_offset: 0x%" PRIx64 ", "

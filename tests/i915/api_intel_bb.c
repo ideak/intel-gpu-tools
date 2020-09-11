@@ -165,6 +165,47 @@ static void simple_bb(struct buf_ops *bops, bool use_context)
 		gem_context_destroy(i915, ctx);
 }
 
+/*
+ * Make sure intel-bb space allocator currently doesn't enter 47-48 bit
+ * gtt sizes.
+ */
+static void check_canonical(struct buf_ops *bops)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_bb *ibb;
+	struct intel_buf *buf;
+	uint32_t offset;
+	uint64_t address;
+	bool supports_48bit;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	supports_48bit = ibb->supports_48b_address;
+	if (!supports_48bit)
+		intel_bb_destroy(ibb);
+	igt_require_f(supports_48bit, "We need 48bit ppgtt for testing\n");
+
+	address = 0xc00000000000;
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	offset = intel_bb_emit_bbe(ibb);
+
+	buf = intel_buf_create(bops, 512, 512, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
+
+	buf->addr.offset = address;
+	intel_bb_add_intel_buf(ibb, buf, true);
+	intel_bb_object_set_flag(ibb, buf->handle, EXEC_OBJECT_PINNED);
+
+	igt_assert(buf->addr.offset == 0);
+
+	intel_bb_exec(ibb, offset,
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
+
+	intel_buf_destroy(buf);
+	intel_bb_destroy(ibb);
+}
+
 #define MI_FLUSH_DW (0x26<<23)
 #define BCS_SWCTRL  0x22200
 #define BCS_SRC_Y   (1 << 0)
@@ -672,6 +713,9 @@ igt_main_args("dpi", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("simple-bb-ctx")
 		simple_bb(bops, true);
+
+	igt_subtest("check-canonical")
+		check_canonical(bops);
 
 	igt_subtest("blit-noreloc-keep-cache")
 		blit(bops, NORELOC, KEEP_CACHE);
