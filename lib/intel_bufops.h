@@ -16,6 +16,9 @@ struct intel_buf {
 	uint32_t bpp;
 	uint32_t compression;
 	uint32_t swizzle_mode;
+	uint32_t yuv_semiplanar_bpp;
+	bool format_is_yuv;
+	bool format_is_yuv_semiplanar;
 	struct {
 		uint32_t offset;
 		uint32_t stride;
@@ -32,6 +35,10 @@ struct intel_buf {
 		uint64_t offset;
 		uint32_t ctx;
 	} addr;
+
+	/* CPU mapping */
+	uint32_t *ptr;
+	bool cpu_write;
 
 	/* For debugging purposes */
 	char name[INTEL_BUF_NAME_MAXSIZE + 1];
@@ -80,9 +87,10 @@ intel_buf_ccs_height(int gen, const struct intel_buf *buf)
 	return DIV_ROUND_UP(intel_buf_height(buf), 512) * 32;
 }
 
-int intel_buf_bo_size(const struct intel_buf *buf);
+uint32_t intel_buf_bo_size(const struct intel_buf *buf);
 
 struct buf_ops *buf_ops_create(int fd);
+struct buf_ops *buf_ops_create_with_selftest(int fd);
 void buf_ops_destroy(struct buf_ops *bops);
 int buf_ops_get_fd(struct buf_ops *bops);
 
@@ -116,7 +124,13 @@ struct intel_buf *intel_buf_create(struct buf_ops *bops,
 				   uint32_t req_tiling, uint32_t compression);
 void intel_buf_destroy(struct intel_buf *buf);
 
+void *intel_buf_cpu_map(struct intel_buf *buf, bool write);
+void *intel_buf_device_map(struct intel_buf *buf, bool write);
+void intel_buf_unmap(struct intel_buf *buf);
+void intel_buf_flush_and_unmap(struct intel_buf *buf);
+
 void intel_buf_print(const struct intel_buf *buf);
+void intel_buf_dump(const struct intel_buf *buf, const char *filename);
 const char *intel_buf_set_name(struct intel_buf *buf, const char *name);
 
 void intel_buf_write_to_png(struct intel_buf *buf, const char *filename);

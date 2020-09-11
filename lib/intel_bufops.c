@@ -704,7 +704,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 	igt_assert(buf);
 	igt_assert(width > 0 && height > 0);
 	igt_assert(bpp == 8 || bpp == 16 || bpp == 32);
-	igt_assert(alignment % 4 == 0);
+	igt_assert(alignment >= 0);
 
 	memset(buf, 0, sizeof(*buf));
 
@@ -757,7 +757,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 
 			buf->surface[0].stride = ALIGN(width * (bpp / 8), tile_width);
 		} else {
-			buf->surface[0].stride = ALIGN(width * (bpp / 8), alignment ?: 4);
+			buf->surface[0].stride = ALIGN(width * (bpp / 8), alignment ?: 1);
 		}
 
 		buf->surface[0].size = buf->surface[0].stride * height;
@@ -865,9 +865,67 @@ struct intel_buf *intel_buf_create(struct buf_ops *bops,
 void intel_buf_destroy(struct intel_buf *buf)
 {
 	igt_assert(buf);
+	igt_assert(buf->ptr == NULL);
 
 	intel_buf_close(buf->bops, buf);
 	free(buf);
+}
+
+void *intel_buf_cpu_map(struct intel_buf *buf, bool write)
+{
+	int i915 = buf_ops_get_fd(buf->bops);
+
+	igt_assert(buf);
+	igt_assert(buf->ptr == NULL); /* already mapped */
+
+	buf->cpu_write = write;
+	buf->ptr = gem_mmap__cpu_coherent(i915, buf->handle, 0,
+					  buf->surface[0].size,
+					  write ? PROT_WRITE : PROT_READ);
+
+	gem_set_domain(i915, buf->handle,
+		       I915_GEM_DOMAIN_CPU,
+		       write ? I915_GEM_DOMAIN_CPU : 0);
+
+	return buf->ptr;
+}
+
+void *intel_buf_device_map(struct intel_buf *buf, bool write)
+{
+	int i915 = buf_ops_get_fd(buf->bops);
+
+	igt_assert(buf);
+	igt_assert(buf->ptr == NULL); /* already mapped */
+
+	buf->ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
+					     buf->surface[0].size,
+					     write ? PROT_WRITE : PROT_READ);
+
+	gem_set_domain(i915, buf->handle,
+		       I915_GEM_DOMAIN_WC,
+		       write ? I915_GEM_DOMAIN_WC : 0);
+
+	return buf->ptr;
+}
+
+void intel_buf_unmap(struct intel_buf *buf)
+{
+	igt_assert(buf);
+	igt_assert(buf->ptr);
+
+	munmap(buf->ptr, buf->surface[0].size);
+	buf->ptr = NULL;
+}
+
+void intel_buf_flush_and_unmap(struct intel_buf *buf)
+{
+	igt_assert(buf);
+	igt_assert(buf->ptr);
+
+	if (buf->cpu_write)
+		gem_sw_finish(buf_ops_get_fd(buf->bops), buf->handle);
+
+	intel_buf_unmap(buf);
 }
 
 void intel_buf_print(const struct intel_buf *buf)
@@ -886,6 +944,21 @@ void intel_buf_print(const struct intel_buf *buf)
 		 buf->ccs[0].stride, buf->cc.offset);
 	igt_info(" addr <offset: %p, ctx: %u>\n",
 		 from_user_pointer(buf->addr.offset), buf->addr.ctx);
+}
+
+void intel_buf_dump(const struct intel_buf *buf, const char *filename)
+{
+	int i915 = buf_ops_get_fd(buf->bops);
+	uint64_t size = intel_buf_bo_size(buf);
+	FILE *out;
+	void *ptr;
+
+	ptr = gem_mmap__device_coherent(i915, buf->handle, 0, size, PROT_READ);
+	out = fopen(filename, "wb");
+	igt_assert(out);
+	fwrite(ptr, size, 1, out);
+	fclose(out);
+	munmap(ptr, size);
 }
 
 const char *intel_buf_set_name(struct intel_buf *buf, const char *name)
@@ -1066,7 +1139,7 @@ static void idempotency_selftest(struct buf_ops *bops, uint32_t tiling)
 	buf_ops_set_software_tiling(bops, tiling, false);
 }
 
-int intel_buf_bo_size(const struct intel_buf *buf)
+uint32_t intel_buf_bo_size(const struct intel_buf *buf)
 {
 	int offset = CCS_OFFSET(buf) ?: buf->surface[0].size;
 	int ccs_size =
@@ -1075,16 +1148,7 @@ int intel_buf_bo_size(const struct intel_buf *buf)
 	return offset + ccs_size;
 }
 
-/**
- * buf_ops_create
- * @fd: device filedescriptor
- *
- * Create buf_ops structure depending on fd-device capabilities.
- *
- * Returns: opaque pointer to buf_ops.
- *
- */
-struct buf_ops *buf_ops_create(int fd)
+static struct buf_ops *__buf_ops_create(int fd, bool check_idempotency)
 {
 	struct buf_ops *bops = calloc(1, sizeof(*bops));
 	uint32_t devid;
@@ -1161,10 +1225,42 @@ struct buf_ops *buf_ops_create(int fd)
 		bops->ys_to_linear = NULL;
 	}
 
-	idempotency_selftest(bops, I915_TILING_X);
-	idempotency_selftest(bops, I915_TILING_Y);
+	if (check_idempotency) {
+		idempotency_selftest(bops, I915_TILING_X);
+		idempotency_selftest(bops, I915_TILING_Y);
+	}
 
 	return bops;
+}
+
+/**
+ * buf_ops_create
+ * @fd: device filedescriptor
+ *
+ * Create buf_ops structure depending on fd-device capabilities.
+ *
+ * Returns: opaque pointer to buf_ops.
+ *
+ */
+struct buf_ops *buf_ops_create(int fd)
+{
+	return __buf_ops_create(fd, false);
+}
+
+/**
+ * buf_ops_create_with_selftest
+ * @fd: device filedescriptor
+ *
+ * Create buf_ops structure depending on fd-device capabilities.
+ * Runs with idempotency selftest to verify software tiling gives same
+ * result like hardware tiling (gens with mappable gtt).
+ *
+ * Returns: opaque pointer to buf_ops.
+ *
+ */
+struct buf_ops *buf_ops_create_with_selftest(int fd)
+{
+	return __buf_ops_create(fd, true);
 }
 
 /**
