@@ -449,8 +449,14 @@ struct intel_bb {
 
 	uint32_t ctx;
 
+	/* Cache */
 	void *root;
-	struct drm_i915_gem_exec_object2 *objects;
+
+	/* Current objects for execbuf */
+	void *current;
+
+	/* Objects for current execbuf */
+	struct drm_i915_gem_exec_object2 **objects;
 	uint32_t num_objects;
 	uint32_t allocated_objects;
 	uint64_t batch_offset;

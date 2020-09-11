@@ -1197,6 +1197,7 @@ static void __reallocate_objects(struct intel_bb *ibb)
 		ibb->objects = realloc(ibb->objects,
 				       sizeof(*ibb->objects) *
 				       (num + ibb->allocated_objects));
+
 		igt_assert(ibb->objects);
 		ibb->allocated_objects += num;
 
@@ -1286,7 +1287,6 @@ __intel_bb_create(int i915, uint32_t size, bool do_relocs)
 	}
 	ibb->gtt_size = gtt_size;
 
-	__reallocate_objects(ibb);
 	ibb->batch_offset = __intel_bb_propose_offset(ibb);
 	intel_bb_add_object(ibb, ibb->handle, ibb->batch_offset, false);
 
@@ -1326,24 +1326,15 @@ struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
 	return __intel_bb_create(i915, size, true);
 }
 
-/*
- * tdestroy() calls free function for each node, but we spread tree
- * on objects array, so do nothing.
- */
-static void __do_nothing(void *node)
-{
-	(void) node;
-}
-
 static void __intel_bb_destroy_relocations(struct intel_bb *ibb)
 {
 	uint32_t i;
 
 	/* Free relocations */
 	for (i = 0; i < ibb->num_objects; i++) {
-		free(from_user_pointer(ibb->objects[i].relocs_ptr));
-		ibb->objects[i].relocs_ptr = to_user_pointer(NULL);
-		ibb->objects[i].relocation_count = 0;
+		free(from_user_pointer(ibb->objects[i]->relocs_ptr));
+		ibb->objects[i]->relocs_ptr = to_user_pointer(NULL);
+		ibb->objects[i]->relocation_count = 0;
 	}
 
 	ibb->relocs = NULL;
@@ -1356,11 +1347,17 @@ static void __intel_bb_destroy_objects(struct intel_bb *ibb)
 	free(ibb->objects);
 	ibb->objects = NULL;
 
-	tdestroy(ibb->root, __do_nothing);
-	ibb->root = NULL;
+	tdestroy(ibb->current, free);
+	ibb->current = NULL;
 
 	ibb->num_objects = 0;
 	ibb->allocated_objects = 0;
+}
+
+static void __intel_bb_destroy_cache(struct intel_bb *ibb)
+{
+	tdestroy(ibb->root, free);
+	ibb->root = NULL;
 }
 
 /**
@@ -1378,11 +1375,14 @@ void intel_bb_destroy(struct intel_bb *ibb)
 
 	__intel_bb_destroy_relocations(ibb);
 	__intel_bb_destroy_objects(ibb);
+	__intel_bb_destroy_cache(ibb);
+
 	gem_close(ibb->i915, ibb->handle);
 
 	if (ibb->fence >= 0)
 		close(ibb->fence);
 
+	free(ibb->batch);
 	free(ibb);
 }
 
@@ -1404,31 +1404,35 @@ void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 	if (ibb->refcount > 1)
 		return;
 
-	__intel_bb_destroy_relocations(ibb);
-
-	if (purge_objects_cache) {
-		__intel_bb_destroy_objects(ibb);
-		__reallocate_objects(ibb);
-	}
-
-	gem_close(ibb->i915, ibb->handle);
-	ibb->handle = gem_create(ibb->i915, ibb->size);
-
-	ibb->batch_offset = __intel_bb_propose_offset(ibb);
-	intel_bb_add_object(ibb, ibb->handle, ibb->batch_offset, false);
-	ibb->ptr = ibb->batch;
-	memset(ibb->batch, 0, ibb->size);
-
-	if (purge_objects_cache)
-		return;
-
 	/*
 	 * To avoid relocation objects previously pinned to high virtual
 	 * addresses should keep 48bit flag. Ensure we won't clear it
 	 * in the reset path.
 	 */
 	for (i = 0; i < ibb->num_objects; i++)
-		ibb->objects[i].flags &= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+		ibb->objects[i]->flags &= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
+	__intel_bb_destroy_relocations(ibb);
+	__intel_bb_destroy_objects(ibb);
+	__reallocate_objects(ibb);
+
+	if (purge_objects_cache) {
+		__intel_bb_destroy_cache(ibb);
+		ibb->batch_offset = __intel_bb_propose_offset(ibb);
+	} else {
+		struct drm_i915_gem_exec_object2 *object;
+
+		object = intel_bb_find_object(ibb, ibb->handle);
+		ibb->batch_offset = object ? object->offset :
+					     __intel_bb_propose_offset(ibb);
+	}
+
+	gem_close(ibb->i915, ibb->handle);
+	ibb->handle = gem_create(ibb->i915, ibb->size);
+
+	intel_bb_add_object(ibb, ibb->handle, ibb->batch_offset, false);
+	ibb->ptr = ibb->batch;
+	memset(ibb->batch, 0, ibb->size);
 }
 
 /*
@@ -1528,6 +1532,50 @@ static int __compare_objects(const void *p1, const void *p2)
 	return (int) ((int64_t) o1->handle - (int64_t) o2->handle);
 }
 
+static struct drm_i915_gem_exec_object2 *
+__add_to_cache(struct intel_bb *ibb, uint32_t handle)
+{
+	struct drm_i915_gem_exec_object2 **found, *object;
+
+	object = malloc(sizeof(*object));
+	object->handle = handle;
+	found = tsearch((void *) object, &ibb->root, __compare_objects);
+
+	if (*found == object) {
+		memset(object, 0, sizeof(*object));
+		object->handle = handle;
+		object->alignment = ibb->alignment;
+	} else {
+		free(object);
+		object = *found;
+	}
+
+	return object;
+}
+
+static int __compare_handles(const void *p1, const void *p2)
+{
+	return (int) (*(int32_t *) p1 - *(int32_t *) p2);
+}
+
+static void __add_to_objects(struct intel_bb *ibb,
+			     struct drm_i915_gem_exec_object2 *object)
+{
+	uint32_t i, **found, *handle;
+
+	handle = malloc(sizeof(*handle));
+	*handle = object->handle;
+	found = tsearch((void *) handle, &ibb->current, __compare_handles);
+
+	if (*found == handle) {
+		__reallocate_objects(ibb);
+		i = ibb->num_objects++;
+		ibb->objects[i] = object;
+	} else {
+		free(handle);
+	}
+}
+
 /**
  * intel_bb_add_object:
  * @ibb: pointer to intel_bb
@@ -1544,27 +1592,14 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
 		    uint64_t offset, bool write)
 {
 	struct drm_i915_gem_exec_object2 *object;
-	struct drm_i915_gem_exec_object2 **found;
-	uint32_t i;
 
-	__reallocate_objects(ibb);
-
-	i = ibb->num_objects;
-	object = &ibb->objects[i];
-	object->handle = handle;
+	object = __add_to_cache(ibb, handle);
+	__add_to_objects(ibb, object);
 
 	/* Limit current offset to gtt size */
 	object->offset = offset;
 	if (offset != INTEL_BUF_INVALID_ADDRESS)
 		object->offset = gen8_canonical_addr(offset & (ibb->gtt_size - 1));
-	object->alignment = ibb->alignment;
-
-	found = tsearch((void *) object, &ibb->root, __compare_objects);
-
-	if (*found == object)
-		ibb->num_objects++;
-	else
-		object = *found;
 
 	if (object->offset == INTEL_BUF_INVALID_ADDRESS)
 		object->offset = __intel_bb_propose_offset(ibb);
@@ -1967,6 +2002,35 @@ static void print_node(const void *node, VISIT which, int depth)
 	}
 }
 
+static struct drm_i915_gem_exec_object2 *
+create_objects_array(struct intel_bb *ibb)
+{
+	struct drm_i915_gem_exec_object2 *objects;
+	uint32_t i;
+
+	objects = malloc(sizeof(*objects) * ibb->num_objects);
+	igt_assert(objects);
+
+	for (i = 0; i < ibb->num_objects; i++)
+		objects[i] = *(ibb->objects[i]);
+
+	return objects;
+}
+
+static void update_offsets(struct intel_bb *ibb,
+			   struct drm_i915_gem_exec_object2 *objects)
+{
+	struct drm_i915_gem_exec_object2 *object;
+	uint32_t i;
+
+	for (i = 0; i < ibb->num_objects; i++) {
+		object = intel_bb_find_object(ibb, objects[i].handle);
+		igt_assert(object);
+
+		object->offset = objects[i].offset;
+	}
+}
+
 /*
  * @__intel_bb_exec:
  * @ibb: pointer to intel_bb
@@ -1985,16 +2049,18 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 		    uint32_t ctx, uint64_t flags, bool sync)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 *objects;
 	int ret, fence, new_fence;
 
-	ibb->objects[0].relocs_ptr = to_user_pointer(ibb->relocs);
-	ibb->objects[0].relocation_count = ibb->num_relocs;
-	ibb->objects[0].handle = ibb->handle;
+	ibb->objects[0]->relocs_ptr = to_user_pointer(ibb->relocs);
+	ibb->objects[0]->relocation_count = ibb->num_relocs;
+	ibb->objects[0]->handle = ibb->handle;
 
 	gem_write(ibb->i915, ibb->handle, 0, ibb->batch, ibb->size);
 
 	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = (uintptr_t) ibb->objects;
+	objects = create_objects_array(ibb);
+	execbuf.buffers_ptr = (uintptr_t) objects;
 	execbuf.buffer_count = ibb->num_objects;
 	execbuf.batch_len = end_offset;
 	execbuf.rsvd1 = ibb->ctx = ctx;
@@ -2009,8 +2075,12 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 	ret = __gem_execbuf_wr(ibb->i915, &execbuf);
 	if (ret) {
 		intel_bb_dump_execbuf(ibb, &execbuf);
+		free(objects);
 		return ret;
 	}
+
+	/* Update addresses in the cache */
+	update_offsets(ibb, objects);
 
 	/* Save/merge fences */
 	fence = execbuf.rsvd2 >> 32;
@@ -2034,6 +2104,8 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 			twalk(ibb->root, print_node);
 		}
 	}
+
+	free(objects);
 
 	return 0;
 }
