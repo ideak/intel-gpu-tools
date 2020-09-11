@@ -27,6 +27,7 @@
 #include "igt_draw.h"
 
 #include "drmtest.h"
+#include "intel_bufops.h"
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
 #include "igt_core.h"
@@ -61,8 +62,8 @@
 /* Some internal data structures to avoid having to pass tons of parameters
  * around everything. */
 struct cmd_data {
-	drm_intel_bufmgr *bufmgr;
-	drm_intel_context *context;
+	struct buf_ops *bops;
+	uint32_t ctx;
 };
 
 struct buf_data {
@@ -264,8 +265,7 @@ static void set_pixel(void *_ptr, int index, uint32_t color, int bpp)
 	}
 }
 
-static void switch_blt_tiling(struct intel_batchbuffer *batch, uint32_t tiling,
-			      bool on)
+static void switch_blt_tiling(struct intel_bb *ibb, uint32_t tiling, bool on)
 {
 	uint32_t bcs_swctrl;
 
@@ -273,26 +273,22 @@ static void switch_blt_tiling(struct intel_batchbuffer *batch, uint32_t tiling,
 	if (tiling != I915_TILING_Y)
 		return;
 
-	igt_require(batch->gen >= 6);
+	igt_require(ibb->gen >= 6);
 
 	bcs_swctrl = (0x3 << 16) | (on ? 0x3 : 0x0);
 
 	/* To change the tile register, insert an MI_FLUSH_DW followed by an
 	 * MI_LOAD_REGISTER_IMM
 	 */
-	BEGIN_BATCH(4, 0);
-	OUT_BATCH(MI_FLUSH_DW | 2);
-	OUT_BATCH(0x0);
-	OUT_BATCH(0x0);
-	OUT_BATCH(0x0);
-	ADVANCE_BATCH();
+	intel_bb_out(ibb, MI_FLUSH_DW | 2);
+	intel_bb_out(ibb, 0x0);
+	intel_bb_out(ibb, 0x0);
+	intel_bb_out(ibb, 0x0);
 
-	BEGIN_BATCH(4, 0);
-	OUT_BATCH(MI_LOAD_REGISTER_IMM);
-	OUT_BATCH(0x22200); /* BCS_SWCTRL */
-	OUT_BATCH(bcs_swctrl);
-	OUT_BATCH(MI_NOOP);
-	ADVANCE_BATCH();
+	intel_bb_out(ibb, MI_LOAD_REGISTER_IMM);
+	intel_bb_out(ibb, 0x22200); /* BCS_SWCTRL */
+	intel_bb_out(ibb, bcs_swctrl);
+	intel_bb_out(ibb, MI_NOOP);
 }
 
 static void draw_rect_ptr_linear(void *ptr, uint32_t stride,
@@ -509,22 +505,42 @@ static void draw_rect_pwrite(int fd, struct buf_data *buf,
 	}
 }
 
+static struct intel_buf *create_buf(int fd, struct buf_ops *bops,
+				    struct buf_data *from, uint32_t tiling)
+{
+	struct intel_buf *buf;
+	uint32_t handle, name, width, height;
+
+	width = from->stride / (from->bpp / 8);
+	height = from->size / from->stride;
+
+	name = gem_flink(fd, from->handle);
+	handle = gem_open(fd, name);
+
+	buf = intel_buf_create_using_handle(bops, handle,
+					    width, height, from->bpp, 0,
+					    tiling, 0);
+
+	/* Make sure we close handle on destroy path */
+	intel_buf_set_ownership(buf, true);
+
+	return buf;
+}
+
 static void draw_rect_blt(int fd, struct cmd_data *cmd_data,
 			  struct buf_data *buf, struct rect *rect,
 			  uint32_t tiling, uint32_t color)
 {
-	drm_intel_bo *dst;
-	struct intel_batchbuffer *batch;
+	struct intel_bb *ibb;
+	struct intel_buf *dst;
 	int blt_cmd_len, blt_cmd_tiling, blt_cmd_depth;
 	uint32_t devid = intel_get_drm_devid(fd);
 	int gen = intel_gen(devid);
 	int pitch;
 
-	dst = gem_handle_to_libdrm_bo(cmd_data->bufmgr, fd, "", buf->handle);
-	igt_assert(dst);
-
-	batch = intel_batchbuffer_alloc(cmd_data->bufmgr, devid);
-	igt_assert(batch);
+	dst = create_buf(fd, cmd_data->bops, buf, tiling);
+	ibb = intel_bb_create(fd, PAGE_SIZE);
+	intel_bb_add_intel_buf(ibb, dst, true);
 
 	switch (buf->bpp) {
 	case 8:
@@ -544,34 +560,32 @@ static void draw_rect_blt(int fd, struct cmd_data *cmd_data,
 	blt_cmd_tiling = (tiling) ? XY_COLOR_BLT_TILED : 0;
 	pitch = (gen >= 4 && tiling) ? buf->stride / 4 : buf->stride;
 
-	switch_blt_tiling(batch, tiling, true);
+	switch_blt_tiling(ibb, tiling, true);
 
-	BEGIN_BATCH(6, 1);
-	OUT_BATCH(XY_COLOR_BLT_CMD_NOLEN | XY_COLOR_BLT_WRITE_ALPHA |
-		  XY_COLOR_BLT_WRITE_RGB | blt_cmd_tiling | blt_cmd_len);
-	OUT_BATCH(blt_cmd_depth | (0xF0 << 16) | pitch);
-	OUT_BATCH((rect->y << 16) | rect->x);
-	OUT_BATCH(((rect->y + rect->h) << 16) | (rect->x + rect->w));
-	OUT_RELOC_FENCED(dst, 0, I915_GEM_DOMAIN_RENDER, 0);
-	OUT_BATCH(color);
-	ADVANCE_BATCH();
+	intel_bb_out(ibb, XY_COLOR_BLT_CMD_NOLEN | XY_COLOR_BLT_WRITE_ALPHA |
+		     XY_COLOR_BLT_WRITE_RGB | blt_cmd_tiling | blt_cmd_len);
+	intel_bb_out(ibb, blt_cmd_depth | (0xF0 << 16) | pitch);
+	intel_bb_out(ibb, (rect->y << 16) | rect->x);
+	intel_bb_out(ibb, ((rect->y + rect->h) << 16) | (rect->x + rect->w));
+	intel_bb_emit_reloc_fenced(ibb, dst->handle, 0, I915_GEM_DOMAIN_RENDER,
+				   0, dst->addr.offset);
+	intel_bb_out(ibb, color);
 
-	switch_blt_tiling(batch, tiling, false);
+	switch_blt_tiling(ibb, tiling, false);
 
-	intel_batchbuffer_flush(batch);
-	intel_batchbuffer_free(batch);
-	drm_intel_bo_unreference(dst);
+	intel_bb_flush_blit(ibb);
+	intel_bb_destroy(ibb);
+	intel_buf_destroy(dst);
 }
 
 static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 			     struct buf_data *buf, struct rect *rect,
 			     uint32_t tiling, uint32_t color)
 {
-	drm_intel_bo *src, *dst;
+	struct intel_buf *src, *dst;
 	uint32_t devid = intel_get_drm_devid(fd);
 	igt_render_copyfunc_t rendercopy = igt_get_render_copyfunc(devid);
-	struct igt_buf src_buf = {}, dst_buf = {};
-	struct intel_batchbuffer *batch;
+	struct intel_bb *ibb;
 	struct buf_data tmp;
 	int pixel_size = buf->bpp / 8;
 
@@ -585,40 +599,24 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 	draw_rect_mmap_cpu(fd, &tmp, &(struct rect){0, 0, rect->w, rect->h},
 			   I915_TILING_NONE, I915_BIT_6_SWIZZLE_NONE, color);
 
-	src = gem_handle_to_libdrm_bo(cmd_data->bufmgr, fd, "", tmp.handle);
-	igt_assert(src);
-	dst = gem_handle_to_libdrm_bo(cmd_data->bufmgr, fd, "", buf->handle);
-	igt_assert(dst);
+	src = create_buf(fd, cmd_data->bops, &tmp, I915_TILING_NONE);
+	dst = create_buf(fd, cmd_data->bops, buf, tiling);
+	ibb = intel_bb_create(fd, PAGE_SIZE);
 
-	src_buf.bo = src;
-	src_buf.surface[0].stride = tmp.stride;
-	src_buf.tiling = I915_TILING_NONE;
-	src_buf.surface[0].size = tmp.size;
-	src_buf.bpp = tmp.bpp;
-	dst_buf.bo = dst;
-	dst_buf.surface[0].stride = buf->stride;
-	dst_buf.tiling = tiling;
-	dst_buf.surface[0].size = buf->size;
-	dst_buf.bpp = buf->bpp;
+	rendercopy(ibb, cmd_data->ctx, src, 0, 0, rect->w,
+		   rect->h, dst, rect->x, rect->y);
 
-	batch = intel_batchbuffer_alloc(cmd_data->bufmgr, devid);
-	igt_assert(batch);
-
-	rendercopy(batch, cmd_data->context, &src_buf, 0, 0, rect->w,
-		   rect->h, &dst_buf, rect->x, rect->y);
-
-	intel_batchbuffer_free(batch);
-	drm_intel_bo_unreference(src);
-	drm_intel_bo_unreference(dst);
+	intel_bb_destroy(ibb);
+	intel_buf_destroy(src);
+	intel_buf_destroy(dst);
 	gem_close(fd, tmp.handle);
 }
 
 /**
  * igt_draw_rect:
  * @fd: the DRM file descriptor
- * @bufmgr: the libdrm bufmgr, only required for IGT_DRAW_BLT and
- *          IGT_DRAW_RENDER
- * @context: the context, can be NULL if you don't want to think about it
+ * @bops: buf ops, only required for IGT_DRAW_BLT and IGT_DRAW_RENDER
+ * @ctx: the context, can be 0 if you don't want to think about it
  * @buf_handle: the handle of the buffer where you're going to draw to
  * @buf_size: the size of the buffer
  * @buf_stride: the stride of the buffer
@@ -634,7 +632,7 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
  * This function draws a colored rectangle on the destination buffer, allowing
  * you to specify the method used to draw the rectangle.
  */
-void igt_draw_rect(int fd, drm_intel_bufmgr *bufmgr, drm_intel_context *context,
+void igt_draw_rect(int fd, struct buf_ops *bops, uint32_t ctx,
 		   uint32_t buf_handle, uint32_t buf_size, uint32_t buf_stride,
 		   uint32_t tiling, enum igt_draw_method method,
 		   int rect_x, int rect_y, int rect_w, int rect_h,
@@ -643,8 +641,8 @@ void igt_draw_rect(int fd, drm_intel_bufmgr *bufmgr, drm_intel_context *context,
 	uint32_t buf_tiling, swizzle;
 
 	struct cmd_data cmd_data = {
-		.bufmgr = bufmgr,
-		.context = context,
+		.bops = bops,
+		.ctx = ctx,
 	};
 	struct buf_data buf = {
 		.handle = buf_handle,
@@ -693,9 +691,8 @@ void igt_draw_rect(int fd, drm_intel_bufmgr *bufmgr, drm_intel_context *context,
 /**
  * igt_draw_rect_fb:
  * @fd: the DRM file descriptor
- * @bufmgr: the libdrm bufmgr, only required for IGT_DRAW_BLT and
- *          IGT_DRAW_RENDER
- * @context: the context, can be NULL if you don't want to think about it
+ * @bops: buf ops, only required for IGT_DRAW_BLT and IGT_DRAW_RENDER
+ * @ctx: context, can be 0 if you don't want to think about it
  * @fb: framebuffer
  * @method: method you're going to use to write to the buffer
  * @rect_x: horizontal position on the buffer where your rectangle starts
@@ -707,12 +704,12 @@ void igt_draw_rect(int fd, drm_intel_bufmgr *bufmgr, drm_intel_context *context,
  * This is exactly the same as igt_draw_rect, but you can pass an igt_fb instead
  * of manually providing its details. See igt_draw_rect.
  */
-void igt_draw_rect_fb(int fd, drm_intel_bufmgr *bufmgr,
-		      drm_intel_context *context, struct igt_fb *fb,
+void igt_draw_rect_fb(int fd, struct buf_ops *bops,
+		      uint32_t ctx, struct igt_fb *fb,
 		      enum igt_draw_method method, int rect_x, int rect_y,
 		      int rect_w, int rect_h, uint32_t color)
 {
-	igt_draw_rect(fd, bufmgr, context, fb->gem_handle, fb->size, fb->strides[0],
+	igt_draw_rect(fd, bops, ctx, fb->gem_handle, fb->size, fb->strides[0],
 		      igt_fb_mod_to_tiling(fb->modifier), method,
 		      rect_x, rect_y, rect_w, rect_h, color,
 		      igt_drm_format_to_bpp(fb->drm_format));
@@ -728,7 +725,7 @@ void igt_draw_rect_fb(int fd, drm_intel_bufmgr *bufmgr,
  */
 void igt_draw_fill_fb(int fd, struct igt_fb *fb, uint32_t color)
 {
-	igt_draw_rect_fb(fd, NULL, NULL, fb,
+	igt_draw_rect_fb(fd, NULL, 0, fb,
 			 gem_has_mappable_ggtt(fd) ? IGT_DRAW_MMAP_GTT :
 						     IGT_DRAW_MMAP_WC,
 			 0, 0, fb->width, fb->height, color);
