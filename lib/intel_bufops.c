@@ -716,7 +716,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 	igt_assert(bops);
 	igt_assert(buf);
 	igt_assert(width > 0 && height > 0);
-	igt_assert(bpp == 8 || bpp == 16 || bpp == 32);
+	igt_assert(bpp == 8 || bpp == 16 || bpp == 32 || bpp == 64);
 	igt_assert(alignment >= 0);
 
 	memset(buf, 0, sizeof(*buf));
