@@ -439,6 +439,7 @@ struct intel_bb {
 	uint32_t size;
 	uint32_t *batch;
 	uint32_t *ptr;
+	uint64_t alignment;
 	int fence;
 
 	uint32_t prng;
@@ -486,6 +487,22 @@ void intel_bb_print(struct intel_bb *ibb);
 void intel_bb_dump(struct intel_bb *ibb, const char *filename);
 void intel_bb_set_debug(struct intel_bb *ibb, bool debug);
 
+static inline uint64_t
+intel_bb_set_default_object_alignment(struct intel_bb *ibb, uint64_t alignment)
+{
+	uint64_t old = ibb->alignment;
+
+	ibb->alignment = alignment;
+
+	return old;
+}
+
+static inline uint64_t
+intel_bb_get_default_object_alignment(struct intel_bb *ibb)
+{
+	return ibb->alignment;
+}
+
 static inline uint32_t intel_bb_offset(struct intel_bb *ibb)
 {
 	return (uint32_t) ((uint8_t *) ibb->ptr - (uint8_t *) ibb->batch);
@@ -513,8 +530,7 @@ static inline uint32_t intel_bb_ptr_add_return_prev_offset(struct intel_bb *ibb,
 	return previous_offset;
 }
 
-static inline void *intel_bb_ptr_align(struct intel_bb *ibb,
-				      uint32_t alignment)
+static inline void *intel_bb_ptr_align(struct intel_bb *ibb, uint32_t alignment)
 {
 	intel_bb_ptr_set(ibb, ALIGN(intel_bb_offset(ibb), alignment));
 
@@ -538,6 +554,16 @@ static inline void intel_bb_out(struct intel_bb *ibb, uint32_t dword)
 struct drm_i915_gem_exec_object2 *
 intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
 		    uint64_t offset, bool write);
+struct drm_i915_gem_exec_object2 *
+intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf, bool write);
+
+struct drm_i915_gem_exec_object2 *
+intel_bb_find_object(struct intel_bb *ibb, uint32_t handle);
+
+bool
+intel_bb_object_set_flag(struct intel_bb *ibb, uint32_t handle, uint64_t flag);
+bool
+intel_bb_object_clear_flag(struct intel_bb *ibb, uint32_t handle, uint64_t flag);
 
 uint64_t intel_bb_emit_reloc(struct intel_bb *ibb,
 			 uint32_t handle,
@@ -568,6 +594,15 @@ uint64_t intel_bb_offset_reloc_with_delta(struct intel_bb *ibb,
 					  uint32_t offset,
 					  uint64_t presumed_offset);
 
+uint64_t intel_bb_offset_reloc_to_object(struct intel_bb *ibb,
+					 uint32_t handle,
+					 uint32_t to_handle,
+					 uint32_t read_domains,
+					 uint32_t write_domain,
+					 uint32_t delta,
+					 uint32_t offset,
+					 uint64_t presumed_offset);
+
 int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 		    uint32_t ctx, uint64_t flags, bool sync);
 
@@ -581,8 +616,12 @@ uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle);
 bool intel_bb_object_offset_to_buf(struct intel_bb *ibb, struct intel_buf *buf);
 
 uint32_t intel_bb_emit_bbe(struct intel_bb *ibb);
+uint32_t intel_bb_emit_flush_common(struct intel_bb *ibb);
+void intel_bb_flush(struct intel_bb *ibb, uint32_t ctx, uint32_t ring);
 void intel_bb_flush_render(struct intel_bb *ibb);
+void intel_bb_flush_render_with_context(struct intel_bb *ibb, uint32_t ctx);
 void intel_bb_flush_blit(struct intel_bb *ibb);
+void intel_bb_flush_blit_with_context(struct intel_bb *ibb, uint32_t ctx);
 
 uint32_t intel_bb_copy_data(struct intel_bb *ibb,
 			    const void *data, unsigned int bytes,

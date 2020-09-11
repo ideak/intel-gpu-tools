@@ -37,6 +37,7 @@
 #include "drmtest.h"
 #include "intel_batchbuffer.h"
 #include "intel_bufmgr.h"
+#include "intel_bufops.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "veboxcopy.h"
@@ -1214,6 +1215,7 @@ static inline uint64_t __intel_bb_propose_offset(struct intel_bb *ibb)
 	offset = hars_petruska_f54_1_random64(&ibb->prng);
 	offset += 256 << 10; /* Keep the low 256k clear, for negative deltas */
 	offset &= ibb->gtt_size - 1;
+	offset &= ~(ibb->alignment - 1);
 
 	return offset;
 }
@@ -1232,7 +1234,6 @@ __intel_bb_create(int i915, uint32_t size, bool do_relocs)
 {
 	struct intel_bb *ibb = calloc(1, sizeof(*ibb));
 	uint64_t gtt_size;
-	uint64_t bb_address;
 
 	igt_assert(ibb);
 
@@ -1242,6 +1243,7 @@ __intel_bb_create(int i915, uint32_t size, bool do_relocs)
 	ibb->enforce_relocs = do_relocs;
 	ibb->handle = gem_create(i915, size);
 	ibb->size = size;
+	ibb->alignment = 4096;
 	ibb->batch = calloc(1, size);
 	igt_assert(ibb->batch);
 	ibb->ptr = ibb->batch;
@@ -1253,11 +1255,12 @@ __intel_bb_create(int i915, uint32_t size, bool do_relocs)
 		gtt_size /= 2;
 	if ((gtt_size - 1) >> 32)
 		ibb->supports_48b_address = true;
+
 	ibb->gtt_size = gtt_size;
 
 	__reallocate_objects(ibb);
-	bb_address = __intel_bb_propose_offset(ibb);
-	intel_bb_add_object(ibb, ibb->handle, bb_address, false);
+	ibb->batch_offset = __intel_bb_propose_offset(ibb);
+	intel_bb_add_object(ibb, ibb->handle, ibb->batch_offset, false);
 
 	ibb->refcount = 1;
 
@@ -1364,7 +1367,7 @@ void intel_bb_destroy(struct intel_bb *ibb)
 */
 void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 {
-	uint64_t bb_address;
+	uint32_t i;
 
 	if (purge_objects_cache && ibb->refcount > 1)
 		igt_warn("Cannot purge objects cache on bb, refcount > 1!");
@@ -1383,10 +1386,21 @@ void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 	gem_close(ibb->i915, ibb->handle);
 	ibb->handle = gem_create(ibb->i915, ibb->size);
 
-	bb_address = __intel_bb_propose_offset(ibb);
-	intel_bb_add_object(ibb, ibb->handle, bb_address, false);
+	ibb->batch_offset = __intel_bb_propose_offset(ibb);
+	intel_bb_add_object(ibb, ibb->handle, ibb->batch_offset, false);
 	ibb->ptr = ibb->batch;
 	memset(ibb->batch, 0, ibb->size);
+
+	if (purge_objects_cache)
+		return;
+
+	/*
+	 * To avoid relocation objects previously pinned to high virtual
+	 * addresses should keep 48bit flag. Ensure we won't clear it
+	 * in the reset path.
+	 */
+	for (i = 0; i < ibb->num_objects; i++)
+		ibb->objects[i].flags &= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 }
 
 /*
@@ -1499,6 +1513,7 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
 	object = &ibb->objects[i];
 	object->handle = handle;
 	object->offset = offset;
+	object->alignment = ibb->alignment;
 
 	found = tsearch((void *) object, &ibb->root, __compare_objects);
 
@@ -1519,7 +1534,48 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
 	return object;
 }
 
-static bool intel_bb_object_set_fence(struct intel_bb *ibb, uint32_t handle)
+struct drm_i915_gem_exec_object2 *
+intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf, bool write)
+{
+	struct drm_i915_gem_exec_object2 *obj;
+
+	obj = intel_bb_add_object(ibb, buf->handle, buf->addr.offset, write);
+
+	/* For compressed surfaces ensure address is aligned to 64KB */
+	if (ibb->gen >= 12 && buf->compression) {
+		obj->offset &= ~(0x10000 - 1);
+		obj->alignment = 0x10000;
+	}
+
+	/* For gen3 ensure tiled buffers are aligned to power of two size */
+	if (ibb->gen == 3 && buf->tiling) {
+		uint64_t alignment = 1024 * 1024;
+
+		while (alignment < buf->surface[0].size)
+			alignment <<= 1;
+		obj->offset &= ~(alignment - 1);
+		obj->alignment = alignment;
+	}
+
+	/* Update address in intel_buf buffer */
+	buf->addr.offset = obj->offset;
+
+	return obj;
+}
+
+struct drm_i915_gem_exec_object2 *
+intel_bb_find_object(struct intel_bb *ibb, uint32_t handle)
+{
+	struct drm_i915_gem_exec_object2 object = { .handle = handle };
+	struct drm_i915_gem_exec_object2 **found;
+
+	found = tfind((void *) &object, &ibb->root, __compare_objects);
+
+	return *found;
+}
+
+bool
+intel_bb_object_set_flag(struct intel_bb *ibb, uint32_t handle, uint64_t flag)
 {
 	struct drm_i915_gem_exec_object2 object = { .handle = handle };
 	struct drm_i915_gem_exec_object2 **found;
@@ -1531,7 +1587,25 @@ static bool intel_bb_object_set_fence(struct intel_bb *ibb, uint32_t handle)
 		return false;
 	}
 
-	(*found)->flags |= EXEC_OBJECT_NEEDS_FENCE;
+	(*found)->flags |= flag;
+
+	return true;
+}
+
+bool
+intel_bb_object_clear_flag(struct intel_bb *ibb, uint32_t handle, uint64_t flag)
+{
+	struct drm_i915_gem_exec_object2 object = { .handle = handle };
+	struct drm_i915_gem_exec_object2 **found;
+
+	found = tfind((void *) &object, &ibb->root, __compare_objects);
+	if (!found) {
+		igt_warn("Trying to set fence on not found handle: %u\n",
+			 handle);
+		return false;
+	}
+
+	(*found)->flags &= ~flag;
 
 	return true;
 }
@@ -1539,7 +1613,8 @@ static bool intel_bb_object_set_fence(struct intel_bb *ibb, uint32_t handle)
 /*
  * intel_bb_add_reloc:
  * @ibb: pointer to intel_bb
- * @handle: object handle which address will be taken to patch the bb
+ * @to_handle: object handle in which do relocation
+ * @handle: object handle which address will be taken to patch the @to_handle
  * @read_domains: gem domain bits for the relocation
  * @write_domain: gem domain bit for the relocation
  * @delta: delta value to add to @buffer's gpu address
@@ -1554,6 +1629,7 @@ static bool intel_bb_object_set_fence(struct intel_bb *ibb, uint32_t handle)
  * exists but doesn't mark it as a render target.
  */
 static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
+				   uint32_t to_handle,
 				   uint32_t handle,
 				   uint32_t read_domains,
 				   uint32_t write_domain,
@@ -1562,20 +1638,32 @@ static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
 				   uint64_t presumed_offset)
 {
 	struct drm_i915_gem_relocation_entry *relocs;
-	struct drm_i915_gem_exec_object2 *object;
+	struct drm_i915_gem_exec_object2 *object, *to_object;
 	uint32_t i;
 
 	object = intel_bb_add_object(ibb, handle, presumed_offset, false);
 
-	relocs = ibb->relocs;
-	if (ibb->num_relocs == ibb->allocated_relocs) {
-		ibb->allocated_relocs += 4096 / sizeof(*relocs);
-		relocs = realloc(relocs, sizeof(*relocs) * ibb->allocated_relocs);
+	/* For ibb we have relocs allocated in chunks */
+	if (to_handle == ibb->handle) {
+		relocs = ibb->relocs;
+		if (ibb->num_relocs == ibb->allocated_relocs) {
+			ibb->allocated_relocs += 4096 / sizeof(*relocs);
+			relocs = realloc(relocs, sizeof(*relocs) * ibb->allocated_relocs);
+			igt_assert(relocs);
+			ibb->relocs = relocs;
+		}
+		i = ibb->num_relocs++;
+	} else {
+		to_object = intel_bb_find_object(ibb, to_handle);
+		igt_assert_f(to_object, "object has to be added to ibb first!\n");
+
+		i = to_object->relocation_count++;
+		relocs = from_user_pointer(to_object->relocs_ptr);
+		relocs = realloc(relocs, sizeof(*relocs) * to_object->relocation_count);
+		to_object->relocs_ptr = to_user_pointer(relocs);
 		igt_assert(relocs);
-		ibb->relocs = relocs;
 	}
 
-	i = ibb->num_relocs++;
 	memset(&relocs[i], 0, sizeof(*relocs));
 	relocs[i].target_handle = handle;
 	relocs[i].read_domains = read_domains;
@@ -1587,15 +1675,40 @@ static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
 	else
 		relocs[i].presumed_offset = object->offset;
 
-	igt_debug("add reloc: handle: %u, r/w: 0x%x/0x%x, "
+	igt_debug("add reloc: to_handle: %u, handle: %u, r/w: 0x%x/0x%x, "
 		  "delta: 0x%" PRIx64 ", "
 		  "offset: 0x%" PRIx64 ", "
 		  "poffset: %p\n",
-		  handle, read_domains, write_domain,
+		  to_handle, handle, read_domains, write_domain,
 		  delta, offset,
 		  from_user_pointer(relocs[i].presumed_offset));
 
 	return object->offset;
+}
+
+static uint64_t __intel_bb_emit_reloc(struct intel_bb *ibb,
+				      uint32_t to_handle,
+				      uint32_t to_offset,
+				      uint32_t handle,
+				      uint32_t read_domains,
+				      uint32_t write_domain,
+				      uint64_t delta,
+				      uint64_t presumed_offset)
+{
+	uint64_t address;
+
+	igt_assert(ibb);
+
+	address = intel_bb_add_reloc(ibb, to_handle, handle,
+				     read_domains, write_domain,
+				     delta, to_offset,
+				     presumed_offset);
+
+	intel_bb_out(ibb, delta + address);
+	if (ibb->gen >= 8)
+		intel_bb_out(ibb, address >> 32);
+
+	return address;
 }
 
 /**
@@ -1626,19 +1739,11 @@ uint64_t intel_bb_emit_reloc(struct intel_bb *ibb,
 			     uint64_t delta,
 			     uint64_t presumed_offset)
 {
-	uint64_t address;
-
 	igt_assert(ibb);
 
-	address = intel_bb_add_reloc(ibb, handle, read_domains, write_domain,
-				     delta, intel_bb_offset(ibb),
-				     presumed_offset);
-
-	intel_bb_out(ibb, delta + address);
-	if (ibb->gen >= 8)
-		intel_bb_out(ibb, address >> 32);
-
-	return address;
+	return __intel_bb_emit_reloc(ibb, ibb->handle, intel_bb_offset(ibb),
+				     handle, read_domains, write_domain,
+				     delta, presumed_offset);
 }
 
 uint64_t intel_bb_emit_reloc_fenced(struct intel_bb *ibb,
@@ -1653,7 +1758,7 @@ uint64_t intel_bb_emit_reloc_fenced(struct intel_bb *ibb,
 	address = intel_bb_emit_reloc(ibb, handle, read_domains, write_domain,
 				      delta, presumed_offset);
 
-	intel_bb_object_set_fence(ibb, handle);
+	intel_bb_object_set_flag(ibb, handle, EXEC_OBJECT_NEEDS_FENCE);
 
 	return address;
 }
@@ -1686,7 +1791,8 @@ uint64_t intel_bb_offset_reloc(struct intel_bb *ibb,
 {
 	igt_assert(ibb);
 
-	return intel_bb_add_reloc(ibb, handle, read_domains, write_domain,
+	return intel_bb_add_reloc(ibb, ibb->handle, handle,
+				  read_domains, write_domain,
 				  0, offset, presumed_offset);
 }
 
@@ -1700,7 +1806,24 @@ uint64_t intel_bb_offset_reloc_with_delta(struct intel_bb *ibb,
 {
 	igt_assert(ibb);
 
-	return intel_bb_add_reloc(ibb, handle, read_domains, write_domain,
+	return intel_bb_add_reloc(ibb, ibb->handle, handle,
+				  read_domains, write_domain,
+				  delta, offset, presumed_offset);
+}
+
+uint64_t intel_bb_offset_reloc_to_object(struct intel_bb *ibb,
+					 uint32_t to_handle,
+					 uint32_t handle,
+					 uint32_t read_domains,
+					 uint32_t write_domain,
+					 uint32_t delta,
+					 uint32_t offset,
+					 uint64_t presumed_offset)
+{
+	igt_assert(ibb);
+
+	return intel_bb_add_reloc(ibb, to_handle, handle,
+				  read_domains, write_domain,
 				  delta, offset, presumed_offset);
 }
 
@@ -1955,16 +2078,38 @@ uint32_t intel_bb_emit_bbe(struct intel_bb *ibb)
 }
 
 /*
- * intel_bb_flush_with_context_ring:
+ * intel_bb_emit_flush_common:
  * @ibb: batchbuffer
- * @ctx: context id
- * @ring: ring
  *
- * Submits the batch for execution on the @ring engine with the supplied
- * hardware context @ctx.
+ * Emits instructions which completes batch buffer.
+ *
+ * Returns: offset in batch buffer where there's end of instructions.
  */
-static void intel_bb_flush_with_context_ring(struct intel_bb *ibb,
-					     uint32_t ctx, uint32_t ring)
+uint32_t intel_bb_emit_flush_common(struct intel_bb *ibb)
+{
+	if (intel_bb_offset(ibb) == 0)
+		return 0;
+
+	if (ibb->gen == 5) {
+		/*
+		 * emit gen5 w/a without batch space checks - we reserve that
+		 * already.
+		 */
+		intel_bb_out(ibb, CMD_POLY_STIPPLE_OFFSET << 16);
+		intel_bb_out(ibb, 0);
+	}
+
+	/* Round batchbuffer usage to 2 DWORDs. */
+	if ((intel_bb_offset(ibb) & 4) == 0)
+		intel_bb_out(ibb, 0);
+
+	intel_bb_emit_bbe(ibb);
+
+	return intel_bb_offset(ibb);
+}
+
+static void intel_bb_exec_with_context_ring(struct intel_bb *ibb,
+					    uint32_t ctx, uint32_t ring)
 {
 	intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), ctx,
 				   ring | I915_EXEC_NO_RELOC,
@@ -1972,23 +2117,109 @@ static void intel_bb_flush_with_context_ring(struct intel_bb *ibb,
 	intel_bb_reset(ibb, false);
 }
 
-void intel_bb_flush_render(struct intel_bb *ibb)
+/*
+ * intel_bb_flush:
+ * @ibb: batchbuffer
+ * @ctx: context
+ * @ring: ring
+ *
+ * If batch is not empty emit batch buffer end, execute on specified
+ * context, ring then reset the batch.
+ */
+void intel_bb_flush(struct intel_bb *ibb, uint32_t ctx, uint32_t ring)
+{
+	if (intel_bb_emit_flush_common(ibb) == 0)
+		return;
+
+	intel_bb_exec_with_context_ring(ibb, ctx, ring);
+}
+
+static void __intel_bb_flush_render_with_context(struct intel_bb *ibb,
+						 uint32_t ctx)
 {
 	uint32_t ring = I915_EXEC_RENDER;
 
-	intel_bb_flush_with_context_ring(ibb, ibb->ctx, ring);
+	if (intel_bb_emit_flush_common(ibb) == 0)
+		return;
+
+	intel_bb_exec_with_context_ring(ibb, ctx, ring);
 }
 
-void intel_bb_flush_blit(struct intel_bb *ibb)
+/*
+ * intel_bb_flush_render:
+ * @ibb: batchbuffer
+ *
+ * If batch is not empty emit batch buffer end, execute on render ring
+ * and reset the batch.
+ * Context used to execute is previous batch context.
+ */
+void intel_bb_flush_render(struct intel_bb *ibb)
+{
+	__intel_bb_flush_render_with_context(ibb, ibb->ctx);
+}
+
+/*
+ * intel_bb_flush_render_with_context:
+ * @ibb: batchbuffer
+ * @ctx: context
+ *
+ * If batch is not empty emit batch buffer end, execute on render ring with @ctx
+ * and reset the batch.
+ */
+void intel_bb_flush_render_with_context(struct intel_bb *ibb, uint32_t ctx)
+{
+	__intel_bb_flush_render_with_context(ibb, ctx);
+}
+
+static void __intel_bb_flush_blit_with_context(struct intel_bb *ibb,
+					       uint32_t ctx)
 {
 	uint32_t ring = I915_EXEC_DEFAULT;
+
+	if (intel_bb_emit_flush_common(ibb) == 0)
+		return;
 
 	if (HAS_BLT_RING(ibb->devid))
 		ring = I915_EXEC_BLT;
 
-	intel_bb_flush_with_context_ring(ibb, ibb->ctx, ring);
+	intel_bb_exec_with_context_ring(ibb, ctx, ring);
 }
 
+/*
+ * intel_bb_flush_blit:
+ * @ibb: batchbuffer
+ *
+ * If batch is not empty emit batch buffer end, execute on default/blit ring
+ * (depends on gen) and reset the batch.
+ * Context used to execute is previous batch context.
+ */
+void intel_bb_flush_blit(struct intel_bb *ibb)
+{
+	__intel_bb_flush_blit_with_context(ibb, ibb->ctx);
+}
+
+/*
+ * intel_bb_flush_blit_with_context:
+ * @ibb: batchbuffer
+ * @ctx: context
+ *
+ * If batch is not empty emit batch buffer end, execute on default/blit ring
+ * (depends on gen) with @ctx and reset the batch.
+ */
+void intel_bb_flush_blit_with_context(struct intel_bb *ibb, uint32_t ctx)
+{
+	__intel_bb_flush_blit_with_context(ibb, ctx);
+}
+
+/*
+ * intel_bb_copy_data:
+ * @ibb: batchbuffer
+ * @data: pointer of data which should be copied into batch
+ * @bytes: number of bytes to copy, must be dword multiplied
+ * @align: alignment in the batch
+ *
+ * Function copies @bytes of data pointed by @data into batch buffer.
+ */
 uint32_t intel_bb_copy_data(struct intel_bb *ibb,
 			    const void *data, unsigned int bytes,
 			    uint32_t align)
@@ -2008,6 +2239,14 @@ uint32_t intel_bb_copy_data(struct intel_bb *ibb,
 	return offset;
 }
 
+/*
+ * intel_bb_blit_start:
+ * @ibb: batchbuffer
+ * @flags: flags to blit command
+ *
+ * Function emits XY_SRC_COPY_BLT instruction with size appropriate size
+ * which depend on gen.
+ */
 void intel_bb_blit_start(struct intel_bb *ibb, uint32_t flags)
 {
 	intel_bb_out(ibb, XY_SRC_COPY_BLT_CMD |
@@ -2017,6 +2256,22 @@ void intel_bb_blit_start(struct intel_bb *ibb, uint32_t flags)
 		     (6 + 2 * (ibb->gen >= 8)));
 }
 
+/*
+ * intel_bb_emit_blt_copy:
+ * @ibb: batchbuffer
+ * @src: source buffer (intel_buf)
+ * @src_x1: source x1 position
+ * @src_y1: source y1 position
+ * @src_pitch: source pitch
+ * @dst: destination buffer (intel_buf)
+ * @dst_x1: destination x1 position
+ * @dst_y1: destination y1 position
+ * @dst_pitch: destination pitch
+ * @width: width of data to copy
+ * @height: height of data to copy
+ *
+ * Function emits complete blit command.
+ */
 void intel_bb_emit_blt_copy(struct intel_bb *ibb,
 			    struct intel_buf *src,
 			    int src_x1, int src_y1, int src_pitch,
@@ -2079,6 +2334,9 @@ void intel_bb_emit_blt_copy(struct intel_bb *ibb,
 		intel_bb_out(ibb, mask);
 	}
 
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_add_intel_buf(ibb, dst, true);
+
 	intel_bb_blit_start(ibb, cmd_bits);
 	intel_bb_out(ibb, (br13_bits) |
 		     (0xcc << 16) | /* copy ROP */
@@ -2123,7 +2381,6 @@ void intel_bb_blt_copy(struct intel_bb *ibb,
 	intel_bb_emit_blt_copy(ibb, src, src_x1, src_y1, src_pitch,
 			       dst, dst_x1, dst_y1, dst_pitch,
 			       width, height, bpp);
-	intel_bb_emit_bbe(ibb);
 	intel_bb_flush_blit(ibb);
 }
 
