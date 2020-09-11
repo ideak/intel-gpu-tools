@@ -87,6 +87,7 @@ LDADD = ../lib/libintel_tools.la $(XMLRPC_LIBS)
 AM_CFLAGS += $(CAIRO_CFLAGS) $(LIBUDEV_CFLAGS)
 AM_LDFLAGS = -Wl,--as-needed
 
+api_intel_bb_LDADD = $(LDADD) -lz
 drm_import_export_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 drm_import_export_LDADD = $(LDADD) -lpthread
 dumb_buffer_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)

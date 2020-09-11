@@ -32,6 +32,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <glib.h>
+#include <zlib.h>
 #include "intel_bufops.h"
 
 #define PAGE_SIZE 4096
@@ -58,6 +60,7 @@ enum obj_cache_ops {
 static bool debug_bb = false;
 static bool write_png = false;
 static bool buf_info = false;
+static bool print_base64 = false;
 
 static void *alloc_aligned(uint64_t size)
 {
@@ -166,6 +169,39 @@ static void simple_bb(struct buf_ops *bops, bool use_context)
 }
 
 /*
+ * Make sure we lead to realloc in the intel_bb.
+ */
+#define NUM_BUFS 4096
+static void lot_of_buffers(struct buf_ops *bops)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_bb *ibb;
+	struct intel_buf *buf[NUM_BUFS];
+	int i;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_ptr_align(ibb, 8);
+
+	for (i = 0; i < NUM_BUFS; i++) {
+		buf[i] = intel_buf_create(bops, 4096, 1, 8, 0, I915_TILING_NONE,
+					  I915_COMPRESSION_NONE);
+		intel_bb_add_intel_buf(ibb, buf[i], false);
+	}
+
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
+
+	intel_bb_destroy(ibb);
+
+	for (i = 0; i < NUM_BUFS; i++)
+		intel_buf_destroy(buf[i]);
+}
+
+/*
  * Make sure intel-bb space allocator currently doesn't enter 47-48 bit
  * gtt sizes.
  */
@@ -214,6 +250,7 @@ static void reset_flags(struct buf_ops *bops)
 	int i915 = buf_ops_get_fd(bops);
 	struct intel_bb *ibb;
 	struct intel_buf *src, *mid, *dst;
+	uint64_t src_48bit, mid_48bit, dst_48bit;
 	struct drm_i915_gem_exec_object2 *obj;
 	const uint32_t width = 512;
 	const uint32_t height = 512;
@@ -236,11 +273,13 @@ static void reset_flags(struct buf_ops *bops)
 	obj = intel_bb_find_object(ibb, src->handle);
 	igt_assert(obj);
 	igt_assert((obj->flags & EXEC_OBJECT_WRITE) == 0);
+	src_48bit = obj->flags & EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
 	/* Check mid has EXEC_OBJECT_WRITE */
 	obj = intel_bb_find_object(ibb, mid->handle);
 	igt_assert(obj);
 	igt_assert(obj->flags & EXEC_OBJECT_WRITE);
+	mid_48bit = obj->flags & EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
 	intel_bb_out(ibb, 0);
 	intel_bb_flush_blit(ibb);
@@ -250,10 +289,16 @@ static void reset_flags(struct buf_ops *bops)
 	igt_assert(obj);
 	igt_assert((obj->flags & EXEC_OBJECT_WRITE) == 0);
 
+	/* Check src keep 48bit address flag */
+	igt_assert((obj->flags & EXEC_OBJECT_SUPPORTS_48B_ADDRESS) == src_48bit);
+
 	/* Check mid has zeroed flags */
 	obj = intel_bb_find_object(ibb, mid->handle);
 	igt_assert(obj);
 	igt_assert((obj->flags & EXEC_OBJECT_WRITE) == 0);
+
+	/* Check mid keep 48bit address flag */
+	igt_assert((obj->flags & EXEC_OBJECT_SUPPORTS_48B_ADDRESS) == mid_48bit);
 
 	intel_bb_emit_blt_copy(ibb,
 			       mid, 0, 0, mid->surface[0].stride,
@@ -271,13 +316,17 @@ static void reset_flags(struct buf_ops *bops)
 	obj = intel_bb_find_object(ibb, dst->handle);
 	igt_assert(obj);
 	igt_assert(obj->flags & EXEC_OBJECT_WRITE);
+	dst_48bit = obj->flags & EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
 	intel_bb_flush_blit(ibb);
 
-	/* Check mid has no EXEC_OBJECT_WRITE */
+	/* Check dst has no EXEC_OBJECT_WRITE */
 	obj = intel_bb_find_object(ibb, dst->handle);
 	igt_assert(obj);
 	igt_assert((obj->flags & EXEC_OBJECT_WRITE) == 0);
+
+	/* Check dst keep 48bit address flag */
+	igt_assert((obj->flags & EXEC_OBJECT_SUPPORTS_48B_ADDRESS) == dst_48bit);
 
 	intel_buf_destroy(src);
 	intel_buf_destroy(mid);
@@ -295,6 +344,7 @@ static void __emit_blit(struct intel_bb *ibb,
 {
 	uint32_t mask;
 	bool has_64b_reloc;
+	uint64_t address;
 
 	has_64b_reloc = ibb->gen >= 8;
 
@@ -318,15 +368,19 @@ static void __emit_blit(struct intel_bb *ibb,
 	intel_bb_out(ibb, 3 << 24 | 0xcc << 16 | dst->surface[0].stride);
 	intel_bb_out(ibb, 0);
 	intel_bb_out(ibb, intel_buf_height(dst) << 16 | intel_buf_width(dst));
+
+	address = intel_bb_get_object_offset(ibb, dst->handle);
 	intel_bb_emit_reloc_fenced(ibb, dst->handle,
 				   I915_GEM_DOMAIN_RENDER,
 				   I915_GEM_DOMAIN_RENDER,
-				   0, dst->addr.offset);
+				   0, address);
 	intel_bb_out(ibb, 0);
 	intel_bb_out(ibb, src->surface[0].stride);
+
+	address = intel_bb_get_object_offset(ibb, src->handle);
 	intel_bb_emit_reloc_fenced(ibb, src->handle,
 				   I915_GEM_DOMAIN_RENDER, 0,
-				   0, src->addr.offset);
+				   0, address);
 
 	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
 		igt_assert(ibb->gen >= 6);
@@ -398,6 +452,7 @@ static void blit(struct buf_ops *bops,
 	poff_bb = intel_bb_get_object_offset(ibb, ibb->handle);
 	poff_src = intel_bb_get_object_offset(ibb, src->handle);
 	poff_dst = intel_bb_get_object_offset(ibb, dst->handle);
+
 	intel_bb_reset(ibb, purge_cache);
 
 	fill_buf(src, COLOR_77);
@@ -441,8 +496,8 @@ static void blit(struct buf_ops *bops,
 	igt_assert(poff_src == poff2_src);
 	igt_assert(poff_dst == poff2_dst);
 
-	intel_buf_close(bops, src);
-	intel_buf_close(bops, dst);
+	intel_buf_destroy(src);
+	intel_buf_destroy(dst);
 	intel_bb_destroy(ibb);
 }
 
@@ -574,6 +629,54 @@ static int compare_bufs(struct intel_buf *buf1, struct intel_buf *buf2,
 
 	return ret;
 }
+
+#define LINELEN 76
+static int dump_base64(const char *name, struct intel_buf *buf)
+{
+	void *ptr;
+	int fd, ret;
+	uLongf outsize = buf->surface[0].size * 3 / 2;
+	Bytef *destbuf = malloc(outsize);
+	gchar *str, *pos;
+
+	fd = buf_ops_get_fd(buf->bops);
+
+	ptr = gem_mmap__device_coherent(fd, buf->handle, 0,
+					buf->surface[0].size, PROT_READ);
+
+	ret = compress2(destbuf, &outsize, ptr, buf->surface[0].size,
+			Z_BEST_COMPRESSION);
+	if (ret != Z_OK) {
+		igt_warn("error compressing, ret: %d\n", ret);
+	} else {
+		igt_info("compressed %u -> %lu\n",
+			 buf->surface[0].size, outsize);
+
+		igt_info("--- %s ---\n", name);
+		pos = str = g_base64_encode(destbuf, outsize);
+		outsize = strlen(str);
+		while (pos) {
+			char line[LINELEN + 1];
+			int to_copy = min(LINELEN, outsize);
+
+			memcpy(line, pos, to_copy);
+			line[to_copy] = 0;
+			igt_info("%s\n", line);
+			pos += LINELEN;
+			outsize -= to_copy;
+
+			if (outsize == 0)
+				break;
+		}
+		free(str);
+	}
+
+	munmap(ptr, buf->surface[0].size);
+	free(destbuf);
+
+	return ret;
+}
+
 
 static int __do_intel_bb_blit(struct buf_ops *bops, uint32_t tiling)
 {
@@ -729,6 +832,10 @@ static void offset_control(struct buf_ops *bops)
 		print_buf(dst2, "dst2");
 	}
 
+	intel_buf_destroy(src);
+	intel_buf_destroy(dst1);
+	intel_buf_destroy(dst2);
+	intel_buf_destroy(dst3);
 	intel_bb_destroy(ibb);
 }
 
@@ -753,6 +860,184 @@ static void full_batch(struct buf_ops *bops)
 	intel_bb_destroy(ibb);
 }
 
+static int render(struct buf_ops *bops, uint32_t tiling, bool do_reloc,
+		  uint32_t width, uint32_t height)
+{
+	struct intel_bb *ibb;
+	struct intel_buf src, dst, final;
+	int i915 = buf_ops_get_fd(bops);
+	uint32_t fails = 0;
+	char name[128];
+	uint32_t devid = intel_get_drm_devid(i915);
+	igt_render_copyfunc_t render_copy = NULL;
+
+	igt_debug("%s() gen: %d\n", __func__, intel_gen(devid));
+
+	/* Don't use relocations on gen12+ */
+	igt_require((do_reloc && intel_gen(devid) < 12) ||
+		    !do_reloc);
+
+	if (do_reloc)
+		ibb = intel_bb_create_with_relocs(i915, PAGE_SIZE);
+	else
+		ibb = intel_bb_create(i915, PAGE_SIZE);
+
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	if (print_base64)
+		intel_bb_set_dump_base64(ibb, true);
+
+	scratch_buf_init(bops, &src, width, height, I915_TILING_NONE,
+			 I915_COMPRESSION_NONE);
+	scratch_buf_init(bops, &dst, width, height, tiling,
+			 I915_COMPRESSION_NONE);
+	scratch_buf_init(bops, &final, width, height, I915_TILING_NONE,
+			 I915_COMPRESSION_NONE);
+
+	scratch_buf_draw_pattern(bops, &src,
+				 0, 0, width, height,
+				 0, 0, width, height, 0);
+
+	render_copy = igt_get_render_copyfunc(devid);
+	igt_assert(render_copy);
+
+	render_copy(ibb, 0,
+		    &src,
+		    0, 0, width, height,
+		    &dst,
+		    0, 0);
+
+	render_copy(ibb, 0,
+		    &dst,
+		    0, 0, width, height,
+		    &final,
+		    0, 0);
+
+	intel_bb_sync(ibb);
+	intel_bb_destroy(ibb);
+
+	if (write_png) {
+		snprintf(name, sizeof(name) - 1,
+			 "render_dst_tiling_%d.png", tiling);
+		intel_buf_write_to_png(&src, "render_src_tiling_none.png");
+		intel_buf_write_to_png(&dst, name);
+		intel_buf_write_to_png(&final, "render_final_tiling_none.png");
+	}
+
+	/* We'll fail on src <-> final compare so just warn */
+	if (tiling == I915_TILING_NONE) {
+		if (compare_bufs(&src, &dst, false) > 0)
+			igt_warn("%s: none->none failed!\n", __func__);
+	} else {
+		if (compare_bufs(&src, &dst, false) == 0)
+			igt_warn("%s: none->tiled failed!\n", __func__);
+	}
+
+	fails = compare_bufs(&src, &final, true);
+
+	if (fails && print_base64) {
+		dump_base64("src", &src);
+		dump_base64("dst", &dst);
+		dump_base64("final", &final);
+	}
+
+	intel_buf_close(bops, &src);
+	intel_buf_close(bops, &dst);
+	intel_buf_close(bops, &final);
+
+	igt_assert_f(fails == 0, "%s: (tiling: %d) fails: %d\n",
+		     __func__, tiling, fails);
+
+	return fails;
+}
+
+static uint32_t count_compressed(int gen, struct intel_buf *buf)
+{
+	int i915 = buf_ops_get_fd(buf->bops);
+	int ccs_size = intel_buf_ccs_width(gen, buf) * intel_buf_ccs_height(gen, buf);
+	uint8_t *ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
+						 intel_buf_bo_size(buf),
+						 PROT_READ);
+	uint32_t compressed = 0;
+	int i;
+
+	for (i = 0; i < ccs_size; i++)
+		if (ptr[buf->ccs[0].offset + i])
+			compressed++;
+
+	munmap(buf, intel_buf_bo_size(buf));
+
+	return compressed;
+}
+
+#define IMGSIZE (512 * 512 * 4)
+#define CCSIMGSIZE (IMGSIZE + 4096)
+static void render_ccs(struct buf_ops *bops)
+{
+	struct intel_bb *ibb;
+	const int width = 1024;
+	const int height = 1024;
+	struct intel_buf src, dst, final;
+	int i915 = buf_ops_get_fd(bops);
+	uint32_t fails = 0;
+	uint32_t compressed = 0;
+	uint32_t devid = intel_get_drm_devid(i915);
+	igt_render_copyfunc_t render_copy = NULL;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	scratch_buf_init(bops, &src, width, height, I915_TILING_NONE,
+			 I915_COMPRESSION_NONE);
+	scratch_buf_init(bops, &dst, width, height, I915_TILING_Y,
+			 I915_COMPRESSION_RENDER);
+	scratch_buf_init(bops, &final, width, height, I915_TILING_NONE,
+			 I915_COMPRESSION_NONE);
+
+	render_copy = igt_get_render_copyfunc(devid);
+	igt_assert(render_copy);
+
+	scratch_buf_draw_pattern(bops, &src,
+				 0, 0, width, height,
+				 0, 0, width, height, 0);
+
+	render_copy(ibb, 0,
+		    &src,
+		    0, 0, width, height,
+		    &dst,
+		    0, 0);
+
+	render_copy(ibb, 0,
+		    &dst,
+		    0, 0, width, height,
+		    &final,
+		    0, 0);
+
+	intel_bb_sync(ibb);
+
+	fails = compare_bufs(&src, &final, true);
+	compressed = count_compressed(ibb->gen, &dst);
+
+	intel_bb_destroy(ibb);
+
+	igt_debug("fails: %u, compressed: %u\n", fails, compressed);
+
+	if (write_png) {
+		intel_buf_write_to_png(&src, "render-ccs-src.png");
+		intel_buf_write_to_png(&dst, "render-ccs-dst.png");
+		intel_buf_write_aux_to_png(&dst, "render-ccs-dst-aux.png");
+		intel_buf_write_to_png(&final, "render-ccs-final.png");
+	}
+
+	intel_buf_close(bops, &src);
+	intel_buf_close(bops, &dst);
+	intel_buf_close(bops, &final);
+
+	igt_assert_f(fails == 0, "render-ccs fails: %d\n", fails);
+}
+
 static int opt_handler(int opt, int opt_index, void *data)
 {
 	switch (opt) {
@@ -765,6 +1050,9 @@ static int opt_handler(int opt, int opt_index, void *data)
 	case 'i':
 		buf_info = true;
 		break;
+	case 'b':
+		print_base64 = true;
+		break;
 	default:
 		return IGT_OPT_HANDLER_ERROR;
 	}
@@ -776,16 +1064,28 @@ const char *help_str =
 	"  -d\tDebug bb\n"
 	"  -p\tWrite surfaces to png\n"
 	"  -i\tPrint buffer info\n"
+	"  -b\tDump to base64 (bb and images)\n"
 	;
 
-igt_main_args("dpi", NULL, help_str, opt_handler, NULL)
+igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 {
-	int i915;
+	int i915, i, gen;
 	struct buf_ops *bops;
+	uint32_t width;
+
+	struct test {
+		uint32_t tiling;
+		const char *tiling_name;
+	} tests[] = {
+		{ I915_TILING_NONE, "none" },
+		{ I915_TILING_X, "x" },
+		{ I915_TILING_Y, "y" },
+	};
 
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
 		bops = buf_ops_create(i915);
+		gen = intel_gen(intel_get_drm_devid(i915));
 	}
 
 	igt_subtest("simple-bb")
@@ -793,6 +1093,9 @@ igt_main_args("dpi", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("simple-bb-ctx")
 		simple_bb(bops, true);
+
+	igt_subtest("lot-of-buffers")
+		lot_of_buffers(bops);
 
 	igt_subtest("check-canonical")
 		check_canonical(bops);
@@ -828,6 +1131,29 @@ igt_main_args("dpi", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("full-batch")
 		full_batch(bops);
+
+	igt_subtest_with_dynamic("render") {
+		for (i = 0; i < ARRAY_SIZE(tests); i++) {
+			const struct test *t = &tests[i];
+
+			for (width = 512; width <= 1024; width += 512) {
+				igt_dynamic_f("render-%s-%u", t->tiling_name, width) {
+					render(bops, t->tiling, false, width, width);
+				}
+
+				/* No relocs for gen12+ */
+				if (gen >= 12)
+					continue;
+
+				igt_dynamic_f("render-%s-reloc-%u", t->tiling_name, width) {
+					render(bops, t->tiling, true, width, width);
+				}
+			}
+		}
+	}
+
+	igt_subtest("render-ccs")
+		render_ccs(bops);
 
 	igt_fixture {
 		buf_ops_destroy(bops);
