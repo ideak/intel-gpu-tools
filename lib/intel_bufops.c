@@ -142,6 +142,16 @@ static inline bool is_tiling_supported(struct buf_ops *bops, uint32_t tiling)
 	return bops->supported_tiles & TILE_DEF(tiling);
 }
 
+static uint32_t get_stride(uint32_t devid, uint32_t tiling)
+{
+	uint32_t stride = 128;
+
+	if (IS_915G(devid) || IS_915GM(devid) || tiling == I915_TILING_X)
+		stride = 512;
+
+	return stride;
+}
+
 static int __gem_get_tiling(int fd, struct drm_i915_gem_get_tiling *arg)
 {
 	int err;
@@ -747,17 +757,9 @@ static void __intel_buf_init(struct buf_ops *bops,
 
 		size = buf->ccs[0].offset + aux_width * aux_height;
 	} else {
-		if (buf->tiling) {
+		if (tiling) {
 			devid =  intel_get_drm_devid(bops->fd);
-
-			if (bops->intel_gen < 3)
-				tile_width = 128;
-			else if (IS_915GM(devid) || IS_915G(devid) ||
-				 buf->tiling == I915_TILING_X)
-				tile_width = 512;
-			else
-				tile_width = 128;
-
+			tile_width = get_stride(devid, tiling);
 			buf->surface[0].stride = ALIGN(width * (bpp / 8), tile_width);
 		} else {
 			buf->surface[0].stride = ALIGN(width * (bpp / 8), alignment ?: 1);
@@ -1049,17 +1051,12 @@ static bool probe_hw_tiling(struct buf_ops *bops, uint32_t tiling,
 {
 	uint64_t size = 256 * 256;
 	uint32_t handle, buf_tiling, buf_swizzle, phys_swizzle;
-	uint32_t stride;
+	uint32_t devid, stride;
 	int ret;
 	bool is_set = false;
 
-	if (tiling == I915_TILING_X)
-		stride = 512;
-	else if (tiling == I915_TILING_Y)
-		stride = 128;
-	else
-		return false;
-
+	devid =  intel_get_drm_devid(bops->fd);
+	stride = get_stride(devid, tiling);
 	handle = gem_create(bops->fd, size);
 
 	/* Single shot, if no fences are available we fail immediately */
