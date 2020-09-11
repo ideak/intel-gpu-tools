@@ -166,7 +166,7 @@ struct {
 	int debugfs;
 	igt_display_t display;
 
-	drm_intel_bufmgr *bufmgr;
+	struct buf_ops *bops;
 } drm;
 
 struct {
@@ -1091,7 +1091,7 @@ static void draw_rect(struct draw_pattern_info *pattern, struct fb_region *fb,
 {
 	struct rect rect = pattern->get_rect(fb, r);
 
-	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, fb->fb, method,
+	igt_draw_rect_fb(drm.fd, drm.bops, 0, fb->fb, method,
 			 fb->x + rect.x, fb->y + rect.y,
 			 rect.w, rect.h, rect.color);
 
@@ -1117,7 +1117,7 @@ static void fill_fb_region(struct fb_region *region, enum color ecolor)
 {
 	uint32_t color = pick_color(region->fb, ecolor);
 
-	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, region->fb, IGT_DRAW_BLT,
+	igt_draw_rect_fb(drm.fd, drm.bops, 0, region->fb, IGT_DRAW_BLT,
 			 region->x, region->y, region->w, region->h,
 			 color);
 }
@@ -1141,7 +1141,7 @@ static bool disable_features(const struct test_mode *t)
 static void *busy_thread_func(void *data)
 {
 	while (!busy_thread.stop)
-		igt_draw_rect(drm.fd, drm.bufmgr, NULL, busy_thread.handle,
+		igt_draw_rect(drm.fd, drm.bops, 0, busy_thread.handle,
 			      busy_thread.size, busy_thread.stride,
 			      busy_thread.tiling, IGT_DRAW_BLT, 0, 0,
 			      busy_thread.width, busy_thread.height,
@@ -1288,14 +1288,12 @@ static void setup_drm(void)
 	kmstest_set_vt_graphics_mode();
 	igt_display_require(&drm.display, drm.fd);
 
-	drm.bufmgr = drm_intel_bufmgr_gem_init(drm.fd, 4096);
-	igt_assert(drm.bufmgr);
-	drm_intel_bufmgr_gem_enable_reuse(drm.bufmgr);
+	drm.bops = buf_ops_create(drm.fd);
 }
 
 static void teardown_drm(void)
 {
-	drm_intel_bufmgr_destroy(drm.bufmgr);
+	buf_ops_destroy(drm.bops);
 	igt_display_fini(&drm.display);
 	close(drm.fd);
 }
@@ -2622,14 +2620,14 @@ static void scaledprimary_subtest(const struct test_mode *t)
 		  t->tiling, t->plane, &new_fb);
 	fill_fb(&new_fb, COLOR_BLUE);
 
-	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, &new_fb, t->method,
+	igt_draw_rect_fb(drm.fd, drm.bops, 0, &new_fb, t->method,
 			 reg->x, reg->y, reg->w / 2, reg->h / 2,
 			 pick_color(&new_fb, COLOR_GREEN));
-	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, &new_fb, t->method,
+	igt_draw_rect_fb(drm.fd, drm.bops, 0, &new_fb, t->method,
 			 reg->x + reg->w / 2, reg->y + reg->h / 2,
 			 reg->w / 2, reg->h / 2,
 			 pick_color(&new_fb, COLOR_RED));
-	igt_draw_rect_fb(drm.fd, drm.bufmgr, NULL, &new_fb, t->method,
+	igt_draw_rect_fb(drm.fd, drm.bops, 0, &new_fb, t->method,
 			 reg->x + reg->w / 2, reg->y + reg->h / 2,
 			 reg->w / 4, reg->h / 4,
 			 pick_color(&new_fb, COLOR_MAGENTA));
