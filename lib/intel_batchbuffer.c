@@ -52,6 +52,7 @@
 #include "igt_rand.h"
 #include "i830_reg.h"
 #include "huc_copy.h"
+#include <glib.h>
 
 #include <i915_drm.h>
 
@@ -1481,6 +1482,18 @@ void intel_bb_set_debug(struct intel_bb *ibb, bool debug)
 	ibb->debug = debug;
 }
 
+/**
+ * intel_bb_set_dump_base64:
+ * @ibb: pointer to intel_bb
+ * @dump: true / false
+ *
+ * Do bb dump as base64 string before execbuf call.
+ */
+void intel_bb_set_dump_base64(struct intel_bb *ibb, bool dump)
+{
+	ibb->dump_base64 = dump;
+}
+
 static int __compare_objects(const void *p1, const void *p2)
 {
 	const struct drm_i915_gem_exec_object2 *o1 = p1, *o2 = p2;
@@ -1883,6 +1896,31 @@ static void intel_bb_dump_execbuf(struct intel_bb *ibb,
 	}
 }
 
+#define LINELEN 76
+static void intel_bb_dump_base64(struct intel_bb *ibb)
+{
+	int outsize;
+	gchar *str, *pos;
+
+	igt_info("--- bb ---\n");
+	pos = str = g_base64_encode((const guchar *) ibb->batch, ibb->size);
+	outsize = strlen(str);
+
+	while (pos) {
+		char line[LINELEN + 1];
+		int to_copy = min(LINELEN, outsize);
+
+		memcpy(line, pos, to_copy);
+		line[to_copy] = 0;
+		igt_info("%s\n", line);
+		pos += LINELEN;
+		outsize -= to_copy;
+		if (outsize == 0)
+			break;
+	}
+	free(str);
+}
+
 static void print_node(const void *node, VISIT which, int depth)
 {
 	const struct drm_i915_gem_exec_object2 *object =
@@ -1937,6 +1975,9 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 	if (ibb->enforce_relocs)
 		execbuf.flags &= ~I915_EXEC_NO_RELOC;
 	execbuf.rsvd2 = 0;
+
+	if (ibb->dump_base64)
+		intel_bb_dump_base64(ibb);
 
 	ret = __gem_execbuf_wr(ibb->i915, &execbuf);
 	if (ret) {

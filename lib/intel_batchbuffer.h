@@ -433,6 +433,7 @@ struct intel_bb {
 	int i915;
 	int gen;
 	bool debug;
+	bool dump_base64;
 	bool enforce_relocs;
 	uint32_t devid;
 	uint32_t handle;
@@ -486,6 +487,7 @@ int intel_bb_sync(struct intel_bb *ibb);
 void intel_bb_print(struct intel_bb *ibb);
 void intel_bb_dump(struct intel_bb *ibb, const char *filename);
 void intel_bb_set_debug(struct intel_bb *ibb, bool debug);
+void intel_bb_set_dump_base64(struct intel_bb *ibb, bool dump);
 
 static inline uint64_t
 intel_bb_set_default_object_alignment(struct intel_bb *ibb, uint64_t alignment)
