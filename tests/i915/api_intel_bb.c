@@ -206,6 +206,86 @@ static void check_canonical(struct buf_ops *bops)
 	intel_bb_destroy(ibb);
 }
 
+/*
+ * Check flags are cleared after intel_bb_reset(ibb, false);
+ */
+static void reset_flags(struct buf_ops *bops)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_bb *ibb;
+	struct intel_buf *src, *mid, *dst;
+	struct drm_i915_gem_exec_object2 *obj;
+	const uint32_t width = 512;
+	const uint32_t height = 512;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	src = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
+	mid = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
+	dst = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
+
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_add_intel_buf(ibb, mid, true);
+
+	/* Check src has no EXEC_OBJECT_WRITE */
+	obj = intel_bb_find_object(ibb, src->handle);
+	igt_assert(obj);
+	igt_assert((obj->flags & EXEC_OBJECT_WRITE) == 0);
+
+	/* Check mid has EXEC_OBJECT_WRITE */
+	obj = intel_bb_find_object(ibb, mid->handle);
+	igt_assert(obj);
+	igt_assert(obj->flags & EXEC_OBJECT_WRITE);
+
+	intel_bb_out(ibb, 0);
+	intel_bb_flush_blit(ibb);
+
+	/* Check src has zeroed flags */
+	obj = intel_bb_find_object(ibb, src->handle);
+	igt_assert(obj);
+	igt_assert((obj->flags & EXEC_OBJECT_WRITE) == 0);
+
+	/* Check mid has zeroed flags */
+	obj = intel_bb_find_object(ibb, mid->handle);
+	igt_assert(obj);
+	igt_assert((obj->flags & EXEC_OBJECT_WRITE) == 0);
+
+	intel_bb_emit_blt_copy(ibb,
+			       mid, 0, 0, mid->surface[0].stride,
+			       dst, 0, 0, dst->surface[0].stride,
+			       intel_buf_width(dst),
+			       intel_buf_height(dst),
+			       dst->bpp);
+
+	/* Check mid has no EXEC_OBJECT_WRITE */
+	obj = intel_bb_find_object(ibb, mid->handle);
+	igt_assert(obj);
+	igt_assert((obj->flags & EXEC_OBJECT_WRITE) == 0);
+
+	/* Check mid has no EXEC_OBJECT_WRITE */
+	obj = intel_bb_find_object(ibb, dst->handle);
+	igt_assert(obj);
+	igt_assert(obj->flags & EXEC_OBJECT_WRITE);
+
+	intel_bb_flush_blit(ibb);
+
+	/* Check mid has no EXEC_OBJECT_WRITE */
+	obj = intel_bb_find_object(ibb, dst->handle);
+	igt_assert(obj);
+	igt_assert((obj->flags & EXEC_OBJECT_WRITE) == 0);
+
+	intel_buf_destroy(src);
+	intel_buf_destroy(mid);
+	intel_buf_destroy(dst);
+	intel_bb_destroy(ibb);
+}
+
+
 #define MI_FLUSH_DW (0x26<<23)
 #define BCS_SWCTRL  0x22200
 #define BCS_SRC_Y   (1 << 0)
@@ -716,6 +796,9 @@ igt_main_args("dpi", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("check-canonical")
 		check_canonical(bops);
+
+	igt_subtest("reset-flags")
+		reset_flags(bops);
 
 	igt_subtest("blit-noreloc-keep-cache")
 		blit(bops, NORELOC, KEEP_CACHE);
