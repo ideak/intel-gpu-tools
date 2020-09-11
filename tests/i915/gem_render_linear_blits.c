@@ -49,7 +49,6 @@
 
 #include "i915/gem.h"
 #include "igt.h"
-#include "intel_bufmgr.h"
 
 #define WIDTH 512
 #define STRIDE (WIDTH*4)
@@ -60,7 +59,7 @@ static uint32_t linear[WIDTH*HEIGHT];
 static igt_render_copyfunc_t render_copy;
 
 static void
-check_bo(int fd, uint32_t handle, uint32_t val)
+check_buf(int fd, uint32_t handle, uint32_t val)
 {
 	int i;
 
@@ -76,114 +75,89 @@ check_bo(int fd, uint32_t handle, uint32_t val)
 
 static void run_test (int fd, int count)
 {
-	drm_intel_bufmgr *bufmgr;
-	struct intel_batchbuffer *batch;
+	struct buf_ops *bops;
+	struct intel_bb *ibb;
 	uint32_t *start_val;
-	drm_intel_bo **bo;
+	struct intel_buf *bufs;
 	uint32_t start = 0;
 	int i, j;
 
 	render_copy = igt_get_render_copyfunc(intel_get_drm_devid(fd));
 	igt_require(render_copy);
 
-	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-	batch = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(fd));
+	bops = buf_ops_create(fd);
+	ibb = intel_bb_create(fd, 4096);
 
-	bo = malloc(sizeof(*bo)*count);
+	bufs = malloc(sizeof(*bufs)*count);
 	start_val = malloc(sizeof(*start_val)*count);
 
 	for (i = 0; i < count; i++) {
-		bo[i] = drm_intel_bo_alloc(bufmgr, "", SIZE, 4096);
+		intel_buf_init(bops, &bufs[i], WIDTH, HEIGHT, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
 		start_val[i] = start;
 		for (j = 0; j < WIDTH*HEIGHT; j++)
 			linear[j] = start++;
-		gem_write(fd, bo[i]->handle, 0, linear, sizeof(linear));
+		gem_write(fd, bufs[i].handle, 0, linear, sizeof(linear));
 	}
 
 	igt_info("Verifying initialisation - %d buffers of %d bytes\n", count, SIZE);
 	for (i = 0; i < count; i++)
-		check_bo(fd, bo[i]->handle, start_val[i]);
+		check_buf(fd, bufs[i].handle, start_val[i]);
 
 	igt_info("Cyclic blits, forward...\n");
 	for (i = 0; i < count * 4; i++) {
-		struct igt_buf src = {}, dst = {};
+		struct intel_buf *src, *dst;
 
-		src.bo = bo[i % count];
-		src.surface[0].stride = STRIDE;
-		src.tiling = I915_TILING_NONE;
-		src.surface[0].size = SIZE;
-		src.bpp = 32;
+		src = &bufs[i % count];
+		dst = &bufs[(i + 1) % count];
 
-		dst.bo = bo[(i + 1) % count];
-		dst.surface[0].stride = STRIDE;
-		dst.tiling = I915_TILING_NONE;
-		dst.surface[0].size = SIZE;
-		dst.bpp = 32;
-
-		render_copy(batch, NULL, &src, 0, 0, WIDTH, HEIGHT, &dst, 0, 0);
+		render_copy(ibb, 0, src, 0, 0, WIDTH, HEIGHT, dst, 0, 0);
 		start_val[(i + 1) % count] = start_val[i % count];
 	}
+
 	for (i = 0; i < count; i++)
-		check_bo(fd, bo[i]->handle, start_val[i]);
+		check_buf(fd, bufs[i].handle, start_val[i]);
 
 	if (igt_run_in_simulation())
 		return;
 
 	igt_info("Cyclic blits, backward...\n");
 	for (i = 0; i < count * 4; i++) {
-		struct igt_buf src = {}, dst = {};
+		struct intel_buf *src, *dst;
 
-		src.bo = bo[(i + 1) % count];
-		src.surface[0].stride = STRIDE;
-		src.tiling = I915_TILING_NONE;
-		src.surface[0].size = SIZE;
-		src.bpp = 32;
+		src = &bufs[(i + 1) % count];
+		dst = &bufs[i % count];
 
-		dst.bo = bo[i % count];
-		dst.surface[0].stride = STRIDE;
-		dst.tiling = I915_TILING_NONE;
-		dst.surface[0].size = SIZE;
-		dst.bpp = 32;
-
-		render_copy(batch, NULL, &src, 0, 0, WIDTH, HEIGHT, &dst, 0, 0);
+		render_copy(ibb, 0, src, 0, 0, WIDTH, HEIGHT, dst, 0, 0);
 		start_val[i % count] = start_val[(i + 1) % count];
 	}
 	for (i = 0; i < count; i++)
-		check_bo(fd, bo[i]->handle, start_val[i]);
+		check_buf(fd, bufs[i].handle, start_val[i]);
 
 	igt_info("Random blits...\n");
 	for (i = 0; i < count * 4; i++) {
-		struct igt_buf src = {}, dst = {};
+		struct intel_buf *src, *dst;
 		int s = random() % count;
 		int d = random() % count;
 
 		if (s == d)
 			continue;
 
-		src.bo = bo[s];
-		src.surface[0].stride = STRIDE;
-		src.tiling = I915_TILING_NONE;
-		src.surface[0].size = SIZE;
-		src.bpp = 32;
+		src = &bufs[s];
+		dst = &bufs[d];
 
-		dst.bo = bo[d];
-		dst.surface[0].stride = STRIDE;
-		dst.tiling = I915_TILING_NONE;
-		dst.surface[0].size = SIZE;
-		dst.bpp = 32;
-
-		render_copy(batch, NULL, &src, 0, 0, WIDTH, HEIGHT, &dst, 0, 0);
+		render_copy(ibb, 0, src, 0, 0, WIDTH, HEIGHT, dst, 0, 0);
 		start_val[d] = start_val[s];
 	}
 	for (i = 0; i < count; i++)
-		check_bo(fd, bo[i]->handle, start_val[i]);
+		check_buf(fd, bufs[i].handle, start_val[i]);
 
 	/* release resources */
-	for (i = 0; i < count; i++) {
-		drm_intel_bo_unreference(bo[i]);
-	}
-	intel_batchbuffer_free(batch);
-	drm_intel_bufmgr_destroy(bufmgr);
+	for (i = 0; i < count; i++)
+		intel_buf_close(bops, &bufs[i]);
+	free(bufs);
+	intel_bb_destroy(ibb);
+	buf_ops_destroy(bops);
 }
 
 igt_main
