@@ -496,65 +496,61 @@ oa_report_get_ctx_id(uint32_t *report)
 	return report[2];
 }
 
-static void
-scratch_buf_memset(drm_intel_bo *bo, int width, int height, uint32_t color)
+/*
+ * Temporary wrapper to distinguish mappings on !llc platforms,
+ * where it seems cache over GEM_MMAP_OFFSET is not flushed before execution.
+ */
+static void *buf_map(int i915, struct intel_buf *buf, bool write)
 {
-	int ret;
+	void *p;
 
-	ret = drm_intel_bo_map(bo, true /* writable */);
-	igt_assert_eq(ret, 0);
+	if (gem_has_llc(i915))
+		p = intel_buf_cpu_map(buf, write);
+	else
+		p = intel_buf_device_map(buf, write);
 
-	for (int i = 0; i < width * height; i++)
-		((uint32_t *)bo->virtual)[i] = color;
-
-	drm_intel_bo_unmap(bo);
+	return p;
 }
 
 static void
-scratch_buf_init(drm_intel_bufmgr *bufmgr,
-		 struct igt_buf *buf,
+scratch_buf_memset(struct intel_buf *buf, int width, int height, uint32_t color)
+{
+	buf_map(buf_ops_get_fd(buf->bops), buf, true);
+
+	for (int i = 0; i < width * height; i++)
+		buf->ptr[i] = color;
+
+	intel_buf_unmap(buf);
+}
+
+static void
+scratch_buf_init(struct buf_ops *bops,
+		 struct intel_buf *buf,
 		 int width, int height,
 		 uint32_t color)
 {
-	size_t stride = width * 4;
-	size_t size = stride * height;
-	drm_intel_bo *bo = drm_intel_bo_alloc(bufmgr, "", size, 4096);
-
-	scratch_buf_memset(bo, width, height, color);
-
-	memset(buf, 0, sizeof(*buf));
-
-	buf->bo = bo;
-	buf->surface[0].stride = stride;
-	buf->tiling = I915_TILING_NONE;
-	buf->surface[0].size = size;
-	buf->bpp = 32;
+	intel_buf_init(bops, buf, width, height, 32, 0,
+		       I915_TILING_NONE, I915_COMPRESSION_NONE);
+	scratch_buf_memset(buf, width, height, color);
 }
 
 static void
-emit_report_perf_count(struct intel_batchbuffer *batch,
-		       drm_intel_bo *dst_bo,
+emit_report_perf_count(struct intel_bb *ibb,
+		       struct intel_buf *dst,
 		       int dst_offset,
 		       uint32_t report_id)
 {
-	if (IS_HASWELL(devid)) {
-		BEGIN_BATCH(3, 1);
-		OUT_BATCH(GEN6_MI_REPORT_PERF_COUNT);
-		OUT_RELOC(dst_bo, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-			  dst_offset);
-		OUT_BATCH(report_id);
-		ADVANCE_BATCH();
-	} else {
-		/* XXX: NB: n dwords arg is actually magic since it internally
-		 * automatically accounts for larger addresses on gen >= 8...
-		 */
-		BEGIN_BATCH(3, 1);
-		OUT_BATCH(GEN8_MI_REPORT_PERF_COUNT);
-		OUT_RELOC(dst_bo, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-			  dst_offset);
-		OUT_BATCH(report_id);
-		ADVANCE_BATCH();
-	}
+	intel_bb_add_intel_buf(ibb, dst, true);
+
+	if (IS_HASWELL(devid))
+		intel_bb_out(ibb, GEN6_MI_REPORT_PERF_COUNT);
+	else
+		intel_bb_out(ibb, GEN8_MI_REPORT_PERF_COUNT);
+
+	intel_bb_emit_reloc(ibb, dst->handle,
+			    I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
+			    dst_offset, dst->addr.offset);
+	intel_bb_out(ibb, report_id);
 }
 
 static void
@@ -1495,14 +1491,13 @@ enum load {
 
 static struct load_helper {
 	int devid;
-	drm_intel_bufmgr *bufmgr;
-	drm_intel_context *context;
+	struct buf_ops *bops;
 	uint32_t context_id;
-	struct intel_batchbuffer *batch;
+	struct intel_bb *ibb;
 	enum load load;
 	bool exit;
 	struct igt_helper_process igt_proc;
-	struct igt_buf src, dst;
+	struct intel_buf src, dst;
 } lh = { 0, };
 
 static void load_helper_signal_handler(int sig)
@@ -1542,21 +1537,12 @@ static void load_helper_run(enum load load)
 		signal(SIGUSR2, load_helper_signal_handler);
 
 		while (!lh.exit) {
-			int ret;
-
-			render_copy(lh.batch,
-				    lh.context,
+			render_copy(lh.ibb,
+				    lh.context_id,
 				    &lh.src, 0, 0, 1920, 1080,
 				    &lh.dst, 0, 0);
 
-			intel_batchbuffer_flush_with_context(lh.batch,
-							     lh.context);
-
-			ret = drm_intel_gem_context_get_id(lh.context,
-							   &lh.context_id);
-			igt_assert_eq(ret, 0);
-
-			drm_intel_bo_wait_rendering(lh.dst.bo);
+			intel_bb_sync(lh.ibb);
 
 			/* Lower the load by pausing after every submitted
 			 * write. */
@@ -1574,52 +1560,36 @@ static void load_helper_stop(void)
 
 static void load_helper_init(void)
 {
-	int ret;
-
 	lh.devid = intel_get_drm_devid(drm_fd);
 
 	/* MI_STORE_DATA can only use GTT address on gen4+/g33 and needs
 	 * snoopable mem on pre-gen6. Hence load-helper only works on gen6+, but
 	 * that's also all we care about for the rps testcase*/
 	igt_assert(intel_gen(lh.devid) >= 6);
-	lh.bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-	igt_assert(lh.bufmgr);
 
-	drm_intel_bufmgr_gem_enable_reuse(lh.bufmgr);
+	lh.bops = buf_ops_create(drm_fd);
 
-	lh.context = drm_intel_gem_context_create(lh.bufmgr);
-	igt_assert(lh.context);
-
-	lh.context_id = 0xffffffff;
-	ret = drm_intel_gem_context_get_id(lh.context, &lh.context_id);
-	igt_assert_eq(ret, 0);
+	lh.context_id = gem_context_create(drm_fd);
 	igt_assert_neq(lh.context_id, 0xffffffff);
 
-	lh.batch = intel_batchbuffer_alloc(lh.bufmgr, lh.devid);
-	igt_assert(lh.batch);
+	lh.ibb = intel_bb_create(drm_fd, BATCH_SZ);
 
-	scratch_buf_init(lh.bufmgr, &lh.dst, 1920, 1080, 0);
-	scratch_buf_init(lh.bufmgr, &lh.src, 1920, 1080, 0);
+	scratch_buf_init(lh.bops, &lh.dst, 1920, 1080, 0);
+	scratch_buf_init(lh.bops, &lh.src, 1920, 1080, 0);
 }
 
 static void load_helper_fini(void)
 {
+	int i915 = buf_ops_get_fd(lh.bops);
+
 	if (lh.igt_proc.running)
 		load_helper_stop();
 
-	if (lh.src.bo)
-		drm_intel_bo_unreference(lh.src.bo);
-	if (lh.dst.bo)
-		drm_intel_bo_unreference(lh.dst.bo);
-
-	if (lh.batch)
-		intel_batchbuffer_free(lh.batch);
-
-	if (lh.context)
-		drm_intel_gem_context_destroy(lh.context);
-
-	if (lh.bufmgr)
-		drm_intel_bufmgr_destroy(lh.bufmgr);
+	intel_buf_close(lh.bops, &lh.src);
+	intel_buf_close(lh.bops, &lh.dst);
+	intel_bb_destroy(lh.ibb);
+	gem_context_destroy(i915, lh.context_id);
+	buf_ops_destroy(lh.bops);
 }
 
 static bool expected_report_timing_delta(uint32_t delta, uint32_t expected_delta)
@@ -1888,20 +1858,11 @@ test_per_context_mode_unprivileged(void)
 	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
 
 	igt_fork(child, 1) {
-		drm_intel_context *context;
-		drm_intel_bufmgr *bufmgr;
 		uint32_t ctx_id = 0xffffffff; /* invalid id */
-		int ret;
 
 		igt_drop_root();
 
-		bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-		context = drm_intel_gem_context_create(bufmgr);
-
-		igt_assert(context);
-
-		ret = drm_intel_gem_context_get_id(context, &ctx_id);
-		igt_assert_eq(ret, 0);
+		ctx_id = gem_context_create(drm_fd);
 		igt_assert_neq(ctx_id, 0xffffffff);
 
 		properties[1] = ctx_id;
@@ -1909,8 +1870,7 @@ test_per_context_mode_unprivileged(void)
 		stream_fd = __perf_open(drm_fd, &param, false);
 		__perf_close(stream_fd);
 
-		drm_intel_gem_context_destroy(context);
-		drm_intel_bufmgr_destroy(bufmgr);
+		gem_context_destroy(drm_fd, ctx_id);
 	}
 
 	igt_waitchildren();
@@ -2938,55 +2898,44 @@ gen12_test_mi_rpc(void)
 		.num_properties = ARRAY_SIZE(properties) / 2,
 		.properties_ptr = to_user_pointer(properties),
 	};
-	drm_intel_bo *bo;
-	drm_intel_bufmgr *bufmgr;
-	drm_intel_context *context;
-	struct intel_batchbuffer *batch;
+	struct buf_ops *bops;
+	struct intel_bb *ibb;
+	struct intel_buf *buf;
 #define INVALID_CTX_ID 0xffffffff
 	uint32_t ctx_id = INVALID_CTX_ID;
 	uint32_t *report32;
-	int ret;
 	size_t format_size_32;
 	struct oa_format format = get_oa_format(test_set->perf_oa_format);
 
 	/* Ensure perf_stream_paranoid is set to 1 by default */
 	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
 
-	bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-	igt_assert(bufmgr);
-
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-
-	context = drm_intel_gem_context_create(bufmgr);
-	igt_assert(context);
-
-	ret = drm_intel_gem_context_get_id(context, &ctx_id);
-	igt_assert_eq(ret, 0);
+	bops = buf_ops_create(drm_fd);
+	ctx_id = gem_context_create(drm_fd);
 	igt_assert_neq(ctx_id, INVALID_CTX_ID);
 	properties[1] = ctx_id;
 
-	batch = intel_batchbuffer_alloc(bufmgr, devid);
-	bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
+	ibb = intel_bb_create(drm_fd, BATCH_SZ);
+	buf = intel_buf_create(bops, 4096, 1, 8, 64,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
 
-	ret = drm_intel_bo_map(bo, true);
-	igt_assert_eq(ret, 0);
-	memset(bo->virtual, 0x80, 4096);
-	drm_intel_bo_unmap(bo);
+	buf_map(drm_fd, buf, true);
+	memset(buf->ptr, 0x80, 4096);
+	intel_buf_unmap(buf);
 
 	stream_fd = __perf_open(drm_fd, &param, false);
 
 #define REPORT_ID 0xdeadbeef
 #define REPORT_OFFSET 0
-	emit_report_perf_count(batch,
-			       bo,
+	emit_report_perf_count(ibb,
+			       buf,
 			       REPORT_OFFSET,
 			       REPORT_ID);
-	intel_batchbuffer_flush_with_context(batch, context);
+	intel_bb_flush_render_with_context(ibb, ctx_id);
+	intel_bb_sync(ibb);
 
-	ret = drm_intel_bo_map(bo, false);
-	igt_assert_eq(ret, 0);
-
-	report32 = bo->virtual;
+	intel_buf_cpu_map(buf, false);
+	report32 = buf->ptr;
 	format_size_32 = format.size >> 2;
 	dump_report(report32, format_size_32, "mi-rpc");
 
@@ -3008,11 +2957,11 @@ gen12_test_mi_rpc(void)
 	igt_assert_neq(report32[format.b_off >> 2], 0x80808080);
 	igt_assert_eq(report32[format_size_32], 0x80808080);
 
-	drm_intel_bo_unmap(bo);
-	drm_intel_bo_unreference(bo);
-	intel_batchbuffer_free(batch);
-	drm_intel_gem_context_destroy(context);
-	drm_intel_bufmgr_destroy(bufmgr);
+	intel_buf_unmap(buf);
+	intel_buf_destroy(buf);
+	intel_bb_destroy(ibb);
+	gem_context_destroy(drm_fd, ctx_id);
+	buf_ops_destroy(bops);
 	__perf_close(stream_fd);
 }
 
@@ -3036,41 +2985,33 @@ test_mi_rpc(void)
 		.num_properties = sizeof(properties) / 16,
 		.properties_ptr = to_user_pointer(properties),
 	};
-	drm_intel_bufmgr *bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-	drm_intel_context *context;
-	struct intel_batchbuffer *batch;
-	drm_intel_bo *bo;
-	uint32_t *report32;
-	int ret;
+	struct buf_ops *bops = buf_ops_create(drm_fd);
+	struct intel_bb *ibb;
+	struct intel_buf *buf;
+	uint32_t *report32, ctx_id;
 
 	stream_fd = __perf_open(drm_fd, &param, false);
 
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+	ctx_id = gem_context_create(drm_fd);
 
-	context = drm_intel_gem_context_create(bufmgr);
-	igt_assert(context);
+	ibb = intel_bb_create(drm_fd, BATCH_SZ);
+	buf = intel_buf_create(bops, 4096, 1, 8, 64,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
 
-	batch = intel_batchbuffer_alloc(bufmgr, devid);
+	buf_map(drm_fd, buf, true);
+	memset(buf->ptr, 0x80, 4096);
+	intel_buf_unmap(buf);
 
-	bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
-
-	ret = drm_intel_bo_map(bo, true);
-	igt_assert_eq(ret, 0);
-
-	memset(bo->virtual, 0x80, 4096);
-	drm_intel_bo_unmap(bo);
-
-	emit_report_perf_count(batch,
-			       bo, /* dst */
+	emit_report_perf_count(ibb,
+			       buf, /* dst */
 			       0, /* dst offset in bytes */
 			       0xdeadbeef); /* report ID */
 
-	intel_batchbuffer_flush_with_context(batch, context);
+	intel_bb_flush_render_with_context(ibb, ctx_id);
+	intel_bb_sync(ibb);
 
-	ret = drm_intel_bo_map(bo, false /* write enable */);
-	igt_assert_eq(ret, 0);
-
-	report32 = bo->virtual;
+	intel_buf_cpu_map(buf, false);
+	report32 = buf->ptr;
 	dump_report(report32, 64, "mi-rpc");
 	igt_assert_eq(report32[0], 0xdeadbeef); /* report ID */
 	igt_assert_neq(report32[1], 0); /* timestamp */
@@ -3078,17 +3019,17 @@ test_mi_rpc(void)
 	igt_assert_neq(report32[63], 0x80808080); /* end of report */
 	igt_assert_eq(report32[64], 0x80808080); /* after 256 byte report */
 
-	drm_intel_bo_unmap(bo);
-	drm_intel_bo_unreference(bo);
-	intel_batchbuffer_free(batch);
-	drm_intel_gem_context_destroy(context);
-	drm_intel_bufmgr_destroy(bufmgr);
+	intel_buf_unmap(buf);
+	intel_buf_destroy(buf);
+	intel_bb_destroy(ibb);
+	gem_context_destroy(drm_fd, ctx_id);
+	buf_ops_destroy(bops);
 	__perf_close(stream_fd);
 }
 
 static void
-emit_stall_timestamp_and_rpc(struct intel_batchbuffer *batch,
-			     drm_intel_bo *dst,
+emit_stall_timestamp_and_rpc(struct intel_bb *ibb,
+			     struct intel_buf *dst,
 			     int timestamp_offset,
 			     int report_dst_offset,
 			     uint32_t report_id)
@@ -3097,27 +3038,21 @@ emit_stall_timestamp_and_rpc(struct intel_batchbuffer *batch,
 				   PIPE_CONTROL_RENDER_TARGET_FLUSH |
 				   PIPE_CONTROL_WRITE_TIMESTAMP);
 
-	if (intel_gen(devid) >= 8) {
-		BEGIN_BATCH(5, 1);
-		OUT_BATCH(GFX_OP_PIPE_CONTROL | (6 - 2));
-		OUT_BATCH(pipe_ctl_flags);
-		OUT_RELOC(dst, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-			  timestamp_offset);
-		OUT_BATCH(0); /* imm lower */
-		OUT_BATCH(0); /* imm upper */
-		ADVANCE_BATCH();
-	} else {
-		BEGIN_BATCH(5, 1);
-		OUT_BATCH(GFX_OP_PIPE_CONTROL | (5 - 2));
-		OUT_BATCH(pipe_ctl_flags);
-		OUT_RELOC(dst, I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-			  timestamp_offset);
-		OUT_BATCH(0); /* imm lower */
-		OUT_BATCH(0); /* imm upper */
-		ADVANCE_BATCH();
-	}
+	intel_bb_add_intel_buf(ibb, dst, true);
 
-	emit_report_perf_count(batch, dst, report_dst_offset, report_id);
+	if (intel_gen(devid) >= 8)
+		intel_bb_out(ibb, GFX_OP_PIPE_CONTROL | (6 - 2));
+	else
+		intel_bb_out(ibb, GFX_OP_PIPE_CONTROL | (5 - 2));
+
+	intel_bb_out(ibb, pipe_ctl_flags);
+	intel_bb_emit_reloc(ibb, dst->handle,
+			    I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
+			    timestamp_offset, dst->addr.offset);
+	intel_bb_out(ibb, 0); /* imm lower */
+	intel_bb_out(ibb, 0); /* imm upper */
+
+	emit_report_perf_count(ibb, dst, report_dst_offset, report_id);
 }
 
 /* Tests the INTEL_performance_query use case where an unprivileged process
@@ -3158,11 +3093,10 @@ hsw_test_single_ctx_counters(void)
 	write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
 
 	igt_fork(child, 1) {
-		drm_intel_bufmgr *bufmgr;
-		drm_intel_context *context0, *context1;
-		struct intel_batchbuffer *batch;
-		struct igt_buf src[3], dst[3];
-		drm_intel_bo *bo;
+		struct buf_ops *bops;
+		struct intel_buf src[3], dst[3], *dst_buf;
+		struct intel_bb *ibb0, *ibb1;
+		uint32_t context0_id, context1_id;
 		uint32_t *report0_32, *report1_32;
 		uint64_t timestamp0_64, timestamp1_64;
 		uint32_t delta_ts64, delta_oa32;
@@ -3171,26 +3105,24 @@ hsw_test_single_ctx_counters(void)
 		int n_samples_written;
 		int width = 800;
 		int height = 600;
-		uint32_t ctx_id = 0xffffffff; /* invalid id */
-		int ret;
 
 		igt_drop_root();
 
-		bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-		drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+		bops = buf_ops_create(drm_fd);
 
 		for (int i = 0; i < ARRAY_SIZE(src); i++) {
-			scratch_buf_init(bufmgr, &src[i], width, height, 0xff0000ff);
-			scratch_buf_init(bufmgr, &dst[i], width, height, 0x00ff00ff);
+			scratch_buf_init(bops, &src[i], width, height, 0xff0000ff);
+			scratch_buf_init(bops, &dst[i], width, height, 0x00ff00ff);
 		}
 
-		batch = intel_batchbuffer_alloc(bufmgr, devid);
-
-		context0 = drm_intel_gem_context_create(bufmgr);
-		igt_assert(context0);
-
-		context1 = drm_intel_gem_context_create(bufmgr);
-		igt_assert(context1);
+		/*
+		 * We currently cache addresses for buffers within
+		 * intel_bb, so use separate batches for different contexts
+		 */
+		ibb0 = intel_bb_create(drm_fd, BATCH_SZ);
+		ibb1 = intel_bb_create(drm_fd, BATCH_SZ);
+		context0_id = gem_context_create(drm_fd);
+		context1_id = gem_context_create(drm_fd);
 
 		igt_debug("submitting warm up render_copy\n");
 
@@ -3214,34 +3146,32 @@ hsw_test_single_ctx_counters(void)
 		 * up pinning the context since there won't ever be a pinning
 		 * hook callback.
 		 */
-		render_copy(batch,
-			    context0,
+		render_copy(ibb0,
+			    context0_id,
 			    &src[0], 0, 0, width, height,
 			    &dst[0], 0, 0);
 
-		ret = drm_intel_gem_context_get_id(context0, &ctx_id);
-		igt_assert_eq(ret, 0);
-		igt_assert_neq(ctx_id, 0xffffffff);
-		properties[1] = ctx_id;
+		properties[1] = context0_id;
 
-		intel_batchbuffer_flush_with_context(batch, context0);
+		intel_bb_flush_render_with_context(ibb0, context0_id);
+		intel_bb_sync(ibb0);
 
-		scratch_buf_memset(src[0].bo, width, height, 0xff0000ff);
-		scratch_buf_memset(dst[0].bo, width, height, 0x00ff00ff);
+		scratch_buf_memset(&src[0], width, height, 0xff0000ff);
+		scratch_buf_memset(&dst[0], width, height, 0x00ff00ff);
 
 		igt_debug("opening i915-perf stream\n");
 		stream_fd = __perf_open(drm_fd, &param, false);
 
-		bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
+		dst_buf = intel_buf_create(bops, 4096, 1, 8, 64,
+					   I915_TILING_NONE,
+					   I915_COMPRESSION_NONE);
 
-		ret = drm_intel_bo_map(bo, true /* write enable */);
-		igt_assert_eq(ret, 0);
+		buf_map(drm_fd, dst_buf, true /* write enable */);
+		memset(dst_buf->ptr, 0x80, 4096);
+		intel_buf_unmap(dst_buf);
 
-		memset(bo->virtual, 0x80, 4096);
-		drm_intel_bo_unmap(bo);
-
-		emit_stall_timestamp_and_rpc(batch,
-					     bo,
+		emit_stall_timestamp_and_rpc(ibb0,
+					     dst_buf,
 					     512 /* timestamp offset */,
 					     0, /* report dst offset */
 					     0xdeadbeef); /* report id */
@@ -3251,45 +3181,45 @@ hsw_test_single_ctx_counters(void)
 		 * that the PIPE_CONTROL + MI_RPC commands will be in a
 		 * separate batch from the copy.
 		 */
-		intel_batchbuffer_flush_with_context(batch, context0);
+		intel_bb_flush_render_with_context(ibb0, context0_id);
 
-		render_copy(batch,
-			    context0,
+		render_copy(ibb0,
+			    context0_id,
 			    &src[0], 0, 0, width, height,
 			    &dst[0], 0, 0);
 
 		/* Another redundant flush to clarify batch bo is free to reuse */
-		intel_batchbuffer_flush_with_context(batch, context0);
+		intel_bb_flush_render_with_context(ibb0, context0_id);
 
 		/* submit two copies on the other context to avoid a false
 		 * positive in case the driver somehow ended up filtering for
 		 * context1
 		 */
-		render_copy(batch,
-			    context1,
+		render_copy(ibb1,
+			    context1_id,
 			    &src[1], 0, 0, width, height,
 			    &dst[1], 0, 0);
 
-		render_copy(batch,
-			    context1,
+		render_copy(ibb1,
+			    context1_id,
 			    &src[2], 0, 0, width, height,
 			    &dst[2], 0, 0);
 
 		/* And another */
-		intel_batchbuffer_flush_with_context(batch, context1);
+		intel_bb_flush_render_with_context(ibb1, context1_id);
 
-		emit_stall_timestamp_and_rpc(batch,
-					     bo,
+		emit_stall_timestamp_and_rpc(ibb0,
+					     dst_buf,
 					     520 /* timestamp offset */,
 					     256, /* report dst offset */
 					     0xbeefbeef); /* report id */
 
-		intel_batchbuffer_flush_with_context(batch, context0);
+		intel_bb_flush_render_with_context(ibb0, context0_id);
+		intel_bb_sync(ibb0);
 
-		ret = drm_intel_bo_map(bo, false /* write enable */);
-		igt_assert_eq(ret, 0);
+		intel_buf_cpu_map(dst_buf, false /* write enable */);
 
-		report0_32 = bo->virtual;
+		report0_32 = dst_buf->ptr;
 		igt_assert_eq(report0_32[0], 0xdeadbeef); /* report ID */
 		igt_assert_neq(report0_32[1], 0); /* timestamp */
 
@@ -3309,8 +3239,8 @@ hsw_test_single_ctx_counters(void)
 		igt_debug("timestamp32 0 = %u\n", report0_32[1]);
 		igt_debug("timestamp32 1 = %u\n", report1_32[1]);
 
-		timestamp0_64 = *(uint64_t *)(((uint8_t *)bo->virtual) + 512);
-		timestamp1_64 = *(uint64_t *)(((uint8_t *)bo->virtual) + 520);
+		timestamp0_64 = *(uint64_t *)(((uint8_t *)dst_buf->ptr) + 512);
+		timestamp1_64 = *(uint64_t *)(((uint8_t *)dst_buf->ptr) + 520);
 
 		igt_debug("timestamp64 0 = %"PRIu64"\n", timestamp0_64);
 		igt_debug("timestamp64 1 = %"PRIu64"\n", timestamp1_64);
@@ -3338,16 +3268,17 @@ hsw_test_single_ctx_counters(void)
 		igt_assert(delta_delta <= 320);
 
 		for (int i = 0; i < ARRAY_SIZE(src); i++) {
-			drm_intel_bo_unreference(src[i].bo);
-			drm_intel_bo_unreference(dst[i].bo);
+			intel_buf_close(bops, &src[i]);
+			intel_buf_close(bops, &dst[i]);
 		}
 
-		drm_intel_bo_unmap(bo);
-		drm_intel_bo_unreference(bo);
-		intel_batchbuffer_free(batch);
-		drm_intel_gem_context_destroy(context0);
-		drm_intel_gem_context_destroy(context1);
-		drm_intel_bufmgr_destroy(bufmgr);
+		intel_buf_unmap(dst_buf);
+		intel_buf_destroy(dst_buf);
+		intel_bb_destroy(ibb0);
+		intel_bb_destroy(ibb1);
+		gem_context_destroy(drm_fd, context0_id);
+		gem_context_destroy(drm_fd, context1_id);
+		buf_ops_destroy(bops);
 		__perf_close(stream_fd);
 	}
 
@@ -3408,11 +3339,10 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 
 		igt_fork_helper(&child) {
 			struct drm_i915_perf_record_header *header;
-			drm_intel_bufmgr *bufmgr;
-			drm_intel_context *context0, *context1;
-			struct intel_batchbuffer *batch;
-			struct igt_buf src[3], dst[3];
-			drm_intel_bo *bo;
+			struct buf_ops *bops;
+			struct intel_bb *ibb0, *ibb1;
+			struct intel_buf src[3], dst[3], *dst_buf;
+			uint32_t context0_id, context1_id;
 			uint32_t *report0_32, *report1_32;
 			uint32_t *prev, *lprev = NULL;
 			uint64_t timestamp0_64, timestamp1_64;
@@ -3430,21 +3360,17 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 				.format = test_set->perf_oa_format
 			};
 
-			bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-			drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+			bops = buf_ops_create(drm_fd);
 
 			for (int i = 0; i < ARRAY_SIZE(src); i++) {
-				scratch_buf_init(bufmgr, &src[i], width, height, 0xff0000ff);
-				scratch_buf_init(bufmgr, &dst[i], width, height, 0x00ff00ff);
+				scratch_buf_init(bops, &src[i], width, height, 0xff0000ff);
+				scratch_buf_init(bops, &dst[i], width, height, 0x00ff00ff);
 			}
 
-			batch = intel_batchbuffer_alloc(bufmgr, devid);
-
-			context0 = drm_intel_gem_context_create(bufmgr);
-			igt_assert(context0);
-
-			context1 = drm_intel_gem_context_create(bufmgr);
-			igt_assert(context1);
+			ibb0 = intel_bb_create(drm_fd, BATCH_SZ);
+			ibb1 = intel_bb_create(drm_fd, BATCH_SZ);
+			context0_id = gem_context_create(drm_fd);
+			context1_id = gem_context_create(drm_fd);
 
 			igt_debug("submitting warm up render_copy\n");
 
@@ -3468,32 +3394,30 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			 * up pinning the context since there won't ever be a pinning
 			 * hook callback.
 			 */
-			render_copy(batch,
-				    context0,
+			render_copy(ibb0,
+				    context0_id,
 				    &src[0], 0, 0, width, height,
 				    &dst[0], 0, 0);
+			intel_bb_sync(ibb0);
 
-			ret = drm_intel_gem_context_get_id(context0, &ctx_id);
-			igt_assert_eq(ret, 0);
-			igt_assert_neq(ctx_id, 0xffffffff);
-			properties[1] = ctx_id;
+			properties[1] = context0_id;
 
-			scratch_buf_memset(src[0].bo, width, height, 0xff0000ff);
-			scratch_buf_memset(dst[0].bo, width, height, 0x00ff00ff);
+			scratch_buf_memset(&src[0], width, height, 0xff0000ff);
+			scratch_buf_memset(&dst[0], width, height, 0x00ff00ff);
 
 			igt_debug("opening i915-perf stream\n");
 			stream_fd = __perf_open(drm_fd, &param, false);
 
-			bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
+			dst_buf = intel_buf_create(bops, 4096, 1, 8, 64,
+						   I915_TILING_NONE,
+						   I915_COMPRESSION_NONE);
 
-			ret = drm_intel_bo_map(bo, true /* write enable */);
-			igt_assert_eq(ret, 0);
+			buf_map(drm_fd, dst_buf, true);
+			memset(dst_buf->ptr, 0x80, 4096);
+			intel_buf_unmap(dst_buf);
 
-			memset(bo->virtual, 0x80, 4096);
-			drm_intel_bo_unmap(bo);
-
-			emit_stall_timestamp_and_rpc(batch,
-						     bo,
+			emit_stall_timestamp_and_rpc(ibb0,
+						     dst_buf,
 						     512 /* timestamp offset */,
 						     0, /* report dst offset */
 						     0xdeadbeef); /* report id */
@@ -3503,49 +3427,46 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			 * that the PIPE_CONTROL + MI_RPC commands will be in a
 			 * separate batch from the copy.
 			 */
-			intel_batchbuffer_flush_with_context(batch, context0);
+			intel_bb_flush_render_with_context(ibb0, context0_id);
 
-			render_copy(batch,
-				    context0,
+			render_copy(ibb0,
+				    context0_id,
 				    &src[0], 0, 0, width, height,
 				    &dst[0], 0, 0);
 
 			/* Another redundant flush to clarify batch bo is free to reuse */
-			intel_batchbuffer_flush_with_context(batch, context0);
+			intel_bb_flush_render_with_context(ibb0, context0_id);
 
 			/* submit two copies on the other context to avoid a false
 			 * positive in case the driver somehow ended up filtering for
 			 * context1
 			 */
-			render_copy(batch,
-				    context1,
+			render_copy(ibb1,
+				    context1_id,
 				    &src[1], 0, 0, width, height,
 				    &dst[1], 0, 0);
 
-			ret = drm_intel_gem_context_get_id(context1, &ctx1_id);
-			igt_assert_eq(ret, 0);
-			igt_assert_neq(ctx1_id, 0xffffffff);
-
-			render_copy(batch,
-				    context1,
+			render_copy(ibb1,
+				    context1_id,
 				    &src[2], 0, 0, width, height,
 				    &dst[2], 0, 0);
 
 			/* And another */
-			intel_batchbuffer_flush_with_context(batch, context1);
+			intel_bb_flush_render_with_context(ibb1, context1_id);
 
-			emit_stall_timestamp_and_rpc(batch,
-						     bo,
+			emit_stall_timestamp_and_rpc(ibb1,
+						     dst_buf,
 						     520 /* timestamp offset */,
 						     256, /* report dst offset */
 						     0xbeefbeef); /* report id */
 
-			intel_batchbuffer_flush_with_context(batch, context1);
+			intel_bb_flush_render_with_context(ibb1, context1_id);
+			intel_bb_sync(ibb1);
+			intel_bb_sync(ibb0);
 
-			ret = drm_intel_bo_map(bo, false /* write enable */);
-			igt_assert_eq(ret, 0);
+			intel_buf_cpu_map(dst_buf, false /* write enable */);
 
-			report0_32 = bo->virtual;
+			report0_32 = dst_buf->ptr;
 			igt_assert_eq(report0_32[0], 0xdeadbeef); /* report ID */
 			igt_assert_neq(report0_32[1], 0); /* timestamp */
 			prev = report0_32;
@@ -3557,6 +3478,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			igt_assert_eq(report1_32[0], 0xbeefbeef); /* report ID */
 			igt_assert_neq(report1_32[1], 0); /* timestamp */
 			ctx1_id = report1_32[2];
+			igt_debug("CTX1 ID: %u\n", ctx1_id);
 			dump_report(report1_32, 64, "report1_32");
 
 			memset(accumulator.deltas, 0, sizeof(accumulator.deltas));
@@ -3571,8 +3493,8 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			igt_debug("ctx_id 0 = %u\n", report0_32[2]);
 			igt_debug("ctx_id 1 = %u\n", report1_32[2]);
 
-			timestamp0_64 = *(uint64_t *)(((uint8_t *)bo->virtual) + 512);
-			timestamp1_64 = *(uint64_t *)(((uint8_t *)bo->virtual) + 520);
+			timestamp0_64 = *(uint64_t *)(((uint8_t *)dst_buf->ptr) + 512);
+			timestamp1_64 = *(uint64_t *)(((uint8_t *)dst_buf->ptr) + 520);
 
 			igt_debug("ts_timestamp64 0 = %"PRIu64"\n", timestamp0_64);
 			igt_debug("ts_timestamp64 1 = %"PRIu64"\n", timestamp1_64);
@@ -3760,27 +3682,26 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 				  width, height);
 			accumulator_print(&accumulator, "filtered");
 
-			ret = drm_intel_bo_map(src[0].bo, false /* write enable */);
-			igt_assert_eq(ret, 0);
-			ret = drm_intel_bo_map(dst[0].bo, false /* write enable */);
-			igt_assert_eq(ret, 0);
+			intel_buf_cpu_map(&src[0], false /* write enable */);
+			intel_buf_cpu_map(&dst[0], false /* write enable */);
 
-			ret = memcmp(src[0].bo->virtual, dst[0].bo->virtual, 4 * width * height);
-			drm_intel_bo_unmap(src[0].bo);
-			drm_intel_bo_unmap(dst[0].bo);
+			ret = memcmp(src[0].ptr, dst[0].ptr, 4 * width * height);
+			intel_buf_unmap(&src[0]);
+			intel_buf_unmap(&dst[0]);
 
 again:
 			for (int i = 0; i < ARRAY_SIZE(src); i++) {
-				drm_intel_bo_unreference(src[i].bo);
-				drm_intel_bo_unreference(dst[i].bo);
+				intel_buf_close(bops, &src[i]);
+				intel_buf_close(bops, &dst[i]);
 			}
 
-			drm_intel_bo_unmap(bo);
-			drm_intel_bo_unreference(bo);
-			intel_batchbuffer_free(batch);
-			drm_intel_gem_context_destroy(context0);
-			drm_intel_gem_context_destroy(context1);
-			drm_intel_bufmgr_destroy(bufmgr);
+			intel_buf_unmap(dst_buf);
+			intel_buf_destroy(dst_buf);
+			intel_bb_destroy(ibb0);
+			intel_bb_destroy(ibb1);
+			gem_context_destroy(drm_fd, context0_id);
+			gem_context_destroy(drm_fd, context1_id);
+			buf_ops_destroy(bops);
 			__perf_close(stream_fd);
 			gem_quiescent_gpu(drm_fd);
 
@@ -3827,11 +3748,10 @@ static void gen12_single_ctx_helper(void)
 		.num_properties = ARRAY_SIZE(properties) / 2,
 		.properties_ptr = to_user_pointer(properties),
 	};
-	drm_intel_bufmgr *bufmgr;
-	drm_intel_context *context0, *context1;
-	struct intel_batchbuffer *batch;
-	struct igt_buf src[3], dst[3];
-	drm_intel_bo *bo;
+	struct buf_ops *bops;
+	struct intel_bb *ibb0, *ibb1;
+	struct intel_buf src[3], dst[3], *dst_buf;
+	uint32_t context0_id, context1_id;
 	uint32_t *report0_32, *report1_32, *report2_32, *report3_32;
 	uint64_t timestamp0_64, timestamp1_64;
 	uint32_t delta_ts64, delta_oa32;
@@ -3847,21 +3767,17 @@ static void gen12_single_ctx_helper(void)
 		.format = test_set->perf_oa_format
 	};
 
-	bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+	bops = buf_ops_create(drm_fd);
 
 	for (int i = 0; i < ARRAY_SIZE(src); i++) {
-		scratch_buf_init(bufmgr, &src[i], width, height, 0xff0000ff);
-		scratch_buf_init(bufmgr, &dst[i], width, height, 0x00ff00ff);
+		scratch_buf_init(bops, &src[i], width, height, 0xff0000ff);
+		scratch_buf_init(bops, &dst[i], width, height, 0x00ff00ff);
 	}
 
-	batch = intel_batchbuffer_alloc(bufmgr, devid);
-
-	context0 = drm_intel_gem_context_create(bufmgr);
-	igt_assert(context0);
-
-	context1 = drm_intel_gem_context_create(bufmgr);
-	igt_assert(context1);
+	ibb0 = intel_bb_create(drm_fd, BATCH_SZ);
+	ibb1 = intel_bb_create(drm_fd, BATCH_SZ);
+	context0_id = gem_context_create(drm_fd);
+	context1_id = gem_context_create(drm_fd);
 
 	igt_debug("submitting warm up render_copy\n");
 
@@ -3885,44 +3801,42 @@ static void gen12_single_ctx_helper(void)
 	 * up pinning the context since there won't ever be a pinning
 	 * hook callback.
 	 */
-	render_copy(batch, context0,
+	render_copy(ibb0, context0_id,
 		    &src[0], 0, 0, width, height,
 		    &dst[0], 0, 0);
 
 	/* Initialize the context parameter to the perf open ioctl here */
-	ret = drm_intel_gem_context_get_id(context0, &ctx0_id);
-	igt_assert_eq(ret, 0);
-	igt_assert_neq(ctx0_id, 0xffffffff);
-	properties[1] = ctx0_id;
+	properties[1] = context0_id;
 
 	igt_debug("opening i915-perf stream\n");
 	stream_fd = __perf_open(drm_fd, &param, false);
 
-	bo = drm_intel_bo_alloc(bufmgr, "mi_rpc dest bo", 4096, 64);
+	dst_buf = intel_buf_create(bops, 4096, 1, 8, 64,
+				   I915_TILING_NONE,
+				   I915_COMPRESSION_NONE);
 
 	/* Set write domain to cpu briefly to fill the buffer with 80s */
-	ret = drm_intel_bo_map(bo, true);
-	igt_assert_eq(ret, 0);
-	memset(bo->virtual, 0x80, 2048);
-	memset(bo->virtual + 2048, 0, 2048);
-	drm_intel_bo_unmap(bo);
+	buf_map(drm_fd, dst_buf, true /* write enable */);
+	memset(dst_buf->ptr, 0x80, 2048);
+	memset((uint8_t *) dst_buf->ptr + 2048, 0, 2048);
+	intel_buf_unmap(dst_buf);
 
 	/* Submit an mi-rpc to context0 before measurable work */
 #define BO_TIMESTAMP_OFFSET0 1024
 #define BO_REPORT_OFFSET0 0
 #define BO_REPORT_ID0 0xdeadbeef
-	emit_stall_timestamp_and_rpc(batch,
-				     bo,
+	emit_stall_timestamp_and_rpc(ibb0,
+				     dst_buf,
 				     BO_TIMESTAMP_OFFSET0,
 				     BO_REPORT_OFFSET0,
 				     BO_REPORT_ID0);
-	intel_batchbuffer_flush_with_context(batch, context0);
+	intel_bb_flush_render_with_context(ibb0, context0_id);
 
 	/* This is the work/context that is measured for counter increments */
-	render_copy(batch, context0,
+	render_copy(ibb0, context0_id,
 		    &src[0], 0, 0, width, height,
 		    &dst[0], 0, 0);
-	intel_batchbuffer_flush_with_context(batch, context0);
+	intel_bb_flush_render_with_context(ibb0, context0_id);
 
 	/* Submit an mi-rpc to context1 before work
 	 *
@@ -3933,54 +3847,51 @@ static void gen12_single_ctx_helper(void)
 #define BO_TIMESTAMP_OFFSET2 1040
 #define BO_REPORT_OFFSET2 512
 #define BO_REPORT_ID2 0x00c0ffee
-	emit_stall_timestamp_and_rpc(batch,
-				     bo,
+	emit_stall_timestamp_and_rpc(ibb1,
+				     dst_buf,
 				     BO_TIMESTAMP_OFFSET2,
 				     BO_REPORT_OFFSET2,
 				     BO_REPORT_ID2);
-	intel_batchbuffer_flush_with_context(batch, context1);
+	intel_bb_flush_render_with_context(ibb1, context1_id);
 
 	/* Submit two copies on the other context to avoid a false
 	 * positive in case the driver somehow ended up filtering for
 	 * context1
 	 */
-	render_copy(batch, context1,
+	render_copy(ibb1, context1_id,
 		    &src[1], 0, 0, width, height,
 		    &dst[1], 0, 0);
-	ret = drm_intel_gem_context_get_id(context1, &ctx1_id);
-	igt_assert_eq(ret, 0);
-	igt_assert_neq(ctx1_id, 0xffffffff);
 
-	render_copy(batch, context1,
+	render_copy(ibb1, context1_id,
 		    &src[2], 0, 0, width, height,
 		    &dst[2], 0, 0);
-	intel_batchbuffer_flush_with_context(batch, context1);
+	intel_bb_flush_render_with_context(ibb1, context1_id);
 
 	/* Submit an mi-rpc to context1 after all work */
 #define BO_TIMESTAMP_OFFSET3 1048
 #define BO_REPORT_OFFSET3 768
 #define BO_REPORT_ID3 0x01c0ffee
-	emit_stall_timestamp_and_rpc(batch,
-				     bo,
+	emit_stall_timestamp_and_rpc(ibb1,
+				     dst_buf,
 				     BO_TIMESTAMP_OFFSET3,
 				     BO_REPORT_OFFSET3,
 				     BO_REPORT_ID3);
-	intel_batchbuffer_flush_with_context(batch, context1);
+	intel_bb_flush_render_with_context(ibb1, context1_id);
 
 	/* Submit an mi-rpc to context0 after all measurable work */
 #define BO_TIMESTAMP_OFFSET1 1032
 #define BO_REPORT_OFFSET1 256
 #define BO_REPORT_ID1 0xbeefbeef
-	emit_stall_timestamp_and_rpc(batch,
-				     bo,
+	emit_stall_timestamp_and_rpc(ibb0,
+				     dst_buf,
 				     BO_TIMESTAMP_OFFSET1,
 				     BO_REPORT_OFFSET1,
 				     BO_REPORT_ID1);
-	intel_batchbuffer_flush_with_context(batch, context0);
+	intel_bb_flush_render_with_context(ibb0, context0_id);
+	intel_bb_sync(ibb0);
+	intel_bb_sync(ibb1);
 
-	/* Set write domain to none */
-	ret = drm_intel_bo_map(bo, false);
-	igt_assert_eq(ret, 0);
+	intel_buf_cpu_map(dst_buf, false);
 
 	/* Sanity check reports
 	 * reportX_32[0]: report id passed with mi-rpc
@@ -3992,7 +3903,7 @@ static void gen12_single_ctx_helper(void)
 	 * report2_32: start of other work
 	 * report3_32: end of other work
 	 */
-	report0_32 = bo->virtual;
+	report0_32 = dst_buf->ptr;
 	igt_assert_eq(report0_32[0], 0xdeadbeef);
 	igt_assert_neq(report0_32[1], 0);
 	ctx0_id = report0_32[2];
@@ -4003,6 +3914,7 @@ static void gen12_single_ctx_helper(void)
 	igt_assert_eq(report1_32[0], 0xbeefbeef);
 	igt_assert_neq(report1_32[1], 0);
 	ctx1_id = report1_32[2];
+	igt_debug("CTX ID1: %u\n", ctx1_id);
 	dump_report(report1_32, 64, "report1_32");
 
 	/* Verify that counters in context1 are all zeroes */
@@ -4011,7 +3923,7 @@ static void gen12_single_ctx_helper(void)
 	igt_assert_neq(report2_32[1], 0);
 	dump_report(report2_32, 64, "report2_32");
 	igt_assert_eq(0, memcmp(&report2_32[4],
-				bo->virtual + 2048,
+				(uint8_t *) dst_buf->ptr + 2048,
 				240));
 
 	report3_32 = report0_32 + 192;
@@ -4019,7 +3931,7 @@ static void gen12_single_ctx_helper(void)
 	igt_assert_neq(report3_32[1], 0);
 	dump_report(report3_32, 64, "report3_32");
 	igt_assert_eq(0, memcmp(&report3_32[4],
-				bo->virtual + 2048,
+				(uint8_t *) dst_buf->ptr + 2048,
 				240));
 
 	/* Accumulate deltas for counters - A0, A21 and A26 */
@@ -4039,8 +3951,8 @@ static void gen12_single_ctx_helper(void)
 	 * the OA report timestamps should be almost identical but
 	 * allow a 500 nanoseconds margin.
 	 */
-	timestamp0_64 = *(uint64_t *)(((uint8_t *)bo->virtual) + BO_TIMESTAMP_OFFSET0);
-	timestamp1_64 = *(uint64_t *)(((uint8_t *)bo->virtual) + BO_TIMESTAMP_OFFSET1);
+	timestamp0_64 = *(uint64_t *)(((uint8_t *)dst_buf->ptr) + BO_TIMESTAMP_OFFSET0);
+	timestamp1_64 = *(uint64_t *)(((uint8_t *)dst_buf->ptr) + BO_TIMESTAMP_OFFSET1);
 
 	igt_debug("ts_timestamp64 0 = %"PRIu64"\n", timestamp0_64);
 	igt_debug("ts_timestamp64 1 = %"PRIu64"\n", timestamp1_64);
@@ -4075,19 +3987,17 @@ static void gen12_single_ctx_helper(void)
 	/* Verify that the work actually happened by comparing the src
 	 * and dst buffers
 	 */
-	ret = drm_intel_bo_map(src[0].bo, false);
-	igt_assert_eq(ret, 0);
-	ret = drm_intel_bo_map(dst[0].bo, false);
-	igt_assert_eq(ret, 0);
+	intel_buf_cpu_map(&src[0], false);
+	intel_buf_cpu_map(&dst[0], false);
 
-	ret = memcmp(src[0].bo->virtual, dst[0].bo->virtual, 4 * width * height);
+	ret = memcmp(src[0].ptr, dst[0].ptr, 4 * width * height);
+	intel_buf_unmap(&src[0]);
+	intel_buf_unmap(&dst[0]);
+
 	if (ret != 0) {
 		accumulator_print(&accumulator, "total");
 		exit(EAGAIN);
 	}
-
-	drm_intel_bo_unmap(src[0].bo);
-	drm_intel_bo_unmap(dst[0].bo);
 
 	/* Check that this test passed. The test measures the number of 2x2
 	 * samples written to the render target using the counter A26. For
@@ -4098,16 +4008,17 @@ static void gen12_single_ctx_helper(void)
 
 	/* Clean up */
 	for (int i = 0; i < ARRAY_SIZE(src); i++) {
-		drm_intel_bo_unreference(src[i].bo);
-		drm_intel_bo_unreference(dst[i].bo);
+		intel_buf_close(bops, &src[i]);
+		intel_buf_close(bops, &dst[i]);
 	}
 
-	drm_intel_bo_unmap(bo);
-	drm_intel_bo_unreference(bo);
-	intel_batchbuffer_free(batch);
-	drm_intel_gem_context_destroy(context0);
-	drm_intel_gem_context_destroy(context1);
-	drm_intel_bufmgr_destroy(bufmgr);
+	intel_buf_unmap(dst_buf);
+	intel_buf_destroy(dst_buf);
+	intel_bb_destroy(ibb0);
+	intel_bb_destroy(ibb1);
+	gem_context_destroy(drm_fd, context0_id);
+	gem_context_destroy(drm_fd, context1_id);
+	buf_ops_destroy(bops);
 	__perf_close(stream_fd);
 }
 
