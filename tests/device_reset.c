@@ -232,8 +232,19 @@ static void set_device_filter(const char* dev_path)
 
 static void unbind_reset_rebind(struct device_fds *dev)
 {
+	uint32_t devid = intel_get_drm_devid(dev->fds.dev);
 	igt_debug("close the device\n");
 	close_if_opened(&dev->fds.dev);
+
+	/**
+	 * FIXME: Unbinding the i915 driver on some platforms with Azalia audio
+	 * results in a kernel WARN on "i915 raw-wakerefs=1 wakelocks=1 on cleanup".
+	 * The below CI friendly user level workaround prevents the warning from
+	 * appearing. Drop this hack as soon as this is fixed in the kernel.
+	 */
+	if (igt_warn_on_f((bool) IS_HASWELL(devid) || IS_BROADWELL(devid),
+	    "Manually enabling audio PM to work around a kernel WARN\n"))
+		igt_pm_enable_audio_runtime_pm();
 
 	driver_unbind(dev);
 
