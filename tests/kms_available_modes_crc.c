@@ -28,6 +28,8 @@
 
 IGT_TEST_DESCRIPTION("CRC test all different plane modes which kernel advertises.");
 
+#define SDR_PLANE_BASE 3
+
 typedef struct {
 	int gfx_fd;
 	igt_display_t display;
@@ -43,7 +45,6 @@ typedef struct {
 	bool separateprimaryplane;
 
 	uint32_t gem_handle;
-	uint32_t gem_handle_yuv;
 	unsigned int size;
 	unsigned char* buf;
 
@@ -355,6 +356,8 @@ test_available_modes(data_t* data)
 		uint16_t reserved;
 	} *lut = NULL;
 
+	igt_display_reset(&data->display);
+
 	for_each_pipe_with_valid_output(&data->display, pipe, output) {
 		igt_output_set_pipe(output, pipe);
 		igt_display_commit2(&data->display, data->commit);
@@ -397,7 +400,8 @@ test_available_modes(data_t* data)
 			modePlane = drmModeGetPlane(data->gfx_fd,
 						    plane->drm_plane->plane_id);
 
-			if (plane->type == DRM_PLANE_TYPE_CURSOR)
+			if (plane->type == DRM_PLANE_TYPE_CURSOR
+			    || plane->index >= SDR_PLANE_BASE)
 				continue;
 
 			for (modeindex = 0;
