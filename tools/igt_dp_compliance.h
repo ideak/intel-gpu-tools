@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright 2017 Intel Corporation
  * Manasi Navare <manasi.d.navare@intel.com>
  *
@@ -28,8 +29,8 @@
 
 extern int drm_fd;
 
-gboolean intel_dp_compliance_setup_hotplug(void);
-void intel_dp_compliance_cleanup_hotplug(void);
+gboolean igt_dp_compliance_setup_hotplug(void);
+void igt_dp_compliance_cleanup_hotplug(void);
 
 /* called by the hotplug code */
 int update_display(int mode, bool is_compliance_test);

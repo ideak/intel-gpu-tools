@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright 2017 Intel Corporation
  *   Jesse Barnes <jesse.barnes@intel.com>
  *   Manasi Navare <manasi.d.navare@intel.com>
@@ -29,7 +30,7 @@
 
 #include <sys/stat.h>
 
-#include "intel_dp_compliance.h"
+#include "igt_dp_compliance.h"
 #include <libudev.h>
 static struct udev_monitor *uevent_monitor;
 static struct udev *udev;
@@ -62,7 +63,7 @@ out:
 }
 
 
-gboolean intel_dp_compliance_setup_hotplug(void)
+gboolean igt_dp_compliance_setup_hotplug(void)
 {
 	int ret;
 
@@ -109,11 +110,11 @@ gboolean intel_dp_compliance_setup_hotplug(void)
 	return TRUE;
 
 out:
-	intel_dp_compliance_cleanup_hotplug();
+	igt_dp_compliance_cleanup_hotplug();
 	return FALSE;
 }
 
-void intel_dp_compliance_cleanup_hotplug(void)
+void igt_dp_compliance_cleanup_hotplug(void)
 {
 	if (udevchannel)
 		g_io_channel_shutdown(udevchannel, TRUE, NULL);

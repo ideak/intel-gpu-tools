@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright © 2017 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -125,7 +126,7 @@
 #include <fcntl.h>
 #include <time.h>
 
-#include "intel_dp_compliance.h"
+#include "igt_dp_compliance.h"
 
 #include <stdlib.h>
 #include <signal.h>
@@ -1067,7 +1068,7 @@ int main(int argc, char **argv)
 		goto out_close;
 	}
 
-	if (!intel_dp_compliance_setup_hotplug()) {
+	if (!igt_dp_compliance_setup_hotplug()) {
 		igt_warn("Failed to initialize hotplug support\n");
 		goto out_mainloop;
 	}
@@ -1108,7 +1109,7 @@ int main(int argc, char **argv)
 out_stdio:
 	g_io_channel_shutdown(stdinchannel, TRUE, NULL);
 out_hotplug:
-	intel_dp_compliance_cleanup_hotplug();
+	igt_dp_compliance_cleanup_hotplug();
 out_mainloop:
 	g_main_loop_unref(mainloop);
 out_close:
