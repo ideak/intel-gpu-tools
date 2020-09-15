@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright © 2013,2014 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -1278,6 +1279,70 @@ void igt_paint_color(cairo_t *cr, int x, int y, int w, int h,
 	cairo_rectangle(cr, x, y, w, h);
 	cairo_set_source_rgb(cr, r, g, b);
 	cairo_fill(cr);
+}
+
+/**
+ * igt_fill_cts_framebuffer:
+ * @pixmap: handle to the mapped buffer
+ * @video_width: required width for the CTS pattern
+ * @video_height: required height for the CTS pattern
+ * @bitdepth: required bitdepth for the CTS pattern
+ * @alpha: required alpha for the CTS pattern
+ * This functions draws the CTS test pattern for a given width, height.
+ */
+int igt_fill_cts_framebuffer(uint32_t *pixmap, uint32_t video_width,
+		uint32_t video_height, uint32_t bitdepth, int alpha)
+{
+	uint32_t tile_height, tile_width;
+	uint32_t *red_ptr, *green_ptr, *blue_ptr;
+	uint32_t *white_ptr, *src_ptr, *dst_ptr;
+	int x, y;
+	int32_t pixel_val;
+
+	tile_height = 64;
+	tile_width = 1 << bitdepth;
+
+	red_ptr = pixmap;
+	green_ptr = red_ptr + (video_width * tile_height);
+	blue_ptr = green_ptr + (video_width * tile_height);
+	white_ptr = blue_ptr + (video_width * tile_height);
+	x = 0;
+
+	/* Fill the frame buffer with video pattern from CTS 3.1.5 */
+	while (x < video_width) {
+		for (pixel_val = 0; pixel_val < 256;
+		     pixel_val = pixel_val + (256 / tile_width)) {
+			red_ptr[x] = alpha << 24 | pixel_val << 16;
+			green_ptr[x] = alpha << 24 | pixel_val << 8;
+			blue_ptr[x] = alpha << 24 | pixel_val << 0;
+			white_ptr[x] = alpha << 24 | red_ptr[x] | green_ptr[x] |
+				       blue_ptr[x];
+			if (++x >= video_width)
+				break;
+		}
+	}
+	for (y = 0; y < video_height; y++) {
+		if (y == 0 || y == 64 || y == 128 || y == 192)
+			continue;
+		switch ((y / tile_height) % 4) {
+		case 0:
+			src_ptr = red_ptr;
+			break;
+		case 1:
+			src_ptr = green_ptr;
+			break;
+		case 2:
+			src_ptr = blue_ptr;
+			break;
+		case 3:
+			src_ptr = white_ptr;
+			break;
+		}
+		dst_ptr = pixmap + (y * video_width);
+		memcpy(dst_ptr, src_ptr, (video_width * 4));
+	}
+
+	return 0;
 }
 
 /**

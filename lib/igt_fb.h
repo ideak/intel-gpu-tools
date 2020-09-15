@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright © 2013,2014 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -206,6 +207,8 @@ bool igt_format_is_fp16(uint32_t drm_format);
 int igt_format_plane_bpp(uint32_t drm_format, int plane);
 void igt_format_array_fill(uint32_t **formats_array, unsigned int *count,
 			   bool allow_yuv);
+int igt_fill_cts_framebuffer(uint32_t *pixmap, uint32_t video_width,
+		uint32_t video_height, uint32_t bitdepth, int alpha);
 
 int igt_fb_get_fnv1a_crc(struct igt_fb *fb, igt_crc_t *crc);
 

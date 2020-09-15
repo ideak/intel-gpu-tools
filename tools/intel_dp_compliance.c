@@ -448,70 +448,12 @@ static int setup_video_pattern_framebuffer(struct connector *dp_conn)
 
 }
 
-static int fill_framebuffer(struct connector *dp_conn)
-{
-	uint32_t tile_height, tile_width, video_width, video_height;
-	uint32_t *red_ptr, *green_ptr, *blue_ptr, *white_ptr, *src_ptr, *dst_ptr;
-	int x, y;
-	int32_t pixel_val;
-	uint8_t alpha;
-
-	video_width = dp_conn->test_pattern.hdisplay;
-	video_height = dp_conn->test_pattern.vdisplay;
-
-	tile_height = 64;
-	tile_width = 1 <<  (dp_conn->test_pattern.bitdepth);
-
-	red_ptr = dp_conn->test_pattern.pixmap;
-	green_ptr = red_ptr + (video_width * tile_height);
-	blue_ptr = green_ptr + (video_width * tile_height);
-	white_ptr = blue_ptr + (video_width * tile_height);
-	x = 0;
-
-	/* Fill the frame buffer with video pattern from CTS 3.1.5 */
-	while (x < video_width) {
-		for (pixel_val = 0; pixel_val < 256;
-		     pixel_val = pixel_val + (256 / tile_width)) {
-			alpha = gen == 10 ? 0xff : 0;
-			red_ptr[x] = alpha << 24 | pixel_val << 16;
-			green_ptr[x] = alpha << 24 | pixel_val << 8;
-			blue_ptr[x] = alpha << 24 | pixel_val << 0;
-			white_ptr[x] = alpha << 24 | red_ptr[x] | green_ptr[x] |
-				       blue_ptr[x];
-			if (++x >= video_width)
-				break;
-		}
-	}
-	for (y = 0; y < video_height; y++) {
-		if (y == 0 || y == 64 || y == 128 || y == 192)
-			continue;
-		switch ((y / tile_height) % 4) {
-		case 0:
-			src_ptr = red_ptr;
-			break;
-		case 1:
-			src_ptr = green_ptr;
-			break;
-		case 2:
-			src_ptr = blue_ptr;
-			break;
-		case 3:
-			src_ptr = white_ptr;
-			break;
-		}
-		dst_ptr = dp_conn->test_pattern.pixmap + (y * video_width);
-		memcpy(dst_ptr, src_ptr, (video_width * 4));
-	}
-	munmap(dp_conn->test_pattern.pixmap,
-	       dp_conn->test_pattern.size);
-	return 0;
-}
-
 static int set_test_mode(struct connector *dp_conn)
 {
 	int ret = 0;
 	int i;
 	bool found_std = false, found_fs = false;
+	uint32_t alpha;
 	drmModeConnector *c = dp_conn->connector;
 
 	/* Ignore any disconnected devices */
@@ -584,6 +526,7 @@ static int set_test_mode(struct connector *dp_conn)
 		dp_conn->test_pattern.hdisplay = hdisplay;
 		dp_conn->test_pattern.vdisplay = vdisplay;
 		dp_conn->test_pattern.bitdepth = bitdepth;
+		alpha = gen == 10 ? 0xff : 0;
 
 		ret = setup_video_pattern_framebuffer(dp_conn);
 		if (ret) {
@@ -592,12 +535,19 @@ static int set_test_mode(struct connector *dp_conn)
 			return ret;
 		}
 
-		ret = fill_framebuffer(dp_conn);
+		ret = igt_fill_cts_framebuffer(dp_conn->test_pattern.pixmap,
+				dp_conn->test_pattern.hdisplay,
+				dp_conn->test_pattern.vdisplay,
+				dp_conn->test_pattern.bitdepth,
+				alpha);
 		if (ret) {
 			igt_warn("Filling framebuffer for connector %u failed (%d)\n",
 				 c->connector_id, ret);
 			return ret;
 		}
+		/* unmapping the buffer previously mapped during setup */
+		munmap(dp_conn->test_pattern.pixmap,
+				dp_conn->test_pattern.size);
 	}
 
 	return ret;
