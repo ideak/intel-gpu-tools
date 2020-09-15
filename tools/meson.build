@@ -101,5 +101,17 @@ executable('amd_hdmi_compliance', 'amd_hdmi_compliance.c',
 	   install_rpath : bindir_rpathdir,
 	   install : true)
 
+if libudev.found()
+	msm_dp_compliance_src = [
+		'msm_dp_compliance.c',
+		'igt_dp_compliance_hotplug.c',
+		'igt_compliance_utils.c'
+	]
+	executable('msm_dp_compliance', sources : msm_dp_compliance_src,
+			dependencies : [tool_deps, libudev],
+			install_rpath : bindir_rpathdir,
+			install : true)
+endif
+
 subdir('i915-perf')
 subdir('null_state_gen')

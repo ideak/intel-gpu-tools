@@ -14,6 +14,10 @@ intel_dp_compliance_LDADD = $(top_builddir)/lib/libintel_tools.la
 bin_PROGRAMS += amd_hdmi_compliance
 amd_hdmi_compliance_CFLAGS = $(AM_CFLAGS) $(GLIB_CFLAGS)
 
+bin_PROGRAMS += msm_dp_compliance
+msm_dp_compliance_CFLAGS = $(AM_CFLAGS) $(GLIB_CFLAGS)
+msm_dp_compliance_LDADD = $(top_builddir)/lib/libintel_tools.la
+
 SUBDIRS = i915-perf null_state_gen registers
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/include/drm-uapi -I$(top_srcdir)/lib \
