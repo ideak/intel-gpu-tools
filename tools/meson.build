@@ -60,7 +60,8 @@ endforeach
 if libudev.found()
 	intel_dp_compliance_src = [
 		'intel_dp_compliance.c',
-		'igt_dp_compliance_hotplug.c'
+		'igt_dp_compliance_hotplug.c',
+		'igt_compliance_utils.c'
 	]
 	executable('intel_dp_compliance', sources : intel_dp_compliance_src,
 		   dependencies : [tool_deps, libudev],

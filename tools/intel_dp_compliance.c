@@ -172,9 +172,6 @@ uint16_t hdisplay;
 uint16_t vdisplay;
 uint8_t bitdepth;
 
-static int tio_fd;
-struct termios saved_tio;
-
 drmModeRes *resources;
 int drm_fd, modes, gen;
 uint64_t tiling = LOCAL_DRM_FORMAT_MOD_NONE;
@@ -823,50 +820,6 @@ static gboolean input_event(GIOChannel *source, GIOCondition condition,
 	}
 
 	return TRUE;
-}
-
-static void enter_exec_path(char **argv)
-{
-	char *exec_path = NULL;
-	char *pos = NULL;
-	short len_path = 0;
-	int ret;
-
-	len_path = strlen(argv[0]);
-	exec_path = (char *) malloc(len_path);
-
-	memcpy(exec_path, argv[0], len_path);
-	pos = strrchr(exec_path, '/');
-	if (pos != NULL)
-		*(pos+1) = '\0';
-
-	ret = chdir(exec_path);
-	igt_assert_eq(ret, 0);
-	free(exec_path);
-}
-
-static void restore_termio_mode(int sig)
-{
-	tcsetattr(tio_fd, TCSANOW, &saved_tio);
-	close(tio_fd);
-}
-
-static void set_termio_mode(void)
-{
-	struct termios tio;
-
-	/* don't attempt to set terminal attributes if not in the foreground
-	 * process group
-	 */
-	if (getpgrp() != tcgetpgrp(STDOUT_FILENO))
-		return;
-
-	tio_fd = dup(STDIN_FILENO);
-	tcgetattr(tio_fd, &saved_tio);
-	igt_install_exit_handler(restore_termio_mode);
-	tio = saved_tio;
-	tio.c_lflag &= ~(ICANON | ECHO);
-	tcsetattr(tio_fd, TCSANOW, &tio);
 }
 
 int main(int argc, char **argv)

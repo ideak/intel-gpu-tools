@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright 2017 Intel Corporation
- * Manasi Navare <manasi.d.navare@intel.com>
+ *   Jesse Barnes <jesse.barnes@intel.com>
+ *   Manasi Navare <manasi.d.navare@intel.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,23 +23,60 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef __IGT_DP_COMPLIANCE_H__
-#define __IGT_DP_COMPLIANCE_H__
-
+#include "igt.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <glib.h>
+#include <signal.h>
+#include <termios.h>
 
-extern int drm_fd;
+#include <sys/stat.h>
 
-gboolean igt_dp_compliance_setup_hotplug(void);
-void igt_dp_compliance_cleanup_hotplug(void);
+#include "igt_dp_compliance.h"
 
-void enter_exec_path(char **argv);
-void set_termio_mode(void);
+static int tio_fd;
+struct termios saved_tio;
 
-/* called by the hotplug code */
-int update_display(int mode, bool is_compliance_test);
+void enter_exec_path(char **argv)
+{
+	char *exec_path = NULL;
+	char *pos = NULL;
+	short len_path = 0;
+	int ret;
 
-#endif /* __IGT_DP_COMPLIANCE_H__ */
+	len_path = strlen(argv[0]);
+	exec_path = (char *) malloc(len_path);
+
+	memcpy(exec_path, argv[0], len_path);
+	pos = strrchr(exec_path, '/');
+	if (pos != NULL)
+		*(pos+1) = '\0';
+
+	ret = chdir(exec_path);
+	igt_assert_eq(ret, 0);
+	free(exec_path);
+}
+
+static void restore_termio_mode(int sig)
+{
+	tcsetattr(tio_fd, TCSANOW, &saved_tio);
+	close(tio_fd);
+}
+
+void set_termio_mode(void)
+{
+	struct termios tio;
+
+	/* don't attempt to set terminal attributes if not in the foreground
+	 * process group
+	 */
+	if (getpgrp() != tcgetpgrp(STDOUT_FILENO))
+		return;
+
+	tio_fd = dup(STDIN_FILENO);
+	tcgetattr(tio_fd, &saved_tio);
+	igt_install_exit_handler(restore_termio_mode);
+	tio = saved_tio;
+	tio.c_lflag &= ~(ICANON | ECHO);
+	tcsetattr(tio_fd, TCSANOW, &tio);
+}
