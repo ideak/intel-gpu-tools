@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright © 2013 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -874,6 +875,7 @@ int igt_connector_sysfs_open(int drm_fd,
 			     drmModeConnector *connector);
 uint32_t igt_reduce_format(uint32_t format);
 
+
 /*
  * igt_require_pipe:
  * @display: pointer to igt_display_t
@@ -886,5 +888,8 @@ uint32_t igt_reduce_format(uint32_t format);
  */
 void igt_require_pipe(igt_display_t *display,
 		enum pipe pipe);
+
+void igt_dump_connectors_fd(int drmfd);
+void igt_dump_crtcs_fd(int drmfd);
 
 #endif /* __IGT_KMS_H__ */
