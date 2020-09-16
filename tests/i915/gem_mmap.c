@@ -214,18 +214,25 @@ igt_main
 			2 * 4096,
 			~0,
 		};
+		uint64_t offset[] = {
+			4096,
+			0
+		};
 
-		for (int i = 0; i < ARRAY_SIZE(bad_size); i++) {
-			struct drm_i915_gem_mmap arg = {
-				.handle = gem_create(fd, 4096),
-				.offset = 4096,
-				.size = bad_size[i],
-			};
+		for(int i = 0; i < ARRAY_SIZE(offset); i++) {
+			for (int j = 0; j < ARRAY_SIZE(bad_size); j++) {
+				struct drm_i915_gem_mmap arg = {
+					.handle = gem_create(fd, 4096),
+					.offset = offset[i],
+					.size = bad_size[j],
+				};
 
-			igt_debug("Trying to mmap bad size; size: %'"PRIu64"\n", bad_size[i]);
-			igt_assert_eq(mmap_ioctl(fd, &arg), -EINVAL);
+				igt_debug("Trying to mmap bad size; size: %'"PRIu64", offset: %'"PRIu64"\n",
+						bad_size[j], offset[i]);
+				igt_assert_eq(mmap_ioctl(fd, &arg), -EINVAL);
 
-			gem_close(fd, arg.handle);
+				gem_close(fd, arg.handle);
+			}
 		}
 	}
 

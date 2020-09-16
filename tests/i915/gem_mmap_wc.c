@@ -563,17 +563,23 @@ igt_main
 			2 * 4096,
 			~0,
 		};
+		uint64_t offset[] = {
+			4096,
+			0
+		};
 
-		for (int i = 0; i < ARRAY_SIZE(bad_size); i++) {
-			struct drm_i915_gem_mmap arg = {
-				.handle = gem_create(fd, 4096),
-				.offset = 4096,
-				.size = bad_size[i],
-				.flags = I915_MMAP_WC,
-			};
+		for(int i = 0; i < ARRAY_SIZE(offset); i++) {
+			for (int j = 0; j < ARRAY_SIZE(bad_size); j++) {
+				struct drm_i915_gem_mmap arg = {
+					.handle = gem_create(fd, 4096),
+					.offset = offset[i],
+					.size = bad_size[j],
+					.flags = I915_MMAP_WC,
+				};
 
-			igt_assert_eq(mmap_ioctl(fd, &arg), -EINVAL);
-			gem_close(fd, arg.handle);
+				igt_assert_eq(mmap_ioctl(fd, &arg), -EINVAL);
+				gem_close(fd, arg.handle);
+			}
 		}
 	}
 
