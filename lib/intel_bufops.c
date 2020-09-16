@@ -786,13 +786,13 @@ static void __intel_buf_init(struct buf_ops *bops,
  * @buf: pointer to intel_buf structure to be filled
  * @width: surface width
  * @height: surface height
- * @bpp: bits-per-pixel (8 / 16 / 32)
+ * @bpp: bits-per-pixel (8 / 16 / 32 / 64)
  * @alignment: alignment of the stride for linear surfaces
  * @tiling: surface tiling
  * @compression: surface compression type
  *
  * Function creates new BO within intel_buf structure and fills all
- * structure fields.
+ * structure fields. Takes bo handle ownership.
  *
  * Note. For X / Y if GPU supports fences HW tiling is configured.
  */
@@ -803,6 +803,8 @@ void intel_buf_init(struct buf_ops *bops,
 {
 	__intel_buf_init(bops, 0, buf, width, height, bpp, alignment,
 			 tiling, compression);
+
+	intel_buf_set_ownership(buf, true);
 }
 
 /**
@@ -810,14 +812,17 @@ void intel_buf_init(struct buf_ops *bops,
  * @bops: pointer to buf_ops
  * @buf: pointer to intel_buf structure
  *
- * Function closes gem BO inside intel_buf.
+ * Function closes gem BO inside intel_buf if bo is owned by intel_buf.
+ * For handle passed from the caller intel_buf doesn't take ownership and
+ * doesn't close it in close()/destroy() paths.
  */
 void intel_buf_close(struct buf_ops *bops, struct intel_buf *buf)
 {
 	igt_assert(bops);
 	igt_assert(buf);
 
-	gem_close(bops->fd, buf->handle);
+	if (buf->is_owner)
+		gem_close(bops->fd, buf->handle);
 }
 
 /**
@@ -827,7 +832,7 @@ void intel_buf_close(struct buf_ops *bops, struct intel_buf *buf)
  * @buf: pointer to intel_buf structure to be filled
  * @width: surface width
  * @height: surface height
- * @bpp: bits-per-pixel (8 / 16 / 32)
+ * @bpp: bits-per-pixel (8 / 16 / 32 / 64)
  * @alignment: alignment of the stride for linear surfaces
  * @tiling: surface tiling
  * @compression: surface compression type
@@ -836,8 +841,8 @@ void intel_buf_close(struct buf_ops *bops, struct intel_buf *buf)
  * (with all its metadata - width, height, ...). Useful if BO was created
  * outside.
  *
- * Note: intel_buf_close() can be used to close the BO handle, but caller
- * must be aware to not close the BO twice.
+ * Note: intel_buf_close() can be used because intel_buf is aware it is not
+ * buffer owner so it won't close it underneath.
  */
 void intel_buf_init_using_handle(struct buf_ops *bops,
 				 uint32_t handle,
@@ -849,6 +854,19 @@ void intel_buf_init_using_handle(struct buf_ops *bops,
 			 req_tiling, compression);
 }
 
+/**
+ * intel_buf_create
+ * @bops: pointer to buf_ops
+ * @width: surface width
+ * @height: surface height
+ * @bpp: bits-per-pixel (8 / 16 / 32 / 64)
+ * @alignment: alignment of the stride for linear surfaces
+ * @tiling: surface tiling
+ * @compression: surface compression type
+ *
+ * Function creates intel_buf with created BO handle. Takes ownership of the
+ * buffer.
+ */
 struct intel_buf *intel_buf_create(struct buf_ops *bops,
 				   int width, int height,
 				   int bpp, int alignment,
@@ -867,12 +885,55 @@ struct intel_buf *intel_buf_create(struct buf_ops *bops,
 	return buf;
 }
 
+/**
+ * intel_buf_create_using_handle
+ * @bops: pointer to buf_ops
+ * @handle: BO handle created by the caller
+ * @width: surface width
+ * @height: surface height
+ * @bpp: bits-per-pixel (8 / 16 / 32 / 64)
+ * @alignment: alignment of the stride for linear surfaces
+ * @tiling: surface tiling
+ * @compression: surface compression type
+ *
+ * Function creates intel_buf with passed BO handle from the caller. Doesn't
+ * take ownership of the buffer. close()/destroy() paths doesn't close
+ * passed handle unless buffer will take ownership using set_ownership().
+ */
+struct intel_buf *intel_buf_create_using_handle(struct buf_ops *bops,
+						uint32_t handle,
+						int width, int height,
+						int bpp, int alignment,
+						uint32_t req_tiling,
+						uint32_t compression)
+{
+	struct intel_buf *buf;
+
+	igt_assert(bops);
+
+	buf = calloc(1, sizeof(*buf));
+	igt_assert(buf);
+
+	intel_buf_init_using_handle(bops, handle, buf, width, height, bpp,
+				    alignment, req_tiling, compression);
+
+	return buf;
+}
+
+/**
+ * intel_buf_destroy
+ * @buf: intel_buf
+ *
+ * Function frees intel_buf memory. It closes bo handle if intel_buf has
+ * buffer ownership.
+ */
 void intel_buf_destroy(struct intel_buf *buf)
 {
 	igt_assert(buf);
 	igt_assert(buf->ptr == NULL);
 
 	intel_buf_close(buf->bops, buf);
+
 	free(buf);
 }
 

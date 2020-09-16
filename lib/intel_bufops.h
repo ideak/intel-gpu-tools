@@ -11,6 +11,7 @@ struct buf_ops;
 #define INTEL_BUF_NAME_MAXSIZE 32
 struct intel_buf {
 	struct buf_ops *bops;
+	bool is_owner;
 	uint32_t handle;
 	uint32_t tiling;
 	uint32_t bpp;
@@ -107,6 +108,11 @@ void linear_to_intel_buf(struct buf_ops *bops, struct intel_buf *buf,
 bool buf_ops_has_hw_fence(struct buf_ops *bops, uint32_t tiling);
 bool buf_ops_has_tiling_support(struct buf_ops *bops, uint32_t tiling);
 
+static inline void intel_buf_set_ownership(struct intel_buf *buf, bool is_owner)
+{
+	buf->is_owner = is_owner;
+}
+
 void intel_buf_init(struct buf_ops *bops, struct intel_buf *buf,
 		    int width, int height, int bpp, int alignment,
 		    uint32_t tiling, uint32_t compression);
@@ -122,6 +128,14 @@ struct intel_buf *intel_buf_create(struct buf_ops *bops,
 				   int width, int height,
 				   int bpp, int alignment,
 				   uint32_t req_tiling, uint32_t compression);
+
+struct intel_buf *intel_buf_create_using_handle(struct buf_ops *bops,
+						uint32_t handle,
+						int width, int height,
+						int bpp, int alignment,
+						uint32_t req_tiling,
+						uint32_t compression);
+
 void intel_buf_destroy(struct intel_buf *buf);
 
 void *intel_buf_cpu_map(struct intel_buf *buf, bool write);
