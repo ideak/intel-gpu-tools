@@ -60,108 +60,111 @@ IGT_TEST_DESCRIPTION("Test doing many tiled blits, with a working set larger"
 
 static int width = 512, height = 512;
 
-static drm_intel_bo *
-create_bo(drm_intel_bufmgr *bufmgr, struct intel_batchbuffer *batch, uint32_t x)
+static void
+copy_buf(struct intel_bb *ibb, struct intel_buf *src, struct intel_buf *dst)
 {
-	drm_intel_bo *bo, *linear_bo;
+	intel_bb_blt_copy(ibb,
+			  src, 0, 0, src->surface[0].stride,
+			  dst, 0, 0, dst->surface[0].stride,
+			  width, height, 32);
+}
+
+static struct intel_buf *
+create_bo(struct buf_ops *bops, struct intel_bb *ibb, uint32_t x)
+{
+	struct intel_buf *buf, *linear_buf;
 	uint32_t *linear;
-	uint32_t tiling = I915_TILING_X;
 	int i;
 
-	bo = drm_intel_bo_alloc(bufmgr, "tiled bo", 1024 * 1024, 4096);
-	do_or_die(drm_intel_bo_set_tiling(bo, &tiling, width * 4));
-	igt_assert(tiling == I915_TILING_X);
+	buf = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_X, I915_COMPRESSION_NONE);
 
-	linear_bo = drm_intel_bo_alloc(bufmgr, "linear src", 1024 * 1024, 4096);
+	linear_buf = intel_buf_create(bops, width, height, 32, 0,
+				      I915_TILING_NONE, I915_COMPRESSION_NONE);
 
 	/* Fill the BO with dwords starting at start_val */
-	do_or_die(drm_intel_bo_map(linear_bo, 1));
-	linear = linear_bo->virtual;
-	for (i = 0; i < 1024 * 1024 / 4; i++)
+	linear = intel_buf_cpu_map(linear_buf, 1);
+	for (i = 0; i < width * height; i++)
 		linear[i] = x++;
-	drm_intel_bo_unmap(linear_bo);
+	intel_buf_unmap(linear_buf);
 
-	intel_copy_bo (batch, bo, linear_bo, width*height*4);
+	copy_buf(ibb, linear_buf, buf);
 
-	drm_intel_bo_unreference(linear_bo);
+	intel_buf_destroy(linear_buf);
 
-	return bo;
+	return buf;
 }
 
 static void
-check_bo(drm_intel_bo *bo, uint32_t val, struct intel_batchbuffer *batch)
+check_bo(struct intel_buf *buf, uint32_t val, struct intel_bb *ibb)
 {
-	drm_intel_bo *linear_bo;
+	struct intel_buf *linear_buf;
 	uint32_t *linear;
 	int num_errors;
 	int i;
 
-	linear_bo = drm_intel_bo_alloc(bo->bufmgr, "linear dst",
-				       1024 * 1024, 4096);
+	linear_buf = intel_buf_create(buf->bops, width, height, 32, 0,
+				      I915_TILING_NONE, I915_COMPRESSION_NONE);
 
-	intel_copy_bo(batch, linear_bo, bo, width*height*4);
+	copy_buf(ibb, buf, linear_buf);
 
-	do_or_die(drm_intel_bo_map(linear_bo, 0));
-	linear = linear_bo->virtual;
-
+	linear = intel_buf_cpu_map(linear_buf, 0);
 	num_errors = 0;
-	for (i = 0; i < 1024 * 1024 / 4; i++) {
+	for (i = 0; i < width * height; i++) {
 		if (linear[i] != val && num_errors++ < 32)
 			igt_warn("[%08x] Expected 0x%08x, found 0x%08x (difference 0x%08x)\n",
 				 i * 4, val, linear[i], val ^ linear[i]);
 		val++;
 	}
 	igt_assert_eq(num_errors, 0);
-	drm_intel_bo_unmap(linear_bo);
+	intel_buf_unmap(linear_buf);
 
-	drm_intel_bo_unreference(linear_bo);
+	intel_buf_destroy(linear_buf);
 }
 
 static void run_test(int fd, int count)
 {
-	struct intel_batchbuffer *batch;
-	drm_intel_bufmgr *bufmgr;
-	drm_intel_bo **bo;
+	struct intel_bb *ibb;
+	struct buf_ops *bops;
+	struct intel_buf **bo;
 	uint32_t *bo_start_val;
 	uint32_t start = 0;
 	int i;
 
-	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-	drm_intel_bufmgr_gem_set_vma_cache_size(bufmgr, 32);
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-	batch = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(fd));
+	bops = buf_ops_create(fd);
+	ibb = intel_bb_create(fd, 4096);
 
-
-	bo = malloc(sizeof(drm_intel_bo *)*count);
+	bo = malloc(sizeof(struct intel_buf *)*count);
 	bo_start_val = malloc(sizeof(uint32_t)*count);
 
 	for (i = 0; i < count; i++) {
-		bo[i] = create_bo(bufmgr, batch, start);
+		bo[i] = create_bo(bops, ibb, start);
 		bo_start_val[i] = start;
 		start += 1024 * 1024 / 4;
 	}
 
-	for (i = 0; i < count * 4; i++) {
+	for (i = 0; i < count + 1; i++) {
 		int src = random() % count;
 		int dst = random() % count;
 
 		if (src == dst)
 			continue;
 
-		intel_copy_bo(batch, bo[dst], bo[src], width*height*4);
+		copy_buf(ibb, bo[src], bo[dst]);
+
 		bo_start_val[dst] = bo_start_val[src];
 	}
 
 	for (i = 0; i < count; i++) {
-		check_bo(bo[i], bo_start_val[i], batch);
-		drm_intel_bo_unreference(bo[i]);
+		check_bo(bo[i], bo_start_val[i], ibb);
+		intel_buf_destroy(bo[i]);
 	}
 
 	free(bo_start_val);
 	free(bo);
 
-	intel_batchbuffer_free(batch);
-	drm_intel_bufmgr_destroy(bufmgr);
+	intel_bb_destroy(ibb);
+	buf_ops_destroy(bops);
 }
 
 #define MAX_32b ((1ull << 32) - 4096)
