@@ -427,6 +427,48 @@ static igt_output_t *get_output_for_port(data_t *data,
 	return output;
 }
 
+static const char test_hotplug_for_each_pipe_desc[] =
+	"Check that we get uevents and updated connector status on "
+	"hotplug and unplug for each pipe with valid output";
+static void
+test_hotplug_for_each_pipe(data_t *data, struct chamelium_port *port)
+{
+	igt_output_t *output;
+	enum pipe pipe;
+	struct udev_monitor *mon = igt_watch_uevents();
+
+	reset_state(data, NULL);
+	igt_hpd_storm_set_threshold(data->drm_fd, 0);
+	/* Disconnect if any port got connected */
+	chamelium_unplug(data->chamelium, port);
+	wait_for_connector_after_hotplug(data, mon, port,
+			DRM_MODE_DISCONNECTED);
+
+	for_each_pipe(&data->display, pipe) {
+		igt_flush_uevents(mon);
+		/* Check if we get a sysfs hotplug event */
+		chamelium_plug(data->chamelium, port);
+		wait_for_connector_after_hotplug(data, mon, port,
+				DRM_MODE_CONNECTED);
+		igt_flush_uevents(mon);
+		output = get_output_for_port(data, port);
+
+		/* If pipe is valid for output then set it */
+		if (igt_pipe_connector_valid(pipe, output)) {
+			igt_output_set_pipe(output, pipe);
+			igt_display_commit2(&data->display, COMMIT_ATOMIC);
+		}
+
+		chamelium_unplug(data->chamelium, port);
+		wait_for_connector_after_hotplug(data, mon, port,
+				DRM_MODE_DISCONNECTED);
+		igt_flush_uevents(mon);
+	}
+
+	igt_cleanup_uevents(mon);
+	igt_hpd_storm_reset(data->drm_fd);
+}
+
 static const char test_basic_hotplug_desc[] =
 	"Check that we get uevents and updated connector status on "
 	"hotplug and unplug";
@@ -2777,6 +2819,10 @@ igt_main
 		connector_subtest("dp-audio-edid", DisplayPort)
 			test_display_audio_edid(&data, port,
 						TEST_EDID_DP_AUDIO);
+
+		igt_describe(test_hotplug_for_each_pipe_desc);
+		connector_subtest("dp-hpd-for-each-pipe", DisplayPort)
+			test_hotplug_for_each_pipe(&data, port);
 	}
 
 	igt_describe("HDMI tests");
@@ -2952,6 +2998,10 @@ igt_main
 		igt_describe(test_display_aspect_ratio_desc);
 		connector_subtest("hdmi-aspect-ratio", HDMIA)
 			test_display_aspect_ratio(&data, port);
+
+		igt_describe(test_hotplug_for_each_pipe_desc);
+		connector_subtest("hdmi-hpd-for-each-pipe", HDMIA)
+			test_hotplug_for_each_pipe(&data, port);
 	}
 
 	igt_describe("VGA tests");
@@ -3025,6 +3075,10 @@ igt_main
 						       SUSPEND_STATE_DISK,
 						       SUSPEND_TEST_DEVICES);
 	}
+
+	igt_describe(test_hotplug_for_each_pipe_desc);
+	connector_subtest("vga-hpd-for-each-pipe", VGA)
+		test_hotplug_for_each_pipe(&data, port);
 
 	igt_fixture {
 		igt_display_fini(&data.display);
