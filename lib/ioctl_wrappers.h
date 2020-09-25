@@ -196,6 +196,7 @@ struct local_drm_mode_fb_cmd2 {
 
 bool igt_has_fb_modifiers(int fd);
 void igt_require_fb_modifiers(int fd);
+bool igt_has_drm_cap(int fd, uint64_t capability);
 
 /**
  * __kms_addfb:

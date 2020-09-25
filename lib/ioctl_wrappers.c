@@ -1318,3 +1318,21 @@ int __kms_addfb(int fd, uint32_t handle,
 
 	return ret < 0 ? -errno : ret;
 }
+
+/**
+ * igt_has_drm_cap:
+ * @fd: Open DRM file descriptor.
+ * @capability: DRM capability
+ *
+ * This helper verifies if the passed capability is
+ * supported by the kernel
+ *
+ * Returns: Whether the capability is supported or not.
+ */
+bool igt_has_drm_cap(int fd, uint64_t capability)
+{
+	struct drm_get_cap cap = { .capability = capability };
+
+	igt_assert(drmIoctl(fd, DRM_IOCTL_GET_CAP, &cap) == 0);
+	return cap.value;
+}
