@@ -16,6 +16,7 @@ test_progs = [
 	'feature_discovery',
 	'kms_3d',
 	'kms_addfb_basic',
+	'kms_async_flips',
 	'kms_atomic',
 	'kms_atomic_interruptible',
 	'kms_atomic_transition',
