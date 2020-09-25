@@ -262,6 +262,18 @@ static void flink_and_close(void)
 	close(fd2);
 }
 
+static bool has_contexts(void)
+{
+	bool result;
+	int fd;
+
+	fd = drm_open_driver(DRIVER_INTEL);
+	result = gem_has_contexts(fd);
+	close(fd);
+
+	return result;
+}
+
 #define N_CHILD 8
 igt_main
 {
@@ -289,6 +301,8 @@ igt_main
 
 	igt_subtest("blt-vs-render-ctxN") {
 		struct intel_buf *bcs[1], *rcs[N_CHILD];
+
+		igt_require(has_contexts());
 
 		fork_rcs_copy(30, 0x8000 / N_CHILD, rcs, N_CHILD, CREATE_CONTEXT);
 		fork_bcs_copy(30, 0x4000, bcs, 1);
