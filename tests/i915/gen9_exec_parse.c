@@ -566,6 +566,81 @@ static void test_bb_start(const int i915, const uint32_t handle, int test)
 	gem_close(i915, target_bo);
 }
 
+static void test_bb_large(int i915)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	static const uint32_t sizes[] = {
+		(1ull << 30) - 4096,
+		(1ull << 30) + 4096,
+		(2ull << 30) - 4096,
+		(2ull << 30) + 4096,
+		(3ull << 30) - 4096,
+		(3ull << 30) + 4096,
+		(4ull << 30) - 4096 /* upper bound of execbuf2 uAPI */
+	};
+	struct drm_i915_gem_exec_object2 obj = {};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = I915_EXEC_BLT,
+	};
+	uint64_t required, total;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(sizes); i++) {
+		if (!__intel_check_memory(2, sizes[i], CHECK_RAM,
+					  &required, &total))
+			break;
+
+		igt_debug("Using object size %#x\n", sizes[i]);
+		obj.handle = gem_create(i915, sizes[i]),
+		gem_write(i915, obj.handle, sizes[i] - 64, &bbe, sizeof(bbe));
+
+		execbuf.batch_start_offset = 0;
+		igt_assert_eq(__checked_execbuf(i915, &execbuf), 0);
+
+		execbuf.batch_start_offset = sizes[i] - 64;
+		igt_assert_eq(__checked_execbuf(i915, &execbuf), 0);
+
+		gem_close(i915, obj.handle);
+	}
+
+	igt_require_f(i > 0 && sizes[i - 1] > 1ull << 31,
+		      "Insufficient free memory, require at least %'"PRIu64"MiB but only have %'"PRIu64"MiB available\n",
+		      required >> 20, total >> 20);
+}
+
+static void test_bb_oversize(int i915)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(i915, 8ull << 30),
+		.flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.batch_start_offset = (4ull << 30) - 4096,
+		.flags = I915_EXEC_BLT,
+	};
+
+	intel_require_memory(2, 8ull << 30, CHECK_RAM);
+	gem_write(i915, obj.handle, (4ull << 30) - sizeof(bbe),
+		  &bbe, sizeof(bbe));
+
+	for (int i = 13; i <= 32; i++) {
+		igt_debug("Checking length %#llx\n", 1ull << i);
+
+		execbuf.batch_len = (1ull << i) - 4096;
+		igt_assert_eq(__checked_execbuf(i915, &execbuf), 0);
+
+		execbuf.batch_len = (1ull << i) + 4096; /* will wrap */
+		igt_assert_eq(__checked_execbuf(i915, &execbuf), 0);
+	}
+
+	gem_close(i915, obj.handle);
+}
+
 static void test_bb_chained(const int i915, const uint32_t handle)
 {
 	const uint32_t batch[] = {
@@ -1052,6 +1127,11 @@ igt_main
 
 	igt_subtest("bb-start-far")
 		test_bb_start(i915, handle, BB_START_FAR);
+
+	igt_subtest("bb-large")
+		test_bb_large(i915);
+	igt_subtest("bb-oversize")
+		test_bb_oversize(i915);
 
 	igt_fixture {
 		igt_stop_hang_detector();
