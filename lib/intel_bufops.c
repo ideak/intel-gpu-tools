@@ -712,6 +712,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 	uint32_t size;
 	uint32_t devid;
 	int tile_width;
+	int align_h = 1;
 
 	igt_assert(bops);
 	igt_assert(buf);
@@ -761,6 +762,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 			devid =  intel_get_drm_devid(bops->fd);
 			tile_width = get_stride(devid, tiling);
 			buf->surface[0].stride = ALIGN(width * (bpp / 8), tile_width);
+			align_h = tiling == I915_TILING_X ? 8 : 32;
 		} else {
 			buf->surface[0].stride = ALIGN(width * (bpp / 8), alignment ?: 1);
 		}
@@ -769,7 +771,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 		buf->tiling = tiling;
 		buf->bpp = bpp;
 
-		size = buf->surface[0].stride * ALIGN(height, 32);
+		size = buf->surface[0].stride * ALIGN(height, align_h);
 	}
 
 	if (handle)
