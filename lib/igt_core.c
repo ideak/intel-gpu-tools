@@ -2271,6 +2271,8 @@ static void children_exit_handler(int sig)
 		;
 }
 
+static pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 bool __igt_fork(void)
 {
 	internal_assert(!test_with_subtests || in_subtest,
@@ -2300,6 +2302,7 @@ bool __igt_fork(void)
 		igt_assert(0);
 	case 0:
 		test_child = true;
+		pthread_mutex_init(&print_mutex, NULL);
 		exit_handler_count = 0;
 		reset_helper_process_list();
 		oom_adjust_for_doom();
@@ -2736,8 +2739,6 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 		"CRITICAL",
 		"NONE"
 	};
-
-	static pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 	assert(format);
 
