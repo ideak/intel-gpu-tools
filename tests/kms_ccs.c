@@ -40,6 +40,7 @@ enum test_flags {
 	TEST_NO_AUX_BUFFER		= 1 << 5,
 	TEST_BAD_CCS_HANDLE		= 1 << 6,
 	TEST_BAD_AUX_STRIDE		= 1 << 7,
+	TEST_RANDOM			= 1 << 8,
 };
 
 #define TEST_FAIL_ON_ADDFB2 \
@@ -52,6 +53,7 @@ enum test_fb_flags {
 	FB_MISALIGN_AUX_STRIDE		= 1 << 2,
 	FB_SMALL_AUX_STRIDE		= 1 << 3,
 	FB_ZERO_AUX_STRIDE		= 1 << 4,
+	FB_RANDOM			= 1 << 5,
 };
 
 typedef struct {
@@ -64,6 +66,8 @@ typedef struct {
 	igt_pipe_crc_t *pipe_crc;
 	uint32_t format;
 	uint64_t ccs_modifier;
+	unsigned int seed;
+	bool user_seed;
 } data_t;
 
 static const struct {
@@ -204,6 +208,22 @@ static void check_all_ccs_planes(int drm_fd, igt_fb_t *fb, const float *cc_color
 	}
 }
 
+static void fill_fb_random(int drm_fd, igt_fb_t *fb)
+{
+	void *map;
+	uint8_t *p;
+	int i;
+
+	gem_set_domain(drm_fd, fb->gem_handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+
+	p = map = gem_mmap__cpu(drm_fd, fb->gem_handle, 0, fb->size, PROT_WRITE);
+
+	for (i = 0; i < fb->size; i++)
+		p[i] = rand();
+
+	munmap(map, fb->size);
+}
+
 static int get_ccs_plane_index(uint32_t format)
 {
 	int index = 1;
@@ -303,7 +323,10 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		}
 	}
 
-	if (!(data->flags & TEST_BAD_PIXEL_FORMAT)) {
+	if (data->flags & TEST_RANDOM) {
+		srand(data->seed);
+		fill_fb_random(data->drm_fd, fb);
+	} else if (!(data->flags & TEST_BAD_PIXEL_FORMAT)) {
 		int c = !!data->plane;
 
 		if (is_ccs_cc_modifier(modifier)) {
@@ -464,6 +487,9 @@ static int test_ccs(data_t *data)
 		data->pipe_crc = NULL;
 	}
 
+	if (data->flags & TEST_RANDOM)
+		valid_tests += try_config(data, fb_flags | FB_COMPRESSED | FB_RANDOM, NULL);
+
 	if (data->flags & TEST_BAD_PIXEL_FORMAT ||
 	    data->flags & TEST_BAD_ROTATION_90 ||
 	    data->flags & TEST_NO_AUX_BUFFER ||
@@ -513,13 +539,17 @@ static void test_output(data_t *data)
 	igt_require_f(valid_tests > 0, "CCS not supported, skipping\n");
 }
 
-static data_t data;
-
 static int opt_handler(int opt, int opt_index, void *opt_data)
 {
+	data_t *data = opt_data;
+
 	switch (opt) {
 	case 'c':
 		check_ccs_planes = true;
+		break;
+	case 's':
+		data->user_seed = true;
+		data->seed = strtoul(optarg, NULL, 0);
 		break;
 	default:
 		return IGT_OPT_HANDLER_ERROR;
@@ -528,11 +558,14 @@ static int opt_handler(int opt, int opt_index, void *opt_data)
 	return IGT_OPT_HANDLER_SUCCESS;
 }
 
+static data_t data;
+
 static const char *help_str =
-"  -c\tCheck the presence of compression meta-data\n"
+"  -c\t\tCheck the presence of compression meta-data\n"
+"  -s <seed>\tSeed for random number generator\n"
 ;
 
-igt_main_args("c", NULL, help_str, opt_handler, NULL)
+igt_main_args("cs:", NULL, help_str, opt_handler, &data)
 {
 	enum pipe pipe;
 
@@ -544,6 +577,9 @@ igt_main_args("c", NULL, help_str, opt_handler, NULL)
 		igt_require_pipe_crc(data.drm_fd);
 
 		igt_display_require(&data.display, data.drm_fd);
+
+		if (!data.user_seed)
+			data.seed = time(NULL);
 	}
 
 	for_each_pipe_static(pipe) {
@@ -587,6 +623,13 @@ igt_main_args("c", NULL, help_str, opt_handler, NULL)
 		}
 
 		data.plane = NULL;
+
+		data.flags = TEST_RANDOM;
+		igt_describe("Test random CCS data");
+		igt_subtest_f("pipe-%s-random-ccs-data", pipe_name) {
+			igt_info("Testing with seed %d\n", data.seed);
+			test_output(&data);
+		}
 
 		data.flags = TEST_NO_AUX_BUFFER;
 		igt_describe("Test missing CCS buffer with given CCS modifier");
