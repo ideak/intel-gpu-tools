@@ -2427,11 +2427,22 @@ void chamelium_deinit_rpc_only(struct chamelium *chamelium)
 struct chamelium *chamelium_init_rpc_only(void)
 {
 	struct chamelium *chamelium = malloc(sizeof(struct chamelium));
+	struct xmlrpc_clientparms clientparms;
+	struct xmlrpc_curl_xportparms curlparms;
 
 	if (!chamelium)
 		return NULL;
 
 	memset(chamelium, 0, sizeof(*chamelium));
+	memset(&clientparms, 0, sizeof(clientparms));
+	memset(&curlparms, 0, sizeof(curlparms));
+
+	/* curl's timeout is in milliseconds */
+	curlparms.timeout = _RECEIVER_RESPONSIVE_AFTER_RESET_SECONDS * 1000;
+
+	clientparms.transport = "curl";
+	clientparms.transportparmsP = &curlparms;
+	clientparms.transportparm_size = XMLRPC_CXPSIZE(timeout);
 
 	chamelium->drm_fd = -1;
 
@@ -2439,7 +2450,7 @@ struct chamelium *chamelium_init_rpc_only(void)
 	xmlrpc_env_init(&chamelium->env);
 	xmlrpc_client_setup_global_const(&chamelium->env);
 	xmlrpc_client_create(&chamelium->env, XMLRPC_CLIENT_NO_FLAGS, PACKAGE,
-			     PACKAGE_VERSION, NULL, 0, &chamelium->client);
+			     PACKAGE_VERSION, &clientparms, 0, &chamelium->client);
 	if (chamelium->env.fault_occurred) {
 		igt_debug("Failed to init xmlrpc: %s\n",
 			  chamelium->env.fault_string);
