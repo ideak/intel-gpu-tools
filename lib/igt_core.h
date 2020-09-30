@@ -1022,6 +1022,18 @@ void igt_describe_f(const char *fmt, ...);
 } while (0)
 
 /**
+ * igt_require_fd:
+ * @fd: file descriptor
+ *
+ * Skips (sub-) test if the given file descriptor is invalid.
+ *
+ * Like igt_require(), but displays the stringified identifier that was supposed
+ * to contain a valid fd on failure.
+ */
+#define igt_require_fd(fd) \
+	igt_require_f(fd >= 0, "file descriptor " #fd " failed\n");
+
+/**
  * igt_skip_on_f:
  * @expr: condition to test
  * @...: format string and optional arguments
