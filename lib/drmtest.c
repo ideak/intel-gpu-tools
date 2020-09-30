@@ -114,6 +114,11 @@ bool is_i915_device(int fd)
 	return __is_device(fd, "i915");
 }
 
+bool is_nouveau_device(int fd)
+{
+	return __is_device(fd, "nouveau");
+}
+
 bool is_vc4_device(int fd)
 {
 	return __is_device(fd, "vc4");
@@ -620,6 +625,11 @@ void igt_require_amdgpu(int fd)
 void igt_require_intel(int fd)
 {
 	igt_require(is_i915_device(fd));
+}
+
+void igt_require_nouveau(int fd)
+{
+	igt_require(is_nouveau_device(fd));
 }
 
 void igt_require_vc4(int fd)
