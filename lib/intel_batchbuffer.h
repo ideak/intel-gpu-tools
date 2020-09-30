@@ -341,7 +341,6 @@ struct intel_bb;
 struct intel_buf;
 
 typedef void (*igt_render_copyfunc_t)(struct intel_bb *ibb,
-				      uint32_t ctx,
 				      struct intel_buf *src,
 				      uint32_t src_x, uint32_t src_y,
 				      uint32_t width, uint32_t height,
@@ -478,7 +477,11 @@ struct intel_bb {
 };
 
 struct intel_bb *intel_bb_create(int i915, uint32_t size);
+struct intel_bb *
+intel_bb_create_with_context(int i915, uint32_t ctx, uint32_t size);
 struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size);
+struct intel_bb *
+intel_bb_create_with_relocs_and_context(int i915, uint32_t ctx, uint32_t size);
 void intel_bb_destroy(struct intel_bb *ibb);
 
 static inline void intel_bb_ref(struct intel_bb *ibb)
@@ -562,9 +565,8 @@ static inline void intel_bb_out(struct intel_bb *ibb, uint32_t dword)
 	igt_assert(intel_bb_offset(ibb) <= ibb->size);
 }
 
-
 struct drm_i915_gem_exec_object2 *
-intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
+intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint32_t size,
 		    uint64_t offset, bool write);
 struct drm_i915_gem_exec_object2 *
 intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf, bool write);
@@ -615,25 +617,17 @@ uint64_t intel_bb_offset_reloc_to_object(struct intel_bb *ibb,
 					 uint32_t offset,
 					 uint64_t presumed_offset);
 
-int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
-		    uint32_t ctx, uint64_t flags, bool sync);
-
 void intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 		   uint64_t flags, bool sync);
-
-void intel_bb_exec_with_context(struct intel_bb *ibb, uint32_t end_offset,
-				uint32_t ctx, uint64_t flags, bool sync);
 
 uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle);
 bool intel_bb_object_offset_to_buf(struct intel_bb *ibb, struct intel_buf *buf);
 
 uint32_t intel_bb_emit_bbe(struct intel_bb *ibb);
 uint32_t intel_bb_emit_flush_common(struct intel_bb *ibb);
-void intel_bb_flush(struct intel_bb *ibb, uint32_t ctx, uint32_t ring);
+void intel_bb_flush(struct intel_bb *ibb, uint32_t ring);
 void intel_bb_flush_render(struct intel_bb *ibb);
-void intel_bb_flush_render_with_context(struct intel_bb *ibb, uint32_t ctx);
 void intel_bb_flush_blit(struct intel_bb *ibb);
-void intel_bb_flush_blit_with_context(struct intel_bb *ibb, uint32_t ctx);
 
 uint32_t intel_bb_copy_data(struct intel_bb *ibb,
 			    const void *data, unsigned int bytes,

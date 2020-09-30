@@ -24,47 +24,38 @@ static inline void emit_vertex_normalized(struct intel_bb *ibb,
 }
 
 void gen12_render_copyfunc(struct intel_bb *ibb,
-			   uint32_t ctx,
 			   struct intel_buf *src, uint32_t src_x, uint32_t src_y,
 			   uint32_t width, uint32_t height,
 			   struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
 void gen11_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
 			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
 void gen9_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
 			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
 void gen8_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
 			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
 void gen7_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
 			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
 void gen6_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
 			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
 void gen4_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
 			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
 void gen3_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
 			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);
 void gen2_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src, uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
 			  struct intel_buf *dst, uint32_t dst_x, uint32_t dst_y);

@@ -1538,7 +1538,6 @@ static void load_helper_run(enum load load)
 
 		while (!lh.exit) {
 			render_copy(lh.ibb,
-				    lh.context_id,
 				    &lh.src, 0, 0, 1920, 1080,
 				    &lh.dst, 0, 0);
 
@@ -1572,7 +1571,7 @@ static void load_helper_init(void)
 	lh.context_id = gem_context_create(drm_fd);
 	igt_assert_neq(lh.context_id, 0xffffffff);
 
-	lh.ibb = intel_bb_create(drm_fd, BATCH_SZ);
+	lh.ibb = intel_bb_create_with_context(drm_fd, lh.context_id, BATCH_SZ);
 
 	scratch_buf_init(lh.bops, &lh.dst, 1920, 1080, 0);
 	scratch_buf_init(lh.bops, &lh.src, 1920, 1080, 0);
@@ -2915,7 +2914,7 @@ gen12_test_mi_rpc(void)
 	igt_assert_neq(ctx_id, INVALID_CTX_ID);
 	properties[1] = ctx_id;
 
-	ibb = intel_bb_create(drm_fd, BATCH_SZ);
+	ibb = intel_bb_create_with_context(drm_fd, ctx_id, BATCH_SZ);
 	buf = intel_buf_create(bops, 4096, 1, 8, 64,
 			       I915_TILING_NONE, I915_COMPRESSION_NONE);
 
@@ -2931,7 +2930,7 @@ gen12_test_mi_rpc(void)
 			       buf,
 			       REPORT_OFFSET,
 			       REPORT_ID);
-	intel_bb_flush_render_with_context(ibb, ctx_id);
+	intel_bb_flush_render(ibb);
 	intel_bb_sync(ibb);
 
 	intel_buf_cpu_map(buf, false);
@@ -2994,7 +2993,7 @@ test_mi_rpc(void)
 
 	ctx_id = gem_context_create(drm_fd);
 
-	ibb = intel_bb_create(drm_fd, BATCH_SZ);
+	ibb = intel_bb_create_with_context(drm_fd, ctx_id, BATCH_SZ);
 	buf = intel_buf_create(bops, 4096, 1, 8, 64,
 			       I915_TILING_NONE, I915_COMPRESSION_NONE);
 
@@ -3007,7 +3006,7 @@ test_mi_rpc(void)
 			       0, /* dst offset in bytes */
 			       0xdeadbeef); /* report ID */
 
-	intel_bb_flush_render_with_context(ibb, ctx_id);
+	intel_bb_flush_render(ibb);
 	intel_bb_sync(ibb);
 
 	intel_buf_cpu_map(buf, false);
@@ -3119,10 +3118,10 @@ hsw_test_single_ctx_counters(void)
 		 * We currently cache addresses for buffers within
 		 * intel_bb, so use separate batches for different contexts
 		 */
-		ibb0 = intel_bb_create(drm_fd, BATCH_SZ);
-		ibb1 = intel_bb_create(drm_fd, BATCH_SZ);
 		context0_id = gem_context_create(drm_fd);
 		context1_id = gem_context_create(drm_fd);
+		ibb0 = intel_bb_create_with_context(drm_fd, context0_id, BATCH_SZ);
+		ibb1 = intel_bb_create_with_context(drm_fd, context1_id,  BATCH_SZ);
 
 		igt_debug("submitting warm up render_copy\n");
 
@@ -3147,13 +3146,12 @@ hsw_test_single_ctx_counters(void)
 		 * hook callback.
 		 */
 		render_copy(ibb0,
-			    context0_id,
 			    &src[0], 0, 0, width, height,
 			    &dst[0], 0, 0);
 
 		properties[1] = context0_id;
 
-		intel_bb_flush_render_with_context(ibb0, context0_id);
+		intel_bb_flush_render(ibb0);
 		intel_bb_sync(ibb0);
 
 		scratch_buf_memset(&src[0], width, height, 0xff0000ff);
@@ -3181,32 +3179,29 @@ hsw_test_single_ctx_counters(void)
 		 * that the PIPE_CONTROL + MI_RPC commands will be in a
 		 * separate batch from the copy.
 		 */
-		intel_bb_flush_render_with_context(ibb0, context0_id);
+		intel_bb_flush_render(ibb0);
 
 		render_copy(ibb0,
-			    context0_id,
 			    &src[0], 0, 0, width, height,
 			    &dst[0], 0, 0);
 
 		/* Another redundant flush to clarify batch bo is free to reuse */
-		intel_bb_flush_render_with_context(ibb0, context0_id);
+		intel_bb_flush_render(ibb0);
 
 		/* submit two copies on the other context to avoid a false
 		 * positive in case the driver somehow ended up filtering for
 		 * context1
 		 */
 		render_copy(ibb1,
-			    context1_id,
 			    &src[1], 0, 0, width, height,
 			    &dst[1], 0, 0);
 
 		render_copy(ibb1,
-			    context1_id,
 			    &src[2], 0, 0, width, height,
 			    &dst[2], 0, 0);
 
 		/* And another */
-		intel_bb_flush_render_with_context(ibb1, context1_id);
+		intel_bb_flush_render(ibb1);
 
 		emit_stall_timestamp_and_rpc(ibb0,
 					     dst_buf,
@@ -3214,7 +3209,7 @@ hsw_test_single_ctx_counters(void)
 					     256, /* report dst offset */
 					     0xbeefbeef); /* report id */
 
-		intel_bb_flush_render_with_context(ibb0, context0_id);
+		intel_bb_flush_render(ibb0);
 		intel_bb_sync(ibb0);
 
 		intel_buf_cpu_map(dst_buf, false /* write enable */);
@@ -3367,10 +3362,10 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 				scratch_buf_init(bops, &dst[i], width, height, 0x00ff00ff);
 			}
 
-			ibb0 = intel_bb_create(drm_fd, BATCH_SZ);
-			ibb1 = intel_bb_create(drm_fd, BATCH_SZ);
 			context0_id = gem_context_create(drm_fd);
 			context1_id = gem_context_create(drm_fd);
+			ibb0 = intel_bb_create_with_context(drm_fd, context0_id, BATCH_SZ);
+			ibb1 = intel_bb_create_with_context(drm_fd, context1_id, BATCH_SZ);
 
 			igt_debug("submitting warm up render_copy\n");
 
@@ -3395,7 +3390,6 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			 * hook callback.
 			 */
 			render_copy(ibb0,
-				    context0_id,
 				    &src[0], 0, 0, width, height,
 				    &dst[0], 0, 0);
 			intel_bb_sync(ibb0);
@@ -3427,32 +3421,29 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			 * that the PIPE_CONTROL + MI_RPC commands will be in a
 			 * separate batch from the copy.
 			 */
-			intel_bb_flush_render_with_context(ibb0, context0_id);
+			intel_bb_flush_render(ibb0);
 
 			render_copy(ibb0,
-				    context0_id,
 				    &src[0], 0, 0, width, height,
 				    &dst[0], 0, 0);
 
 			/* Another redundant flush to clarify batch bo is free to reuse */
-			intel_bb_flush_render_with_context(ibb0, context0_id);
+			intel_bb_flush_render(ibb0);
 
 			/* submit two copies on the other context to avoid a false
 			 * positive in case the driver somehow ended up filtering for
 			 * context1
 			 */
 			render_copy(ibb1,
-				    context1_id,
 				    &src[1], 0, 0, width, height,
 				    &dst[1], 0, 0);
 
 			render_copy(ibb1,
-				    context1_id,
 				    &src[2], 0, 0, width, height,
 				    &dst[2], 0, 0);
 
 			/* And another */
-			intel_bb_flush_render_with_context(ibb1, context1_id);
+			intel_bb_flush_render(ibb1);
 
 			emit_stall_timestamp_and_rpc(ibb1,
 						     dst_buf,
@@ -3460,7 +3451,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 						     256, /* report dst offset */
 						     0xbeefbeef); /* report id */
 
-			intel_bb_flush_render_with_context(ibb1, context1_id);
+			intel_bb_flush_render(ibb1);
 			intel_bb_sync(ibb1);
 			intel_bb_sync(ibb0);
 
@@ -3774,10 +3765,10 @@ static void gen12_single_ctx_helper(void)
 		scratch_buf_init(bops, &dst[i], width, height, 0x00ff00ff);
 	}
 
-	ibb0 = intel_bb_create(drm_fd, BATCH_SZ);
-	ibb1 = intel_bb_create(drm_fd, BATCH_SZ);
 	context0_id = gem_context_create(drm_fd);
 	context1_id = gem_context_create(drm_fd);
+	ibb0 = intel_bb_create_with_context(drm_fd, context0_id, BATCH_SZ);
+	ibb1 = intel_bb_create_with_context(drm_fd, context1_id, BATCH_SZ);
 
 	igt_debug("submitting warm up render_copy\n");
 
@@ -3801,7 +3792,7 @@ static void gen12_single_ctx_helper(void)
 	 * up pinning the context since there won't ever be a pinning
 	 * hook callback.
 	 */
-	render_copy(ibb0, context0_id,
+	render_copy(ibb0,
 		    &src[0], 0, 0, width, height,
 		    &dst[0], 0, 0);
 
@@ -3830,13 +3821,13 @@ static void gen12_single_ctx_helper(void)
 				     BO_TIMESTAMP_OFFSET0,
 				     BO_REPORT_OFFSET0,
 				     BO_REPORT_ID0);
-	intel_bb_flush_render_with_context(ibb0, context0_id);
+	intel_bb_flush_render(ibb0);
 
 	/* This is the work/context that is measured for counter increments */
-	render_copy(ibb0, context0_id,
+	render_copy(ibb0,
 		    &src[0], 0, 0, width, height,
 		    &dst[0], 0, 0);
-	intel_bb_flush_render_with_context(ibb0, context0_id);
+	intel_bb_flush_render(ibb0);
 
 	/* Submit an mi-rpc to context1 before work
 	 *
@@ -3852,20 +3843,20 @@ static void gen12_single_ctx_helper(void)
 				     BO_TIMESTAMP_OFFSET2,
 				     BO_REPORT_OFFSET2,
 				     BO_REPORT_ID2);
-	intel_bb_flush_render_with_context(ibb1, context1_id);
+	intel_bb_flush_render(ibb1);
 
 	/* Submit two copies on the other context to avoid a false
 	 * positive in case the driver somehow ended up filtering for
 	 * context1
 	 */
-	render_copy(ibb1, context1_id,
+	render_copy(ibb1,
 		    &src[1], 0, 0, width, height,
 		    &dst[1], 0, 0);
 
-	render_copy(ibb1, context1_id,
+	render_copy(ibb1,
 		    &src[2], 0, 0, width, height,
 		    &dst[2], 0, 0);
-	intel_bb_flush_render_with_context(ibb1, context1_id);
+	intel_bb_flush_render(ibb1);
 
 	/* Submit an mi-rpc to context1 after all work */
 #define BO_TIMESTAMP_OFFSET3 1048
@@ -3876,7 +3867,7 @@ static void gen12_single_ctx_helper(void)
 				     BO_TIMESTAMP_OFFSET3,
 				     BO_REPORT_OFFSET3,
 				     BO_REPORT_ID3);
-	intel_bb_flush_render_with_context(ibb1, context1_id);
+	intel_bb_flush_render(ibb1);
 
 	/* Submit an mi-rpc to context0 after all measurable work */
 #define BO_TIMESTAMP_OFFSET1 1032
@@ -3887,7 +3878,7 @@ static void gen12_single_ctx_helper(void)
 				     BO_TIMESTAMP_OFFSET1,
 				     BO_REPORT_OFFSET1,
 				     BO_REPORT_ID1);
-	intel_bb_flush_render_with_context(ibb0, context0_id);
+	intel_bb_flush_render(ibb0);
 	intel_bb_sync(ibb0);
 	intel_bb_sync(ibb1);
 

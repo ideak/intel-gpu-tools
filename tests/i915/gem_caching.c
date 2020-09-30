@@ -79,6 +79,9 @@ copy_bo(struct intel_bb *ibb, struct intel_buf *src, struct intel_buf *dst)
 
 	has_64b_reloc = ibb->gen >= 8;
 
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_add_intel_buf(ibb, dst, true);
+
 	intel_bb_out(ibb,
 		     XY_SRC_COPY_BLT_CMD |
 		     XY_SRC_COPY_BLT_WRITE_ALPHA |

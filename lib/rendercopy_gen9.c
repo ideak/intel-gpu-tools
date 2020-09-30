@@ -877,7 +877,6 @@ static void gen8_emit_primitive(struct intel_bb *ibb, uint32_t offset)
 
 static
 void _gen9_render_copyfunc(struct intel_bb *ibb,
-			   uint32_t ctx,
 			   struct intel_buf *src,
 			   unsigned int src_x, unsigned int src_y,
 			   unsigned int width, unsigned int height,
@@ -894,7 +893,7 @@ void _gen9_render_copyfunc(struct intel_bb *ibb,
 
 	igt_assert(src->bpp == dst->bpp);
 
-	intel_bb_flush_render_with_context(ibb, ctx);
+	intel_bb_flush_render(ibb);
 
 	intel_bb_add_intel_buf(ibb, dst, true);
 	intel_bb_add_intel_buf(ibb, src, false);
@@ -978,15 +977,13 @@ void _gen9_render_copyfunc(struct intel_bb *ibb,
 	gen8_emit_primitive(ibb, vertex_buffer);
 
 	intel_bb_emit_bbe(ibb);
-	intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), ctx,
-				   I915_EXEC_RENDER | I915_EXEC_NO_RELOC,
-				   false);
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_RENDER | I915_EXEC_NO_RELOC, false);
 	dump_batch(ibb);
 	intel_bb_reset(ibb, false);
 }
 
 void gen9_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src,
 			  unsigned int src_x, unsigned int src_y,
 			  unsigned int width, unsigned int height,
@@ -994,26 +991,24 @@ void gen9_render_copyfunc(struct intel_bb *ibb,
 			  unsigned int dst_x, unsigned int dst_y)
 
 {
-	_gen9_render_copyfunc(ibb, ctx, src, src_x, src_y,
+	_gen9_render_copyfunc(ibb, src, src_x, src_y,
 			  width, height, dst, dst_x, dst_y, NULL,
 			  ps_kernel_gen9, sizeof(ps_kernel_gen9));
 }
 
 void gen11_render_copyfunc(struct intel_bb *ibb,
-			   uint32_t ctx,
 			   struct intel_buf *src,
 			   unsigned int src_x, unsigned int src_y,
 			   unsigned int width, unsigned int height,
 			   struct intel_buf *dst,
 			   unsigned int dst_x, unsigned int dst_y)
 {
-	_gen9_render_copyfunc(ibb, ctx, src, src_x, src_y,
+	_gen9_render_copyfunc(ibb, src, src_x, src_y,
 			  width, height, dst, dst_x, dst_y, NULL,
 			  ps_kernel_gen11, sizeof(ps_kernel_gen11));
 }
 
 void gen12_render_copyfunc(struct intel_bb *ibb,
-			   uint32_t ctx,
 			   struct intel_buf *src,
 			   unsigned int src_x, unsigned int src_y,
 			   unsigned int width, unsigned int height,
@@ -1024,7 +1019,7 @@ void gen12_render_copyfunc(struct intel_bb *ibb,
 
 	gen12_aux_pgtable_init(&pgtable_info, ibb, src, dst);
 
-	_gen9_render_copyfunc(ibb, ctx, src, src_x, src_y,
+	_gen9_render_copyfunc(ibb, src, src_x, src_y,
 			  width, height, dst, dst_x, dst_y,
 			  pgtable_info.pgtable_buf,
 			  gen12_render_copy,

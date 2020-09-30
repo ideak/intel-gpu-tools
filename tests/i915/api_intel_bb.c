@@ -158,10 +158,15 @@ static void simple_bb(struct buf_ops *bops, bool use_context)
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 8);
 
-	if (use_context)
-		intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), ctx,
-					   I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC,
-					   true);
+	if (use_context) {
+		intel_bb_destroy(ibb);
+		ibb = intel_bb_create_with_context(i915, ctx, PAGE_SIZE);
+		intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+		intel_bb_ptr_align(ibb, 8);
+		intel_bb_exec(ibb, intel_bb_offset(ibb),
+			      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC,
+			      true);
+	}
 
 	intel_bb_destroy(ibb);
 	if (use_context)
@@ -429,6 +434,10 @@ static void blit(struct buf_ops *bops,
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);
 
+
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_add_intel_buf(ibb, dst, true);
+
 	__emit_blit(ibb, src, dst);
 
 	/* We expect initial addresses are zeroed for relocs */
@@ -458,6 +467,11 @@ static void blit(struct buf_ops *bops,
 	fill_buf(src, COLOR_77);
 	fill_buf(dst, COLOR_00);
 
+	if (purge_cache && !do_relocs) {
+		intel_bb_add_intel_buf(ibb, src, false);
+		intel_bb_add_intel_buf(ibb, dst, true);
+	}
+
 	__emit_blit(ibb, src, dst);
 
 	poff2_bb = intel_bb_get_object_offset(ibb, ibb->handle);
@@ -478,8 +492,8 @@ static void blit(struct buf_ops *bops,
 			igt_assert(poff2_dst == 0);
 		} else {
 			igt_assert(poff_bb != poff2_bb);
-			igt_assert(poff_src != poff2_src);
-			igt_assert(poff_dst != poff2_dst);
+			igt_assert(poff_src == poff2_src);
+			igt_assert(poff_dst == poff2_dst);
 		}
 	} else {
 		igt_assert(poff_bb == poff2_bb);
@@ -781,9 +795,12 @@ static void offset_control(struct buf_ops *bops)
 	dst1 = create_buf(bops, WIDTH, HEIGHT, COLOR_00);
 	dst2 = create_buf(bops, WIDTH, HEIGHT, COLOR_77);
 
-	intel_bb_add_object(ibb, src->handle, src->addr.offset, false);
-	intel_bb_add_object(ibb, dst1->handle, dst1->addr.offset, true);
-	intel_bb_add_object(ibb, dst2->handle, dst2->addr.offset, true);
+	intel_bb_add_object(ibb, src->handle, intel_buf_bo_size(src),
+			    src->addr.offset, false);
+	intel_bb_add_object(ibb, dst1->handle, intel_buf_bo_size(dst1),
+			    dst1->addr.offset, true);
+	intel_bb_add_object(ibb, dst2->handle, intel_buf_bo_size(dst2),
+			    dst2->addr.offset, true);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 8);
@@ -806,10 +823,14 @@ static void offset_control(struct buf_ops *bops)
 	intel_bb_reset(ibb, true);
 
 	dst3 = create_buf(bops, WIDTH, HEIGHT, COLOR_33);
-	intel_bb_add_object(ibb, dst3->handle, dst3->addr.offset, true);
-	intel_bb_add_object(ibb, src->handle, src->addr.offset, false);
-	intel_bb_add_object(ibb, dst1->handle, dst1->addr.offset, true);
-	intel_bb_add_object(ibb, dst2->handle, dst2->addr.offset, true);
+	intel_bb_add_object(ibb, dst3->handle, intel_buf_bo_size(dst3),
+			    dst3->addr.offset, true);
+	intel_bb_add_object(ibb, src->handle, intel_buf_bo_size(src),
+			    src->addr.offset, false);
+	intel_bb_add_object(ibb, dst1->handle, intel_buf_bo_size(dst1),
+			    dst1->addr.offset, true);
+	intel_bb_add_object(ibb, dst2->handle, intel_buf_bo_size(dst2),
+			    dst2->addr.offset, true);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 8);
@@ -902,13 +923,13 @@ static int render(struct buf_ops *bops, uint32_t tiling, bool do_reloc,
 	render_copy = igt_get_render_copyfunc(devid);
 	igt_assert(render_copy);
 
-	render_copy(ibb, 0,
+	render_copy(ibb,
 		    &src,
 		    0, 0, width, height,
 		    &dst,
 		    0, 0);
 
-	render_copy(ibb, 0,
+	render_copy(ibb,
 		    &dst,
 		    0, 0, width, height,
 		    &final,
@@ -1003,13 +1024,13 @@ static void render_ccs(struct buf_ops *bops)
 				 0, 0, width, height,
 				 0, 0, width, height, 0);
 
-	render_copy(ibb, 0,
+	render_copy(ibb,
 		    &src,
 		    0, 0, width, height,
 		    &dst,
 		    0, 0);
 
-	render_copy(ibb, 0,
+	render_copy(ibb,
 		    &dst,
 		    0, 0, width, height,
 		    &final,

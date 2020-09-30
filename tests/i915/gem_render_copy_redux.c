@@ -134,7 +134,7 @@ static void copy(data_t *data)
 	scratch_buf_check(data, &src, WIDTH / 2, HEIGHT / 2, SRC_COLOR);
 	scratch_buf_check(data, &dst, WIDTH / 2, HEIGHT / 2, DST_COLOR);
 
-	data->render_copy(data->ibb, 0,
+	data->render_copy(data->ibb,
 			  &src, 0, 0, WIDTH, HEIGHT,
 			  &dst, WIDTH / 2, HEIGHT / 2);
 
@@ -158,14 +158,14 @@ static void copy_flink(data_t *data)
 	scratch_buf_init(data, &src, WIDTH, HEIGHT, STRIDE, 0);
 	scratch_buf_init(data, &dst, WIDTH, HEIGHT, STRIDE, DST_COLOR);
 
-	data->render_copy(data->ibb, 0,
+	data->render_copy(data->ibb,
 			  &src, 0, 0, WIDTH, HEIGHT,
 			  &dst, WIDTH, HEIGHT);
 
 	scratch_buf_init(&local, &local_src, WIDTH, HEIGHT, STRIDE, 0);
 	scratch_buf_init(&local, &local_dst, WIDTH, HEIGHT, STRIDE, SRC_COLOR);
 
-	local.render_copy(local.ibb, 0,
+	local.render_copy(local.ibb,
 			  &local_src, 0, 0, WIDTH, HEIGHT,
 			  &local_dst, WIDTH, HEIGHT);
 
@@ -173,7 +173,7 @@ static void copy_flink(data_t *data)
 	flink = local_dst;
 	flink.handle = gem_open(data->fd, name);
 
-	data->render_copy(data->ibb, 0,
+	data->render_copy(data->ibb,
 			  &flink, 0, 0, WIDTH, HEIGHT,
 			  &dst, WIDTH / 2, HEIGHT / 2);
 

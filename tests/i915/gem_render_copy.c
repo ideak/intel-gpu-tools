@@ -456,12 +456,12 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	 */
 	if (src_mixed_tiled) {
 		if (dst_compressed)
-			data->render_copy(data->ibb, 0,
+			data->render_copy(data->ibb,
 					  &dst, 0, 0, WIDTH, HEIGHT,
 					  &dst_ccs, 0, 0);
 
 		for (int i = 0; i < num_src; i++) {
-			data->render_copy(data->ibb, 0,
+			data->render_copy(data->ibb,
 					  &src[i].buf,
 					  WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
 					  dst_compressed ? &dst_ccs : &dst,
@@ -469,13 +469,13 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 		}
 
 		if (dst_compressed)
-			data->render_copy(data->ibb, 0,
+			data->render_copy(data->ibb,
 					  &dst_ccs, 0, 0, WIDTH, HEIGHT,
 					  &dst, 0, 0);
 
 	} else {
 		if (src_compression == I915_COMPRESSION_RENDER) {
-			data->render_copy(data->ibb, 0,
+			data->render_copy(data->ibb,
 					  &src_tiled, 0, 0, WIDTH, HEIGHT,
 					  &src_ccs,
 					  0, 0);
@@ -498,13 +498,13 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 		}
 
 		if (dst_compression == I915_COMPRESSION_RENDER) {
-			data->render_copy(data->ibb, 0,
+			data->render_copy(data->ibb,
 					  src_compressed ? &src_ccs : &src_tiled,
 					  0, 0, WIDTH, HEIGHT,
 					  &dst_ccs,
 					  0, 0);
 
-			data->render_copy(data->ibb, 0,
+			data->render_copy(data->ibb,
 					  &dst_ccs,
 					  0, 0, WIDTH, HEIGHT,
 					  &dst,
@@ -525,7 +525,7 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 					 WIDTH, HEIGHT,
 					 &dst);
 		} else {
-			data->render_copy(data->ibb, 0,
+			data->render_copy(data->ibb,
 					  src_compressed ? &src_ccs : &src_tiled,
 					  0, 0, WIDTH, HEIGHT,
 					  &dst,

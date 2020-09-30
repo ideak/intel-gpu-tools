@@ -203,7 +203,7 @@ static void fill_render(data_t *data, const struct igt_fb *fb,
 			       0, tiling, 0);
 	gem_write(data->drm_fd, src->handle, 0, buf, 4);
 
-	rendercopy(ibb, 0,
+	rendercopy(ibb,
 		   src, 0, 0, 0xff, 0xff,
 		   dst, 0, 0);
 

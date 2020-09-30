@@ -102,7 +102,7 @@ gen8_media_spinfunc(int i915, struct intel_buf *buf, uint32_t spins)
 	uint32_t curbe_buffer, interface_descriptor;
 
 	ibb = intel_bb_create(i915, PAGE_SIZE);
-	intel_bb_add_object(ibb, buf->handle, 0, true);
+	intel_bb_add_intel_buf(ibb, buf, true);
 
 	/* setup states */
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
@@ -143,7 +143,7 @@ gen9_media_spinfunc(int i915, struct intel_buf *buf, uint32_t spins)
 	uint32_t curbe_buffer, interface_descriptor;
 
 	ibb = intel_bb_create(i915, PAGE_SIZE);
-	intel_bb_add_object(ibb, buf->handle, 0, true);
+	intel_bb_add_intel_buf(ibb, buf, true);
 
 	/* setup states */
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);

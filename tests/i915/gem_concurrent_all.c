@@ -874,7 +874,7 @@ typedef igt_hang_t (*do_hang)(void);
 static void render_copy_bo(struct buffers *b, struct intel_buf *dst,
 			   struct intel_buf *src)
 {
-	rendercopy(b->ibb, 0,
+	rendercopy(b->ibb,
 		   src, 0, 0,
 		   b->width, b->height,
 		   dst, 0, 0);

@@ -111,7 +111,7 @@ static void run_test (int fd, int count)
 		src = &bufs[i % count];
 		dst = &bufs[(i + 1) % count];
 
-		render_copy(ibb, 0, src, 0, 0, WIDTH, HEIGHT, dst, 0, 0);
+		render_copy(ibb, src, 0, 0, WIDTH, HEIGHT, dst, 0, 0);
 		start_val[(i + 1) % count] = start_val[i % count];
 	}
 
@@ -128,7 +128,7 @@ static void run_test (int fd, int count)
 		src = &bufs[(i + 1) % count];
 		dst = &bufs[i % count];
 
-		render_copy(ibb, 0, src, 0, 0, WIDTH, HEIGHT, dst, 0, 0);
+		render_copy(ibb, src, 0, 0, WIDTH, HEIGHT, dst, 0, 0);
 		start_val[i % count] = start_val[(i + 1) % count];
 	}
 	for (i = 0; i < count; i++)
@@ -146,7 +146,7 @@ static void run_test (int fd, int count)
 		src = &bufs[s];
 		dst = &bufs[d];
 
-		render_copy(ibb, 0, src, 0, 0, WIDTH, HEIGHT, dst, 0, 0);
+		render_copy(ibb, src, 0, 0, WIDTH, HEIGHT, dst, 0, 0);
 		start_val[d] = start_val[s];
 	}
 	for (i = 0; i < count; i++)

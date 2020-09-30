@@ -248,7 +248,7 @@ void gen12_vebox_copyfunc(struct intel_bb *ibb,
 
 	igt_assert(src->bpp == dst->bpp);
 
-	intel_bb_flush(ibb, ibb->ctx, I915_EXEC_VEBOX);
+	intel_bb_flush(ibb, I915_EXEC_VEBOX);
 
 	intel_bb_add_intel_buf(ibb, dst, true);
 	intel_bb_add_intel_buf(ibb, src, false);
@@ -304,9 +304,8 @@ void gen12_vebox_copyfunc(struct intel_bb *ibb,
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 8);
 
-	intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), 0,
-				   I915_EXEC_VEBOX | I915_EXEC_NO_RELOC,
-				   false);
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_VEBOX | I915_EXEC_NO_RELOC, false);
 
 	intel_bb_reset(ibb, false);
 

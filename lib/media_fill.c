@@ -155,7 +155,7 @@ gen7_media_fillfunc(int i915,
 	uint32_t curbe_buffer, interface_descriptor;
 
 	ibb = intel_bb_create(i915, PAGE_SIZE);
-	intel_bb_add_object(ibb, buf->handle, 0, true);
+	intel_bb_add_intel_buf(ibb, buf, true);
 
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
 
@@ -198,7 +198,7 @@ gen8_media_fillfunc(int i915,
 	uint32_t curbe_buffer, interface_descriptor;
 
 	ibb = intel_bb_create(i915, PAGE_SIZE);
-	intel_bb_add_object(ibb, buf->handle, 0, true);
+	intel_bb_add_intel_buf(ibb, buf, true);
 
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
 
@@ -242,7 +242,7 @@ __gen9_media_fillfunc(int i915,
 	uint32_t curbe_buffer, interface_descriptor;
 
 	ibb = intel_bb_create(i915, PAGE_SIZE);
-	intel_bb_add_object(ibb, buf->handle, 0, true);
+	intel_bb_add_intel_buf(ibb, buf, true);
 
 	/* setup states */
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
@@ -310,9 +310,9 @@ __gen11_media_vme_func(int i915,
 	struct intel_bb *ibb;
 	uint32_t curbe_buffer, interface_descriptor;
 
-	ibb = intel_bb_create(i915, PAGE_SIZE);
-	intel_bb_add_object(ibb, dst->handle, 0, true);
-	intel_bb_add_object(ibb, src->handle, 0, false);
+	ibb = intel_bb_create_with_context(i915, ctx, PAGE_SIZE);
+	intel_bb_add_intel_buf(ibb, dst, true);
+	intel_bb_add_intel_buf(ibb, src, false);
 
 	/* setup states */
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
@@ -351,9 +351,8 @@ __gen11_media_vme_func(int i915,
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 32);
 
-	intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), ctx,
-				   I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC,
-				   false);
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, false);
 	intel_bb_destroy(ibb);
 }
 

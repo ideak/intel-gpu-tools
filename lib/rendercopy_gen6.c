@@ -510,7 +510,6 @@ static uint32_t gen6_emit_primitive(struct intel_bb *ibb)
 }
 
 void gen6_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src,
 			  uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
@@ -523,7 +522,7 @@ void gen6_render_copyfunc(struct intel_bb *ibb,
 
 	igt_assert(src->bpp == dst->bpp);
 
-	intel_bb_flush_render_with_context(ibb, ctx);
+	intel_bb_flush_render(ibb);
 
 	intel_bb_add_intel_buf(ibb, dst, true);
 	intel_bb_add_intel_buf(ibb, src, false);
@@ -585,8 +584,7 @@ void gen6_render_copyfunc(struct intel_bb *ibb,
 	/* Position to valid batch end position for batch reuse */
 	intel_bb_ptr_set(ibb, batch_end);
 
-	intel_bb_exec_with_context(ibb, batch_end, ctx,
-				   I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC,
-				   false);
+	intel_bb_exec(ibb, batch_end,
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, false);
 	intel_bb_reset(ibb, false);
 }

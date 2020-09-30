@@ -235,7 +235,6 @@ static void gen2_emit_copy_pipeline(struct intel_bb *ibb)
 }
 
 void gen2_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src,
 			  uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
@@ -277,5 +276,5 @@ void gen2_render_copyfunc(struct intel_bb *ibb,
 	emit_vertex_normalized(ibb, src_x, intel_buf_width(src));
 	emit_vertex_normalized(ibb, src_y, intel_buf_height(src));
 
-	intel_bb_flush_blit_with_context(ibb, ctx);
+	intel_bb_flush_blit(ibb);
 }

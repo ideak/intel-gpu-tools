@@ -377,7 +377,7 @@ static void render_copyfunc(struct intel_buf *src, unsigned src_x, unsigned src_
 		 */
 		intel_bb_flush_blit(ibb);
 
-		rendercopy(ibb, 0, src, src_x, src_y,
+		rendercopy(ibb, src, src_x, src_y,
 		     options.tile_size, options.tile_size,
 		     dst, dst_x, dst_y);
 	} else

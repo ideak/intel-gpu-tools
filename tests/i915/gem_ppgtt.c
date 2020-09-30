@@ -110,16 +110,17 @@ static void fork_rcs_copy(int timeout, uint32_t final,
 		struct intel_buf *src;
 		unsigned long i;
 
-		ibb = intel_bb_create(buf_ops_get_fd(dst[child]->bops), 4096);
-
 		if (flags & CREATE_CONTEXT)
 			ctx = gem_context_create(buf_ops_get_fd(dst[child]->bops));
+
+		ibb = intel_bb_create_with_context(buf_ops_get_fd(dst[child]->bops),
+						   ctx, 4096);
 
 		i = 0;
 		igt_until_timeout(timeout) {
 			src = create_bo(dst[child]->bops,
 					i++ | child << 16);
-			render_copy(ibb, ctx,
+			render_copy(ibb,
 				    src, 0, 0,
 				    WIDTH, HEIGHT,
 				    dst[child], 0, 0);
@@ -129,7 +130,7 @@ static void fork_rcs_copy(int timeout, uint32_t final,
 
 		src = create_bo(dst[child]->bops,
 				final | child << 16);
-		render_copy(ibb, ctx,
+		render_copy(ibb,
 			    src, 0, 0,
 			    WIDTH, HEIGHT,
 			    dst[child], 0, 0);

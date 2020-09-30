@@ -20,7 +20,6 @@
 #include "rendercopy.h"
 
 void gen3_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src,
 			  uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
@@ -229,5 +228,5 @@ void gen3_render_copyfunc(struct intel_bb *ibb,
 	emit_vertex(ibb, src_x);
 	emit_vertex(ibb, src_y);
 
-	intel_bb_flush_blit_with_context(ibb, ctx);
+	intel_bb_flush_blit(ibb);
 }

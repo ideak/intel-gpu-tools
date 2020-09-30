@@ -102,7 +102,7 @@ static void copy_pattern(data_t *data,
 	 * rendered with the blitter/render engine.
 	 */
 	if (data->render_copy) {
-		data->render_copy(data->ibb, 0, src, sx, sy, w, h, dst, dx, dy);
+		data->render_copy(data->ibb, src, sx, sy, w, h, dst, dx, dy);
 	} else {
 		w = min(w, src_fb->width - sx);
 		w = min(w, dst_fb->width - dx);

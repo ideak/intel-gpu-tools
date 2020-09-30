@@ -780,7 +780,6 @@ static void gen8_emit_primitive(struct intel_bb *ibb, uint32_t offset)
 #define BATCH_STATE_SPLIT 2048
 
 void gen8_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src,
 			  unsigned int src_x, unsigned int src_y,
 			  unsigned int width, unsigned int height,
@@ -793,7 +792,7 @@ void gen8_render_copyfunc(struct intel_bb *ibb,
 
 	igt_assert(src->bpp == dst->bpp);
 
-	intel_bb_flush_render_with_context(ibb, ctx);
+	intel_bb_flush_render(ibb);
 
 	intel_bb_add_intel_buf(ibb, dst, true);
 	intel_bb_add_intel_buf(ibb, src, false);
@@ -874,9 +873,8 @@ void gen8_render_copyfunc(struct intel_bb *ibb,
 	gen8_emit_primitive(ibb, vertex_buffer);
 
 	intel_bb_emit_bbe(ibb);
-	intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), ctx,
-				   I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC,
-				   false);
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, false);
 	dump_batch(ibb);
 	intel_bb_reset(ibb, false);
 }

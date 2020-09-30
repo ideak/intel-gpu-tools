@@ -1220,7 +1220,10 @@ static uint64_t gen8_canonical_addr(uint64_t address)
 	return (int64_t)(address << shift) >> shift;
 }
 
-static inline uint64_t __intel_bb_propose_offset(struct intel_bb *ibb)
+static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
+					     uint32_t handle,
+					     uint32_t size,
+					     uint32_t alignment)
 {
 	uint64_t offset;
 
@@ -1247,7 +1250,7 @@ static inline uint64_t __intel_bb_propose_offset(struct intel_bb *ibb)
  * Pointer the intel_bb, asserts on failure.
  */
 static struct intel_bb *
-__intel_bb_create(int i915, uint32_t size, bool do_relocs)
+__intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs)
 {
 	struct intel_bb *ibb = calloc(1, sizeof(*ibb));
 	uint64_t gtt_size;
@@ -1261,6 +1264,7 @@ __intel_bb_create(int i915, uint32_t size, bool do_relocs)
 	ibb->handle = gem_create(i915, size);
 	ibb->size = size;
 	ibb->alignment = 4096;
+	ibb->ctx = ctx;
 	ibb->batch = calloc(1, size);
 	igt_assert(ibb->batch);
 	ibb->ptr = ibb->batch;
@@ -1287,8 +1291,12 @@ __intel_bb_create(int i915, uint32_t size, bool do_relocs)
 	}
 	ibb->gtt_size = gtt_size;
 
-	ibb->batch_offset = __intel_bb_propose_offset(ibb);
-	intel_bb_add_object(ibb, ibb->handle, ibb->batch_offset, false);
+	ibb->batch_offset = __intel_bb_get_offset(ibb,
+						  ibb->handle,
+						  ibb->size,
+						  ibb->alignment);
+	intel_bb_add_object(ibb, ibb->handle, ibb->size,
+			    ibb->batch_offset, false);
 
 	ibb->refcount = 1;
 
@@ -1300,13 +1308,33 @@ __intel_bb_create(int i915, uint32_t size, bool do_relocs)
  * @i915: drm fd
  * @size: size of the batchbuffer
  *
+ * Creates bb with default context.
+ *
  * Returns:
  *
  * Pointer the intel_bb, asserts on failure.
  */
 struct intel_bb *intel_bb_create(int i915, uint32_t size)
 {
-	return __intel_bb_create(i915, size, false);
+	return __intel_bb_create(i915, 0, size, false);
+}
+
+/**
+ * intel_bb_create_with_context:
+ * @i915: drm fd
+ * @ctx: context
+ * @size: size of the batchbuffer
+ *
+ * Creates bb with context passed in @ctx.
+ *
+ * Returns:
+ *
+ * Pointer the intel_bb, asserts on failure.
+ */
+struct intel_bb *
+intel_bb_create_with_context(int i915, uint32_t ctx, uint32_t size)
+{
+	return __intel_bb_create(i915, ctx, size, false);
 }
 
 /**
@@ -1314,8 +1342,8 @@ struct intel_bb *intel_bb_create(int i915, uint32_t size)
  * @i915: drm fd
  * @size: size of the batchbuffer
  *
- * Disable passing or randomizing addresses. This will lead to relocations
- * when objects are not previously pinned.
+ * Creates bb which will disable passing addresses.
+ * This will lead to relocations when objects are not previously pinned.
  *
  * Returns:
  *
@@ -1323,7 +1351,26 @@ struct intel_bb *intel_bb_create(int i915, uint32_t size)
  */
 struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
 {
-	return __intel_bb_create(i915, size, true);
+	return __intel_bb_create(i915, 0, size, true);
+}
+
+/**
+ * intel_bb_create_with_relocs_and_context:
+ * @i915: drm fd
+ * @ctx: context
+ * @size: size of the batchbuffer
+ *
+ * Creates bb with default context which will disable passing addresses.
+ * This will lead to relocations when objects are not previously pinned.
+ *
+ * Returns:
+ *
+ * Pointer the intel_bb, asserts on failure.
+ */
+struct intel_bb *
+intel_bb_create_with_relocs_and_context(int i915, uint32_t ctx, uint32_t size)
+{
+	return __intel_bb_create(i915, ctx, size, true);
 }
 
 static void __intel_bb_destroy_relocations(struct intel_bb *ibb)
@@ -1418,19 +1465,26 @@ void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 
 	if (purge_objects_cache) {
 		__intel_bb_destroy_cache(ibb);
-		ibb->batch_offset = __intel_bb_propose_offset(ibb);
+		ibb->batch_offset = __intel_bb_get_offset(ibb,
+							  ibb->handle,
+							  ibb->size,
+							  ibb->alignment);
 	} else {
 		struct drm_i915_gem_exec_object2 *object;
 
 		object = intel_bb_find_object(ibb, ibb->handle);
 		ibb->batch_offset = object ? object->offset :
-					     __intel_bb_propose_offset(ibb);
+					     __intel_bb_get_offset(ibb,
+								   ibb->handle,
+								   ibb->size,
+								   ibb->alignment);
 	}
 
 	gem_close(ibb->i915, ibb->handle);
 	ibb->handle = gem_create(ibb->i915, ibb->size);
 
-	intel_bb_add_object(ibb, ibb->handle, ibb->batch_offset, false);
+	intel_bb_add_object(ibb, ibb->handle, ibb->size,
+			    ibb->batch_offset, false);
 	ibb->ptr = ibb->batch;
 	memset(ibb->batch, 0, ibb->size);
 }
@@ -1580,6 +1634,7 @@ static void __add_to_objects(struct intel_bb *ibb,
  * intel_bb_add_object:
  * @ibb: pointer to intel_bb
  * @handle: which handle to add to objects array
+ * @size: object size
  * @offset: presumed offset of the object when no relocation is enforced
  * @write: does a handle is a render target
  *
@@ -1588,7 +1643,7 @@ static void __add_to_objects(struct intel_bb *ibb,
  * be marked with EXEC_OBJECT_WRITE flag.
  */
 struct drm_i915_gem_exec_object2 *
-intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
+intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint32_t size,
 		    uint64_t offset, bool write)
 {
 	struct drm_i915_gem_exec_object2 *object;
@@ -1602,7 +1657,9 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle,
 		object->offset = gen8_canonical_addr(offset & (ibb->gtt_size - 1));
 
 	if (object->offset == INTEL_BUF_INVALID_ADDRESS)
-		object->offset = __intel_bb_propose_offset(ibb);
+		object->offset = __intel_bb_get_offset(ibb,
+						       handle, size,
+						       object->alignment);
 
 	if (write)
 		object->flags |= EXEC_OBJECT_WRITE;
@@ -1618,7 +1675,9 @@ intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf, bool write)
 {
 	struct drm_i915_gem_exec_object2 *obj;
 
-	obj = intel_bb_add_object(ibb, buf->handle, buf->addr.offset, write);
+	obj = intel_bb_add_object(ibb, buf->handle,
+				  intel_buf_bo_size(buf),
+				  buf->addr.offset, write);
 
 	/* For compressed surfaces ensure address is aligned to 64KB */
 	if (ibb->gen >= 12 && buf->compression) {
@@ -1720,7 +1779,13 @@ static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
 	struct drm_i915_gem_exec_object2 *object, *to_object;
 	uint32_t i;
 
-	object = intel_bb_add_object(ibb, handle, presumed_offset, false);
+	if (ibb->enforce_relocs) {
+		object = intel_bb_add_object(ibb, handle, 0,
+					     presumed_offset, false);
+	} else {
+		object = intel_bb_find_object(ibb, handle);
+		igt_assert(object);
+	}
 
 	/* For ibb we have relocs allocated in chunks */
 	if (to_handle == ibb->handle) {
@@ -2030,7 +2095,6 @@ static void update_offsets(struct intel_bb *ibb,
  * @ibb: pointer to intel_bb
  * @end_offset: offset of the last instruction in the bb
  * @flags: flags passed directly to execbuf
- * @ctx: context
  * @sync: if true wait for execbuf completion, otherwise caller is responsible
  * to wait for completion
  *
@@ -2039,8 +2103,8 @@ static void update_offsets(struct intel_bb *ibb,
  * Note: In this step execobj for bb is allocated and inserted to the objects
  * array.
 */
-int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
-		    uint32_t ctx, uint64_t flags, bool sync)
+static int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
+			   uint64_t flags, bool sync)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 *objects;
@@ -2057,7 +2121,7 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 	execbuf.buffers_ptr = (uintptr_t) objects;
 	execbuf.buffer_count = ibb->num_objects;
 	execbuf.batch_len = end_offset;
-	execbuf.rsvd1 = ibb->ctx = ctx;
+	execbuf.rsvd1 = ibb->ctx;
 	execbuf.flags = flags | I915_EXEC_BATCH_FIRST | I915_EXEC_FENCE_OUT;
 	if (ibb->enforce_relocs)
 		execbuf.flags &= ~I915_EXEC_NO_RELOC;
@@ -2112,29 +2176,12 @@ int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
  * @sync: if true wait for execbuf completion, otherwise caller is responsible
  * to wait for completion
  *
- * Do execbuf with default context. Asserts on failure.
+ * Do execbuf on context selected during bb creation. Asserts on failure.
 */
 void intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 		   uint64_t flags, bool sync)
 {
-	igt_assert_eq(__intel_bb_exec(ibb, end_offset, 0, flags, sync), 0);
-}
-
-/*
- * intel_bb_exec_with_context:
- * @ibb: pointer to intel_bb
- * @end_offset: offset of the last instruction in the bb
- * @flags: flags passed directly to execbuf
- * @ctx: context
- * @sync: if true wait for execbuf completion, otherwise caller is responsible
- * to wait for completion
- *
- * Do execbuf with context @context.
-*/
-void intel_bb_exec_with_context(struct intel_bb *ibb, uint32_t end_offset,
-				uint32_t ctx, uint64_t flags, bool sync)
-{
-	igt_assert_eq(__intel_bb_exec(ibb, end_offset, ctx, flags, sync), 0);
+	igt_assert_eq(__intel_bb_exec(ibb, end_offset, flags, sync), 0);
 }
 
 /**
@@ -2185,7 +2232,7 @@ bool intel_bb_object_offset_to_buf(struct intel_bb *ibb, struct intel_buf *buf)
 	found = tfind((void *)&object, &ibb->root, __compare_objects);
 	if (!found) {
 		buf->addr.offset = 0;
-		buf->addr.ctx = 0;
+		buf->addr.ctx = ibb->ctx;
 
 		return false;
 	}
@@ -2242,41 +2289,27 @@ uint32_t intel_bb_emit_flush_common(struct intel_bb *ibb)
 	return intel_bb_offset(ibb);
 }
 
-static void intel_bb_exec_with_context_ring(struct intel_bb *ibb,
-					    uint32_t ctx, uint32_t ring)
+static void intel_bb_exec_with_ring(struct intel_bb *ibb,uint32_t ring)
 {
-	intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), ctx,
-				   ring | I915_EXEC_NO_RELOC,
-				   false);
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      ring | I915_EXEC_NO_RELOC, false);
 	intel_bb_reset(ibb, false);
 }
 
 /*
  * intel_bb_flush:
  * @ibb: batchbuffer
- * @ctx: context
  * @ring: ring
  *
- * If batch is not empty emit batch buffer end, execute on specified
- * context, ring then reset the batch.
+ * If batch is not empty emit batch buffer end, execute on ring,
+ * then reset the batch.
  */
-void intel_bb_flush(struct intel_bb *ibb, uint32_t ctx, uint32_t ring)
+void intel_bb_flush(struct intel_bb *ibb, uint32_t ring)
 {
 	if (intel_bb_emit_flush_common(ibb) == 0)
 		return;
 
-	intel_bb_exec_with_context_ring(ibb, ctx, ring);
-}
-
-static void __intel_bb_flush_render_with_context(struct intel_bb *ibb,
-						 uint32_t ctx)
-{
-	uint32_t ring = I915_EXEC_RENDER;
-
-	if (intel_bb_emit_flush_common(ibb) == 0)
-		return;
-
-	intel_bb_exec_with_context_ring(ibb, ctx, ring);
+	intel_bb_exec_with_ring(ibb, ring);
 }
 
 /*
@@ -2284,29 +2317,25 @@ static void __intel_bb_flush_render_with_context(struct intel_bb *ibb,
  * @ibb: batchbuffer
  *
  * If batch is not empty emit batch buffer end, execute on render ring
- * and reset the batch.
- * Context used to execute is previous batch context.
+ * and reset the batch. Context used to execute is batch context.
  */
 void intel_bb_flush_render(struct intel_bb *ibb)
 {
-	__intel_bb_flush_render_with_context(ibb, ibb->ctx);
+	if (intel_bb_emit_flush_common(ibb) == 0)
+		return;
+
+	intel_bb_exec_with_ring(ibb, I915_EXEC_RENDER);
 }
 
 /*
- * intel_bb_flush_render_with_context:
+ * intel_bb_flush_blit:
  * @ibb: batchbuffer
- * @ctx: context
  *
- * If batch is not empty emit batch buffer end, execute on render ring with @ctx
- * and reset the batch.
+ * If batch is not empty emit batch buffer end, execute on default/blit ring
+ * (depends on gen) and reset the batch.
+ * Context used to execute is batch context.
  */
-void intel_bb_flush_render_with_context(struct intel_bb *ibb, uint32_t ctx)
-{
-	__intel_bb_flush_render_with_context(ibb, ctx);
-}
-
-static void __intel_bb_flush_blit_with_context(struct intel_bb *ibb,
-					       uint32_t ctx)
+void intel_bb_flush_blit(struct intel_bb *ibb)
 {
 	uint32_t ring = I915_EXEC_DEFAULT;
 
@@ -2316,33 +2345,7 @@ static void __intel_bb_flush_blit_with_context(struct intel_bb *ibb,
 	if (HAS_BLT_RING(ibb->devid))
 		ring = I915_EXEC_BLT;
 
-	intel_bb_exec_with_context_ring(ibb, ctx, ring);
-}
-
-/*
- * intel_bb_flush_blit:
- * @ibb: batchbuffer
- *
- * If batch is not empty emit batch buffer end, execute on default/blit ring
- * (depends on gen) and reset the batch.
- * Context used to execute is previous batch context.
- */
-void intel_bb_flush_blit(struct intel_bb *ibb)
-{
-	__intel_bb_flush_blit_with_context(ibb, ibb->ctx);
-}
-
-/*
- * intel_bb_flush_blit_with_context:
- * @ibb: batchbuffer
- * @ctx: context
- *
- * If batch is not empty emit batch buffer end, execute on default/blit ring
- * (depends on gen) with @ctx and reset the batch.
- */
-void intel_bb_flush_blit_with_context(struct intel_bb *ibb, uint32_t ctx)
-{
-	__intel_bb_flush_blit_with_context(ibb, ctx);
+	intel_bb_exec_with_ring(ibb, ring);
 }
 
 /*

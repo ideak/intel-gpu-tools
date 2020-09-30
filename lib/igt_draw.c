@@ -601,10 +601,9 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 
 	src = create_buf(fd, cmd_data->bops, &tmp, I915_TILING_NONE);
 	dst = create_buf(fd, cmd_data->bops, buf, tiling);
-	ibb = intel_bb_create(fd, PAGE_SIZE);
+	ibb = intel_bb_create_with_context(fd, cmd_data->ctx, PAGE_SIZE);
 
-	rendercopy(ibb, cmd_data->ctx, src, 0, 0, rect->w,
-		   rect->h, dst, rect->x, rect->y);
+	rendercopy(ibb, src, 0, 0, rect->w, rect->h, dst, rect->x, rect->y);
 
 	intel_bb_destroy(ibb);
 	intel_buf_destroy(src);

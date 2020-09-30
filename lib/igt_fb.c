@@ -2267,7 +2267,7 @@ static void copy_with_engine(struct fb_blit_upload *blit,
 			   dst_fb->plane_width[0], dst_fb->plane_height[0],
 			   dst);
 	else
-		render_copy(blit->ibb, 0,
+		render_copy(blit->ibb,
 			    src,
 			    0, 0,
 			    dst_fb->plane_width[0], dst_fb->plane_height[0],

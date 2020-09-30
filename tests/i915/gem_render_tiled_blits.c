@@ -66,7 +66,7 @@ check_buf(struct intel_bb *ibb, struct intel_buf *buf, uint32_t val)
 	uint32_t *ptr;
 	int i;
 
-	render_copy(ibb, 0, buf, 0, 0, WIDTH, HEIGHT, &linear, 0, 0);
+	render_copy(ibb, buf, 0, 0, WIDTH, HEIGHT, &linear, 0, 0);
 
 	if (snoop) {
 		ptr = gem_mmap__cpu_coherent(i915, linear.handle, 0,
@@ -148,7 +148,7 @@ static void run_test (int fd, int count)
 		int src = i % count;
 		int dst = (i + 1) % count;
 
-		render_copy(ibb, 0, &bufs[src], 0, 0, WIDTH, HEIGHT,
+		render_copy(ibb, &bufs[src], 0, 0, WIDTH, HEIGHT,
 			    &bufs[dst], 0, 0);
 		start_val[dst] = start_val[src];
 	}
@@ -161,7 +161,7 @@ static void run_test (int fd, int count)
 		int src = (i + 1) % count;
 		int dst = i % count;
 
-		render_copy(ibb, 0, &bufs[src], 0, 0, WIDTH, HEIGHT,
+		render_copy(ibb, &bufs[src], 0, 0, WIDTH, HEIGHT,
 			    &bufs[dst], 0, 0);
 		start_val[dst] = start_val[src];
 	}
@@ -176,7 +176,7 @@ static void run_test (int fd, int count)
 		if (src == dst)
 			continue;
 
-		render_copy(ibb, 0, &bufs[src], 0, 0, WIDTH, HEIGHT,
+		render_copy(ibb, &bufs[src], 0, 0, WIDTH, HEIGHT,
 			    &bufs[dst], 0, 0);
 		start_val[dst] = start_val[src];
 	}

@@ -66,7 +66,7 @@ static struct intel_bb *rcs_copy_bo(struct intel_buf *dst,
 	/* enforce batch won't be recreated after execution */
 	intel_bb_ref(ibb);
 
-	rendercopy(ibb, 0,
+	rendercopy(ibb,
 		   src, 0, 0,
 		   width, height,
 		   dst, 0, 0);

@@ -507,7 +507,6 @@ gen7_emit_null_depth_buffer(struct intel_bb *ibb)
 
 #define BATCH_STATE_SPLIT 2048
 void gen7_render_copyfunc(struct intel_bb *ibb,
-			  uint32_t ctx,
 			  struct intel_buf *src,
 			  uint32_t src_x, uint32_t src_y,
 			  uint32_t width, uint32_t height,
@@ -520,7 +519,7 @@ void gen7_render_copyfunc(struct intel_bb *ibb,
 
 	igt_assert(src->bpp == dst->bpp);
 
-	intel_bb_flush_render_with_context(ibb, ctx);
+	intel_bb_flush_render(ibb);
 
 	intel_bb_add_intel_buf(ibb, dst, true);
 	intel_bb_add_intel_buf(ibb, src, false);
@@ -575,9 +574,8 @@ void gen7_render_copyfunc(struct intel_bb *ibb,
 	intel_bb_out(ibb, 0);   /* index buffer offset, ignored */
 
 	intel_bb_emit_bbe(ibb);
-	intel_bb_exec_with_context(ibb, intel_bb_offset(ibb), ctx,
-				   I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC,
-				   false);
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, false);
 	dump_batch(ibb);
 	intel_bb_reset(ibb, false);
 }

@@ -140,7 +140,7 @@ gen7_gpgpu_fillfunc(int i915,
 	uint32_t curbe_buffer, interface_descriptor;
 
 	ibb = intel_bb_create(i915, PAGE_SIZE);
-	intel_bb_add_object(ibb, buf->handle, 0, true);
+	intel_bb_add_intel_buf(ibb, buf, true);
 
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
 
@@ -190,7 +190,7 @@ gen8_gpgpu_fillfunc(int i915,
 	uint32_t curbe_buffer, interface_descriptor;
 
 	ibb = intel_bb_create(i915, PAGE_SIZE);
-	intel_bb_add_object(ibb, buf->handle, 0, true);
+	intel_bb_add_intel_buf(ibb, buf, true);
 
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
 
@@ -239,7 +239,7 @@ __gen9_gpgpu_fillfunc(int i915,
 	uint32_t curbe_buffer, interface_descriptor;
 
 	ibb = intel_bb_create(i915, PAGE_SIZE);
-	intel_bb_add_object(ibb, buf->handle, 0, true);
+	intel_bb_add_intel_buf(ibb, buf, true);
 
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
 
