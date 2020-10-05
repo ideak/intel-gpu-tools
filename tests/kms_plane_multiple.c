@@ -54,8 +54,8 @@ typedef struct {
 /* Command line parameters. */
 struct {
 	int iterations;
+	unsigned int seed;
 	bool user_seed;
-	int seed;
 } opt = {
 	.iterations = 1,
 };
@@ -409,7 +409,7 @@ static int opt_handler(int option, int option_index, void *input)
 		break;
 	case 's':
 		opt.user_seed = true;
-		opt.seed = strtol(optarg, NULL, 0);
+		opt.seed = strtoul(optarg, NULL, 0);
 		break;
 	default:
 		return IGT_OPT_HANDLER_ERROR;
