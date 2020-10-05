@@ -46,8 +46,6 @@ struct {
 	bool run;
 } opt = {
 	.iterations = 1,
-	.user_seed = false,
-	.seed = 1,
 	.run = true,
 };
 

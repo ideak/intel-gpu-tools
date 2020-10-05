@@ -58,8 +58,6 @@ struct {
 	int seed;
 } opt = {
 	.iterations = 1,
-	.user_seed = false,
-	.seed = 1,
 };
 
 /*
