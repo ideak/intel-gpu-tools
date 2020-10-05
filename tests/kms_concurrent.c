@@ -294,6 +294,8 @@ run_test(data_t *data, enum pipe pipe, igt_output_t *output)
 		igt_info("Testing resolution with connector %s using pipe %s with seed %d\n",
 			 igt_output_name(output), kmstest_pipe_name(pipe), opt.seed);
 
+		srand(opt.seed);
+
 		test_init(data, pipe, n_planes, output);
 
 		igt_fork(child, 1) {
