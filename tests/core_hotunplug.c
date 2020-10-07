@@ -308,12 +308,22 @@ static void node_healthcheck(struct hotunplug *priv, unsigned flags)
 		priv->failure = "Unrecoverable test failure";
 		if (local_i915_healthcheck(fd_drm, "") &&
 		    (!(flags & FLAG_RECOVER) || local_i915_recover(fd_drm)))
-			priv->failure = "Healthcheck failure!";
+			priv->failure = "GPU healthcheck failure!";
 		else
 			priv->failure = NULL;
 
 	} else {
 		/* no device specific healthcheck, rely on reopen result */
+		priv->failure = NULL;
+	}
+
+	if (!priv->failure) {
+		char path[200];
+
+		priv->failure = "Device sysfs healthckeck failure!";
+		local_debug("%s\n", "running device sysfs healthcheck");
+		igt_assert(igt_sysfs_path(fd_drm, path, sizeof(path)));
+		igt_assert(igt_debugfs_path(fd_drm, path, sizeof(path)));
 		priv->failure = NULL;
 	}
 
@@ -437,7 +447,7 @@ static void hotunplug_rescan(struct hotunplug *priv)
 	healthcheck(priv, false);
 }
 
-static void hotrebind_lateclose(struct hotunplug *priv)
+static void hotrebind(struct hotunplug *priv)
 {
 	igt_assert_eq(priv->fd.drm, -1);
 	igt_assert_eq(priv->fd.drm_hc, -1);
@@ -448,6 +458,30 @@ static void hotrebind_lateclose(struct hotunplug *priv)
 	driver_bind(priv, 0);
 
 	healthcheck(priv, false);
+}
+
+static void hotreplug(struct hotunplug *priv)
+{
+	igt_assert_eq(priv->fd.drm, -1);
+	igt_assert_eq(priv->fd.drm_hc, -1);
+	priv->fd.drm = local_drm_open_driver(false, "", " for hot replug");
+
+	device_unplug(priv, "hot ", 60);
+
+	bus_rescan(priv, 0);
+
+	healthcheck(priv, false);
+}
+
+static void hotrebind_lateclose(struct hotunplug *priv)
+{
+	igt_assert_eq(priv->fd.drm, -1);
+	igt_assert_eq(priv->fd.drm_hc, -1);
+	priv->fd.drm = local_drm_open_driver(false, "", " for hot rebind");
+
+	driver_unbind(priv, "hot ", 60);
+
+	driver_bind(priv, 0);
 
 	priv->fd.drm = close_device(priv->fd.drm, "late ", "unbound ");
 	igt_assert_eq(priv->fd.drm, -1);
@@ -464,8 +498,6 @@ static void hotreplug_lateclose(struct hotunplug *priv)
 	device_unplug(priv, "hot ", 60);
 
 	bus_rescan(priv, 0);
-
-	healthcheck(priv, false);
 
 	priv->fd.drm = close_device(priv->fd.drm, "late ", "removed ");
 	igt_assert_eq(priv->fd.drm, -1);
@@ -570,7 +602,31 @@ igt_main
 		post_healthcheck(&priv);
 
 	igt_subtest_group {
-		igt_describe("Check if the driver hot unbound from a still open device can be cleanly rebound, then the old instance released");
+		igt_describe("Check if the driver can be cleanly rebound to a device with a still open hot unbound driver instance");
+		igt_subtest("hotrebind")
+			hotrebind(&priv);
+
+		igt_fixture
+			recover(&priv);
+	}
+
+	igt_fixture
+		post_healthcheck(&priv);
+
+	igt_subtest_group {
+		igt_describe("Check if a hot unplugged and still open device can be cleanly restored");
+		igt_subtest("hotreplug")
+			hotreplug(&priv);
+
+		igt_fixture
+			recover(&priv);
+	}
+
+	igt_fixture
+		post_healthcheck(&priv);
+
+	igt_subtest_group {
+		igt_describe("Check if a hot unbound driver instance still open after hot rebind can be cleanly released");
 		igt_subtest("hotrebind-lateclose")
 			hotrebind_lateclose(&priv);
 
@@ -582,7 +638,7 @@ igt_main
 		post_healthcheck(&priv);
 
 	igt_subtest_group {
-		igt_describe("Check if a still open while hot unplugged device can be cleanly restored, then the old instance released");
+		igt_describe("Check if an instance of a still open while hot replugged device can be cleanly released");
 		igt_subtest("hotreplug-lateclose")
 			hotreplug_lateclose(&priv);
 
