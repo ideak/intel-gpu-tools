@@ -287,6 +287,50 @@ static void test_write(int vgem, int i915)
 	munmap(ptr, scratch.size);
 }
 
+static bool has_userptr(int i915)
+{
+	uint32_t handle = 0;
+	void *ptr;
+
+	igt_assert(posix_memalign(&ptr, 4096, 4096) == 0);
+	if (__gem_userptr(i915, ptr, 4096, 0, 0, &handle) == 0)
+		gem_close(i915, handle);
+	free(ptr);
+
+	return handle;
+}
+
+static void test_userptr(int vgem, int i915)
+{
+	struct drm_i915_gem_exec_object2 obj = {};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+	};
+	struct vgem_bo scratch;
+	uint32_t *ptr;
+
+	igt_require(has_userptr(i915));
+
+	scratch.width = 1024;
+	scratch.height = 1024;
+	scratch.bpp = 32;
+	vgem_create(vgem, &scratch);
+
+	/* vgem is acting as a simple provider of a single vma backed by pages */
+	ptr = vgem_mmap(vgem, &scratch, PROT_WRITE);
+	gem_close(vgem, scratch.handle);
+	*ptr = MI_BATCH_BUFFER_END;
+
+	gem_userptr(i915, ptr, scratch.size, 0, 0, &obj.handle);
+	gem_set_caching(i915, obj.handle, I915_CACHING_NONE); /* for !llc exec */
+
+	gem_execbuf(i915, &execbuf);
+	gem_close(i915, obj.handle);
+
+	munmap(ptr, scratch.size);
+}
+
 static void test_gtt(int vgem, int i915)
 {
 	struct vgem_bo scratch;
@@ -1037,6 +1081,9 @@ igt_main
 
 	igt_subtest("basic-write")
 		test_write(vgem, i915);
+
+	igt_subtest("basic-userptr")
+		test_userptr(vgem, i915);
 
 	igt_subtest("basic-gtt") {
 		gem_require_mappable_ggtt(i915);
