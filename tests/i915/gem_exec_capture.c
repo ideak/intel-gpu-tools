@@ -494,7 +494,7 @@ static void many(int fd, int dir, uint64_t size, unsigned int flags)
 	free(offsets);
 }
 
-static void prioinv(int fd, int dir, unsigned ring)
+static void prioinv(int fd, int dir, unsigned ring, const char *name)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj = {
@@ -513,6 +513,9 @@ static void prioinv(int fd, int dir, unsigned ring)
 	igt_require(gem_scheduler_enabled(fd));
 	igt_require(igt_params_set(fd, "reset", "%u", -1)); /* engine resets! */
 	igt_require(gem_gpu_reset_type(fd) > 1);
+
+	/* Needs to be fast enough for the hangcheck to return within 1s */
+	gem_engine_property_printf(fd, name, "preempt_timeout_ms", "%d", 500);
 
 	gtt = gem_aperture_size(fd) / size;
 	ram = (intel_get_avail_ram_mb() << 20) / size;
@@ -648,7 +651,7 @@ igt_main
 	}
 
 	test_each_engine("pi", fd, e)
-		prioinv(fd, dir, e->flags);
+		prioinv(fd, dir, e->flags, e->name);
 
 	igt_fixture {
 		close(dir);
