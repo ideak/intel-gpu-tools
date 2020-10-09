@@ -33,7 +33,9 @@
 		     "'%s' != '%s' (%lld not within %d%% tolerance of %lld)\n",\
 		     #x, #ref, (long long)x, tolerance, (long long)ref)
 
-static void spin(int fd, const struct intel_execution_engine2 *e2,
+static void spin(int fd,
+		 const struct intel_execution_engine2 *e2,
+		 unsigned int flags,
 		 unsigned int timeout_sec)
 {
 	const uint64_t timeout_100ms = 100000000LL;
@@ -43,9 +45,10 @@ static void spin(int fd, const struct intel_execution_engine2 *e2,
 	struct timespec itv = { };
 	uint64_t elapsed;
 
-	spin = __igt_spin_new(fd, .engine = e2->flags);
+	spin = __igt_spin_new(fd, .engine = e2->flags, .flags = flags);
 	while ((elapsed = igt_nsec_elapsed(&tv)) >> 30 < timeout_sec) {
-		igt_spin_t *next = __igt_spin_new(fd, .engine = e2->flags);
+		igt_spin_t *next =
+			__igt_spin_new(fd, .engine = e2->flags, .flags = flags);
 
 		igt_spin_set_timeout(spin,
 				     timeout_100ms - igt_nsec_elapsed(&itv));
@@ -120,14 +123,15 @@ static void spin_exit_handler(int sig)
 	igt_terminate_spins();
 }
 
-static void spin_on_all_engines(int fd, unsigned int timeout_sec)
+static void
+spin_on_all_engines(int fd, unsigned long flags, unsigned int timeout_sec)
 {
 	const struct intel_execution_engine2 *e2;
 
 	__for_each_physical_engine(fd, e2) {
 		igt_fork(child, 1) {
 			igt_install_exit_handler(spin_exit_handler);
-			spin(fd, e2, timeout_sec);
+			spin(fd, e2, flags, timeout_sec);
 		}
 	}
 
@@ -186,7 +190,7 @@ igt_main
 		e2 = &e2__;
 
 		igt_subtest_f("legacy-%s", e->name)
-			spin(fd, e2, 3);
+			spin(fd, e2, 0, 3);
 
 		igt_subtest_f("legacy-resubmit-%s", e->name)
 			spin_resubmit(fd, e2, 0);
@@ -202,7 +206,7 @@ igt_main
 
 	__for_each_physical_engine(fd, e2) {
 		igt_subtest_f("%s", e2->name)
-			spin(fd, e2, 3);
+			spin(fd, e2, 0, 3);
 
 		igt_subtest_f("resubmit-%s", e2->name)
 			spin_resubmit(fd, e2, 0);
@@ -220,7 +224,10 @@ igt_main
 	}
 
 	igt_subtest("spin-each")
-		spin_on_all_engines(fd, 3);
+		spin_on_all_engines(fd, 0, 3);
+
+	igt_subtest("user-each")
+		spin_on_all_engines(fd, IGT_SPIN_USERPTR, 3);
 
 	igt_fixture {
 		igt_stop_hang_detector();

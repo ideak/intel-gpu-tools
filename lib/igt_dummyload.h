@@ -33,11 +33,18 @@
 #include "i915_drm.h"
 
 typedef struct igt_spin {
-	unsigned int handle;
 	struct igt_list_head link;
+
+	uint32_t handle;
+	uint32_t poll_handle;
+
+	uint32_t *batch;
 
 	uint32_t *condition;
 	uint32_t cmd_precondition;
+
+	uint32_t *poll;
+#define SPIN_POLL_START_IDX 0
 
 	struct timespec last_signal;
 	pthread_t timer_thread;
@@ -47,9 +54,6 @@ typedef struct igt_spin {
 	struct drm_i915_gem_exec_object2 obj[2];
 #define IGT_SPIN_BATCH   1
 	struct drm_i915_gem_execbuffer2 execbuf;
-	uint32_t poll_handle;
-	uint32_t *poll;
-#define SPIN_POLL_START_IDX 0
 } igt_spin_t;
 
 struct igt_spin_factory {
@@ -66,6 +70,7 @@ struct igt_spin_factory {
 #define IGT_SPIN_FAST          (1 << 3)
 #define IGT_SPIN_NO_PREEMPTION (1 << 4)
 #define IGT_SPIN_INVALID_CS    (1 << 5)
+#define IGT_SPIN_USERPTR       (1 << 6)
 
 igt_spin_t *
 __igt_spin_factory(int fd, const struct igt_spin_factory *opts);

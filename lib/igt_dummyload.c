@@ -68,6 +68,24 @@ static const int LOOP_START_OFFSET = 64;
 static IGT_LIST_HEAD(spin_list);
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static uint32_t
+handle_create(int fd, size_t sz, unsigned long flags, uint32_t **mem)
+{
+	*mem = NULL;
+
+	if (flags & IGT_SPIN_USERPTR) {
+		uint32_t handle;
+
+		*mem = mmap(NULL, sz, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+		igt_assert(*mem != (uint32_t *)-1);
+		gem_userptr(fd, *mem, sz, 0, 0, &handle);
+
+		return handle;
+	}
+
+	return gem_create(fd, sz);
+}
+
 static int
 emit_recursive_batch(igt_spin_t *spin,
 		     int fd, const struct igt_spin_factory *opts)
@@ -81,8 +99,8 @@ emit_recursive_batch(igt_spin_t *spin,
 	unsigned int flags[GEM_MAX_ENGINES];
 	unsigned int nengine;
 	int fence_fd = -1;
-	uint32_t *cs, *batch;
 	uint64_t addr;
+	uint32_t *cs;
 	int i;
 
 	/*
@@ -126,13 +144,16 @@ emit_recursive_batch(igt_spin_t *spin,
 	execbuf->flags = I915_EXEC_NO_RELOC;
 	obj = memset(spin->obj, 0, sizeof(spin->obj));
 
-	obj[BATCH].handle = gem_create(fd, BATCH_SIZE);
-	batch = gem_mmap__device_coherent(fd, obj[BATCH].handle,
-					  0, BATCH_SIZE, PROT_WRITE);
-	gem_set_domain(fd, obj[BATCH].handle,
-		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	obj[BATCH].handle =
+		handle_create(fd, BATCH_SIZE, opts->flags, &spin->batch);
+	if (!spin->batch) {
+		spin->batch = gem_mmap__device_coherent(fd, obj[BATCH].handle,
+						  0, BATCH_SIZE, PROT_WRITE);
+		gem_set_domain(fd, obj[BATCH].handle,
+			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	}
 	execbuf->buffer_count++;
-	cs = batch;
+	cs = spin->batch;
 
 	obj[BATCH].offset = addr;
 	addr += BATCH_SIZE;
@@ -165,19 +186,22 @@ emit_recursive_batch(igt_spin_t *spin,
 			igt_require(__igt_device_set_master(fd) == 0);
 		}
 
-		spin->poll_handle = gem_create(fd, 4096);
+		spin->poll_handle =
+			handle_create(fd, 4096, opts->flags, &spin->poll);
 		obj[SCRATCH].handle = spin->poll_handle;
 
-		if (__gem_set_caching(fd, spin->poll_handle,
-				      I915_CACHING_CACHED) == 0)
-			spin->poll = gem_mmap__cpu(fd, spin->poll_handle,
-						   0, 4096,
-						   PROT_READ | PROT_WRITE);
-		else
-			spin->poll = gem_mmap__device_coherent(fd,
-							       spin->poll_handle,
-							       0, 4096,
-							       PROT_READ | PROT_WRITE);
+		if (!spin->poll) {
+			if (__gem_set_caching(fd, spin->poll_handle,
+					      I915_CACHING_CACHED) == 0)
+				spin->poll = gem_mmap__cpu(fd, spin->poll_handle,
+							   0, 4096,
+							   PROT_READ | PROT_WRITE);
+			else
+				spin->poll = gem_mmap__device_coherent(fd,
+								       spin->poll_handle,
+								       0, 4096,
+								       PROT_READ | PROT_WRITE);
+		}
 		addr += 4096; /* guard page */
 		obj[SCRATCH].offset = addr;
 		addr += 4096;
@@ -210,8 +234,8 @@ emit_recursive_batch(igt_spin_t *spin,
 
 	spin->handle = obj[BATCH].handle;
 
-	igt_assert_lt(cs - batch, LOOP_START_OFFSET / sizeof(*cs));
-	spin->condition = batch + LOOP_START_OFFSET / sizeof(*cs);
+	igt_assert_lt(cs - spin->batch, LOOP_START_OFFSET / sizeof(*cs));
+	spin->condition = spin->batch + LOOP_START_OFFSET / sizeof(*cs);
 	cs = spin->condition;
 
 	/* Allow ourselves to be preempted */
@@ -255,15 +279,15 @@ emit_recursive_batch(igt_spin_t *spin,
 		 * (using 5 << 12).
 		 * For simplicity, we try to stick to a one-size fits all.
 		 */
-		spin->condition = batch + BATCH_SIZE / sizeof(*batch) - 2;
+		spin->condition = spin->batch + BATCH_SIZE / sizeof(*spin->batch) - 2;
 		spin->condition[0] = 0xffffffff;
 		spin->condition[1] = 0xffffffff;
 
 		r->presumed_offset = obj[BATCH].offset;
 		r->target_handle = obj[BATCH].handle;
-		r->offset = (cs + 2 - batch) * sizeof(*cs);
+		r->offset = (cs + 2 - spin->batch) * sizeof(*cs);
 		r->read_domains = I915_GEM_DOMAIN_COMMAND;
-		r->delta = (spin->condition - batch) * sizeof(*cs);
+		r->delta = (spin->condition - spin->batch) * sizeof(*cs);
 
 		*cs++ = MI_COND_BATCH_BUFFER_END | MI_DO_COMPARE | 2;
 		*cs++ = MI_BATCH_BUFFER_END;
@@ -275,7 +299,7 @@ emit_recursive_batch(igt_spin_t *spin,
 	r = &relocs[obj[BATCH].relocation_count++];
 	r->target_handle = obj[BATCH].handle;
 	r->presumed_offset = obj[BATCH].offset;
-	r->offset = (cs + 1 - batch) * sizeof(*cs);
+	r->offset = (cs + 1 - spin->batch) * sizeof(*cs);
 	r->read_domains = I915_GEM_DOMAIN_COMMAND;
 	r->delta = LOOP_START_OFFSET;
 	if (gen >= 8) {
@@ -294,8 +318,8 @@ emit_recursive_batch(igt_spin_t *spin,
 	}
 	obj[BATCH].relocs_ptr = to_user_pointer(relocs);
 
-	execbuf->buffers_ptr = to_user_pointer(obj +
-					       (2 - execbuf->buffer_count));
+	execbuf->buffers_ptr =
+	       	to_user_pointer(obj + (2 - execbuf->buffer_count));
 	execbuf->rsvd1 = opts->ctx;
 
 	if (opts->flags & IGT_SPIN_FENCE_OUT)
@@ -329,7 +353,7 @@ emit_recursive_batch(igt_spin_t *spin,
 		}
 	}
 
-	igt_assert_lt(cs - batch, BATCH_SIZE / sizeof(*cs));
+	igt_assert_lt(cs - spin->batch, BATCH_SIZE / sizeof(*cs));
 
 	/* Make it easier for callers to resubmit. */
 	for (i = 0; i < ARRAY_SIZE(spin->obj); i++) {
@@ -532,13 +556,14 @@ void igt_spin_free(int fd, igt_spin_t *spin)
 	}
 
 	igt_spin_end(spin);
-	gem_munmap((void *)((unsigned long)spin->condition & (~4095UL)),
-		   BATCH_SIZE);
 
-	if (spin->poll) {
+	if (spin->poll)
 		gem_munmap(spin->poll, 4096);
+	if (spin->batch)
+		gem_munmap(spin->batch, BATCH_SIZE);
+
+	if (spin->poll_handle)
 		gem_close(fd, spin->poll_handle);
-	}
 
 	if (spin->handle)
 		gem_close(fd, spin->handle);
