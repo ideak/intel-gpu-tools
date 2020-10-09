@@ -449,7 +449,7 @@ __copy_dev_to_card(struct igt_device *dev, struct igt_device_card *card)
  * Iterate over all igt_devices array and find first discrete card.
  * card->pci_slot_name will be updated only if a discrete card is present.
  */
-void igt_device_find_first_i915_discrete_card(struct igt_device_card *card)
+bool igt_device_find_first_i915_discrete_card(struct igt_device_card *card)
 {
 	struct igt_device *dev;
 
@@ -462,9 +462,11 @@ void igt_device_find_first_i915_discrete_card(struct igt_device_card *card)
 
 		if ((strncmp(dev->pci_slot_name, INTEGRATED_I915_GPU_PCI_ID, PCI_SLOT_NAME_SIZE)) != 0) {
 			__copy_dev_to_card(dev, card);
-			break;
+			return true;
 		}
 	}
+
+	return false;
 }
 
 static struct igt_device *igt_device_from_syspath(const char *syspath)

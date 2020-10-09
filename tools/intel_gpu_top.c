@@ -1394,15 +1394,18 @@ int main(int argc, char **argv)
 
 	if (opt_device != NULL) {
 		ret = igt_device_card_match(opt_device, &card);
-		if (!ret) {
+		if (!ret)
 			fprintf(stderr, "Requested device %s not found!\n", opt_device);
-			free(opt_device);
-			ret = EXIT_FAILURE;
-			goto exit;
-		}
 		free(opt_device);
 	} else {
-		igt_device_find_first_i915_discrete_card(&card);
+		ret = igt_device_find_first_i915_discrete_card(&card);
+		if (!ret)
+			fprintf(stderr, "No device filter specified and no discrete i915 devices found\n");
+	}
+
+	if (!ret) {
+		ret = EXIT_FAILURE;
+		goto exit;
 	}
 
 	if (card.pci_slot_name[0] && !is_igpu_pci(card.pci_slot_name))
