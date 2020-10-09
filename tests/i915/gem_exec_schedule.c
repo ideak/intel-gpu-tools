@@ -308,7 +308,7 @@ static void implicit_rw(int i915, unsigned ring, enum implicit_dir dir)
 		igt_assert_eq_u32(result, ring);
 }
 
-static void independent(int fd, unsigned int engine)
+static void independent(int fd, unsigned int engine, unsigned long flags)
 {
 	const struct intel_execution_engine2 *e;
 	IGT_CORK_FENCE(cork);
@@ -332,7 +332,9 @@ static void independent(int fd, unsigned int engine)
 			continue;
 
 		if (spin == NULL) {
-			spin = __igt_spin_new(fd, .engine = e->flags);
+			spin = __igt_spin_new(fd,
+					      .engine = e->flags,
+					      .flags = flags);
 		} else {
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
@@ -628,7 +630,7 @@ static void timesliceN(int i915, unsigned int engine, int count)
 	munmap(result, sz);
 }
 
-static void lateslice(int i915, unsigned int engine)
+static void lateslice(int i915, unsigned int engine, unsigned long flags)
 {
 	igt_spin_t *spin[3];
 	uint32_t ctx;
@@ -640,7 +642,8 @@ static void lateslice(int i915, unsigned int engine)
 	ctx = gem_context_create(i915);
 	spin[0] = igt_spin_new(i915, .ctx = ctx, .engine = engine,
 			       .flags = (IGT_SPIN_POLL_RUN |
-					 IGT_SPIN_FENCE_OUT));
+					 IGT_SPIN_FENCE_OUT |
+					 flags));
 	gem_context_destroy(i915, ctx);
 
 	igt_spin_busywait_until_started(spin[0]);
@@ -649,7 +652,8 @@ static void lateslice(int i915, unsigned int engine)
 	spin[1] = igt_spin_new(i915, .ctx = ctx, .engine = engine,
 			       .fence = spin[0]->out_fence,
 			       .flags = (IGT_SPIN_POLL_RUN |
-					 IGT_SPIN_FENCE_IN));
+					 IGT_SPIN_FENCE_IN |
+					 flags));
 	gem_context_destroy(i915, ctx);
 
 	usleep(5000); /* give some time for the new spinner to be scheduled */
@@ -663,7 +667,7 @@ static void lateslice(int i915, unsigned int engine)
 
 	ctx = gem_context_create(i915);
 	spin[2] = igt_spin_new(i915, .ctx = ctx, .engine = engine,
-			       .flags = IGT_SPIN_POLL_RUN);
+			       .flags = IGT_SPIN_POLL_RUN | flags);
 	gem_context_destroy(i915, ctx);
 
 	igt_spin_busywait_until_started(spin[2]);
@@ -722,6 +726,7 @@ static void submit_slice(int i915,
 			 unsigned int flags)
 #define EARLY_SUBMIT 0x1
 #define LATE_SUBMIT 0x2
+#define USERPTR 0x4
 {
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines , 1) = {};
 	const struct intel_execution_engine2 *cancel;
@@ -766,6 +771,7 @@ static void submit_slice(int i915,
 				    .flags =
 				    IGT_SPIN_POLL_RUN |
 				    (flags & LATE_SUBMIT ? IGT_SPIN_FENCE_IN : 0) |
+				    (flags & USERPTR ? IGT_SPIN_USERPTR : 0) |
 				    IGT_SPIN_FENCE_OUT);
 		if (fence != -1)
 			close(fence);
@@ -805,7 +811,7 @@ static uint32_t batch_create(int i915)
 	return __batch_create(i915, 0);
 }
 
-static void semaphore_userlock(int i915)
+static void semaphore_userlock(int i915, unsigned long flags)
 {
 	const struct intel_execution_engine2 *e;
 	struct drm_i915_gem_exec_object2 obj = {
@@ -828,7 +834,8 @@ static void semaphore_userlock(int i915)
 		if (!spin) {
 			spin = igt_spin_new(i915,
 					    .dependency = scratch,
-					    .engine = e->flags);
+					    .engine = e->flags,
+					    .flags = flags);
 		} else {
 			uint64_t saved = spin->execbuf.flags;
 
@@ -869,7 +876,7 @@ static void semaphore_userlock(int i915)
 	igt_spin_free(i915, spin);
 }
 
-static void semaphore_codependency(int i915)
+static void semaphore_codependency(int i915, unsigned long flags)
 {
 	const struct intel_execution_engine2 *e;
 	struct {
@@ -903,7 +910,7 @@ static void semaphore_codependency(int i915)
 			__igt_spin_new(i915,
 				       .ctx = ctx,
 				       .engine = e->flags,
-				       .flags = IGT_SPIN_POLL_RUN);
+				       .flags = IGT_SPIN_POLL_RUN | flags);
 		igt_spin_busywait_until_started(task[i].xcs);
 
 		/* Common rcs tasks will be queued in FIFO */
@@ -926,12 +933,17 @@ static void semaphore_codependency(int i915)
 	gem_sync(i915, task[1].rcs->handle); /* to hang if task[0] hogs rcs */
 
 	for (i = 0; i < ARRAY_SIZE(task); i++) {
+		igt_spin_end(task[i].xcs);
+		igt_spin_end(task[i].rcs);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(task); i++) {
 		igt_spin_free(i915, task[i].xcs);
 		igt_spin_free(i915, task[i].rcs);
 	}
 }
 
-static void semaphore_resolve(int i915)
+static void semaphore_resolve(int i915, unsigned long flags)
 {
 	const struct intel_execution_engine2 *e;
 	const uint32_t SEMAPHORE_ADDR = 64 << 10;
@@ -966,7 +978,7 @@ static void semaphore_resolve(int i915)
 		if (!gem_class_can_store_dword(i915, e->class))
 			continue;
 
-		spin = __igt_spin_new(i915, .engine = e->flags);
+		spin = __igt_spin_new(i915, .engine = e->flags, .flags = flags);
 		igt_spin_end(spin); /* we just want its address for later */
 		gem_sync(i915, spin->handle);
 		igt_spin_reset(spin);
@@ -1060,7 +1072,7 @@ static void semaphore_resolve(int i915)
 	gem_context_destroy(i915, outer);
 }
 
-static void semaphore_noskip(int i915)
+static void semaphore_noskip(int i915, unsigned long flags)
 {
 	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	const struct intel_execution_engine2 *outer, *inner;
@@ -1081,9 +1093,9 @@ static void semaphore_noskip(int i915)
 		    !gem_class_can_store_dword(i915, inner->class))
 			continue;
 
-		chain = __igt_spin_new(i915, .engine = outer->flags);
+		chain = __igt_spin_new(i915, .engine = outer->flags, .flags = flags);
 
-		spin = __igt_spin_new(i915, .engine = inner->flags);
+		spin = __igt_spin_new(i915, .engine = inner->flags, .flags = flags);
 		igt_spin_end(spin); /* we just want its address for later */
 		gem_sync(i915, spin->handle);
 		igt_spin_reset(spin);
@@ -1274,7 +1286,8 @@ static void preempt(int fd, const struct intel_execution_engine2 *e, unsigned fl
 		}
 		spin[n] = __igt_spin_new(fd,
 					 .ctx = ctx[LO],
-					 .engine = e->flags);
+					 .engine = e->flags,
+					 .flags = flags & USERPTR ? IGT_SPIN_USERPTR : 0);
 		igt_debug("spin[%d].handle=%d\n", n, spin[n]->handle);
 
 		store_dword(fd, ctx[HI], e->flags, result, 0, n + 1, I915_GEM_DOMAIN_RENDER);
@@ -2707,7 +2720,9 @@ igt_main
 			implicit_rw(fd, e->flags, READ_WRITE | WRITE_READ);
 
 		test_each_engine_store("independent", fd, e)
-			independent(fd, e->flags);
+			independent(fd, e->flags, 0);
+		test_each_engine_store("u-independent", fd, e)
+			independent(fd, e->flags, IGT_SPIN_USERPTR);
 	}
 
 	igt_subtest_group {
@@ -2728,7 +2743,9 @@ igt_main
 			timesliceN(fd, e->flags, 67);
 
 		test_each_engine("lateslice", fd, e)
-			lateslice(fd, e->flags);
+			lateslice(fd, e->flags, 0);
+		test_each_engine("u-lateslice", fd, e)
+			lateslice(fd, e->flags, IGT_SPIN_USERPTR);
 
 		igt_subtest_group {
 			igt_fixture {
@@ -2763,19 +2780,34 @@ igt_main
 
 		test_each_engine("submit-early-slice", fd, e)
 			submit_slice(fd, e, EARLY_SUBMIT);
+		test_each_engine("u-submit-early-slice", fd, e)
+			submit_slice(fd, e, EARLY_SUBMIT | USERPTR);
 		test_each_engine("submit-golden-slice", fd, e)
 			submit_slice(fd, e, 0);
+		test_each_engine("u-submit-golden-slice", fd, e)
+			submit_slice(fd, e, USERPTR);
 		test_each_engine("submit-late-slice", fd, e)
 			submit_slice(fd, e, LATE_SUBMIT);
+		test_each_engine("u-submit-late-slice", fd, e)
+			submit_slice(fd, e, LATE_SUBMIT | USERPTR);
 
 		igt_subtest("semaphore-user")
-			semaphore_userlock(fd);
+			semaphore_userlock(fd, 0);
 		igt_subtest("semaphore-codependency")
-			semaphore_codependency(fd);
+			semaphore_codependency(fd, 0);
 		igt_subtest("semaphore-resolve")
-			semaphore_resolve(fd);
+			semaphore_resolve(fd, 0);
 		igt_subtest("semaphore-noskip")
-			semaphore_noskip(fd);
+			semaphore_noskip(fd, 0);
+
+		igt_subtest("u-semaphore-user")
+			semaphore_userlock(fd, IGT_SPIN_USERPTR);
+		igt_subtest("u-semaphore-codependency")
+			semaphore_codependency(fd, IGT_SPIN_USERPTR);
+		igt_subtest("u-semaphore-resolve")
+			semaphore_resolve(fd, IGT_SPIN_USERPTR);
+		igt_subtest("u-semaphore-noskip")
+			semaphore_noskip(fd, IGT_SPIN_USERPTR);
 
 		igt_subtest("smoketest-all")
 			smoketest(fd, ALL_ENGINES, 30);
@@ -2799,6 +2831,9 @@ igt_main
 
 			test_each_engine_store("preempt-contexts", fd, e)
 				preempt(fd, e, NEW_CTX);
+
+			test_each_engine_store("preempt-user", fd, e)
+				preempt(fd, e, USERPTR);
 
 			test_each_engine_store("preempt-self", fd, e)
 				preempt_self(fd, e->flags);
