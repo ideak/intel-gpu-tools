@@ -453,6 +453,8 @@ void igt_device_find_first_i915_discrete_card(struct igt_device_card *card)
 {
 	struct igt_device *dev;
 
+	memset(card, 0, sizeof(*card));
+
 	igt_list_for_each_entry(dev, &igt_devs.all, link) {
 
 		if (!is_pci_subsystem(dev))
