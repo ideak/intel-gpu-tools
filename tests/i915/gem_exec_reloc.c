@@ -914,13 +914,14 @@ static void concurrent_child(int i915,
 			     uint32_t *common, int num_common,
 			     int in, int out)
 {
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	int idx = flags_to_index(e);
 	uint64_t relocs = concurrent_relocs(i915, idx, CONCURRENT);
 	struct drm_i915_gem_exec_object2 obj[num_common + 2];
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(obj),
 		.buffer_count = ARRAY_SIZE(obj),
-		.flags = e->flags | I915_EXEC_HANDLE_LUT,
+		.flags = e->flags | I915_EXEC_HANDLE_LUT | (gen < 6 ? I915_EXEC_SECURE : 0),
 	};
 	uint32_t *batch = &obj[num_common + 1].handle;
 	unsigned long count = 0;
@@ -954,8 +955,8 @@ static void concurrent_child(int i915,
 
 		for (int n = 0; n < CONCURRENT; n++) {
 			if (x[n] != *batch) {
-				igt_warn("%s: Invalid store [bad reloc] found at index %d\n",
-					 e->name, n);
+				igt_warn("%s: Invalid store [bad reloc] found:%08x at index %d, expected %08x\n",
+					 e->name, x[n], n, *batch);
 				err = -EINVAL;
 				break;
 			}
@@ -975,17 +976,22 @@ static uint32_t create_concurrent_batch(int i915, unsigned int count)
 	size_t sz = ALIGN(4 * (1 + 4 * count), 4096);
 	uint32_t handle = gem_create(i915, sz);
 	uint32_t *map, *cs;
+	uint32_t cmd;
+
+	cmd = MI_STORE_DWORD_IMM;
+	if (gen < 6)
+		cmd |= 1 << 22;
+	if (gen < 4)
+		cmd--;
 
 	cs = map = gem_mmap__device_coherent(i915, handle, 0, sz, PROT_WRITE);
 	for (int n = 0; n < count; n++) {
+		*cs++ = cmd;
+		*cs++ = 0;
 		if (gen >= 4) {
-			*cs++ = MI_STORE_DWORD_IMM;
-			*cs++ = 0;
 			*cs++ = 0;
 			*cs++ = handle;
 		} else {
-			*cs++ = MI_STORE_DWORD_IMM - 1;
-			*cs++ = 0;
 			*cs++ = handle;
 			*cs++ = 0;
 		}
