@@ -515,6 +515,7 @@ static void prioinv(int fd, int dir, unsigned ring, const char *name)
 	igt_require(gem_gpu_reset_type(fd) > 1);
 
 	/* Needs to be fast enough for the hangcheck to return within 1s */
+	igt_require(gem_engine_property_printf(fd, name, "preempt_timeout_ms", "%d", 0) > 0);
 	gem_engine_property_printf(fd, name, "preempt_timeout_ms", "%d", 500);
 
 	gtt = gem_aperture_size(fd) / size;
