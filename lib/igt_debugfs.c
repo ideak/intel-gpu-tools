@@ -195,7 +195,7 @@ char *igt_debugfs_path(int device, char *path, int pathlen)
 				 debugfs_root, idx);
 			file = open(path, O_RDONLY);
 			if (file < 0)
-				return NULL;
+				continue;
 
 			cmp_len = read(file, cmp, sizeof(cmp));
 			close(file);
