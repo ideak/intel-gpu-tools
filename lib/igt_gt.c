@@ -368,6 +368,7 @@ void igt_force_gpu_reset(int drm_fd)
 
 	dir = igt_debugfs_dir(drm_fd);
 
+	wedged = 0;
 	igt_sysfs_set(dir, "i915_wedged", "-1");
 	igt_sysfs_scanf(dir, "i915_wedged", "%d", &wedged);
 
