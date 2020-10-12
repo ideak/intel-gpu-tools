@@ -39,7 +39,7 @@
  */
 
 #define RUN_TIME 2
-#define MIN_FLIPS_PER_FRAME 8
+#define MIN_FLIPS_PER_FRAME 5
 
 IGT_TEST_DESCRIPTION("Test asynchronous page flips.");
 
@@ -205,10 +205,12 @@ static void test_async_flip(data_t *data, bool alternate_sync_async)
 		gettimeofday(&end, NULL);
 		timersub(&end, &start, &diff);
 
-		igt_assert_f(data->flip_interval < 1000.0 / (data->refresh_rate * MIN_FLIPS_PER_FRAME),
-			     "Flip interval not significantly smaller than vblank interval\n"
-			     "Flip interval: %lfms, Refresh Rate = %dHz, Threshold = %d\n",
-			     data->flip_interval, data->refresh_rate, MIN_FLIPS_PER_FRAME);
+		if (alternate_sync_async) {
+			igt_assert_f(data->flip_interval < 1000.0 / (data->refresh_rate * MIN_FLIPS_PER_FRAME),
+				     "Flip interval not significantly smaller than vblank interval\n"
+				     "Flip interval: %lfms, Refresh Rate = %dHz, Threshold = %d\n",
+				     data->flip_interval, data->refresh_rate, MIN_FLIPS_PER_FRAME);
+		}
 
 		frame++;
 	} while (diff.tv_sec < RUN_TIME);
