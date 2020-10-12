@@ -151,7 +151,7 @@ static void *thread(void *data)
 	return NULL;
 }
 
-static void check_bo(int fd, uint32_t handle, int pass, struct thread *threads)
+static void check_bo(int fd, uint32_t *data, uint32_t handle, int pass, struct thread *threads)
 {
 	uint32_t x = hash32(handle * pass) % 1024;
 	uint32_t result;
@@ -161,8 +161,14 @@ static void check_bo(int fd, uint32_t handle, int pass, struct thread *threads)
 
 	igt_debug("Verifying result (pass=%d, handle=%d, thread %d)\n",
 		  pass, handle, x);
-	gem_read(fd, handle, x * sizeof(result), &result, sizeof(result));
-	igt_assert_eq_u32(result, x);
+
+	if (data) {
+		gem_wait(fd, handle, NULL);
+		igt_assert_eq_u32(data[x], x);
+	} else {
+		gem_read(fd, handle, x * sizeof(result), &result, sizeof(result));
+		igt_assert_eq_u32(result, x);
+	}
 }
 
 static uint32_t handle_create(int fd, unsigned int flags, void **data)
@@ -178,6 +184,7 @@ static uint32_t handle_create(int fd, unsigned int flags, void **data)
 		return handle;
 	}
 
+	*data = NULL;
 	return gem_create(fd, 4096);
 }
 
@@ -258,7 +265,7 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 		pthread_join(threads[i].thread, NULL);
 
 	for (i = 0; i < NUMOBJ; i++) {
-		check_bo(fd, handle[i], i, threads);
+		check_bo(fd, arg[i], handle[i], i, threads);
 		handle_close(fd, flags, handle[i], arg[i]);
 	}
 
