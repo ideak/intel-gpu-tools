@@ -320,7 +320,7 @@ static void tiling_tests(int fd)
 		}
 
 		f.pitches[0] = 1024*4;
-		igt_subtest("basic-X-tiled") {
+		igt_subtest("basic-x-tiled-legacy") {
 			f.handles[0] = tiled_x_bo;
 
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) == 0);
@@ -348,7 +348,7 @@ static void tiling_tests(int fd)
 		}
 
 		f.pitches[0] = 1024*4;
-		igt_subtest("basic-Y-tiled") {
+		igt_subtest("basic-y-tiled-legacy") {
 			f.handles[0] = tiled_y_bo;
 
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) == -1 &&
@@ -506,12 +506,12 @@ static void addfb25_tests(int fd)
 			igt_require_fb_modifiers(fd);
 		}
 
-		igt_subtest("addfb25-X-tiled-mismatch") {
+		igt_subtest("addfb25-x-tiled-mismatch-legacy") {
 			f.modifier[0] = LOCAL_DRM_FORMAT_MOD_NONE;
 			igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) < 0 && errno == EINVAL);
 		}
 
-		igt_subtest("addfb25-X-tiled") {
+		igt_subtest("addfb25-x-tiled-legacy") {
 			f.modifier[0] = LOCAL_I915_FORMAT_MOD_X_TILED;
 			igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) == 0);
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
@@ -570,7 +570,7 @@ static void addfb25_ytile(int fd)
 		f.handles[0] = gem_bo;
 	}
 
-	igt_subtest("addfb25-Y-tiled") {
+	igt_subtest("addfb25-y-tiled-legacy") {
 		igt_require_fb_modifiers(fd);
 
 		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Y_TILED;
@@ -581,7 +581,7 @@ static void addfb25_ytile(int fd)
 		f.fb_id = 0;
 	}
 
-	igt_subtest("addfb25-Yf-tiled") {
+	igt_subtest("addfb25-yf-tiled-legacy") {
 		igt_require_fb_modifiers(fd);
 
 		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Yf_TILED;
@@ -592,7 +592,7 @@ static void addfb25_ytile(int fd)
 		f.fb_id = 0;
 	}
 
-	igt_subtest("addfb25-Y-tiled-small") {
+	igt_subtest("addfb25-y-tiled-small-legacy") {
 		igt_require_fb_modifiers(fd);
 
 		gen = intel_gen(intel_get_drm_devid(fd));
