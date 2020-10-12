@@ -34,6 +34,14 @@
 
 IGT_TEST_DESCRIPTION("Test that /dev/drm_dp_aux reads work");
 
+static bool is_mst_connector(int drm_fd, uint32_t connector_id)
+{
+	return kmstest_get_property(drm_fd, connector_id,
+				    DRM_MODE_OBJECT_CONNECTOR,
+				    "PATH", NULL,
+				    NULL, NULL);
+}
+
 static bool test(int drm_fd, uint32_t connector_id)
 {
 	drmModeConnector *connector;
@@ -67,10 +75,12 @@ static bool test(int drm_fd, uint32_t connector_id)
 		igt_assert(fd >= 0);
 
 		ret = read(fd, buf, sizeof(buf));
-		igt_assert(ret == sizeof(buf) || errno == ETIMEDOUT);
-
 		igt_info("%s: %s\n", path,
-			 ret > 0 ? "success" : "timed out");
+			 ret > 0 ? "success" : strerror(errno));
+
+		igt_assert(ret == sizeof(buf) ||
+			   errno == ETIMEDOUT ||
+			   (errno == EIO && is_mst_connector(drm_fd, connector_id)));
 
 		close(fd);
 
