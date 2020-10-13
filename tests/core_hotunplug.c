@@ -233,9 +233,9 @@ static int merge_fences(int old, int new)
 		return new;
 
 	merge = sync_fence_merge(old, new);
-	igt_assert(merge != -1);
-	close(old);
-	close(new);
+	/* Assume fence close errors don't affect device close status */
+	igt_ignore_warn(local_close(old, "old fence close failed"));
+	igt_ignore_warn(local_close(new, "new fence close failed"));
 
 	return merge;
 }
@@ -249,29 +249,53 @@ static int local_i915_healthcheck(int i915, const char *prefix)
 		.buffer_count = 1,
 	};
 	const struct intel_execution_engine2 *engine;
-	int fence = -1;
+	int fence = -1, err = 0, status = 1;
 
 	local_debug("%s%s\n", prefix, "running i915 GPU healthcheck");
-	if (local_i915_is_wedged(i915))
+	if (igt_warn_on_f(local_i915_is_wedged(i915), "GPU found wedged\n"))
 		return -EIO;
 
+	/* Assume gem_create()/gem_write() failures are unrecoverable */
 	obj.handle = gem_create(i915, 4096);
 	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
 
+	/* As soon as a fence is open, don't fail before closing it */
 	__for_each_physical_engine(i915, engine) {
 		execbuf.flags = engine->flags | I915_EXEC_FENCE_OUT;
-		gem_execbuf_wr(i915, &execbuf);
+		err = __gem_execbuf_wr(i915, &execbuf);
+		if (igt_warn_on_f(err < 0, "__gem_execbuf_wr() returned %d\n",
+				  err))
+			break;
 
 		fence = merge_fences(fence, execbuf.rsvd2 >> 32);
+		if (igt_warn_on_f(fence < 0, "merge_fences() returned %d\n",
+				  fence)) {
+			err = fence;
+			break;
+		}
 	}
-	igt_assert(fence != -1);
+	if (fence >= 0) {
+		status = sync_fence_wait(fence, -1);
+		if (igt_warn_on_f(status < 0, "sync_fence_wait() returned %d\n",
+				  status))
+			err = status;
+		if (!err)
+			status = sync_fence_status(fence);
+
+		/* Assume fence close errors don't affect device close status */
+		igt_ignore_warn(local_close(fence, "fence close failed"));
+	}
+
+	/* Assume gem_close() failure is unrecoverable */
 	gem_close(i915, obj.handle);
 
-	igt_assert_eq(sync_fence_wait(fence, -1), 0);
-	igt_assert_eq(sync_fence_status(fence), 1);
-	close(fence);
+	if (err < 0)
+		return err;
+	if (igt_warn_on_f(status != 1, "sync_fence_status() returned %d\n",
+			  status))
+		return -1;
 
-	if (local_i915_is_wedged(i915))
+	if (igt_warn_on_f(local_i915_is_wedged(i915), "GPU turned wedged\n"))
 		return -EIO;
 
 	return 0;
