@@ -884,10 +884,15 @@ for arg in args.xml:
             # delta equations are expected to be identical so warn if that's
             # not true...
             if bool(raw_read_eq) ^ bool(delta_read_eq) or raw_read_eq != delta_read_eq:
-                print_err("WARNING: Inconsistent raw and delta report equations for " + \
-                          mdapi_set.get('ShortName') + " :: " + mdapi_counter.get('SymbolName') + \
-                          "(" + mdapi_counter.get('ShortName') + ")" + ": raw=\"" + str(raw_read_eq) + \
-                          "\" delta=\"" + str(delta_read_eq) + "\" (SKIPPING)")
+                print_err(("WARNING: Inconsistent raw and delta report equations for {0} :: {1} ({2}): " +
+                           "raw=\"{3}\" / \"{4}\" delta=\"{5}\" / \"{6}\" (SKIPPING)")
+                          .format(mdapi_set.get('ShortName'),
+                                  mdapi_counter.get('SymbolName'),
+                                  mdapi_counter.get('ShortName'),
+                                  str(raw_read_eq),
+                                  mdapi_counter.get('SnapshotReportReadEquation'),
+                                  str(delta_read_eq),
+                                  mdapi_counter.get('DeltaReportReadEquation')))
                 set.remove(counter)
                 continue
 
