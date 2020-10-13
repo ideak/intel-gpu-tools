@@ -273,7 +273,7 @@ static void mmapped(int i915)
 	gem_close(i915, buf);
 }
 
-static uint32_t batch_create_size(int fd, uint32_t size)
+static uint32_t batch_create_size(int fd, uint64_t size)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	uint32_t handle;
@@ -315,6 +315,36 @@ static void test_invalid_batch_start(int fd)
 
 	gem_sync(fd, exec.handle);
 	gem_close(fd, exec.handle);
+}
+
+static void test_larger_than_life_batch(int fd)
+{
+       uint64_t size = 1ULL << 32; /* batch_len is __u32 as per the ABI */
+       struct drm_i915_gem_exec_object2 exec = {
+               .handle = batch_create_size(fd, size),
+       };
+       struct drm_i915_gem_execbuffer2 execbuf = {
+               .buffers_ptr = to_user_pointer(&exec),
+               .buffer_count = 1,
+       };
+
+       /*
+	* batch_len seems like it can have different interaction depending on
+	* the engine and HW -- but we know that only if the GTT can be larger
+	* than 4G do we run into u32 issues, so we can safely restrict our
+	* checking to that subset of machines.
+	*/
+       igt_require(size < gem_aperture_size(fd));
+       intel_require_memory(2, size, CHECK_RAM); /* batch + shadow */
+
+       for_each_engine(e, fd) {
+	       /* Keep the batch_len implicit [0] */
+	       execbuf.flags = eb_ring(e);
+	       gem_execbuf(fd, &execbuf);
+       }
+
+       gem_sync(fd, exec.handle);
+       gem_close(fd, exec.handle);
 }
 
 struct drm_i915_gem_execbuffer2 execbuf;
@@ -585,6 +615,9 @@ igt_main
 
 	igt_subtest("invalid-batch-start-offset")
 		test_invalid_batch_start(fd);
+
+	igt_subtest("larger-than-life-batch")
+		test_larger_than_life_batch(fd);
 
 #define DIRT(name) \
 	igt_subtest(#name "-dirt") { \
