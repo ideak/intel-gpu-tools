@@ -628,6 +628,8 @@ static void test_bb_oversize(int i915)
 	gem_write(i915, obj.handle, (4ull << 30) - sizeof(bbe),
 		  &bbe, sizeof(bbe));
 
+	igt_assert_eq(__checked_execbuf(i915, &execbuf), 0);
+
 	for (int i = 13; i <= 32; i++) {
 		igt_debug("Checking length %#llx\n", 1ull << i);
 
@@ -637,6 +639,9 @@ static void test_bb_oversize(int i915)
 		execbuf.batch_len = (1ull << i) + 4096; /* will wrap */
 		igt_assert_eq(__checked_execbuf(i915, &execbuf), 0);
 	}
+
+	execbuf.batch_len = 0;
+	igt_assert_eq(__checked_execbuf(i915, &execbuf), 0);
 
 	gem_close(i915, obj.handle);
 }
