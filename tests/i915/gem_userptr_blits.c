@@ -71,8 +71,7 @@
 #define PAGE_SIZE 4096
 #endif
 
-static uint32_t userptr_flags = I915_USERPTR_UNSYNCHRONIZED;
-
+static uint32_t userptr_flags;
 static bool *can_mmap;
 
 #define WIDTH 512
@@ -504,14 +503,11 @@ static int has_userptr(int fd)
 {
 	uint32_t handle = 0;
 	void *ptr;
-	uint32_t oldflags;
 	int ret;
 
 	igt_assert(posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE) == 0);
-	oldflags = userptr_flags;
-	gem_userptr_test_unsynchronized();
 	ret = __gem_userptr(fd, ptr, PAGE_SIZE, 0, userptr_flags, &handle);
-	userptr_flags = oldflags;
+	errno = 0;
 	if (ret != 0) {
 		free(ptr);
 		return 0;
@@ -2112,6 +2108,10 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest_group {
 		igt_fixture {
+			/* Either mode will do for parameter checking */
+			gem_userptr_test_synchronized();
+			if (!has_userptr(fd))
+				gem_userptr_test_unsynchronized();
 			igt_require(has_userptr(fd));
 		}
 
