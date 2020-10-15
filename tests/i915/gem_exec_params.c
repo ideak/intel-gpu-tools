@@ -600,6 +600,8 @@ igt_main
 
 		close(execbuf.rsvd2);
 		close(timeline);
+
+		gem_sync(fd, handle);
 	}
 
 	igt_subtest("rsvd2-dirt") {
