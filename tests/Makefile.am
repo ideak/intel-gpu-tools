@@ -110,7 +110,6 @@ gem_fence_upload_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_fence_upload_LDADD = $(LDADD) -lpthread
 gem_flink_race_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_flink_race_LDADD = $(LDADD) -lpthread
-gem_mocs_settings_LDADD = $(LDADD) $(top_builddir)/lib/libigt_perf.la
 gem_mmap_gtt_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 gem_mmap_gtt_LDADD = $(LDADD) -lpthread
 gem_mmap_offset_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
