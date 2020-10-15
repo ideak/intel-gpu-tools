@@ -236,6 +236,7 @@ i915_progs = [
 	'i915_query',
 	'i915_selftest',
 	'i915_suspend',
+	'sysfs_defaults',
 	'sysfs_heartbeat_interval',
 	'sysfs_preempt_timeout',
 	'sysfs_timeslice_duration',
