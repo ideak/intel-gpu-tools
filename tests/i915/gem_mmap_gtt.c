@@ -525,6 +525,7 @@ static void *memchr_inv(const void *s, int c, size_t n)
 static void
 test_ptrace(int fd)
 {
+	unsigned long sz = 16 * 4096;
 	unsigned long AA, CC;
 	unsigned long *gtt, *cpy;
 	uint32_t bo;
@@ -533,16 +534,16 @@ test_ptrace(int fd)
 	memset(&AA, 0xaa, sizeof(AA));
 	memset(&CC, 0x55, sizeof(CC));
 
-	cpy = malloc(OBJECT_SIZE);
-	memset(cpy, AA, OBJECT_SIZE);
+	cpy = malloc(sz);
+	memset(cpy, AA, sz);
 
-	bo = gem_create(fd, OBJECT_SIZE);
-	gtt = mmap_bo(fd, bo, OBJECT_SIZE);
-	memset(gtt, CC, OBJECT_SIZE);
+	bo = gem_create(fd, sz);
+	gtt = mmap_bo(fd, bo, sz);
+	memset(gtt, CC, sz);
 	gem_close(fd, bo);
 
-	igt_assert(!memchr_inv(gtt, CC, OBJECT_SIZE));
-	igt_assert(!memchr_inv(cpy, AA, OBJECT_SIZE));
+	igt_assert(!memchr_inv(gtt, CC, sz));
+	igt_assert(!memchr_inv(cpy, AA, sz));
 
 	igt_fork(child, 1) {
 		ptrace(PTRACE_TRACEME, 0, NULL, NULL);
@@ -553,7 +554,7 @@ test_ptrace(int fd)
 	pid = wait(NULL);
 
 	ptrace(PTRACE_ATTACH, pid, NULL, NULL);
-	for (int i = 0; i < OBJECT_SIZE / sizeof(long); i++) {
+	for (int i = 0; i < sz / sizeof(long); i++) {
 		long ret;
 
 		ret = ptrace(PTRACE_PEEKDATA, pid, gtt + i);
@@ -570,10 +571,10 @@ test_ptrace(int fd)
 	igt_waitchildren();
 
 	/* The contents of the two buffers should now be swapped */
-	igt_assert(!memchr_inv(gtt, AA, OBJECT_SIZE));
-	igt_assert(!memchr_inv(cpy, CC, OBJECT_SIZE));
+	igt_assert(!memchr_inv(gtt, AA, sz));
+	igt_assert(!memchr_inv(cpy, CC, sz));
 
-	munmap(gtt, OBJECT_SIZE);
+	munmap(gtt, sz);
 	free(cpy);
 }
 
