@@ -61,6 +61,7 @@ lib_sources = [
 	'igt_core.c',
 	'igt_draw.c',
 	'igt_list.c',
+	'igt_map.c',
 	'igt_pm.c',
 	'igt_dummyload.c',
 	'uwildmat/uwildmat.c',

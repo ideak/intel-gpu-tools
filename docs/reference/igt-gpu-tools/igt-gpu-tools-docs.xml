@@ -33,6 +33,7 @@
     <xi:include href="xml/igt_kmod.xml"/>
     <xi:include href="xml/igt_kms.xml"/>
     <xi:include href="xml/igt_list.xml"/>
+    <xi:include href="xml/igt_map.xml"/>
     <xi:include href="xml/igt_pm.xml"/>
     <xi:include href="xml/igt_primes.xml"/>
     <xi:include href="xml/igt_rand.xml"/>
