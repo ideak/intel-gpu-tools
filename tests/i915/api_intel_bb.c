@@ -1260,7 +1260,7 @@ static void render_ccs(struct buf_ops *bops)
 	struct intel_bb *ibb;
 	const int width = 1024;
 	const int height = 1024;
-	struct intel_buf src, dst, final;
+	struct intel_buf src, dst, dst2, final;
 	int i915 = buf_ops_get_fd(bops);
 	uint32_t fails = 0;
 	uint32_t compressed = 0;
@@ -1274,6 +1274,8 @@ static void render_ccs(struct buf_ops *bops)
 	scratch_buf_init(bops, &src, width, height, I915_TILING_NONE,
 			 I915_COMPRESSION_NONE);
 	scratch_buf_init(bops, &dst, width, height, I915_TILING_Y,
+			 I915_COMPRESSION_RENDER);
+	scratch_buf_init(bops, &dst2, width, height, I915_TILING_Y,
 			 I915_COMPRESSION_RENDER);
 	scratch_buf_init(bops, &final, width, height, I915_TILING_NONE,
 			 I915_COMPRESSION_NONE);
@@ -1294,6 +1296,12 @@ static void render_ccs(struct buf_ops *bops)
 	render_copy(ibb,
 		    &dst,
 		    0, 0, width, height,
+		    &dst2,
+		    0, 0);
+
+	render_copy(ibb,
+		    &dst2,
+		    0, 0, width, height,
 		    &final,
 		    0, 0);
 
@@ -1309,12 +1317,15 @@ static void render_ccs(struct buf_ops *bops)
 	if (write_png) {
 		intel_buf_write_to_png(&src, "render-ccs-src.png");
 		intel_buf_write_to_png(&dst, "render-ccs-dst.png");
+		intel_buf_write_to_png(&dst2, "render-ccs-dst2.png");
 		intel_buf_write_aux_to_png(&dst, "render-ccs-dst-aux.png");
+		intel_buf_write_aux_to_png(&dst2, "render-ccs-dst2-aux.png");
 		intel_buf_write_to_png(&final, "render-ccs-final.png");
 	}
 
 	intel_buf_close(bops, &src);
 	intel_buf_close(bops, &dst);
+	intel_buf_close(bops, &dst2);
 	intel_buf_close(bops, &final);
 
 	igt_assert_f(fails == 0, "render-ccs fails: %d\n", fails);
