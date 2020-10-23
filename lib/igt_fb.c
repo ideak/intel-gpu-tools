@@ -2253,11 +2253,11 @@ igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
 	bo_name = gem_flink(fd, fb->gem_handle);
 	handle = gem_open(fd, bo_name);
 
-	buf = intel_buf_create_using_handle(bops, handle,
-					    fb->width, fb->height,
-					    fb->plane_bpp[0], 0,
-					    igt_fb_mod_to_tiling(fb->modifier),
-					    compression);
+	buf = intel_buf_create_using_handle_and_size(bops, handle,
+						     fb->width, fb->height,
+						     fb->plane_bpp[0], 0,
+						     igt_fb_mod_to_tiling(fb->modifier),
+						     compression, fb->size);
 	intel_buf_set_name(buf, name);
 
 	/* Make sure we close handle on destroy path */
