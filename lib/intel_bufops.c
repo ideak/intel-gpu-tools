@@ -708,7 +708,8 @@ static void __intel_buf_init(struct buf_ops *bops,
 			     uint32_t handle,
 			     struct intel_buf *buf,
 			     int width, int height, int bpp, int alignment,
-			     uint32_t req_tiling, uint32_t compression)
+			     uint32_t req_tiling, uint32_t compression,
+			     uint64_t bo_size)
 {
 	uint32_t tiling = req_tiling;
 	uint64_t size;
@@ -776,6 +777,11 @@ static void __intel_buf_init(struct buf_ops *bops,
 		size = buf->surface[0].stride * ALIGN(height, align_h);
 	}
 
+	if (bo_size > 0) {
+		igt_assert(bo_size >= size);
+		size = bo_size;
+	}
+
 	/* Store real bo size to avoid mistakes in calculating it again */
 	buf->size = size;
 
@@ -809,7 +815,7 @@ void intel_buf_init(struct buf_ops *bops,
 		    uint32_t tiling, uint32_t compression)
 {
 	__intel_buf_init(bops, 0, buf, width, height, bpp, alignment,
-			 tiling, compression);
+			 tiling, compression, 0);
 
 	intel_buf_set_ownership(buf, true);
 }
@@ -858,7 +864,7 @@ void intel_buf_init_using_handle(struct buf_ops *bops,
 				 uint32_t req_tiling, uint32_t compression)
 {
 	__intel_buf_init(bops, handle, buf, width, height, bpp, alignment,
-			 req_tiling, compression);
+			 req_tiling, compression, 0);
 }
 
 /**
@@ -926,6 +932,28 @@ struct intel_buf *intel_buf_create_using_handle(struct buf_ops *bops,
 
 	return buf;
 }
+
+struct intel_buf *intel_buf_create_using_handle_and_size(struct buf_ops *bops,
+							 uint32_t handle,
+							 int width, int height,
+							 int bpp, int alignment,
+							 uint32_t req_tiling,
+							 uint32_t compression,
+							 uint64_t size)
+{
+	struct intel_buf *buf;
+
+	igt_assert(bops);
+
+	buf = calloc(1, sizeof(*buf));
+	igt_assert(buf);
+
+	__intel_buf_init(bops, handle, buf, width, height, bpp, alignment,
+			 req_tiling, compression, size);
+
+	return buf;
+}
+
 
 /**
  * intel_buf_destroy
