@@ -43,6 +43,7 @@
     <xi:include href="xml/igt_vc4.xml"/>
     <xi:include href="xml/igt_vgem.xml"/>
     <xi:include href="xml/igt_x86.xml"/>
+    <xi:include href="xml/intel_allocator.xml"/>
     <xi:include href="xml/intel_batchbuffer.xml"/>
     <xi:include href="xml/intel_bufops.xml"/>
     <xi:include href="xml/intel_chipset.xml"/>

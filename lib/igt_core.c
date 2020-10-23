@@ -58,6 +58,7 @@
 #include <glib.h>
 
 #include "drmtest.h"
+#include "intel_allocator.h"
 #include "intel_chipset.h"
 #include "intel_io.h"
 #include "igt_debugfs.h"
@@ -1411,6 +1412,19 @@ __noreturn static void exit_subtest(const char *result)
 		}
 	}
 	num_test_children = 0;
+
+	/*
+	 * When test completes - mostly in fail state it can leave allocated
+	 * objects. An allocator is not an exception as it is global IGT
+	 * entity and when test will allocate some ranges and then it will
+	 * fail no free/close likely will be called (controling potential
+	 * fails and clearing before assertions in IGT is not common).
+	 *
+	 * We call intel_allocator_init() then to prepare the allocator
+	 * infrastructure from scratch for each test. Init also removes
+	 * remnants from previous allocator run (if any).
+	 */
+	intel_allocator_init();
 
 	if (!in_dynamic_subtest)
 		_igt_dynamic_tests_executed = -1;
