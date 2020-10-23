@@ -810,11 +810,11 @@ static void offset_control(struct buf_ops *bops)
 	dst2 = create_buf(bops, WIDTH, HEIGHT, COLOR_77);
 
 	intel_bb_add_object(ibb, src->handle, intel_buf_bo_size(src),
-			    src->addr.offset, false);
+			    src->addr.offset, 0, false);
 	intel_bb_add_object(ibb, dst1->handle, intel_buf_bo_size(dst1),
-			    dst1->addr.offset, true);
+			    dst1->addr.offset, 0, true);
 	intel_bb_add_object(ibb, dst2->handle, intel_buf_bo_size(dst2),
-			    dst2->addr.offset, true);
+			    dst2->addr.offset, 0, true);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 8);
@@ -838,13 +838,13 @@ static void offset_control(struct buf_ops *bops)
 
 	dst3 = create_buf(bops, WIDTH, HEIGHT, COLOR_33);
 	intel_bb_add_object(ibb, dst3->handle, intel_buf_bo_size(dst3),
-			    dst3->addr.offset, true);
+			    dst3->addr.offset, 0, true);
 	intel_bb_add_object(ibb, src->handle, intel_buf_bo_size(src),
-			    src->addr.offset, false);
+			    src->addr.offset, 0, false);
 	intel_bb_add_object(ibb, dst1->handle, intel_buf_bo_size(dst1),
-			    dst1->addr.offset, true);
+			    dst1->addr.offset, 0, true);
 	intel_bb_add_object(ibb, dst2->handle, intel_buf_bo_size(dst2),
-			    dst2->addr.offset, true);
+			    dst2->addr.offset, 0, true);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 	intel_bb_ptr_align(ibb, 8);
@@ -901,7 +901,7 @@ static void delta_check(struct buf_ops *bops)
 	buf = create_buf(bops, 0x1000, 0x10, COLOR_CC);
 	buf->addr.offset = 0xfffff000;
 	intel_bb_add_object(ibb, buf->handle, intel_buf_bo_size(buf),
-			    buf->addr.offset, false);
+			    buf->addr.offset, 0, false);
 
 	intel_bb_out(ibb, MI_STORE_DWORD_IMM);
 	intel_bb_emit_reloc(ibb, buf->handle,

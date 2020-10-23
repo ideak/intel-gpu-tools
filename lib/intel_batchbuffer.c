@@ -50,7 +50,6 @@
 #include "media_spin.h"
 #include "gpgpu_fill.h"
 #include "igt_aux.h"
-#include "igt_rand.h"
 #include "i830_reg.h"
 #include "huc_copy.h"
 #include <glib.h>
@@ -1211,23 +1210,9 @@ static void __reallocate_objects(struct intel_bb *ibb)
 	}
 }
 
-/*
- * gen8_canonical_addr
- * Used to convert any address into canonical form, i.e. [63:48] == [47].
- * Based on kernel's sign_extend64 implementation.
- * @address - a virtual address
- */
-#define GEN8_HIGH_ADDRESS_BIT 47
-static uint64_t gen8_canonical_addr(uint64_t address)
-{
-	int shift = 63 - GEN8_HIGH_ADDRESS_BIT;
-
-	return (int64_t)(address << shift) >> shift;
-}
-
 static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
 					     uint32_t handle,
-					     uint32_t size,
+					     uint64_t size,
 					     uint32_t alignment)
 {
 	uint64_t offset;
@@ -1235,33 +1220,77 @@ static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
 	if (ibb->enforce_relocs)
 		return 0;
 
-	/* randomize the address, we try to avoid relocations */
-	offset = hars_petruska_f54_1_random64(&ibb->prng);
-	offset += 256 << 10; /* Keep the low 256k clear, for negative deltas */
-	offset &= ibb->gtt_size - 1;
-	offset &= ~(ibb->alignment - 1);
-	offset = gen8_canonical_addr(offset);
+	offset = intel_allocator_alloc(ibb->allocator_handle,
+				       handle, size, alignment);
 
 	return offset;
 }
 
 /**
- * intel_bb_create:
+ * __intel_bb_create:
  * @i915: drm fd
+ * @ctx: context
  * @size: size of the batchbuffer
+ * @do_relocs: use relocations or allocator
+ * @allocator_type: allocator type, must be INTEL_ALLOCATOR_NONE for relocations
+ *
+ * intel-bb assumes it will work in one of two modes - with relocations or
+ * with using allocator (currently RANDOM and SIMPLE are implemented).
+ * Some description is required to describe how they maintain the addresses.
+ *
+ * Before entering into each scenarios generic rule is intel-bb keeps objects
+ * and their offsets in the internal cache and reuses in subsequent execs.
+ *
+ * 1. intel-bb with relocations
+ *
+ * Creating new intel-bb adds handle to cache implicitly and sets its address
+ * to 0. Objects added to intel-bb later also have address 0 set for first run.
+ * After calling execbuf cache is altered with new addresses. As intel-bb
+ * works in reloc mode addresses are only suggestion to the driver and we
+ * cannot be sure they won't change at next exec.
+ *
+ * 2. with allocator
+ *
+ * This mode is valid only for ppgtt. Addresses are acquired from allocator
+ * and softpinned. intel-bb cache must be then coherent with allocator
+ * (simple is coherent, random is not due to fact we don't keep its state).
+ * When we do intel-bb reset with purging cache it has to reacquire addresses
+ * from allocator (allocator should return same address - what is true for
+ * simple allocator and false for random as mentioned before).
+ *
+ * If we do reset without purging caches we use addresses from intel-bb cache
+ * during execbuf objects construction.
  *
  * Returns:
  *
  * Pointer the intel_bb, asserts on failure.
  */
 static struct intel_bb *
-__intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs)
+__intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
+		  uint8_t allocator_type)
 {
+	struct drm_i915_gem_exec_object2 *object;
 	struct intel_bb *ibb = calloc(1, sizeof(*ibb));
-	uint64_t gtt_size;
 
 	igt_assert(ibb);
 
+	ibb->uses_full_ppgtt = gem_uses_full_ppgtt(i915);
+
+	/*
+	 * If we don't have full ppgtt driver can change our addresses
+	 * so allocator is useless in this case. Just enforce relocations
+	 * for such gens and don't use allocator at all.
+	 */
+	if (!ibb->uses_full_ppgtt) {
+		do_relocs = true;
+		allocator_type = INTEL_ALLOCATOR_NONE;
+	}
+
+	if (!do_relocs)
+		ibb->allocator_handle = intel_allocator_open(i915, ctx, allocator_type);
+	else
+		igt_assert(allocator_type == INTEL_ALLOCATOR_NONE);
+	ibb->allocator_type = allocator_type;
 	ibb->i915 = i915;
 	ibb->devid = intel_get_drm_devid(i915);
 	ibb->gen = intel_gen(ibb->devid);
@@ -1273,39 +1302,41 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs)
 	ibb->batch = calloc(1, size);
 	igt_assert(ibb->batch);
 	ibb->ptr = ibb->batch;
-	ibb->prng = (uint32_t) to_user_pointer(ibb);
 	ibb->fence = -1;
 
-	gtt_size = gem_aperture_size(i915);
-	if (!gem_uses_full_ppgtt(i915))
-		gtt_size /= 2;
-	if ((gtt_size - 1) >> 32) {
+	ibb->gtt_size = gem_aperture_size(i915);
+	if ((ibb->gtt_size - 1) >> 32)
 		ibb->supports_48b_address = true;
 
-		/*
-		 * Until we develop IGT address allocator we workaround
-		 * playing with canonical addresses with 47-bit set to 1
-		 * just by limiting gtt size to 46-bit when gtt is 47 or 48
-		 * bit size. Current interface doesn't pass bo size, so
-		 * limiting to 46 bit make us sure we won't enter to
-		 * addresses with 47-bit set (we use 32-bit size now so
-		 * still we fit 47-bit address space).
-		 */
-		if (gtt_size & (3ull << 47))
-			gtt_size = (1ull << 46);
-	}
-	ibb->gtt_size = gtt_size;
-
-	ibb->batch_offset = __intel_bb_get_offset(ibb,
-						  ibb->handle,
-						  ibb->size,
-						  ibb->alignment);
-	intel_bb_add_object(ibb, ibb->handle, ibb->size,
-			    ibb->batch_offset, false);
+	object = intel_bb_add_object(ibb, ibb->handle, ibb->size,
+				     INTEL_BUF_INVALID_ADDRESS, ibb->alignment,
+				     false);
+	ibb->batch_offset = object->offset;
 
 	ibb->refcount = 1;
 
 	return ibb;
+}
+
+/**
+ * intel_bb_create_full:
+ * @i915: drm fd
+ * @ctx: context
+ * @size: size of the batchbuffer
+ * @allocator_type: allocator type, SIMPLE, RANDOM, ...
+ *
+ * Creates bb with context passed in @ctx, size in @size and allocator type
+ * in @allocator_type. Relocations are set to false because IGT allocator
+ * is not used in that case.
+ *
+ * Returns:
+ *
+ * Pointer the intel_bb, asserts on failure.
+ */
+struct intel_bb *intel_bb_create_full(int i915, uint32_t ctx, uint32_t size,
+				      uint8_t allocator_type)
+{
+	return __intel_bb_create(i915, ctx, size, false, allocator_type);
 }
 
 /**
@@ -1318,10 +1349,19 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs)
  * Returns:
  *
  * Pointer the intel_bb, asserts on failure.
+ *
+ * Notes:
+ *
+ * intel_bb must not be created in igt_fixture. The reason is intel_bb
+ * "opens" connection to the allocator and when test completes it can
+ * leave the allocator in unknown state (mostly for failed tests).
+ * As igt_core was armed to reset the allocator infrastructure
+ * connection to it inside intel_bb is not valid anymore.
+ * Trying to use it leads to catastrofic errors.
  */
 struct intel_bb *intel_bb_create(int i915, uint32_t size)
 {
-	return __intel_bb_create(i915, 0, size, false);
+	return __intel_bb_create(i915, 0, size, false, INTEL_ALLOCATOR_SIMPLE);
 }
 
 /**
@@ -1339,7 +1379,7 @@ struct intel_bb *intel_bb_create(int i915, uint32_t size)
 struct intel_bb *
 intel_bb_create_with_context(int i915, uint32_t ctx, uint32_t size)
 {
-	return __intel_bb_create(i915, ctx, size, false);
+	return __intel_bb_create(i915, ctx, size, false, INTEL_ALLOCATOR_SIMPLE);
 }
 
 /**
@@ -1356,7 +1396,7 @@ intel_bb_create_with_context(int i915, uint32_t ctx, uint32_t size)
  */
 struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
 {
-	return __intel_bb_create(i915, 0, size, true);
+	return __intel_bb_create(i915, 0, size, true, INTEL_ALLOCATOR_NONE);
 }
 
 /**
@@ -1375,7 +1415,7 @@ struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
 struct intel_bb *
 intel_bb_create_with_relocs_and_context(int i915, uint32_t ctx, uint32_t size)
 {
-	return __intel_bb_create(i915, ctx, size, true);
+	return __intel_bb_create(i915, ctx, size, true, INTEL_ALLOCATOR_NONE);
 }
 
 static void __intel_bb_destroy_relocations(struct intel_bb *ibb)
@@ -1429,6 +1469,10 @@ void intel_bb_destroy(struct intel_bb *ibb)
 	__intel_bb_destroy_objects(ibb);
 	__intel_bb_destroy_cache(ibb);
 
+	if (ibb->allocator_type != INTEL_ALLOCATOR_NONE) {
+		intel_allocator_free(ibb->allocator_handle, ibb->handle);
+		intel_allocator_close(ibb->allocator_handle);
+	}
 	gem_close(ibb->i915, ibb->handle);
 
 	if (ibb->fence >= 0)
@@ -1445,6 +1489,7 @@ void intel_bb_destroy(struct intel_bb *ibb)
  *
  * Recreate batch bo when there's no additional reference.
 */
+
 void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 {
 	uint32_t i;
@@ -1468,28 +1513,32 @@ void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 	__intel_bb_destroy_objects(ibb);
 	__reallocate_objects(ibb);
 
-	if (purge_objects_cache) {
+	if (purge_objects_cache)
 		__intel_bb_destroy_cache(ibb);
-		ibb->batch_offset = __intel_bb_get_offset(ibb,
-							  ibb->handle,
-							  ibb->size,
-							  ibb->alignment);
-	} else {
-		struct drm_i915_gem_exec_object2 *object;
 
-		object = intel_bb_find_object(ibb, ibb->handle);
-		ibb->batch_offset = object ? object->offset :
-					     __intel_bb_get_offset(ibb,
-								   ibb->handle,
-								   ibb->size,
-								   ibb->alignment);
-	}
+	/*
+	 * When we use allocators we're in no-reloc mode so we have to free
+	 * and reacquire offset (ibb->handle can change in multiprocess
+	 * environment). We also have to remove and add it again to
+	 * objects and cache tree.
+	 */
+	if (ibb->allocator_type != INTEL_ALLOCATOR_NONE && !purge_objects_cache)
+		intel_bb_remove_object(ibb, ibb->handle, ibb->batch_offset,
+				       ibb->size);
 
 	gem_close(ibb->i915, ibb->handle);
 	ibb->handle = gem_create(ibb->i915, ibb->size);
 
+	/* Keep address for bb in reloc mode and RANDOM allocator */
+	if (ibb->allocator_type == INTEL_ALLOCATOR_SIMPLE)
+		ibb->batch_offset = __intel_bb_get_offset(ibb,
+							  ibb->handle,
+							  ibb->size,
+							  ibb->alignment);
+
 	intel_bb_add_object(ibb, ibb->handle, ibb->size,
-			    ibb->batch_offset, false);
+			    ibb->batch_offset,
+			    ibb->alignment, false);
 	ibb->ptr = ibb->batch;
 	memset(ibb->batch, 0, ibb->size);
 }
@@ -1528,8 +1577,8 @@ void intel_bb_print(struct intel_bb *ibb)
 		 ibb->i915, ibb->gen, ibb->devid, ibb->debug);
 	igt_info("handle: %u, size: %u, batch: %p, ptr: %p\n",
 		 ibb->handle, ibb->size, ibb->batch, ibb->ptr);
-	igt_info("prng: %u, gtt_size: %" PRIu64 ", supports 48bit: %d\n",
-		 ibb->prng, ibb->gtt_size, ibb->supports_48b_address);
+	igt_info("gtt_size: %" PRIu64 ", supports 48bit: %d\n",
+		 ibb->gtt_size, ibb->supports_48b_address);
 	igt_info("ctx: %u\n", ibb->ctx);
 	igt_info("root: %p\n", ibb->root);
 	igt_info("objects: %p, num_objects: %u, allocated obj: %u\n",
@@ -1605,13 +1654,32 @@ __add_to_cache(struct intel_bb *ibb, uint32_t handle)
 	if (*found == object) {
 		memset(object, 0, sizeof(*object));
 		object->handle = handle;
-		object->alignment = ibb->alignment;
+		object->offset = INTEL_BUF_INVALID_ADDRESS;
 	} else {
 		free(object);
 		object = *found;
 	}
 
 	return object;
+}
+
+static bool __remove_from_cache(struct intel_bb *ibb, uint32_t handle)
+{
+	struct drm_i915_gem_exec_object2 **found, *object;
+
+	object = intel_bb_find_object(ibb, handle);
+	if (!object) {
+		igt_warn("Object: handle: %u not found\n", handle);
+		return false;
+	}
+
+	found = tdelete((void *) object, &ibb->root, __compare_objects);
+	if (!found)
+		return false;
+
+	free(object);
+
+	return true;
 }
 
 static int __compare_handles(const void *p1, const void *p2)
@@ -1639,12 +1707,54 @@ static void __add_to_objects(struct intel_bb *ibb,
 	}
 }
 
+static void __remove_from_objects(struct intel_bb *ibb,
+				  struct drm_i915_gem_exec_object2 *object)
+{
+	uint32_t i, **handle, *to_free;
+	bool found = false;
+
+	for (i = 0; i < ibb->num_objects; i++) {
+		if (ibb->objects[i] == object) {
+			found = true;
+			break;
+		}
+	}
+
+	/*
+	 * When we reset bb (without purging) we have:
+	 * 1. cache which contains all cached objects
+	 * 2. objects array which contains only bb object (cleared in reset
+	 *    path with bb object added at the end)
+	 * So !found is normal situation and no warning is added here.
+	 */
+	if (!found)
+		return;
+
+	ibb->num_objects--;
+	if (i < ibb->num_objects)
+		memmove(&ibb->objects[i], &ibb->objects[i + 1],
+			sizeof(object) * (ibb->num_objects - i));
+
+	handle = tfind((void *) &object->handle,
+		       &ibb->current, __compare_handles);
+	if (!handle) {
+		igt_warn("Object %u doesn't exist in the tree, can't remove",
+			 object->handle);
+		return;
+	}
+
+	to_free = *handle;
+	tdelete((void *) &object->handle, &ibb->current, __compare_handles);
+	free(to_free);
+}
+
 /**
  * intel_bb_add_object:
  * @ibb: pointer to intel_bb
  * @handle: which handle to add to objects array
  * @size: object size
  * @offset: presumed offset of the object when no relocation is enforced
+ * @alignment: alignment of the object, if 0 it will be set to page size
  * @write: does a handle is a render target
  *
  * Function adds or updates execobj slot in bb objects array and
@@ -1652,23 +1762,71 @@ static void __add_to_objects(struct intel_bb *ibb,
  * be marked with EXEC_OBJECT_WRITE flag.
  */
 struct drm_i915_gem_exec_object2 *
-intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint32_t size,
-		    uint64_t offset, bool write)
+intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint64_t size,
+		    uint64_t offset, uint64_t alignment, bool write)
 {
 	struct drm_i915_gem_exec_object2 *object;
 
+	igt_assert(INVALID_ADDR(offset) || alignment == 0
+		   || ALIGN(offset, alignment) == offset);
+
 	object = __add_to_cache(ibb, handle);
+	object->alignment = alignment ?: 4096;
 	__add_to_objects(ibb, object);
 
-	/* Limit current offset to gtt size */
-	object->offset = offset;
-	if (offset != INTEL_BUF_INVALID_ADDRESS)
-		object->offset = gen8_canonical_addr(offset & (ibb->gtt_size - 1));
+	/*
+	 * If object->offset == INVALID_ADDRESS we added freshly object to the
+	 * cache. In that case we have two choices:
+	 * a) get new offset (passed offset was invalid)
+	 * b) use offset passed in the call (valid)
+	 */
+	if (INVALID_ADDR(object->offset)) {
+		if (INVALID_ADDR(offset)) {
+			offset = __intel_bb_get_offset(ibb, handle, size,
+						       object->alignment);
+		} else {
+			offset = offset & (ibb->gtt_size - 1);
 
-	if (object->offset == INTEL_BUF_INVALID_ADDRESS)
+			/*
+			 * For simple allocator check entry consistency
+			 * - reserve if it is not already allocated.
+			 */
+			if (ibb->allocator_type == INTEL_ALLOCATOR_SIMPLE) {
+				bool allocated, reserved;
+
+				reserved = intel_allocator_reserve_if_not_allocated(ibb->allocator_handle,
+										    handle, size, offset,
+										    &allocated);
+				igt_assert_f(allocated || reserved,
+					     "Can't get offset, allocated: %d, reserved: %d\n",
+					     allocated, reserved);
+			}
+		}
+	} else {
+		/*
+		 * This assertion makes sense only when we have to be consistent
+		 * with underlying allocator. For relocations and when !ppgtt
+		 * we can expect addresses passed by the user can be moved
+		 * within the driver.
+		 */
+		if (ibb->allocator_type == INTEL_ALLOCATOR_SIMPLE)
+			igt_assert_f(object->offset == offset,
+				     "(pid: %ld) handle: %u, offset not match: %" PRIx64 " <> %" PRIx64 "\n",
+				     (long) getpid(), handle,
+				     (uint64_t) object->offset,
+				     offset);
+	}
+
+	object->offset = offset;
+
+	/* Limit current offset to gtt size */
+	if (offset != INTEL_BUF_INVALID_ADDRESS) {
+		object->offset = CANONICAL(offset & (ibb->gtt_size - 1));
+	} else {
 		object->offset = __intel_bb_get_offset(ibb,
 						       handle, size,
 						       object->alignment);
+	}
 
 	if (write)
 		object->flags |= EXEC_OBJECT_WRITE;
@@ -1676,38 +1834,93 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint32_t size,
 	if (ibb->supports_48b_address)
 		object->flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
+	if (ibb->uses_full_ppgtt && ibb->allocator_type == INTEL_ALLOCATOR_SIMPLE)
+		object->flags |= EXEC_OBJECT_PINNED;
+
 	return object;
+}
+
+bool intel_bb_remove_object(struct intel_bb *ibb, uint32_t handle,
+			    uint64_t offset, uint64_t size)
+{
+	struct drm_i915_gem_exec_object2 *object;
+	bool is_reserved;
+
+	object = intel_bb_find_object(ibb, handle);
+	if (!object)
+		return false;
+
+	if (ibb->allocator_type != INTEL_ALLOCATOR_NONE) {
+		intel_allocator_free(ibb->allocator_handle, handle);
+		is_reserved = intel_allocator_is_reserved(ibb->allocator_handle,
+							  size, offset);
+		if (is_reserved)
+			intel_allocator_unreserve(ibb->allocator_handle, handle,
+						  size, offset);
+	}
+
+	__remove_from_objects(ibb, object);
+	__remove_from_cache(ibb, handle);
+
+	return true;
+}
+
+static struct drm_i915_gem_exec_object2 *
+__intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf,
+			 uint64_t alignment, bool write)
+{
+	struct drm_i915_gem_exec_object2 *obj;
+
+	igt_assert(ALIGN(alignment, 4096) == alignment);
+
+	if (!alignment) {
+		alignment = 0x1000;
+
+		if (ibb->gen >= 12 && buf->compression)
+			alignment = 0x10000;
+
+		/* For gen3 ensure tiled buffers are aligned to power of two size */
+		if (ibb->gen == 3 && buf->tiling) {
+			alignment = 1024 * 1024;
+
+			while (alignment < buf->surface[0].size)
+				alignment <<= 1;
+		}
+	}
+
+	obj = intel_bb_add_object(ibb, buf->handle, intel_buf_bo_size(buf),
+				  buf->addr.offset, alignment, write);
+	buf->addr.offset = obj->offset;
+
+	if (!ibb->enforce_relocs)
+		obj->alignment = alignment;
+
+	return obj;
 }
 
 struct drm_i915_gem_exec_object2 *
 intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf, bool write)
 {
-	struct drm_i915_gem_exec_object2 *obj;
+	return __intel_bb_add_intel_buf(ibb, buf, 0, write);
+}
 
-	obj = intel_bb_add_object(ibb, buf->handle,
-				  intel_buf_bo_size(buf),
-				  buf->addr.offset, write);
+struct drm_i915_gem_exec_object2 *
+intel_bb_add_intel_buf_with_alignment(struct intel_bb *ibb, struct intel_buf *buf,
+				      uint64_t alignment, bool write)
+{
+	return __intel_bb_add_intel_buf(ibb, buf, alignment, write);
+}
 
-	/* For compressed surfaces ensure address is aligned to 64KB */
-	if (ibb->gen >= 12 && buf->compression) {
-		obj->offset &= ~(0x10000 - 1);
-		obj->alignment = 0x10000;
-	}
+bool intel_bb_remove_intel_buf(struct intel_bb *ibb, struct intel_buf *buf)
+{
+	bool removed = intel_bb_remove_object(ibb, buf->handle,
+					      buf->addr.offset,
+					      intel_buf_bo_size(buf));
 
-	/* For gen3 ensure tiled buffers are aligned to power of two size */
-	if (ibb->gen == 3 && buf->tiling) {
-		uint64_t alignment = 1024 * 1024;
+	if (removed)
+		buf->addr.offset = INTEL_BUF_INVALID_ADDRESS;
 
-		while (alignment < buf->surface[0].size)
-			alignment <<= 1;
-		obj->offset &= ~(alignment - 1);
-		obj->alignment = alignment;
-	}
-
-	/* Update address in intel_buf buffer */
-	buf->addr.offset = obj->offset;
-
-	return obj;
+	return removed;
 }
 
 struct drm_i915_gem_exec_object2 *
@@ -1717,6 +1930,8 @@ intel_bb_find_object(struct intel_bb *ibb, uint32_t handle)
 	struct drm_i915_gem_exec_object2 **found;
 
 	found = tfind((void *) &object, &ibb->root, __compare_objects);
+	if (!found)
+		return NULL;
 
 	return *found;
 }
@@ -1726,6 +1941,8 @@ intel_bb_object_set_flag(struct intel_bb *ibb, uint32_t handle, uint64_t flag)
 {
 	struct drm_i915_gem_exec_object2 object = { .handle = handle };
 	struct drm_i915_gem_exec_object2 **found;
+
+	igt_assert_f(ibb->root, "Trying to search in null tree\n");
 
 	found = tfind((void *) &object, &ibb->root, __compare_objects);
 	if (!found) {
@@ -1766,14 +1983,9 @@ intel_bb_object_clear_flag(struct intel_bb *ibb, uint32_t handle, uint64_t flag)
  * @write_domain: gem domain bit for the relocation
  * @delta: delta value to add to @buffer's gpu address
  * @offset: offset within bb to be patched
- * @presumed_offset: address of the object in address space. If -1 is passed
- * then final offset of the object will be randomized (for no-reloc bb) or
- * 0 (for reloc bb, in that case reloc.presumed_offset will be -1). In
- * case address is known it should passed in @presumed_offset (for no-reloc).
  *
  * Function allocates additional relocation slot in reloc array for a handle.
- * It also implicitly adds handle in the objects array if object doesn't
- * exists but doesn't mark it as a render target.
+ * Object must be previously added to bb.
  */
 static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
 				   uint32_t to_handle,
@@ -1788,13 +2000,8 @@ static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
 	struct drm_i915_gem_exec_object2 *object, *to_object;
 	uint32_t i;
 
-	if (ibb->enforce_relocs) {
-		object = intel_bb_add_object(ibb, handle, 0,
-					     presumed_offset, false);
-	} else {
-		object = intel_bb_find_object(ibb, handle);
-		igt_assert(object);
-	}
+	object = intel_bb_find_object(ibb, handle);
+	igt_assert(object);
 
 	/* For ibb we have relocs allocated in chunks */
 	if (to_handle == ibb->handle) {
@@ -1988,45 +2195,47 @@ static void intel_bb_dump_execbuf(struct intel_bb *ibb,
 	int i, j;
 	uint64_t address;
 
-	igt_info("execbuf batch len: %u, start offset: 0x%x, "
-		 "DR1: 0x%x, DR4: 0x%x, "
-		 "num clip: %u, clipptr: 0x%llx, "
-		 "flags: 0x%llx, rsvd1: 0x%llx, rsvd2: 0x%llx\n",
-		 execbuf->batch_len, execbuf->batch_start_offset,
-		 execbuf->DR1, execbuf->DR4,
-		 execbuf->num_cliprects, execbuf->cliprects_ptr,
-		 execbuf->flags, execbuf->rsvd1, execbuf->rsvd2);
+	igt_debug("execbuf [pid: %ld, fd: %d, ctx: %u]\n",
+		  (long) getpid(), ibb->i915, ibb->ctx);
+	igt_debug("execbuf batch len: %u, start offset: 0x%x, "
+		  "DR1: 0x%x, DR4: 0x%x, "
+		  "num clip: %u, clipptr: 0x%llx, "
+		  "flags: 0x%llx, rsvd1: 0x%llx, rsvd2: 0x%llx\n",
+		  execbuf->batch_len, execbuf->batch_start_offset,
+		  execbuf->DR1, execbuf->DR4,
+		  execbuf->num_cliprects, execbuf->cliprects_ptr,
+		  execbuf->flags, execbuf->rsvd1, execbuf->rsvd2);
 
-	igt_info("execbuf buffer_count: %d\n", execbuf->buffer_count);
+	igt_debug("execbuf buffer_count: %d\n", execbuf->buffer_count);
 	for (i = 0; i < execbuf->buffer_count; i++) {
 		objects = &((struct drm_i915_gem_exec_object2 *)
 			    from_user_pointer(execbuf->buffers_ptr))[i];
 		relocs = from_user_pointer(objects->relocs_ptr);
 		address = objects->offset;
-		igt_info(" [%d] handle: %u, reloc_count: %d, reloc_ptr: %p, "
-			 "align: 0x%llx, offset: 0x%" PRIx64 ", flags: 0x%llx, "
-			 "rsvd1: 0x%llx, rsvd2: 0x%llx\n",
-			 i, objects->handle, objects->relocation_count,
-			 relocs,
-			 objects->alignment,
-			 address,
-			 objects->flags,
-			 objects->rsvd1, objects->rsvd2);
+		igt_debug(" [%d] handle: %u, reloc_count: %d, reloc_ptr: %p, "
+			  "align: 0x%llx, offset: 0x%" PRIx64 ", flags: 0x%llx, "
+			  "rsvd1: 0x%llx, rsvd2: 0x%llx\n",
+			  i, objects->handle, objects->relocation_count,
+			  relocs,
+			  objects->alignment,
+			  address,
+			  objects->flags,
+			  objects->rsvd1, objects->rsvd2);
 		if (objects->relocation_count) {
-			igt_info("\texecbuf relocs:\n");
+			igt_debug("\texecbuf relocs:\n");
 			for (j = 0; j < objects->relocation_count; j++) {
 				reloc = &relocs[j];
 				address = reloc->presumed_offset;
-				igt_info("\t [%d] target handle: %u, "
-					 "offset: 0x%llx, delta: 0x%x, "
-					 "presumed_offset: 0x%" PRIx64 ", "
-					 "read_domains: 0x%x, "
-					 "write_domain: 0x%x\n",
-					 j, reloc->target_handle,
-					 reloc->offset, reloc->delta,
-					 address,
-					 reloc->read_domains,
-					 reloc->write_domain);
+				igt_debug("\t [%d] target handle: %u, "
+					  "offset: 0x%llx, delta: 0x%x, "
+					  "presumed_offset: 0x%" PRIx64 ", "
+					  "read_domains: 0x%x, "
+					  "write_domain: 0x%x\n",
+					  j, reloc->target_handle,
+					  reloc->offset, reloc->delta,
+					  address,
+					  reloc->read_domains,
+					  reloc->write_domain);
 			}
 		}
 	}
@@ -2069,6 +2278,12 @@ static void print_node(const void *node, VISIT which, int depth)
 	}
 }
 
+void intel_bb_dump_cache(struct intel_bb *ibb)
+{
+	igt_info("[pid: %ld] dump cache\n", (long) getpid());
+	twalk(ibb->root, print_node);
+}
+
 static struct drm_i915_gem_exec_object2 *
 create_objects_array(struct intel_bb *ibb)
 {
@@ -2078,8 +2293,10 @@ create_objects_array(struct intel_bb *ibb)
 	objects = malloc(sizeof(*objects) * ibb->num_objects);
 	igt_assert(objects);
 
-	for (i = 0; i < ibb->num_objects; i++)
+	for (i = 0; i < ibb->num_objects; i++) {
 		objects[i] = *(ibb->objects[i]);
+		objects[i].offset = CANONICAL(objects[i].offset);
+	}
 
 	return objects;
 }
@@ -2094,7 +2311,10 @@ static void update_offsets(struct intel_bb *ibb,
 		object = intel_bb_find_object(ibb, objects[i].handle);
 		igt_assert(object);
 
-		object->offset = objects[i].offset;
+		object->offset = DECANONICAL(objects[i].offset);
+
+		if (i == 0)
+			ibb->batch_offset = object->offset;
 	}
 }
 
@@ -2122,6 +2342,7 @@ static int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 	ibb->objects[0]->relocs_ptr = to_user_pointer(ibb->relocs);
 	ibb->objects[0]->relocation_count = ibb->num_relocs;
 	ibb->objects[0]->handle = ibb->handle;
+	ibb->objects[0]->offset = ibb->batch_offset;
 
 	gem_write(ibb->i915, ibb->handle, 0, ibb->batch, ibb->size);
 
@@ -2206,7 +2427,6 @@ uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle)
 {
 	struct drm_i915_gem_exec_object2 object = { .handle = handle };
 	struct drm_i915_gem_exec_object2 **found;
-	uint64_t address;
 
 	igt_assert(ibb);
 
@@ -2214,12 +2434,7 @@ uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle)
 	if (!found)
 		return INTEL_BUF_INVALID_ADDRESS;
 
-	address = (*found)->offset;
-
-	if (address == INTEL_BUF_INVALID_ADDRESS)
-		return address;
-
-	return address & (ibb->gtt_size - 1);
+	return (*found)->offset;
 }
 
 /**

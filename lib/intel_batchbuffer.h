@@ -8,6 +8,7 @@
 #include "igt_core.h"
 #include "intel_reg.h"
 #include "drmtest.h"
+#include "intel_allocator.h"
 
 #define BATCH_SZ 4096
 #define BATCH_RESERVED 16
@@ -441,6 +442,9 @@ igt_media_spinfunc_t igt_get_media_spinfunc(int devid);
  * Batchbuffer without libdrm dependency
  */
 struct intel_bb {
+	uint64_t allocator_handle;
+	uint8_t allocator_type;
+
 	int i915;
 	unsigned int gen;
 	bool debug;
@@ -454,9 +458,9 @@ struct intel_bb {
 	uint64_t alignment;
 	int fence;
 
-	uint32_t prng;
 	uint64_t gtt_size;
 	bool supports_48b_address;
+	bool uses_full_ppgtt;
 
 	uint32_t ctx;
 
@@ -484,6 +488,8 @@ struct intel_bb {
 	int32_t refcount;
 };
 
+struct intel_bb *intel_bb_create_full(int i915, uint32_t ctx, uint32_t size,
+				      uint8_t allocator_type);
 struct intel_bb *intel_bb_create(int i915, uint32_t size);
 struct intel_bb *
 intel_bb_create_with_context(int i915, uint32_t ctx, uint32_t size);
@@ -510,6 +516,7 @@ void intel_bb_dump(struct intel_bb *ibb, const char *filename);
 void intel_bb_set_debug(struct intel_bb *ibb, bool debug);
 void intel_bb_set_dump_base64(struct intel_bb *ibb, bool dump);
 
+/*
 static inline uint64_t
 intel_bb_set_default_object_alignment(struct intel_bb *ibb, uint64_t alignment)
 {
@@ -525,6 +532,7 @@ intel_bb_get_default_object_alignment(struct intel_bb *ibb)
 {
 	return ibb->alignment;
 }
+*/
 
 static inline uint32_t intel_bb_offset(struct intel_bb *ibb)
 {
@@ -574,11 +582,16 @@ static inline void intel_bb_out(struct intel_bb *ibb, uint32_t dword)
 }
 
 struct drm_i915_gem_exec_object2 *
-intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint32_t size,
-		    uint64_t offset, bool write);
+intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint64_t size,
+		    uint64_t offset, uint64_t alignment, bool write);
+bool intel_bb_remove_object(struct intel_bb *ibb, uint32_t handle,
+			    uint64_t offset, uint64_t size);
 struct drm_i915_gem_exec_object2 *
 intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf, bool write);
-
+struct drm_i915_gem_exec_object2 *
+intel_bb_add_intel_buf_with_alignment(struct intel_bb *ibb, struct intel_buf *buf,
+				      uint64_t alignment, bool write);
+bool intel_bb_remove_intel_buf(struct intel_bb *ibb, struct intel_buf *buf);
 struct drm_i915_gem_exec_object2 *
 intel_bb_find_object(struct intel_bb *ibb, uint32_t handle);
 
@@ -624,6 +637,8 @@ uint64_t intel_bb_offset_reloc_to_object(struct intel_bb *ibb,
 					 uint32_t delta,
 					 uint32_t offset,
 					 uint64_t presumed_offset);
+
+void intel_bb_dump_cache(struct intel_bb *ibb);
 
 void intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 		   uint64_t flags, bool sync);

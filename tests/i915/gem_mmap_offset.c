@@ -614,8 +614,8 @@ static void blt_coherency(int i915)
 	dst = create_bo(bops, 1, width, height);
 	size = src->surface[0].size;
 
-	intel_bb_add_object(ibb, src->handle, size, src->addr.offset, false);
-	intel_bb_add_object(ibb, dst->handle, size, dst->addr.offset, true);
+	intel_bb_add_object(ibb, src->handle, size, src->addr.offset, 0, false);
+	intel_bb_add_object(ibb, dst->handle, size, dst->addr.offset, 0, true);
 
 	intel_bb_blt_copy(ibb,
 			  src, 0, 0, src->surface[0].stride,
