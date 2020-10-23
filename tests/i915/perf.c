@@ -3527,6 +3527,9 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 			/* Another redundant flush to clarify batch bo is free to reuse */
 			intel_bb_flush_render(ibb0);
 
+			/* Remove intel_buf from ibb0 added implicitly in rendercopy */
+			intel_bb_remove_intel_buf(ibb0, dst_buf);
+
 			/* submit two copies on the other context to avoid a false
 			 * positive in case the driver somehow ended up filtering for
 			 * context1
@@ -3919,6 +3922,9 @@ static void gen12_single_ctx_helper(void)
 				     BO_REPORT_ID0);
 	intel_bb_flush_render(ibb0);
 
+	/* Remove intel_buf from ibb0 added implicitly in rendercopy */
+	intel_bb_remove_intel_buf(ibb0, dst_buf);
+
 	/* This is the work/context that is measured for counter increments */
 	render_copy(ibb0,
 		    &src[0], 0, 0, width, height,
@@ -3964,6 +3970,9 @@ static void gen12_single_ctx_helper(void)
 				     BO_REPORT_OFFSET3,
 				     BO_REPORT_ID3);
 	intel_bb_flush_render(ibb1);
+
+	/* Remove intel_buf from ibb1 added implicitly in rendercopy */
+	intel_bb_remove_intel_buf(ibb1, dst_buf);
 
 	/* Submit an mi-rpc to context0 after all measurable work */
 #define BO_TIMESTAMP_OFFSET1 1032
