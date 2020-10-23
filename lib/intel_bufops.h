@@ -9,10 +9,13 @@ struct buf_ops;
 
 #define INTEL_BUF_INVALID_ADDRESS (-1ull)
 #define INTEL_BUF_NAME_MAXSIZE 32
+#define INVALID_ADDR(x) ((x) == INTEL_BUF_INVALID_ADDRESS)
+
 struct intel_buf {
 	struct buf_ops *bops;
 	bool is_owner;
 	uint32_t handle;
+	uint64_t size;
 	uint32_t tiling;
 	uint32_t bpp;
 	uint32_t compression;
@@ -23,7 +26,7 @@ struct intel_buf {
 	struct {
 		uint32_t offset;
 		uint32_t stride;
-		uint32_t size;
+		uint64_t size;
 	} surface[2];
 	struct {
 		uint32_t offset;
@@ -88,7 +91,7 @@ intel_buf_ccs_height(int gen, const struct intel_buf *buf)
 	return DIV_ROUND_UP(intel_buf_height(buf), 512) * 32;
 }
 
-uint32_t intel_buf_bo_size(const struct intel_buf *buf);
+uint64_t intel_buf_bo_size(const struct intel_buf *buf);
 
 struct buf_ops *buf_ops_create(int fd);
 struct buf_ops *buf_ops_create_with_selftest(int fd);

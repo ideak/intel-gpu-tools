@@ -123,9 +123,9 @@ static void print_buf(struct intel_buf *buf, const char *name)
 
 	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
 					buf->surface[0].size, PROT_READ);
-	igt_debug("[%s] Buf handle: %d, size: %d, v: 0x%02x, presumed_addr: %p\n",
+	igt_debug("[%s] Buf handle: %d, size: %" PRIx64 ", v: 0x%02x, presumed_addr: %p\n",
 		  name, buf->handle, buf->surface[0].size, ptr[0],
-			from_user_pointer(buf->addr.offset));
+		  from_user_pointer(buf->addr.offset));
 	munmap(ptr, buf->surface[0].size);
 }
 
@@ -677,7 +677,7 @@ static int dump_base64(const char *name, struct intel_buf *buf)
 	if (ret != Z_OK) {
 		igt_warn("error compressing, ret: %d\n", ret);
 	} else {
-		igt_info("compressed %u -> %lu\n",
+		igt_info("compressed %" PRIx64 " -> %lu\n",
 			 buf->surface[0].size, outsize);
 
 		igt_info("--- %s ---\n", name);

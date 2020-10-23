@@ -711,7 +711,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 			     uint32_t req_tiling, uint32_t compression)
 {
 	uint32_t tiling = req_tiling;
-	uint32_t size;
+	uint64_t size;
 	uint32_t devid;
 	int tile_width;
 	int align_h = 1;
@@ -775,6 +775,9 @@ static void __intel_buf_init(struct buf_ops *bops,
 
 		size = buf->surface[0].stride * ALIGN(height, align_h);
 	}
+
+	/* Store real bo size to avoid mistakes in calculating it again */
+	buf->size = size;
 
 	if (handle)
 		buf->handle = handle;
@@ -1001,8 +1004,8 @@ void intel_buf_flush_and_unmap(struct intel_buf *buf)
 void intel_buf_print(const struct intel_buf *buf)
 {
 	igt_info("[name: %s]\n", buf->name);
-	igt_info("[%u]: w: %u, h: %u, stride: %u, size: %u, bo-size: %u, "
-		 "bpp: %u, tiling: %u, compress: %u\n",
+	igt_info("[%u]: w: %u, h: %u, stride: %u, size: %" PRIx64
+		 ", bo-size: %" PRIx64 ", bpp: %u, tiling: %u, compress: %u\n",
 		 buf->handle, intel_buf_width(buf), intel_buf_height(buf),
 		 buf->surface[0].stride, buf->surface[0].size,
 		 intel_buf_bo_size(buf), buf->bpp,
@@ -1208,13 +1211,9 @@ static void idempotency_selftest(struct buf_ops *bops, uint32_t tiling)
 	buf_ops_set_software_tiling(bops, tiling, false);
 }
 
-uint32_t intel_buf_bo_size(const struct intel_buf *buf)
+uint64_t intel_buf_bo_size(const struct intel_buf *buf)
 {
-	int offset = CCS_OFFSET(buf) ?: buf->surface[0].size;
-	int ccs_size =
-		buf->compression ? CCS_SIZE(buf->bops->intel_gen, buf) : 0;
-
-	return offset + ccs_size;
+	return buf->size;
 }
 
 static struct buf_ops *__buf_ops_create(int fd, bool check_idempotency)
