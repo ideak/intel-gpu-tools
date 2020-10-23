@@ -306,6 +306,10 @@ int num_test_children;
 int test_children_sz;
 bool test_child;
 
+/* For allocator purposes */
+pid_t child_pid  = -1;
+__thread pid_t child_tid  = -1;
+
 enum {
 	/*
 	 * Let the first values be used by individual tests so options don't
@@ -2302,6 +2306,8 @@ bool __igt_fork(void)
 	case 0:
 		test_child = true;
 		pthread_mutex_init(&print_mutex, NULL);
+		child_pid = getpid();
+		child_tid = -1;
 		exit_handler_count = 0;
 		reset_helper_process_list();
 		oom_adjust_for_doom();
