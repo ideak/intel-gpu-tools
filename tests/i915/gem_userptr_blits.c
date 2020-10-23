@@ -1780,9 +1780,7 @@ static void test_unmap_after_close(int fd)
 
 static void test_unmap_cycles(int fd, int expected)
 {
-	int i;
-
-	for (i = 0; i < 1000; i++)
+	igt_until_timeout(5)
 		test_unmap(fd, expected);
 }
 
