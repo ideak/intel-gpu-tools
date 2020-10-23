@@ -828,9 +828,6 @@ static void offset_control(struct buf_ops *bops)
 		print_buf(dst2, "dst2");
 	}
 
-	igt_assert(intel_bb_object_offset_to_buf(ibb, src) == true);
-	igt_assert(intel_bb_object_offset_to_buf(ibb, dst1) == true);
-	igt_assert(intel_bb_object_offset_to_buf(ibb, dst2) == true);
 	poff_src = src->addr.offset;
 	poff_dst1 = dst1->addr.offset;
 	poff_dst2 = dst2->addr.offset;
@@ -853,10 +850,6 @@ static void offset_control(struct buf_ops *bops)
 		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, false);
 	intel_bb_sync(ibb);
 
-	igt_assert(intel_bb_object_offset_to_buf(ibb, src) == true);
-	igt_assert(intel_bb_object_offset_to_buf(ibb, dst1) == true);
-	igt_assert(intel_bb_object_offset_to_buf(ibb, dst2) == true);
-	igt_assert(intel_bb_object_offset_to_buf(ibb, dst3) == true);
 	igt_assert(poff_src == src->addr.offset);
 	igt_assert(poff_dst1 == dst1->addr.offset);
 	igt_assert(poff_dst2 == dst2->addr.offset);

@@ -727,6 +727,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 
 	buf->bops = bops;
 	buf->addr.offset = INTEL_BUF_INVALID_ADDRESS;
+	IGT_INIT_LIST_HEAD(&buf->link);
 
 	if (compression) {
 		int aux_width, aux_height;
@@ -827,12 +828,22 @@ void intel_buf_init(struct buf_ops *bops,
  *
  * Function closes gem BO inside intel_buf if bo is owned by intel_buf.
  * For handle passed from the caller intel_buf doesn't take ownership and
- * doesn't close it in close()/destroy() paths.
+ * doesn't close it in close()/destroy() paths. When intel_buf was previously
+ * added to intel_bb (intel_bb_add_intel_buf() call) it is tracked there and
+ * must be removed from its internal structures.
  */
 void intel_buf_close(struct buf_ops *bops, struct intel_buf *buf)
 {
 	igt_assert(bops);
 	igt_assert(buf);
+
+	/* If buf is tracked by some intel_bb ensure it will be removed there */
+	if (buf->ibb) {
+		intel_bb_remove_intel_buf(buf->ibb, buf);
+		buf->addr.offset = INTEL_BUF_INVALID_ADDRESS;
+		buf->ibb = NULL;
+		IGT_INIT_LIST_HEAD(&buf->link);
+	}
 
 	if (buf->is_owner)
 		gem_close(bops->fd, buf->handle);

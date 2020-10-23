@@ -2,6 +2,7 @@
 #define __INTEL_BUFOPS_H__
 
 #include <stdint.h>
+#include "igt_list.h"
 #include "igt_aux.h"
 #include "intel_batchbuffer.h"
 
@@ -13,6 +14,7 @@ struct buf_ops;
 
 struct intel_buf {
 	struct buf_ops *bops;
+
 	bool is_owner;
 	uint32_t handle;
 	uint64_t size;
@@ -39,6 +41,10 @@ struct intel_buf {
 		uint64_t offset;
 		uint32_t ctx;
 	} addr;
+
+	/* Tracking */
+	struct intel_bb *ibb;
+	struct igt_list_head link;
 
 	/* CPU mapping */
 	uint32_t *ptr;

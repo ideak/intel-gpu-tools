@@ -1261,6 +1261,8 @@ static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
  * If we do reset without purging caches we use addresses from intel-bb cache
  * during execbuf objects construction.
  *
+ * If we do reset with purging caches allocator entries are freed as well.
+ *
  * Returns:
  *
  * Pointer the intel_bb, asserts on failure.
@@ -1303,6 +1305,7 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 	ibb->size = size;
 	ibb->alignment = 4096;
 	ibb->ctx = ctx;
+	ibb->vm_id = 0;
 	ibb->batch = calloc(1, size);
 	igt_assert(ibb->batch);
 	ibb->ptr = ibb->batch;
@@ -1316,6 +1319,8 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 				     INTEL_BUF_INVALID_ADDRESS, ibb->alignment,
 				     false);
 	ibb->batch_offset = object->offset;
+
+	IGT_INIT_LIST_HEAD(&ibb->intel_bufs);
 
 	ibb->refcount = 1;
 
@@ -1508,6 +1513,22 @@ static void __intel_bb_destroy_cache(struct intel_bb *ibb)
 	ibb->root = NULL;
 }
 
+static void __intel_bb_detach_intel_bufs(struct intel_bb *ibb)
+{
+	struct intel_buf *entry, *tmp;
+
+	igt_list_for_each_entry_safe(entry, tmp, &ibb->intel_bufs, link)
+		intel_bb_detach_intel_buf(ibb, entry);
+}
+
+static void __intel_bb_remove_intel_bufs(struct intel_bb *ibb)
+{
+	struct intel_buf *entry, *tmp;
+
+	igt_list_for_each_entry_safe(entry, tmp, &ibb->intel_bufs, link)
+		intel_bb_remove_intel_buf(ibb, entry);
+}
+
 /**
  * intel_bb_destroy:
  * @ibb: pointer to intel_bb
@@ -1521,6 +1542,7 @@ void intel_bb_destroy(struct intel_bb *ibb)
 	ibb->refcount--;
 	igt_assert_f(ibb->refcount == 0, "Trying to destroy referenced bb!");
 
+	__intel_bb_remove_intel_bufs(ibb);
 	__intel_bb_destroy_relocations(ibb);
 	__intel_bb_destroy_objects(ibb);
 	__intel_bb_destroy_cache(ibb);
@@ -1544,6 +1566,10 @@ void intel_bb_destroy(struct intel_bb *ibb)
  * @purge_objects_cache: if true destroy internal execobj and relocs + cache
  *
  * Recreate batch bo when there's no additional reference.
+ *
+ * When purge_object_cache == true we destroy cache as well as remove intel_buf
+ * from intel-bb tracking list. Removing intel_bufs releases their addresses
+ * in the allocator.
 */
 
 void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
@@ -1569,8 +1595,10 @@ void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 	__intel_bb_destroy_objects(ibb);
 	__reallocate_objects(ibb);
 
-	if (purge_objects_cache)
+	if (purge_objects_cache) {
+		__intel_bb_remove_intel_bufs(ibb);
 		__intel_bb_destroy_cache(ibb);
+	}
 
 	/*
 	 * When we use allocators we're in no-reloc mode so we have to free
@@ -1619,6 +1647,50 @@ int intel_bb_sync(struct intel_bb *ibb)
 	}
 
 	return ret;
+}
+
+uint64_t intel_bb_assign_vm(struct intel_bb *ibb, uint64_t allocator,
+			    uint32_t vm_id)
+{
+	struct drm_i915_gem_context_param arg = {
+		.param = I915_CONTEXT_PARAM_VM,
+	};
+	uint64_t prev_allocator = ibb->allocator_handle;
+	bool closed = false;
+
+	if (ibb->vm_id == vm_id) {
+		igt_debug("Skipping to assign same vm_id: %u\n", vm_id);
+		return 0;
+	}
+
+	/* Cannot switch if someone keeps bb refcount */
+	igt_assert(ibb->refcount == 1);
+
+	/* Detach intel_bufs and remove bb handle */
+	__intel_bb_detach_intel_bufs(ibb);
+	intel_bb_remove_object(ibb, ibb->handle, ibb->batch_offset, ibb->size);
+
+	/* Cache + objects are not valid after change anymore */
+	__intel_bb_destroy_objects(ibb);
+	__intel_bb_destroy_cache(ibb);
+
+	/* Attach new allocator */
+	ibb->allocator_handle = allocator;
+
+	/* Setparam */
+	ibb->vm_id = vm_id;
+
+	/* Skip set param, we likely return to default vm */
+	if (vm_id) {
+		arg.ctx_id = ibb->ctx;
+		arg.value = vm_id;
+		gem_context_set_param(ibb->i915, &arg);
+	}
+
+	/* Recreate bb */
+	intel_bb_reset(ibb, false);
+
+	return closed ? 0 : prev_allocator;
 }
 
 /*
@@ -1875,22 +1947,13 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint64_t size,
 
 	object->offset = offset;
 
-	/* Limit current offset to gtt size */
-	if (offset != INTEL_BUF_INVALID_ADDRESS) {
-		object->offset = CANONICAL(offset & (ibb->gtt_size - 1));
-	} else {
-		object->offset = __intel_bb_get_offset(ibb,
-						       handle, size,
-						       object->alignment);
-	}
-
 	if (write)
 		object->flags |= EXEC_OBJECT_WRITE;
 
 	if (ibb->supports_48b_address)
 		object->flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
-	if (ibb->uses_full_ppgtt && ibb->allocator_type == INTEL_ALLOCATOR_SIMPLE)
+	if (ibb->uses_full_ppgtt && !ibb->enforce_relocs)
 		object->flags |= EXEC_OBJECT_PINNED;
 
 	return object;
@@ -1927,6 +1990,9 @@ __intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf,
 {
 	struct drm_i915_gem_exec_object2 *obj;
 
+	igt_assert(ibb);
+	igt_assert(buf);
+	igt_assert(!buf->ibb || buf->ibb == ibb);
 	igt_assert(ALIGN(alignment, 4096) == alignment);
 
 	if (!alignment) {
@@ -1951,6 +2017,13 @@ __intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf,
 	if (!ibb->enforce_relocs)
 		obj->alignment = alignment;
 
+	if (igt_list_empty(&buf->link)) {
+		igt_list_add_tail(&buf->link, &ibb->intel_bufs);
+		buf->ibb = ibb;
+	} else {
+		igt_assert(buf->ibb == ibb);
+	}
+
 	return obj;
 }
 
@@ -1967,16 +2040,51 @@ intel_bb_add_intel_buf_with_alignment(struct intel_bb *ibb, struct intel_buf *bu
 	return __intel_bb_add_intel_buf(ibb, buf, alignment, write);
 }
 
+void intel_bb_detach_intel_buf(struct intel_bb *ibb, struct intel_buf *buf)
+{
+	igt_assert(ibb);
+	igt_assert(buf);
+	igt_assert(!buf->ibb || buf->ibb == ibb);
+
+	if (!igt_list_empty(&buf->link)) {
+		buf->addr.offset = INTEL_BUF_INVALID_ADDRESS;
+		buf->ibb = NULL;
+		igt_list_del_init(&buf->link);
+	}
+}
+
 bool intel_bb_remove_intel_buf(struct intel_bb *ibb, struct intel_buf *buf)
 {
-	bool removed = intel_bb_remove_object(ibb, buf->handle,
-					      buf->addr.offset,
-					      intel_buf_bo_size(buf));
+	bool removed;
 
-	if (removed)
+	igt_assert(ibb);
+	igt_assert(buf);
+	igt_assert(!buf->ibb || buf->ibb == ibb);
+
+	if (igt_list_empty(&buf->link))
+		return false;
+
+	removed = intel_bb_remove_object(ibb, buf->handle,
+					 buf->addr.offset,
+					 intel_buf_bo_size(buf));
+	if (removed) {
 		buf->addr.offset = INTEL_BUF_INVALID_ADDRESS;
+		buf->ibb = NULL;
+		igt_list_del_init(&buf->link);
+	}
 
 	return removed;
+}
+
+void intel_bb_print_intel_bufs(struct intel_bb *ibb)
+{
+	struct intel_buf *entry;
+
+	igt_list_for_each_entry(entry, &ibb->intel_bufs, link) {
+		igt_info("handle: %u, ibb: %p, offset: %lx\n",
+			 entry->handle, entry->ibb,
+			 (long) entry->addr.offset);
+	}
 }
 
 struct drm_i915_gem_exec_object2 *
@@ -2361,6 +2469,7 @@ static void update_offsets(struct intel_bb *ibb,
 			   struct drm_i915_gem_exec_object2 *objects)
 {
 	struct drm_i915_gem_exec_object2 *object;
+	struct intel_buf *entry;
 	uint32_t i;
 
 	for (i = 0; i < ibb->num_objects; i++) {
@@ -2372,11 +2481,23 @@ static void update_offsets(struct intel_bb *ibb,
 		if (i == 0)
 			ibb->batch_offset = object->offset;
 	}
+
+	igt_list_for_each_entry(entry, &ibb->intel_bufs, link) {
+		object = intel_bb_find_object(ibb, entry->handle);
+		igt_assert(object);
+
+		if (ibb->allocator_type == INTEL_ALLOCATOR_SIMPLE)
+			igt_assert(object->offset == entry->addr.offset);
+		else
+			entry->addr.offset = object->offset;
+
+		entry->addr.ctx = ibb->ctx;
+	}
 }
 
 #define LINELEN 76
 /*
- * @__intel_bb_exec:
+ * __intel_bb_exec:
  * @ibb: pointer to intel_bb
  * @end_offset: offset of the last instruction in the bb
  * @flags: flags passed directly to execbuf
@@ -2415,6 +2536,9 @@ static int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 
 	if (ibb->dump_base64)
 		intel_bb_dump_base64(ibb, LINELEN);
+
+	/* For debugging on CI, remove in final series */
+	intel_bb_dump_execbuf(ibb, &execbuf);
 
 	ret = __gem_execbuf_wr(ibb->i915, &execbuf);
 	if (ret) {
@@ -2491,36 +2615,6 @@ uint64_t intel_bb_get_object_offset(struct intel_bb *ibb, uint32_t handle)
 		return INTEL_BUF_INVALID_ADDRESS;
 
 	return (*found)->offset;
-}
-
-/**
- * intel_bb_object_offset_to_buf:
- * @ibb: pointer to intel_bb
- * @buf: buffer we want to store last exec offset and context id
- *
- * Copy object offset used in the batch to intel_buf to allow caller prepare
- * other batch likely without relocations.
- */
-bool intel_bb_object_offset_to_buf(struct intel_bb *ibb, struct intel_buf *buf)
-{
-	struct drm_i915_gem_exec_object2 object = { .handle = buf->handle };
-	struct drm_i915_gem_exec_object2 **found;
-
-	igt_assert(ibb);
-	igt_assert(buf);
-
-	found = tfind((void *)&object, &ibb->root, __compare_objects);
-	if (!found) {
-		buf->addr.offset = 0;
-		buf->addr.ctx = ibb->ctx;
-
-		return false;
-	}
-
-	buf->addr.offset = (*found)->offset & (ibb->gtt_size - 1);
-	buf->addr.ctx = ibb->ctx;
-
-	return true;
 }
 
 /*

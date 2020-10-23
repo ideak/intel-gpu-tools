@@ -132,7 +132,6 @@ gen8_media_spinfunc(int i915, struct intel_buf *buf, uint32_t spins)
 	intel_bb_exec(ibb, intel_bb_offset(ibb),
 		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, false);
 
-	intel_bb_object_offset_to_buf(ibb, buf);
 	intel_bb_destroy(ibb);
 }
 
@@ -186,6 +185,5 @@ gen9_media_spinfunc(int i915, struct intel_buf *buf, uint32_t spins)
 	intel_bb_exec(ibb, intel_bb_offset(ibb),
 		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, false);
 
-	intel_bb_object_offset_to_buf(ibb, buf);
 	intel_bb_destroy(ibb);
 }
