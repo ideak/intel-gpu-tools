@@ -17,6 +17,7 @@ extern __thread pid_t child_tid;
 
 #define FTOK_IGT_ALLOCATOR_KEY "/tmp/igt.allocator.key"
 #define FTOK_IGT_ALLOCATOR_PROJID 2020
+#define MAXQLEN 4096
 
 #define ALLOCATOR_REQUEST 1
 
@@ -61,6 +62,13 @@ static void msgqueue_init(struct msg_channel *channel)
 
 	queue = msgget(key, IPC_CREAT);
 	igt_debug("msg queue: %d\n", queue);
+
+	igt_assert(msgctl(queue, IPC_STAT, &qstat) == 0);
+	igt_debug("msg size in bytes: %lu\n", qstat.msg_qbytes);
+	qstat.msg_qbytes = MAXQLEN * sizeof(struct msgqueue_buf);
+	igt_debug("resizing queue to support %d requests\n", MAXQLEN);
+	igt_assert_f(msgctl(queue, IPC_SET, &qstat) == 0,
+		     "Couldn't change queue size to %lu\n", qstat.msg_qbytes);
 
 	msgdata = calloc(1, sizeof(*msgdata));
 	igt_assert(msgdata);
