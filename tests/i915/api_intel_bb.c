@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "i915/gem.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -94,6 +95,7 @@ static void check_buf(struct intel_buf *buf, uint8_t color)
 
 	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
 					buf->surface[0].size, PROT_READ);
+	gem_set_domain(i915, buf->handle, I915_GEM_DOMAIN_WC, 0);
 
 	for (i = 0; i < buf->surface[0].size; i++)
 		igt_assert(ptr[i] == color);
@@ -123,24 +125,34 @@ static void print_buf(struct intel_buf *buf, const char *name)
 
 	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
 					buf->surface[0].size, PROT_READ);
-	igt_debug("[%s] Buf handle: %d, size: %" PRIx64 ", v: 0x%02x, presumed_addr: %p\n",
+	igt_debug("[%s] Buf handle: %d, size: %" PRIu64
+		  ", v: 0x%02x, presumed_addr: %p\n",
 		  name, buf->handle, buf->surface[0].size, ptr[0],
 		  from_user_pointer(buf->addr.offset));
 	munmap(ptr, buf->surface[0].size);
+}
+
+static void reset_bb(struct buf_ops *bops)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_bb *ibb;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	intel_bb_reset(ibb, false);
+	intel_bb_destroy(ibb);
 }
 
 static void simple_bb(struct buf_ops *bops, bool use_context)
 {
 	int i915 = buf_ops_get_fd(bops);
 	struct intel_bb *ibb;
-	uint32_t ctx;
+	uint32_t ctx = 0;
 
-	if (use_context) {
+	if (use_context)
 		gem_require_contexts(i915);
-		ctx = gem_context_create(i915);
-	}
 
-	ibb = intel_bb_create(i915, PAGE_SIZE);
+	ibb = intel_bb_create_with_allocator(i915, ctx, PAGE_SIZE,
+					     INTEL_ALLOCATOR_SIMPLE);
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);
 
@@ -155,10 +167,8 @@ static void simple_bb(struct buf_ops *bops, bool use_context)
 	intel_bb_reset(ibb, false);
 	intel_bb_reset(ibb, true);
 
-	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
-	intel_bb_ptr_align(ibb, 8);
-
 	if (use_context) {
+		ctx = gem_context_create(i915);
 		intel_bb_destroy(ibb);
 		ibb = intel_bb_create_with_context(i915, ctx, PAGE_SIZE);
 		intel_bb_out(ibb, MI_BATCH_BUFFER_END);
@@ -166,11 +176,10 @@ static void simple_bb(struct buf_ops *bops, bool use_context)
 		intel_bb_exec(ibb, intel_bb_offset(ibb),
 			      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC,
 			      true);
+		gem_context_destroy(i915, ctx);
 	}
 
 	intel_bb_destroy(ibb);
-	if (use_context)
-		gem_context_destroy(i915, ctx);
 }
 
 /*
@@ -194,16 +203,20 @@ static void lot_of_buffers(struct buf_ops *bops)
 	for (i = 0; i < NUM_BUFS; i++) {
 		buf[i] = intel_buf_create(bops, 4096, 1, 8, 0, I915_TILING_NONE,
 					  I915_COMPRESSION_NONE);
-		intel_bb_add_intel_buf(ibb, buf[i], false);
+		if (i % 2)
+			intel_bb_add_intel_buf(ibb, buf[i], false);
+		else
+			intel_bb_add_intel_buf_with_alignment(ibb, buf[i],
+							      0x4000, false);
 	}
 
 	intel_bb_exec(ibb, intel_bb_offset(ibb),
 		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
 
-	intel_bb_destroy(ibb);
-
 	for (i = 0; i < NUM_BUFS; i++)
 		intel_buf_destroy(buf[i]);
+
+	intel_bb_destroy(ibb);
 }
 
 /*
@@ -298,70 +311,287 @@ static void reset_flags(struct buf_ops *bops)
 	intel_bb_destroy(ibb);
 }
 
-
-#define MI_FLUSH_DW (0x26<<23)
-#define BCS_SWCTRL  0x22200
-#define BCS_SRC_Y   (1 << 0)
-#define BCS_DST_Y   (1 << 1)
-static void __emit_blit(struct intel_bb *ibb,
-			struct intel_buf *src, struct intel_buf *dst)
+static void add_remove_objects(struct buf_ops *bops)
 {
-	uint32_t mask;
-	bool has_64b_reloc;
-	uint64_t address;
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_bb *ibb;
+	struct intel_buf *src, *mid, *dst;
+	uint32_t offset;
+	const uint32_t width = 512;
+	const uint32_t height = 512;
 
-	has_64b_reloc = ibb->gen >= 8;
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
 
-	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
-		intel_bb_out(ibb, MI_LOAD_REGISTER_IMM);
-		intel_bb_out(ibb, BCS_SWCTRL);
+	src = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
+	mid = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
+	dst = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
 
-		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
-		if (src->tiling == I915_TILING_Y)
-			mask |= BCS_SRC_Y;
-		if (dst->tiling == I915_TILING_Y)
-			mask |= BCS_DST_Y;
-		intel_bb_out(ibb, mask);
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_add_intel_buf(ibb, mid, true);
+	intel_bb_remove_intel_buf(ibb, mid);
+	intel_bb_remove_intel_buf(ibb, mid);
+	intel_bb_remove_intel_buf(ibb, mid);
+	intel_bb_add_intel_buf(ibb, dst, true);
+
+	offset = intel_bb_emit_bbe(ibb);
+	intel_bb_exec(ibb, offset,
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
+
+	intel_buf_destroy(src);
+	intel_buf_destroy(mid);
+	intel_buf_destroy(dst);
+	intel_bb_destroy(ibb);
+}
+
+static void destroy_bb(struct buf_ops *bops)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_bb *ibb;
+	struct intel_buf *src, *mid, *dst;
+	uint32_t offset;
+	const uint32_t width = 512;
+	const uint32_t height = 512;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	src = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
+	mid = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
+	dst = intel_buf_create(bops, width, height, 32, 0,
+			       I915_TILING_NONE, I915_COMPRESSION_NONE);
+
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_add_intel_buf(ibb, mid, true);
+	intel_bb_add_intel_buf(ibb, dst, true);
+
+	offset = intel_bb_emit_bbe(ibb);
+	intel_bb_exec(ibb, offset,
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
+
+	/* Check destroy will detach intel_bufs */
+	intel_bb_destroy(ibb);
+	igt_assert(src->addr.offset == INTEL_BUF_INVALID_ADDRESS);
+	igt_assert(src->ibb == NULL);
+	igt_assert(mid->addr.offset == INTEL_BUF_INVALID_ADDRESS);
+	igt_assert(mid->ibb == NULL);
+	igt_assert(dst->addr.offset == INTEL_BUF_INVALID_ADDRESS);
+	igt_assert(dst->ibb == NULL);
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	intel_bb_add_intel_buf(ibb, src, false);
+	offset = intel_bb_emit_bbe(ibb);
+	intel_bb_exec(ibb, offset,
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
+
+	intel_bb_destroy(ibb);
+	intel_buf_destroy(src);
+	intel_buf_destroy(mid);
+	intel_buf_destroy(dst);
+}
+
+static void object_reloc(struct buf_ops *bops, enum obj_cache_ops cache_op)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_bb *ibb;
+	uint32_t h1, h2;
+	uint64_t poff_bb, poff_h1, poff_h2;
+	uint64_t poff2_bb, poff2_h1, poff2_h2;
+	uint64_t flags = 0;
+	uint64_t shift = cache_op == PURGE_CACHE ? 0x2000 : 0x0;
+	bool purge_cache = cache_op == PURGE_CACHE ? true : false;
+
+	ibb = intel_bb_create_with_relocs(i915, PAGE_SIZE);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	h1 = gem_create(i915, PAGE_SIZE);
+	h2 = gem_create(i915, PAGE_SIZE);
+
+	/* intel_bb_create adds bb handle so it has 0 for relocs */
+	poff_bb = intel_bb_get_object_offset(ibb, ibb->handle);
+	igt_assert(poff_bb == 0);
+
+	/* Before adding to intel_bb it should return INVALID_ADDRESS */
+	poff_h1 = intel_bb_get_object_offset(ibb, h1);
+	poff_h2 = intel_bb_get_object_offset(ibb, h2);
+	igt_debug("[1] poff_h1: %lx\n", (long) poff_h1);
+	igt_debug("[1] poff_h2: %lx\n", (long) poff_h2);
+	igt_assert(poff_h1 == INTEL_BUF_INVALID_ADDRESS);
+	igt_assert(poff_h2 == INTEL_BUF_INVALID_ADDRESS);
+
+	intel_bb_add_object(ibb, h1, PAGE_SIZE, poff_h1, 0, true);
+	intel_bb_add_object(ibb, h2, PAGE_SIZE, poff_h2, 0x2000, true);
+
+	/*
+	 * Objects were added to bb, we expect initial addresses are zeroed
+	 * for relocs.
+	 */
+	poff_h1 = intel_bb_get_object_offset(ibb, h1);
+	poff_h2 = intel_bb_get_object_offset(ibb, h2);
+	igt_assert(poff_h1 == 0);
+	igt_assert(poff_h2 == 0);
+
+	intel_bb_emit_bbe(ibb);
+	intel_bb_exec(ibb, intel_bb_offset(ibb), flags, false);
+
+	poff2_bb = intel_bb_get_object_offset(ibb, ibb->handle);
+	poff2_h1 = intel_bb_get_object_offset(ibb, h1);
+	poff2_h2 = intel_bb_get_object_offset(ibb, h2);
+	igt_debug("[2] poff2_h1: %lx\n", (long) poff2_h1);
+	igt_debug("[2] poff2_h2: %lx\n", (long) poff2_h2);
+	/* Some addresses won't be 0 */
+	igt_assert(poff2_bb | poff2_h1 | poff2_h2);
+
+	intel_bb_reset(ibb, purge_cache);
+
+	if (purge_cache) {
+		intel_bb_add_object(ibb, h1, PAGE_SIZE, poff2_h1, 0, true);
+		intel_bb_add_object(ibb, h2, PAGE_SIZE, poff2_h2 + shift, 0x2000, true);
 	}
 
-	intel_bb_out(ibb,
-		     XY_SRC_COPY_BLT_CMD |
-		     XY_SRC_COPY_BLT_WRITE_ALPHA |
-		     XY_SRC_COPY_BLT_WRITE_RGB |
-		     (6 + 2 * has_64b_reloc));
-	intel_bb_out(ibb, 3 << 24 | 0xcc << 16 | dst->surface[0].stride);
-	intel_bb_out(ibb, 0);
-	intel_bb_out(ibb, intel_buf_height(dst) << 16 | intel_buf_width(dst));
+	poff_bb = intel_bb_get_object_offset(ibb, ibb->handle);
+	poff_h1 = intel_bb_get_object_offset(ibb, h1);
+	poff_h2 = intel_bb_get_object_offset(ibb, h2);
+	igt_debug("[3] poff_h1: %lx\n", (long) poff_h1);
+	igt_debug("[3] poff_h2: %lx\n", (long) poff_h2);
+	igt_debug("[3] poff2_h1: %lx\n", (long) poff2_h1);
+	igt_debug("[3] poff2_h2: %lx + shift (%lx)\n", (long) poff2_h2,
+		 (long) shift);
+	igt_assert(poff_h1 == poff2_h1);
+	igt_assert(poff_h2 == poff2_h2 + shift);
+	intel_bb_emit_bbe(ibb);
+	intel_bb_exec(ibb, intel_bb_offset(ibb), flags, false);
 
-	address = intel_bb_get_object_offset(ibb, dst->handle);
-	intel_bb_emit_reloc_fenced(ibb, dst->handle,
-				   I915_GEM_DOMAIN_RENDER,
-				   I915_GEM_DOMAIN_RENDER,
-				   0, address);
-	intel_bb_out(ibb, 0);
-	intel_bb_out(ibb, src->surface[0].stride);
+	gem_close(i915, h1);
+	gem_close(i915, h2);
+	intel_bb_destroy(ibb);
+}
 
-	address = intel_bb_get_object_offset(ibb, src->handle);
-	intel_bb_emit_reloc_fenced(ibb, src->handle,
-				   I915_GEM_DOMAIN_RENDER, 0,
-				   0, address);
+#define WITHIN_RANGE(offset, start, end) \
+	(DECANONICAL(offset) >= start && DECANONICAL(offset) <= end)
+static void object_noreloc(struct buf_ops *bops, enum obj_cache_ops cache_op,
+			   uint8_t allocator_type)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_bb *ibb;
+	uint32_t h1, h2;
+	uint64_t start, end;
+	uint64_t poff_bb, poff_h1, poff_h2;
+	uint64_t poff2_bb, poff2_h1, poff2_h2;
+	uint64_t flags = 0;
+	bool purge_cache = cache_op == PURGE_CACHE ? true : false;
 
-	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
-		igt_assert(ibb->gen >= 6);
-		intel_bb_out(ibb, MI_FLUSH_DW | 2);
-		intel_bb_out(ibb, 0);
-		intel_bb_out(ibb, 0);
-		intel_bb_out(ibb, 0);
+	igt_require(gem_uses_full_ppgtt(i915));
 
-		intel_bb_out(ibb, MI_LOAD_REGISTER_IMM);
-		intel_bb_out(ibb, BCS_SWCTRL);
-		intel_bb_out(ibb, (BCS_SRC_Y | BCS_DST_Y) << 16);
+	ibb = intel_bb_create_with_allocator(i915, 0, PAGE_SIZE, allocator_type);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	h1 = gem_create(i915, PAGE_SIZE);
+	h2 = gem_create(i915, PAGE_SIZE);
+
+	intel_allocator_get_address_range(ibb->allocator_handle,
+					  &start, &end);
+	poff_bb = intel_bb_get_object_offset(ibb, ibb->handle);
+	igt_debug("[1] bb presumed offset: 0x%" PRIx64
+		  ", start: %" PRIx64 ", end: %" PRIx64 "\n",
+		  poff_bb, start, end);
+	igt_assert(WITHIN_RANGE(poff_bb, start, end));
+
+	/* Before adding to intel_bb it should return INVALID_ADDRESS */
+	poff_h1 = intel_bb_get_object_offset(ibb, h1);
+	poff_h2 = intel_bb_get_object_offset(ibb, h2);
+	igt_debug("[1] h1 presumed offset: 0x%"PRIx64"\n", poff_h1);
+	igt_debug("[1] h2 presumed offset: 0x%"PRIx64"\n", poff_h2);
+	igt_assert(poff_h1 == INTEL_BUF_INVALID_ADDRESS);
+	igt_assert(poff_h2 == INTEL_BUF_INVALID_ADDRESS);
+
+	intel_bb_add_object(ibb, h1, PAGE_SIZE, poff_h1, 0, true);
+	intel_bb_add_object(ibb, h2, PAGE_SIZE, poff_h2, 0, true);
+
+	poff_h1 = intel_bb_get_object_offset(ibb, h1);
+	poff_h2 = intel_bb_get_object_offset(ibb, h2);
+	igt_debug("[2] bb presumed offset: 0x%"PRIx64"\n", poff_bb);
+	igt_debug("[2] h1 presumed offset: 0x%"PRIx64"\n", poff_h1);
+	igt_debug("[2] h2 presumed offset: 0x%"PRIx64"\n", poff_h2);
+	igt_assert(WITHIN_RANGE(poff_bb, start, end));
+	igt_assert(WITHIN_RANGE(poff_h1, start, end));
+	igt_assert(WITHIN_RANGE(poff_h2, start, end));
+
+	intel_bb_emit_bbe(ibb);
+	igt_debug("exec flags: %" PRIX64 "\n", flags);
+	intel_bb_exec(ibb, intel_bb_offset(ibb), flags, false);
+
+	poff2_bb = intel_bb_get_object_offset(ibb, ibb->handle);
+	poff2_h1 = intel_bb_get_object_offset(ibb, h1);
+	poff2_h2 = intel_bb_get_object_offset(ibb, h2);
+	igt_debug("[3] bb presumed offset: 0x%"PRIx64"\n", poff2_bb);
+	igt_debug("[3] h1 presumed offset: 0x%"PRIx64"\n", poff2_h1);
+	igt_debug("[3] h2 presumed offset: 0x%"PRIx64"\n", poff2_h2);
+	igt_assert(poff_h1 == poff2_h1);
+	igt_assert(poff_h2 == poff2_h2);
+
+	igt_debug("purge: %d\n", purge_cache);
+	intel_bb_reset(ibb, purge_cache);
+
+	/*
+	 * Check if intel-bb cache was purged:
+	 * a) retrieve same address from allocator (works for simple, not random)
+	 * b) passing previous address enters allocator <-> intel_bb cache
+	 *    consistency check path.
+	 */
+	if (purge_cache) {
+		intel_bb_add_object(ibb, h1, PAGE_SIZE,
+				    INTEL_BUF_INVALID_ADDRESS, 0, true);
+		intel_bb_add_object(ibb, h2, PAGE_SIZE, poff2_h2, 0, true);
+	} else {
+		/* See consistency check will not fail */
+		intel_bb_add_object(ibb, h1, PAGE_SIZE, poff2_h1, 0, true);
+		intel_bb_add_object(ibb, h2, PAGE_SIZE, poff2_h2, 0, true);
 	}
+
+	poff_h1 = intel_bb_get_object_offset(ibb, h1);
+	poff_h2 = intel_bb_get_object_offset(ibb, h2);
+	igt_debug("[4] bb presumed offset: 0x%"PRIx64"\n", poff_bb);
+	igt_debug("[4] h1 presumed offset: 0x%"PRIx64"\n", poff_h1);
+	igt_debug("[4] h2 presumed offset: 0x%"PRIx64"\n", poff_h2);
+
+	/* For simple allocator and purge=cache we must have same addresses */
+	if (allocator_type == INTEL_ALLOCATOR_SIMPLE || !purge_cache) {
+		igt_assert(poff_h1 == poff2_h1);
+		igt_assert(poff_h2 == poff2_h2);
+	}
+
+	gem_close(i915, h1);
+	gem_close(i915, h2);
+	intel_bb_destroy(ibb);
+}
+static void __emit_blit(struct intel_bb *ibb,
+			 struct intel_buf *src, struct intel_buf *dst)
+{
+	intel_bb_emit_blt_copy(ibb,
+			       src, 0, 0, src->surface[0].stride,
+			       dst, 0, 0, dst->surface[0].stride,
+			       intel_buf_width(dst),
+			       intel_buf_height(dst),
+			       dst->bpp);
 }
 
 static void blit(struct buf_ops *bops,
 		 enum reloc_objects reloc_obj,
-		 enum obj_cache_ops cache_op)
+		 enum obj_cache_ops cache_op,
+		 uint8_t allocator_type)
 {
 	int i915 = buf_ops_get_fd(bops);
 	struct intel_bb *ibb;
@@ -372,6 +602,17 @@ static void blit(struct buf_ops *bops,
 	bool purge_cache = cache_op == PURGE_CACHE ? true : false;
 	bool do_relocs = reloc_obj == RELOC ? true : false;
 
+	if (!do_relocs)
+		igt_require(gem_uses_full_ppgtt(i915));
+
+	if (do_relocs) {
+		ibb = intel_bb_create_with_relocs(i915, PAGE_SIZE);
+	} else {
+		ibb = intel_bb_create_with_allocator(i915, 0, PAGE_SIZE,
+						     allocator_type);
+		flags |= I915_EXEC_NO_RELOC;
+	}
+
 	src = create_buf(bops, WIDTH, HEIGHT, COLOR_CC);
 	dst = create_buf(bops, WIDTH, HEIGHT, COLOR_00);
 
@@ -380,41 +621,26 @@ static void blit(struct buf_ops *bops,
 		print_buf(dst, "dst");
 	}
 
-	if (do_relocs) {
-		ibb = intel_bb_create_with_relocs(i915, PAGE_SIZE);
-	} else {
-		ibb = intel_bb_create(i915, PAGE_SIZE);
-		flags |= I915_EXEC_NO_RELOC;
-	}
-
-	if (ibb->gen >= 6)
-		flags |= I915_EXEC_BLT;
-
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);
-
-
-	intel_bb_add_intel_buf(ibb, src, false);
-	intel_bb_add_intel_buf(ibb, dst, true);
 
 	__emit_blit(ibb, src, dst);
 
 	/* We expect initial addresses are zeroed for relocs */
-	poff_bb = intel_bb_get_object_offset(ibb, ibb->handle);
-	poff_src = intel_bb_get_object_offset(ibb, src->handle);
-	poff_dst = intel_bb_get_object_offset(ibb, dst->handle);
-	igt_debug("bb  presumed offset: 0x%"PRIx64"\n", poff_bb);
-	igt_debug("src presumed offset: 0x%"PRIx64"\n", poff_src);
-	igt_debug("dst presumed offset: 0x%"PRIx64"\n", poff_dst);
 	if (reloc_obj == RELOC) {
+		poff_bb = intel_bb_get_object_offset(ibb, ibb->handle);
+		poff_src = intel_bb_get_object_offset(ibb, src->handle);
+		poff_dst = intel_bb_get_object_offset(ibb, dst->handle);
+		igt_debug("bb  presumed offset: 0x%"PRIx64"\n", poff_bb);
+		igt_debug("src presumed offset: 0x%"PRIx64"\n", poff_src);
+		igt_debug("dst presumed offset: 0x%"PRIx64"\n", poff_dst);
 		igt_assert(poff_bb == 0);
 		igt_assert(poff_src == 0);
 		igt_assert(poff_dst == 0);
 	}
 
 	intel_bb_emit_bbe(ibb);
-	igt_debug("exec flags: %" PRIX64 "\n", flags);
-	intel_bb_exec(ibb, intel_bb_offset(ibb), flags, true);
+	intel_bb_flush_blit(ibb);
 	check_buf(dst, COLOR_CC);
 
 	poff_bb = intel_bb_get_object_offset(ibb, ibb->handle);
@@ -423,15 +649,29 @@ static void blit(struct buf_ops *bops,
 
 	intel_bb_reset(ibb, purge_cache);
 
+	/* For purge we lost offsets and bufs were removed from tracking list */
+	if (purge_cache) {
+		src->addr.offset = poff_src;
+		dst->addr.offset = poff_dst;
+	}
+
+	/* Add buffers again, should work both for purge and keep cache */
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_add_intel_buf(ibb, dst, true);
+
+	igt_assert_f(poff_src == src->addr.offset,
+		     "prev src addr: %" PRIx64 " <> src addr %" PRIx64 "\n",
+		     poff_src, src->addr.offset);
+	igt_assert_f(poff_dst == dst->addr.offset,
+		     "prev dst addr: %" PRIx64 " <> dst addr %" PRIx64 "\n",
+		     poff_dst, dst->addr.offset);
+
 	fill_buf(src, COLOR_77);
 	fill_buf(dst, COLOR_00);
 
-	if (purge_cache && !do_relocs) {
-		intel_bb_add_intel_buf(ibb, src, false);
-		intel_bb_add_intel_buf(ibb, dst, true);
-	}
-
 	__emit_blit(ibb, src, dst);
+	intel_bb_flush_blit(ibb);
+	check_buf(dst, COLOR_77);
 
 	poff2_bb = intel_bb_get_object_offset(ibb, ibb->handle);
 	poff2_src = intel_bb_get_object_offset(ibb, src->handle);
@@ -455,21 +695,9 @@ static void blit(struct buf_ops *bops,
 	 * we are in full control of our own GTT.
 	 */
 	if (gem_uses_full_ppgtt(i915)) {
-		if (purge_cache) {
-			if (do_relocs) {
-				igt_assert_eq_u64(poff2_bb,  0);
-				igt_assert_eq_u64(poff2_src, 0);
-				igt_assert_eq_u64(poff2_dst, 0);
-			} else {
-				igt_assert_neq_u64(poff_bb, poff2_bb);
-				igt_assert_eq_u64(poff_src, poff2_src);
-				igt_assert_eq_u64(poff_dst, poff2_dst);
-			}
-		} else {
-			igt_assert_eq_u64(poff_bb,  poff2_bb);
-			igt_assert_eq_u64(poff_src, poff2_src);
-			igt_assert_eq_u64(poff_dst, poff2_dst);
-		}
+		igt_assert_eq_u64(poff_bb,  poff2_bb);
+		igt_assert_eq_u64(poff_src, poff2_src);
+		igt_assert_eq_u64(poff_dst, poff2_dst);
 	}
 
 	intel_bb_emit_bbe(ibb);
@@ -636,7 +864,7 @@ static int dump_base64(const char *name, struct intel_buf *buf)
 	if (ret != Z_OK) {
 		igt_warn("error compressing, ret: %d\n", ret);
 	} else {
-		igt_info("compressed %" PRIx64 " -> %lu\n",
+		igt_info("compressed %" PRIu64 " -> %lu\n",
 			 buf->surface[0].size, outsize);
 
 		igt_info("--- %s ---\n", name);
@@ -1142,6 +1370,10 @@ igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 		gen = intel_gen(intel_get_drm_devid(i915));
 	}
 
+	igt_describe("Ensure reset is possible on fresh bb");
+	igt_subtest("reset-bb")
+		reset_bb(bops);
+
 	igt_subtest("simple-bb")
 		simple_bb(bops, false);
 
@@ -1154,17 +1386,47 @@ igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 	igt_subtest("reset-flags")
 		reset_flags(bops);
 
-	igt_subtest("blit-noreloc-keep-cache")
-		blit(bops, NORELOC, KEEP_CACHE);
+	igt_subtest("add-remove-objects")
+		add_remove_objects(bops);
+
+	igt_subtest("destroy-bb")
+		destroy_bb(bops);
+
+	igt_subtest("object-reloc-purge-cache")
+		object_reloc(bops, PURGE_CACHE);
+
+	igt_subtest("object-reloc-keep-cache")
+		object_reloc(bops, KEEP_CACHE);
+
+	igt_subtest("object-noreloc-purge-cache-simple")
+		object_noreloc(bops, PURGE_CACHE, INTEL_ALLOCATOR_SIMPLE);
+
+	igt_subtest("object-noreloc-keep-cache-simple")
+		object_noreloc(bops, KEEP_CACHE, INTEL_ALLOCATOR_SIMPLE);
+
+	igt_subtest("object-noreloc-purge-cache-random")
+		object_noreloc(bops, PURGE_CACHE, INTEL_ALLOCATOR_RANDOM);
+
+	igt_subtest("object-noreloc-keep-cache-random")
+		object_noreloc(bops, KEEP_CACHE, INTEL_ALLOCATOR_RANDOM);
 
 	igt_subtest("blit-reloc-purge-cache")
-		blit(bops, RELOC, PURGE_CACHE);
-
-	igt_subtest("blit-noreloc-purge-cache")
-		blit(bops, NORELOC, PURGE_CACHE);
+		blit(bops, RELOC, PURGE_CACHE, INTEL_ALLOCATOR_SIMPLE);
 
 	igt_subtest("blit-reloc-keep-cache")
-		blit(bops, RELOC, KEEP_CACHE);
+		blit(bops, RELOC, KEEP_CACHE, INTEL_ALLOCATOR_SIMPLE);
+
+	igt_subtest("blit-noreloc-keep-cache-random")
+		blit(bops, NORELOC, KEEP_CACHE, INTEL_ALLOCATOR_RANDOM);
+
+	igt_subtest("blit-noreloc-purge-cache-random")
+		blit(bops, NORELOC, PURGE_CACHE, INTEL_ALLOCATOR_RANDOM);
+
+	igt_subtest("blit-noreloc-keep-cache")
+		blit(bops, NORELOC, KEEP_CACHE, INTEL_ALLOCATOR_SIMPLE);
+
+	igt_subtest("blit-noreloc-purge-cache")
+		blit(bops, NORELOC, PURGE_CACHE, INTEL_ALLOCATOR_SIMPLE);
 
 	igt_subtest("intel-bb-blit-none")
 		do_intel_bb_blit(bops, 10, I915_TILING_NONE);
