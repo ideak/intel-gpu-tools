@@ -1393,7 +1393,7 @@ int main(int argc, char **argv)
 	}
 
 	if (opt_device != NULL) {
-		ret = igt_device_card_match(opt_device, &card);
+		ret = igt_device_card_match_pci(opt_device, &card);
 		if (!ret)
 			fprintf(stderr, "Requested device %s not found!\n", opt_device);
 		free(opt_device);

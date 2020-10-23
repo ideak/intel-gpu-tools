@@ -1237,18 +1237,9 @@ static bool igt_device_filter_apply(const char *fstr)
 	return true;
 }
 
-/**
- * igt_device_card_match
- * @filter: filter string
- * @card: pointer to igt_device_card struct
- *
- * Function applies filter to match device from device array.
- *
- * Returns:
- * false - no card pointer was passed or card wasn't matched,
- * true - card matched and returned.
- */
-bool igt_device_card_match(const char *filter, struct igt_device_card *card)
+
+static bool __igt_device_card_match(const char *filter,
+			struct igt_device_card *card, bool request_pci_ss)
 {
 	struct igt_device *dev = NULL;
 
@@ -1266,10 +1257,46 @@ bool igt_device_card_match(const char *filter, struct igt_device_card *card)
 
 	/* We take first one if more than one card matches filter */
 	dev = igt_list_first_entry(&igt_devs.filtered, dev, link);
-
-	__copy_dev_to_card(dev, card);
-
+	if (request_pci_ss && !is_pci_subsystem(dev) && dev->parent
+		&& is_pci_subsystem(dev->parent))
+		__copy_dev_to_card(dev->parent, card);
+	else
+		__copy_dev_to_card(dev, card);
 	return true;
+}
+
+/**
+ * igt_device_card_match
+ * @filter: filter string
+ * @card: pointer to igt_device_card struct
+ *
+ * Function applies filter to match device from device array.
+ *
+ * Returns:
+ * false - no card pointer was passed or card wasn't matched,
+ * true - card matched and returned.
+ */
+bool igt_device_card_match(const char *filter, struct igt_device_card *card)
+{
+       return __igt_device_card_match(filter, card, false);
+}
+
+/**
+ * igt_device_card_match_pci
+ * @filter: filter string
+ * @card: pointer to igt_device_card struct
+ *
+ * Function applies filter to match device from device array.
+ * Populate associated pci subsystem data if available.
+ *
+ * Returns:
+ * false - no card pointer was passed or card wasn't matched,
+ * true - card matched and returned.
+ */
+bool igt_device_card_match_pci(const char *filter,
+			struct igt_device_card *card)
+{
+       return __igt_device_card_match(filter, card, true);
 }
 
 /**

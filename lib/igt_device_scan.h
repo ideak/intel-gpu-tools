@@ -68,6 +68,8 @@ const char *igt_device_filter_get(int num);
 
 /* Use filter to match the device and fill card structure */
 bool igt_device_card_match(const char *filter, struct igt_device_card *card);
+bool igt_device_card_match_pci(const char *filter,
+	struct igt_device_card *card);
 bool igt_device_find_first_i915_discrete_card(struct igt_device_card *card);
 int igt_open_card(struct igt_device_card *card);
 int igt_open_render(struct igt_device_card *card);
