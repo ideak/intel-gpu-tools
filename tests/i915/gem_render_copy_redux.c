@@ -63,7 +63,6 @@ typedef struct {
 	int fd;
 	uint32_t devid;
 	struct buf_ops *bops;
-	struct intel_bb *ibb;
 	igt_render_copyfunc_t render_copy;
 	uint32_t linear[WIDTH * HEIGHT];
 } data_t;
@@ -77,13 +76,10 @@ static void data_init(data_t *data)
 	data->render_copy = igt_get_render_copyfunc(data->devid);
 	igt_require_f(data->render_copy,
 		      "no render-copy function\n");
-
-	data->ibb = intel_bb_create(data->fd, 4096);
 }
 
 static void data_fini(data_t *data)
 {
-	intel_bb_destroy(data->ibb);
 	buf_ops_destroy(data->bops);
 	close(data->fd);
 }
@@ -126,15 +122,17 @@ scratch_buf_check(data_t *data, struct intel_buf *buf, int x, int y,
 
 static void copy(data_t *data)
 {
+	struct intel_bb *ibb;
 	struct intel_buf src, dst;
 
+	ibb = intel_bb_create(data->fd, 4096);
 	scratch_buf_init(data, &src, WIDTH, HEIGHT, STRIDE, SRC_COLOR);
 	scratch_buf_init(data, &dst, WIDTH, HEIGHT, STRIDE, DST_COLOR);
 
 	scratch_buf_check(data, &src, WIDTH / 2, HEIGHT / 2, SRC_COLOR);
 	scratch_buf_check(data, &dst, WIDTH / 2, HEIGHT / 2, DST_COLOR);
 
-	data->render_copy(data->ibb,
+	data->render_copy(ibb,
 			  &src, 0, 0, WIDTH, HEIGHT,
 			  &dst, WIDTH / 2, HEIGHT / 2);
 
@@ -143,11 +141,13 @@ static void copy(data_t *data)
 
 	scratch_buf_fini(data, &src);
 	scratch_buf_fini(data, &dst);
+	intel_bb_destroy(ibb);
 }
 
 static void copy_flink(data_t *data)
 {
 	data_t local;
+	struct intel_bb *ibb, *local_ibb;
 	struct intel_buf src, dst;
 	struct intel_buf local_src, local_dst;
 	struct intel_buf flink;
@@ -155,32 +155,36 @@ static void copy_flink(data_t *data)
 
 	data_init(&local);
 
+	ibb = intel_bb_create(data->fd, 4096);
+	local_ibb = intel_bb_create(local.fd, 4096);
 	scratch_buf_init(data, &src, WIDTH, HEIGHT, STRIDE, 0);
 	scratch_buf_init(data, &dst, WIDTH, HEIGHT, STRIDE, DST_COLOR);
 
-	data->render_copy(data->ibb,
+	data->render_copy(ibb,
 			  &src, 0, 0, WIDTH, HEIGHT,
 			  &dst, WIDTH, HEIGHT);
 
 	scratch_buf_init(&local, &local_src, WIDTH, HEIGHT, STRIDE, 0);
 	scratch_buf_init(&local, &local_dst, WIDTH, HEIGHT, STRIDE, SRC_COLOR);
 
-	local.render_copy(local.ibb,
+	local.render_copy(local_ibb,
 			  &local_src, 0, 0, WIDTH, HEIGHT,
 			  &local_dst, WIDTH, HEIGHT);
 
 	name = gem_flink(local.fd, local_dst.handle);
 	flink = local_dst;
 	flink.handle = gem_open(data->fd, name);
+	flink.ibb = ibb;
+	flink.addr.offset = INTEL_BUF_INVALID_ADDRESS;
 
-	data->render_copy(data->ibb,
+	data->render_copy(ibb,
 			  &flink, 0, 0, WIDTH, HEIGHT,
 			  &dst, WIDTH / 2, HEIGHT / 2);
 
 	scratch_buf_check(data, &dst, 10, 10, DST_COLOR);
 	scratch_buf_check(data, &dst, WIDTH - 10, HEIGHT - 10, SRC_COLOR);
 
-	intel_bb_reset(data->ibb, true);
+	intel_bb_reset(ibb, true);
 	scratch_buf_fini(data, &src);
 	scratch_buf_fini(data, &flink);
 	scratch_buf_fini(data, &dst);
@@ -188,6 +192,8 @@ static void copy_flink(data_t *data)
 	scratch_buf_fini(&local, &local_src);
 	scratch_buf_fini(&local, &local_dst);
 
+	intel_bb_destroy(local_ibb);
+	intel_bb_destroy(ibb);
 	data_fini(&local);
 }
 
