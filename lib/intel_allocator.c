@@ -106,6 +106,7 @@ static pthread_mutex_t map_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static bool multiprocess;
 static pthread_t allocator_thread;
+static bool allocator_thread_running;
 
 static bool warn_if_not_empty;
 
@@ -725,6 +726,8 @@ static void *allocator_thread_loop(void *data)
 		   (long) allocator_pid, (long) gettid());
 	alloc_info("Entering allocator loop\n");
 
+	WRITE_ONCE(allocator_thread_running, true);
+
 	while (1) {
 		ret = recv_req(channel, &req);
 
@@ -757,6 +760,8 @@ static void *allocator_thread_loop(void *data)
 			return (void *) -1;
 		}
 	}
+
+	WRITE_ONCE(allocator_thread_running, false);
 
 	return NULL;
 }
@@ -797,15 +802,24 @@ void intel_allocator_multiprocess_start(void)
  * Function turns off intel_allocator multiprocess mode what means
  * stopping allocator thread and deinitializing its data.
  */
+#define STOP_TIMEOUT_MS 100
 void intel_allocator_multiprocess_stop(void)
 {
+	int time_left = STOP_TIMEOUT_MS;
+
 	alloc_info("allocator multiprocess stop\n");
 
 	if (multiprocess) {
 		send_alloc_stop(channel);
+
+		/* Give allocator thread time to complete */
+		while (time_left-- > 0 && READ_ONCE(allocator_thread_running))
+			usleep(1000); /* coarse calculation */
+
 		/* Deinit, this should stop all blocked syscalls, if any */
 		channel->deinit(channel);
 		pthread_join(allocator_thread, NULL);
+
 		/* But we're not sure does child will stuck */
 		igt_waitchildren_timeout(5, "Stopping children");
 		multiprocess = false;
