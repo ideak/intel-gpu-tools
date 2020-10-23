@@ -426,6 +426,25 @@ static struct igt_device *igt_device_find(const char *subsystem,
 	return NULL;
 }
 
+static bool is_vendor_matched(struct igt_device *dev, const char *vendor)
+{
+	const char *vendor_id;
+
+	if (!dev->vendor || !vendor)
+		return false;
+
+	/* First we compare vendor id, like 8086 */
+	if (!strcasecmp(dev->vendor, vendor))
+		return true;
+
+	/* Likely we have vendor string instead of id */
+	vendor_id = get_pci_vendor_id_by_name(vendor);
+	if (!vendor_id)
+		return false;
+
+	return !strcasecmp(dev->vendor, vendor_id);
+}
+
 static void
 __copy_dev_to_card(struct igt_device *dev, struct igt_device_card *card)
 {
@@ -457,7 +476,7 @@ bool igt_device_find_first_i915_discrete_card(struct igt_device_card *card)
 
 	igt_list_for_each_entry(dev, &igt_devs.all, link) {
 
-		if (!is_pci_subsystem(dev))
+		if (!is_pci_subsystem(dev) || !is_vendor_matched(dev, "intel"))
 			continue;
 
 		if ((strncmp(dev->pci_slot_name, INTEGRATED_I915_GPU_PCI_ID, PCI_SLOT_NAME_SIZE)) != 0) {
@@ -891,25 +910,6 @@ static bool parse_filter(const char *fstr, struct filter *filter)
 	}
 
 	return false;
-}
-
-static bool is_vendor_matched(struct igt_device *dev, const char *vendor)
-{
-	const char *vendor_id;
-
-	if (!dev->vendor || !vendor)
-		return false;
-
-	/* First we compare vendor id, like 8086 */
-	if (!strcasecmp(dev->vendor, vendor))
-		return true;
-
-	/* Likely we have vendor string instead of id */
-	vendor_id = get_pci_vendor_id_by_name(vendor);
-	if (!vendor_id)
-		return false;
-
-	return !strcasecmp(dev->vendor, vendor_id);
 }
 
 /* Filter which matches subsystem:/sys/... path.
