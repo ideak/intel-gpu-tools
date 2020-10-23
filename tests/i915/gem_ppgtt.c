@@ -104,12 +104,14 @@ static void fork_rcs_copy(int timeout, uint32_t final,
 		struct intel_buf *src;
 		unsigned long i;
 
+		/* Standalone allocator */
+		intel_allocator_init();
+
 		if (flags & CREATE_CONTEXT)
 			ctx = gem_context_create(buf_ops_get_fd(dst[child]->bops));
 
 		ibb = intel_bb_create_with_context(buf_ops_get_fd(dst[child]->bops),
 						   ctx, 4096);
-
 		i = 0;
 		igt_until_timeout(timeout) {
 			src = create_bo(dst[child]->bops,
@@ -150,6 +152,9 @@ static void fork_bcs_copy(int timeout, uint32_t final,
 		struct intel_buf *src[2];
 		struct intel_bb *ibb;
 		unsigned long i;
+
+		/* Standalone allocator */
+		intel_allocator_init();
 
 		ibb = intel_bb_create(buf_ops_get_fd(dst[child]->bops), 4096);
 
