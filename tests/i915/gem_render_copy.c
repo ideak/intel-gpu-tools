@@ -58,7 +58,6 @@ typedef struct {
 	int drm_fd;
 	uint32_t devid;
 	struct buf_ops *bops;
-	struct intel_bb *ibb;
 	igt_render_copyfunc_t render_copy;
 	igt_vebox_copyfunc_t vebox_copy;
 } data_t;
@@ -341,6 +340,7 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 		 enum i915_compression dst_compression,
 		 int flags)
 {
+	struct intel_bb *ibb;
 	struct intel_buf ref, src_tiled, src_ccs, dst_ccs, dst;
 	struct {
 		struct intel_buf buf;
@@ -396,6 +396,8 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	if (src_tiling == I915_TILING_Yf || dst_tiling == I915_TILING_Yf ||
 	    src_compressed || dst_compressed)
 		igt_require(intel_gen(data->devid) >= 9);
+
+	ibb = intel_bb_create(data->drm_fd, 4096);
 
 	for (int i = 0; i < num_src; i++)
 		scratch_buf_init(data, &src[i].buf, WIDTH, HEIGHT, src[i].tiling,
@@ -456,12 +458,12 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	 */
 	if (src_mixed_tiled) {
 		if (dst_compressed)
-			data->render_copy(data->ibb,
+			data->render_copy(ibb,
 					  &dst, 0, 0, WIDTH, HEIGHT,
 					  &dst_ccs, 0, 0);
 
 		for (int i = 0; i < num_src; i++) {
-			data->render_copy(data->ibb,
+			data->render_copy(ibb,
 					  &src[i].buf,
 					  WIDTH/4, HEIGHT/4, WIDTH/2-2, HEIGHT/2-2,
 					  dst_compressed ? &dst_ccs : &dst,
@@ -469,13 +471,13 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 		}
 
 		if (dst_compressed)
-			data->render_copy(data->ibb,
+			data->render_copy(ibb,
 					  &dst_ccs, 0, 0, WIDTH, HEIGHT,
 					  &dst, 0, 0);
 
 	} else {
 		if (src_compression == I915_COMPRESSION_RENDER) {
-			data->render_copy(data->ibb,
+			data->render_copy(ibb,
 					  &src_tiled, 0, 0, WIDTH, HEIGHT,
 					  &src_ccs,
 					  0, 0);
@@ -486,7 +488,7 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 						       "render-src_ccs.bin");
 			}
 		} else if (src_compression == I915_COMPRESSION_MEDIA) {
-			data->vebox_copy(data->ibb,
+			data->vebox_copy(ibb,
 					 &src_tiled, WIDTH, HEIGHT,
 					 &src_ccs);
 			if (dump_compressed_src_buf) {
@@ -498,34 +500,34 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 		}
 
 		if (dst_compression == I915_COMPRESSION_RENDER) {
-			data->render_copy(data->ibb,
+			data->render_copy(ibb,
 					  src_compressed ? &src_ccs : &src_tiled,
 					  0, 0, WIDTH, HEIGHT,
 					  &dst_ccs,
 					  0, 0);
 
-			data->render_copy(data->ibb,
+			data->render_copy(ibb,
 					  &dst_ccs,
 					  0, 0, WIDTH, HEIGHT,
 					  &dst,
 					  0, 0);
 		} else if (dst_compression == I915_COMPRESSION_MEDIA) {
-			data->vebox_copy(data->ibb,
+			data->vebox_copy(ibb,
 					 src_compressed ? &src_ccs : &src_tiled,
 					 WIDTH, HEIGHT,
 					 &dst_ccs);
 
-			data->vebox_copy(data->ibb,
+			data->vebox_copy(ibb,
 					 &dst_ccs,
 					 WIDTH, HEIGHT,
 					 &dst);
 		} else if (force_vebox_dst_copy) {
-			data->vebox_copy(data->ibb,
+			data->vebox_copy(ibb,
 					 src_compressed ? &src_ccs : &src_tiled,
 					 WIDTH, HEIGHT,
 					 &dst);
 		} else {
-			data->render_copy(data->ibb,
+			data->render_copy(ibb,
 					  src_compressed ? &src_ccs : &src_tiled,
 					  0, 0, WIDTH, HEIGHT,
 					  &dst,
@@ -572,8 +574,7 @@ static void test(data_t *data, uint32_t src_tiling, uint32_t dst_tiling,
 	for (int i = 0; i < num_src; i++)
 		scratch_buf_fini(&src[i].buf);
 
-	/* handles gone, need to clean the objects cache within intel_bb */
-	intel_bb_reset(data->ibb, true);
+	intel_bb_destroy(ibb);
 }
 
 static int opt_handler(int opt, int opt_index, void *data)
@@ -796,7 +797,6 @@ igt_main_args("dac", NULL, help_str, opt_handler, NULL)
 		data.vebox_copy = igt_get_vebox_copyfunc(data.devid);
 
 		data.bops = buf_ops_create(data.drm_fd);
-		data.ibb = intel_bb_create(data.drm_fd, 4096);
 
 		igt_fork_hang_detector(data.drm_fd);
 	}
@@ -849,7 +849,6 @@ igt_main_args("dac", NULL, help_str, opt_handler, NULL)
 
 	igt_fixture {
 		igt_stop_hang_detector();
-		intel_bb_destroy(data.ibb);
 		buf_ops_destroy(data.bops);
 	}
 }

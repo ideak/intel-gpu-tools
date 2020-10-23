@@ -53,7 +53,6 @@ IGT_TEST_DESCRIPTION("Test pwrite/pread consistency when touching partial"
 #define PAGE_SIZE 4096
 #define BO_SIZE (4*4096)
 
-struct intel_bb *ibb;
 struct intel_buf *scratch_buf;
 struct intel_buf *staging_buf;
 
@@ -77,7 +76,8 @@ static void *__try_gtt_map_first(data_t *data, struct intel_buf *buf,
 	return ptr;
 }
 
-static void copy_bo(struct intel_buf *src, struct intel_buf *dst)
+static void copy_bo(struct intel_bb *ibb,
+		    struct intel_buf *src, struct intel_buf *dst)
 {
 	bool has_64b_reloc;
 
@@ -109,8 +109,8 @@ static void copy_bo(struct intel_buf *src, struct intel_buf *dst)
 }
 
 static void
-blt_bo_fill(data_t *data, struct intel_buf *tmp_bo,
-		struct intel_buf *bo, uint8_t val)
+blt_bo_fill(data_t *data, struct intel_bb *ibb,
+	    struct intel_buf *tmp_bo, struct intel_buf *bo, uint8_t val)
 {
 	uint8_t *gtt_ptr;
 	int i;
@@ -124,7 +124,7 @@ blt_bo_fill(data_t *data, struct intel_buf *tmp_bo,
 
 	igt_drop_caches_set(data->drm_fd, DROP_BOUND);
 
-	copy_bo(tmp_bo, bo);
+	copy_bo(ibb, tmp_bo, bo);
 }
 
 #define MAX_BLT_SIZE 128
@@ -139,14 +139,17 @@ static void get_range(int *start, int *len)
 
 static void test_partial_reads(data_t *data)
 {
+	struct intel_bb *ibb;
 	int i, j;
+
+	ibb = intel_bb_create(data->drm_fd, PAGE_SIZE);
 
 	igt_info("checking partial reads\n");
 	for (i = 0; i < ROUNDS; i++) {
 		uint8_t val = i;
 		int start, len;
 
-		blt_bo_fill(data, staging_buf, scratch_buf, val);
+		blt_bo_fill(data, ibb, staging_buf, scratch_buf, val);
 
 		get_range(&start, &len);
 		gem_read(data->drm_fd, scratch_buf->handle, start, tmp, len);
@@ -159,26 +162,31 @@ static void test_partial_reads(data_t *data)
 
 		igt_progress("partial reads test: ", i, ROUNDS);
 	}
+
+	intel_bb_destroy(ibb);
 }
 
 static void test_partial_writes(data_t *data)
 {
+	struct intel_bb *ibb;
 	int i, j;
 	uint8_t *gtt_ptr;
+
+	ibb = intel_bb_create(data->drm_fd, PAGE_SIZE);
 
 	igt_info("checking partial writes\n");
 	for (i = 0; i < ROUNDS; i++) {
 		uint8_t val = i;
 		int start, len;
 
-		blt_bo_fill(data, staging_buf, scratch_buf, val);
+		blt_bo_fill(data, ibb, staging_buf, scratch_buf, val);
 
 		memset(tmp, i + 63, BO_SIZE);
 
 		get_range(&start, &len);
 		gem_write(data->drm_fd, scratch_buf->handle, start, tmp, len);
 
-		copy_bo(scratch_buf, staging_buf);
+		copy_bo(ibb, scratch_buf, staging_buf);
 		gtt_ptr = __try_gtt_map_first(data, staging_buf, 0);
 
 		for (j = 0; j < start; j++) {
@@ -200,19 +208,24 @@ static void test_partial_writes(data_t *data)
 
 		igt_progress("partial writes test: ", i, ROUNDS);
 	}
+
+	intel_bb_destroy(ibb);
 }
 
 static void test_partial_read_writes(data_t *data)
 {
+	struct intel_bb *ibb;
 	int i, j;
 	uint8_t *gtt_ptr;
+
+	ibb = intel_bb_create(data->drm_fd, PAGE_SIZE);
 
 	igt_info("checking partial writes after partial reads\n");
 	for (i = 0; i < ROUNDS; i++) {
 		uint8_t val = i;
 		int start, len;
 
-		blt_bo_fill(data, staging_buf, scratch_buf, val);
+		blt_bo_fill(data, ibb, staging_buf, scratch_buf, val);
 
 		/* partial read */
 		get_range(&start, &len);
@@ -226,7 +239,7 @@ static void test_partial_read_writes(data_t *data)
 		/* Change contents through gtt to make the pread cachelines
 		 * stale. */
 		val += 17;
-		blt_bo_fill(data, staging_buf, scratch_buf, val);
+		blt_bo_fill(data, ibb, staging_buf, scratch_buf, val);
 
 		/* partial write */
 		memset(tmp, i + 63, BO_SIZE);
@@ -234,7 +247,7 @@ static void test_partial_read_writes(data_t *data)
 		get_range(&start, &len);
 		gem_write(data->drm_fd, scratch_buf->handle, start, tmp, len);
 
-		copy_bo(scratch_buf, staging_buf);
+		copy_bo(ibb, scratch_buf, staging_buf);
 		gtt_ptr = __try_gtt_map_first(data, staging_buf, 0);
 
 		for (j = 0; j < start; j++) {
@@ -256,6 +269,8 @@ static void test_partial_read_writes(data_t *data)
 
 		igt_progress("partial read/writes test: ", i, ROUNDS);
 	}
+
+	intel_bb_destroy(ibb);
 }
 
 static void do_tests(data_t *data, int cache_level, const char *suffix)
@@ -289,8 +304,6 @@ igt_main
 		data.devid = intel_get_drm_devid(data.drm_fd);
 		data.bops = buf_ops_create(data.drm_fd);
 
-		ibb = intel_bb_create(data.drm_fd, PAGE_SIZE);
-
 		/* overallocate the buffers we're actually using because */	
 		scratch_buf = intel_buf_create(data.bops, BO_SIZE/4, 1, 32, 0, I915_TILING_NONE, 0);
 		staging_buf = intel_buf_create(data.bops, BO_SIZE/4, 1, 32, 0, I915_TILING_NONE, 0);
@@ -304,7 +317,6 @@ igt_main
 	do_tests(&data, 2, "-display");
 
 	igt_fixture {
-		intel_bb_destroy(ibb);
 		intel_buf_destroy(scratch_buf);
 		intel_buf_destroy(staging_buf);
 		buf_ops_destroy(data.bops);
