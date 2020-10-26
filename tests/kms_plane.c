@@ -560,9 +560,11 @@ static void capture_format_crcs(data_t *data, enum pipe pipe,
 	struct drm_event_vblank ev;
 	int i;
 
+restart_round:
 	for (i = 0; i < data->num_colors; i++) {
 		const color_t *c = &data->colors[i];
 		struct igt_fb old_fb = *fb;
+		int ret;
 
 		prepare_format_color(data, pipe, plane, format, modifier,
 				     width, height, encoding, range, c, fb);
@@ -593,10 +595,22 @@ static void capture_format_crcs(data_t *data, enum pipe pipe,
 			 * to be prepared in parallel while the current fb
 			 * awaits to be latched.
 			 */
-			igt_display_commit_atomic(&data->display,
-						  DRM_MODE_ATOMIC_ALLOW_MODESET |
-						  DRM_MODE_ATOMIC_NONBLOCK |
-						  DRM_MODE_PAGE_FLIP_EVENT, NULL);
+			ret = igt_display_try_commit_atomic(&data->display,
+							    DRM_MODE_ATOMIC_NONBLOCK |
+							    DRM_MODE_PAGE_FLIP_EVENT, NULL);
+			if (ret) {
+				/*
+				 * there was needed modeset for pixel format.
+				 * modeset here happen only on first color of
+				 * given set so restart round as modeset will
+				 * mess up crc frame sequence.
+				 */
+				igt_display_commit_atomic(&data->display,
+							  DRM_MODE_ATOMIC_ALLOW_MODESET,
+							  NULL);
+				igt_remove_fb(data->drm_fd, &old_fb);
+				goto restart_round;
+			}
 		} else {
 			/*
 			 * Last moment to grab the previous crc
@@ -815,8 +829,10 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 
 		igt_plane_set_fb(plane, &test_fb);
 
-		ret = igt_display_try_commit_atomic(&data->display, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
-
+		ret = igt_display_try_commit_atomic(&data->display,
+						    DRM_MODE_ATOMIC_TEST_ONLY |
+						    DRM_MODE_ATOMIC_ALLOW_MODESET,
+						    NULL);
 		if (!ret) {
 			width = test_fb.width;
 			height = test_fb.height;
