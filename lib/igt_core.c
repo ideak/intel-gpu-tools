@@ -775,21 +775,20 @@ GKeyFile *igt_load_igtrc(void)
 static void common_init_config(void)
 {
 	GError *error = NULL;
-	int ret;
+	int ret = 0;
 
 	igt_key_file = igt_load_igtrc();
-	if (!igt_key_file)
-		return;
 
-	if (!igt_frame_dump_path)
+	if (igt_key_file && !igt_frame_dump_path)
 		igt_frame_dump_path =
 			g_key_file_get_string(igt_key_file, "Common",
 					      "FrameDumpPath", &error);
 
 	g_clear_error(&error);
 
-	ret = g_key_file_get_integer(igt_key_file, "DUT", "SuspendResumeDelay",
-				     &error);
+	if (igt_key_file)
+		ret = g_key_file_get_integer(igt_key_file, "DUT", "SuspendResumeDelay",
+					     &error);
 	assert(!error || error->code != G_KEY_FILE_ERROR_INVALID_VALUE);
 
 	g_clear_error(&error);
@@ -804,9 +803,10 @@ static void common_init_config(void)
 		if (igt_rc_device) {
 			igt_debug("Notice: using IGT_DEVICE env:\n");
 		} else {
-			igt_rc_device =	g_key_file_get_string(igt_key_file,
-							      "Common",
-							      "Device", &error);
+			if (igt_key_file)
+				igt_rc_device =	g_key_file_get_string(igt_key_file,
+								      "Common",
+								      "Device", &error);
 			g_clear_error(&error);
 			if (igt_rc_device)
 				igt_debug("Notice: using .igtrc "
