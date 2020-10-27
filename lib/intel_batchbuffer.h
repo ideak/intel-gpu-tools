@@ -648,6 +648,9 @@ void intel_bb_blt_copy(struct intel_bb *ibb,
 		       struct intel_buf *dst,
 		       int dst_x1, int dst_y1, int dst_pitch,
 		       int width, int height, int bpp);
+void intel_bb_copy_intel_buf(struct intel_bb *ibb,
+			     struct intel_buf *dst, struct intel_buf *src,
+			     long int size);
 
 /**
  * igt_huc_copyfunc_t:

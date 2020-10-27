@@ -2522,6 +2522,29 @@ void intel_bb_blt_copy(struct intel_bb *ibb,
 }
 
 /**
+ * intel_bb_copy_intel_buf:
+ * @batch: batchbuffer object
+ * @src: source buffer (intel_buf)
+ * @dst: destination libdrm buffer object
+ * @size: size of the copy range in bytes
+ *
+ * Emits a copy operation using blitter commands into the supplied batch.
+ * A total of @size bytes from the start of @src is copied
+ * over to @dst. Note that @size must be page-aligned.
+ */
+void intel_bb_copy_intel_buf(struct intel_bb *ibb,
+			     struct intel_buf *src, struct intel_buf *dst,
+			     long int size)
+{
+	igt_assert(size % 4096 == 0);
+
+	intel_bb_blt_copy(ibb,
+			  src, 0, 0, 4096,
+			  dst, 0, 0, 4096,
+			  4096/4, size/4096, 32);
+}
+
+/**
  * igt_get_huc_copyfunc:
  * @devid: pci device id
  *
