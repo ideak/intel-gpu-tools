@@ -50,94 +50,96 @@
 
 IGT_TEST_DESCRIPTION("Test pread behavior when getting values out of"
 		     " just-drawn-to buffers.");
-
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
 static const int width = 512, height = 512;
 static const int size = 1024 * 1024;
 
 #define PAGE_SIZE 4096
 
-static drm_intel_bo *
-create_bo(uint32_t val)
+static struct intel_buf *
+create_bo(struct buf_ops *bops, uint32_t val)
 {
-	drm_intel_bo *bo;
+	struct intel_buf *buf;
 	uint32_t *vaddr;
 	int i;
 
-	bo = drm_intel_bo_alloc(bufmgr, "src bo", size, 4096);
+	buf = intel_buf_create(bops, width, height, 32, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
 
 	/* Fill the BO with dwords starting at start_val */
-	drm_intel_bo_map(bo, 1);
-	vaddr = bo->virtual;
+	intel_buf_cpu_map(buf, 1);
+	vaddr = buf->ptr;
 
 	for (i = 0; i < 1024 * 1024 / 4; i++)
 		vaddr[i] = val++;
 
-	drm_intel_bo_unmap(bo);
+	intel_buf_unmap(buf);
 
-	return bo;
+	return buf;
 }
 
 static void
-verify_large_read(drm_intel_bo *bo, uint32_t val)
+verify_large_read(int fd, struct intel_buf *buf, uint32_t val)
 {
-	uint32_t buf[size / 4];
+	uint32_t tmp[size / 4];
 	int i;
 
-	drm_intel_bo_get_subdata(bo, 0, size, buf);
+	gem_read(fd, buf->handle, 0, tmp, size);
 
 	for (i = 0; i < size / 4; i++) {
-		igt_assert_f(buf[i] == val,
+		igt_assert_f(tmp[i] == val,
 			     "Unexpected value 0x%08x instead of "
 			     "0x%08x at offset 0x%08x (%p)\n",
-			     buf[i], val, i * 4, buf);
+			     tmp[i], val, i * 4, tmp);
 		val++;
 	}
 }
 
 /** This reads at the size that Mesa usees for software fallbacks. */
 static void
-verify_small_read(drm_intel_bo *bo, uint32_t val)
+verify_small_read(int fd, struct intel_buf *buf, uint32_t val)
 {
-	uint32_t buf[4096 / 4];
+	uint32_t tmp[4096 / 4];
 	int offset, i;
 
 	for (i = 0; i < 4096 / 4; i++)
-		buf[i] = 0x00c0ffee;
+		tmp[i] = 0x00c0ffee;
 
 	for (offset = 0; offset < size; offset += PAGE_SIZE) {
-		drm_intel_bo_get_subdata(bo, offset, PAGE_SIZE, buf);
+		gem_read(fd, buf->handle, offset, tmp, PAGE_SIZE);
 
 		for (i = 0; i < PAGE_SIZE; i += 4) {
-			igt_assert_f(buf[i / 4] == val,
+			igt_assert_f(tmp[i / 4] == val,
 				     "Unexpected value 0x%08x instead of "
 				     "0x%08x at offset 0x%08x\n",
-				     buf[i / 4], val, i * 4);
+				     tmp[i / 4], val, i * 4);
 			val++;
 		}
 	}
 }
 
-typedef igt_hang_t (*do_hang)(int fd);
+typedef igt_hang_t (*do_hang)(int fd, struct intel_bb *ibb);
 
-static igt_hang_t no_hang(int fd)
+static igt_hang_t no_hang(int fd, struct intel_bb *ibb)
 {
 	return (igt_hang_t){0};
 }
 
-static igt_hang_t bcs_hang(int fd)
+static igt_hang_t bcs_hang(int fd, struct intel_bb *ibb)
 {
-	return igt_hang_ring(fd, batch->gen >= 6 ? I915_EXEC_BLT : I915_EXEC_DEFAULT);
+	return igt_hang_ring(fd, ibb->gen >= 6 ? I915_EXEC_BLT : I915_EXEC_DEFAULT);
 }
 
-static void do_test(int fd, int cache_level,
-		    drm_intel_bo *src[2],
+static void do_test(struct buf_ops *bops, int cache_level,
+		    struct intel_buf *src[2],
 		    const uint32_t start[2],
-		    drm_intel_bo *tmp[2],
+		    struct intel_buf *tmp[2],
 		    int loop, do_hang do_hang_func)
 {
+	struct intel_bb *ibb;
 	igt_hang_t hang;
+	int fd = buf_ops_get_fd(bops);
+
+	ibb = intel_bb_create(fd, 4096);
 
 	if (cache_level != -1) {
 		gem_set_caching(fd, tmp[0]->handle, cache_level);
@@ -146,54 +148,53 @@ static void do_test(int fd, int cache_level,
 
 	do {
 		/* First, do a full-buffer read after blitting */
-		intel_copy_bo(batch, tmp[0], src[0], width*height*4);
-		hang = do_hang_func(fd);
-		verify_large_read(tmp[0], start[0]);
+		intel_bb_copy_intel_buf(ibb, src[0], tmp[0], size);
+		hang = do_hang_func(fd, ibb);
+		verify_large_read(fd, tmp[0], start[0]);
 		igt_post_hang_ring(fd, hang);
-		intel_copy_bo(batch, tmp[0], src[1], width*height*4);
-		hang = do_hang_func(fd);
-		verify_large_read(tmp[0], start[1]);
-		igt_post_hang_ring(fd, hang);
-
-		intel_copy_bo(batch, tmp[0], src[0], width*height*4);
-		hang = do_hang_func(fd);
-		verify_small_read(tmp[0], start[0]);
-		igt_post_hang_ring(fd, hang);
-		intel_copy_bo(batch, tmp[0], src[1], width*height*4);
-		hang = do_hang_func(fd);
-		verify_small_read(tmp[0], start[1]);
+		intel_bb_copy_intel_buf(ibb, src[1], tmp[0], size);
+		hang = do_hang_func(fd, ibb);
+		verify_large_read(fd, tmp[0], start[1]);
 		igt_post_hang_ring(fd, hang);
 
-		intel_copy_bo(batch, tmp[0], src[0], width*height*4);
-		hang = do_hang_func(fd);
-		verify_large_read(tmp[0], start[0]);
+		intel_bb_copy_intel_buf(ibb, src[0], tmp[0], size);
+		hang = do_hang_func(fd, ibb);
+		verify_small_read(fd, tmp[0], start[0]);
+		igt_post_hang_ring(fd, hang);
+		intel_bb_copy_intel_buf(ibb, src[1], tmp[0], size);
+		hang = do_hang_func(fd, ibb);
+		verify_small_read(fd, tmp[0], start[1]);
 		igt_post_hang_ring(fd, hang);
 
-		intel_copy_bo(batch, tmp[0], src[0], width*height*4);
-		intel_copy_bo(batch, tmp[1], src[1], width*height*4);
-		hang = do_hang_func(fd);
-		verify_large_read(tmp[0], start[0]);
-		verify_large_read(tmp[1], start[1]);
+		intel_bb_copy_intel_buf(ibb, src[0], tmp[0], size);
+		hang = do_hang_func(fd, ibb);
+		verify_large_read(fd, tmp[0], start[0]);
 		igt_post_hang_ring(fd, hang);
 
-		intel_copy_bo(batch, tmp[0], src[0], width*height*4);
-		intel_copy_bo(batch, tmp[1], src[1], width*height*4);
-		hang = do_hang_func(fd);
-		verify_large_read(tmp[1], start[1]);
-		verify_large_read(tmp[0], start[0]);
+		intel_bb_copy_intel_buf(ibb, src[0], tmp[0], size);
+		intel_bb_copy_intel_buf(ibb, src[1], tmp[1], size);
+		hang = do_hang_func(fd, ibb);
+		verify_large_read(fd, tmp[0], start[0]);
+		verify_large_read(fd, tmp[1], start[1]);
 		igt_post_hang_ring(fd, hang);
 
-		intel_copy_bo(batch, tmp[1], src[0], width*height*4);
-		intel_copy_bo(batch, tmp[0], src[1], width*height*4);
-		hang = do_hang_func(fd);
-		verify_large_read(tmp[0], start[1]);
-		verify_large_read(tmp[1], start[0]);
+		intel_bb_copy_intel_buf(ibb, src[0], tmp[0], size);
+		intel_bb_copy_intel_buf(ibb, src[1], tmp[1], size);
+		hang = do_hang_func(fd, ibb);
+		verify_large_read(fd, tmp[1], start[1]);
+		verify_large_read(fd, tmp[0], start[0]);
+		igt_post_hang_ring(fd, hang);
+
+		intel_bb_copy_intel_buf(ibb, src[0], tmp[1], size);
+		intel_bb_copy_intel_buf(ibb, src[1], tmp[0], size);
+		hang = do_hang_func(fd, ibb);
+		verify_large_read(fd, tmp[0], start[1]);
+		verify_large_read(fd, tmp[1], start[0]);
 		igt_post_hang_ring(fd, hang);
 	} while (--loop);
-}
 
-drm_intel_bo *src[2], *dst[2];
-int fd;
+	intel_bb_destroy(ibb);
+}
 
 igt_main
 {
@@ -208,43 +209,45 @@ igt_main
 		{ "display", 2 },
 		{ NULL, -1 },
 	}, *t;
+	struct intel_buf *src[2], *dst[2];
+	struct buf_ops *bops;
+	int fd;
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 
-		bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-		batch = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(fd));
+		bops = buf_ops_create(fd);
 
-		src[0] = create_bo(start[0]);
-		src[1] = create_bo(start[1]);
+		src[0] = create_bo(bops, start[0]);
+		src[1] = create_bo(bops, start[1]);
 
-		dst[0] = drm_intel_bo_alloc(bufmgr, "dst bo", size, 4096);
-		dst[1] = drm_intel_bo_alloc(bufmgr, "dst bo", size, 4096);
+		dst[0] = intel_buf_create(bops, width, height, 32, 4096,
+					  I915_TILING_NONE, I915_COMPRESSION_NONE);
+		dst[1] = intel_buf_create(bops, width, height, 32, 4096,
+					  I915_TILING_NONE, I915_COMPRESSION_NONE);
 	}
 
 	for (t = tests; t->name; t++) {
 		igt_subtest_f("%s-normal", t->name)
-			do_test(fd, t->cache, src, start, dst, 1, no_hang);
+			do_test(bops, t->cache, src, start, dst, 1, no_hang);
 
 		igt_fork_signal_helper();
 		igt_subtest_f("%s-interruptible", t->name)
-			do_test(fd, t->cache, src, start, dst, 100, no_hang);
+			do_test(bops, t->cache, src, start, dst, 100, no_hang);
 		igt_stop_signal_helper();
 
 		igt_subtest_f("%s-hang", t->name)
-			do_test(fd, t->cache, src, start, dst, 1, bcs_hang);
+			do_test(bops, t->cache, src, start, dst, 1, bcs_hang);
 	}
 
 	igt_fixture {
-		drm_intel_bo_unreference(src[0]);
-		drm_intel_bo_unreference(src[1]);
-		drm_intel_bo_unreference(dst[0]);
-		drm_intel_bo_unreference(dst[1]);
+		intel_buf_destroy(src[0]);
+		intel_buf_destroy(src[1]);
+		intel_buf_destroy(dst[0]);
+		intel_buf_destroy(dst[1]);
 
-		intel_batchbuffer_free(batch);
-		drm_intel_bufmgr_destroy(bufmgr);
+		buf_ops_destroy(bops);
 	}
 
 	igt_fixture
