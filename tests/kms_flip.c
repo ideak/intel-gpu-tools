@@ -86,8 +86,7 @@
 
 drmModeRes *resources;
 int drm_fd;
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
+static struct buf_ops *bops;
 uint32_t devid;
 int test_time = 3;
 static bool monotonic_timestamp;
@@ -211,20 +210,19 @@ static void emit_fence_stress(struct test_output *o)
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 *exec;
 	uint32_t buf[2] = { MI_BATCH_BUFFER_END, 0 };
-	drm_intel_bo **bo;
+	struct intel_buf **bo;
 	int i;
 
-	igt_require(bufmgr);
+	igt_require(bops);
 
 	igt_assert(num_fences);
 	bo = calloc(sizeof(*bo), num_fences);
 	exec = calloc(sizeof(*exec), num_fences+1);
 	for (i = 0; i < num_fences - 1; i++) {
 		uint32_t tiling = I915_TILING_X;
-		unsigned long pitch = 0;
-		bo[i] = drm_intel_bo_alloc_tiled(bufmgr,
-						 "X tiled bo", 1024, 1024, 4,
-						 &tiling, &pitch, 0);
+		bo[i] = intel_buf_create(bops, 1024, 1024, 32, 0, tiling,
+					 I915_COMPRESSION_NONE);
+
 		exec[i].handle = bo[i]->handle;
 		exec[i].flags = EXEC_OBJECT_NEEDS_FENCE;
 	}
@@ -244,7 +242,7 @@ static void emit_fence_stress(struct test_output *o)
 
 	gem_close(drm_fd, exec[i].handle);
 	for (i = 0; i < num_fences - 1; i++)
-		drm_intel_bo_unreference(bo[i]);
+		intel_buf_destroy(bo[i]);
 	free(bo);
 	free(exec);
 }
@@ -1664,11 +1662,7 @@ igt_main
 		get_timestamp_format();
 
 		if (is_i915_device(drm_fd)) {
-			bufmgr = drm_intel_bufmgr_gem_init(drm_fd, 4096);
-			if (bufmgr) {
-				devid = intel_get_drm_devid(drm_fd);
-				batch = intel_batchbuffer_alloc(bufmgr, devid);
-			}
+			bops = buf_ops_create(drm_fd);
 		}
 	}
 
