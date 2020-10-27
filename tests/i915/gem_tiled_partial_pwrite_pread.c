@@ -53,68 +53,72 @@ IGT_TEST_DESCRIPTION("Test pwrite/pread consistency when touching partial"
  *
  */
 
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
+static struct buf_ops *bops;
 
-drm_intel_bo *scratch_bo;
-drm_intel_bo *staging_bo;
-drm_intel_bo *tiled_staging_bo;
-unsigned long scratch_pitch;
+struct intel_buf *scratch_buf;
+struct intel_buf *staging_buf;
+struct intel_buf *tiled_staging_buf;
 #define BO_SIZE (32*4096)
-uint32_t devid;
 int fd;
 
 static void
-copy_bo(drm_intel_bo *src, int src_tiled,
-	drm_intel_bo *dst, int dst_tiled)
+copy_bo(struct intel_bb *ibb, struct intel_buf *src, int src_tiled,
+	struct intel_buf *dst, int dst_tiled)
 {
-	unsigned long dst_pitch = scratch_pitch;
-	unsigned long src_pitch = scratch_pitch;
+	unsigned long dst_pitch = dst->surface[0].stride;
+	unsigned long src_pitch = src->surface[0].stride;
+	unsigned long scratch_pitch = src->surface[0].stride;
 	uint32_t cmd_bits = 0;
 
 	/* dst is tiled ... */
-	if (intel_gen(devid) >= 4 && dst_tiled) {
+	if (ibb->gen >= 4 && dst_tiled) {
 		dst_pitch /= 4;
 		cmd_bits |= XY_SRC_COPY_BLT_DST_TILED;
 	}
 
-	if (intel_gen(devid) >= 4 && dst_tiled) {
+	if (ibb->gen >= 4 && src_tiled) {
 		src_pitch /= 4;
 		cmd_bits |= XY_SRC_COPY_BLT_SRC_TILED;
 	}
 
-	BLIT_COPY_BATCH_START(cmd_bits);
-	OUT_BATCH((3 << 24) | /* 32 bits */
+	intel_bb_add_intel_buf(ibb, dst, true);
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_blit_start(ibb, cmd_bits);
+	intel_bb_out(ibb, (3 << 24) | /* 32 bits */
 		  (0xcc << 16) | /* copy ROP */
 		  dst_pitch);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH(BO_SIZE/scratch_pitch << 16 | 1024);
-	OUT_RELOC_FENCED(dst, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH(src_pitch);
-	OUT_RELOC_FENCED(src, I915_GEM_DOMAIN_RENDER, 0, 0);
-	ADVANCE_BATCH();
+	intel_bb_out(ibb, 0 << 16 | 0);
+	intel_bb_out(ibb, BO_SIZE/scratch_pitch << 16 | 1024);
+	intel_bb_emit_reloc_fenced(ibb, dst->handle, I915_GEM_DOMAIN_RENDER,
+				   I915_GEM_DOMAIN_RENDER, 0, dst->addr.offset);
+	intel_bb_out(ibb, 0 << 16 | 0);
+	intel_bb_out(ibb, src_pitch);
+	intel_bb_emit_reloc_fenced(ibb, src->handle, I915_GEM_DOMAIN_RENDER, 0,
+				   0, src->addr.offset);
 
-	intel_batchbuffer_flush(batch);
+	intel_bb_flush_blit(ibb);
 }
 
 static void
-blt_bo_fill(drm_intel_bo *tmp_bo, drm_intel_bo *bo, int val)
+blt_bo_fill(struct intel_bb *ibb, struct intel_buf *tmp_buf,
+	    struct intel_buf *buf, int val)
 {
 	uint8_t *gtt_ptr;
 	int i;
 
-	drm_intel_gem_bo_map_gtt(tmp_bo);
-	gtt_ptr = tmp_bo->virtual;
+	gtt_ptr = gem_mmap__gtt(fd, tmp_buf->handle, tmp_buf->surface[0].size,
+				PROT_WRITE);
+	gem_set_domain(fd, tmp_buf->handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
 	for (i = 0; i < BO_SIZE; i++)
 		gtt_ptr[i] = val;
 
-	drm_intel_gem_bo_unmap_gtt(tmp_bo);
+	gem_munmap(gtt_ptr, tmp_buf->surface[0].size);
 
 	igt_drop_caches_set(fd, DROP_BOUND);
 
-	copy_bo(tmp_bo, 0, bo, 1);
+	copy_bo(ibb, tmp_buf, 0, buf, 1);
 }
 
 #define MAX_BLT_SIZE 128
@@ -124,18 +128,20 @@ uint8_t compare_tmp[BO_SIZE];
 
 static void test_partial_reads(void)
 {
+	struct intel_bb *ibb;
 	int i, j;
 
+	ibb = intel_bb_create(fd, 4096);
 	for (i = 0; i < ROUNDS; i++) {
 		int start, len;
 		int val = i % 256;
 
-		blt_bo_fill(staging_bo, scratch_bo, i);
+		blt_bo_fill(ibb, staging_buf, scratch_buf, i);
 
 		start = random() % BO_SIZE;
 		len = random() % (BO_SIZE-start) + 1;
 
-		drm_intel_bo_get_subdata(scratch_bo, start, len, tmp);
+		gem_read(fd, scratch_buf->handle, start, tmp, len);
 		for (j = 0; j < len; j++) {
 			igt_assert_f(tmp[j] == val,
 				     "mismatch at %i, got: %i, expected: %i\n",
@@ -144,28 +150,31 @@ static void test_partial_reads(void)
 
 		igt_progress("partial reads test: ", i, ROUNDS);
 	}
+
+	intel_bb_destroy(ibb);
 }
 
 static void test_partial_writes(void)
 {
+	struct intel_bb *ibb;
 	int i, j;
 
+	ibb = intel_bb_create(fd, 4096);
 	for (i = 0; i < ROUNDS; i++) {
 		int start, len;
 		int val = i % 256;
 
-		blt_bo_fill(staging_bo, scratch_bo, i);
+		blt_bo_fill(ibb, staging_buf, scratch_buf, i);
 
 		start = random() % BO_SIZE;
 		len = random() % (BO_SIZE-start) + 1;
 
 		memset(tmp, i + 63, BO_SIZE);
 
-		drm_intel_bo_subdata(scratch_bo, start, len, tmp);
+		gem_write(fd, scratch_buf->handle, start, tmp, len);
 
-		copy_bo(scratch_bo, 1, tiled_staging_bo, 1);
-		drm_intel_bo_get_subdata(tiled_staging_bo, 0, BO_SIZE,
-					 compare_tmp);
+		copy_bo(ibb, scratch_buf, 1, tiled_staging_buf, 1);
+		gem_read(fd, tiled_staging_buf->handle, 0, compare_tmp, BO_SIZE);
 
 		for (j = 0; j < start; j++) {
 			igt_assert_f(compare_tmp[j] == val,
@@ -182,27 +191,30 @@ static void test_partial_writes(void)
 				     "mismatch at %i, got: %i, expected: %i\n",
 				     j, tmp[j], val);
 		}
-		drm_intel_gem_bo_unmap_gtt(staging_bo);
 
 		igt_progress("partial writes test: ", i, ROUNDS);
 	}
+
+	intel_bb_destroy(ibb);
 }
 
 static void test_partial_read_writes(void)
 {
+	struct intel_bb *ibb;
 	int i, j;
 
+	ibb = intel_bb_create(fd, 4096);
 	for (i = 0; i < ROUNDS; i++) {
 		int start, len;
 		int val = i % 256;
 
-		blt_bo_fill(staging_bo, scratch_bo, i);
+		blt_bo_fill(ibb, staging_buf, scratch_buf, i);
 
 		/* partial read */
 		start = random() % BO_SIZE;
 		len = random() % (BO_SIZE-start) + 1;
 
-		drm_intel_bo_get_subdata(scratch_bo, start, len, tmp);
+		gem_read(fd, scratch_buf->handle, start, tmp, len);
 		for (j = 0; j < len; j++) {
 			igt_assert_f(tmp[j] == val,
 				     "mismatch in read at %i, got: %i, expected: %i\n",
@@ -212,7 +224,7 @@ static void test_partial_read_writes(void)
 		/* Change contents through gtt to make the pread cachelines
 		 * stale. */
 		val = (i + 17) % 256;
-		blt_bo_fill(staging_bo, scratch_bo, val);
+		blt_bo_fill(ibb, staging_buf, scratch_buf, val);
 
 		/* partial write */
 		start = random() % BO_SIZE;
@@ -220,11 +232,10 @@ static void test_partial_read_writes(void)
 
 		memset(tmp, i + 63, BO_SIZE);
 
-		drm_intel_bo_subdata(scratch_bo, start, len, tmp);
+		gem_write(fd, scratch_buf->handle, start, tmp, len);
 
-		copy_bo(scratch_bo, 1, tiled_staging_bo, 1);
-		drm_intel_bo_get_subdata(tiled_staging_bo, 0, BO_SIZE,
-					 compare_tmp);
+		copy_bo(ibb, scratch_buf, 1, tiled_staging_buf, 1);
+		gem_read(fd, tiled_staging_buf->handle, 0, compare_tmp, BO_SIZE);
 
 		for (j = 0; j < start; j++) {
 			igt_assert_f(compare_tmp[j] == val,
@@ -241,10 +252,11 @@ static void test_partial_read_writes(void)
 				     "mismatch at %i, got: %i, expected: %i\n",
 				     j, tmp[j], val);
 		}
-		drm_intel_gem_bo_unmap_gtt(staging_bo);
 
 		igt_progress("partial read/writes test: ", i, ROUNDS);
 	}
+
+	intel_bb_destroy(ibb);
 }
 
 static bool known_swizzling(uint32_t handle)
@@ -261,8 +273,6 @@ static bool known_swizzling(uint32_t handle)
 
 igt_main
 {
-	uint32_t tiling_mode = I915_TILING_X;
-
 	srandom(0xdeadbeef);
 
 	igt_fixture {
@@ -271,28 +281,25 @@ igt_main
 		gem_require_mappable_ggtt(fd);
 		gem_require_blitter(fd);
 
-		bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		//drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-		devid = intel_get_drm_devid(fd);
-		batch = intel_batchbuffer_alloc(bufmgr, devid);
+		bops = buf_ops_create(fd);
 
 		/* overallocate the buffers we're actually using because */
-		scratch_bo = drm_intel_bo_alloc_tiled(bufmgr, "scratch bo", 1024,
-						      BO_SIZE/4096, 4,
-						      &tiling_mode, &scratch_pitch, 0);
-		igt_assert(tiling_mode == I915_TILING_X);
-		igt_assert(scratch_pitch == 4096);
+		scratch_buf = intel_buf_create(bops, 1024, BO_SIZE/4096, 32, 0,
+					       I915_TILING_X,
+					       I915_COMPRESSION_NONE);
 
 		/*
 		 * As we want to compare our template tiled pattern against
 		 * the target bo, we need consistent swizzling on both.
 		 */
-		igt_require(known_swizzling(scratch_bo->handle));
-		staging_bo = drm_intel_bo_alloc(bufmgr, "staging bo", BO_SIZE, 4096);
-		tiled_staging_bo = drm_intel_bo_alloc_tiled(bufmgr, "scratch bo", 1024,
-							    BO_SIZE/4096, 4,
-							    &tiling_mode,
-							    &scratch_pitch, 0);
+		igt_require(known_swizzling(scratch_buf->handle));
+		staging_buf = intel_buf_create(bops, 1024, BO_SIZE/4096, 32,
+					       4096, I915_TILING_NONE,
+					       I915_COMPRESSION_NONE);
+
+		tiled_staging_buf = intel_buf_create(bops, 1024, BO_SIZE/4096,
+						     32, 0, I915_TILING_X,
+						     I915_COMPRESSION_NONE);
 	}
 
 	igt_subtest("reads")
@@ -305,7 +312,10 @@ igt_main
 		test_partial_read_writes();
 
 	igt_fixture {
-		drm_intel_bufmgr_destroy(bufmgr);
+		intel_buf_destroy(scratch_buf);
+		intel_buf_destroy(staging_buf);
+		intel_buf_destroy(tiled_staging_buf);
+		buf_ops_destroy(bops);
 
 		close(fd);
 	}
