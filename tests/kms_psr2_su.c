@@ -30,7 +30,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/timerfd.h>
-#include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Test PSR2 selective update");
 
@@ -65,7 +64,6 @@ typedef struct {
 	int drm_fd;
 	int debugfs_fd;
 	igt_display_t display;
-	drm_intel_bufmgr *bufmgr;
 	drmModeModeInfo *mode;
 	igt_output_t *output;
 	struct igt_fb fb[2];
@@ -247,10 +245,6 @@ igt_main
 					       data.debugfs_fd, PSR_MODE_2),
 			      "Sink does not support PSR2\n");
 
-		data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
-		igt_assert(data.bufmgr);
-		drm_intel_bufmgr_gem_enable_reuse(data.bufmgr);
-
 		display_init(&data);
 
 		/* Test if PSR2 can be enabled */
@@ -287,7 +281,6 @@ igt_main
 
 	igt_fixture {
 		close(data.debugfs_fd);
-		drm_intel_bufmgr_destroy(data.bufmgr);
 		display_fini(&data);
 	}
 }
