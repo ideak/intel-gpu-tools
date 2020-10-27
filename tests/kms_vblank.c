@@ -41,8 +41,6 @@
 
 #include <drm.h>
 
-#include "intel_bufmgr.h"
-
 IGT_TEST_DESCRIPTION("Test speed of WaitVblank.");
 
 typedef struct {

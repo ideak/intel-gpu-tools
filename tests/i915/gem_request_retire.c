@@ -48,7 +48,6 @@
 
 #include "i915/gem.h"
 #include "igt.h"
-#include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Collection of tests targeting request retirement code"
 		     " paths.");

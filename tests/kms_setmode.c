@@ -30,7 +30,6 @@
 #include <string.h>
 #include <sys/time.h>
 #include <math.h>
-#include "intel_bufmgr.h"
 
 #define MAX_CONNECTORS  10
 #define MAX_CRTCS       6

@@ -34,7 +34,6 @@
 
 #include "igt.h"
 #include "igt_stats.h"
-#include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Check for flink/open vs. gem close races.");
 

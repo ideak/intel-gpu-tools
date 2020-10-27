@@ -63,7 +63,6 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "igt_sysfs.h"
-#include "intel_bufmgr.h"
 #include "sw_sync.h"
 
 #include "eviction_common.c"

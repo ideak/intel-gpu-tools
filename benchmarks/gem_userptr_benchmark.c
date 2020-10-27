@@ -48,7 +48,6 @@
 #include "i915_drm.h"
 
 #include "drmtest.h"
-#include "intel_bufmgr.h"
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
 #include "ioctl_wrappers.h"
