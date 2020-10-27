@@ -31,8 +31,6 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#include "intel_bufmgr.h"
-
 IGT_TEST_DESCRIPTION("Check parallel access to tiled memory.");
 
 /* Testcase: check parallel access to tiled memory
@@ -45,10 +43,10 @@ IGT_TEST_DESCRIPTION("Check parallel access to tiled memory.");
 #define HEIGHT 4096
 
 struct thread_ctx {
-	drm_intel_bo *bo;
+	struct intel_buf *buf;
 };
 
-static drm_intel_bufmgr *bufmgr;
+static struct buf_ops *bops;
 static struct thread_ctx tctx[NUM_THREADS];
 
 static void *copy_fn(void *p)
@@ -60,13 +58,13 @@ static void *copy_fn(void *p)
 	if (buf == NULL)
 		return (void *)1;
 
-	memcpy(buf, c->bo->virtual, WIDTH * HEIGHT);
+	memcpy(buf, c->buf->ptr, WIDTH * HEIGHT);
 
 	free(buf);
 	return (void *)0;
 }
 
-static int copy_tile_threaded(drm_intel_bo *bo)
+static int copy_tile_threaded(struct intel_buf *buf)
 {
 	int i;
 	int r;
@@ -74,7 +72,7 @@ static int copy_tile_threaded(drm_intel_bo *bo)
 	void *status;
 
 	for (i = 0; i < NUM_THREADS; i++) {
-		tctx[i].bo = bo;
+		tctx[i].buf = buf;
 		r = pthread_create(&thr[i], NULL, copy_fn, (void *)&tctx[i]);
 		igt_assert_eq(r, 0);
 	}
@@ -90,9 +88,8 @@ static int copy_tile_threaded(drm_intel_bo *bo)
 igt_simple_main
 {
 	int fd;
-	drm_intel_bo *bo;
+	struct intel_buf *buf;
 	uint32_t tiling_mode = I915_TILING_Y;
-	unsigned long pitch = 0;
 	int r;
 
 	fd = drm_open_driver(DRIVER_INTEL);
@@ -100,24 +97,26 @@ igt_simple_main
 
 	igt_require(gem_available_fences(fd) > 0);
 
-	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-	igt_assert(bufmgr);
+	bops = buf_ops_create(fd);
 
-	bo = drm_intel_bo_alloc_tiled(bufmgr, "mmap bo", WIDTH, HEIGHT, 1,
-				      &tiling_mode, &pitch, 0);
-	igt_assert(bo);
+	buf = intel_buf_create(bops, WIDTH, HEIGHT, 8, 0, tiling_mode,
+			       I915_COMPRESSION_NONE);
+	igt_assert(buf);
 
-	r = drm_intel_gem_bo_map_gtt(bo);
+	buf->ptr = gem_mmap__gtt(fd, buf->handle, buf->surface[0].size,
+				 PROT_WRITE | PROT_READ);
+	gem_set_domain(fd, buf->handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
+	r = copy_tile_threaded(buf);
 	igt_assert(!r);
 
-	r = copy_tile_threaded(bo);
+	r = gem_munmap(buf->ptr, buf->surface[0].size);
+	buf->ptr = NULL;
 	igt_assert(!r);
 
-	r = drm_intel_gem_bo_unmap_gtt(bo);
-	igt_assert(!r);
-
-	drm_intel_bo_unreference(bo);
-	drm_intel_bufmgr_destroy(bufmgr);
+	intel_buf_destroy(buf);
+	buf_ops_destroy(bops);
 
 	close(fd);
 }
