@@ -1007,7 +1007,7 @@ uint64_t gem_mappable_aperture_size(void)
  * Feature test macro to query the kernel for the global gpu aperture size.
  * This is the area available for the kernel to perform address translations.
  *
- * Returns: The mappable gtt address space size.
+ * Returns: The gtt address space size.
  */
 uint64_t gem_global_aperture_size(int fd)
 {
