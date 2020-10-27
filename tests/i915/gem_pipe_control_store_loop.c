@@ -43,13 +43,10 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
-#include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Test (TLB-)Coherency of pipe_control QW writes.");
 
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
-uint32_t devid;
+static struct buf_ops *bops;
 
 #define GFX_OP_PIPE_CONTROL	((0x3<<29)|(0x3<<27)|(0x2<<24)|2)
 #define   PIPE_CONTROL_WRITE_IMMEDIATE	(1<<14)
@@ -68,96 +65,109 @@ store_pipe_control_loop(bool preuse_buffer, int timeout)
 {
 	int val = 0;
 	uint32_t *buf;
-	drm_intel_bo *target_bo;
+	struct intel_buf *target_buf;
+	static struct intel_bb *ibb;
+
+	ibb = intel_bb_create_with_relocs(buf_ops_get_fd(bops), 4096);
 
 	igt_until_timeout(timeout) {
 		/* we want to check tlb consistency of the pipe_control target,
 		 * so get a new buffer every time around */
-		target_bo = drm_intel_bo_alloc(bufmgr, "target bo", 4096, 4096);
-		igt_assert(target_bo);
+		target_buf = intel_buf_create(bops, 4096, 1, 8, 0,
+					      I915_TILING_NONE,
+					      I915_COMPRESSION_NONE);
 
 		if (preuse_buffer) {
-			COLOR_BLIT_COPY_BATCH_START(0);
-			OUT_BATCH((3 << 24) | (0xf0 << 16) | 64);
-			OUT_BATCH(0);
-			OUT_BATCH(1 << 16 | 1);
+			intel_bb_add_intel_buf(ibb, target_buf, true);
+			intel_bb_out(ibb, XY_COLOR_BLT_CMD_NOLEN |
+				     COLOR_BLT_WRITE_ALPHA |
+				     XY_COLOR_BLT_WRITE_RGB |
+				     (4 + (ibb->gen >= 8)));
+
+			intel_bb_out(ibb, (3 << 24) | (0xf0 << 16) | 64);
+			intel_bb_out(ibb, 0);
+			intel_bb_out(ibb, 1 << 16 | 1);
 
 			/*
 			 * IMPORTANT: We need to preuse the buffer in a
 			 * different domain than what the pipe control write
 			 * (and kernel wa) uses!
 			 */
-			OUT_RELOC_FENCED(target_bo,
-			     I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER,
-			     0);
-			OUT_BATCH(0xdeadbeef);
-			ADVANCE_BATCH();
+			intel_bb_emit_reloc_fenced(ibb, target_buf->handle,
+						   I915_GEM_DOMAIN_RENDER,
+						   I915_GEM_DOMAIN_RENDER,
+						   0, target_buf->addr.offset);
+			intel_bb_out(ibb, 0xdeadbeef);
 
-			intel_batchbuffer_flush(batch);
+			intel_bb_flush_blit(ibb);
 		}
 
 		/* gem_storedw_batches_loop.c is a bit overenthusiastic with
 		 * creating new batchbuffers - with buffer reuse disabled, the
 		 * support code will do that for us. */
-		if (batch->gen >= 8) {
-			BEGIN_BATCH(4, 1);
-			OUT_BATCH(GFX_OP_PIPE_CONTROL + 1);
-			OUT_BATCH(PIPE_CONTROL_WRITE_IMMEDIATE);
-			OUT_RELOC_FENCED(target_bo,
-			     I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-			     PIPE_CONTROL_GLOBAL_GTT);
-			OUT_BATCH(val); /* write data */
-			ADVANCE_BATCH();
-
-		} else if (batch->gen >= 6) {
+		if (ibb->gen >= 8) {
+			intel_bb_add_intel_buf(ibb, target_buf, true);
+			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL + 1);
+			intel_bb_out(ibb, PIPE_CONTROL_WRITE_IMMEDIATE);
+			intel_bb_emit_reloc_fenced(ibb, target_buf->handle,
+						   I915_GEM_DOMAIN_INSTRUCTION,
+						   I915_GEM_DOMAIN_INSTRUCTION,
+						   PIPE_CONTROL_GLOBAL_GTT,
+						   target_buf->addr.offset);
+			intel_bb_out(ibb, val); /* write data */
+		} else if (ibb->gen >= 6) {
 			/* work-around hw issue, see intel_emit_post_sync_nonzero_flush
 			 * in mesa sources. */
-			BEGIN_BATCH(4, 1);
-			OUT_BATCH(GFX_OP_PIPE_CONTROL);
-			OUT_BATCH(PIPE_CONTROL_CS_STALL |
-			     PIPE_CONTROL_STALL_AT_SCOREBOARD);
-			OUT_BATCH(0); /* address */
-			OUT_BATCH(0); /* write data */
-			ADVANCE_BATCH();
+			intel_bb_add_intel_buf(ibb, target_buf, true);
+			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL);
+			intel_bb_out(ibb, PIPE_CONTROL_CS_STALL |
+				     PIPE_CONTROL_STALL_AT_SCOREBOARD);
+			intel_bb_out(ibb, 0); /* address */
+			intel_bb_out(ibb, 0); /* write data */
 
-			BEGIN_BATCH(4, 1);
-			OUT_BATCH(GFX_OP_PIPE_CONTROL);
-			OUT_BATCH(PIPE_CONTROL_WRITE_IMMEDIATE);
-			OUT_RELOC(target_bo,
-			     I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION, 
-			     PIPE_CONTROL_GLOBAL_GTT);
-			OUT_BATCH(val); /* write data */
-			ADVANCE_BATCH();
-		} else if (batch->gen >= 4) {
-			BEGIN_BATCH(4, 1);
-			OUT_BATCH(GFX_OP_PIPE_CONTROL | PIPE_CONTROL_WC_FLUSH |
-					PIPE_CONTROL_TC_FLUSH |
-					PIPE_CONTROL_WRITE_IMMEDIATE | 2);
-			OUT_RELOC(target_bo,
-				I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-				PIPE_CONTROL_GLOBAL_GTT);
-			OUT_BATCH(val);
-			OUT_BATCH(0xdeadbeef);
-			ADVANCE_BATCH();
+			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL);
+			intel_bb_out(ibb, PIPE_CONTROL_WRITE_IMMEDIATE);
+			intel_bb_emit_reloc(ibb, target_buf->handle,
+					    I915_GEM_DOMAIN_INSTRUCTION,
+					    I915_GEM_DOMAIN_INSTRUCTION,
+					    PIPE_CONTROL_GLOBAL_GTT,
+					    target_buf->addr.offset);
+			intel_bb_out(ibb, val); /* write data */
+		} else if (ibb->gen >= 4) {
+			intel_bb_add_intel_buf(ibb, target_buf, true);
+			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL |
+				     PIPE_CONTROL_WC_FLUSH |
+				     PIPE_CONTROL_TC_FLUSH |
+				     PIPE_CONTROL_WRITE_IMMEDIATE | 2);
+			intel_bb_emit_reloc(ibb, target_buf->handle,
+					    I915_GEM_DOMAIN_INSTRUCTION,
+					    I915_GEM_DOMAIN_INSTRUCTION,
+					    PIPE_CONTROL_GLOBAL_GTT,
+					    target_buf->addr.offset);
+			intel_bb_out(ibb, val);
+			intel_bb_out(ibb, 0xdeadbeef);
 		}
 
-		intel_batchbuffer_flush_on_ring(batch, 0);
+		intel_bb_flush(ibb, 0);
 
-		drm_intel_bo_map(target_bo, 1);
+		intel_buf_cpu_map(target_buf, 1);
 
-		buf = target_bo->virtual;
+		buf = target_buf->ptr;
 		igt_assert(buf[0] == val);
 
-		drm_intel_bo_unmap(target_bo);
+		intel_buf_unmap(target_buf);
 		/* Make doublesure that this buffer won't get reused. */
-		drm_intel_bo_disable_reuse(target_bo);
-		drm_intel_bo_unreference(target_bo);
+		intel_bb_reset(ibb, true);
 
+		intel_buf_destroy(target_buf);
 		val++;
 	}
+
+	intel_bb_destroy(ibb);
 }
 
 int fd;
+uint32_t devid;
 
 igt_main
 {
@@ -167,20 +177,10 @@ igt_main
 		gem_require_blitter(fd);
 
 		devid = intel_get_drm_devid(fd);
-
-		bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		igt_assert(bufmgr);
+		bops = buf_ops_create(fd);
 
 		igt_skip_on(IS_GEN2(devid) || IS_GEN3(devid));
 		igt_skip_on(devid == PCI_CHIP_I965_G); /* has totally broken pipe control */
-
-		/* IMPORTANT: No call to
-		 * drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-		 * here because we wan't to have fresh buffers (to trash the tlb)
-		 * every time! */
-
-		batch = intel_batchbuffer_alloc(bufmgr, devid);
-		igt_assert(batch);
 	}
 
 	igt_subtest("fresh-buffer")
@@ -190,9 +190,7 @@ igt_main
 		store_pipe_control_loop(true, 2);
 
 	igt_fixture {
-		intel_batchbuffer_free(batch);
-		drm_intel_bufmgr_destroy(bufmgr);
-
+		buf_ops_destroy(bops);
 		close(fd);
 	}
 }
