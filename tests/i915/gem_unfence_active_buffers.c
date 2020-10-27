@@ -51,112 +51,47 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
-#include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Check for use-after-free in the fence stealing code.");
 
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
-uint32_t devid;
+static uint32_t create_tiled(int i915)
+{
+	uint32_t handle;
 
-#define TEST_SIZE (1024*1024)
-#define TEST_STRIDE (4*1024)
+	handle = gem_create(i915, 1 << 20);
+	gem_set_tiling(i915, handle, I915_TILING_X, 1024);
 
-uint32_t data[TEST_SIZE/4];
+	return handle;
+}
 
 igt_simple_main
 {
-	int i, ret, fd, num_fences;
-	drm_intel_bo *busy_bo, *test_bo;
-	uint32_t tiling = I915_TILING_X;
+	int i915, num_fences;
+	igt_spin_t *spin;
 
-	for (i = 0; i < 1024*256; i++)
-		data[i] = i;
+	i915 = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(i915);
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	igt_require_gem(fd);
-	gem_require_blitter(fd);
+	spin = igt_spin_new(i915);
 
-	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-	devid = intel_get_drm_devid(fd);
-	batch = intel_batchbuffer_alloc(bufmgr, devid);
-
-	igt_info("filling ring\n");
-	busy_bo = drm_intel_bo_alloc(bufmgr, "busy bo bo", 16*1024*1024, 4096);
-
-	for (i = 0; i < 250; i++) {
-		BLIT_COPY_BATCH_START(0);
-		OUT_BATCH((3 << 24) | /* 32 bits */
-			  (0xcc << 16) | /* copy ROP */
-			  2*1024*4);
-		OUT_BATCH(0 << 16 | 1024);
-		OUT_BATCH((2048) << 16 | (2048));
-		OUT_RELOC_FENCED(busy_bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-		OUT_BATCH(0 << 16 | 0);
-		OUT_BATCH(2*1024*4);
-		OUT_RELOC_FENCED(busy_bo, I915_GEM_DOMAIN_RENDER, 0, 0);
-		ADVANCE_BATCH();
-
-		if (batch->gen >= 6) {
-			BEGIN_BATCH(3, 0);
-			OUT_BATCH(XY_SETUP_CLIP_BLT_CMD);
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-			ADVANCE_BATCH();
-		}
-	}
-	intel_batchbuffer_flush(batch);
-
-	num_fences = gem_available_fences(fd);
+	num_fences = gem_available_fences(i915);
 	igt_info("creating havoc on %i fences\n", num_fences);
 
-	for (i = 0; i < num_fences*2; i++) {
-		test_bo = drm_intel_bo_alloc(bufmgr, "test_bo",
-					     TEST_SIZE, 4096);
-		ret = drm_intel_bo_set_tiling(test_bo, &tiling, TEST_STRIDE);
-		igt_assert(ret == 0);
-
-		drm_intel_bo_disable_reuse(test_bo);
-
-		BLIT_COPY_BATCH_START(0);
-		OUT_BATCH((3 << 24) | /* 32 bits */
-			  (0xcc << 16) | /* copy ROP */
-			  TEST_STRIDE);
-		OUT_BATCH(0 << 16 | 0);
-		OUT_BATCH((1) << 16 | (1));
-		OUT_RELOC_FENCED(test_bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-		OUT_BATCH(0 << 16 | 0);
-		OUT_BATCH(TEST_STRIDE);
-		OUT_RELOC_FENCED(test_bo, I915_GEM_DOMAIN_RENDER, 0, 0);
-		ADVANCE_BATCH();
-		intel_batchbuffer_flush(batch);
-		igt_info("test bo offset: %#lx\n", test_bo->offset);
-
-		drm_intel_bo_unreference(test_bo);
+	for (int i = 0; i < num_fences + 3; i++) {
+		struct drm_i915_gem_exec_object2 obj[2] = {
+			{
+				.handle = create_tiled(i915),
+				.flags = EXEC_OBJECT_NEEDS_FENCE,
+			},
+			spin->obj[IGT_SPIN_BATCH],
+		};
+		struct drm_i915_gem_execbuffer2 execbuf = {
+			.buffers_ptr = to_user_pointer(obj),
+			.buffer_count = ARRAY_SIZE(obj),
+		};
+		gem_execbuf(i915, &execbuf);
+		gem_close(i915, obj[0].handle);
 	}
 
-	/* launch a few batchs to ensure the damaged slab objects get reused. */
-	for (i = 0; i < 10; i++) {
-		BLIT_COPY_BATCH_START(0);
-		OUT_BATCH((3 << 24) | /* 32 bits */
-			  (0xcc << 16) | /* copy ROP */
-			  2*1024*4);
-		OUT_BATCH(0 << 16 | 1024);
-		OUT_BATCH((1) << 16 | (1));
-		OUT_RELOC_FENCED(busy_bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-		OUT_BATCH(0 << 16 | 0);
-		OUT_BATCH(2*1024*4);
-		OUT_RELOC_FENCED(busy_bo, I915_GEM_DOMAIN_RENDER, 0, 0);
-		ADVANCE_BATCH();
-
-		if (batch->gen >= 8) {
-			BEGIN_BATCH(3, 0);
-			OUT_BATCH(XY_SETUP_CLIP_BLT_CMD);
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-			ADVANCE_BATCH();
-		}
-	}
-	intel_batchbuffer_flush(batch);
+	igt_spin_free(i915, spin);
 }
