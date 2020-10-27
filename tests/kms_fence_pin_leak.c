@@ -37,34 +37,46 @@ IGT_TEST_DESCRIPTION("Exercises full ppgtt fence pin_count leak in the "
 typedef struct {
 	int drm_fd;
 	uint32_t devid;
-	drm_intel_bufmgr *bufmgr;
+	struct buf_ops *bops;
 	igt_display_t display;
-	drm_intel_bo *bos[64]; /* >= num fence registers */
+	struct intel_buf *bos[64]; /* >= num fence registers */
 } data_t;
 
-static void exec_nop(data_t *data, uint32_t handle, drm_intel_context *context)
+static void exec_nop(data_t *data, struct igt_fb *fb, uint32_t ctx)
 {
-	drm_intel_bo *dst;
-	struct intel_batchbuffer *batch;
+	struct intel_buf *dst;
+	struct intel_bb *ibb;
+	uint32_t name, handle, tiling, stride, width, height, bpp, size;
 
-	dst = gem_handle_to_libdrm_bo(data->bufmgr, data->drm_fd, "", handle);
-	igt_assert(dst);
+	tiling = igt_fb_mod_to_tiling(fb->modifier);
+	stride = fb->strides[0];
+	bpp = fb->plane_bpp[0];
+	size = fb->size;
+	width = stride / (bpp / 8);
+	height = size / stride;
 
-	batch = intel_batchbuffer_alloc(data->bufmgr, data->devid);
-	igt_assert(batch);
+	name = gem_flink(data->drm_fd, fb->gem_handle);
+	handle = gem_open(data->drm_fd, name);
+	dst = intel_buf_create_using_handle(data->bops, handle,
+					    width, height, bpp, 0, tiling, 0);
+	intel_buf_set_ownership(dst, true);
+
+	ibb = intel_bb_create_with_context(buf_ops_get_fd(data->bops),
+					   ctx, 4096);
 
 	/* add the reloc to make sure the kernel will think we write to dst */
-	BEGIN_BATCH(4, 1);
-	OUT_BATCH(MI_BATCH_BUFFER_END);
-	OUT_BATCH(MI_NOOP);
-	OUT_RELOC(dst, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-	OUT_BATCH(MI_NOOP);
-	ADVANCE_BATCH();
+	intel_bb_add_intel_buf(ibb, dst, true);
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_out(ibb, MI_NOOP);
+	intel_bb_emit_reloc(ibb, dst->handle, I915_GEM_DOMAIN_RENDER,
+			    I915_GEM_DOMAIN_RENDER, 0, 0x0);
+	intel_bb_out(ibb, MI_NOOP);
 
-	intel_batchbuffer_flush_with_context(batch, context);
-	intel_batchbuffer_free(batch);
+	intel_bb_flush_render(ibb);
 
-	drm_intel_bo_unreference(dst);
+	intel_bb_destroy(ibb);
+
+	intel_buf_destroy(dst);
 }
 
 static void alloc_fence_objs(data_t *data)
@@ -72,13 +84,12 @@ static void alloc_fence_objs(data_t *data)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(data->bos); i++) {
-		drm_intel_bo *bo;
+		struct intel_buf *buf;
 
-		bo = drm_intel_bo_alloc(data->bufmgr, "fence bo", 4096, 4096);
-		igt_assert(bo);
-		gem_set_tiling(data->drm_fd, bo->handle, I915_TILING_X, 512);
-
-		data->bos[i] = bo;
+		buf = intel_buf_create(data->bops, 128, 8, 32, 0,
+				       I915_TILING_X, I915_COMPRESSION_NONE);
+		igt_assert(buf->surface[0].stride == 512);
+		data->bos[i] = buf;
 	}
 }
 
@@ -102,7 +113,7 @@ static void free_fence_objs(data_t *data)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(data->bos); i++)
-		drm_intel_bo_unreference(data->bos[i]);
+		intel_buf_destroy(data->bos[i]);
 }
 
 static void run_single_test(data_t *data, enum pipe pipe, igt_output_t *output)
@@ -133,19 +144,18 @@ static void run_single_test(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_display_commit(display);
 
 	for (i = 0; i < 64; i++) {
-		drm_intel_context *ctx;
+		uint32_t ctx;
 
 		/*
 		 * Link fb.gem_handle to the ppgtt vm of ctx so that the context
 		 * destruction will unbind the obj from the ppgtt vm in question.
 		 */
-		ctx = drm_intel_gem_context_create(data->bufmgr);
-		igt_assert(ctx);
-		exec_nop(data, fb[i&1].gem_handle, ctx);
-		drm_intel_gem_context_destroy(ctx);
+		ctx = gem_context_create(data->drm_fd);
+		exec_nop(data, &fb[i&1], ctx);
+		gem_context_destroy(data->drm_fd, ctx);
 
 		/* Force a context switch to make sure ctx gets destroyed for real. */
-		exec_nop(data, fb[i&1].gem_handle, NULL);
+		exec_nop(data, &fb[i&1], 0);
 
 		gem_sync(data->drm_fd, fb[i&1].gem_handle);
 
@@ -196,7 +206,7 @@ static void run_test(data_t *data)
 
 igt_simple_main
 {
-	drm_intel_context *ctx;
+	uint32_t ctx;
 	data_t data = {};
 
 	data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
@@ -207,15 +217,12 @@ igt_simple_main
 
 	kmstest_set_vt_graphics_mode();
 
-	data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
-	igt_assert(data.bufmgr);
-	drm_intel_bufmgr_gem_enable_reuse(data.bufmgr);
+	data.bops = buf_ops_create(data.drm_fd);
 
 	igt_display_require(&data.display, data.drm_fd);
 
-	ctx = drm_intel_gem_context_create(data.bufmgr);
-	igt_require(ctx);
-	drm_intel_gem_context_destroy(ctx);
+	ctx = gem_context_create(data.drm_fd);
+	gem_context_destroy(data.drm_fd, ctx);
 
 	alloc_fence_objs(&data);
 
@@ -223,6 +230,6 @@ igt_simple_main
 
 	free_fence_objs(&data);
 
-	drm_intel_bufmgr_destroy(data.bufmgr);
+	buf_ops_destroy(data.bops);
 	igt_display_fini(&data.display);
 }
