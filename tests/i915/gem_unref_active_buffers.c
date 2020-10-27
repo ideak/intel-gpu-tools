@@ -29,70 +29,92 @@
  * Testcase: Unreferencing of active buffers
  *
  * Execs buffers and immediately unreferences them, hence the kernel active list
- * will be the last one to hold a reference on them. Usually libdrm bo caching
- * prevents that by keeping another reference.
+ * will be the last one to hold a reference on them.
  */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
-#include <errno.h>
-#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <sys/signal.h>
 #include <sys/time.h>
 
-#include "drm.h"
-#include "i915/gem.h"
 #include "igt.h"
-#include "intel_bufmgr.h"
+#include "i915/gem.h"
 
 IGT_TEST_DESCRIPTION("Test unreferencing of active buffers.");
 
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
-static drm_intel_bo *load_bo;
+static int __execbuf(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
+{
+	int err;
+
+	err = 0;
+	if (ioctl(i915, DRM_IOCTL_I915_GEM_EXECBUFFER2, execbuf)) {
+		err = -errno;
+		igt_assume(err);
+	}
+
+	errno = 0;
+	return err;
+}
+
+static void alarm_handler(int sig)
+{
+}
 
 igt_simple_main
 {
-	int fd, i;
+	struct sigaction old_sa, sa = { .sa_handler = alarm_handler };
+	unsigned int last[2]= { -1, -1 }, count;
+	struct itimerval itv;
+	igt_spin_t *spin;
+	int i915;
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	igt_require_gem(fd);
-	gem_require_blitter(fd);
+	i915 = drm_open_driver(DRIVER_INTEL);
+	igt_require_gem(i915);
 
-	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-	igt_assert(bufmgr);
-	/* don't enable buffer reuse!! */
-	//drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+	spin = igt_spin_new(i915);
+	fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) | O_NONBLOCK);
 
-	batch = intel_batchbuffer_alloc(bufmgr, intel_get_drm_devid(fd));
-	igt_assert(batch);
+	sigaction(SIGALRM, &sa, &old_sa);
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 1000;
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 10000;
+	setitimer(ITIMER_REAL, &itv, NULL);
 
-	/* put some load onto the gpu to keep the light buffers active for long
-	 * enough */
-	for (i = 0; i < 1000; i++) {
-		load_bo = drm_intel_bo_alloc(bufmgr, "target bo", 1024*4096, 4096);
-		igt_assert(load_bo);
+	count = 0;
+	do {
+		struct drm_i915_gem_exec_object2 obj[2] = {
+			{ .handle = gem_create(i915, 4096) },
+			spin->obj[IGT_SPIN_BATCH],
+		};
+		struct drm_i915_gem_execbuffer2 execbuf = {
+			.buffers_ptr = to_user_pointer(obj),
+			.buffer_count = ARRAY_SIZE(obj),
+		};
+		int err = __execbuf(i915, &execbuf);
+		gem_close(i915, obj[0].handle);
 
-		BLIT_COPY_BATCH_START(0);
-		OUT_BATCH((3 << 24) | /* 32 bits */
-			  (0xcc << 16) | /* copy ROP */
-			  4096);
-		OUT_BATCH(0); /* dst x1,y1 */
-		OUT_BATCH((1024 << 16) | 512);
-		OUT_RELOC_FENCED(load_bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-		OUT_BATCH((0 << 16) | 512); /* src x1, y1 */
-		OUT_BATCH(4096);
-		OUT_RELOC_FENCED(load_bo, I915_GEM_DOMAIN_RENDER, 0, 0);
-		ADVANCE_BATCH();
+		if (err == 0) {
+			count++;
+			continue;
+		}
 
-		intel_batchbuffer_flush(batch);
+		if (err == -EWOULDBLOCK)
+			break;
 
-		drm_intel_bo_disable_reuse(load_bo);
-		drm_intel_bo_unreference(load_bo);
-	}
+		if (last[1] == count)
+			break;
 
-	drm_intel_bufmgr_destroy(bufmgr);
+		/* sleep until the next timer interrupt (woken on signal) */
+		pause();
+		last[1] = last[0];
+		last[0] = count;
+	} while (1);
 
-	close(fd);
+	memset(&itv, 0, sizeof(itv));
+	setitimer(ITIMER_REAL, &itv, NULL);
+	sigaction(SIGALRM, &old_sa, NULL);
+
+	igt_spin_free(i915, spin);
 }

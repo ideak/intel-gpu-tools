@@ -376,9 +376,9 @@ unsigned int gem_submission_measure(int i915, unsigned int engine)
 	unsigned int size;
 	bool nonblock;
 
-	nonblock = fcntl(i915, F_GETFD) & O_NONBLOCK;
+	nonblock = fcntl(i915, F_GETFL) & O_NONBLOCK;
 	if (!nonblock)
-		fcntl(i915, F_SETFD, fcntl(i915, F_GETFD) | O_NONBLOCK);
+		fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) | O_NONBLOCK);
 
 	if (engine == ALL_ENGINES) {
 		struct intel_execution_engine2 *e;
@@ -394,7 +394,7 @@ unsigned int gem_submission_measure(int i915, unsigned int engine)
 	}
 
 	if (!nonblock)
-		fcntl(i915, F_SETFD, fcntl(i915, F_GETFD) & ~O_NONBLOCK);
+		fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) & ~O_NONBLOCK);
 
 	return size;
 }
