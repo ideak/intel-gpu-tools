@@ -166,12 +166,8 @@ static void fork_bcs_copy(int timeout, uint32_t final,
 			src[1] = create_bo(dst[child]->bops,
 					   i++ | child << 16);
 
-			intel_bb_blt_copy(ibb, src[1], 0, 0, 4096,
-					  src[0], 0, 0, 4096,
-					  4096/4, SIZE/4096, 32);
-			intel_bb_blt_copy(ibb, src[0], 0, 0, 4096,
-					  dst[child], 0, 0, 4096,
-					  4096/4, SIZE/4096, 32);
+			intel_bb_copy_intel_buf(ibb, src[1], src[0], SIZE);
+			intel_bb_copy_intel_buf(ibb, src[0], dst[child], SIZE);
 
 			intel_buf_destroy(src[1]);
 			intel_buf_destroy(src[0]);
@@ -181,12 +177,8 @@ static void fork_bcs_copy(int timeout, uint32_t final,
 		src[1] = create_bo(dst[child]->bops,
 				   final | child << 16);
 
-		intel_bb_blt_copy(ibb, src[1], 0, 0, 4096,
-				  src[0], 0, 0, 4096,
-				  4096/4, SIZE/4096, 32);
-		intel_bb_blt_copy(ibb, src[0], 0, 0, 4096,
-				  dst[child], 0, 0, 4096,
-				  4096/4, SIZE/4096, 32);
+		intel_bb_copy_intel_buf(ibb, src[1], src[0], SIZE);
+		intel_bb_copy_intel_buf(ibb, src[0], dst[child], SIZE);
 
 		intel_buf_destroy(src[1]);
 		intel_buf_destroy(src[0]);
