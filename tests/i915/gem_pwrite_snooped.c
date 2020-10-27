@@ -42,40 +42,38 @@ IGT_TEST_DESCRIPTION(
    "pwrite to a snooped bo then make it uncached and check that the GPU sees the data.");
 
 static int fd;
-static uint32_t devid;
-static drm_intel_bufmgr *bufmgr;
+static struct buf_ops *bops;
 
-static void blit(drm_intel_bo *dst, drm_intel_bo *src,
+static void blit(struct intel_buf *dst, struct intel_buf *src,
 		 unsigned int width, unsigned int height,
 		 unsigned int dst_pitch, unsigned int src_pitch)
 {
-	struct intel_batchbuffer *batch;
+	struct intel_bb *ibb;
 
-	batch = intel_batchbuffer_alloc(bufmgr, devid);
-	igt_assert(batch);
-
-	BLIT_COPY_BATCH_START(0);
-	OUT_BATCH((3 << 24) | /* 32 bits */
+	ibb = intel_bb_create(fd, 4096);
+	intel_bb_add_intel_buf(ibb, dst, true);
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_blit_start(ibb, 0);
+	intel_bb_out(ibb, (3 << 24) | /* 32 bits */
 		  (0xcc << 16) | /* copy ROP */
 		  dst_pitch);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH(height << 16 | width);
-	OUT_RELOC_FENCED(dst, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH(src_pitch);
-	OUT_RELOC_FENCED(src, I915_GEM_DOMAIN_RENDER, 0, 0);
-	ADVANCE_BATCH();
+	intel_bb_out(ibb, 0 << 16 | 0);
+	intel_bb_out(ibb, height << 16 | width);
+	intel_bb_emit_reloc_fenced(ibb, dst->handle, I915_GEM_DOMAIN_RENDER,
+				   I915_GEM_DOMAIN_RENDER, 0, dst->addr.offset);
+	intel_bb_out(ibb, 0 << 16 | 0);
+	intel_bb_out(ibb, src_pitch);
+	intel_bb_emit_reloc_fenced(ibb, src->handle, I915_GEM_DOMAIN_RENDER,
+				   0, 0, src->addr.offset);
 
-	if (batch->gen >= 6) {
-		BEGIN_BATCH(3, 0);
-		OUT_BATCH(XY_SETUP_CLIP_BLT_CMD);
-		OUT_BATCH(0);
-		OUT_BATCH(0);
-		ADVANCE_BATCH();
+	if (ibb->gen >= 6) {
+		intel_bb_out(ibb, XY_SETUP_CLIP_BLT_CMD);
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
 	}
 
-	intel_batchbuffer_flush(batch);
-	intel_batchbuffer_free(batch);
+	intel_bb_flush_blit(ibb);
+	intel_bb_destroy(ibb);
 }
 
 static void *memchr_inv(const void *s, int c, size_t n)
@@ -98,13 +96,13 @@ static void *memchr_inv(const void *s, int c, size_t n)
 static void test(int w, int h)
 {
 	int object_size = w * h * 4;
-	drm_intel_bo *src, *dst;
+	struct intel_buf *src, *dst;
 	void *buf;
 
-	src = drm_intel_bo_alloc(bufmgr, "src", object_size, 4096);
-	igt_assert(src);
-	dst = drm_intel_bo_alloc(bufmgr, "dst", object_size, 4096);
-	igt_assert(dst);
+	src = intel_buf_create(bops, w, h, 32, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
+	dst = intel_buf_create(bops, w, h, 32, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
 
 	buf = malloc(object_size);
 	igt_assert(buf);
@@ -125,6 +123,9 @@ static void test(int w, int h)
 	gem_read(fd, dst->handle, 0, buf, object_size);
 
 	igt_assert(memchr_inv(buf, 0xff, object_size) == NULL);
+
+	intel_buf_destroy(src);
+	intel_buf_destroy(dst);
 }
 
 igt_simple_main
@@ -133,11 +134,10 @@ igt_simple_main
 	igt_require_gem(fd);
 	gem_require_blitter(fd);
 
-	devid = intel_get_drm_devid(fd);
-	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
+	bops = buf_ops_create(fd);
 
 	test(256, 256);
 
-	drm_intel_bufmgr_destroy(bufmgr);
+	buf_ops_destroy(bops);
 	close(fd);
 }
