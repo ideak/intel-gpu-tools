@@ -57,14 +57,9 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
-#include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Check for proper synchronization of tiling changes vs."
 		     " tiled gpu access.");
-
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
-uint32_t devid;
 
 #define TEST_SIZE (1024*1024)
 #define TEST_STRIDE (4*1024)
@@ -73,159 +68,160 @@ uint32_t devid;
 
 uint32_t data[TEST_SIZE/4];
 
-static void do_test(uint32_t tiling, unsigned stride,
+static void __set_tiling(struct buf_ops *bops, struct intel_buf *buf,
+			 uint32_t tiling, unsigned stride)
+{
+	int ret;
+
+	ret = __gem_set_tiling(buf_ops_get_fd(bops), buf->handle, tiling, stride);
+
+	buf->surface[0].stride = stride;
+	buf->surface[0].size = buf->surface[0].stride * TEST_HEIGHT(stride);
+	buf->tiling = tiling;
+
+	igt_assert_eq(ret, 0);
+}
+
+static void do_test(struct buf_ops *bops, uint32_t tiling, unsigned stride,
 		    uint32_t tiling_after, unsigned stride_after)
 {
-	drm_intel_bo *busy_bo, *test_bo, *target_bo;
-	int i, ret;
+	struct intel_buf *test_buf, *target_buf;
+	struct intel_bb *ibb;
+	igt_spin_t *busy;
+	int i, fd = buf_ops_get_fd(bops);
 	uint32_t *ptr;
-	uint32_t test_bo_handle;
 	uint32_t blt_stride, blt_bits;
+	uint32_t busy_ctx, ring = I915_EXEC_DEFAULT;
 	bool tiling_changed = false;
 
-	igt_info("filling ring .. ");
-	busy_bo = drm_intel_bo_alloc(bufmgr, "busy bo bo", 16*1024*1024, 4096);
+	ibb = intel_bb_create_with_relocs(fd, 4096);
 
-	for (i = 0; i < 250; i++) {
-		BLIT_COPY_BATCH_START(0);
-		OUT_BATCH((3 << 24) | /* 32 bits */
-			  (0xcc << 16) | /* copy ROP */
-			  2*1024*4);
-		OUT_BATCH(0 << 16 | 1024);
-		OUT_BATCH((2048) << 16 | (2048));
-		OUT_RELOC_FENCED(busy_bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-		OUT_BATCH(0 << 16 | 0);
-		OUT_BATCH(2*1024*4);
-		OUT_RELOC_FENCED(busy_bo, I915_GEM_DOMAIN_RENDER, 0, 0);
-		ADVANCE_BATCH();
-
-		if (batch->gen >= 6) {
-			BEGIN_BATCH(3, 0);
-			OUT_BATCH(XY_SETUP_CLIP_BLT_CMD);
-			OUT_BATCH(0);
-			OUT_BATCH(0);
-			ADVANCE_BATCH();
-		}
-	}
-	intel_batchbuffer_flush(batch);
+	igt_info("filling ring\n");
+	if (HAS_BLT_RING(ibb->devid))
+		ring = I915_EXEC_BLT;
+	busy_ctx = gem_context_create(fd);
+	busy = igt_spin_new(fd, .ctx = busy_ctx, .engine = ring);
 
 	igt_info("playing tricks .. ");
 	/* first allocate the target so it gets out of the way of playing funky
 	 * tricks */
-	target_bo = drm_intel_bo_alloc(bufmgr, "target bo", TEST_SIZE, 4096);
+	target_buf = intel_buf_create(bops, TEST_WIDTH(TEST_STRIDE),
+				      TEST_HEIGHT(TEST_STRIDE), 32, 0,
+				      I915_TILING_NONE, I915_COMPRESSION_NONE);
 
+	intel_bb_add_intel_buf(ibb, target_buf, true);
 	/* allocate buffer with parameters _after_ transition we want to check
 	 * and touch it, so that it's properly aligned in the gtt. */
-	test_bo = drm_intel_bo_alloc(bufmgr, "tiled busy bo", TEST_SIZE, 4096);
-	test_bo_handle = test_bo->handle;
-	ret = drm_intel_bo_set_tiling(test_bo, &tiling_after, stride_after);
-	igt_assert_eq(ret, 0);
-	drm_intel_gem_bo_map_gtt(test_bo);
-	ptr = test_bo->virtual;
+	test_buf = intel_buf_create(bops, TEST_WIDTH(stride_after),
+				    TEST_HEIGHT(stride_after), 32, 0,
+				    tiling_after, I915_COMPRESSION_NONE);
+
+	ptr = gem_mmap__gtt(fd, test_buf->handle, TEST_SIZE,
+			    PROT_READ | PROT_WRITE);
+	gem_set_domain(fd, test_buf->handle,
+		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 	*ptr = 0;
-	ptr = NULL;
-	drm_intel_gem_bo_unmap_gtt(test_bo);
+	gem_munmap(ptr, TEST_SIZE);
 
-	drm_intel_bo_unreference(test_bo);
-
-	test_bo = NULL;
-
-	/* note we need a bo bigger than batches, otherwise the buffer reuse
-	 * trick will fail. */
-	test_bo = drm_intel_bo_alloc(bufmgr, "busy bo", TEST_SIZE, 4096);
-	/* double check that the reuse trick worked */
-	igt_assert(test_bo_handle == test_bo->handle);
-
-	test_bo_handle = test_bo->handle;
-	/* ensure we have the right tiling before we start. */
-	ret = drm_intel_bo_set_tiling(test_bo, &tiling, stride);
-	igt_assert_eq(ret, 0);
+	/* Reuse previously aligned in the gtt object */
+	intel_buf_init_using_handle(bops, test_buf->handle, test_buf,
+				    TEST_WIDTH(stride), TEST_HEIGHT(stride), 32,
+				    0, tiling, I915_COMPRESSION_NONE);
+	igt_assert_eq_u32(intel_buf_bo_size(test_buf), TEST_SIZE);
+	intel_buf_set_ownership(test_buf, true);
+	intel_bb_add_intel_buf(ibb, test_buf, false);
 
 	if (tiling == I915_TILING_NONE) {
-		drm_intel_bo_subdata(test_bo, 0, TEST_SIZE, data);
+		gem_write(fd, test_buf->handle, 0, data, TEST_SIZE);
 	} else {
-		drm_intel_gem_bo_map_gtt(test_bo);
-		ptr = test_bo->virtual;
+		ptr = gem_mmap__gtt(fd, test_buf->handle, TEST_SIZE,
+				    PROT_READ | PROT_WRITE);
+		gem_set_domain(fd, test_buf->handle,
+			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
 		memcpy(ptr, data, TEST_SIZE);
+		gem_munmap(ptr, TEST_SIZE);
 		ptr = NULL;
-		drm_intel_gem_bo_unmap_gtt(test_bo);
 	}
 
 	blt_stride = stride;
 	blt_bits = 0;
-	if (intel_gen(devid) >= 4 && tiling != I915_TILING_NONE) {
+	if (intel_gen(ibb->devid) >= 4 && tiling != I915_TILING_NONE) {
 		blt_stride /= 4;
 		blt_bits = XY_SRC_COPY_BLT_SRC_TILED;
 	}
 
-	BLIT_COPY_BATCH_START(blt_bits);
-	OUT_BATCH((3 << 24) | /* 32 bits */
+	intel_bb_blit_start(ibb, blt_bits);
+	intel_bb_out(ibb, (3 << 24) | /* 32 bits */
 		  (0xcc << 16) | /* copy ROP */
 		  stride);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH((TEST_HEIGHT(stride)) << 16 | (TEST_WIDTH(stride)));
-	OUT_RELOC_FENCED(target_bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH(blt_stride);
-	OUT_RELOC_FENCED(test_bo, I915_GEM_DOMAIN_RENDER, 0, 0);
-	ADVANCE_BATCH();
-	intel_batchbuffer_flush(batch);
+	intel_bb_out(ibb, 0 << 16 | 0);
+	intel_bb_out(ibb, (TEST_HEIGHT(stride)) << 16 | (TEST_WIDTH(stride)));
+	intel_bb_emit_reloc_fenced(ibb, target_buf->handle,
+				   I915_GEM_DOMAIN_RENDER,
+				   I915_GEM_DOMAIN_RENDER, 0, 0);
+	intel_bb_out(ibb, 0 << 16 | 0);
+	intel_bb_out(ibb, blt_stride);
+	intel_bb_emit_reloc_fenced(ibb, test_buf->handle,
+				   I915_GEM_DOMAIN_RENDER, 0, 0, 0);
+	intel_bb_flush_blit(ibb);
 
-	drm_intel_bo_unreference(test_bo);
-
-	test_bo = drm_intel_bo_alloc_for_render(bufmgr, "tiled busy bo", TEST_SIZE, 4096);
-	/* double check that the reuse trick worked */
-	igt_assert(test_bo_handle == test_bo->handle);
-	ret = drm_intel_bo_set_tiling(test_bo, &tiling_after, stride_after);
-	igt_assert_eq(ret, 0);
+	__set_tiling(bops, test_buf, tiling_after, stride_after);
+	intel_bb_reset(ibb, true);
+	intel_bb_add_intel_buf(ibb, test_buf, true);
 
 	/* Note: We don't care about gen4+ here because the blitter doesn't use
 	 * fences there. So not setting tiling flags on the tiled buffer is ok.
 	 */
-	BLIT_COPY_BATCH_START(0);
-	OUT_BATCH((3 << 24) | /* 32 bits */
+
+	intel_bb_blit_start(ibb, 0);
+	intel_bb_out(ibb, (3 << 24) | /* 32 bits */
 		  (0xcc << 16) | /* copy ROP */
 		  stride_after);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH((1) << 16 | (1));
-	OUT_RELOC_FENCED(test_bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER, 0);
-	OUT_BATCH(0 << 16 | 0);
-	OUT_BATCH(stride_after);
-	OUT_RELOC_FENCED(test_bo, I915_GEM_DOMAIN_RENDER, 0, 0);
-	ADVANCE_BATCH();
-	intel_batchbuffer_flush(batch);
-
+	intel_bb_out(ibb, 0 << 16 | 0);
+	intel_bb_out(ibb, (1) << 16 | (1));
+	intel_bb_emit_reloc_fenced(ibb, test_buf->handle,
+				   I915_GEM_DOMAIN_RENDER,
+				   I915_GEM_DOMAIN_RENDER, 0, 0);
+	intel_bb_out(ibb, 0 << 16 | 0);
+	intel_bb_out(ibb, stride_after);
+	intel_bb_emit_reloc_fenced(ibb, test_buf->handle,
+				   I915_GEM_DOMAIN_RENDER, 0, 0, 0);
+	intel_bb_flush_blit(ibb);
 	/* Now try to trick the kernel the kernel into changing up the fencing
 	 * too early. */
-
 	igt_info("checking .. ");
 	memset(data, 0, TEST_SIZE);
-	drm_intel_bo_get_subdata(target_bo, 0, TEST_SIZE, data);
+
+	gem_read(fd, target_buf->handle, 0, data, TEST_SIZE);
 	for (i = 0; i < TEST_SIZE/4; i++)
 		igt_assert(data[i] == i);
 
-	/* check whether tiling on the test_bo actually changed. */
-	drm_intel_gem_bo_map_gtt(test_bo);
-	ptr = test_bo->virtual;
+	/* check whether tiling on the test_buf actually changed. */
+	ptr = gem_mmap__gtt(fd, test_buf->handle, TEST_SIZE,
+			    PROT_WRITE | PROT_READ);
+	gem_set_domain(fd, test_buf->handle, I915_GEM_DOMAIN_GTT, 0);
+
 	for (i = 0; i < TEST_SIZE/4; i++)
 		if (ptr[i] != data[i])
 			tiling_changed = true;
-	ptr = NULL;
-	drm_intel_gem_bo_unmap_gtt(test_bo);
+
+	gem_munmap(ptr, TEST_SIZE);
 	igt_assert(tiling_changed);
 
-	drm_intel_bo_unreference(test_bo);
-	drm_intel_bo_unreference(target_bo);
-	drm_intel_bo_unreference(busy_bo);
+	igt_spin_free(fd, busy);
+	gem_context_destroy(fd, busy_ctx);
+	intel_buf_destroy(test_buf);
+	intel_buf_destroy(target_buf);
+
 	igt_info("done\n");
 }
 
-int fd;
-
 igt_main
 {
-	int i;
+	int fd, i;
 	uint32_t tiling, tiling_after;
+	struct buf_ops *bops;
 
 	igt_fixture {
 		for (i = 0; i < 1024*256; i++)
@@ -235,17 +231,13 @@ igt_main
 		igt_require_gem(fd);
 		gem_require_blitter(fd);
 		igt_require(gem_available_fences(fd) > 0);
-
-		bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-		drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-		devid = intel_get_drm_devid(fd);
-		batch = intel_batchbuffer_alloc(bufmgr, devid);
+		bops = buf_ops_create(fd);
 	}
 
 	igt_subtest("untiled-to-tiled") {
 		tiling = I915_TILING_NONE;
 		tiling_after = I915_TILING_X;
-		do_test(tiling, TEST_STRIDE, tiling_after, TEST_STRIDE);
+		do_test(bops, tiling, TEST_STRIDE, tiling_after, TEST_STRIDE);
 		igt_assert(tiling == I915_TILING_NONE);
 		igt_assert(tiling_after == I915_TILING_X);
 	}
@@ -253,7 +245,7 @@ igt_main
 	igt_subtest("tiled-to-untiled") {
 		tiling = I915_TILING_X;
 		tiling_after = I915_TILING_NONE;
-		do_test(tiling, TEST_STRIDE, tiling_after, TEST_STRIDE);
+		do_test(bops, tiling, TEST_STRIDE, tiling_after, TEST_STRIDE);
 		igt_assert(tiling == I915_TILING_X);
 		igt_assert(tiling_after == I915_TILING_NONE);
 	}
@@ -261,8 +253,13 @@ igt_main
 	igt_subtest("tiled-to-tiled") {
 		tiling = I915_TILING_X;
 		tiling_after = I915_TILING_X;
-		do_test(tiling, TEST_STRIDE/2, tiling_after, TEST_STRIDE);
+		do_test(bops, tiling, TEST_STRIDE/2, tiling_after, TEST_STRIDE);
 		igt_assert(tiling == I915_TILING_X);
 		igt_assert(tiling_after == I915_TILING_X);
+	}
+
+	igt_fixture{
+		buf_ops_destroy(bops);
+		close(fd);
 	}
 }
