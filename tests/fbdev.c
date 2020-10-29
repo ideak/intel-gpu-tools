@@ -43,8 +43,16 @@ igt_main
 	struct fb_fix_screeninfo fix_info;
 	int fd = -1;
 
+	/*
+	 * Should this test focus on the fbdev independent of any drm driver,
+	 * or should it look for fbdev of a particular device?
+	 */
 	igt_fixture {
 		fd = open("/dev/fb0", O_RDWR);
+		if (fd < 0) {
+			drm_load_module(DRIVER_ANY);
+			fd = open("/dev/fb0", O_RDWR);
+		}
 		igt_require_f(fd != -1, "/dev/fb0\n");
 
 		igt_require(ioctl(fd, FBIOGET_VSCREENINFO, &var_info) == 0);
