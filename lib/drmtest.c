@@ -283,7 +283,7 @@ static int __search_and_open(const char *base, int offset, unsigned int chipset,
 	return -1;
 }
 
-static void __try_modprobe(unsigned int chipset)
+void drm_load_module(unsigned int chipset)
 {
 	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -307,7 +307,7 @@ static int __open_driver(const char *base, int offset, unsigned int chipset, int
 	if (fd != -1)
 		return fd;
 
-	__try_modprobe(chipset);
+	drm_load_module(chipset);
 
 	return __search_and_open(base, offset, chipset, as_idx);
 }
@@ -320,7 +320,7 @@ static int __open_driver_exact(const char *name, unsigned int chipset)
 	if (fd != -1)
 		return fd;
 
-	__try_modprobe(chipset);
+	drm_load_module(chipset);
 
 	return open_device(name, chipset);
 }
@@ -419,7 +419,7 @@ int __drm_open_driver_another(int idx, int chipset)
 		found = __get_card_for_nth_filter(idx, &card);
 
 		if (!found) {
-			__try_modprobe(chipset);
+			drm_load_module(chipset);
 			found = __get_card_for_nth_filter(idx, &card);
 		}
 
