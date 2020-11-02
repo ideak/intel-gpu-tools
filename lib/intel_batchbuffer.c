@@ -1275,25 +1275,25 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 	igt_assert(ibb);
 
 	ibb->uses_full_ppgtt = gem_uses_full_ppgtt(i915);
+	ibb->devid = intel_get_drm_devid(i915);
+	ibb->gen = intel_gen(ibb->devid);
 
 	/*
 	 * If we don't have full ppgtt driver can change our addresses
 	 * so allocator is useless in this case. Just enforce relocations
 	 * for such gens and don't use allocator at all.
 	 */
-	if (!ibb->uses_full_ppgtt) {
+	if (!ibb->uses_full_ppgtt)
 		do_relocs = true;
-		allocator_type = INTEL_ALLOCATOR_NONE;
-	}
 
-	if (!do_relocs)
-		ibb->allocator_handle = intel_allocator_open(i915, ctx, allocator_type);
+	/* if relocs are set we won't use an allocator */
+	if (do_relocs)
+		allocator_type = INTEL_ALLOCATOR_NONE;
 	else
-		igt_assert(allocator_type == INTEL_ALLOCATOR_NONE);
+		ibb->allocator_handle = intel_allocator_open(i915, ctx, allocator_type);
+
 	ibb->allocator_type = allocator_type;
 	ibb->i915 = i915;
-	ibb->devid = intel_get_drm_devid(i915);
-	ibb->gen = intel_gen(ibb->devid);
 	ibb->enforce_relocs = do_relocs;
 	ibb->handle = gem_create(i915, size);
 	ibb->size = size;
@@ -1327,7 +1327,7 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
  *
  * Creates bb with context passed in @ctx, size in @size and allocator type
  * in @allocator_type. Relocations are set to false because IGT allocator
- * is not used in that case.
+ * is used in that case.
  *
  * Returns:
  *
@@ -1337,6 +1337,11 @@ struct intel_bb *intel_bb_create_full(int i915, uint32_t ctx, uint32_t size,
 				      uint8_t allocator_type)
 {
 	return __intel_bb_create(i915, ctx, size, false, allocator_type);
+}
+
+static bool aux_needs_softpin(int i915)
+{
+	return intel_gen(intel_get_drm_devid(i915)) >= 12;
 }
 
 /**
@@ -1361,7 +1366,11 @@ struct intel_bb *intel_bb_create_full(int i915, uint32_t ctx, uint32_t size,
  */
 struct intel_bb *intel_bb_create(int i915, uint32_t size)
 {
-	return __intel_bb_create(i915, 0, size, false, INTEL_ALLOCATOR_SIMPLE);
+	bool relocs = gem_has_relocations(i915);
+
+	return __intel_bb_create(i915, 0, size,
+				 relocs && !aux_needs_softpin(i915),
+				 INTEL_ALLOCATOR_SIMPLE);
 }
 
 /**
@@ -1379,7 +1388,11 @@ struct intel_bb *intel_bb_create(int i915, uint32_t size)
 struct intel_bb *
 intel_bb_create_with_context(int i915, uint32_t ctx, uint32_t size)
 {
-	return __intel_bb_create(i915, ctx, size, false, INTEL_ALLOCATOR_SIMPLE);
+	bool relocs = gem_has_relocations(i915);
+
+	return __intel_bb_create(i915, ctx, size,
+				 relocs && !aux_needs_softpin(i915),
+				 INTEL_ALLOCATOR_SIMPLE);
 }
 
 /**
@@ -1396,6 +1409,8 @@ intel_bb_create_with_context(int i915, uint32_t ctx, uint32_t size)
  */
 struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
 {
+	igt_require(gem_has_relocations(i915));
+
 	return __intel_bb_create(i915, 0, size, true, INTEL_ALLOCATOR_NONE);
 }
 
@@ -1415,6 +1430,8 @@ struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
 struct intel_bb *
 intel_bb_create_with_relocs_and_context(int i915, uint32_t ctx, uint32_t size)
 {
+	igt_require(gem_has_relocations(i915));
+
 	return __intel_bb_create(i915, ctx, size, true, INTEL_ALLOCATOR_NONE);
 }
 
