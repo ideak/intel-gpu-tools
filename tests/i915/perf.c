@@ -4806,6 +4806,13 @@ igt_main
 	igt_fixture {
 		struct stat sb;
 
+		/*
+		 * Prior tests may have unloaded i915 or failed while
+		 * loading/unloading i915. Load i915 here before we stat the
+		 * files.
+		 */
+		drm_load_module(DRIVER_INTEL);
+
 		igt_require(stat("/proc/sys/dev/i915/perf_stream_paranoid", &sb)
 			    == 0);
 		igt_require(stat("/proc/sys/dev/i915/oa_max_sample_rate", &sb)
