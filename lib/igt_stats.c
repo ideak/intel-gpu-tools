@@ -550,6 +550,17 @@ double igt_stats_get_std_deviation(igt_stats_t *stats)
 }
 
 /**
+ * igt_stats_get_std_error:
+ * @stats: An #igt_stats_t instance
+ *
+ * Retrieves the standard error of the mean from the @stats dataset.
+ */
+double igt_stats_get_std_error(igt_stats_t *stats)
+{
+	return igt_stats_get_std_deviation(stats) / sqrt(stats->n_values);
+}
+
+/**
  * igt_stats_get_iqm:
  * @stats: An #igt_stats_t instance
  *

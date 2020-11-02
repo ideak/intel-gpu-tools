@@ -81,6 +81,7 @@ double igt_stats_get_trimean(igt_stats_t *stats);
 double igt_stats_get_median(igt_stats_t *stats);
 double igt_stats_get_variance(igt_stats_t *stats);
 double igt_stats_get_std_deviation(igt_stats_t *stats);
+double igt_stats_get_std_error(igt_stats_t *stats);
 
 /**
  * igt_mean:

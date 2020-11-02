@@ -494,7 +494,7 @@ static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 	 * which depend on timing, giving the lowest acceptable MTBF of 5.6s
 	 * for 60Hz sampling rate.
 	 */
-	accuracy = 3. * stddev;
+	accuracy = 3. * igt_stats_get_std_error(&stats);
 
 	igt_info("Expected frametime: %.0fus; measured %.1fus +- %.3fus accuracy %.2f%% [%.2f scanlines]\n",
 		 expected, mean, stddev,
