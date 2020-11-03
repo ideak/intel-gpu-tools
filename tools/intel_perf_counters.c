@@ -46,9 +46,9 @@
 #include "i915_drm.h"
 #include "drmtest.h"
 #include "intel_io.h"
-#include "intel_bufmgr.h"
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
+#include "intel_bufops.h"
 
 #define GEN5_COUNTER_COUNT 29
 
@@ -298,8 +298,8 @@ const int gen7_counter_format = 5; /* 0b101 */
 int have_totals = 0;
 uint32_t *totals;
 uint32_t *last_counter;
-static drm_intel_bufmgr *bufmgr;
-struct intel_batchbuffer *batch;
+static struct buf_ops *bops;
+static struct intel_bb *ibb;
 
 /* DW0 */
 #define GEN5_MI_REPORT_PERF_COUNT ((0x26 << 23) | (3 - 2))
@@ -327,30 +327,29 @@ static void
 gen5_get_counters(void)
 {
 	int i;
-	drm_intel_bo *stats_bo;
+	struct intel_buf *stats_buf;
 	uint32_t *stats_result;
 
-	stats_bo = drm_intel_bo_alloc(bufmgr, "stats", 4096, 4096);
+	stats_buf = intel_buf_create(bops, 4096, 1, 8, 0, I915_TILING_NONE,
+				     I915_COMPRESSION_NONE);
+	intel_bb_add_intel_buf(ibb, stats_buf, true);
 
-	BEGIN_BATCH(6, 2);
-	OUT_BATCH(GEN5_MI_REPORT_PERF_COUNT | MI_COUNTER_SET_0);
-	OUT_RELOC(stats_bo,
-		  I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-		  0);
-	OUT_BATCH(0);
+	intel_bb_out(ibb, GEN5_MI_REPORT_PERF_COUNT | MI_COUNTER_SET_0);
+	intel_bb_emit_reloc(ibb, stats_buf->handle, I915_GEM_DOMAIN_INSTRUCTION,
+			    I915_GEM_DOMAIN_INSTRUCTION, 0,
+			    stats_buf->addr.offset);
+	intel_bb_out(ibb, 0);
 
-	OUT_BATCH(GEN5_MI_REPORT_PERF_COUNT | MI_COUNTER_SET_1);
-	OUT_RELOC(stats_bo,
-		  I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-		  64);
-	OUT_BATCH(0);
+	intel_bb_out(ibb, GEN5_MI_REPORT_PERF_COUNT | MI_COUNTER_SET_1);
+	intel_bb_emit_reloc(ibb, stats_buf->handle, I915_GEM_DOMAIN_INSTRUCTION,
+			    I915_GEM_DOMAIN_INSTRUCTION, 64,
+			    stats_buf->addr.offset);
+	intel_bb_out(ibb, 0);
 
-	ADVANCE_BATCH();
+	intel_bb_flush_blit(ibb);
 
-	intel_batchbuffer_flush(batch);
-
-	drm_intel_bo_map(stats_bo, 0);
-	stats_result = stats_bo->virtual;
+	intel_buf_cpu_map(stats_buf, false);
+	stats_result = stats_buf->ptr;
 	/* skip REPORT_ID, TIMESTAMP */
 	stats_result += 3;
 	for (i = 0 ; i < GEN5_COUNTER_COUNT; i++) {
@@ -358,15 +357,15 @@ gen5_get_counters(void)
 		last_counter[i] = stats_result[i];
 	}
 
-	drm_intel_bo_unmap(stats_bo);
-	drm_intel_bo_unreference(stats_bo);
+	intel_buf_unmap(stats_buf);
+	intel_buf_destroy(stats_buf);
 }
 
 static void
 gen6_get_counters(void)
 {
 	int i;
-	drm_intel_bo *stats_bo;
+	struct intel_buf *stats_buf;
 	uint32_t *stats_result;
 
 	/* Map from counter names to their index in the buffer object */
@@ -378,49 +377,50 @@ gen6_get_counters(void)
 		31, 30, 29, 28, 27, 26, 25, 24,
 	};
 
-	stats_bo = drm_intel_bo_alloc(bufmgr, "stats", 4096, 4096);
+	stats_buf = intel_buf_create(bops, 4096, 1, 8, 0, I915_TILING_NONE,
+				     I915_COMPRESSION_NONE);
+	intel_bb_add_intel_buf(ibb, stats_buf, true);
 
-	BEGIN_BATCH(3, 1);
-	OUT_BATCH(GEN6_MI_REPORT_PERF_COUNT | (3 - 2));
-	OUT_RELOC(stats_bo,
-		  I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
-		  MI_COUNTER_ADDRESS_GTT);
-	OUT_BATCH(0);
-	ADVANCE_BATCH();
+	intel_bb_out(ibb, GEN6_MI_REPORT_PERF_COUNT | (3 - 2));
+	intel_bb_emit_reloc(ibb, stats_buf->handle, I915_GEM_DOMAIN_INSTRUCTION,
+			    I915_GEM_DOMAIN_INSTRUCTION,
+			    MI_COUNTER_ADDRESS_GTT, stats_buf->addr.offset);
+	intel_bb_out(ibb, 0);
 
-	intel_batchbuffer_flush_on_ring(batch, I915_EXEC_RENDER);
+	intel_bb_flush_render(ibb);
 
-	drm_intel_bo_map(stats_bo, 0);
-	stats_result = stats_bo->virtual;
+	intel_buf_cpu_map(stats_buf, 0);
+	stats_result = stats_buf->ptr;
 	for (i = 0; i < GEN6_COUNTER_COUNT; i++) {
 		totals[i] += stats_result[buffer_index[i]] - last_counter[i];
 		last_counter[i] = stats_result[buffer_index[i]];
 	}
 
-	drm_intel_bo_unmap(stats_bo);
-	drm_intel_bo_unreference(stats_bo);
+	intel_buf_unmap(stats_buf);
+	intel_buf_destroy(stats_buf);
 }
 
 static void
 gen7_get_counters(void)
 {
 	int i;
-	drm_intel_bo *stats_bo;
+	struct intel_buf *stats_buf;
 	uint32_t *stats_result;
 
-	stats_bo = drm_intel_bo_alloc(bufmgr, "stats", 4096, 4096);
+	stats_buf = intel_buf_create(bops, 4096, 1, 8, 0, I915_TILING_NONE,
+				     I915_COMPRESSION_NONE);
+	intel_bb_add_intel_buf(ibb, stats_buf, true);
 
-	BEGIN_BATCH(3, 1);
-	OUT_BATCH(GEN6_MI_REPORT_PERF_COUNT | (3 - 2));
-	OUT_RELOC(stats_bo,
-		  I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION, 0);
-	OUT_BATCH(0);
-	ADVANCE_BATCH();
+	intel_bb_out(ibb, GEN6_MI_REPORT_PERF_COUNT | (3 - 2));
+	intel_bb_emit_reloc(ibb, stats_buf->handle, I915_GEM_DOMAIN_INSTRUCTION,
+			    I915_GEM_DOMAIN_INSTRUCTION, 0,
+			    stats_buf->addr.offset);
+	intel_bb_out(ibb, 0);
 
-	intel_batchbuffer_flush_on_ring(batch, I915_EXEC_RENDER);
+	intel_bb_flush_render(ibb);
 
-	drm_intel_bo_map(stats_bo, 0);
-	stats_result = stats_bo->virtual;
+	intel_buf_cpu_map(stats_buf, false);
+	stats_result = stats_buf->ptr;
 	/* skip REPORT_ID, TIMESTAMP */
 	stats_result += 3;
 	for (i = 0; i < GEN7_COUNTER_COUNT; i++) {
@@ -431,8 +431,8 @@ gen7_get_counters(void)
 		last_counter[i] = stats_result[i];
 	}
 
-	drm_intel_bo_unmap(stats_bo);
-	drm_intel_bo_unreference(stats_bo);
+	intel_buf_unmap(stats_buf);
+	intel_buf_destroy(stats_buf);
 }
 
 #define STATS_CHECK_FREQUENCY	100
@@ -458,9 +458,8 @@ main(int argc, char **argv)
 	fd = drm_open_driver(DRIVER_INTEL);
 	devid = intel_get_drm_devid(fd);
 
-	bufmgr = drm_intel_bufmgr_gem_init(fd, 4096);
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-	batch = intel_batchbuffer_alloc(bufmgr, devid);
+	bops = buf_ops_create(fd);
+	ibb = intel_bb_create(fd, 4096);
 
 	if (IS_GEN5(devid)) {
 		counter_name = gen5_counter_names;
@@ -530,6 +529,10 @@ main(int argc, char **argv)
 
 	free(totals);
 	free(last_counter);
+
+	intel_bb_destroy(ibb);
+	buf_ops_destroy(bops);
+	close(fd);
 
 	return 0;
 }
