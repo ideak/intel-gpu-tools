@@ -255,6 +255,48 @@ static inline void psr_debugfs_enable(int device, int debugfs_fd)
 	psr_enable(device, debugfs_fd, PSR_MODE_1);
 }
 
+static void fbc_skips_on_fbcon(int debugfs_fd)
+{
+	const char *reasons[] = {
+		"incompatible mode",
+		"mode too large for compression",
+		"framebuffer not tiled or fenced",
+		"pixel format is invalid",
+		"rotation unsupported",
+		"tiling unsupported",
+		"framebuffer stride not supported",
+		"per-pixel alpha blending is incompatible with FBC",
+		"pixel rate is too big",
+		"CFB requirements changed",
+		"plane Y offset is misaligned",
+		"plane height + offset is non-modulo of 4"
+	};
+	bool skip = false;
+	char buf[128];
+	int i;
+
+	igt_debugfs_simple_read(debugfs_fd, "i915_fbc_status", buf, sizeof(buf));
+	if (strstr(buf, "FBC enabled\n"))
+		return;
+
+	for (i = 0; skip == false && i < ARRAY_SIZE(reasons); i++)
+		skip = strstr(buf, reasons[i]);
+
+	if (skip)
+		igt_skip("fbcon modeset is not compatible with FBC\n");
+}
+
+static void psr_skips_on_fbcon(int debugfs_fd)
+{
+	/*
+	 * Unless fbcon enables interlaced mode all other PSR restrictions
+	 * will be caught and skipped in supported_on_chipset() hook.
+	 * As PSR don't expose in debugfs why it is not enabling for now
+	 * not checking not even if it was not enabled because of interlaced
+	 * mode, if some day it happens changes will be needed first.
+	 */
+}
+
 struct feature {
 	bool (*supported_on_chipset)(int device, int debugfs_fd);
 	bool (*wait_until_enabled)(int debugfs_fd);
@@ -262,6 +304,8 @@ struct feature {
 	bool (*wait_until_update)(struct drm_info *drm);
 	bool (*connector_possible_fn)(drmModeConnectorPtr connector);
 	void (*enable)(int device, int debugfs_fd);
+	/* skip test if feature can't be enabled due fbcon modeset */
+	void (*skips_on_fbcon)(int debugfs_fd);
 } fbc = {
 	.supported_on_chipset = fbc_supported_on_chipset,
 	.wait_until_enabled = fbc_wait_until_enabled,
@@ -269,6 +313,7 @@ struct feature {
 	.wait_until_update = fbc_wait_until_update,
 	.connector_possible_fn = connector_can_fbc,
 	.enable = fbc_modparam_enable,
+	.skips_on_fbcon = fbc_skips_on_fbcon,
 }, psr = {
 	.supported_on_chipset = psr_supported_on_chipset,
 	.wait_until_enabled = psr_wait_until_enabled,
@@ -276,6 +321,7 @@ struct feature {
 	.wait_until_update = psr_wait_until_update,
 	.connector_possible_fn = connector_can_psr,
 	.enable = psr_debugfs_enable,
+	.skips_on_fbcon = psr_skips_on_fbcon,
 };
 
 static void restore_fbcon(struct drm_info *drm)
@@ -317,6 +363,7 @@ static void subtest(struct drm_info *drm, struct feature *feature, bool suspend)
 	sleep(3);
 
 	wait_user("Back to fbcon.");
+	feature->skips_on_fbcon(drm->debugfs_fd);
 	igt_assert(feature->wait_until_update(drm));
 
 	if (suspend) {
