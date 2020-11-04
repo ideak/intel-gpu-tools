@@ -465,12 +465,13 @@ __copy_dev_to_card(struct igt_device *dev, struct igt_device_card *card)
 }
 
 /*
- * Iterate over all igt_devices array and find first discrete card.
- * card->pci_slot_name will be updated only if a discrete card is present.
+ * Iterate over all igt_devices array and find first discrete/integrated card.
+ * card->pci_slot_name will be updated only if a card is found.
  */
-bool igt_device_find_first_i915_discrete_card(struct igt_device_card *card)
+static bool __find_first_i915_card(struct igt_device_card *card, bool discrete)
 {
 	struct igt_device *dev;
+	int cmp;
 
 	memset(card, 0, sizeof(*card));
 
@@ -479,13 +480,33 @@ bool igt_device_find_first_i915_discrete_card(struct igt_device_card *card)
 		if (!is_pci_subsystem(dev) || !is_vendor_matched(dev, "intel"))
 			continue;
 
-		if ((strncmp(dev->pci_slot_name, INTEGRATED_I915_GPU_PCI_ID, PCI_SLOT_NAME_SIZE)) != 0) {
+		cmp = strncmp(dev->pci_slot_name, INTEGRATED_I915_GPU_PCI_ID,
+			      PCI_SLOT_NAME_SIZE);
+
+		if (discrete && cmp) {
+			__copy_dev_to_card(dev, card);
+			return true;
+		} else if (!discrete && !cmp) {
 			__copy_dev_to_card(dev, card);
 			return true;
 		}
 	}
 
 	return false;
+}
+
+bool igt_device_find_first_i915_discrete_card(struct igt_device_card *card)
+{
+	igt_assert(card);
+
+	return __find_first_i915_card(card, true);
+}
+
+bool igt_device_find_integrated_card(struct igt_device_card *card)
+{
+	igt_assert(card);
+
+	return __find_first_i915_card(card, false);
 }
 
 static struct igt_device *igt_device_from_syspath(const char *syspath)
