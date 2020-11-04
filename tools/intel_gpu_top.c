@@ -1400,7 +1400,9 @@ int main(int argc, char **argv)
 	} else {
 		ret = igt_device_find_first_i915_discrete_card(&card);
 		if (!ret)
-			fprintf(stderr, "No device filter specified and no discrete i915 devices found\n");
+			ret = igt_device_find_integrated_card(&card);
+		if (!ret)
+			fprintf(stderr, "No device filter specified and no discrete/integrated i915 devices found\n");
 	}
 
 	if (!ret) {
