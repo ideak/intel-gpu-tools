@@ -77,7 +77,7 @@ static void *thread(void *data)
 	pthread_mutex_unlock(t->mutex);
 
 	if (t->flags & FDS) {
-		fd = drm_open_driver(DRIVER_INTEL);
+		fd = gem_reopen_driver(t->fd);
 		gem_context_copy_engines(t->fd, 0, fd, 0);
 	} else {
 		fd = t->fd;
