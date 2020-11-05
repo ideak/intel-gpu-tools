@@ -173,7 +173,7 @@ igt_main
 	 * generated and compared to the reference one.
 	 */
 
-	igt_subtest_f("flip-changes-tiling") {
+	igt_subtest_with_dynamic("flip-changes-tiling") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_X_TILED,
 				       LOCAL_DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
@@ -181,11 +181,13 @@ igt_main
 		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
 			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
 
-		for_each_pipe_with_valid_output(&data.display, pipe, output)
-			test_flip_tiling(&data, pipe, output, tiling);
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
+				test_flip_tiling(&data, pipe, output, tiling);
+		}
 	}
 
-	igt_subtest_f("flip-changes-tiling-Y") {
+	igt_subtest_with_dynamic("flip-changes-tiling-Y") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Y_TILED,
 				       LOCAL_DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
@@ -197,11 +199,14 @@ igt_main
 
 		igt_require(data.gen >= 9);
 
-		for_each_pipe_with_valid_output(&data.display, pipe, output)
-			test_flip_tiling(&data, pipe, output, tiling);
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
+				test_flip_tiling(&data, pipe, output, tiling);
+		}
 	}
 
-	igt_subtest_f("flip-changes-tiling-Yf") {
+
+	igt_subtest_with_dynamic("flip-changes-tiling-Yf") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Yf_TILED,
 				       LOCAL_DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
@@ -213,8 +218,10 @@ igt_main
 
 		igt_require(data.gen >= 9);
 
-		for_each_pipe_with_valid_output(&data.display, pipe, output)
-			test_flip_tiling(&data, pipe, output, tiling);
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
+				test_flip_tiling(&data, pipe, output, tiling);
+		}
 	}
 
 	/*
@@ -225,7 +232,7 @@ igt_main
 	 * reference one.
 	 */
 
-	igt_subtest_f("flip-X-tiled") {
+	igt_subtest_with_dynamic("flip-X-tiled") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_X_TILED,
 				       LOCAL_I915_FORMAT_MOD_X_TILED };
 		enum pipe pipe;
@@ -233,11 +240,13 @@ igt_main
 		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
 			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
 
-		for_each_pipe_with_valid_output(&data.display, pipe, output)
-			test_flip_tiling(&data, pipe, output, tiling);
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
+				test_flip_tiling(&data, pipe, output, tiling);
+		}
 	}
 
-	igt_subtest_f("flip-Y-tiled") {
+	igt_subtest_with_dynamic("flip-Y-tiled") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Y_TILED,
 				       LOCAL_I915_FORMAT_MOD_Y_TILED };
 		enum pipe pipe;
@@ -249,11 +258,13 @@ igt_main
 
 		igt_require(data.gen >= 9);
 
-		for_each_pipe_with_valid_output(&data.display, pipe, output)
-			test_flip_tiling(&data, pipe, output, tiling);
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
+				test_flip_tiling(&data, pipe, output, tiling);
+		}
 	}
 
-	igt_subtest_f("flip-Yf-tiled") {
+	igt_subtest_with_dynamic("flip-Yf-tiled") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Yf_TILED,
 				       LOCAL_I915_FORMAT_MOD_Yf_TILED };
 		enum pipe pipe;
@@ -265,8 +276,10 @@ igt_main
 
 		igt_require(data.gen >= 9);
 
-		for_each_pipe_with_valid_output(&data.display, pipe, output)
-			test_flip_tiling(&data, pipe, output, tiling);
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
+				test_flip_tiling(&data, pipe, output, tiling);
+		}
 	}
 
 	/*
@@ -277,7 +290,7 @@ igt_main
 	 * reference one.
 	 */
 
-	igt_subtest_f("flip-to-X-tiled") {
+	igt_subtest_with_dynamic("flip-to-X-tiled") {
 		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
 				       LOCAL_I915_FORMAT_MOD_X_TILED };
 		enum pipe pipe;
@@ -285,11 +298,13 @@ igt_main
 		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
 			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
 
-		for_each_pipe_with_valid_output(&data.display, pipe, output)
-			test_flip_tiling(&data, pipe, output, tiling);
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
+				test_flip_tiling(&data, pipe, output, tiling);
+		}
 	}
 
-	igt_subtest_f("flip-to-Y-tiled") {
+	igt_subtest_with_dynamic("flip-to-Y-tiled") {
 		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
 				       LOCAL_I915_FORMAT_MOD_Y_TILED };
 		enum pipe pipe;
@@ -301,11 +316,13 @@ igt_main
 
 		igt_require(data.gen >= 9);
 
-		for_each_pipe_with_valid_output(&data.display, pipe, output)
-			test_flip_tiling(&data, pipe, output, tiling);
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
+				test_flip_tiling(&data, pipe, output, tiling);
+		}
 	}
 
-	igt_subtest_f("flip-to-Yf-tiled") {
+	igt_subtest_with_dynamic("flip-to-Yf-tiled") {
 		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
 				       LOCAL_I915_FORMAT_MOD_Yf_TILED };
 		enum pipe pipe;
@@ -317,8 +334,10 @@ igt_main
 
 		igt_require(data.gen >= 9);
 
-		for_each_pipe_with_valid_output(&data.display, pipe, output)
-			test_flip_tiling(&data, pipe, output, tiling);
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
+				test_flip_tiling(&data, pipe, output, tiling);
+		}
 	}
 
 	igt_fixture {
