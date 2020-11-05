@@ -87,12 +87,12 @@ struct hang {
 	int fd;
 };
 
-static void init_hang(struct hang *h)
+static void init_hang(struct hang *h, int fd)
 {
 	uint32_t *batch;
 	int i, gen;
 
-	h->fd = drm_open_driver(DRIVER_INTEL);
+	h->fd = gem_reopen_driver(fd);
 	igt_allow_hang(h->fd, 0, 0);
 
 	gen = intel_gen(intel_get_drm_devid(h->fd));
@@ -224,7 +224,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		igt_require(gem_has_queues(fd));
 
 	if (flags & HANG)
-		init_hang(&hang);
+		init_hang(&hang, fd);
 
 	nchild = 1;
 	if (flags & FORKED)
@@ -304,7 +304,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 		}
 		if (flags & FDS) {
 			for (n = 0; n < 64; n++)
-				fds[n] = drm_open_driver(DRIVER_INTEL);
+				fds[n] = gem_reopen_driver(fd);
 		}
 
 		memset(batches, 0, sizeof(batches));
