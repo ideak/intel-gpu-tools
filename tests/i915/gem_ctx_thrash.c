@@ -250,7 +250,7 @@ static void processes(void)
 	fds = malloc(num_ctx * sizeof(int));
 	igt_assert(fds);
 	for (unsigned n = 0; n < num_ctx; n++) {
-		fds[n] = drm_open_driver(DRIVER_INTEL);
+		fds[n] = gem_reopen_driver(fd);
 		if (fds[n] == -1) {
 			int err = errno;
 			for (unsigned i = n; i--; )
