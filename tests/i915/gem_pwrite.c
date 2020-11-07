@@ -509,10 +509,10 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 		}
 	}
 
-	igt_subtest("self")
+	igt_subtest("basic-self")
 		pwrite_self(fd);
 
-	igt_subtest("exhaustion")
+	igt_subtest("basic-exhaustion")
 		test_exhaustion(fd);
 
 	for (c = cache; c->level != -1; c++) {
