@@ -385,9 +385,9 @@ static void test_exhaustion(int i915)
 		.i915 = i915,
 		.vgem = drm_open_driver(DRIVER_VGEM),
 	};
+	pthread_t *thread = NULL;
 	struct uffd_msg msg;
 	unsigned long count;
-	pthread_t *thread;
 	char buf[4096];
 	int ufd;
 
@@ -397,7 +397,6 @@ static void test_exhaustion(int i915)
 	igt_require_f(ufd != -1, "kernel support for userfaultfd\n");
 	igt_require_f(ioctl(ufd, UFFDIO_API, &api) == 0 && api.api == UFFD_API,
 		      "userfaultfd API v%lld:%lld\n", UFFD_API, api.api);
-
 
 	t.page = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, 0, 0);
 	igt_assert(t.page != MAP_FAILED);
