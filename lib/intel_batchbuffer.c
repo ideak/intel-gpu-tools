@@ -1850,7 +1850,7 @@ static uint64_t __intel_bb_emit_reloc(struct intel_bb *ibb,
 
 	intel_bb_out(ibb, delta + address);
 	if (ibb->gen >= 8)
-		intel_bb_out(ibb, address >> 32);
+		intel_bb_out(ibb, (delta + address) >> 32);
 
 	return address;
 }
