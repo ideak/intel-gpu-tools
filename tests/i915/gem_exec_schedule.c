@@ -2232,7 +2232,6 @@ static void test_pi_userfault(int i915, unsigned int engine)
 	reg.range.start = to_user_pointer(t.page);
 	reg.range.len = 4096;
 	do_ioctl(ufd, UFFDIO_REGISTER, &reg);
-	igt_assert(reg.ioctls == UFFD_API_RANGE_IOCTLS);
 
 	/* Kick off the low priority submission */
 	igt_assert(pthread_create(&thread, NULL, ufd_thread, &t) == 0);
@@ -2377,7 +2376,6 @@ static void test_pi_iova(int i915, unsigned int engine, unsigned int flags)
 	reg.range.start = to_user_pointer(t.page);
 	reg.range.len = 4096;
 	do_ioctl(ufd, UFFDIO_REGISTER, &reg);
-	igt_assert(reg.ioctls == UFFD_API_RANGE_IOCTLS);
 
 	/*
 	 * Fill the engine with spinners; the store_dword() is too quick!

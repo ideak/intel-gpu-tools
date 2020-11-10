@@ -182,7 +182,6 @@ static void test_exhaustion(int i915)
 	reg.range.start = to_user_pointer(t.page);
 	reg.range.len = 4096;
 	do_ioctl(ufd, UFFDIO_REGISTER, &reg);
-	igt_assert(reg.ioctls == UFFD_API_RANGE_IOCTLS);
 
 	count = 0;
 	while (!READ_ONCE(t.err)) {
