@@ -763,10 +763,15 @@ static void test_vma_merge(int i915)
 static void test_huge_split(int i915)
 {
 	const size_t sz = 2 * hugepagesize();
-	unsigned int flags = MFD_HUGETLB | MFD_HUGE_2MB;
+	unsigned int flags;
 	igt_spin_t *spin;
 	uint32_t handle;
 	void *addr;
+
+	flags = MFD_HUGETLB;
+#if defined(MFD_HUGE_2MB)
+	flags |= MFD_HUGE_2MB;
+#endif
 
 	do {
 		int memfd;
@@ -780,7 +785,7 @@ static void test_huge_split(int i915)
 		if (addr != MAP_FAILED)
 			break;
 
-		igt_require(flags);
+		igt_require_f(flags, "memfd not supported\n");
 		flags = 0;
 	} while (1);
 	madvise(addr, sz, MADV_HUGEPAGE);
