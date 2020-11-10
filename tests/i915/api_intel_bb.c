@@ -860,6 +860,73 @@ static void offset_control(struct buf_ops *bops)
 	intel_bb_destroy(ibb);
 }
 
+/*
+ * Idea of the test is to verify delta is properly added to address
+ * when emit_reloc() is called.
+ */
+#define DELTA_BUFFERS 3
+static void delta_check(struct buf_ops *bops)
+{
+	const uint32_t expected = 0x1234abcd;
+	int i915 = buf_ops_get_fd(bops);
+	uint32_t *ptr, hi, lo, val;
+	struct intel_buf *buf;
+	struct intel_bb *ibb;
+	uint64_t offset;
+	bool supports_48bit;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	supports_48bit = ibb->supports_48b_address;
+	if (!supports_48bit)
+		intel_bb_destroy(ibb);
+	igt_require_f(supports_48bit, "We need 48bit ppgtt for testing\n");
+
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	buf = create_buf(bops, 0x1000, 0x10, COLOR_CC);
+	buf->addr.offset = 0xfffff000;
+	intel_bb_add_object(ibb, buf->handle, intel_buf_bo_size(buf),
+			    buf->addr.offset, false);
+
+	intel_bb_out(ibb, MI_STORE_DWORD_IMM);
+	intel_bb_emit_reloc(ibb, buf->handle,
+			    I915_GEM_DOMAIN_RENDER,
+			    I915_GEM_DOMAIN_RENDER,
+			    0x2000, buf->addr.offset);
+	intel_bb_out(ibb, expected);
+
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_ptr_align(ibb, 8);
+
+	intel_bb_exec(ibb, intel_bb_offset(ibb), I915_EXEC_DEFAULT, false);
+	intel_bb_sync(ibb);
+
+	/* Buffer should be @ 0xc000_0000 */
+	offset = intel_bb_get_object_offset(ibb, buf->handle);
+	igt_assert_eq_u64(offset, 0xfffff000);
+
+	ptr = gem_mmap__device_coherent(i915, ibb->handle, 0, ibb->size, PROT_READ);
+	lo = ptr[1];
+	hi = ptr[2];
+	gem_munmap(ptr, ibb->size);
+
+	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
+					intel_buf_bo_size(buf), PROT_READ);
+	val = ptr[0x2000 / sizeof(uint32_t)];
+	gem_munmap(ptr, ibb->size);
+
+	intel_buf_destroy(buf);
+	intel_bb_destroy(ibb);
+
+	/* Assert after all resources are freed */
+	igt_assert_f(lo == 0x1000 && hi == 0x1,
+		     "intel-bb doesn't properly handle delta in emit relocation\n");
+	igt_assert_f(val == expected,
+		     "Address doesn't contain expected [%x] value [%x]\n",
+		     expected, val);
+}
+
 static void full_batch(struct buf_ops *bops)
 {
 	int i915 = buf_ops_get_fd(bops);
@@ -1149,6 +1216,9 @@ igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("offset-control")
 		offset_control(bops);
+
+	igt_subtest("delta-check")
+		delta_check(bops);
 
 	igt_subtest("full-batch")
 		full_batch(bops);
