@@ -45,6 +45,7 @@
 #include "igt.h"
 #include "igt_sysfs.h"
 #include "igt_x86.h"
+#include "sw_sync.h"
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096
@@ -729,6 +730,59 @@ test_hang(int fd)
 	igt_disallow_hang(fd, hang);
 }
 
+static void
+test_hang_busy(int i915)
+{
+	uint32_t *ptr, *tile, *x;
+	igt_spin_t *spin;
+	igt_hang_t hang;
+	uint32_t handle;
+
+	hang = igt_allow_hang(i915, 0, 0);
+	igt_require(igt_params_set(i915, "reset", "1")); /* global */
+
+	spin = igt_spin_new(i915, .flags = IGT_SPIN_POLL_RUN | IGT_SPIN_FENCE_OUT | IGT_SPIN_NO_PREEMPTION);
+	igt_spin_busywait_until_started(spin);
+	igt_assert(spin->execbuf.buffer_count == 2);
+
+	handle = gem_create(i915, 2 << 20);
+	gem_set_tiling(i915, handle, I915_TILING_X, 512);
+
+	spin->obj[0].handle = handle;
+	spin->obj[0].flags = EXEC_OBJECT_WRITE;
+	gem_execbuf(i915, &spin->execbuf);
+
+	/* Fault in the busy objects */
+	igt_debug("Faulting in busy batch\n");
+	ptr = gem_mmap__gtt(i915, spin->handle, 4096, PROT_READ);
+	x = ptr + ((uintptr_t)spin->condition & 4095) / sizeof(*ptr);
+	igt_assert_eq_u32(READ_ONCE(*x), spin->cmd_precondition);
+
+	igt_debug("Faulting in busy tile\n");
+	tile = gem_mmap__gtt(i915, handle, 2 << 20, PROT_WRITE);
+	*tile = 0xdeadbeef;
+
+	igt_debug("Resetting GPU\n");
+	igt_assert(gem_bo_busy(i915, spin->handle));
+	igt_assert(gem_bo_busy(i915, handle));
+	igt_force_gpu_reset(i915);
+
+	/* Check we reset the busy mmap */
+	igt_debug("Sync\n");
+	gem_sync(i915, spin->handle);
+	igt_assert_eq(sync_fence_status(spin->out_fence), -5);
+
+	igt_debug("Refault and verify\n");
+	igt_assert_eq_u32(READ_ONCE(*tile), 0xdeadbeef);
+	munmap(tile, 2 << 20);
+
+	igt_assert_eq_u32(READ_ONCE(*x), spin->cmd_precondition);
+	munmap(ptr, 4096);
+
+	igt_spin_free(i915, spin);
+	igt_disallow_hang(i915, hang);
+}
+
 static int min_tile_width(uint32_t devid, int tiling)
 {
 	if (tiling < 0) {
@@ -1183,6 +1237,8 @@ igt_main
 		test_clflush(fd);
 	igt_subtest("hang")
 		test_hang(fd);
+	igt_subtest("hang-busy")
+		test_hang_busy(fd);
 	igt_subtest("basic-read-write")
 		test_read_write(fd, READ_BEFORE_WRITE);
 	igt_subtest("basic-write-read")
