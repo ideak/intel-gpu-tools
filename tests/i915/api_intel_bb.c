@@ -1126,7 +1126,8 @@ static void delta_check(struct buf_ops *bops)
 	uint64_t offset;
 	bool supports_48bit;
 
-	ibb = intel_bb_create(i915, PAGE_SIZE);
+	ibb = intel_bb_create_with_allocator(i915, 0, PAGE_SIZE,
+					     INTEL_ALLOCATOR_SIMPLE);
 	supports_48bit = ibb->supports_48b_address;
 	if (!supports_48bit)
 		intel_bb_destroy(ibb);
