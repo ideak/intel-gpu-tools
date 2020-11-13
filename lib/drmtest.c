@@ -412,9 +412,10 @@ static bool __get_card_for_nth_filter(int idx, struct igt_device_card *card)
 int __drm_open_driver_another(int idx, int chipset)
 {
 	int fd = -1;
-	if (igt_device_filter_count() > idx) {
-		bool found;
+
+	if (chipset != DRIVER_VGEM && igt_device_filter_count() > idx) {
 		struct igt_device_card card;
+		bool found;
 
 		found = __get_card_for_nth_filter(idx, &card);
 
@@ -461,9 +462,9 @@ int __drm_open_driver(int chipset)
 
 int __drm_open_driver_render(int chipset)
 {
-	if (igt_device_filter_count() > 0) {
-		bool found;
+	if (chipset != DRIVER_VGEM && igt_device_filter_count() > 0) {
 		struct igt_device_card card;
+		bool found;
 
 		found = __get_card_for_nth_filter(0, &card);
 
