@@ -1370,7 +1370,7 @@ static void __run_forked(struct buffers *buffers,
 		int num_buffers;
 
 		/* recreate process local variables */
-		fd = drm_open_driver(DRIVER_INTEL);
+		fd = gem_reopen_driver(fd);
 
 		num_buffers = buffers->num_buffers / num_children;
 		num_buffers += MIN_BUFFERS;
