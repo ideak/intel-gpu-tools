@@ -264,7 +264,7 @@ static int __search_and_open(const char *base, int offset, unsigned int chipset,
 
 	forced = forced_driver();
 	if (forced)
-		igt_info("Force option used: Using driver %s\n", forced);
+		igt_debug("Force option used: Using driver %s\n", forced);
 
 	for (int i = 0; i < 16; i++) {
 		char name[80];
@@ -342,10 +342,10 @@ static bool __get_card_for_nth_filter(int idx, struct igt_device_card *card)
 
 	if (igt_device_filter_count() > idx) {
 		filter = igt_device_filter_get(idx);
-		igt_info("Looking for devices to open using filter %d: %s\n", idx, filter);
+		igt_debug("Looking for devices to open using filter %d: %s\n", idx, filter);
 
 		if (igt_device_card_match(filter, card)) {
-			igt_info("Filter matched %s | %s\n", card->card, card->render);
+			igt_debug("Filter matched %s | %s\n", card->card, card->render);
 			return true;
 		}
 
