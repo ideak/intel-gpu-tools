@@ -40,6 +40,8 @@
 #include "igt_color_encoding.h"
 #include "igt_debugfs.h"
 
+struct buf_ops;
+
 /*
  * Internal format to denote a buffer compatible with pixman's
  * floating point format. Range [0-1].
@@ -129,6 +131,8 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 			   enum igt_color_range color_range,
 			   struct igt_fb *fb, uint64_t bo_size,
 			   unsigned bo_stride);
+struct intel_buf *igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
+					  const struct igt_fb *fb, const char *name);
 unsigned int igt_create_fb(int fd, int width, int height, uint32_t format,
 			   uint64_t modifier, struct igt_fb *fb);
 unsigned int igt_create_color_fb(int fd, int width, int height,

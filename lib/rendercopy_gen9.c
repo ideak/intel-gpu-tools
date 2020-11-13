@@ -185,23 +185,25 @@ gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst) {
 
 		address = intel_bb_offset_reloc_with_delta(ibb, buf->handle,
 							   read_domain, write_domain,
-							   buf->ccs[0].offset,
+							   (buf->cc.offset ? (1 << 10) : 0) | buf->ccs[0].offset,
 							   intel_bb_offset(ibb) + 4 * 10,
 							   buf->addr.offset);
-		ss->ss10.aux_base_addr = (address + buf->ccs[0].offset);
+		ss->ss10.aux_base_addr = (address + buf->ccs[0].offset) >> 12;
 		ss->ss11.aux_base_addr_hi = (address + buf->ccs[0].offset) >> 32;
-	}
 
-	if (buf->cc.offset) {
-		igt_assert(buf->compression == I915_COMPRESSION_RENDER);
+		if (buf->cc.offset) {
+			igt_assert(buf->compression == I915_COMPRESSION_RENDER);
 
-		address = intel_bb_offset_reloc_with_delta(ibb, buf->handle,
-							   read_domain, write_domain,
-							   buf->cc.offset,
-							   intel_bb_offset(ibb) + 4 * 12,
-							   buf->addr.offset);
-		ss->ss12.clear_address = address + buf->cc.offset;
-		ss->ss13.clear_address_hi = (address + buf->cc.offset) >> 32;
+			ss->ss10.clearvalue_addr_enable = 1;
+
+			address = intel_bb_offset_reloc_with_delta(ibb, buf->handle,
+								   read_domain, write_domain,
+								   buf->cc.offset,
+								   intel_bb_offset(ibb) + 4 * 12,
+								   buf->addr.offset);
+			ss->ss12.clear_address = address + buf->cc.offset;
+			ss->ss13.clear_address_hi = (address + buf->cc.offset) >> 32;
+		}
 	}
 
 	return intel_bb_ptr_add_return_prev_offset(ibb, sizeof(*ss));
@@ -218,7 +220,9 @@ gen8_bind_surfaces(struct intel_bb *ibb,
 	binding_table_offset = intel_bb_ptr_add_return_prev_offset(ibb, 32);
 
 	binding_table[0] = gen8_bind_buf(ibb, dst, 1);
-	binding_table[1] = gen8_bind_buf(ibb, src, 0);
+
+	if (src != NULL)
+		binding_table[1] = gen8_bind_buf(ibb, src, 0);
 
 	return binding_table_offset;
 }
@@ -273,17 +277,37 @@ gen7_fill_vertex_buffer_data(struct intel_bb *ibb,
 	intel_bb_ptr_align(ibb, 8);
 	offset = intel_bb_offset(ibb);
 
-	emit_vertex_2s(ibb, dst_x + width, dst_y + height);
-	emit_vertex_normalized(ibb, src_x + width, intel_buf_width(src));
-	emit_vertex_normalized(ibb, src_y + height, intel_buf_height(src));
+	if (src != NULL) {
+		emit_vertex_2s(ibb, dst_x + width, dst_y + height);
 
-	emit_vertex_2s(ibb, dst_x, dst_y + height);
-	emit_vertex_normalized(ibb, src_x, intel_buf_width(src));
-	emit_vertex_normalized(ibb, src_y + height, intel_buf_height(src));
+		emit_vertex_normalized(ibb, src_x + width, intel_buf_width(src));
+		emit_vertex_normalized(ibb, src_y + height, intel_buf_height(src));
 
-	emit_vertex_2s(ibb, dst_x, dst_y);
-	emit_vertex_normalized(ibb, src_x, intel_buf_width(src));
-	emit_vertex_normalized(ibb, src_y, intel_buf_height(src));
+		emit_vertex_2s(ibb, dst_x, dst_y + height);
+
+		emit_vertex_normalized(ibb, src_x, intel_buf_width(src));
+		emit_vertex_normalized(ibb, src_y + height, intel_buf_height(src));
+
+		emit_vertex_2s(ibb, dst_x, dst_y);
+
+		emit_vertex_normalized(ibb, src_x, intel_buf_width(src));
+		emit_vertex_normalized(ibb, src_y, intel_buf_height(src));
+	} else {
+		emit_vertex_2s(ibb, (dst_x + width)/64, DIV_ROUND_UP(dst_y + height, 16));
+
+		emit_vertex_normalized(ibb, 0, 0);
+		emit_vertex_normalized(ibb, 0, 0);
+
+		emit_vertex_2s(ibb, dst_x/64, DIV_ROUND_UP(dst_y + height, 16));
+
+		emit_vertex_normalized(ibb, 0, 0);
+		emit_vertex_normalized(ibb, 0, 0);
+
+		emit_vertex_2s(ibb, dst_x/64, dst_y/16);
+
+		emit_vertex_normalized(ibb, 0, 0);
+		emit_vertex_normalized(ibb, 0, 0);
+	}
 
 	return offset;
 }
@@ -729,7 +753,7 @@ gen8_emit_sf(struct intel_bb *ibb)
 }
 
 static void
-gen8_emit_ps(struct intel_bb *ibb, uint32_t kernel) {
+gen8_emit_ps(struct intel_bb *ibb, uint32_t kernel, bool fast_clear) {
 	const int max_threads = 63;
 
 	intel_bb_out(ibb, GEN6_3DSTATE_WM | (2 - 2));
@@ -753,12 +777,18 @@ gen8_emit_ps(struct intel_bb *ibb, uint32_t kernel) {
 	intel_bb_out(ibb, GEN7_3DSTATE_PS | (12-2));
 	intel_bb_out(ibb, kernel);
 	intel_bb_out(ibb, 0); /* kernel hi */
-	intel_bb_out(ibb, 1 << GEN6_3DSTATE_WM_SAMPLER_COUNT_SHIFT |
-		     2 << GEN6_3DSTATE_WM_BINDING_TABLE_ENTRY_COUNT_SHIFT);
+
+	if (fast_clear)
+		intel_bb_out(ibb, 1 <<  GEN6_3DSTATE_WM_BINDING_TABLE_ENTRY_COUNT_SHIFT);
+	else
+		intel_bb_out(ibb, 1 << GEN6_3DSTATE_WM_SAMPLER_COUNT_SHIFT |
+		             2 << GEN6_3DSTATE_WM_BINDING_TABLE_ENTRY_COUNT_SHIFT);
+
 	intel_bb_out(ibb, 0); /* scratch space stuff */
 	intel_bb_out(ibb, 0); /* scratch hi */
 	intel_bb_out(ibb, (max_threads - 1) << GEN8_3DSTATE_PS_MAX_THREADS_SHIFT |
-		     GEN6_3DSTATE_WM_16_DISPATCH_ENABLE);
+	             GEN6_3DSTATE_WM_16_DISPATCH_ENABLE |
+	             (fast_clear ? GEN8_3DSTATE_FAST_CLEAR_ENABLE : 0));
 	intel_bb_out(ibb, 6 << GEN6_3DSTATE_WM_DISPATCH_START_GRF_0_SHIFT);
 	intel_bb_out(ibb, 0); // kernel 1
 	intel_bb_out(ibb, 0); /* kernel 1 hi */
@@ -876,27 +906,32 @@ static void gen8_emit_primitive(struct intel_bb *ibb, uint32_t offset)
 #define BATCH_STATE_SPLIT 2048
 
 static
-void _gen9_render_copyfunc(struct intel_bb *ibb,
-			   struct intel_buf *src,
-			   unsigned int src_x, unsigned int src_y,
-			   unsigned int width, unsigned int height,
-			   struct intel_buf *dst,
-			   unsigned int dst_x, unsigned int dst_y,
-			   struct intel_buf *aux_pgtable_buf,
-			   const uint32_t ps_kernel[][4],
-			   uint32_t ps_kernel_size)
+void _gen9_render_op(struct intel_bb *ibb,
+		     struct intel_buf *src,
+		     unsigned int src_x, unsigned int src_y,
+		     unsigned int width, unsigned int height,
+		     struct intel_buf *dst,
+		     unsigned int dst_x, unsigned int dst_y,
+		     struct intel_buf *aux_pgtable_buf,
+		     const float clear_color[4],
+		     const uint32_t ps_kernel[][4],
+		     uint32_t ps_kernel_size)
 {
 	uint32_t ps_sampler_state, ps_kernel_off, ps_binding_table;
 	uint32_t scissor_state;
 	uint32_t vertex_buffer;
 	uint32_t aux_pgtable_state;
+	bool fast_clear = !src;
 
-	igt_assert(src->bpp == dst->bpp);
+	if (!fast_clear)
+		igt_assert(src->bpp == dst->bpp);
 
 	intel_bb_flush_render(ibb);
 
 	intel_bb_add_intel_buf(ibb, dst, true);
-	intel_bb_add_intel_buf(ibb, src, false);
+
+	if (!fast_clear)
+		intel_bb_add_intel_buf(ibb, src, false);
 
 	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
 
@@ -923,6 +958,18 @@ void _gen9_render_copyfunc(struct intel_bb *ibb,
 		     GEN9_PIPELINE_SELECTION_MASK);
 
 	gen12_emit_aux_pgtable_state(ibb, aux_pgtable_state, true);
+
+	if (fast_clear) {
+		for (int i = 0; i < 4; i++) {
+			intel_bb_out(ibb, MI_STORE_DWORD_IMM);
+			intel_bb_emit_reloc(ibb, dst->handle,
+					    I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER,
+                                            dst->cc.offset + i*sizeof(float),
+					    dst->addr.offset);
+			intel_bb_out(ibb, *(uint32_t*)&clear_color[i]);
+               }
+       }
+
 
 	gen8_emit_sip(ibb);
 
@@ -953,7 +1000,7 @@ void _gen9_render_copyfunc(struct intel_bb *ibb,
 
 	gen8_emit_sf(ibb);
 
-	gen8_emit_ps(ibb, ps_kernel_off);
+	gen8_emit_ps(ibb, ps_kernel_off, fast_clear);
 
 	intel_bb_out(ibb, GEN7_3DSTATE_BINDING_TABLE_POINTERS_PS);
 	intel_bb_out(ibb, ps_binding_table);
@@ -991,9 +1038,9 @@ void gen9_render_copyfunc(struct intel_bb *ibb,
 			  unsigned int dst_x, unsigned int dst_y)
 
 {
-	_gen9_render_copyfunc(ibb, src, src_x, src_y,
-			  width, height, dst, dst_x, dst_y, NULL,
-			  ps_kernel_gen9, sizeof(ps_kernel_gen9));
+	_gen9_render_op(ibb, src, src_x, src_y,
+		        width, height, dst, dst_x, dst_y, NULL, NULL,
+		        ps_kernel_gen9, sizeof(ps_kernel_gen9));
 }
 
 void gen11_render_copyfunc(struct intel_bb *ibb,
@@ -1003,9 +1050,9 @@ void gen11_render_copyfunc(struct intel_bb *ibb,
 			   struct intel_buf *dst,
 			   unsigned int dst_x, unsigned int dst_y)
 {
-	_gen9_render_copyfunc(ibb, src, src_x, src_y,
-			  width, height, dst, dst_x, dst_y, NULL,
-			  ps_kernel_gen11, sizeof(ps_kernel_gen11));
+	_gen9_render_op(ibb, src, src_x, src_y,
+		        width, height, dst, dst_x, dst_y, NULL, NULL,
+		        ps_kernel_gen11, sizeof(ps_kernel_gen11));
 }
 
 void gen12_render_copyfunc(struct intel_bb *ibb,
@@ -1019,11 +1066,32 @@ void gen12_render_copyfunc(struct intel_bb *ibb,
 
 	gen12_aux_pgtable_init(&pgtable_info, ibb, src, dst);
 
-	_gen9_render_copyfunc(ibb, src, src_x, src_y,
-			  width, height, dst, dst_x, dst_y,
-			  pgtable_info.pgtable_buf,
-			  gen12_render_copy,
-			  sizeof(gen12_render_copy));
+	_gen9_render_op(ibb, src, src_x, src_y,
+		        width, height, dst, dst_x, dst_y,
+		        pgtable_info.pgtable_buf,
+		        NULL,
+		        gen12_render_copy,
+		        sizeof(gen12_render_copy));
+
+	gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
+}
+
+void gen12_render_clearfunc(struct intel_bb *ibb,
+			    struct intel_buf *dst,
+			    unsigned int dst_x, unsigned int dst_y,
+			    unsigned int width, unsigned int height,
+			    const float clear_color[4])
+{
+	struct aux_pgtable_info pgtable_info = { };
+
+	gen12_aux_pgtable_init(&pgtable_info, ibb, NULL, dst);
+
+	_gen9_render_op(ibb, NULL, 0, 0,
+		        width, height, dst, dst_x, dst_y,
+		        pgtable_info.pgtable_buf,
+		        clear_color,
+		        gen12_render_copy,
+		        sizeof(gen12_render_copy));
 
 	gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
 }

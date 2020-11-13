@@ -127,7 +127,11 @@ struct gen9_surface_state {
 	} ss9;
 
 	struct {
-		uint32_t aux_base_addr;
+		uint32_t quilt_width:5;
+		uint32_t quilt_height:5;
+		uint32_t clearvalue_addr_enable:1;
+		uint32_t procedual_texture:1; /* Only on TGL+ */
+		uint32_t aux_base_addr:20;
 	} ss10;
 
 	struct {

@@ -2141,9 +2141,10 @@ static int yuv_semiplanar_bpp(uint32_t drm_format)
 	}
 }
 
-static struct intel_buf *create_buf(struct fb_blit_upload *blit,
-				   const struct igt_fb *fb,
-				   const char *name)
+struct intel_buf *
+igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
+                        const struct igt_fb *fb,
+                        const char *name)
 {
 	struct intel_buf *buf;
 	uint32_t bo_name, handle, compression;
@@ -2169,10 +2170,10 @@ static struct intel_buf *create_buf(struct fb_blit_upload *blit,
 		compression = I915_COMPRESSION_NONE;
 	}
 
-	bo_name = gem_flink(blit->fd, fb->gem_handle);
-	handle = gem_open(blit->fd, bo_name);
+	bo_name = gem_flink(fd, fb->gem_handle);
+	handle = gem_open(fd, bo_name);
 
-	buf = intel_buf_create_using_handle(blit->bops, handle,
+	buf = intel_buf_create_using_handle(bops, handle,
 					    fb->width, fb->height,
 					    fb->plane_bpp[0], 0,
 					    igt_fb_mod_to_tiling(fb->modifier),
@@ -2211,6 +2212,13 @@ static struct intel_buf *create_buf(struct fb_blit_upload *blit,
 		buf->cc.offset = fb->offsets[2];
 
 	return buf;
+}
+
+static struct intel_buf *create_buf(struct fb_blit_upload *blit,
+				   const struct igt_fb *fb,
+				   const char *name)
+{
+	return igt_fb_create_intel_buf(blit->fd, blit->bops, fb, name);
 }
 
 static void fini_buf(struct intel_buf *buf)

@@ -374,6 +374,12 @@ typedef void (*igt_vebox_copyfunc_t)(struct intel_bb *ibb,
 
 igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid);
 
+typedef void (*igt_render_clearfunc_t)(struct intel_bb *ibb,
+				       struct intel_buf *dst, unsigned int dst_x, unsigned int dst_y,
+				       unsigned int width, unsigned int height,
+				       const float cc_color[4]);
+igt_render_clearfunc_t igt_get_render_clearfunc(int devid);
+
 /**
  * igt_fillfunc_t:
  * @i915: drm fd

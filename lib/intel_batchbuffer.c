@@ -1096,6 +1096,11 @@ igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid)
 	return copy;
 }
 
+igt_render_clearfunc_t igt_get_render_clearfunc(int devid)
+{
+	return IS_GEN12(devid) ? gen12_render_clearfunc : NULL;
+}
+
 /**
  * igt_get_media_fillfunc:
  * @devid: pci device id
