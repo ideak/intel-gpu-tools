@@ -111,6 +111,11 @@ out:
 void gem_submission_print_method(int fd)
 {
 	const unsigned flags = gem_submission_method(fd);
+	const struct intel_device_info *info;
+
+	info = intel_get_device_info(intel_get_drm_devid(fd));
+	if (info)
+		igt_info("Running on %s\n", info->codename);
 
 	if (flags & GEM_SUBMISSION_GUC) {
 		igt_info("Using GuC submission\n");
