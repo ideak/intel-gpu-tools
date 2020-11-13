@@ -774,8 +774,59 @@ test_hang_busy(int i915)
 
 	igt_debug("Refault and verify\n");
 	igt_assert_eq_u32(READ_ONCE(*tile), 0xdeadbeef);
+	gem_close(i915, handle);
 	munmap(tile, 2 << 20);
 
+	igt_assert_eq_u32(READ_ONCE(*x), spin->cmd_precondition);
+	munmap(ptr, 4096);
+
+	igt_spin_free(i915, spin);
+	igt_disallow_hang(i915, hang);
+}
+
+static void
+test_hang_user(int i915)
+{
+	uint32_t *ptr, *mem, *x;
+	igt_spin_t *spin;
+	igt_hang_t hang;
+	uint32_t handle;
+
+	hang = igt_allow_hang(i915, 0, 0);
+	igt_require(igt_params_set(i915, "reset", "1")); /* global */
+
+	spin = igt_spin_new(i915, .flags = IGT_SPIN_POLL_RUN | IGT_SPIN_FENCE_OUT | IGT_SPIN_NO_PREEMPTION);
+	igt_spin_busywait_until_started(spin);
+	igt_assert(spin->execbuf.buffer_count == 2);
+
+	igt_assert(posix_memalign((void **)&mem, 4096, 2 << 20) == 0);
+	gem_userptr(i915, mem, 2 << 20, false, 0, &handle);
+
+	spin->obj[0].handle = handle;
+	spin->obj[0].flags = EXEC_OBJECT_WRITE;
+	gem_execbuf(i915, &spin->execbuf);
+
+	/* Fault in the busy objects */
+	igt_debug("Faulting in busy batch\n");
+	ptr = gem_mmap__gtt(i915, spin->handle, 4096, PROT_READ);
+	x = ptr + ((uintptr_t)spin->condition & 4095) / sizeof(*ptr);
+	igt_assert_eq_u32(READ_ONCE(*x), spin->cmd_precondition);
+
+	igt_debug("Faulting in busy userptr\n");
+	*mem = 0xdeadbeef;
+
+	igt_debug("Resetting GPU\n");
+	igt_assert(gem_bo_busy(i915, spin->handle));
+	igt_assert(gem_bo_busy(i915, handle));
+	igt_force_gpu_reset(i915);
+
+	/* Check we reset the busy mmap */
+	igt_debug("Cancelling busy userptr\n");
+	munmap(mem, 2 << 20);
+	gem_close(i915, handle);
+
+	gem_sync(i915, spin->handle);
+	igt_assert_eq(sync_fence_status(spin->out_fence), -5);
 	igt_assert_eq_u32(READ_ONCE(*x), spin->cmd_precondition);
 	munmap(ptr, 4096);
 
@@ -1239,6 +1290,8 @@ igt_main
 		test_hang(fd);
 	igt_subtest("hang-busy")
 		test_hang_busy(fd);
+	igt_subtest("hang-user")
+		test_hang_user(fd);
 	igt_subtest("basic-read-write")
 		test_read_write(fd, READ_BEFORE_WRITE);
 	igt_subtest("basic-write-read")
