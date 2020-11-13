@@ -1027,7 +1027,8 @@ static bool print_groups(struct cnt_group **groups)
 }
 
 static int
-print_header(struct engines *engines, double t,
+print_header(const struct igt_device_card *card,
+	     struct engines *engines, double t,
 	     int lines, int con_w, int con_h, bool *consumed)
 {
 	struct pmu_counter fake_pmu = {
@@ -1106,14 +1107,15 @@ print_header(struct engines *engines, double t,
 		printf("\033[H\033[J");
 
 		if (lines++ < con_h) {
+			printf("intel-gpu-top: %s - ", card->card);
 			if (!engines->discrete)
-				printf("intel-gpu-top - %s/%s MHz;  %s%% RC6; %s %s; %s irqs/s\n",
+				printf("%s/%s MHz;  %s%% RC6; %s %s; %s irqs/s\n",
 					freq_items[1].buf, freq_items[0].buf,
 					rc6_items[0].buf, power_items[0].buf,
 					engines->rapl_unit,
 					irq_items[0].buf);
 			else
-				printf("intel-gpu-top - %s/%s MHz;  %s%% RC6; %s irqs/s\n",
+				printf("%s/%s MHz;  %s%% RC6; %s irqs/s\n",
 					freq_items[1].buf, freq_items[0].buf,
 					rc6_items[0].buf, irq_items[0].buf);
 		}
@@ -1457,7 +1459,8 @@ int main(int argc, char **argv)
 			break;
 
 		while (!consumed) {
-			lines = print_header(engines, t, lines, con_w, con_h,
+			lines = print_header(&card, engines,
+					     t, lines, con_w, con_h,
 					     &consumed);
 
 			if (engines->imc_fd)
