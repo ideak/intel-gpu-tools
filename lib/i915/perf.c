@@ -253,7 +253,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 		intel_perf_load_metrics_cnl(perf);
 	} else if (devinfo->is_icelake) {
 		intel_perf_load_metrics_icl(perf);
-	} else if (devinfo->is_elkhartlake) {
+	} else if (devinfo->is_elkhartlake || devinfo->is_jasperlake) {
 		intel_perf_load_metrics_ehl(perf);
 	} else if (devinfo->is_tigerlake) {
 		switch (devinfo->gt) {

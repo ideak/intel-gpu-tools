@@ -315,6 +315,12 @@ static const struct intel_device_info intel_elkhartlake_info = {
 	.codename = "elkhartlake"
 };
 
+static const struct intel_device_info intel_jasperlake_info = {
+	.gen = BIT(10),
+	.is_jasperlake = true,
+	.codename = "jasperlake"
+};
+
 static const struct intel_device_info intel_tigerlake_gt1_info = {
 	.gen = BIT(11),
 	.is_tigerlake = true,
@@ -423,6 +429,7 @@ static const struct pci_id_match intel_device_match[] = {
 	INTEL_ICL_11_IDS(&intel_icelake_info),
 
 	INTEL_EHL_IDS(&intel_elkhartlake_info),
+	INTEL_JSL_IDS(&intel_jasperlake_info),
 
 	INTEL_TGL_12_GT1_IDS(&intel_tigerlake_gt1_info),
 	INTEL_TGL_12_GT2_IDS(&intel_tigerlake_gt2_info),

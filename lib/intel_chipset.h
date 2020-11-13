@@ -72,6 +72,7 @@ struct intel_device_info {
 	bool is_cannonlake : 1;
 	bool is_icelake : 1;
 	bool is_elkhartlake : 1;
+	bool is_jasperlake : 1;
 	bool is_tigerlake : 1;
 	bool is_rocketlake : 1;
 	bool is_dg1 : 1;
