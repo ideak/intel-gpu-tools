@@ -26,6 +26,7 @@
 #include "i915/gem.h"
 #include "i915/gem_ring.h"
 #include "igt.h"
+#include "igt_device.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
 
@@ -368,7 +369,7 @@ igt_main
 			igt_require(gem_scheduler_has_preemption(i915));
 
 			intel_register_access_init(&mmio,
-						   intel_get_pci_device(),
+						   igt_device_get_pci_device(i915),
 						   false, i915);
 
 			sysfs = igt_sysfs_open(i915);

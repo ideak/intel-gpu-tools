@@ -29,6 +29,7 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+#include "igt_device.h"
 
 #define PAGE_SIZE 4096
 #define PAGE_ALIGN(x) ALIGN(x, PAGE_SIZE)
@@ -258,7 +259,7 @@ igt_main
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
 
-		intel_mmio_use_pci_bar(&mmio_data, intel_get_pci_device());
+		intel_mmio_use_pci_bar(&mmio_data, igt_device_get_pci_device(device));
 
 		gen = intel_gen(intel_get_drm_devid(device));
 

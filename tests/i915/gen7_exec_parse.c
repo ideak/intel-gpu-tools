@@ -30,6 +30,7 @@
 #include <drm.h>
 
 #include "igt.h"
+#include "igt_device.h"
 #include "i915/gem.h"
 #include "sw_sync.h"
 
@@ -578,7 +579,7 @@ igt_main
 #undef REG
 
 		igt_fixture {
-			intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, fd);
+			intel_register_access_init(&mmio_data, igt_device_get_pci_device(fd), 0, fd);
 		}
 
 		for (int i = 0; i < ARRAY_SIZE(lris); i++) {
