@@ -103,10 +103,11 @@ static void store_dword(int fd, unsigned ring)
 static void store_all(int fd)
 {
 	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
+	unsigned int permuted[I915_EXEC_RING_MASK + 1];
+	unsigned int engines[I915_EXEC_RING_MASK + 1];
 	struct drm_i915_gem_exec_object2 obj[2];
-	struct drm_i915_gem_relocation_entry reloc[32];
+	struct drm_i915_gem_relocation_entry reloc[2 * ARRAY_SIZE(engines)];
 	struct drm_i915_gem_execbuffer2 execbuf;
-	unsigned engines[16], permuted[16];
 	uint32_t batch[16];
 	uint64_t offset;
 	unsigned nengine;

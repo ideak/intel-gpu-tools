@@ -92,7 +92,7 @@ static void single(const char *name, bool all_engines)
 {
 	struct drm_i915_gem_exec_object2 *obj;
 	struct drm_i915_gem_relocation_entry *reloc;
-	unsigned int engines[16], num_engines, num_ctx;
+	unsigned int engines[I915_EXEC_RING_MASK + 1], num_engines, num_ctx;
 	uint32_t *ctx, *map, scratch, size;
 	int fd, gen;
 #define MAX_LOOP 16
@@ -220,7 +220,7 @@ static void single(const char *name, bool all_engines)
 
 static void processes(void)
 {
-	unsigned engines[16];
+	unsigned engines[I915_EXEC_RING_MASK + 1];
 	int num_engines;
 	struct rlimit rlim;
 	unsigned num_ctx;

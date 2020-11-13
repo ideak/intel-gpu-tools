@@ -37,7 +37,7 @@
 #define MADV_FREE 8
 #endif
 
-static unsigned int engines[16], nengine;
+static unsigned int engines[I915_EXEC_RING_MASK + 1], nengine;
 
 static void get_pages(int fd, uint64_t alloc)
 {

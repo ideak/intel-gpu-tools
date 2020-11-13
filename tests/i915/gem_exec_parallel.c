@@ -192,11 +192,11 @@ static void handle_close(int fd, unsigned int flags, uint32_t handle, void *data
 static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 {
 	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
+	unsigned engines[I915_EXEC_RING_MASK + 1], nengine;
+	uint32_t scratch[NUMOBJ], handle[NUMOBJ];
+	struct thread *threads;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
-	struct thread *threads;
-	uint32_t scratch[NUMOBJ], handle[NUMOBJ];
-	unsigned engines[16], nengine;
 	void *arg[NUMOBJ];
 	int go;
 	int i;

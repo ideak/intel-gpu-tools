@@ -881,7 +881,7 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
-	unsigned int engines[16], nengine, n, s;
+	unsigned int engines[I915_EXEC_RING_MASK + 1], nengine, n, s;
 	unsigned long limit;
 	int all_fences;
 	IGT_CORK_HANDLE(c);
@@ -1224,8 +1224,8 @@ static void test_syncobj_wait(int fd)
 	struct drm_i915_gem_exec_fence fence = {
 		.handle = syncobj_create(fd, 0),
 	};
+	unsigned handle[I915_EXEC_RING_MASK + 1];
 	igt_spin_t *spin;
-	unsigned handle[16];
 	int n;
 
 	/* Check that we can use the syncobj to asynchronous wait prior to
@@ -1976,9 +1976,9 @@ static void test_syncobj_timeline_wait(int fd)
 	struct drm_i915_gem_exec_fence fence = {
 		.handle = syncobj_create(fd, 0),
 	};
+	unsigned handle[I915_EXEC_RING_MASK + 1];
 	uint64_t value = 1;
 	igt_spin_t *spin;
-	unsigned handle[16];
 	int n;
 
 	/* Check that we can use the syncobj to asynchronous wait prior to

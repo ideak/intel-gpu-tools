@@ -233,8 +233,8 @@ static void close_race(int fd)
 {
 	const unsigned int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	const unsigned int nhandles = gem_submission_measure(fd, ALL_ENGINES);
+	unsigned int engines[I915_EXEC_RING_MASK + 1], nengine;
 	const struct intel_execution_engine2 *e;
-	unsigned int engines[16], nengine;
 	unsigned long *control;
 	uint32_t *handles;
 	int i;

@@ -694,11 +694,11 @@ static void test_inflight_external(int fd)
 
 static void test_inflight_internal(int fd, unsigned int wait)
 {
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj[2];
-	uint32_t bbe = MI_BATCH_BUFFER_END;
+	int fences[I915_EXEC_RING_MASK + 1];
 	unsigned nfence = 0;
-	int fences[16];
 	igt_spin_t *hang;
 
 	igt_require(gem_has_exec_fence(fd));

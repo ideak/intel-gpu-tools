@@ -175,10 +175,10 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	struct drm_i915_gem_exec_object2 store, scratch;
 	struct drm_i915_gem_exec_object2 tmp[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
+	unsigned engines[I915_EXEC_RING_MASK + 1];
 	struct hang hang;
 	int fds[64];
 	uint32_t contexts[64];
-	unsigned engines[16];
 	unsigned nengine;
 	uint32_t batch[16];
 	unsigned int relocations = 0;

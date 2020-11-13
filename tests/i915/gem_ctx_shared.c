@@ -740,7 +740,7 @@ static void promotion(int i915, unsigned ring)
 static void smoketest(int i915, unsigned ring, unsigned timeout)
 {
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
-	unsigned engines[16];
+	unsigned engines[I915_EXEC_RING_MASK + 1];
 	unsigned nengine;
 	unsigned engine;
 	uint32_t scratch;

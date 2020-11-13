@@ -57,7 +57,7 @@ static void all(int fd, unsigned flags, int timeout, int ncpus)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
-	unsigned engines[16], nengine;
+	unsigned engines[I915_EXEC_RING_MASK + 1], nengine;
 
 	nengine = 0;
 	for_each_physical_engine(e, fd)

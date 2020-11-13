@@ -463,8 +463,8 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 		.flags = IGT_SPIN_POLL_RUN | IGT_SPIN_FAST,
 	};
 	struct rt_pkt *results;
-	unsigned int engines[16];
-	const char *names[16];
+	unsigned int engines[I915_EXEC_RING_MASK + 1];
+	const char *names[ARRAY_SIZE(engines)];
 	unsigned int nengine;
 	int ret;
 

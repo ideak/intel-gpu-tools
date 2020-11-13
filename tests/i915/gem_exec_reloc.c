@@ -270,7 +270,7 @@ static void active(int fd, unsigned engine)
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
-	unsigned engines[16];
+	unsigned engines[I915_EXEC_RING_MASK + 1];
 	unsigned nengine;
 	int pass;
 

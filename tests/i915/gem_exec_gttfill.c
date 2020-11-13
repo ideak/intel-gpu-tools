@@ -110,9 +110,9 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_relocation_entry reloc[2];
+	unsigned engines[I915_EXEC_RING_MASK + 1];
 	volatile uint64_t *shared;
 	struct batch *batches;
-	unsigned engines[16];
 	unsigned nengine;
 	unsigned count;
 	uint64_t size;

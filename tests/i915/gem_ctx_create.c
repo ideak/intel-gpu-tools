@@ -37,10 +37,10 @@
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
-static unsigned all_engines[16];
+static unsigned all_engines[I915_EXEC_RING_MASK + 1];
 static unsigned all_nengine;
 
-static unsigned ppgtt_engines[16];
+static unsigned ppgtt_engines[I915_EXEC_RING_MASK + 1];
 static unsigned ppgtt_nengine;
 
 static int create_ioctl(int fd, struct drm_i915_gem_context_create *arg)
@@ -131,7 +131,7 @@ static void active(int fd, const struct intel_execution_engine2 *e,
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
-	unsigned int nengine, engines[16];
+	unsigned int nengine, engines[ARRAY_SIZE(all_engines)];
 	unsigned *shared;
 	/* When e is NULL, test would run for all engines */
 	if (!e) {
