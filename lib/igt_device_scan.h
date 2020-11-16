@@ -37,6 +37,7 @@
 enum igt_devices_print_type {
 	IGT_PRINT_SIMPLE,
 	IGT_PRINT_DETAIL,
+	IGT_PRINT_USER, /* End user friendly. */
 };
 
 #define INTEGRATED_I915_GPU_PCI_ID "0000:00:02.0"

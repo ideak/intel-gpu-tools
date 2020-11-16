@@ -735,17 +735,25 @@ static inline void _pr_simple2(const char *k, const char *v1, const char *v2)
 	printf("    %-16s: %s:%s\n", k, v1, v2);
 }
 
+static bool __check_empty(struct igt_list_head *view)
+{
+	if (!view)
+		return true;
+
+	if (igt_list_empty(view)) {
+		printf("No GPU devices found\n");
+		return true;
+	}
+
+	return false;
+}
+
 static void igt_devs_print_simple(struct igt_list_head *view)
 {
 	struct igt_device *dev;
 
-	if (!view)
+	if (__check_empty(view))
 		return;
-
-	if (igt_list_empty(view)) {
-		printf("No GPU devices found\n");
-		return;
-	}
 
 	igt_list_for_each_entry(dev, view, link) {
 		printf("sys:%s\n", dev->syspath);
@@ -765,6 +773,89 @@ static void igt_devs_print_simple(struct igt_list_head *view)
 			}
 		}
 		printf("\n");
+	}
+}
+
+static struct igt_device *
+__find_pci(struct igt_list_head *view, const char *drm)
+{
+	struct igt_device *dev;
+
+	igt_list_for_each_entry(dev, view, link) {
+		if (!is_pci_subsystem(dev) || !dev->drm_card)
+			continue;
+
+		if (!strcmp(dev->drm_card, drm))
+			return dev;
+	}
+
+	return NULL;
+}
+
+static void igt_devs_print_user(struct igt_list_head *view)
+{
+	struct igt_device *dev;
+
+	if (__check_empty(view))
+		return;
+
+	igt_list_for_each_entry(dev, view, link) {
+		unsigned int i, num_children;
+		struct igt_device *pci_dev;
+		struct igt_device *dev2;
+		char filter[256];
+		char *drm_name;
+		int ret;
+
+		if (!is_drm_subsystem(dev))
+			continue;
+		if (!dev->drm_card || dev->drm_render)
+			continue;
+
+		drm_name = rindex(dev->drm_card, '/');
+		if (!drm_name || !*++drm_name)
+			continue;
+
+		ret = snprintf(filter, sizeof(filter), "drm:%s", dev->drm_card);
+		igt_assert(ret < sizeof(filter));
+
+		pci_dev = __find_pci(view, dev->drm_card);
+		if (pci_dev)
+			printf("%-24s%4s:%4s    %s\n",
+			       drm_name, pci_dev->vendor, pci_dev->device,
+			       filter);
+		else
+			printf("%-24s             %s\n", drm_name, filter);
+
+		num_children = 0;
+		igt_list_for_each_entry(dev2, view, link) {
+			if (!is_drm_subsystem(dev2) || !dev2->drm_render)
+				continue;
+			if (strcmp(dev2->parent->syspath, dev->parent->syspath))
+				continue;
+
+			num_children++;
+		}
+
+		i = 0;
+		igt_list_for_each_entry(dev2, view, link) {
+			if (!is_drm_subsystem(dev2) || !dev2->drm_render)
+				continue;
+			if (strcmp(dev2->parent->syspath, dev->parent->syspath))
+				continue;
+
+			drm_name = rindex(dev2->drm_render, '/');
+			if (!drm_name || !*++drm_name)
+				continue;
+
+			ret = snprintf(filter, sizeof(filter), "drm:%s",
+				       dev2->drm_render);
+			igt_assert(ret < sizeof(filter));
+
+			printf("%s%-22s             %s\n",
+			       (++i == num_children) ? "└─" : "├─",
+			       drm_name, filter);
+		}
 	}
 }
 
@@ -792,13 +883,8 @@ static void igt_devs_print_detail(struct igt_list_head *view)
 {
 	struct igt_device *dev;
 
-	if (!view)
+	if (__check_empty(view))
 		return;
-
-	if (igt_list_empty(view)) {
-		printf("No GPU devices found\n");
-		return;
-	}
 
 	igt_list_for_each_entry(dev, view, link) {
 		printf("========== %s:%s ==========\n",
@@ -821,6 +907,7 @@ static struct print_func {
 } print_functions[] = {
 	[IGT_PRINT_SIMPLE] = { .prn = igt_devs_print_simple },
 	[IGT_PRINT_DETAIL] = { .prn = igt_devs_print_detail },
+	[IGT_PRINT_USER] = { .prn = igt_devs_print_user },
 };
 
 /**

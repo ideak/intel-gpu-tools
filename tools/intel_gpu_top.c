@@ -1315,7 +1315,6 @@ int main(int argc, char **argv)
 	unsigned int i;
 	int ret = 0, ch;
 	bool list_device = false;
-	enum igt_devices_print_type printtype = IGT_PRINT_SIMPLE;
 	char *pmu_device, *opt_device = NULL;
 	struct igt_device_card card;
 
@@ -1390,7 +1389,7 @@ int main(int argc, char **argv)
 	igt_devices_scan(false);
 
 	if (list_device) {
-		igt_devices_print(printtype);
+		igt_devices_print(IGT_PRINT_USER);
 		goto exit;
 	}
 
