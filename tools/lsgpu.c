@@ -70,6 +70,7 @@
  */
 
 enum {
+	OPT_PRINT_SIMPLE   = 's',
 	OPT_PRINT_DETAIL   = 'p',
 	OPT_LIST_VENDORS   = 'v',
 	OPT_LIST_FILTERS   = 'l',
@@ -85,6 +86,7 @@ static char *igt_device;
 static const char *usage_str =
 	"usage: lsgpu [options]\n\n"
 	"Options:\n"
+	"  -s, --print-simple          Print simple (legacy) device details\n"
 	"  -p, --print-details         Print devices with details\n"
 	"  -v, --list-vendors          List recognized vendors\n"
 	"  -l, --list-filter-types     List registered device filters types\n"
@@ -151,6 +153,7 @@ static char *get_device_from_rc(void)
 int main(int argc, char *argv[])
 {
 	static struct option long_options[] = {
+		{"print-simple",      no_argument,       NULL, OPT_PRINT_SIMPLE},
 		{"print-detail",      no_argument,       NULL, OPT_PRINT_DETAIL},
 		{"list-vendors",      no_argument,       NULL, OPT_LIST_VENDORS},
 		{"list-filter-types", no_argument,       NULL, OPT_LIST_FILTERS},
@@ -160,12 +163,15 @@ int main(int argc, char *argv[])
 	};
 	int c, index = 0;
 	char *env_device = NULL, *opt_device = NULL, *rc_device = NULL;
-	enum igt_devices_print_type printtype = IGT_PRINT_SIMPLE;
+	enum igt_devices_print_type printtype = IGT_PRINT_USER;
 
-	while ((c = getopt_long(argc, argv, "pvld:h",
+	while ((c = getopt_long(argc, argv, "spvld:h",
 				long_options, &index)) != -1) {
 		switch(c) {
 
+		case OPT_PRINT_SIMPLE:
+			printtype = IGT_PRINT_SIMPLE;
+			break;
 		case OPT_PRINT_DETAIL:
 			printtype = IGT_PRINT_DETAIL;
 			break;
