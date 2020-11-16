@@ -166,6 +166,7 @@ struct igt_device {
 	char *vendor;
 	char *device;
 	char *pci_slot_name;
+	int gpu_index; /* For more than one GPU with same vendor and device. */
 
 	struct igt_list_head link;
 };
@@ -601,6 +602,33 @@ static void sort_all_devices(void)
 	free(devs);
 }
 
+static void index_pci_devices(void)
+{
+	struct igt_device *dev;
+
+	igt_list_for_each_entry(dev, &igt_devs.all, link) {
+		struct igt_device *dev2;
+		int index = 0;
+
+		if (!is_pci_subsystem(dev))
+			continue;
+
+		igt_list_for_each_entry(dev2, &igt_devs.all, link) {
+			if (!is_pci_subsystem(dev2))
+				continue;
+
+			if (dev2 == dev)
+				break;
+
+			if (!strcasecmp(dev->vendor, dev2->vendor) &&
+			    !strcasecmp(dev->device, dev2->device))
+				index++;
+		}
+
+		dev->gpu_index = index;
+	}
+}
+
 /* Core scanning function.
  *
  * All scanned devices are kept inside igt_devs.all pointer array.
@@ -657,6 +685,7 @@ static void scan_drm_devices(void)
 	udev_unref(udev);
 
 	sort_all_devices();
+	index_pci_devices();
 
 	igt_list_for_each_entry(dev, &igt_devs.all, link) {
 		struct igt_device *dev_dup = duplicate_device(dev);
