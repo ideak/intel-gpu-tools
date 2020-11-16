@@ -777,7 +777,9 @@ static bool __check_empty(struct igt_list_head *view)
 	return false;
 }
 
-static void igt_devs_print_simple(struct igt_list_head *view)
+static void
+igt_devs_print_simple(struct igt_list_head *view,
+		      const struct igt_devices_print_format *fmt)
 {
 	struct igt_device *dev;
 
@@ -821,7 +823,38 @@ __find_pci(struct igt_list_head *view, const char *drm)
 	return NULL;
 }
 
-static void igt_devs_print_user(struct igt_list_head *view)
+static void __print_filter(char *buf, int len,
+			   const struct igt_devices_print_format *fmt,
+			   struct igt_device *dev,
+			   bool render)
+{
+	int ret;
+
+	switch (fmt->option) {
+	case IGT_PRINT_DRM:
+		ret = snprintf(buf, len, "drm:%s",
+			       render ? dev->drm_render : dev->drm_card);
+		igt_assert(ret < len);
+		break;
+	case IGT_PRINT_SYSFS:
+		ret = snprintf(buf, len, "sys:%s", dev->syspath);
+		igt_assert(ret < len);
+		break;
+	case IGT_PRINT_PCI:
+		if (!render) {
+			ret = snprintf(buf, len,
+				       "pci:vendor=%s,device=%s,card=%d",
+				       dev->vendor, dev->device,
+				       dev->gpu_index);
+			igt_assert(ret < len);
+		}
+		break;
+	};
+}
+
+static void
+igt_devs_print_user(struct igt_list_head *view,
+		    const struct igt_devices_print_format *fmt)
 {
 	struct igt_device *dev;
 
@@ -834,7 +867,6 @@ static void igt_devs_print_user(struct igt_list_head *view)
 		struct igt_device *dev2;
 		char filter[256];
 		char *drm_name;
-		int ret;
 
 		if (!is_drm_subsystem(dev))
 			continue;
@@ -845,16 +877,21 @@ static void igt_devs_print_user(struct igt_list_head *view)
 		if (!drm_name || !*++drm_name)
 			continue;
 
-		ret = snprintf(filter, sizeof(filter), "drm:%s", dev->drm_card);
-		igt_assert(ret < sizeof(filter));
-
 		pci_dev = __find_pci(view, dev->drm_card);
-		if (pci_dev)
+
+		if (fmt->option == IGT_PRINT_PCI && !pci_dev)
+			continue;
+
+		if (pci_dev) {
+			__print_filter(filter, sizeof(filter), fmt, pci_dev,
+				       false);
 			printf("%-24s%4s:%4s    %s\n",
 			       drm_name, pci_dev->vendor, pci_dev->device,
 			       filter);
-		else
+		} else {
+			__print_filter(filter, sizeof(filter), fmt, dev, false);
 			printf("%-24s             %s\n", drm_name, filter);
+		}
 
 		num_children = 0;
 		igt_list_for_each_entry(dev2, view, link) {
@@ -877,13 +914,15 @@ static void igt_devs_print_user(struct igt_list_head *view)
 			if (!drm_name || !*++drm_name)
 				continue;
 
-			ret = snprintf(filter, sizeof(filter), "drm:%s",
-				       dev2->drm_render);
-			igt_assert(ret < sizeof(filter));
-
-			printf("%s%-22s             %s\n",
-			       (++i == num_children) ? "└─" : "├─",
-			       drm_name, filter);
+			printf("%s%-22s",
+				(++i == num_children) ? "└─" : "├─", drm_name);
+			if (fmt->option != IGT_PRINT_PCI) {
+				__print_filter(filter, sizeof(filter), fmt,
+					       dev2, true);
+				printf("             %s\n", filter);
+			} else {
+				printf("\n");
+			}
 		}
 	}
 }
@@ -908,7 +947,10 @@ static void print_ht(GHashTable *ht)
 	g_list_free(keys);
 }
 
-static void igt_devs_print_detail(struct igt_list_head *view)
+static void
+igt_devs_print_detail(struct igt_list_head *view,
+		      const struct igt_devices_print_format *fmt)
+
 {
 	struct igt_device *dev;
 
@@ -932,7 +974,8 @@ static void igt_devs_print_detail(struct igt_list_head *view)
 }
 
 static struct print_func {
-	void (*prn)(struct igt_list_head *view);
+	void (*prn)(struct igt_list_head *view,
+		    const struct igt_devices_print_format *);
 } print_functions[] = {
 	[IGT_PRINT_SIMPLE] = { .prn = igt_devs_print_simple },
 	[IGT_PRINT_DETAIL] = { .prn = igt_devs_print_detail },
@@ -941,15 +984,15 @@ static struct print_func {
 
 /**
  * igt_devices_print
- * @printtype: IGT_PRINT_SIMPLE or IGT_PRINT_DETAIL
+ * @fmt: Print format as specified by struct igt_devices_print_format
  *
  * Function can be used by external tool to print device array in simple
  * or detailed form. This function is added here to avoid exposing
  * internal implementation data structures.
  */
-void igt_devices_print(enum igt_devices_print_type printtype)
+void igt_devices_print(const struct igt_devices_print_format *fmt)
 {
-	print_functions[printtype].prn(&igt_devs.filtered);
+	print_functions[fmt->type].prn(&igt_devs.filtered, fmt);
 }
 
 /**

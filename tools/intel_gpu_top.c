@@ -1389,7 +1389,11 @@ int main(int argc, char **argv)
 	igt_devices_scan(false);
 
 	if (list_device) {
-		igt_devices_print(IGT_PRINT_USER);
+		struct igt_devices_print_format fmt = {
+			.type = IGT_PRINT_USER
+		};
+
+		igt_devices_print(&fmt);
 		goto exit;
 	}
 

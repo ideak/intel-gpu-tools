@@ -91,7 +91,11 @@ static const char *usage_str =
 	"  -v, --list-vendors          List recognized vendors\n"
 	"  -l, --list-filter-types     List registered device filters types\n"
 	"  -d, --device filter         Device filter, can be given multiple times\n"
-	"  -h, --help                  Show this help message and exit\n";
+	"  -h, --help                  Show this help message and exit\n"
+	"\nOptions valid for default print out mode only:\n"
+	"      --drm                   Show DRM filters (default) for each device\n"
+	"      --sysfs                 Show sysfs filters for each device\n"
+	"      --pci                   Show PCI filters for each device\n";
 
 static void test_device_open(struct igt_device_card *card)
 {
@@ -153,6 +157,9 @@ static char *get_device_from_rc(void)
 int main(int argc, char *argv[])
 {
 	static struct option long_options[] = {
+		{"drm",               no_argument,       NULL, 0},
+		{"sysfs",             no_argument,       NULL, 1},
+		{"pci",               no_argument,       NULL, 2},
 		{"print-simple",      no_argument,       NULL, OPT_PRINT_SIMPLE},
 		{"print-detail",      no_argument,       NULL, OPT_PRINT_DETAIL},
 		{"list-vendors",      no_argument,       NULL, OPT_LIST_VENDORS},
@@ -163,17 +170,19 @@ int main(int argc, char *argv[])
 	};
 	int c, index = 0;
 	char *env_device = NULL, *opt_device = NULL, *rc_device = NULL;
-	enum igt_devices_print_type printtype = IGT_PRINT_USER;
+	struct igt_devices_print_format fmt = {
+			.type = IGT_PRINT_USER,
+	};
 
 	while ((c = getopt_long(argc, argv, "spvld:h",
 				long_options, &index)) != -1) {
 		switch(c) {
 
 		case OPT_PRINT_SIMPLE:
-			printtype = IGT_PRINT_SIMPLE;
+			fmt.type = IGT_PRINT_SIMPLE;
 			break;
 		case OPT_PRINT_DETAIL:
-			printtype = IGT_PRINT_DETAIL;
+			fmt.type = IGT_PRINT_DETAIL;
 			break;
 		case OPT_LIST_VENDORS:
 			g_show_vendors = true;
@@ -186,6 +195,15 @@ int main(int argc, char *argv[])
 			break;
 		case OPT_HELP:
 			g_help = true;
+			break;
+		case 0:
+			fmt.option = IGT_PRINT_DRM;
+			break;
+		case 1:
+			fmt.option = IGT_PRINT_SYSFS;
+			break;
+		case 2:
+			fmt.option = IGT_PRINT_PCI;
 			break;
 		}
 	}
@@ -239,14 +257,14 @@ int main(int argc, char *argv[])
 		printf("Device detail:\n");
 		print_card(&card);
 		test_device_open(&card);
-		if (printtype == IGT_PRINT_DETAIL) {
+		if (fmt.type == IGT_PRINT_DETAIL) {
 			printf("\n");
-			igt_devices_print(printtype);
+			igt_devices_print(&fmt);
 		}
 		printf("-------------------------------------------\n");
 
 	} else {
-		igt_devices_print(printtype);
+		igt_devices_print(&fmt);
 	}
 
 	free(rc_device);

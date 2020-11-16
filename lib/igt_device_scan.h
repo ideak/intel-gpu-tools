@@ -35,9 +35,20 @@
 #include <unistd.h>
 
 enum igt_devices_print_type {
-	IGT_PRINT_SIMPLE,
+	IGT_PRINT_SIMPLE = 0,
 	IGT_PRINT_DETAIL,
 	IGT_PRINT_USER, /* End user friendly. */
+};
+
+enum igt_devices_print_option {
+	IGT_PRINT_DRM = 0,
+	IGT_PRINT_SYSFS,
+	IGT_PRINT_PCI,
+};
+
+struct igt_devices_print_format {
+	enum igt_devices_print_type   type;
+	enum igt_devices_print_option option;
 };
 
 #define INTEGRATED_I915_GPU_PCI_ID "0000:00:02.0"
@@ -51,7 +62,7 @@ struct igt_device_card {
 
 void igt_devices_scan(bool force);
 
-void igt_devices_print(enum igt_devices_print_type printtype);
+void igt_devices_print(const struct igt_devices_print_format *fmt);
 void igt_devices_print_vendors(void);
 void igt_device_print_filter_types(void);
 
