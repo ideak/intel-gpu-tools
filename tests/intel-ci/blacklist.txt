@@ -119,8 +119,9 @@ igt@.*@.*pipe-f($|-.*)
 igt@perf_pmu@cpu-hotplug
 
 # Currently fails and leaves the machine in a very bad state, and
-# causes coverage loss for other tests.
-igt@core_hotunplug@.*plug.*
+# causes coverage loss for other tests. IOMMU related.
+# https://gitlab.freedesktop.org/drm/intel/-/issues/2644
+igt@core_hotunplug@.*(hot|plug).*
 
 # hangs several gens of hosts, and has no immediate fix
 igt@device_reset@reset-bound
