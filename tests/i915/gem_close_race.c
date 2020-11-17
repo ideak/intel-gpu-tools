@@ -140,18 +140,17 @@ static uint32_t load(int fd)
 	return handle;
 }
 
-static void process(int child)
+static void process(int fd, int child)
 {
 	uint32_t handle;
-	int fd;
 
-	fd = drm_open_driver(DRIVER_INTEL);
+	fd = gem_reopen_driver(fd);
 
 	handle = load(fd);
 	if ((child & 63) == 63)
 		gem_read(fd, handle, 0, &handle, sizeof(handle));
 
-	gem_quiescent_gpu(fd);
+	/* leave fd to be closed by process termination */
 }
 
 struct crashme {
@@ -262,18 +261,28 @@ igt_main
 	}
 
 	igt_subtest("basic-process") {
+		int fd = drm_open_driver(DRIVER_INTEL);
+
 		igt_fork(child, 1)
-			process(child);
+			process(fd, child);
 		igt_waitchildren();
+
+		gem_quiescent_gpu(fd);
+		close(fd);
 	}
 
 	igt_subtest("basic-threads")
 		threads(1, 0);
 
 	igt_subtest("process-exit") {
+		int fd = drm_open_driver(DRIVER_INTEL);
+
 		igt_fork(child, 768)
-			process(child);
+			process(fd, child);
 		igt_waitchildren();
+
+		gem_quiescent_gpu(fd);
+		close(fd);
 	}
 
 	igt_subtest("contexts")
