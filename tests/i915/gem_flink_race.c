@@ -24,7 +24,6 @@
  *    Daniel Vetter <daniel.vetter@ffwll.ch>
  */
 
-#include "igt.h"
 #include <sys/ioctl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +32,8 @@
 #include <pthread.h>
 #include <errno.h>
 
+#include "igt.h"
+#include "igt_stats.h"
 #include "intel_bufmgr.h"
 
 IGT_TEST_DESCRIPTION("Check for flink/open vs. gem close races.");
@@ -83,9 +84,8 @@ static void test_flink_name(int timeout)
 	struct flink_name *threads;
 	int r, i, num_threads;
 	unsigned long count;
-	char buf[256];
+	igt_stats_t stats;
 	void *status;
-	int len;
 
 	num_threads = sysconf(_SC_NPROCESSORS_ONLN) - 1;
 	if (!num_threads)
@@ -114,14 +114,18 @@ static void test_flink_name(int timeout)
 
 	pls_die = 1;
 
-	len = snprintf(buf, sizeof(buf), "Completed %lu cycles with [", count);
+	igt_stats_init_with_size(&stats, num_threads);
 	for (i = 0;  i < num_threads; i++) {
 		pthread_join(threads[i].thread, &status);
 		igt_assert(status == 0);
-		len += snprintf(buf + len, sizeof(buf) - len, "%lu, ", threads[i].count);
+		igt_stats_push(&stats, threads[i].count);
 	}
-	snprintf(buf + len - 2, sizeof(buf) - len + 2, "] races");
-	igt_info("%s\n", buf);
+	igt_info("Completed %lu cycles with %.0f [%"PRIu64", %"PRIu64"] races\n",
+		 count,
+		 igt_stats_get_median(&stats),
+		 igt_stats_get_min(&stats),
+		 igt_stats_get_max(&stats));
+	igt_stats_fini(&stats);
 
 	close(fd);
 }
