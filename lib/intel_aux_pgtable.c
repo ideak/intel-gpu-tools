@@ -514,18 +514,35 @@ gen12_aux_pgtable_init(struct aux_pgtable_info *info,
 		       struct intel_buf *dst_buf)
 {
 	struct intel_buf *bufs[2];
+	int buf_count = 0;
 	struct intel_buf *reserved_bufs[2];
 	int reserved_buf_count;
+	bool has_compressed_buf = false;
+	bool write_buf[2];
 	int i;
 
 	igt_assert_f(ibb->enforce_relocs == false,
 		     "We support aux pgtables for non-forced relocs yet!");
 
-	if (!intel_buf_compressed(src_buf) && !intel_buf_compressed(dst_buf))
-		return;
+	if (src_buf) {
+		bufs[buf_count] = src_buf;
+		write_buf[buf_count] = false;
+		buf_count++;
 
-	bufs[0] = src_buf;
-	bufs[1] = dst_buf;
+		if (intel_buf_compressed(src_buf))
+			has_compressed_buf = true;
+	}
+	if (dst_buf) {
+		bufs[buf_count] = dst_buf;
+		write_buf[buf_count] = true;
+		buf_count++;
+
+		if (intel_buf_compressed(dst_buf))
+			has_compressed_buf = true;
+	}
+
+	if (!has_compressed_buf)
+		return;
 
 	/*
 	 * Surface index in pgt table depend on its address so:
@@ -541,17 +558,15 @@ gen12_aux_pgtable_init(struct aux_pgtable_info *info,
 	 * surfaces.
 	 */
 
-	intel_bb_add_intel_buf(ibb, src_buf, false);
-	if (intel_buf_compressed(src_buf))
-		intel_bb_object_set_flag(ibb, src_buf->handle, EXEC_OBJECT_PINNED);
-
-	intel_bb_add_intel_buf(ibb, dst_buf, true);
-	if (intel_buf_compressed(dst_buf))
-		intel_bb_object_set_flag(ibb, dst_buf->handle, EXEC_OBJECT_PINNED);
+	for (i = 0; i < buf_count; i++) {
+		intel_bb_add_intel_buf(ibb, bufs[i], write_buf[i]);
+		if (intel_buf_compressed(bufs[i]))
+			intel_bb_object_set_flag(ibb, bufs[i]->handle, EXEC_OBJECT_PINNED);
+	}
 
 	reserved_buf_count = 0;
 	/* First reserve space for any bufs that are bound already. */
-	for (i = 0; i < ARRAY_SIZE(bufs); i++) {
+	for (i = 0; i < buf_count; i++) {
 		igt_assert(bufs[i]->addr.offset != INTEL_BUF_INVALID_ADDRESS);
 		aux_pgtable_reserve_buf_slot(reserved_bufs,
 					     reserved_buf_count++,
