@@ -113,11 +113,6 @@ igt@.*@.*pipe-f($|-.*)
 # Temporary workarounds for CI-impacting bugs
 ###############################################
 
-# https://gitlab.freedesktop.org/drm/intel/issues/1714
-# Since 5.7-rc1, this test has produced tens of megabytes of kernel
-# logs.
-igt@perf_pmu@cpu-hotplug
-
 # Currently fails and leaves the machine in a very bad state, and
 # causes coverage loss for other tests. IOMMU related.
 # https://gitlab.freedesktop.org/drm/intel/-/issues/2644
