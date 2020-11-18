@@ -572,6 +572,7 @@ static void addfb25_ytile(int fd)
 
 	igt_subtest("addfb25-y-tiled-legacy") {
 		igt_require_fb_modifiers(fd);
+		igt_require_intel(fd);
 
 		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Y_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) ==
@@ -583,6 +584,7 @@ static void addfb25_ytile(int fd)
 
 	igt_subtest("addfb25-yf-tiled-legacy") {
 		igt_require_fb_modifiers(fd);
+		igt_require_intel(fd);
 
 		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Yf_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) ==
@@ -594,6 +596,7 @@ static void addfb25_ytile(int fd)
 
 	igt_subtest("addfb25-y-tiled-small-legacy") {
 		igt_require_fb_modifiers(fd);
+		igt_require_intel(fd);
 
 		gen = intel_gen(intel_get_drm_devid(fd));
 		igt_require(gen >= 9);
