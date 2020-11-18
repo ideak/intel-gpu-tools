@@ -281,8 +281,19 @@ static void pitch_tests(int fd)
 	for (i = 0; i < ARRAY_SIZE(bad_pitches); i++) {
 		igt_subtest_f("bad-pitch-%i", bad_pitches[i]) {
 			f.pitches[0] = bad_pitches[i];
-			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) == -1 &&
-				   errno == EINVAL);
+			igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &f), -1);
+			igt_assert(errno != 0);
+			if (is_i915_device(fd)) {
+				igt_assert_eq(errno, EINVAL);
+			} else if (is_nouveau_device(fd)) {
+				if (bad_pitches[i] > 4 * 1024)
+					igt_assert_eq(errno, ERANGE);
+				else
+					igt_assert_eq(errno, EINVAL);
+			} else {
+				igt_info("Unknown vendor; errno unchecked (returned %i)", errno);
+			}
+			errno = 0;
 		}
 	}
 
@@ -367,6 +378,8 @@ static void size_tests(int fd)
 	struct drm_mode_fb_cmd2 f = {};
 	struct drm_mode_fb_cmd2 f_16 = {};
 	struct drm_mode_fb_cmd2 f_8 = {};
+	struct drm_mode_fb_cmd2 *framebuffers[] = {&f, &f_16, &f_8};
+	int i;
 
 	f.width = 1024;
 	f.height = 1024;
@@ -426,18 +439,31 @@ static void size_tests(int fd)
 	f_16.height++;
 	f_8.height++;
 	igt_subtest("too-high") {
-		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) == -1 &&
-			   errno == EINVAL);
-		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f_16) == -1 &&
-			   errno == EINVAL);
-		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f_8) == -1 &&
-			   errno == EINVAL);
+		for (i = 0; i < ARRAY_SIZE(framebuffers); i++) {
+			igt_debug("Checking framebuffer %i\n", i);
+			igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, framebuffers[i]), -1);
+			igt_assert(errno != 0);
+			if (is_i915_device(fd))
+				igt_assert_eq(errno, EINVAL);
+			else if (is_nouveau_device(fd))
+				igt_assert_eq(errno, ERANGE);
+			else
+				igt_info("Unknown vendor; errno unchecked (returned %i)", errno);
+			errno = 0;
+		}
 	}
 
 	f.handles[0] = gem_bo_small;
 	igt_subtest("bo-too-small") {
-		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) == -1 &&
-			   errno == EINVAL);
+		igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &f), -1);
+		igt_assert(errno != 0);
+		if (is_i915_device(fd))
+			igt_assert_eq(errno, EINVAL);
+		else if (is_nouveau_device(fd))
+			igt_assert_eq(errno, ERANGE);
+		else
+			igt_info("Unknown vendor; errno unchecked (returned %i)", errno);
+		errno = 0;
 	}
 
 	/* Just to check that the parameters would work. */
