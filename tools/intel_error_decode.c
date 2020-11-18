@@ -465,7 +465,7 @@ static void decode(struct drm_intel_decode *ctx,
 		       (unsigned)((head_offset + gtt_offset) & 0xffffffff));
 	printf("\n");
 
-	if (decode) {
+	if (decode && ctx) {
 		drm_intel_decode_set_batch_pointer(ctx, data, gtt_offset,
 						   *count);
 		drm_intel_decode(ctx);
@@ -707,7 +707,10 @@ read_data_file(FILE *file)
 			matched = sscanf(line, "  ACTHD: 0x%08x\n", &reg);
 			if (matched == 1) {
 				print_acthd(reg, ring_length);
-				drm_intel_decode_set_head_tail(decode_ctx, reg, 0xffffffff);
+				if (decode_ctx)
+					drm_intel_decode_set_head_tail(decode_ctx,
+								       reg,
+								       0xffffffff);
 			}
 
 			matched = sscanf(line, "  PGTBL_ER: 0x%08x\n", &reg);
