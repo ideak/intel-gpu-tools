@@ -243,6 +243,25 @@ out:
 	return err < 0 ? err : 0;
 }
 
+static int igt_kmod_unload_r(struct kmod_module *kmod, unsigned int flags)
+{
+	struct kmod_list *holders, *pos;
+	int err = 0;
+
+	holders = kmod_module_get_holders(kmod);
+	kmod_list_foreach(pos, holders) {
+		struct kmod_module *it = kmod_module_get_module(pos);
+		err = igt_kmod_unload_r(it, flags);
+		kmod_module_unref(it);
+		if (err < 0)
+			break;
+	}
+	kmod_module_unref_list(holders);
+	if (err < 0)
+		return err;
+
+	return kmod_module_remove_module(kmod, flags);
+}
 
 /**
  * igt_kmod_unload:
@@ -269,7 +288,7 @@ igt_kmod_unload(const char *mod_name, unsigned int flags)
 		goto out;
 	}
 
-	err = kmod_module_remove_module(kmod, flags);
+	err = igt_kmod_unload_r(kmod, flags);
 	if (err < 0) {
 		igt_debug("Could not remove module %s (%s)\n", mod_name,
 			  strerror(-err));
@@ -386,7 +405,7 @@ igt_i915_driver_unload(void)
 		}
 	}
 
-	/* gen5 */
+	/* gen5: ips uses symbol_get() so only a soft module dependency */
 	if (igt_kmod_is_loaded("intel_ips"))
 		igt_kmod_unload("intel_ips", 0);
 
