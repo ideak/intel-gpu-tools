@@ -1902,7 +1902,7 @@ static void igt_fill_display_format_mod(igt_display_t *display);
  */
 void igt_require_pipe(igt_display_t *display, enum pipe pipe)
 {
-	igt_skip_on_f(!display->pipes[pipe].enabled,
+	igt_skip_on_f(pipe >= display->n_pipes || !display->pipes[pipe].enabled,
 			"Pipe %s does not exist or not enabled\n",
 			kmstest_pipe_name(pipe));
 }
