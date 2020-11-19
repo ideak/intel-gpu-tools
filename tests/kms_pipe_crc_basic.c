@@ -71,6 +71,7 @@ static void test_read_crc(data_t *data, enum pipe pipe, unsigned flags)
 	igt_crc_t *crcs = NULL;
 	int c, j;
 
+	igt_require_pipe(display, pipe);
 	igt_display_require_output_on_pipe(display, pipe);
 	output = igt_get_single_output_for_pipe(display, pipe);
 
@@ -171,10 +172,11 @@ static void test_compare_crc(data_t *data, enum pipe pipe)
 	igt_crc_t ref_crc, crc;
 	igt_pipe_crc_t *pipe_crc = NULL;
 	struct igt_fb fb0, fb1;
-	igt_output_t *output = igt_get_single_output_for_pipe(display, pipe);
+	igt_output_t *output;
 
-	igt_require_f(output, "No connector found for pipe %s\n",
-			kmstest_pipe_name(pipe));
+	igt_require_pipe(display, pipe);
+	igt_display_require_output_on_pipe(display, pipe);
+	output = igt_get_single_output_for_pipe(display, pipe);
 
 	igt_display_reset(display);
 	igt_output_set_pipe(output, pipe);
@@ -224,14 +226,21 @@ static void test_compare_crc(data_t *data, enum pipe pipe)
 static void test_disable_crc_after_crtc(data_t *data, enum pipe pipe)
 {
 	igt_display_t *display = &data->display;
-	igt_output_t *output = igt_get_single_output_for_pipe(&data->display, pipe);
-	igt_pipe_crc_t *pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, "auto");
-	drmModeModeInfo *mode = igt_output_get_mode(output);
+	igt_pipe_crc_t *pipe_crc;
+	drmModeModeInfo *mode;
+	igt_output_t *output;
 	igt_crc_t crc[2];
+
+	igt_require_pipe(display, pipe);
+	igt_display_require_output_on_pipe(display, pipe);
+	output = igt_get_single_output_for_pipe(display, pipe);
+
+	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, "auto");
 
 	igt_display_reset(display);
 	igt_output_set_pipe(output, pipe);
 
+	mode = igt_output_get_mode(output);
 	igt_create_color_fb(data->drm_fd,
 			    mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
@@ -290,8 +299,6 @@ igt_main
 			test_read_crc(&data, pipe, TEST_SEQUENCE | TEST_NONBLOCK);
 
 		igt_subtest_f("suspend-read-crc-pipe-%s", kmstest_pipe_name(pipe)) {
-			igt_require_pipe(&data.display, pipe);
-
 			test_read_crc(&data, pipe, 0);
 
 			igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
