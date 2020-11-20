@@ -65,10 +65,13 @@ static void framebuffer_tests(int fd)
 {
 	const int values[] = { 0, 0x55, 0xaa, 0xff };
 	struct fb_fix_screeninfo fix_info;
-	void * volatile map;
-	void * volatile buf;
+	unsigned char * volatile map;
+	unsigned char * volatile buf;
+	volatile size_t pagesize;
 
 	igt_fixture {
+		long ret;
+
 		igt_require(ioctl(fd, FBIOGET_FSCREENINFO, &fix_info) == 0);
 		igt_assert(fix_info.smem_len);
 
@@ -78,6 +81,10 @@ static void framebuffer_tests(int fd)
 
 		buf = malloc(fix_info.smem_len);
 		igt_require(buf);
+
+		ret = sysconf(_SC_PAGESIZE);
+		igt_require(ret != -1);
+		pagesize = ret;
 	}
 
 	igt_describe("Check read operations on framebuffer memory");
@@ -94,6 +101,47 @@ static void framebuffer_tests(int fd)
 				     "read differs from mapped framebuffer for %x\n",
 				     values[i]);
 		}
+	}
+
+	igt_describe("Check read operations on unaligned locations in framebuffer memory");
+	igt_subtest("unaligned-read") {
+		const unsigned char *pos;
+		ssize_t ret;
+		size_t len;
+		off_t off;
+
+		off = pagesize + (pagesize >> 2); /* 1.25 * pagesize */
+		len = (pagesize << 2) + (pagesize >> 1); /* 4.5 * pagesize */
+		igt_require_f(off + len < fix_info.smem_len,
+			      "framebuffer too small to test\n");
+
+		/* read at unaligned location and compare */
+		memset(map, 0, fix_info.smem_len);
+		memset(&map[off], 0x55, len);
+		memset(buf, 0xff, fix_info.smem_len);
+
+		ret = pread(fd, &buf[off], len, off);
+		igt_assert_f(ret == (ssize_t)len,
+			     "pread failed, ret=%zd\n", ret);
+
+		pos = memchr(buf, 0x55, fix_info.smem_len);
+		igt_assert_f(pos, "0x55 not found within read buffer\n");
+		igt_assert_f(pos == &buf[off],
+			     "0x55 found at pos %zu, expected %lld\n",
+			     pos - buf, (long long)off);
+
+		pos = memchr(&buf[off], 0xff, fix_info.smem_len - off);
+		igt_assert_f(pos, "0xff not found within read buffer\n");
+		igt_assert_f(pos == &buf[off + len],
+			     "0xff found at pos %zu, expected %lld\n",
+			     pos - buf, (long long)(off + len));
+
+		pos = memchr(&buf[off + len],
+			     0x55,
+			     fix_info.smem_len - (off + len));
+		igt_assert_f(pos,
+			     "found 0x55 at pos %zu, none expected\n",
+			     pos - buf);
 	}
 
 	igt_fixture {
