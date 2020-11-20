@@ -160,6 +160,8 @@ struct intel_allocator {
 };
 
 void intel_allocator_init(void);
+void __intel_allocator_multiprocess_prepare(void);
+void __intel_allocator_multiprocess_start(void);
 void intel_allocator_multiprocess_start(void);
 void intel_allocator_multiprocess_stop(void);
 

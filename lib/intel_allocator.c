@@ -766,6 +766,38 @@ static void *allocator_thread_loop(void *data)
 	return NULL;
 }
 
+
+/**
+ * __intel_allocator_multiprocess_prepare:
+ *
+ * Prepares allocator infrastructure to work in multiprocess mode.
+ *
+ * Some description is required why prepare/start steps are separated.
+ * When we write the code and we don't use address sanitizer simple
+ * intel_allocator_multiprocess_start() call is enough. With address
+ * sanitizer and using forking we can encounter situation where one
+ * forked child called allocator alloc() (so parent has some poisoned
+ * memory in shadow map), then second fork occurs. Second child will
+ * get poisoned shadow map from parent (there allocator thread reside).
+ * Checking shadow map in this child will report memory leak.
+ *
+ * How to separate initialization steps take a look into api_intel_allocator.c
+ * fork_simple_stress() function.
+ */
+void __intel_allocator_multiprocess_prepare(void)
+{
+	intel_allocator_init();
+
+	multiprocess = true;
+	channel->init(channel);
+}
+
+void __intel_allocator_multiprocess_start(void)
+{
+	pthread_create(&allocator_thread, NULL,
+		       allocator_thread_loop, NULL);
+}
+
 /**
  * intel_allocator_multiprocess_start:
  *
@@ -787,13 +819,8 @@ void intel_allocator_multiprocess_start(void)
 
 	igt_assert_f(child_pid == -1,
 		     "Allocator thread can be spawned only in main IGT process\n");
-	intel_allocator_init();
-
-	multiprocess = true;
-	channel->init(channel);
-
-	pthread_create(&allocator_thread, NULL,
-		       allocator_thread_loop, NULL);
+	__intel_allocator_multiprocess_prepare();
+	__intel_allocator_multiprocess_start();
 }
 
 /**
