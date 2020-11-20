@@ -2,6 +2,7 @@
 
 igt@core_auth@basic-auth
 igt@debugfs_test@read_all_entries
+igt@fbdev@eof
 igt@fbdev@info
 igt@fbdev@read
 igt@fbdev@write

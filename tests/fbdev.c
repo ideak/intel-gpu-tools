@@ -79,7 +79,8 @@ static void framebuffer_tests(int fd)
 			   PROT_WRITE, MAP_SHARED, fd, 0);
 		igt_assert(map != MAP_FAILED);
 
-		buf = malloc(fix_info.smem_len);
+		/* allocate two additional bytes for eof test */
+		buf = malloc(fix_info.smem_len + 2);
 		igt_require(buf);
 
 		ret = sysconf(_SC_PAGESIZE);
@@ -199,6 +200,55 @@ static void framebuffer_tests(int fd)
 		igt_assert_f(pos,
 			     "found 0x55 at pos %zu, none expected\n",
 			     pos - map);
+	}
+
+	igt_describe("Check framebuffer access near EOF");
+	igt_subtest("eof") {
+		unsigned long lastindex = fix_info.smem_len - 1;
+		unsigned char * const maplast = map + lastindex;
+		unsigned char * const buflast = buf + lastindex;
+		ssize_t ret;
+
+		*buflast = 0x55;
+
+		/* write across EOF; set remaining bytes */
+		ret = pwrite(fd, buflast, 2, lastindex);
+		igt_assert_f(ret == 1, "write crossed EOF, ret=%zd\n", ret);
+		igt_assert_f(*maplast == *buflast,
+			     "write buffer differs from mapped framebuffer at final byte, "
+			     "maplast=%u buflast=%u\n", *maplast, *buflast);
+
+		/* write at EOF; get ENOSPC */
+		ret = pwrite(fd, &buflast[1], 1, lastindex + 1);
+		igt_assert_f(ret == -1 && errno == ENOSPC,
+			     "write at EOF, ret=%zd\n", ret);
+
+		*maplast = 0;
+
+		/* write final byte */
+		ret = pwrite(fd, buflast, 1, lastindex);
+		igt_assert_f(ret == 1, "write before EOF, ret=%zd\n", ret);
+		igt_assert_f(*maplast == *buflast,
+			     "write buffer differs from mapped framebuffer at final byte, "
+			     "maplast=%u buflast=%u\n", *maplast, *buflast);
+
+		/* write after EOF; get EFBIG */
+		ret = pwrite(fd, &buflast[2], 1, lastindex + 2);
+		igt_assert_f(ret == -1 && errno == EFBIG,
+			     "write after EOF, ret=%zd\n", ret);
+
+		*maplast = 0;
+
+		/* read across the EOF; get remaining bytes */
+		ret = pread(fd, buflast, 2, lastindex);
+		igt_assert_f(ret == 1, "read before EOF, ret=%zd\n", ret);
+		igt_assert_f(*maplast == *buflast,
+			     "read buffer differs from mapped framebuffer at final byte, "
+			     "maplast=%u buflast=%u\n", *maplast, *buflast);
+
+		/* read after EOF; get 0 */
+		ret = pread(fd, &buflast[1], 1, lastindex + 1);
+		igt_assert_f(ret == 0, "read at EOF, ret=%zd\n", ret);
 	}
 
 	igt_fixture {
