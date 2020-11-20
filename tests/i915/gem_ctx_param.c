@@ -265,23 +265,29 @@ igt_main
 			arg.param = I915_CONTEXT_PARAM_BANNABLE;
 	}
 
+	igt_describe("Basic test for context get/set param ioctls using valid context");
 	igt_subtest("basic") {
 		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
 		gem_context_set_param(fd, &arg);
 	}
 
+	igt_describe("Basic test for context get/set param ioctls using default context");
 	igt_subtest("basic-default") {
 		arg.ctx_id = 0;
 		gem_context_get_param(fd, &arg);
 		gem_context_set_param(fd, &arg);
 	}
 
+	igt_describe("Verify that context get param ioctl using invalid context "
+	       "returns relevant error");
 	igt_subtest("invalid-ctx-get") {
 		arg.ctx_id = 2;
 		igt_assert_eq(__gem_context_get_param(fd, &arg), -ENOENT);
 	}
 
+	igt_describe("Verify that context set param ioctl using invalid context "
+	       "returns relevant error");
 	igt_subtest("invalid-ctx-set") {
 		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
@@ -289,6 +295,7 @@ igt_main
 		igt_assert_eq(__gem_context_set_param(fd, &arg), -ENOENT);
 	}
 
+	igt_describe("Verify that context get param ioctl returns valid size for valid context");
 	igt_subtest("invalid-size-get") {
 		arg.ctx_id = ctx;
 		arg.size = 8;
@@ -296,6 +303,8 @@ igt_main
 		igt_assert(arg.size == 0);
 	}
 
+	igt_describe("Verify that context set param ioctl using invalid size "
+	       "returns relevant error");
 	igt_subtest("invalid-size-set") {
 		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
@@ -304,6 +313,7 @@ igt_main
 		arg.size = 0;
 	}
 
+	igt_describe("Verify that context set param ioctl returns relevant error in non root mode");
 	igt_subtest("non-root-set") {
 		igt_fork(child, 1) {
 			igt_drop_root();
@@ -317,6 +327,7 @@ igt_main
 		igt_waitchildren();
 	}
 
+	igt_describe("Verify that context set param ioctl works fine in root mode");
 	igt_subtest("root-set") {
 		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
@@ -326,6 +337,8 @@ igt_main
 
 	arg.param = I915_CONTEXT_PARAM_NO_ZEROMAP;
 
+	igt_describe("Validates context set param ioctl in non root mode with param "
+	       "set to no zeromap");
 	igt_subtest("non-root-set-no-zeromap") {
 		igt_fork(child, 1) {
 			igt_drop_root();
@@ -339,6 +352,7 @@ igt_main
 		igt_waitchildren();
 	}
 
+	igt_describe("Tests the context set param ioctl with no zeromap enabled in root mode");
 	igt_subtest("root-set-no-zeromap-enabled") {
 		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
@@ -346,6 +360,7 @@ igt_main
 		gem_context_set_param(fd, &arg);
 	}
 
+	igt_describe("Tests the context set param ioctl with no zeromap disabled in root mode");
 	igt_subtest("root-set-no-zeromap-disabled") {
 		arg.ctx_id = ctx;
 		gem_context_get_param(fd, &arg);
@@ -353,11 +368,14 @@ igt_main
 		gem_context_set_param(fd, &arg);
 	}
 
+	igt_describe("Tests that multiple contexts can share the same VMA");
 	igt_subtest("vm")
 		test_vm(fd);
 
 	arg.param = I915_CONTEXT_PARAM_PRIORITY;
 
+	igt_describe("Verify that context set param ioctl returns relevant error if driver "
+	       "doesn't supports assigning custom priorities from userspace");
 	igt_subtest("set-priority-not-supported") {
 		igt_require(!gem_scheduler_has_ctx_priority(fd));
 
@@ -367,11 +385,13 @@ igt_main
 		igt_assert_eq(__gem_context_set_param(fd, &arg), -ENODEV);
 	}
 
+	igt_describe("Test performed with context param set to priority");
 	igt_subtest_group {
 		igt_fixture {
 			igt_require(gem_scheduler_has_ctx_priority(fd));
 		}
 
+		igt_describe("Verify that priority is default for newly created context");
 		igt_subtest("get-priority-new-ctx") {
 			struct drm_i915_gem_context_param local_arg = arg;
 			uint32_t local_ctx = gem_context_create(fd);
@@ -384,6 +404,8 @@ igt_main
 			gem_context_destroy(fd, local_ctx);
 		}
 
+		igt_describe("Verify that relevant error is returned on setting invalid ctx size "
+		       "with default priority");
 		igt_subtest("set-priority-invalid-size") {
 			struct drm_i915_gem_context_param local_arg = arg;
 			local_arg.ctx_id = ctx;
@@ -393,6 +415,7 @@ igt_main
 			igt_assert_eq(__gem_context_set_param(fd, &local_arg), -EINVAL);
 		}
 
+		igt_describe("Change priority range to test value overflow");
 		igt_subtest("set-priority-range")
 			set_priority(fd);
 	}
@@ -401,11 +424,15 @@ igt_main
 
 	arg.param = -1; /* Should be safely unused for a while */
 
+	igt_describe("Checks that fetching context parameters using an unused param value "
+	       "is erroneous");
 	igt_subtest("invalid-param-get") {
 		arg.ctx_id = ctx;
 		igt_assert_eq(__gem_context_get_param(fd, &arg), -EINVAL);
 	}
 
+	igt_describe("Checks that setting context parameters using an unused param value "
+	       "is erroneous");
 	igt_subtest("invalid-param-set") {
 		arg.ctx_id = ctx;
 		igt_assert_eq(__gem_context_set_param(fd, &arg), -EINVAL);
