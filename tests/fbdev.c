@@ -63,22 +63,20 @@ static void mode_tests(int fd)
 static void framebuffer_tests(int fd)
 {
 	struct fb_fix_screeninfo fix_info;
+	void * volatile map;
 
 	igt_fixture {
 		igt_require(ioctl(fd, FBIOGET_FSCREENINFO, &fix_info) == 0);
-	}
-
-	igt_describe("Check mmap operations on framebuffer memory");
-	igt_subtest("mmap") {
-		void *map;
-
-		igt_require(fix_info.smem_len);
+		igt_assert(fix_info.smem_len);
 
 		map = mmap(NULL, fix_info.smem_len,
 			   PROT_WRITE, MAP_SHARED, fd, 0);
 		igt_assert(map != MAP_FAILED);
 
 		memset(map, 0, fix_info.smem_len);
+	}
+
+	igt_fixture {
 		munmap(map, fix_info.smem_len);
 	}
 }
