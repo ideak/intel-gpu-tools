@@ -525,10 +525,12 @@ static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 	 * See:
 	 * https://en.wikipedia.org/wiki/Standard_deviation#Rules_for_normally_distributed_data
 	 */
-	igt_assert_f(fabs(mean - expected) < 1.718 * stddev,
-		     "vblank interval differs from modeline! expected %.1fus, measured %1.fus +- %.3fus, difference %.1fus (%.1f sigma)\n",
+	igt_assert_f(fabs(mean - expected) < max(line_time(kmode), 1.718 * stddev),
+		     "vblank interval differs from modeline! expected %.1fus, measured %1.fus +- %.3fus, difference %.1fus (%.1f sigma, %.1f scanlines)\n",
 		     expected, mean, stddev,
-		     fabs(mean - expected), fabs(mean - expected) / stddev);
+		     fabs(mean - expected),
+		     fabs(mean - expected) / stddev,
+		     fabs(mean - expected) / line_time(kmode));
 }
 
 static void test_crtc_config(const struct test_config *tconf,
