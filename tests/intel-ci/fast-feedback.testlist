@@ -4,6 +4,7 @@ igt@core_auth@basic-auth
 igt@debugfs_test@read_all_entries
 igt@fbdev@eof
 igt@fbdev@info
+igt@fbdev@nullptr
 igt@fbdev@read
 igt@fbdev@write
 igt@gem_basic@bad-close

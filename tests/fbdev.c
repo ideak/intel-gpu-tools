@@ -251,6 +251,21 @@ static void framebuffer_tests(int fd)
 		igt_assert_f(ret == 0, "read at EOF, ret=%zd\n", ret);
 	}
 
+	igt_describe("Check framebuffer access with NULL");
+	igt_subtest("nullptr") {
+		ssize_t ret;
+
+		ret = pread(fd, NULL, fix_info.smem_len, 0);
+		igt_assert_f(ret == -1 && errno == EFAULT,
+			     "reading into NULL did not return EFAULT, ret=%zd\n",
+			     ret);
+
+		ret = pwrite(fd, NULL, fix_info.smem_len, 0);
+		igt_assert_f(ret == -1 && errno == EFAULT,
+			     "writing from NULL did not return EFAULT, ret=%zd\n",
+			     ret);
+	}
+
 	igt_fixture {
 		free(buf);
 		/* don't leave garbage on the screen */
