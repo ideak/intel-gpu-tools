@@ -714,7 +714,7 @@ static size_t hugepagesize(void)
 
 		if (sscanf(line + strlen(LINE), "%zu", &sz) == 1) {
 			sz <<= 10;
-			igt_debug("Found huge page size: %lu\n", sz);
+			igt_debug("Found huge page size: %zu\n", sz);
 		}
 		break;
 	}
