@@ -160,6 +160,47 @@ static void framebuffer_tests(int fd)
 		}
 	}
 
+	igt_describe("Check write operations on unaligned locations in framebuffer memory");
+	igt_subtest("unaligned-write") {
+		const unsigned char *pos;
+		ssize_t ret;
+		size_t len;
+		off_t off;
+
+		off = pagesize + (pagesize >> 2); /* 1.25 * pagesize */
+		len = (pagesize << 2) + (pagesize >> 1); /* 4.5 * pagesize */
+		igt_require_f(off + len < fix_info.smem_len,
+			      "framebuffer too small to test\n");
+
+		/* read at unaligned location and compare */
+		memset(map, 0xff, fix_info.smem_len);
+		memset(buf, 0, fix_info.smem_len);
+		memset(&buf[off], 0x55, len);
+
+		ret = pwrite(fd, &buf[off], len, off);
+		igt_assert_f(ret == (ssize_t)len,
+			     "pwrite failed, ret=%zd\n", ret);
+
+		pos = memchr(map, 0x55, fix_info.smem_len);
+		igt_assert_f(pos, "0x55 not found within framebuffer\n");
+		igt_assert_f(pos == &map[off],
+			     "0x55 found at pos %zu, expected %lld\n",
+			     pos - map, (long long)off);
+
+		pos = memchr(&map[off], 0xff, fix_info.smem_len - off);
+		igt_assert_f(pos, "0xff not found within framebuffer\n");
+		igt_assert_f(pos == &map[off + len],
+			     "0xff found at pos %zu, expected %lld\n",
+			     pos - map, (long long)(off + len));
+
+		pos = memchr(&map[off + len],
+			     0x55,
+			     fix_info.smem_len - (off + len));
+		igt_assert_f(pos,
+			     "found 0x55 at pos %zu, none expected\n",
+			     pos - map);
+	}
+
 	igt_fixture {
 		free(buf);
 		/* don't leave garbage on the screen */
