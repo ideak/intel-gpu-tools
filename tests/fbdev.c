@@ -25,6 +25,7 @@
 
 #include "igt.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -62,8 +63,10 @@ static void mode_tests(int fd)
 
 static void framebuffer_tests(int fd)
 {
+	const int values[] = { 0, 0x55, 0xaa, 0xff };
 	struct fb_fix_screeninfo fix_info;
 	void * volatile map;
+	void * volatile buf;
 
 	igt_fixture {
 		igt_require(ioctl(fd, FBIOGET_FSCREENINFO, &fix_info) == 0);
@@ -73,10 +76,30 @@ static void framebuffer_tests(int fd)
 			   PROT_WRITE, MAP_SHARED, fd, 0);
 		igt_assert(map != MAP_FAILED);
 
-		memset(map, 0, fix_info.smem_len);
+		buf = malloc(fix_info.smem_len);
+		igt_require(buf);
+	}
+
+	igt_describe("Check read operations on framebuffer memory");
+	igt_subtest("read") {
+		ssize_t ret;
+
+		/* fill framebuffer and compare */
+		for (int i = 0; i < ARRAY_SIZE(values); i++) {
+			memset(map, values[i], fix_info.smem_len);
+			ret = pread(fd, buf, fix_info.smem_len, 0);
+			igt_assert_f(ret == (ssize_t)fix_info.smem_len,
+				     "pread failed, ret=%zd\n", ret);
+			igt_assert_f(!memcmp(map, buf, fix_info.smem_len),
+				     "read differs from mapped framebuffer for %x\n",
+				     values[i]);
+		}
 	}
 
 	igt_fixture {
+		free(buf);
+		/* don't leave garbage on the screen */
+		memset(map, 0, fix_info.smem_len);
 		munmap(map, fix_info.smem_len);
 	}
 }
