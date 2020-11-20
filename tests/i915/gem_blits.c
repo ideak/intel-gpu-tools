@@ -738,9 +738,9 @@ igt_main
 		struct buffer *src, *dst;
 		unsigned int x, y;
 
-		for (unsigned int height = 1; height <= 16; height <<= 1) {
+		for (unsigned int height = 1; height <= 16; height <<= 2) {
 			for (unsigned int y0 = ZERO; y0 <= (height > 2 ? BELOW : ZERO); y0++) {
-				for (unsigned int width = 1; width <= 64; width <<= 1) {
+				for (unsigned int width = 1; width <= 64; width <<= 2) {
 					for (unsigned int x0 = ZERO; x0 <= (width > 2 ? BELOW : ZERO); x0++) {
 
 						src = buffer_create(&device,
