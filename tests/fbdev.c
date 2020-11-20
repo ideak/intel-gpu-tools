@@ -144,6 +144,22 @@ static void framebuffer_tests(int fd)
 			     pos - buf);
 	}
 
+	igt_describe("Check write operations on framebuffer memory");
+	igt_subtest("write") {
+		ssize_t ret;
+
+		/* write to framebuffer and compare */
+		for (int i = 0; i < ARRAY_SIZE(values); i++) {
+			memset(buf, values[i], fix_info.smem_len);
+			ret = pwrite(fd, buf, fix_info.smem_len, 0);
+			igt_assert_f(ret == (ssize_t)fix_info.smem_len,
+				     "pwrite failed, ret=%zd\n", ret);
+			igt_assert_f(!memcmp(map, buf, fix_info.smem_len),
+				     "write differs from mapped framebuffer for %x\n",
+				     values[i]);
+		}
+	}
+
 	igt_fixture {
 		free(buf);
 		/* don't leave garbage on the screen */
