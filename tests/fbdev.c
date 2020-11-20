@@ -37,11 +37,55 @@
 
 #include "igt.h"
 
-igt_main
+static void mode_tests(int fd)
 {
 	struct fb_var_screeninfo var_info;
 	struct fb_fix_screeninfo fix_info;
-	int fd = -1;
+
+	igt_fixture {
+		igt_require(ioctl(fd, FBIOGET_VSCREENINFO, &var_info) == 0);
+		igt_require(ioctl(fd, FBIOGET_FSCREENINFO, &fix_info) == 0);
+	}
+
+	igt_describe("Check if screeninfo is valid");
+	igt_subtest("info") {
+		unsigned long size;
+
+		size = var_info.yres * fix_info.line_length;
+		igt_assert_f(size <= fix_info.smem_len,
+			     "screen size (%d x %d) of pitch %d does not fit within mappable area of size %u\n",
+			     var_info.xres, var_info.yres,
+			     fix_info.line_length,
+			     fix_info.smem_len);
+	}
+}
+
+static void framebuffer_tests(int fd)
+{
+	struct fb_fix_screeninfo fix_info;
+
+	igt_fixture {
+		igt_require(ioctl(fd, FBIOGET_FSCREENINFO, &fix_info) == 0);
+	}
+
+	igt_describe("Check mmap operations on framebuffer memory");
+	igt_subtest("mmap") {
+		void *map;
+
+		igt_require(fix_info.smem_len);
+
+		map = mmap(NULL, fix_info.smem_len,
+			   PROT_WRITE, MAP_SHARED, fd, 0);
+		igt_assert(map != MAP_FAILED);
+
+		memset(map, 0, fix_info.smem_len);
+		munmap(map, fix_info.smem_len);
+	}
+}
+
+igt_main
+{
+	volatile int fd = -1;
 
 	/*
 	 * Should this test focus on the fbdev independent of any drm driver,
@@ -54,33 +98,16 @@ igt_main
 			fd = open("/dev/fb0", O_RDWR);
 		}
 		igt_require_f(fd != -1, "/dev/fb0\n");
-
-		igt_require(ioctl(fd, FBIOGET_VSCREENINFO, &var_info) == 0);
-		igt_require(ioctl(fd, FBIOGET_FSCREENINFO, &fix_info) == 0);
 	}
 
-	igt_subtest("info") {
-		unsigned long size;
-
-		size = var_info.yres * fix_info.line_length;
-		igt_assert_f(size <= fix_info.smem_len,
-			     "screen size (%d x %d) of pitch %d does not fit within mappable area of size %u\n",
-			     var_info.xres, var_info.yres,
-			     fix_info.line_length,
-			     fix_info.smem_len);
+	igt_describe("Check modesetting");
+	igt_subtest_group {
+		mode_tests(fd);
 	}
 
-	igt_subtest("mmap") {
-		void *map;
-
-		igt_require(fix_info.smem_len);
-
-		map = mmap(NULL, fix_info.smem_len,
-			   PROT_WRITE, MAP_SHARED, fd, 0);
-		igt_assert(map != MAP_FAILED);
-
-		memset(map, 0, fix_info.smem_len);
-		munmap(map, fix_info.smem_len);
+	igt_describe("Check framebuffer access");
+	igt_subtest_group {
+		framebuffer_tests(fd);
 	}
 
 	igt_fixture {
