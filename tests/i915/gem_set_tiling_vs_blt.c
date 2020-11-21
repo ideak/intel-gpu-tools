@@ -91,7 +91,7 @@ static void do_test(struct buf_ops *bops, uint32_t tiling, unsigned stride,
 	int i, fd = buf_ops_get_fd(bops);
 	uint32_t *ptr;
 	uint32_t blt_stride, blt_bits;
-	uint32_t busy_ctx, ring = I915_EXEC_DEFAULT;
+	uint32_t ring = I915_EXEC_DEFAULT;
 	bool tiling_changed = false;
 
 	ibb = intel_bb_create_with_relocs(fd, 4096);
@@ -99,8 +99,7 @@ static void do_test(struct buf_ops *bops, uint32_t tiling, unsigned stride,
 	igt_info("filling ring\n");
 	if (HAS_BLT_RING(ibb->devid))
 		ring = I915_EXEC_BLT;
-	busy_ctx = gem_context_create(fd);
-	busy = igt_spin_new(fd, .ctx = busy_ctx, .engine = ring);
+	busy = igt_spin_new(fd, .engine = ring);
 
 	igt_info("playing tricks .. ");
 	/* first allocate the target so it gets out of the way of playing funky
@@ -188,6 +187,7 @@ static void do_test(struct buf_ops *bops, uint32_t tiling, unsigned stride,
 	intel_bb_emit_reloc_fenced(ibb, test_buf->handle,
 				   I915_GEM_DOMAIN_RENDER, 0, 0, 0);
 	intel_bb_flush_blit(ibb);
+	igt_spin_free(fd, busy);
 	/* Now try to trick the kernel the kernel into changing up the fencing
 	 * too early. */
 	igt_info("checking .. ");
@@ -209,8 +209,6 @@ static void do_test(struct buf_ops *bops, uint32_t tiling, unsigned stride,
 	gem_munmap(ptr, TEST_SIZE);
 	igt_assert(tiling_changed);
 
-	igt_spin_free(fd, busy);
-	gem_context_destroy(fd, busy_ctx);
 	intel_buf_destroy(test_buf);
 	intel_buf_destroy(target_buf);
 
