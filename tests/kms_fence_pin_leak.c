@@ -212,6 +212,7 @@ igt_simple_main
 	data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 	igt_require_gem(data.drm_fd);
 	igt_require(gem_available_fences(data.drm_fd) > 0);
+	igt_require(gem_has_contexts(data.drm_fd));
 
 	data.devid = intel_get_drm_devid(data.drm_fd);
 
@@ -220,9 +221,6 @@ igt_simple_main
 	data.bops = buf_ops_create(data.drm_fd);
 
 	igt_display_require(&data.display, data.drm_fd);
-
-	ctx = gem_context_create(data.drm_fd);
-	gem_context_destroy(data.drm_fd, ctx);
 
 	alloc_fence_objs(&data);
 
