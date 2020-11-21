@@ -1195,19 +1195,18 @@ static bool intel_bb_debug_tree = false;
  */
 static void __reallocate_objects(struct intel_bb *ibb)
 {
-	uint32_t num;
+	const uint32_t inc = 4096 / sizeof(*ibb->objects);
 
 	if (ibb->num_objects == ibb->allocated_objects) {
-		num = 4096 / sizeof(*ibb->objects);
 		ibb->objects = realloc(ibb->objects,
 				       sizeof(*ibb->objects) *
-				       (num + ibb->allocated_objects));
+				       (inc + ibb->allocated_objects));
 
 		igt_assert(ibb->objects);
-		ibb->allocated_objects += num;
+		ibb->allocated_objects += inc;
 
 		memset(&ibb->objects[ibb->num_objects],	0,
-		       num * sizeof(*ibb->objects));
+		       inc * sizeof(*ibb->objects));
 	}
 }
 
@@ -1597,6 +1596,8 @@ __add_to_cache(struct intel_bb *ibb, uint32_t handle)
 	struct drm_i915_gem_exec_object2 **found, *object;
 
 	object = malloc(sizeof(*object));
+	igt_assert(object);
+
 	object->handle = handle;
 	found = tsearch((void *) object, &ibb->root, __compare_objects);
 
@@ -1620,16 +1621,18 @@ static int __compare_handles(const void *p1, const void *p2)
 static void __add_to_objects(struct intel_bb *ibb,
 			     struct drm_i915_gem_exec_object2 *object)
 {
-	uint32_t i, **found, *handle;
+	uint32_t **found, *handle;
 
 	handle = malloc(sizeof(*handle));
+	igt_assert(handle);
+
 	*handle = object->handle;
 	found = tsearch((void *) handle, &ibb->current, __compare_handles);
 
 	if (*found == handle) {
 		__reallocate_objects(ibb);
-		i = ibb->num_objects++;
-		ibb->objects[i] = object;
+		igt_assert(ibb->num_objects < ibb->allocated_objects);
+		ibb->objects[ibb->num_objects++] = object;
 	} else {
 		free(handle);
 	}
@@ -2123,7 +2126,7 @@ static int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	objects = create_objects_array(ibb);
-	execbuf.buffers_ptr = (uintptr_t) objects;
+	execbuf.buffers_ptr = to_user_pointer(objects);
 	execbuf.buffer_count = ibb->num_objects;
 	execbuf.batch_len = end_offset;
 	execbuf.rsvd1 = ibb->ctx;
