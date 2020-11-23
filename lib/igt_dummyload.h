@@ -71,6 +71,7 @@ struct igt_spin_factory {
 #define IGT_SPIN_NO_PREEMPTION (1 << 4)
 #define IGT_SPIN_INVALID_CS    (1 << 5)
 #define IGT_SPIN_USERPTR       (1 << 6)
+#define IGT_SPIN_SOFTDEP       (1 << 7)
 
 igt_spin_t *
 __igt_spin_factory(int fd, const struct igt_spin_factory *opts);

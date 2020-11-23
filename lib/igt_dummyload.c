@@ -161,19 +161,20 @@ emit_recursive_batch(igt_spin_t *spin,
 	if (opts->dependency) {
 		igt_assert(!(opts->flags & IGT_SPIN_POLL_RUN));
 
-		r = &relocs[obj[BATCH].relocation_count++];
-
-		/* dummy write to dependency */
 		obj[SCRATCH].handle = opts->dependency;
 		obj[SCRATCH].offset = addr;
-		obj[SCRATCH].flags = EXEC_OBJECT_WRITE;
+		if (!(opts->flags & IGT_SPIN_SOFTDEP)) {
+			obj[SCRATCH].flags = EXEC_OBJECT_WRITE;
 
-		r->presumed_offset = obj[SCRATCH].offset;
-		r->target_handle = obj[SCRATCH].handle;
-		r->offset = sizeof(uint32_t) * 1020;
-		r->delta = 0;
-		r->read_domains = I915_GEM_DOMAIN_RENDER;
-		r->write_domain = I915_GEM_DOMAIN_RENDER;
+			/* dummy write to dependency */
+			r = &relocs[obj[BATCH].relocation_count++];
+			r->presumed_offset = obj[SCRATCH].offset;
+			r->target_handle = obj[SCRATCH].handle;
+			r->offset = sizeof(uint32_t) * 1020;
+			r->delta = 0;
+			r->read_domains = I915_GEM_DOMAIN_RENDER;
+			r->write_domain = I915_GEM_DOMAIN_RENDER;
+		}
 
 		execbuf->buffer_count++;
 	} else if (opts->flags & IGT_SPIN_POLL_RUN) {
