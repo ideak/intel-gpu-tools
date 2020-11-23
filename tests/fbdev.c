@@ -140,7 +140,7 @@ static void framebuffer_tests(int fd)
 		pos = memchr(&buf[off + len],
 			     0x55,
 			     fix_info.smem_len - (off + len));
-		igt_assert_f(pos,
+		igt_assert_f(!pos,
 			     "found 0x55 at pos %zu, none expected\n",
 			     pos - buf);
 	}
@@ -197,7 +197,7 @@ static void framebuffer_tests(int fd)
 		pos = memchr(&map[off + len],
 			     0x55,
 			     fix_info.smem_len - (off + len));
-		igt_assert_f(pos,
+		igt_assert_f(!pos,
 			     "found 0x55 at pos %zu, none expected\n",
 			     pos - map);
 	}
