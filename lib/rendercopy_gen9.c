@@ -293,7 +293,7 @@ gen7_fill_vertex_buffer_data(struct intel_bb *ibb,
 		emit_vertex_normalized(ibb, src_x, intel_buf_width(src));
 		emit_vertex_normalized(ibb, src_y, intel_buf_height(src));
 	} else {
-		emit_vertex_2s(ibb, (dst_x + width)/64, DIV_ROUND_UP(dst_y + height, 16));
+		emit_vertex_2s(ibb, DIV_ROUND_UP(dst_x + width, 64), DIV_ROUND_UP(dst_y + height, 16));
 
 		emit_vertex_normalized(ibb, 0, 0);
 		emit_vertex_normalized(ibb, 0, 0);
