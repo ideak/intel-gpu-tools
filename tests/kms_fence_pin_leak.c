@@ -206,7 +206,6 @@ static void run_test(data_t *data)
 
 igt_simple_main
 {
-	uint32_t ctx;
 	data_t data = {};
 
 	data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
