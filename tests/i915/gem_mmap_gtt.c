@@ -713,7 +713,7 @@ test_hang(int fd)
 	count = 0;
 	dir = igt_debugfs_dir(fd);
 	igt_until_timeout(5) {
-		igt_sysfs_set(dir, "i915_wedged", "-1");
+		igt_sysfs_printf(dir, "i915_wedged", "%llu", -1ull);
 		if (READ_ONCE(control->error))
 			break;
 		count++;

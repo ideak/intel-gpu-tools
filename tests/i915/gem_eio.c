@@ -88,7 +88,7 @@ static void manual_hang(int drm_fd)
 {
 	int dir = igt_debugfs_dir(drm_fd);
 
-	igt_sysfs_set(dir, "i915_wedged", "-1");
+	igt_sysfs_printf(dir, "i915_wedged", "%llu", -1ull);
 
 	close(dir);
 }
@@ -236,7 +236,7 @@ static void hang_handler(union sigval arg)
 				    "%d", DROP_RCU));
 
 	igt_nsec_elapsed(ts);
-	igt_assert(igt_sysfs_set(dir, "i915_wedged", "-1"));
+	igt_assert(igt_sysfs_printf(dir, "i915_wedged", "%llu", -1ull));
 	/* -> wake up gem_sync() in check_wait() */
 
 	sched_yield();

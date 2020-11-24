@@ -123,7 +123,7 @@ static void reset_device(int i915)
 
 	if (ioctl(i915, DRM_IOCTL_I915_GEM_THROTTLE)) {
 		igt_info("Found wedged device, trying to reset and continue\n");
-		igt_sysfs_set(dir, "i915_wedged", "-1");
+		igt_sysfs_printf(dir, "i915_wedged", "%llu", -1ull);
 	}
 	igt_sysfs_set(dir, "i915_next_seqno", "1");
 

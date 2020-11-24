@@ -103,7 +103,7 @@ static void test_invalid(int i915, int engine)
 	igt_assert(igt_sysfs_scanf(engine, ATTR, "%u", &saved) == 1);
 	igt_debug("Initial %s:%u\n", ATTR, saved);
 
-	igt_sysfs_printf(engine, ATTR, PRIu64, -1);
+	igt_sysfs_printf(engine, ATTR, "%llu", -1ull);
 	igt_sysfs_scanf(engine, ATTR, "%u", &delay);
 	igt_assert_eq(delay, saved);
 
@@ -111,7 +111,7 @@ static void test_invalid(int i915, int engine)
 	igt_sysfs_scanf(engine, ATTR, "%u", &delay);
 	igt_assert_eq(delay, saved);
 
-	igt_sysfs_printf(engine, ATTR, PRIu64, 40ull << 32);
+	igt_sysfs_printf(engine, ATTR, "%llu", 40ull << 32);
 	igt_sysfs_scanf(engine, ATTR, "%u", &delay);
 	igt_assert_eq(delay, saved);
 }
