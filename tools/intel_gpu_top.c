@@ -55,6 +55,7 @@ struct pmu_counter {
 	unsigned int idx;
 	struct pmu_pair val;
 	double scale;
+	const char *units;
 	bool present;
 };
 
@@ -85,17 +86,14 @@ struct engines {
 	unsigned int num_rapl;
 
 	int imc_fd;
-	double imc_reads_scale;
-	const char *imc_reads_unit;
-	double imc_writes_scale;
-	const char *imc_writes_unit;
+	struct pmu_counter imc_reads;
+	struct pmu_counter imc_writes;
+	unsigned int num_imc;
 
 	struct pmu_counter freq_req;
 	struct pmu_counter freq_act;
 	struct pmu_counter irq;
 	struct pmu_counter rc6;
-	struct pmu_counter imc_reads;
-	struct pmu_counter imc_writes;
 
 	bool discrete;
 	char *device;
@@ -136,14 +134,14 @@ static int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
 	return ret;
 }
 
-static int rapl_parse(struct pmu_counter *pmu, const char *str)
+static int pmu_parse(struct pmu_counter *pmu, const char *path, const char *str)
 {
 	locale_t locale, oldlocale;
 	bool result = true;
 	char buf[128] = {};
 	int dir;
 
-	dir = open("/sys/devices/power", O_RDONLY);
+	dir = open(path, O_RDONLY);
 	if (dir < 0)
 		return -errno;
 
@@ -160,10 +158,8 @@ static int rapl_parse(struct pmu_counter *pmu, const char *str)
 	result &= igt_sysfs_scanf(dir, buf, "%lf", &pmu->scale) == 1;
 
 	snprintf(buf, sizeof(buf) - 1, "events/energy-%s.unit", str);
-	if (igt_sysfs_scanf(dir, buf, "%127s", buf) == 1 &&
-	    strcmp(buf, "Joules"))
-		fprintf(stderr, "Unexpected units for RAPL %s: found %s\n",
-			str, buf);
+	result &= igt_sysfs_scanf(dir, buf, "%127s", buf) == 1;
+	pmu->units = strdup(buf);
 
 	uselocale(oldlocale);
 	freelocale(locale);
@@ -175,6 +171,24 @@ static int rapl_parse(struct pmu_counter *pmu, const char *str)
 
 	if (isnan(pmu->scale) || !pmu->scale)
 		return -ERANGE;
+
+	return 0;
+}
+
+static int rapl_parse(struct pmu_counter *pmu, const char *str)
+{
+	const char *expected_units = "Joules";
+	int err;
+
+	err = pmu_parse(pmu, "/sys/devices/power", str);
+	if (err < 0)
+		return err;
+
+	if (!pmu->units || strcmp(pmu->units, expected_units)) {
+		fprintf(stderr,
+			"Unexpected units for RAPL %s: found '%s', expected '%s'\n",
+			str, pmu->units, expected_units);
+	}
 
 	return 0;
 }
@@ -400,116 +414,6 @@ static struct engines *discover_engines(char *device)
 	return engines;
 }
 
-static int
-filename_to_buf(const char *filename, char *buf, unsigned int bufsize)
-{
-	int fd, err;
-	ssize_t ret;
-
-	fd = open(filename, O_RDONLY);
-	if (fd < 0)
-		return -1;
-
-	ret = read(fd, buf, bufsize - 1);
-	err = errno;
-	close(fd);
-	if (ret < 1) {
-		errno = ret < 0 ? err : ENOMSG;
-
-		return -1;
-	}
-
-	if (ret > 1 && buf[ret - 1] == '\n')
-		buf[ret - 1] = '\0';
-	else
-		buf[ret] = '\0';
-
-	return 0;
-}
-
-static uint64_t filename_to_u64(const char *filename, int base)
-{
-	char buf[64], *b;
-
-	if (filename_to_buf(filename, buf, sizeof(buf)))
-		return 0;
-
-	/*
-	 * Handle both single integer and key=value formats by skipping
-	 * leading non-digits.
-	 */
-	b = buf;
-	while (*b && !isdigit(*b))
-		b++;
-
-	return strtoull(b, NULL, base);
-}
-
-static double filename_to_double(const char *filename)
-{
-	char *oldlocale;
-	char buf[80];
-	double v;
-
-	if (filename_to_buf(filename, buf, sizeof(buf)))
-		return 0;
-
-	oldlocale = setlocale(LC_ALL, "C");
-	v = strtod(buf, NULL);
-	setlocale(LC_ALL, oldlocale);
-
-	return v;
-}
-
-#define IMC_ROOT "/sys/devices/uncore_imc/"
-#define IMC_EVENT "/sys/devices/uncore_imc/events/"
-
-static uint64_t imc_type_id(void)
-{
-	return filename_to_u64(IMC_ROOT "type", 10);
-}
-
-static uint64_t imc_data_reads(void)
-{
-	return filename_to_u64(IMC_EVENT "data_reads", 0);
-}
-
-static double imc_data_reads_scale(void)
-{
-	return filename_to_double(IMC_EVENT "data_reads.scale");
-}
-
-static const char *imc_data_reads_unit(void)
-{
-	char buf[32];
-
-	if (filename_to_buf(IMC_EVENT "data_reads.unit", buf, sizeof(buf)) == 0)
-		return strdup(buf);
-	else
-		return NULL;
-}
-
-static uint64_t imc_data_writes(void)
-{
-	return filename_to_u64(IMC_EVENT "data_writes", 0);
-}
-
-static double imc_data_writes_scale(void)
-{
-	return filename_to_double(IMC_EVENT "data_writes.scale");
-}
-
-static const char *imc_data_writes_unit(void)
-{
-	char buf[32];
-
-	if (filename_to_buf(IMC_EVENT "data_writes.unit",
-			    buf, sizeof(buf)) == 0)
-		return strdup(buf);
-	else
-		return NULL;
-}
-
 #define _open_pmu(type, cnt, pmu, fd) \
 ({ \
 	int fd__; \
@@ -525,20 +429,41 @@ static const char *imc_data_writes_unit(void)
 	fd__; \
 })
 
-#define _open_imc(cnt, pmu, fd) \
-({ \
-	int fd__; \
-\
-	fd__ = igt_perf_open_group(imc_type_id(), (pmu)->config, (fd)); \
-	if (fd__ >= 0) { \
-		if ((fd) == -1) \
-			(fd) = fd__; \
-		(pmu)->present = true; \
-		(pmu)->idx = (cnt)++; \
-	} \
-\
-	fd__; \
-})
+static int imc_parse(struct pmu_counter *pmu, const char *str)
+{
+	return pmu_parse(pmu, "/sys/devices/uncore_imc", str);
+}
+
+static void
+imc_open(struct pmu_counter *pmu,
+	 const char *domain,
+	 struct engines *engines)
+{
+	int fd;
+
+	if (imc_parse(pmu, domain) < 0)
+		return;
+
+	fd = igt_perf_open_group(pmu->type, pmu->config, engines->imc_fd);
+	if (fd < 0)
+		return;
+
+	if (engines->imc_fd == -1)
+		engines->imc_fd = fd;
+
+	pmu->idx = engines->num_imc++;
+	pmu->present = true;
+}
+
+static void imc_writes_open(struct pmu_counter *pmu, struct engines *engines)
+{
+	imc_open(pmu, "data_writes", engines);
+}
+
+static void imc_reads_open(struct pmu_counter *pmu, struct engines *engines)
+{
+	imc_open(pmu, "data_reads", engines);
+}
 
 static int pmu_init(struct engines *engines)
 {
@@ -595,38 +520,8 @@ static int pmu_init(struct engines *engines)
 	}
 
 	engines->imc_fd = -1;
-	if (imc_type_id()) {
-		unsigned int num = 0;
-
-		engines->imc_reads_scale = imc_data_reads_scale();
-		engines->imc_writes_scale = imc_data_writes_scale();
-
-		engines->imc_reads_unit = imc_data_reads_unit();
-		if (!engines->imc_reads_unit)
-			return -1;
-
-		engines->imc_writes_unit = imc_data_writes_unit();
-		if (!engines->imc_writes_unit)
-			return -1;
-
-		engines->imc_reads.config = imc_data_reads();
-		if (!engines->imc_reads.config)
-			return -1;
-
-		engines->imc_writes.config = imc_data_writes();
-		if (!engines->imc_writes.config)
-			return -1;
-
-		fd = _open_imc(num, &engines->imc_reads, engines->imc_fd);
-		if (fd < 0)
-			return -1;
-		fd = _open_imc(num, &engines->imc_writes, engines->imc_fd);
-		if (fd < 0)
-			return -1;
-
-		engines->imc_reads.present = true;
-		engines->imc_writes.present = true;
-	}
+	imc_reads_open(&engines->imc_reads, engines);
+	imc_writes_open(&engines->imc_writes, engines);
 
 	return 0;
 }
@@ -692,13 +587,6 @@ static void pmu_sample(struct engines *engines)
 	unsigned int i;
 
 	engines->ts.prev = engines->ts.cur;
-
-	if (engines->imc_fd >= 0) {
-		pmu_read_multi(engines->imc_fd, 2, val);
-		update_sample(&engines->imc_reads, val);
-		update_sample(&engines->imc_writes, val);
-	}
-
 	engines->ts.cur = pmu_read_multi(engines->fd, num_val, val);
 
 	update_sample(&engines->freq_req, val);
@@ -718,6 +606,12 @@ static void pmu_sample(struct engines *engines)
 		pmu_read_multi(engines->rapl_fd, engines->num_rapl, val);
 		update_sample(&engines->r_gpu, val);
 		update_sample(&engines->r_pkg, val);
+	}
+
+	if (engines->num_imc) {
+		pmu_read_multi(engines->imc_fd, engines->num_imc, val);
+		update_sample(&engines->imc_reads, val);
+		update_sample(&engines->imc_writes, val);
 	}
 }
 
@@ -1172,9 +1066,9 @@ static int
 print_imc(struct engines *engines, double t, int lines, int con_w, int con_h)
 {
 	struct cnt_item imc_items[] = {
-		{ &engines->imc_reads, 6, 0, 1.0, t, engines->imc_reads_scale,
+		{ &engines->imc_reads, 6, 0, 1.0, t, engines->imc_reads.scale,
 		  "reads", "rd" },
-		{ &engines->imc_writes, 6, 0, 1.0, t, engines->imc_writes_scale,
+		{ &engines->imc_writes, 6, 0, 1.0, t, engines->imc_writes.scale,
 		  "writes", "wr" },
 		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit" },
 		{ },
@@ -1189,12 +1083,15 @@ print_imc(struct engines *engines, double t, int lines, int con_w, int con_h)
 	};
 	int ret;
 
+	if (!engines->num_imc)
+		return lines;
+
 	ret = asprintf((char **)&imc_group.display_name, "IMC %s/s",
-			engines->imc_reads_unit);
+			engines->imc_reads.units);
 	assert(ret >= 0);
 
 	ret = asprintf((char **)&imc_items[2].unit, "%s/s",
-			engines->imc_reads_unit);
+			engines->imc_reads.units);
 	assert(ret >= 0);
 
 	print_groups(groups);
@@ -1205,11 +1102,11 @@ print_imc(struct engines *engines, double t, int lines, int con_w, int con_h)
 	if (output_mode == INTERACTIVE) {
 		if (lines++ < con_h)
 			printf("      IMC reads:   %s %s/s\n",
-			       imc_items[0].buf, engines->imc_reads_unit);
+			       imc_items[0].buf, engines->imc_reads.units);
 
 		if (lines++ < con_h)
 			printf("     IMC writes:   %s %s/s\n",
-			       imc_items[1].buf, engines->imc_writes_unit);
+			       imc_items[1].buf, engines->imc_writes.units);
 
 		if (lines++ < con_h)
 			printf("\n");
@@ -1509,9 +1406,7 @@ int main(int argc, char **argv)
 					     t, lines, con_w, con_h,
 					     &consumed);
 
-			if (engines->imc_fd)
-				lines = print_imc(engines, t, lines, con_w,
-						  con_h);
+			lines = print_imc(engines, t, lines, con_w, con_h);
 
 			lines = print_engines_header(engines, t, lines, con_w,
 						     con_h);
