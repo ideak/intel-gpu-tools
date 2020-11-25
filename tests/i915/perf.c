@@ -384,11 +384,17 @@ gen8_read_report_clock_ratios(const uint32_t *report,
 	*unslice_freq_mhz = (unslice_freq * 16666) / 1000;
 }
 
+static uint32_t
+gen8_report_reason(const uint32_t *report)
+{
+	return ((report[0] >> OAREPORT_REASON_SHIFT) &
+		OAREPORT_REASON_MASK);
+}
+
 static const char *
 gen8_read_report_reason(const uint32_t *report)
 {
-	uint32_t reason = ((report[0] >> OAREPORT_REASON_SHIFT) &
-			   OAREPORT_REASON_MASK);
+	uint32_t reason = gen8_report_reason(report);
 
 	if (reason & (1<<0))
 		return "timer";
@@ -467,8 +473,7 @@ oa_report_is_periodic(uint32_t oa_exponent, const uint32_t *report)
 		if ((report[1] & oa_exponent_mask) == (1 << oa_exponent))
 			return true;
 	} else {
-		if ((report[0] >> OAREPORT_REASON_SHIFT) &
-		    OAREPORT_REASON_TIMER)
+		if (gen8_report_reason(report) & OAREPORT_REASON_TIMER)
 			return true;
 	}
 
@@ -775,17 +780,24 @@ gen8_sanity_check_test_oa_reports(const uint32_t *oa_report0,
 					format.b_off);
 	uint32_t *rpt1_b = (uint32_t *)(((uint8_t *)oa_report1) +
 					format.b_off);
+	uint32_t report_reason0, report_reason1;
 	uint32_t b;
 	uint32_t ref;
 
+	igt_debug("report type: %s->%s\n",
+		  gen8_read_report_reason(oa_report0),
+		  gen8_read_report_reason(oa_report1));
 
-	igt_assert_neq(time_delta, 0);
-	igt_assert_neq(clock_delta, 0);
-
-	freq = ((uint64_t)clock_delta * 1000) / time_delta;
+	freq = time_delta ? ((uint64_t)clock_delta * 1000) / time_delta : 0;
 	igt_debug("freq = %"PRIu64"\n", freq);
 
-	igt_assert(freq <= gt_max_freq_mhz);
+	/* Either we have 2 reports back to back with the same
+	 * timestamp and those should have different reason, or we
+	 * were able to compute a frequency because the timestamps are
+	 * different.
+	 */
+	igt_assert(freq || (gen8_report_reason(oa_report0) !=
+			    gen8_report_reason(oa_report1)));
 
 	igt_debug("clock delta = %"PRIu32"\n", clock_delta);
 
@@ -823,42 +835,50 @@ gen8_sanity_check_test_oa_reports(const uint32_t *oa_report0,
 	 * multiple of the gpu clock
 	 */
 	if (format.n_b) {
-		b = rpt1_b[0] - rpt0_b[0];
-		igt_debug("B0: delta = %"PRIu32"\n", b);
-		igt_assert_eq(b, 0);
+		if (clock_delta > 0) {
+			b = rpt1_b[0] - rpt0_b[0];
+			igt_debug("B0: delta = %"PRIu32"\n", b);
+			igt_assert_eq(b, 0);
 
-		b = rpt1_b[1] - rpt0_b[1];
-		igt_debug("B1: delta = %"PRIu32"\n", b);
-		igt_assert_eq(b, clock_delta);
+			b = rpt1_b[1] - rpt0_b[1];
+			igt_debug("B1: delta = %"PRIu32"\n", b);
+			igt_assert_eq(b, clock_delta);
 
-		b = rpt1_b[2] - rpt0_b[2];
-		igt_debug("B2: delta = %"PRIu32"\n", b);
-		igt_assert_eq(b, clock_delta);
+			b = rpt1_b[2] - rpt0_b[2];
+			igt_debug("B2: delta = %"PRIu32"\n", b);
+			igt_assert_eq(b, clock_delta);
 
-		b = rpt1_b[3] - rpt0_b[3];
-		ref = clock_delta / 2;
-		igt_debug("B3: delta = %"PRIu32"\n", b);
-		igt_assert(b >= ref - 1 && b <= ref + 1);
+			b = rpt1_b[3] - rpt0_b[3];
+			ref = clock_delta / 2;
+			igt_debug("B3: delta = %"PRIu32"\n", b);
+			igt_assert(b >= ref - 1 && b <= ref + 1);
 
-		b = rpt1_b[4] - rpt0_b[4];
-		ref = clock_delta / 3;
-		igt_debug("B4: delta = %"PRIu32"\n", b);
-		igt_assert(b >= ref - 1 && b <= ref + 1);
+			b = rpt1_b[4] - rpt0_b[4];
+			ref = clock_delta / 3;
+			igt_debug("B4: delta = %"PRIu32"\n", b);
+			igt_assert(b >= ref - 1 && b <= ref + 1);
 
-		b = rpt1_b[5] - rpt0_b[5];
-		ref = clock_delta / 3;
-		igt_debug("B5: delta = %"PRIu32"\n", b);
-		igt_assert(b >= ref - 1 && b <= ref + 1);
+			b = rpt1_b[5] - rpt0_b[5];
+			ref = clock_delta / 3;
+			igt_debug("B5: delta = %"PRIu32"\n", b);
+			igt_assert(b >= ref - 1 && b <= ref + 1);
 
-		b = rpt1_b[6] - rpt0_b[6];
-		ref = clock_delta / 6;
-		igt_debug("B6: delta = %"PRIu32"\n", b);
-		igt_assert(b >= ref - 1 && b <= ref + 1);
+			b = rpt1_b[6] - rpt0_b[6];
+			ref = clock_delta / 6;
+			igt_debug("B6: delta = %"PRIu32"\n", b);
+			igt_assert(b >= ref - 1 && b <= ref + 1);
 
-		b = rpt1_b[7] - rpt0_b[7];
-		ref = clock_delta * 2 / 3;
-		igt_debug("B7: delta = %"PRIu32"\n", b);
-		igt_assert(b >= ref - 1 && b <= ref + 1);
+			b = rpt1_b[7] - rpt0_b[7];
+			ref = clock_delta * 2 / 3;
+			igt_debug("B7: delta = %"PRIu32"\n", b);
+			igt_assert(b >= ref - 1 && b <= ref + 1);
+		} else {
+			for (int j = 0; j < format.n_b; j++) {
+				b = rpt1_b[j] - rpt0_b[j];
+				igt_debug("B%i: delta = %"PRIu32"\n", j, b);
+				igt_assert_eq(b, 0);
+			}
+		}
 	}
 
 	for (int j = 0; j < format.n_c; j++) {
@@ -2344,8 +2364,7 @@ num_valid_reports_captured(struct drm_i915_perf_open_param *param,
 			if (header->type == DRM_I915_PERF_RECORD_SAMPLE) {
 				uint32_t *report = (void *)(header + 1);
 
-				if ((report[0] >> OAREPORT_REASON_SHIFT) &
-				    OAREPORT_REASON_TIMER)
+				if (gen8_report_reason(report) & OAREPORT_REASON_TIMER)
 					num_reports++;
 			}
 		}
@@ -3610,8 +3629,7 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 				lprev = report;
 
 				/* Print out reason for the report. */
-				reason = ((report[0] >> OAREPORT_REASON_SHIFT) &
-					  OAREPORT_REASON_MASK);
+				reason = gen8_report_reason(report);
 
 				if (reason & OAREPORT_REASON_CTX_SWITCH) {
 					report_reason = "ctx-load";
