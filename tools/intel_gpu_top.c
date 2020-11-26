@@ -151,13 +151,13 @@ static int pmu_parse(struct pmu_counter *pmu, const char *path, const char *str)
 
 	result &= igt_sysfs_scanf(dir, "type", "%"PRIu64, &pmu->type) == 1;
 
-	snprintf(buf, sizeof(buf) - 1, "events/energy-%s", str);
+	snprintf(buf, sizeof(buf) - 1, "events/%s", str);
 	result &= igt_sysfs_scanf(dir, buf, "event=%"PRIx64, &pmu->config) == 1;
 
-	snprintf(buf, sizeof(buf) - 1, "events/energy-%s.scale", str);
+	snprintf(buf, sizeof(buf) - 1, "events/%s.scale", str);
 	result &= igt_sysfs_scanf(dir, buf, "%lf", &pmu->scale) == 1;
 
-	snprintf(buf, sizeof(buf) - 1, "events/energy-%s.unit", str);
+	snprintf(buf, sizeof(buf) - 1, "events/%s.unit", str);
 	result &= igt_sysfs_scanf(dir, buf, "%127s", buf) == 1;
 	pmu->units = strdup(buf);
 
@@ -217,13 +217,13 @@ rapl_open(struct pmu_counter *pmu,
 static void gpu_power_open(struct pmu_counter *pmu,
 			   struct engines *engines)
 {
-	rapl_open(pmu, "gpu", engines);
+	rapl_open(pmu, "energy-gpu", engines);
 }
 
 static void pkg_power_open(struct pmu_counter *pmu,
 			   struct engines *engines)
 {
-	rapl_open(pmu, "pkg", engines);
+	rapl_open(pmu, "energy-pkg", engines);
 }
 
 static uint64_t
