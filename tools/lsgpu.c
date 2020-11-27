@@ -72,6 +72,7 @@
 enum {
 	OPT_PRINT_SIMPLE   = 's',
 	OPT_PRINT_DETAIL   = 'p',
+	OPT_NUMERIC        = 'n',
 	OPT_LIST_VENDORS   = 'v',
 	OPT_LIST_FILTERS   = 'l',
 	OPT_DEVICE         = 'd',
@@ -86,6 +87,7 @@ static char *igt_device;
 static const char *usage_str =
 	"usage: lsgpu [options]\n\n"
 	"Options:\n"
+	"  -n, --numeric               Print vendor/device as hex\n"
 	"  -s, --print-simple          Print simple (legacy) device details\n"
 	"  -p, --print-details         Print devices with details\n"
 	"  -v, --list-vendors          List recognized vendors\n"
@@ -160,6 +162,7 @@ int main(int argc, char *argv[])
 		{"drm",               no_argument,       NULL, 0},
 		{"sysfs",             no_argument,       NULL, 1},
 		{"pci",               no_argument,       NULL, 2},
+		{"numeric",           no_argument,       NULL, OPT_NUMERIC},
 		{"print-simple",      no_argument,       NULL, OPT_PRINT_SIMPLE},
 		{"print-detail",      no_argument,       NULL, OPT_PRINT_DETAIL},
 		{"list-vendors",      no_argument,       NULL, OPT_LIST_VENDORS},
@@ -174,10 +177,13 @@ int main(int argc, char *argv[])
 			.type = IGT_PRINT_USER,
 	};
 
-	while ((c = getopt_long(argc, argv, "spvld:h",
+	while ((c = getopt_long(argc, argv, "nspvld:h",
 				long_options, &index)) != -1) {
 		switch(c) {
 
+		case OPT_NUMERIC:
+			fmt.numeric = true;
+			break;
 		case OPT_PRINT_SIMPLE:
 			fmt.type = IGT_PRINT_SIMPLE;
 			break;
