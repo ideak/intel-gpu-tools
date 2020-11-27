@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  */
 
+#include <sys/poll.h>
 #include <zlib.h>
 
 #include "i915/gem.h"
@@ -524,6 +525,7 @@ static void prioinv(int fd, int dir, unsigned ring, const char *name)
 		  gtt, ram);
 
 	count = min(gtt, ram) / 4;
+	count = min(count, 256); /* Keep the duration within reason */
 	igt_require(count > 1);
 
 	intel_require_memory(count, size, CHECK_RAM);
@@ -535,18 +537,26 @@ static void prioinv(int fd, int dir, unsigned ring, const char *name)
 	igt_assert(pipe(link) == 0);
 	igt_fork(child, 1) {
 		fd = gem_reopen_driver(fd);
-		igt_debug("Submitting large hang + capture\n");
+		igt_debug("Submitting large capture [%ld x %dMiB objects]\n",
+			  count, (int)(size >> 20));
 		free(__captureN(fd, dir, ring, size, count, ASYNC));
 		write(link[1], &fd, sizeof(fd)); /* wake the parent up */
 		igt_force_gpu_reset(fd);
+		write(link[1], &fd, sizeof(fd)); /* wake the parent up */
 	}
 	read(link[0], &dummy, sizeof(dummy));
+	igt_require_f(poll(&(struct pollfd){link[0], POLLIN}, 1, 500) == 0,
+		      "Capture completed too quickly! Will not block\n");
 
 	igt_debug("Submitting nop\n");
 	gem_execbuf(fd, &execbuf);
 	igt_assert_eq(gem_wait(fd, obj.handle, &timeout), 0);
 	gem_close(fd, obj.handle);
 
+	igt_assert_f(poll(&(struct pollfd){link[0], POLLIN}, 1, 0) == 0,
+		     "Capture completed before nop!\n");
+
+	igt_debug("Waiting for capture/reset to complete\n");
 	igt_waitchildren();
 	close(link[0]);
 	close(link[1]);
