@@ -49,6 +49,7 @@ enum igt_devices_print_option {
 struct igt_devices_print_format {
 	enum igt_devices_print_type   type;
 	enum igt_devices_print_option option;
+	bool numeric;
 };
 
 #define INTEGRATED_I915_GPU_PCI_ID "0000:00:02.0"
@@ -58,6 +59,7 @@ struct igt_device_card {
 	char card[NAME_MAX];
 	char render[NAME_MAX];
 	char pci_slot_name[PCI_SLOT_NAME_SIZE+1];
+	uint16_t pci_vendor, pci_device;
 };
 
 void igt_devices_scan(bool force);
@@ -84,6 +86,7 @@ bool igt_device_card_match_pci(const char *filter,
 	struct igt_device_card *card);
 bool igt_device_find_first_i915_discrete_card(struct igt_device_card *card);
 bool igt_device_find_integrated_card(struct igt_device_card *card);
+char *igt_device_get_pretty_name(struct igt_device_card *card, bool numeric);
 int igt_open_card(struct igt_device_card *card);
 int igt_open_render(struct igt_device_card *card);
 

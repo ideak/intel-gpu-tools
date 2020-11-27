@@ -25,7 +25,9 @@
 #include "igt_core.h"
 #include "igt_device_scan.h"
 #include "igt_list.h"
+#include "intel_chipset.h"
 
+#include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <glib.h>
@@ -178,12 +180,46 @@ static struct {
 	bool devs_scanned;
 } igt_devs;
 
+typedef char *(*devname_fn)(uint16_t, uint16_t);
+
+static char *devname_hex(uint16_t vendor, uint16_t device)
+{
+	char *s;
+
+	igt_assert(asprintf(&s, "%04x:%04x", vendor, device) == 9);
+
+	return s;
+}
+
+static char *devname_intel(uint16_t vendor, uint16_t device)
+{
+	const struct intel_device_info *info = intel_get_device_info(device);
+	char *devname = NULL, *s;
+
+	if (info->codename) {
+		devname = strdup(info->codename);
+
+		if (devname) {
+			devname[0] = toupper(devname[0]);
+			igt_assert(asprintf(&s, "Intel %s (Gen%u)", devname,
+					    ffs(info->gen)) != -1);
+			free(devname);
+		}
+	}
+
+	if (!devname)
+		s = devname_hex(vendor, device);
+
+	return s;
+}
+
 static struct {
 	const char *name;
 	const char *vendor_id;
+	devname_fn devname;
 } pci_vendor_mapping[] = {
-	{ "intel", "8086" },
-	{ "amd", "1002" },
+	{ "intel", "8086", devname_intel },
+	{ "amd", "1002", devname_hex },
 	{ NULL, },
 };
 
@@ -196,6 +232,42 @@ static const char *get_pci_vendor_id_by_name(const char *name)
 	}
 
 	return NULL;
+}
+
+static devname_fn get_pci_vendor_device_fn(uint16_t vendor)
+{
+	char vendorstr[5];
+
+	snprintf(vendorstr, sizeof(vendorstr), "%04x", vendor);
+
+	for (typeof(*pci_vendor_mapping) *vm = pci_vendor_mapping; vm->name; vm++) {
+		if (!strcasecmp(vendorstr, vm->vendor_id))
+			return vm->devname;
+	}
+
+	return devname_hex;
+}
+
+static void get_pci_vendor_device(const struct igt_device *dev,
+				  uint16_t *vendorp, uint16_t *devicep)
+{
+	igt_assert(dev && dev->vendor && dev->device);
+	igt_assert(vendorp && devicep);
+
+	igt_assert(sscanf(dev->vendor, "%hx", vendorp) == 1);
+	igt_assert(sscanf(dev->device, "%hx", devicep) == 1);
+}
+
+static char *__pci_pretty_name(uint16_t vendor, uint16_t device, bool numeric)
+{
+	devname_fn fn;
+
+	if (!numeric)
+		fn = get_pci_vendor_device_fn(vendor);
+	else
+		fn = devname_hex;
+
+	return fn(vendor, device);
 }
 
 /* Reading sysattr values can take time (even seconds),
@@ -446,23 +518,44 @@ static bool is_vendor_matched(struct igt_device *dev, const char *vendor)
 	return !strcasecmp(dev->vendor, vendor_id);
 }
 
+static char *safe_strncpy(char *dst, const char *src, int n)
+{
+	char *s;
+
+	igt_assert(n > 0);
+	igt_assert(dst && src);
+
+	s = strncpy(dst, src, n - 1);
+	s[n - 1] = '\0';
+
+	return s;
+}
+
 static void
 __copy_dev_to_card(struct igt_device *dev, struct igt_device_card *card)
 {
 	if (dev->subsystem != NULL)
-		strncpy(card->subsystem, dev->subsystem,
-			sizeof(card->subsystem) - 1);
+		safe_strncpy(card->subsystem, dev->subsystem,
+			     sizeof(card->subsystem));
 
 	if (dev->drm_card != NULL)
-		strncpy(card->card, dev->drm_card, sizeof(card->card) - 1);
+		safe_strncpy(card->card, dev->drm_card, sizeof(card->card));
 
 	if (dev->drm_render != NULL)
-		strncpy(card->render, dev->drm_render,
-			sizeof(card->render) - 1);
+		safe_strncpy(card->render, dev->drm_render,
+			     sizeof(card->render));
 
 	if (dev->pci_slot_name != NULL)
-		strncpy(card->pci_slot_name, dev->pci_slot_name,
-			PCI_SLOT_NAME_SIZE + 1);
+		safe_strncpy(card->pci_slot_name, dev->pci_slot_name,
+			     sizeof(card->pci_slot_name));
+
+	if (dev->vendor != NULL)
+		if (sscanf(dev->vendor, "%hx", &card->pci_vendor) != 1)
+			card->pci_vendor = 0;
+
+	if (dev->device != NULL)
+		if (sscanf(dev->device, "%hx", &card->pci_device) != 1)
+			card->pci_device = 0;
 }
 
 /*
@@ -852,6 +945,7 @@ static void __print_filter(char *buf, int len,
 	};
 }
 
+#define VENDOR_SIZE 30
 static void
 igt_devs_print_user(struct igt_list_head *view,
 		    const struct igt_devices_print_format *fmt)
@@ -883,11 +977,19 @@ igt_devs_print_user(struct igt_list_head *view,
 			continue;
 
 		if (pci_dev) {
+			uint16_t vendor, device;
+			char *devname;
+
+			get_pci_vendor_device(pci_dev, &vendor, &device);
+			devname = __pci_pretty_name(vendor, device, fmt->numeric);
+
 			__print_filter(filter, sizeof(filter), fmt, pci_dev,
 				       false);
-			printf("%-24s%4s:%4s    %s\n",
-			       drm_name, pci_dev->vendor, pci_dev->device,
-			       filter);
+
+			printf("%-24s %-*s    %s\n",
+			       drm_name, VENDOR_SIZE, devname, filter);
+
+			free(devname);
 		} else {
 			__print_filter(filter, sizeof(filter), fmt, dev, false);
 			printf("%-24s             %s\n", drm_name, filter);
@@ -919,7 +1021,7 @@ igt_devs_print_user(struct igt_list_head *view,
 			if (fmt->option != IGT_PRINT_PCI) {
 				__print_filter(filter, sizeof(filter), fmt,
 					       dev2, true);
-				printf("             %s\n", filter);
+				printf("%-*s     %s\n", VENDOR_SIZE, "", filter);
 			} else {
 				printf("\n");
 			}
@@ -1477,6 +1579,30 @@ bool igt_device_card_match_pci(const char *filter,
 			struct igt_device_card *card)
 {
        return __igt_device_card_match(filter, card, true);
+}
+
+/**
+ * igt_device_get_pretty_name
+ * @card: pointer to igt_device_card struct
+ *
+ * For card function returns allocated string having pretty name
+ * or vendor:device as hex if no backend pretty-resolver is implemented.
+ *
+ * Returns: newly allocated string.
+ */
+char *igt_device_get_pretty_name(struct igt_device_card *card, bool numeric)
+{
+	char *devname;
+
+	igt_assert(card);
+
+	if (strlen(card->pci_slot_name))
+		devname = __pci_pretty_name(card->pci_vendor, card->pci_device,
+					    numeric);
+	else
+		devname = strdup(card->subsystem);
+
+	return devname;
 }
 
 /**
