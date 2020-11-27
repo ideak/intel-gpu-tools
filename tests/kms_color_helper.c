@@ -277,77 +277,48 @@ pipe_set_property_blob(igt_pipe_t *pipe,
 				       COMMIT_ATOMIC : COMMIT_LEGACY);
 }
 
-void
-invalid_gamma_lut_sizes(data_t *data)
+static void
+invalid_lut_sizes(data_t *data, enum igt_atomic_crtc_properties prop, int size)
 {
 	igt_display_t *display = &data->display;
 	igt_pipe_t *pipe = &display->pipes[0];
-	size_t gamma_lut_size = data->gamma_lut_size *
-				sizeof(struct drm_color_lut);
-	struct drm_color_lut *gamma_lut;
+	struct drm_color_lut *lut;
+	size_t lut_size = size * sizeof(lut[0]);
 
-	igt_require(igt_pipe_obj_has_prop(pipe, IGT_CRTC_GAMMA_LUT));
+	igt_require(igt_pipe_obj_has_prop(pipe, prop));
 
-	gamma_lut = malloc(gamma_lut_size * 2);
+	lut = malloc(lut_size * 2);
 
 	igt_display_commit2(display,
 			    display->is_atomic ?
 			    COMMIT_ATOMIC : COMMIT_LEGACY);
 
-	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_GAMMA_LUT,
-					     gamma_lut, 1), -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_GAMMA_LUT,
-					     gamma_lut, gamma_lut_size + 1),
-					     -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_GAMMA_LUT,
-					     gamma_lut, gamma_lut_size - 1),
-					     -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_GAMMA_LUT,
-					     gamma_lut, gamma_lut_size +
-					     sizeof(struct drm_color_lut)),
-					     -EINVAL);
-	igt_assert_eq(pipe_set_property_blob_id(pipe, IGT_CRTC_GAMMA_LUT,
-		      pipe->crtc_id), -EINVAL);
-	igt_assert_eq(pipe_set_property_blob_id(pipe, IGT_CRTC_GAMMA_LUT,
-		      4096 * 4096), -EINVAL);
+	igt_assert_eq(pipe_set_property_blob(pipe, prop, lut,
+					     1), -EINVAL);
+	igt_assert_eq(pipe_set_property_blob(pipe, prop, lut,
+					     lut_size + 1), -EINVAL);
+	igt_assert_eq(pipe_set_property_blob(pipe, prop, lut,
+					     lut_size - 1), -EINVAL);
+	igt_assert_eq(pipe_set_property_blob(pipe, prop, lut,
+					     lut_size + sizeof(struct drm_color_lut)), -EINVAL);
+	igt_assert_eq(pipe_set_property_blob_id(pipe, prop,
+						pipe->crtc_id), -EINVAL);
+	igt_assert_eq(pipe_set_property_blob_id(pipe, prop,
+						4096 * 4096), -EINVAL);
 
-	free(gamma_lut);
+	free(lut);
+}
+
+void
+invalid_gamma_lut_sizes(data_t *data)
+{
+	invalid_lut_sizes(data, IGT_CRTC_GAMMA_LUT, data->gamma_lut_size);
 }
 
 void
 invalid_degamma_lut_sizes(data_t *data)
 {
-	igt_display_t *display = &data->display;
-	igt_pipe_t *pipe = &display->pipes[0];
-	size_t degamma_lut_size = data->degamma_lut_size *
-				  sizeof(struct drm_color_lut);
-	struct drm_color_lut *degamma_lut;
-
-	igt_require(igt_pipe_obj_has_prop(pipe, IGT_CRTC_DEGAMMA_LUT));
-
-	degamma_lut = malloc(degamma_lut_size * 2);
-
-	igt_display_commit2(display, display->is_atomic ?
-			    COMMIT_ATOMIC : COMMIT_LEGACY);
-
-	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_DEGAMMA_LUT,
-					     degamma_lut, 1), -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_DEGAMMA_LUT,
-					     degamma_lut, degamma_lut_size + 1),
-					     -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_DEGAMMA_LUT,
-					     degamma_lut, degamma_lut_size - 1),
-					     -EINVAL);
-	igt_assert_eq(pipe_set_property_blob(pipe, IGT_CRTC_DEGAMMA_LUT,
-					     degamma_lut, degamma_lut_size +
-					     sizeof(struct drm_color_lut)),
-					     -EINVAL);
-	igt_assert_eq(pipe_set_property_blob_id(pipe, IGT_CRTC_DEGAMMA_LUT,
-						pipe->crtc_id), -EINVAL);
-	igt_assert_eq(pipe_set_property_blob_id(pipe, IGT_CRTC_DEGAMMA_LUT,
-						4096 * 4096), -EINVAL);
-
-	free(degamma_lut);
+	invalid_lut_sizes(data, IGT_CRTC_DEGAMMA_LUT, data->degamma_lut_size);
 }
 
 void invalid_ctm_matrix_sizes(data_t *data)
