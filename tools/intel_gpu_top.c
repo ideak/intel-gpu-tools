@@ -964,6 +964,7 @@ static bool print_groups(struct cnt_group **groups)
 
 static int
 print_header(const struct igt_device_card *card,
+	     const char *codename,
 	     struct engines *engines, double t,
 	     int lines, int con_w, int con_h, bool *consumed)
 {
@@ -1043,7 +1044,7 @@ print_header(const struct igt_device_card *card,
 		printf("\033[H\033[J");
 
 		if (lines++ < con_h) {
-			printf("intel-gpu-top: %s - ", card->card);
+			printf("intel-gpu-top: %s @ %s - ", codename, card->card);
 			printf("%s/%s MHz;  %s%% RC6; ",
 			       freq_items[1].buf, freq_items[0].buf,
 			       rc6_items[0].buf);
@@ -1256,6 +1257,7 @@ int main(int argc, char **argv)
 	bool list_device = false;
 	char *pmu_device, *opt_device = NULL;
 	struct igt_device_card card;
+	char *codename = NULL;
 
 	/* Parse options */
 	while ((ch = getopt(argc, argv, "o:s:d:JLlh")) != -1) {
@@ -1380,6 +1382,7 @@ int main(int argc, char **argv)
 	ret = EXIT_SUCCESS;
 
 	pmu_sample(engines);
+	codename = igt_device_get_pretty_name(&card, false);
 
 	while (!stop_top) {
 		bool consumed = false;
@@ -1402,7 +1405,7 @@ int main(int argc, char **argv)
 			break;
 
 		while (!consumed) {
-			lines = print_header(&card, engines,
+			lines = print_header(&card, codename, engines,
 					     t, lines, con_w, con_h,
 					     &consumed);
 
@@ -1427,6 +1430,7 @@ int main(int argc, char **argv)
 		usleep(period_us);
 	}
 
+	free(codename);
 err:
 	free(engines);
 	free(pmu_device);

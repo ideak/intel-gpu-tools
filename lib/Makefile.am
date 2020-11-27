@@ -118,7 +118,9 @@ libigt_device_scan_la_SOURCES = \
 	igt_list.c		\
 	igt_tools_stub.c	\
 	igt_device_scan.c	\
-	igt_device_scan.h
+	igt_device_scan.h	\
+	intel_device_info.c	\
+	intel_chipset.h
 
 libigt_perf_la_SOURCES = \
 	igt_perf.c	 \
