@@ -103,14 +103,19 @@ void free_lut(gamma_lut_t *gamma)
 	free(gamma);
 }
 
+static void set_rgb(color_t *coeff, double value)
+{
+	coeff->r = coeff->g = coeff->b = value;
+}
+
 gamma_lut_t *generate_table(int lut_size, double exp)
 {
 	gamma_lut_t *gamma = alloc_lut(lut_size);
 	int i;
 
-	gamma->coeffs[0] = 0.0;
+	set_rgb(&gamma->coeffs[0], 0.0);
 	for (i = 1; i < lut_size; i++)
-		gamma->coeffs[i] = pow(i * 1.0 / (lut_size - 1), exp);
+		set_rgb(&gamma->coeffs[i], pow(i * 1.0 / (lut_size - 1), exp));
 
 	return gamma;
 }
@@ -120,9 +125,9 @@ gamma_lut_t *generate_table_max(int lut_size)
 	gamma_lut_t *gamma = alloc_lut(lut_size);
 	int i;
 
-	gamma->coeffs[0] = 0.0;
+	set_rgb(&gamma->coeffs[0], 0.0);
 	for (i = 1; i < lut_size; i++)
-		gamma->coeffs[i] = 1.0;
+		set_rgb(&gamma->coeffs[i], 1.0);
 
 	return gamma;
 }
@@ -133,7 +138,7 @@ gamma_lut_t *generate_table_zero(int lut_size)
 	int i;
 
 	for (i = 0; i < lut_size; i++)
-		gamma->coeffs[i] = 0.0;
+		set_rgb(&gamma->coeffs[i], 0.0);
 
 	return gamma;
 }
@@ -158,7 +163,9 @@ struct drm_color_lut *coeffs_to_lut(data_t *data,
 	if (IS_CHERRYVIEW(data->devid))
 		lut_size -= 1;
 	for (i = 0; i < lut_size; i++) {
-		uint32_t v = (gamma->coeffs[i] * max_value);
+		uint32_t r = gamma->coeffs[i].r * max_value;
+		uint32_t g = gamma->coeffs[i].g * max_value;
+		uint32_t b = gamma->coeffs[i].b * max_value;
 
 		/*
 		 * Hardware might encode colors on a different number of bits
@@ -166,11 +173,13 @@ struct drm_color_lut *coeffs_to_lut(data_t *data,
 		 * Mask the lower bits not provided by the framebuffer so we
 		 * can do CRC comparisons.
 		 */
-		v &= mask;
+		r &= mask;
+		g &= mask;
+		b &= mask;
 
-		lut[i].red = v;
-		lut[i].green = v;
-		lut[i].blue = v;
+		lut[i].red = r;
+		lut[i].green = g;
+		lut[i].blue = b;
 	}
 
 	if (IS_CHERRYVIEW(data->devid))

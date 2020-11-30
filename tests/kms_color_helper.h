@@ -61,7 +61,7 @@ typedef struct {
 
 typedef struct {
 	int size;
-	double coeffs[];
+	color_t coeffs[];
 } gamma_lut_t;
 
 void paint_gradient_rectangles(data_t *data,
