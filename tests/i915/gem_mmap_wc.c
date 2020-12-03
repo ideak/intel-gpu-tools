@@ -394,7 +394,7 @@ test_set_cache_level(int fd)
 	memset(&res, 0, sizeof(res));
 	res.count_crtcs = 32;
 	res.crtc_id_ptr = to_user_pointer(crtc);
-	do_ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res);
+	igt_skip_on(igt_ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res));
 	for (n = 0; n < res.count_crtcs; n++) {
 		struct drm_mode_crtc mode;
 
