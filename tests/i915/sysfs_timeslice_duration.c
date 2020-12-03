@@ -315,6 +315,8 @@ static void test_duration(int i915, int engine)
 {
 	int delays[] = { 1, 50, 100, 500 };
 	unsigned int saved, heartbeat;
+	uint64_t elapsed;
+	int epsilon;
 
 	/*
 	 * Timeslicing at its very basic level is sharing the GPU by
@@ -333,20 +335,27 @@ static void test_duration(int i915, int engine)
 	gem_quiescent_gpu(i915);
 
 	disable_heartbeat(engine, &heartbeat);
-	for (int i = 0; i < ARRAY_SIZE(delays); i++) {
-		uint64_t elapsed;
 
+	elapsed = __test_duration(i915, engine, 1);
+	epsilon = 2 * elapsed / 1000 / 1000;
+	if (epsilon < 50)
+		epsilon = 50;
+	igt_info("Minimum duration measured as %.3fms; setting error threshold to %dms\n",
+		 elapsed * 1e-6, epsilon);
+	igt_require(epsilon < 1000);
+
+	for (int i = 0; i < ARRAY_SIZE(delays); i++) {
 		elapsed = __test_duration(i915, engine, delays[i]);
 		igt_info("%s:%d, elapsed=%.3fms\n",
 			 ATTR, delays[i], elapsed * 1e-6);
 
 		/*
-		 * We need to give a couple of jiffies slack for the scheduler timeouts
-		 * and then a little more slack fr the overhead in submitting and
-		 * measuring. 50ms should cover all of our sins and be useful
-		 * tolerance.
+		 * We need to give a couple of jiffies slack for the scheduler
+		 * timeouts and then a little more slack fr the overhead in
+		 * submitting and measuring. 50ms should cover all of our sins
+		 * and be useful tolerance.
 		 */
-		igt_assert_f(elapsed / 1000 / 1000 < delays[i] + 50,
+		igt_assert_f(elapsed / 1000 / 1000 < delays[i] + epsilon,
 			     "Timeslice exceeded request!\n");
 	}
 	enable_heartbeat(engine, heartbeat);
@@ -399,6 +408,8 @@ static void test_timeout(int i915, int engine)
 {
 	int delays[] = { 1, 50, 100, 500 };
 	unsigned int saved;
+	uint64_t elapsed;
+	int epsilon;
 
 	/*
 	 * Timeslicing requires us to preempt the running context in order to
@@ -415,20 +426,26 @@ static void test_timeout(int i915, int engine)
 	gem_quiescent_gpu(i915);
 	igt_require(enable_hangcheck(i915, false));
 
-	for (int i = 0; i < ARRAY_SIZE(delays); i++) {
-		uint64_t elapsed;
+	elapsed = __test_timeout(i915, engine, 1);
+	epsilon = 2 * elapsed / 1000 / 1000;
+	if (epsilon < 50)
+		epsilon = 50;
+	igt_info("Minimum timeout measured as %.3fms; setting error threshold to %dms\n",
+		 elapsed * 1e-6, epsilon);
+	igt_require(epsilon < 1000);
 
+	for (int i = 0; i < ARRAY_SIZE(delays); i++) {
 		elapsed = __test_timeout(i915, engine, delays[i]);
 		igt_info("%s:%d, elapsed=%.3fms\n",
 			 ATTR, delays[i], elapsed * 1e-6);
 
 		/*
-		 * We need to give a couple of jiffies slack for the scheduler timeouts
-		 * and then a little more slack fr the overhead in submitting and
-		 * measuring. 50ms should cover all of our sins and be useful
-		 * tolerance.
+		 * We need to give a couple of jiffies slack for the scheduler
+		 * timeouts and then a little more slack fr the overhead in
+		 * submitting and measuring. 50ms should cover all of our sins
+		 * and be useful tolerance.
 		 */
-		igt_assert_f(elapsed / 1000 / 1000 < delays[i] + 50,
+		igt_assert_f(elapsed / 1000 / 1000 < delays[i] + epsilon,
 			     "Timeslice exceeded request!\n");
 	}
 
