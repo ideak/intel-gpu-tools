@@ -505,10 +505,21 @@ static void blit(struct buf_ops *bops,
 	intel_bb_exec(ibb, intel_bb_offset(ibb), flags, true);
 	check_buf(dst, COLOR_77);
 
-	poff2_src = intel_bb_get_object_offset(ibb, src->handle);
-	poff2_dst = intel_bb_get_object_offset(ibb, dst->handle);
-	igt_assert(poff_src == poff2_src);
-	igt_assert(poff_dst == poff2_dst);
+	/*
+	 * Since we let the objects idle, if the GTT is shared, another client
+	 * is liable to reuse our offsets for themselves, causing us to have
+	 * to relocate. We don't expect this to happen as LRU eviction should
+	 * try to avoid reuse, but we use random eviction instead as it is
+	 * much quicker! Given that the kernel is *allowed* to relocate objects,
+	 * we cannot assert that the objects remain in the same location, unless
+	 * we are in full control of our own GTT.
+	 */
+	if (gem_uses_full_ppgtt(i915)) {
+		igt_assert_eq_u64(intel_bb_get_object_offset(ibb, src->handle),
+				  poff_src);
+		igt_assert_eq_u64(intel_bb_get_object_offset(ibb, dst->handle),
+				  poff_dst);
+	}
 
 	intel_buf_destroy(src);
 	intel_buf_destroy(dst);
