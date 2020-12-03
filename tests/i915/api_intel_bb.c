@@ -485,25 +485,6 @@ static void blit(struct buf_ops *bops,
 	igt_debug("bb2  presumed offset: 0x%"PRIx64"\n", poff2_bb);
 	igt_debug("src2 presumed offset: 0x%"PRIx64"\n", poff2_src);
 	igt_debug("dst2 presumed offset: 0x%"PRIx64"\n", poff2_dst);
-	if (purge_cache) {
-		if (do_relocs) {
-			igt_assert(poff2_bb == 0);
-			igt_assert(poff2_src == 0);
-			igt_assert(poff2_dst == 0);
-		} else {
-			igt_assert(poff_bb != poff2_bb);
-			igt_assert(poff_src == poff2_src);
-			igt_assert(poff_dst == poff2_dst);
-		}
-	} else {
-		igt_assert(poff_bb == poff2_bb);
-		igt_assert(poff_src == poff2_src);
-		igt_assert(poff_dst == poff2_dst);
-	}
-
-	intel_bb_emit_bbe(ibb);
-	intel_bb_exec(ibb, intel_bb_offset(ibb), flags, true);
-	check_buf(dst, COLOR_77);
 
 	/*
 	 * Since we let the objects idle, if the GTT is shared, another client
@@ -514,6 +495,28 @@ static void blit(struct buf_ops *bops,
 	 * we cannot assert that the objects remain in the same location, unless
 	 * we are in full control of our own GTT.
 	 */
+	if (gem_uses_full_ppgtt(i915)) {
+		if (purge_cache) {
+			if (do_relocs) {
+				igt_assert_eq_u64(poff2_bb,  0);
+				igt_assert_eq_u64(poff2_src, 0);
+				igt_assert_eq_u64(poff2_dst, 0);
+			} else {
+				igt_assert_neq_u64(poff_bb, poff2_bb);
+				igt_assert_eq_u64(poff_src, poff2_src);
+				igt_assert_eq_u64(poff_dst, poff2_dst);
+			}
+		} else {
+			igt_assert_eq_u64(poff_bb,  poff2_bb);
+			igt_assert_eq_u64(poff_src, poff2_src);
+			igt_assert_eq_u64(poff_dst, poff2_dst);
+		}
+	}
+
+	intel_bb_emit_bbe(ibb);
+	intel_bb_exec(ibb, intel_bb_offset(ibb), flags, true);
+	check_buf(dst, COLOR_77);
+
 	if (gem_uses_full_ppgtt(i915)) {
 		igt_assert_eq_u64(intel_bb_get_object_offset(ibb, src->handle),
 				  poff_src);
