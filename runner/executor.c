@@ -726,6 +726,8 @@ static const char *need_to_timeout(struct settings *settings,
 				   double time_since_kill,
 				   size_t disk_usage)
 {
+	int decrease = 1;
+
 	if (killed) {
 		/*
 		 * Timeout after being killed is a hardcoded amount
@@ -753,20 +755,32 @@ static const char *need_to_timeout(struct settings *settings,
 	}
 
 	/*
-	 * If we're configured to care about taints, kill the
-	 * test if there's a taint.
+	 * If we're configured to care about taints,
+	 * decrease timeouts in use if there's a taint,
+	 * or kill the test if no timeouts have been requested.
 	 */
 	if (settings->abort_mask & ABORT_TAINT &&
-	    is_tainted(taints))
-		return "Killing the test because the kernel is tainted.\n";
+	    is_tainted(taints)) {
+		/* list of timeouts that may postpone immediate kill on taint */
+		if (settings->per_test_timeout || settings->inactivity_timeout)
+			decrease = 10;
+		else
+			return "Killing the test because the kernel is tainted.\n";
+	}
 
 	if (settings->per_test_timeout != 0 &&
-	    time_since_subtest > settings->per_test_timeout)
+	    time_since_subtest > settings->per_test_timeout / decrease) {
+		if (decrease > 1)
+			return "Killing the test because the kernel is tainted.\n";
 		return show_kernel_task_state("Per-test timeout exceeded. Killing the current test with SIGQUIT.\n");
+	}
 
 	if (settings->inactivity_timeout != 0 &&
-	    time_since_activity > settings->inactivity_timeout)
+	    time_since_activity > settings->inactivity_timeout / decrease ) {
+		if (decrease > 1)
+			return "Killing the test because the kernel is tainted.\n";
 		return show_kernel_task_state("Inactivity timeout exceeded. Killing the current test with SIGQUIT.\n");
+	}
 
 	if (disk_usage_limit_exceeded(settings, disk_usage))
 		return "Disk usage limit exceeded.\n";
