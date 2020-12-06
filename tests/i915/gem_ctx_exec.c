@@ -341,6 +341,10 @@ static void close_race(int i915)
 {
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	uint32_t *contexts;
+	igt_spin_t *spin;
+
+	/* Check we can execute a polling spinner */
+	igt_spin_free(i915, igt_spin_new(i915, .flags = IGT_SPIN_POLL_RUN));
 
 	contexts = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(contexts != MAP_FAILED);
@@ -349,9 +353,7 @@ static void close_race(int i915)
 		contexts[child] = gem_context_clone_with_engines(i915, 0);
 
 	igt_fork(child, ncpus) {
-		igt_spin_t *spin;
-
-		spin = igt_spin_new(i915, .flags = IGT_SPIN_POLL_RUN);
+		spin = __igt_spin_new(i915, .flags = IGT_SPIN_POLL_RUN);
 		igt_spin_end(spin);
 		gem_sync(i915, spin->handle);
 
