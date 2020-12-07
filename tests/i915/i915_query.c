@@ -711,46 +711,15 @@ static void engines(int fd)
 	}
 
 	/* Check results match the legacy GET_PARAM (where we can). */
-	for (i = 0; i < engines->num_engines; i++) {
-		struct drm_i915_engine_info *engine =
-			(struct drm_i915_engine_info *)&engines->engines[i];
-
-		switch (engine->engine.engine_class) {
-		case I915_ENGINE_CLASS_RENDER:
-			/* Will be tested later. */
-			break;
-		case I915_ENGINE_CLASS_COPY:
-			igt_assert(gem_has_blt(fd));
-			break;
-		case I915_ENGINE_CLASS_VIDEO:
-			switch (engine->engine.engine_instance) {
-			case 0:
-				igt_assert(gem_has_bsd(fd));
-				break;
-			case 1:
-				igt_assert(gem_has_bsd2(fd));
-				break;
-			}
-			break;
-		case I915_ENGINE_CLASS_VIDEO_ENHANCE:
-			igt_assert(gem_has_vebox(fd));
-			break;
-		default:
-			igt_assert(0);
-		}
-	}
-
-	/* Reverse check to the above - all GET_PARAM engines are present. */
-	igt_assert(has_engine(engines, I915_ENGINE_CLASS_RENDER, 0));
-	if (gem_has_blt(fd))
-		igt_assert(has_engine(engines, I915_ENGINE_CLASS_COPY, 0));
-	if (gem_has_bsd(fd))
-		igt_assert(has_engine(engines, I915_ENGINE_CLASS_VIDEO, 0));
-	if (gem_has_bsd2(fd))
-		igt_assert(has_engine(engines, I915_ENGINE_CLASS_VIDEO, 1));
-	if (gem_has_vebox(fd))
-		igt_assert(has_engine(engines, I915_ENGINE_CLASS_VIDEO_ENHANCE,
-				       0));
+	igt_assert_eq(has_engine(engines, I915_ENGINE_CLASS_RENDER, 0), 1);
+	igt_assert_eq(has_engine(engines, I915_ENGINE_CLASS_COPY, 0),
+		      gem_has_blt(fd));
+	igt_assert_eq(has_engine(engines, I915_ENGINE_CLASS_VIDEO, 0),
+		      gem_has_bsd(fd));
+	igt_assert_eq(has_engine(engines, I915_ENGINE_CLASS_VIDEO, 1),
+		      gem_has_bsd2(fd));
+	igt_assert_eq(has_engine(engines, I915_ENGINE_CLASS_VIDEO_ENHANCE, 0),
+		      gem_has_vebox(fd));
 
 	free(engines);
 }
