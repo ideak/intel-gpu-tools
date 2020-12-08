@@ -24,6 +24,7 @@
 #include "i915/gem.h"
 #include "i915/gem_vm.h"
 #include "igt.h"
+#include "igt_rand.h"
 #include "igt_dummyload.h"
 
 static int vm_create_ioctl(int i915, struct drm_i915_gem_vm_control *ctl)
@@ -386,6 +387,69 @@ static void async_destroy(int i915)
 		igt_spin_free(i915, spin[i]);
 }
 
+static void destroy_race(int i915)
+{
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	uint32_t *vm;
+
+	/* Check we can execute a polling spinner */
+	igt_spin_free(i915, igt_spin_new(i915, .flags = IGT_SPIN_POLL_RUN));
+
+	vm = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	igt_assert(vm != MAP_FAILED);
+
+	for (int child = 0; child < ncpus; child++)
+		vm[child] = gem_vm_create(i915);
+
+	igt_fork(child, ncpus) {
+		uint32_t ctx = gem_context_create(i915);
+		igt_spin_t *spin;
+
+		spin = __igt_spin_new(i915, ctx, .flags = IGT_SPIN_POLL_RUN);
+		while (!READ_ONCE(vm[ncpus])) {
+			struct drm_i915_gem_context_param arg = {
+				.ctx_id = ctx,
+				.param = I915_CONTEXT_PARAM_VM,
+				.value = READ_ONCE(vm[child]),
+			};
+			igt_spin_t *nxt;
+
+			if (__gem_context_set_param(i915, &arg))
+				continue;
+
+			nxt = __igt_spin_new(i915, ctx,
+					     .flags = IGT_SPIN_POLL_RUN);
+
+			igt_spin_end(spin);
+			gem_sync(i915, spin->handle);
+			igt_spin_free(i915, spin);
+
+			usleep(1000 + hars_petruska_f54_1_random_unsafe() % 2000);
+
+			spin = nxt;
+		}
+
+		igt_spin_free(i915, spin);
+		gem_context_destroy(i915, ctx);
+	}
+
+	igt_until_timeout(5) {
+		for (int child = 0; child < ncpus; child++) {
+			gem_vm_destroy(i915, vm[child]);
+			vm[child] = gem_vm_create(i915);
+		}
+		usleep(1000 + hars_petruska_f54_1_random_unsafe() % 2000);
+	}
+
+	vm[ncpus] = 1;
+	igt_waitchildren();
+
+	for (int child = 0; child < ncpus; child++)
+		gem_vm_destroy(i915, vm[child]);
+
+	munmap(vm, 4096);
+}
+
 igt_main
 {
 	int i915 = -1;
@@ -418,6 +482,9 @@ igt_main
 
 		igt_subtest("async-destroy")
 			async_destroy(i915);
+
+		igt_subtest("destroy-race")
+			destroy_race(i915);
 	}
 
 	igt_fixture {
