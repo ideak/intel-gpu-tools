@@ -426,6 +426,7 @@ igt_main
 	int num_processes = 0;
 
 	igt_fixture {
+		const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 		uint64_t mem_size = intel_get_total_ram_mb();
 		int fd;
 
@@ -434,16 +435,16 @@ igt_main
 
 		/*
 		 * Spawn enough processes to use all memory, but each only
-		 * uses half the available mappable aperture ~128MiB.
+		 * uses a fraction of the available per-cpu memory.
 		 * Individually the processes would be ok, but en masse
 		 * we expect the shrinker to start purging objects,
 		 * and possibly fail.
 		 */
-		alloc_size = gem_mappable_aperture_size(fd) / 2;
-		num_processes = 1 + (mem_size / (alloc_size >> 20));
+		alloc_size = (mem_size + ncpus - 1) / ncpus / 8;
+		num_processes = ncpus + (mem_size / alloc_size);
 
-		igt_info("Using %d processes and %'lluMiB per process\n",
-			 num_processes, (long long)(alloc_size >> 20));
+		igt_info("Using %d processes and %'"PRIu64"MiB per process\n",
+			 num_processes, alloc_size);
 
 		intel_require_memory(num_processes, alloc_size,
 				     CHECK_SWAP | CHECK_RAM);
