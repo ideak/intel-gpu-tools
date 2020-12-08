@@ -281,6 +281,7 @@ enum igt_atomic_plane_properties {
        IGT_PLANE_PIXEL_BLEND_MODE,
        IGT_PLANE_ALPHA,
        IGT_PLANE_ZPOS,
+       IGT_PLANE_FB_DAMAGE_CLIPS,
        IGT_NUM_PLANE_PROPS
 };
 
