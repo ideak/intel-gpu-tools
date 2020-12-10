@@ -72,12 +72,14 @@ mmap_bo(int fd, uint32_t handle, uint64_t size)
 }
 
 static void *
-create_pointer_size(int fd, uint64_t size)
+create_pointer_size(int fd, uint64_t size, int tiling)
 {
 	uint32_t handle;
 	void *ptr;
 
 	handle = gem_create(fd, size);
+	if (tiling)
+		gem_set_tiling(fd, handle, tiling, 1024);
 
 	ptr = mmap_bo(fd, handle, size);
 
@@ -89,7 +91,7 @@ create_pointer_size(int fd, uint64_t size)
 static void *
 create_pointer(int fd)
 {
-	return create_pointer_size(fd, OBJECT_SIZE);
+	return create_pointer_size(fd, OBJECT_SIZE, I915_TILING_NONE);
 }
 
 static void
@@ -1180,20 +1182,23 @@ thread_fault_concurrent(void *closure)
 }
 
 static void
-test_fault_concurrent(int fd)
+test_fault_concurrent(int fd, int tiling)
 {
 	uint32_t *ptr[32];
 	struct thread_fault_concurrent thread[64];
 	int *ctl;
 	int n;
 
-	ctl = create_pointer_size(fd, 4096);
+	if (tiling != I915_TILING_NONE)
+		igt_require(gem_available_fences(fd) > 0);
+
+	ctl = create_pointer_size(fd, 4096, I915_TILING_NONE);
 	*ctl = 1;
 
 	for (n = 0; n < 32; n++) {
 		uint32_t sz = (n + 1) << 19; /* 512KiB increments */
 
-		ptr[n] = create_pointer_size(fd, sz);
+		ptr[n] = create_pointer_size(fd, sz, tiling);
 		*ptr[n] = sz / sizeof(uint32_t); /* num_elems for convenience */
 	}
 
@@ -1301,7 +1306,11 @@ igt_main
 	igt_subtest("basic-write-read-distinct")
 		test_read_write2(fd, READ_AFTER_WRITE);
 	igt_subtest("fault-concurrent")
-		test_fault_concurrent(fd);
+		test_fault_concurrent(fd, I915_TILING_NONE);
+	igt_subtest("fault-concurrent-X")
+		test_fault_concurrent(fd, I915_TILING_X);
+	igt_subtest("fault-concurrent-Y")
+		test_fault_concurrent(fd, I915_TILING_Y);
 	igt_subtest("basic-write-cpu-read-gtt")
 		test_write_cpu_read_gtt(fd);
 	igt_subtest("basic-wc")

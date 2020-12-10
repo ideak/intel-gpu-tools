@@ -207,7 +207,6 @@ i915_progs = [
 	'gem_spin_batch',
 	'gem_streaming_writes',
 	'gem_sync',
-	'gem_threaded_access_tiled',
 	'gem_tiled_blits',
 	'gem_tiled_fence_blits',
 	'gem_tiled_partial_pwrite_pread',

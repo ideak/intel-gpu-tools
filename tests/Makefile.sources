@@ -422,9 +422,6 @@ gem_streaming_writes_SOURCES = i915/gem_streaming_writes.c
 TESTS_progs += gem_sync
 gem_sync_SOURCES = i915/gem_sync.c
 
-TESTS_progs += gem_threaded_access_tiled
-gem_threaded_access_tiled_SOURCES = i915/gem_threaded_access_tiled.c
-
 TESTS_progs += gem_tiled_blits
 gem_tiled_blits_SOURCES = i915/gem_tiled_blits.c
 
