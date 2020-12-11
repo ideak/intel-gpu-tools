@@ -796,6 +796,47 @@ static void test_concurrent(int i915, const struct intel_execution_engine2 *e)
 	igt_spin_free(i915, spin);
 }
 
+static void test_submit_chain(int i915)
+{
+	const struct intel_execution_engine2 *e;
+	igt_spin_t *spin, *sn;
+	IGT_LIST_HEAD(list);
+	IGT_CORK_FENCE(cork);
+	int fence;
+
+	/* Check that we can simultaneously launch spinners on each engine */
+
+	fence = igt_cork_plug(&cork, i915);
+	__for_each_physical_engine(i915, e) {
+		spin = igt_spin_new(i915,
+				    .engine = e->flags,
+				    .fence = fence,
+				    .flags = (IGT_SPIN_POLL_RUN |
+					      IGT_SPIN_FENCE_OUT |
+					      IGT_SPIN_FENCE_SUBMIT));
+
+		fence = spin->out_fence;
+		igt_list_move(&spin->link, &list);
+	}
+
+	/* Nothing shall run until we pop the cork */
+	igt_list_for_each_entry(spin, &list, link) {
+		igt_assert(gem_bo_busy(i915, spin->handle));
+		igt_assert(!igt_spin_has_started(spin));
+	}
+
+	igt_cork_unplug(&cork);
+
+	/* Then everything shall run in parallel */
+	igt_list_for_each_entry_safe(spin, sn, &list, link) {
+		igt_spin_busywait_until_started(spin);
+		igt_spin_end(spin);
+		igt_assert_eq(sync_fence_wait(spin->out_fence, 50), 0);
+		igt_assert_eq(sync_fence_status(spin->out_fence), 1);
+		igt_spin_free(i915, spin);
+	}
+}
+
 static uint32_t batch_create(int fd)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -3030,6 +3071,11 @@ igt_main
 					igt_dynamic_f("%s", e->name)
 						test_submitN(i915, e->flags, 67);
 				}
+			}
+
+			igt_subtest("submit-chain") {
+				igt_require(has_submit_fence(i915));
+				test_submit_chain(i915);
 			}
 
 			igt_fixture {

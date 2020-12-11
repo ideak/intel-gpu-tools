@@ -65,13 +65,14 @@ struct igt_spin_factory {
 };
 
 #define IGT_SPIN_FENCE_IN      (1 << 0)
-#define IGT_SPIN_FENCE_OUT     (1 << 1)
-#define IGT_SPIN_POLL_RUN      (1 << 2)
-#define IGT_SPIN_FAST          (1 << 3)
-#define IGT_SPIN_NO_PREEMPTION (1 << 4)
-#define IGT_SPIN_INVALID_CS    (1 << 5)
-#define IGT_SPIN_USERPTR       (1 << 6)
-#define IGT_SPIN_SOFTDEP       (1 << 7)
+#define IGT_SPIN_FENCE_SUBMIT  (1 << 1)
+#define IGT_SPIN_FENCE_OUT     (1 << 2)
+#define IGT_SPIN_POLL_RUN      (1 << 3)
+#define IGT_SPIN_FAST          (1 << 4)
+#define IGT_SPIN_NO_PREEMPTION (1 << 5)
+#define IGT_SPIN_INVALID_CS    (1 << 6)
+#define IGT_SPIN_USERPTR       (1 << 7)
+#define IGT_SPIN_SOFTDEP       (1 << 8)
 
 igt_spin_t *
 __igt_spin_factory(int fd, const struct igt_spin_factory *opts);
