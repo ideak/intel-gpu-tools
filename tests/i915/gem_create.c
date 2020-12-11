@@ -51,7 +51,10 @@
 #include "intel_io.h"
 #include "intel_chipset.h"
 #include "igt_aux.h"
+#include "igt_dummyload.h"
 #include "igt_x86.h"
+#include "i915/gem.h"
+#include "i915/gem_engine_topology.h"
 #include "i915/gem_mman.h"
 #include "i915_drm.h"
 
@@ -224,6 +227,41 @@ static void always_clear(int i915, int timeout)
 	igt_info("Checked %'lu page allocations\n", checked);
 }
 
+static void busy_create(int i915, int timeout)
+{
+	struct intel_execution_engine2 *e;
+	igt_spin_t *spin[I915_EXEC_RING_MASK + 1];
+	unsigned long count = 0;
+
+	igt_fork_hang_detector(i915);
+	__for_each_physical_engine(i915, e)
+		spin[e->flags] = igt_spin_new(i915, .engine = e->flags);
+
+	igt_until_timeout(timeout) {
+		__for_each_physical_engine(i915, e) {
+			uint32_t handle;
+			igt_spin_t *next;
+
+			handle = gem_create(i915, 4096);
+			next = igt_spin_new(i915,
+					    .engine = e->flags,
+					    .dependency = handle,
+					    .flags = IGT_SPIN_SOFTDEP);
+			gem_close(i915, handle);
+
+			igt_spin_free(i915, spin[e->flags]);
+			spin[e->flags] = next;
+
+			count++;
+		}
+	}
+
+	igt_info("Created %ld objects while busy\n", count);
+
+	gem_quiescent_gpu(i915);
+	igt_stop_hang_detector();
+}
+
 static void size_update(int fd)
 {
 	int size_initial_nonaligned = 15;
@@ -255,4 +293,7 @@ igt_main
 
 	igt_subtest("create-clear")
 		always_clear(fd, 30);
+
+	igt_subtest("busy-create")
+		busy_create(fd, 30);
 }
