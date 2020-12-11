@@ -170,6 +170,7 @@ static unsigned int measured_usleep(unsigned int usec)
 #define TEST_RUNTIME_PM (8)
 #define FLAG_LONG (16)
 #define FLAG_HANG (32)
+#define TEST_S3 (64)
 
 static igt_spin_t * __spin_poll(int fd, uint32_t ctx,
 				const struct intel_execution_engine2 *e)
@@ -1578,7 +1579,7 @@ test_frequency_idle(int gem_fd)
 		     "Actual frequency should be 0 while parked!\n");
 }
 
-static bool wait_for_rc6(int fd)
+static bool wait_for_rc6(int fd, int timeout)
 {
 	struct timespec tv = {};
 	uint64_t start, now;
@@ -1594,7 +1595,7 @@ static bool wait_for_rc6(int fd)
 		now = pmu_read_single(fd);
 		if (now - start > 1e6)
 			return true;
-	} while (!igt_seconds_elapsed(&tv));
+	} while (igt_seconds_elapsed(&tv) <= timeout);
 
 	return false;
 }
@@ -1636,14 +1637,43 @@ test_rc6(int gem_fd, unsigned int flags)
 		}
 	}
 
-	igt_require(wait_for_rc6(fd));
+	igt_require(wait_for_rc6(fd, 1));
 
 	/* While idle check full RC6. */
 	prev = __pmu_read_single(fd, &ts[0]);
 	slept = measured_usleep(duration_ns / 1000);
 	idle = __pmu_read_single(fd, &ts[1]);
-	igt_debug("slept=%lu perf=%"PRIu64"\n", slept, ts[1] - ts[0]);
 
+	igt_debug("slept=%lu perf=%"PRIu64"\n", slept, ts[1] - ts[0]);
+	assert_within_epsilon(idle - prev, ts[1] - ts[0], tolerance);
+
+	if (flags & TEST_S3) {
+		/*
+		 * I expect that the system remains almost completely idle
+		 * across suspend, and that the time we spend with rc6 disable
+		 * for S3 is minimal. So across suspend I would expect that
+		 * the rc6 residency was almost the full monotonic time (i.e.
+		 * excluding the suspend time).
+		 *
+		 * However, in practice it appears we are not entering rc6
+		 * immediately after resume... A bug?
+		 */
+		prev = __pmu_read_single(fd, &ts[0]);
+		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
+					      SUSPEND_TEST_NONE);
+		idle = __pmu_read_single(fd, &ts[1]);
+		igt_debug("suspend=%"PRIu64", rc6=%"PRIu64"\n",
+			  ts[1] - ts[0], idle -prev);
+		//assert_within_epsilon(idle - prev, ts[1] - ts[0], tolerance);
+	}
+
+	igt_assert(wait_for_rc6(fd, 5));
+
+	prev = __pmu_read_single(fd, &ts[0]);
+	slept = measured_usleep(duration_ns / 1000);
+	idle = __pmu_read_single(fd, &ts[1]);
+
+	igt_debug("slept=%lu perf=%"PRIu64"\n", slept, ts[1] - ts[0]);
 	assert_within_epsilon(idle - prev, ts[1] - ts[0], tolerance);
 
 	/* Wake up device and check no RC6. */
@@ -2244,6 +2274,9 @@ igt_main
 
 	igt_subtest("rc6-runtime-pm-long")
 		test_rc6(fd, TEST_RUNTIME_PM | FLAG_LONG);
+
+	igt_subtest("rc6-suspend")
+		test_rc6(fd, TEST_S3);
 
 	/**
 	 * Check render nodes are counted.
