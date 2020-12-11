@@ -3183,7 +3183,7 @@ igt_main
 	igt_subtest_group { /* syncobj timeline */
 		igt_fixture {
 			igt_require(exec_has_timeline_fences(i915));
-			igt_assert(has_syncobj_timeline(i915));
+			igt_require(has_syncobj_timeline(i915));
 			igt_fork_hang_detector(i915);
 		}
 
