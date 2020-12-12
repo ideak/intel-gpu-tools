@@ -109,5 +109,11 @@ bool gem_has_mmap_offset_type(int fd, const struct mmap_offset *t);
 	     (__t)++) \
 		for_each_if(gem_has_mmap_offset_type((fd), (__t)))
 
+uint64_t gem_available_aperture_size(int fd);
+uint64_t gem_aperture_size(int fd);
+uint64_t gem_global_aperture_size(int fd);
+uint64_t gem_mappable_aperture_size(int fd);
+int gem_available_fences(int fd);
+
 #endif /* GEM_MMAN_H */
 

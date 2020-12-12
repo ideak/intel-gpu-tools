@@ -645,7 +645,7 @@ igt_main
 
 		data.ram_size = intel_get_total_ram_mb() << 20;
 		data.aper_size = gem_aperture_size(data.drm_fd);
-		data.mappable_size = gem_mappable_aperture_size();
+		data.mappable_size = gem_mappable_aperture_size(data.drm_fd);
 
 		igt_info("RAM: %"PRIu64" MiB, GPU address space: %"PRId64" MiB, GGTT mappable size: %"PRId64" MiB\n",
 			 data.ram_size >> 20, data.aper_size >> 20,

@@ -782,31 +782,6 @@ bool gem_engine_reset_enabled(int fd)
 	return gem_gpu_reset_type(fd) > 1;
 }
 
-/**
- * gem_available_fences:
- * @fd: open i915 drm file descriptor
- *
- * Feature test macro to query the kernel for the number of available fences
- * usable in a batchbuffer. Only relevant for pre-gen4.
- *
- * Returns: The number of available fences.
- */
-int gem_available_fences(int fd)
-{
-	int num_fences;
-	struct drm_i915_getparam gp;
-
-	memset(&gp, 0, sizeof(gp));
-	gp.param = I915_PARAM_NUM_FENCES_AVAIL;
-	gp.value = &num_fences;
-
-	num_fences = 0;
-	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
-	errno = 0;
-
-	return num_fences;
-}
-
 bool gem_has_llc(int fd)
 {
 	int has_llc;
@@ -927,97 +902,6 @@ uint64_t gem_total_stolen_size(int fd)
 	do_ioctl(fd, LOCAL_IOCTL_I915_GEM_GET_APERTURE, &aperture);
 
 	return aperture.stolen_total_size;
-}
-
-/**
- * gem_available_aperture_size:
- * @fd: open i915 drm file descriptor
- *
- * Feature test macro to query the kernel for the available gpu aperture size
- * usable in a batchbuffer.
- *
- * Returns: The available gtt address space size.
- */
-uint64_t gem_available_aperture_size(int fd)
-{
-	struct drm_i915_gem_get_aperture aperture;
-
-	memset(&aperture, 0, sizeof(aperture));
-	aperture.aper_size = 256*1024*1024;
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_GET_APERTURE, &aperture);
-
-	return aperture.aper_available_size;
-}
-
-/**
- * gem_aperture_size:
- * @fd: open i915 drm file descriptor
- *
- * Feature test macro to query the kernel for the total gpu aperture size.
- *
- * Returns: The total gtt address space size.
- */
-uint64_t gem_aperture_size(int fd)
-{
-	uint64_t aperture_size = 0;
-	struct drm_i915_gem_context_param p;
-
-	memset(&p, 0, sizeof(p));
-	p.param = 0x3;
-	if (__gem_context_get_param(fd, &p) == 0) {
-		aperture_size = p.value;
-	} else {
-		struct drm_i915_gem_get_aperture aperture;
-
-		memset(&aperture, 0, sizeof(aperture));
-		aperture.aper_size = 256*1024*1024;
-
-		do_ioctl(fd, DRM_IOCTL_I915_GEM_GET_APERTURE, &aperture);
-		aperture_size =  aperture.aper_size;
-	}
-
-	return aperture_size;
-}
-
-/**
- * gem_mappable_aperture_size:
- *
- * Feature test macro to query the kernel for the mappable gpu aperture size.
- * This is the area available for GTT memory mappings.
- *
- * Returns: The mappable gtt address space size.
- */
-uint64_t gem_mappable_aperture_size(void)
-{
-	struct pci_device *pci_dev = intel_get_pci_device();
-	int bar;
-
-	if (intel_gen(pci_dev->device_id) < 3)
-		bar = 0;
-	else
-		bar = 2;
-
-	return pci_dev->regions[bar].size;
-}
-
-/**
- * gem_global_aperture_size:
- * @fd: open i915 drm file descriptor
- *
- * Feature test macro to query the kernel for the global gpu aperture size.
- * This is the area available for the kernel to perform address translations.
- *
- * Returns: The gtt address space size.
- */
-uint64_t gem_global_aperture_size(int fd)
-{
-	struct drm_i915_gem_get_aperture aperture;
-
-	memset(&aperture, 0, sizeof(aperture));
-	aperture.aper_size = 256*1024*1024;
-	do_ioctl(fd, DRM_IOCTL_I915_GEM_GET_APERTURE, &aperture);
-
-	return aperture.aper_size;
 }
 
 /**

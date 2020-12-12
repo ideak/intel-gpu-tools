@@ -225,7 +225,7 @@ igt_main
 		gem_require_blitter(fd);
 		gem_require_mappable_ggtt(fd);
 
-		count = gem_mappable_aperture_size(); /* thrash fences! */
+		count = gem_mappable_aperture_size(fd); /* thrash fences! */
 		if (count >> 32)
 			count = MAX_32b;
 		count = 3 + count / (1024 * 1024);

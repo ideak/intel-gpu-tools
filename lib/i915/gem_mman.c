@@ -27,7 +27,9 @@
 #include <errno.h>
 
 #include "igt_core.h"
+#include "igt_device.h"
 #include "ioctl_wrappers.h"
+#include "intel_chipset.h"
 
 #include "gem_mman.h"
 
@@ -551,3 +553,109 @@ const struct mmap_offset mmap_offset_types[] = {
 	{ "uc", I915_MMAP_OFFSET_UC, I915_GEM_DOMAIN_WC },
 	{},
 };
+
+/**
+ * gem_available_aperture_size:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query the kernel for the available gpu aperture size
+ * usable in a batchbuffer.
+ *
+ * Returns: The available gtt address space size.
+ */
+uint64_t gem_available_aperture_size(int fd)
+{
+	struct drm_i915_gem_get_aperture aperture = {
+		aperture.aper_available_size = 256*1024*1024,
+	};
+
+	igt_ioctl(fd, DRM_IOCTL_I915_GEM_GET_APERTURE, &aperture);
+	errno = 0;
+
+	return aperture.aper_available_size;
+}
+
+/**
+ * gem_aperture_size:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query the kernel for the total gpu aperture size.
+ *
+ * Returns: The total gtt address space size.
+ */
+uint64_t gem_aperture_size(int fd)
+{
+	struct drm_i915_gem_context_param p = {
+		.param = 0x3
+	};
+
+	if (__gem_context_get_param(fd, &p))
+		p.value = gem_global_aperture_size(fd);
+
+	return p.value;
+}
+
+/**
+ * gem_mappable_aperture_size:
+ *
+ * Feature test macro to query the kernel for the mappable gpu aperture size.
+ * This is the area available for GTT memory mappings.
+ *
+ * Returns: The mappable gtt address space size.
+ */
+uint64_t gem_mappable_aperture_size(int fd)
+{
+	struct pci_device *pci_dev = igt_device_get_pci_device(fd);
+	int bar;
+
+	if (intel_gen(pci_dev->device_id) < 3)
+		bar = 0;
+	else
+		bar = 2;
+
+	return pci_dev->regions[bar].size;
+}
+
+/**
+ * gem_global_aperture_size:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query the kernel for the global gpu aperture size.
+ * This is the area available for the kernel to perform address translations.
+ *
+ * Returns: The gtt address space size.
+ */
+uint64_t gem_global_aperture_size(int fd)
+{
+	struct drm_i915_gem_get_aperture aperture = {
+		aperture.aper_size = 256*1024*1024
+	};
+
+	igt_ioctl(fd, DRM_IOCTL_I915_GEM_GET_APERTURE, &aperture);
+	errno = 0;
+
+	return aperture.aper_size;
+}
+
+/**
+ * gem_available_fences:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query the kernel for the number of available fences
+ * usable in a batchbuffer. Only relevant for pre-gen4.
+ *
+ * Returns: The number of available fences.
+ */
+int gem_available_fences(int fd)
+{
+	int num_fences = 0;
+	struct drm_i915_getparam gp = {
+		gp.param = I915_PARAM_NUM_FENCES_AVAIL,
+		gp.value = &num_fences,
+	};
+
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
+	errno = 0;
+
+	return num_fences;
+}

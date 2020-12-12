@@ -1828,7 +1828,7 @@ igt_main
 				 c->name, s->name, "small");
 			igt_subtest_group {
 				igt_fixture {
-					count = num_buffers(gem_mappable_aperture_size()/4,
+					count = num_buffers(gem_mappable_aperture_size(fd)/4,
 							    s, c, CHECK_RAM);
 				}
 				run_modes(name, c, modes, s, count);
@@ -1839,7 +1839,7 @@ igt_main
 				 c->name, s->name, "thrash");
 			igt_subtest_group {
 				igt_fixture {
-					count = num_buffers(gem_mappable_aperture_size(),
+					count = num_buffers(gem_mappable_aperture_size(fd),
 							    s, c, CHECK_RAM);
 				}
 				run_modes(name, c, modes, s, count);
@@ -1871,7 +1871,7 @@ igt_main
 				 c->name, s->name, "shrink");
 			igt_subtest_group {
 				igt_fixture {
-					count = num_buffers(gem_mappable_aperture_size(),
+					count = num_buffers(gem_mappable_aperture_size(fd),
 							    s, c, CHECK_RAM);
 
 					igt_fork_shrink_helper(fd);
@@ -1887,8 +1887,8 @@ igt_main
 				 c->name, s->name, "swap");
 			igt_subtest_group {
 				igt_fixture {
-					if (intel_get_avail_ram_mb() > gem_mappable_aperture_size()/(1024*1024)) {
-						pin_sz = intel_get_avail_ram_mb() - gem_mappable_aperture_size()/(1024*1024);
+					if (intel_get_avail_ram_mb() > gem_mappable_aperture_size(fd)/(1024*1024)) {
+						pin_sz = intel_get_avail_ram_mb() - gem_mappable_aperture_size(fd)/(1024*1024);
 
 						igt_debug("Pinning %lld MiB\n", (long long)pin_sz);
 						pin_sz *= 1024 * 1024;
@@ -1902,7 +1902,7 @@ igt_main
 						igt_require(pinned);
 					}
 
-					count = num_buffers(gem_mappable_aperture_size(),
+					count = num_buffers(gem_mappable_aperture_size(fd),
 							    s, c, CHECK_RAM | CHECK_SWAP);
 				}
 				run_modes(name, c, modes, s, count);

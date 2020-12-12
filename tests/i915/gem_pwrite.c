@@ -130,7 +130,7 @@ static void test_big_cpu(int fd, int scale, unsigned flags)
 
 	switch (scale) {
 	case 0:
-		size = gem_mappable_aperture_size() + 4096;
+		size = gem_mappable_aperture_size(fd) + 4096;
 		break;
 	case 1:
 		size = gem_global_aperture_size(fd) + 4096;
@@ -192,7 +192,7 @@ static void test_big_gtt(int fd, int scale, unsigned flags)
 	igt_require(gem_mmap__has_wc(fd));
 	switch (scale) {
 	case 0:
-		size = gem_mappable_aperture_size() + 4096;
+		size = gem_mappable_aperture_size(fd) + 4096;
 		break;
 	case 1:
 		size = gem_global_aperture_size(fd) + 4096;
@@ -257,7 +257,7 @@ static void test_random(int fd)
 	gem_require_mmap_wc(fd);
 
 	size = min(intel_get_total_ram_mb() / 2,
-		    gem_mappable_aperture_size() + 4096);
+		    gem_mappable_aperture_size(fd) + 4096);
 	intel_require_memory(1, size, CHECK_RAM);
 
 	handle = gem_create(fd, size);
