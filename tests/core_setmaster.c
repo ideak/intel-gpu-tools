@@ -125,6 +125,15 @@ static unsigned tweak_perm(uint8_t *saved_perm, unsigned max_perm, bool save)
 
 igt_main
 {
+	igt_fixture {
+		/*
+		 * We're operating on the device files themselves
+		 * before opening them, make sure the drivers are
+		 * loaded.
+		 */
+		drm_load_module(DRIVER_ANY);
+	}
+
 	igt_describe("Ensure that root can Set/DropMaster");
 	igt_subtest("master-drop-set-root") {
 		check_drop_set();
