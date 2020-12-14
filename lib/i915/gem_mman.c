@@ -586,7 +586,7 @@ uint64_t gem_available_aperture_size(int fd)
 uint64_t gem_aperture_size(int fd)
 {
 	struct drm_i915_gem_context_param p = {
-		.param = 0x3
+		.param = I915_CONTEXT_PARAM_GTT_SIZE
 	};
 
 	if (__gem_context_get_param(fd, &p))
