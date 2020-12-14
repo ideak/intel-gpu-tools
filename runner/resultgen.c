@@ -412,14 +412,21 @@ static struct json_object *new_escaped_json_string(const char *buf, size_t len)
 	size_t strsize = 0;
 	size_t i;
 
+	/*
+	 * Test output may be garbage; strings passed to json-c need to be
+	 * UTF-8 encoded so any non-ASCII characters are converted to their
+	 * UTF-8 representation, which requires 2 bytes per character.
+	 */
+	str = malloc(len * 2);
+	if (!str)
+		return NULL;
+
 	for (i = 0; i < len; i++) {
 		if (buf[i] > 0 && buf[i] < 128) {
-			str = realloc(str, strsize + 1);
 			str[strsize] = buf[i];
 			++strsize;
 		} else {
 			/* Encode > 128 character to UTF-8. */
-			str = realloc(str, strsize + 2);
 			str[strsize] = ((unsigned char)buf[i] >> 6) | 0xC0;
 			str[strsize + 1] = ((unsigned char)buf[i] & 0x3F) | 0x80;
 			strsize += 2;
