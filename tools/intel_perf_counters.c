@@ -44,6 +44,7 @@
 
 #include "drm.h"
 #include "i915_drm.h"
+#include "igt_device.h"
 #include "drmtest.h"
 #include "intel_io.h"
 #include "intel_batchbuffer.h"
@@ -483,8 +484,9 @@ main(int argc, char **argv)
 
 	if (oacontrol) {
 		/* Forcewake */
-		intel_register_access_init(&mmio_data, intel_get_pci_device(),
-				0, fd);
+		intel_register_access_init(&mmio_data,
+					   igt_device_get_pci_device(fd),
+					   0, fd);
 
 		/* Enable performance counters */
 		intel_register_write(&mmio_data, OACONTROL,
