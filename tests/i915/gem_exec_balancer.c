@@ -2889,7 +2889,7 @@ static void __fairslice(int i915,
 	 */
 	threshold = sqrt(1e9 * duration / timeslice_duration_ns);
 	threshold *= timeslice_duration_ns;
-	threshold *= 3; /* CI safety factor before crying wolf */
+	threshold *= 2; /* CI safety factor before crying wolf */
 
 	qsort(ts, ARRAY_SIZE(ctx), sizeof(*ts), cmp_u32);
 	igt_info("%s: [%.1f, %.1f, %.1f] ms, expect %1.f +- %.1fms\n",
