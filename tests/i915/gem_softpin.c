@@ -97,6 +97,65 @@ static void test_invalid(int fd)
 	}
 }
 
+static uint32_t batch_create(int i915, uint64_t *sz)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_create create = {
+		.size = sizeof(bbe),
+	};
+
+	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_CREATE, &create)) {
+		igt_assert_eq(errno, 0);
+		return 0;
+	}
+
+	gem_write(i915, create.handle, 0, &bbe, sizeof(bbe));
+
+	*sz = create.size;
+	return create.handle;
+}
+
+static void test_zero(int i915)
+{
+	uint64_t sz, gtt = gem_aperture_size(i915);
+	struct drm_i915_gem_exec_object2 object = {
+		.handle = batch_create(i915, &sz),
+		.flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS,
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&object),
+		.buffer_count = 1,
+	};
+
+	/* Under full-ppgtt, we have complete control of the GTT */
+	igt_info("Object size:%"PRIx64", GTT size:%"PRIx64"\n", sz, gtt);
+
+	object.offset = 0;
+	igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
+		     "execbuff failed with object.offset=%llx\n",
+		     object.offset);
+
+	if (gtt >> 32) {
+		object.offset = (1ull << 32) - sz;
+		igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
+			     "execbuff failed with object.offset=%llx\n",
+			     object.offset);
+
+		object.offset = 1ull << 32;
+		igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
+			     "execbuff failed with object.offset=%llx\n",
+			     object.offset);
+	}
+
+	object.offset = gtt - sz;
+	object.offset = gen8_canonical_addr(object.offset);
+	igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
+		     "execbuff failed with object.offset=%llx\n",
+		     object.offset);
+
+	gem_close(i915, object.handle);
+}
+
 static void test_softpin(int fd)
 {
 	const uint32_t size = 1024 * 1024;
@@ -559,6 +618,10 @@ igt_main
 
 	igt_subtest("invalid")
 		test_invalid(fd);
+	igt_subtest("zero") {
+		igt_require(gem_uses_full_ppgtt(fd));
+		test_zero(fd);
+	}
 	igt_subtest("softpin")
 		test_softpin(fd);
 	igt_subtest("overlap")
