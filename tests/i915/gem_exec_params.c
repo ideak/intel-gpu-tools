@@ -340,7 +340,13 @@ static void test_larger_than_life_batch(int fd)
        for_each_engine(e, fd) {
 	       /* Keep the batch_len implicit [0] */
 	       execbuf.flags = eb_ring(e);
-	       gem_execbuf(fd, &execbuf);
+
+	       /* non-48b objects are limited to the low (4G - 4K) */
+	       igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOSPC);
+
+	       exec.flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+	       igt_assert_eq(__gem_execbuf(fd, &execbuf), 0);
+	       exec.flags = 0;
        }
 
        gem_sync(fd, exec.handle);
