@@ -918,7 +918,7 @@ igt_main
 	igt_display_t display;
 	igt_output_t *output;
 	enum pipe pipe;
-	int i;
+	int i, count = 0;
 
 	igt_fixture {
 		display.drm_fd = drm_open_driver_master(DRIVER_ANY);
@@ -929,6 +929,9 @@ igt_main
 		igt_require(display.is_atomic);
 
 		igt_display_require_output(&display);
+
+		for_each_connected_output(&display, output)
+			count++;
 	}
 
 	igt_subtest("plane-primary-toggle-with-vblank-wait")
@@ -1024,18 +1027,32 @@ igt_main
 		for_each_pipe_with_valid_output(&display, pipe, output)
 			run_transition_test(&display, pipe, output, TRANSITION_MODESET_DISABLE, false, false);
 
-	for (i = 1; i <= IGT_MAX_PIPES; i++) {
-		igt_subtest_f("%ix-modeset-transitions", i)
-			run_modeset_transition(&display, i, false, false);
+	igt_subtest_with_dynamic("modeset-transition") {
+		for (i = 1; i <= count; i++) {
+			igt_dynamic_f("%ix-outputs", i)
+				run_modeset_transition(&display, i, false, false);
+		}
+	}
 
-		igt_subtest_f("%ix-modeset-transitions-nonblocking", i)
-			run_modeset_transition(&display, i, true, false);
+	igt_subtest_with_dynamic("modeset-transition-nonblocking") {
+		for (i = 1; i <= count; i++) {
+			igt_dynamic_f("%ix-outputs", i)
+				run_modeset_transition(&display, i, true, false);
+		}
+	}
 
-		igt_subtest_f("%ix-modeset-transitions-fencing", i)
-			run_modeset_transition(&display, i, false, true);
+	igt_subtest_with_dynamic("modeset-transition-fencing") {
+		for (i = 1; i <= count; i++) {
+			igt_dynamic_f("%ix-outputs", i)
+				run_modeset_transition(&display, i, false, true);
+		}
+	}
 
-		igt_subtest_f("%ix-modeset-transitions-nonblocking-fencing", i)
-			run_modeset_transition(&display, i, true, true);
+	igt_subtest_with_dynamic("modeset-transition-nonblocking-fencing") {
+		for (i = 1; i <= count; i++) {
+			igt_dynamic_f("%ix-outputs", i)
+				run_modeset_transition(&display, i, true, true);
+		}
 	}
 
 	igt_fixture {
