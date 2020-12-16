@@ -54,6 +54,7 @@ RUNTIME CONTROL
 Supported keys:
 
     'q'    Exit from the tool.
+    '1'    Toggle between aggregated engine class and physical engine mode.
 
 DEVICE SELECTION
 ================
