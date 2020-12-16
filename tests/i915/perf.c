@@ -780,7 +780,6 @@ gen8_sanity_check_test_oa_reports(const uint32_t *oa_report0,
 					format.b_off);
 	uint32_t *rpt1_b = (uint32_t *)(((uint8_t *)oa_report1) +
 					format.b_off);
-	uint32_t report_reason0, report_reason1;
 	uint32_t b;
 	uint32_t ref;
 
@@ -790,14 +789,6 @@ gen8_sanity_check_test_oa_reports(const uint32_t *oa_report0,
 
 	freq = time_delta ? ((uint64_t)clock_delta * 1000) / time_delta : 0;
 	igt_debug("freq = %"PRIu64"\n", freq);
-
-	/* Either we have 2 reports back to back with the same
-	 * timestamp and those should have different reason, or we
-	 * were able to compute a frequency because the timestamps are
-	 * different.
-	 */
-	igt_assert(freq || (gen8_report_reason(oa_report0) !=
-			    gen8_report_reason(oa_report1)));
 
 	igt_debug("clock delta = %"PRIu32"\n", clock_delta);
 
