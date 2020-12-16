@@ -1165,38 +1165,12 @@ do { \
 	igt_assert_eq(errno, EINVAL);
 }
 
-static void init_other(int i915, unsigned int i, bool valid)
+static void open_invalid(int i915)
 {
 	int fd;
 
-	fd = perf_i915_open(i915, __I915_PMU_OTHER(i));
-	igt_require(!(fd < 0 && errno == ENODEV));
-	if (valid) {
-		igt_assert(fd >= 0);
-	} else {
-		igt_assert(fd < 0);
-		return;
-	}
-
-	close(fd);
-}
-
-static void read_other(int i915, unsigned int i, bool valid)
-{
-	int fd;
-
-	fd = perf_i915_open(i915, __I915_PMU_OTHER(i));
-	igt_require(!(fd < 0 && errno == ENODEV));
-	if (valid) {
-		igt_assert(fd >= 0);
-	} else {
-		igt_assert(fd < 0);
-		return;
-	}
-
-	(void)pmu_read_single(fd);
-
-	close(fd);
+	fd = perf_i915_open(i915, -1ULL);
+	igt_assert(fd < 0);
 }
 
 static bool cpu0_hotplug_support(void)
@@ -2053,10 +2027,14 @@ static void test_unload(unsigned int num_engines)
 igt_main
 {
 	const struct intel_execution_engine2 *e;
-	const unsigned int num_other_metrics =
-		I915_PMU_LAST - __I915_PMU_OTHER(0) + 1;
 	unsigned int num_engines = 0;
 	int fd = -1;
+
+	/**
+	 * All PMU should be accompanied by a test.
+	 *
+	 * Including all the I915_PMU_OTHER(x).
+	 */
 
 	igt_fixture {
 		fd = __drm_open_driver(DRIVER_INTEL);
@@ -2074,6 +2052,12 @@ igt_main
 	 */
 	igt_subtest("invalid-init")
 		invalid_init(fd);
+
+	/**
+	 * Double check the invalid metric does fail.
+	 */
+	igt_subtest("invalid-open")
+		open_invalid(fd);
 
 	igt_subtest_with_dynamic("faulting-read") {
 		for_each_mmap_offset_type(fd, t) {
@@ -2227,18 +2211,6 @@ igt_main
 	igt_subtest("all-busy-idle-check-all")
 		all_busy_check_all(fd, num_engines,
 				   TEST_BUSY | TEST_TRAILING_IDLE);
-
-	/**
-	 * Test that non-engine counters can be initialized and read. Apart
-	 * from the invalid metric which should fail.
-	 */
-	for (unsigned int i = 0; i < num_other_metrics + 1; i++) {
-		igt_subtest_f("other-init-%u", i)
-			init_other(fd, i, i < num_other_metrics);
-
-		igt_subtest_f("other-read-%u", i)
-			read_other(fd, i, i < num_other_metrics);
-	}
 
 	/**
 	 * Test counters are not affected by CPU offline/online events.
