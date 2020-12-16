@@ -159,6 +159,29 @@ static uint32_t dspsurf_reg(uint32_t devid, int pipe, bool async)
 		return PIPE_REG(plane, DSPASURF);
 }
 
+static int pipe_to_transcoder(uint32_t devid, int pipe)
+{
+	int gen = intel_gen(devid);
+
+	if (IS_HASWELL(devid) || IS_BROADWELL(devid) ||
+	    gen == 9 || gen == 10 || gen == 11) {
+		/* FIXME not 100% robust */
+		if (read_reg(PIPE_REG(pipe, PIPEACONF)) & PIPEACONF_ENABLE)
+			return pipe;
+		else
+			return 0xf; /* EDP */
+	} else {
+		return pipe;
+	}
+}
+
+static uint32_t trans_reg(uint32_t devid, int pipe, uint32_t reg)
+{
+	int trans = pipe_to_transcoder(devid, pipe);
+
+	return PIPE_REG(trans, reg);
+}
+
 static void enable_async_flip(uint32_t devid, int pipe, bool enable)
 {
 	int plane = pipe_to_plane(devid, pipe);
@@ -173,6 +196,26 @@ static void enable_async_flip(uint32_t devid, int pipe, bool enable)
 	else
 		tmp &= ~(1 << 9);
 	write_reg(PIPE_REG(plane, DSPACNTR), tmp);
+}
+
+static void push_vrr(uint32_t devid, int pipe, int vrr_push_scanline)
+{
+	uint32_t dsl = PIPE_REG(pipe, PIPEA_DSL);
+	uint32_t push = trans_reg(devid, pipe, TRANS_PUSH_A);
+
+	if (vrr_push_scanline < 0)
+		return;
+
+	if (read_reg(push) & 0x40000000)
+		return;
+
+	while (!quit) {
+		uint32_t dsl1 = read_reg(dsl) & ~0x80000000;
+		if (dsl1 == vrr_push_scanline)
+			break;
+	}
+
+	write_reg(push, 0xc0000000);
 }
 
 static int wait_scanline(int pipe, int target_scanline, bool *field)
@@ -545,7 +588,8 @@ static void poll_dsl_iir_gen3(int pipe, int bit,
 }
 
 static void poll_dsl_deiir(uint32_t devid, int pipe, int bit,
-			   uint32_t *min, uint32_t *max, const int count)
+			   uint32_t *min, uint32_t *max, const int count,
+			   int vrr_push_scanline)
 {
 	uint32_t dsl, dsl1, dsl2, iir1, iir2, imr_save, ier_save;
 	bool field1, field2;
@@ -574,6 +618,8 @@ static void poll_dsl_deiir(uint32_t devid, int pipe, int bit,
 	write_reg(iir, bit);
 
 	while (!quit) {
+		push_vrr(devid, pipe, vrr_push_scanline);
+
 		while (!quit) {
 			dsl1 = read_reg(dsl);
 			iir1 = read_reg(iir);
@@ -608,7 +654,9 @@ static void poll_dsl_deiir(uint32_t devid, int pipe, int bit,
 	write_reg(ier, ier_save);
 }
 
-static void poll_dsl_framecount_g4x(int pipe, uint32_t *min, uint32_t *max, const int count)
+static void poll_dsl_framecount_g4x(uint32_t devid, int pipe,
+				    uint32_t *min, uint32_t *max, const int count,
+				    int vrr_push_scanline)
 {
 	uint32_t dsl, dsl1, dsl2, frm, frm1, frm2;
 	bool field1, field2;
@@ -618,6 +666,8 @@ static void poll_dsl_framecount_g4x(int pipe, uint32_t *min, uint32_t *max, cons
 	dsl = PIPE_REG(pipe, PIPEA_DSL);
 
 	while (!quit) {
+		push_vrr(devid, pipe, vrr_push_scanline);
+
 		while (!quit) {
 			dsl1 = read_reg(dsl);
 			frm1 = read_reg(frm);
@@ -645,7 +695,8 @@ static void poll_dsl_framecount_g4x(int pipe, uint32_t *min, uint32_t *max, cons
 }
 
 static void poll_dsl_flipcount_g4x(uint32_t devid, int pipe,
-				   uint32_t *min, uint32_t *max, const int count)
+				   uint32_t *min, uint32_t *max, const int count,
+				   int vrr_push_scanline)
 {
 	uint32_t dsl, dsl1, dsl2, flp, flp1, flp2, surf;
 	bool field1, field2;
@@ -676,6 +727,7 @@ static void poll_dsl_flipcount_g4x(uint32_t devid, int pipe,
 			return;
 
 		write_reg(surf, read_reg(surf));
+		push_vrr(devid, pipe, vrr_push_scanline);
 
 		while (!quit) {
 			dsl1 = read_reg(dsl);
@@ -738,7 +790,8 @@ static void poll_dsl_framecount_gen3(int pipe, uint32_t *min, uint32_t *max, con
 
 
 static void poll_dsl_frametimestamp(uint32_t devid, int pipe,
-				    uint32_t *min, uint32_t *max, const int count)
+				    uint32_t *min, uint32_t *max, const int count,
+				    int vrr_push_scanline)
 {
 	uint32_t dsl, dsl1, dsl2, frm, frm1, frm2;
 	bool field1, field2;
@@ -748,6 +801,8 @@ static void poll_dsl_frametimestamp(uint32_t devid, int pipe,
 	dsl = PIPE_REG(pipe, PIPEA_DSL);
 
 	while (!quit) {
+		push_vrr(devid, pipe, vrr_push_scanline);
+
 		while (!quit) {
 			dsl1 = read_reg(dsl);
 			frm1 = read_reg(frm);
@@ -785,7 +840,8 @@ static uint32_t timestamp_reg(uint32_t devid)
 }
 
 static void poll_dsl_timestamp(uint32_t devid, int pipe, int target_scanline,
-			       uint32_t *min, uint32_t *max, const int count)
+			       uint32_t *min, uint32_t *max, const int count,
+			       int vrr_push_scanline)
 {
 	uint32_t dsl1, frm, frm1, ts, ts1;
 	bool field1;
@@ -795,6 +851,8 @@ static void poll_dsl_timestamp(uint32_t devid, int pipe, int target_scanline,
 	frm = PIPE_REG(pipe, PIPEAFRMTMSMTP);
 
 	while (!quit) {
+		push_vrr(devid, pipe, vrr_push_scanline);
+
 		dsl1 = wait_scanline(pipe, target_scanline, &field1);
 
 		frm1 = read_reg(frm);
@@ -811,7 +869,8 @@ static void poll_dsl_timestamp(uint32_t devid, int pipe, int target_scanline,
 }
 
 static void poll_dsl_pan(uint32_t devid, int pipe, int target_scanline, int target_fuzz,
-			 uint32_t *min, uint32_t *max, const int count)
+			 uint32_t *min, uint32_t *max, const int count,
+			 int vrr_push_scanline)
 {
 	uint32_t dsl1 = 0, dsl2 = 0;
 	bool field1 = false, field2 = false;
@@ -826,6 +885,7 @@ static void poll_dsl_pan(uint32_t devid, int pipe, int target_scanline, int targ
 		dsl1 = wait_scanline(pipe, target_scanline, &field1);
 
 		write_reg(surf, saved+256);
+		push_vrr(devid, pipe, vrr_push_scanline);
 
 		dsl2 = wait_scanline(pipe, target_scanline + target_fuzz, &field2);
 
@@ -845,7 +905,8 @@ static void poll_dsl_pan(uint32_t devid, int pipe, int target_scanline, int targ
 }
 
 static void poll_dsl_flip(uint32_t devid, int pipe, int target_scanline, int target_fuzz,
-			  uint32_t *min, uint32_t *max, const int count, bool async)
+			  uint32_t *min, uint32_t *max, const int count, bool async,
+			  int vrr_push_scanline)
 {
 	uint32_t dsl1 = 0, dsl2 = 0;
 	bool field1 = false, field2 = false;
@@ -862,6 +923,7 @@ static void poll_dsl_flip(uint32_t devid, int pipe, int target_scanline, int tar
 		dsl1 = wait_scanline(pipe, target_scanline, &field1);
 
 		write_reg(surf, saved+256*1024);
+		push_vrr(devid, pipe, vrr_push_scanline);
 
 		dsl2 = wait_scanline(pipe, target_scanline + target_fuzz, &field2);
 
@@ -944,7 +1006,8 @@ static void poll_dsl_flipdone_pipestat(uint32_t devid, int pipe, int target_scan
 }
 
 static void poll_dsl_flipdone_deiir(uint32_t devid, int pipe, int target_scanline, int target_fuzz,
-				    uint32_t *min, uint32_t *max, const int count, bool async)
+				    uint32_t *min, uint32_t *max, const int count, bool async,
+				    int vrr_push_scanline)
 {
 	uint32_t dsl, dsl1 = 0, dsl2 = 0;
 	uint32_t iir, iir2, ier, imr;
@@ -997,6 +1060,7 @@ static void poll_dsl_flipdone_deiir(uint32_t devid, int pipe, int target_scanlin
 		else
 			next = saved;
 		write_reg(surf, next);
+		push_vrr(devid, pipe, vrr_push_scanline);
 
 		while (!quit) {
 			iir2 = read_reg(iir);
@@ -1028,7 +1092,8 @@ static void poll_dsl_flipdone_deiir(uint32_t devid, int pipe, int target_scanlin
 }
 
 static void poll_dsl_surflive(uint32_t devid, int pipe,
-			      uint32_t *min, uint32_t *max, const int count, bool async)
+			      uint32_t *min, uint32_t *max, const int count, bool async,
+			      int vrr_push_scanline)
 {
 	uint32_t dsl, dsl1 = 0, dsl2 = 0, surf, surf1, surf2, surflive, surfl1 = 0, surfl2, saved, tmp;
 	bool field1 = false, field2 = false;
@@ -1047,6 +1112,7 @@ static void poll_dsl_surflive(uint32_t devid, int pipe,
 
 	while (!quit) {
 		write_reg(surf, surf2);
+		push_vrr(devid, pipe, vrr_push_scanline);
 
 		while (!quit) {
 			dsl1 = read_reg(dsl);
@@ -1083,7 +1149,9 @@ static void poll_dsl_surflive(uint32_t devid, int pipe,
 	write_reg(surf, saved);
 }
 
-static void poll_dsl_wrap(int pipe, uint32_t *min, uint32_t *max, const int count)
+static void poll_dsl_wrap(uint32_t devid, int pipe,
+			  uint32_t *min, uint32_t *max, const int count,
+			  int vrr_push_scanline)
 {
 	uint32_t dsl, dsl1, dsl2;
 	bool field1, field2;
@@ -1092,6 +1160,8 @@ static void poll_dsl_wrap(int pipe, uint32_t *min, uint32_t *max, const int coun
 	dsl = PIPE_REG(pipe, PIPEA_DSL);
 
 	while (!quit) {
+		push_vrr(devid, pipe, vrr_push_scanline);
+
 		while (!quit) {
 			dsl1 = read_reg(dsl);
 			dsl2 = read_reg(dsl);
@@ -1211,7 +1281,8 @@ static void __attribute__((noreturn)) usage(const char *name)
 		" -l,--line <target scanline/pixel>\n"
 		" -f,--fuzz <target fuzz>\n"
 		" -x,--pixel\n"
-		" -a,--async\n",
+		" -a,--async\n"
+		" -v,--vrr-push <push scanline>\n",
 		name);
 	exit(1);
 }
@@ -1223,6 +1294,7 @@ int main(int argc, char *argv[])
 	int pipe = 0, bit = 0, target_scanline = 0, target_fuzz = 1;
 	bool test_pixelcount = false;
 	bool test_async_flip = false;
+	int vrr_push_scanline = -1;
 	uint32_t devid;
 	uint32_t min[2*128] = {};
 	uint32_t max[2*128] = {};
@@ -1239,10 +1311,11 @@ int main(int argc, char *argv[])
 			{ .name = "fuzz", .has_arg = required_argument, },
 			{ .name = "pixel", .has_arg = no_argument, },
 			{ .name = "async", .has_arg = no_argument, },
+			{ .name = "vrr-push", .has_arg = required_argument, },
 			{ },
 		};
 
-		int opt = getopt_long(argc, argv, "t:p:b:l:f:xa", long_options, NULL);
+		int opt = getopt_long(argc, argv, "t:p:b:l:f:xav:", long_options, NULL);
 		if (opt == -1)
 			break;
 
@@ -1311,6 +1384,11 @@ int main(int argc, char *argv[])
 		case 'a':
 			test_async_flip = true;
 			break;
+		case 'v':
+			vrr_push_scanline = atoi(optarg);
+			if (vrr_push_scanline < 0)
+				usage(argv[0]);
+			break;
 		}
 	}
 
@@ -1328,6 +1406,9 @@ int main(int argc, char *argv[])
 			usage(argv[0]);
 
 		if (test_async_flip)
+			usage(argv[0]);
+
+		if (vrr_push_scanline >= 0)
 			usage(argv[0]);
 
 		switch (test) {
@@ -1348,6 +1429,9 @@ int main(int argc, char *argv[])
 			usage(argv[0]);
 
 		if (test_async_flip)
+			usage(argv[0]);
+
+		if (vrr_push_scanline >= 0)
 			usage(argv[0]);
 
 		switch (test) {
@@ -1381,6 +1465,9 @@ int main(int argc, char *argv[])
 			usage(argv[0]);
 
 		if (test_pixelcount)
+			usage(argv[0]);
+
+		if (vrr_push_scanline >= 0)
 			usage(argv[0]);
 
 		switch (test) {
@@ -1425,6 +1512,9 @@ int main(int argc, char *argv[])
 			usage(argv[0]);
 
 		if (test_pixelcount)
+			usage(argv[0]);
+
+		if (vrr_push_scanline >= 0 && intel_gen(devid) < 11)
 			usage(argv[0]);
 
 		switch (test) {
@@ -1488,7 +1578,7 @@ int main(int argc, char *argv[])
 		break;
 	case TEST_DEIIR:
 		assert(!test_pixelcount);
-		poll_dsl_deiir(devid, pipe, bit, min, max, count);
+		poll_dsl_deiir(devid, pipe, bit, min, max, count, vrr_push_scanline);
 		break;
 	case TEST_FRAMECOUNT_GEN3:
 		if (test_pixelcount)
@@ -1498,19 +1588,19 @@ int main(int argc, char *argv[])
 		break;
 	case TEST_FRAMECOUNT_G4X:
 		assert(!test_pixelcount);
-		poll_dsl_framecount_g4x(pipe, min, max, count);
+		poll_dsl_framecount_g4x(devid, pipe, min, max, count, vrr_push_scanline);
 		break;
 	case TEST_FRAMETIMESTAMP:
 		assert(!test_pixelcount);
-		poll_dsl_frametimestamp(devid, pipe, min, max, count);
+		poll_dsl_frametimestamp(devid, pipe, min, max, count, vrr_push_scanline);
 		break;
 	case TEST_TIMESTAMP:
 		assert(!test_pixelcount);
-		poll_dsl_timestamp(devid, pipe, target_scanline, min, max, count);
+		poll_dsl_timestamp(devid, pipe, target_scanline, min, max, count, vrr_push_scanline);
 		break;
 	case TEST_FLIPCOUNT:
 		assert(!test_pixelcount);
-		poll_dsl_flipcount_g4x(devid, pipe, min, max, count);
+		poll_dsl_flipcount_g4x(devid, pipe, min, max, count, vrr_push_scanline);
 		break;
 	case TEST_PAN:
 		if (test_pixelcount)
@@ -1518,7 +1608,7 @@ int main(int argc, char *argv[])
 				       min, max, count);
 		else
 			poll_dsl_pan(devid, pipe, target_scanline, target_fuzz,
-				     min, max, count);
+				     min, max, count, vrr_push_scanline);
 		break;
 	case TEST_FLIP:
 		if (test_pixelcount)
@@ -1526,7 +1616,7 @@ int main(int argc, char *argv[])
 					min, max, count);
 		else
 			poll_dsl_flip(devid, pipe, target_scanline, target_fuzz,
-				      min, max, count, test_async_flip);
+				      min, max, count, test_async_flip, vrr_push_scanline);
 		break;
 	case TEST_FLIPDONE_PIPESTAT:
 		poll_dsl_flipdone_pipestat(devid, pipe, target_scanline, target_fuzz,
@@ -1534,16 +1624,16 @@ int main(int argc, char *argv[])
 		break;
 	case TEST_FLIPDONE_DEIIR:
 		poll_dsl_flipdone_deiir(devid, pipe, target_scanline, target_fuzz,
-					min, max, count, test_async_flip);
+					min, max, count, test_async_flip, vrr_push_scanline);
 		break;
 	case TEST_SURFLIVE:
-		poll_dsl_surflive(devid, pipe, min, max, count, test_async_flip);
+		poll_dsl_surflive(devid, pipe, min, max, count, test_async_flip, vrr_push_scanline);
 		break;
 	case TEST_WRAP:
 		if (test_pixelcount)
 			poll_pixel_wrap(pipe, min, max, count);
 		else
-			poll_dsl_wrap(pipe, min, max, count);
+			poll_dsl_wrap(devid, pipe, min, max, count, vrr_push_scanline);
 		break;
 	case TEST_FIELD:
 		poll_dsl_field(pipe, min, max, count);
