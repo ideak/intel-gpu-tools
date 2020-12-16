@@ -2294,6 +2294,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #define PIPEAFRMCOUNT_G4X	0x70040
 #define PIPEAFLIPCOUNT_G4X	0x70044
+#define PIPEAFRMTMSMTP		0x70048
 /*
  * Computing GMCH M and N values.
  *
@@ -2809,6 +2810,8 @@ typedef enum {
 #define MCHBAR_RENDER_STANDBY	0x111B8
 #define RENDER_STANDBY_ENABLE	(1 << 30)
 
+#define ILK_TIMESTAMP_HI        0x70070
+#define IVB_TIMESTAMP_CTR       0x44070
 
 /* Ironlake */
 
