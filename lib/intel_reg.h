@@ -880,6 +880,43 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define VSYNC_EDP	0x6F014
 #define VSYNCSHIFT_EDP	0x6F028
 
+#define TRANS_VRR_CTL_A                0x60420
+#define TRANS_VRR_CTL_B                0x61420
+#define TRANS_VRR_CTL_C                0x62420
+#define TRANS_VRR_CTL_D                0x63420
+#define TRANS_VRR_VMAX_A               0x60424
+#define TRANS_VRR_VMAX_B               0x61424
+#define TRANS_VRR_VMAX_C               0x62424
+#define TRANS_VRR_VMAX_D               0x63424
+#define TRANS_VRR_VMIN_A               0x60434
+#define TRANS_VRR_VMIN_B               0x61434
+#define TRANS_VRR_VMIN_C               0x62434
+#define TRANS_VRR_VMIN_D               0x63434
+#define TRANS_VRR_VMAXSHIFT_A          0x60428
+#define TRANS_VRR_VMAXSHIFT_B          0x61428
+#define TRANS_VRR_VMAXSHIFT_C          0x62428
+#define TRANS_VRR_VMAXSHIFT_D          0x63428
+#define TRANS_VRR_STATUS_A             0x6042C
+#define TRANS_VRR_STATUS_B             0x6142C
+#define TRANS_VRR_STATUS_C             0x6242C
+#define TRANS_VRR_STATUS_D             0x6342C
+#define TRANS_VRR_VTOTAL_PREV_A        0x60480
+#define TRANS_VRR_VTOTAL_PREV_B        0x61480
+#define TRANS_VRR_VTOTAL_PREV_C        0x62480
+#define TRANS_VRR_VTOTAL_PREV_D        0x63480
+#define TRANS_VRR_FLIPLINE_A           0x60438
+#define TRANS_VRR_FLIPLINE_B           0x61438
+#define TRANS_VRR_FLIPLINE_C           0x62438
+#define TRANS_VRR_FLIPLINE_D           0x63438
+#define TRANS_VRR_STATUS2_A            0x6043C
+#define TRANS_VRR_STATUS2_B            0x6143C
+#define TRANS_VRR_STATUS2_C            0x6243C
+#define TRANS_VRR_STATUS2_D            0x6343C
+#define TRANS_PUSH_A                   0x60A70
+#define TRANS_PUSH_B                   0x61A70
+#define TRANS_PUSH_C                   0x62A70
+#define TRANS_PUSH_D                   0x63A70
+
 #define PP_STATUS	0x61200
 # define PP_ON					(1 << 31)
 /*
