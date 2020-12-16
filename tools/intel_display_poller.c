@@ -574,18 +574,20 @@ static void poll_dsl_deiir(uint32_t devid, int pipe, int bit,
 	write_reg(iir, bit);
 
 	while (!quit) {
-		dsl1 = read_reg(dsl);
-		iir1 = read_reg(iir);
-		iir2 = read_reg(iir);
-		dsl2 = read_reg(dsl);
+		while (!quit) {
+			dsl1 = read_reg(dsl);
+			iir1 = read_reg(iir);
+			iir2 = read_reg(iir);
+			dsl2 = read_reg(dsl);
 
-		field1 = dsl1 & 0x80000000;
-		field2 = dsl2 & 0x80000000;
-		dsl1 &= ~0x80000000;
-		dsl2 &= ~0x80000000;
+			field1 = dsl1 & 0x80000000;
+			field2 = dsl2 & 0x80000000;
+			dsl1 &= ~0x80000000;
+			dsl2 &= ~0x80000000;
 
-		if (!(iir2 & bit))
-			continue;
+			if (iir2 & bit)
+				break;
+		}
 
 		write_reg(iir, bit);
 
@@ -616,18 +618,20 @@ static void poll_dsl_framecount_g4x(int pipe, uint32_t *min, uint32_t *max, cons
 	dsl = PIPE_REG(pipe, PIPEA_DSL);
 
 	while (!quit) {
-		dsl1 = read_reg(dsl);
-		frm1 = read_reg(frm);
-		frm2 = read_reg(frm);
-		dsl2 = read_reg(dsl);
+		while (!quit) {
+			dsl1 = read_reg(dsl);
+			frm1 = read_reg(frm);
+			frm2 = read_reg(frm);
+			dsl2 = read_reg(dsl);
 
-		field1 = dsl1 & 0x80000000;
-		field2 = dsl2 & 0x80000000;
-		dsl1 &= ~0x80000000;
-		dsl2 &= ~0x80000000;
+			field1 = dsl1 & 0x80000000;
+			field2 = dsl2 & 0x80000000;
+			dsl1 &= ~0x80000000;
+			dsl2 &= ~0x80000000;
 
-		if (frm1 + 1 != frm2)
-			continue;
+			if (frm1 + 1 == frm2)
+				break;
+		}
 
 		if (field1 != field2)
 			printf("fields are different (%u:%u -> %u:%u)\n",
@@ -683,19 +687,17 @@ static void poll_dsl_flipcount_g4x(uint32_t devid, int pipe,
 			dsl1 &= ~0x80000000;
 			dsl2 &= ~0x80000000;
 
-			if (flp1 == flp2)
-				continue;
-
-			if (field1 != field2)
-				printf("fields are different (%u:%u -> %u:%u)\n",
-				       field1, dsl1, field2, dsl2);
-
-			min[field1*count+i[field1]] = dsl1;
-			max[field1*count+i[field1]] = dsl2;
-			if (++i[field1] >= count)
+			if (flp1 != flp2)
 				break;
 		}
-		if (i[field1] >= count)
+
+		if (field1 != field2)
+			printf("fields are different (%u:%u -> %u:%u)\n",
+			       field1, dsl1, field2, dsl2);
+
+		min[field1*count+i[field1]] = dsl1;
+		max[field1*count+i[field1]] = dsl2;
+		if (++i[field1] >= count)
 			break;
 	}
 }
@@ -1090,16 +1092,18 @@ static void poll_dsl_wrap(int pipe, uint32_t *min, uint32_t *max, const int coun
 	dsl = PIPE_REG(pipe, PIPEA_DSL);
 
 	while (!quit) {
-		dsl1 = read_reg(dsl);
-		dsl2 = read_reg(dsl);
+		while (!quit) {
+			dsl1 = read_reg(dsl);
+			dsl2 = read_reg(dsl);
 
-		field1 = dsl1 & 0x80000000;
-		field2 = dsl2 & 0x80000000;
-		dsl1 &= ~0x80000000;
-		dsl2 &= ~0x80000000;
+			field1 = dsl1 & 0x80000000;
+			field2 = dsl2 & 0x80000000;
+			dsl1 &= ~0x80000000;
+			dsl2 &= ~0x80000000;
 
-		if (dsl2 >= dsl1)
-			continue;
+			if (dsl2 < dsl1)
+				break;
+		}
 
 		if (field1 != field2)
 			printf("fields are different (%u:%u -> %u:%u)\n",
