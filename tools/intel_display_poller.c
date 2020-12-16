@@ -49,6 +49,8 @@ enum test {
 	TEST_FRAMECOUNT,
 	TEST_FRAMECOUNT_GEN3,
 	TEST_FRAMECOUNT_G4X,
+	TEST_FRAMETIMESTAMP,
+	TEST_TIMESTAMP,
 	TEST_FLIPCOUNT,
 	TEST_PAN,
 	TEST_FLIP,
@@ -732,6 +734,80 @@ static void poll_dsl_framecount_gen3(int pipe, uint32_t *min, uint32_t *max, con
 	}
 }
 
+
+static void poll_dsl_frametimestamp(uint32_t devid, int pipe,
+				    uint32_t *min, uint32_t *max, const int count)
+{
+	uint32_t dsl, dsl1, dsl2, frm, frm1, frm2;
+	bool field1, field2;
+	int i[2] = {};
+
+	frm = PIPE_REG(pipe, PIPEAFRMTMSMTP);
+	dsl = PIPE_REG(pipe, PIPEA_DSL);
+
+	while (!quit) {
+		while (!quit) {
+			dsl1 = read_reg(dsl);
+			frm1 = read_reg(frm);
+			frm2 = read_reg(frm);
+			dsl2 = read_reg(dsl);
+
+			field1 = dsl1 & 0x80000000;
+			field2 = dsl2 & 0x80000000;
+			dsl1 &= ~0x80000000;
+			dsl2 &= ~0x80000000;
+
+			if (frm1 != frm2)
+				break;
+		}
+
+		if (field1 != field2)
+			printf("fields are different (%u:%u -> %u:%u)\n",
+			       field1, dsl1, field2, dsl2);
+
+		min[field1*count+i[field1]] = dsl1;
+		max[field1*count+i[field1]] = dsl2;
+		if (++i[field1] >= count)
+			break;
+	}
+}
+
+static uint32_t timestamp_reg(uint32_t devid)
+{
+	if (intel_gen(devid) >= 7)
+		return IVB_TIMESTAMP_CTR;
+	else if (intel_gen(devid) >= 5)
+		return ILK_TIMESTAMP_HI;
+	else
+		return TIMESTAMP_QW + 4;
+}
+
+static void poll_dsl_timestamp(uint32_t devid, int pipe, int target_scanline,
+			       uint32_t *min, uint32_t *max, const int count)
+{
+	uint32_t dsl1, frm, frm1, ts, ts1;
+	bool field1;
+	int i[2] = {};
+
+	ts = timestamp_reg(devid);
+	frm = PIPE_REG(pipe, PIPEAFRMTMSMTP);
+
+	while (!quit) {
+		dsl1 = wait_scanline(pipe, target_scanline, &field1);
+
+		frm1 = read_reg(frm);
+		ts1 = read_reg(ts);
+
+		field1 = dsl1 & 0x80000000;
+		dsl1 &= ~0x80000000;
+
+		min[field1*count+i[field1]] = dsl1;
+		max[field1*count+i[field1]] = ts1 - frm1;
+		if (++i[field1] >= count)
+			break;
+	}
+}
+
 static void poll_dsl_pan(uint32_t devid, int pipe, int target_scanline, int target_fuzz,
 			 uint32_t *min, uint32_t *max, const int count)
 {
@@ -1087,6 +1163,12 @@ static const char *test_name(enum test test, int pipe, int bit, bool test_pixel_
 	case TEST_FRAMECOUNT_G4X:
 		snprintf(str, sizeof str, "%s / pipe %c / Frame count (g4x+)", type, pipe_name(pipe));
 		return str;
+	case TEST_FRAMETIMESTAMP:
+		snprintf(str, sizeof str, "%s / pipe %c / Frame timestamp", type, pipe_name(pipe));
+		return str;
+	case TEST_TIMESTAMP:
+		snprintf(str, sizeof str, "%s / pipe %c / Timestamp", type, pipe_name(pipe));
+		return str;
 	case TEST_FLIPCOUNT:
 		snprintf(str, sizeof str, "%s / pipe %c / Flip count (g4x+)", type, pipe_name(pipe));
 		return str;
@@ -1119,7 +1201,7 @@ static const char *test_name(enum test test, int pipe, int bit, bool test_pixel_
 static void __attribute__((noreturn)) usage(const char *name)
 {
 	fprintf(stderr, "Usage: %s [options]\n"
-		" -t,--test <pipestat|iir|framecount|flipcount|pan|flip|flipdone|surflive|wrap|field>\n"
+		" -t,--test <pipestat|iir|framecount|flipcount|frametimestamp|timestamp|pan|flip|flipdone|surflive|wrap|field>\n"
 		" -p,--pipe <pipe>\n"
 		" -b,--bit <bit>\n"
 		" -l,--line <target scanline/pixel>\n"
@@ -1170,6 +1252,10 @@ int main(int argc, char *argv[])
 				test = TEST_FRAMECOUNT;
 			else if (!strcmp(optarg, "flipcount"))
 				test = TEST_FLIPCOUNT;
+			else if (!strcmp(optarg, "frametimestamp"))
+				test = TEST_FRAMETIMESTAMP;
+			else if (!strcmp(optarg, "timestamp"))
+				test = TEST_TIMESTAMP;
 			else if (!strcmp(optarg, "pan"))
 				test = TEST_PAN;
 			else if (!strcmp(optarg, "flip"))
@@ -1318,6 +1404,11 @@ int main(int argc, char *argv[])
 		case TEST_WRAP:
 		case TEST_FIELD:
 			break;
+		case TEST_FRAMETIMESTAMP:
+		case TEST_TIMESTAMP:
+			if (!IS_G4X(devid))
+				usage(argv[0]);
+			break;
 		default:
 			usage(argv[0]);
 		}
@@ -1348,6 +1439,8 @@ int main(int argc, char *argv[])
 		case TEST_SURFLIVE:
 		case TEST_WRAP:
 		case TEST_FIELD:
+		case TEST_TIMESTAMP:
+		case TEST_FRAMETIMESTAMP:
 			break;
 		default:
 			usage(argv[0]);
@@ -1402,6 +1495,14 @@ int main(int argc, char *argv[])
 	case TEST_FRAMECOUNT_G4X:
 		assert(!test_pixelcount);
 		poll_dsl_framecount_g4x(pipe, min, max, count);
+		break;
+	case TEST_FRAMETIMESTAMP:
+		assert(!test_pixelcount);
+		poll_dsl_frametimestamp(devid, pipe, min, max, count);
+		break;
+	case TEST_TIMESTAMP:
+		assert(!test_pixelcount);
+		poll_dsl_timestamp(devid, pipe, target_scanline, min, max, count);
 		break;
 	case TEST_FLIPCOUNT:
 		assert(!test_pixelcount);
