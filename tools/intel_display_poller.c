@@ -173,6 +173,21 @@ static void enable_async_flip(uint32_t devid, int pipe, bool enable)
 	write_reg(PIPE_REG(plane, DSPACNTR), tmp);
 }
 
+static int wait_scanline(int pipe, int target_scanline, bool *field)
+{
+	uint32_t dsl_reg = PIPE_REG(pipe, PIPEA_DSL);
+
+	while (!quit) {
+		uint32_t dsl = read_reg(dsl_reg);
+		*field = dsl & 0x80000000;
+		dsl &= ~0x80000000;
+		if (dsl == target_scanline)
+			return dsl;
+	}
+
+	return 0;
+}
+
 static void poll_pixel_pipestat(int pipe, int bit, uint32_t *min, uint32_t *max, const int count)
 {
 	uint32_t pix, pix1, pix2, iir, iir1, iir2, iir_bit, iir_mask;
@@ -720,34 +735,21 @@ static void poll_dsl_framecount_gen3(int pipe, uint32_t *min, uint32_t *max, con
 static void poll_dsl_pan(uint32_t devid, int pipe, int target_scanline, int target_fuzz,
 			 uint32_t *min, uint32_t *max, const int count)
 {
-	uint32_t dsl, dsl1 = 0, dsl2 = 0;
+	uint32_t dsl1 = 0, dsl2 = 0;
 	bool field1 = false, field2 = false;
 	uint32_t saved, surf = 0;
 	int i[2] = {};
 
-	dsl = PIPE_REG(pipe, PIPEA_DSL);
 	surf = dspoffset_reg(devid, pipe);
 
 	saved = read_reg(surf);
 
 	while (!quit) {
-		while (!quit) {
-			dsl1 = read_reg(dsl);
-			field1 = dsl1 & 0x80000000;
-			dsl1 &= ~0x80000000;
-			if (dsl1 == target_scanline)
-				break;
-		}
+		dsl1 = wait_scanline(pipe, target_scanline, &field1);
 
 		write_reg(surf, saved+256);
 
-		while (!quit) {
-			dsl2 = read_reg(dsl);
-			field2 = dsl1 & 0x80000000;
-			dsl2 &= ~0x80000000;
-			if (dsl2 == target_scanline + target_fuzz)
-				break;
-		}
+		dsl2 = wait_scanline(pipe, target_scanline + target_fuzz, &field2);
 
 		write_reg(surf, saved);
 
@@ -767,12 +769,11 @@ static void poll_dsl_pan(uint32_t devid, int pipe, int target_scanline, int targ
 static void poll_dsl_flip(uint32_t devid, int pipe, int target_scanline, int target_fuzz,
 			  uint32_t *min, uint32_t *max, const int count, bool async)
 {
-	uint32_t dsl, dsl1 = 0, dsl2 = 0;
+	uint32_t dsl1 = 0, dsl2 = 0;
 	bool field1 = false, field2 = false;
 	uint32_t saved, surf = 0;
 	int i[2] = {};
 
-	dsl = PIPE_REG(pipe, PIPEA_DSL);
 	surf = dspsurf_reg(devid, pipe, async);
 
 	saved = read_reg(surf);
@@ -780,23 +781,11 @@ static void poll_dsl_flip(uint32_t devid, int pipe, int target_scanline, int tar
 	enable_async_flip(devid, pipe, async);
 
 	while (!quit) {
-		while (!quit) {
-			dsl1 = read_reg(dsl);
-			field1 = dsl1 & 0x80000000;
-			dsl1 &= ~0x80000000;
-			if (dsl1 == target_scanline)
-				break;
-		}
+		dsl1 = wait_scanline(pipe, target_scanline, &field1);
 
 		write_reg(surf, saved+256*1024);
 
-		while (!quit) {
-			dsl2 = read_reg(dsl);
-			field2 = dsl1 & 0x80000000;
-			dsl2 &= ~0x80000000;
-			if (dsl2 == target_scanline + target_fuzz)
-				break;
-		}
+		dsl2 = wait_scanline(pipe, target_scanline + target_fuzz, &field2);
 
 		write_reg(surf, saved);
 
@@ -839,13 +828,7 @@ static void poll_dsl_flipdone_pipestat(uint32_t devid, int pipe, int target_scan
 	enable_async_flip(devid, pipe, async);
 
 	while (!quit) {
-		while (!quit) {
-			dsl1 = read_reg(dsl);
-			field1 = dsl1 & 0x80000000;
-			dsl1 &= ~0x80000000;
-			if (dsl1 == target_scanline)
-				break;
-		}
+		dsl1 = wait_scanline(pipe, target_scanline, &field1);
 
 		write_reg(pipestat, pipestat1 | bit);
 		if (next == saved)
@@ -928,13 +911,7 @@ static void poll_dsl_flipdone_deiir(uint32_t devid, int pipe, int target_scanlin
 	enable_async_flip(devid, pipe, async);
 
 	while (!quit) {
-		while (!quit) {
-			dsl1 = read_reg(dsl);
-			field1 = dsl1 & 0x80000000;
-			dsl1 &= ~0x80000000;
-			if (dsl1 == target_scanline)
-				break;
-		}
+		dsl1 = wait_scanline(pipe, target_scanline, &field1);
 
 		write_reg(iir, bit);
 		if (next == saved)
