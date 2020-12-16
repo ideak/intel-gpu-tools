@@ -156,6 +156,39 @@ static void test_zero(int i915)
 	gem_close(i915, object.handle);
 }
 
+static void test_32b_last_page(int i915)
+{
+	uint64_t sz, gtt = gem_aperture_size(i915);
+	struct drm_i915_gem_exec_object2 object = {
+		.flags = EXEC_OBJECT_PINNED,
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&object),
+		.buffer_count = 1,
+	};
+
+	/*
+	 * The last page under 32b is excluded for !48b objects in order to
+	 * prevent issues with stateless addressing.
+	 */
+
+	igt_require(gtt >= 1ull << 32);
+	object.handle = batch_create(i915, &sz),
+
+	object.offset = 1ull << 32;
+	object.offset -= sz;
+	igt_assert_f(__gem_execbuf(i915, &execbuf) == -EINVAL,
+		     "execbuf succeeded with object.offset=%llx + %"PRIx64"\n",
+		     object.offset, sz);
+
+	object.offset -= 4096;
+	igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
+		     "execbuf failed with object.offset=%llx + %"PRIx64"\n",
+		     object.offset, sz);
+
+	gem_close(i915, object.handle);
+}
+
 static void test_softpin(int fd)
 {
 	const uint32_t size = 1024 * 1024;
@@ -621,6 +654,10 @@ igt_main
 	igt_subtest("zero") {
 		igt_require(gem_uses_full_ppgtt(fd));
 		test_zero(fd);
+	}
+	igt_subtest("32b-excludes-last-page") {
+		igt_require(gem_uses_full_ppgtt(fd));
+		test_32b_last_page(fd);
 	}
 	igt_subtest("softpin")
 		test_softpin(fd);
