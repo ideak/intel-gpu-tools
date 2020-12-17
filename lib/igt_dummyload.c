@@ -590,6 +590,16 @@ void igt_terminate_spins(void)
 	pthread_mutex_unlock(&list_lock);
 }
 
+void igt_free_spins(int i915)
+{
+	struct igt_spin *iter, *next;
+
+	pthread_mutex_lock(&list_lock);
+	igt_list_for_each_entry_safe(iter, next, &spin_list, link)
+		igt_spin_free(i915, iter);
+	pthread_mutex_unlock(&list_lock);
+}
+
 void igt_unshare_spins(void)
 {
 	struct igt_spin *it, *n;

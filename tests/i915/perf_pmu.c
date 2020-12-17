@@ -883,6 +883,43 @@ sema_busy(int gem_fd,
 	close(fd[1]);
 }
 
+static void test_awake(int i915)
+{
+	const struct intel_execution_engine2 *e;
+	unsigned long slept;
+	uint64_t val;
+	int fd;
+
+	fd = perf_i915_open(i915, I915_PMU_SOFTWARE_GT_AWAKE_TIME);
+	igt_skip_on(fd < 0);
+
+	/* Check that each engine is captured by the GT wakeref */
+	__for_each_physical_engine(i915, e) {
+		igt_spin_new(i915, .engine = e->flags);
+
+		val = pmu_read_single(fd);
+		slept = measured_usleep(batch_duration_ns / 1000);
+		val = pmu_read_single(fd) - val;
+
+		gem_quiescent_gpu(i915);
+		assert_within_epsilon(val, slept, tolerance);
+	}
+
+	/* And that the total GT wakeref matches walltime not summation */
+	__for_each_physical_engine(i915, e)
+		igt_spin_new(i915, .engine = e->flags);
+
+	val = pmu_read_single(fd);
+	slept = measured_usleep(batch_duration_ns / 1000);
+	val = pmu_read_single(fd) - val;
+
+	gem_quiescent_gpu(i915);
+	assert_within_epsilon(val, slept, tolerance);
+
+	igt_free_spins(i915);
+	close(fd);
+}
+
 #define   MI_WAIT_FOR_PIPE_C_VBLANK (1<<21)
 #define   MI_WAIT_FOR_PIPE_B_VBLANK (1<<11)
 #define   MI_WAIT_FOR_PIPE_A_VBLANK (1<<3)
@@ -2249,6 +2286,12 @@ igt_main
 
 	igt_subtest("rc6-suspend")
 		test_rc6(fd, TEST_S3);
+
+	/**
+	 * Test GT wakeref tracking (similar to RC0, opposite of RC6)
+	 */
+	igt_subtest("gt-awake")
+		test_awake(fd);
 
 	/**
 	 * Check render nodes are counted.
