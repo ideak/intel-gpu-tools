@@ -1640,6 +1640,11 @@ int main(int argc, char **argv)
 		} else if (ioctl(0, TIOCGWINSZ, &ws) != -1) {
 			con_w = ws.ws_col;
 			con_h = ws.ws_row;
+			if (con_w == 0 && con_h == 0) {
+				/* Serial console. */
+				con_w = 80;
+				con_h = 24;
+			}
 		}
 
 		pmu_sample(engines);
