@@ -538,23 +538,8 @@ void igt_spin_end(igt_spin_t *spin)
 	__sync_synchronize();
 }
 
-/**
- * igt_spin_free:
- * @fd: open i915 drm file descriptor
- * @spin: spin state from igt_spin_new()
- *
- * This function does the necessary post-processing after starting a
- * spin with igt_spin_new() and then frees it.
- */
-void igt_spin_free(int fd, igt_spin_t *spin)
+static void __igt_spin_free(int fd, igt_spin_t *spin)
 {
-	if (!spin)
-		return;
-
-	pthread_mutex_lock(&list_lock);
-	igt_list_del(&spin->link);
-	pthread_mutex_unlock(&list_lock);
-
 	if (spin->timerfd >= 0) {
 		pthread_cancel(spin->timer_thread);
 		igt_assert(pthread_join(spin->timer_thread, NULL) == 0);
@@ -580,6 +565,26 @@ void igt_spin_free(int fd, igt_spin_t *spin)
 	free(spin);
 }
 
+/**
+ * igt_spin_free:
+ * @fd: open i915 drm file descriptor
+ * @spin: spin state from igt_spin_new()
+ *
+ * This function does the necessary post-processing after starting a
+ * spin with igt_spin_new() and then frees it.
+ */
+void igt_spin_free(int fd, igt_spin_t *spin)
+{
+	if (!spin)
+		return;
+
+	pthread_mutex_lock(&list_lock);
+	igt_list_del(&spin->link);
+	pthread_mutex_unlock(&list_lock);
+
+	__igt_spin_free(fd, spin);
+}
+
 void igt_terminate_spins(void)
 {
 	struct igt_spin *iter;
@@ -596,7 +601,8 @@ void igt_free_spins(int i915)
 
 	pthread_mutex_lock(&list_lock);
 	igt_list_for_each_entry_safe(iter, next, &spin_list, link)
-		igt_spin_free(i915, iter);
+		__igt_spin_free(i915, iter);
+	IGT_INIT_LIST_HEAD(&spin_list);
 	pthread_mutex_unlock(&list_lock);
 }
 
