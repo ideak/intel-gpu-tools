@@ -1,12 +1,13 @@
-#include <stdint.h>
+#include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
 #include <sys/sysmacros.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "igt_perf.h"
 
@@ -111,6 +112,8 @@ _perf_open(uint64_t type, uint64_t config, int group, uint64_t format)
 
 	attr.read_format = format;
 	attr.config = config;
+	attr.use_clockid = 1;
+	attr.clockid = CLOCK_MONOTONIC;
 
 	do {
 		ret = perf_event_open(&attr, -1, cpu++, group, 0);
