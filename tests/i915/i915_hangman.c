@@ -341,6 +341,7 @@ igt_main
 			.value = &has_gpu_reset,
 		};
 
+		igt_require(gem_scheduler_has_preemption(device));
 		igt_params_set(device, "reset", "%u", -1);
                 ioctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
 		igt_require(has_gpu_reset > 1);
