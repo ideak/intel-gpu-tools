@@ -27,14 +27,16 @@
  */
 
 #include <limits.h>
-#include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <fcntl.h>
 
 #include "i915/gem.h"
 #include "igt.h"
 #include "igt_sysfs.h"
 #include "igt_debugfs.h"
+#include "sw_sync.h"
 
 #ifndef I915_PARAM_CMD_PARSER_VERSION
 #define I915_PARAM_CMD_PARSER_VERSION       28
@@ -223,6 +225,54 @@ static void test_error_state_capture(unsigned ring_id,
 	munmap(batch, 4096);
 }
 
+static void
+test_engine_hang(const struct intel_execution_engine2 *e, unsigned int flags)
+{
+	const struct intel_execution_engine2 *other;
+	igt_spin_t *spin, *next;
+	IGT_LIST_HEAD(list);
+	uint32_t ctx;
+
+	igt_skip_on(flags & IGT_SPIN_INVALID_CS &&
+		    gem_has_cmdparser(device, e->flags));
+
+	/* Fill all the other engines with background load */
+	__for_each_physical_engine(device, other) {
+		if (other->flags == e->flags)
+			continue;
+
+		ctx = gem_context_clone_with_engines(device, 0);
+		spin = __igt_spin_new(device, ctx,
+				      .engine = other->flags,
+				      .flags = IGT_SPIN_FENCE_OUT);
+		gem_context_destroy(device, ctx);
+
+		igt_list_move(&spin->link, &list);
+	}
+
+	/* And on the target engine, we hang */
+	spin = igt_spin_new(device,
+			    .engine = e->flags,
+			    .flags = (IGT_SPIN_FENCE_OUT |
+				      IGT_SPIN_NO_PREEMPTION |
+				      flags));
+
+	/* Wait for the hangcheck to terminate the hanger */
+	igt_assert(sync_fence_wait(spin->out_fence, 30000) == 0); /* 30s */
+	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
+	igt_spin_free(device, spin);
+
+	/* But no other engines/clients should be affected */
+	igt_list_for_each_entry_safe(spin, next, &list, link) {
+		igt_assert(sync_fence_wait(spin->out_fence, 0) == -ETIME);
+		igt_spin_end(spin);
+
+		igt_assert(sync_fence_wait(spin->out_fence, 500) == 0);
+		igt_assert_eq(sync_fence_status(spin->out_fence), 1);
+		igt_spin_free(device, spin);
+	}
+}
+
 /* This test covers the case where we end up in an uninitialised area of the
  * ppgtt and keep executing through it. This is particularly relevant if 48b
  * ppgtt is enabled because the ppgtt is massively bigger compared to the 32b
@@ -281,6 +331,40 @@ igt_main
 		__for_each_physical_engine(device, e) {
 			igt_dynamic_f("%s", e->name)
 				test_error_state_capture(e->flags, e->name);
+		}
+	}
+
+	igt_subtest_with_dynamic("engine-hang") {
+                int has_gpu_reset = 0;
+		struct drm_i915_getparam gp = {
+			.param = I915_PARAM_HAS_GPU_RESET,
+			.value = &has_gpu_reset,
+		};
+
+		igt_params_set(device, "reset", "%u", -1);
+                ioctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
+		igt_require(has_gpu_reset > 1);
+
+		__for_each_physical_engine(device, e) {
+			igt_dynamic_f("%s", e->name)
+				test_engine_hang(e, 0);
+		}
+	}
+
+	igt_subtest_with_dynamic("engine-error") {
+		int has_gpu_reset = 0;
+		struct drm_i915_getparam gp = {
+			.param = I915_PARAM_HAS_GPU_RESET,
+			.value = &has_gpu_reset,
+		};
+
+		igt_params_set(device, "reset", "%u", -1);
+		ioctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
+		igt_require(has_gpu_reset > 1);
+
+		__for_each_physical_engine(device, e) {
+			igt_dynamic_f("%s", e->name)
+				test_engine_hang(e, IGT_SPIN_INVALID_CS);
 		}
 	}
 
