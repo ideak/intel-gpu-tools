@@ -27,7 +27,6 @@
 
 #include <pthread.h>
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -43,6 +42,9 @@
 #include <sys/poll.h>
 #include <sys/resource.h>
 #include "drm.h"
+
+#include "igt.h"
+#include "igt_device.h"
 
 #define CONTEXT		0x1
 #define REALTIME	0x2
@@ -453,7 +455,8 @@ static int run(int seconds,
 	if (gen < 6)
 		return IGT_EXIT_SKIP; /* Needs BCS timestamp */
 
-	intel_register_access_init(&mmio_data, intel_get_pci_device(), false, fd);
+	intel_register_access_init(&mmio_data,
+				   igt_device_get_pci_device(fd), false, fd);
 
 	if (gen == 6)
 		timestamp_reg = REG(RCS_TIMESTAMP);
@@ -544,6 +547,7 @@ static int run(int seconds,
 	}
 
 	getrusage(RUSAGE_SELF, &rused);
+	intel_register_access_fini(&mmio_data);
 
 	switch ((flags >> 8) & 0xf) {
 	default:
