@@ -140,7 +140,9 @@ static void test_zero(int i915)
 		igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
 			     "execbuff failed with object.offset=%llx\n",
 			     object.offset);
+	}
 
+	if (gtt - sz >> 32) {
 		object.offset = 1ull << 32;
 		igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
 			     "execbuff failed with object.offset=%llx\n",
