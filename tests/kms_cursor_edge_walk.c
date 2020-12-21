@@ -339,21 +339,25 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 				igt_fixture
 					igt_require(data.curw <= max_curw && data.curh <= max_curh);
 
+				igt_describe("Checking cursor by walking left edge of screen");
 				igt_subtest_f("pipe-%s-%dx%d-left-edge",
 					kmstest_pipe_name(data.pipe),
 					data.curw, data.curh)
 					test_crtc(&data, EDGE_LEFT);
 
+				igt_describe("Checking cursor by walking right edge of screen");
 				igt_subtest_f("pipe-%s-%dx%d-right-edge",
 					kmstest_pipe_name(data.pipe),
 					data.curw, data.curh)
 					test_crtc(&data, EDGE_RIGHT);
 
+				igt_describe("Checking cursor by walking top edge of screen");
 				igt_subtest_f("pipe-%s-%dx%d-top-edge",
 					kmstest_pipe_name(data.pipe),
 					data.curw, data.curh)
 					test_crtc(&data, EDGE_TOP);
 
+				igt_describe("Checking cursor by walking bottom edge of screen");
 				igt_subtest_f("pipe-%s-%dx%d-bottom-edge",
 					kmstest_pipe_name(data.pipe),
 					data.curw, data.curh)
