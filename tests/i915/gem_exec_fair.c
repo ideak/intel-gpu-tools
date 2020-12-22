@@ -921,9 +921,11 @@ static uint64_t time_get_mono_ns(void)
 
 static void deadline(int i915, int duration, unsigned int flags)
 {
-	const uint64_t frame_ns = 33670 * 1000; /* 29.7fps */
-	const uint64_t parent_ns = 400 * 1000;
-	const uint64_t switch_ns = 600 * 1000;
+	const int64_t frame_ns = 33670 * 1000; /* 29.7fps */
+	const int64_t parent_ns = 400 * 1000;
+	const int64_t switch_ns = 50 * 1000;
+	const int64_t overhead_ns = /* estimate timeslicing overhead */
+		(frame_ns / 1000 / 1000 + 2) * switch_ns + parent_ns;
 	struct intel_execution_engine2 pe = pick_default(i915);
 	struct intel_execution_engine2 ve = pick_engine(i915, "vcs0");
 	struct drm_i915_gem_exec_fence *fences = calloc(sizeof(*fences), 32);
@@ -954,7 +956,7 @@ static void deadline(int i915, int duration, unsigned int flags)
 		int timeline = sw_sync_timeline_create();
 		int nframes = duration * NSEC64 / frame_ns + 1;
 		int num_children = (1 << n) - 1;
-		int child_ns = (frame_ns - parent_ns - switch_ns) / num_children - switch_ns;
+		int child_ns = (frame_ns - overhead_ns) / num_children - switch_ns;
 		struct { int child[2], parent[2]; } *link;
 		uint64_t start, over;
 		int missed;
