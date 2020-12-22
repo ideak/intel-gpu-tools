@@ -316,9 +316,8 @@ create_fb_for_mode__panning(data_t *data, drmModeModeInfo *mode,
 static void
 test_plane_panning_with_output(data_t *data,
 			       enum pipe pipe,
-			       int plane,
 			       igt_output_t *output,
-			       igt_crc_t *red_crc, igt_crc_t *blue_crc,
+			       igt_crc_t *ref_crc,
 			       unsigned int flags)
 {
 	igt_plane_t *primary;
@@ -326,8 +325,8 @@ test_plane_panning_with_output(data_t *data,
 	drmModeModeInfo *mode;
 	igt_crc_t crc;
 
-	igt_info("Testing connector %s using pipe %s plane %d\n",
-		 igt_output_name(output), kmstest_pipe_name(pipe), plane);
+	igt_info("Testing connector %s using pipe %s\n",
+		 igt_output_name(output), kmstest_pipe_name(pipe));
 
 	igt_output_set_pipe(output, pipe);
 
@@ -350,10 +349,7 @@ test_plane_panning_with_output(data_t *data,
 
 	igt_pipe_crc_collect_crc(data->pipe_crc, &crc);
 
-	if (flags & TEST_PANNING_TOP_LEFT)
-		igt_assert_crc_equal(red_crc, &crc);
-	else
-		igt_assert_crc_equal(blue_crc, &crc);
+	igt_assert_crc_equal(ref_crc, &crc);
 
 	igt_plane_set_fb(primary, NULL);
 
@@ -365,22 +361,20 @@ test_plane_panning_with_output(data_t *data,
 static void
 test_plane_panning(data_t *data, enum pipe pipe, unsigned int flags)
 {
-	int n_planes = data->display.pipes[pipe].n_planes;
 	igt_output_t *output;
-	igt_crc_t red_crc;
-	igt_crc_t blue_crc;
+	igt_crc_t ref_crc;
 
 	output = igt_get_single_output_for_pipe(&data->display, pipe);
 	igt_require(output);
 
 	test_init(data, pipe);
 
-	test_grab_crc(data, output, pipe, &red, flags, &red_crc);
-	test_grab_crc(data, output, pipe, &blue, flags, &blue_crc);
+	if (flags & TEST_PANNING_TOP_LEFT)
+		test_grab_crc(data, output, pipe, &red, flags, &ref_crc);
+	else
+		test_grab_crc(data, output, pipe, &blue, flags, &ref_crc);
 
-	for (int plane = 1; plane < n_planes; plane++)
-		test_plane_panning_with_output(data, pipe, plane, output,
-					       &red_crc, &blue_crc, flags);
+	test_plane_panning_with_output(data, pipe, output, &ref_crc, flags);
 
 	test_fini(data);
 }
