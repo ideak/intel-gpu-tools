@@ -75,6 +75,7 @@ igt_simple_main
 	spin = igt_spin_new(i915);
 
 	num_fences = gem_available_fences(i915);
+	igt_require(num_fences);
 	igt_info("creating havoc on %i fences\n", num_fences);
 
 	for (int i = 0; i < num_fences + 3; i++) {
