@@ -350,7 +350,7 @@ static void single_timeline(int i915)
 		gem_context_clone(i915, 0, 0,
 				  I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
 	n = 0;
-	__for_each_physical_engine(i915, e) {
+	____for_each_physical_engine(i915, spin->execbuf.rsvd1, e) {
 		spin->execbuf.flags = e->flags | I915_EXEC_FENCE_OUT;
 
 		gem_execbuf_wr(i915, &spin->execbuf);

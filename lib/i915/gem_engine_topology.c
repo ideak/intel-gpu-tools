@@ -91,8 +91,7 @@ static void ctx_map_engines(int fd, struct intel_engine_data *ed,
 			from_user_pointer(param->value);
 	int i = 0;
 
-	for (typeof(engines->engines[0]) *p =
-	     &engines->engines[0];
+	for (typeof(engines->engines[0]) *p = &engines->engines[0];
 	     i < ed->nengines; i++, p++) {
 		p->engine_class = ed->engines[i].class;
 		p->engine_instance = ed->engines[i].instance;
