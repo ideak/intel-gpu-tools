@@ -997,8 +997,14 @@ static void deadline(int i915, int duration, unsigned int flags)
 		missed = 0;
 		start = time_get_mono_ns();
 		for (int frame = 1; frame <= nframes; frame++) {
+			struct rusage old_usage, usage;
+			uint64_t cpu_time, d_time;
+			struct timespec tv;
 			uint64_t time;
 			int fence;
+
+			getrusage(RUSAGE_CHILDREN, &old_usage);
+			igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
 
 			sw_sync_timeline_inc(timeline, 1);
 			for (int i = 0; i < num_children; i++) {
@@ -1015,6 +1021,14 @@ static void deadline(int i915, int duration, unsigned int flags)
 			igt_assert_eq(sync_fence_status(fence), 1);
 			time = sync_fence_timestamp(fence) - start;
 			close(fence);
+
+			d_time = igt_nsec_elapsed(&tv);
+			getrusage(RUSAGE_CHILDREN, &usage);
+			cpu_time = d_cpu_time(&usage, &old_usage);
+			igt_debug("CPU usage: %.0f%%\n",
+				  100. * cpu_time / d_time);
+			if (4 * cpu_time > 3 * d_time)
+				break;
 
 			if (time > frame * frame_ns) {
 				igt_warn("Frame %d: over by %'"PRIu64"ns\n",
