@@ -79,7 +79,8 @@ static void store_dword(int fd, unsigned ring,
 	gem_close(fd, obj[1].handle);
 }
 
-static void one(int fd, unsigned engine)
+static void one(int fd, unsigned engine, unsigned int flags)
+#define FORKED (1 << 0)
 {
 	const struct intel_execution_engine2 *e;
 	uint32_t scratch = gem_create(fd, 4096);
@@ -102,9 +103,15 @@ static void one(int fd, unsigned engine)
 		if (!gem_class_can_store_dword(fd, e->class))
 			continue;
 
-		store_dword(fd, e->flags, scratch, 4*i, ~i);
+		if (flags & FORKED) {
+			igt_fork(child, 1)
+				store_dword(fd, e->flags, scratch, 4*i, ~i);
+		} else {
+			store_dword(fd, e->flags, scratch, 4*i, ~i);
+		}
 		i++;
 	}
+	igt_waitchildren();
 
 	result = gem_mmap__device_coherent(fd, scratch, 0, 4096, PROT_READ);
 	while (i--)
@@ -145,7 +152,10 @@ igt_main
 	}
 
 	test_each_engine("concurrent-writes", fd, e)
-		one(fd, e->flags);
+		one(fd, e->flags, 0);
+
+	test_each_engine("forked-writes", fd, e)
+		one(fd, e->flags, FORKED);
 
 	igt_fixture {
 		igt_stop_hang_detector();
