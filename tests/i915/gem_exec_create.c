@@ -50,7 +50,8 @@ static double elapsed(const struct timespec *start, const struct timespec *end)
 		(end->tv_nsec - start->tv_nsec)*1e-9);
 }
 
-#define LEAK 0x1
+#define ENGINES (1 << 0)
+#define LEAK (1 << 1)
 
 static void all(int fd, unsigned flags, int timeout, int ncpus)
 {
@@ -60,8 +61,17 @@ static void all(int fd, unsigned flags, int timeout, int ncpus)
 	unsigned engines[I915_EXEC_RING_MASK + 1], nengine;
 
 	nengine = 0;
-	for_each_physical_engine(e, fd)
-		engines[nengine++] = eb_ring(e);
+	if (flags & ENGINES) { /* Modern API to iterate over *all* engines */
+		const struct intel_execution_engine2 *e;
+
+		__for_each_physical_engine(fd, e)
+			engines[nengine++] = e->flags;
+
+		/* Note: modifies engine map on context 0 */
+	} else {
+		for_each_physical_engine(e, fd)
+			engines[nengine++] = eb_ring(e);
+	}
 	igt_require(nengine);
 
 	memset(&obj, 0, sizeof(obj));
@@ -134,13 +144,15 @@ igt_main
 		igt_fork_hang_detector(device);
 	}
 
-	igt_subtest("basic")
+	igt_subtest("legacy")
 		all(device, 0, 2, 1);
+	igt_subtest("basic")
+		all(device, ENGINES, 2, 1);
 	igt_subtest("forked")
-		all(device, 0, 20, ncpus);
+		all(device, ENGINES, 20, ncpus);
 
 	igt_subtest("madvise")
-		all(device, LEAK, 20, 1);
+		all(device, ENGINES | LEAK, 20, 1);
 
 
 	igt_fixture {
