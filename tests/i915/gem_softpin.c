@@ -32,6 +32,8 @@
 #define EXEC_OBJECT_PINNED	(1<<4)
 #define EXEC_OBJECT_SUPPORTS_48B_ADDRESS (1<<3)
 
+#define LIMIT_32b ((1ull << 32) - (1ull << 12))
+
 /* gen8_canonical_addr
  * Used to convert any address into canonical form, i.e. [63:48] == [47].
  * Based on kernel's sign_extend64 implementation.
@@ -127,32 +129,31 @@ static void test_zero(int i915)
 		.buffer_count = 1,
 	};
 
-	/* Under full-ppgtt, we have complete control of the GTT */
 	igt_info("Object size:%"PRIx64", GTT size:%"PRIx64"\n", sz, gtt);
 
 	object.offset = 0;
 	igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
-		     "execbuff failed with object.offset=%llx\n",
+		     "execbuf failed with object.offset=%llx\n",
 		     object.offset);
 
 	if (gtt >> 32) {
 		object.offset = (1ull << 32) - sz;
 		igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
-			     "execbuff failed with object.offset=%llx\n",
+			     "execbuf failed with object.offset=%llx\n",
 			     object.offset);
 	}
 
 	if ((gtt - sz) >> 32) {
 		object.offset = 1ull << 32;
 		igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
-			     "execbuff failed with object.offset=%llx\n",
+			     "execbuf failed with object.offset=%llx\n",
 			     object.offset);
 	}
 
 	object.offset = gtt - sz;
 	object.offset = gen8_canonical_addr(object.offset);
 	igt_assert_f(__gem_execbuf(i915, &execbuf) == 0,
-		     "execbuff failed with object.offset=%llx\n",
+		     "execbuf failed with object.offset=%llx\n",
 		     object.offset);
 
 	gem_close(i915, object.handle);
@@ -189,6 +190,68 @@ static void test_32b_last_page(int i915)
 		     object.offset, sz);
 
 	gem_close(i915, object.handle);
+}
+
+static void test_full(int i915)
+{
+	uint64_t sz, gtt = gem_aperture_size(i915);
+	struct drm_i915_gem_exec_object2 obj[2] = {
+		/* Use two objects so we can test .pad_to_size works */
+		{
+			.handle = batch_create(i915, &sz),
+			.flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_PAD_TO_SIZE,
+		},
+		{
+			.handle = batch_create(i915, &sz),
+			.flags = EXEC_OBJECT_PINNED,
+		},
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(obj),
+		.buffer_count = ARRAY_SIZE(obj),
+	};
+	int err;
+
+	obj[0].pad_to_size = gtt - sz;
+	if (obj[0].pad_to_size > LIMIT_32b - sz)
+		obj[0].pad_to_size = LIMIT_32b - sz;
+
+	obj[1].offset = sz;
+	igt_assert_f((err = __gem_execbuf(i915, &execbuf)) == -ENOSPC,
+		     "[32b] execbuf succeeded with obj[1].offset=%llx and obj[0].pad_to_size=%llx: err=%d\n",
+		     obj[1].offset, obj[0].pad_to_size, err);
+
+	obj[1].offset = obj[0].pad_to_size;
+	igt_assert_f((err = __gem_execbuf(i915, &execbuf)) == 0,
+		     "[32b] execbuf failed with obj[1].offset=%llx and obj[0].pad_to_size=%llx: err=%d\n",
+		     obj[1].offset, obj[0].pad_to_size, err);
+
+	igt_assert_eq_u64(obj[0].offset, 0);
+	igt_assert_eq_u64(obj[1].offset, obj[0].pad_to_size);
+
+	if (obj[1].offset + sz < gtt) {
+		obj[0].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+		obj[1].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
+		obj[0].pad_to_size = gtt - sz;
+
+		obj[1].offset = gen8_canonical_addr(obj[0].pad_to_size - sz);
+		igt_assert_f((err = __gem_execbuf(i915, &execbuf)) == -ENOSPC,
+			     "[48b] execbuf succeeded with obj[1].offset=%llx and obj[0].pad_to_size=%llx: err=%d\n",
+			     obj[1].offset, obj[0].pad_to_size, err);
+
+		obj[1].offset = gen8_canonical_addr(obj[0].pad_to_size);
+		igt_assert_f((err = __gem_execbuf(i915, &execbuf)) == 0,
+			     "[48b] execbuf failed with obj[1].offset=%llx and obj[0].pad_to_size=%llx: err=%d\n",
+		     obj[1].offset, obj[0].pad_to_size, err);
+
+		igt_assert_eq_u64(obj[0].offset, 0);
+		igt_assert_eq_u64(obj[1].offset,
+				  gen8_canonical_addr(obj[0].pad_to_size));
+	}
+
+	gem_close(i915, obj[1].handle);
+	gem_close(i915, obj[0].handle);
 }
 
 static void test_softpin(int fd)
@@ -653,14 +716,24 @@ igt_main
 
 	igt_subtest("invalid")
 		test_invalid(fd);
-	igt_subtest("zero") {
-		igt_require(gem_uses_full_ppgtt(fd));
-		test_zero(fd);
+
+	igt_subtest_group {
+		/* Under full-ppgtt, we have complete control of the GTT */
+
+		igt_fixture {
+			igt_require(gem_uses_full_ppgtt(fd));
+		}
+
+		igt_subtest("zero")
+			test_zero(fd);
+
+		igt_subtest("32b-excludes-last-page")
+			test_32b_last_page(fd);
+
+		igt_subtest("full")
+			test_full(fd);
 	}
-	igt_subtest("32b-excludes-last-page") {
-		igt_require(gem_uses_full_ppgtt(fd));
-		test_32b_last_page(fd);
-	}
+
 	igt_subtest("softpin")
 		test_softpin(fd);
 	igt_subtest("overlap")
