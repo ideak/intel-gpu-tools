@@ -117,23 +117,11 @@ find_metric_set(struct intel_perf *perf, const char *symbol_name)
 	return NULL;
 }
 
-static void
-init_devinfo(struct intel_perf_devinfo *perf_devinfo,
-	     const struct intel_device_info *devinfo,
-	     uint32_t devid,
-	     uint64_t timestamp_frequency)
-{
-	perf_devinfo->devid = devid;
-	perf_devinfo->gen = devinfo->gen;
-	perf_devinfo->timestamp_frequency = timestamp_frequency;
-}
-
 static bool
 parse_data(struct intel_perf_data_reader *reader)
 {
 	const struct intel_perf_record_device_info *record_info;
 	const struct intel_perf_record_device_topology *record_topology;
-	const struct intel_device_info *devinfo;
 	const uint8_t *end = reader->mmap_data + reader->mmap_size;
 	const uint8_t *iter = reader->mmap_data;
 
@@ -195,23 +183,20 @@ parse_data(struct intel_perf_data_reader *reader)
 	record_info = reader->record_info;
 	record_topology = reader->record_topology;
 
-	devinfo = intel_get_device_info(record_info->device_id);
-	if (!devinfo) {
-		snprintf(reader->error_msg, sizeof(reader->error_msg),
-			 "Recording occured on unsupported device (0x%x)",
-			 record_info->device_id);
-		return false;
-	}
-
-	init_devinfo(&reader->devinfo, devinfo,
-		     record_info->device_id,
-		     record_info->timestamp_frequency);
 	reader->perf = intel_perf_for_devinfo(record_info->device_id,
 					      record_info->device_revision,
 					      record_info->timestamp_frequency,
 					      record_info->gt_min_frequency,
 					      record_info->gt_max_frequency,
 					      &record_topology->topology);
+	if (!reader->perf) {
+		snprintf(reader->error_msg, sizeof(reader->error_msg),
+			 "Recording occured on unsupported device (0x%x)",
+			 record_info->device_id);
+		return false;
+	}
+
+	reader->devinfo = reader->perf->devinfo;
 
 	reader->metric_set_name = record_info->metric_set_name;
 	reader->metric_set_uuid = record_info->metric_set_uuid;
