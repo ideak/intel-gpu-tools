@@ -174,6 +174,11 @@ intel_perf_for_devinfo(uint32_t device_id,
 	perf->devinfo.gt_min_freq = gt_min_freq;
 	perf->devinfo.gt_max_freq = gt_max_freq;
 
+	if (devinfo->codename) {
+		snprintf(perf->devinfo.devname, sizeof(perf->devinfo.devname),
+			 "%s", devinfo->codename);
+	}
+
 	/* On Gen11+ the equations from the xml files expect an 8bits
 	 * mask per subslice, versus only 3bits on prior Gens.
 	 */
