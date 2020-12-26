@@ -282,17 +282,23 @@ static void
 generate_cpu_events(struct intel_perf_data_reader *reader)
 {
 	uint32_t last_header_idx = 0;
-	const struct drm_i915_perf_record_header *last_header = reader->records[0];
+	const struct drm_i915_perf_record_header *last_header = reader->records[0],
+		*current_header = reader->records[0];
+	const uint8_t *start_report, *end_report;
+	uint32_t last_ctx_id, current_ctx_id;
+	uint64_t gpu_ts_start, gpu_ts_end;
 
 	for (uint32_t i = 1; i < reader->n_records; i++) {
-		const struct drm_i915_perf_record_header *current_header =
-			reader->records[i];
-		const uint8_t *start_report = (const uint8_t *) (last_header + 1),
-			*end_report = (const uint8_t *) (current_header + 1);
-		uint32_t last_ctx_id = oa_report_ctx_id(&reader->devinfo, start_report),
-			current_ctx_id = oa_report_ctx_id(&reader->devinfo, end_report);
-		uint64_t gpu_ts_start = oa_report_timestamp(start_report),
-			gpu_ts_end = oa_report_timestamp(end_report);
+		current_header = reader->records[i];
+
+		start_report = (const uint8_t *) (last_header + 1);
+		end_report = (const uint8_t *) (current_header + 1);
+
+		last_ctx_id = oa_report_ctx_id(&reader->devinfo, start_report);
+		current_ctx_id = oa_report_ctx_id(&reader->devinfo, end_report);
+
+		gpu_ts_start = oa_report_timestamp(start_report);
+		gpu_ts_end = oa_report_timestamp(end_report);
 
 		if (last_ctx_id == current_ctx_id)
 			continue;
@@ -302,6 +308,9 @@ generate_cpu_events(struct intel_perf_data_reader *reader)
 		last_header = current_header;
 		last_header_idx = i;
 	}
+
+	if (last_header != current_header)
+		append_timeline_event(reader, gpu_ts_start, gpu_ts_end, last_header_idx, reader->n_records - 1, last_ctx_id);
 }
 
 static void
