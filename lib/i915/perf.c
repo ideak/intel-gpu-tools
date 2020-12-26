@@ -168,6 +168,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 	 * 2x6 does not have 2 samplers).
 	 */
 	perf->devinfo.devid = device_id;
+	perf->devinfo.gen = devinfo->gen;
 	perf->devinfo.revision = revision;
 	perf->devinfo.timestamp_frequency = timestamp_frequency;
 	perf->devinfo.gt_min_freq = gt_min_freq;
