@@ -180,9 +180,6 @@ static void copy_flink(data_t *data)
 	scratch_buf_check(data, &dst, 10, 10, DST_COLOR);
 	scratch_buf_check(data, &dst, WIDTH - 10, HEIGHT - 10, SRC_COLOR);
 
-	scratch_buf_check(data, &dst, 10, 10, DST_COLOR);
-	scratch_buf_check(data, &dst, WIDTH - 10, HEIGHT - 10, SRC_COLOR);
-
 	intel_bb_reset(data->ibb, true);
 	scratch_buf_fini(data, &src);
 	scratch_buf_fini(data, &flink);
