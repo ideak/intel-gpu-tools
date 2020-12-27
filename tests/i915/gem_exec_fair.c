@@ -69,10 +69,15 @@ static uint64_t div64_u64_round_up(uint64_t x, uint64_t y)
 	return (x + y - 1) / y;
 }
 
+static bool is_icelake(int i915)
+{
+	return intel_get_device_info(intel_get_drm_devid(i915))->is_icelake;
+}
+
 static uint64_t ns_to_ctx_ticks(int i915, uint64_t ns)
 {
 	int f = read_timestamp_frequency(i915);
-	if (intel_gen(intel_get_drm_devid(i915)) == 11)
+	if (is_icelake(i915))
 		f = 12500000; /* icl!!! are you feeling alright? CTX vs CS */
 	return div64_u64_round_up(ns * f, NSEC64);
 }
@@ -715,6 +720,8 @@ static void fairness(int i915,
 
 		/* With no contention, we should match our target frametime */
 		if (nchild == 1) {
+			igt_info("Interval %.2fms, range %.2fms\n",
+				 1e-6 * result[0], 1e-6 * iqr[0]);
 			igt_assert(4 * result[0] > 3 * fence_ns &&
 				   3 * result[0] < 4 * fence_ns);
 			continue;
