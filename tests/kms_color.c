@@ -506,7 +506,7 @@ static bool test_pipe_ctm(data_t *data,
 		/* Verify that the CRC of the software computed output is
 		 * equal to the CRC of the CTM matrix transformation output.
 		 */
-		ret &= crc_equal(&crc_software, &crc_hardware);
+		ret &= !igt_skip_crc_compare || igt_check_crc_equal(&crc_software, &crc_hardware);
 
 		igt_plane_set_fb(primary, NULL);
 		igt_output_set_pipe(output, PIPE_NONE);
