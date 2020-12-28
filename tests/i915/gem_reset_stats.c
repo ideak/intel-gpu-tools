@@ -65,11 +65,11 @@ struct local_drm_i915_reset_stats {
 
 #define GET_RESET_STATS_IOCTL DRM_IOWR(DRM_COMMAND_BASE + 0x32, struct local_drm_i915_reset_stats)
 
+static int device;
+
 static void sync_gpu(void)
 {
-	int fd = drm_open_driver(DRIVER_INTEL);
-	gem_quiescent_gpu(fd);
-	close(fd);
+	gem_quiescent_gpu(device);
 }
 
 static int noop(int fd, uint32_t ctx, const struct intel_execution_engine *e)
@@ -112,12 +112,8 @@ static int has_engine(int fd,
 
 static void check_context(const struct intel_execution_engine *e)
 {
-	int fd = drm_open_driver(DRIVER_INTEL);
-
-	gem_require_contexts(fd);
-	igt_require(has_engine(fd, gem_context_create(fd), e));
-
-	close(fd);
+	gem_require_contexts(device);
+	igt_require(has_engine(device, gem_context_create(device), e));
 }
 
 static int gem_reset_stats(int fd, int ctx_id,
@@ -218,7 +214,7 @@ static void test_rs(const struct intel_execution_engine *e,
 	igt_debug("num fds=%d, hang index=%d\n", num_fds, hang_index);
 
 	for (i = 0; i < num_fds; i++) {
-		fd[i] = drm_open_driver(DRIVER_INTEL);
+		fd[i] = gem_reopen_driver(device);
 		assert_reset_status(i, fd[i], 0, RS_NO_ERROR);
 	}
 
@@ -269,7 +265,7 @@ static void test_rs_ctx(const struct intel_execution_engine *e,
 	test_rs(e, num_fds, -1, RS_NO_ERROR);
 
 	for (i = 0; i < num_fds; i++) {
-		fd[i] = drm_open_driver(DRIVER_INTEL);
+		fd[i] = gem_reopen_driver(device);
 		igt_assert(fd[i]);
 		assert_reset_status(i, fd[i], 0, RS_NO_ERROR);
 
@@ -335,8 +331,8 @@ static void test_ban(const struct intel_execution_engine *e)
 	int ban, retry = 10;
 	int active_count = 0;
 
-	fd_bad = drm_open_driver(DRIVER_INTEL);
-	fd_good = drm_open_driver(DRIVER_INTEL);
+	fd_bad = gem_reopen_driver(device);
+	fd_good = gem_reopen_driver(device);
 
 	assert_reset_status(fd_bad, fd_bad, 0, RS_NO_ERROR);
 	assert_reset_status(fd_good, fd_good, 0, RS_NO_ERROR);
@@ -389,7 +385,7 @@ static void test_ban_ctx(const struct intel_execution_engine *e)
 	uint32_t ctx_good, ctx_bad;
 	int active_count = 0;
 
-	fd = drm_open_driver(DRIVER_INTEL);
+	fd = gem_reopen_driver(device);
 
 	assert_reset_status(fd, fd, 0, RS_NO_ERROR);
 
@@ -445,8 +441,8 @@ static void test_unrelated_ctx(const struct intel_execution_engine *e)
 	int fd1,fd2;
 	int ctx_guilty, ctx_unrelated;
 
-	fd1 = drm_open_driver(DRIVER_INTEL);
-	fd2 = drm_open_driver(DRIVER_INTEL);
+	fd1 = gem_reopen_driver(device);
+	fd2 = gem_reopen_driver(device);
 	assert_reset_status(0, fd1, 0, RS_NO_ERROR);
 	assert_reset_status(1, fd2, 0, RS_NO_ERROR);
 	ctx_guilty = gem_context_create(fd1);
@@ -481,7 +477,7 @@ static int get_reset_count(int fd, int ctx)
 
 static void test_close_pending_ctx(const struct intel_execution_engine *e)
 {
-	int fd = drm_open_driver(DRIVER_INTEL);
+	int fd = gem_reopen_driver(device);
 	uint32_t ctx = gem_context_create(fd);
 
 	assert_reset_status(fd, fd, ctx, RS_NO_ERROR);
@@ -495,7 +491,7 @@ static void test_close_pending_ctx(const struct intel_execution_engine *e)
 
 static void test_close_pending(const struct intel_execution_engine *e)
 {
-	int fd = drm_open_driver(DRIVER_INTEL);
+	int fd = gem_reopen_driver(device);
 
 	assert_reset_status(fd, fd, 0, RS_NO_ERROR);
 
@@ -539,7 +535,7 @@ static void noop_on_each_ring(int fd, const bool reverse)
 static void test_close_pending_fork(const struct intel_execution_engine *e,
 				    const bool reverse)
 {
-	int fd = drm_open_driver(DRIVER_INTEL);
+	int fd = gem_reopen_driver(device);
 	igt_hang_t hang;
 	int pid;
 
@@ -554,7 +550,7 @@ static void test_close_pending_fork(const struct intel_execution_engine *e,
 	 */
 	pid = fork();
 	if (pid == 0) {
-		const int fd2 = drm_open_driver(DRIVER_INTEL);
+		const int fd2 = gem_reopen_driver(device);
 		igt_assert_lte(0, fd2);
 
 		/* The crucial component is that we schedule the same noop batch
@@ -581,7 +577,7 @@ static void test_close_pending_fork(const struct intel_execution_engine *e,
 static void test_reset_count(const struct intel_execution_engine *e,
 			     const bool create_ctx)
 {
-	int fd = drm_open_driver(DRIVER_INTEL);
+	int fd = gem_reopen_driver(device);
 	int ctx;
 	long c1, c2;
 
@@ -684,7 +680,7 @@ static void test_params_ctx(void)
 {
 	int fd;
 
-	fd = drm_open_driver(DRIVER_INTEL);
+	fd = gem_reopen_driver(device);
 	_test_param(fd, gem_context_create(fd));
 	close(fd);
 }
@@ -693,7 +689,7 @@ static void test_params(void)
 {
 	int fd;
 
-	fd = drm_open_driver(DRIVER_INTEL);
+	fd = gem_reopen_driver(device);
 	_test_param(fd, 0);
 	close(fd);
 }
@@ -718,7 +714,7 @@ static void defer_hangcheck(const struct intel_execution_engine *engine)
 	int fd, count_start, count_end;
 	int seconds = 30;
 
-	fd = drm_open_driver(DRIVER_INTEL);
+	fd = gem_reopen_driver(device);
 
 	next = next_engine(fd, engine);
 	igt_skip_on(next == engine);
@@ -774,21 +770,18 @@ igt_main
 	const struct intel_execution_engine *e;
 
 	igt_fixture {
-		int fd;
-
 		bool has_reset_stats;
 		bool using_full_reset;
-		fd = drm_open_driver(DRIVER_INTEL);
-		devid = intel_get_drm_devid(fd);
 
-		has_reset_stats = gem_has_reset_stats(fd);
+		device = drm_open_driver(DRIVER_INTEL);
+		devid = intel_get_drm_devid(device);
 
-		igt_assert(igt_params_set(fd, "reset", "%d", 1 /* only global reset */));
+		has_reset_stats = gem_has_reset_stats(device);
 
-		using_full_reset = !gem_engine_reset_enabled(fd) &&
-				   gem_gpu_reset_enabled(fd);
+		igt_assert(igt_params_set(device, "reset", "%d", 1 /* only global reset */));
 
-		close(fd);
+		using_full_reset = !gem_engine_reset_enabled(device) &&
+				   gem_gpu_reset_enabled(device);
 
 		igt_require_f(has_reset_stats,
 			      "No reset stats ioctl support. Too old kernel?\n");
@@ -841,10 +834,7 @@ igt_main
 	}
 
 	igt_fixture {
-		int fd;
-
-		fd = drm_open_driver(DRIVER_INTEL);
-		igt_assert(igt_params_set(fd, "reset", "%d", INT_MAX /* any reset method */));
-		close(fd);
+		igt_assert(igt_params_set(device, "reset", "%d", INT_MAX /* any reset method */));
+		close(device);
 	}
 }
