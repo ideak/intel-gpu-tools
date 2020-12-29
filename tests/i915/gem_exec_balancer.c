@@ -2491,6 +2491,66 @@ static void nop(int i915)
 	gem_quiescent_gpu(i915);
 }
 
+static void sequential(int i915)
+{
+	struct drm_i915_gem_exec_object2 batch = {
+		.handle = batch_create(i915),
+	};
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *ci;
+		struct drm_i915_gem_execbuffer2 execbuf = {
+			.buffers_ptr = to_user_pointer(&batch),
+			.buffer_count = 1,
+			.flags = I915_EXEC_FENCE_OUT,
+		};
+		struct timespec tv = {};
+		unsigned int count;
+		unsigned long nops;
+		double t;
+		uint32_t *ctx;
+
+		ci = list_engines(i915, 1u << class, &count);
+		if (!ci || count < 2)
+			goto next;
+
+		ctx = malloc(sizeof(*ctx) * count);
+		for (int n = 0; n < count; n++)
+			ctx[n] = load_balancer_create(i915, ci, count);
+
+		gem_execbuf_wr(i915, &execbuf);
+		execbuf.rsvd2 >>= 32;
+		execbuf.flags |= I915_EXEC_FENCE_IN;
+		gem_sync(i915, batch.handle);
+
+		nops = 0;
+		igt_nsec_elapsed(&tv);
+		do {
+			for (int n = 0; n < count; n++) {
+				execbuf.rsvd1 = ctx[n];
+				gem_execbuf_wr(i915, &execbuf);
+				close(execbuf.rsvd2);
+				execbuf.rsvd2 >>= 32;
+			}
+			nops += count;
+		} while (igt_seconds_elapsed(&tv) < 2);
+		gem_sync(i915, batch.handle);
+
+		t = igt_nsec_elapsed(&tv) * 1e-3 / nops;
+		igt_info("%s: %.3fus\n", class_to_str(class), t);
+
+		close(execbuf.rsvd2);
+		for (int n = 0; n < count; n++)
+			gem_context_destroy(i915, ctx[n]);
+		free(ctx);
+next:
+		free(ci);
+	}
+
+	gem_close(i915, batch.handle);
+	gem_quiescent_gpu(i915);
+}
+
 static void sighandler(int sig)
 {
 }
@@ -3099,6 +3159,9 @@ igt_main
 
 	igt_subtest("nop")
 		nop(i915);
+
+	igt_subtest("sequential")
+		sequential(i915);
 
 	igt_subtest("semaphore")
 		semaphore(i915);
