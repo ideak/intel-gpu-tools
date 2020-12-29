@@ -230,15 +230,21 @@ static void idempotent(int i915)
 	igt_assert_eq(p.size, base + idx);
 	igt_assert(!memcmp(&expected, &engines, idx));
 
-	memset(&engines, 0, sizeof(engines));
 	p.size = sizeof(engines);
-	gem_context_set_param(i915, &p);
+	__for_each_physical_engine(i915, e) {
+		memset(&engines, 0, sizeof(engines));
+		for (int n = 0; n < I915_EXEC_RING_MASK + 1; n++) {
+			engine_class(&engines, n) = e->class;
+			engine_instance(&engines, n) = e->instance;
+		}
+		gem_context_set_param(i915, &p);
 
-	memcpy(&expected, &engines, sizeof(expected));
+		memcpy(&expected, &engines, sizeof(expected));
 
-	gem_context_get_param(i915, &p);
-	igt_assert_eq(p.size, sizeof(engines));
-	igt_assert(!memcmp(&expected, &engines, idx));
+		gem_context_get_param(i915, &p);
+		igt_assert_eq(p.size, sizeof(engines));
+		igt_assert(!memcmp(&expected, &engines, p.size));
+	}
 
 	gem_context_destroy(i915, p.ctx_id);
 }
