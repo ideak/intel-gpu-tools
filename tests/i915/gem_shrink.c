@@ -28,7 +28,6 @@
  */
 
 #include "i915/gem.h"
-#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_gt.h"
 #include "igt_debugfs.h"
@@ -429,6 +428,7 @@ igt_main
 	igt_fixture {
 		const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 		uint64_t mem_size = intel_get_total_ram_mb();
+		const struct intel_execution_engine2 *e;
 		int fd;
 
 		fd = drm_open_driver(DRIVER_INTEL);
@@ -451,8 +451,8 @@ igt_main
 				     CHECK_SWAP | CHECK_RAM);
 
 		nengine = 0;
-		for_each_ring(e, fd)
-			engines[nengine++] = eb_ring(e);
+		__for_each_physical_engine(fd, e)
+			engines[nengine++] = e->flags;
 		igt_require(nengine);
 
 		close(fd);
