@@ -27,7 +27,6 @@
 #include <sys/poll.h>
 
 #include "i915/gem.h"
-#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_vgem.h"
 
@@ -175,14 +174,15 @@ static void i915_to_amd(int i915, int amd, amdgpu_device_handle device)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
+	const struct intel_execution_engine2 *e;
 	unsigned int engines[16];
 	unsigned int nengine;
 	unsigned long count;
 	struct cork c;
 
 	nengine = 0;
-	for_each_physical_ring(e, i915)
-		engines[nengine++] = eb_ring(e);
+	__for_each_physical_engine(i915, e)
+		engines[nengine++] = e->flags;
 	igt_require(nengine);
 
 	memset(obj, 0, sizeof(obj));
@@ -198,7 +198,7 @@ static void i915_to_amd(int i915, int amd, amdgpu_device_handle device)
 
 	count = 0;
 	igt_until_timeout(5) {
-		execbuf.rsvd1 = gem_context_create(i915);
+		execbuf.rsvd1 = gem_context_clone_with_engines(i915, 0);
 
 		for (unsigned n = 0; n < nengine; n++) {
 			execbuf.flags = engines[n];
