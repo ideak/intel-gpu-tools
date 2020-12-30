@@ -963,23 +963,6 @@ static igt_hang_t rcs_hang(void)
 	return igt_hang_ring(fd, I915_EXEC_RENDER);
 }
 
-static igt_hang_t all_hang(void)
-{
-	igt_hang_t hang = igt_hang_ring(fd, I915_EXEC_RENDER);
-
-	for_each_physical_ring(e, fd) {
-		struct drm_i915_gem_execbuffer2 eb = hang.spin->execbuf;
-
-		eb.flags = eb_ring(e);
-		if (eb.flags == I915_EXEC_RENDER)
-			continue;
-
-		__gem_execbuf(fd, &eb);
-	}
-
-	return hang;
-}
-
 static void do_basic0(struct buffers *buffers,
 		      do_copy do_copy_func,
 		      do_hang do_hang_func)
@@ -1461,7 +1444,6 @@ run_mode(const char *prefix,
 		{ "", no_hang },
 		{ "-hang-blt", bcs_hang },
 		{ "-hang-render", rcs_hang },
-		{ "-hang-all", all_hang },
 		{ NULL, NULL },
 	}, *h;
 	struct buffers buffers;
