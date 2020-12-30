@@ -877,13 +877,8 @@ static void deadline_child(int i915,
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(obj),
 		.buffer_count = ARRAY_SIZE(obj),
-		.num_cliprects = 1,
-		.cliprects_ptr = to_user_pointer(&fence),
+		.flags = I915_EXEC_FENCE_OUT | e->flags,
 		.rsvd1 = ctx,
-		.flags = ((flags & DL_PRIO ? 0 : I915_EXEC_FENCE_IN) |
-			  I915_EXEC_FENCE_ARRAY |
-			  I915_EXEC_FENCE_OUT |
-			  e->flags),
 	};
 	unsigned int seq = 1;
 	int prev = -1, next = -1;
@@ -891,15 +886,26 @@ static void deadline_child(int i915,
 	if (intel_gen(intel_get_drm_devid(i915)) < 8)
 		execbuf.flags |= I915_EXEC_SECURE;
 
+	gem_execbuf_wr(i915, &execbuf);
+	execbuf.rsvd2 >>= 32;
+	gem_execbuf_wr(i915, &execbuf);
+	gem_sync(i915, obj[1].handle);
+
+	execbuf.num_cliprects = 1;
+	execbuf.cliprects_ptr = to_user_pointer(&fence);
+	execbuf.flags |= I915_EXEC_FENCE_ARRAY;
+	if (!(flags & DL_PRIO))
+		execbuf.flags |= I915_EXEC_FENCE_IN;
+
 	write(sv, &prev, sizeof(int));
 	read(rv, &prev, sizeof(int));
 	igt_assert(prev == -1);
 
+	prev = execbuf.rsvd2;
+	next = execbuf.rsvd2 >> 32;
 	while (!READ_ONCE(*done)) {
-		if (prev != -1) {
-			sync_fence_wait(prev, -1);
-			igt_assert_eq(sync_fence_status(prev), 1);
-		}
+		sync_fence_wait(prev, -1);
+		igt_assert_eq(sync_fence_status(prev), 1);
 		close(prev);
 
 		fence.handle = syncobj_create(i915, 0);
