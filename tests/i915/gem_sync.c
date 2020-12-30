@@ -25,6 +25,7 @@
 #include <pthread.h>
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt_debugfs.h"
 #include "igt_dummyload.h"
 #include "igt_gt.h"
@@ -1185,7 +1186,7 @@ igt_main
 	/* Legacy for selecting rings. */
 	for_each_test(t, individual) {
 		igt_subtest_with_dynamic_f("%s", t->name) {
-			for (const struct intel_execution_engine *l = intel_execution_engines; l->name; l++) {
+			for (const struct intel_execution_ring *l = intel_execution_rings; l->name; l++) {
 				igt_dynamic_f("%s", l->name) {
 					t->func(fd, eb_ring(l),
 						t->num_children, t->timeout);

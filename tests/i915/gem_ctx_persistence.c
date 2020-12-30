@@ -370,7 +370,7 @@ static void test_nohangcheck_hostile(int i915)
 
 	igt_require(__enable_hangcheck(dir, false));
 
-	for_each_physical_engine(e, i915) {
+	for_each_physical_ring(e, i915) {
 		int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
 		uint32_t ctx = gem_context_create(i915);
 		igt_spin_t *spin;
@@ -407,7 +407,7 @@ static void test_nohangcheck_hang(int i915)
 
 	igt_require(__enable_hangcheck(dir, false));
 
-	for_each_physical_engine(e, i915) {
+	for_each_physical_ring(e, i915) {
 		int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
 		uint32_t ctx = gem_context_create(i915);
 		igt_spin_t *spin;
@@ -475,7 +475,7 @@ static void test_noheartbeat_many(int i915, int count, unsigned int flags)
 	 * cleaned up.
 	 */
 
-	for_each_physical_engine(e, i915) {
+	for_each_physical_ring(e, i915) {
 		igt_spin_t *spin[count];
 
 		if (!set_preempt_timeout(i915, e->full_name, 250))
@@ -529,7 +529,7 @@ static void test_noheartbeat_close(int i915, unsigned int flags)
 	 * heartbeat has already been disabled.
 	 */
 
-	for_each_physical_engine(e, i915) {
+	for_each_physical_ring(e, i915) {
 		igt_spin_t *spin;
 		uint32_t ctx;
 		int err;
@@ -1357,7 +1357,7 @@ igt_main
 		for (test = tests; test->name; test++) {
 			igt_subtest_with_dynamic_f("legacy-engines-%s",
 						   test->name) {
-				for_each_physical_engine(e, i915) {
+				for_each_physical_ring(e, i915) {
 					igt_dynamic_f("%s", e->name) {
 						do_test(test->func,
 							i915, eb_ring(e),

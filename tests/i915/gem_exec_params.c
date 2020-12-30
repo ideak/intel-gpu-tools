@@ -39,6 +39,7 @@
 
 #include "drm.h"
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_device.h"
 #include "sw_sync.h"
@@ -337,7 +338,7 @@ static void test_larger_than_life_batch(int fd)
        igt_require(size < gem_aperture_size(fd));
        intel_require_memory(2, size, CHECK_RAM); /* batch + shadow */
 
-       for_each_engine(e, fd) {
+       for_each_ring(e, fd) {
 	       /* Keep the batch_len implicit [0] */
 	       execbuf.flags = eb_ring(e);
 
@@ -361,7 +362,7 @@ int fd;
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
@@ -395,7 +396,7 @@ igt_main
 	}
 
 	igt_subtest("control") {
-		for (e = intel_execution_engines; e->name; e++) {
+		for (e = intel_execution_rings; e->name; e++) {
 			if (has_ring(fd, eb_ring(e))) {
 				execbuf.flags = eb_ring(e);
 				gem_execbuf(fd, &execbuf);
@@ -564,7 +565,7 @@ igt_main
 	igt_subtest("rs-invalid") {
 		bool has_rs = has_resource_streamer(fd);
 
-		for_each_engine(it, fd) {
+		for_each_ring(it, fd) {
 			int expect = -EINVAL;
 			if (has_rs &&
 			    (eb_ring(it) == 0 ||

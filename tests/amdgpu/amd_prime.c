@@ -27,6 +27,7 @@
 #include <sys/poll.h>
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_vgem.h"
 
@@ -180,7 +181,7 @@ static void i915_to_amd(int i915, int amd, amdgpu_device_handle device)
 	struct cork c;
 
 	nengine = 0;
-	for_each_physical_engine(e, i915)
+	for_each_physical_ring(e, i915)
 		engines[nengine++] = eb_ring(e);
 	igt_require(nengine);
 

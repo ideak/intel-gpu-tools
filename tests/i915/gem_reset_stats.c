@@ -41,6 +41,7 @@
 #include <signal.h>
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_sysfs.h"
 
@@ -72,7 +73,7 @@ static void sync_gpu(void)
 	gem_quiescent_gpu(device);
 }
 
-static int noop(int fd, uint32_t ctx, const struct intel_execution_engine *e)
+static int noop(int fd, uint32_t ctx, const struct intel_execution_ring *e)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 eb;
@@ -101,7 +102,7 @@ static int noop(int fd, uint32_t ctx, const struct intel_execution_engine *e)
 
 static int has_engine(int fd,
 		      uint32_t ctx,
-		      const struct intel_execution_engine *e)
+		      const struct intel_execution_ring *e)
 {
 	int handle = noop(fd, ctx, e);
 	if (handle < 0)
@@ -110,7 +111,7 @@ static int has_engine(int fd,
 	return 1;
 }
 
-static void check_context(const struct intel_execution_engine *e)
+static void check_context(const struct intel_execution_ring *e)
 {
 	gem_require_contexts(device);
 	igt_require(has_engine(device, gem_context_create(device), e));
@@ -152,7 +153,7 @@ static struct timespec ts_injected;
 #define BAN HANG_ALLOW_BAN
 #define ASYNC 2
 static void inject_hang(int fd, uint32_t ctx,
-			const struct intel_execution_engine *e,
+			const struct intel_execution_ring *e,
 			unsigned flags)
 {
 	igt_hang_t hang;
@@ -202,7 +203,7 @@ static int _assert_reset_status(int idx, int fd, int ctx, int status)
 #define assert_reset_status(idx, fd, ctx, status) \
 	igt_assert(_assert_reset_status(idx, fd, ctx, status) == 0)
 
-static void test_rs(const struct intel_execution_engine *e,
+static void test_rs(const struct intel_execution_ring *e,
 		    int num_fds, int hang_index, int rs_assumed_no_hang)
 {
 	int fd[MAX_FD];
@@ -248,7 +249,7 @@ static void test_rs(const struct intel_execution_engine *e,
 }
 
 #define MAX_CTX 100
-static void test_rs_ctx(const struct intel_execution_engine *e,
+static void test_rs_ctx(const struct intel_execution_ring *e,
 			int num_fds, int num_ctx, int hang_index,
 			int hang_context)
 {
@@ -324,7 +325,7 @@ static void test_rs_ctx(const struct intel_execution_engine *e,
 	}
 }
 
-static void test_ban(const struct intel_execution_engine *e)
+static void test_ban(const struct intel_execution_ring *e)
 {
 	struct local_drm_i915_reset_stats rs_bad, rs_good;
 	int fd_bad, fd_good;
@@ -378,7 +379,7 @@ static void test_ban(const struct intel_execution_engine *e)
 	close(fd_good);
 }
 
-static void test_ban_ctx(const struct intel_execution_engine *e)
+static void test_ban_ctx(const struct intel_execution_ring *e)
 {
 	struct local_drm_i915_reset_stats rs_bad, rs_good;
 	int fd, ban, retry = 10;
@@ -436,7 +437,7 @@ static void test_ban_ctx(const struct intel_execution_engine *e)
 	close(fd);
 }
 
-static void test_unrelated_ctx(const struct intel_execution_engine *e)
+static void test_unrelated_ctx(const struct intel_execution_ring *e)
 {
 	int fd1,fd2;
 	int ctx_guilty, ctx_unrelated;
@@ -475,7 +476,7 @@ static int get_reset_count(int fd, int ctx)
 	return rs.reset_count;
 }
 
-static void test_close_pending_ctx(const struct intel_execution_engine *e)
+static void test_close_pending_ctx(const struct intel_execution_ring *e)
 {
 	int fd = gem_reopen_driver(device);
 	uint32_t ctx = gem_context_create(fd);
@@ -489,7 +490,7 @@ static void test_close_pending_ctx(const struct intel_execution_engine *e)
 	close(fd);
 }
 
-static void test_close_pending(const struct intel_execution_engine *e)
+static void test_close_pending(const struct intel_execution_ring *e)
 {
 	int fd = gem_reopen_driver(device);
 
@@ -504,7 +505,7 @@ static void noop_on_each_ring(int fd, const bool reverse)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_execbuffer2 eb;
 	struct drm_i915_gem_exec_object2 obj;
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
@@ -515,14 +516,14 @@ static void noop_on_each_ring(int fd, const bool reverse)
 	eb.buffer_count = 1;
 
 	if (reverse) {
-		for (e = intel_execution_engines; e->name; e++)
+		for (e = intel_execution_rings; e->name; e++)
 			;
-		while (--e >= intel_execution_engines) {
+		while (--e >= intel_execution_rings) {
 			eb.flags = eb_ring(e);
 			__gem_execbuf(fd, &eb);
 		}
 	} else {
-		for (e = intel_execution_engines; e->name; e++) {
+		for (e = intel_execution_rings; e->name; e++) {
 			eb.flags = eb_ring(e);
 			__gem_execbuf(fd, &eb);
 		}
@@ -532,7 +533,7 @@ static void noop_on_each_ring(int fd, const bool reverse)
 	gem_close(fd, obj.handle);
 }
 
-static void test_close_pending_fork(const struct intel_execution_engine *e,
+static void test_close_pending_fork(const struct intel_execution_ring *e,
 				    const bool reverse)
 {
 	int fd = gem_reopen_driver(device);
@@ -574,7 +575,7 @@ static void test_close_pending_fork(const struct intel_execution_engine *e,
 	close(fd);
 }
 
-static void test_reset_count(const struct intel_execution_engine *e,
+static void test_reset_count(const struct intel_execution_ring *e,
 			     const bool create_ctx)
 {
 	int fd = gem_reopen_driver(device);
@@ -694,13 +695,13 @@ static void test_params(void)
 	close(fd);
 }
 
-static const struct intel_execution_engine *
-next_engine(int fd, const struct intel_execution_engine *e)
+static const struct intel_execution_ring *
+next_engine(int fd, const struct intel_execution_ring *e)
 {
 	do {
 		e++;
 		if (e->name == NULL)
-			e = intel_execution_engines;
+			e = intel_execution_rings;
 		if (e->exec_id == 0)
 			e++;
 	} while (!has_engine(fd, 0, e));
@@ -708,9 +709,9 @@ next_engine(int fd, const struct intel_execution_engine *e)
 	return e;
 }
 
-static void defer_hangcheck(const struct intel_execution_engine *engine)
+static void defer_hangcheck(const struct intel_execution_ring *engine)
 {
-	const struct intel_execution_engine *next;
+	const struct intel_execution_ring *next;
 	int fd, count_start, count_end;
 	int seconds = 30;
 
@@ -767,7 +768,7 @@ static bool gem_has_reset_stats(int fd)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 
 	igt_fixture {
 		bool has_reset_stats;
@@ -795,7 +796,7 @@ igt_main
 	igt_subtest_f("params-ctx")
 		RUN_TEST(test_params_ctx());
 
-	for (e = intel_execution_engines; e->name; e++) {
+	for (e = intel_execution_rings; e->name; e++) {
 		igt_subtest_f("reset-stats-%s", e->name)
 			RUN_TEST(test_rs(e, 4, 1, 0));
 

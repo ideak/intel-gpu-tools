@@ -40,6 +40,7 @@
 
 #include "drm.h"
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
@@ -69,7 +70,7 @@ static void all(int fd, unsigned flags, int timeout, int ncpus)
 
 		/* Note: modifies engine map on context 0 */
 	} else {
-		for_each_physical_engine(e, fd)
+		for_each_physical_ring(e, fd)
 			engines[nengine++] = eb_ring(e);
 	}
 	igt_require(nengine);

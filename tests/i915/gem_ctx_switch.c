@@ -41,6 +41,7 @@
 
 #include "drm.h"
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 
 #define INTERRUPTIBLE 0x1
@@ -305,7 +306,7 @@ igt_main
 {
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	const struct intel_execution_engine2 *e2;
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 	static const struct {
 		const char *name;
 		unsigned int flags;
@@ -338,7 +339,7 @@ igt_main
 	}
 
 	/* Legacy testing must be first. */
-	for (e = intel_execution_engines; e->name; e++) {
+	for (e = intel_execution_rings; e->name; e++) {
 		struct intel_execution_engine2 e2__;
 
 		e2__ = gem_eb_flags_to_engine(eb_ring(e));

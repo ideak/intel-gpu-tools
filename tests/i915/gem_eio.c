@@ -446,7 +446,7 @@ static void test_inflight(int fd, unsigned int wait)
 	max = min(max - 1, ARRAY_SIZE(fence));
 	igt_debug("Using %d inflight batches\n", max);
 
-	for_each_engine(e, parent_fd) {
+	for_each_ring(e, parent_fd) {
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 obj[2];
 		struct drm_i915_gem_execbuffer2 execbuf;
@@ -575,7 +575,7 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 	igt_require(gem_has_exec_fence(fd));
 	gem_require_contexts(fd);
 
-	for_each_engine(e, parent_fd) {
+	for_each_ring(e, parent_fd) {
 		const uint32_t bbe = MI_BATCH_BUFFER_END;
 		struct drm_i915_gem_exec_object2 obj[2];
 		struct drm_i915_gem_execbuffer2 execbuf;
@@ -718,7 +718,7 @@ static void test_inflight_internal(int fd, unsigned int wait)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 2;
-	for_each_engine(e, fd) {
+	for_each_ring(e, fd) {
 		execbuf.flags = eb_ring(e) | I915_EXEC_FENCE_OUT;
 
 		gem_execbuf_wr(fd, &execbuf);
@@ -829,7 +829,7 @@ static void test_reset_stress(int fd, unsigned int flags)
 {
 	uint32_t ctx0 = context_create_safe(fd);
 
-	for_each_engine(e, fd)
+	for_each_ring(e, fd)
 		reset_stress(fd, ctx0, e->name, eb_ring(e), flags);
 
 	gem_context_destroy(fd, ctx0);

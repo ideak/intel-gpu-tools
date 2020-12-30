@@ -31,6 +31,7 @@
 #include <unistd.h>
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_dummyload.h"
 #include "igt_gt.h"
@@ -67,7 +68,7 @@ static void check_bo(int fd, uint32_t handle)
 
 static void test_all(int fd, unsigned flags)
 {
-	for_each_physical_engine(e, fd)
+	for_each_physical_ring(e, fd)
 		if (gem_can_store_dword(fd, eb_ring(e)))
 			run_test(fd, eb_ring(e), flags & ~0xff);
 }
@@ -107,7 +108,7 @@ static void run_test(int fd, unsigned engine, unsigned flags)
 		 * GPU is then unlikely to be active!)
 		 */
 		if (has_semaphores(fd)) {
-			for_each_physical_engine(e, fd) {
+			for_each_physical_ring(e, fd) {
 				if (gem_can_store_dword(fd, eb_ring(e)))
 					engines[nengine++] = eb_ring(e);
 			}
@@ -300,7 +301,7 @@ igt_main
 		{ "-S4", HIBERNATE },
 		{ NULL, 0 }
 	}, *m;
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 	igt_hang_t hang;
 	int fd;
 
@@ -325,7 +326,7 @@ igt_main
 	igt_subtest("basic-S4")
 		run_test(fd, ALL_ENGINES, HIBERNATE);
 
-	for (e = intel_execution_engines; e->name; e++) {
+	for (e = intel_execution_rings; e->name; e++) {
 		for (m = modes; m->suffix; m++) {
 			igt_subtest_f("%s-uncached%s", e->name, m->suffix)
 				run_test(fd, eb_ring(e), m->mode | UNCACHED);

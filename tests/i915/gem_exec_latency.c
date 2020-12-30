@@ -313,7 +313,7 @@ static void latency_from_ring(int fd,
 	reloc.presumed_offset = obj[1].offset;
 	reloc.target_handle = flags & CORK ? 1 : 0;
 
-	for_each_physical_engine(e, fd) {
+	for_each_physical_ring(e, fd) {
 		igt_spin_t *spin = NULL;
 		IGT_CORK_HANDLE(c);
 
@@ -475,7 +475,7 @@ rthog_latency_on_ring(int fd, unsigned int engine, const char *name, unsigned in
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
+		for_each_physical_ring(e, fd) {
 			if (!gem_can_store_dword(fd, eb_ring(e)))
 				continue;
 
@@ -652,7 +652,7 @@ static double clockrate(int i915, int reg)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 	int device = -1;
 
 	igt_fixture {
@@ -686,7 +686,7 @@ igt_main
 		igt_fixture
 			igt_require(intel_gen(intel_get_drm_devid(device)) >= 7);
 
-		for (e = intel_execution_engines; e->name; e++) {
+		for (e = intel_execution_rings; e->name; e++) {
 			if (e->exec_id == 0)
 				continue;
 

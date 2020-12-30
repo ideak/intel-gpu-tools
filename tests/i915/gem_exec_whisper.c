@@ -28,6 +28,7 @@
  */
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_debugfs.h"
 #include "igt_rapl.h"
@@ -202,7 +203,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
-		for_each_physical_engine(e, fd) {
+		for_each_physical_ring(e, fd) {
 			if (gem_can_store_dword(fd, eb_ring(e)))
 				engines[nengine++] = eb_ring(e);
 		}
@@ -572,7 +573,7 @@ igt_main
 			whisper(fd, ALL_ENGINES, m->flags | ALL);
 	}
 
-	for (const struct intel_execution_engine *e = intel_execution_engines;
+	for (const struct intel_execution_ring *e = intel_execution_rings;
 	     e->name; e++) {
 		for (const struct mode *m = modes; m->name; m++) {
 			if (m->flags & CHAIN)

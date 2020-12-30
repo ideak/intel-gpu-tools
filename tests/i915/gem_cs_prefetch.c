@@ -36,6 +36,7 @@
  * very last gtt pte.
  */
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Test the CS prefetch behaviour on batches.");
@@ -140,9 +141,9 @@ static void test_ring(unsigned ring)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 
-	for (e = intel_execution_engines; e->name; e++)
+	for (e = intel_execution_rings; e->name; e++)
 		igt_subtest_f("%s", e->name)
 			test_ring(eb_ring(e));
 }

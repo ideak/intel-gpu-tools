@@ -932,7 +932,7 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 		limit = ring_size / 3;
 
 	nengine = 0;
-	for_each_physical_engine(e, fd)
+	for_each_physical_ring(e, fd)
 		engines[nengine++] = eb_ring(e);
 	igt_require(nengine);
 
@@ -1298,7 +1298,7 @@ static void test_syncobj_wait(int fd)
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
 	n = 0;
-	for_each_engine(e, fd) {
+	for_each_ring(e, fd) {
 		obj.handle = gem_create(fd, 4096);
 		gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
@@ -2058,7 +2058,7 @@ static void test_syncobj_timeline_wait(int fd)
 	gem_write(fd, obj.handle, 0, bbe, sizeof(bbe));
 
 	n = 0;
-	for_each_engine(engine, fd) {
+	for_each_ring(engine, fd) {
 		obj.handle = gem_create(fd, 4096);
 		gem_write(fd, obj.handle, 0, bbe, sizeof(bbe));
 

@@ -23,6 +23,7 @@
  */
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 
 #define MAX_ERROR 5 /* % */
@@ -144,7 +145,7 @@ static void spin_all(int i915, unsigned int flags)
 	struct igt_spin *spin, *n;
 	IGT_LIST_HEAD(list);
 
-	for_each_physical_engine(e, i915) {
+	for_each_physical_ring(e, i915) {
 		uint32_t ctx;
 
 		ctx = 0;
@@ -173,7 +174,7 @@ static void spin_all(int i915, unsigned int flags)
 igt_main
 {
 	const struct intel_execution_engine2 *e2;
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 	struct intel_execution_engine2 e2__;
 	int fd = -1;
 
@@ -183,7 +184,7 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	for (e = intel_execution_engines; e->name; e++) {
+	for (e = intel_execution_rings; e->name; e++) {
 		e2__ = gem_eb_flags_to_engine(eb_ring(e));
 		if (e2__.flags == -1)
 			continue;

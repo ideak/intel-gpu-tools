@@ -549,17 +549,6 @@ unsigned intel_detect_and_clear_missed_interrupts(int fd)
 	return missed;
 }
 
-const struct intel_execution_engine intel_execution_engines[] = {
-	{ "default", NULL, 0, 0 },
-	{ "render", "rcs0", I915_EXEC_RENDER, 0 },
-	{ "bsd", "vcs0", I915_EXEC_BSD, 0 },
-	{ "bsd1", "vcs0", I915_EXEC_BSD, 1<<13 /*I915_EXEC_BSD_RING1*/ },
-	{ "bsd2", "vcs1", I915_EXEC_BSD, 2<<13 /*I915_EXEC_BSD_RING2*/ },
-	{ "blt", "bcs0", I915_EXEC_BLT, 0 },
-	{ "vebox", "vecs0", I915_EXEC_VEBOX, 0 },
-	{ NULL, 0, 0 }
-};
-
 bool gem_class_can_store_dword(int fd, int class)
 {
 	uint16_t devid = intel_get_drm_devid(fd);
@@ -615,27 +604,4 @@ int gem_execbuf_flags_to_engine_class(unsigned int flags)
 	default:
 		igt_assert(0);
 	}
-}
-
-bool gem_ring_is_physical_engine(int fd, unsigned ring)
-{
-	if (ring == I915_EXEC_DEFAULT)
-		return false;
-
-	/* BSD uses an extra flag to chose between aliasing modes */
-	if ((ring & 63) == I915_EXEC_BSD) {
-		bool explicit_bsd = ring & (3 << 13);
-		bool has_bsd2 = gem_has_bsd2(fd);
-		return explicit_bsd ? has_bsd2 : !has_bsd2;
-	}
-
-	return true;
-}
-
-bool gem_ring_has_physical_engine(int fd, unsigned ring)
-{
-	if (!gem_ring_is_physical_engine(fd, ring))
-		return false;
-
-	return gem_has_ring(fd, ring);
 }

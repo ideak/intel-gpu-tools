@@ -28,6 +28,7 @@
  */
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_gt.h"
 #include "igt_debugfs.h"
@@ -450,7 +451,7 @@ igt_main
 				     CHECK_SWAP | CHECK_RAM);
 
 		nengine = 0;
-		for_each_engine(e, fd)
+		for_each_ring(e, fd)
 			engines[nengine++] = eb_ring(e);
 		igt_require(nengine);
 

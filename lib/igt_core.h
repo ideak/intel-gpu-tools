@@ -1387,4 +1387,6 @@ void igt_kmsg(const char *format, ...);
 #define USEC_PER_SEC (1000*MSEC_PER_SEC)
 #define NSEC_PER_SEC (1000*USEC_PER_SEC)
 
+#define for_if(expr__) if (!(expr__)) {} else
+
 #endif /* IGT_CORE_H */

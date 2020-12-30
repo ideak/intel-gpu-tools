@@ -309,11 +309,11 @@ igt_main
 	/* Legacy path for selecting "rings". */
 	for (m = modes; m->suffix; m++) {
 		igt_subtest_with_dynamic_f("legacy-%s", m->suffix) {
-			const struct intel_execution_engine *e;
+			const struct intel_execution_ring *e;
 
 			igt_skip_on(m->flags & NEWFD && master);
 
-			for (e = intel_execution_engines; e->name; e++) {
+			for (e = intel_execution_rings; e->name; e++) {
 				if (!gem_has_ring(fd, eb_ring(e)))
 					continue;
 

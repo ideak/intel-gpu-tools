@@ -65,32 +65,6 @@ unsigned intel_detect_and_clear_missed_interrupts(int fd);
 
 #define ALL_ENGINES ~0u /* Use in interfaces to iterate all engines */
 
-extern const struct intel_execution_engine {
-	const char *name;
-	const char *full_name;
-	unsigned exec_id;
-	unsigned flags;
-} intel_execution_engines[];
-
-#define eb_ring(e) ((e)->exec_id | (e)->flags)
-
-#define for_if(expr__) if (!(expr__)) {} else
-
-#define for_each_engine(it__, fd__) \
-	for (const struct intel_execution_engine *it__ = intel_execution_engines;\
-	     it__->name; \
-	     it__++) \
-		for_if (gem_has_ring(fd__, eb_ring(it__)))
-
-#define for_each_physical_engine(it__, fd__) \
-	for (const struct intel_execution_engine *it__ = intel_execution_engines;\
-	     it__->name; \
-	     it__++) \
-		for_if (gem_ring_has_physical_engine(fd__, eb_ring(it__)))
-
-bool gem_ring_is_physical_engine(int fd, unsigned int ring);
-bool gem_ring_has_physical_engine(int fd, unsigned int ring);
-
 bool gem_can_store_dword(int fd, unsigned int engine);
 bool gem_class_can_store_dword(int fd, int class);
 

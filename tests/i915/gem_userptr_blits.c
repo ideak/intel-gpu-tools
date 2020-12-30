@@ -61,6 +61,7 @@
 #include "i915_drm.h"
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
@@ -1522,7 +1523,7 @@ static void test_readonly(int i915)
 
 		gem_userptr(i915, space, total, true, userptr_flags, &rhandle);
 
-		for_each_engine(e, i915) {
+		for_each_ring(e, i915) {
 			char *ref, *result;
 
 			/* First tweak the backing store through the write */

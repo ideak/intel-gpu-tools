@@ -49,6 +49,7 @@
 #include <drm.h>
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_vgem.h"
 
@@ -966,7 +967,7 @@ static igt_hang_t all_hang(void)
 {
 	igt_hang_t hang = igt_hang_ring(fd, I915_EXEC_RENDER);
 
-	for_each_physical_engine(e, fd) {
+	for_each_physical_ring(e, fd) {
 		struct drm_i915_gem_execbuffer2 eb = hang.spin->execbuf;
 
 		eb.flags = eb_ring(e);

@@ -20,6 +20,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_debugfs.h"
 #include "igt_aux.h"
@@ -148,7 +149,7 @@ static void store_all(int fd)
 
 	nengine = 0;
 	intel_detect_and_clear_missed_interrupts(fd);
-	for_each_engine(e, fd) {
+	for_each_ring(e, fd) {
 		if (!gem_can_store_dword(fd, eb_ring(e)))
 			continue;
 
@@ -278,12 +279,12 @@ static void
 gem_exec_store(void)
 {
 	int fd;
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 
 	fd = __drm_open_driver(DRIVER_INTEL);
 	igt_fork_hang_detector(fd);
 
-	for (e = intel_execution_engines; e->name; e++)
+	for (e = intel_execution_rings; e->name; e++)
 		store_dword(fd, eb_ring(e));
 
 	store_all(fd);

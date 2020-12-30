@@ -24,6 +24,7 @@
 #include <time.h>
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_x86.h"
 
@@ -555,7 +556,7 @@ static const char *yesno(bool x)
 
 igt_main
 {
-	const struct intel_execution_engine *e;
+	const struct intel_execution_ring *e;
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	const struct batch {
 		const char *name;
@@ -602,7 +603,7 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
-	for (e = intel_execution_engines; e->name; e++) igt_subtest_group {
+	for (e = intel_execution_rings; e->name; e++) igt_subtest_group {
 		unsigned ring = eb_ring(e);
 		unsigned timeout = 5 + 120*!!e->exec_id;
 

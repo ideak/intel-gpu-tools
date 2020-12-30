@@ -31,6 +31,7 @@
 #include <sys/resource.h>
 
 #include "i915/gem.h"
+#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_sysfs.h"
 
@@ -105,7 +106,7 @@ static void single(const char *name, bool all_engines)
 
 	num_engines = 0;
 	if (all_engines) {
-		for_each_physical_engine(e, fd) {
+		for_each_physical_ring(e, fd) {
 			if (!gem_can_store_dword(fd, eb_ring(e)))
 				continue;
 
@@ -230,7 +231,7 @@ static void processes(void)
 	fd = drm_open_driver(DRIVER_INTEL);
 
 	num_engines = 0;
-	for_each_physical_engine(e, fd) {
+	for_each_physical_ring(e, fd) {
 		engines[num_engines++] = eb_ring(e);
 		if (num_engines == ARRAY_SIZE(engines))
 			break;
