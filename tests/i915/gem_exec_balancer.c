@@ -31,6 +31,7 @@
 #include "igt.h"
 #include "igt_gt.h"
 #include "igt_perf.h"
+#include "igt_sysfs.h"
 #include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Exercise in-kernel load-balancing");
@@ -3066,6 +3067,156 @@ static void fairslice(int i915)
 	}
 }
 
+static int wait_for_status(int fence, int timeout)
+{
+	int err;
+
+	err = sync_fence_wait(fence, timeout);
+	if (err)
+		return err;
+
+	return sync_fence_status(fence);
+}
+
+static void __persistence(int i915,
+			  struct i915_engine_class_instance *ci,
+			  unsigned int count,
+			  bool persistent)
+{
+	igt_spin_t *spin;
+	uint32_t ctx;
+
+	/*
+	 * A nonpersistent context is terminated immediately upon closure,
+	 * any inflight request is cancelled.
+	 */
+
+	ctx = load_balancer_create(i915, ci, count);
+	if (!persistent)
+		gem_context_set_persistence(i915, ctx, persistent);
+
+	spin = igt_spin_new(i915, ctx,
+			    .flags = IGT_SPIN_FENCE_OUT | IGT_SPIN_POLL_RUN);
+	igt_spin_busywait_until_started(spin);
+	gem_context_destroy(i915, ctx);
+
+	igt_assert_eq(wait_for_status(spin->out_fence, 500), -EIO);
+	igt_spin_free(i915, spin);
+}
+
+static void persistence(int i915)
+{
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *ci;
+		unsigned int count = 0;
+
+		ci = list_engines(i915, 1u << class, &count);
+		if (!ci || count < 2) {
+			free(ci);
+			continue;
+		}
+
+		__persistence(i915, ci, count, false);
+		free(ci);
+	}
+}
+
+static bool set_heartbeat(int i915, const char *name, unsigned int value)
+{
+	unsigned int x;
+
+	if (gem_engine_property_printf(i915, name,
+				       "heartbeat_interval_ms",
+				       "%d", value) < 0)
+		return false;
+
+	x = ~value;
+	gem_engine_property_scanf(i915, name,
+				  "heartbeat_interval_ms",
+				  "%d", &x);
+	igt_assert_eq(x, value);
+
+	return true;
+}
+
+static void noheartbeat(int i915)
+{
+	const struct intel_execution_engine2 *e;
+
+	/*
+	 * Check that non-persistent contexts are also cleaned up if we
+	 * close the context while they are active, but the engine's
+	 * heartbeat has already been disabled.
+	 */
+
+	__for_each_physical_engine(i915, e)
+		set_heartbeat(i915, e->name, 0);
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *ci;
+		unsigned int count = 0;
+
+		ci = list_engines(i915, 1u << class, &count);
+		if (!ci || count < 2) {
+			free(ci);
+			continue;
+		}
+
+		__persistence(i915, ci, count, true);
+		free(ci);
+	}
+
+	igt_require_gem(i915); /* restore default parameters */
+}
+
+static bool enable_hangcheck(int dir, bool state)
+{
+	return igt_sysfs_set(dir, "enable_hangcheck", state ? "1" : "0");
+}
+
+static void nohangcheck(int i915)
+{
+	int params = igt_params_open(i915);
+
+	igt_require(enable_hangcheck(params, false));
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *ci;
+		unsigned int count = 0;
+
+		ci = list_engines(i915, 1u << class, &count);
+		if (!ci || count < 2) {
+			free(ci);
+			continue;
+		}
+
+		__persistence(i915, ci, count, true);
+		free(ci);
+	}
+
+	enable_hangcheck(params, true);
+	close(params);
+}
+
+static bool has_persistence(int i915)
+{
+	struct drm_i915_gem_context_param p = {
+		.param = I915_CONTEXT_PARAM_PERSISTENCE,
+	};
+	uint64_t saved;
+
+	if (__gem_context_get_param(i915, &p))
+		return false;
+
+	saved = p.value;
+	p.value = 0;
+	if (__gem_context_set_param(i915, &p))
+		return false;
+
+	p.value = saved;
+	return __gem_context_set_param(i915, &p) == 0;
+}
+
 static bool has_context_engines(int i915)
 {
 	struct drm_i915_gem_context_param p = {
@@ -3228,5 +3379,21 @@ igt_main
 
 		igt_subtest("hang")
 			hangme(i915);
+	}
+
+	igt_subtest_group {
+		igt_fixture {
+			igt_require_gem(i915); /* reset parameters */
+			igt_require(has_persistence(i915));
+		}
+
+		igt_subtest("persistence")
+			persistence(i915);
+
+		igt_subtest("noheartbeat")
+			noheartbeat(i915);
+
+		igt_subtest("nohangcheck")
+			nohangcheck(i915);
 	}
 }
