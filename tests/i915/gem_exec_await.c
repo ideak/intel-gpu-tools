@@ -26,13 +26,10 @@
 #include <sys/signal.h>
 
 #include "i915/gem.h"
-#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
-
-#define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 static double elapsed(const struct timespec *start, const struct timespec *end)
 {

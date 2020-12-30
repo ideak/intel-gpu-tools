@@ -26,7 +26,6 @@
 #include <sys/ioctl.h>
 
 #include "i915/gem.h"
-#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_vgem.h"

@@ -158,9 +158,6 @@ gem_concurrent_blit_SOURCES = i915/gem_concurrent_blit.c
 TESTS_progs += gem_create
 gem_create_SOURCES = i915/gem_create.c
 
-TESTS_progs += gem_cs_prefetch
-gem_cs_prefetch_SOURCES = i915/gem_cs_prefetch.c
-
 TESTS_progs += gem_cs_tlb
 gem_cs_tlb_SOURCES = i915/gem_cs_tlb.c
 
