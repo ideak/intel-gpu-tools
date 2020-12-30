@@ -32,6 +32,35 @@ IGT_TEST_DESCRIPTION("Check that GPU time and execution order is fairly distribu
 
 #define NSEC64 ((uint64_t)NSEC_PER_SEC)
 
+static int has_secure_batches(int i915)
+{
+	int v = -1;
+	drm_i915_getparam_t gp = {
+		.param = I915_PARAM_HAS_SECURE_BATCHES,
+		.value = &v,
+	};
+
+	drmIoctl(i915, DRM_IOCTL_I915_GETPARAM, &gp);
+
+	return v > 0;
+}
+
+static bool has_mi_math(int i915, const struct intel_execution_engine2 *e)
+{
+	uint32_t devid = intel_get_drm_devid(i915);
+
+	if (intel_gen(devid) >= 8)
+		return true;
+
+	if (!IS_HASWELL(devid))
+		return false;
+
+	if (!has_secure_batches(i915))
+		return false;
+
+	return e == NULL || e->class == I915_ENGINE_CLASS_RENDER;
+}
+
 static unsigned int offset_in_page(void *addr)
 {
 	return (uintptr_t)addr & 4095;
@@ -123,12 +152,13 @@ static void delay(int i915,
 {
 	const int use_64b = intel_gen(intel_get_drm_devid(i915)) >= 8;
 	const uint32_t base = gem_engine_mmio_base(i915, e->name);
+	const uint32_t runtime = base + (use_64b ? 0x3a8 : 0x358);
 #define CS_GPR(x) (base + 0x600 + 8 * (x))
-#define RUNTIME (base + 0x3a8)
 	enum { START_TS, NOW_TS };
 	uint32_t *map, *cs, *jmp;
 
 	igt_require(base);
+	igt_assert(use_64b || (addr >> 32) == 0);
 
 	/* Loop until CTX_TIMESTAMP - initial > @ns */
 
@@ -138,7 +168,7 @@ static void delay(int i915,
 	*cs++ = CS_GPR(START_TS) + 4;
 	*cs++ = 0;
 	*cs++ = MI_LOAD_REGISTER_REG;
-	*cs++ = RUNTIME;
+	*cs++ = runtime;
 	*cs++ = CS_GPR(START_TS);
 
 	while (offset_in_page(cs) & 63)
@@ -151,7 +181,7 @@ static void delay(int i915,
 	*cs++ = CS_GPR(NOW_TS) + 4;
 	*cs++ = 0;
 	*cs++ = MI_LOAD_REGISTER_REG;
-	*cs++ = RUNTIME;
+	*cs++ = runtime;
 	*cs++ = CS_GPR(NOW_TS);
 
 	/* delta = now - start; inverted to match COND_BBE */
@@ -234,6 +264,7 @@ static void tslog(int i915,
 	uint32_t *map, *cs;
 
 	igt_require(base);
+	igt_assert(use_64b || (addr >> 32) == 0);
 
 	map = gem_mmap__device_coherent(i915, handle, 0, 4096, PROT_WRITE);
 	cs = map + 512;
@@ -405,6 +436,7 @@ static void fair_child(int i915, uint32_t ctx,
 	struct intel_execution_engine2 ping = *e;
 	int p_fence = -1, n_fence = -1;
 	unsigned long count = 0;
+	unsigned int aux_flags;
 	int n;
 
 	srandom(getpid());
@@ -419,13 +451,19 @@ static void fair_child(int i915, uint32_t ctx,
 		read(rv, &p_fence, sizeof(p_fence));
 	igt_assert(p_fence == -1);
 
+	aux_flags = 0;
+	if (intel_gen(intel_get_drm_devid(i915)) < 8)
+		aux_flags = I915_EXEC_SECURE;
+	ping.flags |= aux_flags;
+	aux_flags |= e->flags;
+
 	while (!READ_ONCE(*ctl)) {
 		struct drm_i915_gem_execbuffer2 execbuf = {
 			.buffers_ptr = to_user_pointer(obj),
 			.buffer_count = 3,
 			.rsvd1 = ctx,
 			.rsvd2 = -1,
-			.flags = e->flags,
+			.flags = aux_flags,
 		};
 
 		if (flags & F_FLOW) {
@@ -500,6 +538,7 @@ static void fair_child(int i915, uint32_t ctx,
 
 		map = gem_mmap__device_coherent(i915, obj[0].handle,
 						0, 4096, PROT_WRITE);
+		igt_assert(map[0]);
 		for (n = 1; n < min(count, 512); n++) {
 			igt_assert(map[n]);
 			map[n - 1] = map[n] - map[n - 1];
@@ -559,6 +598,8 @@ static void fairness(int i915,
 
 	igt_require(has_ctx_timestamp(i915, e));
 	igt_require(gem_class_has_mutable_submission(i915, e->class));
+	if (flags & (F_ISOLATE | F_PING))
+		igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
 
 	igt_assert(pipe(lnk.child) == 0);
 	igt_assert(pipe(lnk.parent) == 0);
@@ -847,6 +888,9 @@ static void deadline_child(int i915,
 	unsigned int seq = 1;
 	int prev = -1, next = -1;
 
+	if (intel_gen(intel_get_drm_devid(i915)) < 8)
+		execbuf.flags |= I915_EXEC_SECURE;
+
 	write(sv, &prev, sizeof(int));
 	read(rv, &prev, sizeof(int));
 	igt_assert(prev == -1);
@@ -949,6 +993,8 @@ static void deadline(int i915, int duration, unsigned int flags)
 
 	igt_require(has_syncobj(i915));
 	igt_require(has_fence_array(i915));
+	igt_require(has_mi_math(i915, &pe));
+	igt_require(has_mi_math(i915, &ve));
 	igt_assert(obj && fences);
 	if (flags & DL_PRIO)
 		igt_require(gem_scheduler_has_preemption(i915));
@@ -959,6 +1005,8 @@ static void deadline(int i915, int duration, unsigned int flags)
 	obj[0] = delay_create(i915, 0, &pe, parent_ns);
 	if (flags & DL_PRIO)
 		gem_context_set_priority(i915, 0, 1023);
+	if (intel_gen(intel_get_drm_devid(i915)) < 8)
+		execbuf.flags |= I915_EXEC_SECURE;
 	for (int n = 1; n <= 5; n++) {
 		int timeline = sw_sync_timeline_create();
 		int nframes = duration * NSEC64 / frame_ns + 1;
@@ -1070,6 +1118,24 @@ static void deadline(int i915, int duration, unsigned int flags)
 	free(fences);
 }
 
+static bool set_heartbeat(int i915, const char *name, unsigned int value)
+{
+	unsigned int x;
+
+	if (gem_engine_property_printf(i915, name,
+				       "heartbeat_interval_ms",
+				       "%d", value) < 0)
+		return false;
+
+	x = ~value;
+	gem_engine_property_scanf(i915, name,
+				  "heartbeat_interval_ms",
+				  "%d", &x);
+	igt_assert_eq(x, value);
+
+	return true;
+}
+
 igt_main
 {
 	static const struct {
@@ -1171,7 +1237,7 @@ igt_main
 
 		igt_info("CS timestamp frequency: %d\n",
 			 read_timestamp_frequency(i915));
-		igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
+		igt_require(has_mi_math(i915, NULL));
 
 		igt_fork_hang_detector(i915);
 	}
@@ -1183,6 +1249,9 @@ igt_main
 
 		igt_subtest_with_dynamic_f("basic-%s", f->name)  {
 			__for_each_physical_engine(i915, e) {
+				if (!has_mi_math(i915, e))
+					continue;
+
 				if (!gem_class_can_store_dword(i915, e->class))
 					continue;
 
@@ -1203,7 +1272,13 @@ igt_main
 	for (typeof(*fair) *f = fair; f->name; f++) {
 		igt_subtest_with_dynamic_f("fair-%s", f->name)  {
 			__for_each_physical_engine(i915, e) {
+				if (!has_mi_math(i915, e))
+					continue;
+
 				if (!gem_class_can_store_dword(i915, e->class))
+					continue;
+
+				if (!set_heartbeat(i915, e->name, 5000))
 					continue;
 
 				igt_dynamic_f("%s", e->name)
