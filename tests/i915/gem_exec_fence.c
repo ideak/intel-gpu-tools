@@ -26,7 +26,6 @@
 #include <sys/signal.h>
 
 #include "i915/gem.h"
-#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_syncobj.h"
 #include "igt_sysfs.h"
@@ -761,7 +760,7 @@ static void test_concurrent(int i915, const struct intel_execution_engine2 *e)
 	batch[++i] = MI_BATCH_BUFFER_END;
 	gem_write(i915, obj[1].handle, 0, batch, sizeof(batch));
 
-	execbuf.rsvd1 = gem_context_create(i915);
+	execbuf.rsvd1 = gem_context_clone_with_engines(i915, 0);
 	execbuf.rsvd2 = spin->out_fence;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
@@ -922,6 +921,7 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	struct drm_i915_gem_exec_object2 obj[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
+	const struct intel_execution_engine2 *e;
 	unsigned int engines[I915_EXEC_RING_MASK + 1], nengine, n, s;
 	unsigned long limit;
 	int all_fences;
@@ -932,8 +932,8 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 		limit = ring_size / 3;
 
 	nengine = 0;
-	for_each_physical_ring(e, fd)
-		engines[nengine++] = eb_ring(e);
+	__for_each_physical_engine(fd, e)
+		engines[nengine++] = e->flags;
 	igt_require(nengine);
 
 	gem_quiescent_gpu(fd);
@@ -956,7 +956,7 @@ static void test_long_history(int fd, long ring_size, unsigned flags)
 	obj[0].handle = igt_cork_plug(&c, fd);
 
 	igt_until_timeout(5) {
-		execbuf.rsvd1 = gem_context_create(fd);
+		execbuf.rsvd1 = gem_context_clone_with_engines(fd, 0);
 
 		for (n = 0; n < nengine; n++) {
 			struct sync_merge_data merge;
@@ -1265,6 +1265,7 @@ static void test_syncobj_wait(int fd)
 	struct drm_i915_gem_exec_fence fence = {
 		.handle = syncobj_create(fd, 0),
 	};
+	const struct intel_execution_engine2 *e;
 	unsigned handle[I915_EXEC_RING_MASK + 1];
 	igt_spin_t *spin;
 	int n;
@@ -1298,23 +1299,12 @@ static void test_syncobj_wait(int fd)
 	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
 	n = 0;
-	for_each_ring(e, fd) {
+	__for_each_physical_engine(fd, e) {
 		obj.handle = gem_create(fd, 4096);
 		gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
 
-		/* No inter-engine synchronisation, will complete */
-		if (eb_ring(e) == I915_EXEC_BLT) {
-			execbuf.flags = eb_ring(e);
-			execbuf.cliprects_ptr = 0;
-			execbuf.num_cliprects = 0;
-			gem_execbuf(fd, &execbuf);
-			gem_sync(fd, obj.handle);
-			igt_assert(gem_bo_busy(fd, spin->handle));
-		}
-		igt_assert(gem_bo_busy(fd, spin->handle));
-
 		/* Now wait upon the blocked engine */
-		execbuf.flags = I915_EXEC_FENCE_ARRAY | eb_ring(e);
+		execbuf.flags = I915_EXEC_FENCE_ARRAY | e->flags;
 		execbuf.cliprects_ptr = to_user_pointer(&fence);
 		execbuf.num_cliprects = 1;
 		fence.flags = I915_EXEC_FENCE_WAIT;
@@ -1323,6 +1313,7 @@ static void test_syncobj_wait(int fd)
 		igt_assert(gem_bo_busy(fd, obj.handle));
 		handle[n++] = obj.handle;
 	}
+	igt_assert(gem_bo_busy(fd, spin->handle));
 	syncobj_destroy(fd, fence.handle);
 
 	for (int i = 0; i < n; i++)
@@ -1656,6 +1647,8 @@ static void test_invalid_timeline_fence_array(int fd)
 	uint64_t value;
 	void *ptr;
 
+	fd = gem_reopen_driver(fd);
+
 	/* create an otherwise valid execbuf */
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
@@ -1686,8 +1679,6 @@ static void test_invalid_timeline_fence_array(int fd)
 	execbuf.num_cliprects = 0;
 	execbuf.flags = I915_EXEC_FENCE_ARRAY | I915_EXEC_USE_EXTENSIONS;
 	igt_assert_eq(__gem_execbuf(fd, &execbuf), -EINVAL);
-
-	syncobj_create(fd, fence.handle);
 
 	execbuf.flags = I915_EXEC_USE_EXTENSIONS;
 
@@ -1769,6 +1760,7 @@ static void test_invalid_timeline_fence_array(int fd)
 	igt_assert_eq(__gem_execbuf(fd, &execbuf), -EFAULT);
 
 	munmap(ptr, 4096);
+	close(fd);
 }
 
 static const char *test_syncobj_timeline_unused_fence_desc =
@@ -2012,12 +2004,16 @@ static void test_syncobj_timeline_wait(int fd)
 		MI_NOOP,
 	};
 	struct drm_i915_gem_exec_object2 obj;
-	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+	};
 	struct drm_i915_gem_execbuffer_ext_timeline_fences timeline_fences;
 	struct drm_i915_gem_exec_fence fence = {
 		.handle = syncobj_create(fd, 0),
 	};
 	unsigned handle[I915_EXEC_RING_MASK + 1];
+	const struct intel_execution_engine2 *e;
 	uint64_t value = 1;
 	igt_spin_t *spin;
 	int n;
@@ -2036,11 +2032,6 @@ static void test_syncobj_timeline_wait(int fd)
 	timeline_fences.handles_ptr = to_user_pointer(&fence);
 	timeline_fences.values_ptr = to_user_pointer(&value);
 
-	memset(&execbuf, 0, sizeof(execbuf));
-	execbuf.buffers_ptr = to_user_pointer(&obj);
-	execbuf.buffer_count = 1;
-	execbuf.batch_len = sizeof(bbe);
-
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);
 	gem_write(fd, obj.handle, 0, bbe, sizeof(bbe));
@@ -2052,29 +2043,15 @@ static void test_syncobj_timeline_wait(int fd)
 	fence.flags = I915_EXEC_FENCE_SIGNAL;
 	gem_execbuf(fd, &execbuf);
 	igt_assert(gem_bo_busy(fd, spin->handle));
-
 	gem_close(fd, obj.handle);
-	obj.handle = gem_create(fd, 4096);
-	gem_write(fd, obj.handle, 0, bbe, sizeof(bbe));
 
 	n = 0;
-	for_each_ring(engine, fd) {
+	__for_each_physical_engine(fd, e) {
 		obj.handle = gem_create(fd, 4096);
 		gem_write(fd, obj.handle, 0, bbe, sizeof(bbe));
 
-		/* No inter-engine synchronisation, will complete */
-		if (engine->flags == I915_EXEC_BLT) {
-			execbuf.flags = engine->flags;
-			execbuf.cliprects_ptr = 0;
-			execbuf.num_cliprects = 0;
-			gem_execbuf(fd, &execbuf);
-			gem_sync(fd, obj.handle);
-			igt_assert(gem_bo_busy(fd, spin->handle));
-		}
-		igt_assert(gem_bo_busy(fd, spin->handle));
-
 		/* Now wait upon the blocked engine */
-		execbuf.flags = I915_EXEC_USE_EXTENSIONS | engine->flags;
+		execbuf.flags = I915_EXEC_USE_EXTENSIONS | e->flags;
 		execbuf.cliprects_ptr = to_user_pointer(&timeline_fences);
 		execbuf.num_cliprects = 0;
 		fence.flags = I915_EXEC_FENCE_WAIT;
@@ -2083,6 +2060,7 @@ static void test_syncobj_timeline_wait(int fd)
 		igt_assert(gem_bo_busy(fd, obj.handle));
 		handle[n++] = obj.handle;
 	}
+	igt_assert(gem_bo_busy(fd, spin->handle));
 	syncobj_destroy(fd, fence.handle);
 
 	for (int i = 0; i < n; i++)
@@ -2688,7 +2666,7 @@ static void setup_timeline_chain_engines(struct inter_engine_context *context, i
 	context->fd = fd;
 	context->engines = engines;
 
-	context->wait_context = gem_context_create(fd);
+	context->wait_context = gem_context_clone_with_engines(fd, 0);
 	context->wait_timeline = syncobj_create(fd, 0);
 
 	context->engine_counter_object.handle = gem_create(fd, 4096);
