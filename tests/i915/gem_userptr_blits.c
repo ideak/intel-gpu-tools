@@ -61,7 +61,6 @@
 #include "i915_drm.h"
 
 #include "i915/gem.h"
-#include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
@@ -1517,17 +1516,18 @@ static void test_readonly(int i915)
 	igt_assert(mprotect(space, total, PROT_READ) == 0);
 
 	igt_fork(child, 1) {
+		const struct intel_execution_engine2 *e;
 		char *orig;
 
 		orig = g_compute_checksum_for_data(G_CHECKSUM_SHA1, pages, sz);
 
 		gem_userptr(i915, space, total, true, userptr_flags, &rhandle);
 
-		for_each_ring(e, i915) {
+		__for_each_physical_engine(i915, e) {
 			char *ref, *result;
 
 			/* First tweak the backing store through the write */
-			store_dword_rand(i915, eb_ring(e), whandle, sz, 64);
+			store_dword_rand(i915, e->flags, whandle, sz, 64);
 			gem_sync(i915, whandle);
 			ref = g_compute_checksum_for_data(G_CHECKSUM_SHA1,
 							  pages, sz);
@@ -1536,7 +1536,7 @@ static void test_readonly(int i915)
 			igt_assert(strcmp(ref, orig));
 
 			/* Now try the same through the read-only handle */
-			store_dword_rand(i915, eb_ring(e), rhandle, total, 64);
+			store_dword_rand(i915, e->flags, rhandle, total, 64);
 			gem_sync(i915, rhandle);
 			result = g_compute_checksum_for_data(G_CHECKSUM_SHA1,
 							     pages, sz);
