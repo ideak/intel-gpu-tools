@@ -48,7 +48,7 @@
 			.param = I915_CONTEXT_PARAM_ENGINES, \
 			.ctx_id = c__, \
 			.size = SIZEOF_CTX_PARAM, \
-			.value = to_user_pointer(&e__), \
+			.value = to_user_pointer(memset(&e__, 0, sizeof(e__))), \
 		}
 
 static int __gem_query(int fd, struct drm_i915_query *q)

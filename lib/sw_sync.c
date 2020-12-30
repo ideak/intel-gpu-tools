@@ -183,7 +183,7 @@ int sync_fence_count(int fd)
 
 uint64_t sync_fence_timestamp(int fd)
 {
-	struct sync_fence_info fence;
+	struct sync_fence_info fence = {};
 	struct sync_file_info info = {
 		.sync_fence_info = to_user_pointer(&fence),
 		.num_fences = 1,
@@ -195,6 +195,7 @@ uint64_t sync_fence_timestamp(int fd)
 	if (info.num_fences > 1)
 		return 0;
 
+	igt_assert(fence.timestamp_ns);
 	return fence.timestamp_ns;
 }
 
