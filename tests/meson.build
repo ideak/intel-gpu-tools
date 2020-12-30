@@ -137,7 +137,6 @@ i915_progs = [
 	'gem_ctx_ringsize',
 	'gem_ctx_shared',
 	'gem_ctx_switch',
-	'gem_ctx_thrash',
 	'gem_evict_alignment',
 	'gem_evict_everything',
 	'gem_exec_alignment',
