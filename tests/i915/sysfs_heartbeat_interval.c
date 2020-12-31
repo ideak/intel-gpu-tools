@@ -262,10 +262,10 @@ static void test_nopreempt(int i915, int engine)
 		/*
 		 * It takes a few missed heartbeats before we start
 		 * terminating hogs, and a little bit of jiffie slack for
-		 * scheduling at each step. 250ms should cover all of our
-		 * sins and be useful tolerance.
+		 * scheduling at each step. 500ms should cover all of our
+		 * sins (including debug dumps) and be useful tolerance.
 		 */
-		igt_assert_f(elapsed / 1000 / 1000 < 5 * delays[i] + 250,
+		igt_assert_f(elapsed / 1000 / 1000 < 5 * delays[i] + 500,
 			     "Heartbeat interval (and CPR) exceeded request!\n");
 	}
 
@@ -448,7 +448,7 @@ static void test_off(int i915, int engine)
 
 	set_heartbeat(engine, 1);
 
-	igt_assert_eq(sync_fence_wait(spin->out_fence, 250), 0);
+	igt_assert_eq(sync_fence_wait(spin->out_fence, 500), 0);
 	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
 
 	igt_spin_free(i915, spin);
