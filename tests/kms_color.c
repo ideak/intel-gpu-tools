@@ -105,6 +105,8 @@ static void test_pipe_degamma(data_t *data,
 
 		igt_plane_set_fb(primary, NULL);
 		igt_output_set_pipe(output, PIPE_NONE);
+		igt_remove_fb(data->drm_fd, &fb);
+		igt_remove_fb(data->drm_fd, &fb_modeset);
 	}
 
 	free_lut(degamma_linear);
@@ -189,6 +191,8 @@ static void test_pipe_gamma(data_t *data,
 
 		igt_plane_set_fb(primary, NULL);
 		igt_output_set_pipe(output, PIPE_NONE);
+		igt_remove_fb(data->drm_fd, &fb);
+		igt_remove_fb(data->drm_fd, &fb_modeset);
 	}
 
 	free_lut(gamma_full);
@@ -292,6 +296,8 @@ static void test_pipe_legacy_gamma(data_t *data,
 
 		igt_plane_set_fb(primary, NULL);
 		igt_output_set_pipe(output, PIPE_NONE);
+		igt_remove_fb(data->drm_fd, &fb);
+		igt_remove_fb(data->drm_fd, &fb_modeset);
 	}
 
 	free(red_lut);
@@ -510,6 +516,8 @@ static bool test_pipe_ctm(data_t *data,
 
 		igt_plane_set_fb(primary, NULL);
 		igt_output_set_pipe(output, PIPE_NONE);
+		igt_remove_fb(data->drm_fd, &fb);
+		igt_remove_fb(data->drm_fd, &fb_modeset);
 	}
 
 	free_lut(degamma_linear);
@@ -618,6 +626,9 @@ static void test_pipe_limited_range_ctm(data_t *data,
 		 * equal to the CRC of the CTM matrix transformation output.
 		 */
 		igt_assert_crc_equal(&crc_full, &crc_limited);
+
+		igt_remove_fb(data->drm_fd, &fb);
+		igt_remove_fb(data->drm_fd, &fb_modeset);
 	}
 
 	free_lut(gamma_linear);
