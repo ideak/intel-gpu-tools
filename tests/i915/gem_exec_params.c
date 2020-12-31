@@ -44,30 +44,6 @@
 #include "igt_device.h"
 #include "sw_sync.h"
 
-static bool has_ring(int fd, unsigned ring_exec_flags)
-{
-	switch (ring_exec_flags & I915_EXEC_RING_MASK) {
-	case 0:
-	case I915_EXEC_RENDER:
-		return true;
-
-	case I915_EXEC_BSD:
-		if (ring_exec_flags & I915_EXEC_BSD_MASK)
-			return gem_has_bsd2(fd);
-		else
-			return gem_has_bsd(fd);
-
-	case I915_EXEC_BLT:
-		return gem_has_blt(fd);
-
-	case I915_EXEC_VEBOX:
-		return gem_has_vebox(fd);
-	}
-
-	igt_assert_f(0, "invalid exec flag 0x%x\n", ring_exec_flags);
-	return false;
-}
-
 static bool has_exec_batch_first(int fd)
 {
 	int val = -1;
@@ -320,38 +296,39 @@ static void test_invalid_batch_start(int fd)
 
 static void test_larger_than_life_batch(int fd)
 {
-       uint64_t size = 1ULL << 32; /* batch_len is __u32 as per the ABI */
-       struct drm_i915_gem_exec_object2 exec = {
-               .handle = batch_create_size(fd, size),
-       };
-       struct drm_i915_gem_execbuffer2 execbuf = {
-               .buffers_ptr = to_user_pointer(&exec),
-               .buffer_count = 1,
-       };
+	const struct intel_execution_engine2 *e;
+	uint64_t size = 1ULL << 32; /* batch_len is __u32 as per the ABI */
+	struct drm_i915_gem_exec_object2 exec = {
+		.handle = batch_create_size(fd, size),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&exec),
+		.buffer_count = 1,
+	};
 
-       /*
-	* batch_len seems like it can have different interaction depending on
-	* the engine and HW -- but we know that only if the GTT can be larger
-	* than 4G do we run into u32 issues, so we can safely restrict our
-	* checking to that subset of machines.
-	*/
-       igt_require(size < gem_aperture_size(fd));
-       intel_require_memory(2, size, CHECK_RAM); /* batch + shadow */
+	/*
+	 * batch_len seems like it can have different interaction depending on
+	 * the engine and HW -- but we know that only if the GTT can be larger
+	 * than 4G do we run into u32 issues, so we can safely restrict our
+	 * checking to that subset of machines.
+	 */
+	igt_require(size < gem_aperture_size(fd));
+	intel_require_memory(2, size, CHECK_RAM); /* batch + shadow */
 
-       for_each_ring(e, fd) {
-	       /* Keep the batch_len implicit [0] */
-	       execbuf.flags = eb_ring(e);
+	__for_each_physical_engine(fd, e) {
+		/* Keep the batch_len implicit [0] */
+		execbuf.flags = e->flags;
 
-	       /* non-48b objects are limited to the low (4G - 4K) */
-	       igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOSPC);
+		/* non-48b objects are limited to the low (4G - 4K) */
+		igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOSPC);
 
-	       exec.flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
-	       igt_assert_eq(__gem_execbuf(fd, &execbuf), 0);
-	       exec.flags = 0;
-       }
+		exec.flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+		igt_assert_eq(__gem_execbuf(fd, &execbuf), 0);
+		exec.flags = 0;
+	}
 
-       gem_sync(fd, exec.handle);
-       gem_close(fd, exec.handle);
+	gem_sync(fd, exec.handle);
+	gem_close(fd, exec.handle);
 }
 
 struct drm_i915_gem_execbuffer2 execbuf;
@@ -393,15 +370,6 @@ igt_main
 		execbuf.flags = 0;
 		i915_execbuffer2_set_context_id(execbuf, 0);
 		execbuf.rsvd2 = 0;
-	}
-
-	igt_subtest("control") {
-		for (e = intel_execution_rings; e->name; e++) {
-			if (has_ring(fd, eb_ring(e))) {
-				execbuf.flags = eb_ring(e);
-				gem_execbuf(fd, &execbuf);
-			}
-		}
 	}
 
 	igt_subtest("readonly")
