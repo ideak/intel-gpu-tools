@@ -470,16 +470,6 @@ static void flip(igt_display_t *display,
 		igt_remove_fb(display->drm_fd, &cursor_fb2);
 }
 
-static inline uint32_t pipe_select(enum pipe pipe)
-{
-	if (pipe > 1)
-		return pipe << DRM_VBLANK_HIGH_CRTC_SHIFT;
-	else if (pipe > 0)
-		return DRM_VBLANK_SECONDARY;
-	else
-		return 0;
-}
-
 enum basic_flip_cursor {
 	FLIP_BEFORE_CURSOR,
 	FLIP_AFTER_CURSOR
