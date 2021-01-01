@@ -339,8 +339,6 @@ int fd;
 
 igt_main
 {
-	const struct intel_execution_ring *e;
-
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
