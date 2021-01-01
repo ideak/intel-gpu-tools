@@ -1011,7 +1011,7 @@ event_wait(int gem_fd, const struct intel_execution_engine2 *e)
 
 	devid = intel_get_drm_devid(gem_fd);
 	igt_require(intel_gen(devid) >= 7);
-	igt_require(has_secure_batches(fd));
+	igt_require(has_secure_batches(gem_fd));
 	igt_skip_on(IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid));
 
 	igt_device_set_master(gem_fd);
