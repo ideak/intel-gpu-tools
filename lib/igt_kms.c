@@ -2495,7 +2495,7 @@ static bool output_is_internal_panel(igt_output_t *output)
 
 igt_output_t **__igt_pipe_populate_outputs(igt_display_t *display, igt_output_t **chosen_outputs)
 {
-	unsigned full_pipe_mask, assigned_pipes = 0;
+	unsigned full_pipe_mask = 0, assigned_pipes = 0;
 	igt_output_t *output;
 	int i, j;
 
