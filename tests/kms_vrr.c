@@ -291,12 +291,15 @@ flip_and_measure(data_t *data, igt_output_t *output, enum pipe pipe,
 		 * difference between 144Hz and 143Hz which should give this
 		 * enough accuracy for most use cases.
 		 */
-		if ((rate_ns <= vtest_ns.min) && (rate_ns >= vtest_ns.max))
-			diff_ns = rate_ns - (event_ns - last_event_ns);
+		if (rate_ns <= vtest_ns.min && rate_ns >= vtest_ns.max)
+			diff_ns = rate_ns;
 		else if (rate_ns > vtest_ns.min)
-			diff_ns = vtest_ns.min - (event_ns - last_event_ns);
+			diff_ns = vtest_ns.min;
 		else if (rate_ns < vtest_ns.max)
-			diff_ns = vtest_ns.max - (event_ns - last_event_ns);
+			diff_ns = vtest_ns.max;
+		else
+			diff_ns = rate_ns;
+		diff_ns -= event_ns - last_event_ns;
 
 		if (llabs(diff_ns) < 50000ll)
 			total_pass += 1;
