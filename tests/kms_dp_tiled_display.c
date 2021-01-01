@@ -70,33 +70,26 @@ static int drm_property_is_tile(drmModePropertyPtr prop)
 static void get_connector_tile_props(data_t *data, drmModeConnectorPtr conn,
 				     igt_tile_info_t *tile)
 {
-	int i = 0;
-	drmModePropertyPtr prop;
-	drmModePropertyBlobPtr blob;
+	for (int i = 0; i < conn->count_props; i++) {
+		drmModePropertyBlobPtr blob;
+		drmModePropertyPtr prop;
 
-	for (i = 0; i < conn->count_props; i++) {
 		prop = drmModeGetProperty(data->drm_fd, conn->props[i]);
-
 		igt_assert(prop);
 
-		if (!drm_property_is_tile(prop)) {
-			drmModeFreeProperty(prop);
-			continue;
+		blob = NULL;
+		if (drm_property_is_tile(prop)) {
+			blob = drmModeGetPropertyBlob(data->drm_fd,
+						      conn->prop_values[i]);
+			if (blob) {
+				igt_parse_connector_tile_blob(blob, tile);
+				drmModeFreePropertyBlob(blob);
+			}
 		}
-
-		blob = drmModeGetPropertyBlob(data->drm_fd,
-				conn->prop_values[i]);
-
-		if (!blob)
-			goto cleanup;
-
-		igt_parse_connector_tile_blob(blob, tile);
-		break;
+		drmModeFreeProperty(prop);
+		if (blob)
+			return;
 	}
-
-cleanup:
-	drmModeFreeProperty(prop);
-	drmModeFreePropertyBlob(blob);
 }
 
 static void get_number_of_h_tiles(data_t *data)
