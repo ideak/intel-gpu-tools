@@ -119,8 +119,8 @@ static void init_engine(struct intel_execution_engine2 *e2,
 	e2->instance = instance;
 
 	/* engine is a virtual engine */
-	if (class == I915_ENGINE_CLASS_INVALID &&
-	    instance == I915_ENGINE_CLASS_INVALID_VIRTUAL) {
+	if (class == (uint16_t)I915_ENGINE_CLASS_INVALID &&
+	    instance == (uint16_t)I915_ENGINE_CLASS_INVALID_VIRTUAL) {
 		strcpy(e2->name, "virtual");
 		e2->is_virtual = true;
 		return;
