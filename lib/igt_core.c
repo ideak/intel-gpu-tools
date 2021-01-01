@@ -2757,7 +2757,7 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 	}
 
 	if (!thread_id)
-		goto out;
+		return;
 
 	if (list_subtests && level <= IGT_LOG_WARN)
 		return;
@@ -2820,8 +2820,8 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 	pthread_mutex_unlock(&print_mutex);
 
 out:
-	free(thread_id);
 	free(line);
+	free(thread_id);
 }
 
 static const char *timeout_op;
