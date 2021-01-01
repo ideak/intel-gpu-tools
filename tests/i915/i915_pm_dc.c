@@ -195,6 +195,9 @@ static uint32_t read_dc_counter(uint32_t debugfs_fd, int dc_flag)
 	} else if (dc_flag & CHECK_DC3CO) {
 		str = strstr(buf, "DC3CO count");
 		igt_assert_f(str, "DC3CO counter is not available\n");
+	} else {
+		igt_assert(!"reached");
+		str = NULL;
 	}
 
 	return get_dc_counter(str);
