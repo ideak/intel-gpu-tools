@@ -897,10 +897,12 @@ static void semaphore_codependency(int i915, unsigned long flags)
 	__for_each_physical_engine(i915, e) {
 		uint32_t ctx;
 
-		if (!gem_class_can_store_dword(i915, e->class))
+		if (!e->flags) {
+			igt_require(gem_class_can_store_dword(i915, e->class));
 			continue;
+		}
 
-		if (!e->flags)
+		if (!gem_class_can_store_dword(i915, e->class))
 			continue;
 
 		ctx = gem_context_clone_with_engines(i915, 0);
