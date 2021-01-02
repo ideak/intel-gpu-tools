@@ -54,6 +54,9 @@ typedef struct igt_spin {
 	struct drm_i915_gem_exec_object2 obj[2];
 #define IGT_SPIN_BATCH   1
 	struct drm_i915_gem_execbuffer2 execbuf;
+
+	unsigned int flags;
+#define SPIN_CLFLUSH (1 << 0)
 } igt_spin_t;
 
 struct igt_spin_factory {

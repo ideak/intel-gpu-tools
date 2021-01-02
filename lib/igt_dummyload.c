@@ -151,6 +151,10 @@ emit_recursive_batch(igt_spin_t *spin,
 						  0, BATCH_SIZE, PROT_WRITE);
 		gem_set_domain(fd, obj[BATCH].handle,
 			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+	} else if (gen < 6) {
+		gem_set_caching(fd, obj[BATCH].handle, I915_CACHING_NONE);
+		igt_require(igt_setup_clflush());
+		spin->flags |= SPIN_CLFLUSH;
 	}
 	execbuf->buffer_count++;
 	cs = spin->batch;
@@ -505,6 +509,14 @@ void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 	igt_assert(timerfd_settime(timerfd, 0, &its, NULL) == 0);
 }
 
+static void sync_write(igt_spin_t *spin, uint32_t value)
+{
+	*spin->condition = value;
+	if (spin->flags & SPIN_CLFLUSH)
+		igt_clflush_range(spin->condition, sizeof(*spin->condition));
+	__sync_synchronize();
+}
+
 /**
  * igt_spin_reset:
  * @spin: spin state from igt_spin_new()
@@ -516,9 +528,7 @@ void igt_spin_reset(igt_spin_t *spin)
 	if (igt_spin_has_poll(spin))
 		spin->poll[SPIN_POLL_START_IDX] = 0;
 
-	*spin->condition = spin->cmd_precondition;
-	__sync_synchronize();
-
+	sync_write(spin, spin->cmd_precondition);
 	memset(&spin->last_signal, 0, sizeof(spin->last_signal));
 }
 
@@ -534,8 +544,7 @@ void igt_spin_end(igt_spin_t *spin)
 		return;
 
 	igt_gettime(&spin->last_signal);
-	*spin->condition = MI_BATCH_BUFFER_END;
-	__sync_synchronize();
+	sync_write(spin, MI_BATCH_BUFFER_END);
 }
 
 static void __igt_spin_free(int fd, igt_spin_t *spin)
