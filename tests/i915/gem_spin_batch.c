@@ -190,14 +190,20 @@ igt_main
 			continue;
 		e2 = &e2__;
 
-		igt_subtest_f("legacy-%s", e->name)
+		igt_subtest_f("legacy-%s", e->name) {
+			igt_require(gem_has_ring(fd, eb_ring(e)));
 			spin(fd, e2, 0, 3);
+		}
 
-		igt_subtest_f("legacy-resubmit-%s", e->name)
+		igt_subtest_f("legacy-resubmit-%s", e->name) {
+			igt_require(gem_has_ring(fd, eb_ring(e)));
 			spin_resubmit(fd, e2, 0);
+		}
 
-		igt_subtest_f("legacy-resubmit-new-%s", e->name)
+		igt_subtest_f("legacy-resubmit-new-%s", e->name) {
+			igt_require(gem_has_ring(fd, eb_ring(e)));
 			spin_resubmit(fd, e2, RESUBMIT_NEW_CTX);
+		}
 	}
 
 	igt_subtest("spin-all")
