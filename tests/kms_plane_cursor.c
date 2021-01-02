@@ -320,14 +320,18 @@ igt_main
 		for (i = 0; i < ARRAY_SIZE(cursor_sizes); ++i) {
 			int size = cursor_sizes[i];
 
+			igt_describe("Tests atomic cursor positioning on primary plane and overlay plane");
 			igt_subtest_f("pipe-%s-overlay-size-%d",
 				      kmstest_pipe_name(pipe), size)
 				test_cursor_overlay(&data, size, pipe);
 
+			igt_describe("Tests atomic cursor positioning on primary plane");
 			igt_subtest_f("pipe-%s-primary-size-%d",
 				      kmstest_pipe_name(pipe), size)
 				test_cursor_primary(&data, size, pipe);
 
+			igt_describe("Tests atomic cursor positioning on primary plane and overlay plane"
+				"with buffer larger than viewport used for display");
 			igt_subtest_f("pipe-%s-viewport-size-%d",
 				      kmstest_pipe_name(pipe), size)
 				test_cursor_viewport(&data, size, pipe);
