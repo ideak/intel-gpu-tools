@@ -486,13 +486,24 @@ static uint32_t read_result(int timeline, uint32_t *map, int idx)
 	return map[idx];
 }
 
+static bool has_cs_timestamp(const struct intel_execution_engine2 *e, int gen)
+{
+	if (gen >= 7)
+		return true;
+
+	if (gen < 6)
+		return false;
+
+	return e->class == I915_ENGINE_CLASS_RENDER;
+}
+
 static void independent(int i915, const struct intel_execution_engine2 *e)
 {
 #define RCS_TIMESTAMP (mmio_base + 0x358)
 	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	unsigned int mmio_base = gem_engine_mmio_base(i915, e->name);
 	const int has_64bit_reloc = gen >= 8;
-	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines , I915_EXEC_RING_MASK + 1);
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
 	struct drm_i915_gem_context_param param = {
 		.ctx_id = gem_context_clone_with_engines(i915, 0),
 		.param = I915_CONTEXT_PARAM_ENGINES,
@@ -508,6 +519,7 @@ static void independent(int i915, const struct intel_execution_engine2 *e)
 	uint32_t last, *map;
 
 	igt_require(mmio_base);
+	igt_require(has_cs_timestamp(e, gen));
 
 	{
 		struct drm_i915_gem_execbuffer2 execbuf = {
@@ -587,6 +599,7 @@ static void independent(int i915, const struct intel_execution_engine2 *e)
 
 static void independent_all(int i915)
 {
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	const struct intel_execution_engine2 *e;
 	igt_spin_t *spin = NULL;
 
@@ -607,6 +620,10 @@ static void independent_all(int i915)
 	__for_each_physical_engine(i915, e) {
 		if (!gem_engine_mmio_base(i915, e->name))
 			continue;
+
+		if (!has_cs_timestamp(e, gen))
+			continue;
+
 		igt_fork(child, 1)
 			independent(i915, e);
 	}
