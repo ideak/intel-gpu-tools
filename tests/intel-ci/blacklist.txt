@@ -49,7 +49,6 @@ igt@gem_reset_stats(@.*)?
 igt@gem_ringfill@(?!.*basic).*
 igt@gem_shrink@(?!reclaim$).*
 igt@gem_softpin@.*(hang|S4).*
-igt@gem_spin_batch(@.*)?
 igt@gem_streaming_writes(@.*)?
 igt@gem_sync@(?!.*basic).*
 igt@gem_tiled_swapping@(?!non-threaded).*

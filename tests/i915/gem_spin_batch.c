@@ -142,20 +142,24 @@ spin_on_all_engines(int fd, unsigned long flags, unsigned int timeout_sec)
 static void spin_all(int i915, unsigned int flags)
 #define PARALLEL_SPIN_NEW_CTX BIT(0)
 {
+	const struct intel_execution_engine2 *e;
 	struct igt_spin *spin, *n;
 	IGT_LIST_HEAD(list);
 
-	for_each_physical_ring(e, i915) {
+	__for_each_physical_engine(i915, e) {
 		uint32_t ctx;
+
+		if (!gem_class_can_store_dword(i915, e->class))
+			continue;
 
 		ctx = 0;
 		if (flags & PARALLEL_SPIN_NEW_CTX)
-			ctx = gem_context_create(i915);
+			ctx = gem_context_clone_with_engines(i915, 0);
 
 		/* Prevent preemption so only one is allowed on each engine */
 		spin = igt_spin_new(i915,
 				    .ctx = ctx,
-				    .engine = eb_ring(e),
+				    .engine = e->flags,
 				    .flags = (IGT_SPIN_POLL_RUN |
 					      IGT_SPIN_NO_PREEMPTION));
 		if (ctx)
@@ -167,6 +171,8 @@ static void spin_all(int i915, unsigned int flags)
 
 	igt_list_for_each_entry_safe(spin, n, &list, link) {
 		igt_assert(gem_bo_busy(i915, spin->handle));
+		igt_spin_end(spin);
+		gem_sync(i915, spin->handle);
 		igt_spin_free(i915, spin);
 	}
 }
