@@ -58,7 +58,7 @@ static void spin(int fd,
 			  loops,
 			  igt_nsec_elapsed(&itv) * 1e-6,
 			  igt_nsec_elapsed(&tv) * 1e-6);
-		memset(&itv, 0, sizeof(itv));
+		igt_nsec_elapsed(memset(&itv, 0, sizeof(itv)));
 
 		igt_spin_free(fd, spin);
 		spin = next;
