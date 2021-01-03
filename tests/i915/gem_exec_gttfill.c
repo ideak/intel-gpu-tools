@@ -112,6 +112,7 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 	struct drm_i915_gem_relocation_entry reloc[2];
 	unsigned engines[I915_EXEC_RING_MASK + 1];
 	volatile uint64_t *shared;
+	struct timespec tv = {};
 	struct batch *batches;
 	unsigned nengine;
 	unsigned count;
@@ -134,6 +135,7 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 		engines[nengine++] = ring;
 	}
 	igt_require(nengine);
+	igt_assert(nengine * 64 <= BATCH_SIZE);
 
 	size = gem_aperture_size(fd);
 	if (size > 1ull<<32) /* Limit to 4GiB as we do not use allow-48b */
@@ -145,6 +147,8 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 		  count, (long long)size, nengine);
 	intel_require_memory(count, BATCH_SIZE, CHECK_RAM);
 	intel_detect_and_clear_missed_interrupts(fd);
+
+	igt_nsec_elapsed(&tv);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffer_count = 1;
@@ -162,6 +166,9 @@ static void fillgtt(int fd, unsigned ring, int timeout)
 
 	/* Flush all memory before we start the timer */
 	submit(fd, gen, &execbuf, reloc, batches, count);
+
+	igt_info("Setup %u batches in %.2fms\n",
+		 count, 1e-6 * igt_nsec_elapsed(&tv));
 
 	igt_fork(child, nengine) {
 		uint64_t cycles = 0;
