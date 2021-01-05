@@ -174,7 +174,7 @@ chipsets = [ 'hsw',
              'bxt', 'glk',
              'cnl',
              'icl', 'ehl',
-             'tglgt1', 'tglgt2', 'rkl', 'dg1' ]
+             'tglgt1', 'tglgt2', 'rkl', 'dg1', 'adl' ]
 
 for chipset in chipsets:
     filename = 'oa-' + chipset + '.xml'

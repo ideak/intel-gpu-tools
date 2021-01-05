@@ -127,6 +127,7 @@ chipsets = {
     'TGLGT2': gen8_11_chipset_params,
     'RKL': gen8_11_chipset_params,
     'DG1': gen8_11_chipset_params,
+    'ADL': gen8_11_chipset_params,
 }
 
 register_types = { 'OA', 'NOA', 'FLEX', 'PM' }

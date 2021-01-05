@@ -57,6 +57,7 @@
 #include "i915_perf_metrics_tglgt2.h"
 #include "i915_perf_metrics_rkl.h"
 #include "i915_perf_metrics_dg1.h"
+#include "i915_perf_metrics_adl.h"
 
 static int
 perf_ioctl(int fd, unsigned long request, void *arg)
@@ -276,6 +277,8 @@ intel_perf_for_devinfo(uint32_t device_id,
 		intel_perf_load_metrics_rkl(perf);
 	} else if (devinfo->is_dg1) {
 		intel_perf_load_metrics_dg1(perf);
+	} else if (devinfo->is_alderlake_s) {
+		intel_perf_load_metrics_adl(perf);
 	} else {
 		return unsupported_i915_perf_platform(perf);
 	}

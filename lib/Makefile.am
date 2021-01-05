@@ -10,7 +10,7 @@ i915_perf_hardware =		\
 	bxt glk			\
 	cnl			\
 	icl ehl			\
-	tglgt1 tglgt2 rkl dg1
+	tglgt1 tglgt2 rkl dg1 adl
 
 i915_perf_xml_files = $(i915_perf_hardware:%=i915/perf-configs/oa-%.xml)
 
@@ -107,6 +107,10 @@ i915_perf_generated_files = \
 	$(builddir)/i915/i915_perf_metrics_dg1.h \
 	$(builddir)/i915/i915_perf_registers_dg1.c \
 	$(builddir)/i915/i915_perf_registers_dg1.h \
+	$(builddir)/i915/i915_perf_metrics_adl.c \
+	$(builddir)/i915/i915_perf_metrics_adl.h \
+	$(builddir)/i915/i915_perf_registers_adl.c \
+	$(builddir)/i915/i915_perf_registers_adl.h \
 	$(builddir)/i915/i915_perf_equations.c \
 	$(builddir)/i915/i915_perf_equations.h
 
