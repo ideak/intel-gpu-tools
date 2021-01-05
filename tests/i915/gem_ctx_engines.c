@@ -175,8 +175,8 @@ out:
 
 static void idempotent(int i915)
 {
-	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines , I915_EXEC_RING_MASK + 1);
-	I915_DEFINE_CONTEXT_PARAM_ENGINES(expected , I915_EXEC_RING_MASK + 1);
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(expected, I915_EXEC_RING_MASK + 1);
 	struct drm_i915_gem_context_param p = {
 		.ctx_id = gem_context_create(i915),
 		.param = I915_CONTEXT_PARAM_ENGINES,
@@ -316,7 +316,7 @@ static void none(int i915)
 
 static void execute_one(int i915)
 {
-	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines , I915_EXEC_RING_MASK + 1);
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
 	struct drm_i915_gem_context_param param = {
 		.ctx_id = gem_context_create(i915),
 		.param = I915_CONTEXT_PARAM_ENGINES,
@@ -333,31 +333,38 @@ static void execute_one(int i915)
 	};
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	const struct intel_execution_engine2 *e;
+	igt_spin_t *spin;
+
+	/* Prewarm the spinner */
+	spin = igt_spin_new(i915, .ctx = param.ctx_id,
+			    .flags = (IGT_SPIN_NO_PREEMPTION |
+				      IGT_SPIN_POLL_RUN));
 
 	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
 
 	/* Unadulterated I915_EXEC_DEFAULT should work */
 	execbuf.flags = 0;
 	gem_execbuf(i915, &execbuf);
+	obj.flags |= EXEC_OBJECT_PINNED;
+
+	igt_spin_end(spin);
 	gem_sync(i915, obj.handle);
 
 	__for_each_physical_engine(i915, e) {
 		struct drm_i915_gem_busy busy = { .handle = obj.handle };
 
-		for (int i = -1; i <= I915_EXEC_RING_MASK; i++) {
-			igt_spin_t *spin;
+		igt_debug("Testing [%s...]\n", e->name);
 
+		for (int i = -1; i <= I915_EXEC_RING_MASK; i++) {
 			memset(&engines, 0, sizeof(engines));
 			engine_class(&engines, 0) = e->class;
 			engine_instance(&engines, 0) = e->instance;
 			param.size = offsetof(typeof(engines), engines[1]);
 			gem_context_set_param(i915, &param);
 
-			spin = igt_spin_new(i915,
-					    .ctx = param.ctx_id,
-					    .engine = 0,
-					    .flags = (IGT_SPIN_NO_PREEMPTION |
-						      IGT_SPIN_POLL_RUN));
+			gem_sync(i915, spin->handle);
+			igt_spin_reset(spin);
+			gem_execbuf(i915, &spin->execbuf);
 
 			igt_debug("Testing with map of %d engines\n", i + 1);
 			memset(&engines.engines, -1, sizeof(engines.engines));
@@ -382,7 +389,7 @@ static void execute_one(int i915)
 			igt_assert_eq(batch_busy(busy.busy),
 				      i != -1 ? 1 << e->class : 0);
 
-			igt_spin_free(i915, spin);
+			igt_spin_end(spin);
 
 			gem_sync(i915, obj.handle);
 			do_ioctl(i915, DRM_IOCTL_I915_GEM_BUSY, &busy);
@@ -396,13 +403,15 @@ static void execute_one(int i915)
 	execbuf.flags = 0;
 	gem_execbuf(i915, &execbuf);
 
+	igt_spin_free(i915, spin);
+
 	gem_close(i915, obj.handle);
 	gem_context_destroy(i915, param.ctx_id);
 }
 
 static void execute_oneforall(int i915)
 {
-	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines , I915_EXEC_RING_MASK + 1);
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
 	struct drm_i915_gem_context_param param = {
 		.ctx_id = gem_context_create(i915),
 		.param = I915_CONTEXT_PARAM_ENGINES,
@@ -440,7 +449,7 @@ static void execute_oneforall(int i915)
 
 static void execute_allforone(int i915)
 {
-	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines , I915_EXEC_RING_MASK + 1);
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
 	struct drm_i915_gem_context_param param = {
 		.ctx_id = gem_context_create(i915),
 		.param = I915_CONTEXT_PARAM_ENGINES,
