@@ -483,19 +483,8 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 }
 
 static void
-__test_scaler_with_clipping_clamping_scenario(data_t *d, drmModeModeInfo *mode,
-					      uint32_t f1, uint32_t f2)
+__test_scaler_with_clipping_clamping_scenario(data_t *d, drmModeModeInfo *mode)
 {
-	cleanup_fbs(d);
-
-	igt_create_pattern_fb(d->drm_fd,
-			      mode->hdisplay, mode->vdisplay, f1,
-			      LOCAL_I915_FORMAT_MOD_X_TILED, &d->fb[1]);
-
-	igt_create_pattern_fb(d->drm_fd,
-			      mode->hdisplay, mode->vdisplay, f2,
-			      LOCAL_I915_FORMAT_MOD_Y_TILED, &d->fb[2]);
-
 	igt_plane_set_fb(d->plane1, &d->fb[1]);
 	igt_plane_set_fb(d->plane2, &d->fb[2]);
 
@@ -549,6 +538,10 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 
 		igt_vec_init(&tested_formats2, sizeof(uint32_t));
 
+		igt_create_pattern_fb(d->drm_fd,
+				      mode->hdisplay, mode->vdisplay, f1,
+				      LOCAL_I915_FORMAT_MOD_X_TILED, &d->fb[1]);
+
 		for (int j = 0; j < d->plane2->drm_plane->count_formats; j++) {
 			unsigned f2 = d->plane2->drm_plane->formats[j];
 
@@ -556,8 +549,15 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 			    !can_scale(d, f2))
 				continue;
 
-			__test_scaler_with_clipping_clamping_scenario(d, mode, f1, f2);
+			igt_create_pattern_fb(d->drm_fd,
+					      mode->hdisplay, mode->vdisplay, f2,
+					      LOCAL_I915_FORMAT_MOD_Y_TILED,
+					      &d->fb[2]);
+
+			__test_scaler_with_clipping_clamping_scenario(d, mode);
+			igt_remove_fb(d->drm_fd, &d->fb[2]);
 		}
+		igt_remove_fb(d->drm_fd, &d->fb[1]);
 
 		igt_vec_fini(&tested_formats2);
 	}
