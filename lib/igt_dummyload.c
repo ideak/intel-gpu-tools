@@ -485,9 +485,13 @@ void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 	pthread_attr_t attr;
 	int timerfd;
 
-	igt_assert(ns > 0);
 	if (!spin)
 		return;
+
+	if (ns <= 0) {
+		igt_spin_end(spin);
+		return;
+	}
 
 	igt_assert(spin->timerfd == -1);
 	timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
