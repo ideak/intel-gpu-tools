@@ -83,9 +83,9 @@
  *   device selection, e.g. in automated execution setting. In such scenarios
  *   please consider using sys, pci or platform filters instead.
  *
- * - pci: select device using PCI vendor and device properties
+ * - pci: select device using PCI slot or vendor and device properties
  *   |[<!-- language="plain" -->
- *   pci:[vendor=%04x/name][,device=%04x][,card=%d]
+ *   pci:[vendor=%04x/name][,device=%04x][,card=%d] | [slot=%04x:%02x:%02x.%x]
  *   ]|
  *
  *   Filter allows device selection using vendor (hex or name), device id
@@ -116,6 +116,12 @@
  *   ]|
  *
  *   It selects the second one.
+ *
+ *   Another possibility is to select device using a PCI slot:
+ *
+ *   |[<!-- language="plain" -->
+ *   pci:slot=0000:01:00.0
+ *   ]|
  *
  *   As order the on PCI bus doesn't change (unless you'll add new device or
  *   reorder existing one) device selection using this filter will always
@@ -1138,6 +1144,7 @@ struct filter {
 		char *vendor;
 		char *device;
 		char *card;
+		char *slot;
 		char *drm;
 		char *driver;
 	} data;
@@ -1154,6 +1161,7 @@ static void fill_filter_data(struct filter *filter, const char *key, const char 
 	__fill_key(vendor);
 	__fill_key(device);
 	__fill_key(card);
+	__fill_key(slot);
 	__fill_key(drm);
 	__fill_key(driver);
 #undef __fill_key
@@ -1258,6 +1266,11 @@ static struct igt_list_head *filter_pci(const struct filter_class *fcls,
 
 	DBG("filter pci\n");
 
+	if (filter->data.slot && (filter->data.vendor || filter->data.device || filter->data.card)) {
+		fprintf(stderr, "Slot parameter can not be used with other parameters\n");
+		exit(EXIT_FAILURE);
+	}
+
 	if (filter->data.card) {
 		sscanf(filter->data.card, "%d", &card);
 		if (card < 0) {
@@ -1269,6 +1282,10 @@ static struct igt_list_head *filter_pci(const struct filter_class *fcls,
 
 	igt_list_for_each_entry(dev, &igt_devs.all, link) {
 		if (!is_pci_subsystem(dev))
+			continue;
+
+		/* Skip if 'slot' doesn't match */
+		if (filter->data.slot && !strequal(filter->data.slot, dev->pci_slot_name))
 			continue;
 
 		/* Skip if 'vendor' doesn't match (hex or name) */
@@ -1325,7 +1342,7 @@ static struct filter_class filter_definition_list[] = {
 	{
 		.name = "pci",
 		.filter_function = filter_pci,
-		.help = "pci:[vendor=%04x/name][,device=%04x][,card=%d]",
+		.help = "pci:[vendor=%04x/name][,device=%04x][,card=%d] | [slot=%04x:%02x:%02x.%x]",
 		.detail = "vendor is hex number or vendor name\n",
 	},
 	{
