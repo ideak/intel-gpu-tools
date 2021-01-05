@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<metrics version="1609843423" merge_md5="">
+<metrics version="1609843831" merge_md5="">
   <set name="Render Metrics Basic Gen10"
        chipset="CNL"
        symbol_name="RenderBasic"
@@ -4722,6 +4722,19 @@
              mdapi_supported_apis=""
              mdapi_hw_unit_type="gpu"
              />
+    <counter name="Shader Barrier Messages"
+             symbol_name="ShaderBarriers"
+             underscore_name="shader_barriers"
+             description="The total number of shader barrier messages."
+             data_type="uint64"
+             units="messages"
+             semantic_type="event"
+             equation="A 35 READ"
+             mdapi_group="EU Array/Barrier"
+             mdapi_usage_flags="Tier3 Frame Batch Draw"
+             mdapi_supported_apis=""
+             mdapi_hw_unit_type="gpu"
+             />
     <counter name="Slice0 L3 Bank0 Accesses"
              symbol_name="L3Bank00Accesses"
              underscore_name="l3_bank00_accesses"
@@ -4829,19 +4842,6 @@
              semantic_type="throughput"
              equation="$L3Accesses 64 UMUL"
              mdapi_group="L3"
-             mdapi_usage_flags="Tier3 Frame Batch Draw"
-             mdapi_supported_apis=""
-             mdapi_hw_unit_type="gpu"
-             />
-    <counter name="Shader Barrier Messages"
-             symbol_name="ShaderBarriers"
-             underscore_name="shader_barriers"
-             description="The total number of shader barrier messages."
-             data_type="uint64"
-             units="messages"
-             semantic_type="event"
-             equation="A 35 READ"
-             mdapi_group="EU Array/Barrier"
              mdapi_usage_flags="Tier3 Frame Batch Draw"
              mdapi_supported_apis=""
              mdapi_hw_unit_type="gpu"
