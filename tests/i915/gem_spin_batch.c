@@ -176,6 +176,25 @@ static void spin_all(int i915, unsigned int flags)
 	}
 }
 
+static bool has_userptr(int fd)
+{
+	struct drm_i915_gem_userptr userptr;
+	int err;
+
+	memset(&userptr, 0, sizeof(userptr));
+	userptr.user_size = 8192;
+	userptr.user_ptr = -4096;
+
+	err = 0;
+	if (drmIoctl(fd, DRM_IOCTL_I915_GEM_USERPTR, &userptr)) {
+		err = errno;
+		igt_assume(err);
+	}
+	errno = 0;
+
+	return err == EFAULT;
+}
+
 igt_main
 {
 	const struct intel_execution_engine2 *e2;
@@ -235,8 +254,10 @@ igt_main
 	igt_subtest("spin-each")
 		spin_on_all_engines(fd, 0, 3);
 
-	igt_subtest("user-each")
+	igt_subtest("user-each") {
+		igt_require(has_userptr(fd));
 		spin_on_all_engines(fd, IGT_SPIN_USERPTR, 3);
+	}
 
 	igt_fixture {
 		igt_stop_hang_detector();
