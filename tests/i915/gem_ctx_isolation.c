@@ -762,10 +762,21 @@ static void isolation(int fd,
 #define S4 (4 << 8)
 #define SLEEP_MASK (0xf << 8)
 
+static uint32_t create_reset_context(int i915)
+{
+	struct drm_i915_gem_context_param param = {
+		.ctx_id = gem_context_clone_with_engines(i915, 0),
+		.param = I915_CONTEXT_PARAM_BANNABLE,
+	};
+
+	gem_context_set_param(i915, &param);
+	return param.ctx_id;
+}
+
 static void inject_reset_context(int fd, const struct intel_execution_engine2 *e)
 {
 	struct igt_spin_factory opts = {
-		.ctx = gem_context_clone_with_engines(fd, 0),
+		.ctx = create_reset_context(fd),
 		.engine = e->flags,
 		.flags = IGT_SPIN_FAST,
 	};
