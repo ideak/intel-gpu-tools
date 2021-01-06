@@ -353,6 +353,9 @@ static void execute_one(int i915)
 	__for_each_physical_engine(i915, e) {
 		struct drm_i915_gem_busy busy = { .handle = obj.handle };
 
+		if (!gem_class_can_store_dword(i915, e->class))
+			continue;
+
 		igt_debug("Testing [%s...]\n", e->name);
 
 		for (int i = -1; i <= I915_EXEC_RING_MASK; i++) {
@@ -365,6 +368,9 @@ static void execute_one(int i915)
 			gem_sync(i915, spin->handle);
 			igt_spin_reset(spin);
 			gem_execbuf(i915, &spin->execbuf);
+
+			do_ioctl(i915, DRM_IOCTL_I915_GEM_BUSY, &busy);
+			igt_assert_eq(busy.busy, 0);
 
 			igt_debug("Testing with map of %d engines\n", i + 1);
 			memset(&engines.engines, -1, sizeof(engines.engines));
