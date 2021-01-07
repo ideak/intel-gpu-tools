@@ -29,6 +29,7 @@
 #include "igt_core.h"
 #include "igt_kmod.h"
 #include "igt_sysfs.h"
+#include "igt_taints.h"
 
 /**
  * SECTION:igt_kmod
@@ -582,8 +583,11 @@ int igt_kselftest_execute(struct igt_kselftest *tst,
 			  const char *options,
 			  const char *result)
 {
+	unsigned long taints;
 	char buf[1024];
 	int err;
+
+	igt_skip_on(igt_kernel_tainted(&taints));
 
 	lseek(tst->kmsg, 0, SEEK_END);
 
@@ -606,6 +610,8 @@ int igt_kselftest_execute(struct igt_kselftest *tst,
 	igt_assert_f(err == 0,
 		     "kselftest \"%s %s\" failed: %s [%d]\n",
 		     tst->module_name, buf, strerror(-err), -err);
+
+	igt_assert_eq(igt_kernel_tainted(&taints), 0);
 
 	return err;
 }
