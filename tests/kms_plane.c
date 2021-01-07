@@ -1034,10 +1034,12 @@ run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 		igt_require(data->display.pipes[pipe].n_planes > 0);
 	}
 
+	igt_describe("verify the pixel formats for given plane and pipe");
 	igt_subtest_f("pixel-format-pipe-%s-planes",
 		      kmstest_pipe_name(pipe))
 		test_pixel_formats(data, pipe);
 
+	igt_describe("verify the pixel formats for given plane and pipe with source clamping");
 	igt_subtest_f("pixel-format-pipe-%s-planes-source-clamping",
 		      kmstest_pipe_name(pipe)) {
 		data->crop = 4;
@@ -1045,29 +1047,37 @@ run_tests_for_pipe_plane(data_t *data, enum pipe pipe)
 	}
 
 	data->crop = 0;
+	igt_describe("verify plane position using two planes to create a fully covered screen");
 	igt_subtest_f("plane-position-covered-pipe-%s-planes",
 		      kmstest_pipe_name(pipe))
 		test_plane_position(data, pipe, 0);
 
+	igt_describe("verify plane position using two planes to create a partially covered screen");
 	igt_subtest_f("plane-position-hole-pipe-%s-planes",
 		      kmstest_pipe_name(pipe))
 		test_plane_position(data, pipe,
 				    TEST_POSITION_PARTIALLY_COVERED);
 
+	igt_describe("verify plane position using two planes to create a partially covered screen and"
+		       "check for DPMS");
 	igt_subtest_f("plane-position-hole-dpms-pipe-%s-planes",
 		      kmstest_pipe_name(pipe))
 		test_plane_position(data, pipe,
 				    TEST_POSITION_PARTIALLY_COVERED |
 				    TEST_DPMS);
 
+	igt_describe("verify plane panning at top-left position using primary plane");
 	igt_subtest_f("plane-panning-top-left-pipe-%s-planes",
 		      kmstest_pipe_name(pipe))
 		test_plane_panning(data, pipe, TEST_PANNING_TOP_LEFT);
 
+	igt_describe("verify plane panning at bottom-right position using primary plane");
 	igt_subtest_f("plane-panning-bottom-right-pipe-%s-planes",
 		      kmstest_pipe_name(pipe))
 		test_plane_panning(data, pipe, TEST_PANNING_BOTTOM_RIGHT);
 
+	igt_describe("verify plane panning at bottom-right position using primary plane and executes system"
+		       "suspend cycles");
 	igt_subtest_f("plane-panning-bottom-right-suspend-pipe-%s-planes",
 		      kmstest_pipe_name(pipe))
 		test_plane_panning(data, pipe, TEST_PANNING_BOTTOM_RIGHT |
