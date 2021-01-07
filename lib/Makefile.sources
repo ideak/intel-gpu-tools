@@ -64,6 +64,8 @@ lib_source_list =	 	\
 	igt_sysfs.h		\
 	igt_sysrq.c		\
 	igt_sysrq.h		\
+	igt_taints.c		\
+	igt_taints.h		\
 	igt_thread.c		\
 	igt_thread.h		\
 	igt_x86.h		\

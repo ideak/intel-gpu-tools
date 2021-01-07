@@ -24,6 +24,7 @@
 
 #include "igt_aux.h"
 #include "igt_core.h"
+#include "igt_taints.h"
 #include "executor.h"
 #include "output_strings.h"
 
@@ -307,70 +308,23 @@ static char *handle_lockdep(void)
 	return NULL;
 }
 
-/* see Linux's include/linux/kernel.h */
-static const struct {
-	unsigned long bit;
-	const char *explanation;
-} abort_taints[] = {
-  {(1 << 5), "TAINT_BAD_PAGE: Bad page reference or an unexpected page flags."},
-  {(1 << 7), "TAINT_DIE: Kernel has died - BUG/OOPS."},
-  {(1 << 9), "TAINT_WARN: WARN_ON has happened."},
-  {0, 0}};
-
-static unsigned long bad_taints(void)
-{
-	static unsigned long __bad_taints;
-
-	if (!__bad_taints) {
-		for (typeof(*abort_taints) *taint = abort_taints;
-		     taint->bit;
-		     taint++)
-			__bad_taints |= taint->bit;
-	}
-
-	return __bad_taints;
-}
-
-static unsigned long is_tainted(unsigned long taints)
-{
-	return taints & bad_taints();
-}
-
-static unsigned long tainted(unsigned long *taints)
-{
-	FILE *f;
-
-	*taints = 0;
-
-	f = fopen("/proc/sys/kernel/tainted", "r");
-	if (f) {
-		fscanf(f, "%lu", taints);
-		fclose(f);
-	}
-
-	return is_tainted(*taints);
-}
-
 static char *handle_taint(void)
 {
-	unsigned long taints;
+	unsigned long taints, bad;
+	char *explain;
 	char *reason;
 
-	if (!tainted(&taints))
+	bad = igt_kernel_tainted(&taints);
+	if (!bad)
 		return NULL;
 
-	asprintf(&reason, "Kernel badly tainted (%#lx) (check dmesg for details):\n",
-		 taints);
+	asprintf(&reason, "Kernel badly tainted (%#lx, %#lx) (check dmesg for details):\n",
+		 taints, bad);
 
-	for (typeof(*abort_taints) *taint = abort_taints; taint->bit; taint++) {
-		if (taint->bit & taints) {
-			char *old_reason = reason;
-			asprintf(&reason, "%s\t(%#lx) %s\n",
-					old_reason,
-					taint->bit,
-					taint->explanation);
-			free(old_reason);
-		}
+	while ((explain = igt_explain_taints(&bad))) {
+		char *old_reason = reason;
+		asprintf(&reason, "%s\t%s\n", old_reason, explain);
+		free(old_reason);
 	}
 
 	return reason;
@@ -1142,7 +1096,8 @@ static int monitor_output(pid_t child,
 			sigfd = -1; /* we are dying, no signal handling for now */
 		}
 
-		timeout_reason = need_to_timeout(settings, killed, tainted(&taints),
+		timeout_reason = need_to_timeout(settings, killed,
+						 igt_kernel_tainted(&taints),
 						 igt_time_elapsed(&time_last_activity, &time_now),
 						 igt_time_elapsed(&time_last_subtest, &time_now),
 						 igt_time_elapsed(&time_killed, &time_now),

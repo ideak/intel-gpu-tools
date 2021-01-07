@@ -27,6 +27,7 @@ lib_sources = [
 	'igt_syncobj.c',
 	'igt_sysfs.c',
 	'igt_sysrq.c',
+	'igt_taints.c',
 	'igt_thread.c',
 	'igt_vec.c',
 	'igt_vgem.c',
