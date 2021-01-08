@@ -1156,6 +1156,123 @@ static void semaphore_noskip(int i915, unsigned long flags)
 	gem_context_destroy(i915, ctx);
 }
 
+static void
+noreorder(int i915, unsigned int engine, int prio, unsigned int flags)
+#define CORKED 0x1
+{
+	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
+	const struct intel_execution_engine2 *e;
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(i915, 4096),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = engine,
+		.rsvd1 = gem_context_clone_with_engines(i915, 0),
+	};
+	IGT_CORK_FENCE(cork);
+	uint32_t *map, *cs;
+	igt_spin_t *slice;
+	igt_spin_t *spin;
+	int fence = -1;
+	uint64_t addr;
+	uint32_t ctx;
+
+	if (flags & CORKED)
+		fence = igt_cork_plug(&cork, i915);
+
+	ctx = gem_context_clone(i915, execbuf.rsvd1,
+			      I915_CONTEXT_CLONE_ENGINES |
+			      I915_CONTEXT_CLONE_VM,
+			      0);
+	spin = igt_spin_new(i915, ctx,
+			    .engine = engine,
+			    .fence = fence,
+			    .flags = IGT_SPIN_FENCE_OUT | IGT_SPIN_FENCE_IN);
+	close(fence);
+
+	/* Loop around the engines, creating a chain of fences */
+	spin->execbuf.rsvd2 = (uint64_t)dup(spin->out_fence) << 32;
+	spin->execbuf.rsvd2 |= 0xffffffff;
+	__for_each_physical_engine(i915, e) {
+		if (e->flags == engine)
+			continue;
+
+		close(spin->execbuf.rsvd2);
+		spin->execbuf.rsvd2 >>= 32;
+
+		spin->execbuf.flags =
+			e->flags | I915_EXEC_FENCE_IN | I915_EXEC_FENCE_OUT;
+		gem_execbuf_wr(i915, &spin->execbuf);
+	}
+	close(spin->execbuf.rsvd2);
+	spin->execbuf.rsvd2 >>= 32;
+	gem_context_destroy(i915, ctx);
+
+	/*
+	 * Wait upon the fence chain, and try to terminate the spinner.
+	 *
+	 * If the scheduler skips a link in the chain and doesn't reach the
+	 * dependency on the same engine, we may preempt that spinner to
+	 * execute the terminating batch; and the spinner will untimely
+	 * exit.
+	 */
+	map = gem_mmap__device_coherent(i915, obj.handle, 0, 4096, PROT_WRITE);
+	cs = map;
+
+	addr = spin->obj[IGT_SPIN_BATCH].offset +
+		offset_in_page(spin->condition);
+	if (gen >= 8) {
+		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = addr;
+		addr >>= 32;
+	} else if (gen >= 4) {
+		*cs++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		*cs++ = 0;
+	} else {
+		*cs++ = (MI_STORE_DWORD_IMM | 1 << 22) - 1;
+	}
+	*cs++ = addr;
+	*cs++ = MI_BATCH_BUFFER_END;
+	*cs++ = MI_BATCH_BUFFER_END;
+	munmap(map, 4096);
+
+	execbuf.rsvd2 = spin->execbuf.rsvd2;
+	execbuf.flags |= I915_EXEC_FENCE_IN;
+
+	gem_context_set_priority(i915, execbuf.rsvd1, prio);
+
+	gem_execbuf(i915, &execbuf);
+	gem_close(i915, obj.handle);
+	gem_context_destroy(i915, execbuf.rsvd1);
+	if (cork.fd != -1)
+		igt_cork_unplug(&cork);
+
+	/*
+	 * Then wait for a timeslice.
+	 *
+	 * If we start the next spinner it means we have expired the first
+	 * spinner's timeslice and the second batch would have already been run,
+	 * if it will ever be.
+	 *
+	 * Without timeslices, fallback to waiting a second.
+	 */
+	slice = igt_spin_new(i915,
+			    .engine = engine,
+			    .flags = IGT_SPIN_POLL_RUN);
+	igt_until_timeout(1) {
+		if (igt_spin_has_started(slice))
+			break;
+	}
+	igt_spin_free(i915, slice);
+
+	/* Check the store did not run before the spinner */
+	igt_assert_eq(sync_fence_status(spin->out_fence), 0);
+	igt_spin_free(i915, spin);
+	gem_quiescent_gpu(i915);
+}
+
 static void reorder(int fd, unsigned ring, unsigned flags)
 #define EQUAL 1
 {
@@ -2883,6 +3000,19 @@ igt_main
 					igt_fork_hang_detector(fd);
 				}
 			}
+		}
+
+		test_each_engine_store("noreorder", fd, e)
+			noreorder(fd, e->flags, 0, 0);
+
+		test_each_engine_store("noreorder-priority", fd, e) {
+			igt_require(gem_scheduler_enabled(fd));
+			noreorder(fd, e->flags, MAX_PRIO, 0);
+		}
+
+		test_each_engine_store("noreorder-corked", fd, e) {
+			igt_require(gem_scheduler_enabled(fd));
+			noreorder(fd, e->flags, MAX_PRIO, CORKED);
 		}
 
 		test_each_engine_store("deep", fd, e)
