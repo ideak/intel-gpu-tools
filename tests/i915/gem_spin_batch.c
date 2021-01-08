@@ -77,45 +77,33 @@ static void spin(int fd,
 
 static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
 {
-	const uint32_t ctx0 = gem_context_clone_with_engines(fd, 0);
-	const uint32_t ctx1 =
-		(flags & RESUBMIT_NEW_CTX) ?
-		gem_context_clone_with_engines(fd, 0) : ctx0;
-	igt_spin_t *spin = __igt_spin_new(fd, .ctx = ctx0, .engine = engine);
-	const struct intel_execution_engine2 *other;
+	igt_spin_t *spin;
 
-	struct drm_i915_gem_execbuffer2 eb = {
-		.buffer_count = 1,
-		.buffers_ptr = to_user_pointer(&spin->obj[IGT_SPIN_BATCH]),
-		.rsvd1 = ctx1,
-	};
+	if (flags & RESUBMIT_NEW_CTX)
+		igt_require(gem_has_contexts(fd));
 
-	igt_assert(gem_context_has_engine_map(fd, 0) ||
-		   !(flags & RESUBMIT_ALL_ENGINES));
+	spin = __igt_spin_new(fd, .engine = engine);
+	if (flags & RESUBMIT_NEW_CTX)
+		spin->execbuf.rsvd1 = gem_context_clone_with_engines(fd, 0);
 
 	if (flags & RESUBMIT_ALL_ENGINES) {
-		for_each_context_engine(fd, ctx1, other) {
-			if (other->flags == engine)
-				continue;
+		const struct intel_execution_engine2 *other;
 
-			eb.flags = other->flags;
-			gem_execbuf(fd, &eb);
+		for_each_context_engine(fd, spin->execbuf.rsvd1, other) {
+			spin->execbuf.flags &= 0x3f;
+			spin->execbuf.flags |= other->flags;
+			gem_execbuf(fd, &spin->execbuf);
 		}
-	} else {
-		eb.flags = engine;
-		gem_execbuf(fd, &eb);
 	}
 
+	gem_execbuf(fd, &spin->execbuf);
 	igt_spin_end(spin);
-
 	gem_sync(fd, spin->handle);
 
+	if (spin->execbuf.rsvd1)
+		gem_context_destroy(fd, spin->execbuf.rsvd1);
+
 	igt_spin_free(fd, spin);
-
-	if (ctx1 != ctx0)
-		gem_context_destroy(fd, ctx1);
-
-	gem_context_destroy(fd, ctx0);
 }
 
 static void spin_exit_handler(int sig)
