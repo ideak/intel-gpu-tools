@@ -90,7 +90,7 @@ static void spin_resubmit(int fd, unsigned int engine, unsigned int flags)
 		const struct intel_execution_engine2 *other;
 
 		for_each_context_engine(fd, spin->execbuf.rsvd1, other) {
-			spin->execbuf.flags &= 0x3f;
+			spin->execbuf.flags &= ~0x3f;
 			spin->execbuf.flags |= other->flags;
 			gem_execbuf(fd, &spin->execbuf);
 		}
