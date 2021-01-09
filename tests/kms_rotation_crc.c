@@ -272,11 +272,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	 */
 	igt_require(igt_display_has_format_mod(display, pixel_format, tiling));
 
-	/*
-	 * HSW will need to have those CRCs calculated each time, it
-	 * seems to behave different from other platforms.
-	 */
-	if (!data->crc_rect[rect].valid || IS_HASWELL(data->devid)) {
+	if (!data->crc_rect[rect].valid) {
 		/*
 		* Create a reference software rotated flip framebuffer.
 		*/
@@ -345,6 +341,7 @@ static void test_single_case(data_t *data, enum pipe pipe,
 
 	ret = igt_display_try_commit2(display, COMMIT_ATOMIC);
 	if (test_bad_format) {
+		igt_pipe_crc_drain(data->pipe_crc);
 		igt_assert_eq(ret, -EINVAL);
 		return;
 	}
@@ -408,10 +405,6 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
 	enum pipe pipe;
-	int c;
-
-	for (c = 0; c < num_rectangle_types; c++)
-		data->crc_rect[c].valid = false;
 
 	if (plane_type == DRM_PLANE_TYPE_CURSOR)
 		igt_require(display->has_cursor_plane);
@@ -420,7 +413,10 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		igt_plane_t *plane;
-		int i, j;
+		int i, j, c;
+
+		for (c = 0; c < num_rectangle_types; c++)
+			data->crc_rect[c].valid = false;
 
 		if (IS_CHERRYVIEW(data->devid) && pipe != PIPE_B)
 			continue;
