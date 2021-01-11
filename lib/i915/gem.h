@@ -32,7 +32,7 @@ void gem_quiescent_gpu(int i915);
 
 int gem_reopen_driver(int i915);
 
-int __gem_create(int fd, uint64_t size, uint32_t *handle);
+int __gem_create(int fd, uint64_t *size, uint32_t *handle);
 uint32_t gem_create(int fd, uint64_t size);
 
 #endif /* I915_GEM_H */

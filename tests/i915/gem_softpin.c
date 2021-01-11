@@ -102,19 +102,12 @@ static void test_invalid(int fd)
 static uint32_t batch_create(int i915, uint64_t *sz)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
-	struct drm_i915_gem_create create = {
-		.size = sizeof(bbe),
-	};
+	uint32_t handle;
 
-	if (igt_ioctl(i915, DRM_IOCTL_I915_GEM_CREATE, &create)) {
-		igt_assert_eq(errno, 0);
-		return 0;
-	}
+	igt_assert_eq(__gem_create(i915, sz, &handle), 0);
+	gem_write(i915, handle, 0, &bbe, sizeof(bbe));
 
-	gem_write(i915, create.handle, 0, &bbe, sizeof(bbe));
-
-	*sz = create.size;
-	return create.handle;
+	return handle;
 }
 
 static void test_zero(int i915)

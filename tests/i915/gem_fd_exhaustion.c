@@ -48,14 +48,15 @@ igt_simple_main
 
 		for (int i = 0; ; i++) {
 			int leak = open("/dev/null", O_RDONLY);
+			uint64_t size = 4096;
 			uint32_t handle;
 
-			if (__gem_create(fd, 4096, &handle) == 0)
+			if (__gem_create(fd, &size, &handle) == 0)
 				gem_close(fd, handle);
 
 			if (leak < 0) {
 				igt_info("fd exhaustion after %i rounds.\n", i);
-				igt_assert(__gem_create(fd, 4096,
+				igt_assert(__gem_create(fd, &size,
 							&handle) < 0);
 				break;
 			}
