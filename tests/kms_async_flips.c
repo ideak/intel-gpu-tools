@@ -335,6 +335,9 @@ static void test_invalid(data_t *data)
 	width = data->connector->modes[0].hdisplay;
 	height = data->connector->modes[0].vdisplay;
 
+	igt_require(igt_display_has_format_mod(&data->display, DRM_FORMAT_XRGB8888,
+					       LOCAL_I915_FORMAT_MOD_Y_TILED));
+
 	igt_create_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
 		      LOCAL_I915_FORMAT_MOD_Y_TILED, &fb);
 
