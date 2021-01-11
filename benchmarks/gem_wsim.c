@@ -43,21 +43,22 @@
 #include <pthread.h>
 #include <math.h>
 
+#include "drm.h"
+#include "drmtest.h"
 #include "igt_device_scan.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
-#include "drm.h"
 #include "ioctl_wrappers.h"
-#include "drmtest.h"
 
 #include "intel_io.h"
 #include "igt_aux.h"
 #include "igt_rand.h"
 #include "igt_perf.h"
 #include "sw_sync.h"
-#include "i915/gem_mman.h"
 
+#include "i915/gem.h"
 #include "i915/gem_engine_topology.h"
+#include "i915/gem_mman.h"
 
 enum intel_engine_id {
 	DEFAULT,

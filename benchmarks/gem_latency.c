@@ -41,8 +41,9 @@
 #include <sys/time.h>
 #include <sys/poll.h>
 #include <sys/resource.h>
-#include "drm.h"
 
+#include "drm.h"
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_device.h"
 

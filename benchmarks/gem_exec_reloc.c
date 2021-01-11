@@ -35,12 +35,14 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+
 #include "drm.h"
+#include "drmtest.h"
+#include "i915/gem.h"
+#include "i915/gem_mman.h"
+#include "igt_debugfs.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
-#include "igt_debugfs.h"
-#include "drmtest.h"
-#include "i915/gem_mman.h"
 
 #define SKIP_RELOC 0x1
 #define NO_RELOC 0x2

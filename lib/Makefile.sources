@@ -7,6 +7,7 @@ lib_source_list =	 	\
 	i915/gem.h		\
 	i915/gem_context.c	\
 	i915/gem_context.h	\
+	i915/gem_create.c	\
 	i915/gem_engine_topology.c	\
 	i915/gem_engine_topology.h	\
 	i915/gem_scheduler.c	\

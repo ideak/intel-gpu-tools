@@ -21,12 +21,6 @@
  * IN THE SOFTWARE.
  */
 #include "igt.h"
-#include "igt_debugfs.h"
-#include "igt_aux.h"
-#include "igt_kmod.h"
-#include "igt_sysfs.h"
-#include "igt_core.h"
-
 #include <dirent.h>
 #include <sys/utsname.h>
 #include <linux/limits.h>
@@ -35,6 +29,13 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+
+#include "i915/gem.h"
+#include "igt_debugfs.h"
+#include "igt_aux.h"
+#include "igt_kmod.h"
+#include "igt_sysfs.h"
+#include "igt_core.h"
 
 static void store_all(int fd)
 {

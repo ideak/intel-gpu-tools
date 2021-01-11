@@ -39,9 +39,10 @@
 #include <time.h>
 
 #include "drm.h"
-#include "ioctl_wrappers.h"
 #include "drmtest.h"
+#include "i915/gem.h"
 #include "igt_aux.h"
+#include "ioctl_wrappers.h"
 
 static double elapsed(const struct timespec *start,
 		      const struct timespec *end)

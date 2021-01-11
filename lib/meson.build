@@ -3,6 +3,7 @@ lib_sources = [
 	'huc_copy.c',
 	'i915/gem.c',
 	'i915/gem_context.c',
+	'i915/gem_create.c',
 	'i915/gem_engine_topology.c',
 	'i915/gem_scheduler.c',
 	'i915/gem_submission.c',

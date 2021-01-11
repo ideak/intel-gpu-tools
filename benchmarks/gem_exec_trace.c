@@ -40,10 +40,11 @@
 #include <assert.h>
 
 #include "drm.h"
-#include "ioctl_wrappers.h"
 #include "drmtest.h"
-#include "intel_io.h"
+#include "i915/gem.h"
 #include "igt_stats.h"
+#include "intel_io.h"
+#include "ioctl_wrappers.h"
 
 enum {
 	ADD_BO = 0,

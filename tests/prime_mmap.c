@@ -41,11 +41,12 @@
 #include <pthread.h>
 
 #include "drm.h"
-#include "i915_drm.h"
 #include "drmtest.h"
+#include "i915_drm.h"
+#include "i915/gem.h"
+#include "i915/gem_mman.h"
 #include "igt_debugfs.h"
 #include "ioctl_wrappers.h"
-#include "i915/gem_mman.h"
 
 #define BO_SIZE (16*1024)
 

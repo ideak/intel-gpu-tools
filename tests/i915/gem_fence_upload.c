@@ -37,8 +37,10 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <pthread.h>
+
 #include "drm.h"
 #include "i915_drm.h"
+#include "i915/gem.h"
 
 #define OBJECT_SIZE (1024*1024) /* restricted to 1MiB alignment on i915 fences */
 

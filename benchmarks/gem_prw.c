@@ -39,10 +39,11 @@
 #include <time.h>
 
 #include "drm.h"
-#include "ioctl_wrappers.h"
 #include "drmtest.h"
+#include "i915/gem.h"
 #include "igt_aux.h"
 #include "igt_stats.h"
+#include "ioctl_wrappers.h"
 
 #define OBJECT_SIZE (1<<23)
 

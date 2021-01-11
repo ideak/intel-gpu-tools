@@ -33,6 +33,8 @@
 #include <pixman.h>
 
 #include "drmtest.h"
+#include "i915/gem.h"
+#include "i915/gem_mman.h"
 #include "igt_aux.h"
 #include "igt_color_encoding.h"
 #include "igt_fb.h"
@@ -45,7 +47,6 @@
 #include "ioctl_wrappers.h"
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
-#include "i915/gem_mman.h"
 #include "intel_bufops.h"
 
 /**

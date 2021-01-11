@@ -24,6 +24,8 @@
 
 #include "igt.h"
 
+#include "i915/gem.h"
+
 #define SDR_PLANE_BASE	3
 
 IGT_TEST_DESCRIPTION("Test render compression (RC), in which the main surface "

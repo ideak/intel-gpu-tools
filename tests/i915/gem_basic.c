@@ -35,7 +35,9 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+
 #include "drm.h"
+#include "i915/gem.h"
 
 static void
 test_bad_close(int fd)

@@ -24,6 +24,7 @@
 
 #include "drm_mode.h"
 #include "drm_fourcc.h"
+#include "i915/gem.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("CRC test all different plane modes which kernel advertises.");

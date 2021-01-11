@@ -45,8 +45,9 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
-#include "drm.h"
 
+#include "drm.h"
+#include "i915/gem.h"
 
 IGT_TEST_DESCRIPTION("Test pread behavior on tiled objects with respect to the"
 		     " reported swizzling value.");

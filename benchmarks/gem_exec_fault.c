@@ -41,11 +41,12 @@
 #include <time.h>
 
 #include "drm.h"
-#include "ioctl_wrappers.h"
 #include "drmtest.h"
+#include "i915/gem.h"
+#include "igt_stats.h"
 #include "intel_io.h"
 #include "intel_reg.h"
-#include "igt_stats.h"
+#include "ioctl_wrappers.h"
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 

@@ -36,7 +36,9 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+
 #include "drm.h"
+#include "i915/gem.h"
 
 IGT_TEST_DESCRIPTION("Check that max fence stride works.");
 

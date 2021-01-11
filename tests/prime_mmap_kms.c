@@ -32,6 +32,8 @@
 
 #include "igt.h"
 
+#include "i915/gem.h"
+
 IGT_TEST_DESCRIPTION(
    "Efficiently sharing CPU and GPU buffers");
 

@@ -41,8 +41,9 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <pthread.h>
-#include "drm.h"
 
+#include "drm.h"
+#include "i915/gem.h"
 #include "igt_vgem.h"
 
 #define MiB(x) ((x) * 1024 * 1024)

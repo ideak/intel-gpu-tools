@@ -37,10 +37,11 @@
 #include <time.h>
 
 #include "drm.h"
-#include "ioctl_wrappers.h"
 #include "drmtest.h"
-#include "intel_io.h"
+#include "i915/gem.h"
 #include "igt_rand.h"
+#include "intel_io.h"
+#include "ioctl_wrappers.h"
 
 #define CLOSE_DEVICE 0x1
 

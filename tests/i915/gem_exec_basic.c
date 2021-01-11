@@ -23,6 +23,8 @@
 
 #include "igt.h"
 
+#include "i915/gem.h"
+
 IGT_TEST_DESCRIPTION("Basic sanity check of execbuf-ioctl rings.");
 
 static uint32_t batch_create(int fd)

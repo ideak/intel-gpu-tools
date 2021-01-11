@@ -40,7 +40,9 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
+
 #include "drm.h"
+#include "i915/gem.h"
 
 IGT_TEST_DESCRIPTION("Check whether gtt tlbs for cpu access are correctly"
 		     " invalidated.");

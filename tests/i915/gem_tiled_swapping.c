@@ -56,8 +56,8 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 
-#include <drm.h>
-
+#include "drm.h"
+#include "i915/gem.h"
 
 IGT_TEST_DESCRIPTION("Exercise swizzle code for swapping.");
 

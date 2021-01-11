@@ -37,9 +37,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+
 #include "drm.h"
 #include "drm_fourcc.h"
-
+#include "i915/gem.h"
 #include "igt_device.h"
 
 IGT_TEST_DESCRIPTION("Tests GETFB and GETFB2 ioctls.");

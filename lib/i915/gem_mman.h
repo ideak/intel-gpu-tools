@@ -42,10 +42,6 @@ void *gem_mmap__device_coherent(int fd, uint32_t handle, uint64_t offset,
 void *gem_mmap__cpu_coherent(int fd, uint32_t handle, uint64_t offset,
 			     uint64_t size, unsigned prot);
 
-#ifndef I915_GEM_DOMAIN_WC
-#define I915_GEM_DOMAIN_WC 0x80
-#endif
-
 bool gem_has_mappable_ggtt(int i915);
 void gem_require_mappable_ggtt(int i915);
 bool gem_has_mmap_offset(int fd);

@@ -39,11 +39,12 @@
 #include <time.h>
 
 #include "drm.h"
-#include "ioctl_wrappers.h"
 #include "drmtest.h"
+#include "i915/gem.h"
 #include "intel_io.h"
 #include "intel_reg.h"
 #include "igt_stats.h"
+#include "ioctl_wrappers.h"
 
 enum mode { NOP, CREATE, SWITCH, DEFAULT };
 #define SYNC 0x1

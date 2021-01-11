@@ -37,6 +37,7 @@
 #include <signal.h>
 
 #include "drm.h"
+#include "i915/gem.h"
 
 IGT_TEST_DESCRIPTION("Checks that the kernel reports EFAULT when trying to use"
 		     " purged bo.");

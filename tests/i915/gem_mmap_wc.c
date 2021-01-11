@@ -36,7 +36,9 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+
 #include "drm.h"
+#include "i915/gem.h"
 
 struct local_i915_gem_mmap_v2 {
 	uint32_t handle;

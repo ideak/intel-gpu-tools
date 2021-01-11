@@ -42,7 +42,7 @@
 #include <sys/time.h>
 
 #include "drm.h"
-
+#include "i915/gem.h"
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_vgem.h"
