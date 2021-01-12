@@ -297,7 +297,7 @@ igt_main
 		run_test(fd, ALL_ENGINES, HIBERNATE);
 
 	for (m = modes; m->suffix; m++) {
-		igt_subtest_with_dynamic_f("uncached-%s", m->suffix) {
+		igt_subtest_with_dynamic_f("uncached%s", m->suffix) {
 			__for_each_physical_engine(fd, e) {
 				if (!gem_class_can_store_dword(fd, e->class))
 					continue;
@@ -306,7 +306,7 @@ igt_main
 			}
 		}
 
-		igt_subtest_with_dynamic_f("cached-%s", m->suffix) {
+		igt_subtest_with_dynamic_f("cached%s", m->suffix) {
 			__for_each_physical_engine(fd, e) {
 				if (!gem_class_can_store_dword(fd, e->class))
 					continue;
