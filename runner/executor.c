@@ -311,7 +311,7 @@ static char *handle_lockdep(void)
 static char *handle_taint(void)
 {
 	unsigned long taints, bad;
-	char *explain;
+	const char *explain;
 	char *reason;
 
 	bad = igt_kernel_tainted(&taints);
