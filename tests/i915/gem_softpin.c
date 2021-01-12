@@ -112,7 +112,7 @@ static uint32_t batch_create(int i915, uint64_t *sz)
 
 static void test_zero(int i915)
 {
-	uint64_t sz, gtt = gem_aperture_size(i915);
+	uint64_t sz = 4096, gtt = gem_aperture_size(i915);
 	struct drm_i915_gem_exec_object2 object = {
 		.handle = batch_create(i915, &sz),
 		.flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS,
@@ -154,7 +154,7 @@ static void test_zero(int i915)
 
 static void test_32b_last_page(int i915)
 {
-	uint64_t sz, gtt = gem_aperture_size(i915);
+	uint64_t sz = 4096, gtt = gem_aperture_size(i915);
 	struct drm_i915_gem_exec_object2 object = {
 		.flags = EXEC_OBJECT_PINNED,
 	};
@@ -187,7 +187,7 @@ static void test_32b_last_page(int i915)
 
 static void test_full(int i915)
 {
-	uint64_t sz, gtt = gem_aperture_size(i915);
+	uint64_t sz = 4096, gtt = gem_aperture_size(i915);
 	struct drm_i915_gem_exec_object2 obj[2] = {
 		/* Use two objects so we can test .pad_to_size works */
 		{
