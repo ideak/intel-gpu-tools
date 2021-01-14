@@ -81,13 +81,7 @@ static void fork_rcs_copy(int timeout, uint32_t final,
 #define CREATE_CONTEXT 0x1
 {
 	igt_render_copyfunc_t render_copy;
-	uint64_t mem_per_child;
 	int devid;
-
-	mem_per_child = SIZE;
-	if (flags & CREATE_CONTEXT)
-		mem_per_child += 2 * 128 * 1024; /* rough context sizes */
-	intel_require_memory(count, mem_per_child, CHECK_RAM);
 
 	for (int child = 0; child < count; child++) {
 		int fd = drm_open_driver(DRIVER_INTEL);
@@ -267,9 +261,10 @@ static bool has_contexts(void)
 	return result;
 }
 
-#define N_CHILD 8
 igt_main
 {
+	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+
 	igt_fixture {
 		int fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
@@ -278,35 +273,54 @@ igt_main
 	}
 
 	igt_subtest("blt-vs-render-ctx0") {
-		struct intel_buf *bcs[1], *rcs[N_CHILD];
+		struct intel_buf *bcs[1], **rcs;
+		int nchild = ncpus + 1;
+		uint64_t mem_per_test;
+
+		mem_per_test = SIZE;
+		intel_require_memory(nchild + 1, mem_per_test, CHECK_RAM);
+
+		rcs = calloc(sizeof(*rcs), nchild);
+		igt_assert(rcs);
 
 		fork_bcs_copy(30, 0x4000, bcs, 1);
-		fork_rcs_copy(30, 0x8000 / N_CHILD, rcs, N_CHILD, 0);
+		fork_rcs_copy(30, 0x8000 / nchild, rcs, nchild, 0);
 
 		igt_waitchildren();
 
 		surfaces_check(bcs, 1, 0x4000);
-		surfaces_check(rcs, N_CHILD, 0x8000 / N_CHILD);
+		surfaces_check(rcs, nchild, 0x8000 / nchild);
 
 		cleanup_bufs(bcs, 1);
-		cleanup_bufs(rcs, N_CHILD);
+		cleanup_bufs(rcs, nchild);
+		free(rcs);
 	}
 
 	igt_subtest("blt-vs-render-ctxN") {
-		struct intel_buf *bcs[1], *rcs[N_CHILD];
+		struct intel_buf *bcs[1], **rcs;
+		uint64_t mem_per_ctx = 2 * 128 * 1024; /* rough context sizes */
+		uint64_t mem_per_test;
+		int nchild = ncpus + 1;
 
 		igt_require(has_contexts());
 
-		fork_rcs_copy(30, 0x8000 / N_CHILD, rcs, N_CHILD, CREATE_CONTEXT);
+		mem_per_test = SIZE + mem_per_ctx;
+		intel_require_memory(1 + nchild, mem_per_test, CHECK_RAM);
+
+		rcs = calloc(sizeof(*rcs), nchild);
+		igt_assert(rcs);
+
+		fork_rcs_copy(30, 0x8000 / nchild, rcs, nchild, CREATE_CONTEXT);
 		fork_bcs_copy(30, 0x4000, bcs, 1);
 
 		igt_waitchildren();
 
 		surfaces_check(bcs, 1, 0x4000);
-		surfaces_check(rcs, N_CHILD, 0x8000 / N_CHILD);
+		surfaces_check(rcs, nchild, 0x8000 / nchild);
 
 		cleanup_bufs(bcs, 1);
-		cleanup_bufs(rcs, N_CHILD);
+		cleanup_bufs(rcs, nchild);
+		free(rcs);
 	}
 
 	igt_subtest("flink-and-close-vma-leak")
