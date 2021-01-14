@@ -290,6 +290,8 @@ static void test_softpin(int fd)
 		count++;
 	}
 	igt_info("Completed %lu cycles\n", count);
+
+	gem_close(fd, last_handle);
 }
 
 static void invalid_execbuf(int i915, struct drm_i915_gem_execbuffer2 *execbuf)
