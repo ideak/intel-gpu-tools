@@ -28,6 +28,7 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+#include "intel_allocator.h"
 
 #define EXEC_OBJECT_PINNED	(1<<4)
 #define EXEC_OBJECT_SUPPORTS_48B_ADDRESS (1<<3)
@@ -697,6 +698,184 @@ static void test_noreloc(int fd, enum sleep sleep, unsigned flags)
 		gem_close(fd, object[i].handle);
 }
 
+static void __reserve(uint64_t ahnd, int i915, bool pinned,
+		      struct drm_i915_gem_exec_object2 *objects,
+		      int num_obj, uint64_t size)
+{
+	uint64_t gtt = gem_aperture_size(i915);
+	unsigned int flags;
+	int i;
+
+	igt_assert(num_obj > 1);
+
+	flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+	if (pinned)
+		flags |= EXEC_OBJECT_PINNED;
+
+	memset(objects, 0, sizeof(objects) * num_obj);
+
+	for (i = 0; i < num_obj; i++) {
+		objects[i].handle = gem_create(i915, size);
+		if (i < num_obj/2)
+			objects[i].offset = i * size;
+		else
+			objects[i].offset = gtt - (i + 1 - num_obj/2) * size;
+		objects[i].flags = flags;
+
+		intel_allocator_reserve(ahnd, objects[i].handle,
+					size, objects[i].offset);
+		igt_debug("Reserve i: %d, handle: %u, offset: %llx\n", i,
+			  objects[i].handle, (long long) objects[i].offset);
+	}
+}
+
+static void __unreserve(uint64_t ahnd, int i915,
+			struct drm_i915_gem_exec_object2 *objects,
+			int num_obj, uint64_t size)
+{
+	int i;
+
+	for (i = 0; i < num_obj; i++) {
+		intel_allocator_unreserve(ahnd, objects[i].handle,
+					  size, objects[i].offset);
+		igt_debug("Unreserve i: %d, handle: %u, offset: %llx\n", i,
+			  objects[i].handle, (long long) objects[i].offset);
+		gem_close(i915, objects[i].handle);
+	}
+}
+
+static void __exec_using_allocator(uint64_t ahnd, int i915, int num_obj,
+				   bool pinned)
+{
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 object[num_obj];
+	uint64_t stored_offsets[num_obj];
+	unsigned int flags;
+	uint64_t sz = 4096;
+	int i;
+
+	igt_assert(num_obj > 10);
+
+	flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+	if (pinned)
+		flags |= EXEC_OBJECT_PINNED;
+
+	memset(object, 0, sizeof(object));
+
+	for (i = 0; i < num_obj; i++) {
+		sz = (rand() % 15 + 1) * 4096;
+		if (i == num_obj - 1)
+			sz = 4096;
+		object[i].handle = gem_create(i915, sz);
+		object[i].offset =
+			intel_allocator_alloc(ahnd, object[i].handle, sz, 0);
+	}
+	gem_write(i915, object[--i].handle, 0, &bbe, sizeof(bbe));
+
+	for (i = 0; i < num_obj; i++) {
+		object[i].flags = flags;
+		object[i].offset = gen8_canonical_addr(object[i].offset);
+		stored_offsets[i] = object[i].offset;
+	}
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(object);
+	execbuf.buffer_count = num_obj;
+	gem_execbuf(i915, &execbuf);
+
+	for (i = 0; i < num_obj; i++) {
+		igt_assert(intel_allocator_free(ahnd, object[i].handle));
+		gem_close(i915, object[i].handle);
+	}
+
+	/* Check kernel will keep offsets even if pinned is not set. */
+	for (i = 0; i < num_obj; i++)
+		igt_assert_eq_u64(stored_offsets[i], object[i].offset);
+}
+
+static void test_allocator_basic(int fd, bool reserve)
+{
+	const int num_obj = 257, num_reserved = 8;
+	struct drm_i915_gem_exec_object2 objects[num_reserved];
+	uint64_t ahnd, ressize = 4096;
+
+	/*
+	 * Check that we can place objects at start/end
+	 * of the GTT using the allocator.
+	 */
+	ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
+
+	if (reserve)
+		__reserve(ahnd, fd, true, objects, num_reserved, ressize);
+	__exec_using_allocator(ahnd, fd, num_obj, true);
+	if (reserve)
+		__unreserve(ahnd, fd, objects, num_reserved, ressize);
+	igt_assert(intel_allocator_close(ahnd) == true);
+}
+
+static void test_allocator_nopin(int fd, bool reserve)
+{
+	const int num_obj = 257, num_reserved = 8;
+	struct drm_i915_gem_exec_object2 objects[num_reserved];
+	uint64_t ahnd, ressize = 4096;
+
+	/*
+	 * Check that we can combine manual placement with automatic
+	 * GTT placement.
+	 *
+	 * This will also check that we agree with this small sampling of
+	 * allocator placements -- that is the given the same restrictions
+	 * in execobj[] the kernel does not reject the placement due
+	 * to overlaps or invalid addresses.
+	 */
+	ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
+
+	if (reserve)
+		__reserve(ahnd, fd, false, objects, num_reserved, ressize);
+
+	__exec_using_allocator(ahnd, fd, num_obj, false);
+
+	if (reserve)
+		__unreserve(ahnd, fd, objects, num_reserved, ressize);
+
+	igt_assert(intel_allocator_close(ahnd) == true);
+}
+
+static void test_allocator_fork(int fd)
+{
+	const int num_obj = 17, num_reserved = 8;
+	struct drm_i915_gem_exec_object2 objects[num_reserved];
+	uint64_t ahnd, ressize = 4096;
+
+	/*
+	 * Must be called before opening allocator in multiprocess environment
+	 * due to freeing previous allocator infrastructure and proper setup
+	 * of data structures and allocation thread.
+	 */
+	intel_allocator_multiprocess_start();
+
+	ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
+	__reserve(ahnd, fd, true, objects, num_reserved, ressize);
+
+	igt_fork(child, 8) {
+		ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
+		igt_until_timeout(2)
+			__exec_using_allocator(ahnd, fd, num_obj, true);
+		intel_allocator_close(ahnd);
+	}
+
+	igt_waitchildren();
+
+	__unreserve(ahnd, fd, objects, num_reserved, ressize);
+	igt_assert(intel_allocator_close(ahnd) == true);
+
+	ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
+	igt_assert(intel_allocator_close(ahnd) == true);
+
+	intel_allocator_multiprocess_stop();
+}
+
 igt_main
 {
 	int fd = -1;
@@ -727,6 +906,21 @@ igt_main
 
 		igt_subtest("full")
 			test_full(fd);
+
+		igt_subtest("allocator-basic")
+			test_allocator_basic(fd, false);
+
+		igt_subtest("allocator-basic-reserve")
+			test_allocator_basic(fd, true);
+
+		igt_subtest("allocator-nopin")
+			test_allocator_nopin(fd, false);
+
+		igt_subtest("allocator-nopin-reserve")
+			test_allocator_nopin(fd, true);
+
+		igt_subtest("allocator-fork")
+			test_allocator_fork(fd);
 	}
 
 	igt_subtest("softpin")
