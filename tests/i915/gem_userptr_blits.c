@@ -2185,6 +2185,40 @@ static void test_invalidate_close_race(int fd, bool overlap, int timeout)
 	free(t_data.ptr);
 }
 
+static void test_sd_probe(int i915)
+{
+	const int domains[] = {
+		I915_GEM_DOMAIN_CPU,
+		I915_GEM_DOMAIN_GTT,
+	};
+
+	/*
+	 * Quick and simple test to verify that GEM_SET_DOMAIN can
+	 * be used to probe the existence of the userptr, as used
+	 * by mesa and ddx.
+	 */
+
+	for (int idx = 0; idx < ARRAY_SIZE(domains); idx++) {
+		uint32_t handle;
+		void *page;
+
+		page = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+			    MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+
+		gem_userptr(i915, page, 4096, 0, 0, &handle);
+		igt_assert_eq(__gem_set_domain(i915, handle, domains[idx], 0),
+			      0);
+		gem_close(i915, handle);
+
+		munmap(page, 4096);
+
+		gem_userptr(i915, page, 4096, 0, 0, &handle);
+		igt_assert_eq(__gem_set_domain(i915, handle, domains[idx], 0),
+			      -EFAULT);
+		gem_close(i915, handle);
+	}
+}
+
 struct ufd_thread {
 	uint32_t *page;
 	int i915;
@@ -2378,6 +2412,9 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 
 		igt_subtest("forbidden-operations")
 			test_forbidden_ops(fd);
+
+		igt_subtest("sd-probe")
+			test_sd_probe(fd);
 
 		igt_subtest("userfault")
 			test_userfault(fd);
