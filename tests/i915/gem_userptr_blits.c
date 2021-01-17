@@ -2219,6 +2219,44 @@ static void test_sd_probe(int i915)
 	}
 }
 
+static void test_set_caching(int i915)
+{
+	const int levels[] = {
+		I915_CACHING_NONE,
+		I915_CACHING_CACHED,
+	};
+	uint32_t handle;
+	void *page;
+
+	page = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+		    MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+
+	/*
+	 * A userptr is regular GEM object, mapping system pages from the user
+	 * into the GPU. The GPU knows no difference in the pages, and may use
+	 * the regular PTE cache levels. As does mesa.
+	 *
+	 * We could try and detect the different effects of cache levels, but
+	 * for the moment trust that set-cache-level works and reduces the
+	 * problem to other tests.
+	 */
+
+	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++) {
+		gem_userptr(i915, page, 4096, 0, 0, &handle);
+		igt_assert_eq(__gem_set_caching(i915, handle, levels[idx]), 0);
+		gem_close(i915, handle);
+	}
+
+	gem_userptr(i915, page, 4096, 0, 0, &handle);
+	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++)
+		igt_assert_eq(__gem_set_caching(i915, handle, levels[idx]), 0);
+	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++)
+		igt_assert_eq(__gem_set_caching(i915, handle, levels[idx]), 0);
+	gem_close(i915, handle);
+
+	munmap(page, 4096);
+}
+
 struct ufd_thread {
 	uint32_t *page;
 	int i915;
@@ -2415,6 +2453,9 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 
 		igt_subtest("sd-probe")
 			test_sd_probe(fd);
+
+		igt_subtest("set-cache-level")
+			test_set_caching(fd);
 
 		igt_subtest("userfault")
 			test_userfault(fd);
