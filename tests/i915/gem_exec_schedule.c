@@ -1808,7 +1808,7 @@ static void deep(int fd, unsigned ring)
 		ctx[n] = gem_context_clone_with_engines(fd, 0);
 	}
 
-	nreq = gem_submission_measure(fd, ring) / (4 * XS) * MAX_CONTEXTS;
+	nreq = gem_submission_measure(fd, ring) / (3 * XS) * MAX_CONTEXTS;
 	if (nreq > max_req)
 		nreq = max_req;
 	igt_info("Using %d requests (prio range %d)\n", nreq, max_req);
