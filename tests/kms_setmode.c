@@ -255,7 +255,8 @@ static void get_crtc_config_str(struct crtc_config *crtc, char *buf,
 	}
 }
 
-static void setup_crtcs(drmModeRes *resources, struct connector_config *cconf,
+static void setup_crtcs(const struct test_config *tconf,
+			struct connector_config *cconf,
 			int connector_count, struct crtc_config *crtcs,
 			int *crtc_count_ret, bool *config_valid_ret)
 {
@@ -263,6 +264,7 @@ static void setup_crtcs(drmModeRes *resources, struct connector_config *cconf,
 	int crtc_count;
 	bool config_valid;
 	int i;
+	drmModeRes *resources = tconf->resources;
 	int encoder_usage_count[resources->count_encoders];
 
 	kmstest_unset_all_crtcs(drm_fd, resources);
@@ -351,7 +353,8 @@ static void setup_crtcs(drmModeRes *resources, struct connector_config *cconf,
 		drmModeFreeEncoder(encoder);
 	}
 	for (i = 0; i < resources->count_encoders; i++)
-		if (encoder_usage_count[i] > 1)
+		if (encoder_usage_count[i] > 1 &&
+				!!(tconf->flags & TEST_SINGLE_CRTC_CLONE))
 			config_valid = false;
 
 	*crtc_count_ret = crtc_count;
@@ -604,7 +607,7 @@ static void test_one_combination(const struct test_config *tconf,
 	int crtc_count;
 	bool config_valid;
 
-	setup_crtcs(tconf->resources, cconfs, connector_count, crtcs,
+	setup_crtcs(tconf, cconfs, connector_count, crtcs,
 		    &crtc_count, &config_valid);
 
 	if (config_valid == !(tconf->flags & TEST_INVALID))
