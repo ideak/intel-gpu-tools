@@ -909,6 +909,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		igt_require(data.display.is_atomic);
 	}
 
+	igt_describe("Rotation test with 90/270 degree for primary and sprite planes of gen9+");
 	for (subtest = subtests; subtest->rot; subtest++) {
 		igt_subtest_f("%s-rotation-%s",
 			      plane_test_str(subtest->plane),
@@ -921,6 +922,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Rotation test with 90 degree for a plane of gen9+ with given position");
 	igt_subtest_f("sprite-rotation-90-pos-100-0") {
 		igt_require(gen >= 9);
 		data.rotation = IGT_ROTATION_90;
@@ -931,6 +933,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	data.pos_x = 0,
 	data.pos_y = 0;
 
+	igt_describe("Checking unsupported pixel format for gen9+ with 90 degree of rotation");
 	igt_subtest_f("bad-pixel-format") {
 		 /* gen11 enables RGB565 rotation for 90/270 degrees.
 		  * so apart from this, any other gen11+ pixel format
@@ -943,6 +946,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	}
 	data.override_fmt = 0;
 
+	igt_describe("Checking unsupported tiling for gen9+ with 90 degree of rotation");
 	igt_subtest_f("bad-tiling") {
 		igt_require(gen >= 9);
 		data.rotation = IGT_ROTATION_90;
@@ -951,6 +955,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	}
 	data.override_tiling = 0;
 
+	igt_describe("Tiling and Rotation test for gen 10+ for primary plane");
 	for (reflect_x = reflect_x_subtests; reflect_x->tiling; reflect_x++) {
 		igt_subtest_f("primary-%s-reflect-x-%s",
 			      tiling_test_str(reflect_x->tiling),
@@ -964,6 +969,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Rotation test on both planes by making them fully visible");
 	igt_subtest_f("multiplane-rotation") {
 		igt_require(gen >= 9);
 		cleanup_crtc(&data);
@@ -976,6 +982,8 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		test_multi_plane_rotation(&data, 0);
 	}
 
+	igt_describe("Rotation test on both planes by cropping left/top corner of primary plane and"
+			"right/top corner of sprite plane");
 	igt_subtest_f("multiplane-rotation-cropping-top") {
 		igt_require(gen >= 9);
 		cleanup_crtc(&data);
@@ -988,6 +996,8 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		test_multi_plane_rotation(&data, 0);
 	}
 
+	igt_describe("Rotation test on both planes by cropping left/bottom corner of primary plane"
+			"and right/bottom corner of sprite plane");
 	igt_subtest_f("multiplane-rotation-cropping-bottom") {
 		igt_require(gen >= 9);
 		cleanup_crtc(&data);
@@ -1004,6 +1014,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	 * exhaust-fences should be last test, if it fails we may OOM in
 	 * the following subtests otherwise.
 	 */
+	igt_describe("This test intends to check for fence leaks exhaustively");
 	igt_subtest_f("exhaust-fences") {
 		enum pipe pipe;
 		igt_output_t *output;
