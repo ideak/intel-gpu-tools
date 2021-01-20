@@ -90,6 +90,17 @@ static void invalid_size_test(int fd)
 	igt_assert_eq(create.handle, 0);
 }
 
+static void massive_test(int fd)
+{
+	struct drm_i915_gem_create create = {};
+
+	/* No system has this much memory... Yet small enough not to wrap */
+	create.size = -1ull << 32;
+	igt_assert_eq(create_ioctl(fd, &create), -E2BIG);
+
+	igt_assert_eq(create.handle, 0);
+}
+
 /*
  * Creating an object with non-aligned size request and assert the buffer is
  * page aligned. And test the write into the padded extra memory.
@@ -288,6 +299,9 @@ igt_main
 
 	igt_subtest("create-invalid-size")
 		invalid_size_test(fd);
+
+	igt_subtest("create-massive")
+		massive_test(fd);
 
 	igt_subtest("create-valid-nonaligned")
 		valid_nonaligned_size(fd);
