@@ -360,6 +360,60 @@ static int cmp_u32(const void *A, const void *B)
 		return 0;
 }
 
+static uint32_t
+read_ctx_timestamp(int i915, const struct intel_execution_engine2 *e)
+{
+	struct drm_i915_gem_relocation_entry reloc;
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(i915, 4096),
+		.offset = 32 << 20,
+		.relocs_ptr = to_user_pointer(&reloc),
+		.relocation_count = 1,
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+		.flags = e->flags,
+	};
+	const int use_64b = intel_gen(intel_get_drm_devid(i915)) >= 8;
+	const uint32_t base = gem_engine_mmio_base(i915, e->name);
+	const uint32_t runtime = base + (use_64b ? 0x3a8 : 0x358);
+	uint32_t *map, *cs;
+	uint32_t ts;
+
+	cs = map = gem_mmap__device_coherent(i915, obj.handle,
+					     0, 4096, PROT_WRITE);
+
+	*cs++ = 0x24 << 23 | (1 + use_64b); /* SRM */
+	*cs++ = runtime;
+
+	memset(&reloc, 0, sizeof(reloc));
+	reloc.target_handle = obj.handle;
+	reloc.presumed_offset = obj.offset;
+	reloc.offset = offset_in_page(cs);
+	reloc.delta = 4000;
+	*cs++ = obj.offset + 4000;
+	*cs++ = obj.offset >> 32;
+
+	*cs++ = MI_BATCH_BUFFER_END;
+
+	gem_execbuf(i915, &execbuf);
+	gem_sync(i915, obj.handle);
+	ts = map[1000];
+
+	if (!ts) {
+		/* Twice for good luck (and avoid chance 0) */
+		gem_execbuf(i915, &execbuf);
+		gem_sync(i915, obj.handle);
+		ts = map[1000];
+	}
+
+	gem_close(i915, obj.handle);
+	munmap(map, 4096);
+
+	return ts;
+}
+
 static bool has_ctx_timestamp(int i915, const struct intel_execution_engine2 *e)
 {
 	const int gen = intel_gen(intel_get_drm_devid(i915));
@@ -367,7 +421,7 @@ static bool has_ctx_timestamp(int i915, const struct intel_execution_engine2 *e)
 	if (gen == 8 && e->class == I915_ENGINE_CLASS_VIDEO)
 		return false; /* looks fubar */
 
-	return true;
+	return read_ctx_timestamp(i915, e);
 }
 
 static struct intel_execution_engine2
@@ -999,7 +1053,9 @@ static void deadline(int i915, int duration, unsigned int flags)
 	igt_require(has_syncobj(i915));
 	igt_require(has_fence_array(i915));
 	igt_require(has_mi_math(i915, &pe));
+	igt_require(has_ctx_timestamp(i915, &pe));
 	igt_require(has_mi_math(i915, &ve));
+	igt_require(has_ctx_timestamp(i915, &ve));
 	igt_assert(obj && fences);
 	if (flags & DL_PRIO)
 		igt_require(gem_scheduler_has_preemption(i915));
