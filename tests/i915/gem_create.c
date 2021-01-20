@@ -79,11 +79,15 @@ static int create_ioctl(int fd, struct drm_i915_gem_create *create)
 
 static void invalid_size_test(int fd)
 {
-	struct drm_i915_gem_create create = {
-		.size = 0,
-	};
+	struct drm_i915_gem_create create = {};
 
+	create.size = 0; /* zero-sized objects are not allowed */
 	igt_assert_eq(create_ioctl(fd, &create), -EINVAL);
+
+	create.size = -1ull; /* will wrap to 0 on aligning to page */
+	igt_assert_eq(create_ioctl(fd, &create), -EINVAL);
+
+	igt_assert_eq(create.handle, 0);
 }
 
 /*
