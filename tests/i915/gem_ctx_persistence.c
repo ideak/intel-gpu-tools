@@ -1065,6 +1065,50 @@ static void smoketest(int i915)
 	gem_quiescent_gpu(i915);
 }
 
+static void many_contexts(int i915)
+{
+	const struct intel_execution_engine2 *e;
+	int64_t timeout = NSEC_PER_SEC;
+	igt_spin_t *spin;
+
+	cleanup(i915);
+
+	/*
+	 * Perform many peristent kills from the same client. These should not
+	 * cause the client to be banned, which in turn prevents us from
+	 * creating new contexts, and submitting new execbuf.
+	 */
+
+	spin = igt_spin_new(i915, .flags = IGT_SPIN_NO_PREEMPTION);
+	igt_spin_end(spin);
+
+	igt_until_timeout(30) {
+		__for_each_physical_engine(i915, e) {
+			uint32_t ctx;
+
+			ctx = gem_context_clone_with_engines(i915, 0);
+			gem_context_set_persistence(i915, ctx, false);
+
+			igt_spin_reset(spin);
+			spin->execbuf.rsvd1 = ctx;
+			spin->execbuf.flags &= ~63;
+			spin->execbuf.flags |= e->flags;
+			gem_execbuf(i915, &spin->execbuf);
+			gem_context_destroy(i915, ctx);
+		}
+	}
+	igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
+
+	/* And check we can still submit to the default context -- no bans! */
+	igt_spin_reset(spin);
+	spin->execbuf.rsvd1 = 0;
+	spin->execbuf.flags &= ~63;
+	gem_execbuf(i915, &spin->execbuf);
+
+	igt_spin_free(i915, spin);
+	gem_quiescent_gpu(i915);
+}
+
 static void replace_engines(int i915, const struct intel_execution_engine2 *e)
 {
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 1) = {
@@ -1397,6 +1441,9 @@ igt_main
 					test_saturated_hostile(i915, e);
 			}
 		}
+
+		igt_subtest("many-contexts")
+			many_contexts(i915);
 
 		igt_subtest("smoketest")
 			smoketest(i915);
