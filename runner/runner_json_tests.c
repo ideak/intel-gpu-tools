@@ -166,6 +166,7 @@ static const char *dirnames[] = {
 	"dynamic-subtest-name-in-multiple-subtests",
 	"unprintable-characters",
 	"empty-result-files",
+	"graceful-notrun",
 };
 
 igt_main
