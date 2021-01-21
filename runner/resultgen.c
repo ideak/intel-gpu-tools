@@ -17,11 +17,13 @@
 #include "executor.h"
 #include "output_strings.h"
 
-#define INCOMPLETE_EXITCODE -1
+#define INCOMPLETE_EXITCODE -1234
+#define GRACEFUL_EXITCODE -SIGHUP
 
 _Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_SKIP, "exit code clash");
 _Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_SUCCESS, "exit code clash");
 _Static_assert(INCOMPLETE_EXITCODE != IGT_EXIT_INVALID, "exit code clash");
+_Static_assert(INCOMPLETE_EXITCODE != GRACEFUL_EXITCODE, "exit code clash");
 
 struct subtest
 {
@@ -1106,6 +1108,8 @@ static const char *result_from_exitcode(int exitcode)
 		return "abort";
 	case INCOMPLETE_EXITCODE:
 		return "incomplete";
+	case GRACEFUL_EXITCODE:
+		return "notrun";
 	default:
 		return "fail";
 	}
@@ -1180,7 +1184,7 @@ static void fill_from_journal(int fd,
 		}
 	}
 
-	if (subtests->size && exitcode == IGT_EXIT_ABORT) {
+	if (subtests->size && (exitcode == IGT_EXIT_ABORT || exitcode == GRACEFUL_EXITCODE)) {
 		char *last_subtest = subtests->subs[subtests->size - 1].name;
 		char subtest_piglit_name[256];
 		struct json_object *subtest_obj;
@@ -1188,7 +1192,7 @@ static void fill_from_journal(int fd,
 		generate_piglit_name(entry->binary, last_subtest, subtest_piglit_name, sizeof(subtest_piglit_name));
 		subtest_obj = get_or_create_json_object(tests, subtest_piglit_name);
 
-		set_result(subtest_obj, "abort");
+		set_result(subtest_obj, exitcode == IGT_EXIT_ABORT ? "abort" : "notrun");
 	}
 
 	if (subtests->size == 0) {
