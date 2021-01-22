@@ -22,6 +22,7 @@
  */
 
 #include <errno.h>
+#include <stddef.h>
 #include <string.h>
 
 #include "ioctl_wrappers.h"
@@ -324,6 +325,15 @@ void gem_context_set_persistence(int i915, uint32_t ctx, bool state)
 	igt_assert_eq(__gem_context_set_persistence(i915, ctx, state), 0);
 }
 
+bool gem_context_has_persistence(int i915)
+{
+	struct drm_i915_gem_context_param param = {
+		.param = I915_CONTEXT_PARAM_PERSISTENCE,
+	};
+
+	return __gem_context_get_param(i915, &param) == 0;
+}
+
 int
 __gem_context_clone(int i915,
 		    uint32_t src, unsigned int share,
@@ -522,4 +532,56 @@ uint32_t gem_context_create_for_engine(int i915, unsigned int class, unsigned in
 	igt_assert_eq(create_ext_ioctl(i915, &create), 0);
 	igt_assert_neq(create.ctx_id, 0);
 	return create.ctx_id;
+}
+
+static size_t sizeof_param_engines(int count)
+{
+	return offsetof(struct i915_context_param_engines, engines[count]);
+}
+
+uint32_t gem_context_create_for_class(int i915,
+				      unsigned int class,
+				      unsigned int *count)
+{
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, I915_EXEC_RING_MASK + 1);
+	struct drm_i915_gem_context_param p = {
+		.ctx_id = gem_context_create(i915),
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.value = to_user_pointer(&engines)
+	};
+	int i;
+
+	memset(&engines, 0, sizeof(engines));
+	for (i = 0; i < I915_EXEC_RING_MASK + 1; i++) {
+		engines.engines[i].engine_class = class;
+		engines.engines[i].engine_instance = i;
+		p.size = sizeof_param_engines(i + 1);
+		if (__gem_context_set_param(i915, &p))
+			break;
+	}
+	if (i == 0) {
+		gem_context_destroy(i915, p.ctx_id);
+		return 0;
+	}
+	if (i > 1) {
+		I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(balancer, i);
+
+		memset(&balancer, 0, sizeof(balancer));
+		balancer.base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
+		balancer.num_siblings = i;
+		memcpy(balancer.engines,
+		       engines.engines,
+		       i * sizeof(*engines.engines));
+
+		engines.extensions = to_user_pointer(&balancer);
+		engines.engines[0].engine_class = I915_ENGINE_CLASS_INVALID;
+		engines.engines[0].engine_instance = I915_ENGINE_CLASS_INVALID_NONE;
+
+		p.size = sizeof_param_engines(1);
+		p.value = to_user_pointer(&engines);
+		gem_context_set_param(i915, &p);
+	}
+
+	*count = i;
+	return p.ctx_id;
 }

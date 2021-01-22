@@ -114,6 +114,9 @@ TESTS_progs = \
 TESTS_progs += api_intel_bb
 api_intel_bb_SOURCES = i915/api_intel_bb.c
 
+TESTS_progs += sysfs_clients
+sysfs_clients_SOURCES = i915/sysfs_clients.c
+
 TESTS_progs += sysfs_defaults
 sysfs_defaults_SOURCES = i915/sysfs_defaults.c
 

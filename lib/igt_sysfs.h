@@ -47,6 +47,9 @@ int igt_sysfs_printf(int dir, const char *attr, const char *fmt, ...)
 uint32_t igt_sysfs_get_u32(int dir, const char *attr);
 bool igt_sysfs_set_u32(int dir, const char *attr, uint32_t value);
 
+uint64_t igt_sysfs_get_u64(int dir, const char *attr);
+bool igt_sysfs_set_u64(int dir, const char *attr, uint64_t value);
+
 bool igt_sysfs_get_boolean(int dir, const char *attr);
 bool igt_sysfs_set_boolean(int dir, const char *attr, bool value);
 

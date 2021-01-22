@@ -35,6 +35,7 @@ void gem_context_destroy(int fd, uint32_t ctx_id);
 int __gem_context_destroy(int fd, uint32_t ctx_id);
 
 uint32_t gem_context_create_for_engine(int fd, unsigned int class, unsigned int inst);
+uint32_t gem_context_create_for_class(int i915, unsigned int class, unsigned int *count);
 
 int __gem_context_clone(int i915,
 			uint32_t src, unsigned int share,
@@ -68,6 +69,7 @@ int __gem_context_get_param(int fd, struct drm_i915_gem_context_param *p);
 int __gem_context_set_priority(int fd, uint32_t ctx, int prio);
 void gem_context_set_priority(int fd, uint32_t ctx, int prio);
 
+bool gem_context_has_persistence(int i915);
 int __gem_context_set_persistence(int i915, uint32_t ctx, bool state);
 void gem_context_set_persistence(int i915, uint32_t ctx, bool state);
 
