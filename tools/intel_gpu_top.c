@@ -1,5 +1,5 @@
 /*
- * Copyright © 2007-2019 Intel Corporation
+ * Copyright © 2007-2021 Intel Corporation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -45,6 +45,8 @@
 #include <termios.h>
 
 #include "igt_perf.h"
+
+#define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 
 struct pmu_pair {
 	uint64_t cur;
@@ -625,25 +627,484 @@ static void pmu_sample(struct engines *engines)
 	}
 }
 
-static const char *bars[] = { " ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█" };
+enum client_status {
+	FREE = 0, /* mbz */
+	ALIVE,
+	PROBE
+};
+
+struct clients;
+
+struct client {
+	struct clients *clients;
+
+	enum client_status status;
+	int sysfs_root;
+	int busy_root;
+	unsigned int id;
+	unsigned int pid;
+	char name[24];
+	char print_name[24];
+	unsigned int samples;
+	unsigned long total_runtime;
+	unsigned long last_runtime;
+	struct engines *engines;
+	unsigned long *val;
+	uint64_t *last;
+};
+
+struct clients {
+	unsigned int num_clients;
+	unsigned int active_clients;
+
+	unsigned int num_classes;
+	struct engine_class *class;
+
+	char sysfs_root[128];
+
+	struct client *client;
+};
+
+#define for_each_client(clients, c, tmp) \
+	for ((tmp) = (clients)->num_clients, c = (clients)->client; \
+	     (tmp > 0); (tmp)--, (c)++)
+
+static struct clients *init_clients(const char *drm_card)
+{
+	struct clients *clients = malloc(sizeof(*clients));
+	const char *slash;
+	ssize_t ret;
+
+	memset(clients, 0, sizeof(*clients));
+
+	if (drm_card) {
+		slash = rindex(drm_card, '/');
+		assert(slash);
+	} else {
+		slash = "card0";
+	}
+
+	ret = snprintf(clients->sysfs_root, sizeof(clients->sysfs_root),
+		       "/sys/class/drm/%s/clients/", slash);
+	assert(ret > 0 && ret < sizeof(clients->sysfs_root));
+
+	return clients;
+}
+
+static int __read_to_buf(int fd, char *buf, unsigned int bufsize)
+{
+	ssize_t ret;
+	int err;
+
+	ret = read(fd, buf, bufsize - 1);
+	err = errno;
+	if (ret < 1) {
+		errno = ret < 0 ? err : ENOMSG;
+
+		return -1;
+	}
+
+	if (ret > 1 && buf[ret - 1] == '\n')
+		buf[ret - 1] = '\0';
+	else
+		buf[ret] = '\0';
+
+	return 0;
+}
+
+static int
+__read_client_field(int root, const char *field, char *buf, unsigned int bufsize)
+{
+	int fd, ret;
+
+	fd = openat(root, field, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	ret = __read_to_buf(fd, buf, bufsize);
+
+	close(fd);
+
+	return ret;
+}
+
+static uint64_t
+read_client_busy(struct client *client, unsigned int class)
+{
+	const char *class_str[] = { "0", "1", "2", "3", "4", "5", "6", "7" };
+	char buf[256], *b;
+	int ret;
+
+	assert(class < ARRAY_SIZE(class_str));
+	if (class >= ARRAY_SIZE(class_str))
+		return 0;
+
+	assert(client->sysfs_root >= 0);
+	if (client->sysfs_root < 0)
+		return 0;
+
+	if (client->busy_root < 0)
+		client->busy_root = openat(client->sysfs_root, "busy",
+					   O_RDONLY | O_DIRECTORY);
+
+	assert(client->busy_root);
+	if (client->busy_root < 0)
+		return 0;
+
+	ret = __read_client_field(client->busy_root, class_str[class], buf,
+				  sizeof(buf));
+	if (ret) {
+		close(client->busy_root);
+		client->busy_root = -1;
+		return 0;
+	}
+
+	/*
+	 * Handle both single integer and key=value formats by skipping
+	 * leading non-digits.
+	 */
+	b = buf;
+	while (*b && !isdigit(*b))
+		b++;
+
+	return strtoull(b, NULL, 10);
+}
+
+static struct client *
+find_client(struct clients *clients, enum client_status status, unsigned int id)
+{
+	unsigned int start, num;
+	struct client *c;
+
+	start = status == FREE ? clients->active_clients : 0; /* Free block at the end. */
+	num = clients->num_clients - start;
+
+	for (c = &clients->client[start]; num; c++, num--) {
+		if (status != c->status)
+			continue;
+
+		if (status == FREE || c->id == id)
+			return c;
+	}
+
+	return NULL;
+}
+
+static void update_client(struct client *c, unsigned int pid, char *name)
+{
+	uint64_t val[c->clients->num_classes];
+	unsigned int i;
+
+	if (c->pid != pid)
+		c->pid = pid;
+
+	if (strcmp(c->name, name)) {
+		char *p;
+
+		strncpy(c->name, name, sizeof(c->name) - 1);
+		strncpy(c->print_name, name, sizeof(c->print_name) - 1);
+
+		p = c->print_name;
+		while (*p) {
+			if (!isprint(*p))
+				*p = '*';
+			p++;
+		}
+	}
+
+	for (i = 0; i < c->clients->num_classes; i++)
+		val[i] = read_client_busy(c, c->clients->class[i].class);
+
+	c->last_runtime = 0;
+	c->total_runtime = 0;
+
+	for (i = 0; i < c->clients->num_classes; i++) {
+		if (val[i] < c->last[i])
+			continue; /* It will catch up soon. */
+
+		c->total_runtime += val[i];
+		c->val[i] = val[i] - c->last[i];
+		c->last_runtime += c->val[i];
+		c->last[i] = val[i];
+	}
+
+	c->samples++;
+	c->status = ALIVE;
+}
 
 static void
-print_percentage_bar(double percent, int max_len)
+add_client(struct clients *clients, unsigned int id, unsigned int pid,
+	   char *name, int sysfs_root)
 {
-	int bar_len = percent * (8 * (max_len - 2)) / 100.0;
-	int i;
+	struct client *c;
+
+	assert(!find_client(clients, ALIVE, id));
+
+	c = find_client(clients, FREE, 0);
+	if (!c) {
+		unsigned int idx = clients->num_clients;
+
+		clients->num_clients += (clients->num_clients + 2) / 2;
+		clients->client = realloc(clients->client,
+					  clients->num_clients * sizeof(*c));
+		assert(clients->client);
+
+		c = &clients->client[idx];
+		memset(c, 0, (clients->num_clients - idx) * sizeof(*c));
+	}
+
+	c->sysfs_root = sysfs_root;
+	c->busy_root = -1;
+	c->id = id;
+	c->clients = clients;
+	c->val = calloc(clients->num_classes, sizeof(c->val));
+	c->last = calloc(clients->num_classes, sizeof(c->last));
+	assert(c->val && c->last);
+
+	update_client(c, pid, name);
+}
+
+static void free_client(struct client *c)
+{
+	if (c->sysfs_root >= 0)
+		close(c->sysfs_root);
+	if (c->busy_root >= 0)
+		close(c->busy_root);
+	free(c->val);
+	free(c->last);
+	memset(c, 0, sizeof(*c));
+}
+
+static int
+read_client_sysfs(char *buf, int bufsize, const char *sysfs_root,
+		  unsigned int id, const char *field, int *client_root)
+{
+	ssize_t ret;
+
+	if (*client_root < 0) {
+		char namebuf[256];
+
+		ret = snprintf(namebuf, sizeof(namebuf), "%s/%u",
+			       sysfs_root, id);
+		assert(ret > 0 && ret < sizeof(namebuf));
+		if (ret <= 0 || ret == sizeof(namebuf))
+			return -1;
+
+		*client_root = open(namebuf, O_RDONLY | O_DIRECTORY);
+	}
+
+	if (*client_root < 0)
+		return -1;
+
+	return __read_client_field(*client_root, field, buf, bufsize);
+}
+
+static void scan_clients(struct clients *clients)
+{
+	struct dirent *dent;
+	struct client *c;
+	unsigned int id;
+	int tmp;
+	DIR *d;
+
+	if (!clients)
+		return;
+
+	for_each_client(clients, c, tmp) {
+		assert(c->status != PROBE);
+		if (c->status == ALIVE)
+			c->status = PROBE;
+		else
+			break; /* Free block at the end of array. */
+	}
+
+	d = opendir(clients->sysfs_root);
+	if (!d)
+		return;
+
+	while ((dent = readdir(d)) != NULL) {
+		char name[24], pid[24];
+		int ret, root = -1, *pr;
+
+		if (dent->d_type != DT_DIR)
+			continue;
+		if (!isdigit(dent->d_name[0]))
+			continue;
+
+		id = atoi(dent->d_name);
+
+		c = find_client(clients, PROBE, id);
+
+		if (c)
+			pr = &c->sysfs_root;
+		else
+			pr = &root;
+
+		ret = read_client_sysfs(name, sizeof(name), clients->sysfs_root,
+					id, "name", pr);
+		ret |= read_client_sysfs(pid, sizeof(pid), clients->sysfs_root,
+					id, "pid", pr);
+		if (!ret) {
+			if (!c)
+				add_client(clients, id, atoi(pid), name, root);
+			else
+				update_client(c, atoi(pid), name);
+		} else if (c) {
+			c->status = PROBE; /* Will be deleted below. */
+		}
+	}
+
+	closedir(d);
+
+	for_each_client(clients, c, tmp) {
+		if (c->status == PROBE)
+			free_client(c);
+		else if (c->status == FREE)
+			break;
+	}
+}
+
+static int client_last_cmp(const void *_a, const void *_b)
+{
+	const struct client *a = _a;
+	const struct client *b = _b;
+	long tot_a, tot_b;
+
+	/*
+	 * Sort clients in descending order of runtime in the previous sampling
+	 * period for active ones, followed by inactive. Tie-breaker is client
+	 * id.
+	 */
+
+	tot_a = a->status == ALIVE ? a->last_runtime : -1;
+	tot_b = b->status == ALIVE ? b->last_runtime : -1;
+
+	tot_b -= tot_a;
+	if (tot_b > 0)
+		return 1;
+	if (tot_b < 0)
+		return -1;
+
+	return (int)b->id - a->id;
+}
+
+static int client_total_cmp(const void *_a, const void *_b)
+{
+	const struct client *a = _a;
+	const struct client *b = _b;
+	long tot_a, tot_b;
+
+	tot_a = a->status == ALIVE ? a->total_runtime : -1;
+	tot_b = b->status == ALIVE ? b->total_runtime : -1;
+
+	tot_b -= tot_a;
+	if (tot_b > 0)
+		return 1;
+	if (tot_b < 0)
+		return -1;
+
+	return (int)b->id - a->id;
+}
+
+static int client_id_cmp(const void *_a, const void *_b)
+{
+	const struct client *a = _a;
+	const struct client *b = _b;
+	int id_a, id_b;
+
+	id_a = a->status == ALIVE ? a->id : -1;
+	id_b = b->status == ALIVE ? b->id : -1;
+
+	id_b -= id_a;
+	if (id_b > 0)
+		return 1;
+	if (id_b < 0)
+		return -1;
+
+	return (int)b->id - a->id;
+}
+
+static int (*client_cmp)(const void *, const void *) = client_last_cmp;
+
+static void sort_clients(struct clients *clients)
+{
+	unsigned int active, free;
+	struct client *c;
+	int tmp;
+
+	if (!clients)
+		return;
+
+	qsort(clients->client, clients->num_clients, sizeof(*clients->client),
+	      client_cmp);
+
+	/* Trim excessive array space. */
+	active = 0;
+	for_each_client(clients, c, tmp) {
+		if (c->status != ALIVE)
+			break; /* Active clients are first in the array. */
+		active++;
+	}
+
+	clients->active_clients = active;
+
+	free = clients->num_clients - active;
+	if (free > clients->num_clients / 2) {
+		active = clients->num_clients - free / 2;
+		if (active != clients->num_clients) {
+			clients->num_clients = active;
+			clients->client = realloc(clients->client,
+						  clients->num_clients *
+						  sizeof(*c));
+		}
+	}
+}
+
+
+static const char *bars[] = { " ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█" };
+
+static void n_spaces(const unsigned int n)
+{
+	unsigned int i;
+
+	for (i = 0; i < n; i++)
+		putchar(' ');
+}
+
+static void
+print_percentage_bar(double percent, int max_len, bool numeric)
+{
+	int bar_len, i, len = max_len - 2;
+	const int w = 8;
+
+	assert(max_len > 0);
+
+	bar_len = ceil(percent * len / 100.0);
+	if (bar_len > len)
+		bar_len = len;
+	bar_len *= w;
 
 	putchar('|');
 
-	for (i = bar_len; i >= 8; i -= 8)
-		printf("%s", bars[8]);
+	for (i = bar_len; i >= w; i -= w)
+		printf("%s", bars[w]);
 	if (i)
 		printf("%s", bars[i]);
 
-	for (i = 0; i < (max_len - 2 - (bar_len + 7) / 8); i++)
-		putchar(' ');
+	len -= (bar_len + (w - 1)) / w;
+	n_spaces(len);
 
 	putchar('|');
+
+	if (numeric) {
+		/*
+		 * TODO: Finer grained reverse control to better preserve
+		 * bar under numerical percentage.
+		 */
+		printf("\033[%uD\033[7m", max_len - 1);
+		i = printf("%3.f%%", percent);
+		printf("\033[%uC\033[0m", max_len - i - 1);
+	}
 }
 
 #define DEFAULT_PERIOD_MS (1000)
@@ -705,8 +1166,6 @@ static const char *json_indent[] = {
 	"\t\t\t\t\t",
 };
 
-#define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
-
 static unsigned int json_prev_struct_members;
 static unsigned int json_struct_members;
 
@@ -742,6 +1201,18 @@ json_close_struct(void)
 
 	if (json_indent_level == 0)
 		fflush(stdout);
+}
+
+static void
+__json_add_member(const char *key, const char *val)
+{
+	assert(json_indent_level < ARRAY_SIZE(json_indent));
+
+	fprintf(out, "%s%s\"%s\": \"%s\"",
+		json_struct_members ? ",\n" : "",
+		json_indent[json_indent_level], key, val);
+
+	json_struct_members++;
 }
 
 static unsigned int
@@ -1046,16 +1517,16 @@ print_header(const struct igt_device_card *card,
 		memmove(&groups[0], &groups[1],
 			sizeof(groups) - sizeof(groups[0]));
 
-	pops->open_struct(NULL);
-
 	*consumed = print_groups(groups);
 
 	if (output_mode == INTERACTIVE) {
 		printf("\033[H\033[J");
 
+		if (lines++ < con_h)
+			printf("intel-gpu-top: %s @ %s\n",
+			       codename, card->card);
 		if (lines++ < con_h) {
-			printf("intel-gpu-top: %s @ %s - ", codename, card->card);
-			printf("%s/%s MHz;  %s%% RC6; ",
+			printf("%s/%s MHz; %s%% RC6; ",
 			       freq_items[1].buf, freq_items[0].buf,
 			       rc6_items[0].buf);
 			if (engines->r_gpu.present) {
@@ -1065,9 +1536,6 @@ print_header(const struct igt_device_card *card,
 			}
 			printf("%s irqs/s\n", irq_items[0].buf);
 		}
-
-		if (lines++ < con_h)
-			printf("\n");
 	}
 
 	return lines;
@@ -1204,7 +1672,7 @@ print_engine(struct engines *engines, unsigned int i, double t,
 			      engine->display_name, engine_items[0].buf);
 
 		val = pmu_calc(&engine->busy.val, 1e9, t, 100);
-		print_percentage_bar(val, max_w - len);
+		print_percentage_bar(val, max_w > len ? max_w - len : 0, false);
 
 		printf("%s\n", buf);
 
@@ -1218,7 +1686,6 @@ static int
 print_engines_footer(struct engines *engines, double t,
 		     int lines, int con_w, int con_h)
 {
-	pops->close_struct();
 	pops->close_struct();
 
 	if (output_mode == INTERACTIVE) {
@@ -1242,6 +1709,9 @@ static void init_engine_classes(struct engines *engines)
 	struct engine_class *classes;
 	unsigned int i, num;
 	int max = -1;
+
+	if (engines->num_classes)
+		return;
 
 	for (i = 0; i < engines->num_engines; i++) {
 		struct engine *engine = engine_ptr(engines, i);
@@ -1404,6 +1874,153 @@ print_engines(struct engines *engines, double t, int lines, int w, int h)
 	return lines;
 }
 
+static int
+print_clients_header(struct clients *clients, int lines,
+		     int con_w, int con_h, int *class_w)
+{
+	if (output_mode == INTERACTIVE) {
+		const char *pidname = "   PID              NAME ";
+		unsigned int num_active = 0;
+		int len = strlen(pidname);
+
+		if (lines++ >= con_h)
+			return lines;
+
+		printf("\033[7m");
+		printf("%s", pidname);
+
+		if (lines++ >= con_h || len >= con_w)
+			return lines;
+
+		if (clients->num_classes) {
+			unsigned int i;
+			int width;
+
+			for (i = 0; i < clients->num_classes; i++) {
+				if (clients->class[i].num_engines)
+					num_active++;
+			}
+
+			*class_w = width = (con_w - len) / num_active;
+
+			for (i = 0; i < clients->num_classes; i++) {
+				const char *name = clients->class[i].name;
+				int name_len = strlen(name);
+				int pad = (width - name_len) / 2;
+				int spaces = width - pad - name_len;
+
+				if (!clients->class[i].num_engines)
+					continue; /* Assert in the ideal world. */
+
+				if (pad < 0 || spaces < 0)
+					continue;
+
+				n_spaces(pad);
+				printf("%s", name);
+				n_spaces(spaces);
+				len += pad + name_len + spaces;
+			}
+		}
+
+		n_spaces(con_w - len);
+		printf("\033[0m\n");
+	} else {
+		if (clients->num_classes)
+			pops->open_struct("clients");
+	}
+
+	return lines;
+}
+
+static bool numeric_clients;
+
+static int
+print_client(struct client *c, struct engines *engines, double t, int lines,
+	     int con_w, int con_h, unsigned int period_us, int *class_w)
+{
+	struct clients *clients = c->clients;
+	unsigned int i;
+
+	if (output_mode == INTERACTIVE) {
+		lines++;
+
+		printf("%6u %17s ", c->pid, c->print_name);
+
+		for (i = 0; c->samples > 1 && i < clients->num_classes; i++) {
+			double pct;
+
+			if (!clients->class[i].num_engines)
+				continue; /* Assert in the ideal world. */
+
+			pct = (double)c->val[i] / period_us / 1e3 * 100 /
+			      clients->class[i].num_engines;
+
+			/*
+			 * Guard against possible time-drift between sampling
+			 * client data and time we obtained our time-delta from
+			 * PMU.
+			 */
+			if (pct > 100.0)
+				pct = 100.0;
+
+			print_percentage_bar(pct, *class_w, numeric_clients);
+		}
+
+		putchar('\n');
+	} else if (output_mode == JSON) {
+		char buf[64];
+
+		snprintf(buf, sizeof(buf), "%u", c->id);
+		pops->open_struct(buf);
+
+		__json_add_member("name", c->print_name);
+
+		snprintf(buf, sizeof(buf), "%u", c->pid);
+		__json_add_member("pid", buf);
+
+		if (c->samples > 1) {
+			pops->open_struct("engine-classes");
+
+			for (i = 0; i < clients->num_classes; i++) {
+				double pct;
+
+				snprintf(buf, sizeof(buf), "%s",
+					clients->class[i].name);
+				pops->open_struct(buf);
+
+				pct = (double)c->val[i] / period_us / 1e3 * 100;
+				snprintf(buf, sizeof(buf), "%f", pct);
+				__json_add_member("busy", buf);
+
+				__json_add_member("unit", "%");
+
+				pops->close_struct();
+			}
+
+			pops->close_struct();
+		}
+
+		pops->close_struct();
+	}
+
+	return lines;
+}
+
+static int
+print_clients_footer(struct clients *clients, double t,
+		     int lines, int con_w, int con_h)
+{
+	if (output_mode == INTERACTIVE) {
+		if (lines++ < con_h)
+			printf("\n");
+	} else {
+		if (clients->num_classes)
+			pops->close_struct();
+	}
+
+	return lines;
+}
+
 static bool stop_top;
 
 static void sigint_handler(int  sig)
@@ -1459,6 +2076,22 @@ static void interactive_stdin(void)
 	assert(ret == 0);
 }
 
+static void select_client_sort(void)
+{
+	static unsigned int client_sort;
+
+	switch (++client_sort % 3) {
+	case 0:
+		client_cmp = client_last_cmp;
+		break;
+	case 1:
+		client_cmp = client_total_cmp;
+		break;
+	case 2:
+		client_cmp = client_id_cmp;
+	}
+}
+
 static void process_stdin(unsigned int timeout_us)
 {
 	struct pollfd p = { .fd = 0, .events = POLLIN };
@@ -1485,6 +2118,12 @@ static void process_stdin(unsigned int timeout_us)
 		case '1':
 			class_view ^= true;
 			break;
+		case 'n':
+			numeric_clients ^= true;
+			break;
+		case 's':
+			select_client_sort();
+			break;
 		};
 	}
 }
@@ -1492,6 +2131,7 @@ static void process_stdin(unsigned int timeout_us)
 int main(int argc, char **argv)
 {
 	unsigned int period_us = DEFAULT_PERIOD_MS * 1000;
+	struct clients *clients = NULL;
 	int con_w = -1, con_h = -1;
 	char *output_path = NULL;
 	struct engines *engines;
@@ -1625,13 +2265,20 @@ int main(int argc, char **argv)
 
 	ret = EXIT_SUCCESS;
 
+	clients = init_clients(card.pci_slot_name[0] ? card.card : NULL);
+	init_engine_classes(engines);
+	clients->num_classes = engines->num_classes;
+	clients->class = engines->class;
+
 	pmu_sample(engines);
+	scan_clients(clients);
 	codename = igt_device_get_pretty_name(&card, false);
 
 	while (!stop_top) {
 		bool consumed = false;
-		int lines = 0;
+		int j, lines = 0;
 		struct winsize ws;
+		struct client *c;
 		double t;
 
 		/* Update terminal size. */
@@ -1650,10 +2297,15 @@ int main(int argc, char **argv)
 		pmu_sample(engines);
 		t = (double)(engines->ts.cur - engines->ts.prev) / 1e9;
 
+		scan_clients(clients);
+		sort_clients(clients);
+
 		if (stop_top)
 			break;
 
 		while (!consumed) {
+			pops->open_struct(NULL);
+
 			lines = print_header(&card, codename, engines,
 					     t, lines, con_w, con_h,
 					     &consumed);
@@ -1661,6 +2313,33 @@ int main(int argc, char **argv)
 			lines = print_imc(engines, t, lines, con_w, con_h);
 
 			lines = print_engines(engines, t, lines, con_w, con_h);
+
+			if (clients) {
+				int class_w;
+
+				lines = print_clients_header(clients, lines,
+							     con_w, con_h,
+							     &class_w);
+
+				for_each_client(clients, c, j) {
+					assert(c->status != PROBE);
+					if (c->status != ALIVE)
+						break; /* Active clients are first in the array. */
+
+					if (lines >= con_h)
+						break;
+
+					lines = print_client(c, engines, t,
+							     lines, con_w,
+							     con_h, period_us,
+							     &class_w);
+				}
+
+				lines = print_clients_footer(clients, t, lines,
+							     con_w, con_h);
+			}
+
+			pops->close_struct();
 		}
 
 		if (stop_top)
