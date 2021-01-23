@@ -28,4 +28,4 @@ AM_CFLAGS = $(DEBUG_CFLAGS) $(DRM_CFLAGS) $(PCIACCESS_CFLAGS) $(CWARNFLAGS) \
 LDADD = $(top_builddir)/lib/libintel_tools.la
 AM_LDFLAGS = -Wl,--as-needed
 
-intel_gpu_top_LDADD = $(top_builddir)/lib/libigt_perf.la $(top_builddir)/lib/libigt_device_scan.la $(LIBUDEV_LIBS) $(GLIB_LIBS)
+intel_gpu_top_LDADD = $(top_builddir)/lib/libigt_perf.la $(top_builddir)/lib/libigt_device_scan.la $(LIBUDEV_LIBS) $(GLIB_LIBS) -lm
