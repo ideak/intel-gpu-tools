@@ -539,6 +539,13 @@ static size_t sizeof_param_engines(int count)
 	return offsetof(struct i915_context_param_engines, engines[count]);
 }
 
+static size_t sizeof_load_balance(int i)
+{
+	return offsetof(struct i915_context_engines_load_balance, engines[i]);
+}
+
+#define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
+
 uint32_t gem_context_create_for_class(int i915,
 				      unsigned int class,
 				      unsigned int *count)
@@ -564,16 +571,16 @@ uint32_t gem_context_create_for_class(int i915,
 		return 0;
 	}
 	if (i > 1) {
-		I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(balancer, i);
+		struct i915_context_engines_load_balance *balancer =
+			alloca0(sizeof_load_balance(i));
 
-		memset(&balancer, 0, sizeof(balancer));
-		balancer.base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
-		balancer.num_siblings = i;
-		memcpy(balancer.engines,
+		balancer->base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
+		balancer->num_siblings = i;
+		memcpy(balancer->engines,
 		       engines.engines,
 		       i * sizeof(*engines.engines));
 
-		engines.extensions = to_user_pointer(&balancer);
+		engines.extensions = to_user_pointer(balancer);
 		engines.engines[0].engine_class = I915_ENGINE_CLASS_INVALID;
 		engines.engines[0].engine_instance = I915_ENGINE_CLASS_INVALID_NONE;
 
