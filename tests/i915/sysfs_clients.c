@@ -485,7 +485,7 @@ split_child(int i915, int clients,
 
 	write(sv, &go, sizeof(go));
 	read(sv, &go, sizeof(go));
-	while (go) {
+	while (go != -1) {
 		struct timespec tv = {};
 
 		igt_spin_reset(spin);
@@ -503,7 +503,10 @@ split_child(int i915, int clients,
 }
 
 static void
-split(int i915, int clients, const struct intel_execution_engine2 *e, int f)
+__split(int i915, int clients, const struct intel_execution_engine2 *e, int f,
+	void (*fn)(int i915, int clients,
+		   const struct intel_execution_engine2 *e,
+		   int sv))
 {
 	struct client {
 		int64_t active[2];
@@ -511,7 +514,7 @@ split(int i915, int clients, const struct intel_execution_engine2 *e, int f)
 		int f;
 	} client[2];
 	uint64_t total;
-	int go = 1;
+	int go, stop;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(client); i++) {
@@ -522,24 +525,25 @@ split(int i915, int clients, const struct intel_execution_engine2 *e, int f)
 
 		igt_assert(socketpair(AF_UNIX, SOCK_DGRAM, 0, c->sv) == 0);
 		igt_fork(child, 1)
-			split_child(i915, clients, e, c->sv[1]);
+			fn(i915, clients, e, c->sv[1]);
 
 		read(c->sv[0], &go, sizeof(go));
 	}
-	igt_assert(go == 1);
 
 	i = 0;
+	go = 1;
+	stop = 0;
 	write(client[i].sv[0], &go, sizeof(go));
 	igt_until_timeout(2) {
 		measured_usleep(100 * client[i].f);
 		write(client[!i].sv[0], &go, sizeof(go));
-		write(client[i].sv[0], &go, sizeof(go));
+		write(client[i].sv[0], &stop, sizeof(stop));
 
 		i = !i;
 	}
-	write(client[i].sv[0], &go, sizeof(go));
+	write(client[i].sv[0], &stop, sizeof(stop));
 
-	go = 0;
+	go = -1;
 	total = 1;
 	for (i = 0; i < ARRAY_SIZE(client); i++) {
 		struct client *c = &client[i];
@@ -552,16 +556,23 @@ split(int i915, int clients, const struct intel_execution_engine2 *e, int f)
 	}
 
 	for (i = 0; i < ARRAY_SIZE(client); i++) {
-		struct client *c = &client[i];
+		const struct client *c = &client[i];
+		double t = 50 * (100 - c->f) / 100.;
 
 		igt_info("active[%d]: %'"PRIu64"ns (%'"PRIu64"ns), %.1f%%\n", i,
 			 c->active[0], c->active[1],
 			 c->active[0] * 100. / total);
-		assert_within_epsilon(c->active[0], c->f * total / 100., 20);
-		assert_within_epsilon(c->active[0], c->active[1], 10);
+		assert_within_epsilon(c->active[0], c->f * total / 100., t);
+		assert_within_epsilon(c->active[0], c->active[1], 25);
 	}
 
 	igt_waitchildren();
+}
+
+static void
+split(int i915, int clients, const struct intel_execution_engine2 *e, int f)
+{
+	__split(i915, clients, e, f, split_child);
 }
 
 static void
@@ -635,64 +646,7 @@ sema_child(int i915, int clients,
 static void
 sema(int i915, int clients, const struct intel_execution_engine2 *e, int f)
 {
-	struct client {
-		int64_t active[2];
-		int sv[2];
-		int f;
-	} client[2];
-	uint64_t total;
-	int go, stop;
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(client); i++) {
-		struct client *c = memset(&client[i], 0, sizeof(*c));
-
-		c->f = f;
-		f = 100 - f;
-
-		igt_assert(socketpair(AF_UNIX, SOCK_DGRAM, 0, c->sv) == 0);
-		igt_fork(child, 1)
-			sema_child(i915, clients, e, c->sv[1]);
-
-		read(c->sv[0], &go, sizeof(go));
-	}
-
-	i = 0;
-	go = 1;
-	stop = 0;
-	write(client[i].sv[0], &go, sizeof(go));
-	igt_until_timeout(2) {
-		measured_usleep(100 * client[i].f);
-		write(client[!i].sv[0], &go, sizeof(go));
-		write(client[i].sv[0], &stop, sizeof(stop));
-
-		i = !i;
-	}
-	write(client[i].sv[0], &stop, sizeof(stop));
-
-	go = -1;
-	total = 1;
-	for (i = 0; i < ARRAY_SIZE(client); i++) {
-		struct client *c = &client[i];
-
-		write(c->sv[0], &go, sizeof(go));
-		igt_assert_eq(read(c->sv[0], c->active, sizeof(c->active)),
-			      sizeof(c->active));
-
-		total += c->active[1];
-	}
-
-	for (i = 0; i < ARRAY_SIZE(client); i++) {
-		struct client *c = &client[i];
-
-		igt_info("active[%d]: %'"PRIu64"ns (%'"PRIu64"ns), %.1f%%\n", i,
-			 c->active[0], c->active[1],
-			 c->active[0] * 100. / total);
-		assert_within_epsilon(c->active[0], c->f * total / 100., 20);
-		assert_within_epsilon(c->active[0], c->active[1], 10);
-	}
-
-	igt_waitchildren();
+	__split(i915, clients, e, f, sema_child);
 }
 
 static int read_all(int clients, pid_t pid, int class, uint64_t *runtime)
@@ -925,6 +879,7 @@ igt_main
 		igt_require(clients != -1);
 
 		close(sys);
+		usleep(10);
 	}
 
 	igt_subtest("pidname")
