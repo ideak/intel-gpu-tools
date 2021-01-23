@@ -332,6 +332,7 @@ busy_one(int i915, int clients, const struct intel_execution_engine2 *e)
 	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
 	igt_spin_busywait_until_started(spin);
 
+	old = 0;
 	for (int pass = 0; pass <= 10; pass++) {
 		usleep(1500 >> pass);
 		delay = igt_nsec_elapsed(&tv);
