@@ -514,7 +514,7 @@ __split(int i915, int clients, const struct intel_execution_engine2 *e, int f,
 		int sv[2];
 		int f;
 	} client[2];
-	uint64_t total;
+	uint64_t total[2] = { 1, 1 }; /* 1ns offset to prevent div-by-zero */
 	int go, stop;
 	int i;
 
@@ -531,6 +531,7 @@ __split(int i915, int clients, const struct intel_execution_engine2 *e, int f,
 		read(c->sv[0], &go, sizeof(go));
 	}
 
+	/* Alternate between the clients, telling each to be active in turn */
 	i = 0;
 	go = 1;
 	stop = 0;
@@ -544,8 +545,8 @@ __split(int i915, int clients, const struct intel_execution_engine2 *e, int f,
 	}
 	write(client[i].sv[0], &stop, sizeof(stop));
 
+	/* Gather up the client runtimes */
 	go = -1;
-	total = 1;
 	for (i = 0; i < ARRAY_SIZE(client); i++) {
 		struct client *c = &client[i];
 
@@ -553,21 +554,43 @@ __split(int i915, int clients, const struct intel_execution_engine2 *e, int f,
 		igt_assert_eq(read(c->sv[0], c->active, sizeof(c->active)),
 			      sizeof(c->active));
 
-		total += c->active[1];
+		total[0] += c->active[0];
+		total[1] += c->active[1];
 	}
+	igt_waitchildren();
 
+	/* Print the results, before making any checks */
 	for (i = 0; i < ARRAY_SIZE(client); i++) {
 		const struct client *c = &client[i];
-		double t = 50 * (100 - c->f) / 100.;
 
-		igt_info("active[%d]: %'"PRIu64"ns (%'"PRIu64"ns), %.1f%%\n", i,
-			 c->active[0], c->active[1],
-			 c->active[0] * 100. / total);
-		assert_within_epsilon(c->active[0], c->f * total / 100., t);
-		assert_within_epsilon(c->active[0], c->active[1], 25);
+		igt_info("active[%02d]: %'"PRIu64"ns (%'"PRIu64"ns), %.1f%%\n",
+			 c->f, c->active[0], c->active[1],
+			 c->active[0] * 100. / total[0]);
 	}
 
-	igt_waitchildren();
+	/* Check that each client received their target runtime */
+	for (i = 0; i < ARRAY_SIZE(client); i++) {
+		const struct client *c = &client[i];
+		double t = 100 - c->f;
+
+		igt_debug("active[%02d]: target runtime %'"PRIu64"ns, %.1f%%\n",
+			 c->f, c->active[1],
+			 c->active[1] * 100. / total[1]);
+
+		assert_within_epsilon(c->active[1], c->f * total[1] / 100., t);
+	}
+
+	/* Validate each client reported their share of the total runtime */
+	for (i = 0; i < ARRAY_SIZE(client); i++) {
+		const struct client *c = &client[i];
+		double t = 100 - c->f;
+
+		igt_debug("active[%02d]: runtime %'"PRIu64"ns, %.1f%%\n",
+			 c->f, c->active[0],
+			 c->active[0] * 100. / total[0]);
+
+		assert_within_epsilon(c->active[0], c->f * total[0] / 100., t);
+	}
 }
 
 static void
