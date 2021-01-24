@@ -35,6 +35,8 @@ typedef struct {
 	struct igt_fb small_fb;
 	struct igt_fb big_fb;
 	igt_pipe_crc_t *pipe_crc;
+	uint32_t attemptmodewidth;
+	uint32_t attemptmodeheight;
 } data_t;
 
 const struct {
@@ -133,8 +135,7 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 {
 	igt_plane_t *primary;
 	igt_crc_t small_crc, big_crc;
-
-	drmModeModeInfo *mode;
+	drmModeModeInfoPtr modetoset = NULL;
 	struct drm_event_vblank ev;
 	int ret;
 
@@ -142,41 +143,24 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 
 	igt_debug("running on output %s pipe %s\n", output->name,
 		  kmstest_pipe_name(pipe));
+
 	if (data->big_fb.fb_id == 0) {
-		mode = igt_output_get_mode(output);
+		setup_fb(data, &data->small_fb,
+				data->attemptmodewidth,
+				data->attemptmodeheight,
+				flip_scenario_test[index].firstformat,
+				flip_scenario_test[index].firstmodifier);
 
-		// big fb will be 4k unless running on older than ICL
-		if (data->gen < 11) {
-			setup_fb(data, &data->small_fb,
-				 min(mode->hdisplay, 640),
-				 min(mode->vdisplay, 480),
-				 flip_scenario_test[index].firstformat,
-				 flip_scenario_test[index].firstmodifier);
+		setup_fb(data, &data->big_fb,
+				data->attemptmodewidth * 2,
+				data->attemptmodeheight * 2,
+				flip_scenario_test[index].secondformat,
+				flip_scenario_test[index].secondmodifier);
 
-			setup_fb(data, &data->big_fb,
-				 1280, 960,
-				 flip_scenario_test[index].secondformat,
-				 flip_scenario_test[index].secondmodifier);
-			igt_debug("small fb %dx%d\n", data->small_fb.width,
-			          data->small_fb.height);
-			igt_debug("big fb %dx%d\n", data->big_fb.width,
-			          data->big_fb.height);
-		} else {
-			setup_fb(data, &data->small_fb,
-				 min(mode->hdisplay, 1920),
-				 min(mode->vdisplay, 1080),
-				 flip_scenario_test[index].firstformat,
-				 flip_scenario_test[index].firstmodifier);
-
-			setup_fb(data, &data->big_fb,
-				 3840, 2160,
-				 flip_scenario_test[index].secondformat,
-				 flip_scenario_test[index].secondmodifier);
-			igt_debug("small fb %dx%d\n", data->small_fb.width,
-			          data->small_fb.height);
-			igt_debug("big fb %dx%d\n", data->big_fb.width,
-			          data->big_fb.height);
-		}
+		igt_debug("small fb %dx%d\n", data->small_fb.width,
+				data->small_fb.height);
+		igt_debug("big fb %dx%d\n", data->big_fb.width,
+				data->big_fb.height);
 	}
 
 	igt_output_set_pipe(output, pipe);
@@ -186,13 +170,26 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 				  NULL);
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe,
 					  INTEL_PIPE_CRC_SOURCE_AUTO);
-	igt_pipe_crc_start(data->pipe_crc);
+
+	for (int i = 0; i < output->config.connector->count_modes; i++) {
+		if (output->config.connector->modes[i].hdisplay == data->attemptmodewidth &&
+		   output->config.connector->modes[i].vdisplay == data->attemptmodeheight) {
+			modetoset = &output->config.connector->modes[i];
+			break;
+		   }
+	}
+
+	if (!modetoset)
+		igt_debug("%dp mode was not found from connector, will continue with default. This may cause cdclk to fail this test.\n",
+			  data->attemptmodeheight);
+	else
+		igt_output_override_mode(output, modetoset);
 
 	igt_plane_set_position(primary, 0, 0);
 	igt_plane_set_fb(primary, &data->small_fb);
+	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
-	igt_display_commit_atomic(&data->display,
-				  DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+	igt_pipe_crc_start(data->pipe_crc);
 	igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &small_crc);
 
 	igt_plane_set_fb(primary, &data->big_fb);
@@ -203,7 +200,7 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 					    DRM_MODE_PAGE_FLIP_EVENT, NULL);
 
 	igt_require_f(ret != -ERANGE,
-		      "Platform scaling limits exceeded, skipping.");
+		      "Platform scaling limits exceeded, skipping.\n");
 	igt_assert_eq(ret, 0);
 
 	igt_assert(read(data->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
@@ -230,6 +227,14 @@ igt_main
 		igt_require(data.display.is_atomic);
 		igt_require_pipe_crc(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
+
+		if (data.gen < 11) {
+			data.attemptmodewidth = 640;
+			data.attemptmodeheight = 480;
+		} else {
+			data.attemptmodewidth = 1920;
+			data.attemptmodeheight = 1080;
+		}
 	}
 
 	for (int index = 0; index < ARRAY_SIZE(flip_scenario_test); index++) {
