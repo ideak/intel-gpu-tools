@@ -434,6 +434,9 @@ static void busy_all(int i915, int clients)
 			    gem_context_clone_with_engines(i915, 0),
 			    .flags = IGT_SPIN_POLL_RUN);
 	__for_each_physical_engine(i915, e) {
+		if (!gem_class_can_store_dword(i915, e->class))
+			continue;
+
 		spin->execbuf.flags &= ~63;
 		spin->execbuf.flags |= e->flags;
 		gem_execbuf(i915, &spin->execbuf);
@@ -850,6 +853,8 @@ static void test_busy(int i915, int clients)
 
 	igt_subtest_with_dynamic("busy") {
 		__for_each_physical_engine(i915, e) {
+			if (!gem_class_can_store_dword(i915, e->class))
+				continue;
 			igt_dynamic_f("%s", e->name) {
 				gem_quiescent_gpu(i915);
 				igt_fork(child, 1)
